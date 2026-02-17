@@ -32,3 +32,7 @@ htmlcov/
 
 # Data
 data/
+
+# Notebook outputs and checkpoints
+notebooks/output/
+notebooks/.ipynb_checkpoints/

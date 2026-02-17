@@ -56,6 +56,9 @@
 - `bulk.py` — bulk download engine (monthly ZIP archives, retry, dedup, progress reporting)
 - `tests/` — pytest tests (mirrors source modules)
 - `data/` — created at runtime, .gitignored; CSV files stored as `data/<SYMBOL>/<interval>.csv`
+- `notebooks/` — Jupyter analysis notebooks:
+  - `threshold_analysis.ipynb` — single 50/50 split threshold evaluation (7 metrics, 3 criteria)
+  - `threshold_cv.ipynb` — time-series CV threshold evaluation (25 metrics = 6 bases × 4 windows + price_move, 5 criteria incl. forward fluctuation at 50% weight)
 
 ## Conventions
 
