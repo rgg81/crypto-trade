@@ -56,8 +56,9 @@ class Kline:
     def from_csv_row(cls, row: list[str]) -> "Kline":
         """Parse a kline from a CSV row (list of strings).
 
-        Used to read headerless CSVs from data.binance.vision ZIPs.
+        Used to read CSVs from data.binance.vision ZIPs.
         The row has the same 12 columns as the API response.
+        Callers must skip header rows (post-2021 ZIPs include one).
         """
         return cls(
             open_time=int(row[0]),

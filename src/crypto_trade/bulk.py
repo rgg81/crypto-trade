@@ -127,7 +127,7 @@ def download_and_extract(http: httpx.Client, url: str) -> list[Kline]:
                 text = io.TextIOWrapper(f, encoding="utf-8")
                 reader = csv.reader(text)
                 for row in reader:
-                    if len(row) >= 11:
+                    if len(row) >= 11 and row[0] != "open_time":
                         klines.append(Kline.from_csv_row(row))
 
     return klines
@@ -198,7 +198,7 @@ def bulk_fetch_symbol(
 
         try:
             klines = download_and_extract(http, archive.url)
-        except (httpx.HTTPStatusError, zipfile.BadZipFile) as exc:
+        except (httpx.HTTPStatusError, zipfile.BadZipFile, ValueError) as exc:
             if isinstance(exc, httpx.HTTPStatusError) and exc.response.status_code == 404:
                 continue
             if progress:

@@ -222,6 +222,77 @@ def test_bulk_fetch_symbol_skips_404(tmp_path, monkeypatch):
     assert count == 0
 
 
+def test_download_and_extract_with_header():
+    """CSVs with a header row (post-2021) should skip the header and parse data rows."""
+    header = [
+        "open_time", "open", "high", "low", "close", "volume",
+        "close_time", "quote_volume", "trades",
+        "taker_buy_volume", "taker_buy_quote_volume", "ignore",
+    ]
+    rows = [header, _make_csv_row(1000), _make_csv_row(2000)]
+    zip_data = _make_zip(rows, "BTCUSDT-1m-2022-01.csv")
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, content=zip_data)
+
+    transport = httpx.MockTransport(handler)
+    with httpx.Client(transport=transport) as http:
+        klines = download_and_extract(http, "https://example.com/test.zip")
+
+    assert len(klines) == 2
+    assert klines[0].open_time == 1000
+    assert klines[1].open_time == 2000
+
+
+def test_bulk_fetch_symbol_handles_bad_csv(tmp_path, monkeypatch):
+    """A corrupt CSV in one archive should be counted as an error, not abort the symbol."""
+    monkeypatch.setattr("crypto_trade.bulk.time.sleep", lambda _: None)
+
+    # First archive has a corrupt row that will raise ValueError
+    bad_rows = [["not_a_number", "x", "x", "x", "x", "x", "x", "x", "x", "x", "x", "x"]]
+    zip_bad = _make_zip(bad_rows, "BTCUSDT-1m-2024-01.csv")
+
+    rows_feb = [_make_csv_row(3000), _make_csv_row(4000)]
+    zip_feb = _make_zip(rows_feb, "BTCUSDT-1m-2024-02.csv")
+
+    listing_xml = """\
+<?xml version="1.0" encoding="UTF-8"?>
+<ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
+  <IsTruncated>false</IsTruncated>
+  <Contents>
+    <Key>data/futures/um/monthly/klines/BTCUSDT/1m/BTCUSDT-1m-2024-01.zip</Key>
+  </Contents>
+  <Contents>
+    <Key>data/futures/um/monthly/klines/BTCUSDT/1m/BTCUSDT-1m-2024-02.zip</Key>
+  </Contents>
+</ListBucketResult>
+"""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        url = str(request.url)
+        if "BTCUSDT-1m-2024-01.zip" in url:
+            return httpx.Response(200, content=zip_bad)
+        elif "BTCUSDT-1m-2024-02.zip" in url:
+            return httpx.Response(200, content=zip_feb)
+        else:
+            return httpx.Response(200, text=listing_xml)
+
+    transport = httpx.MockTransport(handler)
+    progress = None
+    with httpx.Client(transport=transport) as http:
+        from crypto_trade.bulk import BulkProgress
+
+        progress = BulkProgress()
+        count = bulk_fetch_symbol(
+            http, "https://data.binance.vision", tmp_path, "BTCUSDT", "1m",
+            progress=progress,
+        )
+
+    # Bad archive counted as error, good archive still processed
+    assert progress.errors == 1
+    assert count == 2
+
+
 def test_bulk_fetch_symbol_deduplicates(tmp_path, monkeypatch):
     """Doesn't write klines that already exist in the CSV."""
     monkeypatch.setattr("crypto_trade.bulk.time.sleep", lambda _: None)
