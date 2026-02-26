@@ -74,6 +74,52 @@ uv run crypto-trade symbols --source api
 uv run crypto-trade symbols --source vision
 ```
 
+### Backtest strategies
+
+Run trading strategies against historical kline data. Includes 8 built-in strategies and 2 composable filters derived from notebook analysis.
+
+```bash
+# List all available strategies
+uv run crypto-trade backtest --list
+
+# Run a strategy on a symbol
+uv run crypto-trade backtest --strategy momentum --symbols BTCUSDT --interval 5m
+
+# With the range_spike volatility filter from notebook findings
+uv run crypto-trade backtest --strategy rsi_bb --symbols BTCUSDT --interval 5m --range-spike-filter
+
+# Multiple symbols, date range, custom SL/TP
+uv run crypto-trade backtest --strategy mean_reversion --symbols BTCUSDT,ETHUSDT \
+    --interval 5m --start 2024-01-01 --end 2024-12-31 \
+    --stop-loss 2.0 --take-profit 3.0
+
+# Custom strategy parameters
+uv run crypto-trade backtest --strategy mean_reversion --symbols BTCUSDT \
+    --interval 5m --params lookback=30,multiplier=3.0
+
+# Stack both filters
+uv run crypto-trade backtest --strategy momentum --symbols BTCUSDT \
+    --interval 5m --range-spike-filter --volume-filter
+```
+
+**Strategies:** `momentum`, `mean_reversion`, `wick_rejection`, `inside_bar`, `gap_fill`, `consecutive_reversal`, `rsi_bb`, `bb_squeeze`
+
+**Filters:** `--range-spike-filter` (notebook-derived volatility trigger), `--volume-filter` (volume spike confirmation)
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--strategy` | Strategy name | required |
+| `--symbols` | Comma-separated symbols | from config |
+| `--interval` | Kline interval | `5m` |
+| `--start` | Start date (YYYY-MM-DD) | all data |
+| `--end` | End date (YYYY-MM-DD) | all data |
+| `--amount` | Max trade amount USD | `1000` |
+| `--stop-loss` | Stop loss % | `2.0` |
+| `--take-profit` | Take profit % | `3.0` |
+| `--timeout` | Timeout in minutes | `120` |
+| `--fee` | Round-trip fee % | `0.1` |
+| `--params` | Strategy params (`key=val,key=val`) | — |
+
 ## Configuration
 
 Settings are loaded from environment variables (see `.env.example`):
