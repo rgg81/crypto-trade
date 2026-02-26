@@ -113,6 +113,43 @@ def main() -> None:
         help="After bulk download, use API to fill current incomplete month",
     )
 
+    # --- backtest subcommand ---
+    bt_parser = subparsers.add_parser("backtest", help="Run strategy backtests")
+    bt_parser.add_argument(
+        "--strategy", type=str, default=None, help="Strategy name (e.g. momentum, rsi_bb)"
+    )
+    bt_parser.add_argument("--list", action="store_true", help="List available strategies")
+    bt_parser.add_argument(
+        "--symbols", type=str, default=None, help="Comma-separated symbols (default: from config)"
+    )
+    bt_parser.add_argument(
+        "--interval", type=str, default="5m", help="Kline interval (default: 5m)"
+    )
+    bt_parser.add_argument("--start", type=str, default=None, help="Start date YYYY-MM-DD")
+    bt_parser.add_argument("--end", type=str, default=None, help="End date YYYY-MM-DD")
+    bt_parser.add_argument(
+        "--amount", type=float, default=1000.0, help="Max trade amount USD (default: 1000)"
+    )
+    bt_parser.add_argument(
+        "--stop-loss", type=float, default=2.0, help="Stop loss %% (default: 2.0)"
+    )
+    bt_parser.add_argument(
+        "--take-profit", type=float, default=3.0, help="Take profit %% (default: 3.0)"
+    )
+    bt_parser.add_argument(
+        "--timeout", type=int, default=120, help="Timeout in minutes (default: 120)"
+    )
+    bt_parser.add_argument("--fee", type=float, default=0.1, help="Fee %% (default: 0.1)")
+    bt_parser.add_argument(
+        "--params", type=str, default=None, help="Strategy params as key=val,key=val"
+    )
+    bt_parser.add_argument(
+        "--range-spike-filter", action="store_true", help="Wrap strategy with range spike filter"
+    )
+    bt_parser.add_argument(
+        "--volume-filter", action="store_true", help="Wrap strategy with volume filter"
+    )
+
     args = parser.parse_args()
 
     if args.command is None:
@@ -126,6 +163,8 @@ def main() -> None:
         _cmd_symbols(args, settings)
     elif args.command == "bulk":
         _cmd_bulk(args, settings)
+    elif args.command == "backtest":
+        _cmd_backtest(args, settings)
 
 
 def _cmd_fetch(args, settings) -> None:
@@ -234,6 +273,100 @@ def _cmd_bulk(args, settings) -> None:
                     print(f"  {symbol}/{interval}: {count} klines backfilled")
                     backfill_total += count
         print(f"API backfill complete — {backfill_total:,} klines")
+
+
+def _cmd_backtest(args, settings) -> None:
+    from decimal import Decimal
+    from pathlib import Path
+
+    from crypto_trade.backtest import run_backtest
+    from crypto_trade.backtest_models import BacktestConfig
+    from crypto_trade.backtest_report import summarize
+    from crypto_trade.strategies import get_strategy, list_strategies
+    from crypto_trade.strategies.filters.range_spike_filter import RangeSpikeFilter
+    from crypto_trade.strategies.filters.volume_filter import VolumeFilter
+
+    if args.list:
+        print("Available strategies:")
+        for name in list_strategies():
+            print(f"  {name}")
+        return
+
+    if not args.strategy:
+        print("Error: --strategy required (or use --list)", file=sys.stderr)
+        sys.exit(1)
+
+    # Parse strategy params
+    params: dict[str, str] | None = None
+    if args.params:
+        params = {}
+        for pair in args.params.split(","):
+            k, _, v = pair.partition("=")
+            params[k.strip()] = v.strip()
+
+    strategy = get_strategy(args.strategy, params)
+
+    # Wrap with filters
+    if args.range_spike_filter:
+        strategy = RangeSpikeFilter(inner=strategy)
+    if args.volume_filter:
+        strategy = VolumeFilter(inner=strategy)
+
+    symbols = (
+        tuple(s.strip() for s in args.symbols.split(",")) if args.symbols else settings.symbols
+    )
+    start_time = _parse_date(args.start) if args.start else None
+    end_time = _parse_date(args.end) if args.end else None
+
+    config = BacktestConfig(
+        symbols=symbols,
+        interval=args.interval,
+        max_amount_usd=Decimal(str(args.amount)),
+        stop_loss_pct=Decimal(str(args.stop_loss)),
+        take_profit_pct=Decimal(str(args.take_profit)),
+        timeout_minutes=args.timeout,
+        fee_pct=Decimal(str(args.fee)),
+        data_dir=Path(settings.data_dir),
+        start_time=start_time,
+        end_time=end_time,
+    )
+
+    filters_desc = []
+    if args.range_spike_filter:
+        filters_desc.append("range_spike")
+    if args.volume_filter:
+        filters_desc.append("volume")
+    filters_str = f" + filters=[{', '.join(filters_desc)}]" if filters_desc else ""
+
+    print(f"Backtesting {args.strategy}{filters_str}")
+    print(f"  Symbols: {', '.join(symbols)}")
+    print(f"  Interval: {args.interval}")
+    print(f"  SL={args.stop_loss}% TP={args.take_profit}% Timeout={args.timeout}m Fee={args.fee}%")
+    if start_time:
+        print(f"  Start: {args.start}")
+    if end_time:
+        print(f"  End: {args.end}")
+
+    results = run_backtest(config, strategy)
+    summary = summarize(results)
+
+    if summary is None:
+        print("\nNo trades generated.")
+        return
+
+    print(f"\n{'=' * 50}")
+    print(f"  Total trades:    {summary.total_trades}")
+    print(f"  Wins:            {summary.wins}")
+    print(f"  Losses:          {summary.losses}")
+    print(f"  Win rate:        {summary.win_rate_pct:.1f}%")
+    print(f"  Avg PnL:         {summary.avg_pnl_pct:.4f}%")
+    print(f"  Total net PnL:   {summary.total_net_pnl_pct:.4f}%")
+    print(f"  Max drawdown:    {summary.max_drawdown_pct:.4f}%")
+    print(f"  Profit factor:   {summary.profit_factor:.4f}")
+    print(f"  Best trade:      {summary.best_trade_pct:.4f}%")
+    print(f"  Worst trade:     {summary.worst_trade_pct:.4f}%")
+    print(f"  Exit reasons:    {summary.exit_reasons}")
+    print(f"{'=' * 50}")
 
 
 if __name__ == "__main__":
