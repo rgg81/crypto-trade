@@ -28,6 +28,8 @@ class BacktestConfig:
     timeout_minutes: int
     fee_pct: Decimal = Decimal("0.1")
     data_dir: Path = Path("data")
+    start_time: int | None = None  # epoch ms, default=first row
+    end_time: int | None = None  # epoch ms, default=last row
 
 
 @dataclass(frozen=True)

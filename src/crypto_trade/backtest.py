@@ -30,6 +30,11 @@ def run_backtest(config: BacktestConfig, strategy: Strategy) -> list[TradeResult
     range_start = max(klines[0].open_time for klines in symbol_klines.values())
     range_end = min(klines[-1].open_time for klines in symbol_klines.values())
 
+    if config.start_time is not None:
+        range_start = max(range_start, config.start_time)
+    if config.end_time is not None:
+        range_end = min(range_end, config.end_time)
+
     aligned: dict[str, list[Kline]] = {}
     for symbol, klines in symbol_klines.items():
         aligned[symbol] = [k for k in klines if range_start <= k.open_time <= range_end]

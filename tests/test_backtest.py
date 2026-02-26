@@ -1515,3 +1515,145 @@ class TestOrderCreationVerification:
         assert r.exit_reason == "take_profit"
         assert r.direction == -1
         assert r.weight_factor == Decimal("1")
+
+
+# ---------------------------------------------------------------------------
+# 17. Start/End Time Filtering
+# ---------------------------------------------------------------------------
+
+
+class TestStartEndTime:
+    """start_time / end_time fields on BacktestConfig."""
+
+    def _klines(self) -> list[Kline]:
+        """5 hourly klines starting at BASE_T."""
+        return [
+            _make_kline(BASE_T + i * H, "100", "101", "99", "100")
+            for i in range(5)
+        ]
+
+    def test_start_time_only(self, tmp_path: Path) -> None:
+        """start_time skips early klines."""
+        klines = self._klines()
+        _write_symbol_data(tmp_path, "TEST", klines)
+        config = BacktestConfig(
+            symbols=("TEST",),
+            interval="1h",
+            max_amount_usd=Decimal("1000"),
+            stop_loss_pct=Decimal("2.0"),
+            take_profit_pct=Decimal("3.0"),
+            timeout_minutes=180,
+            data_dir=tmp_path,
+            start_time=BASE_T + 2 * H,
+        )
+        results = run_backtest(config, AlwaysBuyStrategy())
+
+        # All trades should have open_time >= start_time
+        for r in results:
+            assert r.open_time >= BASE_T + 2 * H
+
+    def test_end_time_only(self, tmp_path: Path) -> None:
+        """end_time skips late klines."""
+        klines = self._klines()
+        _write_symbol_data(tmp_path, "TEST", klines)
+        config = BacktestConfig(
+            symbols=("TEST",),
+            interval="1h",
+            max_amount_usd=Decimal("1000"),
+            stop_loss_pct=Decimal("2.0"),
+            take_profit_pct=Decimal("3.0"),
+            timeout_minutes=180,
+            data_dir=tmp_path,
+            end_time=BASE_T + 2 * H,
+        )
+        results = run_backtest(config, AlwaysBuyStrategy())
+
+        # All trade entries should come from klines within the range
+        for r in results:
+            assert r.open_time <= BASE_T + 2 * H + H  # close_time of last included kline
+
+    def test_both_start_and_end_time(self, tmp_path: Path) -> None:
+        """Both start_time and end_time restrict to a window."""
+        klines = self._klines()
+        _write_symbol_data(tmp_path, "TEST", klines)
+        config = BacktestConfig(
+            symbols=("TEST",),
+            interval="1h",
+            max_amount_usd=Decimal("1000"),
+            stop_loss_pct=Decimal("2.0"),
+            take_profit_pct=Decimal("3.0"),
+            timeout_minutes=180,
+            data_dir=tmp_path,
+            start_time=BASE_T + 1 * H,
+            end_time=BASE_T + 3 * H,
+        )
+        strat = HistoryTrackingStrategy()
+        run_backtest(config, strat)
+
+        # 3 klines in window: indices 1, 2, 3
+        assert strat.lengths == [1, 2, 3]
+
+    def test_start_time_after_all_data(self, tmp_path: Path) -> None:
+        """start_time beyond last kline -> empty results."""
+        klines = self._klines()
+        _write_symbol_data(tmp_path, "TEST", klines)
+        config = BacktestConfig(
+            symbols=("TEST",),
+            interval="1h",
+            max_amount_usd=Decimal("1000"),
+            stop_loss_pct=Decimal("2.0"),
+            take_profit_pct=Decimal("3.0"),
+            timeout_minutes=180,
+            data_dir=tmp_path,
+            start_time=BASE_T + 100 * H,
+        )
+        results = run_backtest(config, AlwaysBuyStrategy())
+
+        assert results == []
+
+    def test_end_time_before_all_data(self, tmp_path: Path) -> None:
+        """end_time before first kline -> empty results."""
+        klines = self._klines()
+        _write_symbol_data(tmp_path, "TEST", klines)
+        config = BacktestConfig(
+            symbols=("TEST",),
+            interval="1h",
+            max_amount_usd=Decimal("1000"),
+            stop_loss_pct=Decimal("2.0"),
+            take_profit_pct=Decimal("3.0"),
+            timeout_minutes=180,
+            data_dir=tmp_path,
+            end_time=BASE_T - H,
+        )
+        results = run_backtest(config, AlwaysBuyStrategy())
+
+        assert results == []
+
+    def test_start_after_end_returns_empty(self, tmp_path: Path) -> None:
+        """start_time > end_time -> empty results."""
+        klines = self._klines()
+        _write_symbol_data(tmp_path, "TEST", klines)
+        config = BacktestConfig(
+            symbols=("TEST",),
+            interval="1h",
+            max_amount_usd=Decimal("1000"),
+            stop_loss_pct=Decimal("2.0"),
+            take_profit_pct=Decimal("3.0"),
+            timeout_minutes=180,
+            data_dir=tmp_path,
+            start_time=BASE_T + 3 * H,
+            end_time=BASE_T + 1 * H,
+        )
+        results = run_backtest(config, AlwaysBuyStrategy())
+
+        assert results == []
+
+    def test_default_none_uses_full_range(self, tmp_path: Path) -> None:
+        """Both None (default) -> all klines used."""
+        klines = self._klines()
+        _write_symbol_data(tmp_path, "TEST", klines)
+        config = _default_config(tmp_path)
+        strat = HistoryTrackingStrategy()
+        run_backtest(config, strat)
+
+        assert strat.lengths == [1, 2, 3, 4, 5]
