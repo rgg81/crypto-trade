@@ -225,9 +225,18 @@ def test_bulk_fetch_symbol_skips_404(tmp_path, monkeypatch):
 def test_download_and_extract_with_header():
     """CSVs with a header row (post-2021) should skip the header and parse data rows."""
     header = [
-        "open_time", "open", "high", "low", "close", "volume",
-        "close_time", "quote_volume", "trades",
-        "taker_buy_volume", "taker_buy_quote_volume", "ignore",
+        "open_time",
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume",
+        "close_time",
+        "quote_volume",
+        "trades",
+        "taker_buy_volume",
+        "taker_buy_quote_volume",
+        "ignore",
     ]
     rows = [header, _make_csv_row(1000), _make_csv_row(2000)]
     zip_data = _make_zip(rows, "BTCUSDT-1m-2022-01.csv")
@@ -284,7 +293,11 @@ def test_bulk_fetch_symbol_handles_bad_csv(tmp_path, monkeypatch):
 
         progress = BulkProgress()
         count = bulk_fetch_symbol(
-            http, "https://data.binance.vision", tmp_path, "BTCUSDT", "1m",
+            http,
+            "https://data.binance.vision",
+            tmp_path,
+            "BTCUSDT",
+            "1m",
             progress=progress,
         )
 

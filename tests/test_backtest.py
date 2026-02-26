@@ -1527,10 +1527,7 @@ class TestStartEndTime:
 
     def _klines(self) -> list[Kline]:
         """5 hourly klines starting at BASE_T."""
-        return [
-            _make_kline(BASE_T + i * H, "100", "101", "99", "100")
-            for i in range(5)
-        ]
+        return [_make_kline(BASE_T + i * H, "100", "101", "99", "100") for i in range(5)]
 
     def test_start_time_only(self, tmp_path: Path) -> None:
         """start_time skips early klines."""
