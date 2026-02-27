@@ -76,6 +76,9 @@ from crypto_trade.strategies.filters.range_spike_filter import RangeSpikeFilter 
 from crypto_trade.strategies.filters.volume_filter import VolumeFilter  # noqa: E402
 from crypto_trade.strategies.indicator.bb_squeeze import BbSqueezeStrategy  # noqa: E402
 from crypto_trade.strategies.indicator.rsi_bb import RsiBbStrategy  # noqa: E402
+from crypto_trade.strategies.price_action.consecutive_continuation import (  # noqa: E402
+    ConsecutiveContinuationStrategy,
+)
 from crypto_trade.strategies.price_action.consecutive_reversal import (  # noqa: E402
     ConsecutiveReversalStrategy,
 )
@@ -94,6 +97,7 @@ _register("mean_reversion", MeanReversionStrategy)
 _register("wick_rejection", WickRejectionStrategy)
 _register("inside_bar", InsideBarStrategy)
 _register("gap_fill", GapFillStrategy)
+_register("consecutive_continuation", ConsecutiveContinuationStrategy)
 _register("consecutive_reversal", ConsecutiveReversalStrategy)
 _register("rsi_bb", RsiBbStrategy)
 _register("bb_squeeze", BbSqueezeStrategy)
@@ -104,6 +108,7 @@ __all__ = [
     "NO_SIGNAL",
     "STRATEGY_REGISTRY",
     "BbSqueezeStrategy",
+    "ConsecutiveContinuationStrategy",
     "ConsecutiveReversalStrategy",
     "GapFillStrategy",
     "InsideBarStrategy",
