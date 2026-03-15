@@ -10,6 +10,8 @@ from crypto_trade.config import load_settings
 from crypto_trade.discovery import (
     discover_from_data_vision,
     discover_from_exchange_info,
+    is_perpetual_symbol,
+    is_stablecoin_pair,
     merge_symbols,
 )
 from crypto_trade.fetcher import fetch_all, fetch_symbol_interval
@@ -113,12 +115,64 @@ def main() -> None:
         help="After bulk download, use API to fill current incomplete month",
     )
 
+    # --- features subcommand ---
+    feat_parser = subparsers.add_parser("features", help="Generate feature CSVs for ML pipeline")
+    feat_parser.add_argument("--list", action="store_true", help="List available feature groups")
+    feat_parser.add_argument(
+        "--all",
+        action="store_true",
+        dest="all_symbols",
+        help="Run against all symbols with data for the given interval",
+    )
+    feat_parser.add_argument(
+        "--symbols", type=str, default=None, help="Comma-separated symbols (default: from config)"
+    )
+    feat_parser.add_argument(
+        "--interval", type=str, default="5m", help="Kline interval (default: 5m)"
+    )
+    feat_parser.add_argument(
+        "--groups", type=str, default="all", help="Comma-separated groups or 'all' (default: all)"
+    )
+    feat_parser.add_argument("--start", type=str, default=None, help="Start date YYYY-MM-DD")
+    feat_parser.add_argument("--end", type=str, default=None, help="End date YYYY-MM-DD")
+    feat_parser.add_argument(
+        "--output", type=str, default=None, help="Output directory (default: data/features/)"
+    )
+    feat_parser.add_argument("--workers", type=int, default=1, help="Parallel workers (default: 1)")
+    feat_parser.add_argument(
+        "--format",
+        choices=["csv", "parquet"],
+        default="csv",
+        help="Output format (default: csv)",
+    )
+
+    # --- convert-features subcommand ---
+    conv_parser = subparsers.add_parser(
+        "convert-features", help="Convert feature CSVs to Parquet (and optionally delete CSVs)"
+    )
+    conv_parser.add_argument(
+        "--interval", type=str, default="5m", help="Kline interval (default: 5m)"
+    )
+    conv_parser.add_argument("--workers", type=int, default=4, help="Parallel workers (default: 4)")
+    conv_parser.add_argument(
+        "--keep-csv", action="store_true", help="Keep CSV files after conversion"
+    )
+    conv_parser.add_argument(
+        "--output", type=str, default=None, help="Features directory (default: data/features/)"
+    )
+
     # --- backtest subcommand ---
     bt_parser = subparsers.add_parser("backtest", help="Run strategy backtests")
     bt_parser.add_argument(
         "--strategy", type=str, default=None, help="Strategy name (e.g. momentum, rsi_bb)"
     )
     bt_parser.add_argument("--list", action="store_true", help="List available strategies")
+    bt_parser.add_argument(
+        "--all",
+        action="store_true",
+        dest="all_symbols",
+        help="Run against all symbols with data for the given interval",
+    )
     bt_parser.add_argument(
         "--symbols", type=str, default=None, help="Comma-separated symbols (default: from config)"
     )
@@ -143,11 +197,20 @@ def main() -> None:
     bt_parser.add_argument(
         "--params", type=str, default=None, help="Strategy params as key=val,key=val"
     )
-    bt_parser.add_argument(
+    spike_group = bt_parser.add_mutually_exclusive_group()
+    spike_group.add_argument(
         "--range-spike-filter", action="store_true", help="Wrap strategy with range spike filter"
+    )
+    spike_group.add_argument(
+        "--adaptive-range-spike-filter",
+        action="store_true",
+        help="Wrap strategy with adaptive (auto-recalibrating) range spike filter",
     )
     bt_parser.add_argument(
         "--volume-filter", action="store_true", help="Wrap strategy with volume filter"
+    )
+    bt_parser.add_argument(
+        "--profile-memory", action="store_true", help="Print tracemalloc memory usage at key stages"
     )
 
     args = parser.parse_args()
@@ -165,13 +228,17 @@ def main() -> None:
         _cmd_bulk(args, settings)
     elif args.command == "backtest":
         _cmd_backtest(args, settings)
+    elif args.command == "features":
+        _cmd_features(args, settings)
+    elif args.command == "convert-features":
+        _cmd_convert_features(args, settings)
 
 
 def _cmd_fetch(args, settings) -> None:
     if getattr(args, "all", False):
         with httpx.Client() as http:
             api_symbols = discover_from_exchange_info(settings.base_url, http)
-        symbols = tuple(s.symbol for s in api_symbols)
+        symbols = tuple(s.symbol for s in api_symbols if not is_stablecoin_pair(s.symbol))
         print(f"Discovered {len(symbols)} active perpetual symbols")
     else:
         symbols = (
@@ -237,8 +304,12 @@ def _cmd_bulk(args, settings) -> None:
     with httpx.Client(timeout=60.0) as http:
         if args.all_symbols:
             print("Discovering symbols from data.binance.vision...")
-            symbols = discover_from_data_vision(http)
-            print(f"Found {len(symbols)} symbols")
+            symbols = [
+                s
+                for s in discover_from_data_vision(http)
+                if is_perpetual_symbol(s) and not is_stablecoin_pair(s)
+            ]
+            print(f"Found {len(symbols)} perpetual symbols")
         else:
             symbols = [s.strip() for s in args.symbols.split(",")]
 
@@ -276,13 +347,15 @@ def _cmd_bulk(args, settings) -> None:
 
 
 def _cmd_backtest(args, settings) -> None:
-    from decimal import Decimal
     from pathlib import Path
 
     from crypto_trade.backtest import run_backtest
     from crypto_trade.backtest_models import BacktestConfig
-    from crypto_trade.backtest_report import summarize
+    from crypto_trade.backtest_report import aggregate_monthly_trades, summarize
     from crypto_trade.strategies import get_strategy, list_strategies
+    from crypto_trade.strategies.filters.adaptive_range_spike_filter import (
+        AdaptiveRangeSpikeFilter,
+    )
     from crypto_trade.strategies.filters.range_spike_filter import RangeSpikeFilter
     from crypto_trade.strategies.filters.volume_filter import VolumeFilter
 
@@ -307,25 +380,41 @@ def _cmd_backtest(args, settings) -> None:
     strategy = get_strategy(args.strategy, params)
 
     # Wrap with filters
+    adaptive_filter = None
     if args.range_spike_filter:
         strategy = RangeSpikeFilter(inner=strategy)
+    elif args.adaptive_range_spike_filter:
+        adaptive_filter = AdaptiveRangeSpikeFilter(inner=strategy)
+        strategy = adaptive_filter
     if args.volume_filter:
         strategy = VolumeFilter(inner=strategy)
 
-    symbols = (
-        tuple(s.strip() for s in args.symbols.split(",")) if args.symbols else settings.symbols
-    )
+    if getattr(args, "all_symbols", False):
+        csv_pattern = f"*/{args.interval}.csv"
+        found = sorted(Path(settings.data_dir).glob(csv_pattern))
+        symbols = tuple(
+            p.parent.name
+            for p in found
+            if is_perpetual_symbol(p.parent.name) and not is_stablecoin_pair(p.parent.name)
+        )
+        if not symbols:
+            print(f"Error: no data files matching {csv_pattern}", file=sys.stderr)
+            sys.exit(1)
+    else:
+        symbols = (
+            tuple(s.strip() for s in args.symbols.split(",")) if args.symbols else settings.symbols
+        )
     start_time = _parse_date(args.start) if args.start else None
     end_time = _parse_date(args.end) if args.end else None
 
     config = BacktestConfig(
         symbols=symbols,
         interval=args.interval,
-        max_amount_usd=Decimal(str(args.amount)),
-        stop_loss_pct=Decimal(str(args.stop_loss)),
-        take_profit_pct=Decimal(str(args.take_profit)),
+        max_amount_usd=float(args.amount),
+        stop_loss_pct=float(args.stop_loss),
+        take_profit_pct=float(args.take_profit),
         timeout_minutes=args.timeout,
-        fee_pct=Decimal(str(args.fee)),
+        fee_pct=float(args.fee),
         data_dir=Path(settings.data_dir),
         start_time=start_time,
         end_time=end_time,
@@ -334,6 +423,8 @@ def _cmd_backtest(args, settings) -> None:
     filters_desc = []
     if args.range_spike_filter:
         filters_desc.append("range_spike")
+    elif args.adaptive_range_spike_filter:
+        filters_desc.append("adaptive_range_spike")
     if args.volume_filter:
         filters_desc.append("volume")
     filters_str = f" + filters=[{', '.join(filters_desc)}]" if filters_desc else ""
@@ -347,7 +438,7 @@ def _cmd_backtest(args, settings) -> None:
     if end_time:
         print(f"  End: {args.end}")
 
-    results = run_backtest(config, strategy)
+    results = run_backtest(config, strategy, profile_memory=args.profile_memory)
     summary = summarize(results)
 
     if summary is None:
@@ -355,6 +446,7 @@ def _cmd_backtest(args, settings) -> None:
         return
 
     print(f"\n{'=' * 50}")
+    print(f"  Total signals:   {results.total_signals}")
     print(f"  Total trades:    {summary.total_trades}")
     print(f"  Wins:            {summary.wins}")
     print(f"  Losses:          {summary.losses}")
@@ -365,8 +457,129 @@ def _cmd_backtest(args, settings) -> None:
     print(f"  Profit factor:   {summary.profit_factor:.4f}")
     print(f"  Best trade:      {summary.best_trade_pct:.4f}%")
     print(f"  Worst trade:     {summary.worst_trade_pct:.4f}%")
+    print(f"  Trades/month:    {summary.trades_per_month:.1f}")
     print(f"  Exit reasons:    {summary.exit_reasons}")
     print(f"{'=' * 50}")
+
+    # Monthly breakdown
+    monthly = aggregate_monthly_trades(results)
+    if monthly:
+        print("\n  Trades per month:")
+        for month, count in monthly.items():
+            print(f"    {month}: {count}")
+
+    # Calibration log
+    if adaptive_filter and adaptive_filter._calibration_log:
+        print("\n  Calibration log:")
+        print(f"    {'Date':>19s}  {'Threshold':>10s}  {'Signals/mo':>10s}  {'Error':>8s}")
+        for cal in adaptive_filter._calibration_log:
+            dt = datetime.fromtimestamp(cal.calibrated_at / 1000, tz=UTC)
+            print(
+                f"    {dt:%Y-%m-%d %H:%M}  {cal.threshold:>10.4f}  {cal.signals_per_month:>10.0f}  "
+            )
+
+
+def _cmd_features(args, settings) -> None:
+    from pathlib import Path
+
+    from crypto_trade.features import list_groups, run_features
+
+    if args.list:
+        print("Available feature groups:")
+        for name in list_groups():
+            print(f"  {name}")
+        return
+
+    if getattr(args, "all_symbols", False):
+        csv_pattern = f"*/{args.interval}.csv"
+        found = sorted(Path(settings.data_dir).glob(csv_pattern))
+        symbols = [
+            p.parent.name
+            for p in found
+            if is_perpetual_symbol(p.parent.name) and not is_stablecoin_pair(p.parent.name)
+        ]
+        if not symbols:
+            print(f"Error: no data files matching {csv_pattern}", file=sys.stderr)
+            sys.exit(1)
+    else:
+        symbols = (
+            [s.strip() for s in args.symbols.split(",")]
+            if args.symbols
+            else list(settings.symbols)
+        )
+    groups_arg = args.groups.strip()
+    if groups_arg == "all":
+        groups = list_groups()
+    else:
+        groups = [g.strip() for g in groups_arg.split(",")]
+        available = set(list_groups())
+        unknown = [g for g in groups if g not in available]
+        if unknown:
+            print(f"Error: unknown groups: {unknown}. Available: {list_groups()}", file=sys.stderr)
+            sys.exit(1)
+
+    start_ms = _parse_date(args.start) if args.start else None
+    end_ms = _parse_date(args.end) if args.end else None
+    output_dir = args.output or str(Path(settings.data_dir) / "features")
+
+    print(f"Generating features: {', '.join(groups)}")
+    print(f"  Symbols: {', '.join(symbols)} | Interval: {args.interval} | Workers: {args.workers}")
+
+    output_format = getattr(args, "format", "csv")
+    results = run_features(
+        symbols=symbols,
+        interval=args.interval,
+        data_dir=settings.data_dir,
+        groups=groups,
+        start_ms=start_ms,
+        end_ms=end_ms,
+        output_dir=output_dir,
+        workers=args.workers,
+        output_format=output_format,
+    )
+
+    ext = ".parquet" if output_format == "parquet" else ".csv"
+    for symbol, n_rows, n_features in results:
+        if n_rows > 0:
+            print(
+                f"  {symbol}: {n_rows:,} rows, {n_features} features "
+                f"-> {output_dir}/{symbol}_{args.interval}_features{ext}"
+            )
+        else:
+            print(f"  {symbol}: no data")
+
+    total = sum(1 for _, n, _ in results if n > 0)
+    print(f"Done — {total} symbols processed.")
+
+
+def _cmd_convert_features(args, settings) -> None:
+    from pathlib import Path
+
+    from crypto_trade.feature_store import convert_all_features
+
+    features_dir = args.output or str(Path(settings.data_dir) / "features")
+    delete_csv = not args.keep_csv
+
+    print(f"Converting feature CSVs to Parquet in {features_dir}")
+    print(f"  Interval: {args.interval} | Workers: {args.workers} | Delete CSV: {delete_csv}")
+
+    results = convert_all_features(
+        features_dir=features_dir,
+        interval=args.interval,
+        workers=args.workers,
+        delete_csv=delete_csv,
+    )
+
+    if not results:
+        print("No files to convert (all up-to-date or none found).")
+        return
+
+    total_rows = 0
+    for filename, n_rows in results:
+        print(f"  {filename}: {n_rows:,} rows")
+        total_rows += n_rows
+
+    print(f"Done — {len(results)} files converted, {total_rows:,} total rows.")
 
 
 if __name__ == "__main__":

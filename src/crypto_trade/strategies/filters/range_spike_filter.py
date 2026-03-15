@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-from decimal import Decimal
+import pandas as pd
 
 from crypto_trade.backtest_models import Signal, Strategy
-from crypto_trade.models import Kline
 from crypto_trade.strategies import NO_SIGNAL
 
 
@@ -19,35 +18,32 @@ class RangeSpikeFilter:
         self,
         inner: Strategy | None = None,
         window: int = 48,
-        threshold: Decimal = Decimal("5.85"),
+        threshold: float = 5.85,
     ) -> None:
         self.inner = inner
         self.window = window
         self.threshold = threshold
 
-    def on_kline(self, symbol: str, kline: Kline, history: list[Kline]) -> Signal:
-        if len(history) < self.window:
-            return NO_SIGNAL
-
-        ratios: list[Decimal] = []
-        for k in history[-self.window :]:
-            o = Decimal(k.open)
-            if o == 0:
-                return NO_SIGNAL
-            ratios.append((Decimal(k.high) - Decimal(k.low)) / o)
-
-        rolling_mean = sum(ratios) / Decimal(len(ratios))
-        if rolling_mean == 0:
-            return NO_SIGNAL
-
-        current_ratio = ratios[-1]
-        range_spike = current_ratio / rolling_mean
-
-        if range_spike < self.threshold:
-            return NO_SIGNAL
-
+    def compute_features(self, master: pd.DataFrame) -> None:
         if self.inner is not None:
-            return self.inner.on_kline(symbol, kline, history)
+            self.inner.compute_features(master)
 
-        # No inner strategy — just signal that the filter passed (direction=0 means no trade)
+        range_ratio = (master["high"] - master["low"]) / master["open"]
+        rolling_mean = range_ratio.groupby(master["symbol"]).transform(
+            lambda x: x.rolling(self.window, min_periods=self.window).mean()
+        )
+        range_spike = range_ratio / rolling_mean.replace(0.0, float("nan"))
+
+        self._passes = (range_spike >= self.threshold).values
+        self._pos = 0
+
+    def get_signal(self, symbol: str, open_time: int) -> Signal:
+        i = self._pos
+        self._pos += 1
+        if not self._passes[i]:
+            if self.inner is not None:
+                self.inner.get_signal(symbol, open_time)
+            return NO_SIGNAL
+        if self.inner is not None:
+            return self.inner.get_signal(symbol, open_time)
         return NO_SIGNAL

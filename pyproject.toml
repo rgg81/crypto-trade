@@ -3,7 +3,15 @@ name = "crypto-trade"
 version = "0.1.0"
 description = "Binance Futures USD crypto trading bot"
 requires-python = ">=3.13"
-dependencies = ["httpx>=0.28"]
+dependencies = [
+    "httpx>=0.28",
+    "numpy>=2.0",
+    "pandas>=2.2",
+    "pandas-ta>=0.3.14b1",
+    "lightgbm>=4.0",
+    "pyarrow>=18.0",
+    "tqdm>=4.66",
+]
 
 [project.scripts]
 crypto-trade = "crypto_trade.main:main"
@@ -16,7 +24,8 @@ build-backend = "hatchling.build"
 packages = ["src/crypto_trade"]
 
 [dependency-groups]
-dev = ["pytest>=8.0", "ruff>=0.9"]
+dev = ["pytest>=8.0", "ruff>=0.9", "pandas>=2.2"]
+adaptive = ["pandas>=2.2"]
 notebook = [
     "pandas>=2.2",
     "numpy>=2.0",

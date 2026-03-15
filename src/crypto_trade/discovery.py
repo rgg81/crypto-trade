@@ -75,6 +75,28 @@ def discover_from_data_vision(http: httpx.Client) -> list[str]:
     return symbols
 
 
+def is_perpetual_symbol(symbol: str) -> bool:
+    """Return True if the symbol looks like a perpetual (no delivery date suffix)."""
+    return "_" not in symbol
+
+
+# Stablecoins that appear as base or quote on Binance Futures
+_STABLECOINS = frozenset({"USDT", "USDC", "BUSD", "TUSD", "FDUSD", "DAI", "USDP"})
+
+
+def is_stablecoin_pair(symbol: str) -> bool:
+    """Return True if the symbol is a stablecoin/stablecoin pair (e.g. USDCUSDT).
+
+    These pairs are pegged ~1.0 and unsuitable for trading strategies.
+    """
+    for quote in _STABLECOINS:
+        if symbol.endswith(quote):
+            base = symbol[: -len(quote)]
+            if base in _STABLECOINS:
+                return True
+    return False
+
+
 def merge_symbols(api_symbols: list[SymbolInfo], vision_symbols: list[str]) -> list[SymbolInfo]:
     """Merge symbols from API and data.binance.vision, tagging status."""
     api_map = {s.symbol: s.status for s in api_symbols}

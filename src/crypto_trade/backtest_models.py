@@ -1,15 +1,21 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from decimal import Decimal
 from pathlib import Path
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
-from crypto_trade.models import Kline
+if TYPE_CHECKING:
+    import pandas as pd
 
 
 class Strategy(Protocol):
-    def on_kline(self, symbol: str, kline: Kline, history: list[Kline]) -> Signal: ...
+    def compute_features(self, master: pd.DataFrame) -> None:
+        """Pre-compute features from master DF. Store internally."""
+        ...
+
+    def get_signal(self, symbol: str, open_time: int) -> Signal:
+        """Return signal for one candle. Reads from stored features."""
+        ...
 
 
 @dataclass(frozen=True)
@@ -22,11 +28,11 @@ class Signal:
 class BacktestConfig:
     symbols: tuple[str, ...]
     interval: str
-    max_amount_usd: Decimal
-    stop_loss_pct: Decimal
-    take_profit_pct: Decimal
+    max_amount_usd: float
+    stop_loss_pct: float
+    take_profit_pct: float
     timeout_minutes: int
-    fee_pct: Decimal = Decimal("0.1")
+    fee_pct: float = 0.1
     data_dir: Path = Path("data")
     start_time: int | None = None  # epoch ms, default=first row
     end_time: int | None = None  # epoch ms, default=last row
@@ -36,11 +42,11 @@ class BacktestConfig:
 class Order:
     symbol: str
     direction: int
-    entry_price: Decimal
-    amount_usd: Decimal
-    weight_factor: Decimal
-    stop_loss_price: Decimal
-    take_profit_price: Decimal
+    entry_price: float
+    amount_usd: float
+    weight_factor: float
+    stop_loss_price: float
+    take_profit_price: float
     open_time: int
     timeout_time: int
 
@@ -49,21 +55,36 @@ class Order:
 class TradeResult:
     symbol: str
     direction: int
-    entry_price: Decimal
-    exit_price: Decimal
-    weight_factor: Decimal
+    entry_price: float
+    exit_price: float
+    weight_factor: float
     open_time: int
     close_time: int
     exit_reason: str  # "stop_loss" | "take_profit" | "timeout" | "end_of_data"
-    pnl_pct: Decimal
-    fee_pct: Decimal
-    net_pnl_pct: Decimal
-    weighted_pnl: Decimal
+    pnl_pct: float
+    fee_pct: float
+    net_pnl_pct: float
+    weighted_pnl: float
 
 
 @dataclass(frozen=True)
 class DailyPnL:
     date: str  # "YYYY-MM-DD"
-    avg_weighted_pnl: Decimal
+    avg_weighted_pnl: float
     trade_count: int
     trades: tuple[TradeResult, ...]
+
+
+class BacktestResult(list):
+    """List of TradeResult with extra backtest metadata.
+
+    Extends ``list`` so all existing callers (len, indexing, iteration,
+    equality) keep working.  The ``total_signals`` attribute records how
+    many times the strategy fired (direction != 0, weight > 0), which may
+    exceed ``len(self)`` when signals are skipped because an order is
+    already open for that symbol.
+    """
+
+    def __init__(self, trades: list[TradeResult], total_signals: int = 0):
+        super().__init__(trades)
+        self.total_signals = total_signals

@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-from decimal import Decimal
+import pandas as pd
 
 from crypto_trade.backtest_models import Signal, Strategy
-from crypto_trade.models import Kline
 from crypto_trade.strategies import NO_SIGNAL
 
 
@@ -14,24 +13,30 @@ class VolumeFilter:
         self,
         inner: Strategy | None = None,
         lookback: int = 20,
-        multiplier: Decimal = Decimal("1.5"),
+        multiplier: float = 1.5,
     ) -> None:
         self.inner = inner
         self.lookback = lookback
         self.multiplier = multiplier
 
-    def on_kline(self, symbol: str, kline: Kline, history: list[Kline]) -> Signal:
-        if len(history) < self.lookback:
-            return NO_SIGNAL
-
-        vols = [Decimal(k.volume) for k in history[-self.lookback :]]
-        avg_vol = sum(vols) / Decimal(len(vols))
-        current_vol = Decimal(kline.volume)
-
-        if current_vol <= self.multiplier * avg_vol:
-            return NO_SIGNAL
-
+    def compute_features(self, master: pd.DataFrame) -> None:
         if self.inner is not None:
-            return self.inner.on_kline(symbol, kline, history)
+            self.inner.compute_features(master)
 
+        vol = master["volume"]
+        vol_avg = vol.groupby(master["symbol"]).transform(
+            lambda x: x.rolling(self.lookback, min_periods=self.lookback).mean()
+        )
+        self._passes = (vol > self.multiplier * vol_avg).values
+        self._pos = 0
+
+    def get_signal(self, symbol: str, open_time: int) -> Signal:
+        i = self._pos
+        self._pos += 1
+        if not self._passes[i]:
+            if self.inner is not None:
+                self.inner.get_signal(symbol, open_time)
+            return NO_SIGNAL
+        if self.inner is not None:
+            return self.inner.get_signal(symbol, open_time)
         return NO_SIGNAL

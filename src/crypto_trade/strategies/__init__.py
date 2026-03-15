@@ -1,34 +1,6 @@
 from __future__ import annotations
 
-from decimal import Decimal
-
 from crypto_trade.backtest_models import Signal, Strategy
-from crypto_trade.models import Kline
-
-# ---------------------------------------------------------------------------
-# Kline extraction helpers
-# ---------------------------------------------------------------------------
-
-
-def closes(history: list[Kline]) -> list[Decimal]:
-    return [Decimal(k.close) for k in history]
-
-
-def opens(history: list[Kline]) -> list[Decimal]:
-    return [Decimal(k.open) for k in history]
-
-
-def highs(history: list[Kline]) -> list[Decimal]:
-    return [Decimal(k.high) for k in history]
-
-
-def lows(history: list[Kline]) -> list[Decimal]:
-    return [Decimal(k.low) for k in history]
-
-
-def volumes(history: list[Kline]) -> list[Decimal]:
-    return [Decimal(k.volume) for k in history]
-
 
 # ---------------------------------------------------------------------------
 # Sentinel for "no signal"
@@ -53,13 +25,12 @@ def get_strategy(name: str, params: dict[str, str] | None = None) -> Strategy:
         raise KeyError(f"Unknown strategy: {name!r}. Available: {list_strategies()}")
     cls = STRATEGY_REGISTRY[name]
     if params:
-        converted: dict[str, Decimal | int | float] = {}
+        converted: dict[str, int | float] = {}
         for k, v in params.items():
-            # Try int, then Decimal
             try:
                 converted[k] = int(v)
             except ValueError:
-                converted[k] = Decimal(v)
+                converted[k] = float(v)
         return cls(**converted)  # type: ignore[return-value]
     return cls()  # type: ignore[return-value]
 
@@ -72,6 +43,9 @@ def list_strategies() -> list[str]:
 # Auto-register all strategies on import
 # ---------------------------------------------------------------------------
 
+from crypto_trade.strategies.filters.adaptive_range_spike_filter import (  # noqa: E402
+    AdaptiveRangeSpikeFilter,
+)
 from crypto_trade.strategies.filters.range_spike_filter import RangeSpikeFilter  # noqa: E402
 from crypto_trade.strategies.filters.volume_filter import VolumeFilter  # noqa: E402
 from crypto_trade.strategies.indicator.bb_squeeze import BbSqueezeStrategy  # noqa: E402
@@ -81,6 +55,9 @@ from crypto_trade.strategies.price_action.consecutive_continuation import (  # n
 )
 from crypto_trade.strategies.price_action.consecutive_reversal import (  # noqa: E402
     ConsecutiveReversalStrategy,
+)
+from crypto_trade.strategies.price_action.follow_leader import (  # noqa: E402
+    FollowLeaderStrategy,
 )
 from crypto_trade.strategies.price_action.gap_fill import GapFillStrategy  # noqa: E402
 from crypto_trade.strategies.price_action.inside_bar import InsideBarStrategy  # noqa: E402
@@ -99,17 +76,21 @@ _register("inside_bar", InsideBarStrategy)
 _register("gap_fill", GapFillStrategy)
 _register("consecutive_continuation", ConsecutiveContinuationStrategy)
 _register("consecutive_reversal", ConsecutiveReversalStrategy)
+_register("follow_leader", FollowLeaderStrategy)
 _register("rsi_bb", RsiBbStrategy)
 _register("bb_squeeze", BbSqueezeStrategy)
+_register("adaptive_range_spike_filter", AdaptiveRangeSpikeFilter)
 _register("range_spike_filter", RangeSpikeFilter)
 _register("volume_filter", VolumeFilter)
 
 __all__ = [
     "NO_SIGNAL",
     "STRATEGY_REGISTRY",
+    "AdaptiveRangeSpikeFilter",
     "BbSqueezeStrategy",
     "ConsecutiveContinuationStrategy",
     "ConsecutiveReversalStrategy",
+    "FollowLeaderStrategy",
     "GapFillStrategy",
     "InsideBarStrategy",
     "MeanReversionStrategy",
@@ -118,11 +99,6 @@ __all__ = [
     "RsiBbStrategy",
     "VolumeFilter",
     "WickRejectionStrategy",
-    "closes",
     "get_strategy",
-    "highs",
     "list_strategies",
-    "lows",
-    "opens",
-    "volumes",
 ]

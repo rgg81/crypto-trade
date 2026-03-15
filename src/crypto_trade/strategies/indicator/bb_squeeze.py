@@ -1,11 +1,9 @@
 from __future__ import annotations
 
-from decimal import Decimal
+import pandas as pd
 
 from crypto_trade.backtest_models import Signal
-from crypto_trade.indicators import bollinger_bands
-from crypto_trade.models import Kline
-from crypto_trade.strategies import NO_SIGNAL, closes, volumes
+from crypto_trade.strategies import NO_SIGNAL
 
 
 class BbSqueezeStrategy:
@@ -18,54 +16,64 @@ class BbSqueezeStrategy:
     def __init__(
         self,
         bb_period: int = 20,
-        squeeze_threshold: Decimal = Decimal("0.02"),
+        squeeze_threshold: float = 0.02,
         squeeze_lookback: int = 10,
-        vol_multiplier: Decimal = Decimal("1.5"),
+        vol_multiplier: float = 1.5,
     ) -> None:
         self.bb_period = bb_period
         self.squeeze_threshold = squeeze_threshold
         self.squeeze_lookback = squeeze_lookback
         self.vol_multiplier = vol_multiplier
 
-    def on_kline(self, symbol: str, kline: Kline, history: list[Kline]) -> Signal:
-        min_len = self.bb_period + self.squeeze_lookback
-        if len(history) < min_len:
-            return NO_SIGNAL
+    def compute_features(self, master: pd.DataFrame) -> None:
+        sym = master["symbol"]
+        closes = master["close"]
 
-        # Compute current BB
-        close_vals = closes(history)
-        bb_now = bollinger_bands(close_vals, self.bb_period)
-        if bb_now is None:
-            return NO_SIGNAL
+        bb_middle = closes.groupby(sym).transform(
+            lambda x: x.rolling(self.bb_period, min_periods=self.bb_period).mean()
+        )
+        bb_std = closes.groupby(sym).transform(
+            lambda x: x.rolling(self.bb_period, min_periods=self.bb_period).std(ddof=0)
+        )
+        bb_upper = bb_middle + 2.0 * bb_std
+        bb_lower = bb_middle - 2.0 * bb_std
+        bandwidth = ((bb_upper - bb_lower) / bb_middle).fillna(0)
+        prev_bw = bandwidth.groupby(sym).shift(1)
 
-        # Compute BB for the lookback window (excluding current candle)
-        prev_closes = closes(history[:-1])
-        bb_prev = bollinger_bands(prev_closes, self.bb_period)
-        if bb_prev is None:
-            return NO_SIGNAL
+        vol_avg = (
+            master["volume"]
+            .groupby(sym)
+            .transform(
+                lambda x: x.rolling(self.squeeze_lookback, min_periods=self.squeeze_lookback).mean()
+            )
+        )
+        vol_spike = master["volume"] > self.vol_multiplier * vol_avg
 
-        # Check squeeze: previous bandwidth was below threshold
-        if bb_prev.bandwidth >= self.squeeze_threshold:
-            return NO_SIGNAL
+        self._bandwidth = bandwidth.values
+        self._prev_bw = prev_bw.values
+        self._vol_spike = vol_spike.values
+        self._close = closes.values
+        self._bb_middle = bb_middle.values
+        self._pos = 0
 
-        # Check expansion: current bandwidth exceeds threshold
-        if bb_now.bandwidth <= self.squeeze_threshold:
+    def get_signal(self, symbol: str, open_time: int) -> Signal:
+        i = self._pos
+        self._pos += 1
+        prev = self._prev_bw[i]
+        if prev != prev:  # NaN
             return NO_SIGNAL
-
+        # Previous bandwidth must be below squeeze threshold
+        if prev >= self.squeeze_threshold:
+            return NO_SIGNAL
+        # Current bandwidth must exceed threshold (expansion)
+        if self._bandwidth[i] <= self.squeeze_threshold:
+            return NO_SIGNAL
         # Volume confirmation
-        vol_vals = volumes(history)
-        if len(vol_vals) < self.squeeze_lookback:
+        if not self._vol_spike[i]:
             return NO_SIGNAL
-        avg_vol = sum(vol_vals[-self.squeeze_lookback - 1 : -1]) / Decimal(self.squeeze_lookback)
-        current_vol = vol_vals[-1]
-        if avg_vol > 0 and current_vol <= self.vol_multiplier * avg_vol:
-            return NO_SIGNAL
-
-        # Breakout direction: close vs BB middle
-        current_close = close_vals[-1]
-        if current_close > bb_now.middle:
+        # Breakout direction
+        if self._close[i] > self._bb_middle[i]:
             return Signal(direction=1, weight=80)
-        elif current_close < bb_now.middle:
+        elif self._close[i] < self._bb_middle[i]:
             return Signal(direction=-1, weight=80)
-
         return NO_SIGNAL

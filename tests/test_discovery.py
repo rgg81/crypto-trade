@@ -4,6 +4,7 @@ from crypto_trade.discovery import (
     SymbolInfo,
     discover_from_data_vision,
     discover_from_exchange_info,
+    is_stablecoin_pair,
     merge_symbols,
 )
 
@@ -126,3 +127,20 @@ def test_merge_symbols_empty_vision():
     merged = merge_symbols(api_symbols, [])
     assert len(merged) == 1
     assert merged[0].symbol == "BTCUSDT"
+
+
+def test_is_stablecoin_pair():
+    # Stablecoin/stablecoin pairs should be detected
+    assert is_stablecoin_pair("USDCUSDT") is True
+    assert is_stablecoin_pair("BUSDUSDT") is True
+    assert is_stablecoin_pair("TUSDUSDT") is True
+    assert is_stablecoin_pair("FDUSDUSDT") is True
+    assert is_stablecoin_pair("DAIUSDT") is True
+    assert is_stablecoin_pair("USDPUSDT") is True
+    assert is_stablecoin_pair("USDTUSDC") is True
+
+    # Normal trading pairs should NOT be flagged
+    assert is_stablecoin_pair("BTCUSDT") is False
+    assert is_stablecoin_pair("ETHUSDT") is False
+    assert is_stablecoin_pair("SOLUSDT") is False
+    assert is_stablecoin_pair("USDCETH") is False

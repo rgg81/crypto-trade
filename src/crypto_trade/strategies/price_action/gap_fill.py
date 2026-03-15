@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-from decimal import Decimal
+import pandas as pd
 
 from crypto_trade.backtest_models import Signal
-from crypto_trade.models import Kline
 from crypto_trade.strategies import NO_SIGNAL
 
 
@@ -13,26 +12,31 @@ class GapFillStrategy:
     def __init__(self, weight: int = 60) -> None:
         self.weight = weight
 
-    def on_kline(self, symbol: str, kline: Kline, history: list[Kline]) -> Signal:
-        if len(history) < 2:
+    def compute_features(self, master: pd.DataFrame) -> None:
+        sym = master["symbol"]
+        prev_close = master["close"].groupby(sym).shift(1)
+
+        self._prev_close = prev_close.values
+        self._open = master["open"].values
+        self._pos = 0
+
+    def get_signal(self, symbol: str, open_time: int) -> Signal:
+        i = self._pos
+        self._pos += 1
+        pc = self._prev_close[i]
+        if pc != pc:  # NaN
             return NO_SIGNAL
 
-        prev = history[-2]
-        curr = history[-1]
+        curr_open = self._open[i]
 
-        prev_close = Decimal(prev.close)
-        curr_open = Decimal(curr.open)
-
-        # Gap up: current open > previous close -> expect fill down (short)
-        if curr_open > prev_close:
-            gap = curr_open - prev_close
-            if prev_close != 0 and gap / prev_close > Decimal("0.001"):
+        if curr_open > pc:
+            gap = curr_open - pc
+            if pc != 0 and gap / pc > 0.001:
                 return Signal(direction=-1, weight=self.weight)
 
-        # Gap down: current open < previous close -> expect fill up (long)
-        if curr_open < prev_close:
-            gap = prev_close - curr_open
-            if prev_close != 0 and gap / prev_close > Decimal("0.001"):
+        if curr_open < pc:
+            gap = pc - curr_open
+            if pc != 0 and gap / pc > 0.001:
                 return Signal(direction=1, weight=self.weight)
 
         return NO_SIGNAL

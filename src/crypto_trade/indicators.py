@@ -1,26 +1,27 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from decimal import Decimal
+
+import numpy as np
+import pandas as pd
 
 
 @dataclass(frozen=True)
 class BollingerBands:
-    upper: Decimal
-    middle: Decimal
-    lower: Decimal
-    bandwidth: Decimal
+    upper: float
+    middle: float
+    lower: float
+    bandwidth: float
 
 
-def sma(values: list[Decimal], period: int) -> Decimal | None:
+def sma(values: np.ndarray, period: int) -> float | None:
     """Simple moving average over the last *period* values."""
     if len(values) < period or period <= 0:
         return None
-    window = values[-period:]
-    return sum(window) / Decimal(period)
+    return float(values[-period:].mean())
 
 
-def ema(values: list[Decimal], period: int) -> Decimal | None:
+def ema(values: np.ndarray, period: int) -> float | None:
     """Exponential moving average over *values*.
 
     Uses the standard multiplier k = 2 / (period + 1).
@@ -28,25 +29,22 @@ def ema(values: list[Decimal], period: int) -> Decimal | None:
     """
     if len(values) < period or period <= 0:
         return None
-    k = Decimal(2) / Decimal(period + 1)
-    result = sum(values[:period]) / Decimal(period)
+    k = 2.0 / (period + 1)
+    result = float(values[:period].mean())
     for v in values[period:]:
-        result = v * k + result * (1 - k)
+        result = float(v) * k + result * (1.0 - k)
     return result
 
 
-def stddev(values: list[Decimal], period: int) -> Decimal | None:
+def stddev(values: np.ndarray, period: int) -> float | None:
     """Population standard deviation over the last *period* values."""
     if len(values) < period or period <= 0:
         return None
-    window = values[-period:]
-    mean = sum(window) / Decimal(period)
-    variance = sum((v - mean) ** 2 for v in window) / Decimal(period)
-    return variance.sqrt()
+    return float(values[-period:].std(ddof=0))
 
 
 def bollinger_bands(
-    closes: list[Decimal], period: int = 20, num_std: Decimal = Decimal(2)
+    closes: np.ndarray, period: int = 20, num_std: float = 2.0
 ) -> BollingerBands | None:
     """Bollinger Bands: middle=SMA, upper/lower=middle +/- num_std*stddev."""
     middle = sma(closes, period)
@@ -55,46 +53,58 @@ def bollinger_bands(
         return None
     upper = middle + num_std * sd
     lower = middle - num_std * sd
-    bandwidth = (upper - lower) / middle if middle != 0 else Decimal(0)
+    bandwidth = (upper - lower) / middle if middle != 0 else 0.0
     return BollingerBands(upper=upper, middle=middle, lower=lower, bandwidth=bandwidth)
 
 
-def true_range(high: Decimal, low: Decimal, prev_close: Decimal) -> Decimal:
+def true_range(high: float, low: float, prev_close: float) -> float:
     """True range for a single bar."""
     return max(high - low, abs(high - prev_close), abs(low - prev_close))
 
 
-def atr(
-    highs: list[Decimal], lows: list[Decimal], closes: list[Decimal], period: int = 14
-) -> Decimal | None:
+def atr(highs: np.ndarray, lows: np.ndarray, closes: np.ndarray, period: int = 14) -> float | None:
     """Average true range (SMA of true ranges over *period*)."""
     n = len(highs)
     if n < period + 1 or len(lows) < period + 1 or len(closes) < period + 1:
         return None
-    trs: list[Decimal] = []
-    for i in range(1, n):
-        trs.append(true_range(highs[i], lows[i], closes[i - 1]))
-    return sma(trs, period)
+    # Vectorized true range: max(high-low, |high-prev_close|, |low-prev_close|)
+    h = highs[1:]
+    lo = lows[1:]
+    pc = closes[:-1]
+    tr = np.maximum(h - lo, np.maximum(np.abs(h - pc), np.abs(lo - pc)))
+    return sma(tr, period)
 
 
-def rsi(closes: list[Decimal], period: int = 14) -> Decimal | None:
+def rsi(closes: np.ndarray, period: int = 14) -> float | None:
     """Relative Strength Index using Wilder's smoothing (EMA-style)."""
     if len(closes) < period + 1 or period <= 0:
         return None
-    deltas = [closes[i] - closes[i - 1] for i in range(1, len(closes))]
+    deltas = np.diff(closes)
 
-    gains = [d if d > 0 else Decimal(0) for d in deltas[:period]]
-    losses = [-d if d < 0 else Decimal(0) for d in deltas[:period]]
-    avg_gain = sum(gains) / Decimal(period)
-    avg_loss = sum(losses) / Decimal(period)
+    gains = np.where(deltas[:period] > 0, deltas[:period], 0.0)
+    losses = np.where(deltas[:period] < 0, -deltas[:period], 0.0)
+    avg_gain = float(gains.mean())
+    avg_loss = float(losses.mean())
 
     for d in deltas[period:]:
-        gain = d if d > 0 else Decimal(0)
-        loss = -d if d < 0 else Decimal(0)
-        avg_gain = (avg_gain * Decimal(period - 1) + gain) / Decimal(period)
-        avg_loss = (avg_loss * Decimal(period - 1) + loss) / Decimal(period)
+        d = float(d)
+        gain = d if d > 0 else 0.0
+        loss = -d if d < 0 else 0.0
+        avg_gain = (avg_gain * (period - 1) + gain) / period
+        avg_loss = (avg_loss * (period - 1) + loss) / period
 
     if avg_loss == 0:
-        return Decimal(100)
+        return 100.0
     rs = avg_gain / avg_loss
-    return Decimal(100) - Decimal(100) / (1 + rs)
+    return 100.0 - 100.0 / (1.0 + rs)
+
+
+def rsi_series(closes: pd.Series, period: int = 14) -> pd.Series:
+    """Vectorized RSI using pandas ewm for Wilder's smoothing."""
+    delta = closes.diff()
+    gain = delta.where(delta > 0, 0.0)
+    loss = (-delta).where(delta < 0, 0.0)
+    avg_gain = gain.ewm(com=period - 1, min_periods=period, adjust=False).mean()
+    avg_loss = loss.ewm(com=period - 1, min_periods=period, adjust=False).mean()
+    rs = avg_gain / avg_loss
+    return 100.0 - 100.0 / (1.0 + rs)
