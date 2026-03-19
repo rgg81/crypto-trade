@@ -35,7 +35,7 @@ def _make_kline_array(**kwargs: list[float]) -> KlineArray:
     close_time = (
         np.array(kwargs["close_time"], dtype=np.int64)
         if "close_time" in kwargs
-        else open_time + 299999
+        else open_time + 899999
     )
 
     return KlineArray.from_arrays(
@@ -87,7 +87,7 @@ def _generate_kline_array(
     spike_indices: list[int] | None = None,
     spike_range: float = 0.40,
     base_open: float = 100.0,
-    interval_ms: int = 300_000,
+    interval_ms: int = 900_000,
     start_time: int = 0,
 ) -> KlineArray:
     """Generate a KlineArray with controllable range."""
@@ -140,10 +140,10 @@ class TestCountSignalsPerMonth:
         # 50 signals in each month = 50 avg
         jan_start = int(pd.Timestamp("2024-01-01", tz="UTC").timestamp() * 1000)
         feb_start = int(pd.Timestamp("2024-02-01", tz="UTC").timestamp() * 1000)
-        interval_ms = 300_000  # 5 min
+        interval_ms = 900_000  # 15 min
 
-        n_jan = 8640  # ~30 days of 5m candles
-        n_feb = 8064  # ~28 days of 5m candles
+        n_jan = 2880  # ~30 days of 15m candles
+        n_feb = 2688  # ~28 days of 15m candles
 
         times_jan = np.arange(jan_start, jan_start + n_jan * interval_ms, interval_ms)
         times_feb = np.arange(feb_start, feb_start + n_feb * interval_ms, interval_ms)
@@ -165,7 +165,7 @@ class TestCountSignalsPerMonth:
 
     def test_no_signals_above_threshold(self) -> None:
         jan_start = int(pd.Timestamp("2024-01-15", tz="UTC").timestamp() * 1000)
-        open_times = np.arange(jan_start, jan_start + 100 * 300_000, 300_000)
+        open_times = np.arange(jan_start, jan_start + 100 * 900_000, 900_000)
         spikes = np.full(100, 1.0)
         result = count_signals_per_month(spikes, open_times, threshold=5.0)
         assert result == 0.0
@@ -173,7 +173,7 @@ class TestCountSignalsPerMonth:
     def test_single_month(self) -> None:
         """All data in one month."""
         jan_start = int(pd.Timestamp("2024-01-01", tz="UTC").timestamp() * 1000)
-        open_times = np.arange(jan_start, jan_start + 1000 * 300_000, 300_000)
+        open_times = np.arange(jan_start, jan_start + 1000 * 900_000, 900_000)
         spikes = np.full(1000, 1.0)
         spikes[0:20] = 6.0  # 20 signals
         result = count_signals_per_month(spikes, open_times, threshold=5.0)
@@ -188,9 +188,9 @@ class TestCountSignalsPerMonth:
 class TestFindBestThreshold:
     def test_finds_threshold_near_target(self) -> None:
         rng = np.random.default_rng(42)
-        n = 8640 * 3  # ~3 months of 5m data
+        n = 2880 * 3  # ~3 months of 15m data
         jan_start = int(pd.Timestamp("2024-01-01", tz="UTC").timestamp() * 1000)
-        open_times = np.arange(jan_start, jan_start + n * 300_000, 300_000, dtype=np.int64)
+        open_times = np.arange(jan_start, jan_start + n * 900_000, 900_000, dtype=np.int64)
         spikes = rng.uniform(0, 10, size=n)
         target = 200.0
 
@@ -207,7 +207,7 @@ class TestFindBestThreshold:
 
     def test_respects_bounds(self) -> None:
         jan_start = int(pd.Timestamp("2024-01-01", tz="UTC").timestamp() * 1000)
-        open_times = np.arange(jan_start, jan_start + 100 * 300_000, 300_000, dtype=np.int64)
+        open_times = np.arange(jan_start, jan_start + 100 * 900_000, 900_000, dtype=np.int64)
         spikes = np.full(100, 5.0)
 
         threshold = find_best_threshold(
@@ -228,7 +228,7 @@ class TestFindBestThreshold:
 class TestAdaptiveBasic:
     def test_default_params(self) -> None:
         f = AdaptiveRangeSpikeFilter()
-        assert f.window == 48
+        assert f.window == 16
         assert f.threshold == 5.85
         assert f.target_signals_month == 400
         assert f.recalibrate_days == 30
@@ -366,9 +366,9 @@ class TestRecalibration:
         )
 
         _get_last_signal(f, master)
-        # 600 candles * 5min = 3000min = ~2.08 days. With 2-day interval:
-        # first trigger at min_history, then at most 1 more.
-        assert len(f._calibration_log) <= 2
+        # 600 candles * 15min = 9000min = ~6.25 days. With 2-day interval:
+        # first trigger at min_history, then up to 2 more.
+        assert len(f._calibration_log) <= 4
 
     def test_multi_symbol_calibration(self) -> None:
         n = 350

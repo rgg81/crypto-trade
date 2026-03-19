@@ -5,6 +5,7 @@ from __future__ import annotations
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
@@ -72,7 +73,7 @@ def convert_all_features(
     to_convert: list[tuple[Path, Path]] = []
     for csv_file in csv_files:
         parquet_file = csv_file.with_suffix(".parquet")
-        if parquet_file.exists() and parquet_file.stat().st_mtime > csv_file.stat().st_mtime:
+        if parquet_file.exists() and parquet_file.stat().st_mtime >= csv_file.stat().st_mtime:
             continue
         to_convert.append((csv_file, parquet_file))
 
@@ -112,7 +113,7 @@ def lookup_features(
     Args:
         lookups: List of (symbol, open_time_ms) tuples.
         features_dir: Directory containing Parquet feature files.
-        interval: Kline interval (e.g. "5m").
+        interval: Kline interval (e.g. "15m").
         columns: Optional list of columns to read (for column pruning).
 
     Returns:
@@ -157,6 +158,53 @@ def lookup_features(
 
     result = pd.concat(parts, ignore_index=True)
     result = result.sort_values(["symbol", "open_time"]).reset_index(drop=True)
+    return result
+
+
+def load_features_range(
+    symbols: list[str],
+    features_dir: str | Path,
+    interval: str,
+    start_ms: int,
+    end_ms: int,
+    columns: list[str] | None = None,
+) -> dict[tuple[str, int], np.ndarray]:
+    """Load features for a time range across symbols into a lookup dict.
+
+    Returns {(symbol, open_time): feature_row_array} for fast per-candle lookups.
+    Uses range filters on Parquet (much faster than exact timestamp matching for full months).
+    """
+    features_dir = Path(features_dir)
+    result: dict[tuple[str, int], np.ndarray] = {}
+
+    read_columns = columns
+    if read_columns is not None:
+        read_columns = ["open_time", *[c for c in read_columns if c != "open_time"]]
+
+    for symbol in symbols:
+        parquet_path = features_dir / f"{symbol}_{interval}_features.parquet"
+        if not parquet_path.exists():
+            continue
+
+        table = pq.read_table(
+            parquet_path,
+            columns=read_columns,
+            filters=[("open_time", ">=", start_ms), ("open_time", "<", end_ms)],
+        )
+        df = table.to_pandas()
+
+        if df.empty:
+            continue
+
+        # Extract feature columns (everything except open_time)
+        feat_cols = [c for c in df.columns if c != "open_time"]
+        feat_values = df[feat_cols].values
+        open_times = df["open_time"].values
+
+        for row_idx in range(len(df)):
+            key = (symbol, int(open_times[row_idx]))
+            result[key] = feat_values[row_idx]
+
     return result
 
 

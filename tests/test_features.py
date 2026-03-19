@@ -29,7 +29,7 @@ def _make_ohlcv_df(n: int = 500) -> pd.DataFrame:
     volume = rng.uniform(100, 10000, n)
     taker_buy_volume = volume * rng.uniform(0.3, 0.7, n)
 
-    open_time = np.arange(n, dtype=np.int64) * 300_000  # 5m intervals in ms
+    open_time = np.arange(n, dtype=np.int64) * 900_000  # 15m intervals in ms
 
     df = pd.DataFrame(
         {
@@ -39,7 +39,7 @@ def _make_ohlcv_df(n: int = 500) -> pd.DataFrame:
             "low": low,
             "close": close,
             "volume": volume,
-            "close_time": open_time + 299_999,
+            "close_time": open_time + 899_999,
             "quote_volume": volume * close,
             "trades": rng.integers(10, 1000, n),
             "taker_buy_volume": taker_buy_volume,

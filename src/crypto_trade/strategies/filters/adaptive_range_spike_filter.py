@@ -140,7 +140,7 @@ class AdaptiveRangeSpikeFilter:
     """
 
     inner: Strategy | None = None
-    window: int = 48
+    window: int = 16
     target_signals_month: int = 400
     recalibrate_days: int = 30
     min_history_days: int = 30
@@ -151,7 +151,7 @@ class AdaptiveRangeSpikeFilter:
     def __post_init__(self) -> None:
         self.threshold: float = self.initial_threshold
         self._calibration_log: list[CalibrationResult] = []
-        self._interval_ms: int = 300_000  # default 5m, overridden in compute_features
+        self._interval_ms: int = 900_000  # default 15m, overridden in compute_features
 
     # -- derived helpers -----------------------------------------------------
 

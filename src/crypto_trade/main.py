@@ -100,8 +100,8 @@ def main() -> None:
     bulk_parser.add_argument(
         "--intervals",
         type=str,
-        default="1m,5m",
-        help="Comma-separated intervals (default: 1m,5m)",
+        default="1m,15m",
+        help="Comma-separated intervals (default: 1m,15m)",
     )
     bulk_parser.add_argument(
         "--start",
@@ -128,7 +128,7 @@ def main() -> None:
         "--symbols", type=str, default=None, help="Comma-separated symbols (default: from config)"
     )
     feat_parser.add_argument(
-        "--interval", type=str, default="5m", help="Kline interval (default: 5m)"
+        "--interval", type=str, default="15m", help="Kline interval (default: 15m)"
     )
     feat_parser.add_argument(
         "--groups", type=str, default="all", help="Comma-separated groups or 'all' (default: all)"
@@ -151,7 +151,7 @@ def main() -> None:
         "convert-features", help="Convert feature CSVs to Parquet (and optionally delete CSVs)"
     )
     conv_parser.add_argument(
-        "--interval", type=str, default="5m", help="Kline interval (default: 5m)"
+        "--interval", type=str, default="15m", help="Kline interval (default: 15m)"
     )
     conv_parser.add_argument("--workers", type=int, default=4, help="Parallel workers (default: 4)")
     conv_parser.add_argument(
@@ -177,7 +177,7 @@ def main() -> None:
         "--symbols", type=str, default=None, help="Comma-separated symbols (default: from config)"
     )
     bt_parser.add_argument(
-        "--interval", type=str, default="5m", help="Kline interval (default: 5m)"
+        "--interval", type=str, default="15m", help="Kline interval (default: 15m)"
     )
     bt_parser.add_argument("--start", type=str, default=None, help="Start date YYYY-MM-DD")
     bt_parser.add_argument("--end", type=str, default=None, help="End date YYYY-MM-DD")

@@ -25,12 +25,15 @@ def get_strategy(name: str, params: dict[str, str] | None = None) -> Strategy:
         raise KeyError(f"Unknown strategy: {name!r}. Available: {list_strategies()}")
     cls = STRATEGY_REGISTRY[name]
     if params:
-        converted: dict[str, int | float] = {}
+        converted: dict[str, int | float | str] = {}
         for k, v in params.items():
             try:
                 converted[k] = int(v)
             except ValueError:
-                converted[k] = float(v)
+                try:
+                    converted[k] = float(v)
+                except ValueError:
+                    converted[k] = v
         return cls(**converted)  # type: ignore[return-value]
     return cls()  # type: ignore[return-value]
 
@@ -50,6 +53,9 @@ from crypto_trade.strategies.filters.range_spike_filter import RangeSpikeFilter 
 from crypto_trade.strategies.filters.volume_filter import VolumeFilter  # noqa: E402
 from crypto_trade.strategies.indicator.bb_squeeze import BbSqueezeStrategy  # noqa: E402
 from crypto_trade.strategies.indicator.rsi_bb import RsiBbStrategy  # noqa: E402
+from crypto_trade.strategies.ml.range_spike_lgbm import (  # noqa: E402
+    RangeSpikeLightGbmStrategy,
+)
 from crypto_trade.strategies.price_action.consecutive_continuation import (  # noqa: E402
     ConsecutiveContinuationStrategy,
 )
@@ -82,6 +88,7 @@ _register("bb_squeeze", BbSqueezeStrategy)
 _register("adaptive_range_spike_filter", AdaptiveRangeSpikeFilter)
 _register("range_spike_filter", RangeSpikeFilter)
 _register("volume_filter", VolumeFilter)
+_register("range_spike_lgbm", RangeSpikeLightGbmStrategy)
 
 __all__ = [
     "NO_SIGNAL",
@@ -96,6 +103,7 @@ __all__ = [
     "MeanReversionStrategy",
     "MomentumStrategy",
     "RangeSpikeFilter",
+    "RangeSpikeLightGbmStrategy",
     "RsiBbStrategy",
     "VolumeFilter",
     "WickRejectionStrategy",

@@ -17,7 +17,7 @@ class RangeSpikeFilter:
     def __init__(
         self,
         inner: Strategy | None = None,
-        window: int = 48,
+        window: int = 16,
         threshold: float = 5.85,
     ) -> None:
         self.inner = inner

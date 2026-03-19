@@ -27,7 +27,7 @@ def _make_kline_array(**kwargs: list[float]) -> KlineArray:
     close_time = (
         np.array(kwargs["close_time"], dtype=np.int64)
         if "close_time" in kwargs
-        else open_time + 299999
+        else open_time + 899999
     )
 
     return KlineArray.from_arrays(
@@ -77,7 +77,7 @@ class TestRsiBbStrategy:
         opens = [100.0] * 15 + [100.0, 100.0, 96.0]
         highs = [101.0] * 15 + [100.0, 100.0, 96.0]
         lows = [99.0] * 15 + [98.0, 96.0, 70.0]
-        open_times = [i * 300000 for i in range(18)]
+        open_times = [i * 900000 for i in range(18)]
         master = _make_master(close=closes, open=opens, high=highs, low=lows, open_time=open_times)
         result = _get_last_signal(s, master)
         assert result.direction == 1
@@ -88,7 +88,7 @@ class TestRsiBbStrategy:
         opens = [100.0] * 15 + [100.0, 100.0, 104.0]
         highs = [101.0] * 15 + [102.0, 104.0, 130.0]
         lows = [99.0] * 15 + [100.0, 100.0, 104.0]
-        open_times = [i * 300000 for i in range(18)]
+        open_times = [i * 900000 for i in range(18)]
         master = _make_master(close=closes, open=opens, high=highs, low=lows, open_time=open_times)
         result = _get_last_signal(s, master)
         assert result.direction == -1
@@ -98,7 +98,7 @@ class TestRsiBbStrategy:
         n = 25
         master = _make_master(
             close=[100.0] * n,
-            open_time=[i * 300000 for i in range(n)],
+            open_time=[i * 900000 for i in range(n)],
         )
         result = _get_last_signal(s, master)
         assert result.direction == 0
@@ -136,7 +136,7 @@ class TestBbSqueezeStrategy:
             low=lows,
             close=closes,
             volume=[1000.0] * n,
-            open_time=[i * 300000 for i in range(n)],
+            open_time=[i * 900000 for i in range(n)],
         )
         result = _get_last_signal(s, master)
         assert result.direction == 0
@@ -161,7 +161,7 @@ class TestBbSqueezeStrategy:
             low=lows,
             close=closes,
             volume=volumes,
-            open_time=[i * 300000 for i in range(n)],
+            open_time=[i * 900000 for i in range(n)],
         )
         result = _get_last_signal(s, master)
         assert result.direction == 1
@@ -186,7 +186,7 @@ class TestBbSqueezeStrategy:
             low=lows,
             close=closes,
             volume=volumes,
-            open_time=[i * 300000 for i in range(n)],
+            open_time=[i * 900000 for i in range(n)],
         )
         result = _get_last_signal(s, master)
         assert result.direction == -1

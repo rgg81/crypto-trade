@@ -50,10 +50,10 @@ Download historical kline data in bulk from Binance's public data repository. Us
 
 ```bash
 # Download specific symbols
-uv run crypto-trade bulk --symbols BTCUSDT,ETHUSDT --intervals 1m,5m
+uv run crypto-trade bulk --symbols BTCUSDT,ETHUSDT --intervals 1m,15m
 
 # Download ALL symbols (including delisted) from data.binance.vision
-uv run crypto-trade bulk --all --intervals 1m,5m
+uv run crypto-trade bulk --all --intervals 1m,15m
 
 # Bulk download + backfill current incomplete month via API
 uv run crypto-trade bulk --symbols BTCUSDT --intervals 1m --api-backfill
@@ -83,23 +83,23 @@ Run trading strategies against historical kline data. Includes 8 built-in strate
 uv run crypto-trade backtest --list
 
 # Run a strategy on a symbol
-uv run crypto-trade backtest --strategy momentum --symbols BTCUSDT --interval 5m
+uv run crypto-trade backtest --strategy momentum --symbols BTCUSDT --interval 15m
 
 # With the range_spike volatility filter from notebook findings
-uv run crypto-trade backtest --strategy rsi_bb --symbols BTCUSDT --interval 5m --range-spike-filter
+uv run crypto-trade backtest --strategy rsi_bb --symbols BTCUSDT --interval 15m --range-spike-filter
 
 # Multiple symbols, date range, custom SL/TP
 uv run crypto-trade backtest --strategy mean_reversion --symbols BTCUSDT,ETHUSDT \
-    --interval 5m --start 2024-01-01 --end 2024-12-31 \
+    --interval 15m --start 2024-01-01 --end 2024-12-31 \
     --stop-loss 2.0 --take-profit 3.0
 
 # Custom strategy parameters
 uv run crypto-trade backtest --strategy mean_reversion --symbols BTCUSDT \
-    --interval 5m --params lookback=30,multiplier=3.0
+    --interval 15m --params lookback=30,multiplier=3.0
 
 # Stack both filters
 uv run crypto-trade backtest --strategy momentum --symbols BTCUSDT \
-    --interval 5m --range-spike-filter --volume-filter
+    --interval 15m --range-spike-filter --volume-filter
 ```
 
 **Strategies:** `momentum`, `mean_reversion`, `wick_rejection`, `inside_bar`, `gap_fill`, `consecutive_reversal`, `rsi_bb`, `bb_squeeze`
@@ -110,7 +110,7 @@ uv run crypto-trade backtest --strategy momentum --symbols BTCUSDT \
 |--------|-------------|---------|
 | `--strategy` | Strategy name | required |
 | `--symbols` | Comma-separated symbols | from config |
-| `--interval` | Kline interval | `5m` |
+| `--interval` | Kline interval | `15m` |
 | `--start` | Start date (YYYY-MM-DD) | all data |
 | `--end` | End date (YYYY-MM-DD) | all data |
 | `--amount` | Max trade amount USD | `1000` |

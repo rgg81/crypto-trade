@@ -11,6 +11,8 @@ dependencies = [
     "lightgbm>=4.0",
     "pyarrow>=18.0",
     "tqdm>=4.66",
+    "optuna>=3.0",
+    "scikit-learn>=1.5",
 ]
 
 [project.scripts]

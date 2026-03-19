@@ -19,7 +19,7 @@ from crypto_trade.feature_store import (
 def _make_feature_csv(path: Path, n: int = 200, symbol: str = "TEST") -> pd.DataFrame:
     """Create a small feature CSV and return the DataFrame."""
     rng = np.random.default_rng(42)
-    open_time = np.arange(n, dtype=np.int64) * 300_000
+    open_time = np.arange(n, dtype=np.int64) * 900_000
     df = pd.DataFrame(
         {
             "open_time": open_time,
@@ -40,7 +40,7 @@ def _make_feature_csv(path: Path, n: int = 200, symbol: str = "TEST") -> pd.Data
 
 class TestConvertCsvToParquet:
     def test_basic_conversion(self, tmp_path: Path):
-        csv_path = tmp_path / "TEST_5m_features.csv"
+        csv_path = tmp_path / "TEST_15m_features.csv"
         df = _make_feature_csv(csv_path, n=150)
 
         parquet_path = csv_path.with_suffix(".parquet")
@@ -56,7 +56,7 @@ class TestConvertCsvToParquet:
         assert len(result) == 150
 
     def test_row_groups(self, tmp_path: Path):
-        csv_path = tmp_path / "TEST_5m_features.csv"
+        csv_path = tmp_path / "TEST_15m_features.csv"
         _make_feature_csv(csv_path, n=150)
 
         parquet_path = csv_path.with_suffix(".parquet")
@@ -66,7 +66,7 @@ class TestConvertCsvToParquet:
         assert pf.metadata.num_row_groups == 3  # 150 / 50
 
     def test_statistics_present(self, tmp_path: Path):
-        csv_path = tmp_path / "TEST_5m_features.csv"
+        csv_path = tmp_path / "TEST_15m_features.csv"
         _make_feature_csv(csv_path, n=100)
 
         parquet_path = csv_path.with_suffix(".parquet")
@@ -85,20 +85,20 @@ class TestConvertCsvToParquet:
 
 class TestConvertDeletesCsv:
     def test_csv_deleted(self, tmp_path: Path):
-        csv_path = tmp_path / "TEST_5m_features.csv"
+        csv_path = tmp_path / "TEST_15m_features.csv"
         _make_feature_csv(csv_path, n=50)
 
-        results = convert_all_features(tmp_path, "5m", workers=1, delete_csv=True)
+        results = convert_all_features(tmp_path, "15m", workers=1, delete_csv=True)
 
         assert len(results) == 1
         assert not csv_path.exists()
         assert csv_path.with_suffix(".parquet").exists()
 
     def test_keep_csv(self, tmp_path: Path):
-        csv_path = tmp_path / "TEST_5m_features.csv"
+        csv_path = tmp_path / "TEST_15m_features.csv"
         _make_feature_csv(csv_path, n=50)
 
-        results = convert_all_features(tmp_path, "5m", workers=1, delete_csv=False)
+        results = convert_all_features(tmp_path, "15m", workers=1, delete_csv=False)
 
         assert len(results) == 1
         assert csv_path.exists()
@@ -107,45 +107,45 @@ class TestConvertDeletesCsv:
 
 class TestConvertSkipsUpToDate:
     def test_skips_existing(self, tmp_path: Path):
-        csv_path = tmp_path / "TEST_5m_features.csv"
+        csv_path = tmp_path / "TEST_15m_features.csv"
         _make_feature_csv(csv_path, n=50)
 
         # First conversion
-        convert_all_features(tmp_path, "5m", workers=1, delete_csv=False)
+        convert_all_features(tmp_path, "15m", workers=1, delete_csv=False)
         parquet_path = csv_path.with_suffix(".parquet")
         assert parquet_path.exists()
 
         # Second run should skip (parquet is newer)
-        results = convert_all_features(tmp_path, "5m", workers=1, delete_csv=False)
+        results = convert_all_features(tmp_path, "15m", workers=1, delete_csv=False)
         assert len(results) == 0
 
 
 class TestLookupParquet:
     def test_basic_lookup(self, tmp_path: Path):
-        csv_path = tmp_path / "TEST_5m_features.csv"
+        csv_path = tmp_path / "TEST_15m_features.csv"
         _make_feature_csv(csv_path, n=200)
-        convert_all_features(tmp_path, "5m", workers=1, delete_csv=False)
+        convert_all_features(tmp_path, "15m", workers=1, delete_csv=False)
 
         # Look up specific timestamps
-        ts = [0, 300_000, 600_000]  # first three rows
+        ts = [0, 900_000, 1_800_000]  # first three rows
         result = lookup_features(
             [(s, t) for s in ["TEST"] for t in ts],
             features_dir=tmp_path,
-            interval="5m",
+            interval="15m",
         )
 
         assert len(result) == 3
-        assert list(result["open_time"]) == ts
+        assert list(result["open_time"]) == sorted(ts)
         assert "symbol" in result.columns
 
     def test_missing_timestamps(self, tmp_path: Path):
-        csv_path = tmp_path / "TEST_5m_features.csv"
+        csv_path = tmp_path / "TEST_15m_features.csv"
         _make_feature_csv(csv_path, n=100)
-        convert_all_features(tmp_path, "5m", workers=1, delete_csv=False)
+        convert_all_features(tmp_path, "15m", workers=1, delete_csv=False)
 
         # Mix of real and fake timestamps
         lookups = [("TEST", 0), ("TEST", 999_999_999)]
-        result = lookup_features(lookups, features_dir=tmp_path, interval="5m")
+        result = lookup_features(lookups, features_dir=tmp_path, interval="15m")
 
         assert len(result) == 1
         assert result.iloc[0]["open_time"] == 0
@@ -155,19 +155,19 @@ class TestLookupParquet:
         result = lookup_features(
             [("NOSYMBOL", 0)],
             features_dir=tmp_path,
-            interval="5m",
+            interval="15m",
         )
         assert len(result) == 0
 
     def test_multiple_symbols(self, tmp_path: Path):
         for sym in ["AAA", "BBB"]:
-            csv_path = tmp_path / f"{sym}_5m_features.csv"
+            csv_path = tmp_path / f"{sym}_15m_features.csv"
             _make_feature_csv(csv_path, n=50)
 
-        convert_all_features(tmp_path, "5m", workers=1, delete_csv=False)
+        convert_all_features(tmp_path, "15m", workers=1, delete_csv=False)
 
-        lookups = [("AAA", 0), ("AAA", 300_000), ("BBB", 0)]
-        result = lookup_features(lookups, features_dir=tmp_path, interval="5m")
+        lookups = [("AAA", 0), ("AAA", 900_000), ("BBB", 0)]
+        result = lookup_features(lookups, features_dir=tmp_path, interval="15m")
 
         assert len(result) == 3
         assert set(result["symbol"]) == {"AAA", "BBB"}
@@ -175,14 +175,14 @@ class TestLookupParquet:
         assert list(result["symbol"]) == ["AAA", "AAA", "BBB"]
 
     def test_column_pruning(self, tmp_path: Path):
-        csv_path = tmp_path / "TEST_5m_features.csv"
+        csv_path = tmp_path / "TEST_15m_features.csv"
         _make_feature_csv(csv_path, n=100)
-        convert_all_features(tmp_path, "5m", workers=1, delete_csv=False)
+        convert_all_features(tmp_path, "15m", workers=1, delete_csv=False)
 
         result = lookup_features(
             [("TEST", 0)],
             features_dir=tmp_path,
-            interval="5m",
+            interval="15m",
             columns=["feat_a", "feat_b"],
         )
 
@@ -202,7 +202,7 @@ class TestWriteParquet:
         rng = np.random.default_rng(42)
         df = pd.DataFrame(
             {
-                "open_time": np.arange(100, dtype=np.int64) * 300_000,
+                "open_time": np.arange(100, dtype=np.int64) * 900_000,
                 "value": rng.normal(0, 1, 100),
             }
         )

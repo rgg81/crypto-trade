@@ -27,7 +27,7 @@ def _make_kline_array(**kwargs: list[float]) -> KlineArray:
     close_time = (
         np.array(kwargs["close_time"], dtype=np.int64)
         if "close_time" in kwargs
-        else open_time + 299999
+        else open_time + 899999
     )
 
     return KlineArray.from_arrays(
@@ -123,7 +123,7 @@ class TestRangeSpikeFilter:
 
     def test_default_params(self) -> None:
         f = RangeSpikeFilter()
-        assert f.window == 48
+        assert f.window == 16
         assert f.threshold == 5.85
 
 

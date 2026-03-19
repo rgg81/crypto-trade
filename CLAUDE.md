@@ -19,8 +19,8 @@
 
 ### `bulk` — Bulk download from data.binance.vision
 
-- `uv run crypto-trade bulk --symbols BTCUSDT,ETHUSDT --intervals 1m,5m` — specific symbols
-- `uv run crypto-trade bulk --all --intervals 1m,5m` — all symbols (including delisted)
+- `uv run crypto-trade bulk --symbols BTCUSDT,ETHUSDT --intervals 1m,15m` — specific symbols
+- `uv run crypto-trade bulk --all --intervals 1m,15m` — all symbols (including delisted)
 - `uv run crypto-trade bulk --symbols BTCUSDT --intervals 1m --api-backfill` — bulk + fill current month via API
 - Downloads monthly ZIP archives — much faster than API for historical data
 - Incremental: re-running skips already-downloaded months
@@ -28,11 +28,11 @@
 ### `backtest` — Run strategy backtests
 
 - `uv run crypto-trade backtest --list` — list all available strategies
-- `uv run crypto-trade backtest --strategy momentum --symbols BTCUSDT --interval 5m` — basic run
-- `uv run crypto-trade backtest --strategy rsi_bb --symbols BTCUSDT --interval 5m --range-spike-filter` — with notebook volatility filter
-- `uv run crypto-trade backtest --strategy mean_reversion --symbols BTCUSDT,ETHUSDT --interval 5m --start 2024-01-01 --end 2024-12-31` — date range
-- `uv run crypto-trade backtest --strategy momentum --symbols BTCUSDT --interval 5m --stop-loss 2.0 --take-profit 3.0 --timeout 120 --fee 0.1` — custom SL/TP/timeout/fee
-- `uv run crypto-trade backtest --strategy mean_reversion --symbols BTCUSDT --interval 5m --params lookback=30,multiplier=3.0` — custom strategy params
+- `uv run crypto-trade backtest --strategy momentum --symbols BTCUSDT --interval 15m` — basic run
+- `uv run crypto-trade backtest --strategy rsi_bb --symbols BTCUSDT --interval 15m --range-spike-filter` — with notebook volatility filter
+- `uv run crypto-trade backtest --strategy mean_reversion --symbols BTCUSDT,ETHUSDT --interval 15m --start 2024-01-01 --end 2024-12-31` — date range
+- `uv run crypto-trade backtest --strategy momentum --symbols BTCUSDT --interval 15m --stop-loss 2.0 --take-profit 3.0 --timeout 120 --fee 0.1` — custom SL/TP/timeout/fee
+- `uv run crypto-trade backtest --strategy mean_reversion --symbols BTCUSDT --interval 15m --params lookback=30,multiplier=3.0` — custom strategy params
 - `--range-spike-filter` and `--volume-filter` can be combined with any strategy
 - Strategies: `momentum`, `mean_reversion`, `wick_rejection`, `inside_bar`, `gap_fill`, `consecutive_reversal`, `rsi_bb`, `bb_squeeze`
 
@@ -91,11 +91,11 @@
 
 Core approach: **detect high-volatility moments using `range_spike`** (candle range normalized by rolling mean), then trade them.
 
-- **Best filter**: `range_spike_48` (4h rolling window on 5m candles), threshold ~5.85
+- **Best filter**: `range_spike_16` (4h rolling window on 15m candles), threshold ~5.85
 - Triggered candles have **6.7x larger absolute returns** than average (2.28% vs 0.34%)
 - Forward fluctuation of 0.043 (avg 4.3% movement over next 2h after trigger)
-- ~600 signals/month across 118 symbols on 5m candles
-- `range_spike = (high - low) / open / rolling_mean(range_ratio, window=48)`
+- ~600 signals/month across 118 symbols on 15m candles
+- `range_spike = (high - low) / open / rolling_mean(range_ratio, window=16)`
 
 Strategies decide **direction and timing** when a volatile moment occurs. The `range_spike` threshold acts as a composable filter wrapping any strategy.
 
