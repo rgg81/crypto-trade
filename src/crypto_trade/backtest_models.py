@@ -17,6 +17,14 @@ class Strategy(Protocol):
         """Return signal for one candle. Reads from stored features."""
         ...
 
+    def skip(self) -> None:
+        """Advance internal position without computing a signal.
+
+        Filters call this on the inner strategy when the candle is blocked,
+        avoiding unnecessary computation while keeping ``_pos`` synchronized.
+        """
+        ...
+
 
 @dataclass(frozen=True)
 class Signal:

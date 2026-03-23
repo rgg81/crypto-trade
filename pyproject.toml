@@ -13,6 +13,7 @@ dependencies = [
     "tqdm>=4.66",
     "optuna>=3.0",
     "scikit-learn>=1.5",
+    "quantstats>=0.0.62",
 ]
 
 [project.scripts]

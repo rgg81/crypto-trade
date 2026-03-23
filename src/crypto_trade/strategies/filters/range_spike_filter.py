@@ -37,12 +37,17 @@ class RangeSpikeFilter:
         self._passes = (range_spike >= self.threshold).values
         self._pos = 0
 
+    def skip(self) -> None:
+        self._pos += 1
+        if self.inner is not None:
+            self.inner.skip()
+
     def get_signal(self, symbol: str, open_time: int) -> Signal:
         i = self._pos
         self._pos += 1
         if not self._passes[i]:
             if self.inner is not None:
-                self.inner.get_signal(symbol, open_time)
+                self.inner.skip()
             return NO_SIGNAL
         if self.inner is not None:
             return self.inner.get_signal(symbol, open_time)

@@ -65,6 +65,9 @@ class AlwaysBuy:
     def compute_features(self, master: pd.DataFrame) -> None:
         self._pos = 0
 
+    def skip(self) -> None:
+        self._pos += 1
+
     def get_signal(self, symbol: str, open_time: int) -> Signal:
         self._pos += 1
         return Signal(direction=1, weight=100)

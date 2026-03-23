@@ -28,9 +28,7 @@ def convert_features_to_parquet(
         for chunk in pd.read_csv(csv_path, chunksize=row_group_size):
             table = pa.Table.from_pandas(chunk, preserve_index=False)
             if writer is None:
-                writer = pq.ParquetWriter(
-                    parquet_path, table.schema, compression="zstd"
-                )
+                writer = pq.ParquetWriter(parquet_path, table.schema, compression="zstd")
             writer.write_table(table)
             total_rows += len(chunk)
     finally:

@@ -7,7 +7,11 @@ import pytest
 
 from crypto_trade.backtest import run_backtest
 from crypto_trade.backtest_models import BacktestConfig, Signal, TradeResult
-from crypto_trade.backtest_report import aggregate_daily_pnl
+from crypto_trade.backtest_report import (
+    aggregate_daily_pnl,
+    generate_html_report,
+    to_daily_returns_series,
+)
 from crypto_trade.models import Kline
 from crypto_trade.storage import write_klines
 
@@ -1596,3 +1600,95 @@ class TestChronologicalIteration:
         # Both symbols were visited
         symbols_seen = {s for s, _ in strat.calls}
         assert symbols_seen == {"SYM_A", "SYM_B"}
+
+
+# ---------------------------------------------------------------------------
+# Daily Returns Series & HTML Report
+# ---------------------------------------------------------------------------
+
+DAY_MS = 86_400_000  # 1 day in ms
+
+
+def _make_trade(close_time: int, weighted_pnl: float) -> TradeResult:
+    """Create a minimal TradeResult for returns tests."""
+    return TradeResult(
+        symbol="TEST",
+        direction=1,
+        entry_price=100.0,
+        exit_price=101.0,
+        weight_factor=1.0,
+        open_time=close_time - 3_600_000,
+        close_time=close_time,
+        exit_reason="take_profit",
+        pnl_pct=weighted_pnl,
+        fee_pct=0.0,
+        net_pnl_pct=weighted_pnl,
+        weighted_pnl=weighted_pnl,
+    )
+
+
+class TestDailyReturnsSeries:
+    # 2024-01-15 00:00 UTC in ms
+    DAY1 = 1_705_276_800_000
+    DAY2 = DAY1 + DAY_MS
+    DAY3 = DAY1 + 2 * DAY_MS
+
+    def test_basic(self) -> None:
+        """Two trades on different days produce correct decimal returns."""
+        trades = [
+            _make_trade(self.DAY1, 2.0),  # +2%
+            _make_trade(self.DAY2, -1.0),  # -1%
+        ]
+        s = to_daily_returns_series(trades)
+        assert len(s) == 2
+        assert abs(s.iloc[0] - 0.02) < 1e-9
+        assert abs(s.iloc[1] - (-0.01)) < 1e-9
+
+    def test_fills_gaps(self) -> None:
+        """Missing days between trades are filled with 0.0."""
+        trades = [
+            _make_trade(self.DAY1, 1.0),
+            _make_trade(self.DAY3, 1.0),
+        ]
+        s = to_daily_returns_series(trades)
+        assert len(s) == 3
+        assert s.iloc[1] == 0.0
+
+    def test_sums_same_day(self) -> None:
+        """Multiple trades on the same day are summed."""
+        trades = [
+            _make_trade(self.DAY1, 1.5),
+            _make_trade(self.DAY1, 0.5),
+        ]
+        s = to_daily_returns_series(trades)
+        assert len(s) == 1
+        assert abs(s.iloc[0] - 0.02) < 1e-9  # (1.5 + 0.5) / 100
+
+    def test_empty(self) -> None:
+        """Empty input returns empty Series."""
+        s = to_daily_returns_series([])
+        assert s.empty
+
+    def test_date_range_extends(self) -> None:
+        """start_date/end_date extend the series beyond trade dates."""
+        trades = [_make_trade(self.DAY2, 1.0)]
+        s = to_daily_returns_series(trades, start_date="2024-01-15", end_date="2024-01-19")
+        assert len(s) == 5  # Jan 15-19
+        assert s.iloc[0] == 0.0  # Jan 15 (before trade)
+        assert abs(s.iloc[1] - 0.01) < 1e-9  # Jan 16 (trade day)
+        assert s.iloc[-1] == 0.0  # Jan 19 (after trade)
+
+
+class TestGenerateHtmlReport:
+    def test_creates_file(self, tmp_path: Path) -> None:
+        """Integration test: HTML file is created and contains title."""
+        import numpy as np
+
+        idx = pd.date_range("2024-01-01", periods=60, freq="D")
+        rng = np.random.default_rng(42)
+        returns = pd.Series(rng.normal(0.001, 0.02, len(idx)), index=idx, name="Returns")
+
+        out = generate_html_report(returns, tmp_path / "report.html", title="Test Report")
+        assert Path(out).exists()
+        content = Path(out).read_text()
+        assert "Test Report" in content

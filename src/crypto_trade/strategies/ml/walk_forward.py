@@ -107,10 +107,7 @@ def select_training_samples(
     # Group by calendar month
     ts_seconds = open_times[window_indices] / 1000.0
     month_keys = np.array(
-        [
-            datetime.datetime.fromtimestamp(t, tz=datetime.UTC).strftime("%Y-%m")
-            for t in ts_seconds
-        ]
+        [datetime.datetime.fromtimestamp(t, tz=datetime.UTC).strftime("%Y-%m") for t in ts_seconds]
     )
     unique_months = list(dict.fromkeys(month_keys))  # preserves order
     n_months = len(unique_months)

@@ -140,8 +140,8 @@ class AdaptiveRangeSpikeFilter:
     """
 
     inner: Strategy | None = None
-    window: int = 16
-    target_signals_month: int = 400
+    window: int = 32
+    target_signals_month: int = 100
     recalibrate_days: int = 30
     min_history_days: int = 30
     initial_threshold: float = 5.85
@@ -187,6 +187,11 @@ class AdaptiveRangeSpikeFilter:
             positive = diffs[diffs > 0]
             if len(positive) > 0:
                 self._interval_ms = int(np.min(positive))
+
+    def skip(self) -> None:
+        self._pos += 1
+        if self.inner is not None:
+            self.inner.skip()
 
     def get_signal(self, symbol: str, open_time: int) -> Signal:
         i = self._pos
@@ -245,7 +250,7 @@ class AdaptiveRangeSpikeFilter:
 
         if not passes:
             if self.inner is not None:
-                self.inner.get_signal(symbol, open_time)
+                self.inner.skip()
             return NO_SIGNAL
 
         dt = datetime.fromtimestamp(ot / 1000, tz=UTC)
@@ -254,4 +259,3 @@ class AdaptiveRangeSpikeFilter:
         if self.inner is not None:
             return self.inner.get_signal(symbol, open_time)
         return NO_SIGNAL
-

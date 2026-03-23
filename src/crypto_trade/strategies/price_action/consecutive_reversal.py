@@ -32,6 +32,9 @@ class ConsecutiveReversalStrategy:
         self._bear = bear_streak.values
         self._pos = 0
 
+    def skip(self) -> None:
+        self._pos += 1
+
     def get_signal(self, symbol: str, open_time: int) -> Signal:
         i = self._pos
         self._pos += 1

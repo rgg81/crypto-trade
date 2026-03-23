@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import datetime
 import tracemalloc
 
 import numpy as np
@@ -17,9 +18,109 @@ from crypto_trade.kline_array import load_kline_array
 from crypto_trade.storage import csv_path
 
 
+def _sync_label_params(strategy: Strategy, config: BacktestConfig) -> None:
+    """Push backtest config TP/SL/timeout into ML strategies that use them for labeling.
+
+    Walks through filter wrappers (inner chains) to find the leaf strategy.
+    Only overrides attributes that still hold their default values, so explicit
+    ``--params label_tp_pct=X`` from the CLI takes precedence.
+    """
+    # Unwrap filter chain to find the innermost strategy
+    target = strategy
+    while hasattr(target, "inner") and target.inner is not None:
+        target = target.inner
+
+    defaults = {"label_tp_pct": 3.0, "label_sl_pct": 2.0, "label_timeout_minutes": 120}
+    mapping = {
+        "label_tp_pct": config.take_profit_pct,
+        "label_sl_pct": config.stop_loss_pct,
+        "label_timeout_minutes": config.timeout_minutes,
+    }
+    for attr, config_val in mapping.items():
+        if hasattr(target, attr) and getattr(target, attr) == defaults[attr]:
+            setattr(target, attr, config_val)
+
+
 def _mem_report(label: str) -> None:
     current, peak = tracemalloc.get_traced_memory()
     print(f"[memory] {label}: current={current / 1e9:.2f} GB, peak={peak / 1e9:.2f} GB")
+
+
+def _detect_verbose(strategy: Strategy) -> int:
+    """Walk the strategy/filter chain to find a ``verbose`` attribute."""
+    target = strategy
+    while True:
+        if hasattr(target, "verbose"):
+            return int(target.verbose)
+        if hasattr(target, "inner") and target.inner is not None:
+            target = target.inner
+        else:
+            return 0
+
+
+def _flush_predict_log(strategy: Strategy) -> None:
+    """Walk chain, print and clear any stored ``_last_predict_log``."""
+    target = strategy
+    while True:
+        log = getattr(target, "_last_predict_log", None)
+        if log is not None:
+            print(log)
+            target._last_predict_log = None
+            return
+        if hasattr(target, "inner") and target.inner is not None:
+            target = target.inner
+        else:
+            return
+
+
+def _fmt_ms(ms: int) -> str:
+    """Format epoch milliseconds as 'YYYY-MM-DD HH:MM'."""
+    return datetime.datetime.fromtimestamp(ms / 1000, tz=datetime.UTC).strftime("%Y-%m-%d %H:%M")
+
+
+def _month_of(ms: int) -> str:
+    """Return 'YYYY-MM' for an epoch-ms timestamp."""
+    return datetime.datetime.fromtimestamp(ms / 1000, tz=datetime.UTC).strftime("%Y-%m")
+
+
+def _day_of(ms: int) -> str:
+    """Return 'YYYY-MM-DD' for an epoch-ms timestamp."""
+    return datetime.datetime.fromtimestamp(ms / 1000, tz=datetime.UTC).strftime("%Y-%m-%d")
+
+
+def _log_trade_open(order: Order) -> None:
+    """Print trade open event."""
+    direction = "LONG" if order.direction == 1 else "SHORT"
+    print(
+        f"[trade:open] {_fmt_ms(order.open_time)} {order.symbol} {direction} "
+        f"@ {order.entry_price:.2f} | "
+        f"SL={order.stop_loss_price:.2f} TP={order.take_profit_price:.2f} | "
+        f"timeout={_fmt_ms(order.timeout_time)}"
+    )
+
+
+def _log_trade_close(
+    result: TradeResult,
+    cum_net_pnl: float,
+    month_net_pnl: float,
+    month_label: str,
+    day_net_pnl: float,
+    day_label: str,
+) -> None:
+    """Print trade close event with cumulative PnL."""
+    direction = "LONG" if result.direction == 1 else "SHORT"
+    sign = "+" if result.pnl_pct >= 0 else ""
+    net_sign = "+" if result.net_pnl_pct >= 0 else ""
+    cum_sign = "+" if cum_net_pnl >= 0 else ""
+    mo_sign = "+" if month_net_pnl >= 0 else ""
+    day_sign = "+" if day_net_pnl >= 0 else ""
+    print(
+        f"[trade:close] {_fmt_ms(result.close_time)} {result.symbol} {direction} "
+        f"→ {result.exit_reason} @ {result.exit_price:.2f} | "
+        f"PnL={sign}{result.pnl_pct:.2f}% (net {net_sign}{result.net_pnl_pct:.2f}%) | "
+        f"cum={cum_sign}{cum_net_pnl:.2f}% {month_label}={mo_sign}{month_net_pnl:.2f}% "
+        f"{day_label}={day_sign}{day_net_pnl:.2f}%"
+    )
 
 
 def run_backtest(
@@ -31,6 +132,11 @@ def run_backtest(
     """Run a backtest over historical kline data using the given strategy."""
     if profile_memory:
         tracemalloc.start()
+
+    # Sync labeling params from backtest config into ML strategies
+    _sync_label_params(strategy, config)
+
+    verbose = _detect_verbose(strategy)
 
     master = _build_master(config)
     if master.empty:
@@ -59,6 +165,13 @@ def run_backtest(
     results: list[TradeResult] = []
     total_signals = 0
 
+    # Running PnL accumulators for verbose logging
+    cum_net_pnl = 0.0
+    month_net_pnl = 0.0
+    current_month = ""
+    day_net_pnl = 0.0
+    current_day = ""
+
     for i in range(len(master)):
         sym = str(sym_arr[i])
         ot = int(open_time_arr[i])
@@ -77,6 +190,26 @@ def run_backtest(
             if result is not None:
                 results.append(result)
                 del open_orders[sym]
+                if verbose > 0:
+                    month_label = _month_of(result.close_time)
+                    if month_label != current_month:
+                        month_net_pnl = 0.0
+                        current_month = month_label
+                    day_label = _day_of(result.close_time)
+                    if day_label != current_day:
+                        day_net_pnl = 0.0
+                        current_day = day_label
+                    cum_net_pnl += result.net_pnl_pct
+                    month_net_pnl += result.net_pnl_pct
+                    day_net_pnl += result.net_pnl_pct
+                    _log_trade_close(
+                        result,
+                        cum_net_pnl,
+                        month_net_pnl,
+                        current_month,
+                        day_net_pnl,
+                        current_day,
+                    )
 
         # (b) Ask strategy for signal
         signal = strategy.get_signal(sym, ot)
@@ -91,6 +224,9 @@ def run_backtest(
                     config,
                 )
                 open_orders[sym] = order
+                if verbose > 0:
+                    _flush_predict_log(strategy)
+                    _log_trade_open(order)
 
     # End-of-data: force-close remaining orders
     last_per_sym: dict[str, int] = {}
@@ -102,7 +238,28 @@ def run_backtest(
         idx = last_per_sym[sym]
         exit_price = float(close_arr[idx])
         exit_time = int(close_time_arr[idx])
-        results.append(_make_result(order, exit_price, exit_time, "end_of_data", config.fee_pct))
+        result = _make_result(order, exit_price, exit_time, "end_of_data", config.fee_pct)
+        results.append(result)
+        if verbose > 0:
+            month_label = _month_of(result.close_time)
+            if month_label != current_month:
+                month_net_pnl = 0.0
+                current_month = month_label
+            day_label = _day_of(result.close_time)
+            if day_label != current_day:
+                day_net_pnl = 0.0
+                current_day = day_label
+            cum_net_pnl += result.net_pnl_pct
+            month_net_pnl += result.net_pnl_pct
+            day_net_pnl += result.net_pnl_pct
+            _log_trade_close(
+                result,
+                cum_net_pnl,
+                month_net_pnl,
+                current_month,
+                day_net_pnl,
+                current_day,
+            )
 
     results.sort(key=lambda r: r.close_time)
 

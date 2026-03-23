@@ -53,8 +53,8 @@ from crypto_trade.strategies.filters.range_spike_filter import RangeSpikeFilter 
 from crypto_trade.strategies.filters.volume_filter import VolumeFilter  # noqa: E402
 from crypto_trade.strategies.indicator.bb_squeeze import BbSqueezeStrategy  # noqa: E402
 from crypto_trade.strategies.indicator.rsi_bb import RsiBbStrategy  # noqa: E402
-from crypto_trade.strategies.ml.range_spike_lgbm import (  # noqa: E402
-    RangeSpikeLightGbmStrategy,
+from crypto_trade.strategies.ml.lgbm import (  # noqa: E402
+    LightGbmStrategy,
 )
 from crypto_trade.strategies.price_action.consecutive_continuation import (  # noqa: E402
     ConsecutiveContinuationStrategy,
@@ -88,7 +88,7 @@ _register("bb_squeeze", BbSqueezeStrategy)
 _register("adaptive_range_spike_filter", AdaptiveRangeSpikeFilter)
 _register("range_spike_filter", RangeSpikeFilter)
 _register("volume_filter", VolumeFilter)
-_register("range_spike_lgbm", RangeSpikeLightGbmStrategy)
+_register("lgbm", LightGbmStrategy)
 
 __all__ = [
     "NO_SIGNAL",
@@ -103,7 +103,7 @@ __all__ = [
     "MeanReversionStrategy",
     "MomentumStrategy",
     "RangeSpikeFilter",
-    "RangeSpikeLightGbmStrategy",
+    "LightGbmStrategy",
     "RsiBbStrategy",
     "VolumeFilter",
     "WickRejectionStrategy",

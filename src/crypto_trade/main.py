@@ -212,6 +212,13 @@ def main() -> None:
     bt_parser.add_argument(
         "--profile-memory", action="store_true", help="Print tracemalloc memory usage at key stages"
     )
+    bt_parser.add_argument(
+        "--report",
+        nargs="?",
+        const="auto",
+        default=None,
+        help="Generate quantstats HTML tearsheet (optional: output path)",
+    )
 
     args = parser.parse_args()
 
@@ -478,6 +485,30 @@ def _cmd_backtest(args, settings) -> None:
                 f"    {dt:%Y-%m-%d %H:%M}  {cal.threshold:>10.4f}  {cal.signals_per_month:>10.0f}  "
             )
 
+    # HTML tearsheet
+    if args.report is not None:
+        from crypto_trade.backtest_report import generate_html_report, to_daily_returns_series
+
+        returns = to_daily_returns_series(results, args.start, args.end)
+        if returns.empty:
+            print("\nNo daily returns to report.")
+        else:
+            if args.report == "auto":
+                date_tag = datetime.now(tz=UTC).strftime("%Y%m%d")
+                sym_tag = symbols[0] if len(symbols) == 1 else f"{len(symbols)}syms"
+                report_path = f"{args.strategy}_{sym_tag}_{args.interval}_{date_tag}.html"
+            else:
+                report_path = args.report
+
+            title_parts = [args.strategy]
+            if filters_desc:
+                title_parts.append(f"[{', '.join(filters_desc)}]")
+            title_parts.append(f"{', '.join(symbols)} {args.interval}")
+            title = " | ".join(title_parts)
+
+            out = generate_html_report(returns, report_path, title=title)
+            print(f"\nReport saved to {out}")
+
 
 def _cmd_features(args, settings) -> None:
     from pathlib import Path
@@ -503,9 +534,7 @@ def _cmd_features(args, settings) -> None:
             sys.exit(1)
     else:
         symbols = (
-            [s.strip() for s in args.symbols.split(",")]
-            if args.symbols
-            else list(settings.symbols)
+            [s.strip() for s in args.symbols.split(",")] if args.symbols else list(settings.symbols)
         )
     groups_arg = args.groups.strip()
     if groups_arg == "all":

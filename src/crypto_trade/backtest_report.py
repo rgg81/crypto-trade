@@ -3,6 +3,9 @@ from __future__ import annotations
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from pathlib import Path
+
+import pandas as pd
 
 from crypto_trade.backtest_models import DailyPnL, TradeResult
 
@@ -111,3 +114,88 @@ def aggregate_daily_pnl(results: list[TradeResult]) -> list[DailyPnL]:
             )
         )
     return daily
+
+
+def to_daily_returns_series(
+    results: list[TradeResult],
+    start_date: str | None = None,
+    end_date: str | None = None,
+) -> pd.Series:
+    """Convert trade results to a daily returns Series for quantstats.
+
+    Groups trades by close_time date (UTC), sums weighted_pnl per day,
+    converts percentage to decimal (/ 100), and fills missing calendar
+    days with 0.0.
+
+    Args:
+        results: List of TradeResult from a backtest run.
+        start_date: Optional YYYY-MM-DD to extend series start.
+        end_date: Optional YYYY-MM-DD to extend series end.
+
+    Returns:
+        pd.Series with DatetimeIndex (daily frequency), values as decimal returns.
+    """
+    if not results:
+        return pd.Series(dtype=float)
+
+    # Sum weighted_pnl per close-date
+    by_day: dict[str, float] = {}
+    for r in results:
+        date_str = datetime.fromtimestamp(r.close_time / 1000, tz=UTC).strftime("%Y-%m-%d")
+        by_day[date_str] = by_day.get(date_str, 0.0) + r.weighted_pnl
+
+    series = pd.Series(by_day, dtype=float)
+    series.index = pd.to_datetime(series.index)
+
+    # Determine date range
+    first = series.index.min()
+    last = series.index.max()
+    if start_date:
+        sd = pd.Timestamp(start_date)
+        if sd < first:
+            first = sd
+    if end_date:
+        ed = pd.Timestamp(end_date)
+        if ed > last:
+            last = ed
+
+    idx = pd.date_range(first, last, freq="D")
+    series = series.reindex(idx, fill_value=0.0)
+    series = series / 100.0  # pct -> decimal
+    series.index.name = "Date"
+    series.name = "Returns"
+    return series
+
+
+def generate_html_report(
+    returns: pd.Series,
+    output_path: str | Path,
+    title: str = "Backtest Report",
+) -> str:
+    """Generate a quantstats HTML tearsheet.
+
+    Uses ``compounded=False`` because each trade allocates a fixed dollar
+    amount — daily returns are additive sums, not portfolio growth rates.
+
+    Args:
+        returns: Daily returns Series (decimal, DatetimeIndex).
+        output_path: Where to write the HTML file.
+        title: Report title.
+
+    Returns:
+        Absolute path of the generated file.
+    """
+    import quantstats as qs
+
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    qs.reports.html(
+        returns,
+        output=str(output_path),
+        title=title,
+        periods_per_year=365,
+        benchmark=None,
+        compounded=False,
+    )
+    return str(output_path.resolve())

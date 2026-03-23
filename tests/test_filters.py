@@ -58,6 +58,9 @@ class AlwaysBuy:
         self._pos = 0
         self._n = len(master)
 
+    def skip(self) -> None:
+        self._pos += 1
+
     def get_signal(self, symbol: str, open_time: int) -> Signal:
         self._pos += 1
         return Signal(direction=1, weight=100)
@@ -193,3 +196,73 @@ class TestFilterStacking:
         stacked = VolumeFilter(inner=inner, lookback=10, multiplier=1.5)
         result = _get_last_signal(stacked, master)
         assert result.direction == 0
+
+
+# ---------------------------------------------------------------------------
+# Skip
+# ---------------------------------------------------------------------------
+
+
+class TestSkip:
+    def test_skip_increments_pos_on_filter_and_inner(self) -> None:
+        """skip() advances _pos on both the filter and the inner strategy."""
+        leaf = AlwaysBuy()
+        f = RangeSpikeFilter(inner=leaf, window=10, threshold=2.0)
+        master = _make_master(
+            open=[100.0] * 10,
+            high=[102.0] * 10,
+            low=[98.0] * 10,
+        )
+        f.compute_features(master)
+        assert f._pos == 0
+        assert leaf._pos == 0
+
+        f.skip()
+        assert f._pos == 1
+        assert leaf._pos == 1
+
+        f.skip()
+        assert f._pos == 2
+        assert leaf._pos == 2
+
+    def test_nested_skip_propagates(self) -> None:
+        """skip() propagates through nested filters to the leaf."""
+        leaf = AlwaysBuy()
+        inner_filter = RangeSpikeFilter(inner=leaf, window=10, threshold=2.0)
+        outer_filter = VolumeFilter(inner=inner_filter, lookback=5, multiplier=1.5)
+
+        master = _make_master(
+            open=[100.0] * 10,
+            high=[102.0] * 10,
+            low=[98.0] * 10,
+            volume=[1000.0] * 10,
+        )
+        outer_filter.compute_features(master)
+
+        outer_filter.skip()
+        assert outer_filter._pos == 1
+        assert inner_filter._pos == 1
+        assert leaf._pos == 1
+
+    def test_blocked_candles_call_skip_not_get_signal(self) -> None:
+        """When filter blocks, inner _pos advances via skip() without side effects."""
+        leaf = AlwaysBuy()
+        # All uniform candles → range_spike=1.0 < threshold=2.0 → all blocked
+        f = RangeSpikeFilter(inner=leaf, window=10, threshold=2.0)
+        master = _make_master(
+            open=[100.0] * 10,
+            high=[102.0] * 10,
+            low=[98.0] * 10,
+        )
+        f.compute_features(master)
+
+        # Walk through all candles — all should be blocked
+        syms = master["symbol"].values
+        ots = master["open_time"].values
+        for i in range(len(master)):
+            sig = f.get_signal(str(syms[i]), int(ots[i]))
+            assert sig.direction == 0
+
+        # Both filter and leaf _pos should have advanced to len(master)
+        assert f._pos == len(master)
+        assert leaf._pos == len(master)

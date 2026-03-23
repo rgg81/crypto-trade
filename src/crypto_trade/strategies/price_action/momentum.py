@@ -42,6 +42,9 @@ class MomentumStrategy:
         self._bear = all_bear.values
         self._pos = 0
 
+    def skip(self) -> None:
+        self._pos += 1
+
     def get_signal(self, symbol: str, open_time: int) -> Signal:
         i = self._pos
         self._pos += 1

@@ -33,6 +33,8 @@
 - `uv run crypto-trade backtest --strategy mean_reversion --symbols BTCUSDT,ETHUSDT --interval 15m --start 2024-01-01 --end 2024-12-31` — date range
 - `uv run crypto-trade backtest --strategy momentum --symbols BTCUSDT --interval 15m --stop-loss 2.0 --take-profit 3.0 --timeout 120 --fee 0.1` — custom SL/TP/timeout/fee
 - `uv run crypto-trade backtest --strategy mean_reversion --symbols BTCUSDT --interval 15m --params lookback=30,multiplier=3.0` — custom strategy params
+- `uv run crypto-trade backtest --strategy momentum --symbols BTCUSDT --interval 15m --report` — generate quantstats HTML tearsheet (auto-named)
+- `uv run crypto-trade backtest --strategy momentum --symbols BTCUSDT --interval 15m --report my_report.html` — custom output path
 - `--range-spike-filter` and `--volume-filter` can be combined with any strategy
 - Strategies: `momentum`, `mean_reversion`, `wick_rejection`, `inside_bar`, `gap_fill`, `consecutive_reversal`, `rsi_bb`, `bb_squeeze`
 
