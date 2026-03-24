@@ -294,12 +294,12 @@ def _objective(
     min_period = trial.suggest_int("min_period", 3, 30)
     max_period = trial.suggest_int("max_period", max(min_period + 1, 10), 100)
 
-    confidence_threshold = trial.suggest_float("confidence_threshold", 0.50, 0.85)
+    confidence_threshold = trial.suggest_float("confidence_threshold", 0.50, 0.55)
 
     # Training window size (optimized by Optuna when open_times provided)
     training_days: int | None = None
     if open_times is not None:
-        training_days = trial.suggest_int("training_days", 5, 15)
+        training_days = trial.suggest_int("training_days", 10, 500, step=10)
 
     selected_cols = select_feature_columns(feature_col_map, use_groups, min_period, max_period)
     if not selected_cols:
@@ -313,7 +313,7 @@ def _objective(
     params = {
         "objective": "binary",
         "n_estimators": trial.suggest_int("n_estimators", 50, 500),
-        "max_depth": trial.suggest_int("max_depth", 3, 10),
+        "max_depth": trial.suggest_int("max_depth", 3, 5),
         "num_leaves": trial.suggest_int("num_leaves", 15, 127),
         "learning_rate": trial.suggest_float("learning_rate", 0.01, 0.3, log=True),
         "subsample": trial.suggest_float("subsample", 0.5, 1.0),

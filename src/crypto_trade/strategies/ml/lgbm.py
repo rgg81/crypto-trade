@@ -86,7 +86,7 @@ class LightGbmStrategy:
 
     def __init__(
         self,
-        training_months: int = 1,
+        training_months: int = 12,
         n_trials: int = 50,
         cv_splits: int = 5,
         label_tp_pct: float = 3.0,
@@ -110,7 +110,7 @@ class LightGbmStrategy:
         self._master: pd.DataFrame | None = None
         self._sym_arr: np.ndarray = np.array([])
         self._open_time_arr: np.ndarray = np.array([])
-        self._interval: str = "15m"
+        self._interval: str = "8h"
         self._all_feature_cols: list[str] = []
         self._splits: list[MonthSplit] = []
         self._split_map: dict[str, MonthSplit] = {}
@@ -348,7 +348,7 @@ class LightGbmStrategy:
     def _detect_interval(master: pd.DataFrame) -> str:
         """Detect interval from typical close_time - open_time gap."""
         if len(master) < 2:
-            return "15m"
+            return "8h"
         diff = master["close_time"].iloc[0] - master["open_time"].iloc[0]
         interval_map = {
             59_999: "1m",
@@ -358,10 +358,12 @@ class LightGbmStrategy:
             1_799_999: "30m",
             3_599_999: "1h",
             14_399_999: "4h",
+            28_799_999: "8h",
+            43_199_999: "12h",
             86_399_999: "1d",
         }
-        best = "15m"
-        best_dist = abs(diff - 899_999)
+        best = "8h"
+        best_dist = abs(diff - 28_799_999)
         for ms, name in interval_map.items():
             dist = abs(diff - ms)
             if dist < best_dist:
