@@ -2,6 +2,11 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
+# Fixed project-level constant — never changes between iterations.
+# Used by the reporting layer to split backtest results into IS / OOS batches.
+OOS_CUTOFF_DATE = "2025-03-24"
+OOS_CUTOFF_MS = 1742774400000  # 2025-03-24 00:00:00 UTC in epoch milliseconds
+
 
 @dataclass(frozen=True)
 class Settings:
