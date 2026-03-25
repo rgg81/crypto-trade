@@ -9,6 +9,7 @@ from crypto_trade.strategies.ml.labeling import label_trades
 from crypto_trade.strategies.ml.optimization import (
     classes_to_labels,
     compute_sharpe,
+    compute_sharpe_with_threshold,
     labels_to_classes,
 )
 from crypto_trade.strategies.ml.walk_forward import (
@@ -478,15 +479,15 @@ class TestLazyMonthlyTraining:
 
 
 # ---------------------------------------------------------------------------
-# get_signal always predicts direction (no threshold)
+# Confidence threshold tests
 # ---------------------------------------------------------------------------
 
 
-class TestAlwaysPredict:
+class TestConfidenceThreshold:
     _JAN_2024_MS = 1_704_067_200_000
 
-    def test_long_signal(self):
-        """Model predicting long → always returns long signal."""
+    def test_above_threshold_returns_signal(self):
+        """Confidence above threshold → returns direction."""
         from unittest.mock import MagicMock
 
         from crypto_trade.backtest_models import Signal
@@ -495,6 +496,7 @@ class TestAlwaysPredict:
         ot = self._JAN_2024_MS
         strategy = LightGbmStrategy(features_dir="/nonexistent")
         strategy._current_month = "2024-01"
+        strategy._confidence_threshold = 0.60
 
         mock_model = MagicMock()
         mock_model.predict_proba.return_value = np.array([[0.2, 0.8]])
@@ -505,8 +507,29 @@ class TestAlwaysPredict:
         signal = strategy.get_signal("BTCUSDT", ot)
         assert signal == Signal(direction=1, weight=100)
 
-    def test_short_signal(self):
-        """Model predicting short → always returns short signal."""
+    def test_below_threshold_returns_no_signal(self):
+        """Confidence below threshold → NO_SIGNAL."""
+        from unittest.mock import MagicMock
+
+        from crypto_trade.strategies import NO_SIGNAL
+        from crypto_trade.strategies.ml.lgbm import LightGbmStrategy
+
+        ot = self._JAN_2024_MS
+        strategy = LightGbmStrategy(features_dir="/nonexistent")
+        strategy._current_month = "2024-01"
+        strategy._confidence_threshold = 0.60
+
+        mock_model = MagicMock()
+        mock_model.predict_proba.return_value = np.array([[0.55, 0.45]])
+        strategy._model = mock_model
+        strategy._selected_cols = ["feat_a", "feat_b"]
+        strategy._month_features = {("BTCUSDT", ot): np.array([1.0, 2.0])}
+
+        signal = strategy.get_signal("BTCUSDT", ot)
+        assert signal == NO_SIGNAL
+
+    def test_short_signal_above_threshold(self):
+        """Short prediction above threshold → short signal."""
         from unittest.mock import MagicMock
 
         from crypto_trade.backtest_models import Signal
@@ -515,6 +538,7 @@ class TestAlwaysPredict:
         ot = self._JAN_2024_MS
         strategy = LightGbmStrategy(features_dir="/nonexistent")
         strategy._current_month = "2024-01"
+        strategy._confidence_threshold = 0.55
 
         mock_model = MagicMock()
         mock_model.predict_proba.return_value = np.array([[0.75, 0.25]])
@@ -525,23 +549,62 @@ class TestAlwaysPredict:
         signal = strategy.get_signal("BTCUSDT", ot)
         assert signal == Signal(direction=-1, weight=100)
 
-    def test_low_confidence_still_predicts(self):
-        """Even with low confidence, model still returns a direction."""
-        from unittest.mock import MagicMock
 
-        from crypto_trade.backtest_models import Signal
-        from crypto_trade.strategies.ml.lgbm import LightGbmStrategy
+# ---------------------------------------------------------------------------
+# Sharpe with threshold tests
+# ---------------------------------------------------------------------------
 
-        ot = self._JAN_2024_MS
-        strategy = LightGbmStrategy(features_dir="/nonexistent")
-        strategy._current_month = "2024-01"
 
-        mock_model = MagicMock()
-        # Very low confidence — still predicts
-        mock_model.predict_proba.return_value = np.array([[0.51, 0.49]])
-        strategy._model = mock_model
-        strategy._selected_cols = ["feat_a", "feat_b"]
-        strategy._month_features = {("BTCUSDT", ot): np.array([1.0, 2.0])}
+class TestSharpeWithThreshold:
+    def test_filters_low_confidence(self):
+        """High threshold filters out uncertain wrong predictions."""
+        # 10 confident correct predictions (proba >= 0.85)
+        # Predict long (argmax=1) with positive long_pnl
+        # Predict short (argmax=0) with positive short_pnl
+        proba_good = np.array(
+            [[0.15, 0.85]] * 5 + [[0.85, 0.15]] * 5, dtype=np.float64
+        )
+        # 10 uncertain WRONG predictions (proba ~0.52)
+        # Predict short (argmax=0) but short_pnl is negative
+        # Predict long (argmax=1) but long_pnl is negative
+        proba_bad = np.array(
+            [[0.52, 0.48]] * 5 + [[0.48, 0.52]] * 5, dtype=np.float64
+        )
+        y_proba = np.vstack([proba_good, proba_bad])
 
-        signal = strategy.get_signal("BTCUSDT", ot)
-        assert signal == Signal(direction=-1, weight=100)  # short wins at 0.51
+        # Good long predictions: long_pnl positive
+        # Good short predictions: short_pnl positive
+        # Bad short predictions (0.52,0.48→short): short_pnl negative
+        # Bad long predictions (0.48,0.52→long): long_pnl negative
+        long_pnls = np.array(
+            [3.9, 2.5, 3.9, 1.8, 3.5,   # good long
+             -2.1, -1.5, -2.1, -1.8, -0.8,  # good short (irrelevant)
+             3.9, 2.5, 3.9, 1.8, 3.5,   # bad short (irrelevant)
+             -2.1, -1.5, -2.1, -1.8, -0.8]  # bad long (gets this neg PnL)
+        )
+        short_pnls = np.array(
+            [-2.1, -1.5, -2.1, -1.8, -0.8,  # good long (irrelevant)
+             3.9, 2.5, 3.9, 1.8, 3.5,   # good short
+             -2.1, -1.5, -2.1, -1.8, -0.8,  # bad short (gets this neg PnL)
+             3.9, 2.5, 3.9, 1.8, 3.5]   # bad long (irrelevant)
+        )
+
+        # Strict: keeps only 10 confident correct → all positive PnL
+        sharpe_strict = compute_sharpe_with_threshold(
+            y_proba, long_pnls, short_pnls, threshold=0.70, min_trades=5
+        )
+        # Loose: keeps all 20 → 10 positive + 10 negative PnL
+        sharpe_loose = compute_sharpe_with_threshold(
+            y_proba, long_pnls, short_pnls, threshold=0.50, min_trades=5
+        )
+        assert sharpe_strict > sharpe_loose
+
+    def test_too_few_trades_penalty(self):
+        """Aggressive threshold with too few trades → -10.0."""
+        y_proba = np.array([[0.55, 0.45]] * 5)
+        long_pnls = np.array([3.9] * 5)
+        short_pnls = np.array([-2.1] * 5)
+        sharpe = compute_sharpe_with_threshold(
+            y_proba, long_pnls, short_pnls, threshold=0.80, min_trades=20
+        )
+        assert sharpe == -10.0
