@@ -33,6 +33,11 @@ htmlcov/
 # Data
 data/
 
+# Iteration artifacts — regenerable, large, binary
+reports/
+models/
+analysis/
+
 # Notebook outputs and checkpoints
 notebooks/output/
 notebooks/.ipynb_checkpoints/

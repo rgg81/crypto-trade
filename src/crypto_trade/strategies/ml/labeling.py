@@ -10,48 +10,72 @@ import pandas as pd
 _RESULT_NAMES = {1: "tp", -1: "sl", -2: "timeout", 0: "pending"}
 
 
+def _trade_pnl(result: int, tp_pct: float, sl_pct: float, fwd_return: float) -> float:
+    """Compute the actual PnL for a single direction's outcome.
+
+    Args:
+        result: 1=tp hit, -1=sl hit, -2=timeout, 0=pending/end-of-data.
+        tp_pct: Take-profit percentage (e.g. 4.0).
+        sl_pct: Stop-loss percentage (e.g. 2.0).
+        fwd_return: Forward return in percentage for timeout/pending cases.
+    """
+    if result == 1:
+        return tp_pct
+    if result == -1:
+        return -sl_pct
+    # timeout or pending — use actual forward return
+    return fwd_return
+
+
 def label_trades(
     master: pd.DataFrame,
     candidate_indices: np.ndarray,
     tp_pct: float,
     sl_pct: float,
     timeout_minutes: int,
+    fee_pct: float = 0.1,
     verbose: int = 0,
     verbose_samples: int = 20,
-) -> tuple[np.ndarray, np.ndarray]:
-    """Label each candidate candle as 1 (long) or -1 (short) with sample weights.
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Label each candidate candle as 1 (long) or -1 (short).
 
-    For each candidate, simulates both long and short trades forward from
-    close[i].  If one direction hits TP (and the other doesn't), that direction
-    wins.  If both hit or neither hits, the direction with the better forward
-    return is chosen.
-
-    Sample weights are proportional to the absolute forward return so that
-    high-conviction labels carry more influence during training.
+    Returns actual trade PnLs for both directions so the optimizer can
+    compute realistic Sharpe ratios.
 
     Args:
-        master: DataFrame with columns: symbol, open_time, close_time, open, high, low, close.
+        master: DataFrame with columns: symbol, open_time, close_time,
+                open, high, low, close.
         candidate_indices: Integer indices into master for candles to label.
-        tp_pct: Take-profit percentage (e.g. 3.0 means 3%).
+        tp_pct: Take-profit percentage (e.g. 4.0 means 4%).
         sl_pct: Stop-loss percentage (e.g. 2.0 means 2%).
         timeout_minutes: Maximum forward scan duration in minutes.
+        fee_pct: Trading fee percentage (deducted from returns).
         verbose: If > 0, print detailed labeling info for a random subset.
         verbose_samples: Number of random samples to print (default 20).
 
     Returns:
-        Tuple of (labels, weights):
+        Tuple of (labels, weights, long_pnls, short_pnls):
         - labels: array of 1 (long) or -1 (short)
-        - weights: array of positive floats (higher = stronger signal)
+        - weights: array of positive floats (net-of-fee return magnitude)
+        - long_pnls: array of net PnL if you go long (fee deducted)
+        - short_pnls: array of net PnL if you go short (fee deducted)
     """
-    if len(candidate_indices) == 0:
-        return np.array([], dtype=np.intp), np.array([], dtype=np.float64)
+    n = len(candidate_indices)
+    empty = (
+        np.array([], dtype=np.intp),
+        np.array([], dtype=np.float64),
+        np.array([], dtype=np.float64),
+        np.array([], dtype=np.float64),
+    )
+    if n == 0:
+        return empty
 
     # Pick random sample indices for verbose logging
     verbose_set: set[int] = set()
-    if verbose > 0 and len(candidate_indices) > 0:
+    if verbose > 0 and n > 0:
         rng = np.random.default_rng(42)
-        n_show = min(verbose_samples, len(candidate_indices))
-        verbose_set = set(rng.choice(len(candidate_indices), size=n_show, replace=False).tolist())
+        n_show = min(verbose_samples, n)
+        verbose_set = set(rng.choice(n, size=n_show, replace=False).tolist())
 
     sym_arr = master["symbol"].to_numpy(dtype=str)
     open_time_arr = master["open_time"].values
@@ -70,8 +94,10 @@ def label_trades(
     tp_mult = tp_pct / 100.0
     sl_mult = sl_pct / 100.0
 
-    labels = np.zeros(len(candidate_indices), dtype=np.intp)
-    weights = np.ones(len(candidate_indices), dtype=np.float64)
+    labels = np.zeros(n, dtype=np.intp)
+    weights = np.ones(n, dtype=np.float64)
+    long_pnls = np.zeros(n, dtype=np.float64)
+    short_pnls = np.zeros(n, dtype=np.float64)
 
     for ci, idx in enumerate(candidate_indices):
         entry = close_arr[idx]
@@ -79,7 +105,6 @@ def label_trades(
         deadline = close_time_arr[idx] + timeout_ms
 
         sym_idx = symbol_indices[sym]
-        # Find position of idx in the symbol's array, then scan forward
         pos = np.searchsorted(sym_idx, idx)
 
         long_tp_price = entry * (1 + tp_mult)
@@ -92,8 +117,6 @@ def label_trades(
         long_step = -1
         short_step = -1
         n_candles_scanned = 0
-
-        # Track the last close price within the window for return calculation
         last_close = entry
 
         for j_pos in range(pos + 1, len(sym_idx)):
@@ -112,7 +135,6 @@ def label_trades(
             lo = low_arr[j]
             last_close = close_arr[j]
 
-            # Check long
             if long_result == 0:
                 if lo <= long_sl_price:
                     long_result = -1
@@ -121,7 +143,6 @@ def label_trades(
                     long_result = 1
                     long_step = j_pos
 
-            # Check short
             if short_result == 0:
                 if h >= short_sl_price:
                     short_result = -1
@@ -133,7 +154,6 @@ def label_trades(
             if long_result != 0 and short_result != 0:
                 break
         else:
-            # Ran out of data
             if long_result == 0:
                 long_result = -2
                 long_step = len(sym_idx)
@@ -141,7 +161,19 @@ def label_trades(
                 short_result = -2
                 short_step = len(sym_idx)
 
-        # Label logic
+        # Compute actual forward return for timeout cases
+        fwd_return_pct = (
+            ((last_close - entry) / entry * 100.0) if entry != 0 else 0.0
+        )
+
+        # Actual PnL per direction (net of fees)
+        long_pnl = _trade_pnl(long_result, tp_pct, sl_pct, fwd_return_pct) - fee_pct
+        short_pnl = _trade_pnl(short_result, tp_pct, sl_pct, -fwd_return_pct) - fee_pct
+
+        long_pnls[ci] = long_pnl
+        short_pnls[ci] = short_pnl
+
+        # Label logic (unchanged)
         long_tp_hit = long_result == 1
         short_tp_hit = short_result == 1
 
@@ -152,7 +184,6 @@ def label_trades(
             labels[ci] = -1
             reason = "short_tp_only"
         elif long_tp_hit and short_tp_hit:
-            # Both TP hit — pick whichever was first
             if long_step <= short_step:
                 labels[ci] = 1
                 reason = "both_tp→long_first"
@@ -160,14 +191,12 @@ def label_trades(
                 labels[ci] = -1
                 reason = "both_tp→short_first"
         else:
-            # Neither TP hit — use forward return to decide direction
-            fwd_return = (last_close - entry) / entry if entry != 0 else 0.0
-            labels[ci] = 1 if fwd_return >= 0 else -1
-            reason = f"no_tp→fwd_return={fwd_return:+.4f}"
+            labels[ci] = 1 if fwd_return_pct >= 0 else -1
+            reason = f"no_tp→fwd_return={fwd_return_pct:+.4f}"
 
-        # Weight = absolute forward return (higher return = stronger signal)
-        fwd_return_abs = abs(last_close - entry) / entry if entry != 0 else 0.0
-        weights[ci] = fwd_return_abs
+        # Weight = |net PnL of the labeled direction| (fee-aware)
+        labeled_pnl = long_pnl if labels[ci] == 1 else short_pnl
+        weights[ci] = abs(labeled_pnl)
 
         if ci in verbose_set:
             ts = datetime.datetime.fromtimestamp(
@@ -178,14 +207,13 @@ def label_trades(
             short_r = _RESULT_NAMES[short_result]
             print(
                 f"  [label] {ts} {sym} entry={entry:.4f} → {dir_label} | "
-                f"long={long_r}(step {long_step - pos}) "
-                f"short={short_r}(step {short_step - pos}) | "
-                f"fwd={fwd_return_abs:+.4f} scanned={n_candles_scanned} | "
-                f"{reason}"
+                f"long={long_r}({long_pnl:+.2f}%) "
+                f"short={short_r}({short_pnl:+.2f}%) | "
+                f"scanned={n_candles_scanned} | {reason}"
             )
 
-    # Normalize weights: shift to [1, max_weight] range so all samples contribute
+    # Normalize weights: shift to [1, max_weight] range
     if len(weights) > 0 and weights.max() > 0:
         weights = 1.0 + weights / weights.max() * 9.0  # range [1, 10]
 
-    return labels, weights
+    return labels, weights, long_pnls, short_pnls

@@ -7,12 +7,9 @@ import pandas as pd
 
 from crypto_trade.strategies.ml.labeling import label_trades
 from crypto_trade.strategies.ml.optimization import (
-    build_feature_column_map,
     classes_to_labels,
     compute_sharpe,
-    compute_sharpe_with_threshold,
     labels_to_classes,
-    select_feature_columns,
 )
 from crypto_trade.strategies.ml.walk_forward import (
     generate_monthly_splits,
@@ -88,7 +85,7 @@ class TestLabeling:
             (100.5, 103.5, 100.0, 103.0),  # long TP hit (high=103.5 >= 103)
         ]
         master = _make_label_master(prices)
-        labels, weights = label_trades(
+        labels, weights, long_pnls, short_pnls = label_trades(
             master,
             np.array([0]),
             tp_pct=3.0,
@@ -97,6 +94,8 @@ class TestLabeling:
         )
         assert labels[0] == 1  # long
         assert weights[0] > 0
+        assert long_pnls[0] > 0  # long TP hit → positive PnL
+        assert short_pnls[0] < 0  # short SL hit → negative PnL
 
     def test_label_short_tp(self):
         """Short TP hits when price drops, long SL hits first."""
@@ -106,7 +105,7 @@ class TestLabeling:
             (99.5, 100.0, 96.5, 97.0),  # short TP hit (low=96.5 <= 97)
         ]
         master = _make_label_master(prices)
-        labels, weights = label_trades(
+        labels, weights, long_pnls, short_pnls = label_trades(
             master,
             np.array([0]),
             tp_pct=3.0,
@@ -115,6 +114,8 @@ class TestLabeling:
         )
         assert labels[0] == -1  # short
         assert weights[0] > 0
+        assert short_pnls[0] > 0  # short TP hit → positive PnL
+        assert long_pnls[0] < 0  # long SL hit → negative PnL
 
     def test_label_timeout_uses_forward_return(self):
         """When neither TP hits, label is based on forward return direction."""
@@ -124,7 +125,7 @@ class TestLabeling:
             (100.1, 100.4, 99.8, 100.2),  # slight up
         ]
         master = _make_label_master(prices)
-        labels, weights = label_trades(
+        labels, weights, long_pnls, short_pnls = label_trades(
             master,
             np.array([0]),
             tp_pct=3.0,
@@ -135,9 +136,9 @@ class TestLabeling:
         assert weights[0] >= 1.0
 
     def test_label_empty_candidates(self):
-        """Empty candidates returns empty labels and weights."""
+        """Empty candidates returns empty arrays."""
         master = _make_label_master([(100.0, 101.0, 99.0, 100.0)])
-        labels, weights = label_trades(
+        labels, weights, long_pnls, short_pnls = label_trades(
             master,
             np.array([], dtype=np.intp),
             tp_pct=3.0,
@@ -146,6 +147,8 @@ class TestLabeling:
         )
         assert len(labels) == 0
         assert len(weights) == 0
+        assert len(long_pnls) == 0
+        assert len(short_pnls) == 0
 
     def test_label_long_tp_first_when_both_hit(self):
         """When both TP hit, but long hits on an earlier candle, label is 1."""
@@ -155,7 +158,7 @@ class TestLabeling:
             (101.0, 101.5, 96.5, 97.0),  # short TP hits (96.5 <= 97)
         ]
         master = _make_label_master(prices)
-        labels, weights = label_trades(
+        labels, weights, long_pnls, short_pnls = label_trades(
             master,
             np.array([0]),
             tp_pct=3.0,
@@ -178,24 +181,41 @@ class TestLabeling:
         ]
         master_big = _make_label_master(prices_big)
         master_small = _make_label_master(prices_small)
-        _, w_big = label_trades(
+        _, w_big, _, _ = label_trades(
             master_big,
             np.array([0]),
             tp_pct=3.0,
             sl_pct=2.0,
             timeout_minutes=60,
         )
-        _, w_small = label_trades(
+        _, w_small, _, _ = label_trades(
             master_small,
             np.array([0]),
             tp_pct=3.0,
             sl_pct=2.0,
             timeout_minutes=60,
         )
-        # Single-sample weights are both normalized to same value,
-        # but with multiple samples the bigger move would get more weight
         assert w_big[0] >= 1.0
         assert w_small[0] >= 1.0
+
+    def test_fee_deducted_from_pnls(self):
+        """PnLs should have fee deducted."""
+        prices = [
+            (99.0, 101.0, 99.0, 100.0),
+            (100.0, 101.0, 99.5, 100.5),
+            (100.5, 103.5, 100.0, 103.0),  # long TP hit at 3%
+        ]
+        master = _make_label_master(prices)
+        _, _, long_pnls, _ = label_trades(
+            master,
+            np.array([0]),
+            tp_pct=3.0,
+            sl_pct=2.0,
+            timeout_minutes=60,
+            fee_pct=0.1,
+        )
+        # Long TP hit → pnl = 3.0 - 0.1 = 2.9
+        assert abs(long_pnls[0] - 2.9) < 0.001
 
 
 # ---------------------------------------------------------------------------
@@ -206,11 +226,9 @@ class TestLabeling:
 class TestMonthSplits:
     def test_basic_splits(self):
         """3 months of data with training_months=2 should yield 1 split."""
-        # Jan, Feb, Mar 2024
-        master = _make_master(n=100, start_ms=1_704_067_200_000)  # starts Jan 1 2024
-        # Add Feb and Mar data
-        feb = _make_master(n=100, start_ms=1_706_745_600_000)  # Feb 1 2024
-        mar = _make_master(n=100, start_ms=1_709_251_200_000)  # Mar 1 2024
+        master = _make_master(n=100, start_ms=1_704_067_200_000)
+        feb = _make_master(n=100, start_ms=1_706_745_600_000)
+        mar = _make_master(n=100, start_ms=1_709_251_200_000)
         combined_times = np.concatenate(
             [
                 master["open_time"].values,
@@ -232,7 +250,6 @@ class TestMonthSplits:
         """Verify train/test boundaries are correct month boundaries."""
         import datetime
 
-        # 4 months → 2 splits with training_months=2
         jan = _make_master(n=50, start_ms=1_704_067_200_000)
         feb = _make_master(n=50, start_ms=1_706_745_600_000)
         mar = _make_master(n=50, start_ms=1_709_251_200_000)
@@ -248,114 +265,46 @@ class TestMonthSplits:
         splits = generate_monthly_splits(combined_times, training_months=2)
         assert len(splits) == 2
 
-        # First split: train=Jan+Feb, test=Mar
         s0 = splits[0]
         assert s0.test_month == "2024-03"
-        # train_start = Jan 1
-        assert datetime.datetime.fromtimestamp(s0.train_start_ms / 1000, tz=datetime.UTC).month == 1
-        # test_start = Mar 1
-        assert datetime.datetime.fromtimestamp(s0.test_start_ms / 1000, tz=datetime.UTC).month == 3
+        assert datetime.datetime.fromtimestamp(
+            s0.train_start_ms / 1000, tz=datetime.UTC
+        ).month == 1
+        assert datetime.datetime.fromtimestamp(
+            s0.test_start_ms / 1000, tz=datetime.UTC
+        ).month == 3
 
 
 # ---------------------------------------------------------------------------
-# Sharpe computation tests
+# Sharpe computation tests (using actual returns)
 # ---------------------------------------------------------------------------
 
 
 class TestSharpe:
-    def test_positive_sharpe(self):
+    def test_positive_sharpe_correct_predictions(self):
         """Mostly correct predictions → positive Sharpe."""
-        y_true = np.array([1, 1, 1, -1, -1, 1, 1, -1, 1, 1])
-        y_pred = np.array([1, 1, 1, -1, -1, 1, 1, -1, 1, 1])  # all correct
-        sharpe = compute_sharpe(y_true, y_pred, tp_pct=3.0, sl_pct=2.0, fee_pct=0.1)
+        y_pred = np.array([1, 1, 1, -1, -1, 1, 1, -1, 1, -1])
+        # Realistic: TP/SL/timeout produce varied returns
+        long_pnls = np.array([3.9, 2.5, 3.9, -2.1, -1.5, 3.9, 1.8, -2.1, 3.9, -2.1])
+        short_pnls = np.array([-2.1, -1.8, -2.1, 3.9, 2.8, -2.1, -2.1, 3.9, -0.5, 3.9])
+        sharpe = compute_sharpe(y_pred, long_pnls, short_pnls)
         assert sharpe > 0
 
-    def test_negative_sharpe(self):
-        """Mostly wrong predictions → negative Sharpe."""
-        y_true = np.array([1, 1, 1, -1, -1])
-        y_pred = np.array([-1, -1, -1, 1, 1])  # all wrong
-        sharpe = compute_sharpe(y_true, y_pred, tp_pct=3.0, sl_pct=2.0, fee_pct=0.1)
+    def test_negative_sharpe_wrong_predictions(self):
+        """Wrong predictions → negative Sharpe."""
+        y_pred = np.array([1, 1, 1, -1, -1])
+        long_pnls = np.array([-2.1, -2.1, -2.1, 3.9, 3.9])
+        short_pnls = np.array([3.9, 3.9, 3.9, -2.1, -2.1])
+        sharpe = compute_sharpe(y_pred, long_pnls, short_pnls)
         assert sharpe < 0
 
     def test_too_few_predictions(self):
         """Fewer than 2 predictions → penalty Sharpe."""
-        y_true = np.array([1])
         y_pred = np.array([1])
-        sharpe = compute_sharpe(y_true, y_pred, tp_pct=3.0, sl_pct=2.0, fee_pct=0.1)
+        long_pnls = np.array([3.9])
+        short_pnls = np.array([-2.1])
+        sharpe = compute_sharpe(y_pred, long_pnls, short_pnls)
         assert sharpe == -10.0
-
-
-# ---------------------------------------------------------------------------
-# Feature column map tests
-# ---------------------------------------------------------------------------
-
-
-class TestFeatureColumnMap:
-    def test_basic_mapping(self):
-        """Columns are mapped to correct groups and periods."""
-        cols = [
-            "mom_rsi_14",
-            "mom_rsi_21",
-            "vol_atr_14",
-            "vol_bb_bandwidth_20",
-            "trend_adx_14",
-            "trend_psar_af",
-            "vol_obv",
-            "vol_cmf_14",
-            "mr_zscore_20",
-            "stat_return_5",
-        ]
-        col_map = build_feature_column_map(cols)
-
-        assert "momentum" in col_map
-        assert 14 in col_map["momentum"]
-        assert "mom_rsi_14" in col_map["momentum"][14]
-
-        assert "volatility" in col_map
-        assert 14 in col_map["volatility"]
-        assert "vol_atr_14" in col_map["volatility"][14]
-
-        assert "volume" in col_map
-        assert None in col_map["volume"]  # vol_obv has no period
-        assert "vol_obv" in col_map["volume"][None]
-        assert 14 in col_map["volume"]
-        assert "vol_cmf_14" in col_map["volume"][14]
-
-        assert "trend" in col_map
-        assert None in col_map["trend"]
-        assert "trend_psar_af" in col_map["trend"][None]
-
-    def test_macd_uses_slow_period(self):
-        """MACD columns use the slow EMA period."""
-        cols = ["mom_macd_line_8_21_5", "mom_macd_hist_12_26_9"]
-        col_map = build_feature_column_map(cols)
-        assert 21 in col_map["momentum"]
-        assert "mom_macd_line_8_21_5" in col_map["momentum"][21]
-        assert 26 in col_map["momentum"]
-        assert "mom_macd_hist_12_26_9" in col_map["momentum"][26]
-
-    def test_select_by_period_range(self):
-        """Period range filtering works correctly."""
-        cols = ["mom_rsi_5", "mom_rsi_14", "mom_rsi_30", "vol_obv"]
-        col_map = build_feature_column_map(cols)
-
-        selected = select_feature_columns(
-            col_map,
-            use_groups={
-                "momentum": True,
-                "volume": True,
-                "volatility": False,
-                "trend": False,
-                "mean_reversion": False,
-                "statistical": False,
-            },
-            min_period=10,
-            max_period=20,
-        )
-        assert "mom_rsi_14" in selected
-        assert "mom_rsi_5" not in selected
-        assert "mom_rsi_30" not in selected
-        assert "vol_obv" in selected  # no-period always included
 
 
 # ---------------------------------------------------------------------------
@@ -387,7 +336,6 @@ class TestRegistration:
     def test_get_strategy_string_params(self):
         from crypto_trade.strategies import get_strategy
 
-        # features_dir is a string param that should pass through without int/float conversion
         strategy = get_strategy(
             "lgbm",
             {"features_dir": "data/features", "n_trials": "10"},
@@ -434,10 +382,8 @@ class TestLazyMonthlyTraining:
         strategy = LightGbmStrategy(training_months=2, features_dir="/nonexistent")
         strategy.compute_features(master)
 
-        # No model trained yet
         assert strategy._model is None
         assert strategy._current_month is None
-        # But splits should be generated
         assert len(strategy._splits) > 0
         assert len(strategy._split_map) > 0
 
@@ -458,7 +404,6 @@ class TestLazyMonthlyTraining:
 
         strategy._train_for_month = mock_train
 
-        # First candle is Jan 2024
         first_ot = int(master["open_time"].iloc[0])
         first_sym = master["symbol"].iloc[0]
         strategy.get_signal(first_sym, first_ot)
@@ -483,13 +428,11 @@ class TestLazyMonthlyTraining:
 
         strategy._train_for_month = mock_train
 
-        # Call get_signal for first two candles (both in Jan)
         for i in range(2):
             ot = int(master["open_time"].iloc[i])
             sym = master["symbol"].iloc[i]
             strategy.get_signal(sym, ot)
 
-        # Only one train call despite two get_signal calls
         assert len(train_calls) == 1
 
     def test_month_change_triggers_retrain(self):
@@ -509,15 +452,12 @@ class TestLazyMonthlyTraining:
 
         strategy._train_for_month = mock_train
 
-        # Call for Jan candle, then Feb candle
         jan_ot = int(master["open_time"].iloc[0])
         jan_sym = master["symbol"].iloc[0]
         strategy.get_signal(jan_sym, jan_ot)
 
-        # Find first Feb candle (index 200 since each month has 200 candles)
         feb_ot = int(master["open_time"].iloc[200])
         feb_sym = master["symbol"].iloc[200]
-        strategy._pos = 200  # align pos
         strategy.get_signal(feb_sym, feb_ot)
 
         assert len(train_calls) == 2
@@ -538,99 +478,15 @@ class TestLazyMonthlyTraining:
 
 
 # ---------------------------------------------------------------------------
-# Sharpe with threshold tests
+# get_signal always predicts direction (no threshold)
 # ---------------------------------------------------------------------------
 
 
-class TestSharpeWithThreshold:
-    def test_all_confident(self):
-        """All predictions above threshold → positive Sharpe when all correct."""
-        y_true = np.array([1, 1, -1, -1, 1, 1, -1, 1, 1, -1] * 3)
-        # All confident and correct: class 1 for label 1, class 0 for label -1
-        y_proba = np.array([[0.1, 0.9] if y == 1 else [0.9, 0.1] for y in y_true], dtype=np.float64)
-        sharpe = compute_sharpe_with_threshold(
-            y_true, y_proba, threshold=0.5, tp_pct=3.0, sl_pct=2.0, fee_pct=0.1
-        )
-        assert sharpe > 0
-
-    def test_threshold_filters_low_confidence(self):
-        """Strict threshold filters out wrong low-confidence trades → better Sharpe."""
-        # 30 high-confidence CORRECT predictions + 30 low-confidence WRONG predictions
-        y_true_correct = np.array([1, -1] * 15)
-        y_true_wrong = np.array([1, -1] * 15)
-        y_true = np.concatenate([y_true_correct, y_true_wrong])
-
-        proba_correct = np.array(
-            [[0.15, 0.85] if y == 1 else [0.85, 0.15] for y in y_true_correct],
-            dtype=np.float64,
-        )
-        proba_wrong = np.array(
-            [[0.55, 0.45] if y == 1 else [0.45, 0.55] for y in y_true_wrong],
-            dtype=np.float64,
-        )
-        y_proba = np.concatenate([proba_correct, proba_wrong])
-
-        sharpe_strict = compute_sharpe_with_threshold(
-            y_true, y_proba, threshold=0.7, tp_pct=3.0, sl_pct=2.0, fee_pct=0.1, min_trades=5
-        )
-        sharpe_loose = compute_sharpe_with_threshold(
-            y_true, y_proba, threshold=0.5, tp_pct=3.0, sl_pct=2.0, fee_pct=0.1, min_trades=5
-        )
-        assert sharpe_strict > sharpe_loose
-
-    def test_too_few_trades_penalty(self):
-        """Aggressive threshold leaves < min_trades → returns -10.0."""
-        y_true = np.array([1, -1, 1, -1, 1])
-        # All low confidence
-        y_proba = np.array([[0.55, 0.45]] * 5, dtype=np.float64)
-        sharpe = compute_sharpe_with_threshold(
-            y_true, y_proba, threshold=0.8, tp_pct=3.0, sl_pct=2.0, fee_pct=0.1, min_trades=20
-        )
-        assert sharpe == -10.0
-
-    def test_threshold_at_boundary(self):
-        """Predictions exactly at threshold are included (>= not >)."""
-        y_true = np.array([1] * 30)
-        # Exactly 0.7 confidence, correct predictions
-        y_proba = np.array([[0.3, 0.7]] * 30, dtype=np.float64)
-        sharpe = compute_sharpe_with_threshold(
-            y_true, y_proba, threshold=0.7, tp_pct=3.0, sl_pct=2.0, fee_pct=0.1, min_trades=20
-        )
-        assert sharpe > 0  # all 30 included (>= 0.7), all correct
-
-
-# ---------------------------------------------------------------------------
-# Confidence threshold integration tests
-# ---------------------------------------------------------------------------
-
-
-class TestConfidenceThreshold:
-    # Jan 1 2024 00:00 UTC — matches "2024-01" month
+class TestAlwaysPredict:
     _JAN_2024_MS = 1_704_067_200_000
 
-    def test_signal_below_threshold_returns_no_signal(self):
-        """Mock predict_proba returns 0.55 confidence, threshold 0.7 → NO_SIGNAL."""
-        from unittest.mock import MagicMock
-
-        from crypto_trade.strategies import NO_SIGNAL
-        from crypto_trade.strategies.ml.lgbm import LightGbmStrategy
-
-        ot = self._JAN_2024_MS
-        strategy = LightGbmStrategy(features_dir="/nonexistent")
-        strategy._current_month = "2024-01"
-        strategy._confidence_threshold = 0.70
-
-        mock_model = MagicMock()
-        mock_model.predict_proba.return_value = np.array([[0.55, 0.45]])
-        strategy._model = mock_model
-        strategy._selected_cols = ["feat_a", "feat_b"]
-        strategy._month_features = {("BTCUSDT", ot): np.array([1.0, 2.0])}
-
-        signal = strategy.get_signal("BTCUSDT", ot)
-        assert signal == NO_SIGNAL
-
-    def test_signal_above_threshold_returns_direction(self):
-        """Mock predict_proba returns 0.8 confidence for long, threshold 0.7 → long signal."""
+    def test_long_signal(self):
+        """Model predicting long → always returns long signal."""
         from unittest.mock import MagicMock
 
         from crypto_trade.backtest_models import Signal
@@ -639,10 +495,8 @@ class TestConfidenceThreshold:
         ot = self._JAN_2024_MS
         strategy = LightGbmStrategy(features_dir="/nonexistent")
         strategy._current_month = "2024-01"
-        strategy._confidence_threshold = 0.70
 
         mock_model = MagicMock()
-        # P(short)=0.2, P(long)=0.8 → confidence=0.8 >= 0.7, direction=long
         mock_model.predict_proba.return_value = np.array([[0.2, 0.8]])
         strategy._model = mock_model
         strategy._selected_cols = ["feat_a", "feat_b"]
@@ -651,8 +505,8 @@ class TestConfidenceThreshold:
         signal = strategy.get_signal("BTCUSDT", ot)
         assert signal == Signal(direction=1, weight=100)
 
-    def test_signal_above_threshold_short(self):
-        """Mock predict_proba returns 0.75 for short, threshold 0.7 → short signal."""
+    def test_short_signal(self):
+        """Model predicting short → always returns short signal."""
         from unittest.mock import MagicMock
 
         from crypto_trade.backtest_models import Signal
@@ -661,10 +515,8 @@ class TestConfidenceThreshold:
         ot = self._JAN_2024_MS
         strategy = LightGbmStrategy(features_dir="/nonexistent")
         strategy._current_month = "2024-01"
-        strategy._confidence_threshold = 0.70
 
         mock_model = MagicMock()
-        # P(short)=0.75, P(long)=0.25 → confidence=0.75 >= 0.7, direction=short
         mock_model.predict_proba.return_value = np.array([[0.75, 0.25]])
         strategy._model = mock_model
         strategy._selected_cols = ["feat_a", "feat_b"]
@@ -672,3 +524,24 @@ class TestConfidenceThreshold:
 
         signal = strategy.get_signal("BTCUSDT", ot)
         assert signal == Signal(direction=-1, weight=100)
+
+    def test_low_confidence_still_predicts(self):
+        """Even with low confidence, model still returns a direction."""
+        from unittest.mock import MagicMock
+
+        from crypto_trade.backtest_models import Signal
+        from crypto_trade.strategies.ml.lgbm import LightGbmStrategy
+
+        ot = self._JAN_2024_MS
+        strategy = LightGbmStrategy(features_dir="/nonexistent")
+        strategy._current_month = "2024-01"
+
+        mock_model = MagicMock()
+        # Very low confidence — still predicts
+        mock_model.predict_proba.return_value = np.array([[0.51, 0.49]])
+        strategy._model = mock_model
+        strategy._selected_cols = ["feat_a", "feat_b"]
+        strategy._month_features = {("BTCUSDT", ot): np.array([1.0, 2.0])}
+
+        signal = strategy.get_signal("BTCUSDT", ot)
+        assert signal == Signal(direction=-1, weight=100)  # short wins at 0.51

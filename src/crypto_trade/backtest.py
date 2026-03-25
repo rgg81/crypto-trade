@@ -30,7 +30,7 @@ def _sync_label_params(strategy: Strategy, config: BacktestConfig) -> None:
     while hasattr(target, "inner") and target.inner is not None:
         target = target.inner
 
-    defaults = {"label_tp_pct": 3.0, "label_sl_pct": 2.0, "label_timeout_minutes": 120}
+    defaults = {"label_tp_pct": 4.0, "label_sl_pct": 2.0, "label_timeout_minutes": 4320}
     mapping = {
         "label_tp_pct": config.take_profit_pct,
         "label_sl_pct": config.stop_loss_pct,
