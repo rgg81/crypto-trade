@@ -46,6 +46,37 @@ def compute_sharpe(
     return float(mean / std)
 
 
+def compute_sharpe_with_threshold(
+    y_proba: np.ndarray,
+    long_pnls: np.ndarray,
+    short_pnls: np.ndarray,
+    threshold: float,
+    min_trades: int = 20,
+) -> float:
+    """Compute Sharpe from actual PnLs, filtering by prediction confidence.
+
+    Only includes trades where max(P(short), P(long)) >= threshold.
+    Returns -10.0 penalty if fewer than *min_trades* survive the filter.
+    """
+    confidence = y_proba.max(axis=1)
+    mask = confidence >= threshold
+    n_trades = int(mask.sum())
+    if n_trades < min_trades:
+        return -10.0
+
+    pred_classes = y_proba[mask].argmax(axis=1)
+    y_pred = classes_to_labels(pred_classes)
+
+    pnls = np.where(y_pred == 1, long_pnls[mask], short_pnls[mask])
+
+    mean = pnls.mean()
+    std = pnls.std()
+    if std == 0:
+        return -10.0
+
+    return float(mean / std)
+
+
 # ---------------------------------------------------------------------------
 # Label encoding: {-1, 1} <-> {0, 1} for binary LightGBM
 # ---------------------------------------------------------------------------
@@ -84,6 +115,9 @@ def _objective(
 ) -> float:
     from sklearn.model_selection import TimeSeriesSplit
 
+    # Confidence threshold — only trade when max(proba) >= threshold
+    confidence_threshold = trial.suggest_float("confidence_threshold", 0.50, 0.65)
+
     # Training window size (optimized by Optuna when open_times provided)
     training_days: int | None = None
     if open_times is not None:
@@ -118,6 +152,7 @@ def _objective(
         td_str = f", training_days={training_days}" if training_days is not None else ""
         print(
             f"    [trial {trial.number}] {len(all_columns)} features{td_str} | "
+            f"threshold={confidence_threshold:.3f} | "
             f"labels: {n_long} long, {n_short} short "
             f"({100 * n_long / total:.0f}/{100 * n_short / total:.0f}%)"
         )
@@ -144,13 +179,12 @@ def _objective(
         model = lgb.LGBMClassifier(**params)
         model.fit(feat_tr, y_train, sample_weight=w_train)
 
-        # Predict direction (no threshold — always trade)
+        # Predict and filter by confidence threshold
         y_proba = model.predict_proba(feat_val)
-        pred_classes = y_proba.argmax(axis=1)
-        y_pred = classes_to_labels(pred_classes)
 
-        # Sharpe from actual returns
-        sharpe = compute_sharpe(y_pred, long_pnls[val_idx], short_pnls[val_idx])
+        sharpe = compute_sharpe_with_threshold(
+            y_proba, long_pnls[val_idx], short_pnls[val_idx], confidence_threshold
+        )
         sharpes.append(sharpe)
 
     mean_sharpe = float(np.mean(sharpes))
@@ -177,12 +211,12 @@ def optimize_and_train(
     sample_weights: np.ndarray | None = None,
     open_times: np.ndarray | None = None,
     train_end_ms: int | None = None,
-) -> tuple[lgb.LGBMClassifier, list[str]]:
-    """Run Optuna optimization and return (best_model, all_columns).
+) -> tuple[lgb.LGBMClassifier, list[str], float]:
+    """Run Optuna optimization and return (model, columns, confidence_threshold).
 
     Uses all feature columns (no group/period selection).
-    No confidence threshold — model always predicts a direction.
-    Sharpe is computed from actual trade returns (long_pnls / short_pnls).
+    Confidence threshold is optimized by Optuna and applied at inference time.
+    Sharpe is computed from actual trade returns filtered by threshold.
     """
     import optuna
 
@@ -213,6 +247,7 @@ def optimize_and_train(
     )
 
     best = study.best_params
+    best_threshold = best.get("confidence_threshold", 0.50)
 
     if verbose > 0:
         best_trial = study.best_trial
@@ -222,6 +257,7 @@ def optimize_and_train(
             f"max_depth={best['max_depth']}, "
             f"lr={best['learning_rate']:.4f}, leaves={best['num_leaves']}"
         )
+        print(f"  Best confidence_threshold: {best_threshold:.3f}")
         if "training_days" in best:
             print(f"  Best training_days: {best['training_days']}")
 
@@ -265,4 +301,4 @@ def optimize_and_train(
             f"{len(all_columns)} features)"
         )
 
-    return model, all_columns
+    return model, all_columns, best_threshold

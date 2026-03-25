@@ -120,6 +120,7 @@ class LightGbmStrategy:
         self._current_month: str | None = None
         self._model: object | None = None
         self._selected_cols: list[str] = []
+        self._confidence_threshold: float = 0.50
         self._month_features: dict[tuple[str, int], np.ndarray] = {}
 
     def compute_features(self, master: pd.DataFrame) -> None:
@@ -158,6 +159,7 @@ class LightGbmStrategy:
         """Train a model for the given month. Called lazily from get_signal."""
         self._model = None
         self._selected_cols = []
+        self._confidence_threshold = 0.50
         self._month_features = {}
 
         split = self._split_map.get(month_str)
@@ -283,9 +285,9 @@ class LightGbmStrategy:
                 f"matched, {len(available_feat_cols)} columns"
             )
 
-        # (d) Optuna optimization (all features, no threshold)
+        # (d) Optuna optimization (all features, with threshold)
         try:
-            model, selected_cols = optimize_and_train(
+            model, selected_cols, confidence_threshold = optimize_and_train(
                 feat_train,
                 train_labels,
                 available_feat_cols,
@@ -306,6 +308,7 @@ class LightGbmStrategy:
 
         self._model = model
         self._selected_cols = selected_cols
+        self._confidence_threshold = confidence_threshold
 
         # (e) Batch-load test month features
         symbols = list(dict.fromkeys(self._sym_arr))
@@ -321,7 +324,8 @@ class LightGbmStrategy:
         if self.verbose > 0:
             print(
                 f"  Model trained for {month_str}: "
-                f"{len(self._month_features)} test candles with features"
+                f"{len(self._month_features)} test candles with features, "
+                f"confidence_threshold={self._confidence_threshold:.3f}"
             )
 
     def skip(self) -> None:
@@ -346,14 +350,25 @@ class LightGbmStrategy:
         if feat_row is None:
             return NO_SIGNAL
 
-        # Predict direction (no threshold — always trade)
+        # Predict with confidence threshold gate
         feat_df = pd.DataFrame(
             feat_row.reshape(1, -1), columns=self._selected_cols
         )
         proba = self._model.predict_proba(feat_df)[0]  # [P(short), P(long)]
+        confidence = float(max(proba))
+
+        if confidence < self._confidence_threshold:
+            if self.verbose > 0:
+                ts_str = _ms_to_datetime(open_time)
+                self._last_predict_log = (
+                    f"[predict] {ts_str} {symbol} → SKIP "
+                    f"(conf={confidence:.2f} < "
+                    f"{self._confidence_threshold:.2f})"
+                )
+            return NO_SIGNAL
+
         pred_class = int(np.argmax(proba))
         direction = int(classes_to_labels(np.array([pred_class]))[0])
-        confidence = float(max(proba))
 
         if self.verbose > 0:
             dir_label = "LONG" if direction == 1 else "SHORT"
