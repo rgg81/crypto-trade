@@ -116,7 +116,7 @@ def _objective(
     from sklearn.model_selection import TimeSeriesSplit
 
     # Confidence threshold — only trade when max(proba) >= threshold
-    confidence_threshold = trial.suggest_float("confidence_threshold", 0.50, 0.65)
+    confidence_threshold = trial.suggest_float("confidence_threshold", 0.50, 0.75)
 
     # Training window size (optimized by Optuna when open_times provided)
     training_days: int | None = None
