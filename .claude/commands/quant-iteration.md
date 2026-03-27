@@ -17,7 +17,9 @@ When this skill is triggered, **do NOT ask which role to play or whether to proc
 1. Read the last diary's "Next Iteration Ideas" and BASELINE.md
 2. Determine the next iteration number
 3. Run the full flow: QR Phases 1-5 → QE Phase 6 → QR Phases 7-8
-4. Only pause if there's an actual blocker (ambiguous brief, unexpected error, decision that genuinely requires user input)
+4. **After completing Phase 8 (diary + commit), immediately start the next iteration** — go back to step 1 with the new diary's "Next Iteration Ideas"
+5. Keep looping iterations until the user intervenes or context runs out
+6. Only pause if there's an actual blocker (ambiguous brief, unexpected error, decision that genuinely requires user input)
 
 The user can override by specifying a role (e.g., "be the QR") or a phase (e.g., "run Phase 6"). Otherwise, go.
 
