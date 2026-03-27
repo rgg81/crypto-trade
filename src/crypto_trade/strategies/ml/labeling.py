@@ -34,6 +34,7 @@ def label_trades(
     sl_pct: float,
     timeout_minutes: int,
     fee_pct: float = 0.1,
+    atr_values: np.ndarray | None = None,
     verbose: int = 0,
     verbose_samples: int = 20,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
@@ -46,10 +47,15 @@ def label_trades(
         master: DataFrame with columns: symbol, open_time, close_time,
                 open, high, low, close.
         candidate_indices: Integer indices into master for candles to label.
-        tp_pct: Take-profit percentage (e.g. 4.0 means 4%).
-        sl_pct: Stop-loss percentage (e.g. 2.0 means 2%).
+        tp_pct: Take-profit percentage (e.g. 4.0) OR ATR multiplier when
+                atr_values is provided.
+        sl_pct: Stop-loss percentage (e.g. 2.0) OR ATR multiplier when
+                atr_values is provided.
         timeout_minutes: Maximum forward scan duration in minutes.
         fee_pct: Trading fee percentage (deducted from returns).
+        atr_values: If provided, array of ATR values per master row.
+                    TP = atr * tp_pct, SL = atr * sl_pct (tp_pct/sl_pct
+                    become ATR multipliers instead of percentages).
         verbose: If > 0, print detailed labeling info for a random subset.
         verbose_samples: Number of random samples to print (default 20).
 
@@ -91,6 +97,7 @@ def label_trades(
     for sym in np.unique(sym_arr):
         symbol_indices[sym] = np.where(sym_arr == sym)[0]
 
+    use_atr = atr_values is not None
     tp_mult = tp_pct / 100.0
     sl_mult = sl_pct / 100.0
 
@@ -107,10 +114,18 @@ def label_trades(
         sym_idx = symbol_indices[sym]
         pos = np.searchsorted(sym_idx, idx)
 
-        long_tp_price = entry * (1 + tp_mult)
-        long_sl_price = entry * (1 - sl_mult)
-        short_tp_price = entry * (1 - tp_mult)
-        short_sl_price = entry * (1 + sl_mult)
+        if use_atr:
+            atr = float(atr_values[idx]) if not np.isnan(atr_values[idx]) else entry * 0.02
+            tp_dist = atr * tp_pct  # tp_pct is ATR multiplier
+            sl_dist = atr * sl_pct  # sl_pct is ATR multiplier
+        else:
+            tp_dist = entry * tp_mult
+            sl_dist = entry * sl_mult
+
+        long_tp_price = entry + tp_dist
+        long_sl_price = entry - sl_dist
+        short_tp_price = entry - tp_dist
+        short_sl_price = entry + sl_dist
 
         long_result = 0  # 0=pending, 1=tp, -1=sl, -2=timeout
         short_result = 0
@@ -167,8 +182,14 @@ def label_trades(
         )
 
         # Actual PnL per direction (net of fees)
-        long_pnl = _trade_pnl(long_result, tp_pct, sl_pct, fwd_return_pct) - fee_pct
-        short_pnl = _trade_pnl(short_result, tp_pct, sl_pct, -fwd_return_pct) - fee_pct
+        if use_atr:
+            tp_pnl_pct = tp_dist / entry * 100.0 if entry != 0 else 0.0
+            sl_pnl_pct = sl_dist / entry * 100.0 if entry != 0 else 0.0
+        else:
+            tp_pnl_pct = tp_pct
+            sl_pnl_pct = sl_pct
+        long_pnl = _trade_pnl(long_result, tp_pnl_pct, sl_pnl_pct, fwd_return_pct) - fee_pct
+        short_pnl = _trade_pnl(short_result, tp_pnl_pct, sl_pnl_pct, -fwd_return_pct) - fee_pct
 
         long_pnls[ci] = long_pnl
         short_pnls[ci] = short_pnl

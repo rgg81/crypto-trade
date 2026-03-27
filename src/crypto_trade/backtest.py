@@ -123,13 +123,28 @@ def _log_trade_close(
     )
 
 
+class EarlyStopError(Exception):
+    """Raised when fail-fast checkpoint triggers early termination."""
+
+    def __init__(self, reason: str, results: list[TradeResult], total_signals: int):
+        self.reason = reason
+        self.results = results
+        self.total_signals = total_signals
+        super().__init__(reason)
+
+
 def run_backtest(
     config: BacktestConfig,
     strategy: Strategy,
     *,
     profile_memory: bool = False,
+    yearly_pnl_check: bool = False,
 ) -> BacktestResult:
-    """Run a backtest over historical kline data using the given strategy."""
+    """Run a backtest over historical kline data using the given strategy.
+
+    If *yearly_pnl_check* is True, checks cumulative PnL at each year
+    boundary. Raises EarlyStopError if year-1 PnL is negative.
+    """
     if profile_memory:
         tracemalloc.start()
 
@@ -171,6 +186,11 @@ def run_backtest(
     current_month = ""
     day_net_pnl = 0.0
     current_day = ""
+    # Yearly fail-fast tracking
+    _last_checked_year = 0
+    _yearly_pnl: dict[int, float] = {}
+    _yearly_trades: dict[int, int] = {}
+    _yearly_wins: dict[int, int] = {}
 
     for i in range(len(master)):
         sym = str(sym_arr[i])
@@ -190,6 +210,29 @@ def run_backtest(
             if result is not None:
                 results.append(result)
                 del open_orders[sym]
+                # Yearly fail-fast check
+                if yearly_pnl_check:
+                    yr = datetime.datetime.fromtimestamp(
+                        result.close_time / 1000, tz=datetime.UTC
+                    ).year
+                    _yearly_pnl[yr] = _yearly_pnl.get(yr, 0.0) + result.net_pnl_pct
+                    _yearly_trades[yr] = _yearly_trades.get(yr, 0) + 1
+                    if result.net_pnl_pct > 0:
+                        _yearly_wins[yr] = _yearly_wins.get(yr, 0) + 1
+                    # Check at year boundary (when we enter a new year)
+                    if yr > _last_checked_year and _last_checked_year > 0:
+                        prev = _last_checked_year
+                        prev_pnl = _yearly_pnl.get(prev, 0.0)
+                        prev_n = _yearly_trades.get(prev, 0)
+                        prev_w = _yearly_wins.get(prev, 0)
+                        prev_wr = prev_w / prev_n * 100 if prev_n > 0 else 0
+                        if prev_n >= 10 and prev_pnl < 0:
+                            raise EarlyStopError(
+                                f"Year {prev}: PnL={prev_pnl:+.1f}% "
+                                f"(WR={prev_wr:.1f}%, {prev_n} trades)",
+                                results, total_signals,
+                            )
+                    _last_checked_year = yr
                 if verbose > 0:
                     month_label = _month_of(result.close_time)
                     if month_label != current_month:
