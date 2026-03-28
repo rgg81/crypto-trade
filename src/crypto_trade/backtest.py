@@ -180,6 +180,19 @@ def run_backtest(
     results: list[TradeResult] = []
     total_signals = 0
 
+    # Signal cooldown tracking
+    cooldown_until: dict[str, int] = {}  # symbol → earliest open_time for new trade
+    candle_duration_ms = 0
+    if config.cooldown_candles > 0 and len(master) >= 2:
+        # Compute candle duration from first two rows of same symbol
+        first_sym = str(sym_arr[0])
+        for j in range(1, len(master)):
+            if str(sym_arr[j]) == first_sym:
+                candle_duration_ms = int(open_time_arr[j] - open_time_arr[0])
+                break
+        if candle_duration_ms <= 0:
+            candle_duration_ms = int(close_time_arr[0] - open_time_arr[0] + 1)
+
     # Running PnL accumulators for verbose logging
     cum_net_pnl = 0.0
     month_net_pnl = 0.0
@@ -210,6 +223,12 @@ def run_backtest(
             if result is not None:
                 results.append(result)
                 del open_orders[sym]
+                # Set signal cooldown for this symbol
+                if config.cooldown_candles > 0 and candle_duration_ms > 0:
+                    cooldown_until[sym] = (
+                        result.close_time
+                        + config.cooldown_candles * candle_duration_ms
+                    )
                 # Yearly fail-fast check
                 if yearly_pnl_check:
                     yr = datetime.datetime.fromtimestamp(
@@ -258,7 +277,7 @@ def run_backtest(
         signal = strategy.get_signal(sym, ot)
         if signal.direction != 0 and signal.weight > 0:
             total_signals += 1
-            if sym not in open_orders:
+            if sym not in open_orders and ot >= cooldown_until.get(sym, 0):
                 order = _create_order(
                     sym,
                     signal,

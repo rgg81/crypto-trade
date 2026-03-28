@@ -46,6 +46,7 @@ class BacktestConfig:
     data_dir: Path = Path("data")
     start_time: int | None = None  # epoch ms, default=first row
     end_time: int | None = None  # epoch ms, default=last row
+    cooldown_candles: int = 0  # candles to wait after a trade closes before re-entering
 
 
 @dataclass(frozen=True)
