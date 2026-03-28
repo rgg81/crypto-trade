@@ -392,8 +392,8 @@ def _create_order(
     weight_factor = signal.weight / 100.0
     amount_usd = weight_factor * config.max_amount_usd
 
-    sl_pct = config.stop_loss_pct / 100.0
-    tp_pct = config.take_profit_pct / 100.0
+    sl_pct = (signal.sl_pct if signal.sl_pct is not None else config.stop_loss_pct) / 100.0
+    tp_pct = (signal.tp_pct if signal.tp_pct is not None else config.take_profit_pct) / 100.0
 
     if signal.direction == 1:  # Long
         stop_loss_price = entry_price * (1 - sl_pct)

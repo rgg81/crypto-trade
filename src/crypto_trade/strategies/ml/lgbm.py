@@ -96,6 +96,9 @@ class LightGbmStrategy:
         features_dir: str = "data/features",
         seed: int = 42,
         verbose: int = 0,
+        atr_tp_multiplier: float | None = None,
+        atr_sl_multiplier: float | None = None,
+        atr_column: str = "vol_natr_21",
     ) -> None:
         self.training_months = training_months
         self.n_trials = n_trials
@@ -107,6 +110,9 @@ class LightGbmStrategy:
         self.features_dir = features_dir
         self.seed = seed
         self.verbose = verbose
+        self.atr_tp_multiplier = atr_tp_multiplier
+        self.atr_sl_multiplier = atr_sl_multiplier
+        self.atr_column = atr_column
 
         # Set during compute_features
         self._master: pd.DataFrame | None = None
@@ -122,6 +128,8 @@ class LightGbmStrategy:
         self._selected_cols: list[str] = []
         self._confidence_threshold: float = 0.50
         self._month_features: dict[tuple[str, int], np.ndarray] = {}
+        # ATR cache for dynamic barriers
+        self._month_natr: dict[tuple[str, int], float] = {}
 
     def compute_features(self, master: pd.DataFrame) -> None:
         """Lightweight setup: store master and generate splits. No training."""
@@ -321,6 +329,20 @@ class LightGbmStrategy:
             columns=selected_cols,
         )
 
+        # (f) Load NATR for dynamic barriers (if ATR mode enabled)
+        self._month_natr = {}
+        if self.atr_tp_multiplier is not None:
+            natr_data = load_features_range(
+                symbols,
+                self.features_dir,
+                self._interval,
+                split.test_start_ms,
+                split.test_end_ms,
+                columns=[self.atr_column],
+            )
+            for key, arr in natr_data.items():
+                self._month_natr[key] = float(arr[0])
+
         if self.verbose > 0:
             print(
                 f"  Model trained for {month_str}: "
@@ -370,15 +392,31 @@ class LightGbmStrategy:
         pred_class = int(np.argmax(proba))
         direction = int(classes_to_labels(np.array([pred_class]))[0])
 
+        # Compute dynamic TP/SL from ATR if configured
+        tp_pct = None
+        sl_pct = None
+        if self.atr_tp_multiplier is not None:
+            natr = self._month_natr.get(key)
+            if natr is not None and natr > 0:
+                tp_pct = natr * self.atr_tp_multiplier
+                sl_pct = natr * (
+                    self.atr_sl_multiplier
+                    if self.atr_sl_multiplier is not None
+                    else self.atr_tp_multiplier / 2.0
+                )
+
         if self.verbose > 0:
             dir_label = "LONG" if direction == 1 else "SHORT"
             ts_str = _ms_to_datetime(open_time)
+            atr_str = ""
+            if tp_pct is not None:
+                atr_str = f" TP={tp_pct:.1f}%/SL={sl_pct:.1f}%"
             self._last_predict_log = (
                 f"[predict] {ts_str} {symbol} → {dir_label} "
-                f"(proba={confidence:.2f})"
+                f"(proba={confidence:.2f}{atr_str})"
             )
 
-        return Signal(direction=direction, weight=100)
+        return Signal(direction=direction, weight=100, tp_pct=tp_pct, sl_pct=sl_pct)
 
     @staticmethod
     def _detect_interval(master: pd.DataFrame) -> str:
