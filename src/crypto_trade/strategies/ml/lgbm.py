@@ -40,12 +40,27 @@ _META_COLUMNS = frozenset(
 )
 
 
-def _discover_feature_columns(features_dir: str, interval: str) -> list[str]:
-    """Discover feature columns present in ALL Parquet files (intersection)."""
+def _discover_feature_columns(
+    features_dir: str,
+    interval: str,
+    symbols: list[str] | None = None,
+) -> list[str]:
+    """Discover feature columns present in ALL Parquet files (intersection).
+
+    If *symbols* is provided, only scan those symbols' files instead of all
+    files in the directory.
+    """
     from pathlib import Path
 
     d = Path(features_dir)
-    parquet_files = list(d.glob(f"*_{interval}_features.parquet"))
+    if symbols:
+        parquet_files = [
+            d / f"{sym}_{interval}_features.parquet"
+            for sym in symbols
+            if (d / f"{sym}_{interval}_features.parquet").exists()
+        ]
+    else:
+        parquet_files = list(d.glob(f"*_{interval}_features.parquet"))
     if not parquet_files:
         raise FileNotFoundError(
             f"No Parquet feature files found in {features_dir} for interval {interval}"
