@@ -99,6 +99,7 @@ class LightGbmStrategy:
         atr_tp_multiplier: float | None = None,
         atr_sl_multiplier: float | None = None,
         atr_column: str = "vol_natr_21",
+        ensemble_seeds: list[int] | None = None,
     ) -> None:
         self.training_months = training_months
         self.n_trials = n_trials
@@ -113,6 +114,7 @@ class LightGbmStrategy:
         self.atr_tp_multiplier = atr_tp_multiplier
         self.atr_sl_multiplier = atr_sl_multiplier
         self.atr_column = atr_column
+        self.ensemble_seeds = ensemble_seeds
 
         # Set during compute_features
         self._master: pd.DataFrame | None = None
@@ -125,8 +127,10 @@ class LightGbmStrategy:
         # Per-month lazy training state
         self._current_month: str | None = None
         self._model: object | None = None
+        self._models: list = []
         self._selected_cols: list[str] = []
         self._confidence_threshold: float = 0.50
+        self._confidence_thresholds: list[float] = []
         self._month_features: dict[tuple[str, int], np.ndarray] = {}
         # ATR cache for dynamic barriers
         self._month_natr: dict[tuple[str, int], float] = {}
@@ -294,29 +298,41 @@ class LightGbmStrategy:
             )
 
         # (d) Optuna optimization (all features, with threshold)
-        try:
-            model, selected_cols, confidence_threshold = optimize_and_train(
-                feat_train,
-                train_labels,
-                available_feat_cols,
-                long_pnls,
-                short_pnls,
-                self.n_trials,
-                self.cv_splits,
-                self.seed,
-                self.verbose,
-                sample_weights=train_weights,
-                open_times=train_open_times,
-                train_end_ms=split.train_end_ms,
-            )
-        except Exception as exc:
-            if self.verbose > 0:
-                print(f"  Optimization failed for {month_str}: {exc}")
+        seeds = self.ensemble_seeds or [self.seed]
+        self._models = []
+        self._confidence_thresholds = []
+
+        for i, seed in enumerate(seeds):
+            if self.verbose > 0 and len(seeds) > 1:
+                print(f"  [ensemble {i + 1}/{len(seeds)}] seed={seed}")
+            try:
+                model, selected_cols, confidence_threshold = optimize_and_train(
+                    feat_train,
+                    train_labels,
+                    available_feat_cols,
+                    long_pnls,
+                    short_pnls,
+                    self.n_trials,
+                    self.cv_splits,
+                    seed,
+                    self.verbose,
+                    sample_weights=train_weights,
+                    open_times=train_open_times,
+                    train_end_ms=split.train_end_ms,
+                )
+                self._models.append(model)
+                self._confidence_thresholds.append(confidence_threshold)
+            except Exception as exc:
+                if self.verbose > 0:
+                    print(f"  Optimization failed for {month_str} seed={seed}: {exc}")
+
+        if not self._models:
             return
 
-        self._model = model
+        # Use first model as primary (backward compat)
+        self._model = self._models[0]
         self._selected_cols = selected_cols
-        self._confidence_threshold = confidence_threshold
+        self._confidence_threshold = float(np.mean(self._confidence_thresholds))
 
         # (e) Batch-load test month features
         symbols = list(dict.fromkeys(self._sym_arr))
@@ -363,7 +379,7 @@ class LightGbmStrategy:
 
         self._last_predict_log: str | None = None
 
-        if self._model is None:
+        if not self._models:
             return NO_SIGNAL
 
         # Look up features from month cache
@@ -372,11 +388,12 @@ class LightGbmStrategy:
         if feat_row is None:
             return NO_SIGNAL
 
-        # Predict with confidence threshold gate
+        # Predict with all ensemble models and average probabilities
         feat_df = pd.DataFrame(
             feat_row.reshape(1, -1), columns=self._selected_cols
         )
-        proba = self._model.predict_proba(feat_df)[0]  # [P(short), P(long)]
+        all_proba = [m.predict_proba(feat_df)[0] for m in self._models]
+        proba = np.mean(all_proba, axis=0)  # averaged [P(short), P(long)]
         confidence = float(max(proba))
 
         if confidence < self._confidence_threshold:
