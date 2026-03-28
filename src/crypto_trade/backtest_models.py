@@ -30,6 +30,8 @@ class Strategy(Protocol):
 class Signal:
     direction: int  # 1=buy, -1=sell, 0=do nothing
     weight: int  # 0-100
+    tp_pct: float | None = None  # optional dynamic take-profit %
+    sl_pct: float | None = None  # optional dynamic stop-loss %
 
 
 @dataclass(frozen=True)
