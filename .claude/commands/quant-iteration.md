@@ -189,6 +189,21 @@ When using a pooled model across multiple symbols with different price scales, t
 
 When proposing new features, the QR should prefer normalized/ratio-based features. When the model uses raw price-level features (SMA, EMA, VWAP), understand that these only work well within a single symbol or among symbols with similar price scales.
 
+## Feature Count Discipline
+
+**Fewer features = more stable models.** This is the #1 lesson from 83 iterations of feature work.
+
+- **Target**: 30-50 features for a 2-symbol model (~4,400 training samples/month)
+- **Hard ceiling**: Never exceed 80 features without explicit justification
+- **Samples-per-feature ratio**: Must stay above 50. With 4,400 samples and 50 features = ratio 88 (healthy). With 198 features = ratio 22 (dangerous)
+- **Every added feature must displace a worse one.** Net feature count should decrease or stay flat, never balloon
+- **Symbol-scoped discovery**: Always use `symbols=trading_symbols` in `_discover_feature_columns()`. Global intersection across ~800 symbols is wrong — it drops features that ALL trading symbols have
+
+### Anti-patterns (learned the hard way)
+- Iter 083: Added 85 features (113→198) without pruning — wrong direction
+- Iter 078: 185 features with halved training data (per-symbol) — ratio 21, catastrophic overfitting
+- The baseline works with 106 features but many are likely noise. **Pruning to 40-50 should improve, not degrade.**
+
 ---
 
 ## Baseline Comparison Rules
@@ -293,16 +308,50 @@ After 3+ consecutive NO-MERGE iterations (or after an EARLY STOP), the QR MUST e
 
 #### A. Feature Contribution Analysis
 Using IS data only:
-1. Run permutation importance (or train a single LightGBM on full IS period)
-2. Group features by category (momentum, volatility, trend, volume, mean_reversion, statistical) — compute per-group cumulative importance
-3. For each top-10 feature, provide an economic hypothesis for why it predicts direction
-4. Propose **at least 2 NEW features** not in the current pipeline:
-   - Cross-asset: BTC returns/volatility as leading indicator (`btc_return_lag1`, `btc_natr_14`)
+
+##### A1. Feature Pruning Protocol (MANDATORY before adding features)
+
+Fewer, high-quality features produce more stable models. **Always prune before adding.**
+
+1. **Train a reference LightGBM** on full IS period (all symbols pooled, same hyperparams as
+   baseline) and extract feature importances (gain-based or permutation).
+2. **Correlation dedup**: Compute pairwise Spearman correlation matrix across all features.
+   For each pair with |correlation| > 0.90, keep the one with higher importance and drop the
+   other. Document which features were dropped and their correlated partner.
+3. **Importance threshold**: Rank features by importance. Compute cumulative importance.
+   Drop all features below the "elbow" — typically the bottom 30-50% of features contribute
+   < 5% of total importance. Target: **30-50 features** for a 2-symbol model with ~4,400
+   training samples (ratio ≥ 88 samples/feature).
+4. **Stability check**: Repeat importance analysis on 3 non-overlapping IS sub-periods
+   (e.g., 2020-2021, 2022-2023, 2024-2025). Features that appear in the top-20 in ALL
+   sub-periods are "stable." Features that rank top-10 in one period but bottom-50 in
+   another are "unstable" — drop them regardless of aggregate importance.
+5. **Validation**: Run a quick IS-only backtest with the pruned feature set. IS Sharpe must
+   not degrade by more than 15% from the full-feature baseline. If it does, relax the
+   pruning threshold until the constraint is met.
+
+##### A2. Feature Discovery Scope
+
+**IMPORTANT**: Use symbol-scoped discovery (`symbols=["BTCUSDT","ETHUSDT"]`) instead of
+global intersection. The global intersection across ~800 symbols drops 72+ features that
+BTC+ETH both have (Stochastic, MACD, Aroon, ADX, etc.) because smaller symbols lack them.
+This was discovered in iter 083. Always scope discovery to the trading universe.
+
+##### A3. Feature Importance Analysis
+
+1. Group features by category (momentum, volatility, trend, volume, mean_reversion,
+   statistical, interaction, cross_asset) — compute per-group cumulative importance
+2. For each top-10 feature, provide an economic hypothesis for why it predicts direction
+3. Identify features with importance < 0.1% — these are noise, not signal
+
+##### A4. New Feature Proposals
+
+Only after pruning, propose **at most 5 NEW features** (net feature count should stay ≤ 50):
+   - Cross-asset: BTC returns/volatility as leading indicator (`xbtc_return_1`, `xbtc_natr_14`)
    - Multi-timeframe: 1h or 4h indicators resampled to 8h (`mtf_1h_rsi_14`, `mtf_4h_adx_14`)
    - Microstructure: taker buy ratio momentum, volume imbalance, trade count vs volume
-   - Calendar: hour of day (0/8/16), day of week
    - Interaction: RSI × ADX, volatility × trend strength
-5. Propose a feature selection method (permutation pruning, RFE, or correlation dedup > 0.95)
+   - Each new feature must have an economic rationale — no "let's try it and see"
 
 #### B. Symbol Universe & Diversification Analysis
 
@@ -439,6 +488,8 @@ Pick categories based on the bottleneck:
 - Stuck on 2 symbols / need diversification → B (MANDATORY — use the full B1/B2/B3 protocol) + A (cross-asset features for new symbols)
 - Single-symbol concentration > 30% → B (this constraint cannot be met without expanding the universe)
 - High OOS Sharpe but thin trade count → B (diversify for more trades rather than lowering confidence threshold)
+- **Too many features / overfitting suspected** → A1 (MANDATORY feature pruning protocol). Run correlation dedup + importance pruning BEFORE any other change. Target 30-50 features.
+- **Adding new features** → A1 first (prune), then A4 (add ≤5 new). Net count must not increase.
 
 ---
 
