@@ -162,6 +162,23 @@ When an iteration produces a MERGE-worthy result, the QE MUST validate it is NOT
 
 This was learned in iter 038: seed=42 gave OOS Sharpe +1.33, but seed=123 gave -1.15. Without seed validation, we'd believe the strategy was 3x better than it actually is.
 
+## Symbol Addition Validation (MANDATORY before MERGE with new symbols)
+
+When an iteration adds new symbol(s) to the universe, the QE MUST validate stability:
+
+1. Run the configuration with the new symbol(s) included AND excluded (A/B test)
+2. Compare per-symbol metrics for existing symbols (BTC, ETH):
+   - WR must not degrade by more than 2pp
+   - Sharpe must not degrade by more than 15%
+3. Each new symbol's per-symbol metrics must show:
+   - WR above break-even (33.3% for 8%/4%)
+   - At least 20 OOS trades
+   - Positive net PnL in OOS
+4. Portfolio-level check:
+   - No single symbol > 50% of OOS PnL (relaxed from 30% during expansion phase)
+   - Total OOS Sharpe >= baseline × 0.95 (allow 5% Sharpe sacrifice for diversification)
+5. Report the A/B comparison in the engineering report and diary
+
 ## Feature Normalization Awareness
 
 When using a pooled model across multiple symbols with different price scales, the QR and QE must ensure features are **scale-invariant**:
@@ -187,6 +204,16 @@ Read `BASELINE.md` on main before evaluating. An iteration merges ONLY if:
    - IS/OOS Sharpe ratio > 0.5 (researcher overfitting gate)
 
 If primary metric improves but a constraint fails → NO-MERGE. Document trade-off in diary.
+
+**Diversification exception**: If an iteration adds new symbol(s) and:
+- OOS Sharpe is within 5% of baseline (i.e., >= baseline × 0.95)
+- OOS MaxDD improves by > 10%
+- The 30% concentration constraint improves (moves closer to passing)
+- All other hard constraints pass
+
+Then the QR MAY recommend MERGE with justification, even if OOS Sharpe does not strictly
+improve. Diversification has long-term value that single-period Sharpe does not capture.
+This exception requires explicit justification in the diary.
 
 ## Backtest Report Structure
 
@@ -277,13 +304,100 @@ Using IS data only:
    - Interaction: RSI × ADX, volatility × trend strength
 5. Propose a feature selection method (permutation pruning, RFE, or correlation dedup > 0.95)
 
-#### B. Symbol Universe Analysis
+#### B. Symbol Universe & Diversification Analysis
+
+This section is CRITICAL. Symbol expansion has failed catastrophically every time it was attempted
+naively (iter 001: 50 symbols, Sharpe -4.89; iter 071: 4 symbols, early-stopped). The only
+successful configuration is BTC+ETH (iter 010 onward). Any symbol change requires rigorous
+validation using the protocol below.
+
 Using IS data only:
-1. Compute pairwise return correlation matrix (rolling 90-day windows)
-2. Cluster symbols (hierarchical or k-means) — identify 3-5 natural groups
-3. Rank symbols by per-symbol model WR
-4. Analyze whether per-cluster or per-tier models outperform the pooled model
-5. Document whether BTC/ETH should have dedicated models
+
+##### B1. Correlation & Lead-Lag Analysis
+
+1. Compute pairwise return correlation matrix on 8h candles for candidate symbols using
+   rolling 90-day windows. Report: mean correlation, min/max, and how many windows have
+   correlation > 0.8 (redundant), 0.5-0.8 (moderate), < 0.5 (diversifying).
+2. Compute REGIME-DEPENDENT correlations: split IS data into high-vol and low-vol periods
+   (using BTC NATR_21 above/below median). Report correlation in each regime separately.
+   Symbols that decorrelate during high-vol periods are the most valuable for diversification.
+3. Lead-lag analysis: for each candidate symbol vs BTC, compute cross-correlation at lags
+   0, 1, 2, 3 candles (0h, 8h, 16h, 24h). If BTC leads by 1+ candles, the lagged BTC
+   return is a valid feature for that symbol. If correlation is highest at lag 0, there is
+   no lead-lag edge.
+4. Compute rolling correlation STABILITY: standard deviation of the rolling 90-day
+   correlation. High stability (low std) means the relationship is exploitable.
+   Unstable correlations are dangerous for pooled models.
+
+##### B2. Symbol Screening & Qualification Protocol
+
+Before adding ANY new symbol to the trading universe, it MUST pass ALL of these gates:
+
+**Gate 1 — Data quality**: At least 1,095 IS candles (1 year of 8h data), no gaps > 3 days,
+first candle before 2023-07-01. (Already enforced by `universe.py`.)
+
+**Gate 2 — Liquidity**: Mean daily volume > $10M (8h candles × 3 per day). Low liquidity
+symbols have unreliable price action and slippage risk.
+
+**Gate 3 — Stand-alone profitability**: Train a SEPARATE LightGBM model on only this
+symbol's IS data (same config as baseline: 24mo window, 5 CV folds, 50 Optuna trials,
+TP=8%/SL=4%, ensemble 3 seeds). The symbol passes ONLY if:
+   - IS Sharpe > 0.0 (profitable on its own)
+   - IS WR > break-even for its TP/SL ratio (33.3% for 8%/4%)
+   - At least 100 IS trades
+
+**Gate 4 — Pooled compatibility**: Add the symbol to BTC+ETH and re-run the baseline.
+Compare the 3-symbol result against the 2-symbol baseline. The symbol passes ONLY if:
+   - IS Sharpe >= baseline IS Sharpe × 0.90 (no more than 10% degradation)
+   - BTC and ETH per-symbol WR do not degrade by more than 2pp each
+   - The new symbol's per-symbol WR is above break-even
+
+**Gate 5 — Diversification value**: Compute the portfolio-level benefit:
+   - Correlation with existing portfolio returns < 0.7
+   - Adding this symbol reduces portfolio IS MaxDD or increases IS Sharpe
+
+All candidates MUST pass all 5 gates individually before being pooled. Multiple symbols can
+be added simultaneously if each passes gates independently. Iter 071 failed because symbols
+were added without screening, not because multiple were added at once.
+
+##### B3. Model Architecture Decision Framework
+
+After screening, decide HOW to model the expanded universe:
+
+**Option A — Pooled model** (current approach):
+- Use when: All symbols have similar volatility regime (NATR within 2x), similar WR profile,
+  and high correlation (> 0.6).
+- Risk: Dilution. The model learns an average signal that may not work for any symbol well.
+
+**Option B — Per-symbol models**:
+- Use when: Symbols have fundamentally different dynamics (e.g., ETH SHORT 51% WR vs
+  BTC LONG 43.6% WR as found in iter 076).
+- Implementation: Train separate LightGBM per symbol. Each gets its own Optuna optimization,
+  feature selection, and confidence threshold. Doubles compute but allows specialization.
+- Risk: Fewer training samples per model (~2,200/year for one symbol on 8h). Only viable
+  for symbols with 3+ years of IS data.
+- Decision rule: If per-symbol IS Sharpe > pooled IS Sharpe for BOTH symbols → use per-symbol.
+
+**Option C — Cluster models**:
+- Use when: You have 5+ symbols that naturally group into 2-3 clusters (e.g., large-cap L1,
+  mid-cap DeFi, high-vol meme coins).
+- Implementation: Hierarchical clustering on IS return correlations, train one model per cluster.
+- Risk: Cluster boundaries shift over time. Validate clusters are stable across rolling windows.
+- Decision rule: Only use if clusters have at least 3 symbols each (for sufficient training data).
+
+**Option D — Hierarchical model** (most sophisticated):
+- A global model trained on all symbols, plus per-symbol or per-cluster fine-tuning.
+- Implementation with LightGBM: Train a global model, then add its predictions as a feature
+  for per-symbol models.
+- Risk: Complexity. Only attempt after Options A and B are exhausted.
+
+Document the decision in a matrix in the research brief:
+```
+| Symbol pair   | Correlation | NATR ratio | WR difference | Recommended architecture |
+|---------------|-------------|------------|---------------|-------------------------|
+| BTC ↔ ETH     | 0.82        | 1.3x       | 7pp           | Pooled or Per-symbol     |
+| BTC ↔ SOL     | ???         | ???        | ???           | ??? (after Gates)        |
+```
 
 #### C. Labeling Analysis
 Using IS data only:
@@ -322,6 +436,85 @@ Pick categories based on the bottleneck:
 - Some symbols work, others don't → B (symbols)
 - Model trades too much/little → E (patterns) + C (labeling)
 - Same approach failed 3+ times → F (statistical rigor) to verify if signal exists at all
+- Stuck on 2 symbols / need diversification → B (MANDATORY — use the full B1/B2/B3 protocol) + A (cross-asset features for new symbols)
+- Single-symbol concentration > 30% → B (this constraint cannot be met without expanding the universe)
+- High OOS Sharpe but thin trade count → B (diversify for more trades rather than lowering confidence threshold)
+
+---
+
+## Diversification Research Protocol
+
+The strategy is currently concentrated in BTC+ETH (2 symbols, ETH contributing 91.6% of OOS PnL).
+The 30% single-symbol concentration hard constraint is waived because it's structurally impossible
+with 2 symbols. This section guides the QR on systematically expanding the symbol universe.
+
+### Why Diversification Matters
+
+1. **Risk reduction**: Correlated drawdowns are the #1 killer. BTC and ETH crashed together in
+   every historical bear market. Adding uncorrelated symbols reduces portfolio MaxDD.
+2. **Statistical robustness**: 87 OOS trades is thin. More symbols = more trades = tighter
+   confidence intervals.
+3. **Constraint compliance**: The 30% concentration constraint exists for a reason. Meeting it
+   requires trading at least 4 symbols with balanced signal quality.
+4. **Capacity**: With 2 symbols, the strategy has a hard capacity ceiling. More symbols =
+   more deployment capital.
+
+### Progressive Expansion Roadmap
+
+The QR should follow this order, validating at each step before proceeding:
+
+**Stage 1: Understand BTC/ETH dynamics deeply** (PREREQUISITE for any expansion)
+- Run lead-lag analysis (Research Checklist B1.3)
+- Compute regime-dependent correlation (B1.2)
+- Evaluate per-symbol models vs pooled (B3 Option B)
+- Answer: Does a per-symbol architecture improve the baseline? If yes, use it going forward.
+
+**Stage 2: Screen candidate symbols**
+- Run the Symbol Qualification Protocol (B2) for the top candidates by volume:
+  SOL, XRP, DOGE, BNB, ADA, AVAX, LINK, MATIC/POL.
+- Evaluate candidates in parallel — each must pass all 5 gates independently.
+- Document each candidate's gate results in the research brief.
+
+**Stage 3: Validate the expanded universe**
+- Add all gate-passing symbols together and run full walk-forward.
+- Check all hard constraints including per-symbol metrics.
+- If the expanded configuration passes: update the baseline.
+
+**Stage 4: Portfolio-level optimization** (only after 4+ symbols)
+- Consider non-equal position sizing (e.g., inverse-volatility weighting)
+- Evaluate if the 30% concentration constraint can be met
+- Analyze portfolio-level MaxDD vs per-symbol MaxDD
+
+### Cross-Asset Feature Strategy for Expanded Universe
+
+When adding symbol X to a universe containing BTC+ETH:
+- For X: add `xbtc_` features (BTC returns/volatility as leading indicators). These are
+  genuinely new information for X.
+- For BTC: do NOT add `xbtc_` features — they are redundant (iter 070 lesson).
+- For ETH: the `xbtc_` features may help (BTC leads ETH by ~1 candle historically).
+  Test with and without.
+- If training per-symbol models: each model gets its own cross-asset features.
+  X's model gets BTC features. BTC's model gets NO cross-asset features.
+  ETH's model gets BTC features only if lead-lag analysis confirms a lag.
+
+### Diversification Anti-Patterns (Learned from 77 Iterations)
+
+1. **DO NOT add unscreened symbols.** Every candidate must pass all 5 qualification gates.
+   Iter 071 added SOL+DOGE without screening → catastrophic collapse.
+
+2. **DO NOT assume high-volume = high-signal.** SOL has massive volume but very different
+   dynamics (NATR 5-15% vs BTC 2-4%). Volume does not imply predictability.
+
+3. **DO NOT pool symbols with NATR ratios > 2x.** BTC NATR ~3% and DOGE NATR ~8% — when
+   pooled, the model's confidence threshold and labeling barriers cannot serve both.
+   Fixed TP=8%/SL=4% is reasonable for BTC but too tight for DOGE.
+
+4. **DO NOT add symbols that lack stand-alone profitability.** If a per-symbol model for SOL
+   is unprofitable in IS, adding SOL to the pooled model adds noise, not signal.
+
+5. **DO NOT ignore the feature count / sample count ratio.** With 106 features and 2 symbols,
+   monthly training has ~4,400 samples (ratio ~41). Adding more symbols increases samples
+   which HELPS the model — but only if the new symbols' patterns are learnable.
 
 ---
 
@@ -440,6 +633,20 @@ The QR maintains a running list of untested exploration ideas. At minimum, these
 - TP=8%/SL=4% — tested iter 027: 46% WR! IS Sharpe -0.04. Very promising on BTC+ETH.
 - TP=6%/SL=3% (2:1, middle ground between 4%/2% and 8%/4%)
 - Timeout=1 week (7 days)
+
+**Symbol Universe Expansion (REQUIRES Research Checklist B):**
+- Per-symbol models for BTC and ETH (separate LightGBM, separate Optuna) — ETH has 51.1% SHORT
+  WR vs BTC 43.6% LONG WR (iter 076). Different dynamics suggest different models.
+- Expand to BTC+ETH+SOL (or other top candidates) with each symbol qualified through the
+  5-gate protocol. Screen multiple candidates in parallel.
+- Dynamic per-symbol barriers — instead of fixed 8%/4% for all symbols, use per-symbol
+  ATR-scaled barriers. SOL might need TP=12%/SL=6% while BTC uses TP=6%/SL=3%.
+- Sector rotation feature — compute rolling 30-day returns for L1 (BTC, ETH, SOL),
+  DeFi (AAVE, UNI), and meme (DOGE, SHIB). Use sector-relative performance as a feature.
+- BTC dominance as a feature — BTC market cap share. When dominance rises, altcoins tend
+  to underperform (capital flows to BTC). Available from CoinGecko or on-chain APIs.
+- Portfolio-level signal aggregation — instead of treating each symbol independently,
+  consider portfolio constraints: max N positions at a time, inverse-volatility weighting.
 
 ## Key Reminders
 
