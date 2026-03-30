@@ -5,6 +5,20 @@ description: "Quant research/engineering iteration workflow for the crypto-trade
 
 # Quant Iteration Skill
 
+## Mission
+
+Crypto markets are the most inefficient markets on earth. They trade 24/7 across fragmented venues populated by retail speculators, algorithmic bots with misaligned incentives, and institutions constrained by mandates that have nothing to do with price discovery. Fear and greed oscillate on 8-hour cycles. Liquidation cascades create mispricings that would be arbitraged away in seconds in equities but persist for hours in crypto futures. Funding rates distort positioning. Social media narratives move billions.
+
+Our edge is systematic patience. We use LightGBM on 8-hour candles — a timeframe slow enough to avoid microstructure noise, fast enough to capture the behavioral patterns that human traders create and perpetuate. We do not predict the future. We identify moments when the distribution of forward returns is skewed in our favor, and we bet accordingly, sized by our conviction and disciplined by our risk framework.
+
+The market's irrationality is our opportunity. Volatility is not risk — it is the raw material of profit. Every liquidation cascade, every panic sell, every euphoric FOMO spike creates a statistical edge for the patient, systematic trader who has done the work to distinguish signal from noise.
+
+We build strategies that would survive scrutiny by the most rigorous quantitative finance researchers. No p-hacking. No overfitting to backtest. No self-deception. If a strategy cannot withstand combinatorial purged cross-validation, deflated Sharpe ratio tests, and out-of-sample evaluation on data the researcher never saw, it does not trade.
+
+88 iterations have taught us what does not work. That knowledge is as valuable as what does. We are closer than we think.
+
+---
+
 This skill governs the iterative research/engineering workflow for building and improving the crypto-trade LightGBM strategy on 8h candles.
 
 ## Before You Start
@@ -30,6 +44,8 @@ The user can override by specifying a role (e.g., "be the QR") or a phase (e.g.,
 - **NEVER cherry-pick date ranges** to make IS or OOS look better.
 - **NEVER post-hoc filter trades** from the results to improve metrics.
 - **NEVER tune parameters on OOS data** (the researcher sees OOS only in Phase 7).
+- **NEVER allow labels to leak across CV fold boundaries.** The `gap` parameter in `TimeSeriesSplit` MUST be set correctly: `gap = (timeout_candles + 1) * n_symbols`. The QE MUST verify this in EVERY iteration by reviewing the CV setup in `optimization.py`. This is non-negotiable — iter 089 proved that leaked labels inflate CV Sharpe by 5-10x.
+- **NEVER allow labels to leak from live/prediction data to training data.** In the walk-forward backtest, each month's model trains ONLY on past klines. Labels for training samples must not scan past the training window boundary.
 
 To improve IS Sharpe: improve the STRATEGY (features, model, labeling) — not the measurement window. A strategy that only works from 2023 onward is NOT robust.
 
@@ -206,6 +222,112 @@ When proposing new features, the QR should prefer normalized/ratio-based feature
 
 ---
 
+## LABEL LEAKAGE PREVENTION — NON-NEGOTIABLE
+
+### The Rule
+
+Labels MUST NOT leak across ANY boundary:
+1. **CV fold boundaries** — training labels cannot see validation-period prices
+2. **Walk-forward boundaries** — training labels cannot see future klines
+3. **Live prediction** — the model predicts one step at a time, never trained on future data
+
+Violation of this rule invalidates ALL metrics. Iter 089 proved leaked labels inflate CV Sharpe by **5-10x**. The QE MUST audit label leakage in EVERY iteration.
+
+### CV Label Leakage: The Problem
+
+Triple-barrier labels scan forward up to `timeout_minutes / candle_minutes` candles (e.g., 10080 / 480 = 21 candles for 7-day timeout on 8h). When training data is pooled across N symbols, the feature array interleaves symbols — so 21 candles of leakage per symbol = `21 * N` rows.
+
+If a training sample's label scans into the validation fold, the model trains on information from the validation period. This is invisible but devastating.
+
+### CV Label Leakage: The Fix
+
+Use `TimeSeriesSplit` with a computed `gap` parameter:
+
+```python
+gap = (label_timeout_minutes // interval_minutes + 1) * n_symbols
+tscv = TimeSeriesSplit(n_splits=cv_splits, gap=gap)
+```
+
+This excludes training samples whose labels could reach into the validation fold. The gap is **dynamic** — computed from the actual timeout, interval, and symbol count in `lgbm.py._train_for_month()`.
+
+**Example**: 8h candles, 7-day timeout, 2 symbols → gap = (10080/480 + 1) * 2 = **44 rows**. Data loss: ~1% per fold boundary — negligible.
+
+### Walk-Forward Label Leakage
+
+The walk-forward backtest trains each month's model on a window of past data. The labeling function receives only klines within that window, so it cannot scan past the window boundary. This is correct by construction — but verify it hasn't been broken by code changes.
+
+### What Failed: PurgedKFoldCV (iter 089-090)
+
+A custom `PurgedKFoldCV` class (purge_window=21, embargo_pct=0.02) was tried. It removed ~4% of data per fold + embargo, which combined with Optuna's `training_days` parameter to create empty folds. IS Sharpe collapsed to -1.32 (iter 089) and -1.00 (iter 090). The approach was theoretically correct but practically catastrophic.
+
+The `TimeSeriesSplit(gap=...)` solution (iter 091) achieves the same leakage prevention with ~1% data loss and zero complexity.
+
+---
+
+## Sample Weights: Uniqueness + Time Decay (AFML Ch. 4)
+
+### The Overlap Problem
+
+Triple barrier labels with timeout=7 days mean each label's outcome depends on the next 21 candles (168h / 8h). When two adjacent samples both have labels spanning the same future period, they are not independent observations. The current system (at `labeling.py:245-248`) treats them as independent, which inflates the effective sample size and causes the model to overweight periods with many overlapping labels.
+
+### Uniqueness Weighting
+
+For each sample i with label window [t_i, t_i + timeout]:
+1. Compute c_t = number of active labels at each timestamp t within [t_i, t_i + timeout]
+2. Uniqueness(i) = mean(1/c_t) for all t in [t_i, t_i + timeout]
+3. Samples with fewer concurrent labels get higher uniqueness (closer to 1.0)
+4. Samples during crowded periods (many overlapping labels) get lower uniqueness
+
+### Combined Weight Formula
+
+```
+final_weight(i) = uniqueness(i) * time_decay(i) * abs_pnl_weight(i)
+```
+
+Where:
+- **uniqueness(i)**: from the overlap computation above
+- **time_decay(i)**: exponential decay with half-life = training_months / 2 (e.g., 12 months for a 24-month window). Most recent samples get weight ~1.0, oldest get weight ~0.25
+- **abs_pnl_weight(i)**: the current |PnL| weight normalized to [1, 10] (kept)
+
+### Implementation
+
+Add `compute_sample_uniqueness()` to `src/crypto_trade/strategies/ml/labeling.py`. Input: candidate_indices, timeout_minutes, open_time array. Output: uniqueness weights array (same length as labels). Multiply with existing weights before passing to LightGBM's `sample_weight` parameter.
+
+---
+
+## Fractional Differentiation (AFML Ch. 5)
+
+### The Stationarity-Memory Tradeoff
+
+Most financial features face a tradeoff:
+- **Returns (d=1.0)**: Stationary but memoryless. Yesterday's return tells you nothing about today's price level.
+- **Prices (d=0.0)**: Maximum memory but non-stationary. Split points learned in 2021 (BTC at $40K) are meaningless in 2024 (BTC at $70K).
+
+Fractional differentiation finds the minimum `d` that achieves stationarity while preserving as much memory as possible. This is one of the most impactful techniques in AFML.
+
+### Implementation for 8h Candle Features
+
+1. **New feature module**: `src/crypto_trade/features/fracdiff.py`
+2. **Apply to**: log(close), log(volume), OBV, cumulative taker_buy_ratio
+3. **Method**: Fixed-window fracdiff with window=100 candles (800 hours ~ 33 days)
+   - For each series, find minimum d where ADF test p-value < 0.05
+   - Typical d for crypto prices: 0.3-0.5 (vs d=1.0 for returns)
+   - Use the `fracdiff` Python package or implement FFT-based weights
+4. **Feature names**: `fracdiff_close_d{d}`, `fracdiff_volume_d{d}`, etc.
+5. **Expected benefit**: Features that are both stationary (safe for LightGBM) AND retain long-term trend information (unlike returns)
+
+### Why This Matters for 8h Candles
+
+On 8h candles, a lookback of 100 candles = 33 days. Fractionally differentiated close prices with d~0.4 would preserve information about the price trajectory over the last month while remaining stationary. This is exactly the kind of feature that captures regime persistence — a rising market at d=0.4 retains the "memory" that prices have been trending up, something that 1-period returns completely lose.
+
+### Practical Notes
+
+- The `fracdiff` package (`pip install fracdiff`) provides `fracdiff.fdiff()` which handles the FFT-based computation efficiently
+- With ~4,400 samples per training window, adding 3-4 fracdiff features (close, volume, OBV, taker_ratio) is well within the feature budget
+- These should REPLACE some raw statistical features (e.g., redundant return periods), not add to them — net feature count stays flat
+
+---
+
 ## Baseline Comparison Rules
 
 Read `BASELINE.md` on main before evaluating. An iteration merges ONLY if:
@@ -229,6 +351,43 @@ If primary metric improves but a constraint fails → NO-MERGE. Document trade-o
 Then the QR MAY recommend MERGE with justification, even if OOS Sharpe does not strictly
 improve. Diversification has long-term value that single-period Sharpe does not capture.
 This exception requires explicit justification in the diary.
+
+## Overfitting Quantification (AFML Ch. 11-12)
+
+### Deflated Sharpe Ratio (DSR)
+
+After 88+ iterations, the probability that the best OOS Sharpe is a statistical fluke increases with each trial. The Deflated Sharpe Ratio adjusts for multiple testing:
+
+- **N** = number of independent trials (iterations)
+- **E[max(SR_0)]** = expected maximum Sharpe under the null (all trials random)
+- **DSR** = (SR_observed - E[max(SR_0)]) / SE(SR)
+
+Formula: `E[max(SR_0)] ~ sqrt(2 * ln(N)) * (1 - gamma / (2 * ln(N))) + gamma / sqrt(2 * ln(N))` where gamma ~ 0.5772 (Euler-Mascheroni constant).
+
+**If DSR < 0**, the observed Sharpe is likely explained by multiple testing alone.
+
+**Implementation**: Add `compute_deflated_sharpe()` to `backtest_report.py`. Inputs: observed OOS Sharpe, number of iterations, OOS trade count, skewness and kurtosis of OOS returns. The QR must report DSR in every diary entry alongside raw Sharpe.
+
+### Probability of Backtest Overfitting (PBO)
+
+When using CPCV (15 paths from N=6, k=2):
+1. For each trial (Optuna configuration), collect the 15 path Sharpe ratios
+2. Rank the paths: for each path, rank the trial's Sharpe among all trials
+3. PBO = fraction of paths where the best in-sample trial ranks below median out-of-sample
+4. PBO > 0.5 -> more likely than not that the backtest is overfit
+
+**Practical application**: Run PBO on the final monthly model. If PBO > 0.5 for more than 30% of months, the strategy's IS performance is unreliable.
+
+### Application to the 88-Iteration Problem
+
+With N=88 trials and baseline OOS Sharpe +1.84:
+- E[max(SR_0)] ~ sqrt(2 * ln(88)) ~ 2.99 (expected max Sharpe under random)
+- The observed +1.84 is BELOW the expected random maximum
+- This means DSR < 0 — the baseline Sharpe is within the range expected from 88 random trials
+
+This is sobering but important. It does NOT mean the strategy has no signal (IS Sharpe +1.22 is consistent and positive). But the specific OOS Sharpe of +1.84 is not statistically significant given 88 trials. The correct response is to REDUCE the number of trials (fewer, bolder iterations) and improve per-trial robustness with the MLP techniques below.
+
+---
 
 ## Backtest Report Structure
 
@@ -337,12 +496,38 @@ global intersection. The global intersection across ~800 symbols drops 72+ featu
 BTC+ETH both have (Stochastic, MACD, Aroon, ADX, etc.) because smaller symbols lack them.
 This was discovered in iter 083. Always scope discovery to the trading universe.
 
-##### A3. Feature Importance Analysis
+##### A3. Feature Importance: MDA over MDI (MANDATORY)
 
-1. Group features by category (momentum, volatility, trend, volume, mean_reversion,
-   statistical, interaction, cross_asset) — compute per-group cumulative importance
-2. For each top-10 feature, provide an economic hypothesis for why it predicts direction
-3. Identify features with importance < 0.1% — these are noise, not signal
+LightGBM's default gain-based importance (MDI) is biased toward high-cardinality continuous features. It measures how much a feature was used in splits, not how much accuracy degrades when the feature is removed. This distinction matters.
+
+**Primary method: Mean Decrease Accuracy (MDA) / Permutation Importance**
+
+1. After training each monthly model, compute permutation importance:
+   - For each feature, shuffle its values in the validation fold
+   - Re-compute Sharpe (not accuracy) on the shuffled data
+   - MDA = mean(original_Sharpe - shuffled_Sharpe) across CV folds
+   - Features with MDA ~ 0 contribute nothing; features with MDA < 0 are harmful
+2. Use **cross-validated** MDA: compute permutation importance within each PurgedKFold
+   fold, then average. Single-fold MDA is noisy. With 5 folds, you get 5 MDA estimates
+   per feature.
+3. Report MDA alongside MDI in `feature_importance.csv`. When they disagree (high MDI
+   but low MDA), trust MDA — the feature is being split on frequently but not improving
+   out-of-fold predictions.
+
+**Secondary method: Single Feature Importance (SFI)**
+
+For each of the top-20 MDA features, train a model using ONLY that feature and report
+its solo Sharpe. Features that perform well alone AND in the full model are genuine
+signal. Features that only work in combination may be capturing noise patterns.
+
+**Implementation**: Add `compute_mda_importance()` to
+`src/crypto_trade/strategies/ml/feature_importance.py`. Call it after each monthly
+training. Aggregate across months for the IS report.
+
+4. Group features by category (momentum, volatility, trend, volume, mean_reversion,
+   statistical, interaction, cross_asset) — compute per-group cumulative MDA importance
+5. For each top-10 feature (by MDA), provide an economic hypothesis for why it predicts direction
+6. Identify features with MDA < 0 — these are actively harmful and should be removed
 
 ##### A4. New Feature Proposals
 
@@ -478,6 +663,20 @@ Using IS data only:
 2. Binomial p-value: is WR significantly different from 50%? From break-even?
 3. For proposed changes: is the expected improvement larger than the bootstrap CI width?
 
+#### G. Stationarity & Memory Analysis (AFML Ch. 5)
+Using IS data only:
+1. For each of the top-20 features, run the Augmented Dickey-Fuller (ADF) test. Report p-value and test statistic. Features with p > 0.05 are non-stationary.
+2. For non-stationary features, compute the minimum fractional differentiation order d that achieves stationarity (ADF p < 0.05).
+3. Compute the correlation between the original feature (d=0) and the fracdiff version (d=d_min). Higher correlation = more memory preserved.
+4. Propose replacing non-stationary features with their fracdiff versions.
+5. Report: table of (feature, ADF_p_original, d_min, correlation_original_fracdiff)
+
+#### H. Overfitting Audit (AFML Ch. 11-12)
+1. Compute the Deflated Sharpe Ratio for the baseline, accounting for N=88+ trials. Report DSR and the expected maximum Sharpe under the null.
+2. If CPCV is implemented: compute PBO for the latest monthly model. Report the fraction of months with PBO > 0.5.
+3. Compute the variance of IS Sharpe across walk-forward months. High variance suggests regime sensitivity. Report: mean, std, min, max of monthly IS Sharpe.
+4. For the proposed iteration: estimate the minimum OOS Sharpe needed to reject the null of "no skill" given the current trial count. If the target is below this, the iteration is not worth running.
+
 ### How to Use the Checklist
 
 Pick categories based on the bottleneck:
@@ -490,6 +689,9 @@ Pick categories based on the bottleneck:
 - High OOS Sharpe but thin trade count → B (diversify for more trades rather than lowering confidence threshold)
 - **Too many features / overfitting suspected** → A1 (MANDATORY feature pruning protocol). Run correlation dedup + importance pruning BEFORE any other change. Target 30-50 features.
 - **Adding new features** → A1 first (prune), then A4 (add ≤5 new). Net count must not increase.
+- **Non-stationary features suspected** → G (stationarity analysis). Run ADF tests on top features, propose fracdiff replacements.
+- **Multiple testing / 88+ iterations** → H (overfitting audit). Compute DSR before investing effort in a new iteration.
+- **Methodological upgrade needed** → G + H together. These are the MLP foundation categories.
 
 ---
 
@@ -607,6 +809,7 @@ After the backtest completes, the QE MUST verify trade execution by:
    - PnL calculation is correct: (exit - entry) / entry for long, (entry - exit) / entry for short
 2. **Checking exit reasons are consistent**: SL trades should have PnL ≈ -sl_pct, TP trades ≈ +tp_pct
 3. **Documenting any anomalies** in the engineering report
+4. **Label leakage audit (MANDATORY every iteration)**: Verify that `TimeSeriesSplit` gap is correctly computed: `gap = (timeout_candles + 1) * n_symbols`. Check that no training label's forward scan extends into the validation period. Check that walk-forward training windows don't include future klines. This must be verified even when CV code hasn't changed — parameter changes (timeout, interval, symbols) affect the required gap.
 
 ## Code Quality (QE)
 
@@ -614,6 +817,8 @@ After the backtest completes, the QE MUST verify trade execution by:
 - Pure functions where possible
 - Deterministic backtest (fixed random seed, logged in brief)
 - No lookahead bias within walk-forward folds — `assert` checks on date ordering per monthly fold
+- No label leakage in CV — verify `TimeSeriesSplit` gap matches `(timeout_candles + 1) * n_symbols`
+- No label leakage in walk-forward — training labels use only past klines
 - Tests for labeling, feature generation, PnL calculation
 
 ## Exploration / Exploitation Protocol
@@ -648,19 +853,47 @@ Exploration rate: 3/10 = 30% ✓
 
 If the exploration rate drops below 30%, the NEXT iteration MUST be exploration. No exceptions.
 
-### Exploration Idea Bank
+### Exploration Idea Bank (Prioritized)
 
-The QR maintains a running list of untested exploration ideas. At minimum, these should always be considered:
+The QR maintains a running list of untested exploration ideas, organized by priority tier. MLP Foundation techniques should be implemented before advanced or existing ideas.
 
-**Feature Frequency & Noise Reduction (HIGH PRIORITY):**
-- Slow features via 3-4x lookback multiplier: use period×3 to simulate daily indicators on 8h (e.g., SMA_300 ≈ daily SMA_100). Regenerate parquet with these.
+**TIER 1 — MLP Foundation (implement in this order):**
+
+1. **Purged k-Fold CV with embargo** -> replaces TimeSeriesSplit (prerequisite for everything else). See "Cross-Validation" section above. Expected: IS metrics may decrease slightly (less leakage = lower apparent fit), OOS/IS ratio should improve.
+
+2. **MDA/Permutation importance** -> replaces gain-based importance. See Research Checklist A3. Informs feature pruning — prune to 40-50 features based on MDA, not MDI.
+
+3. **Sample uniqueness weighting** -> fixes overlapping label bias. See "Sample Weights" section above. Expected: model focuses on unique, recent observations.
+
+4. **Fractional differentiation features** -> replace raw non-stationary features. See "Fractional Differentiation" section above. Add fracdiff(log_close, d~0.4), fracdiff(log_volume, d~0.4). Replace equivalent raw statistical features (net count flat). Package: `fracdiff` (pip install fracdiff).
+
+5. **Deflated Sharpe Ratio** -> quantify multiple testing problem. See "Overfitting Quantification" section above. This is a diagnostic, not a strategy change — but it informs whether further iterations are worth running.
+
+**TIER 2 — MLP Advanced:**
+
+6. **Meta-labeling (AFML Ch. 3)** — Train a primary model (current LightGBM) to predict direction, then a secondary model on a NEW target: 1 if the primary model's predicted trade would have been profitable, 0 otherwise. Secondary model features: primary confidence, NATR quartile, ADX regime, rolling 10-trade WR, hour_of_day. The secondary model's output probability becomes the bet size. Critical: the secondary model must be trained on OUT-OF-FOLD predictions of the primary model, not in-sample predictions.
+
+7. **CPCV with PBO** — Combinatorial Purged CV (N=6, k=2 -> 15 paths). Use path distribution to compute Probability of Backtest Overfitting. PBO > 0.5 = overfit likely.
+
+8. **Entropy features (AFML Ch. 18)** — Shannon entropy of discretized returns over rolling 50-candle window: `stat_shannon_entropy_50`, `stat_approx_entropy_50`. High entropy = unpredictable market (avoid trading). Low entropy = patterned market (edge exploitable). Genuinely novel features not captured by volatility or momentum.
+
+9. **CUSUM structural breaks (AFML Ch. 17)** — Cumulative sum of standardized log returns. Detect breakpoints where CUSUM exceeds 2-3 sigma. Features: `struct_cusum_break_5` (break in last 5 candles), `struct_candles_since_break`. Also useful for event-driven sampling.
+
+10. **Event-driven sampling** — Instead of evaluating every candle, only generate labels at "events": structural breaks, volume spikes (>3x rolling mean), range spikes. Reduces label universe from ~4,400 to ~500-1,000 meaningful events with higher signal-to-noise ratio.
+
+11. **Bet sizing via Kelly criterion (AFML Ch. 10)** — Replace fixed weight=100 with half-Kelly sizing: f* = p - (1-p)/b, where p = ensemble probability, b = TP/SL ratio = 2.0. For p=0.55: f*=0.325, weight=65. For p=0.70: f*=0.55, weight=110. Pairs naturally with meta-labeling: meta-model's P(profitable) feeds into Kelly.
+
+**TIER 3 — Existing Ideas:**
+
+**Feature Frequency & Noise Reduction:**
+- Slow features via 3-4x lookback multiplier: use period x 3 to simulate daily indicators on 8h (e.g., SMA_300 ~ daily SMA_100). Regenerate parquet with these.
 - Smoothed-data features: compute indicators on 3-candle rolling mean of close/high/low — removes intra-day noise
 - Long-period-only mode: drop all features with period < 20 — keep only stable, trend-level signals
-- Resample 8h→1d, compute daily indicators, broadcast back to 8h candles
+- Resample 8h->1d, compute daily indicators, broadcast back to 8h candles
 
 **Feature Generation:**
 - Calendar features: hour_of_day (0/8/16 UTC), day_of_week (tried iter 026 — showed signal but didn't beat baseline)
-- Interaction features: RSI × ADX, volatility × trend_strength
+- Interaction features: RSI x ADX, volatility x trend_strength
 - Cross-asset momentum: BTC return as leading indicator
 - Regime indicator as feature: BTC ADX/NATR quartile
 
@@ -698,6 +931,36 @@ The QR maintains a running list of untested exploration ideas. At minimum, these
   to underperform (capital flows to BTC). Available from CoinGecko or on-chain APIs.
 - Portfolio-level signal aggregation — instead of treating each symbol independently,
   consider portfolio constraints: max N positions at a time, inverse-volatility weighting.
+
+### Implementation Sequencing
+
+MLP techniques should be introduced one at a time (respecting the "one variable at a time" rule):
+
+```
+Iter 089: Purged k-Fold CV + embargo (replaces TimeSeriesSplit)
+  → Foundational — all subsequent improvements depend on correct CV
+  → Expected: IS metrics decrease slightly, OOS/IS ratio improves
+
+Iter 090: MDA feature importance + feature pruning round
+  → Use MDA to identify which of the 106 features are truly predictive
+  → Prune to 40-50 features based on MDA, not MDI
+
+Iter 091: Sample uniqueness weighting + time decay
+  → Fix the overlapping label bias
+  → Expected: model focuses on unique, recent observations
+
+Iter 092: Fractional differentiation features
+  → Add fracdiff(log_close), fracdiff(log_volume) — remove equivalent raw features
+  → Expected: features with both memory and stationarity
+
+Iter 093: Deflated Sharpe Ratio + formal overfitting audit
+  → Quantify the multiple testing problem
+  → This is a diagnostic iteration, not a strategy change
+
+Iter 094+: Meta-labeling (if prior iterations show genuine signal)
+  → Secondary model for trade filtering / bet sizing
+  → Most complex addition — requires solid foundations from 089-093
+```
 
 ## Key Reminders
 
