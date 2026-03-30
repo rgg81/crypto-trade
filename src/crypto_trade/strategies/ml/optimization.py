@@ -142,6 +142,7 @@ def _objective(
     verbose: int = 0,
     open_times: np.ndarray | None = None,
     ternary: bool = False,
+    cv_gap: int = 0,
 ) -> float:
     from sklearn.model_selection import TimeSeriesSplit
 
@@ -175,7 +176,9 @@ def _objective(
         params["objective"] = "binary"
         params["is_unbalance"] = True
         y = labels_to_classes(train_labels)
-    tscv = TimeSeriesSplit(n_splits=cv_splits)
+    # gap prevents label leakage across CV folds — excludes training samples
+    # whose triple-barrier labels could see into the validation period.
+    tscv = TimeSeriesSplit(n_splits=cv_splits, gap=cv_gap)
 
     import pandas as pd
 
@@ -247,12 +250,16 @@ def optimize_and_train(
     open_times: np.ndarray | None = None,
     train_end_ms: int | None = None,
     ternary: bool = False,
+    cv_gap: int = 0,
 ) -> tuple[lgb.LGBMClassifier, list[str], float]:
     """Run Optuna optimization and return (model, columns, confidence_threshold).
 
     Uses all feature columns (no group/period selection).
     Confidence threshold is optimized by Optuna and applied at inference time.
     Sharpe is computed from actual trade returns filtered by threshold.
+
+    cv_gap: number of rows to exclude between training and validation folds,
+    preventing label leakage from overlapping triple-barrier labels.
     """
     import optuna
 
@@ -279,6 +286,7 @@ def optimize_and_train(
             verbose,
             open_times=open_times,
             ternary=ternary,
+            cv_gap=cv_gap,
         ),
         n_trials=n_trials,
     )

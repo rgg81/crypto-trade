@@ -96,6 +96,17 @@ def _ms_to_datetime(ms: int) -> str:
     ).strftime("%Y-%m-%d %H:%M")
 
 
+_INTERVAL_MINUTES = {
+    "1m": 1, "3m": 3, "5m": 5, "15m": 15, "30m": 30,
+    "1h": 60, "4h": 240, "8h": 480, "12h": 720, "1d": 1440,
+}
+
+
+def _interval_to_minutes(interval: str) -> int:
+    """Convert interval string to minutes."""
+    return _INTERVAL_MINUTES.get(interval, 480)
+
+
 class LightGbmStrategy:
     """LightGBM strategy with lazy monthly walk-forward retraining."""
 
@@ -317,6 +328,18 @@ class LightGbmStrategy:
             )
 
         # (d) Optuna optimization (all features, with threshold)
+        # Compute CV gap to prevent label leakage across folds (iter 091).
+        # gap = (timeout_in_candles + 1) * n_symbols
+        interval_minutes = _interval_to_minutes(self._interval)
+        timeout_candles = self.label_timeout_minutes // interval_minutes + 1
+        n_symbols = len(set(self._sym_arr[train_indices]))
+        cv_gap = timeout_candles * n_symbols
+        if self.verbose > 0:
+            print(
+                f"  CV gap: {cv_gap} rows "
+                f"({timeout_candles} candles × {n_symbols} symbols)"
+            )
+
         seeds = self.ensemble_seeds or [self.seed]
         self._models = []
         self._confidence_thresholds = []
@@ -339,6 +362,7 @@ class LightGbmStrategy:
                     open_times=train_open_times,
                     train_end_ms=split.train_end_ms,
                     ternary=ternary,
+                    cv_gap=cv_gap,
                 )
                 self._models.append(model)
                 self._confidence_thresholds.append(confidence_threshold)
