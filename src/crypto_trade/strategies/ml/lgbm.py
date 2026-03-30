@@ -115,6 +115,7 @@ class LightGbmStrategy:
         atr_sl_multiplier: float | None = None,
         atr_column: str = "vol_natr_21",
         ensemble_seeds: list[int] | None = None,
+        neutral_threshold_pct: float | None = None,
     ) -> None:
         self.training_months = training_months
         self.n_trials = n_trials
@@ -130,6 +131,7 @@ class LightGbmStrategy:
         self.atr_sl_multiplier = atr_sl_multiplier
         self.atr_column = atr_column
         self.ensemble_seeds = ensemble_seeds
+        self.neutral_threshold_pct = neutral_threshold_pct
 
         # Set during compute_features
         self._master: pd.DataFrame | None = None
@@ -250,23 +252,25 @@ class LightGbmStrategy:
             self.label_timeout_minutes,
             fee_pct=self.fee_pct,
             verbose=self.verbose,
+            neutral_threshold_pct=self.neutral_threshold_pct,
         )
+
+        ternary = self.neutral_threshold_pct is not None
 
         if self.verbose > 0:
             n_long = int((train_labels == 1).sum())
             n_short = int((train_labels == -1).sum())
+            n_neutral = int((train_labels == 0).sum())
             total = len(train_labels)
-            ratio = n_short / n_long if n_long > 0 else 0.0
+            neutral_str = ""
+            if n_neutral > 0:
+                neutral_str = f", {n_neutral} neutral ({100 * n_neutral / total:.1f}%)"
             print(
                 f"  Labels: {n_long} long ({100 * n_long / total:.1f}%), "
-                f"{n_short} short ({100 * n_short / total:.1f}%) | "
+                f"{n_short} short ({100 * n_short / total:.1f}%){neutral_str} | "
                 f"weights: min={train_weights.min():.2f}, "
                 f"mean={train_weights.mean():.2f}, "
                 f"max={train_weights.max():.2f}"
-            )
-            print(
-                f"  Class balance: scale_pos_weight\u2248{ratio:.3f} "
-                "(is_unbalance=True)"
             )
 
         # (c) Load training features
@@ -334,6 +338,7 @@ class LightGbmStrategy:
                     sample_weights=train_weights,
                     open_times=train_open_times,
                     train_end_ms=split.train_end_ms,
+                    ternary=ternary,
                 )
                 self._models.append(model)
                 self._confidence_thresholds.append(confidence_threshold)
@@ -408,8 +413,18 @@ class LightGbmStrategy:
             feat_row.reshape(1, -1), columns=self._selected_cols
         )
         all_proba = [m.predict_proba(feat_df)[0] for m in self._models]
-        proba = np.mean(all_proba, axis=0)  # averaged [P(short), P(long)]
-        confidence = float(max(proba))
+        proba = np.mean(all_proba, axis=0)
+
+        ternary = self.neutral_threshold_pct is not None
+
+        if ternary:
+            # 3-class: [P(short), P(neutral), P(long)]
+            # Confidence = max(P(short), P(long)), ignoring neutral
+            directional_conf = max(float(proba[0]), float(proba[2]))
+            confidence = directional_conf
+        else:
+            # Binary: [P(short), P(long)]
+            confidence = float(max(proba))
 
         if confidence < self._confidence_threshold:
             if self.verbose > 0:
@@ -421,8 +436,12 @@ class LightGbmStrategy:
                 )
             return NO_SIGNAL
 
-        pred_class = int(np.argmax(proba))
-        direction = int(classes_to_labels(np.array([pred_class]))[0])
+        if ternary:
+            # Direction from long vs short probability only
+            direction = 1 if proba[2] >= proba[0] else -1
+        else:
+            pred_class = int(np.argmax(proba))
+            direction = int(classes_to_labels(np.array([pred_class]))[0])
 
         # Compute dynamic TP/SL from ATR if configured
         tp_pct = None

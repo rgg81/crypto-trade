@@ -37,8 +37,9 @@ def label_trades(
     atr_values: np.ndarray | None = None,
     verbose: int = 0,
     verbose_samples: int = 20,
+    neutral_threshold_pct: float | None = None,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    """Label each candidate candle as 1 (long) or -1 (short).
+    """Label each candidate candle as 1 (long), -1 (short), or 0 (neutral).
 
     Returns actual trade PnLs for both directions so the optimizer can
     compute realistic Sharpe ratios.
@@ -212,8 +213,16 @@ def label_trades(
                 labels[ci] = -1
                 reason = "both_tp→short_first"
         else:
-            labels[ci] = 1 if fwd_return_pct >= 0 else -1
-            reason = f"no_tp→fwd_return={fwd_return_pct:+.4f}"
+            # No TP hit in either direction — use forward return sign
+            if (
+                neutral_threshold_pct is not None
+                and abs(fwd_return_pct) < neutral_threshold_pct
+            ):
+                labels[ci] = 0
+                reason = f"neutral→fwd_return={fwd_return_pct:+.4f}"
+            else:
+                labels[ci] = 1 if fwd_return_pct >= 0 else -1
+                reason = f"no_tp→fwd_return={fwd_return_pct:+.4f}"
 
         # Weight = |net PnL of the labeled direction| (fee-aware)
         labeled_pnl = long_pnl if labels[ci] == 1 else short_pnl
@@ -223,7 +232,7 @@ def label_trades(
             ts = datetime.datetime.fromtimestamp(
                 int(open_time_arr[idx]) / 1000, tz=datetime.UTC
             ).strftime("%Y-%m-%d %H:%M")
-            dir_label = "LONG" if labels[ci] == 1 else "SHORT"
+            dir_label = {1: "LONG", -1: "SHORT", 0: "NEUTRAL"}.get(labels[ci], "?")
             long_r = _RESULT_NAMES[long_result]
             short_r = _RESULT_NAMES[short_result]
             print(

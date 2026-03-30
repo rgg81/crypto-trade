@@ -52,20 +52,36 @@ def compute_sharpe_with_threshold(
     short_pnls: np.ndarray,
     threshold: float,
     min_trades: int = 20,
+    ternary: bool = False,
 ) -> float:
     """Compute Sharpe from actual PnLs, filtering by prediction confidence.
 
     Only includes trades where max(P(short), P(long)) >= threshold.
     Returns -10.0 penalty if fewer than *min_trades* survive the filter.
-    """
-    confidence = y_proba.max(axis=1)
-    mask = confidence >= threshold
-    n_trades = int(mask.sum())
-    if n_trades < min_trades:
-        return -10.0
 
-    pred_classes = y_proba[mask].argmax(axis=1)
-    y_pred = classes_to_labels(pred_classes)
+    When ternary=True, y_proba has 3 columns [P(short), P(neutral), P(long)].
+    Confidence is computed from long/short only; neutral predictions are skipped.
+    """
+    if ternary:
+        # 3-class: [short=0, neutral=1, long=2]
+        # Confidence = max(P(short), P(long)), ignoring P(neutral)
+        directional_proba = y_proba[:, [0, 2]]  # short, long
+        confidence = directional_proba.max(axis=1)
+        mask = confidence >= threshold
+        n_trades = int(mask.sum())
+        if n_trades < min_trades:
+            return -10.0
+        # Direction: 0=short, 1=long (within the 2-col subset)
+        dir_pred = directional_proba[mask].argmax(axis=1)
+        y_pred = np.where(dir_pred == 1, 1, -1)  # map to labels
+    else:
+        confidence = y_proba.max(axis=1)
+        mask = confidence >= threshold
+        n_trades = int(mask.sum())
+        if n_trades < min_trades:
+            return -10.0
+        pred_classes = y_proba[mask].argmax(axis=1)
+        y_pred = classes_to_labels(pred_classes)
 
     pnls = np.where(y_pred == 1, long_pnls[mask], short_pnls[mask])
 
@@ -78,11 +94,14 @@ def compute_sharpe_with_threshold(
 
 
 # ---------------------------------------------------------------------------
-# Label encoding: {-1, 1} <-> {0, 1} for binary LightGBM
+# Label encoding: {-1, 1} <-> {0, 1} for binary, {-1, 0, 1} <-> {0, 1, 2} for ternary
 # ---------------------------------------------------------------------------
 
 _LABEL_TO_CLASS = {-1: 0, 1: 1}
 _CLASS_TO_LABEL = {0: -1, 1: 1}
+
+_TERNARY_LABEL_TO_CLASS = {-1: 0, 0: 1, 1: 2}
+_TERNARY_CLASS_TO_LABEL = {0: -1, 1: 0, 2: 1}
 
 
 def labels_to_classes(labels: np.ndarray) -> np.ndarray:
@@ -90,9 +109,19 @@ def labels_to_classes(labels: np.ndarray) -> np.ndarray:
     return np.vectorize(_LABEL_TO_CLASS.get)(labels).astype(np.intp)
 
 
+def labels_to_classes_ternary(labels: np.ndarray) -> np.ndarray:
+    """Convert {-1, 0, 1} labels to {0, 1, 2} classes for LightGBM multiclass."""
+    return np.vectorize(_TERNARY_LABEL_TO_CLASS.get)(labels).astype(np.intp)
+
+
 def classes_to_labels(classes: np.ndarray) -> np.ndarray:
     """Convert {0, 1} classes back to {-1, 1} labels."""
     return np.vectorize(_CLASS_TO_LABEL.get)(classes).astype(np.intp)
+
+
+def classes_to_labels_ternary(classes: np.ndarray) -> np.ndarray:
+    """Convert {0, 1, 2} classes back to {-1, 0, 1} labels."""
+    return np.vectorize(_TERNARY_CLASS_TO_LABEL.get)(classes).astype(np.intp)
 
 
 # ---------------------------------------------------------------------------
@@ -112,6 +141,7 @@ def _objective(
     seed: int,
     verbose: int = 0,
     open_times: np.ndarray | None = None,
+    ternary: bool = False,
 ) -> float:
     from sklearn.model_selection import TimeSeriesSplit
 
@@ -123,9 +153,8 @@ def _objective(
     if open_times is not None:
         training_days = trial.suggest_int("training_days", 10, 500, step=10)
 
-    # LightGBM hyperparameters (binary classification: short=0, long=1)
+    # LightGBM hyperparameters
     params = {
-        "objective": "binary",
         "n_estimators": trial.suggest_int("n_estimators", 50, 500),
         "max_depth": trial.suggest_int("max_depth", 3, 5),
         "num_leaves": trial.suggest_int("num_leaves", 15, 127),
@@ -135,12 +164,17 @@ def _objective(
         "min_child_samples": trial.suggest_int("min_child_samples", 5, 100),
         "reg_alpha": trial.suggest_float("reg_alpha", 1e-8, 10.0, log=True),
         "reg_lambda": trial.suggest_float("reg_lambda", 1e-8, 10.0, log=True),
-        "is_unbalance": True,
         "random_state": seed,
         "verbosity": -1,
     }
-
-    y = labels_to_classes(train_labels)
+    if ternary:
+        params["objective"] = "multiclass"
+        params["num_class"] = 3
+        y = labels_to_classes_ternary(train_labels)
+    else:
+        params["objective"] = "binary"
+        params["is_unbalance"] = True
+        y = labels_to_classes(train_labels)
     tscv = TimeSeriesSplit(n_splits=cv_splits)
 
     import pandas as pd
@@ -183,7 +217,8 @@ def _objective(
         y_proba = model.predict_proba(feat_val)
 
         sharpe = compute_sharpe_with_threshold(
-            y_proba, long_pnls[val_idx], short_pnls[val_idx], confidence_threshold
+            y_proba, long_pnls[val_idx], short_pnls[val_idx],
+            confidence_threshold, ternary=ternary,
         )
         sharpes.append(sharpe)
 
@@ -211,6 +246,7 @@ def optimize_and_train(
     sample_weights: np.ndarray | None = None,
     open_times: np.ndarray | None = None,
     train_end_ms: int | None = None,
+    ternary: bool = False,
 ) -> tuple[lgb.LGBMClassifier, list[str], float]:
     """Run Optuna optimization and return (model, columns, confidence_threshold).
 
@@ -242,6 +278,7 @@ def optimize_and_train(
             seed,
             verbose,
             open_times=open_times,
+            ternary=ternary,
         ),
         n_trials=n_trials,
     )
@@ -272,12 +309,14 @@ def optimize_and_train(
         final_mask = open_times >= cutoff_ms
 
     feat_full = pd.DataFrame(train_features[final_mask], columns=all_columns)
-    y = labels_to_classes(train_labels[final_mask])
+    if ternary:
+        y = labels_to_classes_ternary(train_labels[final_mask])
+    else:
+        y = labels_to_classes(train_labels[final_mask])
     final_weights = sample_weights[final_mask]
 
     # Retrain on full training data
     params = {
-        "objective": "binary",
         "n_estimators": best["n_estimators"],
         "max_depth": best["max_depth"],
         "num_leaves": best["num_leaves"],
@@ -287,10 +326,15 @@ def optimize_and_train(
         "min_child_samples": best["min_child_samples"],
         "reg_alpha": best["reg_alpha"],
         "reg_lambda": best["reg_lambda"],
-        "is_unbalance": True,
         "random_state": seed,
         "verbosity": -1,
     }
+    if ternary:
+        params["objective"] = "multiclass"
+        params["num_class"] = 3
+    else:
+        params["objective"] = "binary"
+        params["is_unbalance"] = True
 
     model = lgb.LGBMClassifier(**params)
     model.fit(feat_full, y, sample_weight=final_weights)
