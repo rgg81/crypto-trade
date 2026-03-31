@@ -198,7 +198,9 @@ def _objective(
     sharpes: list[float] = []
     feat_df = pd.DataFrame(train_features, columns=all_columns)
 
-    for train_idx, val_idx in tscv.split(train_features):
+    import datetime
+
+    for fold_k, (train_idx, val_idx) in enumerate(tscv.split(train_features)):
         # Trim training data to last `training_days` days before validation
         if training_days is not None and open_times is not None:
             val_start_time = open_times[val_idx[0]]
@@ -207,6 +209,24 @@ def _objective(
             train_idx = train_idx[trimmed_mask]
             if len(train_idx) == 0:
                 return -10.0
+
+        # Label leakage audit — print on first trial only
+        if trial.number == 0 and verbose > 0 and open_times is not None:
+            last_train_ms = int(open_times[train_idx[-1]])
+            first_val_ms = int(open_times[val_idx[0]])
+            gap_ms = first_val_ms - last_train_ms
+            gap_candles = len(train_features) - len(train_idx) - len(val_idx)  # approximate
+            last_t = datetime.datetime.fromtimestamp(
+                last_train_ms / 1000, tz=datetime.UTC
+            ).strftime("%Y-%m-%d %H:%M")
+            first_v = datetime.datetime.fromtimestamp(
+                first_val_ms / 1000, tz=datetime.UTC
+            ).strftime("%Y-%m-%d %H:%M")
+            gap_hours = gap_ms / 3_600_000
+            print(
+                f"    [CV fold {fold_k}] train_end={last_t} | val_start={first_v} | "
+                f"gap={gap_hours:.0f}h ({cv_gap} rows)"
+            )
 
         feat_tr = feat_df.iloc[train_idx]
         feat_val = feat_df.iloc[val_idx]
