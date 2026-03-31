@@ -11,7 +11,7 @@ import pyarrow.parquet as pq
 from crypto_trade.backtest_models import Signal
 from crypto_trade.feature_store import load_features_range, lookup_features
 from crypto_trade.strategies import NO_SIGNAL
-from crypto_trade.strategies.ml.labeling import label_trades
+from crypto_trade.strategies.ml.labeling import compute_sample_uniqueness, label_trades
 from crypto_trade.strategies.ml.optimization import (
     classes_to_labels,
     optimize_and_train,
@@ -129,6 +129,7 @@ class LightGbmStrategy:
         neutral_threshold_pct: float | None = None,
         cv_label_gap: bool = True,
         feature_columns: list[str] | None = None,
+        sample_uniqueness: bool = False,
     ) -> None:
         self.training_months = training_months
         self.n_trials = n_trials
@@ -147,6 +148,7 @@ class LightGbmStrategy:
         self.neutral_threshold_pct = neutral_threshold_pct
         self.cv_label_gap = cv_label_gap
         self.feature_columns = feature_columns
+        self.sample_uniqueness = sample_uniqueness
 
         # Set during compute_features
         self._master: pd.DataFrame | None = None
@@ -275,6 +277,21 @@ class LightGbmStrategy:
         )
 
         ternary = self.neutral_threshold_pct is not None
+
+        # (b2) Apply sample uniqueness weighting (AFML Ch. 4)
+        if self.sample_uniqueness:
+            uniq = compute_sample_uniqueness(
+                train_indices,
+                self.label_timeout_minutes,
+                self._open_time_arr,
+                self._sym_arr,
+            )
+            train_weights = train_weights * uniq
+            if self.verbose > 0:
+                print(
+                    f"  Uniqueness: min={uniq.min():.3f}, "
+                    f"mean={uniq.mean():.3f}, max={uniq.max():.3f}"
+                )
 
         if self.verbose > 0:
             n_long = int((train_labels == 1).sum())

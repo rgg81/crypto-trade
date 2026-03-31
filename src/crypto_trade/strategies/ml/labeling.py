@@ -7,6 +7,107 @@ import datetime
 import numpy as np
 import pandas as pd
 
+
+def compute_sample_uniqueness(
+    candidate_indices: np.ndarray,
+    timeout_minutes: int,
+    open_time_arr: np.ndarray,
+    sym_arr: np.ndarray,
+) -> np.ndarray:
+    """Compute sample uniqueness weights (AFML Ch. 4) — vectorized.
+
+    Each label's outcome depends on forward candles up to timeout. When two
+    adjacent samples' label windows overlap, they share information. Uniqueness
+    measures how much of each sample's label window is "its own."
+
+    For each sample i with label window [t_i, t_i + timeout_ms]:
+      1. Count c_t = number of active label windows at each candle t
+      2. Uniqueness(i) = mean(1/c_t) for candles in [t_i, t_i + timeout_ms]
+
+    Uses a vectorized sweep-line approach: O(n log n) per symbol instead of O(n^2).
+
+    Args:
+        candidate_indices: Indices into the master arrays for labeled samples.
+        timeout_minutes: Label forward-scan duration in minutes.
+        open_time_arr: Array of open_time values for the full master df.
+        sym_arr: Array of symbol strings for the full master df.
+
+    Returns:
+        Array of uniqueness values in (0, 1] with same length as candidate_indices.
+    """
+    n = len(candidate_indices)
+    if n == 0:
+        return np.array([], dtype=np.float64)
+
+    timeout_ms = timeout_minutes * 60 * 1000
+    uniqueness = np.ones(n, dtype=np.float64)
+
+    # Group candidates by symbol
+    sym_groups: dict[str, list[int]] = {}
+    for ci, idx in enumerate(candidate_indices):
+        sym = str(sym_arr[idx])
+        sym_groups.setdefault(sym, []).append(ci)
+
+    for sym, ci_list in sym_groups.items():
+        m = len(ci_list)
+        ci_arr = np.array(ci_list)
+
+        # Label window: [start, start + timeout] for each candidate
+        starts = open_time_arr[candidate_indices[ci_arr]].astype(np.int64)
+        ends = starts + timeout_ms
+
+        # Get all candle timestamps for this symbol (sorted)
+        sym_mask = sym_arr == sym
+        sym_times = np.sort(open_time_arr[sym_mask].astype(np.int64))
+        n_times = len(sym_times)
+        if n_times == 0:
+            continue
+
+        # For each candle timestamp, count how many label windows contain it.
+        # A label i is active at candle t if starts[i] <= t <= ends[i].
+        # Use vectorized broadcasting: for each time t, count active labels.
+        # To avoid O(n_times * m), use a sweep-line with sorted start/end events.
+
+        # Compute c_t for all sym_times using cumulative event counting
+        # Events: +1 at each start, -1 at each end+1
+        # Sort events by time, sweep to get c_t at each candle
+        events = np.concatenate([starts, ends + 1])  # +1 so end is inclusive
+        event_vals = np.concatenate([np.ones(m), -np.ones(m)])
+        order = np.argsort(events, kind="mergesort")
+        events = events[order]
+        event_vals = event_vals[order]
+
+        # For each sym_time, compute c_t via binary search into cumulative events
+        cum_vals = np.cumsum(event_vals)
+        # c_t at time t = cum_vals at last event <= t
+        ct_indices = np.searchsorted(events, sym_times, side="right") - 1
+        c_t = np.zeros(n_times, dtype=np.float64)
+        valid = ct_indices >= 0
+        c_t[valid] = cum_vals[ct_indices[valid]]
+        c_t = np.maximum(c_t, 1.0)  # avoid division by zero
+
+        inv_ct = 1.0 / c_t
+
+        # For each sample, compute mean(1/c_t) over candles in its window
+        # Use binary search to find window boundaries efficiently
+        left_idx = np.searchsorted(sym_times, starts, side="left")
+        right_idx = np.searchsorted(sym_times, ends, side="right")
+
+        # Prefix sum of inv_ct for O(1) range queries
+        prefix = np.zeros(n_times + 1, dtype=np.float64)
+        prefix[1:] = np.cumsum(inv_ct)
+
+        for local_i in range(m):
+            li = left_idx[local_i]
+            ri = right_idx[local_i]
+            window_len = ri - li
+            if window_len > 0:
+                uniqueness[ci_arr[local_i]] = (prefix[ri] - prefix[li]) / window_len
+            else:
+                uniqueness[ci_arr[local_i]] = 1.0
+
+    return uniqueness
+
 _RESULT_NAMES = {1: "tp", -1: "sl", -2: "timeout", 0: "pending"}
 
 
