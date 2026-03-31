@@ -127,6 +127,7 @@ class LightGbmStrategy:
         atr_column: str = "vol_natr_21",
         ensemble_seeds: list[int] | None = None,
         neutral_threshold_pct: float | None = None,
+        cv_label_gap: bool = True,
     ) -> None:
         self.training_months = training_months
         self.n_trials = n_trials
@@ -143,6 +144,7 @@ class LightGbmStrategy:
         self.atr_column = atr_column
         self.ensemble_seeds = ensemble_seeds
         self.neutral_threshold_pct = neutral_threshold_pct
+        self.cv_label_gap = cv_label_gap
 
         # Set during compute_features
         self._master: pd.DataFrame | None = None
@@ -172,10 +174,11 @@ class LightGbmStrategy:
         # Detect interval
         self._interval = self._detect_interval(master)
 
-        # Discover feature columns (use ALL of them)
+        # Discover feature columns (symbol-scoped to trading universe)
+        trading_symbols = list(master["symbol"].unique())
         try:
             self._all_feature_cols = _discover_feature_columns(
-                self.features_dir, self._interval
+                self.features_dir, self._interval, symbols=trading_symbols
             )
         except FileNotFoundError:
             self._all_feature_cols = []
@@ -330,15 +333,15 @@ class LightGbmStrategy:
         # (d) Optuna optimization (all features, with threshold)
         # Compute CV gap to prevent label leakage across folds (iter 091).
         # gap = (timeout_in_candles + 1) * n_symbols
-        interval_minutes = _interval_to_minutes(self._interval)
-        timeout_candles = self.label_timeout_minutes // interval_minutes + 1
-        n_symbols = len(set(self._sym_arr[train_indices]))
-        cv_gap = timeout_candles * n_symbols
+        if self.cv_label_gap:
+            interval_minutes = _interval_to_minutes(self._interval)
+            timeout_candles = self.label_timeout_minutes // interval_minutes + 1
+            n_symbols = len(set(self._sym_arr[train_indices]))
+            cv_gap = timeout_candles * n_symbols
+        else:
+            cv_gap = 0
         if self.verbose > 0:
-            print(
-                f"  CV gap: {cv_gap} rows "
-                f"({timeout_candles} candles × {n_symbols} symbols)"
-            )
+            print(f"  CV gap: {cv_gap} rows")
 
         seeds = self.ensemble_seeds or [self.seed]
         self._models = []
