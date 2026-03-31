@@ -43,7 +43,10 @@ def compute_sharpe(
     if std == 0:
         return -10.0
 
-    return float(mean / std)
+    sharpe = float(mean / std)
+    if abs(sharpe) > 100:
+        return -10.0
+    return sharpe
 
 
 def compute_sharpe_with_threshold(
@@ -90,7 +93,12 @@ def compute_sharpe_with_threshold(
     if std == 0:
         return -10.0
 
-    return float(mean / std)
+    sharpe = float(mean / std)
+    # Guard against numerical overflow (e.g., 1 trade with std≈0 → Sharpe=1e15).
+    # No real strategy achieves |Sharpe| > 100.  Discovered in iter 094.
+    if abs(sharpe) > 100:
+        return -10.0
+    return sharpe
 
 
 # ---------------------------------------------------------------------------

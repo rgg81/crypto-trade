@@ -128,6 +128,7 @@ class LightGbmStrategy:
         ensemble_seeds: list[int] | None = None,
         neutral_threshold_pct: float | None = None,
         cv_label_gap: bool = True,
+        feature_columns: list[str] | None = None,
     ) -> None:
         self.training_months = training_months
         self.n_trials = n_trials
@@ -145,6 +146,7 @@ class LightGbmStrategy:
         self.ensemble_seeds = ensemble_seeds
         self.neutral_threshold_pct = neutral_threshold_pct
         self.cv_label_gap = cv_label_gap
+        self.feature_columns = feature_columns
 
         # Set during compute_features
         self._master: pd.DataFrame | None = None
@@ -175,13 +177,16 @@ class LightGbmStrategy:
         self._interval = self._detect_interval(master)
 
         # Discover feature columns (symbol-scoped to trading universe)
-        trading_symbols = list(master["symbol"].unique())
-        try:
-            self._all_feature_cols = _discover_feature_columns(
-                self.features_dir, self._interval, symbols=trading_symbols
-            )
-        except FileNotFoundError:
-            self._all_feature_cols = []
+        if self.feature_columns:
+            self._all_feature_cols = list(self.feature_columns)
+        else:
+            trading_symbols = list(master["symbol"].unique())
+            try:
+                self._all_feature_cols = _discover_feature_columns(
+                    self.features_dir, self._interval, symbols=trading_symbols
+                )
+            except FileNotFoundError:
+                self._all_feature_cols = []
 
         # Generate monthly splits
         self._splits = generate_monthly_splits(
