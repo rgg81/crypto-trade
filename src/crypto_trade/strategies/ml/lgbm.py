@@ -130,6 +130,7 @@ class LightGbmStrategy:
         cv_label_gap: bool = True,
         feature_columns: list[str] | None = None,
         sample_uniqueness: bool = False,
+        time_decay_half_life: float | None = None,
     ) -> None:
         self.training_months = training_months
         self.n_trials = n_trials
@@ -149,6 +150,7 @@ class LightGbmStrategy:
         self.cv_label_gap = cv_label_gap
         self.feature_columns = feature_columns
         self.sample_uniqueness = sample_uniqueness
+        self.time_decay_half_life = time_decay_half_life
 
         # Set during compute_features
         self._master: pd.DataFrame | None = None
@@ -291,6 +293,22 @@ class LightGbmStrategy:
                 print(
                     f"  Uniqueness: min={uniq.min():.3f}, "
                     f"mean={uniq.mean():.3f}, max={uniq.max():.3f}"
+                )
+
+        # (b3) Apply time decay weighting
+        if self.time_decay_half_life is not None:
+            train_times = self._open_time_arr[train_indices]
+            max_time = train_times.max()
+            age_ms = max_time - train_times
+            age_months = age_ms / (30.44 * 24 * 3600 * 1000)  # approx months
+            lam = np.log(2) / self.time_decay_half_life
+            decay = np.exp(-lam * age_months)
+            train_weights = train_weights * decay
+            if self.verbose > 0:
+                print(
+                    f"  Time decay (half_life={self.time_decay_half_life}mo): "
+                    f"min={decay.min():.3f}, mean={decay.mean():.3f}, "
+                    f"max={decay.max():.3f}"
                 )
 
         if self.verbose > 0:
