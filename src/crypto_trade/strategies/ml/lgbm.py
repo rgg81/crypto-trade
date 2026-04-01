@@ -131,6 +131,8 @@ class LightGbmStrategy:
         feature_columns: list[str] | None = None,
         sample_uniqueness: bool = False,
         time_decay_half_life: float | None = None,
+        use_atr_labeling: bool = False,
+        min_natr_threshold: float | None = None,
     ) -> None:
         self.training_months = training_months
         self.n_trials = n_trials
@@ -151,6 +153,8 @@ class LightGbmStrategy:
         self.feature_columns = feature_columns
         self.sample_uniqueness = sample_uniqueness
         self.time_decay_half_life = time_decay_half_life
+        self.use_atr_labeling = use_atr_labeling
+        self.min_natr_threshold = min_natr_threshold
 
         # Set during compute_features
         self._master: pd.DataFrame | None = None
@@ -170,6 +174,8 @@ class LightGbmStrategy:
         self._month_features: dict[tuple[str, int], np.ndarray] = {}
         # ATR cache for dynamic barriers
         self._month_natr: dict[tuple[str, int], float] = {}
+        # Per-row ATR values for dynamic labeling (price units)
+        self._label_atr_values: np.ndarray | None = None
 
     def compute_features(self, master: pd.DataFrame) -> None:
         """Lightweight setup: store master and generate splits. No training."""
@@ -206,6 +212,53 @@ class LightGbmStrategy:
 
         self._current_month = None
         self._model = None
+
+        # Load per-row ATR values for dynamic labeling
+        if self.use_atr_labeling and self.atr_tp_multiplier is not None:
+            self._label_atr_values = self._load_atr_for_master()
+            if self.verbose > 0:
+                valid = ~np.isnan(self._label_atr_values)
+                print(
+                    f"[lgbm] ATR labeling: {valid.sum()}/{len(self._label_atr_values)} "
+                    f"rows with ATR values"
+                )
+        else:
+            self._label_atr_values = None
+
+    def _load_atr_for_master(self) -> np.ndarray:
+        """Load per-candle ATR values (price units) aligned with master rows."""
+        from pathlib import Path
+
+        n = len(self._master)
+        atr_values = np.full(n, np.nan, dtype=np.float64)
+        close_arr = self._master["close"].values.astype(np.float64)
+
+        for sym in np.unique(self._sym_arr):
+            path = Path(self.features_dir) / f"{sym}_{self._interval}_features.parquet"
+            if not path.exists():
+                continue
+            table = pq.read_table(path, columns=["open_time", self.atr_column])
+            feat_ot = table.column("open_time").to_numpy().astype(np.int64)
+            feat_natr = table.column(self.atr_column).to_numpy().astype(np.float64)
+
+            # Vectorized lookup via searchsorted
+            sort_order = np.argsort(feat_ot)
+            sorted_ot = feat_ot[sort_order]
+            sorted_natr = feat_natr[sort_order]
+
+            sym_mask = self._sym_arr == sym
+            sym_indices = np.where(sym_mask)[0]
+            sym_times = self._open_time_arr[sym_indices].astype(np.int64)
+
+            positions = np.searchsorted(sorted_ot, sym_times)
+            in_bounds = positions < len(sorted_ot)
+            clamped = np.minimum(positions, len(sorted_ot) - 1)
+            matched = in_bounds & (sorted_ot[clamped] == sym_times)
+
+            natr_vals = np.where(matched, sorted_natr[clamped], np.nan)
+            atr_values[sym_indices] = close_arr[sym_indices] * natr_vals / 100.0
+
+        return atr_values
 
     def _train_for_month(self, month_str: str) -> None:
         """Train a model for the given month. Called lazily from get_signal."""
@@ -267,13 +320,24 @@ class LightGbmStrategy:
             print(f"  Samples per month: {', '.join(dist_parts)}")
 
         # (b) Label all training samples (with fee-aware returns)
+        # When use_atr_labeling is enabled, pass per-candle ATR values so
+        # labeling barriers scale with each symbol's volatility.
+        if self._label_atr_values is not None:
+            label_tp = self.atr_tp_multiplier
+            label_sl = self.atr_sl_multiplier or self.atr_tp_multiplier / 2.0
+            label_atr = self._label_atr_values
+        else:
+            label_tp = self.label_tp_pct
+            label_sl = self.label_sl_pct
+            label_atr = None
         train_labels, train_weights, long_pnls, short_pnls = label_trades(
             self._master,
             train_indices,
-            self.label_tp_pct,
-            self.label_sl_pct,
+            label_tp,
+            label_sl,
             self.label_timeout_minutes,
             fee_pct=self.fee_pct,
+            atr_values=label_atr,
             verbose=self.verbose,
             neutral_threshold_pct=self.neutral_threshold_pct,
         )
@@ -502,6 +566,19 @@ class LightGbmStrategy:
                     f"{self._confidence_threshold:.2f})"
                 )
             return NO_SIGNAL
+
+        # Regime filter: skip low-volatility candles
+        if self.min_natr_threshold is not None:
+            natr = self._month_natr.get((symbol, open_time))
+            if natr is not None and natr < self.min_natr_threshold:
+                if self.verbose > 0:
+                    ts_str = _ms_to_datetime(open_time)
+                    self._last_predict_log = (
+                        f"[predict] {ts_str} {symbol} → SKIP "
+                        f"(NATR={natr:.2f}% < "
+                        f"{self.min_natr_threshold:.1f}%)"
+                    )
+                return NO_SIGNAL
 
         if ternary:
             # Direction from long vs short probability only
