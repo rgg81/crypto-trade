@@ -15,7 +15,7 @@ The market's irrationality is our opportunity. Volatility is not risk — it is 
 
 We build strategies that would survive scrutiny by the most rigorous quantitative finance researchers. No p-hacking. No overfitting to backtest. No self-deception. If a strategy cannot withstand combinatorial purged cross-validation, deflated Sharpe ratio tests, and out-of-sample evaluation on data the researcher never saw, it does not trade.
 
-88 iterations have taught us what does not work. That knowledge is as valuable as what does. We are closer than we think.
+117+ iterations have taught us what does not work. That knowledge is as valuable as what does.
 
 ---
 
@@ -160,7 +160,7 @@ Before committing notebooks: `uv run jupyter nbconvert --clear-output --inplace 
 
 For subsequent iterations (not the first), the scope of phases 1-4 depends on iteration history:
 - **After a MERGE**: Phases 1-4 may be partially skipped if the diary's "Next Iteration Ideas" only calls for changing one variable. The QR must still complete at least **2 categories** from the Research Checklist (see below).
-- **After 3+ consecutive NO-MERGE iterations**: Phases 1-4 are **MANDATORY**. The QR must complete at least **4 of 6 categories** from the Research Checklist. No skipping.
+- **After 3+ consecutive NO-MERGE iterations on the same model track**: Phases 1-4 are **MANDATORY**. The QR must complete at least **4 of 8 categories** from the Research Checklist (A-H). No skipping.
 - **After an EARLY STOP**: Same as 3+ NO-MERGE — full research mandatory. Parameter-only changes are **banned**.
 
 The research brief (Phase 5) is always required, and Section 0 (Data Split) is always included verbatim.
@@ -207,10 +207,11 @@ When proposing new features, the QR should prefer normalized/ratio-based feature
 
 ## Feature Count Discipline
 
-**Fewer features = more stable models.** This is the #1 lesson from 83 iterations of feature work.
+**Fewer features = more stable models.** This is a key lesson from 117 iterations — but it is model-specific.
 
-- **Target**: 30-50 features for a 2-symbol model (~4,400 training samples/month)
-- **Hard ceiling**: Never exceed 80 features without explicit justification
+- **For new/small models** (<80 features, samples/feature >80): Target 30-50 features. Explicit pruning is effective (iter 117: meme model pruned 67→45, OOS Sharpe doubled from +0.29 to +0.66).
+- **For mature co-optimized models** (100+ features, Optuna-tuned over many iterations): Explicit pruning destroys co-optimization. Use `colsample_bytree` for implicit selection instead. (Iter 094: pruning BTC/ETH to 50 features → IS Sharpe -1.46, catastrophic.)
+- **Hard ceiling**: Never exceed 200 features without explicit justification
 - **Samples-per-feature ratio**: Must stay above 50. With 4,400 samples and 50 features = ratio 88 (healthy). With 198 features = ratio 22 (dangerous)
 - **Every added feature must displace a worse one.** Net feature count should decrease or stay flat, never balloon
 - **Symbol-scoped discovery**: Always use `symbols=trading_symbols` in `_discover_feature_columns()`. Global intersection across ~800 symbols is wrong — it drops features that ALL trading symbols have
@@ -218,7 +219,8 @@ When proposing new features, the QR should prefer normalized/ratio-based feature
 ### Anti-patterns (learned the hard way)
 - Iter 083: Added 85 features (113→198) without pruning — wrong direction
 - Iter 078: 185 features with halved training data (per-symbol) — ratio 21, catastrophic overfitting
-- The baseline works with 106 features but many are likely noise. **Pruning to 40-50 should improve, not degrade.**
+- Iter 094: Pruning BTC/ETH from 185→50 features destroyed co-optimization, IS Sharpe -1.46
+- Iter 117: Pruning meme model from 67→45 features improved OOS Sharpe from +0.29 to +0.66
 
 ---
 
@@ -356,7 +358,7 @@ This exception requires explicit justification in the diary.
 
 ### Deflated Sharpe Ratio (DSR)
 
-After 88+ iterations, the probability that the best OOS Sharpe is a statistical fluke increases with each trial. The Deflated Sharpe Ratio adjusts for multiple testing:
+After 117+ iterations, the probability that the best OOS Sharpe is a statistical fluke increases with each trial. The Deflated Sharpe Ratio adjusts for multiple testing:
 
 - **N** = number of independent trials (iterations)
 - **E[max(SR_0)]** = expected maximum Sharpe under the null (all trials random)
@@ -378,14 +380,14 @@ When using CPCV (15 paths from N=6, k=2):
 
 **Practical application**: Run PBO on the final monthly model. If PBO > 0.5 for more than 30% of months, the strategy's IS performance is unreliable.
 
-### Application to the 88-Iteration Problem
+### Application to the 117-Iteration Problem
 
-With N=88 trials and baseline OOS Sharpe +1.84:
-- E[max(SR_0)] ~ sqrt(2 * ln(88)) ~ 2.99 (expected max Sharpe under random)
-- The observed +1.84 is BELOW the expected random maximum
-- This means DSR < 0 — the baseline Sharpe is within the range expected from 88 random trials
+With N=117 trials and baseline OOS Sharpe +1.01:
+- E[max(SR_0)] ~ sqrt(2 * ln(117)) ~ 3.08 (expected max Sharpe under random)
+- The observed +1.01 is far BELOW the expected random maximum
+- This means DSR < 0 — the baseline Sharpe is within the range expected from 117 random trials
 
-This is sobering but important. It does NOT mean the strategy has no signal (IS Sharpe +1.22 is consistent and positive). But the specific OOS Sharpe of +1.84 is not statistically significant given 88 trials. The correct response is to REDUCE the number of trials (fewer, bolder iterations) and improve per-trial robustness with the MLP techniques below.
+This is sobering but important. It does NOT mean the strategy has no signal (IS Sharpe +0.73 is consistent). But achieving statistical significance through individual iterations is extremely unlikely at N=117. The productive path is to: (1) reduce independent trials (fewer, bolder iterations), (2) focus on portfolio-level metrics across multiple models, and (3) validate via out-of-distribution regimes rather than DSR alone.
 
 ---
 
@@ -496,38 +498,21 @@ global intersection. The global intersection across ~800 symbols drops 72+ featu
 BTC+ETH both have (Stochastic, MACD, Aroon, ADX, etc.) because smaller symbols lack them.
 This was discovered in iter 083. Always scope discovery to the trading universe.
 
-##### A3. Feature Importance: MDA over MDI (MANDATORY)
+##### A3. Feature Importance: MDA vs MDI (OPTIONAL)
 
-LightGBM's default gain-based importance (MDI) is biased toward high-cardinality continuous features. It measures how much a feature was used in splits, not how much accuracy degrades when the feature is removed. This distinction matters.
+LightGBM's default gain-based importance (MDI) is biased toward high-cardinality continuous features. MDA (permutation importance) is theoretically better. However, **MDA is not implemented in the pipeline** after 117 iterations, and MDI has been sufficient for feature analysis.
 
-**Primary method: Mean Decrease Accuracy (MDA) / Permutation Importance**
+**When to consider implementing MDA**: If MDI-based feature pruning produces counterintuitive results (e.g., a feature with high MDI rank degrades the model when removed), MDA may clarify. Otherwise, MDI is adequate for tree-based models.
 
-1. After training each monthly model, compute permutation importance:
-   - For each feature, shuffle its values in the validation fold
-   - Re-compute Sharpe (not accuracy) on the shuffled data
-   - MDA = mean(original_Sharpe - shuffled_Sharpe) across CV folds
-   - Features with MDA ~ 0 contribute nothing; features with MDA < 0 are harmful
-2. Use **cross-validated** MDA: compute permutation importance within each PurgedKFold
-   fold, then average. Single-fold MDA is noisy. With 5 folds, you get 5 MDA estimates
-   per feature.
-3. Report MDA alongside MDI in `feature_importance.csv`. When they disagree (high MDI
-   but low MDA), trust MDA — the feature is being split on frequently but not improving
-   out-of-fold predictions.
+**If implementing MDA**:
+1. After training each monthly model, shuffle each feature's values in the validation fold
+2. Re-compute Sharpe (not accuracy) on the shuffled data
+3. MDA = mean(original_Sharpe - shuffled_Sharpe) across CV folds
+4. Features with MDA < 0 are actively harmful — remove them
+5. Group features by category and compute per-group cumulative importance
+6. For each top-10 feature, provide an economic hypothesis for why it predicts direction
 
-**Secondary method: Single Feature Importance (SFI)**
-
-For each of the top-20 MDA features, train a model using ONLY that feature and report
-its solo Sharpe. Features that perform well alone AND in the full model are genuine
-signal. Features that only work in combination may be capturing noise patterns.
-
-**Implementation**: Add `compute_mda_importance()` to
-`src/crypto_trade/strategies/ml/feature_importance.py`. Call it after each monthly
-training. Aggregate across months for the IS report.
-
-4. Group features by category (momentum, volatility, trend, volume, mean_reversion,
-   statistical, interaction, cross_asset) — compute per-group cumulative MDA importance
-5. For each top-10 feature (by MDA), provide an economic hypothesis for why it predicts direction
-6. Identify features with MDA < 0 — these are actively harmful and should be removed
+**Note**: MDI was used for the successful meme model pruning (iter 117: 67→45 features, OOS doubled). It works.
 
 ##### A4. New Feature Proposals
 
@@ -642,6 +627,7 @@ Using IS data only:
    - Regression: forward 1-candle return as target, compute R²
    - Different RR ratios: 1:1, 1.5:1, 2:1, 3:1 — report WR and resolution for each
 4. Per-regime label quality: which labeling produces more separable features in trending vs choppy?
+5. **Timeout sensitivity**: After establishing a working timeout, do NOT change it by less than 2x. Iter 116 proved that reducing timeout from 7d to 5d caused IS Sharpe +1.71 (overfitting signal) while OOS collapsed to -0.04. Small timeout changes alter label distribution in ways that cause catastrophic overfitting.
 
 #### D. Feature Frequency & Lookback Analysis
 Using IS data only:
@@ -663,19 +649,21 @@ Using IS data only:
 2. Binomial p-value: is WR significantly different from 50%? From break-even?
 3. For proposed changes: is the expected improvement larger than the bootstrap CI width?
 
-#### G. Stationarity & Memory Analysis (AFML Ch. 5)
-Using IS data only:
-1. For each of the top-20 features, run the Augmented Dickey-Fuller (ADF) test. Report p-value and test statistic. Features with p > 0.05 are non-stationary.
-2. For non-stationary features, compute the minimum fractional differentiation order d that achieves stationarity (ADF p < 0.05).
-3. Compute the correlation between the original feature (d=0) and the fracdiff version (d=d_min). Higher correlation = more memory preserved.
-4. Propose replacing non-stationary features with their fracdiff versions.
-5. Report: table of (feature, ADF_p_original, d_min, correlation_original_fracdiff)
+#### G. Stationarity & Memory Analysis (AFML Ch. 5) — OPTIONAL
+
+**Status**: Fracdiff tested in iter 100, inconclusive due to confounding factors. ADF tests never performed in any diary. Tree-based models (LightGBM) are inherently less sensitive to stationarity than linear models. **Revisit only if switching to a linear/neural model.**
+
+If pursuing:
+1. For each top-20 feature, run the ADF test. Report p-value. Features with p > 0.05 are non-stationary.
+2. For non-stationary features, compute minimum d for ADF p < 0.05.
+3. Compute correlation between original (d=0) and fracdiff version (d=d_min).
+4. Report: table of (feature, ADF_p_original, d_min, correlation_original_fracdiff)
 
 #### H. Overfitting Audit (AFML Ch. 11-12)
-1. Compute the Deflated Sharpe Ratio for the baseline, accounting for N=88+ trials. Report DSR and the expected maximum Sharpe under the null.
-2. If CPCV is implemented: compute PBO for the latest monthly model. Report the fraction of months with PBO > 0.5.
+1. Compute the Deflated Sharpe Ratio for the baseline, accounting for N=117+ trials. At N=117, E[max(SR_0)] ~ 3.08. Current baseline OOS Sharpe +1.01 gives DSR < 0 — the observed Sharpe is within the range expected from 117 random trials. This does NOT mean no signal exists, but individual-iteration statistical significance is extremely unlikely.
+2. If CPCV is implemented: compute PBO for the latest monthly model. Report the fraction of months with PBO > 0.5. (Not yet implemented — CPCV/PBO code does not exist in the codebase.)
 3. Compute the variance of IS Sharpe across walk-forward months. High variance suggests regime sensitivity. Report: mean, std, min, max of monthly IS Sharpe.
-4. For the proposed iteration: estimate the minimum OOS Sharpe needed to reject the null of "no skill" given the current trial count. If the target is below this, the iteration is not worth running.
+4. **Decision rule**: At N=117+, focus on portfolio-level metrics and OOS regime consistency rather than DSR alone. Reduce independent trials (fewer, bolder iterations).
 
 ### How to Use the Checklist
 
@@ -690,7 +678,7 @@ Pick categories based on the bottleneck:
 - **Too many features / overfitting suspected** → A1 (MANDATORY feature pruning protocol). Run correlation dedup + importance pruning BEFORE any other change. Target 30-50 features.
 - **Adding new features** → A1 first (prune), then A4 (add ≤5 new). Net count must not increase.
 - **Non-stationary features suspected** → G (stationarity analysis). Run ADF tests on top features, propose fracdiff replacements.
-- **Multiple testing / 88+ iterations** → H (overfitting audit). Compute DSR before investing effort in a new iteration.
+- **Multiple testing / 117+ iterations** → H (overfitting audit). Compute DSR before investing effort in a new iteration.
 - **Methodological upgrade needed** → G + H together. These are the MLP foundation categories.
 
 ---
@@ -771,9 +759,9 @@ When adding symbol X to a universe containing BTC+ETH:
 
 ---
 
-## QR: Deep Analysis & Bold Ideas (Phase 7)
+## QR: Deep Analysis & Bold Ideas (Phase 7) — MANDATORY EVERY ITERATION
 
-When the strategy is far from profitability (PF < 1.0, WR below break-even), the QR MUST:
+The QR MUST perform ALL of the following in every iteration (not just when strategy is unprofitable):
 
 1. **Read the IS quantstats HTML report** (MANDATORY): Open `reports/iteration_NNN/in_sample/quantstats.html` using the browser/screenshot tool or parse its key sections. Extract insights from:
    - Monthly returns heatmap: which months/years are profitable vs losing?
@@ -794,7 +782,7 @@ When the strategy is far from profitability (PF < 1.0, WR below break-even), the
    - Architectural improvements (feature discovery, walk-forward logic, caching)
    - Whether the model training pipeline works correctly
    - Document findings in the diary under "lgbm.py Code Review"
-5. **Reference the Research Checklist**: The diary must document which checklist categories (A-F) were completed, what was found, and how findings influenced the "Next Iteration Ideas." If the checklist was skipped (first iterations after a MERGE), explain why.
+5. **Reference the Research Checklist**: The diary must document which checklist categories (A-H) were completed, what was found, and how findings influenced the "Next Iteration Ideas." If the checklist was skipped (first iterations after a MERGE), explain why.
 6. **Quantify the gap explicitly**: State: "WR is X%, break-even is Y%, gap is Z pp. TP rate is A%, SL rate is B%. To close this gap, the strategy needs [specific mechanism]." Vague statements like "improve signal quality" are insufficient.
 
 ## QE: Trade Execution Verification (Phase 6)
@@ -857,17 +845,31 @@ If the exploration rate drops below 30%, the NEXT iteration MUST be exploration.
 
 The QR maintains a running list of untested exploration ideas, organized by priority tier. MLP Foundation techniques should be implemented before advanced or existing ideas.
 
-**TIER 1 — MLP Foundation (implement in this order):**
+**AFML Technique Status (as of iter 117):**
 
-1. **Purged k-Fold CV with embargo** -> replaces TimeSeriesSplit (prerequisite for everything else). See "Cross-Validation" section above. Expected: IS metrics may decrease slightly (less leakage = lower apparent fit), OOS/IS ratio should improve.
+| Technique | Status | Iter(s) | Outcome |
+|-----------|--------|---------|---------|
+| TimeSeriesSplit+gap | **ADOPTED** | 091-093 | Standard CV method. Works. |
+| PurgedKFoldCV | **ABANDONED** | 089-090 | Removed 4% data/fold, caused empty folds. TSS+gap is better. |
+| Sample Uniqueness | **FAILED** | 097 | Dense labels produce uniform ~0.046 uniqueness. Needs event-driven sampling first. |
+| MDA/Permutation | **UNUSED** | 094 (ad-hoc) | Not in pipeline. MDI sufficient for 117 iterations. |
+| Fractional Differentiation | **INCONCLUSIVE** | 100 | Confounded by parquet regeneration. Tree models less stationarity-sensitive. |
+| Deflated Sharpe Ratio | **UNIMPLEMENTED** | — | No code exists. At N=117, DSR < 0 for baseline. |
+| PBO/CPCV | **UNIMPLEMENTED** | — | No code exists. |
+| Meta-labeling | **FAILED** | 102 | Over-filtered to 2 OOS trades. Needs more meta-features. |
+| Kelly Sizing | **NEUTRAL** | 107 | Scales PnL magnitude but doesn't change WR. |
 
-2. **MDA/Permutation importance** -> replaces gain-based importance. See Research Checklist A3. Informs feature pruning — prune to 40-50 features based on MDA, not MDI.
+**TIER 1 — Active Priorities:**
 
-3. **Sample uniqueness weighting** -> fixes overlapping label bias. See "Sample Weights" section above. Expected: model focuses on unique, recent observations.
+1. **Portfolio combination optimization** — Combine BTC/ETH + DOGE/SHIB models to beat combined OOS Sharpe +1.01. This is the current project goal. Involves: allocation weighting, cross-model trade correlation, combined drawdown analysis.
 
-4. **Fractional differentiation features** -> replace raw non-stationary features. See "Fractional Differentiation" section above. Add fracdiff(log_close, d~0.4), fracdiff(log_volume, d~0.4). Replace equivalent raw statistical features (net count flat). Package: `fracdiff` (pip install fracdiff).
+2. **Meme model refinement** — Continue improving DOGE/SHIB OOS Sharpe from +0.66 toward +0.80+ to make portfolio viable. Feature pruning, barrier tuning, and training window optimization.
 
-5. **Deflated Sharpe Ratio** -> quantify multiple testing problem. See "Overfitting Quantification" section above. This is a diagnostic, not a strategy change — but it informs whether further iterations are worth running.
+3. **Event-driven sampling** — Prerequisite for sample uniqueness. Generate labels only at "events" (volume spikes >3x, range spikes, structural breaks). Reduces label universe from ~4,400 to ~500-1,000 meaningful events. Would fix the uniqueness problem from iter 097.
+
+4. **Entropy features (AFML Ch. 18)** — Shannon entropy of discretized returns over rolling 50-candle window. Genuinely novel features not captured by volatility or momentum. Untested.
+
+5. **CUSUM structural breaks (AFML Ch. 17)** — Detect regime changes. Features: `struct_cusum_break_5`, `struct_candles_since_break`. Useful both as features and for event-driven sampling.
 
 **TIER 2 — MLP Advanced:**
 
@@ -932,35 +934,18 @@ The QR maintains a running list of untested exploration ideas, organized by prio
 - Portfolio-level signal aggregation — instead of treating each symbol independently,
   consider portfolio constraints: max N positions at a time, inverse-volatility weighting.
 
-### Implementation Sequencing
+### Dead Ideas (definitively disproven — do not retry)
 
-MLP techniques should be introduced one at a time (respecting the "one variable at a time" rule):
-
-```
-Iter 089: Purged k-Fold CV + embargo (replaces TimeSeriesSplit)
-  → Foundational — all subsequent improvements depend on correct CV
-  → Expected: IS metrics decrease slightly, OOS/IS ratio improves
-
-Iter 090: MDA feature importance + feature pruning round
-  → Use MDA to identify which of the 106 features are truly predictive
-  → Prune to 40-50 features based on MDA, not MDI
-
-Iter 091: Sample uniqueness weighting + time decay
-  → Fix the overlapping label bias
-  → Expected: model focuses on unique, recent observations
-
-Iter 092: Fractional differentiation features
-  → Add fracdiff(log_close), fracdiff(log_volume) — remove equivalent raw features
-  → Expected: features with both memory and stationarity
-
-Iter 093: Deflated Sharpe Ratio + formal overfitting audit
-  → Quantify the multiple testing problem
-  → This is a diagnostic iteration, not a strategy change
-
-Iter 094+: Meta-labeling (if prior iterations show genuine signal)
-  → Secondary model for trade filtering / bet sizing
-  → Most complex addition — requires solid foundations from 089-093
-```
+| Idea | Iter(s) | Why it failed |
+|------|---------|--------------|
+| PurgedKFoldCV | 089-090 | 4% data loss/fold, empty folds with Optuna |
+| Feature pruning on BTC/ETH (185→50) | 094-095 | Destroys Optuna co-optimization, IS Sharpe -1.46 |
+| Per-symbol models (1 symbol each) | 099, 109 | Too few training samples (~2,200/year), collapses |
+| Naive symbol pooling (BTC+ETH+X) | 071, 105 | Unscreened symbols destroy existing WR |
+| Sample uniqueness with dense labels | 097 | Uniform ~0.046 uniqueness, needs event-driven sampling first |
+| Meta-labeling with 2 meta-features | 102 | Over-filtered to 2 OOS trades, needs 5-6 features |
+| Short timeout for meme (7d→5d) | 116 | Catastrophic overfitting (IS +1.71, OOS -0.04) |
+| TP=8%/SL=4% (now baseline) | 027→093 | **ADOPTED** — not dead, but no longer an "idea" |
 
 ## Key Reminders
 

@@ -1,5 +1,19 @@
 # Crypto-Trade: LightGBM 8H Candle Iteration Plan
 
+## Mission
+
+Crypto markets are the most inefficient markets on earth. They trade 24/7 across fragmented venues populated by retail speculators, algorithmic bots with misaligned incentives, and institutions constrained by mandates that have nothing to do with price discovery. Fear and greed oscillate on 8-hour cycles. Liquidation cascades create mispricings that would be arbitraged away in seconds in equities but persist for hours in crypto futures. Funding rates distort positioning. Social media narratives move billions.
+
+Our edge is systematic patience. We use LightGBM on 8-hour candles — a timeframe slow enough to avoid microstructure noise, fast enough to capture the behavioral patterns that human traders create and perpetuate. We do not predict the future. We identify moments when the distribution of forward returns is skewed in our favor, and we bet accordingly, sized by our conviction and disciplined by our risk framework.
+
+The market's irrationality is our opportunity. Volatility is not risk — it is the raw material of profit. Every liquidation cascade, every panic sell, every euphoric FOMO spike creates a statistical edge for the patient, systematic trader who has done the work to distinguish signal from noise.
+
+We build strategies that would survive scrutiny by the most rigorous quantitative finance researchers. No p-hacking. No overfitting to backtest. No self-deception. If a strategy cannot withstand combinatorial purged cross-validation, deflated Sharpe ratio tests, and out-of-sample evaluation on data the researcher never saw, it does not trade.
+
+88 iterations have taught us what does not work. That knowledge is as valuable as what does. We are closer than we think.
+
+---
+
 ## Context
 
 - **Repo**: `crypto-trade` (Python 3.13, uv, Binance Futures USD)
@@ -7,7 +21,7 @@
 - **Timeframe**: 8h candles
 - **Model**: LightGBM (fixed for this iteration)
 - **Existing infra**: Feature generation pipeline, Binance futures fee model, quantstats report generation, walk-forward backtest (monthly retraining with timeseries CV, 1-year minimum training window)
-- **Goal**: Build a profitable, regime-robust LightGBM strategy on 8h candles through a structured researcher/engineer workflow
+- **Goal**: Build a profitable, regime-robust LightGBM strategy on 8h candles through a structured researcher/engineer workflow, using rigorous quantitative methods from Marcos Lopez de Prado's AFML framework to avoid the pitfalls that destroyed 88 prior iterations
 
 ---
 
@@ -353,8 +367,18 @@ Owns all decisions about **how** to implement: production-quality Python code, p
    - Class balance (long/short/neutral distribution)
    - Label stability (how often does the label flip on adjacent candles?)
    - Regime dependency (does one labeling method degrade in specific regimes?)
-3. **Decision**: Pick ONE labeling strategy with clear justification
-4. Define the exact label generation function signature and parameters
+3. **Meta-labeling evaluation** (AFML Ch. 3):
+   - Generate out-of-fold predictions from the primary model using PurgedKFoldCV
+   - Label each prediction as 1 (would have been profitable) or 0 (would have lost)
+   - Train a secondary model with features: primary confidence, NATR quartile, ADX regime, rolling 10-trade WR, hour_of_day
+   - Compare: meta-labeled bet sizing vs fixed confidence threshold
+   - Metric: IS Sharpe with meta-labeling vs IS Sharpe with current approach
+4. **Sample overlap analysis** (AFML Ch. 4):
+   - For the chosen labeling method, compute average label uniqueness (mean number of concurrent labels per timestamp)
+   - If average uniqueness < 0.5 (each timestamp participates in 2+ labels), plan for uniqueness-based sample weighting
+   - This determines whether the 4,400 "samples" are really 4,400 independent observations or closer to ~2,000 effective observations
+5. **Decision**: Pick ONE labeling strategy with clear justification
+6. Define the exact label generation function signature and parameters
 
 **Output**: Labeling decision documented in `briefs/iteration_NNN/research_brief_phase2.md`
 
@@ -436,7 +460,12 @@ Owns all decisions about **how** to implement: production-quality Python code, p
 ## 4. Feature Candidates
 - Use existing features from the pipeline: [list which ones]
 - New features to add: [list with exact computation spec]
-- Feature selection method: [e.g., importance-based pruning after first run]
+- Feature selection method: [e.g., MDA-based pruning after first run]
+
+## 4b. Stationarity Assessment (AFML Ch. 5)
+- Non-stationary features identified: [list with ADF p-values]
+- Fractional differentiation plan: [which features, target d values]
+- Features to replace with fracdiff versions: [list]
 
 ## 5. Model Spec
 - Model: LightGBM
@@ -445,11 +474,29 @@ Owns all decisions about **how** to implement: production-quality Python code, p
 - Class weighting: [if classification, how to handle imbalance]
 - Random seed: [fixed seed for reproducibility]
 
+## 5b. Sample Weighting (AFML Ch. 4)
+- Average label uniqueness: [value — compute from label overlap analysis]
+- Weighting scheme: uniqueness * time_decay * abs_pnl
+- Time decay half-life: [months]
+- Effective independent samples: [estimate]
+
+## 5c. Cross-Validation (AFML Ch. 7)
+- Method: PurgedKFoldCV (n_splits=5, purge_window=[candles], embargo_pct=0.02)
+- Effective training samples per fold after purging: [estimate]
+- CPCV enabled: [yes/no — only if sample count > 3,000]
+
+## 5d. Overfitting Budget (AFML Ch. 11)
+- Current trial count: [N iterations]
+- Deflated Sharpe threshold: [minimum OOS Sharpe to reject null]
+- Expected max random Sharpe: [E[max(SR_0)] given N]
+
 ## 6. Walk-Forward Configuration
 - Retraining frequency: monthly (existing)
 - Minimum training window: 1 year (existing)
-- Timeseries CV folds: [number]
-- Embargo period between folds: [if any]
+- CV method: PurgedKFoldCV with embargo (replaces TimeSeriesSplit)
+- CV folds: [number]
+- Purge window: [candles, derived from timeout_minutes / candle_hours]
+- Embargo: 2% of training set
 
 ## 7. Backtest Requirements
 - Position sizing: [fixed fractional / volatility-scaled / equal-weight]
@@ -486,12 +533,15 @@ Plus a comparison.csv with side-by-side IS vs OOS metrics and OOS/IS ratios.
    - Generate `out_of_sample/` reports from trades with `entry_time >= OOS_CUTOFF_DATE`
    - Generate `comparison.csv` with side-by-side metrics and OOS/IS ratios
 2. Implement labeling function per spec
+2b. **Replace TimeSeriesSplit with PurgedKFoldCV** (AFML Ch. 7): Implement purged cross-validation with embargo in `src/crypto_trade/strategies/ml/purged_cv.py`. Parameters: purge_window = timeout_minutes / (candle_hours * 60) candles, embargo_pct = 0.02. Update `optimization.py` to use PurgedKFoldCV instead of TimeSeriesSplit.
+2c. **Implement sample uniqueness weighting** (AFML Ch. 4): Add `compute_sample_uniqueness()` to labeling.py. Combine with existing |PnL| weights and time decay before passing to LightGBM.
+2d. **Implement MDA feature importance** (AFML Ch. 8): Add `compute_mda_importance()` to compute permutation importance using Sharpe as the scoring metric on validation folds. Report alongside MDI in feature_importance.csv.
 3. Implement data filtering per spec
-4. Generate features (extend existing pipeline with any new features from brief)
-5. Configure walk-forward parameters per spec (retraining frequency, CV folds, embargo)
+4. Generate features (extend existing pipeline with any new features from brief, including fracdiff if specified)
+5. Configure walk-forward parameters per spec (retraining frequency, PurgedKFoldCV, embargo)
 6. Run walk-forward backtest on the FULL dataset (IS + OOS combined, no artificial split at model level)
 7. Generate split reports
-8. Save trained model artifacts and feature importance
+8. Save trained model artifacts and feature importance (both MDI and MDA)
 
 **Code quality requirements**:
 - All new code must have type hints
@@ -530,7 +580,9 @@ This is the FIRST and ONLY time the researcher sees OOS results.
    - Features with high importance but no economic intuition → suspicious
    - OOS max drawdown significantly worse than IS → possible regime shift or overfit parameters
 8. **Compare against `BASELINE.md`**: Check primary metric (OOS Sharpe) and ALL hard constraints
-9. **Merge decision**: Document as MERGE or NO-MERGE with justification
+9. **Deflated Sharpe check** (AFML Ch. 11): Compute DSR accounting for all N iterations run to date. If DSR < 0, the OOS Sharpe is within the expected range of random trials. Note this in the diary but do not automatically NO-MERGE — the strategy may still have genuine signal that needs more OOS data to confirm.
+10. **PBO check** (if CPCV available): Compute Probability of Backtest Overfitting from CPCV paths. Report in diary.
+11. **Merge decision**: Document as MERGE or NO-MERGE with justification
 
 **Output**: `diary/iteration_NNN.md` (see template below), committed as the LAST commit on the branch: `docs(iter-NNN): diary entry`
 
@@ -619,6 +671,16 @@ patterns that didn't persist. What specifically might have caused this?]
 ## Next Iteration Ideas
 - [idea 1: what to change and why]
 - [idea 2: what to change and why]
+
+## MLP Diagnostics (AFML)
+| Metric | Value |
+|--------|-------|
+| Deflated Sharpe Ratio (DSR) | |
+| Expected max random Sharpe (N=?) | |
+| Average label uniqueness | |
+| PBO (if CPCV used) | |
+| Non-stationary features used | |
+| CV method | [PurgedKFoldCV / TimeSeriesSplit] |
 
 ## Lessons Learned
 - [insight that applies beyond this specific iteration]
