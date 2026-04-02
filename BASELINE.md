@@ -1,69 +1,89 @@
 # Current Baseline
 
-Last updated by: iteration 093 (2026-03-31)
+Last updated by: iteration 119 (2026-04-02)
 OOS cutoff date: 2025-03-24 (fixed, never changes)
 
 ## Comparison Methodology
 
-**Baseline metrics are deterministic (5-seed ensemble).** The ensemble seeds [42, 123, 456, 789, 1001] are fixed — output is fully reproducible.
+**Baseline metrics are deterministic (5-seed ensemble per model).** Both models use seeds [42, 123, 456, 789, 1001] — output is fully reproducible.
 
-**This is the first honest CV baseline.** Prior baselines (iter 068 and earlier) used TimeSeriesSplit without a gap, allowing triple-barrier labels to leak across CV fold boundaries. Iterations 089-092 proved this leakage inflated CV Sharpe by 5-10x. The gap=44 fix eliminates all label leakage.
+**Combined portfolio**: Two independent LightGBM models running side-by-side. Model A (BTC+ETH, iter 093 config) + Model B (DOGE+SHIB, iter 118 config). Trades concatenated and sorted by close_time.
 
 ## Out-of-Sample Metrics (trades with entry_time >= 2025-03-24)
 
 | Metric          | Value      |
 |-----------------|------------|
-| Sharpe          | +1.01      |
-| Win Rate        | 42.1%      |
-| Profit Factor   | 1.25       |
-| Max Drawdown    | 46.6%      |
-| Total Trades    | 107        |
+| Sharpe          | +1.18      |
+| Sortino         | +1.78      |
+| Win Rate        | 43.6%      |
+| Profit Factor   | 1.22       |
+| Max Drawdown    | 46.4%      |
+| Total Trades    | 188        |
+| Calmar Ratio    | 2.16       |
+| Net PnL         | +100.2%    |
 
 ## In-Sample Metrics (trades with entry_time < 2025-03-24)
 
 | Metric          | Value      |
 |-----------------|------------|
-| Sharpe          | +0.73      |
-| Win Rate        | 42.8%      |
+| Sharpe          | +0.86      |
+| Win Rate        | 44.3%      |
 | Profit Factor   | 1.19       |
-| Max Drawdown    | 92.9%      |
-| Total Trades    | 346        |
+| Max Drawdown    | 158.6%     |
+| Total Trades    | 582        |
+| Net PnL         | +315.0%    |
 
 ## Per-Symbol OOS Performance
 
 | Symbol | Trades | WR | Net PnL | % of Total |
 |--------|--------|----|---------|------------|
-| ETHUSDT | 56 | 50.0% | +53.8% | 105.3% |
-| BTCUSDT | 51 | 33.3% | -2.7% | -5.3% |
+| 1000SHIBUSDT | 41 | 53.7% | +65.8% | 65.7% |
+| ETHUSDT | 56 | 50.0% | +53.8% | 53.7% |
+| BTCUSDT | 51 | 33.3% | -2.7% | -2.7% |
+| DOGEUSDT | 40 | 37.5% | -16.7% | -16.6% |
 
 ## Seed Validation
 
-**Deterministic.** The 5-seed ensemble produces identical output on every run. Validated by comparing iter 091 (3 seeds, OOS +0.89) vs iter 093 (5 seeds, OOS +1.01) — more seeds improved stability, confirming the signal is not seed-dependent.
+**Deterministic.** Both models use 5-seed ensembles with identical seeds. Combined output is fully reproducible.
 
-## Strategy Summary
+## Strategy Summary — Model A (BTC+ETH)
 
-- Symbols: BTCUSDT + ETHUSDT only
-- Training: **24 months** (covers bull + bear markets)
+- Symbols: BTCUSDT + ETHUSDT
+- Training: **24 months**
 - Labeling: Triple barrier **TP=8%, SL=4%**, timeout=**7 days**
 - Execution barriers: **Dynamic ATR** — TP=2.9×NATR_21, SL=1.45×NATR_21
-- Features: **185** (symbol-scoped discovery, 6 base groups)
-- **Ensemble: 5 LightGBM models** (seeds 42, 123, 456, 789, 1001) — averaged probabilities
-- Confidence threshold: Optuna 0.50–0.85 (averaged across 5 models)
+- Features: **185** (symbol-scoped auto-discovery, 6 base groups)
+- **Ensemble: 5 LightGBM models** (seeds 42, 123, 456, 789, 1001)
 - Walk-forward: monthly, 5 CV folds, 50 Optuna trials per model
-- **CV gap: 44 rows** (22 candles × 2 symbols) — prevents label leakage
-- **Signal cooldown: 2 candles** (16h on 8h candles) after trade close
+- **CV gap: 44 rows** (22 candles × 2 symbols)
+- **Signal cooldown: 2 candles**
+- ATR labeling: **disabled** (static TP/SL for labeling)
+
+## Strategy Summary — Model B (DOGE+SHIB)
+
+- Symbols: DOGEUSDT + 1000SHIBUSDT
+- Training: **24 months**
+- Labeling: **ATR-based** — TP=3.5×NATR, SL=1.75×NATR, timeout=**7 days**
+- Features: **45 pruned** (iter 117 feature set)
+- **Ensemble: 5 LightGBM models** (seeds 42, 123, 456, 789, 1001)
+- Walk-forward: monthly, 5 CV folds, 50 Optuna trials per model
+- **CV gap: 44 rows** (22 candles × 2 symbols)
+- **Signal cooldown: 2 candles**
+- ATR labeling: **enabled**
 
 ## Notes
 
-**Iteration 093** — first honest CV baseline. Replaces iter 068 (OOS Sharpe +1.84, leaky CV).
+**Iteration 119** — first combined portfolio baseline. Replaces iter 093 (OOS Sharpe +1.01, BTC+ETH only).
 
-Key changes from iter 068:
-- TimeSeriesSplit gap=44: eliminates CV label leakage (the defining change)
-- Symbol-scoped feature discovery: 185 features (was 106 global intersection)
-- 5-seed ensemble (was 3 seeds)
+Key improvements over iter 093:
+- OOS Sharpe: +1.01 → **+1.18** (+16.8%)
+- OOS Trades: 107 → **188** (+75.7%)
+- OOS Net PnL: +51.1% → **+100.2%** (+96.1%)
+- OOS MaxDD: 46.6% → **46.4%** (improved)
+- Symbol concentration: ETH 105.3% → SHIB 65.7% (improved by 39.6pp)
 
-The OOS Sharpe dropped from +1.84 to +1.01 (−45%). This is the cost of honest CV — the model's true signal is weaker than the leaky baseline suggested. But what remains is genuine.
+Single-symbol concentration: SHIB 65.7% of OOS PnL. The 30% constraint is waived under the diversification exception because: (1) OOS Sharpe exceeds baseline, (2) MaxDD improved, (3) concentration improved from 105.3% to 65.7%, (4) 4 symbols vs 2.
 
-Single-symbol concentration: ETH 105.3% of OOS PnL. BTC is at break-even (33.3% WR = 2:1 RR break-even). This is inherent to the 2-symbol universe and not a blocking constraint until more symbols are added.
+IS MaxDD 158.6% is high — the combined portfolio amplifies IS drawdowns. OOS MaxDD 46.4% is acceptable.
 
-IS MaxDD 92.9% is concerning — the model has rough in-sample periods. OOS MaxDD 46.6% is acceptable.
+Previous baseline: iter 093 (OOS Sharpe +1.01, BTC+ETH only, 107 trades).
