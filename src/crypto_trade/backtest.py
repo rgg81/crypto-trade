@@ -180,6 +180,10 @@ def run_backtest(
     results: list[TradeResult] = []
     total_signals = 0
 
+    # Per-symbol daily PnL tracking for vol targeting (iter 147)
+    # symbol -> {YYYY-MM-DD -> sum of net_pnl_pct that closed on that day}
+    vt_per_sym_daily: dict[str, dict[str, float]] = {}
+
     # Signal cooldown tracking
     cooldown_until: dict[str, int] = {}  # symbol → earliest open_time for new trade
     candle_duration_ms = 0
@@ -223,6 +227,13 @@ def run_backtest(
             if result is not None:
                 results.append(result)
                 del open_orders[sym]
+                # Record per-symbol daily PnL for vol targeting lookback
+                if config.vol_targeting:
+                    close_date_str = _day_of(result.close_time)
+                    sym_daily = vt_per_sym_daily.setdefault(result.symbol, {})
+                    sym_daily[close_date_str] = (
+                        sym_daily.get(close_date_str, 0.0) + result.net_pnl_pct
+                    )
                 # Set signal cooldown for this symbol
                 if config.cooldown_candles > 0 and candle_duration_ms > 0:
                     cooldown_until[sym] = (
@@ -278,12 +289,18 @@ def run_backtest(
         if signal.direction != 0 and signal.weight > 0:
             total_signals += 1
             if sym not in open_orders and ot >= cooldown_until.get(sym, 0):
+                vt_scale = 1.0
+                if config.vol_targeting:
+                    vt_scale = _compute_vt_scale(
+                        vt_per_sym_daily, sym, ot, config
+                    )
                 order = _create_order(
                     sym,
                     signal,
                     float(close_arr[i]),
                     int(close_time_arr[i]),
                     config,
+                    vt_scale=vt_scale,
                 )
                 open_orders[sym] = order
                 if verbose > 0:
@@ -399,16 +416,68 @@ def _check_order(
     return _make_result(order, order.take_profit_price, close_time, "take_profit", fee_pct)
 
 
+def _compute_vt_scale(
+    per_sym_daily_pnl: dict[str, dict[str, float]],
+    symbol: str,
+    trade_open_ms: int,
+    config: BacktestConfig,
+) -> float:
+    """Compute per-symbol vol-targeting scale for a trade opening at trade_open_ms.
+
+    Looks at the target symbol's past daily aggregate PnL over the last
+    ``vt_lookback_days``. Scale = target_vol / realized_vol, clipped to
+    [vt_min_scale, vt_max_scale]. Returns 1.0 if history is insufficient
+    or realized vol is zero.
+
+    Uses ONLY past data (days_before >= 1) to remain walk-forward valid.
+    """
+    sym_daily = per_sym_daily_pnl.get(symbol, {})
+    if not sym_daily:
+        return 1.0
+
+    trade_date = datetime.datetime.fromtimestamp(
+        trade_open_ms / 1000, tz=datetime.UTC
+    ).date()
+    lookback_returns: list[float] = []
+    for close_date_str, pnl in sym_daily.items():
+        close_date = datetime.date.fromisoformat(close_date_str)
+        days_before = (trade_date - close_date).days
+        if 1 <= days_before <= config.vt_lookback_days:
+            lookback_returns.append(pnl)
+
+    if len(lookback_returns) < config.vt_min_history:
+        return 1.0
+
+    n = len(lookback_returns)
+    mean_r = sum(lookback_returns) / n
+    var = sum((r - mean_r) ** 2 for r in lookback_returns) / (n - 1)
+    realized_vol = var ** 0.5
+    # Guard against zero/near-zero vol (numeric noise)
+    if realized_vol <= 1e-9:
+        return 1.0
+
+    scale = config.vt_target_vol / realized_vol
+    return max(config.vt_min_scale, min(config.vt_max_scale, scale))
+
+
 def _create_order(
     symbol: str,
     signal: Signal,
     close_price: float,
     close_time: int,
     config: BacktestConfig,
+    vt_scale: float = 1.0,
 ) -> Order:
-    """Create an order from a signal at the current kline's close."""
+    """Create an order from a signal at the current kline's close.
+
+    ``vt_scale`` overrides the signal-derived weight when per-symbol vol
+    targeting is enabled.
+    """
     entry_price = close_price
-    weight_factor = signal.weight / 100.0
+    if config.vol_targeting:
+        weight_factor = vt_scale
+    else:
+        weight_factor = signal.weight / 100.0
     amount_usd = weight_factor * config.max_amount_usd
 
     sl_pct = (signal.sl_pct if signal.sl_pct is not None else config.stop_loss_pct) / 100.0

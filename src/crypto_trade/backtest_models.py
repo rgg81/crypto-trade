@@ -47,6 +47,14 @@ class BacktestConfig:
     start_time: int | None = None  # epoch ms, default=first row
     end_time: int | None = None  # epoch ms, default=last row
     cooldown_candles: int = 0  # candles to wait after a trade closes before re-entering
+    # Per-symbol volatility targeting (iter 147): scale each trade by
+    # target_vol / realized_vol of that symbol's past daily PnL.
+    vol_targeting: bool = False
+    vt_target_vol: float = 0.5
+    vt_lookback_days: int = 30
+    vt_min_scale: float = 0.5
+    vt_max_scale: float = 2.0
+    vt_min_history: int = 5  # minimum past daily returns required for scaling
 
 
 @dataclass(frozen=True)
