@@ -41,22 +41,27 @@ def summarize(results: list[TradeResult]) -> BacktestSummary | None:
         return None
 
     total = len(results)
+    # Win rate uses trade-level PnL (direction-dependent only, not scaled)
     wins = sum(1 for r in results if r.net_pnl_pct > 0)
     losses = total - wins
     win_rate = wins / total * 100.0
 
+    # Portfolio metrics (MaxDD, PnL, PF) use weighted_pnl to reflect position
+    # sizing (e.g. vol targeting). For legacy runs with weight_factor=1.0,
+    # weighted_pnl == net_pnl_pct, so this is backward-compatible.
+    weighted_pnls = [r.weighted_pnl for r in results]
     net_pnls = [r.net_pnl_pct for r in results]
-    avg_pnl = sum(net_pnls) / total
-    total_net = sum(net_pnls)
+    avg_pnl = sum(weighted_pnls) / total
+    total_net = sum(weighted_pnls)
 
     best = max(net_pnls)
     worst = min(net_pnls)
 
-    # Max drawdown: largest peak-to-trough decline in cumulative PnL
+    # Max drawdown: largest peak-to-trough decline in cumulative weighted PnL
     cumulative = 0.0
     peak = 0.0
     max_dd = 0.0
-    for pnl in net_pnls:
+    for pnl in weighted_pnls:
         cumulative += pnl
         if cumulative > peak:
             peak = cumulative
@@ -64,9 +69,9 @@ def summarize(results: list[TradeResult]) -> BacktestSummary | None:
         if dd > max_dd:
             max_dd = dd
 
-    # Profit factor: sum(gains) / sum(losses)
-    gross_gains = sum(p for p in net_pnls if p > 0)
-    gross_losses = sum(-p for p in net_pnls if p < 0)
+    # Profit factor: sum(gains) / sum(losses) on weighted returns
+    gross_gains = sum(p for p in weighted_pnls if p > 0)
+    gross_losses = sum(-p for p in weighted_pnls if p < 0)
     profit_factor = gross_gains / gross_losses if gross_losses > 0 else float("inf")
 
     exit_reasons: dict[str, int] = {}
