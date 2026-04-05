@@ -19,6 +19,7 @@ import pandas as pd
 
 from crypto_trade.backtest_models import TradeResult
 from crypto_trade.backtest_report import (
+    compute_deflated_sharpe_ratio,
     generate_html_report,
     summarize,
     to_daily_returns_series,
@@ -38,10 +39,21 @@ class SplitMetrics:
     total_trades: int
     calmar_ratio: float
     total_net_pnl: float
+    dsr: float  # Deflated Sharpe Ratio (AFML Ch. 14), N_trials-adjusted
 
 
-def _compute_metrics(trades: list[TradeResult]) -> SplitMetrics | None:
-    """Compute Sharpe, Sortino, max drawdown, etc. from trade list."""
+def _compute_metrics(
+    trades: list[TradeResult], n_trials: int = 1
+) -> SplitMetrics | None:
+    """Compute Sharpe, Sortino, max drawdown, DSR, etc. from trade list.
+
+    Args:
+        trades: trade results to summarize.
+        n_trials: number of independent Sharpe estimates considered when
+            computing DSR (AFML Ch. 14). ``n_trials=1`` yields the raw
+            t-statistic (no multiple-testing penalty). Pass the accumulated
+            iteration count for a proper DSR.
+    """
     if not trades:
         return None
 
@@ -66,6 +78,11 @@ def _compute_metrics(trades: list[TradeResult]) -> SplitMetrics | None:
         else 0.0
     )
 
+    # DSR: Sharpe adjusted for skew/kurtosis and multiple testing.
+    dsr = compute_deflated_sharpe_ratio(
+        sharpe=sharpe, n_trials=n_trials, returns=returns.tolist()
+    )
+
     return SplitMetrics(
         sharpe=sharpe,
         sortino=sortino,
@@ -75,6 +92,7 @@ def _compute_metrics(trades: list[TradeResult]) -> SplitMetrics | None:
         total_trades=summary.total_trades,
         calmar_ratio=calmar,
         total_net_pnl=summary.total_net_pnl_pct,
+        dsr=dsr,
     )
 
 
@@ -301,6 +319,7 @@ def _write_comparison(
         "profit_factor",
         "total_trades",
         "calmar_ratio",
+        "dsr",
         "total_net_pnl",
     ]
 
@@ -334,8 +353,19 @@ def generate_iteration_reports(
     features_dir: str | Path = "data/features",
     reports_dir: str | Path = "reports",
     interval: str = "8h",
+    n_trials: int = 1,
 ) -> Path:
     """Generate full IS/OOS split reports for an iteration.
+
+    Args:
+        trades: full trade list (will be split at ``OOS_CUTOFF_MS``).
+        iteration: iteration number or label for the report directory.
+        features_dir: feature parquet location for regime labeling.
+        reports_dir: root reports directory.
+        interval: candle interval (for regime feature selection).
+        n_trials: number of independent trials for DSR computation. Pass
+            the accumulated iteration count for multi-testing adjustment.
+            Default 1 → raw t-stat (no penalty).
 
     Returns the iteration report directory path.
     """
@@ -380,8 +410,8 @@ def generate_iteration_reports(
             generate_html_report(oos_returns, oos_dir / "quantstats.html", title="OOS Report")
 
     # Comparison
-    is_metrics = _compute_metrics(is_trades)
-    oos_metrics = _compute_metrics(oos_trades)
+    is_metrics = _compute_metrics(is_trades, n_trials=n_trials)
+    oos_metrics = _compute_metrics(oos_trades, n_trials=n_trials)
     _write_comparison(is_metrics, oos_metrics, iter_dir / "comparison.csv")
     print("[report] comparison.csv written")
 
@@ -389,6 +419,7 @@ def generate_iteration_reports(
     if is_metrics:
         print(
             f"[report] IS:  Sharpe={is_metrics.sharpe:.4f}"
+            f"  DSR={is_metrics.dsr:+.3f}"
             f"  Trades={is_metrics.total_trades}"
             f"  WR={is_metrics.win_rate:.1f}%"
             f"  PF={is_metrics.profit_factor:.4f}"
@@ -397,6 +428,7 @@ def generate_iteration_reports(
     if oos_metrics:
         print(
             f"[report] OOS: Sharpe={oos_metrics.sharpe:.4f}"
+            f"  DSR={oos_metrics.dsr:+.3f}"
             f"  Trades={oos_metrics.total_trades}"
             f"  WR={oos_metrics.win_rate:.1f}%"
             f"  PF={oos_metrics.profit_factor:.4f}"
