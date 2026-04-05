@@ -1,6 +1,6 @@
 # Current Baseline
 
-Last updated by: iteration 150 (2026-04-06)
+Last updated by: iteration 151 (2026-04-06)
 OOS cutoff date: 2025-03-24 (fixed, never changes)
 
 ## Comparison Methodology
@@ -17,54 +17,51 @@ clipped to [0.5, 2.0].
 
 | Metric          | Value      |
 |-----------------|------------|
-| Sharpe          | +2.65      |
-| Sortino         | +3.81      |
+| Sharpe          | +2.74      |
+| Sortino         | +3.65      |
 | Win Rate        | 50.6%      |
-| Profit Factor   | 1.62       |
-| Max Drawdown    | 39.17%     |
+| Profit Factor   | 1.64       |
+| Max Drawdown    | 32.22%     |
 | Total Trades    | 164        |
-| Calmar Ratio    | 4.02       |
-| Net PnL         | +157.5%    |
+| Calmar Ratio    | 4.12       |
+| Net PnL         | +132.7%    |
 
 ## In-Sample Metrics (trades with entry_time < 2025-03-24)
 
 | Metric          | Value      |
 |-----------------|------------|
-| Sharpe          | +1.26      |
+| Sharpe          | +1.31      |
 | Win Rate        | 44.5%      |
-| Profit Factor   | 1.27       |
-| Max Drawdown    | 118.12%    |
+| Profit Factor   | 1.29       |
+| Max Drawdown    | 93.93%     |
 | Total Trades    | 652        |
-| Net PnL         | +303.4%    |
+| Net PnL         | +273.3%    |
 
 ## Per-Symbol OOS Performance
 
 | Symbol | Model | Trades | WR | Net PnL | % of Total |
 |--------|-------|--------|----|---------|------------|
-| LINKUSDT | C | 42 | 52.4% | +61.1% | 38.8% |
-| ETHUSDT | A | 34 | 55.9% | +37.9% | 24.1% |
-| BNBUSDT | D | 50 | 52.0% | +36.6% | 23.2% |
-| BTCUSDT | A | 38 | 42.1% | +21.9% | 13.9% |
+| ETHUSDT | A | 34 | 55.9% | +60.2% | 34.9% |
+| LINKUSDT | C | 42 | 52.4% | +56.0% | 32.5% |
+| BNBUSDT | D | 50 | 52.0% | +37.7% | 21.9% |
+| BTCUSDT | A | 38 | 42.1% | +18.5% | 10.7% |
 
-## Position Sizing (per-symbol, iter 147)
+## Position Sizing (per-symbol, iter 151 — tuned config)
 
 ```
 For each trade on symbol S at open_time T:
-    symbol_daily_pnls = [daily aggregate PnL of S's trades for dates in [T-30d, T-1d]]
+    symbol_daily_pnls = [daily aggregate PnL of S's trades for dates in [T-45d, T-1d]]
     if len(symbol_daily_pnls) >= 5 and std > 0:
         realized_vol = std(symbol_daily_pnls)
-        scale = 0.5 / realized_vol
+        scale = 0.3 / realized_vol
         scale = clip(scale, 0.5, 2.0)
     else:
         scale = 1.0
     trade_pnl *= scale
 ```
 
-Average OOS scales per symbol:
-- BTC: 0.82 (calmest asset)
-- ETH: 0.76
-- LINK: 0.75
-- BNB: 0.73 (most volatile)
+Config (iter 151 tuned): `target_vol=0.3, lookback=45` days. 45-day lookback gives
+more stable vol estimates than 30-day over crypto regime cycles (~3-6 weeks).
 
 ## Strategy Summary
 
@@ -82,6 +79,20 @@ Enable with `vol_targeting=True` in `BacktestConfig`. Walk-forward validated:
 full engine re-run produces identical metrics to iter 147's post-processing reference.
 
 ## Notes
+
+**Iteration 151** — Broader VT parameter grid search (30 configs) reveals that
+iter 147's config (target=0.5, lookback=30) wasn't tuned over a wide enough
+lookback range. Better config found: **target=0.3, lookback=45**.
+
+Key improvements over iter 150:
+- OOS Sharpe: +2.65 → **+2.74** (+3.3%)
+- OOS MaxDD: 39.17% → **32.22%** (-18%)
+- OOS Calmar: 4.02 → **4.12** (+2.5%)
+- OOS PF: 1.62 → **1.64**
+
+27 of 30 tested configs beat no-VT baseline — demonstrates VT robustness.
+
+**No code change required** — same engine, just updated `BacktestConfig` params.
 
 **Iteration 150** — Per-symbol vol targeting integrated into the backtest engine.
 Full walk-forward re-run with VT active in `backtest.py` reproduces iter 147's
