@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -8,6 +9,9 @@ from pathlib import Path
 import pandas as pd
 
 from crypto_trade.backtest_models import DailyPnL, TradeResult
+
+# Euler-Mascheroni constant for DSR computation (AFML Ch. 14)
+_EULER_MASCHERONI = 0.5772156649015328
 
 
 @dataclass(frozen=True)
@@ -96,6 +100,84 @@ def summarize(results: list[TradeResult]) -> BacktestSummary | None:
         worst_trade_pct=worst,
         trades_per_month=tpm,
     )
+
+
+def expected_max_sharpe(n_trials: int) -> float:
+    """Expected maximum Sharpe under the null of ``n_trials`` random,
+    independent Sharpe estimates (mean 0, unit variance).
+
+    Implements the closed-form approximation from Bailey & López de Prado
+    (AFML Ch. 14, equation 14.4):
+
+        E[max(SR_0)] ≈ √(2·ln·N) · (1 − γ/(2·ln·N)) + γ/√(2·ln·N)
+
+    where γ is the Euler-Mascheroni constant.
+
+    Returns 0.0 for ``n_trials <= 1`` (no multiple-testing adjustment).
+    """
+    if n_trials <= 1:
+        return 0.0
+    ln_n = math.log(n_trials)
+    return (
+        math.sqrt(2 * ln_n) * (1 - _EULER_MASCHERONI / (2 * ln_n))
+        + _EULER_MASCHERONI / math.sqrt(2 * ln_n)
+    )
+
+
+def sharpe_standard_error(sharpe: float, returns: list[float]) -> float:
+    """Standard error of an annualized Sharpe ratio estimate, accounting
+    for the return distribution's skew (γ_3) and kurtosis (γ_4).
+
+    Per AFML Ch. 14:
+
+        SE(SR)² ≈ (1 − γ_3·SR + (γ_4 − 1)/4·SR²) / (T − 1)
+
+    where ``T`` is the number of return observations. Returns 0.0 when
+    ``T < 3`` or when the computed variance is non-positive (guards
+    against degenerate return series).
+    """
+    t = len(returns)
+    if t < 3:
+        return 0.0
+    mean = sum(returns) / t
+    var = sum((r - mean) ** 2 for r in returns) / (t - 1)
+    if var <= 0:
+        return 0.0
+    std = math.sqrt(var)
+    z = [(r - mean) / std for r in returns]
+    skew = sum(v ** 3 for v in z) / t
+    kurt = sum(v ** 4 for v in z) / t  # raw (non-excess) kurtosis
+    se_sq = (1 - skew * sharpe + (kurt - 1) / 4 * sharpe ** 2) / (t - 1)
+    if se_sq <= 0:
+        return 0.0
+    return math.sqrt(se_sq)
+
+
+def compute_deflated_sharpe_ratio(
+    sharpe: float,
+    n_trials: int,
+    returns: list[float],
+) -> float:
+    """Deflated Sharpe Ratio (DSR) from AFML Ch. 14.
+
+    DSR = (SR_observed − E[max(SR_0)]) / SE(SR)
+
+    - DSR > 0: observed Sharpe exceeds expected random maximum.
+    - DSR > 1: ~84% confidence observed Sharpe isn't multiple-testing noise.
+    - DSR < 0: observed Sharpe is within random-chance range.
+
+    Args:
+        sharpe: observed annualized Sharpe ratio.
+        n_trials: number of independent Sharpe estimates considered.
+        returns: daily return observations used to estimate skew/kurtosis.
+
+    Returns 0.0 if the standard error cannot be computed.
+    """
+    emax = expected_max_sharpe(n_trials)
+    se = sharpe_standard_error(sharpe, returns)
+    if se <= 0:
+        return 0.0
+    return (sharpe - emax) / se
 
 
 def aggregate_daily_pnl(results: list[TradeResult]) -> list[DailyPnL]:
