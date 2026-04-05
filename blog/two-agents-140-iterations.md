@@ -165,6 +165,6 @@ The model is good. The workflow is the art.
 
 ---
 
-*The crypto-trade repo runs on Claude Code with the `quant-iteration` skill. The full skill definition — including all eight phase templates, the no-cheating rules, the seed validation protocol, and the git workflow — is a single markdown file the agents read before every iteration.*
+*The crypto-trade repo runs on Claude Code with the `quant-iteration` skill as a quick reference, plus `ITERATION_PLAN_8H.md` for the full eight-phase plan and templates. Together they define the no-cheating rules, the seed validation protocol, and the git workflow the agents follow before every iteration.*
 
 *Every number in this post is pulled from `BASELINE.md` in the repo at iteration 138. The OOS cutoff has not moved. It will not move.*
