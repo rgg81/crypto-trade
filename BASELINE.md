@@ -1,49 +1,70 @@
 # Current Baseline
 
-Last updated by: iteration 145 (2026-04-05)
+Last updated by: iteration 147 (2026-04-05)
 OOS cutoff date: 2025-03-24 (fixed, never changes)
 
 ## Comparison Methodology
 
-**Baseline metrics are deterministic** (5-seed ensemble per model + vol-targeting post-processing).
+**Baseline metrics are deterministic** (5-seed ensemble per model + per-symbol vol-targeting post-processing).
 
 **Combined portfolio**: Three independent LightGBM models (A=BTC+ETH, C=LINK, D=BNB)
-running side-by-side, with **volatility-targeted position sizing** applied as a
-post-processing rule. Each trade's size is scaled by `target_vol / realized_14d_vol`,
-clipped to [0.5, 2.0].
+running side-by-side, with **per-symbol volatility-targeted position sizing** applied
+as a post-processing rule. Each trade's size is scaled by `target_vol / symbol_realized_30d_vol`,
+clipped to [0.5, 2.0], where `symbol_realized_vol` is the std of that SYMBOL's daily PnL
+over the past 30 days.
 
 ## Out-of-Sample Metrics (trades with entry_time >= 2025-03-24)
 
 | Metric          | Value      |
 |-----------------|------------|
-| Sharpe          | +2.33      |
-| Sortino         | +3.01      |
+| Sharpe          | +2.65      |
+| Sortino         | +3.81      |
 | Win Rate        | 50.6%      |
-| Profit Factor   | 1.53       |
-| Max Drawdown    | 38.09%     |
+| Profit Factor   | 1.62       |
+| Max Drawdown    | 39.17%     |
 | Total Trades    | 164        |
-| Calmar Ratio    | 3.40       |
-| Net PnL         | +129.5%    |
+| Calmar Ratio    | 4.02       |
+| Net PnL         | +157.5%    |
 
 ## In-Sample Metrics (trades with entry_time < 2025-03-24)
 
 | Metric          | Value      |
 |-----------------|------------|
-| Sharpe          | +1.36      |
+| Sharpe          | +1.26      |
 | Win Rate        | 44.5%      |
-| Profit Factor   | 1.30       |
-| Max Drawdown    | 100.43%    |
+| Profit Factor   | 1.27       |
+| Max Drawdown    | 118.12%    |
 | Total Trades    | 652        |
-| Net PnL         | +308.7%    |
+| Net PnL         | +303.4%    |
 
 ## Per-Symbol OOS Performance
 
 | Symbol | Model | Trades | WR | Net PnL | % of Total |
 |--------|-------|--------|----|---------|------------|
-| BNBUSDT | D | 50 | 52.0% | +47.5% | 36.6% |
-| ETHUSDT | A | 34 | 55.9% | +37.4% | 28.9% |
-| LINKUSDT | C | 42 | 52.4% | +36.3% | 28.0% |
-| BTCUSDT | A | 38 | 42.1% | +8.3% | 6.4% |
+| LINKUSDT | C | 42 | 52.4% | +61.1% | 38.8% |
+| ETHUSDT | A | 34 | 55.9% | +37.9% | 24.1% |
+| BNBUSDT | D | 50 | 52.0% | +36.6% | 23.2% |
+| BTCUSDT | A | 38 | 42.1% | +21.9% | 13.9% |
+
+## Position Sizing (per-symbol, iter 147)
+
+```
+For each trade on symbol S at open_time T:
+    symbol_daily_pnls = [daily aggregate PnL of S's trades for dates in [T-30d, T-1d]]
+    if len(symbol_daily_pnls) >= 5 and std > 0:
+        realized_vol = std(symbol_daily_pnls)
+        scale = 0.5 / realized_vol
+        scale = clip(scale, 0.5, 2.0)
+    else:
+        scale = 1.0
+    trade_pnl *= scale
+```
+
+Average OOS scales per symbol:
+- BTC: 0.82 (calmest asset)
+- ETH: 0.76
+- LINK: 0.75
+- BNB: 0.73 (most volatile)
 
 ## Strategy Summary
 
@@ -56,42 +77,29 @@ clipped to [0.5, 2.0].
 All models: timeout 7 days, 5-seed ensemble [42, 123, 456, 789, 1001], cooldown 2 candles,
 CV gap = (timeout_candles + 1) × n_symbols, 50 Optuna trials per monthly model.
 
-## Position Sizing (NEW in iter 145)
-
-Applied as post-processing to trade outputs:
-
-```
-For each trade at open_time T:
-    realized_vol = std(daily portfolio PnLs from [T - 14 days, T - 1 day])
-    scale = 1.5 / realized_vol       (if realized_vol > 0 and ≥ 5 past days)
-    scale = clip(scale, 0.5, 2.0)
-    trade_pnl *= scale
-```
-
-Average OOS scale: 0.65 (portfolio ~35% deleveraged on average during OOS).
-
-**IMPORTANT**: This rule is not yet in the backtest engine. For deployment, it must be
-implemented in `src/crypto_trade/backtest.py` (set weight_factor at trade open time).
+**IMPORTANT**: Position sizing is not yet in backtest engine. For deployment, implement
+per-symbol rolling vol at trade-open time in `src/crypto_trade/backtest.py`.
 
 ## Notes
 
-**Iteration 145** — Vol-targeted position sizing applied to iter 138's A+C+D trades.
+**Iteration 147** — Upgraded from portfolio-wide (iter 145) to per-symbol vol targeting.
+Each trade scales by ITS symbol's recent vol, not aggregate portfolio vol. This preserves
+signal from calm symbols when other symbols are volatile.
 
 Walk-forward validation:
-- Config tuned on IS trades only (24 configs tested)
-- Best IS config: target_vol=1.5, lookback=14 days
+- 20 configs tested on IS trades only
+- Best IS config: target_vol=0.5, lookback=30 days
 - Applied to OOS without further tuning
 
-Key improvements over iter 138:
-- OOS Sharpe: +2.32 → **+2.33** (+0.4%, marginal)
-- OOS MaxDD: 62.8% → **38.1%** (-39%, major)
-- OOS Calmar: 2.74 → **3.40** (+24%)
-- OOS PF: 1.49 → 1.53 (+3%)
-- IS Sharpe: +1.15 → **+1.36** (+18%)
+Key improvements over iter 145:
+- OOS Sharpe: +2.33 → **+2.65** (+14%)
+- OOS Sortino: +3.01 → **+3.81** (+27%)
+- OOS Calmar: 3.40 → **4.02** (+18%)
+- OOS PF: 1.53 → **1.62** (+6%)
+- OOS PnL: +129.5% → **+157.5%** (+22%)
 
 Tradeoffs:
-- OOS Net PnL: +172.4% → +129.5% (smaller average position)
-- OOS Sortino: +3.41 → +3.01 (-12%)
-- Concentration shifted from LINK (34.4%) to BNB (36.6%) — still passes ≤50%
+- IS Sharpe: +1.36 → +1.26 (-7%, less IS scaling triggered)
+- OOS MaxDD: 38.1% → 39.2% (+3%, marginal)
 
-Previous baseline: iter 138 (OOS Sharpe +2.32, MaxDD 62.83%, A+C+D without sizing).
+Previous baseline: iter 145 (OOS Sharpe +2.33, portfolio-wide vol targeting).
