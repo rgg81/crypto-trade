@@ -1,17 +1,17 @@
 # Current Baseline
 
-Last updated by: iteration 147 (2026-04-05)
+Last updated by: iteration 150 (2026-04-06)
 OOS cutoff date: 2025-03-24 (fixed, never changes)
 
 ## Comparison Methodology
 
-**Baseline metrics are deterministic** (5-seed ensemble per model + per-symbol vol-targeting post-processing).
+**Baseline metrics are deterministic** (5-seed ensemble per model + per-symbol vol targeting **integrated into backtest engine**).
 
 **Combined portfolio**: Three independent LightGBM models (A=BTC+ETH, C=LINK, D=BNB)
-running side-by-side, with **per-symbol volatility-targeted position sizing** applied
-as a post-processing rule. Each trade's size is scaled by `target_vol / symbol_realized_30d_vol`,
-clipped to [0.5, 2.0], where `symbol_realized_vol` is the std of that SYMBOL's daily PnL
-over the past 30 days.
+running side-by-side. Per-symbol volatility targeting is applied **live within the
+backtest engine**: each trade's `weight_factor` is computed at open time from the std
+of that SYMBOL's past 30-day daily PnL, scaled as `target_vol / realized_vol` and
+clipped to [0.5, 2.0].
 
 ## Out-of-Sample Metrics (trades with entry_time >= 2025-03-24)
 
@@ -77,10 +77,16 @@ Average OOS scales per symbol:
 All models: timeout 7 days, 5-seed ensemble [42, 123, 456, 789, 1001], cooldown 2 candles,
 CV gap = (timeout_candles + 1) × n_symbols, 50 Optuna trials per monthly model.
 
-**IMPORTANT**: Position sizing is not yet in backtest engine. For deployment, implement
-per-symbol rolling vol at trade-open time in `src/crypto_trade/backtest.py`.
+**STATUS**: Position sizing is **INTEGRATED into the backtest engine** (iter 150).
+Enable with `vol_targeting=True` in `BacktestConfig`. Walk-forward validated:
+full engine re-run produces identical metrics to iter 147's post-processing reference.
 
 ## Notes
+
+**Iteration 150** — Per-symbol vol targeting integrated into the backtest engine.
+Full walk-forward re-run with VT active in `backtest.py` reproduces iter 147's
+metrics exactly (OOS Sharpe +2.6486, MaxDD 39.17%, Calmar 4.02). Strategy is
+production-ready end-to-end.
 
 **Iteration 147** — Upgraded from portfolio-wide (iter 145) to per-symbol vol targeting.
 Each trade scales by ITS symbol's recent vol, not aggregate portfolio vol. This preserves
