@@ -154,13 +154,14 @@ def run_features(
 # Auto-register all feature groups on import
 # ---------------------------------------------------------------------------
 
+from crypto_trade.features.calendar import add_calendar_features  # noqa: E402
+from crypto_trade.features.entropy_cusum import add_entropy_cusum_features  # noqa: E402
+from crypto_trade.features.interaction import add_interaction_features  # noqa: E402
 from crypto_trade.features.mean_reversion import add_mean_reversion_features  # noqa: E402
 from crypto_trade.features.momentum import add_momentum_features  # noqa: E402
 from crypto_trade.features.statistical import add_statistical_features  # noqa: E402
 from crypto_trade.features.trend import add_trend_features  # noqa: E402
 from crypto_trade.features.volatility import add_volatility_features  # noqa: E402
-from crypto_trade.features.calendar import add_calendar_features  # noqa: E402
-from crypto_trade.features.interaction import add_interaction_features  # noqa: E402
 from crypto_trade.features.volume import add_volume_features  # noqa: E402
 
 _register("momentum", add_momentum_features)
@@ -171,6 +172,7 @@ _register("mean_reversion", add_mean_reversion_features)
 _register("statistical", add_statistical_features)
 _register("interaction", add_interaction_features)
 _register("calendar", add_calendar_features)
+_register("entropy_cusum", add_entropy_cusum_features)
 
 __all__ = [
     "GROUP_REGISTRY",

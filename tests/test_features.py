@@ -184,3 +184,53 @@ class TestGenerateAll:
         n = len(df)
         result = generate_features(df, list_groups())
         assert len(result) == n
+
+
+# ---------------------------------------------------------------------------
+# Entropy & CUSUM features
+# ---------------------------------------------------------------------------
+
+from crypto_trade.features.entropy_cusum import add_entropy_cusum_features  # noqa: E402
+
+
+class TestEntropyCusum:
+    def test_adds_columns(self):
+        df = _make_ohlcv_df(200)
+        original_cols = set(df.columns)
+        result = add_entropy_cusum_features(df)
+        new_cols = [c for c in result.columns if c not in original_cols]
+        assert len(new_cols) >= 10
+        ent_cols = [c for c in new_cols if c.startswith("ent_")]
+        cusum_cols = [c for c in new_cols if c.startswith("cusum_")]
+        assert len(ent_cols) >= 3  # shannon_10, shannon_20, shannon_50
+        assert len(cusum_cols) >= 6  # since + norm for 3 sigmas + break_5
+
+    def test_entropy_bounded(self):
+        df = _make_ohlcv_df(200)
+        result = add_entropy_cusum_features(df)
+        # Shannon entropy should be >= 0 (max = ln(n_bins) = ln(10) ≈ 2.3)
+        ent = result["ent_shannon_20"].dropna()
+        assert ent.min() >= 0
+        assert ent.max() <= 3.0  # ln(10) + margin
+
+    def test_cusum_since_non_negative(self):
+        df = _make_ohlcv_df(200)
+        result = add_entropy_cusum_features(df)
+        cusum = result["cusum_since_2s"].dropna()
+        assert cusum.min() >= 0
+
+    def test_cusum_break_binary(self):
+        df = _make_ohlcv_df(200)
+        result = add_entropy_cusum_features(df)
+        break_col = result["cusum_break_5"].dropna()
+        assert set(break_col.unique()).issubset({0.0, 1.0})
+
+    def test_volume_entropy_present(self):
+        df = _make_ohlcv_df(200)
+        result = add_entropy_cusum_features(df)
+        assert "ent_volume_20" in result.columns
+
+    def test_no_rows_lost(self):
+        df = _make_ohlcv_df(200)
+        result = add_entropy_cusum_features(df)
+        assert len(result) == 200
