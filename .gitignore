@@ -37,6 +37,7 @@ data/
 reports/
 models/
 analysis/
+catboost_info/
 
 # Notebook outputs and checkpoints
 notebooks/output/
