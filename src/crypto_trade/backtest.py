@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime
 import tracemalloc
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -215,7 +216,7 @@ def run_backtest(
 
         # (a) Check open order for this symbol
         if sym in open_orders:
-            result = _check_order(
+            result = check_order(
                 open_orders[sym],
                 ot,
                 float(open_arr[i]),
@@ -291,10 +292,10 @@ def run_backtest(
             if sym not in open_orders and ot >= cooldown_until.get(sym, 0):
                 vt_scale = 1.0
                 if config.vol_targeting:
-                    vt_scale = _compute_vt_scale(
+                    vt_scale = compute_vt_scale(
                         vt_per_sym_daily, sym, ot, config
                     )
-                order = _create_order(
+                order = create_order(
                     sym,
                     signal,
                     float(close_arr[i]),
@@ -317,7 +318,7 @@ def run_backtest(
         idx = last_per_sym[sym]
         exit_price = float(close_arr[idx])
         exit_time = int(close_time_arr[idx])
-        result = _make_result(order, exit_price, exit_time, "end_of_data", config.fee_pct)
+        result = make_result(order, exit_price, exit_time, "end_of_data", config.fee_pct)
         results.append(result)
         if verbose > 0:
             month_label = _month_of(result.close_time)
@@ -349,19 +350,29 @@ def run_backtest(
     return BacktestResult(results, total_signals)
 
 
-def _build_master(config: BacktestConfig) -> pd.DataFrame:
-    """Build a single master DataFrame from all symbols, sorted by (open_time, symbol)."""
+def build_master(
+    symbols: tuple[str, ...] | list[str],
+    interval: str,
+    data_dir: Path,
+    start_time: int | None = None,
+    end_time: int | None = None,
+) -> pd.DataFrame:
+    """Build a single master DataFrame from kline CSVs, sorted by (open_time, symbol).
+
+    Shared by backtest and live modules.
+    """
     frames: list[pd.DataFrame] = []
     lengths: list[int] = []
     syms: list[str] = []
-    for symbol in config.symbols:
-        path = csv_path(config.data_dir, symbol, config.interval)
+    for symbol in symbols:
+        path = csv_path(data_dir, symbol, interval)
         ka = load_kline_array(path)
         if len(ka) == 0:
             continue
-        ka = ka.time_slice(config.start_time, config.end_time)
-        if len(ka) == 0:
-            continue
+        if start_time is not None or end_time is not None:
+            ka = ka.time_slice(start_time, end_time)
+            if len(ka) == 0:
+                continue
         frames.append(ka.df.reset_index(drop=True))
         lengths.append(len(ka))
         syms.append(symbol)
@@ -373,7 +384,14 @@ def _build_master(config: BacktestConfig) -> pd.DataFrame:
     return master
 
 
-def _check_order(
+def _build_master(config: BacktestConfig) -> pd.DataFrame:
+    return build_master(
+        config.symbols, config.interval, config.data_dir,
+        config.start_time, config.end_time,
+    )
+
+
+def check_order(
     order: Order,
     open_time: int,
     open_price: float,
@@ -385,7 +403,7 @@ def _check_order(
     """Check if an order should be closed on this kline."""
     # 1. Timeout check
     if open_time >= order.timeout_time:
-        return _make_result(order, open_price, open_time, "timeout", fee_pct)
+        return make_result(order, open_price, open_time, "timeout", fee_pct)
 
     # 2. SL/TP check
     if order.direction == 1:  # Long
@@ -412,15 +430,15 @@ def _check_order(
                 tp_hit = False  # SL wins (includes ambiguous case)
 
     if sl_hit:
-        return _make_result(order, order.stop_loss_price, close_time, "stop_loss", fee_pct)
-    return _make_result(order, order.take_profit_price, close_time, "take_profit", fee_pct)
+        return make_result(order, order.stop_loss_price, close_time, "stop_loss", fee_pct)
+    return make_result(order, order.take_profit_price, close_time, "take_profit", fee_pct)
 
 
-def _compute_vt_scale(
+def compute_vt_scale(
     per_sym_daily_pnl: dict[str, dict[str, float]],
     symbol: str,
     trade_open_ms: int,
-    config: BacktestConfig,
+    config: BacktestConfig | object,
 ) -> float:
     """Compute per-symbol vol-targeting scale for a trade opening at trade_open_ms.
 
@@ -430,6 +448,7 @@ def _compute_vt_scale(
     or realized vol is zero.
 
     Uses ONLY past data (days_before >= 1) to remain walk-forward valid.
+    Accepts any config with vt_* attributes (BacktestConfig or LiveConfig).
     """
     sym_daily = per_sym_daily_pnl.get(symbol, {})
     if not sym_daily:
@@ -460,7 +479,7 @@ def _compute_vt_scale(
     return max(config.vt_min_scale, min(config.vt_max_scale, scale))
 
 
-def _create_order(
+def create_order(
     symbol: str,
     signal: Signal,
     close_price: float,
@@ -506,7 +525,7 @@ def _create_order(
     )
 
 
-def _make_result(
+def make_result(
     order: Order,
     exit_price: float,
     close_time: int,

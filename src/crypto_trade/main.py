@@ -220,6 +220,29 @@ def main() -> None:
         help="Generate quantstats HTML tearsheet (optional: output path)",
     )
 
+    # -- live subcommand --
+    live_parser = subparsers.add_parser(
+        "live", help="Run live trading (baseline v152 — 3-model portfolio)"
+    )
+    live_parser.add_argument(
+        "--amount", type=float, default=1000.0, help="Max trade amount USD (default: 1000)"
+    )
+    live_parser.add_argument(
+        "--leverage", type=int, default=1, help="Futures leverage (default: 1)"
+    )
+    live_parser.add_argument(
+        "--poll-interval", type=float, default=30.0,
+        help="Seconds between polls (default: 30)",
+    )
+    live_parser.add_argument(
+        "--feature-groups", type=str, default="all",
+        help="Feature groups to generate (default: all)",
+    )
+    live_parser.add_argument(
+        "--live", action="store_true", dest="live_mode",
+        help="Enable real trading (default: dry-run)",
+    )
+
     args = parser.parse_args()
 
     if args.command is None:
@@ -239,6 +262,8 @@ def main() -> None:
         _cmd_features(args, settings)
     elif args.command == "convert-features":
         _cmd_convert_features(args, settings)
+    elif args.command == "live":
+        _cmd_live(args, settings)
 
 
 def _cmd_fetch(args, settings) -> None:
@@ -609,6 +634,36 @@ def _cmd_convert_features(args, settings) -> None:
         total_rows += n_rows
 
     print(f"Done — {len(results)} files converted, {total_rows:,} total rows.")
+
+
+def _cmd_live(args, settings) -> None:
+    from pathlib import Path
+
+    from crypto_trade.live.engine import LiveEngine
+    from crypto_trade.live.models import BASELINE_MODELS, LiveConfig
+
+    groups = tuple(g.strip() for g in args.feature_groups.split(","))
+
+    config = LiveConfig(
+        models=BASELINE_MODELS,
+        interval="8h",
+        max_amount_usd=float(args.amount),
+        leverage=args.leverage,
+        data_dir=Path(settings.data_dir),
+        features_dir=Path(settings.data_dir) / "features",
+        feature_groups=groups,
+        db_path=Path(settings.data_dir) / ("dry_run.db" if not args.live_mode else "live.db"),
+        poll_interval_seconds=args.poll_interval,
+        dry_run=not args.live_mode,
+    )
+
+    engine = LiveEngine(
+        config=config,
+        api_key=settings.binance_api_key,
+        api_secret=settings.binance_api_secret,
+        base_url=settings.base_url,
+    )
+    engine.run()
 
 
 if __name__ == "__main__":

@@ -1,3 +1,4 @@
+import time
 from pathlib import Path
 
 from crypto_trade.client import BinanceClient
@@ -14,7 +15,11 @@ def fetch_symbol_interval(
     """Fetch klines for one symbol/interval pair and append to CSV.
 
     Reads the last open_time from the existing CSV to resume
-    incrementally. Returns the number of new klines written.
+    incrementally. Only CLOSED klines are written — the currently
+    forming candle (close_time > now) is dropped so it never
+    contaminates the CSV with stale mid-candle values.
+
+    Returns the number of new klines written.
     """
     path = csv_path(data_dir, symbol, interval)
     last_time = read_last_open_time(path)
@@ -22,7 +27,6 @@ def fetch_symbol_interval(
     effective_start = start_time
     append = False
     if last_time is not None:
-        # Resume from after the last known kline
         effective_start = last_time + 1
         append = True
 
@@ -30,7 +34,12 @@ def fetch_symbol_interval(
     if not klines:
         return 0
 
-    return write_klines(path, klines, append=append)
+    now_ms = int(time.time() * 1000)
+    closed = [k for k in klines if k.close_time < now_ms]
+    if not closed:
+        return 0
+
+    return write_klines(path, closed, append=append)
 
 
 def fetch_all(

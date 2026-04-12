@@ -33,6 +33,12 @@ htmlcov/
 # Data
 data/
 
+# Worktrees
+.worktrees/
+
+# Live trading logs
+logs/
+
 # Iteration artifacts — regenerable, large, binary
 reports/
 models/
