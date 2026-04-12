@@ -231,9 +231,9 @@ class TestFindBestThreshold:
 class TestAdaptiveBasic:
     def test_default_params(self) -> None:
         f = AdaptiveRangeSpikeFilter()
-        assert f.window == 16
+        assert f.window == 32
         assert f.threshold == 5.85
-        assert f.target_signals_month == 400
+        assert f.target_signals_month == 100
         assert f.recalibrate_days == 30
         assert f.min_history_days == 30
 

@@ -57,13 +57,23 @@ def _make_ohlcv_df(n: int = 500) -> pd.DataFrame:
 
 def test_list_groups():
     groups = list_groups()
-    assert len(groups) == 6
-    expected = {"momentum", "volatility", "trend", "volume", "mean_reversion", "statistical"}
+    assert len(groups) == 9
+    expected = {
+        "momentum",
+        "volatility",
+        "trend",
+        "volume",
+        "mean_reversion",
+        "statistical",
+        "interaction",
+        "calendar",
+        "entropy_cusum",
+    }
     assert set(groups) == expected
 
 
 def test_registry_has_all_groups():
-    assert len(GROUP_REGISTRY) == 6
+    assert len(GROUP_REGISTRY) == 9
 
 
 # ---------------------------------------------------------------------------
