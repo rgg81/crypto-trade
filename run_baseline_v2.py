@@ -23,20 +23,24 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import json
 import subprocess
 import sys
 import time
 from pathlib import Path
 
+import numpy as np
+
 from crypto_trade.backtest import run_backtest
 from crypto_trade.backtest_models import BacktestConfig
+from crypto_trade.config import OOS_CUTOFF_MS
 from crypto_trade.features_v2 import V2_FEATURE_COLUMNS
 from crypto_trade.iteration_report import generate_iteration_reports
 from crypto_trade.strategies.ml.lgbm import LightGbmStrategy
 from crypto_trade.strategies.ml.risk_v2 import RiskV2Config, RiskV2Wrapper
 
 ITERATION = 1
-ITERATION_LABEL = "v2-001"
+ITERATION_LABEL = "v2-002"
 
 V2_EXCLUDED_SYMBOLS: tuple[str, ...] = ("BTCUSDT", "ETHUSDT", "LINKUSDT", "BNBUSDT")
 """Symbols belonging to v1's baseline. v2 runners MUST exclude these."""
@@ -162,13 +166,58 @@ def main() -> None:
     print()
 
     seeds = list(FULL_SEEDS[: args.seeds]) if args.seeds > 1 else list(DEFAULT_SEEDS)
-    all_trades = _run_single_seed(seeds[0], args.n_trials)
 
-    if not all_trades:
-        print("No trades produced.")
+    # Per-seed results for robustness validation
+    per_seed_summary: list[dict] = []
+    primary_trades: list | None = None
+
+    for i, seed in enumerate(seeds):
+        print(f"\n{'#' * 60}\n# SEED {seed} ({i + 1}/{len(seeds)})\n{'#' * 60}")
+        trades = _run_single_seed(seed, args.n_trials)
+        if not trades:
+            per_seed_summary.append({"seed": seed, "trades": 0, "oos_trades": 0, "oos_sharpe": 0.0})
+            continue
+
+        oos = [t for t in trades if t.open_time >= OOS_CUTOFF_MS]
+        oos_wp = np.array([t.weighted_pnl for t in oos], dtype=float)
+        if len(oos_wp) > 1 and oos_wp.std() > 0:
+            oos_sr = float(oos_wp.mean() / oos_wp.std() * np.sqrt(len(oos_wp)))
+        else:
+            oos_sr = 0.0
+        per_seed_summary.append(
+            {
+                "seed": seed,
+                "trades": len(trades),
+                "oos_trades": len(oos),
+                "oos_sharpe": round(oos_sr, 4),
+            }
+        )
+        print(
+            f"[seed {seed}] {len(trades)} trades, OOS {len(oos)} trades, "
+            f"OOS Sharpe={oos_sr:+.4f}"
+        )
+
+        if i == 0:
+            primary_trades = trades
+
+    if not primary_trades:
+        print("No trades produced for primary seed.")
         sys.exit(1)
 
-    print(f"\nCombined (seed {seeds[0]}): {len(all_trades)} trades")
+    print("\n" + "=" * 60)
+    print("SEED ROBUSTNESS SUMMARY")
+    print("=" * 60)
+    print(f"{'seed':>6}  {'trades':>6}  {'oos_trades':>10}  {'oos_sharpe':>10}")
+    for r in per_seed_summary:
+        print(f"{r['seed']:>6}  {r['trades']:>6}  {r['oos_trades']:>10}  {r['oos_sharpe']:>10}")
+    oos_sharpes = np.array([r["oos_sharpe"] for r in per_seed_summary])
+    profitable = int((oos_sharpes > 0).sum())
+    print(f"\nMean OOS Sharpe: {oos_sharpes.mean():+.4f}")
+    print(f"Profitable seeds: {profitable}/{len(seeds)}")
+    print(
+        f"Pass (mean>0 AND ≥7/10 profitable): "
+        f"{oos_sharpes.mean() > 0 and profitable >= max(1, int(0.7 * len(seeds)))}"
+    )
 
     # generate_iteration_reports reads BTCUSDT's v1 features (vol_natr_14,
     # trend_adx_14) purely for the per_regime.csv annotation. BTC is not in
@@ -176,13 +225,15 @@ def main() -> None:
     # at v1's feature dir — it annotates the reports, it does not feed v2's
     # model, so it does not violate the no-v1-features rule.
     report_dir = generate_iteration_reports(
-        trades=all_trades,
+        trades=primary_trades,
         iteration=ITERATION_LABEL,
         features_dir="data/features",
         reports_dir="reports-v2",
         interval="8h",
         n_trials=1,  # v2 iteration count
     )
+    # Persist per-seed summary next to the comparison.csv
+    (Path(report_dir) / "seed_summary.json").write_text(json.dumps(per_seed_summary, indent=2))
     print(f"Reports: {report_dir}")
 
 

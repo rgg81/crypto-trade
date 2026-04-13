@@ -294,8 +294,14 @@ class RiskV2Wrapper:
         atr_pct = row["atr_pct_rank_200"]
         if not np.isfinite(atr_pct):
             return 1.0
-        # Inverse-linear sizing: high vol percentile → smaller scale
-        raw = 1.0 - atr_pct
+        # iter-v2/002: sign INVERTED from iter-v2/001. This strategy's OOS edge
+        # is concentrated in high-ATR-percentile buckets (Sharpe +1.45 in the
+        # 0.66-1.01 bucket vs -1.85 in the 0-0.33 bucket per iter-v2/001 diary).
+        # Scale position size UP when vol is high and DOWN when vol is low, so
+        # profitable high-vol trades run at full size and unprofitable low-vol
+        # trades run smaller. Direct linear mapping of atr_pct_rank_200 to the
+        # [floor, ceiling] band.
+        raw = float(atr_pct)
         return float(
             np.clip(raw, self.config.vol_scale_floor, self.config.vol_scale_ceiling)
         )
