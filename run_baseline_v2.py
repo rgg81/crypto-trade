@@ -40,15 +40,20 @@ from crypto_trade.strategies.ml.lgbm import LightGbmStrategy
 from crypto_trade.strategies.ml.risk_v2 import RiskV2Config, RiskV2Wrapper
 
 ITERATION = 1
-ITERATION_LABEL = "v2-004"
+ITERATION_LABEL = "v2-005"
 
 V2_EXCLUDED_SYMBOLS: tuple[str, ...] = ("BTCUSDT", "ETHUSDT", "LINKUSDT", "BNBUSDT")
 """Symbols belonging to v1's baseline. v2 runners MUST exclude these."""
 
+# iter-v2/005: added Model H (NEARUSDT) as the 4th v2 symbol to dilute XRP's
+# concentration (52.6% in iter-v2/004, 2.6pp over the 50% limit). NEAR passed
+# the 6-gate screening in iter-v2/001: v1 corr 0.665, $240M daily volume,
+# 4,847 IS candles.
 V2_MODELS: tuple[tuple[str, str], ...] = (
     ("E (DOGEUSDT)", "DOGEUSDT"),
     ("F (SOLUSDT)", "SOLUSDT"),
     ("G (XRPUSDT)", "XRPUSDT"),
+    ("H (NEARUSDT)", "NEARUSDT"),
 )
 
 DEFAULT_SEEDS = (42,)  # iter-v2/001 first-pass uses a single seed
