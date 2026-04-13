@@ -170,10 +170,15 @@ def main() -> None:
 
     print(f"\nCombined (seed {seeds[0]}): {len(all_trades)} trades")
 
+    # generate_iteration_reports reads BTCUSDT's v1 features (vol_natr_14,
+    # trend_adx_14) purely for the per_regime.csv annotation. BTC is not in
+    # v2's feature_v2 parquets (excluded by design). Point the regime lookup
+    # at v1's feature dir — it annotates the reports, it does not feed v2's
+    # model, so it does not violate the no-v1-features rule.
     report_dir = generate_iteration_reports(
         trades=all_trades,
         iteration=ITERATION_LABEL,
-        features_dir="data/features_v2",
+        features_dir="data/features",
         reports_dir="reports-v2",
         interval="8h",
         n_trials=1,  # v2 iteration count
