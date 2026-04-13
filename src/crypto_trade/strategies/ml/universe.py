@@ -14,6 +14,7 @@ def select_symbols(
     interval: str = "8h",
     min_is_candles: int = 1095,
     max_start_date: str = "2023-07-01",
+    exclude: tuple[str, ...] = (),
 ) -> list[str]:
     """Return symbols eligible for walk-forward training.
 
@@ -22,9 +23,11 @@ def select_symbols(
     2. Does not contain "SETTLED" (contract rollovers)
     3. At least *min_is_candles* candles before OOS_CUTOFF_DATE
     4. First candle before *max_start_date*
+    5. Symbol is not in *exclude* (v2 track uses this to forbid v1 baseline symbols)
     """
     import pyarrow.parquet as pq
 
+    exclude_set = frozenset(exclude)
     features_path = Path(features_dir)
     max_start_ms = int(
         datetime.strptime(max_start_date, "%Y-%m-%d").replace(tzinfo=UTC).timestamp() * 1000
@@ -39,6 +42,9 @@ def select_symbols(
             continue
         # 2. No SETTLED
         if "SETTLED" in symbol:
+            continue
+        # 5. Exclusion list
+        if symbol in exclude_set:
             continue
 
         # Read only open_time column for speed
