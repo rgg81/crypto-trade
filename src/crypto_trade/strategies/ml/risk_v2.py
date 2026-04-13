@@ -67,11 +67,19 @@ class RiskV2Config:
     # Feature z-score OOD alert — kill if any feature |z| exceeds threshold
     zscore_threshold: float = 3.0
 
+    # iter-v2/004: Low-vol filter — kill signals when atr_pct_rank_200 is below
+    # this threshold. iter-v2/002's per-regime breakdown showed the low-ATR
+    # trending bucket had weighted Sharpe -1.86 (54 of 139 OOS trades), while
+    # the mid and high buckets both had positive weighted Sharpe. Skipping
+    # the low-vol bucket mechanically removes the single largest OOS drag.
+    low_vol_filter_threshold: float = 0.33
+
     # Gate enables (iter-v2/002+ will toggle deferred primitives on)
     enable_vol_scaling: bool = True
     enable_adx_gate: bool = True
     enable_hurst_check: bool = True
     enable_zscore_ood: bool = True
+    enable_low_vol_filter: bool = True  # NEW in iter-v2/004
 
     # Deferred primitives — defaults to off, iter-v2/002+
     enable_drawdown_brake: bool = False
@@ -88,6 +96,7 @@ class GateStats:
     killed_by_zscore: int = 0
     killed_by_hurst: int = 0
     killed_by_adx: int = 0
+    killed_by_low_vol: int = 0  # iter-v2/004
     vol_scaled_signals: int = 0
     vol_scale_sum: float = 0.0
 
@@ -159,7 +168,13 @@ class RiskV2Wrapper:
             stats.killed_by_adx += 1
             return NO_SIGNAL
 
-        # 4. Vol-adjusted sizing
+        # 4. Low-vol filter (iter-v2/004) — skip signals in the bottom-third
+        # ATR percentile bucket where iter-v2/002 per-regime Sharpe was -1.86.
+        if self.config.enable_low_vol_filter and self._low_vol_filter_fails(row):
+            stats.killed_by_low_vol += 1
+            return NO_SIGNAL
+
+        # 5. Vol-adjusted sizing
         scale = 1.0
         if self.config.enable_vol_scaling:
             scale = self._vol_scale(symbol, row)
@@ -290,6 +305,13 @@ class RiskV2Wrapper:
             return False
         return adx < self.config.adx_threshold
 
+    def _low_vol_filter_fails(self, row: dict) -> bool:
+        """iter-v2/004: return True when atr_pct_rank_200 is below the filter threshold."""
+        atr_pct = row["atr_pct_rank_200"]
+        if not np.isfinite(atr_pct):
+            return False
+        return bool(atr_pct < self.config.low_vol_filter_threshold)
+
     def _vol_scale(self, symbol: str, row: dict) -> float:
         atr_pct = row["atr_pct_rank_200"]
         if not np.isfinite(atr_pct):
@@ -313,17 +335,16 @@ class RiskV2Wrapper:
         """Return per-symbol gate efficacy counters for the engineering report."""
         out: dict[str, dict[str, float]] = {}
         for sym, s in self._gate_stats.items():
+            total_kills = (
+                s.killed_by_zscore + s.killed_by_hurst + s.killed_by_adx + s.killed_by_low_vol
+            )
             out[sym] = {
                 "signals_seen": s.signals_seen,
                 "killed_by_zscore": s.killed_by_zscore,
                 "killed_by_hurst": s.killed_by_hurst,
                 "killed_by_adx": s.killed_by_adx,
-                "kill_rate": (
-                    (s.killed_by_zscore + s.killed_by_hurst + s.killed_by_adx)
-                    / s.signals_seen
-                    if s.signals_seen
-                    else 0.0
-                ),
+                "killed_by_low_vol": s.killed_by_low_vol,
+                "kill_rate": total_kills / s.signals_seen if s.signals_seen else 0.0,
                 "vol_scaled_signals": s.vol_scaled_signals,
                 "mean_vol_scale": s.vol_scale_mean(),
             }

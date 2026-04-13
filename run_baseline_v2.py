@@ -40,7 +40,7 @@ from crypto_trade.strategies.ml.lgbm import LightGbmStrategy
 from crypto_trade.strategies.ml.risk_v2 import RiskV2Config, RiskV2Wrapper
 
 ITERATION = 1
-ITERATION_LABEL = "v2-002"
+ITERATION_LABEL = "v2-004"
 
 V2_EXCLUDED_SYMBOLS: tuple[str, ...] = ("BTCUSDT", "ETHUSDT", "LINKUSDT", "BNBUSDT")
 """Symbols belonging to v1's baseline. v2 runners MUST exclude these."""
