@@ -697,6 +697,150 @@ def apply_hit_rate_gate(
     return braked, stats
 
 
+# ---------------------------------------------------------------------------
+# iter-v2/019: BTC trend-alignment filter
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class BtcTrendFilterConfig:
+    """Config for the BTC trend-alignment filter.
+
+    At each trade's open_time, compute BTC's N-bar return. If the trade's
+    direction fights a BTC trend that exceeds ``threshold_pct`` in the
+    opposing direction, kill the trade.
+
+    iter-v2/019 winning config (Config E from feasibility study):
+        lookback_bars=42 (14 days of 8h bars), threshold_pct=20.0
+
+    Rationale: the 2024-11 post-election crypto rally sent BTC from
+    $67k to $99k (+48%) in the month. iter-v2/017's model went 100%
+    short that month and lost -73.66% weighted PnL. A filter at BTC
+    14d ±20% catches this regime-shift pattern before trades enter.
+
+    The filter is:
+    - Cross-asset: BTC as the signal for all v2 alts
+    - Symmetric: applies to both long and short directions
+    - Stateless: no rolling state, purely local per trade
+    - Rare: ±20% 14-day BTC moves happen 5-10 times per year
+    """
+
+    lookback_bars: int = 42
+    threshold_pct: float = 20.0
+    enabled: bool = True
+
+
+@dataclass
+class BtcTrendFilterStats:
+    """BTC trend filter firing diagnostics."""
+
+    n_total: int = 0
+    n_normal: int = 0
+    n_warmup: int = 0  # BTC history not long enough for lookback
+    n_killed: int = 0
+    first_fire_time: int | None = None
+    last_fire_time: int | None = None
+
+    def as_dict(self) -> dict[str, int | None | float]:
+        return {
+            "n_total": self.n_total,
+            "n_normal": self.n_normal,
+            "n_warmup": self.n_warmup,
+            "n_killed": self.n_killed,
+            "fire_rate": self.n_killed / self.n_total if self.n_total else 0.0,
+            "first_fire_time": self.first_fire_time,
+            "last_fire_time": self.last_fire_time,
+        }
+
+
+def apply_btc_trend_filter(
+    trades: list[TradeResult],
+    btc_open_times: np.ndarray,
+    btc_closes: np.ndarray,
+    config: BtcTrendFilterConfig,
+) -> tuple[list[TradeResult], BtcTrendFilterStats]:
+    """Apply the BTC trend-alignment filter to a trade stream.
+
+    For each trade, find the BTC bar active at the trade's open_time
+    (most recent BTC bar with ``open_time <= trade.open_time``). Compute
+    BTC's N-bar return. If the trade's direction fights a BTC trend
+    exceeding ``threshold_pct`` in the opposing direction, zero the
+    trade's weight.
+
+    Parameters
+    ----------
+    trades
+        Combined trade stream from all v2 models.
+    btc_open_times
+        numpy int64 array of BTC klines' open_time (sorted ascending).
+    btc_closes
+        numpy float64 array of BTC closes, aligned with ``btc_open_times``.
+    config
+        ``BtcTrendFilterConfig`` with lookback and threshold.
+
+    Returns
+    -------
+    filtered
+        New list of ``TradeResult`` with killed trades' weights zeroed.
+    stats
+        ``BtcTrendFilterStats`` counting normal/warmup/killed firings.
+    """
+    stats = BtcTrendFilterStats(n_total=len(trades))
+    if not trades or not config.enabled:
+        stats.n_normal = len(trades)
+        return list(trades), stats
+
+    filtered: list[TradeResult] = []
+    for trade in trades:
+        # Locate BTC bar active at trade's open_time (most recent ≤ open_time)
+        idx = int(np.searchsorted(btc_open_times, trade.open_time, side="right") - 1)
+        if idx < config.lookback_bars or idx >= len(btc_closes):
+            # Not enough BTC history for the lookback — pass through
+            filtered.append(replace(trade))
+            stats.n_warmup += 1
+            continue
+
+        # BTC N-bar return = (close_now / close_n_bars_ago - 1) * 100
+        btc_ret_pct = (btc_closes[idx] / btc_closes[idx - config.lookback_bars] - 1) * 100
+
+        should_kill = (trade.direction == -1 and btc_ret_pct > config.threshold_pct) or (
+            trade.direction == 1 and btc_ret_pct < -config.threshold_pct
+        )
+
+        if should_kill:
+            stats.n_killed += 1
+            if stats.first_fire_time is None:
+                stats.first_fire_time = int(trade.open_time)
+            stats.last_fire_time = int(trade.open_time)
+            filtered.append(
+                replace(
+                    trade,
+                    weight_factor=0.0,
+                    weighted_pnl=0.0,
+                )
+            )
+        else:
+            stats.n_normal += 1
+            filtered.append(replace(trade))
+
+    return filtered, stats
+
+
+def load_btc_klines_for_filter(
+    csv_path: str = "data/BTCUSDT/8h.csv",
+) -> tuple[np.ndarray, np.ndarray]:
+    """Load BTC 8h klines for the BTC trend filter.
+
+    Returns ``(open_times, closes)`` as sorted numpy arrays. The
+    ``apply_btc_trend_filter`` function takes these as inputs.
+    """
+    df = pd.read_csv(csv_path).sort_values("open_time").reset_index(drop=True)
+    return (
+        df["open_time"].to_numpy(dtype=np.int64),
+        df["close"].to_numpy(dtype=np.float64),
+    )
+
+
 __all__ = [
     "RiskV2Config",
     "RiskV2Wrapper",
@@ -707,4 +851,8 @@ __all__ = [
     "HitRateGateConfig",
     "HitRateFireStats",
     "apply_hit_rate_gate",
+    "BtcTrendFilterConfig",
+    "BtcTrendFilterStats",
+    "apply_btc_trend_filter",
+    "load_btc_klines_for_filter",
 ]

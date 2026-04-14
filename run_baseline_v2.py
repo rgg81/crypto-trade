@@ -38,14 +38,17 @@ from crypto_trade.features_v2 import V2_FEATURE_COLUMNS
 from crypto_trade.iteration_report import generate_iteration_reports
 from crypto_trade.strategies.ml.lgbm import LightGbmStrategy
 from crypto_trade.strategies.ml.risk_v2 import (
+    BtcTrendFilterConfig,
     HitRateGateConfig,
     RiskV2Config,
     RiskV2Wrapper,
+    apply_btc_trend_filter,
     apply_hit_rate_gate,
+    load_btc_klines_for_filter,
 )
 
 ITERATION = 1
-ITERATION_LABEL = "v2-017"
+ITERATION_LABEL = "v2-019"
 
 # iter-v2/017: Hit-rate feedback gate (Config D from iter-v2/016 feasibility).
 # For each new signal, look at the last 20 trades that closed before this
@@ -55,6 +58,17 @@ ITERATION_LABEL = "v2-017"
 HIT_RATE_CONFIG = HitRateGateConfig(
     window=20,
     sl_threshold=0.65,
+    enabled=True,
+)
+
+# iter-v2/019: BTC trend-alignment filter. Kill trades whose direction fights
+# a BTC 14-day trend exceeding 20% in the opposing direction. Addresses the
+# 2024-11 post-election rally disaster where the model went 100% short into
+# a BTC +48% month. Filter is full-period (no OOS scoping) so it catches IS
+# regime shifts like 2024-11 and 2022-05 (LUNA).
+BTC_TREND_CONFIG = BtcTrendFilterConfig(
+    lookback_bars=42,  # 14 days of 8h bars
+    threshold_pct=20.0,
     enabled=True,
 )
 
@@ -137,14 +151,18 @@ def _build_model(
     return cfg, strategy
 
 
-def _run_single_seed(seed: int, n_trials: int) -> tuple[list, list, dict]:
-    """Run all 4 models for a single seed.
+def _run_single_seed(
+    seed: int,
+    n_trials: int,
+    btc_times: np.ndarray,
+    btc_closes: np.ndarray,
+) -> tuple[list, list, dict, dict]:
+    """Run all 4 models for a single seed, then apply both risk filters.
 
-    Returns ``(unbraked_trades, braked_trades, gate_stats)`` — the unbraked
-    stream is the raw concatenation of 4 per-model backtests; the braked
-    stream has iter-v2/017's hit-rate feedback gate applied across the
-    whole OOS window. Reports and seed metrics downstream use the braked
-    stream.
+    Returns ``(unbraked_trades, braked_trades, btc_stats, hr_stats)``:
+    - unbraked: raw concatenation of 4 backtests
+    - braked: BTC trend filter + hit-rate gate applied in sequence
+    - btc_stats / hr_stats: per-gate firing counters
     """
     all_trades: list = []
     for name, symbol in V2_MODELS:
@@ -167,24 +185,41 @@ def _run_single_seed(seed: int, n_trials: int) -> tuple[list, list, dict]:
         all_trades.extend(results)
     all_trades.sort(key=lambda t: t.open_time)
 
-    # iter-v2/017: apply the hit-rate feedback gate across all 4 models.
-    # Gate is active from OOS_CUTOFF_MS onwards so pre-OOS training-period
-    # trades don't feed the lookback window.
-    braked, fire_stats = apply_hit_rate_gate(
+    # iter-v2/019: BTC trend filter runs FIRST, full-period (no activation
+    # scoping). Addresses IS regime shifts like 2024-11 post-election rally.
+    after_btc, btc_fire_stats = apply_btc_trend_filter(
         all_trades,
+        btc_times,
+        btc_closes,
+        BTC_TREND_CONFIG,
+    )
+    btc_stats_dict = btc_fire_stats.as_dict()
+    print(
+        f"[btc trend filter seed {seed}] "
+        f"normal={btc_stats_dict['n_normal']} "
+        f"warmup={btc_stats_dict['n_warmup']} "
+        f"killed={btc_stats_dict['n_killed']}/{btc_stats_dict['n_total']} "
+        f"fire_rate={btc_stats_dict['fire_rate']:.2%}"
+    )
+
+    # iter-v2/017: hit-rate feedback gate runs SECOND, OOS-scoped. Operates
+    # on the post-BTC-filter stream so it doesn't double-count killed
+    # trades in its lookback window.
+    braked, hr_fire_stats = apply_hit_rate_gate(
+        after_btc,
         HIT_RATE_CONFIG,
         activate_at_ms=OOS_CUTOFF_MS,
     )
     braked.sort(key=lambda t: t.close_time)
-    stats_dict = fire_stats.as_dict()
+    hr_stats_dict = hr_fire_stats.as_dict()
     print(
         f"[hit-rate gate seed {seed}] "
-        f"normal={stats_dict['n_normal']} "
-        f"warmup={stats_dict['n_warmup']} "
-        f"killed={stats_dict['n_killed']}/{stats_dict['n_total']} "
-        f"fire_rate={stats_dict['fire_rate']:.2%}"
+        f"normal={hr_stats_dict['n_normal']} "
+        f"warmup={hr_stats_dict['n_warmup']} "
+        f"killed={hr_stats_dict['n_killed']}/{hr_stats_dict['n_total']} "
+        f"fire_rate={hr_stats_dict['fire_rate']:.2%}"
     )
-    return all_trades, braked, stats_dict
+    return all_trades, braked, btc_stats_dict, hr_stats_dict
 
 
 def main() -> None:
@@ -208,6 +243,11 @@ def main() -> None:
     print(f"Seeds: {args.seeds}  Optuna trials/model: {args.n_trials}")
     print()
 
+    # iter-v2/019: load BTC klines once for the BTC trend filter
+    btc_times, btc_closes = load_btc_klines_for_filter()
+    print(f"Loaded {len(btc_times)} BTC 8h klines for trend filter")
+    print()
+
     seeds = list(FULL_SEEDS[: args.seeds]) if args.seeds > 1 else list(DEFAULT_SEEDS)
 
     # Per-seed results for robustness validation
@@ -216,7 +256,9 @@ def main() -> None:
 
     for i, seed in enumerate(seeds):
         print(f"\n{'#' * 60}\n# SEED {seed} ({i + 1}/{len(seeds)})\n{'#' * 60}")
-        unbraked, braked, gate_stats = _run_single_seed(seed, args.n_trials)
+        unbraked, braked, btc_stats, hr_stats = _run_single_seed(
+            seed, args.n_trials, btc_times, btc_closes
+        )
         if not braked:
             per_seed_summary.append(
                 {
@@ -245,6 +287,12 @@ def main() -> None:
         else:
             oos_sr_ub = 0.0
 
+        # Compute IS totals too — iter-v2/019 specifically targets IS improvement
+        is_tr = [t for t in braked if t.open_time < OOS_CUTOFF_MS]
+        is_wp = float(sum(t.weighted_pnl for t in is_tr))
+        is_tr_ub = [t for t in unbraked if t.open_time < OOS_CUTOFF_MS]
+        is_wp_ub = float(sum(t.weighted_pnl for t in is_tr_ub))
+
         per_seed_summary.append(
             {
                 "seed": seed,
@@ -252,8 +300,10 @@ def main() -> None:
                 "oos_trades": len(oos),
                 "oos_sharpe": round(oos_sr, 4),
                 "oos_sharpe_unbraked": round(oos_sr_ub, 4),
-                "gate_killed": gate_stats["n_killed"],
-                "gate_fire_rate": round(gate_stats["fire_rate"], 4),
+                "is_total_wpnl": round(is_wp, 2),
+                "is_total_wpnl_unbraked": round(is_wp_ub, 2),
+                "btc_killed": btc_stats["n_killed"],
+                "hr_killed": hr_stats["n_killed"],
             }
         )
         print(
