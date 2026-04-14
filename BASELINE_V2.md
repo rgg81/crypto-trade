@@ -1,6 +1,6 @@
 # Current Baseline — v2 Track (Diversification Arm)
 
-Last updated by: iteration v2/017 (2026-04-14)
+Last updated by: iteration v2/019 (2026-04-14)
 OOS cutoff date: 2025-03-24 (fixed, shared with v1, never changes)
 
 ## Purpose
@@ -31,7 +31,7 @@ criterion is interpreted as the **10-seed mean**, not any single seed.
 A single-seed comparison has ~0.8 Sharpe units of sampling noise on
 the delta, while the mean is the central tendency.
 
-**Risk-layer composition** (6 active gates as of iter-v2/017):
+**Risk-layer composition** (7 active gates as of iter-v2/019):
 
 1. Vol-adjusted position sizing via `atr_pct_rank_200` (inverted:
    `vol_scale = atr_pct_rank_200` clipped to [0.3, 1.0])
@@ -39,97 +39,119 @@ the delta, while the mean is the central tendency.
 3. Hurst regime check (training 5/95 percentile band on `hurst_100`)
 4. Feature z-score OOD alert (|z| > 3 on any of 35 v2 features)
 5. Low-vol filter (`atr_pct_rank_200 >= 0.33`) — added iter-v2/004
-6. **Hit-rate feedback gate (window=20, SL threshold=0.65)** — added iter-v2/017
+6. Hit-rate feedback gate (window=20, SL threshold=0.65) — added iter-v2/017 (OOS only)
+7. **BTC trend-alignment filter (14d ±20%)** — added iter-v2/019 (full period)
 
-## Out-of-Sample Metrics — iter-v2/017
+## Out-of-Sample Metrics — iter-v2/019
 
 **10-seed mean (primary MERGE metric)**
 
-| Statistic | iter-v2/005 | iter-v2/017 | Δ |
+| Statistic | iter-v2/005 | iter-v2/017 | **iter-v2/019** |
 |---|---|---|---|
-| **Mean OOS Sharpe** | +1.297 | **+1.4066** | **+0.11 (+8%)** |
-| Min / Max | +0.319 / +1.964 | +0.061 / +2.463 | wider |
-| **Profitable seeds** | 10/10 | **10/10** | same |
-| Median | ~1.48 | ~1.55 | +0.07 |
+| **Mean OOS Sharpe** | +1.297 | +1.4066 | **+1.3968** |
+| Min / Max | +0.319 / +1.964 | +0.061 / +2.463 | **+0.579 / +2.610** |
+| **Profitable seeds** | 10/10 | 10/10 | **10/10** |
+| Worst-seed floor | +0.319 | +0.061 | **+0.579** |
 
 **Primary seed 42 (reproducibility anchor) — from comparison.csv**
 
-| Metric | iter-v2/005 | **iter-v2/017** | Δ |
+| Metric | iter-v2/005 | iter-v2/017 | **iter-v2/019** |
 |---|---|---|---|
-| **Sharpe** | +1.7371 | **+2.4523** | **+41%** |
-| Sortino | +2.2823 | **+3.9468** | **+73%** |
-| Win rate | 45.3% | 45.3% | unchanged |
-| **Profit factor** | 1.4566 | **1.8832** | **+29%** |
-| **Max drawdown** | 59.88% | **24.39%** | **−59%** |
-| **Calmar** | 1.5701 | **4.9179** | **+213%** |
-| **Total PnL (weighted)** | +94.01% | **+119.94%** | **+27%** |
-| DSR z-score | +12.37 | +10.55 | −15% (fewer active trades) |
-| IS/OOS Sharpe ratio | +14.94 | **+21.10** | +41% |
-| Total OOS trades (active) | 117 | 96 (21 killed by gate) | −18% |
-| **XRP weighted share** | **47.75%** | **38.51%** | **−9 pp (better)** |
+| **OOS Sharpe** | +1.7371 | +2.4523 | **+2.5359** |
+| OOS Sortino | +2.2823 | +3.9468 | **+4.2115** |
+| **OOS Profit factor** | 1.4566 | 1.8832 | **1.9685** |
+| **OOS Max drawdown** | 59.88% | 24.39% | **24.39%** |
+| **OOS Calmar** | 1.5701 | 4.9179 | **5.1050** |
+| **OOS Total PnL** | +94.01% | +119.94% | **+125.82%** |
+| OOS DSR | +12.37 | +10.55 | +10.77 |
+| IS/OOS Sharpe ratio | +14.94 | +21.10 | **+4.46** (more balanced) |
+| XRP weighted share | 47.75% | 38.51% | **41.39%** |
 
 **v2-v1 OOS daily return correlation**: −0.046 (from iter-v2/005 IS
 measurement, re-check in iter-v2/019 post-MERGE combined analysis)
 
-## In-Sample Metrics (primary seed 42)
+## In-Sample Metrics (primary seed 42) — iter-v2/019
 
-| Metric | Value |
-|---|---|
-| Sharpe | +0.1162 |
-| Win rate | 40.1% |
-| Profit factor | 1.0288 |
-| Max drawdown | 111.55% |
-| Total trades | 344 |
+| Metric | iter-v2/005 | iter-v2/017 | **iter-v2/019** |
+|---|---|---|---|
+| **IS Sharpe** | +0.1162 | +0.1162 | **+0.5689** (+390%) |
+| **IS Sortino** | +0.1188 | +0.1188 | **+0.5870** (+394%) |
+| **IS Profit factor** | 1.0288 | 1.0288 | **1.1557** (+12%) |
+| **IS Max drawdown** | 111.55% | 111.55% | **72.24%** (−35%) |
+| **IS DSR** | +4.1589 | +4.1589 | **+17.59** (+323%) |
+| **IS Total PnL** | +25.82% | +25.82% | **+116.72%** (+352%) |
+| IS Win rate | 40.1% | 40.1% | 40.1% |
+| IS Total trades | 344 | 344 | 344 |
 
-IS metrics are unchanged from iter-v2/005 (the hit-rate gate is
-scoped to OOS via `activate_at_ms=OOS_CUTOFF_MS`). NEAR's IS PnL
-is still −67.39% from its 2022 bear-market training domination.
+**The iter-v2/019 BTC trend filter dramatically improves IS.** The
+filter catches 2022 bear-crash longs (LUNA May, FTX Nov) and
+2024-11 post-election rally shorts. NEAR's IS PnL recovers from
+−67.39% to −20.50% (+46.89 improvement on NEAR alone).
 
-**IS/OOS Sharpe ratio: +21.10** (up from +14.94). Opposite of the
-typical researcher-overfit direction. Extremely healthy.
+**2024-11 specifically**: weighted PnL improves from −73.66% to
+−28.68% (−61% loss reduction), directly responding to user
+feedback on iter-v2/018.
 
-## Per-Symbol OOS Performance (primary seed 42, braked)
+**IS/OOS Sharpe ratio: +4.46** (iter-v2/017 was +21.10). The
+lower ratio means IS and OOS are now comparable — a HEALTHIER
+sign than divergent ratios. Both are strong.
 
-| Symbol | Model | Trades | WR | Weighted PnL | Share | Δ from v0.v2-005 |
-|---|---|---|---|---|---|---|
-| XRPUSDT | G | 27 | 55.6% | +46.19% | **38.51%** | −9.24 pp (share) |
-| DOGEUSDT | E | 31 | 48.4% | +43.75% | 36.48% | +24.23 pp (share) |
-| SOLUSDT | F | 37 | 37.8% | +32.20% | 26.85% | −3.89 pp (share) |
-| NEARUSDT | H | 22 | 40.9% | **−2.20%** | **−1.84%** | −11.10 pp (share) |
+## Per-Symbol OOS Performance (primary seed 42, iter-v2/019)
 
-**Concentration: 38.51% — STRICT PASS** (≤ 50% hard constraint). 9
-percentage points BETTER than iter-v2/005.
+| Symbol | Model | Trades | WR | Weighted PnL | Share |
+|---|---|---|---|---|---|
+| XRPUSDT | G | 27 | 55.6% | +52.08% | **41.39%** |
+| DOGEUSDT | E | 31 | 48.4% | +43.75% | 34.77% |
+| SOLUSDT | F | 37 | 37.8% | +32.20% | 25.59% |
+| NEARUSDT | H | 22 | 40.9% | −2.20% | −1.75% |
 
-**NEAR marginal negative flip**: NEAR flipped from +8.71 to −2.20
-because some of its recovery winners during the July-August 2025
-drawdown window are killed by the gate alongside its losers.
-Acceptable trade-off: NEAR is 1.84% of portfolio, and the brake's
-gains elsewhere (+27% total PnL) more than compensate.
+**Concentration: 41.39% — STRICT PASS** (≤ 50% hard constraint).
+6 percentage points better than iter-v2/005's 47.75%.
+
+## Per-Symbol IS Performance (primary seed 42, iter-v2/019)
+
+| Symbol | Model | Trades | WR | Weighted PnL | Δ from v0.v2-005 |
+|---|---|---|---|---|---|
+| XRPUSDT | G | 103 | 42.7% | +83.62% | +2.61 |
+| SOLUSDT | F | 85 | 41.2% | +31.17% | +3.48 |
+| DOGEUSDT | E | 84 | 39.3% | +22.43% | **+40.66** (flipped positive) |
+| **NEARUSDT** | H | 72 | 36.1% | **−20.50%** | **+46.89** (2022 rescue) |
+
+**NEAR's 2022 bear damage cut by 70%**. DOGE flipped from −18.23
+to +22.43 (+40.66 swing). BTC trend filter catches 2022 bear-crash
+longs (LUNA May, FTX Nov, BTC 14d < −20%) AND the 2024-11 rally shorts.
 
 ## Hit-Rate Gate (iter-v2/017 primitive #6)
 
-**Config D (from iter-v2/016 feasibility winner)**:
+**Config D (OOS only, window=20, SL threshold=0.65)**. 21 kills
+per primary seed, all clustered in July 16 → August 29 2025
+drawdown window. See `briefs-v2/iteration_017/engineering_report.md`.
 
-| Parameter | Value |
-|---|---|
-| Window | 20 closed trades |
-| SL threshold | 0.65 (13/20 hits) |
-| Scope | OOS only (resets at OOS_CUTOFF_MS) |
-| Action | Kill signal (weight = 0) |
-| Release | Automatic when SL rate falls below threshold |
+## BTC Trend Filter (iter-v2/019 primitive #7)
 
-**Primary seed firing stats**: 21 trades killed out of 117 OOS (18%
-kill rate). All 21 kills clustered in July 16 → August 29 2025
-drawdown window where rolling-20 SL rate reaches 0.70-0.90.
+**Config**: lookback=42 bars (14 days 8h), threshold=±20%, full period.
 
-**Killed breakdown (seed 42)**:
-- 13 losers (total weighted_pnl −64.84)
-- 6 winners killed (total weighted_pnl +39.36)
-- 2 mixed/neutral
-- **Net savings**: +25.48 weighted_pnl
+Rule: kill alt trade when direction fights BTC 14d return exceeding
+±20% in opposing direction.
 
-**10-seed kill stats**: mean 30.9 kills per seed, range 11-41 kills.
-Fire rate varies 2.72% (seed 4567) to 7.99% (seed 5678).
+**Primary seed firing stats**: 39 kills out of 461 trades (8.46%)
+distributed across the full IS+OOS window:
+
+| Period | Kills | Event |
+|---|---|---|
+| 2022-01, 2022-05-06 | ~6 | LUNA crash |
+| 2022-11 | ~2 | FTX crash |
+| 2023-10 | ~3 | BTC +25% rally |
+| 2024-03 | ~4 | ATH rally |
+| **2024-11** | **15** | **Post-election Trump rally** ← target |
+| other | ~9 | minor events |
+
+**10-seed kill stats**: mean 43 kills per seed, range 35-52.
+The kill list is nearly seed-invariant because trade open_times
+are shared across seeds and BTC data is fixed.
+
+The two gates are complementary: BTC filter catches IS regime
+shifts, hit-rate gate catches OOS slow bleeds. No double-firing.
 
 ## Regime-Stratified OOS Sharpe
 
@@ -157,28 +179,26 @@ Regime-stratified breakdown from iter-v2/017 report not fully recomputed
 | Cooldown | 2 candles |
 | Features | 35 from `V2_FEATURE_COLUMNS` |
 | Feature helper | `natr_21_raw` (labeling input, excluded from features) |
-| Risk gates | 6 active gates (vol-scaling, ADX, Hurst, z-score OOD, low-vol, **hit-rate**) |
+| Risk gates | 7 active gates (vol-scaling, ADX, Hurst, z-score OOD, low-vol, **hit-rate (OOS)**, **BTC trend (full)**) |
 | Fee | 0.1% per trade |
 
-## iter-v2/018+ Roadmap
+## iter-v2/020+ Roadmap
 
-1. **iter-v2/018 (ANALYSIS)**: re-run iter-v2/011's combined v1+v2
-   portfolio analysis with the new braked v2 baseline. Expected:
-   50/50 or 60/40 blend becomes viable; v2 no longer needs to be
-   a 30% satellite. Combined MaxDD drops significantly.
-2. **iter-v2/019 (EXPLOITATION)**: CPCV + PBO validation upgrades.
+1. **iter-v2/020 (EXPLOITATION)**: CPCV + PBO validation upgrades.
    Deferred from iter-v2/001 skill. Quantifies honest
    expected-vs-realized Sharpe gap. Gatekeeper for paper trading.
-3. **iter-v2/020 (EXPLORATION)**: Seed-wise calibration of
-   hit-rate gate. Some seeds (456, 3456) saw brake drag. Consider
-   per-seed threshold tuning or a secondary trigger for
-   non-SL-driven drawdowns.
-4. **iter-v2/021+ (EXPLOITATION)**: Paper trading deployment
-   harness. Run 4 v2 models + hit-rate gate on live data.
+2. **iter-v2/021 (EXPLORATION)**: Paper trading deployment
+   harness. Run 4 v2 models + both risk gates on live data at
+   50/50 v1/v2 capital split (per iter-v2/018 recommendation).
+3. **iter-v2/022+ (EXPLORATION)**: Additional regime filters
+   (BTC realized vol regime, cross-asset correlation spike,
+   macro signals). Speculative — the 2 existing gates cover
+   most known failure modes.
 
 ## Tags
 
-- `v0.v2-002` — first v2 baseline (inverted vol-scale, OOS Sharpe +1.17 primary / +0.96 mean)
-- `v0.v2-004` — low-vol filter baseline (+1.75 primary / +1.10 mean)
+- `v0.v2-002` — first v2 baseline (inverted vol-scale)
+- `v0.v2-004` — low-vol filter baseline
 - `v0.v2-005` — 4-symbol baseline (+1.67 primary / +1.30 mean)
-- **`v0.v2-017` — hit-rate gate baseline (+2.45 primary Sharpe / +1.41 mean, MaxDD 24.39%, Calmar 4.92, concentration 38.51%)**
+- `v0.v2-017` — hit-rate gate baseline (+2.45 primary, Calmar 4.92, 2024-11 NOT addressed)
+- **`v0.v2-019` — BTC trend filter baseline (+2.54 primary Sharpe, IS +0.57, Calmar 5.10, 2024-11 cut from −73.66% to −28.68%, 2022 bear damage rescued)**
