@@ -37,10 +37,26 @@ from crypto_trade.config import OOS_CUTOFF_MS
 from crypto_trade.features_v2 import V2_FEATURE_COLUMNS
 from crypto_trade.iteration_report import generate_iteration_reports
 from crypto_trade.strategies.ml.lgbm import LightGbmStrategy
-from crypto_trade.strategies.ml.risk_v2 import RiskV2Config, RiskV2Wrapper
+from crypto_trade.strategies.ml.risk_v2 import (
+    HitRateGateConfig,
+    RiskV2Config,
+    RiskV2Wrapper,
+    apply_hit_rate_gate,
+)
 
 ITERATION = 1
-ITERATION_LABEL = "v2-005"
+ITERATION_LABEL = "v2-017"
+
+# iter-v2/017: Hit-rate feedback gate (Config D from iter-v2/016 feasibility).
+# For each new signal, look at the last 20 trades that closed before this
+# signal's open_time. If the SL rate in that window >= 0.65, kill the signal.
+# Only active-window (post-OOS_CUTOFF_MS) trades feed the lookback, so the
+# gate is fresh at deployment.
+HIT_RATE_CONFIG = HitRateGateConfig(
+    window=20,
+    sl_threshold=0.65,
+    enabled=True,
+)
 
 V2_EXCLUDED_SYMBOLS: tuple[str, ...] = ("BTCUSDT", "ETHUSDT", "LINKUSDT", "BNBUSDT")
 """Symbols belonging to v1's baseline. v2 runners MUST exclude these."""
@@ -76,9 +92,7 @@ def _verify_symbols(symbols: tuple[str, ...]) -> None:
     """Enforce the symbol-exclusion guardrail."""
     overlap = set(symbols) & set(V2_EXCLUDED_SYMBOLS)
     if overlap:
-        raise RuntimeError(
-            f"v2 runner cannot trade v1 baseline symbols: {sorted(overlap)}"
-        )
+        raise RuntimeError(f"v2 runner cannot trade v1 baseline symbols: {sorted(overlap)}")
 
 
 def _build_model(
@@ -123,8 +137,15 @@ def _build_model(
     return cfg, strategy
 
 
-def _run_single_seed(seed: int, n_trials: int) -> list:
-    """Run all 3 models for a single seed and return concatenated trades."""
+def _run_single_seed(seed: int, n_trials: int) -> tuple[list, list, dict]:
+    """Run all 4 models for a single seed.
+
+    Returns ``(unbraked_trades, braked_trades, gate_stats)`` — the unbraked
+    stream is the raw concatenation of 4 per-model backtests; the braked
+    stream has iter-v2/017's hit-rate feedback gate applied across the
+    whole OOS window. Reports and seed metrics downstream use the braked
+    stream.
+    """
     all_trades: list = []
     for name, symbol in V2_MODELS:
         print("=" * 60)
@@ -141,12 +162,29 @@ def _run_single_seed(seed: int, n_trials: int) -> list:
         results = run_backtest(cfg, strategy, yearly_pnl_check=False)
         elapsed = time.time() - t0
         print(f"{name}: {len(results)} trades in {elapsed:.0f}s (seed={seed})")
-        # Stash gate stats for the engineering report
         gate_summary = strategy.gate_stats_summary()
         print(f"  gate stats: {gate_summary}")
         all_trades.extend(results)
-    all_trades.sort(key=lambda t: t.close_time)
-    return all_trades
+    all_trades.sort(key=lambda t: t.open_time)
+
+    # iter-v2/017: apply the hit-rate feedback gate across all 4 models.
+    # Gate is active from OOS_CUTOFF_MS onwards so pre-OOS training-period
+    # trades don't feed the lookback window.
+    braked, fire_stats = apply_hit_rate_gate(
+        all_trades,
+        HIT_RATE_CONFIG,
+        activate_at_ms=OOS_CUTOFF_MS,
+    )
+    braked.sort(key=lambda t: t.close_time)
+    stats_dict = fire_stats.as_dict()
+    print(
+        f"[hit-rate gate seed {seed}] "
+        f"normal={stats_dict['n_normal']} "
+        f"warmup={stats_dict['n_warmup']} "
+        f"killed={stats_dict['n_killed']}/{stats_dict['n_total']} "
+        f"fire_rate={stats_dict['fire_rate']:.2%}"
+    )
+    return all_trades, braked, stats_dict
 
 
 def main() -> None:
@@ -178,32 +216,53 @@ def main() -> None:
 
     for i, seed in enumerate(seeds):
         print(f"\n{'#' * 60}\n# SEED {seed} ({i + 1}/{len(seeds)})\n{'#' * 60}")
-        trades = _run_single_seed(seed, args.n_trials)
-        if not trades:
-            per_seed_summary.append({"seed": seed, "trades": 0, "oos_trades": 0, "oos_sharpe": 0.0})
+        unbraked, braked, gate_stats = _run_single_seed(seed, args.n_trials)
+        if not braked:
+            per_seed_summary.append(
+                {
+                    "seed": seed,
+                    "trades": 0,
+                    "oos_trades": 0,
+                    "oos_sharpe": 0.0,
+                    "oos_sharpe_unbraked": 0.0,
+                }
+            )
             continue
 
-        oos = [t for t in trades if t.open_time >= OOS_CUTOFF_MS]
+        # Metrics use the BRAKED stream (iter-v2/017 productionization)
+        oos = [t for t in braked if t.open_time >= OOS_CUTOFF_MS]
         oos_wp = np.array([t.weighted_pnl for t in oos], dtype=float)
         if len(oos_wp) > 1 and oos_wp.std() > 0:
             oos_sr = float(oos_wp.mean() / oos_wp.std() * np.sqrt(len(oos_wp)))
         else:
             oos_sr = 0.0
+
+        # Report unbraked Sharpe alongside for diagnostics
+        oos_ub = [t for t in unbraked if t.open_time >= OOS_CUTOFF_MS]
+        oos_ub_wp = np.array([t.weighted_pnl for t in oos_ub], dtype=float)
+        if len(oos_ub_wp) > 1 and oos_ub_wp.std() > 0:
+            oos_sr_ub = float(oos_ub_wp.mean() / oos_ub_wp.std() * np.sqrt(len(oos_ub_wp)))
+        else:
+            oos_sr_ub = 0.0
+
         per_seed_summary.append(
             {
                 "seed": seed,
-                "trades": len(trades),
+                "trades": len(braked),
                 "oos_trades": len(oos),
                 "oos_sharpe": round(oos_sr, 4),
+                "oos_sharpe_unbraked": round(oos_sr_ub, 4),
+                "gate_killed": gate_stats["n_killed"],
+                "gate_fire_rate": round(gate_stats["fire_rate"], 4),
             }
         )
         print(
-            f"[seed {seed}] {len(trades)} trades, OOS {len(oos)} trades, "
-            f"OOS Sharpe={oos_sr:+.4f}"
+            f"[seed {seed}] {len(braked)} trades, OOS {len(oos)} trades, "
+            f"OOS Sharpe={oos_sr:+.4f} (unbraked {oos_sr_ub:+.4f})"
         )
 
         if i == 0:
-            primary_trades = trades
+            primary_trades = braked
 
     if not primary_trades:
         print("No trades produced for primary seed.")

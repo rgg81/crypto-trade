@@ -547,6 +547,156 @@ def apply_portfolio_drawdown_brake(
     return braked, stats
 
 
+# ---------------------------------------------------------------------------
+# iter-v2/017: hit-rate feedback gate
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class HitRateGateConfig:
+    """Config for the hit-rate feedback gate.
+
+    The gate tracks the stop-loss rate in a rolling window of the most
+    recently closed trades (global across all v2 models). When the SL
+    rate exceeds ``sl_threshold``, new signals are killed until enough
+    winning trades close to bring the rate back below the threshold.
+
+    Config D from iter-v2/016 feasibility (the winner):
+        window=20, sl_threshold=0.65, shrink_factor=0.0
+    """
+
+    window: int = 20
+    sl_threshold: float = 0.65
+    enabled: bool = True
+
+
+@dataclass
+class HitRateFireStats:
+    """Hit-rate gate firing diagnostics."""
+
+    n_total: int = 0
+    n_normal: int = 0
+    n_warmup: int = 0
+    n_killed: int = 0
+    first_fire_time: int | None = None
+    last_fire_time: int | None = None
+
+    def as_dict(self) -> dict[str, int | None | float]:
+        return {
+            "n_total": self.n_total,
+            "n_normal": self.n_normal,
+            "n_warmup": self.n_warmup,
+            "n_killed": self.n_killed,
+            "fire_rate": self.n_killed / self.n_total if self.n_total else 0.0,
+            "first_fire_time": self.first_fire_time,
+            "last_fire_time": self.last_fire_time,
+        }
+
+
+def apply_hit_rate_gate(
+    trades: list[TradeResult],
+    config: HitRateGateConfig,
+    activate_at_ms: int | None = None,
+) -> tuple[list[TradeResult], HitRateFireStats]:
+    """Apply the hit-rate feedback gate to a combined trade stream.
+
+    For each trade at ``open_time T``, look at the ``window`` most
+    recently closed trades (strictly ``close_time < T``) and compute
+    the stop-loss rate. If SL rate >= ``sl_threshold``, zero the trade's
+    weight.
+
+    The gate is stateless given the trade stream: it doesn't need shadow
+    equity tracking. The window naturally warms up as the first
+    ``window`` OOS trades close, and it's self-releasing when enough
+    winning trades enter the window.
+
+    Parameters
+    ----------
+    trades
+        Combined trade stream from all v2 models.
+    config
+        ``HitRateGateConfig`` with window and SL threshold.
+    activate_at_ms
+        If set, trades with ``open_time < activate_at_ms`` pass through
+        unchanged, AND they do not feed the gate's lookback window.
+        This scopes the gate to a "live deployment" window so that
+        pre-OOS training-period trades don't pollute the SL-rate
+        calculation.
+
+    Returns
+    -------
+    braked
+        New list of ``TradeResult`` with killed trades' weights zeroed.
+    stats
+        ``HitRateFireStats`` counting normal/warmup/killed firings.
+    """
+    stats = HitRateFireStats(n_total=len(trades))
+    if not trades or not config.enabled or config.window <= 0:
+        stats.n_normal = len(trades)
+        return list(trades), stats
+
+    sorted_trades = sorted(trades, key=lambda t: t.open_time)
+    braked: list[TradeResult] = []
+
+    # Precompute: for each trade, which trades have already closed BEFORE it?
+    # Build a sorted list of (close_time, is_sl, is_active) for closed trades.
+    # "is_active" = trade is within the gate's active window (open_time >=
+    # activate_at_ms), which means it CAN feed the SL-rate calculation.
+    closed_events = []  # list of (close_time, is_sl_hit, trade_idx)
+    for idx, trade in enumerate(sorted_trades):
+        is_active = activate_at_ms is None or trade.open_time >= activate_at_ms
+        is_sl = trade.exit_reason == "stop_loss"
+        # Only ACTIVE trades (post-activation) contribute to the SL-rate window
+        closed_events.append((trade.close_time, is_sl and is_active, is_active, idx))
+
+    # Sort by close_time so we can efficiently process the time-order
+    closed_events.sort(key=lambda x: x[0])
+
+    for trade in sorted_trades:
+        # Pre-activation: pass through unchanged, don't check gate
+        if activate_at_ms is not None and trade.open_time < activate_at_ms:
+            braked.append(replace(trade))
+            stats.n_normal += 1
+            continue
+
+        # Find all ACTIVE closed trades with close_time < this trade's open_time
+        prior_closed = [
+            (ct, sl, idx)
+            for ct, sl, active, idx in closed_events
+            if active and ct < trade.open_time
+        ]
+
+        if len(prior_closed) < config.window:
+            # Not enough warmup history — pass through
+            braked.append(replace(trade))
+            stats.n_warmup += 1
+            continue
+
+        # Take the last ``window`` most recently closed
+        window_trades = prior_closed[-config.window :]
+        sl_count = sum(1 for _, is_sl, _ in window_trades if is_sl)
+        sl_rate = sl_count / config.window
+
+        if sl_rate >= config.sl_threshold:
+            # Kill this trade
+            stats.n_killed += 1
+            if stats.first_fire_time is None:
+                stats.first_fire_time = int(trade.open_time)
+            stats.last_fire_time = int(trade.open_time)
+            braked.append(
+                replace(
+                    trade,
+                    weight_factor=0.0,
+                    weighted_pnl=0.0,
+                )
+            )
+        else:
+            stats.n_normal += 1
+            braked.append(replace(trade))
+
+    return braked, stats
+
+
 __all__ = [
     "RiskV2Config",
     "RiskV2Wrapper",
@@ -554,4 +704,7 @@ __all__ = [
     "DrawdownBrakeConfig",
     "BrakeFireStats",
     "apply_portfolio_drawdown_brake",
+    "HitRateGateConfig",
+    "HitRateFireStats",
+    "apply_hit_rate_gate",
 ]
