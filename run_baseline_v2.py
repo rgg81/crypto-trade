@@ -169,8 +169,15 @@ def _run_single_seed(seed: int, n_trials: int) -> tuple[list, list, dict]:
         all_trades.extend(results)
     all_trades.sort(key=lambda t: t.open_time)
 
-    # iter-v2/013: apply the portfolio-level drawdown brake across all 4 models
-    braked, brake_stats = apply_portfolio_drawdown_brake(all_trades, DD_BRAKE_CONFIG)
+    # iter-v2/013: apply the portfolio-level drawdown brake across all 4 models,
+    # scoped to the OOS "live deployment" window (shadow equity resets at
+    # OOS_CUTOFF_MS so the IS period's -67% PnL doesn't leave the brake stuck
+    # in a flatten state for the entire OOS period).
+    braked, brake_stats = apply_portfolio_drawdown_brake(
+        all_trades,
+        DD_BRAKE_CONFIG,
+        activate_at_ms=OOS_CUTOFF_MS,
+    )
     braked.sort(key=lambda t: t.close_time)
     stats_dict = brake_stats.as_dict()
     print(

@@ -453,6 +453,7 @@ class BrakeFireStats:
 def apply_portfolio_drawdown_brake(
     trades: list[TradeResult],
     config: DrawdownBrakeConfig,
+    activate_at_ms: int | None = None,
 ) -> tuple[list[TradeResult], BrakeFireStats]:
     """Apply the portfolio-level drawdown brake to a combined trade stream.
 
@@ -472,6 +473,14 @@ def apply_portfolio_drawdown_brake(
         ``open_time`` before brake application.
     config
         ``DrawdownBrakeConfig`` with shrink/flatten thresholds.
+    activate_at_ms
+        If set, trades with ``open_time < activate_at_ms`` are passed
+        through unchanged and their PnL does not feed the shadow equity.
+        This scopes the brake to a "live deployment" window (typically
+        ``OOS_CUTOFF_MS`` in backtest-land) instead of compounding through
+        the full IS training history, which would leave the brake stuck
+        in a pre-existing drawdown from the IS period. The shadow equity
+        resets to 1.0 at ``activate_at_ms``.
 
     Returns
     -------
@@ -479,7 +488,8 @@ def apply_portfolio_drawdown_brake(
         New list of ``TradeResult``, sorted by ``open_time``, with
         ``weight_factor`` and ``weighted_pnl`` attenuated per brake state.
     stats
-        ``BrakeFireStats`` counting normal/shrink/flatten firings.
+        ``BrakeFireStats`` counting normal/shrink/flatten firings (only
+        within the active window).
     """
     stats = BrakeFireStats(n_total=len(trades))
     if not trades or not config.enabled:
@@ -493,6 +503,13 @@ def apply_portfolio_drawdown_brake(
     shadow_peak = 1.0
 
     for trade in sorted_trades:
+        # Trades outside the brake's active window pass through unchanged
+        # and do NOT contribute to shadow equity (brake resets at activation)
+        if activate_at_ms is not None and trade.open_time < activate_at_ms:
+            braked.append(replace(trade))
+            stats.n_normal += 1
+            continue
+
         dd_pct = (shadow_equity - shadow_peak) / shadow_peak * 100.0  # non-positive
 
         if -dd_pct >= config.flatten_pct:
