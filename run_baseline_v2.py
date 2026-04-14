@@ -37,10 +37,27 @@ from crypto_trade.config import OOS_CUTOFF_MS
 from crypto_trade.features_v2 import V2_FEATURE_COLUMNS
 from crypto_trade.iteration_report import generate_iteration_reports
 from crypto_trade.strategies.ml.lgbm import LightGbmStrategy
-from crypto_trade.strategies.ml.risk_v2 import RiskV2Config, RiskV2Wrapper
+from crypto_trade.strategies.ml.risk_v2 import (
+    DrawdownBrakeConfig,
+    RiskV2Config,
+    RiskV2Wrapper,
+    apply_portfolio_drawdown_brake,
+)
 
 ITERATION = 1
-ITERATION_LABEL = "v2-005"
+ITERATION_LABEL = "v2-013"
+
+# iter-v2/013: Portfolio-level drawdown brake (Config C from iter-v2/012).
+# Shrink trade weight to 0.5x when the unbraked compound equity is ≥8% below
+# its peak; zero the trade when ≥16% below peak. The brake is self-releasing
+# because state is decided from the unbraked shadow stream, not the braked
+# one. See briefs-v2/iteration_012/engineering_report.md for validation.
+DD_BRAKE_CONFIG = DrawdownBrakeConfig(
+    shrink_pct=8.0,
+    flatten_pct=16.0,
+    shrink_factor=0.5,
+    enabled=True,
+)
 
 V2_EXCLUDED_SYMBOLS: tuple[str, ...] = ("BTCUSDT", "ETHUSDT", "LINKUSDT", "BNBUSDT")
 """Symbols belonging to v1's baseline. v2 runners MUST exclude these."""
@@ -76,9 +93,7 @@ def _verify_symbols(symbols: tuple[str, ...]) -> None:
     """Enforce the symbol-exclusion guardrail."""
     overlap = set(symbols) & set(V2_EXCLUDED_SYMBOLS)
     if overlap:
-        raise RuntimeError(
-            f"v2 runner cannot trade v1 baseline symbols: {sorted(overlap)}"
-        )
+        raise RuntimeError(f"v2 runner cannot trade v1 baseline symbols: {sorted(overlap)}")
 
 
 def _build_model(
@@ -123,8 +138,15 @@ def _build_model(
     return cfg, strategy
 
 
-def _run_single_seed(seed: int, n_trials: int) -> list:
-    """Run all 3 models for a single seed and return concatenated trades."""
+def _run_single_seed(seed: int, n_trials: int) -> tuple[list, list, dict]:
+    """Run all 4 models for a single seed.
+
+    Returns ``(unbraked_trades, braked_trades, brake_stats)`` — the unbraked
+    stream is the raw concatenation of 4 per-model backtests; the braked
+    stream is the iter-v2/013 portfolio-level drawdown brake applied to the
+    whole stream. Reports and seed metrics downstream should use the
+    ``braked_trades``.
+    """
     all_trades: list = []
     for name, symbol in V2_MODELS:
         print("=" * 60)
@@ -145,8 +167,20 @@ def _run_single_seed(seed: int, n_trials: int) -> list:
         gate_summary = strategy.gate_stats_summary()
         print(f"  gate stats: {gate_summary}")
         all_trades.extend(results)
-    all_trades.sort(key=lambda t: t.close_time)
-    return all_trades
+    all_trades.sort(key=lambda t: t.open_time)
+
+    # iter-v2/013: apply the portfolio-level drawdown brake across all 4 models
+    braked, brake_stats = apply_portfolio_drawdown_brake(all_trades, DD_BRAKE_CONFIG)
+    braked.sort(key=lambda t: t.close_time)
+    stats_dict = brake_stats.as_dict()
+    print(
+        f"[brake seed {seed}] "
+        f"normal={stats_dict['n_normal']}/{stats_dict['n_total']} "
+        f"shrink={stats_dict['n_shrink']} "
+        f"flatten={stats_dict['n_flatten']} "
+        f"fire_rate={stats_dict['fire_rate']:.2%}"
+    )
+    return all_trades, braked, stats_dict
 
 
 def main() -> None:
@@ -178,32 +212,54 @@ def main() -> None:
 
     for i, seed in enumerate(seeds):
         print(f"\n{'#' * 60}\n# SEED {seed} ({i + 1}/{len(seeds)})\n{'#' * 60}")
-        trades = _run_single_seed(seed, args.n_trials)
-        if not trades:
-            per_seed_summary.append({"seed": seed, "trades": 0, "oos_trades": 0, "oos_sharpe": 0.0})
+        unbraked, braked, brake_stats = _run_single_seed(seed, args.n_trials)
+        if not braked:
+            per_seed_summary.append(
+                {
+                    "seed": seed,
+                    "trades": 0,
+                    "oos_trades": 0,
+                    "oos_sharpe": 0.0,
+                    "oos_sharpe_unbraked": 0.0,
+                }
+            )
             continue
 
-        oos = [t for t in trades if t.open_time >= OOS_CUTOFF_MS]
+        # Metrics use the BRAKED stream (post iter-v2/013 productionization)
+        oos = [t for t in braked if t.open_time >= OOS_CUTOFF_MS]
         oos_wp = np.array([t.weighted_pnl for t in oos], dtype=float)
         if len(oos_wp) > 1 and oos_wp.std() > 0:
             oos_sr = float(oos_wp.mean() / oos_wp.std() * np.sqrt(len(oos_wp)))
         else:
             oos_sr = 0.0
+
+        # Report unbraked Sharpe alongside for diagnostics
+        oos_ub = [t for t in unbraked if t.open_time >= OOS_CUTOFF_MS]
+        oos_ub_wp = np.array([t.weighted_pnl for t in oos_ub], dtype=float)
+        if len(oos_ub_wp) > 1 and oos_ub_wp.std() > 0:
+            oos_sr_ub = float(oos_ub_wp.mean() / oos_ub_wp.std() * np.sqrt(len(oos_ub_wp)))
+        else:
+            oos_sr_ub = 0.0
+
         per_seed_summary.append(
             {
                 "seed": seed,
-                "trades": len(trades),
+                "trades": len(braked),
                 "oos_trades": len(oos),
                 "oos_sharpe": round(oos_sr, 4),
+                "oos_sharpe_unbraked": round(oos_sr_ub, 4),
+                "brake_shrink": brake_stats["n_shrink"],
+                "brake_flatten": brake_stats["n_flatten"],
+                "brake_fire_rate": round(brake_stats["fire_rate"], 4),
             }
         )
         print(
-            f"[seed {seed}] {len(trades)} trades, OOS {len(oos)} trades, "
-            f"OOS Sharpe={oos_sr:+.4f}"
+            f"[seed {seed}] {len(braked)} trades, OOS {len(oos)} trades, "
+            f"OOS Sharpe={oos_sr:+.4f} (unbraked {oos_sr_ub:+.4f})"
         )
 
         if i == 0:
-            primary_trades = trades
+            primary_trades = braked
 
     if not primary_trades:
         print("No trades produced for primary seed.")

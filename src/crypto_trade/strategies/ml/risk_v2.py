@@ -30,13 +30,13 @@ the gates reproducible across seeds.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Protocol
 
 import numpy as np
 import pandas as pd
 
-from crypto_trade.backtest_models import Signal
+from crypto_trade.backtest_models import Signal, TradeResult
 from crypto_trade.config import OOS_CUTOFF_MS
 from crypto_trade.features_v2 import V2_FEATURE_COLUMNS
 from crypto_trade.strategies import NO_SIGNAL
@@ -223,12 +223,8 @@ class RiskV2Wrapper:
             # Hurst percentile band over IS window
             hurst_is = table.loc[is_mask, "hurst_100"].dropna().to_numpy()
             if len(hurst_is) > 10:
-                self._hurst_lower[sym] = float(
-                    np.quantile(hurst_is, self.config.hurst_lower_pct)
-                )
-                self._hurst_upper[sym] = float(
-                    np.quantile(hurst_is, self.config.hurst_upper_pct)
-                )
+                self._hurst_lower[sym] = float(np.quantile(hurst_is, self.config.hurst_lower_pct))
+                self._hurst_upper[sym] = float(np.quantile(hurst_is, self.config.hurst_upper_pct))
             else:
                 # Not enough data — disable Hurst gate for this symbol
                 self._hurst_lower[sym] = -np.inf
@@ -324,9 +320,7 @@ class RiskV2Wrapper:
         # trades run smaller. Direct linear mapping of atr_pct_rank_200 to the
         # [floor, ceiling] band.
         raw = float(atr_pct)
-        return float(
-            np.clip(raw, self.config.vol_scale_floor, self.config.vol_scale_ceiling)
-        )
+        return float(np.clip(raw, self.config.vol_scale_floor, self.config.vol_scale_ceiling))
 
     # ------------------------------------------------------------------
     # Reporting
@@ -408,4 +402,139 @@ def _compute_adx(
     return adx
 
 
-__all__ = ["RiskV2Config", "RiskV2Wrapper", "GateStats"]
+# ---------------------------------------------------------------------------
+# iter-v2/013: portfolio-level drawdown brake
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class DrawdownBrakeConfig:
+    """Config for the portfolio-level drawdown brake.
+
+    The brake operates on a temporally-sorted combined trade stream (one
+    chronological timeline across all v2 models). It decides brake state
+    from the UNBRAKED strategy's compound equity DD — this makes flatten
+    self-releasing once the underlying strategy recovers above the shrink
+    threshold. See iter-v2/012 engineering report for the design rationale.
+
+    Config C thresholds (iter-v2/012 winner):
+        shrink_pct=8.0, flatten_pct=16.0, shrink_factor=0.5
+    """
+
+    shrink_pct: float = 8.0
+    flatten_pct: float = 16.0
+    shrink_factor: float = 0.5
+    enabled: bool = True
+
+
+@dataclass
+class BrakeFireStats:
+    """Brake firing diagnostics for the engineering report."""
+
+    n_total: int = 0
+    n_normal: int = 0
+    n_shrink: int = 0
+    n_flatten: int = 0
+    first_fire_time: int | None = None
+    last_fire_time: int | None = None
+
+    def as_dict(self) -> dict[str, int | None | float]:
+        return {
+            "n_total": self.n_total,
+            "n_normal": self.n_normal,
+            "n_shrink": self.n_shrink,
+            "n_flatten": self.n_flatten,
+            "fire_rate": ((self.n_shrink + self.n_flatten) / self.n_total if self.n_total else 0.0),
+            "first_fire_time": self.first_fire_time,
+            "last_fire_time": self.last_fire_time,
+        }
+
+
+def apply_portfolio_drawdown_brake(
+    trades: list[TradeResult],
+    config: DrawdownBrakeConfig,
+) -> tuple[list[TradeResult], BrakeFireStats]:
+    """Apply the portfolio-level drawdown brake to a combined trade stream.
+
+    Returns a new list of ``TradeResult`` objects where each trade's
+    ``weight_factor`` and ``weighted_pnl`` have been multiplied by the
+    effective brake factor. The original trades are not mutated.
+
+    The brake state is decided from the UNBRAKED compound equity DD at the
+    trade's ``open_time``. This makes flatten self-releasing once the
+    underlying strategy recovers. When the brake is disabled, the trades
+    pass through unchanged and ``BrakeFireStats`` reports all-normal.
+
+    Parameters
+    ----------
+    trades
+        Combined trade stream from all v2 models. Will be sorted by
+        ``open_time`` before brake application.
+    config
+        ``DrawdownBrakeConfig`` with shrink/flatten thresholds.
+
+    Returns
+    -------
+    braked
+        New list of ``TradeResult``, sorted by ``open_time``, with
+        ``weight_factor`` and ``weighted_pnl`` attenuated per brake state.
+    stats
+        ``BrakeFireStats`` counting normal/shrink/flatten firings.
+    """
+    stats = BrakeFireStats(n_total=len(trades))
+    if not trades or not config.enabled:
+        stats.n_normal = len(trades)
+        return list(trades), stats
+
+    sorted_trades = sorted(trades, key=lambda t: t.open_time)
+    braked: list[TradeResult] = []
+
+    shadow_equity = 1.0
+    shadow_peak = 1.0
+
+    for trade in sorted_trades:
+        dd_pct = (shadow_equity - shadow_peak) / shadow_peak * 100.0  # non-positive
+
+        if -dd_pct >= config.flatten_pct:
+            eff_factor = 0.0
+            is_fire = True
+            stats.n_flatten += 1
+        elif -dd_pct >= config.shrink_pct:
+            eff_factor = config.shrink_factor
+            is_fire = True
+            stats.n_shrink += 1
+        else:
+            eff_factor = 1.0
+            is_fire = False
+            stats.n_normal += 1
+
+        if is_fire:
+            if stats.first_fire_time is None:
+                stats.first_fire_time = int(trade.open_time)
+            stats.last_fire_time = int(trade.open_time)
+
+        new_weight = trade.weight_factor * eff_factor
+        new_weighted_pnl = trade.weighted_pnl * eff_factor
+        braked.append(
+            replace(
+                trade,
+                weight_factor=new_weight,
+                weighted_pnl=new_weighted_pnl,
+            )
+        )
+
+        # Update shadow equity with the UNBRAKED trade PnL — flatten is self-releasing
+        shadow_equity *= 1.0 + trade.weighted_pnl / 100.0
+        shadow_peak = max(shadow_peak, shadow_equity)
+
+    return braked, stats
+
+
+__all__ = [
+    "RiskV2Config",
+    "RiskV2Wrapper",
+    "GateStats",
+    "DrawdownBrakeConfig",
+    "BrakeFireStats",
+    "apply_portfolio_drawdown_brake",
+]
