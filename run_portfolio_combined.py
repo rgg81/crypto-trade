@@ -11,17 +11,18 @@ and computes joint metrics:
 - Sample diversification benefit (combined Sharpe vs equal-weight v1+v2)
 
 Inputs:
-  - reports/iteration_152/in_sample/trades.csv (v1 IS)
-  - reports/iteration_152/out_of_sample/trades.csv (v1 OOS)
+  - {V1_REPORT}/in_sample/trades.csv (v1 IS)
+  - {V1_REPORT}/out_of_sample/trades.csv (v1 OOS)
   - reports-v2/iteration_v2-005/in_sample/trades.csv (v2 IS)
   - reports-v2/iteration_v2-005/out_of_sample/trades.csv (v2 OOS)
 
+The v1 canonical iter-152 reports live in the main repo at
+`../../reports/iteration_152_min33_max200/` — the merged iter-152
+baseline (min_scale=0.33). This runner reads them directly rather
+than re-running the 3-hour v1 baseline each time.
+
 Usage:
     uv run python run_portfolio_combined.py
-
-The script does NOT re-run any backtests; both v1 and v2 must be fresh
-on disk. iter-v2/011 launches v1 baseline first (~30 min), then runs
-this script for the combined analysis.
 """
 
 from __future__ import annotations
@@ -33,7 +34,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-V1_REPORT = Path("reports/iteration_152")
+# v1 canonical iter-152 lives in the main repo (not the worktree)
+V1_REPORT = Path("/home/roberto/crypto-trade/reports/iteration_152_min33_max200")
 V2_REPORT = Path("reports-v2/iteration_v2-005")
 OUT_DIR = Path("reports-v2/iteration_v2-011_combined")
 
@@ -194,7 +196,7 @@ def main() -> None:
 
     if not V1_REPORT.exists():
         print(f"ERROR: v1 report not found at {V1_REPORT}")
-        print("Run `uv run python run_baseline_v152.py` first to generate it.")
+        print("Expected the canonical iter-152 (min_scale=0.33) reports in main repo.")
         sys.exit(1)
     if not V2_REPORT.exists():
         print(f"ERROR: v2 report not found at {V2_REPORT}")
