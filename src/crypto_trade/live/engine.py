@@ -523,6 +523,25 @@ class LiveEngine:
             f"(detect={t_detect * 1000:.0f}ms)"
         )
 
+        # 3b. Dry-run: check open trades for SL/TP/timeout against new candle OHLC
+        if self.config.dry_run:
+            for trade in self._state.get_open_trades():
+                if trade.symbol not in new_candles:
+                    continue
+                candle = new_candles[trade.symbol]
+                reason = self._order_mgr.check_dry_run_exit(
+                    trade,
+                    candle.open_time,
+                    float(candle.open),
+                    float(candle.high),
+                    float(candle.low),
+                    candle.close_time,
+                )
+                if reason:
+                    updated = self._state.get_trade(trade.id)
+                    if updated:
+                        self._handle_trade_close(updated)
+
         # 4. Feature pipeline: fetch klines to CSV, regenerate features
         new_syms = list(new_candles.keys())
         t_fetch_start = time.monotonic()
