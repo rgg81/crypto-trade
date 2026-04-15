@@ -766,43 +766,100 @@ share was **XRP = 73.43%** — a clean failure of the 50% rule. The aggregate
 looked like a MERGE candidate; the per-seed view revealed a concentration
 risk. iter-v2/028 was NO-MERGE because of this check.
 
-### The rule
+### The rule — n-symbol-aware concentration thresholds
 
 Before MERGE, the QE MUST compute per-symbol OOS PnL share for **every one
 of the 10 seeds** (not only primary seed 42) and report them as a table in
-the engineering report. The iteration merges ONLY if ALL of the following
-pass:
+the engineering report.
 
-1. **Per-seed hard cap**: No single seed may have any symbol exceeding **50%**
-   of its OOS PnL (weighted share). Checked on all 10 seeds individually.
-2. **Mean cap**: The mean of the 10 per-seed max-symbol shares must be ≤ **45%**.
-   This catches the "no seed breaches 50% but everyone hovers at 48%" case.
-3. **Concentrated-seed count**: At most **1 of 10** seeds may have its
-   max-symbol share above **40%**. Two or more seeds crossing 40% is
-   structural concentration, not seed noise.
+**The concentration thresholds scale with the number of symbols in the
+portfolio.** A 50% rule is vacuous for n=2 (max is trivially ≥50%) and too
+loose for n=10 (an equal-weight target is 10%). The per-n thresholds are:
 
-Tighten to **30% / 25% / 0-of-10 above 25%** once v2 has ≥5 symbols in the
-portfolio. The looser thresholds above are because v2 currently runs 3-4
-symbol baselines; the 50% cap would be 200%/n_symbols on a 4-symbol run.
+| n_symbols | Max per seed | Mean max-share | ≤1 seed above |
+|-----------|--------------|----------------|---------------|
+| 2         | **60%**      | **55%**        | **50%**       |
+| 3         | **55%**      | **50%**        | **45%**       |
+| 4         | **50%**      | **45%**        | **40%**       |
+| 5         | **40%**      | **35%**        | **32%**       |
+| 6-7       | **35%**      | **30%**        | **28%**       |
+| 8+        | **30%**      | **25%**        | **23%**       |
+
+These are roughly `max = (1/n + 25%)` with a floor of 30% for large n.
+
+An iteration merges ONLY if ALL of the following pass (using the row for
+its n_symbols):
+
+1. **Per-seed hard cap**: No seed may have any symbol exceeding the "Max per
+   seed" threshold for that portfolio's n_symbols.
+2. **Mean cap**: The mean of the 10 per-seed max-shares must be ≤ the "Mean
+   max-share" threshold.
+3. **Concentrated-seed count**: At most **1 of 10** seeds may exceed the
+   "≤1 seed above" threshold (the inner rule).
+
+### Concentration metric — USE `weighted_pnl`, NOT `net_pnl_pct`
+
+**This was a source of a reporting bug through iter-v2/029.** The
+`per_symbol.csv` column `pct_of_total_pnl` is computed from `net_pnl_pct`
+(raw trade return percentage). The correct concentration measure is
+`weighted_pnl` (= net_pnl_pct × vol-adjusted position weight from
+`RiskV2Wrapper`), because concentration is about CAPITAL exposure, not
+return percentage.
+
+iter-v2/029 primary seed 42 reported **60.86% XRP concentration** via
+`per_symbol.csv` but was really **69.47%** via `weighted_pnl`. The
+concentration problem was always worse than visible. Going forward:
+
+- `seed_concentration.json` (added iter-v2/030) uses `weighted_pnl`: this
+  is canonical.
+- `per_symbol.csv` values are informational only; do not use them to judge
+  the Seed Concentration Check rule.
+
+### Distressed-seed handling
+
+When a seed's total OOS `weighted_pnl` is small, near zero, or negative,
+the share metric becomes nonsensical (one symbol can show >100% share
+because the total is nearly zero). Three iter-v2/030 seeds exhibited this
+(seed 1001 showed NEAR = 949% share).
+
+**Rule**: if a seed has **|total_oos_weighted_pnl| < 10.0** OR
+**total_oos_weighted_pnl ≤ 0**, flag it as **DISTRESSED** and:
+
+1. Compute the share metric using the **POSITIVE-ONLY total** as the
+   denominator: `share[sym] = max(0, sym_wpnl) / sum(max(0, s_wpnl) for s in symbols)`.
+   This always produces a number in [0, 1] and has a sensible interpretation
+   ("of the positive contributors, how much is from this symbol").
+2. Distressed seeds still count as seeds for the overall rule, but the
+   dominant-symbol label uses the positive-total interpretation.
+3. Report the distressed count in the audit verdict. If >2 of 10 seeds
+   are distressed, the strategy is unstable and NO-MERGE regardless of
+   other metrics.
 
 ### Required reporting template
 
-Every engineering report for a MERGE-candidate iteration must include this
-table under a "Seed Concentration Audit" subsection:
+Every engineering report for a MERGE-candidate iteration must include a
+Seed Concentration Audit subsection with TWO things:
+
+1. **The per-seed table** (state its n_symbols, use that row's thresholds):
 
 ```
-| Seed | Max Share | Symbol    | Pass ≤50% | Pass ≤40% |
-|------|-----------|-----------|-----------|-----------|
-| 42   | 73.4%     | XRPUSDT   | FAIL      | FAIL      |
-| 123  | 46.2%     | XRPUSDT   | PASS      | FAIL      |
-| ...  | ...       | ...       | ...       | ...       |
-| Mean | 51.3%     | —         | FAIL      | —         |
+n_symbols = 4, thresholds: max ≤ 50%, mean ≤ 45%, ≤1 seed above 40%
+
+| Seed | Max Share | Symbol    | Pass max | Pass inner | Distressed? |
+|------|-----------|-----------|----------|------------|-------------|
+| 42   | 69.5%     | XRPUSDT   | FAIL     | FAIL       | —           |
+| 123  | 53.8%     | XRPUSDT   | FAIL     | FAIL       | —           |
+| 1001 | 72.7%     | XRPUSDT   | FAIL     | FAIL       | DISTRESSED  |
+| ...  | ...       | ...       | ...      | ...        | —           |
+| Mean | 51.3%     | —         | —        | —          | —           |
 ```
 
-Plus one-line verdicts:
-- Per-seed 50% cap:  X of 10 seeds pass
-- Mean ≤ 45%:        PASS / FAIL
-- ≤1 seed above 40%: PASS / FAIL
+2. **One-line verdicts** (each threshold from the row above):
+
+- Per-seed max cap (≤ 50%):  X of 10 seeds pass
+- Mean ≤ 45%:                PASS / FAIL
+- ≤1 seed above 40%:         PASS / FAIL
+- Distressed seed count:     Y of 10 (rule: ≤ 2)
 - **Overall seed concentration**: PASS / FAIL
 
 **If overall = FAIL, the iteration is NO-MERGE regardless of headline mean
