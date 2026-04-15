@@ -81,11 +81,15 @@ V2_EXCLUDED_SYMBOLS: tuple[str, ...] = ("BTCUSDT", "ETHUSDT", "LINKUSDT", "BNBUS
 # the 6-gate screening in iter-v2/001: v1 corr 0.665, $240M daily volume,
 # 4,847 IS candles.
 V2_MODELS: tuple[tuple[str, str], ...] = (
-    # iter-v2/032: 3-symbol portfolio. Dropped SOL and NEAR as chronic
-    # losers on iter-031 primary seed (SOL: −1.66 wpnl, NEAR: −2.73 wpnl).
-    # Keep only the 3 net-positive contributors from iter-031 primary seed.
+    # iter-v2/032 (pivot): 4-symbol portfolio. The 3-symbol smoke test
+    # regressed badly (OOS monthly +0.76 vs iter-029 +1.28 on primary seed)
+    # because the hit-rate gate has cross-symbol coupling — with fewer
+    # symbols, its last-20-trades lookback kills different trades.
+    # Keep trade density at 4 symbols; swap SOL (worst primary-seed
+    # contributor) for ADA (real signal from iter-031).
     ("E (DOGEUSDT)", "DOGEUSDT"),
     ("G (XRPUSDT)", "XRPUSDT"),
+    ("H (NEARUSDT)", "NEARUSDT"),
     ("I (ADAUSDT)", "ADAUSDT"),
 )
 
