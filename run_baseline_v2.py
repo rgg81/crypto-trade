@@ -49,7 +49,7 @@ from crypto_trade.strategies.ml.risk_v2 import (
 )
 
 ITERATION = 1
-ITERATION_LABEL = "v2-032"
+ITERATION_LABEL = "v2-034-seed-diag"
 
 # iter-v2/017: Hit-rate feedback gate (Config D from iter-v2/016 feasibility).
 # For each new signal, look at the last 20 trades that closed before this
@@ -81,20 +81,25 @@ V2_EXCLUDED_SYMBOLS: tuple[str, ...] = ("BTCUSDT", "ETHUSDT", "LINKUSDT", "BNBUS
 # the 6-gate screening in iter-v2/001: v1 corr 0.665, $240M daily volume,
 # 4,847 IS candles.
 V2_MODELS: tuple[tuple[str, str], ...] = (
-    # iter-v2/032 (pivot): 4-symbol portfolio. The 3-symbol smoke test
-    # regressed badly (OOS monthly +0.76 vs iter-029 +1.28 on primary seed)
-    # because the hit-rate gate has cross-symbol coupling — with fewer
-    # symbols, its last-20-trades lookback kills different trades.
-    # Keep trade density at 4 symbols; swap SOL (worst primary-seed
-    # contributor) for ADA (real signal from iter-031).
+    # iter-v2/034 (seed diagnostic): revert to iter-029 baseline config
+    # (DOGE+SOL+XRP+NEAR) and run with DIFFERENT seeds. Goal: isolate
+    # whether the seed variance pattern we see across iter-029→032 is
+    # a property of the standard FULL_SEEDS or of the underlying Optuna
+    # search. If a new seed set produces a similar IS/OOS/concentration
+    # distribution, the variance is structural. If it produces materially
+    # different results, our standard seeds were cherry-picked by history.
     ("E (DOGEUSDT)", "DOGEUSDT"),
+    ("F (SOLUSDT)", "SOLUSDT"),
     ("G (XRPUSDT)", "XRPUSDT"),
     ("H (NEARUSDT)", "NEARUSDT"),
-    ("I (ADAUSDT)", "ADAUSDT"),
 )
 
 DEFAULT_SEEDS = (42,)  # iter-v2/001 first-pass uses a single seed
-FULL_SEEDS = (42, 123, 456, 789, 1001, 1234, 2345, 3456, 4567, 5678)  # MERGE validation
+# iter-v2/034 seed diagnostic: a COMPLETELY DIFFERENT 10-seed set to
+# test whether the iter-029→032 seed variance is structural or
+# artifact-of-seed-choice. Ten distinct primes spanning 11..9941, no
+# overlap with the original FULL_SEEDS.
+FULL_SEEDS = (11, 37, 131, 257, 541, 1093, 2287, 4657, 7621, 9941)
 
 
 def _verify_branch() -> None:
