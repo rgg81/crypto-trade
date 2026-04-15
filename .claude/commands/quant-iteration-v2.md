@@ -751,6 +751,80 @@ multi-seed validation when the first seed shows genuine profitability.
 
 ---
 
+## Seed Concentration Check — Per-Seed, Not Just Primary
+
+**This is a hard pre-MERGE gate. No baseline merges without passing it.**
+
+Even when the 10-seed **mean** metrics look strong, a single seed can produce
+a pathological portfolio that routes nearly all OOS PnL through one symbol.
+If we merge a baseline on mean metrics alone, we inherit that brittle
+concentration — and the combined v1+v2 portfolio inherits it with us.
+
+This happened in iter-v2/028: mean OOS monthly Sharpe was **+1.0796** (10/10
+profitable, first breakthrough above 1.0), but primary seed 42's per-symbol
+share was **XRP = 73.43%** — a clean failure of the 50% rule. The aggregate
+looked like a MERGE candidate; the per-seed view revealed a concentration
+risk. iter-v2/028 was NO-MERGE because of this check.
+
+### The rule
+
+Before MERGE, the QE MUST compute per-symbol OOS PnL share for **every one
+of the 10 seeds** (not only primary seed 42) and report them as a table in
+the engineering report. The iteration merges ONLY if ALL of the following
+pass:
+
+1. **Per-seed hard cap**: No single seed may have any symbol exceeding **50%**
+   of its OOS PnL (weighted share). Checked on all 10 seeds individually.
+2. **Mean cap**: The mean of the 10 per-seed max-symbol shares must be ≤ **45%**.
+   This catches the "no seed breaches 50% but everyone hovers at 48%" case.
+3. **Concentrated-seed count**: At most **1 of 10** seeds may have its
+   max-symbol share above **40%**. Two or more seeds crossing 40% is
+   structural concentration, not seed noise.
+
+Tighten to **30% / 25% / 0-of-10 above 25%** once v2 has ≥5 symbols in the
+portfolio. The looser thresholds above are because v2 currently runs 3-4
+symbol baselines; the 50% cap would be 200%/n_symbols on a 4-symbol run.
+
+### Required reporting template
+
+Every engineering report for a MERGE-candidate iteration must include this
+table under a "Seed Concentration Audit" subsection:
+
+```
+| Seed | Max Share | Symbol    | Pass ≤50% | Pass ≤40% |
+|------|-----------|-----------|-----------|-----------|
+| 42   | 73.4%     | XRPUSDT   | FAIL      | FAIL      |
+| 123  | 46.2%     | XRPUSDT   | PASS      | FAIL      |
+| ...  | ...       | ...       | ...       | ...       |
+| Mean | 51.3%     | —         | FAIL      | —         |
+```
+
+Plus one-line verdicts:
+- Per-seed 50% cap:  X of 10 seeds pass
+- Mean ≤ 45%:        PASS / FAIL
+- ≤1 seed above 40%: PASS / FAIL
+- **Overall seed concentration**: PASS / FAIL
+
+**If overall = FAIL, the iteration is NO-MERGE regardless of headline mean
+Sharpe**, even if it was the highest OOS mean we've ever seen. The diary
+must explicitly state "Seed concentration: PASS" before a MERGE recommendation.
+
+### Why per-seed concentration is its own rule
+
+Seed variance in Optuna hyperparameter search can produce highly-selective
+models that lock onto one symbol's sweet spot. The aggregate mean hides this
+when other seeds find different sweet spots. The mean can be great while
+every individual model is brittle.
+
+Mitigations to try when this rule fails (in priority order):
+1. **Reduce Optuna trials** — fewer trials = less selective = better symbol
+   distribution (iter-v2/028 → iter-v2/029 path: 25 → 15 trials)
+2. **Constrain hyperparameter ranges** (e.g., cap confidence_threshold upper bound)
+3. **Per-symbol position cap** at backtest time (hard clip any symbol > X% of capital)
+4. **Add/rebalance symbols** — more symbols dilutes concentration mechanically
+
+---
+
 ## Symbol Addition Validation — 6 Gates for v2
 
 When iter-v2/001 picks the initial 3 symbols — or any later iteration adds a
@@ -895,8 +969,9 @@ merges ONLY if:
    - Max drawdown (OOS) ≤ v2 baseline OOS max drawdown × 1.2
    - Minimum 50 OOS trades
    - Profit factor > 1.0 (OOS)
-   - No single symbol > 50% of OOS PnL (relaxed from v1's 30% because v2
-     starts with only 3 symbols; tighten to 30% once v2 has ≥5 symbols)
+   - **Seed concentration audit**: PASS (see "Seed Concentration Check" section
+     — no single seed > 50% on any symbol, mean seed max-share ≤ 45%, at most
+     1 of 10 seeds above 40%)
    - IS/OOS Sharpe ratio > 0.5
    - **v2-v1 correlation < 0.80** (NEW): correlation of v2 portfolio returns
      vs v1 portfolio returns during OOS window. If too high, v2 is just
@@ -913,13 +988,29 @@ relaxed:
 - **≥7/10 seeds profitable**
 - OOS trades ≥ 50
 - Profit factor > 1.1
-- No single symbol > 50% of OOS PnL
+- **Seed concentration audit**: PASS (see "Seed Concentration Check" section)
 - **DSR > -0.5** (wide tolerance — N=1 for v2's trial count)
 - **v2-v1 correlation < 0.80** (non-negotiable, the whole point)
 
 If all pass → MERGE: write initial `BASELINE_V2.md`, tag `v0.v2-001`.
 If any fail → NO-MERGE: cherry-pick docs, EARLY STOP triggers mandatory
 research checklist for iter-v2/002.
+
+### One-time baseline reset: iter-v2/029
+
+**User-directed exception.** iter-v2/029 is merged UNCONDITIONALLY as a
+baseline reset, even if its headline metrics are worse than implicit prior
+iterations. Reason: after iter-v2/028's breakthrough-but-concentrated result
+(mean OOS +1.08 / XRP 73%), the user wants a clean reference point to
+continue from, not a continued search in the "maybe MERGE, maybe not" zone.
+
+- iter-v2/029 result → becomes `BASELINE_V2.md` regardless of seed
+  concentration, Sharpe, or any other constraint.
+- The Seed Concentration Check rule is documented in this skill as of
+  iter-v2/029 and is **enforced starting from iter-v2/030 onwards**.
+- The iter-v2/029 diary must still REPORT the seed concentration audit
+  (the table is mandatory), even though its outcome does not gate the merge.
+  This gives iter-v2/030+ a clear reference point for what passed/failed.
 
 ### Diversification exception (iter-v2/002+)
 
