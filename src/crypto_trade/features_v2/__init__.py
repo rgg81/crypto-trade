@@ -27,6 +27,7 @@ from pathlib import Path
 import pandas as pd
 from tqdm import tqdm
 
+from crypto_trade.features_v2.cross_btc import add_cross_btc_features
 from crypto_trade.features_v2.fracdiff_v2 import add_fracdiff_features
 from crypto_trade.features_v2.momentum_accel import add_momentum_accel_features
 from crypto_trade.features_v2.price_efficient_vol import add_price_efficient_vol_features
@@ -43,6 +44,7 @@ GROUP_REGISTRY: dict[str, Callable[[pd.DataFrame], pd.DataFrame]] = {
     "momentum_accel": add_momentum_accel_features,
     "volume_micro": add_volume_micro_features,
     "fracdiff": add_fracdiff_features,
+    "cross_btc": add_cross_btc_features,  # iter-v2/026: BTC cross-asset features
 }
 
 V2_FEATURE_COLUMNS: tuple[str, ...] = (
@@ -87,6 +89,12 @@ V2_FEATURE_COLUMNS: tuple[str, ...] = (
     # Fracdiff
     "fracdiff_logclose_d04",
     "fracdiff_logvolume_d04",
+    # iter-v2/026: BTC cross-asset features
+    "btc_ret_3d",
+    "btc_ret_7d",
+    "btc_ret_14d",
+    "btc_vol_14d",
+    "sym_vs_btc_ret_7d",
 )
 """The 35 features fed to the LightGBM model in iter-v2/001.
 

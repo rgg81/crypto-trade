@@ -30,6 +30,7 @@ import time
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 
 from crypto_trade.backtest import run_backtest
 from crypto_trade.backtest_models import BacktestConfig
@@ -48,7 +49,7 @@ from crypto_trade.strategies.ml.risk_v2 import (
 )
 
 ITERATION = 1
-ITERATION_LABEL = "v2-019"
+ITERATION_LABEL = "v2-026"
 
 # iter-v2/017: Hit-rate feedback gate (Config D from iter-v2/016 feasibility).
 # For each new signal, look at the last 20 trades that closed before this
@@ -287,11 +288,26 @@ def main() -> None:
         else:
             oos_sr_ub = 0.0
 
-        # Compute IS totals too — iter-v2/019 specifically targets IS improvement
+        # Compute IS totals too
         is_tr = [t for t in braked if t.open_time < OOS_CUTOFF_MS]
         is_wp = float(sum(t.weighted_pnl for t in is_tr))
         is_tr_ub = [t for t in unbraked if t.open_time < OOS_CUTOFF_MS]
         is_wp_ub = float(sum(t.weighted_pnl for t in is_tr_ub))
+
+        # Monthly Sharpe (user's preferred metric)
+        def _monthly_sharpe(ts: list) -> float:
+            if not ts:
+                return 0.0
+            months = pd.to_datetime([t.close_time for t in ts], unit="ms").to_period("M")
+            monthly = (
+                pd.Series([t.weighted_pnl for t in ts], index=months).groupby(level=0).sum() / 100.0
+            )
+            if len(monthly) < 2 or monthly.std() == 0:
+                return 0.0
+            return float(monthly.mean() / monthly.std() * np.sqrt(12))
+
+        is_sharpe_monthly = _monthly_sharpe(is_tr)
+        oos_sharpe_monthly = _monthly_sharpe(oos)
 
         per_seed_summary.append(
             {
@@ -300,6 +316,8 @@ def main() -> None:
                 "oos_trades": len(oos),
                 "oos_sharpe": round(oos_sr, 4),
                 "oos_sharpe_unbraked": round(oos_sr_ub, 4),
+                "is_sharpe_monthly": round(is_sharpe_monthly, 4),
+                "oos_sharpe_monthly": round(oos_sharpe_monthly, 4),
                 "is_total_wpnl": round(is_wp, 2),
                 "is_total_wpnl_unbraked": round(is_wp_ub, 2),
                 "btc_killed": btc_stats["n_killed"],
@@ -307,8 +325,8 @@ def main() -> None:
             }
         )
         print(
-            f"[seed {seed}] {len(braked)} trades, OOS {len(oos)} trades, "
-            f"OOS Sharpe={oos_sr:+.4f} (unbraked {oos_sr_ub:+.4f})"
+            f"[seed {seed}] {len(braked)} trades, "
+            f"IS monthly={is_sharpe_monthly:+.4f}, OOS monthly={oos_sharpe_monthly:+.4f}"
         )
 
         if i == 0:
@@ -321,17 +339,24 @@ def main() -> None:
     print("\n" + "=" * 60)
     print("SEED ROBUSTNESS SUMMARY")
     print("=" * 60)
-    print(f"{'seed':>6}  {'trades':>6}  {'oos_trades':>10}  {'oos_sharpe':>10}")
+    print(f"{'seed':>6}  {'IS monthly':>12}  {'OOS monthly':>12}  {'OOS trade':>12}")
     for r in per_seed_summary:
-        print(f"{r['seed']:>6}  {r['trades']:>6}  {r['oos_trades']:>10}  {r['oos_sharpe']:>10}")
+        print(
+            f"{r['seed']:>6}  "
+            f"{r.get('is_sharpe_monthly', 0.0):>+12.4f}  "
+            f"{r.get('oos_sharpe_monthly', 0.0):>+12.4f}  "
+            f"{r['oos_sharpe']:>+12.4f}"
+        )
+    is_monthly = np.array([r.get("is_sharpe_monthly", 0.0) for r in per_seed_summary])
+    oos_monthly = np.array([r.get("oos_sharpe_monthly", 0.0) for r in per_seed_summary])
     oos_sharpes = np.array([r["oos_sharpe"] for r in per_seed_summary])
     profitable = int((oos_sharpes > 0).sum())
-    print(f"\nMean OOS Sharpe: {oos_sharpes.mean():+.4f}")
+    print(f"\nMean IS monthly Sharpe: {is_monthly.mean():+.4f}")
+    print(f"Mean OOS monthly Sharpe: {oos_monthly.mean():+.4f}")
+    print(f"Mean OOS trade Sharpe: {oos_sharpes.mean():+.4f}")
     print(f"Profitable seeds: {profitable}/{len(seeds)}")
-    print(
-        f"Pass (mean>0 AND ≥7/10 profitable): "
-        f"{oos_sharpes.mean() > 0 and profitable >= max(1, int(0.7 * len(seeds)))}"
-    )
+    ratio = oos_monthly.mean() / is_monthly.mean() if is_monthly.mean() > 0 else float("inf")
+    print(f"OOS/IS monthly ratio: {ratio:.2f}x  (target: 1.0-2.0 for balance)")
 
     # generate_iteration_reports reads BTCUSDT's v1 features (vol_natr_14,
     # trend_adx_14) purely for the per_regime.csv annotation. BTC is not in
