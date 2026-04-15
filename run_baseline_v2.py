@@ -49,7 +49,7 @@ from crypto_trade.strategies.ml.risk_v2 import (
 )
 
 ITERATION = 1
-ITERATION_LABEL = "v2-026"
+ITERATION_LABEL = "v2-029"
 
 # iter-v2/017: Hit-rate feedback gate (Config D from iter-v2/016 feasibility).
 # For each new signal, look at the last 20 trades that closed before this
@@ -234,8 +234,8 @@ def main() -> None:
     parser.add_argument(
         "--n-trials",
         type=int,
-        default=10,
-        help="Optuna trials per monthly model (v1 uses 50; iter-v2/001 default 10)",
+        default=15,
+        help="Optuna trials per monthly model (iter-v2/029: 10→15 middle ground)",
     )
     args = parser.parse_args()
 
