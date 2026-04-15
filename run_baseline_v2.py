@@ -49,7 +49,7 @@ from crypto_trade.strategies.ml.risk_v2 import (
 )
 
 ITERATION = 1
-ITERATION_LABEL = "v2-034-seed-diag"
+ITERATION_LABEL = "v2-035"
 
 # iter-v2/017: Hit-rate feedback gate (Config D from iter-v2/016 feasibility).
 # For each new signal, look at the last 20 trades that closed before this
@@ -81,13 +81,10 @@ V2_EXCLUDED_SYMBOLS: tuple[str, ...] = ("BTCUSDT", "ETHUSDT", "LINKUSDT", "BNBUS
 # the 6-gate screening in iter-v2/001: v1 corr 0.665, $240M daily volume,
 # 4,847 IS candles.
 V2_MODELS: tuple[tuple[str, str], ...] = (
-    # iter-v2/034 (seed diagnostic): revert to iter-029 baseline config
-    # (DOGE+SOL+XRP+NEAR) and run with DIFFERENT seeds. Goal: isolate
-    # whether the seed variance pattern we see across iter-029→032 is
-    # a property of the standard FULL_SEEDS or of the underlying Optuna
-    # search. If a new seed set produces a similar IS/OOS/concentration
-    # distribution, the variance is structural. If it produces materially
-    # different results, our standard seeds were cherry-picked by history.
+    # iter-v2/035: keep iter-029 baseline symbols (DOGE+SOL+XRP+NEAR)
+    # to isolate the v1-style 5-seed ensemble as the only new variable
+    # vs baseline. iter-036 can test the iter-032 mix (swap SOL→ADA)
+    # once the ensemble approach is validated.
     ("E (DOGEUSDT)", "DOGEUSDT"),
     ("F (SOLUSDT)", "SOLUSDT"),
     ("G (XRPUSDT)", "XRPUSDT"),
@@ -95,11 +92,12 @@ V2_MODELS: tuple[tuple[str, str], ...] = (
 )
 
 DEFAULT_SEEDS = (42,)  # iter-v2/001 first-pass uses a single seed
-# iter-v2/034 seed diagnostic: a COMPLETELY DIFFERENT 10-seed set to
-# test whether the iter-029→032 seed variance is structural or
-# artifact-of-seed-choice. Ten distinct primes spanning 11..9941, no
-# overlap with the original FULL_SEEDS.
-FULL_SEEDS = (11, 37, 131, 257, 541, 1093, 2287, 4657, 7621, 9941)
+# iter-v2/035: restored to historical FULL_SEEDS. v1-style 5-seed
+# internal ensembling makes the outer seed loop less critical since
+# robustness comes from the internal ensemble. Single-run mode does
+# not iterate this list, but it's kept for backward compat with
+# --seeds > 1 invocations.
+FULL_SEEDS = (42, 123, 456, 789, 1001, 1234, 2345, 3456, 4567, 5678)
 
 
 def _verify_branch() -> None:
@@ -181,11 +179,17 @@ def _run_single_seed(
         print("=" * 60)
         print(f"MODEL {name} — seed {seed}")
         print("=" * 60)
+        # iter-v2/035: v1-style 5-seed internal ensemble per model,
+        # matching run_baseline_v152.py:51. Each model trains 5 separate
+        # Optuna runs with 50 trials each (n_trials passed in), then
+        # averages predictions at inference time. The outer `seed` still
+        # controls the ensemble's first-seed position and random-state
+        # for reproducibility of which 5-seed set is used.
         cfg, strategy = _build_model(
             symbol=symbol,
             seed=seed,
             n_trials=n_trials,
-            ensemble_seeds=[seed],
+            ensemble_seeds=[42, 123, 456, 789, 1001],
         )
         _verify_symbols(cfg.symbols)
         t0 = time.time()
@@ -245,8 +249,8 @@ def main() -> None:
     parser.add_argument(
         "--n-trials",
         type=int,
-        default=15,
-        help="Optuna trials per monthly model (iter-v2/029: 10→15 middle ground)",
+        default=50,
+        help="Optuna trials per monthly model (iter-v2/035: match v1's 50, per ensemble seed)",
     )
     args = parser.parse_args()
 
