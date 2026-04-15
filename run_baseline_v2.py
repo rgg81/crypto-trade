@@ -49,7 +49,7 @@ from crypto_trade.strategies.ml.risk_v2 import (
 )
 
 ITERATION = 1
-ITERATION_LABEL = "v2-030"
+ITERATION_LABEL = "v2-031"
 
 # iter-v2/017: Hit-rate feedback gate (Config D from iter-v2/016 feasibility).
 # For each new signal, look at the last 20 trades that closed before this
@@ -85,6 +85,7 @@ V2_MODELS: tuple[tuple[str, str], ...] = (
     ("F (SOLUSDT)", "SOLUSDT"),
     ("G (XRPUSDT)", "XRPUSDT"),
     ("H (NEARUSDT)", "NEARUSDT"),
+    ("I (ADAUSDT)", "ADAUSDT"),  # iter-v2/031: 5th symbol to dilute XRP concentration
 )
 
 DEFAULT_SEEDS = (42,)  # iter-v2/001 first-pass uses a single seed
@@ -310,27 +311,44 @@ def main() -> None:
         is_sharpe_monthly = _monthly_sharpe(is_tr)
         oos_sharpe_monthly = _monthly_sharpe(oos)
 
-        # iter-v2/030: per-seed per-symbol OOS PnL share for concentration audit
+        # iter-v2/031: per-seed per-symbol OOS PnL share (positive-total metric
+        # + distressed flag). Skill update: use positive-total as denominator to
+        # handle seeds where losing symbols dominate the total.
         sym_pnl: dict[str, float] = {}
         for t in oos:
             sym_pnl[t.symbol] = sym_pnl.get(t.symbol, 0.0) + float(t.weighted_pnl)
         total_oos = sum(sym_pnl.values())
-        if total_oos != 0:
-            sym_share = {s: round(p / total_oos * 100.0, 2) for s, p in sym_pnl.items()}
+        positive_total = sum(max(0.0, p) for p in sym_pnl.values())
+        # A seed is distressed if total is near-zero or negative — in those
+        # cases the losing symbols eat most of the winners' PnL.
+        distressed = (total_oos <= 0.0) or (abs(total_oos) < 10.0)
+        if positive_total > 0:
+            # Positive-total share: each symbol's positive contribution / sum of
+            # positive contributions. Always in [0, 1].
+            sym_share = {
+                s: round(max(0.0, p) / positive_total * 100.0, 2) for s, p in sym_pnl.items()
+            }
         else:
             sym_share = {s: 0.0 for s in sym_pnl}
-        max_share = max(sym_share.values()) if sym_share else 0.0
-        max_symbol = max(sym_share, key=sym_share.get) if sym_share else ""
+        # Only consider positive contributors for max-share
+        positive_contributors = {s: v for s, v in sym_share.items() if v > 0}
+        max_share = max(positive_contributors.values()) if positive_contributors else 0.0
+        max_symbol = (
+            max(positive_contributors, key=positive_contributors.get)
+            if positive_contributors
+            else ""
+        )
         per_seed_concentration.append(
             {
                 "seed": seed,
+                "distressed": distressed,
+                "total_oos_wpnl": round(total_oos, 2),
+                "positive_total_wpnl": round(positive_total, 2),
                 "oos_trades_per_symbol": {s: sum(1 for t in oos if t.symbol == s) for s in sym_pnl},
                 "oos_pnl_per_symbol": {s: round(p, 2) for s, p in sym_pnl.items()},
                 "oos_share_pct": sym_share,
                 "max_share_pct": max_share,
                 "max_symbol": max_symbol,
-                "pass_50pct": max_share <= 50.0,
-                "pass_40pct": max_share <= 40.0,
             }
         )
 
@@ -383,32 +401,72 @@ def main() -> None:
     ratio = oos_monthly.mean() / is_monthly.mean() if is_monthly.mean() > 0 else float("inf")
     print(f"OOS/IS monthly ratio: {ratio:.2f}x  (target: 1.0-2.0 for balance)")
 
-    # iter-v2/030: per-seed concentration audit (new pre-MERGE hard gate)
+    # iter-v2/031: n-symbol-aware concentration audit with distressed handling.
+    # Thresholds scale with the number of symbols in V2_MODELS.
+    def _thresholds_for_n(n: int) -> tuple[float, float, float]:
+        """Return (max_per_seed, mean_max, inner_above). See skill rule."""
+        if n <= 2:
+            return 60.0, 55.0, 50.0
+        if n == 3:
+            return 55.0, 50.0, 45.0
+        if n == 4:
+            return 50.0, 45.0, 40.0
+        if n == 5:
+            return 40.0, 35.0, 32.0
+        if n <= 7:
+            return 35.0, 30.0, 28.0
+        return 30.0, 25.0, 23.0
+
+    n_symbols = len(V2_MODELS)
+    thr_max, thr_mean, thr_inner = _thresholds_for_n(n_symbols)
     if per_seed_concentration:
         print("\n" + "=" * 60)
-        print("SEED CONCENTRATION AUDIT")
+        print(f"SEED CONCENTRATION AUDIT (n_symbols={n_symbols})")
+        print(f"Thresholds: max<={thr_max:.0f}%, mean<={thr_mean:.0f}%, <=1 above {thr_inner:.0f}%")
         print("=" * 60)
-        print(f"{'seed':>6}  {'max':>7}  {'symbol':>10}  {'<=50':>6}  {'<=40':>6}")
+        print(
+            f"{'seed':>6}  {'max':>7}  {'symbol':>10}  "
+            f"{'pass_max':>9}  {'pass_inner':>10}  {'distressed':>11}"
+        )
         max_shares = []
+        n_distressed = 0
         for c in per_seed_concentration:
             max_shares.append(c["max_share_pct"])
+            if c["distressed"]:
+                n_distressed += 1
+            pass_max = c["max_share_pct"] <= thr_max
+            pass_inner = c["max_share_pct"] <= thr_inner
+            c["pass_max"] = pass_max
+            c["pass_inner"] = pass_inner
             print(
                 f"{c['seed']:>6}  "
                 f"{c['max_share_pct']:>6.2f}%  "
                 f"{c['max_symbol']:>10}  "
-                f"{'PASS' if c['pass_50pct'] else 'FAIL':>6}  "
-                f"{'PASS' if c['pass_40pct'] else 'FAIL':>6}"
+                f"{'PASS' if pass_max else 'FAIL':>9}  "
+                f"{'PASS' if pass_inner else 'FAIL':>10}  "
+                f"{'DISTRESS' if c['distressed'] else '—':>11}"
             )
         mean_max = float(np.mean(max_shares))
-        n_pass_50 = sum(1 for c in per_seed_concentration if c["pass_50pct"])
-        n_above_40 = sum(1 for c in per_seed_concentration if not c["pass_40pct"])
-        print(f"\nMean per-seed max-share: {mean_max:.2f}%  (rule: <=45%)")
-        print(f"Seeds passing <=50%:      {n_pass_50}/{len(per_seed_concentration)}  (rule: all)")
-        print(f"Seeds above 40%:          {n_above_40}/{len(per_seed_concentration)}  (rule: <=1)")
+        n_pass_max = sum(1 for c in per_seed_concentration if c["pass_max"])
+        n_above_inner = sum(1 for c in per_seed_concentration if not c["pass_inner"])
+        print(f"\nMean per-seed max-share: {mean_max:.2f}%  (rule: <={thr_mean:.0f}%)")
+        print(
+            f"Seeds passing <={thr_max:.0f}%:      "
+            f"{n_pass_max}/{len(per_seed_concentration)}  (rule: all)"
+        )
+        print(
+            f"Seeds above {thr_inner:.0f}%:          "
+            f"{n_above_inner}/{len(per_seed_concentration)}  (rule: <=1)"
+        )
+        print(
+            f"Distressed seeds:         "
+            f"{n_distressed}/{len(per_seed_concentration)}  (rule: <=2)"
+        )
         overall_pass = (
-            n_pass_50 == len(per_seed_concentration)
-            and mean_max <= 45.0
-            and n_above_40 <= 1
+            n_pass_max == len(per_seed_concentration)
+            and mean_max <= thr_mean
+            and n_above_inner <= 1
+            and n_distressed <= 2
         )
         print(f"Overall seed concentration: {'PASS' if overall_pass else 'FAIL'}")
 
