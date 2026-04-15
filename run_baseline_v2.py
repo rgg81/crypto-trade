@@ -49,7 +49,7 @@ from crypto_trade.strategies.ml.risk_v2 import (
 )
 
 ITERATION = 1
-ITERATION_LABEL = "v2-029"
+ITERATION_LABEL = "v2-030"
 
 # iter-v2/017: Hit-rate feedback gate (Config D from iter-v2/016 feasibility).
 # For each new signal, look at the last 20 trades that closed before this
@@ -253,6 +253,7 @@ def main() -> None:
 
     # Per-seed results for robustness validation
     per_seed_summary: list[dict] = []
+    per_seed_concentration: list[dict] = []  # iter-v2/030: per-seed per-symbol OOS share
     primary_trades: list | None = None
 
     for i, seed in enumerate(seeds):
@@ -309,6 +310,30 @@ def main() -> None:
         is_sharpe_monthly = _monthly_sharpe(is_tr)
         oos_sharpe_monthly = _monthly_sharpe(oos)
 
+        # iter-v2/030: per-seed per-symbol OOS PnL share for concentration audit
+        sym_pnl: dict[str, float] = {}
+        for t in oos:
+            sym_pnl[t.symbol] = sym_pnl.get(t.symbol, 0.0) + float(t.weighted_pnl)
+        total_oos = sum(sym_pnl.values())
+        if total_oos != 0:
+            sym_share = {s: round(p / total_oos * 100.0, 2) for s, p in sym_pnl.items()}
+        else:
+            sym_share = {s: 0.0 for s in sym_pnl}
+        max_share = max(sym_share.values()) if sym_share else 0.0
+        max_symbol = max(sym_share, key=sym_share.get) if sym_share else ""
+        per_seed_concentration.append(
+            {
+                "seed": seed,
+                "oos_trades_per_symbol": {s: sum(1 for t in oos if t.symbol == s) for s in sym_pnl},
+                "oos_pnl_per_symbol": {s: round(p, 2) for s, p in sym_pnl.items()},
+                "oos_share_pct": sym_share,
+                "max_share_pct": max_share,
+                "max_symbol": max_symbol,
+                "pass_50pct": max_share <= 50.0,
+                "pass_40pct": max_share <= 40.0,
+            }
+        )
+
         per_seed_summary.append(
             {
                 "seed": seed,
@@ -358,6 +383,35 @@ def main() -> None:
     ratio = oos_monthly.mean() / is_monthly.mean() if is_monthly.mean() > 0 else float("inf")
     print(f"OOS/IS monthly ratio: {ratio:.2f}x  (target: 1.0-2.0 for balance)")
 
+    # iter-v2/030: per-seed concentration audit (new pre-MERGE hard gate)
+    if per_seed_concentration:
+        print("\n" + "=" * 60)
+        print("SEED CONCENTRATION AUDIT")
+        print("=" * 60)
+        print(f"{'seed':>6}  {'max':>7}  {'symbol':>10}  {'<=50':>6}  {'<=40':>6}")
+        max_shares = []
+        for c in per_seed_concentration:
+            max_shares.append(c["max_share_pct"])
+            print(
+                f"{c['seed']:>6}  "
+                f"{c['max_share_pct']:>6.2f}%  "
+                f"{c['max_symbol']:>10}  "
+                f"{'PASS' if c['pass_50pct'] else 'FAIL':>6}  "
+                f"{'PASS' if c['pass_40pct'] else 'FAIL':>6}"
+            )
+        mean_max = float(np.mean(max_shares))
+        n_pass_50 = sum(1 for c in per_seed_concentration if c["pass_50pct"])
+        n_above_40 = sum(1 for c in per_seed_concentration if not c["pass_40pct"])
+        print(f"\nMean per-seed max-share: {mean_max:.2f}%  (rule: <=45%)")
+        print(f"Seeds passing <=50%:      {n_pass_50}/{len(per_seed_concentration)}  (rule: all)")
+        print(f"Seeds above 40%:          {n_above_40}/{len(per_seed_concentration)}  (rule: <=1)")
+        overall_pass = (
+            n_pass_50 == len(per_seed_concentration)
+            and mean_max <= 45.0
+            and n_above_40 <= 1
+        )
+        print(f"Overall seed concentration: {'PASS' if overall_pass else 'FAIL'}")
+
     # generate_iteration_reports reads BTCUSDT's v1 features (vol_natr_14,
     # trend_adx_14) purely for the per_regime.csv annotation. BTC is not in
     # v2's feature_v2 parquets (excluded by design). Point the regime lookup
@@ -373,6 +427,9 @@ def main() -> None:
     )
     # Persist per-seed summary next to the comparison.csv
     (Path(report_dir) / "seed_summary.json").write_text(json.dumps(per_seed_summary, indent=2))
+    (Path(report_dir) / "seed_concentration.json").write_text(
+        json.dumps(per_seed_concentration, indent=2)
+    )
     print(f"Reports: {report_dir}")
 
 
