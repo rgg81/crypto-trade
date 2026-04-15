@@ -49,7 +49,7 @@ from crypto_trade.strategies.ml.risk_v2 import (
 )
 
 ITERATION = 1
-ITERATION_LABEL = "v2-031"
+ITERATION_LABEL = "v2-032"
 
 # iter-v2/017: Hit-rate feedback gate (Config D from iter-v2/016 feasibility).
 # For each new signal, look at the last 20 trades that closed before this
@@ -81,11 +81,12 @@ V2_EXCLUDED_SYMBOLS: tuple[str, ...] = ("BTCUSDT", "ETHUSDT", "LINKUSDT", "BNBUS
 # the 6-gate screening in iter-v2/001: v1 corr 0.665, $240M daily volume,
 # 4,847 IS candles.
 V2_MODELS: tuple[tuple[str, str], ...] = (
+    # iter-v2/032: 3-symbol portfolio. Dropped SOL and NEAR as chronic
+    # losers on iter-031 primary seed (SOL: −1.66 wpnl, NEAR: −2.73 wpnl).
+    # Keep only the 3 net-positive contributors from iter-031 primary seed.
     ("E (DOGEUSDT)", "DOGEUSDT"),
-    ("F (SOLUSDT)", "SOLUSDT"),
     ("G (XRPUSDT)", "XRPUSDT"),
-    ("H (NEARUSDT)", "NEARUSDT"),
-    ("I (ADAUSDT)", "ADAUSDT"),  # iter-v2/031: 5th symbol to dilute XRP concentration
+    ("I (ADAUSDT)", "ADAUSDT"),
 )
 
 DEFAULT_SEEDS = (42,)  # iter-v2/001 first-pass uses a single seed
