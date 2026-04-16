@@ -97,11 +97,9 @@ V2_FEATURE_COLUMNS: tuple[str, ...] = (
     "btc_ret_14d",
     "btc_vol_14d",
     "sym_vs_btc_ret_7d",
-    # iter-v2/039: microstructure transition features
-    "candle_efficiency_20",
-    "vol_transition_slope_20",
-    "vol_return_divergence_30",
-    "kurt_ratio_50_200",
+    # iter-v2/039 microstructure features REMOVED — overfit IS +46% but
+    # OOS −51%. Kept in the registry for optional regeneration but NOT
+    # in V2_FEATURE_COLUMNS.
 )
 """The 35 features fed to the LightGBM model in iter-v2/001.
 
