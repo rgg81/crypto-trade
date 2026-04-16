@@ -28,6 +28,7 @@ import pandas as pd
 from tqdm import tqdm
 
 from crypto_trade.features_v2.cross_btc import add_cross_btc_features
+from crypto_trade.features_v2.cross_v2sym import add_cross_v2sym_features
 from crypto_trade.features_v2.fracdiff_v2 import add_fracdiff_features
 from crypto_trade.features_v2.microstructure_v2 import add_microstructure_v2_features
 from crypto_trade.features_v2.momentum_accel import add_momentum_accel_features
@@ -47,6 +48,7 @@ GROUP_REGISTRY: dict[str, Callable[[pd.DataFrame], pd.DataFrame]] = {
     "fracdiff": add_fracdiff_features,
     "cross_btc": add_cross_btc_features,  # iter-v2/026: BTC cross-asset features
     "microstructure_v2": add_microstructure_v2_features,  # iter-v2/039
+    "cross_v2sym": add_cross_v2sym_features,  # iter-v2/043: relative strength within v2 universe
 }
 
 V2_FEATURE_COLUMNS: tuple[str, ...] = (
@@ -97,6 +99,10 @@ V2_FEATURE_COLUMNS: tuple[str, ...] = (
     "btc_ret_14d",
     "btc_vol_14d",
     "sym_vs_btc_ret_7d",
+    # iter-v2/043: v2 cross-symbol relative strength
+    "sym_ret_7d_rank_v2",
+    "sym_ret_14d_rank_v2",
+    "sym_vs_v2mean_ret_7d",
 )
 """The 35 features fed to the LightGBM model in iter-v2/001.
 
@@ -151,6 +157,7 @@ def process_symbol_v2(
         return (symbol, 0, 0)
 
     df = ka.df.copy()
+    df["symbol"] = symbol  # iter-v2/043: needed for cross_v2sym features
     before_cols = set(df.columns)
     df = generate_features_v2(df, list(GROUP_REGISTRY.keys()))
     added = [c for c in df.columns if c not in before_cols]
