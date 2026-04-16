@@ -49,7 +49,7 @@ from crypto_trade.strategies.ml.risk_v2 import (
 )
 
 ITERATION = 1
-ITERATION_LABEL = "v2-037"
+ITERATION_LABEL = "v2-035"
 
 # iter-v2/017: Hit-rate feedback gate (Config D from iter-v2/016 feasibility).
 # For each new signal, look at the last 20 trades that closed before this
@@ -138,7 +138,7 @@ def _build_model(
         vol_targeting=False,
     )
     inner = LightGbmStrategy(
-        training_months=18,  # iter-v2/037: 24→18mo to improve IS by focusing on recent patterns
+        training_months=24,
         n_trials=n_trials,
         cv_splits=5,
         label_tp_pct=8.0,
