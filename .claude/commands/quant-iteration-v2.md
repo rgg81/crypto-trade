@@ -1152,6 +1152,26 @@ most valuable resource. Kill bad strategies fast.
 
 ### Yearly Checkpoints
 
+### Training window — FIXED at 24 months
+
+**`training_months=24` is locked. Do NOT change it.**
+
+Changing the training window directly changes WHICH months appear in the IS
+evaluation period. Shorter window → walk-forward starts later → fewer IS
+months to validate. Longer window → same effect (later start due to more
+warm-up). Either direction corrupts the IS/OOS comparison because IS itself
+changes.
+
+Evidence from iter-v2/037 (18mo) and iter-v2/038 (30mo, aborted): 18mo
+improved OOS +9% but IS collapsed −36%. The IS regression was not from
+model quality — it was from losing 6 months of IS evaluation data. Any
+training-window change conflates model improvement with measurement change.
+
+**To improve IS, change features, labeling, or model architecture — not the
+training window.**
+
+### Yearly Checkpoints
+
 Training window is 24 months. First predictions ≈ Jan 2022. Check at end of
 each calendar year:
 
