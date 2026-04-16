@@ -49,7 +49,7 @@ from crypto_trade.strategies.ml.risk_v2 import (
 )
 
 ITERATION = 1
-ITERATION_LABEL = "v2-041"
+ITERATION_LABEL = "v2-042"
 
 # iter-v2/017: Hit-rate feedback gate (Config D from iter-v2/016 feasibility).
 # For each new signal, look at the last 20 trades that closed before this
@@ -81,14 +81,11 @@ V2_EXCLUDED_SYMBOLS: tuple[str, ...] = ("BTCUSDT", "ETHUSDT", "LINKUSDT", "BNBUS
 # the 6-gate screening in iter-v2/001: v1 corr 0.665, $240M daily volume,
 # 4,847 IS candles.
 V2_MODELS: tuple[tuple[str, str], ...] = (
-    # iter-v2/041: 5-symbol with AVAX + pruned features (25 from 40).
-    # More diversification, less noise. AVAX is an established L1 with
-    # 5955 8h klines (since Sep 2020), not in v1 baseline.
+    # iter-v2/042: back to iter-035 4-symbol baseline.
     ("E (DOGEUSDT)", "DOGEUSDT"),
     ("F (SOLUSDT)", "SOLUSDT"),
     ("G (XRPUSDT)", "XRPUSDT"),
     ("H (NEARUSDT)", "NEARUSDT"),
-    ("J (AVAXUSDT)", "AVAXUSDT"),
 )
 
 DEFAULT_SEEDS = (42,)  # iter-v2/001 first-pass uses a single seed
@@ -141,7 +138,7 @@ def _build_model(
     inner = LightGbmStrategy(
         training_months=24,
         n_trials=n_trials,
-        cv_splits=5,
+        cv_splits=3,  # iter-v2/042: 5→3 folds — more data per fold, 40% faster
         label_tp_pct=8.0,
         label_sl_pct=4.0,
         label_timeout_minutes=10080,
