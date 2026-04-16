@@ -49,7 +49,7 @@ from crypto_trade.strategies.ml.risk_v2 import (
 )
 
 ITERATION = 1
-ITERATION_LABEL = "v2-039"
+ITERATION_LABEL = "v2-040"
 
 # iter-v2/017: Hit-rate feedback gate (Config D from iter-v2/016 feasibility).
 # For each new signal, look at the last 20 trades that closed before this
@@ -148,8 +148,8 @@ def _build_model(
         features_dir="data/features_v2",
         seed=seed,
         verbose=0,
-        atr_tp_multiplier=2.9,
-        atr_sl_multiplier=1.45,
+        atr_tp_multiplier=3.5,  # iter-v2/040: wider labels (v1 Models C/D config)
+        atr_sl_multiplier=1.75,
         atr_column="natr_21_raw",
         use_atr_labeling=True,
         ensemble_seeds=list(ensemble_seeds),
