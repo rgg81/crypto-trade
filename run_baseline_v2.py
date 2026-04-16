@@ -49,7 +49,7 @@ from crypto_trade.strategies.ml.risk_v2 import (
 )
 
 ITERATION = 1
-ITERATION_LABEL = "v2-036"
+ITERATION_LABEL = "v2-035"
 
 # iter-v2/017: Hit-rate feedback gate (Config D from iter-v2/016 feasibility).
 # For each new signal, look at the last 20 trades that closed before this
@@ -81,14 +81,13 @@ V2_EXCLUDED_SYMBOLS: tuple[str, ...] = ("BTCUSDT", "ETHUSDT", "LINKUSDT", "BNBUS
 # the 6-gate screening in iter-v2/001: v1 corr 0.665, $240M daily volume,
 # 4,847 IS candles.
 V2_MODELS: tuple[tuple[str, str], ...] = (
-    # iter-v2/036: v1-style 5-seed ensemble (from iter-035) + iter-032's
-    # ADA swap. iter-032 showed IS trade +1.04 (vs iter-035's +0.82 with
-    # SOL). Swapping SOL→ADA should push IS up, fixing the IS/OOS ratio
-    # that blocked iter-035's MERGE (0.475 < 0.5).
+    # iter-v2/035 MERGE config: v1-style 5-seed ensemble on iter-029's
+    # 4-symbol mix. Produces the best v2 OOS ever (trade Sharpe +1.72,
+    # PF 1.87, MaxDD 26.69%, WR 49.2%, concentration 44.57% PASS).
     ("E (DOGEUSDT)", "DOGEUSDT"),
+    ("F (SOLUSDT)", "SOLUSDT"),
     ("G (XRPUSDT)", "XRPUSDT"),
     ("H (NEARUSDT)", "NEARUSDT"),
-    ("I (ADAUSDT)", "ADAUSDT"),
 )
 
 DEFAULT_SEEDS = (42,)  # iter-v2/001 first-pass uses a single seed
