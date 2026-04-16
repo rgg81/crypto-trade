@@ -50,56 +50,45 @@ GROUP_REGISTRY: dict[str, Callable[[pd.DataFrame], pd.DataFrame]] = {
 }
 
 V2_FEATURE_COLUMNS: tuple[str, ...] = (
-    # Regime
+    # iter-v2/041: PRUNED from 40 → 25 features. Dropped 15 redundant/noisy
+    # features (duplicate horizons, niche ratios, weak signals). Goal: reduce
+    # model capacity to memorize IS noise. Kept the strongest representative
+    # from each category.
+    #
+    # Regime (6 — dropped hurst_200, atr_pct_rank_500)
     "hurst_100",
-    "hurst_200",
     "hurst_diff_100_50",
     "atr_pct_rank_200",
-    "atr_pct_rank_500",
     "atr_pct_rank_1000",
     "bb_width_pct_rank_100",
     "cusum_reset_count_200",
-    # Tail risk
+    # Tail risk (3 — dropped ret_skew_100, ret_kurt_200, range_realized_vol_50,
+    #   max_dd_window_50)
     "ret_skew_50",
-    "ret_skew_100",
     "ret_skew_200",
     "ret_kurt_50",
-    "ret_kurt_200",
-    "range_realized_vol_50",
-    "max_dd_window_50",
-    # Efficient OHLC vol
+    # Efficient OHLC vol (3 — dropped parkinson_vol_50, parkinson_gk_ratio_20)
     "parkinson_vol_20",
-    "parkinson_vol_50",
     "garman_klass_vol_20",
     "rogers_satchell_vol_20",
-    "parkinson_gk_ratio_20",
-    # Momentum acceleration
+    # Momentum acceleration (3 — dropped mom_accel_20_100, ret_autocorr_lag5_50)
     "mom_accel_5_20",
-    "mom_accel_20_100",
     "ema_spread_atr_20",
     "ret_autocorr_lag1_50",
-    "ret_autocorr_lag5_50",
-    # Volume microstructure
+    # Volume microstructure (3 — dropped vwap_dev_50, volume_cv_50,
+    #   obv_slope_50, hl_range_ratio_20, close_pos_in_range_50)
     "vwap_dev_20",
-    "vwap_dev_50",
     "volume_mom_ratio_20",
-    "volume_cv_50",
-    "obv_slope_50",
-    "hl_range_ratio_20",
     "close_pos_in_range_20",
-    "close_pos_in_range_50",
-    # Fracdiff
+    # Fracdiff (2 — unchanged)
     "fracdiff_logclose_d04",
     "fracdiff_logvolume_d04",
-    # iter-v2/026: BTC cross-asset features
+    # BTC cross-asset (5 — unchanged)
     "btc_ret_3d",
     "btc_ret_7d",
     "btc_ret_14d",
     "btc_vol_14d",
     "sym_vs_btc_ret_7d",
-    # iter-v2/039 microstructure features REMOVED — overfit IS +46% but
-    # OOS −51%. Kept in the registry for optional regeneration but NOT
-    # in V2_FEATURE_COLUMNS.
 )
 """The 35 features fed to the LightGBM model in iter-v2/001.
 
