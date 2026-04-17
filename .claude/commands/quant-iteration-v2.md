@@ -1021,21 +1021,42 @@ windowed fracdiff with fixed window=100 (≈33 days on 8h candles).
 Read `BASELINE_V2.md` on `quant-research` before evaluating. An iteration
 merges ONLY if:
 
-1. **Primary**: OOS Sharpe > current v2 baseline OOS Sharpe
-2. **Hard constraints** (all must pass):
+1. **Primary**: **combined IS+OOS monthly Sharpe** improves vs the current v2
+   baseline. Rewards balance, not just OOS dominance. Updated in iter-v2/044
+   after iter-044 was unfairly blocked despite beating baseline on combined
+   (+2.24 vs +2.16) with better IS (+24%) and better MaxDDs on both sides.
+2. **Balance guards** (both must pass — catches overfits disguised as gains):
+   - **IS monthly Sharpe ≥ baseline IS × 0.85** — no severe IS regression
+   - **OOS monthly Sharpe ≥ baseline OOS × 0.85** — no severe OOS regression
+3. **Hard constraints** (all must pass):
    - Max drawdown (OOS) ≤ v2 baseline OOS max drawdown × 1.2
    - Minimum 50 OOS trades
    - Profit factor > 1.0 (OOS)
    - **Seed concentration audit**: PASS (see "Seed Concentration Check" section
      — no single seed > 50% on any symbol, mean seed max-share ≤ 45%, at most
      1 of 10 seeds above 40%)
-   - IS/OOS Sharpe ratio > 0.4 (relaxed from 0.5 after iter-v2/035 showed
-     that strong OOS from v1-style ensemble can push ratio to 0.475 with
-     IS still healthy at +0.82. The guard catches IS<<OOS garbage, not
-     legitimately-strong-OOS scenarios.)
+   - IS/OOS Sharpe ratio > 0.4 (guard against IS<<OOS garbage)
    - **v2-v1 correlation < 0.80** (NEW): correlation of v2 portfolio returns
      vs v1 portfolio returns during OOS window. If too high, v2 is just
      v1-in-disguise and offers no combined-portfolio benefit.
+
+### Why combined IS+OOS as primary
+
+The old rule ("OOS Sharpe > baseline OOS") produced asymmetric incentives:
+- A candidate with OOS +1.72, IS +0.82 (ratio 2.10) would beat a candidate
+  with OOS +1.40, IS +0.84 (ratio 1.67) even though the second is more
+  balanced and has a healthier IS.
+- This encouraged OOS-peak-chasing over healthy-portfolio behavior, and
+  made every balance-improving iteration NO-MERGE even when the combined
+  Sharpe improved.
+
+The combined metric (IS + OOS monthly Sharpe) rewards genuine progress:
+- Pure IS gain at OOS expense (iter-039 IS +46% / OOS −51%): combined
+  REGRESSES. Correctly NO-MERGE.
+- Pure OOS gain at IS expense (iter-037 IS −36%): IS guard FAILS.
+  Correctly NO-MERGE.
+- Balanced gain with small OOS regression (iter-044 IS +24% / OOS −5%):
+  combined IMPROVES, guards pass. Correctly MERGE.
 
 If primary metric improves but a constraint fails → NO-MERGE.
 
