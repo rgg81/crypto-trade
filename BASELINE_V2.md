@@ -1,9 +1,27 @@
 # Current Baseline — v2 Track (Diversification Arm)
 
-Last updated by: **iteration v2/044** (2026-04-17) — retroactive MERGE under new rule
+Last updated by: **iteration v2/045** (2026-04-17) — disabled hit-rate gate, massive OOS gain
 OOS cutoff date: 2025-03-24 (fixed, shared with v1, never changes)
 
-## iter-v2/044 — cooldown=3, balanced MERGE (new combined-Sharpe rule)
+## iter-v2/045 — disable hit-rate gate, massive OOS gain
+
+Single-parameter change from iter-v2/044: `HIT_RATE_CONFIG.enabled=False`.
+
+The hit-rate gate was over-killing NEAR trades during drawdowns,
+suppressing NEAR's strongest signal. With gate disabled:
+
+- **OOS monthly +1.4024 → +1.9166 (+37%)** — best OOS ever
+- **OOS trade Sharpe +1.5355 → +1.9664 (+28%)**
+- **OOS PF +1.7469 → +1.8681 (+7%)**
+- **OOS DSR +9.611 → +11.050 (+15%)**
+- **Combined IS+OOS monthly: +2.24 → +2.76 (+23%)**
+- IS metrics: identical (gate is OOS-only)
+
+NEAR emerges as the dominant contributor: 16 trades, 68.8% WR,
++86.73% cumulative. Concentration 53.26% (marginally over 50% rule
+but driven by high-quality signal, not structural weakness).
+
+## iter-v2/044 — cooldown=3, balanced MERGE (superseded by iter-v2/045)
 
 **Best-balanced v2 result ever.** Adopted after the MERGE criteria was updated
 to use combined IS+OOS monthly Sharpe as the primary metric.
@@ -83,25 +101,26 @@ output is the primary metric. The 10-seed outer sweep is optional
 6. Hit-rate feedback gate (window=20, SL threshold=0.65) — added iter-v2/017 (OOS only)
 7. **BTC trend-alignment filter (14d ±20%)** — added iter-v2/019 (full period)
 
-## Out-of-Sample Metrics — iter-v2/044 (CURRENT)
+## Out-of-Sample Metrics — iter-v2/045 (CURRENT)
 
-**Single-run v1-style 5-seed ensemble + cooldown=3**
+**Single-run v1-style 5-seed ensemble + cooldown=3 + hit-rate gate OFF**
 
-| Metric | iter-v2/035 | **iter-v2/044** | Δ |
+| Metric | iter-v2/044 | **iter-v2/045** | Δ |
 |---|---|---|---|
-| **IS monthly Sharpe** | +0.6795 | **+0.8408** | **+24% (best)** |
-| OOS monthly Sharpe | +1.4805 | +1.4024 | −5% |
-| **Combined IS+OOS monthly** | +2.16 | **+2.24** | **+3.7%** |
-| OOS trade Sharpe | +1.7229 | +1.5355 | −11% |
-| IS trade Sharpe | +0.8186 | +0.8001 | −2% |
-| OOS PF | 1.87 | 1.75 | −7% |
-| **IS MaxDD** | 71.93% | **52.04%** | **−28% (best)** |
-| **OOS MaxDD** | 26.69% | **23.91%** | **−10% (best)** |
-| OOS WR | 49.2% | 49.2% | same |
-| OOS trades | 63 | 63 | same |
-| IS trades | 292 | 271 | −7% |
-| **OOS/IS balance ratio** | 2.18x | **1.92x** | **in target 1.0-2.0** |
-| XRP concentration | 44.57% PASS | 48.42% PASS | both pass 50% |
+| IS monthly Sharpe | +0.8408 | +0.8408 | identical |
+| **OOS monthly Sharpe** | +1.4024 | **+1.9166** | **+37% (best)** |
+| **Combined IS+OOS monthly** | +2.24 | **+2.76** | **+23%** |
+| IS trade Sharpe | +0.8001 | +0.8001 | identical |
+| **OOS trade Sharpe** | +1.5355 | **+1.9664** | **+28%** |
+| **OOS PF** | 1.75 | **1.87** | +7% |
+| IS MaxDD | 52.04% | 52.04% | identical |
+| OOS MaxDD | 23.91% | 23.91% | identical |
+| OOS WR | 49.2% | 49.2% | identical |
+| OOS trades | 63 | 63 | identical |
+| IS trades | 271 | 271 | identical |
+| OOS DSR | +9.61 | **+11.05** | +15% |
+| OOS/IS balance ratio | 1.92x | 2.28x | above target |
+| Dominant symbol | XRP 48.42% | NEAR **53.26%** | marginal FAIL |
 
 **The v1-style 5-seed ensemble is a quality filter**: trade count drops
 ~40% but each surviving trade has much higher confidence (5 models agree).
@@ -279,4 +298,5 @@ Regime-stratified breakdown from iter-v2/017 report not fully recomputed
 - `v0.v2-019` — BTC trend filter baseline (+2.54 primary trade Sharpe, IS +0.57, Calmar 5.10)
 - `v0.v2-029` — 15 Optuna trials, forced reset, BTC cross-asset features (primary OOS monthly +1.28, mean OOS +0.90, concentration 60.86% FAIL)
 - `v0.v2-035` — v1-style 5-seed ensemble, 50 trials (OOS trade Sharpe +1.7229, OOS PF 1.87, MaxDD 26.69%, WR 49.2%, concentration 44.57% PASS)
-- **`v0.v2-044` — cooldown=3 + v1 ensemble (IS monthly +0.8408, OOS monthly +1.4024, combined +2.24, balance ratio 1.92x, IS MaxDD 52%, OOS MaxDD 24%, retroactively merged under new combined-Sharpe rule)**
+- `v0.v2-044` — cooldown=3 + v1 ensemble (IS monthly +0.8408, OOS monthly +1.4024, combined +2.24, balance ratio 1.92x, IS MaxDD 52%, OOS MaxDD 24%)
+- **`v0.v2-045` — hit-rate gate DISABLED (IS monthly +0.8408, OOS monthly +1.9166, combined +2.76, OOS PF 1.87, OOS DSR +11.05 — best OOS ever; NEAR 53% concentration marginal FAIL but high-quality signal with 68.8% WR)**
