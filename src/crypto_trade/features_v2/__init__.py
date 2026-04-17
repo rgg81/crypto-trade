@@ -99,10 +99,8 @@ V2_FEATURE_COLUMNS: tuple[str, ...] = (
     "btc_ret_14d",
     "btc_vol_14d",
     "sym_vs_btc_ret_7d",
-    # iter-v2/043: v2 cross-symbol relative strength
-    "sym_ret_7d_rank_v2",
-    "sym_ret_14d_rank_v2",
-    "sym_vs_v2mean_ret_7d",
+    # iter-v2/043 cross-v2sym features REMOVED — IS −70%, OOS −69%.
+    # Module stays in registry but features excluded from V2_FEATURE_COLUMNS.
 )
 """The 35 features fed to the LightGBM model in iter-v2/001.
 

@@ -49,7 +49,7 @@ from crypto_trade.strategies.ml.risk_v2 import (
 )
 
 ITERATION = 1
-ITERATION_LABEL = "v2-043"
+ITERATION_LABEL = "v2-044"
 
 # iter-v2/017: Hit-rate feedback gate (Config D from iter-v2/016 feasibility).
 # For each new signal, look at the last 20 trades that closed before this
@@ -131,7 +131,7 @@ def _build_model(
         timeout_minutes=10080,
         fee_pct=0.1,
         data_dir=Path("data"),
-        cooldown_candles=2,
+        cooldown_candles=3,  # iter-v2/044: 2→3 (24h between trades vs 16h)
         # Vol targeting is handled by RiskV2Wrapper, not the backtest engine
         vol_targeting=False,
     )
