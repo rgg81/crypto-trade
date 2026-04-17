@@ -49,7 +49,7 @@ from crypto_trade.strategies.ml.risk_v2 import (
 )
 
 ITERATION = 1
-ITERATION_LABEL = "v2-046"
+ITERATION_LABEL = "v2-047"
 
 # iter-v2/017: Hit-rate feedback gate (Config D from iter-v2/016 feasibility).
 # For each new signal, look at the last 20 trades that closed before this
@@ -70,7 +70,7 @@ HIT_RATE_CONFIG = HitRateGateConfig(
 BTC_TREND_CONFIG = BtcTrendFilterConfig(
     lookback_bars=42,  # 14 days of 8h bars
     threshold_pct=20.0,
-    enabled=False,  # iter-v2/046: test if BTC filter is over-killing too
+    enabled=True,  # re-enabled: iter-v2/046 proved essential for IS
 )
 
 V2_EXCLUDED_SYMBOLS: tuple[str, ...] = ("BTCUSDT", "ETHUSDT", "LINKUSDT", "BNBUSDT")
@@ -81,8 +81,9 @@ V2_EXCLUDED_SYMBOLS: tuple[str, ...] = ("BTCUSDT", "ETHUSDT", "LINKUSDT", "BNBUS
 # the 6-gate screening in iter-v2/001: v1 corr 0.665, $240M daily volume,
 # 4,847 IS candles.
 V2_MODELS: tuple[tuple[str, str], ...] = (
-    # iter-v2/042: back to iter-035 4-symbol baseline.
-    ("E (DOGEUSDT)", "DOGEUSDT"),
+    # iter-v2/047: swap DOGE (OOS net loser −1.42% share) for ATOMUSDT
+    # (untried L1, not in v1 baseline, 6641 bars, v1-style ensemble).
+    ("K (ATOMUSDT)", "ATOMUSDT"),
     ("F (SOLUSDT)", "SOLUSDT"),
     ("G (XRPUSDT)", "XRPUSDT"),
     ("H (NEARUSDT)", "NEARUSDT"),

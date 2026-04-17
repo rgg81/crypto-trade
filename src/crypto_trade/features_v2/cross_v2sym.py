@@ -145,6 +145,16 @@ def add_cross_v2sym_features(df: pd.DataFrame) -> pd.DataFrame:
     rank_7d_col = f"rank_{sym_col}_ret_7d"
     rank_14d_col = f"rank_{sym_col}_ret_14d"
 
+    # Handle non-peer symbols (e.g., ATOMUSDT when peers are DOGE/SOL/XRP/NEAR)
+    if rank_7d_col not in rank_7d_df.columns:
+        df["sym_ret_7d_rank_v2"] = np.nan
+        df["sym_ret_14d_rank_v2"] = np.nan
+        df["sym_vs_v2mean_ret_7d"] = np.nan
+        if had_open_time_index:
+            df = df.set_index("open_time", drop=False)
+            df.index.name = "open_time"
+        return df
+
     df = df.merge(
         rank_7d_df[["open_time", rank_7d_col]], on="open_time", how="left"
     )
