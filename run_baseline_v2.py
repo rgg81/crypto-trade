@@ -49,7 +49,7 @@ from crypto_trade.strategies.ml.risk_v2 import (
 )
 
 ITERATION = 1
-ITERATION_LABEL = "v2-047"
+ITERATION_LABEL = "v2-048"
 
 # iter-v2/017: Hit-rate feedback gate (Config D from iter-v2/016 feasibility).
 # For each new signal, look at the last 20 trades that closed before this
@@ -81,12 +81,14 @@ V2_EXCLUDED_SYMBOLS: tuple[str, ...] = ("BTCUSDT", "ETHUSDT", "LINKUSDT", "BNBUS
 # the 6-gate screening in iter-v2/001: v1 corr 0.665, $240M daily volume,
 # 4,847 IS candles.
 V2_MODELS: tuple[tuple[str, str], ...] = (
-    # iter-v2/047: swap DOGE (OOS net loser −1.42% share) for ATOMUSDT
-    # (untried L1, not in v1 baseline, 6641 bars, v1-style ensemble).
-    ("K (ATOMUSDT)", "ATOMUSDT"),
+    # iter-v2/048: 5 symbols — KEEP DOGE (IS contributor) + ADD ATOM
+    # (OOS contributor from iter-047). Hit-rate gate disabled since
+    # iter-045 so 5-symbol gate coupling from iter-031/041 era is moot.
+    ("E (DOGEUSDT)", "DOGEUSDT"),
     ("F (SOLUSDT)", "SOLUSDT"),
     ("G (XRPUSDT)", "XRPUSDT"),
     ("H (NEARUSDT)", "NEARUSDT"),
+    ("K (ATOMUSDT)", "ATOMUSDT"),
 )
 
 DEFAULT_SEEDS = (42,)  # iter-v2/001 first-pass uses a single seed
