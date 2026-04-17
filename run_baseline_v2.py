@@ -49,7 +49,7 @@ from crypto_trade.strategies.ml.risk_v2 import (
 )
 
 ITERATION = 1
-ITERATION_LABEL = "v2-045"
+ITERATION_LABEL = "v2-046"
 
 # iter-v2/017: Hit-rate feedback gate (Config D from iter-v2/016 feasibility).
 # For each new signal, look at the last 20 trades that closed before this
@@ -70,7 +70,7 @@ HIT_RATE_CONFIG = HitRateGateConfig(
 BTC_TREND_CONFIG = BtcTrendFilterConfig(
     lookback_bars=42,  # 14 days of 8h bars
     threshold_pct=20.0,
-    enabled=True,
+    enabled=False,  # iter-v2/046: test if BTC filter is over-killing too
 )
 
 V2_EXCLUDED_SYMBOLS: tuple[str, ...] = ("BTCUSDT", "ETHUSDT", "LINKUSDT", "BNBUSDT")
