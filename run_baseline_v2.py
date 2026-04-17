@@ -49,7 +49,7 @@ from crypto_trade.strategies.ml.risk_v2 import (
 )
 
 ITERATION = 1
-ITERATION_LABEL = "v2-048"
+ITERATION_LABEL = "v2-049"
 
 # iter-v2/017: Hit-rate feedback gate (Config D from iter-v2/016 feasibility).
 # For each new signal, look at the last 20 trades that closed before this
@@ -69,8 +69,8 @@ HIT_RATE_CONFIG = HitRateGateConfig(
 # regime shifts like 2024-11 and 2022-05 (LUNA).
 BTC_TREND_CONFIG = BtcTrendFilterConfig(
     lookback_bars=42,  # 14 days of 8h bars
-    threshold_pct=20.0,
-    enabled=True,  # re-enabled: iter-v2/046 proved essential for IS
+    threshold_pct=15.0,  # iter-v2/049: 20→15, more aggressive IS protection
+    enabled=True,
 )
 
 V2_EXCLUDED_SYMBOLS: tuple[str, ...] = ("BTCUSDT", "ETHUSDT", "LINKUSDT", "BNBUSDT")
@@ -81,14 +81,12 @@ V2_EXCLUDED_SYMBOLS: tuple[str, ...] = ("BTCUSDT", "ETHUSDT", "LINKUSDT", "BNBUS
 # the 6-gate screening in iter-v2/001: v1 corr 0.665, $240M daily volume,
 # 4,847 IS candles.
 V2_MODELS: tuple[tuple[str, str], ...] = (
-    # iter-v2/048: 5 symbols — KEEP DOGE (IS contributor) + ADD ATOM
-    # (OOS contributor from iter-047). Hit-rate gate disabled since
-    # iter-045 so 5-symbol gate coupling from iter-031/041 era is moot.
+    # iter-v2/049: revert to iter-045 4-symbol baseline (iter-048 5-sym
+    # regressed -24% combined).
     ("E (DOGEUSDT)", "DOGEUSDT"),
     ("F (SOLUSDT)", "SOLUSDT"),
     ("G (XRPUSDT)", "XRPUSDT"),
     ("H (NEARUSDT)", "NEARUSDT"),
-    ("K (ATOMUSDT)", "ATOMUSDT"),
 )
 
 DEFAULT_SEEDS = (42,)  # iter-v2/001 first-pass uses a single seed
