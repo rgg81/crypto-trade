@@ -49,7 +49,7 @@ from crypto_trade.strategies.ml.risk_v2 import (
 )
 
 ITERATION = 1
-ITERATION_LABEL = "v2-051"
+ITERATION_LABEL = "v2-052"
 
 # iter-v2/017: Hit-rate feedback gate (Config D from iter-v2/016 feasibility).
 # For each new signal, look at the last 20 trades that closed before this
@@ -58,8 +58,8 @@ ITERATION_LABEL = "v2-051"
 # gate is fresh at deployment.
 HIT_RATE_CONFIG = HitRateGateConfig(
     window=20,
-    sl_threshold=0.65,
-    enabled=False,  # iter-v2/045: test if gate helps or hurts with v1 ensemble
+    sl_threshold=0.80,  # iter-v2/052: looser threshold (0.65→0.80)
+    enabled=True,  # iter-v2/052: re-enable with loose threshold
 )
 
 # iter-v2/019: BTC trend-alignment filter. Kill trades whose direction fights
@@ -132,7 +132,7 @@ def _build_model(
         timeout_minutes=10080,
         fee_pct=0.1,
         data_dir=Path("data"),
-        cooldown_candles=5,  # iter-v2/051: 4→5 (40h between trades)
+        cooldown_candles=4,  # iter-v2/050 baseline (32h between trades)
         # Vol targeting is handled by RiskV2Wrapper, not the backtest engine
         vol_targeting=False,
     )
