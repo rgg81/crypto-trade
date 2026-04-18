@@ -49,7 +49,7 @@ from crypto_trade.strategies.ml.risk_v2 import (
 )
 
 ITERATION = 1
-ITERATION_LABEL = "v2-055"
+ITERATION_LABEL = "v2-056"
 
 # iter-v2/017: Hit-rate feedback gate (Config D from iter-v2/016 feasibility).
 # For each new signal, look at the last 20 trades that closed before this
@@ -187,9 +187,7 @@ def _run_single_seed(
             symbol=symbol,
             seed=seed,
             n_trials=n_trials,
-            # iter-v2/055: swap seed 1001 (historically distressed) for 7621
-            # (strong in iter-034 diagnostic: IS +1.05, OOS +1.33).
-            ensemble_seeds=[42, 123, 456, 789, 7621],
+            ensemble_seeds=[42, 123, 456, 789, 1001],
         )
         _verify_symbols(cfg.symbols)
         t0 = time.time()
@@ -249,8 +247,8 @@ def main() -> None:
     parser.add_argument(
         "--n-trials",
         type=int,
-        default=50,
-        help="Optuna trials per monthly model (iter-v2/035: match v1's 50, per ensemble seed)",
+        default=100,  # iter-v2/056: 50→100 to explore deeper hyperparameter space
+        help="Optuna trials per monthly model (iter-v2/056: 100 trials per seed)",
     )
     args = parser.parse_args()
 
