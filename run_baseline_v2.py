@@ -49,7 +49,7 @@ from crypto_trade.strategies.ml.risk_v2 import (
 )
 
 ITERATION = 1
-ITERATION_LABEL = "v2-052"
+ITERATION_LABEL = "v2-050"
 
 # iter-v2/017: Hit-rate feedback gate (Config D from iter-v2/016 feasibility).
 # For each new signal, look at the last 20 trades that closed before this
@@ -58,8 +58,8 @@ ITERATION_LABEL = "v2-052"
 # gate is fresh at deployment.
 HIT_RATE_CONFIG = HitRateGateConfig(
     window=20,
-    sl_threshold=0.80,  # iter-v2/052: looser threshold (0.65→0.80)
-    enabled=True,  # iter-v2/052: re-enable with loose threshold
+    sl_threshold=0.65,
+    enabled=False,  # iter-v2/045: disabled after over-killing
 )
 
 # iter-v2/019: BTC trend-alignment filter. Kill trades whose direction fights
