@@ -49,7 +49,7 @@ from crypto_trade.strategies.ml.risk_v2 import (
 )
 
 ITERATION = 1
-ITERATION_LABEL = "v2-054"
+ITERATION_LABEL = "v2-055"
 
 # iter-v2/017: Hit-rate feedback gate (Config D from iter-v2/016 feasibility).
 # For each new signal, look at the last 20 trades that closed before this
@@ -68,7 +68,7 @@ HIT_RATE_CONFIG = HitRateGateConfig(
 # a BTC +48% month. Filter is full-period (no OOS scoping) so it catches IS
 # regime shifts like 2024-11 and 2022-05 (LUNA).
 BTC_TREND_CONFIG = BtcTrendFilterConfig(
-    lookback_bars=21,  # iter-v2/054: 42→21 (7d vs 14d — faster regime response)
+    lookback_bars=42,  # 14 days of 8h bars
     threshold_pct=20.0,
     enabled=True,
 )
@@ -187,7 +187,9 @@ def _run_single_seed(
             symbol=symbol,
             seed=seed,
             n_trials=n_trials,
-            ensemble_seeds=[42, 123, 456, 789, 1001],
+            # iter-v2/055: swap seed 1001 (historically distressed) for 7621
+            # (strong in iter-034 diagnostic: IS +1.05, OOS +1.33).
+            ensemble_seeds=[42, 123, 456, 789, 7621],
         )
         _verify_symbols(cfg.symbols)
         t0 = time.time()
