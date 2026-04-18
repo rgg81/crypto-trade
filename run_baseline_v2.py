@@ -49,7 +49,7 @@ from crypto_trade.strategies.ml.risk_v2 import (
 )
 
 ITERATION = 1
-ITERATION_LABEL = "v2-056"
+ITERATION_LABEL = "v2-057"
 
 # iter-v2/017: Hit-rate feedback gate (Config D from iter-v2/016 feasibility).
 # For each new signal, look at the last 20 trades that closed before this
@@ -154,7 +154,10 @@ def _build_model(
         ensemble_seeds=list(ensemble_seeds),
         feature_columns=list(V2_FEATURE_COLUMNS),
     )
-    risk_cfg = RiskV2Config()  # iter-v2/050 baseline (low_vol_filter_threshold=0.33)
+    risk_cfg = RiskV2Config(
+        hurst_lower_pct=0.025,  # iter-v2/057: loosen Hurst band 5/95 → 2.5/97.5
+        hurst_upper_pct=0.975,
+    )
     strategy = RiskV2Wrapper(inner, risk_cfg)
     return cfg, strategy
 
@@ -247,8 +250,8 @@ def main() -> None:
     parser.add_argument(
         "--n-trials",
         type=int,
-        default=100,  # iter-v2/056: 50→100 to explore deeper hyperparameter space
-        help="Optuna trials per monthly model (iter-v2/056: 100 trials per seed)",
+        default=50,  # iter-v2/035 baseline
+        help="Optuna trials per monthly model (iter-v2/035: match v1's 50, per ensemble seed)",
     )
     args = parser.parse_args()
 
