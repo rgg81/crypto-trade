@@ -49,7 +49,7 @@ from crypto_trade.strategies.ml.risk_v2 import (
 )
 
 ITERATION = 1
-ITERATION_LABEL = "v2-059"
+ITERATION_LABEL = "v2-061"
 
 # iter-v2/017: Hit-rate feedback gate (Config D from iter-v2/016 feasibility).
 # For each new signal, look at the last 20 trades that closed before this
@@ -81,10 +81,10 @@ V2_EXCLUDED_SYMBOLS: tuple[str, ...] = ("BTCUSDT", "ETHUSDT", "LINKUSDT", "BNBUS
 # the 6-gate screening in iter-v2/001: v1 corr 0.665, $240M daily volume,
 # 4,847 IS candles.
 V2_MODELS: tuple[tuple[str, str], ...] = (
-    # iter-v2/049: revert to iter-045 4-symbol baseline (iter-048 5-sym
-    # regressed -24% combined).
+    # iter-v2/061: swap SOL (weakest 35% WR on iter-059 primary seed) for DOT.
+    # DOT is Polkadot L1, not in v1 baseline, 6051 bars since 2020-08.
     ("E (DOGEUSDT)", "DOGEUSDT"),
-    ("F (SOLUSDT)", "SOLUSDT"),
+    ("L (DOTUSDT)", "DOTUSDT"),
     ("G (XRPUSDT)", "XRPUSDT"),
     ("H (NEARUSDT)", "NEARUSDT"),
 )
