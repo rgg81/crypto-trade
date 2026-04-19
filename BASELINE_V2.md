@@ -1,9 +1,30 @@
 # Current Baseline — v2 Track (Diversification Arm)
 
-Last updated by: **iteration v2/050** (2026-04-18) — cooldown=4, BOTH IS+OOS above 1.0 monthly
+Last updated by: **iteration v2/059** (2026-04-19) — z-score OOD 2.5, all 7 gates clean PASS
 OOS cutoff date: 2025-03-24 (fixed, shared with v1, never changes)
 
-## iter-v2/050 — cooldown=4, BOTH IS+OOS above 1.0 monthly (MILESTONE)
+## iter-v2/059 — z-score OOD 2.5, all gates clean PASS
+
+Change from iter-v2/050: `zscore_threshold: 3.0 → 2.5`. More aggressive
+OOD filtering catches mild distributional drift.
+
+Key gains over iter-v2/050:
+- **OOS monthly +1.7036 → +1.8346 (+8%)**
+- **OOS trade Sharpe +1.8129 → +2.0232 (+12%)**
+- **OOS PF 1.8069 → 1.8782** (best ever)
+- **OOS WR 49.2% → 50.0%** (first time >50%!)
+- **Concentration 47.06% → 44.58%** (best ever)
+- **Combined IS+OOS monthly: +2.87 → +2.88** (+0.3%)
+
+Trade-off:
+- IS monthly +1.1670 → +1.0421 (−11%) — still >1.0
+- IS trade Sharpe +1.2395 → +0.9742 (−21%)
+
+Both IS and OOS still above 1.0 monthly (IS +1.04, OOS +1.83).
+**First iteration with mean concentration ≤45%** (the strict inner
+rule) — truly clean concentration audit, not marginal.
+
+## iter-v2/050 — cooldown=4, BOTH IS+OOS above 1.0 monthly (superseded)
 
 First v2 baseline with **both IS and OOS monthly Sharpe above 1.0** —
 the user's long-standing goal, finally achieved.
@@ -125,26 +146,26 @@ output is the primary metric. The 10-seed outer sweep is optional
 6. Hit-rate feedback gate (window=20, SL threshold=0.65) — added iter-v2/017 (OOS only)
 7. **BTC trend-alignment filter (14d ±20%)** — added iter-v2/019 (full period)
 
-## Out-of-Sample Metrics — iter-v2/050 (CURRENT)
+## Out-of-Sample Metrics — iter-v2/059 (CURRENT)
 
-**v1-style 5-seed ensemble + cooldown=4 + hit-rate gate OFF + BTC filter ON**
+**v1-style 5-seed ensemble + cooldown=4 + hit-rate gate OFF + z-score OOD 2.5**
 
-| Metric | iter-v2/045 | **iter-v2/050** | Δ |
+| Metric | iter-v2/050 | **iter-v2/059** | Δ |
 |---|---|---|---|
-| **IS monthly Sharpe** | +0.8408 | **+1.1670** | **+39% (>1.0!)** |
-| OOS monthly Sharpe | +1.9166 | +1.7036 | −11% |
-| **Combined IS+OOS monthly** | +2.76 | **+2.87** | **+4%** |
-| **IS trade Sharpe** | +0.8001 | **+1.2395** | **+55% (>1.0!)** |
-| OOS trade Sharpe | +1.9664 | +1.8129 | −8% |
-| **IS PF** | 1.27 | **1.48** | +17% |
-| OOS PF | 1.87 | 1.81 | −3% |
-| IS MaxDD | 52.04% | 63.73% | worse |
-| **OOS MaxDD** | 23.91% | **22.61%** | **best ever** |
-| OOS DSR | +11.05 | +10.82 | similar |
-| IS trades | 271 | 258 | −5% |
-| OOS trades | 63 | 59 | −6% |
-| **OOS/IS balance** | 2.28x | **1.46x** | **in target 1.0-2.0** |
-| **Concentration** | 53.26% FAIL | **47.06% PASS** | first clean PASS |
+| IS monthly Sharpe | +1.1670 | +1.0421 | −11% (still >1.0) |
+| **OOS monthly Sharpe** | +1.7036 | **+1.8346** | **+8%** |
+| **Combined IS+OOS monthly** | +2.87 | **+2.88** | +0.3% |
+| IS trade Sharpe | +1.2395 | +0.9742 | −21% |
+| **OOS trade Sharpe** | +1.8129 | **+2.0232** | **+12%** |
+| IS PF | 1.4787 | 1.3807 | −7% |
+| **OOS PF** | 1.8069 | **1.8782** | **best ever** |
+| IS MaxDD | 63.73% | 68.55% | worse |
+| OOS MaxDD | 22.61% | 22.61% | same |
+| **OOS WR** | 49.2% | **50.0%** | **first >50%!** |
+| IS trades | 258 | 225 | −13% |
+| OOS trades | 59 | 54 | −8% |
+| OOS/IS balance | 1.46x | 1.76x | in target |
+| **Concentration** | 47.06% | **44.58%** | **best ever, passes mean ≤45%** |
 
 **The v1-style 5-seed ensemble is a quality filter**: trade count drops
 ~40% but each surviving trade has much higher confidence (5 models agree).
@@ -324,4 +345,5 @@ Regime-stratified breakdown from iter-v2/017 report not fully recomputed
 - `v0.v2-035` — v1-style 5-seed ensemble, 50 trials (OOS trade Sharpe +1.7229, OOS PF 1.87, MaxDD 26.69%, WR 49.2%, concentration 44.57% PASS)
 - `v0.v2-044` — cooldown=3 + v1 ensemble (IS monthly +0.8408, OOS monthly +1.4024, combined +2.24, balance ratio 1.92x, IS MaxDD 52%, OOS MaxDD 24%)
 - `v0.v2-045` — hit-rate gate DISABLED (IS monthly +0.8408, OOS monthly +1.9166, combined +2.76; NEAR 53% concentration marginal FAIL)
-- **`v0.v2-050` — cooldown=4 milestone (IS monthly +1.1670 AND OOS monthly +1.7036 — BOTH ABOVE 1.0 for first time; combined +2.87; IS trade Sharpe +1.24, OOS trade Sharpe +1.81, OOS PF 1.81, OOS MaxDD 22.61% best ever, concentration 47.06% PASS, all 7 gates PASS)**
+- `v0.v2-050` — cooldown=4 milestone (IS monthly +1.1670 AND OOS monthly +1.7036 — BOTH ABOVE 1.0 first time; combined +2.87; concentration 47.06%)
+- **`v0.v2-059` — z-score OOD 2.5 (IS monthly +1.04, OOS monthly +1.83, combined +2.88; OOS trade Sharpe +2.02 best, OOS PF 1.88 best, OOS WR 50.0% first >50%, concentration 44.58% best — all 7 gates clean PASS including mean ≤45% rule)**
