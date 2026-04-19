@@ -49,7 +49,7 @@ from crypto_trade.strategies.ml.risk_v2 import (
 )
 
 ITERATION = 1
-ITERATION_LABEL = "v2-057"
+ITERATION_LABEL = "v2-058"
 
 # iter-v2/017: Hit-rate feedback gate (Config D from iter-v2/016 feasibility).
 # For each new signal, look at the last 20 trades that closed before this
@@ -155,8 +155,7 @@ def _build_model(
         feature_columns=list(V2_FEATURE_COLUMNS),
     )
     risk_cfg = RiskV2Config(
-        hurst_lower_pct=0.025,  # iter-v2/057: loosen Hurst band 5/95 → 2.5/97.5
-        hurst_upper_pct=0.975,
+        adx_threshold=15.0,  # iter-v2/058: loosen ADX gate 20→15
     )
     strategy = RiskV2Wrapper(inner, risk_cfg)
     return cfg, strategy
