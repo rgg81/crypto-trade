@@ -25,7 +25,13 @@ from crypto_trade.live.data_pipeline import (
     refresh_features,
     refresh_klines,
 )
-from crypto_trade.live.models import LiveConfig, LiveTrade, ModelConfig, _new_id
+from crypto_trade.live.models import (
+    BASELINE_FEATURE_COLUMNS,
+    LiveConfig,
+    LiveTrade,
+    ModelConfig,
+    _new_id,
+)
 from crypto_trade.live.order_manager import OrderManager, compute_sl_tp, trade_to_order
 from crypto_trade.live.reconciler import reconcile
 from crypto_trade.live.state_store import StateStore
@@ -88,7 +94,7 @@ class ModelRunner:
             atr_sl_multiplier=model_config.atr_sl_multiplier,
             use_atr_labeling=model_config.use_atr_labeling,
             ensemble_seeds=list(live_config.ensemble_seeds),
-            feature_columns=None,
+            feature_columns=list(BASELINE_FEATURE_COLUMNS),
         )
         self._master: pd.DataFrame | None = None
 
