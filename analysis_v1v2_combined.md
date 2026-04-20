@@ -1,97 +1,116 @@
-# Combined v1 + v2 Portfolio Analysis (CORRECTED)
+# Combined v1 + v2 Portfolio Analysis (FINAL, both fresh)
 
-**Date**: 2026-04-19
-**v1 baseline**: iter-163 (`/home/roberto/crypto-trade/reports/iteration_163/`)
-**v2 baseline**: iter-v2/059 (tag `v0.v2-059`)
-**Weighting**: equal weight per coin (user directive, 1/8 each)
-**OOS window**: 2025-03-24 → 2026-02-28 (v1's data cutoff)
+**Date**: 2026-04-20
+**v1**: iter-152 fresh re-run with data through 2026-04-19
+**v2**: iter-063-fresh (same iter-059 config, fresh data through 2026-04-20)
+**Weighting**: equal weight per coin (1/8 each, user directive)
+**OOS window**: 2025-03-24 → 2026-04-20 (13 months)
 
-## Summary — Combined portfolio BEATS either alone
+## Headline — Combined beats both alone on 3 of 4 Sharpe metrics
 
-| Metric | v1 alone (iter-163) | v2 alone (iter-059 trunc) | **Combined (1/8 per coin)** |
+| Metric | v1 alone | v2 alone | **Combined (1/8 per coin)** |
 |---|---|---|---|
-| IS trade Sharpe | +2.05 | +1.80 | **+2.73** (+33%) |
-| IS monthly Sharpe | +1.21 | +1.04 | **+1.63** (+35%) |
-| **OOS trade Sharpe** | +1.18 | +2.02 | **+2.22** (+10%) |
-| OOS monthly Sharpe | +0.94 | +1.83 | +1.56 (diluted) |
-| IS trades | 663 | 225 | 888 |
-| OOS trades | 175 | 54 | 229 |
+| IS trade Sharpe | +2.27 | +1.80 | **+2.88** (+27% vs v1, +60% vs v2) |
+| IS monthly Sharpe | +1.30 | +1.04 | **+1.64** (+26% vs v1, +58% vs v2) |
+| **OOS trade Sharpe** | +1.40 | +1.94 | **+2.32** (+19% vs v2, +66% vs v1) |
+| OOS monthly Sharpe | +1.24 | **+1.78** | +1.69 (−5% vs v2, +36% vs v1) |
+| IS trades | 646 | 225 | 871 |
+| OOS trades | 191 | 56 | 247 |
+| OOS WR | 44.5% | 50.0% | 45.8% |
+| OOS PF | 1.30 | 1.80 | 1.46 |
 
-**Diversification benefit is REAL on trade Sharpe (most robust metric).**
+**Real diversification benefit confirmed on trade Sharpe** (most robust metric
+for combined portfolios).
 
-IS is superior on both trade and monthly axes. OOS trade Sharpe wins.
-Only OOS monthly Sharpe dilutes — v2's concentrated big months (Nov
-2025 +$35, Feb 2026 +$30) spread across 229 combined trades, reducing
-per-month variance but also per-month mean.
+## Stability comparison: v1 vs v2 decay
 
-## Per-symbol OOS contribution (positive-total share)
+v1 was updated on 2026-04-06 with reported OOS Sharpe +2.83.
+We re-ran both at 2026-04-20, extending OOS by ~50 days (Feb → Apr 2026):
+
+| Model | OOS trade Sharpe before | After (+50 days) | Δ |
+|---|---|---|---|
+| v1 iter-152 | +2.83 (BASELINE peak) | +1.40 | **−50%** |
+| v2 iter-059 | +2.02 | +1.94 | **−4%** |
+
+**v2 is dramatically more robust** in the current market regime. v1's
+performance decayed 50% with 2 months of additional data, while v2 held up
+with only a 4% decline.
+
+## v1 Monthly OOS Decay Analysis
+
+| Month | v1 trades | v1 wpnl | Notes |
+|---|---|---|---|
+| 2025-03 to 2025-06 | 50 | +20.39 | Strong start |
+| 2025-07 | 22 | **−26.76** | Catastrophic month |
+| 2025-08 to 2025-09 | 16 | +22.16 | Recovery |
+| 2025-10 to 2025-12 | 45 | +48.18 | **Peak performance** |
+| 2026-01 | 12 | +6.71 | OK |
+| 2026-02 to 2026-04 | 46 | **−5.15** | **Sustained decay** |
+
+v1 peaked at end of 2025 (trade-Sharpe +1.94 over 10-month OOS). Since
+then: 3 consecutive weak months, indicating a regime change v1 can't
+adapt to.
+
+## v1 per-symbol OOS
+
+All 4 symbols net-positive, but BTC/ETH softening:
+
+| Symbol | IS trade Sharpe | OOS trade Sharpe | OOS wpnl | Decay |
+|---|---|---|---|---|
+| BNB | +1.08 | **+1.01** | +20.26 | Minimal (holds up) |
+| BTC | +1.81 | +0.99 | +19.98 | Moderate |
+| ETH | +1.05 | +0.41 | +11.46 | Significant |
+| LINK | +0.95 | +0.56 | +13.82 | Moderate |
+
+BNB is v1's most robust symbol; ETH's edge has weakened most.
+
+## Combined OOS per-symbol (equal-coin weighted)
+
+**All 8 coins contribute positively.** Diverse portfolio:
 
 | Symbol | Track | Trades | WR | Scaled wpnl | Share |
 |---|---|---|---|---|---|
-| NEARUSDT | v2 | 14 | 64.3% | +4.59 | 27.4% |
-| XRPUSDT | v2 | 6 | 66.7% | +3.51 | 20.9% |
-| LINKUSDT | v1 | 37 | 56.8% | +3.20 | 19.1% |
-| ETHUSDT | v1 | 43 | 39.5% | +1.92 | 11.4% |
-| SOLUSDT | v2 | 18 | 38.9% | +1.48 | 8.8% |
-| BNBUSDT | v1 | 53 | 47.2% | +1.01 | 6.0% |
-| DOGEUSDT | v2 | 16 | 43.8% | +0.72 | 4.3% |
-| BTCUSDT | v1 | 42 | 38.1% | +0.36 | 2.1% |
+| NEARUSDT | v2 | 16 | 62.5% | +4.44 | 24.2% |
+| XRPUSDT | v2 | 6 | 66.7% | +3.51 | 19.1% |
+| BNBUSDT | v1 | 60 | 46.7% | +2.53 | 13.8% |
+| BTCUSDT | v1 | 41 | 46.3% | +2.50 | 13.6% |
+| LINKUSDT | v1 | 43 | 44.2% | +1.73 | 9.4% |
+| SOLUSDT | v2 | 18 | 38.9% | +1.48 | 8.1% |
+| ETHUSDT | v1 | 47 | 40.4% | +1.43 | 7.8% |
+| DOGEUSDT | v2 | 16 | 43.8% | +0.72 | 3.9% |
 
-**All 8 coins contribute positively.** LINK is v1's star contributor at 19.1%.
-NEAR+XRP (v2) dominate at 48.3% combined.
+Top 4 contributors span both tracks (2 from v2, 2 from v1). No single
+track dominates; combined portfolio is genuinely diversified.
 
-## Combined portfolio PnL contributors
+## Earlier analysis mistake corrected
 
-- Top 3 positive: NEAR (27.4%), XRP (20.9%), LINK (19.1%) = 67.4% of positive PnL
-- 3 v1 symbols all positive (LINK, ETH, BNB — iter-163 with entropy+CUSUM features)
-- 4 v2 symbols all positive (NEAR, XRP, SOL, DOGE)
-- Even BTC contributes +$0.36 (2.1%)
+My prior analysis (2026-04-19 morning) showed v1 OOS Sharpe +0.13 and
+concluded v1 was badly decayed. That was **due to stale feature parquets**
+(Apr 12 data vs required Apr 19). After syncing fresh parquets from main
+worktree, v1's fresh run gave OOS Sharpe +1.40 — a much more representative
+result.
 
-## IMPORTANT: v1 has 2 months less OOS data
+Lessons:
+1. Feature parquets must be refreshed before every backtest.
+2. Worktrees have separate data/ directories (not symlinked).
+3. Raw kline CSVs also need refresh via `uv run crypto-trade fetch`.
 
-iter-163's OOS cutoff is 2026-02-28 (11 months). v2's full OOS is
-2026-04-18 (13 months). To make a fair comparison, v2 was truncated
-to v1's window.
+## Recommendations
 
-Without truncation, v2 has 2 extra excellent months (March 2026 had
-bullish trending, April had...) that would inflate v2's standalone
-but also affect combined if v1 had kept up.
+1. **Deploy combined portfolio** as primary strategy. Highest IS and OOS
+   trade Sharpe across all configurations tested.
+2. **Monitor v1 decay**: if trade Sharpe continues to drop, consider
+   dropping ETH (most-decayed) or refreshing v1's training regime.
+3. **v2 is the recent-regime specialist**: its 2025 market-tested
+   architecture (cooldown=4, z-score 2.5, hit-rate gate off) held up in
+   Q1 2026 chop. Consider making v2 more heavily weighted if v1 continues
+   to weaken.
+4. **Rebuild data refresh automation**: CSV fetch + feature regen should
+   be part of the pre-analysis pipeline.
 
-## Weighting details
+## Files produced
 
-8 coins total → 1/8 = 0.125 per coin.
-
-v1 Model A is pooled on BTC+ETH (2 coins). Since its weighted_pnl is
-reported per-trade with individual symbol labels in the trades.csv,
-each of BTC and ETH trades gets scaled by 1/8 (not 1/4 for Model A
-combined).
-
-This is mathematically equivalent to the user's directive: each coin
-gets equal weight, regardless of which model produces its trades.
-
-## Takeaways
-
-1. **Combined portfolio has real diversification benefit** — IS and OOS trade
-   Sharpe both exceed either alone.
-2. **v1 and v2 are genuinely complementary**:
-   - v1's top contributor: LINK (regime-detection features work well there)
-   - v2's top contributor: NEAR (L1 with BTC trend filter)
-   - No overlap in the alpha sources.
-3. **All 8 coins are net-positive contributors** in the 11-month OOS window.
-4. **OOS monthly Sharpe dilutes** because v2's big-win months spread across
-   more trades. This is a known cost of combining concentrated strategies.
-5. **Earlier analysis was wrong** — I used a freshly-run iter-152 instead of
-   the official iter-163. iter-152 doesn't have entropy/CUSUM features and
-   its LINK trades were net-negative when run on the extended OOS window.
-
-## Recommendation
-
-**The combined v1+v2 portfolio is the best deployment candidate** by:
-- OOS trade Sharpe +2.22 (vs v2 alone +2.02, v1 alone +1.18)
-- Better diversification (8 coins, 8 positive contributors)
-- IS Sharpe best of any configuration (+2.73 trade, +1.63 monthly)
-
-Next steps:
-1. Consider extending v1 to April 2026 OOS (rerun iter-163 with latest data)
-2. Validate combined portfolio over walk-forward months
-3. Consider live paper trading with 50/50 v1/v2 capital allocation
+- `reports/iteration_152/` — v1 fresh results (IS/OOS trades, monthly PnL)
+- `reports-v2/iteration_v2-063-fresh/` — v2 fresh results
+- `analyze_combined_v1v2.py` — parameterized analysis script
+- `analysis_v1v2_combined.md` (this file)

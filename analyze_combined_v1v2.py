@@ -140,9 +140,9 @@ def main() -> None:
     v1_oos = _load_trades(Path("reports/iteration_152/out_of_sample/trades.csv"))
     v1_trades = pd.concat([v1_is, v1_oos], ignore_index=True)
 
-    # v2 trades from reports-v2/iteration_v2-059/
-    v2_is = _load_trades(Path("reports-v2/iteration_v2-059/in_sample/trades.csv"))
-    v2_oos = _load_trades(Path("reports-v2/iteration_v2-059/out_of_sample/trades.csv"))
+    # v2 trades from reports-v2/iteration_v2-063-fresh/ (re-run with Apr 2026 data)
+    v2_is = _load_trades(Path("reports-v2/iteration_v2-063-fresh/in_sample/trades.csv"))
+    v2_oos = _load_trades(Path("reports-v2/iteration_v2-063-fresh/out_of_sample/trades.csv"))
     v2_trades = pd.concat([v2_is, v2_oos], ignore_index=True)
 
     # Scale each trade's weighted_pnl by its coin's portfolio weight (equal per coin)
@@ -167,8 +167,8 @@ def main() -> None:
     )
     v2_raw = pd.concat(
         [
-            _load_trades(Path("reports-v2/iteration_v2-059/in_sample/trades.csv")),
-            _load_trades(Path("reports-v2/iteration_v2-059/out_of_sample/trades.csv")),
+            _load_trades(Path("reports-v2/iteration_v2-063-fresh/in_sample/trades.csv")),
+            _load_trades(Path("reports-v2/iteration_v2-063-fresh/out_of_sample/trades.csv")),
         ]
     )
 
