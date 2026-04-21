@@ -43,6 +43,29 @@ runs continuously on all data; reports are split at the cutoff.
 See `BASELINE_V2.md` for current metrics and the forbidden-symbol table.
 Baseline comparison rules for v2 live in the skill file.
 
+## Feature Column Pinning — MANDATORY
+
+Every v2 runner MUST pass `feature_columns=list(V2_FEATURE_COLUMNS)` to
+`LightGbmStrategy`. Never `None`, never sorted, never reordered. Column
+order matters to LightGBM (via `colsample_bytree` position-based sampling);
+changing the order silently produces a different model and breaks
+reproducibility. See `.claude/commands/quant-iteration-v2.md` § "Feature
+Column Pinning — REPRODUCIBILITY GUARANTEE" for the full rationale and
+v1's post-mortem that prompted this rule.
+
+## Candle Integrity — MANDATORY
+
+Every v2 iteration MUST verify before fetching or backtesting:
+1. `fetcher.py` contains the closed-candle filter (`k.close_time < now_ms`)
+2. No kline CSV has a tail row with `close_time` in the future
+
+Fix lives on `main` (commit `19a1d3e`, 2026-04-13). If the quant-research
+branch lacks this fix, merge `main` before running `crypto-trade fetch`.
+Forming candles silently corrupt rolling features for up to ~100 rows and
+are a second major source of non-reproducibility, distinct from the
+column-order bug. See `.claude/commands/quant-iteration-v2.md` § "Candle
+Integrity — CLOSED CANDLES ONLY" for the QE pre-flight check script.
+
 ## Relationship to v1
 
 - **Shared**: OOS cutoff, 8h candles, LightGBM, backtest engine, labeling,

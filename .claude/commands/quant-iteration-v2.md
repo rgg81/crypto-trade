@@ -138,6 +138,17 @@ All of v1's NO-CHEATING rules apply verbatim to v2, plus one extra:
 - **NEVER trade v1's baseline symbols from v2.** BTC, ETH, LINK, BNB belong
   to v1. v2 runners must assert `set(cfg.symbols).isdisjoint(V2_EXCLUDED_SYMBOLS)`
   at startup.
+- **NEVER pass `feature_columns=None` to `LightGbmStrategy`.** Auto-discovery
+  reads parquet schema order, and parquet column order depends on how
+  `generate_features(df, groups=…)` was invoked (which groups list, what
+  insertion order). That means the trained model depends on a parquet layout
+  that is effectively an implementation detail — different parquet
+  regeneration paths can silently produce differently-ordered parquets and
+  therefore different models. See the v1 iter-152 post-mortem
+  (`analysis_v1_baseline_battletest.md`) for the concrete failure: +2.83 OOS
+  Sharpe became unreproducible because Apr 5 auto-discovery returned a
+  column order that today's parquet regeneration cannot recreate. Every v2
+  runner MUST pass an explicit, fixed-order `feature_columns=list(V2_FEATURE_COLUMNS)`.
 
 To improve IS Sharpe: improve the STRATEGY (features, model, risk layer) —
 not the measurement window.
@@ -947,6 +958,166 @@ For iter-v2/001: 35 features × 4,400 samples = ratio 125. Healthy.
 → OOS Sharpe -57%. v2 starts from scratch, so the iter-v2/001 anti-pattern to
 watch for is **scope creep** (the 28-item catalog ballooning to 50 before
 iter-v2/001 even runs).
+
+---
+
+## Feature Column Pinning — REPRODUCIBILITY GUARANTEE
+
+This section is MANDATORY. Violating it produces silently unreproducible
+results. v1 lost its +2.83 baseline exactly this way (see
+`analysis_v1_baseline_battletest.md` for the post-mortem).
+
+### The problem
+
+LightGBM's `colsample_bytree < 1.0` samples columns by **position** using the
+seeded RNG. Same seed + same features + **different column order** → same
+seeded RNG picks **different columns** for each tree → different tree
+structure → different probabilities → different trade signals → different
+OOS Sharpe.
+
+Empirically proven: on real BNB training data with `colsample_bytree=0.7`
+(a typical Optuna-tuned value for v1/v2), shuffling column order produces
+6% label flips at 0.5 threshold and ~15–30 signal flips per test month at
+the 0.7–0.85 thresholds we actually trade at. Over 12 months this
+compounds to hundreds of divergent trades.
+
+LightGBM itself IS deterministic given identical inputs (feature values,
+column order, seed). The non-determinism comes from column-position-dependent
+sampling — not from the library.
+
+### The rule
+
+Every v2 backtest runner, live engine, notebook, and validation script MUST:
+
+1. Import a single canonical ordered tuple from `src/crypto_trade/features_v2`
+   (currently `V2_FEATURE_COLUMNS`; do not fork the name).
+2. Pass it to `LightGbmStrategy(..., feature_columns=list(V2_FEATURE_COLUMNS))`.
+3. Never pass `feature_columns=None`. Never pass `feature_columns=sorted(...)`.
+   Never pass a set, dict-keys view, or any other collection whose iteration
+   order is language/implementation-defined.
+
+The LightGbmStrategy class now rejects `feature_columns=None` with a clear
+error (enforced by a parallel code session). This skill enforces the same
+rule at the workflow/documentation level.
+
+### Changing the feature list
+
+Adding/removing features DOES change the model — that is the whole point of
+iteration. But it must be a deliberate, auditable change:
+
+- **Pruning a feature**: Delete the string from `V2_FEATURE_COLUMNS`. Commit.
+  OOS Sharpe will change; that is the iteration's measurement.
+- **Adding a feature**: Append the string to `V2_FEATURE_COLUMNS` (do NOT
+  insert into the middle — that reshuffles positions for every tree already
+  using colsample and silently changes every existing prediction even for
+  unrelated features).
+- **Reordering** is forbidden unless the iteration is explicitly about
+  measuring column-order sensitivity.
+
+### Baseline reproducibility audit (QE, every iteration)
+
+Before running a backtest, the QE MUST:
+
+```bash
+grep -rn "feature_columns=" run_baseline_v2.py run_iteration_v2_*.py \
+    src/crypto_trade/live_v2/  2>/dev/null | \
+    grep -v "V2_FEATURE_COLUMNS\|BASELINE_V2_FEATURE_COLUMNS\|list(V2_FEATURE"
+```
+
+If this returns any lines, something is passing a non-canonical list.
+STOP. Fix it before running.
+
+### The current canonical list
+
+`V2_FEATURE_COLUMNS` in `src/crypto_trade/features_v2/__init__.py`. As of
+the iter-v2/059 baseline, it contains the 35 v2 features plus the 5 BTC
+cross-asset features (40 total; cross-v2sym features were removed in
+iter-v2/044 after IS regression). This tuple is the single source of truth.
+Everything else (`run_baseline_v2.py`, future live engines, notebooks) must
+import it, never redefine it.
+
+If a future iteration genuinely wants a different feature list (e.g.,
+experimenting with a subset), it must:
+1. Create a new named tuple (`V2_FEATURE_COLUMNS_EXPERIMENT_047` etc.)
+2. Use that named tuple throughout the iteration
+3. Either merge it back into `V2_FEATURE_COLUMNS` on MERGE or discard it on
+   NO-MERGE. Never let two canonical lists coexist.
+
+---
+
+## Candle Integrity — CLOSED CANDLES ONLY
+
+The v1 baseline lost ~7 days of OOS accuracy because an earlier fetcher wrote
+the **currently-forming** kline to the CSV. Binance returns the open/high/low/close
+of the candle *as of right now*, so the last row was stale mid-candle values
+that never got corrected on subsequent incremental fetches. All 4 v1 baseline
+symbols accumulated 3–4 corrupted tail candles; rolling features then
+propagated those bad values back through the longest rolling window (~100
+candles). This is a second major source of non-reproducibility that sits
+BESIDE the column-order bug, not a replacement for it.
+
+### The rule
+
+`fetcher.py::fetch_symbol_interval` MUST drop any kline whose `close_time`
+is in the future:
+
+```python
+now_ms = int(time.time() * 1000)
+closed = [k for k in klines if k.close_time < now_ms]
+if not closed:
+    return 0
+return write_klines(path, closed, append=append)
+```
+
+This fix lives on `main` as commit `19a1d3e` (2026-04-13). The
+`quant-research` branch inherits fixes to core infrastructure from `main`
+via periodic merges — if the branch has drifted and the fix is missing,
+STOP, merge `main`, and never run `crypto-trade fetch` from a branch that
+doesn't have it.
+
+### QE pre-flight check (mandatory before every iteration)
+
+Before running any `fetch` / `bulk` / feature-regeneration / backtest, the
+QE runs this audit:
+
+```bash
+# 1. Fetcher has the closed-candle guard
+grep -q "k.close_time < now_ms" src/crypto_trade/fetcher.py || \
+    { echo "FATAL: fetcher missing closed-candle filter"; exit 1; }
+
+# 2. No CSV tail candle has close_time in the future (proof no corruption)
+uv run python -c "
+import time, pandas as pd
+from pathlib import Path
+now_ms = int(time.time() * 1000)
+bad = []
+for p in Path('data').glob('*/8h.csv'):
+    df = pd.read_csv(p)
+    if (df['close_time'] >= now_ms).any():
+        bad.append(p.name)
+if bad:
+    raise SystemExit(f'Forming candles present in: {bad}')
+print('All CSV tails are closed-candle-only ✓')
+"
+```
+
+Both checks must pass green before Phase 6 starts. If either fails the QE
+stops, deletes the corrupted tail rows, re-fetches from a known-good
+earlier timestamp, and regenerates features before proceeding.
+
+### Why this matters for v2
+
+- Rolling feature windows (ATR_14, BB_30, SMA_100, garman_klass_50, etc.)
+  propagate a single corrupted candle backward through many downstream
+  feature rows.
+- Cross-asset features (e.g., `btc_ret_14d`, `sym_vs_btc_ret_7d`) propagate
+  BTC corruption into every other symbol's feature row for the same period.
+- The vol-targeting layer uses rolling 45-day daily PnL, which consumes
+  these features. Corrupted features → wrong vt scale → wrong weighted_pnl
+  → wrong Sharpe number — even before we get to colsample_bytree.
+
+Combine this with the column-order bug and you have two independent ways to
+silently produce unreproducible baselines. Both must be closed.
 
 ---
 

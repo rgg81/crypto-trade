@@ -317,6 +317,8 @@ Regime-stratified breakdown from iter-v2/017 report not fully recomputed
 | Cooldown | 2 candles |
 | Features | 40 from `V2_FEATURE_COLUMNS` (35 core + 5 BTC cross-asset) |
 | Feature helper | `natr_21_raw` (labeling input, excluded from features) |
+| Feature column pinning | **MANDATORY**: `feature_columns=list(V2_FEATURE_COLUMNS)` from `crypto_trade.features_v2`. Never `None`, never sorted, never reordered. See `.claude/commands/quant-iteration-v2.md` § "Feature Column Pinning". |
+| Candle integrity | **MANDATORY**: `fetcher.py` must drop forming candles (`k.close_time < now_ms`). Fix on `main` at commit `19a1d3e` (2026-04-13). Pre-flight: grep the guard + scan CSV tails for `close_time >= now_ms`. See `.claude/commands/quant-iteration-v2.md` § "Candle Integrity". |
 | Risk gates | 7 active gates (vol-scaling, ADX, Hurst, z-score OOD, low-vol, **hit-rate (OOS)**, **BTC trend (full)**) |
 | **Ensemble** | **5-seed internal** (`[42,123,456,789,1001]`, v1-style, from iter-v2/035) |
 | Fee | 0.1% per trade |
