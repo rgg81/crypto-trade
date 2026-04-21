@@ -197,18 +197,23 @@ When an iteration adds new symbol(s) to the universe, the QE MUST validate stabi
 
 ### Seed Parity on Model Add/Replace — NON-NEGOTIABLE
 
-When an iteration ADDS a new model or REPLACES an existing one in the portfolio, the new model must be validated with **the same number of outer seeds** as the models already in the portfolio. If the existing models each ran 5 outer seeds, the new model must also run 5 outer seeds (typically 42, 123, 456, 789, 1001) with `yearly_pnl_check=True` to keep the cost tractable.
+When an iteration ADDS a new model or REPLACES an existing one in the portfolio, the new model must be validated using the **same seed structure** as the models already in the portfolio. What "same" means depends on the architecture:
 
-A Gate 3 screen at `seed=42` alone is **not sufficient** to merge a new model — it only proves the candidate carries signal. Seed parity proves it carries signal *reliably*, which is the bar the existing models have already cleared.
+**Ensemble architecture (current baseline)** — Models A, C, D each train with `ensemble_seeds=[42, 123, 456, 789, 1001]` (5 inner seeds per monthly training, averaged). A new model satisfies parity if it uses the **same inner ensemble seed list**. The outer `self.seed` parameter on `LightGbmStrategy` is unused in this configuration (`lgbm.py:424` falls through `ensemble_seeds or [self.seed]`), so outer-seed sweeps produce bit-identical runs and have no power to validate anything (learned in iter-166).
 
-Workflow for a new/replacement model:
-1. Cheap Gate 1–2 checks (data quality, liquidity)
-2. Gate 3 at `seed=42` with fail-fast
-3. If Gate 3 passes, run the same config with seeds 123, 456, 789, 1001 (fail-fast each)
-4. Merge ONLY if ≥ 4 of 5 seeds show OOS Sharpe > 0 AND mean OOS Sharpe > 0
-5. Portfolio metrics derived from the seed=42 trades are **provisional** until the sweep confirms stability
+**Single-seed architecture (legacy / per-candidate screens)** — if a runner uses `ensemble_seeds=None` or `ensemble_seeds=[single_value]`, the outer `seed=` parameter IS live. In that case, sweeping outer seeds {42, 123, 456, 789, 1001} with `yearly_pnl_check=True` is the correct stability test.
 
-This rule prevents "coasted" merges where a new model joins an over-validated portfolio on under-validated evidence.
+Workflow for a new/replacement model in the ensemble architecture:
+1. Cheap Gate 1–2 checks (data quality, liquidity).
+2. Gate 3 stand-alone screen with the same `ensemble_seeds` as the portfolio's existing models; fail-fast on.
+3. If Gate 3 passes, merge on those numbers — no outer-seed sweep is needed because the ensemble is itself the variance-reduction mechanism.
+
+Workflow for a single-seed candidate or architectural deviation:
+1. Same Gates 1–3 at the first seed.
+2. Four additional runs at the remaining outer seeds. Fail-fast each.
+3. Merge only if ≥ 4 of 5 seeds show OOS Sharpe > 0 AND mean OOS Sharpe > 0.
+
+This rule prevents "coasted" merges where a new model joins an over-validated portfolio on under-validated evidence **and** also prevents the dual pitfall of running redundant sweeps against dead-code RNG sources.
 
 ## Feature Normalization Awareness
 
