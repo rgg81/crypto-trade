@@ -25,8 +25,11 @@ def get_strategy(name: str, params: dict[str, str] | None = None) -> Strategy:
         raise KeyError(f"Unknown strategy: {name!r}. Available: {list_strategies()}")
     cls = STRATEGY_REGISTRY[name]
     if params:
-        converted: dict[str, int | float | str] = {}
+        converted: dict[str, object] = {}
         for k, v in params.items():
+            if not isinstance(v, str):
+                converted[k] = v
+                continue
             try:
                 converted[k] = int(v)
             except ValueError:

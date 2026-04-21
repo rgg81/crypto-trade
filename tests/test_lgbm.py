@@ -268,12 +268,8 @@ class TestMonthSplits:
 
         s0 = splits[0]
         assert s0.test_month == "2024-03"
-        assert datetime.datetime.fromtimestamp(
-            s0.train_start_ms / 1000, tz=datetime.UTC
-        ).month == 1
-        assert datetime.datetime.fromtimestamp(
-            s0.test_start_ms / 1000, tz=datetime.UTC
-        ).month == 3
+        assert datetime.datetime.fromtimestamp(s0.train_start_ms / 1000, tz=datetime.UTC).month == 1
+        assert datetime.datetime.fromtimestamp(s0.test_start_ms / 1000, tz=datetime.UTC).month == 3
 
 
 # ---------------------------------------------------------------------------
@@ -339,7 +335,11 @@ class TestRegistration:
 
         strategy = get_strategy(
             "lgbm",
-            {"features_dir": "data/features", "n_trials": "10"},
+            {
+                "features_dir": "data/features",
+                "n_trials": "10",
+                "feature_columns": ["mom_rsi_14"],
+            },
         )
         assert strategy.features_dir == "data/features"
         assert strategy.n_trials == 10
@@ -380,7 +380,9 @@ class TestLazyMonthlyTraining:
         from crypto_trade.strategies.ml.lgbm import LightGbmStrategy
 
         master = self._make_multi_month_master()
-        strategy = LightGbmStrategy(training_months=2, features_dir="/nonexistent")
+        strategy = LightGbmStrategy(
+            training_months=2, features_dir="/nonexistent", feature_columns=["mom_rsi_14"]
+        )
         strategy.compute_features(master)
 
         assert strategy._model is None
@@ -393,7 +395,9 @@ class TestLazyMonthlyTraining:
         from crypto_trade.strategies.ml.lgbm import LightGbmStrategy
 
         master = self._make_multi_month_master()
-        strategy = LightGbmStrategy(training_months=2, features_dir="/nonexistent")
+        strategy = LightGbmStrategy(
+            training_months=2, features_dir="/nonexistent", feature_columns=["mom_rsi_14"]
+        )
         strategy.compute_features(master)
 
         train_calls = []
@@ -417,7 +421,9 @@ class TestLazyMonthlyTraining:
         from crypto_trade.strategies.ml.lgbm import LightGbmStrategy
 
         master = self._make_multi_month_master()
-        strategy = LightGbmStrategy(training_months=2, features_dir="/nonexistent")
+        strategy = LightGbmStrategy(
+            training_months=2, features_dir="/nonexistent", feature_columns=["mom_rsi_14"]
+        )
         strategy.compute_features(master)
 
         train_calls = []
@@ -441,7 +447,9 @@ class TestLazyMonthlyTraining:
         from crypto_trade.strategies.ml.lgbm import LightGbmStrategy
 
         master = self._make_multi_month_master()
-        strategy = LightGbmStrategy(training_months=2, features_dir="/nonexistent")
+        strategy = LightGbmStrategy(
+            training_months=2, features_dir="/nonexistent", feature_columns=["mom_rsi_14"]
+        )
         strategy.compute_features(master)
 
         train_calls = []
@@ -471,7 +479,9 @@ class TestLazyMonthlyTraining:
         from crypto_trade.strategies.ml.lgbm import LightGbmStrategy
 
         master = self._make_multi_month_master()
-        strategy = LightGbmStrategy(training_months=2, features_dir="/nonexistent")
+        strategy = LightGbmStrategy(
+            training_months=2, features_dir="/nonexistent", feature_columns=["mom_rsi_14"]
+        )
         strategy.compute_features(master)
 
         signal = strategy.get_signal("BTCUSDT", int(master["open_time"].iloc[0]))
@@ -494,7 +504,7 @@ class TestConfidenceThreshold:
         from crypto_trade.strategies.ml.lgbm import LightGbmStrategy
 
         ot = self._JAN_2024_MS
-        strategy = LightGbmStrategy(features_dir="/nonexistent")
+        strategy = LightGbmStrategy(features_dir="/nonexistent", feature_columns=["mom_rsi_14"])
         strategy._current_month = "2024-01"
         strategy._confidence_threshold = 0.60
 
@@ -515,7 +525,7 @@ class TestConfidenceThreshold:
         from crypto_trade.strategies.ml.lgbm import LightGbmStrategy
 
         ot = self._JAN_2024_MS
-        strategy = LightGbmStrategy(features_dir="/nonexistent")
+        strategy = LightGbmStrategy(features_dir="/nonexistent", feature_columns=["mom_rsi_14"])
         strategy._current_month = "2024-01"
         strategy._confidence_threshold = 0.60
 
@@ -536,7 +546,7 @@ class TestConfidenceThreshold:
         from crypto_trade.strategies.ml.lgbm import LightGbmStrategy
 
         ot = self._JAN_2024_MS
-        strategy = LightGbmStrategy(features_dir="/nonexistent")
+        strategy = LightGbmStrategy(features_dir="/nonexistent", feature_columns=["mom_rsi_14"])
         strategy._current_month = "2024-01"
         strategy._confidence_threshold = 0.55
 
@@ -561,15 +571,11 @@ class TestSharpeWithThreshold:
         # 10 confident correct predictions (proba >= 0.85)
         # Predict long (argmax=1) with positive long_pnl
         # Predict short (argmax=0) with positive short_pnl
-        proba_good = np.array(
-            [[0.15, 0.85]] * 5 + [[0.85, 0.15]] * 5, dtype=np.float64
-        )
+        proba_good = np.array([[0.15, 0.85]] * 5 + [[0.85, 0.15]] * 5, dtype=np.float64)
         # 10 uncertain WRONG predictions (proba ~0.52)
         # Predict short (argmax=0) but short_pnl is negative
         # Predict long (argmax=1) but long_pnl is negative
-        proba_bad = np.array(
-            [[0.52, 0.48]] * 5 + [[0.48, 0.52]] * 5, dtype=np.float64
-        )
+        proba_bad = np.array([[0.52, 0.48]] * 5 + [[0.48, 0.52]] * 5, dtype=np.float64)
         y_proba = np.vstack([proba_good, proba_bad])
 
         # Good long predictions: long_pnl positive
@@ -577,16 +583,52 @@ class TestSharpeWithThreshold:
         # Bad short predictions (0.52,0.48→short): short_pnl negative
         # Bad long predictions (0.48,0.52→long): long_pnl negative
         long_pnls = np.array(
-            [3.9, 2.5, 3.9, 1.8, 3.5,   # good long
-             -2.1, -1.5, -2.1, -1.8, -0.8,  # good short (irrelevant)
-             3.9, 2.5, 3.9, 1.8, 3.5,   # bad short (irrelevant)
-             -2.1, -1.5, -2.1, -1.8, -0.8]  # bad long (gets this neg PnL)
+            [
+                3.9,
+                2.5,
+                3.9,
+                1.8,
+                3.5,  # good long
+                -2.1,
+                -1.5,
+                -2.1,
+                -1.8,
+                -0.8,  # good short (irrelevant)
+                3.9,
+                2.5,
+                3.9,
+                1.8,
+                3.5,  # bad short (irrelevant)
+                -2.1,
+                -1.5,
+                -2.1,
+                -1.8,
+                -0.8,
+            ]  # bad long (gets this neg PnL)
         )
         short_pnls = np.array(
-            [-2.1, -1.5, -2.1, -1.8, -0.8,  # good long (irrelevant)
-             3.9, 2.5, 3.9, 1.8, 3.5,   # good short
-             -2.1, -1.5, -2.1, -1.8, -0.8,  # bad short (gets this neg PnL)
-             3.9, 2.5, 3.9, 1.8, 3.5]   # bad long (irrelevant)
+            [
+                -2.1,
+                -1.5,
+                -2.1,
+                -1.8,
+                -0.8,  # good long (irrelevant)
+                3.9,
+                2.5,
+                3.9,
+                1.8,
+                3.5,  # good short
+                -2.1,
+                -1.5,
+                -2.1,
+                -1.8,
+                -0.8,  # bad short (gets this neg PnL)
+                3.9,
+                2.5,
+                3.9,
+                1.8,
+                3.5,
+            ]  # bad long (irrelevant)
         )
 
         # Strict: keeps only 10 confident correct → all positive PnL

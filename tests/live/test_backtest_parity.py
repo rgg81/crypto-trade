@@ -19,7 +19,7 @@ import pytest
 
 from crypto_trade.backtest import build_master, compute_vt_scale, create_order
 from crypto_trade.backtest_models import BacktestConfig
-from crypto_trade.live.models import LiveConfig
+from crypto_trade.live.models import BASELINE_FEATURE_COLUMNS, LiveConfig
 from crypto_trade.live.order_manager import compute_sl_tp
 from crypto_trade.strategies.ml.lgbm import LightGbmStrategy
 
@@ -62,7 +62,7 @@ def _make_strategy(atr_tp: float, atr_sl: float) -> LightGbmStrategy:
         atr_sl_multiplier=atr_sl,
         use_atr_labeling=True,
         ensemble_seeds=[42, 123, 456, 789, 1001],
-        feature_columns=None,
+        feature_columns=list(BASELINE_FEATURE_COLUMNS),
     )
 
 
