@@ -523,6 +523,31 @@ After 3+ consecutive NO-MERGE iterations (or after an EARLY STOP), the QR MUST e
 
 **Minimum completion**: 2 categories after a MERGE, 4+ categories after 3+ NO-MERGE or EARLY STOP.
 
+### Research with Evidence — NON-NEGOTIABLE
+
+Writing "B. Symbol Universe — AAVE is DeFi, different sector, pass Gate 3 at 3.5/1.75" is **not research**. It is a one-line hypothesis that was never tested. A Phase 5 brief that lists research checklist items without showing the numbers behind them IS a violation of the QR methodology.
+
+Every research checklist category the QR claims to have completed MUST include in the research brief (or linked analysis file) at least one of:
+
+- A table of numerical results computed from IS data (feature importances, correlations, per-regime metrics, WR distributions, etc.)
+- A chart or printout (copy-pasted into the brief as text — remember `reports/` and `analysis/` are gitignored, so charts must be summarised in text)
+- A comparison: "ran X on IS data, observed Y, therefore Z"
+
+A Phase 5 brief without evidence of this sort is a rubber-stamp brief. The QE should REFUSE to run Phase 6 on such a brief and return it to the QR for actual analysis.
+
+### When a Candidate Symbol Fails Gate 3
+
+A single-seed Gate 3 fail is a **signal to investigate the candidate further** — not a rejection. Before moving to the next symbol, the QR MUST:
+
+1. **A3 / A4 — Feature importance on the candidate's IS data**: train a reference model on the candidate alone (using same 193 features), extract MDI, identify which features are top-20 for this candidate vs. the baseline's successful models (LTC, LINK). Are there differences? Propose pruning or replacement.
+2. **C — Labeling analysis for the candidate**: compute the candidate's IS label distribution under the baseline labeling rules (ATR 3.5/1.75). Is the class balance reasonable? Do labels flip at a reasonable rate? Is the implied WR floor achievable given the candidate's realized NATR?
+3. **E — Trade pattern in the failing period**: for candidates that failed year-1, look at what specific events in 2022 caused the losses. Was it one bad month (e.g., LUNA collapse week) dominating? If so, is there a regime-detection feature that would have filtered those trades?
+4. **D — Lookback sensitivity**: is 24-month training too short or too long for this candidate? Try candidate-specific lookback windows.
+
+Only after at least two of these have been run and documented with numerical evidence does the candidate get a definitive "rejected" tag. Until then, it is on "investigation pending".
+
+This rule exists because treating fail-fast as a rejection criterion for the **candidate** (rather than for the **config**) conflates two different things. A candidate may have signal that the default config cannot extract; the research checklist is how we find out.
+
 ### Research Checklist
 
 #### A. Feature Contribution Analysis
