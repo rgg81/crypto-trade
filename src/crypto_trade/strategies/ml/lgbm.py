@@ -122,7 +122,6 @@ class LightGbmStrategy:
         label_timeout_minutes: int = 4320,
         fee_pct: float = 0.1,
         features_dir: str = "data/features",
-        seed: int = 42,
         verbose: int = 0,
         atr_tp_multiplier: float | None = None,
         atr_sl_multiplier: float | None = None,
@@ -142,6 +141,12 @@ class LightGbmStrategy:
                 "is disabled to guarantee reproducibility across parquet "
                 "schema changes. Pass an explicit list of column names."
             )
+        if not ensemble_seeds:
+            raise ValueError(
+                "ensemble_seeds must be a non-empty list of integers. Pass the "
+                "production list (e.g. [42, 123, 456, 789, 1001]) to ensemble "
+                "across seeds, or [42] for a single-seed run."
+            )
         self.training_months = training_months
         self.n_trials = n_trials
         self.cv_splits = cv_splits
@@ -150,7 +155,6 @@ class LightGbmStrategy:
         self.label_timeout_minutes = label_timeout_minutes
         self.fee_pct = fee_pct
         self.features_dir = features_dir
-        self.seed = seed
         self.verbose = verbose
         self.atr_tp_multiplier = atr_tp_multiplier
         self.atr_sl_multiplier = atr_sl_multiplier
@@ -421,7 +425,7 @@ class LightGbmStrategy:
         if self.verbose > 0:
             print(f"  CV gap: {cv_gap} rows")
 
-        seeds = self.ensemble_seeds or [self.seed]
+        seeds = self.ensemble_seeds
         self._models = []
         self._confidence_thresholds = []
 

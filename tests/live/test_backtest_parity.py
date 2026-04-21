@@ -56,7 +56,6 @@ def _make_strategy(atr_tp: float, atr_sl: float) -> LightGbmStrategy:
         label_timeout_minutes=10080,
         fee_pct=0.1,
         features_dir=str(FEATURES_DIR),
-        seed=42,
         verbose=0,
         atr_tp_multiplier=atr_tp,
         atr_sl_multiplier=atr_sl,

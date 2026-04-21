@@ -58,7 +58,6 @@ def run_model(name, symbols, use_atr_labeling, atr_tp, atr_sl):
         label_timeout_minutes=10080,
         fee_pct=0.1,
         features_dir="data/features",
-        seed=42,
         verbose=1,
         atr_tp_multiplier=atr_tp,
         atr_sl_multiplier=atr_sl,

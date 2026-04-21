@@ -339,6 +339,7 @@ class TestRegistration:
                 "features_dir": "data/features",
                 "n_trials": "10",
                 "feature_columns": ["mom_rsi_14"],
+                "ensemble_seeds": [42],
             },
         )
         assert strategy.features_dir == "data/features"
@@ -381,7 +382,10 @@ class TestLazyMonthlyTraining:
 
         master = self._make_multi_month_master()
         strategy = LightGbmStrategy(
-            training_months=2, features_dir="/nonexistent", feature_columns=["mom_rsi_14"]
+            training_months=2,
+            features_dir="/nonexistent",
+            feature_columns=["mom_rsi_14"],
+            ensemble_seeds=[42],
         )
         strategy.compute_features(master)
 
@@ -396,7 +400,10 @@ class TestLazyMonthlyTraining:
 
         master = self._make_multi_month_master()
         strategy = LightGbmStrategy(
-            training_months=2, features_dir="/nonexistent", feature_columns=["mom_rsi_14"]
+            training_months=2,
+            features_dir="/nonexistent",
+            feature_columns=["mom_rsi_14"],
+            ensemble_seeds=[42],
         )
         strategy.compute_features(master)
 
@@ -422,7 +429,10 @@ class TestLazyMonthlyTraining:
 
         master = self._make_multi_month_master()
         strategy = LightGbmStrategy(
-            training_months=2, features_dir="/nonexistent", feature_columns=["mom_rsi_14"]
+            training_months=2,
+            features_dir="/nonexistent",
+            feature_columns=["mom_rsi_14"],
+            ensemble_seeds=[42],
         )
         strategy.compute_features(master)
 
@@ -448,7 +458,10 @@ class TestLazyMonthlyTraining:
 
         master = self._make_multi_month_master()
         strategy = LightGbmStrategy(
-            training_months=2, features_dir="/nonexistent", feature_columns=["mom_rsi_14"]
+            training_months=2,
+            features_dir="/nonexistent",
+            feature_columns=["mom_rsi_14"],
+            ensemble_seeds=[42],
         )
         strategy.compute_features(master)
 
@@ -480,7 +493,10 @@ class TestLazyMonthlyTraining:
 
         master = self._make_multi_month_master()
         strategy = LightGbmStrategy(
-            training_months=2, features_dir="/nonexistent", feature_columns=["mom_rsi_14"]
+            training_months=2,
+            features_dir="/nonexistent",
+            feature_columns=["mom_rsi_14"],
+            ensemble_seeds=[42],
         )
         strategy.compute_features(master)
 
@@ -504,7 +520,11 @@ class TestConfidenceThreshold:
         from crypto_trade.strategies.ml.lgbm import LightGbmStrategy
 
         ot = self._JAN_2024_MS
-        strategy = LightGbmStrategy(features_dir="/nonexistent", feature_columns=["mom_rsi_14"])
+        strategy = LightGbmStrategy(
+            features_dir="/nonexistent",
+            feature_columns=["mom_rsi_14"],
+            ensemble_seeds=[42],
+        )
         strategy._current_month = "2024-01"
         strategy._confidence_threshold = 0.60
 
@@ -525,7 +545,11 @@ class TestConfidenceThreshold:
         from crypto_trade.strategies.ml.lgbm import LightGbmStrategy
 
         ot = self._JAN_2024_MS
-        strategy = LightGbmStrategy(features_dir="/nonexistent", feature_columns=["mom_rsi_14"])
+        strategy = LightGbmStrategy(
+            features_dir="/nonexistent",
+            feature_columns=["mom_rsi_14"],
+            ensemble_seeds=[42],
+        )
         strategy._current_month = "2024-01"
         strategy._confidence_threshold = 0.60
 
@@ -546,7 +570,11 @@ class TestConfidenceThreshold:
         from crypto_trade.strategies.ml.lgbm import LightGbmStrategy
 
         ot = self._JAN_2024_MS
-        strategy = LightGbmStrategy(features_dir="/nonexistent", feature_columns=["mom_rsi_14"])
+        strategy = LightGbmStrategy(
+            features_dir="/nonexistent",
+            feature_columns=["mom_rsi_14"],
+            ensemble_seeds=[42],
+        )
         strategy._current_month = "2024-01"
         strategy._confidence_threshold = 0.55
 

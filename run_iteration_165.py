@@ -51,7 +51,6 @@ def main() -> None:
         label_timeout_minutes=10080,
         fee_pct=0.1,
         features_dir="data/features",
-        seed=42,
         verbose=1,
         atr_tp_multiplier=3.5,
         atr_sl_multiplier=1.75,

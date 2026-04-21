@@ -88,7 +88,6 @@ class ModelRunner:
             label_timeout_minutes=live_config.timeout_minutes,
             fee_pct=live_config.fee_pct,
             features_dir=str(live_config.features_dir),
-            seed=42,
             verbose=1,
             atr_tp_multiplier=model_config.atr_tp_multiplier,
             atr_sl_multiplier=model_config.atr_sl_multiplier,
