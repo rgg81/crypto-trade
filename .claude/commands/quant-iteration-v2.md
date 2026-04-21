@@ -650,13 +650,84 @@ Tag format: `v0.v2-NNN`. `git tag -l 'v0.v2-*'` lists v2 tags only.
 
 ### NO-MERGE (iteration is worse)
 
+**PRINCIPLE**: `quant-research` only ever contains **the current baseline's
+code + reports + docs**. Failed-iteration code NEVER lands on `quant-research`.
+When the iteration's decision is NO-MERGE, the code stays on
+`iteration-v2/NNN` forever; only the 3 doc commits cross over.
+
+**FORBIDDEN on NO-MERGE**:
+
+```bash
+# NEVER run these when the decision is NO-MERGE. They pull the failed
+# code onto quant-research and silently corrupt the baseline:
+git merge iteration-v2/NNN                       # FORBIDDEN
+git merge iteration-v2/NNN --no-ff               # FORBIDDEN
+git merge iteration-v2/NNN -m "merge(iter-v2/NNN): ... NO-MERGE"  # FORBIDDEN — happened iter-v2/061
+git rebase iteration-v2/NNN                       # FORBIDDEN
+git cherry-pick <any code commit>                 # FORBIDDEN
+```
+
+The word "merge" in the commit subject does NOT make a git-merge
+into a cherry-pick. iter-v2/061 was labelled "NO-MERGE" in its subject
+yet the author ran `git merge --no-ff`, which pulled `feat(iter-v2/061):
+swap SOL for DOTUSDT` into `quant-research`. Subsequent baseline runs
+unknowingly trained on DOT instead of SOL for 3+ iterations before the
+discrepancy was caught. Never again.
+
+**Correct NO-MERGE flow** (docs ONLY):
+
 ```bash
 git checkout quant-research
-git cherry-pick <research-brief-commit>
-git cherry-pick <engineering-report-commit>
-git cherry-pick <diary-commit>
-# Branch stays — never delete iteration branches
+git cherry-pick <research-brief-commit>        # briefs-v2/iteration_NNN/
+git cherry-pick <engineering-report-commit>    # briefs-v2/iteration_NNN/
+git cherry-pick <diary-commit>                 # diary-v2/iteration_NNN.md
+# NO git merge. NO cherry-pick of code commits.
+# Branch iteration-v2/NNN stays — never delete iteration branches
 ```
+
+**Post-NO-MERGE audit (MANDATORY)**:
+
+Immediately after the three cherry-picks, confirm no code leaked:
+
+```bash
+# Must return empty — if anything shows up, revert before continuing:
+git diff HEAD~3 HEAD -- \
+    src/crypto_trade/features_v2/ \
+    src/crypto_trade/strategies/ml/risk_v2.py \
+    src/crypto_trade/strategies/ml/validation_v2.py \
+    run_baseline_v2.py
+```
+
+If the audit shows any diff, the NO-MERGE was botched. Fix with:
+
+```bash
+# Revert the stray code change (keeping the docs):
+git revert <stray-code-commit> --no-edit
+```
+
+### NO-MERGE hygiene checks (every v2 iteration)
+
+Before opening a new iteration branch, the QE MUST verify
+`quant-research` hasn't drifted from its declared baseline:
+
+```bash
+# 1. V2_MODELS in run_baseline_v2.py matches BASELINE_V2.md "Symbols" row.
+# Each V2_MODELS entry is ("LABEL (SYMBOL)", "SYMBOL") — the 2nd string is
+# the canonical symbol.
+python -c "
+import re
+with open('run_baseline_v2.py') as f: runner = f.read()
+with open('BASELINE_V2.md') as f: baseline = f.read()
+runner_syms = set(re.findall(r',\s*\"([A-Z0-9]+USDT)\"\s*\),', runner))
+baseline_line = next(l for l in baseline.splitlines() if l.startswith('| Symbols '))
+baseline_syms = set(re.findall(r'[A-Z0-9]+USDT', baseline_line))
+assert runner_syms == baseline_syms, f'DRIFT: runner={runner_syms} baseline={baseline_syms}'
+print(f'OK: runner and BASELINE_V2.md both declare {sorted(runner_syms)}')
+"
+```
+
+If drift is detected, stop and revert the runner before starting any new
+work.
 
 ### First v2 iteration
 

@@ -38,6 +38,32 @@ runs continuously on all data; reports are split at the cutoff.
   v2 features live in `src/crypto_trade/features_v2/`.
 - v2 never imports v1's feature modules.
 
+## quant-research Purity Principle — MANDATORY
+
+`quant-research` contains EXACTLY:
+
+- **The current baseline's code** (`run_baseline_v2.py`, `features_v2/`,
+  `risk_v2.py`, `validation_v2.py`, `baseline_feature_columns.py`)
+- **All iteration docs** (`briefs-v2/`, `diary-v2/`) — both MERGE and NO-MERGE
+- **Baseline & planning docs** (`BASELINE_V2.md`, `ITERATION_PLAN_8H_V2.md`,
+  `.claude/commands/quant-iteration-v2.md`)
+
+Code from **NO-MERGE iterations NEVER lands on `quant-research`**. It stays
+on the `iteration-v2/NNN` branch indefinitely.
+
+- On MERGE → `git merge iteration-v2/NNN --no-ff` is correct.
+- On NO-MERGE → ONLY `git cherry-pick` the 3 doc commits. NEVER
+  `git merge` a NO-MERGE branch, even if the commit subject spells
+  "NO-MERGE" in plain English. The subject line is documentation; the
+  git operation is what matters.
+
+iter-v2/061 silently broke this rule: the author ran `git merge --no-ff`
+on a NO-MERGE iteration, which pulled `feat(iter-v2/061): swap SOL for
+DOTUSDT` onto `quant-research`. Three subsequent baseline runs trained on
+DOT without anyone realising. See `.claude/commands/quant-iteration-v2.md`
+§ "NO-MERGE hygiene checks" for the drift-detection script that runs
+before every new iteration.
+
 ## Baseline Rules
 
 See `BASELINE_V2.md` for current metrics and the forbidden-symbol table.

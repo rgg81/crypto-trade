@@ -81,10 +81,9 @@ V2_EXCLUDED_SYMBOLS: tuple[str, ...] = ("BTCUSDT", "ETHUSDT", "LINKUSDT", "BNBUS
 # the 6-gate screening in iter-v2/001: v1 corr 0.665, $240M daily volume,
 # 4,847 IS candles.
 V2_MODELS: tuple[tuple[str, str], ...] = (
-    # iter-v2/061: swap SOL (weakest 35% WR on iter-059 primary seed) for DOT.
-    # DOT is Polkadot L1, not in v1 baseline, 6051 bars since 2020-08.
+    # iter-v2/059 baseline (declared in BASELINE_V2.md): 4 symbols, z-score OOD 2.5.
     ("E (DOGEUSDT)", "DOGEUSDT"),
-    ("L (DOTUSDT)", "DOTUSDT"),
+    ("F (SOLUSDT)", "SOLUSDT"),
     ("G (XRPUSDT)", "XRPUSDT"),
     ("H (NEARUSDT)", "NEARUSDT"),
 )
