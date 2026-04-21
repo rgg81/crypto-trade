@@ -500,7 +500,7 @@ class TestConfidenceThreshold:
 
         mock_model = MagicMock()
         mock_model.predict_proba.return_value = np.array([[0.2, 0.8]])
-        strategy._model = mock_model
+        strategy._models = [mock_model]
         strategy._selected_cols = ["feat_a", "feat_b"]
         strategy._month_features = {("BTCUSDT", ot): np.array([1.0, 2.0])}
 
@@ -521,7 +521,7 @@ class TestConfidenceThreshold:
 
         mock_model = MagicMock()
         mock_model.predict_proba.return_value = np.array([[0.55, 0.45]])
-        strategy._model = mock_model
+        strategy._models = [mock_model]
         strategy._selected_cols = ["feat_a", "feat_b"]
         strategy._month_features = {("BTCUSDT", ot): np.array([1.0, 2.0])}
 
@@ -542,7 +542,7 @@ class TestConfidenceThreshold:
 
         mock_model = MagicMock()
         mock_model.predict_proba.return_value = np.array([[0.75, 0.25]])
-        strategy._model = mock_model
+        strategy._models = [mock_model]
         strategy._selected_cols = ["feat_a", "feat_b"]
         strategy._month_features = {("BTCUSDT", ot): np.array([1.0, 2.0])}
 
