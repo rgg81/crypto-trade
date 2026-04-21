@@ -380,25 +380,37 @@ On 8h candles, a lookback of 100 candles = 33 days. Fractionally differentiated 
 
 Read `BASELINE.md` on main before evaluating. An iteration merges ONLY if:
 
-1. **Primary**: OOS Sharpe > current baseline OOS Sharpe
-2. **Hard constraints** (all must pass):
+1. **Minimum quality bars** (both must pass, absolute — not relative to baseline):
+   - **OOS Sharpe > 1.0**
+   - **IS Sharpe > 1.0**
+   These floors exist because a Sharpe below 1.0 in either half is too
+   weak to deploy confidently, regardless of how it compares to the
+   previous baseline. A candidate that "beats baseline" by pushing
+   baseline OOS from +0.95 to +0.98 is NOT a merge — both halves must
+   clear 1.0 first.
+2. **Primary**: OOS Sharpe > current baseline OOS Sharpe
+3. **Hard constraints** (all must pass):
    - Max drawdown (OOS) ≤ baseline OOS max drawdown × 1.2
    - Minimum 50 OOS trades
    - Profit factor > 1.0 (OOS)
    - No single symbol > 30% of total OOS PnL
    - IS/OOS Sharpe ratio > 0.5 (researcher overfitting gate)
 
-If primary metric improves but a constraint fails → NO-MERGE. Document trade-off in diary.
+If the minimum quality bars fail → NO-MERGE, full stop. If primary or
+hard constraints fail but the 1.0 floors hold → NO-MERGE with trade-off
+documented in the diary.
 
 **Diversification exception**: If an iteration adds new symbol(s) and:
-- OOS Sharpe is within 5% of baseline (i.e., >= baseline × 0.95)
+- BOTH Sharpe floors (IS > 1.0, OOS > 1.0) still hold
+- OOS Sharpe is within 5% of baseline (>= baseline × 0.95)
 - OOS MaxDD improves by > 10%
 - The 30% concentration constraint improves (moves closer to passing)
 - All other hard constraints pass
 
 Then the QR MAY recommend MERGE with justification, even if OOS Sharpe does not strictly
 improve. Diversification has long-term value that single-period Sharpe does not capture.
-This exception requires explicit justification in the diary.
+The IS/OOS Sharpe > 1.0 floors are NEVER waived by this exception. Justification must be
+explicit in the diary.
 
 ## Overfitting Quantification (AFML Ch. 11-12)
 
