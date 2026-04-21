@@ -195,6 +195,21 @@ When an iteration adds new symbol(s) to the universe, the QE MUST validate stabi
    - Total OOS Sharpe >= baseline × 0.95 (allow 5% Sharpe sacrifice for diversification)
 5. Report the A/B comparison in the engineering report and diary
 
+### Seed Parity on Model Add/Replace — NON-NEGOTIABLE
+
+When an iteration ADDS a new model or REPLACES an existing one in the portfolio, the new model must be validated with **the same number of outer seeds** as the models already in the portfolio. If the existing models each ran 5 outer seeds, the new model must also run 5 outer seeds (typically 42, 123, 456, 789, 1001) with `yearly_pnl_check=True` to keep the cost tractable.
+
+A Gate 3 screen at `seed=42` alone is **not sufficient** to merge a new model — it only proves the candidate carries signal. Seed parity proves it carries signal *reliably*, which is the bar the existing models have already cleared.
+
+Workflow for a new/replacement model:
+1. Cheap Gate 1–2 checks (data quality, liquidity)
+2. Gate 3 at `seed=42` with fail-fast
+3. If Gate 3 passes, run the same config with seeds 123, 456, 789, 1001 (fail-fast each)
+4. Merge ONLY if ≥ 4 of 5 seeds show OOS Sharpe > 0 AND mean OOS Sharpe > 0
+5. Portfolio metrics derived from the seed=42 trades are **provisional** until the sweep confirms stability
+
+This rule prevents "coasted" merges where a new model joins an over-validated portfolio on under-validated evidence.
+
 ## Feature Normalization Awareness
 
 When using a pooled model across multiple symbols with different price scales, the QR and QE must ensure features are **scale-invariant**:
