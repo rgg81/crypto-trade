@@ -5,17 +5,23 @@ from crypto_trade.iteration_report import _compute_metrics
 
 
 def _make_trade(
-    close_time_ms: int, net_pnl_pct: float, open_offset_ms: int = 1_000_000,
+    close_time_ms: int,
+    net_pnl_pct: float,
+    open_offset_ms: int = 1_000_000,
 ) -> TradeResult:
     return TradeResult(
-        symbol="BTCUSDT", direction=1,
-        entry_price=100.0, exit_price=100.0 + net_pnl_pct,
+        symbol="BTCUSDT",
+        direction=1,
+        entry_price=100.0,
+        exit_price=100.0 + net_pnl_pct,
         weight_factor=1.0,
         open_time=close_time_ms - open_offset_ms,
         close_time=close_time_ms,
         exit_reason="take_profit",
-        pnl_pct=net_pnl_pct, fee_pct=0.0,
-        net_pnl_pct=net_pnl_pct, weighted_pnl=net_pnl_pct,
+        pnl_pct=net_pnl_pct,
+        fee_pct=0.0,
+        net_pnl_pct=net_pnl_pct,
+        weighted_pnl=net_pnl_pct,
     )
 
 
@@ -23,10 +29,7 @@ def _make_trades_sequence(pnls: list[float], start_day: int = 0) -> list[TradeRe
     """Create trades spaced 1 day apart starting at 2024-01-01 + start_day."""
     base_ms = 1_704_067_200_000  # 2024-01-01 UTC
     one_day_ms = 86_400_000
-    return [
-        _make_trade(base_ms + (start_day + i) * one_day_ms, p)
-        for i, p in enumerate(pnls)
-    ]
+    return [_make_trade(base_ms + (start_day + i) * one_day_ms, p) for i, p in enumerate(pnls)]
 
 
 class TestSplitMetricsDsr:

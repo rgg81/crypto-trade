@@ -108,6 +108,7 @@ def compute_sample_uniqueness(
 
     return uniqueness
 
+
 _RESULT_NAMES = {1: "tp", -1: "sl", -2: "timeout", 0: "pending"}
 
 
@@ -279,9 +280,7 @@ def label_trades(
                 short_step = len(sym_idx)
 
         # Compute actual forward return for timeout cases
-        fwd_return_pct = (
-            ((last_close - entry) / entry * 100.0) if entry != 0 else 0.0
-        )
+        fwd_return_pct = ((last_close - entry) / entry * 100.0) if entry != 0 else 0.0
 
         # Actual PnL per direction (net of fees)
         if use_atr:
@@ -315,10 +314,7 @@ def label_trades(
                 reason = "both_tp→short_first"
         else:
             # No TP hit in either direction — use forward return sign
-            if (
-                neutral_threshold_pct is not None
-                and abs(fwd_return_pct) < neutral_threshold_pct
-            ):
+            if neutral_threshold_pct is not None and abs(fwd_return_pct) < neutral_threshold_pct:
                 labels[ci] = 0
                 reason = f"neutral→fwd_return={fwd_return_pct:+.4f}"
             else:

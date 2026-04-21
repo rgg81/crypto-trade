@@ -231,15 +231,21 @@ def main() -> None:
         "--leverage", type=int, default=1, help="Futures leverage (default: 1)"
     )
     live_parser.add_argument(
-        "--poll-interval", type=float, default=30.0,
+        "--poll-interval",
+        type=float,
+        default=30.0,
         help="Seconds between polls (default: 30)",
     )
     live_parser.add_argument(
-        "--feature-groups", type=str, default="all",
+        "--feature-groups",
+        type=str,
+        default="all",
         help="Feature groups to generate (default: all)",
     )
     live_parser.add_argument(
-        "--live", action="store_true", dest="live_mode",
+        "--live",
+        action="store_true",
+        dest="live_mode",
         help="Enable real trading (default: dry-run)",
     )
 

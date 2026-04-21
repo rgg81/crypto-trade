@@ -42,9 +42,7 @@ class SplitMetrics:
     dsr: float  # Deflated Sharpe Ratio (AFML Ch. 14), N_trials-adjusted
 
 
-def _compute_metrics(
-    trades: list[TradeResult], n_trials: int = 1
-) -> SplitMetrics | None:
+def _compute_metrics(trades: list[TradeResult], n_trials: int = 1) -> SplitMetrics | None:
     """Compute Sharpe, Sortino, max drawdown, DSR, etc. from trade list.
 
     Args:
@@ -79,9 +77,7 @@ def _compute_metrics(
     )
 
     # DSR: Sharpe adjusted for skew/kurtosis and multiple testing.
-    dsr = compute_deflated_sharpe_ratio(
-        sharpe=sharpe, n_trials=n_trials, returns=returns.tolist()
-    )
+    dsr = compute_deflated_sharpe_ratio(sharpe=sharpe, n_trials=n_trials, returns=returns.tolist())
 
     return SplitMetrics(
         sharpe=sharpe,
@@ -288,8 +284,13 @@ def _write_per_regime(
         writer = csv.DictWriter(
             f,
             fieldnames=[
-                "regime", "trades", "wins", "win_rate",
-                "net_pnl_pct", "avg_pnl_pct", "sharpe",
+                "regime",
+                "trades",
+                "wins",
+                "win_rate",
+                "net_pnl_pct",
+                "avg_pnl_pct",
+                "sharpe",
             ],
         )
         writer.writeheader()

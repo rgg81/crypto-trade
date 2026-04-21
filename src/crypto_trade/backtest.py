@@ -238,8 +238,7 @@ def run_backtest(
                 # Set signal cooldown for this symbol
                 if config.cooldown_candles > 0 and candle_duration_ms > 0:
                     cooldown_until[sym] = (
-                        result.close_time
-                        + config.cooldown_candles * candle_duration_ms
+                        result.close_time + config.cooldown_candles * candle_duration_ms
                     )
                 # Yearly fail-fast check
                 if yearly_pnl_check:
@@ -261,7 +260,8 @@ def run_backtest(
                             raise EarlyStopError(
                                 f"Year {prev}: PnL={prev_pnl:+.1f}% "
                                 f"(WR={prev_wr:.1f}%, {prev_n} trades)",
-                                results, total_signals,
+                                results,
+                                total_signals,
                             )
                     _last_checked_year = yr
                 if verbose > 0:
@@ -292,9 +292,7 @@ def run_backtest(
             if sym not in open_orders and ot >= cooldown_until.get(sym, 0):
                 vt_scale = 1.0
                 if config.vol_targeting:
-                    vt_scale = compute_vt_scale(
-                        vt_per_sym_daily, sym, ot, config
-                    )
+                    vt_scale = compute_vt_scale(vt_per_sym_daily, sym, ot, config)
                 order = create_order(
                     sym,
                     signal,
@@ -386,8 +384,11 @@ def build_master(
 
 def _build_master(config: BacktestConfig) -> pd.DataFrame:
     return build_master(
-        config.symbols, config.interval, config.data_dir,
-        config.start_time, config.end_time,
+        config.symbols,
+        config.interval,
+        config.data_dir,
+        config.start_time,
+        config.end_time,
     )
 
 
@@ -454,9 +455,7 @@ def compute_vt_scale(
     if not sym_daily:
         return 1.0
 
-    trade_date = datetime.datetime.fromtimestamp(
-        trade_open_ms / 1000, tz=datetime.UTC
-    ).date()
+    trade_date = datetime.datetime.fromtimestamp(trade_open_ms / 1000, tz=datetime.UTC).date()
     lookback_returns: list[float] = []
     for close_date_str, pnl in sym_daily.items():
         close_date = datetime.date.fromisoformat(close_date_str)
@@ -470,7 +469,7 @@ def compute_vt_scale(
     n = len(lookback_returns)
     mean_r = sum(lookback_returns) / n
     var = sum((r - mean_r) ** 2 for r in lookback_returns) / (n - 1)
-    realized_vol = var ** 0.5
+    realized_vol = var**0.5
     # Guard against zero/near-zero vol (numeric noise)
     if realized_vol <= 1e-9:
         return 1.0
