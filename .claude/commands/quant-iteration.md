@@ -214,7 +214,33 @@ When proposing new features, the QR should prefer normalized/ratio-based feature
 - **Hard ceiling**: Never exceed 200 features without explicit justification
 - **Samples-per-feature ratio**: Must stay above 50. With 4,400 samples and 50 features = ratio 88 (healthy). With 198 features = ratio 22 (dangerous)
 - **Every added feature must displace a worse one.** Net feature count should decrease or stay flat, never balloon
-- **Symbol-scoped discovery**: Always use `symbols=trading_symbols` in `_discover_feature_columns()`. Global intersection across ~800 symbols is wrong — it drops features that ALL trading symbols have
+
+## Feature Reproducibility — NON-NEGOTIABLE
+
+Every iteration runner MUST pass an explicit `feature_columns` list to
+`LightGbmStrategy`. Auto-discovery from Parquet schemas is **disabled at the code
+level** — `LightGbmStrategy` raises `ValueError` if `feature_columns` is empty or
+`None`. This rule is non-negotiable because auto-discovery caused a silent
+divergence between the live engine and the backtest in April 2026 (iter-162's
+entropy/CUSUM features were silently picked up, producing different trades from
+the baseline).
+
+Rules:
+- **Runner declares the list**: every `run_iteration_NNN.py` / baseline runner
+  must specify `feature_columns=[...]` (or import one of the canonical lists,
+  e.g. `BASELINE_FEATURE_COLUMNS` from `src/crypto_trade/live/models.py`).
+- **Parquet is the source of data, not the source of truth for columns**: new
+  features can exist in the parquet without being used by an iteration. The
+  iteration explicitly selects its inputs.
+- **Canonical lists live in code, not in the parquet**: when a feature set is
+  meant to be reused across iterations or environments, define it as a constant
+  (like `BASELINE_FEATURE_COLUMNS`) and reference it.
+- **When adding new features**: add them to the parquet via the feature pipeline,
+  but do NOT use them in any iteration until the runner explicitly adds them to
+  `feature_columns`. This keeps existing iterations reproducible even as the
+  parquet schema evolves.
+- **QE must verify in every iteration**: the engineering report states which
+  `feature_columns` constant or literal list was passed, and confirms its length.
 
 ### Anti-patterns (learned the hard way)
 - Iter 083: Added 85 features (113→198) without pruning — wrong direction
@@ -798,6 +824,7 @@ After the backtest completes, the QE MUST verify trade execution by:
 2. **Checking exit reasons are consistent**: SL trades should have PnL ≈ -sl_pct, TP trades ≈ +tp_pct
 3. **Documenting any anomalies** in the engineering report
 4. **Label leakage audit (MANDATORY every iteration)**: Verify that `TimeSeriesSplit` gap is correctly computed: `gap = (timeout_candles + 1) * n_symbols`. Check that no training label's forward scan extends into the validation period. Check that walk-forward training windows don't include future klines. This must be verified even when CV code hasn't changed — parameter changes (timeout, interval, symbols) affect the required gap.
+5. **Feature reproducibility check (MANDATORY every iteration)**: The engineering report must state the exact `feature_columns` source used (constant name + count, e.g. "BASELINE_FEATURE_COLUMNS, 193 features"). If the iteration defines its own list, the report must paste the list or its hash. Auto-discovery is disabled in code — the runner must pass `feature_columns=[...]` explicitly or the backtest will not start.
 
 ## Code Quality (QE)
 
