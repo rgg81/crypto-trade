@@ -412,6 +412,165 @@ improve. Diversification has long-term value that single-period Sharpe does not 
 The IS/OOS Sharpe > 1.0 floors are NEVER waived by this exception. Justification must be
 explicit in the diary.
 
+## Risk Mitigation Design — MANDATORY for every MERGE candidate
+
+### Why this is its own phase
+
+The walk-forward backtest measures expected performance under the training
+distribution. It does NOT test the model's behaviour when the distribution
+shifts — black swans, post-crisis regimes, liquidity crunches, exchange
+failures, exogenous macro shocks. These events are by definition not in the
+training data (or they are extreme outliers), and the model does not know to
+be cautious. Left unchecked, it can generate cascades of losses as it
+confidently signals trades the market punishes.
+
+Iter 172's DOT analysis is the canonical motivating case. DOT in Dec 2022
+took 6 consecutive LONG stop-losses on a persistent downtrend (entries at
+5.538 → 5.293 → 5.061 → 4.705 → 4.602 → 4.486) for −26% before the model's
+7th attempt finally hit a TP. A simple "3 consecutive SLs → pause N candles"
+rule would have prevented trades 4, 5, 6, cutting the loss by more than half.
+LTC in the same month, with the same regime, took only 3 trades because its
+Optuna-tuned threshold was naturally more conservative — LTC "got lucky"
+with a built-in defensive reflex. DOT had no equivalent protection.
+
+**Before any iteration can merge, the QR must run the Risk Mitigation
+Analysis below and propose (or verify existing) protective mechanisms.**
+
+### Required Risk Mitigation Analyses
+
+Each analysis uses IS data only and produces numerical evidence. At minimum
+THREE of the following five categories must be completed in the research
+brief for a merge-candidate iteration:
+
+#### R1. Consecutive-loss cool-down calibration
+
+Walk through IS trades.csv for each model. For every trade, compute the
+number of consecutive SLs immediately preceding it (reset on TP or timeout).
+Bucket trades by preceding-SL-streak length (0, 1, 2, 3, 4+). Report:
+
+- Count of trades per bucket
+- WR in each bucket
+- Mean PnL in each bucket
+
+**If WR drops monotonically with streak length (common)**, a cool-down rule
+is justified. Pick the streak threshold K where bucket K's WR falls below
+break-even. Propose: `after K consecutive SLs, pause trading on this symbol
+for N candles`. Calibrate N by measuring how long adverse periods typically
+last (e.g., 75th percentile of SL-streak duration in candles).
+
+#### R2. Drawdown-triggered position scaling
+
+Compute rolling 30-day / 60-day drawdown from running peak weighted-PnL.
+Correlate drawdown depth with the next 10-trade WR. If trades taken during
+deep drawdowns have lower WR, propose a position-size reduction: when
+rolling drawdown exceeds X%, scale new trades by factor F < 1 until the
+drawdown recovers.
+
+Calibrate X and F from the IS evidence, not intuition. A candidate
+framework: `weight_factor *= max(0.33, 1 - drawdown_pct / 60%)`.
+
+#### R3. Out-of-distribution feature detection
+
+Compute the IS distribution of each top-20 feature (or all 193 for pooled
+models). For each live-candle's feature vector, compute a Mahalanobis-like
+z-score against the trailing 24-month IS distribution. If any feature's
+z-score is > 3 (or the aggregate OOD score exceeds a threshold), the
+candidate is out-of-distribution — skip the trade.
+
+This is the cleanest "black swan" detector: the model hasn't seen these
+feature values before, so we don't trust its predictions. IS calibration:
+count how often this trigger would fire per month historically, ensure
+false-positive rate is < 10% of trades.
+
+#### R4. Realized-volatility regime kill-switch
+
+Compute per-symbol realized volatility (log-returns std over rolling 14-day
+window) on IS data. Define a "vol regime" as extreme when the symbol's
+realized vol exceeds the 95th percentile of its training-window distribution.
+Measure: in historical extreme-vol months, what was the model's WR vs. the
+non-extreme baseline?
+
+**Important nuance** (learned iter 172): DOT's Dec 2022 catastrophe was in a
+LOW-vol regime (BTC 30d vol 28%, vs. 65% in Sep 2022 when DOT was profitable).
+A naive "high vol = pause" rule is wrong. If low-vol regimes after crashes
+are the danger, flip the rule or use a drawdown-augmented indicator instead.
+
+#### R5. Cross-model portfolio risk balance
+
+For portfolios with 2+ models, examine the running per-symbol PnL share.
+If any one symbol's weighted PnL contribution exceeds X% of the portfolio
+total across a trailing window, propose portfolio-level rebalancing
+(reduce weight on the concentrated symbol, increase on others). This is
+the "never let one model dominate" constraint turned into a runtime
+mitigation, not just an ex-post merge check.
+
+### Implementation Hint — BacktestConfig risk controls
+
+The backtest engine should accept (not yet implemented; iter-NNN task):
+
+```python
+BacktestConfig(
+    ...
+    risk_consecutive_sl_limit: int | None = None,  # R1
+    risk_consecutive_sl_cooldown_candles: int = 0,
+    risk_drawdown_scale_enabled: bool = False,     # R2
+    risk_drawdown_scale_floor: float = 0.33,
+    risk_ood_zscore_threshold: float | None = None,  # R3
+    risk_vol_regime_threshold_pctile: float | None = None,  # R4
+    risk_concentration_soft_cap: float | None = None,  # R5
+)
+```
+
+Default all None / False so existing baselines are unchanged until a merge
+explicitly introduces a risk control.
+
+### Evidence Requirements
+
+As with the rest of the QR Research Checklist, each R-category claimed as
+completed must include:
+
+- A numerical table from IS data (bucketed WR, correlation coefficient,
+  z-score distribution, etc.)
+- The proposed threshold, calibrated on IS evidence
+- A backtest-like simulation of what the mitigation would have done on IS
+  trades: "Applying R1 with K=3, N=18 candles to iter-172 DOT trades reduces
+  2022 cumulative PnL from −19.1% to −4.7%"
+
+A merge iteration that adds a risk control without this evidence is not
+permitted. A merge iteration that skips risk mitigation entirely is only
+allowed on grounds of "no new mechanism needed — existing controls already
+address the identified risks", which itself must be justified against at
+least R1 and R2 evidence.
+
+### Worked example: DOT Dec 2022 (R1)
+
+From iter-168 partial trades.csv, DOT Dec 2022 SL streak:
+
+| Trade # | Date       | Result            | SL streak entering |
+|---------|------------|-------------------|--------------------|
+| 1 | 2022-12-05 | SL (−4.31) | 0 |
+| 2 | 2022-12-08 | SL (−4.11) | 1 |
+| 3 | 2022-12-13 | SL (−3.81) | 2 |
+| 4 | 2022-12-17 | SL (−5.36) | 3  ← would trigger |
+| 5 | 2022-12-20 | SL (−4.67) | 4  (still in cool-down) |
+| 6 | 2022-12-23 | SL (−4.39) | 5  (still) |
+| 7 | 2022-12-29 | TP (+7.54) | 6  (cool-down expires, trade allowed) |
+
+Applying R1 with K=3, N=18 candles (6 days at 8h): trades 4, 5, 6 are
+filtered out (they opened within 6, 9, 12 days of the triggering SL
+respectively, all < 18). Trade 7 opens 12 days after the triggering SL —
+**exceeds** the 18-candle cool-down? 12 days × 3 candles/day = 36 candles.
+Wait — 18 candles = 6 days. Trade 7 opens 16 days after the K-triggering
+event (Dec 13 → Dec 29). 16 days = 48 candles, well past the cool-down.
+So trade 7 is allowed.
+
+Effect: Dec 2022 goes from 7 trades (−19.11%) to 4 trades (−12.23 + 7.54 =
+−4.69%). Year-1 sum: +10.99 + 1.63 − 4.69 = +7.93% (from −6.49% baseline,
+a +14.4 pp swing). **DOT passes year-1 with R1 active.**
+
+This is exactly the kind of quantitatively-calibrated mitigation the QR
+is now required to propose for every merge-candidate iteration.
+
 ## Overfitting Quantification (AFML Ch. 11-12)
 
 ### Deflated Sharpe Ratio (DSR)
