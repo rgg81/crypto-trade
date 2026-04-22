@@ -187,9 +187,26 @@ def run_backtest(
 
     # Signal cooldown tracking
     cooldown_until: dict[str, int] = {}  # symbol → earliest open_time for new trade
+    # Risk R1 tracking — consecutive-SL cool-down (iter 173)
+    sl_streak: dict[str, int] = {}  # symbol → consecutive SL count
+    risk_cooldown_until: dict[str, int] = {}  # symbol → earliest open_time after R1 triggers
     candle_duration_ms = 0
     if config.cooldown_candles > 0 and len(master) >= 2:
         # Compute candle duration from first two rows of same symbol
+        first_sym = str(sym_arr[0])
+        for j in range(1, len(master)):
+            if str(sym_arr[j]) == first_sym:
+                candle_duration_ms = int(open_time_arr[j] - open_time_arr[0])
+                break
+        if candle_duration_ms <= 0:
+            candle_duration_ms = int(close_time_arr[0] - open_time_arr[0] + 1)
+    # Also ensure candle_duration_ms is set when R1 is active (needed to convert C candles → ms)
+    if (
+        config.risk_consecutive_sl_limit is not None
+        and config.risk_consecutive_sl_cooldown_candles > 0
+        and candle_duration_ms == 0
+        and len(master) >= 2
+    ):
         first_sym = str(sym_arr[0])
         for j in range(1, len(master)):
             if str(sym_arr[j]) == first_sym:
@@ -240,6 +257,18 @@ def run_backtest(
                     cooldown_until[sym] = (
                         result.close_time + config.cooldown_candles * candle_duration_ms
                     )
+                # Risk R1 — track consecutive SL streak and arm cool-down
+                if config.risk_consecutive_sl_limit is not None and candle_duration_ms > 0:
+                    if result.exit_reason == "stop_loss":
+                        sl_streak[result.symbol] = sl_streak.get(result.symbol, 0) + 1
+                        if sl_streak[result.symbol] >= config.risk_consecutive_sl_limit:
+                            risk_cooldown_until[result.symbol] = (
+                                result.close_time
+                                + config.risk_consecutive_sl_cooldown_candles * candle_duration_ms
+                            )
+                            sl_streak[result.symbol] = 0  # reset streak after triggering
+                    else:
+                        sl_streak[result.symbol] = 0
                 # Yearly fail-fast check
                 if yearly_pnl_check:
                     yr = datetime.datetime.fromtimestamp(
@@ -289,7 +318,11 @@ def run_backtest(
         signal = strategy.get_signal(sym, ot)
         if signal.direction != 0 and signal.weight > 0:
             total_signals += 1
-            if sym not in open_orders and ot >= cooldown_until.get(sym, 0):
+            if (
+                sym not in open_orders
+                and ot >= cooldown_until.get(sym, 0)
+                and ot >= risk_cooldown_until.get(sym, 0)
+            ):
                 vt_scale = 1.0
                 if config.vol_targeting:
                     vt_scale = compute_vt_scale(vt_per_sym_daily, sym, ot, config)

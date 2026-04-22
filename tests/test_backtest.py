@@ -1692,3 +1692,112 @@ class TestGenerateHtmlReport:
         assert Path(out).exists()
         content = Path(out).read_text()
         assert "Test Report" in content
+
+
+# ---------------------------------------------------------------------------
+# R1 — Consecutive-SL cool-down (iter 173)
+# ---------------------------------------------------------------------------
+
+
+class TestR1ConsecutiveSlCooldown:
+    def test_r1_triggers_after_k_consecutive_stop_losses(self, tmp_path: Path) -> None:
+        """After K consecutive SLs, new trades on that symbol are suppressed for C candles."""
+        # Build a price series that causes 3 consecutive LONG stop-losses then a recovery.
+        # Each "trade opens on candle N, gets SL next candle" needs a drop ≥ 2% per SL.
+        # Sequence: 100, 100, 98 (SL1), 98, 96 (SL2), 96, 94 (SL3), 94, 92 (would-be SL4),
+        # 92, 94, ..., 98 (recovery long after C=5 candles).
+        klines = [
+            _make_kline(BASE_T + 0 * H, "100", "100", "100", "100"),  # open @ close=100
+            _make_kline(BASE_T + 1 * H, "100", "100", "97", "98"),  # SL1 (low 97 < 98)
+            _make_kline(BASE_T + 2 * H, "98", "98", "98", "98"),  # open @ 98
+            _make_kline(BASE_T + 3 * H, "98", "98", "95", "96"),  # SL2
+            _make_kline(BASE_T + 4 * H, "96", "96", "96", "96"),  # open @ 96
+            _make_kline(BASE_T + 5 * H, "96", "96", "93", "94"),  # SL3 → triggers R1
+            _make_kline(BASE_T + 6 * H, "94", "94", "94", "94"),  # R1 cool-down active
+            _make_kline(BASE_T + 7 * H, "94", "94", "94", "94"),
+            _make_kline(BASE_T + 8 * H, "94", "94", "94", "94"),
+            _make_kline(BASE_T + 9 * H, "94", "94", "94", "94"),
+            _make_kline(BASE_T + 10 * H, "94", "94", "94", "94"),  # cool-down ends here
+            _make_kline(BASE_T + 11 * H, "94", "98", "94", "97"),  # trading can resume
+            _make_kline(BASE_T + 12 * H, "97", "99", "96", "98"),
+        ]
+        _write_symbol_data(tmp_path, "TEST", klines)
+        config = BacktestConfig(
+            symbols=("TEST",),
+            interval="1h",
+            max_amount_usd=1000.0,
+            stop_loss_pct=2.0,
+            take_profit_pct=3.0,
+            timeout_minutes=180,
+            fee_pct=0.1,
+            data_dir=tmp_path,
+            cooldown_candles=0,
+            risk_consecutive_sl_limit=3,
+            risk_consecutive_sl_cooldown_candles=5,
+        )
+        results = run_backtest(config, AlwaysBuyStrategy())
+
+        # Without R1 we'd have 5+ SL-or-end_of_data trades. With R1, after the third SL
+        # there should be a cooldown window with NO new trades opening.
+        sl_trades = [r for r in results if r.exit_reason == "stop_loss"]
+        assert len(sl_trades) == 3, f"expected exactly 3 SL trades, got {len(sl_trades)}"
+        # Verify the candles during the cool-down window produced no new trades
+        cooldown_start = sl_trades[-1].close_time
+        cooldown_end = cooldown_start + 5 * H
+        in_cooldown = [r for r in results if cooldown_start < r.open_time < cooldown_end]
+        assert len(in_cooldown) == 0, f"trades opened during the R1 cool-down window: {in_cooldown}"
+
+    def test_r1_disabled_by_default(self, tmp_path: Path) -> None:
+        """With risk_consecutive_sl_limit=None, behaviour unchanged from pre-iter-173."""
+        klines = [
+            _make_kline(BASE_T + 0 * H, "100", "100", "100", "100"),
+            _make_kline(BASE_T + 1 * H, "100", "100", "97", "98"),
+            _make_kline(BASE_T + 2 * H, "98", "98", "98", "98"),
+            _make_kline(BASE_T + 3 * H, "98", "98", "95", "96"),
+            _make_kline(BASE_T + 4 * H, "96", "96", "96", "96"),
+            _make_kline(BASE_T + 5 * H, "96", "96", "93", "94"),
+            _make_kline(BASE_T + 6 * H, "94", "94", "94", "94"),
+        ]
+        _write_symbol_data(tmp_path, "TEST", klines)
+        config = _default_config(tmp_path)  # no R1 by default
+        results = run_backtest(config, AlwaysBuyStrategy())
+        sl_trades = [r for r in results if r.exit_reason == "stop_loss"]
+        # Without R1 we expect 3 SLs in this data (one per down-candle)
+        assert len(sl_trades) >= 3
+
+    def test_r1_streak_resets_on_non_sl_exit(self, tmp_path: Path) -> None:
+        """Streak counter resets when a trade exits via take_profit or timeout."""
+        klines = [
+            _make_kline(BASE_T + 0 * H, "100", "100", "100", "100"),  # open at 100
+            _make_kline(BASE_T + 1 * H, "100", "100", "97", "98"),  # SL1
+            _make_kline(BASE_T + 2 * H, "98", "98", "98", "98"),
+            _make_kline(BASE_T + 3 * H, "98", "98", "95", "96"),  # SL2
+            _make_kline(BASE_T + 4 * H, "96", "96", "96", "96"),
+            _make_kline(
+                BASE_T + 5 * H, "96", "100", "96", "99"
+            ),  # TP (99/96-1 > 3%) → reset streak
+            _make_kline(BASE_T + 6 * H, "99", "99", "99", "99"),
+            _make_kline(
+                BASE_T + 7 * H, "99", "99", "96", "97"
+            ),  # SL3 (but streak reset, so not counted toward K=3)
+        ]
+        _write_symbol_data(tmp_path, "TEST", klines)
+        config = BacktestConfig(
+            symbols=("TEST",),
+            interval="1h",
+            max_amount_usd=1000.0,
+            stop_loss_pct=2.0,
+            take_profit_pct=3.0,
+            timeout_minutes=180,
+            fee_pct=0.1,
+            data_dir=tmp_path,
+            cooldown_candles=0,
+            risk_consecutive_sl_limit=3,
+            risk_consecutive_sl_cooldown_candles=5,
+        )
+        results = run_backtest(config, AlwaysBuyStrategy())
+        # Should get 2 SL, 1 TP, 1 SL — not in R1 cooldown (streak reset by TP)
+        sls = [r for r in results if r.exit_reason == "stop_loss"]
+        tps = [r for r in results if r.exit_reason == "take_profit"]
+        assert len(tps) >= 1, "expected at least one TP to reset the streak"
+        assert len(sls) >= 3, "streak reset should allow the 3rd SL after the TP"
