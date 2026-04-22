@@ -223,6 +223,23 @@ BASELINE_FEATURE_COLUMNS: tuple[str, ...] = (
     "vol_vwap",
 )
 
+# Iter 189: BASELINE_FEATURE_COLUMNS + BTC cross-asset features (7 features).
+# These expose BTC's regime/momentum/vol state to every symbol's model, including
+# BTC itself (xbtc of BTC = BTC's own recent state, not leakage).
+XBTC_FEATURE_COLUMNS: tuple[str, ...] = (
+    "xbtc_return_1",
+    "xbtc_return_3",
+    "xbtc_return_8",
+    "xbtc_natr_14",
+    "xbtc_natr_21",
+    "xbtc_rsi_14",
+    "xbtc_adx_14",
+)
+BASELINE_PLUS_XBTC_FEATURE_COLUMNS: tuple[str, ...] = (
+    *BASELINE_FEATURE_COLUMNS,
+    *XBTC_FEATURE_COLUMNS,
+)
+
 # Baseline v152 model definitions
 BASELINE_MODELS = (
     ModelConfig(
