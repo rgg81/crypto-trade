@@ -55,6 +55,11 @@ class BacktestConfig:
     vt_min_scale: float = 0.5
     vt_max_scale: float = 2.0
     vt_min_history: int = 5  # minimum past daily returns required for scaling
+    # Risk mitigation R1 (iter 173): consecutive-loss cool-down.
+    # After K consecutive stop-loss closes for a symbol, suppress new
+    # trades on that symbol for C candles. Defaults disable the filter.
+    risk_consecutive_sl_limit: int | None = None  # K; None disables
+    risk_consecutive_sl_cooldown_candles: int = 0  # C
 
 
 @dataclass(frozen=True)
