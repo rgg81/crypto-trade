@@ -507,26 +507,53 @@ class LightGbmStrategy:
                     print("  OOD: insufficient training samples — disabling for this month")
             else:
                 self._ood_feature_cols = ood_cols_in_train
-                train_ood = train_feat_df[ood_cols_in_train].to_numpy(dtype=np.float64)
-                self._ood_mean = train_ood.mean(axis=0)
-                cov = np.cov(train_ood.T)
-                self._ood_inv_cov = np.linalg.pinv(cov)
-                centered = train_ood - self._ood_mean
-                distances = np.einsum("ij,jk,ik->i", centered, self._ood_inv_cov, centered)
-                self._ood_cutoff = float(np.quantile(distances, self.ood_cutoff_pct))
-                if self.verbose > 0:
-                    print(
-                        f"  OOD: {len(ood_cols_in_train)} features, "
-                        f"cutoff (q={self.ood_cutoff_pct}) = {self._ood_cutoff:.2f}"
-                    )
-                self._month_ood_features = load_features_range(
-                    symbols,
-                    self.features_dir,
-                    self._interval,
-                    split.test_start_ms,
-                    split.test_end_ms,
-                    columns=ood_cols_in_train,
+                train_ood_raw = train_feat_df[ood_cols_in_train].to_numpy(
+                    dtype=np.float64
                 )
+                # Drop rows with NaN/inf before computing mean/cov
+                finite_mask = np.isfinite(train_ood_raw).all(axis=1)
+                train_ood = train_ood_raw[finite_mask]
+                if len(train_ood) < 100:
+                    if self.verbose > 0:
+                        print(
+                            "  OOD: insufficient finite training rows "
+                            f"({len(train_ood)}) — disabling for this month"
+                        )
+                else:
+                    self._ood_mean = train_ood.mean(axis=0)
+                    cov = np.cov(train_ood.T)
+                    # Ridge regularization — stabilizes pinv when features
+                    # are near-collinear (returns at lag 1/2/5/10 are correlated).
+                    reg = 1e-6 * np.trace(cov) / cov.shape[0] * np.eye(cov.shape[0])
+                    try:
+                        self._ood_inv_cov = np.linalg.pinv(cov + reg)
+                        centered = train_ood - self._ood_mean
+                        distances = np.einsum(
+                            "ij,jk,ik->i", centered, self._ood_inv_cov, centered
+                        )
+                        self._ood_cutoff = float(
+                            np.quantile(distances, self.ood_cutoff_pct)
+                        )
+                        if self.verbose > 0:
+                            print(
+                                f"  OOD: {len(ood_cols_in_train)} features, "
+                                f"cutoff (q={self.ood_cutoff_pct}) = "
+                                f"{self._ood_cutoff:.2f}"
+                            )
+                        self._month_ood_features = load_features_range(
+                            symbols,
+                            self.features_dir,
+                            self._interval,
+                            split.test_start_ms,
+                            split.test_end_ms,
+                            columns=ood_cols_in_train,
+                        )
+                    except np.linalg.LinAlgError:
+                        self._ood_mean = None
+                        self._ood_inv_cov = None
+                        self._ood_cutoff = None
+                        if self.verbose > 0:
+                            print("  OOD: cov inversion failed — disabled for this month")
 
         # (f) Load NATR for dynamic barriers (if ATR mode enabled)
         self._month_natr = {}
@@ -605,7 +632,7 @@ class LightGbmStrategy:
             and self._ood_cutoff is not None
         ):
             ood_row = self._month_ood_features.get(key)
-            if ood_row is not None:
+            if ood_row is not None and np.isfinite(ood_row).all():
                 diff = ood_row.astype(np.float64) - self._ood_mean
                 dist = float(diff @ self._ood_inv_cov @ diff)
                 if dist > self._ood_cutoff:
