@@ -678,3 +678,79 @@ class TestSharpeWithThreshold:
             y_proba, long_pnls, short_pnls, threshold=0.80, min_trades=20
         )
         assert sharpe == -10.0
+
+
+class TestR3OodDetector:
+    """Regression tests for the R3 OOD Mahalanobis gate in LightGbmStrategy.get_signal."""
+
+    def _mk(self, ood_enabled=False):
+        from crypto_trade.strategies.ml.lgbm import LightGbmStrategy
+
+        s = LightGbmStrategy(
+            training_months=1,
+            features_dir="/nonexistent",
+            feature_columns=["f1", "f2"],
+            ensemble_seeds=[42],
+            ood_enabled=ood_enabled,
+            ood_features=["f1", "f2"] if ood_enabled else None,
+            ood_cutoff_pct=0.70,
+        )
+        return s
+
+    def test_requires_ood_features(self):
+        from crypto_trade.strategies.ml.lgbm import LightGbmStrategy
+
+        try:
+            LightGbmStrategy(
+                feature_columns=["f1"],
+                ensemble_seeds=[42],
+                ood_enabled=True,
+                ood_features=None,
+            )
+        except ValueError as e:
+            assert "ood_features" in str(e)
+            return
+        raise AssertionError("expected ValueError when ood_enabled=True without ood_features")
+
+    def test_disabled_by_default(self):
+        s = self._mk(ood_enabled=False)
+        assert s.ood_enabled is False
+        assert s._ood_mean is None and s._ood_cutoff is None
+
+    def test_ood_state_exposed(self):
+        """With ood_enabled=True, strategy carries the OOD state slots."""
+        s = self._mk(ood_enabled=True)
+        assert s.ood_enabled is True
+        assert s.ood_features == ["f1", "f2"]
+        assert s.ood_cutoff_pct == 0.70
+        # state slots should exist (None until training)
+        assert s._ood_mean is None
+        assert s._ood_inv_cov is None
+        assert s._ood_cutoff is None
+
+    def test_mahalanobis_math(self):
+        """Distance equals (x-mu)^T Sigma^-1 (x-mu); outlier exceeds any quantile cutoff."""
+        s = self._mk(ood_enabled=True)
+        rng = np.random.default_rng(42)
+        train = rng.normal(0.0, 1.0, size=(500, 2))
+        mean = train.mean(axis=0)
+        cov = np.cov(train.T)
+        inv = np.linalg.pinv(cov)
+        centered = train - mean
+        dists = np.einsum("ij,jk,ik->i", centered, inv, centered)
+        cutoff = np.quantile(dists, 0.70)
+        s._ood_mean = mean
+        s._ood_inv_cov = inv
+        s._ood_cutoff = float(cutoff)
+
+        # A point near the mean is within the cutoff
+        near = np.array([0.0, 0.0])
+        diff = near - s._ood_mean
+        d_near = float(diff @ s._ood_inv_cov @ diff)
+        assert d_near <= s._ood_cutoff
+
+        # A point at 5 sigma is way outside
+        far = np.array([5.0, 5.0])
+        diff = far - s._ood_mean
+        d_far = float(diff @ s._ood_inv_cov @ diff)
+        assert d_far > s._ood_cutoff
