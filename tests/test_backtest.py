@@ -1801,3 +1801,65 @@ class TestR1ConsecutiveSlCooldown:
         tps = [r for r in results if r.exit_reason == "take_profit"]
         assert len(tps) >= 1, "expected at least one TP to reset the streak"
         assert len(sls) >= 3, "streak reset should allow the 3rd SL after the TP"
+
+
+# ---------------------------------------------------------------------------
+# R2 — Drawdown-triggered position scaling (iter 175)
+# ---------------------------------------------------------------------------
+
+
+class TestR2DrawdownScaling:
+    def test_r2_scales_new_trades_during_drawdown(self, tmp_path: Path) -> None:
+        """After cumulative PnL drops below trigger, later trades' weight_factor < 1."""
+        # SL sequence accumulates drawdown, later trade on recovery should scale down.
+        klines = [
+            _make_kline(BASE_T + 0 * H, "100", "100", "100", "100"),
+            _make_kline(BASE_T + 1 * H, "100", "100", "95", "96"),  # SL
+            _make_kline(BASE_T + 2 * H, "96", "96", "96", "96"),
+            _make_kline(BASE_T + 3 * H, "96", "96", "91", "92"),  # SL
+            _make_kline(BASE_T + 4 * H, "92", "92", "92", "92"),
+            _make_kline(BASE_T + 5 * H, "92", "92", "87", "88"),  # SL
+            _make_kline(BASE_T + 6 * H, "88", "88", "88", "88"),
+            _make_kline(BASE_T + 7 * H, "88", "92", "87", "91"),  # trading continues
+            _make_kline(BASE_T + 8 * H, "91", "95", "90", "94"),
+        ]
+        _write_symbol_data(tmp_path, "TEST", klines)
+        config = BacktestConfig(
+            symbols=("TEST",),
+            interval="1h",
+            max_amount_usd=1000.0,
+            stop_loss_pct=2.0,
+            take_profit_pct=3.0,
+            timeout_minutes=180,
+            fee_pct=0.1,
+            data_dir=tmp_path,
+            cooldown_candles=0,
+            risk_drawdown_scale_enabled=True,
+            risk_drawdown_trigger_pct=5.0,
+            risk_drawdown_scale_floor=0.33,
+            risk_drawdown_scale_anchor_pct=15.0,
+        )
+        results = run_backtest(config, AlwaysBuyStrategy())
+        assert len(results) >= 3
+        scales = [r.weight_factor for r in results]
+        # Trade 1 is opened before any drawdown → weight 1.0
+        assert scales[0] == pytest.approx(1.0)
+        # At least one trade in the drawdown period should have weight < 1.0
+        assert any(s < 0.999 for s in scales[1:]), (
+            f"expected at least one R2-scaled trade after losses, got {scales}"
+        )
+
+    def test_r2_disabled_by_default(self, tmp_path: Path) -> None:
+        """When risk_drawdown_scale_enabled=False (default), all weights stay 1.0."""
+        klines = [
+            _make_kline(BASE_T + 0 * H, "100", "100", "100", "100"),
+            _make_kline(BASE_T + 1 * H, "100", "100", "95", "96"),
+            _make_kline(BASE_T + 2 * H, "96", "96", "96", "96"),
+            _make_kline(BASE_T + 3 * H, "96", "96", "91", "92"),
+            _make_kline(BASE_T + 4 * H, "92", "92", "92", "92"),
+        ]
+        _write_symbol_data(tmp_path, "TEST", klines)
+        config = _default_config(tmp_path)
+        results = run_backtest(config, AlwaysBuyStrategy())
+        for r in results:
+            assert r.weight_factor == pytest.approx(1.0)

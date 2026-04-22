@@ -190,6 +190,9 @@ def run_backtest(
     # Risk R1 tracking — consecutive-SL cool-down (iter 173)
     sl_streak: dict[str, int] = {}  # symbol → consecutive SL count
     risk_cooldown_until: dict[str, int] = {}  # symbol → earliest open_time after R1 triggers
+    # Risk R2 tracking — drawdown-triggered position scaling (iter 175)
+    cum_weighted_pnl = 0.0
+    peak_weighted_pnl = 0.0
     candle_duration_ms = 0
     if config.cooldown_candles > 0 and len(master) >= 2:
         # Compute candle duration from first two rows of same symbol
@@ -269,6 +272,12 @@ def run_backtest(
                             sl_streak[result.symbol] = 0  # reset streak after triggering
                     else:
                         sl_streak[result.symbol] = 0
+                # Risk R2 — update cumulative weighted PnL + running peak for
+                # drawdown-triggered scaling.
+                if config.risk_drawdown_scale_enabled:
+                    cum_weighted_pnl += result.weighted_pnl
+                    if cum_weighted_pnl > peak_weighted_pnl:
+                        peak_weighted_pnl = cum_weighted_pnl
                 # Yearly fail-fast check
                 if yearly_pnl_check:
                     yr = datetime.datetime.fromtimestamp(
@@ -326,6 +335,17 @@ def run_backtest(
                 vt_scale = 1.0
                 if config.vol_targeting:
                     vt_scale = compute_vt_scale(vt_per_sym_daily, sym, ot, config)
+                # R2 — drawdown-triggered position scaling
+                if config.risk_drawdown_scale_enabled:
+                    dd_pct = max(0.0, peak_weighted_pnl - cum_weighted_pnl)
+                    trigger = float(config.risk_drawdown_trigger_pct)
+                    anchor = float(config.risk_drawdown_scale_anchor_pct)
+                    floor = float(config.risk_drawdown_scale_floor)
+                    if dd_pct > trigger and anchor > trigger:
+                        # Linear interp from 1.0 at trigger to floor at anchor
+                        span = min(1.0, (dd_pct - trigger) / (anchor - trigger))
+                        r2_scale = 1.0 - span * (1.0 - floor)
+                        vt_scale = vt_scale * r2_scale
                 order = create_order(
                     sym,
                     signal,
@@ -528,7 +548,10 @@ def create_order(
     if config.vol_targeting:
         weight_factor = vt_scale
     else:
-        weight_factor = signal.weight / 100.0
+        # When VT is off but a risk control (R2) passed in a sub-1.0 vt_scale,
+        # apply it to the signal-derived weight. If no risk control fired
+        # (vt_scale==1.0), the original signal-weight behaviour is preserved.
+        weight_factor = (signal.weight / 100.0) * vt_scale
     amount_usd = weight_factor * config.max_amount_usd
 
     sl_pct = (signal.sl_pct if signal.sl_pct is not None else config.stop_loss_pct) / 100.0

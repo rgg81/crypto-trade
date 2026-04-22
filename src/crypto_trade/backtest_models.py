@@ -60,6 +60,16 @@ class BacktestConfig:
     # trades on that symbol for C candles. Defaults disable the filter.
     risk_consecutive_sl_limit: int | None = None  # K; None disables
     risk_consecutive_sl_cooldown_candles: int = 0  # C
+    # Risk mitigation R2 (iter 175): drawdown-triggered position scaling.
+    # When per-backtest cumulative weighted PnL drops more than
+    # risk_drawdown_trigger_pct below its running peak, scale new trade
+    # weight_factors by a linear factor between risk_drawdown_scale_floor
+    # (at very deep drawdown) and 1.0 (at the trigger). Disabled when
+    # risk_drawdown_scale_enabled is False.
+    risk_drawdown_scale_enabled: bool = False
+    risk_drawdown_trigger_pct: float = 10.0
+    risk_drawdown_scale_floor: float = 0.33
+    risk_drawdown_scale_anchor_pct: float = 30.0  # full floor reached at this DD
 
 
 @dataclass(frozen=True)
