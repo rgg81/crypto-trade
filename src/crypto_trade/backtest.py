@@ -278,7 +278,10 @@ def run_backtest(
                     cum_weighted_pnl += result.weighted_pnl
                     if cum_weighted_pnl > peak_weighted_pnl:
                         peak_weighted_pnl = cum_weighted_pnl
-                # Yearly fail-fast check
+                # Yearly fail-fast check — per skill spec:
+                #   Year-1 boundary: check year-1 cumulative PnL ≥ 0
+                #   Year-2 boundary: check cumulative year-1+2 PnL ≥ 0
+                #   Silent after year 2.
                 if yearly_pnl_check:
                     yr = datetime.datetime.fromtimestamp(
                         result.close_time / 1000, tz=datetime.UTC
@@ -289,18 +292,35 @@ def run_backtest(
                         _yearly_wins[yr] = _yearly_wins.get(yr, 0) + 1
                     # Check at year boundary (when we enter a new year)
                     if yr > _last_checked_year and _last_checked_year > 0:
-                        prev = _last_checked_year
-                        prev_pnl = _yearly_pnl.get(prev, 0.0)
-                        prev_n = _yearly_trades.get(prev, 0)
-                        prev_w = _yearly_wins.get(prev, 0)
-                        prev_wr = prev_w / prev_n * 100 if prev_n > 0 else 0
-                        if prev_n >= 10 and prev_pnl < 0:
-                            raise EarlyStopError(
-                                f"Year {prev}: PnL={prev_pnl:+.1f}% "
-                                f"(WR={prev_wr:.1f}%, {prev_n} trades)",
-                                results,
-                                total_signals,
+                        first_year = min(_yearly_pnl.keys())
+                        years_elapsed = _last_checked_year - first_year + 1
+                        # Only check year-1 and year-2 boundaries
+                        if years_elapsed == 1:
+                            prev_pnl = _yearly_pnl.get(_last_checked_year, 0.0)
+                            prev_n = _yearly_trades.get(_last_checked_year, 0)
+                            prev_w = _yearly_wins.get(_last_checked_year, 0)
+                            prev_wr = prev_w / prev_n * 100 if prev_n > 0 else 0
+                            if prev_n >= 10 and prev_pnl < 0:
+                                raise EarlyStopError(
+                                    f"Year 1 ({_last_checked_year}): PnL={prev_pnl:+.1f}% "
+                                    f"(WR={prev_wr:.1f}%, {prev_n} trades)",
+                                    results,
+                                    total_signals,
+                                )
+                        elif years_elapsed == 2:
+                            cum_pnl = sum(
+                                v for y, v in _yearly_pnl.items() if y <= _last_checked_year
                             )
+                            cum_n = sum(
+                                v for y, v in _yearly_trades.items() if y <= _last_checked_year
+                            )
+                            if cum_n >= 20 and cum_pnl < 0:
+                                raise EarlyStopError(
+                                    f"Year 1+2 cumulative: PnL={cum_pnl:+.1f}% "
+                                    f"({cum_n} trades)",
+                                    results,
+                                    total_signals,
+                                )
                     _last_checked_year = yr
                 if verbose > 0:
                     month_label = _month_of(result.close_time)
