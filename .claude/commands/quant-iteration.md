@@ -391,7 +391,19 @@ Read `BASELINE.md` on main before evaluating. An iteration merges ONLY if:
 2. **Primary**: OOS Sharpe > current baseline OOS Sharpe
 3. **Hard constraints** (all must pass):
    - Max drawdown (OOS) ≤ baseline OOS max drawdown × 1.2
-   - Minimum 50 OOS trades
+   - **Trade-rate floor**: OOS ≥ 10 trades/month (→ ≥ 130 total over
+     the ~13-month OOS window) AND IS ≥ 10 trades/month
+     (→ ≥ 400 total over the ~39-month IS window). Sharpe computed on
+     too few trades is dominated by individual outcomes and cannot be
+     trusted. Filters that raise Sharpe by starving the strategy (R3
+     OOD, high-confidence thresholds, vol kill-switches) must clear
+     this floor.
+   - **Relative trade-count floor**: OOS trade count must not drop more
+     than ~40% vs. the baseline being compared against. (If the filter
+     is more aggressive than that, re-calibrate on IS, do not push
+     further.)
+   - Minimum 50 OOS trades (legacy floor; subsumed by the rate floor
+     above for the current portfolio but kept for per-symbol screens).
    - Profit factor > 1.0 (OOS)
    - No single symbol > 30% of total OOS PnL
    - IS/OOS Sharpe ratio > 0.5 (researcher overfitting gate)
