@@ -445,6 +445,54 @@ Regime-stratified breakdown from iter-v2/017 report not fully recomputed
    macro signals). Speculative — the 2 existing gates cover
    most known failure modes.
 
+## Dead Ideas — don't re-propose without new justification
+
+Required consultation before any iter-v2/NNN brief. Approach classes that
+have been tried and failed — retrying needs explicit justification of
+WHY conditions have changed.
+
+### Symbol changes
+- **AAVEUSDT** (iter-v2/063): added as 5th symbol without Gate 3
+  screening; OOS −21.34 wpnl, 26% WR, drove total OOS −35%
+- **AVAXUSDT** (iter-v2/041): IS collapsed; NO-MERGE
+- **ATOMUSDT** (iter-v2/047): swap for DOGE; failed
+- **ADAUSDT** (iter-v2/036, /066): single-seed IS screening looks strong
+  but 5-seed ensemble averaging washes out the signal; consistently
+  loses OOS
+- **DOTUSDT** (iter-v2/061): best OOS trade Sharpe ever (+2.18) but IS
+  −62%; NO-MERGE
+- **OPUSDT, TRXUSDT as primary picks** (iter-v2/066): IS-only screener
+  selected both; walk-forward showed TRX 99 trades breakeven, OP only
+  18 trades total
+
+### Concentration fixes
+- **Per-symbol position cap on NEAR** (iter-v2/064, 065): fixes
+  concentration but data-snoops on NEAR's OOS behaviour. User flagged
+  as biased/overfit; validated empirically when same approach via
+  "generic" IS-ranking still failed
+- **Portfolio drawdown brake Config C** (iter-v2/067): symmetric,
+  portfolio-level. Counter-intuitively INCREASED OOS MaxDD (22.61% →
+  35.24%) because shrinking during drawdown misses rebound trades;
+  equity recovers slower → deeper next trough
+- **IS-only universe re-screening** (iter-v2/066): catastrophic OOS
+  −67%, concentration WORSE (XRP 78%). The IS-only 80/20 split + single
+  seed screener does NOT predict walk-forward + 5-seed ensemble Sharpe
+
+### Gate / filter tunes
+- **z-score OOD 2.25** (iter-v2/060): too tight, OOS trade count <50 min
+- **z-score OOD 2.4** (iter-v2/068): pending at time of writing
+- **Hit-rate gate enabled** (iter-v2/017-044): over-kills NEAR signals
+  during drawdowns; disabled in iter-v2/045 onwards
+
+### Key insight — the baseline is near local optimum
+iter-v2/063-067 empirically showed the iter-v2/059-clean baseline is at
+or near a local optimum for this architecture. Five consecutive concen-
+tration-focused iterations all degraded OOS Sharpe. NEAR's ~44%
+concentration is a consequence of NEAR having genuine edge in the OOS
+regime, not a bug. Future iterations should prioritise BOLD
+explorations (new features, new model architecture, new risk layer
+primitives) over incremental tunes.
+
 ## Tags
 
 - `v0.v2-002` — first v2 baseline (inverted vol-scale)
