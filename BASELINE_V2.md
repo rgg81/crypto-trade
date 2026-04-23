@@ -1,20 +1,77 @@
 # Current Baseline — v2 Track (Diversification Arm)
 
-Last updated by: **iteration v2/059** (2026-04-19) — z-score OOD 2.5, all 7 gates clean PASS
+Last updated by: **iter-v2/059-clean** (2026-04-23) — rerun of iter-v2/059
+config on fresh data (through 2026-04-23 07:59 UTC) with the forming-candle
+fetcher fix applied and `feature_columns=list(V2_FEATURE_COLUMNS)` pinned.
 OOS cutoff date: 2025-03-24 (fixed, shared with v1, never changes)
 
-## iter-v2/059 — z-score OOD 2.5, all gates clean PASS
+## iter-v2/059-clean — rerun with fix (CURRENT)
+
+**Same config as iter-v2/059** (z-score OOD 2.5, 4 symbols, cooldown=4,
+hit-rate gate off, v1-style 5-seed internal ensemble, n_trials=50). Rerun
+became necessary when v1's baseline investigation uncovered two
+reproducibility bugs that also affected v2:
+1. **Forming-candle fetcher bug** — corrupt tail CSV rows propagated
+   through rolling features (fixed by commit `19a1d3e`, merged into
+   quant-research at `6f6e63c`).
+2. **Auto-discovered feature column order** — LightGBM's colsample_bytree
+   samples columns by position, so the parquet schema's column order
+   silently bled into the trained model. v2 had already been pinning
+   `feature_columns=list(V2_FEATURE_COLUMNS)` from iter-v2/001, so it
+   wasn't affected by the order bug itself — but the audit caught the
+   fetcher bug at the same time.
+
+Clean-data results vs iter-v2/059 as originally declared:
+
+| Metric | iter-v2/059 (declared) | **iter-v2/059-clean** | Δ |
+|---|---|---|---|
+| IS trade Sharpe | +0.9742 | **+0.9742** | identical |
+| OOS trade Sharpe | **+2.0232** | +1.6626 | **−18%** |
+| OOS monthly Sharpe | +1.8346 | +1.6590 | −10% |
+| IS MaxDD | 68.55% | 68.55% | identical |
+| OOS MaxDD | 22.61% | 22.61% | identical |
+| OOS PF | 1.8782 | 1.7806 | −5% |
+| IS PF | 1.3807 | 1.3807 | identical |
+| OOS WR | 50.0% | 49.1% | −0.9pp |
+| IS trades | 225 | 225 | identical |
+| OOS trades | 54 | 57 | +3 (extended window) |
+| **Concentration (NEAR)** | 44.58% | **57.96%** | **FAIL** (>50% cap) |
+
+**IS is pixel-perfect identical** — same strategy, same seeds, same
+training data. Confirms IS metrics weren't affected by the forming-candle
+bug (which only touches the tail of the CSV).
+
+**OOS regressed** because:
+1. Forming-candle corruption in the Mar-2025→Apr-2026 OOS window was
+   propagating through rolling features until fixed.
+2. The OOS window extended by ~5 weeks (Mar 17 → Apr 23 2026), adding 3
+   new trades, with NEAR dominating that extension.
+
+**Concentration now FAILS**: NEAR's share of positive OOS PnL jumped from
+44.58% to 57.96%, breaching both the 50% outer cap and the 45% inner mean
+rule. This is the honest clean-data number; iter-v2/059's declared 44.58%
+was inflated by the corrupted data.
+
+Still solidly profitable and positive on all 4 symbols (NEAR 62.5% WR,
+XRP 57.1%, SOL 38.9%, DOGE 43.8%). The strategy has real edge — just less
+edge than the pre-fix measurement showed, and less diversified.
+
+## iter-v2/059 (pre-clean) — z-score OOD 2.5 (HISTORICAL — measurements inflated)
 
 Change from iter-v2/050: `zscore_threshold: 3.0 → 2.5`. More aggressive
 OOD filtering catches mild distributional drift.
 
-Key gains over iter-v2/050:
-- **OOS monthly +1.7036 → +1.8346 (+8%)**
-- **OOS trade Sharpe +1.8129 → +2.0232 (+12%)**
-- **OOS PF 1.8069 → 1.8782** (best ever)
-- **OOS WR 49.2% → 50.0%** (first time >50%!)
-- **Concentration 47.06% → 44.58%** (best ever)
-- **Combined IS+OOS monthly: +2.87 → +2.88** (+0.3%)
+**Numbers below were measured on parquets with forming-candle-corrupted
+tail CSV rows and are retained only for historical traceability. Use
+iter-v2/059-clean for all comparisons going forward.**
+
+Key gains over iter-v2/050 (pre-clean measurement):
+- OOS monthly +1.7036 → +1.8346 (+8%)
+- OOS trade Sharpe +1.8129 → +2.0232 (+12%)
+- OOS PF 1.8069 → 1.8782 (best ever)
+- OOS WR 49.2% → 50.0% (first time >50%!)
+- Concentration 47.06% → 44.58% (best ever)
+- Combined IS+OOS monthly: +2.87 → +2.88 (+0.3%)
 
 Trade-off:
 - IS monthly +1.1670 → +1.0421 (−11%) — still >1.0
@@ -22,7 +79,8 @@ Trade-off:
 
 Both IS and OOS still above 1.0 monthly (IS +1.04, OOS +1.83).
 **First iteration with mean concentration ≤45%** (the strict inner
-rule) — truly clean concentration audit, not marginal.
+rule) — declared "clean concentration audit" but turned out to be 45.58%
+after the forming-candle fix.
 
 ## iter-v2/050 — cooldown=4, BOTH IS+OOS above 1.0 monthly (superseded)
 
@@ -146,30 +204,42 @@ output is the primary metric. The 10-seed outer sweep is optional
 6. Hit-rate feedback gate (window=20, SL threshold=0.65) — added iter-v2/017 (OOS only)
 7. **BTC trend-alignment filter (14d ±20%)** — added iter-v2/019 (full period)
 
-## Out-of-Sample Metrics — iter-v2/059 (CURRENT)
+## Out-of-Sample Metrics — iter-v2/059-clean (CURRENT, measured 2026-04-23)
 
 **v1-style 5-seed ensemble + cooldown=4 + hit-rate gate OFF + z-score OOD 2.5**
 
-| Metric | iter-v2/050 | **iter-v2/059** | Δ |
-|---|---|---|---|
-| IS monthly Sharpe | +1.1670 | +1.0421 | −11% (still >1.0) |
-| **OOS monthly Sharpe** | +1.7036 | **+1.8346** | **+8%** |
-| **Combined IS+OOS monthly** | +2.87 | **+2.88** | +0.3% |
-| IS trade Sharpe | +1.2395 | +0.9742 | −21% |
-| **OOS trade Sharpe** | +1.8129 | **+2.0232** | **+12%** |
-| IS PF | 1.4787 | 1.3807 | −7% |
-| **OOS PF** | 1.8069 | **1.8782** | **best ever** |
-| IS MaxDD | 63.73% | 68.55% | worse |
-| OOS MaxDD | 22.61% | 22.61% | same |
-| **OOS WR** | 49.2% | **50.0%** | **first >50%!** |
-| IS trades | 258 | 225 | −13% |
-| OOS trades | 59 | 54 | −8% |
-| OOS/IS balance | 1.46x | 1.76x | in target |
-| **Concentration** | 47.06% | **44.58%** | **best ever, passes mean ≤45%** |
+Fresh-data measurement through 2026-04-23 07:59 UTC with forming-candle
+fetcher fix applied and pinned column order.
 
-**The v1-style 5-seed ensemble is a quality filter**: trade count drops
-~40% but each surviving trade has much higher confidence (5 models agree).
-OOS WR improved 8pp (41% → 49%), PF improved 18%, MaxDD improved 5pp.
+| Metric | iter-v2/050 | iter-v2/059 (pre-clean) | **iter-v2/059-clean** |
+|---|---|---|---|
+| IS monthly Sharpe | +1.1670 | +1.0421 | **+1.0421** (unchanged) |
+| **OOS monthly Sharpe** | +1.7036 | +1.8346 | **+1.6590** |
+| IS trade Sharpe | +1.2395 | +0.9742 | **+0.9742** (unchanged) |
+| **OOS trade Sharpe** | +1.8129 | +2.0232 | **+1.6626** |
+| IS PF | 1.4787 | 1.3807 | **1.3807** (unchanged) |
+| **OOS PF** | 1.8069 | 1.8782 | **1.7806** |
+| IS MaxDD | 63.73% | 68.55% | 68.55% (unchanged) |
+| OOS MaxDD | 22.61% | 22.61% | 22.61% (unchanged) |
+| **OOS WR** | 49.2% | 50.0% | **49.1%** |
+| IS trades | 258 | 225 | 225 (unchanged) |
+| OOS trades | 59 | 54 | **57** (extended window) |
+| **Concentration** | 47.06% | 44.58% | **57.96% (NEAR) — FAILS 50% cap** |
+
+**Notes on the pre-clean → clean transition**:
+- IS is pixel-identical across both measurements — proves the fetcher
+  corruption only affected recent data and the v2 code is fully
+  deterministic given the same inputs.
+- OOS dropped ~10-18% because (a) forming-candle rows were
+  contaminating rolling features in the Mar-2025 → Apr-2026 OOS period,
+  and (b) the OOS window extended ~5 weeks, adding 3 new trades
+  dominated by NEAR.
+- Concentration regressed sharply: NEAR's clean-data share is 57.96%
+  — well over the 50% outer cap. The declared 44.58% was inflated.
+
+**Still a real edge**: all 4 symbols profitable OOS, WR 49.1%, PF 1.78,
+OOS monthly +1.66. But concentration FAIL means this baseline is not
+eligible for deployment without addressing NEAR dominance.
 
 ### iter-v2/019 historical (trade-level Sharpe)
 
@@ -348,4 +418,5 @@ Regime-stratified breakdown from iter-v2/017 report not fully recomputed
 - `v0.v2-044` — cooldown=3 + v1 ensemble (IS monthly +0.8408, OOS monthly +1.4024, combined +2.24, balance ratio 1.92x, IS MaxDD 52%, OOS MaxDD 24%)
 - `v0.v2-045` — hit-rate gate DISABLED (IS monthly +0.8408, OOS monthly +1.9166, combined +2.76; NEAR 53% concentration marginal FAIL)
 - `v0.v2-050` — cooldown=4 milestone (IS monthly +1.1670 AND OOS monthly +1.7036 — BOTH ABOVE 1.0 first time; combined +2.87; concentration 47.06%)
-- **`v0.v2-059` — z-score OOD 2.5 (IS monthly +1.04, OOS monthly +1.83, combined +2.88; OOS trade Sharpe +2.02 best, OOS PF 1.88 best, OOS WR 50.0% first >50%, concentration 44.58% best — all 7 gates clean PASS including mean ≤45% rule)**
+- `v0.v2-059` — z-score OOD 2.5, measured pre-clean on corrupted data. IS monthly +1.04, OOS monthly +1.83 (inflated), concentration 44.58% (inflated). Superseded by v0.v2-059-clean.
+- **`v0.v2-059-clean` (2026-04-23) — SAME CONFIG as v0.v2-059, rerun on fresh data with fetcher fix + pinned feature columns. IS identical (+0.97 trade Sharpe, +1.04 monthly). OOS trade Sharpe +1.66, OOS monthly +1.66, OOS PF 1.78, OOS WR 49.1%, OOS trades 57, OOS MaxDD 22.61%. Concentration 57.96% (NEAR) — FAILS 50% cap. Real edge, still profitable on all 4 symbols, but not deployment-ready without addressing concentration.**
