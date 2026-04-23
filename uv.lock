@@ -390,6 +390,7 @@ dependencies = [
     { name = "pyarrow" },
     { name = "quantstats" },
     { name = "scikit-learn" },
+    { name = "statsmodels" },
     { name = "tqdm" },
 ]
 
@@ -431,6 +432,7 @@ requires-dist = [
     { name = "pyarrow", specifier = ">=18.0" },
     { name = "quantstats", specifier = ">=0.0.62" },
     { name = "scikit-learn", specifier = ">=1.5" },
+    { name = "statsmodels", specifier = ">=0.14.6" },
     { name = "tqdm", specifier = ">=4.66" },
 ]
 
