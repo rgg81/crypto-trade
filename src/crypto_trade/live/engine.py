@@ -217,7 +217,7 @@ class LiveEngine:
 
     def _print_banner(self) -> None:
         mode = "DRY-RUN" if self.config.dry_run else "LIVE"
-        print(f"[live] Starting baseline v152 [{mode}]")
+        print(f"[live] Starting baseline v186 [{mode}]")
         for mc in self.config.models:
             print(
                 f"  Model {mc.name}: {', '.join(mc.symbols)} "

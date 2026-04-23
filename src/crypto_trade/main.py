@@ -222,7 +222,7 @@ def main() -> None:
 
     # -- live subcommand --
     live_parser = subparsers.add_parser(
-        "live", help="Run live trading (baseline v152 — 3-model portfolio)"
+        "live", help="Run live trading (baseline v186 — 4-model portfolio: A/C/D/E)"
     )
     live_parser.add_argument(
         "--amount", type=float, default=1000.0, help="Max trade amount USD (default: 1000)"
