@@ -1500,6 +1500,80 @@ Same A-H as v1, plus a **mandatory Category I** specific to v2.
 **Minimum completion (v2)**: Category I is required every iteration. Plus:
 - After a MERGE: 2 additional categories from A-H
 - After 3+ NO-MERGE or EARLY STOP: 4+ additional categories from A-H
+- **Category A is mandatory every 5 iterations regardless** (see
+  "Mandatory Category A cycle" below)
+
+### Non-negotiable QR output standards
+
+Every brief must satisfy ALL of the following. QE rejects any brief
+missing these:
+
+1. **Each claimed category has its own named subsection** in the brief
+   (e.g., `## Category A — Feature Contribution Analysis`). No bundled
+   bullet points.
+2. **Every subsection includes a quantitative output**: a numbered
+   finding, a table, a CSV path, or a correlation number. Qualitative
+   assertions ("NEAR looks concentrated") are insufficient without a
+   number backing them.
+3. **Section 6 (risk mgmt) pre-registered failure-mode prediction**
+   must be specific enough to be checkable in Phase 7. "Might fail in
+   new regime" doesn't qualify; "if BTC 7-day return > 10% and no
+   signal killed, fail" does.
+4. **"Bold idea" quota**: every 3 iterations, at least 1 must include
+   a proposal that adds/changes/removes at least 50 lines of code or
+   introduces a new feature family / gate / architecture. Parameter
+   tweaks, threshold changes, and single-symbol swaps DO NOT count as
+   bold. Track the count in the diary's "Next Iteration Ideas"
+   section.
+
+### Mandatory Category A cycle (every 5 iterations)
+
+A complete Category A analysis includes:
+
+1. **Feature correlation matrix** — report every pair with |rho|>0.85
+   from the pooled-IS data. Flag for pruning. (Tool:
+   `qr_phase1_feature_eda.py`.)
+2. **Feature stationarity** — flag features whose mean drifts >0.3σ
+   between the first and second halves of the IS period.
+3. **Feature-to-forward-return Spearman correlation** — rank all
+   features by predictive power. Identify the top-3 and bottom-3.
+4. **Feature importance from a trained baseline** — load or compute the
+   LightGBM feature importance from a recent MERGE baseline.
+5. **A written proposal**: either (a) specific features to drop with
+   justification, (b) specific new features to add with math, or (c)
+   both.
+
+If iterations since the last Category A exceed 5, the QR MUST run
+Category A before proposing any other change. No exceptions. Even a
+"quick parameter tweak" iteration must first answer: are we tuning on a
+clean feature set?
+
+### Dead-ideas log (BASELINE_V2.md)
+
+`BASELINE_V2.md` carries a "Dead Ideas" section listing what's been
+tried and FAILED, grouped by category:
+
+```markdown
+## Dead Ideas
+
+### Symbol changes
+- AAVEUSDT (iter-v2/063): +Gate-3-skipped, OOS -21 wpnl
+- AVAXUSDT (iter-v2/041): IS collapsed
+- ATOMUSDT (iter-v2/047): swap for DOGE, failed
+- ADAUSDT (iter-v2/036, v2/066): single-seed looks good, ensemble kills signal
+
+### Concentration fixes
+- Per-symbol position cap on NEAR (iter-v2/064, /065): data-snooping,
+  also trades Sharpe for concentration
+- Portfolio drawdown brake (iter-v2/067): INCREASES MaxDD in this strategy
+
+### Gate / filter tunes
+- z-score OOD 2.25 (iter-v2/060): OOS trades <50 min
+```
+
+QR must consult this list before proposing. Repeating a dead idea
+requires explicit justification of WHY conditions have changed enough
+to retry.
 
 ### A. Feature Contribution Analysis
 (Same as v1 A1-A4. For iter-v2/001, A1 pruning is skipped — there's no v2
