@@ -18,20 +18,14 @@ from pathlib import Path
 from crypto_trade.backtest import run_backtest
 from crypto_trade.backtest_models import BacktestConfig
 from crypto_trade.iteration_report import generate_iteration_reports
-from crypto_trade.live.models import BASELINE_FEATURE_COLUMNS
+from crypto_trade.live.models import BASELINE_FEATURE_COLUMNS, OOD_FEATURE_COLUMNS
 from crypto_trade.strategies.ml.lgbm import LightGbmStrategy
 
 ITERATION = 186
 
-OOD_FEATURES = [
-    "stat_return_1", "stat_return_2", "stat_return_5", "stat_return_10",
-    "mr_rsi_extreme_7", "mr_rsi_extreme_14", "mr_rsi_extreme_21",
-    "mr_bb_pctb_10", "mr_bb_pctb_20",
-    "mom_stoch_k_5", "mom_stoch_k_9",
-    "vol_atr_5", "vol_atr_7",
-    "vol_bb_bandwidth_10",
-    "vol_volume_pctchg_5", "vol_volume_pctchg_10",
-]
+# Shared source of truth with live engine — iter 197 moved this into
+# `src/crypto_trade/live/models.py` so live and backtest can't drift.
+OOD_FEATURES = list(OOD_FEATURE_COLUMNS)
 OOD_CUTOFF_PCT = 0.70
 
 

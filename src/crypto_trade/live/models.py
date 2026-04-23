@@ -1,7 +1,9 @@
 """Data models for the live trading module.
 
-Baseline v152 configuration: 3-model portfolio (A: BTC+ETH, C: LINK, D: BNB)
-with per-symbol volatility targeting and 5-seed LightGBM ensembles.
+Baseline v186 configuration: 4-model portfolio (A: BTC+ETH, C: LINK, D: LTC,
+E: DOT) with per-symbol volatility targeting, 5-seed LightGBM ensembles,
+and risk mitigations R1 (consecutive-SL cool-down), R2 (drawdown scaling),
+and R3 (OOD Mahalanobis gate).
 """
 
 from __future__ import annotations
@@ -12,16 +14,52 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 
+# Iter 186: 16-feature scale-invariant subset used for R3 Mahalanobis OOD
+# distance. Kept separate from BASELINE_FEATURE_COLUMNS (which is the
+# 193-feature prediction set) because OOD requires a curated subset of
+# scale-invariant features — including raw price/SMA-level features in the
+# covariance would let cross-year price drift dominate the distance.
+OOD_FEATURE_COLUMNS: tuple[str, ...] = (
+    "stat_return_1",
+    "stat_return_2",
+    "stat_return_5",
+    "stat_return_10",
+    "mr_rsi_extreme_7",
+    "mr_rsi_extreme_14",
+    "mr_rsi_extreme_21",
+    "mr_bb_pctb_10",
+    "mr_bb_pctb_20",
+    "mom_stoch_k_5",
+    "mom_stoch_k_9",
+    "vol_atr_5",
+    "vol_atr_7",
+    "vol_bb_bandwidth_10",
+    "vol_volume_pctchg_5",
+    "vol_volume_pctchg_10",
+)
+
 
 @dataclass(frozen=True)
 class ModelConfig:
-    """Per-model configuration — mirrors run_baseline_v152.py:run_model args."""
+    """Per-model configuration — mirrors run_baseline_v186.py:run_model args."""
 
-    name: str  # "A", "C", "D"
-    symbols: tuple[str, ...]  # ("BTCUSDT", "ETHUSDT") or ("LINKUSDT",)
+    name: str  # "A", "C", "D", "E"
+    symbols: tuple[str, ...]  # ("BTCUSDT", "ETHUSDT") or single-symbol tuple
     use_atr_labeling: bool
-    atr_tp_multiplier: float  # 2.9 (A) or 3.5 (C/D)
-    atr_sl_multiplier: float  # 1.45 (A) or 1.75 (C/D)
+    atr_tp_multiplier: float  # 2.9 (A) or 3.5 (C/D/E)
+    atr_sl_multiplier: float  # 1.45 (A) or 1.75 (C/D/E)
+    # Iter 173: R1 consecutive-SL cool-down. None ⇒ disabled (Model A).
+    risk_consecutive_sl_limit: int | None = None
+    risk_consecutive_sl_cooldown_candles: int = 0
+    # Iter 176: R2 drawdown-triggered position scaling. False ⇒ disabled.
+    risk_drawdown_scale_enabled: bool = False
+    risk_drawdown_trigger_pct: float = 7.0
+    risk_drawdown_scale_anchor_pct: float = 15.0
+    risk_drawdown_scale_floor: float = 0.33
+    # Iter 186: R3 OOD Mahalanobis gate (per-model, uniform in v0.186).
+    ood_enabled: bool = True
+    ood_features: tuple[str, ...] = OOD_FEATURE_COLUMNS
+    ood_cutoff_pct: float = 0.70
 
 
 # Static feature list for baseline v152: 193 features.
@@ -240,7 +278,7 @@ BASELINE_PLUS_XBTC_FEATURE_COLUMNS: tuple[str, ...] = (
     *XBTC_FEATURE_COLUMNS,
 )
 
-# Baseline v152 model definitions
+# Baseline v186 model definitions: 4 models, R1 on C/D/E, R2 on E, R3 on all.
 BASELINE_MODELS = (
     ModelConfig(
         name="A",
@@ -248,6 +286,8 @@ BASELINE_MODELS = (
         use_atr_labeling=True,
         atr_tp_multiplier=2.9,
         atr_sl_multiplier=1.45,
+        # No R1/R2 on Model A — IS analysis showed mean-reverting WR at
+        # streak length >= 3 (iter 173 finding).
     ),
     ModelConfig(
         name="C",
@@ -255,13 +295,30 @@ BASELINE_MODELS = (
         use_atr_labeling=True,
         atr_tp_multiplier=3.5,
         atr_sl_multiplier=1.75,
+        risk_consecutive_sl_limit=3,
+        risk_consecutive_sl_cooldown_candles=27,
     ),
     ModelConfig(
         name="D",
-        symbols=("BNBUSDT",),
+        symbols=("LTCUSDT",),  # iter 165: changed from BNBUSDT to LTCUSDT
         use_atr_labeling=True,
         atr_tp_multiplier=3.5,
         atr_sl_multiplier=1.75,
+        risk_consecutive_sl_limit=3,
+        risk_consecutive_sl_cooldown_candles=27,
+    ),
+    ModelConfig(
+        name="E",
+        symbols=("DOTUSDT",),  # iter 176: new model
+        use_atr_labeling=True,
+        atr_tp_multiplier=3.5,
+        atr_sl_multiplier=1.75,
+        risk_consecutive_sl_limit=3,
+        risk_consecutive_sl_cooldown_candles=27,
+        risk_drawdown_scale_enabled=True,
+        risk_drawdown_trigger_pct=7.0,
+        risk_drawdown_scale_anchor_pct=15.0,
+        risk_drawdown_scale_floor=0.33,
     ),
 )
 
@@ -270,7 +327,10 @@ BASELINE_MODELS = (
 class LiveConfig:
     """Configuration for the live trading engine.
 
-    Defaults match baseline v152 (run_baseline_v152.py).
+    Defaults match baseline v186 (run_baseline_v186.py).
+
+    R1 (consecutive-SL cooldown), R2 (drawdown scaling), R3 (OOD gate)
+    are configured per-model on ModelConfig, not here.
     """
 
     models: tuple[ModelConfig, ...] = BASELINE_MODELS
