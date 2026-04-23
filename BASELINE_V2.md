@@ -5,7 +5,21 @@ config on fresh data (through 2026-04-23 07:59 UTC) with the forming-candle
 fetcher fix applied and `feature_columns=list(V2_FEATURE_COLUMNS)` pinned.
 OOS cutoff date: 2025-03-24 (fixed, shared with v1, never changes)
 
+## Measurement Discipline
+
+Every headline metric in this file MUST state BOTH the OOS cutoff
+(immutable, 2025-03-24) AND the **data extent** — the last `close_time`
+present in the kline CSVs at measurement time. Without data extent, a
+reader cannot tell whether "OOS Sharpe +X" was measured over 12 months
+or 6. iter-v2/059's original headline +2.02 OOS trade Sharpe was
+measured with CSVs stale to 2026-02-28 — a point the declaration did not
+state and that silently shortened OOS by 50 days. Every new baseline
+entry includes "Data extent: YYYY-MM-DD HH:MM UTC" in its header.
+
 ## iter-v2/059-clean — rerun with fix (CURRENT)
+
+**OOS cutoff: 2025-03-24 (fixed)**
+**Data extent: 2026-04-23 07:59 UTC** (~13.0 months of OOS)
 
 **Same config as iter-v2/059** (z-score OOD 2.5, 4 symbols, cooldown=4,
 hit-rate gate off, v1-style 5-seed internal ensemble, n_trials=50). Rerun
@@ -56,14 +70,20 @@ Still solidly profitable and positive on all 4 symbols (NEAR 62.5% WR,
 XRP 57.1%, SOL 38.9%, DOGE 43.8%). The strategy has real edge — just less
 edge than the pre-fix measurement showed, and less diversified.
 
-## iter-v2/059 (pre-clean) — z-score OOD 2.5 (HISTORICAL — measurements inflated)
+## iter-v2/059 (pre-clean) — z-score OOD 2.5 (HISTORICAL — stale-data measurement)
+
+**OOS cutoff: 2025-03-24 (fixed)**
+**Data extent at measurement: 2026-02-28 23:59 UTC** (~11.2 months of OOS
+— NEAR/SOL/XRP/DOGE CSVs had stopped refreshing; see forensic reconciliation
+below)
 
 Change from iter-v2/050: `zscore_threshold: 3.0 → 2.5`. More aggressive
 OOD filtering catches mild distributional drift.
 
-**Numbers below were measured on parquets with forming-candle-corrupted
-tail CSV rows and are retained only for historical traceability. Use
-iter-v2/059-clean for all comparisons going forward.**
+**Numbers below were measured with stale CSVs (last close 2026-02-28)
+and are retained only for historical traceability. The delta vs clean
+is fully accounted for — no code bug. Use iter-v2/059-clean for all
+comparisons going forward.**
 
 Key gains over iter-v2/050 (pre-clean measurement):
 - OOS monthly +1.7036 → +1.8346 (+8%)
@@ -241,6 +261,24 @@ fetcher fix applied and pinned column order.
 OOS monthly +1.66. But concentration FAIL means this baseline is not
 eligible for deployment without addressing NEAR dominance.
 
+### Forensic reconciliation — iter-v2/059 vs iter-v2/059-clean
+
+Trade-by-trade proof that the OOS delta is fully explained and no code
+bug exists. Total OOS wpnl delta = **−2.44**.
+
+| Source | Contribution | Running |
+|---|---|---|
+| 53 of 54 shared trades — entry/exit/PnL bit-identical | 0.00 | 0.00 |
+| NEAR 2026-02-28 trade: `end_of_data` (Feb 28 23:59) → `take_profit` (Mar 1 07:59) because the clean run has one more candle | +0.76 | +0.76 |
+| 3 new trades in the 50-day extended window: NEAR 2026-03-04 SL, NEAR 2026-03-17 TP, XRP 2026-04-19 SL | −3.20 | **−2.44** ✓ |
+
+`iter-v2/059` has **zero** OOS trades closing on or after 2026-03-01 —
+definitive proof the CSVs had stopped fetching. The `end_of_data` exit
+reason on the NEAR Feb-28 trade is the backtest engine's literal signal
+that it ran out of candles mid-trade.
+
+Script: `forensic_v2_059_vs_clean.py`.
+
 ### iter-v2/019 historical (trade-level Sharpe)
 
 Kept for continuity. iter-029 uses monthly Sharpe going forward.
@@ -389,6 +427,7 @@ Regime-stratified breakdown from iter-v2/017 report not fully recomputed
 | Feature helper | `natr_21_raw` (labeling input, excluded from features) |
 | Feature column pinning | **MANDATORY**: `feature_columns=list(V2_FEATURE_COLUMNS)` from `crypto_trade.features_v2`. Never `None`, never sorted, never reordered. See `.claude/commands/quant-iteration-v2.md` § "Feature Column Pinning". |
 | Candle integrity | **MANDATORY**: `fetcher.py` must drop forming candles (`k.close_time < now_ms`). Fix on `main` at commit `19a1d3e` (2026-04-13). Pre-flight: grep the guard + scan CSV tails for `close_time >= now_ms`. See `.claude/commands/quant-iteration-v2.md` § "Candle Integrity". |
+| Data freshness | **MANDATORY**: every baseline symbol's CSV must have `close_time` within 16h of measurement time. A baseline measured on stale CSVs silently truncates OOS (iter-v2/059 lost 50 days / 3 trades / 1 force-closed trade this way). |
 | Risk gates | 7 active gates (vol-scaling, ADX, Hurst, z-score OOD, low-vol, **hit-rate (OOS)**, **BTC trend (full)**) |
 | **Ensemble** | **5-seed internal** (`[42,123,456,789,1001]`, v1-style, from iter-v2/035) |
 | Fee | 0.1% per trade |

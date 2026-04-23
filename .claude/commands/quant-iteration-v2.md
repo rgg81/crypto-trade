@@ -1170,11 +1170,41 @@ if bad:
     raise SystemExit(f'Forming candles present in: {bad}')
 print('All CSV tails are closed-candle-only ✓')
 "
+
+# 3. Data freshness — kline CSVs for all baseline symbols must be recent.
+# A CSV that stopped fetching weeks ago silently truncates the OOS window:
+# the backtest will force-close any trade still open at CSV end with
+# `exit_reason=end_of_data`, and all trades that would have happened after
+# that point simply don't exist in the measurement. iter-v2/059's "OOS
+# Sharpe +2.02" was measured on NEAR/SOL/XRP/DOGE CSVs stale to 2026-02-28
+# — effectively shortening OOS by 50 days and dropping 3 trades from the
+# measurement. Always run this check before measuring a baseline.
+uv run python -c "
+import sys, time, pandas as pd
+from pathlib import Path
+
+BASELINE_SYMBOLS = ['DOGEUSDT', 'SOLUSDT', 'XRPUSDT', 'NEARUSDT', 'BTCUSDT']
+MAX_LAG_HOURS = 16   # one 8h candle + one 8h grace
+now_ms = int(time.time() * 1000)
+stale = []
+for sym in BASELINE_SYMBOLS:
+    p = Path(f'data/{sym}/8h.csv')
+    last_close_ms = int(pd.read_csv(p, usecols=['close_time'])['close_time'].max())
+    lag_h = (now_ms - last_close_ms) / 3_600_000
+    if lag_h > MAX_LAG_HOURS:
+        stale.append((sym, round(lag_h, 1)))
+if stale:
+    sys.exit(f'STALE DATA (>{MAX_LAG_HOURS}h lag): {stale}. Run crypto-trade fetch.')
+print(f'All baseline CSVs fresh (≤{MAX_LAG_HOURS}h lag) ✓')
+"
+
+# 4. Runner ↔ BASELINE_V2.md symbol drift (see NO-MERGE hygiene section)
 ```
 
-Both checks must pass green before Phase 6 starts. If either fails the QE
-stops, deletes the corrupted tail rows, re-fetches from a known-good
-earlier timestamp, and regenerates features before proceeding.
+All four checks must pass green before Phase 6 starts. If any fails the QE
+stops, fixes the underlying issue (re-fetch / revert stray code / cleanup
+tail corruption), regenerates features, and re-runs the pre-flight before
+proceeding.
 
 ### Why this matters for v2
 

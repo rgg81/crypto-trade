@@ -79,18 +79,31 @@ reproducibility. See `.claude/commands/quant-iteration-v2.md` § "Feature
 Column Pinning — REPRODUCIBILITY GUARANTEE" for the full rationale and
 v1's post-mortem that prompted this rule.
 
-## Candle Integrity — MANDATORY
+## Candle Integrity & Freshness — MANDATORY
 
 Every v2 iteration MUST verify before fetching or backtesting:
 1. `fetcher.py` contains the closed-candle filter (`k.close_time < now_ms`)
 2. No kline CSV has a tail row with `close_time` in the future
+3. **Every baseline symbol's CSV has `close_time` within 16h of `now`**
+   (i.e. the most recent closed 8h candle is present; 16h gives 1 candle
+   of grace for timing).
+4. Runner `V2_MODELS` matches `BASELINE_V2.md` "Symbols" row
 
-Fix lives on `main` (commit `19a1d3e`, 2026-04-13). If the quant-research
-branch lacks this fix, merge `main` before running `crypto-trade fetch`.
-Forming candles silently corrupt rolling features for up to ~100 rows and
-are a second major source of non-reproducibility, distinct from the
-column-order bug. See `.claude/commands/quant-iteration-v2.md` § "Candle
-Integrity — CLOSED CANDLES ONLY" for the QE pre-flight check script.
+Fix for the forming-candle guard lives on `main` (commit `19a1d3e`,
+2026-04-13). If the quant-research branch lacks this fix, merge `main`
+before running `crypto-trade fetch`.
+
+**Why data-freshness matters**: iter-v2/059's declared OOS Sharpe +2.02
+was measured on NEAR/SOL/XRP/DOGE CSVs that had stopped updating at
+2026-02-28, silently truncating the OOS window by 50 days. The rerun on
+fresh data (iter-v2/059-clean) gave +1.66 OOS trade Sharpe — the delta
+was fully explained by 3 missing trades in the extended window plus 1
+trade that had been force-closed with `exit_reason=end_of_data` instead
+of its natural TP. Not a code bug, just a stale CSV. A stale-data baseline
+is an indefensible measurement.
+
+See `.claude/commands/quant-iteration-v2.md` § "Candle Integrity" →
+"QE pre-flight check" for the four-step audit script.
 
 ## Relationship to v1
 
