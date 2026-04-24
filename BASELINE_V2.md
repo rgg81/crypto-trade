@@ -71,6 +71,28 @@ fix (see iter-v2/069 diary).
 
 ## iter-v2/059-clean — previous baseline (superseded by iter-v2/069)
 
+## Reference: current v1 baseline (merged from main 2026-04-24)
+
+v1 lives on `main` and has advanced independently of v2 while this worktree
+iterated. For cross-reference:
+
+| Metric | Value |
+|---|---|
+| Baseline tag | `v0.186` (main branch) |
+| OOS Sharpe | +1.735 |
+| OOS MaxDD | 29.31% |
+| OOS Calmar | 5.91 |
+| Symbols | A: BTC+ETH pooled, C: LINK, D: LTC, E: DOT |
+| Risk primitives | R1 consecutive-SL cooldown, R2 drawdown-triggered position scaling, R3 OOD Mahalanobis |
+
+The eventual combined portfolio (v1 + v2) is still the objective. v2's
+`RiskV2Wrapper` feature z-score OOD gate (|z|>2.5 on any feature) and v1's
+R3 OOD gate (Mahalanobis distance on 16 scale-invariant features) target the
+same failure class — "model running in a regime it wasn't trained on" — via
+different statistics. An iter-v2/072+ decision will evaluate whether v2 should
+adopt R3 in place of (or alongside) its feature z-score gate. Until then, v2
+keeps `ood_enabled=False` on its inner `LightGbmStrategy`.
+
 ## Measurement Discipline
 
 Every headline metric in this file MUST state BOTH the OOS cutoff

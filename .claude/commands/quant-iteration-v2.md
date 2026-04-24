@@ -72,16 +72,24 @@ diverge on the things that matter for diversification.
 
 | Axis | v1 | v2 |
 |---|---|---|
-| Symbol universe | BTC, ETH, LINK, BNB | Everything ELSE on Binance USDT perps |
+| Symbol universe | BTC, ETH, LINK, LTC, DOT (v0.186 universe — A pooled BTC+ETH, C=LINK, D=LTC, E=DOT) | Everything ELSE on Binance USDT perps |
 | Feature code | `src/crypto_trade/features/*` (9 groups) | `src/crypto_trade/features_v2/*` (6 modules, hard-isolated) |
 | Feature parquets | `data/features/` | `data/features_v2/` |
 | Feature families | momentum, volatility, trend, volume, mean_reversion, statistical, interaction, calendar, entropy_cusum, cross_asset | regime, tail_risk, price_efficient_vol, momentum_accel, volume_micro, fracdiff |
-| Risk layer | SL/TP/ATR/cooldown/vol-targeting | v1 + `RiskV2Wrapper` (regime gates, OOD detection) |
-| Validation | 10-seed, walk-forward, profit thresholds | v1 + DSR (iter 001), CPCV (iter 002), PBO (iter 003) |
+| Risk layer | SL/TP/ATR/cooldown/vol-targeting + R1 consecutive-SL cooldown + R2 drawdown-triggered position scaling + R3 OOD Mahalanobis (merged from main 2026-04-24) | v1 + `RiskV2Wrapper` (regime gates, feature z-score OOD) |
+| Validation | walk-forward, profit thresholds, Sharpe > 1.0 merge floor, Gate-3 evidence rule | v1 + DSR (iter 001), CPCV (iter 002), PBO (iter 003) |
 | Git branch | `main` ← `iteration/NNN` | `quant-research` ← `iteration-v2/NNN` |
 | Baseline file | `BASELINE.md` | `BASELINE_V2.md` |
 | Iteration artifacts | `briefs/`, `diary/`, `reports/` | `briefs-v2/`, `diary-v2/`, `reports-v2/` |
 | Tag format | `v0.NNN` | `v0.v2-NNN` |
+
+> **OOD overlap (merged 2026-04-24):** v2's feature z-score gate in
+> `RiskV2Wrapper` and v1's R3 Mahalanobis gate inside `LightGbmStrategy`
+> target the same failure class ("model running in an untrained regime")
+> via different statistics. v2 keeps `ood_enabled=False` on its inner
+> `LightGbmStrategy` construction by default. Adopting R3 in v2 (replacing
+> or supplementing the z-score gate) is an explicit open iter-v2/072+
+> decision — measure before switching.
 
 ### The eventual combined portfolio
 

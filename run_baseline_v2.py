@@ -177,6 +177,11 @@ def _build_model(
         use_atr_labeling=True,
         ensemble_seeds=list(ensemble_seeds),
         feature_columns=list(V2_FEATURE_COLUMNS),
+        # Main's R3 OOD (Mahalanobis) is intentionally OFF for v2.
+        # v2's OOD gate lives in RiskV2Wrapper (feature z-score |z|>2.5).
+        # Adopting R3 here is an explicit iter-v2/072+ decision — until
+        # measured, keeping two OOD gates stacked would double-filter.
+        ood_enabled=False,
     )
     risk_cfg = RiskV2Config(
         zscore_threshold=2.5,  # iter-v2/059 baseline — best OOS gate position
