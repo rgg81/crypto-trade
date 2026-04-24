@@ -63,7 +63,7 @@ diverge on the things that matter for diversification.
 | `LightGbmStrategy` | Yes, wrapped (not replaced) by `RiskV2Wrapper` | ML code is fine; the gap is the risk layer |
 | `TimeSeriesSplit(gap=...)` for label leakage | Yes | Same formula: `gap = (timeout_candles + 1) * n_symbols` |
 | NO-CHEATING rules | Yes | Non-negotiable |
-| Seed robustness discipline | Yes, **stricter** (10 seeds, ≥7/10 profitable) | |
+| Seed robustness discipline | Single-seed with v1-style 5-seed internal ensemble (outer-seed sweeps are vacuous — see "Seed Robustness Validation" §) | |
 | Exploration/Exploitation 70/30 | Yes | |
 | QR/QE role split | Yes | |
 | 4-commit discipline (code/brief/engineering/diary) | Yes | |
@@ -811,48 +811,73 @@ Section 6 (Risk Management Design) always filled in.
 
 ---
 
-## Seed Robustness Validation — 10 Seeds, ≥7/10 Profitable
+## Seed Robustness Validation — SUPERSEDED by v1-style 5-seed internal ensemble
 
-(Stricter than v1's 5/5 rule, reflecting the user's canonical seed validation
-protocol.)
+**Status**: From iter-v2/035 onward, v2 adopted the v1-style 5-seed INTERNAL
+ensemble (`ensemble_seeds=[42, 123, 456, 789, 1001]` baked into every model
+call). The ensemble averages predictions across 5 per-seed Optuna runs per
+monthly training — that IS the seed-robustness validation for this
+architecture.
 
-When an iteration produces a MERGE-worthy result, the QE MUST validate it is
-NOT seed-dependent before merging:
+The old 10-outer-seed rule is therefore **DROPPED** as of iter-v2/069. The
+`LightGbmStrategy._train_for_month` code uses `ensemble_seeds or [self.seed]`
+(lgbm.py:450), meaning the outer `seed` is IGNORED whenever `ensemble_seeds`
+is set (which it always is, post-iter-v2/035). Empirical confirmation from
+iter-v2/069's partial 10-seed run: seed 42 and seed 123 produced bit-identical
+trade counts (DOGE=58, SOL=77, XRP=78) because the inner ensemble is the same.
 
-1. Re-run the SAME configuration with **10 different seeds**
-   (e.g., [42, 123, 456, 789, 1001, 1234, 2345, 3456, 4567, 5678])
-2. Compute the **mean and std of OOS Sharpe** across all seeds
-3. The iteration merges ONLY if:
-   - **Mean OOS Sharpe > 0** (profitable on average)
-   - **At least 7 of 10 seeds are profitable** (OOS Sharpe > 0)
-4. Report the seed sweep results in the engineering report and diary
+### The new rule — single-seed is the measurement
 
-First-seed early-stop: if the first seed is clearly unprofitable (OOS Sharpe
-< 0 or OOS PF < 1.0), STOP. Don't run the other 9 seeds. Only proceed to
-multi-seed validation when the first seed shows genuine profitability.
+For v2 baselines and MERGE candidates:
+
+1. Run a **single outer seed** (default 42). The inner 5-seed ensemble runs
+   5 Optuna studies and averages predictions — this IS the seed robustness.
+2. `run_baseline_v2.py --seeds 1` (default) is sufficient.
+3. `--seeds N > 1` is DEPRECATED for the v1-style ensemble. It does N × 2.5h
+   of work that produces identical trades to `--seeds 1`.
+
+### First-seed early-stop (unchanged)
+
+If the single seed produces OOS Sharpe < 0 or OOS PF < 1.0, the iteration
+is immediately a NO-MERGE candidate. No "try more seeds" — the ensemble
+has already pooled 5 inner seeds; that's the result.
+
+### If you ever restore true multi-seed validation
+
+Refactor `run_baseline_v2.py::_build_model` to make `ensemble_seeds` a
+function of the outer seed, e.g.:
+```python
+ensemble_seeds=[outer_seed + i * 100 for i in range(5)]
+```
+Then each outer seed produces a genuinely different 5-seed inner ensemble.
+This re-introduces true variance at the cost of 10× compute per MERGE.
+
+### Concentration check (the one that DID matter)
+
+Even without outer-seed variance, the PER-SYMBOL concentration rule stays
+fully enforceable on a single seed. See "Seed Concentration Check" below.
 
 ---
 
-## Seed Concentration Check — Per-Seed, Not Just Primary
+## Seed Concentration Check — Single-seed per-symbol check
 
 **This is a hard pre-MERGE gate. No baseline merges without passing it.**
 
-Even when the 10-seed **mean** metrics look strong, a single seed can produce
-a pathological portfolio that routes nearly all OOS PnL through one symbol.
-If we merge a baseline on mean metrics alone, we inherit that brittle
-concentration — and the combined v1+v2 portfolio inherits it with us.
+(Simplified post-iter-v2/069: since outer-seed sweeps are vacuous under
+the v1-style 5-seed internal ensemble, the concentration check runs on
+the single merged-baseline seed only. The per-seed-max / mean-max
+thresholds in the table below still apply, but for a single measurement.)
 
-This happened in iter-v2/028: mean OOS monthly Sharpe was **+1.0796** (10/10
-profitable, first breakthrough above 1.0), but primary seed 42's per-symbol
-share was **XRP = 73.43%** — a clean failure of the 50% rule. The aggregate
-looked like a MERGE candidate; the per-seed view revealed a concentration
-risk. iter-v2/028 was NO-MERGE because of this check.
+### Historical context — why this rule exists
+
+iter-v2/028 had mean OOS monthly Sharpe +1.08 (first breakthrough above
+1.0) but primary seed 42 showed XRP = 73.43% concentration. Merging on
+headline Sharpe would have deployed a brittle portfolio.
 
 ### The rule — n-symbol-aware concentration thresholds
 
-Before MERGE, the QE MUST compute per-symbol OOS PnL share for **every one
-of the 10 seeds** (not only primary seed 42) and report them as a table in
-the engineering report.
+Before MERGE, the QE MUST compute per-symbol OOS PnL share for the
+single baseline seed and report it as a table in the engineering report.
 
 **The concentration thresholds scale with the number of symbols in the
 portfolio.** A 50% rule is vacuous for n=2 (max is trivially ≥50%) and too
@@ -869,15 +894,16 @@ loose for n=10 (an equal-weight target is 10%). The per-n thresholds are:
 
 These are roughly `max = (1/n + 25%)` with a floor of 30% for large n.
 
-An iteration merges ONLY if ALL of the following pass (using the row for
-its n_symbols):
+An iteration merges ONLY if (single-seed baseline, using the row for its
+n_symbols):
 
-1. **Per-seed hard cap**: No seed may have any symbol exceeding the "Max per
-   seed" threshold for that portfolio's n_symbols.
-2. **Mean cap**: The mean of the 10 per-seed max-shares must be ≤ the "Mean
-   max-share" threshold.
-3. **Concentrated-seed count**: At most **1 of 10** seeds may exceed the
-   "≤1 seed above" threshold (the inner rule).
+1. **Per-seed hard cap (outer)**: No symbol exceeds the "Max per seed"
+   threshold for the portfolio's n_symbols. e.g. n=4 → max ≤ 50%.
+2. **Per-seed inner cap**: No symbol exceeds the "≤1 seed above"
+   threshold. e.g. n=4 → no symbol > 40%. (Stricter than outer; passing
+   this is a first-class "clean concentration" signal.)
+3. **Mean cap**: Inapplicable under single-seed baselines. Retained in
+   the table for reference if ever multi-seed is restored.
 
 ### Concentration metric — USE `weighted_pnl`, NOT `net_pnl_pct`
 
@@ -1338,7 +1364,6 @@ Since iter-v2/001 has nothing to compare against, the success criteria are
 relaxed:
 
 - OOS Sharpe > **+0.5** (modest starting bar — any profitable edge)
-- **≥7/10 seeds profitable**
 - OOS trades ≥ 50
 - Profit factor > 1.1
 - **Seed concentration audit**: PASS (see "Seed Concentration Check" section)
