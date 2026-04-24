@@ -49,7 +49,7 @@ from crypto_trade.strategies.ml.risk_v2 import (
 )
 
 ITERATION = 1
-ITERATION_LABEL = "v2-059-clean"
+ITERATION_LABEL = "v2-069-10seed"
 
 # iter-v2/017: Hit-rate feedback gate (Config D from iter-v2/016 feasibility).
 # For each new signal, look at the last 20 trades that closed before this
@@ -114,6 +114,32 @@ def _verify_symbols(symbols: tuple[str, ...]) -> None:
     overlap = set(symbols) & set(V2_EXCLUDED_SYMBOLS)
     if overlap:
         raise RuntimeError(f"v2 runner cannot trade v1 baseline symbols: {sorted(overlap)}")
+
+
+def _verify_data_freshness(symbols: tuple[str, ...], max_lag_hours: float = 16.0) -> None:
+    """Hard-fail on stale data (pre-flight guard #3 from the skill).
+
+    Caught iter-v2/069's initial launch with data 32h stale. Every v2
+    baseline run must have fresh CSVs; this assertion prevents silent
+    OOS truncation.
+    """
+    now_ms = int(time.time() * 1000)
+    stale: list[tuple[str, float]] = []
+    for sym in symbols:
+        p = Path(f"data/{sym}/8h.csv")
+        if not p.exists():
+            raise RuntimeError(f"v2 runner: missing CSV for {sym}")
+        df = pd.read_csv(p, usecols=["close_time"])
+        last_close = int(df["close_time"].max())
+        lag_h = (now_ms - last_close) / 3_600_000
+        if lag_h > max_lag_hours:
+            stale.append((sym, round(lag_h, 1)))
+    if stale:
+        raise RuntimeError(
+            f"v2 runner: STALE DATA (>{max_lag_hours}h lag): {stale}. "
+            f"Run `uv run crypto-trade fetch --symbols {','.join(symbols)} --intervals 8h` "
+            f"then regenerate v2 features before launching the baseline."
+        )
 
 
 def _build_model(
@@ -254,8 +280,11 @@ def main() -> None:
     args = parser.parse_args()
 
     _verify_branch()
+    baseline_symbols = tuple(sym for _, sym in V2_MODELS) + ("BTCUSDT",)
+    _verify_data_freshness(baseline_symbols)
     print(f"BASELINE v2 iter-{ITERATION_LABEL}: DOGE+SOL+XRP individual models with RiskV2Wrapper")
     print(f"Seeds: {args.seeds}  Optuna trials/model: {args.n_trials}")
+    print("Pre-flight: branch OK, symbols OK, data fresh (<16h) ✓")
     print()
 
     # iter-v2/019: load BTC klines once for the BTC trend filter

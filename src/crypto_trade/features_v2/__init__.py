@@ -58,7 +58,7 @@ V2_FEATURE_COLUMNS: tuple[str, ...] = (
     "hurst_diff_100_50",
     "atr_pct_rank_200",
     "atr_pct_rank_500",
-    "atr_pct_rank_1000",
+    # iter-v2/069: dropped atr_pct_rank_1000 (rho 0.905 with atr_pct_rank_500)
     "bb_width_pct_rank_100",
     "cusum_reset_count_200",
     # Tail risk
@@ -71,9 +71,9 @@ V2_FEATURE_COLUMNS: tuple[str, ...] = (
     "max_dd_window_50",
     # Efficient OHLC vol
     "parkinson_vol_20",
-    "parkinson_vol_50",
-    "garman_klass_vol_20",
-    "rogers_satchell_vol_20",
+    # iter-v2/069: dropped parkinson_vol_50 (rho 1.000 with range_realized_vol_50)
+    # iter-v2/069: dropped garman_klass_vol_20 (rho 0.997 with parkinson_vol_20)
+    # iter-v2/069: dropped rogers_satchell_vol_20 (rho 0.988 with parkinson_vol_20)
     "parkinson_gk_ratio_20",
     # Momentum acceleration
     "mom_accel_5_20",
@@ -88,8 +88,8 @@ V2_FEATURE_COLUMNS: tuple[str, ...] = (
     "volume_cv_50",
     "obv_slope_50",
     "hl_range_ratio_20",
-    "close_pos_in_range_20",
-    "close_pos_in_range_50",
+    # iter-v2/069: dropped close_pos_in_range_20 (rho 0.905 with vwap_dev_20)
+    # iter-v2/069: dropped close_pos_in_range_50 (rho 0.927 with vwap_dev_50)
     # Fracdiff
     "fracdiff_logclose_d04",
     "fracdiff_logvolume_d04",
