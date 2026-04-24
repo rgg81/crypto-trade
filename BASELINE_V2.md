@@ -1,9 +1,75 @@
 # Current Baseline — v2 Track (Diversification Arm)
 
-Last updated by: **iter-v2/059-clean** (2026-04-23) — rerun of iter-v2/059
-config on fresh data (through 2026-04-23 07:59 UTC) with the forming-candle
-fetcher fix applied and `feature_columns=list(V2_FEATURE_COLUMNS)` pinned.
+Last updated by: **iter-v2/069** (2026-04-24) — Category-A driven feature
+pruning: 40 → 34 features by removing 6 near-identical/redundant features.
+First iteration in 10 attempts to cleanly pass ALL concentration rules.
 OOS cutoff date: 2025-03-24 (fixed, shared with v1, never changes)
+
+## iter-v2/069 — feature pruning (CURRENT)
+
+**OOS cutoff: 2025-03-24 (fixed)**
+**Data extent: 2026-04-23 23:59 UTC** (~13.0 months of OOS, single seed 42)
+
+| Metric | iter-v2/059-clean | **iter-v2/069** | Δ |
+|---|---|---|---|
+| IS monthly Sharpe | +1.042 | +0.874 | −16% |
+| IS daily Sharpe | +0.974 | +1.032 | +6% |
+| **OOS monthly Sharpe** | +1.659 | **+2.108** | **+27%** |
+| **OOS daily Sharpe** | +1.663 | **+2.409** | **+45%** |
+| **Combined monthly** | +2.701 | **+2.982** | **+10%** |
+| OOS PF | 1.78 | 2.41 | +35% |
+| OOS WR | 49.1% | 54.5% | +5.4pp |
+| **OOS MaxDD** | 22.61% | **18.80%** | **−17% (improved)** |
+| IS MaxDD | 68.55% | 85.91% | +25% (worse) |
+| OOS trades | 57 | 55 | −3% |
+| OOS total wpnl | +79.98 | +116.08 | +45% |
+
+### Concentration — CLEAN on all n=4 rules (first time)
+
+| Symbol | OOS wpnl | Share |
+|---|---|---|
+| SOLUSDT | +41.61 | 35.84% (max) |
+| XRPUSDT | +30.51 | 26.29% |
+| NEARUSDT | +28.70 | 24.72% |
+| DOGEUSDT | +15.26 | 13.15% |
+
+- Max per seed ≤ 50% (outer): **PASS**
+- Max per seed ≤ 40% (inner n=4): **PASS** (first time!)
+- No symbol dominant; all 4 profitable OOS
+
+### Pruning decisions (Category A driven, IS-only)
+
+Removed from V2_FEATURE_COLUMNS:
+
+| Removed | Reason |
+|---|---|
+| `parkinson_vol_50` | rho=1.000 with `range_realized_vol_50` — identical |
+| `garman_klass_vol_20` | rho=0.997 with `parkinson_vol_20` |
+| `rogers_satchell_vol_20` | rho=0.988 with `parkinson_vol_20` |
+| `close_pos_in_range_20` | rho=0.905 with `vwap_dev_20` |
+| `close_pos_in_range_50` | rho=0.927 with `vwap_dev_50` |
+| `atr_pct_rank_1000` | rho=0.905 with `atr_pct_rank_500` |
+
+### Why it worked
+
+LightGBM's `colsample_bytree` (Optuna-tuned, typically 0.6–0.8)
+randomly samples features per tree. With 4 near-identical OHLC vol
+estimators in the pool, trees often picked one of the clones instead
+of a different family. Pruning freed capacity for diverse feature
+coverage → more diverse ensemble → better OOS generalization.
+
+Pre-registered hypothesis confirmed exactly: IS regression (cost of
+reduced overfit) offset by larger OOS improvement.
+
+### 10-seed validation status: STRUCTURALLY VACUOUS
+
+Single-seed is the measurement. `LightGbmStrategy._train_for_month`
+ignores the outer `seed` parameter when `ensemble_seeds=[42,123,456,789,1001]`
+is fixed (the v1-style ensemble convention from iter-v2/035). All "outer
+seeds" produce bit-identical trades. Flagged for future infrastructure
+fix (see iter-v2/069 diary).
+
+## iter-v2/059-clean — previous baseline (superseded by iter-v2/069)
 
 ## Measurement Discipline
 
