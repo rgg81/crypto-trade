@@ -170,7 +170,6 @@ def _build_model(
         label_timeout_minutes=10080,
         fee_pct=0.1,
         features_dir="data/features_v2",
-        seed=seed,
         verbose=0,
         atr_tp_multiplier=2.9,
         atr_sl_multiplier=1.45,
