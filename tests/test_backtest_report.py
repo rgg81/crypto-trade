@@ -57,8 +57,23 @@ class TestSharpeStandardError:
 class TestComputeDeflatedSharpeRatio:
     def test_dsr_exceeds_zero_when_sharpe_above_emax(self):
         # Strong Sharpe, small N → should beat random
-        rets = [0.005, -0.003, 0.008, -0.002, 0.004, -0.003, 0.006, -0.001,
-                0.007, -0.004, 0.005, -0.002, 0.009, -0.003, 0.006]
+        rets = [
+            0.005,
+            -0.003,
+            0.008,
+            -0.002,
+            0.004,
+            -0.003,
+            0.006,
+            -0.001,
+            0.007,
+            -0.004,
+            0.005,
+            -0.002,
+            0.009,
+            -0.003,
+            0.006,
+        ]
         dsr = compute_deflated_sharpe_ratio(sharpe=3.0, n_trials=5, returns=rets)
         assert dsr > 0.0
 
@@ -70,10 +85,7 @@ class TestComputeDeflatedSharpeRatio:
 
     def test_zero_se_returns_zero(self):
         # Degenerate returns produce SE=0 → DSR=0
-        assert (
-            compute_deflated_sharpe_ratio(sharpe=2.0, n_trials=10, returns=[0.01] * 5)
-            == 0.0
-        )
+        assert compute_deflated_sharpe_ratio(sharpe=2.0, n_trials=10, returns=[0.01] * 5) == 0.0
 
     def test_matches_iter159_baseline_reference(self):
         # iter 159 analytical check: v0.152 OOS Sharpe 2.8286, N=21,

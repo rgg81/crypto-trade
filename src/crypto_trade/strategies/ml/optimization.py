@@ -248,8 +248,11 @@ def _objective(
         y_proba = model.predict_proba(feat_val)
 
         sharpe = compute_sharpe_with_threshold(
-            y_proba, long_pnls[val_idx], short_pnls[val_idx],
-            confidence_threshold, ternary=ternary,
+            y_proba,
+            long_pnls[val_idx],
+            short_pnls[val_idx],
+            confidence_threshold,
+            ternary=ternary,
         )
         sharpes.append(sharpe)
 
@@ -377,8 +380,7 @@ def optimize_and_train(
 
     if verbose > 0:
         print(
-            f"  Retrained on full data ({feat_full.shape[0]} samples, "
-            f"{len(all_columns)} features)"
+            f"  Retrained on full data ({feat_full.shape[0]} samples, {len(all_columns)} features)"
         )
 
     return model, all_columns, best_threshold

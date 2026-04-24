@@ -195,6 +195,26 @@ When an iteration adds new symbol(s) to the universe, the QE MUST validate stabi
    - Total OOS Sharpe >= baseline × 0.95 (allow 5% Sharpe sacrifice for diversification)
 5. Report the A/B comparison in the engineering report and diary
 
+### Seed Parity on Model Add/Replace — NON-NEGOTIABLE
+
+When an iteration ADDS a new model or REPLACES an existing one in the portfolio, the new model must be validated using the **same seed structure** as the models already in the portfolio. What "same" means depends on the architecture:
+
+**Ensemble architecture (current baseline)** — Models A, C, D each train with `ensemble_seeds=[42, 123, 456, 789, 1001]` (5 inner seeds per monthly training, averaged). A new model satisfies parity if it uses the **same inner ensemble seed list**. The outer `self.seed` parameter on `LightGbmStrategy` is unused in this configuration (`lgbm.py:424` falls through `ensemble_seeds or [self.seed]`), so outer-seed sweeps produce bit-identical runs and have no power to validate anything (learned in iter-166).
+
+**Single-seed architecture (legacy / per-candidate screens)** — if a runner uses `ensemble_seeds=None` or `ensemble_seeds=[single_value]`, the outer `seed=` parameter IS live. In that case, sweeping outer seeds {42, 123, 456, 789, 1001} with `yearly_pnl_check=True` is the correct stability test.
+
+Workflow for a new/replacement model in the ensemble architecture:
+1. Cheap Gate 1–2 checks (data quality, liquidity).
+2. Gate 3 stand-alone screen with the same `ensemble_seeds` as the portfolio's existing models; fail-fast on.
+3. If Gate 3 passes, merge on those numbers — no outer-seed sweep is needed because the ensemble is itself the variance-reduction mechanism.
+
+Workflow for a single-seed candidate or architectural deviation:
+1. Same Gates 1–3 at the first seed.
+2. Four additional runs at the remaining outer seeds. Fail-fast each.
+3. Merge only if ≥ 4 of 5 seeds show OOS Sharpe > 0 AND mean OOS Sharpe > 0.
+
+This rule prevents "coasted" merges where a new model joins an over-validated portfolio on under-validated evidence **and** also prevents the dual pitfall of running redundant sweeps against dead-code RNG sources.
+
 ## Feature Normalization Awareness
 
 When using a pooled model across multiple symbols with different price scales, the QR and QE must ensure features are **scale-invariant**:
@@ -214,7 +234,33 @@ When proposing new features, the QR should prefer normalized/ratio-based feature
 - **Hard ceiling**: Never exceed 200 features without explicit justification
 - **Samples-per-feature ratio**: Must stay above 50. With 4,400 samples and 50 features = ratio 88 (healthy). With 198 features = ratio 22 (dangerous)
 - **Every added feature must displace a worse one.** Net feature count should decrease or stay flat, never balloon
-- **Symbol-scoped discovery**: Always use `symbols=trading_symbols` in `_discover_feature_columns()`. Global intersection across ~800 symbols is wrong — it drops features that ALL trading symbols have
+
+## Feature Reproducibility — NON-NEGOTIABLE
+
+Every iteration runner MUST pass an explicit `feature_columns` list to
+`LightGbmStrategy`. Auto-discovery from Parquet schemas is **disabled at the code
+level** — `LightGbmStrategy` raises `ValueError` if `feature_columns` is empty or
+`None`. This rule is non-negotiable because auto-discovery caused a silent
+divergence between the live engine and the backtest in April 2026 (iter-162's
+entropy/CUSUM features were silently picked up, producing different trades from
+the baseline).
+
+Rules:
+- **Runner declares the list**: every `run_iteration_NNN.py` / baseline runner
+  must specify `feature_columns=[...]` (or import one of the canonical lists,
+  e.g. `BASELINE_FEATURE_COLUMNS` from `src/crypto_trade/live/models.py`).
+- **Parquet is the source of data, not the source of truth for columns**: new
+  features can exist in the parquet without being used by an iteration. The
+  iteration explicitly selects its inputs.
+- **Canonical lists live in code, not in the parquet**: when a feature set is
+  meant to be reused across iterations or environments, define it as a constant
+  (like `BASELINE_FEATURE_COLUMNS`) and reference it.
+- **When adding new features**: add them to the parquet via the feature pipeline,
+  but do NOT use them in any iteration until the runner explicitly adds them to
+  `feature_columns`. This keeps existing iterations reproducible even as the
+  parquet schema evolves.
+- **QE must verify in every iteration**: the engineering report states which
+  `feature_columns` constant or literal list was passed, and confirms its length.
 
 ### Anti-patterns (learned the hard way)
 - Iter 083: Added 85 features (113→198) without pruning — wrong direction
@@ -334,25 +380,208 @@ On 8h candles, a lookback of 100 candles = 33 days. Fractionally differentiated 
 
 Read `BASELINE.md` on main before evaluating. An iteration merges ONLY if:
 
-1. **Primary**: OOS Sharpe > current baseline OOS Sharpe
-2. **Hard constraints** (all must pass):
+1. **Minimum quality bars** (both must pass, absolute — not relative to baseline):
+   - **OOS Sharpe > 1.0**
+   - **IS Sharpe > 1.0**
+   These floors exist because a Sharpe below 1.0 in either half is too
+   weak to deploy confidently, regardless of how it compares to the
+   previous baseline. A candidate that "beats baseline" by pushing
+   baseline OOS from +0.95 to +0.98 is NOT a merge — both halves must
+   clear 1.0 first.
+2. **Primary**: OOS Sharpe > current baseline OOS Sharpe
+3. **Hard constraints** (all must pass):
    - Max drawdown (OOS) ≤ baseline OOS max drawdown × 1.2
-   - Minimum 50 OOS trades
+   - **Trade-rate floor**: OOS ≥ 10 trades/month (→ ≥ 130 total over
+     the ~13-month OOS window) AND IS ≥ 10 trades/month
+     (→ ≥ 400 total over the ~39-month IS window). Sharpe computed on
+     too few trades is dominated by individual outcomes and cannot be
+     trusted. Filters that raise Sharpe by starving the strategy (R3
+     OOD, high-confidence thresholds, vol kill-switches) must clear
+     this floor.
+   - **Relative trade-count floor**: OOS trade count must not drop more
+     than ~40% vs. the baseline being compared against. (If the filter
+     is more aggressive than that, re-calibrate on IS, do not push
+     further.)
+   - Minimum 50 OOS trades (legacy floor; subsumed by the rate floor
+     above for the current portfolio but kept for per-symbol screens).
    - Profit factor > 1.0 (OOS)
    - No single symbol > 30% of total OOS PnL
    - IS/OOS Sharpe ratio > 0.5 (researcher overfitting gate)
 
-If primary metric improves but a constraint fails → NO-MERGE. Document trade-off in diary.
+If the minimum quality bars fail → NO-MERGE, full stop. If primary or
+hard constraints fail but the 1.0 floors hold → NO-MERGE with trade-off
+documented in the diary.
 
 **Diversification exception**: If an iteration adds new symbol(s) and:
-- OOS Sharpe is within 5% of baseline (i.e., >= baseline × 0.95)
+- BOTH Sharpe floors (IS > 1.0, OOS > 1.0) still hold
+- OOS Sharpe is within 5% of baseline (>= baseline × 0.95)
 - OOS MaxDD improves by > 10%
 - The 30% concentration constraint improves (moves closer to passing)
 - All other hard constraints pass
 
 Then the QR MAY recommend MERGE with justification, even if OOS Sharpe does not strictly
 improve. Diversification has long-term value that single-period Sharpe does not capture.
-This exception requires explicit justification in the diary.
+The IS/OOS Sharpe > 1.0 floors are NEVER waived by this exception. Justification must be
+explicit in the diary.
+
+## Risk Mitigation Design — MANDATORY for every MERGE candidate
+
+### Why this is its own phase
+
+The walk-forward backtest measures expected performance under the training
+distribution. It does NOT test the model's behaviour when the distribution
+shifts — black swans, post-crisis regimes, liquidity crunches, exchange
+failures, exogenous macro shocks. These events are by definition not in the
+training data (or they are extreme outliers), and the model does not know to
+be cautious. Left unchecked, it can generate cascades of losses as it
+confidently signals trades the market punishes.
+
+Iter 172's DOT analysis is the canonical motivating case. DOT in Dec 2022
+took 6 consecutive LONG stop-losses on a persistent downtrend (entries at
+5.538 → 5.293 → 5.061 → 4.705 → 4.602 → 4.486) for −26% before the model's
+7th attempt finally hit a TP. A simple "3 consecutive SLs → pause N candles"
+rule would have prevented trades 4, 5, 6, cutting the loss by more than half.
+LTC in the same month, with the same regime, took only 3 trades because its
+Optuna-tuned threshold was naturally more conservative — LTC "got lucky"
+with a built-in defensive reflex. DOT had no equivalent protection.
+
+**Before any iteration can merge, the QR must run the Risk Mitigation
+Analysis below and propose (or verify existing) protective mechanisms.**
+
+### Required Risk Mitigation Analyses
+
+Each analysis uses IS data only and produces numerical evidence. At minimum
+THREE of the following five categories must be completed in the research
+brief for a merge-candidate iteration:
+
+#### R1. Consecutive-loss cool-down calibration
+
+Walk through IS trades.csv for each model. For every trade, compute the
+number of consecutive SLs immediately preceding it (reset on TP or timeout).
+Bucket trades by preceding-SL-streak length (0, 1, 2, 3, 4+). Report:
+
+- Count of trades per bucket
+- WR in each bucket
+- Mean PnL in each bucket
+
+**If WR drops monotonically with streak length (common)**, a cool-down rule
+is justified. Pick the streak threshold K where bucket K's WR falls below
+break-even. Propose: `after K consecutive SLs, pause trading on this symbol
+for N candles`. Calibrate N by measuring how long adverse periods typically
+last (e.g., 75th percentile of SL-streak duration in candles).
+
+#### R2. Drawdown-triggered position scaling
+
+Compute rolling 30-day / 60-day drawdown from running peak weighted-PnL.
+Correlate drawdown depth with the next 10-trade WR. If trades taken during
+deep drawdowns have lower WR, propose a position-size reduction: when
+rolling drawdown exceeds X%, scale new trades by factor F < 1 until the
+drawdown recovers.
+
+Calibrate X and F from the IS evidence, not intuition. A candidate
+framework: `weight_factor *= max(0.33, 1 - drawdown_pct / 60%)`.
+
+#### R3. Out-of-distribution feature detection
+
+Compute the IS distribution of each top-20 feature (or all 193 for pooled
+models). For each live-candle's feature vector, compute a Mahalanobis-like
+z-score against the trailing 24-month IS distribution. If any feature's
+z-score is > 3 (or the aggregate OOD score exceeds a threshold), the
+candidate is out-of-distribution — skip the trade.
+
+This is the cleanest "black swan" detector: the model hasn't seen these
+feature values before, so we don't trust its predictions. IS calibration:
+count how often this trigger would fire per month historically, ensure
+false-positive rate is < 10% of trades.
+
+#### R4. Realized-volatility regime kill-switch
+
+Compute per-symbol realized volatility (log-returns std over rolling 14-day
+window) on IS data. Define a "vol regime" as extreme when the symbol's
+realized vol exceeds the 95th percentile of its training-window distribution.
+Measure: in historical extreme-vol months, what was the model's WR vs. the
+non-extreme baseline?
+
+**Important nuance** (learned iter 172): DOT's Dec 2022 catastrophe was in a
+LOW-vol regime (BTC 30d vol 28%, vs. 65% in Sep 2022 when DOT was profitable).
+A naive "high vol = pause" rule is wrong. If low-vol regimes after crashes
+are the danger, flip the rule or use a drawdown-augmented indicator instead.
+
+#### R5. Cross-model portfolio risk balance
+
+For portfolios with 2+ models, examine the running per-symbol PnL share.
+If any one symbol's weighted PnL contribution exceeds X% of the portfolio
+total across a trailing window, propose portfolio-level rebalancing
+(reduce weight on the concentrated symbol, increase on others). This is
+the "never let one model dominate" constraint turned into a runtime
+mitigation, not just an ex-post merge check.
+
+### Implementation Hint — BacktestConfig risk controls
+
+The backtest engine should accept (not yet implemented; iter-NNN task):
+
+```python
+BacktestConfig(
+    ...
+    risk_consecutive_sl_limit: int | None = None,  # R1
+    risk_consecutive_sl_cooldown_candles: int = 0,
+    risk_drawdown_scale_enabled: bool = False,     # R2
+    risk_drawdown_scale_floor: float = 0.33,
+    risk_ood_zscore_threshold: float | None = None,  # R3
+    risk_vol_regime_threshold_pctile: float | None = None,  # R4
+    risk_concentration_soft_cap: float | None = None,  # R5
+)
+```
+
+Default all None / False so existing baselines are unchanged until a merge
+explicitly introduces a risk control.
+
+### Evidence Requirements
+
+As with the rest of the QR Research Checklist, each R-category claimed as
+completed must include:
+
+- A numerical table from IS data (bucketed WR, correlation coefficient,
+  z-score distribution, etc.)
+- The proposed threshold, calibrated on IS evidence
+- A backtest-like simulation of what the mitigation would have done on IS
+  trades: "Applying R1 with K=3, N=18 candles to iter-172 DOT trades reduces
+  2022 cumulative PnL from −19.1% to −4.7%"
+
+A merge iteration that adds a risk control without this evidence is not
+permitted. A merge iteration that skips risk mitigation entirely is only
+allowed on grounds of "no new mechanism needed — existing controls already
+address the identified risks", which itself must be justified against at
+least R1 and R2 evidence.
+
+### Worked example: DOT Dec 2022 (R1)
+
+From iter-168 partial trades.csv, DOT Dec 2022 SL streak:
+
+| Trade # | Date       | Result            | SL streak entering |
+|---------|------------|-------------------|--------------------|
+| 1 | 2022-12-05 | SL (−4.31) | 0 |
+| 2 | 2022-12-08 | SL (−4.11) | 1 |
+| 3 | 2022-12-13 | SL (−3.81) | 2 |
+| 4 | 2022-12-17 | SL (−5.36) | 3  ← would trigger |
+| 5 | 2022-12-20 | SL (−4.67) | 4  (still in cool-down) |
+| 6 | 2022-12-23 | SL (−4.39) | 5  (still) |
+| 7 | 2022-12-29 | TP (+7.54) | 6  (cool-down expires, trade allowed) |
+
+Applying R1 with K=3, N=18 candles (6 days at 8h): trades 4, 5, 6 are
+filtered out (they opened within 6, 9, 12 days of the triggering SL
+respectively, all < 18). Trade 7 opens 12 days after the triggering SL —
+**exceeds** the 18-candle cool-down? 12 days × 3 candles/day = 36 candles.
+Wait — 18 candles = 6 days. Trade 7 opens 16 days after the K-triggering
+event (Dec 13 → Dec 29). 16 days = 48 candles, well past the cool-down.
+So trade 7 is allowed.
+
+Effect: Dec 2022 goes from 7 trades (−19.11%) to 4 trades (−12.23 + 7.54 =
+−4.69%). Year-1 sum: +10.99 + 1.63 − 4.69 = +7.93% (from −6.49% baseline,
+a +14.4 pp swing). **DOT passes year-1 with R1 active.**
+
+This is exactly the kind of quantitatively-calibrated mitigation the QR
+is now required to propose for every merge-candidate iteration.
 
 ## Overfitting Quantification (AFML Ch. 11-12)
 
@@ -464,6 +693,31 @@ We spent 40 iterations making tiny improvements to a barely-profitable model. Th
 After 3+ consecutive NO-MERGE iterations (or after an EARLY STOP), the QR MUST execute the research checklist below before writing the Phase 5 brief. The brief MUST contain a "Research Analysis" section documenting findings from the required categories.
 
 **Minimum completion**: 2 categories after a MERGE, 4+ categories after 3+ NO-MERGE or EARLY STOP.
+
+### Research with Evidence — NON-NEGOTIABLE
+
+Writing "B. Symbol Universe — AAVE is DeFi, different sector, pass Gate 3 at 3.5/1.75" is **not research**. It is a one-line hypothesis that was never tested. A Phase 5 brief that lists research checklist items without showing the numbers behind them IS a violation of the QR methodology.
+
+Every research checklist category the QR claims to have completed MUST include in the research brief (or linked analysis file) at least one of:
+
+- A table of numerical results computed from IS data (feature importances, correlations, per-regime metrics, WR distributions, etc.)
+- A chart or printout (copy-pasted into the brief as text — remember `reports/` and `analysis/` are gitignored, so charts must be summarised in text)
+- A comparison: "ran X on IS data, observed Y, therefore Z"
+
+A Phase 5 brief without evidence of this sort is a rubber-stamp brief. The QE should REFUSE to run Phase 6 on such a brief and return it to the QR for actual analysis.
+
+### When a Candidate Symbol Fails Gate 3
+
+A single-seed Gate 3 fail is a **signal to investigate the candidate further** — not a rejection. Before moving to the next symbol, the QR MUST:
+
+1. **A3 / A4 — Feature importance on the candidate's IS data**: train a reference model on the candidate alone (using same 193 features), extract MDI, identify which features are top-20 for this candidate vs. the baseline's successful models (LTC, LINK). Are there differences? Propose pruning or replacement.
+2. **C — Labeling analysis for the candidate**: compute the candidate's IS label distribution under the baseline labeling rules (ATR 3.5/1.75). Is the class balance reasonable? Do labels flip at a reasonable rate? Is the implied WR floor achievable given the candidate's realized NATR?
+3. **E — Trade pattern in the failing period**: for candidates that failed year-1, look at what specific events in 2022 caused the losses. Was it one bad month (e.g., LUNA collapse week) dominating? If so, is there a regime-detection feature that would have filtered those trades?
+4. **D — Lookback sensitivity**: is 24-month training too short or too long for this candidate? Try candidate-specific lookback windows.
+
+Only after at least two of these have been run and documented with numerical evidence does the candidate get a definitive "rejected" tag. Until then, it is on "investigation pending".
+
+This rule exists because treating fail-fast as a rejection criterion for the **candidate** (rather than for the **config**) conflates two different things. A candidate may have signal that the default config cannot extract; the research checklist is how we find out.
 
 ### Research Checklist
 
@@ -798,6 +1052,7 @@ After the backtest completes, the QE MUST verify trade execution by:
 2. **Checking exit reasons are consistent**: SL trades should have PnL ≈ -sl_pct, TP trades ≈ +tp_pct
 3. **Documenting any anomalies** in the engineering report
 4. **Label leakage audit (MANDATORY every iteration)**: Verify that `TimeSeriesSplit` gap is correctly computed: `gap = (timeout_candles + 1) * n_symbols`. Check that no training label's forward scan extends into the validation period. Check that walk-forward training windows don't include future klines. This must be verified even when CV code hasn't changed — parameter changes (timeout, interval, symbols) affect the required gap.
+5. **Feature reproducibility check (MANDATORY every iteration)**: The engineering report must state the exact `feature_columns` source used (constant name + count, e.g. "BASELINE_FEATURE_COLUMNS, 193 features"). If the iteration defines its own list, the report must paste the list or its hash. Auto-discovery is disabled in code — the runner must pass `feature_columns=[...]` explicitly or the backtest will not start.
 
 ## Code Quality (QE)
 

@@ -77,28 +77,30 @@ def _discover_feature_columns(
 
 def _epoch_ms_to_month(open_time: int) -> str:
     """Convert epoch milliseconds to 'YYYY-MM' string."""
-    return datetime.datetime.fromtimestamp(
-        open_time / 1000, tz=datetime.UTC
-    ).strftime("%Y-%m")
+    return datetime.datetime.fromtimestamp(open_time / 1000, tz=datetime.UTC).strftime("%Y-%m")
 
 
 def _ms_to_date(ms: int) -> str:
     """Convert epoch milliseconds to 'YYYY-MM-DD' string."""
-    return datetime.datetime.fromtimestamp(
-        ms / 1000, tz=datetime.UTC
-    ).strftime("%Y-%m-%d")
+    return datetime.datetime.fromtimestamp(ms / 1000, tz=datetime.UTC).strftime("%Y-%m-%d")
 
 
 def _ms_to_datetime(ms: int) -> str:
     """Convert epoch milliseconds to 'YYYY-MM-DD HH:MM' string."""
-    return datetime.datetime.fromtimestamp(
-        ms / 1000, tz=datetime.UTC
-    ).strftime("%Y-%m-%d %H:%M")
+    return datetime.datetime.fromtimestamp(ms / 1000, tz=datetime.UTC).strftime("%Y-%m-%d %H:%M")
 
 
 _INTERVAL_MINUTES = {
-    "1m": 1, "3m": 3, "5m": 5, "15m": 15, "30m": 30,
-    "1h": 60, "4h": 240, "8h": 480, "12h": 720, "1d": 1440,
+    "1m": 1,
+    "3m": 3,
+    "5m": 5,
+    "15m": 15,
+    "30m": 30,
+    "1h": 60,
+    "4h": 240,
+    "8h": 480,
+    "12h": 720,
+    "1d": 1440,
 }
 
 
@@ -120,7 +122,6 @@ class LightGbmStrategy:
         label_timeout_minutes: int = 4320,
         fee_pct: float = 0.1,
         features_dir: str = "data/features",
-        seed: int = 42,
         verbose: int = 0,
         atr_tp_multiplier: float | None = None,
         atr_sl_multiplier: float | None = None,
@@ -133,7 +134,22 @@ class LightGbmStrategy:
         time_decay_half_life: float | None = None,
         use_atr_labeling: bool = False,
         min_natr_threshold: float | None = None,
+        ood_enabled: bool = False,
+        ood_features: list[str] | None = None,
+        ood_cutoff_pct: float = 0.70,
     ) -> None:
+        if not feature_columns:
+            raise ValueError(
+                "feature_columns must be explicitly specified — auto-discovery "
+                "is disabled to guarantee reproducibility across parquet "
+                "schema changes. Pass an explicit list of column names."
+            )
+        if not ensemble_seeds:
+            raise ValueError(
+                "ensemble_seeds must be a non-empty list of integers. Pass the "
+                "production list (e.g. [42, 123, 456, 789, 1001]) to ensemble "
+                "across seeds, or [42] for a single-seed run."
+            )
         self.training_months = training_months
         self.n_trials = n_trials
         self.cv_splits = cv_splits
@@ -142,7 +158,6 @@ class LightGbmStrategy:
         self.label_timeout_minutes = label_timeout_minutes
         self.fee_pct = fee_pct
         self.features_dir = features_dir
-        self.seed = seed
         self.verbose = verbose
         self.atr_tp_multiplier = atr_tp_multiplier
         self.atr_sl_multiplier = atr_sl_multiplier
@@ -155,6 +170,18 @@ class LightGbmStrategy:
         self.time_decay_half_life = time_decay_half_life
         self.use_atr_labeling = use_atr_labeling
         self.min_natr_threshold = min_natr_threshold
+        self.ood_enabled = ood_enabled
+        self.ood_features = list(ood_features) if ood_features else None
+        self.ood_cutoff_pct = ood_cutoff_pct
+        if self.ood_enabled and not self.ood_features:
+            raise ValueError(
+                "ood_features must be specified when ood_enabled=True"
+            )
+        self._ood_mean: np.ndarray | None = None
+        self._ood_inv_cov: np.ndarray | None = None
+        self._ood_cutoff: float | None = None
+        self._ood_feature_cols: list[str] = []
+        self._month_ood_features: dict[tuple[str, int], np.ndarray] = {}
 
         # Set during compute_features
         self._master: pd.DataFrame | None = None
@@ -186,22 +213,11 @@ class LightGbmStrategy:
         # Detect interval
         self._interval = self._detect_interval(master)
 
-        # Discover feature columns (symbol-scoped to trading universe)
-        if self.feature_columns:
-            self._all_feature_cols = list(self.feature_columns)
-        else:
-            trading_symbols = list(master["symbol"].unique())
-            try:
-                self._all_feature_cols = _discover_feature_columns(
-                    self.features_dir, self._interval, symbols=trading_symbols
-                )
-            except FileNotFoundError:
-                self._all_feature_cols = []
+        # feature_columns is required (validated in __init__) — no auto-discovery
+        self._all_feature_cols = list(self.feature_columns)
 
         # Generate monthly splits
-        self._splits = generate_monthly_splits(
-            self._open_time_arr, self.training_months
-        )
+        self._splits = generate_monthly_splits(self._open_time_arr, self.training_months)
         self._split_map = {s.test_month: s for s in self._splits}
 
         if self.verbose > 0:
@@ -270,18 +286,12 @@ class LightGbmStrategy:
         split = self._split_map.get(month_str)
         if split is None:
             if self.verbose > 0:
-                print(
-                    f"[lgbm] No split for {month_str} "
-                    "(insufficient training data)"
-                )
+                print(f"[lgbm] No split for {month_str} (insufficient training data)")
             return
 
         if not self._all_feature_cols:
             if self.verbose > 0:
-                print(
-                    f"[lgbm] No feature columns available, "
-                    f"skipping {month_str}"
-                )
+                print(f"[lgbm] No feature columns available, skipping {month_str}")
             return
 
         if self.verbose > 0:
@@ -298,23 +308,16 @@ class LightGbmStrategy:
         )[0]
         if len(train_indices) < 10:
             if self.verbose > 0:
-                print(
-                    f"  Skipping {month_str}: only "
-                    f"{len(train_indices)} train samples"
-                )
+                print(f"  Skipping {month_str}: only {len(train_indices)} train samples")
             return
 
         if self.verbose > 0:
             from collections import Counter
 
             n_unique_syms = len(set(self._sym_arr[train_indices]))
-            print(
-                f"  {len(train_indices)} training samples "
-                f"from {n_unique_syms} symbols"
-            )
+            print(f"  {len(train_indices)} training samples from {n_unique_syms} symbols")
             sample_months = Counter(
-                _epoch_ms_to_month(int(t))
-                for t in self._open_time_arr[train_indices]
+                _epoch_ms_to_month(int(t)) for t in self._open_time_arr[train_indices]
             )
             dist_parts = [f"{m}: {c}" for m, c in sorted(sample_months.items())]
             print(f"  Samples per month: {', '.join(dist_parts)}")
@@ -393,27 +396,19 @@ class LightGbmStrategy:
 
         # (c) Load training features
         train_lookups = [
-            (str(self._sym_arr[i]), int(self._open_time_arr[i]))
-            for i in train_indices
+            (str(self._sym_arr[i]), int(self._open_time_arr[i])) for i in train_indices
         ]
-        train_feat_df = lookup_features(
-            train_lookups, self.features_dir, self._interval
-        )
+        train_feat_df = lookup_features(train_lookups, self.features_dir, self._interval)
         if train_feat_df.empty:
             if self.verbose > 0:
-                print(
-                    f"  Skipping {month_str}: no features found for training"
-                )
+                print(f"  Skipping {month_str}: no features found for training")
             return
 
         # Align features with labels, weights, and returns
-        feat_keys = set(
-            zip(train_feat_df["symbol"], train_feat_df["open_time"])
-        )
+        feat_keys = set(zip(train_feat_df["symbol"], train_feat_df["open_time"]))
         keep_mask = np.array(
             [
-                (str(self._sym_arr[i]), int(self._open_time_arr[i]))
-                in feat_keys
+                (str(self._sym_arr[i]), int(self._open_time_arr[i])) in feat_keys
                 for i in train_indices
             ]
         )
@@ -423,9 +418,7 @@ class LightGbmStrategy:
         short_pnls = short_pnls[keep_mask]
         train_open_times = self._open_time_arr[train_indices][keep_mask]
 
-        available_feat_cols = [
-            c for c in self._all_feature_cols if c in train_feat_df.columns
-        ]
+        available_feat_cols = [c for c in self._all_feature_cols if c in train_feat_df.columns]
         feat_train = train_feat_df[available_feat_cols].values
 
         if self.verbose > 0:
@@ -447,7 +440,7 @@ class LightGbmStrategy:
         if self.verbose > 0:
             print(f"  CV gap: {cv_gap} rows")
 
-        seeds = self.ensemble_seeds or [self.seed]
+        seeds = self.ensemble_seeds
         self._models = []
         self._confidence_thresholds = []
 
@@ -496,6 +489,72 @@ class LightGbmStrategy:
             columns=selected_cols,
         )
 
+        # (e2) R3 OOD detector — training-window Mahalanobis stats
+        self._ood_mean = None
+        self._ood_inv_cov = None
+        self._ood_cutoff = None
+        self._month_ood_features = {}
+        if self.ood_enabled and self.ood_features:
+            ood_cols_in_train = [
+                c for c in self.ood_features if c in train_feat_df.columns
+            ]
+            if len(ood_cols_in_train) < len(self.ood_features):
+                missing = set(self.ood_features) - set(ood_cols_in_train)
+                if self.verbose > 0:
+                    print(f"  OOD: missing features {missing} — disabling for this month")
+            elif len(train_feat_df) < 100:
+                if self.verbose > 0:
+                    print("  OOD: insufficient training samples — disabling for this month")
+            else:
+                self._ood_feature_cols = ood_cols_in_train
+                train_ood_raw = train_feat_df[ood_cols_in_train].to_numpy(
+                    dtype=np.float64
+                )
+                # Drop rows with NaN/inf before computing mean/cov
+                finite_mask = np.isfinite(train_ood_raw).all(axis=1)
+                train_ood = train_ood_raw[finite_mask]
+                if len(train_ood) < 100:
+                    if self.verbose > 0:
+                        print(
+                            "  OOD: insufficient finite training rows "
+                            f"({len(train_ood)}) — disabling for this month"
+                        )
+                else:
+                    self._ood_mean = train_ood.mean(axis=0)
+                    cov = np.cov(train_ood.T)
+                    # Ridge regularization — stabilizes pinv when features
+                    # are near-collinear (returns at lag 1/2/5/10 are correlated).
+                    reg = 1e-6 * np.trace(cov) / cov.shape[0] * np.eye(cov.shape[0])
+                    try:
+                        self._ood_inv_cov = np.linalg.pinv(cov + reg)
+                        centered = train_ood - self._ood_mean
+                        distances = np.einsum(
+                            "ij,jk,ik->i", centered, self._ood_inv_cov, centered
+                        )
+                        self._ood_cutoff = float(
+                            np.quantile(distances, self.ood_cutoff_pct)
+                        )
+                        if self.verbose > 0:
+                            print(
+                                f"  OOD: {len(ood_cols_in_train)} features, "
+                                f"cutoff (q={self.ood_cutoff_pct}) = "
+                                f"{self._ood_cutoff:.2f}"
+                            )
+                        self._month_ood_features = load_features_range(
+                            symbols,
+                            self.features_dir,
+                            self._interval,
+                            split.test_start_ms,
+                            split.test_end_ms,
+                            columns=ood_cols_in_train,
+                        )
+                    except np.linalg.LinAlgError:
+                        self._ood_mean = None
+                        self._ood_inv_cov = None
+                        self._ood_cutoff = None
+                        if self.verbose > 0:
+                            print("  OOD: cov inversion failed — disabled for this month")
+
         # (f) Load NATR for dynamic barriers (if ATR mode enabled)
         self._month_natr = {}
         if self.atr_tp_multiplier is not None:
@@ -540,9 +599,7 @@ class LightGbmStrategy:
             return NO_SIGNAL
 
         # Predict with all ensemble models and average probabilities
-        feat_df = pd.DataFrame(
-            feat_row.reshape(1, -1), columns=self._selected_cols
-        )
+        feat_df = pd.DataFrame(feat_row.reshape(1, -1), columns=self._selected_cols)
         all_proba = [m.predict_proba(feat_df)[0] for m in self._models]
         proba = np.mean(all_proba, axis=0)
 
@@ -566,6 +623,26 @@ class LightGbmStrategy:
                     f"{self._confidence_threshold:.2f})"
                 )
             return NO_SIGNAL
+
+        # R3 OOD detector: skip candles where features are too far from training
+        if (
+            self.ood_enabled
+            and self._ood_mean is not None
+            and self._ood_inv_cov is not None
+            and self._ood_cutoff is not None
+        ):
+            ood_row = self._month_ood_features.get(key)
+            if ood_row is not None and np.isfinite(ood_row).all():
+                diff = ood_row.astype(np.float64) - self._ood_mean
+                dist = float(diff @ self._ood_inv_cov @ diff)
+                if dist > self._ood_cutoff:
+                    if self.verbose > 0:
+                        ts_str = _ms_to_datetime(open_time)
+                        self._last_predict_log = (
+                            f"[predict] {ts_str} {symbol} → SKIP "
+                            f"(OOD dist={dist:.2f} > {self._ood_cutoff:.2f})"
+                        )
+                    return NO_SIGNAL
 
         # Regime filter: skip low-volatility candles
         if self.min_natr_threshold is not None:
@@ -607,8 +684,7 @@ class LightGbmStrategy:
             if tp_pct is not None:
                 atr_str = f" TP={tp_pct:.1f}%/SL={sl_pct:.1f}%"
             self._last_predict_log = (
-                f"[predict] {ts_str} {symbol} → {dir_label} "
-                f"(proba={confidence:.2f}{atr_str})"
+                f"[predict] {ts_str} {symbol} → {dir_label} (proba={confidence:.2f}{atr_str})"
             )
 
         return Signal(direction=direction, weight=100, tp_pct=tp_pct, sl_pct=sl_pct)

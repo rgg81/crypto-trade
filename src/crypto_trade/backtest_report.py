@@ -118,10 +118,9 @@ def expected_max_sharpe(n_trials: int) -> float:
     if n_trials <= 1:
         return 0.0
     ln_n = math.log(n_trials)
-    return (
-        math.sqrt(2 * ln_n) * (1 - _EULER_MASCHERONI / (2 * ln_n))
-        + _EULER_MASCHERONI / math.sqrt(2 * ln_n)
-    )
+    return math.sqrt(2 * ln_n) * (
+        1 - _EULER_MASCHERONI / (2 * ln_n)
+    ) + _EULER_MASCHERONI / math.sqrt(2 * ln_n)
 
 
 def sharpe_standard_error(sharpe: float, returns: list[float]) -> float:
@@ -145,9 +144,9 @@ def sharpe_standard_error(sharpe: float, returns: list[float]) -> float:
         return 0.0
     std = math.sqrt(var)
     z = [(r - mean) / std for r in returns]
-    skew = sum(v ** 3 for v in z) / t
-    kurt = sum(v ** 4 for v in z) / t  # raw (non-excess) kurtosis
-    se_sq = (1 - skew * sharpe + (kurt - 1) / 4 * sharpe ** 2) / (t - 1)
+    skew = sum(v**3 for v in z) / t
+    kurt = sum(v**4 for v in z) / t  # raw (non-excess) kurtosis
+    se_sq = (1 - skew * sharpe + (kurt - 1) / 4 * sharpe**2) / (t - 1)
     if se_sq <= 0:
         return 0.0
     return math.sqrt(se_sq)

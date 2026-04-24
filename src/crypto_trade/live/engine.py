@@ -88,13 +88,17 @@ class ModelRunner:
             label_timeout_minutes=live_config.timeout_minutes,
             fee_pct=live_config.fee_pct,
             features_dir=str(live_config.features_dir),
-            seed=42,
             verbose=1,
             atr_tp_multiplier=model_config.atr_tp_multiplier,
             atr_sl_multiplier=model_config.atr_sl_multiplier,
             use_atr_labeling=model_config.use_atr_labeling,
             ensemble_seeds=list(live_config.ensemble_seeds),
             feature_columns=list(BASELINE_FEATURE_COLUMNS),
+            ood_enabled=model_config.ood_enabled,
+            ood_features=(
+                list(model_config.ood_features) if model_config.ood_enabled else None
+            ),
+            ood_cutoff_pct=model_config.ood_cutoff_pct,
         )
         self._master: pd.DataFrame | None = None
 
@@ -171,12 +175,31 @@ class LiveEngine:
         # symbol -> {YYYY-MM-DD -> sum of net_pnl_pct that closed on that day}
         self._vt_daily_pnl: dict[str, dict[str, float]] = {}
 
+        # Iter 173: R1 consecutive-SL cool-down state (per-symbol).
+        # symbol -> current consecutive SL count (reset on non-SL close or when
+        # the streak hits K, at which point risk_cooldown_until[symbol] is armed).
+        self._sl_streak: dict[str, int] = {}
+        # symbol -> earliest open_time at which a new trade may open again.
+        self._risk_cooldown_until: dict[str, int] = {}
+
+        # Iter 176: R2 drawdown-triggered position scaling state (per-model).
+        # model_name -> cumulative sum of weighted_pnl over that model's closes.
+        self._cum_weighted_pnl: dict[str, float] = {mc.name: 0.0 for mc in config.models}
+        # model_name -> running peak of cum_weighted_pnl.
+        self._peak_weighted_pnl: dict[str, float] = {mc.name: 0.0 for mc in config.models}
+
+        # Map symbol → model_name for R2 updates on trade close.
+        self._symbol_to_model: dict[str, str] = {
+            s: mc.name for mc in config.models for s in mc.symbols
+        }
+
     def run(self) -> None:
         """Main entry point — runs until SIGINT/SIGTERM."""
         self._setup_signal_handlers()
         self._print_banner()
         self._reconcile()
         self._rebuild_vt_history()
+        self._rebuild_risk_state()
         self._initial_setup()
         self._catch_up()
 
@@ -194,7 +217,7 @@ class LiveEngine:
 
     def _print_banner(self) -> None:
         mode = "DRY-RUN" if self.config.dry_run else "LIVE"
-        print(f"[live] Starting baseline v152 [{mode}]")
+        print(f"[live] Starting baseline v186 [{mode}]")
         for mc in self.config.models:
             print(
                 f"  Model {mc.name}: {', '.join(mc.symbols)} "
@@ -246,6 +269,75 @@ class LiveEngine:
                 f"{len(self._vt_daily_pnl)} symbols"
             )
 
+    def _rebuild_risk_state(self) -> None:
+        """Rebuild R1/R2 state from closed trades in DB.
+
+        R1: per-symbol consecutive-SL streak + armed cooldown.
+        R2: per-model cumulative weighted PnL + running peak.
+
+        Replays closed trades in chronological order exactly like the backtest.
+        """
+        self._sl_streak = {}
+        self._risk_cooldown_until = {}
+        self._cum_weighted_pnl = {mc.name: 0.0 for mc in self.config.models}
+        self._peak_weighted_pnl = {mc.name: 0.0 for mc in self.config.models}
+
+        # Look up R1 config per symbol (None ⇒ R1 disabled for that symbol).
+        r1_config: dict[str, tuple[int, int]] = {}
+        r2_models: set[str] = set()
+        for mc in self.config.models:
+            if mc.risk_consecutive_sl_limit is not None:
+                for sym in mc.symbols:
+                    r1_config[sym] = (
+                        mc.risk_consecutive_sl_limit,
+                        mc.risk_consecutive_sl_cooldown_candles,
+                    )
+            if mc.risk_drawdown_scale_enabled:
+                r2_models.add(mc.name)
+
+        closed = [
+            t for t in self._state.get_all_trades()
+            if t.status == "closed" and t.exit_time is not None and t.exit_reason is not None
+        ]
+        closed.sort(key=lambda t: t.exit_time or 0)
+
+        n_r1_updates = 0
+        for trade in closed:
+            sym = trade.symbol
+            model_name = trade.model_name
+            result = to_trade_result(trade, self.config.fee_pct)
+            if result is None:
+                continue
+            # R1 — update streak and cooldown
+            if sym in r1_config:
+                k_threshold, cooldown_candles = r1_config[sym]
+                if result.exit_reason == "stop_loss":
+                    self._sl_streak[sym] = self._sl_streak.get(sym, 0) + 1
+                    if self._sl_streak[sym] >= k_threshold:
+                        self._risk_cooldown_until[sym] = (
+                            result.close_time + cooldown_candles * self._candle_duration_ms
+                        )
+                        self._sl_streak[sym] = 0
+                        n_r1_updates += 1
+                else:
+                    self._sl_streak[sym] = 0
+            # R2 — accumulate weighted PnL per model and update peak
+            if model_name in r2_models:
+                self._cum_weighted_pnl[model_name] = (
+                    self._cum_weighted_pnl.get(model_name, 0.0) + result.weighted_pnl
+                )
+                if self._cum_weighted_pnl[model_name] > self._peak_weighted_pnl.get(
+                    model_name, 0.0
+                ):
+                    self._peak_weighted_pnl[model_name] = self._cum_weighted_pnl[model_name]
+
+        if n_r1_updates > 0 or any(v != 0.0 for v in self._cum_weighted_pnl.values()):
+            print(
+                f"[live] Rebuilt risk state: {n_r1_updates} R1 cooldowns armed, "
+                f"R2 cum PnL by model = "
+                f"{ {k: round(v, 2) for k, v in self._cum_weighted_pnl.items()} }"
+            )
+
     def _record_trade_close_for_vt(self, trade: LiveTrade) -> None:
         """Record a closed trade's PnL into the VT daily accumulator."""
         if not self.config.vol_targeting:
@@ -257,6 +349,68 @@ class LiveEngine:
         sym_daily = self._vt_daily_pnl.setdefault(trade.symbol, {})
         sym_daily[close_date] = sym_daily.get(close_date, 0.0) + result.net_pnl_pct
 
+    def _record_trade_close_for_risk(self, trade: LiveTrade) -> None:
+        """Update R1 streak / R2 accumulators on a trade close.
+
+        Mirrors backtest.py:263-280 exactly.
+        """
+        result = to_trade_result(trade, self.config.fee_pct)
+        if result is None:
+            return
+
+        # Find R1 config for this symbol
+        r1_limit: int | None = None
+        r1_cooldown_candles = 0
+        r2_enabled = False
+        for mc in self.config.models:
+            if trade.model_name == mc.name:
+                r1_limit = mc.risk_consecutive_sl_limit
+                r1_cooldown_candles = mc.risk_consecutive_sl_cooldown_candles
+                r2_enabled = mc.risk_drawdown_scale_enabled
+                break
+
+        sym = trade.symbol
+        if r1_limit is not None and self._candle_duration_ms > 0:
+            if result.exit_reason == "stop_loss":
+                self._sl_streak[sym] = self._sl_streak.get(sym, 0) + 1
+                if self._sl_streak[sym] >= r1_limit:
+                    self._risk_cooldown_until[sym] = (
+                        result.close_time + r1_cooldown_candles * self._candle_duration_ms
+                    )
+                    self._sl_streak[sym] = 0
+            else:
+                self._sl_streak[sym] = 0
+
+        if r2_enabled:
+            self._cum_weighted_pnl[trade.model_name] = (
+                self._cum_weighted_pnl.get(trade.model_name, 0.0) + result.weighted_pnl
+            )
+            if self._cum_weighted_pnl[trade.model_name] > self._peak_weighted_pnl.get(
+                trade.model_name, 0.0
+            ):
+                self._peak_weighted_pnl[trade.model_name] = self._cum_weighted_pnl[
+                    trade.model_name
+                ]
+
+    def _r2_scale_for(self, model_name: str) -> float:
+        """Compute R2 drawdown scale factor for the given model (1.0 = no scaling).
+
+        Mirrors backtest.py:358-368 exactly.
+        """
+        mc = next((m for m in self.config.models if m.name == model_name), None)
+        if mc is None or not mc.risk_drawdown_scale_enabled:
+            return 1.0
+        cum = self._cum_weighted_pnl.get(model_name, 0.0)
+        peak = self._peak_weighted_pnl.get(model_name, 0.0)
+        dd_pct = max(0.0, peak - cum)
+        trigger = float(mc.risk_drawdown_trigger_pct)
+        anchor = float(mc.risk_drawdown_scale_anchor_pct)
+        floor = float(mc.risk_drawdown_scale_floor)
+        if dd_pct <= trigger or anchor <= trigger:
+            return 1.0
+        span = min(1.0, (dd_pct - trigger) / (anchor - trigger))
+        return 1.0 - span * (1.0 - floor)
+
     def _set_cooldown(self, model_name: str, symbol: str, close_time: int) -> None:
         """Set cooldown after a trade closes — same as backtest.py:238-242."""
         if self.config.cooldown_candles <= 0:
@@ -265,12 +419,13 @@ class LiveEngine:
         self._state.set_state(f"cooldown_{model_name}_{symbol}", str(cooldown_until))
 
     def _handle_trade_close(self, trade: LiveTrade) -> None:
-        """Common handler when a trade closes: log, record VT, set cooldown."""
+        """Common handler when a trade closes: log, record VT, record risk, set cooldown."""
         updated = self._state.get_trade(trade.id)
         if updated is None:
             return
         self._logger.log_close(updated)
         self._record_trade_close_for_vt(updated)
+        self._record_trade_close_for_risk(updated)
         self._set_cooldown(updated.model_name, updated.symbol, updated.exit_time or 0)
 
     def _patch_month_features(
@@ -433,6 +588,7 @@ class LiveEngine:
                     self._state.upsert_trade(trade)
                     self._logger.log_close(trade)
                     self._record_trade_close_for_vt(trade)
+                    self._record_trade_close_for_risk(trade)
                     n_trades_closed += 1
                     # Match backtest.py:239-243 exactly: use result.close_time
                     # (not current candle ct). For timeouts, result.close_time
@@ -448,12 +604,18 @@ class LiveEngine:
             sig = runner.strategy.get_signal(sym, ot)
             if sig.direction != 0 and sig.weight > 0:
                 n_signals += 1
-                if sym not in open_trades and ot >= cooldown_until.get(sym, 0):
+                if (
+                    sym not in open_trades
+                    and ot >= cooldown_until.get(sym, 0)
+                    and ot >= self._risk_cooldown_until.get(sym, 0)
+                ):
                     entry_price = float(close_arr[i])
 
                     vt_scale = 1.0
                     if self.config.vol_targeting:
                         vt_scale = compute_vt_scale(self._vt_daily_pnl, sym, ct, self.config)
+                    # R2 drawdown scaling applied on top of VT
+                    vt_scale *= self._r2_scale_for(runner.model_config.name)
 
                     sl, tp = compute_sl_tp(sig, entry_price, self.config)
                     trade = LiveTrade(
@@ -629,6 +791,11 @@ class LiveEngine:
 
                 # FIX 2: entry price from master DataFrame (same source as backtest)
                 candle_ot = new_candles[symbol].open_time
+                # R1 consecutive-SL cool-down gate (iter 173) — keyed on
+                # candle open_time to match backtest's gate semantics.
+                if candle_ot < self._risk_cooldown_until.get(symbol, 0):
+                    continue
+
                 entry_price = runner.get_close_price(symbol, candle_ot)
                 if entry_price is None:
                     print(f"[live] WARNING: no close price for {symbol} at {candle_ot}")
@@ -644,6 +811,8 @@ class LiveEngine:
                     vt_scale = compute_vt_scale(
                         self._vt_daily_pnl, symbol, candle_close_time, self.config
                     )
+                # R2 drawdown scaling (iter 176) applied on top of VT
+                vt_scale *= self._r2_scale_for(runner.model_config.name)
 
                 trade = self._order_mgr.open_trade(
                     model_name=runner.model_config.name,

@@ -1,136 +1,84 @@
 # Current Baseline
 
-Last updated by: iteration 152 (2026-04-06)
-OOS cutoff date: 2025-03-24 (fixed, never changes)
+Last updated by: iteration 186 on 2026-04-22 (added R3 OOD Mahalanobis gate).
+OOS cutoff date: 2025-03-24 (fixed, never changes).
 
 ## Comparison Methodology
 
-**Baseline metrics are deterministic** (5-seed ensemble per model + per-symbol vol targeting **integrated into backtest engine**).
+**Four independent LightGBM models** — A (BTC+ETH pooled), C (LINK), D (LTC), E (DOT) — each with 5-seed ensemble + per-symbol vol targeting. Feature selection is explicit (`BASELINE_FEATURE_COLUMNS`, 193 columns).
 
-**Combined portfolio**: Three independent LightGBM models (A=BTC+ETH, C=LINK, D=BNB)
-running side-by-side. Per-symbol volatility targeting is applied **live within the
-backtest engine**: each trade's `weight_factor` is computed at open time from the std
-of that SYMBOL's past 30-day daily PnL, scaled as `target_vol / realized_vol` and
-clipped to [0.33, 2.0].
+**Risk mitigations active** (all four models):
+- **R1 consecutive-SL cool-down** (K=3, C=27 candles ≈ 9 days) — Models C, D, E
+- **R2 drawdown-triggered position scaling** (trigger=7%, anchor=15%, floor=0.33) — Model E only
+- **R3 OOD Mahalanobis gate** (cutoff=0.70, 16 scale-invariant features) — ALL MODELS (A, C, D, E)
+- Model A has R3 only (no R1/R2 — IS analysis showed BTC/ETH have mean-reverting WR at late streaks, so R1 would hurt).
 
-## Out-of-Sample Metrics (trades with entry_time >= 2025-03-24)
-
-| Metric          | Value      |
-|-----------------|------------|
-| Sharpe          | +2.83      |
-| Sortino         | +3.33      |
-| Win Rate        | 50.6%      |
-| Profit Factor   | 1.76       |
-| Max Drawdown    | 21.81%     |
-| Total Trades    | 164        |
-| Calmar Ratio    | 5.46       |
-| Net PnL         | +119.1%    |
-
-## In-Sample Metrics (trades with entry_time < 2025-03-24)
+## Out-of-Sample Metrics (entry_time ≥ 2025-03-24)
 
 | Metric          | Value      |
 |-----------------|------------|
-| Sharpe          | +1.33      |
-| Win Rate        | 44.5%      |
-| Profit Factor   | 1.33       |
-| Max Drawdown    | 76.89%     |
-| Total Trades    | 652        |
-| Net PnL         | +237.5%    |
+| Sharpe          | **+1.735** |
+| Max Drawdown    | 29.31%     |
+| Net PnL         | +104.11%   |
+| Total Trades    | 210        |
+| Trades/month    | ~16        |
+| Win Rate        | 43.8%      |
+| Profit Factor   | 1.41       |
 
-## Per-Symbol OOS Performance
+## Per-symbol OOS PnL share
 
-| Symbol | Model | Trades | WR | Net PnL | % of Total |
-|--------|-------|--------|----|---------|------------|
-| ETHUSDT | A | 34 | 55.9% | +60.2% | 34.9% |
-| LINKUSDT | C | 42 | 52.4% | +56.0% | 32.5% |
-| BNBUSDT | D | 50 | 52.0% | +37.7% | 21.9% |
-| BTCUSDT | A | 38 | 42.1% | +18.5% | 10.7% |
+| Symbol | PnL share |
+|--------|----------:|
+| DOT    | 38.3%     |
+| LINK   | 37.3%     |
+| LTC    | 17.9%     |
+| ETH    | 14.2%     |
+| BTC    | −7.6%     |
 
-## Position Sizing (per-symbol, iter 152 — fully tuned)
+(Top-symbol concentration halved vs. v0.176's LINK at 78%.)
 
-```
-For each trade on symbol S at open_time T:
-    symbol_daily_pnls = [daily aggregate PnL of S's trades for dates in [T-45d, T-1d]]
-    if len(symbol_daily_pnls) >= 5 and std > 0:
-        realized_vol = std(symbol_daily_pnls)
-        scale = 0.3 / realized_vol
-        scale = clip(scale, 0.33, 2.0)    # tuned floor (iter 152)
-    else:
-        scale = 1.0
-    trade_pnl *= scale
-```
+## In-Sample Metrics (entry_time < 2025-03-24)
 
-Config (iter 151 tuned): `target_vol=0.3, lookback=45` days. 45-day lookback gives
-more stable vol estimates than 30-day over crypto regime cycles (~3-6 weeks).
+| Metric          | Value      |
+|-----------------|------------|
+| Sharpe          | +1.440     |
+| Max Drawdown    | 56.70%     |
+| Total Trades    | 594        |
 
 ## Strategy Summary
 
-**Model A (BTC+ETH pooled)** — 196 features, ATR labeling 2.9×NATR / 1.45×NATR, 24mo training
+**Model A (BTC+ETH pooled)** — ATR 2.9×NATR / 1.45×NATR, R3 only.
+**Model C (LINK)** — ATR 3.5×NATR / 1.75×NATR, R1 K=3 C=27, R3.
+**Model D (LTC)** — ATR 3.5×NATR / 1.75×NATR, R1 K=3 C=27, R3.
+**Model E (DOT)** — ATR 3.5×NATR / 1.75×NATR, R1 K=3 C=27, R2 t=7%/a=15%/f=0.33, R3.
 
-**Model C (LINK)** — 185 features, ATR labeling 3.5×NATR / 1.75×NATR, 24mo training
+R3 OOD features (16): `stat_return_{1,2,5,10}`, `mr_rsi_extreme_{7,14,21}`, `mr_bb_pctb_{10,20}`, `mom_stoch_k_{5,9}`, `vol_atr_{5,7}`, `vol_bb_bandwidth_10`, `vol_volume_pctchg_{5,10}`.
 
-**Model D (BNB)** — 185 features, ATR labeling 3.5×NATR / 1.75×NATR, 24mo training
+All models: 24-mo training window, 5-seed ensemble [42, 123, 456, 789, 1001], cooldown 2 candles, 193-col `BASELINE_FEATURE_COLUMNS`, 50 Optuna trials per monthly model.
 
-All models: timeout 7 days, 5-seed ensemble [42, 123, 456, 789, 1001], cooldown 2 candles,
-CV gap = (timeout_candles + 1) × n_symbols, 50 Optuna trials per monthly model.
+## Reproducibility
 
-**STATUS**: Position sizing is **INTEGRATED into the backtest engine** (iter 150).
-Enable with `vol_targeting=True` in `BacktestConfig`. Walk-forward validated:
-full engine re-run produces identical metrics to iter 147's post-processing reference.
+```
+uv run python run_baseline_v186.py
+```
 
-## Notes
+R1/R2 mechanics: `src/crypto_trade/backtest.py` + `src/crypto_trade/backtest_models.py`.
+R3 mechanics: `src/crypto_trade/strategies/ml/lgbm.py` (`ood_enabled`, `ood_features`, `ood_cutoff_pct`). Unit tests: `tests/test_lgbm.py::TestR3OodDetector` + `tests/test_backtest.py::TestR1ConsecutiveSlCooldown` / `TestR2DrawdownScaling`.
 
-**Iteration 152** — Tuned VT `min_scale` (position floor) from 0.5 → 0.33. Allows
-more aggressive deleveraging during crashes without affecting calm-period trading.
-Floor only matters during high-vol events — asymmetric improvement.
+## Merge justification (iter 186)
 
-Key improvements over iter 151:
-- OOS Sharpe: +2.74 → **+2.83** (+3.4%)
-- OOS MaxDD: 32.22% → **21.81%** (-32%)
-- OOS Calmar: 4.12 → **5.46** (+33%)
-- OOS PF: 1.64 → **1.76** (+7%)
-- IS MaxDD: 93.93% → **76.89%** (-18%)
+OOS Sharpe lifted from +1.41 to +1.73, IS Sharpe from +1.34 to +1.44. OOS MaxDD essentially unchanged (+2.1 pp, within the 20% baseline tolerance). Single-symbol concentration halved (LINK 78% → top two DOT 38% / LINK 37%). All 1.0 Sharpe floors and the new 10/month trade-rate floor cleared. Full reasoning in `diary/iteration_186.md`. The 30%-per-symbol rule is still strictly violated but improves dramatically over baseline — the diversification-exception clause applies.
 
-Grid search validated monotonic relationship: lower floor → better Sharpe AND lower
-MaxDD across all tested values [0.25, 0.33, 0.5, 0.67, 0.75].
+## Prior baselines
 
-**Iteration 151** — Broader VT parameter grid search (30 configs) reveals that
-iter 147's config (target=0.5, lookback=30) wasn't tuned over a wide enough
-lookback range. Better config found: **target=0.3, lookback=45**.
+- **v0.176** (2026-04-22) — A+C(R1)+LTC(R1)+DOT(R1,R2). OOS +1.41, MaxDD 27.20%, LINK 78%. Superseded by v0.186.
+- **v0.173** (2026-04-22) — A+C(R1)+LTC(R1). OOS +1.39.
+- **v0.165** (2026-04-21) — A+C+LTC without risk mitigations. OOS +1.27.
+- **v0.152 reproduction** (2026-04-21) — A+C+D(BNB). OOS +0.99.
 
-Key improvements over iter 150:
-- OOS Sharpe: +2.65 → **+2.74** (+3.3%)
-- OOS MaxDD: 39.17% → **32.22%** (-18%)
-- OOS Calmar: 4.02 → **4.12** (+2.5%)
-- OOS PF: 1.62 → **1.64**
+## Pending work
 
-27 of 30 tested configs beat no-VT baseline — demonstrates VT robustness.
-
-**No code change required** — same engine, just updated `BacktestConfig` params.
-
-**Iteration 150** — Per-symbol vol targeting integrated into the backtest engine.
-Full walk-forward re-run with VT active in `backtest.py` reproduces iter 147's
-metrics exactly (OOS Sharpe +2.6486, MaxDD 39.17%, Calmar 4.02). Strategy is
-production-ready end-to-end.
-
-**Iteration 147** — Upgraded from portfolio-wide (iter 145) to per-symbol vol targeting.
-Each trade scales by ITS symbol's recent vol, not aggregate portfolio vol. This preserves
-signal from calm symbols when other symbols are volatile.
-
-Walk-forward validation:
-- 20 configs tested on IS trades only
-- Best IS config: target_vol=0.5, lookback=30 days
-- Applied to OOS without further tuning
-
-Key improvements over iter 145:
-- OOS Sharpe: +2.33 → **+2.65** (+14%)
-- OOS Sortino: +3.01 → **+3.81** (+27%)
-- OOS Calmar: 3.40 → **4.02** (+18%)
-- OOS PF: 1.53 → **1.62** (+6%)
-- OOS PnL: +129.5% → **+157.5%** (+22%)
-
-Tradeoffs:
-- IS Sharpe: +1.36 → +1.26 (-7%, less IS scaling triggered)
-- OOS MaxDD: 38.1% → 39.2% (+3%, marginal)
-
-Previous baseline: iter 145 (OOS Sharpe +2.33, portfolio-wide vol targeting).
+- **Iter 187**: 10-seed ensemble-robustness sweep of v0.186. Required before shipping to live.
+- **Iter 188**: Try tighter OOD cutoffs (0.60, 0.50) — iter 185 post-hoc suggested these could lift IS/OOS Sharpe further.
+- **Iter 189**: Per-symbol OOD cutoffs. BTC now contributes −7.6% of OOS PnL, suggesting its regime differs from altcoins; per-symbol calibration could recover.
+- **Iter 190+**: Drop BTC from the pool entirely? Its negative contribution is a red flag. Rebuilding Model A as ETH-only is a concrete next exploitation candidate.

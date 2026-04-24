@@ -104,7 +104,9 @@ def add_cross_asset_features(
 
         symbol = pf.stem.replace(f"_{interval}_features", "")
         n_matched = merged[xbtc_cols[0]].notna().sum()
-        print(f"  {symbol}: added {len(xbtc_cols)} xbtc features ({n_matched}/{len(merged)} matched)")
+        print(
+            f"  {symbol}: added {len(xbtc_cols)} xbtc features ({n_matched}/{len(merged)} matched)"
+        )
         updated += 1
 
     return updated

@@ -187,9 +187,29 @@ def run_backtest(
 
     # Signal cooldown tracking
     cooldown_until: dict[str, int] = {}  # symbol → earliest open_time for new trade
+    # Risk R1 tracking — consecutive-SL cool-down (iter 173)
+    sl_streak: dict[str, int] = {}  # symbol → consecutive SL count
+    risk_cooldown_until: dict[str, int] = {}  # symbol → earliest open_time after R1 triggers
+    # Risk R2 tracking — drawdown-triggered position scaling (iter 175)
+    cum_weighted_pnl = 0.0
+    peak_weighted_pnl = 0.0
     candle_duration_ms = 0
     if config.cooldown_candles > 0 and len(master) >= 2:
         # Compute candle duration from first two rows of same symbol
+        first_sym = str(sym_arr[0])
+        for j in range(1, len(master)):
+            if str(sym_arr[j]) == first_sym:
+                candle_duration_ms = int(open_time_arr[j] - open_time_arr[0])
+                break
+        if candle_duration_ms <= 0:
+            candle_duration_ms = int(close_time_arr[0] - open_time_arr[0] + 1)
+    # Also ensure candle_duration_ms is set when R1 is active (needed to convert C candles → ms)
+    if (
+        config.risk_consecutive_sl_limit is not None
+        and config.risk_consecutive_sl_cooldown_candles > 0
+        and candle_duration_ms == 0
+        and len(master) >= 2
+    ):
         first_sym = str(sym_arr[0])
         for j in range(1, len(master)):
             if str(sym_arr[j]) == first_sym:
@@ -238,10 +258,30 @@ def run_backtest(
                 # Set signal cooldown for this symbol
                 if config.cooldown_candles > 0 and candle_duration_ms > 0:
                     cooldown_until[sym] = (
-                        result.close_time
-                        + config.cooldown_candles * candle_duration_ms
+                        result.close_time + config.cooldown_candles * candle_duration_ms
                     )
-                # Yearly fail-fast check
+                # Risk R1 — track consecutive SL streak and arm cool-down
+                if config.risk_consecutive_sl_limit is not None and candle_duration_ms > 0:
+                    if result.exit_reason == "stop_loss":
+                        sl_streak[result.symbol] = sl_streak.get(result.symbol, 0) + 1
+                        if sl_streak[result.symbol] >= config.risk_consecutive_sl_limit:
+                            risk_cooldown_until[result.symbol] = (
+                                result.close_time
+                                + config.risk_consecutive_sl_cooldown_candles * candle_duration_ms
+                            )
+                            sl_streak[result.symbol] = 0  # reset streak after triggering
+                    else:
+                        sl_streak[result.symbol] = 0
+                # Risk R2 — update cumulative weighted PnL + running peak for
+                # drawdown-triggered scaling.
+                if config.risk_drawdown_scale_enabled:
+                    cum_weighted_pnl += result.weighted_pnl
+                    if cum_weighted_pnl > peak_weighted_pnl:
+                        peak_weighted_pnl = cum_weighted_pnl
+                # Yearly fail-fast check — per skill spec:
+                #   Year-1 boundary: check year-1 cumulative PnL ≥ 0
+                #   Year-2 boundary: check cumulative year-1+2 PnL ≥ 0
+                #   Silent after year 2.
                 if yearly_pnl_check:
                     yr = datetime.datetime.fromtimestamp(
                         result.close_time / 1000, tz=datetime.UTC
@@ -252,17 +292,35 @@ def run_backtest(
                         _yearly_wins[yr] = _yearly_wins.get(yr, 0) + 1
                     # Check at year boundary (when we enter a new year)
                     if yr > _last_checked_year and _last_checked_year > 0:
-                        prev = _last_checked_year
-                        prev_pnl = _yearly_pnl.get(prev, 0.0)
-                        prev_n = _yearly_trades.get(prev, 0)
-                        prev_w = _yearly_wins.get(prev, 0)
-                        prev_wr = prev_w / prev_n * 100 if prev_n > 0 else 0
-                        if prev_n >= 10 and prev_pnl < 0:
-                            raise EarlyStopError(
-                                f"Year {prev}: PnL={prev_pnl:+.1f}% "
-                                f"(WR={prev_wr:.1f}%, {prev_n} trades)",
-                                results, total_signals,
+                        first_year = min(_yearly_pnl.keys())
+                        years_elapsed = _last_checked_year - first_year + 1
+                        # Only check year-1 and year-2 boundaries
+                        if years_elapsed == 1:
+                            prev_pnl = _yearly_pnl.get(_last_checked_year, 0.0)
+                            prev_n = _yearly_trades.get(_last_checked_year, 0)
+                            prev_w = _yearly_wins.get(_last_checked_year, 0)
+                            prev_wr = prev_w / prev_n * 100 if prev_n > 0 else 0
+                            if prev_n >= 10 and prev_pnl < 0:
+                                raise EarlyStopError(
+                                    f"Year 1 ({_last_checked_year}): PnL={prev_pnl:+.1f}% "
+                                    f"(WR={prev_wr:.1f}%, {prev_n} trades)",
+                                    results,
+                                    total_signals,
+                                )
+                        elif years_elapsed == 2:
+                            cum_pnl = sum(
+                                v for y, v in _yearly_pnl.items() if y <= _last_checked_year
                             )
+                            cum_n = sum(
+                                v for y, v in _yearly_trades.items() if y <= _last_checked_year
+                            )
+                            if cum_n >= 20 and cum_pnl < 0:
+                                raise EarlyStopError(
+                                    f"Year 1+2 cumulative: PnL={cum_pnl:+.1f}% "
+                                    f"({cum_n} trades)",
+                                    results,
+                                    total_signals,
+                                )
                     _last_checked_year = yr
                 if verbose > 0:
                     month_label = _month_of(result.close_time)
@@ -289,12 +347,25 @@ def run_backtest(
         signal = strategy.get_signal(sym, ot)
         if signal.direction != 0 and signal.weight > 0:
             total_signals += 1
-            if sym not in open_orders and ot >= cooldown_until.get(sym, 0):
+            if (
+                sym not in open_orders
+                and ot >= cooldown_until.get(sym, 0)
+                and ot >= risk_cooldown_until.get(sym, 0)
+            ):
                 vt_scale = 1.0
                 if config.vol_targeting:
-                    vt_scale = compute_vt_scale(
-                        vt_per_sym_daily, sym, ot, config
-                    )
+                    vt_scale = compute_vt_scale(vt_per_sym_daily, sym, ot, config)
+                # R2 — drawdown-triggered position scaling
+                if config.risk_drawdown_scale_enabled:
+                    dd_pct = max(0.0, peak_weighted_pnl - cum_weighted_pnl)
+                    trigger = float(config.risk_drawdown_trigger_pct)
+                    anchor = float(config.risk_drawdown_scale_anchor_pct)
+                    floor = float(config.risk_drawdown_scale_floor)
+                    if dd_pct > trigger and anchor > trigger:
+                        # Linear interp from 1.0 at trigger to floor at anchor
+                        span = min(1.0, (dd_pct - trigger) / (anchor - trigger))
+                        r2_scale = 1.0 - span * (1.0 - floor)
+                        vt_scale = vt_scale * r2_scale
                 order = create_order(
                     sym,
                     signal,
@@ -386,8 +457,11 @@ def build_master(
 
 def _build_master(config: BacktestConfig) -> pd.DataFrame:
     return build_master(
-        config.symbols, config.interval, config.data_dir,
-        config.start_time, config.end_time,
+        config.symbols,
+        config.interval,
+        config.data_dir,
+        config.start_time,
+        config.end_time,
     )
 
 
@@ -454,9 +528,7 @@ def compute_vt_scale(
     if not sym_daily:
         return 1.0
 
-    trade_date = datetime.datetime.fromtimestamp(
-        trade_open_ms / 1000, tz=datetime.UTC
-    ).date()
+    trade_date = datetime.datetime.fromtimestamp(trade_open_ms / 1000, tz=datetime.UTC).date()
     lookback_returns: list[float] = []
     for close_date_str, pnl in sym_daily.items():
         close_date = datetime.date.fromisoformat(close_date_str)
@@ -470,7 +542,7 @@ def compute_vt_scale(
     n = len(lookback_returns)
     mean_r = sum(lookback_returns) / n
     var = sum((r - mean_r) ** 2 for r in lookback_returns) / (n - 1)
-    realized_vol = var ** 0.5
+    realized_vol = var**0.5
     # Guard against zero/near-zero vol (numeric noise)
     if realized_vol <= 1e-9:
         return 1.0
@@ -496,7 +568,10 @@ def create_order(
     if config.vol_targeting:
         weight_factor = vt_scale
     else:
-        weight_factor = signal.weight / 100.0
+        # When VT is off but a risk control (R2) passed in a sub-1.0 vt_scale,
+        # apply it to the signal-derived weight. If no risk control fired
+        # (vt_scale==1.0), the original signal-weight behaviour is preserved.
+        weight_factor = (signal.weight / 100.0) * vt_scale
     amount_usd = weight_factor * config.max_amount_usd
 
     sl_pct = (signal.sl_pct if signal.sl_pct is not None else config.stop_loss_pct) / 100.0
