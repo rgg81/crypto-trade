@@ -40,9 +40,11 @@ def _print_progress(progress: BulkProgress) -> None:
     )
 
 
-def main() -> None:
-    settings = load_settings()
+def build_parser() -> argparse.ArgumentParser:
+    """Construct the top-level argparse parser.
 
+    Exposed so tests can probe CLI flags without invoking ``main()``.
+    """
     parser = argparse.ArgumentParser(prog="crypto-trade", description="Binance Futures tools")
     subparsers = parser.add_subparsers(dest="command")
 
@@ -248,7 +250,19 @@ def main() -> None:
         dest="live_mode",
         help="Enable real trading (default: dry-run)",
     )
+    live_parser.add_argument(
+        "--track",
+        choices=["v1", "v2", "both"],
+        default="v1",
+        help="Model preset: v1=BASELINE_MODELS, v2=V2_BASELINE_MODELS, both=COMBINED_MODELS (default: v1)",
+    )
 
+    return parser
+
+
+def main() -> None:
+    settings = load_settings()
+    parser = build_parser()
     args = parser.parse_args()
 
     if args.command is None:
@@ -646,12 +660,26 @@ def _cmd_live(args, settings) -> None:
     from pathlib import Path
 
     from crypto_trade.live.engine import LiveEngine
-    from crypto_trade.live.models import BASELINE_MODELS, LiveConfig
+    from crypto_trade.live.models import (
+        BASELINE_MODELS,
+        COMBINED_MODELS,
+        LiveConfig,
+        V2_BASELINE_MODELS,
+    )
 
     groups = tuple(g.strip() for g in args.feature_groups.split(","))
 
+    track = getattr(args, "track", "v1")
+    track_map = {
+        "v1": BASELINE_MODELS,
+        "v2": V2_BASELINE_MODELS,
+        "both": COMBINED_MODELS,
+    }
+    selected_models = track_map[track]
+    print(f"[live] Track: {track} ({len(selected_models)} models)")
+
     config = LiveConfig(
-        models=BASELINE_MODELS,
+        models=selected_models,
         interval="8h",
         max_amount_usd=float(args.amount),
         leverage=args.leverage,

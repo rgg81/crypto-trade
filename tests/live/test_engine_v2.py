@@ -336,3 +336,54 @@ def test_btc_trend_filter_disabled_never_kills():
         evaluate_btc_trend_filter_one_signal(times, closes, int(times[-1]), -1, cfg)
         is False
     )
+
+
+# ----------------------------- Task 8 ---------------------------------------
+
+
+def test_cli_live_track_flag_defaults_to_v1():
+    from crypto_trade.main import build_parser
+
+    parser = build_parser()
+    args = parser.parse_args(["live"])
+    assert args.track == "v1"
+
+
+def test_cli_live_track_flag_accepts_v2_and_both():
+    from crypto_trade.main import build_parser
+
+    parser = build_parser()
+    args_v2 = parser.parse_args(["live", "--track", "v2"])
+    assert args_v2.track == "v2"
+    args_both = parser.parse_args(["live", "--track", "both"])
+    assert args_both.track == "both"
+
+
+def test_cmd_live_track_dispatches_to_correct_model_set(tmp_path):
+    """_cmd_live must hand the right preset to LiveConfig based on args.track."""
+    from unittest.mock import patch
+    from crypto_trade.main import _cmd_live, build_parser
+    from crypto_trade.live.models import (
+        BASELINE_MODELS,
+        COMBINED_MODELS,
+        V2_BASELINE_MODELS,
+    )
+
+    class _StubSettings:
+        binance_api_key = ""
+        binance_api_secret = ""
+        base_url = ""
+        data_dir = str(tmp_path)
+
+    parser = build_parser()
+    for track, expected in (
+        ("v1", BASELINE_MODELS),
+        ("v2", V2_BASELINE_MODELS),
+        ("both", COMBINED_MODELS),
+    ):
+        args = parser.parse_args(["live", "--track", track])
+        with patch("crypto_trade.live.engine.LiveEngine") as engine_cls:
+            engine_cls.return_value.run.return_value = None
+            _cmd_live(args, _StubSettings())
+            cfg = engine_cls.call_args.kwargs["config"]
+            assert cfg.models == expected, f"track={track} got {cfg.models}"
