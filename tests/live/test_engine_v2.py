@@ -439,3 +439,28 @@ def test_live_config_catch_up_lookback_default_90():
 
     cfg3 = LiveConfig(catch_up_lookback_days=None)
     assert cfg3.catch_up_lookback_days is None  # explicit opt-out
+
+
+# ----------------------------- Task 2: catch-up start helper ---------------
+
+
+def test_compute_catch_up_start_ms_lookback_modes():
+    """The helper handles None (legacy) and N-days (new) lookback modes."""
+    import pandas as pd
+    from crypto_trade.live.engine import _compute_catch_up_start_ms
+
+    now = int(pd.Timestamp("2026-04-26 12:00", tz="UTC").value // 1_000_000)
+
+    # None preserves legacy previous-month behavior
+    legacy = _compute_catch_up_start_ms(now, lookback_days=None)
+    assert legacy == int(pd.Timestamp("2026-03-01", tz="UTC").value // 1_000_000)
+
+    # N-day lookback returns now - N days exactly
+    ninety = _compute_catch_up_start_ms(now, lookback_days=90)
+    expected = int((pd.Timestamp("2026-04-26 12:00", tz="UTC") - pd.Timedelta(days=90)).value // 1_000_000)
+    assert ninety == expected
+
+    # Larger lookback works too (full OOS replay)
+    full_oos = _compute_catch_up_start_ms(now, lookback_days=400)
+    expected_400 = int((pd.Timestamp("2026-04-26 12:00", tz="UTC") - pd.Timedelta(days=400)).value // 1_000_000)
+    assert full_oos == expected_400

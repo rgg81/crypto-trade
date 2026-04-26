@@ -75,6 +75,19 @@ def _previous_month_start_ms(epoch_ms: int) -> int:
     return int(prev.timestamp() * 1000)
 
 
+def _compute_catch_up_start_ms(now_ms: int, lookback_days: int | None) -> int:
+    """Return the catch-up start time as epoch ms.
+
+    lookback_days=N (default 90 in LiveConfig) replays the trailing N days,
+    long enough to rebuild VT's 45-day rolling window plus buffer.
+    lookback_days=None preserves the legacy previous-calendar-month
+    behavior — kept as an explicit opt-out for legacy scripts.
+    """
+    if lookback_days is None:
+        return _previous_month_start_ms(now_ms)
+    return now_ms - lookback_days * 86_400_000
+
+
 class ModelRunner:
     """Manages one LightGBM model (e.g., Model A for BTC/ETH)."""
 
@@ -689,7 +702,9 @@ class LiveEngine:
 
         now_ms = int(time.time() * 1000)
         # Start one month earlier to capture carry-over trades
-        catch_up_start = _previous_month_start_ms(now_ms)
+        catch_up_start = _compute_catch_up_start_ms(
+            now_ms, self.config.catch_up_lookback_days
+        )
 
         sym_arr = master["symbol"].to_numpy(dtype=str)
         open_time_arr = master["open_time"].values
