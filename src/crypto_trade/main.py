@@ -147,6 +147,16 @@ def build_parser() -> argparse.ArgumentParser:
         default="csv",
         help="Output format (default: csv)",
     )
+    feat_parser.add_argument(
+        "--track",
+        choices=["v1", "v2"],
+        default="v1",
+        help=(
+            "Feature catalog: v1=crypto_trade.features (193 baseline features); "
+            "v2=crypto_trade.features_v2 (34 v2 features). "
+            "When --track v2 and --output is omitted, default output dir is data/features_v2."
+        ),
+    )
 
     # --- convert-features subcommand ---
     conv_parser = subparsers.add_parser(
@@ -584,11 +594,23 @@ def _cmd_backtest(args, settings) -> None:
 def _cmd_features(args, settings) -> None:
     from pathlib import Path
 
-    from crypto_trade.features import list_groups, run_features
+    track = getattr(args, "track", "v1")
+    if track == "v2":
+        from crypto_trade.features_v2 import (
+            list_groups as _list_groups,
+            run_features_v2 as _run_features,
+        )
+        default_output = str(Path(settings.data_dir) / "features_v2")
+    else:
+        from crypto_trade.features import (
+            list_groups as _list_groups,
+            run_features as _run_features,
+        )
+        default_output = str(Path(settings.data_dir) / "features")
 
     if args.list:
-        print("Available feature groups:")
-        for name in list_groups():
+        print(f"Available {track} feature groups:")
+        for name in _list_groups():
             print(f"  {name}")
         return
 
@@ -609,24 +631,27 @@ def _cmd_features(args, settings) -> None:
         )
     groups_arg = args.groups.strip()
     if groups_arg == "all":
-        groups = list_groups()
+        groups = _list_groups()
     else:
         groups = [g.strip() for g in groups_arg.split(",")]
-        available = set(list_groups())
+        available = set(_list_groups())
         unknown = [g for g in groups if g not in available]
         if unknown:
-            print(f"Error: unknown groups: {unknown}. Available: {list_groups()}", file=sys.stderr)
+            print(
+                f"Error: unknown {track} groups: {unknown}. Available: {_list_groups()}",
+                file=sys.stderr,
+            )
             sys.exit(1)
 
     start_ms = _parse_date(args.start) if args.start else None
     end_ms = _parse_date(args.end) if args.end else None
-    output_dir = args.output or str(Path(settings.data_dir) / "features")
+    output_dir = args.output or default_output
 
-    print(f"Generating features: {', '.join(groups)}")
+    print(f"Generating {track} features: {', '.join(groups)}")
     print(f"  Symbols: {', '.join(symbols)} | Interval: {args.interval} | Workers: {args.workers}")
 
     output_format = getattr(args, "format", "csv")
-    results = run_features(
+    results = _run_features(
         symbols=symbols,
         interval=args.interval,
         data_dir=settings.data_dir,
