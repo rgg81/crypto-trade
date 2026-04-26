@@ -248,6 +248,29 @@ class LiveEngine:
             s: mc.name for mc in config.models for s in mc.symbols
         }
 
+        # Guard 1: v2 ModelConfigs must not trade v1 baseline symbols.
+        from crypto_trade.live.models import V2_EXCLUDED_SYMBOLS as _V2_EXCLUDED
+        for mc in config.models:
+            if mc.risk_wrapper == "v2":
+                overlap = set(mc.symbols) & set(_V2_EXCLUDED)
+                if overlap:
+                    raise ValueError(
+                        f"ModelConfig {mc.name!r}: risk_wrapper='v2' cannot trade "
+                        f"V2_EXCLUDED_SYMBOLS {sorted(overlap)}"
+                    )
+
+        # Guard 2: symbols must be disjoint across models — R1 and VT state are
+        # keyed by symbol alone, so any overlap would silently corrupt state.
+        seen_owner: dict[str, str] = {}
+        for mc in config.models:
+            for s in mc.symbols:
+                if s in seen_owner:
+                    raise ValueError(
+                        f"overlapping symbols across models: {s!r} appears in "
+                        f"{seen_owner[s]!r} and {mc.name!r}"
+                    )
+                seen_owner[s] = mc.name
+
     def _refresh_groups(self, symbols_subset: list[str]) -> list[tuple[tuple[str, ...], Path, str]]:
         """Group ``symbols_subset`` by track (v1/v2) for refresh_features_by_track.
 

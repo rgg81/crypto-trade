@@ -185,3 +185,68 @@ def test_combined_models_unions_v1_and_v2():
 def test_v2_excluded_symbols_constant():
     from crypto_trade.live.models import V2_EXCLUDED_SYMBOLS
     assert set(V2_EXCLUDED_SYMBOLS) == {"BTCUSDT", "ETHUSDT", "LINKUSDT", "BNBUSDT"}
+
+
+# ----------------------------- Task 6 ---------------------------------------
+
+
+def test_engine_rejects_v2_with_v1_symbol(tmp_path):
+    """A v2 ModelConfig naming any V2_EXCLUDED_SYMBOLS symbol must fail at engine init."""
+    from crypto_trade.live.engine import LiveEngine
+    from crypto_trade.strategies.ml.risk_v2 import RiskV2Config
+
+    bad = ModelConfig(
+        name="bad-v2",
+        symbols=("BTCUSDT",),  # v1 baseline symbol — disallowed
+        use_atr_labeling=True,
+        atr_tp_multiplier=2.9,
+        atr_sl_multiplier=1.45,
+        atr_column="natr_21_raw",
+        features_dir=Path("data/features_v2"),
+        risk_wrapper="v2",
+        risk_v2_config=RiskV2Config(),
+    )
+    cfg = LiveConfig(
+        models=(bad,),
+        dry_run=True,
+        db_path=tmp_path / "x.db",
+        data_dir=tmp_path,
+    )
+    with pytest.raises(ValueError, match="V2_EXCLUDED_SYMBOLS"):
+        LiveEngine(cfg)
+
+
+def test_engine_rejects_overlapping_symbols(tmp_path):
+    """Two ModelConfigs sharing a symbol corrupt R1/VT state — reject at init."""
+    from crypto_trade.live.engine import LiveEngine
+
+    a = ModelConfig(
+        name="A1", symbols=("BTCUSDT",),
+        use_atr_labeling=True, atr_tp_multiplier=2.9, atr_sl_multiplier=1.45,
+    )
+    b = ModelConfig(
+        name="A2", symbols=("BTCUSDT",),  # collides with A1
+        use_atr_labeling=True, atr_tp_multiplier=2.9, atr_sl_multiplier=1.45,
+    )
+    cfg = LiveConfig(
+        models=(a, b),
+        dry_run=True,
+        db_path=tmp_path / "y.db",
+        data_dir=tmp_path,
+    )
+    with pytest.raises(ValueError, match="overlapping symbols"):
+        LiveEngine(cfg)
+
+
+def test_engine_combined_models_construct_ok(tmp_path):
+    """COMBINED_MODELS must satisfy both guards (disjoint v1+v2 symbols)."""
+    from crypto_trade.live.engine import LiveEngine
+    from crypto_trade.live.models import COMBINED_MODELS
+
+    cfg = LiveConfig(
+        models=COMBINED_MODELS,
+        dry_run=True,
+        db_path=tmp_path / "z.db",
+        data_dir=tmp_path,
+    )
+    LiveEngine(cfg)  # must not raise
