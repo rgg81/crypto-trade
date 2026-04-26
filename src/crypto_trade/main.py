@@ -257,6 +257,30 @@ def build_parser() -> argparse.ArgumentParser:
         help="Model preset: v1=BASELINE_MODELS, v2=V2_BASELINE_MODELS, both=COMBINED_MODELS (default: v1)",
     )
 
+    # -- portfolio-report subcommand --
+    pr_parser = subparsers.add_parser(
+        "portfolio-report",
+        help="Build combined v1+v2 portfolio tearsheet from two trade CSVs",
+    )
+    pr_parser.add_argument(
+        "--v1-trades",
+        type=str,
+        required=True,
+        help="Path to v1 trades.csv (e.g. reports/iteration_186/out_of_sample/trades.csv)",
+    )
+    pr_parser.add_argument(
+        "--v2-trades",
+        type=str,
+        required=True,
+        help="Path to v2 trades.csv (e.g. reports-v2/iteration_v2-069/out_of_sample/trades.csv)",
+    )
+    pr_parser.add_argument(
+        "--out",
+        type=str,
+        default="combined_portfolio_report.html",
+        help="Output HTML path (default: combined_portfolio_report.html)",
+    )
+
     return parser
 
 
@@ -284,6 +308,8 @@ def main() -> None:
         _cmd_convert_features(args, settings)
     elif args.command == "live":
         _cmd_live(args, settings)
+    elif args.command == "portfolio-report":
+        _cmd_portfolio_report(args, settings)
 
 
 def _cmd_fetch(args, settings) -> None:
@@ -698,6 +724,36 @@ def _cmd_live(args, settings) -> None:
         base_url=settings.base_url,
     )
     engine.run()
+
+
+def _cmd_portfolio_report(args, settings) -> None:
+    """Build a combined v1+v2 portfolio tearsheet from two trade CSVs."""
+    from pathlib import Path
+
+    import pandas as pd
+
+    from crypto_trade.live.portfolio_report import (
+        ReportInputs,
+        build_combined_report,
+    )
+
+    v1 = pd.read_csv(args.v1_trades)
+    v2 = pd.read_csv(args.v2_trades)
+    out_path = Path(args.out)
+    rep = build_combined_report(
+        ReportInputs(v1_trades=v1, v2_trades=v2),
+        html_out=out_path,
+    )
+    print(
+        f"Combined: {rep.total_trades} trades "
+        f"(v1: {rep.v1_trades}, v2: {rep.v2_trades}). "
+        f"Sharpe(monthly)={rep.combined_sharpe_monthly:.4f}, "
+        f"Sharpe(daily)={rep.combined_sharpe_daily:.4f}, "
+        f"MaxDD={rep.combined_max_drawdown_pct:.2f}, "
+        f"Calmar={rep.combined_calmar:.4f}, "
+        f"PnL={rep.combined_weighted_pnl:.2f}"
+    )
+    print(f"Wrote {out_path}")
 
 
 if __name__ == "__main__":
