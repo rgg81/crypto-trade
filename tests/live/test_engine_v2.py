@@ -387,3 +387,40 @@ def test_cmd_live_track_dispatches_to_correct_model_set(tmp_path):
             _cmd_live(args, _StubSettings())
             cfg = engine_cls.call_args.kwargs["config"]
             assert cfg.models == expected, f"track={track} got {cfg.models}"
+
+
+# ----------------------------- Task 9 ---------------------------------------
+
+
+def test_engine_exposes_catch_up_only(tmp_path):
+    """LiveEngine.catch_up_only must exist and be safe to call on an empty model set."""
+    from crypto_trade.live.engine import LiveEngine
+
+    cfg = LiveConfig(
+        models=(),  # no models → no runners → catch_up loop is a no-op
+        dry_run=True,
+        db_path=tmp_path / "smoke.db",
+        data_dir=tmp_path,
+    )
+    engine = LiveEngine(cfg)
+    assert hasattr(engine, "catch_up_only")
+    engine.catch_up_only()  # smoke: must not raise
+
+
+def test_engine_catch_up_only_skips_poll_loop(tmp_path, monkeypatch):
+    """catch_up_only must run setup methods but never enter the poll loop."""
+    from crypto_trade.live.engine import LiveEngine
+
+    cfg = LiveConfig(
+        models=(),
+        dry_run=True,
+        db_path=tmp_path / "ticks.db",
+        data_dir=tmp_path,
+    )
+    engine = LiveEngine(cfg)
+
+    # If catch_up_only ever calls _tick, the test fails.
+    tick_calls = []
+    monkeypatch.setattr(engine, "_tick", lambda: tick_calls.append(1))
+    engine.catch_up_only()
+    assert tick_calls == []

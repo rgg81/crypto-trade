@@ -332,6 +332,22 @@ class LiveEngine:
             groups.append((tuple(v2_syms), v2_dir, "v2"))
         return groups
 
+    def catch_up_only(self) -> None:
+        """Run the same setup pipeline as ``run()`` and exit before the poll loop.
+
+        Used by parity tests to drive the engine deterministically through
+        historical data: reconcile open orders, rebuild risk + VT state from
+        closed trades in the DB, train the strategies, replay the most recent
+        month of candles to populate trade state. Returns once `_catch_up()`
+        completes — does NOT call `_tick()` or sleep.
+        """
+        self._print_banner()
+        self._reconcile()
+        self._rebuild_vt_history()
+        self._rebuild_risk_state()
+        self._initial_setup()
+        self._catch_up()
+
     def run(self) -> None:
         """Main entry point — runs until SIGINT/SIGTERM."""
         self._setup_signal_handlers()
