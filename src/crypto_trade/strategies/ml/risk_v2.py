@@ -758,6 +758,51 @@ class BtcTrendFilterStats:
         }
 
 
+def evaluate_btc_trend_filter_one_signal(
+    btc_open_times: np.ndarray,
+    btc_closes: np.ndarray,
+    signal_open_time_ms: int,
+    direction: int,
+    config: BtcTrendFilterConfig,
+) -> bool:
+    """Return True iff the BTC trend filter would kill this single live signal.
+
+    Live-engine equivalent of ``apply_btc_trend_filter`` for a single signal.
+    Same math, same boundary conditions:
+      - filter disabled  → never kill
+      - lookback warmup  → never kill (returns False)
+      - direction == -1 (short) and BTC rallied > +threshold over lookback → kill
+      - direction == +1 (long)  and BTC dumped <  -threshold over lookback → kill
+
+    Parameters
+    ----------
+    btc_open_times
+        BTC kline open_times (sorted ascending), as returned by
+        ``load_btc_klines_for_filter``.
+    btc_closes
+        BTC closes, aligned with ``btc_open_times``.
+    signal_open_time_ms
+        The candle's open_time (ms epoch) that the signal would enter on.
+    direction
+        Signal direction: +1 for long, -1 for short.
+    config
+        ``BtcTrendFilterConfig`` (lookback_bars, threshold_pct, enabled).
+    """
+    if not config.enabled:
+        return False
+    idx = int(np.searchsorted(btc_open_times, signal_open_time_ms, side="right") - 1)
+    if idx < config.lookback_bars or idx >= len(btc_closes):
+        return False
+    close_now = float(btc_closes[idx])
+    close_then = float(btc_closes[idx - config.lookback_bars])
+    if close_then == 0.0:
+        return False
+    btc_ret_pct = (close_now / close_then - 1.0) * 100.0
+    return (direction == -1 and btc_ret_pct > config.threshold_pct) or (
+        direction == 1 and btc_ret_pct < -config.threshold_pct
+    )
+
+
 def apply_btc_trend_filter(
     trades: list[TradeResult],
     btc_open_times: np.ndarray,

@@ -250,3 +250,89 @@ def test_engine_combined_models_construct_ok(tmp_path):
         data_dir=tmp_path,
     )
     LiveEngine(cfg)  # must not raise
+
+
+# ----------------------------- Task 7 ---------------------------------------
+
+
+def test_btc_trend_filter_kills_short_in_rally():
+    import numpy as np
+
+    from crypto_trade.strategies.ml.risk_v2 import (
+        BtcTrendFilterConfig,
+        evaluate_btc_trend_filter_one_signal,
+    )
+
+    times = np.arange(50, dtype=np.int64) * 28_800_000
+    closes = np.concatenate([np.full(36, 50000.0), np.linspace(50000.0, 62500.0, 14)])
+    cfg = BtcTrendFilterConfig(enabled=True, lookback_bars=14, threshold_pct=20.0)
+
+    # Short during +25% rally → kill
+    assert (
+        evaluate_btc_trend_filter_one_signal(times, closes, int(times[-1]), -1, cfg)
+        is True
+    )
+    # Long during +25% rally → no kill
+    assert (
+        evaluate_btc_trend_filter_one_signal(times, closes, int(times[-1]), 1, cfg)
+        is False
+    )
+
+
+def test_btc_trend_filter_kills_long_in_crash():
+    import numpy as np
+
+    from crypto_trade.strategies.ml.risk_v2 import (
+        BtcTrendFilterConfig,
+        evaluate_btc_trend_filter_one_signal,
+    )
+
+    times = np.arange(50, dtype=np.int64) * 28_800_000
+    closes = np.concatenate([np.full(36, 50000.0), np.linspace(50000.0, 37500.0, 14)])  # -25%
+    cfg = BtcTrendFilterConfig(enabled=True, lookback_bars=14, threshold_pct=20.0)
+
+    assert (
+        evaluate_btc_trend_filter_one_signal(times, closes, int(times[-1]), 1, cfg)
+        is True
+    )
+    assert (
+        evaluate_btc_trend_filter_one_signal(times, closes, int(times[-1]), -1, cfg)
+        is False
+    )
+
+
+def test_btc_trend_filter_warmup_passes():
+    """Idx < lookback_bars ⇒ warmup, no kill regardless of direction."""
+    import numpy as np
+
+    from crypto_trade.strategies.ml.risk_v2 import (
+        BtcTrendFilterConfig,
+        evaluate_btc_trend_filter_one_signal,
+    )
+
+    times = np.arange(10, dtype=np.int64) * 28_800_000  # only 10 bars
+    closes = np.linspace(50000.0, 100000.0, 10)
+    cfg = BtcTrendFilterConfig(enabled=True, lookback_bars=14, threshold_pct=20.0)
+
+    assert (
+        evaluate_btc_trend_filter_one_signal(times, closes, int(times[-1]), -1, cfg)
+        is False
+    )
+
+
+def test_btc_trend_filter_disabled_never_kills():
+    import numpy as np
+
+    from crypto_trade.strategies.ml.risk_v2 import (
+        BtcTrendFilterConfig,
+        evaluate_btc_trend_filter_one_signal,
+    )
+
+    times = np.arange(50, dtype=np.int64) * 28_800_000
+    closes = np.concatenate([np.full(36, 50000.0), np.linspace(50000.0, 62500.0, 14)])
+    cfg = BtcTrendFilterConfig(enabled=False)
+
+    assert (
+        evaluate_btc_trend_filter_one_signal(times, closes, int(times[-1]), -1, cfg)
+        is False
+    )

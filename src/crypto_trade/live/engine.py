@@ -271,6 +271,38 @@ class LiveEngine:
                     )
                 seen_owner[s] = mc.name
 
+        # iter-v2/019: BTC trend filter at signal time (v2 only). Loaded once
+        # at startup to mirror run_baseline_v2.py's load_btc_klines_for_filter.
+        self._btc_filter_cfg: BtcTrendFilterConfig | None = None
+        self._btc_filter_times: np.ndarray | None = None
+        self._btc_filter_closes: np.ndarray | None = None
+        if any(mc.risk_wrapper == "v2" for mc in config.models):
+            from crypto_trade.strategies.ml.risk_v2 import (
+                BtcTrendFilterConfig,
+                load_btc_klines_for_filter,
+            )
+            self._btc_filter_cfg = BtcTrendFilterConfig()  # iter-v2/069 defaults
+            try:
+                self._btc_filter_times, self._btc_filter_closes = (
+                    load_btc_klines_for_filter(
+                        csv_path=str(self.config.data_dir / "BTCUSDT" / "8h.csv"),
+                    )
+                )
+                print(
+                    f"[live] BTC trend filter loaded: {len(self._btc_filter_times)} 8h bars "
+                    f"(lookback={self._btc_filter_cfg.lookback_bars}, "
+                    f"threshold=±{self._btc_filter_cfg.threshold_pct:.1f}%)"
+                )
+            except FileNotFoundError:
+                print(
+                    "[live] WARNING: BTC trend filter requested by v2 model but "
+                    f"BTC CSV not found at {self.config.data_dir / 'BTCUSDT' / '8h.csv'}; "
+                    "v2 signals will run without the filter."
+                )
+                self._btc_filter_cfg = None
+        # Telemetry: count BTC-killed v2 signals across the engine's lifetime.
+        self._btc_killed_count: int = 0
+
     def _refresh_groups(self, symbols_subset: list[str]) -> list[tuple[tuple[str, ...], Path, str]]:
         """Group ``symbols_subset`` by track (v1/v2) for refresh_features_by_track.
 
@@ -904,6 +936,32 @@ class LiveEngine:
                 if candle_ot < self._risk_cooldown_until.get(symbol, 0):
                     continue
 
+                # iter-v2/019: BTC trend filter (v2 models only). Mirrors
+                # run_baseline_v2.py's apply_btc_trend_filter post-hoc gate, but
+                # at signal time so we never enter a position the backtest would
+                # have killed. v1 signals are unaffected.
+                if (
+                    runner.model_config.risk_wrapper == "v2"
+                    and self._btc_filter_cfg is not None
+                ):
+                    from crypto_trade.strategies.ml.risk_v2 import (
+                        evaluate_btc_trend_filter_one_signal,
+                    )
+                    if evaluate_btc_trend_filter_one_signal(
+                        self._btc_filter_times,
+                        self._btc_filter_closes,
+                        candle_ot,
+                        sig.direction,
+                        self._btc_filter_cfg,
+                    ):
+                        self._btc_killed_count += 1
+                        print(
+                            f"[live] BTC trend filter killed v2 signal: "
+                            f"model={runner.model_config.name} symbol={symbol} "
+                            f"direction={sig.direction} ot={candle_ot}"
+                        )
+                        continue
+
                 entry_price = runner.get_close_price(symbol, candle_ot)
                 if entry_price is None:
                     print(f"[live] WARNING: no close price for {symbol} at {candle_ot}")
@@ -913,9 +971,10 @@ class LiveEngine:
                 row = master[(master["symbol"] == symbol) & (master["open_time"] == candle_ot)]
                 candle_close_time = int(row["close_time"].iloc[0])
 
-                # FIX 1: vol targeting — same as backtest.py:293-296
+                # Vol targeting — per-model (v2 disables it; v1 keeps the
+                # LiveConfig default).
                 vt_scale = 1.0
-                if self.config.vol_targeting:
+                if runner.vol_targeting:
                     vt_scale = compute_vt_scale(
                         self._vt_daily_pnl, symbol, candle_close_time, self.config
                     )
