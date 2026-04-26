@@ -417,6 +417,11 @@ class LiveConfig:
     # Engine
     poll_interval_seconds: float = 30.0
     dry_run: bool = True
+    # Catch-up window. 90 days covers VT's 45-day rolling window plus
+    # buffer so position sizing converges to backtest values before any
+    # trade ships. Pass None to keep the legacy previous-calendar-month
+    # behavior (used by old scripts that relied on _previous_month_start_ms).
+    catch_up_lookback_days: int | None = 90
 
     @functools.cached_property
     def all_symbols(self) -> tuple[str, ...]:

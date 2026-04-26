@@ -424,3 +424,18 @@ def test_engine_catch_up_only_skips_poll_loop(tmp_path, monkeypatch):
     monkeypatch.setattr(engine, "_tick", lambda: tick_calls.append(1))
     engine.catch_up_only()
     assert tick_calls == []
+
+
+# ----------------------------- Task 1: catch_up_lookback_days field ---------
+
+
+def test_live_config_catch_up_lookback_default_90():
+    """Default lookback covers VT's 45-day window plus buffer."""
+    cfg = LiveConfig()
+    assert cfg.catch_up_lookback_days == 90
+
+    cfg2 = LiveConfig(catch_up_lookback_days=400)
+    assert cfg2.catch_up_lookback_days == 400
+
+    cfg3 = LiveConfig(catch_up_lookback_days=None)
+    assert cfg3.catch_up_lookback_days is None  # explicit opt-out
