@@ -651,17 +651,36 @@ def _cmd_features(args, settings) -> None:
     print(f"  Symbols: {', '.join(symbols)} | Interval: {args.interval} | Workers: {args.workers}")
 
     output_format = getattr(args, "format", "csv")
-    results = _run_features(
-        symbols=symbols,
-        interval=args.interval,
-        data_dir=settings.data_dir,
-        groups=groups,
-        start_ms=start_ms,
-        end_ms=end_ms,
-        output_dir=output_dir,
-        workers=args.workers,
-        output_format=output_format,
-    )
+    if track == "v2":
+        # v2's run_features_v2 always emits all groups as parquet — no
+        # groups/output_format kwargs.
+        if output_format != "parquet":
+            print(
+                f"NOTE: --format {output_format} ignored for --track v2 "
+                "(v2 features are parquet-only)",
+                file=sys.stderr,
+            )
+        results = _run_features(
+            symbols=symbols,
+            interval=args.interval,
+            data_dir=settings.data_dir,
+            output_dir=output_dir,
+            start_ms=start_ms,
+            end_ms=end_ms,
+            workers=args.workers,
+        )
+    else:
+        results = _run_features(
+            symbols=symbols,
+            interval=args.interval,
+            data_dir=settings.data_dir,
+            groups=groups,
+            start_ms=start_ms,
+            end_ms=end_ms,
+            output_dir=output_dir,
+            workers=args.workers,
+            output_format=output_format,
+        )
 
     ext = ".parquet" if output_format == "parquet" else ".csv"
     for symbol, n_rows, n_features in results:

@@ -96,24 +96,18 @@ def refresh_features_by_track(
                 output_format=output_format,
             )
         elif track == "v2":
-            from crypto_trade.features_v2 import (
-                list_groups as list_groups_v2,
-                run_features_v2,
-            )
+            from crypto_trade.features_v2 import run_features_v2
 
-            grp_list = (
-                list_groups_v2() if "all" in feature_groups else list(feature_groups)
-            )
+            # v2's run_features_v2 always emits all groups as parquet — no
+            # groups/output_format kwargs (unlike v1's run_features).
             run_features_v2(
                 symbols=list(symbols),
                 interval=interval,
                 data_dir=data_dir,
-                groups=grp_list,
+                output_dir=str(features_dir),
                 start_ms=None,
                 end_ms=None,
-                output_dir=str(features_dir),
                 workers=1,
-                output_format=output_format,
             )
         else:
             raise ValueError(f"unknown track: {track!r} (expected 'v1' or 'v2')")
