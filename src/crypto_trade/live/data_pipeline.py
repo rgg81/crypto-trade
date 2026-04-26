@@ -42,7 +42,11 @@ def refresh_features(
     groups: list[str],
     output_format: str = "parquet",
 ) -> None:
-    """Regenerate feature files for the given symbols."""
+    """Regenerate v1 feature files for the given symbols.
+
+    Kept as a thin v1-only entrypoint for backward-compat callers. New code
+    in the live engine should call ``refresh_features_by_track`` instead.
+    """
     from crypto_trade.features import list_groups, run_features
 
     # Expand "all" to actual group names (same as CLI does)
@@ -60,6 +64,59 @@ def refresh_features(
         workers=1,
         output_format=output_format,
     )
+
+
+def refresh_features_by_track(
+    groups: list[tuple[tuple[str, ...], Path, str]],
+    interval: str,
+    data_dir: str,
+    feature_groups: tuple[str, ...],
+    output_format: str = "parquet",
+) -> None:
+    """Dispatch each (symbols, features_dir, track) group through its features module.
+
+    track values:
+        "v1" → ``crypto_trade.features.run_features`` (output_dir defaults to ``data/features``)
+        "v2" → ``crypto_trade.features_v2.run_features_v2`` (output_dir defaults to ``data/features_v2``)
+    """
+    for symbols, features_dir, track in groups:
+        if track == "v1":
+            from crypto_trade.features import list_groups, run_features
+
+            grp_list = list_groups() if "all" in feature_groups else list(feature_groups)
+            run_features(
+                symbols=list(symbols),
+                interval=interval,
+                data_dir=data_dir,
+                groups=grp_list,
+                start_ms=None,
+                end_ms=None,
+                output_dir=str(features_dir),
+                workers=1,
+                output_format=output_format,
+            )
+        elif track == "v2":
+            from crypto_trade.features_v2 import (
+                list_groups as list_groups_v2,
+                run_features_v2,
+            )
+
+            grp_list = (
+                list_groups_v2() if "all" in feature_groups else list(feature_groups)
+            )
+            run_features_v2(
+                symbols=list(symbols),
+                interval=interval,
+                data_dir=data_dir,
+                groups=grp_list,
+                start_ms=None,
+                end_ms=None,
+                output_dir=str(features_dir),
+                workers=1,
+                output_format=output_format,
+            )
+        else:
+            raise ValueError(f"unknown track: {track!r} (expected 'v1' or 'v2')")
 
 
 def detect_new_candle(

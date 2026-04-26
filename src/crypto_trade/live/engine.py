@@ -23,6 +23,7 @@ from crypto_trade.live.data_pipeline import (
     build_master,
     detect_new_candle,
     refresh_features,
+    refresh_features_by_track,
     refresh_klines,
 )
 from crypto_trade.live.models import (
@@ -246,6 +247,35 @@ class LiveEngine:
         self._symbol_to_model: dict[str, str] = {
             s: mc.name for mc in config.models for s in mc.symbols
         }
+
+    def _refresh_groups(self, symbols_subset: list[str]) -> list[tuple[tuple[str, ...], Path, str]]:
+        """Group ``symbols_subset`` by track (v1/v2) for refresh_features_by_track.
+
+        A symbol's track is determined by its owning runner's risk_wrapper:
+        v2-wrapped runners use ``data/features_v2`` (or whatever the runner
+        resolved via per-model override), v1 runners use ``data/features``.
+        """
+        v1_syms: list[str] = []
+        v2_syms: list[str] = []
+        v1_dir: Path | None = None
+        v2_dir: Path | None = None
+        for runner in self._runners:
+            track = "v2" if runner.model_config.risk_wrapper == "v2" else "v1"
+            for s in runner.model_config.symbols:
+                if s not in symbols_subset:
+                    continue
+                if track == "v2":
+                    v2_syms.append(s)
+                    v2_dir = runner.features_dir
+                else:
+                    v1_syms.append(s)
+                    v1_dir = runner.features_dir
+        groups: list[tuple[tuple[str, ...], Path, str]] = []
+        if v1_syms and v1_dir is not None:
+            groups.append((tuple(v1_syms), v1_dir, "v1"))
+        if v2_syms and v2_dir is not None:
+            groups.append((tuple(v2_syms), v2_dir, "v2"))
+        return groups
 
     def run(self) -> None:
         """Main entry point — runs until SIGINT/SIGTERM."""
@@ -544,12 +574,11 @@ class LiveEngine:
         refresh_klines(self._fetch_client, all_symbols, self.config.interval, self.config.data_dir)
 
         print("[live] Refreshing features...")
-        refresh_features(
-            all_symbols,
-            self.config.interval,
-            str(self.config.data_dir),
-            str(self.config.features_dir),
-            list(self.config.feature_groups),
+        refresh_features_by_track(
+            self._refresh_groups(all_symbols),
+            interval=self.config.interval,
+            data_dir=str(self.config.data_dir),
+            feature_groups=tuple(self.config.feature_groups),
         )
 
         for runner in self._runners:
@@ -774,12 +803,11 @@ class LiveEngine:
         t_fetch = time.monotonic() - t_fetch_start
 
         t_feat_start = time.monotonic()
-        refresh_features(
-            new_syms,
-            self.config.interval,
-            str(self.config.data_dir),
-            str(self.config.features_dir),
-            list(self.config.feature_groups),
+        refresh_features_by_track(
+            self._refresh_groups(new_syms),
+            interval=self.config.interval,
+            data_dir=str(self.config.data_dir),
+            feature_groups=tuple(self.config.feature_groups),
         )
         t_feat = time.monotonic() - t_feat_start
         print(
