@@ -337,6 +337,47 @@ BASELINE_MODELS = (
 )
 
 
+# v2 baseline (iter-v2/069): 4 individual models on the diversification universe.
+# Each model wraps its inner LightGbmStrategy with RiskV2Wrapper. Mirrors
+# V2_MODELS in run_baseline_v2.py.
+V2_EXCLUDED_SYMBOLS: tuple[str, ...] = (
+    "BTCUSDT",
+    "ETHUSDT",
+    "LINKUSDT",
+    "BNBUSDT",
+)
+
+
+def _build_v2_baseline_models() -> tuple[ModelConfig, ...]:
+    """Construct V2_BASELINE_MODELS lazily so the import-time module load
+    doesn't pull in features_v2 / risk_v2 (heavy deps) for every consumer."""
+    from crypto_trade.features_v2 import V2_FEATURE_COLUMNS
+    from crypto_trade.strategies.ml.risk_v2 import RiskV2Config
+
+    return tuple(
+        ModelConfig(
+            name=f"V2-{sym.replace('USDT', '')}",
+            symbols=(sym,),
+            use_atr_labeling=True,
+            atr_tp_multiplier=2.9,
+            atr_sl_multiplier=1.45,
+            atr_column="natr_21_raw",
+            feature_columns=V2_FEATURE_COLUMNS,
+            features_dir=Path("data/features_v2"),
+            cooldown_candles=4,
+            vol_targeting=False,
+            ood_enabled=False,  # v2 z-score OOD lives in RiskV2Wrapper, not LGBM
+            risk_wrapper="v2",
+            risk_v2_config=RiskV2Config(zscore_threshold=2.5),
+        )
+        for sym in ("DOGEUSDT", "SOLUSDT", "XRPUSDT", "NEARUSDT")
+    )
+
+
+V2_BASELINE_MODELS: tuple[ModelConfig, ...] = _build_v2_baseline_models()
+COMBINED_MODELS: tuple[ModelConfig, ...] = BASELINE_MODELS + V2_BASELINE_MODELS
+
+
 @dataclass(frozen=True)
 class LiveConfig:
     """Configuration for the live trading engine.

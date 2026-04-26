@@ -140,3 +140,48 @@ def test_v2_runner_requires_risk_v2_config():
     )
     with pytest.raises(ValueError, match="risk_v2_config"):
         ModelRunner(mc, live)
+
+
+# ----------------------------- Task 5 ---------------------------------------
+
+
+def test_v2_baseline_models_shape():
+    """V2_BASELINE_MODELS mirrors run_baseline_v2.V2_MODELS field-for-field."""
+    from crypto_trade.live.models import V2_BASELINE_MODELS, V2_EXCLUDED_SYMBOLS
+
+    expected_symbols = {"DOGEUSDT", "SOLUSDT", "XRPUSDT", "NEARUSDT"}
+    actual_symbols = {s for mc in V2_BASELINE_MODELS for s in mc.symbols}
+    assert actual_symbols == expected_symbols
+    assert len(V2_BASELINE_MODELS) == 4
+
+    for mc in V2_BASELINE_MODELS:
+        assert mc.risk_wrapper == "v2"
+        assert mc.risk_v2_config is not None
+        # ood_enabled MUST be False — v2's z-score OOD lives in the wrapper;
+        # leaving v1's R3 Mahalanobis enabled would double-gate.
+        assert mc.ood_enabled is False
+        assert mc.atr_column == "natr_21_raw"
+        assert mc.cooldown_candles == 4
+        assert mc.vol_targeting is False
+        assert str(mc.features_dir) == "data/features_v2"
+        assert mc.atr_tp_multiplier == 2.9
+        assert mc.atr_sl_multiplier == 1.45
+        assert set(mc.symbols).isdisjoint(V2_EXCLUDED_SYMBOLS)
+
+
+def test_combined_models_unions_v1_and_v2():
+    from crypto_trade.live.models import (
+        BASELINE_MODELS,
+        COMBINED_MODELS,
+        V2_BASELINE_MODELS,
+    )
+    assert len(COMBINED_MODELS) == len(BASELINE_MODELS) + len(V2_BASELINE_MODELS)
+    # Symbols disjoint across the two presets
+    v1_syms = {s for mc in BASELINE_MODELS for s in mc.symbols}
+    v2_syms = {s for mc in V2_BASELINE_MODELS for s in mc.symbols}
+    assert v1_syms.isdisjoint(v2_syms)
+
+
+def test_v2_excluded_symbols_constant():
+    from crypto_trade.live.models import V2_EXCLUDED_SYMBOLS
+    assert set(V2_EXCLUDED_SYMBOLS) == {"BTCUSDT", "ETHUSDT", "LINKUSDT", "BNBUSDT"}
