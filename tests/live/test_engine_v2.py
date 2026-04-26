@@ -89,3 +89,54 @@ def test_model_runner_resolves_with_fallback():
     assert str(r2.features_dir) == "data/features_v2"
     assert r2.vol_targeting is False
     assert r2.inner_atr_column == "natr_21_raw"
+
+
+# ----------------------------- Task 3 ---------------------------------------
+
+
+def test_v2_runner_wraps_strategy_with_riskv2():
+    """When risk_wrapper='v2', ModelRunner wraps the inner LGBM in RiskV2Wrapper."""
+    from crypto_trade.live.engine import ModelRunner
+    from crypto_trade.strategies.ml.risk_v2 import RiskV2Config, RiskV2Wrapper
+
+    live = LiveConfig()
+    mc = ModelConfig(
+        name="V2-DOGE",
+        symbols=("DOGEUSDT",),
+        use_atr_labeling=True,
+        atr_tp_multiplier=2.9,
+        atr_sl_multiplier=1.45,
+        atr_column="natr_21_raw",
+        features_dir=Path("data/features_v2"),
+        cooldown_candles=4,
+        vol_targeting=False,
+        ood_enabled=False,
+        risk_wrapper="v2",
+        risk_v2_config=RiskV2Config(zscore_threshold=2.5),
+    )
+    runner = ModelRunner(mc, live)
+    assert isinstance(runner.strategy, RiskV2Wrapper)
+    # Inner strategy stays accessible — patcher relies on this
+    assert runner.inner_strategy is not runner.strategy
+    assert runner.inner_strategy is runner.strategy.inner
+    # Wrapper must expose atr_column for use by the patcher and any caller
+    # that currently reads strategy.atr_column directly.
+    assert runner.strategy.atr_column == runner.inner_atr_column == "natr_21_raw"
+
+
+def test_v2_runner_requires_risk_v2_config():
+    """risk_wrapper='v2' without a config must raise — no silent default."""
+    from crypto_trade.live.engine import ModelRunner
+
+    live = LiveConfig()
+    mc = ModelConfig(
+        name="V2-bad",
+        symbols=("DOGEUSDT",),
+        use_atr_labeling=True,
+        atr_tp_multiplier=2.9,
+        atr_sl_multiplier=1.45,
+        risk_wrapper="v2",
+        risk_v2_config=None,
+    )
+    with pytest.raises(ValueError, match="risk_v2_config"):
+        ModelRunner(mc, live)

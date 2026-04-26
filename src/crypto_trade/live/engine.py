@@ -131,10 +131,19 @@ class ModelRunner:
             ood_cutoff_pct=model_config.ood_cutoff_pct,
             **atr_column_kwarg,
         )
-        # _inner_strategy is the bare LightGbmStrategy regardless of wrapping
-        # (Task 3 may wrap self.strategy with RiskV2Wrapper).
+        # _inner_strategy is the bare LightGbmStrategy regardless of wrapping;
+        # self.strategy may be wrapped in RiskV2Wrapper for v2 models.
         self._inner_strategy = inner
-        self.strategy = inner
+        if model_config.risk_wrapper == "v2":
+            if model_config.risk_v2_config is None:
+                raise ValueError(
+                    f"ModelConfig {model_config.name}: risk_wrapper='v2' "
+                    "requires risk_v2_config (got None)"
+                )
+            from crypto_trade.strategies.ml.risk_v2 import RiskV2Wrapper
+            self.strategy = RiskV2Wrapper(inner, model_config.risk_v2_config)
+        else:
+            self.strategy = inner
         self._master: pd.DataFrame | None = None
 
     @property

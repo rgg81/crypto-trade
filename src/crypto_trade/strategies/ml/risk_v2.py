@@ -130,6 +130,11 @@ class RiskV2Wrapper:
         self._lookup: dict[str, dict[str, np.ndarray]] = {}
         self._gate_stats: dict[str, GateStats] = {}
 
+    @property
+    def atr_column(self) -> str:
+        """Delegate to the inner strategy so callers can treat the wrapper transparently."""
+        return self.inner.atr_column
+
     # ------------------------------------------------------------------
     # Strategy protocol
     # ------------------------------------------------------------------
