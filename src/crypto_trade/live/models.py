@@ -13,6 +13,10 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import TYPE_CHECKING, Literal
+
+if TYPE_CHECKING:
+    from crypto_trade.strategies.ml.risk_v2 import RiskV2Config
 
 # Iter 186: 16-feature scale-invariant subset used for R3 Mahalanobis OOD
 # distance. Kept separate from BASELINE_FEATURE_COLUMNS (which is the
@@ -60,6 +64,16 @@ class ModelConfig:
     ood_enabled: bool = True
     ood_features: tuple[str, ...] = OOD_FEATURE_COLUMNS
     ood_cutoff_pct: float = 0.70
+    # Per-model overrides for v1+v2 coexistence.
+    # None ⇒ fall back to LiveConfig (preserves v1 bit-identical behavior).
+    feature_columns: tuple[str, ...] | None = None
+    features_dir: Path | None = None
+    atr_column: str | None = None
+    cooldown_candles: int | None = None
+    vol_targeting: bool | None = None
+    ensemble_seeds: tuple[int, ...] | None = None
+    risk_wrapper: Literal["none", "v2"] = "none"
+    risk_v2_config: "RiskV2Config | None" = None
 
 
 # Static feature list for baseline v152: 193 features.
