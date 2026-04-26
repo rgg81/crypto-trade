@@ -79,7 +79,37 @@ class ModelRunner:
 
     def __init__(self, model_config: ModelConfig, live_config: LiveConfig) -> None:
         self.model_config = model_config
-        self.strategy = LightGbmStrategy(
+        # Resolve per-model overrides; fall back to LiveConfig when None.
+        self.feature_columns: tuple[str, ...] = (
+            model_config.feature_columns
+            if model_config.feature_columns is not None
+            else BASELINE_FEATURE_COLUMNS
+        )
+        self.features_dir = (
+            model_config.features_dir
+            if model_config.features_dir is not None
+            else live_config.features_dir
+        )
+        self.cooldown_candles: int = (
+            model_config.cooldown_candles
+            if model_config.cooldown_candles is not None
+            else live_config.cooldown_candles
+        )
+        self.vol_targeting: bool = (
+            model_config.vol_targeting
+            if model_config.vol_targeting is not None
+            else live_config.vol_targeting
+        )
+        self.ensemble_seeds: tuple[int, ...] = (
+            model_config.ensemble_seeds
+            if model_config.ensemble_seeds is not None
+            else live_config.ensemble_seeds
+        )
+        atr_column_kwarg: dict[str, str] = {}
+        if model_config.atr_column is not None:
+            atr_column_kwarg["atr_column"] = model_config.atr_column
+
+        inner = LightGbmStrategy(
             training_months=live_config.training_months,
             n_trials=live_config.n_trials,
             cv_splits=live_config.cv_splits,
@@ -87,20 +117,35 @@ class ModelRunner:
             label_sl_pct=live_config.stop_loss_pct,
             label_timeout_minutes=live_config.timeout_minutes,
             fee_pct=live_config.fee_pct,
-            features_dir=str(live_config.features_dir),
+            features_dir=str(self.features_dir),
             verbose=1,
             atr_tp_multiplier=model_config.atr_tp_multiplier,
             atr_sl_multiplier=model_config.atr_sl_multiplier,
             use_atr_labeling=model_config.use_atr_labeling,
-            ensemble_seeds=list(live_config.ensemble_seeds),
-            feature_columns=list(BASELINE_FEATURE_COLUMNS),
+            ensemble_seeds=list(self.ensemble_seeds),
+            feature_columns=list(self.feature_columns),
             ood_enabled=model_config.ood_enabled,
             ood_features=(
                 list(model_config.ood_features) if model_config.ood_enabled else None
             ),
             ood_cutoff_pct=model_config.ood_cutoff_pct,
+            **atr_column_kwarg,
         )
+        # _inner_strategy is the bare LightGbmStrategy regardless of wrapping
+        # (Task 3 may wrap self.strategy with RiskV2Wrapper).
+        self._inner_strategy = inner
+        self.strategy = inner
         self._master: pd.DataFrame | None = None
+
+    @property
+    def inner_strategy(self):
+        """The underlying LightGbmStrategy regardless of wrapping (used by patcher)."""
+        return self._inner_strategy
+
+    @property
+    def inner_atr_column(self) -> str:
+        """ATR column name on the inner strategy (used by tests + patcher)."""
+        return self._inner_strategy.atr_column
 
     def warmup(self, master: pd.DataFrame) -> None:
         """Run compute_features on the master DF and store reference."""
@@ -441,7 +486,10 @@ class LiveEngine:
         reset the trained model). Also updates the strategy's internal master
         reference so future operations see the latest candle data.
         """
-        strategy = runner.strategy
+        # Always reach the bare LightGbmStrategy — RiskV2Wrapper (when present)
+        # exposes the same Strategy Protocol but doesn't carry the LGBM internals
+        # (_month_features, _selected_cols, atr_column, …) that the patcher mutates.
+        strategy = runner.inner_strategy
         # Update master reference for any code that might read it
         strategy._master = master
         strategy._sym_arr = master["symbol"].to_numpy(dtype=str)

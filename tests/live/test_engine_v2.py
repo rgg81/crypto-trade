@@ -39,3 +39,53 @@ def test_v1_model_config_keeps_defaults_unchanged():
     assert mc.ensemble_seeds is None
     assert mc.risk_wrapper == "none"
     assert mc.risk_v2_config is None
+
+
+# ----------------------------- Task 2 ---------------------------------------
+
+
+def test_model_runner_resolves_with_fallback():
+    """ModelRunner exposes resolved fields and inner_strategy / inner_atr_column.
+
+    A v1-style ModelConfig (all overrides None) resolves to LiveConfig values.
+    A v2-style ModelConfig with overrides resolves to its own values, and its
+    inner_atr_column reflects the explicit atr_column kwarg passed to LightGbm.
+    """
+    from crypto_trade.live.engine import ModelRunner
+
+    live = LiveConfig()  # cooldown_candles=2, features_dir=Path("data/features"), ...
+
+    mc_default = ModelConfig(
+        name="A",
+        symbols=("BTCUSDT",),
+        use_atr_labeling=True,
+        atr_tp_multiplier=2.9,
+        atr_sl_multiplier=1.45,
+    )
+    mc_override = ModelConfig(
+        name="V2-DOGE",
+        symbols=("DOGEUSDT",),
+        use_atr_labeling=True,
+        atr_tp_multiplier=2.9,
+        atr_sl_multiplier=1.45,
+        cooldown_candles=4,
+        features_dir=Path("data/features_v2"),
+        atr_column="natr_21_raw",
+        vol_targeting=False,
+    )
+
+    r1 = ModelRunner(mc_default, live)
+    r2 = ModelRunner(mc_override, live)
+
+    # v1 defaults fall back to LiveConfig
+    assert r1.cooldown_candles == 2
+    assert str(r1.features_dir) == "data/features"
+    assert r1.vol_targeting is True
+    assert r1.inner_atr_column == "vol_natr_21"  # LightGbmStrategy default
+    assert r1.inner_strategy is r1.strategy  # no wrapping yet (Task 3)
+
+    # v2 overrides take precedence
+    assert r2.cooldown_candles == 4
+    assert str(r2.features_dir) == "data/features_v2"
+    assert r2.vol_targeting is False
+    assert r2.inner_atr_column == "natr_21_raw"
