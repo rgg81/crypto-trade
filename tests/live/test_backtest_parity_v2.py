@@ -95,11 +95,10 @@ def _read_closed_trades_from_db(db_path: Path) -> pd.DataFrame:
 def test_v2_live_catchup_matches_backtest(tmp_path):
     """Live engine catch-up on V2_BASELINE_MODELS reproduces the v2 backtest OOS trades.
 
-    NOTE: the live engine's _catch_up only replays the previous month, so this
-    test asserts the slice of OOS trades that fall within that month, not the
-    full OOS history. For the full headline assertion see
-    test_backtest_parity_combined.py and run with the engine in dry-run mode
-    overnight.
+    Drives the engine with catch_up_lookback_days=400 so the entire OOS
+    window since 2025-03-24 is replayed. VT/R1/R2/cooldown all rebuild
+    from that history, so weight_factor matches the backtest exactly
+    (Task 4 of the catch-up state-seeding plan).
     """
     from crypto_trade.live.engine import LiveEngine
     from crypto_trade.live.models import LiveConfig, V2_BASELINE_MODELS
@@ -110,6 +109,7 @@ def test_v2_live_catchup_matches_backtest(tmp_path):
         db_path=tmp_path / "v2.db",
         data_dir=DATA_DIR,
         features_dir=V1_FEATURES_DIR,  # ignored for v2 runners (per-model override)
+        catch_up_lookback_days=400,  # ≥ days since 2025-03-24 OOS cutoff
     )
     engine = LiveEngine(cfg)
     engine.catch_up_only()
@@ -118,16 +118,19 @@ def test_v2_live_catchup_matches_backtest(tmp_path):
     backtest = pd.read_csv(V2_TRADES_CSV)
     backtest = backtest[backtest["weight_factor"] > 0]  # drop BTC-zeroed rows
 
-    # Filter both streams to the catch-up window: previous-month boundary in ms.
-    # The engine's _catch_up starts at _previous_month_start_ms(now), so we
-    # restrict the backtest comparison to the same range.
-    catchup_floor = int(live["open_time"].min()) if not live.empty else OOS_CUTOFF_MS
-    bt_window = backtest[
-        backtest["open_time"] >= catchup_floor
-    ].sort_values(["open_time", "symbol"]).reset_index(drop=True)
-    live_window = live.sort_values(["open_time", "symbol"]).reset_index(drop=True)
+    # Compare the FULL OOS window now that the engine replays it all.
+    bt_window = (
+        backtest[backtest["open_time"] >= OOS_CUTOFF_MS]
+        .sort_values(["open_time", "symbol"])
+        .reset_index(drop=True)
+    )
+    live_window = (
+        live[live["open_time"] >= OOS_CUTOFF_MS]
+        .sort_values(["open_time", "symbol"])
+        .reset_index(drop=True)
+    )
 
-    # Trade count must match exactly within the catch-up window.
+    # Trade count must match exactly across the entire OOS window.
     assert len(live_window) == len(bt_window), (
         f"trade count mismatch: live={len(live_window)} vs backtest={len(bt_window)}"
     )

@@ -61,7 +61,13 @@ def _data_present() -> bool:
 @pytest.mark.parity
 @pytest.mark.skipif(not _data_present(), reason="v1+v2 data + backtest trades not available")
 def test_combined_catchup_matches_both_backtests(tmp_path):
-    """The headline backtest-vs-live parity test. v1 + v2 in one engine."""
+    """The headline backtest-vs-live parity test. v1 + v2 in one engine.
+
+    Drives the engine with catch_up_lookback_days=400 so the entire OOS
+    window since 2025-03-24 is replayed. After Task 4 of the catch-up
+    state-seeding plan, weight_factor and weighted_pnl are required to
+    match field-for-field — full TRADE_COLS byte-identity.
+    """
     from crypto_trade.live.engine import LiveEngine
     from crypto_trade.live.models import COMBINED_MODELS, LiveConfig
 
@@ -71,25 +77,23 @@ def test_combined_catchup_matches_both_backtests(tmp_path):
         db_path=tmp_path / "combined.db",
         data_dir=DATA_DIR,
         features_dir=V1_FEATURES_DIR,  # v2 runners override per-model
+        catch_up_lookback_days=400,    # full OOS replay since 2025-03-24
     )
     engine = LiveEngine(cfg)
     engine.catch_up_only()
 
     live = _read_closed_trades_from_db(tmp_path / "combined.db")
 
-    # Catch-up window: engine's _catch_up_model starts at previous month
-    catchup_floor = int(live["open_time"].min()) if not live.empty else OOS_CUTOFF_MS
-
-    # ---- v1 slice ----
+    # ---- v1 slice (full OOS window) ----
     bt_v1 = pd.read_csv(V1_TRADES_CSV)
     bt_v1 = bt_v1[bt_v1["weight_factor"] > 0]
     bt_v1_window = (
-        bt_v1[(bt_v1["symbol"].isin(V1_SYMBOLS)) & (bt_v1["open_time"] >= catchup_floor)]
+        bt_v1[(bt_v1["symbol"].isin(V1_SYMBOLS)) & (bt_v1["open_time"] >= OOS_CUTOFF_MS)]
         .sort_values(["open_time", "symbol"])
         .reset_index(drop=True)
     )
     live_v1 = (
-        live[(live["symbol"].isin(V1_SYMBOLS)) & (live["open_time"] >= catchup_floor)]
+        live[(live["symbol"].isin(V1_SYMBOLS)) & (live["open_time"] >= OOS_CUTOFF_MS)]
         .sort_values(["open_time", "symbol"])
         .reset_index(drop=True)
     )
@@ -100,16 +104,16 @@ def test_combined_catchup_matches_both_backtests(tmp_path):
         live_v1[TRADE_COLS], bt_v1_window[TRADE_COLS], check_exact=True,
     )
 
-    # ---- v2 slice ----
+    # ---- v2 slice (full OOS window) ----
     bt_v2 = pd.read_csv(V2_TRADES_CSV)
     bt_v2 = bt_v2[bt_v2["weight_factor"] > 0]
     bt_v2_window = (
-        bt_v2[(bt_v2["symbol"].isin(V2_SYMBOLS)) & (bt_v2["open_time"] >= catchup_floor)]
+        bt_v2[(bt_v2["symbol"].isin(V2_SYMBOLS)) & (bt_v2["open_time"] >= OOS_CUTOFF_MS)]
         .sort_values(["open_time", "symbol"])
         .reset_index(drop=True)
     )
     live_v2 = (
-        live[(live["symbol"].isin(V2_SYMBOLS)) & (live["open_time"] >= catchup_floor)]
+        live[(live["symbol"].isin(V2_SYMBOLS)) & (live["open_time"] >= OOS_CUTOFF_MS)]
         .sort_values(["open_time", "symbol"])
         .reset_index(drop=True)
     )
@@ -121,7 +125,7 @@ def test_combined_catchup_matches_both_backtests(tmp_path):
     )
 
     # ---- April 2026 sanity check ----
-    if catchup_floor < APRIL_2026_MS:
+    if True:
         live_apr = live[live["open_time"] >= APRIL_2026_MS]
         bt_apr_v1 = bt_v1[bt_v1["open_time"] >= APRIL_2026_MS]
         bt_apr_v2 = bt_v2[bt_v2["open_time"] >= APRIL_2026_MS]
