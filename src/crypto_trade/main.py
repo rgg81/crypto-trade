@@ -266,6 +266,25 @@ def build_parser() -> argparse.ArgumentParser:
         default="v1",
         help="Model preset: v1=BASELINE_MODELS, v2=V2_BASELINE_MODELS, both=COMBINED_MODELS (default: v1)",
     )
+    catch_up_group = live_parser.add_mutually_exclusive_group()
+    catch_up_group.add_argument(
+        "--catch-up-days",
+        type=int,
+        default=None,
+        help=(
+            "Replay the trailing N days during catch-up. Overrides the "
+            "default 90-day window from LiveConfig."
+        ),
+    )
+    catch_up_group.add_argument(
+        "--catch-up-from",
+        type=str,
+        default=None,
+        help=(
+            "Replay from YYYY-MM-DD UTC during catch-up (e.g. 2025-03-24 "
+            "for full OOS-cutoff parity). Mutually exclusive with --catch-up-days."
+        ),
+    )
 
     # -- portfolio-report subcommand --
     pr_parser = subparsers.add_parser(
@@ -748,6 +767,23 @@ def _cmd_live(args, settings) -> None:
     selected_models = track_map[track]
     print(f"[live] Track: {track} ({len(selected_models)} models)")
 
+    # Catch-up window: --catch-up-from beats --catch-up-days; both override
+    # LiveConfig's default. None of these set ⇒ use the LiveConfig default
+    # (90 days) by leaving catch_up_lookback_days unset in the kwargs.
+    catch_up_kwargs: dict[str, int | None] = {}
+    catch_up_from = getattr(args, "catch_up_from", None)
+    catch_up_days = getattr(args, "catch_up_days", None)
+    if catch_up_from is not None:
+        import pandas as pd
+
+        from_ts = pd.Timestamp(catch_up_from, tz="UTC")
+        days = max(1, (pd.Timestamp.now("UTC") - from_ts).days)
+        catch_up_kwargs["catch_up_lookback_days"] = days
+        print(f"[live] Catch-up lookback: {days} days (from {catch_up_from})")
+    elif catch_up_days is not None:
+        catch_up_kwargs["catch_up_lookback_days"] = catch_up_days
+        print(f"[live] Catch-up lookback: {catch_up_days} days")
+
     config = LiveConfig(
         models=selected_models,
         interval="8h",
@@ -759,6 +795,7 @@ def _cmd_live(args, settings) -> None:
         db_path=Path(settings.data_dir) / ("dry_run.db" if not args.live_mode else "live.db"),
         poll_interval_seconds=args.poll_interval,
         dry_run=not args.live_mode,
+        **catch_up_kwargs,
     )
 
     engine = LiveEngine(
