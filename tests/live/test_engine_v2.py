@@ -567,10 +567,9 @@ def test_catch_up_pre_load_filter_excludes_real_numeric_ids(tmp_path):
     pre-loaded into catch-up's open_trades dict (that's reconciler/poll-loop's
     domain). Pre-loading would let catch-up's check_order simulate exits
     and falsely close DB rows whose Binance positions are still open."""
-    from crypto_trade.live.models import (
-        LiveTrade, ModelConfig, is_paper_trade,
-    )
+    from crypto_trade.live.models import LiveTrade, ModelConfig, is_paper_trade
     from crypto_trade.live.state_store import StateStore
+
 
     db = tmp_path / "test.db"
     state = StateStore(db)
