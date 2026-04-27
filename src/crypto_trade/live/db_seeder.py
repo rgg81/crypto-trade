@@ -79,12 +79,14 @@ def _row_to_trade(
     if as_of_ms is not None and open_time >= as_of_ms:
         return None  # opens after cutoff — let the engine replay it
 
-    # ALL trades that opened before as_of_ms are seeded as `closed` with their
-    # full CSV close info. Even if their close_time falls after as_of_ms, we
-    # still want the cum_weighted_pnl / VT history to include them so R2 / VT
-    # state matches what the backtest would have at the start of catch-up.
-    # The engine's catch-up loop only iterates candles >= catch_up_start, so it
-    # won't re-create these trades — no duplication risk.
+    # If close_time is also before as_of, this trade is fully closed by then —
+    # status='closed' with full exit info. cum_weighted_pnl / VT include it.
+    #
+    # If close_time is at or after as_of, this trade is "open at the catch-up
+    # boundary" — status='open' but with intended-exit fields populated so the
+    # engine's catch-up can close it deterministically at the seeded exit_time.
+    spans_cutoff = as_of_ms is not None and close_time >= as_of_ms
+
     direction = int(row["direction"])
     entry_price = float(row["entry_price"])
     exit_price = float(row["exit_price"])
@@ -96,16 +98,21 @@ def _row_to_trade(
         entry_price=entry_price,
         amount_usd=weight_factor * max_amount_usd,
         weight_factor=weight_factor,
-        # SL/TP/timeout aren't read by to_trade_result for closed trades.
         stop_loss_price=entry_price,
         take_profit_price=entry_price,
         open_time=open_time,
         timeout_time=open_time + timeout_minutes * 60 * 1000,
         signal_time=open_time,
-        status="closed",
-        entry_order_id=None,
+        status="open" if spans_cutoff else "closed",
+        # Sentinel order IDs distinguish seeded open trades from genuine
+        # live-opened ones in `_reconcile` and `_catch_up_model`.
+        entry_order_id="SEEDED" if spans_cutoff else None,
         sl_order_id=None,
         tp_order_id=None,
+        # Even for status='open' rows we populate exit_* with the backtest's
+        # actual close. The engine's catch-up loop reads these to close the
+        # trade exactly at exit_time — no SL/TP/timeout recomputation. For
+        # closed rows these are the real exit (same fields, same meaning).
         exit_price=exit_price,
         exit_time=close_time,
         exit_reason=str(row["exit_reason"]),
@@ -183,11 +190,13 @@ def seed_live_db_from_backtest(
                 if trade is None:
                     continue
                 store.upsert_trade(trade)
-                # All trades come back as "closed" now (we seed every
-                # pre-cutoff trade as closed with full CSV close info).
                 key = f"{track}_{trade.status}"
                 counts[key] = counts.get(key, 0) + 1
-                if trade.exit_time is not None:
+                # Cooldown is keyed off the LAST close that finished before
+                # the catch-up boundary. Open-at-cutoff trades close LATER, so
+                # they don't drive the initial cooldown timestamp; only fully-
+                # closed (status='closed') trades do.
+                if trade.status == "closed" and trade.exit_time is not None:
                     k = (model_name, sym)
                     if trade.exit_time > latest_close[k]:
                         latest_close[k] = trade.exit_time

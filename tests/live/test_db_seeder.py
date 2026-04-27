@@ -144,18 +144,19 @@ def test_seed_inserts_trades_and_cooldown(tmp_path):
     assert int(doge_key) == 2_000_000 + 4 * 28_800_000
 
 
-def test_seed_as_of_seeds_open_at_cutoff_as_closed(tmp_path):
-    """Trades that opened before as_of_ms are seeded as 'closed' with their full
-    CSV close info — even if their close_time falls after as_of. This keeps
-    cum_weighted_pnl / VT state correct when the live engine takes over at
-    catch-up start. Trades that opened after as_of are skipped."""
+def test_seed_as_of_splits_open_vs_closed(tmp_path):
+    """Trade fully-closed before cutoff → status='closed' (PnL flows into cum).
+    Trade open at cutoff (close_time >= as_of) → status='open' with full
+    intended-exit info populated, marked entry_order_id='SEEDED'.
+    Trade opened after cutoff → skipped (engine replays via catch-up).
+    """
     v1_csv = tmp_path / "v1.csv"
     _toy_trades_csv(
         v1_csv,
         [
             _row("BTCUSDT", 1, 1_000_000, 2_000_000),  # closed before cutoff
-            _row("BTCUSDT", -1, 3_000_000, 5_000_000),  # spans cutoff (open<cutoff<close)
-            _row("BTCUSDT", 1, 6_000_000, 7_000_000),  # opens after cutoff — skipped
+            _row("BTCUSDT", -1, 3_000_000, 5_000_000),  # spans cutoff
+            _row("BTCUSDT", 1, 6_000_000, 7_000_000),  # opens after cutoff
         ],
     )
 
@@ -165,18 +166,22 @@ def test_seed_as_of_seeds_open_at_cutoff_as_closed(tmp_path):
         db, [v1_csv], [], cfg, as_of_ms=4_000_000
     )
 
-    assert counts["v1_closed"] == 2  # both pre-cutoff opens, both seeded closed
-    assert counts["v1_open"] == 0
+    assert counts["v1_closed"] == 1
+    assert counts["v1_open"] == 1
     assert counts["skipped_after_cutoff"] == 1
 
     store = StateStore(db)
-    closed = [t for t in store.get_all_trades() if t.status == "closed"]
-    assert len(closed) == 2
-    # The trade that spanned the cutoff carries its real exit info
-    spanning = [t for t in closed if t.open_time == 3_000_000][0]
-    assert spanning.exit_time == 5_000_000
-    assert spanning.exit_price == 105.0
-    assert spanning.exit_reason == "stop_loss"
+    open_trades = store.get_open_trades()
+    assert len(open_trades) == 1
+    seeded_open = open_trades[0]
+    assert seeded_open.symbol == "BTCUSDT"
+    assert seeded_open.open_time == 3_000_000
+    # Sentinel marks it as seeded (vs a live-opened trade)
+    assert seeded_open.entry_order_id == "SEEDED"
+    # Intended-exit info is populated so the engine can close exactly at exit_time
+    assert seeded_open.exit_time == 5_000_000
+    assert seeded_open.exit_price == 105.0
+    assert seeded_open.exit_reason == "stop_loss"
 
 
 def test_seed_skips_unknown_symbols(tmp_path):

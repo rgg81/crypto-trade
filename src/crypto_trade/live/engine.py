@@ -726,7 +726,16 @@ class LiveEngine:
         low_arr = master["low"].values
         close_arr = master["close"].values
 
+        # Pre-load any seeded `status='open'` trades for this model so the
+        # catch-up loop's open-position guard sees them. Each seeded open
+        # trade carries its full intended-exit info (exit_time, exit_price,
+        # exit_reason) — populated by db_seeder._row_to_trade for trades that
+        # span the as_of cutoff. We close them deterministically below at the
+        # candle whose close_time first reaches the seeded exit_time.
         open_trades: dict[str, LiveTrade] = {}
+        for seeded in self._state.get_open_trades(model_name=runner.model_config.name):
+            if seeded.symbol in (s for s in runner.model_config.symbols):
+                open_trades[seeded.symbol] = seeded
         cooldown_until: dict[str, int] = {}
         n_signals = 0
         n_trades_opened = 0
@@ -751,39 +760,58 @@ class LiveEngine:
 
             # Current month: full trade lifecycle (mirrors backtest.py:217-305)
 
-            # (a) Check open trade for SL/TP/timeout
+            # (a) Check open trade for SL/TP/timeout (or apply seeded exit)
             if sym in open_trades:
-                order = trade_to_order(open_trades[sym])
-                result = check_order(
-                    order,
-                    ot,
-                    float(open_arr[i]),
-                    float(high_arr[i]),
-                    float(low_arr[i]),
-                    ct,
-                    self.config.fee_pct,
-                )
-                if result is not None:
-                    trade = open_trades.pop(sym)
-                    trade.status = "closed"
-                    trade.exit_price = result.exit_price
-                    trade.exit_time = result.close_time
-                    trade.exit_reason = result.exit_reason
-                    self._state.upsert_trade(trade)
-                    self._logger.log_close(trade)
-                    self._record_trade_close_for_vt(trade)
-                    self._record_trade_close_for_risk(trade)
-                    n_trades_closed += 1
-                    # Match backtest.py:239-243 exactly: use result.close_time
-                    # (not current candle ct). For timeouts, result.close_time
-                    # is the candle's open_time, not close_time — an 8h difference
-                    # for 8h candles that shifts the next eligible trade.
-                    # Per-model cooldown_candles (v2 uses 4, v1 uses 2).
-                    if runner.cooldown_candles > 0:
-                        cooldown_until[sym] = (
-                            result.close_time
-                            + runner.cooldown_candles * self._candle_duration_ms
-                        )
+                trade = open_trades[sym]
+                # Seeded open trade — close at the seeded exit_time using the
+                # CSV-supplied exit_price/exit_reason. No SL/TP/timeout
+                # recomputation against dummy seeded SL/TP prices.
+                if trade.entry_order_id == "SEEDED" and trade.exit_time is not None:
+                    if ct >= trade.exit_time:
+                        open_trades.pop(sym)
+                        trade.status = "closed"
+                        # exit_* fields are already set by the seeder
+                        self._state.upsert_trade(trade)
+                        self._logger.log_close(trade)
+                        self._record_trade_close_for_vt(trade)
+                        self._record_trade_close_for_risk(trade)
+                        n_trades_closed += 1
+                        if runner.cooldown_candles > 0:
+                            cooldown_until[sym] = (
+                                trade.exit_time
+                                + runner.cooldown_candles * self._candle_duration_ms
+                            )
+                    # else: still holding, will close on a later candle
+                else:
+                    # Genuine live-opened trade: SL/TP/timeout via check_order
+                    order = trade_to_order(trade)
+                    result = check_order(
+                        order,
+                        ot,
+                        float(open_arr[i]),
+                        float(high_arr[i]),
+                        float(low_arr[i]),
+                        ct,
+                        self.config.fee_pct,
+                    )
+                    if result is not None:
+                        trade = open_trades.pop(sym)
+                        trade.status = "closed"
+                        trade.exit_price = result.exit_price
+                        trade.exit_time = result.close_time
+                        trade.exit_reason = result.exit_reason
+                        self._state.upsert_trade(trade)
+                        self._logger.log_close(trade)
+                        self._record_trade_close_for_vt(trade)
+                        self._record_trade_close_for_risk(trade)
+                        n_trades_closed += 1
+                        # Match backtest.py:239-243: use result.close_time (not ct).
+                        # For timeouts, result.close_time = candle open_time.
+                        if runner.cooldown_candles > 0:
+                            cooldown_until[sym] = (
+                                result.close_time
+                                + runner.cooldown_candles * self._candle_duration_ms
+                            )
 
             # (b) Get signal
             sig = runner.strategy.get_signal(sym, ot)
