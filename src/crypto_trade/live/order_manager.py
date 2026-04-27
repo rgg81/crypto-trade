@@ -13,7 +13,7 @@ import uuid
 from crypto_trade.backtest import check_order
 from crypto_trade.backtest_models import Order, Signal
 from crypto_trade.live.auth_client import AuthenticatedBinanceClient
-from crypto_trade.live.models import LiveConfig, LiveTrade
+from crypto_trade.live.models import LiveConfig, LiveTrade, is_paper_trade
 from crypto_trade.live.state_store import StateStore
 
 log = logging.getLogger(__name__)
@@ -170,12 +170,20 @@ class OrderManager:
         return None
 
     def check_exchange_exits(self) -> list[LiveTrade]:
-        """Check if any SL/TP orders filled on exchange. Returns closed trades."""
+        """Check if any SL/TP orders filled on exchange. Returns closed trades.
+
+        Paper trades (None / SEEDED / CATCHUP- / DRY-) are skipped — they have
+        no Binance counterpart, and querying with sentinel order IDs wastes
+        API quota and pollutes logs with 4xx errors.
+        """
         if self._config.dry_run or self._auth is None:
             return []
 
         closed: list[LiveTrade] = []
         for trade in self._state.get_open_trades():
+            if is_paper_trade(trade):
+                continue
+
             if trade.sl_order_id:
                 sl_status = self._auth.get_order(trade.symbol, trade.sl_order_id)
                 if sl_status.get("status") == "FILLED":
