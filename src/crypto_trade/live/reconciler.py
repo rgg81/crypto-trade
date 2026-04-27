@@ -9,6 +9,7 @@ from __future__ import annotations
 import time
 
 from crypto_trade.live.auth_client import AuthenticatedBinanceClient
+from crypto_trade.live.models import is_paper_trade
 from crypto_trade.live.state_store import StateStore
 
 
@@ -19,8 +20,10 @@ def reconcile(
 ) -> list[str]:
     """Reconcile open trades in DB with exchange state.
 
-    Returns a list of log messages describing what was resolved.
-    In dry-run mode, no exchange queries are made — open trades are left as-is.
+    Paper trades (None / SEEDED / CATCHUP-* / DRY-* entry_order_id) are
+    skipped — they have no Binance counterpart. Touching them would corrupt
+    seeded state (e.g. close a SEEDED trade as 'reconciled' before catch-up
+    can replay its scripted exit).
     """
     messages: list[str] = []
     open_trades = state.get_open_trades()
@@ -35,9 +38,18 @@ def reconcile(
         messages.append("[reconcile] Dry-run mode — skipping exchange reconciliation.")
         return messages
 
+    paper_trades = [t for t in open_trades if is_paper_trade(t)]
+    real_trades = [t for t in open_trades if not is_paper_trade(t)]
+
+    if paper_trades:
+        messages.append(
+            f"[reconcile] Skipped {len(paper_trades)} paper trade(s) "
+            f"(SEEDED / CATCHUP- / DRY- / None) — no exchange counterpart."
+        )
+
     now_ms = int(time.time() * 1000)
 
-    for trade in open_trades:
+    for trade in real_trades:
         try:
             resolved = _reconcile_trade(trade, auth_client, state, now_ms)
             if resolved:

@@ -132,3 +132,76 @@ def test_position_still_open(state):
     reconcile(state, client, dry_run=False)
     trade = state.get_trade("t1")
     assert trade.status == "open"
+
+
+def test_seeded_trade_is_skipped_not_corrupted(state):
+    """A SEEDED open trade must not be touched by reconciler — its DB state
+    (entry_price + None SL/TP IDs) would otherwise be destroyed by close_trade."""
+    state.upsert_trade(
+        _open_trade(
+            id="seeded-1",
+            entry_order_id="SEEDED",
+            sl_order_id=None,
+            tp_order_id=None,
+        )
+    )
+    # Mock client returns "no position" — would normally trigger close_trade("reconciled")
+    client = _mock_client(order_statuses={}, positions=[{"positionAmt": "0"}])
+
+    msgs = reconcile(state, client, dry_run=False)
+
+    trade = state.get_trade("seeded-1")
+    assert trade.status == "open"
+    assert trade.entry_order_id == "SEEDED"
+    assert any("paper" in m.lower() and "skip" in m.lower() for m in msgs)
+
+
+def test_catchup_trade_is_skipped(state):
+    state.upsert_trade(
+        _open_trade(
+            id="catchup-1",
+            entry_order_id="CATCHUP-deadbeef",
+            sl_order_id="CATCHUP-feedface",
+            tp_order_id="CATCHUP-12345678",
+        )
+    )
+    client = _mock_client(order_statuses={}, positions=[{"positionAmt": "0"}])
+    reconcile(state, client, dry_run=False)
+    assert state.get_trade("catchup-1").status == "open"
+
+
+def test_dry_prefix_trade_is_skipped(state):
+    """Paper trade left over from a prior --dry-run session must not be reconciled."""
+    state.upsert_trade(
+        _open_trade(
+            id="dry-1",
+            entry_order_id="DRY-abc12345",
+            sl_order_id="DRY-deadbeef",
+            tp_order_id="DRY-feedface",
+        )
+    )
+    client = _mock_client(order_statuses={}, positions=[{"positionAmt": "0"}])
+    reconcile(state, client, dry_run=False)
+    assert state.get_trade("dry-1").status == "open"
+
+
+def test_real_numeric_id_still_reconciled(state):
+    """Regression — pre-existing reconciler behavior preserved for real trades."""
+    state.upsert_trade(_open_trade(entry_order_id="9876543210"))
+    client = _mock_client(
+        order_statuses={"sl_1": {"status": "FILLED", "avgPrice": "57600.0", "updateTime": 2000000}},
+    )
+    reconcile(state, client, dry_run=False)
+    trade = state.get_trade("t1")
+    assert trade.status == "closed"
+    assert trade.exit_reason == "stop_loss"
+
+
+def test_paper_skip_count_in_messages(state):
+    state.upsert_trade(_open_trade(id="seed-a", entry_order_id="SEEDED"))
+    state.upsert_trade(_open_trade(id="seed-b", entry_order_id="CATCHUP-aaaa1111"))
+    state.upsert_trade(_open_trade(id="real-1", entry_order_id="9876543210"))
+    client = _mock_client(order_statuses={}, positions=[{"positionAmt": "0.001"}])
+
+    msgs = reconcile(state, client, dry_run=False)
+    assert any("Skipped 2 paper" in m for m in msgs)
