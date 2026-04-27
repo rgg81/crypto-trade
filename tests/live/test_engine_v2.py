@@ -557,3 +557,68 @@ def test_cmd_live_omits_flags_uses_default(tmp_path):
         _cmd_live(args, _StubSettings())
         cfg = engine_cls.call_args.kwargs["config"]
         assert cfg.catch_up_lookback_days == 90  # LiveConfig default
+
+
+# ----------------------------- Task 5: catch-up pre-load filter ------------
+
+
+def test_catch_up_pre_load_filter_excludes_real_numeric_ids(tmp_path):
+    """Real numeric-ID open trades from a prior --live session must NOT be
+    pre-loaded into catch-up's open_trades dict (that's reconciler/poll-loop's
+    domain). Pre-loading would let catch-up's check_order simulate exits
+    and falsely close DB rows whose Binance positions are still open."""
+    from crypto_trade.live.models import (
+        LiveTrade, ModelConfig, is_paper_trade,
+    )
+    from crypto_trade.live.state_store import StateStore
+
+    db = tmp_path / "test.db"
+    state = StateStore(db)
+
+    state.upsert_trade(LiveTrade(
+        id="paper-1", model_name="A", symbol="BTCUSDT", direction=1,
+        entry_price=60000.0, amount_usd=1000.0, weight_factor=1.0,
+        stop_loss_price=57600.0, take_profit_price=64800.0,
+        open_time=1, timeout_time=10**13, signal_time=0,
+        entry_order_id="CATCHUP-deadbeef",
+        sl_order_id="CATCHUP-feedface", tp_order_id="CATCHUP-12345678",
+    ))
+    state.upsert_trade(LiveTrade(
+        id="real-1", model_name="A", symbol="ETHUSDT", direction=1,
+        entry_price=3000.0, amount_usd=1000.0, weight_factor=1.0,
+        stop_loss_price=2880.0, take_profit_price=3240.0,
+        open_time=1, timeout_time=10**13, signal_time=0,
+        entry_order_id="9876543210", sl_order_id="111", tp_order_id="222",
+    ))
+    state.close()
+
+    # Reproduce the engine's pre-load logic exactly:
+    state2 = StateStore(db)
+    mc = ModelConfig(
+        name="A", symbols=("BTCUSDT", "ETHUSDT"),
+        use_atr_labeling=True, atr_tp_multiplier=2.9, atr_sl_multiplier=1.45,
+    )
+    pre_loaded = {
+        seeded.symbol: seeded
+        for seeded in state2.get_open_trades(model_name=mc.name)
+        if seeded.symbol in mc.symbols and is_paper_trade(seeded)
+    }
+    state2.close()
+
+    assert "BTCUSDT" in pre_loaded
+    assert "ETHUSDT" not in pre_loaded, (
+        "Real numeric-ID trades must not be pre-loaded — they belong to reconciler/poll-loop"
+    )
+
+    # Belt-and-suspenders integration anchor — the engine source must use the helper.
+    import re
+    from pathlib import Path
+    src = Path("src/crypto_trade/live/engine.py").read_text()
+    pre_load_block = re.search(
+        r"open_trades:\s*dict\[str,\s*LiveTrade\]\s*=\s*\{\}.*?cooldown_until",
+        src, flags=re.DOTALL,
+    )
+    assert pre_load_block is not None
+    assert "is_paper_trade" in pre_load_block.group(0), (
+        "engine._catch_up_model must filter pre-loaded open trades via is_paper_trade()"
+    )

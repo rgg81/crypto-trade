@@ -32,6 +32,7 @@ from crypto_trade.live.models import (
     LiveTrade,
     ModelConfig,
     _new_id,
+    is_paper_trade,
 )
 from crypto_trade.live.order_manager import OrderManager, compute_sl_tp, trade_to_order
 from crypto_trade.live.reconciler import reconcile
@@ -726,16 +727,22 @@ class LiveEngine:
         low_arr = master["low"].values
         close_arr = master["close"].values
 
-        # Pre-load any seeded `status='open'` trades for this model so the
-        # catch-up loop's open-position guard sees them. Each seeded open
-        # trade carries its full intended-exit info (exit_time, exit_price,
-        # exit_reason) — populated by db_seeder._row_to_trade for trades that
-        # span the as_of cutoff. We close them deterministically below at the
-        # candle whose close_time first reaches the seeded exit_time.
+        # Pre-load paper open trades (SEEDED, CATCHUP-, DRY-, None) for this
+        # model so the catch-up loop's open-position guard sees them. Each
+        # SEEDED trade carries full intended-exit info (exit_time, exit_price,
+        # exit_reason) and is closed deterministically below.
+        #
+        # Real numeric-ID trades (left over from a prior --live session) are
+        # explicitly excluded — they belong to reconciler + poll-loop. Pre-
+        # loading them would let catch-up's check_order simulate a fake exit
+        # and falsely close DB rows whose Binance positions are still open.
         open_trades: dict[str, LiveTrade] = {}
         for seeded in self._state.get_open_trades(model_name=runner.model_config.name):
-            if seeded.symbol in (s for s in runner.model_config.symbols):
-                open_trades[seeded.symbol] = seeded
+            if seeded.symbol not in runner.model_config.symbols:
+                continue
+            if not is_paper_trade(seeded):
+                continue
+            open_trades[seeded.symbol] = seeded
         cooldown_until: dict[str, int] = {}
         n_signals = 0
         n_trades_opened = 0
