@@ -206,13 +206,25 @@ class OrderManager:
         return closed
 
     def check_timeouts(self, now_ms: int) -> list[LiveTrade]:
-        """Force-close trades that have exceeded their timeout."""
+        """Force-close trades that have exceeded their timeout.
+
+        Real-mode behavior for real numeric-ID trades is unchanged: cancel
+        SL+TP, then place a market close in the opposite direction. Paper
+        trades (None / SEEDED / CATCHUP- / DRY-) skip the Binance branch —
+        place_market_order on a paper trade would OPEN a real position in
+        the close direction (no Binance position exists). The DB is still
+        closed so timeout accounting (R1/R2) and `_handle_trade_close` fire.
+        """
         closed: list[LiveTrade] = []
         for trade in self._state.get_open_trades():
             if now_ms < trade.timeout_time:
                 continue
 
-            if not self._config.dry_run and self._auth is not None:
+            if (
+                not self._config.dry_run
+                and self._auth is not None
+                and not is_paper_trade(trade)
+            ):
                 _try_cancel(self._auth, trade.symbol, trade.sl_order_id)
                 _try_cancel(self._auth, trade.symbol, trade.tp_order_id)
                 quantity = self._round_qty(trade.symbol, trade.amount_usd / trade.entry_price)
