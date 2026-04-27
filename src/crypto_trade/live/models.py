@@ -465,3 +465,28 @@ class LiveTrade:
     exit_time: int | None = None
     exit_reason: str | None = None  # "stop_loss"|"take_profit"|"timeout"|"reconciled"
     created_at: str = field(default_factory=_now_iso)
+
+
+# Paper-trade prefixes used by db_seeder, engine catch-up, and OrderManager
+# in dry-run mode. A real Binance order ID is always a numeric string.
+_PAPER_PREFIXES: tuple[str, ...] = ("SEEDED", "DRY-", "CATCHUP-")
+
+
+def is_paper_trade(trade: LiveTrade) -> bool:
+    """True if the trade was NOT opened against the Binance exchange.
+
+    Paper trade entry_order_id shapes:
+      - None              — pre-cutoff seeded closed trade (db_seeder)
+      - "SEEDED"          — seeded open trade spanning the as-of cutoff
+      - "DRY-<8hex>"      — opened by OrderManager.open_trade in dry-run
+      - "CATCHUP-<8hex>"  — opened by engine._catch_up_model
+
+    Numeric strings (Binance order IDs) and the empty string are treated as
+    real. Empty string can only arise from a Binance API anomaly; treating
+    it as real keeps the failure mode loud rather than silently classifying
+    a possibly-real trade as paper.
+    """
+    oid = trade.entry_order_id
+    if oid is None:
+        return True
+    return oid.startswith(_PAPER_PREFIXES)
