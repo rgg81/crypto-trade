@@ -79,10 +79,12 @@ def _row_to_trade(
     if as_of_ms is not None and open_time >= as_of_ms:
         return None  # opens after cutoff — let the engine replay it
 
-    open_at_cutoff = (
-        as_of_ms is not None and open_time < as_of_ms <= close_time
-    )
-
+    # ALL trades that opened before as_of_ms are seeded as `closed` with their
+    # full CSV close info. Even if their close_time falls after as_of_ms, we
+    # still want the cum_weighted_pnl / VT history to include them so R2 / VT
+    # state matches what the backtest would have at the start of catch-up.
+    # The engine's catch-up loop only iterates candles >= catch_up_start, so it
+    # won't re-create these trades — no duplication risk.
     direction = int(row["direction"])
     entry_price = float(row["entry_price"])
     exit_price = float(row["exit_price"])
@@ -94,21 +96,19 @@ def _row_to_trade(
         entry_price=entry_price,
         amount_usd=weight_factor * max_amount_usd,
         weight_factor=weight_factor,
-        # SL/TP/timeout aren't read by to_trade_result for closed trades, but
-        # set sensible values so any downstream tool that does inspect them
-        # gets something coherent.
+        # SL/TP/timeout aren't read by to_trade_result for closed trades.
         stop_loss_price=entry_price,
         take_profit_price=entry_price,
         open_time=open_time,
         timeout_time=open_time + timeout_minutes * 60 * 1000,
         signal_time=open_time,
-        status="open" if open_at_cutoff else "closed",
+        status="closed",
         entry_order_id=None,
         sl_order_id=None,
         tp_order_id=None,
-        exit_price=None if open_at_cutoff else exit_price,
-        exit_time=None if open_at_cutoff else close_time,
-        exit_reason=None if open_at_cutoff else str(row["exit_reason"]),
+        exit_price=exit_price,
+        exit_time=close_time,
+        exit_reason=str(row["exit_reason"]),
     )
 
 
@@ -183,9 +183,11 @@ def seed_live_db_from_backtest(
                 if trade is None:
                     continue
                 store.upsert_trade(trade)
+                # All trades come back as "closed" now (we seed every
+                # pre-cutoff trade as closed with full CSV close info).
                 key = f"{track}_{trade.status}"
                 counts[key] = counts.get(key, 0) + 1
-                if trade.status == "closed" and trade.exit_time is not None:
+                if trade.exit_time is not None:
                     k = (model_name, sym)
                     if trade.exit_time > latest_close[k]:
                         latest_close[k] = trade.exit_time
