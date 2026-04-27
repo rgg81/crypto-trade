@@ -580,11 +580,23 @@ class LiveEngine:
         return 1.0 - span * (1.0 - floor)
 
     def _set_cooldown(self, model_name: str, symbol: str, close_time: int) -> None:
-        """Set cooldown after a trade closes — same as backtest.py:238-242."""
-        if self.config.cooldown_candles <= 0:
+        """Set cooldown after a trade closes — same as backtest.py:238-242.
+
+        Uses the OWNING model's cooldown_candles, not LiveConfig's, so v2
+        models (cooldown_candles=4) get a different gate than v1 (default 2).
+        """
+        cooldown_candles = self._cooldown_for(model_name)
+        if cooldown_candles <= 0:
             return
-        cooldown_until = close_time + self.config.cooldown_candles * self._candle_duration_ms
+        cooldown_until = close_time + cooldown_candles * self._candle_duration_ms
         self._state.set_state(f"cooldown_{model_name}_{symbol}", str(cooldown_until))
+
+    def _cooldown_for(self, model_name: str) -> int:
+        """Resolve per-model cooldown_candles via the matching runner; fall back to LiveConfig."""
+        for runner in self._runners:
+            if runner.model_config.name == model_name:
+                return runner.cooldown_candles
+        return self.config.cooldown_candles
 
     def _handle_trade_close(self, trade: LiveTrade) -> None:
         """Common handler when a trade closes: log, record VT, record risk, set cooldown."""
@@ -766,10 +778,11 @@ class LiveEngine:
                     # (not current candle ct). For timeouts, result.close_time
                     # is the candle's open_time, not close_time — an 8h difference
                     # for 8h candles that shifts the next eligible trade.
-                    if self.config.cooldown_candles > 0:
+                    # Per-model cooldown_candles (v2 uses 4, v1 uses 2).
+                    if runner.cooldown_candles > 0:
                         cooldown_until[sym] = (
                             result.close_time
-                            + self.config.cooldown_candles * self._candle_duration_ms
+                            + runner.cooldown_candles * self._candle_duration_ms
                         )
 
             # (b) Get signal
@@ -783,11 +796,20 @@ class LiveEngine:
                 ):
                     entry_price = float(close_arr[i])
 
+                    # Per-model VT — v2 sets vol_targeting=False so vt_scale stays 1.0.
                     vt_scale = 1.0
-                    if self.config.vol_targeting:
+                    if runner.vol_targeting:
                         vt_scale = compute_vt_scale(self._vt_daily_pnl, sym, ct, self.config)
                     # R2 drawdown scaling applied on top of VT
                     vt_scale *= self._r2_scale_for(runner.model_config.name)
+
+                    # Match backtest.py:567-575: when VT is enabled, weight_factor=vt_scale.
+                    # When VT is off, weight_factor includes the strategy's signal.weight
+                    # (the wrapper's _vol_scale uses this to pass through position sizing).
+                    if runner.vol_targeting:
+                        weight_factor = vt_scale
+                    else:
+                        weight_factor = (sig.weight / 100.0) * vt_scale
 
                     sl, tp = compute_sl_tp(sig, entry_price, self.config)
                     trade = LiveTrade(
@@ -795,8 +817,8 @@ class LiveEngine:
                         symbol=sym,
                         direction=sig.direction,
                         entry_price=entry_price,
-                        amount_usd=vt_scale * self.config.max_amount_usd,
-                        weight_factor=vt_scale,
+                        amount_usd=weight_factor * self.config.max_amount_usd,
+                        weight_factor=weight_factor,
                         stop_loss_price=sl,
                         take_profit_price=tp,
                         open_time=ct,
@@ -1012,6 +1034,14 @@ class LiveEngine:
                 # R2 drawdown scaling (iter 176) applied on top of VT
                 vt_scale *= self._r2_scale_for(runner.model_config.name)
 
+                # Match backtest.py:567-575: when VT is enabled, weight_factor=vt_scale.
+                # When VT is off (v2), include signal.weight/100 so the wrapper's
+                # _vol_scale (which adjusts sig.weight) flows into the trade.
+                if runner.vol_targeting:
+                    weight_factor = vt_scale
+                else:
+                    weight_factor = (sig.weight / 100.0) * vt_scale
+
                 trade = self._order_mgr.open_trade(
                     model_name=runner.model_config.name,
                     symbol=symbol,
@@ -1019,7 +1049,7 @@ class LiveEngine:
                     entry_price=entry_price,
                     candle_close_time=candle_close_time,
                     candle_open_time=candle_ot,
-                    weight_factor=vt_scale,
+                    weight_factor=weight_factor,
                 )
                 self._logger.log_open(trade)
 
