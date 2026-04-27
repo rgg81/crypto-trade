@@ -286,6 +286,48 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
 
+    # -- seed-live-db subcommand --
+    seed_parser = subparsers.add_parser(
+        "seed-live-db",
+        help="Import backtest trade CSVs into the live SQLite DB so R1/R2/VT/cooldown "
+        "state is preloaded and `live` can launch with a short --catch-up-days.",
+    )
+    seed_parser.add_argument(
+        "--db",
+        type=str,
+        default="data/dry_run.db",
+        help="Target DB (default: data/dry_run.db, matches `live --dry-run` behavior).",
+    )
+    seed_parser.add_argument(
+        "--v1-trades",
+        action="append",
+        type=str,
+        default=None,
+        help="v1 backtest trades.csv (can repeat for IS+OOS — pass each path).",
+    )
+    seed_parser.add_argument(
+        "--v2-trades",
+        action="append",
+        type=str,
+        default=None,
+        help="v2 backtest trades.csv (can repeat). Zero-weight rows skipped.",
+    )
+    seed_parser.add_argument(
+        "--track",
+        choices=["v1", "v2", "both"],
+        default="both",
+        help="Which model preset to use for symbol→model mapping + cooldown_candles "
+        "resolution (default: both).",
+    )
+    seed_parser.add_argument(
+        "--as-of",
+        type=str,
+        default=None,
+        help="Cutoff YYYY-MM-DD UTC. Trades that opened before this date are seeded; "
+        "trades open at the cutoff become status='open'; trades opening after are "
+        "skipped (live engine replays them). Default: seed everything.",
+    )
+
     # -- portfolio-report subcommand --
     pr_parser = subparsers.add_parser(
         "portfolio-report",
@@ -339,6 +381,8 @@ def main() -> None:
         _cmd_live(args, settings)
     elif args.command == "portfolio-report":
         _cmd_portfolio_report(args, settings)
+    elif args.command == "seed-live-db":
+        _cmd_seed_live_db(args, settings)
 
 
 def _cmd_fetch(args, settings) -> None:
@@ -835,6 +879,82 @@ def _cmd_portfolio_report(args, settings) -> None:
         f"PnL={rep.combined_weighted_pnl:.2f}"
     )
     print(f"Wrote {out_path}")
+
+
+def _cmd_seed_live_db(args, settings) -> None:
+    """Seed the live DB with backtest trades to preload R1/R2/VT/cooldown state."""
+    from pathlib import Path
+
+    import pandas as pd
+
+    from crypto_trade.live.db_seeder import seed_live_db_from_backtest
+    from crypto_trade.live.models import (
+        BASELINE_MODELS,
+        COMBINED_MODELS,
+        LiveConfig,
+        V2_BASELINE_MODELS,
+    )
+
+    track_map = {
+        "v1": BASELINE_MODELS,
+        "v2": V2_BASELINE_MODELS,
+        "both": COMBINED_MODELS,
+    }
+    selected_models = track_map[args.track]
+
+    cfg = LiveConfig(models=selected_models, data_dir=Path(settings.data_dir))
+
+    v1_paths = [Path(p) for p in (args.v1_trades or [])]
+    v2_paths = [Path(p) for p in (args.v2_trades or [])]
+
+    if not v1_paths and not v2_paths:
+        print(
+            "ERROR: provide at least one --v1-trades or --v2-trades CSV.",
+            file=sys.stderr,
+        )
+        sys.exit(2)
+
+    as_of_ms = None
+    if args.as_of is not None:
+        as_of_ms = int(pd.Timestamp(args.as_of, tz="UTC").value // 1_000_000)
+
+    db_path = Path(args.db)
+    print(f"[seed] Target DB: {db_path}")
+    print(f"[seed] Track: {args.track} ({len(selected_models)} models)")
+    if v1_paths:
+        print(f"[seed] v1 CSVs: {', '.join(str(p) for p in v1_paths)}")
+    if v2_paths:
+        print(f"[seed] v2 CSVs: {', '.join(str(p) for p in v2_paths)}")
+    if as_of_ms is not None:
+        print(f"[seed] as-of cutoff: {args.as_of} ({as_of_ms} ms)")
+    else:
+        print("[seed] as-of cutoff: none (seeding all backtest trades)")
+
+    counts = seed_live_db_from_backtest(
+        db_path=db_path,
+        v1_trades_csvs=v1_paths,
+        v2_trades_csvs=v2_paths,
+        live_config=cfg,
+        as_of_ms=as_of_ms,
+    )
+
+    print()
+    print("=== Seeding result ===")
+    for k, v in counts.items():
+        print(f"  {k:30s}: {v}")
+    total_inserted = (
+        counts["v1_closed"]
+        + counts["v1_open"]
+        + counts["v2_closed"]
+        + counts["v2_open"]
+    )
+    print(f"  TOTAL inserted               : {total_inserted}")
+    print()
+    print(
+        "Next step: launch `crypto-trade live --track both --catch-up-days N` where N "
+        "covers the gap between the latest seeded close_time and now. Catch-up will "
+        "produce trades only for candles after the seeded data."
+    )
 
 
 if __name__ == "__main__":
