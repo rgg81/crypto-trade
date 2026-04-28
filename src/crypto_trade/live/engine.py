@@ -235,14 +235,26 @@ class LiveEngine:
                 base_url=resolved_auth_url,
             )
 
-        db_path = config.db_path
-        if config.dry_run:
+        # DB path resolution: testnet > dry_run > config.db_path. Each mode
+        # gets its own file so testnet trades never mix with live.db, and
+        # dry_run trades never mix with testnet.db.
+        if config.testnet:
+            db_path = config.data_dir / "testnet.db"
+        elif config.dry_run:
             db_path = config.data_dir / "dry_run.db"
+        else:
+            db_path = config.db_path
         self._state = StateStore(db_path)
 
         self._order_mgr = OrderManager(config, self._state, self._auth_client)
 
-        log_name = "dry_run_trades.csv" if config.dry_run else "live_trades.csv"
+        # Trade-log filename mirrors the DB-path branch above.
+        if config.testnet:
+            log_name = "testnet_trades.csv"
+        elif config.dry_run:
+            log_name = "dry_run_trades.csv"
+        else:
+            log_name = "live_trades.csv"
         self._logger = TradeLogger(config.data_dir / log_name, config.fee_pct, config.dry_run)
 
         self._runners = [ModelRunner(mc, config) for mc in config.models]
@@ -395,7 +407,12 @@ class LiveEngine:
         self._shutdown()
 
     def _print_banner(self) -> None:
-        mode = "DRY-RUN" if self.config.dry_run else "LIVE"
+        if self.config.testnet:
+            mode = "LIVE — TESTNET"
+        elif self.config.dry_run:
+            mode = "DRY-RUN"
+        else:
+            mode = "LIVE"
         print(f"[live] Starting baseline v186 [{mode}]")
         for mc in self.config.models:
             print(

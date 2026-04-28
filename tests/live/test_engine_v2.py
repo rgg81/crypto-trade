@@ -687,3 +687,86 @@ def test_engine_auth_base_url_falls_back_to_base_url(tmp_path):
     )
     assert engine._auth_client is not None
     assert engine._auth_client._base_url == "https://fapi.binance.com"
+
+
+def test_engine_testnet_db_path_uses_testnet_db(tmp_path):
+    """testnet=True ⇒ data/testnet.db, regardless of config.db_path."""
+    from crypto_trade.live.engine import LiveEngine
+
+    cfg = LiveConfig(
+        models=(),
+        dry_run=False,
+        testnet=True,
+        db_path=tmp_path / "live.db",  # ignored — testnet wins
+        data_dir=tmp_path,
+    )
+    engine = LiveEngine(
+        config=cfg,
+        api_key="k",
+        api_secret="s",
+        base_url="https://fapi.binance.com",
+        auth_base_url="https://testnet.binancefuture.com",
+    )
+    assert str(engine._state._db_path).endswith("testnet.db")
+
+
+def test_engine_testnet_trade_log_path(tmp_path):
+    """testnet=True ⇒ data/testnet_trades.csv."""
+    from crypto_trade.live.engine import LiveEngine
+
+    cfg = LiveConfig(
+        models=(),
+        dry_run=False,
+        testnet=True,
+        data_dir=tmp_path,
+    )
+    engine = LiveEngine(
+        config=cfg,
+        api_key="k",
+        api_secret="s",
+        base_url="https://fapi.binance.com",
+        auth_base_url="https://testnet.binancefuture.com",
+    )
+    assert str(engine._logger.path).endswith("testnet_trades.csv")
+
+
+def test_engine_testnet_banner(tmp_path, capsys):
+    """[LIVE — TESTNET] mode marker appears when config.testnet=True."""
+    from crypto_trade.live.engine import LiveEngine
+
+    cfg = LiveConfig(
+        models=(),
+        dry_run=False,
+        testnet=True,
+        data_dir=tmp_path,
+    )
+    engine = LiveEngine(
+        config=cfg,
+        api_key="k",
+        api_secret="s",
+        base_url="https://fapi.binance.com",
+        auth_base_url="https://testnet.binancefuture.com",
+    )
+    engine._print_banner()
+    out = capsys.readouterr().out
+    assert "[LIVE — TESTNET]" in out
+    assert "[DRY-RUN]" not in out
+
+
+def test_engine_non_testnet_banner_unchanged(tmp_path, capsys):
+    """[DRY-RUN] / [LIVE] markers unchanged when testnet=False (regression)."""
+    from crypto_trade.live.engine import LiveEngine
+
+    LiveEngine(LiveConfig(models=(), dry_run=True, data_dir=tmp_path))._print_banner()
+    out_dry = capsys.readouterr().out
+    assert "[DRY-RUN]" in out_dry
+    assert "TESTNET" not in out_dry
+
+    LiveEngine(
+        LiveConfig(models=(), dry_run=False, data_dir=tmp_path),
+        api_key="k",
+        api_secret="s",
+    )._print_banner()
+    out_live = capsys.readouterr().out
+    assert "[LIVE]" in out_live
+    assert "TESTNET" not in out_live

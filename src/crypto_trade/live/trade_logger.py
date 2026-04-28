@@ -59,12 +59,12 @@ class TradeLogger:
     """Appends closed trades to a CSV file for post-hoc analysis."""
 
     def __init__(self, log_path: Path, fee_pct: float, dry_run: bool) -> None:
-        self._path = log_path
+        self.path = log_path
         self._fee_pct = fee_pct
         self._dry_run = dry_run
-        self._path.parent.mkdir(parents=True, exist_ok=True)
-        if not self._path.exists():
-            with open(self._path, "w", newline="") as f:
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        if not self.path.exists():
+            with open(self.path, "w", newline="") as f:
                 csv.writer(f).writerow(_CSV_HEADER)
 
     def log_open(self, trade: LiveTrade) -> None:
@@ -87,7 +87,7 @@ class TradeLogger:
             f"PnL={sign}{result.net_pnl_pct:.2f}%"
         )
 
-        with open(self._path, "a", newline="") as f:
+        with open(self.path, "a", newline="") as f:
             csv.writer(f).writerow(
                 [
                     trade.model_name,
