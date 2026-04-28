@@ -209,20 +209,30 @@ class LiveEngine:
         api_key: str = "",
         api_secret: str = "",
         base_url: str = "https://fapi.binance.com",
+        auth_base_url: str | None = None,
     ) -> None:
         self.config = config
         self._running = True
         self._all_symbols = config.all_symbols
         self._candle_duration_ms = _INTERVAL_MS.get(config.interval, 28_800_000)
 
-        # Use limit=2 for candle polling (only need last closed + currently forming)
+        # auth_base_url splits signed traffic (orders, positions, leverage)
+        # away from kline traffic. None ⇒ same host as klines (preserves the
+        # pre-testnet single-URL behavior). The testnet flow passes
+        # auth_base_url="https://testnet.binancefuture.com" while leaving
+        # base_url on production so klines stay on the full-history feed.
+        resolved_auth_url = auth_base_url if auth_base_url is not None else base_url
+
+        # Use limit=2 for candle polling. Klines always target base_url
+        # (production); testnet kline history is too short / gappy for
+        # the 90-day catch-up window.
         self._read_client = BinanceClient(base_url=base_url, limit=2, rate_limit_pause=0.25)
         self._auth_client: AuthenticatedBinanceClient | None = None
         if not config.dry_run and api_key:
             self._auth_client = AuthenticatedBinanceClient(
                 api_key=api_key,
                 api_secret=api_secret,
-                base_url=base_url,
+                base_url=resolved_auth_url,
             )
 
         db_path = config.db_path

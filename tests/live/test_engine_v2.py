@@ -636,3 +636,54 @@ def test_live_config_testnet_explicit_true_with_live():
     cfg = LiveConfig(testnet=True, dry_run=False)
     assert cfg.testnet is True
     assert cfg.dry_run is False
+
+
+def test_engine_auth_base_url_routes_signed_traffic(tmp_path):
+    """auth_base_url targets the AuthenticatedBinanceClient. The kline
+    BinanceClient instances keep targeting base_url — testnet kline data
+    is gappy and would break catch-up replay."""
+    from crypto_trade.live.engine import LiveEngine
+
+    cfg = LiveConfig(
+        models=(),
+        dry_run=False,
+        testnet=True,
+        db_path=tmp_path / "tn.db",
+        data_dir=tmp_path,
+    )
+    engine = LiveEngine(
+        config=cfg,
+        api_key="k",
+        api_secret="s",
+        base_url="https://fapi.binance.com",
+        auth_base_url="https://testnet.binancefuture.com",
+    )
+    # Auth client → testnet
+    assert engine._auth_client is not None
+    assert engine._auth_client._base_url == "https://testnet.binancefuture.com"
+    assert str(engine._auth_client._client.base_url).rstrip("/") == "https://testnet.binancefuture.com"
+    # Kline clients → production (must stay on full-history feed)
+    assert engine._read_client.base_url == "https://fapi.binance.com"
+    assert engine._fetch_client.base_url == "https://fapi.binance.com"
+
+
+def test_engine_auth_base_url_falls_back_to_base_url(tmp_path):
+    """auth_base_url=None ⇒ AuthenticatedBinanceClient uses base_url
+    (preserves the pre-testnet single-URL behavior)."""
+    from crypto_trade.live.engine import LiveEngine
+
+    cfg = LiveConfig(
+        models=(),
+        dry_run=False,
+        db_path=tmp_path / "x.db",
+        data_dir=tmp_path,
+    )
+    engine = LiveEngine(
+        config=cfg,
+        api_key="k",
+        api_secret="s",
+        base_url="https://fapi.binance.com",
+        auth_base_url=None,
+    )
+    assert engine._auth_client is not None
+    assert engine._auth_client._base_url == "https://fapi.binance.com"
