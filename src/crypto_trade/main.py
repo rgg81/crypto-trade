@@ -261,6 +261,17 @@ def build_parser() -> argparse.ArgumentParser:
         help="Enable real trading (default: dry-run)",
     )
     live_parser.add_argument(
+        "--testnet",
+        action="store_true",
+        help=(
+            "Route signed calls (orders, positions, leverage) to the Binance "
+            "Futures testnet (https://testnet.binancefuture.com) while keeping "
+            "kline fetches on production. Forces live trading; uses "
+            "data/testnet.db and data/testnet_trades.csv. Override the testnet "
+            "host with BINANCE_AUTH_BASE_URL."
+        ),
+    )
+    live_parser.add_argument(
         "--track",
         choices=["v1", "v2", "both"],
         default="v1",
@@ -811,9 +822,6 @@ def _cmd_live(args, settings) -> None:
     selected_models = track_map[track]
     print(f"[live] Track: {track} ({len(selected_models)} models)")
 
-    # Catch-up window: --catch-up-from beats --catch-up-days; both override
-    # LiveConfig's default. None of these set ⇒ use the LiveConfig default
-    # (90 days) by leaving catch_up_lookback_days unset in the kwargs.
     catch_up_kwargs: dict[str, int | None] = {}
     catch_up_from = getattr(args, "catch_up_from", None)
     catch_up_days = getattr(args, "catch_up_days", None)
@@ -828,6 +836,42 @@ def _cmd_live(args, settings) -> None:
         catch_up_kwargs["catch_up_lookback_days"] = catch_up_days
         print(f"[live] Catch-up lookback: {catch_up_days} days")
 
+    # Testnet routing: --testnet forces live trading and points signed calls
+    # at Binance Futures testnet. Klines stay on production for full history.
+    # BINANCE_AUTH_BASE_URL (loaded into settings.auth_base_url) overrides the
+    # hardcoded testnet host so operators can re-target if Binance changes URL.
+    testnet = bool(getattr(args, "testnet", False))
+    if testnet:
+        if not settings.binance_api_key or not settings.binance_api_secret:
+            print(
+                "ERROR: --testnet requires BINANCE_API_KEY / BINANCE_API_SECRET. "
+                "Generate testnet keys at https://testnet.binancefuture.com.",
+                file=sys.stderr,
+            )
+            sys.exit(2)
+        # Testnet IS live trading (just on the test exchange). Promote
+        # live_mode=True so LiveConfig(... dry_run=not args.live_mode ...)
+        # correctly sets dry_run=False below.
+        args.live_mode = True
+
+    # Auth URL resolution: env wins; if --testnet and env unset, hardcode
+    # the testnet host. Otherwise pass None so the engine falls back to
+    # base_url (preserves pre-testnet single-URL behavior).
+    auth_base_url = getattr(settings, "auth_base_url", None)
+    if testnet and auth_base_url is None:
+        auth_base_url = "https://testnet.binancefuture.com"
+
+    # Surface a loud banner whenever the auth URL differs from base_url, so
+    # an .env-set staging URL can never quietly route prod orders to staging.
+    if auth_base_url is not None and auth_base_url != settings.base_url:
+        print(f"[live] AUTH endpoint OVERRIDE: {auth_base_url}")
+
+    # DB path is the live-mode fallback. The engine overrides this to
+    # data/testnet.db when config.testnet is True and to data/dry_run.db
+    # when config.dry_run is True (see engine.py). We always pass live.db
+    # here so single-source-of-truth lives in the engine.
+    db_path = Path(settings.data_dir) / "live.db"
+
     config = LiveConfig(
         models=selected_models,
         interval="8h",
@@ -836,9 +880,10 @@ def _cmd_live(args, settings) -> None:
         data_dir=Path(settings.data_dir),
         features_dir=Path(settings.data_dir) / "features",
         feature_groups=groups,
-        db_path=Path(settings.data_dir) / ("dry_run.db" if not args.live_mode else "live.db"),
+        db_path=db_path,
         poll_interval_seconds=args.poll_interval,
         dry_run=not args.live_mode,
+        testnet=testnet,
         **catch_up_kwargs,
     )
 
@@ -847,6 +892,7 @@ def _cmd_live(args, settings) -> None:
         api_key=settings.binance_api_key,
         api_secret=settings.binance_api_secret,
         base_url=settings.base_url,
+        auth_base_url=auth_base_url,
     )
     engine.run()
 

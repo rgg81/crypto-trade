@@ -18,7 +18,6 @@ import pytest
 
 from crypto_trade.live.models import LiveConfig, ModelConfig
 
-
 # ----------------------------- Task 1 ---------------------------------------
 
 
@@ -362,12 +361,13 @@ def test_cli_live_track_flag_accepts_v2_and_both():
 def test_cmd_live_track_dispatches_to_correct_model_set(tmp_path):
     """_cmd_live must hand the right preset to LiveConfig based on args.track."""
     from unittest.mock import patch
-    from crypto_trade.main import _cmd_live, build_parser
+
     from crypto_trade.live.models import (
         BASELINE_MODELS,
         COMBINED_MODELS,
         V2_BASELINE_MODELS,
     )
+    from crypto_trade.main import _cmd_live, build_parser
 
     class _StubSettings:
         binance_api_key = ""
@@ -447,6 +447,7 @@ def test_live_config_catch_up_lookback_default_90():
 def test_compute_catch_up_start_ms_lookback_modes():
     """The helper handles None (legacy) and N-days (new) lookback modes."""
     import pandas as pd
+
     from crypto_trade.live.engine import _compute_catch_up_start_ms
 
     now = int(pd.Timestamp("2026-04-26 12:00", tz="UTC").value // 1_000_000)
@@ -500,6 +501,7 @@ def test_cli_live_catch_up_flags_mutually_exclusive():
 def test_cmd_live_propagates_catch_up_days_to_config(tmp_path):
     """`--catch-up-days N` flows into LiveConfig.catch_up_lookback_days."""
     from unittest.mock import patch
+
     from crypto_trade.main import _cmd_live, build_parser
 
     class _StubSettings:
@@ -519,8 +521,10 @@ def test_cmd_live_propagates_catch_up_days_to_config(tmp_path):
 
 def test_cmd_live_propagates_catch_up_from_to_config(tmp_path):
     """`--catch-up-from YYYY-MM-DD` is converted to lookback_days based on now."""
-    import pandas as pd
     from unittest.mock import patch
+
+    import pandas as pd
+
     from crypto_trade.main import _cmd_live, build_parser
 
     class _StubSettings:
@@ -542,6 +546,7 @@ def test_cmd_live_propagates_catch_up_from_to_config(tmp_path):
 def test_cmd_live_omits_flags_uses_default(tmp_path):
     """No catch-up flag ⇒ LiveConfig keeps its 90-day default."""
     from unittest.mock import patch
+
     from crypto_trade.main import _cmd_live, build_parser
 
     class _StubSettings:
@@ -770,3 +775,118 @@ def test_engine_non_testnet_banner_unchanged(tmp_path, capsys):
     out_live = capsys.readouterr().out
     assert "[LIVE]" in out_live
     assert "TESTNET" not in out_live
+
+
+def test_cli_live_testnet_flag_default_false():
+    from crypto_trade.main import build_parser
+
+    parser = build_parser()
+    args = parser.parse_args(["live"])
+    assert args.testnet is False
+
+
+def test_cli_live_testnet_flag_set_true():
+    from crypto_trade.main import build_parser
+
+    parser = build_parser()
+    args = parser.parse_args(["live", "--testnet"])
+    assert args.testnet is True
+
+
+def test_cmd_live_testnet_forces_live_mode_and_paths(tmp_path, monkeypatch):
+    """--testnet ⇒ dry_run=False, testnet=True, db_path picked by engine,
+    auth_base_url=https://testnet.binancefuture.com (env unset)."""
+    from unittest.mock import patch
+
+    from crypto_trade.main import _cmd_live, build_parser
+
+    monkeypatch.delenv("BINANCE_AUTH_BASE_URL", raising=False)
+
+    class _StubSettings:
+        binance_api_key = "k"
+        binance_api_secret = "s"
+        base_url = "https://fapi.binance.com"
+        auth_base_url = None
+        data_dir = str(tmp_path)
+
+    parser = build_parser()
+    args = parser.parse_args(["live", "--testnet", "--track", "both"])
+
+    with patch("crypto_trade.live.engine.LiveEngine") as engine_cls:
+        engine_cls.return_value.run.return_value = None
+        _cmd_live(args, _StubSettings())
+        kwargs = engine_cls.call_args.kwargs
+        cfg = kwargs["config"]
+        assert cfg.testnet is True
+        assert cfg.dry_run is False
+        assert kwargs["auth_base_url"] == "https://testnet.binancefuture.com"
+        assert kwargs["base_url"] == "https://fapi.binance.com"
+
+
+def test_cmd_live_testnet_env_override_wins(tmp_path):
+    """settings.auth_base_url (loaded from BINANCE_AUTH_BASE_URL) overrides
+    the hardcoded testnet host so operators can re-target if Binance ever
+    changes the URL."""
+    from unittest.mock import patch
+
+    from crypto_trade.main import _cmd_live, build_parser
+
+    class _StubSettings:
+        binance_api_key = "k"
+        binance_api_secret = "s"
+        base_url = "https://fapi.binance.com"
+        auth_base_url = "https://staging.binance.dev"
+        data_dir = str(tmp_path)
+
+    parser = build_parser()
+    args = parser.parse_args(["live", "--testnet"])
+
+    with patch("crypto_trade.live.engine.LiveEngine") as engine_cls:
+        engine_cls.return_value.run.return_value = None
+        _cmd_live(args, _StubSettings())
+        kwargs = engine_cls.call_args.kwargs
+        assert kwargs["auth_base_url"] == "https://staging.binance.dev"
+
+
+def test_cmd_live_no_testnet_keeps_existing_behavior(tmp_path):
+    """Without --testnet, all paths and URLs match pre-change behavior."""
+    from unittest.mock import patch
+
+    from crypto_trade.main import _cmd_live, build_parser
+
+    class _StubSettings:
+        binance_api_key = "k"
+        binance_api_secret = "s"
+        base_url = "https://fapi.binance.com"
+        auth_base_url = None
+        data_dir = str(tmp_path)
+
+    parser = build_parser()
+    args = parser.parse_args(["live", "--live"])
+
+    with patch("crypto_trade.live.engine.LiveEngine") as engine_cls:
+        engine_cls.return_value.run.return_value = None
+        _cmd_live(args, _StubSettings())
+        kwargs = engine_cls.call_args.kwargs
+        cfg = kwargs["config"]
+        assert cfg.testnet is False
+        assert cfg.dry_run is False
+        # auth_base_url omitted ⇒ engine falls back to base_url
+        assert kwargs.get("auth_base_url") is None
+
+
+def test_cmd_live_testnet_requires_credentials(tmp_path, monkeypatch):
+    """--testnet without API key/secret must error; never silently dry-run."""
+    from crypto_trade.main import _cmd_live, build_parser
+
+    class _StubSettings:
+        binance_api_key = ""
+        binance_api_secret = ""
+        base_url = "https://fapi.binance.com"
+        auth_base_url = None
+        data_dir = str(tmp_path)
+
+    parser = build_parser()
+    args = parser.parse_args(["live", "--testnet"])
+    with pytest.raises(SystemExit):
+        _cmd_live(args, _StubSettings())
