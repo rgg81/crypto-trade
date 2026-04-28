@@ -35,7 +35,7 @@ Three weak areas of v1 this skill specifically addresses:
    as gates that kill signals when the current market is out-of-distribution
    vs the training window.
 
-3. **Validation rigor** — v1 stopped at 10-seed ensembles + profit thresholds.
+3. **Validation rigor** — v1 stopped at 5-seed internal ensembles + profit thresholds.
    v2 adds Deflated Sharpe Ratio and regime-stratified OOS Sharpe in iter-v2/001,
    and phases in CPCV (iter-v2/002) and PBO (iter-v2/003).
 
@@ -827,11 +827,11 @@ call). The ensemble averages predictions across 5 per-seed Optuna runs per
 monthly training — that IS the seed-robustness validation for this
 architecture.
 
-The old 10-outer-seed rule is therefore **DROPPED** as of iter-v2/069. The
+The old multi-outer-seed rule is therefore **DROPPED** as of iter-v2/069. The
 `LightGbmStrategy._train_for_month` code uses `ensemble_seeds or [self.seed]`
 (lgbm.py:450), meaning the outer `seed` is IGNORED whenever `ensemble_seeds`
 is set (which it always is, post-iter-v2/035). Empirical confirmation from
-iter-v2/069's partial 10-seed run: seed 42 and seed 123 produced bit-identical
+iter-v2/069's partial outer-seed sweep: seed 42 and seed 123 produced bit-identical
 trade counts (DOGE=58, SOL=77, XRP=78) because the inner ensemble is the same.
 
 ### The new rule — single-seed is the measurement
@@ -945,37 +945,31 @@ because the total is nearly zero). Three iter-v2/030 seeds exhibited this
    denominator: `share[sym] = max(0, sym_wpnl) / sum(max(0, s_wpnl) for s in symbols)`.
    This always produces a number in [0, 1] and has a sensible interpretation
    ("of the positive contributors, how much is from this symbol").
-2. Distressed seeds still count as seeds for the overall rule, but the
-   dominant-symbol label uses the positive-total interpretation.
-3. Report the distressed count in the audit verdict. If >2 of 10 seeds
-   are distressed, the strategy is unstable and NO-MERGE regardless of
-   other metrics.
+2. Under the post-iter-v2/069 single-seed regime the dominant-symbol label
+   uses the positive-total interpretation when the seed is DISTRESSED.
+3. If the single baseline seed is DISTRESSED, the strategy is unstable
+   and NO-MERGE regardless of other metrics.
 
 ### Required reporting template
 
 Every engineering report for a MERGE-candidate iteration must include a
 Seed Concentration Audit subsection with TWO things:
 
-1. **The per-seed table** (state its n_symbols, use that row's thresholds):
+1. **The single-seed table** (state its n_symbols, use that row's thresholds):
 
 ```
-n_symbols = 4, thresholds: max ≤ 50%, mean ≤ 45%, ≤1 seed above 40%
+n_symbols = 4, thresholds: max ≤ 50%, inner ≤ 40%
 
 | Seed | Max Share | Symbol    | Pass max | Pass inner | Distressed? |
 |------|-----------|-----------|----------|------------|-------------|
-| 42   | 69.5%     | XRPUSDT   | FAIL     | FAIL       | —           |
-| 123  | 53.8%     | XRPUSDT   | FAIL     | FAIL       | —           |
-| 1001 | 72.7%     | XRPUSDT   | FAIL     | FAIL       | DISTRESSED  |
-| ...  | ...       | ...       | ...      | ...        | —           |
-| Mean | 51.3%     | —         | —        | —          | —           |
+| 42   | 35.84%    | SOLUSDT   | PASS     | PASS       | —           |
 ```
 
 2. **One-line verdicts** (each threshold from the row above):
 
-- Per-seed max cap (≤ 50%):  X of 10 seeds pass
-- Mean ≤ 45%:                PASS / FAIL
-- ≤1 seed above 40%:         PASS / FAIL
-- Distressed seed count:     Y of 10 (rule: ≤ 2)
+- Per-seed max cap (≤ 50%):  PASS / FAIL
+- Per-seed inner cap (≤ 40%): PASS / FAIL
+- Distressed seed:           NO / YES
 - **Overall seed concentration**: PASS / FAIL
 
 **If overall = FAIL, the iteration is NO-MERGE regardless of headline mean
@@ -1339,8 +1333,8 @@ merges ONLY if:
    - Minimum 50 OOS trades
    - Profit factor > 1.0 (OOS)
    - **Seed concentration audit**: PASS (see "Seed Concentration Check" section
-     — no single seed > 50% on any symbol, mean seed max-share ≤ 45%, at most
-     1 of 10 seeds above 40%)
+     — single-seed baseline must satisfy n_symbols-aware thresholds: max ≤ outer
+     cap and ≤ inner cap; e.g. n=4 → max ≤ 50% and inner ≤ 40%)
    - IS/OOS Sharpe ratio > 0.4 (guard against IS<<OOS garbage)
    - **v2-v1 correlation < 0.80** (NEW): correlation of v2 portfolio returns
      vs v1 portfolio returns during OOS window. If too high, v2 is just
