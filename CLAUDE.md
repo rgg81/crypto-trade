@@ -38,6 +38,93 @@
 - `--range-spike-filter` and `--volume-filter` can be combined with any strategy
 - Strategies: `momentum`, `mean_reversion`, `wick_rejection`, `inside_bar`, `gap_fill`, `consecutive_reversal`, `rsi_bb`, `bb_squeeze`
 
+### `seed-live-db` + `live` — Initialize live engine from backtest CSVs
+
+**These two commands MUST be run together (in this order) when starting a live engine that needs to reproduce backtest results.** Running `live` without first seeding produces a cold engine with empty R1/R2/VT/cooldown state — it will diverge from the backtest until catch-up has rebuilt enough history (~1-3 months).
+
+**Step 1 — seed the DB from backtest trade CSVs:**
+
+```
+uv run crypto-trade seed-live-db \
+  --v1-trades reports/iteration_186/in_sample/trades.csv \
+  --v1-trades reports/iteration_186/out_of_sample/trades.csv \
+  --v2-trades reports-v2/iteration_v2-069/in_sample/trades.csv \
+  --v2-trades reports-v2/iteration_v2-069/out_of_sample/trades.csv \
+  --as-of 2026-01-27 \
+  --track both \
+  --db data/dry_run.db
+```
+
+What it does:
+- Inserts pre-cutoff backtest trades as `status='closed'` so `_rebuild_risk_state` / `_rebuild_vt_history` reproduce backtest R2/VT exactly.
+- Trades that span `--as-of` (open before, close after) are inserted as `status='open'` with `entry_order_id='SEEDED'` and full intended-exit info; the engine closes them deterministically during catch-up at the seeded `exit_time`.
+- Skips trades that opened after `--as-of` — the engine catch-up replay produces them.
+- Drops zero-`weight_factor` rows (BTC-killed v2 trades).
+- Sets per-(model, symbol) `cooldown_<model>_<symbol>` engine_state keys.
+- Use `--db data/dry_run.db` for dry-run; `--db data/live.db` for real-money.
+
+**Step 2 — launch the engine with matching `--catch-up-from`:**
+
+```
+uv run crypto-trade live --track both --catch-up-from 2026-01-27
+```
+
+**The `--catch-up-from` date MUST equal the seeder's `--as-of`.** Otherwise catch-up either re-creates trades the seeder already inserted (duplicates) or skips trades the seeder didn't seed (gap).
+
+Choosing the date:
+- Recent (e.g. 1-3 months back): fast catch-up (~30-60 min for 90 days) but R2 cum/peak may not have its all-time peak in state if peak was set earlier.
+- OOS cutoff (`2025-03-24`): full backtest reproduction, near-empty catch-up, engine boots into poll loop in seconds, perfect R2 parity.
+- Add `--live` to enable real trading (default is dry-run).
+
+**Verification — `scripts/reconcile_full_oos.py`:**
+
+```
+uv run python scripts/reconcile_full_oos.py --db data/dry_run.db
+```
+
+Compares closed trades in the DB against backtest CSVs across full OOS / March 2026 / April 2026 windows, field-by-field on TRADE_COLS. Pass criterion: zero divergences except known data-extent artifacts (trades the backtest CSV marks `end_of_data` may close as `timeout` in live since live data extends past the CSV).
+
+### Testnet workflow — `live --testnet`
+
+Run the engine against the Binance Futures testnet (https://testnet.binancefuture.com) for an end-to-end smoke test of the auth integration before pointing at production. Testnet has its own API keys, balances, and matching engine; klines stay on production so `--catch-up-from` and feature regen see the full historical OHLCV the backtest used.
+
+**Generate testnet keys:**
+
+1. Visit https://testnet.binancefuture.com and sign in (separate from binance.com).
+2. Create an API key + secret on the testnet console.
+3. Export them in the shell that will run the engine:
+
+```
+export BINANCE_API_KEY=<testnet-key>
+export BINANCE_API_SECRET=<testnet-secret>
+```
+
+**Optional — point at a non-default testnet host:**
+
+```
+export BINANCE_AUTH_BASE_URL=https://staging.binancefuture.com
+```
+
+When unset, `--testnet` defaults to `https://testnet.binancefuture.com`.
+
+**Run:**
+
+```
+uv run crypto-trade live --testnet --track both --catch-up-from 2026-01-27
+```
+
+What happens:
+- Banner reads `[live] Starting baseline v186 [LIVE — TESTNET]`.
+- Signed calls (`place_market_order`, `place_stop_market_order`, `place_take_profit_market_order`, `get_order`, `set_leverage`, `get_positions`, `cancel_order`) hit testnet.
+- Kline fetches stay on `https://fapi.binance.com` so catch-up replay sees full historical data.
+- DB lives at `data/testnet.db`; trade log at `data/testnet_trades.csv`. Neither overlaps with `data/live.db` / `data/dry_run.db` or their CSVs.
+- `--testnet` forces live trading. Combining `--testnet` with empty credentials errors and exits — no silent dry-run fallback.
+- If `BINANCE_AUTH_BASE_URL` is set to anything other than `settings.base_url`, the engine prints `[live] AUTH endpoint OVERRIDE: <url>` so an `.env`-set staging URL can never quietly route prod orders to staging.
+
+**Resuming after Ctrl-C:** the testnet DB persists. Re-running `live --testnet --catch-up-from <same-date>` resumes from where the engine left off — open trades reconciled against testnet, paper rows skipped via `is_paper_trade` guards.
+
+**Cleanup:** `rm data/testnet.db data/testnet_trades.csv` between unrelated smoke tests for a fresh state.
+
 ### `symbols` — Discover available symbols
 
 - `uv run crypto-trade symbols` — list from both API and data.binance.vision
