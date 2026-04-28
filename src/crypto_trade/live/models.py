@@ -417,6 +417,12 @@ class LiveConfig:
     # Engine
     poll_interval_seconds: float = 30.0
     dry_run: bool = True
+    # Testnet mode: when True, signed calls go to auth_base_url passed at
+    # LiveEngine construction (typically https://testnet.binancefuture.com)
+    # while kline fetches stay on base_url. Distinct from dry_run — testnet
+    # IS live trading, just on Binance's test exchange. CLI enforces
+    # testnet ⇒ dry_run=False at the `--testnet` flag handler.
+    testnet: bool = False
     # Catch-up window. 90 days covers VT's 45-day rolling window plus
     # buffer so position sizing converges to backtest values before any
     # trade ships. Pass None to keep the legacy previous-calendar-month

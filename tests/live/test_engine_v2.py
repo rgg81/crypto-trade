@@ -621,3 +621,18 @@ def test_catch_up_pre_load_filter_excludes_real_numeric_ids(tmp_path):
     assert "is_paper_trade" in pre_load_block.group(0), (
         "engine._catch_up_model must filter pre-loaded open trades via is_paper_trade()"
     )
+
+
+# ----------------------------- Testnet support ------------------------------
+
+
+def test_live_config_testnet_default_false():
+    """testnet defaults to False — existing dry-run / live behavior unchanged."""
+    cfg = LiveConfig()
+    assert cfg.testnet is False
+
+
+def test_live_config_testnet_explicit_true_with_live():
+    cfg = LiveConfig(testnet=True, dry_run=False)
+    assert cfg.testnet is True
+    assert cfg.dry_run is False
