@@ -13,6 +13,10 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import TYPE_CHECKING, Literal
+
+if TYPE_CHECKING:
+    from crypto_trade.strategies.ml.risk_v2 import RiskV2Config
 
 # Iter 186: 16-feature scale-invariant subset used for R3 Mahalanobis OOD
 # distance. Kept separate from BASELINE_FEATURE_COLUMNS (which is the
@@ -60,6 +64,16 @@ class ModelConfig:
     ood_enabled: bool = True
     ood_features: tuple[str, ...] = OOD_FEATURE_COLUMNS
     ood_cutoff_pct: float = 0.70
+    # Per-model overrides for v1+v2 coexistence.
+    # None ⇒ fall back to LiveConfig (preserves v1 bit-identical behavior).
+    feature_columns: tuple[str, ...] | None = None
+    features_dir: Path | None = None
+    atr_column: str | None = None
+    cooldown_candles: int | None = None
+    vol_targeting: bool | None = None
+    ensemble_seeds: tuple[int, ...] | None = None
+    risk_wrapper: Literal["none", "v2"] = "none"
+    risk_v2_config: "RiskV2Config | None" = None
 
 
 # Static feature list for baseline v152: 193 features.
@@ -323,6 +337,47 @@ BASELINE_MODELS = (
 )
 
 
+# v2 baseline (iter-v2/069): 4 individual models on the diversification universe.
+# Each model wraps its inner LightGbmStrategy with RiskV2Wrapper. Mirrors
+# V2_MODELS in run_baseline_v2.py.
+V2_EXCLUDED_SYMBOLS: tuple[str, ...] = (
+    "BTCUSDT",
+    "ETHUSDT",
+    "LINKUSDT",
+    "BNBUSDT",
+)
+
+
+def _build_v2_baseline_models() -> tuple[ModelConfig, ...]:
+    """Construct V2_BASELINE_MODELS lazily so the import-time module load
+    doesn't pull in features_v2 / risk_v2 (heavy deps) for every consumer."""
+    from crypto_trade.features_v2 import V2_FEATURE_COLUMNS
+    from crypto_trade.strategies.ml.risk_v2 import RiskV2Config
+
+    return tuple(
+        ModelConfig(
+            name=f"V2-{sym.replace('USDT', '')}",
+            symbols=(sym,),
+            use_atr_labeling=True,
+            atr_tp_multiplier=2.9,
+            atr_sl_multiplier=1.45,
+            atr_column="natr_21_raw",
+            feature_columns=V2_FEATURE_COLUMNS,
+            features_dir=Path("data/features_v2"),
+            cooldown_candles=4,
+            vol_targeting=False,
+            ood_enabled=False,  # v2 z-score OOD lives in RiskV2Wrapper, not LGBM
+            risk_wrapper="v2",
+            risk_v2_config=RiskV2Config(zscore_threshold=2.5),
+        )
+        for sym in ("DOGEUSDT", "SOLUSDT", "XRPUSDT", "NEARUSDT")
+    )
+
+
+V2_BASELINE_MODELS: tuple[ModelConfig, ...] = _build_v2_baseline_models()
+COMBINED_MODELS: tuple[ModelConfig, ...] = BASELINE_MODELS + V2_BASELINE_MODELS
+
+
 @dataclass(frozen=True)
 class LiveConfig:
     """Configuration for the live trading engine.
@@ -362,6 +417,17 @@ class LiveConfig:
     # Engine
     poll_interval_seconds: float = 30.0
     dry_run: bool = True
+    # Testnet mode: when True, signed calls go to auth_base_url passed at
+    # LiveEngine construction (typically https://testnet.binancefuture.com)
+    # while kline fetches stay on base_url. Distinct from dry_run — testnet
+    # IS live trading, just on Binance's test exchange. CLI enforces
+    # testnet ⇒ dry_run=False at the `--testnet` flag handler.
+    testnet: bool = False
+    # Catch-up window. 90 days covers VT's 45-day rolling window plus
+    # buffer so position sizing converges to backtest values before any
+    # trade ships. Pass None to keep the legacy previous-calendar-month
+    # behavior (used by old scripts that relied on _previous_month_start_ms).
+    catch_up_lookback_days: int | None = 90
 
     @functools.cached_property
     def all_symbols(self) -> tuple[str, ...]:
@@ -405,3 +471,28 @@ class LiveTrade:
     exit_time: int | None = None
     exit_reason: str | None = None  # "stop_loss"|"take_profit"|"timeout"|"reconciled"
     created_at: str = field(default_factory=_now_iso)
+
+
+# Paper-trade prefixes used by db_seeder, engine catch-up, and OrderManager
+# in dry-run mode. A real Binance order ID is always a numeric string.
+_PAPER_PREFIXES: tuple[str, ...] = ("SEEDED", "DRY-", "CATCHUP-")
+
+
+def is_paper_trade(trade: LiveTrade) -> bool:
+    """True if the trade was NOT opened against the Binance exchange.
+
+    Paper trade entry_order_id shapes:
+      - None              — pre-cutoff seeded closed trade (db_seeder)
+      - "SEEDED"          — seeded open trade spanning the as-of cutoff
+      - "DRY-<8hex>"      — opened by OrderManager.open_trade in dry-run
+      - "CATCHUP-<8hex>"  — opened by engine._catch_up_model
+
+    Numeric strings (Binance order IDs) and the empty string are treated as
+    real. Empty string can only arise from a Binance API anomaly; treating
+    it as real keeps the failure mode loud rather than silently classifying
+    a possibly-real trade as paper.
+    """
+    oid = trade.entry_order_id
+    if oid is None:
+        return True
+    return oid.startswith(_PAPER_PREFIXES)

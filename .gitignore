@@ -45,6 +45,11 @@ models/
 analysis/
 catboost_info/
 
+# v2 track artifacts — regenerable
+reports-v2/
+models-v2/
+analysis-v2/
+
 # Notebook outputs and checkpoints
 notebooks/output/
 notebooks/.ipynb_checkpoints/

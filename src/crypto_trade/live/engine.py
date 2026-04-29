@@ -23,6 +23,7 @@ from crypto_trade.live.data_pipeline import (
     build_master,
     detect_new_candle,
     refresh_features,
+    refresh_features_by_track,
     refresh_klines,
 )
 from crypto_trade.live.models import (
@@ -31,6 +32,7 @@ from crypto_trade.live.models import (
     LiveTrade,
     ModelConfig,
     _new_id,
+    is_paper_trade,
 )
 from crypto_trade.live.order_manager import OrderManager, compute_sl_tp, trade_to_order
 from crypto_trade.live.reconciler import reconcile
@@ -74,12 +76,55 @@ def _previous_month_start_ms(epoch_ms: int) -> int:
     return int(prev.timestamp() * 1000)
 
 
+def _compute_catch_up_start_ms(now_ms: int, lookback_days: int | None) -> int:
+    """Return the catch-up start time as epoch ms.
+
+    lookback_days=N (default 90 in LiveConfig) replays the trailing N days,
+    long enough to rebuild VT's 45-day rolling window plus buffer.
+    lookback_days=None preserves the legacy previous-calendar-month
+    behavior — kept as an explicit opt-out for legacy scripts.
+    """
+    if lookback_days is None:
+        return _previous_month_start_ms(now_ms)
+    return now_ms - lookback_days * 86_400_000
+
+
 class ModelRunner:
     """Manages one LightGBM model (e.g., Model A for BTC/ETH)."""
 
     def __init__(self, model_config: ModelConfig, live_config: LiveConfig) -> None:
         self.model_config = model_config
-        self.strategy = LightGbmStrategy(
+        # Resolve per-model overrides; fall back to LiveConfig when None.
+        self.feature_columns: tuple[str, ...] = (
+            model_config.feature_columns
+            if model_config.feature_columns is not None
+            else BASELINE_FEATURE_COLUMNS
+        )
+        self.features_dir = (
+            model_config.features_dir
+            if model_config.features_dir is not None
+            else live_config.features_dir
+        )
+        self.cooldown_candles: int = (
+            model_config.cooldown_candles
+            if model_config.cooldown_candles is not None
+            else live_config.cooldown_candles
+        )
+        self.vol_targeting: bool = (
+            model_config.vol_targeting
+            if model_config.vol_targeting is not None
+            else live_config.vol_targeting
+        )
+        self.ensemble_seeds: tuple[int, ...] = (
+            model_config.ensemble_seeds
+            if model_config.ensemble_seeds is not None
+            else live_config.ensemble_seeds
+        )
+        atr_column_kwarg: dict[str, str] = {}
+        if model_config.atr_column is not None:
+            atr_column_kwarg["atr_column"] = model_config.atr_column
+
+        inner = LightGbmStrategy(
             training_months=live_config.training_months,
             n_trials=live_config.n_trials,
             cv_splits=live_config.cv_splits,
@@ -87,20 +132,44 @@ class ModelRunner:
             label_sl_pct=live_config.stop_loss_pct,
             label_timeout_minutes=live_config.timeout_minutes,
             fee_pct=live_config.fee_pct,
-            features_dir=str(live_config.features_dir),
+            features_dir=str(self.features_dir),
             verbose=1,
             atr_tp_multiplier=model_config.atr_tp_multiplier,
             atr_sl_multiplier=model_config.atr_sl_multiplier,
             use_atr_labeling=model_config.use_atr_labeling,
-            ensemble_seeds=list(live_config.ensemble_seeds),
-            feature_columns=list(BASELINE_FEATURE_COLUMNS),
+            ensemble_seeds=list(self.ensemble_seeds),
+            feature_columns=list(self.feature_columns),
             ood_enabled=model_config.ood_enabled,
             ood_features=(
                 list(model_config.ood_features) if model_config.ood_enabled else None
             ),
             ood_cutoff_pct=model_config.ood_cutoff_pct,
+            **atr_column_kwarg,
         )
+        # _inner_strategy is the bare LightGbmStrategy regardless of wrapping;
+        # self.strategy may be wrapped in RiskV2Wrapper for v2 models.
+        self._inner_strategy = inner
+        if model_config.risk_wrapper == "v2":
+            if model_config.risk_v2_config is None:
+                raise ValueError(
+                    f"ModelConfig {model_config.name}: risk_wrapper='v2' "
+                    "requires risk_v2_config (got None)"
+                )
+            from crypto_trade.strategies.ml.risk_v2 import RiskV2Wrapper
+            self.strategy = RiskV2Wrapper(inner, model_config.risk_v2_config)
+        else:
+            self.strategy = inner
         self._master: pd.DataFrame | None = None
+
+    @property
+    def inner_strategy(self):
+        """The underlying LightGbmStrategy regardless of wrapping (used by patcher)."""
+        return self._inner_strategy
+
+    @property
+    def inner_atr_column(self) -> str:
+        """ATR column name on the inner strategy (used by tests + patcher)."""
+        return self._inner_strategy.atr_column
 
     def warmup(self, master: pd.DataFrame) -> None:
         """Run compute_features on the master DF and store reference."""
@@ -140,30 +209,52 @@ class LiveEngine:
         api_key: str = "",
         api_secret: str = "",
         base_url: str = "https://fapi.binance.com",
+        auth_base_url: str | None = None,
     ) -> None:
         self.config = config
         self._running = True
         self._all_symbols = config.all_symbols
         self._candle_duration_ms = _INTERVAL_MS.get(config.interval, 28_800_000)
 
-        # Use limit=2 for candle polling (only need last closed + currently forming)
+        # auth_base_url splits signed traffic (orders, positions, leverage)
+        # away from kline traffic. None ⇒ same host as klines (preserves the
+        # pre-testnet single-URL behavior). The testnet flow passes
+        # auth_base_url="https://testnet.binancefuture.com" while leaving
+        # base_url on production so klines stay on the full-history feed.
+        resolved_auth_url = auth_base_url if auth_base_url is not None else base_url
+
+        # Use limit=2 for candle polling. Klines always target base_url
+        # (production); testnet kline history is too short / gappy for
+        # the 90-day catch-up window.
         self._read_client = BinanceClient(base_url=base_url, limit=2, rate_limit_pause=0.25)
         self._auth_client: AuthenticatedBinanceClient | None = None
         if not config.dry_run and api_key:
             self._auth_client = AuthenticatedBinanceClient(
                 api_key=api_key,
                 api_secret=api_secret,
-                base_url=base_url,
+                base_url=resolved_auth_url,
             )
 
-        db_path = config.db_path
-        if config.dry_run:
+        # DB path resolution: testnet > dry_run > config.db_path. Each mode
+        # gets its own file so testnet trades never mix with live.db, and
+        # dry_run trades never mix with testnet.db.
+        if config.testnet:
+            db_path = config.data_dir / "testnet.db"
+        elif config.dry_run:
             db_path = config.data_dir / "dry_run.db"
+        else:
+            db_path = config.db_path
         self._state = StateStore(db_path)
 
         self._order_mgr = OrderManager(config, self._state, self._auth_client)
 
-        log_name = "dry_run_trades.csv" if config.dry_run else "live_trades.csv"
+        # Trade-log filename mirrors the DB-path branch above.
+        if config.testnet:
+            log_name = "testnet_trades.csv"
+        elif config.dry_run:
+            log_name = "dry_run_trades.csv"
+        else:
+            log_name = "live_trades.csv"
         self._logger = TradeLogger(config.data_dir / log_name, config.fee_pct, config.dry_run)
 
         self._runners = [ModelRunner(mc, config) for mc in config.models]
@@ -193,6 +284,106 @@ class LiveEngine:
             s: mc.name for mc in config.models for s in mc.symbols
         }
 
+        # Guard 1: v2 ModelConfigs must not trade v1 baseline symbols.
+        from crypto_trade.live.models import V2_EXCLUDED_SYMBOLS as _V2_EXCLUDED
+        for mc in config.models:
+            if mc.risk_wrapper == "v2":
+                overlap = set(mc.symbols) & set(_V2_EXCLUDED)
+                if overlap:
+                    raise ValueError(
+                        f"ModelConfig {mc.name!r}: risk_wrapper='v2' cannot trade "
+                        f"V2_EXCLUDED_SYMBOLS {sorted(overlap)}"
+                    )
+
+        # Guard 2: symbols must be disjoint across models — R1 and VT state are
+        # keyed by symbol alone, so any overlap would silently corrupt state.
+        seen_owner: dict[str, str] = {}
+        for mc in config.models:
+            for s in mc.symbols:
+                if s in seen_owner:
+                    raise ValueError(
+                        f"overlapping symbols across models: {s!r} appears in "
+                        f"{seen_owner[s]!r} and {mc.name!r}"
+                    )
+                seen_owner[s] = mc.name
+
+        # iter-v2/019: BTC trend filter at signal time (v2 only). Loaded once
+        # at startup to mirror run_baseline_v2.py's load_btc_klines_for_filter.
+        self._btc_filter_cfg: BtcTrendFilterConfig | None = None
+        self._btc_filter_times: np.ndarray | None = None
+        self._btc_filter_closes: np.ndarray | None = None
+        if any(mc.risk_wrapper == "v2" for mc in config.models):
+            from crypto_trade.strategies.ml.risk_v2 import (
+                BtcTrendFilterConfig,
+                load_btc_klines_for_filter,
+            )
+            self._btc_filter_cfg = BtcTrendFilterConfig()  # iter-v2/069 defaults
+            try:
+                self._btc_filter_times, self._btc_filter_closes = (
+                    load_btc_klines_for_filter(
+                        csv_path=str(self.config.data_dir / "BTCUSDT" / "8h.csv"),
+                    )
+                )
+                print(
+                    f"[live] BTC trend filter loaded: {len(self._btc_filter_times)} 8h bars "
+                    f"(lookback={self._btc_filter_cfg.lookback_bars}, "
+                    f"threshold=±{self._btc_filter_cfg.threshold_pct:.1f}%)"
+                )
+            except FileNotFoundError:
+                print(
+                    "[live] WARNING: BTC trend filter requested by v2 model but "
+                    f"BTC CSV not found at {self.config.data_dir / 'BTCUSDT' / '8h.csv'}; "
+                    "v2 signals will run without the filter."
+                )
+                self._btc_filter_cfg = None
+        # Telemetry: count BTC-killed v2 signals across the engine's lifetime.
+        self._btc_killed_count: int = 0
+
+    def _refresh_groups(self, symbols_subset: list[str]) -> list[tuple[tuple[str, ...], Path, str]]:
+        """Group ``symbols_subset`` by track (v1/v2) for refresh_features_by_track.
+
+        A symbol's track is determined by its owning runner's risk_wrapper:
+        v2-wrapped runners use ``data/features_v2`` (or whatever the runner
+        resolved via per-model override), v1 runners use ``data/features``.
+        """
+        v1_syms: list[str] = []
+        v2_syms: list[str] = []
+        v1_dir: Path | None = None
+        v2_dir: Path | None = None
+        for runner in self._runners:
+            track = "v2" if runner.model_config.risk_wrapper == "v2" else "v1"
+            for s in runner.model_config.symbols:
+                if s not in symbols_subset:
+                    continue
+                if track == "v2":
+                    v2_syms.append(s)
+                    v2_dir = runner.features_dir
+                else:
+                    v1_syms.append(s)
+                    v1_dir = runner.features_dir
+        groups: list[tuple[tuple[str, ...], Path, str]] = []
+        if v1_syms and v1_dir is not None:
+            groups.append((tuple(v1_syms), v1_dir, "v1"))
+        if v2_syms and v2_dir is not None:
+            groups.append((tuple(v2_syms), v2_dir, "v2"))
+        return groups
+
+    def catch_up_only(self) -> None:
+        """Run the same setup pipeline as ``run()`` and exit before the poll loop.
+
+        Used by parity tests to drive the engine deterministically through
+        historical data: reconcile open orders, rebuild risk + VT state from
+        closed trades in the DB, train the strategies, replay the most recent
+        month of candles to populate trade state. Returns once `_catch_up()`
+        completes — does NOT call `_tick()` or sleep.
+        """
+        self._print_banner()
+        self._reconcile()
+        self._rebuild_vt_history()
+        self._rebuild_risk_state()
+        self._initial_setup()
+        self._catch_up()
+
     def run(self) -> None:
         """Main entry point — runs until SIGINT/SIGTERM."""
         self._setup_signal_handlers()
@@ -216,7 +407,12 @@ class LiveEngine:
         self._shutdown()
 
     def _print_banner(self) -> None:
-        mode = "DRY-RUN" if self.config.dry_run else "LIVE"
+        if self.config.testnet:
+            mode = "LIVE — TESTNET"
+        elif self.config.dry_run:
+            mode = "DRY-RUN"
+        else:
+            mode = "LIVE"
         print(f"[live] Starting baseline v186 [{mode}]")
         for mc in self.config.models:
             print(
@@ -412,11 +608,23 @@ class LiveEngine:
         return 1.0 - span * (1.0 - floor)
 
     def _set_cooldown(self, model_name: str, symbol: str, close_time: int) -> None:
-        """Set cooldown after a trade closes — same as backtest.py:238-242."""
-        if self.config.cooldown_candles <= 0:
+        """Set cooldown after a trade closes — same as backtest.py:238-242.
+
+        Uses the OWNING model's cooldown_candles, not LiveConfig's, so v2
+        models (cooldown_candles=4) get a different gate than v1 (default 2).
+        """
+        cooldown_candles = self._cooldown_for(model_name)
+        if cooldown_candles <= 0:
             return
-        cooldown_until = close_time + self.config.cooldown_candles * self._candle_duration_ms
+        cooldown_until = close_time + cooldown_candles * self._candle_duration_ms
         self._state.set_state(f"cooldown_{model_name}_{symbol}", str(cooldown_until))
+
+    def _cooldown_for(self, model_name: str) -> int:
+        """Resolve per-model cooldown_candles via the matching runner; fall back to LiveConfig."""
+        for runner in self._runners:
+            if runner.model_config.name == model_name:
+                return runner.cooldown_candles
+        return self.config.cooldown_candles
 
     def _handle_trade_close(self, trade: LiveTrade) -> None:
         """Common handler when a trade closes: log, record VT, record risk, set cooldown."""
@@ -441,7 +649,10 @@ class LiveEngine:
         reset the trained model). Also updates the strategy's internal master
         reference so future operations see the latest candle data.
         """
-        strategy = runner.strategy
+        # Always reach the bare LightGbmStrategy — RiskV2Wrapper (when present)
+        # exposes the same Strategy Protocol but doesn't carry the LGBM internals
+        # (_month_features, _selected_cols, atr_column, …) that the patcher mutates.
+        strategy = runner.inner_strategy
         # Update master reference for any code that might read it
         strategy._master = master
         strategy._sym_arr = master["symbol"].to_numpy(dtype=str)
@@ -487,12 +698,11 @@ class LiveEngine:
         refresh_klines(self._fetch_client, all_symbols, self.config.interval, self.config.data_dir)
 
         print("[live] Refreshing features...")
-        refresh_features(
-            all_symbols,
-            self.config.interval,
-            str(self.config.data_dir),
-            str(self.config.features_dir),
-            list(self.config.feature_groups),
+        refresh_features_by_track(
+            self._refresh_groups(all_symbols),
+            interval=self.config.interval,
+            data_dir=str(self.config.data_dir),
+            feature_groups=tuple(self.config.feature_groups),
         )
 
         for runner in self._runners:
@@ -532,7 +742,9 @@ class LiveEngine:
 
         now_ms = int(time.time() * 1000)
         # Start one month earlier to capture carry-over trades
-        catch_up_start = _previous_month_start_ms(now_ms)
+        catch_up_start = _compute_catch_up_start_ms(
+            now_ms, self.config.catch_up_lookback_days
+        )
 
         sym_arr = master["symbol"].to_numpy(dtype=str)
         open_time_arr = master["open_time"].values
@@ -542,7 +754,22 @@ class LiveEngine:
         low_arr = master["low"].values
         close_arr = master["close"].values
 
+        # Pre-load paper open trades (SEEDED, CATCHUP-, DRY-, None) for this
+        # model so the catch-up loop's open-position guard sees them. Each
+        # SEEDED trade carries full intended-exit info (exit_time, exit_price,
+        # exit_reason) and is closed deterministically below.
+        #
+        # Real numeric-ID trades (left over from a prior --live session) are
+        # explicitly excluded — they belong to reconciler + poll-loop. Pre-
+        # loading them would let catch-up's check_order simulate a fake exit
+        # and falsely close DB rows whose Binance positions are still open.
         open_trades: dict[str, LiveTrade] = {}
+        for seeded in self._state.get_open_trades(model_name=runner.model_config.name):
+            if seeded.symbol not in runner.model_config.symbols:
+                continue
+            if not is_paper_trade(seeded):
+                continue
+            open_trades[seeded.symbol] = seeded
         cooldown_until: dict[str, int] = {}
         n_signals = 0
         n_trades_opened = 0
@@ -567,38 +794,58 @@ class LiveEngine:
 
             # Current month: full trade lifecycle (mirrors backtest.py:217-305)
 
-            # (a) Check open trade for SL/TP/timeout
+            # (a) Check open trade for SL/TP/timeout (or apply seeded exit)
             if sym in open_trades:
-                order = trade_to_order(open_trades[sym])
-                result = check_order(
-                    order,
-                    ot,
-                    float(open_arr[i]),
-                    float(high_arr[i]),
-                    float(low_arr[i]),
-                    ct,
-                    self.config.fee_pct,
-                )
-                if result is not None:
-                    trade = open_trades.pop(sym)
-                    trade.status = "closed"
-                    trade.exit_price = result.exit_price
-                    trade.exit_time = result.close_time
-                    trade.exit_reason = result.exit_reason
-                    self._state.upsert_trade(trade)
-                    self._logger.log_close(trade)
-                    self._record_trade_close_for_vt(trade)
-                    self._record_trade_close_for_risk(trade)
-                    n_trades_closed += 1
-                    # Match backtest.py:239-243 exactly: use result.close_time
-                    # (not current candle ct). For timeouts, result.close_time
-                    # is the candle's open_time, not close_time — an 8h difference
-                    # for 8h candles that shifts the next eligible trade.
-                    if self.config.cooldown_candles > 0:
-                        cooldown_until[sym] = (
-                            result.close_time
-                            + self.config.cooldown_candles * self._candle_duration_ms
-                        )
+                trade = open_trades[sym]
+                # Seeded open trade — close at the seeded exit_time using the
+                # CSV-supplied exit_price/exit_reason. No SL/TP/timeout
+                # recomputation against dummy seeded SL/TP prices.
+                if trade.entry_order_id == "SEEDED" and trade.exit_time is not None:
+                    if ct >= trade.exit_time:
+                        open_trades.pop(sym)
+                        trade.status = "closed"
+                        # exit_* fields are already set by the seeder
+                        self._state.upsert_trade(trade)
+                        self._logger.log_close(trade)
+                        self._record_trade_close_for_vt(trade)
+                        self._record_trade_close_for_risk(trade)
+                        n_trades_closed += 1
+                        if runner.cooldown_candles > 0:
+                            cooldown_until[sym] = (
+                                trade.exit_time
+                                + runner.cooldown_candles * self._candle_duration_ms
+                            )
+                    # else: still holding, will close on a later candle
+                else:
+                    # Genuine live-opened trade: SL/TP/timeout via check_order
+                    order = trade_to_order(trade)
+                    result = check_order(
+                        order,
+                        ot,
+                        float(open_arr[i]),
+                        float(high_arr[i]),
+                        float(low_arr[i]),
+                        ct,
+                        self.config.fee_pct,
+                    )
+                    if result is not None:
+                        trade = open_trades.pop(sym)
+                        trade.status = "closed"
+                        trade.exit_price = result.exit_price
+                        trade.exit_time = result.close_time
+                        trade.exit_reason = result.exit_reason
+                        self._state.upsert_trade(trade)
+                        self._logger.log_close(trade)
+                        self._record_trade_close_for_vt(trade)
+                        self._record_trade_close_for_risk(trade)
+                        n_trades_closed += 1
+                        # Match backtest.py:239-243: use result.close_time (not ct).
+                        # For timeouts, result.close_time = candle open_time.
+                        if runner.cooldown_candles > 0:
+                            cooldown_until[sym] = (
+                                result.close_time
+                                + runner.cooldown_candles * self._candle_duration_ms
+                            )
 
             # (b) Get signal
             sig = runner.strategy.get_signal(sym, ot)
@@ -611,11 +858,20 @@ class LiveEngine:
                 ):
                     entry_price = float(close_arr[i])
 
+                    # Per-model VT — v2 sets vol_targeting=False so vt_scale stays 1.0.
                     vt_scale = 1.0
-                    if self.config.vol_targeting:
+                    if runner.vol_targeting:
                         vt_scale = compute_vt_scale(self._vt_daily_pnl, sym, ct, self.config)
                     # R2 drawdown scaling applied on top of VT
                     vt_scale *= self._r2_scale_for(runner.model_config.name)
+
+                    # Match backtest.py:567-575: when VT is enabled, weight_factor=vt_scale.
+                    # When VT is off, weight_factor includes the strategy's signal.weight
+                    # (the wrapper's _vol_scale uses this to pass through position sizing).
+                    if runner.vol_targeting:
+                        weight_factor = vt_scale
+                    else:
+                        weight_factor = (sig.weight / 100.0) * vt_scale
 
                     sl, tp = compute_sl_tp(sig, entry_price, self.config)
                     trade = LiveTrade(
@@ -623,8 +879,8 @@ class LiveEngine:
                         symbol=sym,
                         direction=sig.direction,
                         entry_price=entry_price,
-                        amount_usd=vt_scale * self.config.max_amount_usd,
-                        weight_factor=vt_scale,
+                        amount_usd=weight_factor * self.config.max_amount_usd,
+                        weight_factor=weight_factor,
                         stop_loss_price=sl,
                         take_profit_price=tp,
                         open_time=ct,
@@ -691,24 +947,33 @@ class LiveEngine:
             f"(detect={t_detect * 1000:.0f}ms)"
         )
 
-        # 3b. Dry-run: check open trades for SL/TP/timeout against new candle OHLC
-        if self.config.dry_run:
-            for trade in self._state.get_open_trades():
-                if trade.symbol not in new_candles:
-                    continue
-                candle = new_candles[trade.symbol]
-                reason = self._order_mgr.check_dry_run_exit(
-                    trade,
-                    candle.open_time,
-                    float(candle.open),
-                    float(candle.high),
-                    float(candle.low),
-                    candle.close_time,
-                )
-                if reason:
-                    updated = self._state.get_trade(trade.id)
-                    if updated:
-                        self._handle_trade_close(updated)
+        # 3b. Candle-based exit check for paper trades. Real numeric-ID trades
+        # are handled by check_exchange_exits (above) which polls Binance for
+        # SL/TP fills. Paper trades (None / SEEDED / CATCHUP- / DRY-) have no
+        # Binance counterpart, so we deterministically simulate SL/TP/timeout
+        # against the new candle's OHLC — same logic as backtest.check_order.
+        # In dry-run mode all trades are paper; in live mode this catches
+        # seeded carry-overs and catch-up replay rows that would otherwise
+        # only exit via check_timeouts (default 7 days) — a small SL/TP-hit
+        # loss could compound until then.
+        for trade in self._state.get_open_trades():
+            if trade.symbol not in new_candles:
+                continue
+            if not is_paper_trade(trade):
+                continue
+            candle = new_candles[trade.symbol]
+            reason = self._order_mgr.check_dry_run_exit(
+                trade,
+                candle.open_time,
+                float(candle.open),
+                float(candle.high),
+                float(candle.low),
+                candle.close_time,
+            )
+            if reason:
+                updated = self._state.get_trade(trade.id)
+                if updated:
+                    self._handle_trade_close(updated)
 
         # 4. Feature pipeline: fetch klines to CSV, regenerate features
         new_syms = list(new_candles.keys())
@@ -717,12 +982,11 @@ class LiveEngine:
         t_fetch = time.monotonic() - t_fetch_start
 
         t_feat_start = time.monotonic()
-        refresh_features(
-            new_syms,
-            self.config.interval,
-            str(self.config.data_dir),
-            str(self.config.features_dir),
-            list(self.config.feature_groups),
+        refresh_features_by_track(
+            self._refresh_groups(new_syms),
+            interval=self.config.interval,
+            data_dir=str(self.config.data_dir),
+            feature_groups=tuple(self.config.feature_groups),
         )
         t_feat = time.monotonic() - t_feat_start
         print(
@@ -796,6 +1060,32 @@ class LiveEngine:
                 if candle_ot < self._risk_cooldown_until.get(symbol, 0):
                     continue
 
+                # iter-v2/019: BTC trend filter (v2 models only). Mirrors
+                # run_baseline_v2.py's apply_btc_trend_filter post-hoc gate, but
+                # at signal time so we never enter a position the backtest would
+                # have killed. v1 signals are unaffected.
+                if (
+                    runner.model_config.risk_wrapper == "v2"
+                    and self._btc_filter_cfg is not None
+                ):
+                    from crypto_trade.strategies.ml.risk_v2 import (
+                        evaluate_btc_trend_filter_one_signal,
+                    )
+                    if evaluate_btc_trend_filter_one_signal(
+                        self._btc_filter_times,
+                        self._btc_filter_closes,
+                        candle_ot,
+                        sig.direction,
+                        self._btc_filter_cfg,
+                    ):
+                        self._btc_killed_count += 1
+                        print(
+                            f"[live] BTC trend filter killed v2 signal: "
+                            f"model={runner.model_config.name} symbol={symbol} "
+                            f"direction={sig.direction} ot={candle_ot}"
+                        )
+                        continue
+
                 entry_price = runner.get_close_price(symbol, candle_ot)
                 if entry_price is None:
                     print(f"[live] WARNING: no close price for {symbol} at {candle_ot}")
@@ -805,14 +1095,23 @@ class LiveEngine:
                 row = master[(master["symbol"] == symbol) & (master["open_time"] == candle_ot)]
                 candle_close_time = int(row["close_time"].iloc[0])
 
-                # FIX 1: vol targeting — same as backtest.py:293-296
+                # Vol targeting — per-model (v2 disables it; v1 keeps the
+                # LiveConfig default).
                 vt_scale = 1.0
-                if self.config.vol_targeting:
+                if runner.vol_targeting:
                     vt_scale = compute_vt_scale(
                         self._vt_daily_pnl, symbol, candle_close_time, self.config
                     )
                 # R2 drawdown scaling (iter 176) applied on top of VT
                 vt_scale *= self._r2_scale_for(runner.model_config.name)
+
+                # Match backtest.py:567-575: when VT is enabled, weight_factor=vt_scale.
+                # When VT is off (v2), include signal.weight/100 so the wrapper's
+                # _vol_scale (which adjusts sig.weight) flows into the trade.
+                if runner.vol_targeting:
+                    weight_factor = vt_scale
+                else:
+                    weight_factor = (sig.weight / 100.0) * vt_scale
 
                 trade = self._order_mgr.open_trade(
                     model_name=runner.model_config.name,
@@ -821,11 +1120,15 @@ class LiveEngine:
                     entry_price=entry_price,
                     candle_close_time=candle_close_time,
                     candle_open_time=candle_ot,
-                    weight_factor=vt_scale,
+                    weight_factor=weight_factor,
                 )
                 self._logger.log_open(trade)
 
-                if self.config.dry_run:
+                # Same-candle SL/TP simulation for paper trades only. Real
+                # numeric-ID trades from `--live` poll-loop have Binance SL/TP
+                # orders placed already; their exits flow through
+                # check_exchange_exits.
+                if is_paper_trade(trade):
                     self._order_mgr.check_dry_run_exit(
                         trade,
                         candle_ot,

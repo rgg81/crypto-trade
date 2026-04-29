@@ -73,3 +73,25 @@ def test_bulk_fields_from_env(monkeypatch):
     settings = load_settings()
     assert settings.data_vision_base == "https://custom.vision.url"
     assert settings.bulk_rate_pause == 0.5
+
+
+def test_auth_base_url_default_none():
+    """auth_base_url defaults to None — callers fall back to base_url."""
+    settings = Settings(binance_api_key="", binance_api_secret="")
+    assert settings.auth_base_url is None
+
+
+def test_auth_base_url_from_env(monkeypatch):
+    """BINANCE_AUTH_BASE_URL populates Settings.auth_base_url independent of base_url."""
+    monkeypatch.setenv("BINANCE_AUTH_BASE_URL", "https://testnet.binancefuture.com")
+    monkeypatch.delenv("BINANCE_BASE_URL", raising=False)
+    settings = load_settings()
+    assert settings.auth_base_url == "https://testnet.binancefuture.com"
+    assert settings.base_url == "https://fapi.binance.com"
+
+
+def test_auth_base_url_unset_when_env_missing(monkeypatch):
+    """Without BINANCE_AUTH_BASE_URL, Settings.auth_base_url stays None."""
+    monkeypatch.delenv("BINANCE_AUTH_BASE_URL", raising=False)
+    settings = load_settings()
+    assert settings.auth_base_url is None

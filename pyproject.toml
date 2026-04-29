@@ -47,6 +47,11 @@ notebook = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "parity: slow end-to-end backtest-vs-live parity tests; takes hours, gated behind -m parity.",
+]
+# Skip parity tests by default. To run them: `uv run pytest -m parity`.
+addopts = "-m 'not parity'"
 
 [tool.ruff]
 src = ["src"]

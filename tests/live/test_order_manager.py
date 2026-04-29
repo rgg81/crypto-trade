@@ -1,9 +1,11 @@
 """Tests for order_manager — SL/TP parity with backtest, dry-run exits, timeouts."""
 
+import httpx
 import pytest
 
 from crypto_trade.backtest import create_order
 from crypto_trade.backtest_models import BacktestConfig, Signal
+from crypto_trade.live.auth_client import AuthenticatedBinanceClient
 from crypto_trade.live.models import LiveConfig, LiveTrade
 from crypto_trade.live.order_manager import OrderManager, compute_sl_tp
 from crypto_trade.live.state_store import StateStore
@@ -266,3 +268,170 @@ class TestTimeout:
         closed = mgr.check_timeouts(now_ms=1500000)
         assert len(closed) == 0
         assert state.get_trade("t5").status == "open"
+
+
+def _live_config() -> LiveConfig:
+    return LiveConfig(
+        stop_loss_pct=4.0,
+        take_profit_pct=8.0,
+        timeout_minutes=10080,
+        fee_pct=0.1,
+        max_amount_usd=1000.0,
+        cooldown_candles=2,
+        dry_run=False,
+    )
+
+
+def _no_call_client() -> AuthenticatedBinanceClient:
+    """A client whose transport raises on every call — proves no Binance traffic occurred."""
+
+    def handler(request):
+        raise AssertionError(
+            f"Unexpected Binance call in --live mode for paper trade: "
+            f"{request.method} {request.url.path}?{request.url.params}"
+        )
+
+    return AuthenticatedBinanceClient(
+        api_key="t",
+        api_secret="t",
+        transport=httpx.MockTransport(handler),
+    )
+
+
+def _open_paper_trade(state: StateStore, **overrides) -> None:
+    defaults = dict(
+        id="t",
+        model_name="A",
+        symbol="BTCUSDT",
+        direction=1,
+        entry_price=60000.0,
+        amount_usd=1000.0,
+        weight_factor=1.0,
+        stop_loss_price=57600.0,
+        take_profit_price=64800.0,
+        open_time=1,
+        timeout_time=10**13,
+        signal_time=0,
+        entry_order_id="SEEDED",
+        sl_order_id=None,
+        tp_order_id=None,
+    )
+    defaults.update(overrides)
+    state.upsert_trade(LiveTrade(**defaults))
+
+
+class TestLiveModePaperSafety:
+    """In --live mode, paper trades must not generate Binance traffic."""
+
+    def test_check_exchange_exits_skips_seeded(self, state):
+        _open_paper_trade(
+            state, id="seeded-1", entry_order_id="SEEDED", sl_order_id=None, tp_order_id=None
+        )
+        mgr = OrderManager(_live_config(), state, _no_call_client())
+        assert mgr.check_exchange_exits() == []
+        assert state.get_trade("seeded-1").status == "open"
+
+    def test_check_exchange_exits_skips_catchup(self, state):
+        _open_paper_trade(
+            state,
+            id="cu-1",
+            entry_order_id="CATCHUP-deadbeef",
+            sl_order_id="CATCHUP-feedface",
+            tp_order_id="CATCHUP-12345678",
+        )
+        mgr = OrderManager(_live_config(), state, _no_call_client())
+        assert mgr.check_exchange_exits() == []
+
+    def test_check_exchange_exits_skips_dry_prefix(self, state):
+        _open_paper_trade(
+            state,
+            id="dry-1",
+            entry_order_id="DRY-abc12345",
+            sl_order_id="DRY-deadbeef",
+            tp_order_id="DRY-feedface",
+        )
+        mgr = OrderManager(_live_config(), state, _no_call_client())
+        assert mgr.check_exchange_exits() == []
+
+    def test_check_exchange_exits_real_id_still_polled(self, state):
+        """Regression — real numeric-ID trades still hit Binance."""
+        called: list[str] = []
+
+        def handler(request):
+            called.append(str(request.url.path))
+            return httpx.Response(200, json={"status": "NEW"})
+
+        client = AuthenticatedBinanceClient(
+            api_key="t",
+            api_secret="t",
+            transport=httpx.MockTransport(handler),
+        )
+        _open_paper_trade(
+            state, id="real-1", entry_order_id="9876543210", sl_order_id="111", tp_order_id="222"
+        )
+        mgr = OrderManager(_live_config(), state, client)
+        mgr.check_exchange_exits()
+        assert any("/fapi/v1/order" in p for p in called)
+
+    def test_timeout_paper_trade_no_binance_call_but_db_closed(self, state):
+        """Paper trade hitting timeout in --live mode must update DB without
+        calling place_market_order — that would OPEN a real position!"""
+        calls: list[tuple[str, str]] = []
+        def handler(request):
+            calls.append((request.method, str(request.url.path)))
+            return httpx.Response(200, json={"orderId": 999})
+        client = AuthenticatedBinanceClient(
+            api_key="t", api_secret="t", transport=httpx.MockTransport(handler),
+        )
+        _open_paper_trade(state, id="seeded-late",
+                          entry_order_id="SEEDED",
+                          sl_order_id=None, tp_order_id=None,
+                          timeout_time=2_000_000)
+        mgr = OrderManager(_live_config(), state, client)
+
+        closed = mgr.check_timeouts(now_ms=3_000_000)
+        assert len(closed) == 1
+        assert state.get_trade("seeded-late").status == "closed"
+        assert state.get_trade("seeded-late").exit_reason == "timeout"
+        assert calls == [], f"Expected zero Binance calls for paper trade, got: {calls}"
+
+    def test_timeout_catchup_trade_no_binance_call(self, state):
+        calls: list[tuple[str, str]] = []
+        def handler(request):
+            calls.append((request.method, str(request.url.path)))
+            return httpx.Response(200, json={"orderId": 999})
+        client = AuthenticatedBinanceClient(
+            api_key="t", api_secret="t", transport=httpx.MockTransport(handler),
+        )
+        _open_paper_trade(state, id="cu-late", direction=-1,
+                          entry_order_id="CATCHUP-deadbeef",
+                          sl_order_id="CATCHUP-feedface",
+                          tp_order_id="CATCHUP-12345678",
+                          stop_loss_price=62400.0, take_profit_price=55200.0,
+                          timeout_time=2_000_000)
+        mgr = OrderManager(_live_config(), state, client)
+        closed = mgr.check_timeouts(now_ms=3_000_000)
+        assert len(closed) == 1
+        assert state.get_trade("cu-late").status == "closed"
+        assert calls == [], f"Expected zero Binance calls for paper trade, got: {calls}"
+
+    def test_timeout_real_id_still_calls_market_order(self, state):
+        """Regression — real numeric-ID timeout still goes through Binance close path."""
+        calls: list[tuple[str, str]] = []
+        def handler(request):
+            calls.append((request.method, str(request.url.path)))
+            return httpx.Response(200, json={"orderId": 999})
+        client = AuthenticatedBinanceClient(
+            api_key="t", api_secret="t", transport=httpx.MockTransport(handler),
+        )
+        _open_paper_trade(state, id="real-late",
+                          entry_order_id="9876543210",
+                          sl_order_id="111", tp_order_id="222",
+                          timeout_time=2_000_000)
+        mgr = OrderManager(_live_config(), state, client)
+        mgr.check_timeouts(now_ms=3_000_000)
+
+        # Expect: 2 cancels (DELETE) + 1 market close (POST)
+        assert any(c == ("POST", "/fapi/v1/order") for c in calls), (
+            f"Expected market-close POST among {calls}"
+        )

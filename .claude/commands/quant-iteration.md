@@ -665,7 +665,7 @@ The training window is **24 months maximum** (covers both bull and bear markets)
 
 ### First Seed Rule
 
-When running seed validation (10 seeds), run the **first seed fully**. If it's clearly unprofitable (OOS Sharpe < 0 or OOS PF < 1.0), **STOP. Don't run the other 9 seeds.** Only proceed to multi-seed validation when the first seed shows genuine profitability.
+When running seed validation (5 seeds), run the **first seed fully**. If it's clearly unprofitable (OOS Sharpe < 0 or OOS PF < 1.0), **STOP. Don't run the other 4 seeds.** Only proceed to multi-seed validation when the first seed shows genuine profitability.
 
 ### When Early-Stopped
 

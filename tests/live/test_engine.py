@@ -401,3 +401,28 @@ def test_engine_rebuild_risk_state_from_db(tmp_path):
     assert engine._cum_weighted_pnl["E"] > -100
     assert engine._peak_weighted_pnl["E"] > 0
     assert engine._peak_weighted_pnl["E"] >= engine._cum_weighted_pnl["E"]
+
+
+def test_cmd_live_default_is_dry_run_no_testnet(tmp_path):
+    """Bare `live` (no flags) ⇒ dry_run, testnet=False, no auth URL."""
+    from unittest.mock import patch
+
+    from crypto_trade.main import _cmd_live, build_parser
+
+    class _StubSettings:
+        binance_api_key = ""
+        binance_api_secret = ""
+        base_url = "https://fapi.binance.com"
+        auth_base_url = None
+        data_dir = str(tmp_path)
+
+    parser = build_parser()
+    args = parser.parse_args(["live"])
+    with patch("crypto_trade.live.engine.LiveEngine") as engine_cls:
+        engine_cls.return_value.run.return_value = None
+        _cmd_live(args, _StubSettings())
+        kwargs = engine_cls.call_args.kwargs
+        cfg = kwargs["config"]
+        assert cfg.dry_run is True
+        assert cfg.testnet is False
+        assert kwargs.get("auth_base_url") is None

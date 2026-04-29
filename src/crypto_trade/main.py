@@ -40,9 +40,11 @@ def _print_progress(progress: BulkProgress) -> None:
     )
 
 
-def main() -> None:
-    settings = load_settings()
+def build_parser() -> argparse.ArgumentParser:
+    """Construct the top-level argparse parser.
 
+    Exposed so tests can probe CLI flags without invoking ``main()``.
+    """
     parser = argparse.ArgumentParser(prog="crypto-trade", description="Binance Futures tools")
     subparsers = parser.add_subparsers(dest="command")
 
@@ -144,6 +146,16 @@ def main() -> None:
         choices=["csv", "parquet"],
         default="csv",
         help="Output format (default: csv)",
+    )
+    feat_parser.add_argument(
+        "--track",
+        choices=["v1", "v2"],
+        default="v1",
+        help=(
+            "Feature catalog: v1=crypto_trade.features (193 baseline features); "
+            "v2=crypto_trade.features_v2 (34 v2 features). "
+            "When --track v2 and --output is omitted, default output dir is data/features_v2."
+        ),
     )
 
     # --- convert-features subcommand ---
@@ -248,7 +260,115 @@ def main() -> None:
         dest="live_mode",
         help="Enable real trading (default: dry-run)",
     )
+    live_parser.add_argument(
+        "--testnet",
+        action="store_true",
+        help=(
+            "Route signed calls (orders, positions, leverage) to the Binance "
+            "Futures testnet (https://testnet.binancefuture.com) while keeping "
+            "kline fetches on production. Forces live trading; uses "
+            "data/testnet.db and data/testnet_trades.csv. Override the testnet "
+            "host with BINANCE_AUTH_BASE_URL."
+        ),
+    )
+    live_parser.add_argument(
+        "--track",
+        choices=["v1", "v2", "both"],
+        default="v1",
+        help="Model preset: v1=BASELINE_MODELS, v2=V2_BASELINE_MODELS, both=COMBINED_MODELS (default: v1)",
+    )
+    catch_up_group = live_parser.add_mutually_exclusive_group()
+    catch_up_group.add_argument(
+        "--catch-up-days",
+        type=int,
+        default=None,
+        help=(
+            "Replay the trailing N days during catch-up. Overrides the "
+            "default 90-day window from LiveConfig."
+        ),
+    )
+    catch_up_group.add_argument(
+        "--catch-up-from",
+        type=str,
+        default=None,
+        help=(
+            "Replay from YYYY-MM-DD UTC during catch-up (e.g. 2025-03-24 "
+            "for full OOS-cutoff parity). Mutually exclusive with --catch-up-days."
+        ),
+    )
 
+    # -- seed-live-db subcommand --
+    seed_parser = subparsers.add_parser(
+        "seed-live-db",
+        help="Import backtest trade CSVs into the live SQLite DB so R1/R2/VT/cooldown "
+        "state is preloaded and `live` can launch with a short --catch-up-days.",
+    )
+    seed_parser.add_argument(
+        "--db",
+        type=str,
+        default="data/dry_run.db",
+        help="Target DB (default: data/dry_run.db, matches `live --dry-run` behavior).",
+    )
+    seed_parser.add_argument(
+        "--v1-trades",
+        action="append",
+        type=str,
+        default=None,
+        help="v1 backtest trades.csv (can repeat for IS+OOS — pass each path).",
+    )
+    seed_parser.add_argument(
+        "--v2-trades",
+        action="append",
+        type=str,
+        default=None,
+        help="v2 backtest trades.csv (can repeat). Zero-weight rows skipped.",
+    )
+    seed_parser.add_argument(
+        "--track",
+        choices=["v1", "v2", "both"],
+        default="both",
+        help="Which model preset to use for symbol→model mapping + cooldown_candles "
+        "resolution (default: both).",
+    )
+    seed_parser.add_argument(
+        "--as-of",
+        type=str,
+        default=None,
+        help="Cutoff YYYY-MM-DD UTC. Trades that opened before this date are seeded; "
+        "trades open at the cutoff become status='open'; trades opening after are "
+        "skipped (live engine replays them). Default: seed everything.",
+    )
+
+    # -- portfolio-report subcommand --
+    pr_parser = subparsers.add_parser(
+        "portfolio-report",
+        help="Build combined v1+v2 portfolio tearsheet from two trade CSVs",
+    )
+    pr_parser.add_argument(
+        "--v1-trades",
+        type=str,
+        required=True,
+        help="Path to v1 trades.csv (e.g. reports/iteration_186/out_of_sample/trades.csv)",
+    )
+    pr_parser.add_argument(
+        "--v2-trades",
+        type=str,
+        required=True,
+        help="Path to v2 trades.csv (e.g. reports-v2/iteration_v2-069/out_of_sample/trades.csv)",
+    )
+    pr_parser.add_argument(
+        "--out",
+        type=str,
+        default="combined_portfolio_report.html",
+        help="Output HTML path (default: combined_portfolio_report.html)",
+    )
+
+    return parser
+
+
+def main() -> None:
+    settings = load_settings()
+    parser = build_parser()
     args = parser.parse_args()
 
     if args.command is None:
@@ -270,6 +390,10 @@ def main() -> None:
         _cmd_convert_features(args, settings)
     elif args.command == "live":
         _cmd_live(args, settings)
+    elif args.command == "portfolio-report":
+        _cmd_portfolio_report(args, settings)
+    elif args.command == "seed-live-db":
+        _cmd_seed_live_db(args, settings)
 
 
 def _cmd_fetch(args, settings) -> None:
@@ -544,11 +668,23 @@ def _cmd_backtest(args, settings) -> None:
 def _cmd_features(args, settings) -> None:
     from pathlib import Path
 
-    from crypto_trade.features import list_groups, run_features
+    track = getattr(args, "track", "v1")
+    if track == "v2":
+        from crypto_trade.features_v2 import (
+            list_groups as _list_groups,
+            run_features_v2 as _run_features,
+        )
+        default_output = str(Path(settings.data_dir) / "features_v2")
+    else:
+        from crypto_trade.features import (
+            list_groups as _list_groups,
+            run_features as _run_features,
+        )
+        default_output = str(Path(settings.data_dir) / "features")
 
     if args.list:
-        print("Available feature groups:")
-        for name in list_groups():
+        print(f"Available {track} feature groups:")
+        for name in _list_groups():
             print(f"  {name}")
         return
 
@@ -569,34 +705,56 @@ def _cmd_features(args, settings) -> None:
         )
     groups_arg = args.groups.strip()
     if groups_arg == "all":
-        groups = list_groups()
+        groups = _list_groups()
     else:
         groups = [g.strip() for g in groups_arg.split(",")]
-        available = set(list_groups())
+        available = set(_list_groups())
         unknown = [g for g in groups if g not in available]
         if unknown:
-            print(f"Error: unknown groups: {unknown}. Available: {list_groups()}", file=sys.stderr)
+            print(
+                f"Error: unknown {track} groups: {unknown}. Available: {_list_groups()}",
+                file=sys.stderr,
+            )
             sys.exit(1)
 
     start_ms = _parse_date(args.start) if args.start else None
     end_ms = _parse_date(args.end) if args.end else None
-    output_dir = args.output or str(Path(settings.data_dir) / "features")
+    output_dir = args.output or default_output
 
-    print(f"Generating features: {', '.join(groups)}")
+    print(f"Generating {track} features: {', '.join(groups)}")
     print(f"  Symbols: {', '.join(symbols)} | Interval: {args.interval} | Workers: {args.workers}")
 
     output_format = getattr(args, "format", "csv")
-    results = run_features(
-        symbols=symbols,
-        interval=args.interval,
-        data_dir=settings.data_dir,
-        groups=groups,
-        start_ms=start_ms,
-        end_ms=end_ms,
-        output_dir=output_dir,
-        workers=args.workers,
-        output_format=output_format,
-    )
+    if track == "v2":
+        # v2's run_features_v2 always emits all groups as parquet — no
+        # groups/output_format kwargs.
+        if output_format != "parquet":
+            print(
+                f"NOTE: --format {output_format} ignored for --track v2 "
+                "(v2 features are parquet-only)",
+                file=sys.stderr,
+            )
+        results = _run_features(
+            symbols=symbols,
+            interval=args.interval,
+            data_dir=settings.data_dir,
+            output_dir=output_dir,
+            start_ms=start_ms,
+            end_ms=end_ms,
+            workers=args.workers,
+        )
+    else:
+        results = _run_features(
+            symbols=symbols,
+            interval=args.interval,
+            data_dir=settings.data_dir,
+            groups=groups,
+            start_ms=start_ms,
+            end_ms=end_ms,
+            output_dir=output_dir,
+            workers=args.workers,
+            output_format=output_format,
+        )
 
     ext = ".parquet" if output_format == "parquet" else ".csv"
     for symbol, n_rows, n_features in results:
@@ -646,21 +804,87 @@ def _cmd_live(args, settings) -> None:
     from pathlib import Path
 
     from crypto_trade.live.engine import LiveEngine
-    from crypto_trade.live.models import BASELINE_MODELS, LiveConfig
+    from crypto_trade.live.models import (
+        BASELINE_MODELS,
+        COMBINED_MODELS,
+        LiveConfig,
+        V2_BASELINE_MODELS,
+    )
 
     groups = tuple(g.strip() for g in args.feature_groups.split(","))
 
+    track = getattr(args, "track", "v1")
+    track_map = {
+        "v1": BASELINE_MODELS,
+        "v2": V2_BASELINE_MODELS,
+        "both": COMBINED_MODELS,
+    }
+    selected_models = track_map[track]
+    print(f"[live] Track: {track} ({len(selected_models)} models)")
+
+    catch_up_kwargs: dict[str, int | None] = {}
+    catch_up_from = getattr(args, "catch_up_from", None)
+    catch_up_days = getattr(args, "catch_up_days", None)
+    if catch_up_from is not None:
+        import pandas as pd
+
+        from_ts = pd.Timestamp(catch_up_from, tz="UTC")
+        days = max(1, (pd.Timestamp.now("UTC") - from_ts).days)
+        catch_up_kwargs["catch_up_lookback_days"] = days
+        print(f"[live] Catch-up lookback: {days} days (from {catch_up_from})")
+    elif catch_up_days is not None:
+        catch_up_kwargs["catch_up_lookback_days"] = catch_up_days
+        print(f"[live] Catch-up lookback: {catch_up_days} days")
+
+    # Testnet routing: --testnet forces live trading and points signed calls
+    # at Binance Futures testnet. Klines stay on production for full history.
+    # BINANCE_AUTH_BASE_URL (loaded into settings.auth_base_url) overrides the
+    # hardcoded testnet host so operators can re-target if Binance changes URL.
+    testnet = bool(getattr(args, "testnet", False))
+    if testnet:
+        if not settings.binance_api_key or not settings.binance_api_secret:
+            print(
+                "ERROR: --testnet requires BINANCE_API_KEY / BINANCE_API_SECRET. "
+                "Generate testnet keys at https://testnet.binancefuture.com.",
+                file=sys.stderr,
+            )
+            sys.exit(2)
+        # Testnet IS live trading (just on the test exchange). Promote
+        # live_mode=True so LiveConfig(... dry_run=not args.live_mode ...)
+        # correctly sets dry_run=False below.
+        args.live_mode = True
+
+    # Auth URL resolution: env wins; if --testnet and env unset, hardcode
+    # the testnet host. Otherwise pass None so the engine falls back to
+    # base_url (preserves pre-testnet single-URL behavior).
+    auth_base_url = getattr(settings, "auth_base_url", None)
+    if testnet and auth_base_url is None:
+        auth_base_url = "https://testnet.binancefuture.com"
+
+    # Surface a loud banner whenever the auth URL differs from base_url, so
+    # an .env-set staging URL can never quietly route prod orders to staging.
+    if auth_base_url is not None and auth_base_url != settings.base_url:
+        print(f"[live] AUTH endpoint OVERRIDE: {auth_base_url}")
+
+    # DB path is the live-mode fallback. The engine overrides this to
+    # data/testnet.db when config.testnet is True and to data/dry_run.db
+    # when config.dry_run is True (see engine.py). We always pass live.db
+    # here so single-source-of-truth lives in the engine.
+    db_path = Path(settings.data_dir) / "live.db"
+
     config = LiveConfig(
-        models=BASELINE_MODELS,
+        models=selected_models,
         interval="8h",
         max_amount_usd=float(args.amount),
         leverage=args.leverage,
         data_dir=Path(settings.data_dir),
         features_dir=Path(settings.data_dir) / "features",
         feature_groups=groups,
-        db_path=Path(settings.data_dir) / ("dry_run.db" if not args.live_mode else "live.db"),
+        db_path=db_path,
         poll_interval_seconds=args.poll_interval,
         dry_run=not args.live_mode,
+        testnet=testnet,
+        **catch_up_kwargs,
     )
 
     engine = LiveEngine(
@@ -668,8 +892,115 @@ def _cmd_live(args, settings) -> None:
         api_key=settings.binance_api_key,
         api_secret=settings.binance_api_secret,
         base_url=settings.base_url,
+        auth_base_url=auth_base_url,
     )
     engine.run()
+
+
+def _cmd_portfolio_report(args, settings) -> None:
+    """Build a combined v1+v2 portfolio tearsheet from two trade CSVs."""
+    from pathlib import Path
+
+    import pandas as pd
+
+    from crypto_trade.live.portfolio_report import (
+        ReportInputs,
+        build_combined_report,
+    )
+
+    v1 = pd.read_csv(args.v1_trades)
+    v2 = pd.read_csv(args.v2_trades)
+    out_path = Path(args.out)
+    rep = build_combined_report(
+        ReportInputs(v1_trades=v1, v2_trades=v2),
+        html_out=out_path,
+    )
+    print(
+        f"Combined: {rep.total_trades} trades "
+        f"(v1: {rep.v1_trades}, v2: {rep.v2_trades}). "
+        f"Sharpe(monthly)={rep.combined_sharpe_monthly:.4f}, "
+        f"Sharpe(daily)={rep.combined_sharpe_daily:.4f}, "
+        f"MaxDD={rep.combined_max_drawdown_pct:.2f}, "
+        f"Calmar={rep.combined_calmar:.4f}, "
+        f"PnL={rep.combined_weighted_pnl:.2f}"
+    )
+    print(f"Wrote {out_path}")
+
+
+def _cmd_seed_live_db(args, settings) -> None:
+    """Seed the live DB with backtest trades to preload R1/R2/VT/cooldown state."""
+    from pathlib import Path
+
+    import pandas as pd
+
+    from crypto_trade.live.db_seeder import seed_live_db_from_backtest
+    from crypto_trade.live.models import (
+        BASELINE_MODELS,
+        COMBINED_MODELS,
+        LiveConfig,
+        V2_BASELINE_MODELS,
+    )
+
+    track_map = {
+        "v1": BASELINE_MODELS,
+        "v2": V2_BASELINE_MODELS,
+        "both": COMBINED_MODELS,
+    }
+    selected_models = track_map[args.track]
+
+    cfg = LiveConfig(models=selected_models, data_dir=Path(settings.data_dir))
+
+    v1_paths = [Path(p) for p in (args.v1_trades or [])]
+    v2_paths = [Path(p) for p in (args.v2_trades or [])]
+
+    if not v1_paths and not v2_paths:
+        print(
+            "ERROR: provide at least one --v1-trades or --v2-trades CSV.",
+            file=sys.stderr,
+        )
+        sys.exit(2)
+
+    as_of_ms = None
+    if args.as_of is not None:
+        as_of_ms = int(pd.Timestamp(args.as_of, tz="UTC").value // 1_000_000)
+
+    db_path = Path(args.db)
+    print(f"[seed] Target DB: {db_path}")
+    print(f"[seed] Track: {args.track} ({len(selected_models)} models)")
+    if v1_paths:
+        print(f"[seed] v1 CSVs: {', '.join(str(p) for p in v1_paths)}")
+    if v2_paths:
+        print(f"[seed] v2 CSVs: {', '.join(str(p) for p in v2_paths)}")
+    if as_of_ms is not None:
+        print(f"[seed] as-of cutoff: {args.as_of} ({as_of_ms} ms)")
+    else:
+        print("[seed] as-of cutoff: none (seeding all backtest trades)")
+
+    counts = seed_live_db_from_backtest(
+        db_path=db_path,
+        v1_trades_csvs=v1_paths,
+        v2_trades_csvs=v2_paths,
+        live_config=cfg,
+        as_of_ms=as_of_ms,
+    )
+
+    print()
+    print("=== Seeding result ===")
+    for k, v in counts.items():
+        print(f"  {k:30s}: {v}")
+    total_inserted = (
+        counts["v1_closed"]
+        + counts["v1_open"]
+        + counts["v2_closed"]
+        + counts["v2_open"]
+    )
+    print(f"  TOTAL inserted               : {total_inserted}")
+    print()
+    print(
+        "Next step: launch `crypto-trade live --track both --catch-up-days N` where N "
+        "covers the gap between the latest seeded close_time and now. Catch-up will "
+        "produce trades only for candles after the seeded data."
+    )
 
 
 if __name__ == "__main__":

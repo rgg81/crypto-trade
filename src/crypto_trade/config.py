@@ -13,6 +13,11 @@ class Settings:
     binance_api_key: str
     binance_api_secret: str
     base_url: str = "https://fapi.binance.com"
+    # Auth-only URL for signed endpoints (orders, positions, leverage).
+    # None ⇒ callers fall back to base_url. Set to e.g.
+    # "https://testnet.binancefuture.com" to route signed calls to the Binance
+    # Futures testnet while keeping kline fetches on production.
+    auth_base_url: str | None = None
     data_dir: Path = Path("data")
     symbols: tuple[str, ...] = ("BTCUSDT", "ETHUSDT")
     intervals: tuple[str, ...] = ("1h",)
@@ -39,6 +44,8 @@ def load_settings() -> Settings:
 
     if base_url := os.environ.get("BINANCE_BASE_URL"):
         kwargs["base_url"] = base_url
+    if auth_base_url := os.environ.get("BINANCE_AUTH_BASE_URL"):
+        kwargs["auth_base_url"] = auth_base_url
     if data_dir := os.environ.get("DATA_DIR"):
         kwargs["data_dir"] = Path(data_dir)
     if symbols := os.environ.get("SYMBOLS"):
