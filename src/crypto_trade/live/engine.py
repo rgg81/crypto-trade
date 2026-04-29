@@ -947,24 +947,33 @@ class LiveEngine:
             f"(detect={t_detect * 1000:.0f}ms)"
         )
 
-        # 3b. Dry-run: check open trades for SL/TP/timeout against new candle OHLC
-        if self.config.dry_run:
-            for trade in self._state.get_open_trades():
-                if trade.symbol not in new_candles:
-                    continue
-                candle = new_candles[trade.symbol]
-                reason = self._order_mgr.check_dry_run_exit(
-                    trade,
-                    candle.open_time,
-                    float(candle.open),
-                    float(candle.high),
-                    float(candle.low),
-                    candle.close_time,
-                )
-                if reason:
-                    updated = self._state.get_trade(trade.id)
-                    if updated:
-                        self._handle_trade_close(updated)
+        # 3b. Candle-based exit check for paper trades. Real numeric-ID trades
+        # are handled by check_exchange_exits (above) which polls Binance for
+        # SL/TP fills. Paper trades (None / SEEDED / CATCHUP- / DRY-) have no
+        # Binance counterpart, so we deterministically simulate SL/TP/timeout
+        # against the new candle's OHLC — same logic as backtest.check_order.
+        # In dry-run mode all trades are paper; in live mode this catches
+        # seeded carry-overs and catch-up replay rows that would otherwise
+        # only exit via check_timeouts (default 7 days) — a small SL/TP-hit
+        # loss could compound until then.
+        for trade in self._state.get_open_trades():
+            if trade.symbol not in new_candles:
+                continue
+            if not is_paper_trade(trade):
+                continue
+            candle = new_candles[trade.symbol]
+            reason = self._order_mgr.check_dry_run_exit(
+                trade,
+                candle.open_time,
+                float(candle.open),
+                float(candle.high),
+                float(candle.low),
+                candle.close_time,
+            )
+            if reason:
+                updated = self._state.get_trade(trade.id)
+                if updated:
+                    self._handle_trade_close(updated)
 
         # 4. Feature pipeline: fetch klines to CSV, regenerate features
         new_syms = list(new_candles.keys())
@@ -1115,7 +1124,11 @@ class LiveEngine:
                 )
                 self._logger.log_open(trade)
 
-                if self.config.dry_run:
+                # Same-candle SL/TP simulation for paper trades only. Real
+                # numeric-ID trades from `--live` poll-loop have Binance SL/TP
+                # orders placed already; their exits flow through
+                # check_exchange_exits.
+                if is_paper_trade(trade):
                     self._order_mgr.check_dry_run_exit(
                         trade,
                         candle_ot,

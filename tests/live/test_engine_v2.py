@@ -890,3 +890,54 @@ def test_cmd_live_testnet_requires_credentials(tmp_path, monkeypatch):
     args = parser.parse_args(["live", "--testnet"])
     with pytest.raises(SystemExit):
         _cmd_live(args, _StubSettings())
+
+
+# ---- Paper-trade SL/TP candle-exit in --live mode (PR #2 review fix) -------
+
+
+def test_engine_tick_candle_exit_filter_uses_is_paper_trade():
+    """In --live mode, paper trades (SEEDED/CATCHUP-/DRY-) must still close on
+    a SL/TP candle hit via the deterministic OHLC simulator. The previous code
+    gated this entire branch on `if self.config.dry_run:`, so a paper trade in
+    live mode could only exit via `check_timeouts` (default 7 days), even after
+    a SL candle had printed. Fix: gate by `is_paper_trade(trade)` instead.
+
+    Source-anchor regex test — explicit drift guard against a future refactor
+    that re-introduces the dry_run gate."""
+    import re
+    from pathlib import Path
+
+    src = Path("src/crypto_trade/live/engine.py").read_text()
+
+    # Section 3b — open-trade SL/TP candle check inside _tick
+    section_3b = re.search(
+        r"# 3b\..*?# 4\. Feature pipeline",
+        src,
+        flags=re.DOTALL,
+    )
+    assert section_3b is not None, "Could not locate _tick section 3b in engine.py"
+    body_3b = section_3b.group(0)
+    assert "is_paper_trade(trade)" in body_3b, (
+        "engine._tick section 3b must filter open trades via is_paper_trade(); "
+        "the previous `if self.config.dry_run:` gate left paper trades in --live "
+        "mode unable to close on SL/TP candle hits"
+    )
+    assert "if self.config.dry_run:" not in body_3b, (
+        "engine._tick section 3b must NOT gate on self.config.dry_run; "
+        "candle-based exit must run for paper trades in any mode"
+    )
+
+    # Same-candle SL/TP check after open_trade — also must use is_paper_trade
+    after_open_block = re.search(
+        r"self\._logger\.log_open\(trade\).*?(?=# 6\. Mark processed)",
+        src,
+        flags=re.DOTALL,
+    )
+    assert after_open_block is not None, (
+        "Could not locate post-open candle-exit block"
+    )
+    after_open_body = after_open_block.group(0)
+    assert "is_paper_trade(trade)" in after_open_body, (
+        "Post-open SL/TP candle check must use is_paper_trade(trade), "
+        "not self.config.dry_run"
+    )
