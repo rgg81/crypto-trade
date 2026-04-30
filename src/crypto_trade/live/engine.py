@@ -767,7 +767,23 @@ class LiveEngine:
             if not is_paper_trade(seeded):
                 continue
             open_trades[seeded.symbol] = seeded
+        # Pre-load both dicts from engine_state so the seeder's boundary keys
+        # and post-trade cooldown keys are honored from the very first candle.
         cooldown_until: dict[str, int] = {}
+        seeded_through: dict[str, int] = {}
+        for sym in runner.model_config.symbols:
+            cd_raw = self._state.get_state(f"cooldown_{runner.model_config.name}_{sym}")
+            if cd_raw:
+                cooldown_until[sym] = int(cd_raw)
+            sb_raw = self._state.get_state(f"seeded_through_{runner.model_config.name}_{sym}")
+            if sb_raw:
+                seeded_through[sym] = int(sb_raw)
+        if seeded_through or cooldown_until:
+            print(
+                f"[live] Model {runner.model_config.name} catch-up boundary: "
+                f"{len(seeded_through)} seeded keys, {len(cooldown_until)} cooldown keys"
+            )
+
         n_signals = 0
         n_trades_opened = 0
         n_trades_closed = 0
@@ -851,6 +867,7 @@ class LiveEngine:
                     sym not in open_trades
                     and ot >= cooldown_until.get(sym, 0)
                     and ot >= self._risk_cooldown_until.get(sym, 0)
+                    and ot > seeded_through.get(sym, 0)
                 ):
                     entry_price = float(close_arr[i])
 

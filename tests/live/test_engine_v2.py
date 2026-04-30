@@ -10,8 +10,10 @@ v1, but covers the new code paths that v2 introduces:
   - BTC trend filter helper (Task 7)
   - `LiveEngine.catch_up_only()` smoke (Task 9)
 """
+
 from __future__ import annotations
 
+import time
 from pathlib import Path
 
 import pytest
@@ -174,6 +176,7 @@ def test_combined_models_unions_v1_and_v2():
         COMBINED_MODELS,
         V2_BASELINE_MODELS,
     )
+
     assert len(COMBINED_MODELS) == len(BASELINE_MODELS) + len(V2_BASELINE_MODELS)
     # Symbols disjoint across the two presets
     v1_syms = {s for mc in BASELINE_MODELS for s in mc.symbols}
@@ -183,6 +186,7 @@ def test_combined_models_unions_v1_and_v2():
 
 def test_v2_excluded_symbols_constant():
     from crypto_trade.live.models import V2_EXCLUDED_SYMBOLS
+
     assert set(V2_EXCLUDED_SYMBOLS) == {"BTCUSDT", "ETHUSDT", "LINKUSDT", "BNBUSDT"}
 
 
@@ -220,12 +224,18 @@ def test_engine_rejects_overlapping_symbols(tmp_path):
     from crypto_trade.live.engine import LiveEngine
 
     a = ModelConfig(
-        name="A1", symbols=("BTCUSDT",),
-        use_atr_labeling=True, atr_tp_multiplier=2.9, atr_sl_multiplier=1.45,
+        name="A1",
+        symbols=("BTCUSDT",),
+        use_atr_labeling=True,
+        atr_tp_multiplier=2.9,
+        atr_sl_multiplier=1.45,
     )
     b = ModelConfig(
-        name="A2", symbols=("BTCUSDT",),  # collides with A1
-        use_atr_labeling=True, atr_tp_multiplier=2.9, atr_sl_multiplier=1.45,
+        name="A2",
+        symbols=("BTCUSDT",),  # collides with A1
+        use_atr_labeling=True,
+        atr_tp_multiplier=2.9,
+        atr_sl_multiplier=1.45,
     )
     cfg = LiveConfig(
         models=(a, b),
@@ -267,15 +277,9 @@ def test_btc_trend_filter_kills_short_in_rally():
     cfg = BtcTrendFilterConfig(enabled=True, lookback_bars=14, threshold_pct=20.0)
 
     # Short during +25% rally → kill
-    assert (
-        evaluate_btc_trend_filter_one_signal(times, closes, int(times[-1]), -1, cfg)
-        is True
-    )
+    assert evaluate_btc_trend_filter_one_signal(times, closes, int(times[-1]), -1, cfg) is True
     # Long during +25% rally → no kill
-    assert (
-        evaluate_btc_trend_filter_one_signal(times, closes, int(times[-1]), 1, cfg)
-        is False
-    )
+    assert evaluate_btc_trend_filter_one_signal(times, closes, int(times[-1]), 1, cfg) is False
 
 
 def test_btc_trend_filter_kills_long_in_crash():
@@ -290,14 +294,8 @@ def test_btc_trend_filter_kills_long_in_crash():
     closes = np.concatenate([np.full(36, 50000.0), np.linspace(50000.0, 37500.0, 14)])  # -25%
     cfg = BtcTrendFilterConfig(enabled=True, lookback_bars=14, threshold_pct=20.0)
 
-    assert (
-        evaluate_btc_trend_filter_one_signal(times, closes, int(times[-1]), 1, cfg)
-        is True
-    )
-    assert (
-        evaluate_btc_trend_filter_one_signal(times, closes, int(times[-1]), -1, cfg)
-        is False
-    )
+    assert evaluate_btc_trend_filter_one_signal(times, closes, int(times[-1]), 1, cfg) is True
+    assert evaluate_btc_trend_filter_one_signal(times, closes, int(times[-1]), -1, cfg) is False
 
 
 def test_btc_trend_filter_warmup_passes():
@@ -313,10 +311,7 @@ def test_btc_trend_filter_warmup_passes():
     closes = np.linspace(50000.0, 100000.0, 10)
     cfg = BtcTrendFilterConfig(enabled=True, lookback_bars=14, threshold_pct=20.0)
 
-    assert (
-        evaluate_btc_trend_filter_one_signal(times, closes, int(times[-1]), -1, cfg)
-        is False
-    )
+    assert evaluate_btc_trend_filter_one_signal(times, closes, int(times[-1]), -1, cfg) is False
 
 
 def test_btc_trend_filter_disabled_never_kills():
@@ -331,10 +326,7 @@ def test_btc_trend_filter_disabled_never_kills():
     closes = np.concatenate([np.full(36, 50000.0), np.linspace(50000.0, 62500.0, 14)])
     cfg = BtcTrendFilterConfig(enabled=False)
 
-    assert (
-        evaluate_btc_trend_filter_one_signal(times, closes, int(times[-1]), -1, cfg)
-        is False
-    )
+    assert evaluate_btc_trend_filter_one_signal(times, closes, int(times[-1]), -1, cfg) is False
 
 
 # ----------------------------- Task 8 ---------------------------------------
@@ -458,12 +450,16 @@ def test_compute_catch_up_start_ms_lookback_modes():
 
     # N-day lookback returns now - N days exactly
     ninety = _compute_catch_up_start_ms(now, lookback_days=90)
-    expected = int((pd.Timestamp("2026-04-26 12:00", tz="UTC") - pd.Timedelta(days=90)).value // 1_000_000)
+    expected = int(
+        (pd.Timestamp("2026-04-26 12:00", tz="UTC") - pd.Timedelta(days=90)).value // 1_000_000
+    )
     assert ninety == expected
 
     # Larger lookback works too (full OOS replay)
     full_oos = _compute_catch_up_start_ms(now, lookback_days=400)
-    expected_400 = int((pd.Timestamp("2026-04-26 12:00", tz="UTC") - pd.Timedelta(days=400)).value // 1_000_000)
+    expected_400 = int(
+        (pd.Timestamp("2026-04-26 12:00", tz="UTC") - pd.Timedelta(days=400)).value // 1_000_000
+    )
     assert full_oos == expected_400
 
 
@@ -493,9 +489,7 @@ def test_cli_live_catch_up_flags_mutually_exclusive():
 
     parser = build_parser()
     with pytest.raises(SystemExit):
-        parser.parse_args(
-            ["live", "--catch-up-days", "60", "--catch-up-from", "2025-03-24"]
-        )
+        parser.parse_args(["live", "--catch-up-days", "60", "--catch-up-from", "2025-03-24"])
 
 
 def test_cmd_live_propagates_catch_up_days_to_config(tmp_path):
@@ -575,32 +569,57 @@ def test_catch_up_pre_load_filter_excludes_real_numeric_ids(tmp_path):
     from crypto_trade.live.models import LiveTrade, ModelConfig, is_paper_trade
     from crypto_trade.live.state_store import StateStore
 
-
     db = tmp_path / "test.db"
     state = StateStore(db)
 
-    state.upsert_trade(LiveTrade(
-        id="paper-1", model_name="A", symbol="BTCUSDT", direction=1,
-        entry_price=60000.0, amount_usd=1000.0, weight_factor=1.0,
-        stop_loss_price=57600.0, take_profit_price=64800.0,
-        open_time=1, timeout_time=10**13, signal_time=0,
-        entry_order_id="CATCHUP-deadbeef",
-        sl_order_id="CATCHUP-feedface", tp_order_id="CATCHUP-12345678",
-    ))
-    state.upsert_trade(LiveTrade(
-        id="real-1", model_name="A", symbol="ETHUSDT", direction=1,
-        entry_price=3000.0, amount_usd=1000.0, weight_factor=1.0,
-        stop_loss_price=2880.0, take_profit_price=3240.0,
-        open_time=1, timeout_time=10**13, signal_time=0,
-        entry_order_id="9876543210", sl_order_id="111", tp_order_id="222",
-    ))
+    state.upsert_trade(
+        LiveTrade(
+            id="paper-1",
+            model_name="A",
+            symbol="BTCUSDT",
+            direction=1,
+            entry_price=60000.0,
+            amount_usd=1000.0,
+            weight_factor=1.0,
+            stop_loss_price=57600.0,
+            take_profit_price=64800.0,
+            open_time=1,
+            timeout_time=10**13,
+            signal_time=0,
+            entry_order_id="CATCHUP-deadbeef",
+            sl_order_id="CATCHUP-feedface",
+            tp_order_id="CATCHUP-12345678",
+        )
+    )
+    state.upsert_trade(
+        LiveTrade(
+            id="real-1",
+            model_name="A",
+            symbol="ETHUSDT",
+            direction=1,
+            entry_price=3000.0,
+            amount_usd=1000.0,
+            weight_factor=1.0,
+            stop_loss_price=2880.0,
+            take_profit_price=3240.0,
+            open_time=1,
+            timeout_time=10**13,
+            signal_time=0,
+            entry_order_id="9876543210",
+            sl_order_id="111",
+            tp_order_id="222",
+        )
+    )
     state.close()
 
     # Reproduce the engine's pre-load logic exactly:
     state2 = StateStore(db)
     mc = ModelConfig(
-        name="A", symbols=("BTCUSDT", "ETHUSDT"),
-        use_atr_labeling=True, atr_tp_multiplier=2.9, atr_sl_multiplier=1.45,
+        name="A",
+        symbols=("BTCUSDT", "ETHUSDT"),
+        use_atr_labeling=True,
+        atr_tp_multiplier=2.9,
+        atr_sl_multiplier=1.45,
     )
     pre_loaded = {
         seeded.symbol: seeded
@@ -617,10 +636,12 @@ def test_catch_up_pre_load_filter_excludes_real_numeric_ids(tmp_path):
     # Belt-and-suspenders integration anchor — the engine source must use the helper.
     import re
     from pathlib import Path
+
     src = Path("src/crypto_trade/live/engine.py").read_text()
     pre_load_block = re.search(
         r"open_trades:\s*dict\[str,\s*LiveTrade\]\s*=\s*\{\}.*?cooldown_until",
-        src, flags=re.DOTALL,
+        src,
+        flags=re.DOTALL,
     )
     assert pre_load_block is not None
     assert "is_paper_trade" in pre_load_block.group(0), (
@@ -666,7 +687,9 @@ def test_engine_auth_base_url_routes_signed_traffic(tmp_path):
     # Auth client → testnet
     assert engine._auth_client is not None
     assert engine._auth_client._base_url == "https://testnet.binancefuture.com"
-    assert str(engine._auth_client._client.base_url).rstrip("/") == "https://testnet.binancefuture.com"
+    assert (
+        str(engine._auth_client._client.base_url).rstrip("/") == "https://testnet.binancefuture.com"
+    )
     # Kline clients → production (must stay on full-history feed)
     assert engine._read_client.base_url == "https://fapi.binance.com"
     assert engine._fetch_client.base_url == "https://fapi.binance.com"
@@ -933,11 +956,254 @@ def test_engine_tick_candle_exit_filter_uses_is_paper_trade():
         src,
         flags=re.DOTALL,
     )
-    assert after_open_block is not None, (
-        "Could not locate post-open candle-exit block"
-    )
+    assert after_open_block is not None, "Could not locate post-open candle-exit block"
     after_open_body = after_open_block.group(0)
     assert "is_paper_trade(trade)" in after_open_body, (
-        "Post-open SL/TP candle check must use is_paper_trade(trade), "
-        "not self.config.dry_run"
+        "Post-open SL/TP candle check must use is_paper_trade(trade), not self.config.dry_run"
     )
+
+
+# ----------------------------- Boundary handshake (Task 4) ------------------
+
+
+def _build_minimal_engine(tmp_path, models, dry_run=True):
+    """Helper: spin up a LiveEngine with the smallest possible config for
+    catch-up unit tests. Caller must populate the master DF on each runner."""
+    from crypto_trade.live.engine import LiveEngine
+    from crypto_trade.live.models import LiveConfig
+
+    cfg = LiveConfig(
+        models=models,
+        dry_run=dry_run,
+        db_path=tmp_path / "engine_test.db",
+        data_dir=tmp_path,
+        catch_up_lookback_days=400,  # broad — let the master DF dictate range
+    )
+    return LiveEngine(cfg)
+
+
+def _engine_db_path(tmp_path, dry_run=True):
+    """Return the DB path the engine will actually use given the dry_run flag.
+
+    LiveEngine.__init__ routes dry_run=True to data_dir/dry_run.db (independent
+    of the explicit db_path arg). Tests pre-write keys + read back trades
+    against this resolved path.
+    """
+    if dry_run:
+        return tmp_path / "dry_run.db"
+    return tmp_path / "engine_test.db"
+
+
+def test_catch_up_skips_seeded_territory(tmp_path):
+    """Pre-write seeded_through_A_BTCUSDT; assert catch-up does not open a
+    CATCHUP-* trade for any candle whose open_time <= boundary."""
+    import pandas as pd
+
+    from crypto_trade.backtest_models import Signal
+    from crypto_trade.live.models import ModelConfig
+    from crypto_trade.live.state_store import StateStore
+
+    # Use a recent-past boundary so the candles aren't filtered out by ct > now_ms
+    candle_ms = 28_800_000
+    now_ms = int(time.time() * 1000)
+    boundary_ms = (now_ms // candle_ms) * candle_ms - 3 * candle_ms  # ~24h ago
+    cfg_models = (
+        ModelConfig(
+            name="A",
+            symbols=("BTCUSDT",),
+            use_atr_labeling=True,
+            atr_tp_multiplier=2.9,
+            atr_sl_multiplier=1.45,
+        ),
+    )
+    db = _engine_db_path(tmp_path)
+
+    # Pre-write the boundary into the DB the engine will actually use.
+    store = StateStore(db)
+    store.set_state("seeded_through_A_BTCUSDT", str(boundary_ms))
+    store.close()
+
+    engine = _build_minimal_engine(tmp_path, cfg_models)
+    runner = engine._runners[0]
+
+    class _StubStrategy:
+        def compute_features(self, master):
+            pass
+
+        def get_signal(self, sym, ot):
+            return Signal(direction=1, weight=100)
+
+    runner.strategy = _StubStrategy()
+    runner._inner_strategy = _StubStrategy()
+    # Master DF: one candle BEFORE the boundary, one AT the boundary, one AFTER
+    runner._master = pd.DataFrame(
+        {
+            "symbol": ["BTCUSDT"] * 3,
+            "open_time": [
+                boundary_ms - candle_ms,
+                boundary_ms,
+                boundary_ms + candle_ms,
+            ],
+            "close_time": [
+                boundary_ms - 1,
+                boundary_ms + candle_ms - 1,
+                boundary_ms + 2 * candle_ms - 1,
+            ],
+            "open": [100.0] * 3,
+            "high": [100.0] * 3,
+            "low": [100.0] * 3,
+            "close": [100.0] * 3,
+        }
+    )
+
+    engine._catch_up_model(runner)
+
+    store = StateStore(db)
+    trades = store.get_all_trades()
+    store.close()
+    # Only one trade allowed: the one at boundary_ms + candle_ms (post-boundary).
+    assert len(trades) == 1, f"Expected 1 post-boundary trade, got {len(trades)}"
+    # Trade open_time is the candle's close_time (engine.py: catch-up trade-creation block).
+    assert trades[0].open_time == boundary_ms + 2 * candle_ms - 1
+
+
+def test_catch_up_preloads_cooldown_keys(tmp_path):
+    """A seeded cooldown_<model>_<sym> key extending past the boundary must be
+    honored by catch-up — no trade opens during the cooldown window."""
+    import pandas as pd
+
+    from crypto_trade.backtest_models import Signal
+    from crypto_trade.live.models import ModelConfig
+    from crypto_trade.live.state_store import StateStore
+
+    candle_ms = 28_800_000
+    now_ms = int(time.time() * 1000)
+    boundary_ms = (now_ms // candle_ms) * candle_ms - 5 * candle_ms
+    # Cooldown extends 2 candles past the boundary
+    cooldown_until = boundary_ms + 2 * candle_ms
+    cfg_models = (
+        ModelConfig(
+            name="A",
+            symbols=("BTCUSDT",),
+            use_atr_labeling=True,
+            atr_tp_multiplier=2.9,
+            atr_sl_multiplier=1.45,
+        ),
+    )
+    db = _engine_db_path(tmp_path)
+
+    store = StateStore(db)
+    store.set_state("seeded_through_A_BTCUSDT", str(boundary_ms))
+    store.set_state("cooldown_A_BTCUSDT", str(cooldown_until))
+    store.close()
+
+    engine = _build_minimal_engine(tmp_path, cfg_models)
+    runner = engine._runners[0]
+
+    class _StubStrategy:
+        def compute_features(self, master):
+            pass
+
+        def get_signal(self, sym, ot):
+            return Signal(direction=1, weight=100)
+
+    runner.strategy = _StubStrategy()
+    runner._inner_strategy = _StubStrategy()
+    runner._master = pd.DataFrame(
+        {
+            "symbol": ["BTCUSDT"] * 3,
+            "open_time": [
+                boundary_ms + candle_ms,  # post-boundary, inside cooldown
+                boundary_ms + 2 * candle_ms,  # post-boundary, AT cooldown end
+                boundary_ms + 3 * candle_ms,  # post-boundary, post-cooldown
+            ],
+            "close_time": [
+                boundary_ms + 2 * candle_ms - 1,
+                boundary_ms + 3 * candle_ms - 1,
+                boundary_ms + 4 * candle_ms - 1,
+            ],
+            "open": [100.0] * 3,
+            "high": [100.0] * 3,
+            "low": [100.0] * 3,
+            "close": [100.0] * 3,
+        }
+    )
+
+    engine._catch_up_model(runner)
+
+    store = StateStore(db)
+    trades = store.get_all_trades()
+    store.close()
+    # Only the candle that meets ot >= cooldown_until may produce a trade.
+    assert len(trades) == 1, f"Expected 1 trade post-cooldown, got {len(trades)}"
+    # With cooldown pre-load: candle 1 blocked by cooldown, candle 2 opens (at
+    # cooldown end), candle 3 blocked by open-trade guard. Trade.open_time =
+    # candle 2's close_time. Without the cooldown pre-load, candle 1 would open
+    # the trade (open_time = candle 1's close_time = boundary_ms + 2*candle_ms - 1)
+    # — pinning open_time here is what makes this test actually exercise the
+    # cooldown pre-load instead of being satisfied by the open-trade guard alone.
+    expected_open_time = boundary_ms + 3 * candle_ms - 1  # candle 2's close_time
+    assert trades[0].open_time == expected_open_time, (
+        f"Expected trade at candle 2 close_time ({expected_open_time}), "
+        f"got {trades[0].open_time}. If this fails with candle 1's close_time, "
+        f"cooldown pre-load is broken."
+    )
+
+
+def test_catch_up_with_no_seeded_keys_replays_normally(tmp_path):
+    """No boundary key → behavior matches today's no-seed start. The first
+    in-window candle produces a trade; subsequent candles are blocked by the
+    'sym in open_trades' guard since the trade is still open."""
+    import pandas as pd
+
+    from crypto_trade.backtest_models import Signal
+    from crypto_trade.live.models import ModelConfig
+
+    candle_ms = 28_800_000
+    now_ms = int(time.time() * 1000)
+    base = (now_ms // candle_ms) * candle_ms - 3 * candle_ms
+    cfg_models = (
+        ModelConfig(
+            name="A",
+            symbols=("BTCUSDT",),
+            use_atr_labeling=True,
+            atr_tp_multiplier=2.9,
+            atr_sl_multiplier=1.45,
+        ),
+    )
+
+    engine = _build_minimal_engine(tmp_path, cfg_models)
+    runner = engine._runners[0]
+
+    class _StubStrategy:
+        def compute_features(self, master):
+            pass
+
+        def get_signal(self, sym, ot):
+            return Signal(direction=1, weight=100)
+
+    runner.strategy = _StubStrategy()
+    runner._inner_strategy = _StubStrategy()
+    runner._master = pd.DataFrame(
+        {
+            "symbol": ["BTCUSDT"] * 2,
+            "open_time": [base, base + candle_ms],
+            "close_time": [base + candle_ms - 1, base + 2 * candle_ms - 1],
+            "open": [100.0] * 2,
+            "high": [100.0] * 2,
+            "low": [100.0] * 2,
+            "close": [100.0] * 2,
+        }
+    )
+
+    engine._catch_up_model(runner)
+
+    from crypto_trade.live.state_store import StateStore
+
+    store = StateStore(_engine_db_path(tmp_path))
+    trades = store.get_all_trades()
+    store.close()
+    # First candle opens a trade. Second candle is blocked by the catch-up's
+    # local 'sym in open_trades' guard (a trade is currently open on candle 1).
+    # That's existing behavior — no boundary involved.
+    assert len(trades) == 1
