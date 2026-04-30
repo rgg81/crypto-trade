@@ -198,9 +198,13 @@ def test_real_numeric_id_still_reconciled(state):
 
 
 def test_paper_skip_count_in_messages(state):
-    state.upsert_trade(_open_trade(id="seed-a", entry_order_id="SEEDED"))
-    state.upsert_trade(_open_trade(id="seed-b", entry_order_id="CATCHUP-aaaa1111"))
-    state.upsert_trade(_open_trade(id="real-1", entry_order_id="9876543210"))
+    # Distinct open_time per row to satisfy the (model_name, symbol, open_time)
+    # UNIQUE INDEX.
+    state.upsert_trade(_open_trade(id="seed-a", entry_order_id="SEEDED", open_time=1_000_000))
+    state.upsert_trade(
+        _open_trade(id="seed-b", entry_order_id="CATCHUP-aaaa1111", open_time=2_000_000)
+    )
+    state.upsert_trade(_open_trade(id="real-1", entry_order_id="9876543210", open_time=3_000_000))
     client = _mock_client(order_statuses={}, positions=[{"positionAmt": "0.001"}])
 
     msgs = reconcile(state, client, dry_run=False)

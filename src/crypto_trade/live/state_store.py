@@ -11,6 +11,11 @@ from pathlib import Path
 
 from crypto_trade.live.models import LiveTrade
 
+
+class StateStoreMigrationError(RuntimeError):
+    """Raised when an existing DB cannot be opened because of legacy duplicates."""
+
+
 _TRADES_DDL = """\
 CREATE TABLE IF NOT EXISTS trades (
     id TEXT PRIMARY KEY,
@@ -40,6 +45,20 @@ CREATE TABLE IF NOT EXISTS engine_state (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
 )"""
+
+_TRADES_NATKEY_INDEX_DDL = """\
+CREATE UNIQUE INDEX IF NOT EXISTS ux_trades_natkey
+ON trades(model_name, symbol, open_time)
+"""
+
+_COUNT_NATKEY_DUPLICATES = """\
+SELECT COUNT(*) FROM (
+    SELECT model_name, symbol, open_time
+    FROM trades
+    GROUP BY 1, 2, 3
+    HAVING COUNT(*) > 1
+)
+"""
 
 _UPSERT_TRADE = """\
 INSERT INTO trades (
@@ -96,7 +115,26 @@ class StateStore:
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.execute(_TRADES_DDL)
         self._conn.execute(_ENGINE_STATE_DDL)
+        try:
+            self._conn.execute(_TRADES_NATKEY_INDEX_DDL)
+        except sqlite3.IntegrityError as exc:
+            n_dups = self._count_natural_key_duplicates()
+            raise StateStoreMigrationError(
+                f"DB at {db_path} has {n_dups} duplicate (model_name, symbol, "
+                f"open_time) groups from prior runs. The new schema requires "
+                f"uniqueness.\n\n"
+                f"For dry_run/testnet DBs (no real money): rm {db_path} and re-seed.\n"
+                f"For real-money live.db: run\n"
+                f"  uv run python scripts/dedupe_trades.py --db {db_path}\n"
+                f"(interactive — prints what would be removed for review before "
+                f"applying)."
+            ) from exc
         self._conn.commit()
+
+    def _count_natural_key_duplicates(self) -> int:
+        """Count (model_name, symbol, open_time) groups with >1 rows."""
+        row = self._conn.execute(_COUNT_NATKEY_DUPLICATES).fetchone()
+        return int(row[0]) if row else 0
 
     # -- Trades --
 

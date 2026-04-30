@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import datetime
 import signal
+import sqlite3
 import time
 
 import numpy as np
@@ -140,9 +141,7 @@ class ModelRunner:
             ensemble_seeds=list(self.ensemble_seeds),
             feature_columns=list(self.feature_columns),
             ood_enabled=model_config.ood_enabled,
-            ood_features=(
-                list(model_config.ood_features) if model_config.ood_enabled else None
-            ),
+            ood_features=(list(model_config.ood_features) if model_config.ood_enabled else None),
             ood_cutoff_pct=model_config.ood_cutoff_pct,
             **atr_column_kwarg,
         )
@@ -156,6 +155,7 @@ class ModelRunner:
                     "requires risk_v2_config (got None)"
                 )
             from crypto_trade.strategies.ml.risk_v2 import RiskV2Wrapper
+
             self.strategy = RiskV2Wrapper(inner, model_config.risk_v2_config)
         else:
             self.strategy = inner
@@ -286,6 +286,7 @@ class LiveEngine:
 
         # Guard 1: v2 ModelConfigs must not trade v1 baseline symbols.
         from crypto_trade.live.models import V2_EXCLUDED_SYMBOLS as _V2_EXCLUDED
+
         for mc in config.models:
             if mc.risk_wrapper == "v2":
                 overlap = set(mc.symbols) & set(_V2_EXCLUDED)
@@ -317,12 +318,11 @@ class LiveEngine:
                 BtcTrendFilterConfig,
                 load_btc_klines_for_filter,
             )
+
             self._btc_filter_cfg = BtcTrendFilterConfig()  # iter-v2/069 defaults
             try:
-                self._btc_filter_times, self._btc_filter_closes = (
-                    load_btc_klines_for_filter(
-                        csv_path=str(self.config.data_dir / "BTCUSDT" / "8h.csv"),
-                    )
+                self._btc_filter_times, self._btc_filter_closes = load_btc_klines_for_filter(
+                    csv_path=str(self.config.data_dir / "BTCUSDT" / "8h.csv"),
                 )
                 print(
                     f"[live] BTC trend filter loaded: {len(self._btc_filter_times)} 8h bars "
@@ -492,7 +492,8 @@ class LiveEngine:
                 r2_models.add(mc.name)
 
         closed = [
-            t for t in self._state.get_all_trades()
+            t
+            for t in self._state.get_all_trades()
             if t.status == "closed" and t.exit_time is not None and t.exit_reason is not None
         ]
         closed.sort(key=lambda t: t.exit_time or 0)
@@ -584,9 +585,7 @@ class LiveEngine:
             if self._cum_weighted_pnl[trade.model_name] > self._peak_weighted_pnl.get(
                 trade.model_name, 0.0
             ):
-                self._peak_weighted_pnl[trade.model_name] = self._cum_weighted_pnl[
-                    trade.model_name
-                ]
+                self._peak_weighted_pnl[trade.model_name] = self._cum_weighted_pnl[trade.model_name]
 
     def _r2_scale_for(self, model_name: str) -> float:
         """Compute R2 drawdown scale factor for the given model (1.0 = no scaling).
@@ -742,9 +741,7 @@ class LiveEngine:
 
         now_ms = int(time.time() * 1000)
         # Start one month earlier to capture carry-over trades
-        catch_up_start = _compute_catch_up_start_ms(
-            now_ms, self.config.catch_up_lookback_days
-        )
+        catch_up_start = _compute_catch_up_start_ms(now_ms, self.config.catch_up_lookback_days)
 
         sym_arr = master["symbol"].to_numpy(dtype=str)
         open_time_arr = master["open_time"].values
@@ -812,8 +809,7 @@ class LiveEngine:
                         n_trades_closed += 1
                         if runner.cooldown_candles > 0:
                             cooldown_until[sym] = (
-                                trade.exit_time
-                                + runner.cooldown_candles * self._candle_duration_ms
+                                trade.exit_time + runner.cooldown_candles * self._candle_duration_ms
                             )
                     # else: still holding, will close on a later candle
                 else:
@@ -890,7 +886,19 @@ class LiveEngine:
                         sl_order_id=f"CATCHUP-{_new_id()[:8]}",
                         tp_order_id=f"CATCHUP-{_new_id()[:8]}",
                     )
-                    self._state.upsert_trade(trade)
+                    try:
+                        self._state.upsert_trade(trade)
+                    except sqlite3.IntegrityError:
+                        # Defense-in-depth: the boundary handshake (Task 4) is
+                        # the primary mechanism for avoiding duplicates. If a
+                        # row with this (model, sym, open_time) already exists
+                        # (e.g., a stale CATCHUP-* from a prior run, or a
+                        # SEEDED- carry-over), keep the existing row and skip.
+                        print(
+                            f"[live] catch-up duplicate suppressed: "
+                            f"model={runner.model_config.name} sym={sym} ot={ot}"
+                        )
+                        continue
                     self._logger.log_open(trade)
                     open_trades[sym] = trade
                     n_trades_opened += 1
@@ -1064,13 +1072,11 @@ class LiveEngine:
                 # run_baseline_v2.py's apply_btc_trend_filter post-hoc gate, but
                 # at signal time so we never enter a position the backtest would
                 # have killed. v1 signals are unaffected.
-                if (
-                    runner.model_config.risk_wrapper == "v2"
-                    and self._btc_filter_cfg is not None
-                ):
+                if runner.model_config.risk_wrapper == "v2" and self._btc_filter_cfg is not None:
                     from crypto_trade.strategies.ml.risk_v2 import (
                         evaluate_btc_trend_filter_one_signal,
                     )
+
                     if evaluate_btc_trend_filter_one_signal(
                         self._btc_filter_times,
                         self._btc_filter_closes,
