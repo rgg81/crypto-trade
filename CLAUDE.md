@@ -56,7 +56,7 @@ uv run crypto-trade seed-live-db \
   --v1-trades reports/iteration_186/out_of_sample/trades.csv \
   --v2-trades reports-v2/iteration_v2-069/in_sample/trades.csv \
   --v2-trades reports-v2/iteration_v2-069/out_of_sample/trades.csv \
-  [--as-of YYYY-MM-DD]
+  [--reseed]
 ```
 
 Target DB must match what the engine opens at startup (resolution priority `testnet > dry_run > live`, see `engine.py:241-246`):
@@ -65,14 +65,22 @@ Target DB must match what the engine opens at startup (resolution priority `test
 - `data/live.db` → `live --live`
 
 Behavior:
-- Inserts trades that closed before `--as-of` as `status='closed'` so `_rebuild_*` reproduce backtest R1/R2/VT/cooldown exactly.
-- Trades that span `--as-of` (open before, close after) become `status='open'` with `entry_order_id='SEEDED'` + full intended-exit info; the engine's catch-up loop closes them deterministically at the seeded `exit_time`.
-- Skips trades that opened after `--as-of` — the engine's catch-up replay re-creates them from candles + signals.
+- Inserts each CSV row as a `trades` table row. Trades whose `exit_reason` is
+  `end_of_data` become `status='open'` with `entry_order_id='SEEDED'` and
+  full intended-exit info; everything else is `status='closed'`.
+- Writes `seeded_through_<model>_<sym>` engine_state keys equal to
+  `MAX(close_time)` per pair. Catch-up reads these to skip trade-creation
+  in seeded territory — no `--as-of` or `--catch-up-from` needed.
+- Re-runs are idempotent: `(model_name, symbol, open_time)` UNIQUE INDEX
+  blocks duplicate inserts. Boundary keys advance monotonically by default;
+  `--reseed` overrides with the new CSV's extent (even if lower).
 - Drops zero-`weight_factor` rows (BTC-killed v2 trades).
-- Sets per-`(model, symbol)` `cooldown_<model>_<symbol>` engine_state keys.
-- Without `--as-of`: seeds everything up to the CSV end-of-data; trades still open at end-of-data become `status='open'`.
+- Sets per-`(model, symbol)` `cooldown_<model>_<symbol>` engine_state keys
+  for the standard 2-candle post-trade cooldown.
 
-Pair the seeder's `--as-of` with the engine's `--catch-up-from <same-date>` so the two cover the full timeline without gaps or duplicates.
+After seeding, just launch `live`. The catch-up loop reads the boundary
+keys per `(model, symbol)` and replays only the gap between the seeded
+extent and now. Zero date-flag alignment to think about.
 
 ### Testnet workflow — end-to-end
 
@@ -110,7 +118,7 @@ uv run python run_baseline_v186.py    # ~10h
 uv run python run_baseline_v2.py      # ~5h, single seed
 ```
 
-**Step 4 — seed the testnet DB** from existing or freshly-generated CSVs. `--as-of` is optional; omitting it seeds everything up to data extent, which is the simplest setup for a brand-new testnet run:
+**Step 4 — seed the testnet DB** from existing or freshly-generated CSVs. The seeder writes `seeded_through_<model>_<sym>` engine_state keys per `(model, symbol)`, which the catch-up loop reads on startup to skip trade-creation in seeded territory:
 
 ```
 uv run crypto-trade seed-live-db \
@@ -124,18 +132,20 @@ uv run crypto-trade seed-live-db \
 
 Verify with `sqlite3 data/testnet.db "select status, count(*) from trades group by status;"`.
 
-**Step 5 — launch on testnet.** Default 90-day catch-up is fine when the seeder covered everything; otherwise pass `--catch-up-from <day-after-last-seeded-close>` to bound the replay precisely.
+**Step 5 — launch on testnet.** No date flags — the boundary handshake (seeder writes `seeded_through_<model>_<sym>` engine_state keys; catch-up reads them) automatically resumes from the seeded extent.
 
 ```
 uv run crypto-trade live --testnet --track both --amount 100 --leverage 1
 ```
 
-**Training is automatic — no extra flag.** `LightGbmStrategy` retrains lazily per calendar month: `get_signal(symbol, open_time)` (`lgbm.py:582-589`) compares the candle's month against `_current_month` and calls `_train_for_month(month)` on change. On a fresh start `_current_month=None`, so the **first candle the catch-up loop replays triggers a train** for that candle's month, and every subsequent month boundary triggers another. With the default 90-day catch-up window the engine crosses three calendar months minimum and ends with a model trained on the current month's training window. The only way to skip current-month training is to start with an **empty catch-up window** (e.g., `--catch-up-from <today>` on the same day) — avoid that. If you must minimize replay, set `--catch-up-from` no later than the first day of the previous calendar month so the engine still crosses one boundary into the current month.
+**Training is automatic — no extra flag.** `LightGbmStrategy` retrains lazily per calendar month: `get_signal(symbol, open_time)` (`lgbm.py:582-589`) compares the candle's month against `_current_month` and calls `_train_for_month(month)` on change. On a fresh start `_current_month=None`, so the **first candle the catch-up loop replays triggers a train** for that candle's month, and every subsequent month boundary triggers another. The catch-up loop replays only the gap between the seeded boundary and now, so the engine still crosses month boundaries and ends with a model trained on the current month's training window.
 
 What you should see at startup:
 - Banner: `[live] AUTH endpoint OVERRIDE: https://testnet.binancefuture.com`.
 - `[live] Rebuilt VT history: <N> daily PnL entries across <M> symbols`.
 - `[live] Rebuilt risk state: <K> R1 cooldowns armed, R2 cum PnL by model = {…}`.
+- `[live] Model <name> catch-up boundary: <N> seeded keys, <M> cooldown keys`
+  (one line per model with seeded data — confirms the handshake fired).
 - One `[lgbm] === Training for YYYY-MM ===` block per `(model, month)` reached during catch-up. The last one printed is the current month — that's the model that will serve live signals.
 - `[live] Entering poll loop (every 60s)`.
 
