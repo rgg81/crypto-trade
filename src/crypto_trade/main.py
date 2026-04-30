@@ -336,12 +336,13 @@ def build_parser() -> argparse.ArgumentParser:
         "resolution (default: both).",
     )
     seed_parser.add_argument(
-        "--as-of",
-        type=str,
-        default=None,
-        help="Cutoff YYYY-MM-DD UTC. Trades that opened before this date are seeded; "
-        "trades open at the cutoff become status='open'; trades opening after are "
-        "skipped (live engine replays them). Default: seed everything.",
+        "--reseed",
+        action="store_true",
+        help=(
+            "Overwrite seeded_through_* boundary keys with this CSV's "
+            "data extent, even if existing keys are higher. Default is "
+            "monotonic advance (MAX(existing, new))."
+        ),
     )
 
     # -- portfolio-report subcommand --
@@ -679,12 +680,14 @@ def _cmd_features(args, settings) -> None:
             list_groups as _list_groups,
             run_features_v2 as _run_features,
         )
+
         default_output = str(Path(settings.data_dir) / "features_v2")
     else:
         from crypto_trade.features import (
             list_groups as _list_groups,
             run_features as _run_features,
         )
+
         default_output = str(Path(settings.data_dir) / "features")
 
     if args.list:
@@ -936,8 +939,6 @@ def _cmd_seed_live_db(args, settings) -> None:
     """Seed the live DB with backtest trades to preload R1/R2/VT/cooldown state."""
     from pathlib import Path
 
-    import pandas as pd
-
     from crypto_trade.live.db_seeder import seed_live_db_from_backtest
     from crypto_trade.live.models import (
         BASELINE_MODELS,
@@ -965,10 +966,6 @@ def _cmd_seed_live_db(args, settings) -> None:
         )
         sys.exit(2)
 
-    as_of_ms = None
-    if args.as_of is not None:
-        as_of_ms = int(pd.Timestamp(args.as_of, tz="UTC").value // 1_000_000)
-
     db_path = Path(args.db)
     print(f"[seed] Target DB: {db_path}")
     print(f"[seed] Track: {args.track} ({len(selected_models)} models)")
@@ -976,17 +973,15 @@ def _cmd_seed_live_db(args, settings) -> None:
         print(f"[seed] v1 CSVs: {', '.join(str(p) for p in v1_paths)}")
     if v2_paths:
         print(f"[seed] v2 CSVs: {', '.join(str(p) for p in v2_paths)}")
-    if as_of_ms is not None:
-        print(f"[seed] as-of cutoff: {args.as_of} ({as_of_ms} ms)")
-    else:
-        print("[seed] as-of cutoff: none (seeding all backtest trades)")
+    if args.reseed:
+        print("[seed] reseed=True (boundary keys will be overwritten)")
 
     counts = seed_live_db_from_backtest(
         db_path=db_path,
         v1_trades_csvs=v1_paths,
         v2_trades_csvs=v2_paths,
         live_config=cfg,
-        as_of_ms=as_of_ms,
+        reseed=args.reseed,
     )
 
     print()
@@ -994,10 +989,7 @@ def _cmd_seed_live_db(args, settings) -> None:
     for k, v in counts.items():
         print(f"  {k:30s}: {v}")
     total_inserted = (
-        counts["v1_closed"]
-        + counts["v1_open"]
-        + counts["v2_closed"]
-        + counts["v2_open"]
+        counts["v1_closed"] + counts["v1_open"] + counts["v2_closed"] + counts["v2_open"]
     )
     print(f"  TOTAL inserted               : {total_inserted}")
     print()

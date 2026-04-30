@@ -7,14 +7,18 @@ can be launched with a short `--catch-up-days` (covering only the gap
 since the last seeded trade) and still produce trades bit-identical to
 the backtest.
 
-Trades are inserted as `status='closed'` rows when their close_time is
-before the `as_of` cutoff, and as `status='open'` rows when they were
-still open at the cutoff. Trades that opened *after* the cutoff are
-skipped — the live engine's catch-up will produce them.
+Open vs closed split is driven by the CSV's `exit_reason` field:
+rows whose `exit_reason == 'end_of_data'` were still open at the
+backtest's data extent — they're inserted as `status='open'` with
+`entry_order_id='SEEDED'` and full intended-exit info populated. Any
+other `exit_reason` means the trade really closed in the backtest, so
+it goes in as `status='closed'`.
 
 For each (model, symbol), the seeder also writes the
 `cooldown_<model>_<symbol>` engine_state key so the cooldown gate kicks
-in correctly when catch-up starts.
+in correctly when catch-up starts, plus a
+`seeded_through_<model>_<symbol>` boundary key so the engine knows
+where seeded coverage ends.
 
 Zero-`weight_factor` rows (BTC-killed v2 trades from the post-hoc filter)
 are dropped — live's signal-time BTC filter (Task 7) kills these BEFORE
@@ -64,32 +68,28 @@ def _resolve_cooldown_candles(
 def _row_to_trade(
     row: pd.Series,
     model_name: str,
-    as_of_ms: int | None,
     timeout_minutes: int,
     max_amount_usd: float,
 ) -> LiveTrade | None:
-    """Convert a backtest CSV row to a LiveTrade. Returns None if the row should be skipped."""
+    """Convert a backtest CSV row to a LiveTrade. Returns None if the row should be skipped.
+
+    Open vs closed: a row whose exit_reason is 'end_of_data' represents a
+    trade that was still open at the CSV's data extent — the live engine
+    inherits it as a SEEDED open and re-evaluates SL/TP/timeout against
+    new candles. Any other exit_reason means the trade really closed.
+    """
     weight_factor = float(row["weight_factor"])
     if weight_factor <= 0.0:
         return None  # BTC-killed v2 row — never in live DB
 
     open_time = int(row["open_time"])
     close_time = int(row["close_time"])
-
-    if as_of_ms is not None and open_time >= as_of_ms:
-        return None  # opens after cutoff — let the engine replay it
-
-    # If close_time is also before as_of, this trade is fully closed by then —
-    # status='closed' with full exit info. cum_weighted_pnl / VT include it.
-    #
-    # If close_time is at or after as_of, this trade is "open at the catch-up
-    # boundary" — status='open' but with intended-exit fields populated so the
-    # engine's catch-up can close it deterministically at the seeded exit_time.
-    spans_cutoff = as_of_ms is not None and close_time >= as_of_ms
-
     direction = int(row["direction"])
     entry_price = float(row["entry_price"])
     exit_price = float(row["exit_price"])
+    exit_reason = str(row["exit_reason"])
+
+    is_still_open = exit_reason == "end_of_data"
 
     return LiveTrade(
         model_name=model_name,
@@ -103,19 +103,15 @@ def _row_to_trade(
         open_time=open_time,
         timeout_time=open_time + timeout_minutes * 60 * 1000,
         signal_time=open_time,
-        status="open" if spans_cutoff else "closed",
+        status="open" if is_still_open else "closed",
         # Sentinel order IDs distinguish seeded open trades from genuine
         # live-opened ones in `_reconcile` and `_catch_up_model`.
-        entry_order_id="SEEDED" if spans_cutoff else None,
+        entry_order_id="SEEDED" if is_still_open else None,
         sl_order_id=None,
         tp_order_id=None,
-        # Even for status='open' rows we populate exit_* with the backtest's
-        # actual close. The engine's catch-up loop reads these to close the
-        # trade exactly at exit_time — no SL/TP/timeout recomputation. For
-        # closed rows these are the real exit (same fields, same meaning).
         exit_price=exit_price,
         exit_time=close_time,
-        exit_reason=str(row["exit_reason"]),
+        exit_reason=exit_reason,
     )
 
 
@@ -124,26 +120,25 @@ def seed_live_db_from_backtest(
     v1_trades_csvs: list[Path],
     v2_trades_csvs: list[Path],
     live_config: LiveConfig,
-    as_of_ms: int | None = None,
+    reseed: bool = False,
 ) -> dict[str, int]:
-    """Seed `db_path` with backtest trades and cooldown keys.
+    """Seed `db_path` with backtest trades, cooldown keys, and boundary keys.
 
     Args:
-        db_path: target SQLite DB. Existing rows are NOT cleared — caller
-            should `rm` the file first if a fresh seed is wanted.
-        v1_trades_csvs: list of paths (e.g. IS + OOS CSVs).
-        v2_trades_csvs: list of paths.
-        live_config: drives the symbol → model mapping and cooldown_candles
-            resolution. Pass `LiveConfig(models=COMBINED_MODELS)` for v1+v2.
-        as_of_ms: cutoff. None ⇒ seed every trade. Otherwise, trades that
-            opened after `as_of_ms` are skipped (engine will replay them);
-            trades that were still open at `as_of_ms` are inserted as
-            `status='open'`.
+        db_path: target SQLite DB. Existing rows kept; UNIQUE constraint
+            makes re-running idempotent (skipped_duplicate count surfaces
+            already-seeded rows).
+        v1_trades_csvs / v2_trades_csvs: paths to backtest CSVs.
+        live_config: drives symbol → model mapping and cooldown_candles.
+        reseed: if True, overwrite seeded_through_* keys with the new
+            CSV's boundary, even if the new value is lower than what's
+            already in the DB. Default (False) advances boundaries
+            monotonically (MAX(existing, new)).
 
     Returns:
         counts dict with keys "v1_closed", "v1_open", "v2_closed", "v2_open",
-        "skipped_zero_weight", "skipped_unknown_symbol", "skipped_after_cutoff",
-        "cooldown_keys".
+        "skipped_zero_weight", "skipped_unknown_symbol", "skipped_duplicate",
+        "cooldown_keys", "boundary_keys".
     """
     sym_to_model = _build_symbol_to_model(live_config.models)
     cooldown_candles_for = _resolve_cooldown_candles(live_config.models, live_config)
@@ -156,7 +151,6 @@ def seed_live_db_from_backtest(
         "v2_open": 0,
         "skipped_zero_weight": 0,
         "skipped_unknown_symbol": 0,
-        "skipped_after_cutoff": 0,
         "skipped_duplicate": 0,
         "cooldown_keys": 0,
         "boundary_keys": 0,
@@ -181,14 +175,10 @@ def seed_live_db_from_backtest(
                 if float(row["weight_factor"]) <= 0.0:
                     counts["skipped_zero_weight"] += 1
                     continue
-                if as_of_ms is not None and int(row["open_time"]) >= as_of_ms:
-                    counts["skipped_after_cutoff"] += 1
-                    continue
                 model_name = sym_to_model[sym]
                 trade = _row_to_trade(
                     row,
                     model_name=model_name,
-                    as_of_ms=as_of_ms,
                     timeout_minutes=live_config.timeout_minutes,
                     max_amount_usd=live_config.max_amount_usd,
                 )
@@ -236,10 +226,12 @@ def seed_live_db_from_backtest(
         if max_close <= 0:
             continue
         key = f"seeded_through_{model_name}_{sym}"
-        existing_raw = store.get_state(key)
-        existing = int(existing_raw) if existing_raw else 0
-        # Monotonic advance — re-running with an earlier CSV does NOT regress.
-        new_value = max(existing, max_close)
+        if reseed:
+            new_value = max_close
+        else:
+            existing_raw = store.get_state(key)
+            existing = int(existing_raw) if existing_raw else 0
+            new_value = max(existing, max_close)
         store.set_state(key, str(new_value))
         counts["boundary_keys"] = counts.get("boundary_keys", 0) + 1
 

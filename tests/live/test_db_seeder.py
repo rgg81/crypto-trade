@@ -113,7 +113,7 @@ def test_seed_inserts_trades_and_cooldown(tmp_path):
 
     db = tmp_path / "live.db"
     cfg = LiveConfig(models=COMBINED_MODELS)
-    counts = seed_live_db_from_backtest(db, [v1_csv], [v2_csv], cfg, as_of_ms=None)
+    counts = seed_live_db_from_backtest(db, [v1_csv], [v2_csv], cfg)
 
     assert counts["v1_closed"] == 3
     assert counts["v2_closed"] == 1
@@ -141,44 +141,6 @@ def test_seed_inserts_trades_and_cooldown(tmp_path):
     doge_key = store.get_state("cooldown_V2-DOGE_DOGEUSDT")
     assert doge_key is not None
     assert int(doge_key) == 2_000_000 + 4 * 28_800_000
-
-
-def test_seed_as_of_splits_open_vs_closed(tmp_path):
-    """Trade fully-closed before cutoff → status='closed' (PnL flows into cum).
-    Trade open at cutoff (close_time >= as_of) → status='open' with full
-    intended-exit info populated, marked entry_order_id='SEEDED'.
-    Trade opened after cutoff → skipped (engine replays via catch-up).
-    """
-    v1_csv = tmp_path / "v1.csv"
-    _toy_trades_csv(
-        v1_csv,
-        [
-            _row("BTCUSDT", 1, 1_000_000, 2_000_000),  # closed before cutoff
-            _row("BTCUSDT", -1, 3_000_000, 5_000_000),  # spans cutoff
-            _row("BTCUSDT", 1, 6_000_000, 7_000_000),  # opens after cutoff
-        ],
-    )
-
-    db = tmp_path / "live.db"
-    cfg = LiveConfig(models=BASELINE_MODELS)
-    counts = seed_live_db_from_backtest(db, [v1_csv], [], cfg, as_of_ms=4_000_000)
-
-    assert counts["v1_closed"] == 1
-    assert counts["v1_open"] == 1
-    assert counts["skipped_after_cutoff"] == 1
-
-    store = StateStore(db)
-    open_trades = store.get_open_trades()
-    assert len(open_trades) == 1
-    seeded_open = open_trades[0]
-    assert seeded_open.symbol == "BTCUSDT"
-    assert seeded_open.open_time == 3_000_000
-    # Sentinel marks it as seeded (vs a live-opened trade)
-    assert seeded_open.entry_order_id == "SEEDED"
-    # Intended-exit info is populated so the engine can close exactly at exit_time
-    assert seeded_open.exit_time == 5_000_000
-    assert seeded_open.exit_price == 105.0
-    assert seeded_open.exit_reason == "stop_loss"
 
 
 def test_seed_skips_unknown_symbols(tmp_path):
@@ -369,3 +331,67 @@ def test_seed_idempotent_on_repeat(tmp_path):
     rows = store.get_all_trades()
     assert len(rows) == 2, f"Expected 2 rows after dedupe, got {len(rows)}"
     assert counts2.get("skipped_duplicate", 0) == 2
+
+
+def test_seed_split_uses_exit_reason(tmp_path):
+    """exit_reason='end_of_data' → SEEDED open. Everything else → closed."""
+    csv = tmp_path / "v1.csv"
+    _toy_trades_csv(
+        csv,
+        [
+            _row("BTCUSDT", 1, 1_700_000_000_000, 1_700_086_400_000, exit_reason="take_profit"),
+            _row("BTCUSDT", 1, 1_700_172_800_000, 1_700_259_200_000, exit_reason="stop_loss"),
+            _row("ETHUSDT", -1, 1_700_300_000_000, 1_700_400_000_000, exit_reason="end_of_data"),
+        ],
+    )
+    cfg = LiveConfig(models=BASELINE_MODELS, data_dir=tmp_path)
+    db = tmp_path / "seed.db"
+
+    seed_live_db_from_backtest(db, [csv], [], cfg)
+
+    store = StateStore(db)
+    rows = store.get_all_trades()
+    by_sym = {r.symbol: r for r in rows}
+    assert by_sym["ETHUSDT"].status == "open"
+    assert by_sym["ETHUSDT"].entry_order_id == "SEEDED"
+    assert by_sym["ETHUSDT"].exit_time == 1_700_400_000_000  # intended exit
+    assert by_sym["ETHUSDT"].exit_reason == "end_of_data"
+    # The two BTC trades — both status='closed'
+    btc = [r for r in rows if r.symbol == "BTCUSDT"]
+    assert len(btc) == 2
+    assert all(r.status == "closed" for r in btc)
+
+
+def test_seed_reseed_overwrites_boundary(tmp_path):
+    """reseed=True must replace the boundary key, even if the new value is lower."""
+    csv_late = tmp_path / "late.csv"
+    _toy_trades_csv(
+        csv_late,
+        [
+            _row("BTCUSDT", 1, 1_700_172_800_000, 1_700_259_200_000, exit_reason="stop_loss"),
+        ],
+    )
+    csv_early = tmp_path / "early.csv"
+    _toy_trades_csv(
+        csv_early,
+        [
+            _row("BTCUSDT", 1, 1_700_000_000_000, 1_700_086_400_000, exit_reason="take_profit"),
+        ],
+    )
+    cfg = LiveConfig(models=BASELINE_MODELS, data_dir=tmp_path)
+    db = tmp_path / "seed.db"
+
+    seed_live_db_from_backtest(db, [csv_late], [], cfg)
+    seed_live_db_from_backtest(db, [csv_early], [], cfg, reseed=True)
+
+    store = StateStore(db)
+    assert store.get_state("seeded_through_A_BTCUSDT") == "1700086400000"
+
+
+def test_seed_signature_no_as_of_kwarg():
+    """Smoke check: as_of_ms is no longer a valid kwarg."""
+    import inspect
+
+    sig = inspect.signature(seed_live_db_from_backtest)
+    assert "as_of_ms" not in sig.parameters
+    assert "reseed" in sig.parameters
