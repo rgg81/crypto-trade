@@ -103,14 +103,14 @@ uv run crypto-trade features \
   --interval 8h --track v2 --format parquet --workers 4
 ```
 
-**Step 3 — reproduce the backtest** (skip if you already have fresh CSVs in `reports/iteration_186/` and `reports-v2/iteration_v2-069/`):
+**Step 3 (optional) — reproduce the backtest.** Skip this if you already have CSVs in `reports/iteration_186/` and `reports-v2/iteration_v2-069/`. Skipping is safe: the live engine does not need a backtest run, and the per-month LightGBM model is rebuilt on the engine side at startup (see step 5). Re-run only when you want to refresh the seed CSVs to a more recent data extent:
 
 ```
 uv run python run_baseline_v186.py    # ~10h
 uv run python run_baseline_v2.py      # ~5h, single seed
 ```
 
-**Step 4 — seed the testnet DB** from the freshly-generated CSVs. `--as-of` is optional; omitting it seeds everything up to data extent, which is the simplest setup for a brand-new testnet run:
+**Step 4 — seed the testnet DB** from existing or freshly-generated CSVs. `--as-of` is optional; omitting it seeds everything up to data extent, which is the simplest setup for a brand-new testnet run:
 
 ```
 uv run crypto-trade seed-live-db \
@@ -130,11 +130,13 @@ Verify with `sqlite3 data/testnet.db "select status, count(*) from trades group 
 uv run crypto-trade live --testnet --track both --amount 100 --leverage 1
 ```
 
+**Training is automatic — no extra flag.** `LightGbmStrategy` retrains lazily per calendar month: `get_signal(symbol, open_time)` (`lgbm.py:582-589`) compares the candle's month against `_current_month` and calls `_train_for_month(month)` on change. On a fresh start `_current_month=None`, so the **first candle the catch-up loop replays triggers a train** for that candle's month, and every subsequent month boundary triggers another. With the default 90-day catch-up window the engine crosses three calendar months minimum and ends with a model trained on the current month's training window. The only way to skip current-month training is to start with an **empty catch-up window** (e.g., `--catch-up-from <today>` on the same day) — avoid that. If you must minimize replay, set `--catch-up-from` no later than the first day of the previous calendar month so the engine still crosses one boundary into the current month.
+
 What you should see at startup:
 - Banner: `[live] AUTH endpoint OVERRIDE: https://testnet.binancefuture.com`.
 - `[live] Rebuilt VT history: <N> daily PnL entries across <M> symbols`.
 - `[live] Rebuilt risk state: <K> R1 cooldowns armed, R2 cum PnL by model = {…}`.
-- Per-model warmup + per-month LightGBM training (~hours on a fresh-month start; mid-month restarts skip retrain).
+- One `[lgbm] === Training for YYYY-MM ===` block per `(model, month)` reached during catch-up. The last one printed is the current month — that's the model that will serve live signals.
 - `[live] Entering poll loop (every 60s)`.
 
 What goes where:
