@@ -21,8 +21,10 @@ are dropped — live's signal-time BTC filter (Task 7) kills these BEFORE
 order entry, so they never appear in the live DB and would corrupt state
 if seeded.
 """
+
 from __future__ import annotations
 
+import sqlite3
 from collections import defaultdict
 from pathlib import Path
 from typing import Iterable
@@ -54,9 +56,7 @@ def _resolve_cooldown_candles(
     out: dict[str, int] = {}
     for mc in models:
         out[mc.name] = (
-            mc.cooldown_candles
-            if mc.cooldown_candles is not None
-            else live_config.cooldown_candles
+            mc.cooldown_candles if mc.cooldown_candles is not None else live_config.cooldown_candles
         )
     return out
 
@@ -157,11 +157,16 @@ def seed_live_db_from_backtest(
         "skipped_zero_weight": 0,
         "skipped_unknown_symbol": 0,
         "skipped_after_cutoff": 0,
+        "skipped_duplicate": 0,
         "cooldown_keys": 0,
+        "boundary_keys": 0,
     }
 
     # latest close_time per (model, symbol) for cooldown seeding
     latest_close: dict[tuple[str, str], int] = defaultdict(int)
+    # Tracks MAX close_time across ALL seeded rows for the pair (closed AND open),
+    # used to write the seeded_through_<model>_<sym> boundary key.
+    latest_close_any: dict[tuple[str, str], int] = defaultdict(int)
 
     def _ingest(csvs: list[Path], track: str) -> None:
         for csv_path in csvs:
@@ -189,7 +194,13 @@ def seed_live_db_from_backtest(
                 )
                 if trade is None:
                     continue
-                store.upsert_trade(trade)
+                try:
+                    store.upsert_trade(trade)
+                except sqlite3.IntegrityError:
+                    # Same (model, sym, open_time) already in DB. Idempotent
+                    # re-seed: skip and keep the existing row.
+                    counts["skipped_duplicate"] = counts.get("skipped_duplicate", 0) + 1
+                    continue
                 key = f"{track}_{trade.status}"
                 counts[key] = counts.get(key, 0) + 1
                 # Cooldown is keyed off the LAST close that finished before
@@ -200,6 +211,12 @@ def seed_live_db_from_backtest(
                     k = (model_name, sym)
                     if trade.exit_time > latest_close[k]:
                         latest_close[k] = trade.exit_time
+                # Boundary key tracks ALL seeded rows for the pair, regardless
+                # of status. The key tells the engine where seeded coverage
+                # ends so catch-up doesn't replay it.
+                k_any = (model_name, sym)
+                if trade.exit_time is not None and trade.exit_time > latest_close_any[k_any]:
+                    latest_close_any[k_any] = trade.exit_time
 
     _ingest(v1_trades_csvs, "v1")
     _ingest(v2_trades_csvs, "v2")
@@ -212,6 +229,19 @@ def seed_live_db_from_backtest(
         cooldown_until = close_time + cd * _CANDLE_8H_MS
         store.set_state(f"cooldown_{model_name}_{sym}", str(cooldown_until))
         counts["cooldown_keys"] += 1
+
+    # Seed seeded_through_<model>_<symbol> engine_state keys (boundary handshake).
+    # Engine catch-up reads these to skip trade-creation in seeded territory.
+    for (model_name, sym), max_close in latest_close_any.items():
+        if max_close <= 0:
+            continue
+        key = f"seeded_through_{model_name}_{sym}"
+        existing_raw = store.get_state(key)
+        existing = int(existing_raw) if existing_raw else 0
+        # Monotonic advance — re-running with an earlier CSV does NOT regress.
+        new_value = max(existing, max_close)
+        store.set_state(key, str(new_value))
+        counts["boundary_keys"] = counts.get("boundary_keys", 0) + 1
 
     # Close the seeder's StateStore connection so subsequent readers
     # (LiveEngine in particular) see the seeded rows on a fresh connection.

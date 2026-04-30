@@ -1,4 +1,5 @@
 """Tests for `crypto_trade.live.db_seeder` (Option B — seed DB from backtest CSVs)."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -112,9 +113,7 @@ def test_seed_inserts_trades_and_cooldown(tmp_path):
 
     db = tmp_path / "live.db"
     cfg = LiveConfig(models=COMBINED_MODELS)
-    counts = seed_live_db_from_backtest(
-        db, [v1_csv], [v2_csv], cfg, as_of_ms=None
-    )
+    counts = seed_live_db_from_backtest(db, [v1_csv], [v2_csv], cfg, as_of_ms=None)
 
     assert counts["v1_closed"] == 3
     assert counts["v2_closed"] == 1
@@ -162,9 +161,7 @@ def test_seed_as_of_splits_open_vs_closed(tmp_path):
 
     db = tmp_path / "live.db"
     cfg = LiveConfig(models=BASELINE_MODELS)
-    counts = seed_live_db_from_backtest(
-        db, [v1_csv], [], cfg, as_of_ms=4_000_000
-    )
+    counts = seed_live_db_from_backtest(db, [v1_csv], [], cfg, as_of_ms=4_000_000)
 
     assert counts["v1_closed"] == 1
     assert counts["v1_open"] == 1
@@ -214,32 +211,47 @@ def test_seed_then_rebuild_state_matches(tmp_path):
         [
             # Profitable opener — peak goes up
             {
-                "symbol": "DOTUSDT", "direction": 1,
-                "entry_price": 5.0, "exit_price": 5.50,
+                "symbol": "DOTUSDT",
+                "direction": 1,
+                "entry_price": 5.0,
+                "exit_price": 5.50,
                 "weight_factor": 1.0,
-                "open_time": 1_000_000, "close_time": 2_000_000,
+                "open_time": 1_000_000,
+                "close_time": 2_000_000,
                 "exit_reason": "take_profit",
-                "pnl_pct": 10.0, "fee_pct": 0.1, "net_pnl_pct": 9.9,
+                "pnl_pct": 10.0,
+                "fee_pct": 0.1,
+                "net_pnl_pct": 9.9,
                 "weighted_pnl": 9.9,
             },
             # Loss — cum drops, dd opens
             {
-                "symbol": "DOTUSDT", "direction": -1,
-                "entry_price": 5.0, "exit_price": 5.40,
+                "symbol": "DOTUSDT",
+                "direction": -1,
+                "entry_price": 5.0,
+                "exit_price": 5.40,
                 "weight_factor": 1.0,
-                "open_time": 3_000_000, "close_time": 4_000_000,
+                "open_time": 3_000_000,
+                "close_time": 4_000_000,
                 "exit_reason": "stop_loss",
-                "pnl_pct": -8.0, "fee_pct": 0.1, "net_pnl_pct": -8.1,
+                "pnl_pct": -8.0,
+                "fee_pct": 0.1,
+                "net_pnl_pct": -8.1,
                 "weighted_pnl": -8.1,
             },
             # Another loss
             {
-                "symbol": "DOTUSDT", "direction": 1,
-                "entry_price": 5.0, "exit_price": 4.75,
+                "symbol": "DOTUSDT",
+                "direction": 1,
+                "entry_price": 5.0,
+                "exit_price": 4.75,
                 "weight_factor": 1.0,
-                "open_time": 5_000_000, "close_time": 6_000_000,
+                "open_time": 5_000_000,
+                "close_time": 6_000_000,
                 "exit_reason": "stop_loss",
-                "pnl_pct": -5.0, "fee_pct": 0.1, "net_pnl_pct": -5.1,
+                "pnl_pct": -5.0,
+                "fee_pct": 0.1,
+                "net_pnl_pct": -5.1,
                 "weighted_pnl": -5.1,
             },
         ],
@@ -259,3 +271,101 @@ def test_seed_then_rebuild_state_matches(tmp_path):
     #   dd   = 9.9 - (-3.3) = 13.2
     assert engine._cum_weighted_pnl["E"] == pytest.approx(-3.3, abs=1e-9)
     assert engine._peak_weighted_pnl["E"] == pytest.approx(9.9, abs=1e-9)
+
+
+def test_seed_writes_boundary_keys(tmp_path):
+    """After seeding, seeded_through_<model>_<sym> = MAX(close_time) per pair."""
+    csv = tmp_path / "v1.csv"
+    _toy_trades_csv(
+        csv,
+        [
+            _row("BTCUSDT", 1, 1_700_000_000_000, 1_700_086_400_000, exit_reason="take_profit"),
+            _row("BTCUSDT", 1, 1_700_172_800_000, 1_700_259_200_000, exit_reason="stop_loss"),
+            _row("ETHUSDT", -1, 1_700_000_000_000, 1_700_086_400_000, exit_reason="timeout"),
+        ],
+    )
+    cfg = LiveConfig(models=BASELINE_MODELS, data_dir=tmp_path)
+    db = tmp_path / "seed.db"
+
+    seed_live_db_from_backtest(db, [csv], [], cfg)
+
+    store = StateStore(db)
+    # MAX close_time for (A, BTCUSDT) = 1_700_259_200_000
+    assert store.get_state("seeded_through_A_BTCUSDT") == "1700259200000"
+    # MAX close_time for (A, ETHUSDT) = 1_700_086_400_000
+    assert store.get_state("seeded_through_A_ETHUSDT") == "1700086400000"
+
+
+def test_seed_advances_boundary_monotonically(tmp_path):
+    """Re-running with a CSV that extends further must advance the key."""
+    csv1 = tmp_path / "v1a.csv"
+    _toy_trades_csv(
+        csv1,
+        [
+            _row("BTCUSDT", 1, 1_700_000_000_000, 1_700_086_400_000, exit_reason="take_profit"),
+        ],
+    )
+    csv2 = tmp_path / "v1b.csv"
+    _toy_trades_csv(
+        csv2,
+        [
+            _row("BTCUSDT", 1, 1_700_172_800_000, 1_700_259_200_000, exit_reason="stop_loss"),
+        ],
+    )
+    cfg = LiveConfig(models=BASELINE_MODELS, data_dir=tmp_path)
+    db = tmp_path / "seed.db"
+
+    seed_live_db_from_backtest(db, [csv1], [], cfg)
+    seed_live_db_from_backtest(db, [csv2], [], cfg)
+
+    store = StateStore(db)
+    assert store.get_state("seeded_through_A_BTCUSDT") == "1700259200000"
+
+
+def test_seed_does_not_regress_boundary_without_reseed(tmp_path):
+    """Re-running with an EARLIER-extent CSV must NOT lower the boundary."""
+    csv_late = tmp_path / "late.csv"
+    _toy_trades_csv(
+        csv_late,
+        [
+            _row("BTCUSDT", 1, 1_700_172_800_000, 1_700_259_200_000, exit_reason="stop_loss"),
+        ],
+    )
+    csv_early = tmp_path / "early.csv"
+    _toy_trades_csv(
+        csv_early,
+        [
+            _row("BTCUSDT", 1, 1_700_000_000_000, 1_700_086_400_000, exit_reason="take_profit"),
+        ],
+    )
+    cfg = LiveConfig(models=BASELINE_MODELS, data_dir=tmp_path)
+    db = tmp_path / "seed.db"
+
+    seed_live_db_from_backtest(db, [csv_late], [], cfg)
+    seed_live_db_from_backtest(db, [csv_early], [], cfg)
+
+    store = StateStore(db)
+    # Late boundary preserved; early CSV's MAX didn't beat it.
+    assert store.get_state("seeded_through_A_BTCUSDT") == "1700259200000"
+
+
+def test_seed_idempotent_on_repeat(tmp_path):
+    """Re-seeding the same CSV is a no-op for trade rows; result.skipped_duplicate > 0."""
+    csv = tmp_path / "v1.csv"
+    _toy_trades_csv(
+        csv,
+        [
+            _row("BTCUSDT", 1, 1_700_000_000_000, 1_700_086_400_000, exit_reason="take_profit"),
+            _row("BTCUSDT", 1, 1_700_172_800_000, 1_700_259_200_000, exit_reason="stop_loss"),
+        ],
+    )
+    cfg = LiveConfig(models=BASELINE_MODELS, data_dir=tmp_path)
+    db = tmp_path / "seed.db"
+
+    seed_live_db_from_backtest(db, [csv], [], cfg)
+    counts2 = seed_live_db_from_backtest(db, [csv], [], cfg)
+
+    store = StateStore(db)
+    rows = store.get_all_trades()
+    assert len(rows) == 2, f"Expected 2 rows after dedupe, got {len(rows)}"
+    assert counts2.get("skipped_duplicate", 0) == 2
