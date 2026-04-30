@@ -463,82 +463,11 @@ def test_compute_catch_up_start_ms_lookback_modes():
     assert full_oos == expected_400
 
 
-# ----------------------------- Task 3: CLI catch-up flags ------------------
-
-
-def test_cli_live_catch_up_days_flag():
-    from crypto_trade.main import build_parser
-
-    parser = build_parser()
-    args = parser.parse_args(["live", "--catch-up-days", "120"])
-    assert args.catch_up_days == 120
-    assert args.catch_up_from is None
-
-
-def test_cli_live_catch_up_from_flag():
-    from crypto_trade.main import build_parser
-
-    parser = build_parser()
-    args = parser.parse_args(["live", "--catch-up-from", "2025-03-24"])
-    assert args.catch_up_from == "2025-03-24"
-    assert args.catch_up_days is None
-
-
-def test_cli_live_catch_up_flags_mutually_exclusive():
-    from crypto_trade.main import build_parser
-
-    parser = build_parser()
-    with pytest.raises(SystemExit):
-        parser.parse_args(["live", "--catch-up-days", "60", "--catch-up-from", "2025-03-24"])
-
-
-def test_cmd_live_propagates_catch_up_days_to_config(tmp_path):
-    """`--catch-up-days N` flows into LiveConfig.catch_up_lookback_days."""
-    from unittest.mock import patch
-
-    from crypto_trade.main import _cmd_live, build_parser
-
-    class _StubSettings:
-        binance_api_key = ""
-        binance_api_secret = ""
-        base_url = ""
-        data_dir = str(tmp_path)
-
-    parser = build_parser()
-    args = parser.parse_args(["live", "--catch-up-days", "120"])
-    with patch("crypto_trade.live.engine.LiveEngine") as engine_cls:
-        engine_cls.return_value.run.return_value = None
-        _cmd_live(args, _StubSettings())
-        cfg = engine_cls.call_args.kwargs["config"]
-        assert cfg.catch_up_lookback_days == 120
-
-
-def test_cmd_live_propagates_catch_up_from_to_config(tmp_path):
-    """`--catch-up-from YYYY-MM-DD` is converted to lookback_days based on now."""
-    from unittest.mock import patch
-
-    import pandas as pd
-
-    from crypto_trade.main import _cmd_live, build_parser
-
-    class _StubSettings:
-        binance_api_key = ""
-        binance_api_secret = ""
-        base_url = ""
-        data_dir = str(tmp_path)
-
-    parser = build_parser()
-    args = parser.parse_args(["live", "--catch-up-from", "2025-03-24"])
-    with patch("crypto_trade.live.engine.LiveEngine") as engine_cls:
-        engine_cls.return_value.run.return_value = None
-        _cmd_live(args, _StubSettings())
-        cfg = engine_cls.call_args.kwargs["config"]
-        days = (pd.Timestamp.now("UTC") - pd.Timestamp("2025-03-24", tz="UTC")).days
-        assert abs(cfg.catch_up_lookback_days - days) <= 1
+# ----------------------------- Task 3: CLI catch-up defaults ----------------
 
 
 def test_cmd_live_omits_flags_uses_default(tmp_path):
-    """No catch-up flag ⇒ LiveConfig keeps its 90-day default."""
+    """`live` (no flags) ⇒ LiveConfig keeps its 90-day default."""
     from unittest.mock import patch
 
     from crypto_trade.main import _cmd_live, build_parser

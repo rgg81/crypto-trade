@@ -277,31 +277,11 @@ def build_parser() -> argparse.ArgumentParser:
         default="v1",
         help="Model preset: v1=BASELINE_MODELS, v2=V2_BASELINE_MODELS, both=COMBINED_MODELS (default: v1)",
     )
-    catch_up_group = live_parser.add_mutually_exclusive_group()
-    catch_up_group.add_argument(
-        "--catch-up-days",
-        type=int,
-        default=None,
-        help=(
-            "Replay the trailing N days during catch-up. Overrides the "
-            "default 90-day window from LiveConfig."
-        ),
-    )
-    catch_up_group.add_argument(
-        "--catch-up-from",
-        type=str,
-        default=None,
-        help=(
-            "Replay from YYYY-MM-DD UTC during catch-up (e.g. 2025-03-24 "
-            "for full OOS-cutoff parity). Mutually exclusive with --catch-up-days."
-        ),
-    )
-
     # -- seed-live-db subcommand --
     seed_parser = subparsers.add_parser(
         "seed-live-db",
         help="Import backtest trade CSVs into the live SQLite DB so R1/R2/VT/cooldown "
-        "state is preloaded and `live` can launch with a short --catch-up-days.",
+        "state is preloaded. `live` resumes from the seeded boundary automatically.",
     )
     seed_parser.add_argument(
         "--db",
@@ -830,20 +810,6 @@ def _cmd_live(args, settings) -> None:
     selected_models = track_map[track]
     print(f"[live] Track: {track} ({len(selected_models)} models)")
 
-    catch_up_kwargs: dict[str, int | None] = {}
-    catch_up_from = getattr(args, "catch_up_from", None)
-    catch_up_days = getattr(args, "catch_up_days", None)
-    if catch_up_from is not None:
-        import pandas as pd
-
-        from_ts = pd.Timestamp(catch_up_from, tz="UTC")
-        days = max(1, (pd.Timestamp.now("UTC") - from_ts).days)
-        catch_up_kwargs["catch_up_lookback_days"] = days
-        print(f"[live] Catch-up lookback: {days} days (from {catch_up_from})")
-    elif catch_up_days is not None:
-        catch_up_kwargs["catch_up_lookback_days"] = catch_up_days
-        print(f"[live] Catch-up lookback: {catch_up_days} days")
-
     # Testnet routing: --testnet forces live trading and points signed calls
     # at Binance Futures testnet. Klines stay on production for full history.
     # BINANCE_AUTH_BASE_URL (loaded into settings.auth_base_url) overrides the
@@ -892,7 +858,6 @@ def _cmd_live(args, settings) -> None:
         poll_interval_seconds=args.poll_interval,
         dry_run=not args.live_mode,
         testnet=testnet,
-        **catch_up_kwargs,
     )
 
     engine = LiveEngine(
@@ -994,9 +959,9 @@ def _cmd_seed_live_db(args, settings) -> None:
     print(f"  TOTAL inserted               : {total_inserted}")
     print()
     print(
-        "Next step: launch `crypto-trade live --track both --catch-up-days N` where N "
-        "covers the gap between the latest seeded close_time and now. Catch-up will "
-        "produce trades only for candles after the seeded data."
+        "Next step: launch `crypto-trade live --track both`. Catch-up resumes from the "
+        "seeded boundary (seeded_through_* keys) and produces trades only for candles "
+        "after the seeded data."
     )
 
 

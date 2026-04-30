@@ -3,9 +3,9 @@
 Imports v1 and/or v2 backtest trades into the live DB so that
 `LiveEngine._rebuild_*` methods can reconstruct R1/R2/VT/cooldown state
 without needing a multi-month catch-up replay. After seeding, the engine
-can be launched with a short `--catch-up-days` (covering only the gap
-since the last seeded trade) and still produce trades bit-identical to
-the backtest.
+reads the `seeded_through_<model>_<symbol>` boundary keys at startup and
+replays only candles after the last seeded close, producing trades
+bit-identical to the backtest.
 
 Open vs closed split is driven by the CSV's `exit_reason` field:
 rows whose `exit_reason == 'end_of_data'` were still open at the
