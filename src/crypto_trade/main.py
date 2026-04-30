@@ -307,7 +307,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--db",
         type=str,
         default="data/dry_run.db",
-        help="Target DB (default: data/dry_run.db, matches `live --dry-run` behavior).",
+        help=(
+            "Target DB (default: data/dry_run.db, matches `live --dry-run` "
+            "behavior). For testnet pass data/testnet.db; for live, data/live.db. "
+            "The path must match the DB the engine will open at startup "
+            "(testnet > dry_run > live, see engine.py)."
+        ),
     )
     seed_parser.add_argument(
         "--v1-trades",
