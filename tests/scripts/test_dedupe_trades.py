@@ -161,3 +161,19 @@ def test_main_returns_2_on_missing_trades_table(tmp_path, capsys):
     assert rc == 2
     captured = capsys.readouterr()
     assert "trades" in captured.err.lower()
+
+
+def test_plan_dedupe_apply_writes_backup(tmp_path):
+    """--apply must copy the DB to <name>.bak.<timestamp> before deleting."""
+    db_path = tmp_path / "with_dups.db"
+    _build_legacy_db(db_path, [("CATCHUP-aaa", "200"), (None, "100")])
+
+    plan_dedupe(db_path, apply=True)
+
+    backups = list(tmp_path.glob(f"{db_path.name}.bak.*"))
+    assert len(backups) == 1, f"Expected exactly 1 backup, got {len(backups)}"
+    # The backup must contain BOTH original rows (pre-deletion state).
+    conn = sqlite3.connect(str(backups[0]))
+    n = conn.execute("SELECT COUNT(*) FROM trades").fetchone()[0]
+    conn.close()
+    assert n == 2

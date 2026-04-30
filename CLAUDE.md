@@ -78,6 +78,11 @@ Behavior:
 - Sets per-`(model, symbol)` `cooldown_<model>_<symbol>` engine_state keys
   for the standard 2-candle post-trade cooldown.
 
+> **Stop the engine before re-seeding.** `seed-live-db` writes to the same
+> SQLite file the engine reads/writes. Running both at the same time may
+> raise `database is locked`. The handshake is designed for a workflow of:
+> stop engine → seed → start engine.
+
 After seeding, just launch `live`. The catch-up loop reads the boundary
 keys per `(model, symbol)` and replays only the gap between the seeded
 extent and now. Zero date-flag alignment to think about.

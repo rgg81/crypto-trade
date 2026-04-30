@@ -483,7 +483,7 @@ def is_paper_trade(trade: LiveTrade) -> bool:
 
     Paper trade entry_order_id shapes:
       - None              — pre-cutoff seeded closed trade (db_seeder)
-      - "SEEDED"          — seeded open trade spanning the as-of cutoff
+      - "SEEDED"          — seeded open trade still active at CSV's data extent
       - "DRY-<8hex>"      — opened by OrderManager.open_trade in dry-run
       - "CATCHUP-<8hex>"  — opened by engine._catch_up_model
 
