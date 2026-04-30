@@ -98,14 +98,15 @@ FULL_SEEDS = (42, 123, 456, 789, 1001, 1234, 2345, 3456, 4567, 5678)
 
 
 def _verify_branch() -> None:
-    """Enforce the git workflow guardrail: v2 runs from iteration-v2/* or quant-research."""
+    """Enforce the git workflow guardrail: v2 runs from iteration-v2/*, quant-research, or main."""
     branch = subprocess.check_output(
         ["git", "--no-optional-locks", "branch", "--show-current"],
         text=True,
     ).strip()
-    if not (branch.startswith("iteration-v2/") or branch == "quant-research"):
+    allowed = branch.startswith("iteration-v2/") or branch in ("quant-research", "main")
+    if not allowed:
         raise RuntimeError(
-            f"v2 runner must run from iteration-v2/* or quant-research branch; got: {branch}"
+            f"v2 runner must run from iteration-v2/*, quant-research, or main branch; got: {branch}"
         )
 
 
