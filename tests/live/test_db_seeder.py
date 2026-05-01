@@ -36,7 +36,19 @@ def _toy_trades_csv(path: Path, rows: list[dict]) -> None:
         "fee_pct",
         "net_pnl_pct",
         "weighted_pnl",
+        "stop_loss_price",
+        "take_profit_price",
+        "timeout_time",
     ]
+    # Fill in dummy SL/TP/timeout for rows that don't supply them — older
+    # tests construct raw dicts and only care about pre-handshake fields.
+    # end_of_data rows MUST supply real values; they raise in _row_to_trade.
+    for r in rows:
+        r.setdefault("stop_loss_price", float(r["entry_price"]) * 0.95)
+        r.setdefault("take_profit_price", float(r["entry_price"]) * 1.10)
+        r.setdefault(
+            "timeout_time", int(r["open_time"]) + 7 * 24 * 3600 * 1000
+        )
     df = pd.DataFrame(rows)
     df = df[cols]
     df.to_csv(path, index=False)
@@ -49,11 +61,18 @@ def _row(
     close_time: int,
     weight_factor: float = 1.0,
     exit_reason: str = "stop_loss",
+    stop_loss_price: float | None = None,
+    take_profit_price: float | None = None,
 ) -> dict:
+    entry_price = 100.0
+    if stop_loss_price is None:
+        stop_loss_price = 96.0 if direction == 1 else 104.0
+    if take_profit_price is None:
+        take_profit_price = 108.0 if direction == 1 else 92.0
     return {
         "symbol": symbol,
         "direction": direction,
-        "entry_price": 100.0,
+        "entry_price": entry_price,
         "exit_price": 95.0 if direction == 1 else 105.0,
         "weight_factor": weight_factor,
         "open_time": open_time,
@@ -63,6 +82,9 @@ def _row(
         "fee_pct": 0.1,
         "net_pnl_pct": -5.1,
         "weighted_pnl": -5.1 * weight_factor,
+        "stop_loss_price": stop_loss_price,
+        "take_profit_price": take_profit_price,
+        "timeout_time": open_time + 7 * 24 * 3600 * 1000,
     }
 
 
@@ -334,14 +356,24 @@ def test_seed_idempotent_on_repeat(tmp_path):
 
 
 def test_seed_split_uses_exit_reason(tmp_path):
-    """exit_reason='end_of_data' → SEEDED open. Everything else → closed."""
+    """exit_reason='end_of_data' → SEEDED open with REAL SL/TP/timeout from
+    the CSV; exit_* fields stay None so catch-up settles via check_order.
+    Other exit_reason → status='closed' with the realized exit captured."""
     csv = tmp_path / "v1.csv"
     _toy_trades_csv(
         csv,
         [
             _row("BTCUSDT", 1, 1_700_000_000_000, 1_700_086_400_000, exit_reason="take_profit"),
             _row("BTCUSDT", 1, 1_700_172_800_000, 1_700_259_200_000, exit_reason="stop_loss"),
-            _row("ETHUSDT", -1, 1_700_300_000_000, 1_700_400_000_000, exit_reason="end_of_data"),
+            _row(
+                "ETHUSDT",
+                -1,
+                1_700_300_000_000,
+                1_700_400_000_000,
+                exit_reason="end_of_data",
+                stop_loss_price=110.0,
+                take_profit_price=88.0,
+            ),
         ],
     )
     cfg = LiveConfig(models=BASELINE_MODELS, data_dir=tmp_path)
@@ -352,14 +384,50 @@ def test_seed_split_uses_exit_reason(tmp_path):
     store = StateStore(db)
     rows = store.get_all_trades()
     by_sym = {r.symbol: r for r in rows}
-    assert by_sym["ETHUSDT"].status == "open"
-    assert by_sym["ETHUSDT"].entry_order_id == "SEEDED"
-    assert by_sym["ETHUSDT"].exit_time == 1_700_400_000_000  # intended exit
-    assert by_sym["ETHUSDT"].exit_reason == "end_of_data"
-    # The two BTC trades — both status='closed'
+    eth = by_sym["ETHUSDT"]
+    assert eth.status == "open"
+    assert eth.entry_order_id == "SEEDED"
+    # SEEDED open trades carry REAL SL/TP/timeout from the backtest CSV so
+    # catch-up's check_order can settle them naturally.
+    assert eth.stop_loss_price == 110.0
+    assert eth.take_profit_price == 88.0
+    assert eth.timeout_time == 1_700_300_000_000 + 7 * 24 * 3600 * 1000
+    # exit_* fields must be None — not yet realized.
+    assert eth.exit_price is None
+    assert eth.exit_time is None
+    assert eth.exit_reason is None
+    # The two BTC trades — both status='closed' with realized exit captured
     btc = [r for r in rows if r.symbol == "BTCUSDT"]
     assert len(btc) == 2
     assert all(r.status == "closed" for r in btc)
+    assert all(r.exit_reason in ("stop_loss", "take_profit") for r in btc)
+    assert all(r.exit_time is not None for r in btc)
+
+
+def test_seed_end_of_data_without_risk_columns_raises(tmp_path):
+    """Old-format CSVs (no SL/TP/timeout columns) MUST refuse to seed
+    end_of_data rows — settling them on fresh candles requires real SL/TP.
+    """
+    import csv as _csv
+
+    csv_path = tmp_path / "old_format.csv"
+    with open(csv_path, "w", newline="") as f:
+        w = _csv.writer(f)
+        w.writerow([
+            "symbol", "direction", "entry_price", "exit_price", "weight_factor",
+            "open_time", "close_time", "exit_reason", "pnl_pct", "fee_pct",
+            "net_pnl_pct", "weighted_pnl",
+        ])
+        w.writerow([
+            "ETHUSDT", -1, 100.0, 105.0, 1.0,
+            1_700_300_000_000, 1_700_400_000_000, "end_of_data",
+            -5.0, 0.1, -5.1, -5.1,
+        ])
+
+    cfg = LiveConfig(models=BASELINE_MODELS, data_dir=tmp_path)
+    db = tmp_path / "seed.db"
+    with pytest.raises(ValueError, match="end_of_data"):
+        seed_live_db_from_backtest(db, [csv_path], [], cfg)
 
 
 def test_seed_reseed_overwrites_boundary(tmp_path):

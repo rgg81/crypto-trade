@@ -108,6 +108,9 @@ def _write_trades_csv(trades: list[TradeResult], path: Path) -> None:
         "fee_pct",
         "net_pnl_pct",
         "weighted_pnl",
+        "stop_loss_price",
+        "take_profit_price",
+        "timeout_time",
     ]
     with open(path, "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=fields)
@@ -126,6 +129,9 @@ def _write_trades_csv(trades: list[TradeResult], path: Path) -> None:
                 "fee_pct": f"{t.fee_pct:.4f}",
                 "net_pnl_pct": f"{t.net_pnl_pct:.4f}",
                 "weighted_pnl": f"{t.weighted_pnl:.4f}",
+                "stop_loss_price": f"{t.stop_loss_price:.6f}",
+                "take_profit_price": f"{t.take_profit_price:.6f}",
+                "timeout_time": t.timeout_time,
             }
             writer.writerow(row)
 

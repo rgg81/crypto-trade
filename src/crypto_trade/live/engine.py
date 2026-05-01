@@ -807,57 +807,40 @@ class LiveEngine:
 
             # Current month: full trade lifecycle (mirrors backtest.py:217-305)
 
-            # (a) Check open trade for SL/TP/timeout (or apply seeded exit)
+            # (a) Check open trade for SL/TP/timeout. SEEDED carry-over and
+            # CATCHUP-* paper trades both flow through the same check_order
+            # path now that the seeder writes real SL/TP/timeout from the
+            # backtest CSV.
             if sym in open_trades:
                 trade = open_trades[sym]
-                # Seeded open trade — close at the seeded exit_time using the
-                # CSV-supplied exit_price/exit_reason. No SL/TP/timeout
-                # recomputation against dummy seeded SL/TP prices.
-                if trade.entry_order_id == "SEEDED" and trade.exit_time is not None:
-                    if ct >= trade.exit_time:
-                        open_trades.pop(sym)
-                        trade.status = "closed"
-                        # exit_* fields are already set by the seeder
-                        self._state.upsert_trade(trade)
-                        self._logger.log_close(trade)
-                        self._record_trade_close_for_vt(trade)
-                        self._record_trade_close_for_risk(trade)
-                        n_trades_closed += 1
-                        if runner.cooldown_candles > 0:
-                            cooldown_until[sym] = (
-                                trade.exit_time + runner.cooldown_candles * self._candle_duration_ms
-                            )
-                    # else: still holding, will close on a later candle
-                else:
-                    # Genuine live-opened trade: SL/TP/timeout via check_order
-                    order = trade_to_order(trade)
-                    result = check_order(
-                        order,
-                        ot,
-                        float(open_arr[i]),
-                        float(high_arr[i]),
-                        float(low_arr[i]),
-                        ct,
-                        self.config.fee_pct,
-                    )
-                    if result is not None:
-                        trade = open_trades.pop(sym)
-                        trade.status = "closed"
-                        trade.exit_price = result.exit_price
-                        trade.exit_time = result.close_time
-                        trade.exit_reason = result.exit_reason
-                        self._state.upsert_trade(trade)
-                        self._logger.log_close(trade)
-                        self._record_trade_close_for_vt(trade)
-                        self._record_trade_close_for_risk(trade)
-                        n_trades_closed += 1
-                        # Match backtest.py:239-243: use result.close_time (not ct).
-                        # For timeouts, result.close_time = candle open_time.
-                        if runner.cooldown_candles > 0:
-                            cooldown_until[sym] = (
-                                result.close_time
-                                + runner.cooldown_candles * self._candle_duration_ms
-                            )
+                order = trade_to_order(trade)
+                result = check_order(
+                    order,
+                    ot,
+                    float(open_arr[i]),
+                    float(high_arr[i]),
+                    float(low_arr[i]),
+                    ct,
+                    self.config.fee_pct,
+                )
+                if result is not None:
+                    trade = open_trades.pop(sym)
+                    trade.status = "closed"
+                    trade.exit_price = result.exit_price
+                    trade.exit_time = result.close_time
+                    trade.exit_reason = result.exit_reason
+                    self._state.upsert_trade(trade)
+                    self._logger.log_close(trade)
+                    self._record_trade_close_for_vt(trade)
+                    self._record_trade_close_for_risk(trade)
+                    n_trades_closed += 1
+                    # Match backtest.py:239-243: use result.close_time (not ct).
+                    # For timeouts, result.close_time = candle open_time.
+                    if runner.cooldown_candles > 0:
+                        cooldown_until[sym] = (
+                            result.close_time
+                            + runner.cooldown_candles * self._candle_duration_ms
+                        )
 
             # (b) Get signal
             sig = runner.strategy.get_signal(sym, ot)

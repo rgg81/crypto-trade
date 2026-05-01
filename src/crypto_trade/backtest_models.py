@@ -99,6 +99,13 @@ class TradeResult:
     fee_pct: float
     net_pnl_pct: float
     weighted_pnl: float
+    # Entry-side risk parameters carried through so the live engine can
+    # re-evaluate SEEDED open trades (exit_reason='end_of_data') against
+    # fresh post-data-extent candles instead of force-closing them at the
+    # backtest's last close.
+    stop_loss_price: float = 0.0
+    take_profit_price: float = 0.0
+    timeout_time: int = 0
 
 
 @dataclass(frozen=True)

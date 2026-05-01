@@ -629,4 +629,7 @@ def make_result(
         fee_pct=fee_pct,
         net_pnl_pct=net_pnl_pct,
         weighted_pnl=weighted_pnl,
+        stop_loss_price=order.stop_loss_price,
+        take_profit_price=order.take_profit_price,
+        timeout_time=order.timeout_time,
     )

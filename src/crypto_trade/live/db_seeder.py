@@ -75,8 +75,14 @@ def _row_to_trade(
 
     Open vs closed: a row whose exit_reason is 'end_of_data' represents a
     trade that was still open at the CSV's data extent — the live engine
-    inherits it as a SEEDED open and re-evaluates SL/TP/timeout against
-    new candles. Any other exit_reason means the trade really closed.
+    inherits it as a SEEDED open with the real SL/TP/timeout from the
+    backtest, and the catch-up loop runs check_order against fresh
+    post-data-extent candles to settle it naturally. Any other exit_reason
+    means the trade really closed.
+
+    Required CSV columns when end_of_data rows exist:
+      stop_loss_price, take_profit_price, timeout_time. Backtests run
+      before this PR don't write them — re-run the backtests to refresh.
     """
     weight_factor = float(row["weight_factor"])
     if weight_factor <= 0.0:
@@ -88,8 +94,34 @@ def _row_to_trade(
     entry_price = float(row["entry_price"])
     exit_price = float(row["exit_price"])
     exit_reason = str(row["exit_reason"])
-
     is_still_open = exit_reason == "end_of_data"
+
+    # Real SL/TP/timeout. CSVs from the post-handshake backtest writer
+    # always carry them. For older CSVs we fall back to the dummy
+    # entry-price values, but warn when seeding an end_of_data row that
+    # would silently fail to settle on fresh candles.
+    has_risk_cols = (
+        "stop_loss_price" in row
+        and "take_profit_price" in row
+        and "timeout_time" in row
+        and not pd.isna(row["stop_loss_price"])
+    )
+    if has_risk_cols:
+        stop_loss_price = float(row["stop_loss_price"])
+        take_profit_price = float(row["take_profit_price"])
+        timeout_time = int(row["timeout_time"])
+    else:
+        if is_still_open:
+            raise ValueError(
+                f"end_of_data row for {row.get('symbol')!r} at "
+                f"open_time={open_time} lacks stop_loss_price / "
+                f"take_profit_price / timeout_time columns. Re-run the "
+                f"backtest with the post-handshake report writer so the "
+                f"live engine can settle the trade against fresh candles."
+            )
+        stop_loss_price = entry_price
+        take_profit_price = entry_price
+        timeout_time = open_time + timeout_minutes * 60 * 1000
 
     return LiveTrade(
         model_name=model_name,
@@ -98,10 +130,10 @@ def _row_to_trade(
         entry_price=entry_price,
         amount_usd=weight_factor * max_amount_usd,
         weight_factor=weight_factor,
-        stop_loss_price=entry_price,
-        take_profit_price=entry_price,
+        stop_loss_price=stop_loss_price,
+        take_profit_price=take_profit_price,
         open_time=open_time,
-        timeout_time=open_time + timeout_minutes * 60 * 1000,
+        timeout_time=timeout_time,
         signal_time=open_time,
         status="open" if is_still_open else "closed",
         # Sentinel order IDs distinguish seeded open trades from genuine
@@ -109,9 +141,11 @@ def _row_to_trade(
         entry_order_id="SEEDED" if is_still_open else None,
         sl_order_id=None,
         tp_order_id=None,
-        exit_price=exit_price,
-        exit_time=close_time,
-        exit_reason=exit_reason,
+        # Closed trades carry their realized exit; SEEDED open trades
+        # leave exit_* unset so catch-up can fill them via check_order.
+        exit_price=None if is_still_open else exit_price,
+        exit_time=None if is_still_open else close_time,
+        exit_reason=None if is_still_open else exit_reason,
     )
 
 
@@ -193,17 +227,20 @@ def seed_live_db_from_backtest(
                     continue
                 key = f"{track}_{trade.status}"
                 counts[key] = counts.get(key, 0) + 1
+                # Boundary tracking comes from the CSV row, not trade.exit_time
+                # (which is None for SEEDED open trades after this PR).
+                row_close_time = int(row["close_time"])
+                k = (model_name, sym)
                 # Cooldown is keyed off the LAST close that finished before
                 # the catch-up boundary. Open-at-cutoff trades close LATER, so
                 # they don't drive the initial cooldown timestamp; only fully-
                 # closed (status='closed') trades do.
-                k = (model_name, sym)
-                if trade.exit_time is not None:
-                    if trade.status == "closed":
-                        latest_close[k] = max(latest_close[k], trade.exit_time)
-                    # Boundary tracks ALL seeded rows (closed AND open) so the
-                    # engine knows where seeded coverage ends.
-                    latest_close_any[k] = max(latest_close_any[k], trade.exit_time)
+                if trade.status == "closed":
+                    latest_close[k] = max(latest_close[k], row_close_time)
+                # Boundary tracks ALL seeded rows (closed AND open) so the
+                # engine knows where seeded coverage ends. For SEEDED-open
+                # rows, close_time is the backtest's data extent.
+                latest_close_any[k] = max(latest_close_any[k], row_close_time)
 
     _ingest(v1_trades_csvs, "v1")
     _ingest(v2_trades_csvs, "v2")
