@@ -1039,7 +1039,9 @@ class LiveEngine:
                 next(iter(new_candles[s].open_time for s in model_syms))
             )
             t_warmup_start = time.monotonic()
-            if runner.strategy._current_month != new_candle_month:
+            # _current_month lives on the inner LightGbmStrategy. v2 runners
+            # wrap it in RiskV2Wrapper, so go through the inner_strategy property.
+            if runner.inner_strategy._current_month != new_candle_month:
                 runner.warmup(master)
                 t_warmup_label = "compute_features"
             else:

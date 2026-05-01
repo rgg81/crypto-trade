@@ -73,3 +73,32 @@ def test_catch_up_source_has_no_auth_reference():
         "Catch-up creates CATCHUP-* paper rows directly via state.upsert_trade. "
         "Real order placement is the live tick's job (OrderManager.open_trade)."
     )
+
+
+def test_tick_uses_inner_strategy_for_current_month():
+    """Drift guard: _tick must read _current_month off runner.inner_strategy,
+    not runner.strategy. For v2 models runner.strategy is a RiskV2Wrapper
+    that does not expose _current_month — accessing it raises AttributeError
+    and breaks the per-tick same-month/new-month branch.
+    """
+    src = Path("src/crypto_trade/live/engine.py").read_text()
+    match = re.search(
+        r"def _tick\(self\).*?(?=\n    def |\Z)",
+        src,
+        flags=re.DOTALL,
+    )
+    assert match is not None, "Could not locate _tick in engine.py"
+    body = match.group(0)
+    # Any access of _current_month inside _tick must go through inner_strategy.
+    # If you need to access it via another path, update this assertion AND
+    # ensure the new path also works for RiskV2Wrapper-wrapped runners.
+    bad = re.search(r"runner\.strategy\._current_month", body)
+    assert bad is None, (
+        "_tick must use runner.inner_strategy._current_month, not "
+        "runner.strategy._current_month. RiskV2Wrapper does not expose "
+        "_current_month, so the wrapped path raises AttributeError for v2 models."
+    )
+    # Positive assertion: the inner_strategy access must actually be present.
+    assert "inner_strategy._current_month" in body, (
+        "_tick must read _current_month from runner.inner_strategy."
+    )
