@@ -197,16 +197,13 @@ def seed_live_db_from_backtest(
                 # the catch-up boundary. Open-at-cutoff trades close LATER, so
                 # they don't drive the initial cooldown timestamp; only fully-
                 # closed (status='closed') trades do.
-                if trade.status == "closed" and trade.exit_time is not None:
-                    k = (model_name, sym)
-                    if trade.exit_time > latest_close[k]:
-                        latest_close[k] = trade.exit_time
-                # Boundary key tracks ALL seeded rows for the pair, regardless
-                # of status. The key tells the engine where seeded coverage
-                # ends so catch-up doesn't replay it.
-                k_any = (model_name, sym)
-                if trade.exit_time is not None and trade.exit_time > latest_close_any[k_any]:
-                    latest_close_any[k_any] = trade.exit_time
+                k = (model_name, sym)
+                if trade.exit_time is not None:
+                    if trade.status == "closed":
+                        latest_close[k] = max(latest_close[k], trade.exit_time)
+                    # Boundary tracks ALL seeded rows (closed AND open) so the
+                    # engine knows where seeded coverage ends.
+                    latest_close_any[k] = max(latest_close_any[k], trade.exit_time)
 
     _ingest(v1_trades_csvs, "v1")
     _ingest(v2_trades_csvs, "v2")
@@ -226,12 +223,11 @@ def seed_live_db_from_backtest(
         if max_close <= 0:
             continue
         key = f"seeded_through_{model_name}_{sym}"
-        if reseed:
-            new_value = max_close
-        else:
-            existing_raw = store.get_state(key)
-            existing = int(existing_raw) if existing_raw else 0
-            new_value = max(existing, max_close)
+        existing_raw = store.get_state(key)
+        existing = int(existing_raw) if existing_raw else 0
+        new_value = max_close if reseed else max(existing, max_close)
+        if new_value == existing:
+            continue  # no-op write skipped (saves a sqlite fsync per pair)
         store.set_state(key, str(new_value))
         counts["boundary_keys"] = counts.get("boundary_keys", 0) + 1
 

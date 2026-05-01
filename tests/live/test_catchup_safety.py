@@ -53,9 +53,10 @@ def test_catch_up_never_calls_signed_endpoints(tmp_path):
 def test_catch_up_source_has_no_auth_reference():
     """Drift guard: _catch_up_model body must not reference self._auth.
 
-    A regex source-anchor — same style as the dba16ec paper-trade SL/TP fix
-    test. If a future refactor pipes order placement through catch-up, this
-    test fails before that change can land.
+    Source-anchor regex check. Catch-up creates CATCHUP-* paper rows
+    directly via state.upsert_trade; real order placement is the live
+    tick's job. Any future refactor that pipes self._auth into catch-up
+    fails this test before it can land.
     """
     src = Path("src/crypto_trade/live/engine.py").read_text()
     # Match `def _catch_up_model(...)` body up to the next top-level def or

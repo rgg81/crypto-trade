@@ -20,13 +20,15 @@ Within a tier, oldest created_at wins (first arrival).
 from __future__ import annotations
 
 import argparse
-import shutil
 import sqlite3
 import sys
 from collections.abc import Iterable
 from datetime import datetime
 from pathlib import Path
 
+# Mirror of crypto_trade.live.models._PAPER_PREFIXES. Local copy to keep this
+# script's import surface bare-Python (the models module pulls in pandas via
+# the V2 baseline catalog, which is overkill for an ops cleanup tool).
 _PAPER_PREFIXES = ("SEEDED", "DRY-", "CATCHUP-")
 
 
@@ -36,13 +38,11 @@ def classify_priority(row: dict) -> int:
     if eoid is None:
         return 1  # seeded closed (canonical CSV row)
     s = str(eoid)
+    if s == "SEEDED":
+        return 2  # open seeded carry-over (db_seeder writes this literal)
     if s.startswith(_PAPER_PREFIXES):
-        # SEEDED open is priority 2; DRY-/CATCHUP- is priority 3
-        if s == "SEEDED" or s.startswith("SEEDED-"):
-            return 2
-        return 3
-    # numeric (real exchange order ID)
-    return 0
+        return 3  # CATCHUP-/DRY- engine-replayed paper rows
+    return 0  # numeric (real exchange order ID)
 
 
 def pick_keeper(rows: list[dict]) -> dict:
@@ -106,12 +106,9 @@ def plan_dedupe(db_path: Path, apply: bool = False) -> list[dict]:
         if apply and plan:
             ts = datetime.now().strftime("%Y%m%d_%H%M%S")
             backup_path = db_path.parent / f"{db_path.name}.bak.{ts}"
-            # Close the connection so SQLite flushes WAL before copy.
-            conn.close()
-            shutil.copy2(db_path, backup_path)
+            with sqlite3.connect(str(backup_path)) as bak:
+                conn.backup(bak)
             print(f"[dedupe] Backup written to {backup_path}")
-            # Reopen for the destructive transaction.
-            conn = sqlite3.connect(str(db_path))
             conn.execute("BEGIN")
             for entry in plan:
                 for r in entry["removed"]:

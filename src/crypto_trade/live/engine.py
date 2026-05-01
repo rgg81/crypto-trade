@@ -906,11 +906,8 @@ class LiveEngine:
                     try:
                         self._state.upsert_trade(trade)
                     except sqlite3.IntegrityError:
-                        # Defense-in-depth: the boundary handshake (Task 4) is
-                        # the primary mechanism for avoiding duplicates. If a
-                        # row with this (model, sym, open_time) already exists
-                        # (e.g., a stale CATCHUP-* from a prior run, or a
-                        # SEEDED- carry-over), keep the existing row and skip.
+                        # Natural-key collision — keep the existing row (e.g. a
+                        # SEEDED carry-over or stale CATCHUP-* from a prior run).
                         print(
                             f"[live] catch-up duplicate suppressed: "
                             f"model={runner.model_config.name} sym={sym} ot={ot}"
