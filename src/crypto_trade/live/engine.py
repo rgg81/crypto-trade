@@ -810,16 +810,13 @@ class LiveEngine:
             # (a) Check open trade for SL/TP/timeout. SEEDED carry-over and
             # CATCHUP-* paper trades both flow through the same check_order
             # path now that the seeder writes real SL/TP/timeout from the
-            # backtest CSV.
-            if sym in open_trades:
+            # backtest CSV. SEEDED trades carry a real open_time which may
+            # be inside the catch-up window — skip check_order for candles
+            # before that open_time so the trade's SL/TP is not evaluated
+            # against ancient candles. Signal evaluation (step b) still
+            # runs unconditionally — it has its own seeded_through guard.
+            if sym in open_trades and ot >= open_trades[sym].open_time:
                 trade = open_trades[sym]
-                # SEEDED trades from the seeder carry a real open_time that
-                # may be after the catch-up window's start. Skip check_order
-                # for candles before the trade's own open_time — the trade
-                # didn't exist yet, so its SL/TP must not be back-evaluated
-                # against ancient candles.
-                if ot < trade.open_time:
-                    continue
                 order = trade_to_order(trade)
                 result = check_order(
                     order,
