@@ -813,6 +813,13 @@ class LiveEngine:
             # backtest CSV.
             if sym in open_trades:
                 trade = open_trades[sym]
+                # SEEDED trades from the seeder carry a real open_time that
+                # may be after the catch-up window's start. Skip check_order
+                # for candles before the trade's own open_time — the trade
+                # didn't exist yet, so its SL/TP must not be back-evaluated
+                # against ancient candles.
+                if ot < trade.open_time:
+                    continue
                 order = trade_to_order(trade)
                 result = check_order(
                     order,

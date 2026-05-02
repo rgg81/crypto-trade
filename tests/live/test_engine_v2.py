@@ -1136,3 +1136,112 @@ def test_catch_up_with_no_seeded_keys_replays_normally(tmp_path):
     # local 'sym in open_trades' guard (a trade is currently open on candle 1).
     # That's existing behavior — no boundary involved.
     assert len(trades) == 1
+
+
+def test_catch_up_does_not_back_evaluate_seeded_open_before_open_time(tmp_path):
+    """SEEDED open trades carry a real open_time that may be far inside the
+    catch-up window. check_order MUST NOT fire for candles before that
+    open_time — the trade didn't exist yet, so its SL/TP can't be evaluated
+    against ancient candles. Without this guard, a Feb candle could 'close'
+    a SEEDED trade whose open_time is May.
+    """
+    import uuid
+
+    import pandas as pd
+
+    from crypto_trade.backtest_models import Signal
+    from crypto_trade.live.models import LiveTrade, ModelConfig
+    from crypto_trade.live.state_store import StateStore
+
+    candle_ms = 28_800_000
+    now_ms = int(time.time() * 1000)
+    # SEEDED trade opened ONE candle ago. Catch-up window starts well before.
+    seeded_open_time = (now_ms // candle_ms) * candle_ms - candle_ms
+    early_candle_open = seeded_open_time - 5 * candle_ms  # 5 candles earlier
+    early_candle_close = early_candle_open + candle_ms - 1
+
+    cfg_models = (
+        ModelConfig(
+            name="A",
+            symbols=("BTCUSDT",),
+            use_atr_labeling=True,
+            atr_tp_multiplier=2.9,
+            atr_sl_multiplier=1.45,
+        ),
+    )
+    db = _engine_db_path(tmp_path)
+
+    # Pre-seed an open SEEDED trade with TIGHT SL that would fire on the
+    # early candle's low, IF the bug existed. open_time is in the future
+    # relative to the early candle.
+    store = StateStore(db)
+    store.upsert_trade(
+        LiveTrade(
+            id=uuid.uuid4().hex,
+            model_name="A",
+            symbol="BTCUSDT",
+            direction=1,  # LONG
+            entry_price=100.0,
+            amount_usd=1000.0,
+            weight_factor=1.0,
+            stop_loss_price=99.0,  # would trigger on early-candle low=90
+            take_profit_price=110.0,
+            open_time=seeded_open_time,
+            timeout_time=seeded_open_time + 7 * 24 * 3600 * 1000,
+            signal_time=seeded_open_time,
+            status="open",
+            entry_order_id="SEEDED",
+        )
+    )
+    store.close()
+
+    engine = _build_minimal_engine(tmp_path, cfg_models)
+    runner = engine._runners[0]
+
+    class _StubStrategy:
+        def compute_features(self, master):
+            pass
+
+        def get_signal(self, sym, ot):
+            # Make signals inert so we focus on the open-trade evaluation path.
+            return Signal(direction=0, weight=0)
+
+    runner.strategy = _StubStrategy()
+    runner._inner_strategy = _StubStrategy()
+    # Master DF: one candle BEFORE seeded_open_time with low=90 (would fire
+    # SL=99 IF bug present), one candle AT seeded_open_time, one AFTER.
+    runner._master = pd.DataFrame(
+        {
+            "symbol": ["BTCUSDT"] * 3,
+            "open_time": [
+                early_candle_open,
+                seeded_open_time,
+                seeded_open_time + candle_ms,
+            ],
+            "close_time": [
+                early_candle_close,
+                seeded_open_time + candle_ms - 1,
+                seeded_open_time + 2 * candle_ms - 1,
+            ],
+            "open": [100.0, 100.0, 100.0],
+            "high": [105.0, 100.0, 100.0],
+            "low": [90.0, 100.0, 100.0],  # early low would fire SL=99 if bug present
+            "close": [100.0, 100.0, 100.0],
+        }
+    )
+
+    engine._catch_up_model(runner)
+
+    store = StateStore(db)
+    trade = store.get_open_trades(model_name="A")
+    closed = [t for t in store.get_all_trades() if t.status == "closed"]
+    store.close()
+
+    # SEEDED trade must STILL be open — its open_time hasn't been reached
+    # yet at the early candle, so check_order was correctly skipped.
+    assert len(trade) == 1, "SEEDED trade should still be open"
+    assert trade[0].entry_order_id == "SEEDED"
+    assert len(closed) == 0, (
+        "No SEEDED trade should have been closed by back-evaluating "
+        "check_order on candles before its own open_time."
+    )
