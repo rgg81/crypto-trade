@@ -54,7 +54,8 @@ analysis-v2/
 notebooks/output/
 notebooks/.ipynb_checkpoints/
 
-# Claude settings (track commands/skills, ignore the rest)
+# Claude settings (track commands/skills/agents, ignore the rest)
 .claude/*
 !.claude/commands/
 !.claude/skills/
+!.claude/agents/
