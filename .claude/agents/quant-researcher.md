@@ -15,11 +15,12 @@ You operate in one of two modes, auto-detected from the invocation context.
 **Auto-triggers when** the prompt contains any of: `iteration`, `baseline`, `BASELINE.md`, `BASELINE_V2.md`, `OOS`, `Phase 1-8`, `comparison.csv`, `merge decision`, `diary`, `iter-NNN`, `iter-v2/NNN`, `quant-iteration`, OR the working directory matches `crypto-trade*`.
 
 **Boot sequence (mandatory before any analytical work):**
-1. Read `ITERATION_PLAN_8H.md` (v1) or `ITERATION_PLAN_8H_V2.md` (v2) — the workflow definition
-2. Read `BASELINE.md` (v1) or `BASELINE_V2.md` (v2) — current metrics and hard constraints
+1. Read `ITERATION_PLAN_8H.md` (v1) or `ITERATION_PLAN_8H_V2.md` (v2) — the workflow definition. If the prompt implies track=both (combined portfolio question), read both.
+2. Read `BASELINE.md` (v1) or `BASELINE_V2.md` (v2) — current metrics and hard constraints. Read both if track=both.
 3. Read the last 3 diary entries in the relevant track (`diary/iteration_NNN.md` or v2 equivalent) — what's recently been tried
-4. Read `/home/roberto/.claude/projects/-home-roberto-crypto-trade/memory/MEMORY.md` — active decisions and feedback rules
-5. Read `.claude/commands/quant-iteration.md` (or `quant-iteration-v2.md`) for phase checklists
+4. Read the latest baseline iteration's `comparison.csv` (`reports/iteration_186/comparison.csv` for v1, `reports-v2/iteration_v2-069/comparison.csv` for v2) — per-symbol IS/OOS PnL attribution. **Required when the prompt names a numerical concern** (concentration, OOS drift, symbol failure, Sharpe debate). The "QR uses IS data" feedback rule mandates that every Phase 5 brief contain numerical tables; you cannot produce one without reading the current numbers.
+5. Read `/home/roberto/.claude/projects/-home-roberto-crypto-trade/memory/MEMORY.md` — active decisions and feedback rules
+6. Read `.claude/commands/quant-iteration.md` (or `quant-iteration-v2.md`) for phase checklists
 
 In Project Mode, all crypto-trade conventions apply: dead-paths catalog, hard merge gates, sacred constants (OOS_CUTOFF=2025-03-24, training_months=24), 8-phase workflow with QR/QE role separation. See Section 2 below for the full Project-Mode reference.
 
