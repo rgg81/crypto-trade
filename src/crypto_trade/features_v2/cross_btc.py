@@ -38,6 +38,16 @@ BTC_CSV_PATH = Path("data/BTCUSDT/8h.csv")
 _BTC_CACHE: pd.DataFrame | None = None
 
 
+def clear_btc_cache() -> None:
+    """Invalidate the cached BTC features. See cross_v2sym.clear_peer_cache."""
+    global _BTC_CACHE
+    from crypto_trade import decision_log
+
+    if _BTC_CACHE is not None and decision_log.is_configured():
+        decision_log.log({"kind": "cache_clear", "cache": "btc"})
+    _BTC_CACHE = None
+
+
 def _load_btc_features() -> pd.DataFrame:
     """Load BTC 8h klines and precompute BTC-derived columns (cached)."""
     global _BTC_CACHE
@@ -59,6 +69,17 @@ def _load_btc_features() -> pd.DataFrame:
     df["btc_vol_14d"] = btc_vol
 
     _BTC_CACHE = df[["open_time", "btc_ret_3d", "btc_ret_7d", "btc_ret_14d", "btc_vol_14d"]].copy()
+
+    from crypto_trade import decision_log
+
+    if decision_log.is_configured():
+        decision_log.log(
+            {
+                "kind": "cache_load",
+                "cache": "btc",
+                "max_open_time": int(_BTC_CACHE["open_time"].max()) if len(_BTC_CACHE) else None,
+            }
+        )
     return _BTC_CACHE
 
 

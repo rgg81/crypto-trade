@@ -33,6 +33,25 @@ V2_PEER_SYMBOLS: tuple[str, ...] = ("DOGEUSDT", "SOLUSDT", "XRPUSDT", "NEARUSDT"
 _PEERS_CACHE: dict[str, pd.DataFrame] | None = None
 
 
+def clear_peer_cache() -> None:
+    """Invalidate the cached peer returns.
+
+    The cache is process-global and never auto-invalidates, so live engine
+    runs that re-call ``refresh_features`` after appending new klines must
+    clear it explicitly — otherwise cross-symbol features for the new
+    candle are computed against stale peer data, breaking live↔backtest
+    determinism. Backtests call this once at the start of a feature run
+    (zero perf cost). Within one ``run_features_v2`` batch the cache still
+    amortises across the 4 v2 symbols.
+    """
+    global _PEERS_CACHE
+    from crypto_trade import decision_log
+
+    if _PEERS_CACHE is not None and decision_log.is_configured():
+        decision_log.log({"kind": "cache_clear", "cache": "v2_peers"})
+    _PEERS_CACHE = None
+
+
 def _load_peer_returns() -> dict[str, pd.DataFrame]:
     """Load 7d and 14d log returns for each v2 peer symbol. Cached."""
     global _PEERS_CACHE
@@ -65,6 +84,14 @@ def _load_peer_returns() -> dict[str, pd.DataFrame]:
         )
 
     _PEERS_CACHE = out
+
+    from crypto_trade import decision_log
+
+    if decision_log.is_configured():
+        extents = {
+            sym: int(pdf["open_time"].max()) if len(pdf) else None for sym, pdf in out.items()
+        }
+        decision_log.log({"kind": "cache_load", "cache": "v2_peers", "max_open_time": extents})
     return out
 
 

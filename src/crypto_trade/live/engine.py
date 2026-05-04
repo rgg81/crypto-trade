@@ -246,35 +246,53 @@ class LiveEngine:
             db_path = config.db_path
         self._state = StateStore(db_path)
 
-        # Per-symbol quantityPrecision from /fapi/v1/exchangeInfo. Required so
-        # orders use the correct decimal step for each symbol — e.g. DOGE
-        # Futures requires integer quantities (precision=0); without this, a
-        # quantity like 924.044 returns 400 Bad Request.
+        # Per-symbol order constraints from /fapi/v1/exchangeInfo:
+        #   - quantityPrecision (decimal places) + LOT_SIZE.stepSize (increment)
+        #   - PRICE_FILTER.tickSize (price increment — what Binance actually
+        #     validates; pricePrecision alone is insufficient, e.g. NEAR has
+        #     pricePrecision=4 but tickSize=0.0010, so 1.3122 is rejected).
+        # Without these rounding rules, the API returns 400 Bad Request.
         qty_precision: dict[str, int] = {}
+        tick_size: dict[str, float] = {}
         if self._auth_client is not None:
             try:
                 info = self._auth_client.get_exchange_info()
                 for sym_info in info.get("symbols", []):
                     qty_precision[sym_info["symbol"]] = int(sym_info["quantityPrecision"])
+                    for f in sym_info.get("filters", []):
+                        if f.get("filterType") == "PRICE_FILTER":
+                            tick_size[sym_info["symbol"]] = float(f["tickSize"])
+                            break
                 print(
-                    f"[live] Loaded quantityPrecision for {len(qty_precision)} symbols "
-                    f"from /fapi/v1/exchangeInfo"
+                    f"[live] Loaded quantityPrecision + tickSize for "
+                    f"{len(qty_precision)} symbols from /fapi/v1/exchangeInfo"
                 )
             except Exception as exc:
                 print(f"[live] WARNING: could not load exchangeInfo: {exc}")
 
         self._order_mgr = OrderManager(
-            config, self._state, self._auth_client, quantity_precision=qty_precision
+            config,
+            self._state,
+            self._auth_client,
+            quantity_precision=qty_precision,
+            tick_size=tick_size,
         )
 
         # Trade-log filename mirrors the DB-path branch above.
         if config.testnet:
             log_name = "testnet_trades.csv"
+            decision_log_name = "testnet_decisions.jsonl"
         elif config.dry_run:
             log_name = "dry_run_trades.csv"
+            decision_log_name = "dry_run_decisions.jsonl"
         else:
             log_name = "live_trades.csv"
+            decision_log_name = "live_decisions.jsonl"
         self._logger = TradeLogger(config.data_dir / log_name, config.fee_pct, config.dry_run)
+
+        from crypto_trade import decision_log
+
+        decision_log.configure(config.data_dir / decision_log_name)
 
         self._runners = [ModelRunner(mc, config) for mc in config.models]
 
@@ -969,6 +987,16 @@ class LiveEngine:
         if not new_candles:
             return
 
+        from crypto_trade import decision_log
+
+        decision_log.log(
+            {
+                "kind": "tick_start",
+                "now_ms": now_ms,
+                "new_candles": {sym: c.open_time for sym, c in new_candles.items()},
+            }
+        )
+
         t_tick_start = time.monotonic()
         print(
             f"[live] New candle(s): {', '.join(new_candles.keys())} "
@@ -1069,18 +1097,53 @@ class LiveEngine:
                 f"get_signal={t_signal * 1000:.0f}ms"
             )
 
+            from crypto_trade import decision_log
+
             for symbol, sig in signals.items():
+                candle_ot_for_log = new_candles[symbol].open_time if symbol in new_candles else None
                 if sig.direction == 0 or sig.weight <= 0:
+                    decision_log.log(
+                        {
+                            "kind": "tick_decision",
+                            "model": runner.model_config.name,
+                            "symbol": symbol,
+                            "ot": candle_ot_for_log,
+                            "sig_direction": sig.direction,
+                            "sig_weight": sig.weight,
+                            "decision": "skipped:no_signal",
+                        }
+                    )
                     continue
 
                 open_trades = self._state.get_open_trades(model_name=runner.model_config.name)
                 open_syms = {t.symbol for t in open_trades}
                 if symbol in open_syms:
+                    decision_log.log(
+                        {
+                            "kind": "tick_decision",
+                            "model": runner.model_config.name,
+                            "symbol": symbol,
+                            "ot": candle_ot_for_log,
+                            "sig_direction": sig.direction,
+                            "decision": "skipped:position_open",
+                        }
+                    )
                     continue
 
                 cooldown_key = f"cooldown_{runner.model_config.name}_{symbol}"
                 cooldown_str = self._state.get_state(cooldown_key)
                 if cooldown_str and now_ms < int(cooldown_str):
+                    decision_log.log(
+                        {
+                            "kind": "tick_decision",
+                            "model": runner.model_config.name,
+                            "symbol": symbol,
+                            "ot": candle_ot_for_log,
+                            "sig_direction": sig.direction,
+                            "cooldown_until": int(cooldown_str),
+                            "decision": "skipped:cooldown",
+                        }
+                    )
                     continue
 
                 # FIX 2: entry price from master DataFrame (same source as backtest)
@@ -1088,6 +1151,17 @@ class LiveEngine:
                 # R1 consecutive-SL cool-down gate (iter 173) — keyed on
                 # candle open_time to match backtest's gate semantics.
                 if candle_ot < self._risk_cooldown_until.get(symbol, 0):
+                    decision_log.log(
+                        {
+                            "kind": "tick_decision",
+                            "model": runner.model_config.name,
+                            "symbol": symbol,
+                            "ot": candle_ot,
+                            "sig_direction": sig.direction,
+                            "risk_cooldown_until": int(self._risk_cooldown_until.get(symbol, 0)),
+                            "decision": "skipped:r1_cooldown",
+                        }
+                    )
                     continue
 
                 # iter-v2/019: BTC trend filter (v2 models only). Mirrors
@@ -1111,6 +1185,16 @@ class LiveEngine:
                             f"[live] BTC trend filter killed v2 signal: "
                             f"model={runner.model_config.name} symbol={symbol} "
                             f"direction={sig.direction} ot={candle_ot}"
+                        )
+                        decision_log.log(
+                            {
+                                "kind": "tick_decision",
+                                "model": runner.model_config.name,
+                                "symbol": symbol,
+                                "ot": candle_ot,
+                                "sig_direction": sig.direction,
+                                "decision": "skipped:btc_trend_filter",
+                            }
                         )
                         continue
 
@@ -1151,6 +1235,24 @@ class LiveEngine:
                     weight_factor=weight_factor,
                 )
                 self._logger.log_open(trade)
+                decision_log.log(
+                    {
+                        "kind": "tick_decision",
+                        "model": runner.model_config.name,
+                        "symbol": symbol,
+                        "ot": candle_ot,
+                        "ct": candle_close_time,
+                        "sig_direction": sig.direction,
+                        "sig_weight": sig.weight,
+                        "entry_price": float(entry_price),
+                        "vt_scale": float(vt_scale),
+                        "weight_factor": float(weight_factor),
+                        "stop_loss_price": float(trade.stop_loss_price),
+                        "take_profit_price": float(trade.take_profit_price),
+                        "entry_order_id": trade.entry_order_id,
+                        "decision": "opened",
+                    }
+                )
 
                 # Same-candle SL/TP simulation for paper trades only. Real
                 # numeric-ID trades from `--live` poll-loop have Binance SL/TP

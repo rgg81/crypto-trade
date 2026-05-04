@@ -596,6 +596,17 @@ class LightGbmStrategy:
         key = (symbol, open_time)
         feat_row = self._month_features.get(key)
         if feat_row is None:
+            from crypto_trade import decision_log
+
+            decision_log.log(
+                {
+                    "kind": "lgbm_signal",
+                    "symbol": symbol,
+                    "ot": open_time,
+                    "month": candle_month,
+                    "decision": "skipped:no_features",
+                }
+            )
             return NO_SIGNAL
 
         # Predict with all ensemble models and average probabilities
@@ -614,6 +625,8 @@ class LightGbmStrategy:
             # Binary: [P(short), P(long)]
             confidence = float(max(proba))
 
+        from crypto_trade import decision_log
+
         if confidence < self._confidence_threshold:
             if self.verbose > 0:
                 ts_str = _ms_to_datetime(open_time)
@@ -622,6 +635,20 @@ class LightGbmStrategy:
                     f"(conf={confidence:.2f} < "
                     f"{self._confidence_threshold:.2f})"
                 )
+            decision_log.log(
+                {
+                    "kind": "lgbm_signal",
+                    "symbol": symbol,
+                    "ot": open_time,
+                    "month": candle_month,
+                    "threshold": float(self._confidence_threshold),
+                    "ensemble_proba": proba,
+                    "per_seed_probas": [p for p in all_proba],
+                    "feat_hash": decision_log.hash_features(feat_row),
+                    "feat_values": {c: float(feat_row[i]) for i, c in enumerate(self._selected_cols)},
+                    "decision": "skipped:below_threshold",
+                }
+            )
             return NO_SIGNAL
 
         # R3 OOD detector: skip candles where features are too far from training
@@ -642,6 +669,20 @@ class LightGbmStrategy:
                             f"[predict] {ts_str} {symbol} → SKIP "
                             f"(OOD dist={dist:.2f} > {self._ood_cutoff:.2f})"
                         )
+                    decision_log.log(
+                        {
+                            "kind": "lgbm_signal",
+                            "symbol": symbol,
+                            "ot": open_time,
+                            "month": candle_month,
+                            "threshold": float(self._confidence_threshold),
+                            "ensemble_proba": proba,
+                            "ood_dist": dist,
+                            "ood_cutoff": float(self._ood_cutoff),
+                            "feat_hash": decision_log.hash_features(feat_row),
+                            "decision": "skipped:ood",
+                        }
+                    )
                     return NO_SIGNAL
 
         # Regime filter: skip low-volatility candles
@@ -655,6 +696,17 @@ class LightGbmStrategy:
                         f"(NATR={natr:.2f}% < "
                         f"{self.min_natr_threshold:.1f}%)"
                     )
+                decision_log.log(
+                    {
+                        "kind": "lgbm_signal",
+                        "symbol": symbol,
+                        "ot": open_time,
+                        "month": candle_month,
+                        "natr": float(natr),
+                        "min_natr": float(self.min_natr_threshold),
+                        "decision": "skipped:low_natr",
+                    }
+                )
                 return NO_SIGNAL
 
         if ternary:
@@ -687,6 +739,23 @@ class LightGbmStrategy:
                 f"[predict] {ts_str} {symbol} → {dir_label} (proba={confidence:.2f}{atr_str})"
             )
 
+        decision_log.log(
+            {
+                "kind": "lgbm_signal",
+                "symbol": symbol,
+                "ot": open_time,
+                "month": candle_month,
+                "threshold": float(self._confidence_threshold),
+                "ensemble_proba": proba,
+                "per_seed_probas": [p for p in all_proba],
+                "feat_hash": decision_log.hash_features(feat_row),
+                "feat_values": {c: float(feat_row[i]) for i, c in enumerate(self._selected_cols)},
+                "direction": direction,
+                "tp_pct": tp_pct,
+                "sl_pct": sl_pct,
+                "decision": "signal",
+            }
+        )
         return Signal(direction=direction, weight=100, tp_pct=tp_pct, sl_pct=sl_pct)
 
     @staticmethod

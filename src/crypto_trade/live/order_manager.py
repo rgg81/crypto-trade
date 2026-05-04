@@ -76,15 +76,29 @@ class OrderManager:
         state_store: StateStore,
         auth_client: AuthenticatedBinanceClient | None = None,
         quantity_precision: dict[str, int] | None = None,
+        tick_size: dict[str, float] | None = None,
     ) -> None:
         self._config = config
         self._state = state_store
         self._auth = auth_client
         self._qty_prec = quantity_precision or {}
+        self._tick_size = tick_size or {}
 
     def _round_qty(self, symbol: str, quantity: float) -> float:
         prec = self._qty_prec.get(symbol, 3)
         return round(quantity, prec)
+
+    def _round_price(self, symbol: str, price: float) -> float:
+        """Round to nearest tickSize (PRICE_FILTER) — Binance enforces this.
+
+        Falls back to 4-decimal rounding if tickSize wasn't loaded (paper mode).
+        Uses ``round(price/tick) * tick`` and re-rounds to 8 decimals to dodge
+        binary float artifacts (e.g. 0.1 + 0.2 ≠ 0.3).
+        """
+        tick = self._tick_size.get(symbol)
+        if tick is None or tick <= 0:
+            return round(price, 4)
+        return round(round(price / tick) * tick, 8)
 
     def open_trade(
         self,
@@ -127,11 +141,13 @@ class OrderManager:
             trade.entry_order_id = str(entry_resp.get("orderId", ""))
 
             close_side = _close_side(signal.direction)
-            sl_resp = self._auth.place_stop_market_order(symbol, close_side, sl_price, quantity)
+            sl_resp = self._auth.place_stop_market_order(
+                symbol, close_side, self._round_price(symbol, sl_price), quantity
+            )
             trade.sl_order_id = str(sl_resp.get("orderId", ""))
 
             tp_resp = self._auth.place_take_profit_market_order(
-                symbol, close_side, tp_price, quantity
+                symbol, close_side, self._round_price(symbol, tp_price), quantity
             )
             trade.tp_order_id = str(tp_resp.get("orderId", ""))
         else:

@@ -178,6 +178,11 @@ def run_features_v2(
     workers: int = 1,
 ) -> list[tuple[str, int, int]]:
     """Batch generate v2 features across *symbols* with optional multiprocessing."""
+    from crypto_trade.features_v2.cross_btc import clear_btc_cache
+    from crypto_trade.features_v2.cross_v2sym import clear_peer_cache
+
+    clear_peer_cache()
+    clear_btc_cache()
     results: list[tuple[str, int, int]] = []
     if workers <= 1:
         for symbol in tqdm(symbols, desc="v2 features", unit="sym"):
