@@ -1,0 +1,5 @@
+symbol,first_close,last_close,is_n_candles,is_expected_n_candles,is_coverage_pct,is_max_gap_hours,is_n_gaps_gt_1d,passes_listing_floor,v2_dead_path,is_ret_mean_8h,is_ret_std_8h,is_ret_skew,is_ret_kurt,is_sigma_annual_pct,is_mu_annual_pct,is_max_dd_pct,is_avg_daily_quote_vol_musdt
+BCHUSDT,2020-01-01,2025-03-23,5727,5727,100.0,8.0,0,True,False,0.7936,2.8657,-0.0455,9.696,94.83,8.69,-94.25,242.38
+MKRUSDT,2020-08-13,2025-03-23,5037,5052,99.7,80.0,2,True,False,0.7955,3.1589,0.6586,10.1011,104.53,8.71,-91.59,69.62
+LDOUSDT,2022-09-22,2025-03-23,2741,2741,100.0,8.0,0,True,False,-2.0539,3.4005,0.2746,4.0379,112.52,-22.49,-77.44,111.49
+TRXUSDT,2020-01-15,2025-03-23,5669,5684,99.74,80.0,2,True,False,4.6023,2.5451,0.6758,41.9226,84.22,50.39,-72.52,137.81
