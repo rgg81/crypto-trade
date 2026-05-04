@@ -246,7 +246,26 @@ class LiveEngine:
             db_path = config.db_path
         self._state = StateStore(db_path)
 
-        self._order_mgr = OrderManager(config, self._state, self._auth_client)
+        # Per-symbol quantityPrecision from /fapi/v1/exchangeInfo. Required so
+        # orders use the correct decimal step for each symbol — e.g. DOGE
+        # Futures requires integer quantities (precision=0); without this, a
+        # quantity like 924.044 returns 400 Bad Request.
+        qty_precision: dict[str, int] = {}
+        if self._auth_client is not None:
+            try:
+                info = self._auth_client.get_exchange_info()
+                for sym_info in info.get("symbols", []):
+                    qty_precision[sym_info["symbol"]] = int(sym_info["quantityPrecision"])
+                print(
+                    f"[live] Loaded quantityPrecision for {len(qty_precision)} symbols "
+                    f"from /fapi/v1/exchangeInfo"
+                )
+            except Exception as exc:
+                print(f"[live] WARNING: could not load exchangeInfo: {exc}")
+
+        self._order_mgr = OrderManager(
+            config, self._state, self._auth_client, quantity_precision=qty_precision
+        )
 
         # Trade-log filename mirrors the DB-path branch above.
         if config.testnet:
