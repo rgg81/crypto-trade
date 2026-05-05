@@ -1,0 +1,6 @@
+test_case,n_paths,n_strategies,buggy_pbo,corrected_pbo,expected_buggy,expected_corrected
+A_iter_v3_001_S1_undefined,45,1,0.0,,0.0 (degenerate),"NaN (S=1, PBO undefined; report descriptive stats)"
+A2_iter_v3_001_synth_S50,45,50,0.0,0.3108,0.0 (still degenerate — same input as A),"[0.40, 0.60] — chance baseline (synthetic noise erases edge)"
+B_synthetic_overfit,45,50,0.0,0.8566,0.0 (degenerate input) or near-1 if best happens to be tail,"[0.60, 1.00] — IS-best is OOS-worst by construction"
+C_synthetic_clean,45,50,0.0,0.0,0.0 (degenerate) — input has no IS/OOS structure,"[0.00, 0.40] — IS rank correlates with OOS rank"
+D_synthetic_random,45,50,0.0,0.663,0.0 (degenerate),"[0.40, 0.60] — chance baseline (no information)"

@@ -1,0 +1,26 @@
+symbol,feature,adf_stat,p_value,n_obs,stationary_at_0p05,note
+BCHUSDT,cusum_reset_count_200,-4.792043078499313,5.632447338266531e-05,5628,True,
+BCHUSDT,fracdiff_logclose_dstat,-4.61438146024775,0.00012151112148353132,5628,True,
+BCHUSDT,ret_skew_200,-4.076910312519314,0.0010572282030841718,5627,True,
+BCHUSDT,vwap_dev_50,-11.504599655091189,4.407132869381619e-21,5703,True,
+BCHUSDT,atr_pct_rank_200,-7.440531449336012,6.022501112031142e-11,5688,True,
+MKRUSDT,cusum_reset_count_200,-4.548118811572953,0.00016080595227135785,4938,True,
+MKRUSDT,fracdiff_logclose_dstat,-4.973333067538105,2.505422461802917e-05,4938,True,
+MKRUSDT,ret_skew_200,-5.281732801192611,5.973454774013026e-06,4937,True,
+MKRUSDT,vwap_dev_50,-9.403515228719781,6.09750451747409e-16,5013,True,
+MKRUSDT,atr_pct_rank_200,-6.495570827661512,1.1967012387822424e-08,4998,True,
+LDOUSDT,cusum_reset_count_200,-2.7196825171987347,0.07069382200441163,2642,False,
+LDOUSDT,fracdiff_logclose_dstat,-4.15675525986246,0.000779206527020628,2642,True,
+LDOUSDT,ret_skew_200,-3.7603742520278587,0.003339777236447566,2641,True,
+LDOUSDT,vwap_dev_50,-8.041561901924977,1.8411393307451397e-12,2717,True,
+LDOUSDT,atr_pct_rank_200,-5.004235142157839,2.1768794940124434e-05,2702,True,
+TRXUSDT,cusum_reset_count_200,-4.90328404452269,3.4364663803623896e-05,5570,True,
+TRXUSDT,fracdiff_logclose_dstat,-3.082377666514704,0.02788510613025593,5570,True,
+TRXUSDT,ret_skew_200,-4.69592322081624,8.56493105547818e-05,5569,True,
+TRXUSDT,vwap_dev_50,-10.241902240448892,4.725422821980286e-18,5645,True,
+TRXUSDT,atr_pct_rank_200,-8.483206550748266,1.3752770202838813e-13,5630,True,
+(avg),atr_pct_rank_200,,5.44520557876277e-06,0,True,iter-v3/001 ADF approach: average p-value across symbols. Critic Check 5 = FAIL because averaging masks per-symbol non-stationarity.
+(avg),cusum_reset_count_200,,0.017736329273467317,0,True,iter-v3/001 ADF approach: average p-value across symbols. Critic Check 5 = FAIL because averaging masks per-symbol non-stationarity.
+(avg),fracdiff_logclose_dstat,,0.00720271950084453,0,True,iter-v3/001 ADF approach: average p-value across symbols. Critic Check 5 = FAIL because averaging masks per-symbol non-stationarity.
+(avg),ret_skew_200,,0.0011221570512151332,0,True,iter-v3/001 ADF approach: average p-value across symbols. Critic Check 5 = FAIL because averaging masks per-symbol non-stationarity.
+(avg),vwap_dev_50,,4.604384527567105e-13,0,True,iter-v3/001 ADF approach: average p-value across symbols. Critic Check 5 = FAIL because averaging masks per-symbol non-stationarity.
