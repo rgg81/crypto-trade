@@ -73,7 +73,27 @@ from crypto_trade.strategies.ml.validation_v3 import (
 # ============================================================
 OOS_CUTOFF_DATE = "2025-03-24"  # IMMUTABLE
 TRAINING_MONTHS = 24  # IMMUTABLE
-ENSEMBLE_SEEDS: list[int] = [42, 123, 456, 789, 1001]  # IMMUTABLE
+
+# Inner ensemble size (number of seeds combined inside LightGbmStrategy per
+# outer seed). Pre-iter-v3/006: a hardcoded constant [42, 123, 456, 789, 1001]
+# was passed for ALL outer seeds, so --seeds N produced N IDENTICAL ensembles.
+# iter-v3/006 fix: each outer seed now derives a distinct 5-seed inner ensemble
+# via `_derive_ensemble_seeds(outer_seed)`. The legacy seed list is preserved
+# below for documentation only — it is no longer passed to LightGbmStrategy.
+ENSEMBLE_SIZE: int = 5
+LEGACY_ENSEMBLE_SEEDS: list[int] = [42, 123, 456, 789, 1001]  # iter-v3/001-005
+
+
+def _derive_ensemble_seeds(outer_seed: int, size: int = ENSEMBLE_SIZE) -> list[int]:
+    """Deterministically derive `size` inner-ensemble seeds from one outer seed.
+
+    Replaces the pre-iter-v3/006 hardcoded ENSEMBLE_SEEDS that was identical
+    across all outer seeds. With this fix, --seeds N produces N distinct
+    LightGBM ensembles (the prerequisite for any meaningful 10-seed Pareto
+    validation per project memory's seed-validation rule).
+    """
+    rng = np.random.default_rng(outer_seed)
+    return [int(s) for s in rng.integers(low=0, high=2**31 - 1, size=size)]
 
 ITERATION_LABEL = "v3-004"
 REPORTS_DIR = Path("reports-v3")
@@ -1127,11 +1147,14 @@ def _run_single_seed(
         # sub-fix 1d (iter-v3/003): pass OOF persist path so per-trial returns
         # are written to parquet during training (one shared file per run).
         oof_path = REPORTS_DIR / f"iteration_{ITERATION_LABEL}" / "trial_oof_returns.parquet"
+        # iter-v3/006 fix: derive a distinct inner ensemble from this outer seed.
+        # Pre-fix: ensemble_seeds=[42,123,456,789,1001] for ALL outer seeds.
+        ensemble_seeds_run = _derive_ensemble_seeds(seed)
         cfg, strategy = _build_v3_model(
             symbol=symbol,
             seed=seed,
             n_trials=n_trials,
-            ensemble_seeds=ENSEMBLE_SEEDS,
+            ensemble_seeds=ensemble_seeds_run,
             oof_persist_path=oof_path,
         )
         _verify_symbols(cfg.symbols)
@@ -1383,7 +1406,7 @@ def main() -> None:
     # -------------------------------------------------------
     is_ms_primary = _monthly_sharpe(is_trades)
     oos_ms_primary = _monthly_sharpe(oos_trades)
-    n_trials_total = args.n_trials * len(ENSEMBLE_SEEDS) * len(V3_MODELS) * args.seeds
+    n_trials_total = args.n_trials * ENSEMBLE_SIZE * len(V3_MODELS) * args.seeds
 
     is_wp = np.array([float(t.weighted_pnl) for t in is_trades])
     if len(is_wp) > 1 and is_wp.std() > 0:
@@ -1468,7 +1491,7 @@ def main() -> None:
             n_eff = max(1, len(sym_month_groups_fb))
         print(f"[n_eff] per_cell_pbo.csv absent — using surrogate n_eff={n_eff}")
 
-    min_trl_months = float(len(is_trades)) / max(1, len(ENSEMBLE_SEEDS) * len(V3_MODELS))
+    min_trl_months = float(len(is_trades)) / max(1, ENSEMBLE_SIZE * len(V3_MODELS))
 
     print(
         f"\n[metrics] IS monthly Sharpe={is_ms_primary:+.4f}, "
