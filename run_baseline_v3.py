@@ -188,15 +188,19 @@ def _verify_label_leakage_gap() -> None:
 
 
 def _verify_track_isolation() -> None:
-    """Grep-check: features_v3 must not import from features (v1) or features_v2."""
+    """Grep-check: features_v3 must not import from features (v1) or features_v2.
+
+    Uses '^from ...' to match only actual import statements at line start,
+    not occurrences in comments or docstrings.
+    """
     import subprocess as sp  # noqa: PLC0415
 
     for pattern in (
-        "from crypto_trade.features ",
-        "from crypto_trade.features_v2",
+        r"^from crypto_trade\.features ",
+        r"^from crypto_trade\.features_v2",
     ):
         out = sp.run(
-            ["grep", "-r", pattern, "src/crypto_trade/features_v3/"],
+            ["grep", "-rP", pattern, "src/crypto_trade/features_v3/"],
             capture_output=True,
             text=True,
         )
