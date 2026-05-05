@@ -1,0 +1,112 @@
+[
+  {
+    "seed": 42,
+    "mean_pbo": 0.016298,
+    "median_pbo": 0.0034,
+    "n_eff": 25,
+    "informative_cells": 173,
+    "monthly_sharpe": 1.0955,
+    "dsr": 0.0,
+    "psr": 1.0,
+    "wall_clock_s": 82.4
+  },
+  {
+    "seed": 17,
+    "mean_pbo": 0.016191,
+    "median_pbo": 0.0042,
+    "n_eff": 25,
+    "informative_cells": 173,
+    "monthly_sharpe": 1.0955,
+    "dsr": 0.0,
+    "psr": 1.0,
+    "wall_clock_s": 80.6
+  },
+  {
+    "seed": 100,
+    "mean_pbo": 0.016506,
+    "median_pbo": 0.0046,
+    "n_eff": 25,
+    "informative_cells": 173,
+    "monthly_sharpe": 1.0955,
+    "dsr": 0.0,
+    "psr": 1.0,
+    "wall_clock_s": 81.0
+  },
+  {
+    "seed": 999,
+    "mean_pbo": 0.016415,
+    "median_pbo": 0.004,
+    "n_eff": 25,
+    "informative_cells": 173,
+    "monthly_sharpe": 1.0955,
+    "dsr": 0.0,
+    "psr": 1.0,
+    "wall_clock_s": 82.1
+  },
+  {
+    "seed": 8675309,
+    "mean_pbo": 0.016273,
+    "median_pbo": 0.004,
+    "n_eff": 25,
+    "informative_cells": 173,
+    "monthly_sharpe": 1.0955,
+    "dsr": 0.0,
+    "psr": 1.0,
+    "wall_clock_s": 82.3
+  },
+  {
+    "seed": 0,
+    "mean_pbo": 0.01632,
+    "median_pbo": 0.004,
+    "n_eff": 25,
+    "informative_cells": 173,
+    "monthly_sharpe": 1.0955,
+    "dsr": 0.0,
+    "psr": 1.0,
+    "wall_clock_s": 83.1
+  },
+  {
+    "seed": 12345,
+    "mean_pbo": 0.016563,
+    "median_pbo": 0.0044,
+    "n_eff": 25,
+    "informative_cells": 173,
+    "monthly_sharpe": 1.0955,
+    "dsr": 0.0,
+    "psr": 1.0,
+    "wall_clock_s": 82.9
+  },
+  {
+    "seed": 67890,
+    "mean_pbo": 0.01641,
+    "median_pbo": 0.004,
+    "n_eff": 25,
+    "informative_cells": 173,
+    "monthly_sharpe": 1.0955,
+    "dsr": 0.0,
+    "psr": 1.0,
+    "wall_clock_s": 82.5
+  },
+  {
+    "seed": 314159,
+    "mean_pbo": 0.016326,
+    "median_pbo": 0.0038,
+    "n_eff": 25,
+    "informative_cells": 173,
+    "monthly_sharpe": 1.0955,
+    "dsr": 0.0,
+    "psr": 1.0,
+    "wall_clock_s": 82.2
+  },
+  {
+    "seed": 271828,
+    "mean_pbo": 0.016562,
+    "median_pbo": 0.0042,
+    "n_eff": 25,
+    "informative_cells": 173,
+    "monthly_sharpe": 1.0955,
+    "dsr": 0.0,
+    "psr": 1.0,
+    "wall_clock_s": 81.9
+  }
+]
