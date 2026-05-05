@@ -95,7 +95,8 @@ def _derive_ensemble_seeds(outer_seed: int, size: int = ENSEMBLE_SIZE) -> list[i
     rng = np.random.default_rng(outer_seed)
     return [int(s) for s in rng.integers(low=0, high=2**31 - 1, size=size)]
 
-ITERATION_LABEL = "v3-004"
+
+ITERATION_LABEL = "v3-006"
 REPORTS_DIR = Path("reports-v3")
 FEATURES_DIR = Path("data/features_v3")
 DATA_DIR = Path("data")
@@ -1135,12 +1136,21 @@ def _run_single_seed(
     n_trials: int,
     btc_times: np.ndarray,
     btc_closes: np.ndarray,
+    active_models: tuple[tuple[str, str], ...] | None = None,
 ) -> tuple[list, list, dict, dict, list]:
-    """Run all 4 v3 models for a single outer seed."""
+    """Run v3 models for a single outer seed.
+
+    Parameters
+    ----------
+    active_models:
+        Subset of V3_MODELS to run.  Defaults to V3_MODELS when None.
+        Pass a filtered tuple to scope the run (e.g. BCH-only for iter-v3/006).
+    """
+    models_to_run = active_models if active_models is not None else V3_MODELS
     all_trades: list = []
     model_pairs: list = []
 
-    for name, symbol in V3_MODELS:
+    for name, symbol in models_to_run:
         print("=" * 60)
         print(f"MODEL {name} — seed {seed}")
         print("=" * 60)
@@ -1214,22 +1224,52 @@ def main() -> None:
         action="store_true",
         help="Skip feature generation (use existing parquets)",
     )
+    parser.add_argument(
+        "--symbols",
+        type=str,
+        default=None,
+        help=(
+            "Comma-separated list of symbols to run (e.g. BCHUSDT).  "
+            "Filters V3_MODELS at runtime.  Default: all V3_MODELS.  "
+            "Used for iter-v3/006 BCH-only scoped validation."
+        ),
+    )
     args = parser.parse_args()
+
+    # Build active_models from --symbols filter (iter-v3/006 CLI flag).
+    # Default (None) keeps all V3_MODELS.
+    if args.symbols is not None:
+        requested = {s.strip().upper() for s in args.symbols.split(",")}
+        active_models: tuple[tuple[str, str], ...] = tuple(
+            (name, sym) for name, sym in V3_MODELS if sym in requested
+        )
+        if not active_models:
+            raise RuntimeError(
+                f"--symbols filter {requested!r} matched no V3_MODELS. "
+                f"Valid symbols: {[sym for _, sym in V3_MODELS]}"
+            )
+        unknown = requested - {sym for _, sym in V3_MODELS}
+        if unknown:
+            raise RuntimeError(f"--symbols contains symbols not in V3_MODELS: {sorted(unknown)}")
+    else:
+        active_models = V3_MODELS
 
     t_start = time.time()
     _verify_branch()
 
-    baseline_symbols = tuple(sym for _, sym in V3_MODELS)
+    baseline_symbols = tuple(sym for _, sym in active_models)
     _verify_symbols(baseline_symbols)
     _verify_data_freshness(baseline_symbols + ("BTCUSDT",))
     _verify_feature_columns()  # asserts len == 34
     _verify_label_leakage_gap()  # asserts REQUIRED_GAP == 88
     _verify_track_isolation()  # grep check
 
-    print(f"\nBASELINE v3 iter-{ITERATION_LABEL}: BCH+MKR+LDO+TRX (OOF persistence fix)")
+    active_sym_names = ", ".join(sym for _, sym in active_models)
+    print(f"\nBASELINE v3 iter-{ITERATION_LABEL}: {active_sym_names} (seed-plumbing fix)")
     print(f"Seeds: {args.seeds}  Optuna trials/model: {args.n_trials}")
+    print(f"Active models: {len(active_models)}/{len(V3_MODELS)} (--symbols={args.symbols!r})")
     print(f"CPCV: N={CPCV_N_SPLITS}, k={CPCV_N_TEST_SPLITS}, 45 paths on IS CANDLE SEQUENCE")
-    print(f"Gap: {REQUIRED_GAP} (= (timeout_candles+1) * n_symbols = (21+1)*4)")
+    print(f"Gap: {REQUIRED_GAP} (= (timeout_candles+1) * 4 full-universe symbols)")
     print("Pre-flight: branch OK, symbols OK, data fresh (<16h), feature-cols=34  PASS\n")
 
     # Feature generation
@@ -1286,7 +1326,7 @@ def main() -> None:
     for i, seed in enumerate(seeds):
         print(f"\n{'#' * 60}\n# SEED {seed} ({i + 1}/{len(seeds)})\n{'#' * 60}")
         unbraked, braked, btc_stats, hr_stats, model_pairs = _run_single_seed(
-            seed, args.n_trials, btc_times, btc_closes
+            seed, args.n_trials, btc_times, btc_closes, active_models=active_models
         )
 
         if not braked:
@@ -1406,7 +1446,7 @@ def main() -> None:
     # -------------------------------------------------------
     is_ms_primary = _monthly_sharpe(is_trades)
     oos_ms_primary = _monthly_sharpe(oos_trades)
-    n_trials_total = args.n_trials * ENSEMBLE_SIZE * len(V3_MODELS) * args.seeds
+    n_trials_total = args.n_trials * ENSEMBLE_SIZE * len(active_models) * args.seeds
 
     is_wp = np.array([float(t.weighted_pnl) for t in is_trades])
     if len(is_wp) > 1 and is_wp.std() > 0:
@@ -1491,7 +1531,7 @@ def main() -> None:
             n_eff = max(1, len(sym_month_groups_fb))
         print(f"[n_eff] per_cell_pbo.csv absent — using surrogate n_eff={n_eff}")
 
-    min_trl_months = float(len(is_trades)) / max(1, ENSEMBLE_SIZE * len(V3_MODELS))
+    min_trl_months = float(len(is_trades)) / max(1, ENSEMBLE_SIZE * len(active_models))
 
     print(
         f"\n[metrics] IS monthly Sharpe={is_ms_primary:+.4f}, "
