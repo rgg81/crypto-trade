@@ -95,9 +95,7 @@ def buggy_pbo_from_cpcv(path_metrics: np.ndarray | list[float]) -> float:
 # =============================================================================
 
 
-def corrected_pbo_from_path_matrix(
-    path_matrix: np.ndarray, max_iter: int = 5000
-) -> float:
+def corrected_pbo_from_path_matrix(path_matrix: np.ndarray, max_iter: int = 5000) -> float:
     """López de Prado-correct CSCV PBO.
 
     Input: path_matrix of shape (N, S) where N is the number of CPCV paths
@@ -369,12 +367,12 @@ def per_symbol_adf_demo(path_to_v2_features_dir: Path | None = None) -> pd.DataF
     features_dir = path_to_v2_features_dir or (REPO_ROOT / "data" / "features_v3")
 
     # Brief Section 0: IS window ends 2025-03-24
-    OOS_CUTOFF = pd.Timestamp("2025-03-24", tz="UTC")
-    SYMBOLS = ["BCHUSDT", "MKRUSDT", "LDOUSDT", "TRXUSDT"]
+    oos_cutoff = pd.Timestamp("2025-03-24", tz="UTC")
+    symbols = ["BCHUSDT", "MKRUSDT", "LDOUSDT", "TRXUSDT"]
 
     # Pick a SUBSET of features that are already known to potentially have
     # per-symbol non-stationarity issues (per Critic Check 5):
-    DEMO_FEATURES = [
+    demo_features = [
         "cusum_reset_count_200",
         "fracdiff_logclose_dstat",
         "ret_skew_200",
@@ -384,10 +382,10 @@ def per_symbol_adf_demo(path_to_v2_features_dir: Path | None = None) -> pd.DataF
 
     rows: list[dict] = []
 
-    for symbol in SYMBOLS:
+    for symbol in symbols:
         parquet_path = features_dir / f"{symbol}_8h_features.parquet"
         if not parquet_path.exists():
-            for feat in DEMO_FEATURES:
+            for feat in demo_features:
                 rows.append(
                     {
                         "symbol": symbol,
@@ -410,9 +408,9 @@ def per_symbol_adf_demo(path_to_v2_features_dir: Path | None = None) -> pd.DataF
         else:
             raise ValueError(f"No open_time column in {parquet_path}")
 
-        is_mask = ts < OOS_CUTOFF
+        is_mask = ts < oos_cutoff
 
-        for feat in DEMO_FEATURES:
+        for feat in demo_features:
             if feat not in df.columns:
                 rows.append(
                     {
@@ -832,9 +830,7 @@ def write_synthesis(
         "and reports the OOS metric on its test-folds. The path matrix is then "
         "a true (N_paths × N_optuna_trials) array.\n"
     )
-    lines.append(
-        "3. Remove DSR's negative-SR clamp; return the true P(true SR > 0).\n"
-    )
+    lines.append("3. Remove DSR's negative-SR clamp; return the true P(true SR > 0).\n")
     lines.append(
         "4. Make `n_eff_trials` operate on a true n_trials × T return matrix, "
         "not a row-repeated tile. The Optuna trial collection must persist each "
