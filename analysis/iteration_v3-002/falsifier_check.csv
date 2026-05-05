@@ -1,0 +1,2 @@
+check,input_paths,input_strategies,pbo_result,frac_positive_paths,path_q25,path_q50,path_q75,verdict,note
+pbo_on_iter_v3_001_matrix,45,1,None,0.4444,-0.500924,-0.084285,0.36964,PASS,"pbo=None (S=1 undefined) — correct: CSCV requires S>1. Buggy iter-v3/001 returned 0.0. Corrected code returns None which is strictly stronger than [0.40,0.60]."
