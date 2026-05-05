@@ -193,6 +193,7 @@ class PBOResult(NamedTuple):
 def pbo_from_cpcv(
     path_metric_matrix: np.ndarray | list,
     max_splits: int = 5000,
+    rng: np.random.Generator | None = None,
 ) -> PBOResult:
     """Probability of Backtest Overfitting — CSCV on a strategy × path matrix.
 
@@ -217,6 +218,17 @@ def pbo_from_cpcv(
     max_splits
         Maximum number of IS/OOS symmetric splits evaluated (C(N, N//2)
         can be exponential for large N; cap for tractability).
+    rng
+        Optional numpy random Generator for random sampling of IS/OOS splits
+        when C(N, N//2) > max_splits.  When provided, ``max_splits``
+        combinations are drawn uniformly at random (without replacement)
+        from all C(N, N//2) possible splits.  When None (default), the first
+        ``max_splits`` combinations from ``itertools.combinations`` are used
+        (fully deterministic — original behaviour).  Supplying different
+        Generator objects (via ``np.random.default_rng(seed)``) produces
+        different random samples, enabling cross-seed PBO variance estimation.
+        Has no effect when C(N, N//2) ≤ max_splits (all splits evaluated
+        regardless).
 
     Returns
     -------
@@ -287,13 +299,52 @@ def pbo_from_cpcv(
             note=note,
         )
 
-    # ---- CSCV: enumerate all symmetric IS/OOS splits of the N paths
+    # ---- CSCV: enumerate (or sample) symmetric IS/OOS splits of the N paths
     half = n_paths // 2
     n_omega_below_half = 0
     n_splits = 0
 
     all_path_indices = list(range(n_paths))
-    for is_path_indices in combinations(all_path_indices, half):
+
+    # Total number of possible symmetric IS/OOS splits
+    n_total_splits = math.comb(n_paths, half)
+    use_random_sampling = rng is not None and n_total_splits > max_splits
+
+    if use_random_sampling:
+        # Random sampling: draw max_splits indices into the combinations enumeration
+        # without replacement, then materialise only those combinations.
+        # Strategy: enumerate ALL combinations into a list only when
+        # n_total_splits is tractable (≤ 2 × max_splits); otherwise sample
+        # by index using the bijective combinadic algorithm.
+        # For the per-cell use-case (n_paths=45, half=22), n_total_splits ≈ 6.5e12
+        # which is too large to enumerate.  We instead use rejection sampling on
+        # the combinations generator to approximate random sampling with low
+        # collision probability: draw max_splits sorted subsets of {0..n_paths-1}
+        # of size ``half`` via rng.choice on individual positions.
+        #
+        # Simpler and correct implementation: pre-draw max_splits random IS masks
+        # using rng.choice on [n_paths], each of size half, deduplicated.
+        seen: set[tuple[int, ...]] = set()
+        split_list: list[tuple[int, ...]] = []
+        # Safety cap: avoid infinite loop if collisions are frequent
+        max_attempts = max_splits * 20
+        attempts = 0
+        while len(split_list) < max_splits and attempts < max_attempts:
+            chosen = tuple(sorted(rng.choice(n_paths, size=half, replace=False).tolist()))
+            if chosen not in seen:
+                seen.add(chosen)
+                split_list.append(chosen)
+            attempts += 1
+        iter_splits: list[tuple[int, ...]] = split_list
+    else:
+        # Deterministic: first max_splits from itertools.combinations (original behaviour)
+        iter_splits = []
+        for combo in combinations(all_path_indices, half):
+            iter_splits.append(combo)
+            if len(iter_splits) >= max_splits:
+                break
+
+    for is_path_indices in iter_splits:
         oos_path_indices = [i for i in all_path_indices if i not in set(is_path_indices)]
 
         is_mat = mat[list(is_path_indices), :]  # (half, S)
@@ -319,8 +370,6 @@ def pbo_from_cpcv(
             n_omega_below_half += 1
 
         n_splits += 1
-        if n_splits >= max_splits:
-            break
 
     pbo_val = float(n_omega_below_half) / float(n_splits) if n_splits > 0 else float("nan")
 
