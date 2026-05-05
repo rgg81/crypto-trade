@@ -6,6 +6,7 @@ Sharpe computed from actual trade returns (long_pnls / short_pnls).
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import lightgbm as lgb
@@ -101,6 +102,42 @@ def compute_sharpe_with_threshold(
     return sharpe
 
 
+def compute_per_candle_pnl(
+    y_proba: np.ndarray,
+    long_pnls: np.ndarray,
+    short_pnls: np.ndarray,
+    threshold: float,
+    ternary: bool = False,
+) -> np.ndarray:
+    """Compute per-candle PnL for validation set rows (pre-aggregation).
+
+    Returns a float64 array of length len(y_proba) where:
+    - rows below confidence threshold are assigned 0.0 (no trade)
+    - rows above threshold are assigned the realised long or short PnL
+
+    Used by _objective to build the per-trial OOF return buffer for
+    iter-v3/003 trial_oof_returns.parquet.
+    """
+    n = len(y_proba)
+    pnls_out = np.zeros(n, dtype=np.float64)
+    if ternary:
+        directional_proba = y_proba[:, [0, 2]]  # short, long columns
+        confidence = directional_proba.max(axis=1)
+        mask = confidence >= threshold
+        if mask.any():
+            dir_pred = directional_proba[mask].argmax(axis=1)
+            y_pred = np.where(dir_pred == 1, 1, -1)
+            pnls_out[mask] = np.where(y_pred == 1, long_pnls[mask], short_pnls[mask])
+    else:
+        confidence = y_proba.max(axis=1)
+        mask = confidence >= threshold
+        if mask.any():
+            pred_classes = y_proba[mask].argmax(axis=1)
+            y_pred = classes_to_labels(pred_classes)
+            pnls_out[mask] = np.where(y_pred == 1, long_pnls[mask], short_pnls[mask])
+    return pnls_out
+
+
 # ---------------------------------------------------------------------------
 # Label encoding: {-1, 1} <-> {0, 1} for binary, {-1, 0, 1} <-> {0, 1, 2} for ternary
 # ---------------------------------------------------------------------------
@@ -151,6 +188,9 @@ def _objective(
     open_times: np.ndarray | None = None,
     ternary: bool = False,
     cv_gap: int = 0,
+    train_month: str = "",
+    symbols_arr: np.ndarray | None = None,
+    oof_buffer: list[dict] | None = None,
 ) -> float:
     from sklearn.model_selection import TimeSeriesSplit
 
@@ -223,7 +263,6 @@ def _objective(
             last_train_ms = int(open_times[train_idx[-1]])
             first_val_ms = int(open_times[val_idx[0]])
             gap_ms = first_val_ms - last_train_ms
-            gap_candles = len(train_features) - len(train_idx) - len(val_idx)  # approximate
             last_t = datetime.datetime.fromtimestamp(
                 last_train_ms / 1000, tz=datetime.UTC
             ).strftime("%Y-%m-%d %H:%M")
@@ -256,6 +295,29 @@ def _objective(
         )
         sharpes.append(sharpe)
 
+        # Sub-fix 1a (iter-v3/003): capture per-candle OOF returns for trial buffer
+        if oof_buffer is not None:
+            per_candle = compute_per_candle_pnl(
+                y_proba,
+                long_pnls[val_idx],
+                short_pnls[val_idx],
+                confidence_threshold,
+                ternary=ternary,
+            )
+            for local_i, global_i in enumerate(val_idx):
+                candle_ts = int(open_times[global_i]) if open_times is not None else int(global_i)
+                sym = str(symbols_arr[global_i]) if symbols_arr is not None else ""
+                oof_buffer.append(
+                    {
+                        "trial_id": trial.number,
+                        "symbol": sym,
+                        "train_month": train_month,
+                        "fold_idx": fold_k,
+                        "candle_open_time_ms": candle_ts,
+                        "oof_return": float(per_candle[local_i]),
+                    }
+                )
+
     mean_sharpe = float(np.mean(sharpes))
 
     if verbose > 0:
@@ -282,6 +344,9 @@ def optimize_and_train(
     train_end_ms: int | None = None,
     ternary: bool = False,
     cv_gap: int = 0,
+    oof_persist_path: Path | None = None,
+    train_month: str = "",
+    symbols_arr: np.ndarray | None = None,
 ) -> tuple[lgb.LGBMClassifier, list[str], float]:
     """Run Optuna optimization and return (model, columns, confidence_threshold).
 
@@ -291,6 +356,10 @@ def optimize_and_train(
 
     cv_gap: number of rows to exclude between training and validation folds,
     preventing label leakage from overlapping triple-barrier labels.
+
+    oof_persist_path: if set, per-trial OOF candle returns are appended to
+    this parquet file after study.optimize() returns (sub-fix 1b, iter-v3/003).
+    train_month and symbols_arr are embedded in each row for multi-symbol grouping.
     """
     import optuna
 
@@ -302,6 +371,9 @@ def optimize_and_train(
 
     if sample_weights is None:
         sample_weights = np.ones(len(train_labels), dtype=np.float64)
+
+    # Sub-fix 1a: shared mutable buffer; _objective appends rows per (trial, fold)
+    oof_buffer: list[dict] | None = [] if oof_persist_path is not None else None
 
     study.optimize(
         lambda trial: _objective(
@@ -318,9 +390,35 @@ def optimize_and_train(
             open_times=open_times,
             ternary=ternary,
             cv_gap=cv_gap,
+            train_month=train_month,
+            symbols_arr=symbols_arr,
+            oof_buffer=oof_buffer,
         ),
         n_trials=n_trials,
     )
+
+    # Sub-fix 1b: flush per-trial OOF buffer to parquet (append if file exists)
+    if oof_persist_path is not None and oof_buffer:
+        import pandas as pd
+
+        oof_persist_path.parent.mkdir(parents=True, exist_ok=True)
+        new_df = pd.DataFrame(
+            oof_buffer,
+            columns=[
+                "trial_id",
+                "symbol",
+                "train_month",
+                "fold_idx",
+                "candle_open_time_ms",
+                "oof_return",
+            ],
+        )
+        if oof_persist_path.exists():
+            existing = pd.read_parquet(oof_persist_path)
+            combined = pd.concat([existing, new_df], ignore_index=True)
+            combined.to_parquet(oof_persist_path, index=False)
+        else:
+            new_df.to_parquet(oof_persist_path, index=False)
 
     best = study.best_params
     best_threshold = best.get("confidence_threshold", 0.50)

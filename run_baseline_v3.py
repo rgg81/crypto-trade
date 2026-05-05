@@ -1,25 +1,26 @@
-"""Baseline v3 runner — iter-v3/002 methodology-repair iteration.
+"""Baseline v3 runner — iter-v3/003 per-trial OOF persistence.
 
 Inherits the same universe {BCH, MKR, LDO, TRX} and model architecture as
-iter-v3/001 but replaces the broken validation stack:
+iter-v3/002.  The single architectural change is per-Optuna-trial OOF return
+persistence (iter-v3/003 brief Section 3.5):
 
-  1. PBO (CSCV): 2-D matrix (N_paths × S_strategies) via pbo_from_cpcv.
-     If runner produces only S=1, PBOResult.pbo is None — reported as NaN in
-     comparison.csv with frac_positive_paths as the descriptive fallback.
-  2. CPCV scope: per-symbol IS-window candle/feature sequence (not IS trades).
-     N=10 groups, k=2 → 45 paths.  For each path: train-period returns are
-     the Sharpe of that subset's weighted PnL from a mock walk-forward.
-  3. Embargo-gap runtime assertion: gap == REQUIRED_GAP == 88 asserted at
-     runner startup and inside combinatorial_purged_cv.
-  4. ADF per-(symbol, feature, retraining month): ~3672 rows for 4 syms ×
-     34 feats × 27 months.  Row-count asserted at run completion.
-  5. DSR: uses deflated_sharpe_ratio_v3 (no negative-SR clamp).
-  6. n_eff_trials: built from true per-symbol per-trial OOF return matrix.
+  1. optimization.py:_objective captures per-(trial, fold) OOF candle PnL
+     into a shared mutable buffer (sub-fix 1a).
+  2. optimization.py:optimize_and_train flushes buffer to parquet after
+     study.optimize() (sub-fix 1b).
+  3. lgbm.py:_train_for_month passes oof_persist_path + train_month +
+     symbols_arr to optimize_and_train (sub-fix 1c).
+  4. _build_v3_model passes oof_persist_path to LightGbmStrategy (sub-fix 1d).
+  5. _compute_cpcv_paths reads trial_oof_returns.parquet and builds
+     (45, n_trials) matrix — PBO is now a real number (sub-fix 2).
+  6. n_eff computation reads the same parquet for a true (n_trials × T)
+     PCA matrix instead of the per-(sym, month) surrogate (sub-fix 3).
 
 Reports written to:
-  reports-v3/iteration_v3-002/
+  reports-v3/iteration_v3-003/
     in_sample/  out_of_sample/  comparison.csv  pareto_front.csv
     cpcv_paths.csv  adf_test.csv  ic_matrix.csv  dsr.json  run.log
+    trial_oof_returns.parquet  (NEW — iter-v3/003 artifact)
 
 Usage:
     uv run python run_baseline_v3.py
@@ -77,7 +78,7 @@ OOS_CUTOFF_DATE = "2025-03-24"  # IMMUTABLE
 TRAINING_MONTHS = 24  # IMMUTABLE
 ENSEMBLE_SEEDS: list[int] = [42, 123, 456, 789, 1001]  # IMMUTABLE
 
-ITERATION_LABEL = "v3-002"
+ITERATION_LABEL = "v3-003"
 REPORTS_DIR = Path("reports-v3")
 FEATURES_DIR = Path("data/features_v3")
 DATA_DIR = Path("data")
@@ -448,26 +449,16 @@ def _compute_ic_matrix(symbols: list[str]) -> pd.DataFrame:
 def _compute_cpcv_paths(
     symbols: list[str],
     feature_parquets: dict[str, pd.DataFrame],
+    oof_parquet_path: Path | None = None,
 ) -> tuple[pd.DataFrame, np.ndarray]:
     """Compute CPCV statistics from IS candle/feature sequences.
 
-    CORRECTED (iter-v3/002): operates on the IS-window candle sequence, NOT
-    the IS trade sequence.  Each CPCV path partitions the candle/feature
-    timeline into N=10 groups and holds k=2 groups out.
+    UPDATED (iter-v3/003): when oof_parquet_path is provided and exists, reads
+    per-Optuna-trial OOF returns to build the (N_paths, S_strategies) matrix
+    where S = n_unique_trials (sub-fix 2).  PBOResult.pbo is then a real number
+    in [0, 1].
 
-    For each path, the 'model metric' is the weighted-PnL Sharpe of candles
-    in the test groups, computed from the walk-forward model's per-candle
-    weighted_pnl column if available in the parquet, or from a return
-    proxy (feature-weighted sign × absolute return).
-
-    Since the runner does not persist per-Optuna-trial OOF return sequences
-    in this iteration, the strategy axis S=1 (one strategy per path).
-    PBOResult.pbo will be None; the descriptive fallback (frac_positive_paths
-    + path Sharpe quartiles) is reported instead.
-
-    Per brief Section 3.5#1, when S=1: PBO=None is ACCEPTABLE and STRICTER
-    than a number in [0.4, 0.6] because it correctly identifies the input
-    as inadequate for CSCV.
+    Falls back to S=1 (return proxy, PBO=None) if parquet is absent or empty.
 
     Parameters
     ----------
@@ -475,12 +466,14 @@ def _compute_cpcv_paths(
         v3 symbols (BCH, MKR, LDO, TRX).
     feature_parquets
         Dict mapping symbol -> IS-window feature DataFrame.
+    oof_parquet_path
+        Path to trial_oof_returns.parquet written during training (iter-v3/003).
 
     Returns
     -------
     (cpcv_df, path_metric_matrix)
         cpcv_df: DataFrame with path_id, sharpe, max_dd, n_candles.
-        path_metric_matrix: np.ndarray of shape (n_paths, 1) — the S=1 case.
+        path_metric_matrix: np.ndarray of shape (n_paths, S_strategies).
     """
     # Combine IS-window candle sequences across symbols, preserving time order
     all_frames = []
@@ -491,7 +484,7 @@ def _compute_cpcv_paths(
         df_is = df[df["open_time"] < OOS_CUTOFF_MS].copy()
         if len(df_is) < 10:
             continue
-        # Use close-to-close log return as the per-candle return proxy
+        # Use close-to-close log return as per-candle return proxy (for S=1 fallback)
         if "close" in df_is.columns:
             df_is = df_is.copy()
             df_is["_ret"] = np.log(df_is["close"] / df_is["close"].shift(1)).fillna(0.0)
@@ -514,10 +507,11 @@ def _compute_cpcv_paths(
         print(f"  [CPCV] Insufficient candles ({n_candles}) for CPCV — skipping")
         return pd.DataFrame(columns=["path_id", "sharpe", "max_dd", "n_candles"]), np.zeros((0, 1))
 
-    returns = combined["_ret"].to_numpy()
+    # Build candle timeline index for OOF lookup
+    candle_timeline = combined["open_time"].to_numpy()
+    returns_proxy = combined["_ret"].to_numpy()
 
     # Assertion: gap must equal REQUIRED_GAP (brief Section 3.5#3)
-    # Use expected_gap to enforce — no silent rescaling
     splits = combinatorial_purged_cv(
         n_samples=n_candles,
         n_splits=CPCV_N_SPLITS,
@@ -527,27 +521,89 @@ def _compute_cpcv_paths(
         expected_gap=REQUIRED_GAP,  # assertion enforced
     )
 
+    # ----------------------------------------------------------------
+    # Sub-fix 2 (iter-v3/003): load per-trial OOF parquet if available
+    # Build (n_paths, n_trials) matrix — shape needed by pbo_from_cpcv
+    # ----------------------------------------------------------------
+    oof_df: pd.DataFrame | None = None
+    if oof_parquet_path is not None and oof_parquet_path.exists():
+        oof_df = pd.read_parquet(oof_parquet_path)
+        # Filter to IS window only (exclude OOS rows if any leaked)
+        oof_df = oof_df[oof_df["candle_open_time_ms"] < OOS_CUTOFF_MS]
+        if oof_df.empty or oof_df["trial_id"].nunique() <= 1:
+            print(
+                "  [CPCV] trial_oof_returns.parquet is empty or S=1 — "
+                "falling back to return proxy (PBO will be None)"
+            )
+            oof_df = None
+        else:
+            n_unique_trials = oof_df["trial_id"].nunique()
+            print(
+                f"  [CPCV] trial_oof_returns.parquet loaded: "
+                f"{len(oof_df)} rows, {n_unique_trials} unique trials"
+            )
+
+    use_oof = oof_df is not None
+
+    if use_oof:
+        # Group OOF returns by (trial_id, candle_open_time_ms) — sum across folds
+        trial_candle = oof_df.groupby(["trial_id", "candle_open_time_ms"])["oof_return"].sum()
+        trial_ids = sorted(oof_df["trial_id"].unique())
+        n_trials_axis = len(trial_ids)
+
     rows = []
-    path_sharpes = []
+    path_metric_cols: list[np.ndarray] = []
+
     for path_id, (_, test_idx) in enumerate(splits):
-        path_returns = returns[test_idx]
-        if len(path_returns) < 2:
+        test_candles = candle_timeline[test_idx]
+        n_test = len(test_candles)
+
+        if n_test < 2:
             rows.append(
                 {
                     "path_id": path_id,
                     "sharpe": float("nan"),
                     "max_dd": float("nan"),
-                    "n_candles": len(path_returns),
+                    "n_candles": n_test,
                 }
             )
-            path_sharpes.append(float("nan"))
+            if use_oof:
+                path_metric_cols.append(np.full(n_trials_axis, float("nan")))
+            else:
+                path_metric_cols.append(np.array([float("nan")]))
             continue
 
-        mu = float(np.nanmean(path_returns))
-        sigma = float(np.nanstd(path_returns, ddof=1))
-        # Scale to approximate monthly Sharpe: ~252 trading days / 3 candles per day at 8h
-        path_sharpe = mu / sigma * np.sqrt(len(path_returns)) if sigma > 0 else 0.0
-        cum = np.nancumsum(path_returns)
+        if use_oof:
+            # Build per-trial Sharpe vector for this path
+            trial_sharpes = np.full(n_trials_axis, float("nan"))
+            for t_idx, tid in enumerate(trial_ids):
+                if tid not in trial_candle:
+                    continue
+                trial_series = trial_candle[tid]
+                path_rets = np.array(
+                    [float(trial_series.get(ct, 0.0)) for ct in test_candles],
+                    dtype=np.float64,
+                )
+                mu_t = float(np.nanmean(path_rets))
+                sigma_t = float(np.nanstd(path_rets, ddof=1))
+                trial_sharpes[t_idx] = (
+                    mu_t / sigma_t * np.sqrt(len(path_rets)) if sigma_t > 0 else 0.0
+                )
+            path_metric_cols.append(trial_sharpes)
+
+            # Summarise path using return-proxy (mean over all trial returns)
+            proxy_rets = returns_proxy[test_idx]
+        else:
+            proxy_rets = returns_proxy[test_idx]
+            s1_sigma = float(np.nanstd(proxy_rets, ddof=1))
+            s1_mu = float(np.nanmean(proxy_rets))
+            s1_sharpe = s1_mu / s1_sigma * np.sqrt(n_test) if s1_sigma > 0 else 0.0
+            path_metric_cols.append(np.array([s1_sharpe]))
+
+        mu = float(np.nanmean(proxy_rets))
+        sigma = float(np.nanstd(proxy_rets, ddof=1))
+        path_sharpe = mu / sigma * np.sqrt(n_test) if sigma > 0 else 0.0
+        cum = np.nancumsum(proxy_rets)
         running_max = np.maximum.accumulate(cum)
         dd = running_max - cum
         max_dd = float(dd.max()) if len(dd) > 0 else 0.0
@@ -556,15 +612,27 @@ def _compute_cpcv_paths(
             {
                 "path_id": path_id,
                 "sharpe": round(path_sharpe, 6),
-                "max_dd": round(max_dd * 100, 4),  # convert to % for comparability
-                "n_candles": len(path_returns),
+                "max_dd": round(max_dd * 100, 4),
+                "n_candles": n_test,
             }
         )
-        path_sharpes.append(path_sharpe)
 
     cpcv_df = pd.DataFrame(rows)
-    # Shape: (n_paths, 1) — S=1, so pbo_from_cpcv will return PBOResult.pbo=None
-    path_metric_matrix = np.array(path_sharpes, dtype=float).reshape(-1, 1)
+
+    if path_metric_cols:
+        # Stack: rows = paths, cols = strategies (trials or S=1)
+        path_metric_matrix = np.stack(path_metric_cols, axis=0)
+    else:
+        path_metric_matrix = np.zeros((0, 1))
+
+    if use_oof:
+        print(
+            f"  [CPCV] path_metric_matrix shape: {path_metric_matrix.shape} "
+            f"(S={path_metric_matrix.shape[1]} strategies from OOF parquet)"
+        )
+    else:
+        print(f"  [CPCV] path_metric_matrix shape: {path_metric_matrix.shape} (S=1 fallback)")
+
     return cpcv_df, path_metric_matrix
 
 
@@ -578,10 +646,13 @@ def _build_v3_model(
     seed: int,
     n_trials: int,
     ensemble_seeds: list[int],
+    oof_persist_path: Path | None = None,
 ) -> tuple[BacktestConfig, RiskV3Wrapper]:
     """Build v3 M1 LightGBM + RiskV3Wrapper for a single symbol.
 
     v2 5-gate config + BTC trend filter. NO R1/R2/R3 (brief Section 3.4).
+    oof_persist_path: if set, per-trial OOF returns written to parquet
+    (sub-fix 1d, iter-v3/003).
     """
     cfg = BacktestConfig(
         symbols=(symbol,),
@@ -612,6 +683,7 @@ def _build_v3_model(
         ensemble_seeds=list(ensemble_seeds),
         feature_columns=list(V3_FEATURE_COLUMNS),  # EXPLICIT — never None
         ood_enabled=False,  # OOD via RiskV3Wrapper z-score gate
+        oof_persist_path=oof_persist_path,  # sub-fix 1d (iter-v3/003)
     )
     risk_cfg = RiskV2Config(
         zscore_threshold=2.5,
@@ -906,11 +978,15 @@ def _run_single_seed(
         print("=" * 60)
         print(f"MODEL {name} — seed {seed}")
         print("=" * 60)
+        # sub-fix 1d (iter-v3/003): pass OOF persist path so per-trial returns
+        # are written to parquet during training (one shared file per run).
+        oof_path = REPORTS_DIR / f"iteration_{ITERATION_LABEL}" / "trial_oof_returns.parquet"
         cfg, strategy = _build_v3_model(
             symbol=symbol,
             seed=seed,
             n_trials=n_trials,
             ensemble_seeds=ENSEMBLE_SEEDS,
+            oof_persist_path=oof_path,
         )
         _verify_symbols(cfg.symbols)
         t0 = time.time()
@@ -954,7 +1030,7 @@ def _run_single_seed(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="v3 baseline runner — iter-v3/002")
+    parser = argparse.ArgumentParser(description="v3 baseline runner — iter-v3/003")
     parser.add_argument(
         "--seeds",
         type=int,
@@ -981,7 +1057,7 @@ def main() -> None:
     _verify_label_leakage_gap()  # asserts REQUIRED_GAP == 88
     _verify_track_isolation()  # grep check
 
-    print(f"\nBASELINE v3 iter-{ITERATION_LABEL}: BCH+MKR+LDO+TRX (methodology repair)")
+    print(f"\nBASELINE v3 iter-{ITERATION_LABEL}: BCH+MKR+LDO+TRX (OOF persistence fix)")
     print(f"Seeds: {args.seeds}  Optuna trials/model: {args.n_trials}")
     print(f"CPCV: N={CPCV_N_SPLITS}, k={CPCV_N_TEST_SPLITS}, 45 paths on IS CANDLE SEQUENCE")
     print(f"Gap: {REQUIRED_GAP} (= (timeout_candles+1) * n_symbols = (21+1)*4)")
@@ -1109,7 +1185,10 @@ def main() -> None:
     # CPCV on IS candle/feature sequence (brief Section 3.5#2)
     # -------------------------------------------------------
     print("\n[CPCV] Computing 45-path statistics from IS CANDLE SEQUENCE...")
-    cpcv_df, path_metric_matrix = _compute_cpcv_paths(list(baseline_symbols), feature_parquets)
+    oof_parquet = REPORTS_DIR / f"iteration_{ITERATION_LABEL}" / "trial_oof_returns.parquet"
+    cpcv_df, path_metric_matrix = _compute_cpcv_paths(
+        list(baseline_symbols), feature_parquets, oof_parquet_path=oof_parquet
+    )
     print(f"  CPCV: {len(cpcv_df)} paths, matrix shape={path_metric_matrix.shape}")
 
     # PBO via CSCV on (N_paths × S_strategies) matrix — S=1 → pbo_result.pbo=None
@@ -1176,29 +1255,72 @@ def main() -> None:
     else:
         psr_val = 0.0
 
-    # N_eff: per-symbol per-month IS return sequences as the trial-return matrix
-    # Each calendar month × symbol contributes one "trial" of returns.
-    # This avoids the iter-v3/001 row-repeat bug (brief Section 3.5#5).
-    if len(is_wp) > 1:
-        # Build matrix: rows = per-(symbol, month) groups, cols = trades in that group
-        sym_month_groups: dict[tuple[str, str], list[float]] = {}
-        for t in is_trades:
-            sym = t.symbol
-            month = pd.Timestamp(t.open_time, unit="ms").strftime("%Y-%m")
-            key = (sym, month)
-            sym_month_groups.setdefault(key, []).append(float(t.weighted_pnl))
+    # N_eff: sub-fix 3 (iter-v3/003) — build true (n_trials × T) matrix from
+    # the per-trial OOF parquet produced during training.
+    # This replaces the iter-v3/002 per-(symbol, month) surrogate with actual
+    # independent per-Optuna-trial return vectors.
+    oof_parquet_for_neff = (
+        REPORTS_DIR / f"iteration_{ITERATION_LABEL}" / "trial_oof_returns.parquet"
+    )
+    n_eff = 1  # safe default
 
-        if len(sym_month_groups) >= 2:
-            # Pad each group to equal length for matrix construction
-            max_len = max(len(v) for v in sym_month_groups.values())
-            trial_mat = np.array(
-                [v + [0.0] * (max_len - len(v)) for v in sym_month_groups.values()]
+    if oof_parquet_for_neff.exists():
+        try:
+            trial_oof = pd.read_parquet(oof_parquet_for_neff)
+            # IS-only: exclude OOS rows
+            trial_oof = trial_oof[trial_oof["candle_open_time_ms"] < OOS_CUTOFF_MS]
+            if trial_oof["trial_id"].nunique() >= 2:
+                # pivot: rows = trials, cols = candle timestamps, values = oof_return
+                trial_mat_df = trial_oof.pivot_table(
+                    index="trial_id",
+                    columns="candle_open_time_ms",
+                    values="oof_return",
+                    aggfunc="sum",
+                    fill_value=0.0,
+                )
+                trial_mat = trial_mat_df.to_numpy()
+                n_eff = n_effective_trials(trial_mat)
+                print(
+                    f"[n_eff] Built ({trial_mat.shape[0]} trials × {trial_mat.shape[1]} candles) "
+                    f"matrix from OOF parquet → n_eff={n_eff}"
+                )
+            else:
+                # Fallback: parquet exists but not enough trials — use surrogate
+                sym_month_groups: dict[tuple[str, str], list[float]] = {}
+                for t in is_trades:
+                    sym_m = t.symbol
+                    month_m = pd.Timestamp(t.open_time, unit="ms").strftime("%Y-%m")
+                    key_m = (sym_m, month_m)
+                    sym_month_groups.setdefault(key_m, []).append(float(t.weighted_pnl))
+                if len(sym_month_groups) >= 2:
+                    max_len = max(len(v) for v in sym_month_groups.values())
+                    trial_mat_fb = np.array(
+                        [v + [0.0] * (max_len - len(v)) for v in sym_month_groups.values()]
+                    )
+                    n_eff = n_effective_trials(trial_mat_fb)
+                else:
+                    n_eff = max(1, len(sym_month_groups))
+                print(f"[n_eff] OOF parquet has <2 unique trials — using surrogate n_eff={n_eff}")
+        except Exception as e:
+            print(f"[n_eff] Could not read OOF parquet: {e} — using n_eff=1")
+            n_eff = 1
+    elif len(is_wp) > 1:
+        # Parquet not available — use iter-v3/002 surrogate (sym_month groups)
+        sym_month_groups_fb: dict[tuple[str, str], list[float]] = {}
+        for t in is_trades:
+            sym_f = t.symbol
+            month_f = pd.Timestamp(t.open_time, unit="ms").strftime("%Y-%m")
+            key_f = (sym_f, month_f)
+            sym_month_groups_fb.setdefault(key_f, []).append(float(t.weighted_pnl))
+        if len(sym_month_groups_fb) >= 2:
+            max_len_fb = max(len(v) for v in sym_month_groups_fb.values())
+            trial_mat_fallback = np.array(
+                [v + [0.0] * (max_len_fb - len(v)) for v in sym_month_groups_fb.values()]
             )
-            n_eff = n_effective_trials(trial_mat)
+            n_eff = n_effective_trials(trial_mat_fallback)
         else:
-            n_eff = max(1, len(sym_month_groups))
-    else:
-        n_eff = 1
+            n_eff = max(1, len(sym_month_groups_fb))
+        print(f"[n_eff] OOF parquet absent — using surrogate n_eff={n_eff}")
 
     min_trl_months = float(len(is_trades)) / max(1, len(ENSEMBLE_SEEDS) * len(V3_MODELS))
 

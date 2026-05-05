@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -137,6 +138,7 @@ class LightGbmStrategy:
         ood_enabled: bool = False,
         ood_features: list[str] | None = None,
         ood_cutoff_pct: float = 0.70,
+        oof_persist_path: Path | None = None,
     ) -> None:
         if not feature_columns:
             raise ValueError(
@@ -173,10 +175,10 @@ class LightGbmStrategy:
         self.ood_enabled = ood_enabled
         self.ood_features = list(ood_features) if ood_features else None
         self.ood_cutoff_pct = ood_cutoff_pct
+        # iter-v3/003: path for per-trial OOF return persistence (sub-fix 1c)
+        self._oof_persist_path: Path | None = oof_persist_path
         if self.ood_enabled and not self.ood_features:
-            raise ValueError(
-                "ood_features must be specified when ood_enabled=True"
-            )
+            raise ValueError("ood_features must be specified when ood_enabled=True")
         self._ood_mean: np.ndarray | None = None
         self._ood_inv_cov: np.ndarray | None = None
         self._ood_cutoff: float | None = None
@@ -444,6 +446,10 @@ class LightGbmStrategy:
         self._models = []
         self._confidence_thresholds = []
 
+        # sub-fix 1c (iter-v3/003): per-ensemble-seed OOF persistence context
+        # symbols_arr aligns with feat_train rows (after keep_mask filtering)
+        train_symbols_arr = self._sym_arr[train_indices][keep_mask]
+
         for i, seed in enumerate(seeds):
             if self.verbose > 0 and len(seeds) > 1:
                 print(f"  [ensemble {i + 1}/{len(seeds)}] seed={seed}")
@@ -463,6 +469,9 @@ class LightGbmStrategy:
                     train_end_ms=split.train_end_ms,
                     ternary=ternary,
                     cv_gap=cv_gap,
+                    oof_persist_path=self._oof_persist_path,
+                    train_month=month_str,
+                    symbols_arr=train_symbols_arr,
                 )
                 self._models.append(model)
                 self._confidence_thresholds.append(confidence_threshold)
@@ -495,9 +504,7 @@ class LightGbmStrategy:
         self._ood_cutoff = None
         self._month_ood_features = {}
         if self.ood_enabled and self.ood_features:
-            ood_cols_in_train = [
-                c for c in self.ood_features if c in train_feat_df.columns
-            ]
+            ood_cols_in_train = [c for c in self.ood_features if c in train_feat_df.columns]
             if len(ood_cols_in_train) < len(self.ood_features):
                 missing = set(self.ood_features) - set(ood_cols_in_train)
                 if self.verbose > 0:
@@ -507,9 +514,7 @@ class LightGbmStrategy:
                     print("  OOD: insufficient training samples — disabling for this month")
             else:
                 self._ood_feature_cols = ood_cols_in_train
-                train_ood_raw = train_feat_df[ood_cols_in_train].to_numpy(
-                    dtype=np.float64
-                )
+                train_ood_raw = train_feat_df[ood_cols_in_train].to_numpy(dtype=np.float64)
                 # Drop rows with NaN/inf before computing mean/cov
                 finite_mask = np.isfinite(train_ood_raw).all(axis=1)
                 train_ood = train_ood_raw[finite_mask]
@@ -528,12 +533,8 @@ class LightGbmStrategy:
                     try:
                         self._ood_inv_cov = np.linalg.pinv(cov + reg)
                         centered = train_ood - self._ood_mean
-                        distances = np.einsum(
-                            "ij,jk,ik->i", centered, self._ood_inv_cov, centered
-                        )
-                        self._ood_cutoff = float(
-                            np.quantile(distances, self.ood_cutoff_pct)
-                        )
+                        distances = np.einsum("ij,jk,ik->i", centered, self._ood_inv_cov, centered)
+                        self._ood_cutoff = float(np.quantile(distances, self.ood_cutoff_pct))
                         if self.verbose > 0:
                             print(
                                 f"  OOD: {len(ood_cols_in_train)} features, "
