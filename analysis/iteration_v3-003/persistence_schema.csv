@@ -1,0 +1,7 @@
+column,dtype,semantics,example,load_bearing_for
+trial_id,int32,(symbol_idx × n_trials × month_idx) + trial_within_month,"0..50 within a month, then unique offset across months",indexes the strategy axis of the path matrix (S = #unique trial_ids)
+symbol,string (categorical),BCHUSDT | MKRUSDT | LDOUSDT | TRXUSDT,BCHUSDT,aggregation across symbols when building the candle timeline
+train_month,string YYYY-MM,walk-forward month the trial belongs to,2024-03,ensures cross-month trials are not co-mingled in PBO
+fold_idx,int8,0..cv_splits-1 — index into TimeSeriesSplit folds,0..4 for cv_splits=5,lets the runner verify per-fold OOF coverage is complete
+candle_open_time_ms,int64,open_time of the OOF candle (the unit IS-walked through),1709251200000 (2024-03-01 00:00 UTC),joins to CPCV path test_idx via candle position
+oof_return,float64,"trial's predicted-side × forward-realized return at this candle, after fees",+0.0123 or -0.0085,"THE input value to the path matrix M[path, trial]"
