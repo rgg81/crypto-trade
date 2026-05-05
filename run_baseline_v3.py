@@ -1,26 +1,23 @@
-"""Baseline v3 runner — iter-v3/003 per-trial OOF persistence.
+"""Baseline v3 runner — iter-v3/004 per-cell PBO consumer pipeline.
 
 Inherits the same universe {BCH, MKR, LDO, TRX} and model architecture as
-iter-v3/002.  The single architectural change is per-Optuna-trial OOF return
-persistence (iter-v3/003 brief Section 3.5):
+iter-v3/003.  The single architectural change is the per-cell consumer
+pipeline for PBO and n_eff computation (iter-v3/004 brief Section 3.5):
 
-  1. optimization.py:_objective captures per-(trial, fold) OOF candle PnL
-     into a shared mutable buffer (sub-fix 1a).
-  2. optimization.py:optimize_and_train flushes buffer to parquet after
-     study.optimize() (sub-fix 1b).
-  3. lgbm.py:_train_for_month passes oof_persist_path + train_month +
-     symbols_arr to optimize_and_train (sub-fix 1c).
-  4. _build_v3_model passes oof_persist_path to LightGbmStrategy (sub-fix 1d).
-  5. _compute_cpcv_paths reads trial_oof_returns.parquet and builds
-     (45, n_trials) matrix — PBO is now a real number (sub-fix 2).
-  6. n_eff computation reads the same parquet for a true (n_trials × T)
-     PCA matrix instead of the per-(sym, month) surrogate (sub-fix 3).
+  Sub-fix #1: _compute_cpcv_paths rewritten to iterate over (sym, month)
+    cells from trial_oof_returns.parquet, compute per-cell CSCV PBO via
+    pbo_from_cpcv, persist per_cell_pbo.csv, return cross-cell mean PBO.
+  Sub-fix #2: n_eff rewritten to iterate over cells, compute per-cell n_eff
+    via n_effective_trials, return median across cells.
+  Sub-fix #3: New adversarial test tests/strategies/ml/test_per_cell_pbo_synthetic.py.
+  Sub-fix #4: per_cell_pbo.csv written alongside dsr.json for audit trail.
+  Sub-fix #5: seed_summary.json "pbo" field is now a float (not literal "NaN").
 
 Reports written to:
-  reports-v3/iteration_v3-003/
+  reports-v3/iteration_v3-004/
     in_sample/  out_of_sample/  comparison.csv  pareto_front.csv
     cpcv_paths.csv  adf_test.csv  ic_matrix.csv  dsr.json  run.log
-    trial_oof_returns.parquet  (NEW — iter-v3/003 artifact)
+    trial_oof_returns.parquet  per_cell_pbo.csv  (NEW — iter-v3/004)
 
 Usage:
     uv run python run_baseline_v3.py
@@ -78,7 +75,7 @@ OOS_CUTOFF_DATE = "2025-03-24"  # IMMUTABLE
 TRAINING_MONTHS = 24  # IMMUTABLE
 ENSEMBLE_SEEDS: list[int] = [42, 123, 456, 789, 1001]  # IMMUTABLE
 
-ITERATION_LABEL = "v3-003"
+ITERATION_LABEL = "v3-004"
 REPORTS_DIR = Path("reports-v3")
 FEATURES_DIR = Path("data/features_v3")
 DATA_DIR = Path("data")
@@ -450,15 +447,26 @@ def _compute_cpcv_paths(
     symbols: list[str],
     feature_parquets: dict[str, pd.DataFrame],
     oof_parquet_path: Path | None = None,
-) -> tuple[pd.DataFrame, np.ndarray]:
+    report_dir: Path | None = None,
+) -> tuple[pd.DataFrame, np.ndarray, float | None]:
     """Compute CPCV statistics from IS candle/feature sequences.
 
-    UPDATED (iter-v3/003): when oof_parquet_path is provided and exists, reads
-    per-Optuna-trial OOF returns to build the (N_paths, S_strategies) matrix
-    where S = n_unique_trials (sub-fix 2).  PBOResult.pbo is then a real number
-    in [0, 1].
+    UPDATED (iter-v3/004 sub-fix #1): when oof_parquet_path is provided and
+    exists, iterates over (symbol, train_month) cells in the parquet.  For each
+    cell, deduplicates by natural key, pivots to a (n_candles × 50_trials)
+    matrix, runs per-cell CSCV (N=10, k=2 → 45 paths, gap=22 within-cell), and
+    calls pbo_from_cpcv to get a per-cell PBO.  The 173 per-cell PBOs are
+    aggregated via the cross-cell MEAN to produce a finite float strictly inside
+    (0.0, 1.0).  The per_cell_pbo.csv audit trail is written to report_dir.
+
+    The legacy cross-cell CSCV (combining all trial_ids across all cells as a
+    global strategy axis) is REMOVED because cross-cell trial_id has no
+    statistical meaning — each Optuna study has its own independent TPE sampler
+    (brief Section 9 / iter-v3/003 diary lesson #1).
 
     Falls back to S=1 (return proxy, PBO=None) if parquet is absent or empty.
+    The global CPCV candle sequence still runs for cpcv_paths.csv (inherited
+    artifact) using the return proxy — this preserves the cpcv_paths.csv schema.
 
     Parameters
     ----------
@@ -468,14 +476,20 @@ def _compute_cpcv_paths(
         Dict mapping symbol -> IS-window feature DataFrame.
     oof_parquet_path
         Path to trial_oof_returns.parquet written during training (iter-v3/003).
+    report_dir
+        If provided, writes per_cell_pbo.csv to this directory for audit.
 
     Returns
     -------
-    (cpcv_df, path_metric_matrix)
+    (cpcv_df, path_metric_matrix, per_cell_mean_pbo)
         cpcv_df: DataFrame with path_id, sharpe, max_dd, n_candles.
-        path_metric_matrix: np.ndarray of shape (n_paths, S_strategies).
+        path_metric_matrix: np.ndarray of shape (n_paths, 1) — return proxy
+            for cpcv_paths.csv (legacy; per-cell PBO is the headline output).
+        per_cell_mean_pbo: float mean of per-cell PBOs (None if no cells).
     """
-    # Combine IS-window candle sequences across symbols, preserving time order
+    # ----------------------------------------------------------------
+    # Global CPCV candle sequence — for cpcv_paths.csv (inherited schema)
+    # ----------------------------------------------------------------
     all_frames = []
     for sym in symbols:
         df = feature_parquets.get(sym)
@@ -484,7 +498,7 @@ def _compute_cpcv_paths(
         df_is = df[df["open_time"] < OOS_CUTOFF_MS].copy()
         if len(df_is) < 10:
             continue
-        # Use close-to-close log return as per-candle return proxy (for S=1 fallback)
+        # Use close-to-close log return as per-candle return proxy
         if "close" in df_is.columns:
             df_is = df_is.copy()
             df_is["_ret"] = np.log(df_is["close"] / df_is["close"].shift(1)).fillna(0.0)
@@ -494,9 +508,12 @@ def _compute_cpcv_paths(
         all_frames.append(df_is[["open_time", "_ret", "_sym"]].copy())
 
     if not all_frames:
-        return pd.DataFrame(columns=["path_id", "sharpe", "max_dd", "n_candles"]), np.zeros((0, 1))
+        return (
+            pd.DataFrame(columns=["path_id", "sharpe", "max_dd", "n_candles"]),
+            np.zeros((0, 1)),
+            None,
+        )
 
-    # Sort by open_time across symbols → combined candle timeline
     combined = (
         pd.concat(all_frames, ignore_index=True).sort_values("open_time").reset_index(drop=True)
     )
@@ -505,9 +522,12 @@ def _compute_cpcv_paths(
 
     if n_candles < CPCV_N_SPLITS * 10:
         print(f"  [CPCV] Insufficient candles ({n_candles}) for CPCV — skipping")
-        return pd.DataFrame(columns=["path_id", "sharpe", "max_dd", "n_candles"]), np.zeros((0, 1))
+        return (
+            pd.DataFrame(columns=["path_id", "sharpe", "max_dd", "n_candles"]),
+            np.zeros((0, 1)),
+            None,
+        )
 
-    # Build candle timeline index for OOF lookup
     candle_timeline = combined["open_time"].to_numpy()
     returns_proxy = combined["_ret"].to_numpy()
 
@@ -518,38 +538,8 @@ def _compute_cpcv_paths(
         n_test_splits=CPCV_N_TEST_SPLITS,
         gap=REQUIRED_GAP,
         embargo=CPCV_EMBARGO,
-        expected_gap=REQUIRED_GAP,  # assertion enforced
+        expected_gap=REQUIRED_GAP,
     )
-
-    # ----------------------------------------------------------------
-    # Sub-fix 2 (iter-v3/003): load per-trial OOF parquet if available
-    # Build (n_paths, n_trials) matrix — shape needed by pbo_from_cpcv
-    # ----------------------------------------------------------------
-    oof_df: pd.DataFrame | None = None
-    if oof_parquet_path is not None and oof_parquet_path.exists():
-        oof_df = pd.read_parquet(oof_parquet_path)
-        # Filter to IS window only (exclude OOS rows if any leaked)
-        oof_df = oof_df[oof_df["candle_open_time_ms"] < OOS_CUTOFF_MS]
-        if oof_df.empty or oof_df["trial_id"].nunique() <= 1:
-            print(
-                "  [CPCV] trial_oof_returns.parquet is empty or S=1 — "
-                "falling back to return proxy (PBO will be None)"
-            )
-            oof_df = None
-        else:
-            n_unique_trials = oof_df["trial_id"].nunique()
-            print(
-                f"  [CPCV] trial_oof_returns.parquet loaded: "
-                f"{len(oof_df)} rows, {n_unique_trials} unique trials"
-            )
-
-    use_oof = oof_df is not None
-
-    if use_oof:
-        # Group OOF returns by (trial_id, candle_open_time_ms) — sum across folds
-        trial_candle = oof_df.groupby(["trial_id", "candle_open_time_ms"])["oof_return"].sum()
-        trial_ids = sorted(oof_df["trial_id"].unique())
-        n_trials_axis = len(trial_ids)
 
     rows = []
     path_metric_cols: list[np.ndarray] = []
@@ -557,6 +547,7 @@ def _compute_cpcv_paths(
     for path_id, (_, test_idx) in enumerate(splits):
         test_candles = candle_timeline[test_idx]
         n_test = len(test_candles)
+        proxy_rets = returns_proxy[test_idx]
 
         if n_test < 2:
             rows.append(
@@ -567,38 +558,13 @@ def _compute_cpcv_paths(
                     "n_candles": n_test,
                 }
             )
-            if use_oof:
-                path_metric_cols.append(np.full(n_trials_axis, float("nan")))
-            else:
-                path_metric_cols.append(np.array([float("nan")]))
+            path_metric_cols.append(np.array([float("nan")]))
             continue
 
-        if use_oof:
-            # Build per-trial Sharpe vector for this path
-            trial_sharpes = np.full(n_trials_axis, float("nan"))
-            for t_idx, tid in enumerate(trial_ids):
-                if tid not in trial_candle:
-                    continue
-                trial_series = trial_candle[tid]
-                path_rets = np.array(
-                    [float(trial_series.get(ct, 0.0)) for ct in test_candles],
-                    dtype=np.float64,
-                )
-                mu_t = float(np.nanmean(path_rets))
-                sigma_t = float(np.nanstd(path_rets, ddof=1))
-                trial_sharpes[t_idx] = (
-                    mu_t / sigma_t * np.sqrt(len(path_rets)) if sigma_t > 0 else 0.0
-                )
-            path_metric_cols.append(trial_sharpes)
-
-            # Summarise path using return-proxy (mean over all trial returns)
-            proxy_rets = returns_proxy[test_idx]
-        else:
-            proxy_rets = returns_proxy[test_idx]
-            s1_sigma = float(np.nanstd(proxy_rets, ddof=1))
-            s1_mu = float(np.nanmean(proxy_rets))
-            s1_sharpe = s1_mu / s1_sigma * np.sqrt(n_test) if s1_sigma > 0 else 0.0
-            path_metric_cols.append(np.array([s1_sharpe]))
+        s1_sigma = float(np.nanstd(proxy_rets, ddof=1))
+        s1_mu = float(np.nanmean(proxy_rets))
+        s1_sharpe = s1_mu / s1_sigma * np.sqrt(n_test) if s1_sigma > 0 else 0.0
+        path_metric_cols.append(np.array([s1_sharpe]))
 
         mu = float(np.nanmean(proxy_rets))
         sigma = float(np.nanstd(proxy_rets, ddof=1))
@@ -618,22 +584,202 @@ def _compute_cpcv_paths(
         )
 
     cpcv_df = pd.DataFrame(rows)
+    path_metric_matrix = (
+        np.stack(path_metric_cols, axis=0) if path_metric_cols else np.zeros((0, 1))
+    )
+    print(f"  [CPCV] cpcv_paths.csv: {len(cpcv_df)} paths (return proxy, S=1 — for schema)")
 
-    if path_metric_cols:
-        # Stack: rows = paths, cols = strategies (trials or S=1)
-        path_metric_matrix = np.stack(path_metric_cols, axis=0)
-    else:
-        path_metric_matrix = np.zeros((0, 1))
+    # ----------------------------------------------------------------
+    # Sub-fix #1 (iter-v3/004): per-cell CSCV with cross-cell mean aggregation
+    # ----------------------------------------------------------------
+    per_cell_mean_pbo: float | None = None
+    if oof_parquet_path is not None and oof_parquet_path.exists():
+        per_cell_mean_pbo = _compute_per_cell_pbo(oof_parquet_path, report_dir)
 
-    if use_oof:
-        print(
-            f"  [CPCV] path_metric_matrix shape: {path_metric_matrix.shape} "
-            f"(S={path_metric_matrix.shape[1]} strategies from OOF parquet)"
-        )
-    else:
-        print(f"  [CPCV] path_metric_matrix shape: {path_metric_matrix.shape} (S=1 fallback)")
+    return cpcv_df, path_metric_matrix, per_cell_mean_pbo
 
-    return cpcv_df, path_metric_matrix
+
+# Per-cell CSCV parameters (brief Section 0 — within-cell gap = 22)
+PER_CELL_N_SPLITS = 10
+PER_CELL_K = 2  # C(10, 2) = 45 paths
+PER_CELL_GAP = 22  # (timeout_candles + 1) within a single-symbol cell
+
+
+def _compute_per_cell_pbo(
+    oof_parquet_path: Path,
+    report_dir: Path | None = None,
+) -> float | None:
+    """Compute per-(symbol, train_month) cell CSCV PBO and aggregate via mean.
+
+    Implementation of iter-v3/004 brief Section 3.5 sub-fixes #1 and #4.
+
+    For each (symbol, train_month) cell:
+    1. Dedup by natural key (sym, month, trial, fold, candle) — drops the 5x
+       seed-duplicate rows the iter-v3/003 writer produced.
+    2. Pivot to (n_candles × n_trials) returns matrix.
+    3. Run CSCV (N=10, k=2, gap=22) to get 45 paths.
+    4. Build (45, n_trials) path-Sharpe matrix.
+    5. Call pbo_from_cpcv → per-cell PBO.
+
+    Aggregation: cross-cell MEAN of per-cell PBOs for cells with rank > 1.
+    Mean is the only aggregator that is:
+    - Strictly in (0.0, 1.0) on the observed bimodal distribution
+    - Not saturating (Fisher's method chi² > 5000 at this scale)
+    - Interpretable as "fraction of cells showing overfit signature"
+
+    Writes per_cell_pbo.csv to report_dir if provided.
+
+    Returns mean PBO (float) or None if fewer than 1 informative cell.
+    """
+    print(f"  [per-cell PBO] Loading {oof_parquet_path} ...")
+    oof_df = pd.read_parquet(oof_parquet_path)
+    n_raw = len(oof_df)
+
+    # Dedup by natural key — drops the 5x seed-duplicate rows
+    oof_df = oof_df.drop_duplicates(
+        subset=["symbol", "train_month", "trial_id", "fold_idx", "candle_open_time_ms"]
+    )
+    n_dedup = len(oof_df)
+    print(f"  [per-cell PBO] Raw={n_raw}, after dedup={n_dedup}")
+
+    # IS-only filter
+    oof_df = oof_df[oof_df["candle_open_time_ms"] < OOS_CUTOFF_MS].copy()
+    n_is = len(oof_df)
+    print(f"  [per-cell PBO] IS-only rows: {n_is}")
+
+    if oof_df.empty:
+        print("  [per-cell PBO] OOF parquet IS slice is empty — returning None")
+        return None
+
+    cells = sorted(oof_df.groupby(["symbol", "train_month"]).groups.keys())
+    n_cells = len(cells)
+    print(f"  [per-cell PBO] Iterating over {n_cells} (sym, month) cells ...")
+
+    cell_rows: list[dict] = []
+
+    for cell_idx, (sym, month) in enumerate(cells):
+        cell_df = oof_df[(oof_df["symbol"] == sym) & (oof_df["train_month"] == month)]
+        n_trials_cell = int(cell_df["trial_id"].nunique())
+        n_candles_cell = int(cell_df["candle_open_time_ms"].nunique())
+
+        if n_trials_cell < 2 or n_candles_cell < PER_CELL_N_SPLITS * 3:
+            cell_rows.append(
+                {
+                    "symbol": sym,
+                    "train_month": month,
+                    "n_trials": n_trials_cell,
+                    "n_candles": n_candles_cell,
+                    "n_paths": 0,
+                    "rank": 0,
+                    "pbo": float("nan"),
+                    "n_eff": 0,
+                    "mean_path_sharpe": float("nan"),
+                    "error": "insufficient_data",
+                }
+            )
+            continue
+
+        try:
+            # Pivot: (n_candles, n_trials) returns matrix, averaging over fold_idx
+            pivot = cell_df.pivot_table(
+                index="candle_open_time_ms",
+                columns="trial_id",
+                values="oof_return",
+                aggfunc="mean",
+            ).sort_index()
+            returns_mat = pivot.to_numpy()  # (n_candles, n_trials)
+            n_candles_mat, n_trials_mat = returns_mat.shape
+
+            # Per-cell CSCV
+            cell_splits = combinatorial_purged_cv(
+                n_samples=n_candles_mat,
+                n_splits=PER_CELL_N_SPLITS,
+                n_test_splits=PER_CELL_K,
+                gap=PER_CELL_GAP,
+                embargo=0,
+            )
+            n_paths = len(cell_splits)
+            path_mat = np.full((n_paths, n_trials_mat), np.nan, dtype=float)
+
+            for path_id, (_, test_idx) in enumerate(cell_splits):
+                if len(test_idx) < 2:
+                    continue
+                test_rets = returns_mat[test_idx, :]
+                mu = np.nanmean(test_rets, axis=0)
+                sigma = np.nanstd(test_rets, axis=0, ddof=1)
+                with np.errstate(divide="ignore", invalid="ignore"):
+                    sharpe = np.where(sigma > 0, mu / sigma, 0.0)
+                path_mat[path_id, :] = sharpe
+
+            pbo_res = pbo_from_cpcv(path_mat, max_splits=5000)
+            cell_pbo = pbo_res.pbo if pbo_res.pbo is not None else float("nan")
+
+            # n_eff per-cell: (n_trials × n_candles) matrix
+            cell_neff = n_effective_trials(returns_mat.T)
+
+            rank = int(np.linalg.matrix_rank(returns_mat))
+            mean_path_sharpe = float(np.nanmean(path_mat))
+
+            cell_rows.append(
+                {
+                    "symbol": sym,
+                    "train_month": month,
+                    "n_trials": n_trials_mat,
+                    "n_candles": n_candles_mat,
+                    "n_paths": n_paths,
+                    "rank": rank,
+                    "pbo": cell_pbo,
+                    "n_eff": cell_neff,
+                    "mean_path_sharpe": round(mean_path_sharpe, 6),
+                    "error": "",
+                }
+            )
+        except Exception as exc:
+            cell_rows.append(
+                {
+                    "symbol": sym,
+                    "train_month": month,
+                    "n_trials": n_trials_cell,
+                    "n_candles": n_candles_cell,
+                    "n_paths": 0,
+                    "rank": 0,
+                    "pbo": float("nan"),
+                    "n_eff": 0,
+                    "mean_path_sharpe": float("nan"),
+                    "error": str(exc)[:120],
+                }
+            )
+
+        if (cell_idx + 1) % 25 == 0:
+            print(f"  [per-cell PBO]   {cell_idx + 1}/{n_cells} cells processed")
+
+    print(f"  [per-cell PBO] Completed {n_cells} cells")
+
+    per_cell_df = pd.DataFrame(cell_rows)
+
+    # Write audit CSV (sub-fix #4)
+    if report_dir is not None:
+        report_dir.mkdir(parents=True, exist_ok=True)
+        csv_path = report_dir / "per_cell_pbo.csv"
+        per_cell_df.to_csv(csv_path, index=False)
+        print(f"  [per-cell PBO] Wrote {csv_path} ({len(per_cell_df)} rows)")
+
+    # Aggregate: mean of per-cell PBOs for cells with rank > 1 (informative)
+    informative = per_cell_df[per_cell_df["rank"] > 1]["pbo"].dropna()
+    n_informative = len(informative)
+    print(f"  [per-cell PBO] Informative cells (rank>1): {n_informative}/{n_cells}")
+
+    if n_informative == 0:
+        print("  [per-cell PBO] No informative cells — returning None")
+        return None
+
+    mean_pbo = float(informative.mean())
+    median_pbo = float(informative.median())
+    print(
+        f"  [per-cell PBO] Aggregated mean PBO={mean_pbo:.4f}, median PBO={median_pbo:.4f} "
+        f"(|delta|={abs(mean_pbo - median_pbo):.4f})"
+    )
+    return mean_pbo
 
 
 # ============================================================
@@ -1159,7 +1305,7 @@ def main() -> None:
                 "oos_max_dd": round(oos_dd, 4),
                 "oos_calmar": round(oos_calmar, 4),
                 "max_concentration_pct": round(max_conc, 2),
-                "pbo": "NaN",  # S=1 — pbo_from_cpcv returns None
+                "pbo": None,  # placeholder — updated after per-cell PBO computed (sub-fix #5)
                 "btc_killed": btc_stats["n_killed"],
             }
         )
@@ -1182,25 +1328,53 @@ def main() -> None:
     print(f"\n[split] {len(is_trades)} IS trades, {len(oos_trades)} OOS trades")
 
     # -------------------------------------------------------
-    # CPCV on IS candle/feature sequence (brief Section 3.5#2)
+    # CPCV on IS candle/feature sequence (iter-v3/004 sub-fix #1)
     # -------------------------------------------------------
-    print("\n[CPCV] Computing 45-path statistics from IS CANDLE SEQUENCE...")
+    print("\n[CPCV] Computing per-cell CSCV PBO (iter-v3/004 per-cell pathway)...")
     oof_parquet = REPORTS_DIR / f"iteration_{ITERATION_LABEL}" / "trial_oof_returns.parquet"
-    cpcv_df, path_metric_matrix = _compute_cpcv_paths(
-        list(baseline_symbols), feature_parquets, oof_parquet_path=oof_parquet
+    report_dir_cpcv = REPORTS_DIR / f"iteration_{ITERATION_LABEL}"
+    cpcv_df, path_metric_matrix, per_cell_mean_pbo = _compute_cpcv_paths(
+        list(baseline_symbols),
+        feature_parquets,
+        oof_parquet_path=oof_parquet,
+        report_dir=report_dir_cpcv,
     )
-    print(f"  CPCV: {len(cpcv_df)} paths, matrix shape={path_metric_matrix.shape}")
+    print(f"  CPCV: {len(cpcv_df)} paths (return proxy for cpcv_paths.csv)")
+    print(f"  Per-cell mean PBO: {per_cell_mean_pbo}")
 
-    # PBO via CSCV on (N_paths × S_strategies) matrix — S=1 → pbo_result.pbo=None
-    if path_metric_matrix.size > 0:
-        pbo_result = pbo_from_cpcv(path_metric_matrix)
+    # Build PBOResult from per-cell mean PBO (sub-fix #1)
+    # The descriptive stats (frac_positive_paths, quartiles) are computed
+    # from the global return-proxy cpcv_df as before.
+    flat_path_sharpes = cpcv_df["sharpe"].dropna().to_numpy() if len(cpcv_df) > 0 else np.array([])
+    frac_pos = float(np.mean(flat_path_sharpes > 0)) if len(flat_path_sharpes) > 0 else float("nan")
+    q25, q50, q75 = (
+        (
+            float(np.percentile(flat_path_sharpes, 25)),
+            float(np.percentile(flat_path_sharpes, 50)),
+            float(np.percentile(flat_path_sharpes, 75)),
+        )
+        if len(flat_path_sharpes) >= 4
+        else (float("nan"), float("nan"), float("nan"))
+    )
+
+    if per_cell_mean_pbo is not None:
+        pbo_result = PBOResult(
+            pbo=per_cell_mean_pbo,
+            frac_positive_paths=frac_pos,
+            path_sharpe_quartiles=(q25, q50, q75),
+            n_splits_evaluated=len(cpcv_df),
+            note=(
+                f"Per-cell mean PBO={per_cell_mean_pbo:.4f} (iter-v3/004 cross-cell mean). "
+                f"frac_positive_paths={frac_pos:.3f} from {len(cpcv_df)} return-proxy paths."
+            ),
+        )
     else:
         pbo_result = PBOResult(
             pbo=None,
-            frac_positive_paths=float("nan"),
-            path_sharpe_quartiles=(float("nan"), float("nan"), float("nan")),
-            n_splits_evaluated=0,
-            note="CPCV produced no paths.",
+            frac_positive_paths=frac_pos,
+            path_sharpe_quartiles=(q25, q50, q75),
+            n_splits_evaluated=len(cpcv_df),
+            note="Per-cell PBO: OOF parquet absent or all cells degenerate.",
         )
     print(f"  PBO result: {pbo_result.note}")
 
@@ -1255,55 +1429,27 @@ def main() -> None:
     else:
         psr_val = 0.0
 
-    # N_eff: sub-fix 3 (iter-v3/003) — build true (n_trials × T) matrix from
-    # the per-trial OOF parquet produced during training.
-    # This replaces the iter-v3/002 per-(symbol, month) surrogate with actual
-    # independent per-Optuna-trial return vectors.
-    oof_parquet_for_neff = (
-        REPORTS_DIR / f"iteration_{ITERATION_LABEL}" / "trial_oof_returns.parquet"
-    )
+    # N_eff: sub-fix #2 (iter-v3/004) — per-cell median aggregation.
+    # Reads per_cell_pbo.csv written by _compute_cpcv_paths (which already
+    # computed per-cell n_eff via n_effective_trials). Takes the median across
+    # cells with rank > 1. Falls back to surrogate if CSV not available.
+    per_cell_csv = REPORTS_DIR / f"iteration_{ITERATION_LABEL}" / "per_cell_pbo.csv"
     n_eff = 1  # safe default
 
-    if oof_parquet_for_neff.exists():
+    if per_cell_csv.exists():
         try:
-            trial_oof = pd.read_parquet(oof_parquet_for_neff)
-            # IS-only: exclude OOS rows
-            trial_oof = trial_oof[trial_oof["candle_open_time_ms"] < OOS_CUTOFF_MS]
-            if trial_oof["trial_id"].nunique() >= 2:
-                # pivot: rows = trials, cols = candle timestamps, values = oof_return
-                trial_mat_df = trial_oof.pivot_table(
-                    index="trial_id",
-                    columns="candle_open_time_ms",
-                    values="oof_return",
-                    aggfunc="sum",
-                    fill_value=0.0,
-                )
-                trial_mat = trial_mat_df.to_numpy()
-                n_eff = n_effective_trials(trial_mat)
+            per_cell_df_neff = pd.read_csv(per_cell_csv)
+            informative_neff = per_cell_df_neff[per_cell_df_neff["rank"] > 1]["n_eff"].dropna()
+            if len(informative_neff) > 0:
+                n_eff = int(np.median(informative_neff))
                 print(
-                    f"[n_eff] Built ({trial_mat.shape[0]} trials × {trial_mat.shape[1]} candles) "
-                    f"matrix from OOF parquet → n_eff={n_eff}"
+                    f"[n_eff] Per-cell median n_eff={n_eff} from {len(informative_neff)} "
+                    f"informative cells (rank>1) — iter-v3/004 sub-fix #2"
                 )
             else:
-                # Fallback: parquet exists but not enough trials — use surrogate
-                sym_month_groups: dict[tuple[str, str], list[float]] = {}
-                for t in is_trades:
-                    sym_m = t.symbol
-                    month_m = pd.Timestamp(t.open_time, unit="ms").strftime("%Y-%m")
-                    key_m = (sym_m, month_m)
-                    sym_month_groups.setdefault(key_m, []).append(float(t.weighted_pnl))
-                if len(sym_month_groups) >= 2:
-                    max_len = max(len(v) for v in sym_month_groups.values())
-                    trial_mat_fb = np.array(
-                        [v + [0.0] * (max_len - len(v)) for v in sym_month_groups.values()]
-                    )
-                    n_eff = n_effective_trials(trial_mat_fb)
-                else:
-                    n_eff = max(1, len(sym_month_groups))
-                print(f"[n_eff] OOF parquet has <2 unique trials — using surrogate n_eff={n_eff}")
+                print("[n_eff] per_cell_pbo.csv has no informative cells — using n_eff=1")
         except Exception as e:
-            print(f"[n_eff] Could not read OOF parquet: {e} — using n_eff=1")
-            n_eff = 1
+            print(f"[n_eff] Could not read per_cell_pbo.csv: {e} — using n_eff=1")
     elif len(is_wp) > 1:
         # Parquet not available — use iter-v3/002 surrogate (sym_month groups)
         sym_month_groups_fb: dict[tuple[str, str], list[float]] = {}
@@ -1320,7 +1466,7 @@ def main() -> None:
             n_eff = n_effective_trials(trial_mat_fallback)
         else:
             n_eff = max(1, len(sym_month_groups_fb))
-        print(f"[n_eff] OOF parquet absent — using surrogate n_eff={n_eff}")
+        print(f"[n_eff] per_cell_pbo.csv absent — using surrogate n_eff={n_eff}")
 
     min_trl_months = float(len(is_trades)) / max(1, len(ENSEMBLE_SEEDS) * len(V3_MODELS))
 
@@ -1329,8 +1475,11 @@ def main() -> None:
         f"OOS monthly Sharpe={oos_ms_primary:+.4f}"
     )
     print(f"[metrics] DSR={dsr_val:.4f}, PSR={psr_val:.4f}")
+    pbo_display_inline = (
+        "NaN(per-cell:no-data)" if pbo_result.pbo is None else f"{pbo_result.pbo:.4f}"
+    )
     print(
-        f"[metrics] PBO={'NaN (S=1)' if pbo_result.pbo is None else f'{pbo_result.pbo:.4f}'}, "
+        f"[metrics] PBO={pbo_display_inline}, "
         f"frac_positive_paths={pbo_result.frac_positive_paths:.3f}"
     )
     print(f"[metrics] n_trials={n_trials_total}, n_eff={n_eff}")
@@ -1396,6 +1545,13 @@ def main() -> None:
     # DSR JSON
     _write_dsr_json(report_dir, dsr_val, pbo_result, psr_val, n_trials_total, n_eff, min_trl_months)
 
+    # Sub-fix #5 (iter-v3/004): update per_seed_summary pbo from None placeholder
+    # to the actual per-cell mean PBO computed above.  This ensures seed_summary.json
+    # contains a numeric float (not "NaN" or null) per brief Section 3.5 sub-fix #5.
+    for entry in per_seed_summary:
+        if entry.get("pbo") is None:
+            entry["pbo"] = pbo_result.pbo  # float or None (JSON null)
+
     # Pareto front
     _write_pareto_front(per_seed_summary, report_dir)
 
@@ -1407,7 +1563,7 @@ def main() -> None:
     print(f"\n[DONE] Reports: {report_dir}  (wall-clock: {elapsed_h:.2f}h)")
     print(f"  IS monthly Sharpe:  {is_ms_primary:+.4f}")
     print(f"  OOS monthly Sharpe: {oos_ms_primary:+.4f}")
-    pbo_display = "NaN(S=1)" if pbo_result.pbo is None else f"{pbo_result.pbo:.4f}"
+    pbo_display = "NaN(per-cell:no-data)" if pbo_result.pbo is None else f"{pbo_result.pbo:.4f}"
     print(f"  DSR={dsr_val:.4f}  PBO={pbo_display}  PSR={psr_val:.4f}")
     print(f"  n_eff={n_eff}  ADF rows={len(adf_df)}")
 
