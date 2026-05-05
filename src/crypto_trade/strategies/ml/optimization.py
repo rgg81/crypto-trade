@@ -203,13 +203,19 @@ def _objective(
         training_days = trial.suggest_int("training_days", 10, 500, step=10)
 
     # LightGBM hyperparameters
+    # iter-v3/007 fast_mode: hardcode colsample_bytree=1.0 (skip Optuna suggest)
+    # to minimize per-seed feature-subsampling variance during fast exploration.
+    # Production runs (fast_mode=False) keep colsample in the search space.
+    fast_mode = trial.study.user_attrs.get("fast_mode", False)
     params = {
         "n_estimators": trial.suggest_int("n_estimators", 50, 500),
         "max_depth": trial.suggest_int("max_depth", 3, 5),
         "num_leaves": trial.suggest_int("num_leaves", 15, 127),
         "learning_rate": trial.suggest_float("learning_rate", 0.01, 0.3, log=True),
         "subsample": trial.suggest_float("subsample", 0.5, 1.0),
-        "colsample_bytree": trial.suggest_float("colsample_bytree", 0.3, 1.0),
+        "colsample_bytree": 1.0
+        if fast_mode
+        else trial.suggest_float("colsample_bytree", 0.3, 1.0),
         "min_child_samples": trial.suggest_int("min_child_samples", 5, 100),
         "reg_alpha": trial.suggest_float("reg_alpha", 1e-8, 10.0, log=True),
         "reg_lambda": trial.suggest_float("reg_lambda", 1e-8, 10.0, log=True),
@@ -347,6 +353,7 @@ def optimize_and_train(
     oof_persist_path: Path | None = None,
     train_month: str = "",
     symbols_arr: np.ndarray | None = None,
+    fast_mode: bool = False,
 ) -> tuple[lgb.LGBMClassifier, list[str], float]:
     """Run Optuna optimization and return (model, columns, confidence_threshold).
 
@@ -368,6 +375,8 @@ def optimize_and_train(
 
     sampler = optuna.samplers.TPESampler(seed=seed)
     study = optuna.create_study(direction="maximize", sampler=sampler)
+    # iter-v3/007: propagate fast_mode to _objective via study user_attrs
+    study.set_user_attr("fast_mode", fast_mode)
 
     if sample_weights is None:
         sample_weights = np.ones(len(train_labels), dtype=np.float64)
@@ -453,13 +462,15 @@ def optimize_and_train(
     final_weights = sample_weights[final_mask]
 
     # Retrain on full training data
+    # iter-v3/007: in fast_mode, colsample_bytree is hardcoded to 1.0 (not in
+    # the Optuna search space), so `best` won't contain it — use 1.0 directly.
     params = {
         "n_estimators": best["n_estimators"],
         "max_depth": best["max_depth"],
         "num_leaves": best["num_leaves"],
         "learning_rate": best["learning_rate"],
         "subsample": best["subsample"],
-        "colsample_bytree": best["colsample_bytree"],
+        "colsample_bytree": best.get("colsample_bytree", 1.0),
         "min_child_samples": best["min_child_samples"],
         "reg_alpha": best["reg_alpha"],
         "reg_lambda": best["reg_lambda"],

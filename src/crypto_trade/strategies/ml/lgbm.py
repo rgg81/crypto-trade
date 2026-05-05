@@ -139,6 +139,7 @@ class LightGbmStrategy:
         ood_features: list[str] | None = None,
         ood_cutoff_pct: float = 0.70,
         oof_persist_path: Path | None = None,
+        fast_mode: bool = False,
     ) -> None:
         if not feature_columns:
             raise ValueError(
@@ -177,6 +178,8 @@ class LightGbmStrategy:
         self.ood_cutoff_pct = ood_cutoff_pct
         # iter-v3/003: path for per-trial OOF return persistence (sub-fix 1c)
         self._oof_persist_path: Path | None = oof_persist_path
+        # iter-v3/007: fast exploration mode (colsample fixed at 1.0 in optimization.py)
+        self._fast_mode: bool = fast_mode
         if self.ood_enabled and not self.ood_features:
             raise ValueError("ood_features must be specified when ood_enabled=True")
         self._ood_mean: np.ndarray | None = None
@@ -472,6 +475,7 @@ class LightGbmStrategy:
                     oof_persist_path=self._oof_persist_path,
                     train_month=month_str,
                     symbols_arr=train_symbols_arr,
+                    fast_mode=self._fast_mode,
                 )
                 self._models.append(model)
                 self._confidence_thresholds.append(confidence_threshold)

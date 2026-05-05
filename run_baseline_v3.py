@@ -814,12 +814,15 @@ def _build_v3_model(
     n_trials: int,
     ensemble_seeds: list[int],
     oof_persist_path: Path | None = None,
+    fast_mode: bool = False,
 ) -> tuple[BacktestConfig, RiskV3Wrapper]:
     """Build v3 M1 LightGBM + RiskV3Wrapper for a single symbol.
 
     v2 5-gate config + BTC trend filter. NO R1/R2/R3 (brief Section 3.4).
     oof_persist_path: if set, per-trial OOF returns written to parquet
     (sub-fix 1d, iter-v3/003).
+    fast_mode: if True, hardcode colsample_bytree=1.0 in Optuna search space
+    to minimize per-seed feature-subsampling variance (iter-v3/007 exploration).
     """
     cfg = BacktestConfig(
         symbols=(symbol,),
@@ -851,6 +854,7 @@ def _build_v3_model(
         feature_columns=list(V3_FEATURE_COLUMNS),  # EXPLICIT — never None
         ood_enabled=False,  # OOD via RiskV3Wrapper z-score gate
         oof_persist_path=oof_persist_path,  # sub-fix 1d (iter-v3/003)
+        fast_mode=fast_mode,  # iter-v3/007 — colsample_bytree=1.0 when True
     )
     risk_cfg = RiskV2Config(
         zscore_threshold=2.5,
@@ -1137,6 +1141,8 @@ def _run_single_seed(
     btc_times: np.ndarray,
     btc_closes: np.ndarray,
     active_models: tuple[tuple[str, str], ...] | None = None,
+    ensemble_size: int | None = None,
+    fast_mode: bool = False,
 ) -> tuple[list, list, dict, dict, list]:
     """Run v3 models for a single outer seed.
 
@@ -1145,6 +1151,12 @@ def _run_single_seed(
     active_models:
         Subset of V3_MODELS to run.  Defaults to V3_MODELS when None.
         Pass a filtered tuple to scope the run (e.g. BCH-only for iter-v3/006).
+    ensemble_size:
+        Override the default ENSEMBLE_SIZE for this run. Useful for fast
+        exploration (size=1 → no inner-ensemble averaging, ~5x faster).
+    fast_mode:
+        If True, hardcode `colsample_bytree=1.0` in Optuna search space
+        (iter-v3/007 — minimize per-seed feature-subsampling variance).
     """
     models_to_run = active_models if active_models is not None else V3_MODELS
     all_trades: list = []
@@ -1159,13 +1171,15 @@ def _run_single_seed(
         oof_path = REPORTS_DIR / f"iteration_{ITERATION_LABEL}" / "trial_oof_returns.parquet"
         # iter-v3/006 fix: derive a distinct inner ensemble from this outer seed.
         # Pre-fix: ensemble_seeds=[42,123,456,789,1001] for ALL outer seeds.
-        ensemble_seeds_run = _derive_ensemble_seeds(seed)
+        size_for_this_run = ensemble_size if ensemble_size is not None else ENSEMBLE_SIZE
+        ensemble_seeds_run = _derive_ensemble_seeds(seed, size=size_for_this_run)
         cfg, strategy = _build_v3_model(
             symbol=symbol,
             seed=seed,
             n_trials=n_trials,
             ensemble_seeds=ensemble_seeds_run,
             oof_persist_path=oof_path,
+            fast_mode=fast_mode,
         )
         _verify_symbols(cfg.symbols)
         t0 = time.time()
@@ -1234,7 +1248,26 @@ def main() -> None:
             "Used for iter-v3/006 BCH-only scoped validation."
         ),
     )
+    parser.add_argument(
+        "--exploration",
+        action="store_true",
+        help=(
+            "iter-v3/007 fast-exploration mode. Sets ENSEMBLE_SIZE=1 (single "
+            "inner model, ~5x faster), hardcodes colsample_bytree=1.0 in "
+            "Optuna search space (minimizes per-seed feature-subsampling "
+            "variance), and defaults --n-trials to 10 if not specified. Use "
+            "for fast variation across symbols/labels/features. Drop the flag "
+            "for production CONFIRMATION runs (full ensemble, full search space)."
+        ),
+    )
     args = parser.parse_args()
+
+    # iter-v3/007: --exploration overrides defaults for fast iteration
+    ensemble_size_for_run: int = 1 if args.exploration else ENSEMBLE_SIZE
+    fast_mode_for_run: bool = bool(args.exploration)
+    if args.exploration and args.n_trials == 50:
+        # Default for exploration is 10 trials; only override if user kept default
+        args.n_trials = 10
 
     # Build active_models from --symbols filter (iter-v3/006 CLI flag).
     # Default (None) keeps all V3_MODELS.
@@ -1326,7 +1359,13 @@ def main() -> None:
     for i, seed in enumerate(seeds):
         print(f"\n{'#' * 60}\n# SEED {seed} ({i + 1}/{len(seeds)})\n{'#' * 60}")
         unbraked, braked, btc_stats, hr_stats, model_pairs = _run_single_seed(
-            seed, args.n_trials, btc_times, btc_closes, active_models=active_models
+            seed,
+            args.n_trials,
+            btc_times,
+            btc_closes,
+            active_models=active_models,
+            ensemble_size=ensemble_size_for_run,
+            fast_mode=fast_mode_for_run,
         )
 
         if not braked:
@@ -1446,7 +1485,7 @@ def main() -> None:
     # -------------------------------------------------------
     is_ms_primary = _monthly_sharpe(is_trades)
     oos_ms_primary = _monthly_sharpe(oos_trades)
-    n_trials_total = args.n_trials * ENSEMBLE_SIZE * len(active_models) * args.seeds
+    n_trials_total = args.n_trials * ensemble_size_for_run * len(active_models) * args.seeds
 
     is_wp = np.array([float(t.weighted_pnl) for t in is_trades])
     if len(is_wp) > 1 and is_wp.std() > 0:
@@ -1531,7 +1570,7 @@ def main() -> None:
             n_eff = max(1, len(sym_month_groups_fb))
         print(f"[n_eff] per_cell_pbo.csv absent — using surrogate n_eff={n_eff}")
 
-    min_trl_months = float(len(is_trades)) / max(1, ENSEMBLE_SIZE * len(active_models))
+    min_trl_months = float(len(is_trades)) / max(1, ensemble_size_for_run * len(active_models))
 
     print(
         f"\n[metrics] IS monthly Sharpe={is_ms_primary:+.4f}, "
