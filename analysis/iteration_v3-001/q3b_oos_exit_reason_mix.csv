@@ -1,0 +1,13 @@
+symbol,exit_reason,n,avg_pnl,total_wpnl
+BCHUSDT,stop_loss,13,-4.9938,-45.8230
+BCHUSDT,take_profit,3,9.5316,15.4604
+BCHUSDT,timeout,9,3.3535,21.9186
+LDOUSDT,stop_loss,8,-6.6885,-34.2103
+LDOUSDT,take_profit,3,13.7714,32.8233
+LDOUSDT,timeout,2,8.3302,15.5103
+MKRUSDT,stop_loss,7,-5.8610,-26.8842
+MKRUSDT,take_profit,4,12.8159,42.2310
+MKRUSDT,timeout,4,1.7183,5.1529
+TRXUSDT,stop_loss,13,-2.3337,-20.4114
+TRXUSDT,take_profit,11,4.0299,26.2801
+TRXUSDT,timeout,6,1.4292,6.4792
