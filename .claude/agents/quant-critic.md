@@ -195,14 +195,88 @@ Run when time permits or when the 8 above show borderline results.
 
 # 5. The review.md Output Template
 
-Your final assistant message MUST be the full content of `review.md`, formatted exactly as below. The orchestrating session reads your message verbatim and writes it to `briefs-v3/iteration_v3-NNN/review.md`.
+## 5.1 Two-Round Flow (added iter-v3/007)
+
+The Critic operates in **two rounds** to prevent the iter-v3/004/005/006 failure mode where a single-round Critic BLOCK fired on issues the QR's brief had already framed as out-of-scope.
+
+**Round 1 — PRELIMINARY review.** The orchestrator dispatches you with `mode: preliminary`. You read brief Section 0.5 to learn the iteration's TYPE (EXPLORATION vs CONFIRMATION):
+- TYPE=EXPLORATION → score Checks 1, 2, 4, 5, 6, 8 (methodology + look-ahead). Check 3 (DSR/PSR/PBO) is informational only — Check 3 axis FAILs do NOT trigger BLOCK for EXPLORATION iterations because edge thresholds are unclearable on a strategy still being developed.
+- TYPE=CONFIRMATION → score all 8 checks AND optional 9-12 with full threshold enforcement.
+
+Your Round 1 output is `# Phase 7.5 Critic Review — iter-v3/NNN — PRELIMINARY` with each check's status (PASS/WARN/FAIL/CONCERN), reasoning, and a `## Clarifications Requested from QR` section listing 0 to N specific questions for which a QR response could change the verdict. NO `OVERALL` line in Round 1.
+
+If you have ZERO clarifications (every check is unambiguous), end with `## Clarifications Requested from QR — NONE` and the orchestrator skips Round 2.
+
+**Round 2 — FINAL review.** The orchestrator dispatches you with `mode: final` plus the QR's `qr_response.md`. You re-read your PRELIMINARY findings + QR responses + relevant brief sections, then emit the final `review.md` per the template below.
+
+## 5.2 Round 1 PRELIMINARY Template
+
+```markdown
+# Phase 7.5 Critic Review — iter-v3/NNN — PRELIMINARY
+
+(NO OVERALL line in Round 1.)
+
+## Iteration Type (from Brief Section 0.5)
+TYPE: EXPLORATION  (or CONFIRMATION)
+
+## Per-Check Status
+
+### Check 1 — Look-Ahead Audit: PASS
+<one paragraph>
+
+### Check 2 — Embargo Width: PASS
+<one paragraph>
+
+### Check 3 — Multiple-Testing Correction: FAIL (informational for EXPLORATION)
+<one paragraph; for EXPLORATION, also note: "Per Section 0.5 TYPE=EXPLORATION, Check 3-edge axis failures do not trigger BLOCK; flagged here for record">
+
+### Check 4 — IC Correlation: PASS
+<one paragraph>
+
+### Check 5 — ADF Stationarity: PASS
+<one paragraph>
+
+### Check 6 — Pareto Dominance: WARN
+<one paragraph>
+
+### Check 7 — Reproducibility: PASS
+<one paragraph>
+
+### Check 8 — Hypothesis-Implementation Alignment: PASS
+<one paragraph>
+
+## Clarifications Requested from QR
+
+1. <specific question 1>
+2. <specific question 2>
+(or)
+## Clarifications Requested from QR — NONE
+```
+
+## 5.3 Round 2 FINAL Template
+
+Emit the final `review.md` only after reading QR's response. The orchestrator writes your message verbatim to `briefs-v3/iteration_v3-NNN/review.md`.
 
 ```markdown
 # Phase 7.5 Critic Review — iter-v3/NNN
 
-OVERALL: MERGE
+OVERALL: EXPLORATION-PROMISING
 (or)
-OVERALL: BLOCK — <highest-priority FAIL summarized in one line>
+OVERALL: EXPLORATION-NEGATIVE — <highest-priority concern>
+(or)
+OVERALL: CONFIRMATION-MERGE
+(or)
+OVERALL: CONFIRMATION-BLOCK — <highest-priority FAIL summarized in one line>
+
+## Iteration Type (from Brief Section 0.5)
+TYPE: EXPLORATION  (or CONFIRMATION)
+
+## QR Response Considered (Round 2 only)
+
+(For each clarification raised in PRELIMINARY, summarize how QR's response changed your verdict on that check, in 1 sentence each. If a clarification was answered satisfactorily, note "QR response addresses concern; revised to PASS". If unsatisfactory, note "QR response insufficient; FAIL stands.")
+
+1. <Round 1 Clarification 1> → <Round 2 disposition>
+2. <Round 1 Clarification 2> → <Round 2 disposition>
 
 ## Per-Check Status
 
@@ -213,7 +287,7 @@ OVERALL: BLOCK — <highest-priority FAIL summarized in one line>
 <one paragraph evidence with numerical proof: required gap X, actual gap Y>
 
 ### Check 3 — Multiple-Testing Correction: FAIL
-<one paragraph evidence: DSR=0.93 (threshold 0.95), PBO=0.43 (threshold 0.4), PSR=0.97 — PBO failure dominates; iteration is overfit per CSCV>
+<one paragraph evidence: DSR=0.93 (threshold 0.95), PBO=0.43 (threshold 0.4), PSR=0.97 — PBO failure dominates; iteration is overfit per CSCV. For TYPE=EXPLORATION, Check 3-edge axis FAILs (DSR/PSR) are informational, NOT BLOCK-triggering; only Check 3 PBO axis matters. For TYPE=CONFIRMATION, all three axes are BLOCK-triggering.>
 
 ### Check 4 — IC Correlation: PASS
 <one paragraph evidence>
@@ -232,7 +306,8 @@ OVERALL: BLOCK — <highest-priority FAIL summarized in one line>
 
 ## Recommendations to QR
 
-(For BLOCK iterations, list at most 3 process-level fixes for FUTURE iterations. NOT a "fix this iteration" list — a BLOCK is final for this iteration.)
+(For BLOCK / NEGATIVE iterations, list at most 3 process-level fixes for FUTURE iterations. NOT a "fix this iteration" list — final verdict is final.)
+(For PROMISING iterations, list at most 3 specific items the CONFIRMATION iter-v3/NNN+1 brief should pre-register.)
 
 1. <recommendation>
 2. <recommendation>

@@ -274,11 +274,15 @@ Two new gates (5.5, 7.5) are MANDATORY. Skipping either is a process-integrity v
 
 This is the v3 skill's single biggest defense against rushed iterations. The Engineer refuses to start Phase 6 until the brief contains all 10 mandatory sections.
 
-### The 10 Mandatory Brief Sections
+### The 11 Mandatory Brief Sections
 
 The Engineer reads `briefs-v3/iteration_v3-NNN/research_brief.md` and verifies:
 
 - **Section 0 — Data Split declaration.** Confirms `OOS_CUTOFF_DATE = 2025-03-24` and `training_months = 24` are unchanged. Names the IS window and OOS window in absolute dates.
+- **Section 0.5 — Iteration Type Declaration (v3 mandatory, added iter-v3/007).** ONE of:
+  - `TYPE: EXPLORATION` — fast single-axis variation. Wall-clock budget < 1h. Uses `--exploration` flag (colsample=1.0, ENSEMBLE_SIZE=1, n_trials=10). Critic scores Checks 1, 2, 4, 5, 6, 8 (methodology + look-ahead axes only). Edge thresholds (Check 3 DSR/PSR/Sharpe) are SKIPPED. Critic emits `EXPLORATION-PROMISING` (signal found, propose CONFIRMATION) or `EXPLORATION-NEGATIVE` (no signal, propose next axis). Goal: rapidly cycle through symbol sets / labeling params / feature subsets to find a configuration with IS Sharpe > 0.5.
+  - `TYPE: CONFIRMATION` — full production config. Uses default ENSEMBLE_SIZE=5, n_trials=50, full Optuna search space. Wall-clock budget 4-15h. Critic scores all 8 checks AND optional 9-12 including Check 3 DSR/PSR thresholds. Critic emits `CONFIRMATION-MERGE` or `CONFIRMATION-BLOCK`. Goal: validate an EXPLORATION-PROMISING configuration with full statistical rigor before merging.
+  - Brief MUST justify the type choice in 1-2 sentences. CONFIRMATION iterations require an EXPLORATION-PROMISING precedent (referenced by iter-v3/NNN id) unless first-iteration.
 - **Section 1 — Hypothesis.** ONE sentence. What changes and why we expect OOS improvement. Vague hypotheses BLOCK; specific testable hypotheses PASS.
 - **Section 2 — IS-Only Numerical Evidence.** Tables produced by a committed `analysis/iteration_v3-NNN/*.py` script. Reproducible, IS-data-only, concrete numbers. Category-matching ("similar to RSI") is NOT evidence — BLOCK.
 - **Section 3 — Proposed Changes.** Enumerated: labeling params, symbol set additions/removals (with V3_EXCLUDED_SYMBOLS check), feature additions/removals (with cluster-importance check), risk gate changes.
@@ -347,13 +351,32 @@ Plus optional checks 9–12 (symbol exclusion, feature isolation, forming-candle
 
 ### Verdict Mechanics
 
-OVERALL=BLOCK on **any single FAIL**. The Critic does not balance — one methodology breach = NO-MERGE.
+The Critic operates in **two rounds** (added iter-v3/007). The two-round structure exists to prevent the iter-v3/004/005/006 failure mode where Critic BLOCK fired on issues the QR's brief had already framed as out-of-scope.
 
-OVERALL=BLOCK is **FINAL for this iteration**. There is no "let me fix one thing and re-run". If a methodology root-cause needs fixing, it becomes a NEW iter-v3/NNN+1 with new branch, new brief, new backtest. Allowing rerun-after-fix is selection bias and defeats the Critic's purpose.
+**Round 1 — Preliminary Findings (no verdict yet).** Critic runs the 8 checks and emits a `# Phase 7.5 Critic Review — iter-v3/NNN — PRELIMINARY` document. Each check has a status (PASS/WARN/FAIL/CONCERN) plus reasoning. The document ENDS WITH a section `## Clarifications Requested from QR` listing 0 to N specific questions for which a QR response could change the verdict. Examples:
+- "Brief Section 8 marks DSR as out-of-scope per TYPE=EXPLORATION declaration. Confirm this framing applies to Check 3-edge axis."
+- "Per-cell PBO median = 0.95 in 3 cells (BCH 2023-08, MKR 2024-02, LDO 2024-11) — was this expected per Section 7 prediction P3, or a new finding?"
+- "The chosen seed=42 has OOS Sharpe -0.001; seed=123 has +0.55. Brief Section 4 expected std in [0.20, 0.60] — is std=0.39 the iteration's central success metric or a side observation?"
 
-The QR's Phase 8 diary records the BLOCK verdict and the failure mode. The diary becomes part of the dead-paths catalog. The next iteration starts from the QR's Section 7 evaluation + the Critic's Recommendations to QR.
+If Critic has ZERO clarifications (every check is unambiguous), Round 1 ends with `## Clarifications Requested from QR — NONE` and the orchestrator skips Round 2.
 
-OVERALL=MERGE → QR proceeds to Phase 7 evaluation, then Phase 8 diary with MERGE decision (or NO-MERGE if QR finds an issue the Critic missed — Critic's PASS does not force a MERGE; it only enables one).
+**Round 2 — QR Response (if requested).** The orchestrator dispatches QR with the PRELIMINARY review. QR writes `briefs-v3/iteration_v3-NNN/qr_response.md` answering each clarification in 1-3 sentences. QR may NOT introduce new evidence (analysis scripts, additional runs); responses must reference existing brief sections, engineering report, or report artifacts. QR emits `# QR Response to Critic — iter-v3/NNN` with answers + a `## Position` line: `STAND BY VERDICT` (accept Critic's preliminary as-is) or `REQUEST RECONSIDERATION` (with reasoning).
+
+**Round 3 — Final Verdict.** The orchestrator dispatches Critic with both PRELIMINARY review + QR response. Critic re-evaluates and emits the final `briefs-v3/iteration_v3-NNN/review.md` with one of:
+- `OVERALL: EXPLORATION-PROMISING` (Section 0.5 TYPE=EXPLORATION; signal found; propose CONFIRMATION iter-v3/NNN+1)
+- `OVERALL: EXPLORATION-NEGATIVE` (Section 0.5 TYPE=EXPLORATION; no signal; propose next-axis iteration)
+- `OVERALL: CONFIRMATION-MERGE` (Section 0.5 TYPE=CONFIRMATION; all 8 checks PASS; ready to merge)
+- `OVERALL: CONFIRMATION-BLOCK` (Section 0.5 TYPE=CONFIRMATION; ≥1 check FAIL; no merge)
+
+Final verdict is FINAL for this iteration. There is no "let me fix one thing and re-run" beyond the Round 2 QR response. If a methodology root-cause needs fixing, it becomes a NEW iter-v3/NNN+1.
+
+The two-round structure adds ~15-20 min wall-clock per Critic phase but eliminates the "Critic missed the brief's framing" failure mode (iter-v3/004/005/006 precedent). The Critic's preliminary findings are still adversarial — `When in doubt, raise a clarification` is the default; QR cannot bullshit through. But "the brief said this was out-of-scope" is a legitimate clarification, not a Critic miss.
+
+The QR's Phase 8 diary records the final verdict and the failure mode (if BLOCK / NEGATIVE). The diary becomes part of the dead-paths catalog. The next iteration starts from the QR's Section 7 evaluation + the Critic's Recommendations to QR.
+
+`OVERALL: CONFIRMATION-MERGE` → QR proceeds to Phase 7 evaluation, then Phase 8 diary with MERGE decision (or NO-MERGE if QR finds an issue the Critic missed — Critic's PASS does not force a MERGE; it only enables one).
+
+`OVERALL: EXPLORATION-PROMISING` → QR's Phase 8 diary records the promising signal and proposes the CONFIRMATION iter-v3/NNN+1 brief outline. No actual MERGE happens at the EXPLORATION level — it's a forward-pointer to the CONFIRMATION iteration that may MERGE.
 
 ---
 
