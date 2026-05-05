@@ -188,6 +188,17 @@ This is iter-v3/003's only meaningful code modification. It corresponds to iter-
 
 Each sub-fix from §3.5 has its own row. **Each cell maps to a FILE ARTIFACT** with a verifier command (per Critic Recommendation #1). Empty rows = Phase 5.5 BLOCK.
 
+#### 3.6.1 Adversarial test specification (referenced by row 11)
+
+`tests/strategies/ml/test_oof_persistence.py` (the NEW adversarial test in row 11) must assert all four of the following clauses; the Engineer writes the test file in Phase 6 to enforce them, and the row 11 verifier (`uv run pytest tests/strategies/ml/test_oof_persistence.py -v` exits 0) gates passage:
+
+- (a) Calling `optimize_and_train` with `oof_persist_path` set creates the parquet at the supplied path.
+- (b) The parquet has the 6 prescribed columns: `trial_id`, `symbol`, `train_month`, `fold_idx`, `candle_open_time_ms`, `oof_return` (matching the schema in `analysis/iteration_v3-003/persistence_schema.csv`).
+- (c) `trial_id` cardinality equals `n_trials` (every Optuna trial that ran contributes at least one row).
+- (d) Per-trial row count ≈ `cv_splits × ~val_set_size` (within ±20%) — confirms every fold's validation slice was captured, not silently dropped.
+
+Failure of any clause means sub-fix #1a or #1b shipped incompletely.
+
 | Section 3.5 sub-fix | Code path | File artifact + verifier |
 |---|---|---|
 | 1a — per-trial OOF buffer in `_objective` | `src/crypto_trade/strategies/ml/optimization.py:_objective` | (process artifact: `git diff iteration-v3/002 iteration-v3/003 -- src/crypto_trade/strategies/ml/optimization.py` shows additions to `_objective` for OOF buffering; verifier `git log --oneline iteration-v3/003 -- src/crypto_trade/strategies/ml/optimization.py | wc -l` ≥ 1) |
@@ -200,7 +211,7 @@ Each sub-fix from §3.5 has its own row. **Each cell maps to a FILE ARTIFACT** w
 | Risk gates UNCHANGED (v2 5 + BTC) | `RiskV3Wrapper` config | `grep -E "RiskV3Wrapper\\(" run_baseline_v3.py` shows v2 5-gate config, no R1/R2/R3 |
 | Features UNCHANGED (V3_FEATURE_COLUMNS, 34 cols) | `src/crypto_trade/features_v3/__init__.py` | `python -c "from crypto_trade.features_v3 import V3_FEATURE_COLUMNS; assert len(V3_FEATURE_COLUMNS) == 34"` |
 | Adversarial unit tests inherited from iter-v3/002 still pass | `tests/strategies/ml/test_pbo_synthetic.py`, `test_dsr_negative_is.py`, `test_cpcv_embargo_assert.py` | `uv run pytest tests/strategies/ml/test_pbo_synthetic.py tests/strategies/ml/test_dsr_negative_is.py tests/strategies/ml/test_cpcv_embargo_assert.py -v` exits 0 |
-| (NEW) Adversarial test for OOF persistence | `tests/strategies/ml/test_oof_persistence.py` | Test asserts: (a) calling `optimize_and_train` with `oof_persist_path` set creates the parquet, (b) parquet has the 6 prescribed columns, (c) `trial_id` cardinality equals `n_trials`, (d) per-trial row count ≈ `cv_splits × ~val_set_size` (within ±20%). |
+| (NEW) Adversarial test for OOF persistence | `tests/strategies/ml/test_oof_persistence.py` | `uv run pytest tests/strategies/ml/test_oof_persistence.py -v` exits 0 |
 
 ### 3.7 NO new feature families, NO meta-labeling, NO auto-d* fracdiff
 
@@ -423,7 +434,7 @@ The QR has self-verified all 10 mandatory sections plus the new Phase 5.5 inputs
 | 0 — Data Split | PASS — sacred constants unchanged; iter-v3/002 CPCV config inherited |
 | 1 — Hypothesis | PASS — one sentence; specific testable target ("S=1 → S=50, NaN → number"); falsifier in §4.2 |
 | 2 — IS-Only Numerical Evidence | PASS — `analysis/iteration_v3-003/pbo_strategy_axis_demo.py` committed at SHA `9294855` BEFORE this brief; 3 outputs (`pbo_strategy_axis.csv`, `persistence_schema.csv`, `synthesis.md`) committed; results inline in §2.1; persistence schema in §2.2-2.4 |
-| 3 — Proposed Changes | PASS — symbols UNCHANGED (with V3_EXCLUDED check); labeling UNCHANGED; features UNCHANGED; risk gates UNCHANGED; SINGLE methodology fix decomposed into 6 sub-rows in §3.5; brief-vs-code reconciliation table in §3.6 with file-artifact verifiers (per Critic Rec #1); inheritance plan in §3.8 |
+| 3 — Proposed Changes | PASS — symbols UNCHANGED (with V3_EXCLUDED check); labeling UNCHANGED; features UNCHANGED; risk gates UNCHANGED; SINGLE methodology fix decomposed into 6 sub-rows in §3.5; brief-vs-code reconciliation table in §3.6 with file-artifact verifiers (per Critic Rec #1); §3.6.1 added with the 4-clause spec for the new adversarial test, and reconciliation row 11 verifier command (`uv run pytest tests/strategies/ml/test_oof_persistence.py -v` exits 0) added per Engineer Phase 5.5 BLOCK feedback; inheritance plan in §3.8 |
 | 4 — Expected OOS Impact | PASS — predicted metrics table with EXACT expected match on headline; 3-tier falsifier in §4.2; split-merge clause in §4.3 with PBO non-NaN as hard precondition |
 | 5 — Risk Mitigation | PASS — 3 structural safeguards in §5.2 specifically targeting iter-v3/002's process failure mode |
 | 6 — Risk Management Design | PASS — 7-primitive table identical to iter-v3/002; concentration acknowledged as expected fail |
