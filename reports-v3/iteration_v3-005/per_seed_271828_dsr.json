@@ -1,0 +1,13 @@
+{
+  "dsr": 0.0,
+  "pbo": 0.016561849710982658,
+  "pbo_note": "Per-cell mean PBO=0.0166 (iter-v3/005 seed=271828 cross-cell mean). 173 informative cells (rank>1). rng seed=271828.",
+  "pbo_frac_positive_paths": null,
+  "pbo_path_sharpe_q25": null,
+  "pbo_path_sharpe_q50": null,
+  "pbo_path_sharpe_q75": null,
+  "psr": 1.0,
+  "n_eff": 25,
+  "n_trials": 1000,
+  "min_trl_months": 11.25
+}
