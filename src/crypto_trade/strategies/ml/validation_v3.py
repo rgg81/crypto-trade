@@ -40,8 +40,9 @@ from scipy.stats import norm
 # ---------------------------------------------------------------------------
 
 #: Documented gap formula for v3: (timeout_candles + 1) * n_symbols
-#: With timeout=21 candles (10080 min / 480 min) and 4 symbols → 88.
-REQUIRED_GAP: int = (21 + 1) * 4  # 88
+#: With timeout=21 candles (10080 min / 480 min) and 3 symbols → 66.
+#: Updated from 88 (4 symbols) to 66 (3 symbols) at iter-v3/013 when MKR was dropped.
+REQUIRED_GAP: int = (21 + 1) * 3  # 66
 
 # ---------------------------------------------------------------------------
 # CPCV — Combinatorial Purged Cross-Validation (AFML Ch. 12)
@@ -70,7 +71,8 @@ def combinatorial_purged_cv(
     gap
         Number of samples to exclude on both sides of each test boundary
         (purge gap). Implements López de Prado's purge for label overlap.
-        For v3: gap = (timeout_candles + 1) * n_symbols = (21+1)*4 = 88.
+        For v3: gap = (timeout_candles+1)*n_symbols = (21+1)*3 = 66
+        (3-symbol BCH+LDO+TRX universe since iter-v3/013).
     embargo
         Additional samples to embargo after each test block (prevent leakage
         from autocorrelated features). Default 0; recommend ~1% of T.
@@ -569,7 +571,8 @@ def cpcv_walk_forward_splits(
 ) -> Iterator[tuple[np.ndarray, np.ndarray]]:
     """Yield (train_idx, test_idx) tuples for CPCV walk-forward.
 
-    Default gap = REQUIRED_GAP = (timeout_candles + 1) * n_symbols = 88.
+    Default gap = REQUIRED_GAP = (timeout_candles+1)*n_symbols = 66
+    (3-symbol BCH+LDO+TRX universe since iter-v3/013).
     Default embargo = ~1% of 24-month T ≈ 27 candles.
     Asserts gap == REQUIRED_GAP to catch silent rescaling.
     """
