@@ -1,0 +1,13 @@
+{
+  "dsr": 0.0,
+  "pbo": 0.10751023622047243,
+  "pbo_note": "Per-cell mean PBO=0.1075 (iter-v3/004 cross-cell mean). frac_positive_paths=0.644 from 45 return-proxy paths.",
+  "pbo_frac_positive_paths": 0.6444,
+  "pbo_path_sharpe_q25": -0.243,
+  "pbo_path_sharpe_q50": 0.3351,
+  "pbo_path_sharpe_q75": 0.8378,
+  "psr": 1.0,
+  "n_trials": 30,
+  "n_eff": 7,
+  "min_trl_months": 51.0
+}
