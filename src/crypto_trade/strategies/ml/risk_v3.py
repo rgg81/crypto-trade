@@ -48,7 +48,21 @@ class RiskV3Wrapper(RiskV2Wrapper):
             if not path.exists():
                 continue
 
-            needed = ["open_time", "high", "low", "close", "hurst_100", *V3_FEATURE_COLUMNS]
+            # atr_pct_rank_200 is always needed for the vol-scaling and low-vol
+            # gates (primitives 1 and 5 in the 7-primitive table), regardless of
+            # whether it appears in V3_FEATURE_COLUMNS.  When V3_FEATURE_COLUMNS
+            # is the top-14 subset (iter-v3/007+) atr_pct_rank_200 is NOT in the
+            # training feature list but MUST still be loaded from the parquet as a
+            # gate input.  See brief iter-v3/007 Section 3.4.
+            needed = [
+                "open_time",
+                "high",
+                "low",
+                "close",
+                "hurst_100",
+                "atr_pct_rank_200",  # gate primitive — independent of V3_FEATURE_COLUMNS
+                *V3_FEATURE_COLUMNS,
+            ]
             needed = list(dict.fromkeys(needed))  # dedup, preserve order
             table = pq.read_table(path, columns=needed).to_pandas()
             table = table.sort_values("open_time").reset_index(drop=True)
