@@ -1,5 +1,7 @@
 # v3 EXPLORATION Catalog
 
+> **BANNER (added 2026-05-06 at iter-v3/012 Phase 8): iter-v3/013 MANDATORY AXIS: per-symbol-diagnostic (drop MKR, 3-sym BCH+LDO+TRX universe) per `feedback_mkr_threshold_compression.md` rule TRIGGERED at iter-v3/012.** The rule fired at the 5th consecutive MKR OOS-negative (trajectory −6.5/−13.1/−10.6/−25.75/−25.75; iter-v3/012 STATIONARY identity with iter-v3/011 strengthens the diagnostic case). Cannot be renegotiated post-hoc by future Engineer or QR. ±25% BTC band looser-direction test deferred to iter-v3/014+ at earliest.
+
 Running ledger of EXPLORATION iterations. Each EXPLORATION's Phase 8 diary appends one row here. The next CONFIRMATION QR reads this to bundle the best variations.
 
 **Schema**: `iter-v3/NNN | YYYY-MM-DD | axis varied | IS Sharpe Δ | OOS Sharpe (informational) | verdict | confirmation candidate?`
@@ -19,6 +21,7 @@ Running ledger of EXPLORATION iterations. Each EXPLORATION's Phase 8 diary appen
 | iter-v3/009 | 2026-05-06 | Features → top-13 (drop vwap_dev_50) | IS Sharpe Δ -0.144 (vs iter-v3/007 +0.2241) | +1.1223 (INFORMATIONAL — see caveats below) | EXPLORATION-NEGATIVE | NO — Falsifier 1 activated; OOS lift is LDO-concentrated 12-trade lottery; N=87 OOS < 130 floor |
 | iter-v3/010 | 2026-05-06 | Labeling → ATR multipliers (2.9, 1.45) → (2.0, 1.0) | IS Sharpe Δ +0.488 (vs iter-v3/009 +0.0802) | +1.8122 | EXPLORATION-PROMISING | YES — strong candidate for next CONFIRMATION bundle |
 | iter-v3/011 | 2026-05-06 | Risk-gate → z-score OOD 2.5 → 2.0 (tighter) | IS Sharpe Δ +0.39 (vs iter-v3/010 +0.5683) | +1.6251 | EXPLORATION-PROMISING (lottery/concentration caveats) | YES — strong IS lift broad-based, but flag LDO 86% concentration for CONFIRMATION QR |
+| iter-v3/012 | 2026-05-06 | Risk-gate → BTC trend filter band ±20% → ±15% | IS Sharpe Δ -0.147 (vs iter-v3/011 +0.9566) | +1.5914 (informational) | EXPLORATION-NEGATIVE-no-effect | NO — null-result, hypothesis "tightening helps" UNSUPPORTED, trade roster IDENTICAL |
 
 ---
 
@@ -65,12 +68,30 @@ The five caveats above are NOT disqualifying for catalog inclusion. iter-v3/011 
 
 ---
 
+## Caveats — iter-v3/012 EXPLORATION-NEGATIVE-no-effect (NULL-RESULT) flags
+
+The IS Sharpe -0.147 in iter-v3/012 IS a weighted-PnL accounting artifact, NOT a signal-quality change. The trade roster is byte-identical to iter-v3/011 (286 IS, 101 OOS — load-bearing for NULL-RESULT classification). Cataloguing as PROMISING (because IS Sharpe +0.81 > +0.40 threshold) would mislead future CONFIRMATION QR into bundling ±15% as ingredient when finding is "band width in (15%, 20%) is structurally inert over v3 data extent." The five iter-v3/012-specific caveats below are catalogued for audit-trail discipline so the future CONFIRMATION-bundling QR inherits the rule set without re-deriving any of them under post-hoc pressure:
+
+- **`verdict = NEGATIVE-no-effect`** (NULL-RESULT subtype, hypothesis unsupported): IS Sharpe direction is wrong (-0.147), trade roster IDENTICAL to iter-v3/011 (286 IS, 101 OOS — bit-identical including LDO/MKR per-symbol metrics; PBO 0.1077 bit-identical; n_eff 7 bit-identical). The 17 additional BTC-filter kills (26 → 43; +4.39pp fire rate) materialized as zero-weight rows reducing IS total_pnl 97.31% → 73.42% but did NOT displace any trades. NOT a CONFIRMATION-bundle candidate; adds zero information to the bundle relative to iter-v3/011. Distinct from iter-v3/009's `NEGATIVE-failed-axis` (which had IS Sharpe below Falsifier 1 threshold AND a failed IS axis).
+
+- **`mkr_rule_triggered = TRUE`** (5/5 consecutive negative trajectory; threshold compressed 6-7 → 5 in iter-v3/011 review FIRED): MKR OOS PnL trajectory −6.5% → −13.1% → −10.6% → −25.75% → **−25.75%** (iter-v3/012 STATIONARY identity with iter-v3/011 strengthens diagnostic case). MKR OOS WR trajectory 33.3% → 30.8% → 29.4% → 25.0% → **25.0%** (worst stationary). Tighter BTC band had ZERO behavioral effect on MKR's 16 OOS trades. **MKR pattern is gate-orthogonal AND BTC-band-orthogonal**: tightening neither z-gate nor BTC-band fixes it. Per `feedback_mkr_threshold_compression.md` (SHA `b9ebbb2`), iter-v3/013 MUST be drop-MKR per-symbol-diagnostic single-axis EXPLORATION (3-symbol BCH+LDO+TRX universe). Cannot be post-hoc renegotiated by future Engineer/QR.
+
+- **`pm25_deferred = TRUE, earliest = iter-v3/014`**: looser-direction ±25% BTC band test deferred per MKR rule override. The MKR rule overrides any other axis preference at iter-v3/013; ±25% test cannot launch until at minimum iter-v3/014 (post-MKR-diagnostic), and only if no further mandatory rule overrides fire. Falsifier 1 NOT triggered would have prevented activation regardless.
+
+- **`n_high_pbo_cells_99 = 4`** (TRX/2025-10 = 1.00, TRX/2025-11 = 1.00, MKR/2025-04 = 0.995, MKR/2025-07 = 0.991): 2 NEW TRX/2025-Q4 entries with PBO = 1.00 in OOS-extending months — particularly concerning because they suggest either regime drift or per-cell sample-size collapse at the OOS frontier. Mean aggregator dilutes these to a clean 0.1077 PBO (bit-identical to iter-v3/011) but the right-tail thickening is real. **Future CONFIRMATION QR uses `(1 − max_per_cell_pbo)` not just `(1 − mean_pbo)` for aggregation discipline** — carried forward from iter-v3/010 + iter-v3/011 audit trail and now reinforced.
+
+- **`trade_roster_identity = TRUE`** (286 IS, 101 OOS bit-identical to iter-v3/011 — **LOAD-BEARING for null-result classification**): without trade-roster bit-identity, IS Sharpe +0.81 alone would qualify as PROMISING (>+0.40 threshold). With it, the "behavioral effect of axis perturbation = 0" reading dominates the Sharpe-number reading. The Critic FINAL preserves this distinction explicitly: *"Cataloguing PROMISING would mislead future CONFIRMATION QR into bundling ±15% as ingredient when finding is 'band width in (15%, 20%) is structurally inert.'"* Future Critic FINAL writeups should preserve the NEGATIVE-no-effect (NULL-RESULT) vs NEGATIVE-failed-axis distinction explicitly.
+
+The five caveats above are LOAD-BEARING for the NULL-RESULT classification and disqualifying for CONFIRMATION-bundle inclusion (iter-v3/012 adds zero information to the bundle relative to iter-v3/011). The iter-v3/012 catalog row preserves the audit trail but does not contribute a stack ingredient.
+
+---
+
 ## Last CONFIRMATION
 
 (none — iter-v3/008 was aborted at 4h 15min on 2026-05-06; the cadence discipline was established AFTER that abort)
 
 ## Count of EXPLORATIONS since last CONFIRMATION
 
-**4** of **10 required**. iter-v3/012 onwards needs **6 more EXPLORATIONS** before any CONFIRMATION can launch.
+**5** of **10 required**. iter-v3/013 onwards needs **5 more EXPLORATIONS** before any CONFIRMATION can launch.
 
-Axis coverage after iter-v3/011: **features × 2** (007, 009), **labeling × 1** (010), **gate × 1** (011). Per Critic FINAL Recommendation 1 (iter-v3/011 review.md SHA `b9ebbb2`), iter-v3/012 should test ANOTHER non-features-non-labeling-non-gate-zscore axis. Suggested: **BTC trend filter band ±20% (currently) → ±15% (stricter) or ±25% (looser)** as single-axis variation. After iter-v3/012 the catalog will have axis coverage features × 2, labeling × 1, gate-zscore × 1, gate-btc-trend × 1 — substantially diverse for the eventual CONFIRMATION bundle. Alternative axes: ADX threshold (currently 20), low-vol filter floor (0.33), or vol-scaling clip range ([0.3, 1.0]).
+Axis coverage after iter-v3/012: **features × 2** (007, 009), **labeling × 1** (010), **gate-zscore × 1** (011), **gate-btc-trend × 1** (012). Per `feedback_mkr_threshold_compression.md` FIRED at iter-v3/012 (5th consecutive MKR OOS-negative; STATIONARY identity with iter-v3/011), **iter-v3/013 axis is MANDATORILY drop-MKR per-symbol-diagnostic single-axis EXPLORATION (3-symbol BCH+LDO+TRX universe)**. The drop-MKR axis is EXPLICITLY pre-committed; no debate permitted. After iter-v3/013 the catalog will have axis coverage features × 2 + labeling × 1 + gate-zscore × 1 + gate-btc-trend × 1 + universe × 1 = 5 unique axis representations. Alternative axes deferred to iter-v3/014+: ±25% BTC band looser direction (deferred from iter-v3/012), ADX threshold (currently 20), low-vol filter floor (0.33), vol-scaling clip range ([0.3, 1.0]).
