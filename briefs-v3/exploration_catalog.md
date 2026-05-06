@@ -6,8 +6,8 @@ Running ledger of EXPLORATION iterations. Each EXPLORATION's Phase 8 diary appen
 
 **Constraints**:
 - CONFIRMATION cannot launch with fewer than 10 EXPLORATION rows since the last CONFIRMATION
-- Maximum 1 CONFIRMATION per day (24h since last CONFIRMATION launch)
 - Only CONFIRMATION-MERGE updates BASELINE_V3.md
+- No calendar/daily limit — 10:1 ratio is the only cadence constraint
 
 ---
 
