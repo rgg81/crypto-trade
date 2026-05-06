@@ -1,0 +1,20 @@
+metric,in_sample,out_of_sample,ratio
+monthly_sharpe,0.6593,0.8661,1.3136
+daily_sharpe,1.7478,1.9706,1.1275
+max_drawdown,21.8757,25.1458,1.1495
+profit_factor,1.2924,1.3122,1.0154
+win_rate,32.6797,40.0000,1.2240
+n_trades,153,60,0.3922
+total_pnl,48.1386,17.9783,0.3735
+monthly_calmar,2.2006,0.7150,0.3249
+weighted_pnl_total,48.1386,17.9783,0.3735
+dsr,0.000000,—,—
+pbo,0.1075,—,—
+psr,1.0000,—,—
+n_trials,30,—,—
+n_effective_trials,7,—,—
+
+# per_symbol,weighted_pnl,n_trades,win_rate,concentration_pct
+BCHUSDT,5.5385,20,35.0,30.81
+LDOUSDT,7.3936,2,50.0,41.13
+TRXUSDT,5.0463,38,42.1,28.07
