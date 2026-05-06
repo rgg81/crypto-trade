@@ -1,0 +1,22 @@
+{
+  "iteration": "iter-v3/007",
+  "branch": "iteration-v3/007",
+  "commit_sha": "849c4a6de564b731f8fcf5de315602bf35454ae4",
+  "wall_clock_minutes": 8,
+  "n_features": 14,
+  "seeds": 1,
+  "n_trials": 10,
+  "ensemble_size": 1,
+  "exploration_mode": true,
+  "is_monthly_sharpe": 0.2241,
+  "oos_monthly_sharpe": 0.0622,
+  "is_n_trades": 274,
+  "oos_n_trades": 90,
+  "pbo": 0.1419,
+  "psr": 0.7932,
+  "dsr": 0.0,
+  "n_eff": 7,
+  "reconciliation_verifiers_pass": 10,
+  "adversarial_tests_pass": 35,
+  "overall": "READY-FOR-CRITIC"
+}
