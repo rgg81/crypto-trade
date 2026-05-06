@@ -888,15 +888,40 @@ Agent({
 })
 ```
 
-### Engineer Phase 6 (after gate=PASS)
+### Engineer Phase 6 — SPLIT DISPATCH for long backtests (added iter-v3/008)
+
+**Mandatory split for any backtest > 30 min wall-clock**. Anthropic API quota is consumed by agent supervisor loops while the underlying Python process runs; iter-v3/003 first-attempt died at 86 min Engineer wall-clock with 1047 tool uses — Engineer was burning tokens supervising the backtest. Split saves ~5-9h agent quota per long iteration.
+
+**Dispatch #1 — Engineer setup-only** (~10-20 min agent quota; Engineer commits and STOPS, does NOT launch the backtest):
 
 ```
 Agent({
-  description: "Run Phase 6 implementation for iter-v3/NNN",
+  description: "Phase 6 SETUP for iter-v3/NNN",
   subagent_type: "quant-engineer",
-  prompt: "Phase 5.5 gate PASSED. Run Phase 6 for iter-v3/NNN. Brief at briefs-v3/iteration_v3-NNN/research_brief.md. Implement changes in src/, run backtest with CPCV, produce reports + comparison.csv + companion files (pareto_front, cpcv_paths, adf_test, ic_matrix, dsr.json), commit code before backtest, write engineering report ending with OVERALL=READY-FOR-CRITIC."
+  prompt: "Phase 5.5 gate PASSED. Run Phase 6 SETUP-ONLY for iter-v3/NNN. Brief at briefs-v3/iteration_v3-NNN/research_brief.md. Apply src/ changes per brief Section 3.5 (cherry-pick / inheritance / feature subset / ITERATION_LABEL update / banner fix). Run pre-flight: 35/35 adversarial tests, ruff check, _verify_feature_columns. Commit the code BEFORE backtest with message 'feat(iter-v3/NNN): <summary>'. **DO NOT LAUNCH THE BACKTEST.** Return immediately after the setup commit so the orchestrator can launch the backtest as a detached background bash. Final assistant message format: state SETUP-COMPLETE in first line, list the commit SHA, and state the exact bash invocation the orchestrator should use."
 })
 ```
+
+**Orchestrator launches the backtest** (NO agent quota during the multi-hour run):
+
+```bash
+nohup bash -c 'cd /home/roberto/crypto-trade/.worktrees/quant-research && uv run python run_baseline_v3.py <args>' > reports-v3/iteration_v3-NNN/run.log 2>&1 < /dev/null &
+disown
+```
+
+Run via the Bash tool with `run_in_background=true`. Verify the process is detached (PPID=1 after launcher bash exits) so it survives any session/agent disruption. The orchestrator gets a system notification when the bash process completes — NO polling, NO tail-loops.
+
+**Dispatch #2 — Engineer report-only** (~15-30 min agent quota; ONLY after the bash completion notification arrives):
+
+```
+Agent({
+  description: "Phase 6 REPORT for iter-v3/NNN",
+  subagent_type: "quant-engineer",
+  prompt: "The Phase 6 backtest for iter-v3/NNN has completed (bash background task notified). Read reports-v3/iteration_v3-NNN/{comparison.csv, dsr.json, pareto_front.csv, per_cell_pbo.csv, adf_test.csv, ic_matrix.csv, in_sample/, out_of_sample/, run.log}. Verify all reconciliation verifiers per brief Section 3.6 exit 0. Apply Section 8 mechanical evaluation (CONFIRMATION) or methodology-axes evaluation (EXPLORATION). Write briefs-v3/iteration_v3-NNN/engineering_report.md ending with OVERALL=READY-FOR-CRITIC. Commit with message 'docs(iter-v3/NNN): engineering report + backtest results'."
+})
+```
+
+**Exception**: backtests under 30 min may stay inside a single Engineer dispatch (the cohesion is worth the small overhead). The split is MANDATORY for long runs.
 
 ### Critic Phase 7.5
 
