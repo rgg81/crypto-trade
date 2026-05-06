@@ -116,43 +116,47 @@ Preserved as a named constant so iter-v3/008+ can restore via reassignment:
 """
 
 V3_FEATURE_COLUMNS_TOP_N: tuple[str, ...] = (
-    # Top-14 by mean importance rank across iter-v3/006 (BCH-only, n_trials=10)
-    # and iter-v3/003 (full universe, n_trials=50).  See brief Section 2.1 and
-    # analysis/iteration_v3-007/top_n_features.csv (SHA a394314).
-    # Groups represented: tail_risk (6), momentum_accel (3), volume_micro (2),
-    #   regime (2), cross_btc (2).  Dropped: price_efficient_vol, fracdiff,
-    #   microstructure_v3.
+    # Top-13 feature subset for iter-v3/008 CONFIRMATION run.
+    # vwap_dev_50 dropped per Critic FINAL SHA a544621 (Recommendation 1):
+    #   vwap_dev_50 had IC 0.875 with ema_spread_atr_20 AND IC 0.794 with
+    #   vwap_dev_20 — dropping it kills both redundant pairs in one move.
+    # Source: analysis/iteration_v3-008/ic_redundancy_drop_demo.py (SHA 003a21e).
+    # Groups: tail_risk (6), momentum_accel (2), volume_micro (1),
+    #         regime (2), cross_btc (2).
     "max_dd_window_50",  # rank 1 (mean 2.5)  — tail_risk
-    "vwap_dev_50",  # rank 2 (mean 2.5)  — volume_micro
-    "ema_spread_atr_20",  # rank 3 (mean 3.0)  — momentum_accel
-    "ret_kurt_50",  # rank 4 (mean 5.0)  — tail_risk
-    "ret_skew_200",  # rank 5 (mean 5.0)  — tail_risk
-    "range_realized_vol_50",  # rank 6 (mean 6.5)  — tail_risk
-    "hurst_diff_100_50",  # rank 7 (mean 11.5) — regime
-    "ret_kurt_200",  # rank 8 (mean 11.5) — tail_risk
-    "hurst_100",  # rank 9 (mean 11.5) — regime
-    "btc_ret_14d",  # rank 10 (mean 12.5) — cross_btc
-    "ret_skew_50",  # rank 11 (mean 12.5) — tail_risk
-    "vwap_dev_20",  # rank 12 (mean 13.0) — volume_micro
-    "ret_autocorr_lag1_50",  # rank 13 (mean 13.5) — momentum_accel
-    "sym_vs_btc_ret_7d",  # rank 14 (mean 14.5) — cross_btc
+    "ema_spread_atr_20",  # rank 2 (mean 3.0)  — momentum_accel
+    "ret_kurt_50",  # rank 3 (mean 5.0)  — tail_risk
+    "ret_skew_200",  # rank 4 (mean 5.0)  — tail_risk
+    "range_realized_vol_50",  # rank 5 (mean 6.5)  — tail_risk
+    "hurst_diff_100_50",  # rank 6 (mean 11.5) — regime
+    "ret_kurt_200",  # rank 7 (mean 11.5) — tail_risk
+    "hurst_100",  # rank 8 (mean 11.5) — regime
+    "btc_ret_14d",  # rank 9 (mean 12.5) — cross_btc
+    "ret_skew_50",  # rank 10 (mean 12.5) — tail_risk
+    "vwap_dev_20",  # rank 11 (mean 13.0) — volume_micro
+    "ret_autocorr_lag1_50",  # rank 12 (mean 13.5) — momentum_accel
+    "sym_vs_btc_ret_7d",  # rank 13 (mean 14.5) — cross_btc
 )
-"""Top-14 feature subset for iter-v3/007 EXPLORATION run.
+"""Top-13 feature subset for iter-v3/008 CONFIRMATION run.
 
-Replaces V3_FEATURE_COLUMNS (34) for the duration of iter-v3/007 only.
-iter-v3/008 restores V3_FEATURE_COLUMNS = V3_FEATURE_COLUMNS_FULL if
-EXPLORATION-NEGATIVE, or keeps this subset if EXPLORATION-PROMISING.
-
-TEMPORARY — iter-v3/007 only.  See brief Section 3.3 and 3.7.
+vwap_dev_50 dropped per Critic FINAL SHA a544621 (Recommendation 1).
+Dropping it removes both IC-redundant pairs in the 14-feature subset:
+  - vwap_dev_50 x ema_spread_atr_20: IC 0.875 (above 0.70 threshold)
+  - vwap_dev_50 x vwap_dev_20:       IC 0.794 (above 0.70 threshold)
+Residual max |IC| in the 13-feature subset: 0.6602.  No pair above 0.70.
+See analysis/iteration_v3-008/ic_redundancy_drop_demo.py (SHA 003a21e).
 """
 
-# iter-v3/007: reassign to top-14 subset for EXPLORATION run.
-# To restore: V3_FEATURE_COLUMNS = V3_FEATURE_COLUMNS_FULL
+# iter-v3/007-008: reassign to top-N subset for EXPLORATION/CONFIRMATION run.
+# iter-v3/007: top-14; iter-v3/008: top-13 (vwap_dev_50 dropped per Critic Rec 1).
+# To restore full set: V3_FEATURE_COLUMNS = V3_FEATURE_COLUMNS_FULL
 V3_FEATURE_COLUMNS: tuple[str, ...] = V3_FEATURE_COLUMNS_TOP_N
 """Active feature columns fed to LightGBM.
 
 iter-v3/001-006: V3_FEATURE_COLUMNS_FULL (34 features).
 iter-v3/007:     V3_FEATURE_COLUMNS_TOP_N (14 features, EXPLORATION).
+iter-v3/008:     V3_FEATURE_COLUMNS_TOP_N (13 features, CONFIRMATION;
+                 vwap_dev_50 dropped per Critic FINAL SHA a544621).
 """
 
 V3_NON_FEATURE_COLUMNS: tuple[str, ...] = ("natr_21_raw",)

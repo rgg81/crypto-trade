@@ -96,7 +96,7 @@ def _derive_ensemble_seeds(outer_seed: int, size: int = ENSEMBLE_SIZE) -> list[i
     return [int(s) for s in rng.integers(low=0, high=2**31 - 1, size=size)]
 
 
-ITERATION_LABEL = "v3-007"
+ITERATION_LABEL = "v3-008"
 REPORTS_DIR = Path("reports-v3")
 FEATURES_DIR = Path("data/features_v3")
 DATA_DIR = Path("data")
@@ -179,21 +179,26 @@ def _verify_data_freshness(symbols: tuple[str, ...], max_lag_hours: float = 16.0
 
 
 def _verify_feature_columns() -> None:
-    """Assert V3_FEATURE_COLUMNS has exactly 14 columns (iter-v3/007 brief Section 3.3).
+    """Assert V3_FEATURE_COLUMNS has exactly 13 columns (iter-v3/008 brief Section 3.3).
 
-    iter-v3/007 EXPLORATION: V3_FEATURE_COLUMNS is reassigned to
-    V3_FEATURE_COLUMNS_TOP_N (14 features) from V3_FEATURE_COLUMNS_FULL (34).
-    Expected count is 14 for this iteration only.
-    To restore to 34 for iter-v3/008: update this check and reassign
-    V3_FEATURE_COLUMNS = V3_FEATURE_COLUMNS_FULL in features_v3/__init__.py.
+    iter-v3/008 CONFIRMATION: V3_FEATURE_COLUMNS is V3_FEATURE_COLUMNS_TOP_N
+    (13 features) — vwap_dev_50 dropped per Critic FINAL SHA a544621 (Rec 1).
+    Expected count is 13 for this iteration.
+    Also asserts vwap_dev_50 is NOT in V3_FEATURE_COLUMNS (belt-and-suspenders).
     """
     n = len(V3_FEATURE_COLUMNS)
-    if n != 14:
+    if n != 13:
         raise RuntimeError(
-            f"V3_FEATURE_COLUMNS has {n} columns — expected exactly 14. "
-            "iter-v3/007 brief Section 3.3 requires the top-14 subset. "
-            "If reverting to full 34-feature set, restore V3_FEATURE_COLUMNS = "
-            "V3_FEATURE_COLUMNS_FULL in features_v3/__init__.py and update this check."
+            f"V3_FEATURE_COLUMNS has {n} columns — expected exactly 13. "
+            "iter-v3/008 brief Section 3.3 requires the top-13 subset "
+            "(vwap_dev_50 dropped per Critic FINAL SHA a544621). "
+            "Check features_v3/__init__.py V3_FEATURE_COLUMNS_TOP_N."
+        )
+    if "vwap_dev_50" in V3_FEATURE_COLUMNS:
+        raise RuntimeError(
+            "vwap_dev_50 found in V3_FEATURE_COLUMNS — must be dropped per "
+            "Critic FINAL SHA a544621 (Recommendation 1). "
+            "Remove it from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
         )
     print(f"  V3_FEATURE_COLUMNS: {n} columns  PASS")
 
@@ -1302,7 +1307,7 @@ def main() -> None:
     baseline_symbols = tuple(sym for _, sym in active_models)
     _verify_symbols(baseline_symbols)
     _verify_data_freshness(baseline_symbols + ("BTCUSDT",))
-    _verify_feature_columns()  # asserts len == 34
+    _verify_feature_columns()  # asserts len == 13 and vwap_dev_50 not present
     _verify_label_leakage_gap()  # asserts REQUIRED_GAP == 88
     _verify_track_isolation()  # grep check
 
@@ -1312,7 +1317,10 @@ def main() -> None:
     print(f"Active models: {len(active_models)}/{len(V3_MODELS)} (--symbols={args.symbols!r})")
     print(f"CPCV: N={CPCV_N_SPLITS}, k={CPCV_N_TEST_SPLITS}, 45 paths on IS CANDLE SEQUENCE")
     print(f"Gap: {REQUIRED_GAP} (= (timeout_candles+1) * 4 full-universe symbols)")
-    print("Pre-flight: branch OK, symbols OK, data fresh (<16h), feature-cols=34  PASS\n")
+    print(
+        f"Pre-flight: branch OK, symbols OK, data fresh (<16h), "
+        f"feature-cols={len(V3_FEATURE_COLUMNS)}  PASS\n"
+    )
 
     # Feature generation
     if not args.skip_features:
