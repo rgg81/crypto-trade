@@ -218,11 +218,11 @@ iter-v3/008 was killed at 4h 15min after extrapolation showed ~25h total wall-cl
 
 3. **CONFIRMATION requires 10 EXPLORATION precedents.** A CONFIRMATION iteration's brief Section 0.5 MUST list ≥10 EXPLORATION iter-v3/NNN ids completed since the last CONFIRMATION (or since iter-v3/001 if no prior CONFIRMATION). Phase 5.5 gate verifies this count from `briefs-v3/exploration_catalog.md`.
 
-4. **Maximum 1 CONFIRMATION per day** (24h since last CONFIRMATION launch). Phase 5.5 gate verifies via git log timestamps.
+4. **CONFIRMATION = bundle of best EXPLORATIONS.** The CONFIRMATION brief Section 3 lists which features/symbols/labels are imported from which prior EXPLORATION iter-v3/NNN ids. Not a fresh hypothesis — a curated combination.
 
-5. **CONFIRMATION = bundle of best EXPLORATIONS.** The CONFIRMATION brief Section 3 lists which features/symbols/labels are imported from which prior EXPLORATION iter-v3/NNN ids. Not a fresh hypothesis — a curated combination.
+5. **Only CONFIRMATION-MERGE updates BASELINE_V3.md.** EXPLORATION-PROMISING is a forward-pointer, not a baseline change. EXPLORATION-NEGATIVE is recorded in the catalog but never affects baseline.
 
-6. **Only CONFIRMATION-MERGE updates BASELINE_V3.md.** EXPLORATION-PROMISING is a forward-pointer, not a baseline change. EXPLORATION-NEGATIVE is recorded in the catalog but never affects baseline.
+The 10:1 ratio is the only cadence constraint. No daily/weekly limit — if 10 EXPLORATIONs complete in 6h of compute, the CONFIRMATION can launch immediately after.
 
 ### `briefs-v3/exploration_catalog.md` — the EXPLORATION ledger
 
@@ -240,7 +240,7 @@ The catalog accumulates across iterations. The next CONFIRMATION QR reads it, pi
 
 - 10 EXPLORATIONS × 1-2h each = ~15h compute over multiple sessions (can run sequentially or with short batches in a day)
 - 1 CONFIRMATION = ~3-4h compute
-- Result: weekly CONFIRMATION cadence (10 explorations + 1 confirmation = ~20h compute), 50 EXPLORATIONs+5 CONFIRMATIONs per month
+- Result: ~20h compute per "exploration cycle" (10 EXPLORATIONs + 1 CONFIRMATION). Cadence is event-driven (when 10 EXPLORATIONs accumulate, a CONFIRMATION can launch immediately) — no calendar-time limit.
 - Compare to old design: iter-v3/008-style 25h single iteration → 1-2 iterations per week, no exploratory diversity
 
 This discipline is the **answer** to "explore fast, confirm later" — it operationalizes "fast" as 2h-capped EXPLORATIONS and "confirm" as the rare 4h CONFIRMATION bundling.
@@ -345,7 +345,6 @@ Phase 5.5 gate ALSO verifies cadence rules per the Iteration Cadence Discipline 
 
 **For TYPE=CONFIRMATION**:
 - Count EXPLORATION iter-v3/NNN ids in `briefs-v3/exploration_catalog.md` since the last CONFIRMATION (or since iter-v3/001 if first). MUST be ≥ 10. BLOCK if < 10. Engineer reports the actual count.
-- Verify last CONFIRMATION launch was > 24h ago (via git log). BLOCK if too soon.
 - Brief Section 3 lists ≥1 imported feature/symbol/label per source EXPLORATION iter-v3/NNN id. BLOCK if Section 3 is a fresh hypothesis (CONFIRMATION ≠ EXPLORATION).
 - `--seeds 2` (max). BLOCK if --seeds > 2 or absent.
 
@@ -364,7 +363,6 @@ TYPE: EXPLORATION  (or CONFIRMATION)
 ## Cadence Check (added iter-v3/008 abort)
 - Wall-clock budget declared: <2h for EXPLORATION / <4h for CONFIRMATION>: PASS / BLOCK
 - (CONFIRMATION only) EXPLORATION precedents since last CONFIRMATION: <count, ≥10 required>: PASS / BLOCK
-- (CONFIRMATION only) Last CONFIRMATION launch > 24h ago: PASS / BLOCK
 - (CONFIRMATION only) Section 3 lists imported variations from prior EXPLORATIONs: PASS / BLOCK
 
 ## Per-Section Status
