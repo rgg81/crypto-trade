@@ -96,7 +96,7 @@ def _derive_ensemble_seeds(outer_seed: int, size: int = ENSEMBLE_SIZE) -> list[i
     return [int(s) for s in rng.integers(low=0, high=2**31 - 1, size=size)]
 
 
-ITERATION_LABEL = "v3-009"
+ITERATION_LABEL = "v3-010"
 REPORTS_DIR = Path("reports-v3")
 FEATURES_DIR = Path("data/features_v3")
 DATA_DIR = Path("data")
@@ -179,11 +179,10 @@ def _verify_data_freshness(symbols: tuple[str, ...], max_lag_hours: float = 16.0
 
 
 def _verify_feature_columns() -> None:
-    """Assert V3_FEATURE_COLUMNS has exactly 13 columns (iter-v3/008 brief Section 3.3).
+    f"""Verifies V3_FEATURE_COLUMNS contents per current brief (iter-{ITERATION_LABEL}).
 
-    iter-v3/008 CONFIRMATION: V3_FEATURE_COLUMNS is V3_FEATURE_COLUMNS_TOP_N
-    (13 features) — vwap_dev_50 dropped per Critic FINAL SHA a544621 (Rec 1).
-    Expected count is 13 for this iteration.
+    Asserts V3_FEATURE_COLUMNS has exactly 13 columns — vwap_dev_50 dropped
+    per Critic FINAL SHA a544621 (Rec 1, iter-v3/008).
     Also asserts vwap_dev_50 is NOT in V3_FEATURE_COLUMNS (belt-and-suspenders).
     """
     n = len(V3_FEATURE_COLUMNS)
@@ -860,8 +859,8 @@ def _build_v3_model(
         fee_pct=0.1,
         features_dir=str(FEATURES_DIR),
         verbose=1,
-        atr_tp_multiplier=2.9,
-        atr_sl_multiplier=1.45,
+        atr_tp_multiplier=2.0,
+        atr_sl_multiplier=1.0,
         atr_column="natr_21_raw",
         use_atr_labeling=True,
         ensemble_seeds=list(ensemble_seeds),
