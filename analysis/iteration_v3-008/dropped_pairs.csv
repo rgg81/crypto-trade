@@ -1,0 +1,3 @@
+feature_a,feature_b,abs_ic,above_threshold,dropped,kept
+vwap_dev_50,ema_spread_atr_20,0.874624,True,vwap_dev_50,ema_spread_atr_20
+vwap_dev_50,vwap_dev_20,0.793843,True,vwap_dev_50,vwap_dev_20
