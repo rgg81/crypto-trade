@@ -1,0 +1,14 @@
+iter_v3_009_position,feature,iter_v3_007_importance,iter_v3_007_is_rank
+1,ret_skew_200,408.0,1
+2,range_realized_vol_50,321.0,3
+3,ema_spread_atr_20,318.0,4
+4,ret_autocorr_lag1_50,292.0,5
+5,max_dd_window_50,242.0,6
+6,ret_kurt_200,237.0,7
+7,hurst_100,236.0,8
+8,ret_kurt_50,219.0,9
+9,vwap_dev_20,201.0,10
+10,btc_ret_14d,195.0,11
+11,hurst_diff_100_50,172.0,12
+12,ret_skew_50,168.0,13
+13,sym_vs_btc_ret_7d,159.0,14
