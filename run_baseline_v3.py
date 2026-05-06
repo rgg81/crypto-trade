@@ -97,7 +97,7 @@ def _derive_ensemble_seeds(outer_seed: int, size: int = ENSEMBLE_SIZE) -> list[i
     return [int(s) for s in rng.integers(low=0, high=2**31 - 1, size=size)]
 
 
-ITERATION_LABEL = "v3-013"
+ITERATION_LABEL = "v3-014"
 REPORTS_DIR = Path("reports-v3")
 FEATURES_DIR = Path("data/features_v3")
 DATA_DIR = Path("data")
@@ -203,12 +203,12 @@ def _verify_feature_columns() -> None:
 
 
 def _verify_label_leakage_gap() -> None:
-    """Assert gap == REQUIRED_GAP == 88 and print proof (brief Section 3.5#3)."""
+    """Assert gap == REQUIRED_GAP and print proof (brief Section 3.5#3)."""
     timeout_minutes = 10080  # 7 days
     candle_minutes = 480  # 8h
     n_symbols = len(V3_MODELS)
     timeout_candles = timeout_minutes // candle_minutes  # = 21
-    required_gap = (timeout_candles + 1) * n_symbols  # = (21+1)*4 = 88
+    required_gap = (timeout_candles + 1) * n_symbols  # formula: (timeout_candles+1)*len(V3_MODELS)
     assert required_gap == REQUIRED_GAP, (
         f"REQUIRED_GAP mismatch: formula gives {required_gap}, "
         f"REQUIRED_GAP constant is {REQUIRED_GAP}. Update validation_v3.REQUIRED_GAP."
@@ -871,6 +871,7 @@ def _build_v3_model(
     )
     risk_cfg = RiskV2Config(
         zscore_threshold=2.0,
+        adx_threshold=25.0,
     )
     strategy = RiskV3Wrapper(m1, risk_cfg)
     return cfg, strategy
