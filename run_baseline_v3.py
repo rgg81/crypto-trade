@@ -96,7 +96,7 @@ def _derive_ensemble_seeds(outer_seed: int, size: int = ENSEMBLE_SIZE) -> list[i
     return [int(s) for s in rng.integers(low=0, high=2**31 - 1, size=size)]
 
 
-ITERATION_LABEL = "v3-010"
+ITERATION_LABEL = "v3-011"
 REPORTS_DIR = Path("reports-v3")
 FEATURES_DIR = Path("data/features_v3")
 DATA_DIR = Path("data")
@@ -870,7 +870,7 @@ def _build_v3_model(
         fast_mode=fast_mode,  # iter-v3/007 — colsample_bytree=1.0 when True
     )
     risk_cfg = RiskV2Config(
-        zscore_threshold=2.5,
+        zscore_threshold=2.0,
     )
     strategy = RiskV3Wrapper(m1, risk_cfg)
     return cfg, strategy
