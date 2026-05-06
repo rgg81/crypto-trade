@@ -96,7 +96,7 @@ def _derive_ensemble_seeds(outer_seed: int, size: int = ENSEMBLE_SIZE) -> list[i
     return [int(s) for s in rng.integers(low=0, high=2**31 - 1, size=size)]
 
 
-ITERATION_LABEL = "v3-006"
+ITERATION_LABEL = "v3-007"
 REPORTS_DIR = Path("reports-v3")
 FEATURES_DIR = Path("data/features_v3")
 DATA_DIR = Path("data")
@@ -179,12 +179,21 @@ def _verify_data_freshness(symbols: tuple[str, ...], max_lag_hours: float = 16.0
 
 
 def _verify_feature_columns() -> None:
-    """Assert V3_FEATURE_COLUMNS has exactly 34 columns (brief Section 3.3)."""
+    """Assert V3_FEATURE_COLUMNS has exactly 14 columns (iter-v3/007 brief Section 3.3).
+
+    iter-v3/007 EXPLORATION: V3_FEATURE_COLUMNS is reassigned to
+    V3_FEATURE_COLUMNS_TOP_N (14 features) from V3_FEATURE_COLUMNS_FULL (34).
+    Expected count is 14 for this iteration only.
+    To restore to 34 for iter-v3/008: update this check and reassign
+    V3_FEATURE_COLUMNS = V3_FEATURE_COLUMNS_FULL in features_v3/__init__.py.
+    """
     n = len(V3_FEATURE_COLUMNS)
-    if n != 34:
+    if n != 14:
         raise RuntimeError(
-            f"V3_FEATURE_COLUMNS has {n} columns — expected exactly 34. "
-            "Brief Section 3.3 requires the v3 column count to be unchanged from iter-v3/001."
+            f"V3_FEATURE_COLUMNS has {n} columns — expected exactly 14. "
+            "iter-v3/007 brief Section 3.3 requires the top-14 subset. "
+            "If reverting to full 34-feature set, restore V3_FEATURE_COLUMNS = "
+            "V3_FEATURE_COLUMNS_FULL in features_v3/__init__.py and update this check."
         )
     print(f"  V3_FEATURE_COLUMNS: {n} columns  PASS")
 
