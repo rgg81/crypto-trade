@@ -46,7 +46,7 @@ from tqdm import tqdm
 
 from crypto_trade.features_v3.cross_btc_v3 import add_cross_btc_v3_features
 from crypto_trade.features_v3.fracdiff_v3 import add_fracdiff_v3_features
-from crypto_trade.features_v3.funding_v3 import add_funding_v3_features
+from crypto_trade.features_v3.funding_v3 import add_btc_funding_v3_features, add_funding_v3_features
 from crypto_trade.features_v3.microstructure_v3 import add_microstructure_v3_features
 from crypto_trade.features_v3.momentum_accel_v3 import add_momentum_accel_v3_features
 from crypto_trade.features_v3.price_efficient_vol_v3 import add_price_efficient_vol_v3_features
@@ -66,6 +66,7 @@ GROUP_REGISTRY: dict[str, Callable[[pd.DataFrame], pd.DataFrame]] = {
     "cross_btc": add_cross_btc_v3_features,
     "microstructure_v3": add_microstructure_v3_features,
     "funding_v3": add_funding_v3_features,  # iter-v3/019 NEW external-data-source feature family
+    "btc_funding_v3": add_btc_funding_v3_features,  # iter-v3/024 cross-asset BTC funding broadcast
 }
 
 V3_FEATURE_COLUMNS_FULL: tuple[str, ...] = (
@@ -149,9 +150,17 @@ V3_FEATURE_COLUMNS_TOP_N: tuple[str, ...] = (
     # RETEST at n_trials=35 per Critic FINAL `3b3cc41` of iter-v3/022 Rec #1).
     # iter-v3/019 was PROMISING-INERT at n_trials=10; retest disambiguates
     # "feature genuinely INERT" vs "n_trials=10 budget too small".
-    "funding_rate_zscore_30",  # rank TBD — funding_v3 (external-data-source)
+    # iter-v3/024: funding_rate_zscore_30 DROPPED (14 → 13; INERT-CONFIRMED at
+    # n_trials=35 per Critic FINAL `c4574af` of iter-v3/023 Rec #1).
+    # Per-symbol funding family PERMANENTLY-CLOSED in v3 (2 EXPLORATION data
+    # points at n_trials=10 AND n_trials=35 both rank 14/14).
+    # btc_funding_rate_zscore_30 ADDED (13 → 14): cross-asset BTC funding rate
+    # z-score broadcast to all 3 per-symbol models. STRUCTURALLY DISTINCT from
+    # per-symbol funding: BTC's funding stress is a system-level signal shared
+    # across BCH/LDO/TRX training datasets at any given timestamp.
+    "btc_funding_rate_zscore_30",  # rank TBD — btc_funding_v3 (cross-asset)
 )
-"""Top-14 feature subset: funding_rate_zscore_30 re-added at iter-v3/023.
+"""Top-14 feature subset: btc_funding_rate_zscore_30 added at iter-v3/024.
 
 ``tbr_zscore_30`` DROPPED per iter-v3/016 brief §3.3 (Critic FINAL Rec 3 of
 iter-v3/015 mandated revert before XGBoost axis exploration).
@@ -178,6 +187,18 @@ data/funding_rates/ cache) so the column remains in generated parquets
 but is NOT fed to LightGBM.
 RE-ADDED at iter-v3/023 for budget-disambiguation RETEST at n_trials=35
 per Critic FINAL Rec #1 of iter-v3/022 (SHA ``3b3cc41``).
+INERT-CONFIRMED at n_trials=35 per Critic FINAL ``c4574af`` of iter-v3/023
+Rec #1 — OOS Sharpe -1.07 (worst single-seed OOS in v3 history).  Per-symbol
+funding family PERMANENTLY-CLOSED in v3 (2 EXPLORATION data points).
+
+``btc_funding_rate_zscore_30`` ADDED at iter-v3/024 (cross-asset variant):
+BTC funding rate z-score broadcast identically to all 3 per-symbol models
+(BCH/LDO/TRX get the same column value at any given timestamp).
+Mechanism: market-wide leveraged-positioning stress indicator (system-level),
+distinct from per-symbol micro-signal.  IC vs existing 14 features: max 0.1921
+(< 0.50 brief target, < 0.70 hard gate) per EDA SHA ``afdb8bc``.
+Implemented via ``add_btc_funding_v3_features`` in ``funding_v3.py``;
+registered as ``btc_funding_v3`` entry in GROUP_REGISTRY.
 """
 
 # iter-v3/007-008: reassign to top-N subset for EXPLORATION/CONFIRMATION run.
@@ -188,6 +209,9 @@ per Critic FINAL Rec #1 of iter-v3/022 (SHA ``3b3cc41``).
 # iter-v3/020: top-13 (funding_rate_zscore_30 DROPPED per Critic FINAL Rec 2 of iter-v3/019).
 # iter-v3/023: top-14 (funding_rate_zscore_30 RE-ADDED — budget-disambiguation RETEST at
 #              n_trials=35; per Critic FINAL `3b3cc41` of iter-v3/022 Rec #1).
+# iter-v3/024: top-14 (funding_rate_zscore_30 DROPPED — INERT-CONFIRMED at n_trials=35;
+#              btc_funding_rate_zscore_30 ADDED — cross-asset BTC funding broadcast to all 3
+#              per-symbol models; per Critic FINAL `c4574af` of iter-v3/023 Rec #1).
 # To restore full set: V3_FEATURE_COLUMNS = V3_FEATURE_COLUMNS_FULL
 V3_FEATURE_COLUMNS: tuple[str, ...] = V3_FEATURE_COLUMNS_TOP_N
 """Active feature columns fed to LightGBM / XGBoost.
@@ -213,6 +237,12 @@ iter-v3/023:     V3_FEATURE_COLUMNS_TOP_N (14 features; funding_rate_zscore_30
                  RE-ADDED per Critic FINAL Rec #1 of iter-v3/022 (SHA ``3b3cc41``)
                  — budget-disambiguation RETEST at n_trials=35; was PROMISING-INERT
                  at n_trials=10 in iter-v3/019).
+iter-v3/024:     V3_FEATURE_COLUMNS_TOP_N (14 features; funding_rate_zscore_30
+                 DROPPED (INERT-CONFIRMED at n_trials=35; per Critic FINAL
+                 ``c4574af`` of iter-v3/023 Rec #1 — per-symbol funding family
+                 PERMANENTLY-CLOSED); btc_funding_rate_zscore_30 ADDED as cross-asset
+                 BTC funding z-score broadcast to all 3 per-symbol models.
+                 Registered as ``btc_funding_v3`` in GROUP_REGISTRY.)
 """
 
 V3_NON_FEATURE_COLUMNS: tuple[str, ...] = ("natr_21_raw", "tbr_raw")
@@ -328,6 +358,7 @@ __all__ = [
     "V3_FEATURE_COLUMNS_FULL",
     "V3_FEATURE_COLUMNS_TOP_N",
     "V3_NON_FEATURE_COLUMNS",
+    "add_btc_funding_v3_features",
     "add_funding_v3_features",
     "generate_features_v3",
     "list_groups",

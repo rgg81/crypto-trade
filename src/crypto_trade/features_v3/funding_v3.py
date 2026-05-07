@@ -1,4 +1,4 @@
-"""v3 funding-rate features — funding_rate_zscore_30 (iter-v3/019 NEW external-data-source axis).
+"""v3 funding-rate features — per-symbol (iter-v3/019) + cross-asset BTC (iter-v3/024).
 
 Track-isolated: zero imports from crypto_trade.features (v1) or crypto_trade.features_v2 (v2).
 
@@ -144,6 +144,152 @@ def compute_funding_rate_zscore(
     df["funding_rate_zscore_30"] = zscore.values
 
     return df
+
+
+def compute_btc_funding_rate_zscore(
+    df: pd.DataFrame,
+    funding_df: pd.DataFrame,
+    window: int = FUNDING_ZSCORE_WINDOW,
+    clip: float = ZSCORE_CLIP,
+) -> pd.DataFrame:
+    """Merge BTC funding rates into kline frame and broadcast cross-asset z-score.
+
+    Identical z-score computation to ``compute_funding_rate_zscore`` but the
+    result is labelled ``btc_funding_rate_zscore_30`` and carries BTC's funding
+    stress signal regardless of which symbol *df* belongs to.  At any given
+    ``open_time`` the column value is IDENTICAL across BCH/LDO/TRX kline frames
+    — the broadcast invariant is the key architectural difference vs the per-symbol
+    variant from iter-v3/019/023.
+
+    Parameters
+    ----------
+    df:
+        Kline DataFrame with at least ``open_time`` (ms int) column.
+        May belong to any symbol; the BTC funding signal is broadcast.
+    funding_df:
+        DataFrame with columns ``funding_time`` (ms int) and
+        ``funding_rate`` (float) from ``data/funding_rates/BTCUSDT.csv``.
+    window:
+        Rolling window in bars (default 30 = ~10 days at 8h cadence).
+    clip:
+        Absolute clip threshold for the z-scored output (default 10.0).
+
+    Returns
+    -------
+    pd.DataFrame
+        Input df with ``btc_funding_rate_zscore_30`` column appended.
+        Rows that cannot match a BTC funding record get NaN.
+
+    Notes
+    -----
+    Look-ahead discipline: identical to ``compute_funding_rate_zscore``.
+    The z-score at bar t uses ONLY BTC rates t-window…t-1 for the rolling
+    denominator (via ``.shift(1)``).  The numerator uses rate[t] which
+    settled at candle open_time T (past-only by funding broadcast convention).
+
+    Broadcast invariant: since this function reads BTC funding data
+    (not per-symbol data), calling it on BCH, LDO, or TRX kline frames
+    with the same BTC funding_df produces identical column values at
+    matching open_times — verified in the adversarial test suite.
+    """
+    df = df.copy()
+
+    # ------------------------------------------------------------------
+    # Step 1: align timestamps (round to nearest minute to handle jitter)
+    # ------------------------------------------------------------------
+    funding = funding_df.copy()
+    funding["open_time_aligned"] = (funding["funding_time"] // 60_000) * 60_000
+    df["open_time_aligned"] = (df["open_time"] // 60_000) * 60_000
+
+    # ------------------------------------------------------------------
+    # Step 2: left-merge kline → BTC funding on rounded open_time
+    # ------------------------------------------------------------------
+    merged = df.merge(
+        funding[["open_time_aligned", "funding_rate"]],
+        on="open_time_aligned",
+        how="left",
+    ).drop(columns=["open_time_aligned"])
+
+    # Restore original index alignment
+    merged.index = df.index
+
+    # ------------------------------------------------------------------
+    # Step 3: compute past-only rolling z-score (identical math to
+    #         compute_funding_rate_zscore, different output column name)
+    # ------------------------------------------------------------------
+    s = merged["funding_rate"].astype(float)
+
+    # Rolling stats lagged by 1 bar: at bar t, mean/std use t-window…t-1 only
+    s_shifted = s.shift(1)
+    rmean = s_shifted.rolling(window=window, min_periods=window).mean()
+    rstd = s_shifted.rolling(window=window, min_periods=window).std(ddof=1)
+
+    # Numerator: rate[t] (settled at bar t open — past-only by funding broadcast convention)
+    zscore = (s - rmean) / rstd.replace(0, np.nan)
+
+    # Clip to prevent LightGBM instability from funding-floor outliers
+    zscore = zscore.clip(lower=-clip, upper=clip)
+
+    df["btc_funding_rate_zscore_30"] = zscore.values
+
+    return df
+
+
+def add_btc_funding_v3_features(
+    df: pd.DataFrame,
+    data_dir: Path | str = _DEFAULT_DATA_DIR,
+    window: int = FUNDING_ZSCORE_WINDOW,
+    clip: float = ZSCORE_CLIP,
+) -> pd.DataFrame:
+    """Load BTC funding cache and broadcast cross-asset z-score to any symbol's kline frame.
+
+    This is the GROUP_REGISTRY entry point for the ``btc_funding_v3`` group
+    (iter-v3/024).  Unlike ``add_funding_v3_features`` (which reads the per-symbol
+    cache), this function ALWAYS reads ``data/funding_rates/BTCUSDT.csv``
+    regardless of which symbol *df* represents.  The resulting
+    ``btc_funding_rate_zscore_30`` column carries BTC's funding stress signal
+    broadcast identically to BCH/LDO/TRX training datasets.
+
+    Parameters
+    ----------
+    df:
+        Kline DataFrame with ``open_time`` column.  Symbol column optional
+        (not read by this function — BTC funding is always used).
+    data_dir:
+        Root data directory (default ``data/``).
+    window:
+        Rolling window in bars (default 30).
+    clip:
+        Z-score clip threshold (default 10.0).
+
+    Returns
+    -------
+    pd.DataFrame
+        Input df with ``btc_funding_rate_zscore_30`` column appended.
+
+    Raises
+    ------
+    FileNotFoundError
+        If the BTC funding-rate cache does not exist.
+        Run ``uv run crypto-trade fetch-funding --symbols BTCUSDT`` first.
+    """
+    data_dir = Path(data_dir)
+
+    btc_cache_path = data_dir / "funding_rates" / "BTCUSDT.csv"
+    if not btc_cache_path.exists():
+        raise FileNotFoundError(
+            f"BTC funding-rate cache not found: {btc_cache_path}. "
+            "Run: uv run crypto-trade fetch-funding --symbols BTCUSDT"
+        )
+
+    funding_df = pd.read_csv(btc_cache_path)
+    if len(funding_df) == 0:
+        # Empty cache — add NaN column and return
+        df = df.copy()
+        df["btc_funding_rate_zscore_30"] = np.nan
+        return df
+
+    return compute_btc_funding_rate_zscore(df, funding_df, window=window, clip=clip)
 
 
 def add_funding_v3_features(

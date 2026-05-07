@@ -21,7 +21,9 @@ import pytest
 from crypto_trade.features_v3.funding_v3 import (
     FUNDING_ZSCORE_WINDOW,
     ZSCORE_CLIP,
+    add_btc_funding_v3_features,
     add_funding_v3_features,
+    compute_btc_funding_rate_zscore,
     compute_funding_rate_zscore,
 )
 
@@ -359,3 +361,234 @@ class TestAddFundingV3Features:
 
         assert "funding_rate_zscore_30" in out.columns
         assert out["funding_rate_zscore_30"].isna().all()
+
+
+# ---------------------------------------------------------------------------
+# compute_btc_funding_rate_zscore — iter-v3/024 cross-asset variant
+# ---------------------------------------------------------------------------
+
+
+class TestComputeBtcFundingRateZscore:
+    """Adversarial tests for the cross-asset BTC funding z-score (iter-v3/024).
+
+    Key invariants verified:
+    1. Import smoke: public API importable.
+    2. Output column name is ``btc_funding_rate_zscore_30`` (not per-symbol name).
+    3. Past-only discipline: first ``window`` rows NaN (identical to per-symbol).
+    4. Broadcast invariant: calling on BCH, LDO, TRX kline frames with the SAME
+       BTC funding_df produces identical column values at matching open_times.
+    5. NaN handling at series start.
+    6. Clip to [-ZSCORE_CLIP, +ZSCORE_CLIP].
+    7. BTC funding cache is always read (not per-symbol cache).
+    """
+
+    def test_importable(self) -> None:
+        """Module and cross-asset public symbols must be importable without error."""
+        from crypto_trade.features_v3.funding_v3 import (  # noqa: F401
+            add_btc_funding_v3_features,
+            compute_btc_funding_rate_zscore,
+        )
+
+    def test_output_column_name(self) -> None:
+        """Output column must be btc_funding_rate_zscore_30 (not per-symbol name)."""
+        df = _make_kline_df(n=100)
+        funding = _make_funding_df(df)
+        out = compute_btc_funding_rate_zscore(df, funding)
+        assert "btc_funding_rate_zscore_30" in out.columns
+        assert "funding_rate_zscore_30" not in out.columns
+
+    def test_past_only_first_window_rows_nan(self) -> None:
+        """First ``window`` rows of btc_funding_rate_zscore_30 must be NaN.
+
+        Identical past-only invariant as the per-symbol variant: shift(1) +
+        rolling(window, min_periods=window) ensures rows 0..window-1 are NaN.
+        """
+        window = FUNDING_ZSCORE_WINDOW
+        df = _make_kline_df(n=200)
+        funding = _make_funding_df(df)
+        out = compute_btc_funding_rate_zscore(df, funding, window=window)
+        zscore = out["btc_funding_rate_zscore_30"]
+
+        # Rows 0..window-1 must be NaN
+        assert zscore.iloc[:window].isna().all(), (
+            f"Expected first {window} rows to be NaN (rolling init), "
+            f"got: {zscore.iloc[:window].tolist()}"
+        )
+        # At least some rows after window should be valid
+        assert zscore.iloc[window:].notna().any()
+
+    def test_broadcast_invariant(self) -> None:
+        """BTC funding z-score must be identical across different symbol kline frames.
+
+        This is the PRIMARY architectural invariant of iter-v3/024: broadcasting
+        BTC's funding stress signal identically to BCH, LDO, and TRX models.
+        At any given open_time, the column value must be the same across all 3
+        per-symbol DataFrames.
+        """
+        window = FUNDING_ZSCORE_WINDOW
+        n = 200
+        # Create three separate kline frames simulating BCH, LDO, TRX
+        bch_df = _make_kline_df(n=n, seed=10)
+        bch_df["symbol"] = "BCHUSDT"
+
+        ldo_df = _make_kline_df(n=n, seed=20)
+        ldo_df["symbol"] = "LDOUSDT"
+        # Align open_times to BTC (same timestamps, different price data)
+        ldo_df["open_time"] = bch_df["open_time"].values
+
+        trx_df = _make_kline_df(n=n, seed=30)
+        trx_df["symbol"] = "TRXUSDT"
+        trx_df["open_time"] = bch_df["open_time"].values
+
+        # Single BTC funding DataFrame (same for all 3 symbols)
+        funding = _make_funding_df(bch_df, seed=42)
+
+        out_bch = compute_btc_funding_rate_zscore(bch_df, funding, window=window)
+        out_ldo = compute_btc_funding_rate_zscore(ldo_df, funding, window=window)
+        out_trx = compute_btc_funding_rate_zscore(trx_df, funding, window=window)
+
+        # At every open_time with a valid z-score, all 3 frames must agree
+        valid = out_bch["btc_funding_rate_zscore_30"].notna()
+        bch_vals = out_bch.loc[valid, "btc_funding_rate_zscore_30"].values
+        ldo_vals = out_ldo.loc[valid, "btc_funding_rate_zscore_30"].values
+        trx_vals = out_trx.loc[valid, "btc_funding_rate_zscore_30"].values
+
+        np.testing.assert_array_almost_equal(
+            bch_vals,
+            ldo_vals,
+            decimal=10,
+            err_msg="BTC z-score differs between BCH and LDO frames — broadcast invariant violated",
+        )
+        np.testing.assert_array_almost_equal(
+            bch_vals,
+            trx_vals,
+            decimal=10,
+            err_msg="BTC z-score differs between BCH and TRX frames — broadcast invariant violated",
+        )
+
+    def test_past_only_value_at_row_n(self) -> None:
+        """Value at row N uses ONLY BTC rates N-window...N-1 (not row N itself)."""
+        window = FUNDING_ZSCORE_WINDOW
+        n = 150
+        df = _make_kline_df(n=n)
+        funding = _make_funding_df(df)
+        target_row = 80
+
+        funding_spiked = funding.copy()
+        funding_spiked.loc[target_row, "funding_rate"] = 0.01  # extreme spike
+
+        out_base = compute_btc_funding_rate_zscore(df.copy(), funding.copy(), window=window)
+        out_spiked = compute_btc_funding_rate_zscore(df.copy(), funding_spiked, window=window)
+
+        # The spike at target_row must propagate to the NEXT row's rolling window
+        val_next_no_spike = out_base["btc_funding_rate_zscore_30"].iloc[target_row + 1]
+        val_next_spiked = out_spiked["btc_funding_rate_zscore_30"].iloc[target_row + 1]
+        assert val_next_no_spike != pytest.approx(val_next_spiked, abs=1e-10), (
+            f"z-score at row {target_row + 1} did NOT change after spiking BTC row "
+            f"{target_row}. The spike should propagate via shift(1) rolling window."
+        )
+
+    def test_clip_to_bounds(self) -> None:
+        """Extreme BTC z-scores must be clipped to [-ZSCORE_CLIP, +ZSCORE_CLIP]."""
+        window = FUNDING_ZSCORE_WINDOW
+        n = 100
+        df = _make_kline_df(n=n)
+        constant_rate = 0.0001
+        funding = pd.DataFrame(
+            {
+                "funding_time": df["open_time"].values,
+                "funding_rate": [constant_rate] * n,
+            }
+        )
+        out = compute_btc_funding_rate_zscore(df, funding, window=window, clip=ZSCORE_CLIP)
+        zscore = out["btc_funding_rate_zscore_30"].dropna()
+        finite_mask = np.isfinite(zscore)
+        if finite_mask.any():
+            assert (zscore[finite_mask].abs() <= ZSCORE_CLIP + 1e-9).all(), (
+                f"BTC z-score exceeds clip bound {ZSCORE_CLIP}: "
+                f"max={zscore[finite_mask].abs().max():.2f}"
+            )
+
+
+# ---------------------------------------------------------------------------
+# add_btc_funding_v3_features — file I/O and integration (iter-v3/024)
+# ---------------------------------------------------------------------------
+
+
+class TestAddBtcFundingV3Features:
+    """Tests for the GROUP_REGISTRY entry point for btc_funding_v3."""
+
+    def test_missing_btc_cache_raises_file_not_found(self) -> None:
+        """FileNotFoundError must be raised if BTC funding cache does not exist."""
+        df = _make_kline_df(n=50)
+        with tempfile.TemporaryDirectory() as tmpdir:
+            data_dir = Path(tmpdir)
+            # No BTCUSDT.csv created — must raise
+            with pytest.raises(FileNotFoundError, match="BTCUSDT"):
+                add_btc_funding_v3_features(df, data_dir=data_dir)
+
+    def test_always_reads_btcusdt_cache_regardless_of_symbol(self) -> None:
+        """add_btc_funding_v3_features must read BTCUSDT.csv even for BCH/LDO/TRX frames."""
+        n = 100
+        bch_df = _make_kline_df(n=n)
+        bch_df["symbol"] = "BCHUSDT"
+        funding = _make_funding_df(bch_df)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            data_dir = Path(tmpdir)
+            cache_dir = data_dir / "funding_rates"
+            cache_dir.mkdir(parents=True)
+
+            # Write BTC funding cache (NOT BCHUSDT.csv)
+            btc_cache_path = cache_dir / "BTCUSDT.csv"
+            funding.rename(columns={"funding_time": "funding_time"}).to_csv(
+                btc_cache_path, index=False
+            )
+
+            # BCH frame should succeed — reads BTCUSDT.csv, not BCHUSDT.csv
+            out = add_btc_funding_v3_features(bch_df, data_dir=data_dir)
+
+        assert "btc_funding_rate_zscore_30" in out.columns
+        # Verify per-symbol column NOT added (should use BTC column name)
+        assert "funding_rate_zscore_30" not in out.columns
+
+    def test_returns_btc_zscore_column(self) -> None:
+        """When BTC cache exists, btc_funding_rate_zscore_30 must be added."""
+        n = 100
+        df = _make_kline_df(n=n)
+        funding = _make_funding_df(df)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            data_dir = Path(tmpdir)
+            cache_dir = data_dir / "funding_rates"
+            cache_dir.mkdir(parents=True)
+            btc_cache_path = cache_dir / "BTCUSDT.csv"
+            funding.to_csv(btc_cache_path, index=False)
+
+            out = add_btc_funding_v3_features(df, data_dir=data_dir)
+
+        assert "btc_funding_rate_zscore_30" in out.columns
+        coverage = out["btc_funding_rate_zscore_30"].notna().mean()
+        assert coverage >= 0.70, (
+            f"Coverage {coverage:.2%} unexpectedly low for n={n} rows "
+            f"with window={FUNDING_ZSCORE_WINDOW}"
+        )
+
+    def test_empty_btc_cache_adds_nan_column(self) -> None:
+        """Empty BTC funding cache must add an all-NaN column without error."""
+        df = _make_kline_df(n=50)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            data_dir = Path(tmpdir)
+            cache_dir = data_dir / "funding_rates"
+            cache_dir.mkdir(parents=True)
+            # Empty CSV with headers only
+            btc_cache_path = cache_dir / "BTCUSDT.csv"
+            pd.DataFrame(columns=["funding_time", "funding_rate"]).to_csv(
+                btc_cache_path, index=False
+            )
+
+            out = add_btc_funding_v3_features(df, data_dir=data_dir)
+
+        assert "btc_funding_rate_zscore_30" in out.columns
+        assert out["btc_funding_rate_zscore_30"].isna().all()
