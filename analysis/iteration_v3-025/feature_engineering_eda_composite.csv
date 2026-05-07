@@ -1,0 +1,7 @@
+candidate,max_abs_ic_vs_13_features,max_abs_rankic_across_horizons_and_symbols,min_coverage_pct,all_adf_pass,orthogonality_score,rankic_score,stability_score,interpretability_prior,implementation_cost_prior,composite_score,passes_brief_gate
+cross_asset_divergence_norm,0.756056,0.109287,100.0,True,0.0,1.0,1.0,0.7,0.2,0.65,False
+regime_momentum_signed_5d,0.886513,0.062405,100.0,True,0.0,0.624,1.0,1.0,0.1,0.5772,False
+ret_kurt_to_skew_ratio,0.676635,0.077442,100.0,True,0.0,0.7744,1.0,0.4,0.1,0.5623,False
+hurst_drift_50_200,0.832691,0.063325,100.0,True,0.0,0.6332,1.0,0.5,0.3,0.51,False
+fracdiff_d05_close,0.63997,0.088459,100.0,False,0.0,0.8846,0.5,0.7,0.4,0.4954,False
+vol_adj_autocorr,0.984803,0.02786,100.0,True,0.0,0.2786,1.0,0.6,0.1,0.4336,False
