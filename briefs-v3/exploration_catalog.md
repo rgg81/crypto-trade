@@ -1,6 +1,6 @@
 # v3 EXPLORATION Catalog
 
-> **BANNER (REVISED 2026-05-07 at iter-v3/017 review — Critic FINAL `6de26d1`): iter-v3/017 EXPLORATION-NEGATIVE (clean) PATH C sub-flavor (NEGATIVE-over-filter-quality-residual) on the FIRST NEW labeling architecture in v3 catalog (MetaLabelingStrategy with M1=LightGBM + M2=LGBMClassifier on iter-v3/013's 13-feature stack). IS Sharpe Δ -0.48 (+0.5288 vs iter-v3/013 +1.0088); OOS Sharpe Δ -2.15 (+0.5476 informational below 130-trade floor at OOS=62); 159 IS / 62 OOS trades; M2 per-candle veto rate 42.7% (2,976/6,965). Per-symbol IS shifts BCH 100→73 (-27), TRX 88→70 (-18), LDO 21→16 (-5) — all > 5 threshold. M2 demonstrably active filtering 42.7% but kept trades show no per-trade economics lift; same-feature M2 (M1's training-window feature matrix + M1's confidence as input) has no incremental learnable signal beyond M1. Label tolerance divergence (brief §2.4 strict TP-first vs impl `pnl > 0`) noted as non-blocking — qualitative finding robust to either definition. n_eff=4 LOWEST in v3 catalog (M2's Optuna search overlaps M1's hyperparam dimensions, collapsing joint manifold rank under 30-trial budget). PBO=NaN structural (M2 has no label training data on thin walk-forward cells). **CADENCE COMPLETE: 10/10 EXPLORATIONs reached. CONFIRMATION can launch.** **iter-v3/018 axis MANDATORY = MULTI-SEED VALIDATION OF iter-v3/013 BASELINE, NOT bundle assembly** per `feedback_v3_iter018_confirmation_baseline_validation.md` (NEW). All 4 PROMISING components (iter-v3/007 features, 010 labeling, 011 zscore, 013 universe) are ALREADY cumulatively integrated in iter-v3/013 baseline; iter-v3/014-017 all NEGATIVE/NULL — no NEW ingredient to bundle. iter-v3/018 SPEC: `--seeds 2 --n-trials 50` (5 inner × 2 outer = 10 models per cell), ENSEMBLE_SIZE=5, full DSR/PBO/PSR re-evaluation, multi-seed Pareto front for the first time, 4h HARD CAP per CONFIRMATION cadence rule. iter-v3/018 HYPOTHESIS: "does iter-v3/013's IS +1.0088 / OOS +2.6970 Sharpe hold under multi-seed cross-validation, with PBO < 0.4, DSR > 0.95, PSR > 0.95, multi-seed Pareto non-domination, bundle-level OOS trade count ≥ 130?" PASS conditions: IS≥+1.0 multi-seed mean, OOS≥+1.0 multi-seed mean, DSR>0.95, PBO<0.4, PSR>0.95, top-symbol ≤30%, 10-seed pre-MERGE concentration validation (mean Sharpe>0, ≥7/10 profitable), bundle OOS trades ≥130. BLOCK conditions: single-seed concentration artifacts (LDO 65-74%) don't compress under multi-seed averaging → fragility; DSR/PBO/PSR fail; multi-seed Sharpe variance shows trade-rate floor not met at bundle level. CONFIRMATION-MERGE updates BASELINE_V3.md only if all gates pass at non-EXPLORATION thresholds. NO NEW axis variation. NO bundling. Just validate the baseline. Cannot be post-hoc renegotiated. PROMISING vs NEGATIVE breakdown (10 EXPLORATIONs since last CONFIRMATION): PROMISING-class 4 of 10 (007, 010, 011, 013); NEGATIVE-class 6 of 10 (009, 012, 014, 015, 016, 017). Axis coverage: features × 2 + labeling × 1 + gate-zscore × 1 + gate-btc-trend × 1 + universe × 1 + gate-adx × 1 (CLOSED) + NEW feature family × 1 + NEW model architecture × 1 (CLOSED-at-config) + NEW labeling architecture × 1 = 9 unique axis representations.
+> **BANNER (REVISED 2026-05-07 at iter-v3/018 closeout — Critic FINAL `199cbe4`; BASELINE_V3.md `ef18e1d`; diary `f92ae3d`): FIRST v3 CONFIRMATION COMPLETE (iter-v3/018) with OUTCOME = `CONFIRMATION-MERGE-BOOTSTRAP` per user directive `feedback_v3_iter018_baseline_bootstrap.md` (one-time exception). 6 of 10 pre-registered MERGE gates FAIL under multi-seed validation; baseline established with multi-seed mean (NOT single-seed numbers). iter-v3/018 HEADLINE METRICS: IS monthly Sharpe **+0.3788** (mean across 2 outer × 5 inner = 10 models) / OOS monthly Sharpe **+0.3869** (multi-seed mean); DSR 0.0 (structural at n_trials=1500); PBO mean 0.0892 / max 1.0 (TRX/2022-Q4 FTX/LUNA crash regime); PSR 0.9936; n_eff 25; OOS trades 102 (seed 42) / 79 (seed 123); top-symbol concentration TRX 66.08% (seed 42) / 55.83% (seed 123) — multi-seed averaging did NOT compress concentration, only shifted dominant symbol LDO → TRX. **iter-v3/013 single-seed +1.0088 IS / +2.6970 OOS Sharpe formally FALSIFIED**: 62% IS reduction, 86% OOS reduction; LDO 80% WR was single-seed Optuna-path lottery at n_trials=10. Methodology bright spots (Gates that PASSED): Gate 3 OOS/IS ratio 0.5134 (seed 42) / 1.79 (seed 123); Gate 6 PSR 0.9936; Gate 10 Pareto BOTH SEEDS POSITIVE (+0.234 / +0.539); all 12 standard methodology checks PASS. The bootstrap baseline is honest-positive, not honest-zero. BASELINE_V3.md established at root (commit `ef18e1d`); v0.v3-018 tag forthcoming. Wall-clock 4.54h vs 4h CONFIRMATION HARD CAP — exceeded by 32 min; CONFIRMATION cap empirically UPDATED 4h → 6h per `feedback_v3_cadence_discipline.md` (post-iter-v3/018). **CADENCE CLOCK RESTARTS at iter-v3/019**: 0 of 10 EXPLORATIONs accumulated since this CONFIRMATION; next CONFIRMATION earliest = iter-v3/028. Outstanding constraints (next CONFIRMATION must clear): Gate 1 IS Sharpe floor (lift +0.62), Gate 2 OOS Sharpe floor (lift +0.61), Gate 4 DSR (structural — reformulate gate; brief proposes `DSR > 0` OR `--n-trials 20`), Gate 5 PBO max-aggregator (TRX/2022-Q4 regime gate or accepted exception), Gate 7 top-symbol concentration (TRX 66%; structural 3-symbol universe — needs portfolio cap or universe expansion), Gate 8 bundle OOS trades < 130 (lift +28 min). **iter-v3/019 axis priorities LOCKED** per `feedback_v3_iter019_axis_priorities.md` (NEW): HIGH = NEW feature families (top priority — unique lever capable of +0.6 Sharpe lift), HIGH = concentration architecture (per-symbol budget cap or universe expansion); MEDIUM = DSR gate reformulation, TRX/2022-Q4 regime gate; LOW = knob axes (saturated), universe expansion (deferred). iter-v3/019 first EXPLORATION = NEW feature families. Cannot be renegotiated post-hoc. PROMISING vs NEGATIVE breakdown for the 10 EXPLORATIONs that LED to this CONFIRMATION: PROMISING-class 4 of 10 (007, 010, 011, 013-PROMISING-MECHANICAL — now FALSIFIED at multi-seed); NEGATIVE-class 6 of 10 (009, 012, 014, 015, 016, 017). Axis coverage: features × 2 + labeling × 1 + gate-zscore × 1 + gate-btc-trend × 1 + universe × 1 + gate-adx × 1 (CLOSED) + NEW feature family × 1 + NEW model architecture × 1 (CLOSED-at-config) + NEW labeling architecture × 1 = 9 unique axis representations.
 
 Running ledger of EXPLORATION iterations. Each EXPLORATION's Phase 8 diary appends one row here. The next CONFIRMATION QR reads this to bundle the best variations.
 
@@ -22,11 +22,12 @@ Running ledger of EXPLORATION iterations. Each EXPLORATION's Phase 8 diary appen
 | iter-v3/010 | 2026-05-06 | Labeling → ATR multipliers (2.9, 1.45) → (2.0, 1.0) | IS Sharpe Δ +0.488 (vs iter-v3/009 +0.0802) | +1.8122 | EXPLORATION-PROMISING | YES — strong candidate for next CONFIRMATION bundle |
 | iter-v3/011 | 2026-05-06 | Risk-gate → z-score OOD 2.5 → 2.0 (tighter) | IS Sharpe Δ +0.39 (vs iter-v3/010 +0.5683) | +1.6251 | EXPLORATION-PROMISING (lottery/concentration caveats) | YES — strong IS lift broad-based, but flag LDO 86% concentration for CONFIRMATION QR |
 | iter-v3/012 | 2026-05-06 | Risk-gate → BTC trend filter band ±20% → ±15% | IS Sharpe Δ -0.147 (vs iter-v3/011 +0.9566) | +1.5914 (informational) | EXPLORATION-NEGATIVE-no-effect | NO — null-result, hypothesis "tightening helps" UNSUPPORTED, trade roster IDENTICAL |
-| iter-v3/013 | 2026-05-06 | Universe → drop MKR (4-sym → 3-sym BCH+LDO+TRX) | IS Sharpe Δ +0.20 (vs iter-v3/012 +0.81) | +2.6970 (HIGHEST in v3) | EXPLORATION-PROMISING-MECHANICAL (new subtype) | YES — strictly accretive drag removal; mechanical not interaction effect |
+| iter-v3/013 | 2026-05-06 | Universe → drop MKR (4-sym → 3-sym BCH+LDO+TRX) | IS Sharpe Δ +0.20 (vs iter-v3/012 +0.81) | +2.6970 (HIGHEST in v3) | EXPLORATION-PROMISING-MECHANICAL (FALSIFIED at iter-v3/018 multi-seed CONFIRMATION; 86% OOS reduction; single-seed lottery confirmed) | NO — falsified; drop-MKR architectural decision retained as baseline universe but +1.11 OOS lift attribution dead |
 | iter-v3/014 | 2026-05-07 | Risk-gate → ADX threshold 20 → 25 (tighter) | IS Sharpe Δ -0.35 (vs iter-v3/013 +1.0088) | +0.8661 (informational, N=60 below floor) | EXPLORATION-NEGATIVE | NO — tighter ADX over-restricts; LDO 10→2 collapse; iter-v3/015 ADX=18 mandated |
 | iter-v3/015 | 2026-05-07 | NEW microstructure feature: tbr_zscore_30 (single-axis +1; V3_FEATURE_COLUMNS 13→14) | IS Sharpe Δ -0.36 (vs iter-v3/013 +1.0088) | +2.1206 (3rd in v3 — NOT attributable to new feature, importance rank 14/14) | EXPLORATION-NEGATIVE-no-effect | NO — feature INERT (model didn't learn it); axis-category-pivot to NEW model arch (XGBoost) at iter-v3/016 |
 | iter-v3/016 | 2026-05-07 | NEW model architecture: LightGBM → XGBoost (single-axis; n_trials=10+cross-entropy+depth-wise defaults) | IS Sharpe Δ -0.46 (vs iter-v3/013 +1.0088) | +0.1710 (informational, Δ -2.53 WORST in v3 history) | EXPLORATION-NEGATIVE | NO — XGBoost-on-13-features collapses; BCH/LDO negative, only TRX positive; MaxDD 4× iter-v3/013; importance-divergence may be hyperparam noise; iter-v3/017 NEW labeling architecture mandated |
 | iter-v3/017 | 2026-05-07 | NEW labeling architecture: meta-labeling (M1 LGBM + M2 LGBM, threshold 0.5 PINNED) | IS Sharpe Δ -0.48 (vs iter-v3/013 +1.0088) | +0.5476 (informational, Δ -2.15; 62 trades < 130 floor) | EXPLORATION-NEGATIVE | NO — M2 filters 42.7% per-candle but kept trades show no quality lift; PATH C over-filter |
+| iter-v3/018 | 2026-05-07 | CONFIRMATION: multi-seed validation of iter-v3/013 (--seeds 2 --n-trials 50, ENSEMBLE_SIZE=5) | IS Sharpe Δ -0.63 (vs iter-v3/013 +1.0088, multi-seed mean +0.3788) | +0.3869 (multi-seed mean, Δ -2.31) | CONFIRMATION-MERGE-BOOTSTRAP | YES — establishes BASELINE_V3.md per user bootstrap directive; 6 of 10 gates FAIL; iter-v3/013 falsified |
 
 ---
 
@@ -183,49 +184,58 @@ The five caveats above are LOAD-BEARING for the NEGATIVE-clean PATH C classifica
 
 ## Last CONFIRMATION
 
-(none — iter-v3/008 was aborted at 4h 15min on 2026-05-06; the cadence discipline was established AFTER that abort. **iter-v3/018 will be the first true v3 CONFIRMATION.**)
+**iter-v3/018** (2026-05-07) — first v3 CONFIRMATION; outcome `CONFIRMATION-MERGE-BOOTSTRAP` per user directive `feedback_v3_iter018_baseline_bootstrap.md` one-time exception (v3 had no prior baseline). 6 of 10 pre-registered MERGE gates FAILED. BASELINE_V3.md established with multi-seed mean (NOT iter-v3/013's single-seed +1.0088/+2.6970). iter-v3/013 single-seed performance formally falsified. Methodology of multi-seed run itself is clean — failure is genuine signal weakness, not pipeline defect.
+
+- Critic FINAL SHA: `199cbe4` (review.md)
+- Engineering report SHA: `00389ec`
+- Brief SHA: `5c1b303`
+- Setup SHA: `a595f46`
+- Phase 5.5 gate SHA: `98769ce`
+- BASELINE_V3.md SHA: `ef18e1d`
+- Diary SHA: `f92ae3d`
+- Tag: `v0.v3-018` (BOOTSTRAP — first v3 CONFIRMATION; not gates-pass certification)
 
 ## Count of EXPLORATIONS since last CONFIRMATION
 
-**10** of **10 required**. **CADENCE COMPLETE: CONFIRMATION can launch.** iter-v3/018 = first v3 CONFIRMATION.
+**0** of **10 required**. **CADENCE CLOCK RESTARTS at iter-v3/019.** Next CONFIRMATION earliest = iter-v3/028.
 
-Axis coverage after iter-v3/017: **features × 2** (007, 009), **labeling × 1** (010), **gate-zscore × 1** (011), **gate-btc-trend × 1** (012), **universe × 1** (013), **gate-adx × 1 (CLOSED — knob-tuning trap diagnosed at iter-v3/015 setup)** (014), **NEW feature family × 1 (microstructure tbr_zscore_30)** (015), **NEW model architecture × 1 (CLOSED-AT-CONFIG: n_trials=10+cross-entropy+depth-wise defaults; XGBoost NOT closed for all hyperparam configurations)** (016), **NEW labeling architecture × 1 (meta-labeling at threshold 0.5 PINNED + same-feature M2 input; configuration-narrow NEGATIVE)** (017) = **9 unique axis representations**.
+Wall-clock cap empirically UPDATED **4h → 6h** for future CONFIRMATIONs (iter-v3/018 ran 4.54h vs 4h cap; new cap = ceil(4.54 × 1.2) ≈ 6h for safety per `feedback_v3_cadence_discipline.md`).
 
-Per Critic FINAL Recommendation 1 of iter-v3/017 review (SHA `6de26d1`) AND new memory rule `feedback_v3_iter018_confirmation_baseline_validation.md`, **iter-v3/018 axis MANDATORY = MULTI-SEED VALIDATION OF iter-v3/013 BASELINE, NOT bundle assembly**.
+## iter-v3/018 Outstanding Constraints (Failed Gates)
 
-**Critical distinction**: iter-v3/018 is NOT a bundle-assembly run because there is NO NEW ingredient to bundle. All 4 PROMISING components (iter-v3/007 top-13 features, iter-v3/010 ATR 2.0/1.0 labeling, iter-v3/011 z-score 2.0 OOD, iter-v3/013 drop-MKR universe) are ALREADY cumulatively integrated in the current iter-v3/013 baseline. iter-v3/014-017 produced:
-- iter-v3/014: ADX-25 NEGATIVE-clean (axis closed)
-- iter-v3/015: tbr_zscore_30 NEGATIVE-no-effect (feature INERT, model didn't learn)
-- iter-v3/016: XGBoost NEGATIVE-clean (worst OOS Δ in v3 history at -2.53)
-- iter-v3/017: meta-labeling NEGATIVE-over-filter (PATH C sub-flavor)
+The next CONFIRMATION (iter-v3/028+) must clear ALL 10 gates to update BASELINE_V3.md. iter-v3/018's bootstrap exception is one-time. Failed gates from iter-v3/018:
 
-**iter-v3/018 SPEC** (cannot be renegotiated post-hoc):
-- `--seeds 2 --n-trials 50` (per `feedback_outer_seed_cap_2_v3.md`: 5 inner × 2 outer = 10 models per cell)
-- ENSEMBLE_SIZE=5 (live-prediction variance reduction inherited from v1)
-- Full DSR/PBO/PSR re-evaluation with multi-seed n_eff > 10
-- Multi-seed feature importance for hyperparam stability
-- Multi-seed Pareto front for the first time
-- Wall-clock budget: 4h HARD CAP per CONFIRMATION cadence rule
+| # | Gate | Threshold | iter-v3/018 Observed | Required Lift |
+|---|---|---:|---:|---:|
+| 1 | IS monthly Sharpe ≥ +1.0 | ≥ 1.0 | +0.3788 (multi-seed mean) | +0.62 |
+| 2 | OOS monthly Sharpe ≥ +1.0 | ≥ 1.0 | +0.3869 (multi-seed mean) | +0.61 |
+| 4 | DSR > 0.95 | > 0.95 | 0.0 (structural at n_trials=1500) | reformulate gate |
+| 5 | PBO max < 0.4 | < 0.4 | 1.0 (TRX/2022-10, TRX/2023-01) | regime-aware TRX gate |
+| 7 | Top-symbol concentration ≤ 30% | ≤ 30% | TRX 66.08% (seed 42) / 55.83% (seed 123) | -36 to -26pp |
+| 8 | Bundle OOS trades ≥ 130 | ≥ 130 | 102 (seed 42), 79 (seed 123) | +28 trades min |
 
-**iter-v3/018 HYPOTHESIS**: "does iter-v3/013's IS +1.0088 / OOS +2.6970 Sharpe hold under multi-seed cross-validation, with PBO < 0.4, DSR > 0.95, PSR > 0.95, multi-seed Pareto non-domination, bundle-level OOS trade count ≥ 130?"
+Methodology bright spots that PASSED at iter-v3/018: Gate 3 OOS/IS ratio 0.5134 (seed 42) / 1.79 (seed 123); Gate 6 PSR 0.9936; Gate 10 Pareto BOTH SEEDS POSITIVE (+0.234 / +0.539); all 12 standard methodology checks PASS.
 
-**iter-v3/018 PASS conditions for MERGE** (per `feedback_v3_iter018_confirmation_baseline_validation.md`):
-- IS monthly Sharpe ≥ +1.0 (multi-seed mean)
-- OOS monthly Sharpe ≥ +1.0 (multi-seed mean)
-- DSR > 0.95
-- PBO < 0.4
-- PSR > 0.95
-- Top-symbol concentration ≤ 30% (or explicit exception with justification)
-- 10-seed pre-MERGE concentration validation: mean Sharpe > 0, ≥ 7/10 profitable
-- Bundle-level OOS trade count ≥ 130 (per `feedback_trade_rate_floor_bundle_level.md`)
+## Axis Priorities for iter-v3/019 (LOCKED — first post-bootstrap EXPLORATION)
 
-**iter-v3/018 BLOCK conditions**:
-- Single-seed concentration artifacts (LDO 65-74% at iter-v3/013/017) do NOT compress under multi-seed averaging → fragility
-- DSR < 0.95 OR PSR < 0.95 OR PBO ≥ 0.4
-- Multi-seed Sharpe variance shows trade-rate floor not met at bundle level
+Per Critic FINAL Recommendation 1 (iter-v3/018 review SHA `199cbe4`) AND new memory rule `feedback_v3_iter019_axis_priorities.md` (NEW — saved at iter-v3/018 closeout):
 
-CONFIRMATION-MERGE updates BASELINE_V3.md only if all gates pass at non-EXPLORATION thresholds. NO NEW axis variation. NO bundling. Just validate the baseline. Cannot be renegotiated post-hoc by future Engineer or QR.
+| Priority | Axis | Rationale |
+|---|---|---|
+| **HIGH** | **NEW feature families** (iter-v3/019 first EXPLORATION) | 13-feature stack underperforms multi-seed by ~0.6 Sharpe units. Knob-tuning saturated. Order-book microstructure beyond `tbr_zscore_30` (tried/reverted at iter-v3/015), funding-rate momentum/percentile features (Binance fundingRate API), on-chain proxy features (exchange balance flows, miner flows). Bias toward economically-interpretable features. Unique lever capable of +0.6 Sharpe lift. |
+| **HIGH** | Concentration architecture | TRX 66% / 56% structural concentration. Either (a) hard `max_per_symbol_pnl_share = 0.40` portfolio constraint at aggregation layer, OR (b) universe expansion to 5+ symbols to dilute mechanically. |
+| MEDIUM | DSR gate reformulation | iter-v3/019 brief proposes either (a) `DSR > 0` (positive deflation), OR (b) reduce CONFIRMATION budget to `--n-trials 20`. Process fix; current `DSR > 0.95` at n_trials=1500 mathematically blocked. |
+| MEDIUM | TRX/2022-Q4 regime gate | PBO max=1.0 on TRX/2022-10, /2022-12, /2023-01 (FTX/LUNA crash). Either regime-aware TRX gate (kill TRX when BTC_drawdown_30d > 30%), OR Critic-accepted exception clause. **Do NOT remove TRX** (strongest OOS contributor in seed 42, +11.97 weighted_pnl). |
+| LOW | Knob axes (labeling multipliers, ADX, z-score, BTC band) | Saturated per `feedback_axis_saturation_predictor.md`. Future briefs Section 2 must include behavioral-effect predictor with falsifier; saturated axes must be SKIPPED. |
+| LOW | Universe expansion (mechanical) | Defer until after one HIGH-priority feature-family axis is proven. |
 
-**PROMISING vs NEGATIVE breakdown (10 EXPLORATIONs since last CONFIRMATION)**:
-- PROMISING-class: 4 of 10 — iter-v3/007 (features), iter-v3/010 (labeling), iter-v3/011 (zscore), iter-v3/013 (universe drop-MKR)
-- NEGATIVE-class: 6 of 10 — iter-v3/009 (features-too-tight), iter-v3/012 (BTC band NULL), iter-v3/014 (ADX-25), iter-v3/015 (microstructure INERT), iter-v3/016 (XGBoost), iter-v3/017 (meta-labeling)
+iter-v3/019 first EXPLORATION axis = **NEW feature families**. Cannot be renegotiated post-hoc by future Engineer or QR.
+
+## PROMISING vs NEGATIVE breakdown — 10 EXPLORATIONs that LED to iter-v3/018 CONFIRMATION
+
+- **PROMISING-class: 4 of 10** — iter-v3/007 (top-14 features), iter-v3/010 (ATR labeling 2.0/1.0), iter-v3/011 (z-score OOD 2.0), iter-v3/013 (drop-MKR universe — PROMISING-MECHANICAL **FALSIFIED at iter-v3/018 multi-seed CONFIRMATION**; drop-MKR retained as baseline universe but +1.11 OOS lift attribution dead)
+- **NEGATIVE-class: 6 of 10** — iter-v3/009 (features-too-tight), iter-v3/012 (BTC band NULL), iter-v3/014 (ADX-25 — axis closed), iter-v3/015 (microstructure tbr_zscore_30 INERT — model didn't learn; rank 14/14), iter-v3/016 (XGBoost — worst OOS Δ in v3 history at -2.53), iter-v3/017 (meta-labeling — PATH C over-filter)
+
+Axis coverage of those 10 EXPLORATIONs: features × 2, labeling × 1, gate-zscore × 1, gate-btc-trend × 1, universe × 1, gate-adx × 1 (CLOSED), NEW feature family × 1 (closed-narrow), NEW model architecture × 1 (CLOSED-at-config), NEW labeling architecture × 1 = 9 unique axis representations.
+
+After iter-v3/018 multi-seed CONFIRMATION, the falsification of iter-v3/013 means **NO PROMISING component from the prior 10-EXPLORATION cycle survives intact** (007/010/011 already integrated; 013 falsified). Future EXPLORATIONs cannot bundle prior PROMISING signals as additive edge ingredients — the bootstrap baseline IS the post-bundling state, and the bundle didn't reach the +1.0 floor.
