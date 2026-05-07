@@ -99,16 +99,20 @@ def _derive_ensemble_seeds(outer_seed: int, size: int = ENSEMBLE_SIZE) -> list[i
     return [int(s) for s in rng.integers(low=0, high=2**31 - 1, size=size)]
 
 
-ITERATION_LABEL = "v3-020"
+ITERATION_LABEL = "v3-021"
 REPORTS_DIR = Path("reports-v3")
 FEATURES_DIR = Path("data/features_v3")
 DATA_DIR = Path("data")
 
-# v3 symbols — MKR dropped per iter-v3/013 brief §3.1 (feedback_mkr_threshold_compression.md FIRED)
+# v3 symbols — iter-v3/021: universe expanded 3→5 (+HBAR +AVAX; HIGH-priority axis #2b)
+# MKR dropped per iter-v3/013 brief §3.1 (feedback_mkr_threshold_compression.md FIRED)
+# HBARUSDT + AVAXUSDT added per EDA rank 1+2 (SHA a360251); EDA composite 0.756 / 0.740
 V3_MODELS: tuple[tuple[str, str], ...] = (
     ("A (BCHUSDT)", "BCHUSDT"),
     ("C (LDOUSDT)", "LDOUSDT"),
     ("D (TRXUSDT)", "TRXUSDT"),
+    ("E (HBARUSDT)", "HBARUSDT"),
+    ("F (AVAXUSDT)", "AVAXUSDT"),
 )
 
 # Risk gate configs (v2 5-gate + BTC; no R1/R2/R3 — brief Section 3.4)
@@ -181,10 +185,11 @@ def _verify_data_freshness(symbols: tuple[str, ...], max_lag_hours: float = 16.0
 
 
 def _verify_feature_columns() -> None:
-    """Verifies V3_FEATURE_COLUMNS contents per current brief (iter-v3/020).
+    """Verifies V3_FEATURE_COLUMNS contents per current brief (iter-v3/021).
 
-    iter-v3/020: 13 columns (funding_rate_zscore_30 DROPPED per Critic FINAL
-    Rec 2 of iter-v3/019 review — reverts to iter-v3/018 anchor surface).
+    iter-v3/021: 13 columns UNCHANGED from iter-v3/020 (funding_rate_zscore_30
+    DROPPED per Critic FINAL Rec 2 of iter-v3/019 review; HBAR+AVAX inherit
+    the same 13-feature set via per-symbol feature regeneration pipeline).
     iter-v3/016: reverted from 14 to 13 (tbr_zscore_30 dropped). vwap_dev_50
     remains excluded (dropped per Critic FINAL SHA a544621, iter-v3/008).
     tbr_zscore_30 MUST NOT be present. funding_rate_zscore_30 MUST NOT be present.
@@ -907,7 +912,8 @@ def _build_v3_model(
         adx_threshold=20.0,  # RESET: iter-v3/014's failed test (25.0) → iter-v3/013 baseline
         max_per_symbol_pnl_share=0.40,  # iter-v3/020: per-symbol cap at 40% rolling share
         max_per_symbol_window_bars=90,  # ≈ 30 days at 8h cadence
-        enable_per_symbol_cap=True,  # iter-v3/020 single varied axis (primitive 8)
+        # iter-v3/021: REVERTED per iter-v3/020 PATH C closeout (diary 5287bd6)
+        enable_per_symbol_cap=False,
     )
     strategy = RiskV3Wrapper(m1, risk_cfg)
     return cfg, strategy
@@ -1424,7 +1430,7 @@ def main() -> None:
     _verify_data_freshness(baseline_symbols + ("BTCUSDT",))
     # asserts len == 13, funding NOT present, vwap_dev_50/tbr_zscore_30 absent
     _verify_feature_columns()
-    _verify_label_leakage_gap()  # asserts REQUIRED_GAP == 66 (3-symbol universe, iter-v3/013)
+    _verify_label_leakage_gap()  # asserts REQUIRED_GAP == 110 (5-symbol universe, iter-v3/021)
     _verify_track_isolation()  # grep check
 
     active_sym_names = ", ".join(sym for _, sym in active_models)
@@ -1432,7 +1438,10 @@ def main() -> None:
     print(f"Seeds: {args.seeds}  Optuna trials/model: {args.n_trials}")
     print(f"Active models: {len(active_models)}/{len(V3_MODELS)} (--symbols={args.symbols!r})")
     print(f"CPCV: N={CPCV_N_SPLITS}, k={CPCV_N_TEST_SPLITS}, 45 paths on IS CANDLE SEQUENCE")
-    print(f"Gap: {REQUIRED_GAP} (= (timeout_candles+1) * 3 symbols [BCH+LDO+TRX, iter-v3/013])")
+    print(
+        f"Gap: {REQUIRED_GAP} (= (timeout_candles+1) * 5 symbols"
+        f" [BCH+LDO+TRX+HBAR+AVAX, iter-v3/021])"
+    )
     print(
         f"Pre-flight: branch OK, symbols OK, data fresh (<16h), "
         f"feature-cols={len(V3_FEATURE_COLUMNS)}  PASS\n"
