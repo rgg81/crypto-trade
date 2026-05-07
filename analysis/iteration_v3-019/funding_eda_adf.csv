@@ -1,0 +1,4 @@
+symbol,feature,adf_stat,adf_p,pass_threshold,n
+BCHUSDT,funding_rate_zscore_30,-46.8188,0.0,True,2193
+LDOUSDT,funding_rate_zscore_30,-46.8923,0.0,True,2193
+TRXUSDT,funding_rate_zscore_30,-46.8188,0.0,True,2193
