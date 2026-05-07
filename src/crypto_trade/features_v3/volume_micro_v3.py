@@ -85,4 +85,48 @@ def add_volume_micro_v3_features(df: pd.DataFrame) -> pd.DataFrame:
     low50 = low.rolling(50, min_periods=25).min()
     df["close_pos_in_range_50"] = (close - low50) / (high50 - low50).replace(0, np.nan)
 
+    # Taker-buy ratio z-score — iter-v3/015 NEW microstructure feature family
+    df = compute_tbr_zscore(df, window=30)
+
+    return df
+
+
+def compute_tbr_zscore(df: pd.DataFrame, window: int = 30) -> pd.DataFrame:
+    """Compute taker-buy ratio z-score over a rolling window (past-only).
+
+    ``tbr_zscore_30`` = z-score of (taker_buy_quote_volume / quote_volume)
+    over a rolling ``window``-bar window.  All ops are strictly past-only:
+    the z-score at bar t uses bars t-window...t-1 via ``.shift(1)`` before
+    rolling stats, so the bar's own taker volume is excluded.
+
+    Mirrors the reference implementation in
+    ``analysis/iteration_v3-015/tbr_zscore_eda.py`` (SHA fcf6b06).
+
+    Parameters
+    ----------
+    df:
+        DataFrame with columns ``taker_buy_quote_volume`` and ``quote_volume``.
+    window:
+        Rolling window in bars (default 30 = ~10 days at 8h cadence).
+
+    Returns
+    -------
+    pd.DataFrame
+        Input df with ``tbr_zscore_30`` column appended.  ``tbr_raw`` is also
+        written as an intermediate (not in V3_FEATURE_COLUMNS).
+    """
+    qv = df["quote_volume"].astype(float)
+    tbqv = df["taker_buy_quote_volume"].astype(float)
+
+    # Raw ratio in [0, 1]; NaN where quote_volume == 0 (rare edge)
+    tbr_raw = np.where(qv > 0, tbqv / qv, np.nan)
+    df["tbr_raw"] = tbr_raw
+
+    # Rolling stats shifted by 1 — bar t uses bars t-window...t-1 only
+    s = pd.Series(tbr_raw, index=df.index)
+    s_shifted = s.shift(1)
+    rmean = s_shifted.rolling(window=window, min_periods=window).mean()
+    rstd = s_shifted.rolling(window=window, min_periods=window).std(ddof=1)
+    df["tbr_zscore_30"] = (s_shifted - rmean) / rstd.replace(0, np.nan)
+
     return df

@@ -136,8 +136,25 @@ V3_FEATURE_COLUMNS_TOP_N: tuple[str, ...] = (
     "vwap_dev_20",  # rank 11 (mean 13.0) — volume_micro
     "ret_autocorr_lag1_50",  # rank 12 (mean 13.5) — momentum_accel
     "sym_vs_btc_ret_7d",  # rank 13 (mean 14.5) — cross_btc
+    "tbr_zscore_30",  # rank 14 — microstructure (iter-v3/015 NEW feature family)
 )
-"""Top-13 feature subset for iter-v3/008 CONFIRMATION run.
+"""Top-14 feature subset after iter-v3/015 NEW microstructure feature addition.
+
+``tbr_zscore_30`` added as the 14th column per iter-v3/015 brief Section 3.3.
+All prior 13 columns unchanged from iter-v3/008 CONFIRMATION run.
+
+Top-13 history:
+vwap_dev_50 dropped per Critic FINAL SHA a544621 (Recommendation 1).
+Dropping it removed both IC-redundant pairs in the 14-feature subset:
+  - vwap_dev_50 x ema_spread_atr_20: IC 0.875 (above 0.70 threshold)
+  - vwap_dev_50 x vwap_dev_20:       IC 0.794 (above 0.70 threshold)
+Residual max |IC| in the 13-feature subset: 0.6602.  No pair above 0.70.
+See analysis/iteration_v3-008/ic_redundancy_drop_demo.py (SHA 003a21e).
+
+``tbr_zscore_30`` addition (iter-v3/015):
+Max |IC| with existing 13 features: 0.1654 (vs vwap_dev_20).  Well below
+the 0.70 IC threshold.  See analysis/iteration_v3-015/tbr_eda_correlation.csv
+(SHA fcf6b06).
 
 vwap_dev_50 dropped per Critic FINAL SHA a544621 (Recommendation 1).
 Dropping it removes both IC-redundant pairs in the 14-feature subset:
@@ -149,6 +166,7 @@ See analysis/iteration_v3-008/ic_redundancy_drop_demo.py (SHA 003a21e).
 
 # iter-v3/007-008: reassign to top-N subset for EXPLORATION/CONFIRMATION run.
 # iter-v3/007: top-14; iter-v3/008: top-13 (vwap_dev_50 dropped per Critic Rec 1).
+# iter-v3/015: top-14 (tbr_zscore_30 added as NEW microstructure feature family).
 # To restore full set: V3_FEATURE_COLUMNS = V3_FEATURE_COLUMNS_FULL
 V3_FEATURE_COLUMNS: tuple[str, ...] = V3_FEATURE_COLUMNS_TOP_N
 """Active feature columns fed to LightGBM.
@@ -157,6 +175,9 @@ iter-v3/001-006: V3_FEATURE_COLUMNS_FULL (34 features).
 iter-v3/007:     V3_FEATURE_COLUMNS_TOP_N (14 features, EXPLORATION).
 iter-v3/008:     V3_FEATURE_COLUMNS_TOP_N (13 features, CONFIRMATION;
                  vwap_dev_50 dropped per Critic FINAL SHA a544621).
+iter-v3/009-014: V3_FEATURE_COLUMNS_TOP_N (13 features, unchanged).
+iter-v3/015:     V3_FEATURE_COLUMNS_TOP_N (14 features; tbr_zscore_30 added
+                 per iter-v3/015 brief Section 3.3 — NEW microstructure family).
 """
 
 V3_NON_FEATURE_COLUMNS: tuple[str, ...] = ("natr_21_raw",)

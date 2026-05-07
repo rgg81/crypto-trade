@@ -97,7 +97,7 @@ def _derive_ensemble_seeds(outer_seed: int, size: int = ENSEMBLE_SIZE) -> list[i
     return [int(s) for s in rng.integers(low=0, high=2**31 - 1, size=size)]
 
 
-ITERATION_LABEL = "v3-014"
+ITERATION_LABEL = "v3-015"
 REPORTS_DIR = Path("reports-v3")
 FEATURES_DIR = Path("data/features_v3")
 DATA_DIR = Path("data")
@@ -181,16 +181,23 @@ def _verify_data_freshness(symbols: tuple[str, ...], max_lag_hours: float = 16.0
 def _verify_feature_columns() -> None:
     f"""Verifies V3_FEATURE_COLUMNS contents per current brief (iter-{ITERATION_LABEL}).
 
-    Asserts V3_FEATURE_COLUMNS has exactly 13 columns — vwap_dev_50 dropped
-    per Critic FINAL SHA a544621 (Rec 1, iter-v3/008).
-    Also asserts vwap_dev_50 is NOT in V3_FEATURE_COLUMNS (belt-and-suspenders).
+    Asserts V3_FEATURE_COLUMNS has exactly 14 columns — tbr_zscore_30 added
+    per iter-v3/015 brief Section 3.3 (NEW microstructure feature family).
+    vwap_dev_50 remains excluded (dropped per Critic FINAL SHA a544621, Rec 1,
+    iter-v3/008).  tbr_zscore_30 presence is asserted belt-and-suspenders.
     """
     n = len(V3_FEATURE_COLUMNS)
-    if n != 13:
+    if n != 14:
         raise RuntimeError(
-            f"V3_FEATURE_COLUMNS has {n} columns — expected exactly 13. "
-            "iter-v3/008 brief Section 3.3 requires the top-13 subset "
-            "(vwap_dev_50 dropped per Critic FINAL SHA a544621). "
+            f"V3_FEATURE_COLUMNS has {n} columns — expected exactly 14. "
+            "iter-v3/015 brief Section 3.3 added tbr_zscore_30 (NEW microstructure "
+            "feature family) making the count 13→14. "
+            "Check features_v3/__init__.py V3_FEATURE_COLUMNS_TOP_N."
+        )
+    if "tbr_zscore_30" not in V3_FEATURE_COLUMNS:
+        raise RuntimeError(
+            "tbr_zscore_30 NOT found in V3_FEATURE_COLUMNS — must be present per "
+            "iter-v3/015 brief Section 3.3. "
             "Check features_v3/__init__.py V3_FEATURE_COLUMNS_TOP_N."
         )
     if "vwap_dev_50" in V3_FEATURE_COLUMNS:
@@ -871,7 +878,7 @@ def _build_v3_model(
     )
     risk_cfg = RiskV2Config(
         zscore_threshold=2.0,
-        adx_threshold=25.0,
+        adx_threshold=20.0,  # RESET: iter-v3/014's failed test (25.0) → iter-v3/013 baseline
     )
     strategy = RiskV3Wrapper(m1, risk_cfg)
     return cfg, strategy
