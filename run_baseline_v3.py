@@ -50,6 +50,7 @@ from crypto_trade.features_v3 import (
 )
 from crypto_trade.iteration_report import generate_iteration_reports
 from crypto_trade.strategies.ml.lgbm import LightGbmStrategy
+from crypto_trade.strategies.ml.metalabeling import MetaLabelingStrategy
 from crypto_trade.strategies.ml.risk_v2 import (
     BtcTrendFilterConfig,
     HitRateGateConfig,
@@ -98,7 +99,7 @@ def _derive_ensemble_seeds(outer_seed: int, size: int = ENSEMBLE_SIZE) -> list[i
     return [int(s) for s in rng.integers(low=0, high=2**31 - 1, size=size)]
 
 
-ITERATION_LABEL = "v3-016"
+ITERATION_LABEL = "v3-017"
 REPORTS_DIR = Path("reports-v3")
 FEATURES_DIR = Path("data/features_v3")
 DATA_DIR = Path("data")
@@ -861,9 +862,9 @@ def _build_v3_model(
         vol_targeting=False,  # Vol targeting via RiskV3Wrapper
     )
     # iter-v3/016: --model {lgbm,xgboost} routes to the appropriate strategy class.
+    # iter-v3/017: --model metalabeling routes to MetaLabelingStrategy (M1+M2).
     # Constructor signatures are identical so we call with the same kwargs.
-    strategy_cls = XgboostStrategy if model_type == "xgboost" else LightGbmStrategy
-    m1 = strategy_cls(
+    common_kwargs = dict(
         training_months=TRAINING_MONTHS,
         n_trials=n_trials,
         cv_splits=5,
@@ -880,9 +881,18 @@ def _build_v3_model(
         ensemble_seeds=list(ensemble_seeds),
         feature_columns=list(V3_FEATURE_COLUMNS),  # EXPLICIT — never None
         ood_enabled=False,  # OOD via RiskV3Wrapper z-score gate
-        oof_persist_path=oof_persist_path,  # sub-fix 1d (iter-v3/003)
         fast_mode=fast_mode,  # iter-v3/007 — colsample_bytree=1.0 when True
     )
+    if model_type == "metalabeling":
+        # iter-v3/017: MetaLabelingStrategy wraps M1 (LightGbmStrategy) with
+        # an M2 binary classifier that filters low-confidence M1 predictions.
+        # oof_persist_path is NOT passed to MetaLabelingStrategy (M2 does not
+        # write trial OOF returns; only M1's path matters for CPCV).
+        m1 = MetaLabelingStrategy(**common_kwargs)
+    elif model_type == "xgboost":
+        m1 = XgboostStrategy(oof_persist_path=oof_persist_path, **common_kwargs)
+    else:
+        m1 = LightGbmStrategy(oof_persist_path=oof_persist_path, **common_kwargs)
     risk_cfg = RiskV2Config(
         zscore_threshold=2.0,
         adx_threshold=20.0,  # RESET: iter-v3/014's failed test (25.0) → iter-v3/013 baseline
@@ -1122,13 +1132,18 @@ def _write_feature_importance(
 ) -> None:
     """Write feature importance CSVs from model(s) if available.
 
-    iter-v3/016 fix (sub-fix #3): aggregate split+gain importances across ALL
-    (sym, month) per-symbol models.  Emits two CSV types per split:
-      - ``feature_importance_<SYM>.csv``  — per-symbol aggregated across months
-      - ``feature_importance.csv``        — portfolio (sum across all symbols)
+    iter-v3/017 fix (Critic Clar 3 of iter-v3/016, sub-fix #3): emit importance
+    CSVs to ``in_sample/`` ONLY (the last-month model state reflects IS training;
+    duplicating to ``out_of_sample/`` was byte-identical and misleading).
+    Renamed output files to ``model_importance_last_month_<SYM>.csv`` and
+    ``model_importance_last_month_portfolio.csv`` to make scope explicit.
 
-    Works for both LightGbmStrategy and XgboostStrategy (both expose
-    ``feature_importances_`` on each trained model object).
+    For MetaLabelingStrategy: reads importances from M1's inner models
+    (self._m1._models).  M2 importances are not reported (14-dim vs 13-dim;
+    M2 is a secondary filter, not the primary direction model).
+
+    Works for LightGbmStrategy, XgboostStrategy, and MetaLabelingStrategy
+    (all expose ``_models`` on the inner model layer).
     """
     if not primary_model_pairs:
         return
@@ -1141,15 +1156,18 @@ def _write_feature_importance(
             cols = list(inner._all_feature_cols)
             break
 
-    # Collect per-symbol importance sums across all (sym, month) model cells.
+    # Collect per-symbol importance sums.
     # primary_model_pairs is a list of (BacktestConfig, RiskV3Wrapper) — one entry
     # per symbol.  Each strategy's inner._models list holds the ensemble models
-    # trained on the LAST month (lazy monthly training leaves only the final month
-    # loaded).  We aggregate what is available; the per-symbol split is by symbol.
+    # trained on the LAST walk-forward month (lazy monthly training).
+    # For MetaLabelingStrategy: unwrap via inner._m1._models.
     sym_importances: dict[str, dict[str, list[float]]] = {}
     for cfg, strat in primary_model_pairs:
         sym = cfg.symbols[0] if cfg.symbols else "UNKNOWN"
         inner = strat.inner if hasattr(strat, "inner") else strat
+        # MetaLabelingStrategy: read M1's models (M1 is the direction model)
+        if hasattr(inner, "_m1"):
+            inner = inner._m1
         if not hasattr(inner, "_models") or not inner._models:
             continue
         if sym not in sym_importances:
@@ -1164,36 +1182,37 @@ def _write_feature_importance(
     if not sym_importances:
         return
 
-    for split_label in ("in_sample", "out_of_sample"):
-        split_dir = report_dir / split_label
-        split_dir.mkdir(parents=True, exist_ok=True)
+    # iter-v3/017: write to in_sample/ ONLY (last-month model scope).
+    # Do NOT write to out_of_sample/ — byte-duplication was misleading.
+    split_dir = report_dir / "in_sample"
+    split_dir.mkdir(parents=True, exist_ok=True)
 
-        # Portfolio-level accumulator (sum across symbols)
-        portfolio: dict[str, float] = {c: 0.0 for c in cols}
+    # Portfolio-level accumulator (sum across symbols)
+    portfolio: dict[str, float] = {c: 0.0 for c in cols}
 
-        for sym, imp_dict in sym_importances.items():
-            rows_sym: list[dict] = []
-            for col in cols:
-                vals = imp_dict.get(col, [])
-                mean_fi = float(np.mean(vals)) if vals else 0.0
-                rows_sym.append({"feature": col, "importance": round(mean_fi, 4)})
-                portfolio[col] += mean_fi
-            rows_sym.sort(key=lambda r: r["importance"], reverse=True)
+    for sym, imp_dict in sym_importances.items():
+        rows_sym: list[dict] = []
+        for col in cols:
+            vals = imp_dict.get(col, [])
+            mean_fi = float(np.mean(vals)) if vals else 0.0
+            rows_sym.append({"feature": col, "importance": round(mean_fi, 4)})
+            portfolio[col] += mean_fi
+        rows_sym.sort(key=lambda r: r["importance"], reverse=True)
 
-            sym_path = split_dir / f"feature_importance_{sym}.csv"
-            with open(sym_path, "w", newline="") as f:
-                writer = csv.DictWriter(f, fieldnames=["feature", "importance"])
-                writer.writeheader()
-                writer.writerows(rows_sym)
-
-        # Portfolio CSV — sum across symbols, ranked descending
-        rows_port = [{"feature": c, "importance": round(portfolio[c], 4)} for c in cols]
-        rows_port.sort(key=lambda r: r["importance"], reverse=True)
-        port_path = split_dir / "feature_importance.csv"
-        with open(port_path, "w", newline="") as f:
+        sym_path = split_dir / f"model_importance_last_month_{sym}.csv"
+        with open(sym_path, "w", newline="") as f:
             writer = csv.DictWriter(f, fieldnames=["feature", "importance"])
             writer.writeheader()
-            writer.writerows(rows_port)
+            writer.writerows(rows_sym)
+
+    # Portfolio CSV — sum across symbols, ranked descending
+    rows_port = [{"feature": c, "importance": round(portfolio[c], 4)} for c in cols]
+    rows_port.sort(key=lambda r: r["importance"], reverse=True)
+    port_path = split_dir / "model_importance_last_month_portfolio.csv"
+    with open(port_path, "w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=["feature", "importance"])
+        writer.writeheader()
+        writer.writerows(rows_port)
 
 
 # ============================================================
@@ -1335,12 +1354,15 @@ def main() -> None:
         "--model",
         type=str,
         default="lgbm",
-        choices=["lgbm", "xgboost"],
+        choices=["lgbm", "xgboost", "metalabeling"],
         help=(
-            "iter-v3/016: ML model backend. 'lgbm' (default) uses LightGbmStrategy "
+            "ML model backend. 'lgbm' (default) uses LightGbmStrategy "
             "(backward-compatible — all prior iterations). 'xgboost' uses "
-            "XgboostStrategy with depth-wise growth + tree_method='hist'. "
-            "The architectural axis for iter-v3/016 EXPLORATION."
+            "XgboostStrategy with depth-wise growth + tree_method='hist' "
+            "(iter-v3/016 architectural axis; opt-in). 'metalabeling' uses "
+            "MetaLabelingStrategy (M1=LightGbmStrategy + M2=LGBMClassifier binary "
+            "precision filter at threshold=0.5; the architectural axis for "
+            "iter-v3/017 EXPLORATION)."
         ),
     )
     args = parser.parse_args()
