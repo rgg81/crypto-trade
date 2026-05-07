@@ -123,6 +123,8 @@ V3_FEATURE_COLUMNS_TOP_N: tuple[str, ...] = (
     # Source: analysis/iteration_v3-008/ic_redundancy_drop_demo.py (SHA 003a21e).
     # Groups: tail_risk (6), momentum_accel (2), volume_micro (1),
     #         regime (2), cross_btc (2).
+    # iter-v3/016: tbr_zscore_30 DROPPED (reverted to 13 features; iter-v3/013 baseline).
+    # Per Critic FINAL Rec 3 of iter-v3/015 + iter-v3/016 brief §3.3.
     "max_dd_window_50",  # rank 1 (mean 2.5)  — tail_risk
     "ema_spread_atr_20",  # rank 2 (mean 3.0)  — momentum_accel
     "ret_kurt_50",  # rank 3 (mean 5.0)  — tail_risk
@@ -136,12 +138,11 @@ V3_FEATURE_COLUMNS_TOP_N: tuple[str, ...] = (
     "vwap_dev_20",  # rank 11 (mean 13.0) — volume_micro
     "ret_autocorr_lag1_50",  # rank 12 (mean 13.5) — momentum_accel
     "sym_vs_btc_ret_7d",  # rank 13 (mean 14.5) — cross_btc
-    "tbr_zscore_30",  # rank 14 — microstructure (iter-v3/015 NEW feature family)
 )
-"""Top-14 feature subset after iter-v3/015 NEW microstructure feature addition.
+"""Top-13 feature subset restored to iter-v3/013 baseline (iter-v3/016 revert).
 
-``tbr_zscore_30`` added as the 14th column per iter-v3/015 brief Section 3.3.
-All prior 13 columns unchanged from iter-v3/008 CONFIRMATION run.
+``tbr_zscore_30`` DROPPED per iter-v3/016 brief §3.3 (Critic FINAL Rec 3 of
+iter-v3/015 mandated revert before XGBoost axis exploration).
 
 Top-13 history:
 vwap_dev_50 dropped per Critic FINAL SHA a544621 (Recommendation 1).
@@ -151,25 +152,19 @@ Dropping it removed both IC-redundant pairs in the 14-feature subset:
 Residual max |IC| in the 13-feature subset: 0.6602.  No pair above 0.70.
 See analysis/iteration_v3-008/ic_redundancy_drop_demo.py (SHA 003a21e).
 
-``tbr_zscore_30`` addition (iter-v3/015):
-Max |IC| with existing 13 features: 0.1654 (vs vwap_dev_20).  Well below
-the 0.70 IC threshold.  See analysis/iteration_v3-015/tbr_eda_correlation.csv
-(SHA fcf6b06).
-
-vwap_dev_50 dropped per Critic FINAL SHA a544621 (Recommendation 1).
-Dropping it removes both IC-redundant pairs in the 14-feature subset:
-  - vwap_dev_50 x ema_spread_atr_20: IC 0.875 (above 0.70 threshold)
-  - vwap_dev_50 x vwap_dev_20:       IC 0.794 (above 0.70 threshold)
-Residual max |IC| in the 13-feature subset: 0.6602.  No pair above 0.70.
-See analysis/iteration_v3-008/ic_redundancy_drop_demo.py (SHA 003a21e).
+``tbr_zscore_30`` was added in iter-v3/015 (rank 14/14 in LightGBM importance
+across all 3 symbols, determined mechanically inert per EXPLORATION-NEGATIVE-no-effect
+verdict).  Reverted here per iter-v3/016 brief §3.3.  ``tbr_raw`` is now in
+V3_NON_FEATURE_COLUMNS (hygiene; Critic Clarification 4 from iter-v3/015).
 """
 
 # iter-v3/007-008: reassign to top-N subset for EXPLORATION/CONFIRMATION run.
 # iter-v3/007: top-14; iter-v3/008: top-13 (vwap_dev_50 dropped per Critic Rec 1).
 # iter-v3/015: top-14 (tbr_zscore_30 added as NEW microstructure feature family).
+# iter-v3/016: top-13 (tbr_zscore_30 DROPPED; reverted to iter-v3/013 baseline).
 # To restore full set: V3_FEATURE_COLUMNS = V3_FEATURE_COLUMNS_FULL
 V3_FEATURE_COLUMNS: tuple[str, ...] = V3_FEATURE_COLUMNS_TOP_N
-"""Active feature columns fed to LightGBM.
+"""Active feature columns fed to LightGBM / XGBoost.
 
 iter-v3/001-006: V3_FEATURE_COLUMNS_FULL (34 features).
 iter-v3/007:     V3_FEATURE_COLUMNS_TOP_N (14 features, EXPLORATION).
@@ -178,10 +173,18 @@ iter-v3/008:     V3_FEATURE_COLUMNS_TOP_N (13 features, CONFIRMATION;
 iter-v3/009-014: V3_FEATURE_COLUMNS_TOP_N (13 features, unchanged).
 iter-v3/015:     V3_FEATURE_COLUMNS_TOP_N (14 features; tbr_zscore_30 added
                  per iter-v3/015 brief Section 3.3 — NEW microstructure family).
+iter-v3/016:     V3_FEATURE_COLUMNS_TOP_N (13 features; tbr_zscore_30 DROPPED
+                 per Critic FINAL Rec 3 + iter-v3/016 brief §3.3 revert).
 """
 
-V3_NON_FEATURE_COLUMNS: tuple[str, ...] = ("natr_21_raw",)
-"""Columns computed by the v3 pipeline that are NOT model inputs."""
+V3_NON_FEATURE_COLUMNS: tuple[str, ...] = ("natr_21_raw", "tbr_raw")
+"""Columns computed by the v3 pipeline that are NOT model inputs.
+
+``natr_21_raw``: raw NATR used for dynamic ATR barriers (not a signal feature).
+``tbr_raw``:     raw tick-bar ratio before z-score normalization; Critic
+                 Clarification 4 of iter-v3/015 identified this as excluded from
+                 model input regardless (added iter-v3/016, §3.5 sub-fix #2).
+"""
 
 V3_EXCLUDED_SYMBOLS: tuple[str, ...] = (
     # v1 traded

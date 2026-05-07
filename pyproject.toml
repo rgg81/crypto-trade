@@ -15,6 +15,7 @@ dependencies = [
     "scikit-learn>=1.5",
     "quantstats>=0.0.62",
     "statsmodels>=0.14.6",
+    "xgboost>=2.0,<3.0",
 ]
 
 [project.scripts]

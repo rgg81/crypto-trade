@@ -1,6 +1,6 @@
 # iter-v3/016 EDA synthesis — XGBoost head-to-head smoke
 
-**Status**: smoke SKIPPED (no xgboost in env).
+**Status**: smoke PASS.
 
 ## Hyperparameter map
 13 of 13 LightGBM Optuna search-space dimensions have a clean XGBoost
@@ -12,12 +12,12 @@ hessian-sum, same range), and `is_unbalance=True` → `scale_pos_weight=neg/pos`
 
 ## Smoke test summary
 - Symbol: BCHUSDT; test month: 2024-12
-- XGBoost installed: False (version n/a)
-- Train samples: 0 (0 pos / 0 neg)
-- Test samples: 0
-- Test accuracy: nan
-- Top-3 features by gain: (skipped)
-- Fit time: nans; predict time: nans
+- XGBoost installed: True (version 2.1.4)
+- Train samples: 2171 (1083 pos / 1088 neg)
+- Test samples: 72
+- Test accuracy: 0.7083
+- Top-3 features by gain: ret_skew_200=0.0944; ret_kurt_50=0.0922; ret_skew_50=0.0905
+- Fit time: 2.116s; predict time: 0.001s
 
 The smoke is a one-shot fit on coarse forward-return-sign labels — not a
 walk-forward replication of the production runner.  It exists to confirm

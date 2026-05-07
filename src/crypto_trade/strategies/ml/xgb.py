@@ -1,0 +1,703 @@
+"""XgboostStrategy: XGBoost-based strategy with lazy monthly walk-forward retraining.
+
+Parallel structure to LightGbmStrategy (lgbm.py).  Uses XGBoost's depth-wise
+(level-wise) tree growth with ``tree_method='hist'`` instead of LightGBM's
+leaf-wise growth + GOSS.  This is the architectural axis for iter-v3/016.
+
+Key differences from LightGbmStrategy:
+- ``lgb.LGBMClassifier`` → ``xgb.XGBClassifier``
+- ``is_unbalance=True`` → ``scale_pos_weight = n_neg / n_pos`` (computed per-fit)
+- ``objective='binary'`` → ``objective='binary:logistic'``
+- ``objective='multiclass'`` → ``objective='multi:softprob'`` + ``num_class=3``
+- ``num_leaves`` Optuna param DROPPED (no-op under depthwise growth)
+- ``grow_policy='depthwise'`` pinned (default; maximises architectural difference)
+- ``tree_method='hist'`` pinned (rules out version drift / GPU fallback)
+- ``n_jobs=1`` pinned (determinism with fixed seed)
+- All other walk-forward, Optuna, risk-gate, and ensemble infrastructure
+  is byte-identical to LightGbmStrategy (infrastructure is library-agnostic).
+
+See iter-v3/016 brief §3.9 for rationale.  Do NOT modify LightGbmStrategy
+to introduce XGBoost support — parallel class is the correct pattern here.
+"""
+
+from __future__ import annotations
+
+import datetime
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import pyarrow.parquet as pq
+
+from crypto_trade.backtest_models import Signal
+from crypto_trade.feature_store import load_features_range, lookup_features
+from crypto_trade.strategies import NO_SIGNAL
+from crypto_trade.strategies.ml.labeling import compute_sample_uniqueness, label_trades
+from crypto_trade.strategies.ml.optimization_xgb import (
+    classes_to_labels,
+    optimize_and_train_xgb,
+)
+from crypto_trade.strategies.ml.walk_forward import (
+    MonthSplit,
+    generate_monthly_splits,
+)
+
+# Columns that are metadata, not features (mirrors lgbm.py)
+_META_COLUMNS = frozenset(
+    {
+        "open_time",
+        "open",
+        "high",
+        "low",
+        "close",
+        "close_time",
+        "volume",
+        "quote_volume",
+        "trades",
+        "taker_buy_volume",
+        "taker_buy_quote_volume",
+        "symbol",
+    }
+)
+
+
+def _epoch_ms_to_month(open_time: int) -> str:
+    """Convert epoch milliseconds to 'YYYY-MM' string."""
+    return datetime.datetime.fromtimestamp(open_time / 1000, tz=datetime.UTC).strftime("%Y-%m")
+
+
+def _ms_to_date(ms: int) -> str:
+    """Convert epoch milliseconds to 'YYYY-MM-DD' string."""
+    return datetime.datetime.fromtimestamp(ms / 1000, tz=datetime.UTC).strftime("%Y-%m-%d")
+
+
+def _ms_to_datetime(ms: int) -> str:
+    """Convert epoch milliseconds to 'YYYY-MM-DD HH:MM' string."""
+    return datetime.datetime.fromtimestamp(ms / 1000, tz=datetime.UTC).strftime("%Y-%m-%d %H:%M")
+
+
+_INTERVAL_MINUTES = {
+    "1m": 1,
+    "3m": 3,
+    "5m": 5,
+    "15m": 15,
+    "30m": 30,
+    "1h": 60,
+    "4h": 240,
+    "8h": 480,
+    "12h": 720,
+    "1d": 1440,
+}
+
+
+def _interval_to_minutes(interval: str) -> int:
+    """Convert interval string to minutes."""
+    return _INTERVAL_MINUTES.get(interval, 480)
+
+
+class XgboostStrategy:
+    """XGBoost strategy with lazy monthly walk-forward retraining.
+
+    Parallel structure to LightGbmStrategy.  Swaps the boosting library
+    (XGBoost depth-wise) while keeping all walk-forward, Optuna, and
+    ensemble infrastructure identical.  This is the single-axis variation
+    for iter-v3/016 EXPLORATION.
+
+    Constructor signature mirrors LightGbmStrategy exactly so that
+    ``_build_v3_model`` can route to either class without argument changes.
+    """
+
+    def __init__(
+        self,
+        training_months: int = 12,
+        n_trials: int = 50,
+        cv_splits: int = 5,
+        label_tp_pct: float = 4.0,
+        label_sl_pct: float = 2.0,
+        label_timeout_minutes: int = 4320,
+        fee_pct: float = 0.1,
+        features_dir: str = "data/features",
+        verbose: int = 0,
+        atr_tp_multiplier: float | None = None,
+        atr_sl_multiplier: float | None = None,
+        atr_column: str = "vol_natr_21",
+        ensemble_seeds: list[int] | None = None,
+        neutral_threshold_pct: float | None = None,
+        cv_label_gap: bool = True,
+        feature_columns: list[str] | None = None,
+        sample_uniqueness: bool = False,
+        time_decay_half_life: float | None = None,
+        use_atr_labeling: bool = False,
+        min_natr_threshold: float | None = None,
+        ood_enabled: bool = False,
+        ood_features: list[str] | None = None,
+        ood_cutoff_pct: float = 0.70,
+        oof_persist_path: Path | None = None,
+        fast_mode: bool = False,
+    ) -> None:
+        if not feature_columns:
+            raise ValueError(
+                "feature_columns must be explicitly specified — auto-discovery "
+                "is disabled to guarantee reproducibility across parquet "
+                "schema changes. Pass an explicit list of column names."
+            )
+        if not ensemble_seeds:
+            raise ValueError(
+                "ensemble_seeds must be a non-empty list of integers. Pass the "
+                "production list (e.g. [42, 123, 456, 789, 1001]) to ensemble "
+                "across seeds, or [42] for a single-seed run."
+            )
+        self.training_months = training_months
+        self.n_trials = n_trials
+        self.cv_splits = cv_splits
+        self.label_tp_pct = label_tp_pct
+        self.label_sl_pct = label_sl_pct
+        self.label_timeout_minutes = label_timeout_minutes
+        self.fee_pct = fee_pct
+        self.features_dir = features_dir
+        self.verbose = verbose
+        self.atr_tp_multiplier = atr_tp_multiplier
+        self.atr_sl_multiplier = atr_sl_multiplier
+        self.atr_column = atr_column
+        self.ensemble_seeds = ensemble_seeds
+        self.neutral_threshold_pct = neutral_threshold_pct
+        self.cv_label_gap = cv_label_gap
+        self.feature_columns = feature_columns
+        self.sample_uniqueness = sample_uniqueness
+        self.time_decay_half_life = time_decay_half_life
+        self.use_atr_labeling = use_atr_labeling
+        self.min_natr_threshold = min_natr_threshold
+        self.ood_enabled = ood_enabled
+        self.ood_features = list(ood_features) if ood_features else None
+        self.ood_cutoff_pct = ood_cutoff_pct
+        # iter-v3/003: path for per-trial OOF return persistence
+        self._oof_persist_path: Path | None = oof_persist_path
+        # iter-v3/007: fast exploration mode (colsample fixed at 1.0 in optimization)
+        self._fast_mode: bool = fast_mode
+        if self.ood_enabled and not self.ood_features:
+            raise ValueError("ood_features must be specified when ood_enabled=True")
+        self._ood_mean: np.ndarray | None = None
+        self._ood_inv_cov: np.ndarray | None = None
+        self._ood_cutoff: float | None = None
+        self._ood_feature_cols: list[str] = []
+        self._month_ood_features: dict[tuple[str, int], np.ndarray] = {}
+
+        # Set during compute_features
+        self._master: pd.DataFrame | None = None
+        self._sym_arr: np.ndarray = np.array([])
+        self._open_time_arr: np.ndarray = np.array([])
+        self._interval: str = "8h"
+        self._all_feature_cols: list[str] = []
+        self._splits: list[MonthSplit] = []
+        self._split_map: dict[str, MonthSplit] = {}
+        # Per-month lazy training state
+        self._current_month: str | None = None
+        self._model: object | None = None
+        self._models: list = []
+        self._selected_cols: list[str] = []
+        self._confidence_threshold: float = 0.50
+        self._confidence_thresholds: list[float] = []
+        self._month_features: dict[tuple[str, int], np.ndarray] = {}
+        # ATR cache for dynamic barriers
+        self._month_natr: dict[tuple[str, int], float] = {}
+        # Per-row ATR values for dynamic labeling (price units)
+        self._label_atr_values: np.ndarray | None = None
+
+    def compute_features(self, master: pd.DataFrame) -> None:
+        """Lightweight setup: store master and generate splits. No training."""
+        self._master = master
+        self._sym_arr = master["symbol"].to_numpy(dtype=str)
+        self._open_time_arr = master["open_time"].values
+
+        # Detect interval
+        self._interval = self._detect_interval(master)
+
+        # feature_columns is required (validated in __init__) — no auto-discovery
+        self._all_feature_cols = list(self.feature_columns)
+
+        # Generate monthly splits
+        self._splits = generate_monthly_splits(self._open_time_arr, self.training_months)
+        self._split_map = {s.test_month: s for s in self._splits}
+
+        if self.verbose > 0:
+            print(
+                f"[xgb] {len(self._all_feature_cols)} feature columns, "
+                f"{len(self._splits)} walk-forward splits"
+            )
+
+        self._current_month = None
+        self._model = None
+
+        # Load per-row ATR values for dynamic labeling
+        if self.use_atr_labeling and self.atr_tp_multiplier is not None:
+            self._label_atr_values = self._load_atr_for_master()
+            if self.verbose > 0:
+                valid = ~np.isnan(self._label_atr_values)
+                print(
+                    f"[xgb] ATR labeling: {valid.sum()}/{len(self._label_atr_values)} "
+                    f"rows with ATR values"
+                )
+        else:
+            self._label_atr_values = None
+
+    def _load_atr_for_master(self) -> np.ndarray:
+        """Load per-candle ATR values (price units) aligned with master rows."""
+        n = len(self._master)
+        atr_values = np.full(n, np.nan, dtype=np.float64)
+        close_arr = self._master["close"].values.astype(np.float64)
+
+        for sym in np.unique(self._sym_arr):
+            path = Path(self.features_dir) / f"{sym}_{self._interval}_features.parquet"
+            if not path.exists():
+                continue
+            table = pq.read_table(path, columns=["open_time", self.atr_column])
+            feat_ot = table.column("open_time").to_numpy().astype(np.int64)
+            feat_natr = table.column(self.atr_column).to_numpy().astype(np.float64)
+
+            # Vectorized lookup via searchsorted
+            sort_order = np.argsort(feat_ot)
+            sorted_ot = feat_ot[sort_order]
+            sorted_natr = feat_natr[sort_order]
+
+            sym_mask = self._sym_arr == sym
+            sym_indices = np.where(sym_mask)[0]
+            sym_times = self._open_time_arr[sym_indices].astype(np.int64)
+
+            positions = np.searchsorted(sorted_ot, sym_times)
+            in_bounds = positions < len(sorted_ot)
+            clamped = np.minimum(positions, len(sorted_ot) - 1)
+            matched = in_bounds & (sorted_ot[clamped] == sym_times)
+
+            natr_vals = np.where(matched, sorted_natr[clamped], np.nan)
+            atr_values[sym_indices] = close_arr[sym_indices] * natr_vals / 100.0
+
+        return atr_values
+
+    def _train_for_month(self, month_str: str) -> None:
+        """Train an XGBoost model for the given month. Called lazily from get_signal."""
+        self._model = None
+        self._selected_cols = []
+        self._confidence_threshold = 0.50
+        self._month_features = {}
+
+        split = self._split_map.get(month_str)
+        if split is None:
+            if self.verbose > 0:
+                print(f"[xgb] No split for {month_str} (insufficient training data)")
+            return
+
+        if not self._all_feature_cols:
+            if self.verbose > 0:
+                print(f"[xgb] No feature columns available, skipping {month_str}")
+            return
+
+        if self.verbose > 0:
+            print(f"[xgb] === Training for {month_str} ===")
+            print(
+                f"  Train window: {_ms_to_date(split.train_start_ms)} "
+                f"→ {_ms_to_date(split.train_end_ms)}"
+            )
+
+        # (a) Get all indices in the training window
+        train_indices = np.where(
+            (self._open_time_arr >= split.train_start_ms)
+            & (self._open_time_arr < split.train_end_ms)
+        )[0]
+        if len(train_indices) < 10:
+            if self.verbose > 0:
+                print(f"  Skipping {month_str}: only {len(train_indices)} train samples")
+            return
+
+        if self.verbose > 0:
+            from collections import Counter
+
+            n_unique_syms = len(set(self._sym_arr[train_indices]))
+            print(f"  {len(train_indices)} training samples from {n_unique_syms} symbols")
+            sample_months = Counter(
+                _epoch_ms_to_month(int(t)) for t in self._open_time_arr[train_indices]
+            )
+            dist_parts = [f"{m}: {c}" for m, c in sorted(sample_months.items())]
+            print(f"  Samples per month: {', '.join(dist_parts)}")
+
+        # (b) Label all training samples (with fee-aware returns)
+        if self._label_atr_values is not None:
+            label_tp = self.atr_tp_multiplier
+            label_sl = self.atr_sl_multiplier or self.atr_tp_multiplier / 2.0
+            label_atr = self._label_atr_values
+        else:
+            label_tp = self.label_tp_pct
+            label_sl = self.label_sl_pct
+            label_atr = None
+        train_labels, train_weights, long_pnls, short_pnls = label_trades(
+            self._master,
+            train_indices,
+            label_tp,
+            label_sl,
+            self.label_timeout_minutes,
+            fee_pct=self.fee_pct,
+            atr_values=label_atr,
+            verbose=self.verbose,
+            neutral_threshold_pct=self.neutral_threshold_pct,
+        )
+
+        ternary = self.neutral_threshold_pct is not None
+
+        # (b2) Apply sample uniqueness weighting (AFML Ch. 4)
+        if self.sample_uniqueness:
+            uniq = compute_sample_uniqueness(
+                train_indices,
+                self.label_timeout_minutes,
+                self._open_time_arr,
+                self._sym_arr,
+            )
+            train_weights = train_weights * uniq
+            if self.verbose > 0:
+                print(
+                    f"  Uniqueness: min={uniq.min():.3f}, "
+                    f"mean={uniq.mean():.3f}, max={uniq.max():.3f}"
+                )
+
+        # (b3) Apply time decay weighting
+        if self.time_decay_half_life is not None:
+            train_times = self._open_time_arr[train_indices]
+            max_time = train_times.max()
+            age_ms = max_time - train_times
+            age_months = age_ms / (30.44 * 24 * 3600 * 1000)
+            lam = np.log(2) / self.time_decay_half_life
+            decay = np.exp(-lam * age_months)
+            train_weights = train_weights * decay
+            if self.verbose > 0:
+                print(
+                    f"  Time decay (half_life={self.time_decay_half_life}mo): "
+                    f"min={decay.min():.3f}, mean={decay.mean():.3f}, "
+                    f"max={decay.max():.3f}"
+                )
+
+        if self.verbose > 0:
+            n_long = int((train_labels == 1).sum())
+            n_short = int((train_labels == -1).sum())
+            n_neutral = int((train_labels == 0).sum())
+            total = len(train_labels)
+            neutral_str = ""
+            if n_neutral > 0:
+                neutral_str = f", {n_neutral} neutral ({100 * n_neutral / total:.1f}%)"
+            print(
+                f"  Labels: {n_long} long ({100 * n_long / total:.1f}%), "
+                f"{n_short} short ({100 * n_short / total:.1f}%){neutral_str} | "
+                f"weights: min={train_weights.min():.2f}, "
+                f"mean={train_weights.mean():.2f}, "
+                f"max={train_weights.max():.2f}"
+            )
+
+        # (c) Load training features
+        train_lookups = [
+            (str(self._sym_arr[i]), int(self._open_time_arr[i])) for i in train_indices
+        ]
+        train_feat_df = lookup_features(train_lookups, self.features_dir, self._interval)
+        if train_feat_df.empty:
+            if self.verbose > 0:
+                print(f"  Skipping {month_str}: no features found for training")
+            return
+
+        # Align features with labels, weights, and returns
+        feat_keys = set(zip(train_feat_df["symbol"], train_feat_df["open_time"]))
+        keep_mask = np.array(
+            [
+                (str(self._sym_arr[i]), int(self._open_time_arr[i])) in feat_keys
+                for i in train_indices
+            ]
+        )
+        train_labels = train_labels[keep_mask]
+        train_weights = train_weights[keep_mask]
+        long_pnls = long_pnls[keep_mask]
+        short_pnls = short_pnls[keep_mask]
+        train_open_times = self._open_time_arr[train_indices][keep_mask]
+
+        available_feat_cols = [c for c in self._all_feature_cols if c in train_feat_df.columns]
+        feat_train = train_feat_df[available_feat_cols].values
+
+        if self.verbose > 0:
+            print(
+                f"  Features: {len(train_feat_df)}/{len(train_indices)} "
+                f"matched, {len(available_feat_cols)} columns"
+            )
+
+        # (d) Optuna optimization
+        if self.cv_label_gap:
+            interval_minutes = _interval_to_minutes(self._interval)
+            timeout_candles = self.label_timeout_minutes // interval_minutes + 1
+            n_symbols = len(set(self._sym_arr[train_indices]))
+            cv_gap = timeout_candles * n_symbols
+        else:
+            cv_gap = 0
+        if self.verbose > 0:
+            print(f"  CV gap: {cv_gap} rows")
+
+        seeds = self.ensemble_seeds
+        self._models = []
+        self._confidence_thresholds = []
+
+        train_symbols_arr = self._sym_arr[train_indices][keep_mask]
+
+        for i, seed in enumerate(seeds):
+            if self.verbose > 0 and len(seeds) > 1:
+                print(f"  [ensemble {i + 1}/{len(seeds)}] seed={seed}")
+            try:
+                model, selected_cols, confidence_threshold = optimize_and_train_xgb(
+                    feat_train,
+                    train_labels,
+                    available_feat_cols,
+                    long_pnls,
+                    short_pnls,
+                    self.n_trials,
+                    self.cv_splits,
+                    seed,
+                    self.verbose,
+                    sample_weights=train_weights,
+                    open_times=train_open_times,
+                    train_end_ms=split.train_end_ms,
+                    ternary=ternary,
+                    cv_gap=cv_gap,
+                    oof_persist_path=self._oof_persist_path,
+                    train_month=month_str,
+                    symbols_arr=train_symbols_arr,
+                    fast_mode=self._fast_mode,
+                )
+                self._models.append(model)
+                self._confidence_thresholds.append(confidence_threshold)
+            except Exception as exc:
+                if self.verbose > 0:
+                    print(f"  XGBoost optimization failed for {month_str} seed={seed}: {exc}")
+
+        if not self._models:
+            return
+
+        # Use first model as primary (backward compat)
+        self._model = self._models[0]
+        self._selected_cols = selected_cols
+        self._confidence_threshold = float(np.mean(self._confidence_thresholds))
+
+        # (e) Batch-load test month features
+        symbols = list(dict.fromkeys(self._sym_arr))
+        self._month_features = load_features_range(
+            symbols,
+            self.features_dir,
+            self._interval,
+            split.test_start_ms,
+            split.test_end_ms,
+            columns=selected_cols,
+        )
+
+        # (e2) R3 OOD detector — training-window Mahalanobis stats
+        self._ood_mean = None
+        self._ood_inv_cov = None
+        self._ood_cutoff = None
+        self._month_ood_features = {}
+        if self.ood_enabled and self.ood_features:
+            ood_cols_in_train = [c for c in self.ood_features if c in train_feat_df.columns]
+            if len(ood_cols_in_train) < len(self.ood_features):
+                missing = set(self.ood_features) - set(ood_cols_in_train)
+                if self.verbose > 0:
+                    print(f"  OOD: missing features {missing} — disabling for this month")
+            elif len(train_feat_df) < 100:
+                if self.verbose > 0:
+                    print("  OOD: insufficient training samples — disabling for this month")
+            else:
+                self._ood_feature_cols = ood_cols_in_train
+                train_ood_raw = train_feat_df[ood_cols_in_train].to_numpy(dtype=np.float64)
+                finite_mask = np.isfinite(train_ood_raw).all(axis=1)
+                train_ood = train_ood_raw[finite_mask]
+                if len(train_ood) < 100:
+                    if self.verbose > 0:
+                        print(
+                            "  OOD: insufficient finite training rows "
+                            f"({len(train_ood)}) — disabling for this month"
+                        )
+                else:
+                    self._ood_mean = train_ood.mean(axis=0)
+                    cov = np.cov(train_ood.T)
+                    reg = 1e-6 * np.trace(cov) / cov.shape[0] * np.eye(cov.shape[0])
+                    try:
+                        self._ood_inv_cov = np.linalg.pinv(cov + reg)
+                        centered = train_ood - self._ood_mean
+                        distances = np.einsum("ij,jk,ik->i", centered, self._ood_inv_cov, centered)
+                        self._ood_cutoff = float(np.quantile(distances, self.ood_cutoff_pct))
+                        if self.verbose > 0:
+                            print(
+                                f"  OOD: {len(ood_cols_in_train)} features, "
+                                f"cutoff (q={self.ood_cutoff_pct}) = "
+                                f"{self._ood_cutoff:.2f}"
+                            )
+                        self._month_ood_features = load_features_range(
+                            symbols,
+                            self.features_dir,
+                            self._interval,
+                            split.test_start_ms,
+                            split.test_end_ms,
+                            columns=ood_cols_in_train,
+                        )
+                    except np.linalg.LinAlgError:
+                        self._ood_mean = None
+                        self._ood_inv_cov = None
+                        self._ood_cutoff = None
+                        if self.verbose > 0:
+                            print("  OOD: cov inversion failed — disabled for this month")
+
+        # (f) Load NATR for dynamic barriers (if ATR mode enabled)
+        self._month_natr = {}
+        if self.atr_tp_multiplier is not None:
+            natr_data = load_features_range(
+                symbols,
+                self.features_dir,
+                self._interval,
+                split.test_start_ms,
+                split.test_end_ms,
+                columns=[self.atr_column],
+            )
+            for key, arr in natr_data.items():
+                self._month_natr[key] = float(arr[0])
+
+        if self.verbose > 0:
+            print(
+                f"  XGBoost model trained for {month_str}: "
+                f"{len(self._month_features)} test candles with features, "
+                f"confidence_threshold={self._confidence_threshold:.3f}"
+            )
+
+    def skip(self) -> None:
+        pass
+
+    def get_signal(self, symbol: str, open_time: int) -> Signal:
+        """Return signal for one candle. Always predicts 1 or -1."""
+        # Detect month change → lazy training
+        candle_month = _epoch_ms_to_month(open_time)
+        if candle_month != self._current_month:
+            self._current_month = candle_month
+            self._train_for_month(candle_month)
+
+        self._last_predict_log: str | None = None
+
+        if not self._models:
+            return NO_SIGNAL
+
+        # Look up features from month cache
+        key = (symbol, open_time)
+        feat_row = self._month_features.get(key)
+        if feat_row is None:
+            return NO_SIGNAL
+
+        # Predict with all ensemble models and average probabilities
+        feat_df = pd.DataFrame(feat_row.reshape(1, -1), columns=self._selected_cols)
+        all_proba = [m.predict_proba(feat_df)[0] for m in self._models]
+        proba = np.mean(all_proba, axis=0)
+
+        ternary = self.neutral_threshold_pct is not None
+
+        if ternary:
+            # 3-class: [P(short), P(neutral), P(long)]
+            directional_conf = max(float(proba[0]), float(proba[2]))
+            confidence = directional_conf
+        else:
+            # Binary: [P(short), P(long)]
+            confidence = float(max(proba))
+
+        if confidence < self._confidence_threshold:
+            if self.verbose > 0:
+                ts_str = _ms_to_datetime(open_time)
+                self._last_predict_log = (
+                    f"[predict] {ts_str} {symbol} → SKIP "
+                    f"(conf={confidence:.2f} < "
+                    f"{self._confidence_threshold:.2f})"
+                )
+            return NO_SIGNAL
+
+        # R3 OOD detector: skip candles where features are too far from training
+        if (
+            self.ood_enabled
+            and self._ood_mean is not None
+            and self._ood_inv_cov is not None
+            and self._ood_cutoff is not None
+        ):
+            ood_row = self._month_ood_features.get(key)
+            if ood_row is not None and np.isfinite(ood_row).all():
+                diff = ood_row.astype(np.float64) - self._ood_mean
+                dist = float(diff @ self._ood_inv_cov @ diff)
+                if dist > self._ood_cutoff:
+                    if self.verbose > 0:
+                        ts_str = _ms_to_datetime(open_time)
+                        self._last_predict_log = (
+                            f"[predict] {ts_str} {symbol} → SKIP "
+                            f"(OOD dist={dist:.2f} > {self._ood_cutoff:.2f})"
+                        )
+                    return NO_SIGNAL
+
+        # Regime filter: skip low-volatility candles
+        if self.min_natr_threshold is not None:
+            natr = self._month_natr.get((symbol, open_time))
+            if natr is not None and natr < self.min_natr_threshold:
+                if self.verbose > 0:
+                    ts_str = _ms_to_datetime(open_time)
+                    self._last_predict_log = (
+                        f"[predict] {ts_str} {symbol} → SKIP "
+                        f"(NATR={natr:.2f}% < "
+                        f"{self.min_natr_threshold:.1f}%)"
+                    )
+                return NO_SIGNAL
+
+        if ternary:
+            direction = 1 if proba[2] >= proba[0] else -1
+        else:
+            pred_class = int(np.argmax(proba))
+            direction = int(classes_to_labels(np.array([pred_class]))[0])
+
+        # Compute dynamic TP/SL from ATR if configured
+        tp_pct = None
+        sl_pct = None
+        if self.atr_tp_multiplier is not None:
+            natr = self._month_natr.get(key)
+            if natr is not None and natr > 0:
+                tp_pct = natr * self.atr_tp_multiplier
+                sl_pct = natr * (
+                    self.atr_sl_multiplier
+                    if self.atr_sl_multiplier is not None
+                    else self.atr_tp_multiplier / 2.0
+                )
+
+        if self.verbose > 0:
+            dir_label = "LONG" if direction == 1 else "SHORT"
+            ts_str = _ms_to_datetime(open_time)
+            atr_str = ""
+            if tp_pct is not None:
+                atr_str = f" TP={tp_pct:.1f}%/SL={sl_pct:.1f}%"
+            self._last_predict_log = (
+                f"[predict] {ts_str} {symbol} → {dir_label} (proba={confidence:.2f}{atr_str})"
+            )
+
+        return Signal(direction=direction, weight=100, tp_pct=tp_pct, sl_pct=sl_pct)
+
+    @staticmethod
+    def _detect_interval(master: pd.DataFrame) -> str:
+        """Detect interval from typical close_time - open_time gap."""
+        if len(master) < 2:
+            return "8h"
+        diff = master["close_time"].iloc[0] - master["open_time"].iloc[0]
+        interval_map = {
+            59_999: "1m",
+            179_999: "3m",
+            299_999: "5m",
+            899_999: "15m",
+            1_799_999: "30m",
+            3_599_999: "1h",
+            14_399_999: "4h",
+            28_799_999: "8h",
+            43_199_999: "12h",
+            86_399_999: "1d",
+        }
+        best = "8h"
+        best_dist = abs(diff - 28_799_999)
+        for ms, name in interval_map.items():
+            dist = abs(diff - ms)
+            if dist < best_dist:
+                best_dist = dist
+                best = name
+        return best

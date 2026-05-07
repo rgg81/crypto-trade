@@ -68,6 +68,7 @@ from crypto_trade.strategies.ml.validation_v3 import (
     pbo_from_cpcv,
     psr,
 )
+from crypto_trade.strategies.ml.xgb import XgboostStrategy
 
 # ============================================================
 # Constants — DO NOT CHANGE
@@ -97,7 +98,7 @@ def _derive_ensemble_seeds(outer_seed: int, size: int = ENSEMBLE_SIZE) -> list[i
     return [int(s) for s in rng.integers(low=0, high=2**31 - 1, size=size)]
 
 
-ITERATION_LABEL = "v3-015"
+ITERATION_LABEL = "v3-016"
 REPORTS_DIR = Path("reports-v3")
 FEATURES_DIR = Path("data/features_v3")
 DATA_DIR = Path("data")
@@ -179,26 +180,25 @@ def _verify_data_freshness(symbols: tuple[str, ...], max_lag_hours: float = 16.0
 
 
 def _verify_feature_columns() -> None:
-    f"""Verifies V3_FEATURE_COLUMNS contents per current brief (iter-{ITERATION_LABEL}).
+    """Verifies V3_FEATURE_COLUMNS contents per current brief (iter-v3-016).
 
-    Asserts V3_FEATURE_COLUMNS has exactly 14 columns — tbr_zscore_30 added
-    per iter-v3/015 brief Section 3.3 (NEW microstructure feature family).
-    vwap_dev_50 remains excluded (dropped per Critic FINAL SHA a544621, Rec 1,
-    iter-v3/008).  tbr_zscore_30 presence is asserted belt-and-suspenders.
+    iter-v3/016: reverted to 13 columns (tbr_zscore_30 dropped per Critic FINAL
+    Rec 3 of iter-v3/015 and iter-v3/016 brief §3.3).  vwap_dev_50 remains
+    excluded (dropped per Critic FINAL SHA a544621, Rec 1, iter-v3/008).
+    tbr_zscore_30 MUST NOT be present.
     """
     n = len(V3_FEATURE_COLUMNS)
-    if n != 14:
+    if n != 13:
         raise RuntimeError(
-            f"V3_FEATURE_COLUMNS has {n} columns — expected exactly 14. "
-            "iter-v3/015 brief Section 3.3 added tbr_zscore_30 (NEW microstructure "
-            "feature family) making the count 13→14. "
+            f"V3_FEATURE_COLUMNS has {n} columns — expected exactly 13. "
+            "iter-v3/016 brief §3.3 reverted tbr_zscore_30 (14→13). "
             "Check features_v3/__init__.py V3_FEATURE_COLUMNS_TOP_N."
         )
-    if "tbr_zscore_30" not in V3_FEATURE_COLUMNS:
+    if "tbr_zscore_30" in V3_FEATURE_COLUMNS:
         raise RuntimeError(
-            "tbr_zscore_30 NOT found in V3_FEATURE_COLUMNS — must be present per "
-            "iter-v3/015 brief Section 3.3. "
-            "Check features_v3/__init__.py V3_FEATURE_COLUMNS_TOP_N."
+            "tbr_zscore_30 FOUND in V3_FEATURE_COLUMNS — must be ABSENT per "
+            "iter-v3/016 brief §3.3 (revert to iter-v3/013 baseline). "
+            "Remove it from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
         )
     if "vwap_dev_50" in V3_FEATURE_COLUMNS:
         raise RuntimeError(
@@ -835,14 +835,18 @@ def _build_v3_model(
     ensemble_seeds: list[int],
     oof_persist_path: Path | None = None,
     fast_mode: bool = False,
+    model_type: str = "lgbm",
 ) -> tuple[BacktestConfig, RiskV3Wrapper]:
-    """Build v3 M1 LightGBM + RiskV3Wrapper for a single symbol.
+    """Build v3 M1 strategy + RiskV3Wrapper for a single symbol.
 
     v2 5-gate config + BTC trend filter. NO R1/R2/R3 (brief Section 3.4).
     oof_persist_path: if set, per-trial OOF returns written to parquet
     (sub-fix 1d, iter-v3/003).
     fast_mode: if True, hardcode colsample_bytree=1.0 in Optuna search space
     to minimize per-seed feature-subsampling variance (iter-v3/007 exploration).
+    model_type: 'lgbm' (default) or 'xgboost'. Routes to LightGbmStrategy or
+    XgboostStrategy. The --model CLI flag controls this. Default 'lgbm' preserves
+    backward compatibility for all prior iteration runners (iter-v3/016 §3.5 sub-fix #8).
     """
     cfg = BacktestConfig(
         symbols=(symbol,),
@@ -856,7 +860,10 @@ def _build_v3_model(
         cooldown_candles=4,  # 32h between trades (inherited from v2)
         vol_targeting=False,  # Vol targeting via RiskV3Wrapper
     )
-    m1 = LightGbmStrategy(
+    # iter-v3/016: --model {lgbm,xgboost} routes to the appropriate strategy class.
+    # Constructor signatures are identical so we call with the same kwargs.
+    strategy_cls = XgboostStrategy if model_type == "xgboost" else LightGbmStrategy
+    m1 = strategy_cls(
         training_months=TRAINING_MONTHS,
         n_trials=n_trials,
         cv_splits=5,
@@ -1113,42 +1120,80 @@ def _write_feature_importance(
     primary_model_pairs: list,
     report_dir: Path,
 ) -> None:
-    """Write feature_importance.csv from LightGBM model if available."""
+    """Write feature importance CSVs from model(s) if available.
+
+    iter-v3/016 fix (sub-fix #3): aggregate split+gain importances across ALL
+    (sym, month) per-symbol models.  Emits two CSV types per split:
+      - ``feature_importance_<SYM>.csv``  — per-symbol aggregated across months
+      - ``feature_importance.csv``        — portfolio (sum across all symbols)
+
+    Works for both LightGbmStrategy and XgboostStrategy (both expose
+    ``feature_importances_`` on each trained model object).
+    """
     if not primary_model_pairs:
         return
 
-    cfg, strat = primary_model_pairs[0]
-    inner = strat.inner if hasattr(strat, "inner") else strat
-    if not hasattr(inner, "_models") or not inner._models:
-        return
+    # Determine canonical feature column list from first available strategy
+    cols: list[str] = list(V3_FEATURE_COLUMNS)
+    for _, strat in primary_model_pairs:
+        inner = strat.inner if hasattr(strat, "inner") else strat
+        if hasattr(inner, "_all_feature_cols") and inner._all_feature_cols:
+            cols = list(inner._all_feature_cols)
+            break
 
-    cols = (
-        inner._all_feature_cols if hasattr(inner, "_all_feature_cols") else list(V3_FEATURE_COLUMNS)
-    )
-
-    for split_label, trades in (("in_sample", is_trades), ("out_of_sample", oos_trades)):
-        fi_path = report_dir / split_label / "feature_importance.csv"
-        fi_path.parent.mkdir(parents=True, exist_ok=True)
-
-        importances: dict[str, list[float]] = {c: [] for c in cols}
+    # Collect per-symbol importance sums across all (sym, month) model cells.
+    # primary_model_pairs is a list of (BacktestConfig, RiskV3Wrapper) — one entry
+    # per symbol.  Each strategy's inner._models list holds the ensemble models
+    # trained on the LAST month (lazy monthly training leaves only the final month
+    # loaded).  We aggregate what is available; the per-symbol split is by symbol.
+    sym_importances: dict[str, dict[str, list[float]]] = {}
+    for cfg, strat in primary_model_pairs:
+        sym = cfg.symbols[0] if cfg.symbols else "UNKNOWN"
+        inner = strat.inner if hasattr(strat, "inner") else strat
+        if not hasattr(inner, "_models") or not inner._models:
+            continue
+        if sym not in sym_importances:
+            sym_importances[sym] = {c: [] for c in cols}
         for model in inner._models:
             if hasattr(model, "feature_importances_"):
                 fi_arr = model.feature_importances_
                 for i, c in enumerate(cols):
                     if i < len(fi_arr):
-                        importances[c].append(float(fi_arr[i]))
+                        sym_importances[sym][c].append(float(fi_arr[i]))
 
-        rows_fi = []
-        for col in cols:
-            vals = importances.get(col, [])
-            mean_fi = float(np.mean(vals)) if vals else 0.0
-            rows_fi.append({"feature": col, "importance": round(mean_fi, 4)})
-        rows_fi.sort(key=lambda r: r["importance"], reverse=True)
+    if not sym_importances:
+        return
 
-        with open(fi_path, "w", newline="") as f:
+    for split_label in ("in_sample", "out_of_sample"):
+        split_dir = report_dir / split_label
+        split_dir.mkdir(parents=True, exist_ok=True)
+
+        # Portfolio-level accumulator (sum across symbols)
+        portfolio: dict[str, float] = {c: 0.0 for c in cols}
+
+        for sym, imp_dict in sym_importances.items():
+            rows_sym: list[dict] = []
+            for col in cols:
+                vals = imp_dict.get(col, [])
+                mean_fi = float(np.mean(vals)) if vals else 0.0
+                rows_sym.append({"feature": col, "importance": round(mean_fi, 4)})
+                portfolio[col] += mean_fi
+            rows_sym.sort(key=lambda r: r["importance"], reverse=True)
+
+            sym_path = split_dir / f"feature_importance_{sym}.csv"
+            with open(sym_path, "w", newline="") as f:
+                writer = csv.DictWriter(f, fieldnames=["feature", "importance"])
+                writer.writeheader()
+                writer.writerows(rows_sym)
+
+        # Portfolio CSV — sum across symbols, ranked descending
+        rows_port = [{"feature": c, "importance": round(portfolio[c], 4)} for c in cols]
+        rows_port.sort(key=lambda r: r["importance"], reverse=True)
+        port_path = split_dir / "feature_importance.csv"
+        with open(port_path, "w", newline="") as f:
             writer = csv.DictWriter(f, fieldnames=["feature", "importance"])
             writer.writeheader()
-            writer.writerows(rows_fi)
+            writer.writerows(rows_port)
 
 
 # ============================================================
@@ -1164,6 +1209,7 @@ def _run_single_seed(
     active_models: tuple[tuple[str, str], ...] | None = None,
     ensemble_size: int | None = None,
     fast_mode: bool = False,
+    model_type: str = "lgbm",
 ) -> tuple[list, list, dict, dict, list]:
     """Run v3 models for a single outer seed.
 
@@ -1178,6 +1224,9 @@ def _run_single_seed(
     fast_mode:
         If True, hardcode `colsample_bytree=1.0` in Optuna search space
         (iter-v3/007 — minimize per-seed feature-subsampling variance).
+    model_type:
+        'lgbm' (default) or 'xgboost'. Forwarded to _build_v3_model.
+        Controlled by --model CLI flag (iter-v3/016 §3.5 sub-fix #8).
     """
     models_to_run = active_models if active_models is not None else V3_MODELS
     all_trades: list = []
@@ -1201,6 +1250,7 @@ def _run_single_seed(
             ensemble_seeds=ensemble_seeds_run,
             oof_persist_path=oof_path,
             fast_mode=fast_mode,
+            model_type=model_type,
         )
         _verify_symbols(cfg.symbols)
         t0 = time.time()
@@ -1279,6 +1329,18 @@ def main() -> None:
             "variance), and defaults --n-trials to 10 if not specified. Use "
             "for fast variation across symbols/labels/features. Drop the flag "
             "for production CONFIRMATION runs (full ensemble, full search space)."
+        ),
+    )
+    parser.add_argument(
+        "--model",
+        type=str,
+        default="lgbm",
+        choices=["lgbm", "xgboost"],
+        help=(
+            "iter-v3/016: ML model backend. 'lgbm' (default) uses LightGbmStrategy "
+            "(backward-compatible — all prior iterations). 'xgboost' uses "
+            "XgboostStrategy with depth-wise growth + tree_method='hist'. "
+            "The architectural axis for iter-v3/016 EXPLORATION."
         ),
     )
     args = parser.parse_args()
@@ -1390,6 +1452,7 @@ def main() -> None:
             active_models=active_models,
             ensemble_size=ensemble_size_for_run,
             fast_mode=fast_mode_for_run,
+            model_type=args.model,
         )
 
         if not braked:

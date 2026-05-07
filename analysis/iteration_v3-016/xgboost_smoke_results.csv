@@ -1,2 +1,2 @@
 symbol,test_month,n_features,xgboost_available,xgboost_version,n_train,n_test,test_accuracy,test_pos_rate,n_train_pos,n_train_neg,fit_seconds,predict_seconds,top3_features,tbr_or_proxy_present,notes
-BCHUSDT,2024-12,13,False,,0,0,,,0,0,,,,False,"xgboost not installed in this env (ImportError: No module named 'xgboost'). Smoke skipped — Engineer must add `xgboost>=2.0,<3.0` to pyproject.toml and re-run this script as part of Phase 6 setup before the production runner."
+BCHUSDT,2024-12,13,True,2.1.4,2171,72,0.7083,0.1528,1083,1088,2.116,0.001,ret_skew_200=0.0944; ret_kurt_50=0.0922; ret_skew_50=0.0905,False,
