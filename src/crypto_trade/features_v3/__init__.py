@@ -145,13 +145,18 @@ V3_FEATURE_COLUMNS_TOP_N: tuple[str, ...] = (
     # symbols; feature did not contribute signal. Infrastructure (funding_v3.py,
     # GROUP_REGISTRY entry, fetch-funding CLI, data/funding_rates/ cache) is
     # PRESERVED for possible iter-v3/028+ CONFIRMATION retest.
+    # iter-v3/023: funding_rate_zscore_30 RE-ADDED (13 → 14; budget-disambiguation
+    # RETEST at n_trials=35 per Critic FINAL `3b3cc41` of iter-v3/022 Rec #1).
+    # iter-v3/019 was PROMISING-INERT at n_trials=10; retest disambiguates
+    # "feature genuinely INERT" vs "n_trials=10 budget too small".
+    "funding_rate_zscore_30",  # rank TBD — funding_v3 (external-data-source)
 )
-"""Top-13 feature subset: reverted from 14 back to 13 at iter-v3/020.
+"""Top-14 feature subset: funding_rate_zscore_30 re-added at iter-v3/023.
 
 ``tbr_zscore_30`` DROPPED per iter-v3/016 brief §3.3 (Critic FINAL Rec 3 of
 iter-v3/015 mandated revert before XGBoost axis exploration).
 
-Top-13 history:
+Top-N history:
 vwap_dev_50 dropped per Critic FINAL SHA a544621 (Recommendation 1).
 Dropping it removed both IC-redundant pairs in the 14-feature subset:
   - vwap_dev_50 x ema_spread_atr_20: IC 0.875 (above 0.70 threshold)
@@ -171,6 +176,8 @@ at iter-v3/020 to revert to the 13-feature iter-v3/018 anchor surface.
 The funding infrastructure is KEPT (GROUP_REGISTRY, fetch-funding CLI,
 data/funding_rates/ cache) so the column remains in generated parquets
 but is NOT fed to LightGBM.
+RE-ADDED at iter-v3/023 for budget-disambiguation RETEST at n_trials=35
+per Critic FINAL Rec #1 of iter-v3/022 (SHA ``3b3cc41``).
 """
 
 # iter-v3/007-008: reassign to top-N subset for EXPLORATION/CONFIRMATION run.
@@ -179,6 +186,8 @@ but is NOT fed to LightGBM.
 # iter-v3/016: top-13 (tbr_zscore_30 DROPPED; reverted to iter-v3/013 baseline).
 # iter-v3/019: top-14 (funding_rate_zscore_30 added — NEW external-data-source feature family).
 # iter-v3/020: top-13 (funding_rate_zscore_30 DROPPED per Critic FINAL Rec 2 of iter-v3/019).
+# iter-v3/023: top-14 (funding_rate_zscore_30 RE-ADDED — budget-disambiguation RETEST at
+#              n_trials=35; per Critic FINAL `3b3cc41` of iter-v3/022 Rec #1).
 # To restore full set: V3_FEATURE_COLUMNS = V3_FEATURE_COLUMNS_FULL
 V3_FEATURE_COLUMNS: tuple[str, ...] = V3_FEATURE_COLUMNS_TOP_N
 """Active feature columns fed to LightGBM / XGBoost.
@@ -199,6 +208,11 @@ iter-v3/019:     V3_FEATURE_COLUMNS_TOP_N (14 features; funding_rate_zscore_30
 iter-v3/020:     V3_FEATURE_COLUMNS_TOP_N (13 features; funding_rate_zscore_30
                  DROPPED per Critic FINAL Rec 2 of iter-v3/019 review — rank
                  14/14 across all 3 symbols; reverts to iter-v3/018 anchor surface).
+iter-v3/021-022: V3_FEATURE_COLUMNS_TOP_N (13 features, unchanged).
+iter-v3/023:     V3_FEATURE_COLUMNS_TOP_N (14 features; funding_rate_zscore_30
+                 RE-ADDED per Critic FINAL Rec #1 of iter-v3/022 (SHA ``3b3cc41``)
+                 — budget-disambiguation RETEST at n_trials=35; was PROMISING-INERT
+                 at n_trials=10 in iter-v3/019).
 """
 
 V3_NON_FEATURE_COLUMNS: tuple[str, ...] = ("natr_21_raw", "tbr_raw")

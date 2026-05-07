@@ -99,7 +99,7 @@ def _derive_ensemble_seeds(outer_seed: int, size: int = ENSEMBLE_SIZE) -> list[i
     return [int(s) for s in rng.integers(low=0, high=2**31 - 1, size=size)]
 
 
-ITERATION_LABEL = "v3-022"
+ITERATION_LABEL = "v3-023"
 REPORTS_DIR = Path("reports-v3")
 FEATURES_DIR = Path("data/features_v3")
 DATA_DIR = Path("data")
@@ -184,21 +184,22 @@ def _verify_data_freshness(symbols: tuple[str, ...], max_lag_hours: float = 16.0
 
 
 def _verify_feature_columns() -> None:
-    """Verifies V3_FEATURE_COLUMNS contents per current brief (iter-v3/021).
+    """Verifies V3_FEATURE_COLUMNS contents per current brief (iter-v3/023).
 
-    iter-v3/021: 13 columns UNCHANGED from iter-v3/020 (funding_rate_zscore_30
-    DROPPED per Critic FINAL Rec 2 of iter-v3/019 review; HBAR+AVAX inherit
-    the same 13-feature set via per-symbol feature regeneration pipeline).
+    iter-v3/023: 14 columns — funding_rate_zscore_30 RE-ADDED (13→14) per
+    Critic FINAL Rec #1 of iter-v3/022 (SHA ``3b3cc41``). Budget-disambiguation
+    RETEST at n_trials=35; was PROMISING-INERT at n_trials=10 in iter-v3/019.
     iter-v3/016: reverted from 14 to 13 (tbr_zscore_30 dropped). vwap_dev_50
     remains excluded (dropped per Critic FINAL SHA a544621, iter-v3/008).
-    tbr_zscore_30 MUST NOT be present. funding_rate_zscore_30 MUST NOT be present.
+    tbr_zscore_30 MUST NOT be present. vwap_dev_50 MUST NOT be present.
+    funding_rate_zscore_30 MUST be present (re-added at iter-v3/023).
     """
     n = len(V3_FEATURE_COLUMNS)
-    if n != 13:
+    if n != 14:
         raise RuntimeError(
-            f"V3_FEATURE_COLUMNS has {n} columns — expected exactly 13. "
-            "iter-v3/020 brief dropped funding_rate_zscore_30 (14→13 per "
-            "Critic FINAL Rec 2 of iter-v3/019). "
+            f"V3_FEATURE_COLUMNS has {n} columns — expected exactly 14. "
+            "iter-v3/023 brief re-added funding_rate_zscore_30 (13→14 per "
+            "Critic FINAL Rec #1 of iter-v3/022 SHA `3b3cc41`). "
             "Check features_v3/__init__.py V3_FEATURE_COLUMNS_TOP_N."
         )
     if "tbr_zscore_30" in V3_FEATURE_COLUMNS:
@@ -207,12 +208,13 @@ def _verify_feature_columns() -> None:
             "iter-v3/016 brief §3.3 (revert to iter-v3/013 baseline). "
             "Remove it from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
         )
-    if "funding_rate_zscore_30" in V3_FEATURE_COLUMNS:
+    if "funding_rate_zscore_30" not in V3_FEATURE_COLUMNS:
         raise RuntimeError(
-            "funding_rate_zscore_30 FOUND in V3_FEATURE_COLUMNS — must be "
-            "ABSENT per iter-v3/020 brief §3.3 (Critic FINAL Rec 2 of "
-            "iter-v3/019 review: rank 14/14 across all 3 symbols). "
-            "Remove it from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
+            "funding_rate_zscore_30 MISSING from V3_FEATURE_COLUMNS — must be "
+            "PRESENT per iter-v3/023 brief §3.3 (Critic FINAL Rec #1 of "
+            "iter-v3/022 SHA `3b3cc41`: budget-disambiguation RETEST at "
+            "n_trials=35). Add it to V3_FEATURE_COLUMNS_TOP_N in "
+            "features_v3/__init__.py."
         )
     if "vwap_dev_50" in V3_FEATURE_COLUMNS:
         raise RuntimeError(
@@ -916,7 +918,10 @@ def _build_v3_model(
         # iter-v3/022: primitive 9 — regime-conditional kill switch on TRX.
         # Thresholds calibrated at IS-90th/95th percentile (EDA SHA b728313 synthesis.md).
         # Gate fires when BTC drawdown_30d > 20% OR |BTC vol_zscore_30d| > 1.5.
-        enable_regime_gate=True,
+        # iter-v3/023: DISABLED — revert iter-v3/022 axis so the single varied axis
+        # vs iter-v3/018 anchor is funding_rate_zscore_30 re-add only.
+        # Code stays in repo (zero revert cost for future CONFIRMATION-mode re-eval).
+        enable_regime_gate=False,
         regime_gate_symbols=("TRXUSDT",),
         regime_dd_threshold_pct=20.0,
         regime_vol_zscore_threshold=1.5,
