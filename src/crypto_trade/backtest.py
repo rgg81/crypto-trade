@@ -248,6 +248,11 @@ def run_backtest(
             if result is not None:
                 results.append(result)
                 del open_orders[sym]
+                # iter-v3/020: per-symbol cap state feedback — call record_trade_result
+                # on the strategy if it exposes the hook (RiskV2/V3Wrapper only).
+                # Uses hasattr to stay backward-compatible with all other strategies.
+                if hasattr(strategy, "record_trade_result"):
+                    strategy.record_trade_result(result)
                 # Record per-symbol daily PnL for vol targeting lookback
                 if config.vol_targeting:
                     close_date_str = _day_of(result.close_time)
@@ -316,8 +321,7 @@ def run_backtest(
                             )
                             if cum_n >= 20 and cum_pnl < 0:
                                 raise EarlyStopError(
-                                    f"Year 1+2 cumulative: PnL={cum_pnl:+.1f}% "
-                                    f"({cum_n} trades)",
+                                    f"Year 1+2 cumulative: PnL={cum_pnl:+.1f}% ({cum_n} trades)",
                                     results,
                                     total_signals,
                                 )

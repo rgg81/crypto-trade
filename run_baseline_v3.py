@@ -99,7 +99,7 @@ def _derive_ensemble_seeds(outer_seed: int, size: int = ENSEMBLE_SIZE) -> list[i
     return [int(s) for s in rng.integers(low=0, high=2**31 - 1, size=size)]
 
 
-ITERATION_LABEL = "v3-019"
+ITERATION_LABEL = "v3-020"
 REPORTS_DIR = Path("reports-v3")
 FEATURES_DIR = Path("data/features_v3")
 DATA_DIR = Path("data")
@@ -181,19 +181,20 @@ def _verify_data_freshness(symbols: tuple[str, ...], max_lag_hours: float = 16.0
 
 
 def _verify_feature_columns() -> None:
-    """Verifies V3_FEATURE_COLUMNS contents per current brief (iter-v3-016).
+    """Verifies V3_FEATURE_COLUMNS contents per current brief (iter-v3/020).
 
-    iter-v3/019: 14 columns (funding_rate_zscore_30 ADDED to iter-v3/018's 13;
-    NEW feature family axis per `feedback_v3_iter019_axis_priorities.md`).
+    iter-v3/020: 13 columns (funding_rate_zscore_30 DROPPED per Critic FINAL
+    Rec 2 of iter-v3/019 review — reverts to iter-v3/018 anchor surface).
     iter-v3/016: reverted from 14 to 13 (tbr_zscore_30 dropped). vwap_dev_50
     remains excluded (dropped per Critic FINAL SHA a544621, iter-v3/008).
-    tbr_zscore_30 MUST NOT be present.
+    tbr_zscore_30 MUST NOT be present. funding_rate_zscore_30 MUST NOT be present.
     """
     n = len(V3_FEATURE_COLUMNS)
-    if n != 14:
+    if n != 13:
         raise RuntimeError(
-            f"V3_FEATURE_COLUMNS has {n} columns — expected exactly 14. "
-            "iter-v3/019 brief added funding_rate_zscore_30 (13→14 per axis #1). "
+            f"V3_FEATURE_COLUMNS has {n} columns — expected exactly 13. "
+            "iter-v3/020 brief dropped funding_rate_zscore_30 (14→13 per "
+            "Critic FINAL Rec 2 of iter-v3/019). "
             "Check features_v3/__init__.py V3_FEATURE_COLUMNS_TOP_N."
         )
     if "tbr_zscore_30" in V3_FEATURE_COLUMNS:
@@ -202,11 +203,12 @@ def _verify_feature_columns() -> None:
             "iter-v3/016 brief §3.3 (revert to iter-v3/013 baseline). "
             "Remove it from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
         )
-    if "funding_rate_zscore_30" not in V3_FEATURE_COLUMNS:
+    if "funding_rate_zscore_30" in V3_FEATURE_COLUMNS:
         raise RuntimeError(
-            "funding_rate_zscore_30 MISSING from V3_FEATURE_COLUMNS — must be "
-            "PRESENT per iter-v3/019 brief §3 (NEW feature family axis #1). "
-            "Add it to V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
+            "funding_rate_zscore_30 FOUND in V3_FEATURE_COLUMNS — must be "
+            "ABSENT per iter-v3/020 brief §3.3 (Critic FINAL Rec 2 of "
+            "iter-v3/019 review: rank 14/14 across all 3 symbols). "
+            "Remove it from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
         )
     if "vwap_dev_50" in V3_FEATURE_COLUMNS:
         raise RuntimeError(
@@ -903,6 +905,9 @@ def _build_v3_model(
     risk_cfg = RiskV2Config(
         zscore_threshold=2.0,
         adx_threshold=20.0,  # RESET: iter-v3/014's failed test (25.0) → iter-v3/013 baseline
+        max_per_symbol_pnl_share=0.40,  # iter-v3/020: per-symbol cap at 40% rolling share
+        max_per_symbol_window_bars=90,  # ≈ 30 days at 8h cadence
+        enable_per_symbol_cap=True,  # iter-v3/020 single varied axis (primitive 8)
     )
     strategy = RiskV3Wrapper(m1, risk_cfg)
     return cfg, strategy
@@ -1417,7 +1422,8 @@ def main() -> None:
     baseline_symbols = tuple(sym for _, sym in active_models)
     _verify_symbols(baseline_symbols)
     _verify_data_freshness(baseline_symbols + ("BTCUSDT",))
-    _verify_feature_columns()  # asserts len == 14, funding_rate_zscore_30 present, vwap_dev_50/tbr_zscore_30 absent
+    # asserts len == 13, funding NOT present, vwap_dev_50/tbr_zscore_30 absent
+    _verify_feature_columns()
     _verify_label_leakage_gap()  # asserts REQUIRED_GAP == 66 (3-symbol universe, iter-v3/013)
     _verify_track_isolation()  # grep check
 
