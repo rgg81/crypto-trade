@@ -1,0 +1,4 @@
+symbol,n,adf_stat,adf_pvalue,crit_1pct,crit_5pct,crit_10pct,passes
+BCHUSDT,2193,-15.050741,0.0,-3.433341,-2.862861,-2.567473,True
+LDOUSDT,2193,-15.050741,0.0,-3.433341,-2.862861,-2.567473,True
+TRXUSDT,2193,-15.050741,0.0,-3.433341,-2.862861,-2.567473,True
