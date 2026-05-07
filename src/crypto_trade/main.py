@@ -275,7 +275,10 @@ def build_parser() -> argparse.ArgumentParser:
         "--track",
         choices=["v1", "v2", "both"],
         default="v1",
-        help="Model preset: v1=BASELINE_MODELS, v2=V2_BASELINE_MODELS, both=COMBINED_MODELS (default: v1)",
+        help=(
+            "Model preset: v1=BASELINE_MODELS, v2=V2_BASELINE_MODELS, "
+            "both=COMBINED_MODELS (default: v1)"
+        ),
     )
     # -- seed-live-db subcommand --
     seed_parser = subparsers.add_parser(
@@ -323,6 +326,38 @@ def build_parser() -> argparse.ArgumentParser:
             "data extent, even if existing keys are higher. Default is "
             "monotonic advance (MAX(existing, new))."
         ),
+    )
+
+    # -- fetch-funding subcommand (iter-v3/019) --
+    ff_parser = subparsers.add_parser(
+        "fetch-funding",
+        help=(
+            "Fetch Binance Futures funding-rate history from /fapi/v1/fundingRate "
+            "and cache to data/funding_rates/<SYMBOL>.csv. Incremental — re-running "
+            "appends only new entries since last cached timestamp."
+        ),
+    )
+    ff_parser.add_argument(
+        "--symbols",
+        type=str,
+        required=True,
+        help="Comma-separated symbols (e.g. BCHUSDT,LDOUSDT,TRXUSDT)",
+    )
+    ff_parser.add_argument(
+        "--start",
+        type=str,
+        default=None,
+        help=(
+            "Earliest funding date as YYYY-MM-DD (default: 2019-01-01). "
+            "Ignored if cache already exists — incremental fetch resumes from "
+            "last cached timestamp."
+        ),
+    )
+    ff_parser.add_argument(
+        "--output-dir",
+        type=str,
+        default=None,
+        help="Directory for funding-rate CSVs (default: data/funding_rates/)",
     )
 
     # -- portfolio-report subcommand --
@@ -380,6 +415,8 @@ def main() -> None:
         _cmd_portfolio_report(args, settings)
     elif args.command == "seed-live-db":
         _cmd_seed_live_db(args, settings)
+    elif args.command == "fetch-funding":
+        _cmd_fetch_funding(args, settings)
 
 
 def _cmd_fetch(args, settings) -> None:
@@ -658,6 +695,8 @@ def _cmd_features(args, settings) -> None:
     if track == "v2":
         from crypto_trade.features_v2 import (
             list_groups as _list_groups,
+        )
+        from crypto_trade.features_v2 import (
             run_features_v2 as _run_features,
         )
 
@@ -665,6 +704,8 @@ def _cmd_features(args, settings) -> None:
     else:
         from crypto_trade.features import (
             list_groups as _list_groups,
+        )
+        from crypto_trade.features import (
             run_features as _run_features,
         )
 
@@ -795,8 +836,8 @@ def _cmd_live(args, settings) -> None:
     from crypto_trade.live.models import (
         BASELINE_MODELS,
         COMBINED_MODELS,
-        LiveConfig,
         V2_BASELINE_MODELS,
+        LiveConfig,
     )
 
     groups = tuple(g.strip() for g in args.feature_groups.split(","))
@@ -908,8 +949,8 @@ def _cmd_seed_live_db(args, settings) -> None:
     from crypto_trade.live.models import (
         BASELINE_MODELS,
         COMBINED_MODELS,
-        LiveConfig,
         V2_BASELINE_MODELS,
+        LiveConfig,
     )
 
     track_map = {
@@ -963,6 +1004,100 @@ def _cmd_seed_live_db(args, settings) -> None:
         "seeded boundary (seeded_through_* keys) and produces trades only for candles "
         "after the seeded data."
     )
+
+
+def _cmd_fetch_funding(args, settings) -> None:
+    """Fetch funding-rate history from /fapi/v1/fundingRate and cache locally.
+
+    Iterates over each symbol, fetches incrementally from cache, and writes
+    data/funding_rates/<SYMBOL>.csv (schema: funding_time, funding_rate).
+
+    iter-v3/019: supports the NEW funding_rate_zscore_30 feature family.
+    """
+    import time as _time
+    from pathlib import Path
+
+    import httpx as _httpx
+    import pandas as _pd
+
+    symbols = [s.strip() for s in args.symbols.split(",")]
+    if args.output_dir:
+        output_dir = Path(args.output_dir)
+    else:
+        output_dir = Path(settings.data_dir) / "funding_rates"
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Default start: 2019-01-01 00:00:00 UTC in ms
+    default_start_ms = 1_546_300_800_000
+    if args.start:
+        from datetime import UTC, datetime
+
+        dt = datetime.strptime(args.start, "%Y-%m-%d").replace(tzinfo=UTC)
+        default_start_ms = int(dt.timestamp() * 1000)
+
+    funding_endpoint = "/fapi/v1/fundingRate"
+    fapi_base = "https://fapi.binance.com"
+
+    total_fetched = 0
+    for symbol in symbols:
+        cache_path = output_dir / f"{symbol}.csv"
+        print(f"\n[fetch-funding] {symbol} → {cache_path}")
+
+        # Load existing cache (incremental)
+        cached = _pd.DataFrame(columns=["funding_time", "funding_rate"])
+        start_ms = default_start_ms
+        if cache_path.exists():
+            cached = _pd.read_csv(cache_path)
+            if len(cached) > 0:
+                start_ms = int(cached["funding_time"].max()) + 1
+                resume_ts = _pd.to_datetime(start_ms, unit="ms")
+                print(f"  cache hit: {len(cached)} rows, resuming from {resume_ts}")
+
+        rows: list[dict] = []
+        current_start = start_ms
+        page = 0
+
+        with _httpx.Client(base_url=fapi_base, timeout=30.0) as http:
+            while True:
+                params = {"symbol": symbol, "limit": 1000, "startTime": current_start}
+                r = http.get(funding_endpoint, params=params)
+                r.raise_for_status()
+                data = r.json()
+                if not data:
+                    break
+                for d in data:
+                    rows.append(
+                        {
+                            "funding_time": int(d["fundingTime"]),
+                            "funding_rate": float(d["fundingRate"]),
+                        }
+                    )
+                page += 1
+                last_time = int(data[-1]["fundingTime"])
+                print(
+                    f"  page {page}: {len(data)} rows, last={_pd.to_datetime(last_time, unit='ms')}"
+                )
+                if len(data) < 1000:
+                    break
+                current_start = last_time + 1
+                _time.sleep(0.25)  # rate limit
+
+        new_df = _pd.DataFrame(rows)
+        if len(new_df) == 0 and len(cached) == 0:
+            print(f"  WARNING: no data fetched for {symbol}")
+            continue
+
+        full = _pd.concat([cached, new_df], ignore_index=True)
+        full = (
+            full.drop_duplicates(subset=["funding_time"], keep="last")
+            .sort_values("funding_time")
+            .reset_index(drop=True)
+        )
+        full.to_csv(cache_path, index=False)
+        total_fetched += len(new_df)
+        print(f"  saved {len(full)} total rows ({len(new_df)} new) → {cache_path}")
+
+    print(f"\n[fetch-funding] Done — {total_fetched} new rows across {len(symbols)} symbols")
 
 
 if __name__ == "__main__":

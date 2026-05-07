@@ -46,6 +46,7 @@ from tqdm import tqdm
 
 from crypto_trade.features_v3.cross_btc_v3 import add_cross_btc_v3_features
 from crypto_trade.features_v3.fracdiff_v3 import add_fracdiff_v3_features
+from crypto_trade.features_v3.funding_v3 import add_funding_v3_features
 from crypto_trade.features_v3.microstructure_v3 import add_microstructure_v3_features
 from crypto_trade.features_v3.momentum_accel_v3 import add_momentum_accel_v3_features
 from crypto_trade.features_v3.price_efficient_vol_v3 import add_price_efficient_vol_v3_features
@@ -64,6 +65,7 @@ GROUP_REGISTRY: dict[str, Callable[[pd.DataFrame], pd.DataFrame]] = {
     "fracdiff": add_fracdiff_v3_features,
     "cross_btc": add_cross_btc_v3_features,
     "microstructure_v3": add_microstructure_v3_features,
+    "funding_v3": add_funding_v3_features,  # iter-v3/019 NEW external-data-source feature family
 }
 
 V3_FEATURE_COLUMNS_FULL: tuple[str, ...] = (
@@ -138,8 +140,10 @@ V3_FEATURE_COLUMNS_TOP_N: tuple[str, ...] = (
     "vwap_dev_20",  # rank 11 (mean 13.0) — volume_micro
     "ret_autocorr_lag1_50",  # rank 12 (mean 13.5) — momentum_accel
     "sym_vs_btc_ret_7d",  # rank 13 (mean 14.5) — cross_btc
+    # rank 14 — funding/carry (iter-v3/019 NEW external-data-source feature family)
+    "funding_rate_zscore_30",
 )
-"""Top-13 feature subset restored to iter-v3/013 baseline (iter-v3/016 revert).
+"""Top-14 feature subset: top-13 + funding_rate_zscore_30 (iter-v3/019 NEW axis).
 
 ``tbr_zscore_30`` DROPPED per iter-v3/016 brief §3.3 (Critic FINAL Rec 3 of
 iter-v3/015 mandated revert before XGBoost axis exploration).
@@ -156,12 +160,19 @@ See analysis/iteration_v3-008/ic_redundancy_drop_demo.py (SHA 003a21e).
 across all 3 symbols, determined mechanically inert per EXPLORATION-NEGATIVE-no-effect
 verdict).  Reverted here per iter-v3/016 brief §3.3.  ``tbr_raw`` is now in
 V3_NON_FEATURE_COLUMNS (hygiene; Critic Clarification 4 from iter-v3/015).
+
+``funding_rate_zscore_30`` added in iter-v3/019 (rank 14 — NEW external-data-source
+feature family; 30-cycle z-score of Binance Futures funding rate).  IC orthogonality
+verified: max |IC| vs existing 13 = 0.3758 (TRX vs vwap_dev_20), well below 0.50
+strict brief target and 0.70 hard gate.  ADF p ≈ 0 (structurally stationary
+z-scored series).  Non-trivial rank-IC: TRX 7-bar -0.0485 (mean-reversion direction).
 """
 
 # iter-v3/007-008: reassign to top-N subset for EXPLORATION/CONFIRMATION run.
 # iter-v3/007: top-14; iter-v3/008: top-13 (vwap_dev_50 dropped per Critic Rec 1).
 # iter-v3/015: top-14 (tbr_zscore_30 added as NEW microstructure feature family).
 # iter-v3/016: top-13 (tbr_zscore_30 DROPPED; reverted to iter-v3/013 baseline).
+# iter-v3/019: top-14 (funding_rate_zscore_30 added — NEW external-data-source feature family).
 # To restore full set: V3_FEATURE_COLUMNS = V3_FEATURE_COLUMNS_FULL
 V3_FEATURE_COLUMNS: tuple[str, ...] = V3_FEATURE_COLUMNS_TOP_N
 """Active feature columns fed to LightGBM / XGBoost.
@@ -175,6 +186,10 @@ iter-v3/015:     V3_FEATURE_COLUMNS_TOP_N (14 features; tbr_zscore_30 added
                  per iter-v3/015 brief Section 3.3 — NEW microstructure family).
 iter-v3/016:     V3_FEATURE_COLUMNS_TOP_N (13 features; tbr_zscore_30 DROPPED
                  per Critic FINAL Rec 3 + iter-v3/016 brief §3.3 revert).
+iter-v3/017-018: V3_FEATURE_COLUMNS_TOP_N (13 features, unchanged).
+iter-v3/019:     V3_FEATURE_COLUMNS_TOP_N (14 features; funding_rate_zscore_30
+                 added per iter-v3/019 brief §3.3 — NEW external-data-source
+                 feature family; 30-cycle z-score of Binance Futures funding rate).
 """
 
 V3_NON_FEATURE_COLUMNS: tuple[str, ...] = ("natr_21_raw", "tbr_raw")
@@ -290,6 +305,7 @@ __all__ = [
     "V3_FEATURE_COLUMNS_FULL",
     "V3_FEATURE_COLUMNS_TOP_N",
     "V3_NON_FEATURE_COLUMNS",
+    "add_funding_v3_features",
     "generate_features_v3",
     "list_groups",
     "process_symbol_v3",
