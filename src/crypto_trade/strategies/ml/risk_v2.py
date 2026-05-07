@@ -98,6 +98,20 @@ class RiskV2Config:
     max_per_symbol_window_bars: int = 90  # ~30 days at 8h cadence
     enable_per_symbol_cap: bool = False
 
+    # iter-v3/022: primitive 9 — regime-conditional kill switch.
+    # Kills candidate signals for symbols in regime_gate_symbols when EITHER:
+    #   (a) BTC drawdown_30d > regime_dd_threshold_pct (IS-90th-pct = 20.0%)
+    #   (b) |BTC vol_zscore_30d| > regime_vol_zscore_threshold (IS-95th-pct = 1.5)
+    # Thresholds calibrated on IS-window distribution (EDA SHA b728313 synthesis.md).
+    # Past-only: BTC data at bar t uses only bars with open_time < t.open_time.
+    # Default OFF (enable_regime_gate=False) preserves v1/v2/v3-prior behavior.
+    enable_regime_gate: bool = False
+    regime_gate_symbols: tuple[str, ...] = ()  # e.g. ("TRXUSDT",)
+    regime_dd_lookback_bars: int = 90  # 30 calendar days at 8h cadence
+    regime_dd_threshold_pct: float = 20.0  # IS-90th-percentile
+    regime_vol_lookback_bars: int = 90  # 30 calendar days at 8h cadence
+    regime_vol_zscore_threshold: float = 1.5  # IS-95th-percentile
+
 
 @dataclass
 class GateStats:
@@ -111,6 +125,7 @@ class GateStats:
     vol_scaled_signals: int = 0
     vol_scale_sum: float = 0.0
     cap_fires: int = 0  # iter-v3/020: per-symbol PnL cap fires (primitive 8)
+    regime_gate_fires: int = 0  # iter-v3/022: regime-conditional kill switch fires (primitive 9)
 
     def vol_scale_mean(self) -> float:
         return self.vol_scale_sum / self.vol_scaled_signals if self.vol_scaled_signals else 1.0

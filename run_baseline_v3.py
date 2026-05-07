@@ -99,20 +99,19 @@ def _derive_ensemble_seeds(outer_seed: int, size: int = ENSEMBLE_SIZE) -> list[i
     return [int(s) for s in rng.integers(low=0, high=2**31 - 1, size=size)]
 
 
-ITERATION_LABEL = "v3-021"
+ITERATION_LABEL = "v3-022"
 REPORTS_DIR = Path("reports-v3")
 FEATURES_DIR = Path("data/features_v3")
 DATA_DIR = Path("data")
 
-# v3 symbols — iter-v3/021: universe expanded 3→5 (+HBAR +AVAX; HIGH-priority axis #2b)
-# MKR dropped per iter-v3/013 brief §3.1 (feedback_mkr_threshold_compression.md FIRED)
-# HBARUSDT + AVAXUSDT added per EDA rank 1+2 (SHA a360251); EDA composite 0.756 / 0.740
+# v3 symbols — iter-v3/022: revert iter-v3/021's HBAR+AVAX universe expansion (5→3).
+# HBAR+AVAX expansion CLOSED at catalog level (EXPLORATION-NEGATIVE; both deeply negative
+# IS+OOS -85.7% combined PnL drag per iter-v3/021 diary SHA 92290fd).
+# MKR dropped per iter-v3/013 brief §3.1 (feedback_mkr_threshold_compression.md FIRED).
 V3_MODELS: tuple[tuple[str, str], ...] = (
     ("A (BCHUSDT)", "BCHUSDT"),
     ("C (LDOUSDT)", "LDOUSDT"),
     ("D (TRXUSDT)", "TRXUSDT"),
-    ("E (HBARUSDT)", "HBARUSDT"),
-    ("F (AVAXUSDT)", "AVAXUSDT"),
 )
 
 # Risk gate configs (v2 5-gate + BTC; no R1/R2/R3 — brief Section 3.4)
@@ -914,6 +913,13 @@ def _build_v3_model(
         max_per_symbol_window_bars=90,  # ≈ 30 days at 8h cadence
         # iter-v3/021: REVERTED per iter-v3/020 PATH C closeout (diary 5287bd6)
         enable_per_symbol_cap=False,
+        # iter-v3/022: primitive 9 — regime-conditional kill switch on TRX.
+        # Thresholds calibrated at IS-90th/95th percentile (EDA SHA b728313 synthesis.md).
+        # Gate fires when BTC drawdown_30d > 20% OR |BTC vol_zscore_30d| > 1.5.
+        enable_regime_gate=True,
+        regime_gate_symbols=("TRXUSDT",),
+        regime_dd_threshold_pct=20.0,
+        regime_vol_zscore_threshold=1.5,
     )
     strategy = RiskV3Wrapper(m1, risk_cfg)
     return cfg, strategy
@@ -1430,7 +1436,7 @@ def main() -> None:
     _verify_data_freshness(baseline_symbols + ("BTCUSDT",))
     # asserts len == 13, funding NOT present, vwap_dev_50/tbr_zscore_30 absent
     _verify_feature_columns()
-    _verify_label_leakage_gap()  # asserts REQUIRED_GAP == 110 (5-symbol universe, iter-v3/021)
+    _verify_label_leakage_gap()  # asserts REQUIRED_GAP == 66 (3-symbol universe, iter-v3/022)
     _verify_track_isolation()  # grep check
 
     active_sym_names = ", ".join(sym for _, sym in active_models)
@@ -1439,8 +1445,7 @@ def main() -> None:
     print(f"Active models: {len(active_models)}/{len(V3_MODELS)} (--symbols={args.symbols!r})")
     print(f"CPCV: N={CPCV_N_SPLITS}, k={CPCV_N_TEST_SPLITS}, 45 paths on IS CANDLE SEQUENCE")
     print(
-        f"Gap: {REQUIRED_GAP} (= (timeout_candles+1) * 5 symbols"
-        f" [BCH+LDO+TRX+HBAR+AVAX, iter-v3/021])"
+        f"Gap: {REQUIRED_GAP} (= (timeout_candles+1) * 3 symbols [BCH+LDO+TRX, iter-v3/022 revert])"
     )
     print(
         f"Pre-flight: branch OK, symbols OK, data fresh (<16h), "
