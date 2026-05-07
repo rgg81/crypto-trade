@@ -1,0 +1,2 @@
+anchor_iter_v3_018_IS_trades,saturation_band_low_75pct,saturation_band_high_125pct,predicted_IS_trade_count_change_pct,rationale
+172,129,215,0.0,Cap is post-trade weighting layer; does not gate signals
