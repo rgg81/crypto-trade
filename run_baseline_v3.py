@@ -183,16 +183,17 @@ def _verify_data_freshness(symbols: tuple[str, ...], max_lag_hours: float = 16.0
 def _verify_feature_columns() -> None:
     """Verifies V3_FEATURE_COLUMNS contents per current brief (iter-v3-016).
 
-    iter-v3/016: reverted to 13 columns (tbr_zscore_30 dropped per Critic FINAL
-    Rec 3 of iter-v3/015 and iter-v3/016 brief §3.3).  vwap_dev_50 remains
-    excluded (dropped per Critic FINAL SHA a544621, Rec 1, iter-v3/008).
+    iter-v3/019: 14 columns (funding_rate_zscore_30 ADDED to iter-v3/018's 13;
+    NEW feature family axis per `feedback_v3_iter019_axis_priorities.md`).
+    iter-v3/016: reverted from 14 to 13 (tbr_zscore_30 dropped). vwap_dev_50
+    remains excluded (dropped per Critic FINAL SHA a544621, iter-v3/008).
     tbr_zscore_30 MUST NOT be present.
     """
     n = len(V3_FEATURE_COLUMNS)
-    if n != 13:
+    if n != 14:
         raise RuntimeError(
-            f"V3_FEATURE_COLUMNS has {n} columns — expected exactly 13. "
-            "iter-v3/016 brief §3.3 reverted tbr_zscore_30 (14→13). "
+            f"V3_FEATURE_COLUMNS has {n} columns — expected exactly 14. "
+            "iter-v3/019 brief added funding_rate_zscore_30 (13→14 per axis #1). "
             "Check features_v3/__init__.py V3_FEATURE_COLUMNS_TOP_N."
         )
     if "tbr_zscore_30" in V3_FEATURE_COLUMNS:
@@ -200,6 +201,12 @@ def _verify_feature_columns() -> None:
             "tbr_zscore_30 FOUND in V3_FEATURE_COLUMNS — must be ABSENT per "
             "iter-v3/016 brief §3.3 (revert to iter-v3/013 baseline). "
             "Remove it from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
+        )
+    if "funding_rate_zscore_30" not in V3_FEATURE_COLUMNS:
+        raise RuntimeError(
+            "funding_rate_zscore_30 MISSING from V3_FEATURE_COLUMNS — must be "
+            "PRESENT per iter-v3/019 brief §3 (NEW feature family axis #1). "
+            "Add it to V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
         )
     if "vwap_dev_50" in V3_FEATURE_COLUMNS:
         raise RuntimeError(
@@ -1407,7 +1414,7 @@ def main() -> None:
     baseline_symbols = tuple(sym for _, sym in active_models)
     _verify_symbols(baseline_symbols)
     _verify_data_freshness(baseline_symbols + ("BTCUSDT",))
-    _verify_feature_columns()  # asserts len == 13 and vwap_dev_50 not present
+    _verify_feature_columns()  # asserts len == 14, funding_rate_zscore_30 present, vwap_dev_50/tbr_zscore_30 absent
     _verify_label_leakage_gap()  # asserts REQUIRED_GAP == 66 (3-symbol universe, iter-v3/013)
     _verify_track_isolation()  # grep check
 
