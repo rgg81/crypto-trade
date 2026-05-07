@@ -1,0 +1,5 @@
+label,n_total,n_capped,fire_rate_pct,pre_total_pnl,post_total_pnl,pre_top_share_pct,post_top_share_pct,monthly_sharpe,n_active
+static_IS,172,97,56.395348837209305,35.7121,21.2435,78.72,67.24,0.3969,144
+static_OOS,102,86,84.31372549019608,7.871,-3.9393,152.01,259.85,-0.1276,102
+rolling_IS,172,18,10.465116279069768,35.7121,13.9525,78.72,106.97,0.219,144
+rolling_OOS,102,8,7.8431372549019605,7.871,-0.913,152.01,1693.32,-0.0305,102
