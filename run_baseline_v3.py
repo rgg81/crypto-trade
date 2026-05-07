@@ -1321,7 +1321,16 @@ def main() -> None:
         help="Number of outer seeds (1 for first-pass, 10 for MERGE validation)",
     )
     parser.add_argument(
-        "--n-trials", type=int, default=50, help="Optuna trials per monthly model per seed"
+        "--n-trials",
+        type=int,
+        default=35,
+        help=(
+            "Optuna trials per monthly model per seed. CONFIRMATION default "
+            "lowered from 50 → 35 at iter-v3/018 closeout: 50 was below TPE-warmup-saturation "
+            "and added wall-clock cost without proportional gain in best-trial "
+            "selection. 35 stays above TPE-warmup (~30) while saving ~30% "
+            "wall-clock. EXPLORATION mode auto-overrides to 10 below."
+        ),
     )
     parser.add_argument(
         "--skip-features",
@@ -1370,7 +1379,7 @@ def main() -> None:
     # iter-v3/007: --exploration overrides defaults for fast iteration
     ensemble_size_for_run: int = 1 if args.exploration else ENSEMBLE_SIZE
     fast_mode_for_run: bool = bool(args.exploration)
-    if args.exploration and args.n_trials == 50:
+    if args.exploration and args.n_trials == 35:
         # Default for exploration is 10 trials; only override if user kept default
         args.n_trials = 10
 
