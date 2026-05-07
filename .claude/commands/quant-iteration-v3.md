@@ -214,7 +214,7 @@ iter-v3/008 was killed at 4h 15min after extrapolation showed ~25h total wall-cl
 
 1. **EXPLORATION wall-clock HARD CAP: 2h.** Engineer kills the backtest if it exceeds 2h. Default config: `--exploration --seeds 1 --n-trials 10`. Single-axis variation only.
 
-2. **CONFIRMATION wall-clock HARD CAP: 4h.** `--seeds 2 --n-trials 50`, ENSEMBLE_SIZE=5. Engineer kills if exceeds 4h.
+2. **CONFIRMATION wall-clock HARD CAP: 6h.** `--seeds 2 --n-trials 50`, ENSEMBLE_SIZE=5. Engineer kills if exceeds 6h. (Empirically updated 2026-05-07 from 4h after iter-v3/018 ran 4.54h; new cap = ceil(4.54 × 1.2) ≈ 6h for safety.)
 
 3. **CONFIRMATION requires 10 EXPLORATION precedents.** A CONFIRMATION iteration's brief Section 0.5 MUST list ≥10 EXPLORATION iter-v3/NNN ids completed since the last CONFIRMATION (or since iter-v3/001 if no prior CONFIRMATION). Phase 5.5 gate verifies this count from `briefs-v3/exploration_catalog.md`.
 
@@ -239,11 +239,11 @@ The catalog accumulates across iterations. The next CONFIRMATION QR reads it, pi
 ### Cadence math (rough)
 
 - 10 EXPLORATIONS × 1-2h each = ~15h compute over multiple sessions (can run sequentially or with short batches in a day)
-- 1 CONFIRMATION = ~3-4h compute
+- 1 CONFIRMATION = ~4-6h compute (cap 6h post-iter-v3/018)
 - Result: ~20h compute per "exploration cycle" (10 EXPLORATIONs + 1 CONFIRMATION). Cadence is event-driven (when 10 EXPLORATIONs accumulate, a CONFIRMATION can launch immediately) — no calendar-time limit.
 - Compare to old design: iter-v3/008-style 25h single iteration → 1-2 iterations per week, no exploratory diversity
 
-This discipline is the **answer** to "explore fast, confirm later" — it operationalizes "fast" as 2h-capped EXPLORATIONS and "confirm" as the rare 4h CONFIRMATION bundling.
+This discipline is the **answer** to "explore fast, confirm later" — it operationalizes "fast" as 2h-capped EXPLORATIONS and "confirm" as the rare 6h-capped CONFIRMATION bundling (cap raised from 4h after iter-v3/018 ran 4.54h, see `feedback_v3_cadence_discipline.md`).
 
 ---
 
@@ -322,7 +322,7 @@ The Engineer reads `briefs-v3/iteration_v3-NNN/research_brief.md` and verifies:
 - **Section 0 — Data Split declaration.** Confirms `OOS_CUTOFF_DATE = 2025-03-24` and `training_months = 24` are unchanged. Names the IS window and OOS window in absolute dates.
 - **Section 0.5 — Iteration Type Declaration (v3 mandatory, added iter-v3/007).** ONE of:
   - `TYPE: EXPLORATION` — fast single-axis variation. **Wall-clock budget HARD CAP: 2h** (was 1h; 2h gives full v3 universe at exploration config). Uses `--exploration` flag (colsample=1.0, ENSEMBLE_SIZE=1, n_trials=10). Single outer seed (`--seeds 1`). Critic scores Checks 1, 2, 4, 5, 6, 8 (methodology + look-ahead axes only). Edge thresholds (Check 3 DSR/PSR/Sharpe) are SKIPPED. Critic emits `EXPLORATION-PROMISING` (signal found, candidate for CONFIRMATION inclusion) or `EXPLORATION-NEGATIVE` (no signal, recorded in catalog). Goal: rapidly cycle through symbol sets / labeling params / feature subsets to find variations worth bundling into the next CONFIRMATION. **EXPLORATION never updates BASELINE_V3.md.**
-  - `TYPE: CONFIRMATION` — production config. Uses default ENSEMBLE_SIZE=5 (live-prediction variance reduction), `--seeds 2` (variance estimate; max), full Optuna search space. **Wall-clock budget HARD CAP: 4h.** Critic scores all 8 checks AND optional 9-12 including Check 3 DSR/PSR thresholds. Critic emits `CONFIRMATION-MERGE` or `CONFIRMATION-BLOCK`. Goal: validate the bundle of best-of-N-explorations with full statistical rigor before merging. **Only CONFIRMATION-MERGE updates BASELINE_V3.md.**
+  - `TYPE: CONFIRMATION` — production config. Uses default ENSEMBLE_SIZE=5 (live-prediction variance reduction), `--seeds 2` (variance estimate; max), full Optuna search space. **Wall-clock budget HARD CAP: 6h** (empirically updated 2026-05-07 from 4h after iter-v3/018 ran 4.54h; new cap = ceil(4.54 × 1.2) ≈ 6h for safety). Critic scores all 8 checks AND optional 9-12 including Check 3 DSR/PSR thresholds. Critic emits `CONFIRMATION-MERGE` or `CONFIRMATION-BLOCK`. Goal: validate the bundle of best-of-N-explorations with full statistical rigor before merging. **Only CONFIRMATION-MERGE updates BASELINE_V3.md.**
   - Brief MUST justify the type choice in 1-2 sentences. CONFIRMATION iterations require an EXPLORATION-PROMISING precedent (referenced by iter-v3/NNN id) unless first-iteration.
 - **Section 1 — Hypothesis.** ONE sentence. What changes and why we expect OOS improvement. Vague hypotheses BLOCK; specific testable hypotheses PASS.
 - **Section 2 — IS-Only Numerical Evidence.** Tables produced by a committed `analysis/iteration_v3-NNN/*.py` script. Reproducible, IS-data-only, concrete numbers. Category-matching ("similar to RSI") is NOT evidence — BLOCK.
@@ -361,7 +361,7 @@ OVERALL: PASS  (or BLOCK)
 TYPE: EXPLORATION  (or CONFIRMATION)
 
 ## Cadence Check (added iter-v3/008 abort)
-- Wall-clock budget declared: <2h for EXPLORATION / <4h for CONFIRMATION>: PASS / BLOCK
+- Wall-clock budget declared: <2h for EXPLORATION / <6h for CONFIRMATION (cap updated 2026-05-07 post-iter-v3/018)>: PASS / BLOCK
 - (CONFIRMATION only) EXPLORATION precedents since last CONFIRMATION: <count, ≥10 required>: PASS / BLOCK
 - (CONFIRMATION only) Section 3 lists imported variations from prior EXPLORATIONs: PASS / BLOCK
 
