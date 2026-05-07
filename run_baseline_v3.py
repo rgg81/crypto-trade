@@ -1383,12 +1383,15 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    # iter-v3/007: --exploration overrides defaults for fast iteration
+    # iter-v3/007: --exploration overrides defaults for fast iteration.
+    # iter-v3/020: n_trials override REMOVED — both EXPLORATION and CONFIRMATION
+    # default to n_trials=35 (above TPE warmup). The EXPLORATION-vs-CONFIRMATION
+    # distinction is now: ENSEMBLE_SIZE=1, --seeds 1, colsample=1.0 hardcoded
+    # (EXPLORATION) vs ENSEMBLE_SIZE=5, --seeds 2, colsample Optuna-tunable
+    # (CONFIRMATION). n_trials raised from 10 → 35 to fix NEW-feature-family
+    # rank-14/14 INERT pattern (iter-v3/015 + iter-v3/019).
     ensemble_size_for_run: int = 1 if args.exploration else ENSEMBLE_SIZE
     fast_mode_for_run: bool = bool(args.exploration)
-    if args.exploration and args.n_trials == 35:
-        # Default for exploration is 10 trials; only override if user kept default
-        args.n_trials = 10
 
     # Build active_models from --symbols filter (iter-v3/006 CLI flag).
     # Default (None) keeps all V3_MODELS.
