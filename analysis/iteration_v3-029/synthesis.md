@@ -82,3 +82,49 @@ Per BASELINE_V3.md, this is THE first multi-seed-validated edge ingredient in v3
 
 4. **iter-v3/029 implication**: a new symbol candidate's likely compatibility with V3_FEATURE_COLUMNS is best estimated by its 8h-return correlation with the SHARED features' driving factor (BTC trend, vol regime, momentum mean-reversion balance), NOT by its raw price correlation with BCH/LDO/TRX. iter-v3/021's HBAR+AVAX failure confirms this — they had the LOWEST raw price correlation but produced -86% combined PnL. The missing diagnostic was 'does the candidate's regime structure match what the SHARED features capture?'
 
+
+---
+
+# iter-v3/029 — Candidate symbol ranking (Phase 3)
+
+## Method
+
+Per-symbol feature signature alignment with incumbent BCH/LDO/TRX. The 4 SHARED-top features identified in Phase 1 are: vwap_dev_20, range_realized_vol_50, ret_kurt_50, ret_skew_200 (the only features in the top-7 of all 3 incumbents simultaneously). For each candidate, computes the Pearson correlation of each shared feature's time-series vs each incumbent's same feature time-series, takes mean abs across 3 incumbents, then mean across 4 features = alignment_score.
+
+Higher alignment_score = candidate's feature time-series behaves similarly to incumbents → LightGBM is likely to USE these features productively.
+
+Composite = 0.65·alignment_score + 0.20·natr_band_ok + 0.15·btc_coupling_z.
+
+**HBAR+AVAX excluded**: iter-v3/021 NEGATIVE-clean (combined -86% PnL); closed at catalog level. Candidate pool = ranks 3-7 of iter-v3/021 ranking (ADA, FIL, ALGO, ATOM, VET) — all PASSED Gate 1 + Gate 2.
+
+## Ranking
+
+| Rank | Symbol | composite | alignment_score | raw_corr_mean_abs | NATR_21% | NATR ok | btc_coupling_std |
+|---:|---|---:|---:|---:|---:|:---:|---:|
+| 1 | **ALGOUSDT** | 0.6517 | 0.4642 | 0.4920 | 4.19 | PASS | 0.1072 |
+| 2 | **VETUSDT** | 0.5865 | 0.4771 | 0.5584 | 3.97 | PASS | 0.0935 |
+| 3 | **ADAUSDT** | 0.5642 | 0.4288 | 0.4960 | 3.79 | PASS | 0.0952 |
+| 4 | **FILUSDT** | 0.5508 | 0.4198 | 0.5335 | 4.15 | PASS | 0.0938 |
+| 5 | **ATOMUSDT** | 0.4771 | 0.4263 | 0.5305 | 3.54 | PASS | 0.0793 |
+
+## Per-feature alignment detail
+
+| Symbol | align_vwap_dev_20 | align_range_realized_vol_50 | align_ret_kurt_50 | align_ret_skew_200 |
+|---|---:|---:|---:|---:|
+| ALGOUSDT | 0.5219 | 0.6171 | 0.3786 | 0.3392 |
+| VETUSDT | 0.5869 | 0.6425 | 0.3704 | 0.3086 |
+| ADAUSDT | 0.5436 | 0.5372 | 0.3222 | 0.3122 |
+| FILUSDT | 0.5682 | 0.6048 | 0.3113 | 0.1949 |
+| ATOMUSDT | 0.5474 | 0.5830 | 0.3713 | 0.2036 |
+
+## QR Recommendation
+
+**TOP CANDIDATE**: **ALGOUSDT** (composite 0.6517; alignment_score 0.4642; NATR_21 4.19%).
+
+This candidate has the highest feature-signature alignment with incumbent BCH/LDO/TRX across the 4 SHARED-top features. Per Phase 1 finding, these are the features any new symbol must be compatible with for LightGBM to productively use the V3_FEATURE_COLUMNS set. iter-v3/021's mistake was selecting on lowest raw correlation — the corrected criterion is highest feature-signature alignment.
+
+## Caveats
+
+- Alignment_score is computed on time-aligned feature series. It does NOT predict the candidate's per-symbol PnL contribution; that's the empirical question this EXPLORATION answers.
+- Single-axis discipline: ONE NEW symbol; V3_MODELS 3 → 4; REQUIRED_GAP 66 → 88. KEEP all 14 features (including regime_momentum_signed_5d).
+- Falsifier (PATH B-DRAG): candidate's IS PnL is materially negative AND concentration drops below 60% — verifies dilution but at cost of edge drag (similar to iter-v3/021 HBAR+AVAX failure mode). Falsifier (PATH C-INERT): candidate trades but produces ~0% PnL; concentration drops but no signal added. Falsifier (PATH A): candidate produces positive PnL AND concentration drops AND IS+OOS preserved → PROMISING.
