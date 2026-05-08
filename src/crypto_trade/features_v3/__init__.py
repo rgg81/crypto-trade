@@ -45,6 +45,7 @@ import pandas as pd
 from tqdm import tqdm
 
 from crypto_trade.features_v3.cross_btc_v3 import add_cross_btc_v3_features
+from crypto_trade.features_v3.engineered_v3 import add_engineered_v3_features
 from crypto_trade.features_v3.fracdiff_v3 import add_fracdiff_v3_features
 from crypto_trade.features_v3.funding_v3 import add_btc_funding_v3_features, add_funding_v3_features
 from crypto_trade.features_v3.microstructure_v3 import add_microstructure_v3_features
@@ -62,11 +63,15 @@ GROUP_REGISTRY: dict[str, Callable[[pd.DataFrame], pd.DataFrame]] = {
     "price_efficient_vol": add_price_efficient_vol_v3_features,
     "momentum_accel": add_momentum_accel_v3_features,
     "volume_micro": add_volume_micro_v3_features,
-    "fracdiff": add_fracdiff_v3_features,
     "cross_btc": add_cross_btc_v3_features,
+    # iter-v3/025: Category 2 composed features; AFTER regime (needs hurst_100)
+    "engineered_v3": add_engineered_v3_features,
+    "fracdiff": add_fracdiff_v3_features,
     "microstructure_v3": add_microstructure_v3_features,
-    "funding_v3": add_funding_v3_features,  # iter-v3/019 NEW external-data-source feature family
-    "btc_funding_v3": add_btc_funding_v3_features,  # iter-v3/024 cross-asset BTC funding broadcast
+    # iter-v3/019: NEW external-data-source feature family; infrastructure PRESERVED
+    "funding_v3": add_funding_v3_features,
+    # iter-v3/024: cross-asset BTC funding broadcast; infrastructure PRESERVED
+    "btc_funding_v3": add_btc_funding_v3_features,
 }
 
 V3_FEATURE_COLUMNS_FULL: tuple[str, ...] = (
@@ -158,9 +163,17 @@ V3_FEATURE_COLUMNS_TOP_N: tuple[str, ...] = (
     # z-score broadcast to all 3 per-symbol models. STRUCTURALLY DISTINCT from
     # per-symbol funding: BTC's funding stress is a system-level signal shared
     # across BCH/LDO/TRX training datasets at any given timestamp.
-    "btc_funding_rate_zscore_30",  # rank TBD — btc_funding_v3 (cross-asset)
+    # iter-v3/025: btc_funding_rate_zscore_30 DROPPED (14 → 13; BTC cross-asset
+    # funding family PERMANENTLY-CLOSED per Critic FINAL `5a47f5d` of iter-v3/024;
+    # OOS Sharpe −0.82, rank 14/14 across BCH+LDO portfolio cuts + 9/14 TRX).
+    # regime_momentum_signed_5d ADDED (13 → 14): composed feature = ret_5d ×
+    # sign(hurst_100 − 0.5). Category 2 axis (genuine feature engineering pivot
+    # per user directive 2026-05-08 + Critic FINAL `5a47f5d` of iter-v3/024).
+    # IC hard gate BYPASSED with carve-out (see phase5p5_gate.md §IC-Gate Carve-Out
+    # + feedback_v3_engineered_feature_pivot.md).
+    "regime_momentum_signed_5d",  # rank TBD — engineered_v3 (Category 2 composed feature)
 )
-"""Top-14 feature subset: btc_funding_rate_zscore_30 added at iter-v3/024.
+"""Top-14 feature subset: regime_momentum_signed_5d added at iter-v3/025.
 
 ``tbr_zscore_30`` DROPPED per iter-v3/016 brief §3.3 (Critic FINAL Rec 3 of
 iter-v3/015 mandated revert before XGBoost axis exploration).
@@ -199,6 +212,23 @@ distinct from per-symbol micro-signal.  IC vs existing 14 features: max 0.1921
 (< 0.50 brief target, < 0.70 hard gate) per EDA SHA ``afdb8bc``.
 Implemented via ``add_btc_funding_v3_features`` in ``funding_v3.py``;
 registered as ``btc_funding_v3`` entry in GROUP_REGISTRY.
+DROPPED at iter-v3/025: funding family PERMANENTLY-CLOSED (both per-symbol +
+cross-asset variants); rank 14/14 across BCH+LDO portfolio cuts + 9/14 TRX;
+OOS Sharpe −0.82 per Critic FINAL ``5a47f5d`` of iter-v3/024.  Infrastructure
+(funding_v3.py, btc_funding_v3.py, GROUP_REGISTRY entries, data/funding_rates/
+cache) PRESERVED at zero revert cost.
+
+``regime_momentum_signed_5d`` ADDED at iter-v3/025 (Category 2 composed feature):
+ret_5d × sign(hurst_100 − 0.5).  Momentum 5-day log return sign-flipped by the
+Hurst regime classifier: +ret_5d in trending regimes (hurst > 0.5 → momentum
+continues), −ret_5d in mean-reverting regimes (hurst < 0.5 → momentum reverses).
+Per user directive 2026-05-08 + Critic FINAL `5a47f5d` of iter-v3/024 Rec.
+IC vs source primitives: max |IC| 0.887 (vs vwap_dev_20) — EXPECTED for a
+composed feature; IC gate bypassed per Category 2 carve-out in phase5p5_gate.md
++ feedback_v3_engineered_feature_pivot.md.  First Category 2 axis in v3 catalog.
+Implemented via ``compute_regime_momentum_signed_5d`` in ``engineered_v3.py``;
+registered as ``engineered_v3`` entry in GROUP_REGISTRY (after ``cross_btc``,
+before ``fracdiff``; dependency on ``hurst_100`` from ``regime`` group satisfied).
 """
 
 # iter-v3/007-008: reassign to top-N subset for EXPLORATION/CONFIRMATION run.
@@ -212,6 +242,10 @@ registered as ``btc_funding_v3`` entry in GROUP_REGISTRY.
 # iter-v3/024: top-14 (funding_rate_zscore_30 DROPPED — INERT-CONFIRMED at n_trials=35;
 #              btc_funding_rate_zscore_30 ADDED — cross-asset BTC funding broadcast to all 3
 #              per-symbol models; per Critic FINAL `c4574af` of iter-v3/023 Rec #1).
+# iter-v3/025: top-14 (btc_funding_rate_zscore_30 DROPPED — BTC cross-asset funding family
+#              PERMANENTLY-CLOSED per Critic FINAL `5a47f5d` of iter-v3/024; OOS -0.82;
+#              regime_momentum_signed_5d ADDED — Category 2 composed feature: ret_5d ×
+#              sign(hurst_100 - 0.5); per user directive 2026-05-08 + Critic `5a47f5d` Rec).
 # To restore full set: V3_FEATURE_COLUMNS = V3_FEATURE_COLUMNS_FULL
 V3_FEATURE_COLUMNS: tuple[str, ...] = V3_FEATURE_COLUMNS_TOP_N
 """Active feature columns fed to LightGBM / XGBoost.
@@ -243,6 +277,15 @@ iter-v3/024:     V3_FEATURE_COLUMNS_TOP_N (14 features; funding_rate_zscore_30
                  PERMANENTLY-CLOSED); btc_funding_rate_zscore_30 ADDED as cross-asset
                  BTC funding z-score broadcast to all 3 per-symbol models.
                  Registered as ``btc_funding_v3`` in GROUP_REGISTRY.)
+iter-v3/025:     V3_FEATURE_COLUMNS_TOP_N (14 features; btc_funding_rate_zscore_30
+                 DROPPED (BTC cross-asset funding family PERMANENTLY-CLOSED per
+                 Critic FINAL ``5a47f5d`` of iter-v3/024 — OOS Sharpe -0.82, rank
+                 14/14 on BCH+LDO portfolio cuts + 9/14 TRX); regime_momentum_signed_5d
+                 ADDED as Category 2 composed feature: ret_5d × sign(hurst_100 - 0.5).
+                 User directive 2026-05-08 + Critic ``5a47f5d`` Rec mandated pivot
+                 to genuine feature engineering.  First Category 2 axis in v3 catalog.
+                 Registered as ``engineered_v3`` in GROUP_REGISTRY, after ``cross_btc``
+                 and before ``fracdiff`` to satisfy hurst_100 dependency ordering.)
 """
 
 V3_NON_FEATURE_COLUMNS: tuple[str, ...] = ("natr_21_raw", "tbr_raw")
@@ -359,6 +402,7 @@ __all__ = [
     "V3_FEATURE_COLUMNS_TOP_N",
     "V3_NON_FEATURE_COLUMNS",
     "add_btc_funding_v3_features",
+    "add_engineered_v3_features",
     "add_funding_v3_features",
     "generate_features_v3",
     "list_groups",
