@@ -99,19 +99,22 @@ def _derive_ensemble_seeds(outer_seed: int, size: int = ENSEMBLE_SIZE) -> list[i
     return [int(s) for s in rng.integers(low=0, high=2**31 - 1, size=size)]
 
 
-ITERATION_LABEL = "v3-028"
+ITERATION_LABEL = "v3-029"
 REPORTS_DIR = Path("reports-v3")
 FEATURES_DIR = Path("data/features_v3")
 DATA_DIR = Path("data")
 
-# v3 symbols — iter-v3/022: revert iter-v3/021's HBAR+AVAX universe expansion (5→3).
-# HBAR+AVAX expansion CLOSED at catalog level (EXPLORATION-NEGATIVE; both deeply negative
-# IS+OOS -85.7% combined PnL drag per iter-v3/021 diary SHA 92290fd).
+# v3 symbols — iter-v3/029: universe expansion 3→4, ADD ALGOUSDT.
+# Selection criterion: per-symbol feature-signature alignment (composite score 0.6517;
+# alignment_score 0.4642; btc_coupling_std 0.1072 rank-1; NATR_21=4.19% PASS).
+# Corrects iter-v3/021's raw-correlation mechanism (HBAR+AVAX CLOSED-SYMBOL-CYCLE).
+# REQUIRED_GAP updated 66→88 = (21+1)×4 per Section 3 sub-fix #2.
 # MKR dropped per iter-v3/013 brief §3.1 (feedback_mkr_threshold_compression.md FIRED).
 V3_MODELS: tuple[tuple[str, str], ...] = (
     ("A (BCHUSDT)", "BCHUSDT"),
     ("C (LDOUSDT)", "LDOUSDT"),
     ("D (TRXUSDT)", "TRXUSDT"),
+    ("F (ALGOUSDT)", "ALGOUSDT"),
 )
 
 # Risk gate configs (v2 5-gate + BTC; no R1/R2/R3 — brief Section 3.4)
@@ -130,7 +133,7 @@ BTC_TREND_CONFIG = BtcTrendFilterConfig(
 # CPCV parameters (brief Section 0 + 3.5#2)
 CPCV_N_SPLITS = 10
 CPCV_N_TEST_SPLITS = 2
-# gap = REQUIRED_GAP = (timeout_candles+1)*n_symbols = (21+1)*3 = 66 (iter-v3/013)
+# gap = REQUIRED_GAP = (timeout_candles+1)*n_symbols = (21+1)*4 = 88 (iter-v3/029)
 # DO NOT use min(REQUIRED_GAP, n_trades//20) — that is the iter-v3/001 bug.
 CPCV_EMBARGO = 27  # ~1% of 24-month T ≈ 2742 candles * 0.01
 
@@ -1484,7 +1487,7 @@ def main() -> None:
     _verify_data_freshness(baseline_symbols + ("BTCUSDT",))
     # asserts len == 13, funding NOT present, vwap_dev_50/tbr_zscore_30 absent
     _verify_feature_columns()
-    _verify_label_leakage_gap()  # asserts REQUIRED_GAP == 66 (3-symbol universe, iter-v3/022)
+    _verify_label_leakage_gap()  # asserts REQUIRED_GAP == 88 (4-symbol universe, iter-v3/029)
     _verify_track_isolation()  # grep check
 
     active_sym_names = ", ".join(sym for _, sym in active_models)
@@ -1493,7 +1496,7 @@ def main() -> None:
     print(f"Active models: {len(active_models)}/{len(V3_MODELS)} (--symbols={args.symbols!r})")
     print(f"CPCV: N={CPCV_N_SPLITS}, k={CPCV_N_TEST_SPLITS}, 45 paths on IS CANDLE SEQUENCE")
     print(
-        f"Gap: {REQUIRED_GAP} (= (timeout_candles+1) * 3 symbols [BCH+LDO+TRX, iter-v3/022 revert])"
+        f"Gap: {REQUIRED_GAP} (= (timeout_candles+1) * 4 symbols [BCH+LDO+TRX+ALGO, iter-v3/029])"
     )
     print(
         f"Pre-flight: branch OK, symbols OK, data fresh (<16h), "
