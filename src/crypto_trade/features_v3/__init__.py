@@ -404,6 +404,50 @@ V3_NON_FEATURE_COLUMNS: tuple[str, ...] = ("natr_21_raw", "tbr_raw")
                  model input regardless (added iter-v3/016, §3.5 sub-fix #2).
 """
 
+V3_FEATURES_PER_SYMBOL: dict[str, tuple[str, ...]] = {
+    # iter-v3/030: LDO per-symbol 7-feature subset.
+    # Source: analysis/iteration_v3-030/ldo_feature_subset_analysis.py (SHA 36aaacd).
+    # Top-7 by iter-v3/028 multi-seed IS importance (canonical multi-seed BASELINE read-out).
+    # BCH+TRX+ALGO are NOT listed here — they fall back to V3_FEATURE_COLUMNS_TOP_N (14 features).
+    # NEVER add a feature here that is absent from V3_FEATURE_COLUMNS_TOP_N.
+    "LDOUSDT": (
+        "ret_skew_200",
+        "ret_kurt_50",
+        "ret_kurt_200",
+        "vwap_dev_20",
+        "hurst_diff_100_50",
+        "btc_ret_14d",
+        "range_realized_vol_50",
+    ),
+}
+"""Per-symbol feature subsets for v3 models (iter-v3/030+).
+
+Maps symbol → tuple of feature column names to pass to LightGbmStrategy.
+Symbols absent from this dict fall back to V3_FEATURE_COLUMNS_TOP_N (14 features).
+
+Invariant (enforced by _verify_feature_columns in run_baseline_v3.py and by the
+adversarial test tests/features_v3/test_features_for_symbol.py):
+    every tuple in V3_FEATURES_PER_SYMBOL.values() is a strict subset of
+    V3_FEATURE_COLUMNS_TOP_N.
+"""
+
+
+def features_for_symbol(symbol: str) -> tuple[str, ...]:
+    """Return per-symbol feature tuple, falling back to V3_FEATURE_COLUMNS_TOP_N.
+
+    Introduced in iter-v3/030 to support per-symbol model heterogeneity.
+    LDO returns its 7-feature top-7 from iter-v3/028 multi-seed importance.
+    BCH, TRX, ALGO, and any other symbol not in V3_FEATURES_PER_SYMBOL get
+    the full 14-feature V3_FEATURE_COLUMNS_TOP_N.
+
+    Callers MUST pass ``feature_columns=list(features_for_symbol(symbol))``
+    to LightGbmStrategy — never None, never empty, never the global default.
+    This preserves the ``feedback_explicit_feature_columns.md`` invariant while
+    enabling per-symbol feature-set discipline.
+    """
+    return V3_FEATURES_PER_SYMBOL.get(symbol, V3_FEATURE_COLUMNS_TOP_N)
+
+
 V3_EXCLUDED_SYMBOLS: tuple[str, ...] = (
     # v1 traded
     "BTCUSDT",
@@ -507,10 +551,12 @@ __all__ = [
     "V3_FEATURE_COLUMNS",
     "V3_FEATURE_COLUMNS_FULL",
     "V3_FEATURE_COLUMNS_TOP_N",
+    "V3_FEATURES_PER_SYMBOL",
     "V3_NON_FEATURE_COLUMNS",
     "add_btc_funding_v3_features",
     "add_engineered_v3_features",
     "add_funding_v3_features",
+    "features_for_symbol",
     "generate_features_v3",
     "list_groups",
     "process_symbol_v3",

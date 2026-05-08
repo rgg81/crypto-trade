@@ -46,6 +46,9 @@ from crypto_trade.config import OOS_CUTOFF_MS
 from crypto_trade.features_v3 import (
     V3_EXCLUDED_SYMBOLS,
     V3_FEATURE_COLUMNS,
+    V3_FEATURE_COLUMNS_TOP_N,
+    V3_FEATURES_PER_SYMBOL,
+    features_for_symbol,
     process_symbol_v3,
 )
 from crypto_trade.iteration_report import generate_iteration_reports
@@ -99,7 +102,7 @@ def _derive_ensemble_seeds(outer_seed: int, size: int = ENSEMBLE_SIZE) -> list[i
     return [int(s) for s in rng.integers(low=0, high=2**31 - 1, size=size)]
 
 
-ITERATION_LABEL = "v3-029"
+ITERATION_LABEL = "v3-030"
 REPORTS_DIR = Path("reports-v3")
 FEATURES_DIR = Path("data/features_v3")
 DATA_DIR = Path("data")
@@ -187,7 +190,7 @@ def _verify_data_freshness(symbols: tuple[str, ...], max_lag_hours: float = 16.0
 
 
 def _verify_feature_columns() -> None:
-    """Verifies V3_FEATURE_COLUMNS contents per current brief (iter-v3/028).
+    """Verifies V3_FEATURE_COLUMNS contents per current brief (iter-v3/030).
 
     iter-v3/028: 14 columns — atomic drop:
       DROP cross_asset_divergence_norm (iter-v3/027 stacking FALSIFIED at
@@ -207,6 +210,17 @@ def _verify_feature_columns() -> None:
         DROPPED per iter-v3/028 brief §2.1).
     regime_momentum_signed_5d MUST be present (Category 2 composed feature, iter-v3/025;
         MINI-VALIDATION target; iter-v3/028 brief §2.1).
+
+    iter-v3/030: per-symbol feature subset architecture (NEW).
+      V3_FEATURES_PER_SYMBOL maps LDOUSDT → 7-feature tuple.
+      Every per-symbol subset MUST be a strict subset of V3_FEATURE_COLUMNS_TOP_N.
+      BCH+TRX+ALGO (not in V3_FEATURES_PER_SYMBOL) use V3_FEATURE_COLUMNS_TOP_N
+        (14 features) via the fallback in features_for_symbol().
+      regime_momentum_signed_5d MUST be present in V3_FEATURE_COLUMNS_TOP_N so
+        that BCH+TRX+ALGO continue to use it (portfolio-level mandate honored).
+      LDO subset is permitted to OMIT regime_momentum_signed_5d (rank 13/14 at
+        iter-v3/028 multi-seed; per-symbol prescriptive override justified at
+        portfolio level per iter-v3/030 brief §2.2 and §0.5 rationale).
     """
     n = len(V3_FEATURE_COLUMNS)
     if n != 14:
@@ -269,6 +283,35 @@ def _verify_feature_columns() -> None:
             "Remove it from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
         )
     print(f"  V3_FEATURE_COLUMNS: {n} columns  PASS")
+
+    # iter-v3/030: verify per-symbol subsets are strict subsets of V3_FEATURE_COLUMNS_TOP_N.
+    full_set = set(V3_FEATURE_COLUMNS_TOP_N)
+    for sym, subset in V3_FEATURES_PER_SYMBOL.items():
+        extra = set(subset) - full_set
+        if extra:
+            raise RuntimeError(
+                f"V3_FEATURES_PER_SYMBOL['{sym}'] contains features not in "
+                f"V3_FEATURE_COLUMNS_TOP_N: {sorted(extra)}. "
+                "Per-symbol subsets MUST be strict subsets of V3_FEATURE_COLUMNS_TOP_N. "
+                "iter-v3/030 brief §3 sub-fix #4."
+            )
+    n_custom = len(V3_FEATURES_PER_SYMBOL)
+    print(f"  V3_FEATURES_PER_SYMBOL: {n_custom} symbol(s) with custom subsets  PASS")
+
+    # Carve-out check: regime_momentum_signed_5d MUST be in V3_FEATURE_COLUMNS_TOP_N so
+    # BCH+TRX+ALGO (fallback path) continue to use it. The portfolio-level mandate in
+    # feedback_v3_engineered_features_proven.md is honored at V3_FEATURE_COLUMNS_TOP_N level.
+    # LDO's subset may omit it (rank 13/14 at iter-v3/028 multi-seed; per-symbol prescriptive
+    # override; iter-v3/030 brief §2.2).
+    if "regime_momentum_signed_5d" not in V3_FEATURE_COLUMNS_TOP_N:
+        raise RuntimeError(
+            "regime_momentum_signed_5d MISSING from V3_FEATURE_COLUMNS_TOP_N — "
+            "BCH+TRX+ALGO (fallback path in features_for_symbol) MUST use it. "
+            "Portfolio-level mandate from feedback_v3_engineered_features_proven.md. "
+            "iter-v3/030 brief §2.2 carve-out allows LDO subset to omit it, but "
+            "V3_FEATURE_COLUMNS_TOP_N itself must contain it."
+        )
+    print("  regime_momentum_signed_5d in V3_FEATURE_COLUMNS_TOP_N (BCH+TRX+ALGO fallback)  PASS")
 
 
 def _verify_label_leakage_gap() -> None:
@@ -940,7 +983,8 @@ def _build_v3_model(
         atr_column="natr_21_raw",
         use_atr_labeling=True,
         ensemble_seeds=list(ensemble_seeds),
-        feature_columns=list(V3_FEATURE_COLUMNS),  # EXPLICIT — never None
+        # iter-v3/030: per-symbol dispatch — EXPLICIT list, never None.
+        feature_columns=list(features_for_symbol(symbol)),
         ood_enabled=False,  # OOD via RiskV3Wrapper z-score gate
         fast_mode=fast_mode,  # iter-v3/007 — colsample_bytree=1.0 when True
     )
