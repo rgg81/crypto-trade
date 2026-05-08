@@ -103,22 +103,24 @@ def _derive_ensemble_seeds(outer_seed: int, size: int = ENSEMBLE_SIZE) -> list[i
     return [int(s) for s in rng.integers(low=0, high=2**31 - 1, size=size)]
 
 
-ITERATION_LABEL = "v3-032"
+ITERATION_LABEL = "v3-033"
 REPORTS_DIR = Path("reports-v3")
 FEATURES_DIR = Path("data/features_v3")
 DATA_DIR = Path("data")
 
-# v3 symbols — iter-v3/032: RESTORE LDOUSDT (3→4; iter-v3/031 drop REVERSED).
-# Critic FINAL of iter-v3/031 (SHA 12ca079): LDO IS-positive (+40.03 weighted_pnl)
-# means the drop-MKR precedent did NOT transfer — LDO is IS-positive/OOS-marginal
-# (overfit signature), NOT a true drag like MKR (-23/-25). Drop-LDO killed IS
-# aggregate Sharpe (+0.79 → +0.28, Δ -0.51). Critic recommendation: RESTORE LDO
-# + per-symbol ATR multipliers (per-symbol-LABELING axis, Category 7 NEW).
-# REQUIRED_GAP restored 66→88 = (21+1)×4 per Section 3 sub-fix #2.
+# v3 symbols — iter-v3/033: ADD VETUSDT (4→5; per-symbol-feature-signature
+# alignment criterion, 2nd application after iter-v3/029 ALGO success).
+# VET selected via per_symbol_5th_candidate_eda (SHA 06d4ba9): composite 0.6833
+# (rank-1 of 3 candidates {FIL, VET, ATOM}); alignment_score 0.5176 dominated
+# by range_realized_vol_50 alignment 0.7107 — the highest across candidates and
+# aligned with the dominant SHARED-top feature in 4-symbol incumbent universe.
+# NATR 3.97% in band [3.0%, 7.0%]; gates 1+2+3 all PASS.
+# REQUIRED_GAP updated 88→110 = (21+1)×5 per Section 3 sub-fix #2.
 V3_MODELS: tuple[tuple[str, str], ...] = (
     ("A (BCHUSDT)", "BCHUSDT"),
     ("C (LDOUSDT)", "LDOUSDT"),
     ("D (TRXUSDT)", "TRXUSDT"),
+    ("E (VETUSDT)", "VETUSDT"),
     ("F (ALGOUSDT)", "ALGOUSDT"),
 )
 
@@ -138,7 +140,7 @@ BTC_TREND_CONFIG = BtcTrendFilterConfig(
 # CPCV parameters (brief Section 0 + 3.5#2)
 CPCV_N_SPLITS = 10
 CPCV_N_TEST_SPLITS = 2
-# gap = REQUIRED_GAP = (timeout_candles+1)*n_symbols = (21+1)*4 = 88 (iter-v3/032 RESTORE LDO)
+# gap = REQUIRED_GAP = (timeout_candles+1)*n_symbols = (21+1)*5 = 110 (iter-v3/033 ADD VETUSDT)
 # DO NOT use min(REQUIRED_GAP, n_trades//20) — that is the iter-v3/001 bug.
 CPCV_EMBARGO = 27  # ~1% of 24-month T ≈ 2742 candles * 0.01
 
@@ -1530,7 +1532,7 @@ def main() -> None:
     _verify_data_freshness(baseline_symbols + ("BTCUSDT",))
     # asserts len == 13, funding NOT present, vwap_dev_50/tbr_zscore_30 absent
     _verify_feature_columns()
-    _verify_label_leakage_gap()  # asserts REQUIRED_GAP == 88 (4-symbol universe, iter-v3/029)
+    _verify_label_leakage_gap()  # asserts REQUIRED_GAP == 110 (5-symbol universe, iter-v3/033)
     _verify_track_isolation()  # grep check
 
     active_sym_names = ", ".join(sym for _, sym in active_models)
@@ -1539,7 +1541,7 @@ def main() -> None:
     print(f"Active models: {len(active_models)}/{len(V3_MODELS)} (--symbols={args.symbols!r})")
     print(f"CPCV: N={CPCV_N_SPLITS}, k={CPCV_N_TEST_SPLITS}, 45 paths on IS CANDLE SEQUENCE")
     print(
-        f"Gap: {REQUIRED_GAP} (= (timeout_candles+1) * 4 symbols [BCH+LDO+TRX+ALGO, iter-v3/029])"
+        f"Gap: {REQUIRED_GAP} (= (timeout_candles+1) * 5 symbols [BCH+LDO+TRX+VET+ALGO, iter-v3/033])"
     )
     print(
         f"Pre-flight: branch OK, symbols OK, data fresh (<16h), "

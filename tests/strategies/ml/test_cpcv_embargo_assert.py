@@ -23,8 +23,8 @@ from crypto_trade.strategies.ml.validation_v3 import (
 
 # v3 documented constants
 TIMEOUT_CANDLES = 21  # 10080 min / 480 min = 21 candles at 8h
-N_SYMBOLS = 4  # BCH + LDO + TRX + ALGO (iter-v3/032: LDO restored 3→4; iter-v3/031 3-sym was temporary)
-CORRECT_GAP = (TIMEOUT_CANDLES + 1) * N_SYMBOLS  # 88
+N_SYMBOLS = 5  # BCH + LDO + TRX + VET + ALGO (iter-v3/033: ADD VETUSDT 4→5)
+CORRECT_GAP = (TIMEOUT_CANDLES + 1) * N_SYMBOLS  # 110
 DEGRADED_GAP = 11  # what iter-v3/001 actually passed (bug)
 
 N_SAMPLES = 1000  # representative IS candle count
@@ -36,7 +36,7 @@ N_SAMPLES = 1000  # representative IS candle count
 
 
 def test_correct_gap_accepted() -> None:
-    """combinatorial_purged_cv(gap=88, expected_gap=88) runs without error."""
+    """combinatorial_purged_cv(gap=110, expected_gap=110) runs without error."""
     splits = combinatorial_purged_cv(
         n_samples=N_SAMPLES,
         n_splits=10,
@@ -57,7 +57,7 @@ def test_correct_gap_accepted() -> None:
 
 
 def test_degraded_gap_raises_assertion() -> None:
-    """combinatorial_purged_cv raises AssertionError when gap=11 but expected_gap=88."""
+    """combinatorial_purged_cv raises AssertionError when gap=11 but expected_gap=110."""
     with pytest.raises(AssertionError) as exc_info:
         combinatorial_purged_cv(
             n_samples=N_SAMPLES,
@@ -105,7 +105,7 @@ def test_required_gap_matches_formula() -> None:
         f"(timeout_candles+1)*n_symbols={formula_gap}. "
         "Update the REQUIRED_GAP constant or the formula."
     )
-    assert REQUIRED_GAP == 88, f"REQUIRED_GAP should be 88 for v3 (21+1)*4=88 (4-sym universe restored at iter-v3/032; iter-v3/031 3-sym was temporary), got {REQUIRED_GAP}"
+    assert REQUIRED_GAP == 110, f"REQUIRED_GAP should be 110 for v3 (21+1)*5=110 (5-sym universe at iter-v3/033 ADD VETUSDT), got {REQUIRED_GAP}"
 
 
 # ---------------------------------------------------------------------------
@@ -147,7 +147,7 @@ def test_cpcv_walk_forward_splits_degraded_gap_raises() -> None:
 
 
 def test_gap_removes_boundary_samples() -> None:
-    """With gap=88, boundary samples adjacent to test blocks are purged from train."""
+    """With gap=20 (test-local), boundary samples adjacent to test blocks are purged from train."""
     n = 200
     gap = 20
     splits = combinatorial_purged_cv(
