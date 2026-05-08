@@ -172,6 +172,14 @@ V3_FEATURE_COLUMNS_TOP_N: tuple[str, ...] = (
     # IC hard gate BYPASSED with carve-out (see phase5p5_gate.md §IC-Gate Carve-Out
     # + feedback_v3_engineered_feature_pivot.md).
     "regime_momentum_signed_5d",  # rank TBD — engineered_v3 (Category 2 composed feature)
+    # iter-v3/034: fracdiff_d05_close ADDED (14 → 15): LdP AFML Ch. 5 FFD at d=0.5;
+    # fixed-window fractional differentiation of log(close); memory-preserving stationary
+    # feature complementary to regime_momentum_signed_5d (sign-flip direction vs level of
+    # accumulated price memory).  Pure-numpy implementation in engineered_v3.py; weights
+    # truncated at |w_k| < 1e-4 (~120-150 bars).  Dispatched from add_engineered_v3_features
+    # after regime_momentum_signed_5d.  Category 2 carve-out: IC gate BYPASSED; binding gate
+    # is importance ≥ 30 on ≥ 2/4 symbols (BCH+LDO+TRX+ALGO).
+    "fracdiff_d05_close",  # rank TBD — engineered_v3 (Category 2; LdP AFML Ch. 5 FFD d=0.5)
     # iter-v3/026: vol_adj_autocorr ADDED (14 → 15): composed feature =
     # ret_autocorr_lag1_50 / (range_realized_vol_50 + 1e-6). Second Category 2
     # axis: stacked NEGATIVE-SUSPICIOUS-OOS — IS Sharpe collapse to +0.0493 +
@@ -194,9 +202,11 @@ V3_FEATURE_COLUMNS_TOP_N: tuple[str, ...] = (
     # user directive 2026-05-08. compute_cross_asset_divergence_norm retained as
     # dead code in engineered_v3.py at zero revert cost.
 )
-"""Top-14 feature subset: iter-v3/028 drop — cross_asset_divergence_norm removed
-(revert 15→14; matches iter-v3/025 anchor exactly). iter-v3/027 was: atomic swap
-vol_adj_autocorr dropped, cross_asset_divergence_norm added.
+"""Top-15 feature subset: iter-v3/034 add — fracdiff_d05_close added (14→15;
+LdP AFML Ch. 5 FFD at d=0.5; fixed-window fractional differentiation of log(close)).
+iter-v3/028 drop: cross_asset_divergence_norm removed (revert 15→14; matches
+iter-v3/025 anchor exactly). iter-v3/027 was: atomic swap vol_adj_autocorr dropped,
+cross_asset_divergence_norm added.
 
 ``tbr_zscore_30`` DROPPED per iter-v3/016 brief §3.3 (Critic FINAL Rec 3 of
 iter-v3/015 mandated revert before XGBoost axis exploration).
@@ -323,6 +333,11 @@ from ``add_engineered_v3_features`` at iter-v3/028.
 #              stacking FALSIFIED at iter-v3/027; per Critic FINAL `966f4c1` + user
 #              directive 2026-05-08. regime_momentum_signed_5d KEPT — MINI-VALIDATION
 #              target; mandated by `feedback_v3_engineered_features_proven.md`).
+# iter-v3/034: top-15 (fracdiff_d05_close ADDED — LdP AFML Ch. 5 FFD at d=0.5; 14 → 15.
+#              Fixed-window fractional differentiation of log(close); memory-preserving
+#              stationary feature complementary to regime_momentum_signed_5d.  V3_MODELS:
+#              DROP VETUSDT (5 → 4; EXPLORATION-NEGATIVE per Critic FINAL 93d2b85; alignment
+#              necessary but not sufficient for IS lift).  REQUIRED_GAP 110 → 88.)
 # To restore full set: V3_FEATURE_COLUMNS = V3_FEATURE_COLUMNS_FULL
 V3_FEATURE_COLUMNS: tuple[str, ...] = V3_FEATURE_COLUMNS_TOP_N
 """Active feature columns fed to LightGBM / XGBoost.
@@ -393,6 +408,15 @@ iter-v3/028:     V3_FEATURE_COLUMNS_TOP_N (14 features; cross_asset_divergence_n
                  ``add_engineered_v3_features``.  regime_momentum_signed_5d KEPT — MINI-
                  VALIDATION target; mandated by `feedback_v3_engineered_features_proven.md`.
                  Per Critic FINAL ``966f4c1`` of iter-v3/027 + user directive 2026-05-08.)
+iter-v3/034:     V3_FEATURE_COLUMNS_TOP_N (15 features; fracdiff_d05_close ADDED —
+                 LdP AFML Ch. 5 FFD at d=0.5; fixed-window fractional differentiation
+                 of log(close); memory-preserving stationary feature complementary to
+                 regime_momentum_signed_5d.  Pure-numpy implementation in engineered_v3.py;
+                 weights truncated at |w_k| < 1e-4 (~120-150 bars).  Dispatched after
+                 regime_momentum_signed_5d in add_engineered_v3_features.  V3_MODELS:
+                 VETUSDT DROPPED (5 → 4; EXPLORATION-NEGATIVE per Critic FINAL 93d2b85;
+                 reverts to iter-v3/032 4-symbol anchor BCH+LDO+TRX+ALGO).
+                 REQUIRED_GAP 110 → 88 = (21+1)×4.  Atomic swap: DROP VET + ADD feature.)
 """
 
 V3_NON_FEATURE_COLUMNS: tuple[str, ...] = ("natr_21_raw", "tbr_raw")
@@ -434,16 +458,15 @@ def atr_multipliers_for_symbol(symbol: str) -> tuple[float, float]:
 
 
 V3_FEATURES_PER_SYMBOL: dict[str, tuple[str, ...]] = {
-    # iter-v3/031: LDOUSDT dropped from V3_MODELS (9-of-9 OOS-negative; PROMISING-MECHANICAL).
-    # The dict is intentionally empty — iter-v3/030 LDO entry removed.
-    # Architecture preserved: features_for_symbol() still works for any future per-symbol use.
-    # All active symbols (BCH+TRX+ALGO) fall back to V3_FEATURE_COLUMNS_TOP_N (14 features).
+    # iter-v3/034: dict remains empty. All active symbols (BCH+LDO+TRX+ALGO) fall back
+    # to V3_FEATURE_COLUMNS_TOP_N (15 features including fracdiff_d05_close).
     # NEVER add a feature here that is absent from V3_FEATURE_COLUMNS_TOP_N.
 }
 """Per-symbol feature subsets for v3 models (iter-v3/030+).
 
 Maps symbol → tuple of feature column names to pass to LightGbmStrategy.
-Symbols absent from this dict fall back to V3_FEATURE_COLUMNS_TOP_N (14 features).
+Symbols absent from this dict fall back to V3_FEATURE_COLUMNS_TOP_N (15 features
+as of iter-v3/034).
 
 iter-v3/030: populated with LDO → 7-feature top-7 subset from iter-v3/028 multi-seed.
 iter-v3/031: CLEARED (LDOUSDT dropped from V3_MODELS; 9-of-9 OOS-negative;
@@ -461,9 +484,9 @@ def features_for_symbol(symbol: str) -> tuple[str, ...]:
     """Return per-symbol feature tuple, falling back to V3_FEATURE_COLUMNS_TOP_N.
 
     Introduced in iter-v3/030 to support per-symbol model heterogeneity.
-    iter-v3/031: V3_FEATURES_PER_SYMBOL is empty (LDO dropped from V3_MODELS).
-    All active symbols (BCH, TRX, ALGO) and any future symbol not in
-    V3_FEATURES_PER_SYMBOL return the full 14-feature V3_FEATURE_COLUMNS_TOP_N.
+    iter-v3/034: V3_FEATURES_PER_SYMBOL is empty (LDO+VET both absent from V3_MODELS).
+    All active symbols (BCH, LDO, TRX, ALGO) and any future symbol not in
+    V3_FEATURES_PER_SYMBOL return the full 15-feature V3_FEATURE_COLUMNS_TOP_N.
 
     Callers MUST pass ``feature_columns=list(features_for_symbol(symbol))``
     to LightGbmStrategy — never None, never empty, never the global default.

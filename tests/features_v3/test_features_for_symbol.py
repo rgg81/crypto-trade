@@ -1,4 +1,4 @@
-"""Adversarial tests for per-symbol feature-set dispatch — iter-v3/031.
+"""Adversarial tests for per-symbol feature-set dispatch — iter-v3/031/034.
 
 Tests the ``V3_FEATURES_PER_SYMBOL`` dict and the ``features_for_symbol()``
 helper introduced in iter-v3/030.
@@ -11,8 +11,11 @@ now empty. Tests updated accordingly:
 - V3_FEATURES_PER_SYMBOL must be empty (no per-symbol overrides active).
 - Architecture preserved: fallback path works for all symbols.
 
+iter-v3/034 update: fracdiff_d05_close ADDED (14→15 features).
+V3_FEATURE_COLUMNS_TOP_N now has 15 entries. All count assertions updated.
+
 Three core mandatory cases (inherited from iter-v3/030 brief §3 sub-fix #5
-and §10 adversarial test specification, updated for iter-v3/031):
+and §10 adversarial test specification, updated for iter-v3/031/034):
 
 1. ``test_features_for_symbol_subset_invariant`` — every per-symbol subset is a
    strict subset of ``V3_FEATURE_COLUMNS_TOP_N``.  Trivially passes when dict is empty.
@@ -56,12 +59,13 @@ def test_features_for_symbol_fallback() -> None:
     """Symbols not in V3_FEATURES_PER_SYMBOL fall back to V3_FEATURE_COLUMNS_TOP_N.
 
     iter-v3/031: ALL active symbols (BCH, TRX, ALGO) and dropped symbol (LDO) fall back.
+    iter-v3/034: V3_FEATURE_COLUMNS_TOP_N now has 15 features (fracdiff_d05_close added).
     """
     for symbol in ["BCHUSDT", "TRXUSDT", "ALGOUSDT", "LDOUSDT"]:
         result = features_for_symbol(symbol)
         assert result == V3_FEATURE_COLUMNS_TOP_N, (
-            f"{symbol} should fall back to V3_FEATURE_COLUMNS_TOP_N (14 features) — "
-            f"V3_FEATURES_PER_SYMBOL is empty at iter-v3/031."
+            f"{symbol} should fall back to V3_FEATURE_COLUMNS_TOP_N (15 features) — "
+            f"V3_FEATURES_PER_SYMBOL is empty at iter-v3/031/034."
         )
 
 
@@ -80,19 +84,20 @@ def test_v3_features_per_symbol_is_empty() -> None:
 
 
 def test_features_for_symbol_ldo_fallback() -> None:
-    """LDOUSDT falls back to V3_FEATURE_COLUMNS_TOP_N (14 features) at iter-v3/031.
+    """LDOUSDT falls back to V3_FEATURE_COLUMNS_TOP_N (15 features) at iter-v3/034.
 
     iter-v3/030: LDO had a 7-feature per-symbol subset.
     iter-v3/031: LDO dropped from V3_MODELS; V3_FEATURES_PER_SYMBOL cleared;
                  LDO now falls back to V3_FEATURE_COLUMNS_TOP_N (14 features).
+    iter-v3/034: fracdiff_d05_close ADDED; V3_FEATURE_COLUMNS_TOP_N has 15 features.
     """
     result = features_for_symbol("LDOUSDT")
     assert result == V3_FEATURE_COLUMNS_TOP_N, (
-        f"LDOUSDT should fall back to V3_FEATURE_COLUMNS_TOP_N (14 features) at iter-v3/031. "
+        f"LDOUSDT should fall back to V3_FEATURE_COLUMNS_TOP_N (15 features) at iter-v3/034. "
         f"Got {len(result)} features. "
         f"LDO was dropped from V3_MODELS; per-symbol entry cleared."
     )
-    assert len(result) == 14, f"LDOUSDT fallback must have exactly 14 features. Got {len(result)}."
+    assert len(result) == 15, f"LDOUSDT fallback must have exactly 15 features. Got {len(result)}."
 
 
 def test_features_for_symbol_unknown_symbol() -> None:
@@ -106,11 +111,15 @@ def test_features_for_symbol_unknown_symbol() -> None:
 
 
 @pytest.mark.parametrize("symbol", ["BCHUSDT", "TRXUSDT", "ALGOUSDT"])
-def test_fallback_symbols_have_14_features(symbol: str) -> None:
-    """BCH, TRX, ALGO must each receive the full 14-feature set via fallback."""
+def test_fallback_symbols_have_15_features(symbol: str) -> None:
+    """BCH, TRX, ALGO must each receive the full 15-feature set via fallback.
+
+    iter-v3/034: fracdiff_d05_close ADDED (14→15). Count updated from 14.
+    """
     result = features_for_symbol(symbol)
-    assert len(result) == 14, (
-        f"{symbol}: expected 14 features (V3_FEATURE_COLUMNS_TOP_N fallback), got {len(result)}."
+    assert len(result) == 15, (
+        f"{symbol}: expected 15 features (V3_FEATURE_COLUMNS_TOP_N fallback, "
+        f"iter-v3/034 fracdiff_d05_close added), got {len(result)}."
     )
 
 

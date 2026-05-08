@@ -103,24 +103,21 @@ def _derive_ensemble_seeds(outer_seed: int, size: int = ENSEMBLE_SIZE) -> list[i
     return [int(s) for s in rng.integers(low=0, high=2**31 - 1, size=size)]
 
 
-ITERATION_LABEL = "v3-033"
+ITERATION_LABEL = "v3-034"
 REPORTS_DIR = Path("reports-v3")
 FEATURES_DIR = Path("data/features_v3")
 DATA_DIR = Path("data")
 
-# v3 symbols — iter-v3/033: ADD VETUSDT (4→5; per-symbol-feature-signature
-# alignment criterion, 2nd application after iter-v3/029 ALGO success).
-# VET selected via per_symbol_5th_candidate_eda (SHA 06d4ba9): composite 0.6833
-# (rank-1 of 3 candidates {FIL, VET, ATOM}); alignment_score 0.5176 dominated
-# by range_realized_vol_50 alignment 0.7107 — the highest across candidates and
-# aligned with the dominant SHARED-top feature in 4-symbol incumbent universe.
-# NATR 3.97% in band [3.0%, 7.0%]; gates 1+2+3 all PASS.
-# REQUIRED_GAP updated 88→110 = (21+1)×5 per Section 3 sub-fix #2.
+# v3 symbols — iter-v3/034: DROP VETUSDT (5→4; revert to iter-v3/032 anchor).
+# iter-v3/033 EXPLORATION result: VETUSDT was EXPLORATION-NEGATIVE (VET drag;
+# alignment necessary but not sufficient for IS lift per Critic FINAL 93d2b85).
+# iter-v3/034: atomic swap — DROP VET (revert to 4-sym BCH+LDO+TRX+ALGO) +
+# ADD fracdiff_d05_close (15th feature; LdP AFML Ch. 5 FFD at fixed d=0.5).
+# REQUIRED_GAP updated 110→88 = (21+1)×4 per Section 3 sub-fix #2.
 V3_MODELS: tuple[tuple[str, str], ...] = (
     ("A (BCHUSDT)", "BCHUSDT"),
     ("C (LDOUSDT)", "LDOUSDT"),
     ("D (TRXUSDT)", "TRXUSDT"),
-    ("E (VETUSDT)", "VETUSDT"),
     ("F (ALGOUSDT)", "ALGOUSDT"),
 )
 
@@ -140,7 +137,7 @@ BTC_TREND_CONFIG = BtcTrendFilterConfig(
 # CPCV parameters (brief Section 0 + 3.5#2)
 CPCV_N_SPLITS = 10
 CPCV_N_TEST_SPLITS = 2
-# gap = REQUIRED_GAP = (timeout_candles+1)*n_symbols = (21+1)*5 = 110 (iter-v3/033 ADD VETUSDT)
+# gap = REQUIRED_GAP = (timeout_candles+1)*n_symbols = (21+1)*4 = 88 (iter-v3/034 DROP VETUSDT)
 # DO NOT use min(REQUIRED_GAP, n_trades//20) — that is the iter-v3/001 bug.
 CPCV_EMBARGO = 27  # ~1% of 24-month T ≈ 2742 candles * 0.01
 
@@ -194,16 +191,14 @@ def _verify_data_freshness(symbols: tuple[str, ...], max_lag_hours: float = 16.0
 
 
 def _verify_feature_columns() -> None:
-    """Verifies V3_FEATURE_COLUMNS contents per current brief (iter-v3/031).
+    """Verifies V3_FEATURE_COLUMNS contents per current brief (iter-v3/034).
 
-    iter-v3/028: 14 columns — atomic drop:
-      DROP cross_asset_divergence_norm (iter-v3/027 stacking FALSIFIED at
-        single-seed n_trials=35; IS Sharpe collapse -0.2817; OOS spike +1.6786;
-        TRX 91.57% concentration regression; revert 15 → 14; matches iter-v3/025
-        anchor exactly). Per Critic FINAL `966f4c1` of iter-v3/027.
-      KEEP regime_momentum_signed_5d (Category 2 composed feature, iter-v3/025;
-        MUST NOT be reverted — mandated by `feedback_v3_engineered_features_proven.md`).
-    Net count: 14 (unchanged at iter-v3/031).
+    iter-v3/034: 15 columns — atomic swap:
+      DROP VETUSDT from V3_MODELS (5→4; revert to iter-v3/032 anchor).
+      ADD fracdiff_d05_close (14 → 15; Category 2 LdP AFML Ch. 5 FFD at d=0.5;
+        fixed-window fractional differentiation of log(close); memory-preserving
+        stationary feature complementary to regime_momentum_signed_5d).
+    Net count: 15.
     tbr_zscore_30 MUST NOT be present (dropped iter-v3/016).
     vwap_dev_50 MUST NOT be present (dropped iter-v3/008 per Critic SHA a544621).
     funding_rate_zscore_30 MUST NOT be present (per-symbol variant PERMANENTLY-CLOSED).
@@ -213,19 +208,17 @@ def _verify_feature_columns() -> None:
         DROPPED per iter-v3/028 brief §2.1).
     regime_momentum_signed_5d MUST be present (Category 2 composed feature, iter-v3/025;
         mandated by `feedback_v3_engineered_features_proven.md`).
+    fracdiff_d05_close MUST be present (Category 2 LdP feature, iter-v3/034;
+        fixed-window fractional differencing at d=0.5; AFML Ch. 5).
 
-    iter-v3/031: V3_FEATURES_PER_SYMBOL cleared (LDOUSDT dropped from V3_MODELS).
-      Dict is empty — all active symbols (BCH+TRX+ALGO) fall back to
-      V3_FEATURE_COLUMNS_TOP_N (14 features) via features_for_symbol().
-      regime_momentum_signed_5d MUST be present in V3_FEATURE_COLUMNS_TOP_N so
-        that BCH+TRX+ALGO continue to use it (portfolio-level mandate honored).
+    iter-v3/034: V3_FEATURES_PER_SYMBOL remains empty (all active symbols BCH+LDO+TRX+ALGO
+      fall back to V3_FEATURE_COLUMNS_TOP_N (15 features) via features_for_symbol()).
     """
     n = len(V3_FEATURE_COLUMNS)
-    if n != 14:
+    if n != 15:
         raise RuntimeError(
-            f"V3_FEATURE_COLUMNS has {n} columns — expected exactly 14. "
-            "iter-v3/028: atomic drop cross_asset_divergence_norm (revert iter-v3/027 swap; "
-            "15 → 14; matches iter-v3/025 anchor exactly). "
+            f"V3_FEATURE_COLUMNS has {n} columns — expected exactly 15. "
+            "iter-v3/034: ADD fracdiff_d05_close (LdP AFML Ch. 5 FFD d=0.5; 14 → 15). "
             "Check features_v3/__init__.py V3_FEATURE_COLUMNS_TOP_N."
         )
     if "tbr_zscore_30" in V3_FEATURE_COLUMNS:
@@ -309,7 +302,15 @@ def _verify_feature_columns() -> None:
             "iter-v3/030 brief §2.2 carve-out allows LDO subset to omit it, but "
             "V3_FEATURE_COLUMNS_TOP_N itself must contain it."
         )
-    print("  regime_momentum_signed_5d in V3_FEATURE_COLUMNS_TOP_N (BCH+TRX+ALGO fallback)  PASS")
+    print("  regime_momentum_signed_5d in V3_FEATURE_COLUMNS_TOP_N (BCH+LDO+TRX+ALGO)  PASS")
+    # iter-v3/034: fracdiff_d05_close MUST be in V3_FEATURE_COLUMNS_TOP_N.
+    if "fracdiff_d05_close" not in V3_FEATURE_COLUMNS_TOP_N:
+        raise RuntimeError(
+            "fracdiff_d05_close MISSING from V3_FEATURE_COLUMNS_TOP_N — "
+            "iter-v3/034: ADD fracdiff_d05_close (LdP AFML Ch. 5 FFD d=0.5; 14 → 15). "
+            "Add it to V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
+        )
+    print("  fracdiff_d05_close in V3_FEATURE_COLUMNS_TOP_N (iter-v3/034 ADD)  PASS")
 
 
 def _verify_label_leakage_gap() -> None:
@@ -1541,7 +1542,7 @@ def main() -> None:
     print(f"Active models: {len(active_models)}/{len(V3_MODELS)} (--symbols={args.symbols!r})")
     print(f"CPCV: N={CPCV_N_SPLITS}, k={CPCV_N_TEST_SPLITS}, 45 paths on IS CANDLE SEQUENCE")
     print(
-        f"Gap: {REQUIRED_GAP} (= (timeout_candles+1) * 5 symbols [BCH+LDO+TRX+VET+ALGO, iter-v3/033])"
+        f"Gap: {REQUIRED_GAP} (= (timeout_candles+1) * 4 symbols [BCH+LDO+TRX+ALGO, iter-v3/034])"
     )
     print(
         f"Pre-flight: branch OK, symbols OK, data fresh (<16h), "

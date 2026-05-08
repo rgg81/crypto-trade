@@ -40,14 +40,15 @@ from scipy.stats import norm
 # ---------------------------------------------------------------------------
 
 #: Documented gap formula for v3: (timeout_candles + 1) * n_symbols
-#: With timeout=21 candles (10080 min / 480 min) and 5 symbols → 110.
+#: With timeout=21 candles (10080 min / 480 min) and 4 symbols → 88.
 #: History: 88 (4-sym) → 66 (3-sym, iter-v3/013 MKR drop) → 110 (5-sym, iter-v3/021 HBAR+AVAX)
 #:          → 66 (3-sym, iter-v3/022 revert HBAR+AVAX expansion NEGATIVE)
 #:          → 88 (4-sym, iter-v3/029 +ALGOUSDT universe expansion)
 #:          → 66 (3-sym, iter-v3/031 DROP LDOUSDT; 9-of-9 OOS-neg; PROMISING-MECHANICAL)
 #:          → 88 (4-sym, iter-v3/032 RESTORE LDOUSDT + per-symbol ATR multipliers)
-#:          → 110 (5-sym, iter-v3/033 ADD VETUSDT; per-symbol-feature-signature alignment).
-REQUIRED_GAP: int = (21 + 1) * 5  # 110
+#:          → 110 (5-sym, iter-v3/033 ADD VETUSDT; per-symbol-feature-signature alignment)
+#:          → 88 (4-sym, iter-v3/034 DROP VETUSDT; EXPLORATION-NEGATIVE per Critic 93d2b85).
+REQUIRED_GAP: int = (21 + 1) * 4  # 88
 
 # ---------------------------------------------------------------------------
 # CPCV — Combinatorial Purged Cross-Validation (AFML Ch. 12)

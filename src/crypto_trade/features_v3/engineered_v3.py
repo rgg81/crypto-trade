@@ -14,6 +14,11 @@ Module dependency order (GROUP_REGISTRY insertion order matters):
   ``engineered_v3`` MUST run AFTER ``regime`` (which produces ``hurst_100``).
   In the current GROUP_REGISTRY dict the insertion order is preserved, so
   ``engineered_v3`` is registered AFTER ``regime`` and BEFORE ``fracdiff``.
+
+iter-v3/034: ``compute_fracdiff_d05_close`` added (LdP AFML Ch. 5 FFD at d=0.5).
+  Pure-numpy inline implementation; does NOT import from fracdiff_v3.py to
+  preserve intra-module clarity.  fracdiff PyPI package UNAVAILABLE (statsmodels
+  version conflict); see brief Section 9.
 """
 
 from __future__ import annotations
@@ -225,8 +230,110 @@ def compute_cross_asset_divergence_norm(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+_FRACDIFF_D05_CLOSE_WEIGHT_THRESHOLD: float = 1e-4
+_FRACDIFF_D05_CLOSE_D: float = 0.5
+
+
+def _fracdiff_d05_weights(threshold: float = _FRACDIFF_D05_CLOSE_WEIGHT_THRESHOLD) -> np.ndarray:
+    """Compute FFD weights for d=0.5, truncated at |w_k| < threshold.
+
+    Uses the iterative recurrence from LdP AFML Ch. 5:
+        w_0 = 1
+        w_k = -w_{k-1} * (d - k + 1) / k   for k >= 1
+
+    For d=0.5 the weights decay as approximately C * k^{-1.5}.  The truncation
+    point at threshold=1e-4 is typically around k=120-150 bars.
+
+    Returns:
+        1-D numpy array of weights w_0, w_1, ..., w_{W-1}  where W is the
+        truncation window length.  w_0 = 1.0 (current bar), w_1, w_2, ... are
+        the lagged weights (all negative for d < 1).
+    """
+    d = _FRACDIFF_D05_CLOSE_D
+    weights: list[float] = [1.0]
+    k = 1
+    while True:
+        w_next = -weights[-1] * (d - k + 1) / k
+        if abs(w_next) < threshold:
+            break
+        weights.append(w_next)
+        k += 1
+    return np.array(weights, dtype=np.float64)
+
+
+def compute_fracdiff_d05_close(df: pd.DataFrame) -> pd.DataFrame:
+    """Composed feature: Fixed-window Fractional Differencing of log(close) at d=0.5.
+
+    Implements the FFD (Fixed-window Fractional Differencing) algorithm from
+    López de Prado (2018), *Advances in Financial Machine Learning*, Chapter 5.
+
+    Construction:
+    - ``log_close = log(close.clip(lower=1e-12))``
+    - Weights: w_k = -w_{k-1} * (d - k + 1) / k for k >= 1, w_0 = 1.
+      Truncated at |w_k| < 1e-4 (approximately 120-150 lags at d=0.5).
+    - ``fracdiff_d05_close[t] = sum_{k=0}^{W-1} w_k * log_close[t-k]``
+      where W is the truncation window length.
+
+    Stationarity: ADF p < 0.05 expected at d=0.5 per AFML §5.4 theory.
+    Memory: the d=0.5 output preserves long-memory (autocorrelation decays as
+    k^{2*0.5-1} = k^0, i.e., slowly), unlike full differencing (d=1) which
+    destroys all memory.
+
+    Past-only by construction:
+    - FFD at bar t uses ONLY log_close[t], log_close[t-1], ..., log_close[t-W+1].
+      All lookback positions are strictly in the past relative to bar t.
+    - The loop `for i in range(W-1, n)` guarantees that i+1..n are never accessed
+      when computing position i.
+    - Appending future bars t+1, t+2, ... to the input series does NOT alter the
+      value at bar t (no trailing-window centering; purely causal).
+
+    NaN warm-up: first (W-1) bars are NaN where W = len(weights).
+    Typical W ≈ 120-150 at threshold=1e-4.  At 8h cadence: 150 bars ≈ 50 calendar
+    days.  The IS window (24 months ≈ 2742 bars) easily absorbs this warm-up.
+
+    Args:
+        df: DataFrame with column ``close`` (float-castable).
+
+    Returns:
+        Copy of ``df`` with ``fracdiff_d05_close`` column appended.
+        If ``close`` is missing, the column is set to all-NaN without error;
+        the runner's ``_verify_feature_columns`` assertion catches the gap.
+    """
+    df = df.copy()
+    if "close" not in df.columns:
+        df["fracdiff_d05_close"] = np.nan
+        return df
+
+    close = df["close"].astype(float).clip(lower=1e-12)
+    log_close = np.log(close)
+    values = log_close.to_numpy(dtype=np.float64, copy=True)
+    n = len(values)
+
+    weights = _fracdiff_d05_weights()
+    w_window = len(weights)
+    # Reverse weights so that dot(w_rev, window_slice) = sum_k w_k * log_close[t-k]
+    # with w_rev[0] = w_{W-1} (oldest lag) and w_rev[W-1] = w_0 = 1.0 (current bar).
+    w_rev = weights[::-1]
+
+    out = np.full(n, np.nan, dtype=np.float64)
+    for i in range(w_window - 1, n):
+        window_slice = values[i - w_window + 1 : i + 1]
+        if np.isnan(window_slice).any():
+            # Propagate NaN from upstream (e.g., missing close data)
+            continue
+        out[i] = float(np.dot(w_rev, window_slice))
+
+    df["fracdiff_d05_close"] = out
+    return df
+
+
 def add_engineered_v3_features(df: pd.DataFrame) -> pd.DataFrame:
     """GROUP_REGISTRY entry point for all Category 2 (composed) v3 features.
+
+    iter-v3/034: fracdiff_d05_close ADDED (LdP AFML Ch. 5 FFD at d=0.5;
+    fixed-window fractional differentiation of log(close); memory-preserving
+    stationary feature complementary to regime_momentum_signed_5d).
+    Net column count: 15 (14 → 15; see V3_FEATURE_COLUMNS_TOP_N update).
 
     iter-v3/028: cross_asset_divergence_norm DROPPED from dispatch (revert 15 → 14;
     matches iter-v3/025 anchor exactly; MINI-VALIDATION of iter-v3/025 ALONE at
@@ -244,18 +351,22 @@ def add_engineered_v3_features(df: pd.DataFrame) -> pd.DataFrame:
     - ``regime_momentum_signed_5d`` (iter-v3/025, KEPT): composed feature combining
       5-day momentum with Hurst regime classifier.  Depends on ``hurst_100``
       from ``regime`` group (upstream in GROUP_REGISTRY).
+    - ``fracdiff_d05_close`` (iter-v3/034, NEW): FFD of log(close) at d=0.5.
+      Depends only on ``close`` column (no upstream feature dependency beyond OHLCV).
 
     Each new composed feature must be listed in the iteration's research brief Section
     2.2 and validated with an adversarial past-only test.
 
     Args:
         df: DataFrame that has already been processed by ``add_regime_v3_features``
-            (so ``hurst_100`` is available).  Upstream in GROUP_REGISTRY.
+            (so ``hurst_100`` is available for regime_momentum_signed_5d).
+            Upstream in GROUP_REGISTRY.
 
     Returns:
         Copy of ``df`` with all active engineered v3 features appended.
     """
-    df = compute_regime_momentum_signed_5d(df)  # iter-v3/025 (KEPT; mini-validation target)
+    df = compute_regime_momentum_signed_5d(df)  # iter-v3/025 (KEPT; mandated by engineered pivot)
+    df = compute_fracdiff_d05_close(df)  # iter-v3/034 (NEW; LdP AFML Ch. 5 FFD d=0.5)
     # compute_cross_asset_divergence_norm DROPPED at iter-v3/028 — revert 15 → 14;
     # stacking FALSIFIED at iter-v3/027; function retained as dead code at zero cost.
     # compute_vol_adj_autocorr DROPPED at iter-v3/027 — function retained as dead code.
@@ -265,6 +376,7 @@ def add_engineered_v3_features(df: pd.DataFrame) -> pd.DataFrame:
 __all__ = [
     "add_engineered_v3_features",
     "compute_cross_asset_divergence_norm",
+    "compute_fracdiff_d05_close",
     "compute_regime_momentum_signed_5d",
     "compute_vol_adj_autocorr",
 ]

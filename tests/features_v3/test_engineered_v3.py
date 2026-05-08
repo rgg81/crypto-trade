@@ -2,8 +2,9 @@
 
 Focuses on ``compute_regime_momentum_signed_5d`` (iter-v3/025),
 ``compute_vol_adj_autocorr`` (iter-v3/026; dead code — retained for multi-seed
-CONFIRMATION stacking experiments at iter-v3/029+), and
-``compute_cross_asset_divergence_norm`` (iter-v3/027):
+CONFIRMATION stacking experiments at iter-v3/029+),
+``compute_cross_asset_divergence_norm`` (iter-v3/027), and
+``compute_fracdiff_d05_close`` (iter-v3/034; LdP AFML Ch. 5 FFD at d=0.5):
 
 1. Import smoke test — public API importable without error.
 2. Composition correctness — sign flip on hurst > 0.5 vs < 0.5.
@@ -25,6 +26,10 @@ CONFIRMATION stacking experiments at iter-v3/029+), and
     window dominates).
 15. cross_asset_divergence_norm EPS robustness — output is finite when vwap_dev_20 == 0.
 16. cross_asset_divergence_norm idempotency — calling twice produces identical output.
+17. fracdiff_d05_close weights — LdP AFML Ch. 5 recurrence converges; truncated at 1e-4.
+18. fracdiff_d05_close past-only — appending future bars does not alter t's value.
+19. fracdiff_d05_close ADF stationarity — fixed d=0.5 makes a random walk stationary.
+20. fracdiff_d05_close NaN warm-up — first (W-1) bars NaN where W = len(weights).
 """
 
 from __future__ import annotations
@@ -34,8 +39,10 @@ import pandas as pd
 import pytest
 
 from crypto_trade.features_v3.engineered_v3 import (
+    _fracdiff_d05_weights,
     add_engineered_v3_features,
     compute_cross_asset_divergence_norm,
+    compute_fracdiff_d05_close,
     compute_regime_momentum_signed_5d,
     compute_vol_adj_autocorr,
 )
@@ -107,6 +114,10 @@ class TestImport:
         assert "add_engineered_v3_features" in engineered_v3.__all__
         assert "compute_vol_adj_autocorr" in engineered_v3.__all__
         assert "compute_cross_asset_divergence_norm" in engineered_v3.__all__
+        assert "compute_fracdiff_d05_close" in engineered_v3.__all__, (
+            "compute_fracdiff_d05_close must be in engineered_v3.__all__ "
+            "(iter-v3/034: ADD fracdiff_d05_close; LdP AFML Ch. 5 FFD at d=0.5)."
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -1155,4 +1166,342 @@ class TestCrossAssetDivergenceNormIdempotency:
         assert "cross_asset_divergence_norm" in out.columns
         assert out["cross_asset_divergence_norm"].isna().all(), (
             "cross_asset_divergence_norm must be all-NaN when vwap_dev_20 is missing."
+        )
+
+
+# ---------------------------------------------------------------------------
+# 17. fracdiff_d05_close weights — LdP AFML Ch. 5 recurrence (iter-v3/034)
+# ---------------------------------------------------------------------------
+
+
+class TestFracdiffD05Weights:
+    def test_first_weight_is_one(self) -> None:
+        """LdP AFML Ch. 5 recurrence: w_0 = 1.0 exactly."""
+        weights = _fracdiff_d05_weights()
+        assert weights[0] == pytest.approx(1.0, abs=1e-15), (
+            f"First weight must be 1.0 (w_0 = 1 per LdP recurrence). Got {weights[0]}."
+        )
+
+    def test_weights_are_monotonically_decreasing_in_magnitude(self) -> None:
+        """Weights decrease monotonically in absolute value (LdP AFML Ch. 5 property).
+
+        For d=0.5 the recurrence w_k = -w_{k-1}*(d-k+1)/k produces alternating
+        signs; abs(w_k) must be strictly decreasing until truncation.
+        """
+        weights = _fracdiff_d05_weights()
+        abs_w = np.abs(weights)
+        for k in range(1, len(abs_w)):
+            assert abs_w[k] < abs_w[k - 1], (
+                f"Weight magnitude not strictly decreasing at k={k}: "
+                f"|w[{k - 1}]|={abs_w[k - 1]:.6e}, |w[{k}]|={abs_w[k]:.6e}."
+            )
+
+    def test_last_weight_below_threshold(self) -> None:
+        """Truncation condition: all weights must satisfy |w_k| >= threshold except last.
+
+        The loop stops when |w_next| < threshold = 1e-4.  Every retained weight
+        must have |w_k| >= threshold.
+        """
+        threshold = 1e-4
+        weights = _fracdiff_d05_weights(threshold=threshold)
+        # All retained weights must be >= threshold (loop stops before appending sub-threshold)
+        for k, w in enumerate(weights):
+            assert abs(w) >= threshold, (
+                f"Retained weight w[{k}]={w:.6e} is below threshold={threshold:.1e}. "
+                "The loop should have stopped before appending this weight."
+            )
+
+    def test_weight_count_is_reasonable_for_d05(self) -> None:
+        """For d=0.5, threshold=1e-4, expect roughly 50-200 weights (not 1, not 100_000).
+
+        Exact count depends on the recurrence speed; ballpark from LdP AFML Ch. 5
+        is ~50-200 for d=0.5 at 1e-4 threshold.
+        """
+        weights = _fracdiff_d05_weights()
+        w_len = len(weights)
+        assert 30 <= w_len <= 500, (
+            f"Expected 30–500 weights for d=0.5 at threshold=1e-4; got {w_len}. "
+            "Check recurrence implementation."
+        )
+
+    def test_weights_sum_approaches_zero(self) -> None:
+        """For d=0.5, sum of weights should be close to 0 (LdP AFML property: memory-balance).
+
+        The infinite sum of FFD weights at d=0.5 converges to 0 (each w_k has
+        alternating sign and decreasing magnitude).  With truncation at 1e-4 the
+        partial sum should be small (< 0.1 in absolute value).
+        """
+        weights = _fracdiff_d05_weights()
+        total = float(np.sum(weights))
+        assert abs(total) < 0.1, (
+            f"Sum of FFD weights for d=0.5 should be close to 0; got {total:.4f}. "
+            "Weights may not be alternating correctly."
+        )
+
+
+# ---------------------------------------------------------------------------
+# 18. fracdiff_d05_close — Past-only discipline (iter-v3/034)
+# ---------------------------------------------------------------------------
+
+
+class TestFracdiffD05ClosesPastOnly:
+    def test_appending_future_bars_does_not_change_value_at_t(self) -> None:
+        """Adversarial past-only test: value at row t must not change when future bars appended.
+
+        Compute fracdiff_d05_close on df[:T] and df[:T+50]. The value at row T-1
+        (the last bar in the short frame) must be identical in both runs.
+
+        FFD is a pure backward convolution: bar t uses close[t], close[t-1], ...
+        close[t-(W-1)].  Appending future bars cannot alter any of these lags.
+        """
+        weights = _fracdiff_d05_weights()
+        w_window = len(weights)
+        n = w_window + 100  # enough for warm-up + valid bars
+        rng = np.random.default_rng(42)
+        open_times = [_IS_START_MS + i * _8H_MS for i in range(n)]
+        close = np.cumprod(1 + rng.normal(0, 0.01, n)) * 100.0  # random walk
+        df_full = pd.DataFrame(
+            {
+                "open_time": open_times,
+                "open": close * rng.uniform(0.995, 1.005, n),
+                "high": close * rng.uniform(1.0, 1.01, n),
+                "low": close * rng.uniform(0.99, 1.0, n),
+                "close": close,
+                "volume": rng.uniform(1000.0, 10000.0, n),
+                "symbol": "BCHUSDT",
+            }
+        )
+        split = w_window + 30  # last bar in short frame
+
+        df_short = df_full.iloc[:split].reset_index(drop=True)
+        df_long = df_full.reset_index(drop=True)
+
+        out_short = compute_fracdiff_d05_close(df_short)
+        out_long = compute_fracdiff_d05_close(df_long)
+
+        val_short = out_short["fracdiff_d05_close"].iloc[split - 1]
+        val_long = out_long["fracdiff_d05_close"].iloc[split - 1]
+
+        assert not np.isnan(val_short), (
+            f"Value at split-1={split - 1} should not be NaN in the short frame. "
+            f"w_window={w_window}, split={split}."
+        )
+        assert val_short == pytest.approx(val_long, abs=1e-12), (
+            f"Past-only violation: fracdiff_d05_close at row {split - 1} changed from "
+            f"{val_short:.10f} to {val_long:.10f} when future bars were appended. "
+            "FFD backward convolution must depend only on current and past close values."
+        )
+
+    def test_current_bar_close_not_in_its_own_lag_window(self) -> None:
+        """The current bar's close[t] is the first element of the convolution window.
+
+        Spike close[t] to a known extreme value; verify:
+        - Feature at t CHANGES (close[t] IS in bar t's convolution).
+        - Feature at t-1 does NOT change (close[t] is in the FUTURE from t-1).
+
+        This is the primary past-only check: the convolution window for bar t
+        is {close[t], close[t-1], ..., close[t-(W-1)]}.  Bar t-1's window is
+        {close[t-1], close[t-2], ..., close[t-W]}.  They are disjoint at position 0.
+        """
+        weights = _fracdiff_d05_weights()
+        w_window = len(weights)
+        n = w_window + 80
+        rng = np.random.default_rng(99)
+        open_times = [_IS_START_MS + i * _8H_MS for i in range(n)]
+        close = np.cumprod(1 + rng.normal(0, 0.01, n)) * 100.0
+        df_base = pd.DataFrame(
+            {
+                "open_time": open_times,
+                "open": close * rng.uniform(0.995, 1.005, n),
+                "high": close * rng.uniform(1.0, 1.01, n),
+                "low": close * rng.uniform(0.99, 1.0, n),
+                "close": close.copy(),
+                "volume": rng.uniform(1000.0, 10000.0, n),
+                "symbol": "BCHUSDT",
+            }
+        )
+        target = w_window + 20  # well past warm-up
+
+        df_spiked = df_base.copy()
+        df_spiked.loc[target, "close"] = 1_000_000.0  # extreme spike
+
+        out_base = compute_fracdiff_d05_close(df_base)
+        out_spiked = compute_fracdiff_d05_close(df_spiked)
+
+        # At target: value MUST change (close[target] is in bar target's window)
+        val_base_t = out_base["fracdiff_d05_close"].iloc[target]
+        val_spiked_t = out_spiked["fracdiff_d05_close"].iloc[target]
+        assert not np.isnan(val_base_t), f"Value at target={target} should be non-NaN."
+        assert val_base_t != pytest.approx(val_spiked_t, abs=1e-6), (
+            f"Spike at close[{target}] had no effect on feature[{target}]. "
+            "close[t] must be included in bar t's convolution window."
+        )
+
+        # At target-1: value must NOT change (close[target] is future from t-1's perspective)
+        val_base_prev = out_base["fracdiff_d05_close"].iloc[target - 1]
+        val_spiked_prev = out_spiked["fracdiff_d05_close"].iloc[target - 1]
+        assert not np.isnan(val_base_prev), f"Value at target-1={target - 1} should be non-NaN."
+        assert val_base_prev == pytest.approx(val_spiked_prev, abs=1e-12), (
+            f"Past-only violation: feature[{target - 1}] changed when close[{target}] "
+            f"was spiked. Value before={val_base_prev:.10f}, after={val_spiked_prev:.10f}. "
+            "Bar t-1's convolution window must not include close[t]."
+        )
+
+
+# ---------------------------------------------------------------------------
+# 19. fracdiff_d05_close — ADF stationarity on synthetic random walk (iter-v3/034)
+# ---------------------------------------------------------------------------
+
+
+class TestFracdiffD05CloseADFStationarity:
+    def test_fracdiff_d05_is_stationary_on_random_walk(self) -> None:
+        """FFD at d=0.5 must make a random walk stationary (ADF p < 0.05).
+
+        Pre-registered falsifier from brief Section 4: if ADF p-value >= 0.05
+        on the differenced series, the FFD implementation is broken (not producing
+        sufficient memory reduction to achieve stationarity).
+
+        Synthetic data: geometric random walk with drift=0.0001 per bar, vol=0.01.
+        1000 bars is sufficient for ADF to detect stationarity at d=0.5.
+        """
+        import statsmodels.tsa.stattools as smtools
+
+        rng = np.random.default_rng(2034)  # iter-v3/034 seed
+        n = 1000
+        open_times = [_IS_START_MS + i * _8H_MS for i in range(n)]
+        log_returns = rng.normal(0.0001, 0.01, n)
+        close = np.exp(np.cumsum(log_returns)) * 100.0  # geometric random walk
+        df = pd.DataFrame(
+            {
+                "open_time": open_times,
+                "open": close * 0.999,
+                "high": close * 1.005,
+                "low": close * 0.995,
+                "close": close,
+                "volume": rng.uniform(1000.0, 10000.0, n),
+                "symbol": "BCHUSDT",
+            }
+        )
+
+        out = compute_fracdiff_d05_close(df)
+        series = out["fracdiff_d05_close"].dropna()
+
+        assert len(series) >= 200, (
+            f"ADF test needs at least 200 valid bars; got {len(series)}. Check warm-up calculation."
+        )
+
+        # ADF test: null hypothesis = unit root (non-stationary)
+        adf_stat, p_value, *_ = smtools.adfuller(series.values, autolag="AIC")
+        assert p_value < 0.05, (
+            f"ADF test FAILED (p={p_value:.4f} >= 0.05): fracdiff_d05_close is NOT "
+            f"stationary on a random walk (ADF stat={adf_stat:.4f}). "
+            "d=0.5 FFD must produce a stationary series. "
+            "Pre-registered falsifier from brief Section 4 triggered."
+        )
+
+
+# ---------------------------------------------------------------------------
+# 20. fracdiff_d05_close — NaN warm-up at first (W-1) bars (iter-v3/034)
+# ---------------------------------------------------------------------------
+
+
+class TestFracdiffD05CloseNaNWarmUp:
+    def test_first_w_minus_1_bars_are_nan(self) -> None:
+        """First (W-1) bars must be NaN where W = len(_fracdiff_d05_weights()).
+
+        The FFD convolution requires W bars of log(close) history.  Bar index
+        W-1 is the first bar where all W lags are available; bars 0..(W-2) must
+        be NaN.
+        """
+        weights = _fracdiff_d05_weights()
+        w_window = len(weights)
+        n = w_window + 50
+        rng = np.random.default_rng(2034)
+        open_times = [_IS_START_MS + i * _8H_MS for i in range(n)]
+        close = np.cumprod(1 + rng.normal(0, 0.01, n)) * 100.0
+        df = pd.DataFrame(
+            {
+                "open_time": open_times,
+                "open": close * 0.999,
+                "high": close * 1.005,
+                "low": close * 0.995,
+                "close": close,
+                "volume": rng.uniform(1000.0, 10000.0, n),
+                "symbol": "BCHUSDT",
+            }
+        )
+
+        out = compute_fracdiff_d05_close(df)
+        feat = out["fracdiff_d05_close"]
+
+        # Bars 0..(W-2) must be NaN
+        warmup = feat.iloc[: w_window - 1]
+        assert warmup.isna().all(), (
+            f"Expected first {w_window - 1} bars to be NaN (FFD warm-up: W={w_window}). "
+            f"Non-NaN count in warm-up: {warmup.notna().sum()}. "
+            f"First non-NaN index: {feat.first_valid_index()}."
+        )
+
+    def test_first_valid_index_is_w_minus_1(self) -> None:
+        """The first valid (non-NaN) bar must be exactly at index W-1."""
+        weights = _fracdiff_d05_weights()
+        w_window = len(weights)
+        n = w_window + 50
+        rng = np.random.default_rng(2035)
+        open_times = [_IS_START_MS + i * _8H_MS for i in range(n)]
+        close = np.cumprod(1 + rng.normal(0, 0.01, n)) * 100.0
+        df = pd.DataFrame(
+            {
+                "open_time": open_times,
+                "open": close * 0.999,
+                "high": close * 1.005,
+                "low": close * 0.995,
+                "close": close,
+                "volume": rng.uniform(1000.0, 10000.0, n),
+                "symbol": "BCHUSDT",
+            }
+        )
+
+        out = compute_fracdiff_d05_close(df)
+        feat = out["fracdiff_d05_close"]
+
+        first_valid = feat.first_valid_index()
+        assert first_valid == w_window - 1, (
+            f"Expected first valid index at {w_window - 1} (W-1 where W={w_window}); "
+            f"got {first_valid}. "
+            "FFD warm-up must be exactly W-1 bars (not W or W+1)."
+        )
+
+    def test_no_nan_after_warmup(self) -> None:
+        """After bar W-1, all values must be non-NaN (no NaN explosion from FFD).
+
+        On a geometric random walk (all positive close prices), log(close) is
+        always finite.  FFD output must be finite for all post-warm-up bars.
+        """
+        weights = _fracdiff_d05_weights()
+        w_window = len(weights)
+        n = w_window + 100
+        rng = np.random.default_rng(2036)
+        open_times = [_IS_START_MS + i * _8H_MS for i in range(n)]
+        close = np.cumprod(1 + rng.normal(0, 0.01, n)) * 100.0
+        df = pd.DataFrame(
+            {
+                "open_time": open_times,
+                "open": close * 0.999,
+                "high": close * 1.005,
+                "low": close * 0.995,
+                "close": close,
+                "volume": rng.uniform(1000.0, 10000.0, n),
+                "symbol": "BCHUSDT",
+            }
+        )
+
+        out = compute_fracdiff_d05_close(df)
+        feat = out["fracdiff_d05_close"]
+        post_warmup = feat.iloc[w_window - 1 :]
+
+        nan_frac = post_warmup.isna().mean()
+        assert nan_frac == 0.0, (
+            f"Expected 0% NaN after warm-up; got {nan_frac:.1%}. "
+            "FFD on positive close prices must produce finite values for all bars."
         )
