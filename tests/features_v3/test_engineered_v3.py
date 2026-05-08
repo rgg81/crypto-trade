@@ -531,10 +531,10 @@ class TestAddEngineeredV3Features:
     def test_group_registry_imports_correctly(self) -> None:
         """engineered_v3 must be importable from the GROUP_REGISTRY.
 
-        iter-v3/028: cross_asset_divergence_norm DROPPED from dispatch (revert 15→14;
-        matches iter-v3/025 anchor; stacking FALSIFIED at iter-v3/027).  Only
-        regime_momentum_signed_5d is dispatched.  Both vol_adj_autocorr and
-        cross_asset_divergence_norm are dead code — NOT dispatched; must be ABSENT.
+        iter-v3/036: vol_adj_autocorr RE-DISPATCHED (was dead code since iter-v3/027).
+        Generates the column for all symbols so TRX parquet contains it.
+        Only TRX's feature_columns= (via V3_FEATURES_PER_SYMBOL) passes it to LightGBM.
+        cross_asset_divergence_norm remains dead code — NOT dispatched; must be ABSENT.
         """
         from crypto_trade.features_v3 import GROUP_REGISTRY
 
@@ -542,8 +542,7 @@ class TestAddEngineeredV3Features:
             "engineered_v3 must be registered in GROUP_REGISTRY. Check features_v3/__init__.py."
         )
         fn = GROUP_REGISTRY["engineered_v3"]
-        # Call with a DataFrame that includes all engineered feature dependencies
-        # (source primitives present is fine even for dead-code functions).
+        # Call with a DataFrame that includes all engineered feature dependencies.
         df = _make_df_with_all_primitives(n=200, seed=63)
         out = fn(df)
         assert "regime_momentum_signed_5d" in out.columns, (
@@ -556,10 +555,11 @@ class TestAddEngineeredV3Features:
             "be in output. Stacking FALSIFIED at iter-v3/027; reverted to 14 features. "
             "compute_cross_asset_divergence_norm retained as dead code but not dispatched."
         )
-        # vol_adj_autocorr is dead code at iter-v3/026+ — NOT dispatched.
-        assert "vol_adj_autocorr" not in out.columns, (
-            "vol_adj_autocorr (iter-v3/026; DROPPED) must NOT be in output. "
-            "It is retained as dead code but not dispatched from add_engineered_v3_features."
+        # iter-v3/036: vol_adj_autocorr RE-DISPATCHED for parquet generation (TRX-only model).
+        assert "vol_adj_autocorr" in out.columns, (
+            "vol_adj_autocorr (iter-v3/036; RE-DISPATCHED) MUST be in output. "
+            "Column generated for all symbols; only TRX passes it to LightGBM. "
+            "Check add_engineered_v3_features dispatch in engineered_v3.py."
         )
 
 
@@ -961,10 +961,9 @@ class TestVolAdjAutocorrIdempotency:
     def test_add_engineered_v3_features_produces_correct_columns(self) -> None:
         """add_engineered_v3_features (GROUP_REGISTRY entry) must produce correct columns.
 
-        iter-v3/028: only regime_momentum_signed_5d dispatched (revert 15→14; matches
-        iter-v3/025 anchor; cross_asset_divergence_norm stacking FALSIFIED at
-        iter-v3/027).  Both vol_adj_autocorr and cross_asset_divergence_norm are
-        dead code — NOT dispatched; must be ABSENT.
+        iter-v3/036: vol_adj_autocorr RE-DISPATCHED (was dead code since iter-v3/027).
+        regime_momentum_signed_5d and fracdiff_d05_close KEPT. Only
+        cross_asset_divergence_norm remains dead code — NOT dispatched; must be ABSENT.
         """
         df = _make_df_with_all_primitives(n=200, seed=232)
         out = add_engineered_v3_features(df)
@@ -977,8 +976,11 @@ class TestVolAdjAutocorrIdempotency:
             "cross_asset_divergence_norm (iter-v3/028; DROPPED) must NOT be in output. "
             "Stacking FALSIFIED at iter-v3/027; function retained as dead code only."
         )
-        assert "vol_adj_autocorr" not in out.columns, (
-            "vol_adj_autocorr (iter-v3/026; DROPPED dead code) must NOT be in output."
+        # iter-v3/036: vol_adj_autocorr RE-DISPATCHED for parquet generation (TRX-only model).
+        assert "vol_adj_autocorr" in out.columns, (
+            "vol_adj_autocorr (iter-v3/036; RE-DISPATCHED) MUST be in output. "
+            "Column generated for all symbols; only TRX passes it to LightGBM. "
+            "Check add_engineered_v3_features dispatch in engineered_v3.py."
         )
 
 

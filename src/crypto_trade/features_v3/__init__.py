@@ -481,8 +481,19 @@ V3_FEATURES_PER_SYMBOL: dict[str, tuple[str, ...]] = {
     # TRX -20.11 / ALGO -8.24 / LDO -6.81 regressions when applied universally.
     # NOTE: BCHUSDT's tuple EXTENDS V3_FEATURE_COLUMNS_TOP_N by one feature;
     # it is NOT a strict subset. The _verify_feature_columns check in run_baseline_v3.py
-    # enforces this explicitly (len==15 AND fracdiff_d05_close present).
+    # enforces this explicitly (len==15 AND fracdiff_d05_close present AND vol_adj_autocorr absent).
     "BCHUSDT": V3_FEATURE_COLUMNS_TOP_N + ("fracdiff_d05_close",),
+    # iter-v3/036: TRX-only vol_adj_autocorr targeting.
+    # TRX receives all 14 universal features PLUS vol_adj_autocorr (15 total).
+    # BCH unchanged (fracdiff_d05_close). LDO/ALGO fall back to 14-feature universal.
+    # Evidence: iter-v3/026 universal vol_adj_autocorr failed (IS Sharpe collapse +0.0493;
+    # 27× IS/OOS ratio) — per-symbol isolation tests whether TRX specifically benefits.
+    # TRX at iter-v3/035: 52.2% win rate, +29.24 OOS wpnl, 46 trades — dominant contributor
+    # with high persistence. vol_adj_autocorr = ret_autocorr_lag1_50 / (range_realized_vol_50
+    # + 1e-6).
+    # NOTE: TRXUSDT's tuple EXTENDS V3_FEATURE_COLUMNS_TOP_N by one feature (vol_adj_autocorr).
+    # BCH and TRX per-symbol entries are DISJOINT in extension features.
+    "TRXUSDT": V3_FEATURE_COLUMNS_TOP_N + ("vol_adj_autocorr",),
 }
 """Per-symbol feature overrides for v3 models (iter-v3/030+).
 
@@ -494,17 +505,28 @@ iter-v3/031: CLEARED (LDOUSDT dropped from V3_MODELS). Dict empty.
 iter-v3/034: Dict empty. All symbols fall back to 15-feature V3_FEATURE_COLUMNS_TOP_N.
 iter-v3/035: BCH entry ADDED as EXTENSION of universal list (14 + fracdiff_d05_close = 15).
              TRX/ALGO/LDO: 14-feature fallback (no fracdiff_d05_close).
+iter-v3/036: TRX entry ADDED as EXTENSION of universal list (14 + vol_adj_autocorr = 15).
+             BCH unchanged (15 features: 14 + fracdiff_d05_close).
+             LDO/ALGO: 14-feature fallback (no vol_adj_autocorr).
+             BCH and TRX extension features are DISJOINT:
+               BCH: fracdiff_d05_close (NOT vol_adj_autocorr)
+               TRX: vol_adj_autocorr (NOT fracdiff_d05_close)
 
-IMPORTANT INVARIANT CHANGE (iter-v3/035 vs iter-v3/030):
-- iter-v3/030 invariant: per-symbol entries are STRICT SUBSETS of V3_FEATURE_COLUMNS_TOP_N.
-- iter-v3/035 invariant: BCHUSDT EXTENDS V3_FEATURE_COLUMNS_TOP_N by one column
-  (fracdiff_d05_close). The extension feature must exist in the generated parquet
-  (computed by add_engineered_v3_features for ALL symbols).
+IMPORTANT INVARIANT (iter-v3/035+):
+- per-symbol entries EXTEND V3_FEATURE_COLUMNS_TOP_N by exactly one column.
+- Extension features must exist in the generated parquet (computed by
+  add_engineered_v3_features for ALL symbols).
+- BCH and TRX extension features must not overlap (enforced by _verify_feature_columns).
 
 Enforced by _verify_feature_columns in run_baseline_v3.py:
     len(V3_FEATURES_PER_SYMBOL["BCHUSDT"]) == 15
     "fracdiff_d05_close" in V3_FEATURES_PER_SYMBOL["BCHUSDT"]
+    "vol_adj_autocorr" not in V3_FEATURES_PER_SYMBOL["BCHUSDT"]
+    len(V3_FEATURES_PER_SYMBOL["TRXUSDT"]) == 15
+    "vol_adj_autocorr" in V3_FEATURES_PER_SYMBOL["TRXUSDT"]
+    "fracdiff_d05_close" not in V3_FEATURES_PER_SYMBOL["TRXUSDT"]
     "fracdiff_d05_close" not in V3_FEATURE_COLUMNS_TOP_N
+    "vol_adj_autocorr" not in V3_FEATURE_COLUMNS_TOP_N
 """
 
 
@@ -513,10 +535,15 @@ def features_for_symbol(symbol: str) -> tuple[str, ...]:
 
     Introduced in iter-v3/030 to support per-symbol model heterogeneity.
 
-    iter-v3/035:
+    iter-v3/036:
     - BCHUSDT: returns 15 features = V3_FEATURE_COLUMNS_TOP_N + ("fracdiff_d05_close",)
-    - LDOUSDT, TRXUSDT, ALGOUSDT: return 14 features = V3_FEATURE_COLUMNS_TOP_N (fallback)
+    - TRXUSDT: returns 15 features = V3_FEATURE_COLUMNS_TOP_N + ("vol_adj_autocorr",)
+    - LDOUSDT, ALGOUSDT: return 14 features = V3_FEATURE_COLUMNS_TOP_N (fallback)
     - Any other symbol not in V3_FEATURES_PER_SYMBOL: fallback to 14-feature universal set
+
+    BCH and TRX per-symbol extension features are DISJOINT:
+    BCH has fracdiff_d05_close but NOT vol_adj_autocorr.
+    TRX has vol_adj_autocorr but NOT fracdiff_d05_close.
 
     Callers MUST pass ``feature_columns=list(features_for_symbol(symbol))``
     to LightGbmStrategy — never None, never empty, never the global default.

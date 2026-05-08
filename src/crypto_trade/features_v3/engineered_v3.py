@@ -330,6 +330,15 @@ def compute_fracdiff_d05_close(df: pd.DataFrame) -> pd.DataFrame:
 def add_engineered_v3_features(df: pd.DataFrame) -> pd.DataFrame:
     """GROUP_REGISTRY entry point for all Category 2 (composed) v3 features.
 
+    iter-v3/036: vol_adj_autocorr RE-DISPATCHED for per-symbol parquet generation.
+    ``compute_vol_adj_autocorr`` was dead code since iter-v3/027. Re-adding to
+    dispatch adds the column to ALL symbol parquets (same pattern as fracdiff_d05_close).
+    Only TRXUSDT's explicit ``feature_columns=`` list (via V3_FEATURES_PER_SYMBOL) includes
+    ``vol_adj_autocorr`` at model-train time. BCH/LDO/ALGO parquets contain the column
+    but it is NOT passed to LightGBM for those symbols. Tests whether TRX-specific
+    persistence-normalized-by-vol signal works in isolation (iter-v3/026 universal
+    application failed with IS Sharpe collapse +0.0493 + OOS spike +1.4501 / 27× ratio).
+
     iter-v3/034: fracdiff_d05_close ADDED (LdP AFML Ch. 5 FFD at d=0.5;
     fixed-window fractional differentiation of log(close); memory-preserving
     stationary feature complementary to regime_momentum_signed_5d).
@@ -339,37 +348,43 @@ def add_engineered_v3_features(df: pd.DataFrame) -> pd.DataFrame:
     matches iter-v3/025 anchor exactly; MINI-VALIDATION of iter-v3/025 ALONE at
     --seeds 2; stacking FALSIFIED at iter-v3/027 per
     `feedback_v3_engineered_features_dont_stack.md`).  ``compute_cross_asset_divergence_norm``
-    is RETAINED as dead code at zero revert cost.  ``compute_vol_adj_autocorr``
-    likewise retained as dead code.  Per Critic FINAL ``966f4c1`` of iter-v3/027 +
-    user directive 2026-05-08.
+    is RETAINED as dead code at zero revert cost.  Per Critic FINAL ``966f4c1`` of
+    iter-v3/027 + user directive 2026-05-08.
 
-    iter-v3/027 (context): vol_adj_autocorr DROPPED (iter-v3/026 stacking falsified;
-    IS Sharpe collapse +0.0493 + OOS spike +1.4501 at single-seed n_trials=35).
+    iter-v3/027 (context): vol_adj_autocorr DROPPED from dispatch (iter-v3/026 stacking
+    falsified; IS Sharpe collapse +0.0493 + OOS spike +1.4501 at single-seed n_trials=35).
     cross_asset_divergence_norm ADDED then DROPPED here at iter-v3/028.
 
     Currently computes (dispatch order):
     - ``regime_momentum_signed_5d`` (iter-v3/025, KEPT): composed feature combining
       5-day momentum with Hurst regime classifier.  Depends on ``hurst_100``
       from ``regime`` group (upstream in GROUP_REGISTRY).
-    - ``fracdiff_d05_close`` (iter-v3/034, NEW): FFD of log(close) at d=0.5.
-      Depends only on ``close`` column (no upstream feature dependency beyond OHLCV).
+    - ``fracdiff_d05_close`` (iter-v3/034, KEPT): FFD of log(close) at d=0.5.
+      Depends only on ``close`` column.  BCH-only at model level (V3_FEATURES_PER_SYMBOL).
+    - ``vol_adj_autocorr`` (iter-v3/036, RE-ADDED to dispatch): autocorrelation ratio.
+      ret_autocorr_lag1_50 / (range_realized_vol_50 + 1e-6). TRX-only at model level
+      (V3_FEATURES_PER_SYMBOL["TRXUSDT"]).  Column is generated for all symbols so
+      TRX's parquet contains it; BCH/LDO/ALGO parquets also contain it but it is NOT
+      passed to LightGBM for those symbols.
 
     Each new composed feature must be listed in the iteration's research brief Section
     2.2 and validated with an adversarial past-only test.
 
     Args:
         df: DataFrame that has already been processed by ``add_regime_v3_features``
-            (so ``hurst_100`` is available for regime_momentum_signed_5d).
-            Upstream in GROUP_REGISTRY.
+            (so ``hurst_100`` is available for regime_momentum_signed_5d) and
+            ``add_tail_risk_v3_features`` + ``add_momentum_accel_v3_features``
+            (so ``range_realized_vol_50`` and ``ret_autocorr_lag1_50`` are available
+            for ``vol_adj_autocorr``).  All upstream in GROUP_REGISTRY.
 
     Returns:
         Copy of ``df`` with all active engineered v3 features appended.
     """
     df = compute_regime_momentum_signed_5d(df)  # iter-v3/025 (KEPT; mandated by engineered pivot)
-    df = compute_fracdiff_d05_close(df)  # iter-v3/034 (NEW; LdP AFML Ch. 5 FFD d=0.5)
+    df = compute_fracdiff_d05_close(df)  # iter-v3/034 (KEPT; BCH-only at model level)
+    df = compute_vol_adj_autocorr(df)  # iter-v3/036 RE-ADDED to dispatch (TRX-only at model level)
     # compute_cross_asset_divergence_norm DROPPED at iter-v3/028 — revert 15 → 14;
     # stacking FALSIFIED at iter-v3/027; function retained as dead code at zero cost.
-    # compute_vol_adj_autocorr DROPPED at iter-v3/027 — function retained as dead code.
     return df
 
 
