@@ -518,26 +518,34 @@ class TestAddEngineeredV3Features:
         assert len(out) == n
 
     def test_group_registry_imports_correctly(self) -> None:
-        """engineered_v3 must be importable from the GROUP_REGISTRY."""
+        """engineered_v3 must be importable from the GROUP_REGISTRY.
+
+        iter-v3/028: cross_asset_divergence_norm DROPPED from dispatch (revert 15→14;
+        matches iter-v3/025 anchor; stacking FALSIFIED at iter-v3/027).  Only
+        regime_momentum_signed_5d is dispatched.  Both vol_adj_autocorr and
+        cross_asset_divergence_norm are dead code — NOT dispatched; must be ABSENT.
+        """
         from crypto_trade.features_v3 import GROUP_REGISTRY
 
         assert "engineered_v3" in GROUP_REGISTRY, (
             "engineered_v3 must be registered in GROUP_REGISTRY. Check features_v3/__init__.py."
         )
         fn = GROUP_REGISTRY["engineered_v3"]
-        # Call with a DataFrame that includes both engineered feature dependencies:
-        # btc_ret_14d + vwap_dev_20 (for cross_asset_divergence_norm, iter-v3/027)
-        # and ret_autocorr_lag1_50 + range_realized_vol_50 (for vol_adj_autocorr
-        # dead-code function; not dispatched but source primitives present is fine).
+        # Call with a DataFrame that includes all engineered feature dependencies
+        # (source primitives present is fine even for dead-code functions).
         df = _make_df_with_all_primitives(n=200, seed=63)
         out = fn(df)
         assert "regime_momentum_signed_5d" in out.columns, (
-            "regime_momentum_signed_5d (iter-v3/025; KEPT) must be in output."
+            "regime_momentum_signed_5d (iter-v3/025; KEPT; MINI-VALIDATION target) "
+            "must be in output."
         )
-        assert "cross_asset_divergence_norm" in out.columns, (
-            "cross_asset_divergence_norm (iter-v3/027; NEW) must be in output."
+        # cross_asset_divergence_norm is dead code at iter-v3/028 — NOT dispatched.
+        assert "cross_asset_divergence_norm" not in out.columns, (
+            "cross_asset_divergence_norm (iter-v3/027; DROPPED at iter-v3/028) must NOT "
+            "be in output. Stacking FALSIFIED at iter-v3/027; reverted to 14 features. "
+            "compute_cross_asset_divergence_norm retained as dead code but not dispatched."
         )
-        # vol_adj_autocorr is dead code at iter-v3/027 — NOT dispatched.
+        # vol_adj_autocorr is dead code at iter-v3/026+ — NOT dispatched.
         assert "vol_adj_autocorr" not in out.columns, (
             "vol_adj_autocorr (iter-v3/026; DROPPED) must NOT be in output. "
             "It is retained as dead code but not dispatched from add_engineered_v3_features."
@@ -942,17 +950,21 @@ class TestVolAdjAutocorrIdempotency:
     def test_add_engineered_v3_features_produces_correct_columns(self) -> None:
         """add_engineered_v3_features (GROUP_REGISTRY entry) must produce correct columns.
 
-        iter-v3/027: add_engineered_v3_features calls regime_momentum_signed_5d FIRST
-        then cross_asset_divergence_norm.  Both must be present.
-        vol_adj_autocorr is dead code at iter-v3/027 — NOT dispatched; must be ABSENT.
+        iter-v3/028: only regime_momentum_signed_5d dispatched (revert 15→14; matches
+        iter-v3/025 anchor; cross_asset_divergence_norm stacking FALSIFIED at
+        iter-v3/027).  Both vol_adj_autocorr and cross_asset_divergence_norm are
+        dead code — NOT dispatched; must be ABSENT.
         """
         df = _make_df_with_all_primitives(n=200, seed=232)
         out = add_engineered_v3_features(df)
         assert "regime_momentum_signed_5d" in out.columns, (
-            "regime_momentum_signed_5d (iter-v3/025; KEPT) must be in output."
+            "regime_momentum_signed_5d (iter-v3/025; KEPT; MINI-VALIDATION target) "
+            "must be in output."
         )
-        assert "cross_asset_divergence_norm" in out.columns, (
-            "cross_asset_divergence_norm (iter-v3/027; NEW) must be in output."
+        # cross_asset_divergence_norm is dead code at iter-v3/028 — NOT dispatched.
+        assert "cross_asset_divergence_norm" not in out.columns, (
+            "cross_asset_divergence_norm (iter-v3/028; DROPPED) must NOT be in output. "
+            "Stacking FALSIFIED at iter-v3/027; function retained as dead code only."
         )
         assert "vol_adj_autocorr" not in out.columns, (
             "vol_adj_autocorr (iter-v3/026; DROPPED dead code) must NOT be in output."

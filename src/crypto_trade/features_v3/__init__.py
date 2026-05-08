@@ -187,10 +187,16 @@ V3_FEATURE_COLUMNS_TOP_N: tuple[str, ...] = (
     # Category 2 carve-out (IC 0.756 vs source primitive sym_vs_btc_ret_7d is
     # expected for a composed feature; see phase5p5_gate.md §IC-Gate Carve-Out).
     # Per Critic FINAL Rec of iter-v3/026 (SHA `8839bbb`) + user directive 2026-05-08.
-    "cross_asset_divergence_norm",  # rank TBD — engineered_v3 (Category 2 composed feature)
+    # iter-v3/028: cross_asset_divergence_norm DROPPED (15 → 14 revert). Mini-
+    # validation of iter-v3/025 ALONE at --seeds 2; stacking FALSIFIED at
+    # iter-v3/027 (IS Sharpe collapse -0.2817 + OOS spike +1.6786; TRX 91.57%
+    # concentration regression). Per Critic FINAL `966f4c1` of iter-v3/027 +
+    # user directive 2026-05-08. compute_cross_asset_divergence_norm retained as
+    # dead code in engineered_v3.py at zero revert cost.
 )
-"""Top-15 feature subset: iter-v3/027 atomic swap — vol_adj_autocorr dropped,
-cross_asset_divergence_norm added.
+"""Top-14 feature subset: iter-v3/028 drop — cross_asset_divergence_norm removed
+(revert 15→14; matches iter-v3/025 anchor exactly). iter-v3/027 was: atomic swap
+vol_adj_autocorr dropped, cross_asset_divergence_norm added.
 
 ``tbr_zscore_30`` DROPPED per iter-v3/016 brief §3.3 (Critic FINAL Rec 3 of
 iter-v3/015 mandated revert before XGBoost axis exploration).
@@ -274,6 +280,15 @@ vwap_dev_20 vs close-derived ret_5d/hurst_100).  Implemented via
 primitives (close, btc_ret_14d, vwap_dev_20) upstream in GROUP_REGISTRY.
 Third Category 2 axis in v3 catalog.  IS rank-IC: max 0.109 (LDO h7) — STRONGEST
 predictive signal among 4 EDA candidates × 3 symbols × 3 horizons.
+
+``cross_asset_divergence_norm`` DROPPED at iter-v3/028 (15 → 14 revert).  MINI-
+VALIDATION of iter-v3/025 ALONE at ``--seeds 2``; cross_asset_divergence_norm
+stacking FALSIFIED at single-seed iter-v3/027 (IS Sharpe collapse -0.2817, OOS
+spike +1.6786; TRX 91.57% concentration regression; 3-iter monotonic IS degradation
+pattern).  Matches iter-v3/025 anchor exactly (14 features).  Per Critic FINAL
+``966f4c1`` of iter-v3/027 + user directive 2026-05-08.  ``compute_cross_asset_divergence_norm``
+retained as dead code in ``engineered_v3.py`` at zero revert cost; NOT dispatched
+from ``add_engineered_v3_features`` at iter-v3/028.
 """
 
 # iter-v3/007-008: reassign to top-N subset for EXPLORATION/CONFIRMATION run.
@@ -303,6 +318,11 @@ predictive signal among 4 EDA candidates × 3 symbols × 3 horizons.
 #              per Critic FINAL Rec of iter-v3/026 SHA `8839bbb` + user directive 2026-05-08.
 #              regime_momentum_signed_5d KEPT (iter-v3/025 PROMISING; mandated by
 #              `feedback_v3_engineered_features_proven.md`).
+# iter-v3/028: top-14 (cross_asset_divergence_norm DROPPED — revert 15 → 14; matches
+#              iter-v3/025 anchor exactly; MINI-VALIDATION of iter-v3/025 at --seeds 2;
+#              stacking FALSIFIED at iter-v3/027; per Critic FINAL `966f4c1` + user
+#              directive 2026-05-08. regime_momentum_signed_5d KEPT — MINI-VALIDATION
+#              target; mandated by `feedback_v3_engineered_features_proven.md`).
 # To restore full set: V3_FEATURE_COLUMNS = V3_FEATURE_COLUMNS_FULL
 V3_FEATURE_COLUMNS: tuple[str, ...] = V3_FEATURE_COLUMNS_TOP_N
 """Active feature columns fed to LightGBM / XGBoost.
@@ -363,6 +383,16 @@ iter-v3/027:     V3_FEATURE_COLUMNS_TOP_N (15 features; vol_adj_autocorr DROPPED
                  `feedback_v3_engineered_features_proven.md`).  Net column count UNCHANGED
                  at 15 (atomic swap: drop vol_adj_autocorr + add cross_asset_divergence_norm).
                  Per Critic FINAL Rec ``8839bbb`` of iter-v3/026 + user directive 2026-05-08.)
+iter-v3/028:     V3_FEATURE_COLUMNS_TOP_N (14 features; cross_asset_divergence_norm DROPPED —
+                 revert 15 → 14; matches iter-v3/025 anchor exactly.  MINI-VALIDATION of
+                 iter-v3/025 ALONE at --seeds 2 (SPECIAL EXPLORATION cadence #10/10).
+                 Stacking FALSIFIED at iter-v3/027 (IS Sharpe collapse -0.2817; OOS spike
+                 +1.6786; TRX 91.57% concentration regression; 3-iter monotonic IS degradation).
+                 ``compute_cross_asset_divergence_norm`` retained as dead code in
+                 ``engineered_v3.py`` at zero revert cost; NOT dispatched from
+                 ``add_engineered_v3_features``.  regime_momentum_signed_5d KEPT — MINI-
+                 VALIDATION target; mandated by `feedback_v3_engineered_features_proven.md`.
+                 Per Critic FINAL ``966f4c1`` of iter-v3/027 + user directive 2026-05-08.)
 """
 
 V3_NON_FEATURE_COLUMNS: tuple[str, ...] = ("natr_21_raw", "tbr_raw")

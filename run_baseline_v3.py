@@ -99,7 +99,7 @@ def _derive_ensemble_seeds(outer_seed: int, size: int = ENSEMBLE_SIZE) -> list[i
     return [int(s) for s in rng.integers(low=0, high=2**31 - 1, size=size)]
 
 
-ITERATION_LABEL = "v3-027"
+ITERATION_LABEL = "v3-028"
 REPORTS_DIR = Path("reports-v3")
 FEATURES_DIR = Path("data/features_v3")
 DATA_DIR = Path("data")
@@ -184,33 +184,33 @@ def _verify_data_freshness(symbols: tuple[str, ...], max_lag_hours: float = 16.0
 
 
 def _verify_feature_columns() -> None:
-    """Verifies V3_FEATURE_COLUMNS contents per current brief (iter-v3/027).
+    """Verifies V3_FEATURE_COLUMNS contents per current brief (iter-v3/028).
 
-    iter-v3/027: 15 columns — atomic swap:
-      DROP vol_adj_autocorr (iter-v3/026 stacking FALSIFIED at single-seed n_trials=35;
-        IS Sharpe collapse +0.0493 + OOS spike +1.4501; per
-        `feedback_v3_engineered_features_dont_stack.md`).
+    iter-v3/028: 14 columns — atomic drop:
+      DROP cross_asset_divergence_norm (iter-v3/027 stacking FALSIFIED at
+        single-seed n_trials=35; IS Sharpe collapse -0.2817; OOS spike +1.6786;
+        TRX 91.57% concentration regression; revert 15 → 14; matches iter-v3/025
+        anchor exactly). Per Critic FINAL `966f4c1` of iter-v3/027.
       KEEP regime_momentum_signed_5d (Category 2 composed feature, iter-v3/025;
-        MUST NOT be reverted — iter-v3/025 PROMISING per diary;
-        `feedback_v3_engineered_features_proven.md` mandate).
-      ADD cross_asset_divergence_norm (Category 2 composed feature:
-        (sym_ret_7d - btc_ret_14d) / (|vwap_dev_20| + 1e-6); third Category 2 axis;
-        per Critic FINAL Rec `8839bbb` of iter-v3/026 + user directive 2026-05-08).
-    Net count: 15 (UNCHANGED from iter-v3/026; one feature replaced atomically).
+        MUST NOT be reverted — MINI-VALIDATION target; mandated by
+        `feedback_v3_engineered_features_proven.md`).
+    Net count: 14 (matches iter-v3/025 anchor exactly).
     tbr_zscore_30 MUST NOT be present (dropped iter-v3/016).
     vwap_dev_50 MUST NOT be present (dropped iter-v3/008 per Critic SHA a544621).
     funding_rate_zscore_30 MUST NOT be present (per-symbol variant PERMANENTLY-CLOSED).
     btc_funding_rate_zscore_30 MUST NOT be present (cross-asset variant PERMANENTLY-CLOSED).
     vol_adj_autocorr MUST NOT be present (stacking FALSIFIED at iter-v3/026; DROPPED).
-    regime_momentum_signed_5d MUST be present (Category 2 composed feature, iter-v3/025).
-    cross_asset_divergence_norm MUST be present (Category 2 composed feature, iter-v3/027).
+    cross_asset_divergence_norm MUST NOT be present (stacking FALSIFIED at iter-v3/027;
+        DROPPED per iter-v3/028 brief §2.1).
+    regime_momentum_signed_5d MUST be present (Category 2 composed feature, iter-v3/025;
+        MINI-VALIDATION target; iter-v3/028 brief §2.1).
     """
     n = len(V3_FEATURE_COLUMNS)
-    if n != 15:
+    if n != 14:
         raise RuntimeError(
-            f"V3_FEATURE_COLUMNS has {n} columns — expected exactly 15. "
-            "iter-v3/027: atomic swap drop vol_adj_autocorr + add cross_asset_divergence_norm "
-            "(net count: 15; unchanged from iter-v3/026). "
+            f"V3_FEATURE_COLUMNS has {n} columns — expected exactly 14. "
+            "iter-v3/028: atomic drop cross_asset_divergence_norm (revert iter-v3/027 swap; "
+            "15 → 14; matches iter-v3/025 anchor exactly). "
             "Check features_v3/__init__.py V3_FEATURE_COLUMNS_TOP_N."
         )
     if "tbr_zscore_30" in V3_FEATURE_COLUMNS:
@@ -222,7 +222,7 @@ def _verify_feature_columns() -> None:
     if "funding_rate_zscore_30" in V3_FEATURE_COLUMNS:
         raise RuntimeError(
             "funding_rate_zscore_30 FOUND in V3_FEATURE_COLUMNS — must be ABSENT "
-            "per iter-v3/027 brief §8 (per-symbol funding family PERMANENTLY-CLOSED "
+            "per iter-v3/028 brief §8 (per-symbol funding family PERMANENTLY-CLOSED "
             "after Critic FINAL `c4574af` of iter-v3/023 Rec #1; INERT-CONFIRMED at "
             "n_trials=35). Remove it from V3_FEATURE_COLUMNS_TOP_N in "
             "features_v3/__init__.py."
@@ -230,7 +230,7 @@ def _verify_feature_columns() -> None:
     if "btc_funding_rate_zscore_30" in V3_FEATURE_COLUMNS:
         raise RuntimeError(
             "btc_funding_rate_zscore_30 FOUND in V3_FEATURE_COLUMNS — must be ABSENT "
-            "per iter-v3/026 brief §8 (BTC cross-asset funding family PERMANENTLY-CLOSED "
+            "per iter-v3/028 brief §8 (BTC cross-asset funding family PERMANENTLY-CLOSED "
             "after Critic FINAL `5a47f5d` of iter-v3/024; OOS Sharpe -0.82, rank 14/14 "
             "BCH+LDO portfolio cuts + 9/14 TRX). Remove it from V3_FEATURE_COLUMNS_TOP_N "
             "in features_v3/__init__.py."
@@ -243,22 +243,21 @@ def _verify_feature_columns() -> None:
             "`feedback_v3_engineered_features_dont_stack.md`). "
             "Remove it from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
         )
+    if "cross_asset_divergence_norm" in V3_FEATURE_COLUMNS:
+        raise RuntimeError(
+            "cross_asset_divergence_norm FOUND in V3_FEATURE_COLUMNS — must be ABSENT per "
+            "iter-v3/028 brief §2.1 (DROPPED; stacking FALSIFIED at iter-v3/027: "
+            "IS Sharpe collapse -0.2817 + OOS spike +1.6786; TRX 91.57% concentration "
+            "regression; revert 15 → 14; matches iter-v3/025 anchor exactly). "
+            "Remove it from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
+        )
     if "regime_momentum_signed_5d" not in V3_FEATURE_COLUMNS:
         raise RuntimeError(
             "regime_momentum_signed_5d MISSING from V3_FEATURE_COLUMNS — must be "
-            "PRESENT per iter-v3/027 brief §2.1 (KEEP; iter-v3/025 PROMISING; "
-            "Category 2 composed feature: ret_5d × sign(hurst_100 - 0.5); mandated "
-            "by `feedback_v3_engineered_features_proven.md`). "
+            "PRESENT per iter-v3/028 brief §2.1 (KEEP; MINI-VALIDATION target; "
+            "iter-v3/025 PROMISING; Category 2 composed feature: ret_5d × sign(hurst_100 - 0.5); "
+            "mandated by `feedback_v3_engineered_features_proven.md`). "
             "Do NOT revert. Add it to V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
-        )
-    if "cross_asset_divergence_norm" not in V3_FEATURE_COLUMNS:
-        raise RuntimeError(
-            "cross_asset_divergence_norm MISSING from V3_FEATURE_COLUMNS — must be "
-            "PRESENT per iter-v3/027 brief §2.1 (ADD; Category 2 composed feature: "
-            "(sym_ret_7d - btc_ret_14d) / (|vwap_dev_20| + 1e-6); third Category 2 "
-            "axis in v3 catalog; per Critic FINAL Rec `8839bbb` of iter-v3/026 + "
-            "user directive 2026-05-08). "
-            "Add it to V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
         )
     if "vwap_dev_50" in V3_FEATURE_COLUMNS:
         raise RuntimeError(

@@ -228,40 +228,37 @@ def compute_cross_asset_divergence_norm(df: pd.DataFrame) -> pd.DataFrame:
 def add_engineered_v3_features(df: pd.DataFrame) -> pd.DataFrame:
     """GROUP_REGISTRY entry point for all Category 2 (composed) v3 features.
 
-    iter-v3/027: vol_adj_autocorr DROPPED from dispatch (iter-v3/026 stacking
-    falsified per `feedback_v3_engineered_features_dont_stack.md`; IS Sharpe
-    collapse +0.0493 + OOS spike +1.4501 at single-seed n_trials=35).
-    cross_asset_divergence_norm ADDED — DIFFERENT engineered feature ALONE on top
-    of regime_momentum_signed_5d.  Function ``compute_vol_adj_autocorr`` is
-    RETAINED as dead code at zero revert cost for possible multi-seed CONFIRMATION
-    stacking experiments at iter-v3/029+.
+    iter-v3/028: cross_asset_divergence_norm DROPPED from dispatch (revert 15 → 14;
+    matches iter-v3/025 anchor exactly; MINI-VALIDATION of iter-v3/025 ALONE at
+    --seeds 2; stacking FALSIFIED at iter-v3/027 per
+    `feedback_v3_engineered_features_dont_stack.md`).  ``compute_cross_asset_divergence_norm``
+    is RETAINED as dead code at zero revert cost.  ``compute_vol_adj_autocorr``
+    likewise retained as dead code.  Per Critic FINAL ``966f4c1`` of iter-v3/027 +
+    user directive 2026-05-08.
+
+    iter-v3/027 (context): vol_adj_autocorr DROPPED (iter-v3/026 stacking falsified;
+    IS Sharpe collapse +0.0493 + OOS spike +1.4501 at single-seed n_trials=35).
+    cross_asset_divergence_norm ADDED then DROPPED here at iter-v3/028.
 
     Currently computes (dispatch order):
     - ``regime_momentum_signed_5d`` (iter-v3/025, KEPT): composed feature combining
       5-day momentum with Hurst regime classifier.  Depends on ``hurst_100``
       from ``regime`` group (upstream in GROUP_REGISTRY).
-    - ``cross_asset_divergence_norm`` (iter-v3/027, NEW): composed feature =
-      (sym_ret_7d - btc_ret_14d) / (|vwap_dev_20| + EPS).  Depends on ``btc_ret_14d``
-      from ``cross_btc`` group and ``vwap_dev_20`` from ``volume_micro`` group
-      (both upstream in GROUP_REGISTRY).
 
     Each new composed feature must be listed in the iteration's research brief Section
     2.2 and validated with an adversarial past-only test.
 
     Args:
         df: DataFrame that has already been processed by ``add_regime_v3_features``
-            (so ``hurst_100`` is available), ``add_cross_btc_v3_features`` (so
-            ``btc_ret_14d`` is available), and ``add_volume_micro_v3_features`` (so
-            ``vwap_dev_20`` is available).  All three are upstream in GROUP_REGISTRY.
+            (so ``hurst_100`` is available).  Upstream in GROUP_REGISTRY.
 
     Returns:
         Copy of ``df`` with all active engineered v3 features appended.
     """
-    df = compute_regime_momentum_signed_5d(df)  # iter-v3/025 (KEPT)
-    df = compute_cross_asset_divergence_norm(df)  # iter-v3/027 (NEW)
-    # compute_vol_adj_autocorr DROPPED at iter-v3/027 — function retained as
-    # dead code at zero revert cost; restored ONLY for multi-seed CONFIRMATION
-    # stacking experiments at iter-v3/029+.
+    df = compute_regime_momentum_signed_5d(df)  # iter-v3/025 (KEPT; mini-validation target)
+    # compute_cross_asset_divergence_norm DROPPED at iter-v3/028 — revert 15 → 14;
+    # stacking FALSIFIED at iter-v3/027; function retained as dead code at zero cost.
+    # compute_vol_adj_autocorr DROPPED at iter-v3/027 — function retained as dead code.
     return df
 
 
