@@ -102,20 +102,19 @@ def _derive_ensemble_seeds(outer_seed: int, size: int = ENSEMBLE_SIZE) -> list[i
     return [int(s) for s in rng.integers(low=0, high=2**31 - 1, size=size)]
 
 
-ITERATION_LABEL = "v3-030"
+ITERATION_LABEL = "v3-031"
 REPORTS_DIR = Path("reports-v3")
 FEATURES_DIR = Path("data/features_v3")
 DATA_DIR = Path("data")
 
-# v3 symbols — iter-v3/029: universe expansion 3→4, ADD ALGOUSDT.
-# Selection criterion: per-symbol feature-signature alignment (composite score 0.6517;
-# alignment_score 0.4642; btc_coupling_std 0.1072 rank-1; NATR_21=4.19% PASS).
-# Corrects iter-v3/021's raw-correlation mechanism (HBAR+AVAX CLOSED-SYMBOL-CYCLE).
-# REQUIRED_GAP updated 66→88 = (21+1)×4 per Section 3 sub-fix #2.
-# MKR dropped per iter-v3/013 brief §3.1 (feedback_mkr_threshold_compression.md FIRED).
+# v3 symbols — iter-v3/031: universe shrink 4→3, DROP LDOUSDT.
+# LDO was 9-of-9 OOS-negative across iter-v3/018–030 (MKR-threshold=5 exceeded at iter-v3/022).
+# iter-v3/030 Critic FINAL confirmed: LDO is STRUCTURAL mismatch, not overfit.
+# Drop follows iter-v3/013 PROMISING-MECHANICAL precedent
+# (feedback_mkr_threshold_compression.md FIRED; feedback_v3_promising_mechanical_subtype.md).
+# REQUIRED_GAP updated 88→66 = (21+1)×3 per Section 3 sub-fix #2.
 V3_MODELS: tuple[tuple[str, str], ...] = (
     ("A (BCHUSDT)", "BCHUSDT"),
-    ("C (LDOUSDT)", "LDOUSDT"),
     ("D (TRXUSDT)", "TRXUSDT"),
     ("F (ALGOUSDT)", "ALGOUSDT"),
 )
@@ -136,7 +135,7 @@ BTC_TREND_CONFIG = BtcTrendFilterConfig(
 # CPCV parameters (brief Section 0 + 3.5#2)
 CPCV_N_SPLITS = 10
 CPCV_N_TEST_SPLITS = 2
-# gap = REQUIRED_GAP = (timeout_candles+1)*n_symbols = (21+1)*4 = 88 (iter-v3/029)
+# gap = REQUIRED_GAP = (timeout_candles+1)*n_symbols = (21+1)*3 = 66 (iter-v3/031 DROP LDO)
 # DO NOT use min(REQUIRED_GAP, n_trades//20) — that is the iter-v3/001 bug.
 CPCV_EMBARGO = 27  # ~1% of 24-month T ≈ 2742 candles * 0.01
 
@@ -190,7 +189,7 @@ def _verify_data_freshness(symbols: tuple[str, ...], max_lag_hours: float = 16.0
 
 
 def _verify_feature_columns() -> None:
-    """Verifies V3_FEATURE_COLUMNS contents per current brief (iter-v3/030).
+    """Verifies V3_FEATURE_COLUMNS contents per current brief (iter-v3/031).
 
     iter-v3/028: 14 columns — atomic drop:
       DROP cross_asset_divergence_norm (iter-v3/027 stacking FALSIFIED at
@@ -198,9 +197,8 @@ def _verify_feature_columns() -> None:
         TRX 91.57% concentration regression; revert 15 → 14; matches iter-v3/025
         anchor exactly). Per Critic FINAL `966f4c1` of iter-v3/027.
       KEEP regime_momentum_signed_5d (Category 2 composed feature, iter-v3/025;
-        MUST NOT be reverted — MINI-VALIDATION target; mandated by
-        `feedback_v3_engineered_features_proven.md`).
-    Net count: 14 (matches iter-v3/025 anchor exactly).
+        MUST NOT be reverted — mandated by `feedback_v3_engineered_features_proven.md`).
+    Net count: 14 (unchanged at iter-v3/031).
     tbr_zscore_30 MUST NOT be present (dropped iter-v3/016).
     vwap_dev_50 MUST NOT be present (dropped iter-v3/008 per Critic SHA a544621).
     funding_rate_zscore_30 MUST NOT be present (per-symbol variant PERMANENTLY-CLOSED).
@@ -209,18 +207,13 @@ def _verify_feature_columns() -> None:
     cross_asset_divergence_norm MUST NOT be present (stacking FALSIFIED at iter-v3/027;
         DROPPED per iter-v3/028 brief §2.1).
     regime_momentum_signed_5d MUST be present (Category 2 composed feature, iter-v3/025;
-        MINI-VALIDATION target; iter-v3/028 brief §2.1).
+        mandated by `feedback_v3_engineered_features_proven.md`).
 
-    iter-v3/030: per-symbol feature subset architecture (NEW).
-      V3_FEATURES_PER_SYMBOL maps LDOUSDT → 7-feature tuple.
-      Every per-symbol subset MUST be a strict subset of V3_FEATURE_COLUMNS_TOP_N.
-      BCH+TRX+ALGO (not in V3_FEATURES_PER_SYMBOL) use V3_FEATURE_COLUMNS_TOP_N
-        (14 features) via the fallback in features_for_symbol().
+    iter-v3/031: V3_FEATURES_PER_SYMBOL cleared (LDOUSDT dropped from V3_MODELS).
+      Dict is empty — all active symbols (BCH+TRX+ALGO) fall back to
+      V3_FEATURE_COLUMNS_TOP_N (14 features) via features_for_symbol().
       regime_momentum_signed_5d MUST be present in V3_FEATURE_COLUMNS_TOP_N so
         that BCH+TRX+ALGO continue to use it (portfolio-level mandate honored).
-      LDO subset is permitted to OMIT regime_momentum_signed_5d (rank 13/14 at
-        iter-v3/028 multi-seed; per-symbol prescriptive override justified at
-        portfolio level per iter-v3/030 brief §2.2 and §0.5 rationale).
     """
     n = len(V3_FEATURE_COLUMNS)
     if n != 14:

@@ -405,25 +405,21 @@ V3_NON_FEATURE_COLUMNS: tuple[str, ...] = ("natr_21_raw", "tbr_raw")
 """
 
 V3_FEATURES_PER_SYMBOL: dict[str, tuple[str, ...]] = {
-    # iter-v3/030: LDO per-symbol 7-feature subset.
-    # Source: analysis/iteration_v3-030/ldo_feature_subset_analysis.py (SHA 36aaacd).
-    # Top-7 by iter-v3/028 multi-seed IS importance (canonical multi-seed BASELINE read-out).
-    # BCH+TRX+ALGO are NOT listed here — they fall back to V3_FEATURE_COLUMNS_TOP_N (14 features).
+    # iter-v3/031: LDOUSDT dropped from V3_MODELS (9-of-9 OOS-negative; PROMISING-MECHANICAL).
+    # The dict is intentionally empty — iter-v3/030 LDO entry removed.
+    # Architecture preserved: features_for_symbol() still works for any future per-symbol use.
+    # All active symbols (BCH+TRX+ALGO) fall back to V3_FEATURE_COLUMNS_TOP_N (14 features).
     # NEVER add a feature here that is absent from V3_FEATURE_COLUMNS_TOP_N.
-    "LDOUSDT": (
-        "ret_skew_200",
-        "ret_kurt_50",
-        "ret_kurt_200",
-        "vwap_dev_20",
-        "hurst_diff_100_50",
-        "btc_ret_14d",
-        "range_realized_vol_50",
-    ),
 }
 """Per-symbol feature subsets for v3 models (iter-v3/030+).
 
 Maps symbol → tuple of feature column names to pass to LightGbmStrategy.
 Symbols absent from this dict fall back to V3_FEATURE_COLUMNS_TOP_N (14 features).
+
+iter-v3/030: populated with LDO → 7-feature top-7 subset from iter-v3/028 multi-seed.
+iter-v3/031: CLEARED (LDOUSDT dropped from V3_MODELS; 9-of-9 OOS-negative;
+             PROMISING-MECHANICAL per iter-v3/013 precedent). Dict is empty.
+             Architecture preserved for future per-symbol use.
 
 Invariant (enforced by _verify_feature_columns in run_baseline_v3.py and by the
 adversarial test tests/features_v3/test_features_for_symbol.py):
@@ -436,9 +432,9 @@ def features_for_symbol(symbol: str) -> tuple[str, ...]:
     """Return per-symbol feature tuple, falling back to V3_FEATURE_COLUMNS_TOP_N.
 
     Introduced in iter-v3/030 to support per-symbol model heterogeneity.
-    LDO returns its 7-feature top-7 from iter-v3/028 multi-seed importance.
-    BCH, TRX, ALGO, and any other symbol not in V3_FEATURES_PER_SYMBOL get
-    the full 14-feature V3_FEATURE_COLUMNS_TOP_N.
+    iter-v3/031: V3_FEATURES_PER_SYMBOL is empty (LDO dropped from V3_MODELS).
+    All active symbols (BCH, TRX, ALGO) and any future symbol not in
+    V3_FEATURES_PER_SYMBOL return the full 14-feature V3_FEATURE_COLUMNS_TOP_N.
 
     Callers MUST pass ``feature_columns=list(features_for_symbol(symbol))``
     to LightGbmStrategy — never None, never empty, never the global default.

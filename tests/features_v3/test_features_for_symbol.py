@@ -1,29 +1,28 @@
-"""Adversarial tests for per-symbol feature-set dispatch — iter-v3/030.
+"""Adversarial tests for per-symbol feature-set dispatch — iter-v3/031.
 
 Tests the ``V3_FEATURES_PER_SYMBOL`` dict and the ``features_for_symbol()``
-helper introduced in iter-v3/030.  Three mandatory cases (from brief §3 sub-fix #5
-and §10 adversarial test specification):
+helper introduced in iter-v3/030.
+
+iter-v3/031 update: LDOUSDT dropped from V3_MODELS (9-of-9 OOS-negative;
+PROMISING-MECHANICAL per iter-v3/013 precedent). V3_FEATURES_PER_SYMBOL is
+now empty. Tests updated accordingly:
+
+- LDO now falls back to V3_FEATURE_COLUMNS_TOP_N (same as BCH/TRX/ALGO).
+- V3_FEATURES_PER_SYMBOL must be empty (no per-symbol overrides active).
+- Architecture preserved: fallback path works for all symbols.
+
+Three core mandatory cases (inherited from iter-v3/030 brief §3 sub-fix #5
+and §10 adversarial test specification, updated for iter-v3/031):
 
 1. ``test_features_for_symbol_subset_invariant`` — every per-symbol subset is a
-   strict subset of ``V3_FEATURE_COLUMNS_TOP_N``.  Catches LDO-subset drift where
-   a feature is added to ``V3_FEATURES_PER_SYMBOL['LDOUSDT']`` that was not first
-   added to ``V3_FEATURE_COLUMNS_TOP_N``.
+   strict subset of ``V3_FEATURE_COLUMNS_TOP_N``.  Trivially passes when dict is empty.
 
 2. ``test_features_for_symbol_fallback`` — symbols not in ``V3_FEATURES_PER_SYMBOL``
    fall back to exactly ``V3_FEATURE_COLUMNS_TOP_N`` (tuple identity check).  Covers
-   BCH, TRX, ALGO, and any unknown symbol.  Catches a dispatch-path bug where the
-   fallback path resolves to a different object (e.g., ``V3_FEATURE_COLUMNS_FULL``
-   or an empty tuple).
+   BCH, TRX, ALGO, LDO, and any unknown symbol.
 
-3. ``test_features_for_symbol_ldo`` — LDOUSDT returns the canonical iter-v3/028
-   multi-seed top-7 feature set.  Catches LDO-config drift where the subset is
-   silently updated without updating the brief.
-
-Additional safety cases:
-
-4. ``test_features_for_symbol_ldo_count`` — LDO tuple has exactly 7 elements.
-5. ``test_features_for_symbol_unknown_symbol`` — arbitrary unknown symbol falls
-   back to ``V3_FEATURE_COLUMNS_TOP_N`` (not None, not empty).
+3. ``test_v3_features_per_symbol_is_empty`` — V3_FEATURES_PER_SYMBOL must be empty
+   at iter-v3/031 (LDO entry cleared per brief §3 sub-fix #3).
 """
 
 from __future__ import annotations
@@ -38,7 +37,11 @@ from crypto_trade.features_v3 import (
 
 
 def test_features_for_symbol_subset_invariant() -> None:
-    """Every per-symbol subset must be a strict subset of V3_FEATURE_COLUMNS_TOP_N."""
+    """Every per-symbol subset must be a strict subset of V3_FEATURE_COLUMNS_TOP_N.
+
+    Trivially passes at iter-v3/031 when dict is empty. Preserved as a guard
+    for future per-symbol entries.
+    """
     full = set(V3_FEATURE_COLUMNS_TOP_N)
     for sym, subset in V3_FEATURES_PER_SYMBOL.items():
         extra = set(subset) - full
@@ -50,48 +53,46 @@ def test_features_for_symbol_subset_invariant() -> None:
 
 
 def test_features_for_symbol_fallback() -> None:
-    """Symbols not in V3_FEATURES_PER_SYMBOL fall back to V3_FEATURE_COLUMNS_TOP_N."""
-    assert features_for_symbol("BCHUSDT") == V3_FEATURE_COLUMNS_TOP_N, (
-        "BCHUSDT should fall back to V3_FEATURE_COLUMNS_TOP_N (14 features) — "
-        "not in V3_FEATURES_PER_SYMBOL."
-    )
-    assert features_for_symbol("TRXUSDT") == V3_FEATURE_COLUMNS_TOP_N, (
-        "TRXUSDT should fall back to V3_FEATURE_COLUMNS_TOP_N (14 features) — "
-        "not in V3_FEATURES_PER_SYMBOL."
-    )
-    assert features_for_symbol("ALGOUSDT") == V3_FEATURE_COLUMNS_TOP_N, (
-        "ALGOUSDT should fall back to V3_FEATURE_COLUMNS_TOP_N (14 features) — "
-        "not in V3_FEATURES_PER_SYMBOL."
+    """Symbols not in V3_FEATURES_PER_SYMBOL fall back to V3_FEATURE_COLUMNS_TOP_N.
+
+    iter-v3/031: ALL active symbols (BCH, TRX, ALGO) and dropped symbol (LDO) fall back.
+    """
+    for symbol in ["BCHUSDT", "TRXUSDT", "ALGOUSDT", "LDOUSDT"]:
+        result = features_for_symbol(symbol)
+        assert result == V3_FEATURE_COLUMNS_TOP_N, (
+            f"{symbol} should fall back to V3_FEATURE_COLUMNS_TOP_N (14 features) — "
+            f"V3_FEATURES_PER_SYMBOL is empty at iter-v3/031."
+        )
+
+
+def test_v3_features_per_symbol_is_empty() -> None:
+    """V3_FEATURES_PER_SYMBOL must be empty at iter-v3/031.
+
+    LDOUSDT entry cleared per iter-v3/031 brief §3 sub-fix #3 (LDO dropped from
+    V3_MODELS; 9-of-9 OOS-negative; PROMISING-MECHANICAL per iter-v3/013 precedent).
+    Architecture preserved: dict exists and helper function works.
+    """
+    assert len(V3_FEATURES_PER_SYMBOL) == 0, (
+        f"V3_FEATURES_PER_SYMBOL must be empty at iter-v3/031. "
+        f"Got: {dict(V3_FEATURES_PER_SYMBOL)}. "
+        f"LDOUSDT was cleared per iter-v3/031 brief §3 sub-fix #3."
     )
 
 
-def test_features_for_symbol_ldo() -> None:
-    """LDOUSDT returns the canonical iter-v3/028 multi-seed top-7 feature set."""
-    expected = {
-        "ret_skew_200",
-        "ret_kurt_50",
-        "ret_kurt_200",
-        "vwap_dev_20",
-        "hurst_diff_100_50",
-        "btc_ret_14d",
-        "range_realized_vol_50",
-    }
+def test_features_for_symbol_ldo_fallback() -> None:
+    """LDOUSDT falls back to V3_FEATURE_COLUMNS_TOP_N (14 features) at iter-v3/031.
+
+    iter-v3/030: LDO had a 7-feature per-symbol subset.
+    iter-v3/031: LDO dropped from V3_MODELS; V3_FEATURES_PER_SYMBOL cleared;
+                 LDO now falls back to V3_FEATURE_COLUMNS_TOP_N (14 features).
+    """
     result = features_for_symbol("LDOUSDT")
-    assert set(result) == expected, (
-        f"LDOUSDT feature set mismatch. "
-        f"Expected: {sorted(expected)}. "
-        f"Got: {sorted(result)}. "
-        f"Source: analysis/iteration_v3-030/ldo_feature_subset_analysis.py (SHA 36aaacd)."
+    assert result == V3_FEATURE_COLUMNS_TOP_N, (
+        f"LDOUSDT should fall back to V3_FEATURE_COLUMNS_TOP_N (14 features) at iter-v3/031. "
+        f"Got {len(result)} features. "
+        f"LDO was dropped from V3_MODELS; per-symbol entry cleared."
     )
-
-
-def test_features_for_symbol_ldo_count() -> None:
-    """LDOUSDT tuple has exactly 7 elements (iter-v3/030 brief §1 + §2.1)."""
-    result = features_for_symbol("LDOUSDT")
-    assert len(result) == 7, (
-        f"LDOUSDT feature count is {len(result)}, expected 7. "
-        f"iter-v3/030: top-7 by iter-v3/028 multi-seed IS importance."
-    )
+    assert len(result) == 14, f"LDOUSDT fallback must have exactly 14 features. Got {len(result)}."
 
 
 def test_features_for_symbol_unknown_symbol() -> None:
@@ -101,13 +102,6 @@ def test_features_for_symbol_unknown_symbol() -> None:
     assert len(result) > 0, "features_for_symbol must never return an empty tuple."
     assert result == V3_FEATURE_COLUMNS_TOP_N, (
         "Unknown symbol 'XYZUSDT' should fall back to V3_FEATURE_COLUMNS_TOP_N."
-    )
-
-
-def test_v3_features_per_symbol_has_ldo() -> None:
-    """V3_FEATURES_PER_SYMBOL must contain LDOUSDT (iter-v3/030 single entry)."""
-    assert "LDOUSDT" in V3_FEATURES_PER_SYMBOL, (
-        "V3_FEATURES_PER_SYMBOL must contain 'LDOUSDT'. iter-v3/030 brief §3 sub-fix #1."
     )
 
 
@@ -125,8 +119,6 @@ def test_fallback_symbols_include_regime_momentum(symbol: str) -> None:
     """BCH, TRX, ALGO must each include regime_momentum_signed_5d via fallback.
 
     Portfolio-level mandate from feedback_v3_engineered_features_proven.md.
-    LDO is the only symbol permitted to omit this feature (rank 13/14 at
-    iter-v3/028 multi-seed; per-symbol prescriptive override; iter-v3/030 brief §2.2).
     """
     result = features_for_symbol(symbol)
     assert "regime_momentum_signed_5d" in result, (
