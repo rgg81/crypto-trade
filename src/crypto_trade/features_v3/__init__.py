@@ -172,14 +172,12 @@ V3_FEATURE_COLUMNS_TOP_N: tuple[str, ...] = (
     # IC hard gate BYPASSED with carve-out (see phase5p5_gate.md §IC-Gate Carve-Out
     # + feedback_v3_engineered_feature_pivot.md).
     "regime_momentum_signed_5d",  # rank TBD — engineered_v3 (Category 2 composed feature)
-    # iter-v3/034: fracdiff_d05_close ADDED (14 → 15): LdP AFML Ch. 5 FFD at d=0.5;
-    # fixed-window fractional differentiation of log(close); memory-preserving stationary
-    # feature complementary to regime_momentum_signed_5d (sign-flip direction vs level of
-    # accumulated price memory).  Pure-numpy implementation in engineered_v3.py; weights
-    # truncated at |w_k| < 1e-4 (~120-150 bars).  Dispatched from add_engineered_v3_features
-    # after regime_momentum_signed_5d.  Category 2 carve-out: IC gate BYPASSED; binding gate
-    # is importance ≥ 30 on ≥ 2/4 symbols (BCH+LDO+TRX+ALGO).
-    "fracdiff_d05_close",  # rank TBD — engineered_v3 (Category 2; LdP AFML Ch. 5 FFD d=0.5)
+    # iter-v3/034: fracdiff_d05_close ADDED (14 → 15): LdP AFML Ch. 5 FFD at d=0.5.
+    # iter-v3/035: fracdiff_d05_close DROPPED from universal list (15 → 14 revert).
+    # Moved to V3_FEATURES_PER_SYMBOL["BCHUSDT"] only (BCH-only per-symbol targeting).
+    # iter-v3/034 showed BCH +37.98 OOS wpnl swing but TRX -20.11 / ALGO -8.24 / LDO -6.81
+    # regression — universal application creates per-symbol drag.  BCH-only targeting via
+    # V3_FEATURES_PER_SYMBOL preserves BCH lift while restoring TRX/ALGO/LDO anchor.
     # iter-v3/026: vol_adj_autocorr ADDED (14 → 15): composed feature =
     # ret_autocorr_lag1_50 / (range_realized_vol_50 + 1e-6). Second Category 2
     # axis: stacked NEGATIVE-SUSPICIOUS-OOS — IS Sharpe collapse to +0.0493 +
@@ -202,8 +200,10 @@ V3_FEATURE_COLUMNS_TOP_N: tuple[str, ...] = (
     # user directive 2026-05-08. compute_cross_asset_divergence_norm retained as
     # dead code in engineered_v3.py at zero revert cost.
 )
-"""Top-15 feature subset: iter-v3/034 add — fracdiff_d05_close added (14→15;
-LdP AFML Ch. 5 FFD at d=0.5; fixed-window fractional differentiation of log(close)).
+"""Top-14 feature subset: iter-v3/035 revert — fracdiff_d05_close removed from
+universal list (15→14; moved to V3_FEATURES_PER_SYMBOL["BCHUSDT"] for BCH-only
+per-symbol targeting).  iter-v3/034 add: fracdiff_d05_close added (14→15) then
+dropped here at iter-v3/035 (15→14).
 iter-v3/028 drop: cross_asset_divergence_norm removed (revert 15→14; matches
 iter-v3/025 anchor exactly). iter-v3/027 was: atomic swap vol_adj_autocorr dropped,
 cross_asset_divergence_norm added.
@@ -337,7 +337,15 @@ from ``add_engineered_v3_features`` at iter-v3/028.
 #              Fixed-window fractional differentiation of log(close); memory-preserving
 #              stationary feature complementary to regime_momentum_signed_5d.  V3_MODELS:
 #              DROP VETUSDT (5 → 4; EXPLORATION-NEGATIVE per Critic FINAL 93d2b85; alignment
-#              necessary but not sufficient for IS lift).  REQUIRED_GAP 110 → 88.)
+#              necessary but not sufficient for IS lift).  REQUIRED_GAP 110 → 88.
+#              RESULT: BCH +37.98 OOS wpnl swing; TRX -20.11 / ALGO -8.24 / LDO -6.81
+#              regressions.  Universal IS Sharpe -0.1636 (worst post-bootstrap).  BCH lift
+#              is real but universal application creates per-symbol drag.)
+# iter-v3/035: top-14 (fracdiff_d05_close DROPPED from universal list — per-symbol
+#              targeting via V3_FEATURES_PER_SYMBOL["BCHUSDT"] instead.  BCH receives
+#              15 features (14 universal + fracdiff_d05_close); TRX/ALGO/LDO receive
+#              14 features via fallback.  Net: universal list reverts to iter-v3/032/028
+#              anchor.  Atomic operation: revert universal + add BCH per-symbol entry.)
 # To restore full set: V3_FEATURE_COLUMNS = V3_FEATURE_COLUMNS_FULL
 V3_FEATURE_COLUMNS: tuple[str, ...] = V3_FEATURE_COLUMNS_TOP_N
 """Active feature columns fed to LightGBM / XGBoost.
@@ -416,7 +424,15 @@ iter-v3/034:     V3_FEATURE_COLUMNS_TOP_N (15 features; fracdiff_d05_close ADDED
                  regime_momentum_signed_5d in add_engineered_v3_features.  V3_MODELS:
                  VETUSDT DROPPED (5 → 4; EXPLORATION-NEGATIVE per Critic FINAL 93d2b85;
                  reverts to iter-v3/032 4-symbol anchor BCH+LDO+TRX+ALGO).
-                 REQUIRED_GAP 110 → 88 = (21+1)×4.  Atomic swap: DROP VET + ADD feature.)
+                 REQUIRED_GAP 110 → 88 = (21+1)×4.  Atomic swap: DROP VET + ADD feature.
+                 RESULT: BCH +37.98 OOS wpnl swing; TRX -20.11 / ALGO -8.24 / LDO -6.81
+                 regressions.  IS Sharpe -0.1636 (worst post-bootstrap; universal drag).)
+iter-v3/035:     V3_FEATURE_COLUMNS_TOP_N (14 features; fracdiff_d05_close DROPPED from
+                 universal list — per-symbol targeting via V3_FEATURES_PER_SYMBOL["BCHUSDT"].
+                 BCH receives 15 features (14 universal + fracdiff_d05_close via per-symbol
+                 dict); TRX/ALGO/LDO receive 14 features via fallback (same as iter-v3/032/028
+                 anchor).  Universal list reverts to iter-v3/028 anchor.  Atomic: revert
+                 universal list (15→14) + add BCH per-symbol entry.)
 """
 
 V3_NON_FEATURE_COLUMNS: tuple[str, ...] = ("natr_21_raw", "tbr_raw")
@@ -458,25 +474,37 @@ def atr_multipliers_for_symbol(symbol: str) -> tuple[float, float]:
 
 
 V3_FEATURES_PER_SYMBOL: dict[str, tuple[str, ...]] = {
-    # iter-v3/034: dict remains empty. All active symbols (BCH+LDO+TRX+ALGO) fall back
-    # to V3_FEATURE_COLUMNS_TOP_N (15 features including fracdiff_d05_close).
-    # NEVER add a feature here that is absent from V3_FEATURE_COLUMNS_TOP_N.
+    # iter-v3/035: BCH-only fracdiff targeting.
+    # BCH receives all 14 universal features PLUS fracdiff_d05_close (15 total).
+    # TRX/ALGO/LDO fall back to V3_FEATURE_COLUMNS_TOP_N (14 features, no fracdiff).
+    # Evidence: iter-v3/034 showed BCH +37.98 OOS wpnl swing from fracdiff but
+    # TRX -20.11 / ALGO -8.24 / LDO -6.81 regressions when applied universally.
+    # NOTE: BCHUSDT's tuple EXTENDS V3_FEATURE_COLUMNS_TOP_N by one feature;
+    # it is NOT a strict subset. The _verify_feature_columns check in run_baseline_v3.py
+    # enforces this explicitly (len==15 AND fracdiff_d05_close present).
+    "BCHUSDT": V3_FEATURE_COLUMNS_TOP_N + ("fracdiff_d05_close",),
 }
-"""Per-symbol feature subsets for v3 models (iter-v3/030+).
+"""Per-symbol feature overrides for v3 models (iter-v3/030+).
 
 Maps symbol → tuple of feature column names to pass to LightGbmStrategy.
-Symbols absent from this dict fall back to V3_FEATURE_COLUMNS_TOP_N (15 features
-as of iter-v3/034).
+Symbols absent from this dict fall back to V3_FEATURE_COLUMNS_TOP_N.
 
-iter-v3/030: populated with LDO → 7-feature top-7 subset from iter-v3/028 multi-seed.
-iter-v3/031: CLEARED (LDOUSDT dropped from V3_MODELS; 9-of-9 OOS-negative;
-             PROMISING-MECHANICAL per iter-v3/013 precedent). Dict is empty.
-             Architecture preserved for future per-symbol use.
+iter-v3/030: populated with LDO → 7-feature top-7 subset (REDUCTION of 14-feature universal).
+iter-v3/031: CLEARED (LDOUSDT dropped from V3_MODELS). Dict empty.
+iter-v3/034: Dict empty. All symbols fall back to 15-feature V3_FEATURE_COLUMNS_TOP_N.
+iter-v3/035: BCH entry ADDED as EXTENSION of universal list (14 + fracdiff_d05_close = 15).
+             TRX/ALGO/LDO: 14-feature fallback (no fracdiff_d05_close).
 
-Invariant (enforced by _verify_feature_columns in run_baseline_v3.py and by the
-adversarial test tests/features_v3/test_features_for_symbol.py):
-    every tuple in V3_FEATURES_PER_SYMBOL.values() is a strict subset of
-    V3_FEATURE_COLUMNS_TOP_N.
+IMPORTANT INVARIANT CHANGE (iter-v3/035 vs iter-v3/030):
+- iter-v3/030 invariant: per-symbol entries are STRICT SUBSETS of V3_FEATURE_COLUMNS_TOP_N.
+- iter-v3/035 invariant: BCHUSDT EXTENDS V3_FEATURE_COLUMNS_TOP_N by one column
+  (fracdiff_d05_close). The extension feature must exist in the generated parquet
+  (computed by add_engineered_v3_features for ALL symbols).
+
+Enforced by _verify_feature_columns in run_baseline_v3.py:
+    len(V3_FEATURES_PER_SYMBOL["BCHUSDT"]) == 15
+    "fracdiff_d05_close" in V3_FEATURES_PER_SYMBOL["BCHUSDT"]
+    "fracdiff_d05_close" not in V3_FEATURE_COLUMNS_TOP_N
 """
 
 
@@ -484,9 +512,11 @@ def features_for_symbol(symbol: str) -> tuple[str, ...]:
     """Return per-symbol feature tuple, falling back to V3_FEATURE_COLUMNS_TOP_N.
 
     Introduced in iter-v3/030 to support per-symbol model heterogeneity.
-    iter-v3/034: V3_FEATURES_PER_SYMBOL is empty (LDO+VET both absent from V3_MODELS).
-    All active symbols (BCH, LDO, TRX, ALGO) and any future symbol not in
-    V3_FEATURES_PER_SYMBOL return the full 15-feature V3_FEATURE_COLUMNS_TOP_N.
+
+    iter-v3/035:
+    - BCHUSDT: returns 15 features = V3_FEATURE_COLUMNS_TOP_N + ("fracdiff_d05_close",)
+    - LDOUSDT, TRXUSDT, ALGOUSDT: return 14 features = V3_FEATURE_COLUMNS_TOP_N (fallback)
+    - Any other symbol not in V3_FEATURES_PER_SYMBOL: fallback to 14-feature universal set
 
     Callers MUST pass ``feature_columns=list(features_for_symbol(symbol))``
     to LightGbmStrategy — never None, never empty, never the global default.
@@ -510,8 +540,10 @@ V3_EXCLUDED_SYMBOLS: tuple[str, ...] = (
     "XRPUSDT",
     "DOGEUSDT",
     "NEARUSDT",
+    # v3 dropped per iter-v3/013 universe-axis EXPLORATION
+    "MKRUSDT",
 )
-"""Symbols traded by v1 or v2. v3 runners MUST exclude these at startup."""
+"""Symbols traded by v1 or v2, plus v3-dropped symbols. v3 runners MUST exclude at startup."""
 
 
 def list_groups() -> list[str]:

@@ -1,31 +1,34 @@
-"""Adversarial tests for per-symbol feature-set dispatch — iter-v3/031/034.
+"""Adversarial tests for per-symbol feature-set dispatch — iter-v3/035.
 
 Tests the ``V3_FEATURES_PER_SYMBOL`` dict and the ``features_for_symbol()``
 helper introduced in iter-v3/030.
 
-iter-v3/031 update: LDOUSDT dropped from V3_MODELS (9-of-9 OOS-negative;
-PROMISING-MECHANICAL per iter-v3/013 precedent). V3_FEATURES_PER_SYMBOL is
-now empty. Tests updated accordingly:
+iter-v3/035 state:
+- BCHUSDT: per-symbol entry = V3_FEATURE_COLUMNS_TOP_N + ("fracdiff_d05_close",) = 15 features.
+- TRXUSDT, ALGOUSDT, LDOUSDT: fallback to V3_FEATURE_COLUMNS_TOP_N = 14 features (no fracdiff).
+- V3_FEATURES_PER_SYMBOL has exactly 1 entry (BCHUSDT).
+- fracdiff_d05_close is BCH-ONLY; must NOT appear in TRX/ALGO/LDO feature sets.
+- V3_FEATURE_COLUMNS_TOP_N has 14 features (fracdiff_d05_close removed from universal list).
 
-- LDO now falls back to V3_FEATURE_COLUMNS_TOP_N (same as BCH/TRX/ALGO).
-- V3_FEATURES_PER_SYMBOL must be empty (no per-symbol overrides active).
-- Architecture preserved: fallback path works for all symbols.
+Evidence from iter-v3/034 per-symbol OOS (BCH +37.98 wpnl swing from fracdiff;
+TRX -20.11 / ALGO -8.24 / LDO -6.81 regressions when fracdiff applied universally).
+Per-symbol targeting isolates BCH lift while restoring TRX/ALGO/LDO anchor.
 
-iter-v3/034 update: fracdiff_d05_close ADDED (14→15 features).
-V3_FEATURE_COLUMNS_TOP_N now has 15 entries. All count assertions updated.
-
-Three core mandatory cases (inherited from iter-v3/030 brief §3 sub-fix #5
-and §10 adversarial test specification, updated for iter-v3/031/034):
-
-1. ``test_features_for_symbol_subset_invariant`` — every per-symbol subset is a
-   strict subset of ``V3_FEATURE_COLUMNS_TOP_N``.  Trivially passes when dict is empty.
-
-2. ``test_features_for_symbol_fallback`` — symbols not in ``V3_FEATURES_PER_SYMBOL``
-   fall back to exactly ``V3_FEATURE_COLUMNS_TOP_N`` (tuple identity check).  Covers
-   BCH, TRX, ALGO, LDO, and any unknown symbol.
-
-3. ``test_v3_features_per_symbol_is_empty`` — V3_FEATURES_PER_SYMBOL must be empty
-   at iter-v3/031 (LDO entry cleared per brief §3 sub-fix #3).
+Mandatory test cases (iter-v3/035 brief Section 3 sub-fix #7):
+1. test_bch_has_fracdiff
+2. test_trx_no_fracdiff
+3. test_ldo_no_fracdiff
+4. test_algo_no_fracdiff
+5. test_bch_per_symbol_entry_has_fracdiff
+6. test_non_bch_fallback_no_fracdiff (parametrized TRX/ALGO/LDO)
+7. test_bch_per_symbol_len
+8. test_non_bch_fallback_len (parametrized TRX/ALGO/LDO)
+9. test_subset_invariant_extended
+10. test_v3_features_per_symbol_has_one_entry
+11. test_regime_momentum_in_universal_list
+12. test_fracdiff_not_in_universal_list
+13. test_universal_list_is_14
+14. test_features_for_symbol_unknown_fallback
 """
 
 from __future__ import annotations
@@ -39,99 +42,210 @@ from crypto_trade.features_v3 import (
 )
 
 
-def test_features_for_symbol_subset_invariant() -> None:
-    """Every per-symbol subset must be a strict subset of V3_FEATURE_COLUMNS_TOP_N.
+def test_bch_has_fracdiff() -> None:
+    """BCHUSDT must return 15 features including fracdiff_d05_close.
 
-    Trivially passes at iter-v3/031 when dict is empty. Preserved as a guard
-    for future per-symbol entries.
+    iter-v3/035: BCH per-symbol entry = V3_FEATURE_COLUMNS_TOP_N + ("fracdiff_d05_close",).
     """
-    full = set(V3_FEATURE_COLUMNS_TOP_N)
-    for sym, subset in V3_FEATURES_PER_SYMBOL.items():
-        extra = set(subset) - full
-        assert not extra, (
-            f"{sym}: features {sorted(extra)} are in V3_FEATURES_PER_SYMBOL['{sym}'] "
-            f"but NOT in V3_FEATURE_COLUMNS_TOP_N. "
-            f"Per-symbol subsets must be strict subsets of V3_FEATURE_COLUMNS_TOP_N."
-        )
-
-
-def test_features_for_symbol_fallback() -> None:
-    """Symbols not in V3_FEATURES_PER_SYMBOL fall back to V3_FEATURE_COLUMNS_TOP_N.
-
-    iter-v3/031: ALL active symbols (BCH, TRX, ALGO) and dropped symbol (LDO) fall back.
-    iter-v3/034: V3_FEATURE_COLUMNS_TOP_N now has 15 features (fracdiff_d05_close added).
-    """
-    for symbol in ["BCHUSDT", "TRXUSDT", "ALGOUSDT", "LDOUSDT"]:
-        result = features_for_symbol(symbol)
-        assert result == V3_FEATURE_COLUMNS_TOP_N, (
-            f"{symbol} should fall back to V3_FEATURE_COLUMNS_TOP_N (15 features) — "
-            f"V3_FEATURES_PER_SYMBOL is empty at iter-v3/031/034."
-        )
-
-
-def test_v3_features_per_symbol_is_empty() -> None:
-    """V3_FEATURES_PER_SYMBOL must be empty at iter-v3/031.
-
-    LDOUSDT entry cleared per iter-v3/031 brief §3 sub-fix #3 (LDO dropped from
-    V3_MODELS; 9-of-9 OOS-negative; PROMISING-MECHANICAL per iter-v3/013 precedent).
-    Architecture preserved: dict exists and helper function works.
-    """
-    assert len(V3_FEATURES_PER_SYMBOL) == 0, (
-        f"V3_FEATURES_PER_SYMBOL must be empty at iter-v3/031. "
-        f"Got: {dict(V3_FEATURES_PER_SYMBOL)}. "
-        f"LDOUSDT was cleared per iter-v3/031 brief §3 sub-fix #3."
+    result = features_for_symbol("BCHUSDT")
+    assert len(result) == 15, (
+        f"BCHUSDT: expected 15 features (BCH per-symbol entry), got {len(result)}. "
+        f"V3_FEATURES_PER_SYMBOL['BCHUSDT'] should be V3_FEATURE_COLUMNS_TOP_N + fracdiff."
+    )
+    assert "fracdiff_d05_close" in result, (
+        f"BCHUSDT: fracdiff_d05_close MISSING from feature set. "
+        f"BCH is the sole beneficiary of fracdiff (iter-v3/034 +37.98 OOS wpnl swing). "
+        f"Got: {result}"
     )
 
 
-def test_features_for_symbol_ldo_fallback() -> None:
-    """LDOUSDT falls back to V3_FEATURE_COLUMNS_TOP_N (15 features) at iter-v3/034.
+def test_trx_no_fracdiff() -> None:
+    """TRXUSDT must return 14 features WITHOUT fracdiff_d05_close.
 
-    iter-v3/030: LDO had a 7-feature per-symbol subset.
-    iter-v3/031: LDO dropped from V3_MODELS; V3_FEATURES_PER_SYMBOL cleared;
-                 LDO now falls back to V3_FEATURE_COLUMNS_TOP_N (14 features).
-    iter-v3/034: fracdiff_d05_close ADDED; V3_FEATURE_COLUMNS_TOP_N has 15 features.
+    iter-v3/034 showed TRX -20.11 OOS wpnl regression from universal fracdiff.
+    """
+    result = features_for_symbol("TRXUSDT")
+    assert len(result) == 14, (
+        f"TRXUSDT: expected 14 features (V3_FEATURE_COLUMNS_TOP_N fallback), got {len(result)}."
+    )
+    assert "fracdiff_d05_close" not in result, (
+        f"TRXUSDT: fracdiff_d05_close FOUND in feature set — must be ABSENT. "
+        f"fracdiff is BCH-only at iter-v3/035. Got: {result}"
+    )
+
+
+def test_ldo_no_fracdiff() -> None:
+    """LDOUSDT must return 14 features WITHOUT fracdiff_d05_close.
+
+    iter-v3/034 showed LDO -6.81 OOS wpnl regression from universal fracdiff.
     """
     result = features_for_symbol("LDOUSDT")
-    assert result == V3_FEATURE_COLUMNS_TOP_N, (
-        f"LDOUSDT should fall back to V3_FEATURE_COLUMNS_TOP_N (15 features) at iter-v3/034. "
-        f"Got {len(result)} features. "
-        f"LDO was dropped from V3_MODELS; per-symbol entry cleared."
+    assert len(result) == 14, (
+        f"LDOUSDT: expected 14 features (V3_FEATURE_COLUMNS_TOP_N fallback), got {len(result)}."
     )
-    assert len(result) == 15, f"LDOUSDT fallback must have exactly 15 features. Got {len(result)}."
+    assert "fracdiff_d05_close" not in result, (
+        f"LDOUSDT: fracdiff_d05_close FOUND in feature set — must be ABSENT. "
+        f"fracdiff is BCH-only at iter-v3/035. Got: {result}"
+    )
 
 
-def test_features_for_symbol_unknown_symbol() -> None:
-    """An unknown symbol falls back to V3_FEATURE_COLUMNS_TOP_N (never None, never empty)."""
+def test_algo_no_fracdiff() -> None:
+    """ALGOUSDT must return 14 features WITHOUT fracdiff_d05_close.
+
+    iter-v3/034 showed ALGO -8.24 OOS wpnl regression from universal fracdiff.
+    """
+    result = features_for_symbol("ALGOUSDT")
+    assert len(result) == 14, (
+        f"ALGOUSDT: expected 14 features (V3_FEATURE_COLUMNS_TOP_N fallback), got {len(result)}."
+    )
+    assert "fracdiff_d05_close" not in result, (
+        f"ALGOUSDT: fracdiff_d05_close FOUND in feature set — must be ABSENT. "
+        f"fracdiff is BCH-only at iter-v3/035. Got: {result}"
+    )
+
+
+def test_bch_per_symbol_entry_has_fracdiff() -> None:
+    """V3_FEATURES_PER_SYMBOL["BCHUSDT"] must contain fracdiff_d05_close.
+
+    The dict entry is the source; features_for_symbol("BCHUSDT") returns this entry.
+    """
+    assert "BCHUSDT" in V3_FEATURES_PER_SYMBOL, (
+        "V3_FEATURES_PER_SYMBOL missing 'BCHUSDT' key — "
+        "iter-v3/035: BCH must have a per-symbol entry. "
+        "Check features_v3/__init__.py V3_FEATURES_PER_SYMBOL."
+    )
+    bch_entry = V3_FEATURES_PER_SYMBOL["BCHUSDT"]
+    assert "fracdiff_d05_close" in bch_entry, (
+        f"V3_FEATURES_PER_SYMBOL['BCHUSDT']: fracdiff_d05_close MISSING. "
+        f"BCH entry must include fracdiff_d05_close. Got: {bch_entry}"
+    )
+
+
+@pytest.mark.parametrize("symbol", ["TRXUSDT", "ALGOUSDT", "LDOUSDT"])
+def test_non_bch_fallback_no_fracdiff(symbol: str) -> None:
+    """TRX/ALGO/LDO must NOT have fracdiff_d05_close (fallback path, no per-symbol entry).
+
+    All three fall back to V3_FEATURE_COLUMNS_TOP_N which does not contain fracdiff.
+    """
+    result = features_for_symbol(symbol)
+    assert "fracdiff_d05_close" not in result, (
+        f"{symbol}: fracdiff_d05_close FOUND in feature set — must be ABSENT. "
+        f"fracdiff is BCH-only at iter-v3/035 (BCH-only targeting via V3_FEATURES_PER_SYMBOL). "
+        f"Got: {result}"
+    )
+
+
+def test_bch_per_symbol_len() -> None:
+    """V3_FEATURES_PER_SYMBOL["BCHUSDT"] must have exactly 15 features.
+
+    15 = 14 universal (V3_FEATURE_COLUMNS_TOP_N) + fracdiff_d05_close.
+    """
+    assert "BCHUSDT" in V3_FEATURES_PER_SYMBOL, (
+        "V3_FEATURES_PER_SYMBOL missing 'BCHUSDT'. Check features_v3/__init__.py."
+    )
+    bch_entry = V3_FEATURES_PER_SYMBOL["BCHUSDT"]
+    assert len(bch_entry) == 15, (
+        f"V3_FEATURES_PER_SYMBOL['BCHUSDT']: expected 15 features, got {len(bch_entry)}. "
+        f"BCH entry = V3_FEATURE_COLUMNS_TOP_N (14) + fracdiff_d05_close (1) = 15."
+    )
+
+
+@pytest.mark.parametrize("symbol", ["TRXUSDT", "ALGOUSDT", "LDOUSDT"])
+def test_non_bch_fallback_len(symbol: str) -> None:
+    """TRX/ALGO/LDO fallback must return exactly 14 features.
+
+    iter-v3/035: V3_FEATURE_COLUMNS_TOP_N has 14 features (fracdiff removed from universal).
+    """
+    result = features_for_symbol(symbol)
+    assert len(result) == 14, (
+        f"{symbol}: expected 14 features (V3_FEATURE_COLUMNS_TOP_N universal fallback), "
+        f"got {len(result)}. V3_FEATURE_COLUMNS_TOP_N must have exactly 14 at iter-v3/035."
+    )
+
+
+def test_subset_invariant_extended() -> None:
+    """BCH entry must equal V3_FEATURE_COLUMNS_TOP_N + ("fracdiff_d05_close",).
+
+    iter-v3/035: BCH entry EXTENDS (not reduces) the universal list. The extension feature
+    (fracdiff_d05_close) is already computed in the parquet for all symbols by
+    add_engineered_v3_features; only the feature_columns= passed to LightGBM differs.
+    """
+    assert "BCHUSDT" in V3_FEATURES_PER_SYMBOL, (
+        "V3_FEATURES_PER_SYMBOL missing 'BCHUSDT'. Check features_v3/__init__.py."
+    )
+    bch_entry = V3_FEATURES_PER_SYMBOL["BCHUSDT"]
+    expected = V3_FEATURE_COLUMNS_TOP_N + ("fracdiff_d05_close",)
+    assert set(bch_entry) == set(expected), (
+        f"V3_FEATURES_PER_SYMBOL['BCHUSDT'] content mismatch. "
+        f"Expected V3_FEATURE_COLUMNS_TOP_N + ('fracdiff_d05_close',). "
+        f"Extra in BCH entry: {sorted(set(bch_entry) - set(expected))}. "
+        f"Missing from BCH entry: {sorted(set(expected) - set(bch_entry))}."
+    )
+
+
+def test_v3_features_per_symbol_has_one_entry() -> None:
+    """V3_FEATURES_PER_SYMBOL must have exactly 1 entry at iter-v3/035.
+
+    The sole entry is BCHUSDT. TRX/ALGO/LDO use the fallback path.
+    """
+    assert len(V3_FEATURES_PER_SYMBOL) == 1, (
+        f"V3_FEATURES_PER_SYMBOL must have exactly 1 entry at iter-v3/035 (BCHUSDT only). "
+        f"Got {len(V3_FEATURES_PER_SYMBOL)} entries: {dict(V3_FEATURES_PER_SYMBOL)}."
+    )
+    assert "BCHUSDT" in V3_FEATURES_PER_SYMBOL, (
+        f"V3_FEATURES_PER_SYMBOL has 1 entry but it is not BCHUSDT. "
+        f"Got: {list(V3_FEATURES_PER_SYMBOL.keys())}."
+    )
+
+
+def test_regime_momentum_in_universal_list() -> None:
+    """regime_momentum_signed_5d must be in V3_FEATURE_COLUMNS_TOP_N (portfolio mandate).
+
+    Portfolio-level mandate from feedback_v3_engineered_features_proven.md:
+    BCH+TRX+ALGO+LDO (fallback path) ALL use regime_momentum_signed_5d.
+    """
+    assert "regime_momentum_signed_5d" in V3_FEATURE_COLUMNS_TOP_N, (
+        "regime_momentum_signed_5d MISSING from V3_FEATURE_COLUMNS_TOP_N. "
+        "Portfolio-level mandate requires all symbols to use this feature via fallback. "
+        "feedback_v3_engineered_features_proven.md. Do NOT revert."
+    )
+
+
+def test_fracdiff_not_in_universal_list() -> None:
+    """fracdiff_d05_close must NOT be in V3_FEATURE_COLUMNS_TOP_N (universal list).
+
+    iter-v3/035: fracdiff_d05_close moved from universal list to BCH per-symbol only.
+    Universal list has 14 features. BCH per-symbol has 15 (14 + fracdiff).
+    """
+    assert "fracdiff_d05_close" not in V3_FEATURE_COLUMNS_TOP_N, (
+        "fracdiff_d05_close FOUND in V3_FEATURE_COLUMNS_TOP_N — must be ABSENT. "
+        "iter-v3/035: fracdiff_d05_close is in V3_FEATURES_PER_SYMBOL['BCHUSDT'] only. "
+        "Remove it from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
+    )
+
+
+def test_universal_list_is_14() -> None:
+    """V3_FEATURE_COLUMNS_TOP_N must have exactly 14 features at iter-v3/035.
+
+    iter-v3/034 had 15 (fracdiff added). iter-v3/035 reverts to 14 (fracdiff to BCH-only).
+    """
+    n = len(V3_FEATURE_COLUMNS_TOP_N)
+    assert n == 14, (
+        f"V3_FEATURE_COLUMNS_TOP_N has {n} features — expected exactly 14. "
+        f"iter-v3/035: fracdiff_d05_close moved to V3_FEATURES_PER_SYMBOL['BCHUSDT']; "
+        f"universal list reverts to 14 (iter-v3/028/032 anchor). "
+        f"Check features_v3/__init__.py V3_FEATURE_COLUMNS_TOP_N."
+    )
+
+
+def test_features_for_symbol_unknown_fallback() -> None:
+    """An unknown symbol falls back to V3_FEATURE_COLUMNS_TOP_N (14 features, no fracdiff)."""
     result = features_for_symbol("XYZUSDT")
     assert result is not None, "features_for_symbol must never return None."
     assert len(result) > 0, "features_for_symbol must never return an empty tuple."
     assert result == V3_FEATURE_COLUMNS_TOP_N, (
-        "Unknown symbol 'XYZUSDT' should fall back to V3_FEATURE_COLUMNS_TOP_N."
+        "Unknown symbol 'XYZUSDT' should fall back to V3_FEATURE_COLUMNS_TOP_N (14 features)."
     )
-
-
-@pytest.mark.parametrize("symbol", ["BCHUSDT", "TRXUSDT", "ALGOUSDT"])
-def test_fallback_symbols_have_15_features(symbol: str) -> None:
-    """BCH, TRX, ALGO must each receive the full 15-feature set via fallback.
-
-    iter-v3/034: fracdiff_d05_close ADDED (14→15). Count updated from 14.
-    """
-    result = features_for_symbol(symbol)
-    assert len(result) == 15, (
-        f"{symbol}: expected 15 features (V3_FEATURE_COLUMNS_TOP_N fallback, "
-        f"iter-v3/034 fracdiff_d05_close added), got {len(result)}."
-    )
-
-
-@pytest.mark.parametrize("symbol", ["BCHUSDT", "TRXUSDT", "ALGOUSDT"])
-def test_fallback_symbols_include_regime_momentum(symbol: str) -> None:
-    """BCH, TRX, ALGO must each include regime_momentum_signed_5d via fallback.
-
-    Portfolio-level mandate from feedback_v3_engineered_features_proven.md.
-    """
-    result = features_for_symbol(symbol)
-    assert "regime_momentum_signed_5d" in result, (
-        f"{symbol}: regime_momentum_signed_5d MISSING from feature set. "
-        f"Portfolio-level mandate requires BCH+TRX+ALGO to use this feature. "
-        f"feedback_v3_engineered_features_proven.md."
+    assert "fracdiff_d05_close" not in result, (
+        "Unknown symbol fallback must NOT include fracdiff_d05_close (BCH-only feature)."
     )
