@@ -476,28 +476,16 @@ def atr_multipliers_for_symbol(symbol: str) -> tuple[float, float]:
 V3_FEATURES_PER_SYMBOL: dict[str, tuple[str, ...]] = {
     # iter-v3/035: BCH-only fracdiff targeting.
     # BCH receives all 14 universal features PLUS fracdiff_d05_close (15 total).
-    # TRX/LDO fall back to V3_FEATURE_COLUMNS_TOP_N (14 features, no fracdiff).
+    # TRX/ALGO/LDO fall back to V3_FEATURE_COLUMNS_TOP_N (14 features, no fracdiff).
     # Evidence: iter-v3/034 showed BCH +37.98 OOS wpnl swing from fracdiff but
     # TRX -20.11 / ALGO -8.24 / LDO -6.81 regressions when applied universally.
     # NOTE: BCHUSDT's tuple EXTENDS V3_FEATURE_COLUMNS_TOP_N by one feature;
     # it is NOT a strict subset. The _verify_feature_columns check in run_baseline_v3.py
     # enforces this explicitly (len==15 AND fracdiff_d05_close present).
+    # iter-v3/038: ALGO entry ADDED (fracdiff_d05_close; tests fracdiff specificity).
+    # iter-v3/039: ALGO entry REMOVED (iter-v3/038 NEGATIVE — ALGO does NOT benefit from
+    # fracdiff; fracdiff is BCH-SPECIFIC; ALGO returns to 14-feature fallback).
     "BCHUSDT": V3_FEATURE_COLUMNS_TOP_N + ("fracdiff_d05_close",),
-    # iter-v3/038: ALGO-only fracdiff targeting (tests fracdiff SPECIFICITY).
-    # ALGO receives all 14 universal features PLUS fracdiff_d05_close (15 total).
-    # BCH unchanged (fracdiff_d05_close). LDO/TRX fall back to 14-feature universal.
-    # iter-v3/037 REVERTED: LDO cross_asset_divergence_norm entry REMOVED (NEGATIVE result:
-    # OOS swing ~-33 vs iter-v3/035 anchor — LDO-specific cross_asset_divergence_norm failed).
-    # LDO returns to 14-feature fallback identical to iter-v3/035.
-    # Evidence for ALGO: iter-v3/034 showed ALGO -8.24 OOS wpnl from UNIVERSAL fracdiff.
-    # Per-symbol isolation tests whether ALGO specifically benefits when fracdiff is applied
-    # ALONE (not simultaneously with TRX/LDO/BCH). ALGO at iter-v3/035: +20.87 OOS wpnl,
-    # 25 trades, 40.0% WR (second-weakest contributor with sub-50% WR — primary target).
-    # Scientific purpose: if ALGO benefits → fracdiff BROADLY USEFUL (BCH+ALGO);
-    # if ALGO null/negative → fracdiff BCH-SPECIFIC (5/5 per-symbol evidence).
-    # NOTE: ALGOUSDT's tuple EXTENDS V3_FEATURE_COLUMNS_TOP_N by one feature.
-    # BCH and ALGO per-symbol entries share the same extension feature (fracdiff_d05_close).
-    "ALGOUSDT": V3_FEATURE_COLUMNS_TOP_N + ("fracdiff_d05_close",),
 }
 """Per-symbol feature overrides for v3 models (iter-v3/030+).
 
@@ -521,19 +509,24 @@ iter-v3/038: LDO entry REMOVED (iter-v3/037 NEGATIVE reverted). ALGO entry ADDED
              of universal list (14 + fracdiff_d05_close = 15). BCH unchanged.
              LDO/TRX: 14-feature fallback. BCH and ALGO both get fracdiff_d05_close (15 features).
              Scientific purpose: tests fracdiff SPECIFICITY (BCH-specific vs broadly useful).
+             RESULT: NEGATIVE — ALGO does NOT benefit from fracdiff; BCH-SPECIFIC confirmed.
+iter-v3/039: ALGO entry REMOVED (iter-v3/038 NEGATIVE reverted). Dict has 1 entry (BCHUSDT only).
+             ALGO returns to 14-feature fallback. BCH unchanged (15 features: 14 + fracdiff).
+             LDO/TRX/ALGO: 14-feature fallback. BCH is the ONLY per-symbol fracdiff beneficiary.
+             This is the iter-v3/035 bundle state — CONFIRMATION of the 4-ingredient bundle.
 
 IMPORTANT INVARIANT (iter-v3/035+):
 - per-symbol entries EXTEND V3_FEATURE_COLUMNS_TOP_N by exactly one column.
 - Extension features must exist in the generated parquet (computed by
   add_engineered_v3_features for ALL symbols).
 
-Enforced by _verify_feature_columns in run_baseline_v3.py:
+Enforced by _verify_feature_columns in run_baseline_v3.py (iter-v3/039):
     len(V3_FEATURES_PER_SYMBOL["BCHUSDT"]) == 15
     "fracdiff_d05_close" in V3_FEATURES_PER_SYMBOL["BCHUSDT"]
-    len(V3_FEATURES_PER_SYMBOL["ALGOUSDT"]) == 15
-    "fracdiff_d05_close" in V3_FEATURES_PER_SYMBOL["ALGOUSDT"]
+    "ALGOUSDT" not in V3_FEATURES_PER_SYMBOL  (iter-v3/038 NEGATIVE reverted)
     "LDOUSDT" not in V3_FEATURES_PER_SYMBOL  (LDO reverted to 14-feature fallback)
     "TRXUSDT" not in V3_FEATURES_PER_SYMBOL  (TRX unchanged — no per-symbol entry)
+    len(V3_FEATURES_PER_SYMBOL) == 1         (BCHUSDT only)
     "fracdiff_d05_close" not in V3_FEATURE_COLUMNS_TOP_N
     "cross_asset_divergence_norm" not in V3_FEATURE_COLUMNS_TOP_N
     "vol_adj_autocorr" not in V3_FEATURE_COLUMNS_TOP_N
@@ -545,15 +538,21 @@ def features_for_symbol(symbol: str) -> tuple[str, ...]:
 
     Introduced in iter-v3/030 to support per-symbol model heterogeneity.
 
-    iter-v3/038:
+    iter-v3/039 (CONFIRMATION — iter-v3/035 bundle state restored):
     - BCHUSDT: returns 15 features = V3_FEATURE_COLUMNS_TOP_N + ("fracdiff_d05_close",)
-    - ALGOUSDT: returns 15 features = V3_FEATURE_COLUMNS_TOP_N + ("fracdiff_d05_close",)
-    - LDOUSDT, TRXUSDT: return 14 features = V3_FEATURE_COLUMNS_TOP_N (fallback)
+      (per-symbol entry established at iter-v3/035; UNCHANGED through iter-v3/039)
+    - ALGOUSDT: returns 14 features = V3_FEATURE_COLUMNS_TOP_N (fallback)
+      (ALGOUSDT per-symbol entry REVERTED from iter-v3/038 NEGATIVE — ALGO does NOT benefit
+      from fracdiff; fracdiff is BCH-SPECIFIC; ALGO returns to 14-feature fallback)
+    - LDOUSDT: returns 14 features = V3_FEATURE_COLUMNS_TOP_N (fallback)
       (LDOUSDT reverted from iter-v3/037 NEGATIVE — cross_asset_divergence_norm removed)
+    - TRXUSDT: returns 14 features = V3_FEATURE_COLUMNS_TOP_N (fallback; unchanged)
     - Any other symbol not in V3_FEATURES_PER_SYMBOL: fallback to 14-feature universal set
 
-    BCH and ALGO per-symbol extension feature: both have fracdiff_d05_close.
-    LDO and TRX use 14-feature universal fallback (no per-symbol extension).
+    V3_FEATURES_PER_SYMBOL has 1 entry at iter-v3/039 (BCHUSDT only).
+    BCH per-symbol extension feature: fracdiff_d05_close (BCH-SPECIFIC confirmed by
+    iter-v3/038 EXPLORATION — ALGO null/negative result).
+    ALGO/LDO/TRX use 14-feature universal fallback (no per-symbol extension).
 
     Callers MUST pass ``feature_columns=list(features_for_symbol(symbol))``
     to LightGbmStrategy — never None, never empty, never the global default.
