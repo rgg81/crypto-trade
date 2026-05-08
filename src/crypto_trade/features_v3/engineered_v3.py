@@ -80,29 +80,103 @@ def compute_regime_momentum_signed_5d(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+_VOL_ADJ_AUTOCORR_EPS: float = 1e-6
+_VOL_ADJ_AUTOCORR_CAP: float = 100.0
+
+
+def compute_vol_adj_autocorr(df: pd.DataFrame) -> pd.DataFrame:
+    """Composed feature: ret_autocorr_lag1_50 / (range_realized_vol_50 + EPS).
+
+    Encodes the textbook microstructure heuristic (Sinclair, *Volatility Trading*;
+    López de Prado, AFML Ch. 8): return persistence is a meaningful signal only
+    when normalized by realized volatility.  The same lag-1 autocorrelation has
+    different implications:
+
+    - Low-vol regime, high autocorr  → genuine momentum/persistence signal worth trading
+    - High-vol regime, high autocorr → noise-driven persistence; chasing it is a value trap
+
+    Construction:
+    - ``ret_autocorr_lag1_50``: 50-bar trailing rolling Pearson correlation of returns
+      and their lag-1 shift (computed by ``add_momentum_accel_v3_features``).
+    - ``range_realized_vol_50``: 50-bar trailing rolling realized vol from high/low
+      ranges (computed by ``add_tail_risk_v3_features``).
+    - ``vol_adj_autocorr = ret_autocorr_lag1_50 / (range_realized_vol_50 + EPS)``
+      where EPS = 1e-6 prevents division by zero.
+    - Output is clipped to [−100, +100] to prevent infinity from near-zero denominators.
+
+    Past-only by construction:
+    - ``ret_autocorr_lag1_50`` is computed past-only by ``add_momentum_accel_v3_features``
+      (50-bar trailing rolling correlation of returns and lag-1 returns).
+    - ``range_realized_vol_50`` is computed past-only by ``add_tail_risk_v3_features``
+      (50-bar trailing rolling realized vol from high/low ranges).
+    - Division is an element-wise past-only operation: value at row t uses only the
+      source primitive values at row t (which are themselves past-only).
+    - Both source primitives are upstream in GROUP_REGISTRY (tail_risk, momentum_accel
+      run before engineered_v3); appending future bars does NOT alter the value at t.
+
+    NaN warm-up: first ~49 bars are NaN (both source primitives require 50-bar windows;
+    rows 0..48 have insufficient history for the 50-bar rolling computations).
+
+    Args:
+        df: DataFrame with columns ``ret_autocorr_lag1_50`` and ``range_realized_vol_50``
+            (pre-computed by upstream feature groups).
+
+    Returns:
+        Copy of ``df`` with ``vol_adj_autocorr`` column appended.
+        If either source primitive is missing, the column is set to all-NaN without
+        error — the runner's ``_verify_feature_columns`` assertion catches the gap.
+    """
+    df = df.copy()
+    if "ret_autocorr_lag1_50" not in df.columns:
+        df["vol_adj_autocorr"] = np.nan
+        return df
+    if "range_realized_vol_50" not in df.columns:
+        df["vol_adj_autocorr"] = np.nan
+        return df
+
+    autocorr = df["ret_autocorr_lag1_50"].astype(float)
+    vol = df["range_realized_vol_50"].astype(float)
+    raw = autocorr / (vol + _VOL_ADJ_AUTOCORR_EPS)
+    # Cap at ±100 to prevent infinity from near-zero denominators (e.g., vol == 0
+    # on synthetic or thinly-traded data; EPS alone is insufficient when vol < EPS).
+    df["vol_adj_autocorr"] = raw.clip(lower=-_VOL_ADJ_AUTOCORR_CAP, upper=_VOL_ADJ_AUTOCORR_CAP)
+    return df
+
+
 def add_engineered_v3_features(df: pd.DataFrame) -> pd.DataFrame:
     """GROUP_REGISTRY entry point for all Category 2 (composed) v3 features.
 
     Currently computes:
     - ``regime_momentum_signed_5d`` (iter-v3/025): composed feature combining
       5-day momentum with Hurst regime classifier.
+    - ``vol_adj_autocorr`` (iter-v3/026): composed feature = lag-1 autocorrelation
+      per unit realized vol; disambiguates noise-driven from signal-driven persistence.
 
-    Future Category 2 features are added here in subsequent iterations.  Each
-    new composed feature must be listed in the iteration's research brief Section
+    Ordering: regime_momentum_signed_5d is computed FIRST (depends on ``hurst_100``
+    from ``regime`` group), then ``vol_adj_autocorr`` (depends on
+    ``ret_autocorr_lag1_50`` from ``momentum_accel`` and ``range_realized_vol_50``
+    from ``tail_risk`` — both upstream in GROUP_REGISTRY).
+
+    Each new composed feature must be listed in the iteration's research brief Section
     2.2 and validated with an adversarial past-only test.
 
     Args:
         df: DataFrame that has already been processed by ``add_regime_v3_features``
-            (so ``hurst_100`` is available).
+            (so ``hurst_100`` is available), ``add_tail_risk_v3_features`` (so
+            ``range_realized_vol_50`` is available), and
+            ``add_momentum_accel_v3_features`` (so ``ret_autocorr_lag1_50`` is
+            available).
 
     Returns:
         Copy of ``df`` with all engineered v3 features appended.
     """
-    df = compute_regime_momentum_signed_5d(df)
+    df = compute_regime_momentum_signed_5d(df)  # iter-v3/025
+    df = compute_vol_adj_autocorr(df)  # iter-v3/026
     return df
 
 
 __all__ = [
     "add_engineered_v3_features",
     "compute_regime_momentum_signed_5d",
+    "compute_vol_adj_autocorr",
 ]

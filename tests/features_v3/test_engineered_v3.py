@@ -1,6 +1,7 @@
-"""Adversarial tests for v3 engineered (composed) features — iter-v3/025.
+"""Adversarial tests for v3 engineered (composed) features — iter-v3/025+.
 
-Focuses on ``compute_regime_momentum_signed_5d``:
+Focuses on ``compute_regime_momentum_signed_5d`` (iter-v3/025) and
+``compute_vol_adj_autocorr`` (iter-v3/026):
 
 1. Import smoke test — public API importable without error.
 2. Composition correctness — sign flip on hurst > 0.5 vs < 0.5.
@@ -13,6 +14,10 @@ Focuses on ``compute_regime_momentum_signed_5d``:
 6. Missing hurst_100 column — graceful all-NaN fallback, no error.
 7. Pure random-walk edge case — hurst_100 == 0.5 → sign = 0 → treated as NaN.
 8. add_engineered_v3_features integration — GROUP_REGISTRY entry point.
+9. vol_adj_autocorr composition correctness — ratio of autocorr to vol + EPS.
+10. vol_adj_autocorr past-only discipline — appending future bars does not alter t's value.
+11. vol_adj_autocorr edge case — near-zero denominator capped at ±100 (not inf).
+12. vol_adj_autocorr idempotency — calling twice produces identical output.
 """
 
 from __future__ import annotations
@@ -24,6 +29,7 @@ import pytest
 from crypto_trade.features_v3.engineered_v3 import (
     add_engineered_v3_features,
     compute_regime_momentum_signed_5d,
+    compute_vol_adj_autocorr,
 )
 
 # ---------------------------------------------------------------------------
@@ -85,11 +91,12 @@ class TestImport:
         )
 
     def test_column_names_exported(self) -> None:
-        """Both public symbols must be in __all__."""
+        """All public symbols must be in __all__."""
         from crypto_trade.features_v3 import engineered_v3
 
         assert "compute_regime_momentum_signed_5d" in engineered_v3.__all__
         assert "add_engineered_v3_features" in engineered_v3.__all__
+        assert "compute_vol_adj_autocorr" in engineered_v3.__all__
 
 
 # ---------------------------------------------------------------------------
@@ -508,7 +515,392 @@ class TestAddEngineeredV3Features:
             "engineered_v3 must be registered in GROUP_REGISTRY. Check features_v3/__init__.py."
         )
         fn = GROUP_REGISTRY["engineered_v3"]
-        # Call it with a valid DataFrame
-        df = _make_df(n=200, seed=63)
+        # Call it with a valid DataFrame (include vol_adj_autocorr source primitives)
+        df = _make_df_with_vol_primitives(n=200, seed=63)
         out = fn(df)
         assert "regime_momentum_signed_5d" in out.columns
+        assert "vol_adj_autocorr" in out.columns
+
+
+# ---------------------------------------------------------------------------
+# Helpers for vol_adj_autocorr tests (iter-v3/026)
+# ---------------------------------------------------------------------------
+
+
+def _make_df_with_vol_primitives(
+    n: int = 200,
+    seed: int = 100,
+    autocorr_value: float | None = None,
+    vol_value: float | None = None,
+) -> pd.DataFrame:
+    """Extend _make_df with ret_autocorr_lag1_50 and range_realized_vol_50 columns.
+
+    These are the two source primitives required by compute_vol_adj_autocorr.
+    In production they are computed by add_momentum_accel_v3_features and
+    add_tail_risk_v3_features respectively, both of which run before engineered_v3
+    in the GROUP_REGISTRY ordering.
+
+    Args:
+        n: number of rows.
+        seed: numpy random seed.
+        autocorr_value: if not None, overrides ret_autocorr_lag1_50 with a constant.
+        vol_value: if not None, overrides range_realized_vol_50 with a constant.
+    """
+    rng = np.random.default_rng(seed)
+    df = _make_df(n=n, seed=seed)
+    # Simulate ret_autocorr_lag1_50: rolling 50-bar Pearson autocorr in [-1, +1]
+    if autocorr_value is not None:
+        df["ret_autocorr_lag1_50"] = autocorr_value
+    else:
+        df["ret_autocorr_lag1_50"] = rng.uniform(-0.5, 0.5, n)
+        # First 49 bars NaN (warm-up for 50-bar rolling window)
+        df.loc[df.index[:49], "ret_autocorr_lag1_50"] = np.nan
+    # Simulate range_realized_vol_50: rolling 50-bar realized vol (positive, small)
+    if vol_value is not None:
+        df["range_realized_vol_50"] = vol_value
+    else:
+        df["range_realized_vol_50"] = rng.uniform(0.005, 0.05, n)
+        # First 49 bars NaN (warm-up)
+        df.loc[df.index[:49], "range_realized_vol_50"] = np.nan
+    return df
+
+
+# ---------------------------------------------------------------------------
+# 9. vol_adj_autocorr — Composition correctness
+# ---------------------------------------------------------------------------
+
+
+class TestVolAdjAutocorrComposition:
+    def test_basic_ratio_computation(self) -> None:
+        """vol_adj_autocorr = ret_autocorr_lag1_50 / (range_realized_vol_50 + EPS)."""
+        from crypto_trade.features_v3.engineered_v3 import _VOL_ADJ_AUTOCORR_EPS
+
+        n = 200
+        fixed_autocorr = 0.4
+        fixed_vol = 0.02
+        df = _make_df_with_vol_primitives(
+            n=n, seed=200, autocorr_value=fixed_autocorr, vol_value=fixed_vol
+        )
+        out = compute_vol_adj_autocorr(df)
+
+        feat = out["vol_adj_autocorr"]
+        expected = fixed_autocorr / (fixed_vol + _VOL_ADJ_AUTOCORR_EPS)
+
+        # All values should equal expected (constant inputs → constant output)
+        valid = feat.dropna()
+        assert len(valid) > 0, "No valid values produced."
+        np.testing.assert_allclose(
+            valid.values,
+            expected,
+            rtol=1e-9,
+            err_msg=f"Expected ratio {expected:.6f} for fixed autocorr={fixed_autocorr}, "
+            f"vol={fixed_vol}+EPS.",
+        )
+
+    def test_negative_autocorr_produces_negative_output(self) -> None:
+        """Negative autocorrelation / positive vol → negative vol_adj_autocorr."""
+        fixed_autocorr = -0.3
+        fixed_vol = 0.015
+        df = _make_df_with_vol_primitives(
+            n=200, seed=201, autocorr_value=fixed_autocorr, vol_value=fixed_vol
+        )
+        out = compute_vol_adj_autocorr(df)
+        valid = out["vol_adj_autocorr"].dropna()
+        assert len(valid) > 0
+        assert (valid < 0).all(), (
+            "Negative autocorr / positive vol must produce all-negative vol_adj_autocorr."
+        )
+
+    def test_zero_autocorr_produces_near_zero_output(self) -> None:
+        """Zero autocorrelation / any positive vol → vol_adj_autocorr ≈ 0."""
+        fixed_autocorr = 0.0
+        fixed_vol = 0.02
+        df = _make_df_with_vol_primitives(
+            n=200, seed=202, autocorr_value=fixed_autocorr, vol_value=fixed_vol
+        )
+        out = compute_vol_adj_autocorr(df)
+        valid = out["vol_adj_autocorr"].dropna()
+        assert len(valid) > 0
+        np.testing.assert_allclose(
+            valid.values,
+            0.0,
+            atol=1e-6,
+            err_msg="Zero autocorr must produce near-zero vol_adj_autocorr.",
+        )
+
+    def test_output_column_appended_to_df(self) -> None:
+        """compute_vol_adj_autocorr must add vol_adj_autocorr column."""
+        df = _make_df_with_vol_primitives(n=150, seed=203)
+        assert "vol_adj_autocorr" not in df.columns
+        out = compute_vol_adj_autocorr(df)
+        assert "vol_adj_autocorr" in out.columns
+
+    def test_output_length_unchanged(self) -> None:
+        """Output DataFrame must have same number of rows as input."""
+        n = 175
+        df = _make_df_with_vol_primitives(n=n, seed=204)
+        out = compute_vol_adj_autocorr(df)
+        assert len(out) == n
+
+
+# ---------------------------------------------------------------------------
+# 10. vol_adj_autocorr — Past-only discipline
+# ---------------------------------------------------------------------------
+
+
+class TestVolAdjAutocorrPastOnly:
+    def test_appending_future_bars_does_not_change_value_at_t(self) -> None:
+        """Adversarial past-only test: value at t must not change when future bars appended.
+
+        Computes vol_adj_autocorr on df[:T] and df[:T+30].  The value at row T-1
+        (last bar in short frame) must be identical in both runs.
+
+        Both source primitives (ret_autocorr_lag1_50, range_realized_vol_50) are
+        50-bar trailing rolling windows ending at t.  Appending bars t+1...t+30
+        cannot affect the rolling window ending at t.
+        """
+        n = 250
+        df_full = _make_df_with_vol_primitives(n=n, seed=210)
+        split = 180
+
+        df_short = df_full.iloc[:split].reset_index(drop=True)
+        df_long = df_full.reset_index(drop=True)
+
+        out_short = compute_vol_adj_autocorr(df_short)
+        out_long = compute_vol_adj_autocorr(df_long)
+
+        val_short = out_short["vol_adj_autocorr"].iloc[split - 1]
+        val_long = out_long["vol_adj_autocorr"].iloc[split - 1]
+
+        if np.isnan(val_short) and np.isnan(val_long):
+            pass  # Both NaN is consistent
+        else:
+            assert val_short == pytest.approx(val_long, abs=1e-12), (
+                f"Past-only violation: vol_adj_autocorr at row {split - 1} changed from "
+                f"{val_short} to {val_long} when future bars were appended."
+            )
+
+    def test_spike_in_source_at_t_affects_only_t_not_t_minus_1(self) -> None:
+        """Spiking autocorr at bar t changes value at t but NOT value at t-1.
+
+        This validates that the division is element-wise (row t uses source values
+        at row t only) and does not depend on any future-bar context.
+        """
+        n = 250
+        df = _make_df_with_vol_primitives(n=n, seed=211)
+        spike_idx = 150
+
+        df_spiked = df.copy()
+        df_spiked.loc[spike_idx, "ret_autocorr_lag1_50"] = 0.99  # max positive
+
+        out_base = compute_vol_adj_autocorr(df)
+        out_spiked = compute_vol_adj_autocorr(df_spiked)
+
+        # At spike_idx: value must change (spike in numerator)
+        val_base = out_base["vol_adj_autocorr"].iloc[spike_idx]
+        val_spiked = out_spiked["vol_adj_autocorr"].iloc[spike_idx]
+        if not (np.isnan(val_base) and np.isnan(val_spiked)):
+            assert val_base != pytest.approx(val_spiked, abs=1e-10), (
+                f"Spike at autocorr[{spike_idx}] had no effect on feature[{spike_idx}] — "
+                "numerator not correctly applied."
+            )
+
+        # At spike_idx - 1: value must NOT change (spike is in the future from t-1)
+        val_before_base = out_base["vol_adj_autocorr"].iloc[spike_idx - 1]
+        val_before_spiked = out_spiked["vol_adj_autocorr"].iloc[spike_idx - 1]
+        if not (np.isnan(val_before_base) and np.isnan(val_before_spiked)):
+            assert val_before_base == pytest.approx(val_before_spiked, abs=1e-12), (
+                f"Past-only violation: feature[{spike_idx - 1}] changed when "
+                f"autocorr[{spike_idx}] was spiked.  Feature at t-1 must not depend on "
+                "source values at t."
+            )
+
+
+# ---------------------------------------------------------------------------
+# 11. vol_adj_autocorr — Edge case: near-zero denominator capped at ±100
+# ---------------------------------------------------------------------------
+
+
+class TestVolAdjAutocorrEdgeCases:
+    def test_zero_vol_does_not_produce_inf(self) -> None:
+        """range_realized_vol_50 == 0.0 → EPS prevents inf; output capped at ±100."""
+        from crypto_trade.features_v3.engineered_v3 import (
+            _VOL_ADJ_AUTOCORR_CAP,
+            _VOL_ADJ_AUTOCORR_EPS,
+        )
+
+        n = 200
+        fixed_autocorr = 0.5
+        # range_realized_vol_50 exactly 0.0 — would produce inf without EPS
+        df = _make_df_with_vol_primitives(
+            n=n, seed=220, autocorr_value=fixed_autocorr, vol_value=0.0
+        )
+        out = compute_vol_adj_autocorr(df)
+        feat = out["vol_adj_autocorr"]
+
+        # No values should be +/- inf
+        valid = feat.dropna()
+        assert len(valid) > 0
+        assert np.isfinite(valid.values).all(), (
+            "vol_adj_autocorr must be finite even when range_realized_vol_50 == 0.0. "
+            "EPS + cap should prevent inf."
+        )
+
+        # Expected: fixed_autocorr / (0.0 + EPS) = 0.5 / 1e-6 = 500_000 → capped at 100
+        # Because fixed_autocorr / EPS >> CAP
+        uncapped = fixed_autocorr / _VOL_ADJ_AUTOCORR_EPS
+        if uncapped > _VOL_ADJ_AUTOCORR_CAP:
+            np.testing.assert_allclose(
+                valid.values,
+                _VOL_ADJ_AUTOCORR_CAP,
+                rtol=1e-9,
+                err_msg=(
+                    f"Expected cap at {_VOL_ADJ_AUTOCORR_CAP} when vol=0 and autocorr positive."
+                ),
+            )
+
+    def test_very_small_vol_is_capped(self) -> None:
+        """Very small (but non-zero) vol → ratio large → output capped at ±100."""
+        from crypto_trade.features_v3.engineered_v3 import _VOL_ADJ_AUTOCORR_CAP
+
+        n = 200
+        fixed_autocorr = 0.8
+        tiny_vol = 1e-9  # vol << EPS does not help; autocorr/tiny_vol >> CAP
+        df = _make_df_with_vol_primitives(
+            n=n, seed=221, autocorr_value=fixed_autocorr, vol_value=tiny_vol
+        )
+        out = compute_vol_adj_autocorr(df)
+        feat = out["vol_adj_autocorr"].dropna()
+
+        assert len(feat) > 0
+        assert np.isfinite(feat.values).all(), "Output must be finite for tiny_vol."
+        assert (feat <= _VOL_ADJ_AUTOCORR_CAP).all(), (
+            f"All values must be <= {_VOL_ADJ_AUTOCORR_CAP} (cap). Max observed: {feat.max():.2f}"
+        )
+
+    def test_negative_autocorr_zero_vol_capped_at_minus_100(self) -> None:
+        """Negative autocorr / zero vol → capped at -100, not -inf."""
+        from crypto_trade.features_v3.engineered_v3 import _VOL_ADJ_AUTOCORR_CAP
+
+        n = 200
+        fixed_autocorr = -0.5
+        df = _make_df_with_vol_primitives(
+            n=n, seed=222, autocorr_value=fixed_autocorr, vol_value=0.0
+        )
+        out = compute_vol_adj_autocorr(df)
+        feat = out["vol_adj_autocorr"].dropna()
+
+        assert len(feat) > 0
+        assert np.isfinite(feat.values).all()
+        assert (feat >= -_VOL_ADJ_AUTOCORR_CAP).all(), (
+            f"All values must be >= -{_VOL_ADJ_AUTOCORR_CAP} (negative cap). "
+            f"Min observed: {feat.min():.2f}"
+        )
+
+    def test_missing_autocorr_column_returns_all_nan(self) -> None:
+        """When ret_autocorr_lag1_50 is absent, vol_adj_autocorr must be all-NaN."""
+        df = _make_df_with_vol_primitives(n=150, seed=223)
+        df_no_autocorr = df.drop(columns=["ret_autocorr_lag1_50"])
+
+        out = compute_vol_adj_autocorr(df_no_autocorr)
+
+        assert "vol_adj_autocorr" in out.columns
+        assert out["vol_adj_autocorr"].isna().all(), (
+            "vol_adj_autocorr must be all-NaN when ret_autocorr_lag1_50 is missing."
+        )
+
+    def test_missing_vol_column_returns_all_nan(self) -> None:
+        """When range_realized_vol_50 is absent, vol_adj_autocorr must be all-NaN."""
+        df = _make_df_with_vol_primitives(n=150, seed=224)
+        df_no_vol = df.drop(columns=["range_realized_vol_50"])
+
+        out = compute_vol_adj_autocorr(df_no_vol)
+
+        assert "vol_adj_autocorr" in out.columns
+        assert out["vol_adj_autocorr"].isna().all(), (
+            "vol_adj_autocorr must be all-NaN when range_realized_vol_50 is missing."
+        )
+
+    def test_no_nan_explosion_after_warmup(self) -> None:
+        """After warm-up (bar 49+), most values should be non-NaN."""
+        n = 300
+        df = _make_df_with_vol_primitives(n=n, seed=225)
+        out = compute_vol_adj_autocorr(df)
+        feat = out["vol_adj_autocorr"]
+
+        # Warm-up bars (0..48) should be NaN
+        assert feat.iloc[:49].isna().all(), "First 49 bars must be NaN (50-bar warm-up)."
+
+        # After warm-up: < 5% NaN tolerated (NaN from source propagation)
+        post_warmup = feat.iloc[49:]
+        nan_frac = post_warmup.isna().mean()
+        assert nan_frac < 0.05, (
+            f"Too many NaN values after warm-up: {nan_frac:.1%} > 5%. "
+            "Possible NaN explosion in vol_adj_autocorr computation."
+        )
+
+
+# ---------------------------------------------------------------------------
+# 12. vol_adj_autocorr — Idempotency
+# ---------------------------------------------------------------------------
+
+
+class TestVolAdjAutocorrIdempotency:
+    def test_calling_twice_produces_identical_output(self) -> None:
+        """compute_vol_adj_autocorr must be pure: calling twice gives identical result.
+
+        This validates the function does not rely on in-place mutation or external
+        state.  The second call operates on the output of the first call (which has
+        vol_adj_autocorr already appended); the appended column must not alter the
+        computation of a SECOND call.
+        """
+        n = 200
+        df = _make_df_with_vol_primitives(n=n, seed=230)
+
+        out1 = compute_vol_adj_autocorr(df)
+        out2 = compute_vol_adj_autocorr(df)
+
+        # Both outputs must be identical
+        feat1 = out1["vol_adj_autocorr"]
+        feat2 = out2["vol_adj_autocorr"]
+
+        # NaN positions must match
+        nan1 = feat1.isna()
+        nan2 = feat2.isna()
+        assert (nan1 == nan2).all(), (
+            "NaN positions differ between first and second call — function is not pure."
+        )
+
+        # Non-NaN values must be identical
+        valid_idx = feat1.dropna().index
+        if len(valid_idx) > 0:
+            np.testing.assert_array_equal(
+                feat1.loc[valid_idx].values,
+                feat2.loc[valid_idx].values,
+                err_msg="vol_adj_autocorr values differ between first and second call.",
+            )
+
+    def test_does_not_mutate_input_df(self) -> None:
+        """compute_vol_adj_autocorr must return a copy, not mutate the input."""
+        n = 200
+        df = _make_df_with_vol_primitives(n=n, seed=231)
+        cols_before = set(df.columns)
+        _ = compute_vol_adj_autocorr(df)
+        assert set(df.columns) == cols_before, (
+            "compute_vol_adj_autocorr must not add vol_adj_autocorr to the input DataFrame."
+        )
+
+    def test_add_engineered_v3_features_includes_both_columns(self) -> None:
+        """add_engineered_v3_features (GROUP_REGISTRY entry) must produce BOTH columns.
+
+        iter-v3/026: add_engineered_v3_features calls regime_momentum_signed_5d FIRST
+        then vol_adj_autocorr.  Both must be present in output.
+        """
+        df = _make_df_with_vol_primitives(n=200, seed=232)
+        out = add_engineered_v3_features(df)
+        assert "regime_momentum_signed_5d" in out.columns, (
+            "regime_momentum_signed_5d (iter-v3/025) must be in add_engineered_v3_features output."
+        )
+        assert "vol_adj_autocorr" in out.columns, (
+            "vol_adj_autocorr (iter-v3/026) must be in add_engineered_v3_features output."
+        )

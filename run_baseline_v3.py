@@ -99,7 +99,7 @@ def _derive_ensemble_seeds(outer_seed: int, size: int = ENSEMBLE_SIZE) -> list[i
     return [int(s) for s in rng.integers(low=0, high=2**31 - 1, size=size)]
 
 
-ITERATION_LABEL = "v3-025"
+ITERATION_LABEL = "v3-026"
 REPORTS_DIR = Path("reports-v3")
 FEATURES_DIR = Path("data/features_v3")
 DATA_DIR = Path("data")
@@ -184,28 +184,28 @@ def _verify_data_freshness(symbols: tuple[str, ...], max_lag_hours: float = 16.0
 
 
 def _verify_feature_columns() -> None:
-    """Verifies V3_FEATURE_COLUMNS contents per current brief (iter-v3/025).
+    """Verifies V3_FEATURE_COLUMNS contents per current brief (iter-v3/026).
 
-    iter-v3/025: 14 columns — atomic swap:
-      DROP btc_funding_rate_zscore_30 (BTC cross-asset funding family
-        PERMANENTLY-CLOSED per Critic FINAL ``5a47f5d`` of iter-v3/024;
-        OOS Sharpe -0.82, rank 14/14 BCH+LDO portfolio cuts + 9/14 TRX).
-      ADD regime_momentum_signed_5d (Category 2 composed feature: ret_5d ×
-        sign(hurst_100 - 0.5); per user directive 2026-05-08 + Critic ``5a47f5d``
-        Rec; first Category 2 axis in v3 catalog).
-    Net count: 14 (unchanged).
+    iter-v3/026: 15 columns — atomic add:
+      ADD vol_adj_autocorr (Category 2 composed feature: ret_autocorr_lag1_50 /
+        (range_realized_vol_50 + 1e-6); second Category 2 axis; per Critic FINAL
+        Rec ``402643d`` of iter-v3/025 + user directive 2026-05-08).
+      KEEP regime_momentum_signed_5d (Category 2 composed feature, iter-v3/025;
+        MUST NOT be reverted — iter-v3/025 PROMISING per diary).
+    Net count: 15 (+1 vs iter-v3/025).
     tbr_zscore_30 MUST NOT be present (dropped iter-v3/016).
     vwap_dev_50 MUST NOT be present (dropped iter-v3/008 per Critic SHA a544621).
     funding_rate_zscore_30 MUST NOT be present (per-symbol variant PERMANENTLY-CLOSED).
     btc_funding_rate_zscore_30 MUST NOT be present (cross-asset variant PERMANENTLY-CLOSED).
     regime_momentum_signed_5d MUST be present (Category 2 composed feature, iter-v3/025).
+    vol_adj_autocorr MUST be present (Category 2 composed feature, iter-v3/026).
     """
     n = len(V3_FEATURE_COLUMNS)
-    if n != 14:
+    if n != 15:
         raise RuntimeError(
-            f"V3_FEATURE_COLUMNS has {n} columns — expected exactly 14. "
-            "iter-v3/025: regime_momentum_signed_5d replaces btc_funding_rate_zscore_30 "
-            "(net count unchanged at 14). "
+            f"V3_FEATURE_COLUMNS has {n} columns — expected exactly 15. "
+            "iter-v3/026: vol_adj_autocorr added to the 14-feature iter-v3/025 stack "
+            "(net count: 15). "
             "Check features_v3/__init__.py V3_FEATURE_COLUMNS_TOP_N."
         )
     if "tbr_zscore_30" in V3_FEATURE_COLUMNS:
@@ -217,7 +217,7 @@ def _verify_feature_columns() -> None:
     if "funding_rate_zscore_30" in V3_FEATURE_COLUMNS:
         raise RuntimeError(
             "funding_rate_zscore_30 FOUND in V3_FEATURE_COLUMNS — must be ABSENT "
-            "per iter-v3/025 brief §3.3 (per-symbol funding family PERMANENTLY-CLOSED "
+            "per iter-v3/026 brief §8 (per-symbol funding family PERMANENTLY-CLOSED "
             "after Critic FINAL `c4574af` of iter-v3/023 Rec #1; INERT-CONFIRMED at "
             "n_trials=35). Remove it from V3_FEATURE_COLUMNS_TOP_N in "
             "features_v3/__init__.py."
@@ -225,7 +225,7 @@ def _verify_feature_columns() -> None:
     if "btc_funding_rate_zscore_30" in V3_FEATURE_COLUMNS:
         raise RuntimeError(
             "btc_funding_rate_zscore_30 FOUND in V3_FEATURE_COLUMNS — must be ABSENT "
-            "per iter-v3/025 brief §3.3 (BTC cross-asset funding family PERMANENTLY-CLOSED "
+            "per iter-v3/026 brief §8 (BTC cross-asset funding family PERMANENTLY-CLOSED "
             "after Critic FINAL `5a47f5d` of iter-v3/024; OOS Sharpe -0.82, rank 14/14 "
             "BCH+LDO portfolio cuts + 9/14 TRX). Remove it from V3_FEATURE_COLUMNS_TOP_N "
             "in features_v3/__init__.py."
@@ -233,9 +233,17 @@ def _verify_feature_columns() -> None:
     if "regime_momentum_signed_5d" not in V3_FEATURE_COLUMNS:
         raise RuntimeError(
             "regime_momentum_signed_5d MISSING from V3_FEATURE_COLUMNS — must be "
-            "PRESENT per iter-v3/025 brief §3.3 (Category 2 composed feature: ret_5d × "
-            "sign(hurst_100 - 0.5); first Category 2 axis in v3 catalog; per user "
-            "directive 2026-05-08 + Critic FINAL `5a47f5d` of iter-v3/024). "
+            "PRESENT per iter-v3/026 brief §2.1 (KEEP; iter-v3/025 PROMISING; "
+            "Category 2 composed feature: ret_5d × sign(hurst_100 - 0.5)). "
+            "Do NOT revert. Add it to V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
+        )
+    if "vol_adj_autocorr" not in V3_FEATURE_COLUMNS:
+        raise RuntimeError(
+            "vol_adj_autocorr MISSING from V3_FEATURE_COLUMNS — must be "
+            "PRESENT per iter-v3/026 brief §2.1 (ADD; Category 2 composed feature: "
+            "ret_autocorr_lag1_50 / (range_realized_vol_50 + 1e-6); second Category 2 "
+            "axis in v3 catalog; per Critic FINAL Rec `402643d` of iter-v3/025 + "
+            "user directive 2026-05-08). "
             "Add it to V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
         )
     if "vwap_dev_50" in V3_FEATURE_COLUMNS:
