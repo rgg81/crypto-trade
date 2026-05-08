@@ -404,6 +404,35 @@ V3_NON_FEATURE_COLUMNS: tuple[str, ...] = ("natr_21_raw", "tbr_raw")
                  model input regardless (added iter-v3/016, §3.5 sub-fix #2).
 """
 
+V3_ATR_MULTIPLIERS_PER_SYMBOL: dict[str, tuple[float, float]] = {
+    # iter-v3/032: LDO natr_21_raw median 5.01 vs peer median 3.70 (1.35× higher).
+    # At default (2.0, 1.0) multipliers LDO TP barrier = 10.01%, SL = 5.01% — too wide.
+    # (1.5, 0.75) aligns LDO effective barriers with peer aggregate (LDO/peer TP ratio 1.016).
+    # Source: analysis/iteration_v3-032/per_symbol_atr_eda.py (SHA 9834e84).
+    "LDOUSDT": (1.5, 0.75),
+}
+"""Per-symbol ATR multiplier overrides for iter-v3/032+ labeling architecture.
+
+Maps symbol → (atr_tp_multiplier, atr_sl_multiplier).
+Symbols absent from this dict fall back to DEFAULT_ATR_MULTIPLIERS = (2.0, 1.0).
+"""
+
+DEFAULT_ATR_MULTIPLIERS: tuple[float, float] = (2.0, 1.0)
+"""Default ATR multipliers for symbols not in V3_ATR_MULTIPLIERS_PER_SYMBOL."""
+
+
+def atr_multipliers_for_symbol(symbol: str) -> tuple[float, float]:
+    """Return per-symbol ATR multipliers, falling back to DEFAULT_ATR_MULTIPLIERS.
+
+    Introduced in iter-v3/032 to support per-symbol labeling-layer heterogeneity.
+    LDOUSDT returns (1.5, 0.75); all other symbols return (2.0, 1.0) via fallback.
+
+    Callers pass the returned tuple to LightGbmStrategy as
+    ``atr_tp_multiplier=tp, atr_sl_multiplier=sl``.
+    """
+    return V3_ATR_MULTIPLIERS_PER_SYMBOL.get(symbol, DEFAULT_ATR_MULTIPLIERS)
+
+
 V3_FEATURES_PER_SYMBOL: dict[str, tuple[str, ...]] = {
     # iter-v3/031: LDOUSDT dropped from V3_MODELS (9-of-9 OOS-negative; PROMISING-MECHANICAL).
     # The dict is intentionally empty — iter-v3/030 LDO entry removed.
@@ -542,7 +571,9 @@ def run_features_v3(
 
 
 __all__ = [
+    "DEFAULT_ATR_MULTIPLIERS",
     "GROUP_REGISTRY",
+    "V3_ATR_MULTIPLIERS_PER_SYMBOL",
     "V3_EXCLUDED_SYMBOLS",
     "V3_FEATURE_COLUMNS",
     "V3_FEATURE_COLUMNS_FULL",
@@ -552,6 +583,7 @@ __all__ = [
     "add_btc_funding_v3_features",
     "add_engineered_v3_features",
     "add_funding_v3_features",
+    "atr_multipliers_for_symbol",
     "features_for_symbol",
     "generate_features_v3",
     "list_groups",

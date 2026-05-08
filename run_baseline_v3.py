@@ -48,6 +48,7 @@ from crypto_trade.features_v3 import (
     V3_FEATURE_COLUMNS,
     V3_FEATURE_COLUMNS_TOP_N,
     V3_FEATURES_PER_SYMBOL,
+    atr_multipliers_for_symbol,
     features_for_symbol,
     process_symbol_v3,
 )
@@ -102,19 +103,21 @@ def _derive_ensemble_seeds(outer_seed: int, size: int = ENSEMBLE_SIZE) -> list[i
     return [int(s) for s in rng.integers(low=0, high=2**31 - 1, size=size)]
 
 
-ITERATION_LABEL = "v3-031"
+ITERATION_LABEL = "v3-032"
 REPORTS_DIR = Path("reports-v3")
 FEATURES_DIR = Path("data/features_v3")
 DATA_DIR = Path("data")
 
-# v3 symbols — iter-v3/031: universe shrink 4→3, DROP LDOUSDT.
-# LDO was 9-of-9 OOS-negative across iter-v3/018–030 (MKR-threshold=5 exceeded at iter-v3/022).
-# iter-v3/030 Critic FINAL confirmed: LDO is STRUCTURAL mismatch, not overfit.
-# Drop follows iter-v3/013 PROMISING-MECHANICAL precedent
-# (feedback_mkr_threshold_compression.md FIRED; feedback_v3_promising_mechanical_subtype.md).
-# REQUIRED_GAP updated 88→66 = (21+1)×3 per Section 3 sub-fix #2.
+# v3 symbols — iter-v3/032: RESTORE LDOUSDT (3→4; iter-v3/031 drop REVERSED).
+# Critic FINAL of iter-v3/031 (SHA 12ca079): LDO IS-positive (+40.03 weighted_pnl)
+# means the drop-MKR precedent did NOT transfer — LDO is IS-positive/OOS-marginal
+# (overfit signature), NOT a true drag like MKR (-23/-25). Drop-LDO killed IS
+# aggregate Sharpe (+0.79 → +0.28, Δ -0.51). Critic recommendation: RESTORE LDO
+# + per-symbol ATR multipliers (per-symbol-LABELING axis, Category 7 NEW).
+# REQUIRED_GAP restored 66→88 = (21+1)×4 per Section 3 sub-fix #2.
 V3_MODELS: tuple[tuple[str, str], ...] = (
     ("A (BCHUSDT)", "BCHUSDT"),
+    ("C (LDOUSDT)", "LDOUSDT"),
     ("D (TRXUSDT)", "TRXUSDT"),
     ("F (ALGOUSDT)", "ALGOUSDT"),
 )
@@ -135,7 +138,7 @@ BTC_TREND_CONFIG = BtcTrendFilterConfig(
 # CPCV parameters (brief Section 0 + 3.5#2)
 CPCV_N_SPLITS = 10
 CPCV_N_TEST_SPLITS = 2
-# gap = REQUIRED_GAP = (timeout_candles+1)*n_symbols = (21+1)*3 = 66 (iter-v3/031 DROP LDO)
+# gap = REQUIRED_GAP = (timeout_candles+1)*n_symbols = (21+1)*4 = 88 (iter-v3/032 RESTORE LDO)
 # DO NOT use min(REQUIRED_GAP, n_trades//20) — that is the iter-v3/001 bug.
 CPCV_EMBARGO = 27  # ~1% of 24-month T ≈ 2742 candles * 0.01
 
@@ -961,6 +964,9 @@ def _build_v3_model(
     # iter-v3/016: --model {lgbm,xgboost} routes to the appropriate strategy class.
     # iter-v3/017: --model metalabeling routes to MetaLabelingStrategy (M1+M2).
     # Constructor signatures are identical so we call with the same kwargs.
+    # iter-v3/032: per-symbol ATR multipliers via atr_multipliers_for_symbol().
+    # LDOUSDT returns (1.5, 0.75); BCH/TRX/ALGO fall back to (2.0, 1.0) via dict.
+    _atr_tp, _atr_sl = atr_multipliers_for_symbol(symbol)
     common_kwargs = dict(
         training_months=TRAINING_MONTHS,
         n_trials=n_trials,
@@ -971,8 +977,8 @@ def _build_v3_model(
         fee_pct=0.1,
         features_dir=str(FEATURES_DIR),
         verbose=1,
-        atr_tp_multiplier=2.0,
-        atr_sl_multiplier=1.0,
+        atr_tp_multiplier=_atr_tp,
+        atr_sl_multiplier=_atr_sl,
         atr_column="natr_21_raw",
         use_atr_labeling=True,
         ensemble_seeds=list(ensemble_seeds),

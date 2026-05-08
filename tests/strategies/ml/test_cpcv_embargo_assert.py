@@ -23,8 +23,8 @@ from crypto_trade.strategies.ml.validation_v3 import (
 
 # v3 documented constants
 TIMEOUT_CANDLES = 21  # 10080 min / 480 min = 21 candles at 8h
-N_SYMBOLS = 3  # BCH + LDO + TRX (MKR dropped at iter-v3/013 per feedback_mkr_threshold_compression.md FIRED)
-CORRECT_GAP = (TIMEOUT_CANDLES + 1) * N_SYMBOLS  # 66
+N_SYMBOLS = 4  # BCH + LDO + TRX + ALGO (iter-v3/032: LDO restored 3→4; iter-v3/031 3-sym was temporary)
+CORRECT_GAP = (TIMEOUT_CANDLES + 1) * N_SYMBOLS  # 88
 DEGRADED_GAP = 11  # what iter-v3/001 actually passed (bug)
 
 N_SAMPLES = 1000  # representative IS candle count
@@ -105,7 +105,7 @@ def test_required_gap_matches_formula() -> None:
         f"(timeout_candles+1)*n_symbols={formula_gap}. "
         "Update the REQUIRED_GAP constant or the formula."
     )
-    assert REQUIRED_GAP == 66, f"REQUIRED_GAP should be 66 for v3 (21+1)*3=66 (3-sym universe since iter-v3/013), got {REQUIRED_GAP}"
+    assert REQUIRED_GAP == 88, f"REQUIRED_GAP should be 88 for v3 (21+1)*4=88 (4-sym universe restored at iter-v3/032; iter-v3/031 3-sym was temporary), got {REQUIRED_GAP}"
 
 
 # ---------------------------------------------------------------------------
