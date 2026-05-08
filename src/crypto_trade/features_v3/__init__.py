@@ -174,16 +174,23 @@ V3_FEATURE_COLUMNS_TOP_N: tuple[str, ...] = (
     "regime_momentum_signed_5d",  # rank TBD — engineered_v3 (Category 2 composed feature)
     # iter-v3/026: vol_adj_autocorr ADDED (14 → 15): composed feature =
     # ret_autocorr_lag1_50 / (range_realized_vol_50 + 1e-6). Second Category 2
-    # axis: autocorrelation per unit vol — disambiguates noise-driven persistence
-    # (high autocorr, high vol) from signal-driven persistence (high autocorr,
-    # low vol). Structurally orthogonal to regime_momentum_signed_5d: max |IC|_rm
-    # 0.075 (BCH/TRX), 0.0014 (LDO). IC hard gate bypassed per Category 2
-    # carve-out (IC 0.985 vs source primitive ret_autocorr_lag1_50 is expected for
-    # a composed feature; see phase5p5_gate.md §IC-Gate Carve-Out).
-    # Per Critic FINAL Rec of iter-v3/025 (SHA `402643d`) + user directive 2026-05-08.
-    "vol_adj_autocorr",  # rank TBD — engineered_v3 (Category 2 composed feature)
+    # axis: stacked NEGATIVE-SUSPICIOUS-OOS — IS Sharpe collapse to +0.0493 +
+    # OOS spike to +1.4501 (27× IS/OOS ratio absurd; stacking-falsified at
+    # single-seed n_trials=35).
+    # iter-v3/027: vol_adj_autocorr DROPPED (15 → 14 transitional) per
+    # `feedback_v3_engineered_features_dont_stack.md`. cross_asset_divergence_norm
+    # ADDED (14 → 15): composed feature = (sym_ret_7d - btc_ret_14d) /
+    # (|vwap_dev_20| + 1e-6). Third Category 2 axis: alt-vs-BTC return divergence
+    # normalized by mean-reversion intensity — relative-strength signal. Source
+    # primitives NON-OVERLAPPING with regime_momentum's (sym_ret_7d/btc_ret_14d/
+    # vwap_dev_20 vs close-derived ret_5d/hurst_100). IC hard gate bypassed per
+    # Category 2 carve-out (IC 0.756 vs source primitive sym_vs_btc_ret_7d is
+    # expected for a composed feature; see phase5p5_gate.md §IC-Gate Carve-Out).
+    # Per Critic FINAL Rec of iter-v3/026 (SHA `8839bbb`) + user directive 2026-05-08.
+    "cross_asset_divergence_norm",  # rank TBD — engineered_v3 (Category 2 composed feature)
 )
-"""Top-15 feature subset: vol_adj_autocorr added at iter-v3/026.
+"""Top-15 feature subset: iter-v3/027 atomic swap — vol_adj_autocorr dropped,
+cross_asset_divergence_norm added.
 
 ``tbr_zscore_30`` DROPPED per iter-v3/016 brief §3.3 (Critic FINAL Rec 3 of
 iter-v3/015 mandated revert before XGBoost axis exploration).
@@ -240,21 +247,33 @@ Implemented via ``compute_regime_momentum_signed_5d`` in ``engineered_v3.py``;
 registered as ``engineered_v3`` entry in GROUP_REGISTRY (after ``cross_btc``,
 before ``fracdiff``; dependency on ``hurst_100`` from ``regime`` group satisfied).
 
-``vol_adj_autocorr`` ADDED at iter-v3/026 (Category 2 composed feature):
-ret_autocorr_lag1_50 / (range_realized_vol_50 + 1e-6).  Autocorrelation per
-unit realized vol: disambiguates noise-driven persistence (high autocorr, high vol)
-from signal-driven persistence (high autocorr, low vol) — a textbook microstructure
-normalization per Sinclair (Volatility Trading) + Lopez de Prado AFML Ch. 8.
-Output clipped to [−100, +100] to prevent infinity on near-zero denominator.
-Per Critic FINAL Rec of iter-v3/025 (SHA `402643d`) + user directive 2026-05-08.
-Max |IC| vs source primitive ret_autocorr_lag1_50: 0.985 — EXPECTED for a composed
-feature; IC gate bypassed per Category 2 carve-out.  Structurally orthogonal to
-regime_momentum_signed_5d: max |IC|_rm = 0.075 (BCH/TRX), 0.0014 (LDO).
-Implemented via ``compute_vol_adj_autocorr`` in ``engineered_v3.py``;
-dispatched from ``add_engineered_v3_features`` AFTER regime_momentum_signed_5d.
-Source primitives ``ret_autocorr_lag1_50`` (momentum_accel group) and
-``range_realized_vol_50`` (tail_risk group) are both upstream in GROUP_REGISTRY.
-Second Category 2 axis in v3 catalog.
+``vol_adj_autocorr`` ADDED at iter-v3/026 (Category 2 composed feature) then
+DROPPED at iter-v3/027: stacked NEGATIVE-SUSPICIOUS-OOS — IS Sharpe collapse to
++0.0493 (lowest IS in any post-bootstrap iteration) + OOS spike to +1.4501 (27×
+IS/OOS ratio structurally absurd; single-seed-lottery suspect). Stacking two
+engineered features at single-seed n_trials=35 expands Optuna search space beyond
+depth-3-5 LightGBM representational capacity. Per `feedback_v3_engineered_features_dont_stack.md`.
+Function ``compute_vol_adj_autocorr`` retained as dead code in ``engineered_v3.py``
+at zero revert cost; NOT dispatched from ``add_engineered_v3_features``.
+
+``cross_asset_divergence_norm`` ADDED at iter-v3/027 (Category 2 composed feature):
+(sym_ret_7d - btc_ret_14d) / (|vwap_dev_20| + 1e-6).  Alt-vs-BTC return divergence
+normalized by mean-reversion intensity: same alt-BTC divergence has different
+implications depending on local VWAP deviation (Robert Carver *Systematic Trading*
++ Ernest Chan *Quantitative Trading*).  Output clipped to [−100, +100] to prevent
+infinity on near-zero denominator.  Per Critic FINAL Rec of iter-v3/026 (SHA
+`8839bbb`) + user directive 2026-05-08 + `feedback_v3_engineered_features_dont_stack.md`.
+Max |IC| vs source primitive sym_vs_btc_ret_7d: 0.756 — EXPECTED for a composed
+feature; IC gate bypassed per Category 2 carve-out.  Max |IC|_rm vs
+regime_momentum_signed_5d: 0.464 (LDO worst) — informational only; reflects shared
+sym_vs_btc_ret_7d variance pathway, NOT regime_momentum mechanism overlap.
+Source primitives NON-OVERLAPPING with regime_momentum's (sym_ret_7d/btc_ret_14d/
+vwap_dev_20 vs close-derived ret_5d/hurst_100).  Implemented via
+``compute_cross_asset_divergence_norm`` in ``engineered_v3.py``; dispatched from
+``add_engineered_v3_features`` AFTER regime_momentum_signed_5d.  All 3 source
+primitives (close, btc_ret_14d, vwap_dev_20) upstream in GROUP_REGISTRY.
+Third Category 2 axis in v3 catalog.  IS rank-IC: max 0.109 (LDO h7) — STRONGEST
+predictive signal among 4 EDA candidates × 3 symbols × 3 horizons.
 """
 
 # iter-v3/007-008: reassign to top-N subset for EXPLORATION/CONFIRMATION run.
@@ -274,7 +293,16 @@ Second Category 2 axis in v3 catalog.
 #              sign(hurst_100 - 0.5); per user directive 2026-05-08 + Critic `5a47f5d` Rec).
 # iter-v3/026: top-15 (vol_adj_autocorr ADDED — Category 2 composed feature:
 #              ret_autocorr_lag1_50 / (range_realized_vol_50 + 1e-6); second Category 2 axis;
-#              per Critic FINAL Rec of iter-v3/025 SHA `402643d` + user directive 2026-05-08).
+#              per Critic FINAL Rec of iter-v3/025 SHA `402643d` + user directive 2026-05-08.
+#              NEGATIVE-SUSPICIOUS-OOS: IS Sharpe collapse +0.0493 + OOS spike +1.4501;
+#              27× IS/OOS ratio; stacking-falsified at single-seed n_trials=35).
+# iter-v3/027: top-15 (vol_adj_autocorr DROPPED — stacking FALSIFIED at single-seed per
+#              `feedback_v3_engineered_features_dont_stack.md`; cross_asset_divergence_norm
+#              ADDED (14 → 15; net unchanged at 15): Category 2 composed feature:
+#              (sym_ret_7d - btc_ret_14d) / (|vwap_dev_20| + 1e-6); third Category 2 axis;
+#              per Critic FINAL Rec of iter-v3/026 SHA `8839bbb` + user directive 2026-05-08.
+#              regime_momentum_signed_5d KEPT (iter-v3/025 PROMISING; mandated by
+#              `feedback_v3_engineered_features_proven.md`).
 # To restore full set: V3_FEATURE_COLUMNS = V3_FEATURE_COLUMNS_FULL
 V3_FEATURE_COLUMNS: tuple[str, ...] = V3_FEATURE_COLUMNS_TOP_N
 """Active feature columns fed to LightGBM / XGBoost.
@@ -321,7 +349,20 @@ iter-v3/026:     V3_FEATURE_COLUMNS_TOP_N (15 features; vol_adj_autocorr ADDED a
                  Category 2 carve-out (IC 0.985 vs source primitive expected for a composed
                  feature).  Structurally orthogonal to regime_momentum_signed_5d: max
                  |IC|_rm 0.075.  Per Critic FINAL Rec ``402643d`` of iter-v3/025 +
-                 user directive 2026-05-08.  Output clipped to [-100, +100].)
+                 user directive 2026-05-08.  Output clipped to [-100, +100].
+                 RESULT: NEGATIVE-SUSPICIOUS-OOS — IS Sharpe +0.0493 (collapse; lowest
+                 IS in post-bootstrap cycle) + OOS +1.4501 (27× IS/OOS ratio absurd).
+                 Stacking two engineered features at single-seed n_trials=35 FALSIFIED.)
+iter-v3/027:     V3_FEATURE_COLUMNS_TOP_N (15 features; vol_adj_autocorr DROPPED —
+                 stacking falsified per `feedback_v3_engineered_features_dont_stack.md`;
+                 cross_asset_divergence_norm ADDED as Category 2 composed feature:
+                 (sym_ret_7d - btc_ret_14d) / (|vwap_dev_20| + 1e-6).  Third Category 2
+                 axis in v3 catalog.  IC gate bypassed per Category 2 carve-out (IC 0.756
+                 vs source primitive sym_vs_btc_ret_7d expected for a composed feature).
+                 regime_momentum_signed_5d KEPT (iter-v3/025 PROMISING; mandated by
+                 `feedback_v3_engineered_features_proven.md`).  Net column count UNCHANGED
+                 at 15 (atomic swap: drop vol_adj_autocorr + add cross_asset_divergence_norm).
+                 Per Critic FINAL Rec ``8839bbb`` of iter-v3/026 + user directive 2026-05-08.)
 """
 
 V3_NON_FEATURE_COLUMNS: tuple[str, ...] = ("natr_21_raw", "tbr_raw")

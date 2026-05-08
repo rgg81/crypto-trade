@@ -1,7 +1,9 @@
 """Adversarial tests for v3 engineered (composed) features — iter-v3/025+.
 
-Focuses on ``compute_regime_momentum_signed_5d`` (iter-v3/025) and
-``compute_vol_adj_autocorr`` (iter-v3/026):
+Focuses on ``compute_regime_momentum_signed_5d`` (iter-v3/025),
+``compute_vol_adj_autocorr`` (iter-v3/026; dead code — retained for multi-seed
+CONFIRMATION stacking experiments at iter-v3/029+), and
+``compute_cross_asset_divergence_norm`` (iter-v3/027):
 
 1. Import smoke test — public API importable without error.
 2. Composition correctness — sign flip on hurst > 0.5 vs < 0.5.
@@ -18,6 +20,11 @@ Focuses on ``compute_regime_momentum_signed_5d`` (iter-v3/025) and
 10. vol_adj_autocorr past-only discipline — appending future bars does not alter t's value.
 11. vol_adj_autocorr edge case — near-zero denominator capped at ±100 (not inf).
 12. vol_adj_autocorr idempotency — calling twice produces identical output.
+13. cross_asset_divergence_norm past-only — appending future bars does not alter t's value.
+14. cross_asset_divergence_norm NaN warm-up — first 41 bars NaN (btc_ret_14d 42-bar
+    window dominates).
+15. cross_asset_divergence_norm EPS robustness — output is finite when vwap_dev_20 == 0.
+16. cross_asset_divergence_norm idempotency — calling twice produces identical output.
 """
 
 from __future__ import annotations
@@ -28,6 +35,7 @@ import pytest
 
 from crypto_trade.features_v3.engineered_v3 import (
     add_engineered_v3_features,
+    compute_cross_asset_divergence_norm,
     compute_regime_momentum_signed_5d,
     compute_vol_adj_autocorr,
 )
@@ -87,6 +95,7 @@ class TestImport:
         """Public API must be importable without error."""
         from crypto_trade.features_v3.engineered_v3 import (  # noqa: F401
             add_engineered_v3_features,
+            compute_cross_asset_divergence_norm,
             compute_regime_momentum_signed_5d,
         )
 
@@ -97,6 +106,7 @@ class TestImport:
         assert "compute_regime_momentum_signed_5d" in engineered_v3.__all__
         assert "add_engineered_v3_features" in engineered_v3.__all__
         assert "compute_vol_adj_autocorr" in engineered_v3.__all__
+        assert "compute_cross_asset_divergence_norm" in engineered_v3.__all__
 
 
 # ---------------------------------------------------------------------------
@@ -515,16 +525,55 @@ class TestAddEngineeredV3Features:
             "engineered_v3 must be registered in GROUP_REGISTRY. Check features_v3/__init__.py."
         )
         fn = GROUP_REGISTRY["engineered_v3"]
-        # Call it with a valid DataFrame (include vol_adj_autocorr source primitives)
-        df = _make_df_with_vol_primitives(n=200, seed=63)
+        # Call with a DataFrame that includes both engineered feature dependencies:
+        # btc_ret_14d + vwap_dev_20 (for cross_asset_divergence_norm, iter-v3/027)
+        # and ret_autocorr_lag1_50 + range_realized_vol_50 (for vol_adj_autocorr
+        # dead-code function; not dispatched but source primitives present is fine).
+        df = _make_df_with_all_primitives(n=200, seed=63)
         out = fn(df)
-        assert "regime_momentum_signed_5d" in out.columns
-        assert "vol_adj_autocorr" in out.columns
+        assert "regime_momentum_signed_5d" in out.columns, (
+            "regime_momentum_signed_5d (iter-v3/025; KEPT) must be in output."
+        )
+        assert "cross_asset_divergence_norm" in out.columns, (
+            "cross_asset_divergence_norm (iter-v3/027; NEW) must be in output."
+        )
+        # vol_adj_autocorr is dead code at iter-v3/027 — NOT dispatched.
+        assert "vol_adj_autocorr" not in out.columns, (
+            "vol_adj_autocorr (iter-v3/026; DROPPED) must NOT be in output. "
+            "It is retained as dead code but not dispatched from add_engineered_v3_features."
+        )
 
 
 # ---------------------------------------------------------------------------
-# Helpers for vol_adj_autocorr tests (iter-v3/026)
+# Helpers for vol_adj_autocorr tests (iter-v3/026) and cross_asset tests (iter-v3/027)
 # ---------------------------------------------------------------------------
+
+
+def _make_df_with_all_primitives(
+    n: int = 200,
+    seed: int = 100,
+) -> pd.DataFrame:
+    """Extend _make_df with all source primitives for both engineered features.
+
+    Provides:
+    - ``hurst_100`` (from _make_df): needed by compute_regime_momentum_signed_5d.
+    - ``ret_autocorr_lag1_50``, ``range_realized_vol_50``: vol_adj_autocorr dead-code deps.
+    - ``btc_ret_14d``: needed by compute_cross_asset_divergence_norm (cross_btc group).
+    - ``vwap_dev_20``: needed by compute_cross_asset_divergence_norm (volume_micro group).
+    """
+    rng = np.random.default_rng(seed)
+    df = _make_df(n=n, seed=seed)
+    # vol_adj_autocorr source primitives (dead code, but included for completeness)
+    df["ret_autocorr_lag1_50"] = rng.uniform(-0.5, 0.5, n)
+    df.loc[df.index[:49], "ret_autocorr_lag1_50"] = np.nan
+    df["range_realized_vol_50"] = rng.uniform(0.005, 0.05, n)
+    df.loc[df.index[:49], "range_realized_vol_50"] = np.nan
+    # cross_asset_divergence_norm source primitives
+    df["btc_ret_14d"] = rng.uniform(-0.10, 0.10, n)
+    df.loc[df.index[:41], "btc_ret_14d"] = np.nan  # 42-bar warm-up
+    df["vwap_dev_20"] = rng.uniform(-0.05, 0.05, n)
+    df.loc[df.index[:19], "vwap_dev_20"] = np.nan  # 20-bar warm-up
+    return df
 
 
 def _make_df_with_vol_primitives(
@@ -890,17 +939,208 @@ class TestVolAdjAutocorrIdempotency:
             "compute_vol_adj_autocorr must not add vol_adj_autocorr to the input DataFrame."
         )
 
-    def test_add_engineered_v3_features_includes_both_columns(self) -> None:
-        """add_engineered_v3_features (GROUP_REGISTRY entry) must produce BOTH columns.
+    def test_add_engineered_v3_features_produces_correct_columns(self) -> None:
+        """add_engineered_v3_features (GROUP_REGISTRY entry) must produce correct columns.
 
-        iter-v3/026: add_engineered_v3_features calls regime_momentum_signed_5d FIRST
-        then vol_adj_autocorr.  Both must be present in output.
+        iter-v3/027: add_engineered_v3_features calls regime_momentum_signed_5d FIRST
+        then cross_asset_divergence_norm.  Both must be present.
+        vol_adj_autocorr is dead code at iter-v3/027 — NOT dispatched; must be ABSENT.
         """
-        df = _make_df_with_vol_primitives(n=200, seed=232)
+        df = _make_df_with_all_primitives(n=200, seed=232)
         out = add_engineered_v3_features(df)
         assert "regime_momentum_signed_5d" in out.columns, (
-            "regime_momentum_signed_5d (iter-v3/025) must be in add_engineered_v3_features output."
+            "regime_momentum_signed_5d (iter-v3/025; KEPT) must be in output."
         )
-        assert "vol_adj_autocorr" in out.columns, (
-            "vol_adj_autocorr (iter-v3/026) must be in add_engineered_v3_features output."
+        assert "cross_asset_divergence_norm" in out.columns, (
+            "cross_asset_divergence_norm (iter-v3/027; NEW) must be in output."
+        )
+        assert "vol_adj_autocorr" not in out.columns, (
+            "vol_adj_autocorr (iter-v3/026; DROPPED dead code) must NOT be in output."
+        )
+
+
+# ---------------------------------------------------------------------------
+# 13. cross_asset_divergence_norm — Past-only discipline (iter-v3/027)
+# ---------------------------------------------------------------------------
+
+
+class TestCrossAssetDivergenceNormPastOnly:
+    def test_appending_future_bars_does_not_change_value_at_t(self) -> None:
+        """Adversarial past-only test: value at t must not change when future bars appended.
+
+        Computes cross_asset_divergence_norm on df[:T] and df[:T+30].  The value
+        at row T-1 (last bar in short frame) must be identical in both runs.
+
+        All source inputs (sym_ret_7d from close via shift(21), btc_ret_14d,
+        vwap_dev_20) are trailing rolling windows ending at t.  Appending bars
+        t+1...t+30 cannot affect any value at t.
+        """
+        n = 250
+        df_full = _make_df_with_all_primitives(n=n, seed=300)
+        split = 180
+
+        df_short = df_full.iloc[:split].reset_index(drop=True)
+        df_long = df_full.reset_index(drop=True)
+
+        out_short = compute_cross_asset_divergence_norm(df_short)
+        out_long = compute_cross_asset_divergence_norm(df_long)
+
+        val_short = out_short["cross_asset_divergence_norm"].iloc[split - 1]
+        val_long = out_long["cross_asset_divergence_norm"].iloc[split - 1]
+
+        if np.isnan(val_short) and np.isnan(val_long):
+            pass  # Both NaN is consistent (warm-up period)
+        else:
+            assert val_short == pytest.approx(val_long, abs=1e-12), (
+                f"Past-only violation: cross_asset_divergence_norm at row {split - 1} "
+                f"changed from {val_short} to {val_long} when future bars were appended."
+            )
+
+
+# ---------------------------------------------------------------------------
+# 14. cross_asset_divergence_norm — NaN warm-up (iter-v3/027)
+# ---------------------------------------------------------------------------
+
+
+class TestCrossAssetDivergenceNormNaNWarmUp:
+    def test_first_41_bars_nan_dominated_by_btc_ret_14d(self) -> None:
+        """First 41 bars must be NaN because btc_ret_14d requires a 42-bar window.
+
+        btc_ret_14d warm-up (42 bars; rows 0..41 NaN in production) dominates over
+        sym_ret_7d warm-up (21 bars; rows 0..20 NaN).  After bar 41 (index 41),
+        both are valid so cross_asset_divergence_norm can be computed.
+
+        Note: in this test, btc_ret_14d is provided with NaN at rows 0..41 to
+        simulate the upstream warm-up.
+        """
+        n = 300
+        df = _make_df_with_all_primitives(n=n, seed=310)
+        # Ensure btc_ret_14d warm-up is realistic: first 41 NaN
+        df.loc[df.index[:41], "btc_ret_14d"] = np.nan
+        # Ensure vwap_dev_20 warm-up: first 19 NaN (already set; shorter than btc)
+        df.loc[df.index[:19], "vwap_dev_20"] = np.nan
+
+        out = compute_cross_asset_divergence_norm(df)
+        feat = out["cross_asset_divergence_norm"]
+
+        # Rows 0..40 must be NaN (btc_ret_14d not yet valid)
+        assert feat.iloc[:41].isna().all(), (
+            f"Expected first 41 bars to be NaN (btc_ret_14d 42-bar warm-up). "
+            f"First non-NaN index: {feat.first_valid_index()}"
+        )
+        # After bar 41, values should be computable when close + btc_ret_14d + vwap_dev_20 valid
+        assert feat.iloc[42:].notna().any(), (
+            "Expected at least some valid values after bar 42 (all warm-ups complete)."
+        )
+
+
+# ---------------------------------------------------------------------------
+# 15. cross_asset_divergence_norm — EPS robustness (iter-v3/027)
+# ---------------------------------------------------------------------------
+
+
+class TestCrossAssetDivergenceNormEPS:
+    def test_zero_vwap_dev_does_not_produce_inf(self) -> None:
+        """vwap_dev_20 == 0.0 → EPS = 1e-6 prevents division-by-zero; output finite.
+
+        Per brief Section 2.5 test 3: cross_asset_divergence_norm is finite (not inf)
+        when vwap_dev_20 is exactly zero.  EPS=1e-6 prevents division-by-zero;
+        output clipped to [-100, +100].
+        """
+        from crypto_trade.features_v3.engineered_v3 import _CROSS_ASSET_DIVERGENCE_CAP
+
+        n = 200
+        df = _make_df_with_all_primitives(n=n, seed=320)
+        # Set all vwap_dev_20 to exactly 0 (worst-case denominator)
+        df["vwap_dev_20"] = 0.0
+        # Set btc_ret_14d to a moderate value so numerator is non-zero
+        df["btc_ret_14d"] = 0.05
+
+        out = compute_cross_asset_divergence_norm(df)
+        feat = out["cross_asset_divergence_norm"]
+
+        # All values must be finite (not inf or nan from division)
+        valid = feat.dropna()
+        assert len(valid) > 0, "Expected at least some valid values after warm-up."
+        assert np.isfinite(valid.values).all(), (
+            "cross_asset_divergence_norm must be finite even when vwap_dev_20 == 0.0. "
+            "EPS + cap should prevent inf."
+        )
+        # Values must be within [-CAP, +CAP]
+        assert (valid.abs() <= _CROSS_ASSET_DIVERGENCE_CAP + 1e-10).all(), (
+            f"All values must be within ±{_CROSS_ASSET_DIVERGENCE_CAP} (cap). "
+            f"Max observed: {valid.abs().max():.4f}"
+        )
+
+
+# ---------------------------------------------------------------------------
+# 16. cross_asset_divergence_norm — Idempotency (iter-v3/027)
+# ---------------------------------------------------------------------------
+
+
+class TestCrossAssetDivergenceNormIdempotency:
+    def test_calling_twice_produces_identical_output(self) -> None:
+        """compute_cross_asset_divergence_norm must be pure: calling twice gives identical result.
+
+        Per brief Section 2.5 test 4: idempotency test — calling the function twice
+        in succession produces identical output (function is pure; no in-place mutation).
+        """
+        n = 200
+        df = _make_df_with_all_primitives(n=n, seed=330)
+
+        out1 = compute_cross_asset_divergence_norm(df)
+        out2 = compute_cross_asset_divergence_norm(df)
+
+        feat1 = out1["cross_asset_divergence_norm"]
+        feat2 = out2["cross_asset_divergence_norm"]
+
+        # NaN positions must match
+        nan1 = feat1.isna()
+        nan2 = feat2.isna()
+        assert (nan1 == nan2).all(), (
+            "NaN positions differ between first and second call — function is not pure."
+        )
+
+        # Non-NaN values must be identical
+        valid_idx = feat1.dropna().index
+        if len(valid_idx) > 0:
+            np.testing.assert_array_equal(
+                feat1.loc[valid_idx].values,
+                feat2.loc[valid_idx].values,
+                err_msg="cross_asset_divergence_norm values differ between first and second call.",
+            )
+
+    def test_does_not_mutate_input_df(self) -> None:
+        """compute_cross_asset_divergence_norm must return a copy, not mutate the input."""
+        n = 200
+        df = _make_df_with_all_primitives(n=n, seed=331)
+        cols_before = set(df.columns)
+        _ = compute_cross_asset_divergence_norm(df)
+        assert set(df.columns) == cols_before, (
+            "compute_cross_asset_divergence_norm must not add cross_asset_divergence_norm "
+            "to the input DataFrame."
+        )
+
+    def test_missing_btc_ret_14d_returns_all_nan(self) -> None:
+        """When btc_ret_14d is absent, cross_asset_divergence_norm must be all-NaN."""
+        df = _make_df_with_all_primitives(n=150, seed=332)
+        df_no_btc = df.drop(columns=["btc_ret_14d"])
+
+        out = compute_cross_asset_divergence_norm(df_no_btc)
+
+        assert "cross_asset_divergence_norm" in out.columns
+        assert out["cross_asset_divergence_norm"].isna().all(), (
+            "cross_asset_divergence_norm must be all-NaN when btc_ret_14d is missing."
+        )
+
+    def test_missing_vwap_dev_20_returns_all_nan(self) -> None:
+        """When vwap_dev_20 is absent, cross_asset_divergence_norm must be all-NaN."""
+        df = _make_df_with_all_primitives(n=150, seed=333)
+        df_no_vwap = df.drop(columns=["vwap_dev_20"])
+
+        out = compute_cross_asset_divergence_norm(df_no_vwap)
+
+        assert "cross_asset_divergence_norm" in out.columns
+        assert out["cross_asset_divergence_norm"].isna().all(), (
+            "cross_asset_divergence_norm must be all-NaN when vwap_dev_20 is missing."
         )

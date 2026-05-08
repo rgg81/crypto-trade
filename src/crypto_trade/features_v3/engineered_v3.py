@@ -143,40 +143,131 @@ def compute_vol_adj_autocorr(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+_CROSS_ASSET_DIVERGENCE_EPS: float = 1e-6
+_CROSS_ASSET_DIVERGENCE_CAP: float = 100.0
+
+
+def compute_cross_asset_divergence_norm(df: pd.DataFrame) -> pd.DataFrame:
+    """Composed feature: (sym_ret_7d - btc_ret_14d) / (|vwap_dev_20| + EPS).
+
+    Encodes the textbook systematic-trading heuristic (Robert Carver,
+    *Systematic Trading*; Ernest Chan, *Quantitative Trading*): alt-vs-BTC return
+    divergence is a meaningful signal only when normalized by the alt's local
+    mean-reversion intensity.  The same alt-BTC divergence has different implications:
+
+    - High |divergence|, low |vwap_dev_20| (price near VWAP, low MR intensity)
+      → genuine relative-strength signal worth trading
+    - High |divergence|, high |vwap_dev_20| (price far from VWAP, high MR intensity)
+      → divergence may already be priced in or about to revert; value-trap signal
+
+    Construction:
+    - ``sym_ret_7d = log(close_t / close_{t-21})`` at 8h cadence.
+      21 bars × 8h = 168h = 7 calendar days.  Computed inline from ``close``
+      via ``.shift(21)``; past-only.
+    - ``btc_ret_14d``: 42-bar trailing log return of BTC (computed by
+      ``add_cross_btc_v3_features``; upstream in GROUP_REGISTRY).  Past-only.
+    - ``vwap_dev_20``: 20-bar trailing VWAP deviation (computed by
+      ``add_volume_micro_v3_features``; upstream in GROUP_REGISTRY).  Past-only.
+    - ``raw = (sym_ret_7d - btc_ret_14d) / (|vwap_dev_20| + EPS)``
+      where EPS = 1e-6 prevents division by zero.
+    - Output clipped to [−CAP, +CAP] = [−100, +100] to prevent infinity from
+      near-zero denominators (e.g., vwap_dev_20 == 0 on thinly-traded data;
+      EPS alone insufficient when |vwap_dev| < EPS).
+
+    Note on horizon mismatch: sym_ret_7d (21-bar, 7-day) MINUS btc_ret_14d (42-bar,
+    14-day) encodes momentum-divergence: when the symbol's recent 7-day momentum
+    diverges from BTC's longer-window 14-day momentum, the relative-strength signal
+    is information-rich.  Structurally distinct from sym_vs_btc_ret_7d (already in
+    feature set) which uses matching 7-day horizons for both.
+
+    Past-only by construction:
+    - ``sym_ret_7d``: log_close(t) − log_close(t−21); shift(21) is past-only.
+      First 21 bars NaN (insufficient history).
+    - ``btc_ret_14d``: upstream rolling 42-bar window ending at t; past-only.
+      First ~41 bars NaN (dominant warm-up; 42-bar window controls).
+    - ``vwap_dev_20``: upstream rolling 20-bar window ending at t; past-only.
+    - Division and clip: element-wise at row t; no future-bar context needed.
+    - Appending future bars after t does NOT alter the value at t.
+
+    NaN warm-up: first ~41 bars are NaN (btc_ret_14d 42-bar window dominates;
+    sym_ret_7d 21-bar warm-up is subsumed).
+
+    Args:
+        df: DataFrame with columns ``close`` (float-castable), ``btc_ret_14d``
+            (pre-computed by ``add_cross_btc_v3_features``), and ``vwap_dev_20``
+            (pre-computed by ``add_volume_micro_v3_features``).
+
+    Returns:
+        Copy of ``df`` with ``cross_asset_divergence_norm`` column appended.
+        If ``btc_ret_14d`` or ``vwap_dev_20`` is missing, the column is set to
+        all-NaN without error — the runner's ``_verify_feature_columns`` assertion
+        catches the gap downstream.
+    """
+    df = df.copy()
+    if "btc_ret_14d" not in df.columns:
+        df["cross_asset_divergence_norm"] = np.nan
+        return df
+    if "vwap_dev_20" not in df.columns:
+        df["cross_asset_divergence_norm"] = np.nan
+        return df
+
+    close = df["close"].astype(float)
+    log_close = np.log(close.clip(lower=1e-12))
+    # 21 bars at 8h cadence = 7 calendar days (matches sym_ret_7d in cross_btc_v3.py)
+    sym_ret_7d = log_close - log_close.shift(21)
+
+    btc_ret_14d = df["btc_ret_14d"].astype(float)
+    vwap_dev = df["vwap_dev_20"].astype(float)
+    raw = (sym_ret_7d - btc_ret_14d) / (vwap_dev.abs() + _CROSS_ASSET_DIVERGENCE_EPS)
+    df["cross_asset_divergence_norm"] = raw.clip(
+        lower=-_CROSS_ASSET_DIVERGENCE_CAP, upper=_CROSS_ASSET_DIVERGENCE_CAP
+    )
+    return df
+
+
 def add_engineered_v3_features(df: pd.DataFrame) -> pd.DataFrame:
     """GROUP_REGISTRY entry point for all Category 2 (composed) v3 features.
 
-    Currently computes:
-    - ``regime_momentum_signed_5d`` (iter-v3/025): composed feature combining
-      5-day momentum with Hurst regime classifier.
-    - ``vol_adj_autocorr`` (iter-v3/026): composed feature = lag-1 autocorrelation
-      per unit realized vol; disambiguates noise-driven from signal-driven persistence.
+    iter-v3/027: vol_adj_autocorr DROPPED from dispatch (iter-v3/026 stacking
+    falsified per `feedback_v3_engineered_features_dont_stack.md`; IS Sharpe
+    collapse +0.0493 + OOS spike +1.4501 at single-seed n_trials=35).
+    cross_asset_divergence_norm ADDED — DIFFERENT engineered feature ALONE on top
+    of regime_momentum_signed_5d.  Function ``compute_vol_adj_autocorr`` is
+    RETAINED as dead code at zero revert cost for possible multi-seed CONFIRMATION
+    stacking experiments at iter-v3/029+.
 
-    Ordering: regime_momentum_signed_5d is computed FIRST (depends on ``hurst_100``
-    from ``regime`` group), then ``vol_adj_autocorr`` (depends on
-    ``ret_autocorr_lag1_50`` from ``momentum_accel`` and ``range_realized_vol_50``
-    from ``tail_risk`` — both upstream in GROUP_REGISTRY).
+    Currently computes (dispatch order):
+    - ``regime_momentum_signed_5d`` (iter-v3/025, KEPT): composed feature combining
+      5-day momentum with Hurst regime classifier.  Depends on ``hurst_100``
+      from ``regime`` group (upstream in GROUP_REGISTRY).
+    - ``cross_asset_divergence_norm`` (iter-v3/027, NEW): composed feature =
+      (sym_ret_7d - btc_ret_14d) / (|vwap_dev_20| + EPS).  Depends on ``btc_ret_14d``
+      from ``cross_btc`` group and ``vwap_dev_20`` from ``volume_micro`` group
+      (both upstream in GROUP_REGISTRY).
 
     Each new composed feature must be listed in the iteration's research brief Section
     2.2 and validated with an adversarial past-only test.
 
     Args:
         df: DataFrame that has already been processed by ``add_regime_v3_features``
-            (so ``hurst_100`` is available), ``add_tail_risk_v3_features`` (so
-            ``range_realized_vol_50`` is available), and
-            ``add_momentum_accel_v3_features`` (so ``ret_autocorr_lag1_50`` is
-            available).
+            (so ``hurst_100`` is available), ``add_cross_btc_v3_features`` (so
+            ``btc_ret_14d`` is available), and ``add_volume_micro_v3_features`` (so
+            ``vwap_dev_20`` is available).  All three are upstream in GROUP_REGISTRY.
 
     Returns:
-        Copy of ``df`` with all engineered v3 features appended.
+        Copy of ``df`` with all active engineered v3 features appended.
     """
-    df = compute_regime_momentum_signed_5d(df)  # iter-v3/025
-    df = compute_vol_adj_autocorr(df)  # iter-v3/026
+    df = compute_regime_momentum_signed_5d(df)  # iter-v3/025 (KEPT)
+    df = compute_cross_asset_divergence_norm(df)  # iter-v3/027 (NEW)
+    # compute_vol_adj_autocorr DROPPED at iter-v3/027 — function retained as
+    # dead code at zero revert cost; restored ONLY for multi-seed CONFIRMATION
+    # stacking experiments at iter-v3/029+.
     return df
 
 
 __all__ = [
     "add_engineered_v3_features",
+    "compute_cross_asset_divergence_norm",
     "compute_regime_momentum_signed_5d",
     "compute_vol_adj_autocorr",
 ]
