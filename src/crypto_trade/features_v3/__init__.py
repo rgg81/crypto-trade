@@ -481,19 +481,23 @@ V3_FEATURES_PER_SYMBOL: dict[str, tuple[str, ...]] = {
     # TRX -20.11 / ALGO -8.24 / LDO -6.81 regressions when applied universally.
     # NOTE: BCHUSDT's tuple EXTENDS V3_FEATURE_COLUMNS_TOP_N by one feature;
     # it is NOT a strict subset. The _verify_feature_columns check in run_baseline_v3.py
-    # enforces this explicitly (len==15 AND fracdiff_d05_close present AND vol_adj_autocorr absent).
+    # enforces this explicitly (len==15 AND fracdiff_d05_close present AND
+    # cross_asset_divergence_norm absent).
     "BCHUSDT": V3_FEATURE_COLUMNS_TOP_N + ("fracdiff_d05_close",),
-    # iter-v3/036: TRX-only vol_adj_autocorr targeting.
-    # TRX receives all 14 universal features PLUS vol_adj_autocorr (15 total).
-    # BCH unchanged (fracdiff_d05_close). LDO/ALGO fall back to 14-feature universal.
-    # Evidence: iter-v3/026 universal vol_adj_autocorr failed (IS Sharpe collapse +0.0493;
-    # 27× IS/OOS ratio) — per-symbol isolation tests whether TRX specifically benefits.
-    # TRX at iter-v3/035: 52.2% win rate, +29.24 OOS wpnl, 46 trades — dominant contributor
-    # with high persistence. vol_adj_autocorr = ret_autocorr_lag1_50 / (range_realized_vol_50
-    # + 1e-6).
-    # NOTE: TRXUSDT's tuple EXTENDS V3_FEATURE_COLUMNS_TOP_N by one feature (vol_adj_autocorr).
-    # BCH and TRX per-symbol entries are DISJOINT in extension features.
-    "TRXUSDT": V3_FEATURE_COLUMNS_TOP_N + ("vol_adj_autocorr",),
+    # iter-v3/037: LDO-only cross_asset_divergence_norm targeting.
+    # LDO receives all 14 universal features PLUS cross_asset_divergence_norm (15 total).
+    # BCH unchanged (fracdiff_d05_close). TRX/ALGO fall back to 14-feature universal.
+    # iter-v3/036 REVERTED: TRX vol_adj_autocorr entry REMOVED (NEGATIVE result: TRX OOS
+    # wpnl fell ~15 units vs iter-v3/035 anchor — per-symbol isolation did not rescue
+    # vol_adj_autocorr for TRX). TRX returns to 14-feature fallback identical to iter-v3/035.
+    # Evidence for LDO: btc_ret_14d at rank 6 in LDO model (iter-v3/035 feature importance) —
+    # highest cross-asset engagement in portfolio. cross_asset_divergence_norm = (sym_ret_7d
+    # - btc_ret_14d) / (|vwap_dev_20| + 1e-6) amplifies this BTC-coupling signal normalized
+    # by local mean-reversion intensity. LDO at iter-v3/035: +3.98 OOS wpnl, 35.0% WR —
+    # weakest contributor, primary target for signal quality improvement.
+    # NOTE: LDOUSDT's tuple EXTENDS V3_FEATURE_COLUMNS_TOP_N by one feature.
+    # BCH and LDO per-symbol entries are DISJOINT in extension features.
+    "LDOUSDT": V3_FEATURE_COLUMNS_TOP_N + ("cross_asset_divergence_norm",),
 }
 """Per-symbol feature overrides for v3 models (iter-v3/030+).
 
@@ -508,24 +512,30 @@ iter-v3/035: BCH entry ADDED as EXTENSION of universal list (14 + fracdiff_d05_c
 iter-v3/036: TRX entry ADDED as EXTENSION of universal list (14 + vol_adj_autocorr = 15).
              BCH unchanged (15 features: 14 + fracdiff_d05_close).
              LDO/ALGO: 14-feature fallback (no vol_adj_autocorr).
-             BCH and TRX extension features are DISJOINT:
-               BCH: fracdiff_d05_close (NOT vol_adj_autocorr)
-               TRX: vol_adj_autocorr (NOT fracdiff_d05_close)
+             RESULT: NEGATIVE — TRX vol_adj_autocorr hurt TRX (~-15 OOS wpnl swing).
+iter-v3/037: TRX entry REMOVED (iter-v3/036 NEGATIVE reverted). LDO entry ADDED as EXTENSION
+             of universal list (14 + cross_asset_divergence_norm = 15). BCH unchanged.
+             TRX/ALGO: 14-feature fallback (no cross_asset_divergence_norm, no vol_adj_autocorr).
+             BCH and LDO extension features are DISJOINT:
+               BCH: fracdiff_d05_close (NOT cross_asset_divergence_norm)
+               LDO: cross_asset_divergence_norm (NOT fracdiff_d05_close)
 
 IMPORTANT INVARIANT (iter-v3/035+):
 - per-symbol entries EXTEND V3_FEATURE_COLUMNS_TOP_N by exactly one column.
 - Extension features must exist in the generated parquet (computed by
   add_engineered_v3_features for ALL symbols).
-- BCH and TRX extension features must not overlap (enforced by _verify_feature_columns).
+- BCH and LDO extension features must not overlap (enforced by _verify_feature_columns).
 
 Enforced by _verify_feature_columns in run_baseline_v3.py:
     len(V3_FEATURES_PER_SYMBOL["BCHUSDT"]) == 15
     "fracdiff_d05_close" in V3_FEATURES_PER_SYMBOL["BCHUSDT"]
-    "vol_adj_autocorr" not in V3_FEATURES_PER_SYMBOL["BCHUSDT"]
-    len(V3_FEATURES_PER_SYMBOL["TRXUSDT"]) == 15
-    "vol_adj_autocorr" in V3_FEATURES_PER_SYMBOL["TRXUSDT"]
-    "fracdiff_d05_close" not in V3_FEATURES_PER_SYMBOL["TRXUSDT"]
+    "cross_asset_divergence_norm" not in V3_FEATURES_PER_SYMBOL["BCHUSDT"]
+    len(V3_FEATURES_PER_SYMBOL["LDOUSDT"]) == 15
+    "cross_asset_divergence_norm" in V3_FEATURES_PER_SYMBOL["LDOUSDT"]
+    "fracdiff_d05_close" not in V3_FEATURES_PER_SYMBOL["LDOUSDT"]
+    "TRXUSDT" not in V3_FEATURES_PER_SYMBOL  (TRX reverted to 14-feature fallback)
     "fracdiff_d05_close" not in V3_FEATURE_COLUMNS_TOP_N
+    "cross_asset_divergence_norm" not in V3_FEATURE_COLUMNS_TOP_N
     "vol_adj_autocorr" not in V3_FEATURE_COLUMNS_TOP_N
 """
 
@@ -535,15 +545,16 @@ def features_for_symbol(symbol: str) -> tuple[str, ...]:
 
     Introduced in iter-v3/030 to support per-symbol model heterogeneity.
 
-    iter-v3/036:
+    iter-v3/037:
     - BCHUSDT: returns 15 features = V3_FEATURE_COLUMNS_TOP_N + ("fracdiff_d05_close",)
-    - TRXUSDT: returns 15 features = V3_FEATURE_COLUMNS_TOP_N + ("vol_adj_autocorr",)
-    - LDOUSDT, ALGOUSDT: return 14 features = V3_FEATURE_COLUMNS_TOP_N (fallback)
+    - LDOUSDT: returns 15 features = V3_FEATURE_COLUMNS_TOP_N + ("cross_asset_divergence_norm",)
+    - TRXUSDT, ALGOUSDT: return 14 features = V3_FEATURE_COLUMNS_TOP_N (fallback)
+      (TRXUSDT reverted from iter-v3/036 NEGATIVE — vol_adj_autocorr removed)
     - Any other symbol not in V3_FEATURES_PER_SYMBOL: fallback to 14-feature universal set
 
-    BCH and TRX per-symbol extension features are DISJOINT:
-    BCH has fracdiff_d05_close but NOT vol_adj_autocorr.
-    TRX has vol_adj_autocorr but NOT fracdiff_d05_close.
+    BCH and LDO per-symbol extension features are DISJOINT:
+    BCH has fracdiff_d05_close but NOT cross_asset_divergence_norm.
+    LDO has cross_asset_divergence_norm but NOT fracdiff_d05_close.
 
     Callers MUST pass ``feature_columns=list(features_for_symbol(symbol))``
     to LightGbmStrategy — never None, never empty, never the global default.
