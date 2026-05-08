@@ -1,0 +1,13 @@
+candidate,symbol,max_abs_ic_vs_14_features,max_abs_ic_feature,max_abs_ic_vs_regime_momentum,n_ic_features_compared,ic_passes_brief_target_lt_0p50_INFORMATIONAL,ic_passes_hard_gate_lt_0p70_INFORMATIONAL
+vol_adj_autocorr,BCHUSDT,0.984803,ret_autocorr_lag1_50,0.04761,14,False,False
+cross_asset_divergence_norm,BCHUSDT,0.695018,sym_vs_btc_ret_7d,0.375565,14,False,True
+fracdiff_d05_close,BCHUSDT,0.505022,vwap_dev_20,0.423787,14,False,True
+ret_kurt_to_skew_ratio,BCHUSDT,0.55903,ret_kurt_50,0.026764,14,False,True
+vol_adj_autocorr,LDOUSDT,0.980253,ret_autocorr_lag1_50,0.001391,14,False,False
+cross_asset_divergence_norm,LDOUSDT,0.756056,sym_vs_btc_ret_7d,0.464307,14,False,False
+fracdiff_d05_close,LDOUSDT,0.63997,vwap_dev_20,0.568083,14,False,True
+ret_kurt_to_skew_ratio,LDOUSDT,0.676635,ret_kurt_50,0.07532,14,False,True
+vol_adj_autocorr,TRXUSDT,0.97579,ret_autocorr_lag1_50,0.075266,14,False,False
+cross_asset_divergence_norm,TRXUSDT,0.746137,btc_ret_14d,0.260991,14,False,False
+fracdiff_d05_close,TRXUSDT,0.372564,ret_skew_200,0.217943,14,True,True
+ret_kurt_to_skew_ratio,TRXUSDT,0.647712,ret_kurt_50,0.014192,14,False,True
