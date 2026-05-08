@@ -1,0 +1,13 @@
+candidate,symbol,rankic_h1,rankic_h3,rankic_h7,max_abs_rankic,rankic_passes_min_0p02
+cross_asset_divergence_norm,BCHUSDT,-0.026158,-0.015767,-0.034235,0.034235,True
+ret_kurt_to_skew_ratio,BCHUSDT,-0.011803,-0.007137,-0.007857,0.011803,False
+fracdiff_d05_close,BCHUSDT,-0.063681,-0.077981,-0.071596,0.077981,True
+hurst_drift_50_200,BCHUSDT,0.006628,0.02058,0.023269,0.023269,True
+cross_asset_divergence_norm,LDOUSDT,-0.038567,-0.073573,-0.109287,0.109287,True
+ret_kurt_to_skew_ratio,LDOUSDT,0.026616,0.047358,0.077442,0.077442,True
+fracdiff_d05_close,LDOUSDT,-0.055449,-0.084961,-0.088459,0.088459,True
+hurst_drift_50_200,LDOUSDT,0.023014,0.037476,0.064341,0.064341,True
+cross_asset_divergence_norm,TRXUSDT,0.016458,0.009055,-0.001254,0.016458,False
+ret_kurt_to_skew_ratio,TRXUSDT,-0.010076,-0.031922,-0.047255,0.047255,True
+fracdiff_d05_close,TRXUSDT,-0.035979,-0.058006,-0.078612,0.078612,True
+hurst_drift_50_200,TRXUSDT,-0.007227,-0.002989,-0.002559,0.007227,False
