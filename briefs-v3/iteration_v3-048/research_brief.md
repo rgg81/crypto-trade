@@ -749,9 +749,9 @@ threshold) are SEED IDEAS only — the QR scored these via EDA-driven quantitati
 
 **Pre-commit SHAs**:
 - EDA SHA: `a230cd1` (3 scripts + 4 CSVs + 2 markdown synthesis files)
-- Brief SHA: TBD (this brief, committed before Phase 5.5 gate + setup commit)
-- Phase 5.5 gate SHA: TBD (Engineer's gate verification)
-- Setup commit SHA: TBD (Engineer's implementation commit)
+- Brief SHA: `81af783` (this brief, committed before Phase 5.5 gate + setup commit)
+- Setup commit SHA: `c69fdaa` (Engineer's implementation commit)
+- Phase 5.5 gate SHA: `34c97c5` (Engineer's gate verification — OVERALL=PASS)
 
 **Phase 5.5 verification**:
 - EDA committed BEFORE brief (SHA `a230cd1` precedes brief commit)
