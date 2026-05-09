@@ -574,6 +574,19 @@ V3_ATR_MULTIPLIERS_PER_SYMBOL: dict[str, tuple[float, float]] = {
     # natural volatility regime. NOT the iter-v3/032 (1.5, 0.75) tighter-barrier path
     # which was MULTI-SEED-FALSIFIED at iter-v3/039 — this is the OPPOSITE direction.
     "LDOUSDT": (2.0, 1.5),
+    # iter-v3/046: BCHUSDT entry added (2.0, 1.5) — TP unchanged, SL widened by 50%.
+    # QR EDA SHA `d86b1f9` (analysis/iteration_v3-046/bch_trx_bottleneck_diagnosis.py):
+    # BCH direction asymmetry is the IS bottleneck — LONG IS -25.07% (39 trades, 30.8%
+    # WR — toxic), SHORT IS +48.69% (55 trades, 43.6% WR — positive); BCH OOS LONGs
+    # also toxic (-7.44%, 28.6% WR). BCH IS=OOS SL:TP=1.93 STABLE (no IS->OOS regime
+    # shift; mean_SL -3.90% IS / -3.45% OOS) — wider SL helps IS AND OOS SYMMETRICALLY,
+    # distinct from iter-v3/045 LDO which addressed an asymmetric IS->OOS shift. Third
+    # application of validated wider-SL mechanism (ALGO at iter-v3/044 PROMISING + LDO
+    # at iter-v3/045 STRONGEST PROMISING + BCH at iter-v3/046). All-3-symbol
+    # per-symbol-ATR is LABEL-LAYER ONLY (no feature-layer changes), architecturally
+    # homogeneous (vs iter-v3/039's mixed feature+label stack). BCH symmetric IS=OOS
+    # mechanism reduces IS-divergence risk vs iter-v3/039 pattern.
+    "BCHUSDT": (2.0, 1.5),
 }
 """Per-symbol ATR multiplier overrides for iter-v3/032+ labeling architecture.
 
@@ -599,6 +612,14 @@ iter-v3/045: LDOUSDT entry added (2.0, 1.5) — QR EDA-driven per-symbol axis se
   iter-v3/039 — this is the OPPOSITE direction (wider not tighter) per QR EDA
   candidate-ranking. Source: analysis/iteration_v3-045/ldo_bottleneck_diagnosis.py
   SHA `ed949fe`.
+iter-v3/046: BCHUSDT entry added (2.0, 1.5) — QR EDA-driven per-symbol axis selection,
+  cycle 3 #7. BCH direction asymmetry: LONG IS -25.07% (39 trades, 30.8% WR — toxic),
+  SHORT IS +48.69% (55 trades, 43.6% WR). BCH IS=OOS SL:TP=1.93 (regime-stable, no
+  IS->OOS shift) — wider SL helps IS AND OOS SYMMETRICALLY, distinct mechanism from
+  iter-v3/045 LDO which addressed an asymmetric IS->OOS regime shift. Third application
+  of validated wider-SL mechanism (ALGO at iter-v3/044, LDO at iter-v3/045, BCH at
+  iter-v3/046). Source: analysis/iteration_v3-046/bch_trx_bottleneck_diagnosis.py
+  SHA `d86b1f9`.
 """
 
 DEFAULT_ATR_MULTIPLIERS: tuple[float, float] = (2.0, 1.0)
