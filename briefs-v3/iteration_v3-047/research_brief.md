@@ -703,8 +703,9 @@ higher implementation complexity OR speculative direction without EDA support.
 
 **Pre-commit SHA**: `f5f0fd6` (REVERT iter-v3/046 BCH ATR; state = iter-v3/045 config).
 **EDA SHA**: `695fc8e` (BCH direction diagnosis + 4-axis ranking).
-**Brief SHA**: TBD (this commit).
-**Setup commit SHA**: TBD (will follow brief + Phase 5.5 gate per discipline).
+**Brief SHA**: `3541997` (this brief, committed before Phase 5.5 gate + setup).
+**Phase 5.5 gate SHA**: `1236e3c` (PASS).
+**Setup commit SHA**: `9b1293d` (feat: primitive 10 wiring + block_long_for=("BCHUSDT",)).
 
 **Phase 5.5 verification**: pre-commit + EDA committed BEFORE brief; brief includes
 Section 2 numerical evidence sourced from `bch_diagnosis.csv` (committed SHA `695fc8e`);

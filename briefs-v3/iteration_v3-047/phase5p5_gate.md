@@ -11,8 +11,8 @@ OVERALL: PASS
   outputs (`bch_diagnosis.csv`, `synthesis.md`, `candidate_axes_ranking.md`).
 - Brief SHA `3541997` — research brief (this iteration, single revision; REVERT
   mandated by orchestrator + Critic FINAL).
-- Setup commit SHA TBD — feat(iter-v3/047): primitive 10 (direction-asymmetric kill
-  switch) wiring + block_long_for=("BCHUSDT",) dispatch.
+- Setup commit SHA `9b1293d` — feat(iter-v3/047): primitive 10 (direction-asymmetric
+  kill switch) wiring + block_long_for=("BCHUSDT",) dispatch.
 - This gate authored against committed brief.
 
 ## Per-Section Status
