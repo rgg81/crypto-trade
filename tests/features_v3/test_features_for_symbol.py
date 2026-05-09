@@ -1,32 +1,43 @@
-"""Adversarial tests for per-symbol feature-set dispatch — iter-v3/040.
+"""Adversarial tests for per-symbol feature-set dispatch — iter-v3/041.
 
 Tests the ``V3_FEATURES_PER_SYMBOL`` dict and the ``features_for_symbol()``
 helper introduced in iter-v3/030.
 
-iter-v3/040 state (EXPLORATION — cycle 3 #1 — REVERT all per-symbol customizations):
-- V3_FEATURES_PER_SYMBOL is EMPTY (cleared). All symbols fall back to 14-feature universal.
-- V3_ATR_MULTIPLIERS_PER_SYMBOL is EMPTY (cleared). LDO uses default (2.0, 1.0) ATR.
-- BCHUSDT: fallback to V3_FEATURE_COLUMNS_TOP_N = 14 features.
-  REVERTED from iter-v3/035-039 (BCH per-symbol fracdiff_d05_close entry removed).
-  iter-v3/039 CONFIRMATION NO-MERGE: per-symbol customizations broke IS aggregate.
-- ALGOUSDT: fallback to V3_FEATURE_COLUMNS_TOP_N = 14 features. Unchanged.
-- LDOUSDT: fallback to V3_FEATURE_COLUMNS_TOP_N = 14 features.
-  ATR reverts to (2.0, 1.0) from (1.5, 0.75) (iter-v3/032 entry cleared).
-- TRXUSDT: fallback to V3_FEATURE_COLUMNS_TOP_N = 14 features. Unchanged.
+iter-v3/041 state (EXPLORATION — cycle 3 #2 — UNIVERSAL FEATURE PRUNING):
+- V3_FEATURE_COLUMNS_TOP_N: 11 features (was 14 at iter-v3/040; dropped 3 lowest by
+  iter-v3/028 portfolio split-importance).
+  Dropped (per analysis/iteration_v3-041/bottom3_features_eda.py SHA c2e2712):
+    - ret_skew_50               (rank 12/14, importance 412.8)
+    - sym_vs_btc_ret_7d         (rank 13/14, importance 398.0)
+    - regime_momentum_signed_5d (rank 14/14, importance 390.4)
+  Combined dropped importance: 17.6% of total split count.
+- V3_FEATURES_PER_SYMBOL is EMPTY (unchanged from iter-v3/040). All symbols
+  fall back to 11-feature universal list.
+- V3_ATR_MULTIPLIERS_PER_SYMBOL is EMPTY (unchanged from iter-v3/040).
+  LDO continues to use default (2.0, 1.0) ATR multipliers.
+- BCHUSDT: fallback to V3_FEATURE_COLUMNS_TOP_N = 11 features.
+- ALGOUSDT: fallback to V3_FEATURE_COLUMNS_TOP_N = 11 features.
+- LDOUSDT: fallback to V3_FEATURE_COLUMNS_TOP_N = 11 features.
+- TRXUSDT: fallback to V3_FEATURE_COLUMNS_TOP_N = 11 features.
 
-Evidence:
-- iter-v3/029: clean 4-symbol anchor (no per-symbol customizations): IS ~+0.79 / OOS ~+1.77.
-- iter-v3/032-039: per-symbol customizations caused ~-0.55 IS Sharpe swing vs iter-v3/029.
-- iter-v3/040: REVERT to verify IS recovery toward iter-v3/029 anchor.
+Hypothesis: dropping 17.6% of split-importance frees Optuna search-space noise
+and lifts IS Sharpe toward +1.0 while maintaining OOS Sharpe at the iter-v3/040
+anchor (~+1.77).
 
-Mandatory test cases (iter-v3/040 brief Section 3 sub-fix #5):
-1.  test_bch_fallback_14
+Mandate-revocation note: regime_momentum_signed_5d MUST-be-present mandate from
+feedback_v3_engineered_features_proven.md (iter-v3/025) is being REVISITED at
+iter-v3/041 EXPLORATION as the universal-pruning axis. EXPLORATIONs can falsify
+any prior assumption (3-path resolution per brief Section 8 — PROMISING /
+PROMISING-INERT / NEGATIVE).
+
+Mandatory test cases (iter-v3/041 brief Section 3 sub-fix #4):
+1.  test_bch_fallback_11
 2.  test_bch_no_fracdiff
-3.  test_algo_fallback_14
+3.  test_algo_fallback_11
 4.  test_algo_no_fracdiff
-5.  test_ldo_fallback_14
+5.  test_ldo_fallback_11
 6.  test_ldo_no_fracdiff
-7.  test_trx_fallback_14
+7.  test_trx_fallback_11
 8.  test_trx_no_special_features
 9.  test_bchusdt_not_in_per_symbol
 10. test_algousdt_not_in_per_symbol
@@ -35,12 +46,14 @@ Mandatory test cases (iter-v3/040 brief Section 3 sub-fix #5):
 13. test_v3_features_per_symbol_is_empty
 14. test_v3_atr_multipliers_per_symbol_is_empty
 15. test_ldo_atr_default
-16. test_regime_momentum_in_universal_list
-17. test_fracdiff_not_in_universal_list
-18. test_cross_asset_divergence_not_in_universal_list
-19. test_vol_adj_autocorr_not_in_universal_list
-20. test_universal_list_is_14
-21. test_features_for_symbol_unknown_fallback
+16. test_regime_momentum_not_in_universal_list   (INVERTED at iter-v3/041)
+17. test_sym_vs_btc_ret_7d_not_in_universal_list (NEW iter-v3/041)
+18. test_ret_skew_50_not_in_universal_list       (NEW iter-v3/041)
+19. test_fracdiff_not_in_universal_list
+20. test_cross_asset_divergence_not_in_universal_list
+21. test_vol_adj_autocorr_not_in_universal_list
+22. test_universal_list_is_11                    (CHANGED 14 → 11 at iter-v3/041)
+23. test_features_for_symbol_unknown_fallback
 """
 
 from __future__ import annotations
@@ -56,356 +69,284 @@ from crypto_trade.features_v3 import (
 )
 
 
-def test_bch_fallback_14() -> None:
-    """BCHUSDT must return 14 features via fallback at iter-v3/040.
+def test_bch_fallback_11() -> None:
+    """BCHUSDT must return 11 features via fallback at iter-v3/041.
 
-    iter-v3/040: BCHUSDT per-symbol entry CLEARED (BCH fracdiff entry removed).
-    BCH returns to V3_FEATURE_COLUMNS_TOP_N (14-feature universal fallback).
-    iter-v3/035-039 BCH per-symbol fracdiff entry was the IS degradation source;
-    reverting it is the primary action in this EXPLORATION.
+    iter-v3/041: BCHUSDT not in V3_FEATURES_PER_SYMBOL (dict empty since iter-v3/040).
+    BCH uses V3_FEATURE_COLUMNS_TOP_N fallback = 11 features (was 14 at iter-v3/040;
+    dropped 3 bottom by iter-v3/028 portfolio importance).
     """
     result = features_for_symbol("BCHUSDT")
-    assert len(result) == 14, (
-        f"BCHUSDT: expected 14 features (V3_FEATURE_COLUMNS_TOP_N fallback), got {len(result)}. "
-        f"iter-v3/040: BCHUSDT per-symbol entry CLEARED (cycle 3 REVERT EXPLORATION). "
-        f"V3_FEATURES_PER_SYMBOL must be empty. Got: {result}"
+    assert len(result) == 11, (
+        f"BCHUSDT: expected 11 features (V3_FEATURE_COLUMNS_TOP_N fallback at iter-v3/041), "
+        f"got {len(result)}. V3_FEATURES_PER_SYMBOL must be empty + universal list pruned 14→11. "
+        f"Got: {result}"
     )
     assert result == V3_FEATURE_COLUMNS_TOP_N, (
         f"BCHUSDT: fallback result differs from V3_FEATURE_COLUMNS_TOP_N. "
-        f"BCHUSDT must use the universal 14-feature set at iter-v3/040 (no per-symbol entry). "
+        f"BCHUSDT must use the universal 11-feature set at iter-v3/041 (no per-symbol entry). "
         f"Extra: {sorted(set(result) - set(V3_FEATURE_COLUMNS_TOP_N))}. "
         f"Missing: {sorted(set(V3_FEATURE_COLUMNS_TOP_N) - set(result))}."
     )
 
 
 def test_bch_no_fracdiff() -> None:
-    """BCHUSDT must NOT include fracdiff_d05_close at iter-v3/040.
+    """BCHUSDT must NOT include fracdiff_d05_close at iter-v3/041.
 
-    iter-v3/040: BCH per-symbol fracdiff entry CLEARED. fracdiff_d05_close is NOT
-    a model input for any symbol (V3_FEATURES_PER_SYMBOL is empty).
-    BCH uses 14-feature universal fallback which does not include fracdiff_d05_close.
+    iter-v3/040 already cleared the BCH per-symbol fracdiff entry; iter-v3/041 keeps
+    V3_FEATURES_PER_SYMBOL empty. fracdiff_d05_close is NOT a model input for any
+    symbol at iter-v3/041.
     """
     result = features_for_symbol("BCHUSDT")
     assert "fracdiff_d05_close" not in result, (
-        f"BCHUSDT: fracdiff_d05_close FOUND — must be ABSENT at iter-v3/040. "
-        f"iter-v3/040: BCH per-symbol fracdiff entry CLEARED (cycle 3 REVERT EXPLORATION). "
-        f"fracdiff_d05_close is NOT a model input for any symbol at iter-v3/040. "
+        f"BCHUSDT: fracdiff_d05_close FOUND — must be ABSENT at iter-v3/041. "
+        f"V3_FEATURES_PER_SYMBOL is empty; fracdiff is not a model input for any symbol. "
         f"Got: {result}"
     )
 
 
-def test_algo_fallback_14() -> None:
-    """ALGOUSDT must return 14 features via fallback at iter-v3/040.
-
-    iter-v3/040: ALGOUSDT not in V3_FEATURES_PER_SYMBOL (dict is empty).
-    ALGO uses V3_FEATURE_COLUMNS_TOP_N fallback = 14 features. Unchanged from iter-v3/039
-    (ALGO per-symbol entry was already absent at iter-v3/039 after iter-v3/038 revert).
-    """
+def test_algo_fallback_11() -> None:
+    """ALGOUSDT must return 11 features via fallback at iter-v3/041."""
     result = features_for_symbol("ALGOUSDT")
-    assert len(result) == 14, (
-        f"ALGOUSDT: expected 14 features (V3_FEATURE_COLUMNS_TOP_N fallback), got {len(result)}. "
-        f"iter-v3/040: V3_FEATURES_PER_SYMBOL is empty; ALGO uses universal fallback. "
+    assert len(result) == 11, (
+        f"ALGOUSDT: expected 11 features (V3_FEATURE_COLUMNS_TOP_N fallback at iter-v3/041), "
+        f"got {len(result)}. V3_FEATURES_PER_SYMBOL must be empty + universal list pruned 14→11. "
         f"Got: {result}"
     )
     assert result == V3_FEATURE_COLUMNS_TOP_N, (
         f"ALGOUSDT: fallback result differs from V3_FEATURE_COLUMNS_TOP_N. "
-        f"ALGOUSDT must use the universal 14-feature set exactly at iter-v3/040. "
+        f"ALGOUSDT must use the universal 11-feature set exactly at iter-v3/041. "
         f"Extra: {sorted(set(result) - set(V3_FEATURE_COLUMNS_TOP_N))}. "
         f"Missing: {sorted(set(V3_FEATURE_COLUMNS_TOP_N) - set(result))}."
     )
 
 
 def test_algo_no_fracdiff() -> None:
-    """ALGOUSDT must NOT include fracdiff_d05_close at iter-v3/040.
-
-    iter-v3/040: V3_FEATURES_PER_SYMBOL is empty. fracdiff_d05_close is NOT a model
-    input for any symbol. ALGO uses 14-feature fallback which does not include fracdiff.
-    """
+    """ALGOUSDT must NOT include fracdiff_d05_close at iter-v3/041."""
     result = features_for_symbol("ALGOUSDT")
     assert "fracdiff_d05_close" not in result, (
-        f"ALGOUSDT: fracdiff_d05_close FOUND — must be ABSENT at iter-v3/040. "
-        f"iter-v3/040: V3_FEATURES_PER_SYMBOL is empty; fracdiff not a model input. "
-        f"Got: {result}"
+        f"ALGOUSDT: fracdiff_d05_close FOUND — must be ABSENT at iter-v3/041. "
+        f"V3_FEATURES_PER_SYMBOL is empty; fracdiff not a model input. Got: {result}"
     )
 
 
-def test_ldo_fallback_14() -> None:
-    """LDOUSDT must return 14 features via fallback (no per-symbol entry at iter-v3/040).
-
-    iter-v3/040: LDOUSDT not in V3_FEATURES_PER_SYMBOL (dict is empty).
-    LDO uses V3_FEATURE_COLUMNS_TOP_N fallback = 14 features.
-    """
+def test_ldo_fallback_11() -> None:
+    """LDOUSDT must return 11 features via fallback at iter-v3/041."""
     result = features_for_symbol("LDOUSDT")
-    assert len(result) == 14, (
-        f"LDOUSDT: expected 14 features (V3_FEATURE_COLUMNS_TOP_N fallback), got {len(result)}. "
-        f"iter-v3/040: V3_FEATURES_PER_SYMBOL is empty; LDO uses universal fallback. "
+    assert len(result) == 11, (
+        f"LDOUSDT: expected 11 features (V3_FEATURE_COLUMNS_TOP_N fallback at iter-v3/041), "
+        f"got {len(result)}. V3_FEATURES_PER_SYMBOL must be empty + universal list pruned 14→11. "
         f"Got: {result}"
     )
     assert result == V3_FEATURE_COLUMNS_TOP_N, (
         f"LDOUSDT: fallback result differs from V3_FEATURE_COLUMNS_TOP_N. "
-        f"LDOUSDT must use the universal 14-feature set exactly at iter-v3/040. "
+        f"LDOUSDT must use the universal 11-feature set exactly at iter-v3/041. "
         f"Extra: {sorted(set(result) - set(V3_FEATURE_COLUMNS_TOP_N))}. "
         f"Missing: {sorted(set(V3_FEATURE_COLUMNS_TOP_N) - set(result))}."
     )
 
 
 def test_ldo_no_fracdiff() -> None:
-    """LDOUSDT must NOT include fracdiff_d05_close or cross_asset_divergence_norm.
-
-    iter-v3/040: V3_FEATURES_PER_SYMBOL is empty. LDO uses 14-feature fallback.
-    Neither fracdiff (no per-symbol entries) nor cross_asset_divergence_norm
-    (dead at model level since iter-v3/037 NEGATIVE) apply to LDO at iter-v3/040.
-    """
+    """LDOUSDT must NOT include fracdiff_d05_close or cross_asset_divergence_norm."""
     result = features_for_symbol("LDOUSDT")
     assert "fracdiff_d05_close" not in result, (
         f"LDOUSDT: fracdiff_d05_close FOUND — must be ABSENT (no per-symbol entries at "
-        f"iter-v3/040). Got: {result}"
+        f"iter-v3/041). Got: {result}"
     )
     assert "cross_asset_divergence_norm" not in result, (
         f"LDOUSDT: cross_asset_divergence_norm FOUND — must be ABSENT. "
-        f"iter-v3/037 NEGATIVE: LDO per-symbol cross_asset caused ~-33 OOS swing. "
-        f"LDO uses 14-feature fallback at iter-v3/040. Got: {result}"
+        f"LDO uses 11-feature fallback at iter-v3/041. Got: {result}"
     )
 
 
-def test_trx_fallback_14() -> None:
-    """TRXUSDT must return 14 features via fallback (no per-symbol entry at iter-v3/040).
-
-    iter-v3/040: TRXUSDT not in V3_FEATURES_PER_SYMBOL (dict is empty).
-    TRX uses V3_FEATURE_COLUMNS_TOP_N fallback = 14 features. Unchanged from iter-v3/039.
-    """
+def test_trx_fallback_11() -> None:
+    """TRXUSDT must return 11 features via fallback at iter-v3/041."""
     result = features_for_symbol("TRXUSDT")
-    assert len(result) == 14, (
-        f"TRXUSDT: expected 14 features (V3_FEATURE_COLUMNS_TOP_N fallback), got {len(result)}. "
-        f"iter-v3/040: V3_FEATURES_PER_SYMBOL is empty; TRX uses universal fallback. "
+    assert len(result) == 11, (
+        f"TRXUSDT: expected 11 features (V3_FEATURE_COLUMNS_TOP_N fallback at iter-v3/041), "
+        f"got {len(result)}. V3_FEATURES_PER_SYMBOL must be empty + universal list pruned 14→11. "
         f"Got: {result}"
     )
     assert result == V3_FEATURE_COLUMNS_TOP_N, (
         f"TRXUSDT: fallback result differs from V3_FEATURE_COLUMNS_TOP_N. "
-        f"TRXUSDT must use the universal 14-feature set exactly. "
+        f"TRXUSDT must use the universal 11-feature set exactly at iter-v3/041. "
         f"Extra: {sorted(set(result) - set(V3_FEATURE_COLUMNS_TOP_N))}. "
         f"Missing: {sorted(set(V3_FEATURE_COLUMNS_TOP_N) - set(result))}."
     )
 
 
 def test_trx_no_special_features() -> None:
-    """TRXUSDT must NOT include fracdiff_d05_close, cross_asset_divergence_norm, vol_adj_autocorr.
-
-    iter-v3/040: TRX uses 14-feature fallback. No extension features apply.
-    """
+    """TRXUSDT must NOT include fracdiff/cross_asset_divergence/vol_adj_autocorr."""
     result = features_for_symbol("TRXUSDT")
-    assert "fracdiff_d05_close" not in result, (
-        f"TRXUSDT: fracdiff_d05_close FOUND — must be ABSENT (no per-symbol entries at "
-        f"iter-v3/040). Got: {result}"
-    )
-    assert "cross_asset_divergence_norm" not in result, (
-        f"TRXUSDT: cross_asset_divergence_norm FOUND — must be ABSENT (dead at model level). "
-        f"Got: {result}"
-    )
-    assert "vol_adj_autocorr" not in result, (
-        f"TRXUSDT: vol_adj_autocorr FOUND — must be ABSENT. Dead code since iter-v3/036 revert. "
-        f"Got: {result}"
-    )
+    for feat in (
+        "fracdiff_d05_close",
+        "cross_asset_divergence_norm",
+        "vol_adj_autocorr",
+    ):
+        assert feat not in result, (
+            f"TRXUSDT: {feat} FOUND — must be ABSENT at iter-v3/041 (no per-symbol "
+            f"entries; dead at model level). Got: {result}"
+        )
 
 
 def test_bchusdt_not_in_per_symbol() -> None:
-    """BCHUSDT must NOT be in V3_FEATURES_PER_SYMBOL at iter-v3/040.
-
-    iter-v3/040: V3_FEATURES_PER_SYMBOL is empty (cleared in cycle 3 REVERT EXPLORATION).
-    BCHUSDT per-symbol fracdiff entry removed (was present at iter-v3/035-039).
-    BCH reverts to 14-feature universal fallback.
-    """
+    """BCHUSDT must NOT be in V3_FEATURES_PER_SYMBOL at iter-v3/041 (empty dict)."""
     assert "BCHUSDT" not in V3_FEATURES_PER_SYMBOL, (
-        f"V3_FEATURES_PER_SYMBOL has 'BCHUSDT' key — must be ABSENT at iter-v3/040. "
-        f"iter-v3/040: V3_FEATURES_PER_SYMBOL must be empty (cycle 3 REVERT). "
-        f"Remove BCHUSDT from V3_FEATURES_PER_SYMBOL in features_v3/__init__.py. "
+        f"V3_FEATURES_PER_SYMBOL has 'BCHUSDT' key — must be ABSENT at iter-v3/041. "
         f"Current keys: {list(V3_FEATURES_PER_SYMBOL.keys())}."
     )
 
 
 def test_algousdt_not_in_per_symbol() -> None:
-    """ALGOUSDT must NOT be in V3_FEATURES_PER_SYMBOL at iter-v3/040.
-
-    iter-v3/040: V3_FEATURES_PER_SYMBOL is empty. ALGOUSDT not present (unchanged from
-    iter-v3/039 where ALGO entry was already absent after iter-v3/038 NEGATIVE revert).
-    """
+    """ALGOUSDT must NOT be in V3_FEATURES_PER_SYMBOL at iter-v3/041 (empty dict)."""
     assert "ALGOUSDT" not in V3_FEATURES_PER_SYMBOL, (
-        f"V3_FEATURES_PER_SYMBOL has 'ALGOUSDT' key — must be ABSENT at iter-v3/040. "
-        f"iter-v3/040: V3_FEATURES_PER_SYMBOL must be empty. "
+        f"V3_FEATURES_PER_SYMBOL has 'ALGOUSDT' key — must be ABSENT at iter-v3/041. "
         f"Current keys: {list(V3_FEATURES_PER_SYMBOL.keys())}."
     )
 
 
 def test_ldousdt_not_in_per_symbol() -> None:
-    """LDOUSDT must NOT be in V3_FEATURES_PER_SYMBOL at iter-v3/040.
-
-    iter-v3/040: V3_FEATURES_PER_SYMBOL is empty. Unchanged from iter-v3/039.
-    """
+    """LDOUSDT must NOT be in V3_FEATURES_PER_SYMBOL at iter-v3/041 (empty dict)."""
     assert "LDOUSDT" not in V3_FEATURES_PER_SYMBOL, (
-        f"V3_FEATURES_PER_SYMBOL has 'LDOUSDT' key — must be ABSENT at iter-v3/040. "
-        f"iter-v3/040: V3_FEATURES_PER_SYMBOL must be empty. "
+        f"V3_FEATURES_PER_SYMBOL has 'LDOUSDT' key — must be ABSENT at iter-v3/041. "
         f"Current keys: {list(V3_FEATURES_PER_SYMBOL.keys())}."
     )
 
 
 def test_trxusdt_not_in_per_symbol() -> None:
-    """TRXUSDT must NOT be in V3_FEATURES_PER_SYMBOL at iter-v3/040.
-
-    iter-v3/040: V3_FEATURES_PER_SYMBOL is empty. Unchanged from iter-v3/039.
-    """
+    """TRXUSDT must NOT be in V3_FEATURES_PER_SYMBOL at iter-v3/041 (empty dict)."""
     assert "TRXUSDT" not in V3_FEATURES_PER_SYMBOL, (
-        f"V3_FEATURES_PER_SYMBOL has 'TRXUSDT' key — must be ABSENT at iter-v3/040. "
-        f"iter-v3/040: V3_FEATURES_PER_SYMBOL must be empty. "
+        f"V3_FEATURES_PER_SYMBOL has 'TRXUSDT' key — must be ABSENT at iter-v3/041. "
         f"Current keys: {list(V3_FEATURES_PER_SYMBOL.keys())}."
     )
 
 
 def test_v3_features_per_symbol_is_empty() -> None:
-    """V3_FEATURES_PER_SYMBOL must be EMPTY (0 entries) at iter-v3/040.
-
-    iter-v3/040: cycle 3 EXPLORATION #1 — REVERT all per-symbol feature overrides.
-    BCH fracdiff entry (iter-v3/035-039) CLEARED. No per-symbol entries remain.
-    All 4 symbols (BCH/ALGO/LDO/TRX) use 14-feature universal fallback.
-
-    This is the DEFINING change of iter-v3/040: clearing V3_FEATURES_PER_SYMBOL
-    verifies that the IS degradation at iter-v3/039 was caused by per-symbol
-    customizations rather than other factors.
-    """
+    """V3_FEATURES_PER_SYMBOL must be EMPTY at iter-v3/041 (unchanged from iter-v3/040)."""
     assert len(V3_FEATURES_PER_SYMBOL) == 0, (
-        f"V3_FEATURES_PER_SYMBOL must be empty at iter-v3/040 (cycle 3 REVERT). "
+        f"V3_FEATURES_PER_SYMBOL must be empty at iter-v3/041 (unchanged from iter-v3/040). "
         f"Got {len(V3_FEATURES_PER_SYMBOL)} entries: {dict(V3_FEATURES_PER_SYMBOL)}. "
         f"Clear V3_FEATURES_PER_SYMBOL to {{}} in features_v3/__init__.py."
     )
 
 
 def test_v3_atr_multipliers_per_symbol_is_empty() -> None:
-    """V3_ATR_MULTIPLIERS_PER_SYMBOL must be EMPTY (0 entries) at iter-v3/040.
-
-    iter-v3/040: cycle 3 EXPLORATION #1 — REVERT all per-symbol ATR customizations.
-    LDO entry (1.5, 0.75) CLEARED (was added at iter-v3/032). LDO reverts to
-    DEFAULT_ATR_MULTIPLIERS = (2.0, 1.0) via atr_multipliers_for_symbol fallback.
-
-    Reverting LDO ATR widens LDO barriers from ~10% to ~13.4% (TP).
-    Expected effect: fewer LDO trades (wider barriers harder to reach).
-    """
+    """V3_ATR_MULTIPLIERS_PER_SYMBOL must be EMPTY (0 entries) at iter-v3/041 (unchanged)."""
     assert len(V3_ATR_MULTIPLIERS_PER_SYMBOL) == 0, (
-        f"V3_ATR_MULTIPLIERS_PER_SYMBOL must be empty at iter-v3/040 (cycle 3 REVERT). "
+        f"V3_ATR_MULTIPLIERS_PER_SYMBOL must be empty at iter-v3/041. "
         f"Got {len(V3_ATR_MULTIPLIERS_PER_SYMBOL)} entries: {dict(V3_ATR_MULTIPLIERS_PER_SYMBOL)}. "
         f"Clear V3_ATR_MULTIPLIERS_PER_SYMBOL to {{}} in features_v3/__init__.py."
     )
 
 
 def test_ldo_atr_default() -> None:
-    """atr_multipliers_for_symbol("LDOUSDT") must return (2.0, 1.0) at iter-v3/040.
-
-    iter-v3/040: V3_ATR_MULTIPLIERS_PER_SYMBOL is empty. LDO falls back to
-    DEFAULT_ATR_MULTIPLIERS = (2.0, 1.0).
-
-    Previously at iter-v3/032-039: LDOUSDT returned (1.5, 0.75) from per-symbol dict.
-    After revert: LDOUSDT returns (2.0, 1.0) via DEFAULT_ATR_MULTIPLIERS fallback.
-    """
+    """atr_multipliers_for_symbol("LDOUSDT") must return (2.0, 1.0) at iter-v3/041 (default)."""
     result = atr_multipliers_for_symbol("LDOUSDT")
     assert result == (2.0, 1.0), (
         f"atr_multipliers_for_symbol('LDOUSDT') returned {result} — expected (2.0, 1.0). "
-        f"iter-v3/040: V3_ATR_MULTIPLIERS_PER_SYMBOL is empty; LDO must use DEFAULT fallback. "
-        f"Verify V3_ATR_MULTIPLIERS_PER_SYMBOL == {{}} in features_v3/__init__.py."
+        f"iter-v3/041: V3_ATR_MULTIPLIERS_PER_SYMBOL is empty; LDO must use DEFAULT fallback."
     )
 
 
-def test_regime_momentum_in_universal_list() -> None:
-    """regime_momentum_signed_5d must be in V3_FEATURE_COLUMNS_TOP_N (portfolio mandate).
+def test_regime_momentum_not_in_universal_list() -> None:
+    """regime_momentum_signed_5d MUST NOT be in V3_FEATURE_COLUMNS_TOP_N at iter-v3/041.
 
-    Portfolio-level mandate from feedback_v3_engineered_features_proven.md:
-    All 4 symbols (BCH/ALGO/TRX/LDO) use regime_momentum_signed_5d via the 14-feature
-    universal fallback (V3_FEATURES_PER_SYMBOL is empty at iter-v3/040 — all symbols
-    fall back to TOP_N directly).
+    INVERSION of the prior iter-v3/025-040 assertion. The MUST-be-present mandate from
+    feedback_v3_engineered_features_proven.md is being revisited at iter-v3/041
+    EXPLORATION (universal feature pruning axis). 3-path resolution per brief Section 8 —
+    PROMISING (mandate FALSIFIED) / PROMISING-INERT / NEGATIVE (mandate UPHELD; restore
+    at iter-v3/042).
+
+    iter-v3/028 portfolio importance: rank 14/14, importance 390.4 (64.59% of top).
+    iter-v3/040 single-seed cross-check: rank 14/14, importance 454.0 (49.56% of top).
+    Both rankings place this engineered feature at the bottom — strongest evidence
+    that it warrants removal as part of universal pruning.
     """
-    assert "regime_momentum_signed_5d" in V3_FEATURE_COLUMNS_TOP_N, (
-        "regime_momentum_signed_5d MISSING from V3_FEATURE_COLUMNS_TOP_N. "
-        "Portfolio-level mandate requires all symbols to use this feature. "
-        "feedback_v3_engineered_features_proven.md. Do NOT revert."
+    assert "regime_momentum_signed_5d" not in V3_FEATURE_COLUMNS_TOP_N, (
+        "regime_momentum_signed_5d FOUND in V3_FEATURE_COLUMNS_TOP_N — must be ABSENT at "
+        "iter-v3/041 (universal feature pruning EXPLORATION). "
+        "Per analysis/iteration_v3-041/bottom3_features_eda.py SHA c2e2712. "
+        "Remove it from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
+    )
+
+
+def test_sym_vs_btc_ret_7d_not_in_universal_list() -> None:
+    """sym_vs_btc_ret_7d MUST NOT be in V3_FEATURE_COLUMNS_TOP_N at iter-v3/041.
+
+    NEW iter-v3/041 drop. iter-v3/028 portfolio importance: rank 13/14, importance 398.0
+    (65.85% of top). Bottom-3 by canonical multi-seed ranking. ALSO bottom-3 in
+    iter-v3/040 single-seed cross-check (rank 12/14, importance 606.0).
+    """
+    assert "sym_vs_btc_ret_7d" not in V3_FEATURE_COLUMNS_TOP_N, (
+        "sym_vs_btc_ret_7d FOUND in V3_FEATURE_COLUMNS_TOP_N — must be ABSENT at "
+        "iter-v3/041 (universal feature pruning EXPLORATION). "
+        "Per analysis/iteration_v3-041/bottom3_features_eda.py SHA c2e2712."
+    )
+
+
+def test_ret_skew_50_not_in_universal_list() -> None:
+    """ret_skew_50 MUST NOT be in V3_FEATURE_COLUMNS_TOP_N at iter-v3/041.
+
+    NEW iter-v3/041 drop. iter-v3/028 portfolio importance: rank 12/14, importance 412.8
+    (68.30% of top). Bottom-3 by canonical multi-seed ranking. (Note: ret_skew_50 ranks
+    higher in iter-v3/040 single-seed at rank 6, importance 697.0 — but iter-v3/028
+    multi-seed is the canonical source per task spec.)
+    """
+    assert "ret_skew_50" not in V3_FEATURE_COLUMNS_TOP_N, (
+        "ret_skew_50 FOUND in V3_FEATURE_COLUMNS_TOP_N — must be ABSENT at iter-v3/041 "
+        "(universal feature pruning EXPLORATION). "
+        "Per analysis/iteration_v3-041/bottom3_features_eda.py SHA c2e2712."
     )
 
 
 def test_fracdiff_not_in_universal_list() -> None:
-    """fracdiff_d05_close must NOT be in V3_FEATURE_COLUMNS_TOP_N (universal list).
-
-    iter-v3/040: V3_FEATURES_PER_SYMBOL is empty. fracdiff_d05_close is NOT a model
-    input for any symbol. Universal list has 14 features (no fracdiff extension).
-    Column still generated in parquets by add_engineered_v3_features but excluded
-    from all feature_columns lists.
-    """
+    """fracdiff_d05_close must NOT be in V3_FEATURE_COLUMNS_TOP_N (universal list)."""
     assert "fracdiff_d05_close" not in V3_FEATURE_COLUMNS_TOP_N, (
         "fracdiff_d05_close FOUND in V3_FEATURE_COLUMNS_TOP_N — must be ABSENT. "
-        "iter-v3/040: fracdiff_d05_close is NOT a model input for any symbol. "
-        "Remove it from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
+        "iter-v3/041: fracdiff_d05_close is NOT a model input for any symbol."
     )
 
 
 def test_cross_asset_divergence_not_in_universal_list() -> None:
-    """cross_asset_divergence_norm must NOT be in V3_FEATURE_COLUMNS_TOP_N (universal list).
-
-    iter-v3/040: cross_asset_divergence_norm is dead at model level (iter-v3/037 NEGATIVE
-    reverted; no per-symbol entry for any symbol; V3_FEATURES_PER_SYMBOL is empty).
-    Column still generated in parquets by engineered_v3 dispatch but NOT in any
-    V3_FEATURES_PER_SYMBOL entry and NOT in the universal list.
-    Universal application failed at iter-v3/027 (IS Sharpe collapse -0.2817; OOS spike +1.6786).
-    """
+    """cross_asset_divergence_norm must NOT be in V3_FEATURE_COLUMNS_TOP_N."""
     assert "cross_asset_divergence_norm" not in V3_FEATURE_COLUMNS_TOP_N, (
         "cross_asset_divergence_norm FOUND in V3_FEATURE_COLUMNS_TOP_N — must be ABSENT. "
-        "iter-v3/040: cross_asset_divergence_norm dead at model level. "
-        "Universal application FALSIFIED at iter-v3/027. LDO per-symbol FALSIFIED at iter-v3/037. "
-        "Remove it from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
+        "Universal application FALSIFIED at iter-v3/027; LDO per-symbol FALSIFIED at iter-v3/037."
     )
 
 
 def test_vol_adj_autocorr_not_in_universal_list() -> None:
-    """vol_adj_autocorr must NOT be in V3_FEATURE_COLUMNS_TOP_N (universal list).
-
-    iter-v3/040: vol_adj_autocorr is dead code (iter-v3/036 NEGATIVE reverted;
-    iter-v3/037-040 do not reintroduce it; V3_FEATURES_PER_SYMBOL is empty).
-    Universal application failed at iter-v3/026 (IS Sharpe collapse +0.0493; 27x IS/OOS ratio).
-    TRX per-symbol application also failed at iter-v3/036 (~-15 OOS wpnl swing).
-    """
+    """vol_adj_autocorr must NOT be in V3_FEATURE_COLUMNS_TOP_N."""
     assert "vol_adj_autocorr" not in V3_FEATURE_COLUMNS_TOP_N, (
         "vol_adj_autocorr FOUND in V3_FEATURE_COLUMNS_TOP_N — must be ABSENT. "
-        "iter-v3/040: vol_adj_autocorr is dead code. "
-        "Universal application FALSIFIED at iter-v3/026 (IS Sharpe +0.0493; 27x IS/OOS). "
-        "TRX per-symbol FALSIFIED at iter-v3/036 (~-15 OOS wpnl swing). "
-        "Remove it from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
+        "Dead code; iter-v3/036 NEGATIVE reverted."
     )
 
 
-def test_universal_list_is_14() -> None:
-    """V3_FEATURE_COLUMNS_TOP_N must have exactly 14 features at iter-v3/040.
+def test_universal_list_is_11() -> None:
+    """V3_FEATURE_COLUMNS_TOP_N must have exactly 11 features at iter-v3/041.
 
-    iter-v3/040: universal list UNCHANGED from iter-v3/035 (still 14 features).
-    Neither fracdiff_d05_close, cross_asset_divergence_norm, nor vol_adj_autocorr
-    appear in the universal list.
-    All 4 symbols fall back to this 14-feature universal list (V3_FEATURES_PER_SYMBOL empty).
+    iter-v3/041 universal feature pruning: 14 → 11 (dropped bottom-3 by iter-v3/028
+    portfolio split-importance). All 4 symbols fall back to this 11-feature universal list
+    (V3_FEATURES_PER_SYMBOL empty).
     """
     n = len(V3_FEATURE_COLUMNS_TOP_N)
-    assert n == 14, (
-        f"V3_FEATURE_COLUMNS_TOP_N has {n} features — expected exactly 14. "
-        f"iter-v3/040: universal list unchanged (14 features); all symbols use this fallback. "
+    assert n == 11, (
+        f"V3_FEATURE_COLUMNS_TOP_N has {n} features — expected exactly 11 at iter-v3/041. "
+        f"Universal feature pruning dropped 3 bottom features (regime_momentum_signed_5d, "
+        f"sym_vs_btc_ret_7d, ret_skew_50). "
         f"Check features_v3/__init__.py V3_FEATURE_COLUMNS_TOP_N."
     )
 
 
 @pytest.mark.parametrize("symbol", ["BCHUSDT", "ALGOUSDT", "LDOUSDT", "TRXUSDT"])
-def test_all_symbols_fallback_14(symbol: str) -> None:
-    """All 4 v3 symbols must return exactly 14 features at iter-v3/040.
-
-    iter-v3/040: V3_FEATURES_PER_SYMBOL is empty. All symbols fall back to
-    V3_FEATURE_COLUMNS_TOP_N (14 features). No per-symbol extensions exist.
-    BCH reverted from iter-v3/035-039 per-symbol fracdiff (IS degradation source).
-    LDO, TRX, ALGO: unchanged (no per-symbol entries at iter-v3/039 already).
-    """
+def test_all_symbols_fallback_11(symbol: str) -> None:
+    """All 4 v3 symbols must return exactly 11 features at iter-v3/041."""
     result = features_for_symbol(symbol)
-    assert len(result) == 14, (
-        f"{symbol}: expected 14 features (V3_FEATURE_COLUMNS_TOP_N universal fallback), "
-        f"got {len(result)}. V3_FEATURES_PER_SYMBOL must be empty at iter-v3/040. "
-        f"All 4 symbols use the 14-feature universal anchor."
+    assert len(result) == 11, (
+        f"{symbol}: expected 11 features (V3_FEATURE_COLUMNS_TOP_N universal fallback at "
+        f"iter-v3/041), got {len(result)}. V3_FEATURES_PER_SYMBOL must be empty + "
+        f"universal list pruned 14 → 11."
     )
     assert result == V3_FEATURE_COLUMNS_TOP_N, (
         f"{symbol}: result differs from V3_FEATURE_COLUMNS_TOP_N. "
@@ -415,22 +356,24 @@ def test_all_symbols_fallback_14(symbol: str) -> None:
 
 
 def test_features_for_symbol_unknown_fallback() -> None:
-    """An unknown symbol falls back to V3_FEATURE_COLUMNS_TOP_N (14 features, no extensions)."""
+    """An unknown symbol falls back to V3_FEATURE_COLUMNS_TOP_N (11 features at iter-v3/041)."""
     result = features_for_symbol("XYZUSDT")
     assert result is not None, "features_for_symbol must never return None."
-    assert len(result) > 0, "features_for_symbol must never return an empty tuple."
+    assert len(result) == 11, (
+        f"Unknown symbol fallback should be 11 features at iter-v3/041, got {len(result)}."
+    )
     assert result == V3_FEATURE_COLUMNS_TOP_N, (
-        "Unknown symbol 'XYZUSDT' should fall back to V3_FEATURE_COLUMNS_TOP_N (14 features)."
+        "Unknown symbol 'XYZUSDT' should fall back to V3_FEATURE_COLUMNS_TOP_N (11 features)."
     )
-    assert "fracdiff_d05_close" not in result, (
-        "Unknown symbol fallback must NOT include fracdiff_d05_close "
-        "(V3_FEATURES_PER_SYMBOL is empty at iter-v3/040; no per-symbol extensions)."
-    )
-    assert "cross_asset_divergence_norm" not in result, (
-        "Unknown symbol fallback must NOT include cross_asset_divergence_norm "
-        "(dead at model level; iter-v3/037 NEGATIVE reverted)."
-    )
-    assert "vol_adj_autocorr" not in result, (
-        "Unknown symbol fallback must NOT include vol_adj_autocorr "
-        "(dead code; iter-v3/036 reverted)."
-    )
+    for feat in (
+        "fracdiff_d05_close",
+        "cross_asset_divergence_norm",
+        "vol_adj_autocorr",
+        "regime_momentum_signed_5d",  # NEW iter-v3/041
+        "sym_vs_btc_ret_7d",  # NEW iter-v3/041
+        "ret_skew_50",  # NEW iter-v3/041
+    ):
+        assert feat not in result, (
+            f"Unknown symbol fallback must NOT include {feat} (iter-v3/041 universal pruning "
+            f"or dead-code policy)."
+        )

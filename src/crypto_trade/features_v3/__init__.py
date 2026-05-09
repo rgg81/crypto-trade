@@ -142,10 +142,16 @@ V3_FEATURE_COLUMNS_TOP_N: tuple[str, ...] = (
     "ret_kurt_200",  # rank 7 (mean 11.5) — tail_risk
     "hurst_100",  # rank 8 (mean 11.5) — regime
     "btc_ret_14d",  # rank 9 (mean 12.5) — cross_btc
-    "ret_skew_50",  # rank 10 (mean 12.5) — tail_risk
+    # iter-v3/041: ret_skew_50 DROPPED (universal feature pruning EXPLORATION).
+    # iter-v3/028 portfolio importance rank 12/14, importance 412.8 (68.30% of top).
+    # Bottom-3 by canonical multi-seed iter-v3/028 portfolio split-importance.
+    # Per analysis/iteration_v3-041/bottom3_features_eda.py SHA c2e2712.
     "vwap_dev_20",  # rank 11 (mean 13.0) — volume_micro
     "ret_autocorr_lag1_50",  # rank 12 (mean 13.5) — momentum_accel
-    "sym_vs_btc_ret_7d",  # rank 13 (mean 14.5) — cross_btc
+    # iter-v3/041: sym_vs_btc_ret_7d DROPPED (universal feature pruning EXPLORATION).
+    # iter-v3/028 portfolio importance rank 13/14, importance 398.0 (65.85% of top).
+    # ALSO bottom-3 in iter-v3/040 single-seed cross-check (rank 12, importance 606.0).
+    # Per analysis/iteration_v3-041/bottom3_features_eda.py SHA c2e2712.
     # iter-v3/020: funding_rate_zscore_30 DROPPED (reverted to 13 features).
     # Per Critic FINAL Rec 2 of iter-v3/019 review: rank 14/14 across all 3
     # symbols; feature did not contribute signal. Infrastructure (funding_v3.py,
@@ -171,7 +177,8 @@ V3_FEATURE_COLUMNS_TOP_N: tuple[str, ...] = (
     # per user directive 2026-05-08 + Critic FINAL `5a47f5d` of iter-v3/024).
     # IC hard gate BYPASSED with carve-out (see phase5p5_gate.md §IC-Gate Carve-Out
     # + feedback_v3_engineered_feature_pivot.md).
-    "regime_momentum_signed_5d",  # rank TBD — engineered_v3 (Category 2 composed feature)
+    # iter-v3/041: regime_momentum_signed_5d DROPPED — see end-of-tuple comment
+    # block for full rationale + 3-path classification.
     # iter-v3/034: fracdiff_d05_close ADDED (14 → 15): LdP AFML Ch. 5 FFD at d=0.5.
     # iter-v3/035: fracdiff_d05_close DROPPED from universal list (15 → 14 revert).
     # Moved to V3_FEATURES_PER_SYMBOL["BCHUSDT"] only (BCH-only per-symbol targeting).
@@ -199,11 +206,39 @@ V3_FEATURE_COLUMNS_TOP_N: tuple[str, ...] = (
     # concentration regression). Per Critic FINAL `966f4c1` of iter-v3/027 +
     # user directive 2026-05-08. compute_cross_asset_divergence_norm retained as
     # dead code in engineered_v3.py at zero revert cost.
+    # iter-v3/041: regime_momentum_signed_5d DROPPED (universal feature pruning
+    # EXPLORATION).  iter-v3/028 portfolio importance rank 14/14, importance 390.4
+    # (64.59% of top). ALSO rank 14/14 in iter-v3/040 single-seed cross-check
+    # (importance 454.0). Strongest evidence of consistent bottom rank — both the
+    # canonical multi-seed and the single-seed cycle 3 anchor place this engineered
+    # feature at the bottom of the importance distribution.
+    #
+    # MUST-be-present mandate from feedback_v3_engineered_features_proven.md
+    # (established iter-v3/025 closeout) is being REVISITED at iter-v3/041
+    # EXPLORATION. EXPLORATIONs can falsify any prior assumption. Three classification
+    # paths (per briefs-v3/iteration_v3-041/research_brief.md Section 8):
+    #   PATH A (PROMISING):       IS lift ≥ +0.10 AND OOS ≥ +1.55 → mandate FALSIFIED
+    #   PATH B (PROMISING-INERT): |IS delta| ≤ 0.10 AND OOS ≥ +1.55 → parsimony-neutral
+    #   PATH C (NEGATIVE):        OOS < +1.55 → mandate UPHELD; restore at iter-v3/042
+    #
+    # Per analysis/iteration_v3-041/bottom3_features_eda.py SHA c2e2712.
+    # compute_regime_momentum_signed_5d retained as dead code in engineered_v3.py
+    # at zero revert cost.
 )
-"""Top-14 feature subset: iter-v3/035 revert — fracdiff_d05_close removed from
-universal list (15→14; moved to V3_FEATURES_PER_SYMBOL["BCHUSDT"] for BCH-only
-per-symbol targeting).  iter-v3/034 add: fracdiff_d05_close added (14→15) then
-dropped here at iter-v3/035 (15→14).
+"""Top-11 feature subset: iter-v3/041 universal feature pruning EXPLORATION
+(14→11) — dropped 3 lowest by iter-v3/028 portfolio importance:
+  - regime_momentum_signed_5d (rank 14/14, importance 390.4)
+  - sym_vs_btc_ret_7d         (rank 13/14, importance 398.0)
+  - ret_skew_50               (rank 12/14, importance 412.8)
+Combined dropped importance 17.6% of total split count. Per
+analysis/iteration_v3-041/bottom3_features_eda.py SHA c2e2712. The MUST-be-present
+mandate for regime_momentum_signed_5d from feedback_v3_engineered_features_proven.md
+is being revisited via this EXPLORATION axis (3-path resolution per brief Section 8).
+
+iter-v3/035 revert — fracdiff_d05_close removed from universal list (15→14; moved
+to V3_FEATURES_PER_SYMBOL["BCHUSDT"] for BCH-only per-symbol targeting); cleared
+again at iter-v3/040 cycle 3 baseline restore.  iter-v3/034 add: fracdiff_d05_close
+added (14→15) then dropped here at iter-v3/035 (15→14).
 iter-v3/028 drop: cross_asset_divergence_norm removed (revert 15→14; matches
 iter-v3/025 anchor exactly). iter-v3/027 was: atomic swap vol_adj_autocorr dropped,
 cross_asset_divergence_norm added.
