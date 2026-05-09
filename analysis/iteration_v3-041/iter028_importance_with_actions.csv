@@ -1,0 +1,15 @@
+rank_desc,feature,importance,pct_of_top,action
+1,range_realized_vol_50,604.4,100.0,KEEP
+2,vwap_dev_20,586.0,96.96,KEEP
+3,ret_skew_200,571.4,94.54,KEEP
+4,ret_kurt_50,564.4,93.38,KEEP
+5,max_dd_window_50,508.4,84.12,KEEP
+6,ret_kurt_200,507.2,83.92,KEEP
+7,ema_spread_atr_20,496.4,82.13,KEEP
+8,hurst_diff_100_50,490.6,81.17,KEEP
+9,ret_autocorr_lag1_50,459.0,75.94,KEEP
+10,btc_ret_14d,427.0,70.65,KEEP
+11,hurst_100,421.0,69.66,KEEP
+12,ret_skew_50,412.8,68.3,DROP
+13,sym_vs_btc_ret_7d,398.0,65.85,DROP
+14,regime_momentum_signed_5d,390.4,64.59,DROP
