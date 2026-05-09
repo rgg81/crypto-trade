@@ -103,7 +103,7 @@ def _derive_ensemble_seeds(outer_seed: int, size: int = ENSEMBLE_SIZE) -> list[i
     return [int(s) for s in rng.integers(low=0, high=2**31 - 1, size=size)]
 
 
-ITERATION_LABEL = "v3-048"
+ITERATION_LABEL = "v3-049"
 REPORTS_DIR = Path("reports-v3")
 FEATURES_DIR = Path("data/features_v3")
 DATA_DIR = Path("data")
@@ -191,13 +191,15 @@ def _verify_data_freshness(symbols: tuple[str, ...], max_lag_hours: float = 16.0
 
 
 def _verify_feature_columns() -> None:
-    """Verifies V3_FEATURE_COLUMNS contents per current brief (iter-v3/048).
+    """Verifies V3_FEATURE_COLUMNS contents per current brief (iter-v3/049).
 
-    iter-v3/048: EXPLORATION — cycle 3 #9 — NEW universal engineered feature:
-      vol_normalized_ret_5d = ret_5d / (range_realized_vol_50 + 1e-6).
-      Canonical Sharpe-like risk-normalized momentum (Sinclair, Vol Trading; LdP AFML Ch. 8).
-      Cycle 3 plan Axis 1; QR EDA SHA a230cd1. Universal list = 15 features (14 → 15).
-      All other state UNCHANGED from iter-v3/047 carry-forward:
+    iter-v3/049: EXPLORATION — cycle 3 #10 (LAST) — per-symbol ADX threshold raise:
+      adx_threshold_per_symbol = {"TRXUSDT": 21.0} (BCH/LDO/ALGO unchanged at 20.0).
+      NEW RiskV2Config field (gate-config-only change); no feature regeneration needed.
+      REVERT: vol_normalized_ret_5d DROPPED (15 → 14) per iter-v3/048 PATH C-clean
+        closeout. iter-v3/048 ranked it 13-15/15 across all 4 symbols; saturation rule
+        fires — NEW universal engineered feature axis CLOSED for cycle 3.
+      All other state UNCHANGED from iter-v3/047 + iter-v3/048 setup carry-forward:
       PART A (carried forward from iter-v3/044+045): efficiency_ratio_50 DROPPED;
         regime_momentum_signed_3d UNIVERSAL ADDITION REVERTED.
       PART B (per-symbol ATR axis): V3_ATR_MULTIPLIERS_PER_SYMBOL has 2 entries.
@@ -206,6 +208,7 @@ def _verify_feature_columns() -> None:
         - BCHUSDT:  DEFAULT fallback (2.0, 1.0).
         - TRX still falls back to DEFAULT_ATR_MULTIPLIERS = (2.0, 1.0).
       PART C (iter-v3/047 carry-forward): primitive 10 block_long_for=("BCHUSDT",).
+      PART D (iter-v3/049 NEW): per-symbol ADX threshold adx_threshold_per_symbol={"TRXUSDT": 21.0}.
       DEFAULT_ATR_MULTIPLIERS: (2.0, 1.0) — unchanged.
       V3_FEATURES_PER_SYMBOL: EMPTY (unchanged from iter-v3/040).
 
@@ -217,29 +220,30 @@ def _verify_feature_columns() -> None:
     cross_asset_divergence_norm MUST NOT be in universal list (dead at model level).
     fracdiff_d05_close MUST NOT be in universal list AND MUST NOT be in any per-symbol entry.
     efficiency_ratio_50 MUST NOT be present (DROPPED — iter-v3/043 DISASTROUS NEGATIVE).
-    regime_momentum_signed_5d MUST be present (mandate still ACTIVE at iter-v3/048).
-    vol_normalized_ret_5d MUST be present (NEW — iter-v3/048; cycle 3 plan Axis 1).
+    regime_momentum_signed_5d MUST be present (mandate still ACTIVE at iter-v3/049).
+    vol_normalized_ret_5d MUST NOT be present (DROPPED iter-v3/049; iter-v3/048 PATH C-clean).
     regime_momentum_signed_3d MUST NOT be present in V3_FEATURE_COLUMNS_TOP_N (universal
       addition REVERTED at iter-v3/044 per QR EDA). Code retained as dead code in
       engineered_v3.py; available for future per-symbol experiments.
-    sym_vs_btc_ret_7d MUST be present (RESTORED at iter-v3/042; KEPT at iter-v3/048).
-    ret_skew_50 MUST be present (RESTORED at iter-v3/042; KEPT at iter-v3/048).
+    sym_vs_btc_ret_7d MUST be present (RESTORED at iter-v3/042; KEPT at iter-v3/049).
+    ret_skew_50 MUST be present (RESTORED at iter-v3/042; KEPT at iter-v3/049).
 
-    Per-symbol checks (iter-v3/048):
+    Per-symbol checks (iter-v3/049):
     V3_FEATURES_PER_SYMBOL must be EMPTY (0 entries).
     V3_ATR_MULTIPLIERS_PER_SYMBOL must contain exactly 2 entries (unchanged from iter-v3/047):
       ALGOUSDT → (2.0, 1.5) (carried forward from iter-v3/044).
       LDOUSDT  → (2.0, 1.5) (carried forward from iter-v3/045).
       BCHUSDT  MUST NOT be a key (REMOVED at iter-v3/047 per Critic FINAL `5dae6d6` revert).
-    features_for_symbol("BCHUSDT") MUST return 15 features = V3_FEATURE_COLUMNS_TOP_N.
-    features_for_symbol("ALGOUSDT") MUST return 15 features (fallback).
-    features_for_symbol("LDOUSDT") MUST return 15 features (fallback).
-    features_for_symbol("TRXUSDT") MUST return 15 features (fallback).
+    features_for_symbol("BCHUSDT") MUST return 14 features = V3_FEATURE_COLUMNS_TOP_N.
+    features_for_symbol("ALGOUSDT") MUST return 14 features (fallback).
+    features_for_symbol("LDOUSDT") MUST return 14 features (fallback).
+    features_for_symbol("TRXUSDT") MUST return 14 features (fallback).
     atr_multipliers_for_symbol("ALGOUSDT") MUST return (2.0, 1.5) (per-symbol entry).
     atr_multipliers_for_symbol("LDOUSDT") MUST return (2.0, 1.5) (per-symbol entry).
     atr_multipliers_for_symbol("BCHUSDT") MUST return (2.0, 1.0) (DEFAULT fallback).
     atr_multipliers_for_symbol("TRXUSDT") MUST return (2.0, 1.0) (DEFAULT fallback).
     DEFAULT_ATR_MULTIPLIERS MUST be (2.0, 1.0) (correct since iter-v3/043 revert).
+    Per-symbol ADX (NEW iter-v3/049): risk_cfg.adx_threshold_per_symbol == {"TRXUSDT": 21.0}.
     """
     from crypto_trade.features_v3 import (  # noqa: PLC0415
         DEFAULT_ATR_MULTIPLIERS,
@@ -248,12 +252,12 @@ def _verify_feature_columns() -> None:
     )
 
     n = len(V3_FEATURE_COLUMNS)
-    if n != 15:
+    if n != 14:
         raise RuntimeError(
-            f"V3_FEATURE_COLUMNS has {n} columns — expected exactly 15. "
-            "iter-v3/048: ADD vol_normalized_ret_5d (14 → 15; cycle 3 plan Axis 1 "
-            "NEW engineered feature per brief Section 3 Sub-fix 3). "
-            "Add 'vol_normalized_ret_5d' to V3_FEATURE_COLUMNS_TOP_N in "
+            f"V3_FEATURE_COLUMNS has {n} columns — expected exactly 14. "
+            "iter-v3/049: REVERT vol_normalized_ret_5d (15 → 14) per iter-v3/048 PATH C-clean "
+            "closeout (ranked 13-15/15 across all 4 symbols; saturation rule fires). "
+            "Remove 'vol_normalized_ret_5d' from V3_FEATURE_COLUMNS_TOP_N in "
             "features_v3/__init__.py."
         )
     if "tbr_zscore_30" in V3_FEATURE_COLUMNS:
@@ -372,7 +376,8 @@ def _verify_feature_columns() -> None:
         )
     print(
         f"  V3_FEATURE_COLUMNS: {n} columns "
-        "(iter-v3/048: 15-feature set; vol_normalized_ret_5d ADDED; efficiency_ratio_50 ABSENT; "
+        "(iter-v3/049: 14-feature set; vol_normalized_ret_5d DROPPED (iter-v3/048 PATH C-clean); "
+        "efficiency_ratio_50 ABSENT; "
         "regime_momentum_signed_3d ABSENT (universal addition REVERTED); "
         "regime_momentum_signed_5d, sym_vs_btc_ret_7d, ret_skew_50 PRESENT)  PASS"
     )
@@ -398,7 +403,7 @@ def _verify_feature_columns() -> None:
             f"Current keys: {list(V3_FEATURES_PER_SYMBOL.keys())}. "
             "Clear V3_FEATURES_PER_SYMBOL to {{}} in features_v3/__init__.py."
         )
-    print("  V3_FEATURES_PER_SYMBOL: 0 entries (empty — all symbols use 15-feature fallback)  PASS")
+    print("  V3_FEATURES_PER_SYMBOL: 0 entries (empty — all symbols use 14-feature fallback)  PASS")
 
     # iter-v3/047: V3_ATR_MULTIPLIERS_PER_SYMBOL MUST contain exactly 2 entries (BCH REMOVED):
     #   ALGOUSDT → (2.0, 1.5) (carried forward from iter-v3/044 PROMISING)
@@ -456,15 +461,17 @@ def _verify_feature_columns() -> None:
         "TRX + BCH use (2.0, 1.0) DEFAULT (BCH REVERTED at iter-v3/047)  PASS"
     )
 
-    # iter-v3/048: Verify all 4 symbols return 15-feature fallback (V3_FEATURE_COLUMNS_TOP_N).
+    # iter-v3/049: Verify all 4 symbols return 14-feature fallback (V3_FEATURE_COLUMNS_TOP_N).
+    # vol_normalized_ret_5d DROPPED (15 → 14) per iter-v3/048 PATH C-clean closeout.
     for sym in ("BCHUSDT", "ALGOUSDT", "LDOUSDT", "TRXUSDT"):
         sym_feats = features_for_symbol(sym)
-        if len(sym_feats) != 15:
+        if len(sym_feats) != 14:
             raise RuntimeError(
                 f"{sym} fallback has {len(sym_feats)} features — "
-                "expected exactly 15 (iter-v3/048 V3_FEATURE_COLUMNS_TOP_N universal list). "
-                "iter-v3/048: all 4 symbols must use the 15-feature set "
-                "(vol_normalized_ret_5d ADDED; efficiency_ratio_50 ABSENT; "
+                "expected exactly 14 (iter-v3/049 V3_FEATURE_COLUMNS_TOP_N universal list). "
+                "iter-v3/049: REVERT vol_normalized_ret_5d (15 → 14; iter-v3/048 PATH C-clean); "
+                "all 4 symbols must use the 14-feature set "
+                "(vol_normalized_ret_5d ABSENT; efficiency_ratio_50 ABSENT; "
                 "regime_momentum_signed_3d ABSENT; V3_FEATURES_PER_SYMBOL empty)."
             )
         if "fracdiff_d05_close" in sym_feats:
@@ -494,9 +501,9 @@ def _verify_feature_columns() -> None:
                 f"Check V3_FEATURE_COLUMNS_TOP_N and features_for_symbol('{sym}') path."
             )
     print(
-        "  BCH/ALGO/LDO/TRX: 15-feature universal fallback "
-        "(vol_normalized_ret_5d ADDED; efficiency_ratio_50 ABSENT; "
-        "regime_momentum_signed_3d ABSENT; _5d PRESENT)  PASS"
+        "  BCH/ALGO/LDO/TRX: 14-feature universal fallback "
+        "(vol_normalized_ret_5d DROPPED per iter-v3/048 PATH C-clean; efficiency_ratio_50 ABSENT; "
+        "regime_momentum_signed_3d ABSENT; regime_momentum_signed_5d PRESENT)  PASS"
     )
 
     # iter-v3/047: TRX + BCH MUST be (2.0, 1.0) via DEFAULT fallback (BCH REVERTED).
@@ -579,15 +586,20 @@ def _verify_feature_columns() -> None:
         )
     print("  regime_momentum_signed_5d PRESENT in V3_FEATURE_COLUMNS_TOP_N (mandate ACTIVE)  PASS")
 
-    # iter-v3/048: vol_normalized_ret_5d MUST be in V3_FEATURE_COLUMNS_TOP_N (NEW addition).
-    if "vol_normalized_ret_5d" not in V3_FEATURE_COLUMNS_TOP_N:
+    # iter-v3/049: vol_normalized_ret_5d MUST NOT be in V3_FEATURE_COLUMNS_TOP_N (DROPPED).
+    # Reverted from iter-v3/048 (PATH C-clean: ranked 13-15/15 across all 4 symbols;
+    # IS Sharpe Δ -0.43 + OOS Sharpe Δ -3.15; saturation rule fires).
+    if "vol_normalized_ret_5d" in V3_FEATURE_COLUMNS_TOP_N:
         raise RuntimeError(
-            "vol_normalized_ret_5d NOT FOUND in V3_FEATURE_COLUMNS_TOP_N — must be PRESENT "
-            "at iter-v3/048. Cycle 3 plan Axis 1 (NEW engineered feature) per "
-            "feedback_v3_engineered_features_proven.md. "
-            "Add it to V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
+            "vol_normalized_ret_5d FOUND in V3_FEATURE_COLUMNS_TOP_N — must be ABSENT "
+            "at iter-v3/049. DROPPED per iter-v3/048 PATH C-clean closeout (ranked 13-15/15 "
+            "across all 4 symbols; IS Sharpe Δ -0.43 + OOS Sharpe Δ -3.15 vs anchor). "
+            "Remove it from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
         )
-    print("  vol_normalized_ret_5d PRESENT in V3_FEATURE_COLUMNS_TOP_N (cycle 3 plan Axis 1)  PASS")
+    print(
+        "  vol_normalized_ret_5d ABSENT from V3_FEATURE_COLUMNS_TOP_N "
+        "(DROPPED iter-v3/049 per iter-v3/048 PATH C-clean closeout)  PASS"
+    )
 
     # iter-v3/044: regime_momentum_signed_3d UNIVERSAL ADDITION REVERTED before backtest.
     # Per QR EDA SHA `eff841e` — does not address ALGO LONG bottleneck; ranks 14/14 in ALGO.
@@ -612,6 +624,32 @@ def _verify_feature_columns() -> None:
             "Remove it from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
         )
     print("  efficiency_ratio_50 ABSENT from V3_FEATURE_COLUMNS_TOP_N (DROPPED iter-v3/044)  PASS")
+
+    # iter-v3/049: Verify per-symbol ADX threshold override is wired correctly.
+    # Build a TRXUSDT model (quick -- n_trials=1 just to get the config) and check
+    # that adx_threshold_per_symbol == {"TRXUSDT": 21.0}.
+    _trx_cfg_check, trx_strat_check = _build_v3_model(
+        symbol="TRXUSDT", seed=42, n_trials=1, ensemble_seeds=[42]
+    )
+    if not isinstance(trx_strat_check, RiskV3Wrapper):
+        raise RuntimeError(
+            f"_build_v3_model(TRXUSDT) returned {type(trx_strat_check).__name__} — "
+            "expected RiskV3Wrapper. iter-v3/049: per-symbol ADX threshold check requires "
+            "RiskV3Wrapper. Check _build_v3_model returns RiskV3Wrapper."
+        )
+    if trx_strat_check.config.adx_threshold_per_symbol != {"TRXUSDT": 21.0}:
+        raise RuntimeError(
+            f"RiskV2Config.adx_threshold_per_symbol = "
+            f"{trx_strat_check.config.adx_threshold_per_symbol} — expected "
+            "{'TRXUSDT': 21.0}. iter-v3/049: per-symbol ADX threshold raise for TRX "
+            "only (20 → 21) per QR EDA SHA `ba8a3de`. "
+            "Set adx_threshold_per_symbol={'TRXUSDT': 21.0} in RiskV2Config init "
+            "in _build_v3_model."
+        )
+    print(
+        "  Per-symbol ADX threshold (iter-v3/049): {'TRXUSDT': 21.0}; "
+        "BCH/LDO/ALGO unchanged at global 20.0  PASS"
+    )
 
 
 def _verify_label_leakage_gap() -> None:
@@ -1331,6 +1369,14 @@ def _build_v3_model(
         # iter-v3/047 (BCH SHORT is the positive contributor).
         block_long_for=("BCHUSDT",),
         block_short_for=(),
+        # iter-v3/049: per-symbol ADX threshold raise for TRX only (20.0 → 21.0).
+        # QR EDA SHA `ba8a3de` (analysis/iteration_v3-049/axis_e_with_primitive10_carry.py):
+        # 9 TRX IS trades at ADX 20-21 had collective wpnl -4.77 (every one a net-EV
+        # loser); 2 OOS trades at same range had collective wpnl -0.01 (negligible).
+        # BOTH-must-improve PASSES at single-seed EDA stage. BCH/LDO/ALGO unchanged
+        # at global 20.0 — primitive 10 absorbs BCH-LONG ADX-low toxicity; LDO/ALGO
+        # ADX-low buckets are OOS-positive and cannot be safely blocked.
+        adx_threshold_per_symbol={"TRXUSDT": 21.0},
     )
     strategy = RiskV3Wrapper(m1, risk_cfg)
     return cfg, strategy

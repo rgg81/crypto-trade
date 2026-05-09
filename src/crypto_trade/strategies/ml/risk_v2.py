@@ -31,7 +31,7 @@ the gates reproducible across seeds.
 from __future__ import annotations
 
 from collections import deque
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from typing import Protocol
 
 import numpy as np
@@ -123,6 +123,18 @@ class RiskV2Config:
     # Default empty preserves v1/v2/v3-prior behavior.
     block_long_for: tuple[str, ...] = ()  # e.g. ("BCHUSDT",) — block direction == +1
     block_short_for: tuple[str, ...] = ()  # e.g. () — block direction == -1 (unused at iter-v3/047)
+
+    # iter-v3/049: per-symbol ADX threshold override (parallel to regime_gate_symbols,
+    # block_long_for, block_short_for fields). When a symbol is in this dict, the
+    # per-symbol value is used instead of the global adx_threshold. Symbols absent
+    # from this dict fall back to the global adx_threshold.
+    # Default empty preserves v1/v2/v3-prior behavior (universal threshold).
+    # Calibrated by QR EDA at iter-v3/049 (analysis/iteration_v3-049/
+    # axis_e_with_primitive10_carry.py): TRX has 9 IS trades at ADX 20-21 with
+    # collective wpnl -4.77 (every one a net-EV loser); 2 OOS trades at same range
+    # with collective wpnl -0.01 (negligible). BOTH-must-improve PASSES at single-
+    # seed EDA stage. iter-v3/049 sets {"TRXUSDT": 21.0}; BCH/LDO/ALGO unchanged.
+    adx_threshold_per_symbol: dict[str, float] = field(default_factory=dict)
 
 
 @dataclass
@@ -392,7 +404,11 @@ class RiskV2Wrapper:
         adx = float(lk["adx"][idx])
         if not np.isfinite(adx):
             return False
-        return adx < self.config.adx_threshold
+        # iter-v3/049: per-symbol ADX threshold override (default empty falls back to
+        # global adx_threshold). Per QR EDA SHA `ba8a3de`: TRX-only raise 20 → 21
+        # satisfies BOTH-must-improve at single-seed (+4.77 IS lift, -0.01 OOS cost).
+        threshold = self.config.adx_threshold_per_symbol.get(symbol, self.config.adx_threshold)
+        return adx < threshold
 
     def _low_vol_filter_fails(self, row: dict) -> bool:
         """iter-v2/004: return True when atr_pct_rank_200 is below the filter threshold."""

@@ -266,12 +266,20 @@ V3_FEATURE_COLUMNS_TOP_N: tuple[str, ...] = (
     # IC carve-out applies per feedback_v3_engineered_feature_pivot.md (Category 2 composed
     # feature; |IC| with ret_5d ~0.7+ expected by construction). Binding gate: importance >=30
     # in at least 2 of 4 symbols. QR EDA SHA a230cd1; cycle 3 #9 of 10.
-    "vol_normalized_ret_5d",  # iter-v3/048 NEW (14 → 15) — engineered_v3 Category 2
+    # iter-v3/049: vol_normalized_ret_5d DROPPED (15 → 14) per iter-v3/048 PATH C-clean
+    # closeout. iter-v3/048 result: vol_normalized_ret_5d ranked 13-15/15 across all 4
+    # symbols (IS Sharpe Δ -0.43 + OOS Sharpe Δ -3.15 vs iter-v3/045 anchor). Per pre-
+    # registered saturation rule (brief §4 PATH C action), NEW universal engineered feature
+    # axis CLOSED for cycle 3 (5 attempts: iter-v3/035, /041, /042, /043, /044+/048).
+    # compute_vol_normalized_ret_5d retained as dead code in engineered_v3.py (zero revert
+    # cost; available for future per-symbol experiments per iter-v3/048 diary §Architectural
+    # Decisions). NOT dispatched when absent from V3_FEATURE_COLUMNS_TOP_N.
 )
-"""Top-15 feature subset (as of iter-v3/048): vol_normalized_ret_5d ADDED (14 → 15).
-iter-v3/048: vol_normalized_ret_5d = ret_5d / (range_realized_vol_50 + 1e-6). Canonical
-Sharpe-like risk-normalized momentum. Cycle 3 plan Axis 1; QR EDA SHA a230cd1.
-IC carve-out per feedback_v3_engineered_feature_pivot.md (Category 2 composed feature).
+"""Top-14 feature subset (as of iter-v3/049): vol_normalized_ret_5d DROPPED (15 → 14).
+iter-v3/049: vol_normalized_ret_5d DROPPED per iter-v3/048 PATH C-clean closeout.
+iter-v3/048 ranked vol_normalized_ret_5d 13-15/15 across all 4 symbols (IS Sharpe Δ -0.43
++ OOS Sharpe Δ -3.15 vs iter-v3/045 anchor); saturation rule fires — NEW universal
+engineered feature axis CLOSED for cycle 3.
 
 Top-14 context (iter-v3/044): reverts iter-v3/043's DISASTROUS efficiency_ratio_50
 (IS -0.8445 / OOS -0.8990; all 4 symbols broken). The 3d variant universal addition was
@@ -281,7 +289,7 @@ axis selection per feedback_v3_axis_selection_quant_discipline.md).
 iter-v3/042 restored 3 features (ret_skew_50, sym_vs_btc_ret_7d,
 regime_momentum_signed_5d) from iter-v3/041 Path C NEGATIVE mandate.
 The MUST-be-present mandate for regime_momentum_signed_5d from
-feedback_v3_engineered_features_proven.md remains ACTIVE at iter-v3/048.
+feedback_v3_engineered_features_proven.md remains ACTIVE at iter-v3/049.
 
 iter-v3/043: efficiency_ratio_50 ADDED (14 → 15) — DISASTROUS NEGATIVE.
 iter-v3/044: efficiency_ratio_50 DROPPED (reverted to 14 base). compute_efficiency_ratio_50
@@ -294,13 +302,14 @@ attribution loss) and 3d does NOT discriminate ALGO LONG WR. compute_regime_mome
 retained as dead code in engineered_v3.py; NOT dispatched. Per Sub-fix 2 of Section 3.
 Replacement axis: per-symbol ATR widening for ALGOUSDT only.
 
-Top-N history (last 5 entries):
+Top-N history (last 6 entries):
   iter-v3/041: pruned 14 → 11 (dropped ret_skew_50, sym_vs_btc_ret_7d, regime_momentum)
   iter-v3/042: RESTORED 11 → 14 (Path C NEGATIVE mandate at iter-v3/041 fired)
   iter-v3/043: ADDED 14 → 15 (efficiency_ratio_50 Kaufman 1995 ER — DISASTROUS NEGATIVE)
   iter-v3/044: REVERT 15 → 14 (drop both efficiency_ratio_50 AND regime_momentum_signed_3d
               universal addition; new axis = per-symbol ATR for ALGO).
   iter-v3/048: ADDED 14 → 15 (vol_normalized_ret_5d NEW; cycle 3 #9 of 10).
+  iter-v3/049: REVERT 15 → 14 (vol_normalized_ret_5d DROPPED; iter-v3/048 PATH C-clean).
 
 iter-v3/035 revert — fracdiff_d05_close removed from universal list (15→14; moved
 to V3_FEATURES_PER_SYMBOL["BCHUSDT"] for BCH-only per-symbol targeting); cleared
