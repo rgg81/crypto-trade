@@ -574,19 +574,15 @@ V3_ATR_MULTIPLIERS_PER_SYMBOL: dict[str, tuple[float, float]] = {
     # natural volatility regime. NOT the iter-v3/032 (1.5, 0.75) tighter-barrier path
     # which was MULTI-SEED-FALSIFIED at iter-v3/039 — this is the OPPOSITE direction.
     "LDOUSDT": (2.0, 1.5),
-    # iter-v3/046: BCHUSDT entry added (2.0, 1.5) — TP unchanged, SL widened by 50%.
-    # QR EDA SHA `d86b1f9` (analysis/iteration_v3-046/bch_trx_bottleneck_diagnosis.py):
-    # BCH direction asymmetry is the IS bottleneck — LONG IS -25.07% (39 trades, 30.8%
-    # WR — toxic), SHORT IS +48.69% (55 trades, 43.6% WR — positive); BCH OOS LONGs
-    # also toxic (-7.44%, 28.6% WR). BCH IS=OOS SL:TP=1.93 STABLE (no IS->OOS regime
-    # shift; mean_SL -3.90% IS / -3.45% OOS) — wider SL helps IS AND OOS SYMMETRICALLY,
-    # distinct from iter-v3/045 LDO which addressed an asymmetric IS->OOS shift. Third
-    # application of validated wider-SL mechanism (ALGO at iter-v3/044 PROMISING + LDO
-    # at iter-v3/045 STRONGEST PROMISING + BCH at iter-v3/046). All-3-symbol
-    # per-symbol-ATR is LABEL-LAYER ONLY (no feature-layer changes), architecturally
-    # homogeneous (vs iter-v3/039's mixed feature+label stack). BCH symmetric IS=OOS
-    # mechanism reduces IS-divergence risk vs iter-v3/039 pattern.
-    "BCHUSDT": (2.0, 1.5),
+    # iter-v3/047: BCHUSDT entry REMOVED — iter-v3/046 widened BCH SL to (2.0, 1.5) on
+    # the hypothesis that wider SL helps BCH symmetrically across IS+OOS (BCH SL:TP
+    # stable at 1.93). Result: BCH IS-axis collapse (Δ -0.54 IS Sharpe) + OOS -45 swing
+    # (BCH OOS PnL +10.75 → -34.54). Mirror mechanism FAILED on stable-SL:TP symbols.
+    # Critic FINAL `5dae6d6`: "Stable SL:TP across IS/OOS = WRONG axis. Wider-SL
+    # mechanism is REGIME-MISMATCH-SPECIFIC." BCH reverts to DEFAULT_ATR_MULTIPLIERS
+    # = (2.0, 1.0) via fallback. The per-symbol-ATR axis is CLOSED for BCH; iter-v3/047
+    # pivots to a BCH direction-asymmetric axis (LONG IS -25% toxic / SHORT IS +49%
+    # positive — direction filter or LONG-only ATR may help).
 }
 """Per-symbol ATR multiplier overrides for iter-v3/032+ labeling architecture.
 
@@ -619,7 +615,17 @@ iter-v3/046: BCHUSDT entry added (2.0, 1.5) — QR EDA-driven per-symbol axis se
   iter-v3/045 LDO which addressed an asymmetric IS->OOS regime shift. Third application
   of validated wider-SL mechanism (ALGO at iter-v3/044, LDO at iter-v3/045, BCH at
   iter-v3/046). Source: analysis/iteration_v3-046/bch_trx_bottleneck_diagnosis.py
-  SHA `d86b1f9`.
+  SHA `d86b1f9`. RESULT: NEGATIVE — iter-v3/046 caused BCH IS-axis collapse (Δ -0.54
+  IS Sharpe) + OOS -45 swing (BCH OOS PnL +10.75 → -34.54). Critic FINAL `5dae6d6`:
+  mirror mechanism failed on stable-SL:TP symbols. Memory rule established: per-symbol
+  ATR widening only applies to symbols with regime mismatch (IS->OOS SL:TP shift > 30%
+  OR extreme direction asymmetry > 4:1).
+iter-v3/047: BCHUSDT entry REMOVED — REVERT iter-v3/046 per Critic FINAL recommendation.
+  BCH falls back to DEFAULT_ATR_MULTIPLIERS = (2.0, 1.0). State after revert =
+  iter-v3/045 config (ALGO + LDO entries only). The BCH IS-axis bottleneck (LONG IS
+  -25% toxic / SHORT IS +49% positive) requires a DIRECTION-ASYMMETRIC mechanism, not
+  a symmetric labeling-layer adjustment. iter-v3/047 axis = QR EDA-driven BCH direction
+  axis (specific axis chosen by QR EDA at SHA TBD).
 """
 
 DEFAULT_ATR_MULTIPLIERS: tuple[float, float] = (2.0, 1.0)
