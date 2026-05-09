@@ -103,7 +103,7 @@ def _derive_ensemble_seeds(outer_seed: int, size: int = ENSEMBLE_SIZE) -> list[i
     return [int(s) for s in rng.integers(low=0, high=2**31 - 1, size=size)]
 
 
-ITERATION_LABEL = "v3-044"
+ITERATION_LABEL = "v3-045"
 REPORTS_DIR = Path("reports-v3")
 FEATURES_DIR = Path("data/features_v3")
 DATA_DIR = Path("data")
@@ -191,21 +191,22 @@ def _verify_data_freshness(symbols: tuple[str, ...], max_lag_hours: float = 16.0
 
 
 def _verify_feature_columns() -> None:
-    """Verifies V3_FEATURE_COLUMNS contents per current brief (iter-v3/044).
+    """Verifies V3_FEATURE_COLUMNS contents per current brief (iter-v3/045).
 
-    iter-v3/044: EXPLORATION — cycle 3 #5 — REVERT ER + ADD regime_momentum_signed_3d.
-      PART A (revert): efficiency_ratio_50 DROPPED from V3_FEATURE_COLUMNS_TOP_N
-        (already at code level). iter-v3/043 DISASTROUS NEGATIVE (IS -0.8445 / OOS -0.8990;
-        all 4 symbols broken). compute_efficiency_ratio_50 retained as dead code.
-      PART B (per-symbol ATR axis): V3_ATR_MULTIPLIERS_PER_SYMBOL["ALGOUSDT"] = (2.0, 1.5).
-        TP unchanged at 2.0×ATR; SL widened by 50% (1.0 → 1.5×ATR). QR EDA-driven axis
-        per analysis/iteration_v3-044/cycle3_is_diagnosis.py SHA `eff841e`. ALGO LONG is the
-        single largest IS attribution loss (33 trades, -53.26 PnL, 18.2% IS WR / 11.1% OOS WR).
-        Wider SL targets ALGO LONG SL/TP exit asymmetry (27/6 = 4.5:1) directly. Other 3
-        symbols (BCH/LDO/TRX) fall back to DEFAULT_ATR_MULTIPLIERS = (2.0, 1.0).
-      Universal feature list V3_FEATURE_COLUMNS_TOP_N = 14 features (ER REMAINS dropped;
-        regime_momentum_signed_3d UNIVERSAL ADDITION REVERTED — orchestrator's setup commit
-        `1f56c72` superseded by QR EDA-driven axis selection at SHA `eff841e`).
+    iter-v3/045: EXPLORATION — cycle 3 #6 — ADD per-symbol ATR widening for LDO.
+      PART A (carried forward from iter-v3/044): efficiency_ratio_50 DROPPED;
+        regime_momentum_signed_3d UNIVERSAL ADDITION REVERTED. Universal list = 14 features.
+      PART B (per-symbol ATR axis — STACKED): V3_ATR_MULTIPLIERS_PER_SYMBOL has 2 entries.
+        - ALGOUSDT: (2.0, 1.5) — UNCHANGED from iter-v3/044 PROMISING result.
+        - LDOUSDT:  (2.0, 1.5) — NEW iter-v3/045 entry. QR EDA-driven axis per
+          analysis/iteration_v3-045/ldo_bottleneck_diagnosis.py SHA `ed949fe`.
+          LDO IS->OOS exit-composition shift (SL:TP 1.14 -> 2.33; SL rate 53.3% ->
+          63.6%) is the binding constraint. Wider SL targets the IS->OOS regime-shift
+          directly, mirroring iter-v3/044 ALGO mechanism. Predecessor (1.5, 0.75) at
+          iter-v3/032 was MULTI-SEED-FALSIFIED at iter-v3/039 — this is the OPPOSITE
+          direction (wider not tighter).
+        - BCH/TRX still fall back to DEFAULT_ATR_MULTIPLIERS = (2.0, 1.0).
+      Universal feature list V3_FEATURE_COLUMNS_TOP_N = 14 features (UNCHANGED).
         compute_regime_momentum_signed_3d retained as dead code in engineered_v3.py;
         NOT dispatched.
       DEFAULT_ATR_MULTIPLIERS: (2.0, 1.0) — unchanged.
@@ -227,15 +228,17 @@ def _verify_feature_columns() -> None:
     sym_vs_btc_ret_7d MUST be present (RESTORED at iter-v3/042; KEPT at iter-v3/044).
     ret_skew_50 MUST be present (RESTORED at iter-v3/042; KEPT at iter-v3/044).
 
-    Per-symbol checks (iter-v3/044):
+    Per-symbol checks (iter-v3/045):
     V3_FEATURES_PER_SYMBOL must be EMPTY (0 entries).
-    V3_ATR_MULTIPLIERS_PER_SYMBOL must contain exactly 1 entry: ALGOUSDT → (2.0, 1.5).
+    V3_ATR_MULTIPLIERS_PER_SYMBOL must contain exactly 2 entries:
+      ALGOUSDT → (2.0, 1.5) (carried forward from iter-v3/044).
+      LDOUSDT  → (2.0, 1.5) (NEW iter-v3/045).
     features_for_symbol("BCHUSDT") MUST return 14 features = V3_FEATURE_COLUMNS_TOP_N.
     features_for_symbol("ALGOUSDT") MUST return 14 features (fallback).
     features_for_symbol("LDOUSDT") MUST return 14 features (fallback).
     features_for_symbol("TRXUSDT") MUST return 14 features (fallback).
     atr_multipliers_for_symbol("ALGOUSDT") MUST return (2.0, 1.5) (per-symbol entry).
-    atr_multipliers_for_symbol("LDOUSDT") MUST return (2.0, 1.0) (DEFAULT fallback).
+    atr_multipliers_for_symbol("LDOUSDT") MUST return (2.0, 1.5) (per-symbol entry — NEW).
     atr_multipliers_for_symbol("BCHUSDT") MUST return (2.0, 1.0) (DEFAULT fallback).
     atr_multipliers_for_symbol("TRXUSDT") MUST return (2.0, 1.0) (DEFAULT fallback).
     DEFAULT_ATR_MULTIPLIERS MUST be (2.0, 1.0) (correct since iter-v3/043 revert).
@@ -400,34 +403,48 @@ def _verify_feature_columns() -> None:
         )
     print("  V3_FEATURES_PER_SYMBOL: 0 entries (empty — all symbols use 15-feature fallback)  PASS")
 
-    # iter-v3/044: V3_ATR_MULTIPLIERS_PER_SYMBOL MUST contain exactly 1 entry: ALGOUSDT → (2.0, 1.5).
-    # QR EDA-driven axis: ALGO LONG SL/TP exit ratio 4.5:1; widening SL by 50% targets the
-    # bottleneck directly. Other 3 symbols fall back to DEFAULT_ATR_MULTIPLIERS = (2.0, 1.0).
+    # iter-v3/045: V3_ATR_MULTIPLIERS_PER_SYMBOL MUST contain exactly 2 entries:
+    #   ALGOUSDT → (2.0, 1.5) (carried forward from iter-v3/044 PROMISING)
+    #   LDOUSDT  → (2.0, 1.5) (NEW iter-v3/045 — QR EDA-driven mirror of iter-v3/044
+    #     mechanism)
+    # BCH/TRX fall back to DEFAULT_ATR_MULTIPLIERS = (2.0, 1.0).
     n_atr_custom = len(V3_ATR_MULTIPLIERS_PER_SYMBOL)
-    if n_atr_custom != 1:
+    if n_atr_custom != 2:
         raise RuntimeError(
-            f"V3_ATR_MULTIPLIERS_PER_SYMBOL has {n_atr_custom} entries — expected exactly 1 "
-            "(ALGOUSDT → (2.0, 1.5)). iter-v3/044: per-symbol ATR widening for ALGOUSDT only. "
+            f"V3_ATR_MULTIPLIERS_PER_SYMBOL has {n_atr_custom} entries — expected exactly 2 "
+            "(ALGOUSDT → (2.0, 1.5), LDOUSDT → (2.0, 1.5)). iter-v3/045: per-symbol ATR "
+            "widening stacked for ALGOUSDT (UNCHANGED from iter-v3/044) + LDOUSDT (NEW). "
             f"Current keys: {list(V3_ATR_MULTIPLIERS_PER_SYMBOL.keys())}. "
-            "Set V3_ATR_MULTIPLIERS_PER_SYMBOL = {'ALGOUSDT': (2.0, 1.5)} in features_v3/__init__.py."
+            "Set V3_ATR_MULTIPLIERS_PER_SYMBOL = "
+            "{'ALGOUSDT': (2.0, 1.5), 'LDOUSDT': (2.0, 1.5)} in features_v3/__init__.py."
         )
     if V3_ATR_MULTIPLIERS_PER_SYMBOL.get("ALGOUSDT") != (2.0, 1.5):
         raise RuntimeError(
             f"V3_ATR_MULTIPLIERS_PER_SYMBOL['ALGOUSDT'] = "
             f"{V3_ATR_MULTIPLIERS_PER_SYMBOL.get('ALGOUSDT')} — expected (2.0, 1.5). "
-            "iter-v3/044: per-symbol ATR widening for ALGOUSDT (TP=2.0×ATR, SL=1.5×ATR). "
+            "iter-v3/045: ALGOUSDT carried forward UNCHANGED from iter-v3/044 PROMISING. "
             "Set V3_ATR_MULTIPLIERS_PER_SYMBOL['ALGOUSDT'] = (2.0, 1.5)."
         )
-    if any(sym in V3_ATR_MULTIPLIERS_PER_SYMBOL for sym in ("BCHUSDT", "LDOUSDT", "TRXUSDT")):
+    if V3_ATR_MULTIPLIERS_PER_SYMBOL.get("LDOUSDT") != (2.0, 1.5):
         raise RuntimeError(
-            f"V3_ATR_MULTIPLIERS_PER_SYMBOL contains entries for non-ALGO symbols: "
-            f"{[s for s in V3_ATR_MULTIPLIERS_PER_SYMBOL if s != 'ALGOUSDT']}. "
-            "iter-v3/044: ONLY ALGOUSDT should have a per-symbol entry. "
-            "Other 3 symbols use DEFAULT_ATR_MULTIPLIERS via fallback."
+            f"V3_ATR_MULTIPLIERS_PER_SYMBOL['LDOUSDT'] = "
+            f"{V3_ATR_MULTIPLIERS_PER_SYMBOL.get('LDOUSDT')} — expected (2.0, 1.5). "
+            "iter-v3/045: NEW per-symbol ATR widening for LDOUSDT (TP=2.0×ATR, SL=1.5×ATR). "
+            "QR EDA-driven mirror of iter-v3/044 ALGO mechanism per analysis/iteration_v3-045/ "
+            "ldo_bottleneck_diagnosis.py SHA `ed949fe`. Set "
+            "V3_ATR_MULTIPLIERS_PER_SYMBOL['LDOUSDT'] = (2.0, 1.5)."
+        )
+    if any(sym in V3_ATR_MULTIPLIERS_PER_SYMBOL for sym in ("BCHUSDT", "TRXUSDT")):
+        raise RuntimeError(
+            f"V3_ATR_MULTIPLIERS_PER_SYMBOL contains entries for non-{{ALGO,LDO}} symbols: "
+            f"{[s for s in V3_ATR_MULTIPLIERS_PER_SYMBOL if s not in ('ALGOUSDT', 'LDOUSDT')]}. "
+            "iter-v3/045: ONLY ALGOUSDT and LDOUSDT should have per-symbol entries. "
+            "BCH/TRX use DEFAULT_ATR_MULTIPLIERS via fallback."
         )
     print(
-        "  V3_ATR_MULTIPLIERS_PER_SYMBOL: 1 entry (ALGOUSDT → (2.0, 1.5)); "
-        "BCH/LDO/TRX use (2.0, 1.0) DEFAULT  PASS"
+        "  V3_ATR_MULTIPLIERS_PER_SYMBOL: 2 entries "
+        "(ALGOUSDT → (2.0, 1.5), LDOUSDT → (2.0, 1.5)); "
+        "BCH/TRX use (2.0, 1.0) DEFAULT  PASS"
     )
 
     # iter-v3/044: Verify all 4 symbols return 14-feature fallback (V3_FEATURE_COLUMNS_TOP_N).
@@ -471,27 +488,38 @@ def _verify_feature_columns() -> None:
         "(efficiency_ratio_50 ABSENT; regime_momentum_signed_3d ABSENT; _5d PRESENT)  PASS"
     )
 
-    # iter-v3/044: ALL symbols ATR multipliers MUST be (2.0, 1.0) via DEFAULT fallback.
-    for sym in ("LDOUSDT", "BCHUSDT", "TRXUSDT"):
+    # iter-v3/045: BCH/TRX MUST be (2.0, 1.0) via DEFAULT fallback.
+    # ALGO/LDO MUST be (2.0, 1.5) via per-symbol entries.
+    for sym in ("BCHUSDT", "TRXUSDT"):
         sym_atr = atr_multipliers_for_symbol(sym)
         if sym_atr != (2.0, 1.0):
             raise RuntimeError(
                 f"atr_multipliers_for_symbol('{sym}') returned {sym_atr} — expected (2.0, 1.0). "
-                "iter-v3/044: DEFAULT = (2.0, 1.0); "
-                "V3_ATR_MULTIPLIERS_PER_SYMBOL has only ALGOUSDT entry; non-ALGO symbols use "
-                "DEFAULT fallback. "
+                "iter-v3/045: DEFAULT = (2.0, 1.0); "
+                "V3_ATR_MULTIPLIERS_PER_SYMBOL has ALGOUSDT + LDOUSDT entries; "
+                "BCH/TRX use DEFAULT fallback. "
                 "Verify DEFAULT_ATR_MULTIPLIERS = (2.0, 1.0) in features_v3/__init__.py."
             )
     algo_atr = atr_multipliers_for_symbol("ALGOUSDT")
     if algo_atr != (2.0, 1.5):
         raise RuntimeError(
             f"atr_multipliers_for_symbol('ALGOUSDT') returned {algo_atr} — expected (2.0, 1.5). "
-            "iter-v3/044: ALGOUSDT per-symbol entry = (2.0, 1.5) — wider SL targets ALGO LONG "
-            "SL/TP exit asymmetry (27/6 = 4.5:1) directly per QR EDA SHA `eff841e`. "
+            "iter-v3/045: ALGOUSDT per-symbol entry = (2.0, 1.5) carried forward UNCHANGED "
+            "from iter-v3/044 PROMISING. "
             "Set V3_ATR_MULTIPLIERS_PER_SYMBOL['ALGOUSDT'] = (2.0, 1.5) in features_v3/__init__.py."
         )
+    ldo_atr = atr_multipliers_for_symbol("LDOUSDT")
+    if ldo_atr != (2.0, 1.5):
+        raise RuntimeError(
+            f"atr_multipliers_for_symbol('LDOUSDT') returned {ldo_atr} — expected (2.0, 1.5). "
+            "iter-v3/045: LDOUSDT per-symbol entry = (2.0, 1.5) — NEW. Wider SL targets LDO "
+            "IS->OOS exit-composition shift (SL:TP 1.14 -> 2.33; SL rate 53.3% -> 63.6%) per "
+            "QR EDA SHA `ed949fe`. Mirror of iter-v3/044 ALGO mechanism. "
+            "Set V3_ATR_MULTIPLIERS_PER_SYMBOL['LDOUSDT'] = (2.0, 1.5) in features_v3/__init__.py."
+        )
     print(
-        "  atr_multipliers_for_symbol: ALGO=(2.0,1.5) per-symbol; BCH/LDO/TRX=(2.0,1.0) DEFAULT  PASS"
+        "  atr_multipliers_for_symbol: ALGO=(2.0,1.5) + LDO=(2.0,1.5) per-symbol; "
+        "BCH/TRX=(2.0,1.0) DEFAULT  PASS"
     )
 
     # iter-v3/044: regime_momentum_signed_5d MUST be in V3_FEATURE_COLUMNS_TOP_N (mandate ACTIVE).

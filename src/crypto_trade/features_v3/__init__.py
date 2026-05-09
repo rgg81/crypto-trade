@@ -562,6 +562,18 @@ V3_ATR_MULTIPLIERS_PER_SYMBOL: dict[str, tuple[float, float]] = {
     # which is currently at 14/14 SL/TP balance — wider SL may help shorts reach TP too).
     # Proven mechanism per iter-v3/032 LDO ATR success.
     "ALGOUSDT": (2.0, 1.5),
+    # iter-v3/045: LDOUSDT entry added (2.0, 1.5) — TP unchanged, SL widened by 50%.
+    # QR EDA SHA `ed949fe` (analysis/iteration_v3-045/ldo_bottleneck_diagnosis.py):
+    # LDO IS->OOS exit-composition shift (the binding constraint) — SL:TP ratio 1.14 IS
+    # -> 2.33 OOS; SL rate 53.3% IS -> 63.6% OOS; TP rate 46.7% IS -> 27.3% OOS. LDO IS
+    # @ iter-v3/044 is +41.85% PnL (positive contributor); LDO OOS @ iter-v3/044 is
+    # -3.07% PnL (small drag). Direction asymmetry structurally insignificant (1 LONG
+    # OOS trade). Wider SL targets the IS->OOS regime-shift directly, mirroring
+    # iter-v3/044 PROMISING ALGO ATR mechanism. LDO regime mismatch (natr 1.35x peer
+    # median per iter-v3/032 EDA) is structural; wider absolute SL aligns with LDO's
+    # natural volatility regime. NOT the iter-v3/032 (1.5, 0.75) tighter-barrier path
+    # which was MULTI-SEED-FALSIFIED at iter-v3/039 — this is the OPPOSITE direction.
+    "LDOUSDT": (2.0, 1.5),
 }
 """Per-symbol ATR multiplier overrides for iter-v3/032+ labeling architecture.
 
@@ -580,6 +592,13 @@ iter-v3/044: ALGOUSDT entry added (2.0, 1.5) — QR EDA-driven per-symbol axis s
   ALGO LONG SL/TP asymmetry 4.5:1 with mean SL pnl_pct -5.24 (vs -8.40 stop barrier);
   widening SL by 50% gives ALGO longs more breathing room without changing entry signal.
   Source: analysis/iteration_v3-044/cycle3_is_diagnosis.py SHA `eff841e`.
+iter-v3/045: LDOUSDT entry added (2.0, 1.5) — QR EDA-driven per-symbol axis selection,
+  cycle 3 #6. LDO IS->OOS exit-composition shift (SL:TP 1.14 -> 2.33; SL rate 53.3%
+  -> 63.6%); wider SL targets the IS->OOS regime-shift directly, mirroring iter-v3/044
+  ALGO mechanism. Predecessor (1.5, 0.75) at iter-v3/032 was MULTI-SEED-FALSIFIED at
+  iter-v3/039 — this is the OPPOSITE direction (wider not tighter) per QR EDA
+  candidate-ranking. Source: analysis/iteration_v3-045/ldo_bottleneck_diagnosis.py
+  SHA `ed949fe`.
 """
 
 DEFAULT_ATR_MULTIPLIERS: tuple[float, float] = (2.0, 1.0)
