@@ -1703,16 +1703,16 @@ class TestEfficiencyRatio50:
         )
 
     def test_integration_dispatched_by_add_engineered(self) -> None:
-        """H. iter-v3/044: efficiency_ratio_50 is dead code (NOT dispatched).
+        """H. iter-v3/044: efficiency_ratio_50 AND regime_momentum_signed_3d are dead code.
 
-        regime_momentum_signed_3d IS dispatched instead. This test verifies:
-        - efficiency_ratio_50 column is NOT present in add_engineered_v3_features output
-          (it was removed from dispatch at iter-v3/044 after DISASTROUS NEGATIVE at iter-v3/043).
-        - regime_momentum_signed_3d IS present (newly dispatched at iter-v3/044).
+        Both functions retained at module level (zero revert cost) but NOT dispatched:
+        - efficiency_ratio_50: removed from dispatch after DISASTROUS NEGATIVE at iter-v3/043.
+        - regime_momentum_signed_3d: orchestrator's ad-hoc setup commit `1f56c72` reverted
+          before backtest per QR EDA at SHA `eff841e` (does not address ALGO LONG bottleneck).
         """
         from crypto_trade.features_v3.regime_v3 import add_regime_v3_features
 
-        # Build a minimal DataFrame with hurst_100 (needed by regime_momentum_signed_5d and _3d)
+        # Build a minimal DataFrame with hurst_100 (needed by regime_momentum_signed_5d)
         n = 200
         df = _make_er_df(n=n, seed=9)
         df = add_regime_v3_features(df)  # provides hurst_100
@@ -1730,13 +1730,14 @@ class TestEfficiencyRatio50:
             "NEGATIVE at iter-v3/043; dead code retained but not called)."
         )
 
-        # iter-v3/044: regime_momentum_signed_3d MUST be dispatched (NEW 3-bar sign-flip).
-        assert "regime_momentum_signed_3d" in out.columns, (
-            "add_engineered_v3_features must produce 'regime_momentum_signed_3d' column "
-            "(iter-v3/044: 3-bar sign-flip variant added to dispatch)."
+        # iter-v3/044: regime_momentum_signed_3d MUST NOT be dispatched (universal addition
+        # REVERTED per QR EDA at SHA `eff841e`; compute_regime_momentum_signed_3d retained
+        # as dead code in engineered_v3.py).
+        assert "regime_momentum_signed_3d" not in out.columns, (
+            "add_engineered_v3_features must NOT produce 'regime_momentum_signed_3d' column "
+            "(iter-v3/044: orchestrator's ad-hoc setup at commit `1f56c72` reverted before "
+            "backtest per QR EDA SHA `eff841e`; does not address ALGO LONG bottleneck)."
         )
-        rms3 = out["regime_momentum_signed_3d"]
-        assert not rms3.isna().any(), "regime_momentum_signed_3d must not contain NaN (filled 0.0)."
 
 
 # ---------------------------------------------------------------------------

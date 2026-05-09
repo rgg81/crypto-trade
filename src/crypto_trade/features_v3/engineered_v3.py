@@ -436,12 +436,17 @@ def compute_efficiency_ratio_50(df: pd.DataFrame) -> pd.Series:
 def add_engineered_v3_features(df: pd.DataFrame) -> pd.DataFrame:
     """GROUP_REGISTRY entry point for all Category 2 (composed) v3 features.
 
-    iter-v3/044: regime_momentum_signed_3d ADDED to dispatch. 3-bar variant of the proven
-    regime_momentum_signed_5d sign-flip mechanism. ret_3d = close.shift(1)/close.shift(4) - 1.0;
-    same hurst_100 sign-flip as 5d variant; different lookback horizon (1 day vs 5 days).
-    Column added to ALL symbol parquets; ALL 4 symbols receive it via V3_FEATURE_COLUMNS_TOP_N
-    at model-train time (15 features). Past-only: close.shift(1), close.shift(4), hurst.shift(1).
-    efficiency_ratio_50 removed from dispatch (iter-v3/043 DISASTROUS NEGATIVE; dead code retained).
+    iter-v3/044: regime_momentum_signed_3d UNIVERSAL DISPATCH REVERTED. The orchestrator's
+    setup commit `1f56c72` added 3d to dispatch + V3_FEATURE_COLUMNS_TOP_N as a 15th feature.
+    QR EDA at SHA `eff841e` (cycle3_is_diagnosis.py) established that the IS bottleneck
+    is direction-asymmetric per-symbol (ALGO LONG single largest attribution loss); the 3d
+    variant does NOT discriminate ALGO LONG WR (22.2% > 0, 13.3% <=0) and ranks 14/14 in
+    ALGO model. Universal addition would dilute colsample picks without addressing the
+    bottleneck. compute_regime_momentum_signed_3d retained as dead code (zero revert cost,
+    available for future per-symbol experiments); NOT dispatched. Replacement axis:
+    per-symbol ATR widening for ALGOUSDT only (V3_ATR_MULTIPLIERS_PER_SYMBOL["ALGOUSDT"]
+    = (2.0, 1.5)). efficiency_ratio_50 also removed from dispatch (iter-v3/043 DISASTROUS
+    NEGATIVE; dead code retained).
 
     iter-v3/043: efficiency_ratio_50 ADDED to dispatch — DISASTROUS NEGATIVE (IS -0.8445
     / OOS -0.8990; all 4 symbols broken). Removed from dispatch at iter-v3/044.
@@ -476,10 +481,6 @@ def add_engineered_v3_features(df: pd.DataFrame) -> pd.DataFrame:
     - ``regime_momentum_signed_5d`` (iter-v3/025, KEPT): composed feature combining
       5-day momentum with Hurst regime classifier.  Depends on ``hurst_100``
       from ``regime`` group (upstream in GROUP_REGISTRY).
-    - ``regime_momentum_signed_3d`` (iter-v3/044, NEW): 3-bar variant of the sign-flip.
-      ret_3d = close.shift(1)/close.shift(4) - 1.0 * sign(hurst_100.shift(1) - 0.5).
-      Depends on ``hurst_100`` from ``regime`` group (upstream in GROUP_REGISTRY).
-      Universal: ALL 4 symbols receive it via V3_FEATURE_COLUMNS_TOP_N (15 features).
     - ``fracdiff_d05_close`` (iter-v3/034, KEPT): FFD of log(close) at d=0.5.
       Depends only on ``close`` column.  BCH-only at model level (V3_FEATURES_PER_SYMBOL).
     - ``cross_asset_divergence_norm`` (iter-v3/037, RE-ADDED to dispatch):
@@ -493,6 +494,10 @@ def add_engineered_v3_features(df: pd.DataFrame) -> pd.DataFrame:
     - ``compute_vol_adj_autocorr``: reverted at iter-v3/037 (iter-v3/036 NEGATIVE).
     - ``compute_efficiency_ratio_50``: DISASTROUS NEGATIVE at iter-v3/043 (IS -0.8445 /
       OOS -0.8990; all 4 symbols broken); removed from dispatch at iter-v3/044.
+    - ``compute_regime_momentum_signed_3d``: ad-hoc orchestrator pick at iter-v3/044
+      setup commit `1f56c72`; REVERTED before backtest based on QR EDA at SHA `eff841e`
+      (does not address direction-asymmetric per-symbol IS bottleneck — ALGO LONG WR not
+      discriminated by 3d sign; ranks 14/14 in ALGO model).
 
     Each new composed feature must be listed in the iteration's research brief Section
     2.2 and validated with an adversarial past-only test.
@@ -509,9 +514,10 @@ def add_engineered_v3_features(df: pd.DataFrame) -> pd.DataFrame:
         Copy of ``df`` with all active engineered v3 features appended.
     """
     df = compute_regime_momentum_signed_5d(df)  # iter-v3/025 (KEPT; mandated by engineered pivot)
-    df["regime_momentum_signed_3d"] = compute_regime_momentum_signed_3d(df)  # iter-v3/044 (NEW)
     df = compute_fracdiff_d05_close(df)  # iter-v3/034 (KEPT; BCH-only at model level)
     df = compute_cross_asset_divergence_norm(df)  # iter-v3/037 RE-ADDED (LDO-only at model level)
+    # compute_regime_momentum_signed_3d REVERTED at iter-v3/044 (orchestrator ad-hoc pick;
+    #   QR EDA showed it does not address ALGO LONG bottleneck). Dead code retained.
     # compute_efficiency_ratio_50 REMOVED from dispatch at iter-v3/044 — DISASTROUS NEGATIVE.
     # compute_vol_adj_autocorr REVERTED at iter-v3/037 — iter-v3/036 NEGATIVE; dead code.
     return df

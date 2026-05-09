@@ -245,18 +245,24 @@ V3_FEATURE_COLUMNS_TOP_N: tuple[str, ...] = (
     # NEGATIVE (IS -0.8445 / OOS -0.8990; all 4 symbols broken by Kaufman ER).
     # compute_efficiency_ratio_50 retained as dead code in engineered_v3.py; NOT dispatched.
     # Per briefs-v3/iteration_v3-044/research_brief.md Section 3 Sub-fix 1.
-    # iter-v3/044: regime_momentum_signed_3d ADDED (14 → 15). 3-bar variant of the proven
-    # regime_momentum_signed_5d sign-flip mechanism. ret_3d = close.shift(1)/close.shift(4) - 1.0
-    # multiplied by sign(hurst_100.shift(1) - 0.5). Captures shorter-horizon (1-day at 8h
-    # cadence) regime persistence complementary to the 5-day variant. Category 2 composed
-    # feature; IC carve-out applies. Past-only: close.shift(1), close.shift(4), hurst.shift(1).
-    # Implemented via compute_regime_momentum_signed_3d in engineered_v3.py.
-    # Per briefs-v3/iteration_v3-044/research_brief.md Section 3 Sub-fix 2.
-    "regime_momentum_signed_3d",  # iter-v3/044: 3-bar sign-flip variant; Category 2
+    # iter-v3/044: regime_momentum_signed_3d UNIVERSAL ADDITION REVERTED before backtest
+    # (orchestrator's ad-hoc setup commit 1f56c72 superseded by QR EDA-driven axis selection
+    # at SHA `eff841e`).
+    # cycle3_is_diagnosis.py SHA `eff841e`: IS bottleneck is direction-asymmetric per-symbol
+    # (ALGO LONG 33 trades, -53.26 PnL, 18.2% IS WR / 11.1% OOS WR — single largest IS attribution
+    # loss; counterfactual block of 3 bad direction-buckets lifts IS Sharpe +0.79 → +1.95).
+    # The 3d variant does NOT discriminate ALGO LONG WR (22.2% > 0, 13.3% <=0) and ranks
+    # 14/14 in ALGO model — universal addition would dilute colsample picks without
+    # addressing the bottleneck. compute_regime_momentum_signed_3d retained as dead code in
+    # engineered_v3.py; NOT dispatched (per Sub-fix 1 of Section 3 in rewritten brief).
+    # New axis: per-symbol ATR widening for ALGOUSDT only (V3_ATR_MULTIPLIERS_PER_SYMBOL["ALGOUSDT"]
+    # = (2.0, 1.5)). Targets ALGO long SL/TP exit asymmetry (27/6 = 4.5:1) directly; proven
+    # mechanism per iter-v3/032 LDO ATR success.
 )
-"""Top-15 feature subset: iter-v3/044 adds regime_momentum_signed_3d (14 → 15),
-a 3-bar variant of the proven sign-flip mechanism, after reverting iter-v3/043's
-DISASTROUS efficiency_ratio_50 (IS -0.8445 / OOS -0.8990; all 4 symbols broken).
+"""Top-14 feature subset: iter-v3/044 reverts iter-v3/043's DISASTROUS efficiency_ratio_50
+(IS -0.8445 / OOS -0.8990; all 4 symbols broken). The 3d variant universal addition was
+ALSO REVERTED before backtest (orchestrator's ad-hoc setup superseded by QR EDA-driven
+axis selection per feedback_v3_axis_selection_quant_discipline.md).
 
 iter-v3/042 restored 3 features (ret_skew_50, sym_vs_btc_ret_7d,
 regime_momentum_signed_5d) from iter-v3/041 Path C NEGATIVE mandate.
@@ -267,16 +273,19 @@ iter-v3/043: efficiency_ratio_50 ADDED (14 → 15) — DISASTROUS NEGATIVE.
 iter-v3/044: efficiency_ratio_50 DROPPED (reverted to 14 base). compute_efficiency_ratio_50
 retained as dead code in engineered_v3.py; NOT dispatched from add_engineered_v3_features.
 Per briefs-v3/iteration_v3-044/research_brief.md Section 3 Sub-fix 1.
-iter-v3/044: regime_momentum_signed_3d ADDED (14 → 15). 3-bar sign-flip variant of the
-proven regime_momentum_signed_5d mechanism. Category 2 composed feature.
-Per briefs-v3/iteration_v3-044/research_brief.md Section 3 Sub-fix 2.
+iter-v3/044: regime_momentum_signed_3d UNIVERSAL ADDITION REVERTED (15 → 14). The orchestrator's
+setup commit `1f56c72` added 3d as a 15th universal feature ad-hoc; QR EDA at SHA `eff841e`
+established that the IS bottleneck is direction-asymmetric per-symbol (ALGO LONG single largest
+attribution loss) and 3d does NOT discriminate ALGO LONG WR. compute_regime_momentum_signed_3d
+retained as dead code in engineered_v3.py; NOT dispatched. Per Sub-fix 2 of Section 3.
+Replacement axis: per-symbol ATR widening for ALGOUSDT only.
 
 Top-N history (last 5 entries):
   iter-v3/041: pruned 14 → 11 (dropped ret_skew_50, sym_vs_btc_ret_7d, regime_momentum)
   iter-v3/042: RESTORED 11 → 14 (Path C NEGATIVE mandate at iter-v3/041 fired)
   iter-v3/043: ADDED 14 → 15 (efficiency_ratio_50 Kaufman 1995 ER — DISASTROUS NEGATIVE)
-  iter-v3/044: DROPPED efficiency_ratio_50 (15 → 14 REVERT) + ADDED
-              regime_momentum_signed_3d (14 → 15)
+  iter-v3/044: REVERT 15 → 14 (drop both efficiency_ratio_50 AND regime_momentum_signed_3d
+              universal addition; new axis = per-symbol ATR for ALGO).
 
 iter-v3/035 revert — fracdiff_d05_close removed from universal list (15→14; moved
 to V3_FEATURES_PER_SYMBOL["BCHUSDT"] for BCH-only per-symbol targeting); cleared
@@ -542,7 +551,18 @@ V3_NON_FEATURE_COLUMNS: tuple[str, ...] = ("natr_21_raw", "tbr_raw")
                  model input regardless (added iter-v3/016, §3.5 sub-fix #2).
 """
 
-V3_ATR_MULTIPLIERS_PER_SYMBOL: dict[str, tuple[float, float]] = {}
+V3_ATR_MULTIPLIERS_PER_SYMBOL: dict[str, tuple[float, float]] = {
+    # iter-v3/044: ALGOUSDT entry added (2.0, 1.5) — TP unchanged, SL widened by 50%.
+    # QR EDA SHA `eff841e` (analysis/iteration_v3-044/cycle3_is_diagnosis.py): ALGO LONG
+    # is the single largest IS attribution loss (33 trades, -53.26 PnL, 18.2% IS WR /
+    # 11.1% OOS WR; pattern persists OOS). ALGO LONG SL/TP exit ratio is 27/6 = 4.5:1;
+    # average SL pnl_pct -5.24, average TP pnl_pct +6.12. Wider SL gives bear-trend
+    # longs more time to reach TP (mean SL of -5.24% becomes -7.86% threshold) without
+    # changing entry signal. Symmetric per-direction (also widens ALGO short SL,
+    # which is currently at 14/14 SL/TP balance — wider SL may help shorts reach TP too).
+    # Proven mechanism per iter-v3/032 LDO ATR success.
+    "ALGOUSDT": (2.0, 1.5),
+}
 """Per-symbol ATR multiplier overrides for iter-v3/032+ labeling architecture.
 
 Maps symbol → (atr_tp_multiplier, atr_sl_multiplier).
@@ -556,6 +576,10 @@ iter-v3/040: CLEARED (empty dict). Cycle 3 EXPLORATION #1 — REVERT all per-sym
   Architecture (this dict + atr_multipliers_for_symbol helper) is KEPT; only emptied.
   Rationale: iter-v3/039 CONFIRMATION NO-MERGE — per-symbol customizations broke IS
   aggregate (-0.55 IS Sharpe swing from iter-v3/029 clean-4-symbol anchor).
+iter-v3/044: ALGOUSDT entry added (2.0, 1.5) — QR EDA-driven per-symbol axis selection.
+  ALGO LONG SL/TP asymmetry 4.5:1 with mean SL pnl_pct -5.24 (vs -8.40 stop barrier);
+  widening SL by 50% gives ALGO longs more breathing room without changing entry signal.
+  Source: analysis/iteration_v3-044/cycle3_is_diagnosis.py SHA `eff841e`.
 """
 
 DEFAULT_ATR_MULTIPLIERS: tuple[float, float] = (2.0, 1.0)
