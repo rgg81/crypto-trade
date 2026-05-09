@@ -103,7 +103,7 @@ def _derive_ensemble_seeds(outer_seed: int, size: int = ENSEMBLE_SIZE) -> list[i
     return [int(s) for s in rng.integers(low=0, high=2**31 - 1, size=size)]
 
 
-ITERATION_LABEL = "v3-041"
+ITERATION_LABEL = "v3-042"
 REPORTS_DIR = Path("reports-v3")
 FEATURES_DIR = Path("data/features_v3")
 DATA_DIR = Path("data")
@@ -191,30 +191,22 @@ def _verify_data_freshness(symbols: tuple[str, ...], max_lag_hours: float = 16.0
 
 
 def _verify_feature_columns() -> None:
-    """Verifies V3_FEATURE_COLUMNS contents per current brief (iter-v3/041).
+    """Verifies V3_FEATURE_COLUMNS contents per current brief (iter-v3/042).
 
-    iter-v3/041: EXPLORATION — cycle 3 #2 — UNIVERSAL FEATURE PRUNING.
-      V3_FEATURE_COLUMNS_TOP_N: 11 features (was 14 at iter-v3/040; dropped 3 lowest by
-        iter-v3/028 portfolio split-importance).
-        Dropped features (per analysis/iteration_v3-041/bottom3_features_eda.py SHA c2e2712):
+    iter-v3/042: EXPLORATION — cycle 3 #3 — REVERT pruning + universal ATR (1.5, 0.75).
+      PART A (revert): iter-v3/041 Path C NEGATIVE mandate fires — restore 3 features.
+      V3_FEATURE_COLUMNS_TOP_N: 14 features (RESTORED from iter-v3/041 11-feature prune).
+        Restored features (iter-v3/041 Path C mandate):
           - ret_skew_50               (rank 12/14, importance 412.8)
           - sym_vs_btc_ret_7d         (rank 13/14, importance 398.0)
           - regime_momentum_signed_5d (rank 14/14, importance 390.4)
-        Combined dropped importance: 17.6% of total split count.
+        MUST-be-present mandate for regime_momentum_signed_5d REINSTATED
+        per feedback_v3_engineered_features_proven.md.
+      PART B (new variation): DEFAULT_ATR_MULTIPLIERS changed (2.0, 1.0) → (1.5, 0.75).
+        V3_ATR_MULTIPLIERS_PER_SYMBOL: EMPTY — all 4 symbols use DEFAULT universally.
+        All symbols (BCH/LDO/TRX/ALGO) use (1.5, 0.75) via fallback.
       V3_FEATURES_PER_SYMBOL: EMPTY (unchanged from iter-v3/040). All 4 symbols
-        fall back to the 11-feature V3_FEATURE_COLUMNS_TOP_N.
-      V3_ATR_MULTIPLIERS_PER_SYMBOL: EMPTY (unchanged from iter-v3/040).
-        LDO continues to use DEFAULT_ATR_MULTIPLIERS = (2.0, 1.0) via fallback.
-
-    Hypothesis: dropping the 3 lowest-importance features lifts IS Sharpe toward +1.0
-    by reducing Optuna search-space noise (fewer colsample_bytree picks land on
-    low-signal features) and maintains OOS Sharpe near anchor (~+1.77) because
-    dropped features carry only 17.6% of total split-importance.
-
-    The MUST-be-present mandate for regime_momentum_signed_5d from
-    feedback_v3_engineered_features_proven.md (iter-v3/025) is being REVISITED at
-    iter-v3/041 EXPLORATION (3-path resolution per brief Section 8 — PROMISING /
-    PROMISING-INERT / NEGATIVE).
+        fall back to the 14-feature V3_FEATURE_COLUMNS_TOP_N.
 
     tbr_zscore_30 MUST NOT be present (dropped iter-v3/016).
     vwap_dev_50 MUST NOT be present (dropped iter-v3/008 per Critic SHA a544621).
@@ -223,30 +215,34 @@ def _verify_feature_columns() -> None:
     vol_adj_autocorr MUST NOT be in universal list (dead code since iter-v3/036 revert).
     cross_asset_divergence_norm MUST NOT be in universal list (dead at model level).
     fracdiff_d05_close MUST NOT be in universal list AND MUST NOT be in any per-symbol entry.
-    regime_momentum_signed_5d MUST NOT be present (NEW iter-v3/041 — mandate revisited).
-    sym_vs_btc_ret_7d MUST NOT be present (NEW iter-v3/041 drop — bottom-3 by importance).
-    ret_skew_50 MUST NOT be present (NEW iter-v3/041 drop — bottom-3 by importance).
+    regime_momentum_signed_5d MUST be present (mandate REINSTATED at iter-v3/042).
+    sym_vs_btc_ret_7d MUST be present (RESTORED at iter-v3/042).
+    ret_skew_50 MUST be present (RESTORED at iter-v3/042).
 
-    Per-symbol checks (iter-v3/041):
+    Per-symbol checks (iter-v3/042):
     V3_FEATURES_PER_SYMBOL must be EMPTY (0 entries).
     V3_ATR_MULTIPLIERS_PER_SYMBOL must be EMPTY (0 entries).
-    features_for_symbol("BCHUSDT") MUST return 11 features = V3_FEATURE_COLUMNS_TOP_N.
-    features_for_symbol("ALGOUSDT") MUST return 11 features (fallback).
-    features_for_symbol("LDOUSDT") MUST return 11 features (fallback).
-    features_for_symbol("TRXUSDT") MUST return 11 features (fallback).
-    atr_multipliers_for_symbol("LDOUSDT") MUST return (2.0, 1.0) (default fallback).
+    features_for_symbol("BCHUSDT") MUST return 14 features = V3_FEATURE_COLUMNS_TOP_N.
+    features_for_symbol("ALGOUSDT") MUST return 14 features (fallback).
+    features_for_symbol("LDOUSDT") MUST return 14 features (fallback).
+    features_for_symbol("TRXUSDT") MUST return 14 features (fallback).
+    atr_multipliers_for_symbol("LDOUSDT") MUST return (1.5, 0.75) (NEW DEFAULT fallback).
+    atr_multipliers_for_symbol("BCHUSDT") MUST return (1.5, 0.75) (NEW DEFAULT fallback).
+    DEFAULT_ATR_MULTIPLIERS MUST be (1.5, 0.75) (CHANGED from (2.0, 1.0)).
     """
     from crypto_trade.features_v3 import (  # noqa: PLC0415
+        DEFAULT_ATR_MULTIPLIERS,
         V3_ATR_MULTIPLIERS_PER_SYMBOL,
         atr_multipliers_for_symbol,
     )
 
     n = len(V3_FEATURE_COLUMNS)
-    if n != 11:
+    if n != 14:
         raise RuntimeError(
-            f"V3_FEATURE_COLUMNS has {n} columns — expected exactly 11. "
-            "iter-v3/041: universal list is 11 features (14 → 11 prune of bottom-3 by "
-            "iter-v3/028 portfolio importance); no per-symbol extensions. "
+            f"V3_FEATURE_COLUMNS has {n} columns — expected exactly 14. "
+            "iter-v3/042: RESTORED from iter-v3/041 11-feature prune (Path C mandate). "
+            "Universal list = 14 features (ret_skew_50, sym_vs_btc_ret_7d, "
+            "regime_momentum_signed_5d RESTORED). "
             "Check features_v3/__init__.py V3_FEATURE_COLUMNS_TOP_N."
         )
     if "tbr_zscore_30" in V3_FEATURE_COLUMNS:
@@ -290,41 +286,31 @@ def _verify_feature_columns() -> None:
             "iter-v3/040: dead at model level. "
             "Remove it from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
         )
-    # iter-v3/041: regime_momentum_signed_5d MUST NOT be present (universal pruning).
-    # The MUST-be-present mandate from feedback_v3_engineered_features_proven.md
-    # (iter-v3/025) is being REVISITED at iter-v3/041 EXPLORATION as the
-    # universal-pruning axis. EXPLORATIONs can falsify any prior assumption.
-    # 3-path resolution per brief Section 8 — PROMISING / PROMISING-INERT / NEGATIVE.
-    if "regime_momentum_signed_5d" in V3_FEATURE_COLUMNS:
+    # iter-v3/042: regime_momentum_signed_5d MUST be present (mandate REINSTATED).
+    # iter-v3/041 Path C NEGATIVE mandate fired (OOS < +1.55 falsifier threshold).
+    # feedback_v3_engineered_features_proven.md mandate UPHELD at iter-v3/041.
+    # iter-v3/042 restores the feature per mandate.
+    if "regime_momentum_signed_5d" not in V3_FEATURE_COLUMNS:
         raise RuntimeError(
-            "regime_momentum_signed_5d FOUND in V3_FEATURE_COLUMNS — must be ABSENT "
-            "at iter-v3/041 (universal feature pruning EXPLORATION). "
-            "Bottom-3 by iter-v3/028 portfolio importance (rank 14/14, importance 390.4). "
-            "ALSO bottom-3 in iter-v3/040 single-seed cross-check (rank 14/14, importance 454.0). "
-            "Per analysis/iteration_v3-041/bottom3_features_eda.py SHA c2e2712 + "
-            "briefs-v3/iteration_v3-041/research_brief.md Sub-fix 1. "
-            "The iter-v3/025 MUST-be-present mandate is REVISITED at iter-v3/041 "
-            "(3-path resolution per brief Section 8). Remove it from "
-            "V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
+            "regime_momentum_signed_5d NOT FOUND in V3_FEATURE_COLUMNS — must be PRESENT "
+            "at iter-v3/042 (iter-v3/041 Path C mandate REINSTATES this feature). "
+            "iter-v3/041 OOS < +1.55 falsifier threshold — Path C fired. "
+            "feedback_v3_engineered_features_proven.md mandate UPHELD. "
+            "Add it to V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
         )
-    # iter-v3/041: sym_vs_btc_ret_7d MUST NOT be present (universal pruning bottom-3).
-    if "sym_vs_btc_ret_7d" in V3_FEATURE_COLUMNS:
+    # iter-v3/042: sym_vs_btc_ret_7d MUST be present (RESTORED at iter-v3/042).
+    if "sym_vs_btc_ret_7d" not in V3_FEATURE_COLUMNS:
         raise RuntimeError(
-            "sym_vs_btc_ret_7d FOUND in V3_FEATURE_COLUMNS — must be ABSENT at "
-            "iter-v3/041 (universal feature pruning EXPLORATION). "
-            "Bottom-3 by iter-v3/028 portfolio importance (rank 13/14, importance 398.0). "
-            "ALSO bottom-3 in iter-v3/040 single-seed cross-check (rank 12/14, importance 606.0). "
-            "Per analysis/iteration_v3-041/bottom3_features_eda.py SHA c2e2712. "
-            "Remove it from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
+            "sym_vs_btc_ret_7d NOT FOUND in V3_FEATURE_COLUMNS — must be PRESENT at "
+            "iter-v3/042 (iter-v3/041 Path C mandate RESTORES this feature). "
+            "Add it to V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
         )
-    # iter-v3/041: ret_skew_50 MUST NOT be present (universal pruning bottom-3).
-    if "ret_skew_50" in V3_FEATURE_COLUMNS:
+    # iter-v3/042: ret_skew_50 MUST be present (RESTORED at iter-v3/042).
+    if "ret_skew_50" not in V3_FEATURE_COLUMNS:
         raise RuntimeError(
-            "ret_skew_50 FOUND in V3_FEATURE_COLUMNS — must be ABSENT at iter-v3/041 "
-            "(universal feature pruning EXPLORATION). "
-            "Bottom-3 by iter-v3/028 portfolio importance (rank 12/14, importance 412.8). "
-            "Per analysis/iteration_v3-041/bottom3_features_eda.py SHA c2e2712. "
-            "Remove it from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
+            "ret_skew_50 NOT FOUND in V3_FEATURE_COLUMNS — must be PRESENT at "
+            "iter-v3/042 (iter-v3/041 Path C mandate RESTORES this feature). "
+            "Add it to V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
         )
     if "vwap_dev_50" in V3_FEATURE_COLUMNS:
         raise RuntimeError(
@@ -332,7 +318,7 @@ def _verify_feature_columns() -> None:
             "Critic FINAL SHA a544621 (Recommendation 1). "
             "Remove it from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
         )
-    # iter-v3/040: fracdiff_d05_close MUST NOT be in the universal list.
+    # fracdiff_d05_close MUST NOT be in the universal list.
     if "fracdiff_d05_close" in V3_FEATURE_COLUMNS_TOP_N:
         raise RuntimeError(
             "fracdiff_d05_close FOUND in V3_FEATURE_COLUMNS_TOP_N (universal list) — "
@@ -340,7 +326,7 @@ def _verify_feature_columns() -> None:
             "symbol (V3_FEATURES_PER_SYMBOL is empty; no per-symbol extension entries). "
             "Remove it from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
         )
-    # iter-v3/037: vol_adj_autocorr MUST NOT be in the universal list (iter-v3/036 reverted).
+    # vol_adj_autocorr MUST NOT be in the universal list (iter-v3/036 reverted).
     if "vol_adj_autocorr" in V3_FEATURE_COLUMNS_TOP_N:
         raise RuntimeError(
             "vol_adj_autocorr FOUND in V3_FEATURE_COLUMNS_TOP_N (universal list) — "
@@ -357,12 +343,22 @@ def _verify_feature_columns() -> None:
         )
     print(
         f"  V3_FEATURE_COLUMNS: {n} columns "
-        "(iter-v3/041 prune: regime_momentum_signed_5d, sym_vs_btc_ret_7d, ret_skew_50 "
-        "absent — bottom-3 by iter-v3/028 importance)  PASS"
+        "(iter-v3/042 RESTORE: regime_momentum_signed_5d, sym_vs_btc_ret_7d, ret_skew_50 "
+        "PRESENT — Path C mandate from iter-v3/041 FIRED)  PASS"
     )
 
-    # iter-v3/040: V3_FEATURES_PER_SYMBOL MUST BE EMPTY.
-    # All per-symbol feature customizations reverted. BCH uses 14-feature fallback.
+    # iter-v3/042: Verify DEFAULT_ATR_MULTIPLIERS == (1.5, 0.75).
+    if DEFAULT_ATR_MULTIPLIERS != (1.5, 0.75):
+        raise RuntimeError(
+            f"DEFAULT_ATR_MULTIPLIERS = {DEFAULT_ATR_MULTIPLIERS} — expected (1.5, 0.75). "
+            "iter-v3/042: CHANGED from (2.0, 1.0) to (1.5, 0.75) universally. "
+            "All 4 symbols use DEFAULT via V3_ATR_MULTIPLIERS_PER_SYMBOL empty fallback. "
+            "Verify DEFAULT_ATR_MULTIPLIERS = (1.5, 0.75) in features_v3/__init__.py."
+        )
+    print("  DEFAULT_ATR_MULTIPLIERS = (1.5, 0.75) (CHANGED from (2.0, 1.0) at iter-v3/042)  PASS")
+
+    # iter-v3/042: V3_FEATURES_PER_SYMBOL MUST BE EMPTY.
+    # All per-symbol feature customizations reverted. All symbols use 14-feature fallback.
     n_custom = len(V3_FEATURES_PER_SYMBOL)
     if n_custom != 0:
         raise RuntimeError(
@@ -371,33 +367,33 @@ def _verify_feature_columns() -> None:
             f"Current keys: {list(V3_FEATURES_PER_SYMBOL.keys())}. "
             "Clear V3_FEATURES_PER_SYMBOL to {{}} in features_v3/__init__.py."
         )
-    print("  V3_FEATURES_PER_SYMBOL: 0 entries (empty — all symbols use 11-feature fallback)  PASS")
+    print("  V3_FEATURES_PER_SYMBOL: 0 entries (empty — all symbols use 14-feature fallback)  PASS")
 
-    # iter-v3/040: V3_ATR_MULTIPLIERS_PER_SYMBOL MUST BE EMPTY.
-    # LDO reverts to DEFAULT_ATR_MULTIPLIERS = (2.0, 1.0) via fallback.
+    # iter-v3/042: V3_ATR_MULTIPLIERS_PER_SYMBOL MUST BE EMPTY.
+    # All symbols fall back to DEFAULT_ATR_MULTIPLIERS = (1.5, 0.75).
     n_atr_custom = len(V3_ATR_MULTIPLIERS_PER_SYMBOL)
     if n_atr_custom != 0:
         raise RuntimeError(
             f"V3_ATR_MULTIPLIERS_PER_SYMBOL has {n_atr_custom} entries — expected 0 (empty). "
-            "iter-v3/040: REVERT all per-symbol ATR customizations (cycle 3 EXPLORATION #1). "
+            "iter-v3/042: V3_ATR_MULTIPLIERS_PER_SYMBOL must be EMPTY. "
+            "All symbols use DEFAULT_ATR_MULTIPLIERS = (1.5, 0.75) via fallback. "
             f"Current keys: {list(V3_ATR_MULTIPLIERS_PER_SYMBOL.keys())}. "
             "Clear V3_ATR_MULTIPLIERS_PER_SYMBOL to {{}} in features_v3/__init__.py."
         )
     print(
-        "  V3_ATR_MULTIPLIERS_PER_SYMBOL: 0 entries (empty — all symbols use (2.0, 1.0) default)"
+        "  V3_ATR_MULTIPLIERS_PER_SYMBOL: 0 entries (empty — all symbols use (1.5, 0.75) DEFAULT)"
         "  PASS"
     )
 
-    # iter-v3/041: Verify all 4 symbols return 11-feature fallback (V3_FEATURE_COLUMNS_TOP_N).
+    # iter-v3/042: Verify all 4 symbols return 14-feature fallback (V3_FEATURE_COLUMNS_TOP_N).
     for sym in ("BCHUSDT", "ALGOUSDT", "LDOUSDT", "TRXUSDT"):
         sym_feats = features_for_symbol(sym)
-        if len(sym_feats) != 11:
+        if len(sym_feats) != 14:
             raise RuntimeError(
                 f"{sym} fallback has {len(sym_feats)} features — "
-                "expected exactly 11 (iter-v3/041 V3_FEATURE_COLUMNS_TOP_N universal list). "
-                "iter-v3/041: all 4 symbols must use the 11-feature anchor "
-                "(no per-symbol entries; bottom-3 dropped: regime_momentum_signed_5d, "
-                "sym_vs_btc_ret_7d, ret_skew_50)."
+                "expected exactly 14 (iter-v3/042 V3_FEATURE_COLUMNS_TOP_N universal list). "
+                "iter-v3/042: all 4 symbols must use the 14-feature anchor "
+                "(no per-symbol entries; RESTORED from iter-v3/041 11-feature prune)."
             )
         if "fracdiff_d05_close" in sym_feats:
             raise RuntimeError(
@@ -413,35 +409,33 @@ def _verify_feature_columns() -> None:
                 f"Check features_for_symbol('{sym}') path."
             )
     print(
-        "  BCH/ALGO/LDO/TRX: 11-feature universal fallback (no extensions; iter-v3/041 prune)  PASS"
+        "  BCH/ALGO/LDO/TRX: 14-feature universal fallback "
+        "(no extensions; iter-v3/042 RESTORE)  PASS"
     )
 
-    # iter-v3/040: LDO ATR multipliers MUST be default (2.0, 1.0).
-    ldo_atr = atr_multipliers_for_symbol("LDOUSDT")
-    if ldo_atr != (2.0, 1.0):
-        raise RuntimeError(
-            f"atr_multipliers_for_symbol('LDOUSDT') returned {ldo_atr} — expected (2.0, 1.0). "
-            "iter-v3/040: V3_ATR_MULTIPLIERS_PER_SYMBOL is empty; LDO must use DEFAULT "
-            "=(2.0, 1.0) via fallback. "
-            "Verify V3_ATR_MULTIPLIERS_PER_SYMBOL == {{}} in features_v3/__init__.py."
-        )
-    print("  atr_multipliers_for_symbol('LDOUSDT') = (2.0, 1.0) (default fallback)  PASS")
+    # iter-v3/042: ALL symbols ATR multipliers MUST be (1.5, 0.75) via DEFAULT fallback.
+    for sym in ("LDOUSDT", "BCHUSDT", "TRXUSDT", "ALGOUSDT"):
+        sym_atr = atr_multipliers_for_symbol(sym)
+        if sym_atr != (1.5, 0.75):
+            raise RuntimeError(
+                f"atr_multipliers_for_symbol('{sym}') returned {sym_atr} — expected (1.5, 0.75). "
+                "iter-v3/042: DEFAULT_ATR_MULTIPLIERS changed to (1.5, 0.75); "
+                "V3_ATR_MULTIPLIERS_PER_SYMBOL is empty; all symbols use DEFAULT fallback. "
+                "Verify DEFAULT_ATR_MULTIPLIERS = (1.5, 0.75) in features_v3/__init__.py."
+            )
+    print("  atr_multipliers_for_symbol: ALL symbols return (1.5, 0.75) (DEFAULT universal)  PASS")
 
-    # iter-v3/041: regime_momentum_signed_5d MUST NOT be in V3_FEATURE_COLUMNS_TOP_N
-    # (universal feature pruning EXPLORATION; mandate revisited at this iteration).
-    # Bottom-3 by iter-v3/028 portfolio importance (rank 14/14, importance 390.4).
-    # 3-path resolution per brief Section 8 — PROMISING (mandate FALSIFIED) /
-    # PROMISING-INERT (parsimony-neutral) / NEGATIVE (mandate UPHELD; restore at iter-v3/042).
-    if "regime_momentum_signed_5d" in V3_FEATURE_COLUMNS_TOP_N:
+    # iter-v3/042: regime_momentum_signed_5d MUST be in V3_FEATURE_COLUMNS_TOP_N
+    # (mandate REINSTATED; Path C mandate fired at iter-v3/041).
+    if "regime_momentum_signed_5d" not in V3_FEATURE_COLUMNS_TOP_N:
         raise RuntimeError(
-            "regime_momentum_signed_5d FOUND in V3_FEATURE_COLUMNS_TOP_N — must be "
-            "ABSENT at iter-v3/041 (universal feature pruning EXPLORATION). "
-            "Per analysis/iteration_v3-041/bottom3_features_eda.py SHA c2e2712 + "
-            "briefs-v3/iteration_v3-041/research_brief.md Sub-fix 1. "
-            "Remove it from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
+            "regime_momentum_signed_5d NOT FOUND in V3_FEATURE_COLUMNS_TOP_N — must be "
+            "PRESENT at iter-v3/042 (iter-v3/041 Path C mandate REINSTATES this feature). "
+            "Per feedback_v3_engineered_features_proven.md mandate. "
+            "Add it to V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
         )
     print(
-        "  regime_momentum_signed_5d ABSENT from V3_FEATURE_COLUMNS_TOP_N (iter-v3/041 prune)  PASS"
+        "  regime_momentum_signed_5d PRESENT in V3_FEATURE_COLUMNS_TOP_N (mandate REINSTATED)  PASS"
     )
 
 

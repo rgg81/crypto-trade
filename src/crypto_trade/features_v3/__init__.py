@@ -146,12 +146,16 @@ V3_FEATURE_COLUMNS_TOP_N: tuple[str, ...] = (
     # iter-v3/028 portfolio importance rank 12/14, importance 412.8 (68.30% of top).
     # Bottom-3 by canonical multi-seed iter-v3/028 portfolio split-importance.
     # Per analysis/iteration_v3-041/bottom3_features_eda.py SHA c2e2712.
+    # iter-v3/042: ret_skew_50 RESTORED (iter-v3/041 Path C mandate — OOS dropped
+    # below +1.55 falsifier; prune REVERTED per research_brief.md Section 3 Sub-fix 1).
+    "ret_skew_50",  # rank 12/14 importance 412.8 — tail_risk  [RESTORED iter-v3/042]
     "vwap_dev_20",  # rank 11 (mean 13.0) — volume_micro
     "ret_autocorr_lag1_50",  # rank 12 (mean 13.5) — momentum_accel
     # iter-v3/041: sym_vs_btc_ret_7d DROPPED (universal feature pruning EXPLORATION).
     # iter-v3/028 portfolio importance rank 13/14, importance 398.0 (65.85% of top).
     # ALSO bottom-3 in iter-v3/040 single-seed cross-check (rank 12, importance 606.0).
     # Per analysis/iteration_v3-041/bottom3_features_eda.py SHA c2e2712.
+    # iter-v3/042: sym_vs_btc_ret_7d RESTORED (iter-v3/041 Path C mandate — prune REVERTED).
     # iter-v3/020: funding_rate_zscore_30 DROPPED (reverted to 13 features).
     # Per Critic FINAL Rec 2 of iter-v3/019 review: rank 14/14 across all 3
     # symbols; feature did not contribute signal. Infrastructure (funding_v3.py,
@@ -220,20 +224,30 @@ V3_FEATURE_COLUMNS_TOP_N: tuple[str, ...] = (
     #   PATH A (PROMISING):       IS lift ≥ +0.10 AND OOS ≥ +1.55 → mandate FALSIFIED
     #   PATH B (PROMISING-INERT): |IS delta| ≤ 0.10 AND OOS ≥ +1.55 → parsimony-neutral
     #   PATH C (NEGATIVE):        OOS < +1.55 → mandate UPHELD; restore at iter-v3/042
-    #
+    #                                                                               FIRED.
     # Per analysis/iteration_v3-041/bottom3_features_eda.py SHA c2e2712.
-    # compute_regime_momentum_signed_5d retained as dead code in engineered_v3.py
-    # at zero revert cost.
+    # iter-v3/042: regime_momentum_signed_5d RESTORED (Path C mandate fired;
+    # OOS < +1.55 at iter-v3/041; mandate UPHELD per
+    # feedback_v3_engineered_features_proven.md; prune REVERTED;
+    # per briefs-v3/iteration_v3-042/research_brief.md Section 3 Sub-fix 1).
+    "sym_vs_btc_ret_7d",  # rank 13/14 importance 398.0 — cross_btc  [RESTORED iter-v3/042]
+    # rank 14/14 importance 390.4 — engineered_v3  [RESTORED iter-v3/042]
+    "regime_momentum_signed_5d",
 )
-"""Top-11 feature subset: iter-v3/041 universal feature pruning EXPLORATION
-(14→11) — dropped 3 lowest by iter-v3/028 portfolio importance:
-  - regime_momentum_signed_5d (rank 14/14, importance 390.4)
-  - sym_vs_btc_ret_7d         (rank 13/14, importance 398.0)
-  - ret_skew_50               (rank 12/14, importance 412.8)
-Combined dropped importance 17.6% of total split count. Per
-analysis/iteration_v3-041/bottom3_features_eda.py SHA c2e2712. The MUST-be-present
-mandate for regime_momentum_signed_5d from feedback_v3_engineered_features_proven.md
-is being revisited via this EXPLORATION axis (3-path resolution per brief Section 8).
+"""Top-14 feature subset: iter-v3/042 REVERT of iter-v3/041 universal pruning.
+
+iter-v3/041 dropped 3 lowest-importance features (ret_skew_50, sym_vs_btc_ret_7d,
+regime_momentum_signed_5d) and produced NEGATIVE OOS result (OOS < +1.55 falsifier
+threshold). Path C mandate required RESTORE of all 3 features at iter-v3/042.
+The MUST-be-present mandate for regime_momentum_signed_5d from
+feedback_v3_engineered_features_proven.md is REINSTATED at iter-v3/042.
+
+14-feature universal set: matches iter-v3/028/040 anchor exactly.
+Per briefs-v3/iteration_v3-042/research_brief.md Section 3 Sub-fix 1.
+
+Top-N history (last 3 entries):
+  iter-v3/041: pruned 14 → 11 (dropped ret_skew_50, sym_vs_btc_ret_7d, regime_momentum)
+  iter-v3/042: RESTORED 11 → 14 (Path C NEGATIVE mandate at iter-v3/041 fired)
 
 iter-v3/035 revert — fracdiff_d05_close removed from universal list (15→14; moved
 to V3_FEATURES_PER_SYMBOL["BCHUSDT"] for BCH-only per-symbol targeting); cleared
@@ -495,15 +509,28 @@ iter-v3/040: CLEARED (empty dict). Cycle 3 EXPLORATION #1 — REVERT all per-sym
   aggregate (-0.55 IS Sharpe swing from iter-v3/029 clean-4-symbol anchor).
 """
 
-DEFAULT_ATR_MULTIPLIERS: tuple[float, float] = (2.0, 1.0)
-"""Default ATR multipliers for symbols not in V3_ATR_MULTIPLIERS_PER_SYMBOL."""
+DEFAULT_ATR_MULTIPLIERS: tuple[float, float] = (1.5, 0.75)
+"""Default ATR multipliers for symbols not in V3_ATR_MULTIPLIERS_PER_SYMBOL.
+
+iter-v3/042: CHANGED from (2.0, 1.0) → (1.5, 0.75) — universal ATR tightening
+EXPLORATION. V3_ATR_MULTIPLIERS_PER_SYMBOL is empty, so all 4 symbols (BCH/LDO/
+TRX/ALGO) use this default universally. Rationale: (1.5, 0.75) aligned LDO barriers
+with peer aggregate at iter-v3/032 (natr analysis SHA 9834e84); EXPLORATION tests
+whether the same tighter geometry improves the aggregate portfolio.
+Prior value (2.0, 1.0) set at iter-v3/010; in effect through iter-v3/041.
+Per briefs-v3/iteration_v3-042/research_brief.md Section 3 Sub-fix 2.
+"""
 
 
 def atr_multipliers_for_symbol(symbol: str) -> tuple[float, float]:
     """Return per-symbol ATR multipliers, falling back to DEFAULT_ATR_MULTIPLIERS.
 
     Introduced in iter-v3/032 to support per-symbol labeling-layer heterogeneity.
-    LDOUSDT returns (1.5, 0.75); all other symbols return (2.0, 1.0) via fallback.
+
+    iter-v3/042: DEFAULT_ATR_MULTIPLIERS changed to (1.5, 0.75) universally.
+    V3_ATR_MULTIPLIERS_PER_SYMBOL is empty — ALL symbols (BCH/LDO/TRX/ALGO) fall
+    back to DEFAULT_ATR_MULTIPLIERS = (1.5, 0.75). No per-symbol override exists.
+    Prior default (2.0, 1.0) was in effect from iter-v3/010 through iter-v3/041.
 
     Callers pass the returned tuple to LightGbmStrategy as
     ``atr_tp_multiplier=tp, atr_sl_multiplier=sl``.
@@ -574,9 +601,10 @@ def features_for_symbol(symbol: str) -> tuple[str, ...]:
     - TRXUSDT: returns 14 features = V3_FEATURE_COLUMNS_TOP_N (fallback; unchanged)
     - Any other symbol: fallback to 14-feature universal set
 
-    V3_FEATURES_PER_SYMBOL is empty at iter-v3/040 (0 entries).
+    V3_FEATURES_PER_SYMBOL is empty at iter-v3/040/041/042 (0 entries).
     All 4 symbols (BCH/LDO/TRX/ALGO) use the 14-feature universal fallback.
-    fracdiff_d05_close is NOT a model input for any symbol at iter-v3/040
+    iter-v3/041 temporarily pruned to 11 features; iter-v3/042 RESTORED to 14.
+    fracdiff_d05_close is NOT a model input for any symbol at iter-v3/040/041/042
     (column still computed in parquets but excluded from all feature_columns lists).
 
     Callers MUST pass ``feature_columns=list(features_for_symbol(symbol))``
