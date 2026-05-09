@@ -1807,6 +1807,18 @@ def main() -> None:
             "iter-v3/017 EXPLORATION)."
         ),
     )
+    parser.add_argument(
+        "--clean-oof",
+        action="store_true",
+        help=(
+            "Delete trial_oof_returns.parquet for the current iteration_label before "
+            "starting any backtest work. Required when re-running an iteration that "
+            "previously completed (or crashed mid-run) — without this flag, re-running "
+            "raises RuntimeError to prevent silent n_trials inflation and DSR contamination. "
+            "Per QR A5 + Critic FINAL 785500f recommendation (iter-v3/047 accumulated "
+            "5x duplicate rows: 55.78M vs expected 11M, inflating n_trials 140 to 700)."
+        ),
+    )
     args = parser.parse_args()
 
     # iter-v3/007: --exploration overrides defaults for fast iteration.
@@ -1847,6 +1859,34 @@ def main() -> None:
     _verify_feature_columns()
     _verify_label_leakage_gap()  # asserts REQUIRED_GAP == 110 (5-symbol universe, iter-v3/033)
     _verify_track_isolation()  # grep check
+
+    # -----------------------------------------------------------------------
+    # OOF parquet contamination guardrail (iter-v3: QR A5 + Critic FINAL 785500f)
+    #
+    # iter-v3/047 was re-run 5 times unintentionally, accumulating 5x duplicate
+    # rows in trial_oof_returns.parquet (55.78M vs expected 11M). This inflated
+    # n_trials from 140 to 700 in dsr.json and comparison.csv, mechanically
+    # depressing the DSR computation.
+    #
+    # Rule: if the OOF parquet for this iteration_label already exists at startup,
+    # either delete it explicitly via --clean-oof (clean re-run) or abort loudly.
+    # This check is STARTUP-ONLY — it does not affect per-trial append logic.
+    # -----------------------------------------------------------------------
+    oof_parquet_startup = REPORTS_DIR / f"iteration_{ITERATION_LABEL}" / "trial_oof_returns.parquet"
+    if oof_parquet_startup.exists():
+        if args.clean_oof:
+            oof_parquet_startup.unlink()
+            print(f"[CLEAN-OOF] Removed stale OOF parquet at {oof_parquet_startup}")
+        else:
+            raise RuntimeError(
+                f"OOF parquet for iteration_label '{ITERATION_LABEL}' already exists at "
+                f"{oof_parquet_startup}. "
+                "This indicates a previous run did not complete cleanly OR the iteration "
+                "is being re-executed. Re-running silently inflates n_trials and contaminates "
+                "DSR/PSR/comparison.csv. Either: "
+                "(a) delete the parquet manually, OR "
+                "(b) re-run with --clean-oof flag to delete and start fresh."
+            )
 
     active_sym_names = ", ".join(sym for _, sym in active_models)
     print(f"\nBASELINE v3 iter-{ITERATION_LABEL}: {active_sym_names} (seed-plumbing fix)")
