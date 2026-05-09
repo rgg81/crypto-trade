@@ -1,0 +1,131 @@
+# 01_direction_asymmetry_is
+label,symbol,direction,n_trades,wins,win_rate_pct,net_pnl_pct_sum,weighted_pnl_sum,avg_net_pnl_pct,median_net_pnl_pct
+iter-v3/045 IS,BCHUSDT,LONG,39,12,30.77,-25.0718,-18.6781,-0.6429,-3.1782
+iter-v3/045 IS,BCHUSDT,SHORT,55,24,43.64,48.6918,53.5283,0.8853,-2.86
+iter-v3/045 IS,BCHUSDT,TOTAL,94,36,38.3,23.62,34.8502,0.2513,-3.0496
+
+# 01_direction_asymmetry_oos
+label,symbol,direction,n_trades,wins,win_rate_pct,net_pnl_pct_sum,weighted_pnl_sum,avg_net_pnl_pct,median_net_pnl_pct
+iter-v3/045 OOS,BCHUSDT,LONG,21,6,28.57,-7.4413,-4.2379,-0.3543,-2.9613
+iter-v3/045 OOS,BCHUSDT,SHORT,17,9,52.94,18.1932,15.5455,1.0702,0.6414
+iter-v3/045 OOS,BCHUSDT,TOTAL,38,15,39.47,10.7519,11.3076,0.2829,-2.9594
+
+# 02_exit_composition_is
+label,symbol,direction,exit_reason,n_trades,pct_of_direction,mean_pnl_pct,sum_pnl_pct
+iter-v3/045 IS,BCHUSDT,LONG,take_profit,9,23.08,7.4271,66.844
+iter-v3/045 IS,BCHUSDT,LONG,stop_loss,25,64.1,-3.9586,-98.9644
+iter-v3/045 IS,BCHUSDT,LONG,timeout,5,12.82,1.4097,7.0486
+iter-v3/045 IS,BCHUSDT,SHORT,take_profit,20,36.36,7.8621,157.2414
+iter-v3/045 IS,BCHUSDT,SHORT,stop_loss,31,56.36,-3.851,-119.3817
+iter-v3/045 IS,BCHUSDT,SHORT,timeout,4,7.27,2.708,10.8321
+
+# 02_exit_composition_oos
+label,symbol,direction,exit_reason,n_trades,pct_of_direction,mean_pnl_pct,sum_pnl_pct
+iter-v3/045 OOS,BCHUSDT,LONG,take_profit,6,28.57,7.2196,43.3177
+iter-v3/045 OOS,BCHUSDT,LONG,stop_loss,15,71.43,-3.3839,-50.759
+iter-v3/045 OOS,BCHUSDT,LONG,timeout,0,0.0,0.0,0.0
+iter-v3/045 OOS,BCHUSDT,SHORT,take_profit,6,35.29,6.4043,38.4257
+iter-v3/045 OOS,BCHUSDT,SHORT,stop_loss,8,47.06,-3.5623,-28.4984
+iter-v3/045 OOS,BCHUSDT,SHORT,timeout,3,17.65,2.7553,8.2659
+
+# 03_counterfactual_no_long
+label,metric,value
+iter-v3/045 IS,all_trades_total_weighted_pnl,75.3967
+iter-v3/045 IS,BCH_total_weighted_pnl,34.8502
+iter-v3/045 IS,BCH_LONG_weighted_pnl,-18.6781
+iter-v3/045 IS,BCH_SHORT_weighted_pnl,53.5283
+iter-v3/045 IS,BCH_LONG_n_trades,39.0
+iter-v3/045 IS,BCH_SHORT_n_trades,55.0
+iter-v3/045 IS,BCH_LONG_WR_pct,30.77
+iter-v3/045 IS,BCH_SHORT_WR_pct,43.64
+iter-v3/045 IS,bundle_weighted_pnl_minus_BCH_LONG,94.0748
+iter-v3/045 IS,delta_from_removing_BCH_LONG,18.6781
+iter-v3/045 IS,BCH_after_LONG_removal_total_weighted_pnl,53.5283
+iter-v3/045 OOS,all_trades_total_weighted_pnl,96.9943
+iter-v3/045 OOS,BCH_total_weighted_pnl,11.3076
+iter-v3/045 OOS,BCH_LONG_weighted_pnl,-4.2379
+iter-v3/045 OOS,BCH_SHORT_weighted_pnl,15.5455
+iter-v3/045 OOS,BCH_LONG_n_trades,21.0
+iter-v3/045 OOS,BCH_SHORT_n_trades,17.0
+iter-v3/045 OOS,BCH_LONG_WR_pct,28.57
+iter-v3/045 OOS,BCH_SHORT_WR_pct,52.94
+iter-v3/045 OOS,bundle_weighted_pnl_minus_BCH_LONG,101.2322
+iter-v3/045 OOS,delta_from_removing_BCH_LONG,4.2379
+iter-v3/045 OOS,BCH_after_LONG_removal_total_weighted_pnl,15.5455
+
+# 04_monthly_long_vs_short_is
+label,symbol,year_month,n_long,n_short,long_net_pnl_pct,short_net_pnl_pct,long_wr_pct,short_wr_pct
+iter-v3/045 IS,BCHUSDT,2022-01,1,0,-4.8949,0.0,0.0,0.0
+iter-v3/045 IS,BCHUSDT,2022-02,1,3,-4.1902,-0.8334,0.0,33.33
+iter-v3/045 IS,BCHUSDT,2022-03,0,3,0.0,-11.5458,0.0,0.0
+iter-v3/045 IS,BCHUSDT,2022-04,0,1,0.0,7.7109,0.0,100.0
+iter-v3/045 IS,BCHUSDT,2022-05,1,0,-5.2249,0.0,0.0,0.0
+iter-v3/045 IS,BCHUSDT,2022-07,0,3,0.0,-0.0358,0.0,33.33
+iter-v3/045 IS,BCHUSDT,2022-08,1,2,0.3233,-8.5891,100.0,0.0
+iter-v3/045 IS,BCHUSDT,2022-09,1,3,-4.3993,4.6743,0.0,66.67
+iter-v3/045 IS,BCHUSDT,2022-11,6,0,-12.9893,0.0,16.67,0.0
+iter-v3/045 IS,BCHUSDT,2023-01,0,4,0.0,-2.3475,0.0,25.0
+iter-v3/045 IS,BCHUSDT,2023-02,3,3,-0.4572,0.4818,33.33,33.33
+iter-v3/045 IS,BCHUSDT,2023-03,4,2,7.4767,3.2745,50.0,50.0
+iter-v3/045 IS,BCHUSDT,2023-04,0,1,0.0,-2.7677,0.0,0.0
+iter-v3/045 IS,BCHUSDT,2023-05,3,0,2.0232,0.0,33.33,0.0
+iter-v3/045 IS,BCHUSDT,2023-08,0,1,0.0,-3.594,0.0,0.0
+iter-v3/045 IS,BCHUSDT,2023-09,0,1,0.0,-3.4257,0.0,0.0
+iter-v3/045 IS,BCHUSDT,2023-10,1,3,6.448,9.8322,100.0,66.67
+iter-v3/045 IS,BCHUSDT,2023-11,1,2,-3.1782,13.8872,0.0,100.0
+iter-v3/045 IS,BCHUSDT,2023-12,2,0,-6.8928,0.0,0.0,0.0
+iter-v3/045 IS,BCHUSDT,2024-01,0,4,0.0,8.5687,0.0,50.0
+iter-v3/045 IS,BCHUSDT,2024-02,0,3,0.0,-0.199,0.0,33.33
+iter-v3/045 IS,BCHUSDT,2024-04,3,2,7.9699,21.8151,66.67,100.0
+iter-v3/045 IS,BCHUSDT,2024-05,0,1,0.0,5.1934,0.0,100.0
+iter-v3/045 IS,BCHUSDT,2024-06,4,0,-3.2428,0.0,25.0,0.0
+iter-v3/045 IS,BCHUSDT,2024-07,0,1,0.0,-3.8985,0.0,0.0
+iter-v3/045 IS,BCHUSDT,2024-08,0,2,0.0,9.7788,0.0,100.0
+iter-v3/045 IS,BCHUSDT,2024-09,0,1,0.0,-2.86,0.0,0.0
+iter-v3/045 IS,BCHUSDT,2024-10,1,3,-3.0792,-0.6159,0.0,33.33
+iter-v3/045 IS,BCHUSDT,2024-11,2,3,3.4537,-2.4381,50.0,33.33
+iter-v3/045 IS,BCHUSDT,2024-12,3,1,-12.9585,-6.3873,0.0,0.0
+iter-v3/045 IS,BCHUSDT,2025-03,1,2,8.7407,13.0127,100.0,100.0
+
+# 04_monthly_long_vs_short_oos
+label,symbol,year_month,n_long,n_short,long_net_pnl_pct,short_net_pnl_pct,long_wr_pct,short_wr_pct
+iter-v3/045 OOS,BCHUSDT,2025-04,2,4,5.114,-4.2107,50.0,25.0
+iter-v3/045 OOS,BCHUSDT,2025-05,5,1,-18.0898,-3.4981,0.0,0.0
+iter-v3/045 OOS,BCHUSDT,2025-06,0,3,0.0,-0.2573,0.0,33.33
+iter-v3/045 OOS,BCHUSDT,2025-07,1,1,5.7348,6.3567,100.0,100.0
+iter-v3/045 OOS,BCHUSDT,2025-08,6,0,0.106,0.0,33.33,0.0
+iter-v3/045 OOS,BCHUSDT,2025-09,1,0,-2.9576,0.0,0.0,0.0
+iter-v3/045 OOS,BCHUSDT,2025-10,5,1,6.2579,-3.1566,40.0,0.0
+iter-v3/045 OOS,BCHUSDT,2025-11,0,2,0.0,3.5699,0.0,50.0
+iter-v3/045 OOS,BCHUSDT,2025-12,0,2,0.0,7.6245,0.0,100.0
+iter-v3/045 OOS,BCHUSDT,2026-02,1,1,-3.6066,7.5994,0.0,100.0
+iter-v3/045 OOS,BCHUSDT,2026-03,0,1,0.0,0.6414,0.0,100.0
+iter-v3/045 OOS,BCHUSDT,2026-05,0,1,0.0,3.524,0.0,100.0
+
+# 05_reproducibility_is
+label,BCH_n_total,BCH_n_long,BCH_n_short,BCH_long_pnl_pct_sum,BCH_short_pnl_pct_sum,BCH_long_wr_pct,BCH_short_wr_pct
+iter-v3/045 IS,94,39,55,-25.0718,48.6918,30.77,43.64
+iter-v3/046 IS,72,29,43,-18.6416,4.1159,44.83,46.51
+
+# 05_reproducibility_oos
+label,BCH_n_total,BCH_n_long,BCH_n_short,BCH_long_pnl_pct_sum,BCH_short_pnl_pct_sum,BCH_long_wr_pct,BCH_short_wr_pct
+iter-v3/045 IS,38,21,17,-7.4413,18.1932,28.57,52.94
+iter-v3/046 IS,40,21,19,-22.0206,-12.5225,33.33,47.37
+
+# 06_bch_importance
+feature,importance
+ret_kurt_50,173.0
+ema_spread_atr_20,172.0
+range_realized_vol_50,129.0
+max_dd_window_50,107.0
+sym_vs_btc_ret_7d,106.0
+ret_skew_200,104.0
+ret_kurt_200,99.0
+ret_skew_50,87.0
+hurst_100,72.0
+ret_autocorr_lag1_50,63.0
+btc_ret_14d,58.0
+vwap_dev_20,52.0
+regime_momentum_signed_5d,43.0
+hurst_diff_100_50,22.0
+
