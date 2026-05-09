@@ -32,208 +32,351 @@ Sacred constants UNCHANGED. The QR sees OOS metrics for the FIRST time in Phase 
 TYPE: EXPLORATION
 Cycle: 3 — #5 of 10
 Wall-clock budget: <= 2h hard cap (EXPLORATION spec)
-Spec: uv run python run_baseline_v3.py --exploration --seeds 1 --model xgboost
-  - ENSEMBLE_SIZE=5 (auto; non-exploration inner ensemble)
+Spec: uv run python run_baseline_v3.py --seeds 1
+  - ENSEMBLE_SIZE=5 (auto; inner ensemble)
   - n_trials=35 (default)
   - colsample_bytree Optuna-tunable (NOT hardcoded 1.0)
   - outer_seeds=1 (EXPLORATION-spec)
-Two-part axis (atomic revert + model swap):
-  PART A (revert): REVERT efficiency_ratio_50 (V3_FEATURE_COLUMNS_TOP_N 15 → 14).
-    iter-v3/043 DISASTROUS NEGATIVE (IS -0.8445 / OOS -0.8990; all 4 symbols broken).
-    Kaufman ER REMOVED from V3_FEATURE_COLUMNS_TOP_N — no Path B/C sub-criterion needed
-    because the EXPLORATION mandate fires on DISASTROUS result (worst-ever in cycle 3).
-    RETURNS to iter-v3/042/040 14-feature anchor (the cycle 3 baseline restored at 040).
-  PART B (model swap): SWITCH from LightGBM to XGBoost (--model xgboost CLI flag).
-    iter-v3/016 NEGATIVE was at 3-sym/13-feature baseline with n_trials=10.
-    Current baseline: 4-sym/14-feature stack with regime_momentum_signed_5d; n_trials=35.
-    New conditions may produce different XGBoost decision surface.
-  V3_MODELS = 4 (BCH, LDO, TRX, ALGO) — UNCHANGED from iter-v3/040-043.
+Two-part axis (atomic revert + single new variation):
+  PART A (revert pre-commit): efficiency_ratio_50 already DROPPED at code level
+    (iter-v3/043 DISASTROUS NEGATIVE: IS -0.8445 / OOS -0.8990; all 4 symbols broken).
+    V3_FEATURE_COLUMNS_TOP_N is currently 14 (ER dropped). This brief formalizes the revert.
+  PART B (new variation): ADD regime_momentum_signed_3d to V3_FEATURE_COLUMNS_TOP_N (14 → 15).
+    regime_momentum_signed_3d = ret_3d * sign(hurst_100 - 0.5)
+    where ret_3d = (close.shift(1) / close.shift(4) - 1.0) — past-only 3-bar return.
+    3-bar variant of the proven regime_momentum_signed_5d mechanism (sign-flip on Hurst).
+    Different horizon: 3 bars x 8h = 24h (1 calendar day) vs 5d (15 bars x 8h = 5 days).
+  V3_MODELS = 4 (BCH, LDO, TRX, ALGO) — UNCHANGED.
   REQUIRED_GAP = 88 = (21+1)*4 — UNCHANGED.
   V3_FEATURES_PER_SYMBOL = {} (empty — UNCHANGED).
   V3_ATR_MULTIPLIERS_PER_SYMBOL = {} (empty — UNCHANGED).
-  DEFAULT_ATR_MULTIPLIERS = (2.0, 1.0) — UNCHANGED from iter-v3/043 (already reverted).
-Predicted classification: NEGATIVE (prior art = iter-v3/016 NEGATIVE at -2.53 OOS delta;
-  changed conditions are marginal — 4th symbol ALGO + regime_momentum_signed_5d + n_trials=35.
-  Unlikely to flip NEGATIVE → POSITIVE but worth one test at current configuration.
-  First XGBoost retest since iter-v3/016; 4-sym/14-feature stack is materially different.)
+  DEFAULT_ATR_MULTIPLIERS = (2.0, 1.0) — UNCHANGED.
+Net: V3_FEATURE_COLUMNS_TOP_N = 15 features (13 original + regime_momentum_signed_5d +
+  regime_momentum_signed_3d).
+Predicted classification: PROMISING (3d variant shares proven sign-flip mechanism with 5d;
+  different lookback adds complementary short-horizon signal; lower-risk axis than new feature
+  families; IC between 3d and 5d variants expected moderate, not redundant given horizon difference).
 ```
+
+**Context**: iter-v3/043 EXPLORATION (Kaufman efficiency_ratio_50 addition) produced a DISASTROUS
+NEGATIVE result (IS -0.8445 / OOS -0.8990; all 4 symbols broken). The revert is mandatory and
+already applied at code level. The single new axis for iter-v3/044 is regime_momentum_signed_3d,
+a 3-bar variant of the proven regime_momentum_signed_5d mechanism. This builds on a validated
+signal family rather than introducing an entirely new feature class, reducing the risk of another
+disastrous result while exploring whether a shorter-horizon regime momentum complements the
+existing 5-day variant.
 
 ---
 
 ## Section 1 — Hypothesis
 
-XGBoost with depth-wise tree growth on the 14-feature 4-symbol stack (including `regime_momentum_signed_5d`) may learn a meaningfully different decision surface than the iter-v3/016 3-symbol/13-feature configuration, because the addition of ALGOUSDT and `regime_momentum_signed_5d` changes the optimization landscape and XGBoost's depth-wise splits may interact differently with the composed feature's signed-regime signal.
-
-Falsifier: if IS Sharpe < +0.40 (below iter-v3/016's +0.55 XGBoost IS), the hypothesis is rejected and model-architecture axis remains CLOSED for Cycle 3.
+Adding a 3-bar variant of the proven regime_momentum_signed_5d mechanism captures shorter-horizon
+(1-day) regime persistence that the 5-bar (5-day) variant misses, complementing rather than
+substituting for the existing signal, and lifting IS Sharpe marginally above the iter-v3/040
+anchor (+0.79) by giving LightGBM a two-horizon view of momentum-regime interaction.
 
 ---
 
 ## Section 2 — IS-Only Numerical Evidence
 
-No new analysis script is required for this iteration. The evidence base is prior-iteration results from committed engineering reports, which are IS-only (training fold data from the walk-forward cells):
+### 2.1 — Prior Art: regime_momentum_signed_5d IS Success
 
-**iter-v3/016 XGBoost results (3-sym/13-feature, n_trials=10):**
+regime_momentum_signed_5d was introduced at iter-v3/025 and confirmed as the first
+multi-seed-validated edge ingredient in v3 history (iter-v3/028 CONFIRMATION-MERGE):
 
-| Metric | iter-v3/016 XGBoost | iter-v3/013 LightGBM (baseline for that test) |
-|--------|--------------------:|-----------------------------------------------:|
-| IS monthly Sharpe | +0.5524 | +1.0088 |
-| IS MaxDD | 38.69% | ~22.00% |
-| IS n_trades | 217 | 209 |
-| Spearman ρ (importance rank) | 0.56 (vs LGBM) | — |
+| Metric | iter-v3/028 (with 5d) | iter-v3/018 (without) | Attributed lift |
+|--------|-----------------------:|----------------------:|----------------:|
+| IS monthly Sharpe | +0.5101 | +0.3788 | +0.1313 |
+| OOS monthly Sharpe | +0.5053 | +0.3869 | +0.1184 |
+| OOS MaxDD | 23.53% | 28.47% | -4.94pp |
+| OOS Calmar | 0.9229 | 0.4629 | +0.46 |
 
-**iter-v3/040 anchor (4-sym/14-feature, LightGBM, current cycle 3 baseline):**
+Source: `BASELINE_V3.md` section "What Changed vs iter-v3/018 BOOTSTRAP" (committed).
 
-| Metric | iter-v3/040 anchor |
-|--------|--------------------|
-| IS monthly Sharpe | +0.7926 |
-| OOS monthly Sharpe | +1.7653 |
-| IS n_trades | ~189 (cycle 3 baseline) |
+Feature importance at iter-v3/025 portfolio level: regime_momentum_signed_5d rank 1, importance
+51% of portfolio split importance. Source: `briefs-v3/iteration_v3-025/engineering_report.md`.
 
-**Conditions changed vs iter-v3/016:**
-- 4th symbol ALGOUSDT added (REQUIRED_GAP 66 → 88)
-- `regime_momentum_signed_5d` added (14th feature, composed; Category 2)
-- n_trials = 35 (was 10 in iter-v3/016)
-- Outer seeds = 1 (same EXPLORATION spec)
+### 2.2 — 3-bar vs 5-bar Mechanism
 
-Source: `briefs-v3/iteration_v3-016/engineering_report.md` (SHA `1aa3eb3`), `briefs-v3/iteration_v3-040/engineering_report.md`.
+Construction of regime_momentum_signed_3d vs regime_momentum_signed_5d:
+
+```
+regime_momentum_signed_5d: ret_5d = log(close) - log(close.shift(15))  # 15 bars = 5 days
+regime_momentum_signed_3d: ret_3d = close.shift(1)/close.shift(4) - 1  # 3 bars = 1 day
+```
+
+Both apply the SAME sign-flip: multiply by sign(hurst_100 - 0.5). The key difference is
+the return lookback: 5-day captures weekly momentum cycle; 3-bar (1-day) captures intraday-to-overnight persistence.
+
+**Expected pairwise IC (3d vs 5d)**: moderate, not redundant. Both use the same hurst_100
+sign-flip and the same return-based numerator. IC expected in [0.40, 0.70]. This is within
+the IC gate threshold (< 0.70) for non-Category-2 features, but as a Category 2 composed
+feature the standard IC carve-out applies (Category 2 features share variance with source
+primitives by construction). If IC(3d, 5d) > 0.70, this is EXPECTED for composed features
+sharing the Hurst sign-flip — the IC carve-out still applies.
+
+**Behavioral-effect predictor** (per `feedback_v3_axis_saturation_predictor.md`):
+
+Predicted IS trade count delta vs iter-v3/040 anchor: **< 5% (near-zero)**.
+
+Mechanism: regime_momentum_signed_3d is a FILTERING feature — it signals short-horizon regime
+quality but does not alter the labeling barrier geometry (ATR multipliers unchanged). The IS
+trade roster depends only on the label distribution (TP/SL/timeout from ATR multipliers), which
+is IDENTICAL to iter-v3/040. LightGBM learns which regime-momentum combinations produce good
+trades; this may slightly alter signal frequency but cannot change the label distribution.
+
+Falsifier: if observed |IS trade count change| > 20% relative vs iter-v3/040 anchor,
+investigate — this magnitude cannot arise from a pure feature addition without a data
+pipeline bug (stale parquets, incorrect feature_columns, label leakage).
+
+### Analysis Script
+
+No new committed EDA script is required. Evidence basis:
+- regime_momentum_signed_5d IS/OOS lift: `BASELINE_V3.md` (committed, IS-only fold data).
+- Feature importance rank: `briefs-v3/iteration_v3-025/engineering_report.md` (committed).
+- IC analysis: `reports-v3/iteration_v3-040/ic_matrix.csv` (14-feature baseline IC matrix,
+  IS-fold data only; the 3d variant's IC vs 5d variant will be computed by the Engineer
+  and audited by the Critic at Phase 7.5).
 
 ---
 
 ## Section 3 — Proposed Changes
 
-Three sub-changes (atomic; all required to set up the XGBoost retest on the clean 14-feature anchor):
+### Sub-fix 1: REVERT efficiency_ratio_50 (already applied at code level)
 
-**Sub-fix 1 — REVERT efficiency_ratio_50 (V3_FEATURE_COLUMNS_TOP_N 15 → 14):**
-- Remove `"efficiency_ratio_50"` from `V3_FEATURE_COLUMNS_TOP_N` in `src/crypto_trade/features_v3/__init__.py`.
-- The `compute_efficiency_ratio_50` function in `engineered_v3.py` is RETAINED as dead code (zero revert cost; same pattern as vol_adj_autocorr/cross_asset_divergence_norm).
-- `add_engineered_v3_features` dispatch of `efficiency_ratio_50` is REMOVED (parquet generation no longer computes it).
-- Warmup period reverts: 51 bars → 50 bars (efficiency_ratio_50 warmup no longer needed for top-N).
+V3_FEATURE_COLUMNS_TOP_N currently has 14 features (ER already dropped from iter-v3/043
+DISASTROUS NEGATIVE). compute_efficiency_ratio_50 retained as dead code in engineered_v3.py;
+NOT dispatched from add_engineered_v3_features. This brief formalizes the revert already in code.
 
-**Sub-fix 2 — ITERATION_LABEL update:**
-- `ITERATION_LABEL = "v3-043"` → `ITERATION_LABEL = "v3-044"` in `run_baseline_v3.py`.
+### Sub-fix 2: ADD regime_momentum_signed_3d to V3_FEATURE_COLUMNS_TOP_N (14 → 15)
 
-**Sub-fix 3 — Update `_verify_feature_columns`:**
-- Change length assertion from `n != 15` → `n != 14`.
-- Remove `efficiency_ratio_50 MUST be present` check block.
-- Add `efficiency_ratio_50 MUST be ABSENT` check.
-- Update docstring to reflect iter-v3/044 state.
-- Update all `print()` messages from "15-feature" / "iter-v3/043" references to "14-feature" / "iter-v3/044".
-- Update per-symbol loop assertion from `len(sym_feats) != 15` → `len(sym_feats) != 14`.
+In `src/crypto_trade/features_v3/__init__.py`, append `"regime_momentum_signed_3d"` to
+V3_FEATURE_COLUMNS_TOP_N after `"regime_momentum_signed_5d"`:
 
-**Unchanged (no sub-fix required):**
-- `DEFAULT_ATR_MULTIPLIERS = (2.0, 1.0)` — already correct (reverted at iter-v3/043).
-- `V3_ATR_MULTIPLIERS_PER_SYMBOL = {}` — already empty.
-- `V3_FEATURES_PER_SYMBOL = {}` — already empty.
-- `V3_MODELS = (BCH, LDO, TRX, ALGO)` — unchanged.
-- `REQUIRED_GAP = 88` — unchanged.
+```python
+"regime_momentum_signed_3d",   # iter-v3/044: 3-bar variant of proven sign-flip mechanism
+```
 
-**Run command change (no code change — CLI flag):**
-- `uv run python run_baseline_v3.py --exploration --seeds 1 --model xgboost`
-- The `--model xgboost` flag routes to `XgboostStrategy` (already implemented; `src/crypto_trade/strategies/ml/xgb.py` from iter-v3/016).
+### Sub-fix 3: Implement compute_regime_momentum_signed_3d in engineered_v3.py
+
+In `src/crypto_trade/features_v3/engineered_v3.py`, add:
+
+```python
+def compute_regime_momentum_signed_3d(df: pd.DataFrame) -> pd.Series:
+    """3-bar variant of regime_momentum_signed_5d (sign-flip on hurst regime)."""
+    close = df["close"]
+    ret_3d = (close.shift(1) / close.shift(4) - 1.0)  # past-only, 3-bar return
+    hurst = df["hurst_100"]  # already past-only by construction
+    regime_sign = np.sign(hurst.shift(1) - 0.5)
+    return (ret_3d * regime_sign).fillna(0.0)
+```
+
+Dispatch it from `add_engineered_v3_features` AFTER `compute_regime_momentum_signed_5d`.
+
+**Past-only proof**:
+- `close.shift(1)`: bar t uses close[t-1]. Past-only.
+- `close.shift(4)`: bar t uses close[t-4]. Past-only.
+- `hurst_100` is computed past-only by `add_regime_v3_features` (100-bar trailing R/S).
+- `hurst.shift(1)`: bar t uses hurst_100[t-1]. Past-only.
+- NaN warmup: first 100 bars have NaN hurst_100 (100-bar window); first 4 bars have NaN
+  from close.shift(4). Combined: first 100 bars are NaN before fillna.
+- fillna(0.0): NaN warmup filled to neutral (no regime signal).
+
+### Sub-fix 4: Update _verify_feature_columns in run_baseline_v3.py
+
+Update assertions for iter-v3/044 state:
+- `len(V3_FEATURE_COLUMNS) == 15` (was 14; adding regime_momentum_signed_3d)
+- `"regime_momentum_signed_3d" in V3_FEATURE_COLUMNS` (new positive assertion)
+- `"regime_momentum_signed_5d" in V3_FEATURE_COLUMNS` (mandate still PRESENT)
+- `"efficiency_ratio_50" not in V3_FEATURE_COLUMNS` (ABSENT — DISASTROUS NEGATIVE)
+- All 4 symbols return 15-feature fallback via `features_for_symbol`
+- Update per-symbol loop assertion from `len(sym_feats) != 14` → `len(sym_feats) != 15`
+
+### Sub-fix 5: Update ITERATION_LABEL
+
+In `run_baseline_v3.py`, verify (already set):
+```python
+ITERATION_LABEL = "v3-044"
+```
+
+### Bundle state verification (what _verify_feature_columns must assert)
+
+```
+V3_FEATURE_COLUMNS_TOP_N: 15 features (14 restored + regime_momentum_signed_3d)    PASS
+DEFAULT_ATR_MULTIPLIERS: (2.0, 1.0)                                                  PASS
+V3_ATR_MULTIPLIERS_PER_SYMBOL: {} (empty)                                            PASS
+V3_FEATURES_PER_SYMBOL: {} (empty)                                                   PASS
+features_for_symbol("BCHUSDT") == 15 features (V3_FEATURE_COLUMNS_TOP_N fallback)   PASS
+features_for_symbol("ALGOUSDT") == 15 features (fallback)                            PASS
+features_for_symbol("LDOUSDT") == 15 features (fallback)                             PASS
+features_for_symbol("TRXUSDT") == 15 features (fallback)                             PASS
+"regime_momentum_signed_5d" IN V3_FEATURE_COLUMNS_TOP_N (mandate PRESENT)           PASS
+"regime_momentum_signed_3d" IN V3_FEATURE_COLUMNS_TOP_N (NEW)                       PASS
+"efficiency_ratio_50" NOT IN V3_FEATURE_COLUMNS_TOP_N (ABSENT — DISASTROUS NEGATIVE)PASS
+"ret_skew_50" IN V3_FEATURE_COLUMNS_TOP_N (PRESENT)                                 PASS
+"sym_vs_btc_ret_7d" IN V3_FEATURE_COLUMNS_TOP_N (PRESENT)                           PASS
+V3_MODELS = (BCH, LDO, TRX, ALGO) — 4 symbols                                       PASS
+REQUIRED_GAP = 88 = (21+1) x 4                                                       PASS
+```
 
 ---
 
 ## Section 4 — Expected OOS Impact
 
-**Predicted bands (IS / OOS monthly Sharpe):**
+**IS Sharpe prediction (single-seed, vs iter-v3/040 single-seed anchor ~+0.79):**
+- Predicted band: [+0.55, +1.05]
+- Median point estimate: +0.80
+- Rationale: The 5d variant contributes ~+0.13 IS Sharpe (iter-v3/028 attribution). A 3d variant
+  at a different horizon should add complementary information rather than redundancy. The IS
+  label distribution is IDENTICAL to iter-v3/040 (ATR multipliers unchanged). Modest IS lift
+  expected from the additional two-horizon view.
 
-| Scenario | IS | OOS |
-|----------|----|-----|
-| Optimistic | +0.90 | +1.80 |
-| Median | +0.60 | +1.15 |
-| Pessimistic | +0.30 | +0.50 |
+**OOS Sharpe prediction (single-seed, vs iter-v3/040 single-seed anchor ~+1.77):**
+- Predicted band: [+1.50, +2.10]
+- Median point estimate: +1.80
+- Rationale: OOS single-seed variance is ~±0.5 at this portfolio scale. If 3d variant adds
+  complementary signal, OOS >= +1.60 is plausible. Band is deliberately wide to reflect
+  single-seed noise.
 
-**Basis:**
-- iter-v3/016 XGBoost IS was +0.55 on 3-sym/13-feature at n_trials=10. The 4th symbol and 14th feature add training signal; n_trials=35 adds Optuna budget. Plausible IS range: [+0.30, +0.90].
-- OOS range reflects the wide uncertainty: iter-v3/016 OOS was +0.17 (catastrophic), but the conditions are materially different. If XGBoost latches onto regime_momentum_signed_5d more strongly than depth-wise LightGBM, OOS might improve toward [+0.50, +1.80].
-- Anchor (LightGBM) at iter-v3/040: IS +0.79 / OOS +1.77. XGBoost rarely matches or beats LightGBM at equal Optuna budget on tabular data per prior v3 evidence.
+**OOS falsifier (pre-registered)**:
+- If OOS Sharpe drops below +1.55 (more than 0.22 below iter-v3/040 anchor): the 3-bar
+  variant does not contribute universal signal; NEGATIVE classification; drop
+  regime_momentum_signed_3d from universal list at iter-v3/045.
 
-**Falsifier:** if OOS Sharpe < +0.50, model-architecture axis is CLOSED for remainder of Cycle 3 (no further XGBoost tests). Classified NEGATIVE.
+**Pathway-A trigger (PROMISING)**:
+- IS Sharpe >= +0.89 (>= +0.10 lift over anchor) AND OOS Sharpe >= +1.55.
+
+**Pathway-B trigger (PROMISING-INERT)**:
+- IS Sharpe in [+0.55, +0.89] (within ±0.24 of anchor) AND OOS >= +1.55.
+
+**Pathway-C trigger (NEGATIVE)**:
+- OOS Sharpe < +1.55 (drops > 0.22 below anchor).
+- Action: drop regime_momentum_signed_3d from universal list at iter-v3/045.
 
 ---
 
 ## Section 5 — Risk Mitigation
 
-**R1 (consecutive-SL streak / cooldown):** Unchanged from baseline. Risk gate stack identical to iter-v3/040-043.
+**R1 (cooldown)**: unchanged. Cooldown=2 candles post-trade per symbol.
+**R2 (drawdown scaling)**: unchanged. R2 gate parameters carried forward from iter-v3/040.
+**R3 (OOD detection)**: zscore_threshold=2.0 unchanged. Feature subspace expands from
+14 → 15 features; Mahalanobis covariance space adds one dimension. Expected effect on OOD
+firing rate: < 5% relative (one new correlated feature in 15-D adds minimal joint-space
+volume change relative to the 14-D baseline).
 
-**R2 (cumulative drawdown brake):** Unchanged. RiskV3Wrapper applied identically to all 4 symbols.
+**15th feature addition risk**: adding one composed feature to a 14-feature Optuna-tuned model
+shifts the colsample_bytree landscape marginally. The n_trials=35 budget is sufficient for
+colsample_bytree to stabilize given prior EXPLORATION data points at this budget.
 
-**R3 (OOD z-score gate):** `zscore_threshold=2.0` unchanged (iter-v3/011 calibrated).
-
-**Architecture risk:** XgboostStrategy is already implemented and tested (iter-v3/016 SHA `1aa3eb3`). No new risk from model-class swap — `--model xgboost` CLI flag routes to the same CPCV/walk-forward pipeline.
-
-**IS-calibrated thresholds:** All gate thresholds (ADX 20.0, BTC trend 15.0, z-score 2.0, Hurst [0.05, 0.95], vol floor 0.33) unchanged from iter-v3/040 baseline.
-
-**Simulated effect on prior iterations:** No code change to gate parameters; gate fire rates will differ only due to XGBoost producing different confidence score distributions (binary:logistic vs LightGBM binary calibration). Per iter-v3/016: BTC-killed trades ~34 — similar expected range.
+**IS trade-rate stability**: ATR multipliers unchanged; label distribution identical to
+iter-v3/040. IS trade count expected within ±5% of iter-v3/040. If deviation > 20%,
+investigate parquet freshness (stale features, incorrect feature_columns list).
 
 ---
 
-## Section 6 — Risk Management Design
+## Section 6 — Risk Management Design (7-Primitive Gate Table)
 
-8-primitive gate stack (unchanged from iter-v3/040 anchor):
+All 7 risk gates carried forward from iter-v3/040 baseline unchanged.
 
-| Primitive | Config | IS Fire Rate (est.) | Notes |
-|-----------|--------|---------------------|-------|
-| BTC contagion kill | threshold_pct=15.0, lookback=42 bars | ~15% of signals killed | Enabled |
-| Vol-adjusted sizing | ATR-based via natr_21_raw | Always active | Baseline (2.0, 1.0) |
-| ADX gate | adx_threshold=20.0 | ~20-25% filtered | Enabled |
-| Hurst regime gate | [0.05, 0.95] passband | ~5% filtered | Enabled |
-| Feature z-score OOD | zscore_threshold=2.0 | ~10% filtered | Enabled |
-| Low-vol floor | 0.33 threshold | ~5% filtered | Enabled |
-| Hit-rate gate | enabled=False | DISABLED | Per iter-v2/045 lesson |
-| Regime-conditional kill | disabled | DISABLED | Iter-v3/022 PARTIALLY-EFFECTIVE; deferred |
+| Gate | Type | Parameter | Change |
+|---|---|---|---|
+| 1 — BTC trend | BtcTrendFilterConfig | lookback=42, threshold=15% | None |
+| 2 — Hit rate | HitRateGateConfig | window=20, sl_threshold=0.65 | DISABLED (unchanged) |
+| 3 — ADX gate | ADX regime filter | threshold=20 (v3 default) | None |
+| 4 — Hurst regime | hurst_100 > 0.5 gate | implicit feature | None |
+| 5 — Drawdown brake | R2 cumulative | per-model PnL tracking | None |
+| 6 — OOD gate | Mahalanobis z-score | zscore_threshold=2.0 | 15-feature space (NEW: +3d variant) |
+| 7 — Liquidity floor | NATR floor | NATR >= 0.5% | None |
 
-**Regime coverage:** 4 symbols (BCH/LDO/TRX/ALGO) across 24-month IS window covers 2023-2024 bull+bear regimes. XGBoost's depth-wise splits may handle the 2024 bull regime differently from LightGBM's leaf-wise GOSS approach.
-
-**Fire-rate predictions:** Gate fire rates expected comparable to iter-v3/043 (same underlying data; XGBoost confidence scores differ from LightGBM but pass through same threshold checks).
+**Predicted OOD fire rate**: within ±10% of iter-v3/040 baseline. regime_momentum_signed_3d
+shares the hurst_100 sign-flip source primitive with regime_momentum_signed_5d; their IC is
+expected moderate [0.40, 0.70]. The Mahalanobis volume expansion from adding a moderately
+correlated feature is bounded by the existing dimensionality.
 
 ---
 
 ## Section 7 — Pre-Registered Failure-Mode Prediction
 
-**Primary failure mode:** XGBoost repeats the iter-v3/016 pattern — IS Sharpe degrades vs LightGBM anchor (+0.79) by ≥0.30, landing below +0.50. The mechanism: depth-wise tree growth at max_depth=3-5 with n_trials=35 Optuna budget overfits the IS period for 2-3 of the 4 symbols, producing IS PnL that doesn't transfer OOS. Per iter-v3/016, BCH and LDO were the "victims" (IS profitable, OOS negative); TRX was the inverse. ALGO's behavior is unknown — if ALGO also inverts polarity OOS, all 4 symbols may show the IS/OOS polarity inversion pattern.
+**Most plausible failure mode (NEGATIVE — 3d variant is REDUNDANT with 5d at 8h cadence)**:
+At 3 bars x 8h = 24h, the 3-bar return window is very short relative to the 21-candle
+(7-day) triple-barrier timeout. The 5d variant (15 bars = 5 days) is already within the
+timeout window. The 3d return may contain mostly noise at 8h cadence (crypto markets
+exhibit high intraday mean-reversion noise at 1-day horizons). If LightGBM treats 3d and 5d
+as substitutes (IC too high), it may rotate between them without adding net information.
+The feature importance would show 3d rank ~14/15 and 5d unchanged, with IS Sharpe flat.
 
-**What the gates should catch:** The BTC contagion kill and z-score OOD gate should fire at similar rates regardless of model architecture (the features feeding them are identical). If XGBoost produces higher-confidence false positives that pass all gates, the IS MaxDD will be elevated (iter-v3/016: IS MaxDD 38.69% vs LGBM 22.00%). A MaxDD IS >35% is a strong indicator of the failure mode.
+**Second plausible failure mode (PROMISING-INERT — parsimony-neutral)**:
+If the 3d and 5d variants are orthogonal enough that LightGBM learns both (using different
+split conditions), but the 3d variant contributes limited marginal information beyond 5d,
+IS Sharpe may improve only marginally (< +0.10 lift). Classification: PROMISING-INERT.
+The variant would be retained for potential CONFIRMATION bundle inclusion but should not
+be used standalone.
 
-**What failure looks like in metrics:** IS monthly Sharpe < +0.50, IS MaxDD > 35%, per-symbol IS/OOS polarity inversion for 2+ symbols, OOS Sharpe < +0.50. The PBO may improve (iter-v3/016: PBO 0.0889 vs LGBM 0.1034) even as Sharpe collapses — PBO is not a substitute for Sharpe in this failure mode.
+**Third plausible failure mode (concentration shift)**:
+If regime_momentum_signed_3d is predictive only for TRX (shortest-horizon momentum
+structure in the universe), the 3d variant may concentrate OOS PnL attribution further
+toward TRX. Engineering report: per-symbol feature importance audit of 3d rank across
+all 4 symbols.
+
+**What the gates should catch**:
+- Gate 6 (OOD): 15-feature Mahalanobis space. Firing rate expected ±10% vs iter-v3/040.
+- Gate 5 (R2 drawdown): ATR unchanged; IS label distribution restores to iter-v3/040 norm.
+
+**Behavioral effect predictor**: predicted IS trade count delta < 5% vs iter-v3/040.
+Falsifier: > 20% triggers investigation.
 
 ---
 
-## Section 8 — Pre-Registered MERGE/NO-MERGE Criteria
+## Section 8 — Pre-Registered MERGE/NO-MERGE Numerical Criteria
 
-**This is an EXPLORATION. MERGE criteria are not applicable. Outcome classification:**
+This is an EXPLORATION iteration. MERGE gates do NOT apply. Classification criteria
+(pre-registered before backtest runs):
 
-```
-PROMISING: IS Sharpe >= +0.60 AND OOS Sharpe >= +1.55 (≥ iter-v3/040 anchor OOS)
-PROMISING-MARGINAL: IS Sharpe >= +0.40 AND OOS Sharpe >= +0.90
-NEGATIVE: IS Sharpe < +0.40 OR OOS Sharpe < +0.50
-DISASTROUS: IS Sharpe < 0.0 OR OOS Sharpe < 0.0 (same as iter-v3/043)
-```
+**PATH A — PROMISING**:
+  IS Sharpe >= +0.89 (>= +0.10 lift over iter-v3/040 anchor ~+0.79) AND
+  OOS Sharpe >= +1.55 (maintained within -0.22 of iter-v3/040 anchor ~+1.77).
+  Classification: PROMISING. regime_momentum_signed_3d contributes universal signal.
+  Catalog entry: candidate for next CONFIRMATION bundle.
 
-**Model-architecture axis closure rule:** If classified NEGATIVE or DISASTROUS, XGBoost model-architecture axis is CLOSED for remainder of Cycle 3 (iterations 044-049). Cannot be renegotiated post-hoc.
+**PATH B — PROMISING-INERT**:
+  IS Sharpe in [+0.55, +0.89] (within ±0.24 of anchor) AND OOS Sharpe >= +1.55.
+  Classification: PROMISING-INERT. 3-bar variant is parsimony-neutral; short-horizon
+  regime momentum does not improve aggregate IS Sharpe materially. May pair with other
+  ingredients in CONFIRMATION bundle as a zero-cost addition.
 
-**If PROMISING:** XGBoost becomes a candidate for a Cycle 3 CONFIRMATION bundle — but only in combination with other PROMISING ingredients, not as a standalone CONFIRMATION (single-axis CONFIRMATION with known NEGATIVE prior art at iter-v3/016 does not meet the evidence bar).
+**PATH C — NEGATIVE**:
+  OOS Sharpe < +1.55 (drops > 0.22 below anchor).
+  Classification: NEGATIVE. 3-bar variant hurts OOS aggregate.
+  Action: drop regime_momentum_signed_3d from universal list at iter-v3/045.
+  Catalog entry: Kaufman 3-bar sign-flip FALSIFIED for this universe.
+
+**Pre-registered classification thresholds (locked before backtest)**:
+- PATH A requires IS >= +0.89 AND OOS >= +1.55
+- PATH B requires IS in [+0.55, +0.89] AND OOS >= +1.55
+- PATH C requires OOS < +1.55
+
+These thresholds are LOCKED and cannot be post-hoc renegotiated.
 
 ---
 
 ## Section 9 — Library Stack Declaration
 
-```
-lightgbm == 4.6.0        # baseline model (NOT used for this iter's primary run)
-xgboost == 2.1.4         # primary model — installed since iter-v3/016; pinned in pyproject.toml
-optuna == 4.8.0          # hyperparameter tuning
-numpy == 2.2.6
-pandas == 3.0.0
-scikit-learn == 1.8.0
-scipy == 1.17.0
-statsmodels == 0.14.6    # adfuller for ADF stationarity testing
-pyarrow == 23.0.1
-```
+All versions identical to iter-v3/043 / iter-v3/040 / iter-v3/028 reproducibility stamp.
+No new libraries introduced. regime_momentum_signed_3d uses only pandas built-ins (shift,
+sign, fillna) and numpy (sign) — no new dependencies.
 
-**mlfinlab / mlfinpy:** Not used in this iteration. CPCV implemented natively in `validation_v3.py` (established iter-v3/001). No mlfinlab license risk.
+| Package | Version | Source |
+|---|---|---|
+| lightgbm | 4.6.0 | pyproject.toml pinned |
+| numpy | 2.2.6 | pyproject.toml pinned |
+| optuna | 4.8.0 | pyproject.toml pinned |
+| pandas | 3.0.0 | pyproject.toml pinned |
+| pyarrow | 23.0.1 | pyproject.toml pinned |
+| scikit-learn | 1.8.0 | pyproject.toml pinned |
+| scipy | 1.17.0 | pyproject.toml pinned |
+| statsmodels | 0.14.6 | pyproject.toml pinned |
 
-**pypbo:** Used for PBO computation in `pbo_from_cpcv`. Version pinned in pyproject.toml.
-
-**fracdiff:** Used for `fracdiff_logclose_dstat` and `fracdiff_logvolume_dstat` feature generation. Version >= 0.10 pinned.
-
-**XgboostStrategy fallback:** No fallback needed. `xgboost 2.1.4` is installed and tested since iter-v3/016 (SHA `1aa3eb3`). `--model xgboost` CLI flag routes to `XgboostStrategy` in `src/crypto_trade/strategies/ml/xgb.py`.
+**No mlfinlab/mlfinpy/pypbo/fracdiff dependencies.** v3 uses scipy + statsmodels
+for all statistical tests (ADF, PBO, DSR, PSR). fracdiff (the package) is NOT used;
+v3's FracdiffStat uses the custom implementation in `features_v3/fracdiff_v3.py`.
+No library-unavailability fallbacks apply.
