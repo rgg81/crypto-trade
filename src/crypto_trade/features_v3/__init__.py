@@ -241,25 +241,42 @@ V3_FEATURE_COLUMNS_TOP_N: tuple[str, ...] = (
     # Past-only via shift(1) applied to ER series; warmup 51 bars (50-bar window + 1 shift).
     # Implemented via compute_efficiency_ratio_50 in engineered_v3.py.
     # Per briefs-v3/iteration_v3-043/research_brief.md Section 3 Sub-fix 2.
-    "efficiency_ratio_50",  # NEW iter-v3/043 — engineered_v3 (Kaufman 1995)
+    # iter-v3/044: efficiency_ratio_50 DROPPED (15 → 14 REVERT). iter-v3/043 DISASTROUS
+    # NEGATIVE (IS -0.8445 / OOS -0.8990; all 4 symbols broken by Kaufman ER).
+    # compute_efficiency_ratio_50 retained as dead code in engineered_v3.py; NOT dispatched.
+    # Per briefs-v3/iteration_v3-044/research_brief.md Section 3 Sub-fix 1.
+    # iter-v3/044: regime_momentum_signed_3d ADDED (14 → 15). 3-bar variant of the proven
+    # regime_momentum_signed_5d sign-flip mechanism. ret_3d = close.shift(1)/close.shift(4) - 1.0
+    # multiplied by sign(hurst_100.shift(1) - 0.5). Captures shorter-horizon (1-day at 8h
+    # cadence) regime persistence complementary to the 5-day variant. Category 2 composed
+    # feature; IC carve-out applies. Past-only: close.shift(1), close.shift(4), hurst.shift(1).
+    # Implemented via compute_regime_momentum_signed_3d in engineered_v3.py.
+    # Per briefs-v3/iteration_v3-044/research_brief.md Section 3 Sub-fix 2.
+    "regime_momentum_signed_3d",  # iter-v3/044: 3-bar sign-flip variant; Category 2
 )
-"""Top-15 feature subset: iter-v3/043 adds efficiency_ratio_50 (Kaufman 1995) on
-the restored 14-feature anchor from iter-v3/042.
+"""Top-15 feature subset: iter-v3/044 adds regime_momentum_signed_3d (14 → 15),
+a 3-bar variant of the proven sign-flip mechanism, after reverting iter-v3/043's
+DISASTROUS efficiency_ratio_50 (IS -0.8445 / OOS -0.8990; all 4 symbols broken).
 
 iter-v3/042 restored 3 features (ret_skew_50, sym_vs_btc_ret_7d,
 regime_momentum_signed_5d) from iter-v3/041 Path C NEGATIVE mandate.
 The MUST-be-present mandate for regime_momentum_signed_5d from
-feedback_v3_engineered_features_proven.md remains ACTIVE at iter-v3/043.
+feedback_v3_engineered_features_proven.md remains ACTIVE at iter-v3/044.
 
-iter-v3/043: efficiency_ratio_50 ADDED (14 → 15). Kaufman 1995 efficiency ratio:
-unsigned [0,1] regime-quality signal. Category 1 indicator — standard IC gate applies.
-Computed via compute_efficiency_ratio_50 in engineered_v3.py; past-only via shift(1).
-Per briefs-v3/iteration_v3-043/research_brief.md Section 3 Sub-fix 2.
+iter-v3/043: efficiency_ratio_50 ADDED (14 → 15) — DISASTROUS NEGATIVE.
+iter-v3/044: efficiency_ratio_50 DROPPED (reverted to 14 base). compute_efficiency_ratio_50
+retained as dead code in engineered_v3.py; NOT dispatched from add_engineered_v3_features.
+Per briefs-v3/iteration_v3-044/research_brief.md Section 3 Sub-fix 1.
+iter-v3/044: regime_momentum_signed_3d ADDED (14 → 15). 3-bar sign-flip variant of the
+proven regime_momentum_signed_5d mechanism. Category 2 composed feature.
+Per briefs-v3/iteration_v3-044/research_brief.md Section 3 Sub-fix 2.
 
-Top-N history (last 4 entries):
+Top-N history (last 5 entries):
   iter-v3/041: pruned 14 → 11 (dropped ret_skew_50, sym_vs_btc_ret_7d, regime_momentum)
   iter-v3/042: RESTORED 11 → 14 (Path C NEGATIVE mandate at iter-v3/041 fired)
-  iter-v3/043: ADDED 14 → 15 (efficiency_ratio_50 Kaufman 1995 ER)
+  iter-v3/043: ADDED 14 → 15 (efficiency_ratio_50 Kaufman 1995 ER — DISASTROUS NEGATIVE)
+  iter-v3/044: DROPPED efficiency_ratio_50 (15 → 14 REVERT) + ADDED
+              regime_momentum_signed_3d (14 → 15)
 
 iter-v3/035 revert — fracdiff_d05_close removed from universal list (15→14; moved
 to V3_FEATURES_PER_SYMBOL["BCHUSDT"] for BCH-only per-symbol targeting); cleared
@@ -505,7 +522,15 @@ iter-v3/042:     V3_FEATURE_COLUMNS_TOP_N (14 features; RESTORED all 3 pruned fe
 iter-v3/043:     V3_FEATURE_COLUMNS_TOP_N (15 features; efficiency_ratio_50 ADDED —
                  Kaufman 1995 unsigned [0,1] regime-quality signal. DEFAULT_ATR_MULTIPLIERS
                  REVERTED (1.5,0.75)→(2.0,1.0) per iter-v3/042 IS-collapse mandate.
-                 Category 1 indicator; standard IC gate applies.)
+                 Category 1 indicator; standard IC gate applies.
+                 RESULT: DISASTROUS NEGATIVE — IS -0.8445 / OOS -0.8990; all 4 symbols broken.)
+iter-v3/044:     V3_FEATURE_COLUMNS_TOP_N (15 features; efficiency_ratio_50 DROPPED
+                 (15 → 14 REVERT; iter-v3/043 DISASTROUS NEGATIVE mandate;
+                 compute_efficiency_ratio_50 retained as dead code; NOT dispatched).
+                 regime_momentum_signed_3d ADDED (14 → 15): 3-bar sign-flip variant;
+                 ret_3d = close.shift(1)/close.shift(4) - 1.0 * sign(hurst_100[t-1] - 0.5).
+                 Category 2 composed feature; IC carve-out applies.
+                 Net: 15 = 13 original + regime_momentum_signed_5d + regime_momentum_signed_3d.)
 """
 
 V3_NON_FEATURE_COLUMNS: tuple[str, ...] = ("natr_21_raw", "tbr_raw")
@@ -598,16 +623,19 @@ iter-v3/040: CLEARED (empty dict). Cycle 3 EXPLORATION #1 — REVERT all per-sym
              per-symbol customizations caused ~-0.55 IS Sharpe swing from iter-v3/029 anchor.
              iter-v3/040 verifies that clearing per-symbol customizations restores IS anchor.
 
-Enforced by _verify_feature_columns in run_baseline_v3.py (iter-v3/040):
+Enforced by _verify_feature_columns in run_baseline_v3.py (iter-v3/044):
     len(V3_FEATURES_PER_SYMBOL) == 0  (empty — no per-symbol entries)
     "BCHUSDT" not in V3_FEATURES_PER_SYMBOL
     "ALGOUSDT" not in V3_FEATURES_PER_SYMBOL
     "LDOUSDT" not in V3_FEATURES_PER_SYMBOL
     "TRXUSDT" not in V3_FEATURES_PER_SYMBOL
-    features_for_symbol("BCHUSDT") == V3_FEATURE_COLUMNS_TOP_N  (14 features, no fracdiff)
+    features_for_symbol("BCHUSDT") == V3_FEATURE_COLUMNS_TOP_N  (15 features, no fracdiff, no ER)
     "fracdiff_d05_close" not in V3_FEATURE_COLUMNS_TOP_N
     "cross_asset_divergence_norm" not in V3_FEATURE_COLUMNS_TOP_N
     "vol_adj_autocorr" not in V3_FEATURE_COLUMNS_TOP_N
+    "efficiency_ratio_50" not in V3_FEATURE_COLUMNS_TOP_N  (DROPPED iter-v3/044 revert)
+    "regime_momentum_signed_3d" in V3_FEATURE_COLUMNS_TOP_N  (ADDED iter-v3/044)
+    "regime_momentum_signed_5d" in V3_FEATURE_COLUMNS_TOP_N  (PRESENT; mandate ACTIVE)
 """
 
 
@@ -626,15 +654,17 @@ def features_for_symbol(symbol: str) -> tuple[str, ...]:
     - TRXUSDT: returns 14 features = V3_FEATURE_COLUMNS_TOP_N (fallback; unchanged)
     - Any other symbol: fallback to 14-feature universal set
 
-    V3_FEATURES_PER_SYMBOL is empty at iter-v3/040/041/042/043 (0 entries).
-    All 4 symbols (BCH/LDO/TRX/ALGO) use the 15-feature universal fallback at iter-v3/043.
+    V3_FEATURES_PER_SYMBOL is empty at iter-v3/040/041/042/043/044 (0 entries).
+    All 4 symbols (BCH/LDO/TRX/ALGO) use the 15-feature universal fallback at iter-v3/044.
     iter-v3/041 temporarily pruned to 11 features; iter-v3/042 RESTORED to 14;
-    iter-v3/043 ADDED efficiency_ratio_50 to reach 15.
-    fracdiff_d05_close is NOT a model input for any symbol at iter-v3/040-043
+    iter-v3/043 ADDED efficiency_ratio_50 to reach 15 — DISASTROUS NEGATIVE;
+    iter-v3/044 DROPPED efficiency_ratio_50 (reverted to 14) + ADDED
+    regime_momentum_signed_3d (14 → 15).
+    fracdiff_d05_close is NOT a model input for any symbol at iter-v3/040-044
     (column still computed in parquets but excluded from all feature_columns lists).
 
     Callers MUST pass ``feature_columns=list(features_for_symbol(symbol))``
-    to LightGbmStrategy — never None, never empty, never the global default.
+    to LightGbmStrategy/XgboostStrategy — never None, never empty, never the global default.
     This preserves the ``feedback_explicit_feature_columns.md`` invariant while
     enabling per-symbol feature-set discipline.
     """

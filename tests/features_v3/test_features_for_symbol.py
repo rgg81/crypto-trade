@@ -302,15 +302,29 @@ def test_ret_skew_50_in_universal_list() -> None:
 
 
 def test_efficiency_ratio_50_in_universal_list() -> None:
-    """efficiency_ratio_50 MUST be in V3_FEATURE_COLUMNS_TOP_N at iter-v3/043 (NEW).
+    """efficiency_ratio_50 MUST NOT be in V3_FEATURE_COLUMNS_TOP_N at iter-v3/044 (DROPPED).
 
-    NEW iter-v3/043: Kaufman 1995 efficiency ratio. Unsigned [0,1] regime-quality signal.
-    Orthogonal mechanism to regime_momentum_signed_5d (signed direction-flip).
-    Category 1 indicator — standard IC gate applies; no carve-out.
+    iter-v3/043 added efficiency_ratio_50 (Kaufman 1995 ER) — DISASTROUS NEGATIVE result
+    (IS -0.8445 / OOS -0.8990; all 4 symbols broken). iter-v3/044 drops it.
+    compute_efficiency_ratio_50 retained as dead code in engineered_v3.py; NOT dispatched.
     """
-    assert "efficiency_ratio_50" in V3_FEATURE_COLUMNS_TOP_N, (
-        "efficiency_ratio_50 NOT FOUND in V3_FEATURE_COLUMNS_TOP_N — must be PRESENT at "
-        "iter-v3/043 (NEW Kaufman 1995 regime-quality signal; 14 → 15 features). "
+    assert "efficiency_ratio_50" not in V3_FEATURE_COLUMNS_TOP_N, (
+        "efficiency_ratio_50 FOUND in V3_FEATURE_COLUMNS_TOP_N — must be ABSENT at "
+        "iter-v3/044 (DROPPED: iter-v3/043 DISASTROUS NEGATIVE IS -0.8445 / OOS -0.8990). "
+        "Remove it from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
+    )
+
+
+def test_regime_momentum_signed_3d_in_universal_list() -> None:
+    """regime_momentum_signed_3d MUST be in V3_FEATURE_COLUMNS_TOP_N at iter-v3/044 (NEW).
+
+    NEW iter-v3/044: 3-bar variant of proven sign-flip mechanism.
+    ret_3d = close.shift(1)/close.shift(4) - 1.0 multiplied by sign(hurst_100.shift(1) - 0.5).
+    Category 2 composed feature; IC carve-out applies.
+    """
+    assert "regime_momentum_signed_3d" in V3_FEATURE_COLUMNS_TOP_N, (
+        "regime_momentum_signed_3d NOT FOUND in V3_FEATURE_COLUMNS_TOP_N — must be PRESENT "
+        "at iter-v3/044 (NEW 3-bar sign-flip variant; 14 → 15 features). "
         "Add it to V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
     )
 
@@ -340,27 +354,28 @@ def test_vol_adj_autocorr_not_in_universal_list() -> None:
 
 
 def test_universal_list_is_15() -> None:
-    """V3_FEATURE_COLUMNS_TOP_N must have exactly 15 features at iter-v3/043.
+    """V3_FEATURE_COLUMNS_TOP_N must have exactly 15 features at iter-v3/044.
 
-    iter-v3/043: 14-feature anchor + efficiency_ratio_50 (Kaufman 1995).
+    iter-v3/044: 14-anchor + regime_momentum_signed_3d (DROPPED efficiency_ratio_50;
+    ADDED regime_momentum_signed_3d). Net: 15 = 13 original + 5d + 3d.
     All 4 symbols fall back to this 15-feature universal list (V3_FEATURES_PER_SYMBOL empty).
     """
     n = len(V3_FEATURE_COLUMNS_TOP_N)
     assert n == 15, (
-        f"V3_FEATURE_COLUMNS_TOP_N has {n} features — expected exactly 15 at iter-v3/043. "
-        f"iter-v3/043 adds efficiency_ratio_50 to the 14-feature anchor. "
+        f"V3_FEATURE_COLUMNS_TOP_N has {n} features — expected exactly 15 at iter-v3/044. "
+        f"iter-v3/044: DROPPED efficiency_ratio_50 + ADDED regime_momentum_signed_3d (net 15). "
         f"Check features_v3/__init__.py V3_FEATURE_COLUMNS_TOP_N."
     )
 
 
 @pytest.mark.parametrize("symbol", ["BCHUSDT", "ALGOUSDT", "LDOUSDT", "TRXUSDT"])
 def test_all_symbols_fallback_15(symbol: str) -> None:
-    """All 4 v3 symbols must return exactly 15 features at iter-v3/043."""
+    """All 4 v3 symbols must return exactly 15 features at iter-v3/044."""
     result = features_for_symbol(symbol)
     assert len(result) == 15, (
         f"{symbol}: expected 15 features (V3_FEATURE_COLUMNS_TOP_N universal fallback at "
-        f"iter-v3/043), got {len(result)}. V3_FEATURES_PER_SYMBOL must be empty + "
-        f"universal list = 15 (14-anchor + efficiency_ratio_50)."
+        f"iter-v3/044), got {len(result)}. V3_FEATURES_PER_SYMBOL must be empty + "
+        f"universal list = 15 (13-anchor + regime_momentum_signed_5d + regime_momentum_signed_3d)."
     )
     assert result == V3_FEATURE_COLUMNS_TOP_N, (
         f"{symbol}: result differs from V3_FEATURE_COLUMNS_TOP_N. "
@@ -370,11 +385,11 @@ def test_all_symbols_fallback_15(symbol: str) -> None:
 
 
 def test_features_for_symbol_unknown_fallback() -> None:
-    """An unknown symbol falls back to V3_FEATURE_COLUMNS_TOP_N (15 features at iter-v3/043)."""
+    """An unknown symbol falls back to V3_FEATURE_COLUMNS_TOP_N (15 features at iter-v3/044)."""
     result = features_for_symbol("XYZUSDT")
     assert result is not None, "features_for_symbol must never return None."
     assert len(result) == 15, (
-        f"Unknown symbol fallback should be 15 features at iter-v3/043, got {len(result)}."
+        f"Unknown symbol fallback should be 15 features at iter-v3/044, got {len(result)}."
     )
     assert result == V3_FEATURE_COLUMNS_TOP_N, (
         "Unknown symbol 'XYZUSDT' should fall back to V3_FEATURE_COLUMNS_TOP_N (15 features)."
@@ -383,23 +398,24 @@ def test_features_for_symbol_unknown_fallback() -> None:
         "fracdiff_d05_close",
         "cross_asset_divergence_norm",
         "vol_adj_autocorr",
+        "efficiency_ratio_50",  # DROPPED iter-v3/044 — DISASTROUS NEGATIVE
     ):
         assert feat not in result, (
             f"Unknown symbol fallback must NOT include {feat} (dead-code policy)."
         )
-    # iter-v3/043: regime_momentum_signed_5d MUST be present (mandate ACTIVE).
+    # iter-v3/044: regime_momentum_signed_5d MUST be present (mandate ACTIVE).
     assert "regime_momentum_signed_5d" in result, (
-        "regime_momentum_signed_5d must be in fallback at iter-v3/043 (mandate ACTIVE). "
+        "regime_momentum_signed_5d must be in fallback at iter-v3/044 (mandate ACTIVE). "
         "feedback_v3_engineered_features_proven.md mandate UPHELD."
+    )
+    # iter-v3/044: regime_momentum_signed_3d MUST be present (NEW).
+    assert "regime_momentum_signed_3d" in result, (
+        "regime_momentum_signed_3d must be in fallback at iter-v3/044 (NEW 3-bar variant)."
     )
     # iter-v3/042: sym_vs_btc_ret_7d and ret_skew_50 MUST be present (RESTORED; KEPT).
     assert "sym_vs_btc_ret_7d" in result, (
-        "sym_vs_btc_ret_7d must be in fallback at iter-v3/043 (RESTORED iter-v3/042; KEPT)."
+        "sym_vs_btc_ret_7d must be in fallback at iter-v3/044 (RESTORED iter-v3/042; KEPT)."
     )
     assert "ret_skew_50" in result, (
-        "ret_skew_50 must be in fallback at iter-v3/043 (RESTORED iter-v3/042; KEPT)."
-    )
-    # iter-v3/043: efficiency_ratio_50 MUST be present (NEW).
-    assert "efficiency_ratio_50" in result, (
-        "efficiency_ratio_50 must be in fallback at iter-v3/043 (NEW Kaufman 1995 ER)."
+        "ret_skew_50 must be in fallback at iter-v3/044 (RESTORED iter-v3/042; KEPT)."
     )

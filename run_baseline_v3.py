@@ -103,7 +103,7 @@ def _derive_ensemble_seeds(outer_seed: int, size: int = ENSEMBLE_SIZE) -> list[i
     return [int(s) for s in rng.integers(low=0, high=2**31 - 1, size=size)]
 
 
-ITERATION_LABEL = "v3-043"
+ITERATION_LABEL = "v3-044"
 REPORTS_DIR = Path("reports-v3")
 FEATURES_DIR = Path("data/features_v3")
 DATA_DIR = Path("data")
@@ -191,15 +191,17 @@ def _verify_data_freshness(symbols: tuple[str, ...], max_lag_hours: float = 16.0
 
 
 def _verify_feature_columns() -> None:
-    """Verifies V3_FEATURE_COLUMNS contents per current brief (iter-v3/043).
+    """Verifies V3_FEATURE_COLUMNS contents per current brief (iter-v3/044).
 
-    iter-v3/043: EXPLORATION — cycle 3 #4 — REVERT ATR + ADD efficiency_ratio_50 (Kaufman).
-      PART A (revert): DEFAULT_ATR_MULTIPLIERS REVERTED (1.5, 0.75) → (2.0, 1.0).
-        iter-v3/042 IS collapse NEGATIVE mandate fires (IS Sharpe -0.5941; TRX OOS -33).
-        V3_ATR_MULTIPLIERS_PER_SYMBOL: EMPTY — all 4 symbols use DEFAULT (2.0, 1.0).
-      PART B (new variation): efficiency_ratio_50 ADDED to V3_FEATURE_COLUMNS_TOP_N.
-        14 → 15 features. Kaufman 1995 unsigned [0,1] regime-quality signal.
-        Category 1 indicator; standard IC gate applies (no carve-out).
+    iter-v3/044: EXPLORATION — cycle 3 #5 — REVERT ER + ADD regime_momentum_signed_3d.
+      PART A (revert): efficiency_ratio_50 DROPPED from V3_FEATURE_COLUMNS_TOP_N
+        (already at code level). iter-v3/043 DISASTROUS NEGATIVE (IS -0.8445 / OOS -0.8990;
+        all 4 symbols broken). compute_efficiency_ratio_50 retained as dead code.
+      PART B (new feature): regime_momentum_signed_3d ADDED (14 → 15). 3-bar variant
+        of the proven sign-flip: ret_3d * sign(hurst_100.shift(1) - 0.5) where
+        ret_3d = close.shift(1)/close.shift(4) - 1.0. Category 2 composed feature.
+      DEFAULT_ATR_MULTIPLIERS: (2.0, 1.0) — correct (reverted at iter-v3/043).
+      V3_ATR_MULTIPLIERS_PER_SYMBOL: EMPTY — all 4 symbols use DEFAULT (2.0, 1.0).
       V3_FEATURES_PER_SYMBOL: EMPTY (unchanged from iter-v3/040). All 4 symbols
         fall back to the 15-feature V3_FEATURE_COLUMNS_TOP_N.
 
@@ -210,21 +212,22 @@ def _verify_feature_columns() -> None:
     vol_adj_autocorr MUST NOT be in universal list (dead code since iter-v3/036 revert).
     cross_asset_divergence_norm MUST NOT be in universal list (dead at model level).
     fracdiff_d05_close MUST NOT be in universal list AND MUST NOT be in any per-symbol entry.
-    regime_momentum_signed_5d MUST be present (mandate still ACTIVE at iter-v3/043).
-    sym_vs_btc_ret_7d MUST be present (RESTORED at iter-v3/042; KEPT at iter-v3/043).
-    ret_skew_50 MUST be present (RESTORED at iter-v3/042; KEPT at iter-v3/043).
-    efficiency_ratio_50 MUST be present (NEW at iter-v3/043).
+    efficiency_ratio_50 MUST NOT be present (DROPPED — iter-v3/043 DISASTROUS NEGATIVE).
+    regime_momentum_signed_5d MUST be present (mandate still ACTIVE at iter-v3/044).
+    regime_momentum_signed_3d MUST be present (NEW at iter-v3/044; 3-bar sign-flip variant).
+    sym_vs_btc_ret_7d MUST be present (RESTORED at iter-v3/042; KEPT at iter-v3/044).
+    ret_skew_50 MUST be present (RESTORED at iter-v3/042; KEPT at iter-v3/044).
 
-    Per-symbol checks (iter-v3/043):
+    Per-symbol checks (iter-v3/044):
     V3_FEATURES_PER_SYMBOL must be EMPTY (0 entries).
     V3_ATR_MULTIPLIERS_PER_SYMBOL must be EMPTY (0 entries).
     features_for_symbol("BCHUSDT") MUST return 15 features = V3_FEATURE_COLUMNS_TOP_N.
     features_for_symbol("ALGOUSDT") MUST return 15 features (fallback).
     features_for_symbol("LDOUSDT") MUST return 15 features (fallback).
     features_for_symbol("TRXUSDT") MUST return 15 features (fallback).
-    atr_multipliers_for_symbol("LDOUSDT") MUST return (2.0, 1.0) (REVERTED DEFAULT fallback).
-    atr_multipliers_for_symbol("BCHUSDT") MUST return (2.0, 1.0) (REVERTED DEFAULT fallback).
-    DEFAULT_ATR_MULTIPLIERS MUST be (2.0, 1.0) (REVERTED from (1.5, 0.75)).
+    atr_multipliers_for_symbol("LDOUSDT") MUST return (2.0, 1.0) (DEFAULT fallback).
+    atr_multipliers_for_symbol("BCHUSDT") MUST return (2.0, 1.0) (DEFAULT fallback).
+    DEFAULT_ATR_MULTIPLIERS MUST be (2.0, 1.0) (correct since iter-v3/043 revert).
     """
     from crypto_trade.features_v3 import (  # noqa: PLC0415
         DEFAULT_ATR_MULTIPLIERS,
@@ -236,7 +239,7 @@ def _verify_feature_columns() -> None:
     if n != 15:
         raise RuntimeError(
             f"V3_FEATURE_COLUMNS has {n} columns — expected exactly 15. "
-            "iter-v3/043: 14-feature anchor + efficiency_ratio_50 (Kaufman 1995). "
+            "iter-v3/044: REVERT efficiency_ratio_50 + ADD regime_momentum_signed_3d (14 → 15). "
             "Universal list = 15 features. "
             "Check features_v3/__init__.py V3_FEATURE_COLUMNS_TOP_N."
         )
@@ -281,34 +284,42 @@ def _verify_feature_columns() -> None:
             "iter-v3/040: dead at model level. "
             "Remove it from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
         )
-    # regime_momentum_signed_5d MUST be present (mandate still ACTIVE at iter-v3/043).
-    # feedback_v3_engineered_features_proven.md mandate UPHELD through iter-v3/043.
+    # regime_momentum_signed_5d MUST be present (mandate still ACTIVE at iter-v3/044).
+    # feedback_v3_engineered_features_proven.md mandate UPHELD through iter-v3/044.
     if "regime_momentum_signed_5d" not in V3_FEATURE_COLUMNS:
         raise RuntimeError(
             "regime_momentum_signed_5d NOT FOUND in V3_FEATURE_COLUMNS — must be PRESENT "
-            "at iter-v3/043. feedback_v3_engineered_features_proven.md mandate ACTIVE. "
+            "at iter-v3/044. feedback_v3_engineered_features_proven.md mandate ACTIVE. "
             "Add it to V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
         )
-    # sym_vs_btc_ret_7d MUST be present (RESTORED at iter-v3/042; KEPT at iter-v3/043).
+    # iter-v3/044: regime_momentum_signed_3d MUST be present (NEW — 3-bar sign-flip variant).
+    if "regime_momentum_signed_3d" not in V3_FEATURE_COLUMNS:
+        raise RuntimeError(
+            "regime_momentum_signed_3d NOT FOUND in V3_FEATURE_COLUMNS — must be PRESENT "
+            "at iter-v3/044. 3-bar variant of proven sign-flip mechanism. "
+            "Add it to V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
+        )
+    # sym_vs_btc_ret_7d MUST be present (RESTORED at iter-v3/042; KEPT at iter-v3/044).
     if "sym_vs_btc_ret_7d" not in V3_FEATURE_COLUMNS:
         raise RuntimeError(
             "sym_vs_btc_ret_7d NOT FOUND in V3_FEATURE_COLUMNS — must be PRESENT at "
-            "iter-v3/043 (RESTORED at iter-v3/042; KEPT). "
+            "iter-v3/044 (RESTORED at iter-v3/042; KEPT). "
             "Add it to V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
         )
-    # ret_skew_50 MUST be present (RESTORED at iter-v3/042; KEPT at iter-v3/043).
+    # ret_skew_50 MUST be present (RESTORED at iter-v3/042; KEPT at iter-v3/044).
     if "ret_skew_50" not in V3_FEATURE_COLUMNS:
         raise RuntimeError(
             "ret_skew_50 NOT FOUND in V3_FEATURE_COLUMNS — must be PRESENT at "
-            "iter-v3/043 (RESTORED at iter-v3/042; KEPT). "
+            "iter-v3/044 (RESTORED at iter-v3/042; KEPT). "
             "Add it to V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
         )
-    # iter-v3/043: efficiency_ratio_50 MUST be present (NEW).
-    if "efficiency_ratio_50" not in V3_FEATURE_COLUMNS:
+    # iter-v3/044: efficiency_ratio_50 MUST be ABSENT (DROPPED — iter-v3/043 DISASTROUS NEGATIVE).
+    if "efficiency_ratio_50" in V3_FEATURE_COLUMNS:
         raise RuntimeError(
-            "efficiency_ratio_50 NOT FOUND in V3_FEATURE_COLUMNS — must be PRESENT "
-            "at iter-v3/043 (NEW Kaufman 1995 unsigned [0,1] regime-quality signal). "
-            "Add it to V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
+            "efficiency_ratio_50 FOUND in V3_FEATURE_COLUMNS — must be ABSENT "
+            "at iter-v3/044 (DROPPED: iter-v3/043 DISASTROUS NEGATIVE IS -0.8445 / OOS -0.8990; "
+            "all 4 symbols broken by Kaufman ER). "
+            "Remove it from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
         )
     if "vwap_dev_50" in V3_FEATURE_COLUMNS:
         raise RuntimeError(
@@ -341,21 +352,22 @@ def _verify_feature_columns() -> None:
         )
     print(
         f"  V3_FEATURE_COLUMNS: {n} columns "
-        "(iter-v3/043: 14-anchor + efficiency_ratio_50 NEW; regime_momentum_signed_5d, "
-        "sym_vs_btc_ret_7d, ret_skew_50 PRESENT)  PASS"
+        "(iter-v3/044: 15-feature set; efficiency_ratio_50 ABSENT; regime_momentum_signed_5d, "
+        "regime_momentum_signed_3d, sym_vs_btc_ret_7d, ret_skew_50 PRESENT)  PASS"
     )
 
-    # iter-v3/043: Verify DEFAULT_ATR_MULTIPLIERS == (2.0, 1.0) (REVERTED).
+    # iter-v3/044: Verify DEFAULT_ATR_MULTIPLIERS == (2.0, 1.0).
+    # Already correct since iter-v3/043 revert (was (1.5, 0.75) only at iter-v3/042).
     if DEFAULT_ATR_MULTIPLIERS != (2.0, 1.0):
         raise RuntimeError(
             f"DEFAULT_ATR_MULTIPLIERS = {DEFAULT_ATR_MULTIPLIERS} — expected (2.0, 1.0). "
-            "iter-v3/043: REVERTED from (1.5, 0.75) to (2.0, 1.0) — iter-v3/042 IS collapse. "
+            "iter-v3/044: DEFAULT_ATR_MULTIPLIERS must be (2.0, 1.0) (reverted at iter-v3/043). "
             "All 4 symbols use DEFAULT via V3_ATR_MULTIPLIERS_PER_SYMBOL empty fallback. "
             "Verify DEFAULT_ATR_MULTIPLIERS = (2.0, 1.0) in features_v3/__init__.py."
         )
-    print("  DEFAULT_ATR_MULTIPLIERS = (2.0, 1.0) (REVERTED from (1.5, 0.75) at iter-v3/043)  PASS")
+    print("  DEFAULT_ATR_MULTIPLIERS = (2.0, 1.0) (already correct since iter-v3/043 revert)  PASS")
 
-    # iter-v3/043: V3_FEATURES_PER_SYMBOL MUST BE EMPTY.
+    # iter-v3/044: V3_FEATURES_PER_SYMBOL MUST BE EMPTY.
     # All per-symbol feature customizations reverted. All symbols use 15-feature fallback.
     n_custom = len(V3_FEATURES_PER_SYMBOL)
     if n_custom != 0:
@@ -367,13 +379,13 @@ def _verify_feature_columns() -> None:
         )
     print("  V3_FEATURES_PER_SYMBOL: 0 entries (empty — all symbols use 15-feature fallback)  PASS")
 
-    # iter-v3/043: V3_ATR_MULTIPLIERS_PER_SYMBOL MUST BE EMPTY.
+    # iter-v3/044: V3_ATR_MULTIPLIERS_PER_SYMBOL MUST BE EMPTY.
     # All symbols fall back to DEFAULT_ATR_MULTIPLIERS = (2.0, 1.0).
     n_atr_custom = len(V3_ATR_MULTIPLIERS_PER_SYMBOL)
     if n_atr_custom != 0:
         raise RuntimeError(
             f"V3_ATR_MULTIPLIERS_PER_SYMBOL has {n_atr_custom} entries — expected 0 (empty). "
-            "iter-v3/043: V3_ATR_MULTIPLIERS_PER_SYMBOL must be EMPTY. "
+            "iter-v3/044: V3_ATR_MULTIPLIERS_PER_SYMBOL must be EMPTY. "
             "All symbols use DEFAULT_ATR_MULTIPLIERS = (2.0, 1.0) via fallback. "
             f"Current keys: {list(V3_ATR_MULTIPLIERS_PER_SYMBOL.keys())}. "
             "Clear V3_ATR_MULTIPLIERS_PER_SYMBOL to {{}} in features_v3/__init__.py."
@@ -383,15 +395,16 @@ def _verify_feature_columns() -> None:
         "  PASS"
     )
 
-    # iter-v3/043: Verify all 4 symbols return 15-feature fallback (V3_FEATURE_COLUMNS_TOP_N).
+    # iter-v3/044: Verify all 4 symbols return 15-feature fallback (V3_FEATURE_COLUMNS_TOP_N).
     for sym in ("BCHUSDT", "ALGOUSDT", "LDOUSDT", "TRXUSDT"):
         sym_feats = features_for_symbol(sym)
         if len(sym_feats) != 15:
             raise RuntimeError(
                 f"{sym} fallback has {len(sym_feats)} features — "
-                "expected exactly 15 (iter-v3/043 V3_FEATURE_COLUMNS_TOP_N universal list). "
-                "iter-v3/043: all 4 symbols must use the 15-feature anchor "
-                "(14 restored + efficiency_ratio_50; no per-symbol entries)."
+                "expected exactly 15 (iter-v3/044 V3_FEATURE_COLUMNS_TOP_N universal list). "
+                "iter-v3/044: all 4 symbols must use the 15-feature set "
+                "(efficiency_ratio_50 ABSENT; regime_momentum_signed_3d PRESENT; "
+                "no per-symbol entries)."
             )
         if "fracdiff_d05_close" in sym_feats:
             raise RuntimeError(
@@ -406,46 +419,61 @@ def _verify_feature_columns() -> None:
                 "model level. "
                 f"Check features_for_symbol('{sym}') path."
             )
-        if "efficiency_ratio_50" not in sym_feats:
+        if "efficiency_ratio_50" in sym_feats:
             raise RuntimeError(
-                f"{sym} feature set MISSING efficiency_ratio_50 — must be PRESENT. "
-                "iter-v3/043: efficiency_ratio_50 is universal (all 4 symbols). "
+                f"{sym} feature set contains efficiency_ratio_50 — must be ABSENT. "
+                "iter-v3/044: efficiency_ratio_50 DROPPED (DISASTROUS NEGATIVE at iter-v3/043). "
                 f"Check features_for_symbol('{sym}') path."
+            )
+        if "regime_momentum_signed_3d" not in sym_feats:
+            raise RuntimeError(
+                f"{sym} feature set does NOT contain regime_momentum_signed_3d — must be PRESENT. "
+                "iter-v3/044: regime_momentum_signed_3d ADDED (3-bar sign-flip variant). "
+                f"Check V3_FEATURE_COLUMNS_TOP_N and features_for_symbol('{sym}') path."
             )
     print(
         "  BCH/ALGO/LDO/TRX: 15-feature universal fallback "
-        "(14-anchor + efficiency_ratio_50; iter-v3/043)  PASS"
+        "(efficiency_ratio_50 ABSENT; regime_momentum_signed_3d + _5d PRESENT)  PASS"
     )
 
-    # iter-v3/043: ALL symbols ATR multipliers MUST be (2.0, 1.0) via REVERTED DEFAULT fallback.
+    # iter-v3/044: ALL symbols ATR multipliers MUST be (2.0, 1.0) via DEFAULT fallback.
     for sym in ("LDOUSDT", "BCHUSDT", "TRXUSDT", "ALGOUSDT"):
         sym_atr = atr_multipliers_for_symbol(sym)
         if sym_atr != (2.0, 1.0):
             raise RuntimeError(
                 f"atr_multipliers_for_symbol('{sym}') returned {sym_atr} — expected (2.0, 1.0). "
-                "iter-v3/043: DEFAULT_ATR_MULTIPLIERS REVERTED to (2.0, 1.0); "
+                "iter-v3/044: DEFAULT = (2.0, 1.0) (correct since iter-v3/043 revert); "
                 "V3_ATR_MULTIPLIERS_PER_SYMBOL is empty; all symbols use DEFAULT fallback. "
                 "Verify DEFAULT_ATR_MULTIPLIERS = (2.0, 1.0) in features_v3/__init__.py."
             )
-    print("  atr_multipliers_for_symbol: ALL symbols return (2.0, 1.0) (REVERTED DEFAULT)  PASS")
+    print("  atr_multipliers_for_symbol: ALL symbols return (2.0, 1.0) (DEFAULT)  PASS")
 
-    # iter-v3/043: regime_momentum_signed_5d MUST be in V3_FEATURE_COLUMNS_TOP_N (mandate ACTIVE).
+    # iter-v3/044: regime_momentum_signed_5d MUST be in V3_FEATURE_COLUMNS_TOP_N (mandate ACTIVE).
     if "regime_momentum_signed_5d" not in V3_FEATURE_COLUMNS_TOP_N:
         raise RuntimeError(
             "regime_momentum_signed_5d NOT FOUND in V3_FEATURE_COLUMNS_TOP_N — must be "
-            "PRESENT at iter-v3/043. feedback_v3_engineered_features_proven.md mandate ACTIVE. "
+            "PRESENT at iter-v3/044. feedback_v3_engineered_features_proven.md mandate ACTIVE. "
             "Add it to V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
         )
     print("  regime_momentum_signed_5d PRESENT in V3_FEATURE_COLUMNS_TOP_N (mandate ACTIVE)  PASS")
 
-    # iter-v3/043: efficiency_ratio_50 MUST be in V3_FEATURE_COLUMNS_TOP_N (NEW).
-    if "efficiency_ratio_50" not in V3_FEATURE_COLUMNS_TOP_N:
+    # iter-v3/044: regime_momentum_signed_3d MUST be PRESENT (NEW — 3-bar sign-flip variant).
+    if "regime_momentum_signed_3d" not in V3_FEATURE_COLUMNS_TOP_N:
         raise RuntimeError(
-            "efficiency_ratio_50 NOT FOUND in V3_FEATURE_COLUMNS_TOP_N — must be PRESENT "
-            "at iter-v3/043 (NEW Kaufman 1995 regime-quality signal). "
+            "regime_momentum_signed_3d NOT FOUND in V3_FEATURE_COLUMNS_TOP_N — must be "
+            "PRESENT at iter-v3/044 (NEW: 3-bar sign-flip variant of proven mechanism). "
             "Add it to V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
         )
-    print("  efficiency_ratio_50 PRESENT in V3_FEATURE_COLUMNS_TOP_N (NEW iter-v3/043)  PASS")
+    print("  regime_momentum_signed_3d PRESENT in V3_FEATURE_COLUMNS_TOP_N (NEW iter-v3/044)  PASS")
+
+    # iter-v3/044: efficiency_ratio_50 MUST be ABSENT from V3_FEATURE_COLUMNS_TOP_N (DROPPED).
+    if "efficiency_ratio_50" in V3_FEATURE_COLUMNS_TOP_N:
+        raise RuntimeError(
+            "efficiency_ratio_50 FOUND in V3_FEATURE_COLUMNS_TOP_N — must be ABSENT "
+            "at iter-v3/044 (DROPPED: iter-v3/043 DISASTROUS NEGATIVE; all 4 symbols broken). "
+            "Remove it from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
+        )
+    print("  efficiency_ratio_50 ABSENT from V3_FEATURE_COLUMNS_TOP_N (DROPPED iter-v3/044)  PASS")
 
 
 def _verify_label_leakage_gap() -> None:

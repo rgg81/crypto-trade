@@ -44,6 +44,7 @@ from crypto_trade.features_v3.engineered_v3 import (
     compute_cross_asset_divergence_norm,
     compute_efficiency_ratio_50,
     compute_fracdiff_d05_close,
+    compute_regime_momentum_signed_3d,
     compute_regime_momentum_signed_5d,
     compute_vol_adj_autocorr,
 )
@@ -121,7 +122,11 @@ class TestImport:
         )
         assert "compute_efficiency_ratio_50" in engineered_v3.__all__, (
             "compute_efficiency_ratio_50 must be in engineered_v3.__all__ "
-            "(iter-v3/043: ADD efficiency_ratio_50; Kaufman 1995 ER)."
+            "(iter-v3/043: ADD efficiency_ratio_50; Kaufman 1995 ER — dead code since v3-044)."
+        )
+        assert "compute_regime_momentum_signed_3d" in engineered_v3.__all__, (
+            "compute_regime_momentum_signed_3d must be in engineered_v3.__all__ "
+            "(iter-v3/044: ADD regime_momentum_signed_3d; 3-bar sign-flip variant)."
         )
 
 
@@ -1698,10 +1703,16 @@ class TestEfficiencyRatio50:
         )
 
     def test_integration_dispatched_by_add_engineered(self) -> None:
-        """H. add_engineered_v3_features dispatches efficiency_ratio_50 column."""
+        """H. iter-v3/044: efficiency_ratio_50 is dead code (NOT dispatched).
+
+        regime_momentum_signed_3d IS dispatched instead. This test verifies:
+        - efficiency_ratio_50 column is NOT present in add_engineered_v3_features output
+          (it was removed from dispatch at iter-v3/044 after DISASTROUS NEGATIVE at iter-v3/043).
+        - regime_momentum_signed_3d IS present (newly dispatched at iter-v3/044).
+        """
         from crypto_trade.features_v3.regime_v3 import add_regime_v3_features
 
-        # Build a minimal DataFrame with hurst_100 (needed by regime_momentum_signed_5d)
+        # Build a minimal DataFrame with hurst_100 (needed by regime_momentum_signed_5d and _3d)
         n = 200
         df = _make_er_df(n=n, seed=9)
         df = add_regime_v3_features(df)  # provides hurst_100
@@ -1711,11 +1722,167 @@ class TestEfficiencyRatio50:
 
         out = add_engineered_v3_features(df)
 
-        assert "efficiency_ratio_50" in out.columns, (
-            "add_engineered_v3_features must produce 'efficiency_ratio_50' column "
-            "(iter-v3/043: dispatched after compute_regime_momentum_signed_5d)."
+        # iter-v3/044: efficiency_ratio_50 MUST NOT be dispatched (dead code since DISASTROUS
+        # NEGATIVE at iter-v3/043; compute_efficiency_ratio_50 retained but not called).
+        assert "efficiency_ratio_50" not in out.columns, (
+            "add_engineered_v3_features must NOT produce 'efficiency_ratio_50' column "
+            "(iter-v3/044: efficiency_ratio_50 removed from dispatch after DISASTROUS "
+            "NEGATIVE at iter-v3/043; dead code retained but not called)."
         )
-        er = out["efficiency_ratio_50"]
-        assert (er >= 0.0).all(), "Dispatched ER-50 must be >= 0.0."
-        assert (er <= 1.0).all(), "Dispatched ER-50 must be <= 1.0."
-        assert not er.isna().any(), "Dispatched ER-50 must not contain NaN (warmup filled 0.0)."
+
+        # iter-v3/044: regime_momentum_signed_3d MUST be dispatched (NEW 3-bar sign-flip).
+        assert "regime_momentum_signed_3d" in out.columns, (
+            "add_engineered_v3_features must produce 'regime_momentum_signed_3d' column "
+            "(iter-v3/044: 3-bar sign-flip variant added to dispatch)."
+        )
+        rms3 = out["regime_momentum_signed_3d"]
+        assert not rms3.isna().any(), "regime_momentum_signed_3d must not contain NaN (filled 0.0)."
+
+
+# ---------------------------------------------------------------------------
+# regime_momentum_signed_3d adversarial tests (iter-v3/044)
+# ---------------------------------------------------------------------------
+
+
+def _make_rms3_df(n: int = 200, seed: int = 0, hurst_value: float = 0.65) -> pd.DataFrame:
+    """Build a minimal DataFrame for compute_regime_momentum_signed_3d tests."""
+    rng = np.random.default_rng(seed)
+    close = 100.0 * np.cumprod(1.0 + rng.normal(0.0, 0.005, size=n))
+    open_times = _IS_START_MS + np.arange(n) * _8H_MS
+    df = pd.DataFrame(
+        {
+            "open_time": open_times,
+            "open": close * 0.999,
+            "high": close * 1.005,
+            "low": close * 0.995,
+            "close": close,
+            "volume": rng.uniform(100.0, 500.0, size=n),
+            "symbol": "TESTUSDT",
+            "hurst_100": hurst_value,
+        }
+    )
+    return df
+
+
+class TestRegimeMomentumSigned3d:
+    """Adversarial tests for compute_regime_momentum_signed_3d (iter-v3/044)."""
+
+    def test_past_only(self) -> None:
+        """A. Past-only: appending future bars does not alter bar t's value."""
+        n = 150
+        df_short = _make_rms3_df(n=n, seed=1)
+        rms3_short = compute_regime_momentum_signed_3d(df_short)
+
+        # Extend with 10 future bars
+        rng = np.random.default_rng(99)
+        close_extra = df_short["close"].iloc[-1] * np.cumprod(1.0 + rng.normal(0.0, 0.005, size=10))
+        open_times_extra = _IS_START_MS + np.arange(n, n + 10) * _8H_MS
+        df_long = pd.concat(
+            [
+                df_short,
+                pd.DataFrame(
+                    {
+                        "open_time": open_times_extra,
+                        "open": close_extra * 0.999,
+                        "high": close_extra * 1.005,
+                        "low": close_extra * 0.995,
+                        "close": close_extra,
+                        "volume": 100.0,
+                        "symbol": "TESTUSDT",
+                        "hurst_100": 0.65,
+                    }
+                ),
+            ],
+            ignore_index=True,
+        )
+        rms3_long = compute_regime_momentum_signed_3d(df_long)
+
+        pd.testing.assert_series_equal(
+            rms3_short.reset_index(drop=True),
+            rms3_long.iloc[:n].reset_index(drop=True),
+            check_names=False,
+            obj="regime_momentum_signed_3d past-only discipline",
+        )
+
+    def test_nan_warmup(self) -> None:
+        """B. NaN warmup: first 100 bars filled with 0.0 (hurst_100 warm-up dominates)."""
+        n = 200
+        df = _make_rms3_df(n=n, seed=2)
+        # Set hurst_100 NaN for first 100 bars (simulating real warm-up from rolling R/S)
+        df["hurst_100"] = df["hurst_100"].copy()
+        df.loc[df.index[:100], "hurst_100"] = float("nan")
+        rms3 = compute_regime_momentum_signed_3d(df)
+
+        assert not rms3.isna().any(), "regime_momentum_signed_3d must not contain NaN (fillna 0.0)."
+        assert (rms3.iloc[:100] == 0.0).all(), (
+            "First 100 bars should be 0.0 (NaN hurst_100 → NaN product → fillna 0.0)."
+        )
+
+    def test_trending_regime_positive_momentum(self) -> None:
+        """C. hurst_100 > 0.5 → sign = +1 → feature = +ret_3d."""
+        n = 150
+        df = _make_rms3_df(n=n, seed=3, hurst_value=0.70)
+        rms3 = compute_regime_momentum_signed_3d(df)
+
+        # For bars where both ret_3d and hurst are positive: result must be positive
+        # Bar 5 onward: close.shift(1) and close.shift(4) are both defined
+        valid_mask = rms3.iloc[4:] != 0.0  # Skip zero-filled warmup
+        if valid_mask.any():
+            # All non-zero values should match sign of ret_3d (trending regime)
+            close = df["close"]
+            ret_3d = close.shift(1) / close.shift(4) - 1.0
+            # Where hurst > 0.5 and ret_3d > 0, feature should be > 0.
+            # Spot-check a sample of valid non-warmup bars:
+            for i in range(5, min(20, n)):
+                if not pd.isna(ret_3d.iloc[i]) and not pd.isna(df["hurst_100"].iloc[i]):
+                    expected_sign = np.sign(ret_3d.iloc[i])
+                    actual_sign = np.sign(rms3.iloc[i]) if rms3.iloc[i] != 0.0 else 0.0
+                    assert actual_sign == expected_sign, (
+                        f"Bar {i}: expected sign {expected_sign}, "
+                        f"got {actual_sign} (ret_3d={ret_3d.iloc[i]:.6f})."
+                    )
+
+    def test_mean_reverting_regime_sign_flip(self) -> None:
+        """D. hurst_100 < 0.5 → sign = -1 → feature = -ret_3d (momentum reversal)."""
+        n = 150
+        df = _make_rms3_df(n=n, seed=4, hurst_value=0.30)
+        rms3 = compute_regime_momentum_signed_3d(df)
+
+        close = df["close"]
+        ret_3d = close.shift(1) / close.shift(4) - 1.0
+        # Where hurst < 0.5 and ret_3d != 0: feature must have opposite sign to ret_3d
+        for i in range(5, min(20, n)):
+            if not pd.isna(ret_3d.iloc[i]) and ret_3d.iloc[i] != 0.0:
+                # hurst_100.shift(1) at bar i = hurst at bar i-1 = 0.30 < 0.5 → sign = -1
+                expected_sign = -np.sign(ret_3d.iloc[i])
+                actual_sign = np.sign(rms3.iloc[i])
+                assert actual_sign == expected_sign, (
+                    f"Bar {i}: MR regime, expected sign {expected_sign} "
+                    f"(flipped ret_3d sign), got {actual_sign}."
+                )
+
+    def test_missing_hurst_returns_zeros(self) -> None:
+        """E. Missing hurst_100 column → returns zeros (safe degradation)."""
+        n = 150
+        df = _make_rms3_df(n=n, seed=5)
+        df = df.drop(columns=["hurst_100"])
+        rms3 = compute_regime_momentum_signed_3d(df)
+
+        assert (rms3 == 0.0).all(), (
+            "Missing hurst_100 must produce all-zeros (safe degradation; "
+            "runner _verify_feature_columns catches the gap)."
+        )
+
+    def test_no_nan_in_output(self) -> None:
+        """F. Output must not contain NaN (fillna 0.0 applied)."""
+        n = 200
+        df = _make_rms3_df(n=n, seed=6)
+        from crypto_trade.features_v3.regime_v3 import add_regime_v3_features
+
+        df = add_regime_v3_features(df)  # provides realistic hurst_100 with NaN warmup
+        rms3 = compute_regime_momentum_signed_3d(df)
+
+        assert not rms3.isna().any(), (
+            "regime_momentum_signed_3d must not contain NaN after fillna(0.0). "
+            f"NaN count: {rms3.isna().sum()}"
+        )

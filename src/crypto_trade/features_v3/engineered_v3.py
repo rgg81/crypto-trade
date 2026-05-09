@@ -327,6 +327,55 @@ def compute_fracdiff_d05_close(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def compute_regime_momentum_signed_3d(df: pd.DataFrame) -> pd.Series:
+    """3-bar variant of regime_momentum_signed_5d (sign-flip on hurst regime).
+
+    Captures shorter-horizon (1-day at 8h cadence) regime persistence that the
+    5-bar (5-day) variant misses.  Same sign-flip mechanism; different return
+    lookback horizon.
+
+    Construction:
+    - ``ret_3d`` = close.shift(1) / close.shift(4) - 1.0
+      bar t uses close[t-1] / close[t-4] - 1.0; strictly past-only (no close[t]).
+    - ``hurst_100``: rolling 100-bar R/S Hurst exponent (computed by
+      ``add_regime_v3_features``); already past-only by construction.
+    - ``regime_sign`` = sign(hurst_100.shift(1) - 0.5):
+        +1  if hurst_100[t-1] > 0.5  → trending regime  → momentum follows
+        −1  if hurst_100[t-1] < 0.5  → mean-reversion   → momentum reverses
+         0  if hurst_100[t-1] == 0.5 → pure random walk  → treated as 0.0
+
+    Past-only by construction:
+    - ``close.shift(1)``: bar t uses close[t-1]. Past-only.
+    - ``close.shift(4)``: bar t uses close[t-4]. Past-only.
+    - ``hurst_100`` is computed past-only by ``add_regime_v3_features``
+      (100-bar trailing R/S window; first valid value at bar 99).
+    - ``hurst.shift(1)``: bar t uses hurst_100[t-1]. Past-only.
+    - Combined: first valid value appears at bar 100 (hurst_100 warm-up dominates
+      over close.shift(4) warm-up of 4 bars).
+
+    NaN warm-up: first 100 bars NaN before fillna.
+    fillna(0.0): neutral fill (no regime signal) for warm-up bars.
+
+    Args:
+        df: DataFrame with columns ``close`` (float-castable) and ``hurst_100``
+            (pre-computed by ``add_regime_v3_features``).
+
+    Returns:
+        pd.Series with ``regime_momentum_signed_3d`` values.
+        First ~100 elements are 0.0 (NaN warm-up filled neutral).
+        If ``hurst_100`` is missing, returns zeros (safe degradation; the runner's
+        ``_verify_feature_columns`` assertion catches the gap downstream).
+    """
+    if "hurst_100" not in df.columns:
+        return pd.Series(0.0, index=df.index, name="regime_momentum_signed_3d")
+
+    close = df["close"].astype(float)
+    ret_3d = close.shift(1) / close.shift(4) - 1.0  # past-only 3-bar return
+    hurst = df["hurst_100"].astype(float)
+    regime_sign = np.sign(hurst.shift(1) - 0.5)
+    return (ret_3d * regime_sign).fillna(0.0)
+
+
 def compute_efficiency_ratio_50(df: pd.DataFrame) -> pd.Series:
     """Kaufman efficiency ratio (1995): direction strength over noise — 50-bar window.
 
@@ -387,13 +436,16 @@ def compute_efficiency_ratio_50(df: pd.DataFrame) -> pd.Series:
 def add_engineered_v3_features(df: pd.DataFrame) -> pd.DataFrame:
     """GROUP_REGISTRY entry point for all Category 2 (composed) v3 features.
 
-    iter-v3/043: efficiency_ratio_50 ADDED to dispatch. Kaufman 1995 unsigned [0,1]
-    regime-quality signal. Orthogonal mechanism to regime_momentum_signed_5d (signed
-    direction-flip). Category 1 indicator — standard IC gate applies in full. Column is
-    added to ALL symbol parquets (universal dispatch); ALL 4 symbols receive it via
-    V3_FEATURE_COLUMNS_TOP_N at model-train time.
-    DEFAULT_ATR_MULTIPLIERS REVERTED to (2.0, 1.0): iter-v3/042 IS collapse NEGATIVE
-    mandate fires (IS Sharpe -0.5941, TRX OOS -33 wpnl swing at (1.5, 0.75) barriers).
+    iter-v3/044: regime_momentum_signed_3d ADDED to dispatch. 3-bar variant of the proven
+    regime_momentum_signed_5d sign-flip mechanism. ret_3d = close.shift(1)/close.shift(4) - 1.0;
+    same hurst_100 sign-flip as 5d variant; different lookback horizon (1 day vs 5 days).
+    Column added to ALL symbol parquets; ALL 4 symbols receive it via V3_FEATURE_COLUMNS_TOP_N
+    at model-train time (15 features). Past-only: close.shift(1), close.shift(4), hurst.shift(1).
+    efficiency_ratio_50 removed from dispatch (iter-v3/043 DISASTROUS NEGATIVE; dead code retained).
+
+    iter-v3/043: efficiency_ratio_50 ADDED to dispatch — DISASTROUS NEGATIVE (IS -0.8445
+    / OOS -0.8990; all 4 symbols broken). Removed from dispatch at iter-v3/044.
+    compute_efficiency_ratio_50 retained as dead code; NOT dispatched.
 
     iter-v3/037: cross_asset_divergence_norm RE-DISPATCHED for per-symbol parquet generation.
     ``compute_cross_asset_divergence_norm`` was dead code since iter-v3/028. Re-adding to
@@ -424,6 +476,10 @@ def add_engineered_v3_features(df: pd.DataFrame) -> pd.DataFrame:
     - ``regime_momentum_signed_5d`` (iter-v3/025, KEPT): composed feature combining
       5-day momentum with Hurst regime classifier.  Depends on ``hurst_100``
       from ``regime`` group (upstream in GROUP_REGISTRY).
+    - ``regime_momentum_signed_3d`` (iter-v3/044, NEW): 3-bar variant of the sign-flip.
+      ret_3d = close.shift(1)/close.shift(4) - 1.0 * sign(hurst_100.shift(1) - 0.5).
+      Depends on ``hurst_100`` from ``regime`` group (upstream in GROUP_REGISTRY).
+      Universal: ALL 4 symbols receive it via V3_FEATURE_COLUMNS_TOP_N (15 features).
     - ``fracdiff_d05_close`` (iter-v3/034, KEPT): FFD of log(close) at d=0.5.
       Depends only on ``close`` column.  BCH-only at model level (V3_FEATURES_PER_SYMBOL).
     - ``cross_asset_divergence_norm`` (iter-v3/037, RE-ADDED to dispatch):
@@ -432,12 +488,11 @@ def add_engineered_v3_features(df: pd.DataFrame) -> pd.DataFrame:
       LDO's parquet contains it; BCH/TRX/ALGO parquets also contain it but it is NOT
       passed to LightGBM for those symbols.  Depends on ``btc_ret_14d`` (cross_btc group)
       and ``vwap_dev_20`` (volume_micro group), both upstream in GROUP_REGISTRY.
-    - ``efficiency_ratio_50`` (iter-v3/043, NEW): Kaufman 1995 unsigned [0,1] ER.
-      Depends only on ``close`` column (no upstream GROUP_REGISTRY dependency).
-      Universal: ALL 4 symbols receive it via V3_FEATURE_COLUMNS_TOP_N (15 features).
 
     Dead code retained (zero revert cost):
     - ``compute_vol_adj_autocorr``: reverted at iter-v3/037 (iter-v3/036 NEGATIVE).
+    - ``compute_efficiency_ratio_50``: DISASTROUS NEGATIVE at iter-v3/043 (IS -0.8445 /
+      OOS -0.8990; all 4 symbols broken); removed from dispatch at iter-v3/044.
 
     Each new composed feature must be listed in the iteration's research brief Section
     2.2 and validated with an adversarial past-only test.
@@ -454,9 +509,10 @@ def add_engineered_v3_features(df: pd.DataFrame) -> pd.DataFrame:
         Copy of ``df`` with all active engineered v3 features appended.
     """
     df = compute_regime_momentum_signed_5d(df)  # iter-v3/025 (KEPT; mandated by engineered pivot)
+    df["regime_momentum_signed_3d"] = compute_regime_momentum_signed_3d(df)  # iter-v3/044 (NEW)
     df = compute_fracdiff_d05_close(df)  # iter-v3/034 (KEPT; BCH-only at model level)
     df = compute_cross_asset_divergence_norm(df)  # iter-v3/037 RE-ADDED (LDO-only at model level)
-    df["efficiency_ratio_50"] = compute_efficiency_ratio_50(df)  # iter-v3/043 (NEW; universal)
+    # compute_efficiency_ratio_50 REMOVED from dispatch at iter-v3/044 — DISASTROUS NEGATIVE.
     # compute_vol_adj_autocorr REVERTED at iter-v3/037 — iter-v3/036 NEGATIVE; dead code.
     return df
 
@@ -466,6 +522,7 @@ __all__ = [
     "compute_cross_asset_divergence_norm",
     "compute_efficiency_ratio_50",
     "compute_fracdiff_d05_close",
+    "compute_regime_momentum_signed_3d",
     "compute_regime_momentum_signed_5d",
     "compute_vol_adj_autocorr",
 ]
