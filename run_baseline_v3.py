@@ -250,9 +250,10 @@ def _verify_feature_columns() -> None:
     if n != 14:
         raise RuntimeError(
             f"V3_FEATURE_COLUMNS has {n} columns — expected exactly 14. "
-            "iter-v3/044: REVERT efficiency_ratio_50 (15 → 14) AND REVERT regime_momentum_signed_3d "
-            "universal addition (orchestrator's setup commit `1f56c72` superseded by QR EDA-driven "
-            "axis at SHA `eff841e`). Universal list = 14 features. "
+            "iter-v3/044: REVERT efficiency_ratio_50 (15 → 14) AND REVERT "
+            "regime_momentum_signed_3d universal addition (orchestrator's setup "
+            "commit `1f56c72` superseded by QR EDA-driven axis at SHA `eff841e`). "
+            "Universal list = 14 features. "
             "Check features_v3/__init__.py V3_FEATURE_COLUMNS_TOP_N."
         )
     if "tbr_zscore_30" in V3_FEATURE_COLUMNS:

@@ -46,7 +46,7 @@ Mandatory test cases (iter-v3/044 brief Section 3 sub-fix #4):
 17. test_sym_vs_btc_ret_7d_in_universal_list      (PRESENT — RESTORED iter-v3/042; KEPT)
 18. test_ret_skew_50_in_universal_list            (PRESENT — RESTORED iter-v3/042; KEPT)
 19. test_efficiency_ratio_50_in_universal_list    (DROPPED iter-v3/044 — DISASTROUS)
-20. test_regime_momentum_signed_3d_NOT_in_universal_list  (REVERTED iter-v3/044 per QR EDA)
+20. test_regime_momentum_signed_3d_not_in_universal_list  (REVERTED iter-v3/044 per QR EDA)
 21. test_fracdiff_not_in_universal_list
 22. test_cross_asset_divergence_not_in_universal_list
 23. test_vol_adj_autocorr_not_in_universal_list
@@ -334,7 +334,7 @@ def test_efficiency_ratio_50_in_universal_list() -> None:
     )
 
 
-def test_regime_momentum_signed_3d_NOT_in_universal_list() -> None:
+def test_regime_momentum_signed_3d_not_in_universal_list() -> None:  # noqa: N802 (preserves audit semantics)
     """regime_momentum_signed_3d UNIVERSAL ADDITION REVERTED at iter-v3/044 per QR EDA.
 
     Orchestrator's setup commit `1f56c72` added 3d as 15th universal feature ad-hoc.
@@ -425,7 +425,8 @@ def test_features_for_symbol_unknown_fallback() -> None:
         "cross_asset_divergence_norm",
         "vol_adj_autocorr",
         "efficiency_ratio_50",  # DROPPED iter-v3/044 — DISASTROUS NEGATIVE
-        "regime_momentum_signed_3d",  # REVERTED iter-v3/044 — orchestrator ad-hoc, QR EDA superseded
+        # REVERTED iter-v3/044 — orchestrator ad-hoc, QR EDA superseded:
+        "regime_momentum_signed_3d",
     ):
         assert feat not in result, (
             f"Unknown symbol fallback must NOT include {feat} (dead-code policy)."

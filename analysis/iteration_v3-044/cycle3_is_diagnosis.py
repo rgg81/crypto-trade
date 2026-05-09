@@ -117,7 +117,9 @@ def main() -> None:
     oos_dir["wr_pct_round"] = oos_dir["wr_pct"].round(1)
     cmp = is_dir[["symbol", "direction_label", "n_trades", "wr_pct"]].merge(
         oos_dir[["symbol", "direction_label", "n_trades", "wr_pct"]],
-        on=["symbol", "direction_label"], how="outer", suffixes=("_is", "_oos")
+        on=["symbol", "direction_label"],
+        how="outer",
+        suffixes=("_is", "_oos"),
     )
     cmp["wr_persist_diff"] = cmp["wr_pct_oos"] - cmp["wr_pct_is"]
     print(cmp.to_string(index=False))
@@ -148,24 +150,36 @@ def main() -> None:
         sub = is_trades[is_trades["symbol"] == sym]
         long_pnl = sub[sub["direction"] == 1]["weighted_pnl"].sum()
         short_pnl = sub[sub["direction"] == -1]["weighted_pnl"].sum()
-        long_wr = (sub[sub["direction"] == 1]["weighted_pnl"] > 0).mean() * 100 if len(sub[sub["direction"] == 1]) else float("nan")
-        short_wr = (sub[sub["direction"] == -1]["weighted_pnl"] > 0).mean() * 100 if len(sub[sub["direction"] == -1]) else float("nan")
+        long_wr = (
+            (sub[sub["direction"] == 1]["weighted_pnl"] > 0).mean() * 100
+            if len(sub[sub["direction"] == 1])
+            else float("nan")
+        )
+        short_wr = (
+            (sub[sub["direction"] == -1]["weighted_pnl"] > 0).mean() * 100
+            if len(sub[sub["direction"] == -1])
+            else float("nan")
+        )
         long_n = len(sub[sub["direction"] == 1])
         short_n = len(sub[sub["direction"] == -1])
         # Net per-direction net contribution
         pnl_imbalance = long_pnl - short_pnl
-        wr_gap = (long_wr - short_wr) if not (np.isnan(long_wr) or np.isnan(short_wr)) else float("nan")
-        sym_asym.append({
-            "symbol": sym,
-            "long_n": long_n,
-            "long_pnl": long_pnl,
-            "long_wr": long_wr,
-            "short_n": short_n,
-            "short_pnl": short_pnl,
-            "short_wr": short_wr,
-            "wr_gap_long_minus_short": wr_gap,
-            "pnl_imbalance_long_minus_short": pnl_imbalance,
-        })
+        wr_gap = (
+            (long_wr - short_wr) if not (np.isnan(long_wr) or np.isnan(short_wr)) else float("nan")
+        )
+        sym_asym.append(
+            {
+                "symbol": sym,
+                "long_n": long_n,
+                "long_pnl": long_pnl,
+                "long_wr": long_wr,
+                "short_n": short_n,
+                "short_pnl": short_pnl,
+                "short_wr": short_wr,
+                "wr_gap_long_minus_short": wr_gap,
+                "pnl_imbalance_long_minus_short": pnl_imbalance,
+            }
+        )
     sym_asym_df = pd.DataFrame(sym_asym).sort_values("pnl_imbalance_long_minus_short")
     print(sym_asym_df.to_string(index=False))
     print()
@@ -187,18 +201,20 @@ def main() -> None:
             df = pd.read_csv(ROOT / f"data/{sym}/8h.csv")
             df["close_dt"] = pd.to_datetime(df["close_time"], unit="ms").dt.tz_localize("UTC")
             df["close"] = pd.to_numeric(df["close"])
-            IS_START = pd.Timestamp("2023-03-24", tz="UTC")
-            IS_END = pd.Timestamp("2025-03-24", tz="UTC")
-            is_d = df[(df["close_dt"] >= IS_START) & (df["close_dt"] < IS_END)]
-            oos_d = df[(df["close_dt"] >= IS_END)]
+            is_start = pd.Timestamp("2023-03-24", tz="UTC")
+            is_end = pd.Timestamp("2025-03-24", tz="UTC")
+            is_d = df[(df["close_dt"] >= is_start) & (df["close_dt"] < is_end)]
+            oos_d = df[(df["close_dt"] >= is_end)]
             if len(is_d) > 0 and len(oos_d) > 0:
                 is_ret = (is_d["close"].iloc[-1] / is_d["close"].iloc[0] - 1) * 100
                 oos_ret = (oos_d["close"].iloc[-1] / oos_d["close"].iloc[0] - 1) * 100
-                market_trend.append({
-                    "symbol": sym,
-                    "is_market_return_pct": is_ret,
-                    "oos_market_return_pct": oos_ret,
-                })
+                market_trend.append(
+                    {
+                        "symbol": sym,
+                        "is_market_return_pct": is_ret,
+                        "oos_market_return_pct": oos_ret,
+                    }
+                )
         except Exception as e:  # noqa: BLE001
             print(f"  Skip {sym}: {e}")
     mt_df = pd.DataFrame(market_trend)
