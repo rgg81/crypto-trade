@@ -42,6 +42,7 @@ from crypto_trade.features_v3.engineered_v3 import (
     _fracdiff_d05_weights,
     add_engineered_v3_features,
     compute_cross_asset_divergence_norm,
+    compute_efficiency_ratio_50,
     compute_fracdiff_d05_close,
     compute_regime_momentum_signed_5d,
     compute_vol_adj_autocorr,
@@ -117,6 +118,10 @@ class TestImport:
         assert "compute_fracdiff_d05_close" in engineered_v3.__all__, (
             "compute_fracdiff_d05_close must be in engineered_v3.__all__ "
             "(iter-v3/034: ADD fracdiff_d05_close; LdP AFML Ch. 5 FFD at d=0.5)."
+        )
+        assert "compute_efficiency_ratio_50" in engineered_v3.__all__, (
+            "compute_efficiency_ratio_50 must be in engineered_v3.__all__ "
+            "(iter-v3/043: ADD efficiency_ratio_50; Kaufman 1995 ER)."
         )
 
 
@@ -1508,3 +1513,209 @@ class TestFracdiffD05CloseNaNWarmUp:
             f"Expected 0% NaN after warm-up; got {nan_frac:.1%}. "
             "FFD on positive close prices must produce finite values for all bars."
         )
+
+
+# ---------------------------------------------------------------------------
+# efficiency_ratio_50 adversarial tests (iter-v3/043)
+# Tests:
+# A. Past-only discipline: bar t's value unchanged when future bars are appended.
+# B. NaN warmup: first 51 bars are 0.0 (filled neutral); post-warmup values finite.
+# C. Value range: output is always in [0.0, 1.0].
+# D. Perfect trend: ER = 1.0 when price moves monotonically in one direction.
+# E. Perfect chop: ER ≈ 0.0 when price oscillates perfectly around a midpoint.
+# F. Missing close column: graceful zero-Series fallback.
+# G. Idempotency: calling twice produces identical output.
+# H. Integration: add_engineered_v3_features dispatches efficiency_ratio_50.
+# ---------------------------------------------------------------------------
+
+
+def _make_er_df(n: int = 200, seed: int = 42) -> pd.DataFrame:
+    """Minimal DataFrame with 'close' column for ER-50 tests."""
+    rng = np.random.default_rng(seed)
+    open_times = [_IS_START_MS + i * _8H_MS for i in range(n)]
+    close = rng.uniform(100.0, 1000.0, n)
+    return pd.DataFrame(
+        {
+            "open_time": open_times,
+            "open": close * 0.999,
+            "high": close * 1.01,
+            "low": close * 0.99,
+            "close": close,
+            "volume": rng.uniform(1000.0, 10000.0, n),
+            "symbol": "BCHUSDT",
+        }
+    )
+
+
+class TestEfficiencyRatio50:
+    """Adversarial tests for compute_efficiency_ratio_50 (iter-v3/043)."""
+
+    def test_past_only(self) -> None:
+        """A. Past-only: appending future bars does not alter bar t's ER value."""
+        n = 150
+        df_short = _make_er_df(n=n, seed=5)
+        er_short = compute_efficiency_ratio_50(df_short)
+
+        # Append 20 future bars with different price pattern
+        rng = np.random.default_rng(9999)
+        extra_close = rng.uniform(5000.0, 6000.0, 20)  # completely different regime
+        extra = pd.DataFrame(
+            {
+                "open_time": [_IS_START_MS + (n + i) * _8H_MS for i in range(20)],
+                "open": extra_close * 0.999,
+                "high": extra_close * 1.01,
+                "low": extra_close * 0.99,
+                "close": extra_close,
+                "volume": rng.uniform(1000.0, 10000.0, 20),
+                "symbol": "BCHUSDT",
+            }
+        )
+        df_long = pd.concat([df_short, extra], ignore_index=True)
+        er_long = compute_efficiency_ratio_50(df_long)
+
+        # Values at bars 0..n-1 must be identical in both series
+        np.testing.assert_array_equal(
+            er_short.values,
+            er_long.values[:n],
+            err_msg=(
+                "Past-only VIOLATED: appending future bars altered ER-50 values at bars 0..n-1. "
+                "Check that compute_efficiency_ratio_50 uses only trailing windows."
+            ),
+        )
+
+    def test_nan_warmup_filled_neutral(self) -> None:
+        """B. First 51 bars are 0.0 (warmup filled neutral); post-warmup bars are non-NaN."""
+        n = 200
+        df = _make_er_df(n=n, seed=6)
+        er = compute_efficiency_ratio_50(df)
+
+        # First 51 bars should be 0.0 (NaN filled with 0.0)
+        warmup = er.iloc[:51]
+        assert (warmup == 0.0).all(), (
+            f"Expected first 51 bars to be 0.0 (neutral warmup fill); "
+            f"got non-zero values: {warmup[warmup != 0.0]}"
+        )
+
+        # Post-warmup bars should be non-NaN
+        post_warmup = er.iloc[51:]
+        assert not post_warmup.isna().any(), (
+            "Post-warmup ER-50 values contain NaN; expected all non-NaN after bar 51."
+        )
+
+    def test_value_range(self) -> None:
+        """C. All output values are in [0.0, 1.0] — triangle inequality guarantee."""
+        n = 300
+        df = _make_er_df(n=n, seed=7)
+        er = compute_efficiency_ratio_50(df)
+
+        assert (er >= 0.0).all(), (
+            f"ER-50 produced negative values (min={er.min():.6f}). "
+            "Efficiency ratio must be >= 0 by construction."
+        )
+        assert (er <= 1.0).all(), (
+            f"ER-50 produced values > 1.0 (max={er.max():.6f}). "
+            "Efficiency ratio must be <= 1 by triangle inequality."
+        )
+
+    def test_perfect_trend_er_near_one(self) -> None:
+        """D. Monotonically increasing price → ER ≈ 1.0 for all post-warmup bars."""
+        n = 150
+        open_times = [_IS_START_MS + i * _8H_MS for i in range(n)]
+        # Strictly monotonically increasing close (no noise)
+        close = np.linspace(100.0, 200.0, n)
+        df = pd.DataFrame(
+            {
+                "open_time": open_times,
+                "open": close * 0.999,
+                "high": close * 1.001,
+                "low": close * 0.999,
+                "close": close,
+                "volume": np.ones(n) * 1000.0,
+                "symbol": "BCHUSDT",
+            }
+        )
+        er = compute_efficiency_ratio_50(df)
+        post_warmup = er.iloc[51:]
+
+        # For a perfectly monotonic series: direction = noise = sum of steps
+        # → ER = 1.0 (within floating point tolerance)
+        assert (post_warmup >= 0.99).all(), (
+            f"Expected ER ≈ 1.0 for monotonic trend; "
+            f"got min={post_warmup.min():.6f}. Perfect trend should yield ER near 1."
+        )
+
+    def test_perfect_oscillation_er_near_zero(self) -> None:
+        """E. Perfectly alternating +1/-1 steps → ER ≈ 0.0 (high noise, no net direction)."""
+        n = 200
+        open_times = [_IS_START_MS + i * _8H_MS for i in range(n)]
+        # Alternating: 100, 101, 100, 101, ... (net displacement ≈ 0 over any window)
+        close = np.array([100.0 + (i % 2) for i in range(n)], dtype=float)
+        df = pd.DataFrame(
+            {
+                "open_time": open_times,
+                "open": close * 0.999,
+                "high": close * 1.001,
+                "low": close * 0.999,
+                "close": close,
+                "volume": np.ones(n) * 1000.0,
+                "symbol": "BCHUSDT",
+            }
+        )
+        er = compute_efficiency_ratio_50(df)
+        post_warmup = er.iloc[51:]
+
+        # For an oscillating series over 50 bars:
+        # direction = |close[t] - close[t-50]| = |0 or 1| (near 0 after shift)
+        # noise = 50 steps × 1.0 each = 50
+        # ER = direction / (50 + 1e-9) ≈ 0
+        assert (post_warmup <= 0.05).all(), (
+            f"Expected ER ≈ 0.0 for perfect oscillation; "
+            f"got max={post_warmup.max():.6f}. Perfectly oscillating price should yield ER near 0."
+        )
+
+    def test_missing_close_column_safe_fallback(self) -> None:
+        """F. Missing 'close' column: returns zero Series without error."""
+        df = pd.DataFrame({"open_time": [_IS_START_MS], "symbol": ["BCHUSDT"]})
+        er = compute_efficiency_ratio_50(df)
+
+        assert isinstance(er, pd.Series), "Expected pd.Series output even when 'close' missing."
+        assert len(er) == len(df), "Output length must match input length."
+        assert (er == 0.0).all(), (
+            "When 'close' is missing, ER should return all-zero Series (safe degradation)."
+        )
+
+    def test_idempotent(self) -> None:
+        """G. Calling compute_efficiency_ratio_50 twice produces identical output."""
+        df = _make_er_df(n=150, seed=8)
+        er1 = compute_efficiency_ratio_50(df)
+        er2 = compute_efficiency_ratio_50(df)
+
+        pd.testing.assert_series_equal(
+            er1,
+            er2,
+            check_names=False,
+            obj="compute_efficiency_ratio_50 idempotency",
+        )
+
+    def test_integration_dispatched_by_add_engineered(self) -> None:
+        """H. add_engineered_v3_features dispatches efficiency_ratio_50 column."""
+        from crypto_trade.features_v3.regime_v3 import add_regime_v3_features
+
+        # Build a minimal DataFrame with hurst_100 (needed by regime_momentum_signed_5d)
+        n = 200
+        df = _make_er_df(n=n, seed=9)
+        df = add_regime_v3_features(df)  # provides hurst_100
+        # Patch btc_ret_14d and vwap_dev_20 (needed by cross_asset_divergence_norm dispatch)
+        df["btc_ret_14d"] = 0.0
+        df["vwap_dev_20"] = 0.01
+
+        out = add_engineered_v3_features(df)
+
+        assert "efficiency_ratio_50" in out.columns, (
+            "add_engineered_v3_features must produce 'efficiency_ratio_50' column "
+            "(iter-v3/043: dispatched after compute_regime_momentum_signed_5d)."
+        )
+        er = out["efficiency_ratio_50"]
+        assert (er >= 0.0).all(), "Dispatched ER-50 must be >= 0.0."
+        assert (er <= 1.0).all(), "Dispatched ER-50 must be <= 1.0."
+        assert not er.isna().any(), "Dispatched ER-50 must not contain NaN (warmup filled 0.0)."

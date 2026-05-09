@@ -233,21 +233,33 @@ V3_FEATURE_COLUMNS_TOP_N: tuple[str, ...] = (
     "sym_vs_btc_ret_7d",  # rank 13/14 importance 398.0 — cross_btc  [RESTORED iter-v3/042]
     # rank 14/14 importance 390.4 — engineered_v3  [RESTORED iter-v3/042]
     "regime_momentum_signed_5d",
+    # iter-v3/043: efficiency_ratio_50 ADDED (14 → 15). Kaufman 1995 efficiency ratio:
+    # abs(close - close.shift(50)) / sum(abs(close.diff()).rolling(50)) — unsigned [0,1].
+    # Regime-quality signal: measures HOW EFFICIENTLY price moves, not direction.
+    # Orthogonal mechanism to regime_momentum_signed_5d (signed direction-flip).
+    # IC gate: Category 1 indicator (NOT engineered composition); standard |IC|<0.70 applies.
+    # Past-only via shift(1) applied to ER series; warmup 51 bars (50-bar window + 1 shift).
+    # Implemented via compute_efficiency_ratio_50 in engineered_v3.py.
+    # Per briefs-v3/iteration_v3-043/research_brief.md Section 3 Sub-fix 2.
+    "efficiency_ratio_50",  # NEW iter-v3/043 — engineered_v3 (Kaufman 1995)
 )
-"""Top-14 feature subset: iter-v3/042 REVERT of iter-v3/041 universal pruning.
+"""Top-15 feature subset: iter-v3/043 adds efficiency_ratio_50 (Kaufman 1995) on
+the restored 14-feature anchor from iter-v3/042.
 
-iter-v3/041 dropped 3 lowest-importance features (ret_skew_50, sym_vs_btc_ret_7d,
-regime_momentum_signed_5d) and produced NEGATIVE OOS result (OOS < +1.55 falsifier
-threshold). Path C mandate required RESTORE of all 3 features at iter-v3/042.
+iter-v3/042 restored 3 features (ret_skew_50, sym_vs_btc_ret_7d,
+regime_momentum_signed_5d) from iter-v3/041 Path C NEGATIVE mandate.
 The MUST-be-present mandate for regime_momentum_signed_5d from
-feedback_v3_engineered_features_proven.md is REINSTATED at iter-v3/042.
+feedback_v3_engineered_features_proven.md remains ACTIVE at iter-v3/043.
 
-14-feature universal set: matches iter-v3/028/040 anchor exactly.
-Per briefs-v3/iteration_v3-042/research_brief.md Section 3 Sub-fix 1.
+iter-v3/043: efficiency_ratio_50 ADDED (14 → 15). Kaufman 1995 efficiency ratio:
+unsigned [0,1] regime-quality signal. Category 1 indicator — standard IC gate applies.
+Computed via compute_efficiency_ratio_50 in engineered_v3.py; past-only via shift(1).
+Per briefs-v3/iteration_v3-043/research_brief.md Section 3 Sub-fix 2.
 
-Top-N history (last 3 entries):
+Top-N history (last 4 entries):
   iter-v3/041: pruned 14 → 11 (dropped ret_skew_50, sym_vs_btc_ret_7d, regime_momentum)
   iter-v3/042: RESTORED 11 → 14 (Path C NEGATIVE mandate at iter-v3/041 fired)
+  iter-v3/043: ADDED 14 → 15 (efficiency_ratio_50 Kaufman 1995 ER)
 
 iter-v3/035 revert — fracdiff_d05_close removed from universal list (15→14; moved
 to V3_FEATURES_PER_SYMBOL["BCHUSDT"] for BCH-only per-symbol targeting); cleared
@@ -482,6 +494,18 @@ iter-v3/035:     V3_FEATURE_COLUMNS_TOP_N (14 features; fracdiff_d05_close DROPP
                  dict); TRX/ALGO/LDO receive 14 features via fallback (same as iter-v3/032/028
                  anchor).  Universal list reverts to iter-v3/028 anchor.  Atomic: revert
                  universal list (15→14) + add BCH per-symbol entry.)
+iter-v3/041:     V3_FEATURE_COLUMNS_TOP_N (11 features; pruned 3 lowest-importance:
+                 ret_skew_50, sym_vs_btc_ret_7d, regime_momentum_signed_5d DROPPED.
+                 NEGATIVE result: OOS < +1.55 falsifier threshold — Path C fired.)
+iter-v3/042:     V3_FEATURE_COLUMNS_TOP_N (14 features; RESTORED all 3 pruned features
+                 per iter-v3/041 Path C mandate. feedback_v3_engineered_features_proven.md
+                 mandate for regime_momentum_signed_5d REINSTATED. DEFAULT_ATR_MULTIPLIERS
+                 changed (2.0,1.0)→(1.5,0.75) universal tightening. NEGATIVE by IS collapse:
+                 IS Sharpe -0.5941, TRX OOS -33 wpnl swing.)
+iter-v3/043:     V3_FEATURE_COLUMNS_TOP_N (15 features; efficiency_ratio_50 ADDED —
+                 Kaufman 1995 unsigned [0,1] regime-quality signal. DEFAULT_ATR_MULTIPLIERS
+                 REVERTED (1.5,0.75)→(2.0,1.0) per iter-v3/042 IS-collapse mandate.
+                 Category 1 indicator; standard IC gate applies.)
 """
 
 V3_NON_FEATURE_COLUMNS: tuple[str, ...] = ("natr_21_raw", "tbr_raw")
@@ -509,16 +533,15 @@ iter-v3/040: CLEARED (empty dict). Cycle 3 EXPLORATION #1 — REVERT all per-sym
   aggregate (-0.55 IS Sharpe swing from iter-v3/029 clean-4-symbol anchor).
 """
 
-DEFAULT_ATR_MULTIPLIERS: tuple[float, float] = (1.5, 0.75)
+DEFAULT_ATR_MULTIPLIERS: tuple[float, float] = (2.0, 1.0)
 """Default ATR multipliers for symbols not in V3_ATR_MULTIPLIERS_PER_SYMBOL.
 
-iter-v3/042: CHANGED from (2.0, 1.0) → (1.5, 0.75) — universal ATR tightening
-EXPLORATION. V3_ATR_MULTIPLIERS_PER_SYMBOL is empty, so all 4 symbols (BCH/LDO/
-TRX/ALGO) use this default universally. Rationale: (1.5, 0.75) aligned LDO barriers
-with peer aggregate at iter-v3/032 (natr analysis SHA 9834e84); EXPLORATION tests
-whether the same tighter geometry improves the aggregate portfolio.
-Prior value (2.0, 1.0) set at iter-v3/010; in effect through iter-v3/041.
-Per briefs-v3/iteration_v3-042/research_brief.md Section 3 Sub-fix 2.
+iter-v3/043: REVERTED from (1.5, 0.75) back to (2.0, 1.0) — iter-v3/042 Path C
+(IS collapse NEGATIVE: IS Sharpe -0.5941, TRX OOS -33 wpnl swing) mandate fires.
+V3_ATR_MULTIPLIERS_PER_SYMBOL is empty, so all 4 symbols (BCH/LDO/TRX/ALGO) use
+this default universally via fallback.
+Value (2.0, 1.0) first set at iter-v3/010; validated anchor through iter-v3/041.
+Per briefs-v3/iteration_v3-043/research_brief.md Section 3 Sub-fix 1.
 """
 
 
@@ -527,10 +550,12 @@ def atr_multipliers_for_symbol(symbol: str) -> tuple[float, float]:
 
     Introduced in iter-v3/032 to support per-symbol labeling-layer heterogeneity.
 
-    iter-v3/042: DEFAULT_ATR_MULTIPLIERS changed to (1.5, 0.75) universally.
-    V3_ATR_MULTIPLIERS_PER_SYMBOL is empty — ALL symbols (BCH/LDO/TRX/ALGO) fall
-    back to DEFAULT_ATR_MULTIPLIERS = (1.5, 0.75). No per-symbol override exists.
-    Prior default (2.0, 1.0) was in effect from iter-v3/010 through iter-v3/041.
+    iter-v3/043: DEFAULT_ATR_MULTIPLIERS REVERTED to (2.0, 1.0). iter-v3/042's
+    (1.5, 0.75) universal tightening caused IS collapse (IS Sharpe -0.5941; TRX
+    OOS -33 wpnl swing) — Path C mandate fires. V3_ATR_MULTIPLIERS_PER_SYMBOL is
+    empty — ALL symbols (BCH/LDO/TRX/ALGO) fall back to DEFAULT = (2.0, 1.0).
+    Prior value (1.5, 0.75) was in effect only at iter-v3/042.
+    Default (2.0, 1.0) first set at iter-v3/010; validated anchor through iter-v3/041.
 
     Callers pass the returned tuple to LightGbmStrategy as
     ``atr_tp_multiplier=tp, atr_sl_multiplier=sl``.
@@ -601,10 +626,11 @@ def features_for_symbol(symbol: str) -> tuple[str, ...]:
     - TRXUSDT: returns 14 features = V3_FEATURE_COLUMNS_TOP_N (fallback; unchanged)
     - Any other symbol: fallback to 14-feature universal set
 
-    V3_FEATURES_PER_SYMBOL is empty at iter-v3/040/041/042 (0 entries).
-    All 4 symbols (BCH/LDO/TRX/ALGO) use the 14-feature universal fallback.
-    iter-v3/041 temporarily pruned to 11 features; iter-v3/042 RESTORED to 14.
-    fracdiff_d05_close is NOT a model input for any symbol at iter-v3/040/041/042
+    V3_FEATURES_PER_SYMBOL is empty at iter-v3/040/041/042/043 (0 entries).
+    All 4 symbols (BCH/LDO/TRX/ALGO) use the 15-feature universal fallback at iter-v3/043.
+    iter-v3/041 temporarily pruned to 11 features; iter-v3/042 RESTORED to 14;
+    iter-v3/043 ADDED efficiency_ratio_50 to reach 15.
+    fracdiff_d05_close is NOT a model input for any symbol at iter-v3/040-043
     (column still computed in parquets but excluded from all feature_columns lists).
 
     Callers MUST pass ``feature_columns=list(features_for_symbol(symbol))``

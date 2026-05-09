@@ -327,8 +327,73 @@ def compute_fracdiff_d05_close(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def compute_efficiency_ratio_50(df: pd.DataFrame) -> pd.Series:
+    """Kaufman efficiency ratio (1995): direction strength over noise — 50-bar window.
+
+    Encodes the Kaufman (1995) adaptive-moving-average heuristic (*Smarter Trading*,
+    Ch. 5): the ratio of net directional price displacement to total path length
+    measures how efficiently price has moved — close to 1.0 in a clean trend,
+    close to 0.0 in choppy mean-reverting markets.
+
+    Construction:
+    - ``direction[t]  = abs(close[t] - close[t-50])``  — net displacement over 50 bars.
+    - ``noise[t]      = sum_{k=1}^{50} abs(close[t-k+1] - close[t-k])``  — total path.
+    - ``er[t]         = direction[t] / (noise[t] + 1e-9)``  — epsilon prevents div-by-0.
+    - ``.shift(1)`` applied to the ER series: bar t's value uses close[t-51..t-1] only.
+    - ``.fillna(0.0)`` on warmup NaNs (first 51 bars): neutral zero is preferable to NaN
+      propagation at training time; 0.0 = maximally choppy (no directional efficiency).
+    - ``.clip(0.0, 1.0)``: output is bounded by triangle inequality; clip guards float
+      precision edge cases near 0 (e.g., noise sum rounds to < direction from fp errors).
+
+    Past-only by construction:
+    - ``close.shift(50)``: bar t uses close[t-50]. Strictly past-only.
+    - ``close.diff()``: bar t uses close[t] - close[t-1]. Past-only.
+    - ``.rolling(50, min_periods=50).sum()``: sums bars [t-49..t]. Past-only.
+    - ``.shift(1)`` on the ER result: the final bar-t value now uses bars [t-51..t-1].
+      This additional shift ensures bar t cannot observe close[t] at model-inference time.
+    - Appending future bars t+1, t+2, ... does NOT alter the value at bar t (all
+      operations are causal rolling windows terminated at bar t-1 after the shift).
+
+    NaN warm-up: first 51 bars are NaN before fillna (50-bar rolling noise window
+    requires 50 bars, then shift(1) adds 1 more bar of warmup).  After fillna(0.0)
+    the first 51 bars are 0.0 (neutral).  At 8h cadence: 51 bars ≈ 17 calendar days,
+    well within the 24-month IS window (~2742 bars).
+
+    IC gate note: efficiency_ratio_50 is a Category 1 indicator (external formula,
+    NOT a Category 2 composed feature using existing v3 primitives).  The IC carve-out
+    for Category 2 features does NOT apply.  Standard |IC| < 0.70 hard gate applies
+    in full (checked by Critic Check 4 at Phase 7.5).
+
+    Args:
+        df: DataFrame with column ``close`` (float-castable).
+
+    Returns:
+        pd.Series with ``efficiency_ratio_50`` values (float, range [0.0, 1.0]).
+        First 51 elements are 0.0 (warmup filled neutral).
+        If ``close`` column is missing, returns a zero Series (safe degradation;
+        the runner's ``_verify_feature_columns`` assertion catches the gap).
+    """
+    if "close" not in df.columns:
+        return pd.Series(0.0, index=df.index, name="efficiency_ratio_50")
+
+    close = df["close"].astype(float)
+    direction = (close - close.shift(50)).abs()
+    noise = close.diff().abs().rolling(50, min_periods=50).sum()
+    er = direction / (noise + 1e-9)
+    er = er.shift(1)  # past-only: bar t now sees close[t-51..t-1]
+    return er.fillna(0.0).clip(0.0, 1.0)
+
+
 def add_engineered_v3_features(df: pd.DataFrame) -> pd.DataFrame:
     """GROUP_REGISTRY entry point for all Category 2 (composed) v3 features.
+
+    iter-v3/043: efficiency_ratio_50 ADDED to dispatch. Kaufman 1995 unsigned [0,1]
+    regime-quality signal. Orthogonal mechanism to regime_momentum_signed_5d (signed
+    direction-flip). Category 1 indicator — standard IC gate applies in full. Column is
+    added to ALL symbol parquets (universal dispatch); ALL 4 symbols receive it via
+    V3_FEATURE_COLUMNS_TOP_N at model-train time.
+    DEFAULT_ATR_MULTIPLIERS REVERTED to (2.0, 1.0): iter-v3/042 IS collapse NEGATIVE
+    mandate fires (IS Sharpe -0.5941, TRX OOS -33 wpnl swing at (1.5, 0.75) barriers).
 
     iter-v3/037: cross_asset_divergence_norm RE-DISPATCHED for per-symbol parquet generation.
     ``compute_cross_asset_divergence_norm`` was dead code since iter-v3/028. Re-adding to
@@ -367,6 +432,9 @@ def add_engineered_v3_features(df: pd.DataFrame) -> pd.DataFrame:
       LDO's parquet contains it; BCH/TRX/ALGO parquets also contain it but it is NOT
       passed to LightGBM for those symbols.  Depends on ``btc_ret_14d`` (cross_btc group)
       and ``vwap_dev_20`` (volume_micro group), both upstream in GROUP_REGISTRY.
+    - ``efficiency_ratio_50`` (iter-v3/043, NEW): Kaufman 1995 unsigned [0,1] ER.
+      Depends only on ``close`` column (no upstream GROUP_REGISTRY dependency).
+      Universal: ALL 4 symbols receive it via V3_FEATURE_COLUMNS_TOP_N (15 features).
 
     Dead code retained (zero revert cost):
     - ``compute_vol_adj_autocorr``: reverted at iter-v3/037 (iter-v3/036 NEGATIVE).
@@ -388,6 +456,7 @@ def add_engineered_v3_features(df: pd.DataFrame) -> pd.DataFrame:
     df = compute_regime_momentum_signed_5d(df)  # iter-v3/025 (KEPT; mandated by engineered pivot)
     df = compute_fracdiff_d05_close(df)  # iter-v3/034 (KEPT; BCH-only at model level)
     df = compute_cross_asset_divergence_norm(df)  # iter-v3/037 RE-ADDED (LDO-only at model level)
+    df["efficiency_ratio_50"] = compute_efficiency_ratio_50(df)  # iter-v3/043 (NEW; universal)
     # compute_vol_adj_autocorr REVERTED at iter-v3/037 — iter-v3/036 NEGATIVE; dead code.
     return df
 
@@ -395,6 +464,7 @@ def add_engineered_v3_features(df: pd.DataFrame) -> pd.DataFrame:
 __all__ = [
     "add_engineered_v3_features",
     "compute_cross_asset_divergence_norm",
+    "compute_efficiency_ratio_50",
     "compute_fracdiff_d05_close",
     "compute_regime_momentum_signed_5d",
     "compute_vol_adj_autocorr",
