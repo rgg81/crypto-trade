@@ -542,6 +542,37 @@ def _verify_feature_columns() -> None:
             "caused -45 OOS swing — mirror mechanism doesn't transfer to stable-SL:TP symbols. "
             "Remove BCHUSDT entry from V3_ATR_MULTIPLIERS_PER_SYMBOL in features_v3/__init__.py."
         )
+    # iter-v3/047 primitive 10 dispatch: spot-check by building a BCH model and
+    # verifying the risk_cfg has block_long_for=("BCHUSDT",) AND block_short_for=().
+    # The actual signal-suppression behavior is exercised by tests/strategies/ml/
+    # test_direction_block_primitive_10.py (see brief Section 3 Sub-fix 4).
+    _cfg_check, strat_check = _build_v3_model(
+        symbol="BCHUSDT", seed=42, n_trials=1, ensemble_seeds=[42]
+    )
+    if not isinstance(strat_check, RiskV3Wrapper):
+        raise RuntimeError(
+            f"_build_v3_model returned {type(strat_check).__name__} — expected RiskV3Wrapper. "
+            "iter-v3/047: primitive 10 dispatch requires RiskV3Wrapper."
+        )
+    if strat_check.config.block_long_for != ("BCHUSDT",):
+        raise RuntimeError(
+            f"RiskV2Config.block_long_for = {strat_check.config.block_long_for} — "
+            "expected ('BCHUSDT',). iter-v3/047: primitive 10 (direction-asymmetric kill "
+            "switch) MUST block BCH LONGs universally per QR EDA SHA `695fc8e`. "
+            "Set block_long_for=('BCHUSDT',) in RiskV2Config init in _build_v3_model."
+        )
+    if strat_check.config.block_short_for != ():
+        raise RuntimeError(
+            f"RiskV2Config.block_short_for = {strat_check.config.block_short_for} — "
+            "expected () (empty). iter-v3/047: BCH SHORT is the positive contributor "
+            "(+48.69% IS net_pnl); never block SHORTs at iter-v3/047. "
+            "Set block_short_for=() in RiskV2Config init in _build_v3_model."
+        )
+    print(
+        "  Primitive 10 (direction-asymmetric kill switch): block_long_for=('BCHUSDT',); "
+        "block_short_for=()  PASS"
+    )
+
     print(
         "  atr_multipliers_for_symbol: ALGO=(2.0,1.5) + LDO=(2.0,1.5) per-symbol; "
         "TRX=(2.0,1.0) + BCH=(2.0,1.0) DEFAULT (BCH REVERTED at iter-v3/047)  PASS"
@@ -1285,6 +1316,19 @@ def _build_v3_model(
         regime_gate_symbols=("TRXUSDT",),
         regime_dd_threshold_pct=20.0,
         regime_vol_zscore_threshold=1.5,
+        # iter-v3/047: primitive 10 — direction-asymmetric kill switch.
+        # block_long_for=("BCHUSDT",) suppresses ALL BCH LONG candidate signals
+        # universally, regardless of model confidence. SHORT signals and NO_SIGNAL pass
+        # through unchanged. Calibrated by QR EDA at iter-v3/047 (analysis/iteration_v3-047/
+        # bch_diagnosis.csv): BCH LONG IS = 39 trades, 30.8% WR, -25.07% net_pnl_pct
+        # (toxic across IS+OOS; per-month stable; reproducible across iter-v3/045 default
+        # ATR + iter-v3/046 wider SL). Counterfactual estimate: blocking BCH LONG lifts
+        # bundle weighted_pnl by +18.68 IS + +4.24 OOS (NAIVE; see EDA Table 03). The
+        # gate is dispatched on ALL symbols' models (the wrapper checks symbol membership
+        # in block_long_for), but only fires for BCH LONGs. block_short_for unused at
+        # iter-v3/047 (BCH SHORT is the positive contributor).
+        block_long_for=("BCHUSDT",),
+        block_short_for=(),
     )
     strategy = RiskV3Wrapper(m1, risk_cfg)
     return cfg, strategy

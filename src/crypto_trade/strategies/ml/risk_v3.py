@@ -243,12 +243,20 @@ class RiskV3Wrapper(RiskV2Wrapper):
         return dd_fires or vol_z_fires
 
     def get_signal(self, symbol: str, open_time: int):  # type: ignore[override]
-        """Override to apply regime gate (primitive 9) before existing gate cascade.
+        """Override to apply regime gate (primitive 9) and direction-block (primitive 10)
+        on top of the inherited gate cascade.
 
-        If the regime gate fires for this symbol, returns NO_SIGNAL immediately
-        without calling the inherited gates or the inner strategy's signal.
-        The existing gates (1-8) are applied via the inherited get_signal for
-        all signals that pass the regime gate.
+        Order:
+          1. primitive 9 (regime gate; iter-v3/022) — fires BEFORE inner inference.
+             A regime-stress bar produces NO_SIGNAL without ever consulting the model.
+          2. primitive 10 (direction block; iter-v3/047) — fires AFTER inner inference.
+             We need to know the direction the model picked, so the inner.get_signal
+             call must complete first. Then if the picked direction is in the
+             configured block list for this symbol, we suppress to NO_SIGNAL.
+          3. Inherited gates 1-8 (RiskV2Wrapper) — applied to all surviving signals.
+
+        Both new primitives default off (enable_regime_gate=False; block_long_for=();
+        block_short_for=()) so v1/v2/v3-prior behavior is preserved.
         """
         # Regime gate fires FIRST — before ANY other gate including inner strategy.
         # This matches the EDA's per-bar candidate-signal suppression design:
@@ -260,13 +268,32 @@ class RiskV3Wrapper(RiskV2Wrapper):
                 stats.regime_gate_fires += 1
                 return NO_SIGNAL
 
-        return super().get_signal(symbol, open_time)
+        # Inherited gate cascade (computes inner.get_signal first, then applies gates 1-8).
+        sig = super().get_signal(symbol, open_time)
+
+        # iter-v3/047: primitive 10 — direction-asymmetric kill switch.
+        # Applied AFTER the inherited cascade so the inner strategy's signal direction
+        # is known. Any non-NO_SIGNAL whose direction matches the block list is suppressed.
+        # The check is against the FINAL (post-gate) direction so it composes cleanly with
+        # vol-scaling (which only changes weight, not direction).
+        if sig.direction == 1 and symbol in self.config.block_long_for:
+            stats = self._gate_stats.setdefault(symbol, GateStats())
+            stats.direction_block_fires += 1
+            return NO_SIGNAL
+        if sig.direction == -1 and symbol in self.config.block_short_for:
+            stats = self._gate_stats.setdefault(symbol, GateStats())
+            stats.direction_block_fires += 1
+            return NO_SIGNAL
+
+        return sig
 
     def gate_stats_summary(self) -> dict[str, dict[str, float]]:
-        """Extend parent summary with regime_gate_fires counter (iter-v3/022)."""
+        """Extend parent summary with regime_gate_fires (iter-v3/022) +
+        direction_block_fires (iter-v3/047) counters."""
         out = super().gate_stats_summary()
         for sym, s in self._gate_stats.items():
             out[sym]["regime_gate_fires"] = s.regime_gate_fires
+            out[sym]["direction_block_fires"] = s.direction_block_fires
             total_seen = s.signals_seen
             out[sym]["regime_gate_fire_rate"] = (
                 s.regime_gate_fires / total_seen if total_seen else 0.0

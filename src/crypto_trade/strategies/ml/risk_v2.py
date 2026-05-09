@@ -112,6 +112,18 @@ class RiskV2Config:
     regime_vol_lookback_bars: int = 90  # 30 calendar days at 8h cadence
     regime_vol_zscore_threshold: float = 1.5  # IS-95th-percentile
 
+    # iter-v3/047: primitive 10 — direction-asymmetric kill switch.
+    # Universally suppresses candidate signals of a specific direction for a specific
+    # symbol. e.g. block_long_for=("BCHUSDT",) blocks ALL BCH LONG candidates regardless
+    # of model confidence; SHORT and NO_SIGNAL pass through unchanged. Mirrors the
+    # primitive-9 architecture but at the direction level instead of the regime level.
+    # Calibrated by QR EDA at iter-v3/047 (analysis/iteration_v3-047/bch_diagnosis.csv):
+    # BCH LONG IS = 39 trades, 30.8% WR, -25.07% net_pnl_pct (toxic across IS+OOS;
+    # per-month stable; reproducible across iter-v3/045 default ATR + iter-v3/046 wider SL).
+    # Default empty preserves v1/v2/v3-prior behavior.
+    block_long_for: tuple[str, ...] = ()  # e.g. ("BCHUSDT",) — block direction == +1
+    block_short_for: tuple[str, ...] = ()  # e.g. () — block direction == -1 (unused at iter-v3/047)
+
 
 @dataclass
 class GateStats:
@@ -126,6 +138,9 @@ class GateStats:
     vol_scale_sum: float = 0.0
     cap_fires: int = 0  # iter-v3/020: per-symbol PnL cap fires (primitive 8)
     regime_gate_fires: int = 0  # iter-v3/022: regime-conditional kill switch fires (primitive 9)
+    direction_block_fires: int = (
+        0  # iter-v3/047: direction-asymmetric kill switch fires (primitive 10)
+    )
 
     def vol_scale_mean(self) -> float:
         return self.vol_scale_sum / self.vol_scaled_signals if self.vol_scaled_signals else 1.0
