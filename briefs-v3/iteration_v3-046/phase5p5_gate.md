@@ -8,7 +8,7 @@ OVERALL: PASS
   (`bch_trx_diagnosis.csv`, `synthesis.md`, `candidate_axes_ranking.md`).
 - Brief SHA `6704488` — research brief (this iteration, single revision; no orchestrator-pick
   predecessor per `feedback_v3_axis_selection_quant_discipline.md`).
-- Setup commit SHA: TO BE FILLED post-setup-commit (Engineer responsibility).
+- Setup commit SHA `403ae9f` — feat(iter-v3/046): per-symbol ATR widening for BCHUSDT (2.0, 1.5).
 - This gate authored against committed brief.
 
 ## Per-Section Status

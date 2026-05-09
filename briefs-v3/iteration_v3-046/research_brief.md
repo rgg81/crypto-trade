@@ -628,7 +628,9 @@ TRX which would risk OOS regression). Mechanism mirrors iter-v3/044 PROMISING AL
 iter-v3/045 STRONGEST PROMISING LDO ATR. Cleanest single-axis test; lowest-risk candidate
 from the 5-axis ranking.
 
-**Setup commit SHA**: TO BE FILLED post-setup-commit (Engineer responsibility).
+**Setup commit SHA**: `403ae9f` (feat(iter-v3/046): per-symbol ATR widening for BCHUSDT
+(2.0, 1.5); brief committed FIRST at `6704488`; Phase 5.5 gate at `6dea438`; setup commit
+follows the EDA + brief + gate sequence per `feedback_v3_axis_selection_quant_discipline.md`).
 **Phase 5.5 verification**: brief Section 2 numerical evidence committed BEFORE setup
 commit (committed at `d86b1f9`); brief is iter-v3/046 single-rev (no orchestrator-pick
 predecessor).
