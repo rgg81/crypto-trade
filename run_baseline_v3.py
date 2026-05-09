@@ -103,7 +103,7 @@ def _derive_ensemble_seeds(outer_seed: int, size: int = ENSEMBLE_SIZE) -> list[i
     return [int(s) for s in rng.integers(low=0, high=2**31 - 1, size=size)]
 
 
-ITERATION_LABEL = "v3-047"
+ITERATION_LABEL = "v3-048"
 REPORTS_DIR = Path("reports-v3")
 FEATURES_DIR = Path("data/features_v3")
 DATA_DIR = Path("data")
@@ -191,32 +191,23 @@ def _verify_data_freshness(symbols: tuple[str, ...], max_lag_hours: float = 16.0
 
 
 def _verify_feature_columns() -> None:
-    """Verifies V3_FEATURE_COLUMNS contents per current brief (iter-v3/047).
+    """Verifies V3_FEATURE_COLUMNS contents per current brief (iter-v3/048).
 
-    iter-v3/047: EXPLORATION — cycle 3 #8 — REVERT iter-v3/046 BCH ATR per Critic FINAL
-      `5dae6d6` recommendation (BCH ATR (2.0, 1.5) caused -45 OOS swing; mirror mechanism
-      doesn't transfer to symbols with stable SL:TP). State after revert = iter-v3/045
-      config. iter-v3/047 NEW AXIS = QR-driven BCH direction-asymmetric axis (BCH LONG
-      IS -25% toxic / SHORT IS +49% positive; symmetric labeling-layer mechanism CLOSED
-      for BCH; direction-axis mechanism opens).
+    iter-v3/048: EXPLORATION — cycle 3 #9 — NEW universal engineered feature:
+      vol_normalized_ret_5d = ret_5d / (range_realized_vol_50 + 1e-6).
+      Canonical Sharpe-like risk-normalized momentum (Sinclair, Vol Trading; LdP AFML Ch. 8).
+      Cycle 3 plan Axis 1; QR EDA SHA a230cd1. Universal list = 15 features (14 → 15).
+      All other state UNCHANGED from iter-v3/047 carry-forward:
       PART A (carried forward from iter-v3/044+045): efficiency_ratio_50 DROPPED;
-        regime_momentum_signed_3d UNIVERSAL ADDITION REVERTED. Universal list = 14 features.
-      PART B (per-symbol ATR axis — REVERTED to 2-symbol from iter-v3/045 state):
-        V3_ATR_MULTIPLIERS_PER_SYMBOL has 2 entries (BCH REMOVED).
+        regime_momentum_signed_3d UNIVERSAL ADDITION REVERTED.
+      PART B (per-symbol ATR axis): V3_ATR_MULTIPLIERS_PER_SYMBOL has 2 entries.
         - ALGOUSDT: (2.0, 1.5) — UNCHANGED from iter-v3/044 PROMISING result.
         - LDOUSDT:  (2.0, 1.5) — UNCHANGED from iter-v3/045 STRONGEST PROMISING result.
-        - BCHUSDT:  REMOVED (was (2.0, 1.5) at iter-v3/046; -45 OOS swing). Falls back
-          to DEFAULT_ATR_MULTIPLIERS = (2.0, 1.0).
+        - BCHUSDT:  DEFAULT fallback (2.0, 1.0).
         - TRX still falls back to DEFAULT_ATR_MULTIPLIERS = (2.0, 1.0).
-      PART C (NEW iter-v3/047 axis — see Sub-fix 1 in brief Section 3): see brief for
-        the QR-recommended direction-asymmetric axis (one of: BCH LONG signal filter,
-        BCH per-direction ATR, BCH LONG threshold tightening, BCH LONG-only feature subset).
-      Universal feature list V3_FEATURE_COLUMNS_TOP_N = 14 features (UNCHANGED).
-        compute_regime_momentum_signed_3d retained as dead code in engineered_v3.py;
-        NOT dispatched.
+      PART C (iter-v3/047 carry-forward): primitive 10 block_long_for=("BCHUSDT",).
       DEFAULT_ATR_MULTIPLIERS: (2.0, 1.0) — unchanged.
-      V3_FEATURES_PER_SYMBOL: EMPTY (unchanged from iter-v3/040). All 4 symbols
-        fall back to the 14-feature V3_FEATURE_COLUMNS_TOP_N.
+      V3_FEATURES_PER_SYMBOL: EMPTY (unchanged from iter-v3/040).
 
     tbr_zscore_30 MUST NOT be present (dropped iter-v3/016).
     vwap_dev_50 MUST NOT be present (dropped iter-v3/008 per Critic SHA a544621).
@@ -226,26 +217,27 @@ def _verify_feature_columns() -> None:
     cross_asset_divergence_norm MUST NOT be in universal list (dead at model level).
     fracdiff_d05_close MUST NOT be in universal list AND MUST NOT be in any per-symbol entry.
     efficiency_ratio_50 MUST NOT be present (DROPPED — iter-v3/043 DISASTROUS NEGATIVE).
-    regime_momentum_signed_5d MUST be present (mandate still ACTIVE at iter-v3/047).
+    regime_momentum_signed_5d MUST be present (mandate still ACTIVE at iter-v3/048).
+    vol_normalized_ret_5d MUST be present (NEW — iter-v3/048; cycle 3 plan Axis 1).
     regime_momentum_signed_3d MUST NOT be present in V3_FEATURE_COLUMNS_TOP_N (universal
       addition REVERTED at iter-v3/044 per QR EDA). Code retained as dead code in
       engineered_v3.py; available for future per-symbol experiments.
-    sym_vs_btc_ret_7d MUST be present (RESTORED at iter-v3/042; KEPT at iter-v3/044).
-    ret_skew_50 MUST be present (RESTORED at iter-v3/042; KEPT at iter-v3/044).
+    sym_vs_btc_ret_7d MUST be present (RESTORED at iter-v3/042; KEPT at iter-v3/048).
+    ret_skew_50 MUST be present (RESTORED at iter-v3/042; KEPT at iter-v3/048).
 
-    Per-symbol checks (iter-v3/047):
+    Per-symbol checks (iter-v3/048):
     V3_FEATURES_PER_SYMBOL must be EMPTY (0 entries).
-    V3_ATR_MULTIPLIERS_PER_SYMBOL must contain exactly 2 entries (BCH REMOVED at iter-v3/047):
+    V3_ATR_MULTIPLIERS_PER_SYMBOL must contain exactly 2 entries (unchanged from iter-v3/047):
       ALGOUSDT → (2.0, 1.5) (carried forward from iter-v3/044).
       LDOUSDT  → (2.0, 1.5) (carried forward from iter-v3/045).
       BCHUSDT  MUST NOT be a key (REMOVED at iter-v3/047 per Critic FINAL `5dae6d6` revert).
-    features_for_symbol("BCHUSDT") MUST return 14 features = V3_FEATURE_COLUMNS_TOP_N.
-    features_for_symbol("ALGOUSDT") MUST return 14 features (fallback).
-    features_for_symbol("LDOUSDT") MUST return 14 features (fallback).
-    features_for_symbol("TRXUSDT") MUST return 14 features (fallback).
+    features_for_symbol("BCHUSDT") MUST return 15 features = V3_FEATURE_COLUMNS_TOP_N.
+    features_for_symbol("ALGOUSDT") MUST return 15 features (fallback).
+    features_for_symbol("LDOUSDT") MUST return 15 features (fallback).
+    features_for_symbol("TRXUSDT") MUST return 15 features (fallback).
     atr_multipliers_for_symbol("ALGOUSDT") MUST return (2.0, 1.5) (per-symbol entry).
     atr_multipliers_for_symbol("LDOUSDT") MUST return (2.0, 1.5) (per-symbol entry).
-    atr_multipliers_for_symbol("BCHUSDT") MUST return (2.0, 1.0) (DEFAULT fallback — REVERT).
+    atr_multipliers_for_symbol("BCHUSDT") MUST return (2.0, 1.0) (DEFAULT fallback).
     atr_multipliers_for_symbol("TRXUSDT") MUST return (2.0, 1.0) (DEFAULT fallback).
     DEFAULT_ATR_MULTIPLIERS MUST be (2.0, 1.0) (correct since iter-v3/043 revert).
     """
@@ -256,14 +248,13 @@ def _verify_feature_columns() -> None:
     )
 
     n = len(V3_FEATURE_COLUMNS)
-    if n != 14:
+    if n != 15:
         raise RuntimeError(
-            f"V3_FEATURE_COLUMNS has {n} columns — expected exactly 14. "
-            "iter-v3/044: REVERT efficiency_ratio_50 (15 → 14) AND REVERT "
-            "regime_momentum_signed_3d universal addition (orchestrator's setup "
-            "commit `1f56c72` superseded by QR EDA-driven axis at SHA `eff841e`). "
-            "Universal list = 14 features. "
-            "Check features_v3/__init__.py V3_FEATURE_COLUMNS_TOP_N."
+            f"V3_FEATURE_COLUMNS has {n} columns — expected exactly 15. "
+            "iter-v3/048: ADD vol_normalized_ret_5d (14 → 15; cycle 3 plan Axis 1 "
+            "NEW engineered feature per brief Section 3 Sub-fix 3). "
+            "Add 'vol_normalized_ret_5d' to V3_FEATURE_COLUMNS_TOP_N in "
+            "features_v3/__init__.py."
         )
     if "tbr_zscore_30" in V3_FEATURE_COLUMNS:
         raise RuntimeError(
@@ -381,9 +372,9 @@ def _verify_feature_columns() -> None:
         )
     print(
         f"  V3_FEATURE_COLUMNS: {n} columns "
-        "(iter-v3/047: 14-feature set; efficiency_ratio_50 ABSENT; regime_momentum_signed_3d "
-        "ABSENT (universal addition REVERTED); regime_momentum_signed_5d, sym_vs_btc_ret_7d, "
-        "ret_skew_50 PRESENT)  PASS"
+        "(iter-v3/048: 15-feature set; vol_normalized_ret_5d ADDED; efficiency_ratio_50 ABSENT; "
+        "regime_momentum_signed_3d ABSENT (universal addition REVERTED); "
+        "regime_momentum_signed_5d, sym_vs_btc_ret_7d, ret_skew_50 PRESENT)  PASS"
     )
 
     # iter-v3/044: Verify DEFAULT_ATR_MULTIPLIERS == (2.0, 1.0).
@@ -407,7 +398,7 @@ def _verify_feature_columns() -> None:
             f"Current keys: {list(V3_FEATURES_PER_SYMBOL.keys())}. "
             "Clear V3_FEATURES_PER_SYMBOL to {{}} in features_v3/__init__.py."
         )
-    print("  V3_FEATURES_PER_SYMBOL: 0 entries (empty — all symbols use 14-feature fallback)  PASS")
+    print("  V3_FEATURES_PER_SYMBOL: 0 entries (empty — all symbols use 15-feature fallback)  PASS")
 
     # iter-v3/047: V3_ATR_MULTIPLIERS_PER_SYMBOL MUST contain exactly 2 entries (BCH REMOVED):
     #   ALGOUSDT → (2.0, 1.5) (carried forward from iter-v3/044 PROMISING)
@@ -465,16 +456,16 @@ def _verify_feature_columns() -> None:
         "TRX + BCH use (2.0, 1.0) DEFAULT (BCH REVERTED at iter-v3/047)  PASS"
     )
 
-    # iter-v3/047: Verify all 4 symbols return 14-feature fallback (V3_FEATURE_COLUMNS_TOP_N).
+    # iter-v3/048: Verify all 4 symbols return 15-feature fallback (V3_FEATURE_COLUMNS_TOP_N).
     for sym in ("BCHUSDT", "ALGOUSDT", "LDOUSDT", "TRXUSDT"):
         sym_feats = features_for_symbol(sym)
-        if len(sym_feats) != 14:
+        if len(sym_feats) != 15:
             raise RuntimeError(
                 f"{sym} fallback has {len(sym_feats)} features — "
-                "expected exactly 14 (iter-v3/047 V3_FEATURE_COLUMNS_TOP_N universal list). "
-                "iter-v3/047: all 4 symbols must use the 14-feature set "
-                "(efficiency_ratio_50 ABSENT; regime_momentum_signed_3d ABSENT; "
-                "V3_FEATURES_PER_SYMBOL empty)."
+                "expected exactly 15 (iter-v3/048 V3_FEATURE_COLUMNS_TOP_N universal list). "
+                "iter-v3/048: all 4 symbols must use the 15-feature set "
+                "(vol_normalized_ret_5d ADDED; efficiency_ratio_50 ABSENT; "
+                "regime_momentum_signed_3d ABSENT; V3_FEATURES_PER_SYMBOL empty)."
             )
         if "fracdiff_d05_close" in sym_feats:
             raise RuntimeError(
@@ -503,8 +494,9 @@ def _verify_feature_columns() -> None:
                 f"Check V3_FEATURE_COLUMNS_TOP_N and features_for_symbol('{sym}') path."
             )
     print(
-        "  BCH/ALGO/LDO/TRX: 14-feature universal fallback "
-        "(efficiency_ratio_50 ABSENT; regime_momentum_signed_3d ABSENT; _5d PRESENT)  PASS"
+        "  BCH/ALGO/LDO/TRX: 15-feature universal fallback "
+        "(vol_normalized_ret_5d ADDED; efficiency_ratio_50 ABSENT; "
+        "regime_momentum_signed_3d ABSENT; _5d PRESENT)  PASS"
     )
 
     # iter-v3/047: TRX + BCH MUST be (2.0, 1.0) via DEFAULT fallback (BCH REVERTED).
@@ -586,6 +578,16 @@ def _verify_feature_columns() -> None:
             "Add it to V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
         )
     print("  regime_momentum_signed_5d PRESENT in V3_FEATURE_COLUMNS_TOP_N (mandate ACTIVE)  PASS")
+
+    # iter-v3/048: vol_normalized_ret_5d MUST be in V3_FEATURE_COLUMNS_TOP_N (NEW addition).
+    if "vol_normalized_ret_5d" not in V3_FEATURE_COLUMNS_TOP_N:
+        raise RuntimeError(
+            "vol_normalized_ret_5d NOT FOUND in V3_FEATURE_COLUMNS_TOP_N — must be PRESENT "
+            "at iter-v3/048. Cycle 3 plan Axis 1 (NEW engineered feature) per "
+            "feedback_v3_engineered_features_proven.md. "
+            "Add it to V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
+        )
+    print("  vol_normalized_ret_5d PRESENT in V3_FEATURE_COLUMNS_TOP_N (cycle 3 plan Axis 1)  PASS")
 
     # iter-v3/044: regime_momentum_signed_3d UNIVERSAL ADDITION REVERTED before backtest.
     # Per QR EDA SHA `eff841e` — does not address ALGO LONG bottleneck; ranks 14/14 in ALGO.

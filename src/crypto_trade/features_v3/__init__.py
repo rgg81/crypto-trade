@@ -258,8 +258,22 @@ V3_FEATURE_COLUMNS_TOP_N: tuple[str, ...] = (
     # New axis: per-symbol ATR widening for ALGOUSDT only (V3_ATR_MULTIPLIERS_PER_SYMBOL["ALGOUSDT"]
     # = (2.0, 1.5)). Targets ALGO long SL/TP exit asymmetry (27/6 = 4.5:1) directly; proven
     # mechanism per iter-v3/032 LDO ATR success.
+    # iter-v3/048: vol_normalized_ret_5d ADDED (14 → 15; cycle 3 plan Axis 1 NEW engineered
+    # feature). Composed feature: ret_5d / (range_realized_vol_50 + 1e-6). Canonical Sharpe-
+    # like risk-normalized momentum (Sinclair, Vol Trading; LdP AFML Ch. 8). range_realized_
+    # vol_50 is rank-1 TRX importance (313/313; mean rank 3.00 across all 4 symbols). TRX has
+    # flat importance distribution (2.5× top:bottom ratio) — model can't discriminate signal.
+    # IC carve-out applies per feedback_v3_engineered_feature_pivot.md (Category 2 composed
+    # feature; |IC| with ret_5d ~0.7+ expected by construction). Binding gate: importance >=30
+    # in at least 2 of 4 symbols. QR EDA SHA a230cd1; cycle 3 #9 of 10.
+    "vol_normalized_ret_5d",  # iter-v3/048 NEW (14 → 15) — engineered_v3 Category 2
 )
-"""Top-14 feature subset: iter-v3/044 reverts iter-v3/043's DISASTROUS efficiency_ratio_50
+"""Top-15 feature subset (as of iter-v3/048): vol_normalized_ret_5d ADDED (14 → 15).
+iter-v3/048: vol_normalized_ret_5d = ret_5d / (range_realized_vol_50 + 1e-6). Canonical
+Sharpe-like risk-normalized momentum. Cycle 3 plan Axis 1; QR EDA SHA a230cd1.
+IC carve-out per feedback_v3_engineered_feature_pivot.md (Category 2 composed feature).
+
+Top-14 context (iter-v3/044): reverts iter-v3/043's DISASTROUS efficiency_ratio_50
 (IS -0.8445 / OOS -0.8990; all 4 symbols broken). The 3d variant universal addition was
 ALSO REVERTED before backtest (orchestrator's ad-hoc setup superseded by QR EDA-driven
 axis selection per feedback_v3_axis_selection_quant_discipline.md).
@@ -267,7 +281,7 @@ axis selection per feedback_v3_axis_selection_quant_discipline.md).
 iter-v3/042 restored 3 features (ret_skew_50, sym_vs_btc_ret_7d,
 regime_momentum_signed_5d) from iter-v3/041 Path C NEGATIVE mandate.
 The MUST-be-present mandate for regime_momentum_signed_5d from
-feedback_v3_engineered_features_proven.md remains ACTIVE at iter-v3/044.
+feedback_v3_engineered_features_proven.md remains ACTIVE at iter-v3/048.
 
 iter-v3/043: efficiency_ratio_50 ADDED (14 → 15) — DISASTROUS NEGATIVE.
 iter-v3/044: efficiency_ratio_50 DROPPED (reverted to 14 base). compute_efficiency_ratio_50
@@ -286,6 +300,7 @@ Top-N history (last 5 entries):
   iter-v3/043: ADDED 14 → 15 (efficiency_ratio_50 Kaufman 1995 ER — DISASTROUS NEGATIVE)
   iter-v3/044: REVERT 15 → 14 (drop both efficiency_ratio_50 AND regime_momentum_signed_3d
               universal addition; new axis = per-symbol ATR for ALGO).
+  iter-v3/048: ADDED 14 → 15 (vol_normalized_ret_5d NEW; cycle 3 #9 of 10).
 
 iter-v3/035 revert — fracdiff_d05_close removed from universal list (15→14; moved
 to V3_FEATURES_PER_SYMBOL["BCHUSDT"] for BCH-only per-symbol targeting); cleared

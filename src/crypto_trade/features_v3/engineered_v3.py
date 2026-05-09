@@ -433,8 +433,71 @@ def compute_efficiency_ratio_50(df: pd.DataFrame) -> pd.Series:
     return er.fillna(0.0).clip(0.0, 1.0)
 
 
+_VOL_NORMALIZED_RET_5D_EPS: float = 1e-6
+
+
+def compute_vol_normalized_ret_5d(df: pd.DataFrame) -> pd.DataFrame:
+    """Composed feature: ret_5d / (range_realized_vol_50 + epsilon).
+
+    Encodes the canonical Sharpe-like risk-normalized momentum (Sinclair, Vol Trading;
+    LdP AFML Ch. 8): how unusual is this 5d return given recent volatility regime?
+
+    Construction:
+    - ret_5d = log(close_t / close_{t-15}) at 8h cadence (15 bars * 8h = 5 days).
+    - range_realized_vol_50: rolling 50-bar high-low realized vol (computed by
+      add_tail_risk_v3_features).
+    - epsilon = 1e-6 prevents zero-vol division.
+
+    Past-only by construction:
+    - ret_5d.shift(15) ensures bar t uses close at t-15 (no look-ahead).
+    - range_realized_vol_50 is past-only (rolling window); the v3 implementation
+      uses .shift(1) inside add_tail_risk_v3_features.
+
+    NaN warm-up: first ~49 bars NaN from range_realized_vol_50's 50-bar window (ret_5d
+    warm-up is 15 bars; the denominator's 50-bar window dominates).
+
+    IC carve-out applies (per ``feedback_v3_engineered_feature_pivot.md``):
+    - vol_normalized_ret_5d shares variance with both source primitives by construction.
+    - |IC| with range_realized_vol_50 expected ~0.3-0.5 (denominator inverse).
+    - |IC| with ret_5d direction expected ~0.7+ (numerator dominant direction signal).
+    - Strict |IC|<0.50 gate is INAPPROPRIATE for Category 2 composed features.
+    - Binding gate: importance >=30 in at least 2 of 4 symbols (relaxed Falsifier).
+
+    Args:
+        df: DataFrame with columns 'close' (float-castable) and 'range_realized_vol_50'
+            (pre-computed by add_tail_risk_v3_features).
+
+    Returns:
+        Copy of df with vol_normalized_ret_5d column appended.
+        If range_realized_vol_50 is missing the column is set to all-NaN without error,
+        so the pipeline fails loudly at the feature-column assertion downstream.
+    """
+    df = df.copy()
+    close = df["close"].astype(float)
+    log_close = np.log(close.clip(lower=1e-12))
+    # 15 bars at 8h cadence = 5 calendar days
+    ret_5d = log_close - log_close.shift(15)
+
+    if "range_realized_vol_50" not in df.columns:
+        df["vol_normalized_ret_5d"] = np.nan
+        return df
+
+    rv = df["range_realized_vol_50"].astype(float)
+    df["vol_normalized_ret_5d"] = ret_5d / (rv + _VOL_NORMALIZED_RET_5D_EPS)
+    return df
+
+
 def add_engineered_v3_features(df: pd.DataFrame) -> pd.DataFrame:
     """GROUP_REGISTRY entry point for all Category 2 (composed) v3 features.
+
+    iter-v3/048: vol_normalized_ret_5d ADDED to dispatch (NEW 15th feature in
+    V3_FEATURE_COLUMNS_TOP_N). Composed feature: ret_5d / (range_realized_vol_50 + ε).
+    Canonical Sharpe-like risk-normalized momentum (Sinclair, Vol Trading; LdP AFML Ch. 8).
+    range_realized_vol_50 is rank-1 TRX importance (313/313; mean rank 3.00 across 4 symbols).
+    TRX has flat importance distribution (2.5× top:bottom ratio) — risk-normalized momentum
+    may give Optuna better split quality on TRX (the IS-axis-bottleneck symbol).
+    IC carve-out applies per feedback_v3_engineered_feature_pivot.md.
+    Cycle 3 plan Axis 1; QR EDA SHA a230cd1; cycle 3 #9 of 10.
 
     iter-v3/044: regime_momentum_signed_3d UNIVERSAL DISPATCH REVERTED. The orchestrator's
     setup commit `1f56c72` added 3d to dispatch + V3_FEATURE_COLUMNS_TOP_N as a 15th feature.
@@ -489,6 +552,11 @@ def add_engineered_v3_features(df: pd.DataFrame) -> pd.DataFrame:
       LDO's parquet contains it; BCH/TRX/ALGO parquets also contain it but it is NOT
       passed to LightGBM for those symbols.  Depends on ``btc_ret_14d`` (cross_btc group)
       and ``vwap_dev_20`` (volume_micro group), both upstream in GROUP_REGISTRY.
+    - ``vol_normalized_ret_5d`` (iter-v3/048, NEW; dispatched universally):
+      ret_5d / (range_realized_vol_50 + 1e-6). Risk-normalized 5-day momentum. ALL 4
+      symbols receive the column in their parquets AND it is in V3_FEATURE_COLUMNS_TOP_N
+      (universal model-level dispatch). Depends on ``range_realized_vol_50`` from
+      ``tail_risk`` group (upstream in GROUP_REGISTRY).
 
     Dead code retained (zero revert cost):
     - ``compute_vol_adj_autocorr``: reverted at iter-v3/037 (iter-v3/036 NEGATIVE).
@@ -516,6 +584,14 @@ def add_engineered_v3_features(df: pd.DataFrame) -> pd.DataFrame:
     df = compute_regime_momentum_signed_5d(df)  # iter-v3/025 (KEPT; mandated by engineered pivot)
     df = compute_fracdiff_d05_close(df)  # iter-v3/034 (KEPT; BCH-only at model level)
     df = compute_cross_asset_divergence_norm(df)  # iter-v3/037 RE-ADDED (LDO-only at model level)
+    # iter-v3/048: vol_normalized_ret_5d ADDED (15th feature in V3_FEATURE_COLUMNS_TOP_N).
+    # Canonical Sharpe-like risk-normalized momentum: ret_5d / (range_realized_vol_50 + ε).
+    # range_realized_vol_50 is rank-1 TRX importance (313/313) and mean rank 3.00 across all 4
+    # symbols. TRX has flat importance distribution (2.5× ratio) — model can't discriminate.
+    # Depends on range_realized_vol_50 from add_tail_risk_v3_features (upstream in GROUP_REGISTRY).
+    # IC carve-out per feedback_v3_engineered_feature_pivot.md (Category 2 composed feature).
+    # Cycle 3 plan Axis 1 per feedback_v3_axis_selection_quant_discipline.md.
+    df = compute_vol_normalized_ret_5d(df)  # iter-v3/048 (NEW; dispatched)
     # compute_regime_momentum_signed_3d REVERTED at iter-v3/044 (orchestrator ad-hoc pick;
     #   QR EDA showed it does not address ALGO LONG bottleneck). Dead code retained.
     # compute_efficiency_ratio_50 REMOVED from dispatch at iter-v3/044 — DISASTROUS NEGATIVE.
@@ -531,4 +607,5 @@ __all__ = [
     "compute_regime_momentum_signed_3d",
     "compute_regime_momentum_signed_5d",
     "compute_vol_adj_autocorr",
+    "compute_vol_normalized_ret_5d",
 ]
