@@ -103,7 +103,7 @@ def _derive_ensemble_seeds(outer_seed: int, size: int = ENSEMBLE_SIZE) -> list[i
     return [int(s) for s in rng.integers(low=0, high=2**31 - 1, size=size)]
 
 
-ITERATION_LABEL = "v3-039"
+ITERATION_LABEL = "v3-040"
 REPORTS_DIR = Path("reports-v3")
 FEATURES_DIR = Path("data/features_v3")
 DATA_DIR = Path("data")
@@ -191,53 +191,50 @@ def _verify_data_freshness(symbols: tuple[str, ...], max_lag_hours: float = 16.0
 
 
 def _verify_feature_columns() -> None:
-    """Verifies V3_FEATURE_COLUMNS contents per current brief (iter-v3/039).
+    """Verifies V3_FEATURE_COLUMNS contents per current brief (iter-v3/040).
 
-    iter-v3/039: CONFIRMATION — revert iter-v3/038 ALGO fracdiff entry; restore iter-v3/035
-    bundle state (BCH-only fracdiff per-symbol; ALGO returns to 14-feature fallback).
+    iter-v3/040: EXPLORATION — cycle 3 #1 — REVERT all per-symbol customizations.
       V3_FEATURE_COLUMNS_TOP_N: 14 features — NO fracdiff_d05_close, NO vol_adj_autocorr,
-        NO cross_asset_divergence_norm in the universal list.
-      BCH per-symbol (V3_FEATURES_PER_SYMBOL["BCHUSDT"]): 15 features —
-        WITH fracdiff_d05_close. UNCHANGED from iter-v3/035.
-      ALGO fallback: 14 features — NO fracdiff_d05_close.
-        (ALGOUSDT per-symbol entry REVERTED from iter-v3/038 NEGATIVE — fracdiff is
-        BCH-SPECIFIC; ALGO returns to V3_FEATURE_COLUMNS_TOP_N fallback.)
-      LDO/TRX fallback: 14 features — NO fracdiff_d05_close, NO cross_asset_divergence_norm,
-        NO vol_adj_autocorr. (LDO reverted from iter-v3/037; LDOUSDT not in per-symbol dict.)
+        NO cross_asset_divergence_norm in the universal list. UNCHANGED from iter-v3/039.
+      V3_FEATURES_PER_SYMBOL: EMPTY (cleared at iter-v3/040).
+        All 4 symbols (BCH/LDO/TRX/ALGO) fall back to V3_FEATURE_COLUMNS_TOP_N.
+        BCH no longer has a per-symbol fracdiff entry (reverted from iter-v3/035-039).
+      V3_ATR_MULTIPLIERS_PER_SYMBOL: EMPTY (cleared at iter-v3/040).
+        LDO reverts to DEFAULT_ATR_MULTIPLIERS = (2.0, 1.0) via fallback.
 
-    BCH is the ONLY per-symbol entry at iter-v3/039.
-    ALGO/LDO/TRX use 14-feature universal fallback.
+    Rationale: iter-v3/039 CONFIRMATION NO-MERGE — per-symbol customizations caused
+    ~-0.55 IS Sharpe swing from iter-v3/029 clean-4-symbol anchor. Clearing both dicts
+    atomically verifies that the IS degradation is attributable to these customizations.
 
     tbr_zscore_30 MUST NOT be present (dropped iter-v3/016).
     vwap_dev_50 MUST NOT be present (dropped iter-v3/008 per Critic SHA a544621).
     funding_rate_zscore_30 MUST NOT be present (per-symbol variant PERMANENTLY-CLOSED).
     btc_funding_rate_zscore_30 MUST NOT be present (cross-asset variant PERMANENTLY-CLOSED).
-    vol_adj_autocorr MUST NOT be present in universal list (V3_FEATURE_COLUMNS_TOP_N).
-      (iter-v3/036 NEGATIVE reverted; vol_adj_autocorr dead code in engineered_v3.py)
-    cross_asset_divergence_norm MUST NOT be present in universal list.
-      (iter-v3/037 NEGATIVE reverted; column still generated in parquets but NOT in any
-       V3_FEATURES_PER_SYMBOL entry at iter-v3/039.)
-    fracdiff_d05_close MUST NOT be present in V3_FEATURE_COLUMNS_TOP_N (universal list;
-        BCH-only per-symbol at iter-v3/035/039).
-    regime_momentum_signed_5d MUST be present (Category 2 composed feature, iter-v3/025;
-        mandated by `feedback_v3_engineered_features_proven.md`).
-    ALGOUSDT MUST NOT be in V3_FEATURES_PER_SYMBOL (iter-v3/038 NEGATIVE reverted).
-    LDOUSDT MUST NOT be in V3_FEATURES_PER_SYMBOL (iter-v3/037 NEGATIVE reverted).
-    TRXUSDT MUST NOT be in V3_FEATURES_PER_SYMBOL (no per-symbol entry since iter-v3/036 revert).
+    vol_adj_autocorr MUST NOT be in universal list (dead code since iter-v3/036 revert).
+    cross_asset_divergence_norm MUST NOT be in universal list (dead at model level).
+    fracdiff_d05_close MUST NOT be in universal list AND MUST NOT be in any per-symbol entry.
+    regime_momentum_signed_5d MUST be present
+        (portfolio mandate, feedback_v3_engineered_features_proven.md).
 
-    Per-symbol checks (iter-v3/039):
-    V3_FEATURES_PER_SYMBOL has 1 entry (BCHUSDT only).
-    V3_FEATURES_PER_SYMBOL["BCHUSDT"]: 15 features WITH fracdiff_d05_close. UNCHANGED.
-    features_for_symbol("ALGOUSDT") MUST return 14 features (no per-symbol entry; fallback).
-    features_for_symbol("LDOUSDT") MUST return 14 features (no per-symbol entry; fallback).
-    features_for_symbol("TRXUSDT") MUST return 14 features (no per-symbol entry; fallback).
+    Per-symbol checks (iter-v3/040):
+    V3_FEATURES_PER_SYMBOL must be EMPTY (0 entries).
+    V3_ATR_MULTIPLIERS_PER_SYMBOL must be EMPTY (0 entries).
+    features_for_symbol("BCHUSDT") MUST return 14 features = V3_FEATURE_COLUMNS_TOP_N (fallback).
+    features_for_symbol("ALGOUSDT") MUST return 14 features (fallback; unchanged).
+    features_for_symbol("LDOUSDT") MUST return 14 features (fallback; unchanged).
+    features_for_symbol("TRXUSDT") MUST return 14 features (fallback; unchanged).
+    atr_multipliers_for_symbol("LDOUSDT") MUST return (2.0, 1.0) (default fallback).
     """
+    from crypto_trade.features_v3 import (  # noqa: PLC0415
+        V3_ATR_MULTIPLIERS_PER_SYMBOL,
+        atr_multipliers_for_symbol,
+    )
+
     n = len(V3_FEATURE_COLUMNS)
     if n != 14:
         raise RuntimeError(
             f"V3_FEATURE_COLUMNS has {n} columns — expected exactly 14. "
-            "iter-v3/035+: fracdiff_d05_close in V3_FEATURES_PER_SYMBOL['BCHUSDT'] only; "
-            "iter-v3/037: cross_asset_divergence_norm in V3_FEATURES_PER_SYMBOL['LDOUSDT'] only. "
+            "iter-v3/040: universal list is 14 features; no per-symbol extensions. "
             "Check features_v3/__init__.py V3_FEATURE_COLUMNS_TOP_N."
         )
     if "tbr_zscore_30" in V3_FEATURE_COLUMNS:
@@ -273,13 +270,12 @@ def _verify_feature_columns() -> None:
     # cross_asset_divergence_norm MUST NOT be in the universal list.
     # NOTE: cross_asset_divergence_norm IS dispatched in add_engineered_v3_features (for parquet
     # generation) but must NOT be in V3_FEATURE_COLUMNS_TOP_N (the universal model input list).
-    # Only LDOUSDT's V3_FEATURES_PER_SYMBOL entry includes it at model-train time.
     if "cross_asset_divergence_norm" in V3_FEATURE_COLUMNS:
         raise RuntimeError(
             "cross_asset_divergence_norm FOUND in V3_FEATURE_COLUMNS (universal list) — "
-            "must be ABSENT. iter-v3/037: cross_asset_divergence_norm is LDO-only "
-            "(V3_FEATURES_PER_SYMBOL['LDOUSDT']); universal application FALSIFIED at "
-            "iter-v3/027 (IS Sharpe collapse -0.2817 + OOS spike +1.6786). "
+            "must be ABSENT. Universal application FALSIFIED at iter-v3/027 (IS Sharpe "
+            "collapse -0.2817 + OOS spike +1.6786). iter-v3/037 LDO per-symbol NEGATIVE (~-33). "
+            "iter-v3/040: dead at model level. "
             "Remove it from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
         )
     if "regime_momentum_signed_5d" not in V3_FEATURE_COLUMNS:
@@ -296,12 +292,12 @@ def _verify_feature_columns() -> None:
             "Critic FINAL SHA a544621 (Recommendation 1). "
             "Remove it from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
         )
-    # iter-v3/035+: fracdiff_d05_close MUST NOT be in the universal list.
+    # iter-v3/040: fracdiff_d05_close MUST NOT be in the universal list.
     if "fracdiff_d05_close" in V3_FEATURE_COLUMNS_TOP_N:
         raise RuntimeError(
             "fracdiff_d05_close FOUND in V3_FEATURE_COLUMNS_TOP_N (universal list) — "
-            "iter-v3/035+: fracdiff_d05_close must be in V3_FEATURES_PER_SYMBOL['BCHUSDT'] "
-            "ONLY, not in the universal 14-feature list. "
+            "must be ABSENT. iter-v3/040: fracdiff_d05_close is NOT a model input for any "
+            "symbol (V3_FEATURES_PER_SYMBOL is empty; no per-symbol extension entries). "
             "Remove it from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
         )
     # iter-v3/037: vol_adj_autocorr MUST NOT be in the universal list (iter-v3/036 reverted).
@@ -311,14 +307,12 @@ def _verify_feature_columns() -> None:
             "iter-v3/037: iter-v3/036 NEGATIVE reverted; vol_adj_autocorr is dead code. "
             "Remove it from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
         )
-    # iter-v3/038: cross_asset_divergence_norm MUST NOT be in the universal list.
-    # (iter-v3/037 LDO-only per-symbol NEGATIVE; LDO entry removed; cross_asset dead at
-    #  model level but column still generated in parquets via engineered_v3 dispatch.)
+    # cross_asset_divergence_norm MUST NOT be in the universal list.
     if "cross_asset_divergence_norm" in V3_FEATURE_COLUMNS_TOP_N:
         raise RuntimeError(
             "cross_asset_divergence_norm FOUND in V3_FEATURE_COLUMNS_TOP_N (universal list) — "
-            "iter-v3/038: cross_asset_divergence_norm must be ABSENT from universal list. "
-            "iter-v3/037 LDO-only per-symbol NEGATIVE (~-33 OOS swing); LDO entry removed. "
+            "iter-v3/040: dead at model level. Universal application FALSIFIED at iter-v3/027. "
+            "LDO per-symbol FALSIFIED at iter-v3/037. "
             "Remove it from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
         )
     print(
@@ -327,126 +321,75 @@ def _verify_feature_columns() -> None:
         "from universal list)  PASS"
     )
 
-    # iter-v3/035+: BCH per-symbol entry MUST exist with fracdiff_d05_close (NOT cross_asset).
-    # NOTE: BCH entry EXTENDS V3_FEATURE_COLUMNS_TOP_N by fracdiff_d05_close only.
-    if "BCHUSDT" not in V3_FEATURES_PER_SYMBOL:
+    # iter-v3/040: V3_FEATURES_PER_SYMBOL MUST BE EMPTY.
+    # All per-symbol feature customizations reverted. BCH uses 14-feature fallback.
+    n_custom = len(V3_FEATURES_PER_SYMBOL)
+    if n_custom != 0:
         raise RuntimeError(
-            "V3_FEATURES_PER_SYMBOL missing 'BCHUSDT' entry — "
-            "iter-v3/035+: BCH must have a per-symbol entry = V3_FEATURE_COLUMNS_TOP_N + "
-            "('fracdiff_d05_close',) (15 features). "
-            "Add it to V3_FEATURES_PER_SYMBOL in features_v3/__init__.py."
+            f"V3_FEATURES_PER_SYMBOL has {n_custom} entries — expected exactly 0 (empty). "
+            "iter-v3/040: REVERT all per-symbol feature overrides (cycle 3 EXPLORATION #1). "
+            f"Current keys: {list(V3_FEATURES_PER_SYMBOL.keys())}. "
+            "Clear V3_FEATURES_PER_SYMBOL to {{}} in features_v3/__init__.py."
         )
-    bch_features = V3_FEATURES_PER_SYMBOL["BCHUSDT"]
-    if len(bch_features) != 15:
-        raise RuntimeError(
-            f"V3_FEATURES_PER_SYMBOL['BCHUSDT'] has {len(bch_features)} features — "
-            "expected exactly 15 (14 universal + fracdiff_d05_close). "
-            "Check V3_FEATURES_PER_SYMBOL['BCHUSDT'] in features_v3/__init__.py."
-        )
-    if "fracdiff_d05_close" not in bch_features:
-        raise RuntimeError(
-            "fracdiff_d05_close MISSING from V3_FEATURES_PER_SYMBOL['BCHUSDT'] — "
-            "iter-v3/035+: BCH per-symbol entry must include fracdiff_d05_close. "
-            "Check V3_FEATURES_PER_SYMBOL['BCHUSDT'] in features_v3/__init__.py."
-        )
-    # iter-v3/037: BCH entry MUST NOT include cross_asset_divergence_norm (LDO-only feature).
-    if "cross_asset_divergence_norm" in bch_features:
-        raise RuntimeError(
-            "cross_asset_divergence_norm FOUND in V3_FEATURES_PER_SYMBOL['BCHUSDT'] — "
-            "must be ABSENT. iter-v3/037: cross_asset_divergence_norm is LDO-only. "
-            "BCH and LDO extension features must be DISJOINT. "
-            "Check V3_FEATURES_PER_SYMBOL['BCHUSDT'] in features_v3/__init__.py."
-        )
-    # Verify BCH entry = V3_FEATURE_COLUMNS_TOP_N + ("fracdiff_d05_close",)
-    expected_bch = V3_FEATURE_COLUMNS_TOP_N + ("fracdiff_d05_close",)
-    if set(bch_features) != set(expected_bch):
-        raise RuntimeError(
-            f"V3_FEATURES_PER_SYMBOL['BCHUSDT'] content mismatch. "
-            f"Expected V3_FEATURE_COLUMNS_TOP_N + ('fracdiff_d05_close',). "
-            f"Extra: {sorted(set(bch_features) - set(expected_bch))}. "
-            f"Missing: {sorted(set(expected_bch) - set(bch_features))}."
-        )
-    print("  V3_FEATURES_PER_SYMBOL['BCHUSDT']: 15 features (14 universal + fracdiff)  PASS")
+    print("  V3_FEATURES_PER_SYMBOL: 0 entries (empty — all symbols use 14-feature fallback)  PASS")
 
-    # iter-v3/039: ALGOUSDT MUST NOT be in V3_FEATURES_PER_SYMBOL (iter-v3/038 NEGATIVE reverted).
-    # ALGO does NOT benefit from fracdiff — fracdiff is BCH-SPECIFIC.
-    if "ALGOUSDT" in V3_FEATURES_PER_SYMBOL:
+    # iter-v3/040: V3_ATR_MULTIPLIERS_PER_SYMBOL MUST BE EMPTY.
+    # LDO reverts to DEFAULT_ATR_MULTIPLIERS = (2.0, 1.0) via fallback.
+    n_atr_custom = len(V3_ATR_MULTIPLIERS_PER_SYMBOL)
+    if n_atr_custom != 0:
         raise RuntimeError(
-            "V3_FEATURES_PER_SYMBOL has 'ALGOUSDT' entry — must be ABSENT. "
-            "iter-v3/039: ALGO per-symbol entry REVERTED (iter-v3/038 NEGATIVE: "
-            "ALGO does NOT benefit from fracdiff; fracdiff is BCH-SPECIFIC). "
-            "ALGO must use 14-feature fallback. "
-            "Remove ALGOUSDT from V3_FEATURES_PER_SYMBOL in features_v3/__init__.py."
+            f"V3_ATR_MULTIPLIERS_PER_SYMBOL has {n_atr_custom} entries — expected 0 (empty). "
+            "iter-v3/040: REVERT all per-symbol ATR customizations (cycle 3 EXPLORATION #1). "
+            f"Current keys: {list(V3_ATR_MULTIPLIERS_PER_SYMBOL.keys())}. "
+            "Clear V3_ATR_MULTIPLIERS_PER_SYMBOL to {{}} in features_v3/__init__.py."
         )
-    print("  ALGOUSDT not in V3_FEATURES_PER_SYMBOL (14-feature fallback)  PASS")
-
-    # iter-v3/039: LDOUSDT MUST NOT be in V3_FEATURES_PER_SYMBOL (iter-v3/037 NEGATIVE reverted).
-    if "LDOUSDT" in V3_FEATURES_PER_SYMBOL:
-        raise RuntimeError(
-            "V3_FEATURES_PER_SYMBOL has 'LDOUSDT' entry — must be ABSENT. "
-            "iter-v3/038: LDO per-symbol entry REVERTED (iter-v3/037 NEGATIVE: "
-            "cross_asset_divergence_norm OOS swing ~-33 vs iter-v3/035 anchor). "
-            "LDO must use 14-feature fallback. "
-            "Remove LDOUSDT from V3_FEATURES_PER_SYMBOL in features_v3/__init__.py."
-        )
-    print("  LDOUSDT not in V3_FEATURES_PER_SYMBOL (14-feature fallback)  PASS")
-
-    # iter-v3/038: TRXUSDT MUST NOT be in V3_FEATURES_PER_SYMBOL (unchanged since iter-v3/037).
-    if "TRXUSDT" in V3_FEATURES_PER_SYMBOL:
-        raise RuntimeError(
-            "V3_FEATURES_PER_SYMBOL has 'TRXUSDT' entry — must be ABSENT. "
-            "iter-v3/038: TRX has no per-symbol entry (iter-v3/036 NEGATIVE reverted; "
-            "unchanged through iter-v3/037/038). TRX must use 14-feature fallback. "
-            "Remove TRXUSDT from V3_FEATURES_PER_SYMBOL in features_v3/__init__.py."
-        )
-    print("  TRXUSDT not in V3_FEATURES_PER_SYMBOL (14-feature fallback)  PASS")
-
-    # iter-v3/039: ALGO/LDO/TRX fallback MUST NOT include fracdiff_d05_close or cross_asset.
-    # fracdiff_d05_close is BCH-only per-symbol (iter-v3/038 NEGATIVE confirmed BCH-SPECIFIC).
-    for fallback_sym in ("ALGOUSDT", "LDOUSDT", "TRXUSDT"):
-        fallback_feats = features_for_symbol(fallback_sym)
-        if "fracdiff_d05_close" in fallback_feats:
-            raise RuntimeError(
-                f"{fallback_sym} feature set includes fracdiff_d05_close — must be ABSENT. "
-                "iter-v3/039: fracdiff_d05_close is BCH-only per-symbol. "
-                f"Check features_for_symbol('{fallback_sym}') path."
-            )
-        if "cross_asset_divergence_norm" in fallback_feats:
-            raise RuntimeError(
-                f"{fallback_sym} feature set includes cross_asset_divergence_norm "
-                "— must be ABSENT. iter-v3/039: cross_asset_divergence_norm is dead at "
-                "model level (iter-v3/037 NEGATIVE reverted). "
-                f"Check features_for_symbol('{fallback_sym}') path."
-            )
-        if len(fallback_feats) != 14:
-            raise RuntimeError(
-                f"{fallback_sym} fallback has {len(fallback_feats)} features — "
-                "expected exactly 14 (V3_FEATURE_COLUMNS_TOP_N universal list). "
-                "iter-v3/039: ALGO/LDO/TRX must use the 14-feature anchor."
-            )
     print(
-        "  ALGO/LDO/TRX fallback: 14 features, no fracdiff_d05_close, "
-        "no cross_asset_divergence  PASS"
+        "  V3_ATR_MULTIPLIERS_PER_SYMBOL: 0 entries (empty — all symbols use (2.0, 1.0) default)"
+        "  PASS"
     )
 
-    n_custom = len(V3_FEATURES_PER_SYMBOL)
-    if n_custom != 1:
+    # iter-v3/040: Verify all 4 symbols return 14-feature fallback.
+    for sym in ("BCHUSDT", "ALGOUSDT", "LDOUSDT", "TRXUSDT"):
+        sym_feats = features_for_symbol(sym)
+        if len(sym_feats) != 14:
+            raise RuntimeError(
+                f"{sym} fallback has {len(sym_feats)} features — "
+                "expected exactly 14 (V3_FEATURE_COLUMNS_TOP_N universal list). "
+                "iter-v3/040: all 4 symbols must use the 14-feature anchor (no per-symbol entries)."
+            )
+        if "fracdiff_d05_close" in sym_feats:
+            raise RuntimeError(
+                f"{sym} feature set includes fracdiff_d05_close — must be ABSENT. "
+                "iter-v3/040: fracdiff_d05_close is NOT a model input for any symbol. "
+                f"Check features_for_symbol('{sym}') path."
+            )
+        if "cross_asset_divergence_norm" in sym_feats:
+            raise RuntimeError(
+                f"{sym} feature set includes cross_asset_divergence_norm "
+                "— must be ABSENT. iter-v3/040: cross_asset_divergence_norm dead at "
+                "model level. "
+                f"Check features_for_symbol('{sym}') path."
+            )
+    print("  BCH/ALGO/LDO/TRX: 14-feature universal fallback (no extensions)  PASS")
+
+    # iter-v3/040: LDO ATR multipliers MUST be default (2.0, 1.0).
+    ldo_atr = atr_multipliers_for_symbol("LDOUSDT")
+    if ldo_atr != (2.0, 1.0):
         raise RuntimeError(
-            f"V3_FEATURES_PER_SYMBOL has {n_custom} entries — expected exactly 1 "
-            "(BCHUSDT only). iter-v3/039: ALGO per-symbol entry REVERTED (iter-v3/038 NEGATIVE; "
-            "fracdiff is BCH-SPECIFIC); BCH-only fracdiff targeting is the CONFIRMATION state. "
-            "Check V3_FEATURES_PER_SYMBOL in features_v3/__init__.py."
+            f"atr_multipliers_for_symbol('LDOUSDT') returned {ldo_atr} — expected (2.0, 1.0). "
+            "iter-v3/040: V3_ATR_MULTIPLIERS_PER_SYMBOL is empty; LDO must use DEFAULT "
+            "=(2.0, 1.0) via fallback. "
+            "Verify V3_ATR_MULTIPLIERS_PER_SYMBOL == {{}} in features_v3/__init__.py."
         )
-    print(f"  V3_FEATURES_PER_SYMBOL: {n_custom} symbol with custom feature set (BCH only)  PASS")
+    print("  atr_multipliers_for_symbol('LDOUSDT') = (2.0, 1.0) (default fallback)  PASS")
 
     # regime_momentum_signed_5d MUST be in V3_FEATURE_COLUMNS_TOP_N so
-    # all symbols (BCH via per-symbol + ALGO/TRX/LDO via fallback) use it. The portfolio-level
+    # all symbols use it via the 14-feature universal fallback. The portfolio-level
     # mandate in feedback_v3_engineered_features_proven.md is honored at V3_FEATURE_COLUMNS_TOP_N.
     if "regime_momentum_signed_5d" not in V3_FEATURE_COLUMNS_TOP_N:
         raise RuntimeError(
             "regime_momentum_signed_5d MISSING from V3_FEATURE_COLUMNS_TOP_N — "
-            "BCH+TRX+LDO+ALGO MUST use it (BCH per-symbol entry EXTENDS TOP_N; "
-            "ALGO/TRX/LDO fallback path returns TOP_N directly). "
+            "BCH+TRX+LDO+ALGO MUST use it (all symbols fall back to TOP_N at iter-v3/040). "
             "Portfolio-level mandate from feedback_v3_engineered_features_proven.md. "
             "V3_FEATURE_COLUMNS_TOP_N itself must contain it."
         )

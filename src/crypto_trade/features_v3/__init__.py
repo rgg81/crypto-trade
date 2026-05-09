@@ -444,17 +444,20 @@ V3_NON_FEATURE_COLUMNS: tuple[str, ...] = ("natr_21_raw", "tbr_raw")
                  model input regardless (added iter-v3/016, §3.5 sub-fix #2).
 """
 
-V3_ATR_MULTIPLIERS_PER_SYMBOL: dict[str, tuple[float, float]] = {
-    # iter-v3/032: LDO natr_21_raw median 5.01 vs peer median 3.70 (1.35× higher).
-    # At default (2.0, 1.0) multipliers LDO TP barrier = 10.01%, SL = 5.01% — too wide.
-    # (1.5, 0.75) aligns LDO effective barriers with peer aggregate (LDO/peer TP ratio 1.016).
-    # Source: analysis/iteration_v3-032/per_symbol_atr_eda.py (SHA 9834e84).
-    "LDOUSDT": (1.5, 0.75),
-}
+V3_ATR_MULTIPLIERS_PER_SYMBOL: dict[str, tuple[float, float]] = {}
 """Per-symbol ATR multiplier overrides for iter-v3/032+ labeling architecture.
 
 Maps symbol → (atr_tp_multiplier, atr_sl_multiplier).
 Symbols absent from this dict fall back to DEFAULT_ATR_MULTIPLIERS = (2.0, 1.0).
+
+iter-v3/032: LDOUSDT entry added (1.5, 0.75) — LDO natr_21_raw median 5.01 vs peer
+  median 3.70 (1.35× higher); (1.5, 0.75) aligns LDO effective barriers with peer
+  aggregate. Source: analysis/iteration_v3-032/per_symbol_atr_eda.py (SHA 9834e84).
+iter-v3/040: CLEARED (empty dict). Cycle 3 EXPLORATION #1 — REVERT all per-symbol
+  ATR customizations. LDO reverts to DEFAULT_ATR_MULTIPLIERS = (2.0, 1.0) via fallback.
+  Architecture (this dict + atr_multipliers_for_symbol helper) is KEPT; only emptied.
+  Rationale: iter-v3/039 CONFIRMATION NO-MERGE — per-symbol customizations broke IS
+  aggregate (-0.55 IS Sharpe swing from iter-v3/029 clean-4-symbol anchor).
 """
 
 DEFAULT_ATR_MULTIPLIERS: tuple[float, float] = (2.0, 1.0)
@@ -473,20 +476,7 @@ def atr_multipliers_for_symbol(symbol: str) -> tuple[float, float]:
     return V3_ATR_MULTIPLIERS_PER_SYMBOL.get(symbol, DEFAULT_ATR_MULTIPLIERS)
 
 
-V3_FEATURES_PER_SYMBOL: dict[str, tuple[str, ...]] = {
-    # iter-v3/035: BCH-only fracdiff targeting.
-    # BCH receives all 14 universal features PLUS fracdiff_d05_close (15 total).
-    # TRX/ALGO/LDO fall back to V3_FEATURE_COLUMNS_TOP_N (14 features, no fracdiff).
-    # Evidence: iter-v3/034 showed BCH +37.98 OOS wpnl swing from fracdiff but
-    # TRX -20.11 / ALGO -8.24 / LDO -6.81 regressions when applied universally.
-    # NOTE: BCHUSDT's tuple EXTENDS V3_FEATURE_COLUMNS_TOP_N by one feature;
-    # it is NOT a strict subset. The _verify_feature_columns check in run_baseline_v3.py
-    # enforces this explicitly (len==15 AND fracdiff_d05_close present).
-    # iter-v3/038: ALGO entry ADDED (fracdiff_d05_close; tests fracdiff specificity).
-    # iter-v3/039: ALGO entry REMOVED (iter-v3/038 NEGATIVE — ALGO does NOT benefit from
-    # fracdiff; fracdiff is BCH-SPECIFIC; ALGO returns to 14-feature fallback).
-    "BCHUSDT": V3_FEATURE_COLUMNS_TOP_N + ("fracdiff_d05_close",),
-}
+V3_FEATURES_PER_SYMBOL: dict[str, tuple[str, ...]] = {}
 """Per-symbol feature overrides for v3 models (iter-v3/030+).
 
 Maps symbol → tuple of feature column names to pass to LightGbmStrategy.
@@ -513,20 +503,21 @@ iter-v3/038: LDO entry REMOVED (iter-v3/037 NEGATIVE reverted). ALGO entry ADDED
 iter-v3/039: ALGO entry REMOVED (iter-v3/038 NEGATIVE reverted). Dict has 1 entry (BCHUSDT only).
              ALGO returns to 14-feature fallback. BCH unchanged (15 features: 14 + fracdiff).
              LDO/TRX/ALGO: 14-feature fallback. BCH is the ONLY per-symbol fracdiff beneficiary.
-             This is the iter-v3/035 bundle state — CONFIRMATION of the 4-ingredient bundle.
+             CONFIRMATION of iter-v3/035 bundle — NO-MERGE: per-symbol customizations broke IS.
+iter-v3/040: CLEARED (empty dict). Cycle 3 EXPLORATION #1 — REVERT all per-symbol feature
+             overrides. BCH reverts to 14-feature V3_FEATURE_COLUMNS_TOP_N fallback (same as
+             ALGO/LDO/TRX). Architecture (this dict + features_for_symbol helper) is KEPT;
+             only the dict contents are emptied. Rationale: iter-v3/039 NO-MERGE — cumulative
+             per-symbol customizations caused ~-0.55 IS Sharpe swing from iter-v3/029 anchor.
+             iter-v3/040 verifies that clearing per-symbol customizations restores IS anchor.
 
-IMPORTANT INVARIANT (iter-v3/035+):
-- per-symbol entries EXTEND V3_FEATURE_COLUMNS_TOP_N by exactly one column.
-- Extension features must exist in the generated parquet (computed by
-  add_engineered_v3_features for ALL symbols).
-
-Enforced by _verify_feature_columns in run_baseline_v3.py (iter-v3/039):
-    len(V3_FEATURES_PER_SYMBOL["BCHUSDT"]) == 15
-    "fracdiff_d05_close" in V3_FEATURES_PER_SYMBOL["BCHUSDT"]
-    "ALGOUSDT" not in V3_FEATURES_PER_SYMBOL  (iter-v3/038 NEGATIVE reverted)
-    "LDOUSDT" not in V3_FEATURES_PER_SYMBOL  (LDO reverted to 14-feature fallback)
-    "TRXUSDT" not in V3_FEATURES_PER_SYMBOL  (TRX unchanged — no per-symbol entry)
-    len(V3_FEATURES_PER_SYMBOL) == 1         (BCHUSDT only)
+Enforced by _verify_feature_columns in run_baseline_v3.py (iter-v3/040):
+    len(V3_FEATURES_PER_SYMBOL) == 0  (empty — no per-symbol entries)
+    "BCHUSDT" not in V3_FEATURES_PER_SYMBOL
+    "ALGOUSDT" not in V3_FEATURES_PER_SYMBOL
+    "LDOUSDT" not in V3_FEATURES_PER_SYMBOL
+    "TRXUSDT" not in V3_FEATURES_PER_SYMBOL
+    features_for_symbol("BCHUSDT") == V3_FEATURE_COLUMNS_TOP_N  (14 features, no fracdiff)
     "fracdiff_d05_close" not in V3_FEATURE_COLUMNS_TOP_N
     "cross_asset_divergence_norm" not in V3_FEATURE_COLUMNS_TOP_N
     "vol_adj_autocorr" not in V3_FEATURE_COLUMNS_TOP_N
@@ -538,21 +529,20 @@ def features_for_symbol(symbol: str) -> tuple[str, ...]:
 
     Introduced in iter-v3/030 to support per-symbol model heterogeneity.
 
-    iter-v3/039 (CONFIRMATION — iter-v3/035 bundle state restored):
-    - BCHUSDT: returns 15 features = V3_FEATURE_COLUMNS_TOP_N + ("fracdiff_d05_close",)
-      (per-symbol entry established at iter-v3/035; UNCHANGED through iter-v3/039)
-    - ALGOUSDT: returns 14 features = V3_FEATURE_COLUMNS_TOP_N (fallback)
-      (ALGOUSDT per-symbol entry REVERTED from iter-v3/038 NEGATIVE — ALGO does NOT benefit
-      from fracdiff; fracdiff is BCH-SPECIFIC; ALGO returns to 14-feature fallback)
-    - LDOUSDT: returns 14 features = V3_FEATURE_COLUMNS_TOP_N (fallback)
-      (LDOUSDT reverted from iter-v3/037 NEGATIVE — cross_asset_divergence_norm removed)
+    iter-v3/040 (EXPLORATION — cycle 3 #1 — REVERT all per-symbol customizations):
+    - V3_FEATURES_PER_SYMBOL is EMPTY (cleared at iter-v3/040). All symbols fall back
+      to V3_FEATURE_COLUMNS_TOP_N (14 features). No per-symbol feature overrides exist.
+    - BCHUSDT: returns 14 features = V3_FEATURE_COLUMNS_TOP_N (fallback; REVERTED from
+      iter-v3/035-039 BCH-only fracdiff per-symbol entry; fracdiff_d05_close ABSENT)
+    - ALGOUSDT: returns 14 features = V3_FEATURE_COLUMNS_TOP_N (fallback; unchanged)
+    - LDOUSDT: returns 14 features = V3_FEATURE_COLUMNS_TOP_N (fallback; unchanged)
     - TRXUSDT: returns 14 features = V3_FEATURE_COLUMNS_TOP_N (fallback; unchanged)
-    - Any other symbol not in V3_FEATURES_PER_SYMBOL: fallback to 14-feature universal set
+    - Any other symbol: fallback to 14-feature universal set
 
-    V3_FEATURES_PER_SYMBOL has 1 entry at iter-v3/039 (BCHUSDT only).
-    BCH per-symbol extension feature: fracdiff_d05_close (BCH-SPECIFIC confirmed by
-    iter-v3/038 EXPLORATION — ALGO null/negative result).
-    ALGO/LDO/TRX use 14-feature universal fallback (no per-symbol extension).
+    V3_FEATURES_PER_SYMBOL is empty at iter-v3/040 (0 entries).
+    All 4 symbols (BCH/LDO/TRX/ALGO) use the 14-feature universal fallback.
+    fracdiff_d05_close is NOT a model input for any symbol at iter-v3/040
+    (column still computed in parquets but excluded from all feature_columns lists).
 
     Callers MUST pass ``feature_columns=list(features_for_symbol(symbol))``
     to LightGbmStrategy — never None, never empty, never the global default.
