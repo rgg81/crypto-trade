@@ -8,7 +8,7 @@ OVERALL: PASS
   (`ldo_diagnosis.csv`, `synthesis.md`, `candidate_axes_ranking.md`).
 - Brief SHA `4e2f699` — research brief (this iteration, single revision; no orchestrator-pick
   predecessor per `feedback_v3_axis_selection_quant_discipline.md`).
-- Setup commit SHA: <to be filled at setup commit>.
+- Setup commit SHA `a6961a4` — feat(iter-v3/045): per-symbol ATR widening for LDOUSDT (2.0, 1.5).
 - This gate authored against committed brief.
 
 ## Per-Section Status

@@ -534,8 +534,9 @@ IS→OOS exit-composition shift (SL:TP doubling); wider SL targets it mechanical
 mirrors iter-v3/044 PROMISING ALGO ATR (2.0, 1.5). Cleanest single-axis test; lowest-risk
 candidate from the 5-axis ranking.
 
-**Setup commit SHA**: <to be filled at setup commit; brief committed FIRST per Phase 5.5
-discipline; setup commit must reference brief SHA>.
+**Setup commit SHA**: `a6961a4` (feat(iter-v3/045): per-symbol ATR widening for LDOUSDT
+(2.0, 1.5); brief committed FIRST at `4e2f699`; Phase 5.5 gate at `29977ae`; setup commit
+follows the EDA + brief + gate sequence per `feedback_v3_axis_selection_quant_discipline.md`).
 **Phase 5.5 verification**: brief Section 2 numerical evidence committed BEFORE setup
 commit (committed at `ed949fe`); brief is iter-v3/045 single-rev (no orchestrator-pick
 predecessor).
