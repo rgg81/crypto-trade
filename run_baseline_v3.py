@@ -103,7 +103,7 @@ def _derive_ensemble_seeds(outer_seed: int, size: int = ENSEMBLE_SIZE) -> list[i
     return [int(s) for s in rng.integers(low=0, high=2**31 - 1, size=size)]
 
 
-ITERATION_LABEL = "v3-049"
+ITERATION_LABEL = "v3-050"
 REPORTS_DIR = Path("reports-v3")
 FEATURES_DIR = Path("data/features_v3")
 DATA_DIR = Path("data")
@@ -625,30 +625,28 @@ def _verify_feature_columns() -> None:
         )
     print("  efficiency_ratio_50 ABSENT from V3_FEATURE_COLUMNS_TOP_N (DROPPED iter-v3/044)  PASS")
 
-    # iter-v3/049: Verify per-symbol ADX threshold override is wired correctly.
-    # Build a TRXUSDT model (quick -- n_trials=1 just to get the config) and check
-    # that adx_threshold_per_symbol == {"TRXUSDT": 21.0}.
+    # iter-v3/050: Verify per-symbol ADX threshold is EMPTY (iter-v3/049 TRX 21 DROPPED).
+    # Critic FINAL `1908d50` recommendation #2: adx_threshold_per_symbol reverts to {}.
     _trx_cfg_check, trx_strat_check = _build_v3_model(
         symbol="TRXUSDT", seed=42, n_trials=1, ensemble_seeds=[42]
     )
     if not isinstance(trx_strat_check, RiskV3Wrapper):
         raise RuntimeError(
             f"_build_v3_model(TRXUSDT) returned {type(trx_strat_check).__name__} — "
-            "expected RiskV3Wrapper. iter-v3/049: per-symbol ADX threshold check requires "
+            "expected RiskV3Wrapper. iter-v3/050: per-symbol ADX DROP check requires "
             "RiskV3Wrapper. Check _build_v3_model returns RiskV3Wrapper."
         )
-    if trx_strat_check.config.adx_threshold_per_symbol != {"TRXUSDT": 21.0}:
+    if trx_strat_check.config.adx_threshold_per_symbol != {}:
         raise RuntimeError(
             f"RiskV2Config.adx_threshold_per_symbol = "
-            f"{trx_strat_check.config.adx_threshold_per_symbol} — expected "
-            "{'TRXUSDT': 21.0}. iter-v3/049: per-symbol ADX threshold raise for TRX "
-            "only (20 → 21) per QR EDA SHA `ba8a3de`. "
-            "Set adx_threshold_per_symbol={'TRXUSDT': 21.0} in RiskV2Config init "
-            "in _build_v3_model."
+            f"{trx_strat_check.config.adx_threshold_per_symbol} — expected {{}} (EMPTY). "
+            "iter-v3/050: per-symbol ADX DROPPED per Critic FINAL `1908d50` rec #2 "
+            "(axis CLOSED for cycle 3). "
+            "Set adx_threshold_per_symbol={{}} in RiskV2Config init in _build_v3_model."
         )
     print(
-        "  Per-symbol ADX threshold (iter-v3/049): {'TRXUSDT': 21.0}; "
-        "BCH/LDO/ALGO unchanged at global 20.0  PASS"
+        "  Per-symbol ADX threshold (iter-v3/050): {} (EMPTY — TRX 21 DROPPED per Critic FINAL "
+        "`1908d50` rec #2; global ADX threshold 20.0 applies to all symbols)  PASS"
     )
 
 
@@ -1369,14 +1367,10 @@ def _build_v3_model(
         # iter-v3/047 (BCH SHORT is the positive contributor).
         block_long_for=("BCHUSDT",),
         block_short_for=(),
-        # iter-v3/049: per-symbol ADX threshold raise for TRX only (20.0 → 21.0).
-        # QR EDA SHA `ba8a3de` (analysis/iteration_v3-049/axis_e_with_primitive10_carry.py):
-        # 9 TRX IS trades at ADX 20-21 had collective wpnl -4.77 (every one a net-EV
-        # loser); 2 OOS trades at same range had collective wpnl -0.01 (negligible).
-        # BOTH-must-improve PASSES at single-seed EDA stage. BCH/LDO/ALGO unchanged
-        # at global 20.0 — primitive 10 absorbs BCH-LONG ADX-low toxicity; LDO/ALGO
-        # ADX-low buckets are OOS-positive and cannot be safely blocked.
-        adx_threshold_per_symbol={"TRXUSDT": 21.0},
+        # iter-v3/050: per-symbol ADX threshold DROP (iter-v3/049 TRX 21 REVERTED).
+        # Critic FINAL `1908d50` recommendation #2: axis CLOSED for cycle 3.
+        # adx_threshold_per_symbol reverts to empty dict (global-only ADX threshold=20.0).
+        adx_threshold_per_symbol={},
     )
     strategy = RiskV3Wrapper(m1, risk_cfg)
     return cfg, strategy
