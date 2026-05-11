@@ -274,8 +274,38 @@ V3_FEATURE_COLUMNS_TOP_N: tuple[str, ...] = (
     # compute_vol_normalized_ret_5d retained as dead code in engineered_v3.py (zero revert
     # cost; available for future per-symbol experiments per iter-v3/048 diary §Architectural
     # Decisions). NOT dispatched when absent from V3_FEATURE_COLUMNS_TOP_N.
+    # iter-v3/051: fracdiff_d05_close ADDED at universal scope (14 → 15) — cycle 4 #1
+    # EXPLORATION axis. NEW universal engineered feature axis RE-OPENED for cycle 4 per
+    # iter-v3/050 diary §Cycle 4 Priorities axis #1 and Critic FINAL `b6339c5` rec #5.
+    # fracdiff_d05_close = LdP AFML Ch. 5 Fixed-Width Window Fractional Differentiation
+    # at d=0.5 applied to close. Theoretically: preserves long-memory while achieving
+    # stationarity (LdP empirical sweet-spot d=0.5; d→0 = non-stationary; d→1 = memory loss).
+    # Already implemented (compute_fracdiff_d05_close in engineered_v3.py); already in all
+    # 4 symbol parquets (BCH/LDO/TRX/ALGO; ALGO available for future re-inclusion after
+    # system-level REVERT to 3-sym universe at iter-v3/051).
+    # iter-v3/035 BCH-only PROMISING precedent (+37.98 OOS swing for BCH at single-seed
+    # n_trials=10); universal scope UNTESTED at multi-seed per /050 diary recommendation.
+    # EDA evidence (`analysis/iteration_v3-051/axis_c_fracdiff_*.csv` SHA `290f37b`):
+    # - ADF stationary at p<0.05 across all 4 symbols (BCH/LDO/TRX/ALGO p≈0)
+    # - IC carve-out PASS: max |IC| = 0.7381 with vwap_dev_20 at LDO (source close-derived
+    #   primitive; Category 2 carve-out per `feedback_v3_engineered_feature_pivot.md`);
+    #   post-carve-out max |IC| = 0.6721 with regime_momentum_signed_5d < 0.70 strict gate
+    # - Univariate Spearman significant at all 4 symbols (mean ρ = -0.044 negative
+    #   mean-reversion signal; p<0.05 for BCH/LDO/TRX/ALGO)
+    # Per `feedback_v3_engineered_feature_pivot.md` Category 2 carve-out applies.
+    # Per `feedback_v3_engineered_features_proven.md` (iter-v3/025 regime_momentum
+    # PROMISING precedent + iter-v3/028 multi-seed CONFIRMATION-MERGE): composed
+    # engineered features CAN work at universal scope.
+    # System-level REVERT to iter-v3/028 architecture (V3_MODELS=3-sym; V3_ATR_MULTIPLIERS_
+    # PER_SYMBOL={}; block_long_for=(); REQUIRED_GAP=66) per
+    # `feedback_v3_per_symbol_lifts_oos_breaks_is.md` UPDATED 2026-05-10 (second-cycle
+    # confirmation of per-symbol-customization anti-pattern at iter-v3/039 + iter-v3/050).
+    "fracdiff_d05_close",
 )
-"""Top-14 feature subset (as of iter-v3/049): vol_normalized_ret_5d DROPPED (15 → 14).
+"""Top-15 feature subset (as of iter-v3/051): fracdiff_d05_close ADDED (14 → 15).
+iter-v3/051: fracdiff_d05_close ADDED at universal scope per cycle 4 #1 EXPLORATION axis.
+System-level REVERT to iter-v3/028 architecture (V3_MODELS=3-sym BCH+LDO+TRX; ALGO REVERTED;
+V3_ATR_MULTIPLIERS_PER_SYMBOL={}; block_long_for=(); REQUIRED_GAP=66).
 iter-v3/049: vol_normalized_ret_5d DROPPED per iter-v3/048 PATH C-clean closeout.
 iter-v3/048 ranked vol_normalized_ret_5d 13-15/15 across all 4 symbols (IS Sharpe Δ -0.43
 + OOS Sharpe Δ -3.15 vs iter-v3/045 anchor); saturation rule fires — NEW universal
@@ -576,37 +606,16 @@ V3_NON_FEATURE_COLUMNS: tuple[str, ...] = ("natr_21_raw", "tbr_raw")
 """
 
 V3_ATR_MULTIPLIERS_PER_SYMBOL: dict[str, tuple[float, float]] = {
-    # iter-v3/044: ALGOUSDT entry added (2.0, 1.5) — TP unchanged, SL widened by 50%.
-    # QR EDA SHA `eff841e` (analysis/iteration_v3-044/cycle3_is_diagnosis.py): ALGO LONG
-    # is the single largest IS attribution loss (33 trades, -53.26 PnL, 18.2% IS WR /
-    # 11.1% OOS WR; pattern persists OOS). ALGO LONG SL/TP exit ratio is 27/6 = 4.5:1;
-    # average SL pnl_pct -5.24, average TP pnl_pct +6.12. Wider SL gives bear-trend
-    # longs more time to reach TP (mean SL of -5.24% becomes -7.86% threshold) without
-    # changing entry signal. Symmetric per-direction (also widens ALGO short SL,
-    # which is currently at 14/14 SL/TP balance — wider SL may help shorts reach TP too).
-    # Proven mechanism per iter-v3/032 LDO ATR success.
-    "ALGOUSDT": (2.0, 1.5),
-    # iter-v3/045: LDOUSDT entry added (2.0, 1.5) — TP unchanged, SL widened by 50%.
-    # QR EDA SHA `ed949fe` (analysis/iteration_v3-045/ldo_bottleneck_diagnosis.py):
-    # LDO IS->OOS exit-composition shift (the binding constraint) — SL:TP ratio 1.14 IS
-    # -> 2.33 OOS; SL rate 53.3% IS -> 63.6% OOS; TP rate 46.7% IS -> 27.3% OOS. LDO IS
-    # @ iter-v3/044 is +41.85% PnL (positive contributor); LDO OOS @ iter-v3/044 is
-    # -3.07% PnL (small drag). Direction asymmetry structurally insignificant (1 LONG
-    # OOS trade). Wider SL targets the IS->OOS regime-shift directly, mirroring
-    # iter-v3/044 PROMISING ALGO ATR mechanism. LDO regime mismatch (natr 1.35x peer
-    # median per iter-v3/032 EDA) is structural; wider absolute SL aligns with LDO's
-    # natural volatility regime. NOT the iter-v3/032 (1.5, 0.75) tighter-barrier path
-    # which was MULTI-SEED-FALSIFIED at iter-v3/039 — this is the OPPOSITE direction.
-    "LDOUSDT": (2.0, 1.5),
-    # iter-v3/047: BCHUSDT entry REMOVED — iter-v3/046 widened BCH SL to (2.0, 1.5) on
-    # the hypothesis that wider SL helps BCH symmetrically across IS+OOS (BCH SL:TP
-    # stable at 1.93). Result: BCH IS-axis collapse (Δ -0.54 IS Sharpe) + OOS -45 swing
-    # (BCH OOS PnL +10.75 → -34.54). Mirror mechanism FAILED on stable-SL:TP symbols.
-    # Critic FINAL `5dae6d6`: "Stable SL:TP across IS/OOS = WRONG axis. Wider-SL
-    # mechanism is REGIME-MISMATCH-SPECIFIC." BCH reverts to DEFAULT_ATR_MULTIPLIERS
-    # = (2.0, 1.0) via fallback. The per-symbol-ATR axis is CLOSED for BCH; iter-v3/047
-    # pivots to a BCH direction-asymmetric axis (LONG IS -25% toxic / SHORT IS +49%
-    # positive — direction filter or LONG-only ATR may help).
+    # iter-v3/051: REVERT to empty dict per system-level rule
+    # `feedback_v3_per_symbol_lifts_oos_breaks_is.md` UPDATED 2026-05-10 (second-cycle
+    # confirmation of per-symbol-customization anti-pattern at iter-v3/039 + iter-v3/050
+    # CONFIRMATION-NO-MERGE). All 3 symbols (BCH/LDO/TRX) fall back to
+    # DEFAULT_ATR_MULTIPLIERS = (2.0, 1.0). ALGOUSDT and LDOUSDT per-symbol entries
+    # REVERTED. Cycle 4 starting baseline = iter-v3/028 architecture exactly.
+    # Per `analysis/iteration_v3-051/synthesis.md` SHA `290f37b`.
+    # History: {} (iter-v3/040 cycle 3 REVERT) → ALGOUSDT (2.0,1.5) added iter-v3/044
+    #   → LDOUSDT (2.0,1.5) added iter-v3/045 → BCHUSDT added+removed iter-v3/046/047
+    #   → {} (iter-v3/051 system-level REVERT; current state).
 }
 """Per-symbol ATR multiplier overrides for iter-v3/032+ labeling architecture.
 
@@ -650,6 +659,14 @@ iter-v3/047: BCHUSDT entry REMOVED — REVERT iter-v3/046 per Critic FINAL recom
   -25% toxic / SHORT IS +49% positive) requires a DIRECTION-ASYMMETRIC mechanism, not
   a symmetric labeling-layer adjustment. iter-v3/047 axis = QR EDA-driven BCH direction
   axis (specific axis chosen by QR EDA at SHA TBD).
+iter-v3/051: CLEARED (empty dict) — SYSTEM-LEVEL REVERT to iter-v3/028 architecture.
+  Per `feedback_v3_per_symbol_lifts_oos_breaks_is.md` UPDATED 2026-05-10 (second-cycle
+  confirmation of per-symbol-customization anti-pattern; iter-v3/039 + iter-v3/050 both
+  CONFIRMATION-NO-MERGE on per-symbol bundle). ALGOUSDT and LDOUSDT entries REVERTED.
+  All 3 symbols (BCH/LDO/TRX) fall back to DEFAULT_ATR_MULTIPLIERS = (2.0, 1.0).
+  Architecture (this dict + atr_multipliers_for_symbol helper) is KEPT; only emptied.
+  Cycle 4 starting baseline = iter-v3/028 architecture exactly.
+  Per analysis/iteration_v3-051/synthesis.md SHA `290f37b`.
 """
 
 DEFAULT_ATR_MULTIPLIERS: tuple[float, float] = (2.0, 1.0)
