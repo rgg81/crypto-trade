@@ -309,19 +309,16 @@ def _verify_feature_columns() -> None:
             "at iter-v3/044. feedback_v3_engineered_features_proven.md mandate ACTIVE. "
             "Add it to V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
         )
-    # iter-v3/052: regime_momentum_signed_3d UNIVERSAL ACTIVATED (was dead code since /044).
-    # PIVOT from orchestrator-mandated LDO-removal axis (pre-falsified by /052 EDA SHA `0a10581`).
-    # QR EDA (SHA `290f37b`) backed /051 RANKED #2: IC strict-gate PASS (max|IC|=0.6192<0.70),
-    # ADF stationary p=0 all 4 syms, univariate ρ -0.057 mean (stronger than fracdiff -0.044).
-    # /044 ALGO LONG falsification is CONDITIONAL on ALGO universe — ALGO REVERTED at /051+/052.
-    # compute_regime_momentum_signed_3d dispatch ACTIVATED in add_engineered_v3_features at /052.
-    if "regime_momentum_signed_3d" not in V3_FEATURE_COLUMNS:
+    # iter-v3/053: regime_momentum_signed_3d PARKED (DROPPED per /052 PATH C-suspicious).
+    # Critic FINAL `34cc46f` rec #2: pivot to structurally distinct feature family.
+    # compute_regime_momentum_signed_3d dispatch RETAINED as dead code (zero revert cost).
+    if "regime_momentum_signed_3d" in V3_FEATURE_COLUMNS:
         raise RuntimeError(
-            "regime_momentum_signed_3d NOT FOUND in V3_FEATURE_COLUMNS — must be PRESENT at "
-            "iter-v3/052. SWAP: regime_momentum_signed_3d REPLACES fracdiff_d05_close as 15th "
-            "element. QR-EDA-backed /051 RANKED #2 (SHA `290f37b`). "
-            "Add 'regime_momentum_signed_3d' as 15th element of V3_FEATURE_COLUMNS_TOP_N "
-            "in src/crypto_trade/features_v3/__init__.py."
+            "regime_momentum_signed_3d FOUND in V3_FEATURE_COLUMNS — must be ABSENT at "
+            "iter-v3/053. PARKED per /052 PATH C-suspicious closeout (rank 14-15/15 all "
+            "3 symbols; IS-OOS daily ratio 2.327 OUT-OF-BAND). Critic `34cc46f` rec #2. "
+            "Remove 'regime_momentum_signed_3d' from V3_FEATURE_COLUMNS_TOP_N in "
+            "src/crypto_trade/features_v3/__init__.py."
         )
     # sym_vs_btc_ret_7d MUST be present (RESTORED at iter-v3/042; KEPT at iter-v3/044).
     if "sym_vs_btc_ret_7d" not in V3_FEATURE_COLUMNS:
