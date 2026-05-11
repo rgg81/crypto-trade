@@ -838,7 +838,7 @@ QR EDA per `feedback_v3_axis_selection_quant_discipline.md` rule 3-4.**
 
 ### 10.1 — Setup commit SHA backfill
 
-Setup commit SHA: (to be backfilled after Phase 6 setup commit)
+Setup commit SHA: `abc52dc` — `feat(iter-v3/053): SWAP hurst_drift_50_200 in / regime_momentum_signed_3d out of V3_FEATURE_COLUMNS_TOP_N` (fix: `d16d7bb` — stale 3d MUST-BE-PRESENT check in _verify_feature_columns)
 
 ### 10.2 — EDA commit SHA
 
