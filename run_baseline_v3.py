@@ -103,7 +103,7 @@ def _derive_ensemble_seeds(outer_seed: int, size: int = ENSEMBLE_SIZE) -> list[i
     return [int(s) for s in rng.integers(low=0, high=2**31 - 1, size=size)]
 
 
-ITERATION_LABEL = "v3-054"
+ITERATION_LABEL = "v3-055"
 REPORTS_DIR = Path("reports-v3")
 FEATURES_DIR = Path("data/features_v3")
 DATA_DIR = Path("data")
@@ -618,45 +618,27 @@ def _verify_feature_columns() -> None:
         "dropped at iter-v3/050; global ADX threshold 20.0 applies to all 3 symbols)  PASS"
     )
 
-    # iter-v3/054: Primitive 11 (per-symbol drawdown brake) MUST be ENABLED.
-    # enable_per_symbol_drawdown_brake=True in RiskV2Config in _build_v3_model.
-    # Calibrated thresholds: T=10.0, recovery=5.0, window=30 days (IS-derived per EDA
-    # SHA e565b82 per_symbol_drawdown_brake_eda.py).
+    # iter-v3/055: Primitive 11 (per-symbol drawdown brake) MUST be DISABLED.
+    # CLOSED-mechanism per iter-v3/054 closeout: brake deadlock suppressed all OOS trades.
+    # Backward-compatible defaults (T=10.0, recovery=5.0, window=30) retained in config.
     _p11_cfg_check, p11_strat_check = _build_v3_model(
         symbol="BCHUSDT", seed=42, n_trials=1, ensemble_seeds=[42]
     )
     if not isinstance(p11_strat_check, RiskV3Wrapper):
         raise RuntimeError(
             f"_build_v3_model returned {type(p11_strat_check).__name__} — expected RiskV3Wrapper. "
-            "iter-v3/054: primitive 11 check requires RiskV3Wrapper."
+            "iter-v3/055: primitive 11 check requires RiskV3Wrapper."
         )
-    if not p11_strat_check.config.enable_per_symbol_drawdown_brake:
+    if p11_strat_check.config.enable_per_symbol_drawdown_brake:
         raise RuntimeError(
-            "RiskV2Config.enable_per_symbol_drawdown_brake = False — expected True. "
-            "iter-v3/054: per-symbol drawdown brake (primitive 11) must be ENABLED. "
-            "Set enable_per_symbol_drawdown_brake=True in RiskV2Config in _build_v3_model."
-        )
-    if p11_strat_check.config.drawdown_brake_threshold_wpnl != 10.0:
-        raise RuntimeError(
-            f"RiskV2Config.drawdown_brake_threshold_wpnl = "
-            f"{p11_strat_check.config.drawdown_brake_threshold_wpnl} — expected 10.0. "
-            "iter-v3/054: IS-calibrated threshold from QR EDA SHA e565b82."
-        )
-    if p11_strat_check.config.drawdown_brake_recovery_wpnl != 5.0:
-        raise RuntimeError(
-            f"RiskV2Config.drawdown_brake_recovery_wpnl = "
-            f"{p11_strat_check.config.drawdown_brake_recovery_wpnl} — expected 5.0. "
-            "iter-v3/054: T/2 Carver-canonical recovery threshold."
-        )
-    if p11_strat_check.config.drawdown_brake_window_days != 30:
-        raise RuntimeError(
-            f"RiskV2Config.drawdown_brake_window_days = "
-            f"{p11_strat_check.config.drawdown_brake_window_days} — expected 30. "
-            "iter-v3/054: 30-day Carver-canonical rolling window."
+            "RiskV2Config.enable_per_symbol_drawdown_brake = True — expected False. "
+            "iter-v3/055: per-symbol drawdown brake (primitive 11) must be DISABLED "
+            "(CLOSED-mechanism per iter-v3/054 closeout). "
+            "Set enable_per_symbol_drawdown_brake=False in RiskV2Config in _build_v3_model."
         )
     print(
-        "  Primitive 11 (per-symbol drawdown brake): enable=True, T=10.0, "
-        "recovery=5.0, window=30d (iter-v3/054 NEW risk primitive)  PASS"
+        "  Primitive 11 (per-symbol drawdown brake): enable=False "
+        "(CLOSED-mechanism per iter-v3/054 closeout)  PASS"
     )
 
 
@@ -1378,15 +1360,13 @@ def _build_v3_model(
         # Critic FINAL `1908d50` recommendation #2: axis CLOSED for cycle 3.
         # adx_threshold_per_symbol reverts to empty dict (global-only ADX threshold=20.0).
         adx_threshold_per_symbol={},
-        # iter-v3/054: primitive 11 — per-symbol drawdown brake (NEW risk primitive).
-        # 30-day rolling-window weighted_pnl drawdown brake (Carver Leveraged Trading Ch. 11).
-        # IS-calibrated thresholds from QR EDA at SHA e565b82 (analysis/iteration_v3-054/
-        # per_symbol_drawdown_brake_eda.py): T=10.0 wpnl fires on 5 LDO OOS trades + 2 BCH IS
-        # trades at /053 trade roster ORACLE counterfactual (IS Δ +4.39 wpnl; OOS Δ +12.51).
-        enable_per_symbol_drawdown_brake=True,
-        drawdown_brake_threshold_wpnl=10.0,
-        drawdown_brake_recovery_wpnl=5.0,
-        drawdown_brake_window_days=30,
+        # iter-v3/055: per-symbol drawdown brake DISABLED (CLOSED-mechanism per /054 closeout).
+        # /054 PATH C-clean confirmed deadlock: brake permanently suppressed all OOS trades.
+        # Fields retained as backward-compatible defaults; only enable flag changes.
+        enable_per_symbol_drawdown_brake=False,  # per iter-v3/054 closeout (CLOSED-mechanism)
+        drawdown_brake_threshold_wpnl=10.0,  # retained as backward-compatible default
+        drawdown_brake_recovery_wpnl=5.0,  # retained as backward-compatible default
+        drawdown_brake_window_days=30,  # retained as backward-compatible default
     )
     strategy = RiskV3Wrapper(m1, risk_cfg)
     return cfg, strategy
@@ -1549,8 +1529,10 @@ def _write_dsr_json(
     n_trials: int,
     n_eff: int,
     min_trl_months: float,
+    dsr_relative: float = 0.0,
+    cpcv_path_sharpe_q75: float = 0.0,
 ) -> None:
-    """Write dsr.json — includes PBO metadata."""
+    """Write dsr.json — includes PBO metadata and iter-v3/055 DSR_relative fields."""
     pbo_out = pbo_result.pbo if pbo_result.pbo is not None else None
     data = {
         "dsr": round(dsr_val, 8),
@@ -1561,6 +1543,8 @@ def _write_dsr_json(
         "pbo_path_sharpe_q50": round(pbo_result.path_sharpe_quartiles[1], 4),
         "pbo_path_sharpe_q75": round(pbo_result.path_sharpe_quartiles[2], 4),
         "psr": round(psr_val, 4),
+        "dsr_relative": round(dsr_relative, 6),  # iter-v3/055: PSR vs CPCV Q75
+        "cpcv_path_sharpe_q75": round(cpcv_path_sharpe_q75, 6),  # iter-v3/055: benchmark
         "n_trials": n_trials,
         "n_eff": n_eff,
         "min_trl_months": round(min_trl_months, 2),
@@ -1568,7 +1552,8 @@ def _write_dsr_json(
     (report_dir / "dsr.json").write_text(json.dumps(data, indent=2))
     print(
         f"[v3 report] dsr.json: DSR={dsr_val:.4f}, PBO={pbo_out}, "
-        f"frac_pos_paths={pbo_result.frac_positive_paths:.3f}, PSR={psr_val:.4f}, n_eff={n_eff}"
+        f"frac_pos_paths={pbo_result.frac_positive_paths:.3f}, PSR={psr_val:.4f}, "
+        f"DSR_relative={dsr_relative:.4f}, CPCV_Q75={cpcv_path_sharpe_q75:.4f}, n_eff={n_eff}"
     )
 
 
@@ -2184,7 +2169,44 @@ def main() -> None:
             kurtosis=oos_kt,
         )
     else:
+        raw_sharpe_oos = 0.0
+        oos_sk = 0.0
+        oos_kt = 3.0
         psr_val = 0.0
+
+    # DSR_relative — PSR with CPCV path Sharpe Q75 benchmark (iter-v3/055)
+    # Per `analysis/iteration_v3-055/synthesis.md` Section R5: replaces structural
+    # DSR=0 artifact with within-iteration null discipline. Reference: AFML Ch. 14
+    # + Bailey-LdP (2014) JPM "Deflated Sharpe Ratio".
+    cpcv_path_sharpe_q75 = 0.0
+    cpcv_paths_csv = REPORTS_DIR / f"iteration_{ITERATION_LABEL}" / "cpcv_paths.csv"
+    if cpcv_paths_csv.exists():
+        try:
+            _cpcv_df_tmp = pd.read_csv(cpcv_paths_csv)
+            if "sharpe" in _cpcv_df_tmp.columns and len(_cpcv_df_tmp) >= 4:
+                cpcv_path_sharpe_q75 = float(np.percentile(_cpcv_df_tmp["sharpe"], 75))
+                print(
+                    f"[dsr_relative] CPCV path Q75 Sharpe = {cpcv_path_sharpe_q75:.4f} "
+                    f"(from {len(_cpcv_df_tmp)} paths)"
+                )
+        except Exception as e:
+            print(f"[dsr_relative] Could not read cpcv_paths.csv: {e}")
+            cpcv_path_sharpe_q75 = 0.0
+    else:
+        print("[dsr_relative] cpcv_paths.csv not found — cpcv_path_sharpe_q75 = 0.0 (fallback)")
+
+    # Compute DSR_relative using existing psr() function with non-zero benchmark
+    if len(oos_wp) > 1 and oos_wp.std() > 0:
+        dsr_relative = psr(
+            observed_sharpe=raw_sharpe_oos,
+            n_obs=len(oos_wp),
+            skewness=oos_sk,
+            kurtosis=oos_kt,
+            benchmark_sharpe=cpcv_path_sharpe_q75,
+        )
+    else:
+        dsr_relative = 0.0
+    print(f"[dsr_relative] DSR_relative = {dsr_relative:.4f} (benchmark = CPCV Q75)")
 
     # N_eff: sub-fix #2 (iter-v3/004) — per-cell median aggregation.
     # Reads per_cell_pbo.csv written by _compute_cpcv_paths (which already
@@ -2300,7 +2322,17 @@ def main() -> None:
         pd.DataFrame().to_csv(ic_path)
 
     # DSR JSON
-    _write_dsr_json(report_dir, dsr_val, pbo_result, psr_val, n_trials_total, n_eff, min_trl_months)
+    _write_dsr_json(
+        report_dir,
+        dsr_val,
+        pbo_result,
+        psr_val,
+        n_trials_total,
+        n_eff,
+        min_trl_months,
+        dsr_relative=dsr_relative,
+        cpcv_path_sharpe_q75=cpcv_path_sharpe_q75,
+    )
 
     # Sub-fix #5 (iter-v3/004): update per_seed_summary pbo from None placeholder
     # to the actual per-cell mean PBO computed above.  This ensures seed_summary.json
