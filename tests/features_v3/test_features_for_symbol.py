@@ -80,20 +80,24 @@ def test_bch_fallback_15() -> None:
 
 
 def test_bch_has_fracdiff() -> None:
-    """BCHUSDT MUST NOT include fracdiff_d05_close at iter-v3/052 (PARKED via SWAP).
+    """BCHUSDT MUST NOT include fracdiff_d05_close or regime_momentum_signed_3d at /053.
 
-    CHANGED from iter-v3/051 (fracdiff was PRESENT). iter-v3/052 SWAP: fracdiff DROPPED
-    from V3_FEATURE_COLUMNS_TOP_N; regime_momentum_signed_3d ACTIVATED as 15th element.
+    iter-v3/052 SWAP: fracdiff DROPPED; regime_momentum_signed_3d ACTIVATED.
+    iter-v3/053 SWAP: regime_momentum_signed_3d DROPPED (PARKED); hurst_drift_50_200 ACTIVATED.
     """
     result = features_for_symbol("BCHUSDT")
     assert "fracdiff_d05_close" not in result, (
-        f"BCHUSDT: fracdiff_d05_close FOUND — must be ABSENT at iter-v3/052. "
-        f"iter-v3/052 SWAP: fracdiff PARKED (dropped from V3_FEATURE_COLUMNS_TOP_N). "
+        f"BCHUSDT: fracdiff_d05_close FOUND — must be ABSENT at iter-v3/053. "
+        f"iter-v3/052 SWAP: fracdiff PARKED. Got: {result}"
+    )
+    assert "regime_momentum_signed_3d" not in result, (
+        f"BCHUSDT: regime_momentum_signed_3d FOUND — must be ABSENT at iter-v3/053. "
+        f"iter-v3/053 SWAP: 3d PARKED per /052 PATH C-suspicious closeout. "
         f"Got: {result}"
     )
-    assert "regime_momentum_signed_3d" in result, (
-        f"BCHUSDT: regime_momentum_signed_3d ABSENT — must be PRESENT at iter-v3/052. "
-        f"iter-v3/052 SWAP: regime_momentum_signed_3d ACTIVATED as 15th element. "
+    assert "hurst_drift_50_200" in result, (
+        f"BCHUSDT: hurst_drift_50_200 ABSENT — must be PRESENT at iter-v3/053. "
+        f"iter-v3/053 SWAP: hurst_drift_50_200 ACTIVATED as 15th element. "
         f"Got: {result}"
     )
 
@@ -120,19 +124,23 @@ def test_algo_fallback_15() -> None:
 
 
 def test_algo_has_fracdiff() -> None:
-    """ALGOUSDT MUST NOT include fracdiff_d05_close at iter-v3/052 (PARKED via SWAP).
+    """ALGOUSDT must reflect /053 SWAP state (fracdiff ABSENT; 3d ABSENT; hurst_drift PRESENT).
 
-    CHANGED from iter-v3/051 (fracdiff was PRESENT). iter-v3/052 SWAP: fracdiff DROPPED.
-    ALGO not in V3_MODELS at /052 but universal feature list reflects SWAP.
+    iter-v3/053 SWAP: regime_momentum_signed_3d PARKED; hurst_drift_50_200 ACTIVATED.
+    ALGO not in V3_MODELS at /053 but universal feature list reflects SWAP.
     """
     result = features_for_symbol("ALGOUSDT")
     assert "fracdiff_d05_close" not in result, (
-        f"ALGOUSDT: fracdiff_d05_close FOUND — must be ABSENT at iter-v3/052. "
+        f"ALGOUSDT: fracdiff_d05_close FOUND — must be ABSENT at iter-v3/053. "
         f"iter-v3/052 SWAP: fracdiff PARKED. Got: {result}"
     )
-    assert "regime_momentum_signed_3d" in result, (
-        f"ALGOUSDT: regime_momentum_signed_3d ABSENT — must be PRESENT at iter-v3/052. "
-        f"Universal list now has regime_momentum_signed_3d as 15th element. Got: {result}"
+    assert "regime_momentum_signed_3d" not in result, (
+        f"ALGOUSDT: regime_momentum_signed_3d FOUND — must be ABSENT at iter-v3/053. "
+        f"iter-v3/053 SWAP: 3d PARKED per /052 PATH C-suspicious. Got: {result}"
+    )
+    assert "hurst_drift_50_200" in result, (
+        f"ALGOUSDT: hurst_drift_50_200 ABSENT — must be PRESENT at iter-v3/053. "
+        f"Universal list now has hurst_drift_50_200 as 15th element. Got: {result}"
     )
 
 
@@ -153,20 +161,23 @@ def test_ldo_fallback_15() -> None:
 
 
 def test_ldo_has_fracdiff() -> None:
-    """LDOUSDT MUST NOT include fracdiff_d05_close at iter-v3/052 (PARKED via SWAP).
+    """LDOUSDT must reflect /053 SWAP state (fracdiff ABSENT; 3d ABSENT; hurst_drift PRESENT).
 
-    CHANGED from iter-v3/051 (fracdiff was PRESENT). iter-v3/052 SWAP: fracdiff DROPPED.
-    regime_momentum_signed_3d ACTIVATED as 15th element.
-    LDO REMOVAL axis PRE-FALSIFIED by /052 EDA SHA `0a10581` — LDO remains in V3_MODELS.
+    iter-v3/053 SWAP: regime_momentum_signed_3d PARKED; hurst_drift_50_200 ACTIVATED.
+    LDO remains in V3_MODELS (LDO removal pre-falsified by /052 EDA SHA `0a10581`).
     """
     result = features_for_symbol("LDOUSDT")
     assert "fracdiff_d05_close" not in result, (
-        f"LDOUSDT: fracdiff_d05_close FOUND — must be ABSENT at iter-v3/052. "
+        f"LDOUSDT: fracdiff_d05_close FOUND — must be ABSENT at iter-v3/053. "
         f"iter-v3/052 SWAP: fracdiff PARKED. Got: {result}"
     )
-    assert "regime_momentum_signed_3d" in result, (
-        f"LDOUSDT: regime_momentum_signed_3d ABSENT — must be PRESENT at iter-v3/052. "
-        f"Universal SWAP: regime_momentum_signed_3d as 15th element. Got: {result}"
+    assert "regime_momentum_signed_3d" not in result, (
+        f"LDOUSDT: regime_momentum_signed_3d FOUND — must be ABSENT at iter-v3/053. "
+        f"iter-v3/053 SWAP: 3d PARKED per /052 PATH C-suspicious. Got: {result}"
+    )
+    assert "hurst_drift_50_200" in result, (
+        f"LDOUSDT: hurst_drift_50_200 ABSENT — must be PRESENT at iter-v3/053. "
+        f"Universal SWAP: hurst_drift_50_200 as 15th element. Got: {result}"
     )
     assert "cross_asset_divergence_norm" not in result, (
         f"LDOUSDT: cross_asset_divergence_norm FOUND — must be ABSENT. "
@@ -192,28 +203,29 @@ def test_trx_fallback_15() -> None:
 
 
 def test_trx_no_dead_features() -> None:
-    """TRXUSDT must NOT include dead-code features at iter-v3/052.
+    """TRXUSDT must NOT include dead-code features at iter-v3/053.
 
-    fracdiff_d05_close is PARKED at /052 (NOT in V3_FEATURE_COLUMNS_TOP_N).
+    fracdiff_d05_close PARKED at /052; regime_momentum_signed_3d PARKED at /053.
+    hurst_drift_50_200 ACTIVATED as 15th element at /053.
     Dead-code = features that were NEGATIVE/FALSIFIED and removed from universal list.
     """
     result = features_for_symbol("TRXUSDT")
-    # fracdiff is PARKED at /052 — column exists in parquet but NOT passed to LightGBM
-    # Dead code — must remain absent from V3_FEATURE_COLUMNS_TOP_N:
+    # PARKED/dead-code features — must remain absent from V3_FEATURE_COLUMNS_TOP_N:
     for feat in (
         "cross_asset_divergence_norm",
         "vol_adj_autocorr",
         "efficiency_ratio_50",
         "fracdiff_d05_close",
+        "regime_momentum_signed_3d",  # PARKED at /053 (was ACTIVATED at /052)
     ):
         assert feat not in result, (
-            f"TRXUSDT: {feat} FOUND — must be ABSENT at iter-v3/052 "
+            f"TRXUSDT: {feat} FOUND — must be ABSENT at iter-v3/053 "
             f"(dead-code or PARKED: falsified/NEGATIVE or dropped via SWAP). Got: {result}"
         )
-    # regime_momentum_signed_3d IS present at iter-v3/052 (SWAP ACTIVATED)
-    assert "regime_momentum_signed_3d" in result, (
-        f"TRXUSDT: regime_momentum_signed_3d ABSENT — must be PRESENT at iter-v3/052. "
-        f"iter-v3/052 SWAP: regime_momentum_signed_3d ACTIVATED as 15th element. Got: {result}"
+    # hurst_drift_50_200 IS present at iter-v3/053 (SWAP ACTIVATED)
+    assert "hurst_drift_50_200" in result, (
+        f"TRXUSDT: hurst_drift_50_200 ABSENT — must be PRESENT at iter-v3/053. "
+        f"iter-v3/053 SWAP: hurst_drift_50_200 ACTIVATED as 15th element. Got: {result}"
     )
 
 
@@ -366,17 +378,17 @@ def test_efficiency_ratio_50_not_in_universal_list() -> None:
 
 
 def test_regime_momentum_signed_3d_not_in_universal_list() -> None:  # noqa: N802
-    """regime_momentum_signed_3d MUST be in V3_FEATURE_COLUMNS_TOP_N at iter-v3/052 (ACTIVATED).
+    """regime_momentum_signed_3d MUST be ABSENT from V3_FEATURE_COLUMNS_TOP_N at iter-v3/053.
 
-    CHANGED from iter-v3/051 (was ABSENT). iter-v3/052 SWAP: regime_momentum_signed_3d
-    ACTIVATED as 15th element (PIVOT from orchestrator LDO-removal axis; QR-EDA-backed
-    /051 RANKED #2 SHA `290f37b`). compute function dead code since /044 ACTIVATED here.
-    Test name kept for traceability; assertion INVERTED for /052.
+    iter-v3/052 SWAP: ACTIVATED as 15th element.
+    iter-v3/053 SWAP: PARKED (PATH C-suspicious; Critic FINAL `34cc46f` rec #2;
+    rank 14-15/15 all 3 syms; IS-OOS daily ratio 2.327 OUT-OF-BAND).
+    Test name kept for traceability; assertion updated for /053 PARKED state.
     """
-    assert "regime_momentum_signed_3d" in V3_FEATURE_COLUMNS_TOP_N, (
-        "regime_momentum_signed_3d NOT FOUND in V3_FEATURE_COLUMNS_TOP_N — must be PRESENT "
-        "at iter-v3/052 (SWAP: ACTIVATED as 15th element per QR-EDA-backed /051 RANKED #2). "
-        "Add it to V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
+    assert "regime_momentum_signed_3d" not in V3_FEATURE_COLUMNS_TOP_N, (
+        "regime_momentum_signed_3d FOUND in V3_FEATURE_COLUMNS_TOP_N — must be ABSENT "
+        "at iter-v3/053 (PARKED per /052 PATH C-suspicious; Critic `34cc46f` rec #2). "
+        "Remove it from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
     )
 
 
@@ -450,16 +462,15 @@ def test_all_symbols_fallback_15(symbol: str) -> None:
 
 
 def test_features_for_symbol_unknown_fallback() -> None:
-    """An unknown symbol falls back to V3_FEATURE_COLUMNS_TOP_N (15 features at iter-v3/052).
+    """An unknown symbol falls back to V3_FEATURE_COLUMNS_TOP_N (15 features at iter-v3/053).
 
-    CHANGED from iter-v3/051 (fracdiff WAS PRESENT; 3d WAS ABSENT).
-    iter-v3/052: 15-feature universal list; SWAP: regime_momentum_signed_3d PRESENT;
+    iter-v3/053 SWAP: hurst_drift_50_200 PRESENT; regime_momentum_signed_3d PARKED (ABSENT);
     fracdiff_d05_close PARKED (ABSENT from model input).
     """
     result = features_for_symbol("XYZUSDT")
     assert result is not None, "features_for_symbol must never return None."
     assert len(result) == 15, (
-        f"Unknown symbol fallback should be 15 features at iter-v3/052, got {len(result)}."
+        f"Unknown symbol fallback should be 15 features at iter-v3/053, got {len(result)}."
     )
     assert result == V3_FEATURE_COLUMNS_TOP_N, (
         "Unknown symbol 'XYZUSDT' should fall back to V3_FEATURE_COLUMNS_TOP_N (15 features)."
@@ -470,24 +481,26 @@ def test_features_for_symbol_unknown_fallback() -> None:
         "vol_adj_autocorr",
         "efficiency_ratio_50",  # DROPPED iter-v3/044 — DISASTROUS NEGATIVE
         "fracdiff_d05_close",  # PARKED iter-v3/052 — SWAP dropped from model input
+        "regime_momentum_signed_3d",  # PARKED iter-v3/053 — PATH C-suspicious /052
     ):
         assert feat not in result, (
-            f"Unknown symbol fallback must NOT include {feat} (dead-code or PARKED). Got: {result}"
+            f"Unknown symbol fallback must NOT include {feat} (dead-code or PARKED). "
+            f"Got: {result}"
         )
-    # iter-v3/052: regime_momentum_signed_3d MUST be present (SWAP ACTIVATED)
-    assert "regime_momentum_signed_3d" in result, (
-        "regime_momentum_signed_3d must be in fallback at iter-v3/052 (SWAP ACTIVATED). "
-        "V3_FEATURE_COLUMNS_TOP_N[14] = regime_momentum_signed_3d."
+    # iter-v3/053: hurst_drift_50_200 MUST be present (SWAP ACTIVATED)
+    assert "hurst_drift_50_200" in result, (
+        "hurst_drift_50_200 must be in fallback at iter-v3/053 (SWAP ACTIVATED). "
+        "V3_FEATURE_COLUMNS_TOP_N[14] = hurst_drift_50_200."
     )
     # iter-v3/044: regime_momentum_signed_5d MUST be present (mandate ACTIVE).
     assert "regime_momentum_signed_5d" in result, (
-        "regime_momentum_signed_5d must be in fallback at iter-v3/052 (mandate ACTIVE). "
+        "regime_momentum_signed_5d must be in fallback at iter-v3/053 (mandate ACTIVE). "
         "feedback_v3_engineered_features_proven.md mandate UPHELD."
     )
     # iter-v3/042: sym_vs_btc_ret_7d and ret_skew_50 MUST be present (RESTORED; KEPT).
     assert "sym_vs_btc_ret_7d" in result, (
-        "sym_vs_btc_ret_7d must be in fallback at iter-v3/052 (RESTORED iter-v3/042; KEPT)."
+        "sym_vs_btc_ret_7d must be in fallback at iter-v3/053 (RESTORED iter-v3/042; KEPT)."
     )
     assert "ret_skew_50" in result, (
-        "ret_skew_50 must be in fallback at iter-v3/051 (RESTORED iter-v3/042; KEPT)."
+        "ret_skew_50 must be in fallback at iter-v3/053 (RESTORED iter-v3/042; KEPT)."
     )

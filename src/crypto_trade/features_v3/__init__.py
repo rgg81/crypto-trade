@@ -304,15 +304,30 @@ V3_FEATURE_COLUMNS_TOP_N: tuple[str, ...] = (
     # at universal scope (iter-v3/025 PROMISING + /028 CONFIRMATION-MERGE precedent).
     # System-level REVERT to iter-v3/028 architecture (V3_MODELS=3-sym; V3_ATR_MULTIPLIERS_
     # PER_SYMBOL={}; block_long_for=(); REQUIRED_GAP=66) UNCHANGED from /051.
-    "regime_momentum_signed_3d",
+    # iter-v3/053: regime_momentum_signed_3d DROPPED (PARKED per /052 closeout PATH C-suspicious;
+    #   saturation rank 14-15/15 across all 3 symbols; IS-OOS daily ratio 2.327 OUT-OF-BAND;
+    #   Critic FINAL `34cc46f` rec #2 mandate pivot to structurally distinct feature family).
+    #   compute_regime_momentum_signed_3d RETAINED in dispatch as dead code (zero revert cost).
+    # iter-v3/053: hurst_drift_50_200 ADDED as 15th element (NEW Category 1 engineered feature).
+    #   Mechanism: hurst_50 - hurst_200 = hurst_100 - hurst_diff_100_50 - hurst_200.
+    #   REFRAMED HYPOTHESIS B: R^2=1.0 linear redundancy with 3 source primitives
+    #   (EDA SHA `1fc6d55` axis5_linear_redundancy.csv). Primary value: DOCUMENT
+    #   Linear Redundancy Pre-Falsifier (LR-PF) methodology for future Category 2
+    #   composed-feature axis selections (path B 55% predicted).
+    #   Univariate rho NOT significant p<0.05 in all 4 syms (mean +0.0114; weakest).
+    #   Feature computable from existing parquet columns -- NO parquet regen required.
+    "hurst_drift_50_200",
 )
-"""Top-15 feature subset (as of iter-v3/052): SWAP — fracdiff_d05_close DROPPED (PARKED);
-regime_momentum_signed_3d ADDED as 15th element. PIVOT from orchestrator's LDO-removal
-axis (pre-falsified by /052 EDA SHA `0a10581`) to QR-EDA-backed /051 RANKED #2
-(regime_momentum_signed_3d UNIVERSAL; SHA `290f37b`).
+"""Top-15 feature subset (as of iter-v3/053): SWAP -- regime_momentum_signed_3d DROPPED (PARKED
+per /052 PATH C-suspicious; rank 14-15/15 all 3 syms); hurst_drift_50_200 ADDED as 15th element.
+REFRAMED HYPOTHESIS B: primary value is to document the Linear Redundancy Pre-Falsifier (LR-PF)
+methodology. hurst_drift_50_200 = hurst_100 - hurst_diff_100_50 - hurst_200 (R^2=1.0 exact linear
+combination of 3 source primitives; EDA SHA `1fc6d55`). Net count UNCHANGED at 15 (SWAP).
 iter-v3/051: fracdiff_d05_close ADDED at universal scope per cycle 4 #1 EXPLORATION axis.
 iter-v3/052: fracdiff_d05_close PARKED (EXPLORATION-NULL-RESULT; SWAP to 3d per Critic
 `32cc46f` rec #2).
+iter-v3/053: regime_momentum_signed_3d DROPPED (PARKED per /052 PATH C-suspicious closeout;
+Critic FINAL `34cc46f` rec #2).
 System-level REVERT to iter-v3/028 architecture (V3_MODELS=3-sym BCH+LDO+TRX; ALGO REVERTED;
 V3_ATR_MULTIPLIERS_PER_SYMBOL={}; block_long_for=(); REQUIRED_GAP=66).
 iter-v3/049: vol_normalized_ret_5d DROPPED per iter-v3/048 PATH C-clean closeout.

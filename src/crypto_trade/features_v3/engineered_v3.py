@@ -487,6 +487,73 @@ def compute_vol_normalized_ret_5d(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def compute_hurst_drift_50_200(df: pd.DataFrame) -> pd.DataFrame:
+    """Composed feature: hurst_50 - hurst_200 (regime-drift across time-scales).
+
+    Construction (uses existing past-only parquet primitives):
+    - hurst_50  = rolling 50-bar R/S Hurst exponent, computable as hurst_100 -
+      hurst_diff_100_50 (since hurst_diff_100_50 = hurst_100 - rolling_hurst(close, 50)
+      in regime_v3.py:126).
+    - hurst_200 = rolling 200-bar R/S Hurst exponent (in parquet via
+      add_regime_v3_features).
+    - hurst_drift_50_200 = hurst_50 - hurst_200
+                         = hurst_100 - hurst_diff_100_50 - hurst_200
+
+    Mechanism: positive drift = short-horizon (50-bar) trending stronger than
+    long-horizon (200-bar) — mean-reversion entering; negative = long-horizon
+    trending stronger — momentum building.
+
+    Stationarity: ADF p << 0.05 by construction (bounded difference of two bounded
+    R/S Hurst measurements). Verified across all 4 symbols at
+    analysis/iteration_v3-053/axis2_adf_per_symbol.csv (SHA `1fc6d55`).
+
+    Linear redundancy DISCLOSURE (R^2 = 1.000 EXACT):
+    hurst_drift_50_200 is the exact linear combination
+    hurst_100 - hurst_diff_100_50 - hurst_200 (verified at
+    analysis/iteration_v3-053/axis5_linear_redundancy.csv). Tree models with
+    depth-3 splits on (hurst_100, hurst_diff_100_50, hurst_200) can approximate
+    this linear combination via axis-aligned hyperrectangles, but NOT exactly.
+    Single-column representation MAY improve colsample_bytree efficiency at low
+    Optuna budget (n_trials=35 single-seed) — this is the REFRAMED HYPOTHESIS B basis.
+
+    Univariate signal: Spearman rho NOT significant at p<0.05 in any of 4 symbols
+    (mean rho +0.0114 — weakest of any v3 Category 2 candidate). See
+    analysis/iteration_v3-053/axis4_univariate_spearman.csv.
+
+    Past-only by construction:
+    - All 3 source primitives are past-only (computed by upstream regime_v3 group).
+    - Element-wise subtraction at row t uses only past-only values at row t.
+    - Appending future bars does NOT alter the value at t.
+
+    NaN warm-up: first 200 bars NaN (dominated by hurst_200 200-bar warm-up).
+
+    iter-v3/053: ACTIVATED as 15th element of V3_FEATURE_COLUMNS_TOP_N.
+    REFRAMED HYPOTHESIS B: primary value is to document the Linear Redundancy
+    Pre-Falsifier (LR-PF) methodology for future Category 2 composed-feature
+    axis selections.
+
+    Args:
+        df: DataFrame with columns ``hurst_100``, ``hurst_diff_100_50``, ``hurst_200``
+            (pre-computed by ``add_regime_v3_features``).
+
+    Returns:
+        Copy of ``df`` with ``hurst_drift_50_200`` column appended. If any source
+        primitive is missing, the column is set to all-NaN without error (runner's
+        _verify_feature_columns assertion catches the gap downstream).
+    """
+    df = df.copy()
+    required = ("hurst_100", "hurst_diff_100_50", "hurst_200")
+    if not all(c in df.columns for c in required):
+        df["hurst_drift_50_200"] = np.nan
+        return df
+    df["hurst_drift_50_200"] = (
+        df["hurst_100"].astype(float)
+        - df["hurst_diff_100_50"].astype(float)
+        - df["hurst_200"].astype(float)
+    )
+    return df
+
+
 def add_engineered_v3_features(df: pd.DataFrame) -> pd.DataFrame:
     """GROUP_REGISTRY entry point for all Category 2 (composed) v3 features.
 
@@ -607,7 +674,21 @@ def add_engineered_v3_features(df: pd.DataFrame) -> pd.DataFrame:
     #   /044 ALGO LONG falsification CONDITIONAL on ALGO universe; ALGO REVERTED at /051+/052.
     #   fracdiff_d05_close PARKED: column still computed (above) but dropped from
     #   V3_FEATURE_COLUMNS_TOP_N; compute + 5 adversarial tests retained (zero revert cost).
-    df["regime_momentum_signed_3d"] = compute_regime_momentum_signed_3d(df)  # iter-v3/052 ACTIVATE
+    # iter-v3/052: regime_momentum_signed_3d ACTIVATED (SWAP fracdiff → 3d at 15th slot).
+    # iter-v3/053: regime_momentum_signed_3d DROPPED from V3_FEATURE_COLUMNS_TOP_N (PARKED per
+    #   /052 closeout PATH C-suspicious; dispatch call RETAINED at zero revert cost).
+    df["regime_momentum_signed_3d"] = compute_regime_momentum_signed_3d(
+        df
+    )  # dead code at /053 (PARKED)
+    # iter-v3/053: hurst_drift_50_200 ADDED — NEW dispatch at /053 setup.
+    #   Mechanism: hurst_50 − hurst_200 = hurst_100 − hurst_diff_100_50 − hurst_200.
+    #   Category 1 NEW engineered feature; REFRAMED HYPOTHESIS B (LR-PF methodology doc).
+    #   R^2=1.0 linear redundancy with 3 source primitives (EDA SHA `1fc6d55`
+    #   axis5_linear_redundancy.csv).
+    #   Univariate Spearman ρ NOT significant at p<0.05 in any of 4 symbols (mean +0.0114).
+    #   Max |IC| 0.85-0.88 with hurst_diff_100_50 (source primitive); Category 2 carve-out applies.
+    #   Feature is computable from existing parquet columns — NO parquet regen required.
+    df = compute_hurst_drift_50_200(df)  # iter-v3/053 ACTIVATE
     # compute_efficiency_ratio_50 REMOVED from dispatch at iter-v3/044 — DISASTROUS NEGATIVE.
     # compute_vol_adj_autocorr REVERTED at iter-v3/037 — iter-v3/036 NEGATIVE; dead code.
     return df
@@ -618,6 +699,7 @@ __all__ = [
     "compute_cross_asset_divergence_norm",
     "compute_efficiency_ratio_50",
     "compute_fracdiff_d05_close",
+    "compute_hurst_drift_50_200",
     "compute_regime_momentum_signed_3d",
     "compute_regime_momentum_signed_5d",
     "compute_vol_adj_autocorr",
