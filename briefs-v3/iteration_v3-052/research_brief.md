@@ -702,7 +702,7 @@ Python version: 3.13+.
 
 ### 10.1 — Setup commit SHA backfill
 
-(To be backfilled at setup commit time; matches the Engineer's setup commit that implements §3 changes — activate `compute_regime_momentum_signed_3d` dispatch + V3_FEATURE_COLUMNS_TOP_N SWAP + 5 adversarial tests + parquet regen. Until backfill: PENDING.)
+Setup commit SHA: `4cf49e5` — `feat(iter-v3/052): SWAP regime_momentum_signed_3d in / fracdiff_d05_close out of V3_FEATURE_COLUMNS_TOP_N`
 
 ### 10.2 — EDA commit SHAs (TWO EDA scripts inform this brief)
 
@@ -887,7 +887,7 @@ Per `briefs-v3/exploration_catalog.md` format. ONE row added to catalog at diary
 | 11 | Library stack declaration (§9) | DONE — UNCHANGED from /051 |
 | 12 | Section 10 QR audit trail | DONE — orchestrator pick SUPERSEDED by QR EDA per `feedback_v3_axis_selection_quant_discipline.md` rule 4; PIVOT documented in §10.3-10.9 |
 | 13 | Section 11 catalog row pre-commits | DONE — 5 rows (one per path) for PIVOTED axis |
-| 14 | Setup commit SHA backfill placeholder (§10.1) | PENDING (Engineer backfills at setup-commit time) |
+| 14 | Setup commit SHA backfill placeholder (§10.1) | DONE — `4cf49e5` |
 | 15 | All 12 mandatory sections present | DONE |
 
 **Brief PIVOTED at commit. Pre-Phase-5.5 gate criteria satisfied for the new axis. Ready for QE Phase 5.5 review.**
