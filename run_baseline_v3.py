@@ -103,7 +103,7 @@ def _derive_ensemble_seeds(outer_seed: int, size: int = ENSEMBLE_SIZE) -> list[i
     return [int(s) for s in rng.integers(low=0, high=2**31 - 1, size=size)]
 
 
-ITERATION_LABEL = "v3-051"
+ITERATION_LABEL = "v3-052"
 REPORTS_DIR = Path("reports-v3")
 FEATURES_DIR = Path("data/features_v3")
 DATA_DIR = Path("data")
@@ -190,20 +190,25 @@ def _verify_data_freshness(symbols: tuple[str, ...], max_lag_hours: float = 16.0
 
 
 def _verify_feature_columns() -> None:
-    """Verifies V3_FEATURE_COLUMNS contents per current brief (iter-v3/051).
+    """Verifies V3_FEATURE_COLUMNS contents per current brief (iter-v3/052).
 
-    iter-v3/051: EXPLORATION — cycle 4 #1 — fracdiff_d05_close UNIVERSAL ADD (14 → 15).
-      SYSTEM-LEVEL REVERT to iter-v3/028 architecture (per system-level rule
-      `feedback_v3_per_symbol_lifts_oos_breaks_is.md` UPDATED 2026-05-10):
+    iter-v3/052: EXPLORATION — cycle 4 #2 — SWAP: regime_momentum_signed_3d REPLACES
+      fracdiff_d05_close as 15th element (PIVOT from orchestrator LDO-removal axis
+      pre-falsified by /052 EDA SHA `0a10581` to QR-EDA-backed /051 RANKED #2 SHA `290f37b`).
+      Carry-forward SYSTEM-LEVEL REVERT to iter-v3/028 architecture (UNCHANGED from /051):
       - V3_MODELS = (BCH, LDO, TRX) — 3 symbols (ALGO REVERTED).
       - V3_ATR_MULTIPLIERS_PER_SYMBOL = {} (REVERT — ALGO+LDO entries cleared).
       - block_long_for = () (REVERT — primitive 10 cleared).
-      - REQUIRED_GAP = 66 = (21+1)*3 (REVERT from 88 due to 3-sym universe).
-      Single axis under test:
-        fracdiff_d05_close ADDED to V3_FEATURE_COLUMNS_TOP_N (14 → 15).
-        Already in all 4 symbol parquets; no feature regeneration required.
-        EDA evidence: ADF p<0.05 all 4 syms; IC carve-out PASS; univariate Spearman
-        significant p<0.05 all 4 syms (mean ρ=-0.044 negative mean-reversion).
+      - REQUIRED_GAP = 66 = (21+1)*3 (UNCHANGED — universe unchanged).
+      Single axis under test (SWAP):
+        regime_momentum_signed_3d ADDED to V3_FEATURE_COLUMNS_TOP_N (SWAP 15th element).
+        fracdiff_d05_close DROPPED from V3_FEATURE_COLUMNS_TOP_N (PARKED — column still
+          computed in dispatch; compute function + 5 tests retained at zero revert cost).
+        Parquet regen REQUIRED: `uv run crypto-trade features --track v3 --interval 8h
+          --symbols BCHUSDT,LDOUSDT,TRXUSDT,ALGOUSDT --format parquet --workers 4`
+        EDA evidence (analysis/iteration_v3-051/axis_c_regime_3d_*.csv SHA `290f37b`):
+          ADF p=0 all 4 syms; IC strict-gate PASS (max|IC|=0.6192<0.70, no carve-out);
+          univariate Spearman ρ -0.044 to -0.068 all 4 syms (mean -0.057 > fracdiff -0.044).
       DEFAULT_ATR_MULTIPLIERS: (2.0, 1.0) — unchanged.
       V3_FEATURES_PER_SYMBOL: EMPTY (unchanged from iter-v3/040).
       adx_threshold_per_symbol: {} (unchanged; TRX 21 dropped at iter-v3/050 closeout).
@@ -214,20 +219,20 @@ def _verify_feature_columns() -> None:
     btc_funding_rate_zscore_30 MUST NOT be present (cross-asset variant PERMANENTLY-CLOSED).
     vol_adj_autocorr MUST NOT be in universal list (dead code since iter-v3/036 revert).
     cross_asset_divergence_norm MUST NOT be in universal list (dead at model level).
-    fracdiff_d05_close MUST BE in universal list (iter-v3/051 ADDED universal scope).
+    fracdiff_d05_close MUST NOT be in universal list (PARKED at iter-v3/052 SWAP).
     efficiency_ratio_50 MUST NOT be present (DROPPED — iter-v3/043 DISASTROUS NEGATIVE).
-    regime_momentum_signed_5d MUST be present (mandate still ACTIVE at iter-v3/051).
+    regime_momentum_signed_5d MUST be present (mandate still ACTIVE at iter-v3/052).
     vol_normalized_ret_5d MUST NOT be present (DROPPED iter-v3/049; iter-v3/048 PATH C-clean).
-    regime_momentum_signed_3d MUST NOT be present in V3_FEATURE_COLUMNS_TOP_N (universal
-      addition REVERTED at iter-v3/044 per QR EDA; queued for iter-v3/052).
-    sym_vs_btc_ret_7d MUST be present (RESTORED at iter-v3/042; KEPT at iter-v3/051).
-    ret_skew_50 MUST be present (RESTORED at iter-v3/042; KEPT at iter-v3/051).
+    regime_momentum_signed_3d MUST be present in V3_FEATURE_COLUMNS_TOP_N (ACTIVATED at
+      iter-v3/052 SWAP; was dead code; dispatch activated in add_engineered_v3_features).
+    sym_vs_btc_ret_7d MUST be present (RESTORED at iter-v3/042; KEPT at iter-v3/052).
+    ret_skew_50 MUST be present (RESTORED at iter-v3/042; KEPT at iter-v3/052).
 
-    Per-symbol checks (iter-v3/051 — REVERT to /028 baseline):
+    Per-symbol checks (iter-v3/052 — REVERT carry-forward from /051):
     V3_FEATURES_PER_SYMBOL must be EMPTY (0 entries).
     V3_ATR_MULTIPLIERS_PER_SYMBOL must be EMPTY (0 entries — REVERT; all syms use DEFAULT).
-      ALGOUSDT MUST NOT be a key (REVERTED at iter-v3/051; was (2.0,1.5) at iter-v3/044-050).
-      LDOUSDT  MUST NOT be a key (REVERTED at iter-v3/051; was (2.0,1.5) at iter-v3/045-050).
+      ALGOUSDT MUST NOT be a key (REVERTED at iter-v3/051; unchanged at /052).
+      LDOUSDT  MUST NOT be a key (REVERTED at iter-v3/051; unchanged at /052).
     features_for_symbol("BCHUSDT") MUST return 15 features = V3_FEATURE_COLUMNS_TOP_N.
     features_for_symbol("LDOUSDT") MUST return 15 features (fallback — no per-symbol ext).
     features_for_symbol("TRXUSDT") MUST return 15 features (fallback).
@@ -237,7 +242,7 @@ def _verify_feature_columns() -> None:
     DEFAULT_ATR_MULTIPLIERS MUST be (2.0, 1.0) (correct since iter-v3/043 revert).
     Primitive 10 (REVERT): risk_cfg.block_long_for == () (empty — system-level REVERT).
     Per-symbol ADX (UNCHANGED): risk_cfg.adx_threshold_per_symbol == {} (empty; TRX 21
-      dropped at iter-v3/050 closeout per Critic FINAL `1908d50`; unchanged at /051).
+      dropped at iter-v3/050 closeout per Critic FINAL `1908d50`; unchanged at /052).
     """
     from crypto_trade.features_v3 import (  # noqa: PLC0415
         DEFAULT_ATR_MULTIPLIERS,
@@ -303,19 +308,19 @@ def _verify_feature_columns() -> None:
             "at iter-v3/044. feedback_v3_engineered_features_proven.md mandate ACTIVE. "
             "Add it to V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
         )
-    # iter-v3/044: regime_momentum_signed_3d UNIVERSAL ADDITION REVERTED before backtest.
-    # The orchestrator's setup commit `1f56c72` added it to V3_FEATURE_COLUMNS_TOP_N as a 15th
-    # universal feature. QR EDA at SHA `eff841e` (analysis/iteration_v3-044/cycle3_is_diagnosis.py)
-    # established the IS bottleneck is direction-asymmetric per-symbol (ALGO LONG single largest
-    # attribution loss) and 3d does NOT discriminate ALGO LONG WR (22.2% > 0, 13.3% <=0;
-    # ranks 14/14 in ALGO model). Replacement axis: per-symbol ATR widening for ALGOUSDT only.
-    # compute_regime_momentum_signed_3d retained as dead code in engineered_v3.py.
-    if "regime_momentum_signed_3d" in V3_FEATURE_COLUMNS:
+    # iter-v3/052: regime_momentum_signed_3d UNIVERSAL ACTIVATED (was dead code since /044).
+    # PIVOT from orchestrator-mandated LDO-removal axis (pre-falsified by /052 EDA SHA `0a10581`).
+    # QR EDA (SHA `290f37b`) backed /051 RANKED #2: IC strict-gate PASS (max|IC|=0.6192<0.70),
+    # ADF stationary p=0 all 4 syms, univariate ρ -0.057 mean (stronger than fracdiff -0.044).
+    # /044 ALGO LONG falsification is CONDITIONAL on ALGO universe — ALGO REVERTED at /051+/052.
+    # compute_regime_momentum_signed_3d dispatch ACTIVATED in add_engineered_v3_features at /052.
+    if "regime_momentum_signed_3d" not in V3_FEATURE_COLUMNS:
         raise RuntimeError(
-            "regime_momentum_signed_3d FOUND in V3_FEATURE_COLUMNS — must be ABSENT at "
-            "iter-v3/044. Universal addition REVERTED before backtest per QR EDA at SHA "
-            "`eff841e` (does not address ALGO LONG bottleneck; ranks 14/14 in ALGO model). "
-            "Remove it from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
+            "regime_momentum_signed_3d NOT FOUND in V3_FEATURE_COLUMNS — must be PRESENT at "
+            "iter-v3/052. SWAP: regime_momentum_signed_3d REPLACES fracdiff_d05_close as 15th "
+            "element. QR-EDA-backed /051 RANKED #2 (SHA `290f37b`). "
+            "Add 'regime_momentum_signed_3d' as 15th element of V3_FEATURE_COLUMNS_TOP_N "
+            "in src/crypto_trade/features_v3/__init__.py."
         )
     # sym_vs_btc_ret_7d MUST be present (RESTORED at iter-v3/042; KEPT at iter-v3/044).
     if "sym_vs_btc_ret_7d" not in V3_FEATURE_COLUMNS:
@@ -345,19 +350,20 @@ def _verify_feature_columns() -> None:
             "Critic FINAL SHA a544621 (Recommendation 1). "
             "Remove it from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
         )
-    # fracdiff_d05_close MUST BE PRESENT in the universal list (iter-v3/051 ADD axis).
-    # cycle 4 #1 EXPLORATION: fracdiff_d05_close = LdP AFML Ch. 5 FFD at d=0.5.
-    # Already in all 4 symbol parquets; no feature regeneration required.
-    if "fracdiff_d05_close" not in V3_FEATURE_COLUMNS_TOP_N:
+    # fracdiff_d05_close MUST NOT be in universal list — PARKED at iter-v3/052 SWAP.
+    # iter-v3/051 cycle 4 #1 EXPLORATION: EXPLORATION-NULL-RESULT (PARKED). Ranks 11-13/15
+    # (feature LEARNED but no decisive IS lift; OOS within single-seed=42 lottery noise).
+    # Per Critic FINAL `32cc46f` rec #2: DROP fracdiff from V3_FEATURE_COLUMNS_TOP_N at /052.
+    # compute_fracdiff_d05_close RETAINED in dispatch (column still generated; zero revert cost).
+    if "fracdiff_d05_close" in V3_FEATURE_COLUMNS_TOP_N:
         raise RuntimeError(
-            "fracdiff_d05_close NOT FOUND in V3_FEATURE_COLUMNS_TOP_N — must be PRESENT. "
-            "iter-v3/051: fracdiff_d05_close ADDED at universal scope (14 → 15) per "
-            "cycle 4 #1 EXPLORATION axis. EDA evidence: ADF p<0.05 all 4 syms; "
-            "IC carve-out PASS; univariate Spearman significant negative (mean ρ=-0.044). "
-            "Add 'fracdiff_d05_close' as 15th element of V3_FEATURE_COLUMNS_TOP_N in "
+            "fracdiff_d05_close FOUND in V3_FEATURE_COLUMNS_TOP_N — must be ABSENT at "
+            "iter-v3/052. PARKED per /051 EXPLORATION-NULL-RESULT + Critic FINAL `32cc46f` "
+            "rec #2. SWAP: regime_momentum_signed_3d REPLACES fracdiff_d05_close as 15th "
+            "element. Remove 'fracdiff_d05_close' from V3_FEATURE_COLUMNS_TOP_N in "
             "src/crypto_trade/features_v3/__init__.py."
         )
-    print("  fracdiff_d05_close PRESENT in V3_FEATURE_COLUMNS_TOP_N (iter-v3/051 ADD axis)  PASS")
+    print("  fracdiff_d05_close ABSENT from V3_FEATURE_COLUMNS_TOP_N (PARKED at /052 SWAP)  PASS")
     # vol_adj_autocorr MUST NOT be in the universal list (iter-v3/036 reverted).
     if "vol_adj_autocorr" in V3_FEATURE_COLUMNS_TOP_N:
         raise RuntimeError(
@@ -375,9 +381,9 @@ def _verify_feature_columns() -> None:
         )
     print(
         f"  V3_FEATURE_COLUMNS: {n} columns "
-        "(iter-v3/051: 15-feature set; fracdiff_d05_close ADDED (cycle 4 #1 EXPLORATION); "
-        "vol_normalized_ret_5d ABSENT (DROPPED iter-v3/049); efficiency_ratio_50 ABSENT; "
-        "regime_momentum_signed_3d ABSENT (universal addition REVERTED iter-v3/044); "
+        "(iter-v3/052: 15-feature set; SWAP: regime_momentum_signed_3d PRESENT (ACTIVATED); "
+        "fracdiff_d05_close ABSENT (PARKED); vol_normalized_ret_5d ABSENT (DROPPED /049); "
+        "efficiency_ratio_50 ABSENT; "
         "regime_momentum_signed_5d, sym_vs_btc_ret_7d, ret_skew_50 PRESENT)  PASS"
     )
 
@@ -423,24 +429,31 @@ def _verify_feature_columns() -> None:
         "BCH/LDO/TRX all use (2.0, 1.0) DEFAULT)  PASS"
     )
 
-    # iter-v3/051: Verify all 3 v3 symbols return 15-feature fallback (V3_FEATURE_COLUMNS_TOP_N).
-    # fracdiff_d05_close ADDED (14 → 15) at universal scope per cycle 4 #1 EXPLORATION.
-    # ALGOUSDT NOT in V3_MODELS at iter-v3/051 (REVERTED; 4→3 sym universe).
+    # iter-v3/052: Verify all 3 v3 symbols return 15-feature fallback (V3_FEATURE_COLUMNS_TOP_N).
+    # SWAP: regime_momentum_signed_3d ACTIVATED as 15th element; fracdiff_d05_close PARKED.
+    # ALGOUSDT NOT in V3_MODELS at iter-v3/052 (REVERTED from /051; 3-sym universe).
     for sym in ("BCHUSDT", "LDOUSDT", "TRXUSDT"):
         sym_feats = features_for_symbol(sym)
         if len(sym_feats) != 15:
             raise RuntimeError(
                 f"{sym} fallback has {len(sym_feats)} features — "
-                "expected exactly 15 (iter-v3/051 V3_FEATURE_COLUMNS_TOP_N universal list; "
-                "fracdiff_d05_close ADDED as 15th at universal scope). "
-                "iter-v3/051: ADD fracdiff_d05_close to V3_FEATURE_COLUMNS_TOP_N in "
-                "features_v3/__init__.py (14 → 15). V3_FEATURES_PER_SYMBOL must be empty."
+                "expected exactly 15 (iter-v3/052 V3_FEATURE_COLUMNS_TOP_N universal list; "
+                "regime_momentum_signed_3d SWAPPED IN as 15th at universal scope). "
+                "iter-v3/052: SWAP regime_momentum_signed_3d in V3_FEATURE_COLUMNS_TOP_N in "
+                "features_v3/__init__.py (count stays 15). V3_FEATURES_PER_SYMBOL must be empty."
             )
-        if "fracdiff_d05_close" not in sym_feats:
+        if "regime_momentum_signed_3d" not in sym_feats:
             raise RuntimeError(
-                f"{sym} feature set missing fracdiff_d05_close — must be PRESENT. "
-                "iter-v3/051: fracdiff_d05_close ADDED at universal scope; all 3 symbols "
-                "must include it in their feature set. "
+                f"{sym} feature set missing regime_momentum_signed_3d — must be PRESENT. "
+                "iter-v3/052: SWAP — regime_momentum_signed_3d ACTIVATED as 15th element; "
+                "all 3 symbols must include it in their feature set. "
+                f"Check V3_FEATURE_COLUMNS_TOP_N and features_for_symbol('{sym}') path."
+            )
+        if "fracdiff_d05_close" in sym_feats:
+            raise RuntimeError(
+                f"{sym} feature set contains fracdiff_d05_close — must be ABSENT. "
+                "iter-v3/052: SWAP — fracdiff_d05_close PARKED (dropped from "
+                "V3_FEATURE_COLUMNS_TOP_N; compute function retained in dispatch). "
                 f"Check V3_FEATURE_COLUMNS_TOP_N and features_for_symbol('{sym}') path."
             )
         if "cross_asset_divergence_norm" in sym_feats:
@@ -456,18 +469,12 @@ def _verify_feature_columns() -> None:
                 "iter-v3/044: efficiency_ratio_50 DROPPED (DISASTROUS NEGATIVE at iter-v3/043). "
                 f"Check features_for_symbol('{sym}') path."
             )
-        if "regime_momentum_signed_3d" in sym_feats:
-            raise RuntimeError(
-                f"{sym} feature set contains regime_momentum_signed_3d — must be ABSENT. "
-                "iter-v3/047: regime_momentum_signed_3d UNIVERSAL ADDITION REVERTED per QR EDA "
-                "(at iter-v3/044). "
-                f"Check V3_FEATURE_COLUMNS_TOP_N and features_for_symbol('{sym}') path."
-            )
     print(
         "  BCH/LDO/TRX: 15-feature universal fallback "
-        "(fracdiff_d05_close ADDED iter-v3/051 cycle 4 #1; vol_normalized_ret_5d DROPPED /049; "
-        "efficiency_ratio_50 ABSENT; regime_momentum_signed_3d ABSENT; "
-        "regime_momentum_signed_5d PRESENT; fracdiff_d05_close PRESENT)  PASS"
+        "(regime_momentum_signed_3d ACTIVATED iter-v3/052 cycle 4 #2 SWAP; "
+        "fracdiff_d05_close PARKED (ABSENT); vol_normalized_ret_5d DROPPED /049; "
+        "efficiency_ratio_50 ABSENT; "
+        "regime_momentum_signed_5d PRESENT; sym_vs_btc_ret_7d PRESENT)  PASS"
     )
 
     # iter-v3/051: All 3 symbols (BCH/LDO/TRX) MUST return (2.0, 1.0) via DEFAULT fallback.
@@ -542,19 +549,22 @@ def _verify_feature_columns() -> None:
         "(DROPPED iter-v3/049 per iter-v3/048 PATH C-clean closeout)  PASS"
     )
 
-    # iter-v3/044: regime_momentum_signed_3d UNIVERSAL ADDITION REVERTED before backtest.
-    # Per QR EDA SHA `eff841e` — does not address ALGO LONG bottleneck; ranks 14/14 in ALGO.
-    # Universal addition would dilute colsample picks. Code retained as dead code.
-    if "regime_momentum_signed_3d" in V3_FEATURE_COLUMNS_TOP_N:
+    # iter-v3/052: regime_momentum_signed_3d MUST be PRESENT (ACTIVATED via SWAP).
+    # PIVOT from orchestrator LDO-removal axis (pre-falsified by /052 EDA SHA `0a10581`).
+    # QR-EDA-backed /051 RANKED #2 (SHA `290f37b`): IC strict-gate PASS max|IC|=0.6192<0.70;
+    # ADF stationary p=0 all 4 syms; univariate ρ mean -0.057 > fracdiff -0.044.
+    # /044 ALGO LONG falsification CONDITIONAL on ALGO universe; ALGO REVERTED at /051+/052.
+    if "regime_momentum_signed_3d" not in V3_FEATURE_COLUMNS_TOP_N:
         raise RuntimeError(
-            "regime_momentum_signed_3d FOUND in V3_FEATURE_COLUMNS_TOP_N — must be ABSENT "
-            "at iter-v3/044 (universal addition REVERTED per QR EDA at SHA `eff841e`; does "
-            "not discriminate ALGO LONG WR; ranks 14/14 in ALGO model). "
-            "Remove it from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
+            "regime_momentum_signed_3d NOT FOUND in V3_FEATURE_COLUMNS_TOP_N — must be PRESENT "
+            "at iter-v3/052. SWAP: regime_momentum_signed_3d REPLACES fracdiff_d05_close as "
+            "15th element. QR-EDA-backed /051 RANKED #2 (SHA `290f37b`). "
+            "Add 'regime_momentum_signed_3d' as 15th element of V3_FEATURE_COLUMNS_TOP_N "
+            "in src/crypto_trade/features_v3/__init__.py."
         )
     print(
-        "  regime_momentum_signed_3d ABSENT from V3_FEATURE_COLUMNS_TOP_N "
-        "(REVERTED iter-v3/044 per QR EDA)  PASS"
+        "  regime_momentum_signed_3d PRESENT in V3_FEATURE_COLUMNS_TOP_N "
+        "(ACTIVATED iter-v3/052 SWAP per QR-EDA-backed /051 RANKED #2)  PASS"
     )
 
     # iter-v3/044: efficiency_ratio_50 MUST be ABSENT from V3_FEATURE_COLUMNS_TOP_N (DROPPED).

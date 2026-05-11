@@ -1730,13 +1730,13 @@ class TestEfficiencyRatio50:
             "NEGATIVE at iter-v3/043; dead code retained but not called)."
         )
 
-        # iter-v3/044: regime_momentum_signed_3d MUST NOT be dispatched (universal addition
-        # REVERTED per QR EDA at SHA `eff841e`; compute_regime_momentum_signed_3d retained
-        # as dead code in engineered_v3.py).
-        assert "regime_momentum_signed_3d" not in out.columns, (
-            "add_engineered_v3_features must NOT produce 'regime_momentum_signed_3d' column "
-            "(iter-v3/044: orchestrator's ad-hoc setup at commit `1f56c72` reverted before "
-            "backtest per QR EDA SHA `eff841e`; does not address ALGO LONG bottleneck)."
+        # iter-v3/052: regime_momentum_signed_3d MUST BE dispatched (ACTIVATED at /052 SWAP;
+        # replaces fracdiff_d05_close as 15th element in V3_FEATURE_COLUMNS_TOP_N per QR EDA
+        # SHA `290f37b` /051 RANKED #2; dead-code since /044 revert now ACTIVE).
+        assert "regime_momentum_signed_3d" in out.columns, (
+            "add_engineered_v3_features must produce 'regime_momentum_signed_3d' column "
+            "(iter-v3/052: ACTIVATED in dispatch — SWAP replaces fracdiff_d05_close as 15th "
+            "element in V3_FEATURE_COLUMNS_TOP_N; QR EDA SHA `290f37b` /051 RANKED #2)."
         )
 
 

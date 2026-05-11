@@ -1,27 +1,28 @@
-"""Adversarial tests for per-symbol feature-set dispatch — iter-v3/051 (UPDATED from /044).
+"""Adversarial tests for per-symbol feature-set dispatch — iter-v3/052 (UPDATED from /051).
 
-iter-v3/051 state (EXPLORATION — cycle 4 #1 — fracdiff_d05_close UNIVERSAL ADD;
-                   SYSTEM-LEVEL REVERT to iter-v3/028 architecture):
-- V3_FEATURE_COLUMNS_TOP_N: 15 features (14-anchor + fracdiff_d05_close).
-  fracdiff_d05_close ADDED as 15th universal feature per brief Section 3 Sub-fix 7.
-  EDA evidence: ADF p≈0, IC carve-out PASS (max post-carve-out |IC|=0.6721<0.70),
-  Spearman mean ρ=-0.044. SHA `6697f95`.
-- V3_FEATURES_PER_SYMBOL is EMPTY (REVERT). All symbols fall back to 15-feature universal list.
-- V3_ATR_MULTIPLIERS_PER_SYMBOL is EMPTY (SYSTEM-LEVEL REVERT; was ALGO+LDO at /047-/050).
-- V3_MODELS = (BCHUSDT, LDOUSDT, TRXUSDT) — 3 symbols (ALGO REVERTED).
-- block_long_for = () (REVERT from /047 BCHUSDT).
+iter-v3/052 state (EXPLORATION — cycle 4 #2 — SWAP: regime_momentum_signed_3d ACTIVATED;
+                   fracdiff_d05_close PARKED; SYSTEM-LEVEL REVERT carry-forward from /051):
+- V3_FEATURE_COLUMNS_TOP_N: 15 features (14-anchor + regime_momentum_signed_3d as 15th).
+  SWAP: fracdiff_d05_close DROPPED (PARKED per /051 EXPLORATION-NULL-RESULT +
+  Critic FINAL `32cc46f` rec #2); regime_momentum_signed_3d ACTIVATED (/051 EDA RANKED #2
+  SHA `290f37b`; ADF p=0 all 4 syms; IC strict-gate PASS max|IC|=0.6192<0.70).
+- V3_FEATURES_PER_SYMBOL is EMPTY (REVERT carry-forward). All symbols fall back to 15.
+- V3_ATR_MULTIPLIERS_PER_SYMBOL is EMPTY (SYSTEM-LEVEL REVERT carry-forward).
+- V3_MODELS = (BCHUSDT, LDOUSDT, TRXUSDT) — 3 symbols (UNCHANGED from /051).
+- block_long_for = () (REVERT carry-forward from /051).
 
 History of V3_FEATURE_COLUMNS_TOP_N count:
   iter-v3/040-044: 14 features (anchor).
   iter-v3/051: 15 features (fracdiff_d05_close ADDED — single axis, cycle 4 #1).
+  iter-v3/052: 15 features (SWAP: fracdiff PARKED; regime_momentum_signed_3d ACTIVATED).
 
-Mandatory test cases (iter-v3/051 state):
+Mandatory test cases (iter-v3/052 state):
  1. test_bch_fallback_15                 — BCH returns 15 features via fallback
- 2. test_bch_has_fracdiff                — BCH INCLUDES fracdiff_d05_close (CHANGED /044→/051)
+ 2. test_bch_has_fracdiff                — BCH does NOT include fracdiff (PARKED at /052)
  3. test_algo_fallback_15               — ALGO returns 15 features via fallback
- 4. test_algo_has_fracdiff              — ALGO INCLUDES fracdiff_d05_close (CHANGED /044→/051)
+ 4. test_algo_has_fracdiff              — ALGO does NOT include fracdiff (PARKED at /052)
  5. test_ldo_fallback_15               — LDO returns 15 features via fallback
- 6. test_ldo_has_fracdiff              — LDO INCLUDES fracdiff_d05_close (CHANGED /044→/051)
+ 6. test_ldo_has_fracdiff              — LDO does NOT include fracdiff (PARKED at /052)
  7. test_trx_fallback_15               — TRX returns 15 features via fallback
  8. test_trx_no_dead_features          — TRX does NOT include dead-code features
  9. test_bchusdt_not_in_per_symbol     — BCH absent from V3_FEATURES_PER_SYMBOL
@@ -35,11 +36,11 @@ Mandatory test cases (iter-v3/051 state):
 17. test_sym_vs_btc_ret_7d_in_universal_list    — RESTORED iter-v3/042; KEPT
 18. test_ret_skew_50_in_universal_list          — RESTORED iter-v3/042; KEPT
 19. test_efficiency_ratio_50_not_in_universal_list — DROPPED iter-v3/044
-20. test_regime_momentum_signed_3d_not_in_universal_list — REVERTED iter-v3/044
-21. test_fracdiff_in_universal_list             — ADDED iter-v3/051 (CHANGED)
+20. test_regime_momentum_signed_3d_not_in_universal_list — NOW PRESENT (ACTIVATED /052)
+21. test_fracdiff_in_universal_list             — NOW ABSENT (PARKED /052)
 22. test_cross_asset_divergence_not_in_universal_list — dead code
 23. test_vol_adj_autocorr_not_in_universal_list — dead code
-24. test_universal_list_is_15               — 15 features at iter-v3/051 (CHANGED from 14)
+24. test_universal_list_is_15               — 15 features at iter-v3/052 (UNCHANGED count)
 25. test_all_symbols_fallback_15            — parametrized; BCH/LDO/TRX all 15 features
 26. test_features_for_symbol_unknown_fallback — unknown sym falls back to 15-feature list
 """
@@ -79,15 +80,20 @@ def test_bch_fallback_15() -> None:
 
 
 def test_bch_has_fracdiff() -> None:
-    """BCHUSDT MUST include fracdiff_d05_close at iter-v3/051 (universal ADD).
+    """BCHUSDT MUST NOT include fracdiff_d05_close at iter-v3/052 (PARKED via SWAP).
 
-    CHANGED from iter-v3/044 (fracdiff was ABSENT). iter-v3/051 adds fracdiff_d05_close
-    as 15th universal feature (single axis change; cycle 4 #1 EXPLORATION).
+    CHANGED from iter-v3/051 (fracdiff was PRESENT). iter-v3/052 SWAP: fracdiff DROPPED
+    from V3_FEATURE_COLUMNS_TOP_N; regime_momentum_signed_3d ACTIVATED as 15th element.
     """
     result = features_for_symbol("BCHUSDT")
-    assert "fracdiff_d05_close" in result, (
-        f"BCHUSDT: fracdiff_d05_close ABSENT — must be PRESENT at iter-v3/051. "
-        f"iter-v3/051 ADD axis: fracdiff_d05_close is 15th universal feature. "
+    assert "fracdiff_d05_close" not in result, (
+        f"BCHUSDT: fracdiff_d05_close FOUND — must be ABSENT at iter-v3/052. "
+        f"iter-v3/052 SWAP: fracdiff PARKED (dropped from V3_FEATURE_COLUMNS_TOP_N). "
+        f"Got: {result}"
+    )
+    assert "regime_momentum_signed_3d" in result, (
+        f"BCHUSDT: regime_momentum_signed_3d ABSENT — must be PRESENT at iter-v3/052. "
+        f"iter-v3/052 SWAP: regime_momentum_signed_3d ACTIVATED as 15th element. "
         f"Got: {result}"
     )
 
@@ -114,15 +120,19 @@ def test_algo_fallback_15() -> None:
 
 
 def test_algo_has_fracdiff() -> None:
-    """ALGOUSDT MUST include fracdiff_d05_close at iter-v3/051 (universal ADD).
+    """ALGOUSDT MUST NOT include fracdiff_d05_close at iter-v3/052 (PARKED via SWAP).
 
-    CHANGED from iter-v3/044 (fracdiff was ABSENT). ALGO not in V3_MODELS at /051
-    but the universal feature list still includes fracdiff for reserved-for-future use.
+    CHANGED from iter-v3/051 (fracdiff was PRESENT). iter-v3/052 SWAP: fracdiff DROPPED.
+    ALGO not in V3_MODELS at /052 but universal feature list reflects SWAP.
     """
     result = features_for_symbol("ALGOUSDT")
-    assert "fracdiff_d05_close" in result, (
-        f"ALGOUSDT: fracdiff_d05_close ABSENT — must be PRESENT at iter-v3/051. "
-        f"Universal list has 15 features including fracdiff. Got: {result}"
+    assert "fracdiff_d05_close" not in result, (
+        f"ALGOUSDT: fracdiff_d05_close FOUND — must be ABSENT at iter-v3/052. "
+        f"iter-v3/052 SWAP: fracdiff PARKED. Got: {result}"
+    )
+    assert "regime_momentum_signed_3d" in result, (
+        f"ALGOUSDT: regime_momentum_signed_3d ABSENT — must be PRESENT at iter-v3/052. "
+        f"Universal list now has regime_momentum_signed_3d as 15th element. Got: {result}"
     )
 
 
@@ -143,20 +153,24 @@ def test_ldo_fallback_15() -> None:
 
 
 def test_ldo_has_fracdiff() -> None:
-    """LDOUSDT MUST include fracdiff_d05_close at iter-v3/051 (universal ADD).
+    """LDOUSDT MUST NOT include fracdiff_d05_close at iter-v3/052 (PARKED via SWAP).
 
-    CHANGED from iter-v3/044 (fracdiff was ABSENT). fracdiff_d05_close is the 15th
-    universal feature at iter-v3/051. LDO per-symbol ATR REVERTED (SYSTEM-LEVEL REVERT;
-    LDO ATR now uses DEFAULT (2.0, 1.0)).
+    CHANGED from iter-v3/051 (fracdiff was PRESENT). iter-v3/052 SWAP: fracdiff DROPPED.
+    regime_momentum_signed_3d ACTIVATED as 15th element.
+    LDO REMOVAL axis PRE-FALSIFIED by /052 EDA SHA `0a10581` — LDO remains in V3_MODELS.
     """
     result = features_for_symbol("LDOUSDT")
-    assert "fracdiff_d05_close" in result, (
-        f"LDOUSDT: fracdiff_d05_close ABSENT — must be PRESENT at iter-v3/051. "
-        f"Universal ADD axis. Got: {result}"
+    assert "fracdiff_d05_close" not in result, (
+        f"LDOUSDT: fracdiff_d05_close FOUND — must be ABSENT at iter-v3/052. "
+        f"iter-v3/052 SWAP: fracdiff PARKED. Got: {result}"
+    )
+    assert "regime_momentum_signed_3d" in result, (
+        f"LDOUSDT: regime_momentum_signed_3d ABSENT — must be PRESENT at iter-v3/052. "
+        f"Universal SWAP: regime_momentum_signed_3d as 15th element. Got: {result}"
     )
     assert "cross_asset_divergence_norm" not in result, (
         f"LDOUSDT: cross_asset_divergence_norm FOUND — must be ABSENT. "
-        f"Universal application FALSIFIED at iter-v3/027; LDO per-symbol FALSIFIED at iter-v3/037. "
+        f"Universal application FALSIFIED at iter-v3/027; LDO per-symbol FALSIFIED at /037. "
         f"Got: {result}"
     )
 
@@ -178,28 +192,28 @@ def test_trx_fallback_15() -> None:
 
 
 def test_trx_no_dead_features() -> None:
-    """TRXUSDT must NOT include dead-code features at iter-v3/051.
+    """TRXUSDT must NOT include dead-code features at iter-v3/052.
 
-    fracdiff_d05_close is NOW PRESENT (universal ADD). Dead-code = features that were
-    NEGATIVE/FALSIFIED and removed from the universal list entirely.
+    fracdiff_d05_close is PARKED at /052 (NOT in V3_FEATURE_COLUMNS_TOP_N).
+    Dead-code = features that were NEGATIVE/FALSIFIED and removed from universal list.
     """
     result = features_for_symbol("TRXUSDT")
-    # fracdiff IS present at /051 — do NOT assert absent
-    # Dead code — must remain absent:
+    # fracdiff is PARKED at /052 — column exists in parquet but NOT passed to LightGBM
+    # Dead code — must remain absent from V3_FEATURE_COLUMNS_TOP_N:
     for feat in (
         "cross_asset_divergence_norm",
         "vol_adj_autocorr",
         "efficiency_ratio_50",
-        "regime_momentum_signed_3d",
+        "fracdiff_d05_close",
     ):
         assert feat not in result, (
-            f"TRXUSDT: {feat} FOUND — must be ABSENT at iter-v3/051 "
-            f"(dead-code: falsified or NEGATIVE). Got: {result}"
+            f"TRXUSDT: {feat} FOUND — must be ABSENT at iter-v3/052 "
+            f"(dead-code or PARKED: falsified/NEGATIVE or dropped via SWAP). Got: {result}"
         )
-    # fracdiff IS present at iter-v3/051 (ADD axis)
-    assert "fracdiff_d05_close" in result, (
-        f"TRXUSDT: fracdiff_d05_close ABSENT — must be PRESENT at iter-v3/051 (universal ADD). "
-        f"Got: {result}"
+    # regime_momentum_signed_3d IS present at iter-v3/052 (SWAP ACTIVATED)
+    assert "regime_momentum_signed_3d" in result, (
+        f"TRXUSDT: regime_momentum_signed_3d ABSENT — must be PRESENT at iter-v3/052. "
+        f"iter-v3/052 SWAP: regime_momentum_signed_3d ACTIVATED as 15th element. Got: {result}"
     )
 
 
@@ -352,30 +366,32 @@ def test_efficiency_ratio_50_not_in_universal_list() -> None:
 
 
 def test_regime_momentum_signed_3d_not_in_universal_list() -> None:  # noqa: N802
-    """regime_momentum_signed_3d UNIVERSAL ADDITION REVERTED at iter-v3/044 per QR EDA.
+    """regime_momentum_signed_3d MUST be in V3_FEATURE_COLUMNS_TOP_N at iter-v3/052 (ACTIVATED).
 
-    Orchestrator's setup commit `1f56c72` added 3d as 15th universal feature ad-hoc.
-    QR EDA at SHA `eff841e` superseded the orchestrator pick. Remains ABSENT at /051.
-    compute_regime_momentum_signed_3d retained as dead code in engineered_v3.py.
+    CHANGED from iter-v3/051 (was ABSENT). iter-v3/052 SWAP: regime_momentum_signed_3d
+    ACTIVATED as 15th element (PIVOT from orchestrator LDO-removal axis; QR-EDA-backed
+    /051 RANKED #2 SHA `290f37b`). compute function dead code since /044 ACTIVATED here.
+    Test name kept for traceability; assertion INVERTED for /052.
     """
-    assert "regime_momentum_signed_3d" not in V3_FEATURE_COLUMNS_TOP_N, (
-        "regime_momentum_signed_3d FOUND in V3_FEATURE_COLUMNS_TOP_N — must be ABSENT "
-        "at iter-v3/051 (universal addition REVERTED per QR EDA at SHA `eff841e`). "
-        "Remove it from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
+    assert "regime_momentum_signed_3d" in V3_FEATURE_COLUMNS_TOP_N, (
+        "regime_momentum_signed_3d NOT FOUND in V3_FEATURE_COLUMNS_TOP_N — must be PRESENT "
+        "at iter-v3/052 (SWAP: ACTIVATED as 15th element per QR-EDA-backed /051 RANKED #2). "
+        "Add it to V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
     )
 
 
 def test_fracdiff_in_universal_list() -> None:
-    """fracdiff_d05_close MUST be in V3_FEATURE_COLUMNS_TOP_N at iter-v3/051 (ADDED).
+    """fracdiff_d05_close MUST NOT be in V3_FEATURE_COLUMNS_TOP_N at iter-v3/052 (PARKED).
 
-    CHANGED from iter-v3/044 `test_fracdiff_not_in_universal_list` which asserted ABSENT.
-    iter-v3/051 cycle 4 #1 EXPLORATION: fracdiff_d05_close added as 15th universal feature.
-    EDA evidence: ADF p≈0, IC carve-out PASS, Spearman mean ρ=-0.044 (significant negative).
+    CHANGED from iter-v3/051 (fracdiff was PRESENT). iter-v3/052 SWAP: fracdiff DROPPED
+    from V3_FEATURE_COLUMNS_TOP_N per /051 EXPLORATION-NULL-RESULT + Critic `32cc46f` rec #2.
+    compute_fracdiff_d05_close RETAINED in dispatch (column in parquets; zero revert cost).
+    Test name kept for traceability; assertion INVERTED for /052.
     """
-    assert "fracdiff_d05_close" in V3_FEATURE_COLUMNS_TOP_N, (
-        "fracdiff_d05_close NOT FOUND in V3_FEATURE_COLUMNS_TOP_N — must be PRESENT at "
-        "iter-v3/051 (ADDED as 15th universal feature, cycle 4 #1 EXPLORATION axis). "
-        "Add it to V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
+    assert "fracdiff_d05_close" not in V3_FEATURE_COLUMNS_TOP_N, (
+        "fracdiff_d05_close FOUND in V3_FEATURE_COLUMNS_TOP_N — must be ABSENT at "
+        "iter-v3/052 (PARKED per /051 EXPLORATION-NULL-RESULT + Critic `32cc46f` rec #2). "
+        "Remove it from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
     )
 
 
@@ -434,42 +450,43 @@ def test_all_symbols_fallback_15(symbol: str) -> None:
 
 
 def test_features_for_symbol_unknown_fallback() -> None:
-    """An unknown symbol falls back to V3_FEATURE_COLUMNS_TOP_N (15 features at iter-v3/051).
+    """An unknown symbol falls back to V3_FEATURE_COLUMNS_TOP_N (15 features at iter-v3/052).
 
-    CHANGED from iter-v3/044 (was 14; fracdiff was ABSENT).
-    iter-v3/051: 15-feature universal list; fracdiff_d05_close IS PRESENT.
+    CHANGED from iter-v3/051 (fracdiff WAS PRESENT; 3d WAS ABSENT).
+    iter-v3/052: 15-feature universal list; SWAP: regime_momentum_signed_3d PRESENT;
+    fracdiff_d05_close PARKED (ABSENT from model input).
     """
     result = features_for_symbol("XYZUSDT")
     assert result is not None, "features_for_symbol must never return None."
     assert len(result) == 15, (
-        f"Unknown symbol fallback should be 15 features at iter-v3/051, got {len(result)}."
+        f"Unknown symbol fallback should be 15 features at iter-v3/052, got {len(result)}."
     )
     assert result == V3_FEATURE_COLUMNS_TOP_N, (
         "Unknown symbol 'XYZUSDT' should fall back to V3_FEATURE_COLUMNS_TOP_N (15 features)."
     )
-    # Dead-code features — must remain absent:
+    # Dead-code or PARKED features — must remain absent:
     for feat in (
         "cross_asset_divergence_norm",
         "vol_adj_autocorr",
         "efficiency_ratio_50",  # DROPPED iter-v3/044 — DISASTROUS NEGATIVE
-        "regime_momentum_signed_3d",  # REVERTED iter-v3/044 — QR EDA superseded
+        "fracdiff_d05_close",  # PARKED iter-v3/052 — SWAP dropped from model input
     ):
         assert feat not in result, (
-            f"Unknown symbol fallback must NOT include {feat} (dead-code policy). Got: {result}"
+            f"Unknown symbol fallback must NOT include {feat} (dead-code or PARKED). Got: {result}"
         )
-    # iter-v3/051: fracdiff_d05_close MUST be present (universal ADD)
-    assert "fracdiff_d05_close" in result, (
-        "fracdiff_d05_close must be in fallback at iter-v3/051 (universal ADD, cycle 4 #1). "
-        "V3_FEATURE_COLUMNS_TOP_N[14] = fracdiff_d05_close."
+    # iter-v3/052: regime_momentum_signed_3d MUST be present (SWAP ACTIVATED)
+    assert "regime_momentum_signed_3d" in result, (
+        "regime_momentum_signed_3d must be in fallback at iter-v3/052 (SWAP ACTIVATED). "
+        "V3_FEATURE_COLUMNS_TOP_N[14] = regime_momentum_signed_3d."
     )
     # iter-v3/044: regime_momentum_signed_5d MUST be present (mandate ACTIVE).
     assert "regime_momentum_signed_5d" in result, (
-        "regime_momentum_signed_5d must be in fallback at iter-v3/051 (mandate ACTIVE). "
+        "regime_momentum_signed_5d must be in fallback at iter-v3/052 (mandate ACTIVE). "
         "feedback_v3_engineered_features_proven.md mandate UPHELD."
     )
     # iter-v3/042: sym_vs_btc_ret_7d and ret_skew_50 MUST be present (RESTORED; KEPT).
     assert "sym_vs_btc_ret_7d" in result, (
-        "sym_vs_btc_ret_7d must be in fallback at iter-v3/051 (RESTORED iter-v3/042; KEPT)."
+        "sym_vs_btc_ret_7d must be in fallback at iter-v3/052 (RESTORED iter-v3/042; KEPT)."
     )
     assert "ret_skew_50" in result, (
         "ret_skew_50 must be in fallback at iter-v3/051 (RESTORED iter-v3/042; KEPT)."

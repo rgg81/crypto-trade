@@ -275,35 +275,44 @@ V3_FEATURE_COLUMNS_TOP_N: tuple[str, ...] = (
     # cost; available for future per-symbol experiments per iter-v3/048 diary §Architectural
     # Decisions). NOT dispatched when absent from V3_FEATURE_COLUMNS_TOP_N.
     # iter-v3/051: fracdiff_d05_close ADDED at universal scope (14 → 15) — cycle 4 #1
-    # EXPLORATION axis. NEW universal engineered feature axis RE-OPENED for cycle 4 per
-    # iter-v3/050 diary §Cycle 4 Priorities axis #1 and Critic FINAL `b6339c5` rec #5.
-    # fracdiff_d05_close = LdP AFML Ch. 5 Fixed-Width Window Fractional Differentiation
-    # at d=0.5 applied to close. Theoretically: preserves long-memory while achieving
-    # stationarity (LdP empirical sweet-spot d=0.5; d→0 = non-stationary; d→1 = memory loss).
-    # Already implemented (compute_fracdiff_d05_close in engineered_v3.py); already in all
-    # 4 symbol parquets (BCH/LDO/TRX/ALGO; ALGO available for future re-inclusion after
-    # system-level REVERT to 3-sym universe at iter-v3/051).
-    # iter-v3/035 BCH-only PROMISING precedent (+37.98 OOS swing for BCH at single-seed
-    # n_trials=10); universal scope UNTESTED at multi-seed per /050 diary recommendation.
-    # EDA evidence (`analysis/iteration_v3-051/axis_c_fracdiff_*.csv` SHA `290f37b`):
-    # - ADF stationary at p<0.05 across all 4 symbols (BCH/LDO/TRX/ALGO p≈0)
-    # - IC carve-out PASS: max |IC| = 0.7381 with vwap_dev_20 at LDO (source close-derived
-    #   primitive; Category 2 carve-out per `feedback_v3_engineered_feature_pivot.md`);
-    #   post-carve-out max |IC| = 0.6721 with regime_momentum_signed_5d < 0.70 strict gate
-    # - Univariate Spearman significant at all 4 symbols (mean ρ = -0.044 negative
-    #   mean-reversion signal; p<0.05 for BCH/LDO/TRX/ALGO)
-    # Per `feedback_v3_engineered_feature_pivot.md` Category 2 carve-out applies.
-    # Per `feedback_v3_engineered_features_proven.md` (iter-v3/025 regime_momentum
-    # PROMISING precedent + iter-v3/028 multi-seed CONFIRMATION-MERGE): composed
-    # engineered features CAN work at universal scope.
+    # EXPLORATION axis. EXPLORATION-NULL-RESULT (PARKED): fracdiff LEARNED (ranks 11-13/15)
+    # but no decisive IS lift; OOS lift within single-seed=42 lottery noise.
+    # Per Critic FINAL `32cc46f` rec #2: DROP fracdiff_d05_close from V3_FEATURE_COLUMNS_TOP_N
+    # at iter-v3/052 setup. compute_fracdiff_d05_close RETAINED in dispatch (parquet column
+    # still generated) + 5 adversarial tests RETAINED — zero revert cost.
+    # iter-v3/052: SWAP — regime_momentum_signed_3d REPLACES fracdiff_d05_close as 15th element.
+    # PIVOT from orchestrator-mandated LDO-removal axis (pre-falsified by /052 EDA SHA `0a10581`):
+    #   orchestrator premise "LDO IS PnL share -14.96%" misread net_pnl_pct (ignores weight_factor);
+    #   LDO actual weighted_pnl at /051 IS = +11.155 (+36.78% bundle share) — IS CONTRIBUTOR.
+    #   2-sym counterfactual: IS Δ -0.16 BREAKS BOTH-must-improve gate; IS-OOS ratio 3.58 OOB.
+    # QR EDA supersedes per `feedback_v3_axis_selection_quant_discipline.md` rule 4.
+    # PIVOTED axis = regime_momentum_signed_3d UNIVERSAL — /051 EDA RANKED #2 queued for /052
+    # (SHA `290f37b` synthesis.md §c3 + candidate_axes_ranking.md §Candidate 2).
+    # Mechanism: ret_3d × sign(hurst_100 − 0.5). Orthogonal time-scale variant of
+    # regime_momentum_signed_5d (iter-v3/028 baseline edge ingredient; multi-seed validated).
+    # EDA evidence (analysis/iteration_v3-051/axis_c_regime_3d_*.csv SHA `290f37b`):
+    # - ADF stationary p=0 all 4 syms (axis_c_regime_3d_adf.csv); structurally stationary
+    #   by construction (bounded sign factor × stationary ret_3d)
+    # - IC strict-gate PASS: max |IC| = 0.6192 with vwap_dev_20 < 0.70 (NO carve-out needed;
+    #   CLEANER than fracdiff which required Category-2 carve-out at LDO 0.7381)
+    # - Univariate Spearman ρ -0.044 to -0.068 significant all 4 syms (mean -0.057;
+    #   STRONGER than fracdiff -0.044); negative = mean-reversion signal
+    # - IC with sister 5d feature 0.43-0.47 (below 0.50 stacking-risk threshold from /026)
+    # - /044 ALGO LONG falsification CONDITIONAL on ALGO universe; ALGO REVERTED at /051+/052
+    # - compute_regime_momentum_signed_3d dead code at engineered_v3.py:330 ACTIVATED at /052
+    # Per `feedback_v3_engineered_features_proven.md`: composed engineered features CAN work
+    # at universal scope (iter-v3/025 PROMISING + /028 CONFIRMATION-MERGE precedent).
     # System-level REVERT to iter-v3/028 architecture (V3_MODELS=3-sym; V3_ATR_MULTIPLIERS_
-    # PER_SYMBOL={}; block_long_for=(); REQUIRED_GAP=66) per
-    # `feedback_v3_per_symbol_lifts_oos_breaks_is.md` UPDATED 2026-05-10 (second-cycle
-    # confirmation of per-symbol-customization anti-pattern at iter-v3/039 + iter-v3/050).
-    "fracdiff_d05_close",
+    # PER_SYMBOL={}; block_long_for=(); REQUIRED_GAP=66) UNCHANGED from /051.
+    "regime_momentum_signed_3d",
 )
-"""Top-15 feature subset (as of iter-v3/051): fracdiff_d05_close ADDED (14 → 15).
+"""Top-15 feature subset (as of iter-v3/052): SWAP — fracdiff_d05_close DROPPED (PARKED);
+regime_momentum_signed_3d ADDED as 15th element. PIVOT from orchestrator's LDO-removal
+axis (pre-falsified by /052 EDA SHA `0a10581`) to QR-EDA-backed /051 RANKED #2
+(regime_momentum_signed_3d UNIVERSAL; SHA `290f37b`).
 iter-v3/051: fracdiff_d05_close ADDED at universal scope per cycle 4 #1 EXPLORATION axis.
+iter-v3/052: fracdiff_d05_close PARKED (EXPLORATION-NULL-RESULT; SWAP to 3d per Critic
+`32cc46f` rec #2).
 System-level REVERT to iter-v3/028 architecture (V3_MODELS=3-sym BCH+LDO+TRX; ALGO REVERTED;
 V3_ATR_MULTIPLIERS_PER_SYMBOL={}; block_long_for=(); REQUIRED_GAP=66).
 iter-v3/049: vol_normalized_ret_5d DROPPED per iter-v3/048 PATH C-clean closeout.
@@ -332,7 +341,7 @@ attribution loss) and 3d does NOT discriminate ALGO LONG WR. compute_regime_mome
 retained as dead code in engineered_v3.py; NOT dispatched. Per Sub-fix 2 of Section 3.
 Replacement axis: per-symbol ATR widening for ALGOUSDT only.
 
-Top-N history (last 6 entries):
+Top-N history (last 8 entries):
   iter-v3/041: pruned 14 → 11 (dropped ret_skew_50, sym_vs_btc_ret_7d, regime_momentum)
   iter-v3/042: RESTORED 11 → 14 (Path C NEGATIVE mandate at iter-v3/041 fired)
   iter-v3/043: ADDED 14 → 15 (efficiency_ratio_50 Kaufman 1995 ER — DISASTROUS NEGATIVE)
@@ -340,6 +349,9 @@ Top-N history (last 6 entries):
               universal addition; new axis = per-symbol ATR for ALGO).
   iter-v3/048: ADDED 14 → 15 (vol_normalized_ret_5d NEW; cycle 3 #9 of 10).
   iter-v3/049: REVERT 15 → 14 (vol_normalized_ret_5d DROPPED; iter-v3/048 PATH C-clean).
+  iter-v3/051: ADDED 14 → 15 (fracdiff_d05_close UNIVERSAL; cycle 4 #1 EXPLORATION).
+  iter-v3/052: SWAP 15 → 15 (fracdiff_d05_close PARKED; regime_momentum_signed_3d ACTIVATED
+              — PIVOT from orchestrator LDO-removal axis; QR-EDA-backed /051 RANKED #2).
 
 iter-v3/035 revert — fracdiff_d05_close removed from universal list (15→14; moved
 to V3_FEATURES_PER_SYMBOL["BCHUSDT"] for BCH-only per-symbol targeting); cleared

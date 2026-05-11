@@ -582,7 +582,9 @@ def add_engineered_v3_features(df: pd.DataFrame) -> pd.DataFrame:
         Copy of ``df`` with all active engineered v3 features appended.
     """
     df = compute_regime_momentum_signed_5d(df)  # iter-v3/025 (KEPT; mandated by engineered pivot)
-    df = compute_fracdiff_d05_close(df)  # iter-v3/034 (KEPT; BCH-only at model level)
+    # iter-v3/052: fracdiff_d05_close PARKED (dropped from V3_FEATURE_COLUMNS_TOP_N; column
+    # still generated for zero-revert-cost per /051 PARKED policy). Compute call RETAINED.
+    df = compute_fracdiff_d05_close(df)  # iter-v3/034 (PARKED at /052; column generated but unused)
     df = compute_cross_asset_divergence_norm(df)  # iter-v3/037 RE-ADDED (LDO-only at model level)
     # iter-v3/048: vol_normalized_ret_5d ADDED (15th feature in V3_FEATURE_COLUMNS_TOP_N).
     # Canonical Sharpe-like risk-normalized momentum: ret_5d / (range_realized_vol_50 + ε).
@@ -591,9 +593,21 @@ def add_engineered_v3_features(df: pd.DataFrame) -> pd.DataFrame:
     # Depends on range_realized_vol_50 from add_tail_risk_v3_features (upstream in GROUP_REGISTRY).
     # IC carve-out per feedback_v3_engineered_feature_pivot.md (Category 2 composed feature).
     # Cycle 3 plan Axis 1 per feedback_v3_axis_selection_quant_discipline.md.
-    df = compute_vol_normalized_ret_5d(df)  # iter-v3/048 (NEW; dispatched)
-    # compute_regime_momentum_signed_3d REVERTED at iter-v3/044 (orchestrator ad-hoc pick;
-    #   QR EDA showed it does not address ALGO LONG bottleneck). Dead code retained.
+    # iter-v3/049: vol_normalized_ret_5d DROPPED from V3_FEATURE_COLUMNS_TOP_N (PATH C-clean);
+    #   compute_vol_normalized_ret_5d retained in dispatch as inert column (zero revert cost).
+    df = compute_vol_normalized_ret_5d(df)  # iter-v3/048 (inert; DROPPED from TOP_N at /049)
+    # iter-v3/052: ACTIVATE compute_regime_momentum_signed_3d dispatch (was dead code since /044
+    #   revert). PIVOT from orchestrator-mandated LDO-removal axis (pre-falsified by /052 EDA SHA
+    #   `0a10581`) to QR-EDA-backed /051 RANKED #2 (SHA `290f37b`).
+    #   Mechanism: ret_3d × sign(hurst_100 − 0.5). Orthogonal time-scale variant of
+    #   regime_momentum_signed_5d (iter-v3/028 baseline edge ingredient; multi-seed validated).
+    #   IC strict-gate PASS: max|IC|=0.6192<0.70 all 4 syms (NO carve-out needed).
+    #   ADF stationary p=0 all 4 syms. Univariate ρ -0.057 mean (stronger than fracdiff -0.044).
+    #   IC with 5d sister 0.43-0.47 (below 0.50 stacking-risk threshold from iter-v3/026).
+    #   /044 ALGO LONG falsification CONDITIONAL on ALGO universe; ALGO REVERTED at /051+/052.
+    #   fracdiff_d05_close PARKED: column still computed (above) but dropped from
+    #   V3_FEATURE_COLUMNS_TOP_N; compute + 5 adversarial tests retained (zero revert cost).
+    df["regime_momentum_signed_3d"] = compute_regime_momentum_signed_3d(df)  # iter-v3/052 ACTIVATE
     # compute_efficiency_ratio_50 REMOVED from dispatch at iter-v3/044 — DISASTROUS NEGATIVE.
     # compute_vol_adj_autocorr REVERTED at iter-v3/037 — iter-v3/036 NEGATIVE; dead code.
     return df

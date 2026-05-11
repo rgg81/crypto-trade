@@ -1,29 +1,38 @@
-"""Adversarial tests for fracdiff_d05_close universal scope — iter-v3/051.
+"""Adversarial tests for fracdiff_d05_close — PARKED state at iter-v3/052.
 
-5 mandatory tests per brief Section 3 Sub-fix 7:
+5 mandatory tests (iter-v3/051 originals; assertions updated for PARKED state at /052):
 
-1. test_fracdiff_d05_close_in_universal_feature_list — fracdiff_d05_close MUST be in
-   V3_FEATURE_COLUMNS_TOP_N; verify it is present and total count == 15.
+1. test_fracdiff_d05_close_not_in_universal_feature_list — fracdiff_d05_close MUST NOT be
+   in V3_FEATURE_COLUMNS_TOP_N at iter-v3/052 (PARKED — SWAPPED out for
+   regime_momentum_signed_3d per Critic FINAL `32cc46f` rec #2).
+   Total count must still be 15 (SWAP; net count unchanged).
 2. test_fracdiff_d05_close_present_in_all_4_symbol_parquets — all 4 symbol parquets
-   (BCH/LDO/TRX/ALGO; ALGO reserved-for-future even though not in /051 V3_MODELS) must
-   have fracdiff_d05_close column.
+   (BCH/LDO/TRX/ALGO) must still contain fracdiff_d05_close column; compute_fracdiff_d05_close
+   is RETAINED in dispatch (parquet column generated; zero revert cost per PARKED policy).
 3. test_fracdiff_d05_close_stationary_per_symbol — ADF p<0.05 for fracdiff_d05_close
-   in IS subset of each symbol's parquet (smoke test).
+   in IS subset of each symbol's parquet (dead-code coverage regression).
 4. test_fracdiff_d05_close_no_lookahead — verify compute_fracdiff_d05_close uses past-
    only data (Fixed-Width Window FFD; value at bar t depends only on bars [0, t]).
-5. test_v3_models_is_3_symbol_at_iter_v3_051 — V3_MODELS must be exactly
-   (BCH, LDO, TRX) at iter-v3/051; regression test against accidental ALGO re-add.
+5. test_v3_models_is_3_symbol_at_iter_v3_052 — V3_MODELS must be exactly
+   (BCH, LDO, TRX) at iter-v3/052; regression test against accidental ALGO re-add.
+   (V3_MODELS UNCHANGED from /051; LDO removal axis pre-falsified by /052 EDA SHA `0a10581`.)
 
-System-level REVERT state (iter-v3/051):
-- V3_MODELS = (BCHUSDT, LDOUSDT, TRXUSDT) — 3 symbols (ALGO REVERTED).
-- V3_ATR_MULTIPLIERS_PER_SYMBOL = {} (empty — REVERT).
-- block_long_for = () (empty — REVERT).
-- REQUIRED_GAP = 66 = (21+1)*3 (REVERT).
-- V3_FEATURE_COLUMNS_TOP_N = 15 features (fracdiff_d05_close ADDED).
+PARKED state (iter-v3/052):
+- V3_MODELS = (BCHUSDT, LDOUSDT, TRXUSDT) — 3 symbols (UNCHANGED from /051).
+- V3_ATR_MULTIPLIERS_PER_SYMBOL = {} (empty — REVERT carry-forward).
+- block_long_for = () (empty — REVERT carry-forward).
+- REQUIRED_GAP = 66 = (21+1)*3 (UNCHANGED).
+- V3_FEATURE_COLUMNS_TOP_N = 15 features (SWAP: fracdiff PARKED; regime_momentum_signed_3d
+  ACTIVATED as 15th element per /051 EDA RANKED #2 SHA `290f37b`).
 
-Single axis under test: fracdiff_d05_close at universal scope (14 → 15).
+fracdiff_d05_close is PARKED per iter-v3/052 SWAP:
+- Column dropped from V3_FEATURE_COLUMNS_TOP_N (NOT passed to LightGBM).
+- compute_fracdiff_d05_close RETAINED in add_engineered_v3_features dispatch
+  (column still generated in parquets; zero revert cost if axis needs retest).
+- 5 adversarial tests RETAINED as dead-code coverage (test 1 verifies ABSENT, not PRESENT).
+
 EDA evidence (analysis/iteration_v3-051/ SHA `290f37b`):
-- ADF stationary at p<0.05 across all 4 symbols.
+- ADF stationary at p<0.05 across all 4 symbols (column still valid; just parked).
 - IC carve-out PASS (max |IC|=0.7381 with vwap_dev_20 source primitive).
 - Univariate Spearman significant negative (mean ρ=-0.044) across all 4 symbols.
 """
@@ -48,27 +57,30 @@ _OOS_CUTOFF_MS = 1_742_774_400_000  # 2025-03-24 00:00 UTC (IMMUTABLE)
 
 _PARQUET_DIR = "data/features_v3"
 _V3_ALL_SYMBOLS = ("BCHUSDT", "LDOUSDT", "TRXUSDT", "ALGOUSDT")
-_V3_MODELS_ITER_051 = ("BCHUSDT", "LDOUSDT", "TRXUSDT")
+_V3_MODELS_ITER_052 = ("BCHUSDT", "LDOUSDT", "TRXUSDT")
 
 
 # ---------------------------------------------------------------------------
-# Test 1 — fracdiff_d05_close MUST be in V3_FEATURE_COLUMNS_TOP_N (universal list)
+# Test 1 — fracdiff_d05_close MUST NOT be in V3_FEATURE_COLUMNS_TOP_N (PARKED at /052)
 # ---------------------------------------------------------------------------
 
 
-def test_fracdiff_d05_close_in_universal_feature_list() -> None:
-    """fracdiff_d05_close MUST be in V3_FEATURE_COLUMNS_TOP_N and count MUST be 15.
+def test_fracdiff_d05_close_not_in_universal_feature_list() -> None:
+    """fracdiff_d05_close MUST NOT be in V3_FEATURE_COLUMNS_TOP_N at iter-v3/052.
 
-    iter-v3/051: cycle 4 #1 EXPLORATION axis. fracdiff_d05_close ADDED (14 → 15).
+    iter-v3/052 SWAP: fracdiff_d05_close PARKED (SWAPPED OUT for regime_momentum_signed_3d
+    per Critic FINAL `32cc46f` rec #2). Total count must still be 15 (SWAP; net unchanged).
+    compute_fracdiff_d05_close is RETAINED in dispatch at zero revert cost.
     """
-    assert "fracdiff_d05_close" in V3_FEATURE_COLUMNS_TOP_N, (
-        "fracdiff_d05_close NOT found in V3_FEATURE_COLUMNS_TOP_N — "
-        "iter-v3/051 ADD axis failed. Add it as 15th element."
+    assert "fracdiff_d05_close" not in V3_FEATURE_COLUMNS_TOP_N, (
+        "fracdiff_d05_close FOUND in V3_FEATURE_COLUMNS_TOP_N — "
+        "iter-v3/052 SWAP failed. fracdiff is PARKED (column dropped from model input). "
+        "Remove it from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
     )
     n = len(V3_FEATURE_COLUMNS_TOP_N)
     assert n == 15, (
         f"V3_FEATURE_COLUMNS_TOP_N has {n} elements — expected 15. "
-        "iter-v3/051: fracdiff_d05_close ADDED (14 → 15). "
+        "iter-v3/052: SWAP keeps count at 15 (fracdiff OUT; regime_momentum_signed_3d IN). "
         "Check V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
     )
 
@@ -114,7 +126,7 @@ def test_fracdiff_d05_close_stationary_per_symbol() -> None:
     import pyarrow.parquet as pq  # noqa: PLC0415
     from statsmodels.tsa.stattools import adfuller  # noqa: PLC0415
 
-    for sym in _V3_MODELS_ITER_051:
+    for sym in _V3_MODELS_ITER_052:
         path = f"{_PARQUET_DIR}/{sym}_8h_features.parquet"
         try:
             df = pq.read_table(
@@ -194,14 +206,15 @@ def test_fracdiff_d05_close_no_lookahead() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_v3_models_is_3_symbol_at_iter_v3_051() -> None:
-    """V3_MODELS must be exactly (BCHUSDT, LDOUSDT, TRXUSDT) at iter-v3/051.
+def test_v3_models_is_3_symbol_at_iter_v3_052() -> None:
+    """V3_MODELS must be exactly (BCHUSDT, LDOUSDT, TRXUSDT) at iter-v3/052.
 
-    Regression guard against accidental ALGO re-add. ALGOUSDT was REVERTED per
-    system-level rule `feedback_v3_per_symbol_lifts_oos_breaks_is.md` UPDATED
-    2026-05-10 (second-cycle confirmation of per-symbol-customization anti-pattern).
+    Regression guard against accidental ALGO re-add AND LDO removal (LDO removal
+    axis was pre-falsified by /052 QR EDA SHA `0a10581`; V3_MODELS UNCHANGED from /051).
 
-    iter-v3/051: SYSTEM-LEVEL REVERT to iter-v3/028 architecture. V3_MODELS = 3-sym.
+    iter-v3/052: SYSTEM-LEVEL REVERT carry-forward from /051. V3_MODELS = 3-sym.
+    LDO removal axis PRE-FALSIFIED: 2-sym counterfactual IS Δ -0.16 BREAKS
+    BOTH-must-improve gate; IS-OOS daily ratio 3.58 OUT-OF-BAND (PATH C-suspicious).
     """
     # Import locally to catch import-time state
     import importlib  # noqa: PLC0415
@@ -218,17 +231,23 @@ def test_v3_models_is_3_symbol_at_iter_v3_051() -> None:
 
     assert len(symbols) == 3, (
         f"V3_MODELS has {len(symbols)} symbols — expected exactly 3 (BCH/LDO/TRX). "
-        "iter-v3/051 SYSTEM-LEVEL REVERT: ALGOUSDT must be absent from V3_MODELS. "
+        "iter-v3/052: ALGOUSDT must be absent (REVERTED at /051); LDO removal axis "
+        "pre-falsified by /052 EDA SHA `0a10581` (IS Δ -0.16 BREAKS both-must-improve). "
         f"Current symbols: {symbols}"
     )
     assert "ALGOUSDT" not in symbols, (
-        f"ALGOUSDT FOUND in V3_MODELS — must be absent at iter-v3/051. "
-        "SYSTEM-LEVEL REVERT to iter-v3/028 architecture; ALGO must not be in V3_MODELS. "
+        f"ALGOUSDT FOUND in V3_MODELS — must be absent at iter-v3/052. "
+        "SYSTEM-LEVEL REVERT carry-forward; ALGO must not be in V3_MODELS. "
+        f"Current symbols: {symbols}"
+    )
+    assert "LDOUSDT" in symbols, (
+        f"LDOUSDT NOT FOUND in V3_MODELS — must be present at iter-v3/052. "
+        "LDO removal axis PRE-FALSIFIED by /052 EDA SHA `0a10581` (IS Δ -0.16 BREAKS gate). "
         f"Current symbols: {symbols}"
     )
     expected = {"BCHUSDT", "LDOUSDT", "TRXUSDT"}
     actual = set(symbols)
     assert actual == expected, (
         f"V3_MODELS symbols mismatch: expected {expected}, got {actual}. "
-        "iter-v3/051 V3_MODELS must be exactly (BCHUSDT, LDOUSDT, TRXUSDT)."
+        "iter-v3/052 V3_MODELS must be exactly (BCHUSDT, LDOUSDT, TRXUSDT)."
     )
