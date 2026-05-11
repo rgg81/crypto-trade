@@ -1,0 +1,4 @@
+scenario,is_trades,oos_trades,is_monthly_sharpe,oos_monthly_sharpe,is_daily_sharpe,oos_daily_sharpe,is_oos_daily_ratio,is_total_wpnl,oos_total_wpnl,is_bch_wpnl,is_trx_wpnl,is_ldo_wpnl,oos_bch_wpnl,oos_trx_wpnl,oos_ldo_wpnl,is_top_conc_pct,oos_top_conc_pct
+3-sym /051 actual (BCH+LDO+TRX),147,95,0.4571,0.589,0.8738,0.929,1.0632,30.3265,17.4255,24.5995,-5.428,11.155,23.5873,11.2768,-17.4386,,
+2-sym counterfactual (drop LDO),138,82,0.296,1.603,0.6749,2.4179,3.5824,19.1715,34.8641,24.5995,-5.428,0.0,23.5873,11.2768,0.0,128.31,67.65
+DELTA (no_LDO - with_LDO),-9,-13,-0.1611,1.0139,-0.1989,1.4889,,-11.155,17.4386,0.0,0.0,-11.155,0.0,0.0,17.4386,,
