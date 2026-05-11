@@ -1,0 +1,6 @@
+iteration,n_is_ldo,n_oos_ldo,is_ldo_pnl,oos_ldo_pnl,is_ldo_wr,oos_ldo_wr,is_sharpe_with_ldo,is_sharpe_no_ldo,is_sharpe_delta_no_ldo,oos_sharpe_with_ldo,oos_sharpe_no_ldo,oos_sharpe_delta_no_ldo
+iter-v3/028 (3-sym baseline; no per-sym ATR),10,14,5.0192,-22.0501,40.0,21.43,0.5101,0.504,-0.0062,0.5053,1.5449,1.0396
+iter-v3/045 (4-sym + per-sym ATR; PROMISING anchor),17,13,43.8974,9.3355,58.82,53.85,0.746,0.3177,-0.4283,3.5259,1.837,-1.6889
+iter-v3/047 (4-sym + per-sym ATR + primitive 10),13,12,0.8486,-19.1331,46.15,33.33,0.4872,0.4947,0.0075,1.1675,2.0177,0.8502
+iter-v3/049 (4-sym + per-sym ATR + primitive 10 + ADX retune),13,12,0.8486,-19.1331,46.15,33.33,0.4261,0.4315,0.0054,1.0272,1.9145,0.8873
+iter-v3/050 seed=42 (CONFIRMATION; same head as /049),13,12,0.8486,-19.1331,46.15,33.33,0.4872,0.4947,0.0075,1.1659,2.0151,0.8492

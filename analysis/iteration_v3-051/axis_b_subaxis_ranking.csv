@@ -1,0 +1,6 @@
+axis,is_trades,oos_trades,is_sharpe,oos_sharpe,is_delta_vs_028,oos_delta_vs_028,method
+b0 — current head (iter-v3/050 seed 42),168,91,0.4872,1.1659,-0.0229,0.6606,primary projection from /050 (seed 42; bundle assembly: 4-sym + per-sym ATR + primitive 10)
+b1 — LDO removal alone (drop LDO; keep ALGO ATR + primitive 10),155,79,0.4947,2.0151,-0.0154,1.5098,PRECISE: drop LDO rows from /050 daily PnL; no Optuna re-tune assumed for non-LDO syms
+b2 — per-symbol ATR ALGO+LDO REVERT alone (keep 4-sym + primitive 10) [APPROX],-1,-1,,,,,NOT PRECISELY SIMULABLE: requires Optuna re-tune. Empirical proxy below.
+b3 — primitive 10 REVERT alone (keep 4-sym + per-sym ATR) [PROXY=iter-v3/045],217,118,0.746,3.5259,0.2359,3.0206,PROXY: iter-v3/045 single-seed (4-sym + per-sym ATR; no primitive 10) — different Optuna seed/path
+b4 — full per-symbol REVERT to iter-v3/028 architecture [GOLD STANDARD],156,95,0.5101,0.5053,0.0,0.0,GOLD STANDARD: iter-v3/028 multi-seed BASELINE (+0.5101 IS / +0.5053 OOS); not a counterfactual but the actual baseline state

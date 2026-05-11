@@ -1,0 +1,5 @@
+symbol,candidate,n_obs,spearman_rho,spearman_p,significant_at_p005
+BCHUSDT,regime_momentum_signed_3d,5627,-0.05801,1e-05,True
+LDOUSDT,regime_momentum_signed_3d,2641,-0.04383,0.0243,True
+TRXUSDT,regime_momentum_signed_3d,5569,-0.06822,0.0,True
+ALGOUSDT,regime_momentum_signed_3d,5125,-0.05782,3e-05,True
