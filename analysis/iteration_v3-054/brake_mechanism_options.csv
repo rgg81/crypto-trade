@@ -1,0 +1,4 @@
+mechanism,implementable_live,skip_LDO_OOS_catastrophic,skip_TRX_OOS_healthy,skip_BCH_OOS_healthy,verdict
+A — Peak resets at OOS boundary,NO (artificial measurement boundary),YES (peak resets to 0; LDO OOS DD = 35.24),NO (TRX OOS DD = 7.89 < typical T),NO (BCH OOS DD = 9.90 < typical T),REJECTED — live engine can't reset at backtest boundary
+B — 30-day rolling-time-window peak (CARVER),YES (deque-based; identical to RiskV2 state),YES (LDO OOS DD = 23.50 in 30-day window),NO (TRX OOS DD = 4.80 in 30-day window),NO (BCH OOS DD = 9.44 in 30-day window),RECOMMENDED — clean separation of LDO catastrophic from BCH/TRX healthy
+C — 30-trade rolling-count window,YES (deque-based) — but per-symbol trade rate variable,YES,NO,NO,REJECTED — LDO with 9 IS trades in 24 months → 30-trade window > 5 years

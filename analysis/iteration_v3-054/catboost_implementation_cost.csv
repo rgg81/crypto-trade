@@ -1,0 +1,8 @@
+component,h_estimate_low,h_estimate_high,notes
+CatBoost interface in lgbm.py,2.0,3.0,Parallel to LGBM; CatBoost API ~10 config params
+Optuna search space translation,1.0,1.0,num_leaves→depth; colsample_bytree→rsm
+Determinism guardrails,0.5,1.0,Mirror test_lgbm_determinism.py for CatBoost
+Full backtest wall-clock,3.0,4.0,CatBoost 2-3x LGBM per trial; Ordered Boosting overhead
+Critic verify + brief + gate,0.5,0.5,Standard QR/Critic dispatch
+TOTAL (full implementation + backtest),7.0,9.5,EXCEEDS 2h EXPLORATION cap by 3.5-4.75x; defer to CONFIRMATION
+ALTERNATIVE: Methodology-only spike,1.5,2.0,BCHUSDT 2024-12 only; no walk-forward; preliminary evidence only
