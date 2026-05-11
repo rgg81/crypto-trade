@@ -316,13 +316,15 @@ V3_FEATURE_COLUMNS_TOP_N: tuple[str, ...] = (
     #   composed-feature axis selections (path B 55% predicted).
     #   Univariate rho NOT significant p<0.05 in all 4 syms (mean +0.0114; weakest).
     #   Feature computable from existing parquet columns -- NO parquet regen required.
-    "hurst_drift_50_200",
+    # iter-v3/054: hurst_drift_50_200 DROPPED (PARKED per /053 closeout PATH D NULL-RESULT;
+    #   15th-slot SWAP family STRUCTURALLY EXHAUSTED at single-seed EXPLORATION per Critic
+    #   FINAL `c056354` Recommendation #1: CPCV 29/45 positive, median +0.3351, Q25 -0.243
+    #   IDENTICAL across /051/052/053 to 4 decimals). compute_hurst_drift_50_200 RETAINED in
+    #   engineered_v3.py as dead code (zero revert cost). 5 adversarial tests RETAINED.
+    #   Net count: 15 → 14 (system-mandated REVERT to iter-v3/028 base stack).
 )
-"""Top-15 feature subset (as of iter-v3/053): SWAP -- regime_momentum_signed_3d DROPPED (PARKED
-per /052 PATH C-suspicious; rank 14-15/15 all 3 syms); hurst_drift_50_200 ADDED as 15th element.
-REFRAMED HYPOTHESIS B: primary value is to document the Linear Redundancy Pre-Falsifier (LR-PF)
-methodology. hurst_drift_50_200 = hurst_100 - hurst_diff_100_50 - hurst_200 (R^2=1.0 exact linear
-combination of 3 source primitives; EDA SHA `1fc6d55`). Net count UNCHANGED at 15 (SWAP).
+"""Top-14 feature subset (as of iter-v3/054): hurst_drift_50_200 DROPPED (PARKED per /053
+closeout PATH D; 15th-slot SWAP family exhausted per Critic FINAL `c056354`). Net 14 features.
 iter-v3/051: fracdiff_d05_close ADDED at universal scope per cycle 4 #1 EXPLORATION axis.
 iter-v3/052: fracdiff_d05_close PARKED (EXPLORATION-NULL-RESULT; SWAP to 3d per Critic
 `32cc46f` rec #2).

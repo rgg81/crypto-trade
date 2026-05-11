@@ -103,7 +103,7 @@ def _derive_ensemble_seeds(outer_seed: int, size: int = ENSEMBLE_SIZE) -> list[i
     return [int(s) for s in rng.integers(low=0, high=2**31 - 1, size=size)]
 
 
-ITERATION_LABEL = "v3-053"
+ITERATION_LABEL = "v3-054"
 REPORTS_DIR = Path("reports-v3")
 FEATURES_DIR = Path("data/features_v3")
 DATA_DIR = Path("data")
@@ -190,25 +190,19 @@ def _verify_data_freshness(symbols: tuple[str, ...], max_lag_hours: float = 16.0
 
 
 def _verify_feature_columns() -> None:
-    """Verifies V3_FEATURE_COLUMNS contents per current brief (iter-v3/053).
+    """Verifies V3_FEATURE_COLUMNS contents per current brief (iter-v3/054).
 
-    iter-v3/053: EXPLORATION — cycle 4 #3 — SWAP: hurst_drift_50_200 REPLACES
-      regime_momentum_signed_3d as 15th element (PARKED per /052 PATH C-suspicious).
-      Carry-forward SYSTEM-LEVEL REVERT to iter-v3/028 architecture (UNCHANGED from /052):
+    iter-v3/054: EXPLORATION — cycle 4 #4 — per-symbol drawdown brake (NEW risk primitive 11).
+      Carry-forward SYSTEM-LEVEL REVERT to iter-v3/028 architecture (UNCHANGED from /051):
       - V3_MODELS = (BCH, LDO, TRX) — 3 symbols (ALGO REVERTED).
       - V3_ATR_MULTIPLIERS_PER_SYMBOL = {} (REVERT — ALGO+LDO entries cleared).
       - block_long_for = () (REVERT — primitive 10 cleared).
       - REQUIRED_GAP = 66 = (21+1)*3 (UNCHANGED — universe unchanged).
-      Single axis under test (SWAP):
-        hurst_drift_50_200 ADDED to V3_FEATURE_COLUMNS_TOP_N (SWAP 15th element).
-        regime_momentum_signed_3d DROPPED from V3_FEATURE_COLUMNS_TOP_N (PARKED — dispatch
-          call RETAINED as dead code; compute function + 5 tests retained at zero revert cost).
-        Parquet regen NOT REQUIRED: hurst_drift_50_200 computable from existing parquet
-          columns (hurst_100, hurst_diff_100_50, hurst_200). Compute-on-the-fly at training.
-        EDA evidence (analysis/iteration_v3-053/ SHA `1fc6d55`):
-          R^2=1.0 linear redundancy (axis5); ADF p<<0.05 all 4 syms (axis2); IC max 0.881
-          with source primitive (axis3; Category 2 carve-out applies); univariate rho
-          NOT significant p<0.05 all 4 syms (mean +0.0114; weakest of any v3 candidate).
+      Single axis under test: ADD per-symbol drawdown brake to RiskV2Config (primitive 11).
+      System-mandated REVERT: hurst_drift_50_200 DROPPED from V3_FEATURE_COLUMNS_TOP_N
+        (15 → 14). 15th-slot SWAP family STRUCTURALLY EXHAUSTED per Critic FINAL `c056354`.
+        compute_hurst_drift_50_200 RETAINED in engineered_v3.py as dead code.
+      Parquet regen NOT REQUIRED: primitive 11 is a state machine (not a feature).
       DEFAULT_ATR_MULTIPLIERS: (2.0, 1.0) — unchanged.
       V3_FEATURES_PER_SYMBOL: EMPTY (unchanged from iter-v3/040).
       adx_threshold_per_symbol: {} (unchanged; TRX 21 dropped at iter-v3/050 closeout).
@@ -221,29 +215,29 @@ def _verify_feature_columns() -> None:
     cross_asset_divergence_norm MUST NOT be in universal list (dead at model level).
     fracdiff_d05_close MUST NOT be in universal list (PARKED at iter-v3/052 SWAP).
     efficiency_ratio_50 MUST NOT be present (DROPPED — iter-v3/043 DISASTROUS NEGATIVE).
-    regime_momentum_signed_5d MUST be present (mandate still ACTIVE at iter-v3/053).
+    regime_momentum_signed_5d MUST be present (mandate still ACTIVE at iter-v3/054).
     vol_normalized_ret_5d MUST NOT be present (DROPPED iter-v3/049; iter-v3/048 PATH C-clean).
-    hurst_drift_50_200 MUST be present in V3_FEATURE_COLUMNS_TOP_N (ACTIVATED at
-      iter-v3/053 SWAP; NEW Category 1 engineered feature; REFRAMED HYPOTHESIS B).
+    hurst_drift_50_200 MUST NOT be present (PARKED per /053 PATH D + Critic FINAL `c056354`).
     regime_momentum_signed_3d MUST NOT be present (PARKED per /052 PATH C-suspicious).
-    sym_vs_btc_ret_7d MUST be present (RESTORED at iter-v3/042; KEPT at iter-v3/053).
-    ret_skew_50 MUST be present (RESTORED at iter-v3/042; KEPT at iter-v3/053).
+    sym_vs_btc_ret_7d MUST be present (RESTORED at iter-v3/042; KEPT at iter-v3/054).
+    ret_skew_50 MUST be present (RESTORED at iter-v3/042; KEPT at iter-v3/054).
 
-    Per-symbol checks (iter-v3/053 — REVERT carry-forward from /051):
+    Per-symbol checks (iter-v3/054 — REVERT carry-forward from /051):
     V3_FEATURES_PER_SYMBOL must be EMPTY (0 entries).
     V3_ATR_MULTIPLIERS_PER_SYMBOL must be EMPTY (0 entries — REVERT; all syms use DEFAULT).
-      ALGOUSDT MUST NOT be a key (REVERTED at iter-v3/051; unchanged at /052+/053).
-      LDOUSDT  MUST NOT be a key (REVERTED at iter-v3/051; unchanged at /052+/053).
-    features_for_symbol("BCHUSDT") MUST return 15 features = V3_FEATURE_COLUMNS_TOP_N.
-    features_for_symbol("LDOUSDT") MUST return 15 features (fallback — no per-symbol ext).
-    features_for_symbol("TRXUSDT") MUST return 15 features (fallback).
+      ALGOUSDT MUST NOT be a key (REVERTED at iter-v3/051; unchanged at /052-/054).
+      LDOUSDT  MUST NOT be a key (REVERTED at iter-v3/051; unchanged at /052-/054).
+    features_for_symbol("BCHUSDT") MUST return 14 features = V3_FEATURE_COLUMNS_TOP_N.
+    features_for_symbol("LDOUSDT") MUST return 14 features (fallback — no per-symbol ext).
+    features_for_symbol("TRXUSDT") MUST return 14 features (fallback).
     atr_multipliers_for_symbol("BCHUSDT") MUST return (2.0, 1.0) (DEFAULT fallback).
     atr_multipliers_for_symbol("LDOUSDT") MUST return (2.0, 1.0) (DEFAULT fallback — REVERT).
     atr_multipliers_for_symbol("TRXUSDT") MUST return (2.0, 1.0) (DEFAULT fallback).
     DEFAULT_ATR_MULTIPLIERS MUST be (2.0, 1.0) (correct since iter-v3/043 revert).
     Primitive 10 (REVERT): risk_cfg.block_long_for == () (empty — system-level REVERT).
+    Primitive 11 (NEW): risk_cfg.enable_per_symbol_drawdown_brake == True (iter-v3/054 axis).
     Per-symbol ADX (UNCHANGED): risk_cfg.adx_threshold_per_symbol == {} (empty; TRX 21
-      dropped at iter-v3/050 closeout per Critic FINAL `1908d50`; unchanged at /053).
+      dropped at iter-v3/050 closeout per Critic FINAL `1908d50`; unchanged at /054).
     """
     from crypto_trade.features_v3 import (  # noqa: PLC0415
         DEFAULT_ATR_MULTIPLIERS,
@@ -252,12 +246,12 @@ def _verify_feature_columns() -> None:
     )
 
     n = len(V3_FEATURE_COLUMNS)
-    if n != 15:
+    if n != 14:
         raise RuntimeError(
-            f"V3_FEATURE_COLUMNS has {n} columns — expected exactly 15. "
-            "iter-v3/051: fracdiff_d05_close ADDED (14 → 15) at universal scope per "
-            "cycle 4 #1 EXPLORATION axis. "
-            "Add 'fracdiff_d05_close' to V3_FEATURE_COLUMNS_TOP_N in "
+            f"V3_FEATURE_COLUMNS has {n} columns — expected exactly 14. "
+            "iter-v3/054: hurst_drift_50_200 DROPPED (15 → 14) per /053 closeout PATH D "
+            "PARK action (15th-slot SWAP family exhausted per Critic FINAL `c056354`). "
+            "Remove 'hurst_drift_50_200' from V3_FEATURE_COLUMNS_TOP_N in "
             "features_v3/__init__.py."
         )
     if "tbr_zscore_30" in V3_FEATURE_COLUMNS:
@@ -379,7 +373,7 @@ def _verify_feature_columns() -> None:
         )
     print(
         f"  V3_FEATURE_COLUMNS: {n} columns "
-        "(iter-v3/053: 15-feature set; SWAP: hurst_drift_50_200 PRESENT (ACTIVATED); "
+        "(iter-v3/054: 14-feature set; hurst_drift_50_200 ABSENT (PARKED /053 PATH D); "
         "regime_momentum_signed_3d ABSENT (PARKED); "
         "fracdiff_d05_close ABSENT (PARKED); vol_normalized_ret_5d ABSENT (DROPPED /049); "
         "efficiency_ratio_50 ABSENT; "
@@ -407,7 +401,7 @@ def _verify_feature_columns() -> None:
             f"Current keys: {list(V3_FEATURES_PER_SYMBOL.keys())}. "
             "Clear V3_FEATURES_PER_SYMBOL to {{}} in features_v3/__init__.py."
         )
-    print("  V3_FEATURES_PER_SYMBOL: 0 entries (empty — all symbols use 15-feature fallback)  PASS")
+    print("  V3_FEATURES_PER_SYMBOL: 0 entries (empty — all symbols use 14-feature fallback)  PASS")
 
     # iter-v3/051: V3_ATR_MULTIPLIERS_PER_SYMBOL MUST be EMPTY (0 entries — SYSTEM-LEVEL REVERT).
     # Per `feedback_v3_per_symbol_lifts_oos_breaks_is.md` UPDATED 2026-05-10 (second-cycle
@@ -433,20 +427,20 @@ def _verify_feature_columns() -> None:
     # ALGOUSDT NOT in V3_MODELS at iter-v3/053 (REVERTED from /051; 3-sym universe).
     for sym in ("BCHUSDT", "LDOUSDT", "TRXUSDT"):
         sym_feats = features_for_symbol(sym)
-        if len(sym_feats) != 15:
+        if len(sym_feats) != 14:
             raise RuntimeError(
                 f"{sym} fallback has {len(sym_feats)} features — "
-                "expected exactly 15 (iter-v3/053 V3_FEATURE_COLUMNS_TOP_N universal list; "
-                "hurst_drift_50_200 SWAPPED IN as 15th at universal scope). "
-                "iter-v3/053: SWAP hurst_drift_50_200 in V3_FEATURE_COLUMNS_TOP_N in "
-                "features_v3/__init__.py (count stays 15). V3_FEATURES_PER_SYMBOL must be empty."
+                "expected exactly 14 (iter-v3/054 V3_FEATURE_COLUMNS_TOP_N; "
+                "hurst_drift_50_200 PARKED per /053 PATH D + Critic FINAL `c056354`). "
+                "Remove 'hurst_drift_50_200' from V3_FEATURE_COLUMNS_TOP_N in "
+                "features_v3/__init__.py. V3_FEATURES_PER_SYMBOL must be empty."
             )
-        if "hurst_drift_50_200" not in sym_feats:
+        if "hurst_drift_50_200" in sym_feats:
             raise RuntimeError(
-                f"{sym} feature set missing hurst_drift_50_200 — must be PRESENT. "
-                "iter-v3/053: SWAP — hurst_drift_50_200 ACTIVATED as 15th element; "
-                "all 3 symbols must include it in their feature set. "
-                f"Check V3_FEATURE_COLUMNS_TOP_N and features_for_symbol('{sym}') path."
+                f"{sym} feature set contains hurst_drift_50_200 — must be ABSENT. "
+                "iter-v3/054: REVERT — hurst_drift_50_200 PARKED per /053 closeout PATH D "
+                "(15th-slot SWAP family exhausted; Critic FINAL `c056354`). "
+                f"Remove it from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
             )
         if "regime_momentum_signed_3d" in sym_feats:
             raise RuntimeError(
@@ -477,8 +471,8 @@ def _verify_feature_columns() -> None:
                 f"Check features_for_symbol('{sym}') path."
             )
     print(
-        "  BCH/LDO/TRX: 15-feature universal fallback "
-        "(hurst_drift_50_200 ACTIVATED iter-v3/053 cycle 4 #3 SWAP; "
+        "  BCH/LDO/TRX: 14-feature universal fallback "
+        "(hurst_drift_50_200 PARKED iter-v3/054 per /053 PATH D + Critic `c056354`; "
         "regime_momentum_signed_3d PARKED (ABSENT); "
         "fracdiff_d05_close PARKED (ABSENT); vol_normalized_ret_5d DROPPED /049; "
         "efficiency_ratio_50 ABSENT; "
@@ -557,21 +551,22 @@ def _verify_feature_columns() -> None:
         "(DROPPED iter-v3/049 per iter-v3/048 PATH C-clean closeout)  PASS"
     )
 
-    # iter-v3/053: hurst_drift_50_200 MUST be PRESENT (ACTIVATED via SWAP at 15th slot).
-    # NEW Category 1 engineered feature; REFRAMED HYPOTHESIS B (LR-PF methodology doc).
-    # R^2=1.0 linear redundancy with 3 source primitives (EDA SHA `1fc6d55`
-    # axis5_linear_redundancy.csv). Computable from existing parquet columns -- NO regen.
-    if "hurst_drift_50_200" not in V3_FEATURE_COLUMNS_TOP_N:
+    # iter-v3/054: hurst_drift_50_200 MUST be ABSENT (PARKED per /053 PATH D NULL-RESULT).
+    # 15th-slot SWAP family STRUCTURALLY EXHAUSTED: CPCV 29/45, median +0.3351, Q25 -0.243
+    # IDENTICAL across /051/052/053 to 4 decimals — Critic FINAL `c056354` rec #1.
+    # compute_hurst_drift_50_200 RETAINED in engineered_v3.py as dead code (zero revert cost).
+    if "hurst_drift_50_200" in V3_FEATURE_COLUMNS_TOP_N:
         raise RuntimeError(
-            "hurst_drift_50_200 NOT FOUND in V3_FEATURE_COLUMNS_TOP_N — must be PRESENT "
-            "at iter-v3/053. SWAP: hurst_drift_50_200 REPLACES regime_momentum_signed_3d as "
-            "15th element. EDA SHA `1fc6d55` (analysis/iteration_v3-053/). "
-            "Add 'hurst_drift_50_200' as 15th element of V3_FEATURE_COLUMNS_TOP_N "
-            "in src/crypto_trade/features_v3/__init__.py."
+            "hurst_drift_50_200 FOUND in V3_FEATURE_COLUMNS_TOP_N — must be ABSENT "
+            "at iter-v3/054. PARKED per /053 PATH D NULL-RESULT closeout + Critic FINAL "
+            "`c056354` rec #1 (15th-slot SWAP family exhausted; CPCV invariant across "
+            "/051/052/053). compute_hurst_drift_50_200 retained in engineered_v3.py as "
+            "dead code. Remove 'hurst_drift_50_200' from V3_FEATURE_COLUMNS_TOP_N in "
+            "src/crypto_trade/features_v3/__init__.py."
         )
     print(
-        "  hurst_drift_50_200 PRESENT in V3_FEATURE_COLUMNS_TOP_N "
-        "(ACTIVATED iter-v3/053 SWAP; REFRAMED HYPOTHESIS B LR-PF methodology)  PASS"
+        "  hurst_drift_50_200 ABSENT from V3_FEATURE_COLUMNS_TOP_N "
+        "(PARKED iter-v3/054 per /053 PATH D + Critic FINAL `c056354`)  PASS"
     )
 
     # iter-v3/053: regime_momentum_signed_3d MUST be ABSENT (PARKED per /052 PATH C-suspicious).
@@ -621,6 +616,47 @@ def _verify_feature_columns() -> None:
     print(
         "  Per-symbol ADX threshold (iter-v3/051): {} (EMPTY UNCHANGED — TRX 21 already "
         "dropped at iter-v3/050; global ADX threshold 20.0 applies to all 3 symbols)  PASS"
+    )
+
+    # iter-v3/054: Primitive 11 (per-symbol drawdown brake) MUST be ENABLED.
+    # enable_per_symbol_drawdown_brake=True in RiskV2Config in _build_v3_model.
+    # Calibrated thresholds: T=10.0, recovery=5.0, window=30 days (IS-derived per EDA
+    # SHA e565b82 per_symbol_drawdown_brake_eda.py).
+    _p11_cfg_check, p11_strat_check = _build_v3_model(
+        symbol="BCHUSDT", seed=42, n_trials=1, ensemble_seeds=[42]
+    )
+    if not isinstance(p11_strat_check, RiskV3Wrapper):
+        raise RuntimeError(
+            f"_build_v3_model returned {type(p11_strat_check).__name__} — expected RiskV3Wrapper. "
+            "iter-v3/054: primitive 11 check requires RiskV3Wrapper."
+        )
+    if not p11_strat_check.config.enable_per_symbol_drawdown_brake:
+        raise RuntimeError(
+            "RiskV2Config.enable_per_symbol_drawdown_brake = False — expected True. "
+            "iter-v3/054: per-symbol drawdown brake (primitive 11) must be ENABLED. "
+            "Set enable_per_symbol_drawdown_brake=True in RiskV2Config in _build_v3_model."
+        )
+    if p11_strat_check.config.drawdown_brake_threshold_wpnl != 10.0:
+        raise RuntimeError(
+            f"RiskV2Config.drawdown_brake_threshold_wpnl = "
+            f"{p11_strat_check.config.drawdown_brake_threshold_wpnl} — expected 10.0. "
+            "iter-v3/054: IS-calibrated threshold from QR EDA SHA e565b82."
+        )
+    if p11_strat_check.config.drawdown_brake_recovery_wpnl != 5.0:
+        raise RuntimeError(
+            f"RiskV2Config.drawdown_brake_recovery_wpnl = "
+            f"{p11_strat_check.config.drawdown_brake_recovery_wpnl} — expected 5.0. "
+            "iter-v3/054: T/2 Carver-canonical recovery threshold."
+        )
+    if p11_strat_check.config.drawdown_brake_window_days != 30:
+        raise RuntimeError(
+            f"RiskV2Config.drawdown_brake_window_days = "
+            f"{p11_strat_check.config.drawdown_brake_window_days} — expected 30. "
+            "iter-v3/054: 30-day Carver-canonical rolling window."
+        )
+    print(
+        "  Primitive 11 (per-symbol drawdown brake): enable=True, T=10.0, "
+        "recovery=5.0, window=30d (iter-v3/054 NEW risk primitive)  PASS"
     )
 
 
@@ -1342,6 +1378,15 @@ def _build_v3_model(
         # Critic FINAL `1908d50` recommendation #2: axis CLOSED for cycle 3.
         # adx_threshold_per_symbol reverts to empty dict (global-only ADX threshold=20.0).
         adx_threshold_per_symbol={},
+        # iter-v3/054: primitive 11 — per-symbol drawdown brake (NEW risk primitive).
+        # 30-day rolling-window weighted_pnl drawdown brake (Carver Leveraged Trading Ch. 11).
+        # IS-calibrated thresholds from QR EDA at SHA e565b82 (analysis/iteration_v3-054/
+        # per_symbol_drawdown_brake_eda.py): T=10.0 wpnl fires on 5 LDO OOS trades + 2 BCH IS
+        # trades at /053 trade roster ORACLE counterfactual (IS Δ +4.39 wpnl; OOS Δ +12.51).
+        enable_per_symbol_drawdown_brake=True,
+        drawdown_brake_threshold_wpnl=10.0,
+        drawdown_brake_recovery_wpnl=5.0,
+        drawdown_brake_window_days=30,
     )
     strategy = RiskV3Wrapper(m1, risk_cfg)
     return cfg, strategy

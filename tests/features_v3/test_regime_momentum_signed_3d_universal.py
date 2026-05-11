@@ -61,14 +61,14 @@ _V3_MODELS_ITER_052 = ("BCHUSDT", "LDOUSDT", "TRXUSDT")
 
 
 def test_regime_momentum_signed_3d_in_universal_feature_list() -> None:
-    """regime_momentum_signed_3d MUST be ABSENT from V3_FEATURE_COLUMNS_TOP_N at iter-v3/053.
+    """regime_momentum_signed_3d MUST be ABSENT from V3_FEATURE_COLUMNS_TOP_N at iter-v3/054.
 
     iter-v3/052: SWAP activated regime_momentum_signed_3d as 15th element.
     iter-v3/053: regime_momentum_signed_3d PARKED (PATH C-suspicious closeout per
     Critic FINAL `34cc46f` rec #2; rank 14-15/15 all 3 syms; IS-OOS ratio 2.327 OOB).
-    SWAP: hurst_drift_50_200 REPLACES regime_momentum_signed_3d at 15th slot.
+    iter-v3/054: hurst_drift_50_200 also PARKED (Critic FINAL `c056354` rec #1;
+    PATH C-suspicious OOS/IS ratio 3.73; rank 11-13/15 all 3 syms). Count 15→14.
     compute_regime_momentum_signed_3d RETAINED in dispatch as dead code (zero revert cost).
-    Net count stays at 15 (SWAP; 3d PARKED; hurst_drift_50_200 ACTIVATED).
     """
     assert "regime_momentum_signed_3d" not in V3_FEATURE_COLUMNS_TOP_N, (
         "regime_momentum_signed_3d FOUND in V3_FEATURE_COLUMNS_TOP_N — "
@@ -76,9 +76,9 @@ def test_regime_momentum_signed_3d_in_universal_feature_list() -> None:
         "Remove it from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
     )
     n = len(V3_FEATURE_COLUMNS_TOP_N)
-    assert n == 15, (
-        f"V3_FEATURE_COLUMNS_TOP_N has {n} elements — expected 15. "
-        "iter-v3/053: SWAP keeps count at 15 (3d OUT; hurst_drift_50_200 IN). "
+    assert n == 14, (
+        f"V3_FEATURE_COLUMNS_TOP_N has {n} elements — expected 14. "
+        "iter-v3/054: hurst_drift_50_200 PARKED (15→14; Critic FINAL `c056354` rec #1). "
         "Check V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
     )
     assert "fracdiff_d05_close" not in V3_FEATURE_COLUMNS_TOP_N, (
@@ -86,9 +86,10 @@ def test_regime_momentum_signed_3d_in_universal_feature_list() -> None:
         "fracdiff must be PARKED (dropped from model input since /052). "
         "Remove it from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
     )
-    assert "hurst_drift_50_200" in V3_FEATURE_COLUMNS_TOP_N, (
-        "hurst_drift_50_200 NOT found in V3_FEATURE_COLUMNS_TOP_N — "
-        "iter-v3/053 SWAP failed. Add it as 15th element in features_v3/__init__.py."
+    assert "hurst_drift_50_200" not in V3_FEATURE_COLUMNS_TOP_N, (
+        "hurst_drift_50_200 FOUND in V3_FEATURE_COLUMNS_TOP_N — "
+        "iter-v3/054 PARK failed. Remove it from V3_FEATURE_COLUMNS_TOP_N in "
+        "features_v3/__init__.py."
     )
 
 
@@ -225,17 +226,17 @@ def test_regime_momentum_signed_3d_no_lookahead() -> None:
 
 
 def test_v3_feature_columns_top_n_swap_fracdiff_to_3d_at_iter_v3_052() -> None:
-    """Comprehensive SWAP state verification at iter-v3/053 (reflects /053 PARKED state).
+    """Comprehensive PARK state verification at iter-v3/054 (reflects /054 14-feature state).
 
     iter-v3/052: SWAP activated regime_momentum_signed_3d as 15th element.
     iter-v3/053: regime_momentum_signed_3d PARKED (PATH C-suspicious; Critic `34cc46f` rec #2).
-    hurst_drift_50_200 ACTIVATED as new 15th element. Checks:
+    iter-v3/054: hurst_drift_50_200 PARKED (Critic FINAL `c056354` rec #1;
+    PATH C-suspicious OOS/IS ratio 3.73; rank 11-13/15 all 3 syms). Count 15→14. Checks:
     - regime_momentum_signed_3d ABSENT from V3_FEATURE_COLUMNS_TOP_N (PARKED at /053).
-    - hurst_drift_50_200 PRESENT as 15th element (ACTIVATED at /053).
+    - hurst_drift_50_200 ABSENT from V3_FEATURE_COLUMNS_TOP_N (PARKED at /054).
     - fracdiff_d05_close ABSENT (PARKED since /052).
-    - count == 15 (SWAP; net count unchanged).
+    - count == 14 (PARK at /054; net reduction by 1).
     - regime_momentum_signed_5d PRESENT (mandate per feedback_v3_engineered_features_proven.md).
-    - hurst_drift_50_200 is the LAST element (15th position; SWAP at 15th slot at /053).
     """
     assert "regime_momentum_signed_3d" not in V3_FEATURE_COLUMNS_TOP_N, (
         "regime_momentum_signed_3d FOUND in V3_FEATURE_COLUMNS_TOP_N. "
@@ -247,24 +248,16 @@ def test_v3_feature_columns_top_n_swap_fracdiff_to_3d_at_iter_v3_052() -> None:
         "PARKED per /051 EXPLORATION-NULL-RESULT + Critic FINAL `32cc46f` rec #2."
     )
     n = len(V3_FEATURE_COLUMNS_TOP_N)
-    assert n == 15, (
-        f"V3_FEATURE_COLUMNS_TOP_N count={n} — expected 15. "
-        "SWAP must keep count at 15 (3d OUT; hurst_drift_50_200 IN at /053)."
+    assert n == 14, (
+        f"V3_FEATURE_COLUMNS_TOP_N count={n} — expected 14. "
+        "iter-v3/054 PARK: hurst_drift_50_200 DROPPED (15→14; Critic FINAL `c056354` rec #1)."
     )
     assert "regime_momentum_signed_5d" in V3_FEATURE_COLUMNS_TOP_N, (
         "regime_momentum_signed_5d NOT found in V3_FEATURE_COLUMNS_TOP_N. "
-        "Mandate per feedback_v3_engineered_features_proven.md is ACTIVE at iter-v3/053 "
+        "Mandate per feedback_v3_engineered_features_proven.md is ACTIVE at iter-v3/054 "
         "(iter-v3/028 baseline edge ingredient; multi-seed CONFIRMATION-MERGE)."
     )
-    assert "hurst_drift_50_200" in V3_FEATURE_COLUMNS_TOP_N, (
-        "hurst_drift_50_200 NOT found in V3_FEATURE_COLUMNS_TOP_N. "
-        "iter-v3/053 SWAP: Add it as 15th element in features_v3/__init__.py."
-    )
-    # Verify hurst_drift_50_200 is the last element (15th position == index 14) at /053
-    last_element = V3_FEATURE_COLUMNS_TOP_N[-1]
-    assert last_element == "hurst_drift_50_200", (
-        f"Last element of V3_FEATURE_COLUMNS_TOP_N is '{last_element}' — "
-        "expected 'hurst_drift_50_200'. "
-        "iter-v3/053 SWAP: hurst_drift_50_200 must be at position 15 (index 14). "
-        "Check V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
+    assert "hurst_drift_50_200" not in V3_FEATURE_COLUMNS_TOP_N, (
+        "hurst_drift_50_200 FOUND in V3_FEATURE_COLUMNS_TOP_N. "
+        "iter-v3/054 PARK: Remove it from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
     )

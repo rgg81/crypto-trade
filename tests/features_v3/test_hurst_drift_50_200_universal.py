@@ -61,35 +61,29 @@ _V3_MODELS_ITER_053 = ("BCHUSDT", "LDOUSDT", "TRXUSDT")
 
 
 def test_hurst_drift_50_200_in_universal_feature_list() -> None:
-    """hurst_drift_50_200 MUST be in V3_FEATURE_COLUMNS_TOP_N as 15th element; count MUST be 15.
+    """hurst_drift_50_200 MUST NOT be in V3_FEATURE_COLUMNS_TOP_N at iter-v3/054; count MUST be 14.
 
-    iter-v3/053: SWAP -- hurst_drift_50_200 REPLACES regime_momentum_signed_3d as
-    15th element. EDA-backed per /053 QR EDA (SHA `1fc6d55`).
-    Net count stays at 15 (SWAP; 3d PARKED per /052 PATH C-suspicious).
+    iter-v3/053: SWAP added hurst_drift_50_200 as 15th element.
+    iter-v3/054: PARK -- hurst_drift_50_200 DROPPED (Critic FINAL `c056354` rec #1;
+    PATH C-suspicious OOS/IS ratio 3.73; rank 11-13/15 all 3 syms). Count 15→14.
+    The compute function is RETAINED in dispatch (zero revert cost).
     """
-    assert "hurst_drift_50_200" in V3_FEATURE_COLUMNS_TOP_N, (
-        "hurst_drift_50_200 NOT found in V3_FEATURE_COLUMNS_TOP_N -- "
-        "iter-v3/053 SWAP failed. Add it as 15th element in features_v3/__init__.py."
+    assert "hurst_drift_50_200" not in V3_FEATURE_COLUMNS_TOP_N, (
+        "hurst_drift_50_200 FOUND in V3_FEATURE_COLUMNS_TOP_N -- "
+        "iter-v3/054 PARK failed. Remove it from V3_FEATURE_COLUMNS_TOP_N in "
+        "features_v3/__init__.py."
     )
     n = len(V3_FEATURE_COLUMNS_TOP_N)
-    assert n == 15, (
-        f"V3_FEATURE_COLUMNS_TOP_N has {n} elements -- expected 15. "
-        "iter-v3/053: SWAP keeps count at 15 (regime_momentum_signed_3d OUT; "
-        "hurst_drift_50_200 IN). Check V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
+    assert n == 14, (
+        f"V3_FEATURE_COLUMNS_TOP_N has {n} elements -- expected 14. "
+        "iter-v3/054: PARK drops hurst_drift_50_200 (15→14). "
+        "Check V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
     )
     assert "regime_momentum_signed_3d" not in V3_FEATURE_COLUMNS_TOP_N, (
         "regime_momentum_signed_3d STILL in V3_FEATURE_COLUMNS_TOP_N -- "
         "iter-v3/053 SWAP incomplete. 3d must be PARKED (dropped per /052 PATH C-suspicious "
         "closeout; Critic FINAL `34cc46f` rec #2). "
         "Remove it from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
-    )
-    # Verify hurst_drift_50_200 is the last element (15th position == index 14)
-    last_element = V3_FEATURE_COLUMNS_TOP_N[-1]
-    assert last_element == "hurst_drift_50_200", (
-        f"Last element of V3_FEATURE_COLUMNS_TOP_N is '{last_element}' -- "
-        "expected 'hurst_drift_50_200'. "
-        "iter-v3/053 SWAP: hurst_drift_50_200 must be at position 15 (index 14). "
-        "Check V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
     )
 
 
@@ -279,28 +273,29 @@ def test_hurst_drift_50_200_past_only_no_lookahead() -> None:
 
 
 def test_v3_models_is_3_symbol_at_iter_v3_053() -> None:
-    """V3 universe must be (BCHUSDT, LDOUSDT, TRXUSDT) at iter-v3/053.
+    """V3 universe must be (BCHUSDT, LDOUSDT, TRXUSDT) at iter-v3/054.
 
-    Confirms the 3-symbol universe is UNCHANGED from /052. ALGOUSDT was REVERTED
+    Confirms the 3-symbol universe is UNCHANGED from /052-/053. ALGOUSDT was REVERTED
     at the system level per iter-v3/051 (feedback_v3_per_symbol_lifts_oos_breaks_is.md
     UPDATED 2026-05-10; two-cycle anti-pattern confirmation at /039+/050).
 
-    Verified via features_for_symbol: all 3 symbols return 15-feature fallback, none
-    include ALGOUSDT. REQUIRED_GAP = 66 = (21+1)*3 (3-symbol universe; UNCHANGED).
+    iter-v3/054: hurst_drift_50_200 PARKED (15→14). All 3 symbols return 14-feature fallback.
+    REQUIRED_GAP = 66 = (21+1)*3 (3-symbol universe; UNCHANGED).
     """
     from crypto_trade.features_v3 import features_for_symbol  # noqa: PLC0415
 
     expected_universe = ("BCHUSDT", "LDOUSDT", "TRXUSDT")
-    # Each symbol in the expected universe must return the 15-feature universal fallback
+    # Each symbol in the expected universe must return the 14-feature universal fallback
     for sym in expected_universe:
         feats = features_for_symbol(sym)
-        assert len(feats) == 15, (
-            f"{sym} fallback returns {len(feats)} features -- expected 15. "
-            "iter-v3/053 universe: BCH + LDO + TRX, all at 15-feature universal fallback."
+        assert len(feats) == 14, (
+            f"{sym} fallback returns {len(feats)} features -- expected 14. "
+            "iter-v3/054 universe: BCH + LDO + TRX, all at 14-feature universal fallback "
+            "(hurst_drift_50_200 PARKED; Critic FINAL `c056354` rec #1)."
         )
-        assert "hurst_drift_50_200" in feats, (
-            f"{sym} fallback missing hurst_drift_50_200 -- must be PRESENT as 15th element. "
-            "iter-v3/053: SWAP activated hurst_drift_50_200 at 15th slot."
+        assert "hurst_drift_50_200" not in feats, (
+            f"{sym} fallback contains hurst_drift_50_200 -- must be ABSENT. "
+            "iter-v3/054: hurst_drift_50_200 PARKED (15→14)."
         )
         assert "regime_momentum_signed_3d" not in feats, (
             f"{sym} fallback contains regime_momentum_signed_3d -- must be ABSENT. "
@@ -308,7 +303,7 @@ def test_v3_models_is_3_symbol_at_iter_v3_053() -> None:
         )
     # ALGOUSDT must NOT be in the v3 model universe
     assert "ALGOUSDT" not in {sym for sym in expected_universe}, (
-        "ALGOUSDT found in expected universe -- must be ABSENT at iter-v3/053. "
+        "ALGOUSDT found in expected universe -- must be ABSENT at iter-v3/054. "
         "System-level REVERT at iter-v3/051."
     )
     # Verify the constant matches the expected list exactly

@@ -136,6 +136,33 @@ class RiskV2Config:
     # seed EDA stage. iter-v3/049 sets {"TRXUSDT": 21.0}; BCH/LDO/ALGO unchanged.
     adx_threshold_per_symbol: dict[str, float] = field(default_factory=dict)
 
+    # iter-v3/054: primitive 11 — per-symbol drawdown brake.
+    # Pauses signals for a symbol when its 30-day rolling-window weighted_pnl drawdown
+    # hits drawdown_brake_threshold_wpnl. Resumes when drawdown recovers to
+    # drawdown_brake_recovery_wpnl. Per-symbol independent state. Carver canonical
+    # formulation (Leveraged Trading Ch. 11).
+    # Calibrated by QR EDA at iter-v3/054 (analysis/iteration_v3-054/
+    # per_symbol_drawdown_brake_eda.py): at T=10.0 wpnl, recovery=5.0 wpnl, 30-day
+    # window, brake fires on 5 LDO OOS trades + 2 BCH IS trades at /053 trade roster
+    # ORACLE counterfactual (IS Δ +4.39 wpnl; OOS Δ +12.51 wpnl).
+    # Default disabled preserves v1/v2/v3-prior behavior.
+    enable_per_symbol_drawdown_brake: bool = False
+    drawdown_brake_threshold_wpnl: float = 10.0  # engage when dd_30d >= this
+    drawdown_brake_recovery_wpnl: float = 5.0  # disengage when dd_30d <= this
+    drawdown_brake_window_days: int = 30  # rolling window for peak calculation
+
+    def __post_init__(self) -> None:
+        if self.enable_per_symbol_drawdown_brake:
+            if not (0 < self.drawdown_brake_recovery_wpnl < self.drawdown_brake_threshold_wpnl):
+                raise ValueError(
+                    f"drawdown brake requires 0 < recovery ({self.drawdown_brake_recovery_wpnl}) "
+                    f"< threshold ({self.drawdown_brake_threshold_wpnl})"
+                )
+            if self.drawdown_brake_window_days <= 0:
+                raise ValueError(
+                    f"drawdown_brake_window_days must be > 0, got {self.drawdown_brake_window_days}"
+                )
+
 
 @dataclass
 class GateStats:
@@ -153,6 +180,7 @@ class GateStats:
     direction_block_fires: int = (
         0  # iter-v3/047: direction-asymmetric kill switch fires (primitive 10)
     )
+    drawdown_brake_fires: int = 0  # iter-v3/054: per-symbol drawdown brake fires (primitive 11)
 
     def vol_scale_mean(self) -> float:
         return self.vol_scale_sum / self.vol_scaled_signals if self.vol_scaled_signals else 1.0
@@ -195,6 +223,16 @@ class RiskV2Wrapper:
         self._cap_per_symbol_pnl: dict[str, float] = {}
         # Current bar's open_time — used to expire stale entries from the deque
         self._cap_current_bar_ms: int = 0
+        # iter-v3/054: per-symbol drawdown brake state (primitive 11).
+        # _brake_timeline[sym] = deque of (close_time_ms, cum_wpnl) for the last
+        # drawdown_brake_window_days days of THIS symbol's closed trades.
+        # _brake_running_peak[sym] = max cum_wpnl over _brake_timeline[sym].
+        # _brake_cum_wpnl[sym] = current cumulative weighted_pnl (from trade 1).
+        # _brake_on[sym] = True if brake is currently engaged (signals killed).
+        self._brake_timeline: dict[str, deque[tuple[int, float]]] = {}
+        self._brake_running_peak: dict[str, float] = {}
+        self._brake_cum_wpnl: dict[str, float] = {}
+        self._brake_on: dict[str, bool] = {}
 
     @property
     def atr_column(self) -> str:
@@ -268,6 +306,14 @@ class RiskV2Wrapper:
             if cap_scale < 1.0:
                 stats.cap_fires += 1
 
+        # 7. Per-symbol drawdown brake (iter-v3/054, primitive 11) — binary kill switch.
+        # Applied AFTER vol-scaling and cap so all signal-modifying gates have fired first.
+        # The brake fires on signals surviving the prior gate cascade (direction != 0 after
+        # gates 1-6). Counter increments only when a non-zero signal is killed by the brake.
+        if self.config.enable_per_symbol_drawdown_brake and self._brake_on.get(symbol, False):
+            stats.drawdown_brake_fires += 1
+            return NO_SIGNAL
+
         new_weight = max(1, int(round(sig.weight * scale * cap_scale)))
         return Signal(
             direction=sig.direction,
@@ -277,22 +323,77 @@ class RiskV2Wrapper:
         )
 
     def record_trade_result(self, trade: TradeResult) -> None:
-        """Feed a closed trade result into the per-symbol cap rolling window.
+        """Feed a closed trade result into the per-symbol cap rolling window and drawdown brake.
 
         Must be called after each trade closes (close_time established) and
         BEFORE the next get_signal() call that should see the cap effect.
         Uses close_time (not open_time) so the window is past-only:
         a trade closing at time T is visible to signals emitted at T+epsilon.
 
-        This method is a no-op when enable_per_symbol_cap is False.
+        This method handles both primitive 8 (per-symbol cap) and primitive 11
+        (per-symbol drawdown brake). Each primitive is a no-op when disabled.
         """
-        if not self.config.enable_per_symbol_cap or self.config.max_per_symbol_pnl_share is None:
+        # Primitive 8: per-symbol PnL cap rolling window
+        if self.config.enable_per_symbol_cap and self.config.max_per_symbol_pnl_share is not None:
+            entry = (trade.close_time, trade.symbol, trade.weighted_pnl)
+            self._cap_timeline.append(entry)
+            self._cap_per_symbol_pnl[trade.symbol] = (
+                self._cap_per_symbol_pnl.get(trade.symbol, 0.0) + trade.weighted_pnl
+            )
+        # Primitive 11: per-symbol drawdown brake state update
+        self._update_drawdown_brake(trade)
+
+    def _update_drawdown_brake(self, trade: TradeResult) -> None:
+        """Update per-symbol drawdown brake state on each closed trade (primitive 11).
+
+        Called by record_trade_result. No-op when enable_per_symbol_drawdown_brake
+        is False (preserves backward compatibility with all prior behavior).
+
+        State-update logic (Carver Leveraged Trading Ch. 11 canonical formulation):
+          1. Append (close_time_ms, cum_wpnl) to the per-symbol deque.
+          2. Expire entries older than drawdown_brake_window_days from the front.
+          3. Compute running peak = max(cum_wpnl) over the in-window entries.
+          4. Compute dd_30d = running_peak - current_cum_wpnl.
+          5. State machine: engage if dd_30d >= threshold (and was off);
+             disengage if dd_30d <= recovery (and was on).
+        """
+        if not self.config.enable_per_symbol_drawdown_brake:
             return
-        entry = (trade.close_time, trade.symbol, trade.weighted_pnl)
-        self._cap_timeline.append(entry)
-        self._cap_per_symbol_pnl[trade.symbol] = (
-            self._cap_per_symbol_pnl.get(trade.symbol, 0.0) + trade.weighted_pnl
-        )
+
+        sym = trade.symbol
+        close_time = trade.close_time
+        wpnl = trade.weighted_pnl
+
+        # Initialize per-symbol state on first trade
+        if sym not in self._brake_timeline:
+            self._brake_timeline[sym] = deque()
+            self._brake_running_peak[sym] = 0.0
+            self._brake_cum_wpnl[sym] = 0.0
+            self._brake_on[sym] = False
+
+        # Update cumulative wpnl
+        self._brake_cum_wpnl[sym] += wpnl
+        self._brake_timeline[sym].append((close_time, self._brake_cum_wpnl[sym]))
+
+        # Expire entries older than window_days from the front of the deque
+        window_ms = self.config.drawdown_brake_window_days * 24 * 60 * 60 * 1000
+        cutoff = close_time - window_ms
+        while self._brake_timeline[sym] and self._brake_timeline[sym][0][0] < cutoff:
+            self._brake_timeline[sym].popleft()
+
+        # Compute running peak over the rolling window
+        self._brake_running_peak[sym] = max(c for _, c in self._brake_timeline[sym])
+
+        # Compute drawdown relative to running peak
+        dd_30d = self._brake_running_peak[sym] - self._brake_cum_wpnl[sym]
+
+        # State machine: engage / disengage
+        if self._brake_on[sym]:
+            if dd_30d <= self.config.drawdown_brake_recovery_wpnl:
+                self._brake_on[sym] = False  # disengage
+        else:
+            if dd_30d >= self.config.drawdown_brake_threshold_wpnl:
+                self._brake_on[sym] = True  # engage
 
     # ------------------------------------------------------------------
     # Lookup construction
@@ -511,6 +612,10 @@ class RiskV2Wrapper:
                 "mean_vol_scale": s.vol_scale_mean(),
                 "cap_fires": s.cap_fires,  # iter-v3/020: per-symbol cap firings
                 "cap_fire_rate": (s.cap_fires / s.signals_seen if s.signals_seen else 0.0),
+                "drawdown_brake_fires": s.drawdown_brake_fires,  # iter-v3/054: primitive 11
+                "drawdown_brake_fire_rate": (
+                    s.drawdown_brake_fires / s.signals_seen if s.signals_seen else 0.0
+                ),
             }
         return out
 

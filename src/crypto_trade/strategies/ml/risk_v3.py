@@ -288,8 +288,8 @@ class RiskV3Wrapper(RiskV2Wrapper):
         return sig
 
     def gate_stats_summary(self) -> dict[str, dict[str, float]]:
-        """Extend parent summary with regime_gate_fires (iter-v3/022) +
-        direction_block_fires (iter-v3/047) counters."""
+        """Extend parent summary with regime_gate_fires (iter-v3/022),
+        direction_block_fires (iter-v3/047), and drawdown_brake_fires (iter-v3/054)."""
         out = super().gate_stats_summary()
         for sym, s in self._gate_stats.items():
             out[sym]["regime_gate_fires"] = s.regime_gate_fires
@@ -298,6 +298,13 @@ class RiskV3Wrapper(RiskV2Wrapper):
             out[sym]["regime_gate_fire_rate"] = (
                 s.regime_gate_fires / total_seen if total_seen else 0.0
             )
+            # drawdown_brake_fires is already in parent summary (primitive 11)
+            # Ensure it's present even if parent didn't populate (defensive)
+            if "drawdown_brake_fires" not in out[sym]:
+                out[sym]["drawdown_brake_fires"] = s.drawdown_brake_fires
+                out[sym]["drawdown_brake_fire_rate"] = (
+                    s.drawdown_brake_fires / total_seen if total_seen else 0.0
+                )
         return out
 
 

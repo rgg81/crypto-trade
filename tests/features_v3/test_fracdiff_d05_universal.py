@@ -66,10 +66,11 @@ _V3_MODELS_ITER_052 = ("BCHUSDT", "LDOUSDT", "TRXUSDT")
 
 
 def test_fracdiff_d05_close_not_in_universal_feature_list() -> None:
-    """fracdiff_d05_close MUST NOT be in V3_FEATURE_COLUMNS_TOP_N at iter-v3/052.
+    """fracdiff_d05_close MUST NOT be in V3_FEATURE_COLUMNS_TOP_N at iter-v3/054.
 
     iter-v3/052 SWAP: fracdiff_d05_close PARKED (SWAPPED OUT for regime_momentum_signed_3d
-    per Critic FINAL `32cc46f` rec #2). Total count must still be 15 (SWAP; net unchanged).
+    per Critic FINAL `32cc46f` rec #2).
+    iter-v3/054: hurst_drift_50_200 also PARKED (Critic FINAL `c056354` rec #1); count 15→14.
     compute_fracdiff_d05_close is RETAINED in dispatch at zero revert cost.
     """
     assert "fracdiff_d05_close" not in V3_FEATURE_COLUMNS_TOP_N, (
@@ -78,9 +79,9 @@ def test_fracdiff_d05_close_not_in_universal_feature_list() -> None:
         "Remove it from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
     )
     n = len(V3_FEATURE_COLUMNS_TOP_N)
-    assert n == 15, (
-        f"V3_FEATURE_COLUMNS_TOP_N has {n} elements — expected 15. "
-        "iter-v3/052: SWAP keeps count at 15 (fracdiff OUT; regime_momentum_signed_3d IN). "
+    assert n == 14, (
+        f"V3_FEATURE_COLUMNS_TOP_N has {n} elements — expected 14. "
+        "iter-v3/054: hurst_drift_50_200 PARKED (15→14; Critic FINAL `c056354` rec #1). "
         "Check V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
     )
 
