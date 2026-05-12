@@ -140,8 +140,11 @@ Verify with `sqlite3 data/testnet.db "select status, count(*) from trades group 
 **Step 5 — launch on testnet.** No date flags — the boundary handshake (seeder writes `seeded_through_<model>_<sym>` engine_state keys; catch-up reads them) automatically resumes from the seeded extent.
 
 ```
-uv run crypto-trade live --testnet --track both --amount 100 --leverage 1
+PYTHONUNBUFFERED=1 uv run crypto-trade live --testnet --track both --amount 100 --leverage 1 \
+  > logs/testnet_engine.log 2>&1
 ```
+
+**Always set `PYTHONUNBUFFERED=1` (or run `python -u …`) when redirecting engine stdout to a file.** Python uses block-buffered stdout when the FD is a regular file, so `[lgbm] Trial 49 finished` lines can sit in the buffer for many minutes before the file mtime updates — making a healthy training run look identical to a hung process. With `PYTHONUNBUFFERED=1` every print flushes immediately and the log mtime tracks real progress; if the file goes silent, the process is genuinely idle.
 
 **Training is automatic — no extra flag.** `LightGbmStrategy` retrains lazily per calendar month: `get_signal(symbol, open_time)` (`lgbm.py:582-589`) compares the candle's month against `_current_month` and calls `_train_for_month(month)` on change. On a fresh start `_current_month=None`, so the **first candle the catch-up loop replays triggers a train** for that candle's month, and every subsequent month boundary triggers another. The catch-up loop replays only the gap between the seeded boundary and now, so the engine still crosses month boundaries and ends with a model trained on the current month's training window.
 
@@ -155,7 +158,7 @@ What you should see at startup:
 - `[live] Entering poll loop (every 60s)`.
 
 What goes where:
-- Signed calls (`place_market_order`, `place_stop_market_order`, `place_take_profit_market_order`, `get_order`, `set_leverage`, `get_positions`, `cancel_order`) → testnet.
+- Signed calls — `place_market_order`, `set_leverage`, `get_positions`, `cancel_order`, `get_order` (entries) on `/fapi/v1/order`; SL/TP on the new Algo Service: `place_algo_stop_market_order`, `place_algo_take_profit_market_order`, `cancel_algo_order`, `get_algo_order` on `/fapi/v1/algoOrder` (Binance migrated `STOP_MARKET` / `TAKE_PROFIT_MARKET` off the legacy endpoint on 2025-12-09; the legacy endpoint now returns `-4120` for those types) → testnet.
 - Kline fetches → production (`https://fapi.binance.com`).
 - DB → `data/testnet.db`. Trade log → `data/testnet_trades.csv`. Neither overlaps with `data/live.db` / `data/dry_run.db`.
 - `--testnet` forces live trading (sets `dry_run=False`); seeded-DB carry-over trades are still tagged paper via `is_paper_trade` and exit on candle SL/TP without sending Binance orders (fix `dba16ec`).
