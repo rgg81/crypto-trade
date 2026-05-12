@@ -35,7 +35,7 @@ OVERALL: PASS
 
 ## Setup Commit SHA
 
-To be backfilled after git commit (Phase 5.5 gate + setup commit combined).
+`8ab05dc` (Phase 5.5 gate + setup commit combined).
 
 ## Notes
 
