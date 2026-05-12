@@ -794,14 +794,20 @@ class LiveEngine:
         # exit_reason) and is closed deterministically below.
         #
         # Real numeric-ID trades (left over from a prior --live session) are
-        # explicitly excluded — they belong to reconciler + poll-loop. Pre-
-        # loading them would let catch-up's check_order simulate a fake exit
-        # and falsely close DB rows whose Binance positions are still open.
+        # excluded from `open_trades` itself — pre-loading them into that dict
+        # would let catch-up's check_order simulate a fake exit and falsely
+        # close DB rows whose Binance positions are still open. They ARE
+        # tracked in `real_open_syms` so step (b)'s open-guard knows the
+        # symbol is already taken — without it, catch-up would replay
+        # subsequent same-direction signals and produce a CATCHUP- duplicate
+        # that the live tick had correctly skipped via `position_open`.
         open_trades: dict[str, LiveTrade] = {}
+        real_open_syms: set[str] = set()
         for seeded in self._state.get_open_trades(model_name=runner.model_config.name):
             if seeded.symbol not in runner.model_config.symbols:
                 continue
             if not is_paper_trade(seeded):
+                real_open_syms.add(seeded.symbol)
                 continue
             open_trades[seeded.symbol] = seeded
         # Pre-load both dicts from engine_state so the seeder's boundary keys
@@ -889,6 +895,7 @@ class LiveEngine:
                 n_signals += 1
                 if (
                     sym not in open_trades
+                    and sym not in real_open_syms
                     and ot >= cooldown_until.get(sym, 0)
                     and ot >= self._risk_cooldown_until.get(sym, 0)
                     and ot > seeded_through.get(sym, 0)

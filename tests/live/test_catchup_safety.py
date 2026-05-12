@@ -46,8 +46,8 @@ def test_catch_up_never_calls_signed_endpoints(tmp_path):
         engine.catch_up_only()
 
     auth_mock.place_market_order.assert_not_called()
-    auth_mock.place_stop_market_order.assert_not_called()
-    auth_mock.place_take_profit_market_order.assert_not_called()
+    auth_mock.place_algo_stop_market_order.assert_not_called()
+    auth_mock.place_algo_take_profit_market_order.assert_not_called()
 
 
 def test_catch_up_source_has_no_auth_reference():
@@ -72,6 +72,62 @@ def test_catch_up_source_has_no_auth_reference():
         "_catch_up_model body must not reference self._auth. "
         "Catch-up creates CATCHUP-* paper rows directly via state.upsert_trade. "
         "Real order placement is the live tick's job (OrderManager.open_trade)."
+    )
+
+
+def test_catch_up_open_guard_sees_real_binance_trades():
+    """Drift guard: _catch_up_model's step (b) open-guard must skip symbols
+    that have an existing real Binance trade in the DB, not just paper rows.
+
+    Background (the bug this prevents): the engine's two open-guards looked
+    at different worlds —
+      • live tick (engine.py:_tick) hits the DB and sees ALL open trades
+      • catch-up (engine.py:_catch_up_model) loaded a paper-only dict that
+        explicitly skipped `if not is_paper_trade(seeded): continue`,
+        so the open-guard `sym not in open_trades` was blind to real trades
+
+    Result: after a SIGTERM/relaunch, catch-up replayed candles past the
+    candle that opened the real trade and created CATCHUP- duplicates for
+    every subsequent same-direction signal — duplicates the live tick had
+    correctly skipped via `position_open` while running.
+
+    Fix: a parallel `real_open_syms: set[str]` is populated from real
+    (non-paper) trades and checked alongside `open_trades` in step (b).
+    Step (a)'s `check_order` still operates only on `open_trades` (paper
+    only) so it never fakes an exit on a real Binance position.
+
+    This regex anchor fails if either piece is removed.
+    """
+    src = Path("src/crypto_trade/live/engine.py").read_text()
+    match = re.search(
+        r"def _catch_up_model\(self.*?\n    def (?:_tick|_shutdown)\(",
+        src,
+        flags=re.DOTALL,
+    )
+    assert match is not None, "Could not locate _catch_up_model in engine.py"
+    body = match.group(0)
+
+    # Population: real_open_syms must be filled from non-paper trades.
+    assert "real_open_syms" in body, (
+        "_catch_up_model must maintain a `real_open_syms` set tracking "
+        "symbols held by real (non-paper) Binance trades."
+    )
+    pop = re.search(
+        r"if\s+not\s+is_paper_trade\(seeded\)\s*:\s*\n\s*real_open_syms\.add\(seeded\.symbol\)",
+        body,
+    )
+    assert pop is not None, (
+        "real_open_syms must be populated from `not is_paper_trade(seeded)` "
+        "branch — paper-only entries belong in open_trades."
+    )
+
+    # Open-guard: step (b) must skip when sym is in real_open_syms.
+    assert "sym not in real_open_syms" in body, (
+        "Step (b)'s open-guard must include `sym not in real_open_syms` "
+        "alongside `sym not in open_trades`. Without it, catch-up replays "
+        "subsequent same-direction signals on a symbol whose real Binance "
+        "position the live tick had already opened — producing CATCHUP- "
+        "duplicates that diverge from live-tick behavior."
     )
 
 
