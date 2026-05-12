@@ -612,9 +612,9 @@ Phase 5.5 gate at QE setup commit will backfill the setup commit SHA into Sectio
 (BACKFILL slot) after Engineer dispatches the setup commit.
 
 ```
-Setup commit SHA: (BACKFILL after Phase 5.5 setup commit)
-Phase 5.5 gate SHA: (BACKFILL after Phase 5.5 gate documentation)
-Brief SHA: (this commit; populated by orchestrator at git commit time)
+Setup commit SHA: 7a46e05
+Phase 5.5 gate SHA: 2917cfc
+Brief SHA: 3ab47a8
 ```
 
 ---
