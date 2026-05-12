@@ -299,14 +299,23 @@ def test_sym_vs_btc_ret_7d_in_universal_list() -> None:
 
 
 def test_ret_skew_50_in_universal_list() -> None:
-    """ret_skew_50 MUST be in V3_FEATURE_COLUMNS_TOP_N at iter-v3/054.
+    """ret_skew_50 MUST be ABSENT from V3_FEATURE_COLUMNS_TOP_N at iter-v3/057.
 
-    RESTORED at iter-v3/042 (iter-v3/041 Path C mandate); KEPT at iter-v3/043-054.
+    iter-v3/057: A4 base-stack SWAP — ret_skew_50 SWAPPED OUT (rank 12/14 portfolio
+    importance; bottom-3 BCH+TRX per analysis/iteration_v3-057/a4_drop_ranking.csv
+    SHA `8160e3a`). parkinson_gk_ratio_20 SWAPPED IN.
     """
-    assert "ret_skew_50" in V3_FEATURE_COLUMNS_TOP_N, (
-        "ret_skew_50 NOT FOUND in V3_FEATURE_COLUMNS_TOP_N — must be PRESENT at "
-        "iter-v3/054 (RESTORED iter-v3/042; KEPT iter-v3/043-054). "
-        "Add it to V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
+    assert "ret_skew_50" not in V3_FEATURE_COLUMNS_TOP_N, (
+        "ret_skew_50 FOUND in V3_FEATURE_COLUMNS_TOP_N — must be ABSENT at "
+        "iter-v3/057 (A4 base-stack SWAP: ret_skew_50 SWAPPED OUT for "
+        "parkinson_gk_ratio_20; EDA SHA `8160e3a`). "
+        "Remove 'ret_skew_50' from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
+    )
+    assert "parkinson_gk_ratio_20" in V3_FEATURE_COLUMNS_TOP_N, (
+        "parkinson_gk_ratio_20 NOT FOUND in V3_FEATURE_COLUMNS_TOP_N — must be PRESENT "
+        "at iter-v3/057 (A4 base-stack SWAP: parkinson_gk_ratio_20 SWAPPED IN; "
+        "FIRST-IN-CATEGORY price_efficient_vol family; EDA SHA `8160e3a`). "
+        "Add 'parkinson_gk_ratio_20' to V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
     )
 
 
@@ -412,9 +421,11 @@ def test_features_for_symbol_unknown_fallback() -> None:
         "fracdiff_d05_close",
         "regime_momentum_signed_3d",
         "hurst_drift_50_200",
+        "ret_skew_50",  # iter-v3/057: SWAPPED OUT (A4 base-stack SWAP; EDA SHA `8160e3a`)
     ):
         assert feat not in result, (
-            f"Unknown symbol fallback must NOT include {feat} (dead-code or PARKED). Got: {result}"
+            f"Unknown symbol fallback must NOT include {feat} (dead-code, PARKED, or SWAPPED OUT). "
+            f"Got: {result}"
         )
     assert "regime_momentum_signed_5d" in result, (
         "regime_momentum_signed_5d must be in fallback at iter-v3/054 (mandate ACTIVE). "
@@ -423,6 +434,13 @@ def test_features_for_symbol_unknown_fallback() -> None:
     assert "sym_vs_btc_ret_7d" in result, (
         "sym_vs_btc_ret_7d must be in fallback at iter-v3/054 (RESTORED iter-v3/042; KEPT)."
     )
-    assert "ret_skew_50" in result, (
-        "ret_skew_50 must be in fallback at iter-v3/054 (RESTORED iter-v3/042; KEPT)."
+    assert "ret_skew_50" not in result, (
+        "ret_skew_50 must be ABSENT from fallback at iter-v3/057 "
+        "(A4 base-stack SWAP: ret_skew_50 SWAPPED OUT for parkinson_gk_ratio_20; "
+        "EDA SHA `8160e3a`)."
+    )
+    assert "parkinson_gk_ratio_20" in result, (
+        "parkinson_gk_ratio_20 must be in fallback at iter-v3/057 "
+        "(A4 base-stack SWAP: parkinson_gk_ratio_20 SWAPPED IN; "
+        "FIRST-IN-CATEGORY price_efficient_vol family; EDA SHA `8160e3a`)."
     )

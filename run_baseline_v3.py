@@ -103,7 +103,7 @@ def _derive_ensemble_seeds(outer_seed: int, size: int = ENSEMBLE_SIZE) -> list[i
     return [int(s) for s in rng.integers(low=0, high=2**31 - 1, size=size)]
 
 
-ITERATION_LABEL = "v3-056"
+ITERATION_LABEL = "v3-057"
 REPORTS_DIR = Path("reports-v3")
 FEATURES_DIR = Path("data/features_v3")
 DATA_DIR = Path("data")
@@ -190,19 +190,20 @@ def _verify_data_freshness(symbols: tuple[str, ...], max_lag_hours: float = 16.0
 
 
 def _verify_feature_columns() -> None:
-    """Verifies V3_FEATURE_COLUMNS contents per current brief (iter-v3/054).
+    """Verifies V3_FEATURE_COLUMNS contents per current brief (iter-v3/057).
 
-    iter-v3/054: EXPLORATION — cycle 4 #4 — per-symbol drawdown brake (NEW risk primitive 11).
-      Carry-forward SYSTEM-LEVEL REVERT to iter-v3/028 architecture (UNCHANGED from /051):
-      - V3_MODELS = (BCH, LDO, TRX) — 3 symbols (ALGO REVERTED).
-      - V3_ATR_MULTIPLIERS_PER_SYMBOL = {} (REVERT — ALGO+LDO entries cleared).
-      - block_long_for = () (REVERT — primitive 10 cleared).
+    iter-v3/057: EXPLORATION — cycle 4 #7 — A4 base-stack SWAP.
+      DROP ret_skew_50 (rank 12/14 portfolio importance at /056; bottom-3 BCH+TRX).
+      ADD parkinson_gk_ratio_20 (family price_efficient_vol; FIRST-IN-CATEGORY for v3 base stack).
+      Net feature count: 14 → 14 (1-for-1 SWAP at base-stack level).
+      EDA SHA `8160e3a` (analysis/iteration_v3-057/).
+      Carry-forward SYSTEM-LEVEL architecture (UNCHANGED from /056):
+      - V3_MODELS = (BCH, LDO, TRX) — 3 symbols (ALGO REVERTED at /051).
+      - V3_ATR_MULTIPLIERS_PER_SYMBOL = {} (EMPTY — SYSTEM-LEVEL REVERT at /051).
+      - block_long_for = () (REVERT — primitive 10 cleared at /051).
       - REQUIRED_GAP = 66 = (21+1)*3 (UNCHANGED — universe unchanged).
-      Single axis under test: ADD per-symbol drawdown brake to RiskV2Config (primitive 11).
-      System-mandated REVERT: hurst_drift_50_200 DROPPED from V3_FEATURE_COLUMNS_TOP_N
-        (15 → 14). 15th-slot SWAP family STRUCTURALLY EXHAUSTED per Critic FINAL `c056354`.
-        compute_hurst_drift_50_200 RETAINED in engineered_v3.py as dead code.
-      Parquet regen NOT REQUIRED: primitive 11 is a state machine (not a feature).
+      Parquet NOT re-required for parkinson_gk_ratio_20: column already present in
+        v3 parquets via add_price_efficient_vol_v3_features (computed at /001-/006).
       DEFAULT_ATR_MULTIPLIERS: (2.0, 1.0) — unchanged.
       V3_FEATURES_PER_SYMBOL: EMPTY (unchanged from iter-v3/040).
       adx_threshold_per_symbol: {} (unchanged; TRX 21 dropped at iter-v3/050 closeout).
@@ -215,12 +216,13 @@ def _verify_feature_columns() -> None:
     cross_asset_divergence_norm MUST NOT be in universal list (dead at model level).
     fracdiff_d05_close MUST NOT be in universal list (PARKED at iter-v3/052 SWAP).
     efficiency_ratio_50 MUST NOT be present (DROPPED — iter-v3/043 DISASTROUS NEGATIVE).
-    regime_momentum_signed_5d MUST be present (mandate still ACTIVE at iter-v3/054).
+    regime_momentum_signed_5d MUST be present (mandate still ACTIVE at iter-v3/057).
     vol_normalized_ret_5d MUST NOT be present (DROPPED iter-v3/049; iter-v3/048 PATH C-clean).
     hurst_drift_50_200 MUST NOT be present (PARKED per /053 PATH D + Critic FINAL `c056354`).
     regime_momentum_signed_3d MUST NOT be present (PARKED per /052 PATH C-suspicious).
-    sym_vs_btc_ret_7d MUST be present (RESTORED at iter-v3/042; KEPT at iter-v3/054).
-    ret_skew_50 MUST be present (RESTORED at iter-v3/042; KEPT at iter-v3/054).
+    sym_vs_btc_ret_7d MUST be present (RESTORED at iter-v3/042; KEPT at iter-v3/057).
+    ret_skew_50 MUST NOT be present (SWAPPED OUT at iter-v3/057 — A4 base-stack SWAP).
+    parkinson_gk_ratio_20 MUST be present (SWAPPED IN at iter-v3/057 — price_efficient_vol).
 
     Per-symbol checks (iter-v3/054 — REVERT carry-forward from /051):
     V3_FEATURES_PER_SYMBOL must be EMPTY (0 entries).
@@ -321,12 +323,26 @@ def _verify_feature_columns() -> None:
             "iter-v3/044 (RESTORED at iter-v3/042; KEPT). "
             "Add it to V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
         )
-    # ret_skew_50 MUST be present (RESTORED at iter-v3/042; KEPT at iter-v3/044).
-    if "ret_skew_50" not in V3_FEATURE_COLUMNS:
+    # iter-v3/057: ret_skew_50 MUST be ABSENT (SWAPPED for parkinson_gk_ratio_20).
+    # A4 base-stack SWAP: ret_skew_50 was rank 12/14 portfolio importance; bottom-3 BCH+TRX.
+    # Per analysis/iteration_v3-057/synthesis.md SHA `8160e3a`.
+    if "ret_skew_50" in V3_FEATURE_COLUMNS:
         raise RuntimeError(
-            "ret_skew_50 NOT FOUND in V3_FEATURE_COLUMNS — must be PRESENT at "
-            "iter-v3/044 (RESTORED at iter-v3/042; KEPT). "
-            "Add it to V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
+            "ret_skew_50 FOUND in V3_FEATURE_COLUMNS — must be ABSENT at "
+            "iter-v3/057. A4 base-stack SWAP: ret_skew_50 SWAPPED OUT for "
+            "parkinson_gk_ratio_20 (EDA SHA `8160e3a`). "
+            "Remove 'ret_skew_50' and add 'parkinson_gk_ratio_20' in "
+            "V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
+        )
+    # iter-v3/057: parkinson_gk_ratio_20 MUST be PRESENT (SWAP target; FIRST-IN-CATEGORY).
+    # family price_efficient_vol; all 3 syms Spearman p<0.005; max |IC| 0.245 < 0.50 gate.
+    if "parkinson_gk_ratio_20" not in V3_FEATURE_COLUMNS:
+        raise RuntimeError(
+            "parkinson_gk_ratio_20 NOT FOUND in V3_FEATURE_COLUMNS — must be PRESENT at "
+            "iter-v3/057. A4 base-stack SWAP: parkinson_gk_ratio_20 SWAPPED IN for "
+            "ret_skew_50 (EDA SHA `8160e3a`; FIRST-IN-CATEGORY price_efficient_vol family). "
+            "Add 'parkinson_gk_ratio_20' to V3_FEATURE_COLUMNS_TOP_N in "
+            "features_v3/__init__.py."
         )
     # iter-v3/044: efficiency_ratio_50 MUST be ABSENT (DROPPED — iter-v3/043 DISASTROUS NEGATIVE).
     if "efficiency_ratio_50" in V3_FEATURE_COLUMNS:
@@ -373,11 +389,13 @@ def _verify_feature_columns() -> None:
         )
     print(
         f"  V3_FEATURE_COLUMNS: {n} columns "
-        "(iter-v3/054: 14-feature set; hurst_drift_50_200 ABSENT (PARKED /053 PATH D); "
+        "(iter-v3/057: 14-feature set; A4 base-stack SWAP: ret_skew_50 ABSENT (SWAPPED OUT); "
+        "parkinson_gk_ratio_20 PRESENT (SWAPPED IN; price_efficient_vol FIRST-IN-CATEGORY); "
+        "hurst_drift_50_200 ABSENT (PARKED /053 PATH D); "
         "regime_momentum_signed_3d ABSENT (PARKED); "
         "fracdiff_d05_close ABSENT (PARKED); vol_normalized_ret_5d ABSENT (DROPPED /049); "
         "efficiency_ratio_50 ABSENT; "
-        "regime_momentum_signed_5d, sym_vs_btc_ret_7d, ret_skew_50 PRESENT)  PASS"
+        "regime_momentum_signed_5d, sym_vs_btc_ret_7d PRESENT)  PASS"
     )
 
     # iter-v3/044: Verify DEFAULT_ATR_MULTIPLIERS == (2.0, 1.0).
@@ -422,18 +440,35 @@ def _verify_feature_columns() -> None:
         "BCH/LDO/TRX all use (2.0, 1.0) DEFAULT)  PASS"
     )
 
-    # iter-v3/053: Verify all 3 v3 symbols return 15-feature fallback (V3_FEATURE_COLUMNS_TOP_N).
-    # SWAP: hurst_drift_50_200 ACTIVATED as 15th element; regime_momentum_signed_3d PARKED.
-    # ALGOUSDT NOT in V3_MODELS at iter-v3/053 (REVERTED from /051; 3-sym universe).
+    # iter-v3/057: Verify all 3 v3 symbols return 14-feature fallback (V3_FEATURE_COLUMNS_TOP_N).
+    # SWAP: ret_skew_50 ABSENT (SWAPPED OUT); parkinson_gk_ratio_20 PRESENT (SWAPPED IN).
+    # ALGOUSDT NOT in V3_MODELS at iter-v3/057 (REVERTED from /051; 3-sym universe).
     for sym in ("BCHUSDT", "LDOUSDT", "TRXUSDT"):
         sym_feats = features_for_symbol(sym)
         if len(sym_feats) != 14:
             raise RuntimeError(
                 f"{sym} fallback has {len(sym_feats)} features — "
-                "expected exactly 14 (iter-v3/054 V3_FEATURE_COLUMNS_TOP_N; "
-                "hurst_drift_50_200 PARKED per /053 PATH D + Critic FINAL `c056354`). "
-                "Remove 'hurst_drift_50_200' from V3_FEATURE_COLUMNS_TOP_N in "
-                "features_v3/__init__.py. V3_FEATURES_PER_SYMBOL must be empty."
+                "expected exactly 14 (iter-v3/057 V3_FEATURE_COLUMNS_TOP_N; "
+                "A4 base-stack SWAP: ret_skew_50 OUT, parkinson_gk_ratio_20 IN). "
+                "Check V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py. "
+                "V3_FEATURES_PER_SYMBOL must be empty."
+            )
+        # iter-v3/057: ret_skew_50 MUST be ABSENT (SWAPPED OUT — A4 SWAP).
+        if "ret_skew_50" in sym_feats:
+            raise RuntimeError(
+                f"{sym} feature set contains ret_skew_50 — must be ABSENT at iter-v3/057. "
+                "A4 base-stack SWAP: ret_skew_50 SWAPPED OUT for parkinson_gk_ratio_20 "
+                "(EDA SHA `8160e3a`; rank 12/14 bottom-3 BCH+TRX). "
+                f"Remove 'ret_skew_50' from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
+            )
+        # iter-v3/057: parkinson_gk_ratio_20 MUST be PRESENT (SWAPPED IN — A4 SWAP).
+        if "parkinson_gk_ratio_20" not in sym_feats:
+            raise RuntimeError(
+                f"{sym} feature set does not contain parkinson_gk_ratio_20 — must be PRESENT "
+                "at iter-v3/057. A4 base-stack SWAP: parkinson_gk_ratio_20 SWAPPED IN "
+                "(FIRST-IN-CATEGORY price_efficient_vol family; EDA SHA `8160e3a`). "
+                f"Add 'parkinson_gk_ratio_20' to V3_FEATURE_COLUMNS_TOP_N in "
+                "features_v3/__init__.py."
             )
         if "hurst_drift_50_200" in sym_feats:
             raise RuntimeError(
@@ -472,7 +507,9 @@ def _verify_feature_columns() -> None:
             )
     print(
         "  BCH/LDO/TRX: 14-feature universal fallback "
-        "(hurst_drift_50_200 PARKED iter-v3/054 per /053 PATH D + Critic `c056354`; "
+        "(iter-v3/057: ret_skew_50 ABSENT (SWAPPED OUT); "
+        "parkinson_gk_ratio_20 PRESENT (SWAPPED IN); "
+        "hurst_drift_50_200 PARKED iter-v3/054 per /053 PATH D + Critic `c056354`; "
         "regime_momentum_signed_3d PARKED (ABSENT); "
         "fracdiff_d05_close PARKED (ABSENT); vol_normalized_ret_5d DROPPED /049; "
         "efficiency_ratio_50 ABSENT; "
