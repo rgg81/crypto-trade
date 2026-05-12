@@ -42,14 +42,14 @@ def _entry_side(direction: int) -> str:
     return "BUY" if direction == 1 else "SELL"
 
 
-def _try_cancel(auth: AuthenticatedBinanceClient, symbol: str, order_id: str | None) -> None:
-    """Best-effort cancel — logs warning on failure."""
-    if not order_id:
+def _try_cancel_algo(auth: AuthenticatedBinanceClient, symbol: str, algo_id: str | None) -> None:
+    """Best-effort cancel of an algo (SL/TP) order — logs warning on failure."""
+    if not algo_id:
         return
     try:
-        auth.cancel_order(symbol, order_id)
+        auth.cancel_algo_order(symbol, algo_id)
     except Exception as exc:
-        log.warning("Failed to cancel order %s on %s: %s", order_id, symbol, exc)
+        log.warning("Failed to cancel algo order %s on %s: %s", algo_id, symbol, exc)
 
 
 def trade_to_order(trade: LiveTrade) -> Order:
@@ -112,7 +112,12 @@ class OrderManager:
     ) -> LiveTrade:
         """Open a new trade from a signal.
 
-        In real mode: places MARKET entry + STOP_MARKET SL + TAKE_PROFIT_MARKET TP.
+        In real mode: places MARKET entry on /fapi/v1/order plus STOP_MARKET SL
+        and TAKE_PROFIT_MARKET TP on /fapi/v1/algoOrder (algoType=CONDITIONAL —
+        Binance migrated conditional orders off the legacy endpoint on 2025-12-09).
+        Atomic: if SL or TP placement fails after the entry fills, the entry is
+        rolled back via market close so no naked position is left on-exchange.
+
         In dry-run: records the trade without exchange calls.
         """
         sl_price, tp_price = compute_sl_tp(signal, entry_price, self._config)
@@ -141,15 +146,38 @@ class OrderManager:
             trade.entry_order_id = str(entry_resp.get("orderId", ""))
 
             close_side = _close_side(signal.direction)
-            sl_resp = self._auth.place_stop_market_order(
-                symbol, close_side, self._round_price(symbol, sl_price), quantity
-            )
-            trade.sl_order_id = str(sl_resp.get("orderId", ""))
+            try:
+                # SL+TP are CONDITIONAL algo orders (Binance moved STOP_MARKET /
+                # TAKE_PROFIT_MARKET off /fapi/v1/order on 2025-12-09; the legacy
+                # endpoint returns -4120 for these types). Failure here would
+                # otherwise leave a naked entry on the exchange.
+                sl_resp = self._auth.place_algo_stop_market_order(
+                    symbol, close_side, self._round_price(symbol, sl_price), quantity
+                )
+                trade.sl_order_id = str(sl_resp.get("algoId", ""))
 
-            tp_resp = self._auth.place_take_profit_market_order(
-                symbol, close_side, self._round_price(symbol, tp_price), quantity
-            )
-            trade.tp_order_id = str(tp_resp.get("orderId", ""))
+                tp_resp = self._auth.place_algo_take_profit_market_order(
+                    symbol, close_side, self._round_price(symbol, tp_price), quantity
+                )
+                trade.tp_order_id = str(tp_resp.get("algoId", ""))
+            except Exception as exc:
+                log.error(
+                    "SL/TP placement failed after entry %s on %s; "
+                    "rolling back entry to avoid naked position: %s",
+                    trade.entry_order_id, symbol, exc,
+                )
+                # Cancel any SL we did manage to place before TP failed.
+                _try_cancel_algo(self._auth, symbol, trade.sl_order_id)
+                # Close the entry position we just opened.
+                try:
+                    self._auth.place_market_order(symbol, close_side, quantity)
+                except Exception as close_exc:
+                    log.critical(
+                        "CRITICAL: failed to close naked %s position after SL/TP "
+                        "failure (entry order %s): %s — MANUAL INTERVENTION REQUIRED",
+                        symbol, trade.entry_order_id, close_exc,
+                    )
+                raise
         else:
             trade.entry_order_id = f"DRY-{uuid.uuid4().hex[:8]}"
             trade.sl_order_id = f"DRY-{uuid.uuid4().hex[:8]}"
@@ -186,7 +214,11 @@ class OrderManager:
         return None
 
     def check_exchange_exits(self) -> list[LiveTrade]:
-        """Check if any SL/TP orders filled on exchange. Returns closed trades.
+        """Check if any SL/TP algo orders fired on exchange. Returns closed trades.
+
+        SL/TP are CONDITIONAL algo orders (see auth_client.py); when they
+        trigger, ``algoStatus`` flips from ``NEW`` to ``TRIGGERED`` (then
+        ``FINISHED``) and ``actualPrice``/``triggerTime`` get populated.
 
         Paper trades (None / SEEDED / CATCHUP- / DRY-) are skipped — they have
         no Binance counterpart, and querying with sentinel order IDs wastes
@@ -201,22 +233,34 @@ class OrderManager:
                 continue
 
             if trade.sl_order_id:
-                sl_status = self._auth.get_order(trade.symbol, trade.sl_order_id)
-                if sl_status.get("status") == "FILLED":
-                    fill_price = float(sl_status.get("avgPrice", trade.stop_loss_price))
-                    fill_time = int(sl_status.get("updateTime", int(time.time() * 1000)))
+                sl_status = self._auth.get_algo_order(trade.symbol, trade.sl_order_id)
+                if sl_status.get("algoStatus") in ("TRIGGERED", "FINISHED"):
+                    fill_price = float(
+                        sl_status.get("actualPrice") or trade.stop_loss_price
+                    )
+                    fill_time = int(
+                        sl_status.get("triggerTime")
+                        or sl_status.get("updateTime")
+                        or int(time.time() * 1000)
+                    )
                     self._state.close_trade(trade.id, fill_price, fill_time, "stop_loss")
-                    _try_cancel(self._auth, trade.symbol, trade.tp_order_id)
+                    _try_cancel_algo(self._auth, trade.symbol, trade.tp_order_id)
                     closed.append(trade)
                     continue
 
             if trade.tp_order_id:
-                tp_status = self._auth.get_order(trade.symbol, trade.tp_order_id)
-                if tp_status.get("status") == "FILLED":
-                    fill_price = float(tp_status.get("avgPrice", trade.take_profit_price))
-                    fill_time = int(tp_status.get("updateTime", int(time.time() * 1000)))
+                tp_status = self._auth.get_algo_order(trade.symbol, trade.tp_order_id)
+                if tp_status.get("algoStatus") in ("TRIGGERED", "FINISHED"):
+                    fill_price = float(
+                        tp_status.get("actualPrice") or trade.take_profit_price
+                    )
+                    fill_time = int(
+                        tp_status.get("triggerTime")
+                        or tp_status.get("updateTime")
+                        or int(time.time() * 1000)
+                    )
                     self._state.close_trade(trade.id, fill_price, fill_time, "take_profit")
-                    _try_cancel(self._auth, trade.symbol, trade.sl_order_id)
+                    _try_cancel_algo(self._auth, trade.symbol, trade.sl_order_id)
                     closed.append(trade)
 
         return closed
@@ -241,8 +285,9 @@ class OrderManager:
                 and self._auth is not None
                 and not is_paper_trade(trade)
             ):
-                _try_cancel(self._auth, trade.symbol, trade.sl_order_id)
-                _try_cancel(self._auth, trade.symbol, trade.tp_order_id)
+                # SL/TP are algo orders; entry was a regular order.
+                _try_cancel_algo(self._auth, trade.symbol, trade.sl_order_id)
+                _try_cancel_algo(self._auth, trade.symbol, trade.tp_order_id)
                 quantity = self._round_qty(trade.symbol, trade.amount_usd / trade.entry_price)
                 try:
                     self._auth.place_market_order(

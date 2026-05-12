@@ -68,18 +68,21 @@ def _reconcile_trade(trade, auth_client, state, now_ms) -> str | None:
     symbol = trade.symbol
     trade_id = trade.id
 
-    # Check SL order
+    # SL/TP are CONDITIONAL algo orders — query via /fapi/v1/algoOrder, status
+    # field is `algoStatus` (TRIGGERED/FINISHED ⇒ fired), fill price in
+    # `actualPrice`, fill time in `triggerTime`.
     if trade.sl_order_id:
         try:
-            sl_status = auth_client.get_order(symbol, trade.sl_order_id)
-            if sl_status.get("status") == "FILLED":
-                fill_price = float(sl_status.get("avgPrice", trade.stop_loss_price))
-                fill_time = int(sl_status.get("updateTime", now_ms))
+            sl_status = auth_client.get_algo_order(symbol, trade.sl_order_id)
+            if sl_status.get("algoStatus") in ("TRIGGERED", "FINISHED"):
+                fill_price = float(sl_status.get("actualPrice") or trade.stop_loss_price)
+                fill_time = int(
+                    sl_status.get("triggerTime") or sl_status.get("updateTime") or now_ms
+                )
                 state.close_trade(trade_id, fill_price, fill_time, "stop_loss")
-                # Cancel TP order
                 if trade.tp_order_id:
                     try:
-                        auth_client.cancel_order(symbol, trade.tp_order_id)
+                        auth_client.cancel_algo_order(symbol, trade.tp_order_id)
                     except Exception:
                         pass
                 return (
@@ -89,18 +92,18 @@ def _reconcile_trade(trade, auth_client, state, now_ms) -> str | None:
         except Exception:
             pass
 
-    # Check TP order
     if trade.tp_order_id:
         try:
-            tp_status = auth_client.get_order(symbol, trade.tp_order_id)
-            if tp_status.get("status") == "FILLED":
-                fill_price = float(tp_status.get("avgPrice", trade.take_profit_price))
-                fill_time = int(tp_status.get("updateTime", now_ms))
+            tp_status = auth_client.get_algo_order(symbol, trade.tp_order_id)
+            if tp_status.get("algoStatus") in ("TRIGGERED", "FINISHED"):
+                fill_price = float(tp_status.get("actualPrice") or trade.take_profit_price)
+                fill_time = int(
+                    tp_status.get("triggerTime") or tp_status.get("updateTime") or now_ms
+                )
                 state.close_trade(trade_id, fill_price, fill_time, "take_profit")
-                # Cancel SL order
                 if trade.sl_order_id:
                     try:
-                        auth_client.cancel_order(symbol, trade.sl_order_id)
+                        auth_client.cancel_algo_order(symbol, trade.sl_order_id)
                     except Exception:
                         pass
                 return (

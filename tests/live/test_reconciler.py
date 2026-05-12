@@ -37,24 +37,29 @@ def _open_trade(**overrides) -> LiveTrade:
     return LiveTrade(**defaults)
 
 
-def _mock_client(order_statuses: dict[str, dict], positions: list[dict] | None = None):
-    """Create a mock auth client that returns specific order statuses."""
+def _mock_client(algo_statuses: dict[str, dict], positions: list[dict] | None = None):
+    """Create a mock auth client that returns specific algo SL/TP statuses.
+
+    SL/TP are CONDITIONAL algo orders (post-2025-12-09 migration) — looked up
+    on /fapi/v1/algoOrder by `algoId`, status field is `algoStatus`, fill price
+    is `actualPrice`, fill time is `triggerTime`.
+    """
 
     def handler(request):
         path = str(request.url.path)
         params = dict(request.url.params)
 
-        if "/fapi/v1/order" in path and request.method == "GET":
-            oid = params.get("orderId", "")
-            if oid in order_statuses:
-                return httpx.Response(200, json=order_statuses[oid])
-            return httpx.Response(200, json={"status": "NEW"})
+        if path == "/fapi/v1/algoOrder" and request.method == "GET":
+            aid = params.get("algoId", "")
+            if aid in algo_statuses:
+                return httpx.Response(200, json=algo_statuses[aid])
+            return httpx.Response(200, json={"algoStatus": "NEW"})
 
         if "/fapi/v3/positionRisk" in path:
             return httpx.Response(200, json=positions or [])
 
         if request.method == "DELETE":
-            return httpx.Response(200, json={"orderId": params.get("orderId", "")})
+            return httpx.Response(200, json={"algoId": params.get("algoId", "")})
 
         return httpx.Response(200, json={})
 
@@ -80,8 +85,12 @@ def test_dry_run_skips_exchange(state):
 def test_sl_filled_while_offline(state):
     state.upsert_trade(_open_trade())
     client = _mock_client(
-        order_statuses={
-            "sl_1": {"status": "FILLED", "avgPrice": "57600.0", "updateTime": 2000000},
+        algo_statuses={
+            "sl_1": {
+                "algoStatus": "TRIGGERED",
+                "actualPrice": "57600.0",
+                "triggerTime": 2000000,
+            },
         },
         positions=[{"positionAmt": "0.001"}],
     )
@@ -97,9 +106,13 @@ def test_sl_filled_while_offline(state):
 def test_tp_filled_while_offline(state):
     state.upsert_trade(_open_trade())
     client = _mock_client(
-        order_statuses={
-            "sl_1": {"status": "NEW"},
-            "tp_1": {"status": "FILLED", "avgPrice": "64800.0", "updateTime": 2000000},
+        algo_statuses={
+            "sl_1": {"algoStatus": "NEW"},
+            "tp_1": {
+                "algoStatus": "FINISHED",
+                "actualPrice": "64800.0",
+                "triggerTime": 2000000,
+            },
         },
     )
 
@@ -112,7 +125,7 @@ def test_tp_filled_while_offline(state):
 def test_position_gone_marked_reconciled(state):
     state.upsert_trade(_open_trade())
     client = _mock_client(
-        order_statuses={},  # SL/TP both show as NEW
+        algo_statuses={},  # SL/TP both show as NEW
         positions=[{"positionAmt": "0"}],  # No position
     )
 
@@ -125,7 +138,7 @@ def test_position_gone_marked_reconciled(state):
 def test_position_still_open(state):
     state.upsert_trade(_open_trade())
     client = _mock_client(
-        order_statuses={},
+        algo_statuses={},
         positions=[{"positionAmt": "0.016"}],  # Position still exists
     )
 
@@ -146,7 +159,7 @@ def test_seeded_trade_is_skipped_not_corrupted(state):
         )
     )
     # Mock client returns "no position" — would normally trigger close_trade("reconciled")
-    client = _mock_client(order_statuses={}, positions=[{"positionAmt": "0"}])
+    client = _mock_client(algo_statuses={}, positions=[{"positionAmt": "0"}])
 
     msgs = reconcile(state, client, dry_run=False)
 
@@ -165,7 +178,7 @@ def test_catchup_trade_is_skipped(state):
             tp_order_id="CATCHUP-12345678",
         )
     )
-    client = _mock_client(order_statuses={}, positions=[{"positionAmt": "0"}])
+    client = _mock_client(algo_statuses={}, positions=[{"positionAmt": "0"}])
     reconcile(state, client, dry_run=False)
     assert state.get_trade("catchup-1").status == "open"
 
@@ -180,7 +193,7 @@ def test_dry_prefix_trade_is_skipped(state):
             tp_order_id="DRY-feedface",
         )
     )
-    client = _mock_client(order_statuses={}, positions=[{"positionAmt": "0"}])
+    client = _mock_client(algo_statuses={}, positions=[{"positionAmt": "0"}])
     reconcile(state, client, dry_run=False)
     assert state.get_trade("dry-1").status == "open"
 
@@ -189,7 +202,13 @@ def test_real_numeric_id_still_reconciled(state):
     """Regression — pre-existing reconciler behavior preserved for real trades."""
     state.upsert_trade(_open_trade(entry_order_id="9876543210"))
     client = _mock_client(
-        order_statuses={"sl_1": {"status": "FILLED", "avgPrice": "57600.0", "updateTime": 2000000}},
+        algo_statuses={
+            "sl_1": {
+                "algoStatus": "TRIGGERED",
+                "actualPrice": "57600.0",
+                "triggerTime": 2000000,
+            },
+        },
     )
     reconcile(state, client, dry_run=False)
     trade = state.get_trade("t1")
@@ -205,7 +224,7 @@ def test_paper_skip_count_in_messages(state):
         _open_trade(id="seed-b", entry_order_id="CATCHUP-aaaa1111", open_time=2_000_000)
     )
     state.upsert_trade(_open_trade(id="real-1", entry_order_id="9876543210", open_time=3_000_000))
-    client = _mock_client(order_statuses={}, positions=[{"positionAmt": "0.001"}])
+    client = _mock_client(algo_statuses={}, positions=[{"positionAmt": "0.001"}])
 
     msgs = reconcile(state, client, dry_run=False)
     assert any("Skipped 2 paper" in m for m in msgs)
