@@ -1,5 +1,14 @@
 """iter-v3/057 — adversarial past-only audit for parkinson_gk_ratio_20.
 
+PARKED at iter-v3/058 RE-ANCHOR: parkinson_gk_ratio_20 reverted from V3_FEATURE_COLUMNS_TOP_N.
+Test file RETAINED for future cycle 1+ retry. compute_price_efficient_vol_v3 path
+still tested by other adversarial tests in price_efficient_vol_v3 suite.
+
+Tests 1-2 (compute correctness) remain valid; Tests 3-5 (V3_FEATURE_COLUMNS_TOP_N
+membership) are inverted by the RE-ANCHOR and are skipped. Tests 3-5 cover assertions
+now handled by test_ret_skew_50_in_universal_list (iter-v3/058 state) in
+tests/features_v3/test_features_for_symbol.py.
+
 The feature is computed by `add_price_efficient_vol_v3_features` in
 `src/crypto_trade/features_v3/price_efficient_vol_v3.py`:
 
@@ -16,15 +25,16 @@ post-bar-close decision discipline (zero leakage from t+1+).
 Test 1 — past_only discipline: appending future bars t+1, t+2, ... does NOT alter the
          value at bar t. The 20-bar trailing window is causal by construction.
 Test 2 — within_expected_range: ratio median in [0.5, 2.0]; 95% of bars in [0.3, 2.5].
-Test 3 — in_v3_feature_columns_top_n: parkinson_gk_ratio_20 MUST be in V3_FEATURE_COLUMNS_TOP_N.
-Test 4 — ret_skew_50_absent: ret_skew_50 MUST NOT be in V3_FEATURE_COLUMNS_TOP_N (SWAPPED OUT).
-Test 5 — feature_count_14: V3_FEATURE_COLUMNS_TOP_N must have exactly 14 elements.
+Test 3 — in_v3_feature_columns_top_n: SKIPPED (iter-v3/058 RE-ANCHOR inverts this assertion).
+Test 4 — ret_skew_50_absent: SKIPPED (iter-v3/058 RE-ANCHOR inverts this assertion).
+Test 5 — feature_count_14: SKIPPED (already covered by test_features_for_symbol.py).
 """
 
 from __future__ import annotations
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from crypto_trade.features_v3 import V3_FEATURE_COLUMNS_TOP_N
 from crypto_trade.features_v3.price_efficient_vol_v3 import (
@@ -150,14 +160,23 @@ def test_parkinson_gk_ratio_20_within_expected_range() -> None:
 
 # ---------------------------------------------------------------------------
 # Test 3 — parkinson_gk_ratio_20 in V3_FEATURE_COLUMNS_TOP_N
+# SKIPPED at iter-v3/058 RE-ANCHOR (assertion inverted by revert)
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.skip(
+    reason=(
+        "iter-v3/058 RE-ANCHOR: parkinson_gk_ratio_20 reverted from V3_FEATURE_COLUMNS_TOP_N. "
+        "Test file retained for future cycle 1+ retry. compute_price_efficient_vol_v3 path "
+        "still tested by other adversarial tests in price_efficient_vol_v3 suite."
+    )
+)
 def test_parkinson_gk_ratio_20_in_v3_feature_columns_top_n() -> None:
     """parkinson_gk_ratio_20 MUST be in V3_FEATURE_COLUMNS_TOP_N at iter-v3/057.
 
     A4 base-stack SWAP: parkinson_gk_ratio_20 SWAPPED IN for ret_skew_50 as
     the price_efficient_vol FIRST-IN-CATEGORY entry (EDA SHA `8160e3a`).
+    SKIPPED at iter-v3/058: RE-ANCHOR reverts this swap.
     """
     assert "parkinson_gk_ratio_20" in V3_FEATURE_COLUMNS_TOP_N, (
         "parkinson_gk_ratio_20 NOT FOUND in V3_FEATURE_COLUMNS_TOP_N. "
@@ -169,14 +188,22 @@ def test_parkinson_gk_ratio_20_in_v3_feature_columns_top_n() -> None:
 
 # ---------------------------------------------------------------------------
 # Test 4 — ret_skew_50 absent from V3_FEATURE_COLUMNS_TOP_N
+# SKIPPED at iter-v3/058 RE-ANCHOR (assertion inverted by revert)
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.skip(
+    reason=(
+        "iter-v3/058 RE-ANCHOR: parkinson_gk_ratio_20 reverted from V3_FEATURE_COLUMNS_TOP_N. "
+        "Test file retained for future cycle 1+ retry."
+    )
+)
 def test_ret_skew_50_absent_from_v3_feature_columns_top_n() -> None:
     """ret_skew_50 MUST NOT be in V3_FEATURE_COLUMNS_TOP_N at iter-v3/057.
 
     A4 base-stack SWAP: ret_skew_50 SWAPPED OUT (rank 12/14 portfolio importance;
     bottom-3 BCH+TRX per analysis/iteration_v3-057/a4_drop_ranking.csv SHA `8160e3a`).
+    SKIPPED at iter-v3/058: RE-ANCHOR restores ret_skew_50.
     """
     assert "ret_skew_50" not in V3_FEATURE_COLUMNS_TOP_N, (
         "ret_skew_50 FOUND in V3_FEATURE_COLUMNS_TOP_N — must be ABSENT at iter-v3/057. "
@@ -189,14 +216,24 @@ def test_ret_skew_50_absent_from_v3_feature_columns_top_n() -> None:
 
 # ---------------------------------------------------------------------------
 # Test 5 — feature count remains 14 (1-for-1 SWAP)
+# SKIPPED at iter-v3/058 RE-ANCHOR (count is still 14 but via different membership)
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.skip(
+    reason=(
+        "iter-v3/058 RE-ANCHOR: parkinson_gk_ratio_20 reverted from V3_FEATURE_COLUMNS_TOP_N. "
+        "Feature count = 14 is still correct, but this test's SWAP narrative is stale. "
+        "Count assertion is covered by test_universal_list_is_14 in test_features_for_symbol.py."
+    )
+)
 def test_v3_feature_columns_top_n_count_14_after_swap() -> None:
     """V3_FEATURE_COLUMNS_TOP_N must have exactly 14 elements after the A4 SWAP.
 
     iter-v3/057: 1-for-1 SWAP at base-stack level (ret_skew_50 OUT,
     parkinson_gk_ratio_20 IN). Net count must remain 14.
+    SKIPPED at iter-v3/058: RE-ANCHOR reverts this swap. Count still 14 but
+    covered by test_universal_list_is_14 in test_features_for_symbol.py.
     """
     n = len(V3_FEATURE_COLUMNS_TOP_N)
     assert n == 14, (

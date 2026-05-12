@@ -149,15 +149,14 @@ V3_FEATURE_COLUMNS_TOP_N: tuple[str, ...] = (
     # iter-v3/042: ret_skew_50 RESTORED (iter-v3/041 Path C mandate — OOS dropped
     # below +1.55 falsifier; prune REVERTED per research_brief.md Section 3 Sub-fix 1).
     # iter-v3/057: ret_skew_50 SWAPPED for parkinson_gk_ratio_20 (A4 base-stack reordering).
-    # Per analysis/iteration_v3-057/synthesis.md SHA `8160e3a`:
-    # - ret_skew_50 was rank 12/14 portfolio importance at /056; bottom-3 BCH+TRX, mid LDO.
-    # - parkinson_gk_ratio_20 (family `price_efficient_vol`) is FIRST-IN-CATEGORY for v3 base stack.
-    # - All 3 syms univariate Spearman rho p<0.005 (BCH 0.001, LDO 0.0002, TRX 0.003).
-    # - max |IC| with remaining V3_BASE_14 = 0.245 (well below 0.50 strict gate).
-    # - Was in V3_FEATURE_COLUMNS_FULL (34) at /001-006; dropped at /007 top-N reduction
-    #   (rank 17/34).
-    # - Never tested at dedicated EXPLORATION axis. Also in V2_FEATURE_COLUMNS (v0.v2-069 active).
-    "parkinson_gk_ratio_20",  # SWAP iter-v3/057 — price_efficient_vol family
+    # iter-v3/058: REVERT to /028 BASELINE_V3.md composition for RE-ANCHOR under post-fix
+    #              walk-forward (commit `e149e9d`). Per memory rule
+    #              `feedback_v3_walkforward_lookahead_bug.md` user-decision path (a):
+    #              all pre-`e149e9d` v3 iterations INVALIDATED. /058 re-anchors BASELINE_V3.md.
+    # Resulting tuple: 14 features identical to /028 spec. parkinson_gk_ratio_20 dropped
+    # (compute function in price_efficient_vol_v3.py retained as dead code; available for
+    # future cycle 1+ EXPLORATIONs without re-implementation cost).
+    "ret_skew_50",  # RESTORED iter-v3/058 — /028 BASELINE_V3.md composition for RE-ANCHOR
     "vwap_dev_20",  # rank 11 (mean 13.0) — volume_micro
     "ret_autocorr_lag1_50",  # rank 12 (mean 13.5) — momentum_accel
     # iter-v3/041: sym_vs_btc_ret_7d DROPPED (universal feature pruning EXPLORATION).
