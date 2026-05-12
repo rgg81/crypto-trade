@@ -225,6 +225,10 @@ class TestLabeling:
 
 
 class TestMonthSplits:
+    # Production-equivalent timeout/interval: 8h candles + 7d (10080 min) timeout.
+    _TIMEOUT = 10080
+    _INTERVAL = 480
+
     def test_basic_splits(self):
         """3 months of data with training_months=2 should yield 1 split."""
         master = _make_master(n=100, start_ms=1_704_067_200_000)
@@ -237,19 +241,35 @@ class TestMonthSplits:
                 mar["open_time"].values,
             ]
         )
-        splits = generate_monthly_splits(combined_times, training_months=2)
+        splits = generate_monthly_splits(
+            combined_times,
+            training_months=2,
+            label_timeout_minutes=self._TIMEOUT,
+            interval_minutes=self._INTERVAL,
+        )
         assert len(splits) == 1
         assert splits[0].test_month == "2024-03"
 
     def test_no_splits_insufficient_data(self):
         """1 month of data with training_months=2 yields no splits."""
         master = _make_master(n=100)
-        splits = generate_monthly_splits(master["open_time"].values, training_months=2)
+        splits = generate_monthly_splits(
+            master["open_time"].values,
+            training_months=2,
+            label_timeout_minutes=self._TIMEOUT,
+            interval_minutes=self._INTERVAL,
+        )
         assert len(splits) == 0
 
     def test_split_boundaries(self):
-        """Verify train/test boundaries are correct month boundaries."""
+        """Verify train/test boundaries with the labeler embargo applied.
+
+        Without embargo: ``train_end_ms == test_start_ms``.
+        With embargo:    ``test_start_ms - train_end_ms == embargo_candles * interval_ms``.
+        """
         import datetime
+
+        from crypto_trade.strategies.ml.walk_forward import compute_embargo_candles
 
         jan = _make_master(n=50, start_ms=1_704_067_200_000)
         feb = _make_master(n=50, start_ms=1_706_745_600_000)
@@ -263,13 +283,30 @@ class TestMonthSplits:
                 apr["open_time"].values,
             ]
         )
-        splits = generate_monthly_splits(combined_times, training_months=2)
+        splits = generate_monthly_splits(
+            combined_times,
+            training_months=2,
+            label_timeout_minutes=self._TIMEOUT,
+            interval_minutes=self._INTERVAL,
+        )
         assert len(splits) == 2
 
         s0 = splits[0]
         assert s0.test_month == "2024-03"
         assert datetime.datetime.fromtimestamp(s0.train_start_ms / 1000, tz=datetime.UTC).month == 1
         assert datetime.datetime.fromtimestamp(s0.test_start_ms / 1000, tz=datetime.UTC).month == 3
+
+        # Embargo invariant — single source of truth for lookahead protection.
+        expected_embargo_ms = (
+            compute_embargo_candles(self._TIMEOUT, self._INTERVAL) * self._INTERVAL * 60_000
+        )
+        for split in splits:
+            assert split.test_start_ms - split.train_end_ms == expected_embargo_ms, (
+                f"train_end_ms must precede test_start_ms by exactly "
+                f"compute_embargo_candles(timeout, interval) * interval_ms — "
+                f"got gap {split.test_start_ms - split.train_end_ms} ms, "
+                f"expected {expected_embargo_ms} ms"
+            )
 
 
 # ---------------------------------------------------------------------------

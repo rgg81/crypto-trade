@@ -7,6 +7,37 @@ from dataclasses import dataclass
 import numpy as np
 
 
+def compute_embargo_candles(label_timeout_minutes: int, interval_minutes: int) -> int:
+    """Number of candles the triple-barrier labeler scans forward per entry.
+
+    Single source of truth for the embargo size at any boundary that must
+    not leak label information across it. The labeler's forward scan
+    (``labeling.label_trades``) walks ``deadline = close_time + timeout_ms``
+    candles ahead, which for a regular interval evaluates to
+    ``timeout_minutes // interval_minutes + 1`` candles past the entry.
+
+    This same value is used in two places to prevent label leakage:
+
+    1. **Train/test embargo** (walk-forward split boundary):
+       ``MonthSplit.train_end_ms = test_start_ms - embargo_candles × interval_ms``.
+       Drops the last few training candles whose forward scan would otherwise
+       reach into the test month.
+
+    2. **CV gap** (between train and val folds inside Optuna):
+       ``TimeSeriesSplit(gap = embargo_candles × n_symbols)``. Skips rows
+       that span the boundary between the train fold and the val fold.
+
+    Keep this function as the only place that derives candle-count from
+    ``timeout / interval``. If the labeler's scan semantics change, update
+    here and both call sites stay correct.
+    """
+    if interval_minutes <= 0:
+        raise ValueError(f"interval_minutes must be positive, got {interval_minutes}")
+    if label_timeout_minutes <= 0:
+        raise ValueError(f"label_timeout_minutes must be positive, got {label_timeout_minutes}")
+    return label_timeout_minutes // interval_minutes + 1
+
+
 @dataclass(frozen=True)
 class MonthSplit:
     train_start_ms: int
@@ -38,14 +69,27 @@ def _month_boundaries(year: int, month: int) -> tuple[int, int]:
 def generate_monthly_splits(
     open_times: np.ndarray,
     training_months: int,
+    label_timeout_minutes: int,
+    interval_minutes: int,
 ) -> list[MonthSplit]:
-    """Generate walk-forward monthly train/test splits.
+    """Generate walk-forward monthly train/test splits with a train/test
+    embargo derived from the labeler's forward-scan horizon.
 
     For each month M starting from index ``training_months``:
-    - train window = months [M - training_months, M)
-    - test window  = month [M, M+1)
+    - train window = ``[month_start(M - training_months), month_start(M) - embargo_ms)``
+    - test window  = ``[month_start(M), month_start(M + 1))``
+
+    Where ``embargo_ms = compute_embargo_candles(label_timeout_minutes,
+    interval_minutes) * interval_minutes * 60_000``. Dropping the last
+    ``embargo_candles`` training candles guarantees their triple-barrier
+    forward scan can never reach into the test month — the labels are
+    therefore lookahead-free regardless of how much forward data is
+    present in ``master`` at training time.
     """
     import datetime
+
+    embargo_candles = compute_embargo_candles(label_timeout_minutes, interval_minutes)
+    embargo_ms = embargo_candles * interval_minutes * 60_000
 
     # Extract unique (year, month) pairs in order
     ts_seconds = open_times / 1000.0
@@ -66,7 +110,7 @@ def generate_monthly_splits(
 
         train_start_ms, _ = _month_boundaries(train_start_year, train_start_month)
         test_start_ms, test_end_ms = _month_boundaries(test_year, test_month)
-        train_end_ms = test_start_ms  # train ends where test begins
+        train_end_ms = test_start_ms - embargo_ms  # purge labels that would peek into test
 
         splits.append(
             MonthSplit(
