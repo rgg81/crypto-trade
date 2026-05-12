@@ -18,6 +18,7 @@ from crypto_trade.strategies.ml.optimization import (
 )
 from crypto_trade.strategies.ml.walk_forward import (
     MonthSplit,
+    compute_embargo_candles,
     generate_monthly_splits,
 )
 
@@ -216,8 +217,16 @@ class LightGbmStrategy:
         # feature_columns is required (validated in __init__) — no auto-discovery
         self._all_feature_cols = list(self.feature_columns)
 
-        # Generate monthly splits
-        self._splits = generate_monthly_splits(self._open_time_arr, self.training_months)
+        # Generate monthly splits with a labeler-aware embargo at the train/test
+        # boundary. ``compute_embargo_candles`` is the single source of truth
+        # also used for the CV gap below — see _train_for_month.
+        interval_minutes = _interval_to_minutes(self._interval)
+        self._splits = generate_monthly_splits(
+            self._open_time_arr,
+            self.training_months,
+            label_timeout_minutes=self.label_timeout_minutes,
+            interval_minutes=interval_minutes,
+        )
         self._split_map = {s.test_month: s for s in self._splits}
 
         if self.verbose > 0:
@@ -428,13 +437,19 @@ class LightGbmStrategy:
             )
 
         # (d) Optuna optimization (all features, with threshold)
-        # Compute CV gap to prevent label leakage across folds (iter 091).
-        # gap = (timeout_in_candles + 1) * n_symbols
+        # CV gap prevents label leakage between train and val folds inside
+        # TimeSeriesSplit. Uses the SAME ``compute_embargo_candles`` helper
+        # that walk_forward.py uses for the train/test boundary — single
+        # source of truth, no duplicated formula. Multiplies by n_symbols
+        # because TimeSeriesSplit counts ROWS (which are interleaved
+        # symbol-by-symbol), so one candle of time = n_symbols rows.
         if self.cv_label_gap:
             interval_minutes = _interval_to_minutes(self._interval)
-            timeout_candles = self.label_timeout_minutes // interval_minutes + 1
+            embargo_candles = compute_embargo_candles(
+                self.label_timeout_minutes, interval_minutes
+            )
             n_symbols = len(set(self._sym_arr[train_indices]))
-            cv_gap = timeout_candles * n_symbols
+            cv_gap = embargo_candles * n_symbols
         else:
             cv_gap = 0
         if self.verbose > 0:
