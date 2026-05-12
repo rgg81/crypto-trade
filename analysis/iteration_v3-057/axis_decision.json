@@ -1,0 +1,7 @@
+{
+  "drop_target": "ret_skew_50",
+  "add_target": "parkinson_gk_ratio_20",
+  "mean_abs_spearman": 0.051385458160666586,
+  "max_abs_ic_with_base14": 0.24502428865889286,
+  "max_ic_partner": "ret_skew_200(LDOUSDT)"
+}
