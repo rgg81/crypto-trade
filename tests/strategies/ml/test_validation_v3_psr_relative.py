@@ -95,8 +95,8 @@ def test_psr_with_cpcv_q75_integration():
     cpcv_sharpes = np.concatenate(
         [
             np.array([-0.243] * 12),  # paths 1-12: below Q25
-            np.array([0.335] * 11),   # paths 13-23: Q25-Q50 cluster
-            np.array([0.838] * 11),   # paths 24-34: Q50-Q75 cluster (Q75 at index 34)
+            np.array([0.335] * 11),  # paths 13-23: Q25-Q50 cluster
+            np.array([0.838] * 11),  # paths 24-34: Q50-Q75 cluster (Q75 at index 34)
             np.array(  # paths 35-45: top cluster
                 [1.20, 1.30, 1.40, 1.50, 1.60, 1.70, 1.75, 1.78, 1.88, 1.88, 1.88]
             ),
@@ -113,3 +113,70 @@ def test_psr_with_cpcv_q75_integration():
     # Strategy with SR materially above Q75 → high PSR (passes DSR_relative gate)
     p_high = psr(1.5, 200, 0.0, 3.0, benchmark_sharpe=q75)
     assert p_high > 0.95, f"High SR vs Q75 should give PSR > 0.95; got {p_high:.4f}"
+
+
+def test_psr_with_in_memory_flat_path_sharpes_integration():
+    """iter-v3/056 — Integration test: simulates runner's call-site using
+    in-memory flat_path_sharpes array (the exact code path in run_baseline_v3.py
+    after the iter-v3/056 bug fix). Asserts:
+    - cpcv_path_sharpe_q75 is correctly extracted from in-memory array
+    - dsr_relative differs from plain psr (when CPCV Q75 > 0)
+    - Round-trip math matches the Engineer-verified post-hoc /055 value (0.5798)
+    """
+    # Simulate the runner's flat_path_sharpes after _compute_cpcv_paths()
+    # Use cycle-4 PATH E bit-identical structural distribution: Q75=0.8378
+    flat_path_sharpes = np.concatenate(
+        [
+            np.array([-0.243] * 12),  # Q25 cluster
+            np.array([0.335] * 11),  # Q50 cluster
+            np.array([0.8378] * 11),  # Q75 cluster (cycle-4 STRUCTURAL CONSTANT)
+            np.array([1.20, 1.30, 1.40, 1.50, 1.60, 1.70, 1.75, 1.78, 1.88, 1.88, 1.88]),
+        ]
+    )
+    assert len(flat_path_sharpes) == 45, f"Expected 45 paths, got {len(flat_path_sharpes)}"
+
+    # Mirror the runner's exact code path post-fix
+    if len(flat_path_sharpes) >= 4:
+        cpcv_path_sharpe_q75 = float(np.percentile(flat_path_sharpes, 75))
+    else:
+        cpcv_path_sharpe_q75 = 0.0
+
+    # Assert non-degenerate cpcv_path_sharpe_q75 (the /055 bug detector)
+    assert cpcv_path_sharpe_q75 > 0.0, (
+        f"cpcv_path_sharpe_q75={cpcv_path_sharpe_q75} is degenerate (the /055 bug)"
+    )
+    # Assert Q75 lands in cycle-4 structural-constant band [0.83, 0.84]
+    assert 0.83 <= cpcv_path_sharpe_q75 <= 0.84, (
+        f"cpcv_path_sharpe_q75={cpcv_path_sharpe_q75} out of cycle-4 band [0.83, 0.84]"
+    )
+
+    # Reproduce Engineer's post-hoc /055 computation (Engineering report SHA `6dc8256`)
+    raw_sharpe_oos = 0.8591
+    n_obs = 88
+    oos_sk = 1.0684
+    oos_kt = 5.6062
+
+    dsr_relative = psr(
+        observed_sharpe=raw_sharpe_oos,
+        n_obs=n_obs,
+        skewness=oos_sk,
+        kurtosis=oos_kt,
+        benchmark_sharpe=cpcv_path_sharpe_q75,
+    )
+    psr_plain = psr(
+        observed_sharpe=raw_sharpe_oos,
+        n_obs=n_obs,
+        skewness=oos_sk,
+        kurtosis=oos_kt,
+        benchmark_sharpe=0.0,
+    )
+
+    # Assert dsr_relative differs from plain psr (the /055 bug signature was equality)
+    assert abs(dsr_relative - psr_plain) > 0.01, (
+        f"dsr_relative={dsr_relative} ~== psr_plain={psr_plain} (the /055 bug signature)"
+    )
+    # Assert dsr_relative matches the Engineer-verified post-hoc 0.5798 (±0.01)
+    # Engineering report SHA `6dc8256` verified post-hoc: DSR_relative = 0.5798
+    assert abs(dsr_relative - 0.5798) < 0.01, (
+        f"dsr_relative={dsr_relative} != Engineer-verified 0.5798"
+    )

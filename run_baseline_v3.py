@@ -103,7 +103,7 @@ def _derive_ensemble_seeds(outer_seed: int, size: int = ENSEMBLE_SIZE) -> list[i
     return [int(s) for s in rng.integers(low=0, high=2**31 - 1, size=size)]
 
 
-ITERATION_LABEL = "v3-055"
+ITERATION_LABEL = "v3-056"
 REPORTS_DIR = Path("reports-v3")
 FEATURES_DIR = Path("data/features_v3")
 DATA_DIR = Path("data")
@@ -2174,26 +2174,24 @@ def main() -> None:
         oos_kt = 3.0
         psr_val = 0.0
 
-    # DSR_relative — PSR with CPCV path Sharpe Q75 benchmark (iter-v3/055)
+    # DSR_relative — PSR with CPCV path Sharpe Q75 benchmark (iter-v3/056 BUG FIX)
     # Per `analysis/iteration_v3-055/synthesis.md` Section R5: replaces structural
     # DSR=0 artifact with within-iteration null discipline. Reference: AFML Ch. 14
     # + Bailey-LdP (2014) JPM "Deflated Sharpe Ratio".
-    cpcv_path_sharpe_q75 = 0.0
-    cpcv_paths_csv = REPORTS_DIR / f"iteration_{ITERATION_LABEL}" / "cpcv_paths.csv"
-    if cpcv_paths_csv.exists():
-        try:
-            _cpcv_df_tmp = pd.read_csv(cpcv_paths_csv)
-            if "sharpe" in _cpcv_df_tmp.columns and len(_cpcv_df_tmp) >= 4:
-                cpcv_path_sharpe_q75 = float(np.percentile(_cpcv_df_tmp["sharpe"], 75))
-                print(
-                    f"[dsr_relative] CPCV path Q75 Sharpe = {cpcv_path_sharpe_q75:.4f} "
-                    f"(from {len(_cpcv_df_tmp)} paths)"
-                )
-        except Exception as e:
-            print(f"[dsr_relative] Could not read cpcv_paths.csv: {e}")
-            cpcv_path_sharpe_q75 = 0.0
+    # iter-v3/056: use in-memory flat_path_sharpes (already populated at line 2090)
+    # instead of reading cpcv_paths.csv from disk (which is only written at line 2295).
+    if len(flat_path_sharpes) >= 4:
+        cpcv_path_sharpe_q75 = float(np.percentile(flat_path_sharpes, 75))
+        print(
+            f"[dsr_relative] CPCV path Q75 Sharpe = {cpcv_path_sharpe_q75:.4f} "
+            f"(from {len(flat_path_sharpes)} in-memory paths)"
+        )
     else:
-        print("[dsr_relative] cpcv_paths.csv not found — cpcv_path_sharpe_q75 = 0.0 (fallback)")
+        cpcv_path_sharpe_q75 = 0.0
+        print(
+            f"[dsr_relative] flat_path_sharpes has only {len(flat_path_sharpes)} elements "
+            f"(<4 required) — cpcv_path_sharpe_q75 = 0.0 (fallback)"
+        )
 
     # Compute DSR_relative using existing psr() function with non-zero benchmark
     if len(oos_wp) > 1 and oos_wp.std() > 0:
