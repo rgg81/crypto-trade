@@ -1,0 +1,4 @@
+path,feature_count,new_features_to_impl,wallclock_impact_est_h,implementation_surface_loc,single_seed_lottery_risk,expected_classification_PROMISING,expected_classification_INERT,expected_classification_SUSPICIOUS,expected_classification_NEGATIVE,recommendation
+A — Aggressive 100,100,~55 (target 100 minus 45 already-in-parquet),2.0,>800,HIGH (very wide search space at n_trials=35),0.2,0.3,0.3,0.2,Defer to /069 CONFIRMATION if Path B successful
+B — Moderate ~50,50,~1 (50 minus 49 already-in-parquet),1.2,~300-400,MEDIUM (moderate search space),0.3,0.4,0.15,0.15,PRIMARY recommendation for /063
+"C — Phased: 50 at /063, expand to 100 at /069 if PROMISING",50,~1 at /063; ~50 more at /069,1.2,~300-400 at /063,MEDIUM at /063,0.35,0.4,0.1,0.15,SAFE choice; preserves Path A optionality if /063 PROMISING

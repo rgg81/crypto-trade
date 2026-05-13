@@ -1,0 +1,25 @@
+feature,action,reason
+candle_hour_sin,DROP,ADF non-stationary in majority of symbols
+parkinson_vol_50,DROP,|IC|=1.000 with range_realized_vol_50 (kept; ranks 19 vs 48)
+williams_r_14,DROP,|IC|=1.000 with stoch_k_14 (kept; ranks 54 vs 68)
+garman_klass_vol_20,DROP,|IC|=0.993 with parkinson_vol_20 (kept; ranks 38 vs 43)
+taker_buy_zscore_50,DROP,|IC|=0.982 with tbr_zscore_30 (kept; ranks 61 vs 64)
+bb_pctb_20,DROP,|IC|=0.964 with cci_20 (kept; ranks 45 vs 65)
+cci_20,DROP,|IC|=0.942 with vwap_dev_20 (kept; ranks 53 vs 45)
+close_pos_in_range_20,DROP,|IC|=0.939 with vwap_dev_20 (kept; ranks 53 vs 55)
+rsi_28,DROP,|IC|=0.936 with vwap_dev_50 (kept; ranks 37 vs 47)
+rsi_14,DROP,|IC|=0.931 with vwap_dev_50 (kept; ranks 37 vs 46)
+fracdiff_d05_close,DROP,|IC|=0.920 with fracdiff_logclose_dstat (kept; ranks 10 vs 16)
+stoch_k_14,DROP,|IC|=0.889 with vwap_dev_20 (kept; ranks 53 vs 54)
+ret_5d,DROP,|IC|=0.874 with vwap_dev_20 (kept; ranks 53 vs 66)
+vwap_dev_50,DROP,|IC|=0.868 with ema_spread_atr_20 (kept; ranks 29 vs 37)
+ret_3d,DROP,|IC|=0.863 with vwap_dev_20 (kept; ranks 53 vs 56)
+macd_hist_norm,DROP,|IC|=0.845 with vwap_dev_20 (kept; ranks 53 vs 49)
+ret_20d,DROP,|IC|=0.841 with ema_spread_atr_20 (kept; ranks 29 vs 33)
+atr_pct_rank_200,DROP,|IC|=0.820 with atr_pct_rank_500 (kept; ranks 28 vs 26)
+parkinson_vol_20,DROP,|IC|=0.811 with range_realized_vol_50 (kept; ranks 19 vs 38)
+kurt_ratio_50_200,DROP,|IC|=0.768 with ret_kurt_50 (kept; ranks 27 vs 21)
+hl_range_ratio_20,DROP,|IC|=0.739 with fracdiff_logvolume_dstat (kept; ranks 62 vs 58)
+candle_efficiency_20,DROP,|IC|=0.725 with vwap_dev_20 (kept; ranks 53 vs 50)
+ema_spread_atr_20|btc_ret_14d,KEEP_BOTH,Both BASELINE_V3 mandatory at |IC|=0.724
+candle_hour_cos,DROP,Zero/near-zero gain in importance preview (gain=0.00); model could not learn
