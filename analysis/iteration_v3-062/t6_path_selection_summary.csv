@@ -1,0 +1,7 @@
+path,description,code_change,addresses_root_cause,backward_compat,integration_test_surface,predicted_060_dsr_relative,passes_at_0p55,complexity_score,risk_score
+A,Threshold recalibration 0.95 → 0.55,1 constant (DSR_RELATIVE_THRESHOLD),NO,YES (historical numbers unchanged),MINIMAL (no new computation),0.0,NO (0.0 < 0.55),1,1
+B1,Rescale benchmark to trade-level (×√n_trades/√n_test),~10 lines in run_baseline_v3.py:2275-2305,YES,NO (historical dsr_relative numbers change),MEDIUM (smoke test + 6th integration test),see T4 B1 column,depends on observed value,2,2
+B2,Rescale observed to candle-level (×√n_test/√n_trades),~10 lines,YES,NO,MEDIUM,see T4 B2 column,depends on observed value,2,2
+B3,Both per-obs (drop √scaling both sides),~10 lines,PARTIAL (per-obs is correct null but loses Sharpe annualization),NO,MEDIUM,see T4 B3 column,depends on observed value,2,2
+B4,Annualized both sides (daily-Sharpe × √252),~20 lines (need daily skew/kurt),YES (cleanest; matches AFML convention),NO,HIGH (need daily aggregation function + smoke test + integration test),see T4 B4 column,depends on observed value,4,3
+C,Alternative benchmark (CPCV-Q50 instead of Q75),1 literal (cpcv_path_sharpe_q50),NO (still scale-mismatched),NO,MINIMAL,see T5 dsr_with_q50,depends,1,1

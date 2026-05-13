@@ -1,0 +1,7 @@
+iter,architecture,n_trades_oos,raw_sharpe_oos_trade_level,monthly_sharpe_oos,daily_sharpe_oos,cpcv_q75_benchmark,cpcv_q50,cpcv_q25,psr_legacy,dsr_relative_observed,oos_skew,oos_kurt
+028,2-outer × 5-inner buggy WF,96,0.543015,0.5053,1.034,0.0,0.3351,-0.243,1.0,0.0,0.526,3.1823
+050,2-outer × 5-inner post-fix,93,1.262955,1.1659,2.4881,0.0,0.0526,-0.7737,1.0,0.0,-0.1096,3.5682
+058,2-outer × 5-inner post-fix,103,1.104603,0.7826,2.0759,0.837759,0.3351,-0.243,1.0,0.998164,0.6861,3.4539
+059,unified 10-seed,94,0.704578,0.5791,1.4359,0.837759,0.3351,-0.243,1.0,0.113363,0.8829,3.5622
+060,EXPLORATION 3-seed --exploration,102,0.187293,0.1403,0.3659,0.837759,0.3351,-0.243,0.9763,0.0,0.6385,3.4401
+061,EXPLORATION 3-seed --exploration,102,0.20702,0.1551,0.405,0.837759,0.3351,-0.243,0.9861,0.0,0.6298,3.4028
