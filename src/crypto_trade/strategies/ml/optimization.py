@@ -404,6 +404,7 @@ def optimize_and_train(
             oof_buffer=oof_buffer,
         ),
         n_trials=n_trials,
+        n_jobs=2,
     )
 
     # Sub-fix 1b: flush per-trial OOF buffer to parquet (append if file exists)
