@@ -641,7 +641,8 @@ analysis/iteration_v3-062/
 ### 10.5 — Setup commit SHA
 
 EDA: `ae22e60` (committed)
-Brief LOCKED setup: **TO BE FILLED at brief commit** (this brief = the setup commit)
+Brief LOCKED setup: `8df5527` (this commit — initial brief LOCK)
+Backfill: subsequent commit (this edit) backfills the setup SHA into Section 10.5 + reproducibility stamp
 
 ### 10.6 — Anti-pattern static scan (Path C)
 
@@ -695,11 +696,11 @@ grep 'ITERATION_LABEL = "v3-' run_baseline_v3.py
 
 ## Reproducibility Stamp (Path C / iter-v3/062)
 
-- HEAD SHA at brief LOCK: **TO BE FILLED at setup commit**
+- HEAD SHA at brief LOCK: `8df5527`
 - Branch: `iteration-v3/062`
 - Parent branch HEAD: `8a02b7a` (iter-v3/061 diary closeout)
 - EDA commit SHA: `ae22e60`
-- Setup commit SHA: **TO BE BACKFILLED**
+- Setup commit SHA: `8df5527` (initial brief LOCK; backfilled in subsequent commit)
 - Code change: ZERO (no `src/`, no `run_baseline_v3.py`, no `tests/`)
 - Backtest: NONE
 - Wall-clock target: <30 min (EDA + brief + Phase 5.5 + diary; all docs/non-compute work)
