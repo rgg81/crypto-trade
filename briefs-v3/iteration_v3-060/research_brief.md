@@ -533,8 +533,8 @@ Phase B-3 unified seed:   ab2d9ac (ENSEMBLE_SIZE=10; outer-seed loop eliminated)
 Walk-forward fix SHA:     e149e9d (22-candle embargo at train/test boundary)
 RE-ANCHOR #2 BASELINE:    84adfcc (BASELINE_V3.md update)
 EDA SHA:                  6ab47b4 (iter-v3/060 TRX diagnostic — Path A evidence)
-Setup commit SHA:         (backfilled at setup commit)
-Phase 5.5 gate SHA:       (same as setup commit)
+Setup commit SHA:         2d82079 (this brief + research_brief.md locked)
+Phase 5.5 gate SHA:       (orchestrator-dispatched after this commit)
 ```
 
 ### Stage 6 — Cycle counting
