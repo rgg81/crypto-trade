@@ -136,6 +136,20 @@ class RiskV2Config:
     # seed EDA stage. iter-v3/049 sets {"TRXUSDT": 21.0}; BCH/LDO/ALGO unchanged.
     adx_threshold_per_symbol: dict[str, float] = field(default_factory=dict)
 
+    # iter-v3/061: per-symbol vol_scale_floor override (parallel to adx_threshold_per_symbol
+    # field). When a symbol is in this dict, the per-symbol value is used as the vol-scaling
+    # floor instead of the global vol_scale_floor. Symbols absent from this dict fall back to
+    # the global vol_scale_floor.
+    # Default empty preserves v1/v2/v3-prior behavior (universal floor).
+    # Calibrated by QR EDA at iter-v3/061 (analysis/iteration_v3-061/
+    # trx_anti_kelly_diagnostic.py Q4 counterfactual): TRX floor=0.5 produces
+    # +0.47 OOS wpnl counterfactual lift with bit-identical IS (+0.008 wpnl).
+    # BCH/LDO weighted_pnl mathematically invariant per Q5 invariance check.
+    # iter-v3/061 sets {"TRXUSDT": 0.5}; BCH/LDO unchanged at global 0.3.
+    # Per-symbol weight_factor floor — added at iter-v3/061 per /060 Q7 TRX anti-Kelly EDA.
+    # Applied as a floor (lower bound) AFTER the existing vol-scaling formula.
+    vol_scale_floor_per_symbol: dict[str, float] = field(default_factory=dict)
+
     # iter-v3/054: primitive 11 — per-symbol drawdown brake.
     # Pauses signals for a symbol when its 30-day rolling-window weighted_pnl drawdown
     # hits drawdown_brake_threshold_wpnl. Resumes when drawdown recovers to
@@ -588,8 +602,12 @@ class RiskV2Wrapper:
         # profitable high-vol trades run at full size and unprofitable low-vol
         # trades run smaller. Direct linear mapping of atr_pct_rank_200 to the
         # [floor, ceiling] band.
+        # iter-v3/061: per-symbol vol_scale_floor override (default empty falls back to
+        # global vol_scale_floor). Per QR EDA SHA d198b25: TRX-only raise 0.3 → 0.5
+        # produces +0.47 OOS wpnl counterfactual lift; IS bit-identical.
+        floor = self.config.vol_scale_floor_per_symbol.get(symbol, self.config.vol_scale_floor)
         raw = float(atr_pct)
-        return float(np.clip(raw, self.config.vol_scale_floor, self.config.vol_scale_ceiling))
+        return float(np.clip(raw, floor, self.config.vol_scale_ceiling))
 
     # ------------------------------------------------------------------
     # Reporting

@@ -125,7 +125,7 @@ def _derive_ensemble_seeds(outer_seed: int, size: int = 5) -> list[int]:
     return [int(s) for s in rng.integers(low=0, high=2**31 - 1, size=size)]
 
 
-ITERATION_LABEL = "v3-060"
+ITERATION_LABEL = "v3-061"
 REPORTS_DIR = Path("reports-v3")
 FEATURES_DIR = Path("data/features_v3")
 DATA_DIR = Path("data")
@@ -212,7 +212,7 @@ def _verify_data_freshness(symbols: tuple[str, ...], max_lag_hours: float = 16.0
 
 
 def _verify_feature_columns(ensemble_size: int | None = None) -> None:
-    """Verifies V3_FEATURE_COLUMNS contents per current brief (iter-v3/060).
+    """Verifies V3_FEATURE_COLUMNS contents per current brief (iter-v3/061).
 
     Parameters
     ----------
@@ -222,6 +222,14 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
         If None, skips the ensemble-size mode check (backward compat for direct
         calls in unit tests that don't care about mode).
 
+
+    iter-v3/061: CYCLE 1 #2 EXPLORATION — TRX-specific RiskV2 vol_scale_floor=0.5 (Path B).
+      Axis: per-symbol vol_scale_floor per Critic /060 Rec #3 + QR EDA SHA d198b25.
+      Code changes: RiskV2Config.vol_scale_floor_per_symbol={"TRXUSDT": 0.5}; BCH/LDO unchanged.
+      Feature bundle IDENTICAL to /060 (no feature changes).
+      ITERATION_LABEL = "v3-061".
+      Counterfactual: +0.47 OOS wpnl TRX lift; IS bit-identical (+0.008 wpnl).
+      Expected classification: INERT-AT-EXPLORATION (~55% probability per Section 7).
 
     iter-v3/060: CYCLE 1 #1 EXPLORATION — EXPLORATION-MODE-REFERENCE establishment + TRX diagnostic.
       Mode-flag refactor commit `56f5a30`: --exploration CLI flag (EXPLORATION_ENSEMBLE_SIZE=3
@@ -720,6 +728,32 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
     print(
         "  Primitive 11 (per-symbol drawdown brake): enable=False "
         "(CLOSED-mechanism per iter-v3/054 closeout)  PASS"
+    )
+
+    # iter-v3/061: per-symbol vol_scale_floor — TRX-only 0.5; BCH/LDO/ALGO at global 0.3.
+    # Calibrated by QR EDA SHA d198b25 + Critic /060 Rec #3.
+    # Asserts the vol_scale_floor_per_symbol dict is wired correctly.
+    _p12_cfg_check, p12_strat_check = _build_v3_model(
+        symbol="TRXUSDT", seed=42, n_trials=1, ensemble_seeds=[42]
+    )
+    if not isinstance(p12_strat_check, RiskV3Wrapper):
+        raise RuntimeError(
+            f"_build_v3_model(TRXUSDT) returned {type(p12_strat_check).__name__} — "
+            "expected RiskV3Wrapper. iter-v3/061: vol_scale_floor_per_symbol check "
+            "requires RiskV3Wrapper. Check _build_v3_model returns RiskV3Wrapper."
+        )
+    expected_floor_dict: dict[str, float] = {"TRXUSDT": 0.5}
+    if dict(p12_strat_check.config.vol_scale_floor_per_symbol) != expected_floor_dict:
+        raise ValueError(
+            f"RiskV2Config.vol_scale_floor_per_symbol = "
+            f"{p12_strat_check.config.vol_scale_floor_per_symbol} — expected "
+            f"{expected_floor_dict}. iter-v3/061: TRX-only floor=0.5; BCH/LDO unchanged. "
+            "Set vol_scale_floor_per_symbol={'TRXUSDT': 0.5} in RiskV2Config init in "
+            "_build_v3_model."
+        )
+    print(
+        "  Per-symbol vol_scale_floor (iter-v3/061): {'TRXUSDT': 0.5} "
+        "(TRX floor raised 0.3→0.5; BCH/LDO unchanged at global 0.3)  PASS"
     )
 
 
@@ -1448,6 +1482,11 @@ def _build_v3_model(
         drawdown_brake_threshold_wpnl=10.0,  # retained as backward-compatible default
         drawdown_brake_recovery_wpnl=5.0,  # retained as backward-compatible default
         drawdown_brake_window_days=30,  # retained as backward-compatible default
+        # iter-v3/061: TRX-specific vol_scale_floor=0.5 per QR EDA SHA d198b25 + Critic /060 Rec #3.
+        # Single per-symbol risk-primitive customization; BCH/LDO unchanged at global 0.3.
+        # Counterfactual: +0.47 OOS wpnl TRX lift with bit-identical IS (+0.008 wpnl).
+        # BCH/LDO weighted_pnl mathematically invariant per Section 2.5 Q5 invariance check.
+        vol_scale_floor_per_symbol={"TRXUSDT": 0.5},
     )
     strategy = RiskV3Wrapper(m1, risk_cfg)
     return cfg, strategy
