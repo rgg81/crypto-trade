@@ -292,3 +292,65 @@ class TestCpcvGateThreshold:
             f"frac_positive_paths=0.40 should produce gate_pass=False; "
             f"got {data['cpcv_frac_positive_paths_gate_pass']}"
         )
+
+
+# ---------------------------------------------------------------------------
+# (F) EXPLORATION vs CONFIRMATION mode constants (iter-v3/060)
+# ---------------------------------------------------------------------------
+
+
+class TestExplorationConfirmationModeConstants:
+    """EXPLORATION and CONFIRMATION mode constants enforce the binary mode discipline."""
+
+    def test_exploration_mode_uses_3_seeds(self) -> None:
+        """EXPLORATION_ENSEMBLE_SIZE must equal 3."""
+        runner = _load_runner()
+        assert runner.EXPLORATION_ENSEMBLE_SIZE == 3, (
+            f"EXPLORATION_ENSEMBLE_SIZE={runner.EXPLORATION_ENSEMBLE_SIZE}; expected 3. "
+            "iter-v3/060 user directive: EXPLORATION mode uses outer=42-lineage subset "
+            "(ENSEMBLE_SEEDS[0:3]). Wall-clock target ~1.1h."
+        )
+
+    def test_confirmation_mode_uses_10_seeds(self) -> None:
+        """CONFIRMATION_ENSEMBLE_SIZE must equal 10."""
+        runner = _load_runner()
+        assert runner.CONFIRMATION_ENSEMBLE_SIZE == 10, (
+            f"CONFIRMATION_ENSEMBLE_SIZE={runner.CONFIRMATION_ENSEMBLE_SIZE}; expected 10. "
+            "iter-v3/060: CONFIRMATION mode uses full ENSEMBLE_SEEDS tuple. "
+            "Wall-clock ~3.6h per iter-v3/059."
+        )
+
+    def test_exploration_seeds_are_outer_42_lineage_subset(self) -> None:
+        """ENSEMBLE_SEEDS[:3] must be from the outer=42 lineage (first 5)."""
+        runner = _load_runner()
+        outer_42_seeds = runner._derive_ensemble_seeds(42, size=5)
+        exploration_slice = list(runner.ENSEMBLE_SEEDS[: runner.EXPLORATION_ENSEMBLE_SIZE])
+        assert exploration_slice == outer_42_seeds[: runner.EXPLORATION_ENSEMBLE_SIZE], (
+            f"ENSEMBLE_SEEDS[:3] = {exploration_slice} does not match "
+            f"_derive_ensemble_seeds(42,5)[0:3] = "
+            f"{outer_42_seeds[: runner.EXPLORATION_ENSEMBLE_SIZE]}. "
+            "EXPLORATION mode must use the outer=42 lineage prefix."
+        )
+
+    def test_ensemble_size_alias_equals_confirmation(self) -> None:
+        """ENSEMBLE_SIZE backward-compat alias must equal CONFIRMATION_ENSEMBLE_SIZE."""
+        runner = _load_runner()
+        assert runner.ENSEMBLE_SIZE == runner.CONFIRMATION_ENSEMBLE_SIZE, (
+            f"ENSEMBLE_SIZE={runner.ENSEMBLE_SIZE} != "
+            f"CONFIRMATION_ENSEMBLE_SIZE={runner.CONFIRMATION_ENSEMBLE_SIZE}. "
+            "ENSEMBLE_SIZE is a backward-compat alias; "
+            "must always equal CONFIRMATION_ENSEMBLE_SIZE."
+        )
+
+    def test_exploration_is_strict_subset_of_confirmation_seeds(self) -> None:
+        """EXPLORATION seed slice must be a strict prefix of CONFIRMATION seeds."""
+        runner = _load_runner()
+        n_exp = runner.EXPLORATION_ENSEMBLE_SIZE
+        n_conf = runner.CONFIRMATION_ENSEMBLE_SIZE
+        exploration_slice = list(runner.ENSEMBLE_SEEDS[:n_exp])
+        confirmation_slice = list(runner.ENSEMBLE_SEEDS[:n_conf])
+        assert exploration_slice == confirmation_slice[:n_exp], (
+            f"ENSEMBLE_SEEDS[:{n_exp}] = {exploration_slice} is not a prefix of "
+            f"ENSEMBLE_SEEDS[:{n_conf}] = {confirmation_slice}. "
+            "EXPLORATION seeds must be a strict prefix of CONFIRMATION seeds."
+        )

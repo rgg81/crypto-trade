@@ -87,7 +87,10 @@ TRAINING_MONTHS = 24  # IMMUTABLE
 # iter-v3/006 fix: each outer seed now derives a distinct 5-seed inner ensemble
 # via `_derive_ensemble_seeds(outer_seed)`. The legacy seed list is preserved
 # below for documentation only — it is no longer passed to LightGbmStrategy.
-ENSEMBLE_SIZE: int = 10  # iter-v3/059 RE-ANCHOR #2: unified 10-seed ensemble
+CONFIRMATION_ENSEMBLE_SIZE: int = 10  # CONFIRMATION mode: full unified 10-seed ensemble
+# EXPLORATION mode: outer=42-lineage prefix (ENSEMBLE_SEEDS[0:3]); ~1.1h wall-clock
+EXPLORATION_ENSEMBLE_SIZE: int = 3
+ENSEMBLE_SIZE: int = CONFIRMATION_ENSEMBLE_SIZE  # backward-compat alias; do not change
 
 # Lineage-preserving seed list: first 5 derived from outer=42, last 5 from outer=123
 # via legacy _derive_ensemble_seeds.  Hardcoded here for reproducibility and to
@@ -208,8 +211,17 @@ def _verify_data_freshness(symbols: tuple[str, ...], max_lag_hours: float = 16.0
         )
 
 
-def _verify_feature_columns() -> None:
+def _verify_feature_columns(ensemble_size: int | None = None) -> None:
     """Verifies V3_FEATURE_COLUMNS contents per current brief (iter-v3/059).
+
+    Parameters
+    ----------
+    ensemble_size:
+        Effective ensemble size for this run (3 = EXPLORATION, 10 = CONFIRMATION).
+        If provided, asserts the value is in (3, 10) to enforce mode discipline.
+        If None, skips the ensemble-size mode check (backward compat for direct
+        calls in unit tests that don't care about mode).
+
 
     iter-v3/059: RE-ANCHOR #2 — /028 bundle under unified 10-seed ensemble architecture.
       Phase A commit `0a3c30e`: Optuna n_jobs=2 parallelization.
@@ -267,11 +279,16 @@ def _verify_feature_columns() -> None:
         atr_multipliers_for_symbol,
     )
 
-    # iter-v3/059 RE-ANCHOR #2: unified 10-seed ensemble architecture requires ENSEMBLE_SIZE=10.
-    assert ENSEMBLE_SIZE == 10, (
-        f"iter-v3/059+ requires ENSEMBLE_SIZE=10; got {ENSEMBLE_SIZE}. "
-        "Unified ensemble architecture enforces this at pre-flight time."
-    )
+    # iter-v3/059 RE-ANCHOR #2: unified ensemble architecture — ensemble_size must be 3 or 10.
+    # 3 = EXPLORATION mode (ENSEMBLE_SEEDS[0:3], outer=42 lineage subset).
+    # 10 = CONFIRMATION mode (full ENSEMBLE_SEEDS tuple, both outer lineages).
+    if ensemble_size is not None:
+        assert ensemble_size in (EXPLORATION_ENSEMBLE_SIZE, CONFIRMATION_ENSEMBLE_SIZE), (
+            f"ensemble_size={ensemble_size} is not a valid mode. "
+            f"EXPLORATION mode uses EXPLORATION_ENSEMBLE_SIZE={EXPLORATION_ENSEMBLE_SIZE}; "
+            f"CONFIRMATION mode uses CONFIRMATION_ENSEMBLE_SIZE={CONFIRMATION_ENSEMBLE_SIZE}. "
+            "Pass either 3 (--exploration) or 10 (default CONFIRMATION)."
+        )
 
     n = len(V3_FEATURE_COLUMNS)
     if n != 14:
@@ -1862,8 +1879,8 @@ def main() -> None:
             "Optuna trials per monthly model per seed. CONFIRMATION default "
             "lowered from 50 → 35 at iter-v3/018 closeout: 50 was below TPE-warmup-saturation "
             "and added wall-clock cost without proportional gain in best-trial "
-            "selection. 35 stays above TPE-warmup (~30) while saving ~30% "
-            "wall-clock. EXPLORATION mode auto-overrides to 10 below."
+            "selection. 35 stays above TPE-warmup (~30) while saving ~30%% "
+            "wall-clock."
         ),
     )
     parser.add_argument(
@@ -1885,12 +1902,8 @@ def main() -> None:
         "--exploration",
         action="store_true",
         help=(
-            "iter-v3/007 fast-exploration mode. Sets ENSEMBLE_SIZE=1 (single "
-            "inner model, ~5x faster), hardcodes colsample_bytree=1.0 in "
-            "Optuna search space (minimizes per-seed feature-subsampling "
-            "variance), and defaults --n-trials to 10 if not specified. Use "
-            "for fast variation across symbols/labels/features. Drop the flag "
-            "for production CONFIRMATION runs (full ensemble, full search space)."
+            "EXPLORATION mode: uses ENSEMBLE_SIZE=3 (ENSEMBLE_SEEDS[0:3]). "
+            "Default (without flag) is CONFIRMATION mode with ENSEMBLE_SIZE=10."
         ),
     )
     parser.add_argument(
@@ -1931,15 +1944,17 @@ def main() -> None:
             f"Proceeding with ENSEMBLE_SIZE={ENSEMBLE_SIZE}; the --seeds value is ignored."
         )
 
-    # iter-v3/007: --exploration overrides defaults for fast iteration.
-    # iter-v3/020: n_trials override REMOVED — both EXPLORATION and CONFIRMATION
-    # default to n_trials=35 (above TPE warmup). The EXPLORATION-vs-CONFIRMATION
-    # distinction is now: ENSEMBLE_SIZE=1, --seeds 1, colsample=1.0 hardcoded
-    # (EXPLORATION) vs ENSEMBLE_SIZE=5, --seeds 2, colsample Optuna-tunable
-    # (CONFIRMATION). n_trials raised from 10 → 35 to fix NEW-feature-family
-    # rank-14/14 INERT pattern (iter-v3/015 + iter-v3/019).
-    ensemble_size_for_run: int = 1 if args.exploration else ENSEMBLE_SIZE
-    fast_mode_for_run: bool = bool(args.exploration)
+    # iter-v3/060: MODE-AWARE ensemble size.
+    # EXPLORATION (--exploration): ENSEMBLE_SIZE=3, uses ENSEMBLE_SEEDS[0:3].
+    #   Wall-clock ~1.1h (30% of CONFIRMATION ~3.6h per iter-v3/059).
+    # CONFIRMATION (default): ENSEMBLE_SIZE=10, uses full ENSEMBLE_SEEDS tuple.
+    #   Wall-clock ~3.6h per iter-v3/059 baseline.
+    # fast_mode (colsample_bytree=1.0) is NOT tied to --exploration any more;
+    # both modes use the Optuna-tunable search space (fast_mode=False).
+    ensemble_size_for_run: int = (
+        EXPLORATION_ENSEMBLE_SIZE if args.exploration else CONFIRMATION_ENSEMBLE_SIZE
+    )
+    fast_mode_for_run: bool = False  # iter-v3/060: fast_mode decoupled from --exploration
 
     # Build active_models from --symbols filter (iter-v3/006 CLI flag).
     # Default (None) keeps all V3_MODELS.
@@ -1965,8 +1980,9 @@ def main() -> None:
     baseline_symbols = tuple(sym for _, sym in active_models)
     _verify_symbols(baseline_symbols)
     _verify_data_freshness(baseline_symbols + ("BTCUSDT",))
-    # asserts len == 13, funding NOT present, vwap_dev_50/tbr_zscore_30 absent
-    _verify_feature_columns()
+    # asserts len == 14, funding NOT present, vwap_dev_50/tbr_zscore_30 absent;
+    # also asserts ensemble_size in (3, 10) for mode discipline.
+    _verify_feature_columns(ensemble_size=ensemble_size_for_run)
     _verify_label_leakage_gap()  # asserts REQUIRED_GAP == 110 (5-symbol universe, iter-v3/033)
     _verify_track_isolation()  # grep check
 
@@ -1999,8 +2015,13 @@ def main() -> None:
             )
 
     active_sym_names = ", ".join(sym for _, sym in active_models)
+    # iter-v3/060: mode-aware startup log
+    if args.exploration:
+        print(f"[v3] Running in EXPLORATION mode (ensemble_size={ensemble_size_for_run})")
+    else:
+        print(f"[v3] Running in CONFIRMATION mode (ensemble_size={ensemble_size_for_run})")
     print(f"\nBASELINE v3 iter-{ITERATION_LABEL}: {active_sym_names} (seed-plumbing fix)")
-    print(f"Ensemble: {ENSEMBLE_SIZE} seeds (unified)  Optuna trials/model: {args.n_trials}")
+    print(f"Ensemble: {ensemble_size_for_run} seeds  Optuna trials/model: {args.n_trials}")
     print(f"Active models: {len(active_models)}/{len(V3_MODELS)} (--symbols={args.symbols!r})")
     print(f"CPCV: N={CPCV_N_SPLITS}, k={CPCV_N_TEST_SPLITS}, 45 paths on IS CANDLE SEQUENCE")
     print(
@@ -2059,20 +2080,25 @@ def main() -> None:
     # directly to _run_single_seed via ensemble_seeds_override, producing ONE
     # Sharpe per (sym, month) cell (not a mean across outer-seed runs).
     # ENSEMBLE_SEEDS[0] is used as "primary" seed for log naming only.
+    # iter-v3/060: mode-aware seed slice.
+    # EXPLORATION uses ENSEMBLE_SEEDS[0:3] (outer=42 lineage subset).
+    # CONFIRMATION uses full ENSEMBLE_SEEDS (all 10).
+    active_ensemble_seeds: tuple[int, ...] = ENSEMBLE_SEEDS[:ensemble_size_for_run]
+    mode_label = "EXPLORATION" if args.exploration else "CONFIRMATION"
     print(
         f"\n{'#' * 60}\n"
-        f"# UNIFIED ENSEMBLE ({ENSEMBLE_SIZE} seeds)\n"
-        f"# Seeds: {ENSEMBLE_SEEDS}\n"
+        f"# UNIFIED ENSEMBLE — {mode_label} ({ensemble_size_for_run} seeds)\n"
+        f"# Seeds: {active_ensemble_seeds}\n"
         f"{'#' * 60}"
     )
     unbraked, braked, btc_stats, hr_stats, model_pairs = _run_single_seed(
-        seed=ENSEMBLE_SEEDS[0],
+        seed=active_ensemble_seeds[0],
         n_trials=args.n_trials,
         btc_times=btc_times,
         btc_closes=btc_closes,
         active_models=active_models,
         ensemble_size=ensemble_size_for_run,
-        ensemble_seeds_override=None if fast_mode_for_run else ENSEMBLE_SEEDS,
+        ensemble_seeds_override=active_ensemble_seeds,
         fast_mode=fast_mode_for_run,
         model_type=args.model,
     )
@@ -2151,8 +2177,8 @@ def main() -> None:
     # -------------------------------------------------------
     is_ms_primary = _monthly_sharpe(is_trades)
     oos_ms_primary = _monthly_sharpe(oos_trades)
-    # iter-v3/059: outer-seed loop eliminated; n_trials_total no longer multiplied by seeds.
-    n_trials_total = args.n_trials * ENSEMBLE_SIZE * len(active_models)
+    # iter-v3/060: n_trials_total uses ensemble_size_for_run (3 or 10 depending on mode).
+    n_trials_total = args.n_trials * ensemble_size_for_run * len(active_models)
 
     is_wp = np.array([float(t.weighted_pnl) for t in is_trades])
     if len(is_wp) > 1 and is_wp.std() > 0:
@@ -2362,17 +2388,23 @@ def main() -> None:
     # iter-v3/059: outer-seed loop eliminated.  Replace seed_summary.json +
     # pareto_front.csv with ensemble_summary.json (one record per ensemble seed
     # for reproducibility audit; no multi-seed Sharpe aggregation).
-    ensemble_summary = [
-        {
-            "ensemble_seed_index": i,
-            "seed": s,
-            "lineage": "outer=42" if i < 5 else "outer=123",
-        }
-        for i, s in enumerate(ENSEMBLE_SEEDS)
-    ]
+    # iter-v3/060: mode field added; only active_ensemble_seeds appear in the record list.
+    ensemble_summary = {
+        "mode": "exploration" if args.exploration else "confirmation",
+        "ensemble_size": ensemble_size_for_run,
+        "seeds": [
+            {
+                "ensemble_seed_index": i,
+                "seed": s,
+                "lineage": "outer=42" if i < 5 else "outer=123",
+            }
+            for i, s in enumerate(active_ensemble_seeds)
+        ],
+    }
     (report_dir / "ensemble_summary.json").write_text(json.dumps(ensemble_summary, indent=2))
     print(
-        f"[v3 report] ensemble_summary.json: {len(ensemble_summary)} seeds "
+        f"[v3 report] ensemble_summary.json: mode={ensemble_summary['mode']}, "
+        f"{ensemble_summary['ensemble_size']} seeds "
         f"(replaces seed_summary.json + pareto_front.csv)"
     )
 
