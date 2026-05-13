@@ -1,6 +1,23 @@
 # Phase 5.5 Gate — iter-v3/060
 
-OVERALL: BLOCK
+OVERALL: PASS (after re-gate post fix `3fae219`)
+
+## Re-Gate Resolution (2026-05-13)
+
+Initial gate at SHA `b1df6b4` BLOCKED on a single item: ITERATION_LABEL not bumped from "v3-059" to "v3-060". Fix committed at SHA `3fae219`:
+- run_baseline_v3.py line 128: `ITERATION_LABEL = "v3-059"` → `ITERATION_LABEL = "v3-060"`
+- run_baseline_v3.py docstring header: updated to reference iter-v3/060 brief
+- run_baseline_v3.py iteration-history docstring: NEW /060 entry added; /059 entry corrected to note n_jobs=2 REVERT at `31665f6` per Critic /059 Rec #4
+
+Re-gate verification:
+- `grep -n "v3-060" run_baseline_v3.py` returns line 128 ITERATION_LABEL value + docstring history entry. PASS.
+- All other gate sections retained PASS verdicts from initial gate at `b1df6b4` (no other files changed between gates).
+
+OVERALL=PASS. Phase 6 backtest authorized to launch with `--exploration` flag.
+
+---
+
+## Initial Gate (Historical Record) — OVERALL=BLOCK at `b1df6b4`
 
 ## Per-Section Status
 
