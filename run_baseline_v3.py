@@ -125,7 +125,7 @@ def _derive_ensemble_seeds(outer_seed: int, size: int = 5) -> list[int]:
     return [int(s) for s in rng.integers(low=0, high=2**31 - 1, size=size)]
 
 
-ITERATION_LABEL = "v3-059"
+ITERATION_LABEL = "v3-060"
 REPORTS_DIR = Path("reports-v3")
 FEATURES_DIR = Path("data/features_v3")
 DATA_DIR = Path("data")
@@ -212,7 +212,7 @@ def _verify_data_freshness(symbols: tuple[str, ...], max_lag_hours: float = 16.0
 
 
 def _verify_feature_columns(ensemble_size: int | None = None) -> None:
-    """Verifies V3_FEATURE_COLUMNS contents per current brief (iter-v3/059).
+    """Verifies V3_FEATURE_COLUMNS contents per current brief (iter-v3/060).
 
     Parameters
     ----------
@@ -223,8 +223,14 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
         calls in unit tests that don't care about mode).
 
 
+    iter-v3/060: CYCLE 1 #1 EXPLORATION — EXPLORATION-MODE-REFERENCE establishment + TRX diagnostic.
+      Mode-flag refactor commit `56f5a30`: --exploration CLI flag (EXPLORATION_ENSEMBLE_SIZE=3
+        / CONFIRMATION_ENSEMBLE_SIZE=10). User directive 2026-05-13: "use 10 seeds only for CONFIRMATION."
+      ITERATION_LABEL = "v3-060" — first 3-seed EXPLORATION-mode run; bundle IDENTICAL to /059.
+      Cycle 1 cadence: 10 EXPLORATIONs (/060-069) at 3 seeds (~1.1h each) → 1 CONFIRMATION (/070) at 10 seeds.
+
     iter-v3/059: RE-ANCHOR #2 — /028 bundle under unified 10-seed ensemble architecture.
-      Phase A commit `0a3c30e`: Optuna n_jobs=2 parallelization.
+      Phase A commit `0a3c30e`: Optuna n_jobs=2 parallelization — REVERTED at `31665f6` (5x GIL slowdown).
       Phase B-3 commit `ab2d9ac`: unified 10-seed ensemble (ENSEMBLE_SIZE=10, ENSEMBLE_SEEDS
         hardcoded as lineage-preserving 10-value tuple; outer-seed loop eliminated).
       Walk-forward fix commit `e149e9d` (cherry-picked from main `5566a69`): post-fix WF.
