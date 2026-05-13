@@ -554,6 +554,130 @@ def compute_hurst_drift_50_200(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+_TREND_EFFICIENCY_SIGNED_EPS: float = 1e-9
+
+
+def compute_trend_efficiency_signed(df: pd.DataFrame) -> pd.DataFrame:
+    """Composed feature: kaufman_efficiency_50 × sign(ret_20d).
+
+    Encodes the direction-asymmetric version of the Kaufman (1995) efficiency
+    ratio. The unsigned ER was DISASTROUS at iter-v3/043 (IS -0.8445 / OOS
+    -0.8990; all 4 symbols broken) because it treats trending-up and trending-
+    down markets identically. This SIGNED variant adds directional information:
+
+        +ER  → price moved efficiently in the LONG direction (trending up cleanly)
+        -ER  → price moved efficiently in the SHORT direction (trending down cleanly)
+         ≈0  → choppy / sideways regardless of direction
+
+    Construction:
+    - ``kaufman_er_50 = abs(close - close.shift(50)) / sum(abs(close.diff()), 50)``
+      capped to [0, 1]; shift(1) applied to make it past-only.
+    - ``ret_20d = log(close / close.shift(60))`` at 8h cadence (60 bars ≈ 20 days).
+    - ``sign_ret_20d`` = sign(ret_20d); 0 if exactly flat (treated as NaN-equivalent
+      below but left as 0.0 for numerical stability).
+    - ``trend_efficiency_signed = kaufman_er_50 * sign_ret_20d``
+
+    The sign factor converts the [0, 1] unsigned ER to [-1, +1] signed space.
+    Output range: [-1, +1].
+
+    Past-only by construction:
+    - ``close.shift(50)`` and ``close.diff().rolling(50)`` use bars up to t-1
+      after shift(1) is applied to the ER result.
+    - ``close.shift(60)`` uses bar t-60 (past-only).
+    - Appending future bars does NOT alter the value at t.
+
+    NaN warm-up: first 61 bars are NaN (60-bar ret_20d dominates over 51-bar ER
+    warm-up after shift(1)).
+
+    IC carve-out: NOT applicable for the signed product. The ER primitive itself
+    was Category 1 at iter-v3/043; the SIGNED COMPOSITION uses the existing
+    efficiency_ratio_50 as a building block combined with ret_20d direction.
+    This is a Category 2 composed feature per the ``feedback_v3_engineered_feature_pivot.md``
+    methodology (composed feature gate: importance >= 30 in ≥2 symbols, NOT |IC|<0.70).
+
+    Args:
+        df: DataFrame with column ``close`` (float-castable).
+
+    Returns:
+        Copy of ``df`` with ``trend_efficiency_signed`` column appended.
+        If ``close`` is missing, the column is set to all-NaN without error.
+    """
+    df = df.copy()
+    if "close" not in df.columns:
+        df["trend_efficiency_signed"] = np.nan
+        return df
+
+    close = df["close"].astype(float)
+
+    # Kaufman ER (unsigned) at 50-bar window; shift(1) for past-only
+    direction = (close - close.shift(50)).abs()
+    noise = close.diff().abs().rolling(50, min_periods=50).sum()
+    er = (direction / (noise + _TREND_EFFICIENCY_SIGNED_EPS)).clip(0.0, 1.0).shift(1)
+
+    # 20-day direction (60 bars at 8h cadence = 20 calendar days)
+    log_close = np.log(close.clip(lower=1e-12))
+    ret_20d = log_close - log_close.shift(60)
+    sign_ret_20d = np.sign(ret_20d)
+
+    df["trend_efficiency_signed"] = er * sign_ret_20d
+    return df
+
+
+def compute_vol_regime_x_momentum(df: pd.DataFrame) -> pd.DataFrame:
+    """Composed feature: ret_5d × (atr_pct_rank_200 - 0.5).
+
+    Encodes the vol-regime-conditional momentum signal (Asness, Moskowitz, &
+    Pedersen 2013 value-and-momentum across asset classes; adapted to intraday
+    vol percentile rank regime filter):
+
+        - atr_pct_rank_200 > 0.5 → current vol ABOVE median → momentum signal
+          gets positive sign (trending regime in high-vol environment)
+        - atr_pct_rank_200 < 0.5 → current vol BELOW median → momentum signal
+          gets negative sign (mean-reversion tendency in calm markets)
+        - atr_pct_rank_200 == 0.5 → exactly at median → feature is 0.0
+
+    Construction:
+    - ``ret_5d = log(close / close.shift(15))`` at 8h cadence (15 bars ≈ 5 days).
+    - ``atr_pct_rank_200``: 200-bar ATR percentile rank (computed by
+      ``add_regime_v3_features``; upstream in GROUP_REGISTRY).
+    - ``vol_regime_x_momentum = ret_5d * (atr_pct_rank_200 - 0.5)``
+
+    Output range: approximately [-0.5, +0.5] (bounded by ret_5d and the [-0.5,
+    +0.5] range of the centered ATR rank factor).
+
+    Past-only by construction:
+    - ``close.shift(15)``: uses bar t-15 (past-only).
+    - ``atr_pct_rank_200`` is computed past-only by ``add_regime_v3_features``
+      (200-bar trailing rolling window).
+    - Appending future bars does NOT alter the value at t.
+
+    NaN warm-up: first ~199 bars NaN (atr_pct_rank_200 dominates; requires
+    200 bars for the rolling ATR percentile rank).
+
+    Args:
+        df: DataFrame with columns ``close`` (float-castable) and ``atr_pct_rank_200``
+            (pre-computed by ``add_regime_v3_features``).
+
+    Returns:
+        Copy of ``df`` with ``vol_regime_x_momentum`` column appended.
+        If ``atr_pct_rank_200`` is missing, the column is set to all-NaN without error.
+    """
+    df = df.copy()
+    if "close" not in df.columns or "atr_pct_rank_200" not in df.columns:
+        df["vol_regime_x_momentum"] = np.nan
+        return df
+
+    close = df["close"].astype(float)
+    log_close = np.log(close.clip(lower=1e-12))
+    # 15 bars at 8h cadence = 5 calendar days
+    ret_5d = log_close - log_close.shift(15)
+
+    atr_rank = df["atr_pct_rank_200"].astype(float)
+    vol_factor = atr_rank - 0.5  # centered at 0 when at median
+    df["vol_regime_x_momentum"] = ret_5d * vol_factor
+    return df
+
+
 def add_engineered_v3_features(df: pd.DataFrame) -> pd.DataFrame:
     """GROUP_REGISTRY entry point for all Category 2 (composed) v3 features.
 
@@ -652,6 +776,15 @@ def add_engineered_v3_features(df: pd.DataFrame) -> pd.DataFrame:
     # iter-v3/052: fracdiff_d05_close PARKED (dropped from V3_FEATURE_COLUMNS_TOP_N; column
     # still generated for zero-revert-cost per /051 PARKED policy). Compute call RETAINED.
     df = compute_fracdiff_d05_close(df)  # iter-v3/034 (PARKED at /052; column generated but unused)
+    # iter-v3/063: trend_efficiency_signed ADDED — Kaufman ER × sign(ret_20d).
+    # Signed variant of the unsigned ER that was DISASTROUS at /043 (IS -0.8445 / OOS -0.8990).
+    # Direction flip addresses the bottleneck: unsigned ER treats long/short trends identically.
+    # Category 2 composed feature; IC carve-out applies per feedback_v3_engineered_feature_pivot.md.
+    df = compute_trend_efficiency_signed(df)  # iter-v3/063 NEW (ACTIVATED)
+    # iter-v3/063: vol_regime_x_momentum ADDED — ret_5d × (atr_pct_rank_200 - 0.5).
+    # Momentum signal conditioned on vol regime (above/below 200-bar ATR median).
+    # Depends on atr_pct_rank_200 from add_regime_v3_features (upstream in GROUP_REGISTRY).
+    df = compute_vol_regime_x_momentum(df)  # iter-v3/063 NEW (ACTIVATED)
     df = compute_cross_asset_divergence_norm(df)  # iter-v3/037 RE-ADDED (LDO-only at model level)
     # iter-v3/048: vol_normalized_ret_5d ADDED (15th feature in V3_FEATURE_COLUMNS_TOP_N).
     # Canonical Sharpe-like risk-normalized momentum: ret_5d / (range_realized_vol_50 + ε).
@@ -702,6 +835,8 @@ __all__ = [
     "compute_hurst_drift_50_200",
     "compute_regime_momentum_signed_3d",
     "compute_regime_momentum_signed_5d",
+    "compute_trend_efficiency_signed",
     "compute_vol_adj_autocorr",
     "compute_vol_normalized_ret_5d",
+    "compute_vol_regime_x_momentum",
 ]

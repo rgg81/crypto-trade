@@ -3,18 +3,73 @@
 Track-isolated copy of v2's microstructure_v2.py. No imports from
 crypto_trade.features or crypto_trade.features_v2 permitted in this file.
 
-Four scale-invariant features focused on regime transitions and
-market-structure quality:
+Features focused on regime transitions and market-structure quality:
     candle_efficiency_20    — directional fraction of intra-bar range
     vol_transition_slope_20 — linear slope of parkinson_vol_20 over 20 bars
     vol_return_divergence_30 — z-scored volume vs abs(return)
     kurt_ratio_50_200       — short-term tail fatness / long-term
+    taker_buy_imbalance_20  — 20-bar rolling mean of (tbr - 0.5); iter-v3/063 NEW
+
+References:
+    Hasbrouck, J. (1991). Measuring the information content of stock trades.
+        Journal of Finance, 46(1), 179-207. (Trade-direction inference.)
+    Easley, D., & O'Hara, M. (1992). Time and the process of security price
+        adjustment. Journal of Finance, 47(2), 577-605. (PIN / informed trading.)
+    Brogaard, J., Hendershott, T., & Riordan, R. (2014). High-frequency trading
+        and price discovery. Review of Financial Studies. (Toxic flow.)
 """
 
 from __future__ import annotations
 
 import numpy as np
 import pandas as pd
+
+
+def add_taker_buy_imbalance_20(df: pd.DataFrame) -> pd.DataFrame:
+    """Taker-buy imbalance: 20-bar rolling mean of (tbr - 0.5).
+
+    Encodes the Hasbrouck (1991) / Easley-O'Hara (1992) informed-trading proxy:
+    when taker buys constitute more than 50% of volume over the trailing 20 bars,
+    informed demand is present (positive imbalance); below 50% signals selling
+    pressure.
+
+    Construction:
+    - ``tbr`` = taker_buy_ratio (taker_buy_base_volume / volume); range [0, 1].
+      The raw column is ``tbr_raw`` in V3_NON_FEATURE_COLUMNS (helper column
+      computed by add_microstructure_v3_features).
+    - ``tbr_raw.shift(1)`` ensures bar t uses tbr at t-1 (past-only; no current bar).
+    - ``rolling(20).mean()`` over the shifted series: 20-bar trailing average.
+    - ``- 0.5``: centers the feature at 0 (net taker-buy excess; positive = buy
+      pressure, negative = sell pressure).
+
+    Output range: approximately [-0.5, +0.5].
+
+    Past-only by construction:
+    - ``tbr_raw.shift(1)`` uses bar t-1 (past-only).
+    - Rolling mean of 20 bars ending at t-1 uses bars [t-20, t-1] (past-only).
+    - Appending future bars does NOT alter the value at t.
+
+    NaN warm-up: first 20 bars are NaN (20-bar rolling window + 1-bar shift = 21
+    bars needed before first valid output; actually first bar of shift is NaN so
+    effective warm-up is bars 0..20).
+
+    Args:
+        df: DataFrame with column ``tbr_raw`` (float, range [0, 1]).
+
+    Returns:
+        Copy of ``df`` with ``taker_buy_imbalance_20`` column appended.
+        If ``tbr_raw`` is missing, the column is set to all-NaN without error.
+    """
+    df = df.copy()
+    if "tbr_raw" not in df.columns:
+        df["taker_buy_imbalance_20"] = np.nan
+        return df
+
+    tbr = df["tbr_raw"].astype(float)
+    # shift(1): bar t uses tbr at t-1 (past-only; no look-ahead of current bar)
+    tbr_lagged = tbr.shift(1)
+    df["taker_buy_imbalance_20"] = tbr_lagged.rolling(20, min_periods=20).mean() - 0.5
+    return df
 
 
 def add_microstructure_v3_features(df: pd.DataFrame) -> pd.DataFrame:
@@ -98,5 +153,22 @@ def add_microstructure_v3_features(df: pd.DataFrame) -> pd.DataFrame:
         df["kurt_ratio_50_200"] = np.clip(ratio, -10.0, 10.0)
     else:
         df["kurt_ratio_50_200"] = np.nan
+
+    # 5. Taker-buy imbalance (iter-v3/063 NEW)
+    # Depends on tbr_raw which must be computed before microstructure group runs.
+    # tbr_raw is produced by add_microstructure_v3_features itself (below in v2 implementation)
+    # OR pre-existing in parquet for v3. For robustness, tbr_raw is computed here if missing.
+    if "tbr_raw" not in df.columns:
+        # Compute tbr_raw inline: taker_buy_base_volume / volume
+        taker_vol = df.get("taker_buy_base_volume", pd.Series(dtype=float))
+        vol_series = df.get("volume", pd.Series(dtype=float))
+        if len(taker_vol) == n and len(vol_series) == n:
+            taker_vol = taker_vol.astype(float).to_numpy()
+            vol_np = vol_series.astype(float).to_numpy()
+            with np.errstate(divide="ignore", invalid="ignore"):
+                tbr_raw = np.where(vol_np > 0, taker_vol / vol_np, np.nan)
+            df["tbr_raw"] = tbr_raw
+
+    df = add_taker_buy_imbalance_20(df)
 
     return df

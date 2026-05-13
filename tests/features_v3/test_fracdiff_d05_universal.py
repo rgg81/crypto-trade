@@ -1,11 +1,11 @@
-"""Adversarial tests for fracdiff_d05_close — PARKED state at iter-v3/052.
+"""Adversarial tests for fracdiff_d05_close — RE-INCLUDED at iter-v3/063.
 
-5 mandatory tests (iter-v3/051 originals; assertions updated for PARKED state at /052):
+5 mandatory tests (iter-v3/051 originals; test 1 updated for RE-INCLUDED state at /063):
 
-1. test_fracdiff_d05_close_not_in_universal_feature_list — fracdiff_d05_close MUST NOT be
-   in V3_FEATURE_COLUMNS_TOP_N at iter-v3/052 (PARKED — SWAPPED out for
-   regime_momentum_signed_3d per Critic FINAL `32cc46f` rec #2).
-   Total count must still be 15 (SWAP; net count unchanged).
+1. test_fracdiff_d05_close_present_in_universal_feature_list — fracdiff_d05_close MUST be
+   in V3_FEATURE_COLUMNS_TOP_N at iter-v3/063 (RE-EVALUATED: was PARKED at /052-/062;
+   re-included under mass-expansion mandate + post-WF-fix landscape; EDA rank 16/gain 1139).
+   Total count must be 48 (MASS EXPANSION from 14).
 2. test_fracdiff_d05_close_present_in_all_4_symbol_parquets — all 4 symbol parquets
    (BCH/LDO/TRX/ALGO) must still contain fracdiff_d05_close column; compute_fracdiff_d05_close
    is RETAINED in dispatch (parquet column generated; zero revert cost per PARKED policy).
@@ -65,23 +65,25 @@ _V3_MODELS_ITER_052 = ("BCHUSDT", "LDOUSDT", "TRXUSDT")
 # ---------------------------------------------------------------------------
 
 
-def test_fracdiff_d05_close_not_in_universal_feature_list() -> None:
-    """fracdiff_d05_close MUST NOT be in V3_FEATURE_COLUMNS_TOP_N at iter-v3/054.
+def test_fracdiff_d05_close_present_in_universal_feature_list() -> None:
+    """fracdiff_d05_close MUST be in V3_FEATURE_COLUMNS_TOP_N at iter-v3/063.
 
-    iter-v3/052 SWAP: fracdiff_d05_close PARKED (SWAPPED OUT for regime_momentum_signed_3d
-    per Critic FINAL `32cc46f` rec #2).
-    iter-v3/054: hurst_drift_50_200 also PARKED (Critic FINAL `c056354` rec #1); count 15→14.
-    compute_fracdiff_d05_close is RETAINED in dispatch at zero revert cost.
+    iter-v3/063 MASS FEATURE EXPANSION re-evaluation: fracdiff_d05_close was PARKED at
+    /052 but is re-included at /063 under the post-WF-fix landscape + mass-expansion
+    mandate (brief Section 3 adversarial flags). EDA rank 16 / gain 1139 in T8
+    (analysis/iteration_v3-063/T8_final_feature_set.csv; SHA c833f48).
+    compute_fracdiff_d05_close is ACTIVE in dispatch (column in model input).
     """
-    assert "fracdiff_d05_close" not in V3_FEATURE_COLUMNS_TOP_N, (
-        "fracdiff_d05_close FOUND in V3_FEATURE_COLUMNS_TOP_N — "
-        "iter-v3/052 SWAP failed. fracdiff is PARKED (column dropped from model input). "
-        "Remove it from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
+    assert "fracdiff_d05_close" in V3_FEATURE_COLUMNS_TOP_N, (
+        "fracdiff_d05_close NOT FOUND in V3_FEATURE_COLUMNS_TOP_N — "
+        "iter-v3/063 MASS EXPANSION re-evaluation failed. fracdiff should be RE-INCLUDED "
+        "(EDA rank 16 / gain 1139; post-WF-fix re-evaluation). "
+        "Add it to V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
     )
     n = len(V3_FEATURE_COLUMNS_TOP_N)
-    assert n == 14, (
-        f"V3_FEATURE_COLUMNS_TOP_N has {n} elements — expected 14. "
-        "iter-v3/054: hurst_drift_50_200 PARKED (15→14; Critic FINAL `c056354` rec #1). "
+    assert n == 48, (
+        f"V3_FEATURE_COLUMNS_TOP_N has {n} elements — expected 48. "
+        "iter-v3/063: MASS FEATURE EXPANSION 14 → 48 (Path B EDA SHA c833f48). "
         "Check V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
     )
 

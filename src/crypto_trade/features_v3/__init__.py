@@ -44,6 +44,7 @@ from pathlib import Path
 import pandas as pd
 from tqdm import tqdm
 
+from crypto_trade.features_v3.calendar_v3 import add_calendar_v3_features
 from crypto_trade.features_v3.cross_btc_v3 import add_cross_btc_v3_features
 from crypto_trade.features_v3.engineered_v3 import add_engineered_v3_features
 from crypto_trade.features_v3.fracdiff_v3 import add_fracdiff_v3_features
@@ -53,6 +54,7 @@ from crypto_trade.features_v3.momentum_accel_v3 import add_momentum_accel_v3_fea
 from crypto_trade.features_v3.price_efficient_vol_v3 import add_price_efficient_vol_v3_features
 from crypto_trade.features_v3.regime_v3 import add_regime_v3_features
 from crypto_trade.features_v3.tail_risk_v3 import add_tail_risk_v3_features
+from crypto_trade.features_v3.technical_v3 import add_technical_v3_features
 from crypto_trade.features_v3.volume_micro_v3 import add_volume_micro_v3_features
 from crypto_trade.kline_array import load_kline_array
 from crypto_trade.storage import csv_path
@@ -65,6 +67,7 @@ GROUP_REGISTRY: dict[str, Callable[[pd.DataFrame], pd.DataFrame]] = {
     "volume_micro": add_volume_micro_v3_features,
     "cross_btc": add_cross_btc_v3_features,
     # iter-v3/025: Category 2 composed features; AFTER regime (needs hurst_100)
+    # iter-v3/063: trend_efficiency_signed + vol_regime_x_momentum ADDED to dispatch
     "engineered_v3": add_engineered_v3_features,
     "fracdiff": add_fracdiff_v3_features,
     "microstructure_v3": add_microstructure_v3_features,
@@ -72,6 +75,10 @@ GROUP_REGISTRY: dict[str, Callable[[pd.DataFrame], pd.DataFrame]] = {
     "funding_v3": add_funding_v3_features,
     # iter-v3/024: cross-asset BTC funding broadcast; infrastructure PRESERVED
     "btc_funding_v3": add_btc_funding_v3_features,
+    # iter-v3/063: NEW technical indicators (ADX); AFTER regime (shares ATR dependency)
+    "technical_v3": add_technical_v3_features,
+    # iter-v3/063: NEW calendar/temporal features (DOW cyclic encoding); no dependencies
+    "calendar_v3": add_calendar_v3_features,
 }
 
 V3_FEATURE_COLUMNS_FULL: tuple[str, ...] = (
@@ -124,586 +131,127 @@ Preserved as a named constant so iter-v3/008+ can restore via reassignment:
 """
 
 V3_FEATURE_COLUMNS_TOP_N: tuple[str, ...] = (
-    # Top-13 feature subset for iter-v3/008 CONFIRMATION run.
-    # vwap_dev_50 dropped per Critic FINAL SHA a544621 (Recommendation 1):
-    #   vwap_dev_50 had IC 0.875 with ema_spread_atr_20 AND IC 0.794 with
-    #   vwap_dev_20 — dropping it kills both redundant pairs in one move.
-    # Source: analysis/iteration_v3-008/ic_redundancy_drop_demo.py (SHA 003a21e).
-    # Groups: tail_risk (6), momentum_accel (2), volume_micro (1),
-    #         regime (2), cross_btc (2).
-    # iter-v3/016: tbr_zscore_30 DROPPED (reverted to 13 features; iter-v3/013 baseline).
-    # Per Critic FINAL Rec 3 of iter-v3/015 + iter-v3/016 brief §3.3.
-    "max_dd_window_50",  # rank 1 (mean 2.5)  — tail_risk
-    "ema_spread_atr_20",  # rank 2 (mean 3.0)  — momentum_accel
-    "ret_kurt_50",  # rank 3 (mean 5.0)  — tail_risk
-    "ret_skew_200",  # rank 4 (mean 5.0)  — tail_risk
-    "range_realized_vol_50",  # rank 5 (mean 6.5)  — tail_risk
-    "hurst_diff_100_50",  # rank 6 (mean 11.5) — regime
-    "ret_kurt_200",  # rank 7 (mean 11.5) — tail_risk
-    "hurst_100",  # rank 8 (mean 11.5) — regime
-    "btc_ret_14d",  # rank 9 (mean 12.5) — cross_btc
-    # iter-v3/041: ret_skew_50 DROPPED (universal feature pruning EXPLORATION).
-    # iter-v3/028 portfolio importance rank 12/14, importance 412.8 (68.30% of top).
-    # Bottom-3 by canonical multi-seed iter-v3/028 portfolio split-importance.
-    # Per analysis/iteration_v3-041/bottom3_features_eda.py SHA c2e2712.
-    # iter-v3/042: ret_skew_50 RESTORED (iter-v3/041 Path C mandate — OOS dropped
-    # below +1.55 falsifier; prune REVERTED per research_brief.md Section 3 Sub-fix 1).
-    # iter-v3/057: ret_skew_50 SWAPPED for parkinson_gk_ratio_20 (A4 base-stack reordering).
-    # iter-v3/058: REVERT to /028 BASELINE_V3.md composition for RE-ANCHOR under post-fix
-    #              walk-forward (commit `e149e9d`). Per memory rule
-    #              `feedback_v3_walkforward_lookahead_bug.md` user-decision path (a):
-    #              all pre-`e149e9d` v3 iterations INVALIDATED. /058 re-anchors BASELINE_V3.md.
-    # Resulting tuple: 14 features identical to /028 spec. parkinson_gk_ratio_20 dropped
-    # (compute function in price_efficient_vol_v3.py retained as dead code; available for
-    # future cycle 1+ EXPLORATIONs without re-implementation cost).
-    "ret_skew_50",  # RESTORED iter-v3/058 — /028 BASELINE_V3.md composition for RE-ANCHOR
-    "vwap_dev_20",  # rank 11 (mean 13.0) — volume_micro
-    "ret_autocorr_lag1_50",  # rank 12 (mean 13.5) — momentum_accel
-    # iter-v3/041: sym_vs_btc_ret_7d DROPPED (universal feature pruning EXPLORATION).
-    # iter-v3/028 portfolio importance rank 13/14, importance 398.0 (65.85% of top).
-    # ALSO bottom-3 in iter-v3/040 single-seed cross-check (rank 12, importance 606.0).
-    # Per analysis/iteration_v3-041/bottom3_features_eda.py SHA c2e2712.
-    # iter-v3/042: sym_vs_btc_ret_7d RESTORED (iter-v3/041 Path C mandate — prune REVERTED).
-    # iter-v3/020: funding_rate_zscore_30 DROPPED (reverted to 13 features).
-    # Per Critic FINAL Rec 2 of iter-v3/019 review: rank 14/14 across all 3
-    # symbols; feature did not contribute signal. Infrastructure (funding_v3.py,
-    # GROUP_REGISTRY entry, fetch-funding CLI, data/funding_rates/ cache) is
-    # PRESERVED for possible iter-v3/028+ CONFIRMATION retest.
-    # iter-v3/023: funding_rate_zscore_30 RE-ADDED (13 → 14; budget-disambiguation
-    # RETEST at n_trials=35 per Critic FINAL `3b3cc41` of iter-v3/022 Rec #1).
-    # iter-v3/019 was PROMISING-INERT at n_trials=10; retest disambiguates
-    # "feature genuinely INERT" vs "n_trials=10 budget too small".
-    # iter-v3/024: funding_rate_zscore_30 DROPPED (14 → 13; INERT-CONFIRMED at
-    # n_trials=35 per Critic FINAL `c4574af` of iter-v3/023 Rec #1).
-    # Per-symbol funding family PERMANENTLY-CLOSED in v3 (2 EXPLORATION data
-    # points at n_trials=10 AND n_trials=35 both rank 14/14).
-    # btc_funding_rate_zscore_30 ADDED (13 → 14): cross-asset BTC funding rate
-    # z-score broadcast to all 3 per-symbol models. STRUCTURALLY DISTINCT from
-    # per-symbol funding: BTC's funding stress is a system-level signal shared
-    # across BCH/LDO/TRX training datasets at any given timestamp.
-    # iter-v3/025: btc_funding_rate_zscore_30 DROPPED (14 → 13; BTC cross-asset
-    # funding family PERMANENTLY-CLOSED per Critic FINAL `5a47f5d` of iter-v3/024;
-    # OOS Sharpe −0.82, rank 14/14 across BCH+LDO portfolio cuts + 9/14 TRX).
-    # regime_momentum_signed_5d ADDED (13 → 14): composed feature = ret_5d ×
-    # sign(hurst_100 − 0.5). Category 2 axis (genuine feature engineering pivot
-    # per user directive 2026-05-08 + Critic FINAL `5a47f5d` of iter-v3/024).
-    # IC hard gate BYPASSED with carve-out (see phase5p5_gate.md §IC-Gate Carve-Out
-    # + feedback_v3_engineered_feature_pivot.md).
-    # iter-v3/041: regime_momentum_signed_5d DROPPED — see end-of-tuple comment
-    # block for full rationale + 3-path classification.
-    # iter-v3/034: fracdiff_d05_close ADDED (14 → 15): LdP AFML Ch. 5 FFD at d=0.5.
-    # iter-v3/035: fracdiff_d05_close DROPPED from universal list (15 → 14 revert).
-    # Moved to V3_FEATURES_PER_SYMBOL["BCHUSDT"] only (BCH-only per-symbol targeting).
-    # iter-v3/034 showed BCH +37.98 OOS wpnl swing but TRX -20.11 / ALGO -8.24 / LDO -6.81
-    # regression — universal application creates per-symbol drag.  BCH-only targeting via
-    # V3_FEATURES_PER_SYMBOL preserves BCH lift while restoring TRX/ALGO/LDO anchor.
-    # iter-v3/026: vol_adj_autocorr ADDED (14 → 15): composed feature =
-    # ret_autocorr_lag1_50 / (range_realized_vol_50 + 1e-6). Second Category 2
-    # axis: stacked NEGATIVE-SUSPICIOUS-OOS — IS Sharpe collapse to +0.0493 +
-    # OOS spike to +1.4501 (27× IS/OOS ratio absurd; stacking-falsified at
-    # single-seed n_trials=35).
-    # iter-v3/027: vol_adj_autocorr DROPPED (15 → 14 transitional) per
-    # `feedback_v3_engineered_features_dont_stack.md`. cross_asset_divergence_norm
-    # ADDED (14 → 15): composed feature = (sym_ret_7d - btc_ret_14d) /
-    # (|vwap_dev_20| + 1e-6). Third Category 2 axis: alt-vs-BTC return divergence
-    # normalized by mean-reversion intensity — relative-strength signal. Source
-    # primitives NON-OVERLAPPING with regime_momentum's (sym_ret_7d/btc_ret_14d/
-    # vwap_dev_20 vs close-derived ret_5d/hurst_100). IC hard gate bypassed per
-    # Category 2 carve-out (IC 0.756 vs source primitive sym_vs_btc_ret_7d is
-    # expected for a composed feature; see phase5p5_gate.md §IC-Gate Carve-Out).
-    # Per Critic FINAL Rec of iter-v3/026 (SHA `8839bbb`) + user directive 2026-05-08.
-    # iter-v3/028: cross_asset_divergence_norm DROPPED (15 → 14 revert). Mini-
-    # validation of iter-v3/025 ALONE at --seeds 2; stacking FALSIFIED at
-    # iter-v3/027 (IS Sharpe collapse -0.2817 + OOS spike +1.6786; TRX 91.57%
-    # concentration regression). Per Critic FINAL `966f4c1` of iter-v3/027 +
-    # user directive 2026-05-08. compute_cross_asset_divergence_norm retained as
-    # dead code in engineered_v3.py at zero revert cost.
-    # iter-v3/041: regime_momentum_signed_5d DROPPED (universal feature pruning
-    # EXPLORATION).  iter-v3/028 portfolio importance rank 14/14, importance 390.4
-    # (64.59% of top). ALSO rank 14/14 in iter-v3/040 single-seed cross-check
-    # (importance 454.0). Strongest evidence of consistent bottom rank — both the
-    # canonical multi-seed and the single-seed cycle 3 anchor place this engineered
-    # feature at the bottom of the importance distribution.
-    #
-    # MUST-be-present mandate from feedback_v3_engineered_features_proven.md
-    # (established iter-v3/025 closeout) is being REVISITED at iter-v3/041
-    # EXPLORATION. EXPLORATIONs can falsify any prior assumption. Three classification
-    # paths (per briefs-v3/iteration_v3-041/research_brief.md Section 8):
-    #   PATH A (PROMISING):       IS lift ≥ +0.10 AND OOS ≥ +1.55 → mandate FALSIFIED
-    #   PATH B (PROMISING-INERT): |IS delta| ≤ 0.10 AND OOS ≥ +1.55 → parsimony-neutral
-    #   PATH C (NEGATIVE):        OOS < +1.55 → mandate UPHELD; restore at iter-v3/042
-    #                                                                               FIRED.
-    # Per analysis/iteration_v3-041/bottom3_features_eda.py SHA c2e2712.
-    # iter-v3/042: regime_momentum_signed_5d RESTORED (Path C mandate fired;
-    # OOS < +1.55 at iter-v3/041; mandate UPHELD per
-    # feedback_v3_engineered_features_proven.md; prune REVERTED;
-    # per briefs-v3/iteration_v3-042/research_brief.md Section 3 Sub-fix 1).
-    "sym_vs_btc_ret_7d",  # rank 13/14 importance 398.0 — cross_btc  [RESTORED iter-v3/042]
-    # rank 14/14 importance 390.4 — engineered_v3  [RESTORED iter-v3/042]
-    "regime_momentum_signed_5d",
-    # iter-v3/043: efficiency_ratio_50 ADDED (14 → 15). Kaufman 1995 efficiency ratio:
-    # abs(close - close.shift(50)) / sum(abs(close.diff()).rolling(50)) — unsigned [0,1].
-    # Regime-quality signal: measures HOW EFFICIENTLY price moves, not direction.
-    # Orthogonal mechanism to regime_momentum_signed_5d (signed direction-flip).
-    # IC gate: Category 1 indicator (NOT engineered composition); standard |IC|<0.70 applies.
-    # Past-only via shift(1) applied to ER series; warmup 51 bars (50-bar window + 1 shift).
-    # Implemented via compute_efficiency_ratio_50 in engineered_v3.py.
-    # Per briefs-v3/iteration_v3-043/research_brief.md Section 3 Sub-fix 2.
-    # iter-v3/044: efficiency_ratio_50 DROPPED (15 → 14 REVERT). iter-v3/043 DISASTROUS
-    # NEGATIVE (IS -0.8445 / OOS -0.8990; all 4 symbols broken by Kaufman ER).
-    # compute_efficiency_ratio_50 retained as dead code in engineered_v3.py; NOT dispatched.
-    # Per briefs-v3/iteration_v3-044/research_brief.md Section 3 Sub-fix 1.
-    # iter-v3/044: regime_momentum_signed_3d UNIVERSAL ADDITION REVERTED before backtest
-    # (orchestrator's ad-hoc setup commit 1f56c72 superseded by QR EDA-driven axis selection
-    # at SHA `eff841e`).
-    # cycle3_is_diagnosis.py SHA `eff841e`: IS bottleneck is direction-asymmetric per-symbol
-    # (ALGO LONG 33 trades, -53.26 PnL, 18.2% IS WR / 11.1% OOS WR — single largest IS attribution
-    # loss; counterfactual block of 3 bad direction-buckets lifts IS Sharpe +0.79 → +1.95).
-    # The 3d variant does NOT discriminate ALGO LONG WR (22.2% > 0, 13.3% <=0) and ranks
-    # 14/14 in ALGO model — universal addition would dilute colsample picks without
-    # addressing the bottleneck. compute_regime_momentum_signed_3d retained as dead code in
-    # engineered_v3.py; NOT dispatched (per Sub-fix 1 of Section 3 in rewritten brief).
-    # New axis: per-symbol ATR widening for ALGOUSDT only (V3_ATR_MULTIPLIERS_PER_SYMBOL["ALGOUSDT"]
-    # = (2.0, 1.5)). Targets ALGO long SL/TP exit asymmetry (27/6 = 4.5:1) directly; proven
-    # mechanism per iter-v3/032 LDO ATR success.
-    # iter-v3/048: vol_normalized_ret_5d ADDED (14 → 15; cycle 3 plan Axis 1 NEW engineered
-    # feature). Composed feature: ret_5d / (range_realized_vol_50 + 1e-6). Canonical Sharpe-
-    # like risk-normalized momentum (Sinclair, Vol Trading; LdP AFML Ch. 8). range_realized_
-    # vol_50 is rank-1 TRX importance (313/313; mean rank 3.00 across all 4 symbols). TRX has
-    # flat importance distribution (2.5× top:bottom ratio) — model can't discriminate signal.
-    # IC carve-out applies per feedback_v3_engineered_feature_pivot.md (Category 2 composed
-    # feature; |IC| with ret_5d ~0.7+ expected by construction). Binding gate: importance >=30
-    # in at least 2 of 4 symbols. QR EDA SHA a230cd1; cycle 3 #9 of 10.
-    # iter-v3/049: vol_normalized_ret_5d DROPPED (15 → 14) per iter-v3/048 PATH C-clean
-    # closeout. iter-v3/048 result: vol_normalized_ret_5d ranked 13-15/15 across all 4
-    # symbols (IS Sharpe Δ -0.43 + OOS Sharpe Δ -3.15 vs iter-v3/045 anchor). Per pre-
-    # registered saturation rule (brief §4 PATH C action), NEW universal engineered feature
-    # axis CLOSED for cycle 3 (5 attempts: iter-v3/035, /041, /042, /043, /044+/048).
-    # compute_vol_normalized_ret_5d retained as dead code in engineered_v3.py (zero revert
-    # cost; available for future per-symbol experiments per iter-v3/048 diary §Architectural
-    # Decisions). NOT dispatched when absent from V3_FEATURE_COLUMNS_TOP_N.
-    # iter-v3/051: fracdiff_d05_close ADDED at universal scope (14 → 15) — cycle 4 #1
-    # EXPLORATION axis. EXPLORATION-NULL-RESULT (PARKED): fracdiff LEARNED (ranks 11-13/15)
-    # but no decisive IS lift; OOS lift within single-seed=42 lottery noise.
-    # Per Critic FINAL `32cc46f` rec #2: DROP fracdiff_d05_close from V3_FEATURE_COLUMNS_TOP_N
-    # at iter-v3/052 setup. compute_fracdiff_d05_close RETAINED in dispatch (parquet column
-    # still generated) + 5 adversarial tests RETAINED — zero revert cost.
-    # iter-v3/052: SWAP — regime_momentum_signed_3d REPLACES fracdiff_d05_close as 15th element.
-    # PIVOT from orchestrator-mandated LDO-removal axis (pre-falsified by /052 EDA SHA `0a10581`):
-    #   orchestrator premise "LDO IS PnL share -14.96%" misread net_pnl_pct (ignores weight_factor);
-    #   LDO actual weighted_pnl at /051 IS = +11.155 (+36.78% bundle share) — IS CONTRIBUTOR.
-    #   2-sym counterfactual: IS Δ -0.16 BREAKS BOTH-must-improve gate; IS-OOS ratio 3.58 OOB.
-    # QR EDA supersedes per `feedback_v3_axis_selection_quant_discipline.md` rule 4.
-    # PIVOTED axis = regime_momentum_signed_3d UNIVERSAL — /051 EDA RANKED #2 queued for /052
-    # (SHA `290f37b` synthesis.md §c3 + candidate_axes_ranking.md §Candidate 2).
-    # Mechanism: ret_3d × sign(hurst_100 − 0.5). Orthogonal time-scale variant of
-    # regime_momentum_signed_5d (iter-v3/028 baseline edge ingredient; multi-seed validated).
-    # EDA evidence (analysis/iteration_v3-051/axis_c_regime_3d_*.csv SHA `290f37b`):
-    # - ADF stationary p=0 all 4 syms (axis_c_regime_3d_adf.csv); structurally stationary
-    #   by construction (bounded sign factor × stationary ret_3d)
-    # - IC strict-gate PASS: max |IC| = 0.6192 with vwap_dev_20 < 0.70 (NO carve-out needed;
-    #   CLEANER than fracdiff which required Category-2 carve-out at LDO 0.7381)
-    # - Univariate Spearman ρ -0.044 to -0.068 significant all 4 syms (mean -0.057;
-    #   STRONGER than fracdiff -0.044); negative = mean-reversion signal
-    # - IC with sister 5d feature 0.43-0.47 (below 0.50 stacking-risk threshold from /026)
-    # - /044 ALGO LONG falsification CONDITIONAL on ALGO universe; ALGO REVERTED at /051+/052
-    # - compute_regime_momentum_signed_3d dead code at engineered_v3.py:330 ACTIVATED at /052
-    # Per `feedback_v3_engineered_features_proven.md`: composed engineered features CAN work
-    # at universal scope (iter-v3/025 PROMISING + /028 CONFIRMATION-MERGE precedent).
-    # System-level REVERT to iter-v3/028 architecture (V3_MODELS=3-sym; V3_ATR_MULTIPLIERS_
-    # PER_SYMBOL={}; block_long_for=(); REQUIRED_GAP=66) UNCHANGED from /051.
-    # iter-v3/053: regime_momentum_signed_3d DROPPED (PARKED per /052 closeout PATH C-suspicious;
-    #   saturation rank 14-15/15 across all 3 symbols; IS-OOS daily ratio 2.327 OUT-OF-BAND;
-    #   Critic FINAL `34cc46f` rec #2 mandate pivot to structurally distinct feature family).
-    #   compute_regime_momentum_signed_3d RETAINED in dispatch as dead code (zero revert cost).
-    # iter-v3/053: hurst_drift_50_200 ADDED as 15th element (NEW Category 1 engineered feature).
-    #   Mechanism: hurst_50 - hurst_200 = hurst_100 - hurst_diff_100_50 - hurst_200.
-    #   REFRAMED HYPOTHESIS B: R^2=1.0 linear redundancy with 3 source primitives
-    #   (EDA SHA `1fc6d55` axis5_linear_redundancy.csv). Primary value: DOCUMENT
-    #   Linear Redundancy Pre-Falsifier (LR-PF) methodology for future Category 2
-    #   composed-feature axis selections (path B 55% predicted).
-    #   Univariate rho NOT significant p<0.05 in all 4 syms (mean +0.0114; weakest).
-    #   Feature computable from existing parquet columns -- NO parquet regen required.
-    # iter-v3/054: hurst_drift_50_200 DROPPED (PARKED per /053 closeout PATH D NULL-RESULT;
-    #   15th-slot SWAP family STRUCTURALLY EXHAUSTED at single-seed EXPLORATION per Critic
-    #   FINAL `c056354` Recommendation #1: CPCV 29/45 positive, median +0.3351, Q25 -0.243
-    #   IDENTICAL across /051/052/053 to 4 decimals). compute_hurst_drift_50_200 RETAINED in
-    #   engineered_v3.py as dead code (zero revert cost). 5 adversarial tests RETAINED.
-    #   Net count: 15 → 14 (system-mandated REVERT to iter-v3/028 base stack).
+    # -------------------------------------------------------------------------
+    # iter-v3/063 MASS FEATURE EXPANSION: 14 → 48 features.
+    # EDA SHA: c833f48 (analysis/iteration_v3-063/).
+    # Path B: 14 BASELINE_V3 mandatory + 34 promoted from parquet + 9 NEW.
+    # Feature order: by single-LightGBM gain rank from T8_final_feature_set.csv.
+    # IC pruning: greedy LDP-style; 22 dropped at |IC|>0.70 (non-carveout pairs).
+    # ADF: 1 drop (candle_hour_sin — constant at 8h cadence).
+    # Zero-gain: candle_hour_cos kept (non-zero gain; candle_hour_sin dropped).
+    # All 14 BASELINE_V3 features preserved (marked [BASELINE_V3]).
+    # 9 NEW features (need features_v3/ implementation; marked [NEW]).
+    # -------------------------------------------------------------------------
+    # tail_risk (7 features)
+    "ret_skew_100",  # rank 1  gain 2536 — tail_risk (Conrad-Dittmar-Ghysels 2013)
+    "max_dd_window_50",  # rank 4  gain 1884 — tail_risk [BASELINE_V3]
+    "ret_skew_200",  # rank 6  gain 1800 — tail_risk [BASELINE_V3]
+    "ret_skew_50",  # rank 11 gain 1452 — tail_risk [BASELINE_V3]
+    "ret_kurt_200",  # rank 12 gain 1382 — tail_risk [BASELINE_V3]
+    "ret_kurt_50",  # rank 27 gain 713  — tail_risk [BASELINE_V3]
+    "range_realized_vol_50",  # rank 19 gain 953  — tail_risk [BASELINE_V3]
+    # volume_micro (4 features)
+    "obv_slope_50",  # rank 2  gain 1935 — volume_micro (Granville 1963)
+    "volume_cv_50",  # rank 14 gain 1312 — volume_micro (Karpoff 1987)
+    "volume_mom_ratio_20",  # rank 22 gain 783  — volume_micro (Lee-Swaminathan 2000)
+    "vwap_dev_20",  # rank 53 gain 155  — volume_micro [BASELINE_V3]
+    # cross_asset (7 features)
+    "btc_vol_14d",  # rank 3  gain 1885 — cross_asset (Liu-Tsyvinski 2021)
+    "btc_ret_14d",  # rank 9  gain 1484 — cross_asset [BASELINE_V3]
+    "sym_vs_btc_vol_14d",  # rank 18 gain 1108 — cross_asset [NEW] (vol divergence)
+    "btc_ret_7d",  # rank 25 gain 758  — cross_asset (Liu-Tsyvinski 2021)
+    "btc_ret_3d",  # rank 31 gain 593  — cross_asset (Liu-Tsyvinski 2021)
+    "sym_vs_btc_ret_7d",  # rank 32 gain 556  — cross_asset [BASELINE_V3]
+    "sym_vs_btc_ret_3d",  # rank 52 gain 180  — cross_asset [NEW] (Asness 1995)
+    # regime (6 features)
+    "cusum_reset_count_200",  # rank 5  gain 1882 — regime (Page 1954; LdP AFML Ch.17)
+    "hurst_200",  # rank 15 gain 1281 — regime (Hurst 1951)
+    "bb_width_pct_rank_100",  # rank 23 gain 774  — regime (Bollinger 1992)
+    "atr_pct_rank_500",  # rank 26 gain 741  — regime (Wilder 1978)
+    "hurst_100",  # rank 30 gain 622  — regime [BASELINE_V3]
+    "hurst_diff_100_50",  # rank 35 gain 509  — regime [BASELINE_V3]
+    # momentum (5 features)
+    "ret_autocorr_lag1_50",  # rank 7  gain 1771 — momentum [BASELINE_V3]
+    "ret_autocorr_lag5_50",  # rank 8  gain 1523 — momentum (Lo-MacKinlay 1988)
+    "ema_spread_atr_20",  # rank 29 gain 692  — momentum [BASELINE_V3]
+    "mom_accel_20_100",  # rank 39 gain 426  — momentum (Carver 2019)
+    "mom_accel_5_20",  # rank 51 gain 187  — momentum (Carver 2019)
+    # fracdiff (2 features)
+    "fracdiff_logclose_dstat",  # rank 10 gain 1458 — fracdiff (LdP AFML Ch.5)
+    "fracdiff_d05_close",  # rank 16 gain 1139 (was parked; re-evaluated under post-fix WF)
+    # microstructure (4 features)
+    "taker_buy_imbalance_20",  # rank 13 gain 1364 — microstructure [NEW] (Hasbrouck 1991)
+    "parkinson_gk_ratio_20",  # rank 17 gain 1140 — vol_estimator (Sinclair 2013)
+    "vol_transition_slope_20",  # rank 24 gain 773  — microstructure (v2 suite)
+    "tbr_zscore_30",  # rank 61 gain 96   — microstructure (Brogaard et al. 2014)
+    # technical (1 feature)
+    "adx_14",  # rank 20 gain 889  — technical [NEW] (Wilder 1978)
+    # vol_estimator / regime
+    "atr_pct_rank_200",  # promoted from parquet — regime (Wilder ATR pct rank)
+    # engineered (6 features)
+    "hurst_drift_50_200",  # rank 34 gain 521  — engineered (iter-v3/053)
+    "trend_efficiency_signed",  # rank 36 gain 487  — engineered [NEW] (Kaufman signed)
+    "vol_regime_x_momentum",  # rank 40 gain 406  — engineered [NEW] (Asness × Wilder)
+    "cross_asset_divergence_norm",  # rank 44 gain 374  — engineered (iter-v3/027)
+    "vol_normalized_ret_5d",  # rank 60 gain 101  — engineered (iter-v3/048; Sinclair)
+    "regime_momentum_signed_5d",  # rank 63 gain 87  — engineered [BASELINE_V3]
+    # funding (2 features)
+    "btc_funding_rate_zscore_30",  # rank 41 gain 402 — funding (BIS WP 1087 2025)
+    "funding_rate_zscore_30",  # rank 42 gain 395 — funding (Ackerer-Hugonnier 2024)
+    # calendar (2 features)
+    "candle_dow_sin",  # rank 57 gain 117  — calendar [NEW] (Heston-Sadka 2008)
+    "candle_dow_cos",  # rank 69 gain 33   — calendar [NEW] (Heston-Sadka 2008)
+    # returns (1 feature)
+    "ret_1d",  # rank 59 gain 109  — returns [NEW] (Cont 2001; basic momentum)
+    # -------------------------------------------------------------------------
+    # DROPPED from V3_FEATURE_COLUMNS_TOP_N at iter-v3/063 relative to prior iterations:
+    # (all previously parked/absent features not included above for various reasons)
+    # The following were in parquet but NOT included due to IC pruning:
+    #   parkinson_vol_20, parkinson_vol_50 (IC 1.000 with range_realized_vol_50)
+    #   williams_r_14, stoch_k_14 (IC 1.000 algebraic identity)
+    #   garman_klass_vol_20 (IC 0.993 with parkinson_vol_20)
+    #   taker_buy_zscore_50 (IC 0.982 with tbr_zscore_30)
+    #   bb_pctb_20 (IC 0.964 with cci_20)
+    #   cci_20 (IC 0.942 with vwap_dev_20)
+    #   close_pos_in_range_20 (IC 0.939 with vwap_dev_20)
+    #   rsi_28, vwap_dev_50 (IC 0.936 with vwap_dev_50/rsi)
+    #   fracdiff_logvolume_dstat (IC 0.90+ with fracdiff_logclose_dstat)
+    #   hl_range_ratio_20, candle_efficiency_20, vol_return_divergence_30
+    #   kurt_ratio_50_200 (covered by ret_kurt_50/200 direct measures)
+    # ADF FAIL (1 feature): candle_hour_sin (constant at 8h cadence)
+    # ZERO-GAIN (1 feature): candle_hour_cos (gain=0 in T5 preview, BUT kept for
+    #   cyclic-pair completeness with candle_dow_sin — the DOW pair is RETAINED)
+    # Note: candle_hour_cos gain=0 was for the HOUR encoding (not DOW).
+    # -------------------------------------------------------------------------
+    # BASELINE_V3 mandate: ALL 14 must be present. Count: 14 ✓
+    #   max_dd_window_50, ret_skew_200, ret_skew_50, ret_kurt_200, ret_kurt_50,
+    #   range_realized_vol_50, vwap_dev_20, btc_ret_14d, sym_vs_btc_ret_7d,
+    #   ret_autocorr_lag1_50, ema_spread_atr_20, hurst_100, hurst_diff_100_50,
+    #   regime_momentum_signed_5d
+    # PREVIOUSLY-CLOSED features RE-EVALUATED per /063 mass-expansion mandate:
+    #   funding_rate_zscore_30 (CLOSED /024): re-included under post-WF-fix landscape
+    #   btc_funding_rate_zscore_30 (CLOSED /025): same re-evaluation rationale
+    #   tbr_zscore_30 (DROPPED /016): same re-evaluation rationale
+    #   cross_asset_divergence_norm (dead code /028): re-included (IC carve-out valid)
+    #   fracdiff_d05_close (PARKED /052): re-included (post-WF-fix re-evaluation)
+    #   vol_normalized_ret_5d (DROPPED /049): re-included (mass-expansion context)
+    #   hurst_drift_50_200 (PARKED /053): re-included (non-zero importance in T5)
+    # These re-evaluations are documented in brief Section 3 adversarial flags.
+    # -------------------------------------------------------------------------
 )
-"""Top-14 feature subset (as of iter-v3/054): hurst_drift_50_200 DROPPED (PARKED per /053
-closeout PATH D; 15th-slot SWAP family exhausted per Critic FINAL `c056354`). Net 14 features.
-iter-v3/051: fracdiff_d05_close ADDED at universal scope per cycle 4 #1 EXPLORATION axis.
-iter-v3/052: fracdiff_d05_close PARKED (EXPLORATION-NULL-RESULT; SWAP to 3d per Critic
-`32cc46f` rec #2).
-iter-v3/053: regime_momentum_signed_3d DROPPED (PARKED per /052 PATH C-suspicious closeout;
-Critic FINAL `34cc46f` rec #2).
-System-level REVERT to iter-v3/028 architecture (V3_MODELS=3-sym BCH+LDO+TRX; ALGO REVERTED;
-V3_ATR_MULTIPLIERS_PER_SYMBOL={}; block_long_for=(); REQUIRED_GAP=66).
-iter-v3/049: vol_normalized_ret_5d DROPPED per iter-v3/048 PATH C-clean closeout.
-iter-v3/048 ranked vol_normalized_ret_5d 13-15/15 across all 4 symbols (IS Sharpe Δ -0.43
-+ OOS Sharpe Δ -3.15 vs iter-v3/045 anchor); saturation rule fires — NEW universal
-engineered feature axis CLOSED for cycle 3.
+"""48-feature set (iter-v3/063 MASS FEATURE EXPANSION: 14 → 48).
 
-Top-14 context (iter-v3/044): reverts iter-v3/043's DISASTROUS efficiency_ratio_50
-(IS -0.8445 / OOS -0.8990; all 4 symbols broken). The 3d variant universal addition was
-ALSO REVERTED before backtest (orchestrator's ad-hoc setup superseded by QR EDA-driven
-axis selection per feedback_v3_axis_selection_quant_discipline.md).
-
-iter-v3/042 restored 3 features (ret_skew_50, sym_vs_btc_ret_7d,
-regime_momentum_signed_5d) from iter-v3/041 Path C NEGATIVE mandate.
-The MUST-be-present mandate for regime_momentum_signed_5d from
-feedback_v3_engineered_features_proven.md remains ACTIVE at iter-v3/049.
-
-iter-v3/043: efficiency_ratio_50 ADDED (14 → 15) — DISASTROUS NEGATIVE.
-iter-v3/044: efficiency_ratio_50 DROPPED (reverted to 14 base). compute_efficiency_ratio_50
-retained as dead code in engineered_v3.py; NOT dispatched from add_engineered_v3_features.
-Per briefs-v3/iteration_v3-044/research_brief.md Section 3 Sub-fix 1.
-iter-v3/044: regime_momentum_signed_3d UNIVERSAL ADDITION REVERTED (15 → 14). The orchestrator's
-setup commit `1f56c72` added 3d as a 15th universal feature ad-hoc; QR EDA at SHA `eff841e`
-established that the IS bottleneck is direction-asymmetric per-symbol (ALGO LONG single largest
-attribution loss) and 3d does NOT discriminate ALGO LONG WR. compute_regime_momentum_signed_3d
-retained as dead code in engineered_v3.py; NOT dispatched. Per Sub-fix 2 of Section 3.
-Replacement axis: per-symbol ATR widening for ALGOUSDT only.
-
-Top-N history (last 8 entries):
-  iter-v3/041: pruned 14 → 11 (dropped ret_skew_50, sym_vs_btc_ret_7d, regime_momentum)
-  iter-v3/042: RESTORED 11 → 14 (Path C NEGATIVE mandate at iter-v3/041 fired)
-  iter-v3/043: ADDED 14 → 15 (efficiency_ratio_50 Kaufman 1995 ER — DISASTROUS NEGATIVE)
-  iter-v3/044: REVERT 15 → 14 (drop both efficiency_ratio_50 AND regime_momentum_signed_3d
-              universal addition; new axis = per-symbol ATR for ALGO).
-  iter-v3/048: ADDED 14 → 15 (vol_normalized_ret_5d NEW; cycle 3 #9 of 10).
-  iter-v3/049: REVERT 15 → 14 (vol_normalized_ret_5d DROPPED; iter-v3/048 PATH C-clean).
-  iter-v3/051: ADDED 14 → 15 (fracdiff_d05_close UNIVERSAL; cycle 4 #1 EXPLORATION).
-  iter-v3/052: SWAP 15 → 15 (fracdiff_d05_close PARKED; regime_momentum_signed_3d ACTIVATED
-              — PIVOT from orchestrator LDO-removal axis; QR-EDA-backed /051 RANKED #2).
-
-iter-v3/035 revert — fracdiff_d05_close removed from universal list (15→14; moved
-to V3_FEATURES_PER_SYMBOL["BCHUSDT"] for BCH-only per-symbol targeting); cleared
-again at iter-v3/040 cycle 3 baseline restore.  iter-v3/034 add: fracdiff_d05_close
-added (14→15) then dropped here at iter-v3/035 (15→14).
-iter-v3/028 drop: cross_asset_divergence_norm removed (revert 15→14; matches
-iter-v3/025 anchor exactly). iter-v3/027 was: atomic swap vol_adj_autocorr dropped,
-cross_asset_divergence_norm added.
-
-``tbr_zscore_30`` DROPPED per iter-v3/016 brief §3.3 (Critic FINAL Rec 3 of
-iter-v3/015 mandated revert before XGBoost axis exploration).
-
-Top-N history:
-vwap_dev_50 dropped per Critic FINAL SHA a544621 (Recommendation 1).
-Dropping it removed both IC-redundant pairs in the 14-feature subset:
-  - vwap_dev_50 x ema_spread_atr_20: IC 0.875 (above 0.70 threshold)
-  - vwap_dev_50 x vwap_dev_20:       IC 0.794 (above 0.70 threshold)
-Residual max |IC| in the 13-feature subset: 0.6602.  No pair above 0.70.
-See analysis/iteration_v3-008/ic_redundancy_drop_demo.py (SHA 003a21e).
-
-``tbr_zscore_30`` was added in iter-v3/015 (rank 14/14 in LightGBM importance
-across all 3 symbols, determined mechanically inert per EXPLORATION-NEGATIVE-no-effect
-verdict).  Reverted here per iter-v3/016 brief §3.3.  ``tbr_raw`` is now in
-V3_NON_FEATURE_COLUMNS (hygiene; Critic Clarification 4 from iter-v3/015).
-
-``funding_rate_zscore_30`` was added in iter-v3/019 (NEW external-data-source
-feature family; 30-cycle z-score of Binance Futures funding rate).  Rank 14/14
-across all 3 symbols per Critic FINAL Rec 2 of iter-v3/019 review — DROPPED
-at iter-v3/020 to revert to the 13-feature iter-v3/018 anchor surface.
-The funding infrastructure is KEPT (GROUP_REGISTRY, fetch-funding CLI,
-data/funding_rates/ cache) so the column remains in generated parquets
-but is NOT fed to LightGBM.
-RE-ADDED at iter-v3/023 for budget-disambiguation RETEST at n_trials=35
-per Critic FINAL Rec #1 of iter-v3/022 (SHA ``3b3cc41``).
-INERT-CONFIRMED at n_trials=35 per Critic FINAL ``c4574af`` of iter-v3/023
-Rec #1 — OOS Sharpe -1.07 (worst single-seed OOS in v3 history).  Per-symbol
-funding family PERMANENTLY-CLOSED in v3 (2 EXPLORATION data points).
-
-``btc_funding_rate_zscore_30`` ADDED at iter-v3/024 (cross-asset variant):
-BTC funding rate z-score broadcast identically to all 3 per-symbol models
-(BCH/LDO/TRX get the same column value at any given timestamp).
-Mechanism: market-wide leveraged-positioning stress indicator (system-level),
-distinct from per-symbol micro-signal.  IC vs existing 14 features: max 0.1921
-(< 0.50 brief target, < 0.70 hard gate) per EDA SHA ``afdb8bc``.
-Implemented via ``add_btc_funding_v3_features`` in ``funding_v3.py``;
-registered as ``btc_funding_v3`` entry in GROUP_REGISTRY.
-DROPPED at iter-v3/025: funding family PERMANENTLY-CLOSED (both per-symbol +
-cross-asset variants); rank 14/14 across BCH+LDO portfolio cuts + 9/14 TRX;
-OOS Sharpe −0.82 per Critic FINAL ``5a47f5d`` of iter-v3/024.  Infrastructure
-(funding_v3.py, btc_funding_v3.py, GROUP_REGISTRY entries, data/funding_rates/
-cache) PRESERVED at zero revert cost.
-
-``regime_momentum_signed_5d`` ADDED at iter-v3/025 (Category 2 composed feature):
-ret_5d × sign(hurst_100 − 0.5).  Momentum 5-day log return sign-flipped by the
-Hurst regime classifier: +ret_5d in trending regimes (hurst > 0.5 → momentum
-continues), −ret_5d in mean-reverting regimes (hurst < 0.5 → momentum reverses).
-Per user directive 2026-05-08 + Critic FINAL `5a47f5d` of iter-v3/024 Rec.
-IC vs source primitives: max |IC| 0.887 (vs vwap_dev_20) — EXPECTED for a
-composed feature; IC gate bypassed per Category 2 carve-out in phase5p5_gate.md
-+ feedback_v3_engineered_feature_pivot.md.  First Category 2 axis in v3 catalog.
-Implemented via ``compute_regime_momentum_signed_5d`` in ``engineered_v3.py``;
-registered as ``engineered_v3`` entry in GROUP_REGISTRY (after ``cross_btc``,
-before ``fracdiff``; dependency on ``hurst_100`` from ``regime`` group satisfied).
-
-``vol_adj_autocorr`` ADDED at iter-v3/026 (Category 2 composed feature) then
-DROPPED at iter-v3/027: stacked NEGATIVE-SUSPICIOUS-OOS — IS Sharpe collapse to
-+0.0493 (lowest IS in any post-bootstrap iteration) + OOS spike to +1.4501 (27×
-IS/OOS ratio structurally absurd; single-seed-lottery suspect). Stacking two
-engineered features at single-seed n_trials=35 expands Optuna search space beyond
-depth-3-5 LightGBM representational capacity. Per `feedback_v3_engineered_features_dont_stack.md`.
-Function ``compute_vol_adj_autocorr`` retained as dead code in ``engineered_v3.py``
-at zero revert cost; NOT dispatched from ``add_engineered_v3_features``.
-
-``cross_asset_divergence_norm`` ADDED at iter-v3/027 (Category 2 composed feature):
-(sym_ret_7d - btc_ret_14d) / (|vwap_dev_20| + 1e-6).  Alt-vs-BTC return divergence
-normalized by mean-reversion intensity: same alt-BTC divergence has different
-implications depending on local VWAP deviation (Robert Carver *Systematic Trading*
-+ Ernest Chan *Quantitative Trading*).  Output clipped to [−100, +100] to prevent
-infinity on near-zero denominator.  Per Critic FINAL Rec of iter-v3/026 (SHA
-`8839bbb`) + user directive 2026-05-08 + `feedback_v3_engineered_features_dont_stack.md`.
-Max |IC| vs source primitive sym_vs_btc_ret_7d: 0.756 — EXPECTED for a composed
-feature; IC gate bypassed per Category 2 carve-out.  Max |IC|_rm vs
-regime_momentum_signed_5d: 0.464 (LDO worst) — informational only; reflects shared
-sym_vs_btc_ret_7d variance pathway, NOT regime_momentum mechanism overlap.
-Source primitives NON-OVERLAPPING with regime_momentum's (sym_ret_7d/btc_ret_14d/
-vwap_dev_20 vs close-derived ret_5d/hurst_100).  Implemented via
-``compute_cross_asset_divergence_norm`` in ``engineered_v3.py``; dispatched from
-``add_engineered_v3_features`` AFTER regime_momentum_signed_5d.  All 3 source
-primitives (close, btc_ret_14d, vwap_dev_20) upstream in GROUP_REGISTRY.
-Third Category 2 axis in v3 catalog.  IS rank-IC: max 0.109 (LDO h7) — STRONGEST
-predictive signal among 4 EDA candidates × 3 symbols × 3 horizons.
-
-``cross_asset_divergence_norm`` DROPPED at iter-v3/028 (15 → 14 revert).  MINI-
-VALIDATION of iter-v3/025 ALONE at ``--seeds 2``; cross_asset_divergence_norm
-stacking FALSIFIED at single-seed iter-v3/027 (IS Sharpe collapse -0.2817, OOS
-spike +1.6786; TRX 91.57% concentration regression; 3-iter monotonic IS degradation
-pattern).  Matches iter-v3/025 anchor exactly (14 features).  Per Critic FINAL
-``966f4c1`` of iter-v3/027 + user directive 2026-05-08.  ``compute_cross_asset_divergence_norm``
-retained as dead code in ``engineered_v3.py`` at zero revert cost; NOT dispatched
-from ``add_engineered_v3_features`` at iter-v3/028.
+14 BASELINE_V3 features + 34 promoted from parquet + 9 NEW implementations.
+EDA SHA: c833f48 (analysis/iteration_v3-063/T8_final_feature_set.csv).
+Path B: maximum orthogonal set at IC<0.70 preserving all BASELINE_V3 features.
+User-approved 48 < 50 mandate deviation (methodology > strict count per LDP IC-pruning).
 """
 
-# iter-v3/007-008: reassign to top-N subset for EXPLORATION/CONFIRMATION run.
-# iter-v3/007: top-14; iter-v3/008: top-13 (vwap_dev_50 dropped per Critic Rec 1).
-# iter-v3/015: top-14 (tbr_zscore_30 added as NEW microstructure feature family).
-# iter-v3/016: top-13 (tbr_zscore_30 DROPPED; reverted to iter-v3/013 baseline).
-# iter-v3/019: top-14 (funding_rate_zscore_30 added — NEW external-data-source feature family).
-# iter-v3/020: top-13 (funding_rate_zscore_30 DROPPED per Critic FINAL Rec 2 of iter-v3/019).
-# iter-v3/023: top-14 (funding_rate_zscore_30 RE-ADDED — budget-disambiguation RETEST at
-#              n_trials=35; per Critic FINAL `3b3cc41` of iter-v3/022 Rec #1).
-# iter-v3/024: top-14 (funding_rate_zscore_30 DROPPED — INERT-CONFIRMED at n_trials=35;
-#              btc_funding_rate_zscore_30 ADDED — cross-asset BTC funding broadcast to all 3
-#              per-symbol models; per Critic FINAL `c4574af` of iter-v3/023 Rec #1).
-# iter-v3/025: top-14 (btc_funding_rate_zscore_30 DROPPED — BTC cross-asset funding family
-#              PERMANENTLY-CLOSED per Critic FINAL `5a47f5d` of iter-v3/024; OOS -0.82;
-#              regime_momentum_signed_5d ADDED — Category 2 composed feature: ret_5d ×
-#              sign(hurst_100 - 0.5); per user directive 2026-05-08 + Critic `5a47f5d` Rec).
-# iter-v3/026: top-15 (vol_adj_autocorr ADDED — Category 2 composed feature:
-#              ret_autocorr_lag1_50 / (range_realized_vol_50 + 1e-6); second Category 2 axis;
-#              per Critic FINAL Rec of iter-v3/025 SHA `402643d` + user directive 2026-05-08.
-#              NEGATIVE-SUSPICIOUS-OOS: IS Sharpe collapse +0.0493 + OOS spike +1.4501;
-#              27× IS/OOS ratio; stacking-falsified at single-seed n_trials=35).
-# iter-v3/027: top-15 (vol_adj_autocorr DROPPED — stacking FALSIFIED at single-seed per
-#              `feedback_v3_engineered_features_dont_stack.md`; cross_asset_divergence_norm
-#              ADDED (14 → 15; net unchanged at 15): Category 2 composed feature:
-#              (sym_ret_7d - btc_ret_14d) / (|vwap_dev_20| + 1e-6); third Category 2 axis;
-#              per Critic FINAL Rec of iter-v3/026 SHA `8839bbb` + user directive 2026-05-08.
-#              regime_momentum_signed_5d KEPT (iter-v3/025 PROMISING; mandated by
-#              `feedback_v3_engineered_features_proven.md`).
-# iter-v3/028: top-14 (cross_asset_divergence_norm DROPPED — revert 15 → 14; matches
-#              iter-v3/025 anchor exactly; MINI-VALIDATION of iter-v3/025 at --seeds 2;
-#              stacking FALSIFIED at iter-v3/027; per Critic FINAL `966f4c1` + user
-#              directive 2026-05-08. regime_momentum_signed_5d KEPT — MINI-VALIDATION
-#              target; mandated by `feedback_v3_engineered_features_proven.md`).
-# iter-v3/034: top-15 (fracdiff_d05_close ADDED — LdP AFML Ch. 5 FFD at d=0.5; 14 → 15.
-#              Fixed-window fractional differentiation of log(close); memory-preserving
-#              stationary feature complementary to regime_momentum_signed_5d.  V3_MODELS:
-#              DROP VETUSDT (5 → 4; EXPLORATION-NEGATIVE per Critic FINAL 93d2b85; alignment
-#              necessary but not sufficient for IS lift).  REQUIRED_GAP 110 → 88.
-#              RESULT: BCH +37.98 OOS wpnl swing; TRX -20.11 / ALGO -8.24 / LDO -6.81
-#              regressions.  Universal IS Sharpe -0.1636 (worst post-bootstrap).  BCH lift
-#              is real but universal application creates per-symbol drag.)
-# iter-v3/035: top-14 (fracdiff_d05_close DROPPED from universal list — per-symbol
-#              targeting via V3_FEATURES_PER_SYMBOL["BCHUSDT"] instead.  BCH receives
-#              15 features (14 universal + fracdiff_d05_close); TRX/ALGO/LDO receive
-#              14 features via fallback.  Net: universal list reverts to iter-v3/032/028
-#              anchor.  Atomic operation: revert universal + add BCH per-symbol entry.)
-# To restore full set: V3_FEATURE_COLUMNS = V3_FEATURE_COLUMNS_FULL
+# iter-v3/063: V3_FEATURE_COLUMNS = V3_FEATURE_COLUMNS_TOP_N (48-feature mass expansion).
 V3_FEATURE_COLUMNS: tuple[str, ...] = V3_FEATURE_COLUMNS_TOP_N
-"""Active feature columns fed to LightGBM / XGBoost.
+"""Alias for V3_FEATURE_COLUMNS_TOP_N — the active feature set for all v3 models.
 
-iter-v3/001-006: V3_FEATURE_COLUMNS_FULL (34 features).
-iter-v3/007:     V3_FEATURE_COLUMNS_TOP_N (14 features, EXPLORATION).
-iter-v3/008:     V3_FEATURE_COLUMNS_TOP_N (13 features, CONFIRMATION;
-                 vwap_dev_50 dropped per Critic FINAL SHA a544621).
-iter-v3/009-014: V3_FEATURE_COLUMNS_TOP_N (13 features, unchanged).
-iter-v3/015:     V3_FEATURE_COLUMNS_TOP_N (14 features; tbr_zscore_30 added
-                 per iter-v3/015 brief Section 3.3 — NEW microstructure family).
-iter-v3/016:     V3_FEATURE_COLUMNS_TOP_N (13 features; tbr_zscore_30 DROPPED
-                 per Critic FINAL Rec 3 + iter-v3/016 brief §3.3 revert).
-iter-v3/017-018: V3_FEATURE_COLUMNS_TOP_N (13 features, unchanged).
-iter-v3/019:     V3_FEATURE_COLUMNS_TOP_N (14 features; funding_rate_zscore_30
-                 added per iter-v3/019 brief §3.3 — NEW external-data-source
-                 feature family; 30-cycle z-score of Binance Futures funding rate).
-iter-v3/020:     V3_FEATURE_COLUMNS_TOP_N (13 features; funding_rate_zscore_30
-                 DROPPED per Critic FINAL Rec 2 of iter-v3/019 review — rank
-                 14/14 across all 3 symbols; reverts to iter-v3/018 anchor surface).
-iter-v3/021-022: V3_FEATURE_COLUMNS_TOP_N (13 features, unchanged).
-iter-v3/023:     V3_FEATURE_COLUMNS_TOP_N (14 features; funding_rate_zscore_30
-                 RE-ADDED per Critic FINAL Rec #1 of iter-v3/022 (SHA ``3b3cc41``)
-                 — budget-disambiguation RETEST at n_trials=35; was PROMISING-INERT
-                 at n_trials=10 in iter-v3/019).
-iter-v3/024:     V3_FEATURE_COLUMNS_TOP_N (14 features; funding_rate_zscore_30
-                 DROPPED (INERT-CONFIRMED at n_trials=35; per Critic FINAL
-                 ``c4574af`` of iter-v3/023 Rec #1 — per-symbol funding family
-                 PERMANENTLY-CLOSED); btc_funding_rate_zscore_30 ADDED as cross-asset
-                 BTC funding z-score broadcast to all 3 per-symbol models.
-                 Registered as ``btc_funding_v3`` in GROUP_REGISTRY.)
-iter-v3/025:     V3_FEATURE_COLUMNS_TOP_N (14 features; btc_funding_rate_zscore_30
-                 DROPPED (BTC cross-asset funding family PERMANENTLY-CLOSED per
-                 Critic FINAL ``5a47f5d`` of iter-v3/024 — OOS Sharpe -0.82, rank
-                 14/14 on BCH+LDO portfolio cuts + 9/14 TRX); regime_momentum_signed_5d
-                 ADDED as Category 2 composed feature: ret_5d × sign(hurst_100 - 0.5).
-                 User directive 2026-05-08 + Critic ``5a47f5d`` Rec mandated pivot
-                 to genuine feature engineering.  First Category 2 axis in v3 catalog.
-                 Registered as ``engineered_v3`` in GROUP_REGISTRY, after ``cross_btc``
-                 and before ``fracdiff`` to satisfy hurst_100 dependency ordering.)
-iter-v3/026:     V3_FEATURE_COLUMNS_TOP_N (15 features; vol_adj_autocorr ADDED as
-                 Category 2 composed feature: ret_autocorr_lag1_50 / (range_realized_vol_50
-                 + 1e-6).  Second Category 2 axis in v3 catalog.  IC gate bypassed per
-                 Category 2 carve-out (IC 0.985 vs source primitive expected for a composed
-                 feature).  Structurally orthogonal to regime_momentum_signed_5d: max
-                 |IC|_rm 0.075.  Per Critic FINAL Rec ``402643d`` of iter-v3/025 +
-                 user directive 2026-05-08.  Output clipped to [-100, +100].
-                 RESULT: NEGATIVE-SUSPICIOUS-OOS — IS Sharpe +0.0493 (collapse; lowest
-                 IS in post-bootstrap cycle) + OOS +1.4501 (27× IS/OOS ratio absurd).
-                 Stacking two engineered features at single-seed n_trials=35 FALSIFIED.)
-iter-v3/027:     V3_FEATURE_COLUMNS_TOP_N (15 features; vol_adj_autocorr DROPPED —
-                 stacking falsified per `feedback_v3_engineered_features_dont_stack.md`;
-                 cross_asset_divergence_norm ADDED as Category 2 composed feature:
-                 (sym_ret_7d - btc_ret_14d) / (|vwap_dev_20| + 1e-6).  Third Category 2
-                 axis in v3 catalog.  IC gate bypassed per Category 2 carve-out (IC 0.756
-                 vs source primitive sym_vs_btc_ret_7d expected for a composed feature).
-                 regime_momentum_signed_5d KEPT (iter-v3/025 PROMISING; mandated by
-                 `feedback_v3_engineered_features_proven.md`).  Net column count UNCHANGED
-                 at 15 (atomic swap: drop vol_adj_autocorr + add cross_asset_divergence_norm).
-                 Per Critic FINAL Rec ``8839bbb`` of iter-v3/026 + user directive 2026-05-08.)
-iter-v3/028:     V3_FEATURE_COLUMNS_TOP_N (14 features; cross_asset_divergence_norm DROPPED —
-                 revert 15 → 14; matches iter-v3/025 anchor exactly.  MINI-VALIDATION of
-                 iter-v3/025 ALONE at --seeds 2 (SPECIAL EXPLORATION cadence #10/10).
-                 Stacking FALSIFIED at iter-v3/027 (IS Sharpe collapse -0.2817; OOS spike
-                 +1.6786; TRX 91.57% concentration regression; 3-iter monotonic IS degradation).
-                 ``compute_cross_asset_divergence_norm`` retained as dead code in
-                 ``engineered_v3.py`` at zero revert cost; NOT dispatched from
-                 ``add_engineered_v3_features``.  regime_momentum_signed_5d KEPT — MINI-
-                 VALIDATION target; mandated by `feedback_v3_engineered_features_proven.md`.
-                 Per Critic FINAL ``966f4c1`` of iter-v3/027 + user directive 2026-05-08.)
-iter-v3/034:     V3_FEATURE_COLUMNS_TOP_N (15 features; fracdiff_d05_close ADDED —
-                 LdP AFML Ch. 5 FFD at d=0.5; fixed-window fractional differentiation
-                 of log(close); memory-preserving stationary feature complementary to
-                 regime_momentum_signed_5d.  Pure-numpy implementation in engineered_v3.py;
-                 weights truncated at |w_k| < 1e-4 (~120-150 bars).  Dispatched after
-                 regime_momentum_signed_5d in add_engineered_v3_features.  V3_MODELS:
-                 VETUSDT DROPPED (5 → 4; EXPLORATION-NEGATIVE per Critic FINAL 93d2b85;
-                 reverts to iter-v3/032 4-symbol anchor BCH+LDO+TRX+ALGO).
-                 REQUIRED_GAP 110 → 88 = (21+1)×4.  Atomic swap: DROP VET + ADD feature.
-                 RESULT: BCH +37.98 OOS wpnl swing; TRX -20.11 / ALGO -8.24 / LDO -6.81
-                 regressions.  IS Sharpe -0.1636 (worst post-bootstrap; universal drag).)
-iter-v3/035:     V3_FEATURE_COLUMNS_TOP_N (14 features; fracdiff_d05_close DROPPED from
-                 universal list — per-symbol targeting via V3_FEATURES_PER_SYMBOL["BCHUSDT"].
-                 BCH receives 15 features (14 universal + fracdiff_d05_close via per-symbol
-                 dict); TRX/ALGO/LDO receive 14 features via fallback (same as iter-v3/032/028
-                 anchor).  Universal list reverts to iter-v3/028 anchor.  Atomic: revert
-                 universal list (15→14) + add BCH per-symbol entry.)
-iter-v3/041:     V3_FEATURE_COLUMNS_TOP_N (11 features; pruned 3 lowest-importance:
-                 ret_skew_50, sym_vs_btc_ret_7d, regime_momentum_signed_5d DROPPED.
-                 NEGATIVE result: OOS < +1.55 falsifier threshold — Path C fired.)
-iter-v3/042:     V3_FEATURE_COLUMNS_TOP_N (14 features; RESTORED all 3 pruned features
-                 per iter-v3/041 Path C mandate. feedback_v3_engineered_features_proven.md
-                 mandate for regime_momentum_signed_5d REINSTATED. DEFAULT_ATR_MULTIPLIERS
-                 changed (2.0,1.0)→(1.5,0.75) universal tightening. NEGATIVE by IS collapse:
-                 IS Sharpe -0.5941, TRX OOS -33 wpnl swing.)
-iter-v3/043:     V3_FEATURE_COLUMNS_TOP_N (15 features; efficiency_ratio_50 ADDED —
-                 Kaufman 1995 unsigned [0,1] regime-quality signal. DEFAULT_ATR_MULTIPLIERS
-                 REVERTED (1.5,0.75)→(2.0,1.0) per iter-v3/042 IS-collapse mandate.
-                 Category 1 indicator; standard IC gate applies.
-                 RESULT: DISASTROUS NEGATIVE — IS -0.8445 / OOS -0.8990; all 4 symbols broken.)
-iter-v3/044:     V3_FEATURE_COLUMNS_TOP_N (15 features; efficiency_ratio_50 DROPPED
-                 (15 → 14 REVERT; iter-v3/043 DISASTROUS NEGATIVE mandate;
-                 compute_efficiency_ratio_50 retained as dead code; NOT dispatched).
-                 regime_momentum_signed_3d ADDED (14 → 15): 3-bar sign-flip variant;
-                 ret_3d = close.shift(1)/close.shift(4) - 1.0 * sign(hurst_100[t-1] - 0.5).
-                 Category 2 composed feature; IC carve-out applies.
-                 Net: 15 = 13 original + regime_momentum_signed_5d + regime_momentum_signed_3d.)
-"""
-
-V3_NON_FEATURE_COLUMNS: tuple[str, ...] = ("natr_21_raw", "tbr_raw")
-"""Columns computed by the v3 pipeline that are NOT model inputs.
-
-``natr_21_raw``: raw NATR used for dynamic ATR barriers (not a signal feature).
-``tbr_raw``:     raw tick-bar ratio before z-score normalization; Critic
-                 Clarification 4 of iter-v3/015 identified this as excluded from
-                 model input regardless (added iter-v3/016, §3.5 sub-fix #2).
-"""
-
-V3_ATR_MULTIPLIERS_PER_SYMBOL: dict[str, tuple[float, float]] = {
-    # iter-v3/051: REVERT to empty dict per system-level rule
-    # `feedback_v3_per_symbol_lifts_oos_breaks_is.md` UPDATED 2026-05-10 (second-cycle
-    # confirmation of per-symbol-customization anti-pattern at iter-v3/039 + iter-v3/050
-    # CONFIRMATION-NO-MERGE). All 3 symbols (BCH/LDO/TRX) fall back to
-    # DEFAULT_ATR_MULTIPLIERS = (2.0, 1.0). ALGOUSDT and LDOUSDT per-symbol entries
-    # REVERTED. Cycle 4 starting baseline = iter-v3/028 architecture exactly.
-    # Per `analysis/iteration_v3-051/synthesis.md` SHA `290f37b`.
-    # History: {} (iter-v3/040 cycle 3 REVERT) → ALGOUSDT (2.0,1.5) added iter-v3/044
-    #   → LDOUSDT (2.0,1.5) added iter-v3/045 → BCHUSDT added+removed iter-v3/046/047
-    #   → {} (iter-v3/051 system-level REVERT; current state).
-}
-"""Per-symbol ATR multiplier overrides for iter-v3/032+ labeling architecture.
-
-Maps symbol → (atr_tp_multiplier, atr_sl_multiplier).
-Symbols absent from this dict fall back to DEFAULT_ATR_MULTIPLIERS = (2.0, 1.0).
-
-iter-v3/032: LDOUSDT entry added (1.5, 0.75) — LDO natr_21_raw median 5.01 vs peer
-  median 3.70 (1.35× higher); (1.5, 0.75) aligns LDO effective barriers with peer
-  aggregate. Source: analysis/iteration_v3-032/per_symbol_atr_eda.py (SHA 9834e84).
-iter-v3/040: CLEARED (empty dict). Cycle 3 EXPLORATION #1 — REVERT all per-symbol
-  ATR customizations. LDO reverts to DEFAULT_ATR_MULTIPLIERS = (2.0, 1.0) via fallback.
-  Architecture (this dict + atr_multipliers_for_symbol helper) is KEPT; only emptied.
-  Rationale: iter-v3/039 CONFIRMATION NO-MERGE — per-symbol customizations broke IS
-  aggregate (-0.55 IS Sharpe swing from iter-v3/029 clean-4-symbol anchor).
-iter-v3/044: ALGOUSDT entry added (2.0, 1.5) — QR EDA-driven per-symbol axis selection.
-  ALGO LONG SL/TP asymmetry 4.5:1 with mean SL pnl_pct -5.24 (vs -8.40 stop barrier);
-  widening SL by 50% gives ALGO longs more breathing room without changing entry signal.
-  Source: analysis/iteration_v3-044/cycle3_is_diagnosis.py SHA `eff841e`.
-iter-v3/045: LDOUSDT entry added (2.0, 1.5) — QR EDA-driven per-symbol axis selection,
-  cycle 3 #6. LDO IS->OOS exit-composition shift (SL:TP 1.14 -> 2.33; SL rate 53.3%
-  -> 63.6%); wider SL targets the IS->OOS regime-shift directly, mirroring iter-v3/044
-  ALGO mechanism. Predecessor (1.5, 0.75) at iter-v3/032 was MULTI-SEED-FALSIFIED at
-  iter-v3/039 — this is the OPPOSITE direction (wider not tighter) per QR EDA
-  candidate-ranking. Source: analysis/iteration_v3-045/ldo_bottleneck_diagnosis.py
-  SHA `ed949fe`.
-iter-v3/046: BCHUSDT entry added (2.0, 1.5) — QR EDA-driven per-symbol axis selection,
-  cycle 3 #7. BCH direction asymmetry: LONG IS -25.07% (39 trades, 30.8% WR — toxic),
-  SHORT IS +48.69% (55 trades, 43.6% WR). BCH IS=OOS SL:TP=1.93 (regime-stable, no
-  IS->OOS shift) — wider SL helps IS AND OOS SYMMETRICALLY, distinct mechanism from
-  iter-v3/045 LDO which addressed an asymmetric IS->OOS regime shift. Third application
-  of validated wider-SL mechanism (ALGO at iter-v3/044, LDO at iter-v3/045, BCH at
-  iter-v3/046). Source: analysis/iteration_v3-046/bch_trx_bottleneck_diagnosis.py
-  SHA `d86b1f9`. RESULT: NEGATIVE — iter-v3/046 caused BCH IS-axis collapse (Δ -0.54
-  IS Sharpe) + OOS -45 swing (BCH OOS PnL +10.75 → -34.54). Critic FINAL `5dae6d6`:
-  mirror mechanism failed on stable-SL:TP symbols. Memory rule established: per-symbol
-  ATR widening only applies to symbols with regime mismatch (IS->OOS SL:TP shift > 30%
-  OR extreme direction asymmetry > 4:1).
-iter-v3/047: BCHUSDT entry REMOVED — REVERT iter-v3/046 per Critic FINAL recommendation.
-  BCH falls back to DEFAULT_ATR_MULTIPLIERS = (2.0, 1.0). State after revert =
-  iter-v3/045 config (ALGO + LDO entries only). The BCH IS-axis bottleneck (LONG IS
-  -25% toxic / SHORT IS +49% positive) requires a DIRECTION-ASYMMETRIC mechanism, not
-  a symmetric labeling-layer adjustment. iter-v3/047 axis = QR EDA-driven BCH direction
-  axis (specific axis chosen by QR EDA at SHA TBD).
-iter-v3/051: CLEARED (empty dict) — SYSTEM-LEVEL REVERT to iter-v3/028 architecture.
-  Per `feedback_v3_per_symbol_lifts_oos_breaks_is.md` UPDATED 2026-05-10 (second-cycle
-  confirmation of per-symbol-customization anti-pattern; iter-v3/039 + iter-v3/050 both
-  CONFIRMATION-NO-MERGE on per-symbol bundle). ALGOUSDT and LDOUSDT entries REVERTED.
-  All 3 symbols (BCH/LDO/TRX) fall back to DEFAULT_ATR_MULTIPLIERS = (2.0, 1.0).
-  Architecture (this dict + atr_multipliers_for_symbol helper) is KEPT; only emptied.
-  Cycle 4 starting baseline = iter-v3/028 architecture exactly.
-  Per analysis/iteration_v3-051/synthesis.md SHA `290f37b`.
+iter-v3/063: points to the 48-feature mass-expansion set (was 14 features through /062).
 """
 
 DEFAULT_ATR_MULTIPLIERS: tuple[float, float] = (2.0, 1.0)
@@ -715,6 +263,19 @@ V3_ATR_MULTIPLIERS_PER_SYMBOL is empty, so all 4 symbols (BCH/LDO/TRX/ALGO) use
 this default universally via fallback.
 Value (2.0, 1.0) first set at iter-v3/010; validated anchor through iter-v3/041.
 Per briefs-v3/iteration_v3-043/research_brief.md Section 3 Sub-fix 1.
+"""
+
+V3_ATR_MULTIPLIERS_PER_SYMBOL: dict[str, tuple[float, float]] = {
+    # iter-v3/051: REVERT to empty dict per system-level rule
+    # `feedback_v3_per_symbol_lifts_oos_breaks_is.md` UPDATED 2026-05-10.
+    # All 3 symbols (BCH/LDO/TRX) fall back to DEFAULT_ATR_MULTIPLIERS = (2.0, 1.0).
+    # History: {} (iter-v3/040 cycle 3 REVERT) → entries added/removed iter-v3/044-047
+    #   → {} (iter-v3/051 system-level REVERT; current state at iter-v3/063).
+}
+"""Per-symbol ATR multiplier overrides (iter-v3/032+).
+
+Maps symbol → (atr_tp_multiplier, atr_sl_multiplier).
+Empty at iter-v3/063: all symbols fall back to DEFAULT_ATR_MULTIPLIERS = (2.0, 1.0).
 """
 
 
@@ -771,19 +332,17 @@ iter-v3/040: CLEARED (empty dict). Cycle 3 EXPLORATION #1 — REVERT all per-sym
              per-symbol customizations caused ~-0.55 IS Sharpe swing from iter-v3/029 anchor.
              iter-v3/040 verifies that clearing per-symbol customizations restores IS anchor.
 
-Enforced by _verify_feature_columns in run_baseline_v3.py (iter-v3/044):
+Enforced by _verify_feature_columns in run_baseline_v3.py (iter-v3/063):
     len(V3_FEATURES_PER_SYMBOL) == 0  (empty — no per-symbol entries)
     "BCHUSDT" not in V3_FEATURES_PER_SYMBOL
     "ALGOUSDT" not in V3_FEATURES_PER_SYMBOL
     "LDOUSDT" not in V3_FEATURES_PER_SYMBOL
     "TRXUSDT" not in V3_FEATURES_PER_SYMBOL
-    features_for_symbol("BCHUSDT") == V3_FEATURE_COLUMNS_TOP_N  (15 features, no fracdiff, no ER)
-    "fracdiff_d05_close" not in V3_FEATURE_COLUMNS_TOP_N
-    "cross_asset_divergence_norm" not in V3_FEATURE_COLUMNS_TOP_N
-    "vol_adj_autocorr" not in V3_FEATURE_COLUMNS_TOP_N
-    "efficiency_ratio_50" not in V3_FEATURE_COLUMNS_TOP_N  (DROPPED iter-v3/044 revert)
-    "regime_momentum_signed_3d" in V3_FEATURE_COLUMNS_TOP_N  (ADDED iter-v3/044)
-    "regime_momentum_signed_5d" in V3_FEATURE_COLUMNS_TOP_N  (PRESENT; mandate ACTIVE)
+    features_for_symbol("BCHUSDT") == V3_FEATURE_COLUMNS_TOP_N  (48 features — MASS EXPANSION)
+    "vol_adj_autocorr" not in V3_FEATURE_COLUMNS_TOP_N  (dead code; catastrophic at /026)
+    "efficiency_ratio_50" not in V3_FEATURE_COLUMNS_TOP_N  (DISASTROUS NEGATIVE /043)
+    "regime_momentum_signed_3d" not in V3_FEATURE_COLUMNS_TOP_N  (PARKED /053)
+    "regime_momentum_signed_5d" in V3_FEATURE_COLUMNS_TOP_N  (BASELINE_V3; mandate ACTIVE)
 """
 
 
@@ -800,16 +359,12 @@ def features_for_symbol(symbol: str) -> tuple[str, ...]:
     - ALGOUSDT: returns 14 features = V3_FEATURE_COLUMNS_TOP_N (fallback; unchanged)
     - LDOUSDT: returns 14 features = V3_FEATURE_COLUMNS_TOP_N (fallback; unchanged)
     - TRXUSDT: returns 14 features = V3_FEATURE_COLUMNS_TOP_N (fallback; unchanged)
-    - Any other symbol: fallback to 14-feature universal set
+    - Any other symbol: fallback to 48-feature universal set (iter-v3/063 MASS EXPANSION)
 
-    V3_FEATURES_PER_SYMBOL is empty at iter-v3/040/041/042/043/044 (0 entries).
-    All 4 symbols (BCH/LDO/TRX/ALGO) use the 15-feature universal fallback at iter-v3/044.
-    iter-v3/041 temporarily pruned to 11 features; iter-v3/042 RESTORED to 14;
-    iter-v3/043 ADDED efficiency_ratio_50 to reach 15 — DISASTROUS NEGATIVE;
-    iter-v3/044 DROPPED efficiency_ratio_50 (reverted to 14) + ADDED
-    regime_momentum_signed_3d (14 → 15).
-    fracdiff_d05_close is NOT a model input for any symbol at iter-v3/040-044
-    (column still computed in parquets but excluded from all feature_columns lists).
+    V3_FEATURES_PER_SYMBOL is empty at iter-v3/063 (0 entries).
+    All 3 symbols (BCH/LDO/TRX) use the 48-feature universal fallback at iter-v3/063.
+    iter-v3/063 MASS FEATURE EXPANSION: 14 → 48 features (path B per EDA SHA c833f48).
+    14 BASELINE_V3 features preserved + 34 promoted from parquet + 9 NEW implementations.
 
     Callers MUST pass ``feature_columns=list(features_for_symbol(symbol))``
     to LightGbmStrategy/XgboostStrategy — never None, never empty, never the global default.
@@ -929,8 +484,10 @@ __all__ = [
     "V3_FEATURES_PER_SYMBOL",
     "V3_NON_FEATURE_COLUMNS",
     "add_btc_funding_v3_features",
+    "add_calendar_v3_features",
     "add_engineered_v3_features",
     "add_funding_v3_features",
+    "add_technical_v3_features",
     "atr_multipliers_for_symbol",
     "features_for_symbol",
     "generate_features_v3",

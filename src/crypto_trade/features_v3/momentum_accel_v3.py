@@ -59,4 +59,11 @@ def add_momentum_accel_v3_features(df: pd.DataFrame) -> pd.DataFrame:
     df["ret_autocorr_lag1_50"] = _rolling_autocorr(log_returns, window=50, lag=1)
     df["ret_autocorr_lag5_50"] = _rolling_autocorr(log_returns, window=50, lag=5)
 
+    # iter-v3/063: ret_1d — 1-day log return (3 bars at 8h cadence = 24h = 1 calendar day).
+    # Reference: Cont (2001) stylized facts; basic short-horizon momentum.
+    # 3 bars x 8h = 24h = 1 calendar day; log(close[t]) - log(close[t-3]).
+    # Past-only by construction: shift(3) uses bar t-3 (strictly past).
+    # NaN warm-up: first 3 bars.
+    df["ret_1d"] = _momentum(close, 3)
+
     return df

@@ -125,7 +125,7 @@ def _derive_ensemble_seeds(outer_seed: int, size: int = 5) -> list[int]:
     return [int(s) for s in rng.integers(low=0, high=2**31 - 1, size=size)]
 
 
-ITERATION_LABEL = "v3-061"
+ITERATION_LABEL = "v3-063"
 REPORTS_DIR = Path("reports-v3")
 FEATURES_DIR = Path("data/features_v3")
 DATA_DIR = Path("data")
@@ -212,7 +212,7 @@ def _verify_data_freshness(symbols: tuple[str, ...], max_lag_hours: float = 16.0
 
 
 def _verify_feature_columns(ensemble_size: int | None = None) -> None:
-    """Verifies V3_FEATURE_COLUMNS contents per current brief (iter-v3/061).
+    """Verifies V3_FEATURE_COLUMNS contents per current brief (iter-v3/063).
 
     Parameters
     ----------
@@ -233,12 +233,15 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
 
     iter-v3/060: CYCLE 1 #1 EXPLORATION — EXPLORATION-MODE-REFERENCE establishment + TRX diagnostic.
       Mode-flag refactor commit `56f5a30`: --exploration CLI flag (EXPLORATION_ENSEMBLE_SIZE=3
-        / CONFIRMATION_ENSEMBLE_SIZE=10). User directive 2026-05-13: "use 10 seeds only for CONFIRMATION."
+        / CONFIRMATION_ENSEMBLE_SIZE=10). User directive 2026-05-13:
+        "use 10 seeds only for CONFIRMATION."
       ITERATION_LABEL = "v3-060" — first 3-seed EXPLORATION-mode run; bundle IDENTICAL to /059.
-      Cycle 1 cadence: 10 EXPLORATIONs (/060-069) at 3 seeds (~1.1h each) → 1 CONFIRMATION (/070) at 10 seeds.
+      Cycle 1 cadence: 10 EXPLORATIONs (/060-069) at 3 seeds (~1.1h each)
+        → 1 CONFIRMATION (/070) at 10 seeds.
 
     iter-v3/059: RE-ANCHOR #2 — /028 bundle under unified 10-seed ensemble architecture.
-      Phase A commit `0a3c30e`: Optuna n_jobs=2 parallelization — REVERTED at `31665f6` (5x GIL slowdown).
+      Phase A commit `0a3c30e`: Optuna n_jobs=2 parallelization —
+        REVERTED at `31665f6` (5x GIL slowdown).
       Phase B-3 commit `ab2d9ac`: unified 10-seed ensemble (ENSEMBLE_SIZE=10, ENSEMBLE_SEEDS
         hardcoded as lineage-preserving 10-value tuple; outer-seed loop eliminated).
       Walk-forward fix commit `e149e9d` (cherry-picked from main `5566a69`): post-fix WF.
@@ -304,38 +307,21 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
             "Pass either 3 (--exploration) or 10 (default CONFIRMATION)."
         )
 
+    # iter-v3/063: MASS FEATURE EXPANSION — 14 → 48 features.
+    # Previously-closed features re-evaluated under post-WF-fix landscape (brief adversarial flags).
+    # vol_adj_autocorr and efficiency_ratio_50 (the two CATASTROPHICALLY NEGATIVE features)
+    # remain EXCLUDED. All others re-evaluated (funding, fracdiff, cross_asset_divergence_norm,
+    # vol_normalized_ret_5d, hurst_drift_50_200 — now included).
     n = len(V3_FEATURE_COLUMNS)
-    if n != 14:
+    if n != 48:
         raise RuntimeError(
-            f"V3_FEATURE_COLUMNS has {n} columns — expected exactly 14. "
-            "iter-v3/054: hurst_drift_50_200 DROPPED (15 → 14) per /053 closeout PATH D "
-            "PARK action (15th-slot SWAP family exhausted per Critic FINAL `c056354`). "
-            "Remove 'hurst_drift_50_200' from V3_FEATURE_COLUMNS_TOP_N in "
-            "features_v3/__init__.py."
+            f"V3_FEATURE_COLUMNS has {n} columns — expected exactly 48. "
+            "iter-v3/063: MASS FEATURE EXPANSION (14 → 48). "
+            "Expected: 14 BASELINE_V3 + 34 promoted from parquet (post-IC-pruning). "
+            "Check V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
         )
-    if "tbr_zscore_30" in V3_FEATURE_COLUMNS:
-        raise RuntimeError(
-            "tbr_zscore_30 FOUND in V3_FEATURE_COLUMNS — must be ABSENT per "
-            "iter-v3/016 brief §3.3 (revert to iter-v3/013 baseline). "
-            "Remove it from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
-        )
-    if "funding_rate_zscore_30" in V3_FEATURE_COLUMNS:
-        raise RuntimeError(
-            "funding_rate_zscore_30 FOUND in V3_FEATURE_COLUMNS — must be ABSENT "
-            "per iter-v3/028 brief §8 (per-symbol funding family PERMANENTLY-CLOSED "
-            "after Critic FINAL `c4574af` of iter-v3/023 Rec #1; INERT-CONFIRMED at "
-            "n_trials=35). Remove it from V3_FEATURE_COLUMNS_TOP_N in "
-            "features_v3/__init__.py."
-        )
-    if "btc_funding_rate_zscore_30" in V3_FEATURE_COLUMNS:
-        raise RuntimeError(
-            "btc_funding_rate_zscore_30 FOUND in V3_FEATURE_COLUMNS — must be ABSENT "
-            "per iter-v3/028 brief §8 (BTC cross-asset funding family PERMANENTLY-CLOSED "
-            "after Critic FINAL `5a47f5d` of iter-v3/024; OOS Sharpe -0.82, rank 14/14 "
-            "BCH+LDO portfolio cuts + 9/14 TRX). Remove it from V3_FEATURE_COLUMNS_TOP_N "
-            "in features_v3/__init__.py."
-        )
-    # vol_adj_autocorr MUST NOT be in the universal list (iter-v3/036 NEGATIVE reverted).
+    # vol_adj_autocorr MUST NOT be in the universal list (iter-v3/036 NEGATIVE reverted;
+    # catastrophically bad IS collapse at single-seed n_trials=35; dead code retained).
     if "vol_adj_autocorr" in V3_FEATURE_COLUMNS:
         raise RuntimeError(
             "vol_adj_autocorr FOUND in V3_FEATURE_COLUMNS (universal list) — must be ABSENT. "
@@ -343,112 +329,80 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
             "Universal application FALSIFIED at iter-v3/026 (IS Sharpe +0.0493; 27× IS/OOS). "
             "Remove it from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
         )
-    # cross_asset_divergence_norm MUST NOT be in the universal list.
-    # NOTE: cross_asset_divergence_norm IS dispatched in add_engineered_v3_features (for parquet
-    # generation) but must NOT be in V3_FEATURE_COLUMNS_TOP_N (the universal model input list).
-    if "cross_asset_divergence_norm" in V3_FEATURE_COLUMNS:
-        raise RuntimeError(
-            "cross_asset_divergence_norm FOUND in V3_FEATURE_COLUMNS (universal list) — "
-            "must be ABSENT. Universal application FALSIFIED at iter-v3/027 (IS Sharpe "
-            "collapse -0.2817 + OOS spike +1.6786). iter-v3/037 LDO per-symbol NEGATIVE (~-33). "
-            "iter-v3/040: dead at model level. "
-            "Remove it from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
-        )
-    # regime_momentum_signed_5d MUST be present (mandate still ACTIVE at iter-v3/044).
-    # feedback_v3_engineered_features_proven.md mandate UPHELD through iter-v3/044.
-    if "regime_momentum_signed_5d" not in V3_FEATURE_COLUMNS:
-        raise RuntimeError(
-            "regime_momentum_signed_5d NOT FOUND in V3_FEATURE_COLUMNS — must be PRESENT "
-            "at iter-v3/044. feedback_v3_engineered_features_proven.md mandate ACTIVE. "
-            "Add it to V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
-        )
-    # iter-v3/053: regime_momentum_signed_3d PARKED (DROPPED per /052 PATH C-suspicious).
-    # Critic FINAL `34cc46f` rec #2: pivot to structurally distinct feature family.
-    # compute_regime_momentum_signed_3d dispatch RETAINED as dead code (zero revert cost).
-    if "regime_momentum_signed_3d" in V3_FEATURE_COLUMNS:
-        raise RuntimeError(
-            "regime_momentum_signed_3d FOUND in V3_FEATURE_COLUMNS — must be ABSENT at "
-            "iter-v3/053. PARKED per /052 PATH C-suspicious closeout (rank 14-15/15 all "
-            "3 symbols; IS-OOS daily ratio 2.327 OUT-OF-BAND). Critic `34cc46f` rec #2. "
-            "Remove 'regime_momentum_signed_3d' from V3_FEATURE_COLUMNS_TOP_N in "
-            "src/crypto_trade/features_v3/__init__.py."
-        )
-    # sym_vs_btc_ret_7d MUST be present (RESTORED at iter-v3/042; KEPT at iter-v3/044).
-    if "sym_vs_btc_ret_7d" not in V3_FEATURE_COLUMNS:
-        raise RuntimeError(
-            "sym_vs_btc_ret_7d NOT FOUND in V3_FEATURE_COLUMNS — must be PRESENT at "
-            "iter-v3/044 (RESTORED at iter-v3/042; KEPT). "
-            "Add it to V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
-        )
-    # iter-v3/058: RE-ANCHOR — ret_skew_50 MUST be PRESENT (RESTORED; /028 BASELINE_V3.md).
-    # REVERT of /057 A4 base-stack SWAP per memory rule `feedback_v3_walkforward_lookahead_bug.md`
-    # user-decision path (a). Walk-forward fix commit: `e149e9d`.
-    if "ret_skew_50" not in V3_FEATURE_COLUMNS:
-        raise RuntimeError(
-            "ret_skew_50 NOT FOUND in V3_FEATURE_COLUMNS — must be PRESENT at "
-            "iter-v3/058 (RE-ANCHOR; restore /028 BASELINE_V3.md composition). "
-            "Add it back to V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
-        )
-    # iter-v3/058: RE-ANCHOR — parkinson_gk_ratio_20 MUST NOT be present (REVERTED from /057).
-    # compute function in price_efficient_vol_v3.py retained as dead code for future cycle 1+ use.
-    if "parkinson_gk_ratio_20" in V3_FEATURE_COLUMNS:
-        raise RuntimeError(
-            "parkinson_gk_ratio_20 FOUND in V3_FEATURE_COLUMNS — must be ABSENT at iter-v3/058 "
-            "(RE-ANCHOR; /057 SWAP REVERTED for /028 BASELINE_V3.md re-anchor). "
-            "Replace it with 'ret_skew_50' in V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
-        )
-    # iter-v3/044: efficiency_ratio_50 MUST be ABSENT (DROPPED — iter-v3/043 DISASTROUS NEGATIVE).
+    # efficiency_ratio_50 MUST be ABSENT (unsigned Kaufman ER — DISASTROUS NEGATIVE iter-v3/043).
+    # NOTE: trend_efficiency_signed (signed variant) IS ALLOWED at iter-v3/063
+    # — different mechanism (signed vs unsigned Kaufman ER).
     if "efficiency_ratio_50" in V3_FEATURE_COLUMNS:
         raise RuntimeError(
             "efficiency_ratio_50 FOUND in V3_FEATURE_COLUMNS — must be ABSENT "
-            "at iter-v3/044 (DROPPED: iter-v3/043 DISASTROUS NEGATIVE IS -0.8445 / OOS -0.8990; "
-            "all 4 symbols broken by Kaufman ER). "
-            "Remove it from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
+            "at iter-v3/063 (DROPPED at iter-v3/044: iter-v3/043 DISASTROUS NEGATIVE IS -0.8445 / "
+            "OOS -0.8990; all 4 symbols broken by unsigned Kaufman ER). "
+            "The SIGNED variant 'trend_efficiency_signed' is the /063 NEW feature. "
+            "Remove 'efficiency_ratio_50' from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
         )
     if "vwap_dev_50" in V3_FEATURE_COLUMNS:
         raise RuntimeError(
             "vwap_dev_50 found in V3_FEATURE_COLUMNS — must be dropped per "
-            "Critic FINAL SHA a544621 (Recommendation 1). "
+            "Critic FINAL SHA a544621 (Recommendation 1; IC 0.875 with ema_spread_atr_20). "
             "Remove it from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
         )
-    # fracdiff_d05_close MUST NOT be in universal list — PARKED at iter-v3/052 SWAP.
-    # iter-v3/051 cycle 4 #1 EXPLORATION: EXPLORATION-NULL-RESULT (PARKED). Ranks 11-13/15
-    # (feature LEARNED but no decisive IS lift; OOS within single-seed=42 lottery noise).
-    # Per Critic FINAL `32cc46f` rec #2: DROP fracdiff from V3_FEATURE_COLUMNS_TOP_N at /052.
-    # compute_fracdiff_d05_close RETAINED in dispatch (column still generated; zero revert cost).
-    if "fracdiff_d05_close" in V3_FEATURE_COLUMNS_TOP_N:
+    # regime_momentum_signed_5d MUST be present
+    # (mandate from feedback_v3_engineered_features_proven.md).
+    if "regime_momentum_signed_5d" not in V3_FEATURE_COLUMNS:
         raise RuntimeError(
-            "fracdiff_d05_close FOUND in V3_FEATURE_COLUMNS_TOP_N — must be ABSENT at "
-            "iter-v3/052. PARKED per /051 EXPLORATION-NULL-RESULT + Critic FINAL `32cc46f` "
-            "rec #2. SWAP: regime_momentum_signed_3d REPLACES fracdiff_d05_close as 15th "
-            "element. Remove 'fracdiff_d05_close' from V3_FEATURE_COLUMNS_TOP_N in "
-            "src/crypto_trade/features_v3/__init__.py."
+            "regime_momentum_signed_5d NOT FOUND in V3_FEATURE_COLUMNS — must be PRESENT. "
+            "feedback_v3_engineered_features_proven.md mandate ACTIVE. "
+            "Add it to V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
         )
-    print("  fracdiff_d05_close ABSENT from V3_FEATURE_COLUMNS_TOP_N (PARKED at /052 SWAP)  PASS")
-    # vol_adj_autocorr MUST NOT be in the universal list (iter-v3/036 reverted).
-    if "vol_adj_autocorr" in V3_FEATURE_COLUMNS_TOP_N:
+    # sym_vs_btc_ret_7d MUST be present (BASELINE_V3 feature).
+    if "sym_vs_btc_ret_7d" not in V3_FEATURE_COLUMNS:
         raise RuntimeError(
-            "vol_adj_autocorr FOUND in V3_FEATURE_COLUMNS_TOP_N (universal list) — "
-            "iter-v3/037: iter-v3/036 NEGATIVE reverted; vol_adj_autocorr is dead code. "
-            "Remove it from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
+            "sym_vs_btc_ret_7d NOT FOUND in V3_FEATURE_COLUMNS — must be PRESENT. "
+            "BASELINE_V3 feature (RESTORED at iter-v3/042; KEPT). "
+            "Add it to V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
         )
-    # cross_asset_divergence_norm MUST NOT be in the universal list.
-    if "cross_asset_divergence_norm" in V3_FEATURE_COLUMNS_TOP_N:
+    # ret_skew_50 MUST be present (BASELINE_V3 feature).
+    if "ret_skew_50" not in V3_FEATURE_COLUMNS:
         raise RuntimeError(
-            "cross_asset_divergence_norm FOUND in V3_FEATURE_COLUMNS_TOP_N (universal list) — "
-            "iter-v3/040: dead at model level. Universal application FALSIFIED at iter-v3/027. "
-            "LDO per-symbol FALSIFIED at iter-v3/037. "
-            "Remove it from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
+            "ret_skew_50 NOT FOUND in V3_FEATURE_COLUMNS — must be PRESENT. "
+            "BASELINE_V3 feature (RESTORED iter-v3/058 RE-ANCHOR; /028 BASELINE_V3.md). "
+            "Add it back to V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
         )
+    # regime_momentum_signed_3d MUST NOT be present (PARKED per /053 PATH C-suspicious).
+    if "regime_momentum_signed_3d" in V3_FEATURE_COLUMNS:
+        raise RuntimeError(
+            "regime_momentum_signed_3d FOUND in V3_FEATURE_COLUMNS — must be ABSENT. "
+            "PARKED per /052 PATH C-suspicious closeout; Critic `34cc46f` rec #2. "
+            "Remove 'regime_momentum_signed_3d' from V3_FEATURE_COLUMNS_TOP_N."
+        )
+    # iter-v3/063: 9 NEW features MUST be present
+    _new_063_features = (
+        "adx_14",
+        "candle_dow_sin",
+        "candle_dow_cos",
+        "ret_1d",
+        "sym_vs_btc_ret_3d",
+        "sym_vs_btc_vol_14d",
+        "taker_buy_imbalance_20",
+        "trend_efficiency_signed",
+        "vol_regime_x_momentum",
+    )
+    for _feat in _new_063_features:
+        if _feat not in V3_FEATURE_COLUMNS:
+            raise RuntimeError(
+                f"iter-v3/063 NEW feature '{_feat}' NOT FOUND in V3_FEATURE_COLUMNS. "
+                "All 9 NEW features must be present in V3_FEATURE_COLUMNS_TOP_N. "
+                f"Missing: {_feat}. Add it to V3_FEATURE_COLUMNS_TOP_N."
+            )
     print(
         f"  V3_FEATURE_COLUMNS: {n} columns "
-        "(iter-v3/058: RE-ANCHOR 14-feature set; /028 BASELINE_V3.md composition RESTORED; "
-        "ret_skew_50 PRESENT (RESTORED); parkinson_gk_ratio_20 ABSENT (REVERTED from /057); "
-        "hurst_drift_50_200 ABSENT (PARKED /053 PATH D); "
-        "regime_momentum_signed_3d ABSENT (PARKED); "
-        "fracdiff_d05_close ABSENT (PARKED); vol_normalized_ret_5d ABSENT (DROPPED /049); "
-        "efficiency_ratio_50 ABSENT; "
-        "regime_momentum_signed_5d, sym_vs_btc_ret_7d PRESENT)  PASS"
+        "(iter-v3/063: MASS FEATURE EXPANSION 14 → 48; "
+        "14 BASELINE_V3 features present; "
+        "9 NEW features (adx_14, candle_dow_sin, candle_dow_cos, ret_1d, "
+        "sym_vs_btc_ret_3d, sym_vs_btc_vol_14d, taker_buy_imbalance_20, "
+        "trend_efficiency_signed, vol_regime_x_momentum) PRESENT; "
+        "vol_adj_autocorr ABSENT; efficiency_ratio_50 ABSENT; "
+        "regime_momentum_signed_5d PRESENT; sym_vs_btc_ret_7d PRESENT)  PASS"
     )
 
     # iter-v3/044: Verify DEFAULT_ATR_MULTIPLIERS == (2.0, 1.0).
@@ -493,79 +447,41 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
         "BCH/LDO/TRX all use (2.0, 1.0) DEFAULT)  PASS"
     )
 
-    # iter-v3/058: Verify all 3 v3 symbols return 14-feature fallback (V3_FEATURE_COLUMNS_TOP_N).
-    # RE-ANCHOR: ret_skew_50 PRESENT (RESTORED); parkinson_gk_ratio_20 ABSENT (REVERTED from /057).
-    # ALGOUSDT NOT in V3_MODELS at iter-v3/058 (REVERTED from /051; 3-sym universe unchanged).
+    # iter-v3/063: Verify all 3 v3 symbols return 48-feature fallback (V3_FEATURE_COLUMNS_TOP_N).
+    # MASS FEATURE EXPANSION: 14 → 48. V3_FEATURES_PER_SYMBOL must be empty (all symbols fallback).
     for sym in ("BCHUSDT", "LDOUSDT", "TRXUSDT"):
         sym_feats = features_for_symbol(sym)
-        if len(sym_feats) != 14:
+        if len(sym_feats) != 48:
             raise RuntimeError(
                 f"{sym} fallback has {len(sym_feats)} features — "
-                "expected exactly 14 (iter-v3/058 V3_FEATURE_COLUMNS_TOP_N; "
-                "RE-ANCHOR: ret_skew_50 RESTORED, parkinson_gk_ratio_20 REVERTED). "
+                "expected exactly 48 (iter-v3/063 MASS FEATURE EXPANSION). "
                 "Check V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py. "
                 "V3_FEATURES_PER_SYMBOL must be empty."
             )
-        # iter-v3/058: RE-ANCHOR — ret_skew_50 MUST be PRESENT (RESTORED; /028 baseline).
         if "ret_skew_50" not in sym_feats:
             raise RuntimeError(
-                f"{sym} feature set does not contain ret_skew_50 — must be PRESENT at "
-                "iter-v3/058 (RE-ANCHOR: ret_skew_50 RESTORED from /028 BASELINE_V3.md). "
-                f"Add 'ret_skew_50' to V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
-            )
-        # iter-v3/058: RE-ANCHOR — parkinson_gk_ratio_20 MUST be ABSENT (REVERTED from /057).
-        if "parkinson_gk_ratio_20" in sym_feats:
-            raise RuntimeError(
-                f"{sym} feature set contains parkinson_gk_ratio_20 — must be ABSENT at "
-                "iter-v3/058 (RE-ANCHOR: /057 SWAP REVERTED; compute function retained as "
-                "dead code for future cycle 1+ use). "
-                f"Remove 'parkinson_gk_ratio_20' from V3_FEATURE_COLUMNS_TOP_N in "
-                "features_v3/__init__.py."
-            )
-        if "hurst_drift_50_200" in sym_feats:
-            raise RuntimeError(
-                f"{sym} feature set contains hurst_drift_50_200 — must be ABSENT. "
-                "iter-v3/054: REVERT — hurst_drift_50_200 PARKED per /053 closeout PATH D "
-                "(15th-slot SWAP family exhausted; Critic FINAL `c056354`). "
-                f"Remove it from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
+                f"{sym} feature set does not contain ret_skew_50 — must be PRESENT. "
+                "BASELINE_V3 feature. Add 'ret_skew_50' to V3_FEATURE_COLUMNS_TOP_N."
             )
         if "regime_momentum_signed_3d" in sym_feats:
             raise RuntimeError(
                 f"{sym} feature set contains regime_momentum_signed_3d — must be ABSENT. "
-                "iter-v3/053: SWAP — regime_momentum_signed_3d PARKED (dropped from "
-                "V3_FEATURE_COLUMNS_TOP_N per /052 PATH C-suspicious closeout; compute "
-                "function retained in dispatch as dead code). "
+                "PARKED per /053 PATH C-suspicious closeout. "
                 f"Check V3_FEATURE_COLUMNS_TOP_N and features_for_symbol('{sym}') path."
-            )
-        if "fracdiff_d05_close" in sym_feats:
-            raise RuntimeError(
-                f"{sym} feature set contains fracdiff_d05_close — must be ABSENT. "
-                "iter-v3/052: SWAP — fracdiff_d05_close PARKED (dropped from "
-                "V3_FEATURE_COLUMNS_TOP_N; compute function retained in dispatch). "
-                f"Check V3_FEATURE_COLUMNS_TOP_N and features_for_symbol('{sym}') path."
-            )
-        if "cross_asset_divergence_norm" in sym_feats:
-            raise RuntimeError(
-                f"{sym} feature set includes cross_asset_divergence_norm "
-                "— must be ABSENT. iter-v3/040: cross_asset_divergence_norm dead at "
-                "model level. "
-                f"Check features_for_symbol('{sym}') path."
             )
         if "efficiency_ratio_50" in sym_feats:
             raise RuntimeError(
                 f"{sym} feature set contains efficiency_ratio_50 — must be ABSENT. "
-                "iter-v3/044: efficiency_ratio_50 DROPPED (DISASTROUS NEGATIVE at iter-v3/043). "
+                "iter-v3/044: DISASTROUS NEGATIVE. Use 'trend_efficiency_signed' instead. "
                 f"Check features_for_symbol('{sym}') path."
             )
     print(
-        "  BCH/LDO/TRX: 14-feature universal fallback "
-        "(iter-v3/058: RE-ANCHOR; ret_skew_50 PRESENT (RESTORED /028 baseline); "
-        "parkinson_gk_ratio_20 ABSENT (REVERTED from /057); "
-        "hurst_drift_50_200 PARKED iter-v3/054 per /053 PATH D + Critic `c056354`; "
-        "regime_momentum_signed_3d PARKED (ABSENT); "
-        "fracdiff_d05_close PARKED (ABSENT); vol_normalized_ret_5d DROPPED /049; "
-        "efficiency_ratio_50 ABSENT; "
-        "regime_momentum_signed_5d PRESENT; sym_vs_btc_ret_7d PRESENT)  PASS"
+        "  BCH/LDO/TRX: 48-feature universal fallback "
+        "(iter-v3/063: MASS FEATURE EXPANSION 14→48; "
+        "14 BASELINE_V3 features present; "
+        "9 NEW features implemented; "
+        "vol_adj_autocorr ABSENT; efficiency_ratio_50 ABSENT; "
+        "regime_momentum_signed_5d, sym_vs_btc_ret_7d PRESENT)  PASS"
     )
 
     # iter-v3/051: All 3 symbols (BCH/LDO/TRX) MUST return (2.0, 1.0) via DEFAULT fallback.

@@ -61,28 +61,30 @@ _V3_MODELS_ITER_053 = ("BCHUSDT", "LDOUSDT", "TRXUSDT")
 
 
 def test_hurst_drift_50_200_in_universal_feature_list() -> None:
-    """hurst_drift_50_200 MUST NOT be in V3_FEATURE_COLUMNS_TOP_N at iter-v3/054; count MUST be 14.
+    """hurst_drift_50_200 MUST be in V3_FEATURE_COLUMNS_TOP_N at iter-v3/063; count MUST be 48.
 
     iter-v3/053: SWAP added hurst_drift_50_200 as 15th element.
-    iter-v3/054: PARK -- hurst_drift_50_200 DROPPED (Critic FINAL `c056354` rec #1;
-    PATH C-suspicious OOS/IS ratio 3.73; rank 11-13/15 all 3 syms). Count 15→14.
-    The compute function is RETAINED in dispatch (zero revert cost).
+    iter-v3/054: PARK -- hurst_drift_50_200 DROPPED (Critic FINAL `c056354` rec #1).
+    iter-v3/063: RE-INCLUDED under mass-expansion mandate + post-WF-fix re-evaluation.
+    EDA rank 34 / gain 521 in T8 (analysis/iteration_v3-063/T8_final_feature_set.csv; SHA c833f48).
+    The compute function is ACTIVE in dispatch (column included in model input at /063).
     """
-    assert "hurst_drift_50_200" not in V3_FEATURE_COLUMNS_TOP_N, (
-        "hurst_drift_50_200 FOUND in V3_FEATURE_COLUMNS_TOP_N -- "
-        "iter-v3/054 PARK failed. Remove it from V3_FEATURE_COLUMNS_TOP_N in "
-        "features_v3/__init__.py."
+    assert "hurst_drift_50_200" in V3_FEATURE_COLUMNS_TOP_N, (
+        "hurst_drift_50_200 NOT FOUND in V3_FEATURE_COLUMNS_TOP_N -- "
+        "iter-v3/063 RE-EVALUATION failed. hurst_drift_50_200 should be RE-INCLUDED "
+        "(EDA rank 34 / gain 521; post-WF-fix re-evaluation). "
+        "Add it to V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
     )
     n = len(V3_FEATURE_COLUMNS_TOP_N)
-    assert n == 14, (
-        f"V3_FEATURE_COLUMNS_TOP_N has {n} elements -- expected 14. "
-        "iter-v3/054: PARK drops hurst_drift_50_200 (15→14). "
+    assert n == 48, (
+        f"V3_FEATURE_COLUMNS_TOP_N has {n} elements -- expected 48. "
+        "iter-v3/063: MASS FEATURE EXPANSION 14 → 48 (Path B EDA SHA c833f48). "
         "Check V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
     )
     assert "regime_momentum_signed_3d" not in V3_FEATURE_COLUMNS_TOP_N, (
         "regime_momentum_signed_3d STILL in V3_FEATURE_COLUMNS_TOP_N -- "
-        "iter-v3/053 SWAP incomplete. 3d must be PARKED (dropped per /052 PATH C-suspicious "
-        "closeout; Critic FINAL `34cc46f` rec #2). "
+        "iter-v3/053 PARK must remain active at /063. 3d must be ABSENT (dropped per /052 "
+        "PATH C-suspicious closeout; Critic FINAL `34cc46f` rec #2; NOT re-evaluated at /063). "
         "Remove it from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
     )
 
@@ -285,21 +287,21 @@ def test_v3_models_is_3_symbol_at_iter_v3_053() -> None:
     from crypto_trade.features_v3 import features_for_symbol  # noqa: PLC0415
 
     expected_universe = ("BCHUSDT", "LDOUSDT", "TRXUSDT")
-    # Each symbol in the expected universe must return the 14-feature universal fallback
+    # Each symbol in the expected universe must return the 48-feature universal fallback
     for sym in expected_universe:
         feats = features_for_symbol(sym)
-        assert len(feats) == 14, (
-            f"{sym} fallback returns {len(feats)} features -- expected 14. "
-            "iter-v3/054 universe: BCH + LDO + TRX, all at 14-feature universal fallback "
-            "(hurst_drift_50_200 PARKED; Critic FINAL `c056354` rec #1)."
+        assert len(feats) == 48, (
+            f"{sym} fallback returns {len(feats)} features -- expected 48. "
+            "iter-v3/063 MASS EXPANSION: BCH + LDO + TRX, all at 48-feature universal fallback "
+            "(hurst_drift_50_200 RE-INCLUDED; EDA rank 34 / gain 521; SHA c833f48)."
         )
-        assert "hurst_drift_50_200" not in feats, (
-            f"{sym} fallback contains hurst_drift_50_200 -- must be ABSENT. "
-            "iter-v3/054: hurst_drift_50_200 PARKED (15→14)."
+        assert "hurst_drift_50_200" in feats, (
+            f"{sym} fallback does NOT contain hurst_drift_50_200 -- must be PRESENT. "
+            "iter-v3/063: hurst_drift_50_200 RE-INCLUDED (post-WF-fix re-evaluation)."
         )
         assert "regime_momentum_signed_3d" not in feats, (
             f"{sym} fallback contains regime_momentum_signed_3d -- must be ABSENT. "
-            "iter-v3/053: 3d PARKED per /052 PATH C-suspicious."
+            "iter-v3/053: 3d PARKED per /052 PATH C-suspicious; NOT re-evaluated at /063."
         )
     # ALGOUSDT must NOT be in the v3 model universe
     assert "ALGOUSDT" not in {sym for sym in expected_universe}, (
