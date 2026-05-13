@@ -407,8 +407,8 @@ BASELINE_V3.md update. iter-v3/060 = CYCLE 1 EXPLORATION #1 of 10.
 ### Stage 5 — Setup commit SHA backfill
 
 ```
-Setup commit SHA: (BACKFILL after setup commit)
-Phase 5.5 gate SHA: (BACKFILL after gate commit)
+Setup commit SHA: 20095a8
+Phase 5.5 gate SHA: 20095a8 (combined in setup commit)
 ```
 
 ---
