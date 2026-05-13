@@ -87,11 +87,30 @@ TRAINING_MONTHS = 24  # IMMUTABLE
 # iter-v3/006 fix: each outer seed now derives a distinct 5-seed inner ensemble
 # via `_derive_ensemble_seeds(outer_seed)`. The legacy seed list is preserved
 # below for documentation only — it is no longer passed to LightGbmStrategy.
-ENSEMBLE_SIZE: int = 5
+ENSEMBLE_SIZE: int = 10  # iter-v3/059 RE-ANCHOR #2: unified 10-seed ensemble
+
+# Lineage-preserving seed list: first 5 derived from outer=42, last 5 from outer=123
+# via legacy _derive_ensemble_seeds.  Hardcoded here for reproducibility and to
+# eliminate the outer-seed loop concept.  Values verified by Python REPL:
+#   _derive_ensemble_seeds(42,  5) → [191664963, 1662057957, 1405681631, 942484272, 929893137]
+#   _derive_ensemble_seeds(123, 5) → [33158374, 1465339467, 1273345680, 115579757, 1952249162]
+ENSEMBLE_SEEDS: tuple[int, ...] = (
+    191664963,
+    1662057957,
+    1405681631,
+    942484272,
+    929893137,  # outer=42 lineage
+    33158374,
+    1465339467,
+    1273345680,
+    115579757,
+    1952249162,  # outer=123 lineage
+)
+
 LEGACY_ENSEMBLE_SEEDS: list[int] = [42, 123, 456, 789, 1001]  # iter-v3/001-005
 
 
-def _derive_ensemble_seeds(outer_seed: int, size: int = ENSEMBLE_SIZE) -> list[int]:
+def _derive_ensemble_seeds(outer_seed: int, size: int = 5) -> list[int]:
     """Deterministically derive `size` inner-ensemble seeds from one outer seed.
 
     Replaces the pre-iter-v3/006 hardcoded ENSEMBLE_SEEDS that was identical
@@ -246,6 +265,12 @@ def _verify_feature_columns() -> None:
         DEFAULT_ATR_MULTIPLIERS,
         V3_ATR_MULTIPLIERS_PER_SYMBOL,
         atr_multipliers_for_symbol,
+    )
+
+    # iter-v3/059 RE-ANCHOR #2: unified 10-seed ensemble architecture requires ENSEMBLE_SIZE=10.
+    assert ENSEMBLE_SIZE == 10, (
+        f"iter-v3/059+ requires ENSEMBLE_SIZE=10; got {ENSEMBLE_SIZE}. "
+        "Unified ensemble architecture enforces this at pre-flight time."
     )
 
     n = len(V3_FEATURE_COLUMNS)
@@ -1554,6 +1579,10 @@ def _write_v3_comparison(
 # ============================================================
 
 
+_CPCV_FRAC_POSITIVE_PATHS_GATE_THRESHOLD: float = 0.55
+"""Gate threshold for cpcv_frac_positive_paths (iter-v3/059: replaces Pareto Gate 10)."""
+
+
 def _write_dsr_json(
     report_dir: Path,
     dsr_val: float,
@@ -1565,16 +1594,26 @@ def _write_dsr_json(
     dsr_relative: float = 0.0,
     cpcv_path_sharpe_q75: float = 0.0,
 ) -> None:
-    """Write dsr.json — includes PBO metadata and iter-v3/055 DSR_relative fields."""
+    """Write dsr.json — includes PBO metadata, iter-v3/055 DSR_relative, and
+    iter-v3/059 cpcv_frac_positive_paths gate fields."""
     pbo_out = pbo_result.pbo if pbo_result.pbo is not None else None
+    frac_pos = pbo_result.frac_positive_paths
+    # iter-v3/059: cpcv_frac_positive_paths_gate replaces Pareto Gate 10.
+    cpcv_gate_pass = (
+        frac_pos >= _CPCV_FRAC_POSITIVE_PATHS_GATE_THRESHOLD
+        if not (frac_pos != frac_pos)  # NaN check
+        else False
+    )
     data = {
         "dsr": round(dsr_val, 8),
         "pbo": pbo_out,
         "pbo_note": pbo_result.note,
-        "pbo_frac_positive_paths": round(pbo_result.frac_positive_paths, 4),
+        "pbo_frac_positive_paths": round(frac_pos, 4),
         "pbo_path_sharpe_q25": round(pbo_result.path_sharpe_quartiles[0], 4),
         "pbo_path_sharpe_q50": round(pbo_result.path_sharpe_quartiles[1], 4),
         "pbo_path_sharpe_q75": round(pbo_result.path_sharpe_quartiles[2], 4),
+        "cpcv_frac_positive_paths_gate_pass": cpcv_gate_pass,
+        "cpcv_frac_positive_paths_gate_threshold": _CPCV_FRAC_POSITIVE_PATHS_GATE_THRESHOLD,
         "psr": round(psr_val, 4),
         "dsr_relative": round(dsr_relative, 6),  # iter-v3/055: PSR vs CPCV Q75
         "cpcv_path_sharpe_q75": round(cpcv_path_sharpe_q75, 6),  # iter-v3/055: benchmark
@@ -1583,49 +1622,20 @@ def _write_dsr_json(
         "min_trl_months": round(min_trl_months, 2),
     }
     (report_dir / "dsr.json").write_text(json.dumps(data, indent=2))
+    gate_str = "PASS" if cpcv_gate_pass else "FAIL"
+    thr = _CPCV_FRAC_POSITIVE_PATHS_GATE_THRESHOLD
     print(
         f"[v3 report] dsr.json: DSR={dsr_val:.4f}, PBO={pbo_out}, "
-        f"frac_pos_paths={pbo_result.frac_positive_paths:.3f}, PSR={psr_val:.4f}, "
-        f"DSR_relative={dsr_relative:.4f}, CPCV_Q75={cpcv_path_sharpe_q75:.4f}, n_eff={n_eff}"
+        f"frac_pos_paths={frac_pos:.3f} (gate {gate_str} @ {thr}), "
+        f"PSR={psr_val:.4f}, DSR_relative={dsr_relative:.4f}, "
+        f"CPCV_Q75={cpcv_path_sharpe_q75:.4f}, n_eff={n_eff}"
     )
 
 
-# ============================================================
-# Pareto front
-# ============================================================
-
-
-def _write_pareto_front(
-    per_seed_summary: list[dict],
-    report_dir: Path,
-) -> None:
-    """Write pareto_front.csv — seed × 6-metric matrix."""
-    path = report_dir / "pareto_front.csv"
-    with open(path, "w", newline="") as f:
-        writer = csv.writer(f)
-        writer.writerow(
-            [
-                "seed",
-                "monthly_sharpe",
-                "max_drawdown",
-                "calmar",
-                "pbo",
-                "n_trades",
-                "max_concentration_pct",
-            ]
-        )
-        for r in per_seed_summary:
-            writer.writerow(
-                [
-                    r.get("seed", ""),
-                    f"{r.get('oos_sharpe_monthly', 0.0):.4f}",
-                    f"{r.get('oos_max_dd', 0.0):.4f}",
-                    f"{r.get('oos_calmar', 0.0):.4f}",
-                    f"{r.get('pbo', 'NaN')}",  # NaN when S=1
-                    r.get("oos_trades", 0),
-                    f"{r.get('max_concentration_pct', 0.0):.2f}",
-                ]
-            )
+# pareto_front.csv removed at iter-v3/059: outer-seed loop eliminated; per-seed
+# Pareto metrics no longer applicable with unified 10-seed ensemble.
+# Former Gate 10 ("both Pareto seeds positive") replaced by
+# cpcv_frac_positive_paths_gate_pass (>= 0.55 threshold) in dsr.json.
 
 
 # ============================================================
@@ -1736,10 +1746,11 @@ def _run_single_seed(
     btc_closes: np.ndarray,
     active_models: tuple[tuple[str, str], ...] | None = None,
     ensemble_size: int | None = None,
+    ensemble_seeds_override: tuple[int, ...] | None = None,
     fast_mode: bool = False,
     model_type: str = "lgbm",
 ) -> tuple[list, list, dict, dict, list]:
-    """Run v3 models for a single outer seed.
+    """Run v3 models for a single outer seed (or unified ensemble pass).
 
     Parameters
     ----------
@@ -1749,6 +1760,11 @@ def _run_single_seed(
     ensemble_size:
         Override the default ENSEMBLE_SIZE for this run. Useful for fast
         exploration (size=1 → no inner-ensemble averaging, ~5x faster).
+        Ignored when ensemble_seeds_override is provided.
+    ensemble_seeds_override:
+        iter-v3/059: When provided, use this exact tuple of seeds INSTEAD of
+        deriving from ``seed`` via _derive_ensemble_seeds.  Enables the unified
+        10-seed inner ensemble (ENSEMBLE_SEEDS constant) without an outer loop.
     fast_mode:
         If True, hardcode `colsample_bytree=1.0` in Optuna search space
         (iter-v3/007 — minimize per-seed feature-subsampling variance).
@@ -1767,10 +1783,14 @@ def _run_single_seed(
         # sub-fix 1d (iter-v3/003): pass OOF persist path so per-trial returns
         # are written to parquet during training (one shared file per run).
         oof_path = REPORTS_DIR / f"iteration_{ITERATION_LABEL}" / "trial_oof_returns.parquet"
-        # iter-v3/006 fix: derive a distinct inner ensemble from this outer seed.
-        # Pre-fix: ensemble_seeds=[42,123,456,789,1001] for ALL outer seeds.
-        size_for_this_run = ensemble_size if ensemble_size is not None else ENSEMBLE_SIZE
-        ensemble_seeds_run = _derive_ensemble_seeds(seed, size=size_for_this_run)
+        # iter-v3/059: when ensemble_seeds_override is provided (unified 10-seed pass),
+        # use it directly.  Otherwise fall back to deriving from the outer seed.
+        # Pre-iter-v3/006: ensemble_seeds=[42,123,456,789,1001] for ALL outer seeds.
+        if ensemble_seeds_override is not None:
+            ensemble_seeds_run = list(ensemble_seeds_override)
+        else:
+            size_for_this_run = ensemble_size if ensemble_size is not None else ENSEMBLE_SIZE
+            ensemble_seeds_run = _derive_ensemble_seeds(seed, size=size_for_this_run)
         cfg, strategy = _build_v3_model(
             symbol=symbol,
             seed=seed,
@@ -1826,8 +1846,13 @@ def main() -> None:
     parser.add_argument(
         "--seeds",
         type=int,
-        default=1,
-        help="Number of outer seeds (1 for first-pass, 10 for MERGE validation)",
+        default=None,
+        help=(
+            "DEPRECATED at iter-v3/059 RE-ANCHOR #2. Outer-seed loop eliminated; "
+            "single 10-seed inner ensemble per cell now produces ONE Sharpe. "
+            "Flag retained for backward compat. Any value passed logs a warning "
+            "and is ignored. Internally always ENSEMBLE_SIZE=10."
+        ),
     )
     parser.add_argument(
         "--n-trials",
@@ -1896,6 +1921,15 @@ def main() -> None:
         ),
     )
     args = parser.parse_args()
+
+    # iter-v3/059: --seeds is deprecated; outer-seed loop eliminated.
+    if args.seeds is not None:
+        print(
+            f"WARNING: --seeds={args.seeds} is DEPRECATED since iter-v3/059 RE-ANCHOR #2. "
+            f"The outer-seed loop has been eliminated. The runner now uses a unified "
+            f"10-seed inner ensemble (ENSEMBLE_SIZE={ENSEMBLE_SIZE}) in a single pass. "
+            f"Proceeding with ENSEMBLE_SIZE={ENSEMBLE_SIZE}; the --seeds value is ignored."
+        )
 
     # iter-v3/007: --exploration overrides defaults for fast iteration.
     # iter-v3/020: n_trials override REMOVED — both EXPLORATION and CONFIRMATION
@@ -1966,7 +2000,7 @@ def main() -> None:
 
     active_sym_names = ", ".join(sym for _, sym in active_models)
     print(f"\nBASELINE v3 iter-{ITERATION_LABEL}: {active_sym_names} (seed-plumbing fix)")
-    print(f"Seeds: {args.seeds}  Optuna trials/model: {args.n_trials}")
+    print(f"Ensemble: {ENSEMBLE_SIZE} seeds (unified)  Optuna trials/model: {args.n_trials}")
     print(f"Active models: {len(active_models)}/{len(V3_MODELS)} (--symbols={args.symbols!r})")
     print(f"CPCV: N={CPCV_N_SPLITS}, k={CPCV_N_TEST_SPLITS}, 45 paths on IS CANDLE SEQUENCE")
     print(
@@ -2020,86 +2054,45 @@ def main() -> None:
     btc_times, btc_closes = load_btc_klines_for_filter()
     print(f"Loaded {len(btc_times)} BTC 8h klines for trend filter\n")
 
-    full_seeds = (42, 123, 456, 789, 1001, 1234, 2345, 3456, 4567, 5678)
-    default_seeds = (42,)
-    seeds = list(full_seeds[: args.seeds]) if args.seeds > 1 else list(default_seeds)
+    # iter-v3/059 RE-ANCHOR #2: single unified 10-seed ensemble pass.
+    # The outer-seed loop is eliminated.  All 10 ensemble seeds are passed
+    # directly to _run_single_seed via ensemble_seeds_override, producing ONE
+    # Sharpe per (sym, month) cell (not a mean across outer-seed runs).
+    # ENSEMBLE_SEEDS[0] is used as "primary" seed for log naming only.
+    print(
+        f"\n{'#' * 60}\n"
+        f"# UNIFIED ENSEMBLE ({ENSEMBLE_SIZE} seeds)\n"
+        f"# Seeds: {ENSEMBLE_SEEDS}\n"
+        f"{'#' * 60}"
+    )
+    unbraked, braked, btc_stats, hr_stats, model_pairs = _run_single_seed(
+        seed=ENSEMBLE_SEEDS[0],
+        n_trials=args.n_trials,
+        btc_times=btc_times,
+        btc_closes=btc_closes,
+        active_models=active_models,
+        ensemble_size=ensemble_size_for_run,
+        ensemble_seeds_override=None if fast_mode_for_run else ENSEMBLE_SEEDS,
+        fast_mode=fast_mode_for_run,
+        model_type=args.model,
+    )
 
-    per_seed_summary: list[dict] = []
-    primary_trades: list | None = None
-    primary_model_pairs: list | None = None
-
-    for i, seed in enumerate(seeds):
-        print(f"\n{'#' * 60}\n# SEED {seed} ({i + 1}/{len(seeds)})\n{'#' * 60}")
-        unbraked, braked, btc_stats, hr_stats, model_pairs = _run_single_seed(
-            seed,
-            args.n_trials,
-            btc_times,
-            btc_closes,
-            active_models=active_models,
-            ensemble_size=ensemble_size_for_run,
-            fast_mode=fast_mode_for_run,
-            model_type=args.model,
-        )
-
-        if not braked:
-            per_seed_summary.append(
-                {
-                    "seed": seed,
-                    "trades": 0,
-                    "oos_trades": 0,
-                    "oos_sharpe_monthly": 0.0,
-                    "is_sharpe_monthly": 0.0,
-                }
-            )
-            continue
-
-        is_tr = [t for t in braked if t.open_time < OOS_CUTOFF_MS]
-        oos_tr = [t for t in braked if t.open_time >= OOS_CUTOFF_MS]
-
-        is_ms = _monthly_sharpe(is_tr)
-        oos_ms = _monthly_sharpe(oos_tr)
-        oos_dd = _max_drawdown(oos_tr)
-        oos_calmar = (sum(t.weighted_pnl for t in oos_tr) / oos_dd) if oos_dd > 0 else 0.0
-
-        sym_pnl: dict[str, float] = {}
-        for t in oos_tr:
-            sym_pnl[t.symbol] = sym_pnl.get(t.symbol, 0.0) + float(t.weighted_pnl)
-        positive_total = sum(max(0.0, p) for p in sym_pnl.values())
-        max_conc = 0.0
-        if positive_total > 0:
-            conc_pcts = [max(0.0, p) / positive_total * 100.0 for p in sym_pnl.values()]
-            max_conc = max(conc_pcts) if conc_pcts else 0.0
-
-        per_seed_summary.append(
-            {
-                "seed": seed,
-                "trades": len(braked),
-                "oos_trades": len(oos_tr),
-                "is_sharpe_monthly": round(is_ms, 4),
-                "oos_sharpe_monthly": round(oos_ms, 4),
-                "oos_max_dd": round(oos_dd, 4),
-                "oos_calmar": round(oos_calmar, 4),
-                "max_concentration_pct": round(max_conc, 2),
-                "pbo": None,  # placeholder — updated after per-cell PBO computed (sub-fix #5)
-                "btc_killed": btc_stats["n_killed"],
-            }
-        )
-
-        print(
-            f"[seed {seed}] {len(braked)} trades — IS monthly={is_ms:+.4f}, "
-            f"OOS monthly={oos_ms:+.4f}, OOS MaxDD={oos_dd:.4f}"
-        )
-
-        if i == 0:
-            primary_trades = braked
-            primary_model_pairs = model_pairs
-
-    if not primary_trades:
-        print("No trades produced for primary seed.")
+    if not braked:
+        print("No trades produced by unified ensemble.")
         sys.exit(1)
 
-    is_trades = [t for t in primary_trades if t.open_time < OOS_CUTOFF_MS]
-    oos_trades = [t for t in primary_trades if t.open_time >= OOS_CUTOFF_MS]
+    is_trades = [t for t in braked if t.open_time < OOS_CUTOFF_MS]
+    oos_trades = [t for t in braked if t.open_time >= OOS_CUTOFF_MS]
+
+    is_ms_run = _monthly_sharpe(is_trades)
+    oos_ms_run = _monthly_sharpe(oos_trades)
+    oos_dd_run = _max_drawdown(oos_trades)
+    print(
+        f"[ensemble] {len(braked)} trades — IS monthly={is_ms_run:+.4f}, "
+        f"OOS monthly={oos_ms_run:+.4f}, OOS MaxDD={oos_dd_run:.4f}, "
+        f"BTC killed={btc_stats['n_killed']}"
+    )
+
     print(f"\n[split] {len(is_trades)} IS trades, {len(oos_trades)} OOS trades")
 
     # -------------------------------------------------------
@@ -2158,7 +2151,8 @@ def main() -> None:
     # -------------------------------------------------------
     is_ms_primary = _monthly_sharpe(is_trades)
     oos_ms_primary = _monthly_sharpe(oos_trades)
-    n_trials_total = args.n_trials * ensemble_size_for_run * len(active_models) * args.seeds
+    # iter-v3/059: outer-seed loop eliminated; n_trials_total no longer multiplied by seeds.
+    n_trials_total = args.n_trials * ENSEMBLE_SIZE * len(active_models)
 
     is_wp = np.array([float(t.weighted_pnl) for t in is_trades])
     if len(is_wp) > 1 and is_wp.std() > 0:
@@ -2301,7 +2295,7 @@ def main() -> None:
     report_dir.mkdir(parents=True, exist_ok=True)
 
     generate_iteration_reports(
-        trades=primary_trades,
+        trades=braked,
         iteration=ITERATION_LABEL,
         features_dir="data/features",  # BTC regime annotation only
         reports_dir=str(REPORTS_DIR),
@@ -2309,7 +2303,7 @@ def main() -> None:
         n_trials=n_trials_total,
     )
 
-    _write_feature_importance(is_trades, oos_trades, primary_model_pairs or [], report_dir)
+    _write_feature_importance(is_trades, oos_trades, model_pairs, report_dir)
 
     _write_v3_comparison(
         is_trades,
@@ -2365,18 +2359,22 @@ def main() -> None:
         cpcv_path_sharpe_q75=cpcv_path_sharpe_q75,
     )
 
-    # Sub-fix #5 (iter-v3/004): update per_seed_summary pbo from None placeholder
-    # to the actual per-cell mean PBO computed above.  This ensures seed_summary.json
-    # contains a numeric float (not "NaN" or null) per brief Section 3.5 sub-fix #5.
-    for entry in per_seed_summary:
-        if entry.get("pbo") is None:
-            entry["pbo"] = pbo_result.pbo  # float or None (JSON null)
-
-    # Pareto front
-    _write_pareto_front(per_seed_summary, report_dir)
-
-    # Seed summary
-    (report_dir / "seed_summary.json").write_text(json.dumps(per_seed_summary, indent=2))
+    # iter-v3/059: outer-seed loop eliminated.  Replace seed_summary.json +
+    # pareto_front.csv with ensemble_summary.json (one record per ensemble seed
+    # for reproducibility audit; no multi-seed Sharpe aggregation).
+    ensemble_summary = [
+        {
+            "ensemble_seed_index": i,
+            "seed": s,
+            "lineage": "outer=42" if i < 5 else "outer=123",
+        }
+        for i, s in enumerate(ENSEMBLE_SEEDS)
+    ]
+    (report_dir / "ensemble_summary.json").write_text(json.dumps(ensemble_summary, indent=2))
+    print(
+        f"[v3 report] ensemble_summary.json: {len(ensemble_summary)} seeds "
+        f"(replaces seed_summary.json + pareto_front.csv)"
+    )
 
     t_end = time.time()
     elapsed_h = (t_end - t_start) / 3600.0
