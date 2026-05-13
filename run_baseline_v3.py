@@ -122,7 +122,7 @@ def _derive_ensemble_seeds(outer_seed: int, size: int = 5) -> list[int]:
     return [int(s) for s in rng.integers(low=0, high=2**31 - 1, size=size)]
 
 
-ITERATION_LABEL = "v3-058"
+ITERATION_LABEL = "v3-059"
 REPORTS_DIR = Path("reports-v3")
 FEATURES_DIR = Path("data/features_v3")
 DATA_DIR = Path("data")
@@ -209,24 +209,24 @@ def _verify_data_freshness(symbols: tuple[str, ...], max_lag_hours: float = 16.0
 
 
 def _verify_feature_columns() -> None:
-    """Verifies V3_FEATURE_COLUMNS contents per current brief (iter-v3/058).
+    """Verifies V3_FEATURE_COLUMNS contents per current brief (iter-v3/059).
 
-    iter-v3/058: RE-ANCHOR — REVERT /057 A4 base-stack SWAP.
-      RESTORE ret_skew_50 (REVERTED — /028 BASELINE_V3.md composition).
-      DROP parkinson_gk_ratio_20 (REVERTED from /057; compute function retained as dead code).
-      Net feature count: 14 → 14 (1-for-1 REVERT at base-stack level).
-      Per memory rule `feedback_v3_walkforward_lookahead_bug.md` user-decision path (a):
-        all pre-`e149e9d` v3 iterations INVALIDATED. /058 re-anchors BASELINE_V3.md.
-        walk-forward fix commit: `e149e9d`.
-      Carry-forward SYSTEM-LEVEL architecture (UNCHANGED from /057 / /056):
-      - V3_MODELS = (BCH, LDO, TRX) — 3 symbols (ALGO REVERTED at /051).
+    iter-v3/059: RE-ANCHOR #2 — /028 bundle under unified 10-seed ensemble architecture.
+      Phase A commit `0a3c30e`: Optuna n_jobs=2 parallelization.
+      Phase B-3 commit `ab2d9ac`: unified 10-seed ensemble (ENSEMBLE_SIZE=10, ENSEMBLE_SEEDS
+        hardcoded as lineage-preserving 10-value tuple; outer-seed loop eliminated).
+      Walk-forward fix commit `e149e9d` (cherry-picked from main `5566a69`): post-fix WF.
+      ITERATION_LABEL = "v3-059" (only change vs /058 Phase-B-3 prep state).
+      Bundle IDENTICAL to /028 BASELINE_V3.md / /058 RE-ANCHOR #1.
+      Carry-forward SYSTEM-LEVEL architecture (UNCHANGED from /058):
+      - V3_MODELS = (BCH, LDO, TRX) — 3 symbols.
       - V3_ATR_MULTIPLIERS_PER_SYMBOL = {} (EMPTY — SYSTEM-LEVEL REVERT at /051).
       - block_long_for = () (REVERT — primitive 10 cleared at /051).
       - REQUIRED_GAP = 66 = (21+1)*3 (UNCHANGED — universe unchanged).
-      Parquet NOT re-required for ret_skew_50: column already present in v3 parquets.
-      DEFAULT_ATR_MULTIPLIERS: (2.0, 1.0) — unchanged.
-      V3_FEATURES_PER_SYMBOL: EMPTY (unchanged from iter-v3/040).
-      adx_threshold_per_symbol: {} (unchanged; TRX 21 dropped at iter-v3/050 closeout).
+      - DEFAULT_ATR_MULTIPLIERS: (2.0, 1.0) — unchanged.
+      - V3_FEATURES_PER_SYMBOL: EMPTY (unchanged from iter-v3/040).
+      - adx_threshold_per_symbol: {} (unchanged; TRX 21 dropped at iter-v3/050 closeout).
+      ENSEMBLE_SIZE = 10 (unified 10-seed; replaces 2-outer × 5-inner architecture).
 
     tbr_zscore_30 MUST NOT be present (dropped iter-v3/016).
     vwap_dev_50 MUST NOT be present (dropped iter-v3/008 per Critic SHA a544621).
@@ -236,19 +236,19 @@ def _verify_feature_columns() -> None:
     cross_asset_divergence_norm MUST NOT be in universal list (dead at model level).
     fracdiff_d05_close MUST NOT be in universal list (PARKED at iter-v3/052 SWAP).
     efficiency_ratio_50 MUST NOT be present (DROPPED — iter-v3/043 DISASTROUS NEGATIVE).
-    regime_momentum_signed_5d MUST be present (mandate still ACTIVE at iter-v3/058).
+    regime_momentum_signed_5d MUST be present (mandate still ACTIVE at iter-v3/059).
     vol_normalized_ret_5d MUST NOT be present (DROPPED iter-v3/049; iter-v3/048 PATH C-clean).
     hurst_drift_50_200 MUST NOT be present (PARKED per /053 PATH D + Critic FINAL `c056354`).
     regime_momentum_signed_3d MUST NOT be present (PARKED per /052 PATH C-suspicious).
-    sym_vs_btc_ret_7d MUST be present (RESTORED at iter-v3/042; KEPT at iter-v3/058).
-    ret_skew_50 MUST be present (RESTORED iter-v3/058 — RE-ANCHOR reverts /057 SWAP).
-    parkinson_gk_ratio_20 MUST NOT be present (REVERTED at iter-v3/058 — RE-ANCHOR).
+    sym_vs_btc_ret_7d MUST be present (RESTORED at iter-v3/042; KEPT at iter-v3/059).
+    ret_skew_50 MUST be present (RESTORED iter-v3/058 RE-ANCHOR — /028 BASELINE_V3.md).
+    parkinson_gk_ratio_20 MUST NOT be present (REVERTED at iter-v3/058 RE-ANCHOR).
 
     Per-symbol checks (iter-v3/054 — REVERT carry-forward from /051):
     V3_FEATURES_PER_SYMBOL must be EMPTY (0 entries).
     V3_ATR_MULTIPLIERS_PER_SYMBOL must be EMPTY (0 entries — REVERT; all syms use DEFAULT).
-      ALGOUSDT MUST NOT be a key (REVERTED at iter-v3/051; unchanged at /052-/058).
-      LDOUSDT  MUST NOT be a key (REVERTED at iter-v3/051; unchanged at /052-/058).
+      ALGOUSDT MUST NOT be a key (REVERTED at iter-v3/051; unchanged at /052-/059).
+      LDOUSDT  MUST NOT be a key (REVERTED at iter-v3/051; unchanged at /052-/059).
     features_for_symbol("BCHUSDT") MUST return 14 features = V3_FEATURE_COLUMNS_TOP_N.
     features_for_symbol("LDOUSDT") MUST return 14 features (fallback — no per-symbol ext).
     features_for_symbol("TRXUSDT") MUST return 14 features (fallback).
@@ -259,7 +259,7 @@ def _verify_feature_columns() -> None:
     Primitive 10 (REVERT): risk_cfg.block_long_for == () (empty — system-level REVERT).
     Primitive 11 (DISABLED): risk_cfg.enable_per_symbol_drawdown_brake == False (/028 baseline).
     Per-symbol ADX (UNCHANGED): risk_cfg.adx_threshold_per_symbol == {} (empty; TRX 21
-      dropped at iter-v3/050 closeout per Critic FINAL `1908d50`; unchanged at /058).
+      dropped at iter-v3/050 closeout per Critic FINAL `1908d50`; unchanged at /059).
     """
     from crypto_trade.features_v3 import (  # noqa: PLC0415
         DEFAULT_ATR_MULTIPLIERS,
