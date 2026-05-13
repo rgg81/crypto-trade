@@ -1,0 +1,13 @@
+criterion,value,interpretation
+TRX IS partition-method sign flip A vs B,1.0,"Method A (060 Q7)=-0.0608, Method B (cleaned)=+0.0199"
+TRX OOS partition-method sign flip A vs B,0.0,"Method A (060 Q7)=-0.0139, Method B (cleaned)=-0.0308"
+TRX IS anti-Kelly significant (Method B CI),0.0,"Welch t=+0.34, CI=[-0.091, 0.130]"
+TRX OOS anti-Kelly significant (Method B CI),0.0,"Welch t=-0.49, CI=[-0.154, 0.088]"
+BCH IS Kelly direction (sign of Method B diff),0.06823529411764706,Positive sign indicates Kelly-aligned (baseline)
+LDO IS Kelly direction (sign of Method B diff),0.12466666666666659,Positive sign indicates Kelly-aligned (baseline)
+TRX IS wins weight P25 (Method B),0.555,"If < 0.5, raising floor to 0.5 would lift IS winning-trade weight"
+TRX OOS wins weight P25 (Method B),0.485,"If < 0.5, raising floor to 0.5 would lift OOS winning-trade weight"
+TRX Q4 floor=0.5 IS counterfactual lift,0.00802099999999939,Δ weighted_pnl_sum vs current (floor=0.3) — IS
+TRX Q4 floor=0.5 OOS counterfactual lift,0.4712829999999979,Δ weighted_pnl_sum vs current (floor=0.3) — OOS
+TRX Q4 floor=0.6 OOS counterfactual lift,0.9260519999999985,Δ weighted_pnl_sum vs current (floor=0.3) — OOS at floor=0.6 (alt)
+VERDICT,1.0,Path B (TRX floor=0.5) — counterfactual OOS lift +0.47wpnl > noise; IS bit-identical
