@@ -497,21 +497,22 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
         "regime_momentum_signed_5d, sym_vs_btc_ret_7d PRESENT)  PASS"
     )
 
-    # iter-v3/051: All 3 symbols (BCH/LDO/TRX) MUST return (2.0, 1.0) via DEFAULT fallback.
-    # SYSTEM-LEVEL REVERT — V3_ATR_MULTIPLIERS_PER_SYMBOL is empty; no per-symbol overrides.
+    # iter-v3/065: All 3 symbols (BCH/LDO/TRX) MUST return (2.0, 1.5) via DEFAULT fallback.
+    # iter-v3/065 UNIVERSAL labeling axis (Path D): SL widened from 1.0 → 1.5×ATR
+    # universally; V3_ATR_MULTIPLIERS_PER_SYMBOL is empty (no per-symbol overrides).
     for _sym_atr in ("BCHUSDT", "LDOUSDT", "TRXUSDT"):
         sym_atr = atr_multipliers_for_symbol(_sym_atr)
-        if sym_atr != (2.0, 1.0):
+        if sym_atr != (2.0, 1.5):
             raise RuntimeError(
                 f"atr_multipliers_for_symbol('{_sym_atr}') returned {sym_atr} — "
-                "expected (2.0, 1.0) (DEFAULT fallback). "
-                "iter-v3/051: SYSTEM-LEVEL REVERT — V3_ATR_MULTIPLIERS_PER_SYMBOL must be "
-                "EMPTY; all 3 symbols use DEFAULT_ATR_MULTIPLIERS = (2.0, 1.0). "
+                "expected (2.0, 1.5) (DEFAULT fallback at iter-v3/065). "
+                "UNIVERSAL labeling axis: V3_ATR_MULTIPLIERS_PER_SYMBOL must be "
+                "EMPTY; all 3 symbols use DEFAULT_ATR_MULTIPLIERS = (2.0, 1.5). "
                 "Clear V3_ATR_MULTIPLIERS_PER_SYMBOL = {{}} in features_v3/__init__.py."
             )
     print(
-        "  atr_multipliers_for_symbol: BCH/LDO/TRX all (2.0, 1.0) DEFAULT "
-        "(SYSTEM-LEVEL REVERT at iter-v3/051; V3_ATR_MULTIPLIERS_PER_SYMBOL EMPTY)  PASS"
+        "  atr_multipliers_for_symbol: BCH/LDO/TRX all (2.0, 1.5) DEFAULT "
+        "(iter-v3/065 UNIVERSAL labeling axis Path D; V3_ATR_MULTIPLIERS_PER_SYMBOL EMPTY)  PASS"
     )
 
     # iter-v3/051: Primitive 10 REVERT — block_long_for=() per system-level rule.
