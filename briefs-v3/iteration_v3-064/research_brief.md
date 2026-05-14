@@ -2,7 +2,7 @@
 
 **Branch**: `iteration-v3/064`
 **EDA SHA**: `4a9f9c9`
-**Setup commit SHA**: (this commit — LOCKED at brief commit)
+**Setup commit SHA**: `8ce02e0` (LOCKED)
 **Iteration type**: EXPLORATION (cycle 1 #5 of 10; PHASED MASS-EXPANSION #1)
 **Axis**: REVERT V3_FEATURE_COLUMNS_TOP_N to /060 14-feature anchor + ADD `adx_14` = 15 features
 
@@ -352,7 +352,7 @@ ALL of:
 
 **Reproducibility stamp**:
 - EDA SHA: `4a9f9c9` (`analysis/iteration_v3-064/adx_14_singleton_eda.py`)
-- Setup commit SHA: (this commit — LOCKED at brief commit)
+- Setup commit SHA: `8ce02e0` (LOCKED — backfilled at brief setup commit)
 - ITERATION_LABEL: `"v3-064"`
 - Parquet data: `data/features_v3/{BCHUSDT,LDOUSDT,TRXUSDT}_8h_features.parquet` (adx_14 column present per /063 generation)
 
