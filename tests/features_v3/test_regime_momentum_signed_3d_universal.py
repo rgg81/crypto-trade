@@ -61,15 +61,16 @@ _V3_MODELS_ITER_052 = ("BCHUSDT", "LDOUSDT", "TRXUSDT")
 
 
 def test_regime_momentum_signed_3d_in_universal_feature_list() -> None:
-    """regime_momentum_signed_3d MUST be ABSENT from V3_FEATURE_COLUMNS_TOP_N at iter-v3/063.
+    """regime_momentum_signed_3d MUST be ABSENT from V3_FEATURE_COLUMNS_TOP_N at iter-v3/064.
 
     iter-v3/052: SWAP activated regime_momentum_signed_3d as 15th element.
     iter-v3/053: regime_momentum_signed_3d PARKED (PATH C-suspicious closeout per
     Critic FINAL `34cc46f` rec #2; rank 14-15/15 all 3 syms; IS-OOS ratio 2.327 OOB).
     iter-v3/063: 3d remains PARKED (NOT re-evaluated; catastrophic PATH C-suspicious history).
-    fracdiff_d05_close and hurst_drift_50_200 ARE re-evaluated and RE-INCLUDED at /063
-    (post-WF-fix landscape; mass-expansion mandate; brief Section 3 adversarial flags).
-    Count at /063: 48 (MASS EXPANSION from 14).
+    iter-v3/064: PHASED MASS-EXPANSION #1 (REVERT to 14-feature anchor + ADD adx_14 = 15).
+                 3d REMAINS PARKED-ABSENT. fracdiff_d05_close and hurst_drift_50_200 are also
+                 ABSENT (REVERTED with /063 mass-expansion); only adx_14 retained.
+    Count at /064: 15 (14 BASELINE_V3 + adx_14).
     """
     assert "regime_momentum_signed_3d" not in V3_FEATURE_COLUMNS_TOP_N, (
         "regime_momentum_signed_3d FOUND in V3_FEATURE_COLUMNS_TOP_N — "
@@ -77,20 +78,24 @@ def test_regime_momentum_signed_3d_in_universal_feature_list() -> None:
         "Remove it from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
     )
     n = len(V3_FEATURE_COLUMNS_TOP_N)
-    assert n == 48, (
-        f"V3_FEATURE_COLUMNS_TOP_N has {n} elements — expected 48. "
-        "iter-v3/063: MASS FEATURE EXPANSION 14 → 48 (Path B EDA SHA c833f48). "
+    assert n == 15, (
+        f"V3_FEATURE_COLUMNS_TOP_N has {n} elements — expected 15. "
+        "iter-v3/064: PHASED MASS-EXPANSION #1 (REVERT to 14-feature anchor + ADD adx_14). "
         "Check V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
     )
-    assert "fracdiff_d05_close" in V3_FEATURE_COLUMNS_TOP_N, (
-        "fracdiff_d05_close NOT IN V3_FEATURE_COLUMNS_TOP_N — "
-        "fracdiff must be RE-INCLUDED at /063 (EDA rank 16 / gain 1139; post-WF-fix re-eval). "
-        "Add it to V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
+    assert "fracdiff_d05_close" not in V3_FEATURE_COLUMNS_TOP_N, (
+        "fracdiff_d05_close FOUND in V3_FEATURE_COLUMNS_TOP_N — "
+        "iter-v3/064: must be ABSENT (PARKED at /053; REVERTED at /064 with mass-expansion). "
+        "Remove it from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
     )
-    assert "hurst_drift_50_200" in V3_FEATURE_COLUMNS_TOP_N, (
-        "hurst_drift_50_200 NOT IN V3_FEATURE_COLUMNS_TOP_N — "
-        "iter-v3/063 RE-EVALUATION: should be RE-INCLUDED (EDA rank 34 / gain 521). "
-        "Add it to V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
+    assert "hurst_drift_50_200" not in V3_FEATURE_COLUMNS_TOP_N, (
+        "hurst_drift_50_200 FOUND in V3_FEATURE_COLUMNS_TOP_N — "
+        "iter-v3/064: must be ABSENT (PARKED at /053 PATH D + Critic FINAL `c056354`)."
+    )
+    assert "adx_14" in V3_FEATURE_COLUMNS_TOP_N, (
+        "adx_14 NOT IN V3_FEATURE_COLUMNS_TOP_N — "
+        "iter-v3/064 PHASED MASS-EXPANSION #1: adx_14 is the single-feature axis. "
+        "Add 'adx_14' to V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
     )
 
 
@@ -227,39 +232,49 @@ def test_regime_momentum_signed_3d_no_lookahead() -> None:
 
 
 def test_v3_feature_columns_top_n_swap_fracdiff_to_3d_at_iter_v3_052() -> None:
-    """Comprehensive feature state verification at iter-v3/063 (48-feature MASS EXPANSION).
+    """Comprehensive feature state at iter-v3/064 (15-feature phased mass-expansion #1).
 
     iter-v3/052: SWAP activated regime_momentum_signed_3d as 15th element.
     iter-v3/053: regime_momentum_signed_3d PARKED (PATH C-suspicious; Critic `34cc46f` rec #2).
-    iter-v3/063: MASS FEATURE EXPANSION 14 → 48. Checks:
-    - regime_momentum_signed_3d ABSENT (PARKED at /053; NOT re-evaluated at /063).
-    - hurst_drift_50_200 PRESENT (RE-INCLUDED at /063; EDA rank 34 / gain 521).
-    - fracdiff_d05_close PRESENT (RE-INCLUDED at /063; EDA rank 16 / gain 1139).
-    - count == 48 (MASS EXPANSION at /063; Path B EDA SHA c833f48).
-    - regime_momentum_signed_5d PRESENT (mandate per feedback_v3_engineered_features_proven.md).
+    iter-v3/063: MASS FEATURE EXPANSION 14 → 46. Mass-expansion axis CLOSED at /063
+                 (SUSPICIOUS-OOS-DOMINANT + IS-COLLAPSE, Critic FINAL `7cbc136`).
+    iter-v3/064: PHASED MASS-EXPANSION #1 — REVERT to 14-feature anchor + ADD adx_14 = 15.
+                 Per amended `feedback_v3_mass_feature_expansion.md` (2026-05-14).
+
+    Checks at /064:
+    - count == 15 (14 BASELINE_V3 + adx_14)
+    - regime_momentum_signed_3d ABSENT (PARKED at /053)
+    - regime_momentum_signed_5d PRESENT (mandate; BASELINE_V3 edge ingredient)
+    - fracdiff_d05_close ABSENT (PARKED at /053; REVERTED at /064 with mass-expansion)
+    - hurst_drift_50_200 ABSENT (PARKED at /053; REVERTED at /064)
+    - adx_14 PRESENT (PHASED MASS-EXPANSION #1 single-feature addition)
     """
     assert "regime_momentum_signed_3d" not in V3_FEATURE_COLUMNS_TOP_N, (
         "regime_momentum_signed_3d FOUND in V3_FEATURE_COLUMNS_TOP_N. "
         "iter-v3/053: 3d must be PARKED (dropped per /052 PATH C-suspicious; "
         "Critic FINAL `34cc46f` rec #2). Remove it from V3_FEATURE_COLUMNS_TOP_N."
     )
-    assert "fracdiff_d05_close" in V3_FEATURE_COLUMNS_TOP_N, (
-        "fracdiff_d05_close NOT IN V3_FEATURE_COLUMNS_TOP_N. "
-        "iter-v3/063 RE-EVALUATION: fracdiff_d05_close RE-INCLUDED (EDA rank 16 / gain 1139; "
-        "post-WF-fix landscape). Add it to V3_FEATURE_COLUMNS_TOP_N."
+    assert "fracdiff_d05_close" not in V3_FEATURE_COLUMNS_TOP_N, (
+        "fracdiff_d05_close FOUND in V3_FEATURE_COLUMNS_TOP_N. "
+        "iter-v3/064: must be ABSENT (PARKED at /053; REVERTED at /064 with mass-expansion). "
+        "Per amended `feedback_v3_mass_feature_expansion.md` (2026-05-14)."
     )
     n = len(V3_FEATURE_COLUMNS_TOP_N)
-    assert n == 48, (
-        f"V3_FEATURE_COLUMNS_TOP_N count={n} — expected 48. "
-        "iter-v3/063: MASS FEATURE EXPANSION 14 → 48 (Path B EDA SHA c833f48)."
+    assert n == 15, (
+        f"V3_FEATURE_COLUMNS_TOP_N count={n} — expected 15. "
+        "iter-v3/064: PHASED MASS-EXPANSION #1 (14 BASELINE_V3 + adx_14)."
     )
     assert "regime_momentum_signed_5d" in V3_FEATURE_COLUMNS_TOP_N, (
         "regime_momentum_signed_5d NOT found in V3_FEATURE_COLUMNS_TOP_N. "
-        "Mandate per feedback_v3_engineered_features_proven.md is ACTIVE at iter-v3/063 "
+        "Mandate per feedback_v3_engineered_features_proven.md is ACTIVE at iter-v3/064 "
         "(iter-v3/028 baseline edge ingredient; multi-seed CONFIRMATION-MERGE)."
     )
-    assert "hurst_drift_50_200" in V3_FEATURE_COLUMNS_TOP_N, (
-        "hurst_drift_50_200 NOT FOUND in V3_FEATURE_COLUMNS_TOP_N. "
-        "iter-v3/063 RE-EVALUATION: hurst_drift_50_200 RE-INCLUDED (EDA rank 34 / gain 521; "
-        "post-WF-fix re-evaluation). Add it to V3_FEATURE_COLUMNS_TOP_N."
+    assert "hurst_drift_50_200" not in V3_FEATURE_COLUMNS_TOP_N, (
+        "hurst_drift_50_200 FOUND in V3_FEATURE_COLUMNS_TOP_N. "
+        "iter-v3/064: must be ABSENT (PARKED at /053 PATH D + Critic FINAL `c056354` rec #1)."
+    )
+    assert "adx_14" in V3_FEATURE_COLUMNS_TOP_N, (
+        "adx_14 NOT IN V3_FEATURE_COLUMNS_TOP_N. "
+        "iter-v3/064 PHASED MASS-EXPANSION #1: adx_14 is the single-feature axis. "
+        "Add 'adx_14' to V3_FEATURE_COLUMNS_TOP_N."
     )

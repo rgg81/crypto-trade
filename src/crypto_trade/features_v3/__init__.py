@@ -132,127 +132,91 @@ Preserved as a named constant so iter-v3/008+ can restore via reassignment:
 
 V3_FEATURE_COLUMNS_TOP_N: tuple[str, ...] = (
     # -------------------------------------------------------------------------
-    # iter-v3/063 MASS FEATURE EXPANSION: 14 → 48 features.
-    # EDA SHA: c833f48 (analysis/iteration_v3-063/).
-    # Path B: 14 BASELINE_V3 mandatory + 34 promoted from parquet + 9 NEW.
-    # Feature order: by single-LightGBM gain rank from T8_final_feature_set.csv.
-    # IC pruning: greedy LDP-style; 22 dropped at |IC|>0.70 (non-carveout pairs).
-    # ADF: 1 drop (candle_hour_sin — constant at 8h cadence).
-    # Zero-gain: candle_hour_cos kept (non-zero gain; candle_hour_sin dropped).
-    # All 14 BASELINE_V3 features preserved (marked [BASELINE_V3]).
-    # 9 NEW features (need features_v3/ implementation; marked [NEW]).
+    # iter-v3/064 PHASED MASS-EXPANSION #1: REVERT to 14-feature anchor + ADD adx_14.
+    # = 15 features total.
+    #
+    # Rationale: iter-v3/063 mass expansion (14 → 46) at single-seed n_trials=35
+    # EXPLORATION mode FAILED with SUSPICIOUS-OOS-DOMINANT + IS-COLLAPSE (Critic FINAL
+    # `7cbc136`; diary `937f7d6`). IS Sharpe collapsed -1.38 from /060 anchor +0.83
+    # to -0.55. Per amended `feedback_v3_mass_feature_expansion.md` (2026-05-14):
+    # phased single-feature expansion at single-seed EXPLORATION is the path forward
+    # for CYCLE-5 mass-feature expansion mandate.
+    #
+    # adx_14 selected as phased-mass-expansion #1 per:
+    # - Highest /063 last-month importance at LDO (rank 5/46, gain 161.0)
+    # - Moderate at BCH (rank 11/46, gain 42.3)
+    # - Mid at TRX (rank 25/46, gain 19.3)
+    # - In leaner 15-feature stack (per iter-v3/064 EDA SHA <eda_sha>):
+    #   LDO rank 2/15 (gain 227), TRX rank 7/15 (gain 186), BCH rank 12/15 (gain 146)
+    # - Off-the-shelf Wilder (1978) ADX trend-strength indicator; walk-forward-safe
+    #   per /063 Critic Check 1 verified past-only at `technical_v3.py:71-167`
+    # - Clean orthogonality to 14-feature anchor: max |IC|=0.162 with
+    #   range_realized_vol_50 (per /064 EDA T3 + /063 IC matrix). No carve-out needed.
+    # - ADF stationary across all 3 IS symbols (p < 1e-15)
+    #
+    # EDA-implementation parity gate (per /063 Critic Rec #2): V3_FEATURE_COLUMNS_TOP_N
+    # is BIT-IDENTICAL to the 15-feature set declared in iter-v3/064 brief Section 3.
+    # No silent additions or substitutions.
     # -------------------------------------------------------------------------
-    # tail_risk (7 features)
-    "ret_skew_100",  # rank 1  gain 2536 — tail_risk (Conrad-Dittmar-Ghysels 2013)
-    "max_dd_window_50",  # rank 4  gain 1884 — tail_risk [BASELINE_V3]
-    "ret_skew_200",  # rank 6  gain 1800 — tail_risk [BASELINE_V3]
-    "ret_skew_50",  # rank 11 gain 1452 — tail_risk [BASELINE_V3]
-    "ret_kurt_200",  # rank 12 gain 1382 — tail_risk [BASELINE_V3]
-    "ret_kurt_50",  # rank 27 gain 713  — tail_risk [BASELINE_V3]
-    "range_realized_vol_50",  # rank 19 gain 953  — tail_risk [BASELINE_V3]
-    # volume_micro (4 features)
-    "obv_slope_50",  # rank 2  gain 1935 — volume_micro (Granville 1963)
-    "volume_cv_50",  # rank 14 gain 1312 — volume_micro (Karpoff 1987)
-    "volume_mom_ratio_20",  # rank 22 gain 783  — volume_micro (Lee-Swaminathan 2000)
-    "vwap_dev_20",  # rank 53 gain 155  — volume_micro [BASELINE_V3]
-    # cross_asset (7 features)
-    "btc_vol_14d",  # rank 3  gain 1885 — cross_asset (Liu-Tsyvinski 2021)
-    "btc_ret_14d",  # rank 9  gain 1484 — cross_asset [BASELINE_V3]
-    "sym_vs_btc_vol_14d",  # rank 18 gain 1108 — cross_asset [NEW] (vol divergence)
-    "btc_ret_7d",  # rank 25 gain 758  — cross_asset (Liu-Tsyvinski 2021)
-    "btc_ret_3d",  # rank 31 gain 593  — cross_asset (Liu-Tsyvinski 2021)
-    "sym_vs_btc_ret_7d",  # rank 32 gain 556  — cross_asset [BASELINE_V3]
-    "sym_vs_btc_ret_3d",  # rank 52 gain 180  — cross_asset [NEW] (Asness 1995)
-    # regime (6 features)
-    "cusum_reset_count_200",  # rank 5  gain 1882 — regime (Page 1954; LdP AFML Ch.17)
-    "hurst_200",  # rank 15 gain 1281 — regime (Hurst 1951)
-    "bb_width_pct_rank_100",  # rank 23 gain 774  — regime (Bollinger 1992)
-    "atr_pct_rank_500",  # rank 26 gain 741  — regime (Wilder 1978)
-    "hurst_100",  # rank 30 gain 622  — regime [BASELINE_V3]
-    "hurst_diff_100_50",  # rank 35 gain 509  — regime [BASELINE_V3]
-    # momentum (5 features)
-    "ret_autocorr_lag1_50",  # rank 7  gain 1771 — momentum [BASELINE_V3]
-    "ret_autocorr_lag5_50",  # rank 8  gain 1523 — momentum (Lo-MacKinlay 1988)
-    "ema_spread_atr_20",  # rank 29 gain 692  — momentum [BASELINE_V3]
-    "mom_accel_20_100",  # rank 39 gain 426  — momentum (Carver 2019)
-    "mom_accel_5_20",  # rank 51 gain 187  — momentum (Carver 2019)
-    # fracdiff (2 features)
-    "fracdiff_logclose_dstat",  # rank 10 gain 1458 — fracdiff (LdP AFML Ch.5)
-    "fracdiff_d05_close",  # rank 16 gain 1139 (was parked; re-evaluated under post-fix WF)
-    # microstructure (4 features)
-    "taker_buy_imbalance_20",  # rank 13 gain 1364 — microstructure [NEW] (Hasbrouck 1991)
-    "parkinson_gk_ratio_20",  # rank 17 gain 1140 — vol_estimator (Sinclair 2013)
-    "vol_transition_slope_20",  # rank 24 gain 773  — microstructure (v2 suite)
-    "tbr_zscore_30",  # rank 61 gain 96   — microstructure (Brogaard et al. 2014)
-    # technical (1 feature)
-    "adx_14",  # rank 20 gain 889  — technical [NEW] (Wilder 1978)
-    # vol_estimator / regime
-    "atr_pct_rank_200",  # promoted from parquet — regime (Wilder ATR pct rank)
-    # engineered (4 features — vol_normalized_ret_5d + hurst_drift_50_200 removed
-    # at /063 pre-flight fix per orchestrator 2026-05-14: both historically banned
-    # per /049 PATH C-clean (vol_normalized_ret_5d OOS Δ -3.15) and /053 PATH D
-    # (hurst_drift_50_200 Critic FINAL c056354). Final count: 46 features.)
-    "trend_efficiency_signed",  # rank 36 gain 487  — engineered [NEW] (Kaufman signed)
-    "vol_regime_x_momentum",  # rank 40 gain 406  — engineered [NEW] (Asness × Wilder)
-    "cross_asset_divergence_norm",  # rank 44 gain 374  — engineered (iter-v3/027)
-    "regime_momentum_signed_5d",  # rank 63 gain 87  — engineered [BASELINE_V3]
-    # funding (2 features)
-    "btc_funding_rate_zscore_30",  # rank 41 gain 402 — funding (BIS WP 1087 2025)
-    "funding_rate_zscore_30",  # rank 42 gain 395 — funding (Ackerer-Hugonnier 2024)
-    # calendar (2 features)
-    "candle_dow_sin",  # rank 57 gain 117  — calendar [NEW] (Heston-Sadka 2008)
-    "candle_dow_cos",  # rank 69 gain 33   — calendar [NEW] (Heston-Sadka 2008)
-    # returns (1 feature)
-    "ret_1d",  # rank 59 gain 109  — returns [NEW] (Cont 2001; basic momentum)
+    # BASELINE_V3 14 features (anchor — order matches BASELINE_V3.md /059 spec):
+    "max_dd_window_50",  # tail_risk [BASELINE_V3]
+    "ema_spread_atr_20",  # momentum [BASELINE_V3]
+    "ret_kurt_50",  # tail_risk [BASELINE_V3]
+    "ret_skew_200",  # tail_risk [BASELINE_V3]
+    "range_realized_vol_50",  # tail_risk [BASELINE_V3]
+    "hurst_diff_100_50",  # regime [BASELINE_V3]
+    "ret_kurt_200",  # tail_risk [BASELINE_V3]
+    "hurst_100",  # regime [BASELINE_V3]
+    "btc_ret_14d",  # cross_btc [BASELINE_V3]
+    "ret_skew_50",  # tail_risk [BASELINE_V3]
+    "vwap_dev_20",  # volume_micro [BASELINE_V3]
+    "ret_autocorr_lag1_50",  # momentum [BASELINE_V3]
+    "sym_vs_btc_ret_7d",  # cross_btc [BASELINE_V3]
+    "regime_momentum_signed_5d",  # engineered [BASELINE_V3, /025 PROMISING]
+    # NEW feature added at iter-v3/064 phased-mass-expansion #1:
+    "adx_14",  # technical (Wilder 1978; trend-strength indicator at 14-period)
     # -------------------------------------------------------------------------
-    # DROPPED from V3_FEATURE_COLUMNS_TOP_N at iter-v3/063 relative to prior iterations:
-    # (all previously parked/absent features not included above for various reasons)
-    # The following were in parquet but NOT included due to IC pruning:
-    #   parkinson_vol_20, parkinson_vol_50 (IC 1.000 with range_realized_vol_50)
-    #   williams_r_14, stoch_k_14 (IC 1.000 algebraic identity)
-    #   garman_klass_vol_20 (IC 0.993 with parkinson_vol_20)
-    #   taker_buy_zscore_50 (IC 0.982 with tbr_zscore_30)
-    #   bb_pctb_20 (IC 0.964 with cci_20)
-    #   cci_20 (IC 0.942 with vwap_dev_20)
-    #   close_pos_in_range_20 (IC 0.939 with vwap_dev_20)
-    #   rsi_28, vwap_dev_50 (IC 0.936 with vwap_dev_50/rsi)
-    #   fracdiff_logvolume_dstat (IC 0.90+ with fracdiff_logclose_dstat)
-    #   hl_range_ratio_20, candle_efficiency_20, vol_return_divergence_30
-    #   kurt_ratio_50_200 (covered by ret_kurt_50/200 direct measures)
-    # ADF FAIL (1 feature): candle_hour_sin (constant at 8h cadence)
-    # ZERO-GAIN (1 feature): candle_hour_cos (gain=0 in T5 preview, BUT kept for
-    #   cyclic-pair completeness with candle_dow_sin — the DOW pair is RETAINED)
-    # Note: candle_hour_cos gain=0 was for the HOUR encoding (not DOW).
+    # REVERTED at iter-v3/064 (relative to iter-v3/063 46-feature set):
+    # All 31 NON-baseline features from /063 REMOVED. The /063 mass-expansion
+    # at single-seed n_trials=35 produced IS Sharpe collapse -1.38.
+    # Removed features (in /063 order, with reason for non-re-addition at /064):
+    #   ret_skew_100, obv_slope_50, btc_vol_14d, cusum_reset_count_200,
+    #   ret_autocorr_lag5_50, fracdiff_logclose_dstat, volume_cv_50, hurst_200,
+    #   fracdiff_d05_close, parkinson_gk_ratio_20, sym_vs_btc_vol_14d,
+    #   kurt_ratio_50_200, volume_mom_ratio_20, bb_width_pct_rank_100,
+    #   vol_transition_slope_20, btc_ret_7d, atr_pct_rank_500, atr_pct_rank_200,
+    #   btc_ret_3d, ret_20d, mom_accel_20_100, trend_efficiency_signed,
+    #   btc_funding_rate_zscore_30, funding_rate_zscore_30, vol_regime_x_momentum,
+    #   cross_asset_divergence_norm, mom_accel_5_20, taker_buy_imbalance_20,
+    #   sym_vs_btc_ret_3d, candle_dow_sin, candle_dow_cos, ret_1d, tbr_zscore_30
+    # These features remain implemented in features_v3/ modules and parquets
+    # (zero revert cost). They can be considered for phased-mass-expansion #2+
+    # individually with full EDA backing per `feedback_v3_axis_selection_quant_discipline.md`.
     # -------------------------------------------------------------------------
-    # BASELINE_V3 mandate: ALL 14 must be present. Count: 14 ✓
-    #   max_dd_window_50, ret_skew_200, ret_skew_50, ret_kurt_200, ret_kurt_50,
-    #   range_realized_vol_50, vwap_dev_20, btc_ret_14d, sym_vs_btc_ret_7d,
-    #   ret_autocorr_lag1_50, ema_spread_atr_20, hurst_100, hurst_diff_100_50,
-    #   regime_momentum_signed_5d
-    # PREVIOUSLY-CLOSED features RE-EVALUATED per /063 mass-expansion mandate:
-    #   funding_rate_zscore_30 (CLOSED /024): re-included under post-WF-fix landscape
-    #   btc_funding_rate_zscore_30 (CLOSED /025): same re-evaluation rationale
-    #   tbr_zscore_30 (DROPPED /016): same re-evaluation rationale
-    #   cross_asset_divergence_norm (dead code /028): re-included (IC carve-out valid)
-    #   fracdiff_d05_close (PARKED /052): re-included (post-WF-fix re-evaluation)
-    #   vol_normalized_ret_5d (DROPPED /049): re-included (mass-expansion context)
-    #   hurst_drift_50_200 (PARKED /053): re-included (non-zero importance in T5)
-    # These re-evaluations are documented in brief Section 3 adversarial flags.
+    # BANNED features (MUST remain absent):
+    #   vol_normalized_ret_5d  — /049 PATH C-clean (OOS Δ -3.15)
+    #   hurst_drift_50_200     — /053 PATH D + Critic FINAL `c056354`
+    #   regime_momentum_signed_3d — /052 PATH C-suspicious + Critic `34cc46f`
+    #   efficiency_ratio_50    — /043 DISASTROUS NEGATIVE (IS -0.84 / OOS -0.90)
+    #   vol_adj_autocorr       — /026 catastrophic IS collapse + /036 NEGATIVE
+    #   vwap_dev_50            — Critic FINAL `a544621` Rec #1 (IC 0.875 with ema_spread_atr_20)
     # -------------------------------------------------------------------------
 )
-"""48-feature set (iter-v3/063 MASS FEATURE EXPANSION: 14 → 48).
+"""15-feature set (iter-v3/064 PHASED MASS-EXPANSION #1: 14 BASELINE_V3 + adx_14).
 
-14 BASELINE_V3 features + 34 promoted from parquet + 9 NEW implementations.
-EDA SHA: c833f48 (analysis/iteration_v3-063/T8_final_feature_set.csv).
-Path B: maximum orthogonal set at IC<0.70 preserving all BASELINE_V3 features.
-User-approved 48 < 50 mandate deviation (methodology > strict count per LDP IC-pruning).
+REVERT from iter-v3/063 46-feature set (SUSPICIOUS-OOS-DOMINANT closed) +
+phased single-feature addition of adx_14.
+
+Per amended `feedback_v3_mass_feature_expansion.md` (2026-05-14) the CYCLE-5
+mass-expansion mandate proceeds via phased single-feature axes at single-seed
+EXPLORATION. /064 is phased-mass-expansion #1.
 """
 
-# iter-v3/063: V3_FEATURE_COLUMNS = V3_FEATURE_COLUMNS_TOP_N (48-feature mass expansion).
+# iter-v3/064: V3_FEATURE_COLUMNS = V3_FEATURE_COLUMNS_TOP_N (15-feature phased #1).
 V3_FEATURE_COLUMNS: tuple[str, ...] = V3_FEATURE_COLUMNS_TOP_N
 """Alias for V3_FEATURE_COLUMNS_TOP_N — the active feature set for all v3 models.
 
-iter-v3/063: points to the 48-feature mass-expansion set (was 14 features through /062).
+iter-v3/064: points to 15-feature set (14 BASELINE_V3 + adx_14).
 """
 
 DEFAULT_ATR_MULTIPLIERS: tuple[float, float] = (2.0, 1.0)
@@ -333,13 +297,14 @@ iter-v3/040: CLEARED (empty dict). Cycle 3 EXPLORATION #1 — REVERT all per-sym
              per-symbol customizations caused ~-0.55 IS Sharpe swing from iter-v3/029 anchor.
              iter-v3/040 verifies that clearing per-symbol customizations restores IS anchor.
 
-Enforced by _verify_feature_columns in run_baseline_v3.py (iter-v3/063):
+Enforced by _verify_feature_columns in run_baseline_v3.py (iter-v3/064):
     len(V3_FEATURES_PER_SYMBOL) == 0  (empty — no per-symbol entries)
     "BCHUSDT" not in V3_FEATURES_PER_SYMBOL
     "ALGOUSDT" not in V3_FEATURES_PER_SYMBOL
     "LDOUSDT" not in V3_FEATURES_PER_SYMBOL
     "TRXUSDT" not in V3_FEATURES_PER_SYMBOL
-    features_for_symbol("BCHUSDT") == V3_FEATURE_COLUMNS_TOP_N  (48 features — MASS EXPANSION)
+    features_for_symbol("BCHUSDT") == V3_FEATURE_COLUMNS_TOP_N  (15 features — phased #1)
+    "adx_14" in V3_FEATURE_COLUMNS_TOP_N  (PHASED-MASS-EXPANSION #1 ADDITION)
     "vol_adj_autocorr" not in V3_FEATURE_COLUMNS_TOP_N  (dead code; catastrophic at /026)
     "efficiency_ratio_50" not in V3_FEATURE_COLUMNS_TOP_N  (DISASTROUS NEGATIVE /043)
     "regime_momentum_signed_3d" not in V3_FEATURE_COLUMNS_TOP_N  (PARKED /053)
@@ -354,18 +319,17 @@ def features_for_symbol(symbol: str) -> tuple[str, ...]:
 
     iter-v3/040 (EXPLORATION — cycle 3 #1 — REVERT all per-symbol customizations):
     - V3_FEATURES_PER_SYMBOL is EMPTY (cleared at iter-v3/040). All symbols fall back
-      to V3_FEATURE_COLUMNS_TOP_N (14 features). No per-symbol feature overrides exist.
-    - BCHUSDT: returns 14 features = V3_FEATURE_COLUMNS_TOP_N (fallback; REVERTED from
-      iter-v3/035-039 BCH-only fracdiff per-symbol entry; fracdiff_d05_close ABSENT)
-    - ALGOUSDT: returns 14 features = V3_FEATURE_COLUMNS_TOP_N (fallback; unchanged)
-    - LDOUSDT: returns 14 features = V3_FEATURE_COLUMNS_TOP_N (fallback; unchanged)
-    - TRXUSDT: returns 14 features = V3_FEATURE_COLUMNS_TOP_N (fallback; unchanged)
-    - Any other symbol: fallback to 48-feature universal set (iter-v3/063 MASS EXPANSION)
+      to V3_FEATURE_COLUMNS_TOP_N. No per-symbol feature overrides exist.
 
-    V3_FEATURES_PER_SYMBOL is empty at iter-v3/063 (0 entries).
-    All 3 symbols (BCH/LDO/TRX) use the 48-feature universal fallback at iter-v3/063.
-    iter-v3/063 MASS FEATURE EXPANSION: 14 → 48 features (path B per EDA SHA c833f48).
-    14 BASELINE_V3 features preserved + 34 promoted from parquet + 9 NEW implementations.
+    iter-v3/064 PHASED MASS-EXPANSION #1 (REVERT to /060 14-feature anchor + ADD adx_14):
+    - V3_FEATURES_PER_SYMBOL still EMPTY (0 entries).
+    - BCHUSDT/LDOUSDT/TRXUSDT: each returns 15 features = V3_FEATURE_COLUMNS_TOP_N
+      (fallback). The 14-feature BASELINE_V3 + adx_14 (Wilder 1978 ADX).
+    - Any other symbol: same 15-feature fallback (universal).
+
+    iter-v3/064 PHASED MASS-EXPANSION #1: 14 → 15 features (single-feature axis,
+    REVERTED from /063 46-feature SUSPICIOUS-OOS-DOMINANT). Per amended
+    `feedback_v3_mass_feature_expansion.md` (2026-05-14).
 
     Callers MUST pass ``feature_columns=list(features_for_symbol(symbol))``
     to LightGbmStrategy/XgboostStrategy — never None, never empty, never the global default.

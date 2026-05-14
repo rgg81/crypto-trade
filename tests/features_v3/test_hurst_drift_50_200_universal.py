@@ -1,37 +1,36 @@
-"""Adversarial tests for hurst_drift_50_200 universal scope — iter-v3/053.
+"""Adversarial tests for hurst_drift_50_200 universal scope — iter-v3/064.
 
-5 mandatory tests per brief Section 3.9:
+iter-v3/064: hurst_drift_50_200 PARKED state — RE-CONFIRMED ABSENT.
+- /053: PATH D NULL-RESULT closeout (Critic FINAL `c056354` rec #1).
+- /054: PARKED — dropped from V3_FEATURE_COLUMNS_TOP_N.
+- /063: RE-INCLUDED briefly in mass expansion 14→48. Pre-flight assertion (PATH
+  C-clean + PATH D bans) blocked launch; user-authorized 48→46 drop removed it
+  again. Mass-expansion axis itself CLOSED at /063 (SUSPICIOUS-OOS-DOMINANT,
+  Critic FINAL `7cbc136`).
+- /064: REVERT to 14-feature anchor + ADD adx_14 = 15 features (PHASED
+  MASS-EXPANSION #1). hurst_drift_50_200 REMAINS PARKED (catastrophic-dead
+  per `feedback_v3_mass_feature_expansion.md` amended 2026-05-14 ban list).
 
-1. test_hurst_drift_50_200_in_universal_feature_list — hurst_drift_50_200 MUST be in
-   V3_FEATURE_COLUMNS_TOP_N as 15th element (SWAP: regime_momentum_signed_3d PARKED).
-2. test_hurst_drift_50_200_computable_from_source_primitives — assert exact match between
-   compute_hurst_drift_50_200 output and hurst_100 - hurst_diff_100_50 - hurst_200 on
-   synthetic data (verifies algebraic identity R^2=1.0).
-3. test_hurst_drift_50_200_stationary_per_symbol — ADF p<0.05 for hurst_drift_50_200
-   in IS subset of each V3_MODELS symbol (computed on-the-fly from parquet primitives).
-4. test_hurst_drift_50_200_past_only_no_lookahead — assert value at row t depends only
-   on rows 0..t; verified by appending future bars and checking row t value is unchanged.
-5. test_v3_models_is_3_symbol_at_iter_v3_053 — assert V3_MODELS = (BCHUSDT, LDOUSDT,
-   TRXUSDT); confirms universe UNCHANGED at /053.
+5 tests retained (compute function dispatch + ADF + look-ahead) verify the
+underlying primitive remains correctly implemented (zero revert cost; the
+compute function and parquet column are RETAINED as dead code in case of
+future re-evaluation under different conditions). Tests 1 + 5 verify that
+hurst_drift_50_200 is ABSENT from V3_FEATURE_COLUMNS_TOP_N at /064.
 
-SWAP state (iter-v3/053):
-- V3_FEATURE_COLUMNS_TOP_N = 15 features (SWAP: regime_momentum_signed_3d PARKED;
-  hurst_drift_50_200 ACTIVATED).
-- hurst_drift_50_200 PRESENT as 15th element.
-- regime_momentum_signed_3d ABSENT from V3_FEATURE_COLUMNS_TOP_N (PARKED; retained).
-- fracdiff_d05_close ABSENT (PARKED since iter-v3/052).
+State (iter-v3/064 PHASED MASS-EXPANSION #1):
+- V3_FEATURE_COLUMNS_TOP_N = 15 features (14 BASELINE_V3 + adx_14).
+- hurst_drift_50_200 ABSENT from V3_FEATURE_COLUMNS_TOP_N (PARKED).
+- regime_momentum_signed_3d ABSENT (PARKED; retained as dead code).
 - regime_momentum_signed_5d PRESENT (mandate per feedback_v3_engineered_features_proven.md).
-- V3_MODELS = (BCHUSDT, LDOUSDT, TRXUSDT) — 3 symbols (UNCHANGED from /052).
+- adx_14 PRESENT (PHASED MASS-EXPANSION #1 addition).
+- V3_MODELS = (BCHUSDT, LDOUSDT, TRXUSDT) — 3 symbols (UNCHANGED).
 - REQUIRED_GAP = 66 = (21+1)*3 (UNCHANGED).
 
 EDA evidence (analysis/iteration_v3-053/ SHA `1fc6d55`):
-- ADF stationary p<<0.05 all 4 syms (axis2_adf_per_symbol.csv; structurally stationary
-  by construction: bounded difference of two bounded R/S Hurst measurements).
-- Linear redundancy R^2=1.0 EXACT (axis5_linear_redundancy.csv): hurst_drift_50_200 =
-  hurst_100 - hurst_diff_100_50 - hurst_200 (algebraic identity; residuals at machine epsilon).
-- IC max 0.85-0.88 with hurst_diff_100_50 (source primitive); Category 2 carve-out applies.
-- Univariate Spearman rho NOT significant p<0.05 in any of 4 symbols (mean +0.0114).
-- compute function at engineered_v3.py (ACTIVATED via dispatch at /053).
+- ADF stationary p<<0.05 all 4 syms (axis2_adf_per_symbol.csv).
+- Linear redundancy R^2=1.0 EXACT (algebraic identity).
+- IC max 0.85-0.88 with hurst_diff_100_50 (Category 2 carve-out applies).
+- Compute function at engineered_v3.py RETAINED as dead code dispatch.
 """
 
 from __future__ import annotations
@@ -61,30 +60,33 @@ _V3_MODELS_ITER_053 = ("BCHUSDT", "LDOUSDT", "TRXUSDT")
 
 
 def test_hurst_drift_50_200_in_universal_feature_list() -> None:
-    """hurst_drift_50_200 MUST be in V3_FEATURE_COLUMNS_TOP_N at iter-v3/063; count MUST be 48.
+    """hurst_drift_50_200 MUST be ABSENT from V3_FEATURE_COLUMNS_TOP_N at iter-v3/064.
 
     iter-v3/053: SWAP added hurst_drift_50_200 as 15th element.
     iter-v3/054: PARK -- hurst_drift_50_200 DROPPED (Critic FINAL `c056354` rec #1).
-    iter-v3/063: RE-INCLUDED under mass-expansion mandate + post-WF-fix re-evaluation.
-    EDA rank 34 / gain 521 in T8 (analysis/iteration_v3-063/T8_final_feature_set.csv; SHA c833f48).
-    The compute function is ACTIVE in dispatch (column included in model input at /063).
+    iter-v3/063: RE-INCLUDED briefly under mass-expansion mandate; pre-flight ban
+                 filter dropped it again at 48→46 step. Mass-expansion axis CLOSED.
+    iter-v3/064: REMAINS PARKED. PHASED MASS-EXPANSION #1 (14 BASELINE_V3 + adx_14 = 15
+                 features). hurst_drift_50_200 is on the catastrophic-dead ban list per
+                 amended `feedback_v3_mass_feature_expansion.md` (2026-05-14 amendment).
+                 Compute function in engineered_v3.py is RETAINED as dead code dispatch.
     """
-    assert "hurst_drift_50_200" in V3_FEATURE_COLUMNS_TOP_N, (
-        "hurst_drift_50_200 NOT FOUND in V3_FEATURE_COLUMNS_TOP_N -- "
-        "iter-v3/063 RE-EVALUATION failed. hurst_drift_50_200 should be RE-INCLUDED "
-        "(EDA rank 34 / gain 521; post-WF-fix re-evaluation). "
-        "Add it to V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
+    assert "hurst_drift_50_200" not in V3_FEATURE_COLUMNS_TOP_N, (
+        "hurst_drift_50_200 FOUND in V3_FEATURE_COLUMNS_TOP_N -- must be ABSENT at iter-v3/064. "
+        "PARKED per /053 PATH D NULL-RESULT closeout + Critic FINAL `c056354` rec #1. "
+        "Re-evaluated at /063 mass expansion; pre-flight ban filter restored exclusion. "
+        "Remove it from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
     )
     n = len(V3_FEATURE_COLUMNS_TOP_N)
-    assert n == 48, (
-        f"V3_FEATURE_COLUMNS_TOP_N has {n} elements -- expected 48. "
-        "iter-v3/063: MASS FEATURE EXPANSION 14 → 48 (Path B EDA SHA c833f48). "
+    assert n == 15, (
+        f"V3_FEATURE_COLUMNS_TOP_N has {n} elements -- expected 15. "
+        "iter-v3/064: PHASED MASS-EXPANSION #1 (REVERT to 14-feature anchor + ADD adx_14). "
         "Check V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
     )
     assert "regime_momentum_signed_3d" not in V3_FEATURE_COLUMNS_TOP_N, (
         "regime_momentum_signed_3d STILL in V3_FEATURE_COLUMNS_TOP_N -- "
-        "iter-v3/053 PARK must remain active at /063. 3d must be ABSENT (dropped per /052 "
-        "PATH C-suspicious closeout; Critic FINAL `34cc46f` rec #2; NOT re-evaluated at /063). "
+        "iter-v3/053 PARK must remain active. 3d must be ABSENT (PARKED per /052 "
+        "PATH C-suspicious closeout; Critic FINAL `34cc46f` rec #2; NOT re-evaluated). "
         "Remove it from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
     )
 
@@ -275,37 +277,42 @@ def test_hurst_drift_50_200_past_only_no_lookahead() -> None:
 
 
 def test_v3_models_is_3_symbol_at_iter_v3_053() -> None:
-    """V3 universe must be (BCHUSDT, LDOUSDT, TRXUSDT) at iter-v3/054.
+    """V3 universe must be (BCHUSDT, LDOUSDT, TRXUSDT) at iter-v3/064.
 
-    Confirms the 3-symbol universe is UNCHANGED from /052-/053. ALGOUSDT was REVERTED
+    Confirms the 3-symbol universe is UNCHANGED from /052-/063. ALGOUSDT was REVERTED
     at the system level per iter-v3/051 (feedback_v3_per_symbol_lifts_oos_breaks_is.md
     UPDATED 2026-05-10; two-cycle anti-pattern confirmation at /039+/050).
 
-    iter-v3/054: hurst_drift_50_200 PARKED (15→14). All 3 symbols return 14-feature fallback.
+    iter-v3/064: PHASED MASS-EXPANSION #1 (15 features = 14 BASELINE_V3 + adx_14).
+    hurst_drift_50_200 PARKED-ABSENT. All 3 symbols return 15-feature fallback.
     REQUIRED_GAP = 66 = (21+1)*3 (3-symbol universe; UNCHANGED).
     """
     from crypto_trade.features_v3 import features_for_symbol  # noqa: PLC0415
 
     expected_universe = ("BCHUSDT", "LDOUSDT", "TRXUSDT")
-    # Each symbol in the expected universe must return the 48-feature universal fallback
+    # Each symbol in the expected universe must return the 15-feature universal fallback
     for sym in expected_universe:
         feats = features_for_symbol(sym)
-        assert len(feats) == 48, (
-            f"{sym} fallback returns {len(feats)} features -- expected 48. "
-            "iter-v3/063 MASS EXPANSION: BCH + LDO + TRX, all at 48-feature universal fallback "
-            "(hurst_drift_50_200 RE-INCLUDED; EDA rank 34 / gain 521; SHA c833f48)."
+        assert len(feats) == 15, (
+            f"{sym} fallback returns {len(feats)} features -- expected 15. "
+            "iter-v3/064 PHASED MASS-EXPANSION #1: BCH + LDO + TRX, all at 15-feature universal "
+            "fallback (14 BASELINE_V3 + adx_14; hurst_drift_50_200 PARKED-ABSENT)."
         )
-        assert "hurst_drift_50_200" in feats, (
-            f"{sym} fallback does NOT contain hurst_drift_50_200 -- must be PRESENT. "
-            "iter-v3/063: hurst_drift_50_200 RE-INCLUDED (post-WF-fix re-evaluation)."
+        assert "hurst_drift_50_200" not in feats, (
+            f"{sym} fallback contains hurst_drift_50_200 -- must be ABSENT at iter-v3/064. "
+            "PARKED per /053 PATH D NULL-RESULT + Critic FINAL `c056354` rec #1."
         )
         assert "regime_momentum_signed_3d" not in feats, (
             f"{sym} fallback contains regime_momentum_signed_3d -- must be ABSENT. "
-            "iter-v3/053: 3d PARKED per /052 PATH C-suspicious; NOT re-evaluated at /063."
+            "iter-v3/053: 3d PARKED per /052 PATH C-suspicious; NOT re-evaluated."
+        )
+        assert "adx_14" in feats, (
+            f"{sym} fallback does NOT contain adx_14 -- must be PRESENT at iter-v3/064. "
+            "PHASED MASS-EXPANSION #1 single-feature addition."
         )
     # ALGOUSDT must NOT be in the v3 model universe
     assert "ALGOUSDT" not in {sym for sym in expected_universe}, (
-        "ALGOUSDT found in expected universe -- must be ABSENT at iter-v3/054. "
+        "ALGOUSDT found in expected universe -- must be ABSENT at iter-v3/064. "
         "System-level REVERT at iter-v3/051."
     )
     # Verify the constant matches the expected list exactly

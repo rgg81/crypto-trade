@@ -1,40 +1,30 @@
-"""Adversarial tests for fracdiff_d05_close — RE-INCLUDED at iter-v3/063.
+"""Adversarial tests for fracdiff_d05_close — PARKED-ABSENT at iter-v3/064.
 
-5 mandatory tests (iter-v3/051 originals; test 1 updated for RE-INCLUDED state at /063):
+iter-v3/052: SWAP added fracdiff_d05_close as 15th element; subsequently PARKED.
+iter-v3/063: RE-INCLUDED briefly under mass-expansion mandate (14→48 → 14→46 after
+             pre-flight ban filter). Mass-expansion axis itself CLOSED at /063
+             (SUSPICIOUS-OOS-DOMINANT, Critic FINAL `7cbc136`).
+iter-v3/064: PHASED MASS-EXPANSION #1: REVERT to 14-feature anchor + ADD adx_14 = 15.
+             fracdiff_d05_close PARKED-ABSENT (along with all other /063 NEW features
+             except adx_14). Compute function retained in engineered_v3.py dispatch
+             (parquet column generated; zero revert cost).
 
-1. test_fracdiff_d05_close_present_in_universal_feature_list — fracdiff_d05_close MUST be
-   in V3_FEATURE_COLUMNS_TOP_N at iter-v3/063 (RE-EVALUATED: was PARKED at /052-/062;
-   re-included under mass-expansion mandate + post-WF-fix landscape; EDA rank 16/gain 1139).
-   Total count must be 48 (MASS EXPANSION from 14).
-2. test_fracdiff_d05_close_present_in_all_4_symbol_parquets — all 4 symbol parquets
-   (BCH/LDO/TRX/ALGO) must still contain fracdiff_d05_close column; compute_fracdiff_d05_close
-   is RETAINED in dispatch (parquet column generated; zero revert cost per PARKED policy).
-3. test_fracdiff_d05_close_stationary_per_symbol — ADF p<0.05 for fracdiff_d05_close
-   in IS subset of each symbol's parquet (dead-code coverage regression).
-4. test_fracdiff_d05_close_no_lookahead — verify compute_fracdiff_d05_close uses past-
-   only data (Fixed-Width Window FFD; value at bar t depends only on bars [0, t]).
-5. test_v3_models_is_3_symbol_at_iter_v3_052 — V3_MODELS must be exactly
-   (BCH, LDO, TRX) at iter-v3/052; regression test against accidental ALGO re-add.
-   (V3_MODELS UNCHANGED from /051; LDO removal axis pre-falsified by /052 EDA SHA `0a10581`.)
+5 tests retained as dead-code coverage:
+1. test_fracdiff_d05_close_present_in_universal_feature_list — verifies fracdiff_d05_close
+   is ABSENT from V3_FEATURE_COLUMNS_TOP_N at /064. Total count must be 15.
+2-5. Compute function correctness + parquet column presence + ADF + look-ahead.
 
-PARKED state (iter-v3/052):
-- V3_MODELS = (BCHUSDT, LDOUSDT, TRXUSDT) — 3 symbols (UNCHANGED from /051).
+State (iter-v3/064 PHASED MASS-EXPANSION #1):
+- V3_MODELS = (BCHUSDT, LDOUSDT, TRXUSDT) — 3 symbols (UNCHANGED).
 - V3_ATR_MULTIPLIERS_PER_SYMBOL = {} (empty — REVERT carry-forward).
 - block_long_for = () (empty — REVERT carry-forward).
 - REQUIRED_GAP = 66 = (21+1)*3 (UNCHANGED).
-- V3_FEATURE_COLUMNS_TOP_N = 15 features (SWAP: fracdiff PARKED; regime_momentum_signed_3d
-  ACTIVATED as 15th element per /051 EDA RANKED #2 SHA `290f37b`).
-
-fracdiff_d05_close is PARKED per iter-v3/052 SWAP:
-- Column dropped from V3_FEATURE_COLUMNS_TOP_N (NOT passed to LightGBM).
-- compute_fracdiff_d05_close RETAINED in add_engineered_v3_features dispatch
-  (column still generated in parquets; zero revert cost if axis needs retest).
-- 5 adversarial tests RETAINED as dead-code coverage (test 1 verifies ABSENT, not PRESENT).
+- V3_FEATURE_COLUMNS_TOP_N = 15 features (14 BASELINE_V3 + adx_14).
+  fracdiff_d05_close ABSENT. Compute function in engineered_v3.py RETAINED as dead code.
 
 EDA evidence (analysis/iteration_v3-051/ SHA `290f37b`):
 - ADF stationary at p<0.05 across all 4 symbols (column still valid; just parked).
 - IC carve-out PASS (max |IC|=0.7381 with vwap_dev_20 source primitive).
-- Univariate Spearman significant negative (mean ρ=-0.044) across all 4 symbols.
 """
 
 from __future__ import annotations
@@ -61,29 +51,30 @@ _V3_MODELS_ITER_052 = ("BCHUSDT", "LDOUSDT", "TRXUSDT")
 
 
 # ---------------------------------------------------------------------------
-# Test 1 — fracdiff_d05_close MUST NOT be in V3_FEATURE_COLUMNS_TOP_N (PARKED at /052)
+# Test 1 — fracdiff_d05_close MUST NOT be in V3_FEATURE_COLUMNS_TOP_N (PARKED at /064)
 # ---------------------------------------------------------------------------
 
 
 def test_fracdiff_d05_close_present_in_universal_feature_list() -> None:
-    """fracdiff_d05_close MUST be in V3_FEATURE_COLUMNS_TOP_N at iter-v3/063.
+    """fracdiff_d05_close MUST be ABSENT from V3_FEATURE_COLUMNS_TOP_N at iter-v3/064.
 
-    iter-v3/063 MASS FEATURE EXPANSION re-evaluation: fracdiff_d05_close was PARKED at
-    /052 but is re-included at /063 under the post-WF-fix landscape + mass-expansion
-    mandate (brief Section 3 adversarial flags). EDA rank 16 / gain 1139 in T8
-    (analysis/iteration_v3-063/T8_final_feature_set.csv; SHA c833f48).
-    compute_fracdiff_d05_close is ACTIVE in dispatch (column in model input).
+    iter-v3/052: SWAP added fracdiff; PARKED at /053.
+    iter-v3/063: RE-INCLUDED briefly in mass expansion 14→48. Mass-expansion axis CLOSED.
+    iter-v3/064: PHASED MASS-EXPANSION #1: REVERT to 14-feature anchor + ADD adx_14 = 15.
+                 fracdiff_d05_close REMAINS PARKED-ABSENT.
+                 Compute function in engineered_v3.py RETAINED as dead code.
     """
-    assert "fracdiff_d05_close" in V3_FEATURE_COLUMNS_TOP_N, (
-        "fracdiff_d05_close NOT FOUND in V3_FEATURE_COLUMNS_TOP_N — "
-        "iter-v3/063 MASS EXPANSION re-evaluation failed. fracdiff should be RE-INCLUDED "
-        "(EDA rank 16 / gain 1139; post-WF-fix re-evaluation). "
-        "Add it to V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
+    assert "fracdiff_d05_close" not in V3_FEATURE_COLUMNS_TOP_N, (
+        "fracdiff_d05_close FOUND in V3_FEATURE_COLUMNS_TOP_N — must be ABSENT at iter-v3/064. "
+        "PARKED at /053 PATH C-suspicious + carry-forward at /064. "
+        "Per amended `feedback_v3_mass_feature_expansion.md` (2026-05-14): mass-expansion "
+        "candidates must go through phased-mass-expansion single-feature axes individually. "
+        "Remove it from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
     )
     n = len(V3_FEATURE_COLUMNS_TOP_N)
-    assert n == 48, (
-        f"V3_FEATURE_COLUMNS_TOP_N has {n} elements — expected 48. "
-        "iter-v3/063: MASS FEATURE EXPANSION 14 → 48 (Path B EDA SHA c833f48). "
+    assert n == 15, (
+        f"V3_FEATURE_COLUMNS_TOP_N has {n} elements — expected 15. "
+        "iter-v3/064: PHASED MASS-EXPANSION #1 (REVERT to 14-feature anchor + ADD adx_14). "
         "Check V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
     )
 
