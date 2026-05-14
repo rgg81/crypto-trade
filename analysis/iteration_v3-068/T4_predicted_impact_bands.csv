@@ -1,0 +1,7 @@
+path,K_candles,trades_affected_IS,trades_affected_OOS,label_shift,is_delta_band,oos_delta_band,direction,structural_risk
+Path_A (timeout=7 = -67% dur),7,50,22,MAJOR (31.4% IS / 21.6% OOS to fwd-return),"[-0.40, -0.05]","[-0.50, -0.05]",NEGATIVE (label noise injection),Forward-return labels at K=7 are dominated by random walk noise
+Path_B (timeout=14 = -33% dur),14,22,14,MEDIUM (13.8% IS / 13.7% OOS to fwd-return),"[-0.25, +0.00]","[-0.30, +0.05]",WEAKLY NEGATIVE (intermediate noise),Longer-cycle TP/SL trades become noisy fwd-return labels
+ANCHOR (timeout=21 = current),21,0,0,BASELINE (5.7% IS / 2.9% OOS timeouts),0,0,REFERENCE,—
+Path_C (timeout=42 = +100% dur),42,~9 timeout→TP/SL conversion,~3 timeout→TP/SL conversion,MINOR (~5.7% IS / ~2.9% OOS labels potentially upgrade),"[-0.10, +0.10]","[-0.15, +0.15]",INERT (label cleanup vs sample-uniqueness tradeoff),Sample-uniqueness drop; effective sample size penalty; Optuna 2nd-order coupling
+Path_D (timeout=63 = +200% dur),63,~9 timeout→TP/SL conversion + sample overlap,~3 timeout→TP/SL conversion + sample overlap,MINOR + sample overlap DOMINANT,"[-0.25, +0.05]","[-0.30, +0.05]",WEAKLY NEGATIVE (sample-uniqueness drop dominates),Adjacent samples overlap heavily; effective sample size collapses; embargo at 64 candles (63+1)
+Path_E (PASSIVE DIAGNOSTIC — no change),21,0,0,REFERENCE,0,0,INERT-by-design,Skip — saturation justified by T1/T2 finding

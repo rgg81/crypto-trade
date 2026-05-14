@@ -1,0 +1,10 @@
+stage,iter_065_SL_widening,iter_066_vol_scale_ceiling,iter_067_inference_threshold_floor,iter_068_label_timeout,orthogonal
+feature_engineering,no change,no change,no change,no change,"YES (4 axes, all stage-1 inert)"
+label_generation_MAGNITUDE,TRAIN-TIME: sl_multiplier 1.0 → 1.5,no change,no change,no change (magnitude unchanged),YES (068 ≠ 065 stage at sub-stage)
+label_generation_DURATION,no change,no change,no change,TRAIN-TIME: label_timeout_minutes 10080 → 20160 (K=42),YES (068 is unique stage; nothing else touches duration)
+embargo_purging,no change (preserves label_timeout_minutes=10080 → embargo=22),no change,no change,CHANGES (label_timeout_minutes=20160 → embargo=43; cross-cell gap=129),PARTIAL (068 affects walk-forward embargo computation; structural — purge tightens)
+optuna_hyperparameter_search,TPE on different labels,TPE unchanged,TPE unchanged,TPE on different labels (some timeout→TP/SL conversions),PARTIAL (068 ≠ 065 because timeout vs SL multiplier perturb different label dims)
+model_training,fit on changed labels,no change,no change,fit on changed labels (~9 IS labels per cell converted),PARTIAL (068 affects same code path as 065 but at different sub-stage)
+inference_time_prediction,no direct change (proba surface differs from model),weight modifier,emission gate threshold,no change,"YES (068 ≠ 066, 067 at inference stage)"
+risk_gate_stack,no change,ceiling field changed,no change,no change,YES (068 ≠ 066 at risk-primitive stage)
+trade_emission,different roster (different model + different labels),different roster (weight cap),different roster (threshold floor),different roster (different model + different labels),NO (all 4 axes affect roster — but via STRUCTURALLY DISTINCT mechanisms)

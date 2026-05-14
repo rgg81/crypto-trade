@@ -1,0 +1,17 @@
+metric,value,source
+monthly_sharpe_in_sample,0.8325,reports-v3/iteration_v3-060/comparison.csv:2
+monthly_sharpe_out_of_sample,0.1403,reports-v3/iteration_v3-060/comparison.csv:2
+n_trades_in_sample,159.0,reports-v3/iteration_v3-060/comparison.csv:7
+n_trades_out_of_sample,102,reports-v3/iteration_v3-060/comparison.csv:7
+weighted_pnl_total_in_sample,51.8906,reports-v3/iteration_v3-060/comparison.csv:10
+weighted_pnl_total_out_of_sample,5.4989,reports-v3/iteration_v3-060/comparison.csv:10
+BCH_OOS_weighted_pnl,1.9078,"reports-v3/iteration_v3-060/comparison.csv:18 (per_symbol block, weighted_pnl col)"
+LDO_OOS_weighted_pnl,-19.7208,"reports-v3/iteration_v3-060/comparison.csv:19 (per_symbol block, weighted_pnl col)"
+TRX_OOS_weighted_pnl,23.3119,"reports-v3/iteration_v3-060/comparison.csv:20 (per_symbol block, weighted_pnl col)"
+BCH_IS_net_pnl_pct,79.4465,reports-v3/iteration_v3-060/in_sample/per_symbol.csv
+LDO_IS_net_pnl_pct,-11.4379,reports-v3/iteration_v3-060/in_sample/per_symbol.csv
+TRX_IS_net_pnl_pct,-23.0435,reports-v3/iteration_v3-060/in_sample/per_symbol.csv
+BCH_IS_concentration_pct,176.68,reports-v3/iteration_v3-060/in_sample/per_symbol.csv (pct_of_total_pnl col)
+current_label_timeout_minutes,10080,run_baseline_v3.py:1398
+current_label_timeout_candles,21,run_baseline_v3.py:740 (10080 / 480 = 21)
+frac_positive_paths_cpcv,0.6444,BASELINE_V3.md Headline Metrics (CPCV architecture-invariant)
