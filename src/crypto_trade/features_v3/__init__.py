@@ -173,8 +173,8 @@ V3_FEATURE_COLUMNS_TOP_N: tuple[str, ...] = (
     "ret_autocorr_lag1_50",  # momentum [BASELINE_V3]
     "sym_vs_btc_ret_7d",  # cross_btc [BASELINE_V3]
     "regime_momentum_signed_5d",  # engineered [BASELINE_V3, /025 PROMISING]
-    # NEW feature added at iter-v3/064 phased-mass-expansion #1:
-    "adx_14",  # technical (Wilder 1978; trend-strength indicator at 14-period)
+    # adx_14 REMOVED at /064 closeout (NEGATIVE per Critic `452fcf2`).
+    # Cycle 1 #6+ pivots to NON-FEATURE axes per Critic /064 Rec #4.
     # -------------------------------------------------------------------------
     # REVERTED at iter-v3/064 (relative to iter-v3/063 46-feature set):
     # All 31 NON-baseline features from /063 REMOVED. The /063 mass-expansion

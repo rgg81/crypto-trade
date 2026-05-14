@@ -307,19 +307,17 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
             "Pass either 3 (--exploration) or 10 (default CONFIRMATION)."
         )
 
-    # iter-v3/064: PHASED MASS-EXPANSION #1 — REVERT to 14-feature anchor + ADD adx_14 = 15.
-    # /063 mass-expansion (14 → 46) at single-seed n_trials=35 produced SUSPICIOUS-OOS-DOMINANT
-    # + IS-COLLAPSE (Critic FINAL `7cbc136`; diary `937f7d6`); axis CLOSED.
-    # /064 is phased-mass-expansion #1 per amended `feedback_v3_mass_feature_expansion.md`
-    # (2026-05-14 amendment): single-feature additions at single-seed EXPLORATION.
+    # iter-v3/065+: REVERT to /060 14-feature anchor after /064 NEGATIVE closeout.
+    # /064 phased mass-expansion #1 (+adx_14) NEGATIVE per Critic `452fcf2` (IS Δ -0.68).
+    # Cycle 1 #6+ pivots to NON-FEATURE axes per Critic /064 Rec #4.
     # vol_adj_autocorr and efficiency_ratio_50 (the two CATASTROPHICALLY NEGATIVE features)
-    # remain EXCLUDED. The 31 non-baseline /063 features are all DROPPED for /064.
+    # remain EXCLUDED.
     n = len(V3_FEATURE_COLUMNS)
-    if n != 15:
+    if n != 14:
         raise RuntimeError(
-            f"V3_FEATURE_COLUMNS has {n} columns — expected exactly 15. "
-            "iter-v3/064: PHASED MASS-EXPANSION #1 (REVERT to 14-feature anchor + ADD adx_14). "
-            "Expected: 14 BASELINE_V3 features + adx_14. "
+            f"V3_FEATURE_COLUMNS has {n} columns — expected exactly 14. "
+            "iter-v3/065+: REVERT to /060 14-feature anchor (post-/064 NEGATIVE closeout). "
+            "Expected: 14 BASELINE_V3 features only. "
             "Check V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
         )
     # vol_adj_autocorr MUST NOT be in the universal list (iter-v3/036 NEGATIVE reverted;
@@ -377,19 +375,11 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
             "PARKED per /052 PATH C-suspicious closeout; Critic `34cc46f` rec #2. "
             "Remove 'regime_momentum_signed_3d' from V3_FEATURE_COLUMNS_TOP_N."
         )
-    # iter-v3/064: adx_14 MUST be present (PHASED MASS-EXPANSION #1 — single-feature addition).
-    # The other 8 NEW features from /063 (candle_dow_sin/cos, ret_1d, sym_vs_btc_ret_3d,
-    # sym_vs_btc_vol_14d, taker_buy_imbalance_20, trend_efficiency_signed,
-    # vol_regime_x_momentum) are NOT present at /064 — REVERTED with the 46-feature set.
-    # They can be considered for phased-mass-expansion #2+ individually.
-    if "adx_14" not in V3_FEATURE_COLUMNS:
-        raise RuntimeError(
-            "adx_14 NOT FOUND in V3_FEATURE_COLUMNS — must be PRESENT at iter-v3/064. "
-            "PHASED MASS-EXPANSION #1: REVERT to 14-feature anchor + ADD adx_14. "
-            "Add it to V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
-        )
-    # /063 NEW features that MUST be ABSENT at /064 (REVERTED with mass expansion).
+    # iter-v3/065+: ALL 9 /063 NEW features (including adx_14) MUST be ABSENT.
+    # /064 adx_14 phased-mass-expansion #1 NEGATIVE per Critic `452fcf2` (IS Δ -0.68).
+    # Cycle 1 #6+ pivots to NON-FEATURE axes per Critic /064 Rec #4.
     _reverted_063_features = (
+        "adx_14",
         "candle_dow_sin",
         "candle_dow_cos",
         "ret_1d",
@@ -403,19 +393,17 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
         if _feat in V3_FEATURE_COLUMNS:
             raise RuntimeError(
                 f"iter-v3/063 NEW feature '{_feat}' FOUND in V3_FEATURE_COLUMNS — must be "
-                "ABSENT at iter-v3/064 (PHASED MASS-EXPANSION #1 — single-feature axis). "
-                "These 8 features are REVERTED with the 46-feature /063 set; only adx_14 retained. "
-                f"Remove '{_feat}' from V3_FEATURE_COLUMNS_TOP_N. Per amended "
-                "`feedback_v3_mass_feature_expansion.md` (2026-05-14 amendment)."
+                "ABSENT at iter-v3/065+ (post-/064 NEGATIVE; REVERT to /060 14-feature anchor). "
+                f"Remove '{_feat}' from V3_FEATURE_COLUMNS_TOP_N. Per `feedback_v3_iter064_process_lessons.md` "
+                "Rule 5 (/060 14-feature anchor is local optimum at single-seed n_trials=35)."
             )
     print(
         f"  V3_FEATURE_COLUMNS: {n} columns "
-        "(iter-v3/064: PHASED MASS-EXPANSION #1; "
+        "(iter-v3/065+: REVERT to /060 14-feature anchor post-/064 NEGATIVE; "
         "14 BASELINE_V3 features present; "
-        "1 NEW feature (adx_14) PRESENT; "
-        "8 /063-NEW features (candle_dow_sin/cos, ret_1d, sym_vs_btc_ret_3d, "
-        "sym_vs_btc_vol_14d, taker_buy_imbalance_20, trend_efficiency_signed, "
-        "vol_regime_x_momentum) REVERTED-ABSENT; "
+        "all 9 /063-NEW features ABSENT (adx_14, candle_dow_sin/cos, ret_1d, "
+        "sym_vs_btc_ret_3d, sym_vs_btc_vol_14d, taker_buy_imbalance_20, "
+        "trend_efficiency_signed, vol_regime_x_momentum); "
         "vol_adj_autocorr ABSENT; efficiency_ratio_50 ABSENT; "
         "regime_momentum_signed_5d PRESENT; sym_vs_btc_ret_7d PRESENT)  PASS"
     )
@@ -462,21 +450,20 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
         "BCH/LDO/TRX all use (2.0, 1.0) DEFAULT)  PASS"
     )
 
-    # iter-v3/064: Verify all 3 v3 symbols return 15-feature fallback (V3_FEATURE_COLUMNS_TOP_N).
-    # PHASED MASS-EXPANSION #1: 14 BASELINE_V3 + adx_14 = 15. V3_FEATURES_PER_SYMBOL is empty.
+    # iter-v3/065+: REVERT to /060 14-feature anchor. V3_FEATURES_PER_SYMBOL is empty.
     for sym in ("BCHUSDT", "LDOUSDT", "TRXUSDT"):
         sym_feats = features_for_symbol(sym)
-        if len(sym_feats) != 15:
+        if len(sym_feats) != 14:
             raise RuntimeError(
                 f"{sym} fallback has {len(sym_feats)} features — "
-                "expected exactly 15 (iter-v3/064 PHASED MASS-EXPANSION #1). "
+                "expected exactly 14 (iter-v3/065+ REVERT to /060 anchor). "
                 "Check V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py. "
                 "V3_FEATURES_PER_SYMBOL must be empty."
             )
-        if "adx_14" not in sym_feats:
+        if "adx_14" in sym_feats:
             raise RuntimeError(
-                f"{sym} feature set does not contain adx_14 — must be PRESENT. "
-                "iter-v3/064 PHASED MASS-EXPANSION #1: adx_14 is the single-feature axis."
+                f"{sym} feature set contains adx_14 — must be ABSENT at iter-v3/065+. "
+                "iter-v3/064 phased mass-expansion #1 NEGATIVE per Critic `452fcf2`."
             )
         if "ret_skew_50" not in sym_feats:
             raise RuntimeError(
@@ -496,10 +483,9 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
                 f"Check features_for_symbol('{sym}') path."
             )
     print(
-        "  BCH/LDO/TRX: 15-feature universal fallback "
-        "(iter-v3/064: PHASED MASS-EXPANSION #1; "
-        "14 BASELINE_V3 features present; adx_14 PRESENT; "
-        "8 /063-NEW features REVERTED-ABSENT; "
+        "  BCH/LDO/TRX: 14-feature universal fallback "
+        "(iter-v3/065+: REVERT to /060 anchor post-/064 NEGATIVE; "
+        "14 BASELINE_V3 features present; all 9 /063-NEW features ABSENT; "
         "vol_adj_autocorr ABSENT; efficiency_ratio_50 ABSENT; "
         "regime_momentum_signed_5d, sym_vs_btc_ret_7d PRESENT)  PASS"
     )
