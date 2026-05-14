@@ -1,0 +1,6 @@
+path,stateless,universal,distinct_from_065,distinct_from_066,predicted_promising_viable,predicted_promising_magnitude,trade_count_floor_safe,rationale,score
+Path_D_tighten_060,True,True,True,True,True,True,True,"**SELECTED**. Asymmetric tightening drops marginal trades (lowest-edge predictions). Predicted PROMISING-band positive on OOS (+0.10 to +0.30). At 30-50% trade drop, IS=80-110 / OOS=50-70 — above trade-rate floor (≥10/month over 14 OOS months = 140; just under at 50). Note: trade-rate floor concern flagged in Section 4.5 falsifier.",7
+Path_E_vote_2of3,True,True,True,True,True,False,True,Drops uncertain trades; PROMISING-viable but smaller magnitude than Path D. Implementation more complex (vote logic per direction; not a simple threshold modification).,6
+Path_A_median_threshold,True,True,True,True,False,False,True,First-order Sharpe-neutral. Useful at multi-seed CONFIRMATION (ENSEMBLE_SIZE=10) but at 3-seed EXPLORATION the mean-median gap is too small to produce PROMISING shift.,5
+Path_C_fixed_055,True,True,True,True,False,False,True,Predicted NEGATIVE — overrides Optuna per-cell optimum. Loses information.,5
+Path_B_median_proba,True,True,True,True,False,False,True,Analogous to Path A — marginal proba flip is structurally too small at 3-seed.,5
