@@ -307,17 +307,18 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
             "Pass either 3 (--exploration) or 10 (default CONFIRMATION)."
         )
 
-    # iter-v3/063: MASS FEATURE EXPANSION — 14 → 48 features.
+    # iter-v3/063: MASS FEATURE EXPANSION — 14 → 46 features.
+    # vol_normalized_ret_5d + hurst_drift_50_200 REMOVED at pre-flight fix (2026-05-14):
+    # both historically banned (per /049 PATH C-clean + /053 PATH D Critic c056354).
     # Previously-closed features re-evaluated under post-WF-fix landscape (brief adversarial flags).
     # vol_adj_autocorr and efficiency_ratio_50 (the two CATASTROPHICALLY NEGATIVE features)
-    # remain EXCLUDED. All others re-evaluated (funding, fracdiff, cross_asset_divergence_norm,
-    # vol_normalized_ret_5d, hurst_drift_50_200 — now included).
+    # remain EXCLUDED.
     n = len(V3_FEATURE_COLUMNS)
-    if n != 48:
+    if n != 46:
         raise RuntimeError(
-            f"V3_FEATURE_COLUMNS has {n} columns — expected exactly 48. "
-            "iter-v3/063: MASS FEATURE EXPANSION (14 → 48). "
-            "Expected: 14 BASELINE_V3 + 34 promoted from parquet (post-IC-pruning). "
+            f"V3_FEATURE_COLUMNS has {n} columns — expected exactly 46. "
+            "iter-v3/063: MASS FEATURE EXPANSION (14 → 46 after pre-flight fix). "
+            "Expected: 14 BASELINE_V3 + 32 promoted (post-IC-pruning + ban filter). "
             "Check V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
         )
     # vol_adj_autocorr MUST NOT be in the universal list (iter-v3/036 NEGATIVE reverted;
@@ -396,7 +397,7 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
             )
     print(
         f"  V3_FEATURE_COLUMNS: {n} columns "
-        "(iter-v3/063: MASS FEATURE EXPANSION 14 → 48; "
+        "(iter-v3/063: MASS FEATURE EXPANSION 14 → 46; "
         "14 BASELINE_V3 features present; "
         "9 NEW features (adx_14, candle_dow_sin, candle_dow_cos, ret_1d, "
         "sym_vs_btc_ret_3d, sym_vs_btc_vol_14d, taker_buy_imbalance_20, "
@@ -447,14 +448,14 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
         "BCH/LDO/TRX all use (2.0, 1.0) DEFAULT)  PASS"
     )
 
-    # iter-v3/063: Verify all 3 v3 symbols return 48-feature fallback (V3_FEATURE_COLUMNS_TOP_N).
-    # MASS FEATURE EXPANSION: 14 → 48. V3_FEATURES_PER_SYMBOL must be empty (all symbols fallback).
+    # iter-v3/063: Verify all 3 v3 symbols return 46-feature fallback (V3_FEATURE_COLUMNS_TOP_N).
+    # MASS FEATURE EXPANSION: 14 → 46. V3_FEATURES_PER_SYMBOL must be empty (all symbols fallback).
     for sym in ("BCHUSDT", "LDOUSDT", "TRXUSDT"):
         sym_feats = features_for_symbol(sym)
-        if len(sym_feats) != 48:
+        if len(sym_feats) != 46:
             raise RuntimeError(
                 f"{sym} fallback has {len(sym_feats)} features — "
-                "expected exactly 48 (iter-v3/063 MASS FEATURE EXPANSION). "
+                "expected exactly 46 (iter-v3/063 MASS FEATURE EXPANSION). "
                 "Check V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py. "
                 "V3_FEATURES_PER_SYMBOL must be empty."
             )
@@ -476,8 +477,8 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
                 f"Check features_for_symbol('{sym}') path."
             )
     print(
-        "  BCH/LDO/TRX: 48-feature universal fallback "
-        "(iter-v3/063: MASS FEATURE EXPANSION 14→48; "
+        "  BCH/LDO/TRX: 46-feature universal fallback "
+        "(iter-v3/063: MASS FEATURE EXPANSION 14→46; "
         "14 BASELINE_V3 features present; "
         "9 NEW features implemented; "
         "vol_adj_autocorr ABSENT; efficiency_ratio_50 ABSENT; "

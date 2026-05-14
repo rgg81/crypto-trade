@@ -188,12 +188,13 @@ V3_FEATURE_COLUMNS_TOP_N: tuple[str, ...] = (
     "adx_14",  # rank 20 gain 889  — technical [NEW] (Wilder 1978)
     # vol_estimator / regime
     "atr_pct_rank_200",  # promoted from parquet — regime (Wilder ATR pct rank)
-    # engineered (6 features)
-    "hurst_drift_50_200",  # rank 34 gain 521  — engineered (iter-v3/053)
+    # engineered (4 features — vol_normalized_ret_5d + hurst_drift_50_200 removed
+    # at /063 pre-flight fix per orchestrator 2026-05-14: both historically banned
+    # per /049 PATH C-clean (vol_normalized_ret_5d OOS Δ -3.15) and /053 PATH D
+    # (hurst_drift_50_200 Critic FINAL c056354). Final count: 46 features.)
     "trend_efficiency_signed",  # rank 36 gain 487  — engineered [NEW] (Kaufman signed)
     "vol_regime_x_momentum",  # rank 40 gain 406  — engineered [NEW] (Asness × Wilder)
     "cross_asset_divergence_norm",  # rank 44 gain 374  — engineered (iter-v3/027)
-    "vol_normalized_ret_5d",  # rank 60 gain 101  — engineered (iter-v3/048; Sinclair)
     "regime_momentum_signed_5d",  # rank 63 gain 87  — engineered [BASELINE_V3]
     # funding (2 features)
     "btc_funding_rate_zscore_30",  # rank 41 gain 402 — funding (BIS WP 1087 2025)
