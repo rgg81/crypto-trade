@@ -51,7 +51,9 @@ from scipy.stats import norm
 #:          → 66 (3-sym, iter-v3/051 SYSTEM-LEVEL REVERT to iter-v3/028 architecture;
 #:               drop ALGO per `feedback_v3_per_symbol_lifts_oos_breaks_is.md` UPDATED
 #:               2026-05-10 second-cycle confirmation of per-symbol-customization anti-pattern).
-REQUIRED_GAP: int = (21 + 1) * 3  # 66
+#:          → 129 (3-sym, iter-v3/068 timeout widen 21→42 candles;
+#:                embargo_candles=42+1=43; cross-cell gap=43*3=129).
+REQUIRED_GAP: int = (42 + 1) * 3  # 129
 
 # ---------------------------------------------------------------------------
 # CPCV — Combinatorial Purged Cross-Validation (AFML Ch. 12)

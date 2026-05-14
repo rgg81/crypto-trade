@@ -125,7 +125,7 @@ def _derive_ensemble_seeds(outer_seed: int, size: int = 5) -> list[int]:
     return [int(s) for s in rng.integers(low=0, high=2**31 - 1, size=size)]
 
 
-ITERATION_LABEL = "v3-067"
+ITERATION_LABEL = "v3-068"
 REPORTS_DIR = Path("reports-v3")
 FEATURES_DIR = Path("data/features_v3")
 DATA_DIR = Path("data")
@@ -158,7 +158,7 @@ BTC_TREND_CONFIG = BtcTrendFilterConfig(
 # CPCV parameters (brief Section 0 + 3.5#2)
 CPCV_N_SPLITS = 10
 CPCV_N_TEST_SPLITS = 2
-# gap = REQUIRED_GAP = (timeout_candles+1)*n_symbols = (21+1)*3 = 66 (iter-v3/051 REVERT to 3-sym)
+# gap = REQUIRED_GAP = (timeout_candles+1)*n_symbols = (42+1)*3 = 129 (iter-v3/068 timeout widen)
 # DO NOT use min(REQUIRED_GAP, n_trades//20) — that is the iter-v3/001 bug.
 CPCV_EMBARGO = 27  # ~1% of 24-month T ≈ 2742 candles * 0.01
 
@@ -688,56 +688,75 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
         "(TRX floor raised 0.3→0.5; BCH/LDO unchanged at global 0.3)  PASS"
     )
 
-    # iter-v3/067 Path D: inference_threshold_floor must be 0.60 on all v3 models.
-    # vol_scale_ceiling reverts to default 1.0 (iter-v3/066 INERT-AT-EXPLORATION, closed).
-    # brief Section 3 Sub-fix 3 + Sub-fix 4 + Sub-fix 8.
+    # iter-v3/068: REVERT inference_threshold_floor to default 0.0 (/067 INERT-AT-EXPLORATION).
+    # iter-v3/067's axis is closed per Critic FINAL `b8d3bb5` (Path D non-activation).
+    # /068 reverts to default for clean single-axis attribution of Path C label-timeout widening.
+    # vol_scale_ceiling stays at default 1.0 (already reverted at /067).
+    # brief Section 3 Sub-fix 2 + Sub-fix 3.
     _p13_cfg_check, p13_strat_check = _build_v3_model(
         symbol="BCHUSDT", seed=42, n_trials=1, ensemble_seeds=[42]
     )
     if not isinstance(p13_strat_check, RiskV3Wrapper):
         raise RuntimeError(
             f"_build_v3_model(BCHUSDT) returned {type(p13_strat_check).__name__} — "
-            "expected RiskV3Wrapper. iter-v3/067: inference_threshold_floor check requires "
-            "RiskV3Wrapper around LightGbmStrategy."
+            "expected RiskV3Wrapper. iter-v3/068: inference_threshold_floor revert check "
+            "requires RiskV3Wrapper around LightGbmStrategy."
         )
-    expected_floor = 0.60
-    _p13_inner = (
-        p13_strat_check.inner
-        if hasattr(p13_strat_check, "inner")
-        else p13_strat_check
-    )
-    if not hasattr(_p13_inner, "_inference_threshold_floor"):
-        raise RuntimeError(
-            "LightGbmStrategy for BCHUSDT has no _inference_threshold_floor attribute. "
-            "iter-v3/067: LightGbmStrategy must support inference_threshold_floor=0.60. "
-            "Check lgbm.py __init__ and _build_v3_model call."
-        )
-    if _p13_inner._inference_threshold_floor != expected_floor:
-        raise RuntimeError(
-            f"LightGbmStrategy._inference_threshold_floor = "
-            f"{_p13_inner._inference_threshold_floor} — expected {expected_floor}. "
-            f"iter-v3/067 Path D: pass inference_threshold_floor=0.60 in _build_v3_model "
-            f"common_kwargs (brief Section 3 Sub-fix 3)."
-        )
+    _p13_inner = p13_strat_check.inner if hasattr(p13_strat_check, "inner") else p13_strat_check
+    if hasattr(_p13_inner, "_inference_threshold_floor"):
+        if _p13_inner._inference_threshold_floor != 0.0:
+            raise RuntimeError(
+                f"LightGbmStrategy._inference_threshold_floor = "
+                f"{_p13_inner._inference_threshold_floor} — expected 0.0 at iter-v3/068. "
+                "iter-v3/068 REVERTS /067's INERT inference_threshold_floor (Critic FINAL "
+                "`b8d3bb5` closed the Path D axis). Remove inference_threshold_floor=0.60 "
+                "from _build_v3_model common_kwargs (brief Section 3 Sub-fix 2)."
+            )
     if p13_strat_check.config.vol_scale_ceiling != 1.0:
         raise RuntimeError(
             f"RiskV2Config.vol_scale_ceiling = {p13_strat_check.config.vol_scale_ceiling} — "
-            "expected 1.0 (default). iter-v3/067 reverts /066's vol_scale_ceiling=0.8 for "
-            "clean single-axis attribution (brief Section 3 Sub-fix 4)."
+            "expected 1.0 (default). iter-v3/068: vol_scale_ceiling reverted at /067 and "
+            "must remain at default 1.0 (brief Section 3 Sub-fix 3)."
+        )
+    # iter-v3/068: label_timeout_minutes must be 20160 on all v3 models (Path C axis).
+    expected_label_timeout = 20160
+    _p13_lgbm = _p13_inner
+    if not hasattr(_p13_lgbm, "label_timeout_minutes"):
+        raise RuntimeError(
+            "LightGbmStrategy for BCHUSDT has no label_timeout_minutes attribute. "
+            "iter-v3/068: LightGbmStrategy must expose label_timeout_minutes. "
+            "Check lgbm.py __init__ and _build_v3_model call."
+        )
+    if _p13_lgbm.label_timeout_minutes != expected_label_timeout:
+        raise RuntimeError(
+            f"LightGbmStrategy.label_timeout_minutes = "
+            f"{_p13_lgbm.label_timeout_minutes} — expected {expected_label_timeout}. "
+            f"iter-v3/068 Path C: pass label_timeout_minutes=20160 in _build_v3_model "
+            f"common_kwargs (brief Section 3 Sub-fix 1)."
         )
     print(
-        f"  Universal inference_threshold_floor (iter-v3/067): {expected_floor} "
-        f"(Path D universal tightening — max(mean(per_seed_thresholds), 0.60) at lgbm.py:507)  PASS"
+        "  inference_threshold_floor REVERTED to default 0.0 "
+        "(iter-v3/068 reverts /067 INERT axis for clean attribution)  PASS"
     )
-    print("  vol_scale_ceiling reverted to default 1.0 (iter-v3/067 REVERT /066 INERT axis)  PASS")
+    print("  vol_scale_ceiling at default 1.0 (reverted at /067, unchanged at /068)  PASS")
+    print(
+        f"  Universal label_timeout_minutes (iter-v3/068): {expected_label_timeout} min "
+        f"(= 42 candles at 8h; Path C DURATION widening — embargo 22→43 per cell, "
+        f"cross-cell gap 66→129)  PASS"
+    )
 
 
 def _verify_label_leakage_gap() -> None:
-    """Assert gap == REQUIRED_GAP and print proof (brief Section 3.5#3)."""
-    timeout_minutes = 10080  # 7 days
+    """Assert gap == REQUIRED_GAP and print proof (brief Section 3.5#3).
+
+    iter-v3/068 Path C: timeout widened 10080 → 20160 min (21 → 42 candles).
+    embargo_candles = 20160 // 480 + 1 = 43.
+    cross-cell gap = 43 * 3 = 129 (REQUIRED_GAP updated accordingly).
+    """
+    timeout_minutes = 20160  # 14 days (42 candles at 8h) — iter-v3/068 Path C axis
     candle_minutes = 480  # 8h
     n_symbols = len(V3_MODELS)
-    timeout_candles = timeout_minutes // candle_minutes  # = 21
+    timeout_candles = timeout_minutes // candle_minutes  # = 42
     required_gap = (timeout_candles + 1) * n_symbols  # formula: (timeout_candles+1)*len(V3_MODELS)
     assert required_gap == REQUIRED_GAP, (
         f"REQUIRED_GAP mismatch: formula gives {required_gap}, "
@@ -1166,7 +1185,7 @@ def _compute_cpcv_paths(
 # Per-cell CSCV parameters (brief Section 0 — within-cell gap = 22)
 PER_CELL_N_SPLITS = 10
 PER_CELL_K = 2  # C(10, 2) = 45 paths
-PER_CELL_GAP = 22  # (timeout_candles + 1) within a single-symbol cell
+PER_CELL_GAP = 43  # (timeout_candles + 1) within a single-symbol cell — iter-v3/068 timeout widen
 
 
 def _compute_per_cell_pbo(
@@ -1377,7 +1396,7 @@ def _build_v3_model(
         max_amount_usd=1000.0,
         stop_loss_pct=4.0,
         take_profit_pct=8.0,
-        timeout_minutes=10080,  # 7 days (21 candles at 8h)
+        timeout_minutes=20160,  # 14 days (42 candles at 8h) — iter-v3/068 Path C axis
         fee_pct=0.1,
         data_dir=DATA_DIR,
         cooldown_candles=4,  # 32h between trades (inherited from v2)
@@ -1395,7 +1414,7 @@ def _build_v3_model(
         cv_splits=5,
         label_tp_pct=8.0,
         label_sl_pct=4.0,
-        label_timeout_minutes=10080,
+        label_timeout_minutes=20160,  # 14 days (42 candles at 8h) — iter-v3/068 Path C axis
         fee_pct=0.1,
         features_dir=str(FEATURES_DIR),
         verbose=1,
@@ -1418,12 +1437,11 @@ def _build_v3_model(
     elif model_type == "xgboost":
         m1 = XgboostStrategy(oof_persist_path=oof_persist_path, **common_kwargs)
     else:
-        # iter-v3/067 Path D: pass inference_threshold_floor=0.60 to LightGbmStrategy only.
-        # XgboostStrategy and MetaLabelingStrategy do not support this parameter.
-        # Ref: brief Section 3 Sub-fix 3; Critic /066 Rec #2 (GATE modifier, not WEIGHT modifier).
+        # iter-v3/068: REVERT inference_threshold_floor to default 0.0 (iter-v3/067 INERT closed).
+        # /067's Path D axis (floor=0.60) was INERT-AT-EXPLORATION per Critic FINAL `b8d3bb5`.
+        # /068 isolates the single varied axis: label_timeout_minutes=20160 (Path C).
         m1 = LightGbmStrategy(
             oof_persist_path=oof_persist_path,
-            inference_threshold_floor=0.60,
             **common_kwargs,
         )
     risk_cfg = RiskV2Config(
@@ -2055,9 +2073,7 @@ def main() -> None:
     print(f"Ensemble: {ensemble_size_for_run} seeds  Optuna trials/model: {args.n_trials}")
     print(f"Active models: {len(active_models)}/{len(V3_MODELS)} (--symbols={args.symbols!r})")
     print(f"CPCV: N={CPCV_N_SPLITS}, k={CPCV_N_TEST_SPLITS}, 45 paths on IS CANDLE SEQUENCE")
-    print(
-        f"Gap: {REQUIRED_GAP} (= (timeout_candles+1) * 4 symbols [BCH+LDO+TRX+ALGO, iter-v3/034])"
-    )
+    print(f"Gap: {REQUIRED_GAP} (= (42+1)*3=129; iter-v3/068 timeout 21→42 candles)")
     print(
         f"Pre-flight: branch OK, symbols OK, data fresh (<16h), "
         f"feature-cols={len(V3_FEATURE_COLUMNS)}  PASS\n"

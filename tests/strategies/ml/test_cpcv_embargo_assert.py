@@ -3,12 +3,14 @@
 Tests verify that the gap-assertion machinery in combinatorial_purged_cv
 correctly rejects silently degraded gaps.  Per brief Section 3.6:
 
-  'Calling combinatorial_purged_cv(n_samples=1000, gap=88) accepts the gap.
-   Calling with gap=11 when the documented formula would produce gap=88
+  'Calling combinatorial_purged_cv(n_samples=1000, gap=129) accepts the gap.
+   Calling with gap=11 when the documented formula would produce gap=129
    raises an assertion error or a clear warning, not a silent rescaling.'
 
 This test is the regression guard against the iter-v3/001 bug where
 run_baseline_v3.py:381 silently passed gap=min(88, 11)=11 to CPCV.
+
+iter-v3/068 Path C: CORRECT_GAP updated 66→129 (timeout 21→42 candles, 3-sym universe).
 """
 
 from __future__ import annotations
@@ -22,9 +24,11 @@ from crypto_trade.strategies.ml.validation_v3 import (
 )
 
 # v3 documented constants
-TIMEOUT_CANDLES = 21  # 10080 min / 480 min = 21 candles at 8h
-N_SYMBOLS = 4  # BCH + LDO + TRX + ALGO (iter-v3/034: DROP VETUSDT 5→4)
-CORRECT_GAP = (TIMEOUT_CANDLES + 1) * N_SYMBOLS  # 88
+# iter-v3/068 Path C: timeout widened 21 → 42 candles (10080 → 20160 min).
+# REQUIRED_GAP = (42+1)*3 = 129 (3-symbol universe BCH+LDO+TRX, unchanged from /051 REVERT).
+TIMEOUT_CANDLES = 42  # 20160 min / 480 min = 42 candles at 8h (iter-v3/068 Path C)
+N_SYMBOLS = 3  # BCH + LDO + TRX (iter-v3/051 SYSTEM-LEVEL REVERT — 3-sym universe)
+CORRECT_GAP = (TIMEOUT_CANDLES + 1) * N_SYMBOLS  # 129
 DEGRADED_GAP = 11  # what iter-v3/001 actually passed (bug)
 
 N_SAMPLES = 1000  # representative IS candle count
@@ -36,7 +40,7 @@ N_SAMPLES = 1000  # representative IS candle count
 
 
 def test_correct_gap_accepted() -> None:
-    """combinatorial_purged_cv(gap=88, expected_gap=88) runs without error."""
+    """combinatorial_purged_cv(gap=CORRECT_GAP, expected_gap=CORRECT_GAP) runs without error."""
     splits = combinatorial_purged_cv(
         n_samples=N_SAMPLES,
         n_splits=10,
@@ -57,7 +61,7 @@ def test_correct_gap_accepted() -> None:
 
 
 def test_degraded_gap_raises_assertion() -> None:
-    """combinatorial_purged_cv raises AssertionError when gap=11 but expected_gap=88."""
+    """combinatorial_purged_cv raises AssertionError when gap=11 but expected_gap=CORRECT_GAP."""
     with pytest.raises(AssertionError) as exc_info:
         combinatorial_purged_cv(
             n_samples=N_SAMPLES,
@@ -105,9 +109,10 @@ def test_required_gap_matches_formula() -> None:
         f"(timeout_candles+1)*n_symbols={formula_gap}. "
         "Update the REQUIRED_GAP constant or the formula."
     )
-    assert REQUIRED_GAP == 88, (
-        f"REQUIRED_GAP should be 88 for v3 (21+1)*4=88 "
-        f"(4-sym universe at iter-v3/034 DROP VETUSDT), got {REQUIRED_GAP}"
+    # iter-v3/068 Path C: timeout=42 candles, 3 symbols → (42+1)*3=129
+    assert REQUIRED_GAP == 129, (
+        f"REQUIRED_GAP should be 129 for v3 (42+1)*3=129 "
+        f"(3-sym universe BCH+LDO+TRX at iter-v3/068 timeout widen), got {REQUIRED_GAP}"
     )
 
 
