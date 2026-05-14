@@ -702,8 +702,8 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
         )
     expected_floor = 0.60
     _p13_inner = (
-        p13_strat_check.inner_strategy
-        if hasattr(p13_strat_check, "inner_strategy")
+        p13_strat_check.inner
+        if hasattr(p13_strat_check, "inner")
         else p13_strat_check
     )
     if not hasattr(_p13_inner, "_inference_threshold_floor"):
