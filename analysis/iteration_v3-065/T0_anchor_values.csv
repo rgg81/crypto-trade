@@ -1,0 +1,7 @@
+metric,value,source
+monthly_sharpe_in_sample,0.8325,reports-v3/iteration_v3-060/comparison.csv:2
+monthly_sharpe_out_of_sample,0.1403,reports-v3/iteration_v3-060/comparison.csv:2
+BCH_OOS_weighted_pnl,1.9078,reports-v3/iteration_v3-060/comparison.csv:18
+LDO_OOS_weighted_pnl,-19.7208,reports-v3/iteration_v3-060/comparison.csv:19
+TRX_OOS_weighted_pnl,23.3119,reports-v3/iteration_v3-060/comparison.csv:20
+n_trades_out_of_sample,102.0,reports-v3/iteration_v3-060/comparison.csv:7
