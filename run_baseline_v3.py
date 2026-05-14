@@ -1404,7 +1404,7 @@ def _build_v3_model(
         max_amount_usd=1000.0,
         stop_loss_pct=4.0,
         take_profit_pct=8.0,
-        timeout_minutes=20160,  # 14 days (42 candles at 8h) — iter-v3/068 Path C axis
+        timeout_minutes=10080,  # 7 days (21 candles at 8h) — REVERT /068's Path C at /069
         fee_pct=0.1,
         data_dir=DATA_DIR,
         cooldown_candles=4,  # 32h between trades (inherited from v2)
