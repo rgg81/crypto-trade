@@ -286,29 +286,30 @@ def test_v3_atr_multipliers_per_symbol_is_empty() -> None:
     )
 
 
-def test_all_symbols_atr_default_iter_v3_065() -> None:
-    """All 3 active symbols (BCH/LDO/TRX) must return (2.0, 1.5) via DEFAULT at iter-v3/065.
+def test_all_symbols_atr_default_iter_v3_066() -> None:
+    """All 3 active symbols (BCH/LDO/TRX) must return (2.0, 1.0) via DEFAULT at iter-v3/066.
 
-    iter-v3/065 Path D: universal SL widening from 1.0×ATR to 1.5×ATR.
-    TP multiplier unchanged at 2.0×ATR. V3_ATR_MULTIPLIERS_PER_SYMBOL is empty;
-    all 3 symbols fall back to DEFAULT_ATR_MULTIPLIERS = (2.0, 1.5).
-    EDA SHA `662659c`; analysis/iteration_v3-065/labeling_parameter_eda.py.
+    iter-v3/066 axis isolation: REVERTED from /065's (2.0, 1.5) back to (2.0, 1.0).
+    The single varied axis at /066 is RiskV2Config.vol_scale_ceiling=0.8 (Path E0.8).
+    EDA SHA `1d75cb0`; analysis/iteration_v3-066/risk_primitive_eda.py Section 2.7 T6.
+    V3_ATR_MULTIPLIERS_PER_SYMBOL is empty; all 3 symbols fall back to DEFAULT = (2.0, 1.0).
     """
-    assert DEFAULT_ATR_MULTIPLIERS == (2.0, 1.5), (
-        f"DEFAULT_ATR_MULTIPLIERS = {DEFAULT_ATR_MULTIPLIERS} — expected (2.0, 1.5). "
-        "iter-v3/065 Path D: universal SL widening. Verify features_v3/__init__.py."
+    assert DEFAULT_ATR_MULTIPLIERS == (2.0, 1.0), (
+        f"DEFAULT_ATR_MULTIPLIERS = {DEFAULT_ATR_MULTIPLIERS} — expected (2.0, 1.0). "
+        "iter-v3/066 axis isolation: /065 SL widening reverted for single-axis attribution. "
+        "Verify DEFAULT_ATR_MULTIPLIERS = (2.0, 1.0) in features_v3/__init__.py."
     )
     for sym in ("BCHUSDT", "LDOUSDT", "TRXUSDT"):
         result = atr_multipliers_for_symbol(sym)
-        assert result == (2.0, 1.5), (
-            f"atr_multipliers_for_symbol('{sym}') returned {result} — expected (2.0, 1.5). "
-            "iter-v3/065 Path D: V3_ATR_MULTIPLIERS_PER_SYMBOL is empty; "
-            "all symbols use DEFAULT_ATR_MULTIPLIERS = (2.0, 1.5) via fallback."
+        assert result == (2.0, 1.0), (
+            f"atr_multipliers_for_symbol('{sym}') returned {result} — expected (2.0, 1.0). "
+            "iter-v3/066 axis isolation: V3_ATR_MULTIPLIERS_PER_SYMBOL is empty; "
+            "all symbols use DEFAULT_ATR_MULTIPLIERS = (2.0, 1.0) via fallback."
         )
     algo_atr = atr_multipliers_for_symbol("ALGOUSDT")
-    assert algo_atr == (2.0, 1.5), (
-        f"atr_multipliers_for_symbol('ALGOUSDT') returned {algo_atr} — expected (2.0, 1.5). "
-        "iter-v3/065: V3_ATR_MULTIPLIERS_PER_SYMBOL is empty; ALGO uses DEFAULT fallback."
+    assert algo_atr == (2.0, 1.0), (
+        f"atr_multipliers_for_symbol('ALGOUSDT') returned {algo_atr} — expected (2.0, 1.0). "
+        "iter-v3/066: V3_ATR_MULTIPLIERS_PER_SYMBOL is empty; ALGO uses DEFAULT fallback."
     )
 
 

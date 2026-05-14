@@ -125,7 +125,7 @@ def _derive_ensemble_seeds(outer_seed: int, size: int = 5) -> list[int]:
     return [int(s) for s in rng.integers(low=0, high=2**31 - 1, size=size)]
 
 
-ITERATION_LABEL = "v3-065"
+ITERATION_LABEL = "v3-066"
 REPORTS_DIR = Path("reports-v3")
 FEATURES_DIR = Path("data/features_v3")
 DATA_DIR = Path("data")
@@ -409,21 +409,22 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
         "regime_momentum_signed_5d PRESENT; sym_vs_btc_ret_7d PRESENT)  PASS"
     )
 
-    # iter-v3/065 Path D: DEFAULT_ATR_MULTIPLIERS must be (2.0, 1.5).
-    # Universal SL widening from 1.0×ATR → 1.5×ATR (TP unchanged at 2.0×ATR).
-    # V3_ATR_MULTIPLIERS_PER_SYMBOL remains empty — all 3 symbols (BCH/LDO/TRX) use DEFAULT.
-    # EDA SHA `662659c`; briefs-v3/iteration_v3-065/research_brief.md Section 3 Sub-fix 1.
-    if DEFAULT_ATR_MULTIPLIERS != (2.0, 1.5):
+    # iter-v3/066: DEFAULT_ATR_MULTIPLIERS REVERTED to (2.0, 1.0).
+    # /065 set (2.0, 1.5); /066 REVERTS to (2.0, 1.0) for single-axis attribution.
+    # The single varied axis at /066 is RiskV2Config.vol_scale_ceiling=0.8 (Path E0.8).
+    # /065 labeling axis (SL=1.5) is reserved for /069 CONFIRMATION bundle alongside /066.
+    # EDA SHA `1d75cb0`; briefs-v3/iteration_v3-066/research_brief.md Section 3 Sub-fix 2.
+    if DEFAULT_ATR_MULTIPLIERS != (2.0, 1.0):
         raise RuntimeError(
-            f"DEFAULT_ATR_MULTIPLIERS = {DEFAULT_ATR_MULTIPLIERS} — expected (2.0, 1.5). "
-            "iter-v3/065 Path D: universal SL widening from 1.0×ATR to 1.5×ATR. "
-            "TP multiplier unchanged at 2.0×ATR. "
-            "V3_ATR_MULTIPLIERS_PER_SYMBOL remains empty — all 3 symbols use DEFAULT. "
-            "Verify DEFAULT_ATR_MULTIPLIERS = (2.0, 1.5) in features_v3/__init__.py."
+            f"DEFAULT_ATR_MULTIPLIERS = {DEFAULT_ATR_MULTIPLIERS} — expected (2.0, 1.0). "
+            "iter-v3/066 axis isolation: /065's universal SL widening (2.0, 1.5) reverts "
+            "to /060 baseline labeling (2.0, 1.0) so the single varied axis at /066 is "
+            "RiskV2Config.vol_scale_ceiling=0.8 (Path E0.8 per EDA SHA 1d75cb0). "
+            "/065 axis is bundled at /069 CONFIRMATION."
         )
     print(
-        "  DEFAULT_ATR_MULTIPLIERS = (2.0, 1.5) "
-        "(iter-v3/065 Path D: universal SL widening)  PASS"
+        "  DEFAULT_ATR_MULTIPLIERS = (2.0, 1.0) "
+        "(iter-v3/066 axis isolation: /065 SL reverted; single axis = vol_scale_ceiling=0.8)  PASS"
     )
 
     # iter-v3/044: V3_FEATURES_PER_SYMBOL MUST BE EMPTY.
@@ -497,22 +498,23 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
         "regime_momentum_signed_5d, sym_vs_btc_ret_7d PRESENT)  PASS"
     )
 
-    # iter-v3/065: All 3 symbols (BCH/LDO/TRX) MUST return (2.0, 1.5) via DEFAULT fallback.
-    # iter-v3/065 UNIVERSAL labeling axis (Path D): SL widened from 1.0 → 1.5×ATR
-    # universally; V3_ATR_MULTIPLIERS_PER_SYMBOL is empty (no per-symbol overrides).
+    # iter-v3/066: All 3 symbols (BCH/LDO/TRX) MUST return (2.0, 1.0) via DEFAULT fallback.
+    # /065 set (2.0, 1.5); /066 REVERTS to (2.0, 1.0) for single-axis attribution.
+    # V3_ATR_MULTIPLIERS_PER_SYMBOL must be EMPTY (no per-symbol overrides; carry-forward /051).
     for _sym_atr in ("BCHUSDT", "LDOUSDT", "TRXUSDT"):
         sym_atr = atr_multipliers_for_symbol(_sym_atr)
-        if sym_atr != (2.0, 1.5):
+        if sym_atr != (2.0, 1.0):
             raise RuntimeError(
                 f"atr_multipliers_for_symbol('{_sym_atr}') returned {sym_atr} — "
-                "expected (2.0, 1.5) (DEFAULT fallback at iter-v3/065). "
-                "UNIVERSAL labeling axis: V3_ATR_MULTIPLIERS_PER_SYMBOL must be "
-                "EMPTY; all 3 symbols use DEFAULT_ATR_MULTIPLIERS = (2.0, 1.5). "
-                "Clear V3_ATR_MULTIPLIERS_PER_SYMBOL = {{}} in features_v3/__init__.py."
+                "expected (2.0, 1.0) (DEFAULT fallback at iter-v3/066). "
+                "iter-v3/066 axis isolation: REVERT /065's (2.0, 1.5) back to (2.0, 1.0). "
+                "V3_ATR_MULTIPLIERS_PER_SYMBOL must be EMPTY; "
+                "all 3 symbols use DEFAULT_ATR_MULTIPLIERS = (2.0, 1.0). "
+                "Verify DEFAULT_ATR_MULTIPLIERS = (2.0, 1.0) in features_v3/__init__.py."
             )
     print(
-        "  atr_multipliers_for_symbol: BCH/LDO/TRX all (2.0, 1.5) DEFAULT "
-        "(iter-v3/065 UNIVERSAL labeling axis Path D; V3_ATR_MULTIPLIERS_PER_SYMBOL EMPTY)  PASS"
+        "  atr_multipliers_for_symbol: BCH/LDO/TRX all (2.0, 1.0) DEFAULT "
+        "(iter-v3/066 axis isolation: /065 SL reverted; PER_SYMBOL EMPTY)  PASS"
     )
 
     # iter-v3/051: Primitive 10 REVERT — block_long_for=() per system-level rule.
@@ -684,6 +686,33 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
     print(
         "  Per-symbol vol_scale_floor (iter-v3/061): {'TRXUSDT': 0.5} "
         "(TRX floor raised 0.3→0.5; BCH/LDO unchanged at global 0.3)  PASS"
+    )
+
+    # iter-v3/066: Universal vol_scale_ceiling must be 0.8 (Path E0.8).
+    # EDA SHA `1d75cb0`; analysis/iteration_v3-066/risk_primitive_eda.py.
+    # LDO OOS anti-Kelly correction: 6 of 11 LDO OOS trades at wf≥0.8 with -19.72 OOS wpnl.
+    # Reuses p12_strat_check (TRXUSDT model) — vol_scale_ceiling is a universal scalar
+    # independent of per-symbol config, so any symbol's RiskV2Config is representative.
+    _p13_cfg_check, p13_strat_check = _build_v3_model(
+        symbol="BCHUSDT", seed=42, n_trials=1, ensemble_seeds=[42]
+    )
+    if not isinstance(p13_strat_check, RiskV3Wrapper):
+        raise RuntimeError(
+            f"_build_v3_model(BCHUSDT) returned {type(p13_strat_check).__name__} — "
+            "expected RiskV3Wrapper. iter-v3/066: vol_scale_ceiling check requires "
+            "RiskV3Wrapper around LightGbmStrategy."
+        )
+    expected_ceiling = 0.8
+    if p13_strat_check.config.vol_scale_ceiling != expected_ceiling:
+        raise RuntimeError(
+            f"RiskV2Config.vol_scale_ceiling = {p13_strat_check.config.vol_scale_ceiling} — "
+            f"expected {expected_ceiling}. iter-v3/066 Path E0.8: universal ceiling "
+            f"tightening 1.0 → 0.8 per EDA SHA 1d75cb0. "
+            f"Set vol_scale_ceiling=0.8 in RiskV2Config init in _build_v3_model."
+        )
+    print(
+        f"  Universal vol_scale_ceiling (iter-v3/066): {expected_ceiling} "
+        f"(Path E0.8 universal tightening from 1.0; LDO anti-Kelly correction)  PASS"
     )
 
 
@@ -1417,6 +1446,13 @@ def _build_v3_model(
         # Counterfactual: +0.47 OOS wpnl TRX lift with bit-identical IS (+0.008 wpnl).
         # BCH/LDO weighted_pnl mathematically invariant per Section 2.5 Q5 invariance check.
         vol_scale_floor_per_symbol={"TRXUSDT": 0.5},
+        # iter-v3/066: UNIVERSAL vol_scale_ceiling tightening 1.0 → 0.8 (Path E0.8).
+        # EDA SHA `1d75cb0`; analysis/iteration_v3-066/risk_primitive_eda.py.
+        # LDO OOS anti-Kelly correction: 6 of 11 LDO OOS trades at wf≥0.8 with -19.72 OOS wpnl.
+        # ORACLE prediction: IS Δ +0.008, OOS Δ +0.022 (sign-aligned positive; sub-band magnitude).
+        # Universal (BCH+LDO+TRX all capped at 0.8). Effective vol-scale band: [0.3, 0.8] universal
+        # / [0.5, 0.8] for TRX (combined with vol_scale_floor_per_symbol override from /061).
+        vol_scale_ceiling=0.8,
     )
     strategy = RiskV3Wrapper(m1, risk_cfg)
     return cfg, strategy
