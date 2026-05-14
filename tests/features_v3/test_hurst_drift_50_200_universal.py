@@ -60,27 +60,26 @@ _V3_MODELS_ITER_053 = ("BCHUSDT", "LDOUSDT", "TRXUSDT")
 
 
 def test_hurst_drift_50_200_in_universal_feature_list() -> None:
-    """hurst_drift_50_200 MUST be ABSENT from V3_FEATURE_COLUMNS_TOP_N at iter-v3/064.
+    """hurst_drift_50_200 MUST be ABSENT from V3_FEATURE_COLUMNS_TOP_N at iter-v3/065.
 
     iter-v3/053: SWAP added hurst_drift_50_200 as 15th element.
     iter-v3/054: PARK -- hurst_drift_50_200 DROPPED (Critic FINAL `c056354` rec #1).
     iter-v3/063: RE-INCLUDED briefly under mass-expansion mandate; pre-flight ban
                  filter dropped it again at 48→46 step. Mass-expansion axis CLOSED.
-    iter-v3/064: REMAINS PARKED. PHASED MASS-EXPANSION #1 (14 BASELINE_V3 + adx_14 = 15
-                 features). hurst_drift_50_200 is on the catastrophic-dead ban list per
-                 amended `feedback_v3_mass_feature_expansion.md` (2026-05-14 amendment).
+    iter-v3/064: REMAINS PARKED. adx_14 added, then REMOVED at /064 closeout (NEGATIVE).
+                 V3_FEATURE_COLUMNS_TOP_N reverted to 14 at commit `04080c4`.
+    iter-v3/065: NON-FEATURE axis. Feature count = 14. hurst_drift_50_200 still PARKED-ABSENT.
                  Compute function in engineered_v3.py is RETAINED as dead code dispatch.
     """
     assert "hurst_drift_50_200" not in V3_FEATURE_COLUMNS_TOP_N, (
-        "hurst_drift_50_200 FOUND in V3_FEATURE_COLUMNS_TOP_N -- must be ABSENT at iter-v3/064. "
+        "hurst_drift_50_200 FOUND in V3_FEATURE_COLUMNS_TOP_N -- must be ABSENT at iter-v3/065. "
         "PARKED per /053 PATH D NULL-RESULT closeout + Critic FINAL `c056354` rec #1. "
-        "Re-evaluated at /063 mass expansion; pre-flight ban filter restored exclusion. "
         "Remove it from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
     )
     n = len(V3_FEATURE_COLUMNS_TOP_N)
-    assert n == 15, (
-        f"V3_FEATURE_COLUMNS_TOP_N has {n} elements -- expected 15. "
-        "iter-v3/064: PHASED MASS-EXPANSION #1 (REVERT to 14-feature anchor + ADD adx_14). "
+    assert n == 14, (
+        f"V3_FEATURE_COLUMNS_TOP_N has {n} elements -- expected 14. "
+        "iter-v3/065: NON-FEATURE axis (universal SL widening); feature count = 14. "
         "Check V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
     )
     assert "regime_momentum_signed_3d" not in V3_FEATURE_COLUMNS_TOP_N, (
@@ -283,36 +282,37 @@ def test_v3_models_is_3_symbol_at_iter_v3_053() -> None:
     at the system level per iter-v3/051 (feedback_v3_per_symbol_lifts_oos_breaks_is.md
     UPDATED 2026-05-10; two-cycle anti-pattern confirmation at /039+/050).
 
-    iter-v3/064: PHASED MASS-EXPANSION #1 (15 features = 14 BASELINE_V3 + adx_14).
-    hurst_drift_50_200 PARKED-ABSENT. All 3 symbols return 15-feature fallback.
+    iter-v3/065: NON-FEATURE axis (universal SL widening). Feature count = 14.
+    hurst_drift_50_200 PARKED-ABSENT. All 3 symbols return 14-feature fallback.
     REQUIRED_GAP = 66 = (21+1)*3 (3-symbol universe; UNCHANGED).
     """
     from crypto_trade.features_v3 import features_for_symbol  # noqa: PLC0415
 
     expected_universe = ("BCHUSDT", "LDOUSDT", "TRXUSDT")
-    # Each symbol in the expected universe must return the 15-feature universal fallback
+    # Each symbol in the expected universe must return the 14-feature universal fallback
     for sym in expected_universe:
         feats = features_for_symbol(sym)
-        assert len(feats) == 15, (
-            f"{sym} fallback returns {len(feats)} features -- expected 15. "
-            "iter-v3/064 PHASED MASS-EXPANSION #1: BCH + LDO + TRX, all at 15-feature universal "
-            "fallback (14 BASELINE_V3 + adx_14; hurst_drift_50_200 PARKED-ABSENT)."
+        assert len(feats) == 14, (
+            f"{sym} fallback returns {len(feats)} features -- expected 14. "
+            "iter-v3/065 NON-FEATURE axis: BCH + LDO + TRX, all at 14-feature universal "
+            "fallback (14 BASELINE_V3; adx_14 removed at /064 closeout; "
+            "hurst_drift_50_200 PARKED-ABSENT)."
         )
         assert "hurst_drift_50_200" not in feats, (
-            f"{sym} fallback contains hurst_drift_50_200 -- must be ABSENT at iter-v3/064. "
+            f"{sym} fallback contains hurst_drift_50_200 -- must be ABSENT at iter-v3/065. "
             "PARKED per /053 PATH D NULL-RESULT + Critic FINAL `c056354` rec #1."
         )
         assert "regime_momentum_signed_3d" not in feats, (
             f"{sym} fallback contains regime_momentum_signed_3d -- must be ABSENT. "
             "iter-v3/053: 3d PARKED per /052 PATH C-suspicious; NOT re-evaluated."
         )
-        assert "adx_14" in feats, (
-            f"{sym} fallback does NOT contain adx_14 -- must be PRESENT at iter-v3/064. "
-            "PHASED MASS-EXPANSION #1 single-feature addition."
+        assert "adx_14" not in feats, (
+            f"{sym} fallback contains adx_14 -- must be ABSENT at iter-v3/065. "
+            "adx_14 REMOVED at /064 closeout (NEGATIVE per Critic FINAL `452fcf2`)."
         )
     # ALGOUSDT must NOT be in the v3 model universe
     assert "ALGOUSDT" not in {sym for sym in expected_universe}, (
-        "ALGOUSDT found in expected universe -- must be ABSENT at iter-v3/064. "
+        "ALGOUSDT found in expected universe -- must be ABSENT at iter-v3/065. "
         "System-level REVERT at iter-v3/051."
     )
     # Verify the constant matches the expected list exactly

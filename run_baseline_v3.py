@@ -125,7 +125,7 @@ def _derive_ensemble_seeds(outer_seed: int, size: int = 5) -> list[int]:
     return [int(s) for s in rng.integers(low=0, high=2**31 - 1, size=size)]
 
 
-ITERATION_LABEL = "v3-064"
+ITERATION_LABEL = "v3-065"
 REPORTS_DIR = Path("reports-v3")
 FEATURES_DIR = Path("data/features_v3")
 DATA_DIR = Path("data")
@@ -394,8 +394,9 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
             raise RuntimeError(
                 f"iter-v3/063 NEW feature '{_feat}' FOUND in V3_FEATURE_COLUMNS — must be "
                 "ABSENT at iter-v3/065+ (post-/064 NEGATIVE; REVERT to /060 14-feature anchor). "
-                f"Remove '{_feat}' from V3_FEATURE_COLUMNS_TOP_N. Per `feedback_v3_iter064_process_lessons.md` "
-                "Rule 5 (/060 14-feature anchor is local optimum at single-seed n_trials=35)."
+                f"Remove '{_feat}' from V3_FEATURE_COLUMNS_TOP_N. "
+                "Per `feedback_v3_iter064_process_lessons.md` Rule 5 "
+                "(/060 14-feature anchor is local optimum at single-seed n_trials=35)."
             )
     print(
         f"  V3_FEATURE_COLUMNS: {n} columns "
@@ -408,16 +409,22 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
         "regime_momentum_signed_5d PRESENT; sym_vs_btc_ret_7d PRESENT)  PASS"
     )
 
-    # iter-v3/044: Verify DEFAULT_ATR_MULTIPLIERS == (2.0, 1.0).
-    # Already correct since iter-v3/043 revert (was (1.5, 0.75) only at iter-v3/042).
-    if DEFAULT_ATR_MULTIPLIERS != (2.0, 1.0):
+    # iter-v3/065 Path D: DEFAULT_ATR_MULTIPLIERS must be (2.0, 1.5).
+    # Universal SL widening from 1.0×ATR → 1.5×ATR (TP unchanged at 2.0×ATR).
+    # V3_ATR_MULTIPLIERS_PER_SYMBOL remains empty — all 3 symbols (BCH/LDO/TRX) use DEFAULT.
+    # EDA SHA `662659c`; briefs-v3/iteration_v3-065/research_brief.md Section 3 Sub-fix 1.
+    if DEFAULT_ATR_MULTIPLIERS != (2.0, 1.5):
         raise RuntimeError(
-            f"DEFAULT_ATR_MULTIPLIERS = {DEFAULT_ATR_MULTIPLIERS} — expected (2.0, 1.0). "
-            "iter-v3/047: DEFAULT_ATR_MULTIPLIERS must be (2.0, 1.0) (reverted at iter-v3/043). "
-            "TRX + BCH use DEFAULT via V3_ATR_MULTIPLIERS_PER_SYMBOL fallback. "
-            "Verify DEFAULT_ATR_MULTIPLIERS = (2.0, 1.0) in features_v3/__init__.py."
+            f"DEFAULT_ATR_MULTIPLIERS = {DEFAULT_ATR_MULTIPLIERS} — expected (2.0, 1.5). "
+            "iter-v3/065 Path D: universal SL widening from 1.0×ATR to 1.5×ATR. "
+            "TP multiplier unchanged at 2.0×ATR. "
+            "V3_ATR_MULTIPLIERS_PER_SYMBOL remains empty — all 3 symbols use DEFAULT. "
+            "Verify DEFAULT_ATR_MULTIPLIERS = (2.0, 1.5) in features_v3/__init__.py."
         )
-    print("  DEFAULT_ATR_MULTIPLIERS = (2.0, 1.0) (already correct since iter-v3/043 revert)  PASS")
+    print(
+        "  DEFAULT_ATR_MULTIPLIERS = (2.0, 1.5) "
+        "(iter-v3/065 Path D: universal SL widening)  PASS"
+    )
 
     # iter-v3/044: V3_FEATURES_PER_SYMBOL MUST BE EMPTY.
     # All per-symbol feature customizations reverted. All symbols use 14-feature fallback.

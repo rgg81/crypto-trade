@@ -219,15 +219,24 @@ V3_FEATURE_COLUMNS: tuple[str, ...] = V3_FEATURE_COLUMNS_TOP_N
 iter-v3/064: points to 15-feature set (14 BASELINE_V3 + adx_14).
 """
 
-DEFAULT_ATR_MULTIPLIERS: tuple[float, float] = (2.0, 1.0)
+DEFAULT_ATR_MULTIPLIERS: tuple[float, float] = (2.0, 1.5)
 """Default ATR multipliers for symbols not in V3_ATR_MULTIPLIERS_PER_SYMBOL.
 
-iter-v3/043: REVERTED from (1.5, 0.75) back to (2.0, 1.0) — iter-v3/042 Path C
-(IS collapse NEGATIVE: IS Sharpe -0.5941, TRX OOS -33 wpnl swing) mandate fires.
-V3_ATR_MULTIPLIERS_PER_SYMBOL is empty, so all 4 symbols (BCH/LDO/TRX/ALGO) use
-this default universally via fallback.
-Value (2.0, 1.0) first set at iter-v3/010; validated anchor through iter-v3/041.
-Per briefs-v3/iteration_v3-043/research_brief.md Section 3 Sub-fix 1.
+iter-v3/065 Path D — UNIVERSAL SL WIDENING: (2.0, 1.0) → (2.0, 1.5).
+EDA SHA `662659c`; analysis/iteration_v3-065/labeling_parameter_eda.py.
+Path D selected because it produces the highest LDO long_tp_hit_rate lift
+(+8.6pp: 30.8% → 39.4%) and largest LDO SL reduction (-9.6pp: 68.7% → 59.0%)
+of any labeling path tested. Universal change (V3_ATR_MULTIPLIERS_PER_SYMBOL
+remains empty) — all 3 symbols (BCH/LDO/TRX) use DEFAULT via fallback.
+Per `feedback_v3_per_symbol_lifts_oos_breaks_is.md`: universal change preserves
+IS aggregate by construction; no per-symbol asymmetry.
+
+History:
+  iter-v3/043: REVERTED from (1.5, 0.75) back to (2.0, 1.0) — iter-v3/042 Path C
+  (IS collapse NEGATIVE: IS Sharpe -0.5941, TRX OOS -33 wpnl swing) mandate fires.
+  Value (2.0, 1.0) first set at iter-v3/010; validated anchor through iter-v3/041.
+  iter-v3/065: (2.0, 1.0) → (2.0, 1.5) — UNIVERSAL SL widening (TP unchanged).
+  Per briefs-v3/iteration_v3-065/research_brief.md Section 3 Sub-fix 1.
 """
 
 V3_ATR_MULTIPLIERS_PER_SYMBOL: dict[str, tuple[float, float]] = {

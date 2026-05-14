@@ -56,25 +56,25 @@ _V3_MODELS_ITER_052 = ("BCHUSDT", "LDOUSDT", "TRXUSDT")
 
 
 def test_fracdiff_d05_close_present_in_universal_feature_list() -> None:
-    """fracdiff_d05_close MUST be ABSENT from V3_FEATURE_COLUMNS_TOP_N at iter-v3/064.
+    """fracdiff_d05_close MUST be ABSENT from V3_FEATURE_COLUMNS_TOP_N at iter-v3/065.
 
     iter-v3/052: SWAP added fracdiff; PARKED at /053.
     iter-v3/063: RE-INCLUDED briefly in mass expansion 14→48. Mass-expansion axis CLOSED.
     iter-v3/064: PHASED MASS-EXPANSION #1: REVERT to 14-feature anchor + ADD adx_14 = 15.
                  fracdiff_d05_close REMAINS PARKED-ABSENT.
+                 adx_14 REMOVED at /064 closeout (NEGATIVE per Critic `452fcf2`).
+    iter-v3/065: NON-FEATURE axis. Feature count = 14. fracdiff_d05_close still PARKED-ABSENT.
                  Compute function in engineered_v3.py RETAINED as dead code.
     """
     assert "fracdiff_d05_close" not in V3_FEATURE_COLUMNS_TOP_N, (
-        "fracdiff_d05_close FOUND in V3_FEATURE_COLUMNS_TOP_N — must be ABSENT at iter-v3/064. "
-        "PARKED at /053 PATH C-suspicious + carry-forward at /064. "
-        "Per amended `feedback_v3_mass_feature_expansion.md` (2026-05-14): mass-expansion "
-        "candidates must go through phased-mass-expansion single-feature axes individually. "
+        "fracdiff_d05_close FOUND in V3_FEATURE_COLUMNS_TOP_N — must be ABSENT at iter-v3/065. "
+        "PARKED at /053 PATH C-suspicious + carry-forward at /065. "
         "Remove it from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
     )
     n = len(V3_FEATURE_COLUMNS_TOP_N)
-    assert n == 15, (
-        f"V3_FEATURE_COLUMNS_TOP_N has {n} elements — expected 15. "
-        "iter-v3/064: PHASED MASS-EXPANSION #1 (REVERT to 14-feature anchor + ADD adx_14). "
+    assert n == 14, (
+        f"V3_FEATURE_COLUMNS_TOP_N has {n} elements — expected 14. "
+        "iter-v3/065: NON-FEATURE axis (universal SL widening); feature count = 14. "
         "Check V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
     )
 

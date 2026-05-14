@@ -114,16 +114,18 @@ _ITER_063_NEW_REVERTED = frozenset(
 )
 
 
-def test_bch_fallback_15() -> None:
-    """BCHUSDT must return 15 features via fallback at iter-v3/064.
+def test_bch_fallback_14() -> None:
+    """BCHUSDT must return 14 features via fallback at iter-v3/065.
 
-    iter-v3/064: BCHUSDT not in V3_FEATURES_PER_SYMBOL (dict empty).
-    BCH uses V3_FEATURE_COLUMNS_TOP_N fallback = 15 features (PHASED MASS-EXPANSION #1).
+    iter-v3/064 closeout: adx_14 REMOVED (NEGATIVE per Critic `452fcf2`). V3_FEATURE_COLUMNS_TOP_N
+    reverted to 14 BASELINE_V3 features (commit `04080c4`).
+    iter-v3/065: BCHUSDT not in V3_FEATURES_PER_SYMBOL (dict empty).
+    BCH uses V3_FEATURE_COLUMNS_TOP_N fallback = 14 features (BASELINE_V3 + regime_momentum).
     """
     result = features_for_symbol("BCHUSDT")
-    assert len(result) == 15, (
-        f"BCHUSDT: expected 15 features (V3_FEATURE_COLUMNS_TOP_N fallback at iter-v3/064), "
-        f"got {len(result)}. V3_FEATURES_PER_SYMBOL must be empty + universal list = 15. "
+    assert len(result) == 14, (
+        f"BCHUSDT: expected 14 features (V3_FEATURE_COLUMNS_TOP_N fallback at iter-v3/065), "
+        f"got {len(result)}. V3_FEATURES_PER_SYMBOL must be empty + universal list = 14. "
         f"Got: {result}"
     )
     assert result == V3_FEATURE_COLUMNS_TOP_N, (
@@ -134,25 +136,26 @@ def test_bch_fallback_15() -> None:
 
 
 def test_bch_absent_dead_features() -> None:
-    """BCHUSDT MUST NOT include catastrophic-dead features at /064."""
+    """BCHUSDT MUST NOT include catastrophic-dead features at /065."""
     result = features_for_symbol("BCHUSDT")
     for feat in _CATASTROPHIC_DEAD:
         assert feat not in result, (
-            f"BCHUSDT: {feat} FOUND — must be ABSENT at iter-v3/064 (catastrophic-dead). "
+            f"BCHUSDT: {feat} FOUND — must be ABSENT at iter-v3/065 (catastrophic-dead). "
             f"Got: {result}"
         )
 
 
-def test_algo_fallback_15() -> None:
-    """ALGOUSDT must return 15 features via fallback at iter-v3/064.
+def test_algo_fallback_14() -> None:
+    """ALGOUSDT must return 14 features via fallback at iter-v3/065.
 
     ALGO is NOT in V3_MODELS but V3_FEATURES_PER_SYMBOL is empty and
-    features_for_symbol still returns the universal 15-feature list for ALGO.
+    features_for_symbol still returns the universal 14-feature list for ALGO.
+    iter-v3/064 closeout: adx_14 REMOVED. V3_FEATURE_COLUMNS_TOP_N = 14 at /065.
     """
     result = features_for_symbol("ALGOUSDT")
-    assert len(result) == 15, (
-        f"ALGOUSDT: expected 15 features (V3_FEATURE_COLUMNS_TOP_N fallback at iter-v3/064), "
-        f"got {len(result)}. V3_FEATURES_PER_SYMBOL must be empty + universal list = 15. "
+    assert len(result) == 14, (
+        f"ALGOUSDT: expected 14 features (V3_FEATURE_COLUMNS_TOP_N fallback at iter-v3/065), "
+        f"got {len(result)}. V3_FEATURES_PER_SYMBOL must be empty + universal list = 14. "
         f"Got: {result}"
     )
     assert result == V3_FEATURE_COLUMNS_TOP_N, (
@@ -163,21 +166,24 @@ def test_algo_fallback_15() -> None:
 
 
 def test_algo_absent_dead_features() -> None:
-    """ALGOUSDT must reflect /064 state (catastrophic-dead features ABSENT)."""
+    """ALGOUSDT must reflect /065 state (catastrophic-dead features ABSENT)."""
     result = features_for_symbol("ALGOUSDT")
     for feat in _CATASTROPHIC_DEAD:
         assert feat not in result, (
-            f"ALGOUSDT: {feat} FOUND — must be ABSENT at iter-v3/064 (catastrophic-dead). "
+            f"ALGOUSDT: {feat} FOUND — must be ABSENT at iter-v3/065 (catastrophic-dead). "
             f"Got: {result}"
         )
 
 
-def test_ldo_fallback_15() -> None:
-    """LDOUSDT must return 15 features via fallback at iter-v3/064."""
+def test_ldo_fallback_14() -> None:
+    """LDOUSDT must return 14 features via fallback at iter-v3/065.
+
+    iter-v3/064 closeout: adx_14 REMOVED. V3_FEATURE_COLUMNS_TOP_N = 14 at /065.
+    """
     result = features_for_symbol("LDOUSDT")
-    assert len(result) == 15, (
-        f"LDOUSDT: expected 15 features (V3_FEATURE_COLUMNS_TOP_N fallback at iter-v3/064), "
-        f"got {len(result)}. V3_FEATURES_PER_SYMBOL must be empty + universal list = 15. "
+    assert len(result) == 14, (
+        f"LDOUSDT: expected 14 features (V3_FEATURE_COLUMNS_TOP_N fallback at iter-v3/065), "
+        f"got {len(result)}. V3_FEATURES_PER_SYMBOL must be empty + universal list = 14. "
         f"Got: {result}"
     )
     assert result == V3_FEATURE_COLUMNS_TOP_N, (
@@ -188,21 +194,24 @@ def test_ldo_fallback_15() -> None:
 
 
 def test_ldo_absent_dead_features() -> None:
-    """LDOUSDT must reflect /064 state (catastrophic-dead features ABSENT)."""
+    """LDOUSDT must reflect /065 state (catastrophic-dead features ABSENT)."""
     result = features_for_symbol("LDOUSDT")
     for feat in _CATASTROPHIC_DEAD:
         assert feat not in result, (
-            f"LDOUSDT: {feat} FOUND — must be ABSENT at iter-v3/064 (catastrophic-dead). "
+            f"LDOUSDT: {feat} FOUND — must be ABSENT at iter-v3/065 (catastrophic-dead). "
             f"Got: {result}"
         )
 
 
-def test_trx_fallback_15() -> None:
-    """TRXUSDT must return 15 features via fallback at iter-v3/064."""
+def test_trx_fallback_14() -> None:
+    """TRXUSDT must return 14 features via fallback at iter-v3/065.
+
+    iter-v3/064 closeout: adx_14 REMOVED. V3_FEATURE_COLUMNS_TOP_N = 14 at /065.
+    """
     result = features_for_symbol("TRXUSDT")
-    assert len(result) == 15, (
-        f"TRXUSDT: expected 15 features (V3_FEATURE_COLUMNS_TOP_N fallback at iter-v3/064), "
-        f"got {len(result)}. V3_FEATURES_PER_SYMBOL must be empty + universal list = 15. "
+    assert len(result) == 14, (
+        f"TRXUSDT: expected 14 features (V3_FEATURE_COLUMNS_TOP_N fallback at iter-v3/065), "
+        f"got {len(result)}. V3_FEATURES_PER_SYMBOL must be empty + universal list = 14. "
         f"Got: {result}"
     )
     assert result == V3_FEATURE_COLUMNS_TOP_N, (
@@ -213,63 +222,63 @@ def test_trx_fallback_15() -> None:
 
 
 def test_trx_no_dead_features() -> None:
-    """TRXUSDT must NOT include catastrophic-dead features at iter-v3/064."""
+    """TRXUSDT must NOT include catastrophic-dead features at iter-v3/065."""
     result = features_for_symbol("TRXUSDT")
     for feat in _CATASTROPHIC_DEAD:
         assert feat not in result, (
-            f"TRXUSDT: {feat} FOUND — must be ABSENT at iter-v3/064 "
+            f"TRXUSDT: {feat} FOUND — must be ABSENT at iter-v3/065 "
             f"(catastrophic-dead). Got: {result}"
         )
 
 
 def test_bchusdt_not_in_per_symbol() -> None:
-    """BCHUSDT must NOT be in V3_FEATURES_PER_SYMBOL at iter-v3/064 (empty dict)."""
+    """BCHUSDT must NOT be in V3_FEATURES_PER_SYMBOL at iter-v3/065 (empty dict)."""
     assert "BCHUSDT" not in V3_FEATURES_PER_SYMBOL, (
-        f"V3_FEATURES_PER_SYMBOL has 'BCHUSDT' key — must be ABSENT at iter-v3/064. "
+        f"V3_FEATURES_PER_SYMBOL has 'BCHUSDT' key — must be ABSENT at iter-v3/065. "
         f"Current keys: {list(V3_FEATURES_PER_SYMBOL.keys())}."
     )
 
 
 def test_algousdt_not_in_per_symbol() -> None:
-    """ALGOUSDT must NOT be in V3_FEATURES_PER_SYMBOL at iter-v3/064 (empty dict)."""
+    """ALGOUSDT must NOT be in V3_FEATURES_PER_SYMBOL at iter-v3/065 (empty dict)."""
     assert "ALGOUSDT" not in V3_FEATURES_PER_SYMBOL, (
-        f"V3_FEATURES_PER_SYMBOL has 'ALGOUSDT' key — must be ABSENT at iter-v3/064. "
+        f"V3_FEATURES_PER_SYMBOL has 'ALGOUSDT' key — must be ABSENT at iter-v3/065. "
         f"Current keys: {list(V3_FEATURES_PER_SYMBOL.keys())}."
     )
 
 
 def test_ldousdt_not_in_per_symbol() -> None:
-    """LDOUSDT must NOT be in V3_FEATURES_PER_SYMBOL at iter-v3/064 (empty dict)."""
+    """LDOUSDT must NOT be in V3_FEATURES_PER_SYMBOL at iter-v3/065 (empty dict)."""
     assert "LDOUSDT" not in V3_FEATURES_PER_SYMBOL, (
-        f"V3_FEATURES_PER_SYMBOL has 'LDOUSDT' key — must be ABSENT at iter-v3/064. "
+        f"V3_FEATURES_PER_SYMBOL has 'LDOUSDT' key — must be ABSENT at iter-v3/065. "
         f"Current keys: {list(V3_FEATURES_PER_SYMBOL.keys())}."
     )
 
 
 def test_trxusdt_not_in_per_symbol() -> None:
-    """TRXUSDT must NOT be in V3_FEATURES_PER_SYMBOL at iter-v3/064 (empty dict)."""
+    """TRXUSDT must NOT be in V3_FEATURES_PER_SYMBOL at iter-v3/065 (empty dict)."""
     assert "TRXUSDT" not in V3_FEATURES_PER_SYMBOL, (
-        f"V3_FEATURES_PER_SYMBOL has 'TRXUSDT' key — must be ABSENT at iter-v3/064. "
+        f"V3_FEATURES_PER_SYMBOL has 'TRXUSDT' key — must be ABSENT at iter-v3/065. "
         f"Current keys: {list(V3_FEATURES_PER_SYMBOL.keys())}."
     )
 
 
 def test_v3_features_per_symbol_is_empty() -> None:
-    """V3_FEATURES_PER_SYMBOL must be EMPTY at iter-v3/064 (SYSTEM-LEVEL carry-forward)."""
+    """V3_FEATURES_PER_SYMBOL must be EMPTY at iter-v3/065 (SYSTEM-LEVEL carry-forward)."""
     assert len(V3_FEATURES_PER_SYMBOL) == 0, (
-        f"V3_FEATURES_PER_SYMBOL must be empty at iter-v3/064. "
+        f"V3_FEATURES_PER_SYMBOL must be empty at iter-v3/065. "
         f"Got {len(V3_FEATURES_PER_SYMBOL)} entries: {dict(V3_FEATURES_PER_SYMBOL)}. "
         f"Clear V3_FEATURES_PER_SYMBOL to {{}} in features_v3/__init__.py."
     )
 
 
 def test_v3_atr_multipliers_per_symbol_is_empty() -> None:
-    """V3_ATR_MULTIPLIERS_PER_SYMBOL must be EMPTY (0 entries) at iter-v3/064.
+    """V3_ATR_MULTIPLIERS_PER_SYMBOL must be EMPTY (0 entries) at iter-v3/065.
 
     SYSTEM-LEVEL REVERT carry-forward from iter-v3/051.
     """
     assert len(V3_ATR_MULTIPLIERS_PER_SYMBOL) == 0, (
-        f"V3_ATR_MULTIPLIERS_PER_SYMBOL must be EMPTY (0 entries) at iter-v3/064. "
+        f"V3_ATR_MULTIPLIERS_PER_SYMBOL must be EMPTY (0 entries) at iter-v3/065. "
         f"Got {len(V3_ATR_MULTIPLIERS_PER_SYMBOL)} entries: "
         f"{dict(V3_ATR_MULTIPLIERS_PER_SYMBOL)}. "
         f"SYSTEM-LEVEL REVERT to iter-v3/028 architecture per "
@@ -277,26 +286,29 @@ def test_v3_atr_multipliers_per_symbol_is_empty() -> None:
     )
 
 
-def test_all_symbols_atr_default_iter_v3_064() -> None:
-    """All 3 active symbols (BCH/LDO/TRX) must return (2.0, 1.0) via DEFAULT at iter-v3/064.
+def test_all_symbols_atr_default_iter_v3_065() -> None:
+    """All 3 active symbols (BCH/LDO/TRX) must return (2.0, 1.5) via DEFAULT at iter-v3/065.
 
-    SYSTEM-LEVEL REVERT carry-forward from iter-v3/051.
+    iter-v3/065 Path D: universal SL widening from 1.0×ATR to 1.5×ATR.
+    TP multiplier unchanged at 2.0×ATR. V3_ATR_MULTIPLIERS_PER_SYMBOL is empty;
+    all 3 symbols fall back to DEFAULT_ATR_MULTIPLIERS = (2.0, 1.5).
+    EDA SHA `662659c`; analysis/iteration_v3-065/labeling_parameter_eda.py.
     """
-    assert DEFAULT_ATR_MULTIPLIERS == (2.0, 1.0), (
-        f"DEFAULT_ATR_MULTIPLIERS = {DEFAULT_ATR_MULTIPLIERS} — expected (2.0, 1.0). "
-        "iter-v3/064: DEFAULT unchanged. Verify features_v3/__init__.py."
+    assert DEFAULT_ATR_MULTIPLIERS == (2.0, 1.5), (
+        f"DEFAULT_ATR_MULTIPLIERS = {DEFAULT_ATR_MULTIPLIERS} — expected (2.0, 1.5). "
+        "iter-v3/065 Path D: universal SL widening. Verify features_v3/__init__.py."
     )
     for sym in ("BCHUSDT", "LDOUSDT", "TRXUSDT"):
         result = atr_multipliers_for_symbol(sym)
-        assert result == (2.0, 1.0), (
-            f"atr_multipliers_for_symbol('{sym}') returned {result} — expected (2.0, 1.0). "
-            "iter-v3/064 SYSTEM-LEVEL REVERT: V3_ATR_MULTIPLIERS_PER_SYMBOL is empty; "
-            "all symbols use DEFAULT_ATR_MULTIPLIERS = (2.0, 1.0) via fallback."
+        assert result == (2.0, 1.5), (
+            f"atr_multipliers_for_symbol('{sym}') returned {result} — expected (2.0, 1.5). "
+            "iter-v3/065 Path D: V3_ATR_MULTIPLIERS_PER_SYMBOL is empty; "
+            "all symbols use DEFAULT_ATR_MULTIPLIERS = (2.0, 1.5) via fallback."
         )
     algo_atr = atr_multipliers_for_symbol("ALGOUSDT")
-    assert algo_atr == (2.0, 1.0), (
-        f"atr_multipliers_for_symbol('ALGOUSDT') returned {algo_atr} — expected (2.0, 1.0). "
-        "iter-v3/064: V3_ATR_MULTIPLIERS_PER_SYMBOL is empty; ALGO uses DEFAULT fallback."
+    assert algo_atr == (2.0, 1.5), (
+        f"atr_multipliers_for_symbol('ALGOUSDT') returned {algo_atr} — expected (2.0, 1.5). "
+        "iter-v3/065: V3_ATR_MULTIPLIERS_PER_SYMBOL is empty; ALGO uses DEFAULT fallback."
     )
 
 
@@ -375,33 +387,35 @@ def test_vwap_dev_50_not_in_universal_list() -> None:
     )
 
 
-def test_universal_list_is_15() -> None:
-    """V3_FEATURE_COLUMNS_TOP_N must have exactly 15 features at iter-v3/064.
+def test_universal_list_is_14() -> None:
+    """V3_FEATURE_COLUMNS_TOP_N must have exactly 14 features at iter-v3/065.
 
-    CHANGED from iter-v3/063 `test_universal_list_is_48` (was 48).
-    iter-v3/064: PHASED MASS-EXPANSION #1: REVERT to 14-feature anchor + ADD adx_14 = 15.
-    Per amended `feedback_v3_mass_feature_expansion.md` (2026-05-14).
+    CHANGED from iter-v3/064 `test_universal_list_is_15` (was 15 with adx_14).
+    iter-v3/064 closeout: adx_14 REMOVED (NEGATIVE per Critic `452fcf2`).
+    V3_FEATURE_COLUMNS_TOP_N reverted to 14 BASELINE_V3 features (commit `04080c4`).
+    iter-v3/065: NON-FEATURE axis (universal SL widening); feature count unchanged at 14.
     """
     n = len(V3_FEATURE_COLUMNS_TOP_N)
-    assert n == 15, (
-        f"V3_FEATURE_COLUMNS_TOP_N has {n} features — expected exactly 15 at iter-v3/064. "
-        f"iter-v3/064: PHASED MASS-EXPANSION #1 (REVERT to /060 14-feature anchor + ADD adx_14). "
+    assert n == 14, (
+        f"V3_FEATURE_COLUMNS_TOP_N has {n} features — expected exactly 14 at iter-v3/065. "
+        f"iter-v3/065: NON-FEATURE axis (universal SL widening); feature universe = 14. "
         f"Check features_v3/__init__.py V3_FEATURE_COLUMNS_TOP_N."
     )
 
 
 @pytest.mark.parametrize("symbol", ["BCHUSDT", "LDOUSDT", "TRXUSDT"])
-def test_all_symbols_fallback_15(symbol: str) -> None:
-    """All 3 active V3_MODELS symbols must return exactly 15 features at iter-v3/064.
+def test_all_symbols_fallback_14(symbol: str) -> None:
+    """All 3 active V3_MODELS symbols must return exactly 14 features at iter-v3/065.
 
-    CHANGED from iter-v3/063 `test_all_symbols_fallback_48` (was 48).
-    iter-v3/064: 15 features (PHASED MASS-EXPANSION #1). Parametrized over BCH/LDO/TRX.
+    CHANGED from iter-v3/064 `test_all_symbols_fallback_15` (was 15).
+    iter-v3/065: 14 features (14 BASELINE_V3 features; adx_14 removed at /064 closeout).
+    Parametrized over BCH/LDO/TRX.
     """
     result = features_for_symbol(symbol)
-    assert len(result) == 15, (
-        f"{symbol}: expected 15 features (V3_FEATURE_COLUMNS_TOP_N universal fallback at "
-        f"iter-v3/064), got {len(result)}. V3_FEATURES_PER_SYMBOL must be empty + "
-        f"universal list = 15 (14 BASELINE_V3 + adx_14)."
+    assert len(result) == 14, (
+        f"{symbol}: expected 14 features (V3_FEATURE_COLUMNS_TOP_N universal fallback at "
+        f"iter-v3/065), got {len(result)}. V3_FEATURES_PER_SYMBOL must be empty + "
+        f"universal list = 14 (14 BASELINE_V3 features, adx_14 removed at /064 closeout)."
     )
     assert result == V3_FEATURE_COLUMNS_TOP_N, (
         f"{symbol}: result differs from V3_FEATURE_COLUMNS_TOP_N. "
@@ -411,74 +425,83 @@ def test_all_symbols_fallback_15(symbol: str) -> None:
 
 
 def test_features_for_symbol_unknown_fallback() -> None:
-    """An unknown symbol falls back to V3_FEATURE_COLUMNS_TOP_N (15 features at iter-v3/064)."""
+    """An unknown symbol falls back to V3_FEATURE_COLUMNS_TOP_N (14 features at iter-v3/065).
+
+    iter-v3/064 closeout: adx_14 REMOVED. Feature count reverted to 14.
+    iter-v3/065: NON-FEATURE axis; feature count unchanged at 14.
+    """
     result = features_for_symbol("XYZUSDT")
     assert result is not None, "features_for_symbol must never return None."
-    assert len(result) == 15, (
-        f"Unknown symbol fallback should be 15 features at iter-v3/064, got {len(result)}."
+    assert len(result) == 14, (
+        f"Unknown symbol fallback should be 14 features at iter-v3/065, got {len(result)}."
     )
     assert result == V3_FEATURE_COLUMNS_TOP_N, (
-        "Unknown symbol 'XYZUSDT' should fall back to V3_FEATURE_COLUMNS_TOP_N (15 features)."
+        "Unknown symbol 'XYZUSDT' should fall back to V3_FEATURE_COLUMNS_TOP_N (14 features)."
     )
     for feat in _CATASTROPHIC_DEAD:
         assert feat not in result, (
             f"Unknown symbol fallback must NOT include {feat} (catastrophic-dead). Got: {result}"
         )
     assert "regime_momentum_signed_5d" in result, (
-        "regime_momentum_signed_5d must be in fallback at iter-v3/064 (mandate ACTIVE). "
+        "regime_momentum_signed_5d must be in fallback at iter-v3/065 (mandate ACTIVE). "
         "feedback_v3_engineered_features_proven.md mandate UPHELD."
     )
     assert "sym_vs_btc_ret_7d" in result, (
-        "sym_vs_btc_ret_7d must be in fallback at iter-v3/064 (RESTORED iter-v3/042; KEPT)."
+        "sym_vs_btc_ret_7d must be in fallback at iter-v3/065 (RESTORED iter-v3/042; KEPT)."
     )
     assert "ret_skew_50" in result, (
-        "ret_skew_50 must be PRESENT in fallback at iter-v3/064 "
-        "(RE-ANCHOR from /028 BASELINE_V3.md; KEPT through /064)."
+        "ret_skew_50 must be PRESENT in fallback at iter-v3/065 "
+        "(RE-ANCHOR from /028 BASELINE_V3.md; KEPT through /065)."
     )
-    assert "adx_14" in result, (
-        "adx_14 must be PRESENT in fallback at iter-v3/064 (PHASED MASS-EXPANSION #1)."
+    assert "adx_14" not in result, (
+        "adx_14 must be ABSENT in fallback at iter-v3/065 "
+        "(REMOVED at /064 closeout per Critic FINAL `452fcf2`)."
     )
 
 
 def test_baseline_v3_features_all_present() -> None:
-    """ALL 14 BASELINE_V3 features must be in V3_FEATURE_COLUMNS_TOP_N at iter-v3/064.
+    """ALL 14 BASELINE_V3 features must be in V3_FEATURE_COLUMNS_TOP_N at iter-v3/065.
 
-    iter-v3/064 PHASED MASS-EXPANSION #1: 14 BASELINE_V3 features + adx_14 = 15.
-    All 14 BASELINE_V3 features preserved.
+    iter-v3/065: NON-FEATURE axis (universal SL widening). Feature count = 14.
+    All 14 BASELINE_V3 features preserved (adx_14 removed at /064 closeout).
     """
     feature_set = set(V3_FEATURE_COLUMNS_TOP_N)
     missing = _BASELINE_V3_FEATURES - feature_set
     assert not missing, (
-        f"BASELINE_V3 features missing from V3_FEATURE_COLUMNS_TOP_N at iter-v3/064: "
-        f"{sorted(missing)}. All 14 BASELINE_V3 features must be preserved in the "
-        f"15-feature phased-expansion set. Add missing features to V3_FEATURE_COLUMNS_TOP_N."
+        f"BASELINE_V3 features missing from V3_FEATURE_COLUMNS_TOP_N at iter-v3/065: "
+        f"{sorted(missing)}. All 14 BASELINE_V3 features must be preserved. "
+        f"Add missing features to V3_FEATURE_COLUMNS_TOP_N."
     )
 
 
-def test_adx_14_in_universal_list() -> None:
-    """adx_14 MUST be in V3_FEATURE_COLUMNS_TOP_N at iter-v3/064 (PHASED-MASS-EXPANSION #1)."""
-    assert "adx_14" in V3_FEATURE_COLUMNS_TOP_N, (
-        "adx_14 NOT FOUND in V3_FEATURE_COLUMNS_TOP_N — must be PRESENT at iter-v3/064. "
-        "PHASED MASS-EXPANSION #1: REVERT to 14-feature anchor + ADD adx_14 (Wilder 1978 ADX). "
-        "Per amended `feedback_v3_mass_feature_expansion.md` (2026-05-14). "
-        "Add 'adx_14' to V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
+def test_adx_14_absent_from_universal_list() -> None:
+    """adx_14 MUST be ABSENT from V3_FEATURE_COLUMNS_TOP_N at iter-v3/065.
+
+    iter-v3/064 closeout: adx_14 REMOVED (NEGATIVE per Critic FINAL `452fcf2`).
+    Cycle 1 #6+ pivots to NON-FEATURE axes per Critic /064 Rec #4.
+    V3_FEATURE_COLUMNS_TOP_N reverted to 14 BASELINE_V3 features (commit `04080c4`).
+    iter-v3/065: NON-FEATURE axis (universal SL widening); adx_14 remains ABSENT.
+    """
+    assert "adx_14" not in V3_FEATURE_COLUMNS_TOP_N, (
+        "adx_14 FOUND in V3_FEATURE_COLUMNS_TOP_N — must be ABSENT at iter-v3/065. "
+        "adx_14 was REMOVED at iter-v3/064 closeout (NEGATIVE per Critic `452fcf2`). "
+        "Remove 'adx_14' from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
     )
 
 
 def test_iter_063_new_features_reverted() -> None:
-    """8 of 9 iter-v3/063 NEW features must be ABSENT at iter-v3/064 (REVERTED with mass-expansion).
+    """All 9 iter-v3/063 NEW features must be ABSENT at iter-v3/065.
 
-    iter-v3/064 PHASED MASS-EXPANSION #1: only adx_14 is kept from the /063 9-NEW set.
-    The other 8 features remain implemented in features_v3/ modules (zero revert cost) but
-    are NOT in V3_FEATURE_COLUMNS_TOP_N for /064.
-
-    They can be considered for phased-mass-expansion #2+ individually.
+    iter-v3/064 PHASED MASS-EXPANSION #1: only adx_14 was retained, then REMOVED at /064 closeout.
+    iter-v3/065: NON-FEATURE axis; all /063 mass-expansion features remain ABSENT.
+    They remain implemented in features_v3/ modules (zero revert cost) but
+    are NOT in V3_FEATURE_COLUMNS_TOP_N for /065.
     """
     feature_set = set(V3_FEATURE_COLUMNS_TOP_N)
     found = _ITER_063_NEW_REVERTED & feature_set
     assert not found, (
-        f"iter-v3/063 NEW features FOUND in V3_FEATURE_COLUMNS_TOP_N at /064: {sorted(found)}. "
-        "These 8 features should be REVERTED (kept-implemented; ABSENT from feature list) at "
-        "iter-v3/064 PHASED MASS-EXPANSION #1. Only adx_14 is retained. "
+        f"iter-v3/063 NEW features FOUND in V3_FEATURE_COLUMNS_TOP_N at /065: {sorted(found)}. "
+        "These features should be ABSENT (kept-implemented; ABSENT from feature list) at "
+        "iter-v3/065 NON-FEATURE axis. "
         "Per amended `feedback_v3_mass_feature_expansion.md` (2026-05-14)."
     )
