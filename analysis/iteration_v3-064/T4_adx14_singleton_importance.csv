@@ -1,0 +1,4 @@
+symbol,n_rows,n_long_labels,adx_14_rank_of_15,adx_14_gain,top3_features
+BCHUSDT,1876,743,12,145.6286816596985,"ret_kurt_200(421), btc_ret_14d(338), ret_autocorr_lag1_50(310)"
+LDOUSDT,881,312,2,226.74433088302612,"max_dd_window_50(243), adx_14(227), ret_kurt_200(192)"
+TRXUSDT,1857,799,7,185.97689867019653,"range_realized_vol_50(553), ret_skew_200(362), ret_skew_50(348)"
