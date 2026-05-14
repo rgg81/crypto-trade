@@ -1,0 +1,11 @@
+axis,before,after,delta,interpretation
+REQUIRED_GAP,66,88,+22,+1% per-cell train sample loss (small)
+n_trials_total,315,420,+105,Optuna independent per-symbol; per-symbol budget UNCHANGED
+n_symbols,3,4,+1,denominator expansion (per concentration_is_signal)
+predicted_IS_trades,159,"[194, 209]",+35 to +50,from NATR-derived candidate trade-rate proxy
+predicted_OOS_trades,102,"[122, 132]",+20 to +30,bundle-level floor 130 may or may not clear
+wall_clock_estimate,0.4-0.7h,1.5h target,+0.8-1.1h,4 syms × 3 seeds × 35 trials at single-seed EXPLORATION
+predicted_IS_Sharpe_PROMISING,+0.83,"[+0.93, +1.10]",+0.10 to +0.27,4th symbol contributes IS Sharpe ~+0.3 + dilution effect
+predicted_IS_Sharpe_NEGATIVE,+0.83,"[+0.33, +0.63]",-0.20 to -0.50,4th symbol drags IS (Optuna doesn't fit at single-seed) — per /021 mode
+predicted_OOS_Sharpe_PROMISING,+0.14,"[+0.24, +0.50]",+0.10 to +0.36,4th symbol contributes OOS + concentration dilution lifts TRX edge denominator
+predicted_OOS_Sharpe_NEGATIVE,+0.14,"[-0.36, -0.16]",-0.30 to -0.50,envelope per Critic /068 Rec #1 widening; 4th sym OOS-negative scenario
