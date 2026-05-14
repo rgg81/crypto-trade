@@ -1,8 +1,8 @@
 # iter-v3/069 — Research Brief
 
 **Branch**: `iteration-v3/069`
-**EDA SHA**: (analysis commit — populated at setup commit)
-**Setup commit SHA**: (this commit, LOCKED)
+**EDA SHA**: `95038dd`
+**Setup commit SHA**: `cde507b` (to be re-committed in a follow-up backfill commit after Phase 5.5 gate; this brief was first committed at `cde507b` as part of the setup commit; brief Section 10 SHA stamps backfilled to this brief via a follow-up `docs(iter-v3/069): backfill setup SHA in brief` commit)
 **Iteration type**: EXPLORATION (cycle 1 #10 of 10 — FINAL before /070 CONFIRMATION; NON-FEATURE PIVOT continuation; UNIVERSE EXPANSION axis — denominator-expansion mechanism per `feedback_v3_concentration_is_signal.md`)
 **Axis**: UNIVERSE EXPANSION — V3_MODELS expands 3 → 4 symbols (BCH+LDO+TRX + **ADAUSDT**); 14 V3_FEATURE_COLUMNS UNCHANGED; 7-primitive risk gate stack BYTE-IDENTICAL to /060; ATR multipliers UNCHANGED at default (2.0, 1.0); label_timeout REVERTED from /068's 20160 back to 10080; REQUIRED_GAP scaled 66 → 88 = (21+1)×4
 
@@ -73,7 +73,7 @@
 
 ## Section 2 — Numerical EDA Tables
 
-EDA committed at SHA (analysis commit — populated at setup) (`analysis/iteration_v3-069/universe_expansion_eda.py`). Produces 6 tables (T0-T6) + 1 ranking CSV. Anchor = iter-v3/060 EXPLORATION-MODE-REFERENCE (IS +0.8325 / OOS +0.1403; 3-seed lineage subset of /059's unified 10-seed mass). NOT iter-v3/065 nor /068 (parallel cycle 1 axes; /060 is the canonical EXPLORATION-mode anchor per `feedback_v3_cycle1_axis_pass_criteria.md`).
+EDA committed at SHA `95038dd` (`analysis/iteration_v3-069/universe_expansion_eda.py`). Produces 6 tables (T0-T6) + 1 ranking CSV + 1 per-symbol z-score CSV. Anchor = iter-v3/060 EXPLORATION-MODE-REFERENCE (IS +0.8325 / OOS +0.1403; 3-seed lineage subset of /059's unified 10-seed mass). NOT iter-v3/065 nor /068 (parallel cycle 1 axes; /060 is the canonical EXPLORATION-mode anchor per `feedback_v3_cycle1_axis_pass_criteria.md`).
 
 ### Section 2.1 — T0 Anchor-value declaration (Rule 1 compliance)
 
@@ -436,9 +436,9 @@ Per `feedback_v3_axis_selection_quant_discipline.md` (LOCKED 2026-05-09): the or
 - Path B: LDO-only ATR labeling override — REJECTED per same `feedback_v3_per_symbol_lifts_oos_breaks_is.md` rule (per-symbol ATR is a per-symbol customization).
 - **Path C: Universe expansion (THIS BRIEF)** — SELECTED per UNIVERSAL discipline + `feedback_v3_concentration_is_signal.md` orthogonal mechanism #a.
 
-**EDA SHA**: (analysis commit — populated at setup) (`analysis/iteration_v3-069/universe_expansion_eda.py` + 6 T0-T6 CSV outputs + 1 T3b per-symbol z-score CSV)
+**EDA SHA**: `95038dd` (`analysis/iteration_v3-069/universe_expansion_eda.py` + 7 CSV outputs: T0_anchor_values, T1_per_candidate_data_quality, T2_correlation_diversification, T3_feature_space_proximity, T3b_per_symbol_feature_z_means, T4_trade_rate_proxy, T5_composite_ranking, T6_predicted_impact)
 
-**Setup commit SHA**: (this commit — LOCKED at "setup(iter-v3/069)" commit; will be backfilled here after commit)
+**Setup commit SHA**: `cde507b` (this brief was first committed as part of the setup commit; SHA backfilled to brief via follow-up `docs(iter-v3/069): backfill setup commit SHA in brief Section 10` commit)
 
 **Phase 5.5 gate SHA**: (TBD at gate)
 
