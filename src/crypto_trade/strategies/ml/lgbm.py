@@ -141,6 +141,7 @@ class LightGbmStrategy:
         ood_cutoff_pct: float = 0.70,
         oof_persist_path: Path | None = None,
         fast_mode: bool = False,
+        inference_threshold_floor: float = 0.0,
     ) -> None:
         if not feature_columns:
             raise ValueError(
@@ -181,6 +182,10 @@ class LightGbmStrategy:
         self._oof_persist_path: Path | None = oof_persist_path
         # iter-v3/007: fast exploration mode (colsample fixed at 1.0 in optimization.py)
         self._fast_mode: bool = fast_mode
+        # iter-v3/067 Path D: universal inference-time confidence-threshold floor.
+        # Default 0.0 = no floor (backward-compatible). Pass 0.60 to raise the bar
+        # for marginal-confidence trades (brief Section 3 Sub-fix 2).
+        self._inference_threshold_floor: float = float(inference_threshold_floor)
         if self.ood_enabled and not self.ood_features:
             raise ValueError("ood_features must be specified when ood_enabled=True")
         self._ood_mean: np.ndarray | None = None
@@ -450,9 +455,7 @@ class LightGbmStrategy:
         # symbol-by-symbol), so one candle of time = n_symbols rows.
         if self.cv_label_gap:
             interval_minutes = _interval_to_minutes(self._interval)
-            embargo_candles = compute_embargo_candles(
-                self.label_timeout_minutes, interval_minutes
-            )
+            embargo_candles = compute_embargo_candles(self.label_timeout_minutes, interval_minutes)
             n_symbols = len(set(self._sym_arr[train_indices]))
             cv_gap = embargo_candles * n_symbols
         else:
@@ -504,7 +507,14 @@ class LightGbmStrategy:
         # Use first model as primary (backward compat)
         self._model = self._models[0]
         self._selected_cols = selected_cols
-        self._confidence_threshold = float(np.mean(self._confidence_thresholds))
+        # iter-v3/067 Path D: apply universal inference-time confidence-threshold floor.
+        # Floor=0.60 raises the bar for marginal-confidence trades whose Optuna-inherited
+        # per-seed mean falls below 0.60 (brief Section 3 Sub-fix 1 + Sub-fix 2).
+        # Default floor=0.0 is a no-op, preserving backward compatibility for v1/v2/earlier v3.
+        # Ref: Critic /066 Rec #2 — Path D is a GATE modifier, not a WEIGHT modifier.
+        self._confidence_threshold = float(
+            max(np.mean(self._confidence_thresholds), self._inference_threshold_floor)
+        )
 
         # (e) Batch-load test month features
         symbols = list(dict.fromkeys(self._sym_arr))

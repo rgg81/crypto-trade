@@ -125,7 +125,7 @@ def _derive_ensemble_seeds(outer_seed: int, size: int = 5) -> list[int]:
     return [int(s) for s in rng.integers(low=0, high=2**31 - 1, size=size)]
 
 
-ITERATION_LABEL = "v3-066"
+ITERATION_LABEL = "v3-067"
 REPORTS_DIR = Path("reports-v3")
 FEATURES_DIR = Path("data/features_v3")
 DATA_DIR = Path("data")
@@ -688,32 +688,48 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
         "(TRX floor raised 0.3→0.5; BCH/LDO unchanged at global 0.3)  PASS"
     )
 
-    # iter-v3/066: Universal vol_scale_ceiling must be 0.8 (Path E0.8).
-    # EDA SHA `1d75cb0`; analysis/iteration_v3-066/risk_primitive_eda.py.
-    # LDO OOS anti-Kelly correction: 6 of 11 LDO OOS trades at wf≥0.8 with -19.72 OOS wpnl.
-    # Reuses p12_strat_check (TRXUSDT model) — vol_scale_ceiling is a universal scalar
-    # independent of per-symbol config, so any symbol's RiskV2Config is representative.
+    # iter-v3/067 Path D: inference_threshold_floor must be 0.60 on all v3 models.
+    # vol_scale_ceiling reverts to default 1.0 (iter-v3/066 INERT-AT-EXPLORATION, closed).
+    # brief Section 3 Sub-fix 3 + Sub-fix 4 + Sub-fix 8.
     _p13_cfg_check, p13_strat_check = _build_v3_model(
         symbol="BCHUSDT", seed=42, n_trials=1, ensemble_seeds=[42]
     )
     if not isinstance(p13_strat_check, RiskV3Wrapper):
         raise RuntimeError(
             f"_build_v3_model(BCHUSDT) returned {type(p13_strat_check).__name__} — "
-            "expected RiskV3Wrapper. iter-v3/066: vol_scale_ceiling check requires "
+            "expected RiskV3Wrapper. iter-v3/067: inference_threshold_floor check requires "
             "RiskV3Wrapper around LightGbmStrategy."
         )
-    expected_ceiling = 0.8
-    if p13_strat_check.config.vol_scale_ceiling != expected_ceiling:
+    expected_floor = 0.60
+    _p13_inner = (
+        p13_strat_check.inner_strategy
+        if hasattr(p13_strat_check, "inner_strategy")
+        else p13_strat_check
+    )
+    if not hasattr(_p13_inner, "_inference_threshold_floor"):
+        raise RuntimeError(
+            "LightGbmStrategy for BCHUSDT has no _inference_threshold_floor attribute. "
+            "iter-v3/067: LightGbmStrategy must support inference_threshold_floor=0.60. "
+            "Check lgbm.py __init__ and _build_v3_model call."
+        )
+    if _p13_inner._inference_threshold_floor != expected_floor:
+        raise RuntimeError(
+            f"LightGbmStrategy._inference_threshold_floor = "
+            f"{_p13_inner._inference_threshold_floor} — expected {expected_floor}. "
+            f"iter-v3/067 Path D: pass inference_threshold_floor=0.60 in _build_v3_model "
+            f"common_kwargs (brief Section 3 Sub-fix 3)."
+        )
+    if p13_strat_check.config.vol_scale_ceiling != 1.0:
         raise RuntimeError(
             f"RiskV2Config.vol_scale_ceiling = {p13_strat_check.config.vol_scale_ceiling} — "
-            f"expected {expected_ceiling}. iter-v3/066 Path E0.8: universal ceiling "
-            f"tightening 1.0 → 0.8 per EDA SHA 1d75cb0. "
-            f"Set vol_scale_ceiling=0.8 in RiskV2Config init in _build_v3_model."
+            "expected 1.0 (default). iter-v3/067 reverts /066's vol_scale_ceiling=0.8 for "
+            "clean single-axis attribution (brief Section 3 Sub-fix 4)."
         )
     print(
-        f"  Universal vol_scale_ceiling (iter-v3/066): {expected_ceiling} "
-        f"(Path E0.8 universal tightening from 1.0; LDO anti-Kelly correction)  PASS"
+        f"  Universal inference_threshold_floor (iter-v3/067): {expected_floor} "
+        f"(Path D universal tightening — max(mean(per_seed_thresholds), 0.60) at lgbm.py:507)  PASS"
     )
+    print("  vol_scale_ceiling reverted to default 1.0 (iter-v3/067 REVERT /066 INERT axis)  PASS")
 
 
 def _verify_label_leakage_gap() -> None:
@@ -1402,7 +1418,14 @@ def _build_v3_model(
     elif model_type == "xgboost":
         m1 = XgboostStrategy(oof_persist_path=oof_persist_path, **common_kwargs)
     else:
-        m1 = LightGbmStrategy(oof_persist_path=oof_persist_path, **common_kwargs)
+        # iter-v3/067 Path D: pass inference_threshold_floor=0.60 to LightGbmStrategy only.
+        # XgboostStrategy and MetaLabelingStrategy do not support this parameter.
+        # Ref: brief Section 3 Sub-fix 3; Critic /066 Rec #2 (GATE modifier, not WEIGHT modifier).
+        m1 = LightGbmStrategy(
+            oof_persist_path=oof_persist_path,
+            inference_threshold_floor=0.60,
+            **common_kwargs,
+        )
     risk_cfg = RiskV2Config(
         zscore_threshold=2.0,
         adx_threshold=20.0,  # RESET: iter-v3/014's failed test (25.0) → iter-v3/013 baseline
@@ -1446,13 +1469,10 @@ def _build_v3_model(
         # Counterfactual: +0.47 OOS wpnl TRX lift with bit-identical IS (+0.008 wpnl).
         # BCH/LDO weighted_pnl mathematically invariant per Section 2.5 Q5 invariance check.
         vol_scale_floor_per_symbol={"TRXUSDT": 0.5},
-        # iter-v3/066: UNIVERSAL vol_scale_ceiling tightening 1.0 → 0.8 (Path E0.8).
-        # EDA SHA `1d75cb0`; analysis/iteration_v3-066/risk_primitive_eda.py.
-        # LDO OOS anti-Kelly correction: 6 of 11 LDO OOS trades at wf≥0.8 with -19.72 OOS wpnl.
-        # ORACLE prediction: IS Δ +0.008, OOS Δ +0.022 (sign-aligned positive; sub-band magnitude).
-        # Universal (BCH+LDO+TRX all capped at 0.8). Effective vol-scale band: [0.3, 0.8] universal
-        # / [0.5, 0.8] for TRX (combined with vol_scale_floor_per_symbol override from /061).
-        vol_scale_ceiling=0.8,
+        # iter-v3/067: REVERT vol_scale_ceiling to default 1.0 (per brief Section 3 Sub-fix 4).
+        # /066's vol_scale_ceiling=0.8 axis was INERT-AT-EXPLORATION (closed per Critic /066).
+        # Scenario B: revert to default for clean single-axis attribution of Path D threshold floor.
+        # vol_scale_ceiling not set here — defaults to 1.0 per risk_v2.py:58.
     )
     strategy = RiskV3Wrapper(m1, risk_cfg)
     return cfg, strategy
