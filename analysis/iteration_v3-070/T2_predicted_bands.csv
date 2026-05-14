@@ -1,0 +1,16 @@
+metric,iter059_anchor,predicted_lower,predicted_upper,PASS_threshold,gate_classification,rationale
+monthly_sharpe_in_sample,1.0894,0.95,1.3,1.0894,PASS lower bound = anchor (BOTH must STRICTLY IMPROVE per feedback),Modest IS lift expected: /065 single-seed IS regressed -0.16 vs /060; multi-seed should compensate via ensemble averaging
+monthly_sharpe_out_of_sample,0.5791,0.6,1.05,0.5791,PASS lower bound = anchor (BOTH must STRICTLY IMPROVE per feedback),Moderate OOS lift expected: /065 single-seed OOS lifted +0.91 vs /060; multi-seed should partially preserve via SL widening's structural mechanism
+daily_sharpe_in_sample,2.7092,2.5,3.4,n/a,Tracking metric (not gate),Bundle compounds /065 IS daily Sharpe lift with multi-seed compression
+daily_sharpe_out_of_sample,1.4359,1.5,2.4,n/a,Tracking metric (not gate); used as Path B4 input,Lift from SL widening structural mechanism; required for dsr_relative_B4 PASS
+n_trades_in_sample,171,150.0,200.0,n/a,Trade-rate floor: ≥130 OOS aggregate (per feedback_v3_trade_rate_floor_bundle_level.md),/065 IS trades 161 (-10 vs /059 anchor 171); SL widening produces fewer entries
+n_trades_out_of_sample,94,85.0,130.0,130,Trade-rate floor: ≥130 OOS aggregate (gate; bundle-level per feedback),Anchor /059 = 94 (already below 130 floor); /065 OOS = 93; bundle expected to be near anchor; trade-rate floor likely INFORMATIONAL
+frac_positive_paths,0.6444,0.55,0.75,0.55,Gate 10-CPCV PASS at ≥0.55 (baseline_v3.md hard gate),Architecture-invariant; preserved across /058/059/060/061/065
+cpcv_path_sharpe_q75,0.8378,0.83,0.84,n/a,Architecture-invariant,BIT-IDENTICAL across /058/059/060/061/065 — invariant under bundle change
+pbo_mean,0.1278,0.1,0.2,0.4,Gate 5 PBO < 0.40 PASS,Cell-level invariant; preserved across architecture changes
+psr_legacy,1.0,0.99,1.0,0.95,Gate 6 PSR > 0.95 PASS,Saturated at n_trials=1050
+dsr_relative_B4,n/a (NEW field),0.95,1.0,0.95,Path B4 BINDING GATE (replaces dsr_relative_legacy as v3 hard gate),"Per /062 brief Section 3 prediction: ≈ 0.999+; for /070 with daily Sharpe ≥ 1.50 and benchmark CPCV-Q75-annualized ≈ 0.64, expected band [0.95, 1.0]"
+BCH_OOS_weighted_pnl,24.75,20.0,60.0,n/a (gate via no-collapse),BCH expected to retain dominant contribution; /065 single-seed lifted +55 (lottery),Multi-seed compresses /065 BCH lottery; expected band wider than other symbols
+LDO_OOS_weighted_pnl,-6.18,-10.0,10.0,WR > 15% AND n_trades > 3,Per-symbol no-collapse gate (per /065 Critic Rec #4),LDO expected to participate at multi-seed via SL widening WR mechanism
+TRX_OOS_weighted_pnl,4.16,-10.0,25.0,WR > 15% AND n_trades > 3,Per-symbol no-collapse gate (per /065 Critic Rec #4),TRX collapsed at /065 single-seed (-22 vs /060); multi-seed may recover
+BCH_IS_pct_of_total_pnl,95.76,70.0,100.0,80.0,BCH IS share one-sided gate ≥ 80% (per /059 Critic Rec #3 carry-forward),BCH IS dominance is structural at /059; bundle expected to preserve
