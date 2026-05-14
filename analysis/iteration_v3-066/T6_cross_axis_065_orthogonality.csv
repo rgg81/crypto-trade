@@ -1,0 +1,8 @@
+check,iter_v3_065_module,iter_v3_066_module,isolated,iter_v3_065_state,iter_v3_066_state,iter_v3_065_field,iter_v3_066_field,iter_v3_065_effect,iter_v3_066_effect,value,iter_v3_069_bundle
+code_path_isolation,src/crypto_trade/strategies/ml/labeling.py,src/crypto_trade/strategies/ml/risk_v2.py,True,,,,,,,,
+execution_time_state_isolation,,,True,"TRAIN-TIME label generation (atr_tp_multiplier, atr_sl_multiplier)","INFERENCE-TIME weight modifier (vol_scale_floor, vol_scale_ceiling)",,,,,,
+signal_field_independence,,,True,,,"Signal(.tp_pct, .sl_pct)",Signal(.weight),,,,
+trade_roster_emission_dependency,,,True,,,,,CHANGES roster (wider SL = some prior SL-hits become TP/timeout),DOES NOT change roster (only weight applied to surviving trades),,
+optuna_search_space_coupling,,,False,,,,,Label distribution shift -> TPE explores different model regions,Weight distribution shift -> TPE explores different confidence regions,,
+single_axis_at_066,,,True,,,,,,,"/066 changes ONLY RiskV2Config field (Path B or E); DEFAULT_ATR_MULTIPLIERS reverts to (2.0, 1.0)",
+bundle_at_069,,,False,,,,,,,,/065 (SL=1.5) + /066 (Path B or E if PROMISING) — multi-seed CONFIRMATION

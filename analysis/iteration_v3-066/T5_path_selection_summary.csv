@@ -1,0 +1,8 @@
+path,is_sharpe_delta_oracle,oos_sharpe_delta_oracle,sign_aligned_positive,magnitude_in_band_pm03,max_abs_per_symbol_wpnl_delta,implementation_cost_axes,methodology_pass
+B_floor_0.4,-0.005650623817796019,0.005958890270280848,False,True,0.36588080495356223,1,True
+B_floor_0.5,-0.018275679067376926,0.0033539016511243414,False,True,2.082495872594726,1,True
+E_ceiling_0.8,0.008424119059480817,0.022055312297525498,True,True,9.40266019893113,1,True
+E_ceiling_0.7,-0.03211983277284791,-0.0005205183281379033,False,True,17.33260793763364,1,True
+A_sortino_vol_scaling,,,False,False,,2,False
+C_confidence_weighted_vol_scaling,,,False,False,,2,False
+D_dsr_based_kill_switch,,,False,False,,1,False
