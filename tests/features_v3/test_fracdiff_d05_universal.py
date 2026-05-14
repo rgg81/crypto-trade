@@ -200,15 +200,21 @@ def test_fracdiff_d05_close_no_lookahead() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_v3_models_is_3_symbol_at_iter_v3_052() -> None:
-    """V3_MODELS must be exactly (BCHUSDT, LDOUSDT, TRXUSDT) at iter-v3/052.
+def test_v3_models_at_iter_v3_069() -> None:
+    """V3_MODELS must be (BCHUSDT, LDOUSDT, TRXUSDT, ADAUSDT) at iter-v3/069.
 
-    Regression guard against accidental ALGO re-add AND LDO removal (LDO removal
-    axis was pre-falsified by /052 QR EDA SHA `0a10581`; V3_MODELS UNCHANGED from /051).
+    Regression guard against accidental ALGO re-add (system-level REVERT at /051)
+    AND LDO removal (LDO removal axis pre-falsified at /052 EDA SHA `0a10581`).
 
-    iter-v3/052: SYSTEM-LEVEL REVERT carry-forward from /051. V3_MODELS = 3-sym.
-    LDO removal axis PRE-FALSIFIED: 2-sym counterfactual IS Δ -0.16 BREAKS
-    BOTH-must-improve gate; IS-OOS daily ratio 3.58 OUT-OF-BAND (PATH C-suspicious).
+    iter-v3/069: UNIVERSE EXPANSION axis — adds ADAUSDT (4th symbol; denominator-
+    expansion mechanism per `feedback_v3_concentration_is_signal.md`). HBAR + AVAX
+    CLOSED at catalog level per iter-v3/021 diary lesson (c). ADA selected via
+    EDA SHA 95038dd composite ranking (feat-prox dominant per /021 lesson (a)).
+
+    HISTORY:
+    - iter-v3/051: SYSTEM-LEVEL REVERT (4 → 3 syms; drop ALGOUSDT)
+    - iter-v3/052: 3-sym carry-forward; LDO removal axis PRE-FALSIFIED
+    - iter-v3/069: 3 → 4 (+ADAUSDT) UNIVERSE EXPANSION (THIS axis)
     """
     # Import locally to catch import-time state
     import importlib  # noqa: PLC0415
@@ -223,25 +229,34 @@ def test_v3_models_is_3_symbol_at_iter_v3_052() -> None:
     v3_models = run_mod.V3_MODELS
     symbols = [sym for _, sym in v3_models]
 
-    assert len(symbols) == 3, (
-        f"V3_MODELS has {len(symbols)} symbols — expected exactly 3 (BCH/LDO/TRX). "
-        "iter-v3/052: ALGOUSDT must be absent (REVERTED at /051); LDO removal axis "
-        "pre-falsified by /052 EDA SHA `0a10581` (IS Δ -0.16 BREAKS both-must-improve). "
+    assert len(symbols) == 4, (
+        f"V3_MODELS has {len(symbols)} symbols — expected exactly 4 "
+        "(BCH/LDO/TRX/ADA) at iter-v3/069. UNIVERSE EXPANSION axis per "
+        "Critic /068 Rec #3 + EDA SHA 95038dd composite ranking. "
         f"Current symbols: {symbols}"
     )
     assert "ALGOUSDT" not in symbols, (
-        f"ALGOUSDT FOUND in V3_MODELS — must be absent at iter-v3/052. "
-        "SYSTEM-LEVEL REVERT carry-forward; ALGO must not be in V3_MODELS. "
+        f"ALGOUSDT FOUND in V3_MODELS — must be absent (system-level REVERT at /051). "
         f"Current symbols: {symbols}"
     )
     assert "LDOUSDT" in symbols, (
-        f"LDOUSDT NOT FOUND in V3_MODELS — must be present at iter-v3/052. "
-        "LDO removal axis PRE-FALSIFIED by /052 EDA SHA `0a10581` (IS Δ -0.16 BREAKS gate). "
+        f"LDOUSDT NOT FOUND in V3_MODELS — must be present (LDO removal axis "
+        f"pre-falsified at /052). Current symbols: {symbols}"
+    )
+    # iter-v3/021 closed HBAR + AVAX at catalog level (NEGATIVE-clean)
+    assert "HBARUSDT" not in symbols, (
+        f"HBARUSDT FOUND in V3_MODELS — must be absent (CLOSED at catalog level "
+        f"per iter-v3/021 diary lesson (c) — universe expansion HBAR+AVAX NEGATIVE-clean). "
         f"Current symbols: {symbols}"
     )
-    expected = {"BCHUSDT", "LDOUSDT", "TRXUSDT"}
+    assert "AVAXUSDT" not in symbols, (
+        f"AVAXUSDT FOUND in V3_MODELS — must be absent (CLOSED at catalog level "
+        f"per iter-v3/021 diary lesson (c) — universe expansion HBAR+AVAX NEGATIVE-clean). "
+        f"Current symbols: {symbols}"
+    )
+    expected = {"BCHUSDT", "LDOUSDT", "TRXUSDT", "ADAUSDT"}
     actual = set(symbols)
     assert actual == expected, (
         f"V3_MODELS symbols mismatch: expected {expected}, got {actual}. "
-        "iter-v3/052 V3_MODELS must be exactly (BCHUSDT, LDOUSDT, TRXUSDT)."
+        "iter-v3/069 V3_MODELS must be exactly (BCHUSDT, LDOUSDT, TRXUSDT, ADAUSDT)."
     )

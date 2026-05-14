@@ -24,11 +24,11 @@ from crypto_trade.strategies.ml.validation_v3 import (
 )
 
 # v3 documented constants
-# iter-v3/068 Path C: timeout widened 21 → 42 candles (10080 → 20160 min).
-# REQUIRED_GAP = (42+1)*3 = 129 (3-symbol universe BCH+LDO+TRX, unchanged from /051 REVERT).
-TIMEOUT_CANDLES = 42  # 20160 min / 480 min = 42 candles at 8h (iter-v3/068 Path C)
-N_SYMBOLS = 3  # BCH + LDO + TRX (iter-v3/051 SYSTEM-LEVEL REVERT — 3-sym universe)
-CORRECT_GAP = (TIMEOUT_CANDLES + 1) * N_SYMBOLS  # 129
+# iter-v3/069: UNIVERSE EXPANSION axis — 4-symbol universe (BCH+LDO+TRX+ADA).
+# REVERT /068's Path C (timeout 42 → 21 candles); REQUIRED_GAP = (21+1)*4 = 88.
+TIMEOUT_CANDLES = 21  # 10080 min / 480 min = 21 candles at 8h (REVERT /068 Path C)
+N_SYMBOLS = 4  # BCH + LDO + TRX + ADA (iter-v3/069 UNIVERSE EXPANSION)
+CORRECT_GAP = (TIMEOUT_CANDLES + 1) * N_SYMBOLS  # 88
 DEGRADED_GAP = 11  # what iter-v3/001 actually passed (bug)
 
 N_SAMPLES = 1000  # representative IS candle count
@@ -109,10 +109,11 @@ def test_required_gap_matches_formula() -> None:
         f"(timeout_candles+1)*n_symbols={formula_gap}. "
         "Update the REQUIRED_GAP constant or the formula."
     )
-    # iter-v3/068 Path C: timeout=42 candles, 3 symbols → (42+1)*3=129
-    assert REQUIRED_GAP == 129, (
-        f"REQUIRED_GAP should be 129 for v3 (42+1)*3=129 "
-        f"(3-sym universe BCH+LDO+TRX at iter-v3/068 timeout widen), got {REQUIRED_GAP}"
+    # iter-v3/069 UNIVERSE EXPANSION: timeout=21 candles, 4 symbols → (21+1)*4=88
+    assert REQUIRED_GAP == 88, (
+        f"REQUIRED_GAP should be 88 for v3 (21+1)*4=88 "
+        f"(4-sym universe BCH+LDO+TRX+ADA at iter-v3/069 UNIVERSE EXPANSION; "
+        f"REVERT /068's Path C 21→42), got {REQUIRED_GAP}"
     )
 
 

@@ -125,7 +125,7 @@ def _derive_ensemble_seeds(outer_seed: int, size: int = 5) -> list[int]:
     return [int(s) for s in rng.integers(low=0, high=2**31 - 1, size=size)]
 
 
-ITERATION_LABEL = "v3-068"
+ITERATION_LABEL = "v3-069"
 REPORTS_DIR = Path("reports-v3")
 FEATURES_DIR = Path("data/features_v3")
 DATA_DIR = Path("data")
@@ -134,12 +134,16 @@ DATA_DIR = Path("data")
 # Per `feedback_v3_per_symbol_lifts_oos_breaks_is.md` UPDATED 2026-05-10 (second-cycle
 # confirmation of per-symbol-customization anti-pattern at iter-v3/039 + iter-v3/050
 # both CONFIRMATION-NO-MERGE on per-symbol bundle). ALGOUSDT REVERTED (4→3 symbols).
-# REQUIRED_GAP updated 88→66 = (21+1)×3 per system-level REVERT.
-# Per `analysis/iteration_v3-051/synthesis.md` SHA `290f37b` (cycle 4 #1 EDA).
+# iter-v3/069: UNIVERSE EXPANSION axis — add ADAUSDT (4th symbol; denominator-
+# expansion mechanism per `feedback_v3_concentration_is_signal.md` LOCKED 2026-05-07).
+# Per EDA SHA 95038dd (composite ranking: ADA 0.5594 rank-1 of 5 PASSING candidates;
+# feat-prox dominant weighting per /021 diary lesson (a)). REQUIRED_GAP scaled
+# 66 → 88 = (21+1)×4 (timeout REVERT 42→21; n_symbols 3→4).
 V3_MODELS: tuple[tuple[str, str], ...] = (
     ("A (BCHUSDT)", "BCHUSDT"),
     ("C (LDOUSDT)", "LDOUSDT"),
     ("D (TRXUSDT)", "TRXUSDT"),
+    ("F (ADAUSDT)", "ADAUSDT"),  # iter-v3/069 — 4th symbol; UNIVERSE EXPANSION axis
 )
 
 # Risk gate configs (v2 5-gate + BTC; no R1/R2/R3 — brief Section 3.4)
@@ -158,7 +162,8 @@ BTC_TREND_CONFIG = BtcTrendFilterConfig(
 # CPCV parameters (brief Section 0 + 3.5#2)
 CPCV_N_SPLITS = 10
 CPCV_N_TEST_SPLITS = 2
-# gap = REQUIRED_GAP = (timeout_candles+1)*n_symbols = (42+1)*3 = 129 (iter-v3/068 timeout widen)
+# gap = REQUIRED_GAP = (timeout_candles+1)*n_symbols = (21+1)*4 = 88
+# (iter-v3/069 UNIVERSE EXPANSION +ADAUSDT).
 # DO NOT use min(REQUIRED_GAP, n_trades//20) — that is the iter-v3/001 bug.
 CPCV_EMBARGO = 27  # ~1% of 24-month T ≈ 2742 candles * 0.01
 
@@ -718,45 +723,48 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
             "expected 1.0 (default). iter-v3/068: vol_scale_ceiling reverted at /067 and "
             "must remain at default 1.0 (brief Section 3 Sub-fix 3)."
         )
-    # iter-v3/068: label_timeout_minutes must be 20160 on all v3 models (Path C axis).
-    expected_label_timeout = 20160
+    # iter-v3/069: label_timeout_minutes REVERTED to 10080 on all v3 models
+    # (REVERT /068's Path C — labeling-timeout family CLOSED both directions
+    # per iter-v3/068 Critic FINAL `9ad043c`).
+    expected_label_timeout = 10080
     _p13_lgbm = _p13_inner
     if not hasattr(_p13_lgbm, "label_timeout_minutes"):
         raise RuntimeError(
             "LightGbmStrategy for BCHUSDT has no label_timeout_minutes attribute. "
-            "iter-v3/068: LightGbmStrategy must expose label_timeout_minutes. "
+            "iter-v3/069: LightGbmStrategy must expose label_timeout_minutes. "
             "Check lgbm.py __init__ and _build_v3_model call."
         )
     if _p13_lgbm.label_timeout_minutes != expected_label_timeout:
         raise RuntimeError(
             f"LightGbmStrategy.label_timeout_minutes = "
             f"{_p13_lgbm.label_timeout_minutes} — expected {expected_label_timeout}. "
-            f"iter-v3/068 Path C: pass label_timeout_minutes=20160 in _build_v3_model "
-            f"common_kwargs (brief Section 3 Sub-fix 1)."
+            f"iter-v3/069 REVERTS /068's Path C — pass label_timeout_minutes=10080 "
+            f"in _build_v3_model common_kwargs (brief Section 3 spec item #3)."
         )
     print(
         "  inference_threshold_floor REVERTED to default 0.0 "
-        "(iter-v3/068 reverts /067 INERT axis for clean attribution)  PASS"
+        "(iter-v3/068 reverts /067 INERT axis; unchanged at /069)  PASS"
     )
-    print("  vol_scale_ceiling at default 1.0 (reverted at /067, unchanged at /068)  PASS")
+    print("  vol_scale_ceiling at default 1.0 (reverted at /067, unchanged at /069)  PASS")
     print(
-        f"  Universal label_timeout_minutes (iter-v3/068): {expected_label_timeout} min "
-        f"(= 42 candles at 8h; Path C DURATION widening — embargo 22→43 per cell, "
-        f"cross-cell gap 66→129)  PASS"
+        f"  Universal label_timeout_minutes (iter-v3/069 REVERT): {expected_label_timeout} min "
+        f"(= 21 candles at 8h; REVERT /068 Path C; embargo 22 per cell, "
+        f"cross-cell gap 88 per 4-sym universe)  PASS"
     )
 
 
 def _verify_label_leakage_gap() -> None:
     """Assert gap == REQUIRED_GAP and print proof (brief Section 3.5#3).
 
-    iter-v3/068 Path C: timeout widened 10080 → 20160 min (21 → 42 candles).
-    embargo_candles = 20160 // 480 + 1 = 43.
-    cross-cell gap = 43 * 3 = 129 (REQUIRED_GAP updated accordingly).
+    iter-v3/069 UNIVERSE EXPANSION: REVERT /068's Path C (timeout 42 → 21 candles)
+    AND expand universe 3 → 4 symbols (+ADAUSDT).
+    embargo_candles = 10080 // 480 + 1 = 22.
+    cross-cell gap = 22 * 4 = 88 (REQUIRED_GAP updated accordingly).
     """
-    timeout_minutes = 20160  # 14 days (42 candles at 8h) — iter-v3/068 Path C axis
+    timeout_minutes = 10080  # 7 days (21 candles at 8h) — iter-v3/069 REVERT /068 Path C
     candle_minutes = 480  # 8h
     n_symbols = len(V3_MODELS)
-    timeout_candles = timeout_minutes // candle_minutes  # = 42
+    timeout_candles = timeout_minutes // candle_minutes  # = 21
     required_gap = (timeout_candles + 1) * n_symbols  # formula: (timeout_candles+1)*len(V3_MODELS)
     assert required_gap == REQUIRED_GAP, (
         f"REQUIRED_GAP mismatch: formula gives {required_gap}, "
@@ -1414,7 +1422,7 @@ def _build_v3_model(
         cv_splits=5,
         label_tp_pct=8.0,
         label_sl_pct=4.0,
-        label_timeout_minutes=20160,  # 14 days (42 candles at 8h) — iter-v3/068 Path C axis
+        label_timeout_minutes=10080,  # 7 days (21 candles at 8h) — REVERT /068's Path C at /069
         fee_pct=0.1,
         features_dir=str(FEATURES_DIR),
         verbose=1,
@@ -2073,7 +2081,10 @@ def main() -> None:
     print(f"Ensemble: {ensemble_size_for_run} seeds  Optuna trials/model: {args.n_trials}")
     print(f"Active models: {len(active_models)}/{len(V3_MODELS)} (--symbols={args.symbols!r})")
     print(f"CPCV: N={CPCV_N_SPLITS}, k={CPCV_N_TEST_SPLITS}, 45 paths on IS CANDLE SEQUENCE")
-    print(f"Gap: {REQUIRED_GAP} (= (42+1)*3=129; iter-v3/068 timeout 21→42 candles)")
+    print(
+        f"Gap: {REQUIRED_GAP} (= (21+1)*4=88; iter-v3/069 UNIVERSE EXPANSION "
+        f"+ADAUSDT; timeout REVERT 42→21)"
+    )
     print(
         f"Pre-flight: branch OK, symbols OK, data fresh (<16h), "
         f"feature-cols={len(V3_FEATURE_COLUMNS)}  PASS\n"

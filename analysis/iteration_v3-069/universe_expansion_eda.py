@@ -57,7 +57,7 @@ Output: 6 tables (T0-T5) + 1 ranking CSV committed to analysis/iteration_v3-069/
 from __future__ import annotations
 
 import csv
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import numpy as np
@@ -75,7 +75,7 @@ DATA_DIR = REPO_ROOT / "data"
 OOS_CUTOFF_MS = 1742774400000  # 2025-03-24 UTC
 
 # IS evaluation window (same as iter-v3/021 EDA — 2023-04-01 → OOS cutoff)
-IS_EVAL_START_MS = int(datetime(2023, 4, 1, tzinfo=timezone.utc).timestamp() * 1000)
+IS_EVAL_START_MS = int(datetime(2023, 4, 1, tzinfo=UTC).timestamp() * 1000)
 IS_EVAL_END_MS = OOS_CUTOFF_MS
 
 CANDLE_MS = 480 * 60 * 1000  # 8h interval = 480 min
@@ -280,9 +280,13 @@ def t1_per_candidate_data_quality() -> None:
     _write_csv(rows, ROOT / "T1_per_candidate_data_quality.csv")
     print(f"T1: {len(rows)} candidates evaluated on Gate 1 + Gate 2.")
     for r in rows:
-        print(f"  {r['symbol']}: pre_is={r['pre_is_months']}mo cov={r['is_coverage_pct']}% "
-              f"gaps={r['gap_count']} qvol_avg=${r['is_avg_daily_qvol_usd_M']}M "
-              f"p10=${r['is_p10_daily_qvol_usd_M']}M gate1={r['gate1_pass']} gate2={r['gate2_pass']}")
+        print(
+            f"  {r['symbol']}: pre_is={r['pre_is_months']}mo "
+            f"cov={r['is_coverage_pct']}% gaps={r['gap_count']} "
+            f"qvol_avg=${r['is_avg_daily_qvol_usd_M']}M "
+            f"p10=${r['is_p10_daily_qvol_usd_M']}M "
+            f"gate1={r['gate1_pass']} gate2={r['gate2_pass']}"
+        )
 
 
 # ============================================================================
@@ -525,10 +529,13 @@ def t5_composite_ranking() -> None:
         # 2. Complementarity: 1 - mean |corr|
         compl_score = 1.0 - float(t2_idx[sym]["mean_abs_corr"])
         # 3. Data quality: gate1 × 0.5 + gate2 × 0.5 (both pass = 1.0)
-        dq_score = 0.5 * (t1_idx[sym]["gate1_pass"] == "True") + 0.5 * (t1_idx[sym]["gate2_pass"] == "True")
-        # 4. Liquidity: log10(avg_qvol_M) / log10(1000) — caps at $1B
-        avg_qvol_M = float(t1_idx[sym]["is_avg_daily_qvol_usd_M"])
-        liq_score = min(1.0, np.log10(max(avg_qvol_M, 1.0)) / np.log10(1000))
+        dq_score = (
+            0.5 * (t1_idx[sym]["gate1_pass"] == "True")
+            + 0.5 * (t1_idx[sym]["gate2_pass"] == "True")
+        )
+        # 4. Liquidity: log10(avg_qvol_m) / log10(1000) — caps at $1B
+        avg_qvol_m = float(t1_idx[sym]["is_avg_daily_qvol_usd_M"])
+        liq_score = min(1.0, np.log10(max(avg_qvol_m, 1.0)) / np.log10(1000))
         # 5. Trade rate: gate_retained / 5.0 (caps at 5/month)
         tr_score = min(1.0, float(t4_idx[sym]["gate_retained_trades_per_month_proxy"]) / 5.0)
 
@@ -610,31 +617,76 @@ def t6_predicted_impact() -> None:
          incumbents).
     """
     rows = [
-        {"axis": "REQUIRED_GAP", "before": "66", "after": "88",
-         "delta": "+22", "interpretation": "+1% per-cell train sample loss (small)"},
-        {"axis": "n_trials_total", "before": "315", "after": "420",
-         "delta": "+105", "interpretation": "Optuna independent per-symbol; per-symbol budget UNCHANGED"},
-        {"axis": "n_symbols", "before": "3", "after": "4",
-         "delta": "+1", "interpretation": "denominator expansion (per concentration_is_signal)"},
-        {"axis": "predicted_IS_trades", "before": "159", "after": "[194, 209]",
-         "delta": "+35 to +50", "interpretation": "from NATR-derived candidate trade-rate proxy"},
-        {"axis": "predicted_OOS_trades", "before": "102", "after": "[122, 132]",
-         "delta": "+20 to +30", "interpretation": "bundle-level floor 130 may or may not clear"},
-        {"axis": "wall_clock_estimate", "before": "0.4-0.7h", "after": "1.5h target",
-         "delta": "+0.8-1.1h", "interpretation": "4 syms × 3 seeds × 35 trials at single-seed EXPLORATION"},
+        {
+            "axis": "REQUIRED_GAP", "before": "66", "after": "88",
+            "delta": "+22",
+            "interpretation": "+1% per-cell train sample loss (small)",
+        },
+        {
+            "axis": "n_trials_total", "before": "315", "after": "420",
+            "delta": "+105",
+            "interpretation": (
+                "Optuna independent per-symbol; per-symbol budget UNCHANGED"
+            ),
+        },
+        {
+            "axis": "n_symbols", "before": "3", "after": "4",
+            "delta": "+1",
+            "interpretation": (
+                "denominator expansion (per concentration_is_signal)"
+            ),
+        },
+        {
+            "axis": "predicted_IS_trades", "before": "159",
+            "after": "[194, 209]", "delta": "+35 to +50",
+            "interpretation": (
+                "from NATR-derived candidate trade-rate proxy"
+            ),
+        },
+        {
+            "axis": "predicted_OOS_trades", "before": "102",
+            "after": "[122, 132]", "delta": "+20 to +30",
+            "interpretation": "bundle-level floor 130 may or may not clear",
+        },
+        {
+            "axis": "wall_clock_estimate", "before": "0.4-0.7h",
+            "after": "1.5h target", "delta": "+0.8-1.1h",
+            "interpretation": (
+                "4 syms x 3 seeds x 35 trials at single-seed EXPLORATION"
+            ),
+        },
         # Predicted Sharpe bands (widened per Critic /068 Rec #1)
-        {"axis": "predicted_IS_Sharpe_PROMISING", "before": "+0.83",
-         "after": "[+0.93, +1.10]", "delta": "+0.10 to +0.27",
-         "interpretation": "4th symbol contributes IS Sharpe ~+0.3 + dilution effect"},
-        {"axis": "predicted_IS_Sharpe_NEGATIVE", "before": "+0.83",
-         "after": "[+0.33, +0.63]", "delta": "-0.20 to -0.50",
-         "interpretation": "4th symbol drags IS (Optuna doesn't fit at single-seed) — per /021 mode"},
-        {"axis": "predicted_OOS_Sharpe_PROMISING", "before": "+0.14",
-         "after": "[+0.24, +0.50]", "delta": "+0.10 to +0.36",
-         "interpretation": "4th symbol contributes OOS + concentration dilution lifts TRX edge denominator"},
-        {"axis": "predicted_OOS_Sharpe_NEGATIVE", "before": "+0.14",
-         "after": "[-0.36, -0.16]", "delta": "-0.30 to -0.50",
-         "interpretation": "envelope per Critic /068 Rec #1 widening; 4th sym OOS-negative scenario"},
+        {
+            "axis": "predicted_IS_Sharpe_PROMISING", "before": "+0.83",
+            "after": "[+0.93, +1.10]", "delta": "+0.10 to +0.27",
+            "interpretation": (
+                "4th symbol contributes IS Sharpe ~+0.3 + dilution effect"
+            ),
+        },
+        {
+            "axis": "predicted_IS_Sharpe_NEGATIVE", "before": "+0.83",
+            "after": "[+0.33, +0.63]", "delta": "-0.20 to -0.50",
+            "interpretation": (
+                "4th symbol drags IS (Optuna doesn't fit at single-seed) "
+                "per /021 mode"
+            ),
+        },
+        {
+            "axis": "predicted_OOS_Sharpe_PROMISING", "before": "+0.14",
+            "after": "[+0.24, +0.50]", "delta": "+0.10 to +0.36",
+            "interpretation": (
+                "4th symbol contributes OOS + concentration dilution "
+                "lifts TRX edge denominator"
+            ),
+        },
+        {
+            "axis": "predicted_OOS_Sharpe_NEGATIVE", "before": "+0.14",
+            "after": "[-0.36, -0.16]", "delta": "-0.30 to -0.50",
+            "interpretation": (
+                "envelope per Critic /068 Rec #1 widening; "
+                "4th sym OOS-negative scenario"
+            ),
+        },
     ]
     _write_csv(rows, ROOT / "T6_predicted_impact.csv")
     print("T6: predicted-impact table written.")
@@ -648,11 +700,11 @@ def t6_predicted_impact() -> None:
 
 def main() -> None:
     print("=" * 70)
-    print(f"iter-v3/069 EDA — UNIVERSE EXPANSION (4th symbol; cycle 1 #10 of 10)")
+    print("iter-v3/069 EDA — UNIVERSE EXPANSION (4th symbol; cycle 1 #10 of 10)")
     print(f"Output dir: {ROOT}")
-    print(f"Anchor: iter-v3/060 (IS +0.8325 / OOS +0.1403)")
+    print("Anchor: iter-v3/060 (IS +0.8325 / OOS +0.1403)")
     print(f"Candidates: {CANDIDATES}")
-    print(f"EXCLUDED: V3_EXCLUDED_SYMBOLS + HBAR/AVAX (iter-v3/021 closed)")
+    print("EXCLUDED: V3_EXCLUDED_SYMBOLS + HBAR/AVAX (iter-v3/021 closed)")
     print("=" * 70)
     t0_anchor_values()
     print()

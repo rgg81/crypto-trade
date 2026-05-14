@@ -37,9 +37,20 @@ def _load_runner():
 
 
 def test_derive_returns_correct_size():
+    """_derive_ensemble_seeds default returns `size` inner seeds (default size=5).
+
+    Note: at iter-v3/059+ the unified 10-seed architecture deprecated this helper
+    in favor of the hardcoded ENSEMBLE_SEEDS 10-tuple. _derive_ensemble_seeds
+    remains exposed for backward compat / regression tests but defaults to size=5
+    (legacy 2-outer × 5-inner architecture). The 10-seed unified ENSEMBLE_SEEDS
+    is constructed by concatenating _derive_ensemble_seeds(42, size=5) +
+    _derive_ensemble_seeds(123, size=5) — see ENSEMBLE_SEEDS literal in runner.
+    """
     runner = _load_runner()
     seeds = runner._derive_ensemble_seeds(42)
-    assert len(seeds) == runner.ENSEMBLE_SIZE
+    # Default size is 5 (legacy per-outer-seed inner ensemble count); 10 only
+    # via explicit size=10 or the hardcoded ENSEMBLE_SEEDS tuple.
+    assert len(seeds) == 5
     assert all(isinstance(s, int) for s in seeds)
 
 
