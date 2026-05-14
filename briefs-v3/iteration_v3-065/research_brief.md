@@ -2,7 +2,7 @@
 
 **Branch**: `iteration-v3/065`
 **EDA SHA**: `662659c`
-**Setup commit SHA**: (LOCKED at setup commit — Section 10 backfilled post-LOCK)
+**Setup commit SHA**: `6d1c7cf` (LOCKED)
 **Iteration type**: EXPLORATION (cycle 1 #6 of 10; NON-FEATURE PIVOT; UNIVERSAL LABELING AXIS)
 **Axis**: UNIVERSAL TRIPLE-BARRIER SL WIDENING — DEFAULT_ATR_MULTIPLIERS (2.0, 1.0) → (2.0, 1.5)
 
@@ -421,7 +421,7 @@ ALL of:
 
 **Reproducibility stamp**:
 - EDA SHA: `662659c` (`analysis/iteration_v3-065/labeling_parameter_eda.py`)
-- Setup commit SHA: (LOCKED at setup commit — backfilled into Section 10 post-LOCK)
+- Setup commit SHA: `6d1c7cf` (LOCKED)
 - ITERATION_LABEL: `"v3-065"`
 - DEFAULT_ATR_MULTIPLIERS at runtime: (2.0, 1.5)
 - V3_ATR_MULTIPLIERS_PER_SYMBOL: {} (empty — universal change applies to all)
@@ -478,7 +478,7 @@ A smoke test consists of running `uv run pytest tests/features_v3/ -k atr -v` an
 
 ---
 
-**Setup commit SHA**: (backfilled at Phase 5.5 by orchestrator)
+**Setup commit SHA**: `6d1c7cf` (LOCKED — this commit)
 
 **Reading order for Engineer (Phase 6)**:
 1. Verify branch `iteration-v3/065`; pull SHA `662659c` (EDA).
