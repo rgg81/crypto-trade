@@ -1,0 +1,4 @@
+cohort,is_label_dur_mean,is_label_dur_median,is_tp_pct,is_sl_pct,is_timeout_pct
+removed (LDOUSDT),6.043,4.0,27.4,69.2,3.4
+added (ADAUSDT),6.421,4.0,28.8,65.7,5.5
+ADDED minus REMOVED gap,0.378,n/a,n/a,n/a,falsifier >+1.0 candle -> NOT fired

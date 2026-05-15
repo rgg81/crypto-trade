@@ -1,0 +1,12 @@
+key,value
+axis,universe_revision_LDO_to_ADA
+axis_type,UNIVERSE REVISION (replace LDOUSDT with ADAUSDT)
+re_anchor_IS,0.8236
+re_anchor_OOS,0.2078
+swap_out,LDOUSDT
+swap_in (T7 IS-edge argmax),ADAUSDT
+swap_in_IS_edge_sharpe,0.617
+swap_out_IS_edge_sharpe,-0.55
+feature_candidate_axis,EXHAUSTED — both candidates INERT (T3)
+m2_candidate_axis,EXHAUSTED — max |AUC-0.5| 0.0664 (T5 portfolio scopes; LDO n=11 row excluded as small-sample)
+added_minus_removed_dur_gap,0.378
