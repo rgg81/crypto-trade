@@ -179,8 +179,8 @@ class RiskV2Config:
     # Calibrated by QR EDA at iter-v3/075 (analysis/iteration_v3-075/
     # axis_selection_eda.py): SMA_270 classifier (T2 highest IS discrimination),
     # scope LDO+TRX (T7 — the symbols whose bear/chop-entry IS wpnl is negative;
-    # BCH WINS in BTC-bear/chop so it is excluded), de-rate 0.50 (T8 — largest IS
-    # lift clearing the +0.10 PROMISING / -0.20 NEGATIVE classification floors).
+    # BCH WINS in BTC-bear/chop so it is excluded), de-rate 0.50 (a-priori
+    # data-free default — halve the position size in the adverse BTC regime).
     # Default OFF (enable_regime_size_scalar=False) preserves v1/v2/v3-prior behavior.
     enable_regime_size_scalar: bool = False
     regime_size_scalar_symbols: tuple[str, ...] = ()  # e.g. ("LDOUSDT", "TRXUSDT")
