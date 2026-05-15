@@ -24,11 +24,15 @@ from crypto_trade.strategies.ml.validation_v3 import (
 )
 
 # v3 documented constants
-# iter-v3/069: UNIVERSE EXPANSION axis — 4-symbol universe (BCH+LDO+TRX+ADA).
-# REVERT /068's Path C (timeout 42 → 21 candles); REQUIRED_GAP = (21+1)*4 = 88.
-TIMEOUT_CANDLES = 21  # 10080 min / 480 min = 21 candles at 8h (REVERT /068 Path C)
-N_SYMBOLS = 4  # BCH + LDO + TRX + ADA (iter-v3/069 UNIVERSE EXPANSION)
-CORRECT_GAP = (TIMEOUT_CANDLES + 1) * N_SYMBOLS  # 88
+# iter-v3/076: STALE-TEST FIX. This test was set up at iter-v3/069 for a 4-symbol
+# universe (BCH+LDO+TRX+ADA) but iter-v3/069 closed out reverting to the 3-symbol
+# universe (ADA dropped — universe-expansion EXPLORATION failed). The constants
+# below were never updated, so test_required_gap_matches_formula has been failing
+# (asserting 88 while REQUIRED_GAP is 66) since /069. Corrected here to match the
+# canonical BASELINE_V3 3-symbol universe: REQUIRED_GAP = (21+1)*3 = 66.
+TIMEOUT_CANDLES = 21  # 10080 min / 480 min = 21 candles at 8h
+N_SYMBOLS = 3  # BCH + LDO + TRX (canonical 3-symbol v3 universe; ADA dropped at /069)
+CORRECT_GAP = (TIMEOUT_CANDLES + 1) * N_SYMBOLS  # 66
 DEGRADED_GAP = 11  # what iter-v3/001 actually passed (bug)
 
 N_SAMPLES = 1000  # representative IS candle count
@@ -109,11 +113,12 @@ def test_required_gap_matches_formula() -> None:
         f"(timeout_candles+1)*n_symbols={formula_gap}. "
         "Update the REQUIRED_GAP constant or the formula."
     )
-    # iter-v3/069 UNIVERSE EXPANSION: timeout=21 candles, 4 symbols → (21+1)*4=88
-    assert REQUIRED_GAP == 88, (
-        f"REQUIRED_GAP should be 88 for v3 (21+1)*4=88 "
-        f"(4-sym universe BCH+LDO+TRX+ADA at iter-v3/069 UNIVERSE EXPANSION; "
-        f"REVERT /068's Path C 21→42), got {REQUIRED_GAP}"
+    # iter-v3/076 STALE-TEST FIX: the canonical v3 universe is 3-symbol
+    # (BCH+LDO+TRX); ADA was dropped at the iter-v3/069 universe-expansion
+    # closeout. REQUIRED_GAP = (timeout_candles 21 + 1) * 3 symbols = 66.
+    assert REQUIRED_GAP == 66, (
+        f"REQUIRED_GAP should be 66 for the canonical 3-symbol v3 universe "
+        f"(BCH+LDO+TRX): (21+1)*3=66, got {REQUIRED_GAP}"
     )
 
 

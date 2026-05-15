@@ -72,9 +72,10 @@ def test_fracdiff_d05_close_present_in_universal_feature_list() -> None:
         "Remove it from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
     )
     n = len(V3_FEATURE_COLUMNS_TOP_N)
-    assert n == 14, (
-        f"V3_FEATURE_COLUMNS_TOP_N has {n} elements — expected 14. "
-        "iter-v3/065: NON-FEATURE axis (universal SL widening); feature count = 14. "
+    assert n == 15, (
+        f"V3_FEATURE_COLUMNS_TOP_N has {n} elements — expected 15. "
+        "iter-v3/076: 14 BASELINE_V3 anchor features + range_efficiency_50 "
+        "(the cycle-2 EXPLORATION #6 axis); feature count = 15. "
         "Check V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
     )
 

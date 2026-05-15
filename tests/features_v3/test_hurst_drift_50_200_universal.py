@@ -77,9 +77,10 @@ def test_hurst_drift_50_200_in_universal_feature_list() -> None:
         "Remove it from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
     )
     n = len(V3_FEATURE_COLUMNS_TOP_N)
-    assert n == 14, (
-        f"V3_FEATURE_COLUMNS_TOP_N has {n} elements -- expected 14. "
-        "iter-v3/065: NON-FEATURE axis (universal SL widening); feature count = 14. "
+    assert n == 15, (
+        f"V3_FEATURE_COLUMNS_TOP_N has {n} elements -- expected 15. "
+        "iter-v3/076: 14 BASELINE_V3 anchor features + range_efficiency_50 "
+        "(the cycle-2 EXPLORATION #6 axis); feature count = 15. "
         "Check V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
     )
     assert "regime_momentum_signed_3d" not in V3_FEATURE_COLUMNS_TOP_N, (
@@ -289,13 +290,13 @@ def test_v3_models_is_3_symbol_at_iter_v3_053() -> None:
     from crypto_trade.features_v3 import features_for_symbol  # noqa: PLC0415
 
     expected_universe = ("BCHUSDT", "LDOUSDT", "TRXUSDT")
-    # Each symbol in the expected universe must return the 14-feature universal fallback
+    # Each symbol in the expected universe must return the 15-feature universal fallback
     for sym in expected_universe:
         feats = features_for_symbol(sym)
-        assert len(feats) == 14, (
-            f"{sym} fallback returns {len(feats)} features -- expected 14. "
-            "iter-v3/065 NON-FEATURE axis: BCH + LDO + TRX, all at 14-feature universal "
-            "fallback (14 BASELINE_V3; adx_14 removed at /064 closeout; "
+        assert len(feats) == 15, (
+            f"{sym} fallback returns {len(feats)} features -- expected 15. "
+            "iter-v3/076 cycle-2 EXPLORATION #6: BCH + LDO + TRX, all at 15-feature "
+            "universal fallback (14 BASELINE_V3 anchor + range_efficiency_50; "
             "hurst_drift_50_200 PARKED-ABSENT)."
         )
         assert "hurst_drift_50_200" not in feats, (

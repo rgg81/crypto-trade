@@ -678,6 +678,97 @@ def compute_vol_regime_x_momentum(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+_RANGE_EFFICIENCY_50_EPS: float = 1e-9
+
+
+def compute_range_efficiency_50(df: pd.DataFrame) -> pd.DataFrame:
+    """Sign-invariant feature: Kaufman-style UNSIGNED path efficiency, 50-bar.
+
+    iter-v3/076 NEW feature (cycle-2 EXPLORATION #6). A feature-internal IS-regime
+    discriminator the LightGBM model learns: it measures HOW price has moved
+    (clean efficient directional move vs choppy sideways grind), NOT WHICH WAY.
+
+    Construction:
+    - ``path  = |close[t] - close[t-50]|``  — net 50-bar directional displacement.
+    - ``noise = sum_{k=1}^{50} |close[t-k+1] - close[t-k]|``  — total path length.
+    - ``er    = path / (noise + 1e-9)``  — Kaufman (1995) efficiency ratio.
+    - ``.clip(0.0, 1.0)``: bounded by the triangle inequality; clip guards float
+      precision near 0 (noise sum can round below path from fp errors).
+    - ``.shift(1)`` applied to the ER series: bar t's value uses close[t-51..t-1]
+      only — the signal bar's own close is NEVER observed at inference time.
+    - ``.fillna(0.0)`` on the first 51 warm-up bars: neutral 0.0 = maximally
+      choppy (no directional efficiency); preferable to NaN propagation at
+      training time.
+
+    Output range [0, 1]. 1.0 = a perfectly clean monotone move; 0.0 = a choppy
+    grind that ends where it started.
+
+    SIGN-INVARIANT (the load-bearing property for iter-v3/076): the feature's
+    value is the SAME for a clean up-trend and a clean down-trend, and the SAME
+    for choppy grind regardless of net direction. It is therefore NOT a monotone
+    proxy for the bull/bear regime axis — a choppy low-efficiency grind exists in
+    BOTH bear and bull markets; a clean efficient move exists in BOTH. iter-v3/076
+    EDA T3 verified |regime-sign correlation| = 0.010 (the feature's value
+    distribution is statistically the same across the IS bear/chop window and the
+    OOS uptrend window). This is what lets a model learn to down-weight the
+    choppy-grind drag WITHIN IS bear/chop WITHOUT the IS-up/OOS-down trade-off
+    that iter-v3/075 demonstrated is structural to a directional-regime
+    discriminator. The feature's job is regime-QUALITY conditioning alongside the
+    14 directional BASELINE_V3 features — NOT to provide direction itself.
+
+    RE-EVALUATION DISCLOSURE (iter-v3/076 brief Section 10.2): this is the SAME
+    Kaufman path-efficiency MATH as ``compute_efficiency_ratio_50`` (the unsigned
+    ER feature ``efficiency_ratio_50`` that was DISASTROUS-NEGATIVE at
+    iter-v3/043, IS -0.8445 / OOS -0.8990, and is on the BASELINE_V3.md "BANNED"
+    list). ``range_efficiency_50`` is its deliberate, rule-sanctioned
+    RE-EVALUATION under ``feedback_v3_walkforward_lookahead_bug.md`` (cycle-3
+    verdicts pre-date the walk-forward fix and are eligible for re-evaluation),
+    with (a) a DIFFERENT universe — the post-bootstrap 3-symbol BCH/LDO/TRX set,
+    NOT /043's 4-symbol+ALGO universe; and (b) a DIFFERENT role — a 15th
+    regime-QUALITY conditioning feature alongside 14 directional features, NOT a
+    STANDALONE directional signal (which is how /043 used it, and why /043's
+    docstring records the failure mode as "treats trending-up and trending-down
+    markets identically"). The feature is named ``range_efficiency_50``, NOT
+    ``efficiency_ratio_50``, so the literal-name pre-flight ban stays meaningful.
+    The precedent for a same-family-different-role feature with a new name is
+    ``compute_trend_efficiency_signed`` (iter-v3/063, the signed variant).
+
+    Past-only by construction:
+    - ``close.shift(50)``: bar t uses close[t-50]. Strictly past-only.
+    - ``close.diff()``: bar t uses close[t] - close[t-1]. Past-only.
+    - ``.rolling(50, min_periods=50).sum()``: sums bars [t-49..t]. Past-only.
+    - ``.shift(1)`` on the ER result: the final bar-t value uses bars [t-51..t-1].
+      This shift ensures bar t cannot observe close[t] at model-inference time.
+    - Appending future bars t+1, t+2, ... does NOT alter the value at bar t (all
+      operations are causal rolling windows terminated at bar t-1 after the shift).
+
+    NaN warm-up: first 51 bars are NaN before fillna (50-bar rolling noise window
+    + the shift(1)). After fillna(0.0) the first 51 bars are 0.0 (neutral). At 8h
+    cadence: 51 bars ~= 17 calendar days, well within the 24-month IS window.
+
+    Args:
+        df: DataFrame with column ``close`` (float-castable).
+
+    Returns:
+        Copy of ``df`` with ``range_efficiency_50`` column appended (float, range
+        [0.0, 1.0]). If ``close`` is missing, the column is set to all-NaN
+        without error — the runner's ``_verify_feature_columns`` assertion
+        catches the gap downstream.
+    """
+    df = df.copy()
+    if "close" not in df.columns:
+        df["range_efficiency_50"] = np.nan
+        return df
+
+    close = df["close"].astype(float)
+    path = (close - close.shift(50)).abs()
+    noise = close.diff().abs().rolling(50, min_periods=50).sum()
+    er = (path / (noise + _RANGE_EFFICIENCY_50_EPS)).clip(0.0, 1.0)
+    # .shift(1): bar t now sees close[t-51..t-1] only (past-only at inference).
+    df["range_efficiency_50"] = er.shift(1).fillna(0.0)
+    return df
+
+
 def add_engineered_v3_features(df: pd.DataFrame) -> pd.DataFrame:
     """GROUP_REGISTRY entry point for all Category 2 (composed) v3 features.
 
@@ -822,6 +913,17 @@ def add_engineered_v3_features(df: pd.DataFrame) -> pd.DataFrame:
     #   Max |IC| 0.85-0.88 with hurst_diff_100_50 (source primitive); Category 2 carve-out applies.
     #   Feature is computable from existing parquet columns — NO parquet regen required.
     df = compute_hurst_drift_50_200(df)  # iter-v3/053 ACTIVATE
+    # iter-v3/076: range_efficiency_50 ADDED — Kaufman-style UNSIGNED 50-bar path
+    # efficiency. The cycle-2 EXPLORATION #6 axis: a sign-invariant feature-internal
+    # IS-regime discriminator the model learns. SIGN-INVARIANT (regime-sign |corr|
+    # 0.010 per /076 EDA T3) — it measures HOW price moves, not WHICH WAY, so it
+    # breaks the /075 IS-up/OOS-down tension (a directional-regime discriminator
+    # de-rates IS and OOS together; a regime-orthogonal feature does not).
+    # RE-EVALUATION of the /043-DISASTROUS efficiency_ratio_50 math under
+    # feedback_v3_walkforward_lookahead_bug.md, on the 3-symbol universe, as a
+    # regime-QUALITY conditioning feature (NOT a standalone directional signal).
+    # See compute_range_efficiency_50 docstring + /076 brief Section 10.2.
+    df = compute_range_efficiency_50(df)  # iter-v3/076 ACTIVATE (15th V3_FEATURE_COLUMNS feature)
     # compute_efficiency_ratio_50 REMOVED from dispatch at iter-v3/044 — DISASTROUS NEGATIVE.
     # compute_vol_adj_autocorr REVERTED at iter-v3/037 — iter-v3/036 NEGATIVE; dead code.
     return df
@@ -833,6 +935,7 @@ __all__ = [
     "compute_efficiency_ratio_50",
     "compute_fracdiff_d05_close",
     "compute_hurst_drift_50_200",
+    "compute_range_efficiency_50",
     "compute_regime_momentum_signed_3d",
     "compute_regime_momentum_signed_5d",
     "compute_trend_efficiency_signed",

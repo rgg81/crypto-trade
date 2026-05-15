@@ -125,7 +125,7 @@ def _derive_ensemble_seeds(outer_seed: int, size: int = 5) -> list[int]:
     return [int(s) for s in rng.integers(low=0, high=2**31 - 1, size=size)]
 
 
-ITERATION_LABEL = "v3-075"
+ITERATION_LABEL = "v3-076"
 REPORTS_DIR = Path("reports-v3")
 FEATURES_DIR = Path("data/features_v3")
 DATA_DIR = Path("data")
@@ -310,17 +310,19 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
             "Pass either 3 (--exploration) or 10 (default CONFIRMATION)."
         )
 
-    # iter-v3/065+: REVERT to /060 14-feature anchor after /064 NEGATIVE closeout.
-    # /064 phased mass-expansion #1 (+adx_14) NEGATIVE per Critic `452fcf2` (IS Δ -0.68).
-    # Cycle 1 #6+ pivots to NON-FEATURE axes per Critic /064 Rec #4.
-    # vol_adj_autocorr and efficiency_ratio_50 (the two CATASTROPHICALLY NEGATIVE features)
-    # remain EXCLUDED.
+    # iter-v3/076: V3_FEATURE_COLUMNS = 15 (14 BASELINE_V3 anchor + range_efficiency_50,
+    # the cycle-2 EXPLORATION #6 axis — a sign-invariant trend-efficiency feature).
+    # The 14-feature /060 anchor was carried /065-/075; /076 adds the 15th feature
+    # on its own EDA backing (SHA 40b6e66) per feedback_v3_axis_selection_quant_discipline.md.
+    # vol_adj_autocorr and efficiency_ratio_50 (the two CATASTROPHICALLY NEGATIVE
+    # features) remain EXCLUDED — range_efficiency_50 is a SEPARATELY-NAMED
+    # re-evaluation (brief Section 10.2), NOT the banned efficiency_ratio_50.
     n = len(V3_FEATURE_COLUMNS)
-    if n != 14:
+    if n != 15:
         raise RuntimeError(
-            f"V3_FEATURE_COLUMNS has {n} columns — expected exactly 14. "
-            "iter-v3/065+: REVERT to /060 14-feature anchor (post-/064 NEGATIVE closeout). "
-            "Expected: 14 BASELINE_V3 features only. "
+            f"V3_FEATURE_COLUMNS has {n} columns — expected exactly 15. "
+            "iter-v3/076: 14 BASELINE_V3 anchor features + range_efficiency_50 "
+            "(the cycle-2 EXPLORATION #6 axis). "
             "Check V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
         )
     # vol_adj_autocorr MUST NOT be in the universal list (iter-v3/036 NEGATIVE reverted;
@@ -333,14 +335,20 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
             "Remove it from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
         )
     # efficiency_ratio_50 MUST be ABSENT (unsigned Kaufman ER — DISASTROUS NEGATIVE iter-v3/043).
-    # NOTE: trend_efficiency_signed (signed variant) IS ALLOWED at iter-v3/063
-    # — different mechanism (signed vs unsigned Kaufman ER).
+    # NOTE: the SIGNED variant trend_efficiency_signed (iter-v3/063) and the
+    # SEPARATELY-NAMED re-evaluation range_efficiency_50 (iter-v3/076 — same
+    # Kaufman path-efficiency math, different ROLE: a regime-quality conditioning
+    # feature, NOT a standalone directional signal; see /076 brief Section 10.2)
+    # are DISTINCT feature names and are NOT covered by this ban. This assertion
+    # bans only the literal name 'efficiency_ratio_50'.
     if "efficiency_ratio_50" in V3_FEATURE_COLUMNS:
         raise RuntimeError(
             "efficiency_ratio_50 FOUND in V3_FEATURE_COLUMNS — must be ABSENT "
-            "at iter-v3/063 (DROPPED at iter-v3/044: iter-v3/043 DISASTROUS NEGATIVE IS -0.8445 / "
-            "OOS -0.8990; all 4 symbols broken by unsigned Kaufman ER). "
-            "The SIGNED variant 'trend_efficiency_signed' is the /063 NEW feature. "
+            "(DROPPED at iter-v3/044: iter-v3/043 DISASTROUS NEGATIVE IS -0.8445 / "
+            "OOS -0.8990; all 4 symbols broken by unsigned Kaufman ER as a "
+            "standalone directional signal). iter-v3/076's range_efficiency_50 is "
+            "a separately-named re-evaluation (brief Section 10.2) — it does NOT "
+            "satisfy or violate this ban. "
             "Remove 'efficiency_ratio_50' from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
         )
     if "vwap_dev_50" in V3_FEATURE_COLUMNS:
@@ -370,6 +378,15 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
             "ret_skew_50 NOT FOUND in V3_FEATURE_COLUMNS — must be PRESENT. "
             "BASELINE_V3 feature (RESTORED iter-v3/058 RE-ANCHOR; /028 BASELINE_V3.md). "
             "Add it back to V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
+        )
+    # iter-v3/076: range_efficiency_50 MUST be present (the cycle-2 EXPLORATION #6 axis).
+    if "range_efficiency_50" not in V3_FEATURE_COLUMNS:
+        raise RuntimeError(
+            "range_efficiency_50 NOT FOUND in V3_FEATURE_COLUMNS — must be PRESENT "
+            "at iter-v3/076 (the cycle-2 EXPLORATION #6 axis — a sign-invariant "
+            "Kaufman-style trend-efficiency feature, the 15th feature). QR EDA SHA "
+            "40b6e66; brief Section 3.1. Add 'range_efficiency_50' to "
+            "V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
         )
     # regime_momentum_signed_3d MUST NOT be present (PARKED per /053 PATH C-suspicious).
     if "regime_momentum_signed_3d" in V3_FEATURE_COLUMNS:
@@ -403,13 +420,13 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
             )
     print(
         f"  V3_FEATURE_COLUMNS: {n} columns "
-        "(iter-v3/065+: REVERT to /060 14-feature anchor post-/064 NEGATIVE; "
-        "14 BASELINE_V3 features present; "
+        "(iter-v3/076: 14 BASELINE_V3 anchor features + range_efficiency_50; "
         "all 9 /063-NEW features ABSENT (adx_14, candle_dow_sin/cos, ret_1d, "
         "sym_vs_btc_ret_3d, sym_vs_btc_vol_14d, taker_buy_imbalance_20, "
         "trend_efficiency_signed, vol_regime_x_momentum); "
         "vol_adj_autocorr ABSENT; efficiency_ratio_50 ABSENT; "
-        "regime_momentum_signed_5d PRESENT; sym_vs_btc_ret_7d PRESENT)  PASS"
+        "regime_momentum_signed_5d PRESENT; sym_vs_btc_ret_7d PRESENT; "
+        "range_efficiency_50 PRESENT (the /076 EXPLORATION #6 axis))  PASS"
     )
 
     # iter-v3/070 CLOSEOUT: DEFAULT_ATR_MULTIPLIERS REVERTED (2.0, 1.5) → (2.0, 1.0).
@@ -464,25 +481,33 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
         "per-symbol asymmetry; all symbols DEFAULT (2.0, 1.0))  PASS"
     )
 
-    # iter-v3/065+: REVERT to /060 14-feature anchor. V3_FEATURES_PER_SYMBOL is empty.
+    # iter-v3/076: 15-feature universal set (V3_FEATURES_PER_SYMBOL empty — all 3
+    # symbols fall back to V3_FEATURE_COLUMNS_TOP_N).
     for sym in ("BCHUSDT", "LDOUSDT", "TRXUSDT"):
         sym_feats = features_for_symbol(sym)
-        if len(sym_feats) != 14:
+        if len(sym_feats) != 15:
             raise RuntimeError(
                 f"{sym} fallback has {len(sym_feats)} features — "
-                "expected exactly 14 (iter-v3/065+ REVERT to /060 anchor). "
+                "expected exactly 15 (iter-v3/076: 14 BASELINE_V3 anchor + "
+                "range_efficiency_50). "
                 "Check V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py. "
                 "V3_FEATURES_PER_SYMBOL must be empty."
             )
         if "adx_14" in sym_feats:
             raise RuntimeError(
-                f"{sym} feature set contains adx_14 — must be ABSENT at iter-v3/065+. "
+                f"{sym} feature set contains adx_14 — must be ABSENT at iter-v3/076. "
                 "iter-v3/064 phased mass-expansion #1 NEGATIVE per Critic `452fcf2`."
             )
         if "ret_skew_50" not in sym_feats:
             raise RuntimeError(
                 f"{sym} feature set does not contain ret_skew_50 — must be PRESENT. "
                 "BASELINE_V3 feature. Add 'ret_skew_50' to V3_FEATURE_COLUMNS_TOP_N."
+            )
+        if "range_efficiency_50" not in sym_feats:
+            raise RuntimeError(
+                f"{sym} feature set does not contain range_efficiency_50 — must be "
+                "PRESENT at iter-v3/076 (the cycle-2 EXPLORATION #6 axis). Add "
+                "'range_efficiency_50' to V3_FEATURE_COLUMNS_TOP_N."
             )
         if "regime_momentum_signed_3d" in sym_feats:
             raise RuntimeError(
@@ -497,11 +522,11 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
                 f"Check features_for_symbol('{sym}') path."
             )
     print(
-        "  BCH/LDO/TRX: 14-feature universal fallback "
-        "(iter-v3/065+: REVERT to /060 anchor post-/064 NEGATIVE; "
-        "14 BASELINE_V3 features present; all 9 /063-NEW features ABSENT; "
+        "  BCH/LDO/TRX: 15-feature universal fallback "
+        "(iter-v3/076: 14 BASELINE_V3 anchor features + range_efficiency_50; "
+        "all 9 /063-NEW features ABSENT; "
         "vol_adj_autocorr ABSENT; efficiency_ratio_50 ABSENT; "
-        "regime_momentum_signed_5d, sym_vs_btc_ret_7d PRESENT)  PASS"
+        "regime_momentum_signed_5d, sym_vs_btc_ret_7d, range_efficiency_50 PRESENT)  PASS"
     )
 
     # iter-v3/074: V3_ATR_MULTIPLIERS_PER_SYMBOL reverted to {} (the /073 per-symbol
@@ -579,47 +604,35 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
             "regime_gate_symbols must be empty."
         )
 
-    # iter-v3/075: Primitive 12 (BTC-trend-regime position-SIZE de-rate scalar)
-    # ENABLED — the cycle-2 EXPLORATION #5 axis. When BTC is in a bear/chop trend
-    # state (BTC close[t-1] < SMA_270(close)[t-1]), the position WEIGHT of LDO and
-    # TRX trades is multiplied by 0.50; BCH and bull-regime trades unchanged.
-    # Holding-time-ORTHOGONAL (a SIZE scalar removes no trade, shifts no barrier).
-    # Pre-flight verifies the scalar is ON for LDO+TRX at the EDA-derived
-    # parameters (SMA_270 classifier, 0.50 de-rate). QR EDA SHA 9a04f6f.
-    if not strat_check.config.enable_regime_size_scalar:
+    # iter-v3/076: Primitive 12 (BTC-trend-regime position-SIZE de-rate scalar)
+    # REVERTED to DISABLED. /075 enabled it as the cycle-2 EXPLORATION #5 axis
+    # (INERT-AT-EXPLORATION — a post-gate macro BTC-trend classifier whose sign IS
+    # the IS/OOS regime axis is OOS-costly by construction; it did NOT advance to
+    # CONFIRMATION). /076's axis is a NEW model feature (range_efficiency_50);
+    # Primitive 12 must be OFF to restore the /060 baseline risk-gate stack per
+    # `feedback_no_cheating.md` anti-drift discipline. The RiskV2Config fields stay
+    # DEFINED (Primitive 12's mechanics remain test-covered by
+    # test_regime_size_scalar.py) — only the runner enablement reverts.
+    if strat_check.config.enable_regime_size_scalar:
         raise RuntimeError(
-            "RiskV2Config.enable_regime_size_scalar = False — expected True. "
-            "iter-v3/075: the BTC-trend-regime position-SIZE de-rate scalar "
-            "(primitive 12) is the cycle-2 EXPLORATION #5 axis. Set "
-            "enable_regime_size_scalar=True in RiskV2Config init in _build_v3_model."
+            "RiskV2Config.enable_regime_size_scalar = True — expected False. "
+            "iter-v3/076: the /075 BTC-trend-regime position-SIZE de-rate scalar "
+            "(primitive 12) axis is closed and must be REVERTED to OFF (the /060 "
+            "baseline state). /076's axis is the NEW feature range_efficiency_50. "
+            "Set enable_regime_size_scalar=False in RiskV2Config init in "
+            "_build_v3_model."
         )
-    if strat_check.config.regime_size_scalar_symbols != ("LDOUSDT", "TRXUSDT"):
+    if strat_check.config.regime_size_scalar_symbols != ():
         raise RuntimeError(
             f"RiskV2Config.regime_size_scalar_symbols = "
-            f"{strat_check.config.regime_size_scalar_symbols} — expected "
-            "('LDOUSDT', 'TRXUSDT'). iter-v3/075: the de-rate scope is LDO+TRX "
-            "only (the genuine-drag symbols per EDA T7; BCH WINS in BTC-bear/chop "
-            "and is the positive control). Set "
-            "regime_size_scalar_symbols=('LDOUSDT', 'TRXUSDT')."
-        )
-    if strat_check.config.regime_size_scalar_value != 0.50:
-        raise RuntimeError(
-            f"RiskV2Config.regime_size_scalar_value = "
-            f"{strat_check.config.regime_size_scalar_value} — expected 0.50 "
-            "(iter-v3/075: a-priori data-free default — halve the position "
-            "size in the adverse BTC regime; not fitted to IS or OOS)."
-        )
-    if strat_check.config.regime_size_ma_window != 270:
-        raise RuntimeError(
-            f"RiskV2Config.regime_size_ma_window = "
-            f"{strat_check.config.regime_size_ma_window} — expected 270 "
-            "(EDA T2: SMA_270 = 90-day slow trend, highest IS discrimination)."
+            f"{strat_check.config.regime_size_scalar_symbols} — expected () "
+            "(empty). iter-v3/076: the /075 Primitive-12 de-rate is reverted; "
+            "regime_size_scalar_symbols must be empty."
         )
     print(
         "  Primitive 12 (BTC-trend-regime position-SIZE de-rate scalar): "
-        "enable_regime_size_scalar=True; regime_size_scalar_symbols=('LDOUSDT', "
-        "'TRXUSDT'); de-rate 0.50 when BTC close < SMA_270 "
-        "(iter-v3/075 cycle-2 EXPLORATION #5 axis)  PASS"
+        "enable_regime_size_scalar=False (iter-v3/076 REVERT of the /075 "
+        "EXPLORATION #5 axis; /060 baseline risk-gate stack restored)  PASS"
     )
 
     # iter-v3/044: regime_momentum_signed_5d MUST be in V3_FEATURE_COLUMNS_TOP_N (mandate ACTIVE).
@@ -1623,20 +1636,24 @@ def _build_v3_model(
         regime_dd_threshold_pct=20.0,
         regime_vol_zscore_threshold=1.5,
         # iter-v3/075: primitive 12 — BTC-trend-regime position-SIZE de-rate scalar.
-        # The cycle-2 EXPLORATION #5 axis. When BTC is in a bear/chop trend state
-        # (BTC close[t-1] < SMA_270(close)[t-1]), the position WEIGHT of LDO and TRX
-        # trades is multiplied by 0.50; BCH and all bull-regime trades unchanged.
-        # Holding-time-ORTHOGONAL (a SIZE scalar removes no trade, shifts no barrier
-        # — duration delta EXACTLY 0); FULL-ROSTER (re-weights ~24 IS + ~32 OOS
-        # LDO/TRX trades — materially larger than /074's 3/5). It satisfies the
-        # Critic /074 Rec #3 mandate (target the IS bear/chop drag with a
-        # holding-time-orthogonal, full-roster mechanism). The LDO+TRX scope is
-        # EDA-derived: BCH WINS in BTC-bear/chop (bear-entry IS wpnl +35.7) so a
-        # blanket de-rate is IS-negative; scoping to the genuine-drag symbols
-        # (LDO -3.6, TRX -10.5 bear-entry IS wpnl) preserves the BCH IS edge.
-        # QR EDA: analysis/iteration_v3-075/axis_selection_eda.py (SHA 9a04f6f).
-        enable_regime_size_scalar=True,
-        regime_size_scalar_symbols=("LDOUSDT", "TRXUSDT"),
+        # /075 enabled this as the cycle-2 EXPLORATION #5 axis (INERT-AT-EXPLORATION
+        # per Critic FINAL `2211927` — the de-rate traded IS for OOS roughly 1:1; a
+        # post-gate macro BTC-trend classifier whose sign IS the IS/OOS regime axis
+        # is OOS-costly by construction). /075 did NOT advance to CONFIRMATION.
+        # iter-v3/076: REVERTED to DISABLED. /075's Primitive-12 axis is closed and
+        #   must not silently carry into /076 per `feedback_no_cheating.md` anti-drift
+        #   discipline. This revert restores the /060 baseline risk-gate stack
+        #   (Primitive 12 OFF). /076's axis is a NEW model FEATURE (range_efficiency_50,
+        #   a sign-invariant trend-efficiency feature — the structurally-correct
+        #   response to /075's IS-up/OOS-down finding: move the IS-regime
+        #   discrimination INTO the model via a regime-orthogonal feature, rather
+        #   than a post-gate directional-regime classifier). regime_size_scalar_value
+        #   and regime_size_ma_window left as inert defaults — they have no effect
+        #   when enable_regime_size_scalar=False. The RiskV2Config fields stay
+        #   DEFINED (Primitive 12's mechanics remain test-covered by
+        #   test_regime_size_scalar.py); only the runner enablement reverts.
+        enable_regime_size_scalar=False,
+        regime_size_scalar_symbols=(),
         regime_size_scalar_value=0.50,
         regime_size_ma_window=270,
         # iter-v3/051: REVERT primitive 10 — block_long_for=() per system-level rule

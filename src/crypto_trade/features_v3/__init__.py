@@ -173,6 +173,21 @@ V3_FEATURE_COLUMNS_TOP_N: tuple[str, ...] = (
     "ret_autocorr_lag1_50",  # momentum [BASELINE_V3]
     "sym_vs_btc_ret_7d",  # cross_btc [BASELINE_V3]
     "regime_momentum_signed_5d",  # engineered [BASELINE_V3, /025 PROMISING]
+    # -------------------------------------------------------------------------
+    # iter-v3/076 NEW feature (cycle-2 EXPLORATION #6) — 15th feature.
+    # range_efficiency_50: Kaufman-style UNSIGNED 50-bar path efficiency. A
+    # sign-invariant feature-internal IS-regime discriminator the LightGBM model
+    # learns — it measures HOW price moves (clean trend vs choppy grind), NOT
+    # WHICH WAY. SIGN-INVARIANT (regime-sign |corr| 0.010 per /076 EDA T3) so it
+    # is NOT a directional-regime proxy: it breaks the /075 IS-up/OOS-down
+    # structural tension (a directional-regime discriminator de-rates IS and OOS
+    # together; a regime-orthogonal feature does not). RE-EVALUATION of the
+    # /043-DISASTROUS efficiency_ratio_50 MATH (different name; different ROLE —
+    # a regime-QUALITY conditioning feature alongside 14 directional features,
+    # NOT a standalone directional signal) under
+    # feedback_v3_walkforward_lookahead_bug.md. /076 EDA SHA 40b6e66; brief
+    # Section 10.2. QR-chosen per feedback_v3_axis_selection_quant_discipline.md.
+    "range_efficiency_50",  # engineered [iter-v3/076 NEW — sign-invariant trend efficiency]
     # adx_14 REMOVED at /064 closeout (NEGATIVE per Critic `452fcf2`).
     # Cycle 1 #6+ pivots to NON-FEATURE axes per Critic /064 Rec #4.
     # -------------------------------------------------------------------------
@@ -202,25 +217,31 @@ V3_FEATURE_COLUMNS_TOP_N: tuple[str, ...] = (
     #   vwap_dev_50            — Critic FINAL `a544621` Rec #1 (IC 0.875 with ema_spread_atr_20)
     # -------------------------------------------------------------------------
 )
-"""14-feature set (BASELINE_V3 /059 anchor — adx_14 removed at iter-v3/064 NEGATIVE).
+"""15-feature set — 14 BASELINE_V3 /059 anchor features + range_efficiency_50.
 
-iter-v3/064 phased mass-expansion #1 (+adx_14, briefly a 15-feature set) was
-NEGATIVE; the runner pre-flight asserts adx_14 ABSENT. The active set is the
-14 BASELINE_V3 features, unchanged from the /028 spec carried by /059.
+iter-v3/076 (cycle-2 EXPLORATION #6) ADDS range_efficiency_50 as the 15th
+feature — a sign-invariant Kaufman-style trend-efficiency feature. The first 14
+entries are the BASELINE_V3 /059 anchor (unchanged from the /028 spec).
 
-Per amended `feedback_v3_mass_feature_expansion.md` (2026-05-14) the CYCLE-5
-mass-expansion mandate proceeds via phased single-feature axes at single-seed
-EXPLORATION. /064 was phased-mass-expansion #1 (NEGATIVE — adx_14 dropped).
+History:
+  /065+: 14-feature /060 anchor (adx_14 dropped at /064 NEGATIVE).
+  /076 : range_efficiency_50 ADDED (15th) — the EXPLORATION #6 axis. NEW
+         engineered feature; QR EDA SHA 40b6e66. EXPLORATION only — a
+         CONFIRMATION must validate it before BASELINE_V3.md changes.
 
-Docstring corrected at iter-v3/070 closeout per Critic FINAL `2991781` Rec #1
-(stale "15-feature" wording was documentation rot).
+The iter-v3/064 phased mass-expansion #1 (+adx_14, briefly 15 features) was
+NEGATIVE; the runner pre-flight still asserts adx_14 ABSENT. range_efficiency_50
+is a DIFFERENT feature (a sign-invariant trend-efficiency discriminator) added
+on its own EDA backing per `feedback_v3_axis_selection_quant_discipline.md`.
 """
 
-# iter-v3/064 closeout: V3_FEATURE_COLUMNS = V3_FEATURE_COLUMNS_TOP_N (14-feature set).
+# iter-v3/076: V3_FEATURE_COLUMNS = V3_FEATURE_COLUMNS_TOP_N (15-feature set —
+# 14 BASELINE_V3 + range_efficiency_50, the iter-v3/076 EXPLORATION #6 axis).
 V3_FEATURE_COLUMNS: tuple[str, ...] = V3_FEATURE_COLUMNS_TOP_N
 """Alias for V3_FEATURE_COLUMNS_TOP_N — the active feature set for all v3 models.
 
-Points to the 14 BASELINE_V3 features (adx_14 removed at iter-v3/064 NEGATIVE).
+Points to the 15-feature set: the 14 BASELINE_V3 features + range_efficiency_50
+(iter-v3/076 EXPLORATION #6 axis — a sign-invariant trend-efficiency feature).
 """
 
 DEFAULT_ATR_MULTIPLIERS: tuple[float, float] = (2.0, 1.0)
