@@ -1,0 +1,5 @@
+axis,metric,value,interpretation
+AXIS_1_fixed_horizon_labeling,mean_TB_vs_FH_agreement,0.794,lower => fixed-horizon genuinely re-labels (structural change)
+AXIS_1_fixed_horizon_labeling,LDO_ATR_TB_label_imbalance_abs,0.0067,LDO triple-barrier label imbalance |long_frac-0.5|
+AXIS_1_fixed_horizon_labeling,LDO_fixed_horizon_14_label_imbalance_abs,0.0162,LDO fixed-horizon-14 label imbalance |long_frac-0.5|
+AXIS_2_distinct_feature_M2,best_distinct_feature_abs_auc_minus_half,0.0347,funding z-score winner/loser separability; >=0.12 = RESIDUAL-SIGNAL
