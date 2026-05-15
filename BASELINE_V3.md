@@ -4,7 +4,7 @@
 
 **Sibling to:** `BASELINE.md` (v1) and `BASELINE_V2.md` (v2). All three coexist.
 
-**Last updated:** 2026-05-13 — iter-v3/059 RE-ANCHOR #2 under unified 10-seed ensemble architecture
+**Last updated:** 2026-05-15 — iter-v3/070 CYCLE 1 CONFIRMATION closeout (NO-MERGE; anchor METRICS UNCHANGED; Path B4 retained as infrastructure)
 
 ## Unified 10-Seed Ensemble Architecture (Phase B-3 at commit `ab2d9ac`)
 
@@ -108,6 +108,20 @@ IS attribution:
 - **Optuna**: `--n-trials 35` per cell × 10 seeds × 3 symbols = 1050 total trials; `n_jobs=1` (Phase A n_jobs=2 ATTEMPTED at `0a3c30e`, REVERTED at `31665f6` due to 5× GIL slowdown); `colsample_bytree` Optuna-tuned (NOT hardcoded 1.0)
 - **OOF parquet guardrail**: `--clean-oof` flag active (per `feedback_v3_oof_parquet_guardrail.md`)
 - **Outer seeds**: deprecated under unified architecture; `--seeds` flag logs warning if passed
+- **DSR reporting (Path B4 — retained infrastructure from iter-v3/070 CONFIRMATION)**: `dsr.json`
+  reports BOTH the legacy `dsr_relative` field AND the new `dsr_relative_b4` field. Path B4
+  (the annualized-both-sides reformulation specified at iter-v3/062 brief Section 3) corrects a
+  granularity-mismatch bug in the legacy computation — trade-level cumulative PnL had entered
+  `psr()` as if it were an annualized Sharpe. Path B4 puts both inputs at the same granularity:
+  observed Sharpe at √252 (annualized daily), benchmark CPCV-Q75 at √756. `dsr.json` additionally
+  carries the informational tracking fields `daily_sharpe_oos_b4_at_sqrt252`,
+  `cpcv_q75_annualized_b4`, and `n_daily_obs_oos`. Path B4 was the one durable methodology gain
+  of cycle 1 — bundled and validated at iter-v3/070 CONFIRMATION (Component B; ACCEPTED). It is a
+  strictly-accretive methodology improvement per `feedback_v3_promising_mechanical_subtype.md`
+  (non-compoundable across iterations). **The /059 anchor METRICS are UNCHANGED** — Path B4 is a
+  reporting-layer-only change with zero behavioral effect on the trade roster. The /059 legacy
+  `dsr_relative` of 0.1134 (recorded in Headline Metrics above) was a measurement artifact; under
+  Path B4 the same /059 OOS performance would report `dsr_relative_b4 ≈ 1.0`.
 - **Sacred constants**: OOS_CUTOFF_DATE=2025-03-24, training_months=24 (IMMUTABLE)
 
 ## Reproducibility Stamp
@@ -171,7 +185,7 @@ Inherited project-level merge gates:
 - Top symbol concentration ≤ 30% of OOS PnL (or explicit exception)
 - Single-roster validation under unified architecture (replaces multi-seed concentration validation)
 
-## Failed MERGE Gates (Outstanding Constraints — carry forward to cycle 1 CONFIRMATION iter-v3/069)
+## Failed MERGE Gates (Outstanding Constraints — cycle 1 CONFIRMATION iter-v3/070 did NOT clear them; carry forward to cycle 2)
 
 | # | Gate | Threshold | iter-v3/059 Observed | Required Lift |
 |---|---|---:|---:|---:|
@@ -315,28 +329,33 @@ The Critic's Check 7 verifies reproducibility properties — explicit `feature_c
 
 **CONFIRMATION-MERGE — RE-ANCHOR-MERGE-IS-DOMINANT** per user directive 2026-05-13 + RE-ANCHOR #2 mandate at brief Section 8.1. iter-v3/059 is the FIRST canonical baseline under unified 10-seed ensemble architecture (live-deployment compatible: one model per coin per account). Multi-seed-mean Sharpe reporting (/058 architecture) is OBSOLETE. The prior /058 RE-ANCHOR #1 anchor and tag `v0.v3-058` are RETIRED as canonical.
 
-### Cycle Counting (UNCHANGED — RE-ANCHOR #2 orthogonal)
+### Cycle Counting (cycle 1 CLOSED at iter-v3/070 CONFIRMATION)
 
 Per user directive 2026-05-13: RE-ANCHOR #2 is orthogonal to cycle counting; NOT a cycle 1 EXPLORATION; NOT subject to 10:1 cadence constraint.
 - **iter-v3/058 = RE-ANCHOR #1** (cycle 4 RESET; NOT counted toward cycle 1)
 - **iter-v3/059 = RE-ANCHOR #2** (orthogonal to cycle counting; NOT counted toward cycle 1)
-- **NEXT iteration = iter-v3/060 = CYCLE 1 EXPLORATION #1 of 10** (under unified-architecture anchor)
-- **Cycle 1 CONFIRMATION = iter-v3/069** (or later per cadence discipline; do NOT collapse 10th EXPLORATION into CONFIRMATION)
+- **iter-v3/060-069 = CYCLE 1 EXPLORATIONs #1-10** (COMPLETE — under unified-architecture anchor)
+- **iter-v3/070 = CYCLE 1 CONFIRMATION** (COMPLETE — SUSPICIOUS-OOS-DOMINANT, NO-MERGE)
+- **NEXT iteration = iter-v3/071 = CYCLE 2 EXPLORATION #1 of 10**
+- **Cycle 2 CONFIRMATION = iter-v3/081** (or later per cadence discipline; do NOT collapse 10th EXPLORATION into CONFIRMATION)
 - **EXPLORATION cap 2h** (unchanged)
-- **CONFIRMATION cap 6h** (iter-v3/059 ran 3.60h within cap)
+- **CONFIRMATION cap 6h** (iter-v3/070 ran 3.13h within cap)
 
-Per `feedback_v3_strict_10_to_1_cadence.md` Directive 2: STRICT 10:1 EXPLORATION:CONFIRMATION cadence. iter-v3/060-068 are 9 SEPARATE EXPLORATIONs; iter-v3/069 (or later) is the SEPARATE CONFIRMATION.
+Per `feedback_v3_strict_10_to_1_cadence.md` Directive 2: STRICT 10:1 EXPLORATION:CONFIRMATION cadence. iter-v3/071-080 are 10 SEPARATE EXPLORATIONs; iter-v3/081 (or later) is the SEPARATE CONFIRMATION.
 
-Per `feedback_v3_mass_feature_expansion.md` (user directive 2026-05-11 refined): mass feature expansion mandate shifted +1 slot from iter-v3/062 to **iter-v3/063** (cycle 1's first slot post-axis-priorities setup; /059 RE-ANCHOR consumed the /062 calendar slot).
+### Cycle 1 Outcome (iter-v3/060-070 — CLOSED)
 
-### Cycle 1 Axis Priorities (post-RE-ANCHOR #2)
+**Cycle 1 produced NO BASELINE_V3.md update.** /059 remains canonical. Per `feedback_v3_strict_both_is_oos_baseline.md` (BOTH-must-improve), the cycle 1 CONFIRMATION (iter-v3/070, 2-component bundle = /065 SL widening + /062 Path B4) classified SUSPICIOUS-OOS-DOMINANT: IS Sharpe collapsed -0.97 (FAIL the BOTH-must-improve IS gate) while OOS soared +0.67; OOS/IS ratio 10.81 — regime exposure, not robust edge. Component A (/065 SL widening) REJECTED; `DEFAULT_ATR_MULTIPLIERS` reverted (2.0,1.5)→(2.0,1.0). Component B (/062 Path B4) ACCEPTED as accretive methodology infrastructure (see DSR reporting bullet in Code Configuration). The cycle 1 EXPLORATION outcome distribution was 1 PROMISING-anchor, 1 PASSIVE-DIAGNOSTIC, 1 SUSPICIOUS-OOS-DOMINANT, 4 INERT, 3 NEGATIVE. Detail in `diary-v3/iteration_v3-070.md`.
 
-Per Critic FINAL `0fc18c2` Recommendations:
-1. **HIGHEST priority**: TRX OOS diagnostic (Recommendation #2) — single-feature single-axis EXPLORATION at iter-v3/060
-2. **HIGH priority**: DSR_relative threshold/benchmark recalibration (Recommendation #1) — methodology-only EXPLORATION at iter-v3/061
-3. **MEDIUM priority**: BCH IS concentration sensitivity (Recommendation #3) — applied as constraint on every cycle 1 brief's Section 4
-4. **STRUCTURAL**: Mass feature expansion at iter-v3/063 (per `feedback_v3_mass_feature_expansion.md` shifted slot)
-5. **CONTINUING**: NEW feature families per `feedback_v3_structural_over_knob_exploration.md` (engineered > off-the-shelf indicators per `feedback_v3_engineered_features_proven.md`)
+### Cycle 2 Axis Priorities (post-iter-v3/070 CONFIRMATION)
+
+The defining unresolved problem of cycle 1 is **LDO structural weakness** — LDO was a drag through every cycle 1 EXPLORATION and the CONFIRMATION (/070 IS net_pnl -47.46 / 28.6% WR; OOS net_pnl -13.77 / 35.7% WR). No labeling knob, feature expansion, or universe addition fixed it. Cycle 1 exhausted the knob space; cycle 2 must be STRUCTURAL.
+
+1. **HIGHEST — Model architecture (meta-labeling)** per `feedback_v3_iter017_metalabeling_mandate.md` (mandated, never fully executed; /017 was a single-seed over-filter). An M2 secondary classifier that predicts whether to ACT on the M1 direction is the natural response to a directionally-bleeding symbol.
+2. **HIGH — Labeling architecture** — fixed-horizon return labels as an alternative to ATR triple-barrier. A different label DEFINITION, not a different multiplier.
+3. **MEDIUM — Universe revision: replace LDO** — only if axes 1-2 fail; a replacement must clear an IS-edge screen BEFORE inclusion (prior universe-expansion EXPLORATIONs /021, /069 all failed).
+4. **CONSTRAINT on every cycle 2 brief** — per-symbol IS-axis discipline (`feedback_v3_per_symbol_lifts_oos_breaks_is.md`): validate any per-symbol customization PRESERVES/LIFTS IS Sharpe before bundling.
+5. **CONSTRAINT on every cycle 2 brief** — pre-register the OOS/IS Sharpe ratio bound (> 3.0 → SUSPICIOUS) in Section 4 per `feedback_v3_oos_is_ratio_gate.md`.
 
 ## Relationship to v1 and v2
 
