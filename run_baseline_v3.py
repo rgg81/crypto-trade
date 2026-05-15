@@ -125,7 +125,7 @@ def _derive_ensemble_seeds(outer_seed: int, size: int = 5) -> list[int]:
     return [int(s) for s in rng.integers(low=0, high=2**31 - 1, size=size)]
 
 
-ITERATION_LABEL = "v3-076"
+ITERATION_LABEL = "v3-077"
 REPORTS_DIR = Path("reports-v3")
 FEATURES_DIR = Path("data/features_v3")
 DATA_DIR = Path("data")
@@ -215,7 +215,7 @@ def _verify_data_freshness(symbols: tuple[str, ...], max_lag_hours: float = 16.0
 
 
 def _verify_feature_columns(ensemble_size: int | None = None) -> None:
-    """Verifies V3_FEATURE_COLUMNS contents per current brief (iter-v3/063).
+    """Verifies V3_FEATURE_COLUMNS contents per current brief (iter-v3/077).
 
     Parameters
     ----------
@@ -310,19 +310,19 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
             "Pass either 3 (--exploration) or 10 (default CONFIRMATION)."
         )
 
-    # iter-v3/076: V3_FEATURE_COLUMNS = 15 (14 BASELINE_V3 anchor + range_efficiency_50,
-    # the cycle-2 EXPLORATION #6 axis — a sign-invariant trend-efficiency feature).
-    # The 14-feature /060 anchor was carried /065-/075; /076 adds the 15th feature
-    # on its own EDA backing (SHA 40b6e66) per feedback_v3_axis_selection_quant_discipline.md.
-    # vol_adj_autocorr and efficiency_ratio_50 (the two CATASTROPHICALLY NEGATIVE
-    # features) remain EXCLUDED — range_efficiency_50 is a SEPARATELY-NAMED
-    # re-evaluation (brief Section 10.2), NOT the banned efficiency_ratio_50.
+    # iter-v3/077: V3_FEATURE_COLUMNS = 14 (the BASELINE_V3 /059/060 anchor stack).
+    # iter-v3/077 (cycle-2 EXPLORATION #7) is a PASSIVE-DIAGNOSTIC iteration
+    # (conditional-orthogonality report instrumentation; brief Section 3) — it
+    # adds NO feature and REVERTS /076's range_efficiency_50, returning to the
+    # 14-feature anchor carried /065-/075. /076's range_efficiency_50 was
+    # SUSPICIOUS-OOS-DOMINANT (NON-ADVANCING); the Kaufman path-efficiency axis
+    # is CLOSED across 2 data points (/043 + /076 — BASELINE_V3.md Dead Ideas).
     n = len(V3_FEATURE_COLUMNS)
-    if n != 15:
+    if n != 14:
         raise RuntimeError(
-            f"V3_FEATURE_COLUMNS has {n} columns — expected exactly 15. "
-            "iter-v3/076: 14 BASELINE_V3 anchor features + range_efficiency_50 "
-            "(the cycle-2 EXPLORATION #6 axis). "
+            f"V3_FEATURE_COLUMNS has {n} columns — expected exactly 14. "
+            "iter-v3/077: the BASELINE_V3 /059/060 14-feature anchor stack "
+            "(/076's range_efficiency_50 reverted; PASSIVE-DIAGNOSTIC iteration). "
             "Check V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
         )
     # vol_adj_autocorr MUST NOT be in the universal list (iter-v3/036 NEGATIVE reverted;
@@ -335,20 +335,21 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
             "Remove it from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
         )
     # efficiency_ratio_50 MUST be ABSENT (unsigned Kaufman ER — DISASTROUS NEGATIVE iter-v3/043).
-    # NOTE: the SIGNED variant trend_efficiency_signed (iter-v3/063) and the
-    # SEPARATELY-NAMED re-evaluation range_efficiency_50 (iter-v3/076 — same
-    # Kaufman path-efficiency math, different ROLE: a regime-quality conditioning
-    # feature, NOT a standalone directional signal; see /076 brief Section 10.2)
-    # are DISTINCT feature names and are NOT covered by this ban. This assertion
-    # bans only the literal name 'efficiency_ratio_50'.
+    # The Kaufman path-efficiency axis is now CLOSED across 2 data points: /043
+    # (efficiency_ratio_50 DISASTROUS) + /076 (the bit-identical-math
+    # range_efficiency_50 re-evaluation SUSPICIOUS-OOS-DOMINANT — BASELINE_V3.md
+    # Dead Ideas; the feedback_v3_walkforward_lookahead_bug.md re-eval eligibility
+    # is DISCHARGED). Both the literal name 'efficiency_ratio_50' AND the
+    # bit-identical 'range_efficiency_50' must stay absent (the latter is
+    # asserted separately above). This assertion bans the literal name
+    # 'efficiency_ratio_50'.
     if "efficiency_ratio_50" in V3_FEATURE_COLUMNS:
         raise RuntimeError(
             "efficiency_ratio_50 FOUND in V3_FEATURE_COLUMNS — must be ABSENT "
             "(DROPPED at iter-v3/044: iter-v3/043 DISASTROUS NEGATIVE IS -0.8445 / "
             "OOS -0.8990; all 4 symbols broken by unsigned Kaufman ER as a "
-            "standalone directional signal). iter-v3/076's range_efficiency_50 is "
-            "a separately-named re-evaluation (brief Section 10.2) — it does NOT "
-            "satisfy or violate this ban. "
+            "standalone directional signal). The Kaufman path-efficiency axis is "
+            "CLOSED across /043 + /076 — do not re-propose it. "
             "Remove 'efficiency_ratio_50' from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
         )
     if "vwap_dev_50" in V3_FEATURE_COLUMNS:
@@ -379,14 +380,18 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
             "BASELINE_V3 feature (RESTORED iter-v3/058 RE-ANCHOR; /028 BASELINE_V3.md). "
             "Add it back to V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
         )
-    # iter-v3/076: range_efficiency_50 MUST be present (the cycle-2 EXPLORATION #6 axis).
-    if "range_efficiency_50" not in V3_FEATURE_COLUMNS:
+    # iter-v3/077: range_efficiency_50 MUST be ABSENT — REVERTED at /077.
+    # /076 added it (15th feature) and was SUSPICIOUS-OOS-DOMINANT (NON-ADVANCING);
+    # the Kaufman path-efficiency axis is CLOSED across /043 + /076
+    # (BASELINE_V3.md Dead Ideas). /077 is a PASSIVE-DIAGNOSTIC iteration on the
+    # 14-feature anchor (brief Section 3.2).
+    if "range_efficiency_50" in V3_FEATURE_COLUMNS:
         raise RuntimeError(
-            "range_efficiency_50 NOT FOUND in V3_FEATURE_COLUMNS — must be PRESENT "
-            "at iter-v3/076 (the cycle-2 EXPLORATION #6 axis — a sign-invariant "
-            "Kaufman-style trend-efficiency feature, the 15th feature). QR EDA SHA "
-            "40b6e66; brief Section 3.1. Add 'range_efficiency_50' to "
-            "V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
+            "range_efficiency_50 FOUND in V3_FEATURE_COLUMNS — must be ABSENT "
+            "at iter-v3/077 (REVERTED — /076 SUSPICIOUS-OOS-DOMINANT; the Kaufman "
+            "path-efficiency axis is CLOSED across /043 + /076). /077 is a "
+            "PASSIVE-DIAGNOSTIC iteration on the 14-feature BASELINE_V3 anchor. "
+            "Remove 'range_efficiency_50' from V3_FEATURE_COLUMNS_TOP_N."
         )
     # regime_momentum_signed_3d MUST NOT be present (PARKED per /053 PATH C-suspicious).
     if "regime_momentum_signed_3d" in V3_FEATURE_COLUMNS:
@@ -420,13 +425,13 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
             )
     print(
         f"  V3_FEATURE_COLUMNS: {n} columns "
-        "(iter-v3/076: 14 BASELINE_V3 anchor features + range_efficiency_50; "
+        "(iter-v3/077: the BASELINE_V3 /059/060 14-feature anchor stack; "
         "all 9 /063-NEW features ABSENT (adx_14, candle_dow_sin/cos, ret_1d, "
         "sym_vs_btc_ret_3d, sym_vs_btc_vol_14d, taker_buy_imbalance_20, "
         "trend_efficiency_signed, vol_regime_x_momentum); "
         "vol_adj_autocorr ABSENT; efficiency_ratio_50 ABSENT; "
-        "regime_momentum_signed_5d PRESENT; sym_vs_btc_ret_7d PRESENT; "
-        "range_efficiency_50 PRESENT (the /076 EXPLORATION #6 axis))  PASS"
+        "range_efficiency_50 ABSENT (/076 reverted at /077 — Kaufman axis CLOSED); "
+        "regime_momentum_signed_5d PRESENT; sym_vs_btc_ret_7d PRESENT)  PASS"
     )
 
     # iter-v3/070 CLOSEOUT: DEFAULT_ATR_MULTIPLIERS REVERTED (2.0, 1.5) → (2.0, 1.0).
@@ -481,21 +486,21 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
         "per-symbol asymmetry; all symbols DEFAULT (2.0, 1.0))  PASS"
     )
 
-    # iter-v3/076: 15-feature universal set (V3_FEATURES_PER_SYMBOL empty — all 3
-    # symbols fall back to V3_FEATURE_COLUMNS_TOP_N).
+    # iter-v3/077: 14-feature universal set (V3_FEATURES_PER_SYMBOL empty — all 3
+    # symbols fall back to V3_FEATURE_COLUMNS_TOP_N, the BASELINE_V3 /059/060 anchor).
     for sym in ("BCHUSDT", "LDOUSDT", "TRXUSDT"):
         sym_feats = features_for_symbol(sym)
-        if len(sym_feats) != 15:
+        if len(sym_feats) != 14:
             raise RuntimeError(
                 f"{sym} fallback has {len(sym_feats)} features — "
-                "expected exactly 15 (iter-v3/076: 14 BASELINE_V3 anchor + "
-                "range_efficiency_50). "
+                "expected exactly 14 (iter-v3/077: the BASELINE_V3 /059/060 "
+                "14-feature anchor stack). "
                 "Check V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py. "
                 "V3_FEATURES_PER_SYMBOL must be empty."
             )
         if "adx_14" in sym_feats:
             raise RuntimeError(
-                f"{sym} feature set contains adx_14 — must be ABSENT at iter-v3/076. "
+                f"{sym} feature set contains adx_14 — must be ABSENT at iter-v3/077. "
                 "iter-v3/064 phased mass-expansion #1 NEGATIVE per Critic `452fcf2`."
             )
         if "ret_skew_50" not in sym_feats:
@@ -503,11 +508,12 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
                 f"{sym} feature set does not contain ret_skew_50 — must be PRESENT. "
                 "BASELINE_V3 feature. Add 'ret_skew_50' to V3_FEATURE_COLUMNS_TOP_N."
             )
-        if "range_efficiency_50" not in sym_feats:
+        if "range_efficiency_50" in sym_feats:
             raise RuntimeError(
-                f"{sym} feature set does not contain range_efficiency_50 — must be "
-                "PRESENT at iter-v3/076 (the cycle-2 EXPLORATION #6 axis). Add "
-                "'range_efficiency_50' to V3_FEATURE_COLUMNS_TOP_N."
+                f"{sym} feature set contains range_efficiency_50 — must be ABSENT "
+                "at iter-v3/077 (/076 SUSPICIOUS-OOS-DOMINANT; the Kaufman "
+                "path-efficiency axis is CLOSED across /043 + /076). Remove "
+                "'range_efficiency_50' from V3_FEATURE_COLUMNS_TOP_N."
             )
         if "regime_momentum_signed_3d" in sym_feats:
             raise RuntimeError(
@@ -518,15 +524,17 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
         if "efficiency_ratio_50" in sym_feats:
             raise RuntimeError(
                 f"{sym} feature set contains efficiency_ratio_50 — must be ABSENT. "
-                "iter-v3/044: DISASTROUS NEGATIVE. Use 'trend_efficiency_signed' instead. "
+                "iter-v3/044: DISASTROUS NEGATIVE. The Kaufman path-efficiency axis "
+                "is CLOSED. "
                 f"Check features_for_symbol('{sym}') path."
             )
     print(
-        "  BCH/LDO/TRX: 15-feature universal fallback "
-        "(iter-v3/076: 14 BASELINE_V3 anchor features + range_efficiency_50; "
+        "  BCH/LDO/TRX: 14-feature universal fallback "
+        "(iter-v3/077: the BASELINE_V3 /059/060 14-feature anchor stack; "
         "all 9 /063-NEW features ABSENT; "
         "vol_adj_autocorr ABSENT; efficiency_ratio_50 ABSENT; "
-        "regime_momentum_signed_5d, sym_vs_btc_ret_7d, range_efficiency_50 PRESENT)  PASS"
+        "range_efficiency_50 ABSENT (/076 reverted); "
+        "regime_momentum_signed_5d, sym_vs_btc_ret_7d PRESENT)  PASS"
     )
 
     # iter-v3/074: V3_ATR_MULTIPLIERS_PER_SYMBOL reverted to {} (the /073 per-symbol
@@ -604,21 +612,21 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
             "regime_gate_symbols must be empty."
         )
 
-    # iter-v3/076: Primitive 12 (BTC-trend-regime position-SIZE de-rate scalar)
-    # REVERTED to DISABLED. /075 enabled it as the cycle-2 EXPLORATION #5 axis
-    # (INERT-AT-EXPLORATION — a post-gate macro BTC-trend classifier whose sign IS
-    # the IS/OOS regime axis is OOS-costly by construction; it did NOT advance to
-    # CONFIRMATION). /076's axis is a NEW model feature (range_efficiency_50);
-    # Primitive 12 must be OFF to restore the /060 baseline risk-gate stack per
-    # `feedback_no_cheating.md` anti-drift discipline. The RiskV2Config fields stay
-    # DEFINED (Primitive 12's mechanics remain test-covered by
-    # test_regime_size_scalar.py) — only the runner enablement reverts.
+    # iter-v3/077: Primitive 12 (BTC-trend-regime position-SIZE de-rate scalar)
+    # stays DISABLED (reverted OFF at /076; remains OFF at /077). /075 enabled it
+    # as the cycle-2 EXPLORATION #5 axis (INERT-AT-EXPLORATION — a post-gate macro
+    # BTC-trend classifier whose sign IS the IS/OOS regime axis is OOS-costly by
+    # construction; it did NOT advance to CONFIRMATION). /077's axis is a
+    # PASSIVE-DIAGNOSTIC report instrumentation; Primitive 12 must be OFF to keep
+    # the /060 baseline risk-gate stack per `feedback_no_cheating.md` anti-drift
+    # discipline. The RiskV2Config fields stay DEFINED (Primitive 12's mechanics
+    # remain test-covered by test_regime_size_scalar.py) — only enablement is OFF.
     if strat_check.config.enable_regime_size_scalar:
         raise RuntimeError(
             "RiskV2Config.enable_regime_size_scalar = True — expected False. "
-            "iter-v3/076: the /075 BTC-trend-regime position-SIZE de-rate scalar "
-            "(primitive 12) axis is closed and must be REVERTED to OFF (the /060 "
-            "baseline state). /076's axis is the NEW feature range_efficiency_50. "
+            "iter-v3/077: the /075 BTC-trend-regime position-SIZE de-rate scalar "
+            "(primitive 12) axis is closed and stays OFF (the /060 baseline "
+            "state). /077's axis is a PASSIVE-DIAGNOSTIC report instrumentation. "
             "Set enable_regime_size_scalar=False in RiskV2Config init in "
             "_build_v3_model."
         )
@@ -1640,15 +1648,16 @@ def _build_v3_model(
         # per Critic FINAL `2211927` — the de-rate traded IS for OOS roughly 1:1; a
         # post-gate macro BTC-trend classifier whose sign IS the IS/OOS regime axis
         # is OOS-costly by construction). /075 did NOT advance to CONFIRMATION.
-        # iter-v3/076: REVERTED to DISABLED. /075's Primitive-12 axis is closed and
-        #   must not silently carry into /076 per `feedback_no_cheating.md` anti-drift
-        #   discipline. This revert restores the /060 baseline risk-gate stack
-        #   (Primitive 12 OFF). /076's axis is a NEW model FEATURE (range_efficiency_50,
-        #   a sign-invariant trend-efficiency feature — the structurally-correct
-        #   response to /075's IS-up/OOS-down finding: move the IS-regime
-        #   discrimination INTO the model via a regime-orthogonal feature, rather
-        #   than a post-gate directional-regime classifier). regime_size_scalar_value
-        #   and regime_size_ma_window left as inert defaults — they have no effect
+        # iter-v3/077: Primitive 12 stays DISABLED (reverted OFF at /076; OFF at
+        #   /077). /075's Primitive-12 axis is closed and must not silently carry
+        #   forward per `feedback_no_cheating.md` anti-drift discipline. Keeping it
+        #   OFF holds the /060 baseline risk-gate stack. /077's axis is a
+        #   PASSIVE-DIAGNOSTIC report instrumentation (a per-feature conditional-
+        #   orthogonality map; the trade roster is bit-identical to /060) — the
+        #   structurally-correct response to the cycle-2 0/6-PROMISING state:
+        #   build the conditional-orthogonality tooling /078+ need before
+        #   proposing another feature. regime_size_scalar_value and
+        #   regime_size_ma_window left as inert defaults — they have no effect
         #   when enable_regime_size_scalar=False. The RiskV2Config fields stay
         #   DEFINED (Primitive 12's mechanics remain test-covered by
         #   test_regime_size_scalar.py); only the runner enablement reverts.
@@ -2007,6 +2016,142 @@ def _write_feature_importance(
         writer = csv.DictWriter(f, fieldnames=["feature", "importance"])
         writer.writeheader()
         writer.writerows(rows_port)
+
+
+# ============================================================
+# Conditional-orthogonality report (iter-v3/077 PASSIVE-DIAGNOSTIC axis)
+# ============================================================
+
+
+def _write_conditional_orthogonality(
+    primary_model_pairs: list,
+    report_dir: Path,
+) -> None:
+    """Write `conditional_orthogonality.csv` — the iter-v3/077 PASSIVE-DIAGNOSTIC
+    axis (brief Section 3.1).
+
+    This is a REPORT-EMISSION-ONLY function. It reads the already-trained models
+    in ``primary_model_pairs`` (the same object ``_write_feature_importance``
+    consumes) and emits a per-feature conditional-orthogonality table. It does
+    NOT touch the model, the feature set, the labeling, the risk gates, or the
+    trade roster — the iter-v3/077 trade roster is bit-identical to /060.
+
+    Two parts are emitted:
+      PART A — last-month gain-importance SHARE per feature, per symbol. This is
+        the runner-self-contained part: ``inner._models`` carries only the LAST
+        walk-forward month's ensemble (lazy monthly training — same scope as
+        ``_write_feature_importance``), so the runner can report the last-month
+        model-split-allocation share but cannot reconstruct the per-IS-month
+        trajectory at the report stage.
+      PART B — the EDA's committed full per-IS-month conditional-orthogonality
+        correlation, copied from ``analysis/iteration_v3-077/
+        T3_conditional_orthogonality.csv`` (EDA SHA 313d3c0). This is the full
+        diagnostic deliverable — the correlation of each feature's per-(symbol,
+        IS-month) importance share with the BTC monthly regime label. The EDA
+        produces it; the runner surfaces it in the report directory so the
+        conditional-orthogonality map ships with the iteration's reports.
+
+    The engineering report must state which parts were emitted (per brief
+    Section 3.1 implementation note).
+    """
+    if not primary_model_pairs:
+        return
+
+    cols: list[str] = list(V3_FEATURE_COLUMNS)
+    for _, strat in primary_model_pairs:
+        inner = strat.inner if hasattr(strat, "inner") else strat
+        if hasattr(inner, "_all_feature_cols") and inner._all_feature_cols:
+            cols = list(inner._all_feature_cols)
+            break
+
+    # PART A — last-month gain-importance SHARE per (symbol, feature).
+    sym_share: dict[str, dict[str, float]] = {}
+    for cfg, strat in primary_model_pairs:
+        sym = cfg.symbols[0] if cfg.symbols else "UNKNOWN"
+        inner = strat.inner if hasattr(strat, "inner") else strat
+        if hasattr(inner, "_m1"):
+            inner = inner._m1
+        if not hasattr(inner, "_models") or not inner._models:
+            continue
+        acc = {c: 0.0 for c in cols}
+        n_models = 0
+        for model in inner._models:
+            if hasattr(model, "feature_importances_"):
+                fi_arr = model.feature_importances_
+                for i, c in enumerate(cols):
+                    if i < len(fi_arr):
+                        acc[c] += float(fi_arr[i])
+                n_models += 1
+        if n_models == 0:
+            continue
+        total = sum(acc.values())
+        sym_share[sym] = {
+            c: (acc[c] / total if total > 0 else 0.0) for c in cols
+        }
+
+    # PART B — the EDA's committed full per-IS-month conditional-orthogonality map.
+    eda_t3 = (
+        Path(__file__).resolve().parent
+        / "analysis"
+        / "iteration_v3-077"
+        / "T3_conditional_orthogonality.csv"
+    )
+    cond_corr: dict[str, dict] = {}
+    if eda_t3.is_file():
+        with open(eda_t3, newline="") as f:
+            for row in csv.DictReader(f):
+                cond_corr[row["feature"]] = row
+
+    out_path = report_dir / "conditional_orthogonality.csv"
+    fieldnames = [
+        "feature",
+        "last_month_importance_share_portfolio",
+        "eda_corr_portfolio_pooled",
+        "eda_max_abs_corr",
+        "eda_conditionally_regime_loaded",
+        "source",
+    ]
+    rows: list[dict] = []
+    for c in cols:
+        # portfolio-mean last-month share across symbols
+        shares = [sym_share[s][c] for s in sym_share if c in sym_share[s]]
+        lm_share = round(sum(shares) / len(shares), 6) if shares else 0.0
+        ec = cond_corr.get(c, {})
+        rows.append(
+            {
+                "feature": c,
+                "last_month_importance_share_portfolio": lm_share,
+                "eda_corr_portfolio_pooled": ec.get("corr_portfolio_pooled", ""),
+                "eda_max_abs_corr": ec.get("max_abs_corr", ""),
+                "eda_conditionally_regime_loaded": (
+                    "True"
+                    if ec.get("max_abs_corr")
+                    and float(ec["max_abs_corr"]) > 0.35
+                    else "False"
+                    if ec.get("max_abs_corr")
+                    else ""
+                ),
+                "source": (
+                    "PART_A_runner + PART_B_eda_313d3c0"
+                    if ec
+                    else "PART_A_runner_only (EDA T3 not found)"
+                ),
+            }
+        )
+    rows.sort(
+        key=lambda r: (
+            float(r["eda_max_abs_corr"]) if r["eda_max_abs_corr"] else -1.0
+        ),
+        reverse=True,
+    )
+    with open(out_path, "w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(rows)
+    print(
+        f"[v3 report] conditional_orthogonality.csv: {len(rows)} features "
+        f"(PART A last-month share + PART B EDA per-month map)"
+    )
 
 
 # ============================================================
@@ -2676,6 +2821,11 @@ def main() -> None:
     )
 
     _write_feature_importance(is_trades, oos_trades, model_pairs, report_dir)
+
+    # iter-v3/077 PASSIVE-DIAGNOSTIC axis — per-feature conditional-orthogonality
+    # map (brief Section 3.1). Report-emission only; the trade roster is
+    # bit-identical to /060.
+    _write_conditional_orthogonality(model_pairs, report_dir)
 
     _write_v3_comparison(
         is_trades,

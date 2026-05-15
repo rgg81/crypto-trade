@@ -79,10 +79,10 @@ def test_regime_momentum_signed_3d_in_universal_feature_list() -> None:
         "Remove it from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
     )
     n = len(V3_FEATURE_COLUMNS_TOP_N)
-    assert n == 15, (
-        f"V3_FEATURE_COLUMNS_TOP_N has {n} elements — expected 15. "
-        "iter-v3/076: 14 BASELINE_V3 anchor features + range_efficiency_50 "
-        "(the cycle-2 EXPLORATION #6 axis); feature count = 15. "
+    assert n == 14, (
+        f"V3_FEATURE_COLUMNS_TOP_N has {n} elements — expected 14. "
+        "iter-v3/077: the BASELINE_V3 /059/060 14-feature anchor stack "
+        "(/076's range_efficiency_50 reverted; PASSIVE-DIAGNOSTIC iteration). "
         "Check V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
     )
     assert "fracdiff_d05_close" not in V3_FEATURE_COLUMNS_TOP_N, (
@@ -262,10 +262,10 @@ def test_v3_feature_columns_top_n_swap_fracdiff_to_3d_at_iter_v3_052() -> None:
         "iter-v3/065: must be ABSENT (PARKED at /053; REVERTED at /063-/064)."
     )
     n = len(V3_FEATURE_COLUMNS_TOP_N)
-    assert n == 15, (
-        f"V3_FEATURE_COLUMNS_TOP_N count={n} — expected 15. "
-        "iter-v3/076: 14 BASELINE_V3 anchor features + range_efficiency_50 "
-        "(the cycle-2 EXPLORATION #6 axis)."
+    assert n == 14, (
+        f"V3_FEATURE_COLUMNS_TOP_N count={n} — expected 14. "
+        "iter-v3/077: the BASELINE_V3 /059/060 14-feature anchor stack "
+        "(/076's range_efficiency_50 reverted; PASSIVE-DIAGNOSTIC iteration)."
     )
     assert "regime_momentum_signed_5d" in V3_FEATURE_COLUMNS_TOP_N, (
         "regime_momentum_signed_5d NOT found in V3_FEATURE_COLUMNS_TOP_N. "

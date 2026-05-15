@@ -174,20 +174,15 @@ V3_FEATURE_COLUMNS_TOP_N: tuple[str, ...] = (
     "sym_vs_btc_ret_7d",  # cross_btc [BASELINE_V3]
     "regime_momentum_signed_5d",  # engineered [BASELINE_V3, /025 PROMISING]
     # -------------------------------------------------------------------------
-    # iter-v3/076 NEW feature (cycle-2 EXPLORATION #6) — 15th feature.
-    # range_efficiency_50: Kaufman-style UNSIGNED 50-bar path efficiency. A
-    # sign-invariant feature-internal IS-regime discriminator the LightGBM model
-    # learns — it measures HOW price moves (clean trend vs choppy grind), NOT
-    # WHICH WAY. SIGN-INVARIANT (regime-sign |corr| 0.010 per /076 EDA T3) so it
-    # is NOT a directional-regime proxy: it breaks the /075 IS-up/OOS-down
-    # structural tension (a directional-regime discriminator de-rates IS and OOS
-    # together; a regime-orthogonal feature does not). RE-EVALUATION of the
-    # /043-DISASTROUS efficiency_ratio_50 MATH (different name; different ROLE —
-    # a regime-QUALITY conditioning feature alongside 14 directional features,
-    # NOT a standalone directional signal) under
-    # feedback_v3_walkforward_lookahead_bug.md. /076 EDA SHA 40b6e66; brief
-    # Section 10.2. QR-chosen per feedback_v3_axis_selection_quant_discipline.md.
-    "range_efficiency_50",  # engineered [iter-v3/076 NEW — sign-invariant trend efficiency]
+    # iter-v3/077 (cycle-2 EXPLORATION #7) REVERTS /076's range_efficiency_50 —
+    # the feature set returns to the BASELINE_V3 /059/060 14-feature anchor.
+    # /076 (NEW feature range_efficiency_50, the Kaufman path-efficiency math)
+    # was SUSPICIOUS-OOS-DOMINANT (OOS/IS ratio 15.04; IS edge destroyed) and
+    # NON-ADVANCING; the Kaufman path-efficiency axis is CLOSED across 2 data
+    # points (/043 DISASTROUS + /076 SUSPICIOUS — BASELINE_V3.md Dead Ideas).
+    # iter-v3/077 is a PASSIVE-DIAGNOSTIC iteration (conditional-orthogonality
+    # report instrumentation; brief Section 3) — it adds NO feature and reverts
+    # /076's so the diagnostic measures the canonical /060 anchor.
     # adx_14 REMOVED at /064 closeout (NEGATIVE per Critic `452fcf2`).
     # Cycle 1 #6+ pivots to NON-FEATURE axes per Critic /064 Rec #4.
     # -------------------------------------------------------------------------
@@ -217,31 +212,33 @@ V3_FEATURE_COLUMNS_TOP_N: tuple[str, ...] = (
     #   vwap_dev_50            — Critic FINAL `a544621` Rec #1 (IC 0.875 with ema_spread_atr_20)
     # -------------------------------------------------------------------------
 )
-"""15-feature set — 14 BASELINE_V3 /059 anchor features + range_efficiency_50.
+"""14-feature set — the BASELINE_V3 /059 anchor stack.
 
-iter-v3/076 (cycle-2 EXPLORATION #6) ADDS range_efficiency_50 as the 15th
-feature — a sign-invariant Kaufman-style trend-efficiency feature. The first 14
-entries are the BASELINE_V3 /059 anchor (unchanged from the /028 spec).
+iter-v3/077 (cycle-2 EXPLORATION #7) REVERTS /076's range_efficiency_50; the
+feature set returns to the BASELINE_V3 /059/060 14-feature anchor (unchanged
+from the /028 spec).
 
 History:
   /065+: 14-feature /060 anchor (adx_14 dropped at /064 NEGATIVE).
-  /076 : range_efficiency_50 ADDED (15th) — the EXPLORATION #6 axis. NEW
-         engineered feature; QR EDA SHA 40b6e66. EXPLORATION only — a
-         CONFIRMATION must validate it before BASELINE_V3.md changes.
+  /076 : range_efficiency_50 ADDED (15th) — EXPLORATION #6 axis;
+         SUSPICIOUS-OOS-DOMINANT, NON-ADVANCING (Kaufman path-efficiency axis
+         CLOSED across /043 + /076 — BASELINE_V3.md Dead Ideas).
+  /077 : range_efficiency_50 REVERTED — back to the 14-feature anchor. /077 is
+         a PASSIVE-DIAGNOSTIC iteration (conditional-orthogonality report
+         instrumentation) and adds no feature.
 
 The iter-v3/064 phased mass-expansion #1 (+adx_14, briefly 15 features) was
-NEGATIVE; the runner pre-flight still asserts adx_14 ABSENT. range_efficiency_50
-is a DIFFERENT feature (a sign-invariant trend-efficiency discriminator) added
-on its own EDA backing per `feedback_v3_axis_selection_quant_discipline.md`.
+NEGATIVE; the runner pre-flight still asserts adx_14 ABSENT.
 """
 
-# iter-v3/076: V3_FEATURE_COLUMNS = V3_FEATURE_COLUMNS_TOP_N (15-feature set —
-# 14 BASELINE_V3 + range_efficiency_50, the iter-v3/076 EXPLORATION #6 axis).
+# iter-v3/077: V3_FEATURE_COLUMNS = V3_FEATURE_COLUMNS_TOP_N (14-feature
+# BASELINE_V3 /059/060 anchor — /076's range_efficiency_50 reverted).
 V3_FEATURE_COLUMNS: tuple[str, ...] = V3_FEATURE_COLUMNS_TOP_N
 """Alias for V3_FEATURE_COLUMNS_TOP_N — the active feature set for all v3 models.
 
-Points to the 15-feature set: the 14 BASELINE_V3 features + range_efficiency_50
-(iter-v3/076 EXPLORATION #6 axis — a sign-invariant trend-efficiency feature).
+Points to the 14-feature BASELINE_V3 /059/060 anchor stack (iter-v3/077 reverted
+/076's range_efficiency_50; /077 is a PASSIVE-DIAGNOSTIC iteration, no feature
+change).
 """
 
 DEFAULT_ATR_MULTIPLIERS: tuple[float, float] = (2.0, 1.0)
@@ -351,8 +348,9 @@ Enforced by _verify_feature_columns in run_baseline_v3.py (iter-v3/064):
     "ALGOUSDT" not in V3_FEATURES_PER_SYMBOL
     "LDOUSDT" not in V3_FEATURES_PER_SYMBOL
     "TRXUSDT" not in V3_FEATURES_PER_SYMBOL
-    features_for_symbol("BCHUSDT") == V3_FEATURE_COLUMNS_TOP_N  (15 features — phased #1)
-    "adx_14" in V3_FEATURE_COLUMNS_TOP_N  (PHASED-MASS-EXPANSION #1 ADDITION)
+    features_for_symbol("BCHUSDT") == V3_FEATURE_COLUMNS_TOP_N  (14 features — /060 anchor)
+    "adx_14" not in V3_FEATURE_COLUMNS_TOP_N  (/064 phased-mass-expansion #1 NEGATIVE)
+    "range_efficiency_50" not in V3_FEATURE_COLUMNS_TOP_N  (/076 SUSPICIOUS; reverted /077)
     "vol_adj_autocorr" not in V3_FEATURE_COLUMNS_TOP_N  (dead code; catastrophic at /026)
     "efficiency_ratio_50" not in V3_FEATURE_COLUMNS_TOP_N  (DISASTROUS NEGATIVE /043)
     "regime_momentum_signed_3d" not in V3_FEATURE_COLUMNS_TOP_N  (PARKED /053)
@@ -369,15 +367,14 @@ def features_for_symbol(symbol: str) -> tuple[str, ...]:
     - V3_FEATURES_PER_SYMBOL is EMPTY (cleared at iter-v3/040). All symbols fall back
       to V3_FEATURE_COLUMNS_TOP_N. No per-symbol feature overrides exist.
 
-    iter-v3/064 PHASED MASS-EXPANSION #1 (REVERT to /060 14-feature anchor + ADD adx_14):
+    iter-v3/077 (cycle-2 EXPLORATION #7 — PASSIVE-DIAGNOSTIC; REVERT /076's
+    range_efficiency_50):
     - V3_FEATURES_PER_SYMBOL still EMPTY (0 entries).
-    - BCHUSDT/LDOUSDT/TRXUSDT: each returns 15 features = V3_FEATURE_COLUMNS_TOP_N
-      (fallback). The 14-feature BASELINE_V3 + adx_14 (Wilder 1978 ADX).
-    - Any other symbol: same 15-feature fallback (universal).
-
-    iter-v3/064 PHASED MASS-EXPANSION #1: 14 → 15 features (single-feature axis,
-    REVERTED from /063 46-feature SUSPICIOUS-OOS-DOMINANT). Per amended
-    `feedback_v3_mass_feature_expansion.md` (2026-05-14).
+    - BCHUSDT/LDOUSDT/TRXUSDT: each returns the 14-feature BASELINE_V3 /059/060
+      anchor = V3_FEATURE_COLUMNS_TOP_N (fallback).
+    - Any other symbol: same 14-feature fallback (universal).
+    - /076 briefly added range_efficiency_50 (15th); reverted at /077 — the
+      Kaufman path-efficiency axis is CLOSED (BASELINE_V3.md Dead Ideas).
 
     Callers MUST pass ``feature_columns=list(features_for_symbol(symbol))``
     to LightGbmStrategy/XgboostStrategy — never None, never empty, never the global default.
