@@ -563,5 +563,7 @@ EDA-derived numerical tables).
   `vol_scale_floor_per_symbol={"TRXUSDT": 0.5}` is DELIBERATELY kept (the cycle-2
   baseline state /071+/072 ran) — reverting it would be a second axis.
 
-**Setup commit SHA**: (backfilled after the setup commit per the standard
-two-commit flow).
+**Setup commit SHA**: `b859dab` — `setup(iter-v3/073): per-symbol triple-barrier
+asymmetry + research brief LOCKED`. Edits: `V3_ATR_MULTIPLIERS_PER_SYMBOL`
+(Edit 1), `label_mode` revert (Edit 2), `ITERATION_LABEL` (Edit 3),
+`tests/features_v3/test_per_symbol_atr_v3_073.py` (Edit 4 — 6 tests, all pass).
