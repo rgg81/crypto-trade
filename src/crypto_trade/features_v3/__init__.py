@@ -249,27 +249,25 @@ History:
 """
 
 V3_ATR_MULTIPLIERS_PER_SYMBOL: dict[str, tuple[float, float]] = {
-    # iter-v3/073 — CYCLE 2 EXPLORATION #3: per-symbol triple-barrier asymmetry.
-    # The single global (2.0, 1.0) pair produces an SL-saturated training label on
-    # every v3 symbol (LONG SL-hit 58-69%; worst LDO 69%) because the 3 symbols'
-    # 8h NATR differs ~2x (BCH 3.70%, LDO 5.01%, TRX 2.65% median). The EDA
-    # (analysis/iteration_v3-073/axis_selection_eda.py SHA b004bc9) 9-cell grid
-    # sweep recalibrates each symbol's barrier toward balance:
-    #   BCH (2.0, 1.25) — directional_spread -0.167 -> +0.071; balance 0.50 -> 0.62
-    #   LDO (1.5, 1.25) — directional_spread -0.709 -> -0.244; balance 0.45 -> 0.80
-    #   TRX omitted     — EDA keep-decision; (2.0,1.0) eligible-grid optimum did
-    #                     NOT beat current; falls back to DEFAULT_ATR_MULTIPLIERS.
-    # Label-execution consistent BY CONSTRUCTION: the runner derives BOTH the
-    # training label AND the live Signal.tp_pct/sl_pct from these multipliers
-    # (satisfies Critic /072 Rec #3). History: {} (iter-v3/051-072) -> this.
-    "BCHUSDT": (2.0, 1.25),
-    "LDOUSDT": (1.5, 1.25),
+    # iter-v3/074 — CYCLE 2 EXPLORATION #4: REVERTED to {} (empty).
+    # The iter-v3/073 per-symbol triple-barrier asymmetry axis — BCH (2.0, 1.25),
+    # LDO (1.5, 1.25) — classified SUSPICIOUS-OOS-DOMINANT (OOS/IS monthly Sharpe
+    # ratio 6.85, the most extreme in v3 history; per-symbol SL widening is a
+    # holding-time-extension axis loading the IS/OOS regime factor). The axis was
+    # CLOSED at catalog level and did NOT advance to the cycle-2 CONFIRMATION.
+    # Per `feedback_no_cheating.md` anti-drift discipline, /074 must not silently
+    # inherit a catalog-closed axis — V3_ATR_MULTIPLIERS_PER_SYMBOL is reverted to
+    # empty so all symbols use DEFAULT_ATR_MULTIPLIERS = (2.0, 1.0), the canonical
+    # /059 baseline labeling. /074's axis is the regime-conditional kill switch
+    # (primitive 9), orthogonal to labeling. See diary-v3/iteration_v3-073.md.
+    # History: {} (iter-v3/051-072) -> BCH/LDO (iter-v3/073) -> {} (iter-v3/074).
 }
 """Per-symbol ATR multiplier overrides (iter-v3/032+).
 
 Maps symbol → (atr_tp_multiplier, atr_sl_multiplier).
-iter-v3/073: BCH (2.0, 1.25), LDO (1.5, 1.25); TRX falls back to
-DEFAULT_ATR_MULTIPLIERS = (2.0, 1.0).
+iter-v3/074: EMPTY — all symbols (BCH/LDO/TRX) fall back to
+DEFAULT_ATR_MULTIPLIERS = (2.0, 1.0). The iter-v3/073 per-symbol axis was
+SUSPICIOUS-OOS-DOMINANT and is reverted here per anti-drift discipline.
 """
 
 

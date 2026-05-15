@@ -125,7 +125,7 @@ def _derive_ensemble_seeds(outer_seed: int, size: int = 5) -> list[int]:
     return [int(s) for s in rng.integers(low=0, high=2**31 - 1, size=size)]
 
 
-ITERATION_LABEL = "v3-073"
+ITERATION_LABEL = "v3-074"
 REPORTS_DIR = Path("reports-v3")
 FEATURES_DIR = Path("data/features_v3")
 DATA_DIR = Path("data")
@@ -443,22 +443,25 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
         )
     print("  V3_FEATURES_PER_SYMBOL: 0 entries (empty — all symbols use 14-feature fallback)  PASS")
 
-    # iter-v3/073: V3_ATR_MULTIPLIERS_PER_SYMBOL = per-symbol triple-barrier asymmetry axis.
-    # EDA `b004bc9`: global (2.0, 1.0) SL-saturates training labels on all 3 symbols (NATR
-    # differs ~2×). Per-symbol calibration balances barriers — BCH (2.0, 1.25), LDO (1.5, 1.25),
-    # TRX absent (global (2.0, 1.0) fallback). Label-execution consistent by construction.
-    _expected_atr_per_symbol = {"BCHUSDT": (2.0, 1.25), "LDOUSDT": (1.5, 1.25)}
+    # iter-v3/074: V3_ATR_MULTIPLIERS_PER_SYMBOL REVERTED to {} (empty). The
+    # iter-v3/073 per-symbol triple-barrier asymmetry axis (BCH (2.0,1.25), LDO
+    # (1.5,1.25)) was SUSPICIOUS-OOS-DOMINANT (OOS/IS ratio 6.85; holding-time-
+    # extension axis) — closed at catalog level, did NOT advance. Per anti-drift
+    # discipline (`feedback_no_cheating.md`) /074 reverts it so all symbols use
+    # DEFAULT_ATR_MULTIPLIERS = (2.0, 1.0). /074's axis is the regime-conditional
+    # kill switch (primitive 9), orthogonal to labeling.
+    _expected_atr_per_symbol: dict[str, tuple[float, float]] = {}
     _actual_atr_per_symbol = {k: tuple(v) for k, v in V3_ATR_MULTIPLIERS_PER_SYMBOL.items()}
     if _actual_atr_per_symbol != _expected_atr_per_symbol:
         raise RuntimeError(
             f"V3_ATR_MULTIPLIERS_PER_SYMBOL = {_actual_atr_per_symbol} — expected "
-            f"{_expected_atr_per_symbol} (iter-v3/073 per-symbol triple-barrier asymmetry axis). "
-            "BCH (2.0, 1.25), LDO (1.5, 1.25), TRX absent. "
-            "Set V3_ATR_MULTIPLIERS_PER_SYMBOL in features_v3/__init__.py."
+            "{} (EMPTY — iter-v3/074 REVERT of the /073 per-symbol triple-barrier "
+            "asymmetry axis; all symbols use DEFAULT_ATR_MULTIPLIERS = (2.0, 1.0)). "
+            "Set V3_ATR_MULTIPLIERS_PER_SYMBOL = {} in features_v3/__init__.py."
         )
     print(
-        "  V3_ATR_MULTIPLIERS_PER_SYMBOL: 2 entries (iter-v3/073 per-symbol barrier asymmetry; "
-        "BCH (2.0, 1.25), LDO (1.5, 1.25), TRX (2.0, 1.0) DEFAULT)  PASS"
+        "  V3_ATR_MULTIPLIERS_PER_SYMBOL: 0 entries (iter-v3/074 REVERT of /073 "
+        "per-symbol asymmetry; all symbols DEFAULT (2.0, 1.0))  PASS"
     )
 
     # iter-v3/065+: REVERT to /060 14-feature anchor. V3_FEATURES_PER_SYMBOL is empty.
@@ -501,11 +504,12 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
         "regime_momentum_signed_5d, sym_vs_btc_ret_7d PRESENT)  PASS"
     )
 
-    # iter-v3/073: per-symbol triple-barrier asymmetry axis. BCH (2.0, 1.25), LDO (1.5, 1.25)
-    # via V3_ATR_MULTIPLIERS_PER_SYMBOL; TRX falls back to DEFAULT_ATR_MULTIPLIERS = (2.0, 1.0).
+    # iter-v3/074: V3_ATR_MULTIPLIERS_PER_SYMBOL reverted to {} (the /073 per-symbol
+    # axis was SUSPICIOUS-OOS-DOMINANT). ALL symbols (BCH/LDO/TRX) fall back to
+    # DEFAULT_ATR_MULTIPLIERS = (2.0, 1.0) — the canonical /059 baseline labeling.
     _expected_atr_lookup = {
-        "BCHUSDT": (2.0, 1.25),
-        "LDOUSDT": (1.5, 1.25),
+        "BCHUSDT": (2.0, 1.0),
+        "LDOUSDT": (2.0, 1.0),
         "TRXUSDT": (2.0, 1.0),
     }
     for _sym_atr in ("BCHUSDT", "LDOUSDT", "TRXUSDT"):
@@ -513,14 +517,14 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
         if sym_atr != _expected_atr_lookup[_sym_atr]:
             raise RuntimeError(
                 f"atr_multipliers_for_symbol('{_sym_atr}') returned {sym_atr} — "
-                f"expected {_expected_atr_lookup[_sym_atr]} (iter-v3/073 per-symbol "
-                "barrier asymmetry axis). BCH (2.0, 1.25), LDO (1.5, 1.25), TRX (2.0, 1.0). "
-                "Verify V3_ATR_MULTIPLIERS_PER_SYMBOL + DEFAULT_ATR_MULTIPLIERS in "
-                "features_v3/__init__.py."
+                f"expected {_expected_atr_lookup[_sym_atr]} (iter-v3/074 REVERT — all "
+                "symbols use DEFAULT_ATR_MULTIPLIERS = (2.0, 1.0)). Verify "
+                "V3_ATR_MULTIPLIERS_PER_SYMBOL = {} + DEFAULT_ATR_MULTIPLIERS = (2.0, 1.0) "
+                "in features_v3/__init__.py."
             )
     print(
-        "  atr_multipliers_for_symbol: BCH (2.0, 1.25), LDO (1.5, 1.25), TRX (2.0, 1.0) "
-        "(iter-v3/073 per-symbol triple-barrier asymmetry axis)  PASS"
+        "  atr_multipliers_for_symbol: BCH/LDO/TRX all (2.0, 1.0) DEFAULT "
+        "(iter-v3/074 REVERT of /073 per-symbol asymmetry)  PASS"
     )
 
     # iter-v3/051: Primitive 10 REVERT — block_long_for=() per system-level rule.
@@ -552,6 +556,44 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
     print(
         "  Primitive 10 (direction-asymmetric kill switch): block_long_for=(); "
         "block_short_for=() (SYSTEM-LEVEL REVERT at iter-v3/051)  PASS"
+    )
+
+    # iter-v3/074: Primitive 9 (regime-conditional kill switch) ENABLED — the
+    # cycle-2 EXPLORATION #4 axis. The gate suppresses TRX candidate signals on
+    # BTC-regime-stress bars. Holding-time-ORTHOGONAL (binary kill switch removing
+    # whole trades; surviving trades unchanged) — satisfies the Critic /073 Rec #1
+    # hard constraint. Pre-flight verifies the gate is ON for TRX only at the
+    # IS-calibrated thresholds (20.0% drawdown / 1.5 vol-zscore — unchanged; /074
+    # does NOT re-tune them, which would be a second axis).
+    if not strat_check.config.enable_regime_gate:
+        raise RuntimeError(
+            "RiskV2Config.enable_regime_gate = False — expected True. iter-v3/074: "
+            "the regime-conditional kill switch (primitive 9) is the cycle-2 "
+            "EXPLORATION #4 axis. Set enable_regime_gate=True in RiskV2Config init "
+            "in _build_v3_model."
+        )
+    if strat_check.config.regime_gate_symbols != ("TRXUSDT",):
+        raise RuntimeError(
+            f"RiskV2Config.regime_gate_symbols = {strat_check.config.regime_gate_symbols} "
+            "— expected ('TRXUSDT',). iter-v3/074: the regime gate targets TRX only "
+            "(BCH/LDO are the positive controls). Set regime_gate_symbols=('TRXUSDT',)."
+        )
+    if strat_check.config.regime_dd_threshold_pct != 20.0:
+        raise RuntimeError(
+            f"RiskV2Config.regime_dd_threshold_pct = "
+            f"{strat_check.config.regime_dd_threshold_pct} — expected 20.0 "
+            "(IS-90th-percentile; iter-v3/074 does NOT re-tune the threshold)."
+        )
+    if strat_check.config.regime_vol_zscore_threshold != 1.5:
+        raise RuntimeError(
+            f"RiskV2Config.regime_vol_zscore_threshold = "
+            f"{strat_check.config.regime_vol_zscore_threshold} — expected 1.5 "
+            "(IS-95th-percentile; iter-v3/074 does NOT re-tune the threshold)."
+        )
+    print(
+        "  Primitive 9 (regime-conditional kill switch): enable_regime_gate=True; "
+        "regime_gate_symbols=('TRXUSDT',); dd>20.0% OR |vol_z|>1.5 "
+        "(iter-v3/074 cycle-2 EXPLORATION #4 axis)  PASS"
     )
 
     # iter-v3/044: regime_momentum_signed_5d MUST be in V3_FEATURE_COLUMNS_TOP_N (mandate ACTIVE).
@@ -742,8 +784,10 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
             f"iter-v3/069 REVERTS /068's Path C — pass label_timeout_minutes=10080 "
             f"in _build_v3_model common_kwargs (brief Section 3 spec item #3)."
         )
-    # iter-v3/072: label_mode must be "fixed_horizon" on all v3 models.
-    # Default is "triple_barrier" (backward-compat); v3/072 sets "fixed_horizon".
+    # iter-v3/074: label_mode must be "triple_barrier" on all v3 models — the
+    # canonical /059 baseline labeling. /072's "fixed_horizon" axis was NEGATIVE
+    # (label-execution mismatch); /073 reverted it; /074 carries the revert
+    # forward (the /074 axis is the regime gate, orthogonal to labeling).
     if not hasattr(_p13_lgbm, "label_mode"):
         raise RuntimeError(
             "LightGbmStrategy for BCHUSDT has no label_mode attribute. "
@@ -1536,10 +1580,16 @@ def _build_v3_model(
         # iter-v3/022: primitive 9 — regime-conditional kill switch on TRX.
         # Thresholds calibrated at IS-90th/95th percentile (EDA SHA b728313 synthesis.md).
         # Gate fires when BTC drawdown_30d > 20% OR |BTC vol_zscore_30d| > 1.5.
-        # iter-v3/023: DISABLED — revert iter-v3/022 axis so the single varied axis
-        # vs iter-v3/018 anchor is funding_rate_zscore_30 re-add only.
-        # Code stays in repo (zero revert cost for future CONFIRMATION-mode re-eval).
-        enable_regime_gate=False,
+        # iter-v3/023-073: DISABLED (axis isolation for other iterations' single axes).
+        # iter-v3/074: ENABLED — the cycle-2 EXPLORATION #4 axis. The regime gate is
+        # holding-time-ORTHOGONAL (binary kill switch removing whole TRX trades on
+        # BTC-regime-stress bars; surviving trades unchanged) — it satisfies the
+        # Critic /073 Rec #1 hard constraint (`feedback_v3_is_oos_regime_divergence.md`)
+        # that the /074 axis must NOT extend effective trade holding time. The gate's
+        # /074 re-test is its first post-walk-forward-fix data point (the /022 verdict
+        # was at the BIASED pre-fix baseline; eligible for re-eval per
+        # `feedback_v3_walkforward_lookahead_bug.md`). EDA: analysis/iteration_v3-074/.
+        enable_regime_gate=True,
         regime_gate_symbols=("TRXUSDT",),
         regime_dd_threshold_pct=20.0,
         regime_vol_zscore_threshold=1.5,
