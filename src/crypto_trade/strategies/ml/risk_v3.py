@@ -14,6 +14,13 @@ and vol_zscore_30d, computed PAST-ONLY with strict open_time < t discipline).
 get_signal is overridden to apply the regime gate before handing off to the
 inherited gate cascade (gates 1-6).
 
+iter-v3/075: adds primitive 12 — BTC-trend-regime position-SIZE de-rate scalar.
+_build_lookups also populates _btc_trend_lookup (per-bar BTC bull/bear-chop
+classifier: close[t-1] < SMA_N(close)[t-1], computed PAST-ONLY). get_signal
+applies the scalar LAST — a surviving non-NO_SIGNAL for an in-scope symbol on a
+BTC-bear/chop bar has its WEIGHT de-rated by config.regime_size_scalar_value.
+WEIGHT only — direction/tp/sl/timeout unchanged (holding-time-ORTHOGONAL).
+
 Past-only contract:
   - BTC drawdown_30d at bar t = (close[t-1] - max(close[t-90:t-1])) / max(...)
     using .shift(1) so bar t CANNOT see its own close.
@@ -35,7 +42,7 @@ import pandas as pd
 
 from crypto_trade.config import OOS_CUTOFF_MS
 from crypto_trade.features_v3 import V3_FEATURE_COLUMNS
-from crypto_trade.strategies import NO_SIGNAL
+from crypto_trade.strategies import NO_SIGNAL, Signal
 from crypto_trade.strategies.ml.risk_v2 import GateStats, RiskV2Wrapper, _compute_adx
 
 
@@ -103,6 +110,55 @@ def _build_btc_regime_lookup(
     }
 
 
+def _build_btc_trend_lookup(
+    btc_csv_path: Path,
+    ma_window: int = 270,
+) -> dict[str, np.ndarray]:
+    """iter-v3/075 primitive 12: build a per-bar BTC bull / bear-chop classifier.
+
+    BTC is in "bear/chop" at bar t when ``close[t-1] < SMA_ma_window(close)[t-1]``
+    — the slow-trend filter (Carver, *Systematic Trading*).
+
+    Parameters
+    ----------
+    btc_csv_path
+        Path to data/BTCUSDT/8h.csv.
+    ma_window
+        Slow-MA window in bars (270 bars = 90 days at 8h cadence).
+
+    Returns
+    -------
+    dict with keys:
+        "open_time"    np.ndarray[int64]  — BTC bar open_times, sorted asc.
+        "btc_bearchop" np.ndarray[int8]   — 1 when BTC bear/chop, 0 when bull.
+
+    Past-only discipline (identical contract to ``_build_btc_regime_lookup``):
+        ``close.shift(1)`` is applied BEFORE the rolling SMA so bar t's
+        classification uses only close[t-1 .. t-ma_window]. The current bar's own
+        close is NEVER seen. Warm-up bars (SMA NaN) are classified bull (0) — no
+        de-rate is applied where the classifier is undefined.
+
+    This is the EXACT contract of
+    ``analysis/iteration_v3-075/axis_selection_eda.py::_build_btc_trend_lookup``.
+    """
+    df = pd.read_csv(btc_csv_path, usecols=["open_time", "close"])
+    df = df.sort_values("open_time").reset_index(drop=True)
+    df["close"] = df["close"].astype(float)
+
+    # Shift close by 1 so at bar t the SMA sees only close[t-1 .. t-ma_window].
+    close_shifted = df["close"].shift(1)
+    sma = close_shifted.rolling(window=ma_window, min_periods=ma_window).mean()
+    # bear/chop = past close strictly below the slow trend MA.
+    bearchop = (close_shifted < sma).astype("Int64")
+    # Warm-up bars (sma NaN) -> bull (0): conservative, no de-rate where undefined.
+    bearchop = bearchop.fillna(0).astype(np.int8)
+
+    return {
+        "open_time": df["open_time"].to_numpy(dtype=np.int64),
+        "btc_bearchop": bearchop.to_numpy(dtype=np.int8),
+    }
+
+
 class RiskV3Wrapper(RiskV2Wrapper):
     """v3 variant of RiskV2Wrapper that uses V3_FEATURE_COLUMNS for z-score OOD.
 
@@ -120,6 +176,9 @@ class RiskV3Wrapper(RiskV2Wrapper):
         super().__init__(inner, config)
         # iter-v3/022: BTC regime lookup — populated in _build_lookups
         self._btc_regime_lookup: dict[str, np.ndarray] | None = None
+        # iter-v3/075: BTC bull/bear-chop trend lookup (primitive 12) — populated
+        # in _build_lookups when config.enable_regime_size_scalar is True.
+        self._btc_trend_lookup: dict[str, np.ndarray] | None = None
 
     def _build_lookups(self, master: pd.DataFrame) -> None:
         """Load v3 features and compute ADX per symbol — v3 parquet schema.
@@ -204,6 +263,16 @@ class RiskV3Wrapper(RiskV2Wrapper):
                     vol_lookback_bars=self.config.regime_vol_lookback_bars,
                 )
 
+        # iter-v3/075: build BTC bull/bear-chop trend lookup (primitive 12) if
+        # enabled. Same data/BTCUSDT/8h.csv source; close-vs-slow-SMA classifier.
+        if self.config.enable_regime_size_scalar and self.config.regime_size_scalar_symbols:
+            btc_csv = Path("data") / "BTCUSDT" / "8h.csv"
+            if btc_csv.exists():
+                self._btc_trend_lookup = _build_btc_trend_lookup(
+                    btc_csv,
+                    ma_window=self.config.regime_size_ma_window,
+                )
+
     def _regime_gate_fires(self, symbol: str, open_time_ms: int) -> bool:
         """iter-v3/022 primitive 9: return True if regime-gate should kill this signal.
 
@@ -242,21 +311,60 @@ class RiskV3Wrapper(RiskV2Wrapper):
         vol_z_fires = abs(vz) > self.config.regime_vol_zscore_threshold
         return dd_fires or vol_z_fires
 
+    def _regime_size_scalar(self, symbol: str, open_time_ms: int) -> float:
+        """iter-v3/075 primitive 12: return the position-SIZE de-rate multiplier.
+
+        Returns ``config.regime_size_scalar_value`` (< 1.0) when the symbol is in
+        ``config.regime_size_scalar_symbols`` AND BTC is in a bear/chop trend
+        state at the bar. Returns ``1.0`` (no de-rate) otherwise.
+
+        Past-only: find the most recent BTC bar with open_time STRICTLY LESS THAN
+        the symbol's open_time (``np.searchsorted(..., side="left") - 1``). The BTC
+        bar at open_time == symbol's open_time is excluded — identical contract to
+        ``_regime_gate_fires``.
+
+        Returns 1.0 (no de-rate) when:
+          - symbol not in regime_size_scalar_symbols
+          - BTC trend lookup not built (CSV missing / scalar disabled)
+          - No BTC bar precedes open_time_ms
+          - the most recent BTC bar is classified bull (btc_bearchop == 0)
+        """
+        if symbol not in self.config.regime_size_scalar_symbols:
+            return 1.0
+        if self._btc_trend_lookup is None:
+            return 1.0
+
+        btc_times = self._btc_trend_lookup["open_time"]
+        idx = int(np.searchsorted(btc_times, open_time_ms, side="left")) - 1
+        if idx < 0:
+            return 1.0  # No past BTC bar — no classification, no de-rate
+
+        if int(self._btc_trend_lookup["btc_bearchop"][idx]) == 1:
+            return float(self.config.regime_size_scalar_value)
+        return 1.0
+
     def get_signal(self, symbol: str, open_time: int):  # type: ignore[override]
-        """Override to apply regime gate (primitive 9) and direction-block (primitive 10)
-        on top of the inherited gate cascade.
+        """Override to apply regime gate (primitive 9), direction-block (primitive
+        10), and the BTC-trend-regime SIZE de-rate scalar (primitive 12) on top of
+        the inherited gate cascade.
 
         Order:
           1. primitive 9 (regime gate; iter-v3/022) — fires BEFORE inner inference.
              A regime-stress bar produces NO_SIGNAL without ever consulting the model.
-          2. primitive 10 (direction block; iter-v3/047) — fires AFTER inner inference.
+          2. Inherited gates 1-8 (RiskV2Wrapper) — applied to all surviving signals.
+          3. primitive 10 (direction block; iter-v3/047) — fires AFTER inner inference.
              We need to know the direction the model picked, so the inner.get_signal
              call must complete first. Then if the picked direction is in the
              configured block list for this symbol, we suppress to NO_SIGNAL.
-          3. Inherited gates 1-8 (RiskV2Wrapper) — applied to all surviving signals.
+          4. primitive 12 (regime SIZE de-rate scalar; iter-v3/075) — fires LAST.
+             It is the final weight-modifying step: a surviving non-NO_SIGNAL whose
+             symbol is in scope AND whose bar is in a BTC bear/chop trend state has
+             its WEIGHT multiplied by config.regime_size_scalar_value. Direction,
+             tp_pct, sl_pct are unchanged — the scalar is holding-time-ORTHOGONAL.
 
-        Both new primitives default off (enable_regime_gate=False; block_long_for=();
-        block_short_for=()) so v1/v2/v3-prior behavior is preserved.
+        All three new primitives default off (enable_regime_gate=False;
+        block_long_for=(); enable_regime_size_scalar=False) so v1/v2/v3-prior
+        behavior is preserved.
         """
         # Regime gate fires FIRST — before ANY other gate including inner strategy.
         # This matches the EDA's per-bar candidate-signal suppression design:
@@ -285,11 +393,28 @@ class RiskV3Wrapper(RiskV2Wrapper):
             stats.direction_block_fires += 1
             return NO_SIGNAL
 
+        # iter-v3/075: primitive 12 — BTC-trend-regime position-SIZE de-rate scalar.
+        # Applied LAST — the final weight-modifying step. A surviving non-NO_SIGNAL
+        # for an in-scope symbol on a BTC-bear/chop bar has its WEIGHT de-rated.
+        # WEIGHT only — direction/tp/sl/timeout are preserved (holding-time-ORTHOGONAL).
+        if self.config.enable_regime_size_scalar and sig.direction != 0:
+            s = self._regime_size_scalar(symbol, open_time)
+            if s < 1.0:
+                stats = self._gate_stats.setdefault(symbol, GateStats())
+                stats.regime_size_scalar_fires += 1
+                return Signal(
+                    direction=sig.direction,
+                    weight=max(1, int(round(sig.weight * s))),
+                    tp_pct=sig.tp_pct,
+                    sl_pct=sig.sl_pct,
+                )
+
         return sig
 
     def gate_stats_summary(self) -> dict[str, dict[str, float]]:
         """Extend parent summary with regime_gate_fires (iter-v3/022),
-        direction_block_fires (iter-v3/047), and drawdown_brake_fires (iter-v3/054)."""
+        direction_block_fires (iter-v3/047), drawdown_brake_fires (iter-v3/054),
+        and regime_size_scalar_fires (iter-v3/075 primitive 12)."""
         out = super().gate_stats_summary()
         for sym, s in self._gate_stats.items():
             out[sym]["regime_gate_fires"] = s.regime_gate_fires
@@ -297,6 +422,11 @@ class RiskV3Wrapper(RiskV2Wrapper):
             total_seen = s.signals_seen
             out[sym]["regime_gate_fire_rate"] = (
                 s.regime_gate_fires / total_seen if total_seen else 0.0
+            )
+            # iter-v3/075: primitive 12 — BTC-trend-regime SIZE de-rate scalar.
+            out[sym]["regime_size_scalar_fires"] = s.regime_size_scalar_fires
+            out[sym]["regime_size_scalar_fire_rate"] = (
+                s.regime_size_scalar_fires / total_seen if total_seen else 0.0
             )
             # drawdown_brake_fires is already in parent summary (primitive 11)
             # Ensure it's present even if parent didn't populate (defensive)

@@ -125,7 +125,7 @@ def _derive_ensemble_seeds(outer_seed: int, size: int = 5) -> list[int]:
     return [int(s) for s in rng.integers(low=0, high=2**31 - 1, size=size)]
 
 
-ITERATION_LABEL = "v3-074"
+ITERATION_LABEL = "v3-075"
 REPORTS_DIR = Path("reports-v3")
 FEATURES_DIR = Path("data/features_v3")
 DATA_DIR = Path("data")
@@ -558,42 +558,68 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
         "block_short_for=() (SYSTEM-LEVEL REVERT at iter-v3/051)  PASS"
     )
 
-    # iter-v3/074: Primitive 9 (regime-conditional kill switch) ENABLED — the
-    # cycle-2 EXPLORATION #4 axis. The gate suppresses TRX candidate signals on
-    # BTC-regime-stress bars. Holding-time-ORTHOGONAL (binary kill switch removing
-    # whole trades; surviving trades unchanged) — satisfies the Critic /073 Rec #1
-    # hard constraint. Pre-flight verifies the gate is ON for TRX only at the
-    # IS-calibrated thresholds (20.0% drawdown / 1.5 vol-zscore — unchanged; /074
-    # does NOT re-tune them, which would be a second axis).
-    if not strat_check.config.enable_regime_gate:
+    # iter-v3/075: Primitive 9 (regime-conditional kill switch) REVERTED to
+    # DISABLED. /074 enabled it as the cycle-2 EXPLORATION #4 axis (INERT — the
+    # gate suppressed only 3 IS + 5 OOS TRX trades; closed across two data points).
+    # /075's axis is primitive 12, NOT primitive 9 — the regime gate must be OFF
+    # to restore the /060 baseline risk-gate stack per `feedback_no_cheating.md`
+    # anti-drift discipline.
+    if strat_check.config.enable_regime_gate:
         raise RuntimeError(
-            "RiskV2Config.enable_regime_gate = False — expected True. iter-v3/074: "
-            "the regime-conditional kill switch (primitive 9) is the cycle-2 "
-            "EXPLORATION #4 axis. Set enable_regime_gate=True in RiskV2Config init "
-            "in _build_v3_model."
+            "RiskV2Config.enable_regime_gate = True — expected False. iter-v3/075: "
+            "the /074 regime-conditional kill switch (primitive 9) axis is closed "
+            "and must be REVERTED to OFF (the /060 baseline state). /075's axis is "
+            "primitive 12. Set enable_regime_gate=False, regime_gate_symbols=() in "
+            "RiskV2Config init in _build_v3_model."
         )
-    if strat_check.config.regime_gate_symbols != ("TRXUSDT",):
+    if strat_check.config.regime_gate_symbols != ():
         raise RuntimeError(
             f"RiskV2Config.regime_gate_symbols = {strat_check.config.regime_gate_symbols} "
-            "— expected ('TRXUSDT',). iter-v3/074: the regime gate targets TRX only "
-            "(BCH/LDO are the positive controls). Set regime_gate_symbols=('TRXUSDT',)."
+            "— expected () (empty). iter-v3/075: the /074 regime gate is reverted; "
+            "regime_gate_symbols must be empty."
         )
-    if strat_check.config.regime_dd_threshold_pct != 20.0:
+
+    # iter-v3/075: Primitive 12 (BTC-trend-regime position-SIZE de-rate scalar)
+    # ENABLED — the cycle-2 EXPLORATION #5 axis. When BTC is in a bear/chop trend
+    # state (BTC close[t-1] < SMA_270(close)[t-1]), the position WEIGHT of LDO and
+    # TRX trades is multiplied by 0.50; BCH and bull-regime trades unchanged.
+    # Holding-time-ORTHOGONAL (a SIZE scalar removes no trade, shifts no barrier).
+    # Pre-flight verifies the scalar is ON for LDO+TRX at the EDA-derived
+    # parameters (SMA_270 classifier, 0.50 de-rate). QR EDA SHA 9a04f6f.
+    if not strat_check.config.enable_regime_size_scalar:
         raise RuntimeError(
-            f"RiskV2Config.regime_dd_threshold_pct = "
-            f"{strat_check.config.regime_dd_threshold_pct} — expected 20.0 "
-            "(IS-90th-percentile; iter-v3/074 does NOT re-tune the threshold)."
+            "RiskV2Config.enable_regime_size_scalar = False — expected True. "
+            "iter-v3/075: the BTC-trend-regime position-SIZE de-rate scalar "
+            "(primitive 12) is the cycle-2 EXPLORATION #5 axis. Set "
+            "enable_regime_size_scalar=True in RiskV2Config init in _build_v3_model."
         )
-    if strat_check.config.regime_vol_zscore_threshold != 1.5:
+    if strat_check.config.regime_size_scalar_symbols != ("LDOUSDT", "TRXUSDT"):
         raise RuntimeError(
-            f"RiskV2Config.regime_vol_zscore_threshold = "
-            f"{strat_check.config.regime_vol_zscore_threshold} — expected 1.5 "
-            "(IS-95th-percentile; iter-v3/074 does NOT re-tune the threshold)."
+            f"RiskV2Config.regime_size_scalar_symbols = "
+            f"{strat_check.config.regime_size_scalar_symbols} — expected "
+            "('LDOUSDT', 'TRXUSDT'). iter-v3/075: the de-rate scope is LDO+TRX "
+            "only (the genuine-drag symbols per EDA T7; BCH WINS in BTC-bear/chop "
+            "and is the positive control). Set "
+            "regime_size_scalar_symbols=('LDOUSDT', 'TRXUSDT')."
+        )
+    if strat_check.config.regime_size_scalar_value != 0.50:
+        raise RuntimeError(
+            f"RiskV2Config.regime_size_scalar_value = "
+            f"{strat_check.config.regime_size_scalar_value} — expected 0.50 "
+            "(EDA T8: largest IS lift clearing the +0.10 PROMISING / -0.20 "
+            "NEGATIVE classification floors)."
+        )
+    if strat_check.config.regime_size_ma_window != 270:
+        raise RuntimeError(
+            f"RiskV2Config.regime_size_ma_window = "
+            f"{strat_check.config.regime_size_ma_window} — expected 270 "
+            "(EDA T2: SMA_270 = 90-day slow trend, highest IS discrimination)."
         )
     print(
-        "  Primitive 9 (regime-conditional kill switch): enable_regime_gate=True; "
-        "regime_gate_symbols=('TRXUSDT',); dd>20.0% OR |vol_z|>1.5 "
-        "(iter-v3/074 cycle-2 EXPLORATION #4 axis)  PASS"
+        "  Primitive 12 (BTC-trend-regime position-SIZE de-rate scalar): "
+        "enable_regime_size_scalar=True; regime_size_scalar_symbols=('LDOUSDT', "
+        "'TRXUSDT'); de-rate 0.50 when BTC close < SMA_270 "
+        "(iter-v3/075 cycle-2 EXPLORATION #5 axis)  PASS"
     )
 
     # iter-v3/044: regime_momentum_signed_5d MUST be in V3_FEATURE_COLUMNS_TOP_N (mandate ACTIVE).
@@ -1581,18 +1607,38 @@ def _build_v3_model(
         # Thresholds calibrated at IS-90th/95th percentile (EDA SHA b728313 synthesis.md).
         # Gate fires when BTC drawdown_30d > 20% OR |BTC vol_zscore_30d| > 1.5.
         # iter-v3/023-073: DISABLED (axis isolation for other iterations' single axes).
-        # iter-v3/074: ENABLED — the cycle-2 EXPLORATION #4 axis. The regime gate is
-        # holding-time-ORTHOGONAL (binary kill switch removing whole TRX trades on
-        # BTC-regime-stress bars; surviving trades unchanged) — it satisfies the
-        # Critic /073 Rec #1 hard constraint (`feedback_v3_is_oos_regime_divergence.md`)
-        # that the /074 axis must NOT extend effective trade holding time. The gate's
-        # /074 re-test is its first post-walk-forward-fix data point (the /022 verdict
-        # was at the BIASED pre-fix baseline; eligible for re-eval per
-        # `feedback_v3_walkforward_lookahead_bug.md`). EDA: analysis/iteration_v3-074/.
-        enable_regime_gate=True,
-        regime_gate_symbols=("TRXUSDT",),
+        # iter-v3/074: ENABLED — the cycle-2 EXPLORATION #4 axis (regime kill switch,
+        #   TRX-scoped). INERT-AT-EXPLORATION (Critic FINAL `2371324`); the gate
+        #   suppressed only 3 IS + 5 OOS TRX trades — too few to lift the IS drag.
+        #   Primitive 9 is now CLOSED across two data points (NEGATIVE-pre-fix /022 +
+        #   INERT-post-fix /074; BASELINE_V3.md "Dead Ideas").
+        # iter-v3/075: REVERTED to DISABLED. /074's regime-gate axis is closed and
+        #   must not silently carry into /075 per `feedback_no_cheating.md` anti-drift
+        #   discipline. This revert restores the /060 baseline risk-gate stack
+        #   (primitive 9 OFF). /075's axis is primitive 12 (BTC-trend-regime SIZE
+        #   de-rate scalar), enabled below. regime_dd/vol thresholds left as inert
+        #   defaults — they have no effect when enable_regime_gate=False.
+        enable_regime_gate=False,
+        regime_gate_symbols=(),
         regime_dd_threshold_pct=20.0,
         regime_vol_zscore_threshold=1.5,
+        # iter-v3/075: primitive 12 — BTC-trend-regime position-SIZE de-rate scalar.
+        # The cycle-2 EXPLORATION #5 axis. When BTC is in a bear/chop trend state
+        # (BTC close[t-1] < SMA_270(close)[t-1]), the position WEIGHT of LDO and TRX
+        # trades is multiplied by 0.50; BCH and all bull-regime trades unchanged.
+        # Holding-time-ORTHOGONAL (a SIZE scalar removes no trade, shifts no barrier
+        # — duration delta EXACTLY 0); FULL-ROSTER (re-weights ~24 IS + ~32 OOS
+        # LDO/TRX trades — materially larger than /074's 3/5). It satisfies the
+        # Critic /074 Rec #3 mandate (target the IS bear/chop drag with a
+        # holding-time-orthogonal, full-roster mechanism). The LDO+TRX scope is
+        # EDA-derived: BCH WINS in BTC-bear/chop (bear-entry IS wpnl +35.7) so a
+        # blanket de-rate is IS-negative; scoping to the genuine-drag symbols
+        # (LDO -3.6, TRX -10.5 bear-entry IS wpnl) preserves the BCH IS edge.
+        # QR EDA: analysis/iteration_v3-075/axis_selection_eda.py (SHA 9a04f6f).
+        enable_regime_size_scalar=True,
+        regime_size_scalar_symbols=("LDOUSDT", "TRXUSDT"),
+        regime_size_scalar_value=0.50,
+        regime_size_ma_window=270,
         # iter-v3/051: REVERT primitive 10 — block_long_for=() per system-level rule
         # `feedback_v3_per_symbol_lifts_oos_breaks_is.md` UPDATED 2026-05-10 (second-cycle
         # confirmation of per-symbol-customization anti-pattern at iter-v3/039 + iter-v3/050

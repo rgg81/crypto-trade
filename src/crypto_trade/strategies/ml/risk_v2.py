@@ -165,6 +165,28 @@ class RiskV2Config:
     drawdown_brake_recovery_wpnl: float = 5.0  # disengage when dd_30d <= this
     drawdown_brake_window_days: int = 30  # rolling window for peak calculation
 
+    # iter-v3/075: primitive 12 — BTC-trend-regime position-SIZE de-rate scalar.
+    # When BTC is in a bear/chop trend state (BTC close[t-1] < SMA_N(close)[t-1],
+    # the slow-trend filter; Carver, Systematic Trading), the position WEIGHT of
+    # trades for symbols in regime_size_scalar_symbols is multiplied by
+    # regime_size_scalar_value (< 1.0 to de-rate). Bull-regime trades and
+    # out-of-scope symbols are unchanged. The scalar is applied AFTER the inherited
+    # gate cascade — it is the last weight-modifying step and changes WEIGHT only,
+    # never direction/tp/sl/timeout (holding-time-ORTHOGONAL by construction).
+    # Past-only: BTC close.shift(1) before the rolling SMA; the scalar reads the
+    # most recent BTC bar with open_time STRICTLY LESS THAN the symbol's bar time.
+    # Implemented in RiskV3Wrapper (v3-only); v1/v2 do not use RiskV3Wrapper.
+    # Calibrated by QR EDA at iter-v3/075 (analysis/iteration_v3-075/
+    # axis_selection_eda.py): SMA_270 classifier (T2 highest IS discrimination),
+    # scope LDO+TRX (T7 — the symbols whose bear/chop-entry IS wpnl is negative;
+    # BCH WINS in BTC-bear/chop so it is excluded), de-rate 0.50 (T8 — largest IS
+    # lift clearing the +0.10 PROMISING / -0.20 NEGATIVE classification floors).
+    # Default OFF (enable_regime_size_scalar=False) preserves v1/v2/v3-prior behavior.
+    enable_regime_size_scalar: bool = False
+    regime_size_scalar_symbols: tuple[str, ...] = ()  # e.g. ("LDOUSDT", "TRXUSDT")
+    regime_size_scalar_value: float = 1.0  # de-rate multiplier (< 1.0 de-rates)
+    regime_size_ma_window: int = 270  # BTC slow-MA window in bars (90 days at 8h)
+
     def __post_init__(self) -> None:
         if self.enable_per_symbol_drawdown_brake:
             if not (0 < self.drawdown_brake_recovery_wpnl < self.drawdown_brake_threshold_wpnl):
@@ -175,6 +197,16 @@ class RiskV2Config:
             if self.drawdown_brake_window_days <= 0:
                 raise ValueError(
                     f"drawdown_brake_window_days must be > 0, got {self.drawdown_brake_window_days}"
+                )
+        if self.enable_regime_size_scalar:
+            if not (0.0 < self.regime_size_scalar_value <= 1.0):
+                raise ValueError(
+                    "regime_size_scalar requires 0 < regime_size_scalar_value "
+                    f"({self.regime_size_scalar_value}) <= 1.0"
+                )
+            if self.regime_size_ma_window <= 0:
+                raise ValueError(
+                    f"regime_size_ma_window must be > 0, got {self.regime_size_ma_window}"
                 )
 
 
@@ -195,6 +227,9 @@ class GateStats:
         0  # iter-v3/047: direction-asymmetric kill switch fires (primitive 10)
     )
     drawdown_brake_fires: int = 0  # iter-v3/054: per-symbol drawdown brake fires (primitive 11)
+    regime_size_scalar_fires: int = (
+        0  # iter-v3/075: BTC-trend-regime position-SIZE de-rate scalar fires (primitive 12)
+    )
 
     def vol_scale_mean(self) -> float:
         return self.vol_scale_sum / self.vol_scaled_signals if self.vol_scaled_signals else 1.0
