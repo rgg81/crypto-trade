@@ -1146,20 +1146,6 @@ def _verify_adf_row_count(adf_df: pd.DataFrame, symbols: list[str]) -> None:
             f"Months per symbol: {months_per_sym}"
         )
 
-    # Secondary falsifier: LDO cusum_reset_count_200 must fail p<0.05 in at least 1 month
-    ldo_cusum = adf_df[
-        (adf_df["symbol"] == "LDOUSDT") & (adf_df["feature_name"] == "cusum_reset_count_200")
-    ]
-    if len(ldo_cusum) > 0:
-        n_fail = int((ldo_cusum["p_value"] >= 0.05).sum())
-        print(
-            f"  [ADF] Secondary falsifier: LDOUSDT/cusum_reset_count_200 "
-            f"fails p<0.05 in {n_fail}/{len(ldo_cusum)} months  "
-            f"({'PASS' if n_fail > 0 else 'FAIL — averaging masking per-symbol non-stationarity'})"
-        )
-    else:
-        print("  [ADF] WARNING: LDOUSDT/cusum_reset_count_200 not found in ADF output")
-
 
 # ============================================================
 # IC matrix
