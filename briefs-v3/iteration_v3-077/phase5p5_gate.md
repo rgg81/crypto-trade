@@ -90,4 +90,4 @@ The shipped `conditional_orthogonality.csv` is therefore a **hybrid**: PART A (r
 
 All 10 mandatory brief sections present and substantive. All 6 code-readiness checks PASS. Tests: 345 passed, 3 skipped. Ruff: clean. Bit-identity claim verified — `_write_conditional_orthogonality` is pure post-backtest report emission with no strategy-path interaction. The Section 3.1 implementation-note finding is resolved: the shipped CSV is a hybrid (PART A = last-month snapshot; PART B = full EDA per-month map from `T3_conditional_orthogonality.csv`). **Proceed to Phase 6.**
 
-Gate SHA: `<to be backfilled by commit>`
+Gate SHA: `caed50d`

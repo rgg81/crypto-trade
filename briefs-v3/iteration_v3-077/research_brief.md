@@ -281,4 +281,4 @@ The EDA computes **no** per-candidate OOS counterfactual. The only OOS-window qu
 - EDA commit SHA: `313d3c0` (`analysis/iteration_v3-077/` — committed before the brief)
 - Brief commit SHA: `77d0b62`
 - Setup commit SHA: `30cda98` (`run_baseline_v3.py` + `features_v3/__init__.py` + 5 test files — ITERATION_LABEL "v3-077", `_write_conditional_orthogonality` instrumentation, /076's `range_efficiency_50` reverted)
-- Phase 5.5 gate SHA: `<to be backfilled by the Engineer>`
+- Phase 5.5 gate SHA: `caed50d`
