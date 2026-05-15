@@ -512,7 +512,8 @@ the QR with committed EDA backing, NOT by an orchestrator ad-hoc pick.
 
 - **EDA SHA:** `b5e42f6` — `analysis/iteration_v3-074/axis_selection_eda.py`
   (dual-purpose: PART 1 regime diagnostic + PART 2 axis selection).
-- **Setup commit SHA:** (backfilled after the setup commit).
+- **Setup commit SHA:** `a5d5cdd` — `setup(iter-v3/074): regime-conditional kill
+  switch (primitive 9) + research brief LOCKED`.
 - **Orchestrator framing:** the orchestrator did not pre-commit an axis. The task
   defined a HARD CONSTRAINT (holding-time-orthogonal OR regime-diagnostic) and
   named candidate families (NEW feature family, regime-conditional kill switch,
