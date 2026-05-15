@@ -92,24 +92,27 @@ class TestPBOFromCPCV:
         assert callable(pbo_from_cpcv)
 
     def test_pbo_in_range(self) -> None:
-        """PBO is always in [0, 1]."""
+        """frac_positive_paths is always in [0, 1]; pbo is None for S=1 (1-D input)."""
         rng = np.random.default_rng(42)
         for _ in range(5):
             metrics = rng.standard_normal(45)
             result = pbo_from_cpcv(metrics)
-            assert 0.0 <= result <= 1.0
+            # 1-D input → S=1 → pbo=None; use frac_positive_paths which is always defined
+            assert result.pbo is None or 0.0 <= result.pbo <= 1.0
+            assert 0.0 <= result.frac_positive_paths <= 1.0
 
     def test_pbo_all_positive_is_low(self) -> None:
-        """If all paths have positive performance, PBO should be near 0."""
+        """If all paths have positive performance, frac_positive_paths should be 1.0."""
         metrics = np.ones(45) * 2.0  # all paths identical Sharpe = 2
         result = pbo_from_cpcv(metrics)
-        # With identical paths, there's no overfitting signal
-        assert result < 0.6  # generous bound
+        # With identical positive paths, all paths are positive
+        assert result.frac_positive_paths >= 0.9  # generous bound
 
     def test_pbo_single_path(self) -> None:
-        """PBO with a single path returns 0 (no splits possible)."""
+        """PBO with a single path returns None (undefined — S=1, CSCV requires S>1)."""
         result = pbo_from_cpcv([1.0])
-        assert result == 0.0
+        assert result.pbo is None
+        assert result.frac_positive_paths == 1.0
 
 
 class TestPSR:
