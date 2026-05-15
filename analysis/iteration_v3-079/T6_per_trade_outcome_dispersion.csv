@@ -1,0 +1,5 @@
+symbol,is_n_trades,net_pnl_pct_mean,net_pnl_pct_std,net_pnl_pct_p10,net_pnl_pct_p90,win_rate_pct,dispersion_p90_minus_p10
+BCHUSDT,73,1.0883,5.74,-4.5911,8.7216,45.21,13.3127
+LDOUSDT,11,-1.0398,9.6314,-8.4675,12.5147,27.27,20.9822
+TRXUSDT,75,-0.3072,3.0097,-2.9425,4.4741,29.33,7.4166
+ALL,159,0.2828,5.0709,-4.6066,7.3705,36.48,11.9771

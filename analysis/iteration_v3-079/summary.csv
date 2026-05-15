@@ -1,0 +1,2 @@
+selected_axis,category,rejected_candidate,bch_is_wpnl_concentration_pct,persym_is_sharpe_BCH,persym_is_sharpe_LDO,persym_is_sharpe_TRX,inverse_vol_is_sharpe_delta_FALSIFIED,current_sizing_corr_weightfactor_netpnl_ALL,is_per_trade_dispersion_p90_p10_ALL,full_roster_duration_delta,trades_added_or_removed
+conviction_weighted_per_trade_sizing,NEW_model_architecture,inverse_vol_cross_symbol_sizing,150.98,1.3532,-0.1825,-0.995,-0.5304,0.0937,11.9771,0.0,0
