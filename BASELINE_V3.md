@@ -4,7 +4,7 @@
 
 **Sibling to:** `BASELINE.md` (v1) and `BASELINE_V2.md` (v2). All three coexist.
 
-**Last updated:** 2026-05-15 — iter-v3/070 CYCLE 1 CONFIRMATION closeout (NO-MERGE; anchor METRICS UNCHANGED; Path B4 retained as infrastructure)
+**Last updated:** 2026-05-15 — iter-v3/076 EXPLORATION closeout (SUSPICIOUS-OOS-DOMINANT, non-advancing; anchor METRICS UNCHANGED; only edit is the Kaufman path-efficiency entry added to Dead Ideas)
 
 ## Unified 10-Seed Ensemble Architecture (Phase B-3 at commit `ab2d9ac`)
 
@@ -292,6 +292,7 @@ assert set(cfg.symbols).isdisjoint(V3_EXCLUDED_SYMBOLS), \
 - **iter-v3/026 vol_adj_autocorr stacked on regime_momentum** (NEGATIVE-SUSPICIOUS-OOS pre-fix): 27× IS/OOS daily ratio. Engineered features DON'T STACK at single-seed n_trials=35.
 - **iter-v3/027 cross_asset_divergence_norm swap for vol_adj_autocorr** (NEGATIVE-SUSPICIOUS-OOS pre-fix): 3-iter monotonic IS degradation pattern REPLICATED.
 - **iter-v3/029-/057 cycle-4 EXPLORATION verdicts** — all produced under BUGGY walk-forward; eligible for re-evaluation as part of post-fix axis-rethink rule.
+- **Kaufman path-efficiency feature family (`efficiency_ratio_50` / `range_efficiency_50`) — CLOSED across 2 data points; re-evaluation eligibility DISCHARGED.** `range_efficiency_50` is mathematically identical to `efficiency_ratio_50` (same Kaufman formula `|close[t]-close[t-50]| / sum(|close.diff()|, 50)`, same 50-bar window, same `1e-9` epsilon, clip, shift, fillna). The literal `efficiency_ratio_50` name remains runner-banned (`raise RuntimeError`) + a prohibited test entry; the column is never generated. Two data points: **iter-v3/043** added `efficiency_ratio_50` to a 4-symbol universe pre-walk-forward-fix → DISASTROUS (IS -0.8445 / OOS -0.8990); **iter-v3/076** re-added the bit-identical math as `range_efficiency_50` (15th `V3_FEATURE_COLUMNS` feature, 3-symbol BCH/LDO/TRX universe, post-walk-forward-fix) as a rule-sanctioned re-evaluation per `feedback_v3_walkforward_lookahead_bug.md` → SUSPICIOUS-OOS-DOMINANT (IS collapsed to +0.0431, MaxDD blew out to 61.69%, OOS/IS ratio 15.04 — the clearest SUSPICIOUS signature in cycle 2; BCH IS edge destroyed +79.45%→-8.27%). The /076 re-evaluation did NOT vindicate the feature — IS is still economically broken. The `feedback_v3_walkforward_lookahead_bug.md` re-evaluation eligibility for this axis is **DISCHARGED**. `efficiency_ratio_50` / `range_efficiency_50` must NOT be re-proposed (Critic FINAL `8203410` Recommendation #3). NOTE: /076's failure mode (regime-loading via trade SELECTION — the feature shifted which trades the model picks toward longer-held OOS-uptrend trades, with NO barrier-extension mechanism) is a material extension of the v3 IS/OOS regime-divergence finding — see `briefs-v3/exploration_catalog.md` cycle-level-finding section and `feedback_v3_is_oos_regime_divergence.md`.
 
 ## Measurement Discipline
 
