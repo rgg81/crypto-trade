@@ -132,42 +132,59 @@ select any parameter). Per-parameter selection functions:
 
   --- PART B design parameters of the SELECTED axis (conviction-weighted sizing) ---
 
-  P5  conviction-weight map  weight(margin) = clip(BASE + GAIN * (margin - PIVOT) / PIVOT,
-                                                   W_MIN, W_MAX)
-      where `margin = confidence - 0.5` is the M1 directional margin above the coin-flip
-      line, and `confidence = max(P(long), P(short))` from the M1 ensemble (the value
-      `lgbm.py:get_signal` already computes and currently discards).
-        BASE  = 100   — a-priori. The current flat weight. The map is calibrated so a
-                        MEDIAN-margin trade keeps weight ~100 (gross-exposure-neutral).
-        PIVOT = the IS-only MEDIAN of the per-trade margin distribution. SELECTION
-                FUNCTION: median over IS trades of (M1 confidence - 0.5). This is the
-                production-trailing-window analogue described below; the EDA reports the
-                static-IS median as the DESIGN BASIS. INPUT: M1 confidence per IS trade
-                (NOT available in the roster — see EDA LIMITATION; the brief Section 3
-                specifies the production wiring). Data-free RULE = "median"; the value
-                is an IS statistic. NOT tuned to any metric.
-        GAIN  = 50    — a-priori, data-free. A trade at 2x the median margin gets
-                        weight ~150; a trade at ~0 margin gets weight ~50. The slope is
-                        a fixed RULE, not fitted.
-        [W_MIN, W_MAX] = [33, 150] — a-priori, data-free. Mirrors the existing risk-gate
-                        weight-floor discipline (primitive 12 de-rate floor; the R2
-                        drawdown-scale floor 0.33). Bounds the lever to ~4.5x span.
-      NONE of BASE/GAIN/W_MIN/W_MAX is fitted to an IS or OOS metric — they are a-priori
-      RULES. PIVOT is selected by the data-free "median" rule.
+  The SELECTED axis is a conviction-DERATE map: every parameter is A-PRIORI and data-free,
+  and the map NEVER levers above the current flat weight (W_MAX = 100). The map is a pure
+  function of the M1 directional confidence, which is intrinsically bounded on [0.5, 1.0]
+  for the chosen directional class — so NO IS statistic is needed to locate it.
+
+  P5  conviction-derate map
+        weight(confidence) = round( 100 * clip( (confidence - C_FLOOR) / (C_REF - C_FLOOR),
+                                                W_MIN_FRAC, 1.0 ) )
+      where `confidence = max(P(long), P(short))` from the M1 ensemble's averaged
+      probability vector — the value `lgbm.py:get_signal` already computes (line ~646-650)
+      and currently DISCARDS after the binary gate.
+        C_FLOOR    = 0.50  — a-priori, data-free. The coin-flip line. A trade with
+                             confidence at the coin-flip line maps to the weight floor.
+        C_REF      = 0.65  — a-priori, data-free. The confidence at/above which a trade
+                             keeps the FULL weight 100. 0.65 is a fixed, round a-priori
+                             reference (a clearly-directional 65/35 read), NOT fitted to
+                             any IS or OOS metric. The current confidence-threshold gate
+                             floor (`_inference_threshold_floor`, /067) already establishes
+                             0.60 as the project's a-priori "marginal" line; C_REF = 0.65
+                             sits one notch above it as the a-priori "clear-conviction"
+                             line. It is a RULE, not a tuned value.
+        W_MIN_FRAC = 0.50  — a-priori, data-free. The weight floor as a fraction of 100,
+                             i.e. a marginal-confidence trade is de-rated to weight 50.
+                             Mirrors the R2 drawdown-scale floor 0.33 and the primitive-12
+                             de-rate discipline; 0.50 is a round, conservative half-size
+                             floor. A RULE, not fitted.
+      The map is MONOTONE non-decreasing in confidence, bounded on [50, 100], and equals
+      100 for every confidence >= 0.65. NONE of C_FLOOR / C_REF / W_MIN_FRAC is fitted to
+      a metric — all three are a-priori RULES. There is NO PIVOT computed from data; the
+      map is located entirely by the intrinsic [0.5, 1.0] confidence scale.
+
+      WHY DE-RATE-ONLY (W_MAX = 100, never levers up): (1) it keeps the emitted weight
+      inside the `Signal.weight` documented `0-100` contract — no dataclass change; (2) it
+      is gross-exposure-NEUTRAL-OR-LOWER — it introduces NO new leverage and NO new tail
+      risk (a Risk-Mitigation property, Section 5); (3) it mirrors primitive 12's proven
+      de-rate-only design exactly. The axis still genuinely differentiates sizing — it
+      shrinks marginal-confidence trades relative to clear-conviction trades.
 
   P6  in-scope = ALL of {BCH, LDO, TRX}, ALL directions — a-priori structural. ONE
       universal map; NO per-symbol constant (the /078-closed per-symbol-customization
       pattern). NOT a tuned subset.
 
-PRODUCTION-WIRING NOTE (for the brief Section 3, not selected here): the per-trade
-M1 `confidence` is computed inside `lgbm.py:get_signal` at signal time from PAST-ONLY
-features and a model trained ONLY on the past walk-forward window — so it is inherently
-walk-forward-safe and look-ahead-clean. The conviction-weight map applies that
-already-computed value; the only design choice is the map's PIVOT. The brief Section 3
-specifies that PIVOT is computed from a TRAILING window of realised per-trade margins
-(walk-forward-safe), with the static-IS median reported here as the DESIGN BASIS. This
-EDA does NOT pretend the static median is the production constant — it is the IS-only
-design basis and the predicted-behavioral-effect anchor.
+PRODUCTION-WIRING NOTE (for the brief Section 3): the per-trade M1 `confidence` is
+computed inside `lgbm.py:get_signal` at signal time from PAST-ONLY features and a model
+trained ONLY on the past walk-forward window — so it is inherently walk-forward-safe and
+look-ahead-clean. The conviction-derate map is applied INSIDE `lgbm.py:get_signal` at the
+point where `confidence` is already in scope (immediately after the existing
+confidence-threshold gate and before the `Signal(...)` return at line ~725), replacing
+the hardcoded `weight=100` with `weight=conviction_derate(confidence)`. The downstream
+vol-targeting scale and the RiskV3 gate stack multiply this weight exactly as they
+multiply the current flat 100 (`backtest.py`: `weight_factor = (signal.weight/100)*vt_scale`)
+— so the change composes cleanly with every existing primitive. NO IS statistic feeds the
+production map; all of P5's parameters are a-priori constants.
 
 Outputs (committed CSVs):
   T1_per_symbol_variance.csv          — per-symbol IS monthly-PnL mean/std/Sharpe + conc
