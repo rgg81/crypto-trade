@@ -695,8 +695,14 @@ by the QR with committed EDA backing, NOT by an orchestrator ad-hoc pick.
   (T0–T8: anchor, regime stratification, BTC-trend classifier sweep, blanket +
   scoped de-rate counterfactuals, holding-time predictor, behavioral predictor,
   per-symbol IS discipline).
-- **Setup commit SHA:** (backfilled at the setup commit — see the setup commit
-  message; this brief is committed in the same logical sequence).
+- **Brief SHA:** `00405c5` — `briefs-v3/iteration_v3-075/research_brief.md`
+  (this file; all 11 sections LOCKED).
+- **Setup commit SHA:** `f170a75` — `setup(iter-v3/075): primitive 12
+  BTC-trend-regime position-SIZE de-rate scalar + revert /074 regime gate`
+  (the four Section 3.1 code changes; ruff-clean; test_regime_size_scalar.py
+  10/10 + test_regime_gate.py 6/6 pass; tests/features_v3/ 177 passed;
+  `_verify_feature_columns(ensemble_size=3)` passes all /075 pre-flight
+  assertions). Backfilled into this Section 10 at the brief-backfill commit.
 - **Orchestrator framing:** the orchestrator defined the HARD CONSTRAINT (Critic
   /074 Rec #3: target the IS bear/chop drag with a holding-time-orthogonal,
   full-roster mechanism) and named three candidate families (a NEW
