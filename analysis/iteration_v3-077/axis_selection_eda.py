@@ -195,7 +195,6 @@ OUTPUT TABLES
 
 from __future__ import annotations
 
-import subprocess
 import sys
 from pathlib import Path
 
@@ -506,8 +505,8 @@ def compute_per_month_importance() -> pd.DataFrame:
             train = train.iloc[: max(0, len(train) - timeout)]
             if len(train) < 120 or train["_label"].nunique() < 2:
                 continue
-            X = train[list(ANCHOR_14_FEATURES)].fillna(0.0).to_numpy()
-            y = train["_label"].to_numpy()
+            x_train = train[list(ANCHOR_14_FEATURES)].fillna(0.0).to_numpy()
+            y_train = train["_label"].to_numpy()
 
             gain_sum = np.zeros(len(ANCHOR_14_FEATURES), dtype=float)
             for sd in seeds:
@@ -516,7 +515,7 @@ def compute_per_month_importance() -> pd.DataFrame:
                     importance_type="gain", random_state=sd, verbose=-1,
                     min_child_samples=20,
                 )
-                model.fit(X, y)
+                model.fit(x_train, y_train)
                 gain_sum += model.feature_importances_.astype(float)
             gain = gain_sum / len(seeds)
             total = gain.sum()
@@ -649,8 +648,16 @@ def t6_escapability(t1: pd.DataFrame, t2: pd.DataFrame) -> pd.DataFrame:
 
     # IS bear/chop vs bull win-rate gap from T2
     reg_rows = t2[t2.cut.str.startswith("regime=")].set_index("cut")
-    wr_bull = reg_rows.loc["regime=BULL", "win_rate_pct"] if "regime=BULL" in reg_rows.index else float("nan")
-    wr_bear = reg_rows.loc["regime=BEAR/CHOP", "win_rate_pct"] if "regime=BEAR/CHOP" in reg_rows.index else float("nan")
+    wr_bull = (
+        reg_rows.loc["regime=BULL", "win_rate_pct"]
+        if "regime=BULL" in reg_rows.index
+        else float("nan")
+    )
+    wr_bear = (
+        reg_rows.loc["regime=BEAR/CHOP", "win_rate_pct"]
+        if "regime=BEAR/CHOP" in reg_rows.index
+        else float("nan")
+    )
 
     is_strata = t1[t1.stratum.str.startswith("IS_")]
     drag_stratum = is_strata.loc[is_strata.monthly_sharpe.idxmin(), "stratum"]
