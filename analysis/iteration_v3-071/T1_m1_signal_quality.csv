@@ -1,0 +1,5 @@
+symbol,n_trades,n_take_profit,n_stop_loss,n_timeout,tp_hit_rate,m2_pos_rate_netpnl_gt0,n_timeout_positive,timeout_positive_frac
+BCHUSDT,73,27,40,6,0.3699,0.4521,6,1.0
+LDOUSDT,11,3,8,0,0.2727,0.2727,0,0.0
+TRXUSDT,75,19,53,3,0.2533,0.2933,3,1.0
+PORTFOLIO,159,49,101,9,0.3082,0.3648,9,1.0
