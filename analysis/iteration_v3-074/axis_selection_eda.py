@@ -267,7 +267,7 @@ def _regime_gate_fires_for_bar(
 # ===========================================================================
 # AXIS A — regime-conditional kill-switch counterfactual on the /060 TRX roster
 # ===========================================================================
-def axisA_regime_gate_counterfactual(
+def axis_a_regime_gate_counterfactual(
     btc_lookup: pd.DataFrame,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """For every /060 TRX trade, tag whether the regime gate would have suppressed
@@ -329,7 +329,7 @@ def axisA_regime_gate_counterfactual(
     return counterfactual, trx
 
 
-def axisA_holding_time_predictor(trx: pd.DataFrame) -> pd.DataFrame:
+def axis_a_holding_time_predictor(trx: pd.DataFrame) -> pd.DataFrame:
     """Holding-time-effect predictor for AXIS A (mandated by
     `feedback_v3_is_oos_regime_divergence.md`).
 
@@ -374,7 +374,7 @@ def axisA_holding_time_predictor(trx: pd.DataFrame) -> pd.DataFrame:
 # ===========================================================================
 # AXIS B + C — holding-time-effect screen (the disqualification check)
 # ===========================================================================
-def axisBC_holding_time_screen() -> pd.DataFrame:
+def axis_bc_holding_time_screen() -> pd.DataFrame:
     """Screen AXIS B (distinct-feature meta-labeling) and AXIS C (entry-timing
     shift) against the holding-time-orthogonal hard constraint.
 
@@ -506,18 +506,18 @@ def main() -> int:
     btc_lookup = build_btc_regime_lookup()
 
     # --- AXIS A: regime-gate counterfactual ---
-    counterfactual, trx = axisA_regime_gate_counterfactual(btc_lookup)
+    counterfactual, trx = axis_a_regime_gate_counterfactual(btc_lookup)
     counterfactual.to_csv(OUT / "axisA_regime_gate_counterfactual.csv", index=False)
     print("\n[AXIS A] regime-conditional kill-switch counterfactual on /060 TRX roster:")
     print(counterfactual.to_string(index=False))
 
-    ht_pred = axisA_holding_time_predictor(trx)
+    ht_pred = axis_a_holding_time_predictor(trx)
     ht_pred.to_csv(OUT / "axisA_holding_time_predictor.csv", index=False)
     print("\n[AXIS A] holding-time-effect predictor (kept vs full TRX roster):")
     print(ht_pred.to_string(index=False))
 
     # --- AXIS B + C: holding-time screen ---
-    bc_screen = axisBC_holding_time_screen()
+    bc_screen = axis_bc_holding_time_screen()
     bc_screen.to_csv(OUT / "axisBC_holding_time_screen.csv", index=False)
     print("\n[AXIS B+C] holding-time-effect screen:")
     for _, r in bc_screen.iterrows():
@@ -570,8 +570,8 @@ def write_synthesis(t0, strat, counterfactual, ht_pred, bc_screen, decision) -> 
         "",
         "Splitting the /060 anchor's monthly PnL into three regime sub-periods:",
         "",
-        f"| Regime | Months | Monthly Sharpe | Mean monthly PnL% | % positive months |",
-        f"|---|---:|---:|---:|---:|",
+        "| Regime | Months | Monthly Sharpe | Mean monthly PnL% | % positive months |",
+        "|---|---:|---:|---:|---:|",
         f"| IS bear/chop (2022-09->2023-12) | {int(is_bear['n_months'])} | "
         f"{is_bear['monthly_sharpe']} | {is_bear['mean_monthly_pnl_pct']} | "
         f"{is_bear['pct_positive_months']}% |",
@@ -621,7 +621,8 @@ def write_synthesis(t0, strat, counterfactual, ht_pred, bc_screen, decision) -> 
         "",
         "**Quantitative basis.** On the /060 TRX roster the gate would suppress",
         f"{int(is_supp['n_trades'])} IS trades (combined wpnl {is_supp['weighted_pnl_sum']})",
-        f"and {int(oos_supp['n_trades'])} OOS trades (combined wpnl {oos_supp['weighted_pnl_sum']}).",
+        f"and {int(oos_supp['n_trades'])} OOS trades "
+        f"(combined wpnl {oos_supp['weighted_pnl_sum']}).",
         "See `axisA_regime_gate_counterfactual.csv` for the suppressed-vs-kept economics",
         "split, and brief Section 2 for the interpretation. The gate targets TRX",
         "specifically because TRX carried the FTX/LUNA-crash PBO=1.0 cells",
