@@ -918,14 +918,26 @@ justification — given here in full, transparently:
   (T0–T7: anchor, regime stratification, candidate-feature within-IS
   discrimination, regime-sign-correlation test, holding-time predictor,
   behavioral-effect predictor, per-symbol IS discipline, IC matrix).
-- **Brief SHA:** _(this file — backfilled at the brief-commit SHA)_
-- **Setup commit SHA:** _(backfilled into this Section 10.4 at the brief-backfill
-  commit, per the /075 template — the setup commit makes the Section 3 / 3.1 code
-  changes: the new `compute_range_efficiency_50`, the dispatch + `__all__`, the
-  15th-feature addition, the Primitive-12 revert, the `_verify_feature_columns`
-  count + assertion updates, `ITERATION_LABEL` → "v3-076",
-  `test_v3_feature_count.py` 14→15, and the new
-  `tests/features_v3/test_range_efficiency_50.py`)._
+- **Brief SHA:** `ed7b27b` — `briefs-v3/iteration_v3-076/research_brief.md`
+  (this file; all 11 sections — 0, 0.5, 1-10).
+- **Setup commit SHA:** `79a62b0` — `setup(iter-v3/076): NEW feature
+  range_efficiency_50 + revert /075 Primitive 12`. The setup commit makes the
+  Section 3 / 3.1 code changes: the new `compute_range_efficiency_50` + dispatch
+  + `__all__` in `engineered_v3.py`; the 15th-feature addition to
+  `V3_FEATURE_COLUMNS_TOP_N`; the /075 Primitive-12 revert
+  (`enable_regime_size_scalar` True→False) in `run_baseline_v3.py`; the
+  `_verify_feature_columns` count assertions (14→15) + the
+  `range_efficiency_50`-present assertion + the Primitive-12 assertion
+  replacement; `ITERATION_LABEL` → "v3-076"; the NEW
+  `tests/features_v3/test_range_efficiency_50.py` (6 tests); the feature-count
+  assertion updates (14→15) in `test_v3_feature_count.py`,
+  `test_features_for_symbol.py`, and the 3 `*_universal.py` feature tests; and
+  the stale-test fix in `test_cpcv_embargo_assert.py` (N_SYMBOLS 4→3,
+  CORRECT_GAP 88→66 — a pre-existing failure since the iter-v3/069
+  universe-expansion closeout). Verification: ruff clean on all modified files;
+  `tests/features_v3/` + `tests/strategies/ml/` 345 passed / 3 skipped; runner
+  `_verify_feature_columns(ensemble_size=3)` pre-flight PASS.
+- **Phase 5.5 gate SHA:** _(set by the QE at the Phase 5.5 gate commit)._
 
 **Per-symbol IS-axis discipline** (`feedback_v3_per_symbol_lifts_oos_breaks_is.md`):
 `range_efficiency_50` is a UNIVERSAL feature — there is NO per-symbol
