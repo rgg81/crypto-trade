@@ -249,16 +249,27 @@ History:
 """
 
 V3_ATR_MULTIPLIERS_PER_SYMBOL: dict[str, tuple[float, float]] = {
-    # iter-v3/051: REVERT to empty dict per system-level rule
-    # `feedback_v3_per_symbol_lifts_oos_breaks_is.md` UPDATED 2026-05-10.
-    # All 3 symbols (BCH/LDO/TRX) fall back to DEFAULT_ATR_MULTIPLIERS = (2.0, 1.0).
-    # History: {} (iter-v3/040 cycle 3 REVERT) → entries added/removed iter-v3/044-047
-    #   → {} (iter-v3/051 system-level REVERT; current state at iter-v3/063).
+    # iter-v3/073 — CYCLE 2 EXPLORATION #3: per-symbol triple-barrier asymmetry.
+    # The single global (2.0, 1.0) pair produces an SL-saturated training label on
+    # every v3 symbol (LONG SL-hit 58-69%; worst LDO 69%) because the 3 symbols'
+    # 8h NATR differs ~2x (BCH 3.70%, LDO 5.01%, TRX 2.65% median). The EDA
+    # (analysis/iteration_v3-073/axis_selection_eda.py SHA b004bc9) 9-cell grid
+    # sweep recalibrates each symbol's barrier toward balance:
+    #   BCH (2.0, 1.25) — directional_spread -0.167 -> +0.071; balance 0.50 -> 0.62
+    #   LDO (1.5, 1.25) — directional_spread -0.709 -> -0.244; balance 0.45 -> 0.80
+    #   TRX omitted     — EDA keep-decision; (2.0,1.0) eligible-grid optimum did
+    #                     NOT beat current; falls back to DEFAULT_ATR_MULTIPLIERS.
+    # Label-execution consistent BY CONSTRUCTION: the runner derives BOTH the
+    # training label AND the live Signal.tp_pct/sl_pct from these multipliers
+    # (satisfies Critic /072 Rec #3). History: {} (iter-v3/051-072) -> this.
+    "BCHUSDT": (2.0, 1.25),
+    "LDOUSDT": (1.5, 1.25),
 }
 """Per-symbol ATR multiplier overrides (iter-v3/032+).
 
 Maps symbol → (atr_tp_multiplier, atr_sl_multiplier).
-Empty at iter-v3/063: all symbols fall back to DEFAULT_ATR_MULTIPLIERS = (2.0, 1.0).
+iter-v3/073: BCH (2.0, 1.25), LDO (1.5, 1.25); TRX falls back to
+DEFAULT_ATR_MULTIPLIERS = (2.0, 1.0).
 """
 
 

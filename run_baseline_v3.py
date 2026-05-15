@@ -125,7 +125,7 @@ def _derive_ensemble_seeds(outer_seed: int, size: int = 5) -> list[int]:
     return [int(s) for s in rng.integers(low=0, high=2**31 - 1, size=size)]
 
 
-ITERATION_LABEL = "v3-072"
+ITERATION_LABEL = "v3-073"
 REPORTS_DIR = Path("reports-v3")
 FEATURES_DIR = Path("data/features_v3")
 DATA_DIR = Path("data")
@@ -1503,7 +1503,12 @@ def _build_v3_model(
         feature_columns=list(features_for_symbol(symbol)),
         ood_enabled=False,  # OOD via RiskV3Wrapper z-score gate
         fast_mode=fast_mode,  # iter-v3/007 — colsample_bytree=1.0 when True
-        label_mode="fixed_horizon",  # iter-v3/072: fixed-horizon return-sign label
+        # iter-v3/073: REVERT /072's fixed-horizon label. Per-symbol ATR
+        # triple-barrier asymmetry (V3_ATR_MULTIPLIERS_PER_SYMBOL) only takes
+        # effect under the triple-barrier label path; the /072 fixed-horizon
+        # axis was NEGATIVE (label-execution decoupling). triple_barrier also
+        # restores the /060 EXPLORATION-mode anchor labeling rule.
+        label_mode="triple_barrier",
     )
     if model_type == "metalabeling":
         # iter-v3/017: MetaLabelingStrategy wraps M1 (LightGbmStrategy) with

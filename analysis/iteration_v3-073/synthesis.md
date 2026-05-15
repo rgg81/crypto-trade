@@ -188,10 +188,15 @@ Rationale:
   LDO" — LDO's IS signal is structurally weak independent of barrier geometry.
   The honest framing: the axis improves label-economics QUALITY on BCH+LDO; it is
   not an LDO rescue.
-- **Two leftover-state reverts the setup commit must apply** (so the run anchors
-  cleanly against /060): (a) the runner is currently on `label_mode="fixed_horizon"`
-  (run_baseline_v3.py:1506, /072 leftover) — MUST revert to `"triple_barrier"`;
-  (b) `vol_scale_floor_per_symbol={"TRXUSDT": 0.5}` (run_baseline_v3.py:1566) is
-  /061 state, NOT present in the /060 anchor runner — MUST revert to `{}`. Both
-  reverts are part of restoring the /060 anchor, not new axes. The Phase 5.5
-  anchor-byte gate must verify the /060 RiskV2Config + label_mode are restored.
+- **One leftover-state revert the setup commit must apply.** The runner is
+  currently on `label_mode="fixed_horizon"` (run_baseline_v3.py:1506, the /072
+  axis) — the setup commit MUST revert it to `"triple_barrier"`. This is NOT a
+  second axis: it is the REVERT of the /072 NEGATIVE axis, and the per-symbol ATR
+  multipliers only take effect under the triple-barrier label path. Without the
+  revert, iter-v3/073 would stack the ATR axis on top of the failed /072 label.
+  NOTE on `vol_scale_floor_per_symbol={"TRXUSDT": 0.5}` (run_baseline_v3.py:1566):
+  this dict is /061 state, but /071 AND /072 BOTH ran with it and both anchored
+  against /060 as trade-roster-equivalent (the /071 brief change table explicitly
+  lists it "unchanged"; the /071 Critic certified that framing clean). It is the
+  ESTABLISHED cycle-2 EXPLORATION baseline state — iter-v3/073 KEEPS it. Reverting
+  it would deviate from the /071/072 baseline and introduce a SECOND axis.

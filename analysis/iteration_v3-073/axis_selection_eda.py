@@ -348,7 +348,7 @@ def _is_sharpe_proxy(df_is: pd.DataFrame) -> tuple[float, float]:
 # --------------------------------------------------------------------------
 # AXIS A — LDO replacement IS-edge screen
 # --------------------------------------------------------------------------
-def axisA_replacement_screen() -> pd.DataFrame:
+def axis_a_replacement_screen() -> pd.DataFrame:
     """IS-edge screen for LDO replacement candidates.
 
     A *replacement* (not an addition) only makes sense if the candidate has a
@@ -685,16 +685,16 @@ def main() -> None:
     print("\n" + "=" * 78)
     print("AXIS A — LDO replacement IS-edge screen")
     print("=" * 78)
-    axisA = axisA_replacement_screen()
-    axisA.to_csv(OUT_DIR / "axisA_replacement_screen.csv", index=False)
-    print(axisA.to_string(index=False))
+    axis_a = axis_a_replacement_screen()
+    axis_a.to_csv(OUT_DIR / "axisA_replacement_screen.csv", index=False)
+    print(axis_a.to_string(index=False))
 
     # =====================================================================
     # QR DECISION SUMMARY
     # =====================================================================
     n_per_symbol_changes = int((rec["spread_delta"] > 0.0).sum())
-    ldo_sh = axisA.loc[axisA["symbol"] == "LDOUSDT", "is_sharpe_proxy"].iloc[0]
-    cands = axisA[axisA["role"] == "CANDIDATE"]
+    ldo_sh = axis_a.loc[axis_a["symbol"] == "LDOUSDT", "is_sharpe_proxy"].iloc[0]
+    cands = axis_a[axis_a["role"] == "CANDIDATE"]
     n_beat_ldo = int((cands["beats_ldo"] == "YES").sum())
 
     summary_rows = [
