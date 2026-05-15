@@ -1,0 +1,10 @@
+metric,in_sample,out_of_sample,source
+monthly_sharpe,0.8325,0.1403,reports-v3/iteration_v3-060/comparison.csv:2
+daily_sharpe,1.7115,0.3659,reports-v3/iteration_v3-060/comparison.csv:3
+max_drawdown,31.8701,35.7804,reports-v3/iteration_v3-060/comparison.csv:4
+profit_factor,1.2806,1.0482,reports-v3/iteration_v3-060/comparison.csv:5
+win_rate,31.4465,39.2157,reports-v3/iteration_v3-060/comparison.csv:6
+n_trades,159,102,reports-v3/iteration_v3-060/comparison.csv:7
+per_symbol::BCHUSDT::OOS_wpnl,,1.9078,reports-v3/iteration_v3-060/comparison.csv:18
+per_symbol::LDOUSDT::OOS_wpnl,,-19.7208,reports-v3/iteration_v3-060/comparison.csv:19
+per_symbol::TRXUSDT::OOS_wpnl,,23.3119,reports-v3/iteration_v3-060/comparison.csv:20

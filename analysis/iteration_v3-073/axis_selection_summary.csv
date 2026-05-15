@@ -1,0 +1,4 @@
+axis,verdict,evidence
+A_LDO_universe_revision,DOMINATED,"1/5 /069-shortlisted candidates beat LDO's IS-edge proxy (-0.1132); /052 ALREADY pre-falsified LDO REMOVAL at single-seed scope (IS Delta -0.16, IS-OOS ratio 3.58 OOB). A replacement is not IS-accretive and re-runs closed work."
+B_model_architecture,DOMINATED,XGBoost head-to-head closed at /016 (NEGATIVE-clean). LightGBM hyperparameter-space changes are knob-tuning; cycle 1 exhausted the knob space. No EDA-identifiable structural bottleneck.
+C_per_symbol_barrier_asymmetry,SELECTED,"2/3 symbols have a grid cell with strictly higher directional_spread than the current global (2.0, 1.0). LDO LONG barrier is SL-saturated (see axisC_barrier_hit_profile). The runner derives BOTH the training label AND the live Signal exit from the SAME per-symbol multipliers — label-execution consistent BY CONSTRUCTION (satisfies Critic /072 Rec #3). ZERO new code: V3_ATR_MULTIPLIERS_PER_SYMBOL is the entire interface."

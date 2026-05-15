@@ -1,0 +1,7 @@
+symbol,role,is_candles,is_sharpe_proxy,is_frac_pos_months,beats_ldo,data_source
+LDOUSDT,INCUMBENT,2741,-0.1132,0.4194,—,features_v3 parquet
+ADAUSDT,CANDIDATE,5636,-0.1383,0.3387,NO,features_v3 parquet
+FILUSDT,CANDIDATE,4845,0.1341,0.5926,YES,raw 8h kline CSV
+ATOMUSDT,CANDIDATE,5615,-0.2724,0.4677,NO,raw 8h kline CSV
+ALGOUSDT,CANDIDATE,5225,-0.3261,0.3793,NO,features_v3 parquet
+VETUSDT,CANDIDATE,5579,-0.2646,0.3871,NO,features_v3 parquet
