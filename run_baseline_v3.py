@@ -443,23 +443,22 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
         )
     print("  V3_FEATURES_PER_SYMBOL: 0 entries (empty — all symbols use 14-feature fallback)  PASS")
 
-    # iter-v3/051: V3_ATR_MULTIPLIERS_PER_SYMBOL MUST be EMPTY (0 entries — SYSTEM-LEVEL REVERT).
-    # Per `feedback_v3_per_symbol_lifts_oos_breaks_is.md` UPDATED 2026-05-10 (second-cycle
-    # confirmation of per-symbol-customization anti-pattern). ALGOUSDT and LDOUSDT entries
-    # REVERTED. All 3 symbols (BCH/LDO/TRX) fall back to DEFAULT_ATR_MULTIPLIERS = (2.0, 1.0).
-    n_atr_custom = len(V3_ATR_MULTIPLIERS_PER_SYMBOL)
-    if n_atr_custom != 0:
+    # iter-v3/073: V3_ATR_MULTIPLIERS_PER_SYMBOL = per-symbol triple-barrier asymmetry axis.
+    # EDA `b004bc9`: global (2.0, 1.0) SL-saturates training labels on all 3 symbols (NATR
+    # differs ~2×). Per-symbol calibration balances barriers — BCH (2.0, 1.25), LDO (1.5, 1.25),
+    # TRX absent (global (2.0, 1.0) fallback). Label-execution consistent by construction.
+    _expected_atr_per_symbol = {"BCHUSDT": (2.0, 1.25), "LDOUSDT": (1.5, 1.25)}
+    _actual_atr_per_symbol = {k: tuple(v) for k, v in V3_ATR_MULTIPLIERS_PER_SYMBOL.items()}
+    if _actual_atr_per_symbol != _expected_atr_per_symbol:
         raise RuntimeError(
-            f"V3_ATR_MULTIPLIERS_PER_SYMBOL has {n_atr_custom} entries — expected exactly 0 "
-            "(EMPTY; iter-v3/051 SYSTEM-LEVEL REVERT to iter-v3/028 baseline architecture). "
-            "ALGOUSDT and LDOUSDT entries must be cleared per "
-            "`feedback_v3_per_symbol_lifts_oos_breaks_is.md` UPDATED 2026-05-10. "
-            f"Current keys: {list(V3_ATR_MULTIPLIERS_PER_SYMBOL.keys())}. "
-            "Set V3_ATR_MULTIPLIERS_PER_SYMBOL = {{}} in features_v3/__init__.py."
+            f"V3_ATR_MULTIPLIERS_PER_SYMBOL = {_actual_atr_per_symbol} — expected "
+            f"{_expected_atr_per_symbol} (iter-v3/073 per-symbol triple-barrier asymmetry axis). "
+            "BCH (2.0, 1.25), LDO (1.5, 1.25), TRX absent. "
+            "Set V3_ATR_MULTIPLIERS_PER_SYMBOL in features_v3/__init__.py."
         )
     print(
-        "  V3_ATR_MULTIPLIERS_PER_SYMBOL: 0 entries (EMPTY — SYSTEM-LEVEL REVERT to /028; "
-        "BCH/LDO/TRX all use (2.0, 1.0) DEFAULT)  PASS"
+        "  V3_ATR_MULTIPLIERS_PER_SYMBOL: 2 entries (iter-v3/073 per-symbol barrier asymmetry; "
+        "BCH (2.0, 1.25), LDO (1.5, 1.25), TRX (2.0, 1.0) DEFAULT)  PASS"
     )
 
     # iter-v3/065+: REVERT to /060 14-feature anchor. V3_FEATURES_PER_SYMBOL is empty.
@@ -502,26 +501,26 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
         "regime_momentum_signed_5d, sym_vs_btc_ret_7d PRESENT)  PASS"
     )
 
-    # iter-v3/070 CLOSEOUT: All 3 symbols (BCH/LDO/TRX) MUST return (2.0, 1.0) via DEFAULT.
-    # /070 CONFIRMATION REJECTED Component A (/065 universal SL widening); (2.0, 1.5) →
-    # (2.0, 1.0) REVERTED to the /059 canonical anchor. V3_ATR_MULTIPLIERS_PER_SYMBOL
-    # stays EMPTY (no per-symbol overrides; carry-forward /051).
+    # iter-v3/073: per-symbol triple-barrier asymmetry axis. BCH (2.0, 1.25), LDO (1.5, 1.25)
+    # via V3_ATR_MULTIPLIERS_PER_SYMBOL; TRX falls back to DEFAULT_ATR_MULTIPLIERS = (2.0, 1.0).
+    _expected_atr_lookup = {
+        "BCHUSDT": (2.0, 1.25),
+        "LDOUSDT": (1.5, 1.25),
+        "TRXUSDT": (2.0, 1.0),
+    }
     for _sym_atr in ("BCHUSDT", "LDOUSDT", "TRXUSDT"):
-        sym_atr = atr_multipliers_for_symbol(_sym_atr)
-        if sym_atr != (2.0, 1.0):
+        sym_atr = tuple(atr_multipliers_for_symbol(_sym_atr))
+        if sym_atr != _expected_atr_lookup[_sym_atr]:
             raise RuntimeError(
                 f"atr_multipliers_for_symbol('{_sym_atr}') returned {sym_atr} — "
-                "expected (2.0, 1.0) (DEFAULT fallback at iter-v3/070 CLOSEOUT). "
-                "iter-v3/070 CONFIRMATION REJECTED Component A (/065 SL widening); "
-                "(2.0, 1.5) → (2.0, 1.0) REVERTED to /059 anchor. "
-                "V3_ATR_MULTIPLIERS_PER_SYMBOL must be EMPTY; "
-                "all 3 symbols use DEFAULT_ATR_MULTIPLIERS = (2.0, 1.0). "
-                "Verify DEFAULT_ATR_MULTIPLIERS = (2.0, 1.0) in features_v3/__init__.py."
+                f"expected {_expected_atr_lookup[_sym_atr]} (iter-v3/073 per-symbol "
+                "barrier asymmetry axis). BCH (2.0, 1.25), LDO (1.5, 1.25), TRX (2.0, 1.0). "
+                "Verify V3_ATR_MULTIPLIERS_PER_SYMBOL + DEFAULT_ATR_MULTIPLIERS in "
+                "features_v3/__init__.py."
             )
     print(
-        "  atr_multipliers_for_symbol: BCH/LDO/TRX all (2.0, 1.0) DEFAULT "
-        "(iter-v3/070 CLOSEOUT: /065 SL widening REJECTED; /059 anchor; "
-        "PER_SYMBOL EMPTY)  PASS"
+        "  atr_multipliers_for_symbol: BCH (2.0, 1.25), LDO (1.5, 1.25), TRX (2.0, 1.0) "
+        "(iter-v3/073 per-symbol triple-barrier asymmetry axis)  PASS"
     )
 
     # iter-v3/051: Primitive 10 REVERT — block_long_for=() per system-level rule.
@@ -751,17 +750,18 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
             "iter-v3/072: LightGbmStrategy must expose label_mode. "
             "Check lgbm.py __init__ and _build_v3_model call."
         )
-    expected_label_mode = "fixed_horizon"
+    expected_label_mode = "triple_barrier"
     if _p13_lgbm.label_mode != expected_label_mode:
         raise RuntimeError(
             f"LightGbmStrategy.label_mode = '{_p13_lgbm.label_mode}' — "
             f"expected '{expected_label_mode}'. "
-            "iter-v3/072: pass label_mode='fixed_horizon' in _build_v3_model "
-            "common_kwargs (brief Section 3.1 item #4)."
+            "iter-v3/073: label_mode REVERTED to 'triple_barrier' (/072 fixed-horizon "
+            "axis NEGATIVE — label-execution mismatch). Per-symbol barrier asymmetry "
+            "at /073 keeps the triple-barrier label execution-consistent."
         )
     print(
-        f"  label_mode (iter-v3/072): '{_p13_lgbm.label_mode}' "
-        f"(fixed-horizon return-sign label; no TP/SL barriers at training time)  PASS"
+        f"  label_mode (iter-v3/073): '{_p13_lgbm.label_mode}' "
+        f"(triple-barrier REVERT; /072 fixed-horizon NEGATIVE — label-execution mismatch)  PASS"
     )
     print(
         "  inference_threshold_floor REVERTED to default 0.0 "
