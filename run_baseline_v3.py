@@ -606,8 +606,8 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
         raise RuntimeError(
             f"RiskV2Config.regime_size_scalar_value = "
             f"{strat_check.config.regime_size_scalar_value} — expected 0.50 "
-            "(EDA T8: largest IS lift clearing the +0.10 PROMISING / -0.20 "
-            "NEGATIVE classification floors)."
+            "(iter-v3/075: a-priori data-free default — halve the position "
+            "size in the adverse BTC regime; not fitted to IS or OOS)."
         )
     if strat_check.config.regime_size_ma_window != 270:
         raise RuntimeError(
