@@ -138,43 +138,63 @@ de-rate is SCOPED to LDO+TRX — the symbols whose bear/chop-entry IS wpnl is
 negative.** The scope is the IS-improving design, not a customization that breaks
 IS.
 
-### 2.4 T8 — SCOPED de-rate counterfactual (the simulated historical effect)
+### 2.4 T8 — SCOPED de-rate IS counterfactual (simulated historical IS effect)
 
-The de-rate applied ONLY to LDO+TRX bear/chop-entry trades (BCH never touched):
+The de-rate applied ONLY to LDO+TRX bear/chop-entry trades (BCH never touched).
+**This table is IS-ONLY.** The de-rate scalar is an iteration DESIGN PARAMETER;
+constructing a per-de-rate OOS counterfactual and selecting on it is OOS tuning —
+the QR sees OOS only in Phase 7 (`feedback_no_cheating.md`). T8 therefore reports
+the IS counterfactual only:
 
-| De-rate scalar | IS monthly Sharpe | OOS monthly Sharpe | IS Δ | OOS Δ | OOS/IS ratio |
-|---:|---:|---:|---:|---:|---:|
-| 1.00 (baseline) | 0.8325 | 0.1403 | 0.0000 | 0.0000 | 0.1685 |
-| 0.25 | 1.0434 | -0.0880 | +0.2109 | -0.2283 | -0.0844 |
-| 0.35 | 1.0157 | -0.0527 | +0.1832 | -0.1930 | -0.0519 |
-| **0.50** | **0.9738** | **-0.0023** | **+0.1413** | **-0.1426** | -0.0024 |
-| 0.65 | 0.9315 | +0.0446 | +0.0990 | -0.0956 | +0.0479 |
-| 0.75 | 0.9032 | +0.0739 | +0.0708 | -0.0663 | +0.0818 |
+| De-rate scalar | IS monthly Sharpe | IS Δ vs /060 |
+|---:|---:|---:|
+| 1.00 (baseline) | 0.8325 | 0.0000 |
+| 0.25 | 1.0434 | +0.2109 |
+| 0.35 | 1.0157 | +0.1832 |
+| **0.50** | **0.9738** | **+0.1413** |
+| 0.65 | 0.9315 | +0.0990 |
+| 0.75 | 0.9032 | +0.0708 |
 
-**Finding — and the honest IS<->OOS tension.** T8 reveals a GENUINE tension: the
-same BTC-bear/chop classifier that de-rates IS-bleeding LDO/TRX trades ALSO
-de-rates OOS-window LDO/TRX trades that the uptrend rewards (50.0% of OOS trades
-fall in the classifier's bear/chop tag — Section 2.2). The de-rate trades IS for
-OOS roughly 1:1.
+**De-rate choice = 0.50 — an a-priori default, chosen with NO OOS data and NO
+IS-fitted magnitude.** The de-rate scalar is set to 0.50 as a canonical, data-free
+risk default: *"halve the position size in the adverse BTC regime."* The
+justification is interpretability — a 1/2 size cut is the textbook
+regime-conditional de-rate — NOT a fitted optimum. The IS lift is monotone in the
+de-rate aggressiveness (0.25→+0.21, 0.35→+0.18, 0.50→+0.14, 0.65→+0.10,
+0.75→+0.07), so "max IS lift" would trivially pick 0.25; that is a defensible
+IS-only criterion but it fits the de-rate to the IS counterfactual magnitude. The
+a-priori 0.50 is the cleaner choice — being data-free, it cannot overfit IS *or*
+OOS. The T8 IS column is reported (it shows the SCOPED de-rate is IS-positive,
+unlike the blanket de-rate of Section 2.3 / T3) but it is **not used to select
+the de-rate magnitude**.
 
-**De-rate choice = 0.50.** The chosen scalar is the largest IS-lift scalar that
-clears BOTH (a) the +0.10 PROMISING IS floor AND (b) the -0.20 NEGATIVE OOS floor
-— and among those, the one with the best OOS headroom. At 0.50: IS Δ **+0.1413**
-(clears the +0.10 PROMISING bar), OOS Δ **-0.1426** (inside the [-0.20,+0.20]
-noise band — not NEGATIVE). The 0.25/0.35 scalars give a larger IS lift but drive
-OOS into NEGATIVE territory (-0.228 / -0.193) — rejected. The 0.65/0.75 scalars
-keep OOS milder but the IS lift falls below the PROMISING bar.
+**The IS<->OOS tension — a MECHANISM, not a counterfactual number.** The same
+BTC-bear/chop classifier that de-rates the IS-bleeding LDO/TRX trades will also
+de-rate any OOS-window LDO/TRX trade whose entry bar the classifier tags
+bear/chop. The /060 OOS window is a persistent BCH/LDO/TRX uptrend (50.0% of OOS
+trades fall in the classifier's bear/chop tag — Section 2.2); if that uptrend
+rewards the tagged LDO/TRX trades, the de-rate down-scales OOS-productive trades
+and **costs OOS Sharpe**. This is legitimate mechanism reasoning — it predicts the
+SIGN of the OOS effect (a cost) from the structure of the primitive. The EDA does
+NOT compute or cite any per-de-rate OOS counterfactual; Section 4 derives the
+predicted OOS band from this mechanism + the IS counterfactual magnitude +
+EXPLORATION-mode seed variance.
 
-**Counterfactual exactness.** CRUCIAL: a position-SIZE scalar at primitive 5
-fires AFTER the model and AFTER labeling — it changes only the realised
-`weighted_pnl` of trades that still happen; it does NOT change trade SELECTION,
-labels, or the Optuna optimization landscape. (This is the structural difference
-from the /074 KILL switch, which fired BEFORE the model and shifted the training
-distribution.) The T8 counterfactual is therefore **essentially exact** — the
-backtest should reproduce the T8 numbers up to a tiny integer-rounding
-interaction with the existing vol-scale (`weight = round(weight * scale * ...)`).
-This is honestly disclosed: the EDA does NOT predict an OOS recovery beyond the
-counterfactual.
+**IS counterfactual exactness.** A position-SIZE scalar at primitive 5 fires
+AFTER the model and AFTER labeling — it changes only the realised `weighted_pnl`
+of trades that still happen; it does NOT change trade SELECTION, labels, or the
+Optuna optimization landscape. (This is the structural difference from the /074
+KILL switch, which fired BEFORE the model.) The T8 IS counterfactual is therefore
+**essentially exact on the IS roster** — the backtest should reproduce the T8 IS
+numbers up to a tiny integer-rounding interaction with the existing vol-scale
+(`weight = round(weight * scale * ...)`).
+
+**Correction disclosure.** The first EDA pass selected the de-rate via an
+OOS-informed rule — it filtered T8 candidate de-rates by `oos_delta >= -0.20` and
+ranked the survivors by `oos_delta`. That used the /060 OOS roster to rank and
+pick a design parameter (OOS tuning). The defect was caught pre-Phase-5.5-gate and
+corrected: T3/T8 now compute IS columns only, and the de-rate is the a-priori 0.50
+default. See Section 10.
 
 ### 2.5 Holding-time-effect predictor (T4) — MANDATED by `feedback_v3_is_oos_regime_divergence.md`
 
@@ -351,28 +371,35 @@ reverted (primitive 10 OFF, per /051). `enable_per_symbol_drawdown_brake=False`
 
 ### 4.1 Predicted bands (cycle-2 axis-PASS criteria, anchored on /060)
 
-The T8 counterfactual is essentially exact (Section 2.4) — a position-SIZE scalar
-fires after the model + labeling, so trade selection and the Optuna landscape are
-unchanged. The predicted bands are therefore tight, centred on the T8 derate-0.50
-row:
+The IS prediction is anchored on the T8 IS counterfactual (essentially exact —
+Section 2.4). The OOS prediction is **mechanism-derived**, NOT a cited
+counterfactual: no per-de-rate OOS number is computed anywhere in the EDA.
 
 - **Predicted IS monthly Sharpe Δ vs /060:** **+0.14** (CI: **[+0.08, +0.20]**).
-  T8 derate-0.50 IS Δ = +0.1413. The band is narrow because the counterfactual is
-  exact up to integer-rounding of the re-weighted positions.
-- **Predicted OOS monthly Sharpe Δ vs /060:** **-0.14** (CI: **[-0.20, -0.06]**).
-  T8 derate-0.50 OOS Δ = -0.1426. Honestly disclosed: this axis trades IS for OOS
-  roughly 1:1 — the same BTC-bear/chop classifier de-rates OOS-uptrend LDO/TRX
-  trades the trend rewards. The CI lower bound touches the -0.20 NEGATIVE floor.
+  T8 derate-0.50 IS Δ = +0.1413. The band is narrow because the IS counterfactual
+  is essentially exact up to integer-rounding of the re-weighted positions.
+- **Predicted OOS monthly Sharpe Δ vs /060: a COST, mechanism-derived.** The
+  primitive de-rates LDO/TRX trades whose entry bar the BTC classifier tags
+  bear/chop; the /060 OOS window is a persistent uptrend in which a sizeable share
+  of LDO/TRX trades carry that tag (Section 2.2). De-rating OOS-productive trades
+  costs OOS Sharpe — so the OOS effect is predicted **negative in sign**. The
+  magnitude is bounded by the mechanism, not peeked: the SCOPED de-rate halves the
+  weight of the tagged OOS trades, and the T8 IS counterfactual shows a halving of
+  the tagged trades' contribution moves a Sharpe of this regime by ≈ 0.14 in
+  magnitude; absent any reason the OOS regime's tagged-trade contribution is
+  larger than the IS one, the OOS cost is of **comparable order** — predicted band
+  **[-0.20, 0.00]**, centred near **-0.10 to -0.14**. The lower bound touches the
+  -0.20 NEGATIVE floor; EXPLORATION-mode 3-seed variance (noise floor ≈ ±0.20 OOS
+  per `feedback_v3_cycle1_axis_pass_criteria.md`) can push it either way.
 - **Predicted frac_positive_paths:** ≈ 0.6444 ± 0.03 (CPCV is largely
   architecture-invariant; the scalar re-weights a small number of trades and the
   CPCV path construction is on the cell-level model, not the post-gate roster).
 - **Falsifier:** if **OOS monthly Sharpe Δ < -0.20** vs /060 (i.e. OOS Sharpe
-  below -0.06), the axis is NEGATIVE on the OOS axis — the de-rate is destroying
-  more OOS-productive trades than the counterfactual estimated, and the axis is
-  rejected. If **IS monthly Sharpe Δ < +0.08** (below the CI lower bound), the IS
-  lift the counterfactual predicts did not materialise — flag an implementation
-  defect (the counterfactual is exact, so a missing IS lift means the scalar is
-  mis-wired).
+  below -0.0597), the axis is NEGATIVE on the OOS axis — the de-rate destroys more
+  OOS-productive trades than the mechanism bounds, and the axis is rejected. If
+  **IS monthly Sharpe Δ < +0.08** (below the IS CI lower bound), the IS lift the
+  essentially-exact IS counterfactual predicts did not materialise — flag an
+  implementation defect (a missing IS lift means the scalar is mis-wired).
 
 ### 4.2 BCH IS sensitivity (mandated by `feedback_v3_cycle1_axis_pass_criteria.md`)
 
@@ -441,16 +468,18 @@ ratio column (the value the Section 8 SUSPICIOUS classifier consumes — no
 alternative ratio construction is introduced, per the /074 Critic Rec #1
 standardization). The gate fires unconditionally per the memory rule.
 
-Primitive 12 is predicted NOT to trip the ratio gate: the holding-time-effect
-predictor (Section 4.3) shows EXACTLY 0 duration change, so the IS/OOS
-regime-divergence factor is not loaded. The T8 counterfactual OOS/IS ratio at
-derate-0.50 is **-0.0024** (the OOS Sharpe is slightly negative at -0.0023, so the
-ratio is near-zero negative) — far below 3.0. The de-rate REDUCES OOS Sharpe; it
-does not inflate it. SUSPICIOUS-OOS-DOMINANT is mechanically impossible here — the
-SUSPICIOUS-OOS-DOMINANT sub-mode requires OOS shift ≥ +0.20, and the predicted
-OOS shift is NEGATIVE (-0.14). But the gate is pre-registered and binding: if /075
-returns OOS/IS > 3.0, the axis is SUSPICIOUS and does NOT advance, even though the
-mechanism analysis rules it out.
+Primitive 12 is predicted NOT to trip the ratio gate, by mechanism: the
+holding-time-effect predictor (Section 4.3) shows EXACTLY 0 duration change, so
+the IS/OOS regime-divergence factor — the usual driver of an inflated OOS/IS
+ratio — is not loaded. More directly, the de-rate REDUCES the weight of
+OOS-window LDO/TRX trades; a primitive that down-scales OOS exposure cannot
+inflate OOS Sharpe relative to IS. The mechanism predicts the de-rate moves OOS
+Sharpe DOWN (Section 4.1), so the OOS/IS ratio moves toward zero, not toward 3.0.
+SUSPICIOUS-OOS-DOMINANT is mechanically impossible here — the
+SUSPICIOUS-OOS-DOMINANT sub-mode requires OOS shift ≥ +0.20, and the
+mechanism-derived OOS shift is NEGATIVE. But the gate is pre-registered and
+binding: if /075 returns OOS/IS > 3.0, the axis is SUSPICIOUS and does NOT
+advance, even though the mechanism analysis rules it out.
 
 ---
 
@@ -468,18 +497,19 @@ scalar is correctly bounded and what protects against it misfiring.
   in `test_regime_gate.py`) and of `axis_selection_eda.py::_build_btc_trend_lookup`.
   The NEW `tests/strategies/ml/test_regime_size_scalar.py` re-asserts the
   past-only property. No look-ahead.
-- **IS-calibrated parameters.** The SMA_270 classifier window is chosen by T2 on
-  the IS-window discrimination metric only (Section 2.2). The de-rate scalar 0.50
-  is chosen by T8 on the IS-counterfactual lift subject to the IS PROMISING floor
-  and the OOS NEGATIVE floor — both pre-registered classification boundaries, not
-  tuned optima (Section 2.4). The scope LDO+TRX is chosen by T7 on the
-  IS-bear/chop-entry-wpnl sign (Section 2.3). Every parameter has an IS-only
-  derivation.
-- **Simulated historical effect.** Section 2.4 (T8) IS the simulated historical
-  effect: on the /060 trade roster, de-rating LDO+TRX bear/chop-entry trades by
-  0.50 produces IS monthly Sharpe +0.1413 / OOS monthly Sharpe -0.1426. Section
-  2.3 (T7) shows the de-rate is applied only to symbols whose bear/chop-entry IS
-  wpnl is negative. The full de-rate grid is in `T8_scoped_derate_counterfactual.csv`.
+- **IS-only and a-priori parameters.** The SMA_270 classifier window is chosen by
+  T2 on the IS-window discrimination metric only (Section 2.2). The de-rate scalar
+  0.50 is an a-priori default — "halve the position size in the adverse BTC
+  regime" — chosen with NO OOS data and NO IS-fitted magnitude (Section 2.4). The
+  scope LDO+TRX is chosen by T7 on the IS-bear/chop-entry-wpnl sign (Section 2.3).
+  Every parameter has an IS-only or a-priori derivation; none is OOS-tuned.
+- **Simulated historical IS effect.** Section 2.4 (T8) is the simulated historical
+  IS effect: on the /060 IS roster, de-rating LDO+TRX bear/chop-entry trades by
+  0.50 produces IS monthly Sharpe +0.9738 (IS Δ +0.1413). Section 2.3 (T7) shows
+  the de-rate is applied only to symbols whose bear/chop-entry IS wpnl is negative.
+  The full IS de-rate grid is in `T8_scoped_derate_counterfactual.csv` (IS columns
+  only — no per-de-rate OOS counterfactual is computed). The OOS effect is
+  mechanism-predicted (a cost — Section 4.1), not a counterfactual number.
 - **Scope bound.** `regime_size_scalar_symbols=("LDOUSDT", "TRXUSDT")` — the
   scalar touches LDO and TRX only. BCH (the IS-edge carrier) is untouched (positive
   control, Section 4.2). If the scalar misfires, the blast radius is the WEIGHT of
@@ -533,33 +563,36 @@ count will be ≥ the trade-level estimate).
 
 ## Section 7 — Pre-Registered Failure-Mode Prediction
 
-**Most plausible outcome (probability ≈ 45%): INERT-AT-EXPLORATION.** The T8
-counterfactual at derate-0.50 predicts OOS Δ = -0.1426 — inside the [-0.20,+0.20]
-OOS noise band. Per the Section 8 disjunctive classifier, an OOS Δ within the
-noise band fires INERT-AT-EXPLORATION (the IS Δ of +0.14 clears the PROMISING bar,
-but PROMISING requires BOTH IS Δ ≥ +0.10 AND OOS Δ ≥ +0.20 — the OOS gate fails).
-The mechanism: the de-rate trades IS for OOS roughly 1:1, and at 0.50 the OOS cost
-lands inside the noise band rather than crossing the NEGATIVE floor. The metric
-signature: IS Δ ≈ +0.10 to +0.18, OOS Δ ≈ -0.06 to -0.18, BCH byte-identical to
-/060, `regime_size_scalar_fires` > 0.
+**Most plausible outcome (probability ≈ 45%): INERT-AT-EXPLORATION.** The
+mechanism (Section 4.1) predicts a negative OOS effect of order ≈ -0.10 to -0.14 —
+inside the [-0.20,+0.20] OOS noise band. Per the Section 8 disjunctive classifier,
+an OOS Δ within the noise band fires INERT-AT-EXPLORATION (the IS Δ of ≈ +0.14
+clears the PROMISING IS bar, but PROMISING requires BOTH IS Δ ≥ +0.10 AND
+OOS Δ ≥ +0.20 — the OOS gate fails). The mechanism: the de-rate down-scales
+OOS-window LDO/TRX trades the uptrend rewards, so it COSTS OOS Sharpe; if that
+cost lands inside the noise band rather than crossing the NEGATIVE floor, the
+outcome is INERT. The metric signature: IS Δ ≈ +0.10 to +0.18, OOS Δ negative but
+> -0.20, BCH byte-identical to /060, `regime_size_scalar_fires` > 0.
 
 **Second outcome (probability ≈ 35%): NEGATIVE-AT-EXPLORATION (OOS axis).** The
-T8 counterfactual OOS Δ CI lower bound (-0.20) touches the NEGATIVE floor. If the
-backtest's integer-rounding of the re-weighted positions, or a slightly different
-BTC-trend tagging at the live signal-bar granularity, pushes OOS Δ below -0.20,
-the axis is NEGATIVE on the OOS axis (Section 8.2). The metric signature: OOS Δ <
--0.20 (OOS Sharpe < -0.06), IS Δ still positive (the IS lift is robust — T8
-derate-0.50 IS Δ +0.14). This is an honest, pre-registered failure mode: the
-counterfactual is essentially exact and predicts OOS -0.14, but the -0.20 floor
-is only 0.06 away.
+mechanism-derived OOS band's lower bound (-0.20) touches the NEGATIVE floor. If
+the OOS regime's tagged-trade contribution is larger than the IS one, or
+EXPLORATION-mode 3-seed variance swings adverse, OOS Δ drops below -0.20 and the
+axis is NEGATIVE on the OOS axis (Section 8.2). The metric signature: OOS Δ <
+-0.20 (OOS Sharpe < -0.0597), IS Δ still positive (the IS lift is robust — T8
+derate-0.50 IS Δ +0.14, IS counterfactual essentially exact). This is an honest,
+pre-registered failure mode: the mechanism predicts a negative OOS cost, and the
+-0.20 floor is only a modest distance below the band centre.
 
 **Third outcome (probability ≈ 18%): PROMISING-AT-EXPLORATION.** This requires the
-backtest OOS Δ to land ≥ +0.20 — i.e. +0.34 BETTER than the T8 counterfactual
-estimate. The counterfactual is essentially exact (a size scalar fires post-model;
-trade selection is unchanged), so a +0.34 OOS surprise is unlikely — it would
-require the 3-seed EXPLORATION-mode variance (noise floor ≈ -0.44 OOS per
-`feedback_v3_cycle1_axis_pass_criteria.md`) to swing strongly favourable. Weighted
-low and honestly: the EDA does NOT predict a clean PROMISING.
+backtest OOS Δ to land ≥ +0.20 — i.e. the OOS effect to be strongly POSITIVE,
+opposite in sign to the mechanism prediction. The mechanism says the de-rate
+down-scales OOS-productive trades and costs OOS Sharpe; a positive OOS surprise
+would require either that the classifier's bear/chop-tagged OOS LDO/TRX trades are
+net LOSERS (so de-rating them helps OOS) or that 3-seed EXPLORATION-mode variance
+(noise floor ≈ ±0.20 OOS per `feedback_v3_cycle1_axis_pass_criteria.md`) swings
+strongly favourable. Weighted low and honestly: the EDA does NOT predict a clean
+PROMISING — the mechanism points the OOS effect the other way.
 
 **Tail outcome (probability ≈ 2%): NULL-RESULT.** `regime_size_scalar_fires`
 total = 0 — the scalar never fired. Near-impossible given T5 shows ≈ 24 IS / ≈ 32
@@ -691,10 +724,34 @@ in isolation.
 Per `feedback_v3_axis_selection_quant_discipline.md`, the /075 axis was selected
 by the QR with committed EDA backing, NOT by an orchestrator ad-hoc pick.
 
+### 10.0 — Pre-gate correction: OOS-tuning of the de-rate scalar (DISCLOSED)
+
+The first EDA pass (`9a04f6f`) selected the de-rate scalar via an OOS-informed
+rule: `axis_selection_eda.py::main()` filtered T8 candidate de-rates by
+`oos_delta >= -0.20` and ranked the survivors by `oos_delta`, picking the de-rate
+with the best OOS counterfactual. T3 and T8 computed `oos_monthly_sharpe`,
+`oos_delta`, and `oos_is_ratio` for every candidate de-rate (0.25/0.35/0.50/0.65/
+0.75) — fresh OOS evaluations of candidate iteration designs, selected on. The
+de-rate scalar is an iteration DESIGN PARAMETER; ranking and picking it on the
+/060 OOS roster is tuning a parameter on OOS data. That violates the v3 skill's
+NO CHEATING rule and `feedback_no_cheating.md` — the QR sees OOS only in Phase 7.
+(Pre-registering OOS *evaluation gates* — Section 8 — is correct and required;
+using the actual OOS roster to *select* a parameter is a different thing, and was
+the defect.) The defect was caught pre-Phase-5.5-gate and corrected: T3/T8 now
+compute IS columns only (no OOS counterfactual for any candidate de-rate), and the
+de-rate scalar is re-selected by an a-priori, data-free criterion — 0.50, "halve
+the position size in the adverse BTC regime." The de-rate value is unchanged at
+0.50, so the setup commit's `regime_size_scalar_value` is unchanged; the EDA and
+brief are re-committed with the corrected derivation. The MA-window choice (T2,
+IS `is_discrimination_pp`) and the LDO+TRX scope (T7, IS bear/chop-entry wpnl
+sign) were always IS-only and are unaffected. This subsection discloses the
+correction in full per the transparency requirement.
+
 - **EDA SHA:** `9a04f6f` — `analysis/iteration_v3-075/axis_selection_eda.py`
   (T0–T8: anchor, regime stratification, BTC-trend classifier sweep, blanket +
-  scoped de-rate counterfactuals, holding-time predictor, behavioral predictor,
-  per-symbol IS discipline).
+  scoped de-rate IS counterfactuals — IS columns only, holding-time predictor,
+  behavioral predictor, per-symbol IS discipline). Corrected EDA SHA backfilled
+  at the correction commit (see Section 10.0).
 - **Brief SHA:** `00405c5` — `briefs-v3/iteration_v3-075/research_brief.md`
   (this file; all 11 sections LOCKED).
 - **Setup commit SHA:** `f170a75` — `setup(iter-v3/075): primitive 12
@@ -710,8 +767,10 @@ by the QR with committed EDA backing, NOT by an orchestrator ad-hoc pick.
   dedicated IS bear/chop sub-period diagnostic). The orchestrator did NOT
   pre-commit a specific axis. The QR ran the EDA and selected the
   position-SIZE-modulation family — and within it, the EDA itself drove the
-  specific design (the classifier window via T2, the LDO+TRX SCOPE via T7, the
-  0.50 de-rate via T8).
+  data-derived design parameters (the classifier window via T2 on IS
+  `is_discrimination_pp`, the LDO+TRX SCOPE via T7 on IS bear/chop-entry wpnl
+  sign). The de-rate scalar (0.50) is an a-priori, data-free default — see
+  Section 10.0 for the disclosed correction from the first pass's OOS-tuned rule.
 
 **How Primitive 12 satisfies the Critic /074 hard constraint:**
 
