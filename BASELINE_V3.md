@@ -4,7 +4,7 @@
 
 **Sibling to:** `BASELINE.md` (v1) and `BASELINE_V2.md` (v2). All three coexist.
 
-**Last updated:** 2026-05-15 — iter-v3/076 EXPLORATION closeout (SUSPICIOUS-OOS-DOMINANT, non-advancing; anchor METRICS UNCHANGED; only edit is the Kaufman path-efficiency entry added to Dead Ideas)
+**Last updated:** 2026-05-15 — iter-v3/077 EXPLORATION closeout (INERT-AT-EXPLORATION PASSIVE-DIAGNOSTIC, non-advancing; canonical /059 anchor METRICS UNCHANGED; only edit is the EXPLORATION-Mode Anchor Staleness note in Measurement Discipline — the /060 EXPLORATION-MODE-REFERENCE is stale, /078+ re-anchor)
 
 ## Unified 10-Seed Ensemble Architecture (Phase B-3 at commit `ab2d9ac`)
 
@@ -297,6 +297,12 @@ assert set(cfg.symbols).isdisjoint(V3_EXCLUDED_SYMBOLS), \
 ## Measurement Discipline
 
 (Inherited from `BASELINE_V2.md`.)
+
+### EXPLORATION-Mode Anchor Staleness (established iter-v3/077 closeout)
+
+> This note concerns ONLY the EXPLORATION-MODE-REFERENCE intra-cycle delta anchor. The **/059 CONFIRMATION baseline above (the canonical anchor, tag `v0.v3-059`, IS +1.0894 / OOS +0.5791) is UNCHANGED and unaffected** — it is a unified-architecture CONFIRMATION number, not an EXPLORATION-mode reference.
+
+Cycle-2 EXPLORATIONs /071-/076 quoted the iter-v3/060 EXPLORATION-MODE-REFERENCE as a frozen IS +0.8325 / OOS +0.1403. iter-v3/077 — the first iteration since /060 to run the exact /060 14-feature config with no axis — established that the frozen value no longer reproduces on current code + current data. The **current-code /060-config baseline is IS +0.8236 / OOS +0.2078**, with the exact additive decomposition: IS code-drift **-0.0089** (the iter-v3/061 TRX `vol_scale_floor=0.5`, a permanent deterministic offset) + OOS data-extent **+0.0675** (the 2026-05 OOS month post-dating /060's data fetch, growing monotonically with calendar time). Cycle-2 EXPLORATIONs **/078+ re-anchor against the current-code /060-config baseline (IS +0.8236 / OOS +0.2078)**, not the stale frozen value. This is a methodology correction (a stale reference value replaced by the freshest reproducible no-axis run of the canonical config), not a measurement-window change — the OOS-cutoff and start dates are untouched. The /071-/076 classifications remain robust (the drift is well inside the ±0.10 IS / ±0.20 OOS noise bands and cannot move a SUSPICIOUS ratio across the 3.0 gate). Detail: `diary-v3/iteration_v3-077.md` Section 4 and the anchor-staleness cycle-note in `briefs-v3/exploration_catalog.md`.
 
 ### Data Extent Rule
 
