@@ -55,7 +55,9 @@ from scipy.stats import norm
 #:                embargo_candles=42+1=43; cross-cell gap=43*3=129).
 #:          → 88 (4-sym, iter-v3/069 UNIVERSE EXPANSION +ADAUSDT; timeout REVERT
 #:                21 candles; embargo_candles=21+1=22; cross-cell gap=22*4=88).
-REQUIRED_GAP: int = (21 + 1) * 4  # 88
+#:          → 66 (3-sym, iter-v3/070 REVERT /069 ADAUSDT; universe=BCH+LDO+TRX;
+#:                embargo_candles=21+1=22; cross-cell gap=22*3=66).
+REQUIRED_GAP: int = (21 + 1) * 3  # 66
 
 # ---------------------------------------------------------------------------
 # CPCV — Combinatorial Purged Cross-Validation (AFML Ch. 12)

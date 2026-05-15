@@ -200,21 +200,19 @@ def test_fracdiff_d05_close_no_lookahead() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_v3_models_at_iter_v3_069() -> None:
-    """V3_MODELS must be (BCHUSDT, LDOUSDT, TRXUSDT, ADAUSDT) at iter-v3/069.
+def test_v3_models_at_iter_v3_070() -> None:
+    """V3_MODELS must be (BCHUSDT, LDOUSDT, TRXUSDT) at iter-v3/070.
 
+    iter-v3/070 CYCLE 1 CONFIRMATION: REVERT /069 ADAUSDT universe expansion
+    (INERT at EXPLORATION per /069 closeout). 3-symbol universe restored.
     Regression guard against accidental ALGO re-add (system-level REVERT at /051)
     AND LDO removal (LDO removal axis pre-falsified at /052 EDA SHA `0a10581`).
-
-    iter-v3/069: UNIVERSE EXPANSION axis — adds ADAUSDT (4th symbol; denominator-
-    expansion mechanism per `feedback_v3_concentration_is_signal.md`). HBAR + AVAX
-    CLOSED at catalog level per iter-v3/021 diary lesson (c). ADA selected via
-    EDA SHA 95038dd composite ranking (feat-prox dominant per /021 lesson (a)).
 
     HISTORY:
     - iter-v3/051: SYSTEM-LEVEL REVERT (4 → 3 syms; drop ALGOUSDT)
     - iter-v3/052: 3-sym carry-forward; LDO removal axis PRE-FALSIFIED
-    - iter-v3/069: 3 → 4 (+ADAUSDT) UNIVERSE EXPANSION (THIS axis)
+    - iter-v3/069: 3 → 4 (+ADAUSDT) UNIVERSE EXPANSION (INERT-AT-EXPLORATION)
+    - iter-v3/070: 4 → 3 (REVERT ADAUSDT) CYCLE 1 CONFIRMATION
     """
     # Import locally to catch import-time state
     import importlib  # noqa: PLC0415
@@ -229,14 +227,17 @@ def test_v3_models_at_iter_v3_069() -> None:
     v3_models = run_mod.V3_MODELS
     symbols = [sym for _, sym in v3_models]
 
-    assert len(symbols) == 4, (
-        f"V3_MODELS has {len(symbols)} symbols — expected exactly 4 "
-        "(BCH/LDO/TRX/ADA) at iter-v3/069. UNIVERSE EXPANSION axis per "
-        "Critic /068 Rec #3 + EDA SHA 95038dd composite ranking. "
+    assert len(symbols) == 3, (
+        f"V3_MODELS has {len(symbols)} symbols — expected exactly 3 "
+        "(BCH/LDO/TRX) at iter-v3/070. REVERT /069 ADAUSDT per CYCLE 1 CONFIRMATION. "
         f"Current symbols: {symbols}"
     )
     assert "ALGOUSDT" not in symbols, (
         f"ALGOUSDT FOUND in V3_MODELS — must be absent (system-level REVERT at /051). "
+        f"Current symbols: {symbols}"
+    )
+    assert "ADAUSDT" not in symbols, (
+        f"ADAUSDT FOUND in V3_MODELS — must be absent (REVERT /069 at iter-v3/070). "
         f"Current symbols: {symbols}"
     )
     assert "LDOUSDT" in symbols, (
@@ -254,9 +255,9 @@ def test_v3_models_at_iter_v3_069() -> None:
         f"per iter-v3/021 diary lesson (c) — universe expansion HBAR+AVAX NEGATIVE-clean). "
         f"Current symbols: {symbols}"
     )
-    expected = {"BCHUSDT", "LDOUSDT", "TRXUSDT", "ADAUSDT"}
+    expected = {"BCHUSDT", "LDOUSDT", "TRXUSDT"}
     actual = set(symbols)
     assert actual == expected, (
         f"V3_MODELS symbols mismatch: expected {expected}, got {actual}. "
-        "iter-v3/069 V3_MODELS must be exactly (BCHUSDT, LDOUSDT, TRXUSDT, ADAUSDT)."
+        "iter-v3/070 V3_MODELS must be exactly (BCHUSDT, LDOUSDT, TRXUSDT)."
     )

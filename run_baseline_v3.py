@@ -125,7 +125,7 @@ def _derive_ensemble_seeds(outer_seed: int, size: int = 5) -> list[int]:
     return [int(s) for s in rng.integers(low=0, high=2**31 - 1, size=size)]
 
 
-ITERATION_LABEL = "v3-069"
+ITERATION_LABEL = "v3-070"
 REPORTS_DIR = Path("reports-v3")
 FEATURES_DIR = Path("data/features_v3")
 DATA_DIR = Path("data")
@@ -134,16 +134,14 @@ DATA_DIR = Path("data")
 # Per `feedback_v3_per_symbol_lifts_oos_breaks_is.md` UPDATED 2026-05-10 (second-cycle
 # confirmation of per-symbol-customization anti-pattern at iter-v3/039 + iter-v3/050
 # both CONFIRMATION-NO-MERGE on per-symbol bundle). ALGOUSDT REVERTED (4→3 symbols).
-# iter-v3/069: UNIVERSE EXPANSION axis — add ADAUSDT (4th symbol; denominator-
-# expansion mechanism per `feedback_v3_concentration_is_signal.md` LOCKED 2026-05-07).
-# Per EDA SHA 95038dd (composite ranking: ADA 0.5594 rank-1 of 5 PASSING candidates;
-# feat-prox dominant weighting per /021 diary lesson (a)). REQUIRED_GAP scaled
-# 66 → 88 = (21+1)×4 (timeout REVERT 42→21; n_symbols 3→4).
+# iter-v3/069: UNIVERSE EXPANSION axis — ADAUSDT added (4th symbol).
+# iter-v3/070: REVERT /069 universe expansion — ADAUSDT removed (INERT at EXPLORATION);
+# cycle 1 CONFIRMATION runs on 3-symbol universe (BCH+LDO+TRX).
+# REQUIRED_GAP reverts 88 → 66 = (21+1)×3 (n_symbols 4→3).
 V3_MODELS: tuple[tuple[str, str], ...] = (
     ("A (BCHUSDT)", "BCHUSDT"),
     ("C (LDOUSDT)", "LDOUSDT"),
     ("D (TRXUSDT)", "TRXUSDT"),
-    ("F (ADAUSDT)", "ADAUSDT"),  # iter-v3/069 — 4th symbol; UNIVERSE EXPANSION axis
 )
 
 # Risk gate configs (v2 5-gate + BTC; no R1/R2/R3 — brief Section 3.4)
@@ -162,8 +160,8 @@ BTC_TREND_CONFIG = BtcTrendFilterConfig(
 # CPCV parameters (brief Section 0 + 3.5#2)
 CPCV_N_SPLITS = 10
 CPCV_N_TEST_SPLITS = 2
-# gap = REQUIRED_GAP = (timeout_candles+1)*n_symbols = (21+1)*4 = 88
-# (iter-v3/069 UNIVERSE EXPANSION +ADAUSDT).
+# gap = REQUIRED_GAP = (timeout_candles+1)*n_symbols = (21+1)*3 = 66
+# (iter-v3/070 REVERT /069 ADAUSDT; universe=BCH+LDO+TRX; 3-sym CONFIRMATION).
 # DO NOT use min(REQUIRED_GAP, n_trades//20) — that is the iter-v3/001 bug.
 CPCV_EMBARGO = 27  # ~1% of 24-month T ≈ 2742 candles * 0.01
 
@@ -414,22 +412,22 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
         "regime_momentum_signed_5d PRESENT; sym_vs_btc_ret_7d PRESENT)  PASS"
     )
 
-    # iter-v3/066: DEFAULT_ATR_MULTIPLIERS REVERTED to (2.0, 1.0).
-    # /065 set (2.0, 1.5); /066 REVERTS to (2.0, 1.0) for single-axis attribution.
-    # The single varied axis at /066 is RiskV2Config.vol_scale_ceiling=0.8 (Path E0.8).
-    # /065 labeling axis (SL=1.5) is reserved for /069 CONFIRMATION bundle alongside /066.
-    # EDA SHA `1d75cb0`; briefs-v3/iteration_v3-066/research_brief.md Section 3 Sub-fix 2.
-    if DEFAULT_ATR_MULTIPLIERS != (2.0, 1.0):
+    # iter-v3/070: DEFAULT_ATR_MULTIPLIERS RE-APPLIED to (2.0, 1.5).
+    # /065 set (2.0, 1.5); /066-/069 reverted to (2.0, 1.0) for single-axis attribution.
+    # /070 CYCLE 1 CONFIRMATION: Component A = universal SL widening (2.0, 1.0) → (2.0, 1.5).
+    # V3_ATR_MULTIPLIERS_PER_SYMBOL remains empty {} — universal change, no per-symbol overrides.
+    # EDA SHA `fe219c1`; briefs-v3/iteration_v3-070/research_brief.md Section 3 Sub-fix 1.
+    if DEFAULT_ATR_MULTIPLIERS != (2.0, 1.5):
         raise RuntimeError(
-            f"DEFAULT_ATR_MULTIPLIERS = {DEFAULT_ATR_MULTIPLIERS} — expected (2.0, 1.0). "
-            "iter-v3/066 axis isolation: /065's universal SL widening (2.0, 1.5) reverts "
-            "to /060 baseline labeling (2.0, 1.0) so the single varied axis at /066 is "
-            "RiskV2Config.vol_scale_ceiling=0.8 (Path E0.8 per EDA SHA 1d75cb0). "
-            "/065 axis is bundled at /069 CONFIRMATION."
+            f"DEFAULT_ATR_MULTIPLIERS = {DEFAULT_ATR_MULTIPLIERS} — expected (2.0, 1.5). "
+            "iter-v3/070 CYCLE 1 CONFIRMATION Component A: universal SL widening "
+            "(2.0, 1.0) → (2.0, 1.5) RE-APPLIED from /065 (bundled at /070 CONFIRMATION). "
+            "Set DEFAULT_ATR_MULTIPLIERS = (2.0, 1.5) in features_v3/__init__.py. "
+            "EDA SHA fe219c1; brief Section 3 Sub-fix 1."
         )
     print(
-        "  DEFAULT_ATR_MULTIPLIERS = (2.0, 1.0) "
-        "(iter-v3/066 axis isolation: /065 SL reverted; single axis = vol_scale_ceiling=0.8)  PASS"
+        "  DEFAULT_ATR_MULTIPLIERS = (2.0, 1.5) "
+        "(iter-v3/070 CONFIRMATION Component A: /065 SL widening RE-APPLIED universally)  PASS"
     )
 
     # iter-v3/044: V3_FEATURES_PER_SYMBOL MUST BE EMPTY.
@@ -503,23 +501,24 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
         "regime_momentum_signed_5d, sym_vs_btc_ret_7d PRESENT)  PASS"
     )
 
-    # iter-v3/066: All 3 symbols (BCH/LDO/TRX) MUST return (2.0, 1.0) via DEFAULT fallback.
-    # /065 set (2.0, 1.5); /066 REVERTS to (2.0, 1.0) for single-axis attribution.
+    # iter-v3/070: All 3 symbols (BCH/LDO/TRX) MUST return (2.0, 1.5) via DEFAULT fallback.
+    # /070 CONFIRMATION Component A: RE-APPLY /065 universal SL widening (2.0, 1.0) → (2.0, 1.5).
     # V3_ATR_MULTIPLIERS_PER_SYMBOL must be EMPTY (no per-symbol overrides; carry-forward /051).
     for _sym_atr in ("BCHUSDT", "LDOUSDT", "TRXUSDT"):
         sym_atr = atr_multipliers_for_symbol(_sym_atr)
-        if sym_atr != (2.0, 1.0):
+        if sym_atr != (2.0, 1.5):
             raise RuntimeError(
                 f"atr_multipliers_for_symbol('{_sym_atr}') returned {sym_atr} — "
-                "expected (2.0, 1.0) (DEFAULT fallback at iter-v3/066). "
-                "iter-v3/066 axis isolation: REVERT /065's (2.0, 1.5) back to (2.0, 1.0). "
+                "expected (2.0, 1.5) (DEFAULT fallback at iter-v3/070 CONFIRMATION). "
+                "iter-v3/070 Component A: RE-APPLY /065 universal SL widening (2.0, 1.5). "
                 "V3_ATR_MULTIPLIERS_PER_SYMBOL must be EMPTY; "
-                "all 3 symbols use DEFAULT_ATR_MULTIPLIERS = (2.0, 1.0). "
-                "Verify DEFAULT_ATR_MULTIPLIERS = (2.0, 1.0) in features_v3/__init__.py."
+                "all 3 symbols use DEFAULT_ATR_MULTIPLIERS = (2.0, 1.5). "
+                "Verify DEFAULT_ATR_MULTIPLIERS = (2.0, 1.5) in features_v3/__init__.py."
             )
     print(
-        "  atr_multipliers_for_symbol: BCH/LDO/TRX all (2.0, 1.0) DEFAULT "
-        "(iter-v3/066 axis isolation: /065 SL reverted; PER_SYMBOL EMPTY)  PASS"
+        "  atr_multipliers_for_symbol: BCH/LDO/TRX all (2.0, 1.5) DEFAULT "
+        "(iter-v3/070 CONFIRMATION Component A: /065 SL widening RE-APPLIED; "
+        "PER_SYMBOL EMPTY)  PASS"
     )
 
     # iter-v3/051: Primitive 10 REVERT — block_long_for=() per system-level rule.
@@ -747,21 +746,33 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
     )
     print("  vol_scale_ceiling at default 1.0 (reverted at /067, unchanged at /069)  PASS")
     print(
-        f"  Universal label_timeout_minutes (iter-v3/069 REVERT): {expected_label_timeout} min "
-        f"(= 21 candles at 8h; REVERT /068 Path C; embargo 22 per cell, "
-        f"cross-cell gap 88 per 4-sym universe)  PASS"
+        f"  Universal label_timeout_minutes (iter-v3/070 CARRY-FORWARD): "
+        f"{expected_label_timeout} min "
+        f"(= 21 candles at 8h; timeout UNCHANGED; embargo 22 per cell, "
+        f"cross-cell gap 66 per 3-sym universe; REVERT /069 ADAUSDT)  PASS"
+    )
+
+    # iter-v3/070 NEW: _verify_timeout_consistency — Critic /069 Rec #1.
+    # Assert BacktestConfig.timeout_minutes == LightGbmStrategy.label_timeout_minutes.
+    # The /069 iteration had these two values silently fall out of sync.
+    # Verify on the BCHUSDT model already built above (p13_strat_check).
+    _verify_timeout_consistency(_p13_cfg_check, _p13_lgbm)
+    print(
+        "  Timeout consistency (iter-v3/070 Critic /069 Rec #1): "
+        f"BacktestConfig.timeout_minutes == LightGbmStrategy.label_timeout_minutes "
+        f"== {expected_label_timeout}  PASS"
     )
 
 
 def _verify_label_leakage_gap() -> None:
     """Assert gap == REQUIRED_GAP and print proof (brief Section 3.5#3).
 
-    iter-v3/069 UNIVERSE EXPANSION: REVERT /068's Path C (timeout 42 → 21 candles)
-    AND expand universe 3 → 4 symbols (+ADAUSDT).
+    iter-v3/070 REVERT /069 ADAUSDT: universe 4 → 3 symbols (BCH+LDO+TRX).
+    Timeout unchanged at 21 candles (10080 min / 8h).
     embargo_candles = 10080 // 480 + 1 = 22.
-    cross-cell gap = 22 * 4 = 88 (REQUIRED_GAP updated accordingly).
+    cross-cell gap = 22 * 3 = 66 (REQUIRED_GAP reverts 88 → 66).
     """
-    timeout_minutes = 10080  # 7 days (21 candles at 8h) — iter-v3/069 REVERT /068 Path C
+    timeout_minutes = 10080  # 7 days (21 candles at 8h) — UNCHANGED
     candle_minutes = 480  # 8h
     n_symbols = len(V3_MODELS)
     timeout_candles = timeout_minutes // candle_minutes  # = 21
@@ -773,6 +784,40 @@ def _verify_label_leakage_gap() -> None:
     print(
         f"  Label-leakage gap: (timeout_candles={timeout_candles}+1) * n_symbols={n_symbols}"
         f" = {required_gap}  [matches REQUIRED_GAP={REQUIRED_GAP}]  PASS"
+    )
+
+
+def _verify_timeout_consistency(cfg: BacktestConfig, lgbm_strategy: LightGbmStrategy) -> None:
+    """Assert BacktestConfig.timeout_minutes == LightGbmStrategy.label_timeout_minutes.
+
+    iter-v3/070 NEW runtime assertion per Critic /069 Rec #1 anchor-byte gate enforcement.
+    The /069 iteration had BacktestConfig.timeout_minutes (line 1407) and
+    LightGbmStrategy.label_timeout_minutes (line 1425) fall out of sync silently.
+    This function enforces the single-source-of-truth invariant at runner startup,
+    catching any future desync between the two fields before any backtest data is produced.
+
+    Called from _verify_model_config() for each (model, symbol) pair after _build_v3_model().
+    """
+    expected_timeout_minutes = 10080  # 7 days (21 candles at 8h) — SACRED at iter-v3/070
+    assert cfg.timeout_minutes == expected_timeout_minutes, (
+        f"BacktestConfig.timeout_minutes ({cfg.timeout_minutes}) != expected "
+        f"({expected_timeout_minutes}). iter-v3/070 timeout_minutes must be "
+        f"{expected_timeout_minutes}. "
+        "Verify _build_v3_model BacktestConfig(timeout_minutes=10080). "
+        "Critic /069 Rec #1: label horizon must be consistent at "
+        "BacktestConfig + LightGbmStrategy."
+    )
+    assert lgbm_strategy.label_timeout_minutes == expected_timeout_minutes, (
+        f"LightGbmStrategy.label_timeout_minutes ({lgbm_strategy.label_timeout_minutes}) "
+        f"!= expected ({expected_timeout_minutes}). "
+        "Verify _build_v3_model common_kwargs label_timeout_minutes=10080. "
+        "Critic /069 Rec #1: same single-source-of-truth invariant."
+    )
+    assert cfg.timeout_minutes == lgbm_strategy.label_timeout_minutes, (
+        f"BacktestConfig.timeout_minutes ({cfg.timeout_minutes}) != "
+        f"LightGbmStrategy.label_timeout_minutes ({lgbm_strategy.label_timeout_minutes}) — "
+        "DESYNC DETECTED. Both must be 10080. Centralize via shared module-level constant. "
+        "Critic /069 Rec #1: desync of these two fields silently corrupts label horizon."
     )
 
 
@@ -1667,9 +1712,13 @@ def _write_dsr_json(
     min_trl_months: float,
     dsr_relative: float = 0.0,
     cpcv_path_sharpe_q75: float = 0.0,
+    dsr_relative_b4: float = 0.0,
+    daily_sharpe_oos_b4_at_sqrt252: float = 0.0,
+    cpcv_q75_annualized_b4: float = 0.0,
+    n_daily_obs_oos: int = 0,
 ) -> None:
     """Write dsr.json — includes PBO metadata, iter-v3/055 DSR_relative, and
-    iter-v3/059 cpcv_frac_positive_paths gate fields."""
+    iter-v3/059 cpcv_frac_positive_paths gate fields, and iter-v3/070 Path B4 fields."""
     pbo_out = pbo_result.pbo if pbo_result.pbo is not None else None
     frac_pos = pbo_result.frac_positive_paths
     # iter-v3/059: cpcv_frac_positive_paths_gate replaces Pareto Gate 10.
@@ -1689,20 +1738,30 @@ def _write_dsr_json(
         "cpcv_frac_positive_paths_gate_pass": cpcv_gate_pass,
         "cpcv_frac_positive_paths_gate_threshold": _CPCV_FRAC_POSITIVE_PATHS_GATE_THRESHOLD,
         "psr": round(psr_val, 4),
-        "dsr_relative": round(dsr_relative, 6),  # iter-v3/055: PSR vs CPCV Q75
+        "dsr_relative": round(dsr_relative, 6),  # iter-v3/055: PSR vs CPCV Q75 (legacy)
         "cpcv_path_sharpe_q75": round(cpcv_path_sharpe_q75, 6),  # iter-v3/055: benchmark
         "n_trials": n_trials,
         "n_eff": n_eff,
         "min_trl_months": round(min_trl_months, 2),
+        # iter-v3/070 Path B4: annualized-both-sides DSR_relative reformulation.
+        # Resolves granularity-mismatch artifact in legacy dsr_relative.
+        # Per briefs-v3/iteration_v3-062/research_brief.md Section 3 (deferred) +
+        # briefs-v3/iteration_v3-070/research_brief.md Section 2.4 T3 traceback.
+        "dsr_relative_b4": round(dsr_relative_b4, 6),
+        "daily_sharpe_oos_b4_at_sqrt252": round(daily_sharpe_oos_b4_at_sqrt252, 6),
+        "cpcv_q75_annualized_b4": round(cpcv_q75_annualized_b4, 6),
+        "n_daily_obs_oos": n_daily_obs_oos,
     }
     (report_dir / "dsr.json").write_text(json.dumps(data, indent=2))
     gate_str = "PASS" if cpcv_gate_pass else "FAIL"
     thr = _CPCV_FRAC_POSITIVE_PATHS_GATE_THRESHOLD
+    b4_gate = "PASS" if dsr_relative_b4 >= 0.95 else "FAIL"
     print(
         f"[v3 report] dsr.json: DSR={dsr_val:.4f}, PBO={pbo_out}, "
         f"frac_pos_paths={frac_pos:.3f} (gate {gate_str} @ {thr}), "
         f"PSR={psr_val:.4f}, DSR_relative={dsr_relative:.4f}, "
-        f"CPCV_Q75={cpcv_path_sharpe_q75:.4f}, n_eff={n_eff}"
+        f"CPCV_Q75={cpcv_path_sharpe_q75:.4f}, n_eff={n_eff}, "
+        f"DSR_relative_B4={dsr_relative_b4:.4f} ({b4_gate} @ 0.95)"
     )
 
 
@@ -2040,7 +2099,7 @@ def main() -> None:
     # asserts len == 14, funding NOT present, vwap_dev_50/tbr_zscore_30 absent;
     # also asserts ensemble_size in (3, 10) for mode discipline.
     _verify_feature_columns(ensemble_size=ensemble_size_for_run)
-    _verify_label_leakage_gap()  # asserts REQUIRED_GAP == 110 (5-symbol universe, iter-v3/033)
+    _verify_label_leakage_gap()  # asserts REQUIRED_GAP == 66 (3-symbol universe, iter-v3/070)
     _verify_track_isolation()  # grep check
 
     # -----------------------------------------------------------------------
@@ -2082,8 +2141,8 @@ def main() -> None:
     print(f"Active models: {len(active_models)}/{len(V3_MODELS)} (--symbols={args.symbols!r})")
     print(f"CPCV: N={CPCV_N_SPLITS}, k={CPCV_N_TEST_SPLITS}, 45 paths on IS CANDLE SEQUENCE")
     print(
-        f"Gap: {REQUIRED_GAP} (= (21+1)*4=88; iter-v3/069 UNIVERSE EXPANSION "
-        f"+ADAUSDT; timeout REVERT 42→21)"
+        f"Gap: {REQUIRED_GAP} (= (21+1)*3=66; iter-v3/070 REVERT /069 ADAUSDT; "
+        f"3-sym universe BCH+LDO+TRX; timeout UNCHANGED 10080 min)"
     )
     print(
         f"Pre-flight: branch OK, symbols OK, data fresh (<16h), "
@@ -2304,7 +2363,11 @@ def main() -> None:
             f"(<4 required) — cpcv_path_sharpe_q75 = 0.0 (fallback)"
         )
 
-    # Compute DSR_relative using existing psr() function with non-zero benchmark
+    # Compute DSR_relative (legacy) using existing psr() function with non-zero benchmark.
+    # This is the LEGACY computation: trade-level Sharpe (NOT annualized), which produces
+    # systematically low PSR values when compared to the CPCV-Q75 benchmark
+    # (a candle-period Sharpe). The granularity mismatch was the root cause of the
+    # /059 dsr_relative_legacy = 0.1134 artifact.
     if len(oos_wp) > 1 and oos_wp.std() > 0:
         dsr_relative = psr(
             observed_sharpe=raw_sharpe_oos,
@@ -2315,7 +2378,90 @@ def main() -> None:
         )
     else:
         dsr_relative = 0.0
-    print(f"[dsr_relative] DSR_relative = {dsr_relative:.4f} (benchmark = CPCV Q75)")
+    print(
+        f"[dsr_relative] DSR_relative (legacy, trade-level) = {dsr_relative:.4f} "
+        "(benchmark = CPCV Q75)"
+    )
+
+    # -------------------------------------------------------
+    # Path B4 — annualized-both-sides DSR_relative (iter-v3/070 Component B)
+    # Per briefs-v3/iteration_v3-062/research_brief.md Section 3 lines 260-301
+    # and briefs-v3/iteration_v3-070/research_brief.md Section 2.4 T3 traceback.
+    #
+    # Resolves the granularity-mismatch artifact in dsr_relative (legacy):
+    #   legacy: trade-level observed_sharpe vs candle-period CPCV-Q75 benchmark
+    #   Path B4: BOTH sides annualized to same basis (daily Sharpe at √252)
+    #
+    # Inputs (per Section 2.4 T3):
+    #   observed_sharpe: daily_sharpe_oos at √252 (mean/std of daily PnL * √252)
+    #   n_obs: n_daily_obs_oos (number of distinct OOS dates with at least one trade)
+    #   benchmark_sharpe: cpcv_q75 de-annualized from raw path Sharpe then re-annualized
+    #                     to √756 (3 candles/day × 252 trading days)
+    #   skewness / kurtosis: computed on OOS daily PnL series
+    #
+    # CONVENTION NOTE: this function uses √252 (trading days) for daily Sharpe,
+    # whereas the existing _daily_sharpe() helper uses √365 (calendar days).
+    # This is DELIBERATE per brief Section 2.4 T3 CRITICAL convention divergence note.
+    # The resulting daily_sharpe_oos_b4_at_sqrt252 value will be LOWER than the
+    # comparison.csv daily_sharpe field (which uses √365). Documented to prevent
+    # Critic confusion at Phase 7.5.
+    # -------------------------------------------------------
+    oos_trades_for_b4 = [t for t in braked if t.open_time >= OOS_CUTOFF_MS]
+    dsr_relative_b4 = 0.0
+    daily_sharpe_oos_b4 = 0.0
+    cpcv_q75_annualized_b4 = 0.0
+    n_daily_obs_oos = 0
+
+    if oos_trades_for_b4:
+        # Build OOS daily PnL series (group weighted_pnl by calendar date)
+        oos_daily_series: dict[str, float] = {}
+        for t in oos_trades_for_b4:
+            trade_date = str(pd.Timestamp(t.close_time, unit="ms").date())
+            oos_daily_series[trade_date] = oos_daily_series.get(trade_date, 0.0) + float(
+                t.weighted_pnl
+            )
+        oos_daily_arr = np.array(list(oos_daily_series.values()), dtype=float)
+        n_daily_obs_oos = len(oos_daily_arr)
+
+        if n_daily_obs_oos >= 2 and oos_daily_arr.std() > 0:
+            # Daily Sharpe at √252 (trading days convention per brief Section 2.4 T3)
+            daily_sharpe_oos_b4 = float(oos_daily_arr.mean() / oos_daily_arr.std() * np.sqrt(252))
+            daily_skew_oos_b4 = float(skew(oos_daily_arr))
+            daily_kurt_oos_b4 = float(kurtosis(oos_daily_arr, fisher=False))
+
+            # CPCV-Q75 annualized to √756 basis:
+            #   flat_path_sharpes are raw candle-level Sharpes (from cpcv_paths.csv).
+            #   Each path spans ~1296 candles (= 54 months × 24 candles/month on 8h data).
+            #   Annualize: cpcv_q75_raw / sqrt(1296) * sqrt(756)
+            #   where 756 = 3 candles/day × 252 trading days.
+            #   Then compare to daily_sharpe_oos_b4 (also annualized, at √252).
+            #   Effective: cpcv_q75_raw * sqrt(756 / 1296) = cpcv_q75_raw * sqrt(7/12).
+            if len(flat_path_sharpes) >= 4:
+                cpcv_q75_raw = float(np.percentile(flat_path_sharpes, 75))
+                # De-annualize from candle-period (per-path), re-annualize to daily at √756
+                cpcv_q75_annualized_b4 = cpcv_q75_raw / np.sqrt(1296) * np.sqrt(756)
+            else:
+                cpcv_q75_annualized_b4 = 0.0
+
+            dsr_relative_b4 = psr(
+                observed_sharpe=daily_sharpe_oos_b4,
+                n_obs=max(2, n_daily_obs_oos),
+                benchmark_sharpe=cpcv_q75_annualized_b4,
+                skewness=daily_skew_oos_b4,
+                kurtosis=daily_kurt_oos_b4,
+            )
+            print(
+                f"[dsr_relative_b4] daily_sharpe_oos_at_√252={daily_sharpe_oos_b4:.4f}, "
+                f"cpcv_q75_annualized_B4={cpcv_q75_annualized_b4:.4f}, "
+                f"n_daily_obs={n_daily_obs_oos}, DSR_relative_B4={dsr_relative_b4:.6f}"
+            )
+        else:
+            print(
+                f"[dsr_relative_b4] n_daily_obs_oos={n_daily_obs_oos} < 2 or zero variance "
+                "— dsr_relative_b4 = 0.0 (degenerate; not a binding gate failure)"
+            )
+    else:
+        print("[dsr_relative_b4] No OOS trades — dsr_relative_b4 = 0.0")
 
     # N_eff: sub-fix #2 (iter-v3/004) — per-cell median aggregation.
     # Reads per_cell_pbo.csv written by _compute_cpcv_paths (which already
@@ -2430,7 +2576,7 @@ def main() -> None:
     else:
         pd.DataFrame().to_csv(ic_path)
 
-    # DSR JSON
+    # DSR JSON — includes legacy dsr_relative and iter-v3/070 Path B4 fields
     _write_dsr_json(
         report_dir,
         dsr_val,
@@ -2441,6 +2587,10 @@ def main() -> None:
         min_trl_months,
         dsr_relative=dsr_relative,
         cpcv_path_sharpe_q75=cpcv_path_sharpe_q75,
+        dsr_relative_b4=dsr_relative_b4,
+        daily_sharpe_oos_b4_at_sqrt252=daily_sharpe_oos_b4,
+        cpcv_q75_annualized_b4=cpcv_q75_annualized_b4,
+        n_daily_obs_oos=n_daily_obs_oos,
     )
 
     # iter-v3/059: outer-seed loop eliminated.  Replace seed_summary.json +

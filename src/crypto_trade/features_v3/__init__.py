@@ -219,15 +219,13 @@ V3_FEATURE_COLUMNS: tuple[str, ...] = V3_FEATURE_COLUMNS_TOP_N
 iter-v3/064: points to 15-feature set (14 BASELINE_V3 + adx_14).
 """
 
-DEFAULT_ATR_MULTIPLIERS: tuple[float, float] = (2.0, 1.0)
+DEFAULT_ATR_MULTIPLIERS: tuple[float, float] = (2.0, 1.5)
 """Default ATR multipliers for symbols not in V3_ATR_MULTIPLIERS_PER_SYMBOL.
 
-iter-v3/066 axis isolation: REVERTED from /065's (2.0, 1.5) back to (2.0, 1.0).
-EDA SHA `1d75cb0`; analysis/iteration_v3-066/risk_primitive_eda.py (Section 2.7 T6).
-The single varied axis at /066 is RiskV2Config.vol_scale_ceiling=0.8 (Path E0.8).
-/065's universal SL widening (2.0, 1.5) is reserved for /069 CONFIRMATION bundle
-alongside /066 ceiling=0.8 (if PROMISING). Reverts to /060 baseline labeling for
-clean single-axis attribution per `feedback_v3_engineered_features_dont_stack.md`.
+iter-v3/070 CYCLE 1 CONFIRMATION: RE-APPLY /065 universal SL widening (Component A).
+TP multiplier stays at 2.0×ATR; SL multiplier widens (1.0 → 1.5)×ATR for all 3 symbols.
+V3_ATR_MULTIPLIERS_PER_SYMBOL remains empty {} — universal change, no per-symbol overrides.
+EDA SHA `fe219c1`; briefs-v3/iteration_v3-070/research_brief.md Section 3 Sub-fix 1.
 
 History:
   iter-v3/043: REVERTED from (1.5, 0.75) back to (2.0, 1.0) — iter-v3/042 Path C
@@ -235,7 +233,9 @@ History:
   Value (2.0, 1.0) first set at iter-v3/010; validated anchor through iter-v3/041.
   iter-v3/065: (2.0, 1.0) → (2.0, 1.5) — UNIVERSAL SL widening (Path D).
   iter-v3/066: (2.0, 1.5) → (2.0, 1.0) — REVERT for axis isolation (Path E0.8).
-  Per briefs-v3/iteration_v3-066/research_brief.md Section 3 Sub-fix 2.
+  iter-v3/067-069: (2.0, 1.0) — carry-forward (non-labeling axes).
+  iter-v3/070: (2.0, 1.0) → (2.0, 1.5) — RE-APPLY /065 Component A at CONFIRMATION.
+  Per briefs-v3/iteration_v3-070/research_brief.md Section 3 Sub-fix 1.
 """
 
 V3_ATR_MULTIPLIERS_PER_SYMBOL: dict[str, tuple[float, float]] = {
