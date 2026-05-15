@@ -326,10 +326,8 @@ Per `feedback_v3_axis_selection_quant_discipline.md`, every EXPLORATION axis is 
   - **Path C (pooled M2 across symbols) rejected**: pooling dilutes the LDO-specific precision the axis targets; per `feedback_v3_per_symbol_lifts_oos_breaks_is.md`, per-symbol model structure is the v3 norm. (Note: the `MetaLabelingStrategy` already trains M2 per symbol-month — Path A *is* the per-symbol architecture.)
   - **Path D (PASSIVE-DIAGNOSTIC defer) rejected**: T3 portfolio AUC clears the 0.12 residual-signal bar. Path D would be justified only if best `|AUC-0.5|` < 0.12 (M1's features carry zero residual signal). The portfolio number clears it — narrowly, but it clears. Deferring would be over-conservative given the axis is structurally mandated and /017 was on a retired anchor under a different (single-seed, buggy-walk-forward) architecture.
 - **Honest framing**: T3 also shows the margin is thin (mean `|AUC-0.5|`=0.0577 near-zero; BCH NEAR-ZERO; LDO INSUFFICIENT). The brief pre-registers PATH C / INERT (40%) as the dominant predicted outcome and NEGATIVE (35%) as the second. This is a conservative cycle-2 #1 EXPLORATION: it executes the mandated structural axis with the existing same-feature M2, produces a clean unified-architecture data point, and — if PATH C reproduces — gives a quantitatively-grounded mandate for a future meta-labeling EXPLORATION with DIFFERENT M2 features (the /017 lesson-#4 fix). The same-feature M2 re-test must be done first to isolate the model-architecture axis from a feature-family axis (single-axis discipline).
-- **Setup commit SHA**: (backfilled at setup commit — see below).
+- **Setup commit SHA**: `7303113` (this brief + ITERATION_LABEL bump to "v3-071").
 
 ---
 
-**Brief LOCKED.** EDA SHA `4f32ec5`. Setup commit SHA: backfilled below.
-
-Setup commit SHA: `__SETUP_SHA__`
+**Brief LOCKED.** EDA SHA `4f32ec5`. Setup commit SHA `7303113`.
