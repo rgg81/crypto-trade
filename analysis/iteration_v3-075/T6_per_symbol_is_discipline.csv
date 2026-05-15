@@ -1,0 +1,4 @@
+symbol,in_derate_scope,is_wpnl_base,is_wpnl_post_derate,is_wpnl_delta,is_bearchop_entry_wpnl_base,n_is_trades,n_is_bearchop_entry,is_axis_preserves_or_lifts
+BCHUSDT,False,78.3438,78.3438,0.0,35.6641,73,27,True
+LDOUSDT,True,-1.664,0.1565,1.8205,-3.641,11,1,True
+TRXUSDT,True,-24.7891,-19.5454,5.2438,-10.4875,75,23,True
