@@ -412,22 +412,23 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
         "regime_momentum_signed_5d PRESENT; sym_vs_btc_ret_7d PRESENT)  PASS"
     )
 
-    # iter-v3/070: DEFAULT_ATR_MULTIPLIERS RE-APPLIED to (2.0, 1.5).
-    # /065 set (2.0, 1.5); /066-/069 reverted to (2.0, 1.0) for single-axis attribution.
-    # /070 CYCLE 1 CONFIRMATION: Component A = universal SL widening (2.0, 1.0) → (2.0, 1.5).
-    # V3_ATR_MULTIPLIERS_PER_SYMBOL remains empty {} — universal change, no per-symbol overrides.
-    # EDA SHA `fe219c1`; briefs-v3/iteration_v3-070/research_brief.md Section 3 Sub-fix 1.
-    if DEFAULT_ATR_MULTIPLIERS != (2.0, 1.5):
+    # iter-v3/070 CLOSEOUT: DEFAULT_ATR_MULTIPLIERS REVERTED (2.0, 1.5) → (2.0, 1.0).
+    # /065 set (2.0, 1.5); /070 CONFIRMATION bundled it as Component A and REJECTED it —
+    # the IS-collapse + OOS-soar pattern persisted at multi-seed (IS Sharpe -0.97; OOS/IS
+    # ratio 10.81 — regime exposure, not robust edge). Cycle 2 must NOT inherit a
+    # CONFIRMATION-rejected axis (per `feedback_no_cheating.md` + anti-drift discipline).
+    # /059 canonical anchor value (atr_tp=2.0, atr_sl=1.0) restored.
+    # See diary-v3/iteration_v3-070.md Section 6 (Component A REJECT) + Section 7.
+    if DEFAULT_ATR_MULTIPLIERS != (2.0, 1.0):
         raise RuntimeError(
-            f"DEFAULT_ATR_MULTIPLIERS = {DEFAULT_ATR_MULTIPLIERS} — expected (2.0, 1.5). "
-            "iter-v3/070 CYCLE 1 CONFIRMATION Component A: universal SL widening "
-            "(2.0, 1.0) → (2.0, 1.5) RE-APPLIED from /065 (bundled at /070 CONFIRMATION). "
-            "Set DEFAULT_ATR_MULTIPLIERS = (2.0, 1.5) in features_v3/__init__.py. "
-            "EDA SHA fe219c1; brief Section 3 Sub-fix 1."
+            f"DEFAULT_ATR_MULTIPLIERS = {DEFAULT_ATR_MULTIPLIERS} — expected (2.0, 1.0). "
+            "iter-v3/070 CONFIRMATION CLOSEOUT: Component A (/065 universal SL widening) "
+            "was REJECTED; (2.0, 1.5) → (2.0, 1.0) REVERTED to the /059 canonical anchor. "
+            "Set DEFAULT_ATR_MULTIPLIERS = (2.0, 1.0) in features_v3/__init__.py."
         )
     print(
-        "  DEFAULT_ATR_MULTIPLIERS = (2.0, 1.5) "
-        "(iter-v3/070 CONFIRMATION Component A: /065 SL widening RE-APPLIED universally)  PASS"
+        "  DEFAULT_ATR_MULTIPLIERS = (2.0, 1.0) "
+        "(iter-v3/070 CLOSEOUT: /065 SL widening REJECTED at CONFIRMATION; /059 anchor)  PASS"
     )
 
     # iter-v3/044: V3_FEATURES_PER_SYMBOL MUST BE EMPTY.
@@ -501,23 +502,25 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
         "regime_momentum_signed_5d, sym_vs_btc_ret_7d PRESENT)  PASS"
     )
 
-    # iter-v3/070: All 3 symbols (BCH/LDO/TRX) MUST return (2.0, 1.5) via DEFAULT fallback.
-    # /070 CONFIRMATION Component A: RE-APPLY /065 universal SL widening (2.0, 1.0) → (2.0, 1.5).
-    # V3_ATR_MULTIPLIERS_PER_SYMBOL must be EMPTY (no per-symbol overrides; carry-forward /051).
+    # iter-v3/070 CLOSEOUT: All 3 symbols (BCH/LDO/TRX) MUST return (2.0, 1.0) via DEFAULT.
+    # /070 CONFIRMATION REJECTED Component A (/065 universal SL widening); (2.0, 1.5) →
+    # (2.0, 1.0) REVERTED to the /059 canonical anchor. V3_ATR_MULTIPLIERS_PER_SYMBOL
+    # stays EMPTY (no per-symbol overrides; carry-forward /051).
     for _sym_atr in ("BCHUSDT", "LDOUSDT", "TRXUSDT"):
         sym_atr = atr_multipliers_for_symbol(_sym_atr)
-        if sym_atr != (2.0, 1.5):
+        if sym_atr != (2.0, 1.0):
             raise RuntimeError(
                 f"atr_multipliers_for_symbol('{_sym_atr}') returned {sym_atr} — "
-                "expected (2.0, 1.5) (DEFAULT fallback at iter-v3/070 CONFIRMATION). "
-                "iter-v3/070 Component A: RE-APPLY /065 universal SL widening (2.0, 1.5). "
+                "expected (2.0, 1.0) (DEFAULT fallback at iter-v3/070 CLOSEOUT). "
+                "iter-v3/070 CONFIRMATION REJECTED Component A (/065 SL widening); "
+                "(2.0, 1.5) → (2.0, 1.0) REVERTED to /059 anchor. "
                 "V3_ATR_MULTIPLIERS_PER_SYMBOL must be EMPTY; "
-                "all 3 symbols use DEFAULT_ATR_MULTIPLIERS = (2.0, 1.5). "
-                "Verify DEFAULT_ATR_MULTIPLIERS = (2.0, 1.5) in features_v3/__init__.py."
+                "all 3 symbols use DEFAULT_ATR_MULTIPLIERS = (2.0, 1.0). "
+                "Verify DEFAULT_ATR_MULTIPLIERS = (2.0, 1.0) in features_v3/__init__.py."
             )
     print(
-        "  atr_multipliers_for_symbol: BCH/LDO/TRX all (2.0, 1.5) DEFAULT "
-        "(iter-v3/070 CONFIRMATION Component A: /065 SL widening RE-APPLIED; "
+        "  atr_multipliers_for_symbol: BCH/LDO/TRX all (2.0, 1.0) DEFAULT "
+        "(iter-v3/070 CLOSEOUT: /065 SL widening REJECTED; /059 anchor; "
         "PER_SYMBOL EMPTY)  PASS"
     )
 

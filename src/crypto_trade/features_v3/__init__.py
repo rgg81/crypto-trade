@@ -202,30 +202,39 @@ V3_FEATURE_COLUMNS_TOP_N: tuple[str, ...] = (
     #   vwap_dev_50            — Critic FINAL `a544621` Rec #1 (IC 0.875 with ema_spread_atr_20)
     # -------------------------------------------------------------------------
 )
-"""15-feature set (iter-v3/064 PHASED MASS-EXPANSION #1: 14 BASELINE_V3 + adx_14).
+"""14-feature set (BASELINE_V3 /059 anchor — adx_14 removed at iter-v3/064 NEGATIVE).
 
-REVERT from iter-v3/063 46-feature set (SUSPICIOUS-OOS-DOMINANT closed) +
-phased single-feature addition of adx_14.
+iter-v3/064 phased mass-expansion #1 (+adx_14, briefly a 15-feature set) was
+NEGATIVE; the runner pre-flight asserts adx_14 ABSENT. The active set is the
+14 BASELINE_V3 features, unchanged from the /028 spec carried by /059.
 
 Per amended `feedback_v3_mass_feature_expansion.md` (2026-05-14) the CYCLE-5
 mass-expansion mandate proceeds via phased single-feature axes at single-seed
-EXPLORATION. /064 is phased-mass-expansion #1.
+EXPLORATION. /064 was phased-mass-expansion #1 (NEGATIVE — adx_14 dropped).
+
+Docstring corrected at iter-v3/070 closeout per Critic FINAL `2991781` Rec #1
+(stale "15-feature" wording was documentation rot).
 """
 
-# iter-v3/064: V3_FEATURE_COLUMNS = V3_FEATURE_COLUMNS_TOP_N (15-feature phased #1).
+# iter-v3/064 closeout: V3_FEATURE_COLUMNS = V3_FEATURE_COLUMNS_TOP_N (14-feature set).
 V3_FEATURE_COLUMNS: tuple[str, ...] = V3_FEATURE_COLUMNS_TOP_N
 """Alias for V3_FEATURE_COLUMNS_TOP_N — the active feature set for all v3 models.
 
-iter-v3/064: points to 15-feature set (14 BASELINE_V3 + adx_14).
+Points to the 14 BASELINE_V3 features (adx_14 removed at iter-v3/064 NEGATIVE).
 """
 
-DEFAULT_ATR_MULTIPLIERS: tuple[float, float] = (2.0, 1.5)
+DEFAULT_ATR_MULTIPLIERS: tuple[float, float] = (2.0, 1.0)
 """Default ATR multipliers for symbols not in V3_ATR_MULTIPLIERS_PER_SYMBOL.
 
-iter-v3/070 CYCLE 1 CONFIRMATION: RE-APPLY /065 universal SL widening (Component A).
-TP multiplier stays at 2.0×ATR; SL multiplier widens (1.0 → 1.5)×ATR for all 3 symbols.
-V3_ATR_MULTIPLIERS_PER_SYMBOL remains empty {} — universal change, no per-symbol overrides.
-EDA SHA `fe219c1`; briefs-v3/iteration_v3-070/research_brief.md Section 3 Sub-fix 1.
+iter-v3/070 CYCLE 1 CONFIRMATION CLOSEOUT: REVERTED (2.0, 1.5) → (2.0, 1.0).
+Component A (/065 universal SL widening) was REJECTED at the /070 CONFIRMATION —
+the IS-collapse + OOS-soar pattern persisted and amplified at multi-seed (IS Sharpe
+collapsed -0.97; OOS/IS ratio 10.81 — regime exposure, not robust edge). Leaving
+(2.0, 1.5) would mean cycle 2 silently inherits a CONFIRMATION-rejected axis, which
+violates `feedback_no_cheating.md` and the anti-drift discipline. The canonical /059
+baseline (BASELINE_V3.md) documents (atr_tp=2.0, atr_sl=1.0); the code now matches.
+V3_ATR_MULTIPLIERS_PER_SYMBOL stays empty {} — universal value, no per-symbol overrides.
+See diary-v3/iteration_v3-070.md Section 6 (Component A REJECT) + Section 7.
 
 History:
   iter-v3/043: REVERTED from (1.5, 0.75) back to (2.0, 1.0) — iter-v3/042 Path C
@@ -234,8 +243,9 @@ History:
   iter-v3/065: (2.0, 1.0) → (2.0, 1.5) — UNIVERSAL SL widening (Path D).
   iter-v3/066: (2.0, 1.5) → (2.0, 1.0) — REVERT for axis isolation (Path E0.8).
   iter-v3/067-069: (2.0, 1.0) — carry-forward (non-labeling axes).
-  iter-v3/070: (2.0, 1.0) → (2.0, 1.5) — RE-APPLY /065 Component A at CONFIRMATION.
-  Per briefs-v3/iteration_v3-070/research_brief.md Section 3 Sub-fix 1.
+  iter-v3/070: (2.0, 1.0) → (2.0, 1.5) — RE-APPLIED /065 Component A at CONFIRMATION.
+  iter-v3/070 CLOSEOUT: (2.0, 1.5) → (2.0, 1.0) — Component A REJECTED; SL widening
+  is regime exposure not edge. /059 canonical anchor value restored.
 """
 
 V3_ATR_MULTIPLIERS_PER_SYMBOL: dict[str, tuple[float, float]] = {

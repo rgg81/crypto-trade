@@ -38,7 +38,7 @@ Mandatory test cases (iter-v3/064 state):
 12. test_trxusdt_not_in_per_symbol   — TRX absent from V3_FEATURES_PER_SYMBOL
 13. test_v3_features_per_symbol_is_empty — empty dict
 14. test_v3_atr_multipliers_per_symbol_is_empty — EMPTY (REVERT from /047-/050 state)
-15. test_all_symbols_atr_default_iter_v3_064     — all 3 syms return (2.0, 1.0)
+15. test_all_symbols_atr_default_iter_v3_070     — all 3 syms return (2.0, 1.0) post-revert
 16. test_regime_momentum_in_universal_list       — mandate ACTIVE
 17. test_sym_vs_btc_ret_7d_in_universal_list     — RESTORED iter-v3/042; KEPT
 18. test_ret_skew_50_in_universal_list           — RESTORED iter-v3/058; KEPT
@@ -287,27 +287,29 @@ def test_v3_atr_multipliers_per_symbol_is_empty() -> None:
 
 
 def test_all_symbols_atr_default_iter_v3_070() -> None:
-    """All 3 active symbols (BCH/LDO/TRX) must return (2.0, 1.5) via DEFAULT at iter-v3/070.
+    """All 3 active symbols (BCH/LDO/TRX) must return (2.0, 1.0) via DEFAULT at iter-v3/070.
 
-    iter-v3/070 CYCLE 1 CONFIRMATION Component A: RE-APPLY /065's (2.0, 1.5) universally.
-    EDA SHA `fe219c1`; briefs-v3/iteration_v3-070/research_brief.md Section 3 Sub-fix 1.
-    V3_ATR_MULTIPLIERS_PER_SYMBOL is empty; all 3 symbols fall back to DEFAULT = (2.0, 1.5).
+    iter-v3/070 CYCLE 1 CONFIRMATION CLOSEOUT: Component A (/065 universal SL widening
+    (2.0, 1.5)) was REJECTED — the IS-collapse + OOS-soar pattern persisted at multi-seed
+    (IS Sharpe -0.97; OOS/IS ratio 10.81). (2.0, 1.5) → (2.0, 1.0) REVERTED to the /059
+    canonical anchor. See diary-v3/iteration_v3-070.md Section 6 + Section 7.
+    V3_ATR_MULTIPLIERS_PER_SYMBOL is empty; all 3 symbols fall back to DEFAULT = (2.0, 1.0).
     """
-    assert DEFAULT_ATR_MULTIPLIERS == (2.0, 1.5), (
-        f"DEFAULT_ATR_MULTIPLIERS = {DEFAULT_ATR_MULTIPLIERS} — expected (2.0, 1.5). "
-        "iter-v3/070 CONFIRMATION Component A: RE-APPLY /065 SL widening (2.0, 1.5). "
-        "Verify DEFAULT_ATR_MULTIPLIERS = (2.0, 1.5) in features_v3/__init__.py."
+    assert DEFAULT_ATR_MULTIPLIERS == (2.0, 1.0), (
+        f"DEFAULT_ATR_MULTIPLIERS = {DEFAULT_ATR_MULTIPLIERS} — expected (2.0, 1.0). "
+        "iter-v3/070 CLOSEOUT: Component A (/065 SL widening) REJECTED; reverted to /059 anchor. "
+        "Verify DEFAULT_ATR_MULTIPLIERS = (2.0, 1.0) in features_v3/__init__.py."
     )
     for sym in ("BCHUSDT", "LDOUSDT", "TRXUSDT"):
         result = atr_multipliers_for_symbol(sym)
-        assert result == (2.0, 1.5), (
-            f"atr_multipliers_for_symbol('{sym}') returned {result} — expected (2.0, 1.5). "
-            "iter-v3/070 CONFIRMATION Component A: V3_ATR_MULTIPLIERS_PER_SYMBOL is empty; "
-            "all symbols use DEFAULT_ATR_MULTIPLIERS = (2.0, 1.5) via fallback."
+        assert result == (2.0, 1.0), (
+            f"atr_multipliers_for_symbol('{sym}') returned {result} — expected (2.0, 1.0). "
+            "iter-v3/070 CLOSEOUT: V3_ATR_MULTIPLIERS_PER_SYMBOL is empty; "
+            "all symbols use DEFAULT_ATR_MULTIPLIERS = (2.0, 1.0) via fallback."
         )
     algo_atr = atr_multipliers_for_symbol("ALGOUSDT")
-    assert algo_atr == (2.0, 1.5), (
-        f"atr_multipliers_for_symbol('ALGOUSDT') returned {algo_atr} — expected (2.0, 1.5). "
+    assert algo_atr == (2.0, 1.0), (
+        f"atr_multipliers_for_symbol('ALGOUSDT') returned {algo_atr} — expected (2.0, 1.0). "
         "iter-v3/070: V3_ATR_MULTIPLIERS_PER_SYMBOL is empty; ALGO uses DEFAULT fallback."
     )
 
