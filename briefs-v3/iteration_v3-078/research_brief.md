@@ -386,6 +386,6 @@ The EDA computes **no** per-candidate OOS counterfactual. The only OOS-window qu
 ### 10.3 — Setup commit SHA
 
 - EDA commit SHA: `e48ebad` (`analysis/iteration_v3-078/` — committed before the brief)
-- Brief commit SHA: `<BRIEF_SHA>` (this file)
-- Setup commit SHA: `<SETUP_SHA>` (`run_baseline_v3.py` — `V3_MODELS` `LDOUSDT`→`ADAUSDT`, `ITERATION_LABEL` `"v3-078"`, pre-flight assertions + affected test files)
+- Brief commit SHA: `7be5323` (this file)
+- Setup commit SHA: `0648504` (`run_baseline_v3.py` — `V3_MODELS` `LDOUSDT`→`ADAUSDT`, `ITERATION_LABEL` `"v3-078"`, pre-flight assertions + 5 affected test files)
 - Phase 5.5 gate SHA: `<GATE_SHA>`
