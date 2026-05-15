@@ -140,6 +140,7 @@ def label_trades(
     verbose: int = 0,
     verbose_samples: int = 20,
     neutral_threshold_pct: float | None = None,
+    label_mode: str = "triple_barrier",
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """Label each candidate candle as 1 (long), -1 (short), or 0 (neutral).
 
@@ -161,6 +162,15 @@ def label_trades(
                     become ATR multipliers instead of percentages).
         verbose: If > 0, print detailed labeling info for a random subset.
         verbose_samples: Number of random samples to print (default 20).
+        label_mode: Labeling rule to use. Default ``"triple_barrier"``
+                    preserves byte-identical behaviour for v1/v2 and any
+                    caller that does not pass the parameter. ``"fixed_horizon"``
+                    replaces the TP/SL barrier-first-hit rule with the sign
+                    of the realized N-candle-forward return (where N is
+                    determined by timeout_minutes / candle_interval). Barriers
+                    are NOT scanned; the full scan runs to the timeout candle.
+                    ``long_pnl`` and ``short_pnl`` are the realized forward
+                    return net of fee_pct; ``weight = abs(labeled_pnl)``.
 
     Returns:
         Tuple of (labels, weights, long_pnls, short_pnls):
@@ -237,6 +247,8 @@ def label_trades(
         n_candles_scanned = 0
         last_close = entry
 
+        use_fixed_horizon = label_mode == "fixed_horizon"
+
         for j_pos in range(pos + 1, len(sym_idx)):
             j = sym_idx[j_pos]
             n_candles_scanned += 1
@@ -253,24 +265,26 @@ def label_trades(
             lo = low_arr[j]
             last_close = close_arr[j]
 
-            if long_result == 0:
-                if lo <= long_sl_price:
-                    long_result = -1
-                    long_step = j_pos
-                elif h >= long_tp_price:
-                    long_result = 1
-                    long_step = j_pos
+            if not use_fixed_horizon:
+                # triple_barrier: detect TP/SL hits and short-circuit
+                if long_result == 0:
+                    if lo <= long_sl_price:
+                        long_result = -1
+                        long_step = j_pos
+                    elif h >= long_tp_price:
+                        long_result = 1
+                        long_step = j_pos
 
-            if short_result == 0:
-                if h >= short_sl_price:
-                    short_result = -1
-                    short_step = j_pos
-                elif lo <= short_tp_price:
-                    short_result = 1
-                    short_step = j_pos
+                if short_result == 0:
+                    if h >= short_sl_price:
+                        short_result = -1
+                        short_step = j_pos
+                    elif lo <= short_tp_price:
+                        short_result = 1
+                        short_step = j_pos
 
-            if long_result != 0 and short_result != 0:
-                break
+                if long_result != 0 and short_result != 0:
+                    break
         else:
             if long_result == 0:
                 long_result = -2
@@ -279,47 +293,61 @@ def label_trades(
                 short_result = -2
                 short_step = len(sym_idx)
 
-        # Compute actual forward return for timeout cases
+        # Compute actual forward return for timeout cases (and fixed_horizon)
         fwd_return_pct = ((last_close - entry) / entry * 100.0) if entry != 0 else 0.0
 
-        # Actual PnL per direction (net of fees)
-        if use_atr:
-            tp_pnl_pct = tp_dist / entry * 100.0 if entry != 0 else 0.0
-            sl_pnl_pct = sl_dist / entry * 100.0 if entry != 0 else 0.0
+        if use_fixed_horizon:
+            # fixed_horizon: ignore barriers entirely; PnL = realized N-candle return
+            long_pnl = fwd_return_pct - fee_pct
+            short_pnl = -fwd_return_pct - fee_pct
+            if neutral_threshold_pct is not None and abs(fwd_return_pct) < neutral_threshold_pct:
+                labels[ci] = 0
+                reason = f"fh_neutral→fwd_return={fwd_return_pct:+.4f}"
+            else:
+                labels[ci] = 1 if fwd_return_pct >= 0 else -1
+                reason = f"fh_fwd_return={fwd_return_pct:+.4f}"
         else:
-            tp_pnl_pct = tp_pct
-            sl_pnl_pct = sl_pct
-        long_pnl = _trade_pnl(long_result, tp_pnl_pct, sl_pnl_pct, fwd_return_pct) - fee_pct
-        short_pnl = _trade_pnl(short_result, tp_pnl_pct, sl_pnl_pct, -fwd_return_pct) - fee_pct
+            # Actual PnL per direction (net of fees) — triple_barrier path
+            if use_atr:
+                tp_pnl_pct = tp_dist / entry * 100.0 if entry != 0 else 0.0
+                sl_pnl_pct = sl_dist / entry * 100.0 if entry != 0 else 0.0
+            else:
+                tp_pnl_pct = tp_pct
+                sl_pnl_pct = sl_pct
+            long_pnl = _trade_pnl(long_result, tp_pnl_pct, sl_pnl_pct, fwd_return_pct) - fee_pct
+            short_pnl = _trade_pnl(short_result, tp_pnl_pct, sl_pnl_pct, -fwd_return_pct) - fee_pct
+
+            # Label logic — triple_barrier
+            long_tp_hit = long_result == 1
+            short_tp_hit = short_result == 1
+
+            if long_tp_hit and not short_tp_hit:
+                labels[ci] = 1
+                reason = "long_tp_only"
+            elif short_tp_hit and not long_tp_hit:
+                labels[ci] = -1
+                reason = "short_tp_only"
+            elif long_tp_hit and short_tp_hit:
+                if long_step <= short_step:
+                    labels[ci] = 1
+                    reason = "both_tp→long_first"
+                else:
+                    labels[ci] = -1
+                    reason = "both_tp→short_first"
+            else:
+                # No TP hit in either direction — use forward return sign
+                if (
+                    neutral_threshold_pct is not None
+                    and abs(fwd_return_pct) < neutral_threshold_pct
+                ):
+                    labels[ci] = 0
+                    reason = f"neutral→fwd_return={fwd_return_pct:+.4f}"
+                else:
+                    labels[ci] = 1 if fwd_return_pct >= 0 else -1
+                    reason = f"no_tp→fwd_return={fwd_return_pct:+.4f}"
 
         long_pnls[ci] = long_pnl
         short_pnls[ci] = short_pnl
-
-        # Label logic (unchanged)
-        long_tp_hit = long_result == 1
-        short_tp_hit = short_result == 1
-
-        if long_tp_hit and not short_tp_hit:
-            labels[ci] = 1
-            reason = "long_tp_only"
-        elif short_tp_hit and not long_tp_hit:
-            labels[ci] = -1
-            reason = "short_tp_only"
-        elif long_tp_hit and short_tp_hit:
-            if long_step <= short_step:
-                labels[ci] = 1
-                reason = "both_tp→long_first"
-            else:
-                labels[ci] = -1
-                reason = "both_tp→short_first"
-        else:
-            # No TP hit in either direction — use forward return sign
-            if neutral_threshold_pct is not None and abs(fwd_return_pct) < neutral_threshold_pct:
-                labels[ci] = 0
-                reason = f"neutral→fwd_return={fwd_return_pct:+.4f}"
-            else:
-                labels[ci] = 1 if fwd_return_pct >= 0 else -1
-                reason = f"no_tp→fwd_return={fwd_return_pct:+.4f}"
 
         # Weight = |net PnL of the labeled direction| (fee-aware)
         labeled_pnl = long_pnl if labels[ci] == 1 else short_pnl
@@ -330,14 +358,22 @@ def label_trades(
                 int(open_time_arr[idx]) / 1000, tz=datetime.UTC
             ).strftime("%Y-%m-%d %H:%M")
             dir_label = {1: "LONG", -1: "SHORT", 0: "NEUTRAL"}.get(labels[ci], "?")
-            long_r = _RESULT_NAMES[long_result]
-            short_r = _RESULT_NAMES[short_result]
-            print(
-                f"  [label] {ts} {sym} entry={entry:.4f} → {dir_label} | "
-                f"long={long_r}({long_pnl:+.2f}%) "
-                f"short={short_r}({short_pnl:+.2f}%) | "
-                f"scanned={n_candles_scanned} | {reason}"
-            )
+            if use_fixed_horizon:
+                print(
+                    f"  [label] {ts} {sym} entry={entry:.4f} → {dir_label} | "
+                    f"fwd_return={fwd_return_pct:+.2f}% "
+                    f"long_pnl={long_pnl:+.2f}% short_pnl={short_pnl:+.2f}% | "
+                    f"scanned={n_candles_scanned} | {reason}"
+                )
+            else:
+                long_r = _RESULT_NAMES[long_result]
+                short_r = _RESULT_NAMES[short_result]
+                print(
+                    f"  [label] {ts} {sym} entry={entry:.4f} → {dir_label} | "
+                    f"long={long_r}({long_pnl:+.2f}%) "
+                    f"short={short_r}({short_pnl:+.2f}%) | "
+                    f"scanned={n_candles_scanned} | {reason}"
+                )
 
     # Normalize weights: shift to [1, max_weight] range
     if len(weights) > 0 and weights.max() > 0:

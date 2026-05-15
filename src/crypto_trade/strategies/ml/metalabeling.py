@@ -215,6 +215,7 @@ class MetaLabelingStrategy:
         ood_cutoff_pct: float = 0.70,
         oof_persist_path: Path | None = None,
         fast_mode: bool = False,
+        label_mode: str = "triple_barrier",
     ) -> None:
         if not feature_columns:
             raise ValueError(
@@ -253,6 +254,7 @@ class MetaLabelingStrategy:
             ood_cutoff_pct=ood_cutoff_pct,
             oof_persist_path=oof_persist_path,
             fast_mode=fast_mode,
+            label_mode=label_mode,
         )
 
         # M1 training-window derived params (read after M1 trains)

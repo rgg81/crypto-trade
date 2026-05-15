@@ -142,6 +142,7 @@ class LightGbmStrategy:
         oof_persist_path: Path | None = None,
         fast_mode: bool = False,
         inference_threshold_floor: float = 0.0,
+        label_mode: str = "triple_barrier",
     ) -> None:
         if not feature_columns:
             raise ValueError(
@@ -182,6 +183,9 @@ class LightGbmStrategy:
         self._oof_persist_path: Path | None = oof_persist_path
         # iter-v3/007: fast exploration mode (colsample fixed at 1.0 in optimization.py)
         self._fast_mode: bool = fast_mode
+        # iter-v3/072: labeling mode — "triple_barrier" (default, backward-compat)
+        # or "fixed_horizon" (sign of N-candle-forward return; no barriers).
+        self.label_mode: str = label_mode
         # iter-v3/067 Path D: universal inference-time confidence-threshold floor.
         # Default 0.0 = no floor (backward-compatible). Pass 0.60 to raise the bar
         # for marginal-confidence trades (brief Section 3 Sub-fix 2).
@@ -362,6 +366,7 @@ class LightGbmStrategy:
             atr_values=label_atr,
             verbose=self.verbose,
             neutral_threshold_pct=self.neutral_threshold_pct,
+            label_mode=self.label_mode,
         )
 
         ternary = self.neutral_threshold_pct is not None

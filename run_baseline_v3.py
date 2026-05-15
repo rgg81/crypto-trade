@@ -125,7 +125,7 @@ def _derive_ensemble_seeds(outer_seed: int, size: int = 5) -> list[int]:
     return [int(s) for s in rng.integers(low=0, high=2**31 - 1, size=size)]
 
 
-ITERATION_LABEL = "v3-071"
+ITERATION_LABEL = "v3-072"
 REPORTS_DIR = Path("reports-v3")
 FEATURES_DIR = Path("data/features_v3")
 DATA_DIR = Path("data")
@@ -743,6 +743,26 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
             f"iter-v3/069 REVERTS /068's Path C — pass label_timeout_minutes=10080 "
             f"in _build_v3_model common_kwargs (brief Section 3 spec item #3)."
         )
+    # iter-v3/072: label_mode must be "fixed_horizon" on all v3 models.
+    # Default is "triple_barrier" (backward-compat); v3/072 sets "fixed_horizon".
+    if not hasattr(_p13_lgbm, "label_mode"):
+        raise RuntimeError(
+            "LightGbmStrategy for BCHUSDT has no label_mode attribute. "
+            "iter-v3/072: LightGbmStrategy must expose label_mode. "
+            "Check lgbm.py __init__ and _build_v3_model call."
+        )
+    expected_label_mode = "fixed_horizon"
+    if _p13_lgbm.label_mode != expected_label_mode:
+        raise RuntimeError(
+            f"LightGbmStrategy.label_mode = '{_p13_lgbm.label_mode}' — "
+            f"expected '{expected_label_mode}'. "
+            "iter-v3/072: pass label_mode='fixed_horizon' in _build_v3_model "
+            "common_kwargs (brief Section 3.1 item #4)."
+        )
+    print(
+        f"  label_mode (iter-v3/072): '{_p13_lgbm.label_mode}' "
+        f"(fixed-horizon return-sign label; no TP/SL barriers at training time)  PASS"
+    )
     print(
         "  inference_threshold_floor REVERTED to default 0.0 "
         "(iter-v3/068 reverts /067 INERT axis; unchanged at /069)  PASS"
@@ -1483,6 +1503,7 @@ def _build_v3_model(
         feature_columns=list(features_for_symbol(symbol)),
         ood_enabled=False,  # OOD via RiskV3Wrapper z-score gate
         fast_mode=fast_mode,  # iter-v3/007 — colsample_bytree=1.0 when True
+        label_mode="fixed_horizon",  # iter-v3/072: fixed-horizon return-sign label
     )
     if model_type == "metalabeling":
         # iter-v3/017: MetaLabelingStrategy wraps M1 (LightGbmStrategy) with
