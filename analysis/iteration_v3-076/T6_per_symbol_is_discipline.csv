@@ -1,0 +1,4 @@
+symbol,n_is_bearchop_trades,discrimination_auc,carries_signal
+BCHUSDT,44,0.6973,True
+LDOUSDT,0,,n/a (no IS bear/chop trades)
+TRXUSDT,33,0.5549,True

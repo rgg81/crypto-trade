@@ -1,0 +1,15 @@
+baseline_feature,ic_pooled_mean,abs_ic
+sym_vs_btc_ret_7d,0.2061,0.2061
+ema_spread_atr_20,0.1347,0.1544
+range_realized_vol_50,0.1538,0.1538
+regime_momentum_signed_5d,0.1426,0.1426
+vwap_dev_20,0.1419,0.1419
+ret_kurt_200,0.1209,0.1279
+ret_skew_200,0.0973,0.0973
+max_dd_window_50,-0.0544,0.0963
+ret_kurt_50,0.0882,0.0882
+ret_skew_50,0.0321,0.0872
+ret_autocorr_lag1_50,0.0803,0.0803
+hurst_100,0.0703,0.0738
+btc_ret_14d,-0.0232,0.0575
+hurst_diff_100_50,-0.0264,0.0452
