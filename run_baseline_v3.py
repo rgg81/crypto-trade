@@ -125,7 +125,7 @@ def _derive_ensemble_seeds(outer_seed: int, size: int = 5) -> list[int]:
     return [int(s) for s in rng.integers(low=0, high=2**31 - 1, size=size)]
 
 
-ITERATION_LABEL = "v3-077"
+ITERATION_LABEL = "v3-078"
 REPORTS_DIR = Path("reports-v3")
 FEATURES_DIR = Path("data/features_v3")
 DATA_DIR = Path("data")
@@ -138,9 +138,22 @@ DATA_DIR = Path("data")
 # iter-v3/070: REVERT /069 universe expansion — ADAUSDT removed (INERT at EXPLORATION);
 # cycle 1 CONFIRMATION runs on 3-symbol universe (BCH+LDO+TRX).
 # REQUIRED_GAP reverts 88 → 66 = (21+1)×3 (n_symbols 4→3).
+# iter-v3/078 (cycle-2 EXPLORATION #8): UNIVERSE REVISION axis — REPLACE LDOUSDT
+# with ADAUSDT (3 symbols stays 3 — a REPLACEMENT, not an EXPANSION). LDO is the
+# binding cycle-long structural drag (/060 IS net_pnl -11.44%, 27.3% WR, 11 IS
+# trades; LDO OOS wpnl -19.72). It is the one in-universe symbol whose drag is NOT
+# regime-split-correlated (weak in BOTH the IS and OOS windows — EDA T6), so a swap
+# does NOT trip the /075 IS-up/OOS-down tension. ADAUSDT is the IS-edge-screen
+# argmax (EDA T7: ADA IS-Sharpe +0.617 vs LDO -0.550 — IS-only walk-forward; clears
+# LDO by +1.17). ADAUSDT is NOT in V3_EXCLUDED_SYMBOLS. The 14-feature anchor stack,
+# the ATR labeling, and the 7-primitive risk-gate stack are ALL unchanged.
+# This is DISTINCT from the closed /069 ADA-EXPANSION axis (/069 added ADA on top of
+# LDO — 4 symbols — keeping the LDO drag; the /069 EDA picked ADA by feature-space
+# distance, a correlation criterion). REQUIRED_GAP stays 66 = (21+1)×3 (3 symbols).
+# QR EDA SHA <eda_sha>; see briefs-v3/iteration_v3-078/research_brief.md Section 3.
 V3_MODELS: tuple[tuple[str, str], ...] = (
     ("A (BCHUSDT)", "BCHUSDT"),
-    ("C (LDOUSDT)", "LDOUSDT"),
+    ("C (ADAUSDT)", "ADAUSDT"),
     ("D (TRXUSDT)", "TRXUSDT"),
 )
 
@@ -282,11 +295,13 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
       ALGOUSDT MUST NOT be a key (REVERTED at iter-v3/051; unchanged at /052-/059).
       LDOUSDT  MUST NOT be a key (REVERTED at iter-v3/051; unchanged at /052-/059).
     features_for_symbol("BCHUSDT") MUST return 14 features = V3_FEATURE_COLUMNS_TOP_N.
-    features_for_symbol("LDOUSDT") MUST return 14 features (fallback — no per-symbol ext).
+    features_for_symbol("ADAUSDT") MUST return 14 features (fallback — no per-symbol ext).
     features_for_symbol("TRXUSDT") MUST return 14 features (fallback).
     atr_multipliers_for_symbol("BCHUSDT") MUST return (2.0, 1.0) (DEFAULT fallback).
-    atr_multipliers_for_symbol("LDOUSDT") MUST return (2.0, 1.0) (DEFAULT fallback — REVERT).
+    atr_multipliers_for_symbol("ADAUSDT") MUST return (2.0, 1.0) (DEFAULT fallback).
     atr_multipliers_for_symbol("TRXUSDT") MUST return (2.0, 1.0) (DEFAULT fallback).
+    iter-v3/078 UNIVERSE REVISION: V3_MODELS universe is BCH/ADA/TRX (LDOUSDT
+      replaced by ADAUSDT — a single-axis replacement; 3 symbols stays 3).
     DEFAULT_ATR_MULTIPLIERS MUST be (2.0, 1.0) (correct since iter-v3/043 revert).
     Primitive 10 (REVERT): risk_cfg.block_long_for == () (empty — system-level REVERT).
     Primitive 11 (DISABLED): risk_cfg.enable_per_symbol_drawdown_brake == False (/028 baseline).
@@ -486,9 +501,10 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
         "per-symbol asymmetry; all symbols DEFAULT (2.0, 1.0))  PASS"
     )
 
-    # iter-v3/077: 14-feature universal set (V3_FEATURES_PER_SYMBOL empty — all 3
+    # iter-v3/078: 14-feature universal set (V3_FEATURES_PER_SYMBOL empty — all 3
     # symbols fall back to V3_FEATURE_COLUMNS_TOP_N, the BASELINE_V3 /059/060 anchor).
-    for sym in ("BCHUSDT", "LDOUSDT", "TRXUSDT"):
+    # Universe: BCH/ADA/TRX (iter-v3/078 UNIVERSE REVISION — LDOUSDT replaced by ADAUSDT).
+    for sym in ("BCHUSDT", "ADAUSDT", "TRXUSDT"):
         sym_feats = features_for_symbol(sym)
         if len(sym_feats) != 14:
             raise RuntimeError(
@@ -529,8 +545,8 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
                 f"Check features_for_symbol('{sym}') path."
             )
     print(
-        "  BCH/LDO/TRX: 14-feature universal fallback "
-        "(iter-v3/077: the BASELINE_V3 /059/060 14-feature anchor stack; "
+        "  BCH/ADA/TRX: 14-feature universal fallback "
+        "(iter-v3/078: the BASELINE_V3 /059/060 14-feature anchor stack; "
         "all 9 /063-NEW features ABSENT; "
         "vol_adj_autocorr ABSENT; efficiency_ratio_50 ABSENT; "
         "range_efficiency_50 ABSENT (/076 reverted); "
@@ -538,14 +554,15 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
     )
 
     # iter-v3/074: V3_ATR_MULTIPLIERS_PER_SYMBOL reverted to {} (the /073 per-symbol
-    # axis was SUSPICIOUS-OOS-DOMINANT). ALL symbols (BCH/LDO/TRX) fall back to
+    # axis was SUSPICIOUS-OOS-DOMINANT). ALL symbols fall back to
     # DEFAULT_ATR_MULTIPLIERS = (2.0, 1.0) — the canonical /059 baseline labeling.
+    # iter-v3/078: universe is BCH/ADA/TRX (LDOUSDT replaced by ADAUSDT).
     _expected_atr_lookup = {
         "BCHUSDT": (2.0, 1.0),
-        "LDOUSDT": (2.0, 1.0),
+        "ADAUSDT": (2.0, 1.0),
         "TRXUSDT": (2.0, 1.0),
     }
-    for _sym_atr in ("BCHUSDT", "LDOUSDT", "TRXUSDT"):
+    for _sym_atr in ("BCHUSDT", "ADAUSDT", "TRXUSDT"):
         sym_atr = tuple(atr_multipliers_for_symbol(_sym_atr))
         if sym_atr != _expected_atr_lookup[_sym_atr]:
             raise RuntimeError(
@@ -556,7 +573,7 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
                 "in features_v3/__init__.py."
             )
     print(
-        "  atr_multipliers_for_symbol: BCH/LDO/TRX all (2.0, 1.0) DEFAULT "
+        "  atr_multipliers_for_symbol: BCH/ADA/TRX all (2.0, 1.0) DEFAULT "
         "(iter-v3/074 REVERT of /073 per-symbol asymmetry)  PASS"
     )
 
@@ -757,9 +774,12 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
         "(CLOSED-mechanism per iter-v3/054 closeout)  PASS"
     )
 
-    # iter-v3/061: per-symbol vol_scale_floor — TRX-only 0.5; BCH/LDO/ALGO at global 0.3.
+    # iter-v3/061: per-symbol vol_scale_floor — TRX-only 0.5; BCH/ADA at global 0.3.
     # Calibrated by QR EDA SHA d198b25 + Critic /060 Rec #3.
-    # Asserts the vol_scale_floor_per_symbol dict is wired correctly.
+    # Asserts the vol_scale_floor_per_symbol dict is wired correctly. iter-v3/078:
+    # LDOUSDT replaced by ADAUSDT; LDO was never a key in the floor dict, so the
+    # universe swap leaves {"TRXUSDT": 0.5} unchanged — ADA, like LDO before it,
+    # uses the global 0.3 floor.
     _p12_cfg_check, p12_strat_check = _build_v3_model(
         symbol="TRXUSDT", seed=42, n_trials=1, ensemble_seeds=[42]
     )
@@ -774,13 +794,13 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
         raise ValueError(
             f"RiskV2Config.vol_scale_floor_per_symbol = "
             f"{p12_strat_check.config.vol_scale_floor_per_symbol} — expected "
-            f"{expected_floor_dict}. iter-v3/061: TRX-only floor=0.5; BCH/LDO unchanged. "
+            f"{expected_floor_dict}. iter-v3/061: TRX-only floor=0.5; BCH/ADA unchanged. "
             "Set vol_scale_floor_per_symbol={'TRXUSDT': 0.5} in RiskV2Config init in "
             "_build_v3_model."
         )
     print(
         "  Per-symbol vol_scale_floor (iter-v3/061): {'TRXUSDT': 0.5} "
-        "(TRX floor raised 0.3→0.5; BCH/LDO unchanged at global 0.3)  PASS"
+        "(TRX floor raised 0.3→0.5; BCH/ADA unchanged at global 0.3)  PASS"
     )
 
     # iter-v3/068: REVERT inference_threshold_floor to default 0.0 (/067 INERT-AT-EXPLORATION).

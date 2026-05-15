@@ -23,7 +23,7 @@ State (iter-v3/064 PHASED MASS-EXPANSION #1):
 - regime_momentum_signed_3d ABSENT (PARKED; retained as dead code).
 - regime_momentum_signed_5d PRESENT (mandate per feedback_v3_engineered_features_proven.md).
 - adx_14 PRESENT (PHASED MASS-EXPANSION #1 addition).
-- V3_MODELS = (BCHUSDT, LDOUSDT, TRXUSDT) — 3 symbols (UNCHANGED).
+- V3_MODELS = (BCHUSDT, ADAUSDT, TRXUSDT) — 3 symbols (iter-v3/078 UNIVERSE REVISION).
 - REQUIRED_GAP = 66 = (21+1)*3 (UNCHANGED).
 
 EDA evidence (analysis/iteration_v3-053/ SHA `1fc6d55`):
@@ -51,7 +51,7 @@ _IS_START_MS = 1_679_616_000_000  # 2023-03-24 00:00 UTC
 _OOS_CUTOFF_MS = 1_742_774_400_000  # 2025-03-24 00:00 UTC (IMMUTABLE)
 
 _PARQUET_DIR = "data/features_v3"
-_V3_MODELS_ITER_053 = ("BCHUSDT", "LDOUSDT", "TRXUSDT")
+_V3_MODELS_ITER_053 = ("BCHUSDT", "ADAUSDT", "TRXUSDT")  # iter-v3/078 UNIVERSE REVISION
 
 
 # ---------------------------------------------------------------------------
@@ -277,7 +277,7 @@ def test_hurst_drift_50_200_past_only_no_lookahead() -> None:
 
 
 def test_v3_models_is_3_symbol_at_iter_v3_053() -> None:
-    """V3 universe must be (BCHUSDT, LDOUSDT, TRXUSDT) at iter-v3/064.
+    """V3 universe must be (BCHUSDT, ADAUSDT, TRXUSDT) at iter-v3/078.
 
     Confirms the 3-symbol universe is UNCHANGED from /052-/063. ALGOUSDT was REVERTED
     at the system level per iter-v3/051 (feedback_v3_per_symbol_lifts_oos_breaks_is.md
@@ -289,7 +289,7 @@ def test_v3_models_is_3_symbol_at_iter_v3_053() -> None:
     """
     from crypto_trade.features_v3 import features_for_symbol  # noqa: PLC0415
 
-    expected_universe = ("BCHUSDT", "LDOUSDT", "TRXUSDT")
+    expected_universe = ("BCHUSDT", "ADAUSDT", "TRXUSDT")
     # Each symbol in the expected universe must return the 14-feature universal fallback
     for sym in expected_universe:
         feats = features_for_symbol(sym)

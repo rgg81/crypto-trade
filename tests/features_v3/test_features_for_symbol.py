@@ -9,7 +9,8 @@ range_efficiency_50):
   (conditional-orthogonality report instrumentation; research brief Section 3).
 - V3_FEATURES_PER_SYMBOL is EMPTY. All 3 symbols (BCH/LDO/TRX) use 14-feature fallback.
 - V3_ATR_MULTIPLIERS_PER_SYMBOL is EMPTY (SYSTEM-LEVEL REVERT carry-forward from /051).
-- V3_MODELS = (BCHUSDT, LDOUSDT, TRXUSDT) — 3 symbols (UNCHANGED from /051).
+- V3_MODELS = (BCHUSDT, ADAUSDT, TRXUSDT) — 3 symbols (iter-v3/078 UNIVERSE
+  REVISION: LDOUSDT replaced by ADAUSDT).
 - block_long_for = () — primitive 10 REVERTED at iter-v3/051 (carry-forward).
 
 iter-v3/063 NEW features REVERTED at /064 (kept-implemented; not in V3_FEATURE_COLUMNS_TOP_N):
@@ -28,13 +29,13 @@ Mandatory test cases (iter-v3/064 state):
  2. test_bch_absent_dead_features    — BCH does NOT include catastrophic-dead features
  3. test_algo_fallback_14            — ALGO returns 14 features via fallback
  4. test_algo_absent_dead_features   — ALGO does NOT include catastrophic-dead features
- 5. test_ldo_fallback_14             — LDO returns 14 features via fallback
- 6. test_ldo_absent_dead_features    — LDO does NOT include catastrophic-dead features
+ 5. test_ada_fallback_14             — ADA returns 14 features via fallback
+ 6. test_ada_absent_dead_features    — ADA does NOT include catastrophic-dead features
  7. test_trx_fallback_14             — TRX returns 14 features via fallback
  8. test_trx_no_dead_features        — TRX does NOT include catastrophically-dead features
  9. test_bchusdt_not_in_per_symbol   — BCH absent from V3_FEATURES_PER_SYMBOL
 10. test_algousdt_not_in_per_symbol  — ALGO absent from V3_FEATURES_PER_SYMBOL
-11. test_ldousdt_not_in_per_symbol   — LDO absent from V3_FEATURES_PER_SYMBOL
+11. test_adausdt_not_in_per_symbol   — ADA absent from V3_FEATURES_PER_SYMBOL
 12. test_trxusdt_not_in_per_symbol   — TRX absent from V3_FEATURES_PER_SYMBOL
 13. test_v3_features_per_symbol_is_empty — empty dict
 14. test_v3_atr_multipliers_per_symbol_is_empty — EMPTY (REVERT from /047-/050 state)
@@ -173,27 +174,27 @@ def test_algo_absent_dead_features() -> None:
         )
 
 
-def test_ldo_fallback_14() -> None:
-    """LDOUSDT returns the 14-feature BASELINE_V3 anchor via fallback at iter-v3/077."""
-    result = features_for_symbol("LDOUSDT")
+def test_ada_fallback_14() -> None:
+    """ADAUSDT returns the 14-feature BASELINE_V3 anchor via fallback at iter-v3/078."""
+    result = features_for_symbol("ADAUSDT")
     assert len(result) == 14, (
-        f"LDOUSDT: expected 14 features (V3_FEATURE_COLUMNS_TOP_N fallback at iter-v3/077), "
+        f"ADAUSDT: expected 14 features (V3_FEATURE_COLUMNS_TOP_N fallback at iter-v3/078), "
         f"got {len(result)}. V3_FEATURES_PER_SYMBOL must be empty + universal list = 14. "
         f"Got: {result}"
     )
     assert result == V3_FEATURE_COLUMNS_TOP_N, (
-        f"LDOUSDT: fallback result differs from V3_FEATURE_COLUMNS_TOP_N. "
+        f"ADAUSDT: fallback result differs from V3_FEATURE_COLUMNS_TOP_N. "
         f"Extra: {sorted(set(result) - set(V3_FEATURE_COLUMNS_TOP_N))}. "
         f"Missing: {sorted(set(V3_FEATURE_COLUMNS_TOP_N) - set(result))}."
     )
 
 
-def test_ldo_absent_dead_features() -> None:
-    """LDOUSDT must reflect /065 state (catastrophic-dead features ABSENT)."""
-    result = features_for_symbol("LDOUSDT")
+def test_ada_absent_dead_features() -> None:
+    """ADAUSDT must reflect /065 state (catastrophic-dead features ABSENT)."""
+    result = features_for_symbol("ADAUSDT")
     for feat in _CATASTROPHIC_DEAD:
         assert feat not in result, (
-            f"LDOUSDT: {feat} FOUND — must be ABSENT at iter-v3/077 (catastrophic-dead). "
+            f"ADAUSDT: {feat} FOUND — must be ABSENT at iter-v3/078 (catastrophic-dead). "
             f"Got: {result}"
         )
 
@@ -239,10 +240,10 @@ def test_algousdt_not_in_per_symbol() -> None:
     )
 
 
-def test_ldousdt_not_in_per_symbol() -> None:
-    """LDOUSDT must NOT be in V3_FEATURES_PER_SYMBOL at iter-v3/077 (empty dict)."""
-    assert "LDOUSDT" not in V3_FEATURES_PER_SYMBOL, (
-        f"V3_FEATURES_PER_SYMBOL has 'LDOUSDT' key — must be ABSENT at iter-v3/077. "
+def test_adausdt_not_in_per_symbol() -> None:
+    """ADAUSDT must NOT be in V3_FEATURES_PER_SYMBOL at iter-v3/078 (empty dict)."""
+    assert "ADAUSDT" not in V3_FEATURES_PER_SYMBOL, (
+        f"V3_FEATURES_PER_SYMBOL has 'ADAUSDT' key — must be ABSENT at iter-v3/078. "
         f"Current keys: {list(V3_FEATURES_PER_SYMBOL.keys())}."
     )
 
@@ -292,7 +293,7 @@ def test_all_symbols_atr_default_iter_v3_070() -> None:
         "iter-v3/070 CLOSEOUT: Component A (/065 SL widening) REJECTED; reverted to /059 anchor. "
         "Verify DEFAULT_ATR_MULTIPLIERS = (2.0, 1.0) in features_v3/__init__.py."
     )
-    for sym in ("BCHUSDT", "LDOUSDT", "TRXUSDT"):
+    for sym in ("BCHUSDT", "ADAUSDT", "TRXUSDT"):
         result = atr_multipliers_for_symbol(sym)
         assert result == (2.0, 1.0), (
             f"atr_multipliers_for_symbol('{sym}') returned {result} — expected (2.0, 1.0). "
@@ -397,7 +398,7 @@ def test_universal_list_is_14() -> None:
     )
 
 
-@pytest.mark.parametrize("symbol", ["BCHUSDT", "LDOUSDT", "TRXUSDT"])
+@pytest.mark.parametrize("symbol", ["BCHUSDT", "ADAUSDT", "TRXUSDT"])
 def test_all_symbols_fallback_14(symbol: str) -> None:
     """All 3 active V3_MODELS symbols must return exactly 14 features at iter-v3/077.
 

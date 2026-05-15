@@ -7,8 +7,8 @@ iter-v3/074 state (V3_ATR_MULTIPLIERS_PER_SYMBOL REVERT):
     SUSPICIOUS-OOS-DOMINANT (OOS/IS monthly Sharpe ratio 6.85 — a holding-time-
     extension axis) and was CLOSED at catalog level. Per `feedback_no_cheating.md`
     anti-drift discipline /074 reverts the dict so no symbol carries an override.
-  - V3_MODELS = (BCHUSDT, LDOUSDT, TRXUSDT) — 3 symbols.
-  - atr_multipliers_for_symbol: BCH/LDO/TRX all (2.0, 1.0) DEFAULT.
+  - V3_MODELS = (BCHUSDT, ADAUSDT, TRXUSDT) — 3 symbols (iter-v3/078 UNIVERSE REVISION).
+  - atr_multipliers_for_symbol: BCH/ADA/TRX all (2.0, 1.0) DEFAULT.
 
 History:
   iter-v3/010: (2.0, 1.0) first set.
@@ -22,7 +22,7 @@ Tests:
   1. DEFAULT_ATR_MULTIPLIERS == (2.0, 1.0).
   2. V3_ATR_MULTIPLIERS_PER_SYMBOL is empty {}.
   3. BCHUSDT returns (2.0, 1.0) — DEFAULT fallback (/073 entry reverted).
-  4. LDOUSDT returns (2.0, 1.0) — DEFAULT fallback (/073 entry reverted).
+  4. ADAUSDT returns (2.0, 1.0) — DEFAULT fallback.
   5. TRXUSDT returns (2.0, 1.0) — DEFAULT fallback.
   6. Unknown symbol returns (2.0, 1.0) — DEFAULT fallback.
   7. The runner's _build_v3_model dispatches the global (2.0, 1.0) pair to all syms.
@@ -46,9 +46,8 @@ def test_atr_multipliers_default():
         "BCHUSDT must return (2.0, 1.0) at iter-v3/074 — the /073 (2.0, 1.25) "
         "per-symbol entry is reverted."
     )
-    assert atr_multipliers_for_symbol("LDOUSDT") == (2.0, 1.0), (
-        "LDOUSDT must return (2.0, 1.0) at iter-v3/074 — the /073 (1.5, 1.25) "
-        "per-symbol entry is reverted."
+    assert atr_multipliers_for_symbol("ADAUSDT") == (2.0, 1.0), (
+        "ADAUSDT must return (2.0, 1.0) — DEFAULT fallback (no per-symbol entry)."
     )
     assert atr_multipliers_for_symbol("ALGOUSDT") == (2.0, 1.0)
     assert atr_multipliers_for_symbol("UNKNOWN_SYMBOL") == (2.0, 1.0)
@@ -69,18 +68,18 @@ def test_atr_multipliers_bch_default_fallback():
     assert tuple(atr_multipliers_for_symbol("BCHUSDT")) == (2.0, 1.0)
 
 
-def test_atr_multipliers_ldo_default_fallback():
-    """LDO must return (2.0, 1.0) via DEFAULT fallback at iter-v3/074.
+def test_atr_multipliers_ada_default_fallback():
+    """ADA must return (2.0, 1.0) via DEFAULT fallback (iter-v3/078 universe symbol).
 
-    iter-v3/074: the /073 per-symbol (1.5, 1.25) LDO entry is reverted.
+    iter-v3/078: V3_ATR_MULTIPLIERS_PER_SYMBOL is empty — ADA uses DEFAULT.
     """
     from crypto_trade.features_v3 import V3_ATR_MULTIPLIERS_PER_SYMBOL, atr_multipliers_for_symbol
 
-    assert "LDOUSDT" not in V3_ATR_MULTIPLIERS_PER_SYMBOL, (
-        "V3_ATR_MULTIPLIERS_PER_SYMBOL must NOT contain 'LDOUSDT' at iter-v3/074 "
-        f"(the /073 entry is reverted). Current keys: {list(V3_ATR_MULTIPLIERS_PER_SYMBOL.keys())}."
+    assert "ADAUSDT" not in V3_ATR_MULTIPLIERS_PER_SYMBOL, (
+        "V3_ATR_MULTIPLIERS_PER_SYMBOL must NOT contain 'ADAUSDT' at iter-v3/078 "
+        f"(empty dict). Current keys: {list(V3_ATR_MULTIPLIERS_PER_SYMBOL.keys())}."
     )
-    assert tuple(atr_multipliers_for_symbol("LDOUSDT")) == (2.0, 1.0)
+    assert tuple(atr_multipliers_for_symbol("ADAUSDT")) == (2.0, 1.0)
 
 
 def test_atr_multipliers_trx_default_fallback():
@@ -109,8 +108,8 @@ def test_v3_atr_multipliers_per_symbol_is_empty():
 def test_atr_multipliers_runner_dispatch():
     """The runner's _build_v3_model dispatches the global (2.0, 1.0) pair at iter-v3/074.
 
-    All three v3 symbols (BCH/LDO/TRX) receive DEFAULT_ATR_MULTIPLIERS — the
-    labeling layer is symbol-homogeneous after the /073 axis revert.
+    All three v3 symbols (BCH/ADA/TRX) receive DEFAULT_ATR_MULTIPLIERS — the
+    labeling layer is symbol-homogeneous (iter-v3/078 universe BCH/ADA/TRX).
     """
     import sys
     from pathlib import Path
@@ -121,14 +120,14 @@ def test_atr_multipliers_runner_dispatch():
     _cfg_bch, strat_bch = _build_v3_model(
         symbol="BCHUSDT", seed=42, n_trials=1, ensemble_seeds=[42]
     )
-    _cfg_ldo, strat_ldo = _build_v3_model(
-        symbol="LDOUSDT", seed=42, n_trials=1, ensemble_seeds=[42]
+    _cfg_ada, strat_ada = _build_v3_model(
+        symbol="ADAUSDT", seed=42, n_trials=1, ensemble_seeds=[42]
     )
     _cfg_trx, strat_trx = _build_v3_model(
         symbol="TRXUSDT", seed=42, n_trials=1, ensemble_seeds=[42]
     )
 
-    for sym, strat in [("BCHUSDT", strat_bch), ("LDOUSDT", strat_ldo), ("TRXUSDT", strat_trx)]:
+    for sym, strat in [("BCHUSDT", strat_bch), ("ADAUSDT", strat_ada), ("TRXUSDT", strat_trx)]:
         assert strat.inner.atr_tp_multiplier == 2.0, (
             f"{sym} atr_tp_multiplier: expected 2.0, got {strat.inner.atr_tp_multiplier}. "
             "iter-v3/074: all symbols use DEFAULT (2.0, 1.0)."

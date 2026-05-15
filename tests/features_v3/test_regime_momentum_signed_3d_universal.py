@@ -21,7 +21,7 @@ SWAP state (iter-v3/052):
 - regime_momentum_signed_3d PRESENT as 15th element.
 - fracdiff_d05_close ABSENT from V3_FEATURE_COLUMNS_TOP_N (PARKED; column still in parquets).
 - regime_momentum_signed_5d PRESENT (mandate per feedback_v3_engineered_features_proven.md).
-- V3_MODELS = (BCHUSDT, LDOUSDT, TRXUSDT) — 3 symbols (UNCHANGED from /051).
+- V3_MODELS = (BCHUSDT, ADAUSDT, TRXUSDT) — 3 symbols (iter-v3/078 UNIVERSE REVISION).
 - REQUIRED_GAP = 66 = (21+1)*3 (UNCHANGED).
 
 EDA evidence (analysis/iteration_v3-051/axis_c_regime_3d_*.csv SHA `290f37b`):
@@ -51,8 +51,8 @@ _IS_START_MS = 1_679_616_000_000  # 2023-03-24 00:00 UTC
 _OOS_CUTOFF_MS = 1_742_774_400_000  # 2025-03-24 00:00 UTC (IMMUTABLE)
 
 _PARQUET_DIR = "data/features_v3"
-_V3_ALL_SYMBOLS = ("BCHUSDT", "LDOUSDT", "TRXUSDT", "ALGOUSDT")
-_V3_MODELS_ITER_052 = ("BCHUSDT", "LDOUSDT", "TRXUSDT")
+_V3_ALL_SYMBOLS = ("BCHUSDT", "ADAUSDT", "TRXUSDT", "LDOUSDT", "ALGOUSDT")
+_V3_MODELS_ITER_052 = ("BCHUSDT", "ADAUSDT", "TRXUSDT")  # iter-v3/078 UNIVERSE REVISION
 
 
 # ---------------------------------------------------------------------------
