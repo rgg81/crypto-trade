@@ -1,12 +1,14 @@
-"""Assertion test for V3_FEATURE_COLUMNS_TOP_N count — iter-v3/084 (14 features).
+"""Assertion test for V3_FEATURE_COLUMNS_TOP_N count — iter-v3/085 (15 features).
 
-Verifies that V3_FEATURE_COLUMNS_TOP_N has exactly 14 entries: the BASELINE_V3
-/059 anchor stack. The /082 4-member funding-rate family was reverted (18 -> 14)
-at the /083 setup and stays reverted (the v3 funding axis is CLOSED at 4 data
-points /019/023/024/082; per `feedback_v3_inert_features_at_higher_budget.md` an
-INERT family must NOT be carried forward). iter-v3/084 (cycle-3 REFERENCE /
-METHODOLOGY) makes NO feature change — it is a clean /059-config anchor re-run;
-its single declared change is the PER_CELL_GAP 43->22 methodology fix.
+Verifies that V3_FEATURE_COLUMNS_TOP_N has exactly 15 entries: the BASELINE_V3
+/059 14-feature anchor stack + funding_regime_momentum_5d, the SOLE iter-v3/085
+(cycle-3 EXPLORATION #4) axis. funding_regime_momentum_5d is a Category-2
+composed feature regime_momentum_signed_5d * sign(funding_z_30) — funding enters
+ONLY as a sign() switch inside the composed feature, never as a direct model
+column. This is NOT the closed funding-as-direct-feature axis (/019/023/024/082):
+the /082 4-member funding-rate FAMILY stays reverted. An EXPLORATION never
+updates BASELINE_V3.md; the 14-feature /059 stack stays canonical until a
+CONFIRMATION-MERGE.
 
 Background:
     iter-v3/063 attempted MASS FEATURE EXPANSION 14 → 46 at single-seed n_trials=35
@@ -34,14 +36,15 @@ Background:
     (/019/023/024/082). Feature count returns 18 → 14, the /059 anchor.
 
 Tests:
-1. Count is exactly 14.
+1. Count is exactly 15.
 2. All 14 BASELINE_V3 features present.
-3. range_efficiency_50 ABSENT (reverted at /077; Kaufman axis CLOSED).
-4. adx_14 ABSENT (iter-v3/064 NEGATIVE; DROPPED at /065 revert).
-5. All 9 /063 NEW features absent (reverted at /064 revert).
-6. Prohibited features absent (vol_adj_autocorr, efficiency_ratio_50,
+3. funding_regime_momentum_5d PRESENT (the iter-v3/085 axis — the 15th feature).
+4. range_efficiency_50 ABSENT (reverted at /077; Kaufman axis CLOSED).
+5. adx_14 ABSENT (iter-v3/064 NEGATIVE; DROPPED at /065 revert).
+6. All 9 /063 NEW features absent (reverted at /064 revert).
+7. Prohibited features absent (vol_adj_autocorr, efficiency_ratio_50,
    regime_momentum_signed_3d, vwap_dev_50, hurst_drift_50_200, vol_normalized_ret_5d).
-7. No duplicates in the feature list.
+8. No duplicates in the feature list.
 """
 
 from __future__ import annotations
@@ -99,14 +102,15 @@ _PROHIBITED_FEATURES = frozenset(
 
 
 def test_feature_count_14():
-    """V3_FEATURE_COLUMNS_TOP_N must have exactly 14 entries at iter-v3/083."""
+    """V3_FEATURE_COLUMNS_TOP_N must have exactly 15 entries at iter-v3/085."""
     n = len(V3_FEATURE_COLUMNS_TOP_N)
-    assert n == 14, (
-        f"V3_FEATURE_COLUMNS_TOP_N has {n} features — expected 14. "
-        "iter-v3/083: the BASELINE_V3 /059 14-feature anchor stack. /082's "
-        "4-member funding-rate family is REVERTED (SUSPICIOUS-OOS-DOMINANT; "
-        "funding axis CLOSED at 4 data points). iter-v3/083's axis is the "
-        "UNIVERSE EXPANSION (V3_MODELS 3 -> 4), NOT a feature change. "
+    assert n == 15, (
+        f"V3_FEATURE_COLUMNS_TOP_N has {n} features — expected 15. "
+        "iter-v3/085 (cycle-3 EXPLORATION #4): the BASELINE_V3 /059 14-feature "
+        "anchor stack + funding_regime_momentum_5d (the 15th feature, the SOLE "
+        "/085 axis — a Category-2 composed feature). /082's 4-member funding-rate "
+        "FAMILY stays REVERTED (the closed funding-as-direct-feature axis at 4 "
+        "data points /019/023/024/082). "
         "Update V3_FEATURE_COLUMNS_TOP_N in src/crypto_trade/features_v3/__init__.py."
     )
 
@@ -117,7 +121,21 @@ def test_baseline_v3_features_present():
     missing = _BASELINE_V3_FEATURES - feature_set
     assert not missing, (
         f"BASELINE_V3 features missing from V3_FEATURE_COLUMNS_TOP_N: {sorted(missing)}. "
-        "All 14 BASELINE_V3 features must be preserved in the iter-v3/083 anchor set."
+        "All 14 BASELINE_V3 features must be preserved in the iter-v3/085 anchor set."
+    )
+
+
+def test_funding_regime_momentum_5d_present():
+    """funding_regime_momentum_5d MUST be PRESENT — the SOLE iter-v3/085 axis.
+
+    The 15th feature: a Category-2 composed feature
+    regime_momentum_signed_5d * sign(funding_z_30) (cycle-3 EXPLORATION #4).
+    """
+    assert "funding_regime_momentum_5d" in set(V3_FEATURE_COLUMNS_TOP_N), (
+        "funding_regime_momentum_5d NOT FOUND in V3_FEATURE_COLUMNS_TOP_N — must "
+        "be PRESENT at iter-v3/085 (the 15th feature, the SOLE cycle-3 "
+        "EXPLORATION #4 axis). Add it to V3_FEATURE_COLUMNS_TOP_N in "
+        "src/crypto_trade/features_v3/__init__.py."
     )
 
 

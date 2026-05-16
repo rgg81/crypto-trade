@@ -79,10 +79,11 @@ def test_regime_momentum_signed_3d_in_universal_feature_list() -> None:
         "Remove it from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
     )
     n = len(V3_FEATURE_COLUMNS_TOP_N)
-    assert n == 14, (
-        f"V3_FEATURE_COLUMNS_TOP_N has {n} elements — expected 14 (the BASELINE_V3 "
-        "/059 anchor stack). iter-v3/084 keeps the 14-feature anchor UNCHANGED — "
-        "/082's funding family stays reverted (funding axis CLOSED at 4 data points). "
+    assert n == 15, (
+        f"V3_FEATURE_COLUMNS_TOP_N has {n} elements — expected 15 (the BASELINE_V3 "
+        "/059 14-feature anchor stack + funding_regime_momentum_5d, the iter-v3/085 "
+        "cycle-3 EXPLORATION #4 axis). regime_momentum_signed_3d stays PARKED-ABSENT; "
+        "/082's funding family stays reverted. "
         "Check V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
     )
     assert "fracdiff_d05_close" not in V3_FEATURE_COLUMNS_TOP_N, (
@@ -262,10 +263,11 @@ def test_v3_feature_columns_top_n_swap_fracdiff_to_3d_at_iter_v3_052() -> None:
         "iter-v3/065: must be ABSENT (PARKED at /053; REVERTED at /063-/064)."
     )
     n = len(V3_FEATURE_COLUMNS_TOP_N)
-    assert n == 14, (
-        f"V3_FEATURE_COLUMNS_TOP_N count={n} — expected 14 (the BASELINE_V3 /059 "
-        "anchor stack). iter-v3/083 REVERTS /082's 4-member funding family "
-        "(SUSPICIOUS-OOS-DOMINANT; funding axis CLOSED at 4 data points)."
+    assert n == 15, (
+        f"V3_FEATURE_COLUMNS_TOP_N count={n} — expected 15 (the BASELINE_V3 /059 "
+        "14-feature anchor stack + funding_regime_momentum_5d, the iter-v3/085 "
+        "cycle-3 EXPLORATION #4 axis). /082's 4-member funding family stays "
+        "reverted (funding-as-direct-feature axis CLOSED at 4 data points)."
     )
     assert "regime_momentum_signed_5d" in V3_FEATURE_COLUMNS_TOP_N, (
         "regime_momentum_signed_5d NOT found in V3_FEATURE_COLUMNS_TOP_N. "
