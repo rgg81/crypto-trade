@@ -77,9 +77,9 @@ def test_hurst_drift_50_200_in_universal_feature_list() -> None:
         "Remove it from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
     )
     n = len(V3_FEATURE_COLUMNS_TOP_N)
-    assert n == 14, (
-        f"V3_FEATURE_COLUMNS_TOP_N has {n} elements -- expected 14. "
-        "iter-v3/077: the BASELINE_V3 /059/060 14-feature anchor stack "
+    assert n == 18, (
+        f"V3_FEATURE_COLUMNS_TOP_N has {n} elements -- expected 18 (14 anchor + funding family). "
+        "iter-v3/077: the BASELINE_V3 /059/060 18-feature stack (14 anchor + funding family) "
         "(/076's range_efficiency_50 reverted; PASSIVE-DIAGNOSTIC iteration). "
         "Check V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
     )
@@ -293,11 +293,11 @@ def test_v3_models_is_3_symbol_at_iter_v3_053() -> None:
     # Each symbol in the expected universe must return the 14-feature universal fallback
     for sym in expected_universe:
         feats = features_for_symbol(sym)
-        assert len(feats) == 14, (
-            f"{sym} fallback returns {len(feats)} features -- expected 14. "
-            "iter-v3/077 cycle-2 EXPLORATION #7: BCH + LDO + TRX, all at the 14-feature "
-            "BASELINE_V3 /059/060 anchor universal fallback (/076's range_efficiency_50 "
-            "reverted; hurst_drift_50_200 PARKED-ABSENT)."
+        assert len(feats) == 18, (
+            f"{sym} fallback returns {len(feats)} features -- expected 18 "
+            "(14 anchor + funding family). iter-v3/082: BCH + LDO + TRX at the "
+            "18-feature stack (BASELINE_V3 /059 14 anchor + the 4-member "
+            "funding-rate family); hurst_drift_50_200 stays PARKED-ABSENT."
         )
         assert "hurst_drift_50_200" not in feats, (
             f"{sym} fallback contains hurst_drift_50_200 -- must be ABSENT at iter-v3/065. "

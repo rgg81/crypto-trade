@@ -128,7 +128,7 @@ def _derive_ensemble_seeds(outer_seed: int, size: int = 5) -> list[int]:
     return [int(s) for s in rng.integers(low=0, high=2**31 - 1, size=size)]
 
 
-ITERATION_LABEL = "v3-081"
+ITERATION_LABEL = "v3-082"
 REPORTS_DIR = Path("reports-v3")
 FEATURES_DIR = Path("data/features_v3")
 DATA_DIR = Path("data")
@@ -344,13 +344,31 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
     # SUSPICIOUS-OOS-DOMINANT (NON-ADVANCING); the Kaufman path-efficiency axis
     # is CLOSED across 2 data points (/043 + /076 — BASELINE_V3.md Dead Ideas).
     n = len(V3_FEATURE_COLUMNS)
-    if n != 14:
+    if n != 18:
         raise RuntimeError(
-            f"V3_FEATURE_COLUMNS has {n} columns — expected exactly 14. "
-            "iter-v3/077: the BASELINE_V3 /059/060 14-feature anchor stack "
-            "(/076's range_efficiency_50 reverted; PASSIVE-DIAGNOSTIC iteration). "
+            f"V3_FEATURE_COLUMNS has {n} columns — expected exactly 18. "
+            "iter-v3/082 (cycle-3 EXPLORATION #1): the BASELINE_V3 /059 14-feature "
+            "anchor stack PLUS the 4-member funding-rate FEATURE FAMILY "
+            "(funding_sign_persist_9, funding_momentum_3, funding_accel_3, "
+            "funding_price_divergence_6). This is a NEW crypto-native feature "
+            "family — Direction 1 of briefs-v3/cycle3_plan.md; a DIFFERENT axis "
+            "from the closed single funding_rate_zscore_30 (asserted-absent "
+            "below; the closed single-z-score axis stays closed). "
             "Check V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
         )
+    # iter-v3/082: the 4 funding-FAMILY columns MUST be present.
+    for _fam in (
+        "funding_sign_persist_9",
+        "funding_momentum_3",
+        "funding_accel_3",
+        "funding_price_divergence_6",
+    ):
+        if _fam not in V3_FEATURE_COLUMNS:
+            raise RuntimeError(
+                f"{_fam} NOT FOUND in V3_FEATURE_COLUMNS — must be PRESENT at "
+                "iter-v3/082 (cycle-3 EXPLORATION #1 funding-family axis). "
+                "Add it to V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
+            )
     # vol_adj_autocorr MUST NOT be in the universal list (iter-v3/036 NEGATIVE reverted;
     # catastrophically bad IS collapse at single-seed n_trials=35; dead code retained).
     if "vol_adj_autocorr" in V3_FEATURE_COLUMNS:
@@ -518,14 +536,27 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
     # the universe-revision axis was SUSPICIOUS-OOS-DOMINANT and is CLOSED for cycle 2).
     for sym in ("BCHUSDT", "LDOUSDT", "TRXUSDT"):
         sym_feats = features_for_symbol(sym)
-        if len(sym_feats) != 14:
+        if len(sym_feats) != 18:
             raise RuntimeError(
                 f"{sym} fallback has {len(sym_feats)} features — "
-                "expected exactly 14 (iter-v3/077: the BASELINE_V3 /059/060 "
-                "14-feature anchor stack). "
+                "expected exactly 18 (iter-v3/082: the BASELINE_V3 /059 "
+                "14-feature anchor stack PLUS the 4-member funding-rate FEATURE "
+                "FAMILY). "
                 "Check V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py. "
                 "V3_FEATURES_PER_SYMBOL must be empty."
             )
+        for _fam in (
+            "funding_sign_persist_9",
+            "funding_momentum_3",
+            "funding_accel_3",
+            "funding_price_divergence_6",
+        ):
+            if _fam not in sym_feats:
+                raise RuntimeError(
+                    f"{sym} feature set does not contain {_fam} — must be PRESENT "
+                    "at iter-v3/082 (cycle-3 EXPLORATION #1 funding-family axis). "
+                    "Add it to V3_FEATURE_COLUMNS_TOP_N."
+                )
         if "adx_14" in sym_feats:
             raise RuntimeError(
                 f"{sym} feature set contains adx_14 — must be ABSENT at iter-v3/077. "
@@ -557,12 +588,11 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
                 f"Check features_for_symbol('{sym}') path."
             )
     print(
-        "  BCH/LDO/TRX: 14-feature universal fallback "
-        "(iter-v3/079: the BASELINE_V3 /059/060 14-feature anchor stack; "
-        "all 9 /063-NEW features ABSENT; "
-        "vol_adj_autocorr ABSENT; efficiency_ratio_50 ABSENT; "
-        "range_efficiency_50 ABSENT (/076 reverted); "
-        "regime_momentum_signed_5d, sym_vs_btc_ret_7d PRESENT)  PASS"
+        "  BCH/LDO/TRX: 18-feature universal fallback "
+        "(iter-v3/082: the BASELINE_V3 /059 14-feature anchor stack PLUS the "
+        "4-member funding-rate FEATURE FAMILY — funding_sign_persist_9, "
+        "funding_momentum_3, funding_accel_3, funding_price_divergence_6; "
+        "the closed single funding_rate_zscore_30 stays ABSENT)  PASS"
     )
 
     # iter-v3/074: V3_ATR_MULTIPLIERS_PER_SYMBOL reverted to {} (the /073 per-symbol
@@ -818,6 +848,55 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
     print(
         "  Per-symbol vol_scale_floor (iter-v3/081): {} "
         "(REVERTED iter-v3/061 accretion; all 3 symbols at global 0.3 floor)  PASS"
+    )
+
+    # iter-v3/082 (cycle-3 EXPLORATION #1) — GENERALISED CONFIG-ACCRETION CHECK.
+    # Per Critic /081 Recommendation #3 + briefs-v3/cycle3_plan.md Section 5: the
+    # /061 vol-floor rode 19 iterations undetected because each EXPLORATION
+    # varied one OTHER axis and never touched the floor line. This consolidated
+    # pre-flight asserts every behavior-affecting knob equals its /059-canonical
+    # value, so a future /061-style accretion is caught at runtime, not by
+    # git-archaeology. The SOLE intended /082 delta vs /059 is the feature count
+    # (14 -> 18, the funding family); EVERYTHING else must match /059.
+    _acc_cfg, _acc_strat = _build_v3_model(
+        symbol="BCHUSDT", seed=42, n_trials=1, ensemble_seeds=[42]
+    )
+    if not isinstance(_acc_strat, RiskV3Wrapper):
+        raise RuntimeError(
+            "config-accretion check: _build_v3_model did not return RiskV3Wrapper."
+        )
+    _rc = _acc_strat.config
+    # (knob_name, observed, expected /059-canonical value)
+    _v3_model_symbols = tuple(sym for _label, sym in V3_MODELS)
+    _canonical_v059 = [
+        ("V3_MODELS symbols", _v3_model_symbols, ("BCHUSDT", "LDOUSDT", "TRXUSDT")),
+        ("DEFAULT_ATR_MULTIPLIERS", tuple(DEFAULT_ATR_MULTIPLIERS), (2.0, 1.0)),
+        ("V3_ATR_MULTIPLIERS_PER_SYMBOL", dict(V3_ATR_MULTIPLIERS_PER_SYMBOL), {}),
+        ("zscore_threshold", _rc.zscore_threshold, 2.0),
+        ("adx_threshold", _rc.adx_threshold, 20.0),
+        ("adx_threshold_per_symbol", dict(_rc.adx_threshold_per_symbol), {}),
+        ("vol_scale_floor_per_symbol", dict(_rc.vol_scale_floor_per_symbol), {}),
+        ("block_long_for", tuple(_rc.block_long_for), ()),
+        ("block_short_for", tuple(_rc.block_short_for), ()),
+        ("enable_per_symbol_drawdown_brake", _rc.enable_per_symbol_drawdown_brake, False),
+        ("REQUIRED_GAP", REQUIRED_GAP, 66),
+    ]
+    _drift = [
+        (name, obs, exp) for name, obs, exp in _canonical_v059 if obs != exp
+    ]
+    if _drift:
+        _msg = "; ".join(f"{n}: observed {o!r} != /059-canonical {e!r}" for n, o, e in _drift)
+        raise ValueError(
+            f"config-accretion check FAILED — {len(_drift)} knob(s) drifted from "
+            f"the /059 canonical config: {_msg}. iter-v3/082's SOLE intended delta "
+            "vs /059 is V3_FEATURE_COLUMNS 14 -> 18 (the funding family). Any other "
+            "drift is illegitimate accretion (the /061 vol-floor failure mode). "
+            "Revert the drifted knob(s) to the /059 value, or — if intended — "
+            "document it as a deliberate axis in the brief and update this check."
+        )
+    print(
+        f"  Config-accretion check (iter-v3/082; Critic /081 Rec #3): "
+        f"{len(_canonical_v059)} knobs == /059 canonical  PASS"
     )
 
     # iter-v3/068: REVERT inference_threshold_floor to default 0.0 (/067 INERT-AT-EXPLORATION).

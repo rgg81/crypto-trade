@@ -48,7 +48,11 @@ from crypto_trade.features_v3.calendar_v3 import add_calendar_v3_features
 from crypto_trade.features_v3.cross_btc_v3 import add_cross_btc_v3_features
 from crypto_trade.features_v3.engineered_v3 import add_engineered_v3_features
 from crypto_trade.features_v3.fracdiff_v3 import add_fracdiff_v3_features
-from crypto_trade.features_v3.funding_v3 import add_btc_funding_v3_features, add_funding_v3_features
+from crypto_trade.features_v3.funding_v3 import (
+    add_btc_funding_v3_features,
+    add_funding_family_v3_features,
+    add_funding_v3_features,
+)
 from crypto_trade.features_v3.microstructure_v3 import add_microstructure_v3_features
 from crypto_trade.features_v3.momentum_accel_v3 import add_momentum_accel_v3_features
 from crypto_trade.features_v3.price_efficient_vol_v3 import add_price_efficient_vol_v3_features
@@ -75,6 +79,12 @@ GROUP_REGISTRY: dict[str, Callable[[pd.DataFrame], pd.DataFrame]] = {
     "funding_v3": add_funding_v3_features,
     # iter-v3/024: cross-asset BTC funding broadcast; infrastructure PRESERVED
     "btc_funding_v3": add_btc_funding_v3_features,
+    # iter-v3/082: funding-rate FEATURE FAMILY (cycle-3 EXPLORATION #1) — a
+    # DIFFERENT axis from the closed single funding_rate_zscore_30. Builds the 4
+    # FUNDING_FAMILY_COLUMNS (sign-persistence, momentum, acceleration,
+    # funding-price divergence). Needs `close` — no ordering constraint vs the
+    # other groups.
+    "funding_family_v3": add_funding_family_v3_features,
     # iter-v3/063: NEW technical indicators (ADX); AFTER regime (shares ATR dependency)
     "technical_v3": add_technical_v3_features,
     # iter-v3/063: NEW calendar/temporal features (DOW cyclic encoding); no dependencies
@@ -173,6 +183,20 @@ V3_FEATURE_COLUMNS_TOP_N: tuple[str, ...] = (
     "ret_autocorr_lag1_50",  # momentum [BASELINE_V3]
     "sym_vs_btc_ret_7d",  # cross_btc [BASELINE_V3]
     "regime_momentum_signed_5d",  # engineered [BASELINE_V3, /025 PROMISING]
+    # -------------------------------------------------------------------------
+    # iter-v3/082 (cycle-3 EXPLORATION #1) — funding-rate FEATURE FAMILY.
+    # 14 -> 18 features. A NEW crypto-native feature family (Direction 1 of
+    # briefs-v3/cycle3_plan.md). DIFFERENT axis from the PERMANENTLY-CLOSED
+    # single funding_rate_zscore_30 (/019/023/024 — a mean-zero rolling z-score
+    # discards sign + level + the price leg). These 4 encode the four funding
+    # channels the 2023-2025 literature identifies (sign-persistence/crowding,
+    # momentum, acceleration/carry-shock per BIS WP 1087, funding-price
+    # divergence per CFB/the crowding-reversal literature). Brief
+    # briefs-v3/iteration_v3-082/research_brief.md Section 3; EDA SHA 37d4da8.
+    "funding_sign_persist_9",  # funding_family_v3 [iter-v3/082]
+    "funding_momentum_3",  # funding_family_v3 [iter-v3/082]
+    "funding_accel_3",  # funding_family_v3 [iter-v3/082]
+    "funding_price_divergence_6",  # funding_family_v3 [iter-v3/082]
     # -------------------------------------------------------------------------
     # iter-v3/077 (cycle-2 EXPLORATION #7) REVERTS /076's range_efficiency_50 —
     # the feature set returns to the BASELINE_V3 /059/060 14-feature anchor.
