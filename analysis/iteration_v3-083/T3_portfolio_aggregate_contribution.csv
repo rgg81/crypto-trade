@@ -1,0 +1,5 @@
+symbol,incumbent_3sym_is_sharpe,aggregate_4sym_is_sharpe,is_sharpe_delta,bch_wpnl_share_3sym_pct,bch_wpnl_share_4sym_pct,bch_trade_share_3sym_pct,bch_trade_share_4sym_pct,bch_trade_share_dilution_pp,candidate_trade_share_pct
+ATOMUSDT,-0.0761,-0.4166,-0.3405,378.0,67.7,47.5,33.3,14.3,30.0
+FILUSDT,-0.0761,-0.1143,-0.0382,378.0,170.1,47.5,35.4,12.1,25.5
+ETCUSDT,-0.0761,-0.2491,-0.1731,378.0,77.9,47.5,31.6,15.9,33.5
+AAVEUSDT,-0.0761,-0.1299,-0.0539,378.0,186.1,47.5,36.1,11.4,24.0

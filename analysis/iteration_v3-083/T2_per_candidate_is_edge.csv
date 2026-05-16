@@ -1,0 +1,5 @@
+symbol,is_trades,is_eval_months,is_trades_per_month,is_monthly_sharpe,is_win_rate,is_total_pnl
+ATOMUSDT,1952,36,54.22,-0.4108,30.2,-1368.1
+FILUSDT,1561,28,55.75,-0.1368,33.4,-364.94
+ETCUSDT,2295,37,62.03,-0.286,33.3,-1150.33
+AAVEUSDT,1435,28,51.25,-0.1487,33.2,-307.67
