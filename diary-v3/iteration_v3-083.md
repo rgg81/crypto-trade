@@ -236,7 +236,7 @@ Three recommendations from Critic FINAL `1116124`, plus the cycle-3 forward agen
 
 ---
 
-**Diary commit SHA**: (this closeout — diary + catalog + BASELINE_V3.md + cycle3_plan.md)
+**Diary commit SHA**: `5f6a619` (this closeout — diary + catalog + BASELINE_V3.md + cycle3_plan.md; SHA backfilled by the immediately-following commit)
 **Critic FINAL SHA**: `1116124`
 **Engineering report SHA**: `6479e88`
 **Phase-6 setup SHA**: `17ef604`
