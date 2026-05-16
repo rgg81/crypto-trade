@@ -1,8 +1,8 @@
 # iter-v3/081 — Research Brief (CYCLE 2 CONFIRMATION)
 
 **Branch**: `iteration-v3/081`
-**EDA SHA**: `be0ccf5` (the `analysis/iteration_v3-081/baseline_integrity_audit.py` commit)
-**Setup commit SHA**: `TBD` (backfilled into Section 10 at Phase 5.5)
+**EDA SHA**: `be0ccf5` (the `analysis/iteration_v3-081/baseline_integrity_audit.py` commit; ruff-clean `f9ddea5`)
+**Setup commit SHA**: `5d42c4a` (Sub-fixes 1-3 applied to `run_baseline_v3.py`; this brief SHA-backfill is the commit after it)
 **Iteration type**: CYCLE 2 CONFIRMATION (NOT EXPLORATION) — the SEPARATE CONFIRMATION after the strict 10:1 cadence (cycle 2 = EXPLORATIONs /071-/080, then 1 SEPARATE CONFIRMATION /081)
 **Bundle**: NONE — cycle 2 produced 0 clean PROMISING across all 10 EXPLORATIONs. /081 is a multi-seed RE-VALIDATION of the canonical /059 configuration, analogous to cycle 1's /070 CONFIRMATION (also NO-MERGE).
 
@@ -392,8 +392,8 @@ Per the `BASELINE_V3.md` Data Extent Rule: every `data/<SYMBOL>/8h.csv` must hav
 
 ### Section 9.4 — Reproducibility stamp
 
-- EDA SHA: `be0ccf5` (`analysis/iteration_v3-081/baseline_integrity_audit.py`)
-- Setup commit SHA: `TBD` (this commit — backfilled into Section 10 at Phase 5.5)
+- EDA SHA: `be0ccf5` (`analysis/iteration_v3-081/baseline_integrity_audit.py`); ruff-clean `f9ddea5`
+- Setup commit SHA: `5d42c4a` (Sub-fixes 1-3 to `run_baseline_v3.py`)
 - `ITERATION_LABEL`: `"v3-081"`
 - `vol_scale_floor_per_symbol` at runtime: `{}` (the /081 revert — genuine /059 value)
 - `DEFAULT_ATR_MULTIPLIERS` at runtime: `(2.0, 1.0)`
@@ -457,6 +457,15 @@ The /080 closeout (Critic FINAL `35fc6de`) carried 3 recommendations to /081:
 ### Section 10.4 — Cannot be retroactively renegotiated
 
 Section 8 LOCKED (CONFIRM ±0.20 both axes; RE-ANCHOR BOTH-improve; hard-blocking Gates 3/6/10-CPCV). Section 7 probability calibration LOCKED. Section 4 falsifier bands LOCKED. Section 3 config (the genuine /059 canonical config with `vol_scale_floor_per_symbol` reverted to `{}`) LOCKED. Established at brief LOCK (the setup commit).
+
+### Section 10.5 — Commit chain (SHA-backfilled)
+
+- EDA: `be0ccf5` (`analysis/iteration_v3-081/baseline_integrity_audit.py` + T1-T4 CSVs)
+- EDA ruff-clean: `f9ddea5` (lint-only; CSVs byte-unchanged — deterministic audit)
+- Research brief: `944dddf`
+- Setup commit: `5d42c4a` (Sub-fixes 1-3 applied to `run_baseline_v3.py`)
+- Brief SHA-backfill: this commit
+- Phase 5.5 gate SHA: `TBD` (Engineer)
 
 ---
 
