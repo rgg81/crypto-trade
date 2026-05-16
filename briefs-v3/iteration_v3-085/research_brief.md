@@ -248,5 +248,5 @@ No new libraries. The /059-canonical stack, pinned: lightgbm 4.6.0, optuna 4.8.0
 **Selection criteria — from "literature says X" to "the /085 axis is Y".** (1) The pooled-panel literature (Gu/Kelly/Xiu) is the natural Direction-3 design — the QR tested it with EDA and the v3 cross-section failed the shared-structure precondition. (2) Cakici et al. — "simple models prevail" — argues against adding complexity (a pooled panel) and for a targeted feature on the existing simple per-symbol models. (3) BIS WP 1087 — funding-crowding is a real crypto-native regime signal — but the closed v3 funding axis proved funding-as-direct-feature is INERT; the literature-consistent move is funding as a *regime conditioner inside a composed feature*, which is the `feedback_v3_engineered_feature_pivot.md` Category-2 family (the one PROVEN-PROMISING v3 axis). The /085 axis — `funding_regime_momentum_5d` — is the intersection of those three findings.
 
 **EDA SHA**: `5264091` — `analysis/iteration_v3-085/pooled_model_cross_symbol_structure.py`, `pooled_with_symbol_dummy.py`, `ldo_donor_augmentation.py`, `funding_regime_engineered_feature.py`.
-**Brief SHA**: `<BRIEF_SHA>` (backfilled by the immediately-following commit).
-**Setup SHA**: `<SETUP_SHA>` (backfilled at setup).
+**Brief SHA**: `2bc25d1` (this brief; SHA backfilled by the setup commit).
+**Setup SHA**: `<SETUP_SHA>` (backfilled at setup — Section 10 final line).
