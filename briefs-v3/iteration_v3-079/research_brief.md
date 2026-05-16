@@ -170,13 +170,17 @@ The map is **monotone non-decreasing** in confidence, **bounded on [50, 100]**, 
 
 **In-scope: ALL of {BCH, LDO, TRX}, ALL directions.** ONE universal map — NO per-symbol constant (the /078-closed per-symbol-customization pattern). NOT a tuned subset.
 
-### 3.2 — Affected code (setup commit, QR-authored)
+### 3.2 — Affected code
 
+**QR-authored setup commit (runner config only — the QR does not write `src/` model code):**
 - `run_baseline_v3.py`: `ITERATION_LABEL` `"v3-078"` → `"v3-079"`.
-- `run_baseline_v3.py`: `V3_MODELS` reverts BCH/ADA/TRX → **BCH/LDO/TRX** (the /078 axis revert; Section 3.3). All pre-flight assertion sites and smoke-loop symbol tuples that name `ADAUSDT` revert to `LDOUSDT` (lines ~507, ~562/565, the `V3_MODELS` block comment).
-- Pre-flight assertion: a NEW assertion confirming the conviction-derate primitive's a-priori parameters are at their declared values, and that the map equals 100 at `confidence ≥ 0.65` and `W_MIN_FRAC*100` at `confidence ≤ 0.50` (a 3-point sanity check).
+- `run_baseline_v3.py`: `V3_MODELS` reverts BCH/ADA/TRX → **BCH/LDO/TRX** (the /078 axis revert; Section 3.3). All pre-flight assertion sites, smoke-loop symbol tuples, and the comment/print strings that name `ADAUSDT` revert to `LDOUSDT` (the `V3_MODELS` block + comment; the 14-feature-fallback loop ~line 507; the ATR-multiplier loop ~line 565; the `vol_scale_floor` block ~line 775; the `features_for_symbol`/`atr_multipliers_for_symbol` docstring).
 
-The conviction-derate primitive itself (the map function + the `lgbm.py:get_signal` wiring at line ~725) is **QE Phase-6 scope** — the QR does not write `src/` model code (role boundary). This brief specifies the map (3.1) precisely; the QE implements it and writes its adversarial test (Section 6, Section 8 gate).
+**QE Phase-6 scope (the primary axis implementation — the QR specifies it, the QE implements it):**
+- The conviction-derate map function + the `lgbm.py:get_signal` wiring (replace the hardcoded `weight=100` at line ~725 with `weight=conviction_derate(confidence)`, applied where `confidence` is already in scope) is `src/` model code — **QE Phase-6 scope** (role boundary: the QR does not write `src/` model code).
+- A NEW Phase-6 pre-flight assertion confirming the conviction-derate map's a-priori parameters are at their declared values and the map equals 100 at `confidence ≥ 0.65` / 50 at `confidence ≤ 0.50` (a 3-point sanity check) — also QE Phase-6 scope, since it asserts against the QE-authored map function.
+
+This brief specifies the map (3.1) precisely; the QE implements it and writes its adversarial test (Section 6, Section 8.6 BLOCK conditions).
 
 ### 3.3 — Single-axis discipline
 
@@ -328,5 +332,6 @@ Every design parameter and its selection function — full statement in the EDA 
 ### 10.3 — Commit SHAs
 
 - EDA: `0a54acd` (`analysis(iter-v3/079): sizing-axis EDA …`); stale-CSV cleanup `b942dc7`; conviction-derate design refinement `dc5b723`.
-- Setup commit: `<setup_sha>` (backfilled at the phase-5.5 gate).
-- Brief: `<brief_sha>` (this commit; SHA backfilled).
+- Brief: `b61c8a8` (`docs(iter-v3/079): research brief …`).
+- Setup commit: `3dbbd4b` (`feat(iter-v3/079): setup — V3_MODELS revert ADA->LDO …`).
+- This SHA-backfill commit: `<backfill_sha>`.
