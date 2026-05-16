@@ -149,12 +149,14 @@ def build_parser() -> argparse.ArgumentParser:
     )
     feat_parser.add_argument(
         "--track",
-        choices=["v1", "v2"],
+        choices=["v1", "v2", "v3"],
         default="v1",
         help=(
             "Feature catalog: v1=crypto_trade.features (193 baseline features); "
-            "v2=crypto_trade.features_v2 (34 v2 features). "
-            "When --track v2 and --output is omitted, default output dir is data/features_v2."
+            "v2=crypto_trade.features_v2 (34 v2 features); "
+            "v3=crypto_trade.features_v3 (v3 rigor-arm features, parquet only). "
+            "When --track v2/v3 and --output is omitted, default output dir is "
+            "data/features_v2 or data/features_v3 respectively."
         ),
     )
 
@@ -360,6 +362,35 @@ def build_parser() -> argparse.ArgumentParser:
         help="Directory for funding-rate CSVs (default: data/funding_rates/)",
     )
 
+    # -- fetch-spot subcommand (iter-v3/086) --
+    fs_parser = subparsers.add_parser(
+        "fetch-spot",
+        help=(
+            "Fetch Binance SPOT 8h klines from data.binance.vision monthly archives "
+            "and cache to data/spot/<SYMBOL>/8h.csv. Incremental — re-running appends "
+            "only new candles. Timestamp normalisation: 16-digit microsecond epochs "
+            "(Binance spot archives 2025-01+) are converted to milliseconds."
+        ),
+    )
+    fs_parser.add_argument(
+        "--symbols",
+        type=str,
+        required=True,
+        help="Comma-separated symbols (e.g. BCHUSDT,LDOUSDT,TRXUSDT)",
+    )
+    fs_parser.add_argument(
+        "--intervals",
+        type=str,
+        default="8h",
+        help="Comma-separated intervals (default: 8h)",
+    )
+    fs_parser.add_argument(
+        "--output-dir",
+        type=str,
+        default=None,
+        help="Directory for spot-kline CSVs (default: data/spot/)",
+    )
+
     # -- portfolio-report subcommand --
     pr_parser = subparsers.add_parser(
         "portfolio-report",
@@ -417,6 +448,8 @@ def main() -> None:
         _cmd_seed_live_db(args, settings)
     elif args.command == "fetch-funding":
         _cmd_fetch_funding(args, settings)
+    elif args.command == "fetch-spot":
+        _cmd_fetch_spot(args, settings)
 
 
 def _cmd_fetch(args, settings) -> None:
@@ -692,7 +725,16 @@ def _cmd_features(args, settings) -> None:
     from pathlib import Path
 
     track = getattr(args, "track", "v1")
-    if track == "v2":
+    if track == "v3":
+        from crypto_trade.features_v3 import (
+            list_groups as _list_groups,
+        )
+        from crypto_trade.features_v3 import (
+            run_features_v3 as _run_features,
+        )
+
+        default_output = str(Path(settings.data_dir) / "features_v3")
+    elif track == "v2":
         from crypto_trade.features_v2 import (
             list_groups as _list_groups,
         )
@@ -754,13 +796,12 @@ def _cmd_features(args, settings) -> None:
     print(f"  Symbols: {', '.join(symbols)} | Interval: {args.interval} | Workers: {args.workers}")
 
     output_format = getattr(args, "format", "csv")
-    if track == "v2":
-        # v2's run_features_v2 always emits all groups as parquet — no
-        # groups/output_format kwargs.
+    if track in ("v2", "v3"):
+        # v2/v3 feature runners always emit parquet — no groups/output_format kwargs.
         if output_format != "parquet":
             print(
-                f"NOTE: --format {output_format} ignored for --track v2 "
-                "(v2 features are parquet-only)",
+                f"NOTE: --format {output_format} ignored for --track {track} "
+                f"({track} features are parquet-only)",
                 file=sys.stderr,
             )
         results = _run_features(
@@ -1098,6 +1139,225 @@ def _cmd_fetch_funding(args, settings) -> None:
         print(f"  saved {len(full)} total rows ({len(new_df)} new) → {cache_path}")
 
     print(f"\n[fetch-funding] Done — {total_fetched} new rows across {len(symbols)} symbols")
+
+
+def _cmd_fetch_spot(args, settings) -> None:
+    """Fetch Binance SPOT klines from data.binance.vision monthly archives.
+
+    Writes data/spot/<SYMBOL>/<INTERVAL>.csv with the 11-column kline schema
+    (identical to the perp CSV schema). Incremental: re-running appends only
+    candles not already cached (dedup on open_time).
+
+    Timestamp normalisation (iter-v3/086 Section 3.2 — LOAD-BEARING):
+    Binance spot kline archives switched open_time/close_time from millisecond
+    (13-digit) to microsecond (16-digit) epochs at 2025-01. This function
+    normalises every timestamp to milliseconds so the spot CSVs join cleanly
+    with the millisecond perp CSVs on open_time. Without this normalisation a
+    microsecond open_time would never match a millisecond perp open_time.
+
+    Source: data.binance.vision/data/spot/monthly/klines/<SYM>/<IV>/<SYM>-<IV>-<YYYY-MM>.zip
+    Current month (not yet archived): Binance /api/v3/klines REST API fallback.
+    """
+    import csv as _csv
+    import io as _io
+    import time as _time
+    import zipfile as _zipfile
+    from datetime import UTC, datetime
+    from pathlib import Path
+
+    import httpx as _httpx
+
+    spot_archive_tmpl = (
+        "https://data.binance.vision/data/spot/monthly/klines/{sym}/{iv}/{sym}-{iv}-{ym}.zip"
+    )
+    spot_api_base = "https://api.binance.com"
+    kline_header = [
+        "open_time",
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume",
+        "close_time",
+        "quote_volume",
+        "trades",
+        "taker_buy_volume",
+        "taker_buy_quote_volume",
+    ]
+
+    def _to_ms(val: int) -> int:
+        """Normalise a Binance epoch value to milliseconds.
+
+        Binance spot archives switched from ms (13-digit) to µs (16-digit) at
+        2025-01. Anything >= 1e15 is a microsecond epoch — divide by 1000.
+        Unit test: _to_ms(1_735_689_600_000_000) == 1_735_689_600_000.
+        """
+        return val // 1000 if val >= 1_000_000_000_000_000 else val
+
+    def _month_range(start: str, end: str) -> list[str]:
+        sy, sm = (int(x) for x in start.split("-"))
+        ey, em = (int(x) for x in end.split("-"))
+        out: list[str] = []
+        y, m = sy, sm
+        while (y, m) <= (ey, em):
+            out.append(f"{y:04d}-{m:02d}")
+            m += 1
+            if m == 13:
+                m, y = 1, y + 1
+        return out
+
+    def _fetch_month_archive(http: _httpx.Client, sym: str, iv: str, ym: str) -> list[list[str]]:
+        """Download one monthly spot ZIP; return 11-col kline rows (ms-normalised)."""
+        url = spot_archive_tmpl.format(sym=sym, iv=iv, ym=ym)
+        for attempt in range(3):
+            try:
+                r = http.get(url, timeout=60.0)
+                if r.status_code in (403, 404) or not r.content.startswith(b"PK"):
+                    return []  # absent archive or NoSuchKey XML
+                r.raise_for_status()
+                zf = _zipfile.ZipFile(_io.BytesIO(r.content))
+                name = zf.namelist()[0]
+                rows: list[list[str]] = []
+                for line in zf.read(name).decode().splitlines():
+                    parts = line.split(",")
+                    if parts and parts[0].lstrip("-").isdigit():
+                        parts[0] = str(_to_ms(int(parts[0])))
+                        parts[6] = str(_to_ms(int(parts[6])))
+                        rows.append(parts[:11])
+                return rows
+            except (_httpx.HTTPError, _zipfile.BadZipFile) as exc:
+                if attempt == 2:
+                    raise
+                print(f"    retry {sym} {ym}: {exc}")
+                _time.sleep(2.0 * (attempt + 1))
+        return []
+
+    def _fetch_current_month_api(
+        http: _httpx.Client, sym: str, iv: str, since_ms: int
+    ) -> list[list[str]]:
+        """Fill the current (not-yet-archived) month via /api/v3/klines."""
+        rows: list[list[str]] = []
+        start = since_ms
+        while True:
+            params = {
+                "symbol": sym,
+                "interval": iv,
+                "startTime": start,
+                "limit": 1000,
+            }
+            r = http.get("/api/v3/klines", params=params)
+            r.raise_for_status()
+            data = r.json()
+            if not data:
+                break
+            for k in data:
+                ot = _to_ms(int(k[0]))
+                ct = _to_ms(int(k[6]))
+                now_ms = int(datetime.now(UTC).timestamp() * 1000)
+                if ct >= now_ms:
+                    continue  # forming candle — skip
+                rows.append(
+                    [
+                        str(ot),
+                        str(k[1]),
+                        str(k[2]),
+                        str(k[3]),
+                        str(k[4]),
+                        str(k[5]),
+                        str(ct),
+                        str(k[7]),
+                        str(k[8]),
+                        str(k[9]),
+                        str(k[10]),
+                    ]
+                )
+            if len(data) < 1000:
+                break
+            start = _to_ms(int(data[-1][6])) + 1
+            _time.sleep(0.25)
+        return rows
+
+    symbols = [s.strip() for s in args.symbols.split(",")]
+    intervals = [i.strip() for i in args.intervals.split(",")]
+    if args.output_dir:
+        output_root = Path(args.output_dir)
+    else:
+        output_root = Path(settings.data_dir) / "spot"
+    output_root.mkdir(parents=True, exist_ok=True)
+
+    # Widen the month range to cover historical spot depth (spot predates perp).
+    now_ym = datetime.now(UTC).strftime("%Y-%m")
+    months = _month_range("2018-01", now_ym)
+
+    total_new = 0
+    with (
+        _httpx.Client(timeout=60.0) as bulk_http,
+        _httpx.Client(base_url=spot_api_base, timeout=30.0) as api_http,
+    ):
+        for sym in symbols:
+            for iv in intervals:
+                out_dir = output_root / sym
+                out_dir.mkdir(parents=True, exist_ok=True)
+                out_csv = out_dir / f"{iv}.csv"
+
+                # Load existing cache (incremental dedup on open_time).
+                seen: set[int] = set()
+                existing: list[list[str]] = []
+                if out_csv.exists():
+                    with out_csv.open() as fh:
+                        rd = _csv.reader(fh)
+                        next(rd, None)  # skip header
+                        for row in rd:
+                            if row:
+                                existing.append(row)
+                                seen.add(int(row[0]))
+                    print(f"[fetch-spot] {sym}/{iv}: cache hit — {len(existing)} rows")
+                else:
+                    print(f"[fetch-spot] {sym}/{iv}: no cache — full fetch")
+
+                new_rows: list[list[str]] = []
+
+                # --- Bulk archive months ---
+                for ym in months:
+                    rows = _fetch_month_archive(bulk_http, sym, iv, ym)
+                    fresh = [r for r in rows if int(r[0]) not in seen]
+                    if fresh:
+                        new_rows.extend(fresh)
+                        seen.update(int(r[0]) for r in fresh)
+                    if rows:
+                        print(f"  {sym}/{iv} {ym}: {len(rows)} rows ({len(fresh)} new)")
+                    _time.sleep(0.05)  # light rate-limit courtesy
+
+                # --- Current month via REST API ---
+                last_ms = (
+                    max(int(r[0]) for r in (existing + new_rows)) if (existing or new_rows) else 0
+                )
+                api_rows = _fetch_current_month_api(api_http, sym, iv, last_ms + 1)
+                fresh_api = [r for r in api_rows if int(r[0]) not in seen]
+                if fresh_api:
+                    new_rows.extend(fresh_api)
+                    seen.update(int(r[0]) for r in fresh_api)
+                    print(f"  {sym}/{iv} API current-month: {len(fresh_api)} new rows")
+
+                combined = existing + new_rows
+                combined.sort(key=lambda r: int(r[0]))
+                with out_csv.open("w", newline="") as fh:
+                    wr = _csv.writer(fh)
+                    wr.writerow(kline_header)
+                    wr.writerows(combined)
+
+                total_new += len(new_rows)
+                if combined:
+                    first_ms = int(combined[0][0])
+                    last_ms_out = int(combined[-1][0])
+                    fd = datetime.fromtimestamp(first_ms / 1000, UTC).date()
+                    ld = datetime.fromtimestamp(last_ms_out / 1000, UTC).date()
+                    print(
+                        f"[fetch-spot] {sym}/{iv}: {len(combined)} total rows "
+                        f"({len(new_rows)} new) {fd} → {ld} → {out_csv}"
+                    )
+
+    print(f"\n[fetch-spot] Done — {total_new} new rows across {len(symbols)} symbols")
 
 
 if __name__ == "__main__":
