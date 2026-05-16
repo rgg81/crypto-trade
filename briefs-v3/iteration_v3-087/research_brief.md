@@ -283,9 +283,9 @@ The research path: WebSearch on the Fundamental Law established the breadth thes
 ## Section 11 — Reproducibility Stamp (backfilled at setup)
 
 - EDA SHA: `1a117b2` (`analysis/iteration_v3-087/wholesale_breadth_expansion_eda.py` + `robustness_check.py` + the T1-T6 CSVs)
-- Brief SHA: (this commit)
-- Setup SHA: (backfilled by the setup commit)
-- Phase 5.5 gate SHA: (backfilled)
+- Brief SHA: `287ce0d`
+- Setup SHA: `0d9a5e4` (V3_MODELS 3→6 + REQUIRED_GAP 66→132 + the basis-revert + the 9 affected test files)
+- Phase 5.5 gate SHA: (backfilled by the Phase 5.5 gate commit)
 - ITERATION_LABEL: `v3-087`
 - Run command: `uv run python run_baseline_v3.py --exploration --n-trials 35` (3-seed EXPLORATION-mode, 6-symbol universe)
 - Estimated wall-clock: ~1.6h (linear-in-trials extrapolation from /084 3-symbol 0.70h / 315 trials and /083 4-symbol 1.00h / 420 trials; /087 is 6 symbols × 3 seeds × 35 = 630 trials → ~1.6h base, ~1.9h with 6-symbol CPCV/per-cell-PBO/report headroom — within the 2h EXPLORATION cap). Book size 6 (not 8) is the EDA-peak AND keeps the run within the cap.
