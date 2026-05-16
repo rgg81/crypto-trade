@@ -126,7 +126,8 @@ def build_t1() -> None:
     feat_059 = _git_file_at(SETUP_059, "src/crypto_trade/features_v3/__init__.py")
     feat_head = (REPO / "src/crypto_trade/features_v3/__init__.py").read_text()
     atr_059 = "(2.0, 1.0)" if "(2.0, 1.0)" in feat_059 else "OTHER"
-    atr_head = "(2.0, 1.0)" if "DEFAULT_ATR_MULTIPLIERS: tuple[float, float] = (2.0, 1.0)" in feat_head else "OTHER"
+    _atr_head_needle = "DEFAULT_ATR_MULTIPLIERS: tuple[float, float] = (2.0, 1.0)"
+    atr_head = "(2.0, 1.0)" if _atr_head_needle in feat_head else "OTHER"
     rows.append([
         "DEFAULT_ATR_MULTIPLIERS",
         atr_059,
@@ -140,10 +141,14 @@ def build_t1() -> None:
     ])
 
     # --- Knob 3: V3_ATR_MULTIPLIERS_PER_SYMBOL -----------------------------
-    pa_059 = "{} (empty)" if "V3_ATR_MULTIPLIERS_PER_SYMBOL: dict[str, tuple[float, float]] = {\n}" in feat_059 or "V3_ATR_MULTIPLIERS_PER_SYMBOL: dict[str, tuple[float, float]] = {}" in feat_059 else "see file"
+    # The dict literal opens with "{" and (current code) closes after a
+    # comment block — the canonical empty/per-/051 state is what matters.
+    _pa_decl = "V3_ATR_MULTIPLIERS_PER_SYMBOL: dict[str, tuple[float, float]] = {"
+    _pa_empty = _pa_decl + "}" in feat_059 or _pa_decl + "\n}" in feat_059
+    pa_059 = "{} (empty)" if _pa_empty else "{} (empty per /051)"
     rows.append([
         "V3_ATR_MULTIPLIERS_PER_SYMBOL",
-        pa_059 if pa_059 != "see file" else "{} (empty per /051)",
+        pa_059,
         "{} (empty)",
         "iter-v3/073 per-symbol axis; REVERTED to {} at /074",
         "BEHAVIOR-AFFECTING — per-symbol barriers",
@@ -275,11 +280,6 @@ def build_t2() -> None:
     tag_list = sorted(t for t in tags.splitlines() if t.strip())
     has_061_tag = "v0.v3-061" in tag_list
 
-    # /061 closeout commits (diary line records the verdict).
-    log_061 = _git(
-        "log", "--all", "--oneline", "--grep", "iter-v3/061", "-i"
-    )
-
     rows = [
         [
             "1. iteration type",
@@ -363,8 +363,8 @@ def build_t2() -> None:
         rows,
     )
     print(
-        f"  T2 SUMMARY: iter-v3/061 = INERT EXPLORATION, no v0.v3-061 tag, "
-        f"never in a CONFIRMATION-MERGE bundle => ILLEGITIMATE ACCRETION."
+        "  T2 SUMMARY: iter-v3/061 = INERT EXPLORATION, no v0.v3-061 tag, "
+        "never in a CONFIRMATION-MERGE bundle => ILLEGITIMATE ACCRETION."
     )
 
 
