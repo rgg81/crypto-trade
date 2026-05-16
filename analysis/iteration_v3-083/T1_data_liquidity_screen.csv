@@ -1,0 +1,9 @@
+symbol,first_listing,is_bars_post_burnin,median_daily_quote_vol_musd,depth_ok,liquidity_ok,status
+ATOMUSDT,2020-02-07,5435,92.3,True,True,PASS
+FILUSDT,2020-10-16,4665,163.9,True,True,PASS
+ALGOUSDT,2020-06-16,5045,47.6,True,False,DROP
+VETUSDT,2020-02-14,5399,35.0,True,False,DROP
+ETCUSDT,2020-01-16,5501,139.5,True,True,PASS
+XLMUSDT,2020-01-20,5474,46.3,True,False,DROP
+XTZUSDT,2020-02-06,5438,34.0,True,False,DROP
+AAVEUSDT,2020-10-16,4680,104.0,True,True,PASS

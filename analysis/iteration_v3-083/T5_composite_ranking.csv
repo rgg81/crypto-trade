@@ -1,0 +1,5 @@
+symbol,standalone_is_sharpe,aggregate_is_sharpe_delta,bch_trade_share_dilution_pp,is_trades_per_month,duration_gap_candles,gate_trade_rate,gate_duration_clean,gate_bch_diluted,composite_score,hard_gates_pass,composite_rank
+FILUSDT,-0.1368,-0.0382,12.1,55.75,-0.403,True,True,True,-0.2132,True,1
+AAVEUSDT,-0.1487,-0.0539,11.4,51.25,-0.749,True,True,True,-0.2565,True,2
+ETCUSDT,-0.286,-0.1731,15.9,62.03,0.085,True,True,True,-0.6322,True,3
+ATOMUSDT,-0.4108,-0.3405,14.3,54.22,-0.365,True,True,True,-1.0918,True,4

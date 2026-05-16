@@ -73,10 +73,10 @@ def test_fracdiff_d05_close_present_in_universal_feature_list() -> None:
         "Remove it from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
     )
     n = len(V3_FEATURE_COLUMNS_TOP_N)
-    assert n == 18, (
-        f"V3_FEATURE_COLUMNS_TOP_N has {n} elements — expected 18 (14 anchor + funding family). "
-        "iter-v3/077: the BASELINE_V3 /059/060 18-feature stack (14 anchor + funding family) "
-        "(/076's range_efficiency_50 reverted; PASSIVE-DIAGNOSTIC iteration). "
+    assert n == 14, (
+        f"V3_FEATURE_COLUMNS_TOP_N has {n} elements — expected 14 (the BASELINE_V3 "
+        "/059 anchor stack). iter-v3/083 REVERTS /082's 4-member funding family "
+        "(SUSPICIOUS-OOS-DOMINANT; funding axis CLOSED at 4 data points). "
         "Check V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
     )
 
@@ -198,29 +198,30 @@ def test_fracdiff_d05_close_no_lookahead() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Test 5 — V3_MODELS is exactly (BCH, LDO, TRX) at iter-v3/051 (regression guard)
+# Test 5 — V3_MODELS is exactly (BCH, LDO, TRX, FIL) at iter-v3/083 (regression guard)
 # ---------------------------------------------------------------------------
 
 
-def test_v3_models_at_iter_v3_079() -> None:
-    """V3_MODELS must be (BCHUSDT, LDOUSDT, TRXUSDT) at iter-v3/079.
+def test_v3_models_at_iter_v3_083() -> None:
+    """V3_MODELS must be (BCHUSDT, LDOUSDT, TRXUSDT, FILUSDT) at iter-v3/083.
 
-    iter-v3/079 CYCLE 2 EXPLORATION #9 — the primary axis is the
-    conviction-weighted per-trade sizing primitive (primitive 13) in lgbm.py;
-    V3_MODELS REVERTS /078's BCH/ADA/TRX back to BCH/LDO/TRX. /078's universe
-    revision (LDOUSDT -> ADAUSDT) was SUSPICIOUS-OOS-DOMINANT (Critic FINAL
-    `75f4d42`) and the universe-revision axis is CLOSED for cycle 2 — LDOUSDT
-    is RETAINED. The revert is a baseline-restore of the /060 anchor universe,
-    not a new varied axis. Regression guard against accidental ALGO re-add
-    (system-level REVERT at /051) and against ADA silently remaining.
+    iter-v3/083 CYCLE 3 EXPLORATION #2 — the axis is symbol-universe EXPANSION:
+    V3_MODELS grows 3 -> 4 symbols by ADDING FILUSDT. This is DENOMINATOR
+    EXPANSION (the structural fix for the /082 finding that v3's OOS Sharpe is
+    ~104%-concentrated in BCH), DISTINCT from the CLOSED swap-by-replacement
+    family (/078 LDO->ADA): expansion keeps every incumbent and adds a symbol.
+    FILUSDT picked by the committed IS-edge screen (analysis/iteration_v3-083/).
+    Regression guard against accidental ALGO re-add (REVERT at /051), against
+    ADA re-add (/078 SUSPICIOUS-OOS-DOMINANT, CLOSED), and against HBAR/AVAX
+    (CLOSED at /021).
 
     HISTORY:
     - iter-v3/051: SYSTEM-LEVEL REVERT (4 -> 3 syms; drop ALGOUSDT)
-    - iter-v3/052: 3-sym carry-forward
     - iter-v3/069: 3 -> 4 (+ADAUSDT) UNIVERSE EXPANSION (INERT-AT-EXPLORATION)
     - iter-v3/070: 4 -> 3 (REVERT ADAUSDT) CYCLE 1 CONFIRMATION
     - iter-v3/078: LDOUSDT -> ADAUSDT UNIVERSE REVISION (SUSPICIOUS-OOS-DOMINANT)
     - iter-v3/079: ADAUSDT -> LDOUSDT REVERT (baseline-restore; /078 axis CLOSED)
+    - iter-v3/083: 3 -> 4 (+FILUSDT) UNIVERSE EXPANSION (denominator expansion)
     """
     # Import locally to catch import-time state
     import importlib  # noqa: PLC0415
@@ -235,22 +236,26 @@ def test_v3_models_at_iter_v3_079() -> None:
     v3_models = run_mod.V3_MODELS
     symbols = [sym for _, sym in v3_models]
 
-    assert len(symbols) == 3, (
-        f"V3_MODELS has {len(symbols)} symbols — expected exactly 3 "
-        "(BCH/LDO/TRX) at iter-v3/079. Current symbols: {symbols}"
+    assert len(symbols) == 4, (
+        f"V3_MODELS has {len(symbols)} symbols — expected exactly 4 "
+        f"(BCH/LDO/TRX/FIL) at iter-v3/083. Current symbols: {symbols}"
     )
     assert "ALGOUSDT" not in symbols, (
         f"ALGOUSDT FOUND in V3_MODELS — must be absent (system-level REVERT at /051). "
         f"Current symbols: {symbols}"
     )
     assert "LDOUSDT" in symbols, (
-        f"LDOUSDT NOT FOUND in V3_MODELS — must be present (iter-v3/079 baseline-restore: "
-        f"/078's ADAUSDT swap reverted; LDOUSDT RETAINED). Current symbols: {symbols}"
+        f"LDOUSDT NOT FOUND in V3_MODELS — must be present (iter-v3/083 expansion "
+        f"keeps every incumbent; LDOUSDT RETAINED). Current symbols: {symbols}"
+    )
+    assert "FILUSDT" in symbols, (
+        f"FILUSDT NOT FOUND in V3_MODELS — must be present (iter-v3/083 universe "
+        f"expansion ADDS FILUSDT as the 4th symbol). Current symbols: {symbols}"
     )
     assert "ADAUSDT" not in symbols, (
-        f"ADAUSDT FOUND in V3_MODELS — must be absent (iter-v3/079 baseline-restore: "
-        f"/078's LDOUSDT->ADAUSDT universe revision was SUSPICIOUS-OOS-DOMINANT and is "
-        f"CLOSED for cycle 2). Current symbols: {symbols}"
+        f"ADAUSDT FOUND in V3_MODELS — must be absent (/078's LDOUSDT->ADAUSDT "
+        f"universe revision was SUSPICIOUS-OOS-DOMINANT and is CLOSED). "
+        f"Current symbols: {symbols}"
     )
     # iter-v3/021 closed HBAR + AVAX at catalog level (NEGATIVE-clean)
     assert "HBARUSDT" not in symbols, (
@@ -263,9 +268,9 @@ def test_v3_models_at_iter_v3_079() -> None:
         f"per iter-v3/021 diary lesson (c) — universe expansion HBAR+AVAX NEGATIVE-clean). "
         f"Current symbols: {symbols}"
     )
-    expected = {"BCHUSDT", "LDOUSDT", "TRXUSDT"}
+    expected = {"BCHUSDT", "LDOUSDT", "TRXUSDT", "FILUSDT"}
     actual = set(symbols)
     assert actual == expected, (
         f"V3_MODELS symbols mismatch: expected {expected}, got {actual}. "
-        "iter-v3/079 V3_MODELS must be exactly (BCHUSDT, LDOUSDT, TRXUSDT)."
+        "iter-v3/083 V3_MODELS must be exactly (BCHUSDT, LDOUSDT, TRXUSDT, FILUSDT)."
     )

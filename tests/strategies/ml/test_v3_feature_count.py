@@ -1,8 +1,12 @@
-"""Assertion test for V3_FEATURE_COLUMNS_TOP_N count — iter-v3/082 (18 features).
+"""Assertion test for V3_FEATURE_COLUMNS_TOP_N count — iter-v3/083 (14 features).
 
-Verifies that V3_FEATURE_COLUMNS_TOP_N has exactly 18 entries: the BASELINE_V3
-/059/060 14-feature anchor stack plus the 4-member funding-rate family added at
-iter-v3/082.
+Verifies that V3_FEATURE_COLUMNS_TOP_N has exactly 14 entries: the BASELINE_V3
+/059 anchor stack. iter-v3/083 (cycle-3 EXPLORATION #2) REVERTS /082's 4-member
+funding-rate family (V3_FEATURE_COLUMNS_TOP_N 18 -> 14) — /082 was
+SUSPICIOUS-OOS-DOMINANT and the family ranked bottom-4/18 by importance; per
+`feedback_v3_inert_features_at_higher_budget.md` an INERT family must NOT be
+carried forward. The v3 funding axis is CLOSED at 4 data points. iter-v3/083's
+axis is the UNIVERSE EXPANSION (V3_MODELS 3 -> 4 symbols), NOT a feature change.
 
 Background:
     iter-v3/063 attempted MASS FEATURE EXPANSION 14 → 46 at single-seed n_trials=35
@@ -24,12 +28,13 @@ Background:
     efficiency_ratio_50; both must stay absent. The literal name
     efficiency_ratio_50 stays in the prohibited set.
 
-    iter-v3/082 (cycle-3 EXPLORATION #1) adds the 4-member funding-rate family:
-    funding_rate_momentum_8, funding_accel_3, funding_sign_persist_9,
-    funding_price_divergence_6. Feature count expands 14 → 18.
+    iter-v3/082 (cycle-3 EXPLORATION #1) added the 4-member funding-rate family
+    (feature count 14 → 18). iter-v3/083 (cycle-3 EXPLORATION #2) REVERTS it —
+    /082 was SUSPICIOUS-OOS-DOMINANT; the funding axis is CLOSED at 4 data points
+    (/019/023/024/082). Feature count returns 18 → 14, the /059 anchor.
 
 Tests:
-1. Count is exactly 18.
+1. Count is exactly 14.
 2. All 14 BASELINE_V3 features present.
 3. range_efficiency_50 ABSENT (reverted at /077; Kaufman axis CLOSED).
 4. adx_14 ABSENT (iter-v3/064 NEGATIVE; DROPPED at /065 revert).
@@ -93,14 +98,15 @@ _PROHIBITED_FEATURES = frozenset(
 )
 
 
-def test_feature_count_18():
-    """V3_FEATURE_COLUMNS_TOP_N must have exactly 18 entries at iter-v3/082."""
+def test_feature_count_14():
+    """V3_FEATURE_COLUMNS_TOP_N must have exactly 14 entries at iter-v3/083."""
     n = len(V3_FEATURE_COLUMNS_TOP_N)
-    assert n == 18, (
-        f"V3_FEATURE_COLUMNS_TOP_N has {n} features — expected 18. "
-        "iter-v3/082: the BASELINE_V3 /059/060 14-feature anchor stack plus "
-        "the 4-member funding-rate family (funding_rate_momentum_8, funding_accel_3, "
-        "funding_sign_persist_9, funding_price_divergence_6). "
+    assert n == 14, (
+        f"V3_FEATURE_COLUMNS_TOP_N has {n} features — expected 14. "
+        "iter-v3/083: the BASELINE_V3 /059 14-feature anchor stack. /082's "
+        "4-member funding-rate family is REVERTED (SUSPICIOUS-OOS-DOMINANT; "
+        "funding axis CLOSED at 4 data points). iter-v3/083's axis is the "
+        "UNIVERSE EXPANSION (V3_MODELS 3 -> 4), NOT a feature change. "
         "Update V3_FEATURE_COLUMNS_TOP_N in src/crypto_trade/features_v3/__init__.py."
     )
 
@@ -111,7 +117,26 @@ def test_baseline_v3_features_present():
     missing = _BASELINE_V3_FEATURES - feature_set
     assert not missing, (
         f"BASELINE_V3 features missing from V3_FEATURE_COLUMNS_TOP_N: {sorted(missing)}. "
-        "All 14 BASELINE_V3 features must be preserved in the 18-feature /082 set."
+        "All 14 BASELINE_V3 features must be preserved in the iter-v3/083 anchor set."
+    )
+
+
+def test_funding_family_reverted():
+    """The 4 /082 funding-family features MUST be ABSENT at iter-v3/083 (reverted)."""
+    feature_set = set(V3_FEATURE_COLUMNS_TOP_N)
+    funding = {
+        "funding_sign_persist_9",
+        "funding_momentum_3",
+        "funding_accel_3",
+        "funding_price_divergence_6",
+    }
+    found = funding & feature_set
+    assert not found, (
+        f"/082 funding-family features FOUND in V3_FEATURE_COLUMNS_TOP_N: {sorted(found)}. "
+        "iter-v3/083 REVERTS the /082 funding family — it was SUSPICIOUS-OOS-DOMINANT "
+        "and bottom-4/18 by importance; per `feedback_v3_inert_features_at_higher_"
+        "budget.md` an INERT family must NOT be carried forward. The funding axis is "
+        "CLOSED at 4 data points (/019/023/024/082)."
     )
 
 
