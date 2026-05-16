@@ -128,7 +128,7 @@ def _derive_ensemble_seeds(outer_seed: int, size: int = 5) -> list[int]:
     return [int(s) for s in rng.integers(low=0, high=2**31 - 1, size=size)]
 
 
-ITERATION_LABEL = "v3-084"
+ITERATION_LABEL = "v3-085"
 REPORTS_DIR = Path("reports-v3")
 FEATURES_DIR = Path("data/features_v3")
 DATA_DIR = Path("data")
@@ -244,7 +244,7 @@ def _verify_data_freshness(symbols: tuple[str, ...], max_lag_hours: float = 16.0
 
 
 def _verify_feature_columns(ensemble_size: int | None = None) -> None:
-    """Verifies V3_FEATURE_COLUMNS contents per current brief (iter-v3/077).
+    """Verifies V3_FEATURE_COLUMNS contents per current brief (iter-v3/085).
 
     Parameters
     ----------
@@ -254,6 +254,14 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
         If None, skips the ensemble-size mode check (backward compat for direct
         calls in unit tests that don't care about mode).
 
+    iter-v3/085: CYCLE 3 EXPLORATION #4 — APPEND funding_regime_momentum_5d (the
+      15th feature, the SOLE /085 axis). A Category-2 composed feature
+      regime_momentum_signed_5d × sign(funding_z_30): funding enters ONLY as a
+      sign() switch inside the composed feature, never as a direct model column.
+      NOT the closed funding-as-direct-feature axis (/019/023/024/082) — the
+      /082 funding FAMILY stays REVERTED, the funding_rate_zscore_30 /
+      btc_funding_rate_zscore_30 literal-name bans stay enforced. Asserts
+      len == 15 + funding_regime_momentum_5d present. ITERATION_LABEL = "v3-085".
 
     iter-v3/081: CYCLE 2 CONFIRMATION — re-validate the /059 canonical config.
       Cycle 2 (/071-/080) produced 0 clean PROMISING; /081 is a multi-seed
@@ -321,9 +329,10 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
     V3_ATR_MULTIPLIERS_PER_SYMBOL must be EMPTY (0 entries — REVERT; all syms use DEFAULT).
       ALGOUSDT MUST NOT be a key (REVERTED at iter-v3/051; unchanged at /052-/059).
       LDOUSDT  MUST NOT be a key (REVERTED at iter-v3/051; unchanged at /052-/059).
-    features_for_symbol("BCHUSDT") MUST return 14 features = V3_FEATURE_COLUMNS_TOP_N.
-    features_for_symbol("LDOUSDT") MUST return 14 features (fallback — no per-symbol ext).
-    features_for_symbol("TRXUSDT") MUST return 14 features (fallback).
+    features_for_symbol("BCHUSDT") MUST return 15 features = V3_FEATURE_COLUMNS_TOP_N.
+    features_for_symbol("LDOUSDT") MUST return 15 features (fallback — no per-symbol ext).
+    features_for_symbol("TRXUSDT") MUST return 15 features (fallback).
+    funding_regime_momentum_5d MUST be present (iter-v3/085 EXPLORATION #4 — the 15th feature).
     atr_multipliers_for_symbol("BCHUSDT") MUST return (2.0, 1.0) (DEFAULT fallback).
     atr_multipliers_for_symbol("LDOUSDT") MUST return (2.0, 1.0) (DEFAULT fallback).
     atr_multipliers_for_symbol("TRXUSDT") MUST return (2.0, 1.0) (DEFAULT fallback).
@@ -359,25 +368,37 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
     # 14-feature anchor carried /065-/075. /076's range_efficiency_50 was
     # SUSPICIOUS-OOS-DOMINANT (NON-ADVANCING); the Kaufman path-efficiency axis
     # is CLOSED across 2 data points (/043 + /076 — BASELINE_V3.md Dead Ideas).
-    # iter-v3/084 (cycle-3 REFERENCE / METHODOLOGY): V3_FEATURE_COLUMNS = 14 —
-    # the BASELINE_V3 /059 anchor stack, UNCHANGED. The /082 4-member funding
-    # family was reverted 18 -> 14 at the /083 setup and stays reverted (the v3
-    # funding axis is CLOSED at 4 data points /019/023/024/082). iter-v3/084
-    # makes NO feature change — it is a clean /059-config anchor re-run; its
-    # single declared change is the PER_CELL_GAP 43->22 methodology fix. The
-    # closed funding column names are asserted-ABSENT below.
+    # iter-v3/085 (cycle-3 EXPLORATION #4): V3_FEATURE_COLUMNS = 15 — the
+    # BASELINE_V3 /059 14-feature anchor stack + funding_regime_momentum_5d (the
+    # SOLE /085 axis). funding_regime_momentum_5d is a Category-2 composed
+    # feature regime_momentum_signed_5d × sign(funding_z_30) — funding enters
+    # ONLY as a sign() switch inside the composed feature, NOT as a direct model
+    # column. This is NOT the closed v3 funding axis (/019/023/024/082): the
+    # closed axis fed funding as a DIRECT feature. The /082 4-member funding
+    # FAMILY stays REVERTED and the funding_rate_zscore_30 /
+    # btc_funding_rate_zscore_30 literal-name bans below stay enforced (different
+    # columns). Single-axis EXPLORATION: count 14 → 15, nothing else changes.
     n = len(V3_FEATURE_COLUMNS)
-    if n != 14:
+    if n != 15:
         raise RuntimeError(
-            f"V3_FEATURE_COLUMNS has {n} columns — expected exactly 14. "
-            "iter-v3/084 (cycle-3 REFERENCE / METHODOLOGY): the BASELINE_V3 /059 "
-            "14-feature anchor stack, UNCHANGED. /082's 4-member funding-rate "
-            "family stays REVERTED (SUSPICIOUS-OOS-DOMINANT, bottom-4/18 "
-            "importance — funding axis CLOSED at 4 data points). iter-v3/084 "
-            "makes NO feature change (a clean /059-config anchor re-run). "
+            f"V3_FEATURE_COLUMNS has {n} columns — expected exactly 15. "
+            "iter-v3/085 (cycle-3 EXPLORATION #4): the BASELINE_V3 /059 "
+            "14-feature anchor stack + funding_regime_momentum_5d (the 15th "
+            "feature, the SOLE /085 axis — a Category-2 composed feature). "
+            "/082's 4-member funding-rate FAMILY stays REVERTED (the closed "
+            "funding-as-direct-feature axis at 4 data points /019/023/024/082). "
             "Check V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
         )
-    # iter-v3/084: the 4 /082 funding-FAMILY columns MUST be ABSENT (stay reverted).
+    # iter-v3/085: funding_regime_momentum_5d MUST be PRESENT (the SOLE /085 axis).
+    if "funding_regime_momentum_5d" not in V3_FEATURE_COLUMNS:
+        raise RuntimeError(
+            "funding_regime_momentum_5d NOT FOUND in V3_FEATURE_COLUMNS — must be "
+            "PRESENT at iter-v3/085 (cycle-3 EXPLORATION #4; the 15th feature, the "
+            "SOLE declared axis — a Category-2 composed feature "
+            "regime_momentum_signed_5d × sign(funding_z_30)). "
+            "Add it to V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
+        )
+    # iter-v3/085: the 4 /082 funding-FAMILY columns MUST be ABSENT (stay reverted).
     for _fam in (
         "funding_sign_persist_9",
         "funding_momentum_3",
@@ -491,13 +512,15 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
             )
     print(
         f"  V3_FEATURE_COLUMNS: {n} columns "
-        "(iter-v3/077: the BASELINE_V3 /059/060 14-feature anchor stack; "
+        "(iter-v3/085: the BASELINE_V3 /059/060 14-feature anchor stack + "
+        "funding_regime_momentum_5d, the 15th feature / SOLE /085 axis; "
         "all 9 /063-NEW features ABSENT (adx_14, candle_dow_sin/cos, ret_1d, "
         "sym_vs_btc_ret_3d, sym_vs_btc_vol_14d, taker_buy_imbalance_20, "
         "trend_efficiency_signed, vol_regime_x_momentum); "
         "vol_adj_autocorr ABSENT; efficiency_ratio_50 ABSENT; "
         "range_efficiency_50 ABSENT (/076 reverted at /077 — Kaufman axis CLOSED); "
-        "regime_momentum_signed_5d PRESENT; sym_vs_btc_ret_7d PRESENT)  PASS"
+        "regime_momentum_signed_5d PRESENT; funding_regime_momentum_5d PRESENT; "
+        "sym_vs_btc_ret_7d PRESENT)  PASS"
     )
 
     # iter-v3/070 CLOSEOUT: DEFAULT_ATR_MULTIPLIERS REVERTED (2.0, 1.5) → (2.0, 1.0).
@@ -529,7 +552,7 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
             f"Current keys: {list(V3_FEATURES_PER_SYMBOL.keys())}. "
             "Clear V3_FEATURES_PER_SYMBOL to {{}} in features_v3/__init__.py."
         )
-    print("  V3_FEATURES_PER_SYMBOL: 0 entries (empty — all symbols use 14-feature fallback)  PASS")
+    print("  V3_FEATURES_PER_SYMBOL: 0 entries (empty — all symbols use 15-feature fallback)  PASS")
 
     # iter-v3/074: V3_ATR_MULTIPLIERS_PER_SYMBOL REVERTED to {} (empty). The
     # iter-v3/073 per-symbol triple-barrier asymmetry axis (BCH (2.0,1.25), LDO
@@ -552,21 +575,29 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
         "per-symbol asymmetry; all symbols DEFAULT (2.0, 1.0))  PASS"
     )
 
-    # iter-v3/084: 14-feature universal set (V3_FEATURES_PER_SYMBOL empty — all 3
-    # symbols fall back to V3_FEATURE_COLUMNS_TOP_N, the BASELINE_V3 /059/060 anchor).
-    # Universe: BCH/LDO/TRX (iter-v3/084 REVERT /083 FILUSDT expansion — /083 was
-    # NEGATIVE/NO-MERGE; REQUIRED_GAP reverts 88→66). /082's 4-member funding-rate
-    # FEATURE FAMILY stays REVERTED (the /083 18→14 revert is retained): /082 was
-    # SUSPICIOUS-OOS-DOMINANT and the family ranked bottom-4/18; funding axis CLOSED.
+    # iter-v3/085: 15-feature universal set (V3_FEATURES_PER_SYMBOL empty — all 3
+    # symbols fall back to V3_FEATURE_COLUMNS_TOP_N = the BASELINE_V3 /059/060
+    # 14-feature anchor + funding_regime_momentum_5d, the SOLE /085 axis).
+    # Universe: BCH/LDO/TRX (3-symbol; REQUIRED_GAP 66). /082's 4-member
+    # funding-rate FEATURE FAMILY stays REVERTED (the closed funding-as-direct-
+    # feature axis); funding_regime_momentum_5d is a DIFFERENT column — funding
+    # enters only as a sign() switch inside the composed feature.
     for sym in ("BCHUSDT", "LDOUSDT", "TRXUSDT"):
         sym_feats = features_for_symbol(sym)
-        if len(sym_feats) != 14:
+        if len(sym_feats) != 15:
             raise RuntimeError(
                 f"{sym} fallback has {len(sym_feats)} features — "
-                "expected exactly 14 (iter-v3/084: the BASELINE_V3 /059 "
-                "14-feature anchor stack; /082 funding-rate family stays REVERTED). "
+                "expected exactly 15 (iter-v3/085: the BASELINE_V3 /059 "
+                "14-feature anchor stack + funding_regime_momentum_5d, the SOLE "
+                "/085 axis; /082 funding-rate family stays REVERTED). "
                 "Check V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py. "
                 "V3_FEATURES_PER_SYMBOL must be empty."
+            )
+        if "funding_regime_momentum_5d" not in sym_feats:
+            raise RuntimeError(
+                f"{sym} feature set does not contain funding_regime_momentum_5d "
+                "— must be PRESENT at iter-v3/085 (the 15th feature, the SOLE "
+                "/085 axis). Add it to V3_FEATURE_COLUMNS_TOP_N."
             )
         for _fam in (
             "funding_sign_persist_9",
@@ -611,10 +642,11 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
                 f"Check features_for_symbol('{sym}') path."
             )
     print(
-        "  BCH/LDO/TRX: 14-feature universal fallback "
-        "(iter-v3/084: the BASELINE_V3 /059 14-feature anchor stack; "
-        "the /082 4-member funding-rate FEATURE FAMILY stays REVERTED — funding "
-        "axis CLOSED at 4 data points; funding_sign_persist_9, funding_momentum_3, "
+        "  BCH/LDO/TRX: 15-feature universal fallback "
+        "(iter-v3/085: the BASELINE_V3 /059 14-feature anchor stack + "
+        "funding_regime_momentum_5d, the SOLE /085 axis; the /082 4-member "
+        "funding-rate FEATURE FAMILY stays REVERTED — closed funding-as-direct-"
+        "feature axis; funding_sign_persist_9, funding_momentum_3, "
         "funding_accel_3, funding_price_divergence_6 all ABSENT)  PASS"
     )
 
@@ -2550,10 +2582,12 @@ def main() -> None:
     baseline_symbols = tuple(sym for _, sym in active_models)
     _verify_symbols(baseline_symbols)
     _verify_data_freshness(baseline_symbols + ("BTCUSDT",))
-    # asserts len == 14, funding NOT present, vwap_dev_50/tbr_zscore_30 absent;
+    # asserts len == 15 (BASELINE_V3 14-feature anchor + iter-v3/085's
+    # funding_regime_momentum_5d), funding_regime_momentum_5d present,
+    # vwap_dev_50/tbr_zscore_30/closed funding-FAMILY columns absent;
     # also asserts ensemble_size in (3, 10) for mode discipline.
     _verify_feature_columns(ensemble_size=ensemble_size_for_run)
-    _verify_label_leakage_gap()  # asserts REQUIRED_GAP == 66 (3-symbol universe, iter-v3/084)
+    _verify_label_leakage_gap()  # asserts REQUIRED_GAP == 66 (3-symbol universe, iter-v3/085)
     _verify_track_isolation()  # grep check
 
     # -----------------------------------------------------------------------

@@ -23,8 +23,14 @@ iter-v3/034: ``compute_fracdiff_d05_close`` added (LdP AFML Ch. 5 FFD at d=0.5).
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
+
+# iter-v3/085: default data root for the per-symbol funding-rate cache used by
+# add_funding_regime_momentum_v3_features (mirrors funding_v3._DEFAULT_DATA_DIR).
+_DEFAULT_DATA_DIR: Path = Path("data")
 
 
 def compute_regime_momentum_signed_5d(df: pd.DataFrame) -> pd.DataFrame:
@@ -929,11 +935,146 @@ def add_engineered_v3_features(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+# ===========================================================================
+# iter-v3/085 — funding-regime-conditioned momentum (cycle-3 EXPLORATION #4)
+# ===========================================================================
+
+_FUNDING_REGIME_Z_WINDOW: int = 30  # 30 8h funding-settlement cycles = 10 days
+_FUNDING_REGIME_Z_EPS: float = 1e-9
+
+
+def compute_funding_regime_momentum_5d(
+    df: pd.DataFrame, funding_df: pd.DataFrame
+) -> pd.DataFrame:
+    """Composed feature: regime_momentum_signed_5d × sign(funding_z_30).
+
+    iter-v3/085 — cycle-3 EXPLORATION #4. A Category-2 composed feature: the
+    regime-conditioned momentum primitive ``regime_momentum_signed_5d`` is
+    sign-switched a SECOND time by the prevailing funding-CROWDING regime.
+
+    Hypothesis: momentum into a crowded long is exhaustion (fade it); momentum
+    into a crowded short is a squeeze setup (follow it). The funding rate
+    encodes positioning crowding; a depth-4 LightGBM cannot compose this
+    funding×momentum sign-interaction from the primitives.
+
+    THIS IS NOT THE CLOSED v3 FUNDING AXIS. The closed axis (/019/023/024/082 —
+    ``funding_rate_zscore_30``, ``btc_funding_rate_zscore_30``, the /082 4-channel
+    family) fed funding as a DIRECT model feature. Here the funding rate enters
+    ONLY as a ``sign()`` switch inside a composed feature — it is never a column
+    the tree splits on directly. Category-2 composed construction (the
+    ``feedback_v3_engineered_feature_pivot.md`` carve-out family).
+
+    Construction:
+    - ``regime_momentum_signed_5d``: the existing composed primitive
+      (``ret_5d × sign(hurst_100 − 0.5)``) — must be present in ``df`` (it is
+      computed earlier in ``add_engineered_v3_features``).
+    - ``funding_z_30``: 30-period (10-day) z-score of the past-only funding rate
+      = ``(rate − mean(rate.shift(1), 30)) / (std(rate.shift(1), 30) + 1e-9)``.
+    - ``funding_regime_momentum_5d = regime_momentum_signed_5d × sign(funding_z_30)``.
+      ``sign(0) == 0`` only for exactly-zero funding-z (degenerate early-window
+      rows); 0 is replaced with NaN so the composed feature is NaN there.
+
+    Past-only by construction (Critic Check 1):
+    - ``regime_momentum_signed_5d`` is verified past-only (see
+      ``compute_regime_momentum_signed_5d``).
+    - ``funding_rate[t]`` settled at candle ``open_time`` and is broadcast
+      ~5 min before the 8h boundary — knowable at bar t open (the identical
+      convention ``funding_v3.compute_funding_family`` uses).
+    - ``funding_z_30`` applies ``rate.shift(1)`` BEFORE the 30-bar rolling
+      mean/std, so bar t's own settlement never enters its own z-score window.
+    - The composed feature is an element-wise product of two past-only series.
+
+    Args:
+        df: DataFrame with ``open_time``, ``close`` and ``regime_momentum_signed_5d``.
+        funding_df: DataFrame with ``funding_time`` (ms int) and ``funding_rate``.
+
+    Returns:
+        Copy of ``df`` with ``funding_regime_momentum_5d`` appended. If
+        ``regime_momentum_signed_5d`` is missing the column is all-NaN (the
+        pipeline then fails loudly at the downstream feature-column assertion).
+    """
+    df = df.copy()
+
+    if "regime_momentum_signed_5d" not in df.columns:
+        df["funding_regime_momentum_5d"] = np.nan
+        return df
+
+    # --- merge funding rate (round to minute to absorb settlement jitter) ----
+    funding = funding_df.copy()
+    funding["open_time_aligned"] = (funding["funding_time"] // 60_000) * 60_000
+    df["open_time_aligned"] = (df["open_time"] // 60_000) * 60_000
+    merged = df.merge(
+        funding[["open_time_aligned", "funding_rate"]],
+        on="open_time_aligned",
+        how="left",
+    ).drop(columns=["open_time_aligned"])
+    merged.index = df.index
+    df = df.drop(columns=["open_time_aligned"])
+    r = merged["funding_rate"].astype(float)
+
+    # --- funding_z_30 — PAST-ONLY: .shift(1) before the rolling window -------
+    fr_lag = r.shift(1)
+    fz = (
+        r - fr_lag.rolling(_FUNDING_REGIME_Z_WINDOW, min_periods=_FUNDING_REGIME_Z_WINDOW).mean()
+    ) / (
+        fr_lag.rolling(_FUNDING_REGIME_Z_WINDOW, min_periods=_FUNDING_REGIME_Z_WINDOW).std(ddof=1)
+        + _FUNDING_REGIME_Z_EPS
+    )
+
+    # --- the composed feature ------------------------------------------------
+    # sign(funding_z); 0 (exactly-zero funding-z) -> NaN so the product is NaN.
+    funding_regime_sign = np.sign(fz).replace(0.0, np.nan)
+    df["funding_regime_momentum_5d"] = (
+        df["regime_momentum_signed_5d"].astype(float) * funding_regime_sign
+    )
+    return df
+
+
+def add_funding_regime_momentum_v3_features(
+    df: pd.DataFrame, data_dir: Path | str = _DEFAULT_DATA_DIR
+) -> pd.DataFrame:
+    """GROUP_REGISTRY entry point for ``funding_regime_momentum_v3`` (iter-v3/085).
+
+    Reads the per-symbol ``data/funding_rates/<SYMBOL>.csv`` cache (the same
+    cache ``add_funding_family_v3_features`` uses; populated by
+    ``uv run crypto-trade fetch-funding``) and appends ``funding_regime_momentum_5d``.
+
+    MUST be registered AFTER ``engineered_v3`` in GROUP_REGISTRY — it depends on
+    ``regime_momentum_signed_5d`` being computed by ``add_engineered_v3_features``.
+
+    Raises:
+        KeyError: if ``df`` has no ``symbol`` column.
+        FileNotFoundError: if the funding-rate cache for the symbol is absent.
+    """
+    data_dir = Path(data_dir)
+    symbol = df["symbol"].iloc[0] if "symbol" in df.columns else None
+    if symbol is None:
+        raise KeyError(
+            "df must contain a 'symbol' column for the funding_regime_momentum_v3 "
+            "feature group. Set df['symbol'] = '<SYMBOL>' before calling "
+            "add_funding_regime_momentum_v3_features."
+        )
+    cache_path = data_dir / "funding_rates" / f"{symbol}.csv"
+    if not cache_path.exists():
+        raise FileNotFoundError(
+            f"Funding-rate cache not found: {cache_path}. "
+            f"Run: uv run crypto-trade fetch-funding --symbols {symbol}"
+        )
+    funding_df = pd.read_csv(cache_path)
+    if len(funding_df) == 0:
+        df = df.copy()
+        df["funding_regime_momentum_5d"] = np.nan
+        return df
+    return compute_funding_regime_momentum_5d(df, funding_df)
+
+
 __all__ = [
     "add_engineered_v3_features",
+    "add_funding_regime_momentum_v3_features",
     "compute_cross_asset_divergence_norm",
     "compute_efficiency_ratio_50",
     "compute_fracdiff_d05_close",
+    "compute_funding_regime_momentum_5d",
     "compute_hurst_drift_50_200",
     "compute_range_efficiency_50",
     "compute_regime_momentum_signed_3d",

@@ -46,7 +46,10 @@ from tqdm import tqdm
 
 from crypto_trade.features_v3.calendar_v3 import add_calendar_v3_features
 from crypto_trade.features_v3.cross_btc_v3 import add_cross_btc_v3_features
-from crypto_trade.features_v3.engineered_v3 import add_engineered_v3_features
+from crypto_trade.features_v3.engineered_v3 import (
+    add_engineered_v3_features,
+    add_funding_regime_momentum_v3_features,
+)
 from crypto_trade.features_v3.fracdiff_v3 import add_fracdiff_v3_features
 from crypto_trade.features_v3.funding_v3 import (
     add_btc_funding_v3_features,
@@ -73,6 +76,13 @@ GROUP_REGISTRY: dict[str, Callable[[pd.DataFrame], pd.DataFrame]] = {
     # iter-v3/025: Category 2 composed features; AFTER regime (needs hurst_100)
     # iter-v3/063: trend_efficiency_signed + vol_regime_x_momentum ADDED to dispatch
     "engineered_v3": add_engineered_v3_features,
+    # iter-v3/085: funding-regime-conditioned momentum (cycle-3 EXPLORATION #4).
+    # Category-2 composed feature funding_regime_momentum_5d =
+    # regime_momentum_signed_5d × sign(funding_z_30). MUST be AFTER engineered_v3
+    # — it depends on regime_momentum_signed_5d. Reads data/funding_rates/<SYM>.csv.
+    # NOT the closed funding axis: funding enters only as a sign-switch inside a
+    # composed feature, never as a direct model feature.
+    "funding_regime_momentum_v3": add_funding_regime_momentum_v3_features,
     "fracdiff": add_fracdiff_v3_features,
     "microstructure_v3": add_microstructure_v3_features,
     # iter-v3/019: NEW external-data-source feature family; infrastructure PRESERVED
@@ -184,6 +194,19 @@ V3_FEATURE_COLUMNS_TOP_N: tuple[str, ...] = (
     "sym_vs_btc_ret_7d",  # cross_btc [BASELINE_V3]
     "regime_momentum_signed_5d",  # engineered [BASELINE_V3, /025 PROMISING]
     # -------------------------------------------------------------------------
+    # iter-v3/085 (cycle-3 EXPLORATION #4) — the 15th feature, the SOLE /085 axis.
+    # funding_regime_momentum_5d = regime_momentum_signed_5d × sign(funding_z_30)
+    # — a Category-2 composed feature (the feedback_v3_engineered_feature_pivot.md
+    # carve-out family, the one PROVEN-PROMISING v3 axis per iter-v3/025).
+    # Appended AFTER regime_momentum_signed_5d (its primitive). This is NOT the
+    # CLOSED v3 funding axis (/019/023/024/082): funding enters ONLY as a sign()
+    # switch INSIDE the composed feature — it is never a column the tree can split
+    # on directly. The funding_rate_zscore_30 / btc_funding_rate_zscore_30
+    # literal-name bans below stay enforced (different column, different
+    # construction). Single-axis EXPLORATION: count 14 → 15, nothing else changes.
+    # See briefs-v3/iteration_v3-085/research_brief.md Section 3.
+    "funding_regime_momentum_5d",  # engineered/funding-regime [iter-v3/085 EXPLORATION #4]
+    # -------------------------------------------------------------------------
     # iter-v3/083 (cycle-3 EXPLORATION #2) REVERTS /082's funding-rate FEATURE
     # FAMILY — V3_FEATURE_COLUMNS_TOP_N returns 18 -> 14, the BASELINE_V3 /059
     # anchor stack. /082 (the 4-member funding family funding_sign_persist_9 /
@@ -239,11 +262,11 @@ V3_FEATURE_COLUMNS_TOP_N: tuple[str, ...] = (
     #   vwap_dev_50            — Critic FINAL `a544621` Rec #1 (IC 0.875 with ema_spread_atr_20)
     # -------------------------------------------------------------------------
 )
-"""14-feature set — the BASELINE_V3 /059 anchor stack.
+"""15-feature set — the BASELINE_V3 /059 14-feature anchor + the iter-v3/085 axis.
 
-iter-v3/077 (cycle-2 EXPLORATION #7) REVERTS /076's range_efficiency_50; the
-feature set returns to the BASELINE_V3 /059/060 14-feature anchor (unchanged
-from the /028 spec).
+iter-v3/085 (cycle-3 EXPLORATION #4) APPENDS funding_regime_momentum_5d (the
+15th feature) to the BASELINE_V3 /059/060 14-feature anchor. This is the SOLE
+/085 axis — a single Category-2 composed feature, single-axis EXPLORATION.
 
 History:
   /065+: 14-feature /060 anchor (adx_14 dropped at /064 NEGATIVE).
@@ -253,19 +276,23 @@ History:
   /077 : range_efficiency_50 REVERTED — back to the 14-feature anchor. /077 is
          a PASSIVE-DIAGNOSTIC iteration (conditional-orthogonality report
          instrumentation) and adds no feature.
+  /085 : funding_regime_momentum_5d ADDED (15th) — cycle-3 EXPLORATION #4 axis;
+         a Category-2 composed feature regime_momentum_signed_5d × sign(funding_z_30).
+         An EXPLORATION never updates BASELINE_V3.md; the 14-feature /059 stack
+         stays canonical until a CONFIRMATION-MERGE.
 
 The iter-v3/064 phased mass-expansion #1 (+adx_14, briefly 15 features) was
 NEGATIVE; the runner pre-flight still asserts adx_14 ABSENT.
 """
 
-# iter-v3/077: V3_FEATURE_COLUMNS = V3_FEATURE_COLUMNS_TOP_N (14-feature
-# BASELINE_V3 /059/060 anchor — /076's range_efficiency_50 reverted).
+# iter-v3/085: V3_FEATURE_COLUMNS = V3_FEATURE_COLUMNS_TOP_N (15-feature
+# BASELINE_V3 /059/060 14-feature anchor + the iter-v3/085 axis
+# funding_regime_momentum_5d).
 V3_FEATURE_COLUMNS: tuple[str, ...] = V3_FEATURE_COLUMNS_TOP_N
 """Alias for V3_FEATURE_COLUMNS_TOP_N — the active feature set for all v3 models.
 
-Points to the 14-feature BASELINE_V3 /059/060 anchor stack (iter-v3/077 reverted
-/076's range_efficiency_50; /077 is a PASSIVE-DIAGNOSTIC iteration, no feature
-change).
+Points to the 15-feature set = the BASELINE_V3 /059/060 14-feature anchor +
+funding_regime_momentum_5d (the iter-v3/085 cycle-3 EXPLORATION #4 axis).
 """
 
 DEFAULT_ATR_MULTIPLIERS: tuple[float, float] = (2.0, 1.0)
