@@ -81,8 +81,8 @@ def test_regime_momentum_signed_3d_in_universal_feature_list() -> None:
     n = len(V3_FEATURE_COLUMNS_TOP_N)
     assert n == 14, (
         f"V3_FEATURE_COLUMNS_TOP_N has {n} elements — expected 14 (the BASELINE_V3 "
-        "/059 anchor stack). iter-v3/083 REVERTS /082's 4-member funding family "
-        "(SUSPICIOUS-OOS-DOMINANT; funding axis CLOSED at 4 data points). "
+        "/059 anchor stack). iter-v3/084 keeps the 14-feature anchor UNCHANGED — "
+        "/082's funding family stays reverted (funding axis CLOSED at 4 data points). "
         "Check V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
     )
     assert "fracdiff_d05_close" not in V3_FEATURE_COLUMNS_TOP_N, (

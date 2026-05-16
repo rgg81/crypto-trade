@@ -1,0 +1,14 @@
+knob,v059_canonical_value,note
+V3_MODELS symbols,"('BCHUSDT', 'LDOUSDT', 'TRXUSDT')",iter-v3/084 setup restores this 3-symbol /059 value
+REQUIRED_GAP,66,iter-v3/084 setup restores this 3-symbol /059 value
+DEFAULT_ATR_MULTIPLIERS,"(2.0, 1.0)",iter-v3/084 setup restores this 3-symbol /059 value
+V3_ATR_MULTIPLIERS_PER_SYMBOL,{},iter-v3/084 setup restores this 3-symbol /059 value
+zscore_threshold,2.0,iter-v3/084 setup restores this 3-symbol /059 value
+adx_threshold,20.0,iter-v3/084 setup restores this 3-symbol /059 value
+adx_threshold_per_symbol,{},iter-v3/084 setup restores this 3-symbol /059 value
+vol_scale_floor_per_symbol,{},iter-v3/084 setup restores this 3-symbol /059 value
+block_long_for,(),iter-v3/084 setup restores this 3-symbol /059 value
+block_short_for,(),iter-v3/084 setup restores this 3-symbol /059 value
+enable_per_symbol_drawdown_brake,False,iter-v3/084 setup restores this 3-symbol /059 value
+PER_CELL_GAP,22,FIX: stale 43->22; /084 single declared methodology change
+V3_FEATURE_COLUMNS count,14,14-feature /059 anchor — already in place since /083 funding revert

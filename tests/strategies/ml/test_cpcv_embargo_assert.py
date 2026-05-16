@@ -24,14 +24,13 @@ from crypto_trade.strategies.ml.validation_v3 import (
 )
 
 # v3 documented constants
-# iter-v3/076: STALE-TEST FIX. This test was set up at iter-v3/069 for a 4-symbol
-# iter-v3/083 (cycle-3 EXPLORATION #2) — UNIVERSE EXPANSION: V3_MODELS grows
-# 3 -> 4 symbols (BCH+LDO+TRX+FIL; FILUSDT added — denominator expansion, NOT a
-# swap). REQUIRED_GAP rises 66 -> 88 = (timeout_candles 21 + 1) * 4 symbols,
-# mechanically forced by the symbol count.
+# iter-v3/084 (cycle-3 REFERENCE / METHODOLOGY) — REVERT the /083 FILUSDT
+# universe expansion (NEGATIVE/NO-MERGE). V3_MODELS reverts 4 -> 3 symbols
+# (BCH+LDO+TRX; FILUSDT dropped). REQUIRED_GAP reverts 88 -> 66 = (timeout_
+# candles 21 + 1) * 3 symbols, mechanically forced by the symbol count.
 TIMEOUT_CANDLES = 21  # 10080 min / 480 min = 21 candles at 8h
-N_SYMBOLS = 4  # BCH + LDO + TRX + FIL (iter-v3/083 universe expansion 3 -> 4)
-CORRECT_GAP = (TIMEOUT_CANDLES + 1) * N_SYMBOLS  # 88
+N_SYMBOLS = 3  # BCH + LDO + TRX (iter-v3/084 REVERT /083 FILUSDT expansion 4 -> 3)
+CORRECT_GAP = (TIMEOUT_CANDLES + 1) * N_SYMBOLS  # 66
 DEGRADED_GAP = 11  # what iter-v3/001 actually passed (bug)
 
 N_SAMPLES = 1000  # representative IS candle count
@@ -112,11 +111,11 @@ def test_required_gap_matches_formula() -> None:
         f"(timeout_candles+1)*n_symbols={formula_gap}. "
         "Update the REQUIRED_GAP constant or the formula."
     )
-    # iter-v3/083: UNIVERSE EXPANSION 3 -> 4 symbols (BCH+LDO+TRX+FIL).
-    # REQUIRED_GAP = (timeout_candles 21 + 1) * 4 symbols = 88.
-    assert REQUIRED_GAP == 88, (
-        f"REQUIRED_GAP should be 88 for the iter-v3/083 4-symbol v3 universe "
-        f"(BCH+LDO+TRX+FIL): (21+1)*4=88, got {REQUIRED_GAP}"
+    # iter-v3/084: REVERT /083 FILUSDT expansion — 3-symbol universe (BCH+LDO+TRX).
+    # REQUIRED_GAP = (timeout_candles 21 + 1) * 3 symbols = 66.
+    assert REQUIRED_GAP == 66, (
+        f"REQUIRED_GAP should be 66 for the iter-v3/084 3-symbol v3 universe "
+        f"(BCH+LDO+TRX): (21+1)*3=66, got {REQUIRED_GAP}"
     )
 
 
