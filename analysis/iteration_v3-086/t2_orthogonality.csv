@@ -1,0 +1,10 @@
+symbol,feature,max_abs_ic_vs_anchors,argmax_anchor
+BCHUSDT,basis_zscore_30,0.2497,vwap_dev_20
+BCHUSDT,basis_momentum_3,0.0403,vwap_dev_20
+BCHUSDT,basis_extreme_flag,0.3538,ema_spread_atr_20
+LDOUSDT,basis_zscore_30,0.2086,vwap_dev_20
+LDOUSDT,basis_momentum_3,0.0798,vwap_dev_20
+LDOUSDT,basis_extreme_flag,0.4566,btc_ret_14d
+TRXUSDT,basis_zscore_30,0.315,vwap_dev_20
+TRXUSDT,basis_momentum_3,0.0915,vwap_dev_20
+TRXUSDT,basis_extreme_flag,0.3394,btc_ret_14d

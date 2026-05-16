@@ -1,0 +1,10 @@
+symbol,feature,n,spearman_ic,abs_ic
+BCHUSDT,basis_zscore_30,5697,0.0073,0.0073
+BCHUSDT,basis_momentum_3,5714,-0.0054,0.0054
+BCHUSDT,basis_extreme_flag,5714,0.0483,0.0483
+LDOUSDT,basis_zscore_30,2711,-0.0513,0.0513
+LDOUSDT,basis_momentum_3,2728,-0.039,0.039
+LDOUSDT,basis_extreme_flag,2728,-0.0135,0.0135
+TRXUSDT,basis_zscore_30,5639,-0.0196,0.0196
+TRXUSDT,basis_momentum_3,5656,0.0128,0.0128
+TRXUSDT,basis_extreme_flag,5656,-0.0106,0.0106

@@ -1,0 +1,13 @@
+symbol,bucket,n,long_label_rate
+BCHUSDT,all_IS,5697,0.3544
+BCHUSDT,basis_z > +1.5 (crowded long),416,0.351
+BCHUSDT,basis_z < -1.5 (crowded short),453,0.3311
+BCHUSDT,|basis_z| <= 0.5 (neutral),2123,0.3523
+LDOUSDT,all_IS,2711,0.3124
+LDOUSDT,basis_z > +1.5 (crowded long),187,0.246
+LDOUSDT,basis_z < -1.5 (crowded short),203,0.3892
+LDOUSDT,|basis_z| <= 0.5 (neutral),909,0.3201
+TRXUSDT,all_IS,5639,0.413
+TRXUSDT,basis_z > +1.5 (crowded long),417,0.4125
+TRXUSDT,basis_z < -1.5 (crowded short),423,0.4113
+TRXUSDT,|basis_z| <= 0.5 (neutral),2031,0.422

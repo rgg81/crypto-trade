@@ -1,0 +1,10 @@
+symbol,feature,perturb_bar,bars_before_K_identical
+BCHUSDT,basis_zscore_30,400,True
+BCHUSDT,basis_momentum_3,400,True
+BCHUSDT,basis_extreme_flag,400,True
+LDOUSDT,basis_zscore_30,400,True
+LDOUSDT,basis_momentum_3,400,True
+LDOUSDT,basis_extreme_flag,400,True
+TRXUSDT,basis_zscore_30,400,True
+TRXUSDT,basis_momentum_3,400,True
+TRXUSDT,basis_extreme_flag,400,True
