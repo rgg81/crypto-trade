@@ -601,6 +601,7 @@ def create_order(
         take_profit_price=take_profit_price,
         open_time=open_time,
         timeout_time=timeout_time,
+        confidence=signal.confidence,
     )
 
 
@@ -636,4 +637,5 @@ def make_result(
         stop_loss_price=order.stop_loss_price,
         take_profit_price=order.take_profit_price,
         timeout_time=order.timeout_time,
+        confidence=order.confidence,
     )

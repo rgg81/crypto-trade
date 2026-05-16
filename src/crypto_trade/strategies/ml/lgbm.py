@@ -748,11 +748,17 @@ class LightGbmStrategy:
                 f"[predict] {ts_str} {symbol} → {dir_label} (proba={confidence:.2f}{atr_str})"
             )
 
-        # iter-v3/079 primitive 13: conviction-DERATE map.
-        # Replace flat weight=100 with the per-trade conviction-weighted weight.
-        # confidence is already in scope from lines above (past-only, look-ahead-clean).
-        weight = conviction_derate(confidence)
-        return Signal(direction=direction, weight=weight, tp_pct=tp_pct, sl_pct=sl_pct)
+        # iter-v3/080: flat weight=100 restored (reverts /079 conviction-derate).
+        # confidence is in scope (past-only, look-ahead-clean) and is now threaded
+        # as passive metadata into Signal → Order → TradeResult → trades.csv.
+        weight = 100
+        return Signal(
+            direction=direction,
+            weight=weight,
+            tp_pct=tp_pct,
+            sl_pct=sl_pct,
+            confidence=confidence,
+        )
 
     @staticmethod
     def _detect_interval(master: pd.DataFrame) -> str:

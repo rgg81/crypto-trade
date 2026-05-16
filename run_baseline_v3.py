@@ -52,7 +52,10 @@ from crypto_trade.features_v3 import (
     features_for_symbol,
     process_symbol_v3,
 )
-from crypto_trade.iteration_report import generate_iteration_reports
+from crypto_trade.iteration_report import (
+    _write_confidence_distribution,
+    generate_iteration_reports,
+)
 from crypto_trade.strategies.ml.lgbm import LightGbmStrategy
 from crypto_trade.strategies.ml.metalabeling import MetaLabelingStrategy
 from crypto_trade.strategies.ml.risk_v2 import (
@@ -2837,6 +2840,13 @@ def main() -> None:
     # map (brief Section 3.1). Report-emission only; the trade roster is
     # bit-identical to /060.
     _write_conditional_orthogonality(model_pairs, report_dir)
+
+    # iter-v3/080 PASSIVE-DIAGNOSTIC axis — per-trade M1 confidence distribution.
+    # Reads IS trades (which now carry TradeResult.confidence) and emits
+    # confidence_distribution.csv (schema: symbol, is_month, conf_bin_lo,
+    # conf_bin_hi, n_trades, realized_optuna_conf_threshold).
+    # Report-emission only; the trade roster is bit-identical to /060.
+    _write_confidence_distribution(is_trades, model_pairs, report_dir)
 
     _write_v3_comparison(
         is_trades,
