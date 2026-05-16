@@ -198,6 +198,6 @@ Cycle 3 has used 4 of its 10 EXPLORATION slots — outcome distribution so far: 
 - Engineering report SHA: `d1f8b36`; engineering report follow-up `2908caf`
 - Critic FINAL SHA: `50f32be` (OVERALL=EXPLORATION-MERGE)
 - Phase 8 roster-diff analysis SHA: `b86364c` — `analysis/iteration_v3-085/roster_diff_oos.py` (the Critic-mandated sub-channel-(c) check + the per-cell-PBO aggregation reproduction)
-- Diary + catalog + cycle3_plan + BASELINE_V3.md Dead-Ideas SHA: this closeout commit
+- Diary + catalog + cycle3_plan + BASELINE_V3.md Dead-Ideas SHA: `894ab8e` (this closeout; SHA backfilled by the immediately-following commit)
 **Reports**: `reports-v3/iteration_v3-085/`
 **Tag**: `v0.v3-085` (EXPLORATION closeout marker; NOT a baseline update — BASELINE_V3.md UNCHANGED at `v0.v3-059`)
