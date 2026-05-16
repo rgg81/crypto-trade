@@ -1,157 +1,170 @@
-# v3 Cycle 3 Plan — iter-v3/040–050 (post-iter-v3/039 strategy)
+# v3 Cycle 3 Plan — iter-v3/082-091 (10 EXPLORATIONs) + iter-v3/092 CONFIRMATION
 
-**Date:** 2026-05-09 (at iter-v3/039 closeout — CONFIRMATION-NO-MERGE)
-**Author:** QR (autopilot)
-**Anchor:** BASELINE_V3.md UNCHANGED at iter-v3/028 (+0.5101 IS / +0.5053 OOS)
-**Cycle:** 3rd post-bootstrap cycle (cycle 1 = iter-v3/019-028 → CONFIRMATION-MERGE; cycle 2 = iter-v3/029-039 → CONFIRMATION-NO-MERGE)
+**Date**: 2026-05-16 (authored at the iter-v3/081 cycle-2 CONFIRMATION closeout)
+**Author**: QR (autopilot)
+**Supersedes**: the prior `cycle3_plan.md` dated 2026-05-09 (an obsolete plan written under the pre-RE-ANCHOR iter-v3/040-050 cycle numbering — fully superseded)
+**Anchor**: BASELINE_V3.md UNCHANGED at iter-v3/059 — `v0.v3-059`, **IS monthly Sharpe +1.0894 / OOS monthly Sharpe +0.5791** (the BASELINE_V3.md / CONFIRMATION anchor). iter-v3/081 freshly RE-VALIDATED this config at unified-10-seed CONFIRMATION rigor: IS +1.0894 (exact) / OOS +0.5999 — the canonical baseline is confirmed live and pristine.
+**Cycle structure**: cycle 3 = 10 SEPARATE EXPLORATIONs (iter-v3/082-091) + 1 SEPARATE CONFIRMATION (iter-v3/092), per the strict 10:1 cadence (`feedback_v3_strict_10_to_1_cadence.md`). The 10th EXPLORATION (/091) is NOT collapsed into /092.
 
-## Cycle 3 Goal
+---
 
-**Lift IS Sharpe to ≥ +1.0** (or at minimum ≥ +0.5101 to satisfy strict BOTH-must-improve rule per `feedback_v3_strict_both_is_oos_baseline.md`) **while preserving OOS Sharpe ≥ +1.0** (target: maintain iter-v3/039's OOS gate clearance with a more IS-friendly mechanism).
+## 1. The Mandate — cycle 3 is a step-change in ambition
 
-**Why IS is the focus.** iter-v3/039 confirmed that OOS Sharpe ≥ +1.0 IS achievable in v3 (+1.4650 multi-seed mean, first time in v3 history). The binding constraint shifted from OOS to IS. Strict baseline rule (per user directive 2026-05-09): BOTH IS and OOS multi-seed mean Sharpe must improve to update BASELINE_V3.md. Cycle 3 must produce an iteration that lifts BOTH simultaneously.
+This plan is governed by two user directives:
 
-**Why per-symbol customizations are off the table.** iter-v3/039 confirmed the "suspicious-OOS-divergence" pattern is STRUCTURAL to per-symbol-customizations bundle (PERSISTED at multi-seed; was hoped to dissolve). Per-symbol features (BCH fracdiff) and per-symbol labels (LDO ATR) systematically lift OOS but break IS. Future per-symbol additions must clear IS-axis pre-validation BEFORE inclusion.
+- **`feedback_v3_bold_research_mandate.md`** (user directive 2026-05-16, verbatim): *"do not stop by any means. Be creative, there are so many symbols and possibilities, be bold, ask the QR to research, and force him to do his job best way possible."*
+- **`feedback_v3_mass_feature_expansion.md`** — research papers / internet / domain literature to identify production-grade quant features; v3's 14-feature stack is undersized vs production-grade systems that run 50-200+ features.
 
-## Starting State (iter-v3/040)
+**The evidence that forces a pivot.** Cycle 2 produced **0 clean PROMISING across all 10 EXPLORATIONs** (4 SUSPICIOUS-OOS-DOMINANT, 1 NEGATIVE, 3 INERT, 2 NULL-RESULT). Cycle 1 produced the identical outcome — a /070 CONFIRMATION that was a NO-MERGE re-validation because no cycle-1 EXPLORATION reached the bundle-grade bar. Two full cycles, 20 EXPLORATIONs, 0 edge ingredients. The conclusion is dispositive: **the conservative axis families — gate-threshold knobs, risk primitives, single-symbol swaps, labeling tweaks, instrumentation — are EXHAUSTED against the narrow 3-symbol BCH/LDO/TRX universe.** A narrow universe + incremental axes will not find an edge.
 
-**iter-v3/040 = REVERT per-symbol customizations + restore iter-v3/028 baseline + ALGO universe + regime_momentum.** Acts as cycle 3 baseline-restore-and-extend.
+**Cycle 3 axis-family CLOSURE (binding).** The following families are CLOSED for cycle 3 — no cycle-3 EXPLORATION may pick an axis in these families:
 
-Specific changes from iter-v3/039 head:
-1. **Clear V3_FEATURES_PER_SYMBOL** (currently `{"BCHUSDT": V3_FEATURE_COLUMNS_TOP_N + ("fracdiff_d05_close",)}`) → `{}` (empty). Or keep as architecture but unused — implementation choice for the iter-v3/040 Engineer.
-2. **Clear V3_ATR_MULTIPLIERS_PER_SYMBOL** (currently `{"LDOUSDT": (1.5, 0.75)}`) → `{}` (empty). Or keep as architecture but unused.
-3. **KEEP V3_MODELS = (BCH, LDO, TRX, ALGO)** — 4 symbols, ALGO is validated PROMISING from iter-v3/029 single-seed.
-4. **KEEP V3_FEATURE_COLUMNS_TOP_N = 14** including regime_momentum_signed_5d (validated at iter-v3/028 CONFIRMATION-MERGE).
-5. **KEEP REQUIRED_GAP = 88 = (21+1) × 4** for 4-symbol universe.
-6. **ITERATION_LABEL = "v3-040"**.
+| CLOSED family | Why | Evidence |
+|---|---|---|
+| Gate-threshold knobs (ADX, z-score OOD, BTC-trend band, vol-scale ceiling/floor, confidence threshold floor) | Saturated | `feedback_axis_saturation_predictor.md`; cycle-1 /066/067, cycle-2 /074/075 all INERT; ADX axis closed at `feedback_v3_adx_axis_asymmetric_v3.md` |
+| ATR-multiplier labeling knobs (tighten or widen) | Dead axis | /065 widening + /042 tightening both failed; `project_v3_cycle1_outcome.md` |
+| Risk primitives (kill switches, position-size de-rates, drawdown brakes, conviction de-rates) | Most-tried-least-productive cycle-2 category — 2 INERT + 1 NULL-RESULT | cycle-2 /074, /075, /079 |
+| Single-symbol swaps / universe revision *by replacement* (swap one symbol for another within a 3-symbol universe) | Loads the regime factor via the added symbol's roster | /078 SUSPICIOUS-OOS-DOMINANT; `feedback_v3_is_oos_regime_divergence.md` extension |
+| Labeling tweaks (fixed-horizon, per-symbol triple-barrier asymmetry, meta-labeling on the same 14 features) | Exhausted | cycle-2 /071, /072, /073 |
+| Instrumentation / passive-diagnostic axes | Produce no edge ingredient by construction | cycle-2 /077, /080 |
 
-Hypothesis for iter-v3/040: clean baseline restore beats iter-v3/039 on IS axis (lift to ≥ +0.30) and approximately matches iter-v3/028 baseline OOS (~ +0.50). Acts as cycle-3 anchor for iter-v3/041-049 EXPLORATIONs.
+Boldness is in the **axis design and the research depth** — NOT in bypassing the workflow. All standing cadence, no-cheating, sacred-constant, and merge-gate rules hold in full.
 
-**iter-v3/040 classification:** EXPLORATION (single-seed=42 EXPLORATION-spec; --exploration --seeds 1 --n-trials 35 default; ENSEMBLE_SIZE=5 inner). NOT a CONFIRMATION-NO-MERGE retry (per user directive "let's try to fix is next cycle" — iter-v3/040 is the start of a new EXPLORATION cycle, not a CONFIRMATION re-run).
+## 2. The Research Mandate — every cycle-3 QR must do genuine literature research
 
-**Why iter-v3/040 is also a "PROMISING-MECHANICAL"-class candidate:** baseline restoration is a clean architectural decision (drag removal of per-symbol customizations that were proven to break IS at multi-seed). Per `feedback_promising_mechanical_subtype.md`, mechanical lift gets classified as PROMISING-MECHANICAL — strictly accretive component decision NOT new edge ingredient — and is non-compoundable across iterations.
+**This is the defining process change for cycle 3.** Every cycle-3 EXPLORATION QR (starting iter-v3/082) MUST, in Phases 1-4, do genuine **WebSearch / WebFetch research** into quant-finance papers, domain literature, and crypto-native alpha sources. EDA on the existing 3-symbol parquets alone is no longer sufficient — it is the activity that produced two cycles of null results.
 
-## Cycle 3 EXPLORATION Axes (iter-v3/041–049)
+Concretely, each cycle-3 QR must:
 
-Five candidate axes for the next 9 EXPLORATIONs after iter-v3/040 baseline-restore. All are UNIVERSAL (target both IS and OOS lift), not per-symbol.
+1. **Research before EDA.** Use WebSearch/WebFetch to survey the current literature on the axis family the QR is pursuing (see Section 3 priority axes). Funding-rate microstructure, OI dynamics, basis/premium, liquidation-cascade modeling, on-chain flow, and crypto-universe construction all have a real 2023-2025 research literature. The companion reference `references/crypto-edge-deep.md` is a starting index, not a substitute for fresh research.
+2. **Document the research path in brief Section 10 (QR Audit Trail)** — papers consulted (with arXiv/SSRN IDs or DOIs where available), the specific finding each contributes, and the selection criteria that took the QR from "literature says X" to "the iter-v3/0NN axis is Y."
+3. **Ground Section 2 (IS-only numerical evidence) in committed analysis** — per `feedback_v3_axis_selection_quant_discipline.md`, the axis must be QR-EDA-driven with a committed `analysis/iteration_v3-0NN/*.py` script producing numerical tables BEFORE the brief. Research motivates the axis; EDA on IS data validates it is worth a backtest slot.
+4. **Reject incremental knob-tweaks at the brief stage.** If a proposed axis is in a Section-1 CLOSED family, the Phase 5.5 gate BLOCKS it. The orchestrator must push the QR hard in every dispatch — demand depth and ambition, reject the conservative reflex.
 
-### Axis 1 — NEW universal engineered feature with proven IS lift (3-4 EXPLORATIONs)
+The orchestrator's `quant-researcher` agent has WebSearch and WebFetch tools. Use them.
 
-**Why first:** Engineered features have the strongest track record in v3 (iter-v3/025 → iter-v3/028 CONFIRMATION-MERGE; first multi-seed-validated edge ingredient). The pattern that fails at multi-seed is per-symbol customization, NOT engineered features per se. UNIVERSAL composed features should still work.
+## 3. Priority Axes for Cycle 3 — three directions (QR EDA-picks the specific axis each iteration)
 
-**Selection methodology:** ANALYSIS-DRIVEN, not random. Build IS-only candidate-screening pipeline:
-1. EDA on iter-v3/028 multi-seed importance ranks per symbol (BCH+LDO+TRX) — already done at `analysis/iteration_v3-029/per_symbol_feature_analysis.py` (commit `d451885`).
-2. Identify high-importance primitive pairs that LightGBM can't compose at depth 3-5 (similar to regime_momentum_signed_5d = ret_5d × sign(hurst_100 − 0.5)).
-3. Test composed features for: (a) IS Spearman ρ with target ≥ 0.05 (mild lift over universal feature distribution), (b) IC with existing 14 features ≤ 0.50 (orthogonality), (c) ADF p < 0.05 (stationarity).
-4. RANK candidates by IS Spearman ρ DESC; test top 3-4 candidates as separate EXPLORATIONs (atomic swap one universal feature each — replace or add).
+Cycle 3 has THREE priority directions. Each cycle-3 QR selects the specific axis for its iteration via genuine research + IS EDA, within one of these directions. This plan sets direction and priority — it deliberately does NOT pre-prescribe all 10 axes (per `feedback_v3_axis_selection_quant_discipline.md`, axis selection is QR-EDA-driven, not orchestrator-pre-committed).
 
-**Candidate features (illustrative, to be re-derived from analysis):**
-- `hurst_drift_50_200 = hurst_50 − hurst_200` (multi-timeframe regime drift; requires hurst_50/hurst_200 primitives — small EDA cost)
-- `adx_signed_momentum = adx_14 × sign(ret_5d)` (REJECTED at iter-v3/025 EDA but worth retesting at cycle 3 anchor)
-- `vwap_dev_signed_momentum = vwap_dev_20 × sign(ret_5d)` (cross of mean reversion and momentum; new mechanism)
-- `volatility_regime_momentum = ret_5d × sign(range_realized_vol_50 − rolling_median(range_realized_vol_50, 100))` (regime-conditional momentum; high-vol vs low-vol)
+### Direction 1 (HIGHEST) — NEW crypto-native feature families, researched from literature
 
-**Iterations consumed:** iter-v3/041, iter-v3/042, iter-v3/043 (and possibly iter-v3/044) for top 3-4 candidates as separate atomic-swap EXPLORATIONs.
+v3's 14-feature `V3_FEATURE_COLUMNS_TOP_N` stack is entirely price/return/volatility/regime features computed from OHLCV. It contains **zero crypto-native alpha sources**. This is the single largest structural gap. Crypto markets generate edge sources that do not exist in equities — and the v3 8h candle cadence is uniquely well-suited to capture them (an 8h candle is exactly one funding-settlement period on Binance/OKX/Bybit).
 
-### Axis 2 — NEW model architecture (1-2 EXPLORATIONs)
+Feature families to research and bring into v3 (the QR EDA-picks which, and the specific feature construction, per iteration):
 
-**Why retest:** iter-v3/016 closed XGBoost head-to-head as NEGATIVE (worst OOS Δ in v3 history at -2.53), but the closure was specifically for `n_trials=10 + cross-entropy + depth-wise defaults`. NOT closed for all configs. Cycle 3 retest at:
-- `n_trials=35` (current default; matches iter-v3/041+ EXPLORATION budget)
-- Sharpe-objective Optuna (vs cross-entropy)
-- `lossguide` growth (vs depth-wise)
-- New universal feature set from Axis 1
+- **Funding-rate term structure and regimes** — funding settles every 8h; persistent funding regimes encode positioning crowding. Raw rate, 8/24/72h funding momentum, funding z-score (rolling), premium index. Per BIS WP 1087 (2025), a carry shock predicts a liquidation jump — the most actionable empirical result for a crypto futures bot. (Note: cycle-1 /019/023/024 tried a single `funding_rate_zscore_30` feature and it was INERT — but that was ONE feature added by univariate rank at n_trials=10/35; a researched funding *family* with proper construction is a different axis. The QR must address why this attempt differs.)
+- **Open-interest dynamics** — OI delta as a leverage-stretch signal: 8h OI delta, OI/MarketCap, venue-concentration, cross-OI correlation. Rising OI + flat price = stealth leverage build.
+- **Basis / perp-spot premium** — mark-vs-index, cross-exchange basis, 8h basis delta, basis z-score. The premium index trades faster than the funding clamp.
+- **Liquidation cascades** — self-exciting via stop-loss/liquidation-price chaining (Hawkes-process structure); liquidation count/notional by side over 1/4/8/24h windows, cluster booleans, long/short asymmetry.
+- **On-chain flow** (BTC/ETH, used as a cross-asset regime input for the alt-symbols) — Exchange Whale Ratio, MVRV-Z, NUPL/SOPR. Lag ≥1 candle behind block-publication time.
 
-**Hypothesis:** XGBoost on the NEW universal feature set (post-Axis 1 winner) outperforms LightGBM on IS Sharpe by ≥ +0.20 (XGBoost's sequential boosting may capture different decision-tree splits than LightGBM's leaf-wise growth, which could surface IS signal that LightGBM misses).
+Per `feedback_v3_mass_feature_expansion.md`, **mass feature expansion toward the 50-100 feature target is in scope** — but per that memory's AMENDMENT 2026-05-14, mass expansion is structurally inadequate at single-seed EXPLORATION (iter-v3/063 falsified 14→46 features at single-seed: IS Sharpe collapsed to NEGATIVE). The cycle-3 methodology for mass expansion: either **phased single-feature-family EXPLORATIONs** at single-seed (add a researched 3-5-feature crypto-native family at a time, validated as a family), OR **full mass expansion attempted only at the /092 CONFIRMATION** in multi-seed mode with n_trials ≥ 100. The cycle-3 QRs should favor phased crypto-native-family additions across the EXPLORATION slots; /092 may attempt the full mass-expansion bundle.
 
-**Iterations consumed:** iter-v3/045 (XGBoost head-to-head retest with new feature set + Sharpe objective).
+**Engineering note (cycle-3 prerequisite):** the crypto-native families above require data feeds v3 does not currently fetch (funding rate, open interest, basis, liquidations). The first cycle-3 EXPLORATION that pursues Direction 1 must include, in its brief, the data-acquisition plan — which feed, which endpoint, the look-ahead lag, and the `features_v3/` extension. This is a real engineering cost and a legitimate one; it is the structural investment cycle 3 exists to make.
 
-### Axis 3 — NEW universal labeling architecture (1-2 EXPLORATIONs)
+### Direction 2 (HIGH) — Symbol-universe EXPANSION
 
-**Why:** iter-v3/017 closed meta-labeling as NEGATIVE PATH C (over-filter; M2 filters 42.7% per-candle but kept trades show no quality lift). Cycle 3 retest with new universal feature set (post-Axis 1) and possibly relaxed M2 threshold (vs PINNED 0.5 at iter-v3/017).
+v3 has been LOCKED to BCH/LDO/TRX for the **entirety of cycles 1 AND 2** — every one of 20+ iterations. This is a structural fragility, not a setting:
 
-**Alternative labeling axes:**
-- Fixed-horizon return labels (vs triple-barrier) — simpler, may produce different IS distribution
-- Volatility-clustering labels (recent-vol-conditional barrier) — adapts barrier to volatility regime instead of fixed ATR multipliers
-- Asymmetric triple-barrier (TP=2.0, SL=0.5 instead of 2.0/1.0) — emphasizes positive tail captures
+- The /078 finding: BCH dominates **~77% of IS wpnl**. A positive-edge change to any non-BCH symbol washes against BCH's dominance of the aggregate. The 3-symbol universe makes the portfolio a near-single-symbol bet.
+- LDO directional weakness (OOS WR 25.0%) is unresolved — and a 3-symbol universe gives no room to dilute it.
 
-**Iterations consumed:** iter-v3/046 (one labeling EXPLORATION; if PROMISING, iter-v3/047 = labeling refinement).
+**Universe EXPANSION** — adding symbols to grow the denominator — is the structural fix for both. It is distinct from the CLOSED "universe revision by replacement" family (/078 swapped LDO→ADA within a 3-symbol universe and loaded the regime factor via the added symbol's roster). Expansion grows the count; it is denominator expansion, the orthogonal mechanism.
 
-### Axis 4 — Feature pruning for parsimony (1 EXPLORATION)
+The allowed universe is wide. v3's `V3_EXCLUDED_SYMBOLS` excludes only the v1/v2 symbols (BTC, ETH, LINK, LTC, DOT, SOL, XRP, DOGE, NEAR, BNB) plus MKR. **Dozens of liquid Binance-futures symbols are available.** The cycle-3 QR pursuing Direction 2 must:
 
-**Why:** iter-v3/039 used 14 universal features + per-symbol BCH fracdiff. Cycle 3 anchor (iter-v3/040) is 14 universal features. Test if dropping the bottom-3 importance features (per iter-v3/028 multi-seed importance ranks) lifts IS Sharpe via parsimony (smaller search space → less Optuna overfitting on IS).
+1. Research the candidate-symbol set — liquidity, listing date (drop the first 30-60 days of any newly-listed symbol per the crypto non-stationarity pitfall), data depth, and whether the symbol has a genuine independent edge signal.
+2. **Screen candidates on a genuine IS-edge screen, not feature-space distance alone.** Prior universe expansions failed precisely here: /021 (HBAR+AVAX) and /069 (ADA) used feature-space-distance / price-correlation screens that captured price diversity, not signal diversity. The cycle-3 screen must measure per-symbol IS edge AND portfolio-aggregate IS-Sharpe contribution under BCH dominance (the /078 lesson: a per-symbol Sharpe screen does not transfer to portfolio-aggregate Sharpe lift).
+3. Pre-register the holding-time / roster-composition predictor per `feedback_v3_is_oos_regime_divergence.md` — an added symbol whose roster is duration-loaded relative to the existing universe loads the regime factor.
 
-**Hypothesis:** Dropping 3 lowest-importance universal features (e.g., `ret_skew_50`, `ret_skew_200`, `vwap_dev_20` if low-importance — TBD from EDA) reduces IS overfitting risk without dropping signal. Predicted IS lift: +0.10 to +0.30; OOS effect: neutral to slightly positive.
+A larger universe (5-8 symbols) directly dilutes BCH concentration and gives the portfolio genuine breadth — the Fundamental Law (IR = IC × √breadth) says breadth is the lever v3 has never pulled.
 
-**Iterations consumed:** iter-v3/048 (single feature-pruning EXPLORATION; atomic drop of 3 features; V3_FEATURE_COLUMNS_TOP_N 14 → 11).
+### Direction 3 (MEDIUM) — NEW model architectures / multi-symbol-pooled models
 
-### Axis 5 — Per-symbol additions that DON'T break IS (1 EXPLORATION, optional)
+v3 runs one independent LightGBM model per symbol. Two structural alternatives worth a cycle-3 EXPLORATION slot:
 
-**Why:** Per-symbol architecture is validated as CODE INFRASTRUCTURE at iter-v3/039. The structural problem is per-symbol customizations breaking IS. Cycle 3 reserves ONE iteration to test a per-symbol addition that PASSES an IS-axis pre-validation gate.
+- **Multi-symbol-pooled model** — a single model trained on the pooled cross-section of all universe symbols (the v1 Model A precedent: BTC+ETH pooled). Pooling shares statistical strength across symbols and is the natural architecture for a *larger* universe (Direction 2) — a pooled model over 6-8 symbols has far more training data per fit than 6-8 thin per-symbol models. Pooling requires scale-invariant features (the project convention) — which the crypto-native families of Direction 1 (z-scores, ratios) satisfy.
+- **NEW model architecture** — cycle-1 /016 closed a LightGBM→XGBoost head-to-head, but only at `n_trials=10 + cross-entropy + depth-wise defaults`; it was explicitly NOT closed for all configs. A cycle-3 retest would need a genuine structural rationale (a Sharpe-objective Optuna, a different growth policy) AND should be paired with the new feature families — not run on the stale 14-feature stack.
 
-**IS-axis pre-validation gate (NEW — cycle 3 protocol):** Before adding any per-symbol feature or per-symbol label to V3_FEATURES_PER_SYMBOL or V3_ATR_MULTIPLIERS_PER_SYMBOL, the QR must run an IS-only paired-bootstrap CV showing:
-- Δ IS Sharpe with the candidate ≥ -0.10 (does NOT regress IS by more than 0.10 monthly Sharpe at 90% CI)
-- Δ IS Sharpe at 90% CI lower bound ≥ -0.20
+Direction 3 is MEDIUM priority because it compounds best *after* Direction 1 (new features) or Direction 2 (larger universe) have given the model something new to learn. A cycle-3 QR may pick Direction 3 if the EDA motivates it — but the highest-expected-value cycle-3 EXPLORATIONs are Directions 1 and 2.
 
-**If the IS-axis pre-validation FAILS, the per-symbol candidate is REJECTED at the brief stage** (Phase 5.5 gate BLOCK). Only candidates passing the IS-axis pre-validation enter the EXPLORATION queue.
+## 4. Standing Constraints Carried into Cycle 3
 
-**Iterations consumed:** iter-v3/049 (per-symbol candidate; only if Axis 5 produces a candidate that passes IS-axis pre-validation; otherwise reserve as buffer).
+Every cycle-3 EXPLORATION brief must carry and, where its axis touches them, target these three unresolved constraints:
 
-## iter-v3/050 — SECOND v3 CONFIRMATION
+1. **LDO directional weakness** — OOS WR 25.0%, well below the 50% baseline for a triple-barrier classifier; a drag through every cycle-1 and cycle-2 iteration. Universe expansion (Direction 2) dilutes it; a multi-symbol-pooled model (Direction 3) may rescue it via shared strength; crypto-native features (Direction 1) may give the LDO model signal it currently lacks.
+2. **BCH IS-PnL / OOS concentration** — BCH dominates ~77% of IS wpnl. Universe expansion is the direct denominator-expansion fix. The aspirational top-symbol concentration gate is ≤ 30%.
+3. **OOS Sharpe gap** — /059's OOS +0.60 is +0.42 short of the aspirational +1.0 floor. The aspirational merge floors (IS and OOS Sharpe ≥ +1.0) inform cycle-3 priorities; per `feedback_v3_baseline_update_policy.md` they do not block a baseline update, but BOTH IS and OOS must improve over /059 for /092 to update BASELINE_V3.md (`feedback_v3_strict_both_is_oos_baseline.md`).
 
-**Trigger:** 10/10 EXPLORATIONs in cycle 3 (iter-v3/040-049) complete; choose the bundle that lifts BOTH IS and OOS.
+## 5. Per-Iteration Discipline (every cycle-3 EXPLORATION brief)
 
-**Bundle selection criteria (pre-registered, locked at cycle 3 start):**
-1. iter-v3/040 baseline-restore (always-included; cycle anchor)
-2. From Axis 1 EXPLORATIONs: select the engineered feature with highest IS Sharpe lift AND positive OOS Sharpe lift (SINGLE feature; engineered features DON'T STACK at single-seed per `feedback_v3_engineered_features_dont_stack.md`).
-3. From Axis 2-4 EXPLORATIONs: select architectural changes (model, labeling, pruning) that produced PROMISING (clean) at single-seed. Do NOT bundle PROMISING-INERT or PROMISING-MECHANICAL (per cycle 2 lessons).
-4. From Axis 5 EXPLORATION: include only if the per-symbol candidate passed IS-axis pre-validation AND showed positive IS Sharpe lift at single-seed.
+- **Section 2** — committed `analysis/iteration_v3-0NN/*.py` IS-only EDA with numerical tables, per `feedback_v3_axis_selection_quant_discipline.md`. Axis must be QR-EDA-driven.
+- **Section 4** — pre-register the falsifier band AND the holding-time / roster-composition predictor (`feedback_v3_is_oos_regime_divergence.md`); for a per-symbol or universe axis, pre-register the target-symbol-axis falsifier band, not just the non-target bands (`feedback_v3_per_symbol_target_axis_falsifier.md`).
+- **Section 4 SUSPICIOUS gate** — pre-register "OOS/IS Sharpe ratio > 3.0 → SUSPICIOUS" as a supplemental classifier (`feedback_v3_oos_is_ratio_gate.md`).
+- **Section 8** — LOCKED classification criteria. For a NEW feature family, pre-register a conditional-orthogonality test (model-split-allocation / SHAP attribution vs the regime label) — marginal orthogonality is necessary but not sufficient (the /076 lesson).
+- **Section 10** — QR Audit Trail, documenting the literature-research path (Section 2 of this plan).
+- **NO-CHEATING** — `OOS_CUTOFF_DATE = 2025-03-24` and `training_months = 24` IMMUTABLE; `start_time` never trimmed; no date-range cherry-picked; QR sees OOS only in Phase 7.
+- **Config-accretion pre-flight** — per Critic /081 Rec #3, the cycle-3 runner should carry a generalized "config == last-CONFIRMATION-MERGE (/059) config" pre-flight diff so a future accretion (like the /061 vol-floor that rode 19 iterations) is caught at runtime, not by archaeology. The first cycle-3 EXPLORATION that touches `run_baseline_v3.py` setup should add it.
 
-**Pre-registered MERGE gate criteria for iter-v3/050:** Same 10 gates as iter-v3/039 brief Section 8. STRICT BOTH-must-improve rule: must clear iter-v3/028 baseline on BOTH IS and OOS multi-seed mean Sharpe to update BASELINE_V3.md.
+## 6. iter-v3/092 — the THIRD v3 cycle CONFIRMATION
 
-**iter-v3/050 spec:** `--seeds 2 + ENSEMBLE_SIZE=5 + n_trials=35` (CONFIRMATION-spec, identical to iter-v3/028 and iter-v3/039). 6h wall-clock cap.
+**Trigger**: 10/10 cycle-3 EXPLORATIONs (iter-v3/082-091) complete.
 
-## Cadence Summary
+**Bundle**: the cycle-3 PROMISING findings. Unlike cycles 1 and 2 (which produced 0 PROMISING and whose CONFIRMATIONs were re-validations), cycle 3's structural-pivot axes are designed to produce genuine edge ingredients — /092 is intended to be a real edge-bundle CONFIRMATION. If, after a genuine bold cycle, cycle 3 also produces 0 PROMISING, /092 is a re-validation by the cycle-1/-2 precedent — but the cycle-3 mandate is explicitly to break that pattern.
 
-| Iteration | Type | Axis | Status |
+**Spec**: unified 10-seed CONFIRMATION mode, `--n-trials 35` default (`feedback_v3_confirmation_n_trials_35.md`) — OR n_trials ≥ 100 if /092 attempts the full mass-feature-expansion bundle (`feedback_v3_mass_feature_expansion.md` AMENDMENT point 6). 6h wall-clock HARD CAP (`feedback_v3_cadence_discipline.md`).
+
+**Baseline-update rule**: /092 updates BASELINE_V3.md only if it beats /059 on BOTH IS Sharpe AND OOS Sharpe (multi-seed mean) with both Pareto/CPCV checks positive (`feedback_v3_strict_both_is_oos_baseline.md`, `feedback_v3_baseline_update_policy.md`). Hard-blocking gates retained: Gate 3 (OOS/IS ≥ 0.50), Gate 6 (PSR > 0.95), Gate 10 (frac_positive_paths ≥ 0.55).
+
+## 7. Cadence Summary
+
+| Iteration | Type | Direction | Status |
 |---|---|---|---|
-| iter-v3/040 | EXPLORATION (PROMISING-MECHANICAL) | Cycle 3 baseline-restore | iter-v3/039 closeout deliverable |
-| iter-v3/041 | EXPLORATION | Axis 1 — engineered feature #1 | TBD (analysis-driven) |
-| iter-v3/042 | EXPLORATION | Axis 1 — engineered feature #2 | TBD |
-| iter-v3/043 | EXPLORATION | Axis 1 — engineered feature #3 | TBD |
-| iter-v3/044 | EXPLORATION | Axis 1 — engineered feature #4 (optional) | TBD |
-| iter-v3/045 | EXPLORATION | Axis 2 — XGBoost retest with new features | TBD |
-| iter-v3/046 | EXPLORATION | Axis 3 — labeling architecture | TBD |
-| iter-v3/047 | EXPLORATION | Axis 3 — labeling refinement (optional) | TBD |
-| iter-v3/048 | EXPLORATION | Axis 4 — feature pruning | TBD |
-| iter-v3/049 | EXPLORATION | Axis 5 — per-symbol with IS-axis pre-validation (optional) | TBD |
-| iter-v3/050 | SECOND v3 CONFIRMATION | Best bundle (multi-seed validation) | Pre-registered MERGE gates |
+| iter-v3/082 | EXPLORATION #1 | QR EDA-picks within Directions 1-3 (Direction 1 or 2 strongly preferred — the first bold axis) | TBD — QR research-and-EDA-driven |
+| iter-v3/083 | EXPLORATION #2 | QR EDA-picks within Directions 1-3 | TBD |
+| iter-v3/084 | EXPLORATION #3 | QR EDA-picks within Directions 1-3 | TBD |
+| iter-v3/085 | EXPLORATION #4 | QR EDA-picks within Directions 1-3 | TBD |
+| iter-v3/086 | EXPLORATION #5 | QR EDA-picks within Directions 1-3 | TBD |
+| iter-v3/087 | EXPLORATION #6 | QR EDA-picks within Directions 1-3 | TBD |
+| iter-v3/088 | EXPLORATION #7 | QR EDA-picks within Directions 1-3 | TBD |
+| iter-v3/089 | EXPLORATION #8 | QR EDA-picks within Directions 1-3 | TBD |
+| iter-v3/090 | EXPLORATION #9 | QR EDA-picks within Directions 1-3 | TBD |
+| iter-v3/091 | EXPLORATION #10 | QR EDA-picks within Directions 1-3 | TBD |
+| iter-v3/092 | THIRD v3 CONFIRMATION | best cycle-3 bundle (multi-seed validation) | pre-registered MERGE gates |
 
-**STRICT 10:1 cadence per `feedback_v3_strict_10_to_1_cadence.md`** — iter-v3/040-049 are 10 SEPARATE EXPLORATIONs; iter-v3/050 is a SEPARATE CONFIRMATION. Do NOT collapse 10th into next CONFIRMATION.
+**STRICT 10:1 cadence** — iter-v3/082-091 are 10 SEPARATE EXPLORATIONs; iter-v3/092 is a SEPARATE CONFIRMATION. Do NOT collapse the 10th into the CONFIRMATION (`feedback_v3_strict_10_to_1_cadence.md`).
 
-## What This Plan Avoids (carry-forward from cycle 2)
+The specific axis for each EXPLORATION is deliberately left TBD — it is selected by that iteration's QR via genuine research + IS EDA, within Directions 1-3. The orchestrator should sequence the early slots toward Direction 1 (crypto-native features) and Direction 2 (universe expansion), since those carry the highest expected value and Direction 3 compounds best after them.
 
-- **Per-symbol customizations breaking IS** — primary cycle 2 failure mode; addressed by IS-axis pre-validation gate (Axis 5).
-- **Knob-tuning** — saturated per `feedback_axis_saturation_predictor.md`. No ADX, z-score, BTC-band tunes in cycle 3.
-- **Symbol-swapping** — 4-symbol universe (BCH+LDO+TRX+ALGO) FROZEN for cycle 3 unless an EXPLORATION explicitly proposes a structural reason (which would require new EDA + per-symbol-feature-signature alignment per iter-v3/032 methodology).
-- **Stacking 2 engineered features at single-seed** — per `feedback_v3_engineered_features_dont_stack.md`. Test ONE engineered feature alone per Axis 1 EXPLORATION.
-- **CONFIRMATION-bundle assembly outside iter-v3/050** — per cycle 2 conflation lessons. Only iter-v3/050 runs CONFIRMATION-spec.
+## 8. What Cycle 3 Must NOT Do
 
-## Status
+- **No axis in a Section-1 CLOSED family** — no gate-threshold knobs, no ATR-multiplier tweaks, no risk primitives, no single-symbol swaps, no labeling tweaks on the same 14 features, no instrumentation-only axes. The Phase 5.5 gate BLOCKs them.
+- **No axis selected without genuine literature research** — Section 2 of this plan is binding; brief Section 10 must document the research path.
+- **No feature added by univariate rank alone** — test multivariate contribution (cluster-MDA), not univariate Spearman ρ (`feedback_v3_inert_features_at_higher_budget.md`; the iter-v3/070-era lesson).
+- **No mass feature expansion at single-seed EXPLORATION** — phased single-family additions at EXPLORATION, full mass expansion only at /092 CONFIRMATION with n_trials ≥ 100 (`feedback_v3_mass_feature_expansion.md` AMENDMENT).
+- **No cherry-picked date range, no OOS-cutoff drift, no OOS peeking in Phases 1-5** — `feedback_no_cheating.md`.
+- **No CONFIRMATION-bundle assembly outside iter-v3/092** — only /092 runs CONFIRMATION-spec.
+- **No stopping the autopilot loop** — per `feedback_v3_bold_research_mandate.md`, never offer the user a stopping point; iterate until the user explicitly intervenes.
 
-**Cycle 3 plan COMMITTED at iter-v3/039 closeout (this commit).** Cycle 3 EXPLORATIONs commence at iter-v3/040 baseline-restore. iter-v3/041's specific axis-1 candidate selection deferred to the iter-v3/041 brief (will be analysis-driven, not pre-committed here).
+## 9. Status
 
-**Anchor for cycle 3:** iter-v3/028 baseline (multi-seed +0.5101 IS / +0.5053 OOS). NOT iter-v3/039 NO-MERGE result (which is documented but does not update the anchor).
+**Cycle 3 plan COMMITTED at the iter-v3/081 cycle-2 CONFIRMATION closeout (this document).** Cycle 3 EXPLORATIONs commence at iter-v3/082. The iter-v3/082 specific axis is deferred to the iter-v3/082 brief — it will be QR research-and-EDA-driven, within Directions 1-3, Direction 1 or 2 strongly preferred as the first bold axis.
+
+**Anchor for cycle 3**: iter-v3/059 (BASELINE_V3.md, `v0.v3-059`, IS +1.0894 / OOS +0.5791) — freshly re-validated at the iter-v3/081 CONFIRMATION (IS +1.0894 exact / OOS +0.5999).
 
 ## See Also
 
-- `BASELINE_V3.md` — cycle 3 anchor
-- `briefs-v3/iteration_v3-039/` — cycle 2 closeout artifacts (research brief, engineering report, Critic FINAL)
-- `diary-v3/iteration_v3-039.md` — cycle 2 closeout diary
+- `feedback_v3_bold_research_mandate.md` — the cycle-3 ambition + research mandate (user directive 2026-05-16)
+- `feedback_v3_mass_feature_expansion.md` — mass feature expansion methodology (target 100, 50 minimum) + the 2026-05-14 phased-expansion AMENDMENT
+- `project_v3_cycle2_outcome.md` — the cycle-2 outcome this plan responds to
+- `project_v3_cycle1_outcome.md` — cycle 1 (the first 0-PROMISING cycle)
+- `diary-v3/iteration_v3-081.md` — the cycle-2 CONFIRMATION closeout
+- `briefs-v3/iteration_v3-081/` — cycle-2 CONFIRMATION artifacts (research brief, engineering report, Critic FINAL `f8c8474`)
 - `briefs-v3/exploration_catalog.md` — cycle history
-- `feedback_v3_strict_both_is_oos_baseline.md` — cycle 3 baseline-update rule
-- `feedback_v3_per_symbol_lifts_oos_breaks_is.md` — per-symbol architecture validated; per-symbol customizations need IS-axis pre-validation
-- `feedback_v3_baseline_update_policy.md` — predecessor STRICTLY-BETTER policy (now tightened to BOTH-must-improve)
 - `feedback_v3_strict_10_to_1_cadence.md` — cycle structure
-- `feedback_v3_engineered_features_proven.md` — Axis 1 evidence base
-- `feedback_v3_engineered_features_dont_stack.md` — Axis 1 single-feature constraint
-- `feedback_promising_mechanical_subtype.md` — iter-v3/040 classification
+- `feedback_v3_strict_both_is_oos_baseline.md` + `feedback_v3_baseline_update_policy.md` — the /092 baseline-update rule
+- `feedback_v3_axis_selection_quant_discipline.md` — QR-EDA-driven axis selection
+- `feedback_v3_is_oos_regime_divergence.md` — the holding-time / roster-composition predictor
+- `feedback_v3_oos_is_ratio_gate.md` — the OOS/IS ratio SUSPICIOUS gate
+- `references/crypto-edge-deep.md` — crypto-native alpha-source index (a research starting point, not a substitute for fresh research)
