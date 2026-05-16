@@ -1,0 +1,4 @@
+run,is_monthly_sharpe,oos_monthly_sharpe
+"/059 CONFIRMATION baseline (10-seed, canonical)",1.0894,0.5791
+/081 CONFIRMATION re-validation (10-seed),1.0894,0.5999
+"/082 EXPLORATION 3-seed (3 incumbents, fresh data, 18-feat)",1.0776,1.7872
