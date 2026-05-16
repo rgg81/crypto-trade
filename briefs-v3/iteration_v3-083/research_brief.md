@@ -577,11 +577,13 @@ portfolio-aggregate** EDA. The EDA then selected FILUSDT (rank #1 of 4 survivors
 best standalone IS edge, least-harmful aggregate delta, duration-clean, deepest liquidity)
 and the count (1-symbol-at-a-time per the explicit /021 catalog lesson).
 
-**Setup commit SHA**: `<SETUP_SHA — backfilled at the Phase-5.5-gate setup commit>`.
+**Setup commit SHA**: `c5f6456` (`feat(iter-v3/083): universe EXPANSION 3->4 (add FILUSDT)
++ REQUIRED_GAP 66->88`).
 
 ---
 
 **EDA SHA**: `e538d5f` (`analysis/iteration_v3-083/universe_expansion_edge_screen.py` + 5
 T-table CSVs).
-**Brief SHA**: `<this commit — backfilled>`.
-**Setup SHA**: `<backfilled at setup>`.
+**Brief SHA**: `36c7630` (`docs(iter-v3/083): research brief — symbol-universe EXPANSION
+3->4 (add FILUSDT)`).
+**Setup SHA**: `c5f6456`.
