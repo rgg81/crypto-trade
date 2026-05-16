@@ -15,7 +15,8 @@ iter-v3/064: PHASED MASS-EXPANSION #1: REVERT to 14-feature anchor + ADD adx_14 
 2-5. Compute function correctness + parquet column presence + ADF + look-ahead.
 
 State (iter-v3/064 PHASED MASS-EXPANSION #1):
-- V3_MODELS = (BCHUSDT, ADAUSDT, TRXUSDT) — 3 symbols (iter-v3/078 UNIVERSE REVISION).
+- V3_MODELS = (BCHUSDT, LDOUSDT, TRXUSDT) — 3 symbols (iter-v3/079 baseline-restore;
+  /078's ADAUSDT universe revision was SUSPICIOUS-OOS-DOMINANT and is CLOSED).
 - V3_ATR_MULTIPLIERS_PER_SYMBOL = {} (empty — REVERT carry-forward).
 - block_long_for = () (empty — REVERT carry-forward).
 - REQUIRED_GAP = 66 = (21+1)*3 (UNCHANGED).
@@ -47,7 +48,7 @@ _OOS_CUTOFF_MS = 1_742_774_400_000  # 2025-03-24 00:00 UTC (IMMUTABLE)
 
 _PARQUET_DIR = "data/features_v3"
 _V3_ALL_SYMBOLS = ("BCHUSDT", "ADAUSDT", "TRXUSDT", "LDOUSDT", "ALGOUSDT")
-_V3_MODELS_ITER_052 = ("BCHUSDT", "ADAUSDT", "TRXUSDT")  # iter-v3/078 UNIVERSE REVISION
+_V3_MODELS_ITER_052 = ("BCHUSDT", "LDOUSDT", "TRXUSDT")  # iter-v3/079 baseline-restore
 
 
 # ---------------------------------------------------------------------------
@@ -201,22 +202,25 @@ def test_fracdiff_d05_close_no_lookahead() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_v3_models_at_iter_v3_078() -> None:
-    """V3_MODELS must be (BCHUSDT, ADAUSDT, TRXUSDT) at iter-v3/078.
+def test_v3_models_at_iter_v3_079() -> None:
+    """V3_MODELS must be (BCHUSDT, LDOUSDT, TRXUSDT) at iter-v3/079.
 
-    iter-v3/078 CYCLE 2 EXPLORATION #8 — UNIVERSE REVISION axis: LDOUSDT is
-    REPLACED by ADAUSDT (a single-axis replacement; 3 symbols stays 3). LDO is
-    the binding cycle-long structural drag; ADAUSDT is the IS-edge-screen argmax
-    (EDA T7: ADA IS-Sharpe +0.617 vs LDO -0.550). Regression guard against
-    accidental ALGO re-add (system-level REVERT at /051) and against LDO
-    silently remaining in the universe.
+    iter-v3/079 CYCLE 2 EXPLORATION #9 — the primary axis is the
+    conviction-weighted per-trade sizing primitive (primitive 13) in lgbm.py;
+    V3_MODELS REVERTS /078's BCH/ADA/TRX back to BCH/LDO/TRX. /078's universe
+    revision (LDOUSDT -> ADAUSDT) was SUSPICIOUS-OOS-DOMINANT (Critic FINAL
+    `75f4d42`) and the universe-revision axis is CLOSED for cycle 2 — LDOUSDT
+    is RETAINED. The revert is a baseline-restore of the /060 anchor universe,
+    not a new varied axis. Regression guard against accidental ALGO re-add
+    (system-level REVERT at /051) and against ADA silently remaining.
 
     HISTORY:
     - iter-v3/051: SYSTEM-LEVEL REVERT (4 -> 3 syms; drop ALGOUSDT)
     - iter-v3/052: 3-sym carry-forward
     - iter-v3/069: 3 -> 4 (+ADAUSDT) UNIVERSE EXPANSION (INERT-AT-EXPLORATION)
     - iter-v3/070: 4 -> 3 (REVERT ADAUSDT) CYCLE 1 CONFIRMATION
-    - iter-v3/078: LDOUSDT -> ADAUSDT UNIVERSE REVISION (replacement, 3 syms)
+    - iter-v3/078: LDOUSDT -> ADAUSDT UNIVERSE REVISION (SUSPICIOUS-OOS-DOMINANT)
+    - iter-v3/079: ADAUSDT -> LDOUSDT REVERT (baseline-restore; /078 axis CLOSED)
     """
     # Import locally to catch import-time state
     import importlib  # noqa: PLC0415
@@ -233,21 +237,20 @@ def test_v3_models_at_iter_v3_078() -> None:
 
     assert len(symbols) == 3, (
         f"V3_MODELS has {len(symbols)} symbols — expected exactly 3 "
-        "(BCH/ADA/TRX) at iter-v3/078. UNIVERSE REVISION is a 3->3 replacement. "
-        f"Current symbols: {symbols}"
+        "(BCH/LDO/TRX) at iter-v3/079. Current symbols: {symbols}"
     )
     assert "ALGOUSDT" not in symbols, (
         f"ALGOUSDT FOUND in V3_MODELS — must be absent (system-level REVERT at /051). "
         f"Current symbols: {symbols}"
     )
-    assert "ADAUSDT" in symbols, (
-        f"ADAUSDT NOT FOUND in V3_MODELS — must be present (iter-v3/078 UNIVERSE "
-        f"REVISION: LDOUSDT replaced by ADAUSDT). Current symbols: {symbols}"
+    assert "LDOUSDT" in symbols, (
+        f"LDOUSDT NOT FOUND in V3_MODELS — must be present (iter-v3/079 baseline-restore: "
+        f"/078's ADAUSDT swap reverted; LDOUSDT RETAINED). Current symbols: {symbols}"
     )
-    assert "LDOUSDT" not in symbols, (
-        f"LDOUSDT FOUND in V3_MODELS — must be absent (iter-v3/078 UNIVERSE "
-        f"REVISION: LDOUSDT replaced by ADAUSDT — the EDA-supported axis after "
-        f"the feature/M2 candidates were exhausted). Current symbols: {symbols}"
+    assert "ADAUSDT" not in symbols, (
+        f"ADAUSDT FOUND in V3_MODELS — must be absent (iter-v3/079 baseline-restore: "
+        f"/078's LDOUSDT->ADAUSDT universe revision was SUSPICIOUS-OOS-DOMINANT and is "
+        f"CLOSED for cycle 2). Current symbols: {symbols}"
     )
     # iter-v3/021 closed HBAR + AVAX at catalog level (NEGATIVE-clean)
     assert "HBARUSDT" not in symbols, (
@@ -260,9 +263,9 @@ def test_v3_models_at_iter_v3_078() -> None:
         f"per iter-v3/021 diary lesson (c) — universe expansion HBAR+AVAX NEGATIVE-clean). "
         f"Current symbols: {symbols}"
     )
-    expected = {"BCHUSDT", "ADAUSDT", "TRXUSDT"}
+    expected = {"BCHUSDT", "LDOUSDT", "TRXUSDT"}
     actual = set(symbols)
     assert actual == expected, (
         f"V3_MODELS symbols mismatch: expected {expected}, got {actual}. "
-        "iter-v3/078 V3_MODELS must be exactly (BCHUSDT, ADAUSDT, TRXUSDT)."
+        "iter-v3/079 V3_MODELS must be exactly (BCHUSDT, LDOUSDT, TRXUSDT)."
     )
