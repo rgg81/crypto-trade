@@ -549,18 +549,19 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
         "per-symbol asymmetry; all symbols DEFAULT (2.0, 1.0))  PASS"
     )
 
-    # iter-v3/079: 14-feature universal set (V3_FEATURES_PER_SYMBOL empty — all 3
+    # iter-v3/083: 14-feature universal set (V3_FEATURES_PER_SYMBOL empty — all 4
     # symbols fall back to V3_FEATURE_COLUMNS_TOP_N, the BASELINE_V3 /059/060 anchor).
-    # Universe: BCH/LDO/TRX (iter-v3/079 baseline-restore — /078 ADAUSDT swap reverted;
-    # the universe-revision axis was SUSPICIOUS-OOS-DOMINANT and is CLOSED for cycle 2).
-    for sym in ("BCHUSDT", "LDOUSDT", "TRXUSDT"):
+    # Universe: BCH/LDO/TRX/FIL (iter-v3/083 UNIVERSE EXPANSION — FILUSDT added as 4th
+    # symbol via IS-edge + portfolio-aggregate screen; REQUIRED_GAP rises 66→88).
+    # /082's 4-member funding-rate FEATURE FAMILY is REVERTED (18 → 14): /082 was
+    # SUSPICIOUS-OOS-DOMINANT and the family ranked bottom-4/18; funding axis CLOSED.
+    for sym in ("BCHUSDT", "LDOUSDT", "TRXUSDT", "FILUSDT"):
         sym_feats = features_for_symbol(sym)
-        if len(sym_feats) != 18:
+        if len(sym_feats) != 14:
             raise RuntimeError(
                 f"{sym} fallback has {len(sym_feats)} features — "
-                "expected exactly 18 (iter-v3/082: the BASELINE_V3 /059 "
-                "14-feature anchor stack PLUS the 4-member funding-rate FEATURE "
-                "FAMILY). "
+                "expected exactly 14 (iter-v3/083: the BASELINE_V3 /059 "
+                "14-feature anchor stack; /082 funding-rate family REVERTED). "
                 "Check V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py. "
                 "V3_FEATURES_PER_SYMBOL must be empty."
             )
@@ -570,11 +571,11 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
             "funding_accel_3",
             "funding_price_divergence_6",
         ):
-            if _fam not in sym_feats:
+            if _fam in sym_feats:
                 raise RuntimeError(
-                    f"{sym} feature set does not contain {_fam} — must be PRESENT "
-                    "at iter-v3/082 (cycle-3 EXPLORATION #1 funding-family axis). "
-                    "Add it to V3_FEATURE_COLUMNS_TOP_N."
+                    f"{sym} feature set contains {_fam} — must be ABSENT "
+                    "at iter-v3/083 (the /082 funding family is REVERTED; funding axis "
+                    "CLOSED at 4 data points). Remove it from V3_FEATURE_COLUMNS_TOP_N."
                 )
         if "adx_14" in sym_feats:
             raise RuntimeError(
@@ -607,23 +608,25 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
                 f"Check features_for_symbol('{sym}') path."
             )
     print(
-        "  BCH/LDO/TRX: 18-feature universal fallback "
-        "(iter-v3/082: the BASELINE_V3 /059 14-feature anchor stack PLUS the "
-        "4-member funding-rate FEATURE FAMILY — funding_sign_persist_9, "
-        "funding_momentum_3, funding_accel_3, funding_price_divergence_6; "
-        "the closed single funding_rate_zscore_30 stays ABSENT)  PASS"
+        "  BCH/LDO/TRX/FIL: 14-feature universal fallback "
+        "(iter-v3/083: the BASELINE_V3 /059 14-feature anchor stack; "
+        "the 4-member funding-rate FEATURE FAMILY is REVERTED — funding axis "
+        "CLOSED at 4 data points; funding_sign_persist_9, funding_momentum_3, "
+        "funding_accel_3, funding_price_divergence_6 all ABSENT)  PASS"
     )
 
     # iter-v3/074: V3_ATR_MULTIPLIERS_PER_SYMBOL reverted to {} (the /073 per-symbol
     # axis was SUSPICIOUS-OOS-DOMINANT). ALL symbols fall back to
     # DEFAULT_ATR_MULTIPLIERS = (2.0, 1.0) — the canonical /059 baseline labeling.
-    # iter-v3/079: universe is BCH/LDO/TRX (/078 ADAUSDT swap reverted — baseline-restore).
+    # iter-v3/083: universe is BCH/LDO/TRX/FIL (FILUSDT added as 4th symbol — universe
+    # EXPANSION; no per-symbol ATR override — universal (2.0, 1.0) for all 4).
     _expected_atr_lookup = {
         "BCHUSDT": (2.0, 1.0),
         "LDOUSDT": (2.0, 1.0),
         "TRXUSDT": (2.0, 1.0),
+        "FILUSDT": (2.0, 1.0),
     }
-    for _sym_atr in ("BCHUSDT", "LDOUSDT", "TRXUSDT"):
+    for _sym_atr in ("BCHUSDT", "LDOUSDT", "TRXUSDT", "FILUSDT"):
         sym_atr = tuple(atr_multipliers_for_symbol(_sym_atr))
         if sym_atr != _expected_atr_lookup[_sym_atr]:
             raise RuntimeError(
@@ -634,8 +637,8 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
                 "in features_v3/__init__.py."
             )
     print(
-        "  atr_multipliers_for_symbol: BCH/LDO/TRX all (2.0, 1.0) DEFAULT "
-        "(iter-v3/074 REVERT of /073 per-symbol asymmetry)  PASS"
+        "  atr_multipliers_for_symbol: BCH/LDO/TRX/FIL all (2.0, 1.0) DEFAULT "
+        "(iter-v3/074 REVERT of /073 per-symbol asymmetry; FIL uses DEFAULT by /083 design)  PASS"
     )
 
     # iter-v3/051: Primitive 10 REVERT — block_long_for=() per system-level rule.

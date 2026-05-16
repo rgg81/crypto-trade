@@ -572,7 +572,8 @@ class TestConfidenceThreshold:
         strategy._month_features = {("BTCUSDT", ot): np.array([1.0, 2.0])}
 
         signal = strategy.get_signal("BTCUSDT", ot)
-        assert signal == Signal(direction=1, weight=100)
+        # iter-v3/080 added confidence passthrough: binary mode → confidence = max(proba) = 0.8
+        assert signal == Signal(direction=1, weight=100, confidence=0.8)
 
     def test_below_threshold_returns_no_signal(self):
         """Confidence below threshold → NO_SIGNAL."""
@@ -622,7 +623,8 @@ class TestConfidenceThreshold:
         strategy._month_features = {("BTCUSDT", ot): np.array([1.0, 2.0])}
 
         signal = strategy.get_signal("BTCUSDT", ot)
-        assert signal == Signal(direction=-1, weight=100)
+        # iter-v3/080 added confidence passthrough: binary mode → confidence = max(proba) = 0.75
+        assert signal == Signal(direction=-1, weight=100, confidence=0.75)
 
 
 # ---------------------------------------------------------------------------
