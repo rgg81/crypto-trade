@@ -171,7 +171,7 @@ Cycle 3 has used 3 of its 10 EXPLORATION slots. /082 and /083 were the two genui
 
 ---
 
-**Diary commit SHA**: (this closeout — diary + catalog + BASELINE_V3.md + cycle3_plan.md; SHA backfilled by the immediately-following commit)
+**Diary commit SHA**: `f5d3e41` (this closeout — diary + catalog + BASELINE_V3.md + cycle3_plan.md; SHA backfilled by this immediately-following commit)
 **Critic FINAL SHA**: `16b4cc1`
 **Engineering report SHA**: `2981cda`
 **Phase 5.5 gate SHA**: `3d0d9db`
