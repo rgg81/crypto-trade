@@ -337,6 +337,7 @@ The EDA computes **no** per-candidate OOS counterfactual. The only OOS-window qu
 ### 10.3 — Setup commit SHA
 
 - EDA commit SHA: `0029155` (`analysis/iteration_v3-080/` — committed before the brief)
-- Brief commit SHA: `<this commit>`
-- Setup commit SHA: `<filled by the setup commit — to be backfilled>`
+- Brief commit SHA: `6df3d04`
+- Setup commit SHA: `dec440e` (`run_baseline_v3.py` — `ITERATION_LABEL` "v3-080", `conviction_derate` import + 3-point pre-flight assertion removed; the `lgbm.py` call-site revert + the passive-`confidence` `src/` instrumentation are QE Phase-6 scope per Section 3.1/3.2)
+- This SHA-backfill commit: `<backfill_sha>`
 - Phase 5.5 gate SHA: `<filled by the Phase 5.5 gate>`
