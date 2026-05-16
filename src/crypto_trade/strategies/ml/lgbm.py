@@ -111,6 +111,32 @@ def _interval_to_minutes(interval: str) -> int:
     return _INTERVAL_MINUTES.get(interval, 480)
 
 
+def conviction_derate(
+    confidence: float,
+    c_floor: float = 0.50,
+    c_ref: float = 0.65,
+    w_min_frac: float = 0.50,
+) -> int:
+    """Conviction-DERATE map (iter-v3/079 primitive 13).
+
+    Maps the M1 ensemble's directional confidence scalar to a per-trade weight
+    in [50, 100].  The map is monotone non-decreasing in confidence and is a
+    pure de-rate: it never levers above the flat weight=100 baseline.
+
+    Parameters (a-priori, data-free constants):
+        c_floor    = 0.50  — coin-flip line → weight floor.
+        c_ref      = 0.65  — clear-conviction reference → full weight (100).
+        w_min_frac = 0.50  — weight floor as a fraction of 100.
+
+    Formula:
+        weight = round( 100 * clip( (confidence - c_floor) / (c_ref - c_floor),
+                                    w_min_frac, 1.0 ) )
+
+    Returns int in [50, 100] (compatible with Signal.weight int contract).
+    """
+    return round(100 * float(np.clip((confidence - c_floor) / (c_ref - c_floor), w_min_frac, 1.0)))
+
+
 class LightGbmStrategy:
     """LightGBM strategy with lazy monthly walk-forward retraining."""
 
@@ -722,7 +748,11 @@ class LightGbmStrategy:
                 f"[predict] {ts_str} {symbol} → {dir_label} (proba={confidence:.2f}{atr_str})"
             )
 
-        return Signal(direction=direction, weight=100, tp_pct=tp_pct, sl_pct=sl_pct)
+        # iter-v3/079 primitive 13: conviction-DERATE map.
+        # Replace flat weight=100 with the per-trade conviction-weighted weight.
+        # confidence is already in scope from lines above (past-only, look-ahead-clean).
+        weight = conviction_derate(confidence)
+        return Signal(direction=direction, weight=weight, tp_pct=tp_pct, sl_pct=sl_pct)
 
     @staticmethod
     def _detect_interval(master: pd.DataFrame) -> str:

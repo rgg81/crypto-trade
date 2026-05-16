@@ -53,7 +53,7 @@ from crypto_trade.features_v3 import (
     process_symbol_v3,
 )
 from crypto_trade.iteration_report import generate_iteration_reports
-from crypto_trade.strategies.ml.lgbm import LightGbmStrategy
+from crypto_trade.strategies.ml.lgbm import LightGbmStrategy, conviction_derate
 from crypto_trade.strategies.ml.metalabeling import MetaLabelingStrategy
 from crypto_trade.strategies.ml.risk_v2 import (
     BtcTrendFilterConfig,
@@ -2089,9 +2089,7 @@ def _write_conditional_orthogonality(
         if n_models == 0:
             continue
         total = sum(acc.values())
-        sym_share[sym] = {
-            c: (acc[c] / total if total > 0 else 0.0) for c in cols
-        }
+        sym_share[sym] = {c: (acc[c] / total if total > 0 else 0.0) for c in cols}
 
     # PART B — the EDA's committed full per-IS-month conditional-orthogonality map.
     eda_t3 = (
@@ -2129,8 +2127,7 @@ def _write_conditional_orthogonality(
                 "eda_max_abs_corr": ec.get("max_abs_corr", ""),
                 "eda_conditionally_regime_loaded": (
                     "True"
-                    if ec.get("max_abs_corr")
-                    and float(ec["max_abs_corr"]) > 0.35
+                    if ec.get("max_abs_corr") and float(ec["max_abs_corr"]) > 0.35
                     else "False"
                     if ec.get("max_abs_corr")
                     else ""
@@ -2143,9 +2140,7 @@ def _write_conditional_orthogonality(
             }
         )
     rows.sort(
-        key=lambda r: (
-            float(r["eda_max_abs_corr"]) if r["eda_max_abs_corr"] else -1.0
-        ),
+        key=lambda r: float(r["eda_max_abs_corr"]) if r["eda_max_abs_corr"] else -1.0,
         reverse=True,
     )
     with open(out_path, "w", newline="") as f:
@@ -2392,6 +2387,28 @@ def main() -> None:
     _verify_feature_columns(ensemble_size=ensemble_size_for_run)
     _verify_label_leakage_gap()  # asserts REQUIRED_GAP == 66 (3-symbol universe, iter-v3/070)
     _verify_track_isolation()  # grep check
+
+    # -----------------------------------------------------------------------
+    # iter-v3/079 primitive 13: conviction-derate 3-point pre-flight assertion.
+    # Verifies the a-priori constants (C_FLOOR=0.50, C_REF=0.65, W_MIN_FRAC=0.50)
+    # produce the expected boundary values before any backtest trial runs.
+    # -----------------------------------------------------------------------
+    assert conviction_derate(0.50) == 50, (
+        f"conviction_derate(0.50) must equal 50 (weight floor); got {conviction_derate(0.50)}"
+    )
+    assert conviction_derate(0.65) == 100, (
+        f"conviction_derate(0.65) must equal 100 (full weight at C_REF); "
+        f"got {conviction_derate(0.65)}"
+    )
+    assert conviction_derate(1.00) == 100, (
+        f"conviction_derate(1.00) must equal 100 (full weight above C_REF); "
+        f"got {conviction_derate(1.00)}"
+    )
+    print(
+        "[preflight] conviction_derate 3-point assertion PASSED: "
+        f"f(0.50)={conviction_derate(0.50)}, f(0.65)={conviction_derate(0.65)}, "
+        f"f(1.00)={conviction_derate(1.00)}"
+    )
 
     # -----------------------------------------------------------------------
     # OOF parquet contamination guardrail (iter-v3: QR A5 + Critic FINAL 785500f)
