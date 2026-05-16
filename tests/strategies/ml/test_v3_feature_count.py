@@ -1,12 +1,12 @@
-"""Assertion test for V3_FEATURE_COLUMNS_TOP_N count — iter-v3/083 (14 features).
+"""Assertion test for V3_FEATURE_COLUMNS_TOP_N count — iter-v3/084 (14 features).
 
 Verifies that V3_FEATURE_COLUMNS_TOP_N has exactly 14 entries: the BASELINE_V3
-/059 anchor stack. iter-v3/083 (cycle-3 EXPLORATION #2) REVERTS /082's 4-member
-funding-rate family (V3_FEATURE_COLUMNS_TOP_N 18 -> 14) — /082 was
-SUSPICIOUS-OOS-DOMINANT and the family ranked bottom-4/18 by importance; per
-`feedback_v3_inert_features_at_higher_budget.md` an INERT family must NOT be
-carried forward. The v3 funding axis is CLOSED at 4 data points. iter-v3/083's
-axis is the UNIVERSE EXPANSION (V3_MODELS 3 -> 4 symbols), NOT a feature change.
+/059 anchor stack. The /082 4-member funding-rate family was reverted (18 -> 14)
+at the /083 setup and stays reverted (the v3 funding axis is CLOSED at 4 data
+points /019/023/024/082; per `feedback_v3_inert_features_at_higher_budget.md` an
+INERT family must NOT be carried forward). iter-v3/084 (cycle-3 REFERENCE /
+METHODOLOGY) makes NO feature change — it is a clean /059-config anchor re-run;
+its single declared change is the PER_CELL_GAP 43->22 methodology fix.
 
 Background:
     iter-v3/063 attempted MASS FEATURE EXPANSION 14 → 46 at single-seed n_trials=35

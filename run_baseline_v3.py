@@ -128,7 +128,7 @@ def _derive_ensemble_seeds(outer_seed: int, size: int = 5) -> list[int]:
     return [int(s) for s in rng.integers(low=0, high=2**31 - 1, size=size)]
 
 
-ITERATION_LABEL = "v3-083"
+ITERATION_LABEL = "v3-084"
 REPORTS_DIR = Path("reports-v3")
 FEATURES_DIR = Path("data/features_v3")
 DATA_DIR = Path("data")
@@ -151,21 +151,26 @@ DATA_DIR = Path("data")
 # conviction-weighted per-trade sizing primitive (primitive 13) in lgbm.py — see
 # briefs-v3/iteration_v3-079/research_brief.md Section 3. REQUIRED_GAP stays
 # 66 = (21+1)×3 (3 symbols).
-# iter-v3/083 (cycle-3 EXPLORATION #2): UNIVERSE EXPANSION axis — V3_MODELS grows
-# 3 → 4 symbols by ADDING FILUSDT. This is DENOMINATOR EXPANSION (the structural
-# fix for the /082 finding that v3's OOS Sharpe is ~104%-concentrated in BCH),
-# DISTINCT from the CLOSED swap-by-replacement family (/078 LDO→ADA): expansion
-# keeps every incumbent and adds a symbol — it does not swap. FILUSDT picked by
-# the committed IS-edge screen analysis/iteration_v3-083/universe_expansion_edge_
-# screen.py (rank #1 of 4 candidates: best standalone IS edge, least-harmful
-# portfolio-aggregate IS-Sharpe delta, duration-clean, deepest liquidity).
-# Universe expansion IS iter-v3/083's SINGLE declared axis. REQUIRED_GAP rises
-# 66 → 88 = (21+1)×4 (4 symbols). See briefs-v3/iteration_v3-083/research_brief.md.
+# iter-v3/083 (cycle-3 EXPLORATION #2): UNIVERSE EXPANSION axis — V3_MODELS grew
+# 3 → 4 symbols by ADDING FILUSDT. Verdict NEGATIVE/NO-MERGE (Critic FINAL
+# `1116124`): IS monthly Sharpe collapsed −0.9156 (FIL's own −32% IS edge + a
+# confounding ~70pp /059 anchor-staleness drift). FILUSDT joins HBAR/AVAX/ADA as
+# a CLOSED universe-expansion candidate.
+# iter-v3/084 (cycle-3 REFERENCE / METHODOLOGY): V3_MODELS REVERTS BCH/LDO/TRX/FIL
+# → BCH/LDO/TRX (drop FILUSDT — a NEGATIVE-axis symbol is not carried forward).
+# This is a BASELINE-RESTORE of the closed /083 axis — the established "revert the
+# non-merged prior iteration" pattern (cf. /083 reverting /082's funding family,
+# /079 reverting /078's ADA swap, /077 reverting /076's range_efficiency_50), NOT
+# a new varied axis. iter-v3/084 is a clean /059-config 3-symbol anchor re-run on
+# current data — the /060→/077 EXPLORATION-MODE-REFERENCE precedent. REQUIRED_GAP
+# reverts 88 → 66 = (21+1)×3 (3 symbols). iter-v3/084's SINGLE declared change is
+# the PER_CELL_GAP 43→22 methodology fix (see below + the research brief);
+# everything else here is a /059-canonical revert. See
+# briefs-v3/iteration_v3-084/research_brief.md.
 V3_MODELS: tuple[tuple[str, str], ...] = (
     ("A (BCHUSDT)", "BCHUSDT"),
     ("C (LDOUSDT)", "LDOUSDT"),
     ("D (TRXUSDT)", "TRXUSDT"),
-    ("F (FILUSDT)", "FILUSDT"),
 )
 
 # Risk gate configs (v2 5-gate + BTC; no R1/R2/R3 — brief Section 3.4)
@@ -185,7 +190,7 @@ BTC_TREND_CONFIG = BtcTrendFilterConfig(
 CPCV_N_SPLITS = 10
 CPCV_N_TEST_SPLITS = 2
 # gap = REQUIRED_GAP = (timeout_candles+1)*n_symbols = (21+1)*3 = 66
-# (iter-v3/070 REVERT /069 ADAUSDT; universe=BCH+LDO+TRX; 3-sym CONFIRMATION).
+# (iter-v3/084 REVERT /083 FILUSDT expansion; universe=BCH+LDO+TRX; 3-sym).
 # DO NOT use min(REQUIRED_GAP, n_trades//20) — that is the iter-v3/001 bug.
 CPCV_EMBARGO = 27  # ~1% of 24-month T ≈ 2742 candles * 0.01
 
@@ -354,27 +359,25 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
     # 14-feature anchor carried /065-/075. /076's range_efficiency_50 was
     # SUSPICIOUS-OOS-DOMINANT (NON-ADVANCING); the Kaufman path-efficiency axis
     # is CLOSED across 2 data points (/043 + /076 — BASELINE_V3.md Dead Ideas).
-    # iter-v3/083 (cycle-3 EXPLORATION #2): V3_FEATURE_COLUMNS = 14 — the
-    # BASELINE_V3 /059 anchor stack. /082's 4-member funding-rate FEATURE FAMILY
-    # is REVERTED (18 -> 14): /082 was SUSPICIOUS-OOS-DOMINANT and the family
-    # ranked bottom-4/18 by importance; per `feedback_v3_inert_features_at_higher
-    # _budget.md` an INERT family must NOT be carried forward. The v3 funding
-    # axis is CLOSED at 4 data points (/019/023/024/082). This revert is the
-    # mandatory secondary edit so /083's SOLE declared delta vs /059 is the
-    # universe expansion (V3_MODELS 3 -> 4 symbols). The closed funding column
-    # names are asserted-ABSENT below.
+    # iter-v3/084 (cycle-3 REFERENCE / METHODOLOGY): V3_FEATURE_COLUMNS = 14 —
+    # the BASELINE_V3 /059 anchor stack, UNCHANGED. The /082 4-member funding
+    # family was reverted 18 -> 14 at the /083 setup and stays reverted (the v3
+    # funding axis is CLOSED at 4 data points /019/023/024/082). iter-v3/084
+    # makes NO feature change — it is a clean /059-config anchor re-run; its
+    # single declared change is the PER_CELL_GAP 43->22 methodology fix. The
+    # closed funding column names are asserted-ABSENT below.
     n = len(V3_FEATURE_COLUMNS)
     if n != 14:
         raise RuntimeError(
             f"V3_FEATURE_COLUMNS has {n} columns — expected exactly 14. "
-            "iter-v3/083 (cycle-3 EXPLORATION #2): the BASELINE_V3 /059 14-feature "
-            "anchor stack. /082's 4-member funding-rate family is REVERTED "
-            "(SUSPICIOUS-OOS-DOMINANT, bottom-4/18 importance — funding axis "
-            "CLOSED at 4 data points). iter-v3/083's axis is the UNIVERSE "
-            "EXPANSION (V3_MODELS 3 -> 4), NOT a feature change. "
+            "iter-v3/084 (cycle-3 REFERENCE / METHODOLOGY): the BASELINE_V3 /059 "
+            "14-feature anchor stack, UNCHANGED. /082's 4-member funding-rate "
+            "family stays REVERTED (SUSPICIOUS-OOS-DOMINANT, bottom-4/18 "
+            "importance — funding axis CLOSED at 4 data points). iter-v3/084 "
+            "makes NO feature change (a clean /059-config anchor re-run). "
             "Check V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
         )
-    # iter-v3/083: the 4 /082 funding-FAMILY columns MUST be ABSENT (reverted).
+    # iter-v3/084: the 4 /082 funding-FAMILY columns MUST be ABSENT (stay reverted).
     for _fam in (
         "funding_sign_persist_9",
         "funding_momentum_3",
@@ -549,19 +552,19 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
         "per-symbol asymmetry; all symbols DEFAULT (2.0, 1.0))  PASS"
     )
 
-    # iter-v3/083: 14-feature universal set (V3_FEATURES_PER_SYMBOL empty — all 4
+    # iter-v3/084: 14-feature universal set (V3_FEATURES_PER_SYMBOL empty — all 3
     # symbols fall back to V3_FEATURE_COLUMNS_TOP_N, the BASELINE_V3 /059/060 anchor).
-    # Universe: BCH/LDO/TRX/FIL (iter-v3/083 UNIVERSE EXPANSION — FILUSDT added as 4th
-    # symbol via IS-edge + portfolio-aggregate screen; REQUIRED_GAP rises 66→88).
-    # /082's 4-member funding-rate FEATURE FAMILY is REVERTED (18 → 14): /082 was
+    # Universe: BCH/LDO/TRX (iter-v3/084 REVERT /083 FILUSDT expansion — /083 was
+    # NEGATIVE/NO-MERGE; REQUIRED_GAP reverts 88→66). /082's 4-member funding-rate
+    # FEATURE FAMILY stays REVERTED (the /083 18→14 revert is retained): /082 was
     # SUSPICIOUS-OOS-DOMINANT and the family ranked bottom-4/18; funding axis CLOSED.
-    for sym in ("BCHUSDT", "LDOUSDT", "TRXUSDT", "FILUSDT"):
+    for sym in ("BCHUSDT", "LDOUSDT", "TRXUSDT"):
         sym_feats = features_for_symbol(sym)
         if len(sym_feats) != 14:
             raise RuntimeError(
                 f"{sym} fallback has {len(sym_feats)} features — "
-                "expected exactly 14 (iter-v3/083: the BASELINE_V3 /059 "
-                "14-feature anchor stack; /082 funding-rate family REVERTED). "
+                "expected exactly 14 (iter-v3/084: the BASELINE_V3 /059 "
+                "14-feature anchor stack; /082 funding-rate family stays REVERTED). "
                 "Check V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py. "
                 "V3_FEATURES_PER_SYMBOL must be empty."
             )
@@ -574,8 +577,8 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
             if _fam in sym_feats:
                 raise RuntimeError(
                     f"{sym} feature set contains {_fam} — must be ABSENT "
-                    "at iter-v3/083 (the /082 funding family is REVERTED; funding axis "
-                    "CLOSED at 4 data points). Remove it from V3_FEATURE_COLUMNS_TOP_N."
+                    "at iter-v3/084 (the /082 funding family stays REVERTED; funding "
+                    "axis CLOSED at 4 data points). Remove it from V3_FEATURE_COLUMNS_TOP_N."
                 )
         if "adx_14" in sym_feats:
             raise RuntimeError(
@@ -608,25 +611,24 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
                 f"Check features_for_symbol('{sym}') path."
             )
     print(
-        "  BCH/LDO/TRX/FIL: 14-feature universal fallback "
-        "(iter-v3/083: the BASELINE_V3 /059 14-feature anchor stack; "
-        "the 4-member funding-rate FEATURE FAMILY is REVERTED — funding axis "
-        "CLOSED at 4 data points; funding_sign_persist_9, funding_momentum_3, "
+        "  BCH/LDO/TRX: 14-feature universal fallback "
+        "(iter-v3/084: the BASELINE_V3 /059 14-feature anchor stack; "
+        "the /082 4-member funding-rate FEATURE FAMILY stays REVERTED — funding "
+        "axis CLOSED at 4 data points; funding_sign_persist_9, funding_momentum_3, "
         "funding_accel_3, funding_price_divergence_6 all ABSENT)  PASS"
     )
 
     # iter-v3/074: V3_ATR_MULTIPLIERS_PER_SYMBOL reverted to {} (the /073 per-symbol
     # axis was SUSPICIOUS-OOS-DOMINANT). ALL symbols fall back to
     # DEFAULT_ATR_MULTIPLIERS = (2.0, 1.0) — the canonical /059 baseline labeling.
-    # iter-v3/083: universe is BCH/LDO/TRX/FIL (FILUSDT added as 4th symbol — universe
-    # EXPANSION; no per-symbol ATR override — universal (2.0, 1.0) for all 4).
+    # iter-v3/084: universe is BCH/LDO/TRX (the /083 FILUSDT expansion is REVERTED —
+    # /083 was NEGATIVE/NO-MERGE); no per-symbol ATR override — universal (2.0, 1.0).
     _expected_atr_lookup = {
         "BCHUSDT": (2.0, 1.0),
         "LDOUSDT": (2.0, 1.0),
         "TRXUSDT": (2.0, 1.0),
-        "FILUSDT": (2.0, 1.0),
     }
-    for _sym_atr in ("BCHUSDT", "LDOUSDT", "TRXUSDT", "FILUSDT"):
+    for _sym_atr in ("BCHUSDT", "LDOUSDT", "TRXUSDT"):
         sym_atr = tuple(atr_multipliers_for_symbol(_sym_atr))
         if sym_atr != _expected_atr_lookup[_sym_atr]:
             raise RuntimeError(
@@ -637,8 +639,8 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
                 "in features_v3/__init__.py."
             )
     print(
-        "  atr_multipliers_for_symbol: BCH/LDO/TRX/FIL all (2.0, 1.0) DEFAULT "
-        "(iter-v3/074 REVERT of /073 per-symbol asymmetry; FIL uses DEFAULT by /083 design)  PASS"
+        "  atr_multipliers_for_symbol: BCH/LDO/TRX all (2.0, 1.0) DEFAULT "
+        "(iter-v3/074 REVERT of /073 per-symbol asymmetry; /059-canonical labeling)  PASS"
     )
 
     # iter-v3/051: Primitive 10 REVERT — block_long_for=() per system-level rule.
@@ -880,16 +882,15 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
     # value, so a future /061-style accretion is caught at runtime, not by
     # git-archaeology.
     #
-    # iter-v3/083 (cycle-3 EXPLORATION #2): the SOLE intended delta vs /059 is the
-    # UNIVERSE EXPANSION — V3_MODELS 3 → 4 symbols (add FILUSDT). The two knobs
-    # this axis legitimately changes — `V3_MODELS symbols` and `REQUIRED_GAP`
-    # (= (21+1)*n_symbols, mechanically forced by the symbol count) — have their
-    # expected values updated to the 4-symbol universe below. EVERYTHING else
-    # (ATR multipliers, z-score, ADX, vol-floor, block lists, drawdown brake)
-    # must still match /059 — the check still guards 9 knobs, confirming
-    # single-axis discipline (no feature/label/risk-gate change rides along).
-    # The /082 funding family is reverted (V3_FEATURE_COLUMNS_TOP_N 18 → 14, the
-    # /059 anchor) — the mandatory secondary edit; not a second axis.
+    # iter-v3/084 (cycle-3 REFERENCE / METHODOLOGY): the /083 UNIVERSE EXPANSION
+    # (V3_MODELS 3 → 4, +FILUSDT) was NEGATIVE/NO-MERGE and is fully REVERTED.
+    # iter-v3/084 has ZERO research axis — it is a clean /059-config 3-symbol
+    # anchor re-run. ALL 11 knobs below revert to /059-canonical: `V3_MODELS
+    # symbols` back to the 3-symbol BCH/LDO/TRX set, `REQUIRED_GAP` back to
+    # 66 = (21+1)*3. The check now guards 11/11 knobs == /059 — there is no
+    # /084 axis-delta to carve out (the PER_CELL_GAP fix is a per-cell-CSCV
+    # methodology correction, not a RiskV3 config knob, so it is not in this
+    # table). A future /061-style accretion is still caught at runtime.
     _acc_cfg, _acc_strat = _build_v3_model(
         symbol="BCHUSDT", seed=42, n_trials=1, ensemble_seeds=[42]
     )
@@ -898,17 +899,17 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
             "config-accretion check: _build_v3_model did not return RiskV3Wrapper."
         )
     _rc = _acc_strat.config
-    # (knob_name, observed, expected value). V3_MODELS symbols + REQUIRED_GAP
-    # carry the iter-v3/083 universe-expansion delta; the other 9 are /059-canonical.
+    # (knob_name, observed, expected value). iter-v3/084: ALL 11 knobs are
+    # /059-canonical — the /083 universe-expansion delta is reverted.
     _v3_model_symbols = tuple(sym for _label, sym in V3_MODELS)
     _canonical_v059 = [
-        # iter-v3/083 universe-expansion axis (the SOLE intended delta vs /059):
+        # iter-v3/084 REVERT — back to /059-canonical 3-symbol (no /084 axis):
         (
             "V3_MODELS symbols",
             _v3_model_symbols,
-            ("BCHUSDT", "LDOUSDT", "TRXUSDT", "FILUSDT"),
+            ("BCHUSDT", "LDOUSDT", "TRXUSDT"),
         ),
-        ("REQUIRED_GAP", REQUIRED_GAP, 88),  # (21+1)*4 — forced by the 4-symbol count
+        ("REQUIRED_GAP", REQUIRED_GAP, 66),  # (21+1)*3 — /059-canonical 3-symbol
         # /059-canonical knobs (must NOT drift — single-axis discipline guard):
         ("DEFAULT_ATR_MULTIPLIERS", tuple(DEFAULT_ATR_MULTIPLIERS), (2.0, 1.0)),
         ("V3_ATR_MULTIPLIERS_PER_SYMBOL", dict(V3_ATR_MULTIPLIERS_PER_SYMBOL), {}),
@@ -927,16 +928,16 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
         _msg = "; ".join(f"{n}: observed {o!r} != expected {e!r}" for n, o, e in _drift)
         raise ValueError(
             f"config-accretion check FAILED — {len(_drift)} knob(s) drifted: {_msg}. "
-            "iter-v3/083's SOLE intended delta vs /059 is the UNIVERSE EXPANSION "
-            "(V3_MODELS 3 -> 4 symbols, add FILUSDT; REQUIRED_GAP 66 -> 88). Any "
-            "OTHER drift is illegitimate accretion (the /061 vol-floor failure "
-            "mode). Revert the drifted knob(s), or — if intended — document it as "
-            "a deliberate axis in the brief and update this check."
+            "iter-v3/084 is a clean /059-config 3-symbol anchor re-run — ALL 11 knobs "
+            "must equal /059-canonical (the /083 FILUSDT universe expansion is REVERTED). "
+            "Any drift is illegitimate accretion (the /061 vol-floor failure mode). "
+            "Revert the drifted knob(s), or — if intended — document it as a deliberate "
+            "axis in the brief and update this check."
         )
     print(
-        f"  Config-accretion check (iter-v3/083; Critic /081 Rec #3): "
+        f"  Config-accretion check (iter-v3/084; Critic /081 Rec #3): "
         f"{len(_canonical_v059)} knobs verified "
-        f"(V3_MODELS=4-sym + REQUIRED_GAP=88 = /083 axis; 9 knobs == /059)  PASS"
+        f"(all 11 == /059-canonical; /083 FILUSDT expansion REVERTED)  PASS"
     )
 
     # iter-v3/068: REVERT inference_threshold_floor to default 0.0 (/067 INERT-AT-EXPLORATION).
@@ -1037,7 +1038,7 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
 def _verify_label_leakage_gap() -> None:
     """Assert gap == REQUIRED_GAP and print proof (brief Section 3.5#3).
 
-    iter-v3/070 REVERT /069 ADAUSDT: universe 4 → 3 symbols (BCH+LDO+TRX).
+    iter-v3/084 REVERT /083 FILUSDT expansion: universe 4 → 3 symbols (BCH+LDO+TRX).
     Timeout unchanged at 21 candles (10080 min / 8h).
     embargo_candles = 10080 // 480 + 1 = 22.
     cross-cell gap = 22 * 3 = 66 (REQUIRED_GAP reverts 88 → 66).
@@ -1494,7 +1495,19 @@ def _compute_cpcv_paths(
 # Per-cell CSCV parameters (brief Section 0 — within-cell gap = 22)
 PER_CELL_N_SPLITS = 10
 PER_CELL_K = 2  # C(10, 2) = 45 paths
-PER_CELL_GAP = 43  # (timeout_candles + 1) within a single-symbol cell — iter-v3/068 timeout widen
+# iter-v3/084 METHODOLOGY FIX (the SINGLE declared change of /084; /083 Critic
+# FINAL `1116124` Rec #2): PER_CELL_GAP was the stale value 43 = (42+1), left
+# over from the iter-v3/068 42-candle timeout-widening, which /069/070 REVERTED
+# to 21 candles. The per-cell CSCV is a SINGLE-symbol per-(symbol, month) cell —
+# the purge gap is (timeout_candles+1) = (21+1) = 22; the *n_symbols factor
+# applies ONLY to the pooled global CPCV (REQUIRED_GAP), which interleaves all
+# symbols into one candle sequence. The stale 43 OVER-purged (the conservative
+# direction — it biased per-cell PBO pessimistically, so it did NOT invalidate
+# /083). tests/strategies/ml/test_per_cell_pbo_synthetic.py already carried the
+# correct 22 — the runner was out of sync with its own regression test; this
+# fix brings the runner INTO sync. Correcting 43→22 changes the per-cell PBO
+# number going forward.
+PER_CELL_GAP = 22  # (timeout_candles + 1) = (21 + 1) within a SINGLE-symbol cell
 
 
 def _compute_per_cell_pbo(
@@ -1582,13 +1595,17 @@ def _compute_per_cell_pbo(
             returns_mat = pivot.to_numpy()  # (n_candles, n_trials)
             n_candles_mat, n_trials_mat = returns_mat.shape
 
-            # Per-cell CSCV
+            # Per-cell CSCV — iter-v3/084: expected_gap self-assertion added
+            # (/083 Critic FINAL `1116124` Rec #2) so PER_CELL_GAP cannot
+            # silently drift again; mirrors the global _compute_cpcv_paths
+            # call which already passes expected_gap=REQUIRED_GAP.
             cell_splits = combinatorial_purged_cv(
                 n_samples=n_candles_mat,
                 n_splits=PER_CELL_N_SPLITS,
                 n_test_splits=PER_CELL_K,
                 gap=PER_CELL_GAP,
                 embargo=0,
+                expected_gap=PER_CELL_GAP,
             )
             n_paths = len(cell_splits)
             path_mat = np.full((n_paths, n_trials_mat), np.nan, dtype=float)
@@ -2536,7 +2553,7 @@ def main() -> None:
     # asserts len == 14, funding NOT present, vwap_dev_50/tbr_zscore_30 absent;
     # also asserts ensemble_size in (3, 10) for mode discipline.
     _verify_feature_columns(ensemble_size=ensemble_size_for_run)
-    _verify_label_leakage_gap()  # asserts REQUIRED_GAP == 66 (3-symbol universe, iter-v3/070)
+    _verify_label_leakage_gap()  # asserts REQUIRED_GAP == 66 (3-symbol universe, iter-v3/084)
     _verify_track_isolation()  # grep check
 
     # -----------------------------------------------------------------------
@@ -2590,7 +2607,7 @@ def main() -> None:
     print(f"Active models: {len(active_models)}/{len(V3_MODELS)} (--symbols={args.symbols!r})")
     print(f"CPCV: N={CPCV_N_SPLITS}, k={CPCV_N_TEST_SPLITS}, 45 paths on IS CANDLE SEQUENCE")
     print(
-        f"Gap: {REQUIRED_GAP} (= (21+1)*3=66; iter-v3/070 REVERT /069 ADAUSDT; "
+        f"Gap: {REQUIRED_GAP} (= (21+1)*3; iter-v3/084 REVERT /083 FILUSDT expansion; "
         f"3-sym universe BCH+LDO+TRX; timeout UNCHANGED 10080 min)"
     )
     print(
