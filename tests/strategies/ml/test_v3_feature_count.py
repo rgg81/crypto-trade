@@ -1,7 +1,8 @@
-"""Assertion test for V3_FEATURE_COLUMNS_TOP_N count — iter-v3/077 (14 features).
+"""Assertion test for V3_FEATURE_COLUMNS_TOP_N count — iter-v3/082 (18 features).
 
-Verifies that V3_FEATURE_COLUMNS_TOP_N has exactly 14 entries: the BASELINE_V3
-/059/060 anchor stack. iter-v3/077 REVERTS /076's range_efficiency_50.
+Verifies that V3_FEATURE_COLUMNS_TOP_N has exactly 18 entries: the BASELINE_V3
+/059/060 14-feature anchor stack plus the 4-member funding-rate family added at
+iter-v3/082.
 
 Background:
     iter-v3/063 attempted MASS FEATURE EXPANSION 14 → 46 at single-seed n_trials=35
@@ -23,8 +24,12 @@ Background:
     efficiency_ratio_50; both must stay absent. The literal name
     efficiency_ratio_50 stays in the prohibited set.
 
+    iter-v3/082 (cycle-3 EXPLORATION #1) adds the 4-member funding-rate family:
+    funding_rate_momentum_8, funding_accel_3, funding_sign_persist_9,
+    funding_price_divergence_6. Feature count expands 14 → 18.
+
 Tests:
-1. Count is exactly 14.
+1. Count is exactly 18.
 2. All 14 BASELINE_V3 features present.
 3. range_efficiency_50 ABSENT (reverted at /077; Kaufman axis CLOSED).
 4. adx_14 ABSENT (iter-v3/064 NEGATIVE; DROPPED at /065 revert).
@@ -88,13 +93,14 @@ _PROHIBITED_FEATURES = frozenset(
 )
 
 
-def test_feature_count_14():
-    """V3_FEATURE_COLUMNS_TOP_N must have exactly 14 entries at iter-v3/077."""
+def test_feature_count_18():
+    """V3_FEATURE_COLUMNS_TOP_N must have exactly 18 entries at iter-v3/082."""
     n = len(V3_FEATURE_COLUMNS_TOP_N)
-    assert n == 14, (
-        f"V3_FEATURE_COLUMNS_TOP_N has {n} features — expected 14. "
-        "iter-v3/077: the BASELINE_V3 /059/060 14-feature anchor stack "
-        "(/076's range_efficiency_50 reverted; PASSIVE-DIAGNOSTIC iteration). "
+    assert n == 18, (
+        f"V3_FEATURE_COLUMNS_TOP_N has {n} features — expected 18. "
+        "iter-v3/082: the BASELINE_V3 /059/060 14-feature anchor stack plus "
+        "the 4-member funding-rate family (funding_rate_momentum_8, funding_accel_3, "
+        "funding_sign_persist_9, funding_price_divergence_6). "
         "Update V3_FEATURE_COLUMNS_TOP_N in src/crypto_trade/features_v3/__init__.py."
     )
 
@@ -105,7 +111,7 @@ def test_baseline_v3_features_present():
     missing = _BASELINE_V3_FEATURES - feature_set
     assert not missing, (
         f"BASELINE_V3 features missing from V3_FEATURE_COLUMNS_TOP_N: {sorted(missing)}. "
-        "All 14 BASELINE_V3 features must be preserved in the 15-feature /076 set."
+        "All 14 BASELINE_V3 features must be preserved in the 18-feature /082 set."
     )
 
 
