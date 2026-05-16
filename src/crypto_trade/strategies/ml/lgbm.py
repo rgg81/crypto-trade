@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -18,6 +19,7 @@ from crypto_trade.strategies.ml.optimization import (
 )
 from crypto_trade.strategies.ml.walk_forward import (
     MonthSplit,
+    compute_embargo_candles,
     generate_monthly_splits,
 )
 
@@ -109,6 +111,32 @@ def _interval_to_minutes(interval: str) -> int:
     return _INTERVAL_MINUTES.get(interval, 480)
 
 
+def conviction_derate(
+    confidence: float,
+    c_floor: float = 0.50,
+    c_ref: float = 0.65,
+    w_min_frac: float = 0.50,
+) -> int:
+    """Conviction-DERATE map (iter-v3/079 primitive 13).
+
+    Maps the M1 ensemble's directional confidence scalar to a per-trade weight
+    in [50, 100].  The map is monotone non-decreasing in confidence and is a
+    pure de-rate: it never levers above the flat weight=100 baseline.
+
+    Parameters (a-priori, data-free constants):
+        c_floor    = 0.50  — coin-flip line → weight floor.
+        c_ref      = 0.65  — clear-conviction reference → full weight (100).
+        w_min_frac = 0.50  — weight floor as a fraction of 100.
+
+    Formula:
+        weight = round( 100 * clip( (confidence - c_floor) / (c_ref - c_floor),
+                                    w_min_frac, 1.0 ) )
+
+    Returns int in [50, 100] (compatible with Signal.weight int contract).
+    """
+    return round(100 * float(np.clip((confidence - c_floor) / (c_ref - c_floor), w_min_frac, 1.0)))
+
+
 class LightGbmStrategy:
     """LightGBM strategy with lazy monthly walk-forward retraining."""
 
@@ -137,6 +165,10 @@ class LightGbmStrategy:
         ood_enabled: bool = False,
         ood_features: list[str] | None = None,
         ood_cutoff_pct: float = 0.70,
+        oof_persist_path: Path | None = None,
+        fast_mode: bool = False,
+        inference_threshold_floor: float = 0.0,
+        label_mode: str = "triple_barrier",
     ) -> None:
         if not feature_columns:
             raise ValueError(
@@ -173,10 +205,19 @@ class LightGbmStrategy:
         self.ood_enabled = ood_enabled
         self.ood_features = list(ood_features) if ood_features else None
         self.ood_cutoff_pct = ood_cutoff_pct
+        # iter-v3/003: path for per-trial OOF return persistence (sub-fix 1c)
+        self._oof_persist_path: Path | None = oof_persist_path
+        # iter-v3/007: fast exploration mode (colsample fixed at 1.0 in optimization.py)
+        self._fast_mode: bool = fast_mode
+        # iter-v3/072: labeling mode — "triple_barrier" (default, backward-compat)
+        # or "fixed_horizon" (sign of N-candle-forward return; no barriers).
+        self.label_mode: str = label_mode
+        # iter-v3/067 Path D: universal inference-time confidence-threshold floor.
+        # Default 0.0 = no floor (backward-compatible). Pass 0.60 to raise the bar
+        # for marginal-confidence trades (brief Section 3 Sub-fix 2).
+        self._inference_threshold_floor: float = float(inference_threshold_floor)
         if self.ood_enabled and not self.ood_features:
-            raise ValueError(
-                "ood_features must be specified when ood_enabled=True"
-            )
+            raise ValueError("ood_features must be specified when ood_enabled=True")
         self._ood_mean: np.ndarray | None = None
         self._ood_inv_cov: np.ndarray | None = None
         self._ood_cutoff: float | None = None
@@ -216,8 +257,16 @@ class LightGbmStrategy:
         # feature_columns is required (validated in __init__) — no auto-discovery
         self._all_feature_cols = list(self.feature_columns)
 
-        # Generate monthly splits
-        self._splits = generate_monthly_splits(self._open_time_arr, self.training_months)
+        # Generate monthly splits with a labeler-aware embargo at the train/test
+        # boundary. ``compute_embargo_candles`` is the single source of truth
+        # also used for the CV gap below — see _train_for_month.
+        interval_minutes = _interval_to_minutes(self._interval)
+        self._splits = generate_monthly_splits(
+            self._open_time_arr,
+            self.training_months,
+            label_timeout_minutes=self.label_timeout_minutes,
+            interval_minutes=interval_minutes,
+        )
         self._split_map = {s.test_month: s for s in self._splits}
 
         if self.verbose > 0:
@@ -343,6 +392,7 @@ class LightGbmStrategy:
             atr_values=label_atr,
             verbose=self.verbose,
             neutral_threshold_pct=self.neutral_threshold_pct,
+            label_mode=self.label_mode,
         )
 
         ternary = self.neutral_threshold_pct is not None
@@ -428,13 +478,17 @@ class LightGbmStrategy:
             )
 
         # (d) Optuna optimization (all features, with threshold)
-        # Compute CV gap to prevent label leakage across folds (iter 091).
-        # gap = (timeout_in_candles + 1) * n_symbols
+        # CV gap prevents label leakage between train and val folds inside
+        # TimeSeriesSplit. Uses the SAME ``compute_embargo_candles`` helper
+        # that walk_forward.py uses for the train/test boundary — single
+        # source of truth, no duplicated formula. Multiplies by n_symbols
+        # because TimeSeriesSplit counts ROWS (which are interleaved
+        # symbol-by-symbol), so one candle of time = n_symbols rows.
         if self.cv_label_gap:
             interval_minutes = _interval_to_minutes(self._interval)
-            timeout_candles = self.label_timeout_minutes // interval_minutes + 1
+            embargo_candles = compute_embargo_candles(self.label_timeout_minutes, interval_minutes)
             n_symbols = len(set(self._sym_arr[train_indices]))
-            cv_gap = timeout_candles * n_symbols
+            cv_gap = embargo_candles * n_symbols
         else:
             cv_gap = 0
         if self.verbose > 0:
@@ -443,6 +497,10 @@ class LightGbmStrategy:
         seeds = self.ensemble_seeds
         self._models = []
         self._confidence_thresholds = []
+
+        # sub-fix 1c (iter-v3/003): per-ensemble-seed OOF persistence context
+        # symbols_arr aligns with feat_train rows (after keep_mask filtering)
+        train_symbols_arr = self._sym_arr[train_indices][keep_mask]
 
         for i, seed in enumerate(seeds):
             if self.verbose > 0 and len(seeds) > 1:
@@ -463,6 +521,10 @@ class LightGbmStrategy:
                     train_end_ms=split.train_end_ms,
                     ternary=ternary,
                     cv_gap=cv_gap,
+                    oof_persist_path=self._oof_persist_path,
+                    train_month=month_str,
+                    symbols_arr=train_symbols_arr,
+                    fast_mode=self._fast_mode,
                 )
                 self._models.append(model)
                 self._confidence_thresholds.append(confidence_threshold)
@@ -476,7 +538,14 @@ class LightGbmStrategy:
         # Use first model as primary (backward compat)
         self._model = self._models[0]
         self._selected_cols = selected_cols
-        self._confidence_threshold = float(np.mean(self._confidence_thresholds))
+        # iter-v3/067 Path D: apply universal inference-time confidence-threshold floor.
+        # Floor=0.60 raises the bar for marginal-confidence trades whose Optuna-inherited
+        # per-seed mean falls below 0.60 (brief Section 3 Sub-fix 1 + Sub-fix 2).
+        # Default floor=0.0 is a no-op, preserving backward compatibility for v1/v2/earlier v3.
+        # Ref: Critic /066 Rec #2 — Path D is a GATE modifier, not a WEIGHT modifier.
+        self._confidence_threshold = float(
+            max(np.mean(self._confidence_thresholds), self._inference_threshold_floor)
+        )
 
         # (e) Batch-load test month features
         symbols = list(dict.fromkeys(self._sym_arr))
@@ -495,9 +564,7 @@ class LightGbmStrategy:
         self._ood_cutoff = None
         self._month_ood_features = {}
         if self.ood_enabled and self.ood_features:
-            ood_cols_in_train = [
-                c for c in self.ood_features if c in train_feat_df.columns
-            ]
+            ood_cols_in_train = [c for c in self.ood_features if c in train_feat_df.columns]
             if len(ood_cols_in_train) < len(self.ood_features):
                 missing = set(self.ood_features) - set(ood_cols_in_train)
                 if self.verbose > 0:
@@ -507,9 +574,7 @@ class LightGbmStrategy:
                     print("  OOD: insufficient training samples — disabling for this month")
             else:
                 self._ood_feature_cols = ood_cols_in_train
-                train_ood_raw = train_feat_df[ood_cols_in_train].to_numpy(
-                    dtype=np.float64
-                )
+                train_ood_raw = train_feat_df[ood_cols_in_train].to_numpy(dtype=np.float64)
                 # Drop rows with NaN/inf before computing mean/cov
                 finite_mask = np.isfinite(train_ood_raw).all(axis=1)
                 train_ood = train_ood_raw[finite_mask]
@@ -528,12 +593,8 @@ class LightGbmStrategy:
                     try:
                         self._ood_inv_cov = np.linalg.pinv(cov + reg)
                         centered = train_ood - self._ood_mean
-                        distances = np.einsum(
-                            "ij,jk,ik->i", centered, self._ood_inv_cov, centered
-                        )
-                        self._ood_cutoff = float(
-                            np.quantile(distances, self.ood_cutoff_pct)
-                        )
+                        distances = np.einsum("ij,jk,ik->i", centered, self._ood_inv_cov, centered)
+                        self._ood_cutoff = float(np.quantile(distances, self.ood_cutoff_pct))
                         if self.verbose > 0:
                             print(
                                 f"  OOD: {len(ood_cols_in_train)} features, "
@@ -687,7 +748,17 @@ class LightGbmStrategy:
                 f"[predict] {ts_str} {symbol} → {dir_label} (proba={confidence:.2f}{atr_str})"
             )
 
-        return Signal(direction=direction, weight=100, tp_pct=tp_pct, sl_pct=sl_pct)
+        # iter-v3/080: flat weight=100 restored (reverts /079 conviction-derate).
+        # confidence is in scope (past-only, look-ahead-clean) and is now threaded
+        # as passive metadata into Signal → Order → TradeResult → trades.csv.
+        weight = 100
+        return Signal(
+            direction=direction,
+            weight=weight,
+            tp_pct=tp_pct,
+            sl_pct=sl_pct,
+            confidence=confidence,
+        )
 
     @staticmethod
     def _detect_interval(master: pd.DataFrame) -> str:

@@ -1,0 +1,4 @@
+symbol,sigma_is_monthly_pnl_std,vol_anchor_median_sigma,inverse_vol_scalar_raw,inverse_vol_scalar_clipped,clip_active
+BCHUSDT,0.0692,0.0632,0.9133,0.9133,False
+LDOUSDT,0.0632,0.0632,1.0,1.0,False
+TRXUSDT,0.032,0.0632,1.976,1.976,False

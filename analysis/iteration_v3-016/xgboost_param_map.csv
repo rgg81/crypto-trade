@@ -1,0 +1,15 @@
+optuna_name,lightgbm_param,lightgbm_range,xgboost_param,xgboost_range,equivalence_note
+n_estimators,n_estimators,"[50, 500]",n_estimators,"[50, 500]",Identical: number of boosted trees
+max_depth,max_depth,"[3, 5]",max_depth,"[3, 5]",Identical semantic: max tree depth
+num_leaves,num_leaves,"[15, 127]",max_leaves,"[15, 127]","XGBoost respects max_leaves only when grow_policy='lossguide'; default 'depthwise' growth ignores num_leaves. Set grow_policy='lossguide' to mirror LightGBM's leaf-wise growth, OR drop max_leaves and let depthwise growth interact with max_depth."
+learning_rate,learning_rate,"[0.01, 0.3] log-scale",learning_rate (eta),"[0.01, 0.3] log-scale",Identical
+subsample,subsample,"[0.5, 1.0]",subsample,"[0.5, 1.0]",Identical: row subsampling per tree
+colsample_bytree,colsample_bytree,"[0.3, 1.0] (fast_mode: hardcoded 1.0)",colsample_bytree,"[0.3, 1.0] (fast_mode: hardcoded 1.0)","Identical name + identical semantic. Per `--exploration` spec, fast_mode hardcodes 1.0 to minimize per-seed feature-subsampling variance."
+min_child_samples,min_child_samples,"[5, 100]",min_child_weight,"[5, 100]",Semantic equivalent (sample-count vs sum-of-hessians min in leaf). Same range works as a near-equivalent regularization knob.
+reg_alpha,reg_alpha,"[1e-8, 10.0] log-scale",reg_alpha,"[1e-8, 10.0] log-scale",Identical: L1 regularization on leaf weights
+reg_lambda,reg_lambda,"[1e-8, 10.0] log-scale",reg_lambda,"[1e-8, 10.0] log-scale",Identical: L2 regularization on leaf weights
+random_state,random_state,outer-derived,random_state,outer-derived,Identical
+(implicit binary),objective='binary' + is_unbalance=True,—,objective='binary:logistic' + scale_pos_weight=neg/pos,—,XGBoost has no `is_unbalance` flag.  Compute scale_pos_weight = n_neg / n_pos at fit time to mirror LightGBM's automatic class-weight balancing.
+(implicit ternary),objective='multiclass' + num_class=3,—,objective='multi:softprob' + num_class=3,—,XGBoost requires probabilities-output objective for predict_proba; 'multi:softprob' is the correct choice (vs 'multi:softmax' which outputs hard classes).
+verbosity,verbosity=-1,—,verbosity=0,—,XGBoost's silence flag is verbosity=0 (LightGBM uses -1).
+fast_mode forced,tree_learner='serial' (default),—,tree_method='hist',—,XGBoost default 'auto' selects 'hist' for v2.x.  Pin tree_method='hist' explicitly so behavior matches across XGBoost versions and rules out 'gpu_hist' if a future env adds a CUDA install.

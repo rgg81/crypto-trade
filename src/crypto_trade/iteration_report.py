@@ -111,6 +111,10 @@ def _write_trades_csv(trades: list[TradeResult], path: Path) -> None:
         "stop_loss_price",
         "take_profit_price",
         "timeout_time",
+        # iter-v3/080: passive metadata — M1 directional confidence scalar.
+        # max(P(long), P(short)) from the inner-ensemble mean predict_proba.
+        # No decision path reads this field; it is pure diagnostic output.
+        "confidence",
     ]
     with open(path, "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=fields)
@@ -132,8 +136,152 @@ def _write_trades_csv(trades: list[TradeResult], path: Path) -> None:
                 "stop_loss_price": f"{t.stop_loss_price:.6f}",
                 "take_profit_price": f"{t.take_profit_price:.6f}",
                 "timeout_time": t.timeout_time,
+                "confidence": (f"{t.confidence:.6f}" if t.confidence is not None else ""),
             }
             writer.writerow(row)
+
+
+def _write_confidence_distribution(
+    is_trades: list[TradeResult],
+    model_pairs: list,
+    report_dir: Path,
+) -> None:
+    """Emit ``confidence_distribution.csv`` — iter-v3/080 PASSIVE-DIAGNOSTIC axis.
+
+    Reads the IS trade roster (which now carries ``TradeResult.confidence``) and
+    the per-symbol realized Optuna ``confidence_threshold`` from the trained
+    strategy objects (``model_pairs``), then writes a per-symbol / per-IS-month
+    histogram of trade M1-confidence over the a-priori uniform bin grid
+    ``conf_bin_edges`` (edges every 0.025 on [0.50, 1.00]).
+
+    Schema: symbol, is_month, conf_bin_lo, conf_bin_hi, n_trades,
+            realized_optuna_conf_threshold
+
+    Includes pooled rows: ``symbol=PORTFOLIO`` (all symbols combined) and
+    ``is_month=ALL_IS`` per symbol.
+
+    The realized ``confidence_threshold`` uses the last-month strategy state
+    (the lazy-monthly-training pattern — same degeneracy as
+    ``_write_conditional_orthogonality`` PART A); the column is labelled
+    ``last_month`` in rows where a per-IS-month threshold is unavailable.
+    """
+    conf_bin_edges = [round(0.50 + i * 0.025, 3) for i in range(21)]  # 0.50 … 1.00
+
+    # Collect per-symbol last-month confidence threshold from model_pairs.
+    sym_threshold: dict[str, float] = {}
+    for cfg, strat in model_pairs:
+        sym = cfg.symbols[0] if cfg.symbols else "UNKNOWN"
+        inner = strat.inner if hasattr(strat, "inner") else strat
+        if hasattr(inner, "_m1"):
+            inner = inner._m1
+        if hasattr(inner, "_confidence_threshold"):
+            sym_threshold[sym] = float(inner._confidence_threshold)
+
+    # Filter to IS trades that have confidence populated.
+    is_conf = [(t.symbol, t.open_time, t.confidence) for t in is_trades if t.confidence is not None]
+
+    def _month_label(open_time_ms: int) -> str:
+        dt = datetime.fromtimestamp(open_time_ms / 1000, tz=UTC)
+        return dt.strftime("%Y-%m")
+
+    def _histogram(confidences: list[float], edges: list[float]) -> list[tuple[float, float, int]]:
+        """Return list of (lo, hi, n_trades) for each bin."""
+        bins: list[tuple[float, float, int]] = []
+        for i in range(len(edges) - 1):
+            lo, hi = edges[i], edges[i + 1]
+            count = sum(1 for c in confidences if lo <= c < hi)
+            bins.append((lo, hi, count))
+        # Last bin is closed: include exactly 1.00
+        lo, hi = edges[-1], edges[-1]
+        count = sum(1 for c in confidences if c == hi)
+        bins.append((lo, hi, count))
+        return bins
+
+    fieldnames = [
+        "symbol",
+        "is_month",
+        "conf_bin_lo",
+        "conf_bin_hi",
+        "n_trades",
+        "realized_optuna_conf_threshold",
+    ]
+
+    rows: list[dict] = []
+
+    symbols_in_trades = sorted({sym for sym, _, _ in is_conf})
+
+    for sym in symbols_in_trades:
+        sym_conf = [(m, c) for s, ot, c in is_conf for m in [_month_label(ot)] if s == sym]
+        months = sorted({m for m, _ in sym_conf})
+        threshold_str = f"{sym_threshold[sym]:.4f}" if sym in sym_threshold else "last_month"
+
+        # Per-IS-month rows
+        for month in months:
+            month_confs = [c for m, c in sym_conf if m == month]
+            for lo, hi, n in _histogram(month_confs, conf_bin_edges):
+                rows.append(
+                    {
+                        "symbol": sym,
+                        "is_month": month,
+                        "conf_bin_lo": f"{lo:.3f}",
+                        "conf_bin_hi": f"{hi:.3f}",
+                        "n_trades": n,
+                        "realized_optuna_conf_threshold": threshold_str,
+                    }
+                )
+
+        # ALL_IS block per symbol
+        all_confs = [c for _, c in sym_conf]
+        for lo, hi, n in _histogram(all_confs, conf_bin_edges):
+            rows.append(
+                {
+                    "symbol": sym,
+                    "is_month": "ALL_IS",
+                    "conf_bin_lo": f"{lo:.3f}",
+                    "conf_bin_hi": f"{hi:.3f}",
+                    "n_trades": n,
+                    "realized_optuna_conf_threshold": threshold_str,
+                }
+            )
+
+    # PORTFOLIO block — all symbols combined
+    all_confs_portfolio = [c for _, _, c in is_conf]
+    portfolio_threshold = (
+        f"{sum(sym_threshold.values()) / len(sym_threshold):.4f}" if sym_threshold else "last_month"
+    )
+    months_all = sorted({_month_label(ot) for _, ot, _ in is_conf})
+    for month in months_all:
+        month_confs = [c for _, ot, c in is_conf if _month_label(ot) == month]
+        for lo, hi, n in _histogram(month_confs, conf_bin_edges):
+            rows.append(
+                {
+                    "symbol": "PORTFOLIO",
+                    "is_month": month,
+                    "conf_bin_lo": f"{lo:.3f}",
+                    "conf_bin_hi": f"{hi:.3f}",
+                    "n_trades": n,
+                    "realized_optuna_conf_threshold": portfolio_threshold,
+                }
+            )
+
+    for lo, hi, n in _histogram(all_confs_portfolio, conf_bin_edges):
+        rows.append(
+            {
+                "symbol": "PORTFOLIO",
+                "is_month": "ALL_IS",
+                "conf_bin_lo": f"{lo:.3f}",
+                "conf_bin_hi": f"{hi:.3f}",
+                "n_trades": n,
+                "realized_optuna_conf_threshold": portfolio_threshold,
+            }
+        )
+
+    out_path = report_dir / "confidence_distribution.csv"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(out_path, "w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(rows)
 
 
 def _write_daily_pnl(trades: list[TradeResult], path: Path) -> None:

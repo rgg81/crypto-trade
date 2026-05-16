@@ -30,7 +30,8 @@ the gates reproducible across seeds.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from collections import deque
+from dataclasses import dataclass, field, replace
 from typing import Protocol
 
 import numpy as np
@@ -87,6 +88,127 @@ class RiskV2Config:
     enable_isolation_forest: bool = False
     enable_liquidity_floor: bool = False
 
+    # iter-v3/020: per-symbol PnL cap (primitive 8 — concentration architecture)
+    # Scales down position weight when a symbol's rolling weighted-PnL share
+    # exceeds max_per_symbol_pnl_share.  Uses POSITIVE-share-only semantics:
+    # only caps symbols whose share is strictly positive and > cap threshold.
+    # Negative-share symbols (drags) are self-limiting and are never capped.
+    # Default OFF (enable_per_symbol_cap=False) preserves v1/v2 behavior.
+    max_per_symbol_pnl_share: float | None = None  # e.g. 0.40 = 40%
+    max_per_symbol_window_bars: int = 90  # ~30 days at 8h cadence
+    enable_per_symbol_cap: bool = False
+
+    # iter-v3/022: primitive 9 — regime-conditional kill switch.
+    # Kills candidate signals for symbols in regime_gate_symbols when EITHER:
+    #   (a) BTC drawdown_30d > regime_dd_threshold_pct (IS-90th-pct = 20.0%)
+    #   (b) |BTC vol_zscore_30d| > regime_vol_zscore_threshold (IS-95th-pct = 1.5)
+    # Thresholds calibrated on IS-window distribution (EDA SHA b728313 synthesis.md).
+    # Past-only: BTC data at bar t uses only bars with open_time < t.open_time.
+    # Default OFF (enable_regime_gate=False) preserves v1/v2/v3-prior behavior.
+    enable_regime_gate: bool = False
+    regime_gate_symbols: tuple[str, ...] = ()  # e.g. ("TRXUSDT",)
+    regime_dd_lookback_bars: int = 90  # 30 calendar days at 8h cadence
+    regime_dd_threshold_pct: float = 20.0  # IS-90th-percentile
+    regime_vol_lookback_bars: int = 90  # 30 calendar days at 8h cadence
+    regime_vol_zscore_threshold: float = 1.5  # IS-95th-percentile
+
+    # iter-v3/047: primitive 10 — direction-asymmetric kill switch.
+    # Universally suppresses candidate signals of a specific direction for a specific
+    # symbol. e.g. block_long_for=("BCHUSDT",) blocks ALL BCH LONG candidates regardless
+    # of model confidence; SHORT and NO_SIGNAL pass through unchanged. Mirrors the
+    # primitive-9 architecture but at the direction level instead of the regime level.
+    # Calibrated by QR EDA at iter-v3/047 (analysis/iteration_v3-047/bch_diagnosis.csv):
+    # BCH LONG IS = 39 trades, 30.8% WR, -25.07% net_pnl_pct (toxic across IS+OOS;
+    # per-month stable; reproducible across iter-v3/045 default ATR + iter-v3/046 wider SL).
+    # Default empty preserves v1/v2/v3-prior behavior.
+    block_long_for: tuple[str, ...] = ()  # e.g. ("BCHUSDT",) — block direction == +1
+    block_short_for: tuple[str, ...] = ()  # e.g. () — block direction == -1 (unused at iter-v3/047)
+
+    # iter-v3/049: per-symbol ADX threshold override (parallel to regime_gate_symbols,
+    # block_long_for, block_short_for fields). When a symbol is in this dict, the
+    # per-symbol value is used instead of the global adx_threshold. Symbols absent
+    # from this dict fall back to the global adx_threshold.
+    # Default empty preserves v1/v2/v3-prior behavior (universal threshold).
+    # Calibrated by QR EDA at iter-v3/049 (analysis/iteration_v3-049/
+    # axis_e_with_primitive10_carry.py): TRX has 9 IS trades at ADX 20-21 with
+    # collective wpnl -4.77 (every one a net-EV loser); 2 OOS trades at same range
+    # with collective wpnl -0.01 (negligible). BOTH-must-improve PASSES at single-
+    # seed EDA stage. iter-v3/049 sets {"TRXUSDT": 21.0}; BCH/LDO/ALGO unchanged.
+    adx_threshold_per_symbol: dict[str, float] = field(default_factory=dict)
+
+    # iter-v3/061: per-symbol vol_scale_floor override (parallel to adx_threshold_per_symbol
+    # field). When a symbol is in this dict, the per-symbol value is used as the vol-scaling
+    # floor instead of the global vol_scale_floor. Symbols absent from this dict fall back to
+    # the global vol_scale_floor.
+    # Default empty preserves v1/v2/v3-prior behavior (universal floor).
+    # Calibrated by QR EDA at iter-v3/061 (analysis/iteration_v3-061/
+    # trx_anti_kelly_diagnostic.py Q4 counterfactual): TRX floor=0.5 produces
+    # +0.47 OOS wpnl counterfactual lift with bit-identical IS (+0.008 wpnl).
+    # BCH/LDO weighted_pnl mathematically invariant per Q5 invariance check.
+    # iter-v3/061 sets {"TRXUSDT": 0.5}; BCH/LDO unchanged at global 0.3.
+    # Per-symbol weight_factor floor — added at iter-v3/061 per /060 Q7 TRX anti-Kelly EDA.
+    # Applied as a floor (lower bound) AFTER the existing vol-scaling formula.
+    vol_scale_floor_per_symbol: dict[str, float] = field(default_factory=dict)
+
+    # iter-v3/054: primitive 11 — per-symbol drawdown brake.
+    # Pauses signals for a symbol when its 30-day rolling-window weighted_pnl drawdown
+    # hits drawdown_brake_threshold_wpnl. Resumes when drawdown recovers to
+    # drawdown_brake_recovery_wpnl. Per-symbol independent state. Carver canonical
+    # formulation (Leveraged Trading Ch. 11).
+    # Calibrated by QR EDA at iter-v3/054 (analysis/iteration_v3-054/
+    # per_symbol_drawdown_brake_eda.py): at T=10.0 wpnl, recovery=5.0 wpnl, 30-day
+    # window, brake fires on 5 LDO OOS trades + 2 BCH IS trades at /053 trade roster
+    # ORACLE counterfactual (IS Δ +4.39 wpnl; OOS Δ +12.51 wpnl).
+    # Default disabled preserves v1/v2/v3-prior behavior.
+    enable_per_symbol_drawdown_brake: bool = False
+    drawdown_brake_threshold_wpnl: float = 10.0  # engage when dd_30d >= this
+    drawdown_brake_recovery_wpnl: float = 5.0  # disengage when dd_30d <= this
+    drawdown_brake_window_days: int = 30  # rolling window for peak calculation
+
+    # iter-v3/075: primitive 12 — BTC-trend-regime position-SIZE de-rate scalar.
+    # When BTC is in a bear/chop trend state (BTC close[t-1] < SMA_N(close)[t-1],
+    # the slow-trend filter; Carver, Systematic Trading), the position WEIGHT of
+    # trades for symbols in regime_size_scalar_symbols is multiplied by
+    # regime_size_scalar_value (< 1.0 to de-rate). Bull-regime trades and
+    # out-of-scope symbols are unchanged. The scalar is applied AFTER the inherited
+    # gate cascade — it is the last weight-modifying step and changes WEIGHT only,
+    # never direction/tp/sl/timeout (holding-time-ORTHOGONAL by construction).
+    # Past-only: BTC close.shift(1) before the rolling SMA; the scalar reads the
+    # most recent BTC bar with open_time STRICTLY LESS THAN the symbol's bar time.
+    # Implemented in RiskV3Wrapper (v3-only); v1/v2 do not use RiskV3Wrapper.
+    # Calibrated by QR EDA at iter-v3/075 (analysis/iteration_v3-075/
+    # axis_selection_eda.py): SMA_270 classifier (T2 highest IS discrimination),
+    # scope LDO+TRX (T7 — the symbols whose bear/chop-entry IS wpnl is negative;
+    # BCH WINS in BTC-bear/chop so it is excluded), de-rate 0.50 (a-priori
+    # data-free default — halve the position size in the adverse BTC regime).
+    # Default OFF (enable_regime_size_scalar=False) preserves v1/v2/v3-prior behavior.
+    enable_regime_size_scalar: bool = False
+    regime_size_scalar_symbols: tuple[str, ...] = ()  # e.g. ("LDOUSDT", "TRXUSDT")
+    regime_size_scalar_value: float = 1.0  # de-rate multiplier (< 1.0 de-rates)
+    regime_size_ma_window: int = 270  # BTC slow-MA window in bars (90 days at 8h)
+
+    def __post_init__(self) -> None:
+        if self.enable_per_symbol_drawdown_brake:
+            if not (0 < self.drawdown_brake_recovery_wpnl < self.drawdown_brake_threshold_wpnl):
+                raise ValueError(
+                    f"drawdown brake requires 0 < recovery ({self.drawdown_brake_recovery_wpnl}) "
+                    f"< threshold ({self.drawdown_brake_threshold_wpnl})"
+                )
+            if self.drawdown_brake_window_days <= 0:
+                raise ValueError(
+                    f"drawdown_brake_window_days must be > 0, got {self.drawdown_brake_window_days}"
+                )
+        if self.enable_regime_size_scalar:
+            if not (0.0 < self.regime_size_scalar_value <= 1.0):
+                raise ValueError(
+                    "regime_size_scalar requires 0 < regime_size_scalar_value "
+                    f"({self.regime_size_scalar_value}) <= 1.0"
+                )
+            if self.regime_size_ma_window <= 0:
+                raise ValueError(
+                    f"regime_size_ma_window must be > 0, got {self.regime_size_ma_window}"
+                )
+
 
 @dataclass
 class GateStats:
@@ -99,6 +221,15 @@ class GateStats:
     killed_by_low_vol: int = 0  # iter-v2/004
     vol_scaled_signals: int = 0
     vol_scale_sum: float = 0.0
+    cap_fires: int = 0  # iter-v3/020: per-symbol PnL cap fires (primitive 8)
+    regime_gate_fires: int = 0  # iter-v3/022: regime-conditional kill switch fires (primitive 9)
+    direction_block_fires: int = (
+        0  # iter-v3/047: direction-asymmetric kill switch fires (primitive 10)
+    )
+    drawdown_brake_fires: int = 0  # iter-v3/054: per-symbol drawdown brake fires (primitive 11)
+    regime_size_scalar_fires: int = (
+        0  # iter-v3/075: BTC-trend-regime position-SIZE de-rate scalar fires (primitive 12)
+    )
 
     def vol_scale_mean(self) -> float:
         return self.vol_scale_sum / self.vol_scaled_signals if self.vol_scaled_signals else 1.0
@@ -129,6 +260,28 @@ class RiskV2Wrapper:
         # Per-(symbol, open_time) feature + ADX lookups — numpy arrays + searchsorted index
         self._lookup: dict[str, dict[str, np.ndarray]] = {}
         self._gate_stats: dict[str, GateStats] = {}
+        # iter-v3/020: per-symbol PnL cap state (primitive 8).
+        # _cap_pnl_window[symbol] = deque of (close_time_ms, weighted_pnl) for
+        # the last max_per_symbol_window_bars closed trades across ALL symbols.
+        # The shared deque allows computing the rolling portfolio PnL at each bar,
+        # enabling per-symbol share = symbol_rolling_pnl / portfolio_rolling_pnl.
+        # Note: this is a SHARED timeline deque (not per-symbol); all symbols'
+        # trades are appended to it in chronological order, keyed by symbol.
+        self._cap_timeline: deque[tuple[int, str, float]] = deque()
+        # _cap_per_symbol_pnl[symbol] = rolling sum of weighted_pnl in window
+        self._cap_per_symbol_pnl: dict[str, float] = {}
+        # Current bar's open_time — used to expire stale entries from the deque
+        self._cap_current_bar_ms: int = 0
+        # iter-v3/054: per-symbol drawdown brake state (primitive 11).
+        # _brake_timeline[sym] = deque of (close_time_ms, cum_wpnl) for the last
+        # drawdown_brake_window_days days of THIS symbol's closed trades.
+        # _brake_running_peak[sym] = max cum_wpnl over _brake_timeline[sym].
+        # _brake_cum_wpnl[sym] = current cumulative weighted_pnl (from trade 1).
+        # _brake_on[sym] = True if brake is currently engaged (signals killed).
+        self._brake_timeline: dict[str, deque[tuple[int, float]]] = {}
+        self._brake_running_peak: dict[str, float] = {}
+        self._brake_cum_wpnl: dict[str, float] = {}
+        self._brake_on: dict[str, bool] = {}
 
     @property
     def atr_column(self) -> str:
@@ -155,44 +308,142 @@ class RiskV2Wrapper:
         stats.signals_seen += 1
 
         row = self._row_for(symbol, open_time)
-        if row is None:
-            return sig  # no feature row — let the inner strategy's own gates handle it
 
-        # 1. Feature z-score OOD
-        if self.config.enable_zscore_ood and self._zscore_ood(symbol, row):
-            stats.killed_by_zscore += 1
+        # Gates 1-5 require a feature row; if absent, skip to gate 6 (cap).
+        if row is not None:
+            # 1. Feature z-score OOD
+            if self.config.enable_zscore_ood and self._zscore_ood(symbol, row):
+                stats.killed_by_zscore += 1
+                return NO_SIGNAL
+
+            # 2. Hurst regime check
+            if self.config.enable_hurst_check and self._hurst_ood(symbol, row):
+                stats.killed_by_hurst += 1
+                return NO_SIGNAL
+
+            # 3. ADX gate
+            if self.config.enable_adx_gate and self._adx_gate_fails(symbol, open_time):
+                stats.killed_by_adx += 1
+                return NO_SIGNAL
+
+            # 4. Low-vol filter (iter-v2/004) — skip signals in the bottom-third
+            # ATR percentile bucket where iter-v2/002 per-regime Sharpe was -1.86.
+            if self.config.enable_low_vol_filter and self._low_vol_filter_fails(row):
+                stats.killed_by_low_vol += 1
+                return NO_SIGNAL
+
+            # 5. Vol-adjusted sizing
+            scale = 1.0
+            if self.config.enable_vol_scaling:
+                scale = self._vol_scale(symbol, row)
+                stats.vol_scaled_signals += 1
+                stats.vol_scale_sum += scale
+        else:
+            # No feature row — feature-gated primitives (1-5) skipped.
+            # Cap (primitive 6) still applies independently of feature data.
+            scale = 1.0
+
+        # 6. Per-symbol PnL cap (iter-v3/020, primitive 8) — multiplicative scaling
+        # Applied AFTER vol-scaling. Uses POSITIVE-share-only semantics: only caps
+        # symbols whose rolling share > cap; never penalises negative-share drags.
+        # Past-only: the rolling window is populated by record_trade_result() which
+        # is called with closed-trade data BEFORE the next get_signal() call.
+        # The cap is independent of feature lookup and fires even when row is None.
+        cap_scale = 1.0
+        if self.config.enable_per_symbol_cap and self.config.max_per_symbol_pnl_share is not None:
+            cap_scale = self._per_symbol_cap_scale(symbol, open_time)
+            if cap_scale < 1.0:
+                stats.cap_fires += 1
+
+        # 7. Per-symbol drawdown brake (iter-v3/054, primitive 11) — binary kill switch.
+        # Applied AFTER vol-scaling and cap so all signal-modifying gates have fired first.
+        # The brake fires on signals surviving the prior gate cascade (direction != 0 after
+        # gates 1-6). Counter increments only when a non-zero signal is killed by the brake.
+        if self.config.enable_per_symbol_drawdown_brake and self._brake_on.get(symbol, False):
+            stats.drawdown_brake_fires += 1
             return NO_SIGNAL
 
-        # 2. Hurst regime check
-        if self.config.enable_hurst_check and self._hurst_ood(symbol, row):
-            stats.killed_by_hurst += 1
-            return NO_SIGNAL
-
-        # 3. ADX gate
-        if self.config.enable_adx_gate and self._adx_gate_fails(symbol, open_time):
-            stats.killed_by_adx += 1
-            return NO_SIGNAL
-
-        # 4. Low-vol filter (iter-v2/004) — skip signals in the bottom-third
-        # ATR percentile bucket where iter-v2/002 per-regime Sharpe was -1.86.
-        if self.config.enable_low_vol_filter and self._low_vol_filter_fails(row):
-            stats.killed_by_low_vol += 1
-            return NO_SIGNAL
-
-        # 5. Vol-adjusted sizing
-        scale = 1.0
-        if self.config.enable_vol_scaling:
-            scale = self._vol_scale(symbol, row)
-            stats.vol_scaled_signals += 1
-            stats.vol_scale_sum += scale
-
-        new_weight = max(1, int(round(sig.weight * scale)))
+        new_weight = max(1, int(round(sig.weight * scale * cap_scale)))
         return Signal(
             direction=sig.direction,
             weight=new_weight,
             tp_pct=sig.tp_pct,
             sl_pct=sig.sl_pct,
+            confidence=sig.confidence,
         )
+
+    def record_trade_result(self, trade: TradeResult) -> None:
+        """Feed a closed trade result into the per-symbol cap rolling window and drawdown brake.
+
+        Must be called after each trade closes (close_time established) and
+        BEFORE the next get_signal() call that should see the cap effect.
+        Uses close_time (not open_time) so the window is past-only:
+        a trade closing at time T is visible to signals emitted at T+epsilon.
+
+        This method handles both primitive 8 (per-symbol cap) and primitive 11
+        (per-symbol drawdown brake). Each primitive is a no-op when disabled.
+        """
+        # Primitive 8: per-symbol PnL cap rolling window
+        if self.config.enable_per_symbol_cap and self.config.max_per_symbol_pnl_share is not None:
+            entry = (trade.close_time, trade.symbol, trade.weighted_pnl)
+            self._cap_timeline.append(entry)
+            self._cap_per_symbol_pnl[trade.symbol] = (
+                self._cap_per_symbol_pnl.get(trade.symbol, 0.0) + trade.weighted_pnl
+            )
+        # Primitive 11: per-symbol drawdown brake state update
+        self._update_drawdown_brake(trade)
+
+    def _update_drawdown_brake(self, trade: TradeResult) -> None:
+        """Update per-symbol drawdown brake state on each closed trade (primitive 11).
+
+        Called by record_trade_result. No-op when enable_per_symbol_drawdown_brake
+        is False (preserves backward compatibility with all prior behavior).
+
+        State-update logic (Carver Leveraged Trading Ch. 11 canonical formulation):
+          1. Append (close_time_ms, cum_wpnl) to the per-symbol deque.
+          2. Expire entries older than drawdown_brake_window_days from the front.
+          3. Compute running peak = max(cum_wpnl) over the in-window entries.
+          4. Compute dd_30d = running_peak - current_cum_wpnl.
+          5. State machine: engage if dd_30d >= threshold (and was off);
+             disengage if dd_30d <= recovery (and was on).
+        """
+        if not self.config.enable_per_symbol_drawdown_brake:
+            return
+
+        sym = trade.symbol
+        close_time = trade.close_time
+        wpnl = trade.weighted_pnl
+
+        # Initialize per-symbol state on first trade
+        if sym not in self._brake_timeline:
+            self._brake_timeline[sym] = deque()
+            self._brake_running_peak[sym] = 0.0
+            self._brake_cum_wpnl[sym] = 0.0
+            self._brake_on[sym] = False
+
+        # Update cumulative wpnl
+        self._brake_cum_wpnl[sym] += wpnl
+        self._brake_timeline[sym].append((close_time, self._brake_cum_wpnl[sym]))
+
+        # Expire entries older than window_days from the front of the deque
+        window_ms = self.config.drawdown_brake_window_days * 24 * 60 * 60 * 1000
+        cutoff = close_time - window_ms
+        while self._brake_timeline[sym] and self._brake_timeline[sym][0][0] < cutoff:
+            self._brake_timeline[sym].popleft()
+
+        # Compute running peak over the rolling window
+        self._brake_running_peak[sym] = max(c for _, c in self._brake_timeline[sym])
+
+        # Compute drawdown relative to running peak
+        dd_30d = self._brake_running_peak[sym] - self._brake_cum_wpnl[sym]
+
+        # State machine: engage / disengage
+        if self._brake_on[sym]:
+            if dd_30d <= self.config.drawdown_brake_recovery_wpnl:
+                self._brake_on[sym] = False  # disengage
+        else:
+            if dd_30d >= self.config.drawdown_brake_threshold_wpnl:
+                self._brake_on[sym] = True  # engage
 
     # ------------------------------------------------------------------
     # Lookup construction
@@ -304,7 +555,11 @@ class RiskV2Wrapper:
         adx = float(lk["adx"][idx])
         if not np.isfinite(adx):
             return False
-        return adx < self.config.adx_threshold
+        # iter-v3/049: per-symbol ADX threshold override (default empty falls back to
+        # global adx_threshold). Per QR EDA SHA `ba8a3de`: TRX-only raise 20 → 21
+        # satisfies BOTH-must-improve at single-seed (+4.77 IS lift, -0.01 OOS cost).
+        threshold = self.config.adx_threshold_per_symbol.get(symbol, self.config.adx_threshold)
+        return adx < threshold
 
     def _low_vol_filter_fails(self, row: dict) -> bool:
         """iter-v2/004: return True when atr_pct_rank_200 is below the filter threshold."""
@@ -312,6 +567,65 @@ class RiskV2Wrapper:
         if not np.isfinite(atr_pct):
             return False
         return bool(atr_pct < self.config.low_vol_filter_threshold)
+
+    def _per_symbol_cap_scale(self, symbol: str, open_time_ms: int) -> float:
+        """iter-v3/020 primitive 8: return the cap scaling factor for this signal.
+
+        Computes the symbol's rolling weighted-PnL share over the past
+        max_per_symbol_window_bars bars (≈ 30 days at 8h).  Uses POSITIVE-share-only
+        semantics:
+
+        - Only symbols whose rolling PnL share is strictly > cap threshold are
+          scaled down.  Negative-share symbols (sustained drags) are self-limiting
+          and are never penalised.
+        - If the portfolio rolling PnL is zero or negative (e.g. early warmup, or
+          all symbols losing), no cap is applied (returns 1.0).
+
+        Past-only guarantee: the timeline deque is populated by record_trade_result()
+        which is called with close_time, so only trades that have ALREADY CLOSED
+        before this signal's open_time appear in the share computation.  The current
+        signal's own trade is never in its own denominator.
+
+        Returns a float in (0, 1] where 1.0 means no cap applied.
+        """
+        if self.config.max_per_symbol_pnl_share is None:
+            return 1.0
+
+        window = self.config.max_per_symbol_window_bars
+        cap = self.config.max_per_symbol_pnl_share
+
+        # Expire entries outside the rolling window.
+        # Window is defined in bars (each bar = 8h = 28_800_000 ms).
+        # We use close_time of entries vs open_time of the current signal.
+        bar_ms = 28_800_000  # 8h in milliseconds
+        window_start_ms = open_time_ms - window * bar_ms
+
+        # Remove expired entries from the front of the deque and subtract from sums.
+        # Only entries with close_time >= window_start_ms and < open_time_ms are valid.
+        while self._cap_timeline and self._cap_timeline[0][0] < window_start_ms:
+            old_close_time, old_sym, old_pnl = self._cap_timeline.popleft()
+            self._cap_per_symbol_pnl[old_sym] = self._cap_per_symbol_pnl.get(old_sym, 0.0) - old_pnl
+
+        # Compute portfolio PnL in window (sum of all symbols' rolling sums)
+        portfolio_pnl = sum(self._cap_per_symbol_pnl.values())
+
+        # No cap if portfolio PnL is non-positive (warmup or losing streak)
+        if portfolio_pnl <= 0.0:
+            return 1.0
+
+        sym_pnl = self._cap_per_symbol_pnl.get(symbol, 0.0)
+
+        # Only apply cap to positive-share symbols
+        if sym_pnl <= 0.0:
+            return 1.0
+
+        share = sym_pnl / portfolio_pnl
+
+        if share <= cap:
+            return 1.0
+
+        # Scale down: weight *= cap / share
+        return cap / share
 
     def _vol_scale(self, symbol: str, row: dict) -> float:
         atr_pct = row["atr_pct_rank_200"]
@@ -324,8 +638,12 @@ class RiskV2Wrapper:
         # profitable high-vol trades run at full size and unprofitable low-vol
         # trades run smaller. Direct linear mapping of atr_pct_rank_200 to the
         # [floor, ceiling] band.
+        # iter-v3/061: per-symbol vol_scale_floor override (default empty falls back to
+        # global vol_scale_floor). Per QR EDA SHA d198b25: TRX-only raise 0.3 → 0.5
+        # produces +0.47 OOS wpnl counterfactual lift; IS bit-identical.
+        floor = self.config.vol_scale_floor_per_symbol.get(symbol, self.config.vol_scale_floor)
         raw = float(atr_pct)
-        return float(np.clip(raw, self.config.vol_scale_floor, self.config.vol_scale_ceiling))
+        return float(np.clip(raw, floor, self.config.vol_scale_ceiling))
 
     # ------------------------------------------------------------------
     # Reporting
@@ -346,6 +664,12 @@ class RiskV2Wrapper:
                 "kill_rate": total_kills / s.signals_seen if s.signals_seen else 0.0,
                 "vol_scaled_signals": s.vol_scaled_signals,
                 "mean_vol_scale": s.vol_scale_mean(),
+                "cap_fires": s.cap_fires,  # iter-v3/020: per-symbol cap firings
+                "cap_fire_rate": (s.cap_fires / s.signals_seen if s.signals_seen else 0.0),
+                "drawdown_brake_fires": s.drawdown_brake_fires,  # iter-v3/054: primitive 11
+                "drawdown_brake_fire_rate": (
+                    s.drawdown_brake_fires / s.signals_seen if s.signals_seen else 0.0
+                ),
             }
         return out
 

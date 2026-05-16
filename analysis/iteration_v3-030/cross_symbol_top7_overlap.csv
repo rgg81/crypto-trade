@@ -1,0 +1,4 @@
+pair,intersection_count,union_count,jaccard,intersection_features,a_only,b_only
+BCH-LDO,5,9,0.5556,range_realized_vol_50; ret_kurt_200; ret_kurt_50; ret_skew_200; vwap_dev_20,ema_spread_atr_20; max_dd_window_50,btc_ret_14d; hurst_diff_100_50
+BCH-TRX,5,9,0.5556,max_dd_window_50; range_realized_vol_50; ret_kurt_50; ret_skew_200; vwap_dev_20,ema_spread_atr_20; ret_kurt_200,hurst_100; ret_autocorr_lag1_50
+LDO-TRX,4,10,0.4,range_realized_vol_50; ret_kurt_50; ret_skew_200; vwap_dev_20,btc_ret_14d; hurst_diff_100_50; ret_kurt_200,hurst_100; max_dd_window_50; ret_autocorr_lag1_50

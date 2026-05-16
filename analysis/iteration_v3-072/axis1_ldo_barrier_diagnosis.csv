@@ -1,0 +1,5 @@
+scope,n_labelable,long_tp,long_sl,long_timeout,long_tp_rate,long_sl_rate
+LDOUSDT_IS,2741,749,1895.0,97.0,0.2733,0.6914
+LDOUSDT_IS_outcome::timeout_fwd_sign,2741,1125,,,0.4104,
+LDOUSDT_IS_outcome::short_tp,2741,867,,,0.3163,
+LDOUSDT_IS_outcome::long_tp,2741,749,,,0.2733,

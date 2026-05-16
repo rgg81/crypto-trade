@@ -1,0 +1,4 @@
+symbol,n_candles_total,first_open,last_open,is_candles,oos_candles,is_months_approx,oos_months_approx,deficit_vs_bch
+BCHUSDT,6965,2020-01-01,2026-05-10,5727,1238,62.8,13.6,n/a
+LDOUSDT,3979,2022-09-22,2026-05-10,2741,1238,30.1,13.6,42.9% less
+TRXUSDT,6907,2020-01-15,2026-05-10,5669,1238,62.2,13.6,0.8% less

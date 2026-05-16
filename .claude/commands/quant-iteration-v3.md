@@ -212,9 +212,9 @@ iter-v3/008 was killed at 4h 15min after extrapolation showed ~25h total wall-cl
 
 ### Hard rules
 
-1. **EXPLORATION wall-clock HARD CAP: 2h.** Engineer kills the backtest if it exceeds 2h. Default config: `--exploration --seeds 1 --n-trials 10`. Single-axis variation only.
+1. **EXPLORATION wall-clock HARD CAP: 2h.** Engineer kills the backtest if it exceeds 2h. Default config: `--exploration --seeds 1 --n-trials 35`. Single-axis variation only. (n_trials raised 10 → 35 at iter-v3/019 closeout 2026-05-07: at n_trials=10 NEW-feature-family axes consistently hit rank 14/14 importance because Optuna's TPE sampler couldn't surface signal in only 10 trials × 1 ensemble. iter-v3/015 microstructure + iter-v3/019 funding rate both hit this pattern. n_trials=35 stays above TPE warmup ~30 while keeping wall-clock under cap. Single-seed lottery risk remains — only multi-seed CONFIRMATION resolves that.)
 
-2. **CONFIRMATION wall-clock HARD CAP: 6h.** `--seeds 2 --n-trials 50`, ENSEMBLE_SIZE=5. Engineer kills if exceeds 6h. (Empirically updated 2026-05-07 from 4h after iter-v3/018 ran 4.54h; new cap = ceil(4.54 × 1.2) ≈ 6h for safety.)
+2. **CONFIRMATION wall-clock HARD CAP: 6h.** `--seeds 2 --n-trials 35`, ENSEMBLE_SIZE=5. Engineer kills if exceeds 6h. (Wall-clock cap empirically updated 2026-05-07 from 4h after iter-v3/018 ran 4.54h; new cap = ceil(4.54 × 1.2) ≈ 6h for safety. n_trials lowered 50 → 35 same date — 50 was past TPE diminishing returns; 35 saves ~30% wall-clock while keeping above warmup.)
 
 3. **CONFIRMATION requires 10 EXPLORATION precedents.** A CONFIRMATION iteration's brief Section 0.5 MUST list ≥10 EXPLORATION iter-v3/NNN ids completed since the last CONFIRMATION (or since iter-v3/001 if no prior CONFIRMATION). Phase 5.5 gate verifies this count from `briefs-v3/exploration_catalog.md`.
 
@@ -321,8 +321,8 @@ The Engineer reads `briefs-v3/iteration_v3-NNN/research_brief.md` and verifies:
 
 - **Section 0 — Data Split declaration.** Confirms `OOS_CUTOFF_DATE = 2025-03-24` and `training_months = 24` are unchanged. Names the IS window and OOS window in absolute dates.
 - **Section 0.5 — Iteration Type Declaration (v3 mandatory, added iter-v3/007).** ONE of:
-  - `TYPE: EXPLORATION` — fast single-axis variation. **Wall-clock budget HARD CAP: 2h** (was 1h; 2h gives full v3 universe at exploration config). Uses `--exploration` flag (colsample=1.0, ENSEMBLE_SIZE=1, n_trials=10). Single outer seed (`--seeds 1`). Critic scores Checks 1, 2, 4, 5, 6, 8 (methodology + look-ahead axes only). Edge thresholds (Check 3 DSR/PSR/Sharpe) are SKIPPED. Critic emits `EXPLORATION-PROMISING` (signal found, candidate for CONFIRMATION inclusion) or `EXPLORATION-NEGATIVE` (no signal, recorded in catalog). Goal: rapidly cycle through symbol sets / labeling params / feature subsets to find variations worth bundling into the next CONFIRMATION. **EXPLORATION never updates BASELINE_V3.md.**
-  - `TYPE: CONFIRMATION` — production config. Uses default ENSEMBLE_SIZE=5 (live-prediction variance reduction), `--seeds 2` (variance estimate; max), full Optuna search space. **Wall-clock budget HARD CAP: 6h** (empirically updated 2026-05-07 from 4h after iter-v3/018 ran 4.54h; new cap = ceil(4.54 × 1.2) ≈ 6h for safety). Critic scores all 8 checks AND optional 9-12 including Check 3 DSR/PSR thresholds. Critic emits `CONFIRMATION-MERGE` or `CONFIRMATION-BLOCK`. Goal: validate the bundle of best-of-N-explorations with full statistical rigor before merging. **Only CONFIRMATION-MERGE updates BASELINE_V3.md.**
+  - `TYPE: EXPLORATION` — single-axis variation. **Wall-clock budget HARD CAP: 2h.** Uses `--exploration` flag (colsample=1.0, ENSEMBLE_SIZE=1, n_trials=35 default — raised from 10 at iter-v3/019 closeout to fix the NEW-feature-family rank-14/14 INERT pattern; see `feedback_v3_exploration_n_trials_35.md`). Single outer seed (`--seeds 1`). Critic scores Checks 1, 2, 4, 5, 6, 8 (methodology + look-ahead axes only). Edge thresholds (Check 3 DSR/PSR/Sharpe) are SKIPPED. Critic emits `EXPLORATION-PROMISING` (signal found, candidate for CONFIRMATION inclusion) or `EXPLORATION-NEGATIVE` (no signal, recorded in catalog). Goal: rapidly cycle through symbol sets / labeling params / feature subsets to find variations worth bundling into the next CONFIRMATION. **EXPLORATION never updates BASELINE_V3.md.**
+  - `TYPE: CONFIRMATION` — production config. Uses default ENSEMBLE_SIZE=5 (live-prediction variance reduction), `--seeds 2` (variance estimate; max), full Optuna search space (colsample_bytree Optuna-tunable). Default `--n-trials 35` (lowered from 50 at iter-v3/018 closeout). **Wall-clock budget HARD CAP: 6h** (empirically updated 2026-05-07 from 4h after iter-v3/018 ran 4.54h; new cap = ceil(4.54 × 1.2) ≈ 6h for safety). Critic scores all 8 checks AND optional 9-12 including Check 3 DSR/PSR thresholds. Critic emits `CONFIRMATION-MERGE` or `CONFIRMATION-BLOCK`. Goal: validate the bundle of best-of-N-explorations with full statistical rigor before merging. **Only CONFIRMATION-MERGE updates BASELINE_V3.md.**
   - Brief MUST justify the type choice in 1-2 sentences. CONFIRMATION iterations require an EXPLORATION-PROMISING precedent (referenced by iter-v3/NNN id) unless first-iteration.
 - **Section 1 — Hypothesis.** ONE sentence. What changes and why we expect OOS improvement. Vague hypotheses BLOCK; specific testable hypotheses PASS.
 - **Section 2 — IS-Only Numerical Evidence.** Tables produced by a committed `analysis/iteration_v3-NNN/*.py` script. Reproducible, IS-data-only, concrete numbers. Category-matching ("similar to RSI") is NOT evidence — BLOCK.
@@ -952,15 +952,40 @@ Agent({
 })
 ```
 
-### Engineer Phase 6 (after gate=PASS)
+### Engineer Phase 6 — SPLIT DISPATCH for long backtests (added iter-v3/008)
+
+**Mandatory split for any backtest > 30 min wall-clock**. Anthropic API quota is consumed by agent supervisor loops while the underlying Python process runs; iter-v3/003 first-attempt died at 86 min Engineer wall-clock with 1047 tool uses — Engineer was burning tokens supervising the backtest. Split saves ~5-9h agent quota per long iteration.
+
+**Dispatch #1 — Engineer setup-only** (~10-20 min agent quota; Engineer commits and STOPS, does NOT launch the backtest):
 
 ```
 Agent({
-  description: "Run Phase 6 implementation for iter-v3/NNN",
+  description: "Phase 6 SETUP for iter-v3/NNN",
   subagent_type: "quant-engineer",
-  prompt: "Phase 5.5 gate PASSED. Run Phase 6 for iter-v3/NNN. Brief at briefs-v3/iteration_v3-NNN/research_brief.md. Implement changes in src/, run backtest with CPCV, produce reports + comparison.csv + companion files (pareto_front, cpcv_paths, adf_test, ic_matrix, dsr.json), commit code before backtest, write engineering report ending with OVERALL=READY-FOR-CRITIC."
+  prompt: "Phase 5.5 gate PASSED. Run Phase 6 SETUP-ONLY for iter-v3/NNN. Brief at briefs-v3/iteration_v3-NNN/research_brief.md. Apply src/ changes per brief Section 3.5 (cherry-pick / inheritance / feature subset / ITERATION_LABEL update / banner fix). Run pre-flight: 35/35 adversarial tests, ruff check, _verify_feature_columns. Commit the code BEFORE backtest with message 'feat(iter-v3/NNN): <summary>'. **DO NOT LAUNCH THE BACKTEST.** Return immediately after the setup commit so the orchestrator can launch the backtest as a detached background bash. Final assistant message format: state SETUP-COMPLETE in first line, list the commit SHA, and state the exact bash invocation the orchestrator should use."
 })
 ```
+
+**Orchestrator launches the backtest** (NO agent quota during the multi-hour run):
+
+```bash
+nohup bash -c 'cd /home/roberto/crypto-trade/.worktrees/quant-research && uv run python run_baseline_v3.py <args>' > reports-v3/iteration_v3-NNN/run.log 2>&1 < /dev/null &
+disown
+```
+
+Run via the Bash tool with `run_in_background=true`. Verify the process is detached (PPID=1 after launcher bash exits) so it survives any session/agent disruption. The orchestrator gets a system notification when the bash process completes — NO polling, NO tail-loops.
+
+**Dispatch #2 — Engineer report-only** (~15-30 min agent quota; ONLY after the bash completion notification arrives):
+
+```
+Agent({
+  description: "Phase 6 REPORT for iter-v3/NNN",
+  subagent_type: "quant-engineer",
+  prompt: "The Phase 6 backtest for iter-v3/NNN has completed (bash background task notified). Read reports-v3/iteration_v3-NNN/{comparison.csv, dsr.json, pareto_front.csv, per_cell_pbo.csv, adf_test.csv, ic_matrix.csv, in_sample/, out_of_sample/, run.log}. Verify all reconciliation verifiers per brief Section 3.6 exit 0. Apply Section 8 mechanical evaluation (CONFIRMATION) or methodology-axes evaluation (EXPLORATION). Write briefs-v3/iteration_v3-NNN/engineering_report.md ending with OVERALL=READY-FOR-CRITIC. Commit with message 'docs(iter-v3/NNN): engineering report + backtest results'."
+})
+```
+
+**Exception**: backtests under 30 min may stay inside a single Engineer dispatch (the cohesion is worth the small overhead). The split is MANDATORY for long runs.
 
 ### Critic Phase 7.5
 

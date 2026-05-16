@@ -1,0 +1,5 @@
+symbol,candidate,n_is_obs,adf_p_value,stationary_at_p005
+BCHUSDT,regime_momentum_signed_3d,5628,0.0,True
+LDOUSDT,regime_momentum_signed_3d,2642,0.0,True
+TRXUSDT,regime_momentum_signed_3d,5570,0.0,True
+ALGOUSDT,regime_momentum_signed_3d,5126,0.0,True

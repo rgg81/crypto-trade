@@ -1,0 +1,4 @@
+scenario,trade_level_reduction,is_trades_before,is_trades_after,oos_trades_before,oos_trades_after,oos_trades_per_month,trade_rate_floor
+optimistic_15pct,0.15,159,135,102,87,6.21,BELOW-FLOOR
+iter017_empirical_25pct,0.25,159,119,102,76,5.43,BELOW-FLOOR
+pessimistic_43pct,0.43,159,91,102,58,4.14,BELOW-FLOOR

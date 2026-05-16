@@ -1,0 +1,68 @@
+# Phase 7.5 Critic Review — iter-v3/075
+
+OVERALL: MERGE
+
+The INERT-AT-EXPLORATION classification is certified clean. The OOS-tuning remediation (first EDA pass `9a04f6f` → corrected `a254e5a`) is judged COMPLETE. /075 does NOT advance to the cycle-2 CONFIRMATION bundle. No methodology FAIL across 13 checks + the §11 anti-pattern scan + the Foundation Audit. One non-blocking documentation-hygiene defect is recorded as a process recommendation.
+
+## Iteration Type (from Brief Section 0.5)
+TYPE: EXPLORATION (cycle 2 #5 of 10). Per `feedback_v3_dsr_mode_artifact.md`, Check 3 edge axes (DSR/PSR/DSR_relative) are informational only; Check 3 is not BLOCK-triggering for EXPLORATION.
+
+## The OOS-Tuning Remediation Adjudication (the load-bearing call)
+
+This was the primary mandate and it is mine to decide. Verdict: **remediation COMPLETE; the a-priori 0.50 default is genuinely un-overfittable.**
+
+Independent audit of the corrected EDA `axis_selection_eda.py` (`a254e5a`):
+
+- `main()` line 897: `chosen_derate = 0.50` — a hardcoded literal with a documented a-priori rationale ("halve size in adverse BTC regime"). It is NOT the output of any `sort_values`, `filter`, `argmax`, or threshold operation. The first pass's defective `oos_delta >= -0.20` filter + `oos_delta`-rank is entirely gone.
+- `t3_derate_counterfactual` and `t8_scoped_derate_counterfactual` compute only `is_monthly_sharpe` and `is_delta` per candidate de-rate. A repository-wide grep for `oos_delta`, `oos_monthly_sharpe`, `oos_is_ratio` in the EDA source returns zero. No per-candidate-design OOS evaluation exists anywhere in the corrected EDA.
+- The two surviving IS-only design choices were never contaminated: MA-window via T2 `is_discrimination_pp` (IS-bear-flag-rate minus IS-bull-flag-rate); scope via T7 `bearchop_is_genuine_drag` (sign of IS bear/chop-entry wpnl). Both audited — IS-only.
+- The only OOS number in the EDA is T1's `OOS_uptrend` row (+0.1403), which merely reproduces the already-public /060 anchor present in every brief — not a per-candidate-design OOS evaluation.
+
+The judgment call — does the QR's prior exposure to the first-pass OOS counterfactual taint the 0.50? No. A round-number "half size" cut is about as un-tunable as a parameter gets: the T8 IS lift is monotone in aggressiveness (0.25→+0.21 ... 0.75→+0.07), so the only IS-fittable optimum is the boundary value 0.25, and the QR explicitly rejected fitting to it. The 0.50 is data-free by construction; prior knowledge of an OOS counterfactual cannot retroactively overfit a parameter selected by a structural interpretability rule that ignores both IS and OOS magnitudes. The correction is disclosed in full (brief §10.0, EDA docstring, synthesis.md). Remediation accepted.
+
+## Per-Check Status
+
+### Check 1 — Look-Ahead Audit: PASS
+Three audit surfaces, all clean. (a) Corrected EDA — adjudicated above; IS-only, no design choice references OOS. (b) Production `_build_btc_trend_lookup` (`risk_v3.py:144-159`): `close.shift(1)` is applied BEFORE `rolling(ma_window, min_periods=ma_window).mean()`, so bar t's classification uses only `close[t-1 .. t-ma_window]` — the current BTC bar's close is never seen; warm-up NaN → 0 (bull, no de-rate). (c) `_regime_size_scalar` (`risk_v3.py:337-344`): trade-time selection via `np.searchsorted(btc_times, open_time_ms, side="left") - 1`, the strict `< t` past-only contract identical to `_regime_gate_fires`. `test_regime_size_scalar.py::test_btc_trend_classifier_past_only` adversarially confirms the drop bar does not flag itself. No look-ahead.
+
+### Check 2 — Embargo Width: PASS
+`walk_forward.py:113` has `train_end_ms = test_start_ms - embargo_ms` — the embargo purge is intact. `compute_embargo_candles(10080, 480) = 22` candles. REQUIRED_GAP = 66 = (21+1) × 3 symbols, confirmed at `validation_v3.py:60`. Primitive 12 changes neither the label horizon nor the symbol count, so the gap is unchanged from /060. The `feedback_v3_walkforward_lookahead_bug.md` note describes a separate historical defect; the current `walk_forward.py:113` has the embargo correctly applied, and any residual v3 bias is uniform across iterations — cross-iteration deltas remain valid.
+
+### Check 3 — Multiple-Testing Correction: FAIL (informational for EXPLORATION)
+DSR = 0.0, PSR = 0.798, DSR_relative_B4 = 5.3e-05 — all below the 0.95 CONFIRMATION thresholds; PBO = 0.1278 (clears < 0.4). Per `feedback_v3_dsr_mode_artifact.md` and brief §0.5 TYPE=EXPLORATION, the DSR/PSR edge axes are EXPLORATION-mode artifacts (n_trials=315, E[max_SR] is regime-specific) and are NOT comparable to CONFIRMATION-mode DSR. Check 3 edge-axis FAILs do NOT trigger BLOCK for an EXPLORATION iteration. PBO — the one Check-3 axis that is meaningful at any mode — PASSES at 0.1278, bit-identical to /060 (a post-gate weight scalar leaves the Optuna landscape and CPCV path construction untouched). n_trials = 315 (3 seeds × 3 symbols × 35 trials) matches the EXPLORATION budget; n_eff = 19. Flagged for record; not BLOCK-triggering.
+
+### Check 4 — IC Correlation: PASS
+`ic_matrix.csv` is present, 14×14, on the frozen /059/060 anchor feature set. Primitive 12 adds NO feature — it is a post-gate risk-layer weight scalar. There is no "new feature family" to test for redundancy; the IC matrix is structurally identical to /060. No `|IC| ≥ 0.7` new-vs-existing pair exists because there is no new feature. Check passes by construction.
+
+### Check 5 — ADF Stationarity: PASS
+`adf_test.csv` present, 2198 rows (within the expected [1302, 2646] range for 3 syms × 14 feats × [31,63] months). All 14 features are the frozen /059/060 anchor set — Primitive 12 adds no feature, so feature stationarity cannot change vs /060. The 395 non-stationary (feature, month) cells are per-month warm-up artifacts (e.g. 2020-01 cells with empty `adf_statistic`), structurally unchanged from /060. The `run.log` warning `[ADF] WARNING: LDOUSDT/cusum_reset_count_200 not found in ADF output` is verified BENIGN: `cusum_reset_count_200` for LDO is genuinely absent from `adf_test.csv` (0 occurrences) because LDO trades only from 2022-09-22 (31 ADF months vs 63 for BCH/TRX) and the window-200 feature is all-NaN in LDO's earliest training sub-windows, so the ADF runner finds no valid cell and omits it. ADF is diagnostic metadata — not a training or scoring input — so the omission has zero impact on the backtest. Not a defect.
+
+### Check 6 — Pareto Dominance: PASS (N/A at EXPLORATION; not gating)
+Single-seed-lineage EXPLORATION (outer=42 lineage subset `[191664963, 1662057957, 1405681631]`, ENSEMBLE_SIZE=3). The 10-seed pre-MERGE Pareto validation is a CONFIRMATION gate; it does not apply to an EXPLORATION iteration. `frac_positive_paths = 0.6444` (CPCV invariant, bit-identical to /060) clears the 0.55 EXPLORATION threshold. No seed-selection defect; nothing to fail.
+
+### Check 7 — Reproducibility: PASS
+Commit chain stamped (EDA `a254e5a`, brief `a41d308`, setup `f170a75`, error-fix `f6da345`, gate `e37d6cf`). `ITERATION_LABEL = "v3-075"` at `run_baseline_v3.py:128`. Feature columns are the explicit frozen 14-column V3_FEATURE_COLUMNS (no auto-discovery). BCH bit-identity (positive control) independently VERIFIED by direct file comparison: /075 vs /060 IS rows 2-5 (all BCH) are byte-identical in `weight_factor` (0.0000, 0.5200, 0.0000, 0.8800) and `weighted_pnl`; /075 vs /060 OOS BCH rows likewise identical (e.g. weight 0.3300 → weighted_pnl 2.3311 in both). The de-rate scope `("LDOUSDT","TRXUSDT")` excludes BCH perfectly — engineering-report claim of 73/73 IS + 37/37 OOS confirmed. OOS PnL arithmetic spot-checked on 4 trades (BCH short row 2: `(303.87-282.100779)/303.87×100 = 7.164%` ✓, net 7.064, weighted 7.064×0.33 = 2.3311 ✓; TRX long row 5; LDO short row 24) — all reconcile. The TRX de-rate is visible in the diff: /060 IS TRX weight 0.8900 → /075 0.4400 (halving with rounding); /060 OOS TRX weight 0.4000 → /075 0.2500. The OOS count 103 vs predicted 102 is a verified data-extent artifact: both /060 and /075 have exactly 1 `end_of_data` trade; /075's is a later LDO trade (`open_time=1778716799999`, 2026-05-14) present only because /075's klines extend to 2026-05-15. A size scalar multiplies `weight_factor` — it cannot create a trade; the +1 is purely the later data extent. Reproducible.
+
+### Check 8 — Hypothesis-Implementation Alignment: PASS
+The brief declares exactly TWO changes: Primitive 12 ON, Primitive 9 (regime gate) reverted OFF. The runner config confirms exactly that — `enable_regime_size_scalar=True` / `("LDOUSDT","TRXUSDT")` / 0.50 / 270 (lines 1638-1641); `enable_regime_gate=False`, `regime_gate_symbols=()` (lines 1621-1622, the /074 revert). No scope creep: `enable_per_symbol_cap=False`, `block_long_for=()`/`block_short_for=()`, `enable_per_symbol_drawdown_brake=False`, `V3_ATR_MULTIPLIERS_PER_SYMBOL={}`, `DEFAULT_ATR_MULTIPLIERS=(2.0,1.0)` — all primitives 8/10/11 and labeling unchanged. The pre-flight assertions enforce all four Primitive-12 values and the Primitive-9 OFF state. Behavioral-effect predictor: brief §4.4 pre-registered ≈24 IS / ≈32 OOS trade-level re-weightings; observed 28 IS / 33 OOS — within the "approximate" band (the T5 derivation used the static /060 roster without 3-seed Optuna variation). Signal-level `regime_size_scalar_fires` from `run.log`: BCH=0 (positive control), LDO=5, TRX=232, total=237 — NULL-RESULT falsifier not triggered. Brief §7 pre-registered INERT-AT-EXPLORATION at ≈45%; observed INERT (IS Δ +0.1198 clears the +0.10 PROMISING IS floor; OOS Δ -0.0768 inside the [-0.20,+0.20] noise band, below the +0.20 PROMISING OOS floor, above the -0.20 NEGATIVE floor). Holding-time-orthogonality confirmed: LDO+TRX kept-roster mean duration Δ = 0.000 IS / +0.004 OOS candles (the +0.004 is the one extra data-extent trade, 250× below the +1.0 falsifier). Implementation matches the registered hypothesis exactly.
+
+## Checks 9-12 (Optional — run)
+
+- **Check 9 (Symbol Exclusion):** PASS. BCH/LDO/TRX are the v3 universe; none in V3_EXCLUDED_SYMBOLS.
+- **Check 10 (Feature Isolation):** PASS. `risk_v3.py` imports only from `risk_v2`, `features_v3`, `config`, `strategies` — no `crypto_trade.features` / `features_v2` cross-track import. The module docstring explicitly restates the isolation contract.
+- **Check 11 (Forming-Candle):** PASS (indirect). The OOS `end_of_data` trade at 2026-05-14 with a non-future `close_time` is consistent with klines refreshed to 2026-05-15; no future-dated bar observed.
+- **Check 12 (Library Pinning):** PASS. Brief §9 pins lightgbm 4.6.0 / optuna 4.8.0 / numpy 2.2.6 / pandas 3.0.0 / sklearn 1.8.0 / scipy 1.17.0 / statsmodels 0.14.6 / pyarrow 23.0.1; Primitive 12 introduces no new library (pure numpy/pandas).
+
+## §11 Anti-Pattern Static Scan
+
+No anti-pattern found. No `start_time` trimming. No OOS-window manipulation. The de-rate fires AFTER the model and AFTER labeling (post-gate weight step) — it cannot leak into trade selection or the Optuna landscape, which is why PBO/frac_positive_paths/feature-importance are all bit-identical to /060. ONE documentation-hygiene defect (not an anti-pattern, not gating) — see Recommendations.
+
+## Recommendations to QR
+
+The verdict is final (MERGE — INERT-AT-EXPLORATION certified). These are process-level items for FUTURE iterations.
+
+1. **Stale code comment — fix in the next setup commit.** `risk_v2.py:182-183` still reads `de-rate 0.50 (T8 — largest IS lift clearing the +0.10 PROMISING / -0.20 NEGATIVE classification floors)` — a pre-correction artifact contradicting the a-priori-default rationale. The parallel stale text in `run_baseline_v3.py:609` was correctly fixed by `f6da345`; this code comment was missed by the same sweep. It is a non-executable docstring annotation — the runtime value (0.50), the runner's executable assertions, the EDA `main()`, the brief, and synthesis.md all correctly state the a-priori derivation, so this does NOT re-introduce OOS contamination and does NOT meet the BLOCK bar. But when a methodology correction is applied, the correction sweep must cover ALL textual references — code comments included — not only error-message strings. Future correction commits should grep the full repo for the stale phrasing.
+
+2. **The OOS-tuning defect must not recur — codify the rule.** The first EDA pass selecting a design parameter by an OOS-counterfactual filter+rank was caught only by the orchestrator pre-gate, not by the QR's own discipline. For all future EDA scripts, any design parameter (de-rate, MA window, scope, threshold) must be selected by a function whose inputs are demonstrably IS-only or a-priori — and the EDA docstring should state, per parameter, the exact selection function and its input columns. The corrected /075 EDA now does this well (the per-parameter "How the three design parameters are chosen" block); make that block a mandatory EDA section.
+
+3. **Cycle-2 #6 (/076) axis selection.** The IS bear/chop drag is now directly measured and localized (T1/T7), but Primitive 12 demonstrated that a BTC-trend classifier de-rating the IS drag necessarily also de-rates OOS-uptrend trades at cost — the IS-improving classifier is OOS-costly because the regime is "bear" in IS and "bull" in OOS. The /076 EDA should pre-register, with committed IS-only analysis, whether a mechanism exists that discriminates IS bear/chop from OOS uptrend WITHOUT relying on a feature whose sign is regime-correlated in exactly that way (e.g. a feature-internal IS-regime discriminator the model can learn, rather than a post-gate macro classifier). Cycle 2 so far is 0/5 clean PROMISING; the next axis should be chosen to break, not repeat, the IS-up/OOS-down tension.

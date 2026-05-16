@@ -1,0 +1,9 @@
+symbol,feature,n_trades,spearman_rho_aligned,spearman_p_aligned,spearman_rho_raw,spearman_p_raw,WR_when_sign_matches_dir_pct,n_match,WR_when_sign_diverges_dir_pct,n_nomatch
+BCHUSDT,ret_kurt_50_signed_momentum,94,0.134,0.199,-0.219,0.034,41.9,62,31.2,32
+BCHUSDT,ret_skew_50_signed_momentum,94,-0.268,0.009,0.211,0.041,31.9,47,44.7,47
+LDOUSDT,ret_kurt_50_signed_momentum,18,0.265,0.287,0.251,0.316,60.0,15,33.3,3
+LDOUSDT,ret_skew_50_signed_momentum,18,-0.451,0.06,-0.362,0.14,50.0,8,60.0,10
+TRXUSDT,ret_kurt_50_signed_momentum,85,0.124,0.256,-0.093,0.399,40.6,32,30.2,53
+TRXUSDT,ret_skew_50_signed_momentum,85,0.024,0.828,0.096,0.384,34.2,38,34.0,47
+ALGOUSDT,ret_kurt_50_signed_momentum,53,0.062,0.657,0.309,0.025,41.2,34,36.8,19
+ALGOUSDT,ret_skew_50_signed_momentum,53,-0.081,0.563,0.054,0.701,33.3,24,44.8,29

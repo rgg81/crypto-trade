@@ -1,0 +1,5 @@
+symbol,candidate,n_obs,spearman_rho,spearman_p,significant_at_p005
+BCHUSDT,fracdiff_d05_close,5527,-0.03753,0.00526,True
+LDOUSDT,fracdiff_d05_close,2541,-0.05119,0.00985,True
+TRXUSDT,fracdiff_d05_close,5469,-0.05016,0.00021,True
+ALGOUSDT,fracdiff_d05_close,5025,-0.03849,0.00636,True

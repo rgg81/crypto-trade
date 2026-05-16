@@ -1,0 +1,7 @@
+sample,symbol,n_trades,n_TP,n_SL,n_TIMEOUT,n_EOD,pct_TIMEOUT,avg_dur_all,avg_dur_TP,avg_dur_SL
+in_sample,BCHUSDT,73,27,40,6,0,8.22%,6.85,7.81,4.08
+in_sample,LDOUSDT,11,3,8,0,0,0.00%,4.91,4.33,5.12
+in_sample,TRXUSDT,75,19,53,3,0,4.00%,6.00,7.05,4.77
+out_of_sample,BCHUSDT,37,11,24,2,0,5.41%,5.92,6.64,4.33
+out_of_sample,LDOUSDT,11,2,9,0,0,0.00%,7.36,11.00,6.56
+out_of_sample,TRXUSDT,54,26,26,1,1,1.85%,6.65,6.96,5.88

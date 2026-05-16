@@ -1,0 +1,10 @@
+symbol,feature,horizon_bars,horizon_days,n_pairs,rank_ic_spearman
+BCHUSDT,tbr_zscore_30,1,0.33,2192,0.00429
+BCHUSDT,tbr_zscore_30,3,1.0,2190,0.01657
+BCHUSDT,tbr_zscore_30,7,2.33,2186,0.06493
+LDOUSDT,tbr_zscore_30,1,0.33,2192,-0.0265
+LDOUSDT,tbr_zscore_30,3,1.0,2190,-0.01979
+LDOUSDT,tbr_zscore_30,7,2.33,2186,-0.01426
+TRXUSDT,tbr_zscore_30,1,0.33,2192,-0.01309
+TRXUSDT,tbr_zscore_30,3,1.0,2190,-0.00698
+TRXUSDT,tbr_zscore_30,7,2.33,2186,0.00399

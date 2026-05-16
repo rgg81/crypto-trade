@@ -1,0 +1,7 @@
+iteration,rank,n_total_features,importance,top_importance,importance_pct_of_top
+iter-v3/028 (3-sym),14,14,390.4,604.4,64.59
+iter-v3/050 (4-sym; seed 42),14,14,370.6,759.4,48.8
+iter-v3/050 BCHUSDT,11,14,90.6,180.4,50.22
+iter-v3/050 LDOUSDT,14,14,48.2,144.6,33.33
+iter-v3/050 TRXUSDT,11,14,128.4,229.4,55.97
+iter-v3/050 ALGOUSDT,13,14,103.4,287.6,35.95

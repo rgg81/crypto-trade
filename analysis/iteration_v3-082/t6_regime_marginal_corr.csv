@@ -1,0 +1,13 @@
+symbol,feature,regime_marginal_ic
+BCHUSDT,funding_sign_persist_9,0.1652299639327686
+BCHUSDT,funding_momentum_3,0.013366666828472616
+BCHUSDT,funding_accel_3,0.0143641480654477
+BCHUSDT,funding_price_divergence_6,0.0645967494114477
+LDOUSDT,funding_sign_persist_9,0.2063987242849499
+LDOUSDT,funding_momentum_3,0.015093025126385537
+LDOUSDT,funding_accel_3,0.037186175550489274
+LDOUSDT,funding_price_divergence_6,0.058429191235717576
+TRXUSDT,funding_sign_persist_9,0.10144398802021648
+TRXUSDT,funding_momentum_3,0.007942260866787912
+TRXUSDT,funding_accel_3,0.0062140349957603225
+TRXUSDT,funding_price_divergence_6,0.003923702272261596

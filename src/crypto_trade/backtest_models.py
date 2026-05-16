@@ -32,6 +32,10 @@ class Signal:
     weight: int  # 0-100
     tp_pct: float | None = None  # optional dynamic take-profit %
     sl_pct: float | None = None  # optional dynamic stop-loss %
+    # iter-v3/080: passive metadata field — M1 directional confidence scalar.
+    # max(P(long), P(short)) from the inner-ensemble mean predict_proba.
+    # No decision, barrier, gate, or model input ever reads this field.
+    confidence: float | None = None
 
 
 @dataclass(frozen=True)
@@ -83,6 +87,8 @@ class Order:
     take_profit_price: float
     open_time: int
     timeout_time: int
+    # iter-v3/080: passive metadata — carried from Signal.confidence.
+    confidence: float | None = None
 
 
 @dataclass(frozen=True)
@@ -106,6 +112,9 @@ class TradeResult:
     stop_loss_price: float = 0.0
     take_profit_price: float = 0.0
     timeout_time: int = 0
+    # iter-v3/080: passive metadata — M1 directional confidence scalar.
+    # Carried from Order.confidence. No decision path reads this field.
+    confidence: float | None = None
 
 
 @dataclass(frozen=True)

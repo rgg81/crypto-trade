@@ -1,0 +1,13 @@
+symbol,labeling,n_scannable,spread_common7_pct,spread_own_horizon_pct,label_persistence
+BCHUSDT,ATR_triple_barrier,5727,8.068,14.7666,0.7316
+BCHUSDT,fixed_horizon_7,5727,10.2055,10.2055,0.6283
+BCHUSDT,fixed_horizon_14,5727,7.8638,15.2281,0.7558
+BCHUSDT,fixed_horizon_21,5727,6.6973,19.1407,0.7906
+LDOUSDT,ATR_triple_barrier,2741,10.1401,15.0636,0.7197
+LDOUSDT,fixed_horizon_7,2741,13.1327,13.1327,0.6642
+LDOUSDT,fixed_horizon_14,2741,9.5145,18.6127,0.7647
+LDOUSDT,fixed_horizon_21,2741,7.2281,22.2963,0.7897
+TRXUSDT,ATR_triple_barrier,5669,6.3679,10.8214,0.7298
+TRXUSDT,fixed_horizon_7,5669,8.1378,8.1378,0.6306
+TRXUSDT,fixed_horizon_14,5669,6.1216,11.6024,0.7631
+TRXUSDT,fixed_horizon_21,5669,5.2297,14.207,0.7838

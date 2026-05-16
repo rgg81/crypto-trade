@@ -1,0 +1,13 @@
+metric,predicted_lower,predicted_upper,anchor_060,anchor_target_PROMISING
+IS_monthly_sharpe_delta_vs_060,-0.2,0.3,0.8325,0.9325
+OOS_monthly_sharpe_delta_vs_060,-0.3,0.5,0.1403,0.34030000000000005
+OOS_IS_daily_ratio,0.2,0.5,0.21,≥ 0.5 (stability)
+BCH_IS_wpnl_delta,-15.0,15.0,BCH IS share 176.68% at /060,BCH IS share ≥ 80%
+BCH_OOS_wpnl_delta,-15.0,20.0,+24.75 OOS wpnl at /060 (BCH),BCH OOS wpnl stable or improved
+LDO_IS_wpnl_delta,-5.0,15.0,LDO IS contribution thin at /060,LDO IS lift on trend-regime signal
+LDO_OOS_wpnl_delta,-10.0,15.0,-6.18 OOS wpnl at /060 (LDO),LDO OOS turns positive
+TRX_IS_wpnl_delta,-10.0,10.0,TRX IS thin at /060,TRX IS stable
+TRX_OOS_wpnl_delta,-10.0,10.0,+4.16 OOS wpnl at /060 (TRX),TRX OOS stable
+IS_trade_count_delta,-5.0,15.0,~171 IS trades at /060 (single roster),"IS trades within [128, 222]"
+OOS_trade_count_delta,-5.0,10.0,94 OOS trades at /060 (single roster),"OOS trades within [66, 122]"
+frac_positive_paths,0.5,0.75,0.6444 at /060 (CPCV architecture-invariant),≥ 0.50

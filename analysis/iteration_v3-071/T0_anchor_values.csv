@@ -1,0 +1,11 @@
+metric,value,source
+IS monthly Sharpe,0.8325,reports-v3/iteration_v3-060/comparison.csv:2
+OOS monthly Sharpe,0.1403,reports-v3/iteration_v3-060/comparison.csv:2
+OOS/IS monthly Sharpe ratio,0.16852852852852854,derived from comparison.csv:2
+IS n_trades,159.0,reports-v3/iteration_v3-060/comparison.csv:7
+OOS n_trades,102.0,reports-v3/iteration_v3-060/comparison.csv:7
+IS profit_factor,1.2806,reports-v3/iteration_v3-060/comparison.csv:5
+OOS profit_factor,1.0482,reports-v3/iteration_v3-060/comparison.csv:5
+IS win_rate,31.4465,reports-v3/iteration_v3-060/comparison.csv:6
+OOS win_rate,39.2157,reports-v3/iteration_v3-060/comparison.csv:6
+frac_positive_paths (CPCV),,reports-v3/iteration_v3-060/comparison.csv:12 (pbo row — informational)

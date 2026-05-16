@@ -1,0 +1,4 @@
+symbol,is_n_trades,is_active_months,is_monthly_pnl_mean,is_monthly_pnl_std,is_per_symbol_monthly_sharpe,is_total_wpnl,is_wpnl_concentration_pct
+BCHUSDT,73,29,0.027,0.0692,1.3532,78.3438,150.98
+LDOUSDT,11,5,-0.0033,0.0632,-0.1825,-1.664,-3.21
+TRXUSDT,75,27,-0.0092,0.032,-0.995,-24.7891,-47.77

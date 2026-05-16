@@ -1,0 +1,7 @@
+metric,value,symbol,is_sharpe_base,is_sharpe_scaled,delta
+portfolio_is_monthly_sharpe_baseline,0.8325,,,,
+portfolio_is_monthly_sharpe_inverse_vol,0.3021,,,,
+is_monthly_sharpe_delta,-0.5304,,,,
+,,BCHUSDT,1.3532,1.3532,0.0
+,,LDOUSDT,-0.1825,-0.1825,0.0
+,,TRXUSDT,-0.995,-0.995,-0.0

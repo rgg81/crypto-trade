@@ -1,0 +1,6 @@
+path,predicted_is_sharpe_delta_low,predicted_is_sharpe_delta_high,predicted_oos_sharpe_delta_low,predicted_oos_sharpe_delta_high,mechanism
+Path_A_median_threshold,-0.05,0.05,-0.1,0.1,Marginal-trade flip (~7%). First-order Sharpe-neutral; second-order Optuna re-converge.
+Path_B_median_proba,-0.05,0.05,-0.1,0.1,Marginal-proba trade flip. First-order Sharpe-neutral.
+Path_C_fixed_055,-0.3,-0.05,-0.3,-0.05,Sub-optimal universal threshold; degrades CV Sharpe; tighter in some cells
+Path_D_tighten_060,0.05,0.2,0.1,0.3,Tighten only marginal trades. Drops more losers than winners (marginal-quality bias)
+Path_E_vote_2of3,0.0,0.15,0.05,0.25,Disagreement = uncertainty; drops uncertain trades. Smaller magnitude than Path D.

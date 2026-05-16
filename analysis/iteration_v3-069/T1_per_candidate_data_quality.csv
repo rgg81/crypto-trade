@@ -1,0 +1,6 @@
+symbol,pre_is_months,is_coverage_pct,gap_count,is_avg_daily_qvol_usd_M,is_p10_daily_qvol_usd_M,gate1_pass,gate2_pass
+ATOMUSDT,37.74,100.0,0,105.8,39.1,True,True
+FILUSDT,29.47,100.0,0,220.6,68.3,True,True
+ALGOUSDT,33.47,100.0,0,60.6,12.6,True,True
+ADAUSDT,37.97,100.0,0,390.6,101.4,True,True
+VETUSDT,37.51,100.0,0,38.3,9.5,True,True

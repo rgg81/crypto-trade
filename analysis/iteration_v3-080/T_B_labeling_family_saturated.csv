@@ -1,0 +1,5 @@
+cycle2_labeling_attempt,verdict,mechanism
+iter-v3/071 meta-labeling (M2 take/skip),SUSPICIOUS-OOS-DOMINANT,M2 veto removes early stop-outs -> holding-time extension
+iter-v3/072 fixed-horizon-21 label,NEGATIVE,label DEFINITION change; no edge
+iter-v3/073 per-symbol triple-barrier asymmetry,SUSPICIOUS-OOS-DOMINANT (OOS/IS ratio 6.85),per-symbol barrier rebalanced toward TP -> holding-time extension
+candidate: vol-adjusted past-only-realized-vol barrier (the /079-diary floated alt),PREDICTED SUSPICIOUS-OOS-DOMINANT — SKIP,replacing the global ATR multiplier with a per-symbol realized-vol barrier RE-SCALES the TP/SL distances per trade -> changes per-trade duration -> SATURATED holding-time-extension family (feedback_v3_is_oos_regime_divergence.md: /065/071/073). A barrier knob is NOT a category-1/2 structural axis; it is a knob on a closed axis.

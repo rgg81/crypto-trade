@@ -1,0 +1,3 @@
+candidate_feature,mean_rank_BCH,mean_rank_LDO,mean_rank_TRX,last_month_rank_BCH,last_month_rank_LDO,last_month_rank_TRX,max_cond_ortho_corr,engineered_falsifier_PASS,verdict
+overext_atr_50,13.0,13.7,14.5,12,15,15,0.1769,False,INERT — rank >10 all symbols; engineered falsifier FAILS
+momentum_extension_brake_5d,13.9,13.5,14.2,14,15,15,0.3156,False,INERT — rank >10 all symbols; engineered falsifier FAILS

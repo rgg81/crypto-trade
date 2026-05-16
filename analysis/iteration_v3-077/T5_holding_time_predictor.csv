@@ -1,0 +1,5 @@
+channel,predicted,falsifier,basis
+full-roster mean trade-duration delta vs /060,0.000 candles (mechanical identity),>+1.0 candle full-roster shift -> Phase-6 wiring defect,byte-identical labeling + model -> identical per-trade barriers
+added-vs-removed roster-composition mean-duration gap,UNDEFINED (added set and removed set both EMPTY),any non-empty added/removed set -> Phase-6 wiring defect,"bit-identical roster: 0 trades added, 0 removed"
+IS trade-count delta vs /060,"0 (159 IS trades, identical)",any IS count change -> Phase-6 wiring defect,deterministic models from identical seeds + feature set
+OOS/IS monthly Sharpe ratio,0.1685 (mechanically equal to /060),ratio != 0.1685 -> Phase-6 wiring defect (NOT regime loading),bit-identical roster -> identical comparison.csv

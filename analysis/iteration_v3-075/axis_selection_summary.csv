@@ -1,0 +1,7 @@
+key,value
+axis,Primitive 12 — BTC-trend-regime position-SIZE de-rate scalar
+btc_trend_ma_window_bars,270
+bearchop_derate_scalar,0.5
+derate_scope_symbols,"LDOUSDT,TRXUSDT"
+holding_time_orthogonal,YES — duration delta EXACT 0 (T4)
+full_roster,YES — every bear/chop-entry trade of scope symbols (T5)

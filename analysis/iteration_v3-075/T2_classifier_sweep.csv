@@ -1,0 +1,5 @@
+ma_window_bars,ma_window_days,is_bearchop_trades_flagged_pct,is_bull_trades_flagged_pct,oos_trades_flagged_pct,is_discrimination_pp,n_is_bearchop_trades_flagged,n_is_total_flagged,n_oos_total_flagged
+90,30,26.0,36.6,52.9,-10.6,20,50,54
+135,45,26.0,35.4,47.1,-9.4,20,49,48
+180,60,32.5,30.5,46.1,2.0,25,50,47
+270,90,40.3,24.4,50.0,15.9,31,51,51

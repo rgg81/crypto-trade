@@ -1,0 +1,6 @@
+check,metric,value,ceiling,note
+feature candidate: overext_atr_50,max conditional-orthogonality corr,0.1769,0.35,"BELOW 0.35 — NOT conditionally regime-loaded; the candidate is rejected for INERT importance rank, not regime-loading"
+feature candidate: momentum_extension_brake_5d,max conditional-orthogonality corr,0.3156,0.35,"BELOW 0.35 — NOT conditionally regime-loaded; the candidate is rejected for INERT importance rank, not regime-loading"
+model-stability: LDOUSDT,mean per-month top-feature importance share,0.1157,-0.2128,top-share-vs-BULL corr=-0.213 in 'ceiling' col; ADA distribution normal if comparable to TRX/LDO
+model-stability: ADAUSDT,mean per-month top-feature importance share,0.119,0.1697,top-share-vs-BULL corr=+0.170 in 'ceiling' col; ADA distribution normal if comparable to TRX/LDO
+model-stability: TRXUSDT,mean per-month top-feature importance share,0.1233,-0.2472,top-share-vs-BULL corr=-0.247 in 'ceiling' col; ADA distribution normal if comparable to TRX/LDO

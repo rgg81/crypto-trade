@@ -1,0 +1,9 @@
+key,value
+axis,passive_diagnostic_conditional_orthogonality
+axis_type,PASSIVE-DIAGNOSTIC (bit-identical roster)
+IS_bull_months,36
+IS_bearchop_months,27
+features_conditionally_regime_loaded,4
+max_conditional_corr,0.4803
+predicted_OOS_IS_ratio,0.1685 (mechanical identity = /060)
+predicted_roster_delta,0 trades (bit-identical to /060)

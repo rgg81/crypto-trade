@@ -1,0 +1,5 @@
+candidate,col,feat_mean_IS_bearchop,feat_mean_OOS_uptrend,standardized_mean_gap,regime_sign_abs_corr,regime_sign_corr_signed,below_035_ceiling
+C1 range_compression_ratio (bb_width_pct_rank_100),C1_range_compression_ratio,0.6316,0.6569,-0.0897,0.0444,-0.0444,True
+C2 range_efficiency_50 (unsigned Kaufman path efficiency),C2_range_efficiency_50,0.1686,0.1708,-0.0202,0.01,-0.01,True
+C3 abs_ret_autocorr_50 (|ret_autocorr_lag1_50|),C3_abs_ret_autocorr_50,0.0991,0.1118,-0.1501,0.0743,-0.0743,True
+C4 realized_vol_pct_rank (atr_pct_rank_200),C4_realized_vol_pct_rank,0.7304,0.7005,0.1463,0.0724,0.0724,True

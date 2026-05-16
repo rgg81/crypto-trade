@@ -1,0 +1,5 @@
+symbol,n_nonzero_weight,median_weight_factor,win_rate_high_weight,win_rate_low_weight
+BCHUSDT,60,0.705,0.6,0.4
+LDOUSDT,10,0.685,0.4,0.2
+TRXUSDT,63,0.79,0.25,0.2903
+PORTFOLIO,133,0.74,0.4118,0.3385

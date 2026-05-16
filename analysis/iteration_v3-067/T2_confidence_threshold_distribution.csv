@@ -1,0 +1,6 @@
+property,value_min,value_max_or_estimate,description
+optuna_range,0.5,0.85,Optuna suggest_float bounds (optimization.py:198)
+uniform_3seed_std,,0.10103629710818451,Theoretical std of uniformly distributed 3-seed sample
+uniform_mean_median_gap_expected,,0.04,Expected gap between mean and median at n=3 uniform draws
+n_sym_month_cells_oos,,42.0,"Total (sym, month) cells across OOS — each has 3 per-seed thresholds"
+n_sym_month_cells_is,,114.0,"Total (sym, month) cells across IS"

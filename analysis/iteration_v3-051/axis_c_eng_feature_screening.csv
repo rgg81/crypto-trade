@@ -1,0 +1,6 @@
+candidate,description,BCH_present,LDO_present,TRX_present,ALGO_present,BCH_max_ic_existing14,LDO_max_ic_existing14,TRX_max_ic_existing14,ALGO_max_ic_existing14,max_ic_overall,ic_carve_out_eligible
+fracdiff_d05_close,Category 2 composed (LdP AFML Ch. 5 FFD; existing in parquets — re-add at universal scope after BCH-only drop at /035),True,True,True,True,0.6597,0.7381,0.5238,0.5881,0.7381,YES (Category 2 composed)
+candle_efficiency_20,Category 1 indicator: |close-open|/range; trend-strength regime signal (orthogonal to ema_spread_atr_20),True,True,True,True,0.7289,0.704,0.724,0.7632,0.7632,YES (Category 2 composed)
+fracdiff_logclose_dstat,Category 1 indicator: ADF d-stat for FFD log-price; stationarity quality score,True,True,True,True,0.4862,0.6602,0.454,0.5127,0.6602,YES (Category 2 composed)
+fracdiff_logvolume_dstat,Category 1 indicator: ADF d-stat for FFD log-volume; volume-stationarity score,True,True,True,True,0.1467,0.1304,0.1298,0.125,0.1467,YES (Category 2 composed)
+cross_asset_divergence_norm,"Category 2 composed (already-tested, dropped at /027 due to NEGATIVE-SUSPICIOUS-OOS at single-seed); included as comparison-baseline",True,True,True,True,0.1019,0.1494,0.1257,0.1262,0.1494,YES (Category 2 composed)

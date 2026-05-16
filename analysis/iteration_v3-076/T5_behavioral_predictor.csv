@@ -1,0 +1,3 @@
+split,chosen_feature,roster_n,n_in_informative_tail,pct_in_informative_tail,lo_tercile_threshold,hi_tercile_threshold
+IS,C2_range_efficiency_50,159,106,66.7,0.0979,0.2038
+OOS,C2_range_efficiency_50,102,68,66.7,0.0979,0.2038
