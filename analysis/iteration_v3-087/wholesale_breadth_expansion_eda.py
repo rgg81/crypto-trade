@@ -316,9 +316,7 @@ def compute_v3_features(df: pd.DataFrame, btc: pd.DataFrame) -> pd.DataFrame:
 # ---------------------------------------------------------------------------
 
 
-def _barrier_hit_candles(
-    df: pd.DataFrame, atr: np.ndarray, side_for_idx: np.ndarray
-) -> np.ndarray:
+def _barrier_hit_candles(df: pd.DataFrame, atr: np.ndarray, side_for_idx: np.ndarray) -> np.ndarray:
     """Label-implied holding time in candles per row, for the labeled side.
 
     Re-scans each candle forward to its first barrier hit (TP or SL) or the
@@ -647,8 +645,10 @@ def main() -> None:
         )
     _write_csv(ANALYSIS_DIR / "T1_data_liquidity_screen.csv", t1_rows)
     for r in t1_rows:
-        print(f"   {r['symbol']:12s} {r['status']:8s} listed={r['first_listing']} "
-              f"IS_bars={r['is_bars_post_burnin']} qvol=${r['median_daily_quote_vol_musd']}M")
+        print(
+            f"   {r['symbol']:12s} {r['status']:8s} listed={r['first_listing']} "
+            f"IS_bars={r['is_bars_post_burnin']} qvol=${r['median_daily_quote_vol_musd']}M"
+        )
     print(f"   T1 survivors ({len(survivors)}): {survivors}")
 
     # ----- T2: per-symbol IS model — incumbents + survivors ----------------
@@ -678,27 +678,29 @@ def main() -> None:
                 mean_trade_duration_candles=round(mean_dur, 3),
             )
         )
-        print(f"   {sym:12s} {'INC' if is_incumbent else 'cand':4s} "
-              f"trades={n_tr:4d} WR={wr:.3f} monthlySharpe={ms:+.4f} "
-              f"net={net:+8.2f} dur={mean_dur:.2f}")
+        print(
+            f"   {sym:12s} {'INC' if is_incumbent else 'cand':4s} "
+            f"trades={n_tr:4d} WR={wr:.3f} monthlySharpe={ms:+.4f} "
+            f"net={net:+8.2f} dur={mean_dur:.2f}"
+        )
     _write_csv(ANALYSIS_DIR / "T2_per_symbol_is_model.csv", t2_rows)
 
     # ----- T3: THE LOAD-BEARING TEST — aggregate book Sharpe ---------------
     print("\n[T3] aggregate IS monthly Sharpe — 3-symbol book vs wholesale books ...")
     inc_sharpe, _ = pooled_book_sharpe({s: rosters[s] for s in INCUMBENTS})
-    inc_pred, inc_meanS, inc_rho, inc_n = bailey_lopezdeprado_predicted_sharpe(
+    inc_pred, inc_mean_s, inc_rho, inc_n = bailey_lopezdeprado_predicted_sharpe(
         {s: rosters[s] for s in INCUMBENTS}
     )
     print(f"   3-symbol incumbent book: aggregate IS monthly Sharpe = {inc_sharpe:+.4f}")
-    print(f"     BLdP decomposition: mean_S={inc_meanS:+.4f} rho_bar(PnL)={inc_rho:+.4f}"
-          f" N={inc_n} -> predicted {inc_pred:+.4f}")
+    print(
+        f"     BLdP decomposition: mean_S={inc_mean_s:+.4f} rho_bar(PnL)={inc_rho:+.4f}"
+        f" N={inc_n} -> predicted {inc_pred:+.4f}"
+    )
 
     # rank candidates by their own IS monthly Sharpe (descending) for the
     # greedy-add construction of wholesale books — but the DECISION metric is
     # the aggregate book Sharpe, not the per-symbol Sharpe.
-    cand_by_sharpe = sorted(
-        survivors, key=lambda s: monthly_sharpe(rosters[s]), reverse=True
-    )
+    cand_by_sharpe = sorted(survivors, key=lambda s: monthly_sharpe(rosters[s]), reverse=True)
     # also rank by the marginal aggregate-Sharpe lift each candidate gives when
     # added alone to the incumbent book — the genuine indifference-curve test.
     marg_rows = []
@@ -719,7 +721,7 @@ def main() -> None:
             book_size=3,
             aggregate_is_monthly_sharpe=round(inc_sharpe, 4),
             bldp_predicted_sharpe=round(inc_pred, 4),
-            mean_per_symbol_sharpe=round(inc_meanS, 4),
+            mean_per_symbol_sharpe=round(inc_mean_s, 4),
             mean_pairwise_pnl_corr=round(inc_rho, 4),
             delta_vs_incumbent=0.0,
         )
@@ -732,7 +734,7 @@ def main() -> None:
         adds = cand_by_marginal[:n_add]
         bk = {s: rosters[s] for s in list(INCUMBENTS) + adds}
         agg, _ = pooled_book_sharpe(bk)
-        pred, meanS, rho, nn = bailey_lopezdeprado_predicted_sharpe(bk)
+        pred, mean_s_book, rho, _bk_n = bailey_lopezdeprado_predicted_sharpe(bk)
         t3_rows.append(
             dict(
                 book=f"wholesale_{size}_marginal",
@@ -740,14 +742,16 @@ def main() -> None:
                 book_size=size,
                 aggregate_is_monthly_sharpe=round(agg, 4),
                 bldp_predicted_sharpe=round(pred, 4),
-                mean_per_symbol_sharpe=round(meanS, 4),
+                mean_per_symbol_sharpe=round(mean_s_book, 4),
                 mean_pairwise_pnl_corr=round(rho, 4),
                 delta_vs_incumbent=round(agg - inc_sharpe, 4),
             )
         )
-        print(f"   wholesale {size} (greedy-marginal {adds}): aggregate Sharpe "
-              f"{agg:+.4f}  delta {agg - inc_sharpe:+.4f}  (mean_S {meanS:+.3f} "
-              f"rho {rho:+.3f} -> pred {pred:+.3f})")
+        print(
+            f"   wholesale {size} (greedy-marginal {adds}): aggregate Sharpe "
+            f"{agg:+.4f}  delta {agg - inc_sharpe:+.4f}  (mean_S {mean_s_book:+.3f} "
+            f"rho {rho:+.3f} -> pred {pred:+.3f})"
+        )
     # also a by-own-Sharpe construction at each size for cross-check
     for size in (5, 6, 7, 8):
         n_add = size - 3
@@ -756,7 +760,7 @@ def main() -> None:
         adds = cand_by_sharpe[:n_add]
         bk = {s: rosters[s] for s in list(INCUMBENTS) + adds}
         agg, _ = pooled_book_sharpe(bk)
-        pred, meanS, rho, nn = bailey_lopezdeprado_predicted_sharpe(bk)
+        pred, mean_s_book, rho, _bk_n = bailey_lopezdeprado_predicted_sharpe(bk)
         t3_rows.append(
             dict(
                 book=f"wholesale_{size}_ownSharpe",
@@ -764,7 +768,7 @@ def main() -> None:
                 book_size=size,
                 aggregate_is_monthly_sharpe=round(agg, 4),
                 bldp_predicted_sharpe=round(pred, 4),
-                mean_per_symbol_sharpe=round(meanS, 4),
+                mean_per_symbol_sharpe=round(mean_s_book, 4),
                 mean_pairwise_pnl_corr=round(rho, 4),
                 delta_vs_incumbent=round(agg - inc_sharpe, 4),
             )
@@ -772,10 +776,7 @@ def main() -> None:
     _write_csv(ANALYSIS_DIR / "T3_aggregate_book_sharpe.csv", t3_rows)
     _write_csv(
         ANALYSIS_DIR / "T3b_marginal_lift_per_candidate.csv",
-        [
-            dict(symbol=c, marginal_aggregate_sharpe_lift=round(d, 4))
-            for c, d in marg_rows
-        ],
+        [dict(symbol=c, marginal_aggregate_sharpe_lift=round(d, 4)) for c, d in marg_rows],
     )
 
     # ----- T4: price-return corr vs strategy-PnL corr ----------------------
@@ -815,17 +816,13 @@ def main() -> None:
                 pair=f"{a}|{b}",
                 price_return_corr=round(pc, 4) if not np.isnan(pc) else "",
                 strategy_monthly_pnl_corr=round(sc, 4) if not np.isnan(sc) else "",
-                abs_gap=round(abs(pc) - abs(sc), 4)
-                if not (np.isnan(pc) or np.isnan(sc))
-                else "",
+                abs_gap=round(abs(pc) - abs(sc), 4) if not (np.isnan(pc) or np.isnan(sc)) else "",
             )
         )
     _write_csv(ANALYSIS_DIR / "T4_correlation_price_vs_pnl.csv", t4_rows)
     pc_all = [r["price_return_corr"] for r in t4_rows if r["price_return_corr"] != ""]
     sc_all = [
-        r["strategy_monthly_pnl_corr"]
-        for r in t4_rows
-        if r["strategy_monthly_pnl_corr"] != ""
+        r["strategy_monthly_pnl_corr"] for r in t4_rows if r["strategy_monthly_pnl_corr"] != ""
     ]
     print(f"   mean |price-return corr|      = {np.mean(np.abs(pc_all)):.4f}")
     print(f"   mean |strategy monthly-PnL corr| = {np.mean(np.abs(sc_all)):.4f}")
@@ -863,8 +860,10 @@ def main() -> None:
         )
     _write_csv(ANALYSIS_DIR / "T5_holding_time_predictor.csv", t5_rows)
     for r in t5_rows:
-        print(f"   {r['symbol']:16s} mean_dur={r['mean_duration_candles']:.2f} "
-              f"gap_vs_incumbent={r['duration_gap_vs_incumbent']:+.3f}")
+        print(
+            f"   {r['symbol']:16s} mean_dur={r['mean_duration_candles']:.2f} "
+            f"gap_vs_incumbent={r['duration_gap_vs_incumbent']:+.3f}"
+        )
 
     # ----- T6: the wholesale-expansion decision ----------------------------
     print("\n[T6] wholesale-expansion DECISION ...")
@@ -873,13 +872,9 @@ def main() -> None:
     # (|gap| > ~2.0 candles loads the regime factor — flag, do not auto-include).
     best = None
     for row in t3_rows:
-        if not row["book"].startswith("wholesale_") or not row["book"].endswith(
-            "marginal"
-        ):
+        if not row["book"].startswith("wholesale_") or not row["book"].endswith("marginal"):
             continue
-        if best is None or row["aggregate_is_monthly_sharpe"] > best[
-            "aggregate_is_monthly_sharpe"
-        ]:
+        if best is None or row["aggregate_is_monthly_sharpe"] > best["aggregate_is_monthly_sharpe"]:
             best = row
     t6_rows = []
     if best is not None:

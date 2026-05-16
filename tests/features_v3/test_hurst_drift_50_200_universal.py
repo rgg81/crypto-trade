@@ -51,8 +51,15 @@ _IS_START_MS = 1_679_616_000_000  # 2023-03-24 00:00 UTC
 _OOS_CUTOFF_MS = 1_742_774_400_000  # 2025-03-24 00:00 UTC (IMMUTABLE)
 
 _PARQUET_DIR = "data/features_v3"
-# iter-v3/084 REVERT /083 FILUSDT expansion — /059-canonical 3-symbol universe.
-_V3_MODELS_ITER_053 = ("BCHUSDT", "LDOUSDT", "TRXUSDT")
+# iter-v3/087 WHOLESALE universe-breadth expansion — 6-symbol universe.
+_V3_MODELS_ITER_053 = (
+    "BCHUSDT",
+    "LDOUSDT",
+    "TRXUSDT",
+    "GALAUSDT",
+    "MANAUSDT",
+    "SANDUSDT",
+)
 
 
 # ---------------------------------------------------------------------------
@@ -78,10 +85,11 @@ def test_hurst_drift_50_200_in_universal_feature_list() -> None:
         "Remove it from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
     )
     n = len(V3_FEATURE_COLUMNS_TOP_N)
-    assert n == 17, (
-        f"V3_FEATURE_COLUMNS_TOP_N has {n} elements -- expected 17 (the BASELINE_V3 "
-        "/059 14-feature anchor stack + the 3-feature perp-spot basis family, the iter-v3/086 "
-        "cycle-3 EXPLORATION #4 axis). hurst_drift_50_200 stays PARKED-ABSENT; "
+    assert n == 14, (
+        f"V3_FEATURE_COLUMNS_TOP_N has {n} elements -- expected 14 (the BASELINE_V3 "
+        "/059/060 14-feature anchor stack). iter-v3/087's SOLE axis is the WHOLESALE "
+        "V3_MODELS 3->6 expansion, NOT a feature change; the /086 perp-spot basis "
+        "family is REVERTED. hurst_drift_50_200 stays PARKED-ABSENT; "
         "/082's funding family stays reverted. "
         "Check V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
     )
@@ -284,32 +292,37 @@ def test_hurst_drift_50_200_past_only_no_lookahead() -> None:
 
 
 def test_v3_models_is_3_symbol_at_iter_v3_084() -> None:
-    """V3 universe must be (BCHUSDT, LDOUSDT, TRXUSDT) at iter-v3/084.
+    """V3 universe must be the 6-symbol BCH/LDO/TRX/GALA/MANA/SAND set at iter-v3/087.
 
-    iter-v3/084 CYCLE 3 REFERENCE / METHODOLOGY — REVERTS the /083 FILUSDT
-    universe expansion (NEGATIVE/NO-MERGE) back to the /059-canonical 3-symbol
-    universe. iter-v3/084 is a clean /059-config anchor re-run; its single
-    declared change is the PER_CELL_GAP 43->22 methodology fix. ALGOUSDT was
-    REVERTED at the system level per iter-v3/051; ADAUSDT is CLOSED (/078
-    SUSPICIOUS-OOS-DOMINANT); FILUSDT is CLOSED (/083 NEGATIVE).
+    iter-v3/087 CYCLE 3 EXPLORATION #6 — the SOLE axis is a WHOLESALE
+    universe-breadth EXPANSION: V3_MODELS grows 3 -> 6 by adding GALAUSDT,
+    MANAUSDT, SANDUSDT. ALGOUSDT was REVERTED at the system level per iter-v3/051;
+    ADAUSDT is CLOSED (/078 SUSPICIOUS-OOS-DOMINANT); FILUSDT is CLOSED (/083
+    NEGATIVE).
 
-    iter-v3/085: feature count = 17 (the BASELINE_V3 /059 14-feature anchor +
-    funding_regime_momentum_5d, the cycle-3 EXPLORATION #4 axis; /082's funding
-    family stays reverted). All 3 symbols return the 15-feature universal
-    fallback. The universe stays the /059-canonical 3-symbol set — iter-v3/085 is
-    a single-feature axis, NOT a universe change. REQUIRED_GAP = 66 = (21+1)*3.
+    iter-v3/087: feature count = 14 (the BASELINE_V3 /059/060 anchor stack — the
+    /086 perp-spot basis family REVERTED, Critic /086 Rec #3). All 6 symbols
+    return the 14-feature universal fallback. The /087 axis is a universe
+    expansion, NOT a feature change. REQUIRED_GAP = 132 = (21+1)*6.
     """
     from crypto_trade.features_v3 import features_for_symbol  # noqa: PLC0415
 
-    expected_universe = ("BCHUSDT", "LDOUSDT", "TRXUSDT")
-    # Each symbol in the expected universe must return the 15-feature universal fallback
+    expected_universe = (
+        "BCHUSDT",
+        "LDOUSDT",
+        "TRXUSDT",
+        "GALAUSDT",
+        "MANAUSDT",
+        "SANDUSDT",
+    )
+    # Each symbol in the expected universe must return the 14-feature universal fallback
     for sym in expected_universe:
         feats = features_for_symbol(sym)
-        assert len(feats) == 17, (
-            f"{sym} fallback returns {len(feats)} features -- expected 15 "
-            "(the BASELINE_V3 /059 14-feature anchor + the 3-feature perp-spot basis family, "
-            "the iter-v3/085 cycle-3 EXPLORATION #4 axis); hurst_drift_50_200 "
-            "stays PARKED-ABSENT."
+        assert len(feats) == 14, (
+            f"{sym} fallback returns {len(feats)} features -- expected 14 "
+            "(the BASELINE_V3 /059/060 14-feature anchor stack; the /086 perp-spot "
+            "basis family REVERTED at iter-v3/087); hurst_drift_50_200 stays "
+            "PARKED-ABSENT."
         )
         assert "hurst_drift_50_200" not in feats, (
             f"{sym} fallback contains hurst_drift_50_200 -- must be ABSENT at iter-v3/065. "

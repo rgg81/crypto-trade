@@ -10,8 +10,6 @@ from __future__ import annotations
 import importlib.util
 from pathlib import Path
 
-import numpy as np
-
 _SPEC = importlib.util.spec_from_file_location(
     "wbe_eda", Path(__file__).resolve().parent / "wholesale_breadth_expansion_eda.py"
 )

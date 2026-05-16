@@ -1,13 +1,12 @@
-"""Assertion test for V3_FEATURE_COLUMNS_TOP_N count — iter-v3/086 (17 features).
+"""Assertion test for V3_FEATURE_COLUMNS_TOP_N count — iter-v3/087 (14 features).
 
-Verifies that V3_FEATURE_COLUMNS_TOP_N has exactly 17 entries: the BASELINE_V3
-/059 14-feature anchor stack + the 3-feature perp-spot BASIS family
-(basis_zscore_30, basis_momentum_3, basis_extreme_flag), the SOLE iter-v3/086
-(cycle-3 EXPLORATION #5) axis — a NEW crypto-native data feed (perp-spot basis,
-computed from spot 8h klines). iter-v3/085's funding_regime_momentum_5d is
-DROPPED (INERT-by-importance + SUSPICIOUS; Critic /085 Rec #1). An EXPLORATION
-never updates BASELINE_V3.md; the 14-feature /059 stack stays canonical until a
-CONFIRMATION-MERGE.
+Verifies that V3_FEATURE_COLUMNS_TOP_N has exactly 14 entries: the BASELINE_V3
+/059/060 anchor stack. iter-v3/087 (cycle-3 EXPLORATION #6) — the SOLE axis is a
+WHOLESALE universe-breadth expansion (V3_MODELS 3 → 6, +GALA +MANA +SAND), NOT a
+feature change. The /086 3-feature perp-spot BASIS family (basis_zscore_30,
+basis_momentum_3, basis_extreme_flag) is REVERTED (Critic /086 Rec #3 — /086
+INERT-by-importance, rank 15/16/17 of 17; the 7-FEED STRUCTURAL VERDICT).
+iter-v3/085's funding_regime_momentum_5d stays DROPPED.
 
 Background:
     iter-v3/063 attempted MASS FEATURE EXPANSION 14 → 46 at single-seed n_trials=35
@@ -101,15 +100,14 @@ _PROHIBITED_FEATURES = frozenset(
 
 
 def test_feature_count_14():
-    """V3_FEATURE_COLUMNS_TOP_N must have exactly 17 entries at iter-v3/086."""
+    """V3_FEATURE_COLUMNS_TOP_N must have exactly 14 entries at iter-v3/087."""
     n = len(V3_FEATURE_COLUMNS_TOP_N)
-    assert n == 17, (
-        f"V3_FEATURE_COLUMNS_TOP_N has {n} features — expected 17. "
-        "iter-v3/086 (cycle-3 EXPLORATION #5): the BASELINE_V3 /059 14-feature "
-        "anchor stack + the 3-feature perp-spot BASIS family (basis_zscore_30, "
-        "basis_momentum_3, basis_extreme_flag — the SOLE /086 axis, a NEW "
-        "crypto-native data feed). iter-v3/085's funding_regime_momentum_5d is "
-        "DROPPED (INERT + SUSPICIOUS). "
+    assert n == 14, (
+        f"V3_FEATURE_COLUMNS_TOP_N has {n} features — expected 14. "
+        "iter-v3/087 (cycle-3 EXPLORATION #6): the BASELINE_V3 /059/060 "
+        "14-feature anchor stack. The SOLE /087 axis is the WHOLESALE V3_MODELS "
+        "3->6 expansion, NOT a feature change; the /086 3-feature perp-spot BASIS "
+        "family is REVERTED (Critic /086 Rec #3 — /086 INERT-by-importance). "
         "Update V3_FEATURE_COLUMNS_TOP_N in src/crypto_trade/features_v3/__init__.py."
     )
 
@@ -125,22 +123,23 @@ def test_baseline_v3_features_present():
 
 
 def test_funding_regime_momentum_5d_present():
-    """The 3-feature perp-spot basis family MUST be PRESENT — the SOLE iter-v3/086 axis.
+    """The 3 /086 basis features + funding_regime_momentum_5d ALL ABSENT — iter-v3/087.
 
-    iter-v3/086 (cycle-3 EXPLORATION #5) appends the 3-feature perp-spot basis
-    family (a NEW crypto-native data feed) and DROPS iter-v3/085's
-    funding_regime_momentum_5d (INERT-by-importance + SUSPICIOUS; Critic /085
-    Rec #1).
+    iter-v3/087 (cycle-3 EXPLORATION #6) REVERTS the /086 3-feature perp-spot
+    basis family (Critic /086 Rec #3 — /086 INERT-by-importance, rank 15/16/17
+    of 17). iter-v3/085's funding_regime_momentum_5d stays DROPPED. The SOLE /087
+    axis is the WHOLESALE V3_MODELS 3->6 expansion, not a feature change.
     """
     cols = set(V3_FEATURE_COLUMNS_TOP_N)
     for bf in ("basis_zscore_30", "basis_momentum_3", "basis_extreme_flag"):
-        assert bf in cols, (
-            f"{bf} NOT FOUND in V3_FEATURE_COLUMNS_TOP_N — must be PRESENT at "
-            "iter-v3/086 (the 3-feature perp-spot basis family, the SOLE axis)."
+        assert bf not in cols, (
+            f"{bf} FOUND in V3_FEATURE_COLUMNS_TOP_N — must be ABSENT at "
+            "iter-v3/087 (the /086 perp-spot basis family REVERTED — Critic "
+            "/086 Rec #3; /086 INERT-by-importance)."
         )
     assert "funding_regime_momentum_5d" not in cols, (
         "funding_regime_momentum_5d FOUND in V3_FEATURE_COLUMNS_TOP_N — must be "
-        "ABSENT at iter-v3/086 (DROPPED — /085 INERT + SUSPICIOUS; Critic Rec #1)."
+        "ABSENT at iter-v3/087 (DROPPED at /086 — /085 INERT + SUSPICIOUS)."
     )
 
 
