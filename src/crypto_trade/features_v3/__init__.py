@@ -184,19 +184,22 @@ V3_FEATURE_COLUMNS_TOP_N: tuple[str, ...] = (
     "sym_vs_btc_ret_7d",  # cross_btc [BASELINE_V3]
     "regime_momentum_signed_5d",  # engineered [BASELINE_V3, /025 PROMISING]
     # -------------------------------------------------------------------------
-    # iter-v3/082 (cycle-3 EXPLORATION #1) — funding-rate FEATURE FAMILY.
-    # 14 -> 18 features. A NEW crypto-native feature family (Direction 1 of
-    # briefs-v3/cycle3_plan.md). DIFFERENT axis from the PERMANENTLY-CLOSED
-    # single funding_rate_zscore_30 (/019/023/024 — a mean-zero rolling z-score
-    # discards sign + level + the price leg). These 4 encode the four funding
-    # channels the 2023-2025 literature identifies (sign-persistence/crowding,
-    # momentum, acceleration/carry-shock per BIS WP 1087, funding-price
-    # divergence per CFB/the crowding-reversal literature). Brief
-    # briefs-v3/iteration_v3-082/research_brief.md Section 3; EDA SHA 37d4da8.
-    "funding_sign_persist_9",  # funding_family_v3 [iter-v3/082]
-    "funding_momentum_3",  # funding_family_v3 [iter-v3/082]
-    "funding_accel_3",  # funding_family_v3 [iter-v3/082]
-    "funding_price_divergence_6",  # funding_family_v3 [iter-v3/082]
+    # iter-v3/083 (cycle-3 EXPLORATION #2) REVERTS /082's funding-rate FEATURE
+    # FAMILY — V3_FEATURE_COLUMNS_TOP_N returns 18 -> 14, the BASELINE_V3 /059
+    # anchor stack. /082 (the 4-member funding family funding_sign_persist_9 /
+    # funding_momentum_3 / funding_accel_3 / funding_price_divergence_6) was
+    # SUSPICIOUS-OOS-DOMINANT and NON-ADVANCING: the family ranked bottom-4/18 by
+    # importance (combined 9.90%, below the 5.56% uniform-parity baseline). Per
+    # `feedback_v3_inert_features_at_higher_budget.md` an INERT feature family
+    # must NOT be carried forward and must NOT be retested at higher budget. The
+    # v3 funding axis is CLOSED at 4 data points (/019/023/024/082). This revert
+    # is the established "mandatory secondary edit" pattern (cf. /077 reverting
+    # /076's range_efficiency_50, /079 reverting /078's ADA swap) — it restores
+    # the canonical baseline so iter-v3/083's SOLE declared delta vs /059 is the
+    # universe expansion. `compute_funding_family` (funding_v3.py) and the
+    # `funding_family_v3` GROUP_REGISTRY entry are left as harmless unreferenced
+    # infrastructure at zero revert cost. The funding_rate_zscore_30 /
+    # btc_funding_rate_zscore_30 literal-name bans stay intact.
     # -------------------------------------------------------------------------
     # iter-v3/077 (cycle-2 EXPLORATION #7) REVERTS /076's range_efficiency_50 —
     # the feature set returns to the BASELINE_V3 /059/060 14-feature anchor.

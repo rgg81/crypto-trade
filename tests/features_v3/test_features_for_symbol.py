@@ -116,16 +116,17 @@ _ITER_063_NEW_REVERTED = frozenset(
 
 
 def test_bch_fallback_14() -> None:
-    """BCHUSDT must return 14 features via fallback at iter-v3/077.
+    """BCHUSDT must return 14 features via fallback at iter-v3/083.
 
     BCHUSDT not in V3_FEATURES_PER_SYMBOL (dict empty); BCH uses the
-    V3_FEATURE_COLUMNS_TOP_N fallback = 18 features (14 BASELINE_V3 anchor +
-    the BASELINE_V3 /059/060 anchor (range_efficiency_50 reverted at /077).
+    V3_FEATURE_COLUMNS_TOP_N fallback = 14 features (the BASELINE_V3 /059
+    anchor stack; /082's funding family reverted at iter-v3/083 — the funding
+    axis is CLOSED at 4 data points).
     """
     result = features_for_symbol("BCHUSDT")
-    assert len(result) == 18, (
-        f"BCHUSDT: expected 18 features (V3_FEATURE_COLUMNS_TOP_N fallback at iter-v3/077), "
-        f"got {len(result)}. V3_FEATURES_PER_SYMBOL empty + universal list = 18. "
+    assert len(result) == 14, (
+        f"BCHUSDT: expected 14 features (V3_FEATURE_COLUMNS_TOP_N fallback at iter-v3/077), "
+        f"got {len(result)}. V3_FEATURES_PER_SYMBOL empty + universal list = 14. "
         f"Got: {result}"
     )
     assert result == V3_FEATURE_COLUMNS_TOP_N, (
@@ -152,9 +153,9 @@ def test_algo_fallback_14() -> None:
     features_for_symbol returns the universal 14-feature list for ALGO.
     """
     result = features_for_symbol("ALGOUSDT")
-    assert len(result) == 18, (
-        f"ALGOUSDT: expected 18 features (V3_FEATURE_COLUMNS_TOP_N fallback at iter-v3/077), "
-        f"got {len(result)}. V3_FEATURES_PER_SYMBOL empty + universal list = 18. "
+    assert len(result) == 14, (
+        f"ALGOUSDT: expected 14 features (V3_FEATURE_COLUMNS_TOP_N fallback at iter-v3/077), "
+        f"got {len(result)}. V3_FEATURES_PER_SYMBOL empty + universal list = 14. "
         f"Got: {result}"
     )
     assert result == V3_FEATURE_COLUMNS_TOP_N, (
@@ -177,9 +178,9 @@ def test_algo_absent_dead_features() -> None:
 def test_ada_fallback_14() -> None:
     """ADAUSDT returns the 14-feature BASELINE_V3 anchor via fallback at iter-v3/078."""
     result = features_for_symbol("ADAUSDT")
-    assert len(result) == 18, (
-        f"ADAUSDT: expected 18 features (V3_FEATURE_COLUMNS_TOP_N fallback at iter-v3/078), "
-        f"got {len(result)}. V3_FEATURES_PER_SYMBOL empty + universal list = 18. "
+    assert len(result) == 14, (
+        f"ADAUSDT: expected 14 features (V3_FEATURE_COLUMNS_TOP_N fallback at iter-v3/078), "
+        f"got {len(result)}. V3_FEATURES_PER_SYMBOL empty + universal list = 14. "
         f"Got: {result}"
     )
     assert result == V3_FEATURE_COLUMNS_TOP_N, (
@@ -202,9 +203,9 @@ def test_ada_absent_dead_features() -> None:
 def test_trx_fallback_14() -> None:
     """TRXUSDT returns the 14-feature BASELINE_V3 anchor via fallback at iter-v3/077."""
     result = features_for_symbol("TRXUSDT")
-    assert len(result) == 18, (
-        f"TRXUSDT: expected 18 features (V3_FEATURE_COLUMNS_TOP_N fallback at iter-v3/077), "
-        f"got {len(result)}. V3_FEATURES_PER_SYMBOL empty + universal list = 18. "
+    assert len(result) == 14, (
+        f"TRXUSDT: expected 14 features (V3_FEATURE_COLUMNS_TOP_N fallback at iter-v3/077), "
+        f"got {len(result)}. V3_FEATURES_PER_SYMBOL empty + universal list = 14. "
         f"Got: {result}"
     )
     assert result == V3_FEATURE_COLUMNS_TOP_N, (
@@ -391,9 +392,9 @@ def test_universal_list_is_14() -> None:
     iter-v3/077: PASSIVE-DIAGNOSTIC — range_efficiency_50 reverted; count = 14.
     """
     n = len(V3_FEATURE_COLUMNS_TOP_N)
-    assert n == 18, (
+    assert n == 14, (
         f"V3_FEATURE_COLUMNS_TOP_N has {n} features — expected exactly 14 at iter-v3/077 "
-        f"(the BASELINE_V3 /059/060 18-feature stack (14 anchor + funding family)). "
+        f"(the BASELINE_V3 /059 14-feature anchor stack — /082 funding family reverted at /083). "
         f"Check features_v3/__init__.py V3_FEATURE_COLUMNS_TOP_N."
     )
 
@@ -407,8 +408,8 @@ def test_all_symbols_fallback_14(symbol: str) -> None:
     Parametrized over BCH/LDO/TRX.
     """
     result = features_for_symbol(symbol)
-    assert len(result) == 18, (
-        f"{symbol}: expected 18 features (V3_FEATURE_COLUMNS_TOP_N universal fallback at "
+    assert len(result) == 14, (
+        f"{symbol}: expected 14 features (V3_FEATURE_COLUMNS_TOP_N universal fallback at "
         f"iter-v3/077), got {len(result)}. V3_FEATURES_PER_SYMBOL must be empty + "
         f"universal list = 14 (the BASELINE_V3 anchor stack)."
     )
@@ -427,11 +428,11 @@ def test_features_for_symbol_unknown_fallback() -> None:
     """
     result = features_for_symbol("XYZUSDT")
     assert result is not None, "features_for_symbol must never return None."
-    assert len(result) == 18, (
+    assert len(result) == 14, (
         f"Unknown symbol fallback should be 14 features at iter-v3/077, got {len(result)}."
     )
     assert result == V3_FEATURE_COLUMNS_TOP_N, (
-        "Unknown symbol 'XYZUSDT' should fall back to V3_FEATURE_COLUMNS_TOP_N (18 features)."
+        "Unknown symbol 'XYZUSDT' should fall back to V3_FEATURE_COLUMNS_TOP_N (14 features)."
     )
     for feat in _CATASTROPHIC_DEAD:
         assert feat not in result, (

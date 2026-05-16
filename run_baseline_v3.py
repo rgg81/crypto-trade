@@ -128,7 +128,7 @@ def _derive_ensemble_seeds(outer_seed: int, size: int = 5) -> list[int]:
     return [int(s) for s in rng.integers(low=0, high=2**31 - 1, size=size)]
 
 
-ITERATION_LABEL = "v3-082"
+ITERATION_LABEL = "v3-083"
 REPORTS_DIR = Path("reports-v3")
 FEATURES_DIR = Path("data/features_v3")
 DATA_DIR = Path("data")
@@ -151,10 +151,21 @@ DATA_DIR = Path("data")
 # conviction-weighted per-trade sizing primitive (primitive 13) in lgbm.py — see
 # briefs-v3/iteration_v3-079/research_brief.md Section 3. REQUIRED_GAP stays
 # 66 = (21+1)×3 (3 symbols).
+# iter-v3/083 (cycle-3 EXPLORATION #2): UNIVERSE EXPANSION axis — V3_MODELS grows
+# 3 → 4 symbols by ADDING FILUSDT. This is DENOMINATOR EXPANSION (the structural
+# fix for the /082 finding that v3's OOS Sharpe is ~104%-concentrated in BCH),
+# DISTINCT from the CLOSED swap-by-replacement family (/078 LDO→ADA): expansion
+# keeps every incumbent and adds a symbol — it does not swap. FILUSDT picked by
+# the committed IS-edge screen analysis/iteration_v3-083/universe_expansion_edge_
+# screen.py (rank #1 of 4 candidates: best standalone IS edge, least-harmful
+# portfolio-aggregate IS-Sharpe delta, duration-clean, deepest liquidity).
+# Universe expansion IS iter-v3/083's SINGLE declared axis. REQUIRED_GAP rises
+# 66 → 88 = (21+1)×4 (4 symbols). See briefs-v3/iteration_v3-083/research_brief.md.
 V3_MODELS: tuple[tuple[str, str], ...] = (
     ("A (BCHUSDT)", "BCHUSDT"),
     ("C (LDOUSDT)", "LDOUSDT"),
     ("D (TRXUSDT)", "TRXUSDT"),
+    ("F (FILUSDT)", "FILUSDT"),
 )
 
 # Risk gate configs (v2 5-gate + BTC; no R1/R2/R3 — brief Section 3.4)
@@ -343,31 +354,39 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
     # 14-feature anchor carried /065-/075. /076's range_efficiency_50 was
     # SUSPICIOUS-OOS-DOMINANT (NON-ADVANCING); the Kaufman path-efficiency axis
     # is CLOSED across 2 data points (/043 + /076 — BASELINE_V3.md Dead Ideas).
+    # iter-v3/083 (cycle-3 EXPLORATION #2): V3_FEATURE_COLUMNS = 14 — the
+    # BASELINE_V3 /059 anchor stack. /082's 4-member funding-rate FEATURE FAMILY
+    # is REVERTED (18 -> 14): /082 was SUSPICIOUS-OOS-DOMINANT and the family
+    # ranked bottom-4/18 by importance; per `feedback_v3_inert_features_at_higher
+    # _budget.md` an INERT family must NOT be carried forward. The v3 funding
+    # axis is CLOSED at 4 data points (/019/023/024/082). This revert is the
+    # mandatory secondary edit so /083's SOLE declared delta vs /059 is the
+    # universe expansion (V3_MODELS 3 -> 4 symbols). The closed funding column
+    # names are asserted-ABSENT below.
     n = len(V3_FEATURE_COLUMNS)
-    if n != 18:
+    if n != 14:
         raise RuntimeError(
-            f"V3_FEATURE_COLUMNS has {n} columns — expected exactly 18. "
-            "iter-v3/082 (cycle-3 EXPLORATION #1): the BASELINE_V3 /059 14-feature "
-            "anchor stack PLUS the 4-member funding-rate FEATURE FAMILY "
-            "(funding_sign_persist_9, funding_momentum_3, funding_accel_3, "
-            "funding_price_divergence_6). This is a NEW crypto-native feature "
-            "family — Direction 1 of briefs-v3/cycle3_plan.md; a DIFFERENT axis "
-            "from the closed single funding_rate_zscore_30 (asserted-absent "
-            "below; the closed single-z-score axis stays closed). "
+            f"V3_FEATURE_COLUMNS has {n} columns — expected exactly 14. "
+            "iter-v3/083 (cycle-3 EXPLORATION #2): the BASELINE_V3 /059 14-feature "
+            "anchor stack. /082's 4-member funding-rate family is REVERTED "
+            "(SUSPICIOUS-OOS-DOMINANT, bottom-4/18 importance — funding axis "
+            "CLOSED at 4 data points). iter-v3/083's axis is the UNIVERSE "
+            "EXPANSION (V3_MODELS 3 -> 4), NOT a feature change. "
             "Check V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
         )
-    # iter-v3/082: the 4 funding-FAMILY columns MUST be present.
+    # iter-v3/083: the 4 /082 funding-FAMILY columns MUST be ABSENT (reverted).
     for _fam in (
         "funding_sign_persist_9",
         "funding_momentum_3",
         "funding_accel_3",
         "funding_price_divergence_6",
     ):
-        if _fam not in V3_FEATURE_COLUMNS:
+        if _fam in V3_FEATURE_COLUMNS:
             raise RuntimeError(
-                f"{_fam} NOT FOUND in V3_FEATURE_COLUMNS — must be PRESENT at "
-                "iter-v3/082 (cycle-3 EXPLORATION #1 funding-family axis). "
-                "Add it to V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
+                f"{_fam} FOUND in V3_FEATURE_COLUMNS — must be ABSENT at "
+                "iter-v3/083 (the /082 funding family is reverted; funding axis "
+                "CLOSED at 4 data points per `feedback_v3_inert_features_at_"
+                "higher_budget.md`). Remove it from V3_FEATURE_COLUMNS_TOP_N."
             )
     # vol_adj_autocorr MUST NOT be in the universal list (iter-v3/036 NEGATIVE reverted;
     # catastrophically bad IS collapse at single-seed n_trials=35; dead code retained).
@@ -856,8 +875,18 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
     # varied one OTHER axis and never touched the floor line. This consolidated
     # pre-flight asserts every behavior-affecting knob equals its /059-canonical
     # value, so a future /061-style accretion is caught at runtime, not by
-    # git-archaeology. The SOLE intended /082 delta vs /059 is the feature count
-    # (14 -> 18, the funding family); EVERYTHING else must match /059.
+    # git-archaeology.
+    #
+    # iter-v3/083 (cycle-3 EXPLORATION #2): the SOLE intended delta vs /059 is the
+    # UNIVERSE EXPANSION — V3_MODELS 3 → 4 symbols (add FILUSDT). The two knobs
+    # this axis legitimately changes — `V3_MODELS symbols` and `REQUIRED_GAP`
+    # (= (21+1)*n_symbols, mechanically forced by the symbol count) — have their
+    # expected values updated to the 4-symbol universe below. EVERYTHING else
+    # (ATR multipliers, z-score, ADX, vol-floor, block lists, drawdown brake)
+    # must still match /059 — the check still guards 9 knobs, confirming
+    # single-axis discipline (no feature/label/risk-gate change rides along).
+    # The /082 funding family is reverted (V3_FEATURE_COLUMNS_TOP_N 18 → 14, the
+    # /059 anchor) — the mandatory secondary edit; not a second axis.
     _acc_cfg, _acc_strat = _build_v3_model(
         symbol="BCHUSDT", seed=42, n_trials=1, ensemble_seeds=[42]
     )
@@ -866,10 +895,18 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
             "config-accretion check: _build_v3_model did not return RiskV3Wrapper."
         )
     _rc = _acc_strat.config
-    # (knob_name, observed, expected /059-canonical value)
+    # (knob_name, observed, expected value). V3_MODELS symbols + REQUIRED_GAP
+    # carry the iter-v3/083 universe-expansion delta; the other 9 are /059-canonical.
     _v3_model_symbols = tuple(sym for _label, sym in V3_MODELS)
     _canonical_v059 = [
-        ("V3_MODELS symbols", _v3_model_symbols, ("BCHUSDT", "LDOUSDT", "TRXUSDT")),
+        # iter-v3/083 universe-expansion axis (the SOLE intended delta vs /059):
+        (
+            "V3_MODELS symbols",
+            _v3_model_symbols,
+            ("BCHUSDT", "LDOUSDT", "TRXUSDT", "FILUSDT"),
+        ),
+        ("REQUIRED_GAP", REQUIRED_GAP, 88),  # (21+1)*4 — forced by the 4-symbol count
+        # /059-canonical knobs (must NOT drift — single-axis discipline guard):
         ("DEFAULT_ATR_MULTIPLIERS", tuple(DEFAULT_ATR_MULTIPLIERS), (2.0, 1.0)),
         ("V3_ATR_MULTIPLIERS_PER_SYMBOL", dict(V3_ATR_MULTIPLIERS_PER_SYMBOL), {}),
         ("zscore_threshold", _rc.zscore_threshold, 2.0),
@@ -879,24 +916,24 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
         ("block_long_for", tuple(_rc.block_long_for), ()),
         ("block_short_for", tuple(_rc.block_short_for), ()),
         ("enable_per_symbol_drawdown_brake", _rc.enable_per_symbol_drawdown_brake, False),
-        ("REQUIRED_GAP", REQUIRED_GAP, 66),
     ]
     _drift = [
         (name, obs, exp) for name, obs, exp in _canonical_v059 if obs != exp
     ]
     if _drift:
-        _msg = "; ".join(f"{n}: observed {o!r} != /059-canonical {e!r}" for n, o, e in _drift)
+        _msg = "; ".join(f"{n}: observed {o!r} != expected {e!r}" for n, o, e in _drift)
         raise ValueError(
-            f"config-accretion check FAILED — {len(_drift)} knob(s) drifted from "
-            f"the /059 canonical config: {_msg}. iter-v3/082's SOLE intended delta "
-            "vs /059 is V3_FEATURE_COLUMNS 14 -> 18 (the funding family). Any other "
-            "drift is illegitimate accretion (the /061 vol-floor failure mode). "
-            "Revert the drifted knob(s) to the /059 value, or — if intended — "
-            "document it as a deliberate axis in the brief and update this check."
+            f"config-accretion check FAILED — {len(_drift)} knob(s) drifted: {_msg}. "
+            "iter-v3/083's SOLE intended delta vs /059 is the UNIVERSE EXPANSION "
+            "(V3_MODELS 3 -> 4 symbols, add FILUSDT; REQUIRED_GAP 66 -> 88). Any "
+            "OTHER drift is illegitimate accretion (the /061 vol-floor failure "
+            "mode). Revert the drifted knob(s), or — if intended — document it as "
+            "a deliberate axis in the brief and update this check."
         )
     print(
-        f"  Config-accretion check (iter-v3/082; Critic /081 Rec #3): "
-        f"{len(_canonical_v059)} knobs == /059 canonical  PASS"
+        f"  Config-accretion check (iter-v3/083; Critic /081 Rec #3): "
+        f"{len(_canonical_v059)} knobs verified "
+        f"(V3_MODELS=4-sym + REQUIRED_GAP=88 = /083 axis; 9 knobs == /059)  PASS"
     )
 
     # iter-v3/068: REVERT inference_threshold_floor to default 0.0 (/067 INERT-AT-EXPLORATION).
