@@ -6,7 +6,7 @@
 - Branch: iteration-v3/085
 - Pre-flight commit SHA (setup): ae38f1e
 - Phase 5.5 gate SHA: 0a67b71
-- Report commit SHA: (backfilled after commit)
+- Report commit SHA: d1f8b36
 - Hardware: WSL2 Linux 6.6.114.1-microsoft-standard-WSL2
 - Wall-clock time: 0.71h (within the 2h EXPLORATION HARD CAP)
 
