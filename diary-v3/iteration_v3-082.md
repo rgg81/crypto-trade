@@ -182,7 +182,7 @@ Three recommendations from Critic FINAL `d5670aa`, plus the cycle-3 forward agen
 
 ---
 
-**Diary commit SHA**: (this commit)
+**Diary commit SHA**: `afdf4d3` (this closeout — diary + catalog + BASELINE_V3.md + cycle3_plan.md)
 **Critic FINAL SHA**: `d5670aa`
 **Engineering report SHA**: `8913d9c`
 **Brief LOCKED SHA**: `275d24a` (backfill `222308e`)
