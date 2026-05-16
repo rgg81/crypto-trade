@@ -1,0 +1,4 @@
+held_out_symbol,train_symbols,n_test_rows,base_rate,acc_cross_symbol,cross_transfer_lift,acc_within_symbol,within_lift
+BCHUSDT,LDO+TRX,5627,0.5145,0.5012,-0.0133,0.5216,0.0089
+LDOUSDT,BCH+TRX,2641,0.5002,0.5066,0.0064,0.5359,0.0164
+TRXUSDT,BCH+LDO,5569,0.5471,0.4978,-0.0494,0.4626,-0.091

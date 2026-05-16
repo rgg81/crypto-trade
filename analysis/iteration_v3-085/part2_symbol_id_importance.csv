@@ -1,0 +1,16 @@
+feature,importance_share
+max_dd_window_50,0.1207
+ema_spread_atr_20,0.0819
+ret_kurt_50,0.0692
+ret_skew_200,0.1214
+range_realized_vol_50,0.0783
+hurst_diff_100_50,0.0367
+ret_kurt_200,0.103
+hurst_100,0.0303
+btc_ret_14d,0.055
+ret_skew_50,0.0699
+vwap_dev_20,0.0536
+ret_autocorr_lag1_50,0.0932
+sym_vs_btc_ret_7d,0.0346
+regime_momentum_signed_5d,0.0183
+symbol_id,0.0339

@@ -1,0 +1,5 @@
+config,ldo_test_accuracy,lift_over_base
+C1_LDO_per_symbol,0.5359,0.0164
+C2_donor_aug_no_dummy,0.5006,-0.0189
+C3_donor_aug_symbol_id,0.5195,0.0
+C4_donor_downweighted_0.3,0.5347,0.0151

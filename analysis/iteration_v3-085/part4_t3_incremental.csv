@@ -1,0 +1,4 @@
+symbol,n_test,base_rate,acc_14_feat,acc_15_feat,acc_lift,engineered_importance_share,engineered_rank_of_15
+BCHUSDT,1689,0.5127,0.5216,0.5074,-0.0142,0.0166,15
+LDOUSDT,793,0.5195,0.5359,0.5296,-0.0063,0.0533,12
+TRXUSDT,1671,0.5536,0.4626,0.4782,0.0156,0.0209,15
