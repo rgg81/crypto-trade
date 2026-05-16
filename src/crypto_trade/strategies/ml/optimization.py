@@ -406,8 +406,18 @@ def optimize_and_train(
         n_trials=n_trials,
     )
 
-    # Sub-fix 1b: flush per-trial OOF buffer to parquet (append if file exists)
+    # Sub-fix 1b: flush per-trial OOF buffer to parquet (append if file exists).
+    # iter-v3/082 infra fix: atomic write via write-to-temp + os.replace().
+    # to_parquet() in-place truncates then streams — a mid-write interruption
+    # leaves a file with no Parquet footer ("magic bytes not found") that
+    # corrupts every subsequent read.  os.replace() is atomic on POSIX: readers
+    # always see a complete old or complete new file, never a partial write.
+    # The writers are strictly serial (outer symbol loop + serial walk-forward
+    # months, study.optimize n_jobs=1), so no cross-writer lock is needed.
     if oof_persist_path is not None and oof_buffer:
+        import os
+        import tempfile
+
         import pandas as pd
 
         oof_persist_path.parent.mkdir(parents=True, exist_ok=True)
@@ -425,9 +435,23 @@ def optimize_and_train(
         if oof_persist_path.exists():
             existing = pd.read_parquet(oof_persist_path)
             combined = pd.concat([existing, new_df], ignore_index=True)
-            combined.to_parquet(oof_persist_path, index=False)
         else:
-            new_df.to_parquet(oof_persist_path, index=False)
+            combined = new_df
+        # Write to a sibling temp file, then atomically replace the target.
+        tmp_fd, tmp_name = tempfile.mkstemp(
+            dir=oof_persist_path.parent, suffix=".parquet.tmp"
+        )
+        try:
+            os.close(tmp_fd)
+            combined.to_parquet(tmp_name, index=False)
+            os.replace(tmp_name, oof_persist_path)
+        except Exception:
+            # Clean up temp file on failure; do not leave a partial write.
+            try:
+                os.unlink(tmp_name)
+            except OSError:
+                pass
+            raise
 
     best = study.best_params
     best_threshold = best.get("confidence_threshold", 0.50)
