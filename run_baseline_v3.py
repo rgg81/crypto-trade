@@ -128,7 +128,7 @@ def _derive_ensemble_seeds(outer_seed: int, size: int = 5) -> list[int]:
     return [int(s) for s in rng.integers(low=0, high=2**31 - 1, size=size)]
 
 
-ITERATION_LABEL = "v3-080"
+ITERATION_LABEL = "v3-081"
 REPORTS_DIR = Path("reports-v3")
 FEATURES_DIR = Path("data/features_v3")
 DATA_DIR = Path("data")
@@ -239,13 +239,24 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
         calls in unit tests that don't care about mode).
 
 
+    iter-v3/081: CYCLE 2 CONFIRMATION — re-validate the /059 canonical config.
+      Cycle 2 (/071-/080) produced 0 clean PROMISING; /081 is a multi-seed
+      RE-VALIDATION (analogous to cycle 1's /070 NO-MERGE), NOT an edge bundle.
+      Code change: REVERT the iter-v3/061 illegitimate accretion —
+      vol_scale_floor_per_symbol {"TRXUSDT": 0.5} -> {} (empty). /061 was an
+      INERT EXPLORATION, never MERGED (no v0.v3-061 tag, not a /070-bundle
+      component); the /059 canonical config has no per-symbol vol-floor. /081
+      runs the genuine /059 config (10-seed CONFIRMATION mode, n_trials=35).
+      ITERATION_LABEL = "v3-081". Evidence: analysis/iteration_v3-081/.
+
     iter-v3/061: CYCLE 1 #2 EXPLORATION — TRX-specific RiskV2 vol_scale_floor=0.5 (Path B).
       Axis: per-symbol vol_scale_floor per Critic /060 Rec #3 + QR EDA SHA d198b25.
       Code changes: RiskV2Config.vol_scale_floor_per_symbol={"TRXUSDT": 0.5}; BCH/LDO unchanged.
       Feature bundle IDENTICAL to /060 (no feature changes).
       ITERATION_LABEL = "v3-061".
       Counterfactual: +0.47 OOS wpnl TRX lift; IS bit-identical (+0.008 wpnl).
-      Expected classification: INERT-AT-EXPLORATION (~55% probability per Section 7).
+      Classification: INERT-AT-EXPLORATION. REVERTED at iter-v3/081 (illegitimate
+      accretion — INERT EXPLORATION never carried by a CONFIRMATION-MERGE).
 
     iter-v3/060: CYCLE 1 #1 EXPLORATION — EXPLORATION-MODE-REFERENCE establishment + TRX diagnostic.
       Mode-flag refactor commit `56f5a30`: --exploration CLI flag (EXPLORATION_ENSEMBLE_SIZE=3
@@ -775,33 +786,38 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
         "(CLOSED-mechanism per iter-v3/054 closeout)  PASS"
     )
 
-    # iter-v3/061: per-symbol vol_scale_floor — TRX-only 0.5; BCH/LDO at global 0.3.
-    # Calibrated by QR EDA SHA d198b25 + Critic /060 Rec #3.
-    # Asserts the vol_scale_floor_per_symbol dict is wired correctly. iter-v3/079
-    # restores the BCH/LDO/TRX universe (/078's ADAUSDT swap reverted); LDO was
-    # never a key in the floor dict, so the dict stays {"TRXUSDT": 0.5} — LDO uses
-    # the global 0.3 floor.
+    # iter-v3/081: per-symbol vol_scale_floor REVERTED to {} (empty). The
+    # iter-v3/061 {"TRXUSDT": 0.5} floor was illegitimate accretion — an INERT
+    # EXPLORATION axis (never PROMISING, never MERGED, no v0.v3-061 tag, not a
+    # /070-bundle component) that persisted in the active runner config. The /059
+    # canonical baseline (setup commit 20095a8) has NO per-symbol vol-floor; the
+    # /081 cycle-2 CONFIRMATION reverts it so the run measures the genuine /059
+    # config. See analysis/iteration_v3-081/ (T1 accretion ledger + T2 vol-floor
+    # provenance) and brief Section 2-3. With the empty {} all 3 symbols use the
+    # global 0.3 floor. This assertion now guards the GENUINE /059 value — it
+    # blocks the /061 accretion from silently re-creeping in.
     _p12_cfg_check, p12_strat_check = _build_v3_model(
         symbol="TRXUSDT", seed=42, n_trials=1, ensemble_seeds=[42]
     )
     if not isinstance(p12_strat_check, RiskV3Wrapper):
         raise RuntimeError(
             f"_build_v3_model(TRXUSDT) returned {type(p12_strat_check).__name__} — "
-            "expected RiskV3Wrapper. iter-v3/061: vol_scale_floor_per_symbol check "
+            "expected RiskV3Wrapper. iter-v3/081: vol_scale_floor_per_symbol check "
             "requires RiskV3Wrapper. Check _build_v3_model returns RiskV3Wrapper."
         )
-    expected_floor_dict: dict[str, float] = {"TRXUSDT": 0.5}
+    expected_floor_dict: dict[str, float] = {}
     if dict(p12_strat_check.config.vol_scale_floor_per_symbol) != expected_floor_dict:
         raise ValueError(
             f"RiskV2Config.vol_scale_floor_per_symbol = "
             f"{p12_strat_check.config.vol_scale_floor_per_symbol} — expected "
-            f"{expected_floor_dict}. iter-v3/061: TRX-only floor=0.5; BCH/LDO unchanged. "
-            "Set vol_scale_floor_per_symbol={'TRXUSDT': 0.5} in RiskV2Config init in "
-            "_build_v3_model."
+            f"{expected_floor_dict}. iter-v3/081: the iter-v3/061 TRX floor=0.5 was "
+            "REVERTED as illegitimate accretion (never-merged INERT EXPLORATION). "
+            "Set vol_scale_floor_per_symbol={} in RiskV2Config init in "
+            "_build_v3_model — all 3 symbols use the global 0.3 floor."
         )
     print(
-        "  Per-symbol vol_scale_floor (iter-v3/061): {'TRXUSDT': 0.5} "
-        "(TRX floor raised 0.3→0.5; BCH/LDO unchanged at global 0.3)  PASS"
+        "  Per-symbol vol_scale_floor (iter-v3/081): {} "
+        "(REVERTED iter-v3/061 accretion; all 3 symbols at global 0.3 floor)  PASS"
     )
 
     # iter-v3/068: REVERT inference_threshold_floor to default 0.0 (/067 INERT-AT-EXPLORATION).
@@ -1693,11 +1709,24 @@ def _build_v3_model(
         drawdown_brake_threshold_wpnl=10.0,  # retained as backward-compatible default
         drawdown_brake_recovery_wpnl=5.0,  # retained as backward-compatible default
         drawdown_brake_window_days=30,  # retained as backward-compatible default
-        # iter-v3/061: TRX-specific vol_scale_floor=0.5 per QR EDA SHA d198b25 + Critic /060 Rec #3.
-        # Single per-symbol risk-primitive customization; BCH/LDO unchanged at global 0.3.
-        # Counterfactual: +0.47 OOS wpnl TRX lift with bit-identical IS (+0.008 wpnl).
-        # BCH/LDO weighted_pnl mathematically invariant per Section 2.5 Q5 invariance check.
-        vol_scale_floor_per_symbol={"TRXUSDT": 0.5},
+        # iter-v3/081: REVERT the iter-v3/061 per-symbol vol_scale_floor accretion.
+        # The {"TRXUSDT": 0.5} floor was introduced by iter-v3/061 — an EXPLORATION
+        # classified INERT-AT-EXPLORATION (IS Δ -0.009 / OOS Δ +0.015 vs /060 anchor,
+        # inside the noise band; never even PROMISING). iter-v3/061 was never MERGED
+        # (no v0.v3-061 tag; cycle-1 CONFIRMATION /070 was NO-MERGE), and the floor
+        # was NOT a component of the /070 bundle. Per the v3 cadence rule "only
+        # CONFIRMATION-MERGE updates the canonical config", an INERT EXPLORATION axis
+        # that persisted in the active runner config is ILLEGITIMATE ACCRETION. The
+        # /059 canonical baseline (BASELINE_V3.md, setup commit 20095a8) has NO
+        # per-symbol vol-floor — TRX uses the global 0.3 floor like BCH/LDO.
+        # The /081 cycle-2 CONFIRMATION reverts the floor to {} so it measures the
+        # genuine /059 canonical config. Evidence: analysis/iteration_v3-081/
+        # (T1 accretion ledger + T2 vol-floor provenance), brief Section 2-3.
+        # This mirrors the iter-v3/070-closeout precedent (revert 8bdf392 stripped
+        # the rejected /065 SL-widening). The RiskV2Config.vol_scale_floor_per_symbol
+        # FIELD and the risk_v2.py _vol_scale per-symbol lookup STAY — backward-
+        # compatible mechanism, empty {} reproduces pre-/061 behavior bit-identically.
+        vol_scale_floor_per_symbol={},
         # iter-v3/067: REVERT vol_scale_ceiling to default 1.0 (per brief Section 3 Sub-fix 4).
         # /066's vol_scale_ceiling=0.8 axis was INERT-AT-EXPLORATION (closed per Critic /066).
         # Scenario B: revert to default for clean single-axis attribution of Path D threshold floor.
