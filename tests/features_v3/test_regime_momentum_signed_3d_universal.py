@@ -3,7 +3,7 @@
 5 mandatory tests per brief Section 3.2:
 
 1. test_regime_momentum_signed_3d_in_universal_feature_list — regime_momentum_signed_3d
-   MUST be in V3_FEATURE_COLUMNS_TOP_N; verify it is present and total count == 15.
+   MUST be in V3_FEATURE_COLUMNS_TOP_N; verify it is present and total count == 17.
    (SWAP: fracdiff_d05_close PARKED; regime_momentum_signed_3d ACTIVATED as 15th element.)
 2. test_regime_momentum_signed_3d_present_in_all_4_symbol_parquets — all 4 symbol parquets
    (BCH/LDO/TRX/ALGO; ALGO reserved-for-future) must have regime_momentum_signed_3d column
@@ -13,7 +13,7 @@
 4. test_regime_momentum_signed_3d_no_lookahead — verify compute_regime_momentum_signed_3d
    uses past-only data (ret_3d = close.shift(1)/close.shift(4)-1.0 + hurst.shift(1)).
 5. test_v3_feature_columns_top_n_swap_fracdiff_to_3d_at_iter_v3_052 — comprehensive SWAP
-   state: regime_momentum_signed_3d PRESENT; fracdiff_d05_close ABSENT; count == 15;
+   state: regime_momentum_signed_3d PRESENT; fracdiff_d05_close ABSENT; count == 17;
    regime_momentum_signed_5d PRESENT (mandate).
 
 SWAP state (iter-v3/052):
@@ -79,9 +79,9 @@ def test_regime_momentum_signed_3d_in_universal_feature_list() -> None:
         "Remove it from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
     )
     n = len(V3_FEATURE_COLUMNS_TOP_N)
-    assert n == 15, (
-        f"V3_FEATURE_COLUMNS_TOP_N has {n} elements — expected 15 (the BASELINE_V3 "
-        "/059 14-feature anchor stack + funding_regime_momentum_5d, the iter-v3/085 "
+    assert n == 17, (
+        f"V3_FEATURE_COLUMNS_TOP_N has {n} elements — expected 17 (the BASELINE_V3 "
+        "/059 14-feature anchor stack + the 3-feature perp-spot basis family, the iter-v3/086 "
         "cycle-3 EXPLORATION #4 axis). regime_momentum_signed_3d stays PARKED-ABSENT; "
         "/082's funding family stays reverted. "
         "Check V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
@@ -263,9 +263,9 @@ def test_v3_feature_columns_top_n_swap_fracdiff_to_3d_at_iter_v3_052() -> None:
         "iter-v3/065: must be ABSENT (PARKED at /053; REVERTED at /063-/064)."
     )
     n = len(V3_FEATURE_COLUMNS_TOP_N)
-    assert n == 15, (
-        f"V3_FEATURE_COLUMNS_TOP_N count={n} — expected 15 (the BASELINE_V3 /059 "
-        "14-feature anchor stack + funding_regime_momentum_5d, the iter-v3/085 "
+    assert n == 17, (
+        f"V3_FEATURE_COLUMNS_TOP_N count={n} — expected 17 (the BASELINE_V3 /059 "
+        "14-feature anchor stack + the 3-feature perp-spot basis family, the iter-v3/086 "
         "cycle-3 EXPLORATION #4 axis). /082's 4-member funding family stays "
         "reverted (funding-as-direct-feature axis CLOSED at 4 data points)."
     )

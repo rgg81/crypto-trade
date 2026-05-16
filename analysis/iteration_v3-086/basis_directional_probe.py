@@ -46,8 +46,8 @@ OOS_CUTOFF_MS = int(pd.Timestamp("2025-03-24", tz="UTC").timestamp() * 1000)
 SYMBOLS = ("BCHUSDT", "LDOUSDT", "TRXUSDT")
 OUT_DIR = Path("analysis/iteration_v3-086")
 
-# reuse the verified PART-1 builders
-import sys
+# reuse the verified PART-1 builders (sys.path insert must precede the import)
+import sys  # noqa: E402
 
 sys.path.insert(0, str(OUT_DIR))
 from basis_feed_eda import (  # noqa: E402
@@ -66,19 +66,27 @@ def main() -> None:
     p1_rows = []
     for sym in SYMBOLS:
         perp = pd.read_csv(f"data/{sym}/8h.csv").sort_values("open_time").reset_index(drop=True)
-        spot = pd.read_csv(f"data/spot/{sym}/8h.csv").sort_values("open_time").reset_index(drop=True)
+        spot = (
+            pd.read_csv(f"data/spot/{sym}/8h.csv").sort_values("open_time").reset_index(drop=True)
+        )
         bf = compute_basis_features(perp, spot)
         close = perp["close"].to_numpy(float)
         logc = np.log(close)
-        fwd1 = np.concatenate([np.diff(logc), [np.nan]])           # ret t -> t+1
+        fwd1 = np.concatenate([np.diff(logc), [np.nan]])  # ret t -> t+1
         fwd3 = np.concatenate([logc[3:] - logc[:-3], [np.nan] * 3])  # ret t -> t+3
         z = bf["basis_zscore_30"].to_numpy(float)
         is_mask = (bf["open_time"] < OOS_CUTOFF_MS).to_numpy()
         for horizon, fwd in (("fwd_ret_1bar", fwd1), ("fwd_ret_3bar", fwd3)):
             m = is_mask & np.isfinite(z) & np.isfinite(fwd)
             ic, _ = spearmanr(z[m], fwd[m])
-            p1_rows.append({"symbol": sym, "horizon": horizon, "n": int(m.sum()),
-                            "basis_z_vs_fwdret_ic": round(float(ic), 4)})
+            p1_rows.append(
+                {
+                    "symbol": sym,
+                    "horizon": horizon,
+                    "n": int(m.sum()),
+                    "basis_z_vs_fwdret_ic": round(float(ic), 4),
+                }
+            )
     p1 = pd.DataFrame(p1_rows)
     print("\n--- P1: basis_z[t-1] -> forward raw return Spearman IC ---")
     print("(reversal hypothesis: a crowded-high basis -> negative fwd ret -> IC < 0)")
@@ -89,7 +97,9 @@ def main() -> None:
     p2_rows = []
     for sym in SYMBOLS:
         perp = pd.read_csv(f"data/{sym}/8h.csv").sort_values("open_time").reset_index(drop=True)
-        spot = pd.read_csv(f"data/spot/{sym}/8h.csv").sort_values("open_time").reset_index(drop=True)
+        spot = (
+            pd.read_csv(f"data/spot/{sym}/8h.csv").sort_values("open_time").reset_index(drop=True)
+        )
         bf = compute_basis_features(perp, spot)
         label = triple_barrier_label(perp)
         z = bf["basis_zscore_30"].to_numpy(float)
@@ -104,8 +114,14 @@ def main() -> None:
         ):
             n = int(sel.sum())
             long_rate = float((label[sel] == 1).mean()) if n else np.nan
-            p2_rows.append({"symbol": sym, "bucket": tag, "n": n,
-                            "long_label_rate": round(long_rate, 4) if n else np.nan})
+            p2_rows.append(
+                {
+                    "symbol": sym,
+                    "bucket": tag,
+                    "n": n,
+                    "long_label_rate": round(long_rate, 4) if n else np.nan,
+                }
+            )
     p2 = pd.DataFrame(p2_rows)
     print("\n--- P2: triple-barrier long-label rate by basis-z extreme bucket ---")
     print(p2.to_string(index=False))
@@ -118,7 +134,9 @@ def main() -> None:
     p3_rows = []
     for sym in SYMBOLS:
         perp = pd.read_csv(f"data/{sym}/8h.csv").sort_values("open_time").reset_index(drop=True)
-        spot = pd.read_csv(f"data/spot/{sym}/8h.csv").sort_values("open_time").reset_index(drop=True)
+        spot = (
+            pd.read_csv(f"data/spot/{sym}/8h.csv").sort_values("open_time").reset_index(drop=True)
+        )
         bf = compute_basis_features(perp, spot)
         adf = _anchor_features(sym)
         label = triple_barrier_label(perp)
@@ -133,12 +151,15 @@ def main() -> None:
         mr = is_mask & np.isfinite(composed) & np.isfinite(rm)
         ic_prim = np.corrcoef(composed[mr], rm[mr])[0, 1] if mr.sum() > 50 else np.nan
         rm_ic, _ = spearmanr(rm[m], lab[m]) if m.sum() > 50 else (np.nan, 0)
-        p3_rows.append({
-            "symbol": sym, "n": int(m.sum()),
-            "composed_vs_label_ic": round(float(ic_lab), 4),
-            "raw_regime_mom_vs_label_ic": round(float(rm_ic), 4),
-            "composed_vs_primitive_ic": round(float(ic_prim), 4),
-        })
+        p3_rows.append(
+            {
+                "symbol": sym,
+                "n": int(m.sum()),
+                "composed_vs_label_ic": round(float(ic_lab), 4),
+                "raw_regime_mom_vs_label_ic": round(float(rm_ic), 4),
+                "composed_vs_primitive_ic": round(float(ic_prim), 4),
+            }
+        )
     p3 = pd.DataFrame(p3_rows)
     print("\n--- P3: basis_regime_momentum = regime_momentum_signed_5d × -sign(basis_z) ---")
     print(p3.to_string(index=False))

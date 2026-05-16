@@ -78,9 +78,9 @@ def test_hurst_drift_50_200_in_universal_feature_list() -> None:
         "Remove it from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
     )
     n = len(V3_FEATURE_COLUMNS_TOP_N)
-    assert n == 15, (
-        f"V3_FEATURE_COLUMNS_TOP_N has {n} elements -- expected 15 (the BASELINE_V3 "
-        "/059 14-feature anchor stack + funding_regime_momentum_5d, the iter-v3/085 "
+    assert n == 17, (
+        f"V3_FEATURE_COLUMNS_TOP_N has {n} elements -- expected 17 (the BASELINE_V3 "
+        "/059 14-feature anchor stack + the 3-feature perp-spot basis family, the iter-v3/086 "
         "cycle-3 EXPLORATION #4 axis). hurst_drift_50_200 stays PARKED-ABSENT; "
         "/082's funding family stays reverted. "
         "Check V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
@@ -293,7 +293,7 @@ def test_v3_models_is_3_symbol_at_iter_v3_084() -> None:
     REVERTED at the system level per iter-v3/051; ADAUSDT is CLOSED (/078
     SUSPICIOUS-OOS-DOMINANT); FILUSDT is CLOSED (/083 NEGATIVE).
 
-    iter-v3/085: feature count = 15 (the BASELINE_V3 /059 14-feature anchor +
+    iter-v3/085: feature count = 17 (the BASELINE_V3 /059 14-feature anchor +
     funding_regime_momentum_5d, the cycle-3 EXPLORATION #4 axis; /082's funding
     family stays reverted). All 3 symbols return the 15-feature universal
     fallback. The universe stays the /059-canonical 3-symbol set — iter-v3/085 is
@@ -305,9 +305,9 @@ def test_v3_models_is_3_symbol_at_iter_v3_084() -> None:
     # Each symbol in the expected universe must return the 15-feature universal fallback
     for sym in expected_universe:
         feats = features_for_symbol(sym)
-        assert len(feats) == 15, (
+        assert len(feats) == 17, (
             f"{sym} fallback returns {len(feats)} features -- expected 15 "
-            "(the BASELINE_V3 /059 14-feature anchor + funding_regime_momentum_5d, "
+            "(the BASELINE_V3 /059 14-feature anchor + the 3-feature perp-spot basis family, "
             "the iter-v3/085 cycle-3 EXPLORATION #4 axis); hurst_drift_50_200 "
             "stays PARKED-ABSENT."
         )

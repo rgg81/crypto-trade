@@ -1,13 +1,12 @@
-"""Assertion test for V3_FEATURE_COLUMNS_TOP_N count — iter-v3/085 (15 features).
+"""Assertion test for V3_FEATURE_COLUMNS_TOP_N count — iter-v3/086 (17 features).
 
-Verifies that V3_FEATURE_COLUMNS_TOP_N has exactly 15 entries: the BASELINE_V3
-/059 14-feature anchor stack + funding_regime_momentum_5d, the SOLE iter-v3/085
-(cycle-3 EXPLORATION #4) axis. funding_regime_momentum_5d is a Category-2
-composed feature regime_momentum_signed_5d * sign(funding_z_30) — funding enters
-ONLY as a sign() switch inside the composed feature, never as a direct model
-column. This is NOT the closed funding-as-direct-feature axis (/019/023/024/082):
-the /082 4-member funding-rate FAMILY stays reverted. An EXPLORATION never
-updates BASELINE_V3.md; the 14-feature /059 stack stays canonical until a
+Verifies that V3_FEATURE_COLUMNS_TOP_N has exactly 17 entries: the BASELINE_V3
+/059 14-feature anchor stack + the 3-feature perp-spot BASIS family
+(basis_zscore_30, basis_momentum_3, basis_extreme_flag), the SOLE iter-v3/086
+(cycle-3 EXPLORATION #5) axis — a NEW crypto-native data feed (perp-spot basis,
+computed from spot 8h klines). iter-v3/085's funding_regime_momentum_5d is
+DROPPED (INERT-by-importance + SUSPICIOUS; Critic /085 Rec #1). An EXPLORATION
+never updates BASELINE_V3.md; the 14-feature /059 stack stays canonical until a
 CONFIRMATION-MERGE.
 
 Background:
@@ -102,15 +101,15 @@ _PROHIBITED_FEATURES = frozenset(
 
 
 def test_feature_count_14():
-    """V3_FEATURE_COLUMNS_TOP_N must have exactly 15 entries at iter-v3/085."""
+    """V3_FEATURE_COLUMNS_TOP_N must have exactly 17 entries at iter-v3/086."""
     n = len(V3_FEATURE_COLUMNS_TOP_N)
-    assert n == 15, (
-        f"V3_FEATURE_COLUMNS_TOP_N has {n} features — expected 15. "
-        "iter-v3/085 (cycle-3 EXPLORATION #4): the BASELINE_V3 /059 14-feature "
-        "anchor stack + funding_regime_momentum_5d (the 15th feature, the SOLE "
-        "/085 axis — a Category-2 composed feature). /082's 4-member funding-rate "
-        "FAMILY stays REVERTED (the closed funding-as-direct-feature axis at 4 "
-        "data points /019/023/024/082). "
+    assert n == 17, (
+        f"V3_FEATURE_COLUMNS_TOP_N has {n} features — expected 17. "
+        "iter-v3/086 (cycle-3 EXPLORATION #5): the BASELINE_V3 /059 14-feature "
+        "anchor stack + the 3-feature perp-spot BASIS family (basis_zscore_30, "
+        "basis_momentum_3, basis_extreme_flag — the SOLE /086 axis, a NEW "
+        "crypto-native data feed). iter-v3/085's funding_regime_momentum_5d is "
+        "DROPPED (INERT + SUSPICIOUS). "
         "Update V3_FEATURE_COLUMNS_TOP_N in src/crypto_trade/features_v3/__init__.py."
     )
 
@@ -121,21 +120,27 @@ def test_baseline_v3_features_present():
     missing = _BASELINE_V3_FEATURES - feature_set
     assert not missing, (
         f"BASELINE_V3 features missing from V3_FEATURE_COLUMNS_TOP_N: {sorted(missing)}. "
-        "All 14 BASELINE_V3 features must be preserved in the iter-v3/085 anchor set."
+        "All 14 BASELINE_V3 features must be preserved in the iter-v3/086 anchor set."
     )
 
 
 def test_funding_regime_momentum_5d_present():
-    """funding_regime_momentum_5d MUST be PRESENT — the SOLE iter-v3/085 axis.
+    """The 3-feature perp-spot basis family MUST be PRESENT — the SOLE iter-v3/086 axis.
 
-    The 15th feature: a Category-2 composed feature
-    regime_momentum_signed_5d * sign(funding_z_30) (cycle-3 EXPLORATION #4).
+    iter-v3/086 (cycle-3 EXPLORATION #5) appends the 3-feature perp-spot basis
+    family (a NEW crypto-native data feed) and DROPS iter-v3/085's
+    funding_regime_momentum_5d (INERT-by-importance + SUSPICIOUS; Critic /085
+    Rec #1).
     """
-    assert "funding_regime_momentum_5d" in set(V3_FEATURE_COLUMNS_TOP_N), (
-        "funding_regime_momentum_5d NOT FOUND in V3_FEATURE_COLUMNS_TOP_N — must "
-        "be PRESENT at iter-v3/085 (the 15th feature, the SOLE cycle-3 "
-        "EXPLORATION #4 axis). Add it to V3_FEATURE_COLUMNS_TOP_N in "
-        "src/crypto_trade/features_v3/__init__.py."
+    cols = set(V3_FEATURE_COLUMNS_TOP_N)
+    for bf in ("basis_zscore_30", "basis_momentum_3", "basis_extreme_flag"):
+        assert bf in cols, (
+            f"{bf} NOT FOUND in V3_FEATURE_COLUMNS_TOP_N — must be PRESENT at "
+            "iter-v3/086 (the 3-feature perp-spot basis family, the SOLE axis)."
+        )
+    assert "funding_regime_momentum_5d" not in cols, (
+        "funding_regime_momentum_5d FOUND in V3_FEATURE_COLUMNS_TOP_N — must be "
+        "ABSENT at iter-v3/086 (DROPPED — /085 INERT + SUSPICIOUS; Critic Rec #1)."
     )
 
 
