@@ -1,0 +1,5 @@
+fact,value,note
+trades.csv column count,15,symbol; direction; entry_price; exit_price; weight_factor; open_time; close_time; exit_reason; pnl_pct; fee_pct; net_pnl_pct; weighted_pnl; stop_loss_price; take_profit_price; timeout_time
+confidence column present in trades.csv,False,M1 directional margin is NOT persisted anywhere
+weight_factor semantics,vt_scale x (signal.weight/100),weight_factor is the vol-target scale times the signal weight; at /079 signal.weight is the conviction-derate output. It is NOT the M1 confidence scalar — confidence is upstream of weight.
+C_REF empirical placement possible today,False,the M1 confidence distribution is computed inside lgbm.get_signal and discarded; recovering it needs a backtest (re-train every walk-forward month) — exactly the /079 instrumentation gap the Critic Rec #1 named

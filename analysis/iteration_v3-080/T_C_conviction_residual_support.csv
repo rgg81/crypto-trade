@@ -1,0 +1,4 @@
+group,n_is_trades,mean_net_pnl_pct,win_rate_pct
+"de-rated (low-conviction, /079 weight_factor < /060)",11,-0.1816,27.3
+non-de-rated,148,0.3173,31.8
+de-rate incidence (IS),11/159,6.9%,7.5% at /079 vs >=25% predicted -> NULL-RESULT behavioral saturation; C_REF=0.65 sat on the Optuna threshold pile-up
