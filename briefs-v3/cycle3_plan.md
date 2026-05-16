@@ -121,8 +121,8 @@ Every cycle-3 EXPLORATION brief must carry and, where its axis touches them, tar
 
 | Iteration | Type | Direction | Status |
 |---|---|---|---|
-| iter-v3/082 | EXPLORATION #1 | QR EDA-picks within Directions 1-3 (Direction 1 or 2 strongly preferred — the first bold axis) | TBD — QR research-and-EDA-driven |
-| iter-v3/083 | EXPLORATION #2 | QR EDA-picks within Directions 1-3 | TBD |
+| iter-v3/082 | EXPLORATION #1 | Direction 1 — NEW crypto-native funding-rate FEATURE FAMILY (4 features, `V3_FEATURE_COLUMNS` 14→18) | **DONE — SUSPICIOUS-OOS-DOMINANT (NO-MERGE)**; funding axis CLOSED at 4 data points (/019/023/024/082, all INERT-by-importance) |
+| iter-v3/083 | EXPLORATION #2 | QR EDA-picks within Directions 1-3 — **Direction 2 (universe expansion) strongly preferred** (per /082 Critic Rec #3) | TBD |
 | iter-v3/084 | EXPLORATION #3 | QR EDA-picks within Directions 1-3 | TBD |
 | iter-v3/085 | EXPLORATION #4 | QR EDA-picks within Directions 1-3 | TBD |
 | iter-v3/086 | EXPLORATION #5 | QR EDA-picks within Directions 1-3 | TBD |
@@ -150,6 +150,8 @@ The specific axis for each EXPLORATION is deliberately left TBD — it is select
 ## 9. Status
 
 **Cycle 3 plan COMMITTED at the iter-v3/081 cycle-2 CONFIRMATION closeout (this document).** Cycle 3 EXPLORATIONs commence at iter-v3/082. The iter-v3/082 specific axis is deferred to the iter-v3/082 brief — it will be QR research-and-EDA-driven, within Directions 1-3, Direction 1 or 2 strongly preferred as the first bold axis.
+
+**UPDATE — iter-v3/082 closeout (2026-05-16): cycle 3 is 1/10, 0 clean PROMISING.** iter-v3/082 ran Direction 1 (a NEW crypto-native funding-rate feature family) and classified **SUSPICIOUS-OOS-DOMINANT** — NO-MERGE, the funding family ranked bottom-4/18 by importance (9.90% combined), the +1.21 OOS lift was the INERT-feature Optuna-perturbation / 3-seed-lottery artifact, not funding signal. The v3 funding-rate axis is now a **4-data-point structural verdict** (/019/023/024/082, all INERT-by-importance) and is **CLOSED for the remainder of cycle 3** absent a fundamentally different construction (multi-symbol-pooled model or open-interest data). **Per /082 Critic Rec #3, the remaining cycle-3 EXPLORATIONs (/083-091) should weight Direction 2 (symbol-universe EXPANSION) higher up the priority list**: /082's OOS Sharpe is ~104%-concentrated in BCH on a 3-symbol universe — the OOS is structurally a single-symbol bet and **no feature-family axis can fix that denominator problem.** Direction 2 (universe expansion = denominator expansion, distinct from the CLOSED swap-by-replacement family) and Direction 3 (multi-symbol-pooled model) directly attack the BCH-concentration fragility that makes every v3 OOS number fragile. **iter-v3/083 should prioritize Direction 2 — symbol-universe expansion.** Detail: `diary-v3/iteration_v3-082.md` Section 11.
 
 **Anchor for cycle 3**: iter-v3/059 (BASELINE_V3.md, `v0.v3-059`, IS +1.0894 / OOS +0.5791) — freshly re-validated at the iter-v3/081 CONFIRMATION (IS +1.0894 exact / OOS +0.5999).
 
