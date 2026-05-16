@@ -290,5 +290,5 @@ Per `briefs-v3/cycle3_plan.md` §2, this section documents the genuine WebSearch
 
 **No OOS data was consulted in selecting any /082 design parameter.** The family members, their window lengths (9-bar persistence, 3-bar momentum, 6-bar divergence, 60-bar normalisation), and the 14→18 feature count all trace to either an IS-only EDA table or an a-priori literature-grounded default (e.g. the 3-bar window = 1 day at 8h cadence; the 9-bar window = 3 days). The EDA masks every computation to `open_time < 2025-03-24`.
 
-**Setup commit SHA**: (backfilled after the setup commit — see Section 0 reproducibility note).
-**EDA SHA**: `37d4da8`. **Brief SHA**: (this commit). **Phase 5.5 gate SHA**: (TBD, QE).
+**Setup commit SHA**: `87195d1` (`feat(iter-v3/082)`: funding-family axis + config-accretion pre-flight; V3_FEATURE_COLUMNS 14→18; ITERATION_LABEL v3-082; 204 features_v3 + lookahead-embargo tests pass; ruff clean).
+**EDA SHA**: `37d4da8`. **Brief SHA**: `275d24a`. **Phase 5.5 gate SHA**: (TBD, QE).
