@@ -369,6 +369,7 @@ class RiskV2Wrapper:
             weight=new_weight,
             tp_pct=sig.tp_pct,
             sl_pct=sig.sl_pct,
+            confidence=sig.confidence,
         )
 
     def record_trade_result(self, trade: TradeResult) -> None:

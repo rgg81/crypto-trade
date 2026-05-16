@@ -407,6 +407,7 @@ class RiskV3Wrapper(RiskV2Wrapper):
                     weight=max(1, int(round(sig.weight * s))),
                     tp_pct=sig.tp_pct,
                     sl_pct=sig.sl_pct,
+                    confidence=sig.confidence,
                 )
 
         return sig

@@ -171,6 +171,8 @@ class TestNoDecisionPathReadsConfidence:
         "backtest_models.py",  # dataclass declarations
         "iteration_report.py",  # _write_trades_csv, _write_confidence_distribution
         "lgbm.py",  # get_signal return + conviction_derate (dead code)
+        "risk_v2.py",  # forward-copy confidence=sig.confidence in Signal reconstruction
+        "risk_v3.py",  # forward-copy confidence=sig.confidence in Signal reconstruction
     }
 
     def _src_files(self) -> list[Path]:
@@ -407,6 +409,21 @@ class TestConfidenceDistributionEmission:
             all_is_rows = [r for r in rows if r["is_month"] == "ALL_IS"]
             assert all_is_rows, "ALL_IS rows missing from confidence_distribution.csv"
 
+    def test_confidence_distribution_nondegenerate_when_trades_have_confidence(self) -> None:
+        """When IS trades have non-None confidence, n_trades > 0 in at least one bin."""
+        trades = self._make_is_trades()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            report_dir = Path(tmpdir)
+            _write_confidence_distribution(trades, model_pairs=[], report_dir=report_dir)
+            out = report_dir / "confidence_distribution.csv"
+            with open(out, newline="") as f:
+                rows = list(csv.DictReader(f))
+            nonzero = [r for r in rows if int(r["n_trades"]) > 0]
+            assert nonzero, (
+                "confidence_distribution.csv must have at least one row with n_trades > 0 "
+                "when IS trades all carry non-None confidence values"
+            )
+
     def test_no_confidence_trades_has_no_per_symbol_rows(self) -> None:
         """When trades have confidence=None, no per-symbol histogram rows are emitted.
 
@@ -449,3 +466,187 @@ class TestConfidenceDistributionEmission:
                     f"Expected n_trades=0 when all confidence=None, got {r['n_trades']} "
                     f"for symbol={r['symbol']} is_month={r['is_month']}"
                 )
+
+
+# ---------------------------------------------------------------------------
+# 9. Wrapper-chain regression: confidence survives RiskV2Wrapper.get_signal
+#    and RiskV3Wrapper.get_signal (the two drop points found in iter-v3/080).
+#
+#    Both wrappers previously reconstructed Signal without confidence=sig.confidence
+#    (risk_v2.py:366-372, risk_v3.py:405-410), silently zeroing the field before
+#    it reached trades.csv.  This class regression-locks the fix.
+#
+#    Strategy: stub the inner strategy with a minimal Protocol-compliant object
+#    that returns a Signal with a known confidence value.  Route the signal
+#    through each wrapper with ALL gates disabled so only the final
+#    Signal-reconstruction path executes.  Assert confidence is preserved.
+#
+#    Passive-metadata assertion: confidence is NOT read in any wrapper branch —
+#    only forwarded.  Covered by Test 4 (TestNoDecisionPathReadsConfidence).
+# ---------------------------------------------------------------------------
+class TestWrapperChainConfidencePassthrough:
+    """Regression test for iter-v3/080 fix: both risk wrappers forward confidence."""
+
+    # ------------------------------------------------------------------
+    # Minimal inner-strategy stub
+    # ------------------------------------------------------------------
+    class _StubInner:
+        """Minimal Strategy-protocol stub that returns a fixed Signal."""
+
+        atr_column = "atr_pct"
+
+        def __init__(self, signal: Signal) -> None:
+            self._signal = signal
+
+        def compute_features(self, master) -> None:  # pd.DataFrame — import deferred
+            pass
+
+        def get_signal(self, symbol: str, open_time: int) -> Signal:
+            return self._signal
+
+        def skip(self) -> None:
+            pass
+
+    def _gates_off_config(self):
+        """All gates disabled — only the final Signal reconstruction executes."""
+        from crypto_trade.strategies.ml.risk_v2 import RiskV2Config
+
+        return RiskV2Config(
+            enable_vol_scaling=False,
+            enable_adx_gate=False,
+            enable_hurst_check=False,
+            enable_zscore_ood=False,
+            enable_low_vol_filter=False,
+            enable_per_symbol_cap=False,
+            enable_per_symbol_drawdown_brake=False,
+            enable_regime_gate=False,
+            enable_regime_size_scalar=False,
+        )
+
+    # ------------------------------------------------------------------
+    # RiskV2Wrapper
+    # ------------------------------------------------------------------
+    def test_risk_v2_wrapper_passes_confidence_through(self) -> None:
+        """RiskV2Wrapper.get_signal must not drop confidence from the inner Signal."""
+        import pandas as pd
+
+        from crypto_trade.strategies.ml.risk_v2 import RiskV2Wrapper
+
+        known_confidence = 0.7654
+        inner_sig = Signal(
+            direction=1, weight=100, tp_pct=4.0, sl_pct=2.0, confidence=known_confidence
+        )
+        stub = self._StubInner(inner_sig)
+        config = self._gates_off_config()
+        wrapper = RiskV2Wrapper(inner=stub, config=config)
+
+        # compute_features must be called first so _gate_stats etc. are ready.
+        # Pass an empty master — _build_lookups iterates symbols from master,
+        # so an empty DataFrame produces an empty loop and no parquet I/O.
+        empty_master = pd.DataFrame(columns=["symbol", "open_time"])
+        wrapper.compute_features(empty_master)
+
+        result = wrapper.get_signal("BCHUSDT", open_time=1_700_000_000_000)
+
+        assert result.direction == 1, "direction must be unchanged"
+        assert result.confidence == pytest.approx(known_confidence), (
+            f"RiskV2Wrapper.get_signal dropped confidence. "
+            f"Expected {known_confidence}, got {result.confidence!r}. "
+            "Fix: add confidence=sig.confidence to Signal(...) at risk_v2.py."
+        )
+
+    def test_risk_v2_wrapper_passes_none_confidence_through(self) -> None:
+        """RiskV2Wrapper.get_signal must preserve confidence=None (backward compat)."""
+        import pandas as pd
+
+        from crypto_trade.strategies.ml.risk_v2 import RiskV2Wrapper
+
+        inner_sig = Signal(direction=1, weight=100, tp_pct=4.0, sl_pct=2.0, confidence=None)
+        stub = self._StubInner(inner_sig)
+        wrapper = RiskV2Wrapper(inner=stub, config=self._gates_off_config())
+        wrapper.compute_features(pd.DataFrame(columns=["symbol", "open_time"]))
+
+        result = wrapper.get_signal("BCHUSDT", open_time=1_700_000_000_000)
+        assert result.confidence is None
+
+    # ------------------------------------------------------------------
+    # RiskV3Wrapper — regime_size_scalar path (the second drop point)
+    # ------------------------------------------------------------------
+    def test_risk_v3_wrapper_passes_confidence_through_no_scalar(self) -> None:
+        """RiskV3Wrapper.get_signal with scalar disabled must forward confidence."""
+        import pandas as pd
+
+        from crypto_trade.strategies.ml.risk_v3 import RiskV3Wrapper
+
+        known_confidence = 0.8812
+        inner_sig = Signal(
+            direction=1, weight=100, tp_pct=4.0, sl_pct=2.0, confidence=known_confidence
+        )
+        stub = self._StubInner(inner_sig)
+        config = self._gates_off_config()
+        wrapper = RiskV3Wrapper(inner=stub, config=config)
+        wrapper.compute_features(pd.DataFrame(columns=["symbol", "open_time"]))
+
+        result = wrapper.get_signal("BCHUSDT", open_time=1_700_000_000_000)
+
+        assert result.direction == 1
+        assert result.confidence == pytest.approx(known_confidence), (
+            f"RiskV3Wrapper.get_signal (no scalar) dropped confidence. "
+            f"Expected {known_confidence}, got {result.confidence!r}."
+        )
+
+    def test_risk_v3_wrapper_passes_confidence_through_regime_scalar_fires(self) -> None:
+        """RiskV3Wrapper with regime_size_scalar FIRING must still forward confidence.
+
+        This is the second drop point (risk_v3.py Signal reconstruction at the
+        scalar branch).  We force the scalar to fire by injecting a pre-built
+        _btc_trend_lookup that classifies the target bar as BTC bear/chop.
+        """
+        import numpy as np
+        import pandas as pd
+
+        from crypto_trade.strategies.ml.risk_v2 import RiskV2Config
+        from crypto_trade.strategies.ml.risk_v3 import RiskV3Wrapper
+
+        known_confidence = 0.5543
+        inner_sig = Signal(
+            direction=1, weight=100, tp_pct=4.0, sl_pct=2.0, confidence=known_confidence
+        )
+        stub = self._StubInner(inner_sig)
+
+        config = RiskV2Config(
+            enable_vol_scaling=False,
+            enable_adx_gate=False,
+            enable_hurst_check=False,
+            enable_zscore_ood=False,
+            enable_low_vol_filter=False,
+            enable_per_symbol_cap=False,
+            enable_per_symbol_drawdown_brake=False,
+            enable_regime_gate=False,
+            # Scalar ON — scope includes BCHUSDT, value=0.5
+            enable_regime_size_scalar=True,
+            regime_size_scalar_symbols=("BCHUSDT",),
+            regime_size_scalar_value=0.5,
+            regime_size_ma_window=1,
+        )
+        wrapper = RiskV3Wrapper(inner=stub, config=config)
+        wrapper.compute_features(pd.DataFrame(columns=["symbol", "open_time"]))
+
+        # Inject a fake _btc_trend_lookup so the scalar fires without CSV I/O.
+        # open_time=0 precedes the target bar; btc_bearchop=1 forces bear/chop
+        # classification → scalar = 0.5 < 1.0 → branch executes.
+        wrapper._btc_trend_lookup = {
+            "open_time": np.array([0], dtype=np.int64),
+            "btc_bearchop": np.array([1], dtype=np.int8),
+        }
+
+        result = wrapper.get_signal("BCHUSDT", open_time=1_700_000_000_000)
+
+        # Scalar halves the weight (100 → 50) but must NOT drop confidence.
+        assert result.direction == 1
+        assert result.weight == 50, f"Expected weight=50 after 0.5 scalar, got {result.weight}"
+        assert result.confidence == pytest.approx(known_confidence), (
+            f"RiskV3Wrapper.get_signal (scalar branch) dropped confidence. "
+            f"Expected {known_confidence}, got {result.confidence!r}. "
+            "Fix: add confidence=sig.confidence to Signal(...) at risk_v3.py."
+        )
