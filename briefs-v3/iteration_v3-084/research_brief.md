@@ -486,12 +486,14 @@ prior-iteration artifacts; it touches no OOS data — `feedback_no_cheating.md` 
 
 ## Section 11 — Closeout SHA Block (backfilled at setup)
 
-- **Brief SHA**: (this commit; backfilled by the immediately-following setup commit)
-- **Setup commit SHA**: (the setup commit — `run_baseline_v3.py` ITERATION_LABEL `v3-084`
-  + the PER_CELL_GAP fix + expected_gap guard + stale literals; `validation_v3.py`
-  REQUIRED_GAP→66; V3_MODELS→3 symbols; config-accretion check→/059-canonical 3-symbol;
-  test updates)
-- **EDA SHA**: (the EDA commit — `analysis/iteration_v3-084/`)
+- **EDA SHA**: `401de40` (`analysis/iteration_v3-084/` — the config audit + the
+  anchor-staleness Sharpe-vs-net_pnl table)
+- **Brief SHA**: `c18a2dc` (this brief, all 11 sections)
+- **Setup commit SHA**: `1073f32` (`run_baseline_v3.py` ITERATION_LABEL `v3-084`
+  + the PER_CELL_GAP 43→22 fix + the per-cell `expected_gap` guard + the stale literals;
+  `validation_v3.py` REQUIRED_GAP 88→66; `V3_MODELS` 4→3 symbols; the 11-knob
+  config-accretion check → /059-canonical 3-symbol; the 5 test-file updates)
+- **Brief SHA-backfill SHA**: (this commit — Section 11 SHAs backfilled)
 - **Phase 5.5 gate SHA**: TBD (Engineer)
 - **Engineering report SHA**: TBD (Engineer, Phase 6)
 - **Critic FINAL SHA**: TBD (Phase 7.5)
@@ -499,3 +501,7 @@ prior-iteration artifacts; it touches no OOS data — `feedback_no_cheating.md` 
 - **Tag**: `v0.v3-084` (EXPLORATION/REFERENCE closeout marker — NOT a baseline update;
   BASELINE_V3.md stays at `v0.v3-059`)
 - **Reports**: `reports-v3/iteration_v3-084/`
+- **Test verification**: `uv run pytest tests/strategies/ml/ tests/features_v3/
+  tests/test_lookahead_embargo.py` → 427 passed, 3 skipped (unrelated). Runner pre-flight
+  `_verify_label_leakage_gap` + `_verify_feature_columns(ensemble_size=3)` → all PASS
+  (gap 66, 11-knob config-accretion check all 11 == /059-canonical). `ruff check` clean.
