@@ -200,6 +200,6 @@ Per `feedback_v3_axis_selection_quant_discipline.md` + the cycle-3 research mand
 - Engineering report SHA: `ae9081e`
 - Critic FINAL SHA: `a3297e1` (OVERALL=MERGE)
 - Phase 8 roster-diff analysis SHA: `c0fbeab` — `analysis/iteration_v3-086/roster_diff_oos.py` (the Critic-mandated F2/F3 sub-channel adjudication)
-- Diary + catalog + cycle3_plan + BASELINE_V3.md Dead-Ideas SHA: `<closeout_sha>` (this closeout; SHA backfilled by the immediately-following commit)
+- Diary + catalog + cycle3_plan + BASELINE_V3.md Dead-Ideas SHA: `51cefb6` (this closeout; SHA backfilled by the immediately-following commit)
 **Reports**: `reports-v3/iteration_v3-086/`
 **Tag**: `v0.v3-086` (EXPLORATION closeout marker; NOT a baseline update — BASELINE_V3.md UNCHANGED at `v0.v3-059`)
