@@ -245,13 +245,13 @@ No new libraries. The basis feature module is pure numpy/pandas arithmetic. The 
 **No design parameter selected on OOS data** (`feedback_no_cheating.md`): all EDA loaded IS rows only; the basis windows (30/3/9) are fixed a-priori at the funding-settlement-cycle / /082-family conventions, NOT swept on any metric; OOS_CUTOFF_DATE / training_months untouched. The fetch script acquires the full series (the walk-forward needs it) but the EDA never reads `open_time ≥ 2025-03-24`.
 
 **EDA SHA**: `c9bf818` — `analysis/iteration_v3-086/{fetch_spot_klines.py, basis_feed_eda.py, basis_directional_probe.py}` + the t0/t1/t2/t3/t4/p1/p2/p3 CSVs.
-**Setup SHA**: `<setup_sha>` — backfilled at the Phase 5.5 gate.
+**Setup SHA**: `47b9a35` — backfilled at the Phase 5.5 gate.
 
 ## Section 11 — Reproducibility Stamp (backfilled)
 
-- Brief SHA: `<brief_sha>`
+- Brief SHA: `8385398` (setup-SHA backfill: this commit)
 - EDA SHA: `c9bf818`
-- Setup SHA: `<setup_sha>`
+- Setup SHA: `47b9a35`
 - Phase 5.5 gate SHA: `<gate_sha>`
 - Anchor: ANCHOR 1 = /084 EXPLORATION-MODE-REFERENCE (IS +0.8325 / OOS +0.3322, 3-seed); ANCHOR 2 = /059 CONFIRMATION baseline (IS +1.0894 / OOS +0.5791, 10-seed, reserved for /092).
 - Run command: `uv run python run_baseline_v3.py --exploration --n-trials 35`
