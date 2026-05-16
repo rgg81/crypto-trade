@@ -591,13 +591,11 @@ def cpcv_walk_forward_splits(
 ) -> Iterator[tuple[np.ndarray, np.ndarray]]:
     """Yield (train_idx, test_idx) tuples for CPCV walk-forward.
 
-    Default gap = REQUIRED_GAP = (timeout_candles+1)*n_symbols = 88
-    (4-symbol BCH+LDO+TRX+ADA universe; iter-v3/069 UNIVERSE EXPANSION;
-    history: 66 (iter-v3/031 3-sym) → 88 (iter-v3/032 4-sym restore LDO) →
-    110 (iter-v3/033 +VETUSDT) → 88 (iter-v3/034 DROP VETUSDT) →
-    66 (iter-v3/051 3-sym SYSTEM-LEVEL REVERT) →
-    129 (iter-v3/068 timeout 21→42 candles) →
-    88 (iter-v3/069 timeout REVERT 42→21 + +ADAUSDT 4th symbol)).
+    Default gap = REQUIRED_GAP = (timeout_candles+1)*n_symbols = 66
+    (3-symbol BCH+LDO+TRX universe; (21+1)*3 = 66 — the live value since the
+    iter-v3/079 baseline-restore to the 3-symbol /059-canonical universe;
+    docstring corrected at iter-v3/086 per Critic /085 Rec #3 — the prior text
+    described the reverted iter-v3/069 4-symbol BCH+LDO+TRX+ADA gap=88 era).
     Default embargo = ~1% of 24-month T ≈ 27 candles.
     Asserts gap == REQUIRED_GAP to catch silent rescaling.
     """

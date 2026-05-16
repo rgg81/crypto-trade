@@ -1,7 +1,7 @@
 """Adversarial tests for per-symbol feature-set dispatch — iter-v3/085.
 
 iter-v3/085 state (cycle-3 EXPLORATION #4 — APPEND funding_regime_momentum_5d):
-- V3_FEATURE_COLUMNS_TOP_N: 15 features — the BASELINE_V3 /059/060 14-feature
+- V3_FEATURE_COLUMNS_TOP_N: 17 features — the BASELINE_V3 /059/060 14-feature
   anchor stack + funding_regime_momentum_5d (the 15th feature, the SOLE /085
   axis). funding_regime_momentum_5d is a Category-2 composed feature
   regime_momentum_signed_5d × sign(funding_z_30): funding enters ONLY as a
@@ -9,7 +9,7 @@ iter-v3/085 state (cycle-3 EXPLORATION #4 — APPEND funding_regime_momentum_5d)
   NOT the closed funding-as-direct-feature axis (/019/023/024/082). An
   EXPLORATION never updates BASELINE_V3.md; the 14-feature /059 stack stays
   canonical until a CONFIRMATION-MERGE.
-- V3_FEATURES_PER_SYMBOL is EMPTY. All 3 symbols (BCH/LDO/TRX) use 15-feature fallback.
+- V3_FEATURES_PER_SYMBOL is EMPTY. All 3 symbols (BCH/LDO/TRX) use 17-feature fallback.
 - V3_ATR_MULTIPLIERS_PER_SYMBOL is EMPTY (SYSTEM-LEVEL REVERT carry-forward from /051).
 - V3_MODELS = (BCHUSDT, ADAUSDT, TRXUSDT) — 3 symbols (iter-v3/078 UNIVERSE
   REVISION: LDOUSDT replaced by ADAUSDT).
@@ -49,8 +49,8 @@ Mandatory test cases (iter-v3/064 state):
 20. test_regime_momentum_signed_3d_not_in_universal_list — PARKED /053
 21. test_vol_adj_autocorr_not_in_universal_list  — dead code
 22. test_vwap_dev_50_not_in_universal_list       — Critic rec (IC 0.875 with ema_spread)
-23. test_universal_list_is_14                    — 15 features at iter-v3/085
-24. test_all_symbols_fallback_14                 — parametrized; BCH/LDO/TRX all 15 features
+23. test_universal_list_is_14                    — 17 features at iter-v3/085
+24. test_all_symbols_fallback_14                 — parametrized; BCH/LDO/TRX all 17 features
 25. test_features_for_symbol_unknown_fallback    — unknown sym falls back to 15-feature list
 26. test_baseline_v3_features_all_present        — all 14 BASELINE_V3 features preserved
 29. test_funding_regime_momentum_in_universal_list — funding_regime_momentum_5d PRESENT (/085 axis)
@@ -119,17 +119,17 @@ _ITER_063_NEW_REVERTED = frozenset(
 
 
 def test_bch_fallback_14() -> None:
-    """BCHUSDT must return 15 features via fallback at iter-v3/085.
+    """BCHUSDT must return 17 features via fallback at iter-v3/085.
 
     BCHUSDT not in V3_FEATURES_PER_SYMBOL (dict empty); BCH uses the
-    V3_FEATURE_COLUMNS_TOP_N fallback = 15 features (the BASELINE_V3 /059
+    V3_FEATURE_COLUMNS_TOP_N fallback = 17 features (the BASELINE_V3 /059
     14-feature anchor stack + funding_regime_momentum_5d, the SOLE iter-v3/085
     cycle-3 EXPLORATION #4 axis).
     """
     result = features_for_symbol("BCHUSDT")
-    assert len(result) == 15, (
-        f"BCHUSDT: expected 15 features (V3_FEATURE_COLUMNS_TOP_N fallback at iter-v3/085), "
-        f"got {len(result)}. V3_FEATURES_PER_SYMBOL empty + universal list = 15. "
+    assert len(result) == 17, (
+        f"BCHUSDT: expected 17 features (V3_FEATURE_COLUMNS_TOP_N fallback at iter-v3/085), "
+        f"got {len(result)}. V3_FEATURES_PER_SYMBOL empty + universal list = 17. "
         f"Got: {result}"
     )
     assert result == V3_FEATURE_COLUMNS_TOP_N, (
@@ -150,15 +150,15 @@ def test_bch_absent_dead_features() -> None:
 
 
 def test_algo_fallback_14() -> None:
-    """ALGOUSDT must return 15 features via fallback at iter-v3/085.
+    """ALGOUSDT must return 17 features via fallback at iter-v3/085.
 
     ALGO is NOT in V3_MODELS but V3_FEATURES_PER_SYMBOL is empty and
     features_for_symbol returns the universal 15-feature list for ALGO.
     """
     result = features_for_symbol("ALGOUSDT")
-    assert len(result) == 15, (
-        f"ALGOUSDT: expected 15 features (V3_FEATURE_COLUMNS_TOP_N fallback at iter-v3/085), "
-        f"got {len(result)}. V3_FEATURES_PER_SYMBOL empty + universal list = 15. "
+    assert len(result) == 17, (
+        f"ALGOUSDT: expected 17 features (V3_FEATURE_COLUMNS_TOP_N fallback at iter-v3/085), "
+        f"got {len(result)}. V3_FEATURES_PER_SYMBOL empty + universal list = 17. "
         f"Got: {result}"
     )
     assert result == V3_FEATURE_COLUMNS_TOP_N, (
@@ -181,9 +181,9 @@ def test_algo_absent_dead_features() -> None:
 def test_ada_fallback_14() -> None:
     """ADAUSDT returns the 15-feature universal set via fallback at iter-v3/085."""
     result = features_for_symbol("ADAUSDT")
-    assert len(result) == 15, (
-        f"ADAUSDT: expected 15 features (V3_FEATURE_COLUMNS_TOP_N fallback at iter-v3/085), "
-        f"got {len(result)}. V3_FEATURES_PER_SYMBOL empty + universal list = 15. "
+    assert len(result) == 17, (
+        f"ADAUSDT: expected 17 features (V3_FEATURE_COLUMNS_TOP_N fallback at iter-v3/085), "
+        f"got {len(result)}. V3_FEATURES_PER_SYMBOL empty + universal list = 17. "
         f"Got: {result}"
     )
     assert result == V3_FEATURE_COLUMNS_TOP_N, (
@@ -206,9 +206,9 @@ def test_ada_absent_dead_features() -> None:
 def test_trx_fallback_14() -> None:
     """TRXUSDT returns the 15-feature universal set via fallback at iter-v3/085."""
     result = features_for_symbol("TRXUSDT")
-    assert len(result) == 15, (
-        f"TRXUSDT: expected 15 features (V3_FEATURE_COLUMNS_TOP_N fallback at iter-v3/085), "
-        f"got {len(result)}. V3_FEATURES_PER_SYMBOL empty + universal list = 15. "
+    assert len(result) == 17, (
+        f"TRXUSDT: expected 17 features (V3_FEATURE_COLUMNS_TOP_N fallback at iter-v3/085), "
+        f"got {len(result)}. V3_FEATURES_PER_SYMBOL empty + universal list = 17. "
         f"Got: {result}"
     )
     assert result == V3_FEATURE_COLUMNS_TOP_N, (
@@ -387,47 +387,53 @@ def test_vwap_dev_50_not_in_universal_list() -> None:
 
 
 def test_universal_list_is_14() -> None:
-    """V3_FEATURE_COLUMNS_TOP_N must have exactly 15 features at iter-v3/085.
+    """V3_FEATURE_COLUMNS_TOP_N must have exactly 17 features at iter-v3/086.
 
-    iter-v3/085 (cycle-3 EXPLORATION #4): APPEND funding_regime_momentum_5d to
-    the BASELINE_V3 /059 14-feature anchor stack — count 14 → 15. This is the
-    SOLE /085 axis: a single Category-2 composed feature
-    (regime_momentum_signed_5d × sign(funding_z_30)). An EXPLORATION never
-    updates BASELINE_V3.md; the 14-feature /059 stack stays canonical.
+    iter-v3/086 (cycle-3 EXPLORATION #5): APPEND the 3-feature perp-spot BASIS
+    family to the BASELINE_V3 /059 14-feature anchor stack — count 14 → 17.
+    This is the SOLE /086 axis: a NEW crypto-native data feed. iter-v3/085's
+    funding_regime_momentum_5d is DROPPED (INERT + SUSPICIOUS). An EXPLORATION
+    never updates BASELINE_V3.md; the 14-feature /059 stack stays canonical.
     """
     n = len(V3_FEATURE_COLUMNS_TOP_N)
-    assert n == 15, (
-        f"V3_FEATURE_COLUMNS_TOP_N has {n} features — expected exactly 15 at iter-v3/085 "
-        f"(the BASELINE_V3 /059 14-feature anchor stack + funding_regime_momentum_5d, "
-        f"the SOLE /085 axis). Check features_v3/__init__.py V3_FEATURE_COLUMNS_TOP_N."
+    assert n == 17, (
+        f"V3_FEATURE_COLUMNS_TOP_N has {n} features — expected exactly 17 at iter-v3/086 "
+        f"(the BASELINE_V3 /059 14-feature anchor stack + the 3-feature perp-spot "
+        f"basis family). Check features_v3/__init__.py V3_FEATURE_COLUMNS_TOP_N."
     )
 
 
 def test_funding_regime_momentum_in_universal_list() -> None:
-    """funding_regime_momentum_5d MUST be in V3_FEATURE_COLUMNS_TOP_N at iter-v3/085.
+    """The 3 basis features PRESENT + funding_regime_momentum_5d ABSENT at iter-v3/086.
 
-    The 15th feature — the SOLE iter-v3/085 cycle-3 EXPLORATION #4 axis. A
-    Category-2 composed feature regime_momentum_signed_5d × sign(funding_z_30).
+    iter-v3/086 (cycle-3 EXPLORATION #5): the 3-feature perp-spot basis family
+    (basis_zscore_30, basis_momentum_3, basis_extreme_flag) is the SOLE axis;
+    iter-v3/085's funding_regime_momentum_5d is DROPPED (INERT-by-importance +
+    SUSPICIOUS trade-selection sub-channel; Critic /085 Rec #1).
     """
-    assert "funding_regime_momentum_5d" in V3_FEATURE_COLUMNS_TOP_N, (
-        "funding_regime_momentum_5d NOT FOUND in V3_FEATURE_COLUMNS_TOP_N — must be "
-        "PRESENT at iter-v3/085 (the 15th feature, the SOLE cycle-3 EXPLORATION #4 "
-        "axis). Add it to V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
+    for bf in ("basis_zscore_30", "basis_momentum_3", "basis_extreme_flag"):
+        assert bf in V3_FEATURE_COLUMNS_TOP_N, (
+            f"{bf} NOT FOUND in V3_FEATURE_COLUMNS_TOP_N — must be PRESENT at "
+            "iter-v3/086 (the 3-feature perp-spot basis family is the SOLE axis)."
+        )
+    assert "funding_regime_momentum_5d" not in V3_FEATURE_COLUMNS_TOP_N, (
+        "funding_regime_momentum_5d FOUND in V3_FEATURE_COLUMNS_TOP_N — must be "
+        "ABSENT at iter-v3/086 (DROPPED — /085 INERT + SUSPICIOUS; Critic Rec #1)."
     )
 
 
 @pytest.mark.parametrize("symbol", ["BCHUSDT", "ADAUSDT", "TRXUSDT"])
 def test_all_symbols_fallback_14(symbol: str) -> None:
-    """All 3 active V3_MODELS symbols must return exactly 15 features at iter-v3/085.
+    """All 3 active V3_MODELS symbols must return exactly 17 features at iter-v3/085.
 
-    iter-v3/085: 15 features (the BASELINE_V3 14-feature anchor +
+    iter-v3/085: 17 features (the BASELINE_V3 14-feature anchor +
     funding_regime_momentum_5d, the SOLE /085 axis). Parametrized over BCH/LDO/TRX.
     """
     result = features_for_symbol(symbol)
-    assert len(result) == 15, (
-        f"{symbol}: expected 15 features (V3_FEATURE_COLUMNS_TOP_N universal fallback at "
+    assert len(result) == 17, (
+        f"{symbol}: expected 17 features (V3_FEATURE_COLUMNS_TOP_N universal fallback at "
         f"iter-v3/085), got {len(result)}. V3_FEATURES_PER_SYMBOL must be empty + "
-        f"universal list = 15 (the BASELINE_V3 anchor + funding_regime_momentum_5d)."
+        f"universal list = 17 (the BASELINE_V3 anchor + funding_regime_momentum_5d)."
     )
     assert result == V3_FEATURE_COLUMNS_TOP_N, (
         f"{symbol}: result differs from V3_FEATURE_COLUMNS_TOP_N. "
@@ -437,30 +443,35 @@ def test_all_symbols_fallback_14(symbol: str) -> None:
 
 
 def test_features_for_symbol_unknown_fallback() -> None:
-    """An unknown symbol falls back to V3_FEATURE_COLUMNS_TOP_N (15 features at iter-v3/085).
+    """An unknown symbol falls back to V3_FEATURE_COLUMNS_TOP_N (17 features at iter-v3/086).
 
-    iter-v3/085 (cycle-3 EXPLORATION #4): funding_regime_momentum_5d appended —
-    feature count 14 → 15.
+    iter-v3/086 (cycle-3 EXPLORATION #5): the 3-feature perp-spot basis family
+    appended; iter-v3/085's funding_regime_momentum_5d dropped — count 14 → 17.
     """
     result = features_for_symbol("XYZUSDT")
     assert result is not None, "features_for_symbol must never return None."
-    assert len(result) == 15, (
-        f"Unknown symbol fallback should be 15 features at iter-v3/085, got {len(result)}."
+    assert len(result) == 17, (
+        f"Unknown symbol fallback should be 17 features at iter-v3/086, got {len(result)}."
     )
     assert result == V3_FEATURE_COLUMNS_TOP_N, (
-        "Unknown symbol 'XYZUSDT' should fall back to V3_FEATURE_COLUMNS_TOP_N (15 features)."
+        "Unknown symbol 'XYZUSDT' should fall back to V3_FEATURE_COLUMNS_TOP_N (17 features)."
     )
     for feat in _CATASTROPHIC_DEAD:
         assert feat not in result, (
             f"Unknown symbol fallback must NOT include {feat} (catastrophic-dead). Got: {result}"
         )
     assert "regime_momentum_signed_5d" in result, (
-        "regime_momentum_signed_5d must be in fallback at iter-v3/085 (mandate ACTIVE). "
+        "regime_momentum_signed_5d must be in fallback at iter-v3/086 (mandate ACTIVE). "
         "feedback_v3_engineered_features_proven.md mandate UPHELD."
     )
-    assert "funding_regime_momentum_5d" in result, (
-        "funding_regime_momentum_5d must be in fallback at iter-v3/085 "
-        "(the 15th feature, the SOLE cycle-3 EXPLORATION #4 axis)."
+    for bf in ("basis_zscore_30", "basis_momentum_3", "basis_extreme_flag"):
+        assert bf in result, (
+            f"{bf} must be in fallback at iter-v3/086 "
+            "(the 3-feature perp-spot basis family, the SOLE cycle-3 EXPLORATION #5 axis)."
+        )
+    assert "funding_regime_momentum_5d" not in result, (
+        "funding_regime_momentum_5d must be ABSENT at iter-v3/086 "
+        "(DROPPED — /085 INERT + SUSPICIOUS; Critic /085 Rec #1)."
     )
     assert "sym_vs_btc_ret_7d" in result, (
         "sym_vs_btc_ret_7d must be in fallback at iter-v3/077 (RESTORED iter-v3/042; KEPT)."

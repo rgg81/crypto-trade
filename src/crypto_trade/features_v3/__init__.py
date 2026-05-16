@@ -44,6 +44,7 @@ from pathlib import Path
 import pandas as pd
 from tqdm import tqdm
 
+from crypto_trade.features_v3.basis_v3 import add_basis_v3_features
 from crypto_trade.features_v3.calendar_v3 import add_calendar_v3_features
 from crypto_trade.features_v3.cross_btc_v3 import add_cross_btc_v3_features
 from crypto_trade.features_v3.engineered_v3 import (
@@ -95,6 +96,13 @@ GROUP_REGISTRY: dict[str, Callable[[pd.DataFrame], pd.DataFrame]] = {
     # funding-price divergence). Needs `close` — no ordering constraint vs the
     # other groups.
     "funding_family_v3": add_funding_family_v3_features,
+    # iter-v3/086: perp-spot BASIS feature family (cycle-3 EXPLORATION #5) — a NEW
+    # crypto-native data feed. Builds the 3 BASIS_FAMILY_COLUMNS (crowding level,
+    # momentum, sign-persistence) from basis = (perp_close - spot_close)/spot_close.
+    # Reads data/spot/<SYM>/8h.csv (the fetch-spot cache). Needs `close` — no
+    # ordering constraint vs the other groups. NOT the closed funding axis:
+    # IS corr(basis_z, funding_z) is only 0.22-0.28 — a genuinely distinct feed.
+    "basis_v3": add_basis_v3_features,
     # iter-v3/063: NEW technical indicators (ADX); AFTER regime (shares ATR dependency)
     "technical_v3": add_technical_v3_features,
     # iter-v3/063: NEW calendar/temporal features (DOW cyclic encoding); no dependencies
@@ -194,18 +202,39 @@ V3_FEATURE_COLUMNS_TOP_N: tuple[str, ...] = (
     "sym_vs_btc_ret_7d",  # cross_btc [BASELINE_V3]
     "regime_momentum_signed_5d",  # engineered [BASELINE_V3, /025 PROMISING]
     # -------------------------------------------------------------------------
-    # iter-v3/085 (cycle-3 EXPLORATION #4) — the 15th feature, the SOLE /085 axis.
-    # funding_regime_momentum_5d = regime_momentum_signed_5d × sign(funding_z_30)
-    # — a Category-2 composed feature (the feedback_v3_engineered_feature_pivot.md
-    # carve-out family, the one PROVEN-PROMISING v3 axis per iter-v3/025).
-    # Appended AFTER regime_momentum_signed_5d (its primitive). This is NOT the
-    # CLOSED v3 funding axis (/019/023/024/082): funding enters ONLY as a sign()
-    # switch INSIDE the composed feature — it is never a column the tree can split
-    # on directly. The funding_rate_zscore_30 / btc_funding_rate_zscore_30
-    # literal-name bans below stay enforced (different column, different
-    # construction). Single-axis EXPLORATION: count 14 → 15, nothing else changes.
-    # See briefs-v3/iteration_v3-085/research_brief.md Section 3.
-    "funding_regime_momentum_5d",  # engineered/funding-regime [iter-v3/085 EXPLORATION #4]
+    # iter-v3/086 (cycle-3 EXPLORATION #5) — the 15th/16th/17th features, the
+    # SOLE /086 axis: a NEW crypto-native data feed (perp-spot BASIS) FEATURE
+    # FAMILY. count 14 → 17.
+    #
+    # basis(t) = (perp_close[t] - spot_close[t]) / spot_close[t] — the perp-spot
+    # premium, the canonical sentiment primitive of a perpetual market. This is
+    # a NEW DATA FEED: every prior v3 feature is derived from OHLCV or the
+    # funding rate; the basis requires SPOT 8h klines (data/spot/<SYM>/8h.csv,
+    # the fetch-spot cache), a feed v3 has never fetched.
+    #
+    # NOT the CLOSED v3 funding axis (/019/023/024/082/085). The funding axis is
+    # closed across BOTH direct-feature and composed-sign-switch constructions —
+    # but the basis is a DIFFERENT FEED, not another construction on the funding
+    # rate. IS corr(basis_z, funding_z) is only 0.22-0.28 (funding is the lagged,
+    # +/-clamped 8h settlement; the basis is the continuous, unclamped premium).
+    # The /085 Critic Rec #4 explicitly named a NEW crypto-native data feed as
+    # the highest-value untried axis. EDA: analysis/iteration_v3-086/.
+    #
+    # The 3 basis features are PAST-ONLY (computed on basis.shift(1) — a strict
+    # one-candle lag, since basis(t) needs both closes and is knowable only at
+    # bar t CLOSE; STRICTER than the funding convention). See basis_v3.py and
+    # briefs-v3/iteration_v3-086/research_brief.md Section 3.
+    #
+    # iter-v3/085's funding_regime_momentum_5d is DROPPED here (Critic /085
+    # Rec #1): it was INERT-by-importance (rank 13/14/15-of-15) AND SUSPICIOUS
+    # (trade-selection sub-channel). Per feedback_v3_inert_features_at_higher_
+    # budget.md an INERT feature is not carried forward; its literal name joins
+    # the runner ABSENT-assertion ban. This is the established "mandatory
+    # secondary baseline-restore edit" pattern (cf. /083 reverting /082's funding
+    # family, /077 reverting /076's range_efficiency_50).
+    "basis_zscore_30",  # basis crowding LEVEL [iter-v3/086 EXPLORATION #5]
+    "basis_momentum_3",  # basis crowding MOMENTUM [iter-v3/086 EXPLORATION #5]
+    "basis_extreme_flag",  # basis crowding DIRECTION+PERSISTENCE [iter-v3/086 EXPLORATION #5]
     # -------------------------------------------------------------------------
     # iter-v3/083 (cycle-3 EXPLORATION #2) REVERTS /082's funding-rate FEATURE
     # FAMILY — V3_FEATURE_COLUMNS_TOP_N returns 18 -> 14, the BASELINE_V3 /059
@@ -260,24 +289,29 @@ V3_FEATURE_COLUMNS_TOP_N: tuple[str, ...] = (
     #   efficiency_ratio_50    — /043 DISASTROUS NEGATIVE (IS -0.84 / OOS -0.90)
     #   vol_adj_autocorr       — /026 catastrophic IS collapse + /036 NEGATIVE
     #   vwap_dev_50            — Critic FINAL `a544621` Rec #1 (IC 0.875 with ema_spread_atr_20)
+    #   funding_regime_momentum_5d — /085 INERT-by-importance (rank 13/14/15-of-15)
+    #                                + SUSPICIOUS (trade-selection sub-channel)
     # -------------------------------------------------------------------------
 )
-"""15-feature set — the BASELINE_V3 /059 14-feature anchor + the iter-v3/085 axis.
+"""17-feature set — the BASELINE_V3 /059 14-feature anchor + the iter-v3/086 axis.
 
-iter-v3/085 (cycle-3 EXPLORATION #4) APPENDS funding_regime_momentum_5d (the
-15th feature) to the BASELINE_V3 /059/060 14-feature anchor. This is the SOLE
-/085 axis — a single Category-2 composed feature, single-axis EXPLORATION.
+iter-v3/086 (cycle-3 EXPLORATION #5) APPENDS the 3-feature perp-spot BASIS
+family (basis_zscore_30, basis_momentum_3, basis_extreme_flag — the 15th/16th/
+17th features) to the BASELINE_V3 /059/060 14-feature anchor. This is the SOLE
+/086 axis — a NEW crypto-native data feed (perp-spot basis), single-axis
+EXPLORATION.
 
 History:
   /065+: 14-feature /060 anchor (adx_14 dropped at /064 NEGATIVE).
   /076 : range_efficiency_50 ADDED (15th) — EXPLORATION #6 axis;
          SUSPICIOUS-OOS-DOMINANT, NON-ADVANCING (Kaufman path-efficiency axis
          CLOSED across /043 + /076 — BASELINE_V3.md Dead Ideas).
-  /077 : range_efficiency_50 REVERTED — back to the 14-feature anchor. /077 is
-         a PASSIVE-DIAGNOSTIC iteration (conditional-orthogonality report
-         instrumentation) and adds no feature.
+  /077 : range_efficiency_50 REVERTED — back to the 14-feature anchor.
   /085 : funding_regime_momentum_5d ADDED (15th) — cycle-3 EXPLORATION #4 axis;
-         a Category-2 composed feature regime_momentum_signed_5d × sign(funding_z_30).
+         INERT-by-importance + SUSPICIOUS (trade-selection sub-channel).
+  /086 : funding_regime_momentum_5d DROPPED (Critic /085 Rec #1; an INERT
+         feature is not carried forward). The 3-feature perp-spot basis family
+         ADDED (15th/16th/17th) — cycle-3 EXPLORATION #5 axis, a NEW data feed.
          An EXPLORATION never updates BASELINE_V3.md; the 14-feature /059 stack
          stays canonical until a CONFIRMATION-MERGE.
 
@@ -285,14 +319,14 @@ The iter-v3/064 phased mass-expansion #1 (+adx_14, briefly 15 features) was
 NEGATIVE; the runner pre-flight still asserts adx_14 ABSENT.
 """
 
-# iter-v3/085: V3_FEATURE_COLUMNS = V3_FEATURE_COLUMNS_TOP_N (15-feature
-# BASELINE_V3 /059/060 14-feature anchor + the iter-v3/085 axis
-# funding_regime_momentum_5d).
+# iter-v3/086: V3_FEATURE_COLUMNS = V3_FEATURE_COLUMNS_TOP_N (17-feature
+# BASELINE_V3 /059/060 14-feature anchor + the iter-v3/086 axis — the 3-feature
+# perp-spot basis family).
 V3_FEATURE_COLUMNS: tuple[str, ...] = V3_FEATURE_COLUMNS_TOP_N
 """Alias for V3_FEATURE_COLUMNS_TOP_N — the active feature set for all v3 models.
 
-Points to the 15-feature set = the BASELINE_V3 /059/060 14-feature anchor +
-funding_regime_momentum_5d (the iter-v3/085 cycle-3 EXPLORATION #4 axis).
+Points to the 17-feature set = the BASELINE_V3 /059/060 14-feature anchor + the
+3-feature perp-spot basis family (the iter-v3/086 cycle-3 EXPLORATION #5 axis).
 """
 
 DEFAULT_ATR_MULTIPLIERS: tuple[float, float] = (2.0, 1.0)
