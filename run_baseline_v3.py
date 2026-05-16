@@ -53,7 +53,7 @@ from crypto_trade.features_v3 import (
     process_symbol_v3,
 )
 from crypto_trade.iteration_report import generate_iteration_reports
-from crypto_trade.strategies.ml.lgbm import LightGbmStrategy, conviction_derate
+from crypto_trade.strategies.ml.lgbm import LightGbmStrategy
 from crypto_trade.strategies.ml.metalabeling import MetaLabelingStrategy
 from crypto_trade.strategies.ml.risk_v2 import (
     BtcTrendFilterConfig,
@@ -125,7 +125,7 @@ def _derive_ensemble_seeds(outer_seed: int, size: int = 5) -> list[int]:
     return [int(s) for s in rng.integers(low=0, high=2**31 - 1, size=size)]
 
 
-ITERATION_LABEL = "v3-079"
+ITERATION_LABEL = "v3-080"
 REPORTS_DIR = Path("reports-v3")
 FEATURES_DIR = Path("data/features_v3")
 DATA_DIR = Path("data")
@@ -2389,26 +2389,16 @@ def main() -> None:
     _verify_track_isolation()  # grep check
 
     # -----------------------------------------------------------------------
-    # iter-v3/079 primitive 13: conviction-derate 3-point pre-flight assertion.
-    # Verifies the a-priori constants (C_FLOOR=0.50, C_REF=0.65, W_MIN_FRAC=0.50)
-    # produce the expected boundary values before any backtest trial runs.
+    # iter-v3/080 baseline-restore: /079's conviction-derate (primitive 13) is
+    # REVERTED. /079 was NULL-RESULT (behavioral saturation — the de-rate
+    # engaged only 7.5% of IS trades; PARKED per diary-v3/iteration_v3-079.md
+    # Section 5). iter-v3/080 restores the /060-config flat weight=100 in
+    # lgbm.get_signal — so the conviction-derate 3-point pre-flight assertion
+    # is no longer a /080 invariant and is removed with the runner import.
+    # The /080 axis is the PASSIVE-DIAGNOSTIC persisted-`confidence`
+    # instrument (brief Section 3.1) — verified by the QE Phase-6 adversarial
+    # test suite, not by a runner pre-flight assertion.
     # -----------------------------------------------------------------------
-    assert conviction_derate(0.50) == 50, (
-        f"conviction_derate(0.50) must equal 50 (weight floor); got {conviction_derate(0.50)}"
-    )
-    assert conviction_derate(0.65) == 100, (
-        f"conviction_derate(0.65) must equal 100 (full weight at C_REF); "
-        f"got {conviction_derate(0.65)}"
-    )
-    assert conviction_derate(1.00) == 100, (
-        f"conviction_derate(1.00) must equal 100 (full weight above C_REF); "
-        f"got {conviction_derate(1.00)}"
-    )
-    print(
-        "[preflight] conviction_derate 3-point assertion PASSED: "
-        f"f(0.50)={conviction_derate(0.50)}, f(0.65)={conviction_derate(0.65)}, "
-        f"f(1.00)={conviction_derate(1.00)}"
-    )
 
     # -----------------------------------------------------------------------
     # OOF parquet contamination guardrail (iter-v3: QR A5 + Critic FINAL 785500f)
