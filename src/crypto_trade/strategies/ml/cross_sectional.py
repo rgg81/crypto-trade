@@ -102,11 +102,56 @@ XS_VOL_TARGET: float = 0.10  # 10% annualised
 #: Fee per side, modeled on every 8h rebalance.
 XS_FEE_PER_SIDE: float = 0.001  # 0.1%
 
-#: Tercile cutoff fraction (Section 3.4 — a-priori from factor convention).
+#: Tercile cutoff fraction — the /088 quantile (a-priori from factor convention).
 XS_TERCILE_FRAC: float = 1.0 / 3.0
 
 #: Realised-vol lookback for inverse-vol weighting (past-only, in bars).
 XS_VOL_LOOKBACK: int = 50
+
+# ---------------------------------------------------------------------------
+# iter-v3/089 cost-aware construction constants — all IS-selected or a-priori.
+# /088 lost money because of (1) a sign inversion and (2) turnover drag (IS
+# fees 8.8x gross PnL).  These constants attack turnover STRUCTURALLY; the
+# /089 research brief Section 3 derives each from the committed IS-only EDA
+# (analysis/iteration_v3-089/) — never from OOS data.
+# ---------------------------------------------------------------------------
+
+#: /089 per-leg QUANTILE fraction — QUINTILE (top/bottom 20%).
+#: EDA G1: quintile maximises the realised L-S spread per-bar Sharpe across
+#: the 22-symbol universe; decile (10%) is THINNER and weaker (~2 names/leg
+#: is too noisy at N=22); tercile dilutes the LTR precision.  Poh/Lim/Zohren
+#: (arXiv 2012.07149): an LTR model places assets in the right quantile with
+#: greater precision, so a tighter quantile steepens the spread — but not so
+#: tight the leg loses diversification.  Quintile = ~4-5 names/leg.
+XS_QUANTILE_FRAC: float = 0.20
+
+#: /089 HOLDING PERIOD — overlapping tranches held XS_HOLD_BARS bars.
+#: At each bar a NEW tranche sized 1/XS_HOLD_BARS of the book is formed and
+#: held XS_HOLD_BARS bars; the book is the sum of the live tranches.  This is
+#: the Jegadeesh-Titman (1993) overlapping-portfolio construction; it cuts
+#: gross turnover ~XS_HOLD_BARS-fold with negligible signal loss (J-T: "no
+#: significant difference in returns between overlapping and non-overlapping
+#: portfolios" + a diversification benefit).  H=3 (= XS_HORIZON) is
+#: horizon-matched: the label predicts the 3-bar-forward cross-section.
+#: EDA E3: hold=3 cuts IS fee/|gross| 10.0x -> 5.4x and lifts IS net Sharpe
+#: -0.57 -> -0.42 vs hold=1.
+XS_HOLD_BARS: int = 3
+
+#: /089 NO-TRADE BAND — only re-trade a symbol when its target book weight
+#: moves more than XS_NO_TRADE_BAND vs the held weight (Constantinides 1986;
+#: Davis-Norman 1990 — the optimal no-trade band scales O(eps^1/3) in the
+#: proportional cost eps; utility loss is O(eps^2/3), so when costs dominate
+#: a wide band is mandatory).  EDA E4 scanned tau on IS data; tau=0.020 was
+#: the IS-best net Sharpe of the grid (-0.31).  Selected on IS net Sharpe.
+XS_NO_TRADE_BAND: float = 0.020
+
+#: /089 PRE-REGISTERED HARD TURNOVER CEILING — gross turnover per bar.
+#: EDA E6: the IS-best construction (quintile + hold=3 + tau=0.020) runs at
+#: 0.120 gross turnover/bar; the ceiling is set at x1.15 headroom = 0.138.
+#: This is a HARD MERGE-BLOCKING GATE (the /089 brief Section 4): any /089
+#: build whose realised mean gross turnover/bar EXCEEDS XS_TURNOVER_CEILING
+#: is NO-MERGE — turnover drag cannot be rationalised post-hoc.
+XS_TURNOVER_CEILING: float = 0.138
 
 
 # ---------------------------------------------------------------------------
@@ -125,11 +170,20 @@ def label_cross_sectional_rank(
          Uses the 'close' column.  NaN when close(t+H) is unavailable.
       2. Within each timestamp's cross-section, rank r_fwd ascending →
          discrete relevance grade in {0, 1, 2} by tercile:
-           bottom-third → grade 0 (under-performers — predicted cross-section
-             WINNERS given the reversal signal; these become LONG leg targets)
+           bottom-third → grade 0 (the lowest FORWARD returns — future
+             cross-section UNDER-performers)
            middle-third → grade 1
-           top-third    → grade 2 (out-performers — predicted cross-section
-             LOSERS; these become SHORT leg targets in the reversal book)
+           top-third    → grade 2 (the highest FORWARD returns — future
+             cross-section OUT-performers)
+
+    iter-v3/089 SIGN NOTE — the grade is assigned by FORWARD-return rank.  An
+    LGBMRanker(lambdarank) trained on this grade learns the FORWARD mapping:
+    high predicted score → high grade → high future return.  The /088 brief
+    mis-reasoned (it conflated the EDA's PAST-return reversal predictor with
+    what the model learns from a FORWARD-return label) and longed the model's
+    predicted LOSERS.  The corrected /089 construction (`build_positions`)
+    LONGs the top tercile (high score = predicted future winner) and SHORTs
+    the bottom tercile.  See the /089 research brief Section 3.1/3.3.
 
     Look-ahead safety: r_fwd is the LABEL (the prediction target), not a
     feature.  The labeling is look-ahead-correct.  The walk-forward embargo
@@ -508,11 +562,20 @@ class CrossSectionalRankStrategy:
     def predict_ranking(self, panel: pd.DataFrame) -> np.ndarray:
         """Score each row in the test panel; returns predicted ranking scores.
 
-        Higher score = model predicts this symbol will RANK HIGHER (i.e., be
-        a top-tercile forward-return symbol in the cross-section).  Given the
-        reversal signal (negative IC), higher score → lower forward return →
-        SHORT candidate; lower score → LONG candidate.  The position
-        constructor in build_positions() handles this mapping.
+        Higher score = the model predicts this symbol will RANK HIGHER in the
+        cross-section's FORWARD return — i.e. be a top-tercile forward-return
+        symbol.  The model is trained by `lambdarank` on the forward-return
+        tercile grade from `label_cross_sectional_rank`, so it learns the
+        FORWARD mapping directly: high score → high future return.
+
+        iter-v3/089 SIGN FIX — therefore high score = predicted future WINNER:
+        `build_positions` LONGs the top tercile (highest scores) and SHORTs
+        the bottom tercile (lowest scores).  The /088 docstring's "reversal
+        ... higher score → lower forward return → SHORT" reasoning was WRONG
+        (the model is not trained on past returns, so there is no reversal for
+        it to invert; the /088 IS Spearman(predicted_score, label_grade) =
+        +0.033, p=1.2e-12 confirms high score → high grade → high future
+        return).  See the /089 research brief Section 3.1/3.3.
         """
         if self._model is None:
             raise RuntimeError(
@@ -537,16 +600,28 @@ def build_positions(
     min_symbols: int = XS_MIN_SYMBOLS_PER_BAR,
     vol_lookback: int = XS_VOL_LOOKBACK,
 ) -> dict[str, float]:
-    """Construct dollar-neutral tercile long-short positions at timestamp t.
+    """Construct dollar-neutral quantile long-short positions at timestamp t.
 
-    Algorithm (Section 3.4):
+    iter-v3/089 SIGN FIX (Critic /088 Rec #2).
+    -------------------------------------------
+    The LGBMRanker is trained by `lambdarank` on `label_cross_sectional_rank`
+    grades, where grade is assigned by FORWARD-return rank (grade 2 = top-third
+    of FUTURE returns).  The model therefore learns the FORWARD mapping —
+    high predicted score → high future return.  The /088 build inverted this:
+    it longed `sorted_syms[:n_leg]` (the LOWEST scores = predicted future
+    LOSERS) and shorted the highest.  /089 corrects the sign.
+
+    Algorithm:
       1. Score each symbol with the ranking model.
-      2. Long the BOTTOM tercile (grade-0 / low-score symbols — the reversal
-         long: recent cross-section under-performers are predicted to bounce).
-         Short the TOP tercile (grade-2 / high-score symbols — recent winners).
+      2. LONG the TOP quantile (HIGHEST scores = predicted future WINNERS).
+         SHORT the BOTTOM quantile (LOWEST scores = predicted future LOSERS).
       3. Dollar-neutral: equal gross long and gross short notional.
       4. Within each leg, inverse-vol weight (weight ∝ 1/σ̂).
       5. Scale the whole book to XS_VOL_TARGET via portfolio vol-targeting.
+
+    `tercile_frac` is the per-leg quantile fraction (kept named `tercile_frac`
+    for call-site compatibility; the /089 runner passes the EDA-selected
+    quintile fraction — see the /089 research brief Section 3.3).
 
     Parameters
     ----------
@@ -582,9 +657,10 @@ def build_positions(
     order = np.argsort(scores)
     sorted_syms = syms[order]
 
+    # iter-v3/089 SIGN FIX: high score = predicted future WINNER → LONG.
     n_leg = max(1, int(np.floor(n * tercile_frac)))
-    long_syms = set(sorted_syms[:n_leg])  # bottom tercile → LONG
-    short_syms = set(sorted_syms[-n_leg:])  # top tercile → SHORT
+    long_syms = set(sorted_syms[-n_leg:])  # TOP quantile (high score) → LONG
+    short_syms = set(sorted_syms[:n_leg])  # BOTTOM quantile (low score) → SHORT
 
     # Per-symbol realised vol estimate (past-only).
     vol_map: dict[str, float] = {}
@@ -663,6 +739,34 @@ def _approximate_group(n_rows: int, n_symbols: int) -> list[int]:
     return groups
 
 
+def apply_no_trade_band(
+    target: dict[str, float],
+    held: dict[str, float],
+    band: float,
+) -> dict[str, float]:
+    """iter-v3/089 no-trade band — hold the previous book weight for a symbol
+    unless its target weight has moved by more than `band`.
+
+    Constantinides (1986) / Davis-Norman (1990): with a proportional cost the
+    optimal policy is a no-trade region; when a holding leaves the region it
+    is rebalanced to the (target) boundary.  Here:
+      - |target - held| <= band  →  carry the HELD weight (zero turnover fee).
+      - |target - held| >  band  →  move to the TARGET weight.
+
+    band = 0  →  rebalance every symbol every bar (the /088 behaviour).
+
+    Returns the post-band book weights (dust below 1e-9 dropped).
+    """
+    if band <= 0.0:
+        return dict(target)
+    out: dict[str, float] = {}
+    for s in set(target) | set(held):
+        t = target.get(s, 0.0)
+        h = held.get(s, 0.0)
+        out[s] = t if abs(t - h) > band else h
+    return {s: v for s, v in out.items() if abs(v) > 1e-9}
+
+
 # ---------------------------------------------------------------------------
 # A5 — Cross-sectional backtest (Section 3.4.1)
 # ---------------------------------------------------------------------------
@@ -676,18 +780,34 @@ def run_cross_sectional_backtest(
     oos_cutoff_ms: int = OOS_CUTOFF_MS,
     fee_per_side: float = XS_FEE_PER_SIDE,
     vol_lookback: int = XS_VOL_LOOKBACK,
+    quantile_frac: float = XS_QUANTILE_FRAC,
+    hold_bars: int = XS_HOLD_BARS,
+    no_trade_band: float = XS_NO_TRADE_BAND,
 ) -> pd.DataFrame:
-    """Full walk-forward cross-sectional backtest.
+    """Full walk-forward cross-sectional backtest — iter-v3/089 cost-aware.
 
     Walk-forward cadence (Section 3.6):
       - Train on trailing training_months months (IS-only past data).
       - Embargo: train_end_ms = test_start_ms - embargo_ms, where
         embargo_ms = XS_REQUIRED_GAP bars * interval_ms.
         This is the e149e9d fix carried through to the cross-sectional path.
-      - Rebalance every 8h bar (Section 3.4.1).
 
-    Fees: 0.1% per side modeled on every 8h rebalance, both long and short
-    legs (Section 3.5 / Section 5 risk table).
+    iter-v3/089 cost-aware construction (the /089 research brief Section 3) —
+    /088 lost money to turnover drag (IS fees 8.8x gross PnL); /089 attacks it
+    structurally with THREE composed levers, all IS-selected / a-priori:
+      - QUINTILE legs (quantile_frac=0.20) — EDA G1; tighter than /088's
+        tercile so the LTR precision concentrates the spread.
+      - OVERLAPPING HOLDS (hold_bars=3) — at each bar a new tranche sized
+        1/hold_bars of the target book is formed and held hold_bars bars;
+        the book is the sum of the live tranches.  Jegadeesh-Titman (1993):
+        cuts gross turnover ~hold_bars-fold with negligible signal loss.
+      - NO-TRADE BAND (no_trade_band=0.020) — a symbol is re-traded only
+        when its target book weight moves more than the band vs the held
+        weight.  Constantinides (1986) / Davis-Norman (1990): the optimal
+        no-trade band scales O(eps^1/3) in the proportional cost.
+
+    Fees: 0.1% per side modeled, turnover-based, charged on the absolute
+    change in the BOOK position bar-to-bar (Section 3.5 / Section 5).
 
     Parameters
     ----------
@@ -749,8 +869,14 @@ def run_cross_sectional_backtest(
 
     results: list[dict] = []
     trained_months: set[str] = set()
-    # Turnover-based fee tracking: carry previous bar's signed positions.
-    prev_positions: dict[str, float] = {}
+    # iter-v3/089 cost-aware construction state:
+    #   prev_book   — the previous bar's post-band BOOK weights (for the fee).
+    #   tranches    — live overlapping tranches: (retire_bar_index, {sym: w}).
+    #                 each tranche is sized 1/hold_bars of a bar's target book
+    #                 and retired hold_bars bars after it was formed.
+    prev_book: dict[str, float] = {}
+    tranches: list[tuple[int, dict[str, float]]] = []
+    bar_counter = 0  # global rebalance-bar index across all walk-forward months
 
     for split in splits:
         train_start_ms_split = split["train_start_ms"]
@@ -814,60 +940,78 @@ def run_cross_sectional_backtest(
 
             # Past-only vol estimate: trailing vol_lookback bars ending BEFORE ts.
             hist = ret_wide[ret_wide.index < ts].tail(vol_lookback)
-            positions = build_positions(panel_t, scores, hist)
+            # The per-bar TARGET book — corrected-sign, QUINTILE, dollar-neutral,
+            # inverse-vol, vol-targeted (build_positions; quantile_frac=0.20).
+            target = build_positions(panel_t, scores, hist, tercile_frac=quantile_frac)
 
-            if not positions:
+            if not target:
                 continue
 
-            # PnL computation.  The 1-bar gross return for a position opened at t
-            # and closed at t+1 is position * (close(t+1) / close(t) - 1).
-            # We accrue PnL over the rebalance bar (bar t → bar t+H).
-            # For simplicity in the backtest we use 1-bar PnL (the book
-            # rebalances every bar, so each bar's contribution is 1 period).
-            label_grades_t = test_labels[ts_mask].values
+            # --- iter-v3/089 OVERLAPPING-HOLD tranche book ------------------
+            # A new tranche sized 1/hold_bars of the target is formed each bar
+            # and retired hold_bars bars later; the book = sum of live tranches.
+            # Jegadeesh-Titman (1993) overlapping-portfolio construction.
+            new_tranche = {s: w / hold_bars for s, w in target.items()}
+            tranches.append((bar_counter + hold_bars, new_tranche))
+            tranches = [(rb, w) for (rb, w) in tranches if rb > bar_counter]
+            raw_book: dict[str, float] = {}
+            for _, tw in tranches:
+                for s, v in tw.items():
+                    raw_book[s] = raw_book.get(s, 0.0) + v
 
-            for i, row in panel_t.iterrows():
-                sym = row["symbol"]
-                pos = positions.get(sym, 0.0)
-                if pos == 0.0:
+            # --- iter-v3/089 NO-TRADE BAND ----------------------------------
+            # A symbol is re-traded to its raw_book weight only if that weight
+            # moved more than no_trade_band vs the held weight; else it carries.
+            book = apply_no_trade_band(raw_book, prev_book, no_trade_band)
+            bar_counter += 1
+
+            if not book:
+                prev_book = {}
+                continue
+
+            # PnL on the BOOK positions: the 1-bar gross return for a book
+            # weight held over bar t→t+1 is book_pos * (close(t+1)/close(t) - 1).
+            label_grades_t = test_labels[ts_mask].values
+            # symbol → row index in panel_t (for score / label lookup)
+            sym_to_iloc = {row["symbol"]: i for i, row in panel_t.iterrows()}
+            idx_loc = ret_wide.index.searchsorted(ts, side="right")
+            is_oos = ts >= oos_cutoff_ms
+
+            # iterate the UNION of book symbols and previous-book symbols, so a
+            # symbol that just exited (book weight → 0) still pays its exit fee.
+            for sym in set(book) | set(prev_book):
+                pos = book.get(sym, 0.0)
+                prev_pos = prev_book.get(sym, 0.0)
+                if pos == 0.0 and prev_pos == 0.0:
                     continue
                 # 1-bar return for this symbol.
-                if sym in ret_wide.columns:
-                    idx_loc = ret_wide.index.searchsorted(ts, side="right")
-                    if idx_loc < len(ret_wide):
-                        next_ret = (
-                            float(ret_wide[sym].iloc[idx_loc])
-                            if not pd.isna(ret_wide[sym].iloc[idx_loc])
-                            else 0.0
-                        )
-                    else:
-                        next_ret = 0.0
+                if sym in ret_wide.columns and idx_loc < len(ret_wide):
+                    nr = ret_wide[sym].iloc[idx_loc]
+                    next_ret = 0.0 if pd.isna(nr) else float(nr)
                 else:
                     next_ret = 0.0
 
                 gross_pnl = pos * next_ret
-                # Turnover-based fee: charge fee_per_side on the absolute
-                # change in position vs the previous bar.  A symbol entering
-                # from flat pays on its full new position; a symbol with an
-                # unchanged weight pays ~0; a symbol exiting pays on the
-                # closed amount.  This is correct cost accounting for a
-                # continuously-rebalanced cross-sectional book.
-                prev_pos = prev_positions.get(sym, 0.0)
+                # Turnover-based fee on the BOOK-position change bar-to-bar.
                 fee = abs(pos - prev_pos) * fee_per_side
 
-                is_oos = ts >= oos_cutoff_ms
                 # label_grades_t is a numpy array from an Int8 Series; the last
                 # H bars and thin-cross-section bars carry pd.NA (not NaN).
-                # int(pd.NA) raises TypeError, so guard explicitly.
-                # A NA-label row still contributes valid PnL (1-bar next_ret is
-                # available); only label_grade is missing → store None sentinel.
-                # compute_oos_rank_ic drops None rows before computing rank-IC.
-                raw_grade = label_grades_t[i]
-                label_grade: int | None = (
-                    None if (raw_grade is pd.NA or raw_grade is None) else int(raw_grade)
-                )
+                # int(pd.NA) raises TypeError, so guard explicitly.  A symbol
+                # present in the book but absent from panel_t (carried by the
+                # no-trade band from an earlier bar) has no current-bar score
+                # or label — store None / 0.0 sentinels.
+                row_iloc = sym_to_iloc.get(sym)
+                if row_iloc is None:
+                    label_grade: int | None = None
+                    pred_score = 0.0
+                else:
+                    raw_grade = label_grades_t[row_iloc]
+                    label_grade = (
+                        None if (raw_grade is pd.NA or raw_grade is None) else int(raw_grade)
+                    )
+                    pred_score = float(scores[row_iloc])
 
-                row_iloc = panel_t.index.get_loc(i) if hasattr(panel_t.index, "get_loc") else i
                 results.append(
                     {
                         "open_time": ts,
@@ -878,20 +1022,13 @@ def run_cross_sectional_backtest(
                         "net_pnl": gross_pnl - fee,
                         "is_oos": is_oos,
                         "rank_ic": strategy._is_rank_ic or 0.0,
-                        "predicted_score": float(scores[row_iloc]),
+                        "predicted_score": pred_score,
                         "label_grade": label_grade,
                     }
                 )
 
-            # Update prev_positions for turnover calculation at the next bar.
-            # Symbols absent from the current positions dict have exited to 0.
-            # We store ALL symbols that were either active this bar or last bar,
-            # so the exit-cost is charged correctly on the following bar.
-            all_syms_this_bar = set(panel_t["symbol"].values)
-            new_prev: dict[str, float] = {}
-            for s in all_syms_this_bar | set(prev_positions.keys()):
-                new_prev[s] = positions.get(s, 0.0)
-            prev_positions = new_prev
+            # Carry the post-band book as the previous book for the next bar.
+            prev_book = dict(book)
 
     if not results:
         return pd.DataFrame(
@@ -977,8 +1114,43 @@ def _month_end_ms(year: int, month: int) -> int:
 
 
 # ---------------------------------------------------------------------------
-# A6 — Rank-IC reporting helpers
+# A6 — Rank-IC + turnover reporting helpers
 # ---------------------------------------------------------------------------
+
+
+def compute_turnover_per_bar(results: pd.DataFrame, is_oos: bool) -> float:
+    """iter-v3/089 — mean gross turnover per bar.
+
+    The turnover-based fee is `|pos - prev_pos| * fee_per_side`, so the gross
+    turnover at a bar is `sum_fee_at_bar / fee_per_side`.  This returns the
+    mean over all bars of the chosen split — the quantity the /089 brief
+    pre-registers a HARD CEILING on (XS_TURNOVER_CEILING = 0.138): a build
+    whose IS mean gross turnover/bar exceeds the ceiling is NO-MERGE.
+
+    Parameters
+    ----------
+    results:
+        The run_cross_sectional_backtest results DataFrame.
+    is_oos:
+        False → IS turnover (the gated quantity); True → OOS turnover.
+
+    Returns
+    -------
+    float — mean gross turnover per bar (0.0 if the split is empty).
+    """
+    sub = results[results["is_oos"] == is_oos]
+    if sub.empty:
+        return 0.0
+    fee_per_bar = sub.groupby("open_time")["fee"].sum()
+    if fee_per_bar.empty:
+        return 0.0
+    # turnover = fee / fee_per_side; recover fee_per_side from a non-trivial row.
+    nonzero = sub[sub["fee"] > 0]
+    if nonzero.empty:
+        return 0.0
+    # fee = |dpos| * fee_per_side  →  the modal fee_per_side is XS_FEE_PER_SIDE.
+    fee_per_side = XS_FEE_PER_SIDE
+    return float((fee_per_bar / fee_per_side).mean())
 
 
 def compute_oos_rank_ic(results: pd.DataFrame) -> dict:

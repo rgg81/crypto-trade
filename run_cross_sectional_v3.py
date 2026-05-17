@@ -1,4 +1,17 @@
-"""Cross-sectional ranking model runner — iter-v3/088.
+"""Cross-sectional ranking model runner — iter-v3/089 (cost-aware build).
+
+iter-v3/089 is the CORRECTED next build on the RETAINED /088 cross-sectional
+architecture (NOT a fresh re-architecture).  /088 produced v3's first genuine
+OOS signal transfer (OOS rank-IC +0.0430, t~4.6) but the long-short book lost
+money for two diagnosed reasons; /089 fixes both and attacks turnover:
+  - SIGN FIX — the model is trained on a FORWARD-return grade, so high score =
+    predicted future WINNER.  `build_positions` now LONGs the top quantile.
+  - CPCV-PROXY FIX — `_compute_xs_cpcv` now computes the ACTUAL long-short net
+    return on each CPCV path (was a degenerate label-grade self-correlation).
+  - COST-AWARE CONSTRUCTION — QUINTILE legs + 3-bar OVERLAPPING HOLDS +
+    a NO-TRADE BAND, all IS-selected (analysis/iteration_v3-089/).
+  - A HARD PRE-REGISTERED TURNOVER CEILING (XS_TURNOVER_CEILING = 0.138 gross
+    turnover/bar) — a build that breaches it on IS is NO-MERGE.
 
 Implements the Phase-6 A5/A6 build stages:
   A5 — cross-sectional backtest path
@@ -42,14 +55,18 @@ from crypto_trade.features_v3 import (
 )
 from crypto_trade.strategies.ml.cross_sectional import (
     XS_DROP_FEATURES,
+    XS_HOLD_BARS,
     XS_HORIZON,
-    XS_MIN_SYMBOLS_PER_BAR,
+    XS_NO_TRADE_BAND,
+    XS_QUANTILE_FRAC,
     XS_REQUIRED_GAP,
+    XS_TURNOVER_CEILING,
     XS_UNIVERSE,
     CrossSectionalRankStrategy,
     _generate_xs_monthly_splits,
     build_cross_sectional_panel,
     compute_oos_rank_ic,
+    compute_turnover_per_bar,
     label_cross_sectional_rank,
     run_cross_sectional_backtest,
 )
@@ -63,7 +80,7 @@ from crypto_trade.strategies.ml.validation_v3 import (
 # ============================================================
 OOS_CUTOFF_DATE = "2025-03-24"  # IMMUTABLE
 TRAINING_MONTHS = 24  # IMMUTABLE
-ITERATION_LABEL = "v3-088"
+ITERATION_LABEL = "v3-089"
 REPORTS_DIR = Path("reports-v3")
 FEATURES_DIR = Path("data/features_v3")
 DATA_DIR = Path("data")
@@ -211,24 +228,62 @@ def _generate_xs_features(symbols: list[str]) -> None:
 
 
 def _compute_xs_cpcv(
-    panel_is: pd.DataFrame,
-    labels_is: pd.Series,
+    results: pd.DataFrame,
     report_dir: Path,
     n_trials: int,
     seed: int = 42,
 ) -> tuple[pd.DataFrame, PBOResult]:
-    """Run CPCV on the IS pooled panel.
+    """Run CPCV on the IS pooled cross-section — ACTUAL long-short net return.
+
+    iter-v3/089 CPCV-PROXY FIX (Critic /088 Rec #3).
+    --------------------------------------------------
+    The /088 implementation computed each CPCV path "Sharpe" as a label-grade
+    self-correlation (`mean(sub_labels[long_idx]) - mean(sub_labels[short_idx])`)
+    — a degenerate proxy: grade-0 < grade-2 by construction of the tercile
+    label, so it measures nothing about the model.  `cpcv_paths.csv` collapsed
+    to 45 rows of literally `sharpe=0.0`, and the F4 `frac_positive_paths`
+    gate carried no information.
+
+    The fix: the CPCV path metric is now the ACTUAL realised long-short NET
+    return of the trained model on each path's test fold.  We do not re-fit
+    the model per path — instead we read the per-(timestamp, symbol) net_pnl
+    from the already-computed walk-forward backtest `results` (which carries
+    the trained model's CORRECTED-SIGN positions, gross PnL, turnover fee and
+    net PnL).  For a CPCV path defined over a subset of IS timestamps we sum
+    net_pnl into one book return per timestamp and compute the Sharpe of the
+    path's test-fold book-return series.  This is the actual model-driven
+    long-short net P&L on the path — exactly the informative F4 gate.
 
     Uses XS_REQUIRED_GAP=88 (asserted via expected_gap).
 
     Returns (cpcv_df, pbo_result).
     """
-    # The IS panel is sorted by (open_time, symbol).  CPCV operates on
-    # the n_IS_timestamps sequence (one "sample" per unique timestamp).
-    is_timestamps = np.sort(panel_is["open_time"].unique())
+    # Restrict to the IS rows of the backtest results.
+    is_res = results[~results["is_oos"]].copy()
+    # One book return per IS timestamp = sum of per-symbol net_pnl at that bar.
+    bar_ret = (
+        is_res.groupby("open_time")["net_pnl"].sum().sort_index()
+        if not is_res.empty
+        else pd.Series(dtype=float)
+    )
+    is_timestamps = bar_ret.index.to_numpy()
     n_samples = len(is_timestamps)
 
-    print(f"[cpcv] IS timestamps: {n_samples}, XS_REQUIRED_GAP={XS_REQUIRED_GAP}")
+    print(f"[cpcv] IS book-return timestamps: {n_samples}, XS_REQUIRED_GAP={XS_REQUIRED_GAP}")
+
+    if n_samples < CPCV_N_SPLITS * 4:
+        # Too few timestamps to split meaningfully — emit an honest sentinel.
+        pbo_sentinel = PBOResult(
+            pbo=None,
+            frac_positive_paths=0.0,
+            path_sharpe_quartiles=(float("nan"), float("nan"), float("nan")),
+            n_splits_evaluated=0,
+            note=(
+                f"Cross-sectional CPCV: only {n_samples} IS book-return "
+                "timestamps — too few for CPCV. frac_positive_paths sentinel 0.0."
+            ),
+        )
+        return pd.DataFrame(columns=["path_id", "sharpe", "max_dd", "n_trades"]), pbo_sentinel
 
     splits = combinatorial_purged_cv(
         n_samples=n_samples,
@@ -239,42 +294,31 @@ def _compute_xs_cpcv(
         expected_gap=XS_REQUIRED_GAP,  # hard self-assertion
     )
 
-    # For each path, compute a "Sharpe proxy" from the label grades.
-    # In a full backtest CPCV, we would run the model on each path's test fold.
-    # For the IS-only CPCV diagnostic we use the label-based equal-weight book
-    # return as the proxy: long grade-0 symbols, short grade-2 symbols at each
-    # IS timestamp in the test fold.
-    def _path_proxy_sharpe(test_idx: np.ndarray) -> float:
-        """Equal-weight label-based long-short return proxy."""
-        test_ts = is_timestamps[test_idx]
-        path_rets: list[float] = []
-        for ts in test_ts:
-            ts_mask = panel_is["open_time"] == ts
-            sub = panel_is[ts_mask].copy()
-            sub_labels = labels_is[ts_mask].values
-            if len(sub) < XS_MIN_SYMBOLS_PER_BAR:
-                continue
-            # Long grade-0, short grade-2.
-            long_idx = np.where(sub_labels == 0)[0]
-            short_idx = np.where(sub_labels == 2)[0]
-            if len(long_idx) == 0 or len(short_idx) == 0:
-                continue
-            # Equal-weight 1-bar return proxy: close-to-close.
-            close_vals = sub["close"].values
-            if len(close_vals) < 2:
-                continue
-            # Use label grades as proxy for realized return direction.
-            long_ret = float(np.mean(sub_labels[long_idx]))  # higher label = more positive ret
-            short_ret = float(np.mean(sub_labels[short_idx]))  # short the winners
-            path_rets.append(long_ret - short_ret)
+    bar_ret_arr = bar_ret.to_numpy()
+
+    def _path_net_sharpe(test_idx: np.ndarray) -> tuple[float, float]:
+        """Actual realised long-short NET-return Sharpe + max-DD on a path's
+        test fold.  test_idx indexes the sorted IS book-return series."""
+        path_rets = bar_ret_arr[test_idx]
         if len(path_rets) < 2:
-            return 0.0
-        arr = np.array(path_rets)
-        return float(arr.mean() / arr.std()) if arr.std() > 1e-10 else 0.0
+            return 0.0, 0.0
+        std = float(path_rets.std())
+        sharpe = float(path_rets.mean() / std) if std > 1e-12 else 0.0
+        cum = np.cumsum(path_rets)
+        peak = np.maximum.accumulate(cum)
+        dd = peak - cum
+        denom = max(abs(float(peak.max())), 1e-10)
+        max_dd = float(dd.max() / denom) if len(dd) > 0 else 0.0
+        return sharpe, max_dd
 
     path_sharpes: list[float] = []
-    for train_idx, test_idx in splits:
-        path_sharpes.append(_path_proxy_sharpe(test_idx))
+    path_max_dds: list[float] = []
+    path_n_trades: list[int] = []
+    for _train_idx, test_idx in splits:
+        s, mdd = _path_net_sharpe(test_idx)
+        path_sharpes.append(s)
+        path_max_dds.append(mdd)
+        path_n_trades.append(int(len(test_idx)))
 
     path_sharpes_arr = np.array(path_sharpes)
     frac_pos = float(np.mean(path_sharpes_arr > 0))
@@ -291,9 +335,9 @@ def _compute_xs_cpcv(
     cpcv_df = pd.DataFrame(
         {
             "path_id": list(range(len(path_sharpes))),
-            "sharpe": path_sharpes,
-            "max_dd": [0.0] * len(path_sharpes),  # not computed in proxy mode
-            "n_trades": [0] * len(path_sharpes),  # not applicable
+            "sharpe": path_sharpes,  # actual long-short NET-return Sharpe per path
+            "max_dd": path_max_dds,  # actual max-DD on the path's net-return series
+            "n_trades": path_n_trades,  # test-fold timestamp count for the path
         }
     )
 
@@ -303,7 +347,7 @@ def _compute_xs_cpcv(
         path_sharpe_quartiles=(q25, q50, q75),
         n_splits_evaluated=len(splits),
         note=(
-            f"Cross-sectional CPCV label-proxy: {len(splits)} paths, "
+            f"Cross-sectional CPCV (actual long-short net return): {len(splits)} paths, "
             f"frac_positive={frac_pos:.3f}, Q50={q50:.4f}. "
             f"XS_REQUIRED_GAP={XS_REQUIRED_GAP} asserted."
         ),
@@ -380,6 +424,11 @@ def _write_xs_reports(
     is_mdd = _max_dd(is_results)
     oos_mdd = _max_dd(oos_results)
 
+    # iter-v3/089 turnover ceiling — the HARD pre-registered gate.
+    is_turnover = compute_turnover_per_bar(results, is_oos=False)
+    oos_turnover = compute_turnover_per_bar(results, is_oos=True)
+    turnover_gate_pass = is_turnover <= XS_TURNOVER_CEILING
+
     # Per-symbol attribution.
     def _per_sym(sub: pd.DataFrame) -> pd.DataFrame:
         if sub.empty:
@@ -449,6 +498,21 @@ def _write_xs_reports(
             "ratio": float("nan"),
         },
         {
+            # iter-v3/089 — mean gross turnover per bar; the HARD pre-registered
+            # gate is IS turnover <= XS_TURNOVER_CEILING (0.138).
+            "metric": "turnover_per_bar",
+            "in_sample": is_turnover,
+            "out_of_sample": oos_turnover,
+            "ratio": oos_turnover / max(is_turnover, 1e-10),
+        },
+        {
+            # 1.0 = IS turnover within the ceiling (PASS); 0.0 = breach (FAIL).
+            "metric": "turnover_ceiling_gate_pass",
+            "in_sample": float(turnover_gate_pass),
+            "out_of_sample": XS_TURNOVER_CEILING,
+            "ratio": float("nan"),
+        },
+        {
             "metric": "frac_positive_paths",
             "in_sample": pbo_result.frac_positive_paths,
             "out_of_sample": float("nan"),
@@ -474,10 +538,16 @@ def _write_xs_reports(
         "rank_ic_mean_oos": rank_ic_stats["mean_rank_ic"],
         "rank_ic_std_oos": rank_ic_stats["std_rank_ic"],
         "rank_ic_n_timestamps": rank_ic_stats["n_timestamps"],
+        "turnover_per_bar_is": is_turnover,
+        "turnover_per_bar_oos": oos_turnover,
+        "turnover_ceiling": XS_TURNOVER_CEILING,
+        "turnover_ceiling_gate_pass": bool(turnover_gate_pass),
         "note": (
-            "iter-v3/088 cross-sectional path: DSR/PSR not applicable at EXPLORATION. "
-            f"Primary falsifier F1: OOS rank-IC={rank_ic_stats['mean_rank_ic']:.4f}. "
-            f"F1 PASS if > 0, FAIL if <= 0."
+            "iter-v3/089 cross-sectional path: DSR/PSR not applicable at EXPLORATION. "
+            f"Primary falsifier F1: OOS rank-IC={rank_ic_stats['mean_rank_ic']:.4f} "
+            "(PASS if > 0). HARD turnover gate: IS turnover/bar "
+            f"{is_turnover:.4f} {'<=' if turnover_gate_pass else '>'} "
+            f"ceiling {XS_TURNOVER_CEILING} — {'PASS' if turnover_gate_pass else 'FAIL'}."
         ),
     }
     with open(report_dir / "dsr.json", "w") as f:
@@ -501,6 +571,20 @@ def _write_xs_reports(
     )
     print(f"frac_positive_paths (CPCV): {pbo_result.frac_positive_paths:.3f}")
     print(f"CPCV note: {pbo_result.note}")
+    print(
+        f"IS turnover/bar:  {is_turnover:.4f}  (OOS {oos_turnover:.4f})  "
+        f"ceiling {XS_TURNOVER_CEILING}"
+    )
+    if turnover_gate_pass:
+        print(
+            f"HARD turnover gate: PASS — IS turnover/bar {is_turnover:.4f} "
+            f"<= ceiling {XS_TURNOVER_CEILING}."
+        )
+    else:
+        print(
+            f"HARD turnover gate: FAIL (NO-MERGE) — IS turnover/bar {is_turnover:.4f} "
+            f"> ceiling {XS_TURNOVER_CEILING}."
+        )
     if rank_ic_stats["mean_rank_ic"] > 0:
         print("F1 (OOS rank-IC > 0): PASS — cross-sectional signal transferred OOS.")
     else:
@@ -621,8 +705,15 @@ def main() -> None:
         verbose=0,
     )
 
-    # Run the full walk-forward backtest.
+    # Run the full walk-forward backtest with the /089 cost-aware construction
+    # — QUINTILE legs, 3-bar overlapping holds, no-trade band (all IS-selected;
+    # passed explicitly so the construction is visible at the runner level).
     print("\n[backtest] Running cross-sectional walk-forward backtest...")
+    print(
+        f"[backtest] /089 construction: quantile_frac={XS_QUANTILE_FRAC}, "
+        f"hold_bars={XS_HOLD_BARS}, no_trade_band={XS_NO_TRADE_BAND}, "
+        f"turnover ceiling={XS_TURNOVER_CEILING}"
+    )
     train_start_ms = int(panel[panel["open_time"] < OOS_CUTOFF_MS]["open_time"].min())
     results = run_cross_sectional_backtest(
         strategy=strategy,
@@ -630,6 +721,9 @@ def main() -> None:
         labels=labels,
         train_start_ms=train_start_ms,
         oos_cutoff_ms=OOS_CUTOFF_MS,
+        quantile_frac=XS_QUANTILE_FRAC,
+        hold_bars=XS_HOLD_BARS,
+        no_trade_band=XS_NO_TRADE_BAND,
     )
     print(f"[backtest] {len(results)} bar-symbol rows produced.")
 
@@ -646,13 +740,10 @@ def main() -> None:
         f"n={rank_ic_stats['n_timestamps']}"
     )
 
-    # IS-only CPCV.
-    panel_is = panel[panel["open_time"] < OOS_CUTOFF_MS].copy()
-    labels_is = labels[panel["open_time"] < OOS_CUTOFF_MS].copy()
-    print("\n[cpcv] Running IS-only CPCV (label proxy)...")
+    # IS-only CPCV — actual long-short net return per path (iter-v3/089 fix).
+    print("\n[cpcv] Running IS-only CPCV (actual long-short net return)...")
     cpcv_df, pbo_result = _compute_xs_cpcv(
-        panel_is,
-        labels_is,
+        results,
         report_dir,
         n_trials=args.n_trials,
         seed=args.seed,

@@ -1,0 +1,3 @@
+feature_set,n_snapshots,mean_rank_ic,ic_ir,t_stat
+anchor_13,5363,0.05893,0.2001,14.65
+anchor_13_plus_5xs_momentum_channels,5363,0.06121,0.2041,14.94
