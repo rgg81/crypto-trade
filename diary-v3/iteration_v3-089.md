@@ -217,6 +217,6 @@ iter-v3/089 classified **CONSTRUCTION-PARTIAL** (brief Section 8.4 — OOS rank-
 - Phase 5.5 gate SHA: `32ee747` (PASS — QE independent verification of the QR-driven corrected cross-sectional axis)
 - Engineering report SHA: `3c7d300` — `briefs-v3/iteration_v3-089/engineering_report.md`
 - Critic FINAL SHA: `74054c2` (OVERALL=MERGE — methodology of a clean corrected-build EXPLORATION certified; the gross-positive finding verified genuine; 3 Recommendations — Recs #2/#3 define /090)
-- Diary + catalog + cycle3_plan + BASELINE_V3.md update SHA: this closeout commit (SHA backfilled by the immediately-following commit)
+- Diary + catalog + cycle3_plan + BASELINE_V3.md update SHA: `0975071` (this closeout; SHA backfilled by the immediately-following commit)
 **Reports**: `reports-v3/iteration_v3-089/`
 **Tag**: `v0.v3-089` (EXPLORATION closeout marker; NOT a baseline update — BASELINE_V3.md UNCHANGED at `v0.v3-059`)
