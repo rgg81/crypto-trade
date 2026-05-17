@@ -128,7 +128,7 @@ def _derive_ensemble_seeds(outer_seed: int, size: int = 5) -> list[int]:
     return [int(s) for s in rng.integers(low=0, high=2**31 - 1, size=size)]
 
 
-ITERATION_LABEL = "v3-087"
+ITERATION_LABEL = "v3-088"
 REPORTS_DIR = Path("reports-v3")
 FEATURES_DIR = Path("data/features_v3")
 DATA_DIR = Path("data")
@@ -176,13 +176,21 @@ DATA_DIR = Path("data")
 # (feedback_v3_per_symbol_lifts_oos_breaks_is.md satisfied). REQUIRED_GAP
 # recomputes 66 → 132 = (21+1)*6 (6 symbols). See
 # briefs-v3/iteration_v3-087/research_brief.md.
+# iter-v3/088 (cycle-3 EXPLORATION #7 — RE-ARCHITECTURE): MANDATORY /087
+# baseline-restore — V3_MODELS REVERTS 6 → 3 (drop GALAUSDT/MANAUSDT/SANDUSDT;
+# /087's wholesale expansion classified NEGATIVE, a NEGATIVE-axis universe is
+# not carried forward). REQUIRED_GAP recomputes 132 → 66 = (21+1)*3.
+# V3_MODELS below is the PER-SYMBOL legacy path. iter-v3/088 RE-ARCHITECTS to a
+# cross-sectional relative-value ranking model: the production cross-sectional
+# path uses XS_UNIVERSE (the 22-symbol cross-section screened IS-only in
+# analysis/iteration_v3-088/cross_sectional_signal_eda.py, EDA SHA aebd9f3) and
+# a NEW pooled-ranking backtest path built in Phase 6 per brief Section 3. The
+# 3-symbol V3_MODELS is the clean /059-state restore the QE builds the new path
+# onto — it is NOT the iter-v3/088 trading universe.
 V3_MODELS: tuple[tuple[str, str], ...] = (
     ("A (BCHUSDT)", "BCHUSDT"),
     ("C (LDOUSDT)", "LDOUSDT"),
     ("D (TRXUSDT)", "TRXUSDT"),
-    ("E (GALAUSDT)", "GALAUSDT"),  # <- iter-v3/087 WHOLESALE expansion
-    ("F (MANAUSDT)", "MANAUSDT"),  # <- iter-v3/087 WHOLESALE expansion
-    ("G (SANDUSDT)", "SANDUSDT"),  # <- iter-v3/087 WHOLESALE expansion
 )
 
 # Risk gate configs (v2 5-gate + BTC; no R1/R2/R3 — brief Section 3.4)
@@ -201,8 +209,8 @@ BTC_TREND_CONFIG = BtcTrendFilterConfig(
 # CPCV parameters (brief Section 0 + 3.5#2)
 CPCV_N_SPLITS = 10
 CPCV_N_TEST_SPLITS = 2
-# gap = REQUIRED_GAP = (timeout_candles+1)*n_symbols = (21+1)*6 = 132
-# (iter-v3/087 WHOLESALE expansion; universe=BCH+LDO+TRX+GALA+MANA+SAND; 6-sym).
+# gap = REQUIRED_GAP = (timeout_candles+1)*n_symbols = (21+1)*3 = 66
+# (iter-v3/088 reverts /087's 6-sym expansion; universe=BCH+LDO+TRX; 3-sym).
 # DO NOT use min(REQUIRED_GAP, n_trades//20) — that is the iter-v3/001 bug.
 CPCV_EMBARGO = 27  # ~1% of 24-month T ≈ 2742 candles * 0.01
 
@@ -256,7 +264,7 @@ def _verify_data_freshness(symbols: tuple[str, ...], max_lag_hours: float = 16.0
 
 
 def _verify_feature_columns(ensemble_size: int | None = None) -> None:
-    """Verifies V3_FEATURE_COLUMNS contents per current brief (iter-v3/087).
+    """Verifies V3_FEATURE_COLUMNS contents per current brief (iter-v3/088).
 
     Parameters
     ----------
@@ -266,15 +274,14 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
         If None, skips the ensemble-size mode check (backward compat for direct
         calls in unit tests that don't care about mode).
 
-    iter-v3/087: CYCLE 3 EXPLORATION #6 — the SOLE axis is a WHOLESALE
-      universe-breadth EXPANSION (V3_MODELS 3 -> 6, +GALA +MANA +SAND), NOT a
-      feature change. Mandatory secondary baseline-restore (Critic /086 Rec #3):
-      DROP the 3 /086 perp-spot basis features (basis_zscore_30 /
-      basis_momentum_3 / basis_extreme_flag — /086 INERT-by-importance rank
-      15/16/17-of-17, the 7th INERT crypto-native feed) — revert
-      V3_FEATURE_COLUMNS_TOP_N 17 -> 14, the /059 anchor stack — and ban the 3
-      literal names in the ABSENT-assertion list. Asserts len == 14 + the 3
-      basis features ABSENT. ITERATION_LABEL = "v3-087".
+    iter-v3/088: CYCLE 3 EXPLORATION #7 — RE-ARCHITECTURE. The axis is a NEW
+      cross-sectional relative-value RANKING model (brief Section 3); it is NOT
+      a feature-column change. The 14-feature /059 anchor stack
+      V3_FEATURE_COLUMNS_TOP_N is UNCHANGED — the cross-sectional ranking model
+      reuses it (cross-sectionally normalized; btc_ret_14d is dropped from the
+      XS feature set per EDA T6 zero-dispersion, but the column constant is
+      untouched). This check still asserts len == 14 and the closed-feature
+      ABSENT-bans hold. ITERATION_LABEL = "v3-088".
       Evidence: analysis/iteration_v3-087/.
 
     iter-v3/086: CYCLE 3 EXPLORATION #5 — APPENDED the 3-feature perp-spot BASIS
@@ -359,9 +366,9 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
       /086 INERT-by-importance, the 7-FEED STRUCTURAL VERDICT).
     funding_regime_momentum_5d MUST be ABSENT (DROPPED at /086 — /085 INERT + SUSPICIOUS).
     atr_multipliers_for_symbol(<any V3_MODELS sym>) MUST return (2.0, 1.0) (DEFAULT fallback).
-    iter-v3/087 WHOLESALE expansion: V3_MODELS universe is the 6-symbol
-      BCH/LDO/TRX/GALA/MANA/SAND set (cycle-3 EXPLORATION #6; the Grinold-Kahn
-      breadth lever; the SOLE /087 axis).
+    iter-v3/088 RE-ARCHITECTURE: the legacy per-symbol V3_MODELS universe
+      reverts to the 3-symbol BCH/LDO/TRX /059 set (/087's 6-sym expansion was
+      NEGATIVE). The /088 axis is the NEW cross-sectional ranking path.
     DEFAULT_ATR_MULTIPLIERS MUST be (2.0, 1.0) (correct since iter-v3/043 revert).
     Primitive 10 (REVERT): risk_cfg.block_long_for == () (empty — system-level REVERT).
     Primitive 11 (DISABLED): risk_cfg.enable_per_symbol_drawdown_brake == False (/028 baseline).
@@ -406,12 +413,12 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
     if n != 14:
         raise RuntimeError(
             f"V3_FEATURE_COLUMNS has {n} columns — expected exactly 14. "
-            "iter-v3/087 (cycle-3 EXPLORATION #6): the BASELINE_V3 /059/060 "
-            "14-feature anchor stack. The /086 3-feature perp-spot BASIS family "
-            "(basis_zscore_30, basis_momentum_3, basis_extreme_flag) is REVERTED "
-            "(Critic /086 Rec #3 — /086 INERT-by-importance). The SOLE /087 axis "
-            "is the WHOLESALE V3_MODELS 3->6 expansion, not a feature change. "
-            "Check V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
+            "iter-v3/088 (cycle-3 EXPLORATION #7 — RE-ARCHITECTURE): the "
+            "BASELINE_V3 /059/060 14-feature anchor stack is UNCHANGED. The /088 "
+            "axis is a NEW cross-sectional ranking model (brief Section 3), not a "
+            "feature-column change — the 14-feature stack is reused by the "
+            "cross-sectional model. Check V3_FEATURE_COLUMNS_TOP_N in "
+            "features_v3/__init__.py."
         )
     # iter-v3/087: the 3 /086 basis-family features MUST be ABSENT (DROPPED —
     # Critic /086 Rec #3: /086 INERT-by-importance, rank 15/16/17 of 17, the 7th
@@ -560,10 +567,10 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
             )
     print(
         f"  V3_FEATURE_COLUMNS: {n} columns "
-        "(iter-v3/087: the BASELINE_V3 /059/060 14-feature anchor stack — the "
-        "/086 perp-spot BASIS family REVERTED, Critic /086 Rec #3; the SOLE "
-        "/087 axis is the WHOLESALE V3_MODELS 3->6 expansion, not a feature "
-        "change; all 9 /063-NEW features ABSENT (adx_14, candle_dow_sin/cos, "
+        "(iter-v3/088: the BASELINE_V3 /059/060 14-feature anchor stack — "
+        "UNCHANGED; the /088 axis is the NEW cross-sectional ranking model "
+        "(brief Section 3), not a feature change; the 14-feature stack is reused "
+        "by the cross-sectional model; all 9 /063-NEW features ABSENT (adx_14, candle_dow_sin/cos, "
         "ret_1d, sym_vs_btc_ret_3d, sym_vs_btc_vol_14d, taker_buy_imbalance_20, "
         "trend_efficiency_signed, vol_regime_x_momentum); "
         "vol_adj_autocorr ABSENT; efficiency_ratio_50 ABSENT; "
@@ -626,13 +633,13 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
         "per-symbol asymmetry; all symbols DEFAULT (2.0, 1.0))  PASS"
     )
 
-    # iter-v3/087: 14-feature universal set (V3_FEATURES_PER_SYMBOL empty — all 6
+    # iter-v3/088: 14-feature universal set (V3_FEATURES_PER_SYMBOL empty — all 3
     # symbols fall back to V3_FEATURE_COLUMNS_TOP_N = the BASELINE_V3 /059/060
-    # 14-feature anchor). The /086 perp-spot BASIS family is REVERTED (Critic
-    # /086 Rec #3 — /086 INERT). Universe: the 6-symbol BCH/LDO/TRX/GALA/MANA/
-    # SAND set (the WHOLESALE /087 expansion; REQUIRED_GAP 132). /082's 4-member
-    # funding-rate FAMILY stays REVERTED; /085's funding_regime_momentum_5d
-    # stays DROPPED; the 3 /086 basis features are DROPPED.
+    # 14-feature anchor). Universe: the 3-symbol BCH/LDO/TRX /059 set
+    # (REQUIRED_GAP 66) — /087's 6-sym expansion (NEGATIVE) reverted. The /088
+    # axis is the NEW cross-sectional ranking path. /082's funding FAMILY stays
+    # REVERTED; /085's funding_regime_momentum_5d stays DROPPED; the 3 /086
+    # basis features stay DROPPED.
     for _label, sym in V3_MODELS:
         sym_feats = features_for_symbol(sym)
         if len(sym_feats) != 14:
@@ -703,19 +710,19 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
                 f"Check features_for_symbol('{sym}') path."
             )
     print(
-        "  6-symbol universe (BCH/LDO/TRX/GALA/MANA/SAND): 14-feature universal "
-        "fallback (iter-v3/087: the BASELINE_V3 /059/060 14-feature anchor "
-        "stack; the /086 3-feature perp-spot BASIS family REVERTED — Critic "
-        "/086 Rec #3, /086 INERT; /085 funding_regime_momentum_5d ABSENT; the "
-        "/082 4-member funding-rate FAMILY ABSENT)  PASS"
+        "  3-symbol universe (BCH/LDO/TRX): 14-feature universal "
+        "fallback (iter-v3/088: the BASELINE_V3 /059/060 14-feature anchor "
+        "stack, UNCHANGED; /086 basis family ABSENT; /085 "
+        "funding_regime_momentum_5d ABSENT; the /082 funding-rate FAMILY "
+        "ABSENT; /087's 6-sym expansion reverted)  PASS"
     )
 
     # iter-v3/074: V3_ATR_MULTIPLIERS_PER_SYMBOL reverted to {} (the /073 per-symbol
     # axis was SUSPICIOUS-OOS-DOMINANT). ALL symbols fall back to
     # DEFAULT_ATR_MULTIPLIERS = (2.0, 1.0) — the canonical /059 baseline labeling.
-    # iter-v3/087: universe is the 6-symbol BCH/LDO/TRX/GALA/MANA/SAND set (the
-    # WHOLESALE expansion); V3_ATR_MULTIPLIERS_PER_SYMBOL stays EMPTY — every
-    # symbol, incumbent and added, uses the universal DEFAULT (2.0, 1.0).
+    # iter-v3/088: universe is the 3-symbol BCH/LDO/TRX /059 set (/087's 6-sym
+    # expansion reverted); V3_ATR_MULTIPLIERS_PER_SYMBOL stays EMPTY — every
+    # symbol uses the universal DEFAULT (2.0, 1.0).
     for _label_atr, _sym_atr in V3_MODELS:
         sym_atr = tuple(atr_multipliers_for_symbol(_sym_atr))
         if sym_atr != (2.0, 1.0):
@@ -727,9 +734,9 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
                 "in features_v3/__init__.py."
             )
     print(
-        "  atr_multipliers_for_symbol: all 6 symbols (BCH/LDO/TRX/GALA/MANA/SAND) "
+        "  atr_multipliers_for_symbol: all 3 symbols (BCH/LDO/TRX) "
         "(2.0, 1.0) DEFAULT (iter-v3/074 REVERT of /073 per-symbol asymmetry; "
-        "/059-canonical labeling, universal across the /087 6-symbol universe)  PASS"
+        "/059-canonical labeling, universal across the 3-symbol /059 universe)  PASS"
     )
 
     # iter-v3/051: Primitive 10 REVERT — block_long_for=() per system-level rule.
@@ -971,14 +978,13 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
     # value, so a future /061-style accretion is caught at runtime, not by
     # git-archaeology.
     #
-    # iter-v3/087 (cycle-3 EXPLORATION #6): the SOLE axis is a WHOLESALE
-    # universe-breadth EXPANSION — V3_MODELS grows 3 → 6 (+GALA +MANA +SAND).
-    # TWO of the 11 knobs below carry the DECLARED /087 axis delta and are
-    # documented as deliberate (this is exactly the procedure the check's
-    # error message prescribes): `V3_MODELS symbols` 3-sym → 6-sym, and
-    # `REQUIRED_GAP` 66 → 132 = (21+1)*6. The other 9 knobs stay /059-canonical
-    # (single-axis discipline). A future /061-style accretion in any of the 9
-    # is still caught at runtime.
+    # iter-v3/088 (cycle-3 EXPLORATION #7 — RE-ARCHITECTURE): the legacy
+    # per-symbol path is fully RESTORED to the /059-canonical 3-symbol state —
+    # /087's WHOLESALE 6-sym expansion was NEGATIVE and is reverted (mandatory
+    # baseline-restore). ALL 11 knobs below MUST equal /059-canonical: the
+    # iter-v3/088 axis is NOT a per-symbol-path knob change — it is a NEW
+    # cross-sectional ranking path (brief Section 3). This check guards the
+    # legacy per-symbol path against accretion; the new path has its own gates.
     _acc_cfg, _acc_strat = _build_v3_model(
         symbol="BCHUSDT", seed=42, n_trials=1, ensemble_seeds=[42]
     )
@@ -987,17 +993,17 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
             "config-accretion check: _build_v3_model did not return RiskV3Wrapper."
         )
     _rc = _acc_strat.config
-    # (knob_name, observed, expected value). iter-v3/087: 2 of 11 knobs carry
-    # the declared WHOLESALE-expansion axis delta; the other 9 are /059-canonical.
+    # (knob_name, observed, expected value). iter-v3/088: ALL 11 knobs are
+    # /059-canonical — the per-symbol path is a clean restore.
     _v3_model_symbols = tuple(sym for _label, sym in V3_MODELS)
     _canonical_v059 = [
-        # iter-v3/087 DECLARED AXIS — WHOLESALE universe-breadth expansion 3->6:
+        # iter-v3/088: V3_MODELS reverts to the 3-symbol /059 universe.
         (
             "V3_MODELS symbols",
             _v3_model_symbols,
-            ("BCHUSDT", "LDOUSDT", "TRXUSDT", "GALAUSDT", "MANAUSDT", "SANDUSDT"),
+            ("BCHUSDT", "LDOUSDT", "TRXUSDT"),
         ),
-        ("REQUIRED_GAP", REQUIRED_GAP, 132),  # (21+1)*6 — /087 6-symbol axis
+        ("REQUIRED_GAP", REQUIRED_GAP, 66),  # (21+1)*3 — /059 3-symbol universe
         # /059-canonical knobs (must NOT drift — single-axis discipline guard):
         ("DEFAULT_ATR_MULTIPLIERS", tuple(DEFAULT_ATR_MULTIPLIERS), (2.0, 1.0)),
         ("V3_ATR_MULTIPLIERS_PER_SYMBOL", dict(V3_ATR_MULTIPLIERS_PER_SYMBOL), {}),
@@ -1016,18 +1022,16 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
         _msg = "; ".join(f"{n}: observed {o!r} != expected {e!r}" for n, o, e in _drift)
         raise ValueError(
             f"config-accretion check FAILED — {len(_drift)} knob(s) drifted: {_msg}. "
-            "iter-v3/087's SOLE axis is the WHOLESALE V3_MODELS 3->6 expansion: only "
-            "`V3_MODELS symbols` (6-sym BCH/LDO/TRX/GALA/MANA/SAND) and `REQUIRED_GAP` "
-            "(132 = (21+1)*6) carry the declared axis delta — the other 9 knobs must "
-            "equal /059-canonical. Any drift in the 9 is illegitimate accretion (the "
-            "/061 vol-floor failure mode). Revert the drifted knob(s), or — if intended "
-            "— document it as a deliberate axis in the brief and update this check."
+            "iter-v3/088 RESTORES the legacy per-symbol path to /059-canonical "
+            "(3-sym BCH/LDO/TRX, REQUIRED_GAP=66): ALL 11 knobs must equal "
+            "/059-canonical. The iter-v3/088 axis is a NEW cross-sectional ranking "
+            "path, not a per-symbol-knob change. Any drift here is illegitimate "
+            "accretion (the /061 vol-floor failure mode). Revert the drifted knob(s)."
         )
     print(
-        f"  Config-accretion check (iter-v3/087; Critic /081 Rec #3): "
-        f"{len(_canonical_v059)} knobs verified "
-        f"(2 carry the declared WHOLESALE-expansion axis: V3_MODELS 6-sym + "
-        f"REQUIRED_GAP=132; the other 9 == /059-canonical)  PASS"
+        f"  Config-accretion check (iter-v3/088; Critic /081 Rec #3): "
+        f"{len(_canonical_v059)} knobs verified — ALL /059-canonical "
+        f"(legacy per-symbol path restored; the /088 axis is the NEW XS path)  PASS"
     )
 
     # iter-v3/068: REVERT inference_threshold_floor to default 0.0 (/067 INERT-AT-EXPLORATION).
@@ -1110,7 +1114,7 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
         f"  Universal label_timeout_minutes (iter-v3/070 CARRY-FORWARD): "
         f"{expected_label_timeout} min "
         f"(= 21 candles at 8h; timeout UNCHANGED; embargo 22 per cell, "
-        f"cross-cell gap 132 per 6-sym universe; iter-v3/087 WHOLESALE expansion)  PASS"
+        f"cross-cell gap 66 per 3-sym universe; iter-v3/088 reverts /087 6-sym)  PASS"
     )
 
     # iter-v3/070 NEW: _verify_timeout_consistency — Critic /069 Rec #1.
@@ -1128,10 +1132,12 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
 def _verify_label_leakage_gap() -> None:
     """Assert gap == REQUIRED_GAP and print proof (brief Section 3.5#3).
 
-    iter-v3/087 WHOLESALE universe-breadth expansion: universe 3 → 6 symbols
-    (BCH+LDO+TRX+GALA+MANA+SAND). Timeout unchanged at 21 candles (10080 min / 8h).
-    embargo_candles = 10080 // 480 + 1 = 22.
-    cross-cell gap = 22 * 6 = 132 (REQUIRED_GAP recomputes 66 → 132).
+    iter-v3/088 RE-ARCHITECTURE: the legacy per-symbol path reverts to the
+    3-symbol /059 universe (BCH+LDO+TRX) — /087's 6-sym expansion was NEGATIVE.
+    Timeout unchanged at 21 candles (10080 min / 8h). embargo_candles =
+    10080 // 480 + 1 = 22. cross-cell gap = 22 * 3 = 66 (REQUIRED_GAP 132 -> 66).
+    The cross-sectional ranking path (brief Section 3) computes its own
+    pooled-CPCV purge gap; this assertion governs the legacy per-symbol path.
     """
     timeout_minutes = 10080  # 7 days (21 candles at 8h) — UNCHANGED
     candle_minutes = 480  # 8h
@@ -2645,7 +2651,7 @@ def main() -> None:
     # funding_regime_momentum_5d / vwap_dev_50 / closed funding-FAMILY columns
     # absent; also asserts ensemble_size in (3, 10) for mode discipline.
     _verify_feature_columns(ensemble_size=ensemble_size_for_run)
-    _verify_label_leakage_gap()  # asserts REQUIRED_GAP == 132 (6-symbol universe, iter-v3/087)
+    _verify_label_leakage_gap()  # asserts REQUIRED_GAP == 66 (3-symbol /059 universe, iter-v3/088)
     _verify_track_isolation()  # grep check
 
     # -----------------------------------------------------------------------
@@ -2699,8 +2705,8 @@ def main() -> None:
     print(f"Active models: {len(active_models)}/{len(V3_MODELS)} (--symbols={args.symbols!r})")
     print(f"CPCV: N={CPCV_N_SPLITS}, k={CPCV_N_TEST_SPLITS}, 45 paths on IS CANDLE SEQUENCE")
     print(
-        f"Gap: {REQUIRED_GAP} (= (21+1)*6; iter-v3/087 WHOLESALE universe-breadth "
-        f"expansion 3->6; 6-sym universe BCH+LDO+TRX+GALA+MANA+SAND; timeout "
+        f"Gap: {REQUIRED_GAP} (= (21+1)*3; iter-v3/088 RE-ARCHITECTURE reverts "
+        f"/087's 6-sym expansion to the 3-sym /059 universe BCH+LDO+TRX; timeout "
         f"UNCHANGED 10080 min)"
     )
     print(

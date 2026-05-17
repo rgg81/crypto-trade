@@ -66,7 +66,14 @@ from scipy.stats import norm
 #:                3->6, +GALAUSDT +MANAUSDT +SANDUSDT; the Grinold-Kahn breadth
 #:                lever; timeout 21 candles; embargo_candles=21+1=22; cross-cell
 #:                gap=22*6=132).
-REQUIRED_GAP: int = (21 + 1) * 6  # 132
+#:          → 66 (3-sym, iter-v3/088 RE-ARCHITECTURE: MANDATORY /087
+#:                baseline-restore — /087's wholesale 6-sym expansion was
+#:                NEGATIVE, so V3_MODELS reverts 6->3; universe=BCH+LDO+TRX;
+#:                embargo_candles=21+1=22; cross-cell gap=22*3=66. NOTE: the
+#:                iter-v3/088 cross-sectional ranking model builds its own
+#:                pooled-CPCV gap in the Phase-6 path; this REQUIRED_GAP governs
+#:                the legacy per-symbol path that the new path supersedes.)
+REQUIRED_GAP: int = (21 + 1) * 3  # 66 — iter-v3/088: REVERT /087 6-sym (NEGATIVE) to 3-sym /059
 
 # ---------------------------------------------------------------------------
 # CPCV — Combinatorial Purged Cross-Validation (AFML Ch. 12)
