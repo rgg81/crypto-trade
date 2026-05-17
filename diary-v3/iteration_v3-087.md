@@ -193,6 +193,6 @@ The /088 setup mandate (revert `V3_MODELS` 6→3, `REQUIRED_GAP` 132→66) resto
 - Engineering report SHA: `32becde`
 - Critic FINAL SHA: `24a9dcc` (OVERALL=MERGE — methodology-only; result-read NEGATIVE)
 - Phase 8 roster-diff analysis SHA: `541e626` — `analysis/iteration_v3-087/roster_diff_oos.py` (the F4 / sub-channel-(c)/(d) adjudication)
-- Diary + catalog + cycle3_plan + BASELINE_V3.md Dead-Ideas SHA: (this closeout; SHA backfilled by the immediately-following commit)
+- Diary + catalog + cycle3_plan + BASELINE_V3.md Dead-Ideas SHA: `6407312` (this closeout)
 **Reports**: `reports-v3/iteration_v3-087/`
 **Tag**: `v0.v3-087` (EXPLORATION closeout marker; NOT a baseline update — BASELINE_V3.md UNCHANGED at `v0.v3-059`)
