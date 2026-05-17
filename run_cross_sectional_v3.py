@@ -371,7 +371,11 @@ def _write_xs_reports(
         cum = sub.sort_values("open_time")["net_pnl"].cumsum().values
         peak = np.maximum.accumulate(cum)
         dd = peak - cum
-        return float(dd.max() / max(peak.max(), 1e-10)) if len(dd) > 0 else 0.0
+        # peak.max() can be 0 or negative when all cumulative PnL is <= 0;
+        # clamp to abs to avoid division by a tiny positive that inflates the ratio.
+        peak_max = float(peak.max())
+        denom = max(abs(peak_max), 1e-10)
+        return float(dd.max() / denom) if len(dd) > 0 else 0.0
 
     is_mdd = _max_dd(is_results)
     oos_mdd = _max_dd(oos_results)

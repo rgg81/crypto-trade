@@ -856,7 +856,16 @@ def run_cross_sectional_backtest(
                 fee = abs(pos - prev_pos) * fee_per_side
 
                 is_oos = ts >= oos_cutoff_ms
-                label_grade = int(label_grades_t[i]) if i < len(label_grades_t) else -1
+                # label_grades_t is a numpy array from an Int8 Series; the last
+                # H bars and thin-cross-section bars carry pd.NA (not NaN).
+                # int(pd.NA) raises TypeError, so guard explicitly.
+                # A NA-label row still contributes valid PnL (1-bar next_ret is
+                # available); only label_grade is missing → store None sentinel.
+                # compute_oos_rank_ic drops None rows before computing rank-IC.
+                raw_grade = label_grades_t[i]
+                label_grade: int | None = (
+                    None if (raw_grade is pd.NA or raw_grade is None) else int(raw_grade)
+                )
 
                 row_iloc = panel_t.index.get_loc(i) if hasattr(panel_t.index, "get_loc") else i
                 results.append(
@@ -986,9 +995,21 @@ def compute_oos_rank_ic(results: pd.DataFrame) -> dict:
 
     ics: list[float] = []
     for ts, grp in oos.groupby("open_time"):
-        if len(grp) < 2:
+        # Drop rows whose label_grade is NA/None — those rows have valid PnL
+        # (included in compute_xs_sharpe) but no realised forward rank, so
+        # they must not pollute the rank-IC calculation.
+        grp_valid = grp[grp["label_grade"].notna()].copy()
+        if len(grp_valid) < 2:
             continue
-        ic = _spearman_ic(grp["predicted_score"].values, grp["label_grade"].values.astype(float))
+        label_vals = grp_valid["label_grade"].astype(float).values
+        # Guard: if any NaN slipped through (e.g. object column with np.nan),
+        # drop them to avoid corrupting std() / argsort().
+        finite_mask = np.isfinite(label_vals)
+        if finite_mask.sum() < 2:
+            continue
+        score_vals = grp_valid["predicted_score"].values[finite_mask]
+        label_vals = label_vals[finite_mask]
+        ic = _spearman_ic(score_vals, label_vals)
         ics.append(ic)
 
     if not ics:
@@ -1034,6 +1055,9 @@ def _spearman_ic(x: np.ndarray, y: np.ndarray) -> float:
     """
     n = len(x)
     if n < 2:
+        return 0.0
+    # Guard: NaN in inputs corrupts std() and argsort().
+    if np.any(np.isnan(x)) or np.any(np.isnan(y)):
         return 0.0
     # Detect degenerate inputs: constant arrays have no rank information.
     if x.std() < 1e-12 or y.std() < 1e-12:
