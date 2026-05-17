@@ -40,7 +40,7 @@ from scipy.stats import norm
 # ---------------------------------------------------------------------------
 
 #: Documented gap formula for v3: (timeout_candles + 1) * n_symbols
-#: With timeout=21 candles (10080 min / 480 min) and 3 symbols → 66.
+#: With timeout=21 candles (10080 min / 480 min) and 6 symbols → 132.
 #: History: 88 (4-sym) → 66 (3-sym, iter-v3/013 MKR drop) → 110 (5-sym, iter-v3/021 HBAR+AVAX)
 #:          → 66 (3-sym, iter-v3/022 revert HBAR+AVAX expansion NEGATIVE)
 #:          → 88 (4-sym, iter-v3/029 +ALGOUSDT universe expansion)
@@ -62,7 +62,11 @@ from scipy.stats import norm
 #:          → 66 (3-sym, iter-v3/084 REVERT /083 FILUSDT expansion — /083 was
 #:                NEGATIVE/NO-MERGE; universe=BCH+LDO+TRX; clean /059-config
 #:                anchor re-run; embargo_candles=21+1=22; cross-cell gap=22*3=66).
-REQUIRED_GAP: int = (21 + 1) * 3  # 66
+#:          → 132 (6-sym, iter-v3/087 WHOLESALE universe-breadth EXPANSION
+#:                3->6, +GALAUSDT +MANAUSDT +SANDUSDT; the Grinold-Kahn breadth
+#:                lever; timeout 21 candles; embargo_candles=21+1=22; cross-cell
+#:                gap=22*6=132).
+REQUIRED_GAP: int = (21 + 1) * 6  # 132
 
 # ---------------------------------------------------------------------------
 # CPCV — Combinatorial Purged Cross-Validation (AFML Ch. 12)
@@ -591,11 +595,9 @@ def cpcv_walk_forward_splits(
 ) -> Iterator[tuple[np.ndarray, np.ndarray]]:
     """Yield (train_idx, test_idx) tuples for CPCV walk-forward.
 
-    Default gap = REQUIRED_GAP = (timeout_candles+1)*n_symbols = 66
-    (3-symbol BCH+LDO+TRX universe; (21+1)*3 = 66 — the live value since the
-    iter-v3/079 baseline-restore to the 3-symbol /059-canonical universe;
-    docstring corrected at iter-v3/086 per Critic /085 Rec #3 — the prior text
-    described the reverted iter-v3/069 4-symbol BCH+LDO+TRX+ADA gap=88 era).
+    Default gap = REQUIRED_GAP = (timeout_candles+1)*n_symbols = 132
+    (6-symbol BCH+LDO+TRX+GALA+MANA+SAND universe; (21+1)*6 = 132 — the live
+    value since the iter-v3/087 WHOLESALE universe-breadth expansion 3->6).
     Default embargo = ~1% of 24-month T ≈ 27 candles.
     Asserts gap == REQUIRED_GAP to catch silent rescaling.
     """
