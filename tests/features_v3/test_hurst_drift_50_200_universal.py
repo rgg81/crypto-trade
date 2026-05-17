@@ -51,14 +51,14 @@ _IS_START_MS = 1_679_616_000_000  # 2023-03-24 00:00 UTC
 _OOS_CUTOFF_MS = 1_742_774_400_000  # 2025-03-24 00:00 UTC (IMMUTABLE)
 
 _PARQUET_DIR = "data/features_v3"
-# iter-v3/087 WHOLESALE universe-breadth expansion — 6-symbol universe.
+# iter-v3/088 RE-ARCHITECTURE — legacy per-symbol V3_MODELS reverts to the
+# 3-symbol /059 universe (/087's 6-sym WHOLESALE expansion was NEGATIVE). The
+# /088 axis is the NEW cross-sectional ranking path (the 22-symbol XS_UNIVERSE),
+# not a per-symbol V3_MODELS change.
 _V3_MODELS_ITER_053 = (
     "BCHUSDT",
     "LDOUSDT",
     "TRXUSDT",
-    "GALAUSDT",
-    "MANAUSDT",
-    "SANDUSDT",
 )
 
 
@@ -292,18 +292,20 @@ def test_hurst_drift_50_200_past_only_no_lookahead() -> None:
 
 
 def test_v3_models_is_3_symbol_at_iter_v3_084() -> None:
-    """V3 universe must be the 6-symbol BCH/LDO/TRX/GALA/MANA/SAND set at iter-v3/087.
+    """Legacy per-symbol V3_MODELS must be the 3-symbol BCH/LDO/TRX /059 set at iter-v3/088.
 
-    iter-v3/087 CYCLE 3 EXPLORATION #6 — the SOLE axis is a WHOLESALE
-    universe-breadth EXPANSION: V3_MODELS grows 3 -> 6 by adding GALAUSDT,
-    MANAUSDT, SANDUSDT. ALGOUSDT was REVERTED at the system level per iter-v3/051;
-    ADAUSDT is CLOSED (/078 SUSPICIOUS-OOS-DOMINANT); FILUSDT is CLOSED (/083
-    NEGATIVE).
+    iter-v3/088 CYCLE 3 EXPLORATION #7 — RE-ARCHITECTURE. The /088 axis is a
+    NEW cross-sectional relative-value RANKING model (the cross-sectional path
+    trades the 22-symbol XS_UNIVERSE). The mandatory /087 baseline-restore
+    reverts the legacy per-symbol V3_MODELS 6 -> 3 — /087's WHOLESALE 6-sym
+    expansion was NEGATIVE/NO-MERGE. ALGOUSDT REVERTED at /051; ADAUSDT CLOSED
+    (/078 SUSPICIOUS); FILUSDT CLOSED (/083 NEGATIVE); GALA/MANA/SAND CLOSED
+    (/087 NEGATIVE).
 
-    iter-v3/087: feature count = 14 (the BASELINE_V3 /059/060 anchor stack — the
-    /086 perp-spot basis family REVERTED, Critic /086 Rec #3). All 6 symbols
-    return the 14-feature universal fallback. The /087 axis is a universe
-    expansion, NOT a feature change. REQUIRED_GAP = 132 = (21+1)*6.
+    iter-v3/088: feature count = 14 (the BASELINE_V3 /059/060 anchor stack —
+    UNCHANGED; the /088 axis is a model re-architecture, NOT a feature change).
+    All 3 symbols return the 14-feature universal fallback. The legacy
+    per-symbol path's REQUIRED_GAP = 66 = (21+1)*3.
     """
     from crypto_trade.features_v3 import features_for_symbol  # noqa: PLC0415
 
@@ -311,9 +313,6 @@ def test_v3_models_is_3_symbol_at_iter_v3_084() -> None:
         "BCHUSDT",
         "LDOUSDT",
         "TRXUSDT",
-        "GALAUSDT",
-        "MANAUSDT",
-        "SANDUSDT",
     )
     # Each symbol in the expected universe must return the 14-feature universal fallback
     for sym in expected_universe:

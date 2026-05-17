@@ -1,0 +1,3 @@
+quantile_scheme,n_snapshots,mean_winner_fwd_ret,mean_loser_fwd_ret,momentum_book_mean_spread,momentum_book_spread_sharpe,reversal_book_mean_spread,reversal_book_spread_sharpe,frac_snapshots_reversal_positive
+tercile,5399,0.00415,0.00176,0.00239,0.0686,-0.00239,-0.0686,0.499
+quartile,5399,0.00486,0.00187,0.00298,0.0699,-0.00298,-0.0699,0.5025

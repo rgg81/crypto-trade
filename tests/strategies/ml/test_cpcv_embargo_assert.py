@@ -24,13 +24,15 @@ from crypto_trade.strategies.ml.validation_v3 import (
 )
 
 # v3 documented constants
-# iter-v3/087 (cycle-3 EXPLORATION #6) — WHOLESALE universe-breadth EXPANSION.
-# V3_MODELS grows 3 -> 6 symbols (BCH+LDO+TRX incumbents + GALA+MANA+SAND added).
-# REQUIRED_GAP recomputes 66 -> 132 = (timeout_candles 21 + 1) * 6 symbols,
-# mechanically forced by the symbol count.
+# iter-v3/088 (cycle-3 EXPLORATION #7) — RE-ARCHITECTURE. The legacy per-symbol
+# V3_MODELS reverts to the 3-symbol /059 universe (BCH+LDO+TRX) — /087's
+# WHOLESALE 6-sym expansion was NEGATIVE. REQUIRED_GAP recomputes 132 -> 66
+# = (timeout_candles 21 + 1) * 3 symbols. (The /088 cross-sectional ranking
+# path uses its own XS_REQUIRED_GAP = (H 3 + 1) * 22 = 88; this legacy
+# REQUIRED_GAP governs the per-symbol path the new path supersedes.)
 TIMEOUT_CANDLES = 21  # 10080 min / 480 min = 21 candles at 8h
-N_SYMBOLS = 6  # BCH+LDO+TRX+GALA+MANA+SAND (iter-v3/087 WHOLESALE expansion 3 -> 6)
-CORRECT_GAP = (TIMEOUT_CANDLES + 1) * N_SYMBOLS  # 132
+N_SYMBOLS = 3  # BCH+LDO+TRX (iter-v3/088 reverts /087's 6-sym expansion)
+CORRECT_GAP = (TIMEOUT_CANDLES + 1) * N_SYMBOLS  # 66
 DEGRADED_GAP = 11  # what iter-v3/001 actually passed (bug)
 
 N_SAMPLES = 1000  # representative IS candle count
@@ -111,11 +113,12 @@ def test_required_gap_matches_formula() -> None:
         f"(timeout_candles+1)*n_symbols={formula_gap}. "
         "Update the REQUIRED_GAP constant or the formula."
     )
-    # iter-v3/087: WHOLESALE universe-breadth expansion — 6-symbol universe
-    # (BCH+LDO+TRX+GALA+MANA+SAND). REQUIRED_GAP = (timeout_candles 21 + 1) * 6 = 132.
-    assert REQUIRED_GAP == 132, (
-        f"REQUIRED_GAP should be 132 for the iter-v3/087 6-symbol v3 universe "
-        f"(BCH+LDO+TRX+GALA+MANA+SAND): (21+1)*6=132, got {REQUIRED_GAP}"
+    # iter-v3/088 RE-ARCHITECTURE — the legacy per-symbol path reverts to the
+    # 3-symbol /059 universe (BCH+LDO+TRX); /087's 6-sym expansion was NEGATIVE.
+    # REQUIRED_GAP = (timeout_candles 21 + 1) * 3 = 66.
+    assert REQUIRED_GAP == 66, (
+        f"REQUIRED_GAP should be 66 for the iter-v3/088 3-symbol /059 v3 "
+        f"universe (BCH+LDO+TRX): (21+1)*3=66, got {REQUIRED_GAP}"
     )
 
 
