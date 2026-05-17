@@ -173,6 +173,6 @@ iter-v3/088 is the most promising structural result v3 has produced post-bootstr
 - Fix SHAs: `8e5cb7c` (correct cross-sectional CV grouping + turnover-based fees), `1d3d0a4` (NA-safe results assembly + results/report-path edge-case audit)
 - Engineering report SHA: `3e5be41`
 - Critic FINAL SHA: `1acfb9c` (OVERALL=MERGE — methodology-only; result-read a methodologically-clean NEGATIVE; 3 Recommendations defining /089)
-- Diary + catalog + cycle3_plan + BASELINE_V3.md update SHA: this closeout (SHA backfilled by the immediately-following commit)
+- Diary + catalog + cycle3_plan + BASELINE_V3.md update SHA: `4d50d83` (this closeout; SHA backfilled by the immediately-following commit)
 **Reports**: `reports-v3/iteration_v3-088/`
 **Tag**: `v0.v3-088` (EXPLORATION / re-architecture closeout marker; NOT a baseline update — BASELINE_V3.md UNCHANGED at `v0.v3-059`)
