@@ -393,7 +393,8 @@ Per `feedback_no_cheating.md` — every design parameter selected on IS data onl
 
 - **EDA SHA**: `aebd9f3` — `analysis/iteration_v3-088/cross_sectional_signal_eda.py` + T1/T3/T4/T5/T6/T7 CSVs.
 - **Setup SHA**: `6de7c44` — ITERATION_LABEL "v3-088"; V3_MODELS 6→3 baseline-restore; REQUIRED_GAP 132→66; config-accretion check + stale 6-symbol comments updated to /059-canonical.
-- **Brief SHA**: (this file — backfilled at the Phase-5.5 gate.)
+- **Setup test-update SHA**: `22f465d` — 4 universe-pinning tests reverted to the 3-symbol /059 state (test_fracdiff_d05_universal, test_hurst_drift_50_200_universal, test_features_for_symbol, test_cpcv_embargo_assert).
+- **Brief SHA**: `e76dbe3` (research brief); this Section-11 backfill in the immediately-following commit.
 - **Reports**: `reports-v3/iteration_v3-088/` (Phase 6).
 - **Run mode**: EXPLORATION — 3-seed, `--n-trials 35` (the cross-sectional-path runner spec; the QE Phase-6 build defines the cross-sectional run invocation).
 - **Future-iteration axes** (deferred from /088, recorded for the cycle plan): (i) re-introduce / re-design the v3 risk gates for the cross-sectional book; (ii) tune the position construction (quantile cutoff, vol-target, rebalance cadence) — IS-only; (iii) cross-sectionally-normalized crypto-native features (funding/OI) — the 7-feed verdict was for the per-symbol architecture; a pooled cross-sectional model with ~100k rows is a genuinely different test; (iv) a long-only top-quantile variant (Cakici et al.: crypto abnormal returns come from the long leg); (v) a dedicated cross-sectional CONFIRMATION if /088 lands 8.3-FOUNDATION or 8.3-FULL.
