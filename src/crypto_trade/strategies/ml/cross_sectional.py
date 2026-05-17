@@ -349,6 +349,9 @@ class CrossSectionalRankStrategy:
         x_train = train_panel[self.feature_columns].values.astype(np.float32)
         y_train = train_labels.values.astype(np.int32)
 
+        # open_time array aligned to the valid training rows (for CV grouping).
+        open_times_train = train_panel["open_time"].values
+
         def _objective(trial: optuna.Trial) -> float:
             params = {
                 "objective": "lambdarank",
@@ -365,7 +368,8 @@ class CrossSectionalRankStrategy:
                 "random_state": self.seed,
             }
             # 5-fold time-series CV with XS_REQUIRED_GAP purge.
-            return self._cv_rank_ic(x_train, y_train, group, params)
+            # Pass open_times so CV can split by timestamp (real group arrays).
+            return self._cv_rank_ic(x_train, y_train, open_times_train, params)
 
         sampler = optuna.samplers.TPESampler(seed=self.seed)
         study = optuna.create_study(direction="maximize", sampler=sampler)
@@ -394,48 +398,87 @@ class CrossSectionalRankStrategy:
         self,
         x_arr: np.ndarray,
         y: np.ndarray,
-        group: np.ndarray,
+        open_times: np.ndarray,
         params: dict,
     ) -> float:
-        """5-fold time-series CV on the training panel; returns mean rank-IC.
+        """5-fold time-series CV on the training panel; returns mean per-timestamp rank-IC.
 
-        CV gap = XS_REQUIRED_GAP rows (the Lopez de Prado purge requirement
-        for the cross-sectional label with H=3 and 22 symbols).
+        Splits by TIMESTAMP (whole cross-sections stay together — no timestamp
+        is ever split across train/val).  Builds the real per-timestamp group
+        arrays for each fold (no approximate groups).  The XS_REQUIRED_GAP=88
+        timestamp-row purge is applied at the fold boundary: all rows whose
+        open_time lies within the gap zone are excluded from both train and val.
+
+        The CV objective is the mean per-timestamp Spearman rank-IC across all
+        validation timestamps — the same metric used to evaluate the final model.
         """
-        n_rows = len(x_arr)
+        unique_ts = np.unique(open_times)
+        n_ts = len(unique_ts)
         n_folds = 5
-        fold_size = n_rows // n_folds
-        gap = XS_REQUIRED_GAP
+        fold_size = max(1, n_ts // n_folds)
+        gap_ts = XS_REQUIRED_GAP  # gap in rows = (H+1)*N; one "gap unit" = one row
+
+        # Convert to per-timestamp indexing.  For each unique timestamp, record
+        # the start/end row-index in x_arr (rows are already sorted by open_time).
+        ts_to_rows: dict[int, tuple[int, int]] = {}
+        ptr = 0
+        for ts in unique_ts:
+            mask = open_times == ts
+            n = int(mask.sum())
+            ts_to_rows[int(ts)] = (ptr, ptr + n)
+            ptr += n
 
         ics: list[float] = []
         for k in range(1, n_folds):
-            val_start = k * fold_size
-            val_end = (k + 1) * fold_size if k < n_folds - 1 else n_rows
-            train_end = max(0, val_start - gap)
+            val_ts_start_idx = k * fold_size
+            val_ts_end_idx = (k + 1) * fold_size if k < n_folds - 1 else n_ts
 
-            if train_end < 2 * gap or (val_end - val_start) < gap:
-                continue  # not enough data in this fold
+            # Gap boundary: exclude the XS_REQUIRED_GAP rows (= gap_ts rows)
+            # that straddle the train/val boundary.  One row in the pooled panel
+            # corresponds to one (symbol, timestamp) pair; XS_REQUIRED_GAP rows
+            # at 22 symbols/bar = 4 full timestamp-steps.  We purge gap_ts
+            # timestamp-steps from the end of train (conservative but correct).
+            gap_ts_steps = max(1, gap_ts // len(self.symbols))  # timestamp-steps to purge
+            train_ts_end_idx = max(0, val_ts_start_idx - gap_ts_steps)
 
-            x_tr = x_arr[:train_end]
-            y_tr = y[:train_end]
-            x_val = x_arr[val_start:val_end]
-            y_val = y[val_start:val_end]
+            # Need enough timestamps in each split.
+            if train_ts_end_idx < gap_ts_steps or (val_ts_end_idx - val_ts_start_idx) < 1:
+                continue
 
-            # Rebuild group arrays for train and val folds.
-            # We approximate group arrays by constant group size (n_symbols)
-            # since the panel is not available here.  The approximation is
-            # valid when the cross-section is approximately full at each bar.
-            g_tr = _approximate_group(len(x_tr), len(self.symbols))
-            g_val = _approximate_group(len(x_val), len(self.symbols))
+            # Build row index arrays from the timestamp ranges.
+            train_ts = unique_ts[:train_ts_end_idx]
+            val_ts = unique_ts[val_ts_start_idx:val_ts_end_idx]
 
-            if sum(g_tr) < 1 or sum(g_val) < 1:
+            # Collect row slices and group arrays using actual per-timestamp sizes.
+            tr_rows_list: list[tuple[int, int]] = [ts_to_rows[int(t)] for t in train_ts]
+            val_rows_list: list[tuple[int, int]] = [ts_to_rows[int(t)] for t in val_ts]
+
+            if not tr_rows_list or not val_rows_list:
+                continue
+
+            # Build index arrays for fancy-indexing x_arr / y / open_times.
+            tr_idx = np.concatenate([np.arange(s, e) for s, e in tr_rows_list])
+            val_idx = np.concatenate([np.arange(s, e) for s, e in val_rows_list])
+
+            x_tr = x_arr[tr_idx]
+            y_tr = y[tr_idx]
+            x_val = x_arr[val_idx]
+            y_val = y[val_idx]
+            ot_val = open_times[val_idx]
+
+            # Real per-timestamp group arrays (exact symbol counts per bar).
+            g_tr = [e - s for s, e in tr_rows_list]
+            g_val = [e - s for s, e in val_rows_list]
+
+            if not g_tr or not g_val or sum(g_tr) < 1 or sum(g_val) < 1:
                 continue
 
             try:
                 m = lgb.LGBMRanker(**params)
                 m.fit(x_tr, y_tr, group=g_tr)
                 scores = m.predict(x_val)
-                ic = _spearman_ic(scores, y_val.astype(float))
+                # Per-timestamp rank-IC (cross-sectional IC, not pooled).
+                ic = self._spearman_ic_by_timestamp(ot_val, scores, y_val)
                 ics.append(ic)
             except Exception:  # noqa: BLE001
                 continue
@@ -706,6 +749,8 @@ def run_cross_sectional_backtest(
 
     results: list[dict] = []
     trained_months: set[str] = set()
+    # Turnover-based fee tracking: carry previous bar's signed positions.
+    prev_positions: dict[str, float] = {}
 
     for split in splits:
         train_start_ms_split = split["train_start_ms"]
@@ -801,8 +846,14 @@ def run_cross_sectional_backtest(
                     next_ret = 0.0
 
                 gross_pnl = pos * next_ret
-                # Fee: 0.1% per side on entry (and notionally on exit at next bar).
-                fee = abs(pos) * fee_per_side * 2  # entry + exit
+                # Turnover-based fee: charge fee_per_side on the absolute
+                # change in position vs the previous bar.  A symbol entering
+                # from flat pays on its full new position; a symbol with an
+                # unchanged weight pays ~0; a symbol exiting pays on the
+                # closed amount.  This is correct cost accounting for a
+                # continuously-rebalanced cross-sectional book.
+                prev_pos = prev_positions.get(sym, 0.0)
+                fee = abs(pos - prev_pos) * fee_per_side
 
                 is_oos = ts >= oos_cutoff_ms
                 label_grade = int(label_grades_t[i]) if i < len(label_grades_t) else -1
@@ -822,6 +873,16 @@ def run_cross_sectional_backtest(
                         "label_grade": label_grade,
                     }
                 )
+
+            # Update prev_positions for turnover calculation at the next bar.
+            # Symbols absent from the current positions dict have exited to 0.
+            # We store ALL symbols that were either active this bar or last bar,
+            # so the exit-cost is charged correctly on the following bar.
+            all_syms_this_bar = set(panel_t["symbol"].values)
+            new_prev: dict[str, float] = {}
+            for s in all_syms_this_bar | set(prev_positions.keys()):
+                new_prev[s] = positions.get(s, 0.0)
+            prev_positions = new_prev
 
     if not results:
         return pd.DataFrame(
