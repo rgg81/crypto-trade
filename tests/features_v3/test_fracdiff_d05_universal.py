@@ -200,19 +200,23 @@ def test_fracdiff_d05_close_no_lookahead() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Test 5 — V3_MODELS is the 6-symbol WHOLESALE-expanded universe at iter-v3/087
+# Test 5 — legacy per-symbol V3_MODELS is the 3-symbol /059 universe at iter-v3/088
 # ---------------------------------------------------------------------------
 
 
 def test_v3_models_at_iter_v3_084() -> None:
-    """V3_MODELS must be the 6-symbol BCH/LDO/TRX/GALA/MANA/SAND set at iter-v3/087.
+    """Legacy per-symbol V3_MODELS must be the 3-symbol BCH/LDO/TRX /059 set at iter-v3/088.
 
-    iter-v3/087 CYCLE 3 EXPLORATION #6 — the SOLE axis is a WHOLESALE
-    universe-breadth EXPANSION: V3_MODELS grows 3 -> 6 by adding GALAUSDT,
-    MANAUSDT, SANDUSDT (the Grinold-Kahn breadth lever). Regression guard
-    against accidental ALGO re-add (REVERT at /051), ADA re-add (/078
-    SUSPICIOUS-OOS-DOMINANT, CLOSED), HBAR/AVAX (CLOSED at /021), and FILUSDT
-    re-add (/083 NEGATIVE, CLOSED universe-expansion candidate).
+    iter-v3/088 CYCLE 3 EXPLORATION #7 — RE-ARCHITECTURE. The /088 axis is a
+    NEW cross-sectional relative-value RANKING model (the cross-sectional path
+    trades the 22-symbol XS_UNIVERSE); it is NOT a per-symbol V3_MODELS change.
+    The mandatory /087 baseline-restore reverts the legacy per-symbol
+    V3_MODELS 6 -> 3 (drop GALA/MANA/SAND — /087's WHOLESALE expansion was
+    NEGATIVE). This test guards the LEGACY per-symbol path's V3_MODELS at the
+    3-symbol /059-canonical state. Regression guard against accidental ALGO
+    re-add (REVERT at /051), ADA re-add (/078 SUSPICIOUS-OOS-DOMINANT, CLOSED),
+    HBAR/AVAX (CLOSED at /021), FILUSDT (/083 NEGATIVE, CLOSED), and the
+    GALA/MANA/SAND /087 re-add (NEGATIVE, CLOSED).
 
     HISTORY:
     - iter-v3/051: SYSTEM-LEVEL REVERT (4 -> 3 syms; drop ALGOUSDT)
@@ -222,7 +226,8 @@ def test_v3_models_at_iter_v3_084() -> None:
     - iter-v3/079: ADAUSDT -> LDOUSDT REVERT (baseline-restore; /078 axis CLOSED)
     - iter-v3/083: 3 -> 4 (+FILUSDT) UNIVERSE EXPANSION (NEGATIVE/NO-MERGE)
     - iter-v3/084: 4 -> 3 (REVERT FILUSDT) — clean /059-config anchor re-run
-    - iter-v3/087: 3 -> 6 (+GALA +MANA +SAND) WHOLESALE breadth EXPANSION
+    - iter-v3/087: 3 -> 6 (+GALA +MANA +SAND) WHOLESALE EXPANSION (NEGATIVE)
+    - iter-v3/088: 6 -> 3 (REVERT GALA/MANA/SAND) — RE-ARCHITECTURE baseline-restore
     """
     # Import locally to catch import-time state
     import importlib  # noqa: PLC0415
@@ -237,17 +242,20 @@ def test_v3_models_at_iter_v3_084() -> None:
     v3_models = run_mod.V3_MODELS
     symbols = [sym for _, sym in v3_models]
 
-    assert len(symbols) == 6, (
-        f"V3_MODELS has {len(symbols)} symbols — expected exactly 6 "
-        f"(BCH/LDO/TRX/GALA/MANA/SAND) at iter-v3/087. Current symbols: {symbols}"
+    assert len(symbols) == 3, (
+        f"V3_MODELS has {len(symbols)} symbols — expected exactly 3 "
+        f"(BCH/LDO/TRX, the /059 universe) at iter-v3/088. The /088 axis is the "
+        f"NEW cross-sectional ranking path (XS_UNIVERSE), not a per-symbol "
+        f"V3_MODELS change; /087's 6-sym expansion was NEGATIVE and is reverted. "
+        f"Current symbols: {symbols}"
     )
     assert "ALGOUSDT" not in symbols, (
         f"ALGOUSDT FOUND in V3_MODELS — must be absent (system-level REVERT at /051). "
         f"Current symbols: {symbols}"
     )
     assert "LDOUSDT" in symbols, (
-        f"LDOUSDT NOT FOUND in V3_MODELS — must be present (an incumbent, RETAINED "
-        f"through the /087 WHOLESALE expansion). Current symbols: {symbols}"
+        f"LDOUSDT NOT FOUND in V3_MODELS — must be present (a /059-canonical "
+        f"incumbent). Current symbols: {symbols}"
     )
     assert "FILUSDT" not in symbols, (
         f"FILUSDT FOUND in V3_MODELS — must be absent (/083's FILUSDT universe "
@@ -270,10 +278,17 @@ def test_v3_models_at_iter_v3_084() -> None:
         f"per iter-v3/021 diary lesson (c) — universe expansion HBAR+AVAX NEGATIVE-clean). "
         f"Current symbols: {symbols}"
     )
-    expected = {"BCHUSDT", "LDOUSDT", "TRXUSDT", "GALAUSDT", "MANAUSDT", "SANDUSDT"}
+    # iter-v3/087 closed GALA/MANA/SAND (WHOLESALE expansion NEGATIVE)
+    for _closed in ("GALAUSDT", "MANAUSDT", "SANDUSDT"):
+        assert _closed not in symbols, (
+            f"{_closed} FOUND in V3_MODELS — must be absent (the /087 WHOLESALE "
+            f"universe expansion was NEGATIVE/NO-MERGE and is reverted at the "
+            f"/088 baseline-restore). Current symbols: {symbols}"
+        )
+    expected = {"BCHUSDT", "LDOUSDT", "TRXUSDT"}
     actual = set(symbols)
     assert actual == expected, (
         f"V3_MODELS symbols mismatch: expected {expected}, got {actual}. "
-        "iter-v3/087 V3_MODELS must be the 6-symbol WHOLESALE-expanded universe "
-        "(BCH/LDO/TRX incumbents + GALA/MANA/SAND added)."
+        "iter-v3/088 reverts the legacy per-symbol V3_MODELS to the 3-symbol "
+        "BCH/LDO/TRX /059 universe (/087's 6-sym expansion was NEGATIVE)."
     )

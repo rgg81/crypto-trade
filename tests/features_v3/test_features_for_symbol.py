@@ -421,21 +421,20 @@ def test_funding_regime_momentum_in_universal_list() -> None:
     )
 
 
-@pytest.mark.parametrize(
-    "symbol", ["BCHUSDT", "LDOUSDT", "TRXUSDT", "GALAUSDT", "MANAUSDT", "SANDUSDT"]
-)
+@pytest.mark.parametrize("symbol", ["BCHUSDT", "LDOUSDT", "TRXUSDT"])
 def test_all_symbols_fallback_14(symbol: str) -> None:
-    """All 6 active V3_MODELS symbols must return exactly 14 features at iter-v3/087.
+    """All 3 legacy per-symbol V3_MODELS symbols must return exactly 14 features at iter-v3/088.
 
-    iter-v3/087: 14 features (the BASELINE_V3 /059/060 anchor stack — the /086
-    perp-spot basis family REVERTED). Parametrized over the 6-symbol WHOLESALE-
-    expanded universe BCH/LDO/TRX/GALA/MANA/SAND.
+    iter-v3/088 RE-ARCHITECTURE: 14 features (the BASELINE_V3 /059/060 anchor
+    stack — UNCHANGED; the /088 axis is a NEW cross-sectional ranking model,
+    not a feature change). The legacy per-symbol V3_MODELS reverts to the
+    3-symbol BCH/LDO/TRX /059 universe (/087's 6-sym expansion was NEGATIVE).
     """
     result = features_for_symbol(symbol)
     assert len(result) == 14, (
         f"{symbol}: expected 14 features (V3_FEATURE_COLUMNS_TOP_N universal fallback at "
-        f"iter-v3/087), got {len(result)}. V3_FEATURES_PER_SYMBOL must be empty + "
-        f"universal list = 14 (the BASELINE_V3 /059/060 anchor; /086 basis family REVERTED)."
+        f"iter-v3/088), got {len(result)}. V3_FEATURES_PER_SYMBOL must be empty + "
+        f"universal list = 14 (the BASELINE_V3 /059/060 anchor stack, UNCHANGED)."
     )
     assert result == V3_FEATURE_COLUMNS_TOP_N, (
         f"{symbol}: result differs from V3_FEATURE_COLUMNS_TOP_N. "
