@@ -19,13 +19,19 @@ import pandas as pd
 import pytest
 
 from crypto_trade.strategies.ml.cross_sectional import (
+    XS_HOLD_BARS,
     XS_HORIZON,
     XS_MIN_SYMBOLS_PER_BAR,
+    XS_NO_TRADE_BAND,
+    XS_QUANTILE_FRAC,
     XS_REQUIRED_GAP,
+    XS_TURNOVER_CEILING,
     XS_UNIVERSE,
     CrossSectionalRankStrategy,
     _spearman_ic,
+    apply_no_trade_band,
     build_positions,
+    compute_turnover_per_bar,
     compute_xs_sharpe,
     label_cross_sectional_rank,
 )
@@ -890,3 +896,130 @@ def test_na_label_rows_pnl_counted_in_sharpe():
         f"Sharpe mismatch: compute_xs_sharpe={is_sharpe:.6f}, manual={expected_sharpe:.6f}. "
         "NA-label rows may have been incorrectly filtered."
     )
+
+
+# ---------------------------------------------------------------------------
+# 14. iter-v3/089 SIGN FIX — build_positions longs the HIGHEST scores
+# ---------------------------------------------------------------------------
+
+
+def test_sign_fix_longs_highest_scores():
+    """iter-v3/089 SIGN FIX (Critic /088 Rec #2).
+
+    The LGBMRanker is trained on a FORWARD-return tercile grade, so high
+    predicted score = predicted future WINNER.  build_positions must LONG the
+    TOP quantile (highest scores) and SHORT the BOTTOM quantile (lowest
+    scores) — the inverse of the /088 build, which longed sorted_syms[:n_leg]
+    (the lowest scores = predicted future losers).
+    """
+    n_syms = 15
+    syms = [f"SYM{i:02d}USDT" for i in range(n_syms)]
+    panel_t = pd.DataFrame({"symbol": syms, "open_time": [1_700_000_000_000] * n_syms})
+    # Deterministic ascending scores: SYM00 lowest, SYM14 highest.
+    scores = np.arange(n_syms, dtype=float)
+    rng = np.random.default_rng(0)
+    hist = pd.DataFrame(rng.standard_normal((50, n_syms)) * 0.02, columns=syms)
+
+    pos = build_positions(panel_t, scores, hist, tercile_frac=0.20)
+    long_syms = {s for s, v in pos.items() if v > 0}
+    short_syms = {s for s, v in pos.items() if v < 0}
+
+    # quintile of 15 = 3 names per leg.
+    assert len(long_syms) == 3, f"Expected 3 long names, got {len(long_syms)}"
+    assert len(short_syms) == 3, f"Expected 3 short names, got {len(short_syms)}"
+    # LONG must be the HIGHEST-score symbols (SYM12, SYM13, SYM14).
+    assert all(int(s[3:5]) >= 12 for s in long_syms), (
+        f"SIGN FIX FAILED: longs are not the highest-score symbols: {sorted(long_syms)}"
+    )
+    # SHORT must be the LOWEST-score symbols (SYM00, SYM01, SYM02).
+    assert all(int(s[3:5]) <= 2 for s in short_syms), (
+        f"SIGN FIX FAILED: shorts are not the lowest-score symbols: {sorted(short_syms)}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# 15. iter-v3/089 NO-TRADE BAND — apply_no_trade_band
+# ---------------------------------------------------------------------------
+
+
+def test_no_trade_band_holds_within_band():
+    """A symbol whose target weight moved <= band carries the HELD weight."""
+    held = {"A": 0.50, "B": -0.30, "C": 0.20}
+    # A moves 0.01 (<= 0.05 → hold), B moves 0.20 (> 0.05 → move),
+    # C moves 0.20 (> 0.05 → move to 0).
+    target = {"A": 0.51, "B": -0.10, "C": 0.00}
+    out = apply_no_trade_band(target, held, band=0.05)
+    assert abs(out["A"] - 0.50) < 1e-9, "A moved 0.01 <= band → must hold 0.50"
+    assert abs(out["B"] - (-0.10)) < 1e-9, "B moved 0.20 > band → must move to -0.10"
+    assert "C" not in out or abs(out["C"]) < 1e-9, "C moved to 0 → dust dropped"
+
+
+def test_no_trade_band_zero_is_identity():
+    """band = 0 → rebalance every symbol every bar (the /088 behaviour)."""
+    held = {"A": 0.5, "B": -0.3}
+    target = {"A": 0.6, "B": -0.2, "C": 0.1}
+    out = apply_no_trade_band(target, held, band=0.0)
+    assert out == target, "band=0 must reproduce the target book exactly"
+
+
+def test_no_trade_band_reduces_turnover():
+    """A wider no-trade band must produce <= turnover than a zero band.
+
+    Over a sequence of small target wobbles, the band suppresses re-trades,
+    so the cumulative |Δposition| (turnover) is non-increasing in the band.
+    """
+    rng = np.random.default_rng(3)
+    held: dict[str, float] = {f"S{i}": 0.0 for i in range(8)}
+    held_band: dict[str, float] = dict(held)
+    turn_zero = 0.0
+    turn_band = 0.0
+    for _ in range(40):
+        target = {f"S{i}": float(rng.standard_normal() * 0.05) for i in range(8)}
+        nb_zero = apply_no_trade_band(target, held, band=0.0)
+        nb_band = apply_no_trade_band(target, held_band, band=0.03)
+        turn_zero += sum(
+            abs(nb_zero.get(s, 0.0) - held.get(s, 0.0)) for s in set(nb_zero) | set(held)
+        )
+        turn_band += sum(
+            abs(nb_band.get(s, 0.0) - held_band.get(s, 0.0))
+            for s in set(nb_band) | set(held_band)
+        )
+        held, held_band = nb_zero, nb_band
+    assert turn_band <= turn_zero + 1e-9, (
+        f"No-trade band must not increase turnover: band={turn_band:.4f} > zero={turn_zero:.4f}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# 16. iter-v3/089 turnover helper + construction constants
+# ---------------------------------------------------------------------------
+
+
+def test_compute_turnover_per_bar():
+    """compute_turnover_per_bar returns mean gross turnover/bar = fee/fee_per_side."""
+    # Two bars: bar 1 fees {0.0005, 0.0005} → turnover 1.0; bar 2 {0.0, 0.001}
+    # → turnover 1.0.  Mean = 1.0.
+    res = pd.DataFrame(
+        {
+            "open_time": [1, 1, 2, 2],
+            "symbol": ["A", "B", "A", "B"],
+            "fee": [0.0005, 0.0005, 0.0, 0.001],
+            "is_oos": [False, False, False, False],
+        }
+    )
+    t = compute_turnover_per_bar(res, is_oos=False)
+    assert abs(t - 1.0) < 1e-9, f"Expected turnover/bar 1.0, got {t}"
+    # Empty OOS split → 0.0.
+    assert compute_turnover_per_bar(res, is_oos=True) == 0.0
+
+
+def test_iter089_construction_constants():
+    """iter-v3/089 construction constants are set to the EDA-selected values."""
+    # Quintile legs (EDA G1).
+    assert abs(XS_QUANTILE_FRAC - 0.20) < 1e-12, "XS_QUANTILE_FRAC must be 0.20 (quintile)"
+    # 3-bar overlapping holds (horizon-matched; EDA E3).
+    assert XS_HOLD_BARS == 3, "XS_HOLD_BARS must be 3 (horizon-matched overlapping holds)"
+    # No-trade band tau = 0.020 (EDA E4 IS-best).
+    assert abs(XS_NO_TRADE_BAND - 0.020) < 1e-12, "XS_NO_TRADE_BAND must be 0.020"
+    # Hard turnover ceiling = 0.138 (EDA E6 — IS-best turnover x1.15 headroom).
+    assert abs(XS_TURNOVER_CEILING - 0.138) < 1e-12, "XS_TURNOVER_CEILING must be 0.138"
