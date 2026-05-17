@@ -26,7 +26,7 @@ iter-v3/089 is a CORRECTED-BUILD EXPLORATION on the RETAINED /088 cross-sectiona
 
 ## Feasibility Judgment — Section-3 Build Spec
 
-Section 3 is precise and the build is in fact already wired at the /089 setup commit. The QE Phase-6 step is the backtest run + the engineering report. The specified changes:
+Section 3 is precise and the build is in fact already wired at the /089 setup commit (`bb8c231`). The QE Phase-6 step is the backtest run + the engineering report. The specified changes:
 
 **Correction #1 — the SIGN FIX (Section 3.1)**: `build_positions` LONGs the TOP quantile (`sorted_syms[-n_leg:]`, highest scores) and SHORTs the BOTTOM (`sorted_syms[:n_leg]`, lowest scores) — the inverse of /088. The `predict_ranking` and `label_cross_sectional_rank` docstrings are corrected to state the forward mapping from first principles. Verified: a deterministic-score functional test confirms `build_positions` longs the highest scores (`test_sign_fix_longs_highest_scores`).
 

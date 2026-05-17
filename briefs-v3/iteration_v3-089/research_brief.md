@@ -355,8 +355,8 @@ iter-v3/089 is a genuine, well-researched advance on the cross-sectional constru
 ## Section 11 — Reproducibility Stamp
 
 - **EDA SHA**: `c172a12` — `analysis/iteration_v3-089/turnover_construction_eda.py` (E1–E6 CSVs) + `analysis/iteration_v3-089/gross_signal_eda.py` (G1–G4 CSVs).
-- **Brief SHA**: `<BRIEF_SHA>` (this research brief); the Section-11 SHA backfill in the immediately-following commit.
-- **Setup SHA**: `<SETUP_SHA>` — the sign fix + CPCV-proxy fix + cost-aware construction + turnover ceiling wired into `cross_sectional.py` / `run_cross_sectional_v3.py`; ITERATION_LABEL "v3-089"; the 6 new /089 tests in `tests/strategies/ml/test_cross_sectional.py`.
+- **Brief SHA**: `ac2b487` (this research brief + the Phase 5.5 gate); this Section-11 SHA backfill in the immediately-following commit.
+- **Setup SHA**: `bb8c231` — the sign fix + CPCV-proxy fix + cost-aware construction + turnover ceiling wired into `cross_sectional.py` / `run_cross_sectional_v3.py`; ITERATION_LABEL "v3-089"; the 6 new /089 tests in `tests/strategies/ml/test_cross_sectional.py`.
 - **Reports**: `reports-v3/iteration_v3-089/` (Phase 6).
 - **Run mode**: EXPLORATION — single-seed (seed=42), `--n-trials 35` (the cross-sectional-path runner spec).
 - **Future-iteration axes** (deferred from /089, recorded for the cycle plan): (i) /090 — the cross-sectional gross-signal feature expansion (EDA G4: cross-sectional momentum/reversal multi-lookback channels, +2% IC-IR on IS — a dedicated EXPLORATION with its own EDA, multivariate-contribution tested per the iter-v3/070 dead-path discipline); (ii) the cross-sectional risk-gate re-design (which v3 gates transfer to a market-neutral book); (iii) a long-only top-quantile variant (Cakici et al.: crypto abnormal returns concentrate in the long leg); (iv) a dedicated cross-sectional CONFIRMATION if /089/090/091 reach a CONSTRUCTION-VALIDATED-PROMISING result.
