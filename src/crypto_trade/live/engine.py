@@ -405,6 +405,74 @@ class LiveEngine:
             groups.append((tuple(v2_syms), v2_dir, "v2"))
         return groups
 
+    def _defer_v2_if_btc_lagging(self, new_candles: dict[str, Kline]) -> None:
+        """Drop v2 symbols from ``new_candles`` if BTC's kline doesn't cover them.
+
+        v2 cross-asset features merge BTC by open_time. If BTC is stale,
+        ``cross_btc`` silently NaN-fills — feeding NaN into the model, which
+        produces a different prediction than the backtest. We try fetching
+        BTC once; if it's still stale (Binance hasn't published BTC's
+        candle yet), the affected v2 symbols are removed from this tick's
+        ``new_candles`` so they get re-detected next poll, by which time
+        BTC will normally have caught up.
+
+        Mutates ``new_candles`` in place. ``last_processed_<symbol>`` is
+        written at end-of-tick, so a deferred symbol naturally re-fires
+        next tick.
+        """
+        from crypto_trade import decision_log
+        from crypto_trade.kline_array import load_kline_array
+        from crypto_trade.storage import csv_path
+
+        v2_in_tick = [
+            s
+            for runner in self._runners
+            if runner.model_config.risk_wrapper == "v2"
+            for s in runner.model_config.symbols
+            if s in new_candles
+        ]
+        if not v2_in_tick:
+            return
+
+        max_v2_ot = max(new_candles[s].open_time for s in v2_in_tick)
+        btc_csv = csv_path(self.config.data_dir, "BTCUSDT", self.config.interval)
+        if not btc_csv.exists():
+            return
+
+        def _btc_max_ot() -> int | None:
+            ka = load_kline_array(btc_csv)
+            if len(ka) == 0:
+                return None
+            return int(ka.df["open_time"].iloc[-1])
+
+        btc_max_ot = _btc_max_ot()
+        if btc_max_ot is not None and btc_max_ot >= max_v2_ot:
+            return  # BTC already current — no action needed
+
+        # BTC lags. Try one fetch — Binance may have published since last poll.
+        refresh_klines(self._fetch_client, ["BTCUSDT"], self.config.interval, self.config.data_dir)
+        btc_max_ot = _btc_max_ot()
+        if btc_max_ot is not None and btc_max_ot >= max_v2_ot:
+            return  # Caught up after fetch — proceed normally
+
+        # Still stale — defer the v2 symbols whose ot exceeds BTC's extent.
+        deferred = [s for s in v2_in_tick if new_candles[s].open_time > (btc_max_ot or 0)]
+        for s in deferred:
+            del new_candles[s]
+
+        decision_log.log(
+            {
+                "kind": "v2_deferred_btc_lag",
+                "deferred_v2_syms": deferred,
+                "max_v2_ot": max_v2_ot,
+                "btc_max_ot": btc_max_ot,
+            }
+        )
+        print(
+            f"[live] BTC kline lagging (max_ot={btc_max_ot}, need {max_v2_ot}); "
+            f"deferring v2 syms to next tick: {deferred}"
+        )
+
     def catch_up_only(self) -> None:
         """Run the same setup pipeline as ``run()`` and exit before the poll loop.
 
@@ -885,8 +953,7 @@ class LiveEngine:
                     # For timeouts, result.close_time = candle open_time.
                     if runner.cooldown_candles > 0:
                         cooldown_until[sym] = (
-                            result.close_time
-                            + runner.cooldown_candles * self._candle_duration_ms
+                            result.close_time + runner.cooldown_candles * self._candle_duration_ms
                         )
 
             # (b) Get signal
@@ -1003,6 +1070,17 @@ class LiveEngine:
                 "new_candles": {sym: c.open_time for sym, c in new_candles.items()},
             }
         )
+
+        # Defer v2 candles when BTC's kline file hasn't caught up to them yet.
+        # Binance's per-symbol candle publication is racy: a v2 symbol's just-
+        # closed candle can land in the API a few seconds before BTC's. If we
+        # ran v2 feature gen now, ``cross_btc`` would merge against a stale BTC
+        # frame → btc_ret_*, btc_vol_14d, sym_vs_btc_ret_7d all NaN → LightGBM
+        # routes NaN inputs down default tree branches → predictions diverge
+        # from backtest's clean inputs (broken signal-level determinism).
+        self._defer_v2_if_btc_lagging(new_candles)
+        if not new_candles:
+            return
 
         t_tick_start = time.monotonic()
         print(
