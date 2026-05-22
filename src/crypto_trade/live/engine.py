@@ -716,12 +716,34 @@ class LiveEngine:
 
         Uses the OWNING model's cooldown_candles, not LiveConfig's, so v2
         models (cooldown_candles=4) get a different gate than v1 (default 2).
+
+        ``close_time`` is the trade's recorded exit timestamp. For Binance
+        SL/TP fills this is the algo's wall-clock ``triggerTime`` — mid-
+        candle. The backtest, in contrast, exits at the candle close. We
+        normalize by rounding ``close_time`` UP to the close of the candle
+        that contained it, so a live mid-candle fill produces the SAME
+        cooldown_until value as the backtest's same-candle SL/TP exit.
+        Without this, a SL fill at 23:42 would end cooldown 17 minutes
+        earlier than the backtest's 23:59 fill, occasionally opening the
+        next trade one candle too early (observed: v1 BTC/ETH/DOT on
+        2026-05-16/05-18, 3 signal-level mismatches against the backtest).
         """
         cooldown_candles = self._cooldown_for(model_name)
         if cooldown_candles <= 0:
             return
-        cooldown_until = close_time + cooldown_candles * self._candle_duration_ms
+        candle_close = self._round_to_candle_close(close_time)
+        cooldown_until = candle_close + cooldown_candles * self._candle_duration_ms
         self._state.set_state(f"cooldown_{model_name}_{symbol}", str(cooldown_until))
+
+    def _round_to_candle_close(self, ms: int) -> int:
+        """Return the close_time of the 8h candle containing ``ms``.
+
+        Binance 8h candles are aligned at 00:00, 08:00, 16:00 UTC; for
+        ms inside [open, open+8h), the close_time is open+8h-1ms.
+        """
+        candle_ms = self._candle_duration_ms
+        candle_open = (ms // candle_ms) * candle_ms
+        return candle_open + candle_ms - 1
 
     def _cooldown_for(self, model_name: str) -> int:
         """Resolve per-model cooldown_candles via the matching runner; fall back to LiveConfig."""
@@ -1215,9 +1237,22 @@ class LiveEngine:
                     )
                     continue
 
+                # Cooldown gate keyed on the just-closed candle's Kline.open_time,
+                # NOT wall-clock now_ms. The catch-up + backtest paths both use
+                # ot >= cooldown_until; using now_ms here would let live open one
+                # candle earlier than backtest whenever the tick runs even a few
+                # seconds before cooldown_until's nominal expiry (e.g., now_ms
+                # just past the candle close while ot is still inside cooldown).
+                candle_ot_for_cooldown = (
+                    new_candles[symbol].open_time if symbol in new_candles else None
+                )
                 cooldown_key = f"cooldown_{runner.model_config.name}_{symbol}"
                 cooldown_str = self._state.get_state(cooldown_key)
-                if cooldown_str and now_ms < int(cooldown_str):
+                if (
+                    cooldown_str
+                    and candle_ot_for_cooldown is not None
+                    and candle_ot_for_cooldown < int(cooldown_str)
+                ):
                     decision_log.log(
                         {
                             "kind": "tick_decision",
