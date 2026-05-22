@@ -50,6 +50,12 @@ reports-v2/
 models-v2/
 analysis-v2/
 
+# Parquet artifacts inside reports-v3/ (e.g., trial_oof_returns.parquet)
+# can exceed GitHub's 100MB limit. Keep CSV/JSON reports tracked; never
+# commit parquet files into reports-v3 again. Other parquet locations
+# (data/features_v3/, etc.) already covered by the data/ rule above.
+reports-v3/**/*.parquet
+
 # Notebook outputs and checkpoints
 notebooks/output/
 notebooks/.ipynb_checkpoints/
