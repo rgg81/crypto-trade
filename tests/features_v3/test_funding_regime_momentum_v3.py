@@ -278,18 +278,16 @@ def test_add_funding_regime_momentum_missing_symbol_raises() -> None:
         add_funding_regime_momentum_v3_features(df)
 
 
-def test_group_registry_contains_funding_regime_momentum() -> None:
-    """funding_regime_momentum_v3 is registered in GROUP_REGISTRY, AFTER engineered_v3.
+def test_funding_regime_momentum_v3_NOT_in_group_registry_for_121_baseline() -> None:
+    """funding_regime_momentum_v3 is NOT registered in /121-minimal GROUP_REGISTRY.
 
-    Ordering matters: funding_regime_momentum_5d depends on
-    regime_momentum_signed_5d, which add_engineered_v3_features computes.
+    The composed feature funding_regime_momentum_5d was tried at iter-v3/085
+    (cycle-3 EXPLORATION #4), classified INERT + SUSPICIOUS, and dropped at
+    /086. The module function is retained as research museum code (covered
+    by tests in this file in isolation) but is NOT in the /121-minimal
+    registry — re-adding it would re-introduce a data dependency on
+    ``data/funding_rates/<SYM>.csv`` that the /121 baseline does not need.
     """
     from crypto_trade.features_v3 import GROUP_REGISTRY
 
-    keys = list(GROUP_REGISTRY.keys())
-    assert "funding_regime_momentum_v3" in keys
-    assert "engineered_v3" in keys
-    assert keys.index("funding_regime_momentum_v3") > keys.index("engineered_v3"), (
-        "funding_regime_momentum_v3 must be registered AFTER engineered_v3 — it "
-        "depends on regime_momentum_signed_5d computed by add_engineered_v3_features."
-    )
+    assert "funding_regime_momentum_v3" not in GROUP_REGISTRY

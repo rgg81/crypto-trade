@@ -19,20 +19,39 @@ to mark the FracdiffStat substitution (iter-v3/001 brief Section 3.4):
 
 Net column count: 34 (unchanged). No new feature families in iter-v3/001.
 
-Groups in the v3 registry:
----------------------------
-- ``regime``           — Hurst, ATR percentile ranks, BB width rank, CUSUM
-                         reset count, natr_21_raw helper
-- ``tail_risk``        — rolling skew/kurt, range realized vol, max drawdown
-- ``price_efficient_vol`` — Parkinson, GK, Rogers-Satchell estimators
-- ``momentum_accel``   — momentum acceleration, EMA spread, return autocorr
-- ``volume_micro``     — VWAP deviation, volume CV, OBV slope, HL range ratio
-- ``fracdiff``         — FracdiffStat-auto-d* fracdiff (v3 — replaces fixed d=0.4)
-- ``cross_btc``        — BTC cross-asset features
-- ``microstructure_v2`` — candle efficiency, vol transition, vol-return divergence
+Groups in the v3 registry (BASELINE_V3 /121-MINIMAL — 2026-05-22):
+-----------------------------------------------------------------
+Only feature groups that produce a column in ``V3_FEATURE_COLUMNS_TOP_N``
+(the 14-feature /121 baseline) are registered. ``microstructure_v3`` is
+also kept because ``engineered_v3.compute_ret5d_signed_tbi`` reads
+``taker_buy_imbalance_20`` from it during dispatch (museum call retained
+for parity with /121's canonical feature parquet).
 
-Cross-v2sym features (``cross_v2sym``) are omitted from v3: in v2 they produced
-IS −70% / OOS −69% (iter-v2/043), and v3 uses a different peer universe.
+- ``regime``            — hurst_100, hurst_diff_100_50
+- ``tail_risk``         — max_dd_window_50, ret_skew_50/200, ret_kurt_50/200,
+                          range_realized_vol_50
+- ``momentum_accel``    — ema_spread_atr_20, ret_autocorr_lag1_50
+- ``volume_micro``      — vwap_dev_20
+- ``cross_btc``         — btc_ret_14d, sym_vs_btc_ret_7d
+                          (requires BTCUSDT + ETHUSDT 8h klines)
+- ``microstructure_v3`` — taker_buy_imbalance_20 (dependency of engineered_v3)
+- ``engineered_v3``     — regime_momentum_signed_5d (composed)
+
+Groups removed from the registry on 2026-05-22 because their output is
+not in ``V3_FEATURE_COLUMNS_TOP_N`` AND they require external data sources
+that the /121 baseline does not need:
+  - ``basis_v3`` (needed ``data/spot/<SYM>/8h.csv``)
+  - ``funding_v3``, ``btc_funding_v3``, ``funding_family_v3``,
+    ``funding_regime_momentum_v3`` (needed ``data/funding_rates/<SYM>.csv``)
+  - ``multifreq_v3_24h`` (needed ``data/features_v3_24h/<SYM>_24h_features.parquet``)
+  - ``price_efficient_vol``, ``fracdiff``, ``technical_v3``,
+    ``calendar_v3``, ``multifreq_v3`` (produced columns dropped from
+    V3_FEATURE_COLUMNS_TOP_N at various closeouts; no /121 dependency)
+
+The module files are RETAINED as research museum code (analysis/* scripts
+in past iteration directories reference them). To re-add a group, restore
+its import + GROUP_REGISTRY entry in a future iteration that brings the
+feature back into V3_FEATURE_COLUMNS_TOP_N.
 """
 
 from __future__ import annotations
@@ -44,98 +63,37 @@ from pathlib import Path
 import pandas as pd
 from tqdm import tqdm
 
-from crypto_trade.features_v3.basis_v3 import add_basis_v3_features
-from crypto_trade.features_v3.calendar_v3 import add_calendar_v3_features
+# /121-MINIMAL imports — only modules registered in GROUP_REGISTRY below.
+# Removed modules (basis_v3, calendar_v3, fracdiff_v3, funding_v3,
+# multifreq_v3, price_efficient_vol_v3, technical_v3, formulaic_v3,
+# engineered_v3.add_funding_regime_momentum_v3_features) are RETAINED
+# on disk as research museum code but NOT imported at runtime.
 from crypto_trade.features_v3.cross_btc_v3 import add_cross_btc_v3_features
-from crypto_trade.features_v3.engineered_v3 import (
-    add_engineered_v3_features,
-    add_funding_regime_momentum_v3_features,
-)
-from crypto_trade.features_v3.fracdiff_v3 import add_fracdiff_v3_features
-from crypto_trade.features_v3.funding_v3 import (
-    add_btc_funding_v3_features,
-    add_funding_family_v3_features,
-    add_funding_v3_features,
-)
+from crypto_trade.features_v3.engineered_v3 import add_engineered_v3_features
 from crypto_trade.features_v3.microstructure_v3 import add_microstructure_v3_features
 from crypto_trade.features_v3.momentum_accel_v3 import add_momentum_accel_v3_features
-from crypto_trade.features_v3.multifreq_v3 import (
-    add_multifreq_v3_24h_features,
-    add_multifreq_v3_features,
-)
-from crypto_trade.features_v3.price_efficient_vol_v3 import add_price_efficient_vol_v3_features
 from crypto_trade.features_v3.regime_v3 import add_regime_v3_features
 from crypto_trade.features_v3.tail_risk_v3 import add_tail_risk_v3_features
-from crypto_trade.features_v3.technical_v3 import add_technical_v3_features
 from crypto_trade.features_v3.volume_micro_v3 import add_volume_micro_v3_features
 from crypto_trade.kline_array import load_kline_array
 from crypto_trade.storage import csv_path
 
 GROUP_REGISTRY: dict[str, Callable[[pd.DataFrame], pd.DataFrame]] = {
+    # /121-MINIMAL registry — only groups whose output appears in
+    # V3_FEATURE_COLUMNS_TOP_N, plus dependencies. See module docstring for
+    # the full list of groups removed 2026-05-22 and the rationale.
+    #
+    # Order is significant: each group may read columns added by earlier
+    # groups (e.g. engineered_v3 consumes hurst_100 from regime,
+    # range_realized_vol_50 from tail_risk, and taker_buy_imbalance_20 from
+    # microstructure_v3 via compute_ret5d_signed_tbi).
     "regime": add_regime_v3_features,
     "tail_risk": add_tail_risk_v3_features,
-    "price_efficient_vol": add_price_efficient_vol_v3_features,
     "momentum_accel": add_momentum_accel_v3_features,
     "volume_micro": add_volume_micro_v3_features,
     "cross_btc": add_cross_btc_v3_features,
-    # iter-v3/119: microstructure_v3 MOVED BEFORE engineered_v3 (was after engineered_v3
-    # from iter-v3/063 original placement). Required so taker_buy_imbalance_20 is
-    # available when compute_ret5d_signed_tbi runs inside add_engineered_v3_features.
-    # microstructure_v3 dependencies: OHLCV (always present), ret_kurt_50/200 (from
-    # tail_risk, position 2 — upstream), tbr_raw (computed inline from
-    # taker_buy_base_volume/volume). All dependencies precede the new position.
-    # No downstream groups depend on the old microstructure_v3 position.
     "microstructure_v3": add_microstructure_v3_features,
-    # iter-v3/025: Category 2 composed features; AFTER regime (needs hurst_100)
-    # ALSO AFTER microstructure_v3 (iter-v3/119: needs taker_buy_imbalance_20 for
-    # compute_ret5d_signed_tbi). iter-v3/063: trend_efficiency_signed + vol_regime_x_momentum
     "engineered_v3": add_engineered_v3_features,
-    # iter-v3/085: funding-regime-conditioned momentum (cycle-3 EXPLORATION #4).
-    # Category-2 composed feature funding_regime_momentum_5d =
-    # regime_momentum_signed_5d × sign(funding_z_30). MUST be AFTER engineered_v3
-    # — it depends on regime_momentum_signed_5d. Reads data/funding_rates/<SYM>.csv.
-    # NOT the closed funding axis: funding enters only as a sign-switch inside a
-    # composed feature, never as a direct model feature.
-    "funding_regime_momentum_v3": add_funding_regime_momentum_v3_features,
-    "fracdiff": add_fracdiff_v3_features,
-    # iter-v3/019: NEW external-data-source feature family; infrastructure PRESERVED
-    "funding_v3": add_funding_v3_features,
-    # iter-v3/024: cross-asset BTC funding broadcast; infrastructure PRESERVED
-    "btc_funding_v3": add_btc_funding_v3_features,
-    # iter-v3/082: funding-rate FEATURE FAMILY (cycle-3 EXPLORATION #1) — a
-    # DIFFERENT axis from the closed single funding_rate_zscore_30. Builds the 4
-    # FUNDING_FAMILY_COLUMNS (sign-persistence, momentum, acceleration,
-    # funding-price divergence). Needs `close` — no ordering constraint vs the
-    # other groups.
-    "funding_family_v3": add_funding_family_v3_features,
-    # iter-v3/086: perp-spot BASIS feature family (cycle-3 EXPLORATION #5) — a NEW
-    # crypto-native data feed. Builds the 3 BASIS_FAMILY_COLUMNS (crowding level,
-    # momentum, sign-persistence) from basis = (perp_close - spot_close)/spot_close.
-    # Reads data/spot/<SYM>/8h.csv (the fetch-spot cache). Needs `close` — no
-    # ordering constraint vs the other groups. NOT the closed funding axis:
-    # IS corr(basis_z, funding_z) is only 0.22-0.28 — a genuinely distinct feed.
-    "basis_v3": add_basis_v3_features,
-    # iter-v3/063: NEW technical indicators (ADX); AFTER regime (shares ATR dependency)
-    "technical_v3": add_technical_v3_features,
-    # iter-v3/063: NEW calendar/temporal features (DOW cyclic encoding); no dependencies
-    "calendar_v3": add_calendar_v3_features,
-    # iter-v3/102: formulaic_v3 (alpha032) REMOVED from dispatch at /102 closeout
-    # (NEGATIVE — IS collapsed +0.3993, F2 falsifier fired; OOS +1.55 overfitting).
-    # formulaic_v3.py + test_formulaic_v3.py RETAINED as reusable infrastructure.
-    # The group key is intentionally omitted here — it is NOT wired for feature gen.
-    # iter-v3/113: COARSER-frequency (1d daily) feature family — 8 new features
-    # aggregated look-ahead-free from the existing 8h candles. No new data fetch.
-    # AFTER cross_btc (no dependency; placed for tidiness after cross-asset group).
-    "multifreq_v3": add_multifreq_v3_features,
-    # iter-v3/126: 24h multi-frequency feature — d24_ret_autocorr_lag1_50.
-    # Loads data/features_v3_24h/<SYM>_24h_features.parquet (offset_id=0 slice),
-    # extracts ret_autocorr_lag1_50, renames to d24_ret_autocorr_lag1_50, and merges
-    # causally onto the 8h decision grid via merge_asof(direction='backward',
-    # left_on='open_time', right_on='bar_close_time', allow_exact_matches=True).
-    # T2 audit (EDA SHA dd9fc2d): 0 look-ahead violations / 14130 rows.
-    # T5 importance ranks 2/1/3 across BCH/LDO/TRX (top-3 on ALL symbols).
-    # Requires 'symbol' column in input DataFrame to locate the 24h parquet.
-    "multifreq_v3_24h": add_multifreq_v3_24h_features,
 }
 
 V3_FEATURE_COLUMNS_FULL: tuple[str, ...] = (
@@ -644,13 +602,8 @@ def process_symbol_v3(
     start_ms: int | None = None,
     end_ms: int | None = None,
 ) -> tuple[str, int, int]:
-    """Load klines for *symbol*, run the full v3 feature pipeline, write parquet.
-
-    ``multifreq_v3_24h`` requires ``data/features_v3_24h/<SYM>_24h_features.parquet``
-    which is only generated for symbols that ran the 24h pipeline (iter-v3/117
-    infrastructure; reverted from V3_FEATURE_COLUMNS_TOP_N at /127).  When that
-    parquet is absent the group is silently skipped — the column is not in the active
-    feature set so the omission is correct and safe.
+    """Load klines for *symbol*, run the /121-minimal v3 feature pipeline,
+    write parquet.
 
     Returns ``(symbol, n_rows, n_feature_columns)``.
     """
@@ -668,13 +621,7 @@ def process_symbol_v3(
     df["symbol"] = symbol
     before_cols = set(df.columns)
 
-    # Build the active group list: skip multifreq_v3_24h when the 24h parquet
-    # does not exist for this symbol (graceful degradation for non-24h-pipeline symbols).
-    _24h_parquet = Path("data/features_v3_24h") / f"{symbol}_24h_features.parquet"
-    active_groups = [
-        g for g in GROUP_REGISTRY.keys() if g != "multifreq_v3_24h" or _24h_parquet.exists()
-    ]
-    df = generate_features_v3(df, active_groups)
+    df = generate_features_v3(df, list(GROUP_REGISTRY.keys()))
     added = [c for c in df.columns if c not in before_cols]
 
     out = Path(output_dir)
@@ -736,12 +683,7 @@ __all__ = [
     "V3_FEATURE_COLUMNS_TOP_N",
     "V3_FEATURES_PER_SYMBOL",
     "V3_NON_FEATURE_COLUMNS",
-    "add_btc_funding_v3_features",
-    "add_calendar_v3_features",
     "add_engineered_v3_features",
-    "add_funding_v3_features",
-    "add_multifreq_v3_24h_features",
-    "add_technical_v3_features",
     "atr_multipliers_for_symbol",
     "features_for_symbol",
     "generate_features_v3",
