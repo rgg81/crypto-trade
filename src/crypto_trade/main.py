@@ -275,11 +275,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     live_parser.add_argument(
         "--track",
-        choices=["v1", "v2", "v3", "both"],
+        choices=["v1", "v2", "v3", "both", "all"],
         default="v1",
         help=(
             "Model preset: v1=BASELINE_MODELS, v2=V2_BASELINE_MODELS, "
-            "v3=V3_BASELINE_MODELS (iter-v3/121), both=COMBINED_MODELS (default: v1)"
+            "v3=V3_BASELINE_MODELS (iter-v3/121), both=COMBINED_MODELS (v1+v2), "
+            "all=ALL_MODELS (v1+v2+v3) (default: v1)"
         ),
     )
     # -- seed-live-db subcommand --
@@ -322,10 +323,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     seed_parser.add_argument(
         "--track",
-        choices=["v1", "v2", "v3", "both"],
+        choices=["v1", "v2", "v3", "both", "all"],
         default="both",
         help="Which model preset to use for symbol→model mapping + cooldown_candles "
-        "resolution (default: both — covers v1+v2; pass v3 for /121).",
+        "resolution (default: both — covers v1+v2; pass v3 for /121; pass all for "
+        "v1+v2+v3 combined).",
     )
     seed_parser.add_argument(
         "--reseed",
@@ -910,6 +912,7 @@ def _cmd_live(args, settings) -> None:
 
     from crypto_trade.live.engine import LiveEngine
     from crypto_trade.live.models import (
+        ALL_MODELS,
         BASELINE_MODELS,
         COMBINED_MODELS,
         V2_BASELINE_MODELS,
@@ -923,8 +926,9 @@ def _cmd_live(args, settings) -> None:
     track_map = {
         "v1": BASELINE_MODELS,
         "v2": V2_BASELINE_MODELS,
-        "v3": V3_BASELINE_MODELS,                # iter-v3/121 baseline (BCH/LDO/TRX)
-        "both": COMBINED_MODELS,                  # v1+v2 only (deliberate; v3 deploys alone)
+        "v3": V3_BASELINE_MODELS,  # iter-v3/121 baseline (BCH/LDO/TRX)
+        "both": COMBINED_MODELS,  # v1+v2 (deliberate; backward compat)
+        "all": ALL_MODELS,  # v1+v2+v3 (11 models — disjoint universes)
     }
     selected_models = track_map[track]
     print(f"[live] Track: {track} ({len(selected_models)} models)")
@@ -1025,6 +1029,7 @@ def _cmd_seed_live_db(args, settings) -> None:
 
     from crypto_trade.live.db_seeder import seed_live_db_from_backtest
     from crypto_trade.live.models import (
+        ALL_MODELS,
         BASELINE_MODELS,
         COMBINED_MODELS,
         V2_BASELINE_MODELS,
@@ -1035,8 +1040,9 @@ def _cmd_seed_live_db(args, settings) -> None:
     track_map = {
         "v1": BASELINE_MODELS,
         "v2": V2_BASELINE_MODELS,
-        "v3": V3_BASELINE_MODELS,                # iter-v3/121 baseline (BCH/LDO/TRX)
-        "both": COMBINED_MODELS,                  # v1+v2 only — v3 deploys alone
+        "v3": V3_BASELINE_MODELS,  # iter-v3/121 baseline (BCH/LDO/TRX)
+        "both": COMBINED_MODELS,  # v1+v2 (deliberate; backward compat)
+        "all": ALL_MODELS,  # v1+v2+v3 (11 models — disjoint universes)
     }
     selected_models = track_map[args.track]
 

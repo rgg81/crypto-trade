@@ -411,8 +411,16 @@ def _build_v3_baseline_models() -> tuple[ModelConfig, ...]:
     # iter-v3/121 10-seed unified lineage (outer=42 prefix + outer=123 suffix).
     # Matches run_baseline_v3.py:ENSEMBLE_SEEDS verbatim.
     V3_ENSEMBLE_SEEDS_121: tuple[int, ...] = (
-        191664963, 1662057957, 1405681631, 942484272, 929893137,    # outer=42 lineage
-        33158374, 1465339467, 1273345680, 115579757, 1952249162,    # outer=123 lineage
+        191664963,
+        1662057957,
+        1405681631,
+        942484272,
+        929893137,  # outer=42 lineage
+        33158374,
+        1465339467,
+        1273345680,
+        115579757,
+        1952249162,  # outer=123 lineage
     )
 
     # iter-v3/121 RiskV2Config (consumed by RiskV3Wrapper). Verified against
@@ -432,15 +440,15 @@ def _build_v3_baseline_models() -> tuple[ModelConfig, ...]:
             name=f"V3-{sym.replace('USDT', '')}",
             symbols=(sym,),
             use_atr_labeling=True,
-            atr_tp_multiplier=2.0,   # /121 DEFAULT_ATR_MULTIPLIERS
+            atr_tp_multiplier=2.0,  # /121 DEFAULT_ATR_MULTIPLIERS
             atr_sl_multiplier=1.0,
             atr_column="natr_21_raw",
             feature_columns=V3_FEATURE_COLUMNS_TOP_N,
             features_dir=Path("data/features_v3"),
-            cooldown_candles=4,                       # /121 BacktestConfig cooldown
-            vol_targeting=False,                      # vol_scale lives in RiskV3Wrapper
+            cooldown_candles=4,  # /121 BacktestConfig cooldown
+            vol_targeting=False,  # vol_scale lives in RiskV3Wrapper
             ensemble_seeds=V3_ENSEMBLE_SEEDS_121,
-            ood_enabled=False,                        # z-score OOD lives in RiskV3Wrapper
+            ood_enabled=False,  # z-score OOD lives in RiskV3Wrapper
             risk_wrapper="v3",
             risk_v2_config=v3_risk_cfg,
             # /121 training hyperparams (mismatched from LiveConfig defaults)
@@ -457,6 +465,11 @@ def _build_v3_baseline_models() -> tuple[ModelConfig, ...]:
 
 
 V3_BASELINE_MODELS: tuple[ModelConfig, ...] = _build_v3_baseline_models()
+
+# All three tracks together. Used when v1 (BTC/ETH/LINK/LTC/DOT) + v2 (DOGE/SOL/
+# XRP/NEAR) + v3 (BCH/LDO/TRX) are deployed in a single engine process.  Symbol
+# universes are disjoint by construction so there's no overlap to police here.
+ALL_MODELS: tuple[ModelConfig, ...] = BASELINE_MODELS + V2_BASELINE_MODELS + V3_BASELINE_MODELS
 
 
 @dataclass(frozen=True)

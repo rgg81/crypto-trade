@@ -184,6 +184,31 @@ def test_combined_models_unions_v1_and_v2():
     assert v1_syms.isdisjoint(v2_syms)
 
 
+def test_all_models_unions_v1_v2_v3():
+    """``ALL_MODELS`` = BASELINE_MODELS + V2_BASELINE_MODELS + V3_BASELINE_MODELS,
+    used when the live engine runs all three tracks in one process
+    (``--track all``). Symbol universes must stay disjoint."""
+    from crypto_trade.live.models import (
+        ALL_MODELS,
+        BASELINE_MODELS,
+        V2_BASELINE_MODELS,
+        V3_BASELINE_MODELS,
+    )
+
+    assert len(ALL_MODELS) == (
+        len(BASELINE_MODELS) + len(V2_BASELINE_MODELS) + len(V3_BASELINE_MODELS)
+    )
+    # Disjoint symbol universes across all three tracks. Two state-tracking
+    # bugs in the engine (cooldown_<model>_<symbol>, last_processed_<symbol>)
+    # silently break if two tracks share a symbol.
+    v1_syms = {s for mc in BASELINE_MODELS for s in mc.symbols}
+    v2_syms = {s for mc in V2_BASELINE_MODELS for s in mc.symbols}
+    v3_syms = {s for mc in V3_BASELINE_MODELS for s in mc.symbols}
+    assert v1_syms.isdisjoint(v2_syms)
+    assert v1_syms.isdisjoint(v3_syms)
+    assert v2_syms.isdisjoint(v3_syms)
+
+
 def test_v2_excluded_symbols_constant():
     from crypto_trade.live.models import V2_EXCLUDED_SYMBOLS
 
