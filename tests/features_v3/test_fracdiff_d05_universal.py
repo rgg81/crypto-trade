@@ -74,11 +74,9 @@ def test_fracdiff_d05_close_present_in_universal_feature_list() -> None:
     )
     n = len(V3_FEATURE_COLUMNS_TOP_N)
     assert n == 14, (
-        f"V3_FEATURE_COLUMNS_TOP_N has {n} elements — expected 14 (the BASELINE_V3 "
-        "/059/060 14-feature anchor stack). iter-v3/087's SOLE axis is the WHOLESALE "
-        "V3_MODELS 3->6 expansion, NOT a feature change; the /086 perp-spot basis "
-        "family is REVERTED (Critic /086 Rec #3 — /086 INERT). fracdiff_d05_close "
-        "stays PARKED-ABSENT; /082's 4-member funding family stays reverted. "
+        f"V3_FEATURE_COLUMNS_TOP_N has {n} elements — expected 14 "
+        "(iter-v3/124: eth_vs_sym_rv_50 REMOVED; /121 BASELINE_V3 14-feature anchor restored). "
+        "fracdiff_d05_close stays PARKED-ABSENT; /082's 4-member funding family stays reverted. "
         "Check V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
     )
 
@@ -200,34 +198,23 @@ def test_fracdiff_d05_close_no_lookahead() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Test 5 — legacy per-symbol V3_MODELS is the 3-symbol /059 universe at iter-v3/088
+# Test 5 — V3_MODELS is exactly (BCH, LDO, TRX) at iter-v3/051 (regression guard)
 # ---------------------------------------------------------------------------
 
 
-def test_v3_models_at_iter_v3_084() -> None:
-    """Legacy per-symbol V3_MODELS must be the 3-symbol BCH/LDO/TRX /059 set at iter-v3/088.
+def test_v3_models_is_3_symbol_at_iter_v3_052() -> None:
+    """V3_MODELS must be exactly (BCHUSDT, LDOUSDT, TRXUSDT) at iter-v3/127.
 
-    iter-v3/088 CYCLE 3 EXPLORATION #7 — RE-ARCHITECTURE. The /088 axis is a
-    NEW cross-sectional relative-value RANKING model (the cross-sectional path
-    trades the 22-symbol XS_UNIVERSE); it is NOT a per-symbol V3_MODELS change.
-    The mandatory /087 baseline-restore reverts the legacy per-symbol
-    V3_MODELS 6 -> 3 (drop GALA/MANA/SAND — /087's WHOLESALE expansion was
-    NEGATIVE). This test guards the LEGACY per-symbol path's V3_MODELS at the
-    3-symbol /059-canonical state. Regression guard against accidental ALGO
-    re-add (REVERT at /051), ADA re-add (/078 SUSPICIOUS-OOS-DOMINANT, CLOSED),
-    HBAR/AVAX (CLOSED at /021), FILUSDT (/083 NEGATIVE, CLOSED), and the
-    GALA/MANA/SAND /087 re-add (NEGATIVE, CLOSED).
+    Regression guard against accidental universe drift. iter-v3/126 REVERTED
+    ATOM/RUNE/UNI (/125 NEGATIVE-catastrophic) back to BCH/LDO/TRX.
+    iter-v3/127 inherits BCH/LDO/TRX unchanged.
 
-    HISTORY:
+    HISTORY (V3_MODELS evolution):
     - iter-v3/051: SYSTEM-LEVEL REVERT (4 -> 3 syms; drop ALGOUSDT)
-    - iter-v3/069: 3 -> 4 (+ADAUSDT) UNIVERSE EXPANSION (INERT-AT-EXPLORATION)
-    - iter-v3/070: 4 -> 3 (REVERT ADAUSDT) CYCLE 1 CONFIRMATION
-    - iter-v3/078: LDOUSDT -> ADAUSDT UNIVERSE REVISION (SUSPICIOUS-OOS-DOMINANT)
-    - iter-v3/079: ADAUSDT -> LDOUSDT REVERT (baseline-restore; /078 axis CLOSED)
-    - iter-v3/083: 3 -> 4 (+FILUSDT) UNIVERSE EXPANSION (NEGATIVE/NO-MERGE)
-    - iter-v3/084: 4 -> 3 (REVERT FILUSDT) — clean /059-config anchor re-run
-    - iter-v3/087: 3 -> 6 (+GALA +MANA +SAND) WHOLESALE EXPANSION (NEGATIVE)
-    - iter-v3/088: 6 -> 3 (REVERT GALA/MANA/SAND) — RE-ARCHITECTURE baseline-restore
+    - iter-v3/112: BCH/LDO/TRX RESTORED (/110-/111 CRV/AAVE/GRT/ADA universe closed)
+    - iter-v3/125: BCH/LDO/TRX -> ATOM/RUNE/UNI WILD universe replacement
+    - iter-v3/126: ATOM/RUNE/UNI -> BCH/LDO/TRX REVERTED (/125 NEGATIVE-catastrophic)
+    - iter-v3/127: BCH/LDO/TRX UNCHANGED (sole axis is drawdown brake)
     """
     # Import locally to catch import-time state
     import importlib  # noqa: PLC0415
@@ -243,52 +230,36 @@ def test_v3_models_at_iter_v3_084() -> None:
     symbols = [sym for _, sym in v3_models]
 
     assert len(symbols) == 3, (
-        f"V3_MODELS has {len(symbols)} symbols — expected exactly 3 "
-        f"(BCH/LDO/TRX, the /059 universe) at iter-v3/088. The /088 axis is the "
-        f"NEW cross-sectional ranking path (XS_UNIVERSE), not a per-symbol "
-        f"V3_MODELS change; /087's 6-sym expansion was NEGATIVE and is reverted. "
+        f"V3_MODELS has {len(symbols)} symbols — expected exactly 3 (BCH/LDO/TRX). "
+        "iter-v3/127: V3_MODELS BCH/LDO/TRX UNCHANGED (/126 reverted ATOM/RUNE/UNI). "
         f"Current symbols: {symbols}"
     )
     assert "ALGOUSDT" not in symbols, (
-        f"ALGOUSDT FOUND in V3_MODELS — must be absent (system-level REVERT at /051). "
+        f"ALGOUSDT FOUND in V3_MODELS — must be absent (REVERTED at /051). "
         f"Current symbols: {symbols}"
     )
-    assert "LDOUSDT" in symbols, (
-        f"LDOUSDT NOT FOUND in V3_MODELS — must be present (a /059-canonical "
-        f"incumbent). Current symbols: {symbols}"
-    )
-    assert "FILUSDT" not in symbols, (
-        f"FILUSDT FOUND in V3_MODELS — must be absent (/083's FILUSDT universe "
-        f"expansion was NEGATIVE/NO-MERGE; FILUSDT is a CLOSED universe-expansion "
-        f"candidate). Current symbols: {symbols}"
-    )
-    assert "ADAUSDT" not in symbols, (
-        f"ADAUSDT FOUND in V3_MODELS — must be absent (/078's LDOUSDT->ADAUSDT "
-        f"universe revision was SUSPICIOUS-OOS-DOMINANT and is CLOSED). "
+    assert "CRVUSDT" not in symbols, (
+        f"CRVUSDT FOUND in V3_MODELS — must be absent (CRV/AAVE/GRT/ADA universe CLOSED at /112). "
         f"Current symbols: {symbols}"
     )
-    # iter-v3/021 closed HBAR + AVAX at catalog level (NEGATIVE-clean)
-    assert "HBARUSDT" not in symbols, (
-        f"HBARUSDT FOUND in V3_MODELS — must be absent (CLOSED at catalog level "
-        f"per iter-v3/021 diary lesson (c) — universe expansion HBAR+AVAX NEGATIVE-clean). "
+    assert "ATOMUSDT" not in symbols, (
+        f"ATOMUSDT FOUND in V3_MODELS — must be absent at iter-v3/127 "
+        "(ATOM/RUNE/UNI was /125 WILD axis; REVERTED at /126 NEGATIVE-catastrophic). "
         f"Current symbols: {symbols}"
     )
-    assert "AVAXUSDT" not in symbols, (
-        f"AVAXUSDT FOUND in V3_MODELS — must be absent (CLOSED at catalog level "
-        f"per iter-v3/021 diary lesson (c) — universe expansion HBAR+AVAX NEGATIVE-clean). "
+    assert "RUNEUSDT" not in symbols, (
+        f"RUNEUSDT FOUND in V3_MODELS — must be absent at iter-v3/127 "
+        "(ATOM/RUNE/UNI was /125 WILD axis; REVERTED at /126 NEGATIVE-catastrophic). "
         f"Current symbols: {symbols}"
     )
-    # iter-v3/087 closed GALA/MANA/SAND (WHOLESALE expansion NEGATIVE)
-    for _closed in ("GALAUSDT", "MANAUSDT", "SANDUSDT"):
-        assert _closed not in symbols, (
-            f"{_closed} FOUND in V3_MODELS — must be absent (the /087 WHOLESALE "
-            f"universe expansion was NEGATIVE/NO-MERGE and is reverted at the "
-            f"/088 baseline-restore). Current symbols: {symbols}"
-        )
+    assert "UNIUSDT" not in symbols, (
+        f"UNIUSDT FOUND in V3_MODELS — must be absent at iter-v3/127 "
+        "(ATOM/RUNE/UNI was /125 WILD axis; REVERTED at /126 NEGATIVE-catastrophic). "
+        f"Current symbols: {symbols}"
+    )
     expected = {"BCHUSDT", "LDOUSDT", "TRXUSDT"}
     actual = set(symbols)
     assert actual == expected, (
         f"V3_MODELS symbols mismatch: expected {expected}, got {actual}. "
-        "iter-v3/088 reverts the legacy per-symbol V3_MODELS to the 3-symbol "
-        "BCH/LDO/TRX /059 universe (/087's 6-sym expansion was NEGATIVE)."
+        "iter-v3/127 V3_MODELS must be exactly (BCHUSDT, LDOUSDT, TRXUSDT)."
     )

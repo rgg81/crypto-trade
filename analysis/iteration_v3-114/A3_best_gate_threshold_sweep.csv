@@ -1,0 +1,14 @@
+trigger,polarity,threshold,n_suppressed,n_losers_suppressed,n_winners_suppressed,loser_hit_rate,cf_wpnl_delta
+ldo_vz,kill_LOW,0.2694,0,0,0,,0.0
+ldo_vz,kill_LOW,0.3755,2,2,0,1.0,4.8694
+ldo_vz,kill_LOW,0.4816,2,2,0,1.0,4.8694
+ldo_vz,kill_LOW,0.5876,3,2,1,0.6667,-0.6934
+ldo_vz,kill_LOW,0.6937,4,3,1,0.75,1.984
+ldo_vz,kill_LOW,0.7998,5,4,1,0.8,1.984
+ldo_vz,kill_LOW,0.9058,5,4,1,0.8,1.984
+ldo_vz,kill_LOW,1.0119,6,4,2,0.6667,-8.4032
+ldo_vz,kill_LOW,1.1179,7,5,2,0.7143,0.3501
+ldo_vz,kill_LOW,1.224,8,6,2,0.75,3.9911
+ldo_vz,kill_LOW,1.3301,8,6,2,0.75,3.9911
+ldo_vz,kill_LOW,1.4361,8,6,2,0.75,3.9911
+ldo_vz,kill_LOW,1.5422,9,6,3,0.6667,-8.9253

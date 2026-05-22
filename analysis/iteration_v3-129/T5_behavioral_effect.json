@@ -1,0 +1,19 @@
+{
+  "continuous": {
+    "n_trades_total": 173,
+    "n_partial_scaled": 13,
+    "n_zero_scaled": 4,
+    "mean_multiplier": 0.9425,
+    "median_multiplier": 1.0,
+    "min_multiplier": 0.0,
+    "total_wpnl_scaled": 62.908,
+    "total_wpnl_orig": 88.766
+  },
+  "binary_equivalent": {
+    "n_trades_total": 173,
+    "n_zero_scaled": 3,
+    "pct_trades_killed": 1.73,
+    "total_wpnl_with_binary": 94.144
+  },
+  "interpretation": "Continuous form partial-scales more trades but never zeroes the majority. Binary form (/127 equivalent) either keeps or fully kills. Continuous preserves more signal contribution; expected to reduce Optuna-trajectory-shift magnitude vs /127."
+}

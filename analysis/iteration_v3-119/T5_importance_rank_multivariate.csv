@@ -1,0 +1,7 @@
+candidate,BCH,LDO,TRX
+C1_obv_signed_volmom,rank5/15_gain69%,rank6/15_gain56%,rank8/15_gain31%
+C2_vwap_signed_volcv,rank10/15_gain58%,rank11/15_gain20%,rank14/15_gain15%
+C3_ret5d_signed_skew50,rank12/15_gain46%,rank12/15_gain22%,rank13/15_gain15%
+C4_symvsbtc_signed_kurt50,rank15/15_gain18%,rank15/15_gain8%,rank15/15_gain7%
+C5_maxdd_signed_skew200,rank6/15_gain61%,rank11/15_gain30%,rank4/15_gain55%
+C6_ret5d_signed_tbi,rank11/15_gain55%,rank11/15_gain24%,rank15/15_gain12%

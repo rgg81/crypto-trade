@@ -1,0 +1,4 @@
+held_out_symbol,trained_on,transfer_rank_ic,within_symbol_ic,transfer_retention_pct
+BCHUSDT,LDO+TRX,0.06893,0.02542,2.7119
+LDOUSDT,BCH+TRX,0.14703,0.17793,0.8263
+TRXUSDT,BCH+LDO,-0.00646,0.02907,-0.2221

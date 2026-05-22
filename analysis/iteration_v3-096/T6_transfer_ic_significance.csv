@@ -1,0 +1,4 @@
+held_out_symbol,transfer_ic_point,boot_ci_lo,boot_ci_hi,ci_excludes_zero,n_held_rows
+BCHUSDT,0.06893,-0.01588,0.15018,False,3567
+LDOUSDT,0.14703,-0.05875,0.34783,False,581
+TRXUSDT,-0.00646,-0.09212,0.07674,False,3509

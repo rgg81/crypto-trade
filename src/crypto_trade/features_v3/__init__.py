@@ -59,6 +59,10 @@ from crypto_trade.features_v3.funding_v3 import (
 )
 from crypto_trade.features_v3.microstructure_v3 import add_microstructure_v3_features
 from crypto_trade.features_v3.momentum_accel_v3 import add_momentum_accel_v3_features
+from crypto_trade.features_v3.multifreq_v3 import (
+    add_multifreq_v3_24h_features,
+    add_multifreq_v3_features,
+)
 from crypto_trade.features_v3.price_efficient_vol_v3 import add_price_efficient_vol_v3_features
 from crypto_trade.features_v3.regime_v3 import add_regime_v3_features
 from crypto_trade.features_v3.tail_risk_v3 import add_tail_risk_v3_features
@@ -74,8 +78,17 @@ GROUP_REGISTRY: dict[str, Callable[[pd.DataFrame], pd.DataFrame]] = {
     "momentum_accel": add_momentum_accel_v3_features,
     "volume_micro": add_volume_micro_v3_features,
     "cross_btc": add_cross_btc_v3_features,
+    # iter-v3/119: microstructure_v3 MOVED BEFORE engineered_v3 (was after engineered_v3
+    # from iter-v3/063 original placement). Required so taker_buy_imbalance_20 is
+    # available when compute_ret5d_signed_tbi runs inside add_engineered_v3_features.
+    # microstructure_v3 dependencies: OHLCV (always present), ret_kurt_50/200 (from
+    # tail_risk, position 2 — upstream), tbr_raw (computed inline from
+    # taker_buy_base_volume/volume). All dependencies precede the new position.
+    # No downstream groups depend on the old microstructure_v3 position.
+    "microstructure_v3": add_microstructure_v3_features,
     # iter-v3/025: Category 2 composed features; AFTER regime (needs hurst_100)
-    # iter-v3/063: trend_efficiency_signed + vol_regime_x_momentum ADDED to dispatch
+    # ALSO AFTER microstructure_v3 (iter-v3/119: needs taker_buy_imbalance_20 for
+    # compute_ret5d_signed_tbi). iter-v3/063: trend_efficiency_signed + vol_regime_x_momentum
     "engineered_v3": add_engineered_v3_features,
     # iter-v3/085: funding-regime-conditioned momentum (cycle-3 EXPLORATION #4).
     # Category-2 composed feature funding_regime_momentum_5d =
@@ -85,7 +98,6 @@ GROUP_REGISTRY: dict[str, Callable[[pd.DataFrame], pd.DataFrame]] = {
     # composed feature, never as a direct model feature.
     "funding_regime_momentum_v3": add_funding_regime_momentum_v3_features,
     "fracdiff": add_fracdiff_v3_features,
-    "microstructure_v3": add_microstructure_v3_features,
     # iter-v3/019: NEW external-data-source feature family; infrastructure PRESERVED
     "funding_v3": add_funding_v3_features,
     # iter-v3/024: cross-asset BTC funding broadcast; infrastructure PRESERVED
@@ -107,6 +119,23 @@ GROUP_REGISTRY: dict[str, Callable[[pd.DataFrame], pd.DataFrame]] = {
     "technical_v3": add_technical_v3_features,
     # iter-v3/063: NEW calendar/temporal features (DOW cyclic encoding); no dependencies
     "calendar_v3": add_calendar_v3_features,
+    # iter-v3/102: formulaic_v3 (alpha032) REMOVED from dispatch at /102 closeout
+    # (NEGATIVE — IS collapsed +0.3993, F2 falsifier fired; OOS +1.55 overfitting).
+    # formulaic_v3.py + test_formulaic_v3.py RETAINED as reusable infrastructure.
+    # The group key is intentionally omitted here — it is NOT wired for feature gen.
+    # iter-v3/113: COARSER-frequency (1d daily) feature family — 8 new features
+    # aggregated look-ahead-free from the existing 8h candles. No new data fetch.
+    # AFTER cross_btc (no dependency; placed for tidiness after cross-asset group).
+    "multifreq_v3": add_multifreq_v3_features,
+    # iter-v3/126: 24h multi-frequency feature — d24_ret_autocorr_lag1_50.
+    # Loads data/features_v3_24h/<SYM>_24h_features.parquet (offset_id=0 slice),
+    # extracts ret_autocorr_lag1_50, renames to d24_ret_autocorr_lag1_50, and merges
+    # causally onto the 8h decision grid via merge_asof(direction='backward',
+    # left_on='open_time', right_on='bar_close_time', allow_exact_matches=True).
+    # T2 audit (EDA SHA dd9fc2d): 0 look-ahead violations / 14130 rows.
+    # T5 importance ranks 2/1/3 across BCH/LDO/TRX (top-3 on ALL symbols).
+    # Requires 'symbol' column in input DataFrame to locate the 24h parquet.
+    "multifreq_v3_24h": add_multifreq_v3_24h_features,
 }
 
 V3_FEATURE_COLUMNS_FULL: tuple[str, ...] = (
@@ -201,6 +230,28 @@ V3_FEATURE_COLUMNS_TOP_N: tuple[str, ...] = (
     "ret_autocorr_lag1_50",  # momentum [BASELINE_V3]
     "sym_vs_btc_ret_7d",  # cross_btc [BASELINE_V3]
     "regime_momentum_signed_5d",  # engineered [BASELINE_V3, /025 PROMISING]
+    # iter-v3/127: d24_ret_autocorr_lag1_50 REMOVED — /126 NEGATIVE-catastrophic closeout.
+    # EDA methodology FALSIFIED at 3-occurrence pattern (/122 eth_ret_3d INERT, /123
+    # eth_vs_sym_rv_50 NEGATIVE-catastrophic, /126 d24_ret_autocorr_lag1_50 NEGATIVE-catastrophic).
+    # Walk-forward production disagreed with 5-fold AUC EDA prediction 3/3 times.
+    # d24_ret_autocorr_lag1_50 joins the ABSENT-assertion ban (runner pre-flight verified).
+    # The multifreq_v3_24h infrastructure (multifreq_v3.py, data/features_v3_24h/) is RETAINED
+    # as museum code — function NOT deleted, GROUP_REGISTRY entry remains for future use.
+    # V3_FEATURE_COLUMNS_TOP_N reverts to /121-canonical 14-feature anchor.
+    # iter-v3/126 cycle-7 EXPLORATION #5 reference: EDA SHA dd9fc2d (ARCHIVED).
+    # eth_vs_sym_rv_50 REMOVED at iter-v3/124 — /123 NEGATIVE-catastrophic closeout.
+    # cycle-7 cross-asset OHLCV axis CLOSED at 6th consecutive failure (/082/085/086/119/122/123).
+    # eth_vs_sym_rv_50 code in cross_btc_v3.py is MUSEUM (not deleted; not in columns).
+    # eth_ret_3d (iter-v3/122 cycle-7 EXPLORATION axis-1) REMOVED — /122 NEGATIVE-INERT
+    # (Critic FINAL `9e0eeb6`: IC=0.5613 with vwap_dev_20; importance rank 11-15/15 all syms).
+    # _load_eth_v3_features() infrastructure is RETAINED (museum; revived if eth features return).
+    # ret5d_signed_tbi REMOVED at iter-v3/121-METHODOLOGY — Component B REVERTED.
+    # /119 added this as 15th feature; /120 CONFIRMATION-NO-MERGE (F3 sister-redistribution
+    # + F4 IS regime-cost fired). Per /120 F3-DROP binding pre-commitment + diary §6 Q4:
+    # Component B DROPPED; V3_FEATURE_COLUMNS_TOP_N reverts to /059 canonical 14-feature stack.
+    # compute_ret5d_signed_tbi REMAINS in engineered_v3.py (code-museum value per /118//119
+    # precedent — function RETAINED, export in __all__ RETAINED, call-site RETAINED at line 1055).
+    # DO NOT add ret5d_signed_tbi back to this tuple without a new EXPLORATION brief.
     # -------------------------------------------------------------------------
     # iter-v3/087 (cycle-3 EXPLORATION #6) REVERTS /086's perp-spot BASIS FEATURE
     # FAMILY — V3_FEATURE_COLUMNS_TOP_N returns 17 -> 14, the BASELINE_V3 /059
@@ -269,6 +320,25 @@ V3_FEATURE_COLUMNS_TOP_N: tuple[str, ...] = (
     # (zero revert cost). They can be considered for phased-mass-expansion #2+
     # individually with full EDA backing per `feedback_v3_axis_selection_quant_discipline.md`.
     # -------------------------------------------------------------------------
+    # iter-v3/102 (cycle-5 EXPLORATION #2) REVERTS: WorldQuant Alpha#32 DROPPED.
+    # alpha032 collapsed IS monthly Sharpe to +0.3993 (fired F2 falsifier IS < +0.60).
+    # OOS +1.55 confirmed overfitting/regime-luck by Critic (not look-ahead).
+    # Per `feedback_v3_inert_features_at_higher_budget.md` pattern: NO-MERGE axes
+    # do not carry forward. V3_FEATURE_COLUMNS_TOP_N returns 15 → 14 (the /059 anchor).
+    # formulaic_v3.py + test_formulaic_v3.py RETAINED as reusable infrastructure.
+    # alpha032 joins the runner ABSENT-assertion ban (see run_baseline_v3.py).
+    # -------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
+    # iter-v3/114 (cycle-6 EXPLORATION #5): REVERT the /113 multi-frequency daily
+    # features (d_ret_5d, d_ret_10d, d_trend_slope_10, d_realvol_10,
+    # d_realvol_ratio, d_atr_pctrank_60, d_efficiency_10, d_close_pos_20) —
+    # mandatory /113-closeout housekeeping (Critic /113 Recommendation 2).
+    # /113 was NEGATIVE (INERT). V3_FEATURE_COLUMNS_TOP_N returns 22 → 14,
+    # restoring the /059-canonical BASELINE_V3 14-feature stack.
+    # The multifreq_v3 module + its GROUP_REGISTRY registration are RETAINED as
+    # dormant infrastructure (zero revert cost — the established v3 dead-code pattern).
+    # The 8 d_* features join the runner ABSENT-assertion ban below.
+    # -------------------------------------------------------------------------
     # BANNED features (MUST remain absent):
     #   vol_normalized_ret_5d  — /049 PATH C-clean (OOS Δ -3.15)
     #   hurst_drift_50_200     — /053 PATH D + Critic FINAL `c056354`
@@ -281,15 +351,40 @@ V3_FEATURE_COLUMNS_TOP_N: tuple[str, ...] = (
     #   basis_zscore_30        — /086 INERT-by-importance (rank 15/17)
     #   basis_momentum_3       — /086 INERT-by-importance (rank 16/17)
     #   basis_extreme_flag     — /086 INERT-by-importance (rank 17/17)
+    #   alpha032               — /102 NEGATIVE (IS collapsed +0.3993; F2 falsifier fired)
+    #   ema_signed_volregime   — /118 NEGATIVE catastrophic (IS Δ -0.4543; broader
+    #                            `value × sign(vol-regime-classifier)` Category-2
+    #                            lineage CLOSED at single-seed budget; Critic FINAL `80caafd`
+    #                            + /118 closeout Critic Rec 3). Function STAYS in
+    #                            engineered_v3.py for code-museum value; MUST NOT appear
+    #                            in V3_FEATURE_COLUMNS_TOP_N.
     # -------------------------------------------------------------------------
 )
-"""14-feature set — the BASELINE_V3 /059 anchor stack.
+"""15-feature set — BASELINE_V3 /059/060 canonical anchor + iter-v3/126 24h multi-frequency.
 
-iter-v3/087 (cycle-3 EXPLORATION #6) REVERTS /086's 3-feature perp-spot BASIS
-family back to the BASELINE_V3 /059/060 14-feature anchor. The SOLE /087 axis is
-a WHOLESALE universe-breadth EXPANSION (V3_MODELS 3 -> 6), NOT a feature change —
-the basis-revert is a mandatory baseline-restore (Critic /086 Rec #3), not an
-axis.
+iter-v3/126: d24_ret_autocorr_lag1_50 ADDED as 15th feature (cycle-7 EXPLORATION axis-5).
+24h-cadence 1-bar lag autocorrelation of log returns over 50 daily bars. Sourced from
+data/features_v3_24h/<SYM>_24h_features.parquet offset_id=0. Causally merged onto 8h
+decision grid via merge_asof(direction='backward'). EDA SHA dd9fc2d. Count: 14 → 15.
+
+iter-v3/123: eth_vs_sym_rv_50 ADDED as 15th feature (cycle-7 EXPLORATION axis-2).
+ETH-vs-symbol 50-bar realized-vol regime ratio = eth_rv_50 / (sym_rv_50 + EPS).
+Past-only: rolling(50, min_periods=50).std() of 1-bar log returns (ETH and symbol).
+Pairwise IC: 0.069 with vwap_dev_20; 0.021 with regime_momentum_signed_5d — 8-26×
+cleaner than /122's eth_ret_3d (which had IC 0.56/0.53 with those same anchors).
+ADF: p<0.01 on all 3 symbols. EDA SHA `dbc2993`. Replaces eth_ret_3d (/122 NEGATIVE-INERT).
+Count: 14 → 15.
+
+iter-v3/122: eth_ret_3d ADDED (15th) — cycle-7 EXPLORATION axis-1. NEGATIVE-INERT
+(Critic FINAL `9e0eeb6`: IC=0.5613 with vwap_dev_20, IC=0.5280 with
+regime_momentum_signed_5d — substantially spanned by 2 incumbents). REMOVED at /123.
+eth_ret_3d joins the runner ABSENT-assertion ban (same pattern as /082 funding family,
+/086 basis family, /064 adx_14). _load_eth_v3_features() infrastructure RETAINED
+(needed by eth_vs_sym_rv_50's eth_rv_50 intermediate computation).
+
+iter-v3/121-METHODOLOGY: Component B (ret5d_signed_tbi, /119's 15th feature) DROPPED.
+V3_FEATURE_COLUMNS_TOP_N reverts from 15 → 14 (/059 canonical 14-feature stack).
+Per /120 F3-DROP binding pre-commitment + diary §6 Q4 + Critic FINAL `a49dd17`.
 
 History:
   /065+: 14-feature /060 anchor (adx_14 dropped at /064 NEGATIVE).
@@ -307,45 +402,85 @@ History:
   /087 : the 3 basis features DROPPED (Critic /086 Rec #3; an INERT feature
          family is not carried forward) — back to the 14-feature /059 anchor.
          The /087 axis is the WHOLESALE V3_MODELS 3 -> 6 expansion.
+  /088-101: various non-feature axes (cross-sectional re-architecture, BCH signal
+         filter, etc.) — V3_FEATURE_COLUMNS_TOP_N stayed at 14.
+  /102 : alpha032 ADDED (15th) — cycle-5 EXPLORATION #2 axis;
+         NEGATIVE (IS collapsed to +0.3993, fired F2 falsifier IS < +0.60);
+         OOS +1.55 confirmed overfitting/regime-luck. REVERTED at /102 closeout.
+         formulaic_v3.py + test_formulaic_v3.py RETAINED as infrastructure.
+  /113 : 8 coarser-frequency (1d daily) features ADDED (15th–22nd) — cycle-6
+         EXPLORATION #4 axis. Features: d_ret_5d, d_ret_10d, d_trend_slope_10,
+         d_realvol_10, d_realvol_ratio, d_atr_pctrank_60, d_efficiency_10,
+         d_close_pos_20. No new data fetch. EDA SHA ebd84e2. Count: 14 → 22.
+         NEGATIVE (INERT). REVERTED at /114 closeout housekeeping.
+         multifreq_v3 module RETAINED as dormant infrastructure.
+  /114 : 8 d_* daily features DROPPED (mandatory /113-closeout housekeeping;
+         Critic /113 Recommendation 2; /113 NEGATIVE-INERT). V3_FEATURE_COLUMNS_TOP_N
+         returns 22 → 14 (the /059-canonical BASELINE_V3 14-feature stack). The
+         /114 sole axis is the LDO-realvol kill_LOW gate (primitive 9 variant).
+  /118 : ema_signed_volregime ADDED (15th) — cycle-6 EXPLORATION #9 axis.
+         Category-2 composed feature: ema_spread_atr_20 × sign(range_realized_vol_50
+         − rolling_median_200). Vol-regime-conditioned momentum at ~67-day
+         rolling-median timescale — slower than /025's ~33-day Hurst regime.
+         T9 POOLED multivariate-lift +0.0081 > 0.005 gate; importance rank 8-10/15,
+         gain 38-63% across all 3 symbols. EDA SHA `60a45e8`. /025 PROMISING lineage.
+         Count: 14 → 15. NEGATIVE catastrophic (IS Δ -0.4543); `value ×
+         sign(vol-regime-classifier)` Category-2 lineage CLOSED at /118 closeout.
+         REVERTED at /119 (Critic /118 Rec 3; function retained for code-museum value).
+  /119 : ema_signed_volregime REMOVED (mandatory /118-closeout housekeeping) AND
+         ret5d_signed_tbi ADDED (15th) — cycle-6 EXPLORATION #10 (FINAL) axis.
+         Category-2 composed feature: ret_5d × sign(taker_buy_imbalance_20).
+         Order-flow-regime-conditioned momentum at ~7-day microstructure timescale
+         (20-bar taker-buy imbalance window). Structurally orthogonal to /025
+         Hurst regime and /118 vol regime. T7 POOLED multivariate-lift +0.0083
+         (broad-based: BCH +0.0057 / LDO +0.0123 / TRX +0.0053; all positive).
+         T9 SSC-RISK gate: 1.48× < 2.0 (sole candidate clearing the new gate).
+         EDA SHA `7aa5cc5`. Net count: 15 → 15 (C3 → C6 swap).
+  /121 : ret5d_signed_tbi REMOVED (Component B DROPPED per /120 F3-DROP binding
+         pre-commitment + diary §6 Q4 + Critic FINAL `a49dd17`). V3_FEATURE_COLUMNS_TOP_N
+         reverts 15 → 14 (the /059 canonical BASELINE_V3 anchor).
+         compute_ret5d_signed_tbi RETAINED in engineered_v3.py (code-museum value).
+         /121-METHODOLOGY isolates Component A (/116 no_confirm) at 10-seed CONFIRMATION.
+  /122 : eth_ret_3d ADDED (15th) — cycle-7 EXPLORATION axis-1. NEGATIVE-INERT.
+         REMOVED at /123 — eth_vs_sym_rv_50 replaces it per /122 Critic Rec 1.
+  /123 : eth_vs_sym_rv_50 ADDED (15th) — cycle-7 EXPLORATION axis-2. See top.
 
 The iter-v3/064 phased mass-expansion #1 (+adx_14, briefly 15 features) was
 NEGATIVE; the runner pre-flight still asserts adx_14 ABSENT.
 """
 
-# iter-v3/087: V3_FEATURE_COLUMNS = V3_FEATURE_COLUMNS_TOP_N (the 14-feature
-# BASELINE_V3 /059/060 anchor — the /086 perp-spot basis family REVERTED per
-# Critic /086 Rec #3). The SOLE /087 axis is the WHOLESALE V3_MODELS 3 -> 6
-# universe-breadth expansion, not a feature change.
+# iter-v3/127: V3_FEATURE_COLUMNS = V3_FEATURE_COLUMNS_TOP_N (14 features — REVERTED).
+# d24_ret_autocorr_lag1_50 REMOVED (/126 NEGATIVE-catastrophic; EDA methodology FALSIFIED).
+# V3_MODELS BCH/LDO/TRX UNCHANGED from /121 (reverted at /126; verified PASS).
 V3_FEATURE_COLUMNS: tuple[str, ...] = V3_FEATURE_COLUMNS_TOP_N
 """Alias for V3_FEATURE_COLUMNS_TOP_N — the active feature set for all v3 models.
 
-Points to the 14-feature BASELINE_V3 /059/060 anchor stack (the /086 perp-spot
-basis family reverted at the /087 setup).
+Points to the 14-feature /121-canonical anchor at iter-v3/127:
+  14-feature BASELINE_V3 /059/060/121 canonical anchor.
+  d24_ret_autocorr_lag1_50 (/126 NEGATIVE-catastrophic) ABSENT.
+  eth_vs_sym_rv_50 (/123 NEGATIVE-catastrophic) ABSENT. eth_ret_3d (/122 INERT) ABSENT.
+  Component A (/116 no_confirm) ENABLED (locked constraint per /121 CONFIRMATION).
+  Per-symbol drawdown brake ENABLED at T=7.0/T_R=6.0/N=45/M=21 (/127 sole axis).
 """
 
 DEFAULT_ATR_MULTIPLIERS: tuple[float, float] = (2.0, 1.0)
 """Default ATR multipliers for symbols not in V3_ATR_MULTIPLIERS_PER_SYMBOL.
 
-iter-v3/070 CYCLE 1 CONFIRMATION CLOSEOUT: REVERTED (2.0, 1.5) → (2.0, 1.0).
-Component A (/065 universal SL widening) was REJECTED at the /070 CONFIRMATION —
-the IS-collapse + OOS-soar pattern persisted and amplified at multi-seed (IS Sharpe
-collapsed -0.97; OOS/IS ratio 10.81 — regime exposure, not robust edge). Leaving
-(2.0, 1.5) would mean cycle 2 silently inherits a CONFIRMATION-rejected axis, which
-violates `feedback_no_cheating.md` and the anti-drift discipline. The canonical /059
-baseline (BASELINE_V3.md) documents (atr_tp=2.0, atr_sl=1.0); the code now matches.
-V3_ATR_MULTIPLIERS_PER_SYMBOL stays empty {} — universal value, no per-symbol overrides.
-See diary-v3/iteration_v3-070.md Section 6 (Component A REJECT) + Section 7.
+iter-v3/125: REVERT (3.4641, 1.7321) → (2.0, 1.0). /124 NEGATIVE-catastrophic
+(K=63 Branch B longer-cadence labels axis); /124 closed bilaterally per brief Section
+3. /125 WILD CYCLE-7 axis-4 uses /121-canonical (2.0, 1.0) ATR multipliers.
 
 History:
-  iter-v3/043: REVERTED from (1.5, 0.75) back to (2.0, 1.0) — iter-v3/042 Path C
-  (IS collapse NEGATIVE: IS Sharpe -0.5941, TRX OOS -33 wpnl swing) mandate fires.
+  iter-v3/043: REVERTED from (1.5, 0.75) back to (2.0, 1.0) — iter-v3/042 Path C.
   Value (2.0, 1.0) first set at iter-v3/010; validated anchor through iter-v3/041.
   iter-v3/065: (2.0, 1.0) → (2.0, 1.5) — UNIVERSAL SL widening (Path D).
   iter-v3/066: (2.0, 1.5) → (2.0, 1.0) — REVERT for axis isolation (Path E0.8).
   iter-v3/067-069: (2.0, 1.0) — carry-forward (non-labeling axes).
   iter-v3/070: (2.0, 1.0) → (2.0, 1.5) — RE-APPLIED /065 Component A at CONFIRMATION.
-  iter-v3/070 CLOSEOUT: (2.0, 1.5) → (2.0, 1.0) — Component A REJECTED; SL widening
-  is regime exposure not edge. /059 canonical anchor value restored.
+  iter-v3/070 CLOSEOUT: (2.0, 1.5) → (2.0, 1.0) — Component A REJECTED; restored /059 canonical.
+  iter-v3/071–123: (2.0, 1.0) — carry-forward across 53 iterations (canonical baseline).
+  iter-v3/124: (2.0, 1.0) → (3.4641, 1.7321) — Branch B sqrt(3) scaling (K=63 axis). NEGATIVE.
+  iter-v3/125: (3.4641, 1.7321) → (2.0, 1.0) — REVERT /124 (NEGATIVE-catastrophic); /121 canonical.
 """
 
 V3_ATR_MULTIPLIERS_PER_SYMBOL: dict[str, tuple[float, float]] = {
@@ -430,7 +565,7 @@ Enforced by _verify_feature_columns in run_baseline_v3.py (iter-v3/064):
     "ALGOUSDT" not in V3_FEATURES_PER_SYMBOL
     "LDOUSDT" not in V3_FEATURES_PER_SYMBOL
     "TRXUSDT" not in V3_FEATURES_PER_SYMBOL
-    features_for_symbol("BCHUSDT") == V3_FEATURE_COLUMNS_TOP_N  (14 features — /060 anchor)
+    features_for_symbol("BCHUSDT") == V3_FEATURE_COLUMNS_TOP_N  (14 features at /127)
     "adx_14" not in V3_FEATURE_COLUMNS_TOP_N  (/064 phased-mass-expansion #1 NEGATIVE)
     "range_efficiency_50" not in V3_FEATURE_COLUMNS_TOP_N  (/076 SUSPICIOUS; reverted /077)
     "vol_adj_autocorr" not in V3_FEATURE_COLUMNS_TOP_N  (dead code; catastrophic at /026)
@@ -511,6 +646,12 @@ def process_symbol_v3(
 ) -> tuple[str, int, int]:
     """Load klines for *symbol*, run the full v3 feature pipeline, write parquet.
 
+    ``multifreq_v3_24h`` requires ``data/features_v3_24h/<SYM>_24h_features.parquet``
+    which is only generated for symbols that ran the 24h pipeline (iter-v3/117
+    infrastructure; reverted from V3_FEATURE_COLUMNS_TOP_N at /127).  When that
+    parquet is absent the group is silently skipped — the column is not in the active
+    feature set so the omission is correct and safe.
+
     Returns ``(symbol, n_rows, n_feature_columns)``.
     """
     path = csv_path(Path(data_dir), symbol, interval)
@@ -526,7 +667,14 @@ def process_symbol_v3(
     df = ka.df.copy()
     df["symbol"] = symbol
     before_cols = set(df.columns)
-    df = generate_features_v3(df, list(GROUP_REGISTRY.keys()))
+
+    # Build the active group list: skip multifreq_v3_24h when the 24h parquet
+    # does not exist for this symbol (graceful degradation for non-24h-pipeline symbols).
+    _24h_parquet = Path("data/features_v3_24h") / f"{symbol}_24h_features.parquet"
+    active_groups = [
+        g for g in GROUP_REGISTRY.keys() if g != "multifreq_v3_24h" or _24h_parquet.exists()
+    ]
+    df = generate_features_v3(df, active_groups)
     added = [c for c in df.columns if c not in before_cols]
 
     out = Path(output_dir)
@@ -547,6 +695,19 @@ def run_features_v3(
     workers: int = 1,
 ) -> list[tuple[str, int, int]]:
     """Batch generate v3 features across *symbols* with optional multiprocessing."""
+    # iter-v3/132 live-track parity: invalidate cross-asset caches on every
+    # call. Without this, live ticks see stale BTC/ETH frames after the first
+    # invocation and cross_btc_v3 merges go silently NaN — divergence from
+    # backtest. Mirrors features_v2 post-62d56dc hygiene. Zero-cost in
+    # backtest (which calls this once at startup); critical for live.
+    from crypto_trade.features_v3.cross_btc_v3 import (
+        clear_btc_cache_v3,
+        clear_eth_cache_v3,
+    )
+
+    clear_btc_cache_v3()
+    clear_eth_cache_v3()
+
     results: list[tuple[str, int, int]] = []
     if workers <= 1:
         for symbol in tqdm(symbols, desc="v3 features", unit="sym"):
@@ -579,6 +740,7 @@ __all__ = [
     "add_calendar_v3_features",
     "add_engineered_v3_features",
     "add_funding_v3_features",
+    "add_multifreq_v3_24h_features",
     "add_technical_v3_features",
     "atr_multipliers_for_symbol",
     "features_for_symbol",

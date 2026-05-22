@@ -1,0 +1,4 @@
+trigger,n_candles,median_threshold,n_high,n_low,mean_pnl_high,mean_pnl_low,separation_gap,winrate_high,winrate_low,welch_t,separates
+abs_btc_dd,2741,5.6435,1370,1371,10.6129,11.1594,-0.5466,0.9832,0.9869,-1.463,True
+abs_btc_vz,2741,0.7059,1370,1371,10.3006,11.4715,-1.1709,0.9796,0.9905,-3.14,True
+abs_ldo_vz,2728,0.6967,1364,1364,10.0211,11.7654,-1.7443,0.9795,0.9905,-4.666,True

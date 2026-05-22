@@ -1,0 +1,15 @@
+d24_candidate,max_symbol,max_share,total_share_3_syms,max_to_total_ratio,ssc_risk_pass_lt_0.70
+d24_hurst_100,LDOUSDT,0.0887,0.2104,0.4216,PASS
+d24_hurst_diff_100_50,BCHUSDT,0.1364,0.3102,0.4397,PASS
+d24_range_realized_vol_50,BCHUSDT,0.176,0.4257,0.4134,PASS
+d24_ret_kurt_50,LDOUSDT,0.2058,0.4162,0.4945,PASS
+d24_ret_skew_50,TRXUSDT,0.1328,0.3513,0.378,PASS
+d24_ret_kurt_200,BCHUSDT,0.1026,0.2631,0.39,PASS
+d24_ret_skew_200,BCHUSDT,0.15,0.3115,0.4815,PASS
+d24_max_dd_window_50,LDOUSDT,0.1019,0.1918,0.5313,PASS
+d24_vwap_dev_20,LDOUSDT,0.0321,0.0751,0.4274,PASS
+d24_ema_spread_atr_20,LDOUSDT,0.0679,0.0899,0.7553,FAIL
+d24_ret_autocorr_lag1_50,BCHUSDT,0.1429,0.3882,0.3681,PASS
+d24_btc_ret_14d,BCHUSDT,0.0759,0.1634,0.4645,PASS
+d24_sym_vs_btc_ret_7d,LDOUSDT,0.0485,0.1051,0.4615,PASS
+d24_regime_momentum_signed_5d,LDOUSDT,0.0647,0.1095,0.5909,PASS

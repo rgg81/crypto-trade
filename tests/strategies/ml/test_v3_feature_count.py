@@ -99,16 +99,21 @@ _PROHIBITED_FEATURES = frozenset(
 )
 
 
-def test_feature_count_14():
-    """V3_FEATURE_COLUMNS_TOP_N must have exactly 14 entries at iter-v3/087."""
+def test_feature_count_15():
+    """V3_FEATURE_COLUMNS_TOP_N must have exactly 14 entries at iter-v3/127+.
+
+    iter-v3/127: d24_ret_autocorr_lag1_50 REMOVED (REVERTED from /126; /126 NEGATIVE-catastrophic).
+    iter-v3/128: V3_FEATURE_COLUMNS_TOP_N UNCHANGED at 14. The /128 axis is UNIVERSE SUBSTITUTION
+    (BCH/LDO/TRX → ATOM/RUNE/AVAX/HBAR/ICP/ALGO), NOT a feature change.
+    """
     n = len(V3_FEATURE_COLUMNS_TOP_N)
     assert n == 14, (
         f"V3_FEATURE_COLUMNS_TOP_N has {n} features — expected 14. "
-        "iter-v3/087 (cycle-3 EXPLORATION #6): the BASELINE_V3 /059/060 "
-        "14-feature anchor stack. The SOLE /087 axis is the WHOLESALE V3_MODELS "
-        "3->6 expansion, NOT a feature change; the /086 3-feature perp-spot BASIS "
-        "family is REVERTED (Critic /086 Rec #3 — /086 INERT-by-importance). "
-        "Update V3_FEATURE_COLUMNS_TOP_N in src/crypto_trade/features_v3/__init__.py."
+        "iter-v3/127: d24_ret_autocorr_lag1_50 REMOVED (/126 NEGATIVE-catastrophic). "
+        "iter-v3/128: feature count UNCHANGED at 14 "
+        "(universe substitution axis, not feature axis). "
+        "Update V3_FEATURE_COLUMNS_TOP_N in "
+        "src/crypto_trade/features_v3/__init__.py."
     )
 
 

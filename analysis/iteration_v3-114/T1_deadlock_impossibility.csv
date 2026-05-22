@@ -1,0 +1,4 @@
+trigger,input_series,depends_on_LDO_trades,depends_on_LDO_price,depends_on_BTC_price,deadlock_possible,note
+btc_drawdown_pct,BTCUSDT 8h close,False,False,True,False,BTC price unaffected by LDO trading -> trigger frozen-free
+btc_vol_zscore,BTCUSDT 8h close log-returns,False,False,True,False,BTC vol unaffected by LDO trading -> trigger frozen-free
+ldo_realvol_zscore,LDOUSDT 8h close log-returns,False,True,False,False,LDO PRICE != LDO TRADE OUTCOMES; kill-switch halts LDO trading not LDO price -> realized-vol series updates regardless -> frozen-free. Contrast /054 endogenous PnL-streak brake.

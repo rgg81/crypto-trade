@@ -1,0 +1,4 @@
+symbol,in_regime_gate_symbols,expected_gate_fires,expected_roster_change
+BCHUSDT,False,0,none (bit-identical to /059 BCH)
+TRXUSDT,False,0,none (bit-identical to /059 TRX)
+LDOUSDT,True,>=1 (the target; see T4/T5),LDO IS roster shrinks by the suppressed count

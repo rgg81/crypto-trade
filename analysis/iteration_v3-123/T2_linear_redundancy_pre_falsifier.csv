@@ -1,0 +1,5 @@
+candidate,pooled_r2,top_primitive,top_abs_corr,ic_vwap_dev_20,ic_regime_momentum_signed_5d,max_pairwise_ic,verdict
+B1b_eth_vs_sym_rv_25,0.3152,range_realized_vol_50,0.453,0.0407,0.0522,0.453,PASS
+B1_eth_vs_sym_rv_50,0.3937,range_realized_vol_50,0.5204,0.0687,0.0205,0.5204,PASS
+B1c_eth_vs_sym_rv_100,0.3951,range_realized_vol_50,0.5176,0.0725,0.0024,0.5176,PASS
+B1a_log_eth_vs_sym_rv_50,0.473,range_realized_vol_50,0.5395,0.0664,0.0495,0.5395,PASS

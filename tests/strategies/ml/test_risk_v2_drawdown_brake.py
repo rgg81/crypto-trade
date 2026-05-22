@@ -1,18 +1,26 @@
-"""iter-v3/054: adversarial tests for primitive 11 — per-symbol drawdown brake.
+"""Adversarial tests for primitive 11 — per-symbol drawdown brake.
 
-5 adversarial tests covering:
+iter-v3/054 original 5 adversarial tests:
   1. brake_disabled_by_default_is_no_op: backward compat; no state, no counter, no kills.
   2. brake_engages_at_threshold_per_symbol: LDO synthetic sequence; brake state transitions.
   3. brake_disengages_at_recovery_threshold: recovery trade taken; state machine integrity.
   4. brake_independent_across_symbols: LDO brake doesn't affect BCH/TRX signals.
   5. brake_respects_30_day_window: old-peak expiry prevents false engagement.
+
+iter-v3/127 time-override deadlock-breaker 3 additional adversarial tests:
+  6. brake_time_override_fires_after_M_candles: deadlock-impossibility proof integration test.
+     Synthetic: 5 BCH losses → brake-ON → 31 candles no-signal → 1 BCH signal → assert
+     time-override fires + trade NOT blocked.
+  7. brake_time_override_disabled_when_M_zero: M=0 preserves legacy /054 behavior (no override).
+  8. brake_time_override_does_not_re_trigger_after_state_recovery: when state-based recovery
+     fires BEFORE M elapsed, time-override does not re-trigger on the same engagement.
 """
 
 from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-from crypto_trade.backtest_models import TradeResult
+from crypto_trade.backtest_models import Signal, TradeResult
 from crypto_trade.strategies.ml.risk_v2 import RiskV2Config, RiskV2Wrapper
 
 # ---------------------------------------------------------------------------
@@ -25,6 +33,8 @@ def _make_config(
     threshold: float = 10.0,
     recovery: float = 5.0,
     window_days: int = 30,
+    time_override_candles: int = 0,
+    candle_interval_minutes: int = 480,
 ) -> RiskV2Config:
     """Build a minimal RiskV2Config with the drawdown brake fields set."""
     return RiskV2Config(
@@ -37,6 +47,8 @@ def _make_config(
         drawdown_brake_threshold_wpnl=threshold,
         drawdown_brake_recovery_wpnl=recovery,
         drawdown_brake_window_days=window_days,
+        drawdown_brake_time_override_candles=time_override_candles,
+        drawdown_brake_candle_interval_minutes=candle_interval_minutes,
     )
 
 
@@ -264,3 +276,241 @@ def test_brake_respects_30_day_window() -> None:
     # Now add another -8 loss: cum = 1, dd = 17 - 1 = 16 >= T=10 → brake engages
     wrapper.record_trade_result(_make_trade("LDOUSDT", -8.0, new_trade_ms + 2 * day_ms))
     assert wrapper._brake_on["LDOUSDT"] is True
+
+
+# ---------------------------------------------------------------------------
+# iter-v3/127 Tests 6-8: time-based override deadlock-breaker
+# ---------------------------------------------------------------------------
+
+# Use short candle intervals to make ms math easy in tests (1 "candle" = 1 minute)
+_TEST_CANDLE_MINUTES = 1
+_TEST_CANDLE_MS = _TEST_CANDLE_MINUTES * 60 * 1000
+
+
+def _make_config_with_override(
+    threshold: float = 7.0,
+    recovery: float = 6.0,
+    window_days: int = 45,
+    m_candles: int = 21,
+) -> RiskV2Config:
+    """Build a minimal RiskV2Config with time-override enabled.
+
+    Uses _TEST_CANDLE_MINUTES (1 minute) as the candle interval so time-override
+    ms math is trivial without depending on real 8h timing in test code.
+    """
+    return RiskV2Config(
+        enable_vol_scaling=False,
+        enable_adx_gate=False,
+        enable_hurst_check=False,
+        enable_zscore_ood=False,
+        enable_low_vol_filter=False,
+        enable_per_symbol_drawdown_brake=True,
+        drawdown_brake_threshold_wpnl=threshold,
+        drawdown_brake_recovery_wpnl=recovery,
+        drawdown_brake_window_days=window_days,
+        drawdown_brake_time_override_candles=m_candles,
+        drawdown_brake_candle_interval_minutes=_TEST_CANDLE_MINUTES,
+    )
+
+
+def _make_wrapper_with_override(config: RiskV2Config) -> RiskV2Wrapper:
+    """Build a RiskV2Wrapper with override config and a signal-emitting inner mock."""
+    inner = MagicMock()
+    inner.atr_column = "atr"
+    # Inner strategy always emits a LONG signal for any symbol
+    inner.get_signal.return_value = Signal(
+        direction=1, weight=1, tp_pct=8.0, sl_pct=4.0, confidence=0.9
+    )
+    wrapper = RiskV2Wrapper(inner, config)
+    # Stub out feature-gated lookups (not needed for brake tests)
+    wrapper._lookup = {}
+    wrapper._feature_mean = {}
+    wrapper._feature_std = {}
+    wrapper._hurst_lower = {}
+    wrapper._hurst_upper = {}
+    return wrapper
+
+
+# ---------------------------------------------------------------------------
+# Test 6: brake_time_override_fires_after_M_candles — deadlock-impossibility proof
+# ---------------------------------------------------------------------------
+
+
+def test_brake_time_override_fires_after_m_candles() -> None:
+    """Adversarial deadlock-impossibility integration test (iter-v3/127 brief Section 2.3).
+
+    Sequence:
+      1. 5 BCH losses to engage the brake (dd ≥ T=7.0).
+      2. 31 candles of no signals (simulated by advancing open_time beyond M+10 candles).
+      3. 1 BCH signal arrives at open_time >= brake_on_close_time + M * candle_ms.
+
+    Assertions:
+      - After the 4th+ loss, brake engages (brake_on[BCH] = True).
+      - The signal at step 3 is NOT blocked (brake-OFF via time-override fires).
+      - drawdown_brake_time_overrides counter increments.
+      - drawdown_brake_fires counter does NOT increment (no kill).
+    """
+    m_candles = 21  # M=21 candles at _TEST_CANDLE_MINUTES each
+    cfg = _make_config_with_override(
+        threshold=7.0, recovery=6.0, window_days=45, m_candles=m_candles
+    )
+    wrapper = _make_wrapper_with_override(cfg)
+
+    base_ms = 1_700_000_000_000
+    day_ms = 24 * 60 * 60 * 1000
+
+    # Step 1: 5 BCH losses clustered in a 5-day window (each -5.5 wpnl).
+    # Start with +20 initial gain to establish a peak, then 5 losses of -5.5.
+    # After initial: cum=+20, peak=+20, dd=0.
+    # After 5x-5.5: cum=+20-27.5=-7.5; peak=+20; dd=27.5>=T=7.
+    wrapper.record_trade_result(_make_trade("BCHUSDT", +20.0, base_ms))
+    assert wrapper._brake_on.get("BCHUSDT") is False
+
+    loss_times = []
+    for i in range(5):
+        t_ms = base_ms + (i + 1) * day_ms
+        wrapper.record_trade_result(_make_trade("BCHUSDT", -5.5, t_ms))
+        loss_times.append(t_ms)
+
+    # After 5 losses: brake engages at the 2nd loss (dd=11 >= T=7.0).
+    # _brake_on_close_time stores the time of the trade that FIRST crossed T.
+    first_engage_time = loss_times[1]  # 3rd trade overall (index 1 of loss_times)
+    assert wrapper._brake_on.get("BCHUSDT") is True, "Brake should be ON after 5 losses"
+    assert wrapper._brake_on_close_time.get("BCHUSDT") == first_engage_time
+
+    # Step 2: No BCH trades for m_candles+10 candles (21+10=31 buffer).
+    # Step 3: BCH signal arrives at open_time = first_engage_time + (m_candles+10)*candle_ms.
+    # 31 candles elapsed since first engagement; exceeds M=21 → time-override must fire.
+    signal_open_time = first_engage_time + (m_candles + 10) * _TEST_CANDLE_MS
+
+    # Call get_signal: inner returns LONG (+1); time-override should disengage brake; signal passes.
+    result_signal = wrapper.get_signal("BCHUSDT", signal_open_time)
+
+    # Assert: brake-OFF via time-override; signal NOT blocked
+    assert wrapper._brake_on.get("BCHUSDT") is False, (
+        "Time-override must have fired: brake_on[BCHUSDT] should be False "
+        "after m_candles+10 elapsed"
+    )
+    assert result_signal.direction == 1, "Signal must NOT be blocked after time-override fires"
+
+    # Assert: time-override counter incremented; brake_fires did NOT increment
+    bch_stats = wrapper._gate_stats.get("BCHUSDT")
+    assert bch_stats is not None, "GateStats for BCHUSDT should exist after get_signal"
+    assert bch_stats.drawdown_brake_time_overrides == 1, (
+        f"Expected 1 time-override fire, got {bch_stats.drawdown_brake_time_overrides}"
+    )
+    assert bch_stats.drawdown_brake_fires == 0, (
+        f"Expected 0 brake kills (override fired before kill check), "
+        f"got {bch_stats.drawdown_brake_fires}"
+    )
+
+    # The DEADLOCK is broken: the time-override allowed the signal through.
+    # This is the /127 deadlock-impossibility proof materialized as a test.
+
+
+# ---------------------------------------------------------------------------
+# Test 7: brake_time_override_disabled_when_M_zero
+# ---------------------------------------------------------------------------
+
+
+def test_brake_time_override_disabled_when_m_zero() -> None:
+    """With M=0 (default), the time-override is DISABLED — preserves /054 legacy behavior.
+
+    Scenario: brake engages, then a signal arrives at open_time >> brake_on_close_time.
+    With M=0, the time-override must NOT fire; the brake must continue to block signals.
+    """
+    # M=0 means time_override_candles=0 — legacy behavior
+    cfg = _make_config(
+        enabled=True,
+        threshold=10.0,
+        recovery=5.0,
+        window_days=30,
+        time_override_candles=0,  # DISABLED
+        candle_interval_minutes=480,
+    )
+    wrapper = _make_wrapper_with_override(cfg)
+
+    base_ms = 1_700_000_000_000
+    day_ms = 24 * 60 * 60 * 1000
+
+    # Engage the brake: peak +15, then loss of -14 → dd=14 ≥ T=10
+    wrapper.record_trade_result(_make_trade("LDOUSDT", +15.0, base_ms))
+    wrapper.record_trade_result(_make_trade("LDOUSDT", -14.0, base_ms + 1 * day_ms))
+    assert wrapper._brake_on.get("LDOUSDT") is True, "Brake should be ON"
+
+    # Signal arrives 1000 days later — WELL past any real M threshold
+    far_future_open_time = base_ms + 1000 * day_ms
+
+    result_signal = wrapper.get_signal("LDOUSDT", far_future_open_time)
+
+    # With M=0, time-override never fires; brake stays ON; signal is BLOCKED
+    assert wrapper._brake_on.get("LDOUSDT") is True, (
+        "With M=0 (disabled), brake should remain ON regardless of elapsed time"
+    )
+    assert result_signal.direction == 0, (
+        "Signal must be BLOCKED when M=0 (no time-override) and brake is ON"
+    )
+
+    ldo_stats = wrapper._gate_stats.get("LDOUSDT")
+    assert ldo_stats is not None
+    assert ldo_stats.drawdown_brake_time_overrides == 0, "No time-override fires expected when M=0"
+    assert ldo_stats.drawdown_brake_fires == 1, (
+        "Brake kill counter must increment when signal is blocked"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Test 8: brake_time_override_does_not_re_trigger_after_state_recovery
+# ---------------------------------------------------------------------------
+
+
+def test_brake_time_override_does_not_re_trigger_after_state_recovery() -> None:
+    """If state-based recovery fires BEFORE M candles elapsed, time-override should not
+    fire on the same engagement (mutual exclusivity of brake-OFF mechanisms).
+
+    Sequence:
+      1. Engage brake (dd ≥ T).
+      2. Recovery trade arrives within M candles (dd ≤ T_R) → state-based brake-OFF.
+      3. Next signal arrives after M candles from original brake-ON.
+      4. Assert: time-override counter is 0 (state-based recovery fired, not time-override).
+      5. Assert: signal passes (brake is OFF from state-recovery, not from time-override).
+    """
+    m_candles = 21
+    cfg = _make_config_with_override(
+        threshold=7.0, recovery=6.0, window_days=45, m_candles=m_candles
+    )
+    wrapper = _make_wrapper_with_override(cfg)
+
+    base_ms = 1_700_000_000_000
+    day_ms = 24 * 60 * 60 * 1000
+
+    # Step 1: Engage brake via losses
+    # Trade sequence: +20, -14 → cum +6, peak +20, dd = 14 >= T=7.0 → brake ON
+    wrapper.record_trade_result(_make_trade("TRXUSDT", +20.0, base_ms))
+    wrapper.record_trade_result(_make_trade("TRXUSDT", -14.0, base_ms + 1 * day_ms))
+    assert wrapper._brake_on.get("TRXUSDT") is True, "Brake should be ON"
+    brake_on_time = base_ms + 1 * day_ms  # close_time of the trade that triggered brake-ON
+
+    # Step 2: Recovery trade arrives WITHIN M candles (5 candles after brake-ON).
+    # Recovery trade: +10 wpnl → cum = 6 + 10 = 16, peak = 20, dd = 20 - 16 = 4 ≤ T_R=6.0 → OFF
+    recovery_close_time = brake_on_time + 5 * _TEST_CANDLE_MS  # 5 candles after brake-ON
+    wrapper.record_trade_result(_make_trade("TRXUSDT", +10.0, recovery_close_time))
+    assert wrapper._brake_on.get("TRXUSDT") is False, (
+        "State-based recovery should have fired (dd=4 ≤ T_R=6.0)"
+    )
+
+    # Step 3: Signal arrives after m_candles+5 candles from brake_on_time (well past M=21)
+    signal_open_time = brake_on_time + (m_candles + 5) * _TEST_CANDLE_MS
+
+    result_signal = wrapper.get_signal("TRXUSDT", signal_open_time)
+
+    # Step 4: time-override counter must be 0 (state-based recovery fired first)
+    trx_stats = wrapper._gate_stats.get("TRXUSDT")
+    assert trx_stats is not None
+    assert trx_stats.drawdown_brake_time_overrides == 0, (
+        "Time-override must NOT fire when brake was already disengaged by state-based recovery"
+    )
+
+    # Step 5: Signal must pass (brake is OFF from state-recovery)
+    assert result_signal.direction == 1, "Signal must pass when brake is OFF"
+    assert trx_stats.drawdown_brake_fires == 0, "No brake kills expected (brake was OFF)"

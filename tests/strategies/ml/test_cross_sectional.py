@@ -14,11 +14,19 @@ Covers:
 
 from __future__ import annotations
 
+import json
+import tempfile
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 import pytest
 
 from crypto_trade.strategies.ml.cross_sectional import (
+    N_XS_SYMBOLS,
+    XS_DOWNSIDE_FEATURES,
+    XS_DOWNSIDE_MOM_LOOKBACK,
+    XS_DOWNSIDE_VOL_WINDOW,
     XS_HOLD_BARS,
     XS_HORIZON,
     XS_MIN_SYMBOLS_PER_BAR,
@@ -28,12 +36,15 @@ from crypto_trade.strategies.ml.cross_sectional import (
     XS_TURNOVER_CEILING,
     XS_UNIVERSE,
     CrossSectionalRankStrategy,
+    _engineer_xs_downside_features,
+    _generate_xs_monthly_splits,
     _spearman_ic,
     apply_no_trade_band,
     build_positions,
     compute_turnover_per_bar,
     compute_xs_sharpe,
     label_cross_sectional_rank,
+    run_cross_sectional_backtest,
 )
 from crypto_trade.strategies.ml.validation_v3 import combinatorial_purged_cv
 
@@ -46,8 +57,8 @@ def test_import_smoke():
     """Module imports without error and key constants are present."""
     assert XS_UNIVERSE is not None
     assert len(XS_UNIVERSE) == 22
-    assert XS_REQUIRED_GAP == 88
-    assert XS_HORIZON == 3
+    assert XS_REQUIRED_GAP == 484  # updated at iter-v3/091: (21+1)*22
+    assert XS_HORIZON == 21  # updated at iter-v3/091
 
 
 # ---------------------------------------------------------------------------
@@ -123,11 +134,11 @@ def test_label_thin_cross_section_returns_na():
 
 
 def test_xs_required_gap_formula():
-    """XS_REQUIRED_GAP must equal (H+1) * N_symbols = (3+1)*22 = 88."""
+    """XS_REQUIRED_GAP must equal (H+1) * N_symbols = (21+1)*22 = 484."""
     expected = (XS_HORIZON + 1) * len(XS_UNIVERSE)
     assert XS_REQUIRED_GAP == expected, (
         f"XS_REQUIRED_GAP={XS_REQUIRED_GAP} != (H+1)*N={expected}. "
-        "The gap formula ensures no training label's H=3 forward window "
+        "The gap formula ensures no training label's H=21 forward window "
         "overlaps a test row in the pooled cross-section."
     )
 
@@ -136,18 +147,18 @@ def test_cpcv_expected_gap_assertion_fires():
     """CPCV raises AssertionError when gap != expected_gap."""
     with pytest.raises(AssertionError, match="does not match expected_gap"):
         combinatorial_purged_cv(
-            n_samples=500,
+            n_samples=5000,
             n_splits=10,
             n_test_splits=2,
-            gap=66,  # wrong gap (legacy per-symbol)
-            expected_gap=XS_REQUIRED_GAP,  # 88
+            gap=88,  # wrong gap (old H=3 value)
+            expected_gap=XS_REQUIRED_GAP,  # 484
         )
 
 
 def test_cpcv_correct_gap_passes():
     """CPCV does NOT raise when gap == expected_gap == XS_REQUIRED_GAP."""
     splits = combinatorial_purged_cv(
-        n_samples=1000,
+        n_samples=10000,
         n_splits=10,
         n_test_splits=2,
         gap=XS_REQUIRED_GAP,
@@ -176,7 +187,7 @@ def test_no_label_leakage_at_test_boundary():
     We verify this: after applying the gap, no training timestamp-index is
     within H=3 of the nearest test boundary.
     """
-    n_timestamps = 500  # synthetic timestamp count
+    n_timestamps = 10000  # synthetic timestamp count (must be >> XS_REQUIRED_GAP=484)
 
     # CPCV operates on timestamp-space (n_samples = n_timestamps).
     splits = combinatorial_purged_cv(
@@ -509,6 +520,228 @@ def test_cv_splits_by_timestamp():
     # IC is a float in a plausible range for a random panel.
     assert isinstance(ic, float), f"Expected float IS IC, got {type(ic)}"
     assert -2.0 <= ic <= 2.0, f"IS IC implausibly large: {ic}"
+
+
+# ---------------------------------------------------------------------------
+# 12. iter-v3/092 multi-seed integration tests (brief Section 3.3 item 7)
+# ---------------------------------------------------------------------------
+
+
+def test_derive_ensemble_seeds_reproduces_baseline_lineage():
+    """(iv) _derive_ensemble_seeds(42,5) and _derive_ensemble_seeds(123,5) reproduce
+    the BASELINE_V3.md lineage tuple -- i.e. the cross-sectional runner reuses
+    the same derivation as the per-symbol baseline.
+
+    The expected values are computed from the canonical run_baseline_v3.py
+    _derive_ensemble_seeds implementation, copied verbatim to the cross-sectional
+    runner per brief Section 3.3 Mechanism A.
+    """
+    from run_cross_sectional_v3 import _derive_ensemble_seeds
+
+    # Reproduce the expected values independently using numpy directly.
+    def _canonical(outer_seed: int, size: int = 5) -> list[int]:
+        rng = np.random.default_rng(outer_seed)
+        return [int(s) for s in rng.integers(low=0, high=2**31 - 1, size=size)]
+
+    seeds_42 = _derive_ensemble_seeds(42, 5)
+    seeds_123 = _derive_ensemble_seeds(123, 5)
+
+    assert seeds_42 == _canonical(42, 5), (
+        f"_derive_ensemble_seeds(42, 5) = {seeds_42} does not match canonical = {_canonical(42, 5)}"
+    )
+    assert seeds_123 == _canonical(123, 5), (
+        f"_derive_ensemble_seeds(123, 5) = {seeds_123} does not match "
+        f"canonical = {_canonical(123, 5)}"
+    )
+    # Verify the two outer seeds produce DIFFERENT inner seed sets.
+    assert seeds_42 != seeds_123, (
+        "outer_seed=42 and outer_seed=123 must produce distinct inner seed sets"
+    )
+    assert len(seeds_42) == 5
+    assert len(seeds_123) == 5
+
+
+def test_inner_ensemble_trains_distinct_models():
+    """(i) The 5 inner models per cell are distinct objects with the 5 derived seeds.
+
+    CrossSectionalRankStrategy with ensemble_seeds=[s0, s1, s2, s3, s4] must
+    populate strategy._models with 5 distinct LGBMRanker objects after
+    _train_for_month completes.
+    """
+    rng = np.random.default_rng(0)
+    t0 = 1_700_000_000_000
+    interval_ms = 8 * 3600 * 1000
+    rows = []
+    for bar in range(100):
+        ts = t0 + bar * interval_ms
+        for i in range(6):
+            rows.append(
+                {
+                    "open_time": ts,
+                    "symbol": f"SYM{i:02d}USDT",
+                    "feat_a": float(rng.standard_normal()),
+                    "feat_b": float(rng.standard_normal()),
+                    "close": 100.0,
+                }
+            )
+    panel = pd.DataFrame(rows).sort_values(["open_time", "symbol"]).reset_index(drop=True)
+    labels = label_cross_sectional_rank(panel, horizon=XS_HORIZON)
+    valid_mask = labels.notna()
+    panel_valid = panel[valid_mask].reset_index(drop=True)
+    labels_valid = labels[valid_mask].reset_index(drop=True)
+
+    inner_seeds = [10, 20, 30, 40, 50]
+    strat = CrossSectionalRankStrategy(
+        feature_columns=["feat_a", "feat_b"],
+        training_months=24,
+        n_trials=2,
+        symbols=tuple(f"SYM{i:02d}USDT" for i in range(6)),
+        ensemble_seeds=inner_seeds,
+    )
+    strat._train_for_month(panel_valid, labels_valid)
+
+    assert len(strat._models) == 5, f"Expected 5 inner models, got {len(strat._models)}"
+    # All models are distinct objects.
+    for i, m in enumerate(strat._models):
+        import lightgbm as lgb_mod
+
+        assert isinstance(m, lgb_mod.LGBMRanker), f"Model {i} is not an LGBMRanker: {type(m)}"
+    # All objects are distinct (not the same reference).
+    model_ids = [id(m) for m in strat._models]
+    assert len(set(model_ids)) == 5, "Some inner models share the same object identity"
+
+
+def test_inner_ensemble_score_is_arithmetic_mean():
+    """(ii) The inner-ensemble score is the arithmetic mean of the 5 predict() vectors.
+
+    We directly verify _predict_ensemble returns element-wise mean of all models.
+    """
+    rng = np.random.default_rng(0)
+    t0 = 1_700_000_000_000
+    interval_ms = 8 * 3600 * 1000
+    rows = []
+    for bar in range(80):
+        ts = t0 + bar * interval_ms
+        for i in range(6):
+            rows.append(
+                {
+                    "open_time": ts,
+                    "symbol": f"SYM{i:02d}USDT",
+                    "feat_a": float(rng.standard_normal()),
+                    "feat_b": float(rng.standard_normal()),
+                    "close": 100.0,
+                }
+            )
+    panel = pd.DataFrame(rows).sort_values(["open_time", "symbol"]).reset_index(drop=True)
+    labels = label_cross_sectional_rank(panel, horizon=XS_HORIZON)
+    valid_mask = labels.notna()
+    panel_valid = panel[valid_mask].reset_index(drop=True)
+    labels_valid = labels[valid_mask].reset_index(drop=True)
+
+    inner_seeds = [11, 22, 33, 44, 55]
+    strat = CrossSectionalRankStrategy(
+        feature_columns=["feat_a", "feat_b"],
+        training_months=24,
+        n_trials=2,
+        symbols=tuple(f"SYM{i:02d}USDT" for i in range(6)),
+        ensemble_seeds=inner_seeds,
+    )
+    strat._train_for_month(panel_valid, labels_valid)
+
+    x_test = panel_valid[["feat_a", "feat_b"]].values.astype(np.float32)
+    ensemble_scores = strat._predict_ensemble(x_test)
+
+    # Manually compute the expected mean.
+    individual_preds = np.stack([m.predict(x_test) for m in strat._models], axis=0)
+    expected_mean = individual_preds.mean(axis=0)
+
+    np.testing.assert_allclose(
+        ensemble_scores,
+        expected_mean,
+        rtol=1e-6,
+        err_msg=("_predict_ensemble must return the arithmetic mean of individual predictions"),
+    )
+
+
+def test_aggregate_comparison_csv_mean_equals_seed_mean():
+    """(iii) The aggregate comparison.csv multi-seed-mean equals the mean of seed csvs.
+
+    This test constructs two synthetic per-seed metrics dicts and verifies that
+    _write_aggregate_reports produces a comparison.csv whose monthly_sharpe
+    in_sample equals the arithmetic mean of the two seed values.
+    """
+
+    from run_cross_sectional_v3 import _write_aggregate_reports
+
+    seed_metrics = [
+        {
+            "outer_seed": 42,
+            "is_monthly_sharpe": 0.60,
+            "oos_monthly_sharpe": 0.40,
+            "is_gross_monthly_sharpe": 0.70,
+            "oos_gross_monthly_sharpe": 0.50,
+            "is_max_drawdown": 0.20,
+            "oos_max_drawdown": 0.25,
+            "is_n_bars": 1000,
+            "oos_n_bars": 300,
+            "oos_rank_ic_mean": 0.035,
+            "frac_positive_paths": 0.55,
+            "is_turnover_per_bar": 0.10,
+            "oos_turnover_per_bar": 0.11,
+            "turnover_ceiling_gate_pass": True,
+            "oos_net_positive": True,
+        },
+        {
+            "outer_seed": 123,
+            "is_monthly_sharpe": 0.20,
+            "oos_monthly_sharpe": -0.10,
+            "is_gross_monthly_sharpe": 0.30,
+            "oos_gross_monthly_sharpe": 0.00,
+            "is_max_drawdown": 0.30,
+            "oos_max_drawdown": 0.35,
+            "is_n_bars": 1000,
+            "oos_n_bars": 300,
+            "oos_rank_ic_mean": 0.020,
+            "frac_positive_paths": 0.40,
+            "is_turnover_per_bar": 0.12,
+            "oos_turnover_per_bar": 0.13,
+            "turnover_ceiling_gate_pass": True,
+            "oos_net_positive": False,
+        },
+    ]
+
+    with tempfile.TemporaryDirectory() as tmpdir:  # noqa: SIM117
+        report_dir = Path(tmpdir)
+        _write_aggregate_reports(seed_metrics=seed_metrics, report_dir=report_dir, n_trials=35)
+
+        # Check comparison.csv exists.
+        comp = pd.read_csv(report_dir / "comparison.csv")
+        sharpe_row = comp[comp["metric"] == "monthly_sharpe"].iloc[0]
+        expected_mean_is = (0.60 + 0.20) / 2
+        expected_mean_oos = (0.40 + (-0.10)) / 2
+        assert abs(sharpe_row["in_sample"] - expected_mean_is) < 1e-9, (
+            f"Aggregate IS mean={sharpe_row['in_sample']:.6f} != expected {expected_mean_is:.6f}"
+        )
+        observed_oos = sharpe_row["out_of_sample"]
+        assert abs(observed_oos - expected_mean_oos) < 1e-9, (
+            f"Aggregate OOS mean={observed_oos:.6f} != expected {expected_mean_oos:.6f}"
+        )
+
+        # Check ensemble_summary.json.
+        with open(report_dir / "ensemble_summary.json") as f:
+            summary = json.load(f)
+        assert summary["n_seeds"] == 2
+        assert summary["ensemble_size_per_seed"] == 5
+        # Pareto: seed 123 is OOS-negative, so Pareto should be False.
+        assert summary["pareto_both_oos_positive"] is False
+        assert summary["confirmation_gate_G10"] is False
+
+        # Check dsr.json.
+        with open(report_dir / "dsr.json") as f:
+            dsr = json.load(f)
+        assert abs(dsr["monthly_sharpe_is"] - expected_mean_is) < 1e-9
+        assert abs(dsr["monthly_sharpe_oos"] - expected_mean_oos) < 1e-9
+        assert dsr["pareto_both_oos_positive"] is False
 
 
 def test_cv_uses_per_timestamp_ic():
@@ -981,8 +1214,7 @@ def test_no_trade_band_reduces_turnover():
             abs(nb_zero.get(s, 0.0) - held.get(s, 0.0)) for s in set(nb_zero) | set(held)
         )
         turn_band += sum(
-            abs(nb_band.get(s, 0.0) - held_band.get(s, 0.0))
-            for s in set(nb_band) | set(held_band)
+            abs(nb_band.get(s, 0.0) - held_band.get(s, 0.0)) for s in set(nb_band) | set(held_band)
         )
         held, held_band = nb_zero, nb_band
     assert turn_band <= turn_zero + 1e-9, (
@@ -1014,12 +1246,387 @@ def test_compute_turnover_per_bar():
 
 
 def test_iter089_construction_constants():
-    """iter-v3/089 construction constants are set to the EDA-selected values."""
+    """iter-v3/089/091 construction constants are set to the EDA-selected values."""
     # Quintile legs (EDA G1).
     assert abs(XS_QUANTILE_FRAC - 0.20) < 1e-12, "XS_QUANTILE_FRAC must be 0.20 (quintile)"
-    # 3-bar overlapping holds (horizon-matched; EDA E3).
-    assert XS_HOLD_BARS == 3, "XS_HOLD_BARS must be 3 (horizon-matched overlapping holds)"
+    # iter-v3/091: 21-bar overlapping holds (horizon-matched to H=21).
+    assert XS_HOLD_BARS == 21, "XS_HOLD_BARS must be 21 (iter-v3/091 horizon-matched to H=21)"
     # No-trade band tau = 0.020 (EDA E4 IS-best).
     assert abs(XS_NO_TRADE_BAND - 0.020) < 1e-12, "XS_NO_TRADE_BAND must be 0.020"
     # Hard turnover ceiling = 0.138 (EDA E6 — IS-best turnover x1.15 headroom).
     assert abs(XS_TURNOVER_CEILING - 0.138) < 1e-12, "XS_TURNOVER_CEILING must be 0.138"
+
+
+# ---------------------------------------------------------------------------
+# iter-v3/090 — gross-signal downside-risk feature expansion
+# ---------------------------------------------------------------------------
+
+
+def test_iter090_downside_feature_constants():
+    """iter-v3/090 — the two EDA-selected downside-risk features are declared."""
+    assert XS_DOWNSIDE_FEATURES == (
+        "xs_sortino_mom_12",
+        "xs_downbeta_50",
+    ), "XS_DOWNSIDE_FEATURES must be the C4-selected orthogonal downside pair"
+    # window constants match the EDA (50-bar vol window, 12-bar momentum lookback).
+    assert XS_DOWNSIDE_VOL_WINDOW == 50
+    assert XS_DOWNSIDE_MOM_LOOKBACK == 12
+
+
+def _synthetic_symbol_panel(n: int = 400, seed: int = 7) -> pd.DataFrame:
+    """A single-symbol panel with the columns the downside engineering reads."""
+    rng = np.random.default_rng(seed)
+    rets = rng.normal(0.0, 0.03, n)
+    close = 100.0 * np.cumprod(1.0 + rets)
+    btc_rets_3d = rng.normal(0.0, 0.05, n)  # 3-bar BTC return proxy
+    return pd.DataFrame(
+        {
+            "open_time": np.arange(n, dtype=np.int64) * (8 * 3600 * 1000),
+            "close": close,
+            "btc_ret_3d": btc_rets_3d,
+        }
+    )
+
+
+def test_iter090_engineer_adds_both_downside_features():
+    """_engineer_xs_downside_features adds exactly the two declared columns."""
+    df = _synthetic_symbol_panel()
+    out = _engineer_xs_downside_features(df.copy())
+    for f in XS_DOWNSIDE_FEATURES:
+        assert f in out.columns, f"engineering must add {f}"
+    # the engineered columns have real (non-all-NaN) values after warm-up.
+    for f in XS_DOWNSIDE_FEATURES:
+        tail = out[f].iloc[XS_DOWNSIDE_VOL_WINDOW + XS_DOWNSIDE_MOM_LOOKBACK :]
+        assert tail.notna().sum() > 0, f"{f} must have non-NaN values after warm-up"
+
+
+def test_iter090_downside_features_no_lookahead():
+    """The downside features at bar t must NOT change when FUTURE bars are
+    appended — the load-bearing look-ahead guard.
+
+    Engineer the features on the full panel and on a truncated prefix; the
+    overlapping rows (away from the truncation edge) must be bit-identical.
+    Every transform in `_engineer_xs_downside_features` is backward-looking, so
+    appending future bars cannot alter a past row's value.
+    """
+    df = _synthetic_symbol_panel(n=400)
+    full = _engineer_xs_downside_features(df.copy())
+    prefix = _engineer_xs_downside_features(df.iloc[:300].copy())
+    # compare rows [0, 300) — all present in both; the prefix has NO future data.
+    for f in XS_DOWNSIDE_FEATURES:
+        a = full[f].iloc[:300].to_numpy()
+        b = prefix[f].to_numpy()
+        both = ~(np.isnan(a) | np.isnan(b))
+        assert both.sum() > 50, f"{f}: need overlapping non-NaN rows to compare"
+        np.testing.assert_allclose(
+            a[both],
+            b[both],
+            rtol=1e-9,
+            atol=1e-12,
+            err_msg=f"{f} changed when future bars were appended — LOOK-AHEAD",
+        )
+
+
+def test_iter090_runner_feature_count():
+    """iter-v3/091: runner reverts to 13-feature base (downside features ABSENT)."""
+    import run_cross_sectional_v3 as runner
+
+    assert len(runner.XS_BASE_FEATURES) == 14, (
+        "14 base features (iter-v3/102 V3_FEATURE_COLUMNS_TOP_N=15 minus btc_ret_14d=14)"
+    )
+    assert len(runner.XS_FEATURE_COLUMNS) == 14, (
+        "iter-v3/102: alpha032 added to V3_FEATURE_COLUMNS_TOP_N; "
+        "XS_BASE_FEATURES = 15 - 1 (btc_ret_14d dropped) = 14"
+    )
+    for f in XS_DOWNSIDE_FEATURES:
+        assert f not in runner.XS_FEATURE_COLUMNS, (
+            f"{f} must be ABSENT from XS_FEATURE_COLUMNS (iter-v3/091 revert)"
+        )
+    assert "btc_ret_14d" not in runner.XS_FEATURE_COLUMNS
+    assert runner.ITERATION_LABEL == "v3-092"
+
+
+# ---------------------------------------------------------------------------
+# iter-v3/091 — Integration tests (Section 9 mandate)
+# ---------------------------------------------------------------------------
+
+
+def test_import_smoke_iter091():
+    """iter-v3/091 constants: H=21, HOLD_BARS=21, REQUIRED_GAP=484."""
+    assert XS_HORIZON == 21, f"H must be 21 for iter-v3/091, got {XS_HORIZON}"
+    assert XS_HOLD_BARS == 21, f"HOLD_BARS must be 21 for iter-v3/091, got {XS_HOLD_BARS}"
+    expected_gap = (XS_HORIZON + 1) * N_XS_SYMBOLS
+    assert XS_REQUIRED_GAP == expected_gap, (
+        f"XS_REQUIRED_GAP={XS_REQUIRED_GAP} != (H+1)*N={expected_gap}"
+    )
+    assert XS_REQUIRED_GAP == 484, f"XS_REQUIRED_GAP must be 484, got {XS_REQUIRED_GAP}"
+
+
+# ---------------------------------------------------------------------------
+# IT-1: model_free scoring smoke test (Section 9 integration test 1)
+# ---------------------------------------------------------------------------
+
+
+def _make_xs_panel_with_close(
+    n_syms: int = 8,
+    n_months: int = 3,
+    seed: int = 42,
+) -> pd.DataFrame:
+    """Synthetic cross-sectional panel spanning n_months calendar months.
+
+    Symbols are named SYM00..SYM{n_syms-1}.  Close prices follow a random
+    walk so that trailing-return scores are non-trivial.
+    """
+    rng = np.random.default_rng(seed)
+    t0 = 1_704_067_200_000  # 2024-01-01 00:00 UTC
+    interval_ms = 8 * 3600 * 1000
+    n_bars = n_months * 90
+    syms = [f"SYM{i:02d}USDT" for i in range(n_syms)]
+    price = np.ones(n_syms) * 100.0
+    rows = []
+    for bar in range(n_bars):
+        ts = t0 + bar * interval_ms
+        ret = rng.standard_normal(n_syms) * 0.02
+        price = price * (1 + ret)
+        for i, sym in enumerate(syms):
+            rows.append({"open_time": ts, "symbol": sym, "close": float(price[i])})
+    return pd.DataFrame(rows)
+
+
+def test_iter091_model_free_scoring_smoke():
+    """IT-1: model_free scoring integration smoke test.
+
+    Asserts:
+      (a) run_cross_sectional_backtest(score_mode='model_free') produces a
+          non-empty results DataFrame on a small IS panel.
+      (b) strategy._model is None after the run (no model trained).
+      (c) predicted_score values equal the independently-computed
+          trailing-H-bar return for the same (ts, sym).
+    """
+    n_syms = 8
+    n_months = 4  # 4 calendar months → training_months=3 → 1 test month
+    panel = _make_xs_panel_with_close(n_syms=n_syms, n_months=n_months)
+
+    # Add a dummy feature column so CrossSectionalRankStrategy instantiates OK.
+    panel["feat_a"] = 0.5
+
+    labels = label_cross_sectional_rank(panel, horizon=XS_HORIZON)
+
+    strategy = CrossSectionalRankStrategy(
+        feature_columns=["feat_a"],
+        training_months=3,  # 3 months → 1 test split
+        n_trials=1,
+        symbols=tuple(panel["symbol"].unique()),
+    )
+
+    t0 = int(panel["open_time"].min())
+    interval_ms = 8 * 3600 * 1000
+    oos_cutoff = int(panel["open_time"].max()) + interval_ms * 10  # all IS
+
+    # (a) non-empty results.
+    results = run_cross_sectional_backtest(
+        strategy=strategy,
+        panel=panel,
+        labels=labels,
+        train_start_ms=t0,
+        oos_cutoff_ms=oos_cutoff,
+        score_mode="model_free",
+    )
+    assert isinstance(results, pd.DataFrame), "Expected DataFrame return."
+    assert not results.empty, "model_free backtest must produce at least one row."
+
+    # (b) no model trained.
+    assert strategy._model is None, (
+        "strategy._model must be None after model_free run — no training should occur."
+    )
+
+    # (c) predicted_score == trailing-H-bar return.
+    # Compute mom_wide independently from the panel's close prices.
+    close_wide = panel.pivot_table(
+        index="open_time", columns="symbol", values="close", aggfunc="first"
+    ).sort_index()
+    mom_wide = close_wide / close_wide.shift(XS_HORIZON) - 1.0
+
+    # For rows with a non-zero predicted_score (i.e., not the 0.0 sentinel for
+    # carried symbols), verify the score equals the expected trailing return.
+    syms_in_panel = set(panel["symbol"].unique())
+    n_checked = 0
+    for _, row in results.iterrows():
+        ts = row["open_time"]
+        sym = row["symbol"]
+        score = row["predicted_score"]
+        # Skip the 0.0-sentinel rows (carried symbols not in panel at this bar).
+        if score == 0.0:
+            continue
+        if sym not in syms_in_panel:
+            continue
+        if ts not in mom_wide.index or sym not in mom_wide.columns:
+            continue
+        expected = float(mom_wide.loc[ts, sym])
+        if np.isnan(expected):
+            continue
+        assert abs(score - expected) < 1e-10, (
+            f"model_free predicted_score mismatch at ts={ts}, sym={sym}: "
+            f"got {score:.8f}, expected {expected:.8f}"
+        )
+        n_checked += 1
+        if n_checked >= 20:
+            break  # enough spot-checks
+
+    assert n_checked >= 1, (
+        "Could not verify any predicted_score against trailing-return formula. "
+        "Check mom_wide index alignment in run_cross_sectional_backtest."
+    )
+
+
+# ---------------------------------------------------------------------------
+# IT-2: gross-Sharpe runner-artifact smoke test (Section 9 integration test 2)
+# ---------------------------------------------------------------------------
+
+
+def test_iter091_gross_sharpe_shared_helper():
+    """IT-2: gross_monthly_sharpe and monthly_sharpe share the same code path.
+
+    Verifies:
+      - comparison.csv contains 'gross_monthly_sharpe' and 'monthly_sharpe' rows.
+      - dsr.json contains 'gross_monthly_sharpe_is', 'gross_monthly_sharpe_oos',
+        'monthly_sharpe_is', 'monthly_sharpe_oos'.
+      - Values are finite (not NaN).
+      - gross_pnl >= net_pnl per bar so gross Sharpe >= net Sharpe is plausible
+        (not strictly enforced — both can be negative; we just check finite).
+    """
+    import json
+    import sys
+
+    # Use a minimal synthetic results DataFrame that has gross_pnl > net_pnl
+    # (fee > 0) so both columns are non-trivially different.
+    rng = np.random.default_rng(77)
+    t0 = 1_704_067_200_000  # 2024-01-01 00:00 UTC
+    interval_ms = 8 * 3600 * 1000
+    rows = []
+    for bar in range(3 * 90):  # 3 months of IS data
+        ts = t0 + bar * interval_ms
+        gross = float(rng.standard_normal() * 0.002)
+        fee = abs(gross) * 0.1  # 10% fee
+        rows.append(
+            {
+                "open_time": ts,
+                "symbol": "SYM00USDT",
+                "position": 0.1,
+                "gross_pnl": gross,
+                "fee": fee,
+                "net_pnl": gross - fee,
+                "is_oos": False,
+                "rank_ic": 0.0,
+                "predicted_score": float(rng.standard_normal()),
+                "label_grade": None,
+            }
+        )
+    results_df = pd.DataFrame(rows)
+
+    # Import the runner to call _write_xs_reports.
+    # We need to make sure the runner is importable.
+    sys.path.insert(0, str(__import__("pathlib").Path(__file__).parent.parent.parent))
+    import run_cross_sectional_v3 as runner
+
+    from crypto_trade.strategies.ml.validation_v3 import PBOResult
+
+    pbo_result = PBOResult(
+        pbo=None,
+        frac_positive_paths=0.5,
+        path_sharpe_quartiles=(float("nan"), float("nan"), float("nan")),
+        n_splits_evaluated=0,
+        note="test",
+    )
+    rank_ic_stats = {"mean_rank_ic": 0.05, "std_rank_ic": 0.01, "n_timestamps": 10}
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        report_dir = __import__("pathlib").Path(tmpdir) / "test_reports"
+        runner._write_xs_reports(
+            results=results_df,
+            rank_ic_stats=rank_ic_stats,
+            pbo_result=pbo_result,
+            cpcv_df=pd.DataFrame(columns=["path_id", "sharpe", "max_dd", "n_trades"]),
+            report_dir=report_dir,
+            n_trials=0,
+            ensemble_size=1,
+        )
+
+        # Check comparison.csv.
+        comp = pd.read_csv(report_dir / "comparison.csv")
+        metrics = set(comp["metric"].tolist())
+        assert "monthly_sharpe" in metrics, "comparison.csv must contain 'monthly_sharpe'"
+        assert "gross_monthly_sharpe" in metrics, (
+            "comparison.csv must contain 'gross_monthly_sharpe' (IT-2 requirement)"
+        )
+        for m in ("monthly_sharpe", "gross_monthly_sharpe"):
+            row = comp[comp["metric"] == m].iloc[0]
+            assert np.isfinite(row["in_sample"]), f"{m} IS is not finite"
+
+        # Check dsr.json.
+        with open(report_dir / "dsr.json") as f:
+            dsr = json.load(f)
+        for key in (
+            "monthly_sharpe_is",
+            "monthly_sharpe_oos",
+            "gross_monthly_sharpe_is",
+            "gross_monthly_sharpe_oos",
+        ):
+            assert key in dsr, f"dsr.json must contain '{key}' (IT-2)"
+            assert np.isfinite(dsr[key]) or dsr[key] == 0.0, (
+                f"dsr.json['{key}'] is not finite: {dsr[key]}"
+            )
+
+
+# ---------------------------------------------------------------------------
+# IT-3: embargo-distinction assertion test (Section 9 integration test 3)
+# ---------------------------------------------------------------------------
+
+
+def test_iter091_embargo_distinction():
+    """IT-3: CPCV row-gap ≠ walk-forward time embargo at H=21.
+
+    Verifies the two separate embargo quantities introduced at iter-v3/091:
+      1. CPCV row-gap: XS_REQUIRED_GAP = (H+1)*N_XS_SYMBOLS = 484 (×N present).
+      2. Walk-forward wall-clock embargo: (H+1)*interval_ms (×N absent).
+
+    Also asserts the bugged form differs from the corrected form, and that
+    _generate_xs_monthly_splits at the corrected embargo produces splits.
+    """
+    interval_ms = 8 * 3600 * 1000
+
+    # --- (1) CPCV row-gap: XS_REQUIRED_GAP has ×N -------------------------
+    expected_cpcv_gap = (XS_HORIZON + 1) * N_XS_SYMBOLS
+    assert XS_REQUIRED_GAP == expected_cpcv_gap, (
+        f"CPCV gap={XS_REQUIRED_GAP} != (H+1)*N={expected_cpcv_gap}; "
+        "N_XS_SYMBOLS={N_XS_SYMBOLS} factor must be present in CPCV row-gap."
+    )
+
+    # --- (2) Walk-forward embargo: (H+1)*interval_ms, NO ×N ---------------
+    corrected_embargo_ms = (XS_HORIZON + 1) * interval_ms
+    bugged_embargo_ms = XS_REQUIRED_GAP * interval_ms  # old: ×N included in time
+
+    assert corrected_embargo_ms != bugged_embargo_ms, (
+        "Corrected and bugged embargo_ms must differ — if they are equal the "
+        "bug is not present to fix."
+    )
+    # Bugged form is N_XS_SYMBOLS × larger.
+    assert abs(bugged_embargo_ms / corrected_embargo_ms - N_XS_SYMBOLS) < 1e-9, (
+        f"Bugged form should be {N_XS_SYMBOLS}× larger than corrected, "
+        f"got ratio={bugged_embargo_ms / corrected_embargo_ms:.2f}"
+    )
+
+    # --- (3) _generate_xs_monthly_splits at corrected embargo produces splits ---
+    # Synthetic IS timestamp array: 2 calendar years of 8h bars
+    t0 = 1_704_067_200_000  # 2024-01-01 00:00 UTC
+    n_bars = 2 * 365 * 3  # 2 years of 8h bars (approx)
+    all_ts = np.array([t0 + i * interval_ms for i in range(n_bars)], dtype=np.int64)
+
+    splits_corrected = _generate_xs_monthly_splits(
+        all_timestamps=all_ts,
+        training_months=12,  # 12-month training window
+        embargo_ms=corrected_embargo_ms,
+    )
+    assert len(splits_corrected) > 0, (
+        "Corrected embargo must produce at least one walk-forward split over a 2-year panel."
+    )

@@ -1,0 +1,13 @@
+metric,value
+benchmark_093_return_ic_ceiling,0.0800
+go_mean_threshold,0.1200
+T2_return_ic_best_mean,0.1406
+T2_return_ic_best_max,0.1475
+T3_barrier_label_ic_best_mean,0.0981
+T3_barrier_label_ic_best_max,0.1223
+headline_mean_metric,T3_barrier_label_ic_best_mean
+headline_mean_value,0.0981
+n_symbols_over_ceiling,2
+t2_corroborates,True
+max_abs_corr_vs_price,0.6015
+VERDICT,NO-GO

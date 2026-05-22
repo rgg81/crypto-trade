@@ -103,6 +103,7 @@ _INTERVAL_MINUTES = {
     "8h": 480,
     "12h": 720,
     "1d": 1440,
+    "24h": 1440,  # iter-v3/117: alias for "1d" — 24h bar interval for candle-frequency axis
 }
 
 
@@ -169,6 +170,7 @@ class LightGbmStrategy:
         fast_mode: bool = False,
         inference_threshold_floor: float = 0.0,
         label_mode: str = "triple_barrier",
+        trend_scan_grid: tuple[int, ...] = (5, 8, 13, 21),
     ) -> None:
         if not feature_columns:
             raise ValueError(
@@ -211,7 +213,11 @@ class LightGbmStrategy:
         self._fast_mode: bool = fast_mode
         # iter-v3/072: labeling mode — "triple_barrier" (default, backward-compat)
         # or "fixed_horizon" (sign of N-candle-forward return; no barriers).
+        # iter-v3/105: "trend_scanning" (OLS trend, max-|t| horizon selection
+        # from *trend_scan_grid*). When label_mode != "trend_scanning", the
+        # grid is inert (backward-compatible for v1/v2 and all existing callers).
         self.label_mode: str = label_mode
+        self.trend_scan_grid: tuple[int, ...] = tuple(trend_scan_grid)
         # iter-v3/067 Path D: universal inference-time confidence-threshold floor.
         # Default 0.0 = no floor (backward-compatible). Pass 0.60 to raise the bar
         # for marginal-confidence trades (brief Section 3 Sub-fix 2).
@@ -393,6 +399,7 @@ class LightGbmStrategy:
             verbose=self.verbose,
             neutral_threshold_pct=self.neutral_threshold_pct,
             label_mode=self.label_mode,
+            trend_scan_grid=self.trend_scan_grid,
         )
 
         ternary = self.neutral_threshold_pct is not None
@@ -486,7 +493,9 @@ class LightGbmStrategy:
         # symbol-by-symbol), so one candle of time = n_symbols rows.
         if self.cv_label_gap:
             interval_minutes = _interval_to_minutes(self._interval)
-            embargo_candles = compute_embargo_candles(self.label_timeout_minutes, interval_minutes)
+            embargo_candles = compute_embargo_candles(
+                self.label_timeout_minutes, interval_minutes
+            )
             n_symbols = len(set(self._sym_arr[train_indices]))
             cv_gap = embargo_candles * n_symbols
         else:
@@ -657,6 +666,17 @@ class LightGbmStrategy:
         key = (symbol, open_time)
         feat_row = self._month_features.get(key)
         if feat_row is None:
+            from crypto_trade import decision_log
+
+            decision_log.log(
+                {
+                    "kind": "lgbm_signal",
+                    "symbol": symbol,
+                    "ot": open_time,
+                    "month": candle_month,
+                    "decision": "skipped:no_features",
+                }
+            )
             return NO_SIGNAL
 
         # Predict with all ensemble models and average probabilities
@@ -675,6 +695,8 @@ class LightGbmStrategy:
             # Binary: [P(short), P(long)]
             confidence = float(max(proba))
 
+        from crypto_trade import decision_log
+
         if confidence < self._confidence_threshold:
             if self.verbose > 0:
                 ts_str = _ms_to_datetime(open_time)
@@ -683,6 +705,20 @@ class LightGbmStrategy:
                     f"(conf={confidence:.2f} < "
                     f"{self._confidence_threshold:.2f})"
                 )
+            decision_log.log(
+                {
+                    "kind": "lgbm_signal",
+                    "symbol": symbol,
+                    "ot": open_time,
+                    "month": candle_month,
+                    "threshold": float(self._confidence_threshold),
+                    "ensemble_proba": proba,
+                    "per_seed_probas": [p for p in all_proba],
+                    "feat_hash": decision_log.hash_features(feat_row),
+                    "feat_values": {c: float(feat_row[i]) for i, c in enumerate(self._selected_cols)},
+                    "decision": "skipped:below_threshold",
+                }
+            )
             return NO_SIGNAL
 
         # R3 OOD detector: skip candles where features are too far from training
@@ -703,6 +739,20 @@ class LightGbmStrategy:
                             f"[predict] {ts_str} {symbol} → SKIP "
                             f"(OOD dist={dist:.2f} > {self._ood_cutoff:.2f})"
                         )
+                    decision_log.log(
+                        {
+                            "kind": "lgbm_signal",
+                            "symbol": symbol,
+                            "ot": open_time,
+                            "month": candle_month,
+                            "threshold": float(self._confidence_threshold),
+                            "ensemble_proba": proba,
+                            "ood_dist": dist,
+                            "ood_cutoff": float(self._ood_cutoff),
+                            "feat_hash": decision_log.hash_features(feat_row),
+                            "decision": "skipped:ood",
+                        }
+                    )
                     return NO_SIGNAL
 
         # Regime filter: skip low-volatility candles
@@ -716,6 +766,17 @@ class LightGbmStrategy:
                         f"(NATR={natr:.2f}% < "
                         f"{self.min_natr_threshold:.1f}%)"
                     )
+                decision_log.log(
+                    {
+                        "kind": "lgbm_signal",
+                        "symbol": symbol,
+                        "ot": open_time,
+                        "month": candle_month,
+                        "natr": float(natr),
+                        "min_natr": float(self.min_natr_threshold),
+                        "decision": "skipped:low_natr",
+                    }
+                )
                 return NO_SIGNAL
 
         if ternary:
@@ -751,10 +812,29 @@ class LightGbmStrategy:
         # iter-v3/080: flat weight=100 restored (reverts /079 conviction-derate).
         # confidence is in scope (past-only, look-ahead-clean) and is now threaded
         # as passive metadata into Signal → Order → TradeResult → trades.csv.
-        weight = 100
+        # iter-v3/132 live-integration merge: keep main's forensic decision_log
+        # (commit 62d56dc) AND v3's confidence passthrough (/080 revert).
+        decision_log.log(
+            {
+                "kind": "lgbm_signal",
+                "symbol": symbol,
+                "ot": open_time,
+                "month": candle_month,
+                "threshold": float(self._confidence_threshold),
+                "ensemble_proba": proba,
+                "per_seed_probas": [p for p in all_proba],
+                "feat_hash": decision_log.hash_features(feat_row),
+                "feat_values": {c: float(feat_row[i]) for i, c in enumerate(self._selected_cols)},
+                "direction": direction,
+                "tp_pct": tp_pct,
+                "sl_pct": sl_pct,
+                "confidence": confidence,
+                "decision": "signal",
+            }
+        )
         return Signal(
             direction=direction,
-            weight=weight,
+            weight=100,
             tp_pct=tp_pct,
             sl_pct=sl_pct,
             confidence=confidence,
@@ -776,7 +856,7 @@ class LightGbmStrategy:
             14_399_999: "4h",
             28_799_999: "8h",
             43_199_999: "12h",
-            86_399_999: "1d",
+            86_399_999: "24h",  # iter-v3/117: 24h bars named "24h" to match parquet suffix
         }
         best = "8h"
         best_dist = abs(diff - 28_799_999)

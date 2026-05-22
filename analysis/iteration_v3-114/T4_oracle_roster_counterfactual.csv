@@ -1,0 +1,10 @@
+open_time,date,direction,exit_reason,net_pnl_pct,weighted_pnl,trigger,trigger_value,threshold,suppressed
+1727337599999,2024-09-26,-1,stop_loss,-4.2556,-2.5108,abs_ldo_vz,0.3126,1.6621,False
+1728345599999,2024-10-07,-1,stop_loss,-5.0184,-2.3586,abs_ldo_vz,0.2694,1.6621,False
+1732492799999,2024-11-24,-1,stop_loss,-6.2311,0.0,abs_ldo_vz,0.7221,1.6621,False
+1733846399999,2024-12-10,-1,stop_loss,-8.7533,-8.7533,abs_ldo_vz,1.0657,1.6621,False
+1734883199999,2024-12-22,1,take_profit,16.7745,12.9164,abs_ldo_vz,1.5422,1.6621,False
+1736553599999,2025-01-10,1,stop_loss,-6.3746,-2.6774,abs_ldo_vz,0.664,1.6621,False
+1737043199999,2025-01-16,-1,take_profit,10.6977,5.5628,abs_ldo_vz,0.5752,1.6621,False
+1738367999999,2025-01-31,-1,take_profit,12.5147,10.3872,abs_ldo_vz,0.9138,1.6621,False
+1740499199999,2025-02-25,1,stop_loss,-8.4675,-3.641,abs_ldo_vz,1.1829,1.6621,False

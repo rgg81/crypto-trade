@@ -1,0 +1,9 @@
+K_candles,K_minutes,sample,n_orig_trades,n_resolved_within_K,n_truncated_at_K,pct_truncated,n_TP_within,n_SL_within,n_no_confirm_within,n_TIMEOUT_within,n_EOD_within,pct_TP_within,pct_resolution_TP_SL
+21,10080,in_sample,173,173,0,0.00%,56,91,10,16,0,32.37%,84.97%
+21,10080,out_of_sample,98,98,0,0.00%,39,46,9,3,1,39.80%,86.73%
+42,20160,in_sample,173,173,0,0.00%,56,91,10,16,0,32.37%,84.97%
+42,20160,out_of_sample,98,98,0,0.00%,39,46,9,3,1,39.80%,86.73%
+63,30240,in_sample,173,173,0,0.00%,56,91,10,16,0,32.37%,84.97%
+63,30240,out_of_sample,98,98,0,0.00%,39,46,9,3,1,39.80%,86.73%
+84,40320,in_sample,173,173,0,0.00%,56,91,10,16,0,32.37%,84.97%
+84,40320,out_of_sample,98,98,0,0.00%,39,46,9,3,1,39.80%,86.73%

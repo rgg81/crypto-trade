@@ -1,0 +1,8 @@
+{
+  "t3a_8h_baseline_mean": 0.39506222841168664,
+  "t3b_4h_proxy_mean": 0.3907849069791908,
+  "delta_mean_4h_minus_8h": -0.0042773214324958175,
+  "delta_std_4h_minus_8h": -0.016964751460173344,
+  "delta_q75_4h_minus_8h": 0.0034618944175278665,
+  "interpretation": "Relative improvement of 4h vs 8h: a positive delta_mean indicates 4h density would produce HIGHER mean IS Sharpe at single-seed budget. The interpretation relies on the proxy assumption that bootstrap-upsampling the /121 IS trade roster faithfully represents the 4h-density Optuna trajectory. The proxy may under-estimate the true 4h benefit because actual 4h training would include different (depth, colsample, reg_lambda) search regions that are not captured by trade-level resampling."
+}

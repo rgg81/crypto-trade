@@ -15,7 +15,7 @@ import time
 import numpy as np
 import pandas as pd
 
-from crypto_trade.backtest import check_order, compute_vt_scale
+from crypto_trade.backtest import check_order, compute_vt_scale, evaluate_order_with_no_confirm
 from crypto_trade.backtest_models import Signal
 from crypto_trade.client import BinanceClient
 from crypto_trade.feature_store import lookup_features
@@ -157,6 +157,19 @@ class ModelRunner:
             from crypto_trade.strategies.ml.risk_v2 import RiskV2Wrapper
 
             self.strategy = RiskV2Wrapper(inner, model_config.risk_v2_config)
+        elif model_config.risk_wrapper == "v3":
+            # iter-v3/132: v3 models wrap inner LightGbmStrategy in RiskV3Wrapper
+            # (subclasses RiskV2Wrapper; overrides _build_lookups for v3 parquet
+            # schema + get_signal to add BTC regime gates). Takes RiskV2Config —
+            # no new dataclass needed; field reused for boot-time isolation.
+            if model_config.risk_v2_config is None:
+                raise ValueError(
+                    f"ModelConfig {model_config.name}: risk_wrapper='v3' "
+                    "requires risk_v2_config (RiskV2Config; consumed by RiskV3Wrapper) — got None"
+                )
+            from crypto_trade.strategies.ml.risk_v3 import RiskV3Wrapper
+
+            self.strategy = RiskV3Wrapper(inner, model_config.risk_v2_config)
         else:
             self.strategy = inner
         self._master: pd.DataFrame | None = None
@@ -246,16 +259,61 @@ class LiveEngine:
             db_path = config.db_path
         self._state = StateStore(db_path)
 
-        self._order_mgr = OrderManager(config, self._state, self._auth_client)
+        # Per-symbol order constraints from /fapi/v1/exchangeInfo:
+        #   - quantityPrecision (decimal places) + LOT_SIZE.stepSize (increment)
+        #   - PRICE_FILTER.tickSize (price increment — what Binance actually
+        #     validates; pricePrecision alone is insufficient, e.g. NEAR has
+        #     pricePrecision=4 but tickSize=0.0010, so 1.3122 is rejected).
+        # Without these rounding rules, the API returns 400 Bad Request.
+        qty_precision: dict[str, int] = {}
+        tick_size: dict[str, float] = {}
+        if self._auth_client is not None:
+            try:
+                info = self._auth_client.get_exchange_info()
+                for sym_info in info.get("symbols", []):
+                    qty_precision[sym_info["symbol"]] = int(sym_info["quantityPrecision"])
+                    for f in sym_info.get("filters", []):
+                        if f.get("filterType") == "PRICE_FILTER":
+                            tick_size[sym_info["symbol"]] = float(f["tickSize"])
+                            break
+                print(
+                    f"[live] Loaded quantityPrecision + tickSize for "
+                    f"{len(qty_precision)} symbols from /fapi/v1/exchangeInfo"
+                )
+            except Exception as exc:
+                print(f"[live] WARNING: could not load exchangeInfo: {exc}")
+
+        self._order_mgr = OrderManager(
+            config,
+            self._state,
+            self._auth_client,
+            quantity_precision=qty_precision,
+            tick_size=tick_size,
+        )
+
+        # iter-v3/132: /116 no_confirm primitive state (load-bearing for /121).
+        # Maps (model_name, symbol, trade_id) → confirmed_bool. Set True when
+        # favorable excursion reaches threshold; popped when trade closes.
+        # Rebuilt for SEEDED open trades during catch-up (past-candle replay).
+        # Backtest's id(order) approach doesn't work in live: Order objects
+        # are rebuilt by trade_to_order each candle, so id() isn't stable.
+        self._no_confirm_confirmed: dict[tuple[str, str, str], bool] = {}
 
         # Trade-log filename mirrors the DB-path branch above.
         if config.testnet:
             log_name = "testnet_trades.csv"
+            decision_log_name = "testnet_decisions.jsonl"
         elif config.dry_run:
             log_name = "dry_run_trades.csv"
+            decision_log_name = "dry_run_decisions.jsonl"
         else:
             log_name = "live_trades.csv"
+            decision_log_name = "live_decisions.jsonl"
         self._logger = TradeLogger(config.data_dir / log_name, config.fee_pct, config.dry_run)
+
+        from crypto_trade import decision_log
+
+        decision_log.configure(config.data_dir / decision_log_name)
 
         self._runners = [ModelRunner(mc, config) for mc in config.models]
 
@@ -340,22 +398,29 @@ class LiveEngine:
         self._btc_killed_count: int = 0
 
     def _refresh_groups(self, symbols_subset: list[str]) -> list[tuple[tuple[str, ...], Path, str]]:
-        """Group ``symbols_subset`` by track (v1/v2) for refresh_features_by_track.
+        """Group ``symbols_subset`` by track (v1/v2/v3) for refresh_features_by_track.
 
         A symbol's track is determined by its owning runner's risk_wrapper:
-        v2-wrapped runners use ``data/features_v2`` (or whatever the runner
-        resolved via per-model override), v1 runners use ``data/features``.
+        - risk_wrapper=="v3" → "v3" track (features_v3 dispatch, iter-v3/132)
+        - risk_wrapper=="v2" → "v2" track
+        - otherwise           → "v1" track
         """
         v1_syms: list[str] = []
         v2_syms: list[str] = []
+        v3_syms: list[str] = []
         v1_dir: Path | None = None
         v2_dir: Path | None = None
+        v3_dir: Path | None = None
         for runner in self._runners:
-            track = "v2" if runner.model_config.risk_wrapper == "v2" else "v1"
+            wrapper = runner.model_config.risk_wrapper
+            track = "v3" if wrapper == "v3" else ("v2" if wrapper == "v2" else "v1")
             for s in runner.model_config.symbols:
                 if s not in symbols_subset:
                     continue
-                if track == "v2":
+                if track == "v3":
+                    v3_syms.append(s)
+                    v3_dir = runner.features_dir
+                elif track == "v2":
                     v2_syms.append(s)
                     v2_dir = runner.features_dir
                 else:
@@ -366,7 +431,150 @@ class LiveEngine:
             groups.append((tuple(v1_syms), v1_dir, "v1"))
         if v2_syms and v2_dir is not None:
             groups.append((tuple(v2_syms), v2_dir, "v2"))
+        if v3_syms and v3_dir is not None:
+            groups.append((tuple(v3_syms), v3_dir, "v3"))
         return groups
+
+    def _defer_xsymbol_if_btc_lagging(self, new_candles: dict[str, Kline]) -> None:
+        """Drop v2/v3 symbols from ``new_candles`` if BTC's kline doesn't cover them.
+
+        v2 cross-asset features (cross_btc.py:_BTC_CACHE) AND v3 cross-asset
+        features (cross_btc_v3.py:_BTC_CACHE_V3) both merge BTC by open_time.
+        If BTC is stale, the merge silently NaN-fills — feeding NaN into the
+        model, which produces a different prediction than the backtest. We
+        try fetching BTC once; if it's still stale (Binance hasn't published
+        BTC's candle yet), the affected v2/v3 symbols are removed from this
+        tick's ``new_candles`` so they get re-detected next poll, by which
+        time BTC will normally have caught up.
+
+        iter-v3/132: renamed from ``_defer_v2_if_btc_lagging`` to cover v3
+        symbols too. Old name kept as alias below for back-compat.
+
+        Mutates ``new_candles`` in place. ``last_processed_<symbol>`` is
+        written at end-of-tick, so a deferred symbol naturally re-fires
+        next tick.
+        """
+        from crypto_trade import decision_log
+        from crypto_trade.kline_array import load_kline_array
+        from crypto_trade.storage import csv_path
+
+        xsym_in_tick = [
+            s
+            for runner in self._runners
+            if runner.model_config.risk_wrapper in ("v2", "v3")
+            for s in runner.model_config.symbols
+            if s in new_candles
+        ]
+        if not xsym_in_tick:
+            return
+
+        max_xsym_ot = max(new_candles[s].open_time for s in xsym_in_tick)
+        btc_csv = csv_path(self.config.data_dir, "BTCUSDT", self.config.interval)
+        if not btc_csv.exists():
+            return
+
+        def _btc_max_ot() -> int | None:
+            ka = load_kline_array(btc_csv)
+            if len(ka) == 0:
+                return None
+            return int(ka.df["open_time"].iloc[-1])
+
+        btc_max_ot = _btc_max_ot()
+        if btc_max_ot is not None and btc_max_ot >= max_xsym_ot:
+            return  # BTC already current — no action needed
+
+        # BTC lags. Try one fetch — Binance may have published since last poll.
+        refresh_klines(self._fetch_client, ["BTCUSDT"], self.config.interval, self.config.data_dir)
+        btc_max_ot = _btc_max_ot()
+        if btc_max_ot is not None and btc_max_ot >= max_xsym_ot:
+            return  # Caught up after fetch — proceed normally
+
+        # Still stale — defer the v2/v3 symbols whose ot exceeds BTC's extent.
+        deferred = [s for s in xsym_in_tick if new_candles[s].open_time > (btc_max_ot or 0)]
+        for s in deferred:
+            del new_candles[s]
+
+        decision_log.log(
+            {
+                "kind": "xsymbol_deferred_btc_lag",
+                "deferred_syms": deferred,
+                "max_xsym_ot": max_xsym_ot,
+                "btc_max_ot": btc_max_ot,
+            }
+        )
+        print(
+            f"[live] BTC kline lagging (max_ot={btc_max_ot}, need {max_xsym_ot}); "
+            f"deferring v2/v3 syms to next tick: {deferred}"
+        )
+
+    # Back-compat alias for existing tests/callers that still reference the
+    # v2-only name. iter-v3/132 renamed the actual function to
+    # _defer_xsymbol_if_btc_lagging to reflect v3 coverage.
+    def _defer_v2_if_btc_lagging(self, new_candles: dict[str, Kline]) -> None:
+        self._defer_xsymbol_if_btc_lagging(new_candles)
+
+    def _check_real_no_confirm_exits(self) -> None:
+        """Real-mode no_confirm pass — fires no_confirm exit for non-paper trades.
+
+        iter-v3/132 Phase 5d. Runs after check_exchange_exits so SL/TP that
+        already triggered on Binance wins. Iterates each open non-paper trade
+        whose owning model has enable_no_confirm_exit=True and:
+        1. Loads the symbol's latest kline (the most-recently-closed candle).
+        2. Calls OrderManager.check_no_confirm_exit which updates state and
+           fires market close + cancels algos if the trade is still
+           unconfirmed at arm_time.
+        """
+        from crypto_trade.kline_array import load_kline_array
+        from crypto_trade.storage import csv_path
+
+        for trade in self._state.get_open_trades():
+            if is_paper_trade(trade):
+                continue
+            mc = self._find_model_for_trade(trade)
+            if mc is None or not mc.enable_no_confirm_exit:
+                continue
+            # Load latest closed candle for this symbol — that's what
+            # the no_confirm gate evaluates against.
+            kline_path = csv_path(self.config.data_dir, trade.symbol, self.config.interval)
+            if not kline_path.exists():
+                continue
+            ka = load_kline_array(kline_path)
+            if len(ka) == 0:
+                continue
+            row = ka.df.iloc[-1]
+            candle_close_time = int(row["close_time"])
+            # Only consider candles AFTER the trade's open_time (entry-candle
+            # excursion check is the open-bar; this method handles subsequent bars).
+            if candle_close_time <= trade.open_time:
+                continue
+            reason = self._order_mgr.check_no_confirm_exit(
+                trade,
+                candle_high=float(row["high"]),
+                candle_low=float(row["low"]),
+                candle_close=float(row["close"]),
+                candle_close_time=candle_close_time,
+                no_confirm_trigger_atr=mc.no_confirm_trigger_atr,
+                no_confirm_k_candles=mc.no_confirm_k_candles,
+                interval_ms=self._candle_duration_ms,
+                no_confirm_state=self._no_confirm_confirmed,
+                model_name=mc.name,
+            )
+            if reason:
+                updated = self._state.get_trade(trade.id)
+                if updated:
+                    self._handle_trade_close(updated)
+
+    def _find_model_for_trade(self, trade: LiveTrade):
+        """Lookup the owning ModelConfig for a trade by matching model_name.
+
+        iter-v3/132: needed for per-model /116 no_confirm config threading
+        through OrderManager.check_dry_run_exit + the catch-up loop. Returns
+        None if no matching runner — caller falls through to bare check_order.
+        """
+        for runner in self._runners:
+            if runner.model_config.name == trade.model_name:
+                return runner.model_config
+        return None
 
     def catch_up_only(self) -> None:
         """Run the same setup pipeline as ``run()`` and exit before the poll loop.
@@ -535,6 +743,83 @@ class LiveEngine:
                 f"{ {k: round(v, 2) for k, v in self._cum_weighted_pnl.items()} }"
             )
 
+        # iter-v3/132: rebuild /116 no_confirm state for currently-open SEEDED
+        # trades whose owning model has enable_no_confirm_exit=True. Without
+        # this, a SEEDED trade with prior favorable excursion would be treated
+        # as "not confirmed" after engine restart and could fire no_confirm
+        # exit prematurely on the next candle.
+        self._rebuild_no_confirm_state_for_seeded()
+
+    def _rebuild_no_confirm_state_for_seeded(self) -> None:
+        """Replay past candles for SEEDED open trades to rebuild no_confirm state.
+
+        For each currently-open trade whose owning model has /116 no_confirm
+        enabled, walks past candles from open_time forward (up to "now") and
+        sets ``self._no_confirm_confirmed[(model, sym, trade_id)]`` to True
+        if favorable excursion ever reached the threshold.
+
+        This is mandatory after every engine startup — otherwise SEEDED open
+        trades carrying real on-exchange positions would lose their already-
+        confirmed status and potentially fire spurious no_confirm exits.
+        """
+        from crypto_trade.kline_array import load_kline_array
+        from crypto_trade.storage import csv_path
+
+        open_trades = self._state.get_open_trades()
+        if not open_trades:
+            return
+
+        n_rebuilt = 0
+        n_confirmed = 0
+        for trade in open_trades:
+            mc = self._find_model_for_trade(trade)
+            if mc is None or not mc.enable_no_confirm_exit:
+                continue
+            # Derive arm_time + threshold_price the same way trade_to_order does
+            sl_pct = abs(trade.entry_price - trade.stop_loss_price) / trade.entry_price
+            if trade.direction == 1:
+                threshold_price = trade.entry_price * (
+                    1.0 + mc.no_confirm_trigger_atr * sl_pct
+                )
+            else:
+                threshold_price = trade.entry_price * (
+                    1.0 - mc.no_confirm_trigger_atr * sl_pct
+                )
+            # Load symbol klines and scan candles from open_time forward
+            kline_path = csv_path(self.config.data_dir, trade.symbol, self.config.interval)
+            if not kline_path.exists():
+                continue
+            ka = load_kline_array(kline_path)
+            if len(ka) == 0:
+                continue
+            df = ka.df
+            # Filter to candles with open_time > trade.open_time (excludes entry candle;
+            # backtest also evaluates confirmation on POST-entry candles only).
+            scan = df[df["open_time"] > trade.open_time]
+            if len(scan) == 0:
+                continue
+            state_key = (mc.name, trade.symbol, trade.id)
+            confirmed = False
+            for _, row in scan.iterrows():
+                if trade.direction == 1:
+                    if float(row["high"]) >= threshold_price:
+                        confirmed = True
+                        break
+                else:
+                    if float(row["low"]) <= threshold_price:
+                        confirmed = True
+                        break
+            if confirmed:
+                self._no_confirm_confirmed[state_key] = True
+                n_confirmed += 1
+            n_rebuilt += 1
+
+        if n_rebuilt > 0:
+            print(
+                f"[live] Rebuilt no_confirm state for {n_rebuilt} SEEDED v3 trades "
+                f"({n_confirmed} already confirmed by past excursion)"
+            )
+
     def _record_trade_close_for_vt(self, trade: LiveTrade) -> None:
         """Record a closed trade's PnL into the VT daily accumulator."""
         if not self.config.vol_targeting:
@@ -611,12 +896,34 @@ class LiveEngine:
 
         Uses the OWNING model's cooldown_candles, not LiveConfig's, so v2
         models (cooldown_candles=4) get a different gate than v1 (default 2).
+
+        ``close_time`` is the trade's recorded exit timestamp. For Binance
+        SL/TP fills this is the algo's wall-clock ``triggerTime`` — mid-
+        candle. The backtest, in contrast, exits at the candle close. We
+        normalize by rounding ``close_time`` UP to the close of the candle
+        that contained it, so a live mid-candle fill produces the SAME
+        cooldown_until value as the backtest's same-candle SL/TP exit.
+        Without this, a SL fill at 23:42 would end cooldown 17 minutes
+        earlier than the backtest's 23:59 fill, occasionally opening the
+        next trade one candle too early (observed: v1 BTC/ETH/DOT on
+        2026-05-16/05-18, 3 signal-level mismatches against the backtest).
         """
         cooldown_candles = self._cooldown_for(model_name)
         if cooldown_candles <= 0:
             return
-        cooldown_until = close_time + cooldown_candles * self._candle_duration_ms
+        candle_close = self._round_to_candle_close(close_time)
+        cooldown_until = candle_close + cooldown_candles * self._candle_duration_ms
         self._state.set_state(f"cooldown_{model_name}_{symbol}", str(cooldown_until))
+
+    def _round_to_candle_close(self, ms: int) -> int:
+        """Return the close_time of the 8h candle containing ``ms``.
+
+        Binance 8h candles are aligned at 00:00, 08:00, 16:00 UTC; for
+        ms inside [open, open+8h), the close_time is open+8h-1ms.
+        """
+        candle_ms = self._candle_duration_ms
+        candle_open = (ms // candle_ms) * candle_ms
+        return candle_open + candle_ms - 1
 
     def _cooldown_for(self, model_name: str) -> int:
         """Resolve per-model cooldown_candles via the matching runner; fall back to LiveConfig."""
@@ -693,6 +1000,19 @@ class LiveEngine:
     def _initial_setup(self) -> None:
         """Fetch latest klines, regenerate features, warmup all models."""
         all_symbols = list(self._all_symbols)
+        # iter-v3/132: when any v2 or v3 model is configured, ensure BTCUSDT
+        # klines are present (cross-asset features merge BTC by open_time).
+        # When any v3 model is configured, also ensure ETHUSDT — the
+        # _load_eth_v3_features helper inside add_cross_btc_v3_features is
+        # called unconditionally even though eth_vs_sym_rv_50 was removed
+        # from V3_FEATURE_COLUMNS_TOP_N at /124 (dormant merge that still
+        # needs fresh ETH data to avoid NaN noise).
+        any_v2 = any(mc.risk_wrapper == "v2" for mc in self.config.models)
+        any_v3 = any(mc.risk_wrapper == "v3" for mc in self.config.models)
+        if (any_v2 or any_v3) and "BTCUSDT" not in all_symbols:
+            all_symbols.append("BTCUSDT")
+        if any_v3 and "ETHUSDT" not in all_symbols:
+            all_symbols.append("ETHUSDT")
         print(f"[live] Refreshing klines for {', '.join(all_symbols)}...")
         refresh_klines(self._fetch_client, all_symbols, self.config.interval, self.config.data_dir)
 
@@ -757,14 +1077,20 @@ class LiveEngine:
         # exit_reason) and is closed deterministically below.
         #
         # Real numeric-ID trades (left over from a prior --live session) are
-        # explicitly excluded — they belong to reconciler + poll-loop. Pre-
-        # loading them would let catch-up's check_order simulate a fake exit
-        # and falsely close DB rows whose Binance positions are still open.
+        # excluded from `open_trades` itself — pre-loading them into that dict
+        # would let catch-up's check_order simulate a fake exit and falsely
+        # close DB rows whose Binance positions are still open. They ARE
+        # tracked in `real_open_syms` so step (b)'s open-guard knows the
+        # symbol is already taken — without it, catch-up would replay
+        # subsequent same-direction signals and produce a CATCHUP- duplicate
+        # that the live tick had correctly skipped via `position_open`.
         open_trades: dict[str, LiveTrade] = {}
+        real_open_syms: set[str] = set()
         for seeded in self._state.get_open_trades(model_name=runner.model_config.name):
             if seeded.symbol not in runner.model_config.symbols:
                 continue
             if not is_paper_trade(seeded):
+                real_open_syms.add(seeded.symbol)
                 continue
             open_trades[seeded.symbol] = seeded
         # Pre-load both dicts from engine_state so the seeder's boundary keys
@@ -817,16 +1143,44 @@ class LiveEngine:
             # runs unconditionally — it has its own seeded_through guard.
             if sym in open_trades and ot >= open_trades[sym].open_time:
                 trade = open_trades[sym]
-                order = trade_to_order(trade)
-                result = check_order(
-                    order,
-                    ot,
-                    float(open_arr[i]),
-                    float(high_arr[i]),
-                    float(low_arr[i]),
-                    ct,
-                    self.config.fee_pct,
-                )
+                # iter-v3/132: thread /116 no_confirm via the shared helper.
+                # For v1/v2 (enable_no_confirm=False), behaves identically to
+                # bare check_order. For v3 trades, the model_config carries
+                # the per-model no_confirm primitive settings.
+                mc = runner.model_config
+                if mc.enable_no_confirm_exit:
+                    order = trade_to_order(
+                        trade,
+                        enable_no_confirm=True,
+                        no_confirm_trigger_atr=mc.no_confirm_trigger_atr,
+                        no_confirm_k_candles=mc.no_confirm_k_candles,
+                        interval_ms=self._candle_duration_ms,
+                    )
+                    state_key = (mc.name, sym, trade.id)
+                    result = evaluate_order_with_no_confirm(
+                        order,
+                        ot,
+                        float(open_arr[i]),
+                        float(high_arr[i]),
+                        float(low_arr[i]),
+                        float(close_arr[i]),
+                        ct,
+                        self.config.fee_pct,
+                        enable_no_confirm=True,
+                        no_confirm_state=self._no_confirm_confirmed,
+                        state_key=state_key,
+                    )
+                else:
+                    order = trade_to_order(trade)
+                    result = check_order(
+                        order,
+                        ot,
+                        float(open_arr[i]),
+                        float(high_arr[i]),
+                        float(low_arr[i]),
+                        ct,
+                        self.config.fee_pct,
+                    )
                 if result is not None:
                     trade = open_trades.pop(sym)
                     trade.status = "closed"
@@ -842,8 +1196,7 @@ class LiveEngine:
                     # For timeouts, result.close_time = candle open_time.
                     if runner.cooldown_candles > 0:
                         cooldown_until[sym] = (
-                            result.close_time
-                            + runner.cooldown_candles * self._candle_duration_ms
+                            result.close_time + runner.cooldown_candles * self._candle_duration_ms
                         )
 
             # (b) Get signal
@@ -852,6 +1205,7 @@ class LiveEngine:
                 n_signals += 1
                 if (
                     sym not in open_trades
+                    and sym not in real_open_syms
                     and ot >= cooldown_until.get(sym, 0)
                     and ot >= self._risk_cooldown_until.get(sym, 0)
                     and ot > seeded_through.get(sym, 0)
@@ -936,6 +1290,13 @@ class LiveEngine:
             for trade in self._order_mgr.check_exchange_exits():
                 self._handle_trade_close(trade)
 
+        # 2b. iter-v3/132: /116 no_confirm exit for real-mode trades.
+        # Runs AFTER check_exchange_exits so any SL/TP that already triggered
+        # on Binance takes precedence (algo wins over engine-side rule).
+        # Skipped in dry_run — paper trades go through check_dry_run_exit.
+        if not self.config.dry_run:
+            self._check_real_no_confirm_exits()
+
         # 3. Detect new candles
         t_detect_start = time.monotonic()
         new_candles: dict[str, Kline] = {}
@@ -947,6 +1308,27 @@ class LiveEngine:
                 new_candles[symbol] = candle
         t_detect = time.monotonic() - t_detect_start
 
+        if not new_candles:
+            return
+
+        from crypto_trade import decision_log
+
+        decision_log.log(
+            {
+                "kind": "tick_start",
+                "now_ms": now_ms,
+                "new_candles": {sym: c.open_time for sym, c in new_candles.items()},
+            }
+        )
+
+        # Defer v2 candles when BTC's kline file hasn't caught up to them yet.
+        # Binance's per-symbol candle publication is racy: a v2 symbol's just-
+        # closed candle can land in the API a few seconds before BTC's. If we
+        # ran v2 feature gen now, ``cross_btc`` would merge against a stale BTC
+        # frame → btc_ret_*, btc_vol_14d, sym_vs_btc_ret_7d all NaN → LightGBM
+        # routes NaN inputs down default tree branches → predictions diverge
+        # from backtest's clean inputs (broken signal-level determinism).
+        self._defer_xsymbol_if_btc_lagging(new_candles)
         if not new_candles:
             return
 
@@ -971,6 +1353,21 @@ class LiveEngine:
             if not is_paper_trade(trade):
                 continue
             candle = new_candles[trade.symbol]
+            # iter-v3/132: thread per-model /116 no_confirm config if the
+            # owning model has it enabled (v3 baseline). v1/v2 fall through
+            # to bare check_order via check_dry_run_exit's back-compat path.
+            mc = self._find_model_for_trade(trade)
+            nc_kwargs = {}
+            if mc is not None and mc.enable_no_confirm_exit:
+                nc_kwargs = dict(
+                    candle_close=float(candle.close),
+                    enable_no_confirm=True,
+                    no_confirm_trigger_atr=mc.no_confirm_trigger_atr,
+                    no_confirm_k_candles=mc.no_confirm_k_candles,
+                    interval_ms=self._candle_duration_ms,
+                    no_confirm_state=self._no_confirm_confirmed,
+                    model_name=mc.name,
+                )
             reason = self._order_mgr.check_dry_run_exit(
                 trade,
                 candle.open_time,
@@ -978,6 +1375,7 @@ class LiveEngine:
                 float(candle.high),
                 float(candle.low),
                 candle.close_time,
+                **nc_kwargs,
             )
             if reason:
                 updated = self._state.get_trade(trade.id)
@@ -1050,18 +1448,66 @@ class LiveEngine:
                 f"get_signal={t_signal * 1000:.0f}ms"
             )
 
+            from crypto_trade import decision_log
+
             for symbol, sig in signals.items():
+                candle_ot_for_log = new_candles[symbol].open_time if symbol in new_candles else None
                 if sig.direction == 0 or sig.weight <= 0:
+                    decision_log.log(
+                        {
+                            "kind": "tick_decision",
+                            "model": runner.model_config.name,
+                            "symbol": symbol,
+                            "ot": candle_ot_for_log,
+                            "sig_direction": sig.direction,
+                            "sig_weight": sig.weight,
+                            "decision": "skipped:no_signal",
+                        }
+                    )
                     continue
 
                 open_trades = self._state.get_open_trades(model_name=runner.model_config.name)
                 open_syms = {t.symbol for t in open_trades}
                 if symbol in open_syms:
+                    decision_log.log(
+                        {
+                            "kind": "tick_decision",
+                            "model": runner.model_config.name,
+                            "symbol": symbol,
+                            "ot": candle_ot_for_log,
+                            "sig_direction": sig.direction,
+                            "decision": "skipped:position_open",
+                        }
+                    )
                     continue
 
+                # Cooldown gate keyed on the just-closed candle's Kline.open_time,
+                # NOT wall-clock now_ms. The catch-up + backtest paths both use
+                # ot >= cooldown_until; using now_ms here would let live open one
+                # candle earlier than backtest whenever the tick runs even a few
+                # seconds before cooldown_until's nominal expiry (e.g., now_ms
+                # just past the candle close while ot is still inside cooldown).
+                candle_ot_for_cooldown = (
+                    new_candles[symbol].open_time if symbol in new_candles else None
+                )
                 cooldown_key = f"cooldown_{runner.model_config.name}_{symbol}"
                 cooldown_str = self._state.get_state(cooldown_key)
-                if cooldown_str and now_ms < int(cooldown_str):
+                if (
+                    cooldown_str
+                    and candle_ot_for_cooldown is not None
+                    and candle_ot_for_cooldown < int(cooldown_str)
+                ):
+                    decision_log.log(
+                        {
+                            "kind": "tick_decision",
+                            "model": runner.model_config.name,
+                            "symbol": symbol,
+                            "ot": candle_ot_for_log,
+                            "sig_direction": sig.direction,
+                            "cooldown_until": int(cooldown_str),
+                            "decision": "skipped:cooldown",
+                        }
+                    )
                     continue
 
                 # FIX 2: entry price from master DataFrame (same source as backtest)
@@ -1069,6 +1515,17 @@ class LiveEngine:
                 # R1 consecutive-SL cool-down gate (iter 173) — keyed on
                 # candle open_time to match backtest's gate semantics.
                 if candle_ot < self._risk_cooldown_until.get(symbol, 0):
+                    decision_log.log(
+                        {
+                            "kind": "tick_decision",
+                            "model": runner.model_config.name,
+                            "symbol": symbol,
+                            "ot": candle_ot,
+                            "sig_direction": sig.direction,
+                            "risk_cooldown_until": int(self._risk_cooldown_until.get(symbol, 0)),
+                            "decision": "skipped:r1_cooldown",
+                        }
+                    )
                     continue
 
                 # iter-v2/019: BTC trend filter (v2 models only). Mirrors
@@ -1092,6 +1549,16 @@ class LiveEngine:
                             f"[live] BTC trend filter killed v2 signal: "
                             f"model={runner.model_config.name} symbol={symbol} "
                             f"direction={sig.direction} ot={candle_ot}"
+                        )
+                        decision_log.log(
+                            {
+                                "kind": "tick_decision",
+                                "model": runner.model_config.name,
+                                "symbol": symbol,
+                                "ot": candle_ot,
+                                "sig_direction": sig.direction,
+                                "decision": "skipped:btc_trend_filter",
+                            }
                         )
                         continue
 
@@ -1132,12 +1599,43 @@ class LiveEngine:
                     weight_factor=weight_factor,
                 )
                 self._logger.log_open(trade)
+                decision_log.log(
+                    {
+                        "kind": "tick_decision",
+                        "model": runner.model_config.name,
+                        "symbol": symbol,
+                        "ot": candle_ot,
+                        "ct": candle_close_time,
+                        "sig_direction": sig.direction,
+                        "sig_weight": sig.weight,
+                        "entry_price": float(entry_price),
+                        "vt_scale": float(vt_scale),
+                        "weight_factor": float(weight_factor),
+                        "stop_loss_price": float(trade.stop_loss_price),
+                        "take_profit_price": float(trade.take_profit_price),
+                        "entry_order_id": trade.entry_order_id,
+                        "decision": "opened",
+                    }
+                )
 
                 # Same-candle SL/TP simulation for paper trades only. Real
                 # numeric-ID trades from `--live` poll-loop have Binance SL/TP
                 # orders placed already; their exits flow through
                 # check_exchange_exits.
                 if is_paper_trade(trade):
+                    # iter-v3/132: thread per-model /116 no_confirm config.
+                    mc = runner.model_config
+                    nc_kwargs = {}
+                    if mc.enable_no_confirm_exit:
+                        nc_kwargs = dict(
+                            candle_close=float(row["close"].iloc[0]),
+                            enable_no_confirm=True,
+                            no_confirm_trigger_atr=mc.no_confirm_trigger_atr,
+                            no_confirm_k_candles=mc.no_confirm_k_candles,
+                            interval_ms=self._candle_duration_ms,
+                            no_confirm_state=self._no_confirm_confirmed,
+                            model_name=mc.name,
+                        )
                     self._order_mgr.check_dry_run_exit(
                         trade,
                         candle_ot,
@@ -1145,6 +1643,7 @@ class LiveEngine:
                         float(row["high"].iloc[0]),
                         float(row["low"].iloc[0]),
                         candle_close_time,
+                        **nc_kwargs,
                     )
 
         # 6. Mark processed

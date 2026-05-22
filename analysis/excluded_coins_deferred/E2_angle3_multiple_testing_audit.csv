@@ -1,0 +1,14 @@
+symbol,winning_label,ic_is_half1,ic_is_half2,half2_minus_half1,half2_still_genuine,both_halves_positive,note
+BTCUSDT,fwd_h3,0.08424,0.05328,-0.03096,False,True,
+ETHUSDT,fwd_h9,0.08772,0.09247,0.00476,True,True,
+LINKUSDT,tb_tp2.0_sl1.0_t12,-0.01552,0.09514,0.11066,True,False,
+LTCUSDT,fwd_h9,-0.00856,0.15326,0.16182,True,False,
+DOTUSDT,tb_tp3.0_sl1.5_t21,0.03496,0.09223,0.05727,True,True,
+BNBUSDT,tb_tp2.0_sl1.0_t45,0.0094,0.18,0.17061,True,True,
+SOLUSDT,tb_tp2.0_sl1.0_t45,-0.11456,0.11018,0.22474,True,False,
+XRPUSDT,fwd_h6,0.05685,0.05634,-0.0005,False,True,
+DOGEUSDT,tb_tp2.0_sl1.0_t45,-0.00797,0.08043,0.0884,True,False,
+NEARUSDT,tb_tp3.0_sl1.5_t21,0.05567,0.18573,0.13006,True,True,
+BCHUSDT,tb_tp3.0_sl1.5_t21,-0.06678,0.13092,0.1977,True,False,
+LDOUSDT,,,,,,,insufficient
+TRXUSDT,fwd_h3,0.03395,0.05298,0.01903,False,True,

@@ -1,0 +1,5 @@
+metric,value,tstat,n_bars,frac_positive
+xs_model_ic,0.00819,1.312,3431,0.512
+long_short_mean_fwd3_pct,-0.01604,,3431,0.503
+long_short_std_fwd3_pct,2.17352,,3431,
+long_short_ann_sharpe_proxy,-0.141,,3431,

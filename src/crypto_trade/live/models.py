@@ -72,8 +72,21 @@ class ModelConfig:
     cooldown_candles: int | None = None
     vol_targeting: bool | None = None
     ensemble_seeds: tuple[int, ...] | None = None
-    risk_wrapper: Literal["none", "v2"] = "none"
+    risk_wrapper: Literal["none", "v2", "v3"] = "none"
     risk_v2_config: "RiskV2Config | None" = None
+    # iter-v3/132: per-model training-hyperparam overrides (resolved at runtime
+    # by ModelRunner; None ⇒ fall back to LiveConfig). v3 /121 uses n_trials=35,
+    # training_months=24 — mismatched from v1/v2 LiveConfig defaults (50, 24).
+    training_months: int | None = None
+    n_trials: int | None = None
+    cv_splits: int | None = None
+    # iter-v3/132: per-model no_confirm primitive (iter-v3/116, merged at /121).
+    # Cuts trades after K candles if no favorable trigger_atr × sl_pct excursion.
+    # Per-model (NOT LiveConfig) so --track both can mix v3 (enabled) with
+    # v1/v2 (disabled) without cross-contamination.
+    enable_no_confirm_exit: bool = False
+    no_confirm_trigger_atr: float = 0.50
+    no_confirm_k_candles: int = 4
 
 
 # Static feature list for baseline v152: 193 features.
@@ -376,6 +389,74 @@ def _build_v2_baseline_models() -> tuple[ModelConfig, ...]:
 
 V2_BASELINE_MODELS: tuple[ModelConfig, ...] = _build_v2_baseline_models()
 COMBINED_MODELS: tuple[ModelConfig, ...] = BASELINE_MODELS + V2_BASELINE_MODELS
+
+
+# iter-v3/132: v3 baseline pinned to iter-v3/121 canonical (BCH/LDO/TRX 8h,
+# 14-feature stack, RiskV3Wrapper with /127 brake + /129 scaling DISABLED,
+# /116 no_confirm primitive ENABLED, n_trials=35, ENSEMBLE_SIZE=10).
+# BASELINE_V3.md tag v0.v3-121 (IS +1.31 / OOS +0.97).
+def _build_v3_baseline_models() -> tuple[ModelConfig, ...]:
+    """Construct V3_BASELINE_MODELS lazily so the import-time module load
+    doesn't pull in features_v3 / risk_v3 (heavy deps) for every consumer.
+
+    Pinned to iter-v3/121 canonical baseline. The 10-seed unified ensemble
+    is hardcoded here for boot-time isolation; the runner's ENSEMBLE_SEEDS
+    at run_baseline_v3.py:156-167 is the single source of truth, this
+    duplicate is intentional to keep live/models.py importable without
+    the run_baseline_v3.py module.
+    """
+    from crypto_trade.features_v3 import V3_FEATURE_COLUMNS_TOP_N
+    from crypto_trade.strategies.ml.risk_v2 import RiskV2Config
+
+    # iter-v3/121 10-seed unified lineage (outer=42 prefix + outer=123 suffix).
+    # Matches run_baseline_v3.py:ENSEMBLE_SEEDS verbatim.
+    V3_ENSEMBLE_SEEDS_121: tuple[int, ...] = (
+        191664963, 1662057957, 1405681631, 942484272, 929893137,    # outer=42 lineage
+        33158374, 1465339467, 1273345680, 115579757, 1952249162,    # outer=123 lineage
+    )
+
+    # iter-v3/121 RiskV2Config (consumed by RiskV3Wrapper). Verified against
+    # run_baseline_v3.py:_build_v3_model. /127 brake + /129 scaling DISABLED
+    # (axes CLOSED at /127 / /129 NEGATIVE-catastrophic).
+    v3_risk_cfg = RiskV2Config(
+        zscore_threshold=2.0,
+        adx_threshold=20.0,
+        # /127 brake CLOSED
+        enable_per_symbol_drawdown_brake=False,
+        # /129 continuous scaling CLOSED
+        enable_per_symbol_drawdown_scaling=False,
+    )
+
+    return tuple(
+        ModelConfig(
+            name=f"V3-{sym.replace('USDT', '')}",
+            symbols=(sym,),
+            use_atr_labeling=True,
+            atr_tp_multiplier=2.0,   # /121 DEFAULT_ATR_MULTIPLIERS
+            atr_sl_multiplier=1.0,
+            atr_column="natr_21_raw",
+            feature_columns=V3_FEATURE_COLUMNS_TOP_N,
+            features_dir=Path("data/features_v3"),
+            cooldown_candles=4,                       # /121 BacktestConfig cooldown
+            vol_targeting=False,                      # vol_scale lives in RiskV3Wrapper
+            ensemble_seeds=V3_ENSEMBLE_SEEDS_121,
+            ood_enabled=False,                        # z-score OOD lives in RiskV3Wrapper
+            risk_wrapper="v3",
+            risk_v2_config=v3_risk_cfg,
+            # /121 training hyperparams (mismatched from LiveConfig defaults)
+            training_months=24,
+            n_trials=35,
+            cv_splits=5,
+            # /116 no_confirm primitive (load-bearing in /121 baseline)
+            enable_no_confirm_exit=True,
+            no_confirm_trigger_atr=0.50,
+            no_confirm_k_candles=4,
+        )
+        for sym in ("BCHUSDT", "LDOUSDT", "TRXUSDT")
+    )
+
+
+V3_BASELINE_MODELS: tuple[ModelConfig, ...] = _build_v3_baseline_models()
 
 
 @dataclass(frozen=True)

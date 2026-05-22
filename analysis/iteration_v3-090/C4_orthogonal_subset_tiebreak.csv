@@ -1,0 +1,4 @@
+feature_set,n_features,composite_ic_ir,delta_ic_ir_vs_anchor,quintile_ls_spread_sharpe,decision
+anchor_13,13,0.1981,0.0000,-0.0754,baseline
+anchor_13 + cand_sortino_mom_12 + cand_downbeta_50 (orthogonal pair),15,0.2171,0.0190,-0.0535,SELECTED — the /090 feature additions
+anchor_13 + all 3 C1-selected B2 features (incl redundant cand_semidev_50),16,0.2303,0.0322,-0.0539,REJECTED — cand_semidev_50 has 0.80 xs-rank-corr with incumbent range_realized_vol_50 (iter-v3/070 colsample-dilution risk); it adds +0.013 IC-IR but ~0.000 realised L-S spread Sharpe

@@ -1,0 +1,4 @@
+symbol,n_folds,tb_label_mean_abs_ic,hz_label_mean_abs_ic,hz_over_tb_ic_ratio,hz_ic_within_25pct
+BCHUSDT,6,0.20714,0.30992,1.4962,True
+LDOUSDT,6,0.20802,0.33205,1.5962,True
+TRXUSDT,6,0.22361,0.34068,1.5235,True

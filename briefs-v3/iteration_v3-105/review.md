@@ -1,0 +1,73 @@
+# Phase 7.5 Critic Review — iter-v3/105
+
+OVERALL: MERGE
+
+## Iteration Type (from Brief Section 0.5)
+TYPE: EXPLORATION — cycle-5 EXPLORATION slot #5, 3-seed mode. The brief has no literal "Section 0.5" header, but Section 3 ("Backtest spec") and Section 8 ("Classification Taxonomy") unambiguously declare this a 3-seed EXPLORATION (`--exploration`, `EXPLORATION_ENSEMBLE_SIZE=3`, `--n-trials 35`), anchored to the /060 3-seed EXPLORATION-mode reference, with the explicit statement that no EXPLORATION outcome updates `BASELINE_V3.md`. For an EXPLORATION, Check 3 edge-axis FAILs (DSR/PSR) are informational and do NOT trigger BLOCK; only methodology defects (look-ahead, embargo error, hard-coded-placeholder DSR/PBO) trigger BLOCK.
+
+## Per-Check Status
+
+### Check 1 — Look-Ahead Audit: PASS
+
+This was the dispatch priority — the IS-collapse (+0.2201) / OOS-spike (+1.1897) signature demands that look-ahead be conclusively ruled out before any other reading. I traced `_trend_scan_label` (`src/crypto_trade/strategies/ml/labeling.py:132-214`) independently, line by line:
+
+1. **The forward look never exceeds 21 candles.** `max_h = max(grid) = max((5,8,13,21)) = 21` (`labeling.py:151`). The forward gather loop `for j_pos in range(pos + 1, min(pos + max_h + 1, len(sym_idx)) + 1)` with the inner `if len(available) >= max_h: break` (`labeling.py:153-158`) collects at most 21 forward closes. The per-horizon OLS at `labeling.py:167-212` builds `y = [entry_close, available[0..h-1]]` for `h ∈ grid` — the forward window is `close[t+1 .. t+h]`, `h ≤ 21`. No horizon, and no fitted statistic, reaches beyond `t + 21`.
+
+2. **The embargo fully covers the forward look.** `compute_embargo_candles(10080, 480) = 10080 // 480 + 1 = 22` candles (`walk_forward.py:38`, verified). `walk_forward.py:113`: `train_end_ms = test_start_ms - embargo_ms` pushes the training-candidate cutoff back 22 candles. Training candidates are `open_time < train_end_ms` (`lgbm.py:359-361`), so the latest training-set entry bar `t` satisfies `t ≤ test_start − 22 candles`. The latest forward bar a training-set label can touch is `t + 21 ≤ test_start − 22 + 21 = test_start − 1 candle` — **strictly inside the training period, one full candle short of the test month**. The embargo (22) was sized for the triple-barrier `timeout//interval + 1`; `max(grid) = 21 = timeout//interval`, so the embargo over-covers the trend-scanning forward look by exactly 1 candle. The grid-capping at the incumbent 21-candle horizon (brief Section 3.4) is precisely what makes this hold with zero new leakage surface.
+
+3. **The OLS at bar `t` uses only `close[t .. t+h]`** — the entry close plus forward closes — which is the prediction *target* window, correct by construction (a label is permitted to look forward; the model's *features* must not). The features are the 14 unchanged `V3_FEATURE_COLUMNS`, bit-identical to /059, carrying no future information.
+
+4. **No centered window, no full-series statistic, no `bfill`.** The OLS slope/t-stat is a closed-form per-bar least-squares fit over a bounded forward window — no rolling op, no `pandas` expanding/centered call, no fill. The forward gather indexes `close_arr[sym_idx[j_pos]]` where `sym_idx = symbol_indices[sym]` is a single-symbol index array (`labeling.py:308-310, 326`), so the forward window stays within the entry bar's own symbol — no cross-symbol bleed.
+
+The QE's hard-causality test (`tests/strategies/ml/test_trend_scanning_label_mode.py:132-177`, `test_trend_scanning_hard_causality`) is **genuine and sufficient**: it builds a 23-bar frame (entry + 21 forward + 1 deadline), appends 5 extra bars beyond `max(grid)`, and asserts the label, `long_pnl`, and `short_pnl` of bar 0 are bit-identical (`abs(diff) < 1e-9`) between the short and long frames. Bar 0's full grid maximum h=21 is exercised at the frame boundary — the 23-bar base frame is exactly the h=21-resolvable case, and the test confirms data beyond bar 21 does not change the label. `test_trend_scanning_max_grid_leakage_guard` (lines 306-354) additionally asserts `_trend_scan_label` returns `best_h ∈ grid` and `best_h ≤ 21`. Both tests genuinely exercise the h=21 horizon at the embargo boundary. The runner preflight `_verify_feature_columns` (`run_baseline_v3.py:1144-1155`) is a hard `assert max(trend_scan_grid)=21 ≤ timeout_candles=21` runtime gate. **No look-ahead found.** The OOS +1.1897 is NOT a leak artifact — it is, per the QR's Phase-8 call, an IS-collapse / OOS-regime outcome (the /102 NEGATIVE-shaped structural twin).
+
+### Check 2 — Embargo Width: PASS
+
+Required gap and embargo are unchanged from /059 by deliberate design. `timeout_minutes = 10080`, `candle_minutes = 480` (8h) → `timeout_candles = 21`. Required CV gap = `(timeout_candles + 1) × n_symbols = (21 + 1) × 3 = 66` (3-symbol BCH/LDO/TRX universe). Actual: `REQUIRED_GAP = 66` (`run_baseline_v3.py:1036`, asserted by `_verify_label_leakage_gap` at line 2713), CV gap `embargo_candles × n_symbols` (`lgbm.py:495-497`), walk-forward embargo 22 candles (`walk_forward.py:113`, `compute_embargo_candles` verified to return 22). The trend-scanning label's forward window `max(grid) = 21` is identical to the incumbent triple-barrier 21-candle timeout, so the embargo correctly covers the new label geometry — see Check 1 for the numerical leak-path proof (latest forward bar = `test_start − 1 candle`). Symmetric application is via `compute_embargo_candles` as the single source of truth used at both the train/test split boundary and the inner Optuna CV gap. Actual gap (66) = required gap (66). PASS.
+
+### Check 3 — Multiple-Testing Correction: FAIL (informational only — TYPE=EXPLORATION)
+
+`dsr.json` and `comparison.csv` report `DSR = 0.0`, `PBO = 0.1153`, `PSR = 1.0`, `n_trials = 315`, `n_eff = 16`. Against the hard thresholds: DSR 0.0 < 0.95 (FAIL), PBO 0.1153 < 0.4 (PASS), PSR 1.0 > 0.95 (PASS). DSR fails its threshold; PBO and PSR clear.
+
+Per `feedback_v3_dsr_mode_artifact.md`, in 3-seed EXPLORATION mode `n_trials = 315` makes DSR/PSR regime-specific structural artifacts — DSR=0.0 / PSR=1.0 are the expected EXPLORATION-mode pair and are INFORMATIONAL ONLY, not classification or BLOCK inputs. The DSR axis FAIL does NOT trigger BLOCK for this EXPLORATION iteration. The PBO axis is the BLOCK-triggering one and it clears decisively (0.1153, well below 0.4). `frac_positive_paths = 0.644` clears the CPCV 0.55 gate.
+
+I verified the DSR/PBO/PSR are **genuinely computed, not hard-coded placeholders** (the iter-v3/090/092 defect). `dsr.json` carries a full computational provenance trail: `pbo_path_sharpe_q25/q50/q75` (−0.243 / 0.3351 / 0.8378), `min_trl_months = 20.67`, `n_daily_obs_oos = 82`, `dsr_relative = 0.965083`, `cpcv_q75_annualized_b4 = 0.639849`. `cpcv_paths.csv` is a genuine 45-row CPCV path matrix with dispersed Sharpes (range −1.32 to +1.88). `per_cell_pbo.csv` has 109 per-cell rows with distinct per-month PBO values (0.0 to 1.0, mean 0.1153). The multiple-testing machinery is genuine; this is not the /090/092 defect.
+
+### Check 4 — IC Correlation: PASS
+
+No feature family was added — `V3_FEATURE_COLUMNS` stays at 14, bit-identical to /059. Check 4 governs *newly-added* feature families; there are none. The required `ic_matrix.csv` is present (14×14). The highest off-diagonal pair is `vwap_dev_20`×`regime_momentum_signed_5d` at |IC| = 0.7642 — a composed-feature pair inherited from /059 unchanged, carved out of the strict <0.70 gate per `feedback_v3_engineered_feature_pivot.md`. No new redundancy is introduced by this iteration. PASS.
+
+### Check 5 — ADF Stationarity: PASS
+
+`adf_test.csv` is per-symbol × per-feature × per-month. Check 5 tests stationarity at the end of the training window. The end-of-training-window months 2025-01/02/03 report `stationary=True` for all 14 features on all 3 symbols at 2025-03 (verified: BCH lines 870-883, LDO lines 1304-1317, TRX lines 2186-2199; every row True, p-values 0.0 to 0.045). The early-window `stationary=False` rows have empty `adf_statistic`/`p_value` (insufficient-data, not a failure). No feature is added by this iteration. PASS.
+
+### Check 6 — Pareto Dominance: PASS (not applicable — single-mode 3-seed EXPLORATION)
+
+`pareto_front.csv` is absent from `reports-v3/iteration_v3-105/` — correctly so. This is a 3-seed EXPLORATION (`ensemble_summary.json`: `"mode": "exploration"`, `"ensemble_size": 3`, all three inner seeds lineage `outer=42`). A multi-seed Pareto front is the pre-registered requirement for the cycle-5 CONFIRMATION, not this EXPLORATION. The check is not applicable at this stage; its absence is correct, not a defect. PASS.
+
+### Check 7 — Reproducibility: PASS
+
+(1) Commit SHA: engineering report stamps HEAD `a819727b724ee3894643e01ca3d1baa7d45c27c8` and gate SHA `3ce01acf6f4009a7263ebef58968fe7b9a489b88`. (2) Explicit feature columns: `run_baseline_v3.py:1902` passes `feature_columns=list(features_for_symbol(symbol))` — explicit per-symbol list, never `None`. (3) Inner ensemble seeds literal: `[42, 123, 456, 789, 1001]` unchanged; `ensemble_summary.json` shows the 3 EXPLORATION inner seeds derived from `outer=42`. (4) Trade PnL spot-check — 3 OOS trades recomputed from `out_of_sample/trades.csv`: row 2 (BCH dir−1, 303.870→282.100779, w=0.33): raw +7.1640%, net 7.0640, weighted 2.3311 — match. Row 3 (BCH dir−1, 314.950→328.014999, w=0.55): net −4.2483, weighted −2.3366 — match. Row 9 (LDO dir−1, 0.987600→0.877261, w=0.88): net 11.0724, weighted 9.7437 — match. No off-by-one, no sign error. PASS.
+
+### Check 8 — Hypothesis-Implementation Alignment: PASS
+
+Brief Section 1 hypothesis: replace the fixed 21-candle triple-barrier *training label* with a per-bar trend-scanning label, keeping the 14 features, the BCH/LDO/TRX universe, the triple-barrier TP/SL/timeout EXITS, and the 7-gate RiskV2 stack bit-identical to /059 — ONE clean variable: `label_mode`. The implementation matches exactly: (a) `_trend_scan_label` + the `trend_scanning` branch in `label_trades` (`labeling.py:132-214, 349-362`); (b) `trend_scan_grid` plumbed through `LightGbmStrategy` (`lgbm.py:172, 219, 400-401`) and `MetaLabelingStrategy` (`metalabeling.py:219, 258-259`); (c) `run_baseline_v3.py` `common_kwargs` `label_mode="trend_scanning"` + `trend_scan_grid=(5,8,13,21)` (lines 1915-1916), `ITERATION_LABEL = "v3-105"` (line 131), the `_verify_feature_columns` preflight. No scope creep — the 14-feature list, universe, ATR multipliers, 21-candle timeout, `REQUIRED_GAP=66`, and 7-gate RiskV2 are all unchanged; the `triple_barrier` branch is byte-identical preserved. No hypothesis-faking. PASS.
+
+## Optional Checks 9-12
+
+- **Check 9 — Symbol Exclusion Enforcement: PASS.** `run_baseline_v3.py:237` and lines 656-665 both run the disjointness audit; `V3_MODELS ∩ V3_EXCLUDED_SYMBOLS = ∅`. BCH/LDO/TRX are the canonical v3 universe.
+- **Check 10 — Feature Isolation Enforcement: PASS.** Grep for executable `from crypto_trade.features import` in `src/crypto_trade/features_v3/` returns no real import — all matches are docstring/comment statements of the isolation invariant. `features_v3/` is untouched by this iteration.
+- **Check 11 — Forming-Candle Audit: NOT VERIFIED (read-only limitation).** I cannot tail the `data/<SYMBOL>/8h.csv` files within scope. The engineering report attests the BCH/LDO/TRX `close_time` freshness + forming-candle pre-flight checks were run. The 90 OOS trades carry well-formed monotone `close_time` values, none in the future. No anomaly observed; full verification deferred to the Engineer's pre-flight.
+- **Check 12 — Library Version Pinning: PASS.** Brief Section 9 declares no new library — the trend-scanning OLS is closed-form `numpy` only. Pinned versions inherited from /059. No version surface changes.
+
+## Recommendations to QR
+
+This iteration is methodologically clean and MERGES the Phase-7.5 gate. The verdict here is the BLOCK/MERGE methodology gate only — the EXPLORATION classification (the brief's falsifiers F2 "IS < +0.60" and F5 "IS/OOS daily-Sharpe ratio outside [0.2, 5]" both fire) is the QR's Phase-8 call. Three items for the QR's Phase-8 diary and the cycle-5 CONFIRMATION brief:
+
+1. **The IS-collapse / OOS-spike is the /102 structural twin — document it as overfitting / OOS-regime outcome, NOT as edge, and NOT as leak.** IS monthly Sharpe +0.2201 (a −0.61 collapse vs the /060 anchor +0.8325; F2 fires hard, < +0.60 floor) with OOS monthly Sharpe +1.1897. Critic Check 1 conclusively rules out look-ahead — the trend-scanning forward window is embargo-covered with a 1-candle margin, the hard-causality test is genuine, the leak-path is closed numerically. So the OOS +1.19 is the iter-v3/026/027/030/034/036/037/102 IS-collapse / OOS-spike overfitting signature. The brief's Section 4 prediction that "the /102 IS-collapse mode is specifically NOT predicted here" because no feature is added was wrong — the IS fit collapsed anyway. The mechanism is not a 15th-feature search-space widening; it is that the trend-scanning label is a *different and noisier estimand* the multi-seed Optuna fit overfits in-sample. A future label-geometry brief should rank IS-collapse as a leading predicted mode, not a tail.
+
+2. **The F5 SUSPICIOUS ratio leg fires — note the disjunctive-precedence interaction.** `comparison.csv`: IS daily Sharpe 0.4330, OOS daily Sharpe 2.1910 → ratio 5.06, outside the brief's pre-registered [0.2, 5] band. Brief Section 8's LOCKED disjunctive taxonomy is first-match-wins: NEGATIVE (step 2, F2) precedes SUSPICIOUS (step 3, F5). F2 fires at IS +0.2201 < +0.60, so the classification settles at NEGATIVE before step 3 — but the QR should record F5 as also firing for completeness. This is a NEGATIVE iteration whichever leg is cited.
+
+3. **For the cycle-5 CONFIRMATION brief: do NOT carry the trend-scanning label forward.** A NEGATIVE EXPLORATION does not advance. The trend-scanning label collapsed the IS fit; per `feedback_v3_strict_both_is_oos_baseline.md` a CONFIRMATION must improve BOTH IS and OOS over /059 — there is no IS-improvement thesis here. The `_trend_scan_label` branch + `trend_scan_grid` parameter should stay in the tree as zero-revert-cost dead code, with `label_mode` reverted to `"triple_barrier"`. Record the trend-scanning label as a v3 Dead Idea with the specific failure mode (a better-IS-predicted-IC label that nonetheless collapsed the multi-seed Optuna IS fit — the /104 diagnosis that "the label was the constraint" is *falsified*; the binding constraint is downstream, consistent with the brief Section 6 meta-prediction pointing to the trade-construction / exit layer as the next axis).
+
+OVERALL: MERGE

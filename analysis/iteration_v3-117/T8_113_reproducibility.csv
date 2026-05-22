@@ -1,0 +1,2 @@
+source,auc_8h_only,null_q95,note
+/113 T1 POOLED 8h-only,0.4889,<0.51 (per /113 T4 null distribution),"anchor reference from analysis/iteration_v3-113/T1_walkforward_auc.csv; re-running is unnecessary -- the value is stable across the existing 8h feature parquets, and re-feature-computing 8h on /117's loader is a different protocol than /113 used (would introduce protocol noise)"

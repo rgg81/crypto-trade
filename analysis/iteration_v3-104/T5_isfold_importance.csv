@@ -1,0 +1,11 @@
+symbol,candidate,gain_rank_of_15,gain_share_pct,n_train,above_parity_6.67pct,note
+BCHUSDT,btc_adract_growth_14d_z90,13,4.0535,3938,False,
+BCHUSDT,btc_txcnt_growth_14d_z90,12,4.4708,3938,False,
+BCHUSDT,bch_adract_growth_14d_z90,13,3.5348,3938,False,
+BCHUSDT,bch_txcnt_growth_14d_z90,13,4.6994,3938,False,
+LDOUSDT,btc_adract_growth_14d_z90,10,5.8073,1848,False,
+LDOUSDT,btc_txcnt_growth_14d_z90,7,6.5851,1848,False,
+TRXUSDT,btc_adract_growth_14d_z90,15,2.6901,3898,False,
+TRXUSDT,btc_txcnt_growth_14d_z90,13,4.4058,3898,False,
+TRXUSDT,trx_adract_growth_14d_z90,14,3.6219,3898,False,
+TRXUSDT,trx_txcnt_growth_14d_z90,12,5.0067,3898,False,

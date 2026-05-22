@@ -1,0 +1,2 @@
+stat,value,ci95_lo,ci95_hi,edge_top_tercile,edge_bot_tercile,edge_gradient,n_holdout_candles,bootstrap_n,block
+pooled_holdout_auc,0.548,0.5018,0.5898,4.7131,4.2057,0.5074,1566,2000,21

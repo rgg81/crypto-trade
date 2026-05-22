@@ -41,16 +41,19 @@ def test_per_symbol_atr_dict_is_empty() -> None:
 
 
 def test_default_atr_multipliers_unchanged() -> None:
-    """DEFAULT_ATR_MULTIPLIERS must be the canonical /059 baseline pair (2.0, 1.0)."""
+    """DEFAULT_ATR_MULTIPLIERS must be (2.0, 1.0) — /121-canonical (reverted at /125).
+
+    iter-v3/125: REVERT /124 Branch B (3.4641, 1.7321) -> /121-canonical (2.0, 1.0).
+    """
     assert DEFAULT_ATR_MULTIPLIERS == (2.0, 1.0)
 
 
 def test_all_v3_symbols_use_one_global_pair() -> None:
-    """All three v3 symbols (BCH/LDO/TRX) resolve to the SAME global pair (2.0, 1.0).
+    """All v3 symbols resolve to the SAME global pair (2.0, 1.0) at iter-v3/125.
 
     With V3_ATR_MULTIPLIERS_PER_SYMBOL empty, the labeling layer is symbol-
-    homogeneous — no per-symbol barrier customization. The /074 axis (regime gate)
-    is the only varied surface.
+    homogeneous — no per-symbol barrier customization. The /125 axis (WILD universe
+    ATOM/RUNE/UNI) restores /121-canonical (2.0, 1.0) ATR after /124 NEGATIVE.
     """
     pairs = {atr_multipliers_for_symbol(s) for s in ("BCHUSDT", "LDOUSDT", "TRXUSDT")}
     assert pairs == {(2.0, 1.0)}

@@ -1,0 +1,2 @@
+pooled_n,train_n,test_n,observed_holdout_auc,permutation_null_mean,permutation_null_q95,permutation_p_value,clears_q95
+13774,9641,4133,0.5625,0.5007,0.5473,0.0,True

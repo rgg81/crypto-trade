@@ -78,6 +78,7 @@ def refresh_features_by_track(
     track values:
         "v1" → ``crypto_trade.features.run_features`` (output_dir defaults to ``data/features``)
         "v2" → ``crypto_trade.features_v2.run_features_v2`` (output_dir defaults to ``data/features_v2``)
+        "v3" → ``crypto_trade.features_v3.run_features_v3`` (output_dir defaults to ``data/features_v3``)
     """
     for symbols, features_dir, track in groups:
         if track == "v1":
@@ -109,8 +110,24 @@ def refresh_features_by_track(
                 end_ms=None,
                 workers=1,
             )
+        elif track == "v3":
+            # iter-v3/132: v3 features for /121 baseline. run_features_v3
+            # calls clear_btc_cache_v3 + clear_eth_cache_v3 at entry to
+            # invalidate cross-asset caches each live tick (mirrors features_v2
+            # post-commit 62d56dc hygiene). Critical for live↔backtest parity.
+            from crypto_trade.features_v3 import run_features_v3
+
+            run_features_v3(
+                symbols=list(symbols),
+                interval=interval,
+                data_dir=data_dir,
+                output_dir=str(features_dir),
+                start_ms=None,
+                end_ms=None,
+                workers=1,
+            )
         else:
-            raise ValueError(f"unknown track: {track!r} (expected 'v1' or 'v2')")
+            raise ValueError(f"unknown track: {track!r} (expected 'v1', 'v2', or 'v3')")
 
 
 def detect_new_candle(

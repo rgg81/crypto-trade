@@ -227,18 +227,17 @@ def test_ret_skew_50_absent_from_v3_feature_columns_top_n() -> None:
         "Count assertion is covered by test_universal_list_is_14 in test_features_for_symbol.py."
     )
 )
-def test_v3_feature_columns_top_n_count_14_after_swap() -> None:
-    """V3_FEATURE_COLUMNS_TOP_N must have exactly 14 elements after the A4 SWAP.
+def test_v3_feature_columns_top_n_count_after_swap() -> None:
+    """V3_FEATURE_COLUMNS_TOP_N must have exactly 15 elements at iter-v3/102.
 
     iter-v3/057: 1-for-1 SWAP at base-stack level (ret_skew_50 OUT,
-    parkinson_gk_ratio_20 IN). Net count must remain 14.
-    SKIPPED at iter-v3/058: RE-ANCHOR reverts this swap. Count still 14 but
-    covered by test_universal_list_is_14 in test_features_for_symbol.py.
+    parkinson_gk_ratio_20 IN). RE-ANCHOR at /058 reverted the swap (count stayed 14).
+    iter-v3/102: alpha032 added as 15th feature (WorldQuant Alpha#32 per-symbol port).
     """
     n = len(V3_FEATURE_COLUMNS_TOP_N)
     assert n == 14, (
-        f"V3_FEATURE_COLUMNS_TOP_N has {n} elements — expected exactly 14 after "
-        "iter-v3/057 A4 base-stack SWAP (ret_skew_50 OUT, parkinson_gk_ratio_20 IN). "
-        "Net count must be 14 (1-for-1 SWAP). "
+        f"V3_FEATURE_COLUMNS_TOP_N has {n} elements — expected exactly 14 at iter-v3/124. "
+        "iter-v3/124: eth_vs_sym_rv_50 REMOVED (/123 NEGATIVE-catastrophic); "
+        "/121 BASELINE_V3 14-feature canonical anchor restored. "
         "Check V3_FEATURE_COLUMNS_TOP_N in src/crypto_trade/features_v3/__init__.py."
     )

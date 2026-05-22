@@ -1,28 +1,90 @@
 # Current Baseline — v2 Track (Diversification Arm)
 
-Last updated by: **iter-v2/069** (2026-04-24) — Category-A driven feature
-pruning: 40 → 34 features by removing 6 near-identical/redundant features.
-First iteration in 10 attempts to cleanly pass ALL concentration rules.
+Last updated by: **lookahead-bias correction on 2026-05-13** (re-ran
+iter-v2/069 under the fixed walk-forward labeler — see *Quant integrity
+correction* below). Prior content: iter-v2/069 (2026-04-24).
 OOS cutoff date: 2025-03-24 (fixed, shared with v1, never changes)
 
-## iter-v2/069 — feature pruning (CURRENT)
+## 🚨 Quant integrity correction (2026-05-13)
+
+Every metric previously reported in this file was produced with an undetected
+**lookahead bias** at the walk-forward train/test boundary. `walk_forward.py`
+set `train_end_ms = test_start_ms`, but the triple-barrier labeler's forward
+scan extends `label_timeout_minutes` (7 days) past each training candle's
+close. For the last ~22 training candles of every (model, test_month) split,
+the label was computed using price data **from inside the test month** —
+peek-into-test contamination.
+
+Fixed in commit `5566a69`
+(`fix(walk-forward): purge labeler-horizon from train_end_ms`). Same helper
+also feeds the existing CV gap inside Optuna — single source of truth.
+
+Re-running the iter-v2/069 baseline with the fix produces the metrics below.
+Pre-fix numbers are preserved further down for the record but **must not**
+be cited going forward.
+
+### iter-v2/069 — headline before vs after the fix
+
+| Metric | Pre-fix (with lookahead) | **Post-fix (clean)** | Δ |
+|---|---|---|---|
+| IS Sharpe (daily) | +1.0319 | **+0.4790** | **−54%** |
+| OOS Sharpe (daily) | **+2.3248** | **+1.0642** | **−54%** |
+| IS Trades | 222 | 224 | +1% |
+| OOS Trades | 57 | 52 | −9% |
+| IS Win Rate | 44.1% | 40.6% | −3.5 pp |
+| OOS Win Rate | 54.4% | 44.2% | −10.2 pp |
+| IS Profit Factor | n/a | 1.17 | down materially |
+| OOS Profit Factor | 2.37 | 1.56 | −34% |
+| IS Max Drawdown | 85.91% | 60.97% | improved (paper) |
+| OOS Max Drawdown | 18.80% | 22.56% | +20% (worse) |
+| IS DSR | +15.36 | +15.47 | ~same |
+| OOS DSR | +10.28 | **+7.65** | −26% (still significant) |
+
+**What this means:** v2 retains a statistically significant OOS edge after
+the correction (OOS DSR = +7.65, OOS Sharpe = +1.06, OOS PF = 1.56) — the
+strategy is more robust than v1, which collapses to negative DSR under the
+fix. The lookahead was inflating OOS Sharpe roughly **2.2×**. Headlines like
+"Sharpe ≥ 2.0" or "OOS/IS ratio 2.2528" measured with the lookahead present
+were ~half real. Future merge-gate comparisons must use the post-fix
+numbers as the new floor.
+
+Same fix re-ran v0.186 (v1) — see `BASELINE.md`. Both baselines lost
+~the same fraction of Sharpe, confirming the bug was systemic to the
+walk-forward training pipeline, not a model-specific quirk.
+
+## iter-v2/069 — POST-FIX (CURRENT)
 
 **OOS cutoff: 2025-03-24 (fixed)**
-**Data extent: 2026-04-23 23:59 UTC** (~13.0 months of OOS, single seed 42)
+**Data extent: 2026-05-12 (re-ran with lookahead fix; ~14 months of OOS, single seed 42)**
 
-| Metric | iter-v2/059-clean | **iter-v2/069** | Δ |
+| Metric          | Value      |
+|-----------------|------------|
+| IS Sharpe (daily) | +0.4790  |
+| OOS Sharpe (daily)| **+1.0642** |
+| IS DSR           | +15.47    |
+| OOS DSR          | +7.65     |
+| IS Trades        | 224       |
+| OOS Trades       | 52        |
+| IS Win Rate      | 40.6%     |
+| OOS Win Rate     | 44.2%     |
+| IS Profit Factor | 1.17      |
+| OOS Profit Factor| 1.56      |
+| IS Max Drawdown  | 60.97%    |
+| OOS Max Drawdown | 22.56%    |
+
+**Historical pre-fix table (with lookahead — do not cite for merge gates):**
+
+| Metric | iter-v2/059-clean | iter-v2/069 (pre-fix) | Δ |
 |---|---|---|---|
 | IS monthly Sharpe | +1.042 | +0.874 | −16% |
 | IS daily Sharpe | +0.974 | +1.032 | +6% |
-| **OOS monthly Sharpe** | +1.659 | **+2.108** | **+27%** |
-| **OOS daily Sharpe** | +1.663 | **+2.409** | **+45%** |
-| **Combined monthly** | +2.701 | **+2.982** | **+10%** |
+| OOS monthly Sharpe | +1.659 | +2.108 | +27% |
+| OOS daily Sharpe | +1.663 | +2.409 | +45% |
 | OOS PF | 1.78 | 2.41 | +35% |
 | OOS WR | 49.1% | 54.5% | +5.4pp |
-| **OOS MaxDD** | 22.61% | **18.80%** | **−17% (improved)** |
-| IS MaxDD | 68.55% | 85.91% | +25% (worse) |
+| OOS MaxDD | 22.61% | 18.80% | −17% |
+| IS MaxDD | 68.55% | 85.91% | +25% |
 | OOS trades | 57 | 55 | −3% |
-| OOS total wpnl | +79.98 | +116.08 | +45% |
 
 ### Concentration — CLEAN on all n=4 rules (first time)
 
@@ -74,16 +136,22 @@ fix (see iter-v2/069 diary).
 ## Reference: current v1 baseline (merged from main 2026-04-24)
 
 v1 lives on `main` and has advanced independently of v2 while this worktree
-iterated. For cross-reference:
+iterated. For cross-reference (post-fix metrics — see BASELINE.md for full
+correction notice):
 
-| Metric | Value |
-|---|---|
-| Baseline tag | `v0.186` (main branch) |
-| OOS Sharpe | +1.735 |
-| OOS MaxDD | 29.31% |
-| OOS Calmar | 5.91 |
-| Symbols | A: BTC+ETH pooled, C: LINK, D: LTC, E: DOT |
-| Risk primitives | R1 consecutive-SL cooldown, R2 drawdown-triggered position scaling, R3 OOD Mahalanobis |
+| Metric | Value (post-fix) | Value (pre-fix, biased) |
+|---|---|---|
+| Baseline tag | `v0.186` (main branch) | same |
+| **OOS Sharpe** | **+0.827** | +1.735 |
+| **OOS Max Drawdown** | 40.94% | 29.31% |
+| OOS DSR | **−32.79** (not significant) | n/a |
+| Symbols | A: BTC+ETH pooled, C: LINK, D: LTC, E: DOT | same |
+| Risk primitives | R1 consecutive-SL cooldown, R2 drawdown-triggered position scaling, R3 OOD Mahalanobis | same |
+
+Under the corrected labels, v1's OOS edge collapses to a non-significant
++0.83 Sharpe (DSR negative). v2 (this baseline) survives the correction
+with OOS Sharpe +1.06 and DSR +7.65 — making v2 currently the **only**
+statistically significant track.
 
 The eventual combined portfolio (v1 + v2) is still the objective. v2's
 `RiskV2Wrapper` feature z-score OOD gate (|z|>2.5 on any feature) and v1's

@@ -775,6 +775,119 @@ def compute_range_efficiency_50(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def compute_ema_signed_volregime(df: pd.DataFrame) -> pd.DataFrame:
+    """Composed feature: ema_spread_atr_20 × sign(range_realized_vol_50 - rolling_median_200).
+
+    Encodes a vol-regime-conditioned momentum signal at a slower timescale
+    (~67 calendar days at 8h cadence) than /025's regime_momentum_signed_5d
+    (~33-day Hurst regime).
+
+    Construction:
+    - ``ema_spread_atr_20``: 20-bar EMA spread normalised by ATR (computed by
+      ``add_momentum_accel_v3_features``).
+    - ``range_realized_vol_50``: 50-bar rolling realized vol from log-returns
+      (computed by ``add_tail_risk_v3_features``).
+    - ``vol_median_200``: trailing 200-bar rolling median of range_realized_vol_50
+      (hand-chosen window per brief Section 0; matches longest TOP_N rolling
+      window — hurst_200, atr_pct_rank_200 — and is structurally slower than
+      the value primitive it conditions).
+    - ``vol_regime_sign``: sign(range_realized_vol_50 − vol_median_200);
+        +1 if realized vol > median (high-vol regime)
+        −1 if realized vol < median (low-vol regime)
+         0 (degenerate equality case) → treated as NaN (no signal)
+
+    Past-only by construction:
+    - ``ema_spread_atr_20`` is past-only (momentum_accel computed it past-only).
+    - ``range_realized_vol_50`` is past-only (tail_risk computed it past-only).
+    - ``rolling(window=200, min_periods=200).median()`` is a trailing window;
+      value at t uses only bars 0..t-1+1 ≤ t. Both upstream primitives run
+      BEFORE engineered_v3 in GROUP_REGISTRY; appending future bars does NOT
+      alter the value at t.
+
+    NaN warm-up: first 200 bars are NaN (vol_median_200 needs 200-bar
+    history; the underlying primitives range_realized_vol_50 and
+    ema_spread_atr_20 stabilise earlier so they are dominated).
+
+    Args:
+        df: DataFrame with columns ``ema_spread_atr_20`` (from momentum_accel)
+            and ``range_realized_vol_50`` (from tail_risk).
+
+    Returns:
+        Copy of ``df`` with ``ema_signed_volregime`` column appended.
+        If a source primitive is missing, the column is set to all-NaN
+        without error (downstream feature-column assertion will fail loudly).
+    """
+    df = df.copy()
+    if "ema_spread_atr_20" not in df.columns or "range_realized_vol_50" not in df.columns:
+        df["ema_signed_volregime"] = np.nan
+        return df
+    ema = df["ema_spread_atr_20"].astype(float)
+    rv = df["range_realized_vol_50"].astype(float)
+    rv_med200 = rv.rolling(window=200, min_periods=200).median()
+    vol_diff = rv - rv_med200
+    sign_vol = np.sign(vol_diff)
+    sign_vol = sign_vol.replace(0.0, np.nan)
+    df["ema_signed_volregime"] = ema * sign_vol
+    return df
+
+
+def compute_ret5d_signed_tbi(df: pd.DataFrame) -> pd.DataFrame:
+    """Composed feature: ret_5d x sign(taker_buy_imbalance_20).
+
+    Encodes an order-flow-regime-conditioned momentum signal at the
+    microstructure timescale (~7 calendar days at 8h cadence via 20-bar
+    taker-buy imbalance window). Structurally orthogonal to:
+    - /025 regime_momentum_signed_5d (~33-day Hurst regime; long-memory)
+    - /118 ema_signed_volregime (~67-day vol regime; return-volatility) — CLOSED
+
+    Construction:
+    - ``ret_5d``: log(close_t / close_{t-15}) at 8h cadence.
+      15 bars x 8h = 120h ~= 5 calendar days. Past-only by .shift(15).
+      Identical to the value primitive in regime_momentum_signed_5d (/025).
+    - ``taker_buy_imbalance_20``: 20-bar rolling order-flow imbalance
+      (precomputed by add_taker_buy_imbalance_20; past-only by construction).
+      Threshold = 0 (zero-cross of imbalance; positive = buy-imbalanced;
+      negative = sell-imbalanced).
+    - ``order_flow_sign``: sign(taker_buy_imbalance_20);
+        +1 if imbalance > 0 (buy-dominated regime) -> momentum confirmed
+        -1 if imbalance < 0 (sell-dominated regime) -> momentum faded
+         0 (degenerate zero case) -> treated as NaN (no signal)
+
+    Past-only by construction:
+    - ``ret_5d`` is past-only (log_close.shift(15)).
+    - ``taker_buy_imbalance_20`` is past-only (microstructure_v3 computed it
+      past-only at parquet generation).
+    - Upstream primitives (close, taker_buy_imbalance_20) run BEFORE
+      engineered_v3 in GROUP_REGISTRY; the past-only invariant is preserved.
+
+    NaN warm-up: first 19 bars are NaN (taker_buy_imbalance_20 needs 20-bar
+    history). ret_5d warm-up (15 bars) is dominated.
+
+    Args:
+        df: DataFrame with columns ``close`` (float-castable) and
+            ``taker_buy_imbalance_20`` (from microstructure_v3).
+
+    Returns:
+        Copy of ``df`` with ``ret5d_signed_tbi`` column appended.
+        If a source primitive is missing, the column is set to all-NaN
+        without error (downstream feature-column assertion will fail loudly).
+    """
+    df = df.copy()
+    if "close" not in df.columns or "taker_buy_imbalance_20" not in df.columns:
+        df["ret5d_signed_tbi"] = np.nan
+        return df
+    close = df["close"].astype(float)
+    log_close = np.log(close.clip(lower=1e-12))
+    # 15 bars at 8h cadence = 5 calendar days (identical to /025's ret_5d)
+    ret_5d = log_close - log_close.shift(15)
+    tbi = df["taker_buy_imbalance_20"].astype(float)
+    sign_tbi = np.sign(tbi)
+    # Zero-imbalance edge case: treat as NaN (no signal)
+    sign_tbi = sign_tbi.replace(0.0, np.nan)
+    df["ret5d_signed_tbi"] = ret_5d * sign_tbi
+    return df
+
+
 def add_engineered_v3_features(df: pd.DataFrame) -> pd.DataFrame:
     """GROUP_REGISTRY entry point for all Category 2 (composed) v3 features.
 
@@ -929,7 +1042,17 @@ def add_engineered_v3_features(df: pd.DataFrame) -> pd.DataFrame:
     # feedback_v3_walkforward_lookahead_bug.md, on the 3-symbol universe, as a
     # regime-QUALITY conditioning feature (NOT a standalone directional signal).
     # See compute_range_efficiency_50 docstring + /076 brief Section 10.2.
-    df = compute_range_efficiency_50(df)  # iter-v3/076 ACTIVATE (15th V3_FEATURE_COLUMNS feature)
+    df = compute_range_efficiency_50(df)  # iter-v3/076 (PARKED — reverted /077; dead code)
+    # iter-v3/118: ema_signed_volregime ADDED — NEW 15th feature in V3_FEATURE_COLUMNS_TOP_N.
+    # Category-2 composed feature: ema_spread_atr_20 × sign(range_realized_vol_50 - median_200).
+    # Vol-regime-conditioned momentum at ~67-day rolling-median timescale (slower than /025's
+    # ~33-day Hurst-regime timescale). T9 POOLED multivariate-lift +0.0081 (> 0.005 gate);
+    # importance rank 8-10/15, gain 38-63% across all 3 symbols (EDA SHA `60a45e8`).
+    # Depends on ema_spread_atr_20 (momentum_accel) and range_realized_vol_50 (tail_risk),
+    # both upstream in GROUP_REGISTRY. Section 0 hand-chosen: rolling-median window = 200 bars.
+    # /025 PROMISING lineage; per `feedback_v3_engineered_features_proven.md`.
+    df = compute_ema_signed_volregime(df)  # iter-v3/118 (DEAD CODE — REMOVED from TOP_N at /119)
+    df = compute_ret5d_signed_tbi(df)  # iter-v3/119 NEW (15th V3_FEATURE_COLUMNS feature)
     # compute_efficiency_ratio_50 REMOVED from dispatch at iter-v3/044 — DISASTROUS NEGATIVE.
     # compute_vol_adj_autocorr REVERTED at iter-v3/037 — iter-v3/036 NEGATIVE; dead code.
     return df
@@ -943,9 +1066,7 @@ _FUNDING_REGIME_Z_WINDOW: int = 30  # 30 8h funding-settlement cycles = 10 days
 _FUNDING_REGIME_Z_EPS: float = 1e-9
 
 
-def compute_funding_regime_momentum_5d(
-    df: pd.DataFrame, funding_df: pd.DataFrame
-) -> pd.DataFrame:
+def compute_funding_regime_momentum_5d(df: pd.DataFrame, funding_df: pd.DataFrame) -> pd.DataFrame:
     """Composed feature: regime_momentum_signed_5d × sign(funding_z_30).
 
     iter-v3/085 — cycle-3 EXPLORATION #4. A Category-2 composed feature: the
@@ -1073,12 +1194,14 @@ __all__ = [
     "add_funding_regime_momentum_v3_features",
     "compute_cross_asset_divergence_norm",
     "compute_efficiency_ratio_50",
+    "compute_ema_signed_volregime",
     "compute_fracdiff_d05_close",
     "compute_funding_regime_momentum_5d",
     "compute_hurst_drift_50_200",
     "compute_range_efficiency_50",
     "compute_regime_momentum_signed_3d",
     "compute_regime_momentum_signed_5d",
+    "compute_ret5d_signed_tbi",
     "compute_trend_efficiency_signed",
     "compute_vol_adj_autocorr",
     "compute_vol_normalized_ret_5d",

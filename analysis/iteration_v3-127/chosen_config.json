@@ -1,0 +1,6 @@
+{
+  "threshold_wpnl": 7.0,
+  "recovery_wpnl": 6.0,
+  "window_days": 45,
+  "time_override_candles": 21
+}

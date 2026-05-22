@@ -1,0 +1,6 @@
+metric,in_sample,out_of_sample,oos_over_is_ratio
+monthly_sharpe,1.0894,0.5791,0.5316
+daily_sharpe,2.7092,1.4359,0.53
+profit_factor,1.4949,1.2107,0.8099
+win_rate,33.3333,38.2979,1.1489
+total_pnl,78.1805,22.7359,0.2908

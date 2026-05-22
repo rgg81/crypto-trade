@@ -1,26 +1,41 @@
-"""Cross-sectional relative-value ranking model for iter-v3/088.
+"""Cross-sectional relative-value ranking model for iter-v3/091.
 
-Implements the Phase-6 build spec from briefs-v3/iteration_v3-088/research_brief.md
-Section 3 (A1-A6).
+Implements the Phase-6 build spec from briefs-v3/iteration_v3-091/research_brief.md
+Section 3.
 
 Design:
-  - Label: cross-sectional forward-return rank, {0,1,2} graded relevance, H=3 bars.
-  - Model: ONE pooled LGBMRanker(objective="lambdarank"), one query-group per
-    timestamp, monthly walk-forward.
+  - Label: cross-sectional forward-return rank, {0,1,2} graded relevance, H=21 bars.
+  - Score (primary — score_mode="model_free"): parameter-free trailing-H-bar return
+    close(ts) / close(ts - H*interval) - 1.  No model, no Optuna, no seed.
+  - Score (reference — score_mode="trained"): ONE pooled LGBMRanker(lambdarank),
+    monthly walk-forward.  Emitted to reference_lgbmranker/ subdirectory.
   - Universe: 22-symbol XS_UNIVERSE of liquid non-v1/v2 Binance-USDT perps.
   - Features: 13 features (14-feature /059 stack minus btc_ret_14d), each
-    cross-sectionally rank-normalized.
-  - Position: dollar-neutral cross-sectional tercile long-short, inverse-vol
+    cross-sectionally rank-normalized.  (Used only by score_mode="trained".)
+  - Position: dollar-neutral cross-sectional quintile long-short, inverse-vol
     weighting, portfolio vol-targeting, 0.1% fee.
-  - XS_REQUIRED_GAP = 88 = (H+1)*N = (3+1)*22.
+  - XS_REQUIRED_GAP = 484 = (H+1)*N = (21+1)*22.  (CPCV row-count purge.)
+
+iter-v3/091 axis: the cross-sectional scoring function (trained LGBMRanker
+prediction → parameter-free trailing-H-bar return).  The /089 cost-aware
+quintile long-short construction is RETAINED verbatim.
+
+iter-v3/091 SETUP items (correctness + instrumentation, NOT edge axes):
+  1. Walk-forward embargo bug fix: embargo_ms = (XS_HORIZON+1)*interval_ms
+     (was XS_REQUIRED_GAP*interval_ms — over-embargoing by N=22×).
+  2. Gross-Sharpe runner artifact: gross_monthly_sharpe emitted to
+     comparison.csv and dsr.json via a shared _monthly_sharpe(sub, pnl_col)
+     helper (Critic /090 Rec #1).
 
 No-cheating guarantees:
   - OOS_CUTOFF_DATE / training_months are IMMUTABLE (imported from config).
   - Walk-forward trains each month on IS-only past data; train_end_ms =
-    test_start_ms - embargo_ms (the e149e9d fix, carried through).
-  - XS_REQUIRED_GAP=88 is asserted at CPCV call-site via expected_gap.
-  - The cross-sectional label's H=3 forward window NEVER overlaps a test row
-    because the embargo removes (H+1)*N_symbols = 88 rows at every boundary.
+    test_start_ms - embargo_ms (the e149e9d fix + /091 embargo correction).
+  - XS_REQUIRED_GAP=484 is asserted at CPCV call-site via expected_gap.
+  - The cross-sectional label's H=21 forward window NEVER overlaps a test row
+    because the embargo removes (H+1)*N_symbols = 484 rows at every boundary.
+  - Model-free score uses only close(ts) and close(ts-H*interval) (both ≤ ts);
+    PnL return is taken strictly after ts via searchsorted(side='right').
 """
 
 from __future__ import annotations
@@ -70,17 +85,26 @@ XS_UNIVERSE: tuple[str, ...] = (
 
 N_XS_SYMBOLS: int = len(XS_UNIVERSE)  # 22
 
-#: H = forward horizon in bars (Section 3.1 / EDA T3: strongest |IS IC-IR|)
-XS_HORIZON: int = 3
+#: H = forward horizon in bars.
+#: iter-v3/091: H=21 (~7 days, the literature weekly cross-sectional-momentum
+#: horizon).  The model-free book scores each symbol by the trailing-21-bar
+#: return; the overlapping J-T hold is horizon-matched at XS_HOLD_BARS=21.
+#: EDA M1a: H=21 is inside a smooth [17,25] plateau (IS net [+0.22, +0.32]) —
+#: the choice within the plateau is not fragile; H=21 is the a-priori
+#: literature anchor (Jegadeesh-Titman 1993 weekly momentum).
+XS_HORIZON: int = 21
 
-#: CPCV purge gap for the pooled cross-section.
-#: Formula: (H + 1) * N_symbols = (3 + 1) * 22 = 88.
+#: CPCV purge gap for the pooled cross-section (ROW COUNT, not time).
+#: Formula: (H + 1) * N_symbols = (21 + 1) * 22 = 484.
 #: This is DIFFERENT from the legacy per-symbol REQUIRED_GAP = 66.
 #: - Legacy: (timeout_candles=21 + 1) * 3 symbols = 66
-#: - Cross-sectional: (H=3 + 1) * 22 symbols = 88
+#: - Cross-sectional: (H=21 + 1) * 22 symbols = 484
 #: The gap removes, on both sides of every test boundary, enough rows so that
-#: no training label's H=3 forward window overlaps a test row.
-XS_REQUIRED_GAP: int = (XS_HORIZON + 1) * N_XS_SYMBOLS  # 88
+#: no training label's H=21 forward window overlaps a test row.
+#: NOTE: XS_REQUIRED_GAP is the CPCV row-count purge; the walk-forward TIME
+#: embargo is embargo_ms = (XS_HORIZON + 1) * interval_ms — a separate
+#: quantity that does NOT multiply by N_symbols (iter-v3/091 Section 3.2).
+XS_REQUIRED_GAP: int = (XS_HORIZON + 1) * N_XS_SYMBOLS  # 484
 
 #: Listing burn-in per symbol: 60 days = 180 8h-bars (crypto new-listing
 #: non-stationarity pitfall — Section 3.3).
@@ -94,6 +118,42 @@ XS_MIN_SYMBOLS_PER_BAR: int = 6
 #: timestamp — EDA T6).  The 14-column V3_FEATURE_COLUMNS_TOP_N constant is
 #: NOT edited; this drop happens at training/inference time.
 XS_DROP_FEATURES: frozenset[str] = frozenset({"btc_ret_14d"})
+
+# ---------------------------------------------------------------------------
+# iter-v3/090 cross-sectional GROSS-SIGNAL feature expansion.
+# /089 left the book GROSS-POSITIVE (OOS gross monthly Sharpe +0.1717) but
+# net-sub-zero on fees.  /090 strengthens the GROSS SIGNAL by adding two
+# DOWNSIDE-RISK cross-sectional features to the ranker.  Both are IS-EDA
+# selected (analysis/iteration_v3-090/) — the /090 EDA showed (A3) the
+# cross-sectional signal in this 22-altcoin universe resolves 4.1x sharper at
+# the loser end of the book (bottom-half within-IC 0.0576 vs top-half 0.0141),
+# so DOWNSIDE-RISK features that better rank the short leg are the highest-EV
+# gross-signal lever.  B2 downside-risk was the strongest candidate family by
+# INCREMENTAL multivariate contribution (d composite IC-IR +0.0306) — the
+# iter-v3/070-correct test, not a univariate Spearman.  The two features here
+# are the leave-one-out-confirmed ORTHOGONAL subset (C3/C4): the third B2
+# candidate (cand_semidev_50) was DROPPED for 0.80 cross-sectional rank
+# correlation with the incumbent range_realized_vol_50 (the iter-v3/070
+# colsample-dilution risk); the orthogonal pair captures the full realised
+# long-short spread improvement.
+# ---------------------------------------------------------------------------
+
+#: iter-v3/090 — the two engineered DOWNSIDE-RISK cross-sectional features
+#: appended to the ranker's feature set.  Computed per-symbol from OHLCV +
+#: btc_ret_3d in `_engineer_xs_downside_features`, then cross-sectionally
+#: rank-normalised by `build_cross_sectional_panel` exactly like every other
+#: feature.  Names are NOT in V3_FEATURE_COLUMNS_TOP_N (engineered at panel
+#: build time, the cross-sectional path only — the legacy per-symbol path is
+#: untouched).
+XS_DOWNSIDE_FEATURES: tuple[str, ...] = (
+    "xs_sortino_mom_12",  # 12-bar return / downside semi-deviation
+    "xs_downbeta_50",  # beta vs the BTC proxy on down-market bars only
+)
+
+#: iter-v3/090 window constants for the downside-risk features (a-priori,
+#: matched to the existing 50-bar v3 feature windows; the EDA used the same).
+XS_DOWNSIDE_VOL_WINDOW: int = 50  # rolling window for semi-deviation / down-beta
+XS_DOWNSIDE_MOM_LOOKBACK: int = 12  # the Sortino-momentum return lookback
 
 #: Portfolio vol-target: annualised daily volatility target.
 #: Standard cross-sectional construction (Poh/Lim/Zohren).
@@ -129,13 +189,12 @@ XS_QUANTILE_FRAC: float = 0.20
 #: At each bar a NEW tranche sized 1/XS_HOLD_BARS of the book is formed and
 #: held XS_HOLD_BARS bars; the book is the sum of the live tranches.  This is
 #: the Jegadeesh-Titman (1993) overlapping-portfolio construction; it cuts
-#: gross turnover ~XS_HOLD_BARS-fold with negligible signal loss (J-T: "no
-#: significant difference in returns between overlapping and non-overlapping
-#: portfolios" + a diversification benefit).  H=3 (= XS_HORIZON) is
-#: horizon-matched: the label predicts the 3-bar-forward cross-section.
-#: EDA E3: hold=3 cuts IS fee/|gross| 10.0x -> 5.4x and lifts IS net Sharpe
-#: -0.57 -> -0.42 vs hold=1.
-XS_HOLD_BARS: int = 3
+#: gross turnover ~XS_HOLD_BARS-fold with negligible signal loss.
+#: iter-v3/091: XS_HOLD_BARS=21, horizon-matched to H=21.  At H=21 the
+#: overlapping-hold cuts gross turnover ~7× vs the /089 H=3 book; the IS
+#: model-free EDA at H=21 shows turnover/bar ≈ 0.0263 — far inside the
+#: 0.138 ceiling.
+XS_HOLD_BARS: int = 21
 
 #: /089 NO-TRADE BAND — only re-trade a symbol when its target book weight
 #: moves more than XS_NO_TRADE_BAND vs the held weight (Constantinides 1986;
@@ -230,6 +289,70 @@ def label_cross_sectional_rank(
 
 
 # ---------------------------------------------------------------------------
+# iter-v3/090 — downside-risk feature engineering (Section 3)
+# ---------------------------------------------------------------------------
+
+
+def _engineer_xs_downside_features(df: pd.DataFrame) -> pd.DataFrame:
+    """Add the iter-v3/090 DOWNSIDE-RISK cross-sectional features to one
+    symbol's panel — `xs_sortino_mom_12` and `xs_downbeta_50`.
+
+    Both are computed from PAST-ONLY data: rolling windows on `close` and the
+    `btc_ret_3d` market-return proxy already in the v3 feature parquet.  Every
+    rolling statistic at bar t uses only bars <= t (pandas `.rolling` is
+    backward-looking; `.pct_change()` / `.shift()` look back).  The features
+    are NOT forward-looking — they are predictors, scored at bar t.  Cross-
+    sectional rank-normalisation happens later, per timestamp, in
+    `build_cross_sectional_panel`.
+
+    These reproduce `cand_sortino_mom_12` and `cand_downbeta_50` from the
+    committed IS-only EDA `analysis/iteration_v3-090/gross_signal_expansion_eda.py`
+    (the `_engineer_candidates` function) exactly — the EDA measured the same
+    features the /090 build trades on.
+
+    Look-ahead safety: every column read (`close`, `btc_ret_3d`) is a
+    historical observation at bar t; every transform is backward-looking.  The
+    walk-forward embargo (XS_REQUIRED_GAP) is unchanged and still governs the
+    train/test boundary.
+
+    Parameters
+    ----------
+    df:
+        One symbol's feature DataFrame, sorted by open_time, with at least
+        the columns ['close', 'btc_ret_3d'].
+
+    Returns
+    -------
+    The same DataFrame with two columns added: the names in
+    XS_DOWNSIDE_FEATURES.
+    """
+    win = XS_DOWNSIDE_VOL_WINDOW
+    lb = XS_DOWNSIDE_MOM_LOOKBACK
+    close = df["close"].astype(float)
+    ret_1 = close.pct_change()
+
+    # btc_ret_3d is a 3-bar BTC return; convert to a ~1-bar BTC return proxy so
+    # the down-beta regression is on a per-bar basis (matches the EDA).
+    btc_ret_1 = (df["btc_ret_3d"].astype(float) + 1.0) ** (1.0 / 3.0) - 1.0
+
+    # --- xs_sortino_mom_12: lb-bar return scaled by downside semi-deviation --
+    # semi-deviation = rolling std of NEGATIVE returns only (downside dispersion).
+    neg = ret_1.where(ret_1 < 0.0, 0.0)
+    semidev = neg.rolling(win).std()
+    df["xs_sortino_mom_12"] = (close / close.shift(lb) - 1.0) / semidev.replace(0.0, np.nan)
+
+    # --- xs_downbeta_50: beta vs the BTC proxy on DOWN-market bars only ------
+    down_mask = btc_ret_1 < 0.0
+    r_d = ret_1.where(down_mask)
+    b_d = btc_ret_1.where(down_mask)
+    cov_d = r_d.rolling(win, min_periods=15).cov(b_d)
+    var_d = b_d.rolling(win, min_periods=15).var()
+    df["xs_downbeta_50"] = cov_d / var_d.replace(0.0, np.nan)
+
+    return df
+
+
+# ---------------------------------------------------------------------------
 # A3 — Pooled-panel builder (Section 3.5)
 # ---------------------------------------------------------------------------
 
@@ -241,17 +364,20 @@ def build_cross_sectional_panel(
     drop_features: frozenset[str] = XS_DROP_FEATURES,
     listing_burnin_bars: int = XS_LISTING_BURNIN_BARS,
     interval: str = "8h",
+    expand_downside: bool = False,
 ) -> pd.DataFrame:
     """Load and align the pooled cross-sectional panel.
 
     Steps:
       1. Load each symbol's feature parquet (open_time, close, + feature_cols).
-      2. Apply the 60-day (180-bar) listing burn-in per symbol.
-      3. Concatenate all symbols into a pooled panel sorted by (open_time, symbol).
-      4. Drop btc_ret_14d (zero cross-sectional dispersion — EDA T6).
-      5. Cross-sectionally rank-normalize each remaining feature at each
-         timestamp (rank-transform within the cross-section → comparable
-         across symbols).
+      2. iter-v3/090: if `expand_downside`, engineer the two DOWNSIDE-RISK
+         cross-sectional features (XS_DOWNSIDE_FEATURES) per symbol BEFORE the
+         burn-in (the rolling windows need the pre-burn-in warm-up history).
+      3. Apply the 60-day (180-bar) listing burn-in per symbol.
+      4. Concatenate all symbols into a pooled panel sorted by (open_time, symbol).
+      5. Drop btc_ret_14d (zero cross-sectional dispersion — EDA T6).
+      6. Cross-sectionally rank-normalize each remaining feature (and, when
+         `expand_downside`, the two downside features) at each timestamp.
 
     Parameters
     ----------
@@ -268,23 +394,40 @@ def build_cross_sectional_panel(
         Number of leading bars to drop per symbol (60-day burn-in).
     interval:
         Candle interval string (default '8h').
+    expand_downside:
+        iter-v3/090 — when True, engineer and rank-normalize the two
+        DOWNSIDE-RISK cross-sectional features (XS_DOWNSIDE_FEATURES) in
+        addition to the base feature set.  When False, the /088/089 13-feature
+        behaviour is byte-identical.
 
     Returns
     -------
     pd.DataFrame with columns:
-        ['open_time', 'symbol', 'close'] + [13 xs-normalized feature cols]
+        ['open_time', 'symbol', 'close'] + [xs-normalized feature cols]
+        (13 features when expand_downside is False; 15 when True).
     Sorted by (open_time, symbol).
     """
     features_path = Path(features_dir)
     xs_cols = [c for c in feature_columns if c not in drop_features]
+    # iter-v3/090 — the downside-risk features are appended AFTER engineering;
+    # they are rank-normalized alongside the base features.
+    if expand_downside:
+        xs_cols = xs_cols + list(XS_DOWNSIDE_FEATURES)
+        # raw columns needed to engineer the downside features (past-only).
+        engineer_inputs = ["btc_ret_3d"]
+    else:
+        engineer_inputs = []
 
     frames: list[pd.DataFrame] = []
     for sym in symbols:
         pf = features_path / f"{sym}_{interval}_features.parquet"
         if not pf.exists():
             raise FileNotFoundError(f"build_cross_sectional_panel: parquet missing for {sym}: {pf}")
-        # Load only the columns we need.
-        needed = ["open_time", "close"] + xs_cols
+        # Load only the columns we need (base features + close + any raw
+        # columns the iter-v3/090 downside engineering reads).
+        base_needed = [c for c in feature_columns if c not in drop_features]
+        needed = ["open_time", "close"] + base_needed + engineer_inputs
+        needed = list(dict.fromkeys(needed))  # dedup, preserve order
         # Parquet schema may have extra cols — read only what we need.
         available = set(pq.read_schema(pf).names)
         missing = [c for c in needed if c not in available]
@@ -294,6 +437,16 @@ def build_cross_sectional_panel(
             )
         df = pq.read_table(pf, columns=needed).to_pandas()
         df["symbol"] = sym
+
+        # iter-v3/090 — engineer the downside-risk features BEFORE the burn-in
+        # so the rolling windows have warm-up history; the burn-in then drops
+        # exactly the warm-up rows.  No look-ahead: every transform is
+        # backward-looking (see `_engineer_xs_downside_features`).
+        if expand_downside:
+            df = df.sort_values("open_time").reset_index(drop=True)
+            df = _engineer_xs_downside_features(df)
+            # the raw engineering inputs are no longer needed downstream.
+            df = df.drop(columns=[c for c in engineer_inputs if c not in base_needed])
 
         # Listing burn-in: drop the first `listing_burnin_bars` rows per symbol.
         if len(df) > listing_burnin_bars:
@@ -365,6 +518,7 @@ class CrossSectionalRankStrategy:
         symbols: tuple[str, ...] = XS_UNIVERSE,
         horizon: int = XS_HORIZON,
         seed: int = 42,
+        ensemble_seeds: list[int] | None = None,
         verbose: int = 0,
     ) -> None:
         if not feature_columns:
@@ -379,11 +533,23 @@ class CrossSectionalRankStrategy:
         self.symbols = symbols
         self.horizon = horizon
         self.seed = seed
+        # iter-v3/092 inner-ensemble support: when ensemble_seeds is provided,
+        # _train_for_month trains one LGBMRanker per seed (with its own TPESampler
+        # and random_state) and predict() returns the arithmetic mean of all
+        # models' score vectors.  When None, behaviour is identical to /091
+        # (single model, seed=self.seed).
+        self.ensemble_seeds: list[int] = ensemble_seeds if ensemble_seeds is not None else [seed]
         self.verbose = verbose
 
-        self._model: lgb.LGBMRanker | None = None
+        self._models: list[lgb.LGBMRanker] = []  # one model per ensemble seed
+        # Backward-compat alias: self._model points to first model (or None).
         self._current_month: str | None = None
         self._is_rank_ic: float | None = None  # IS rank-IC from last training
+
+    @property
+    def _model(self) -> lgb.LGBMRanker | None:
+        """Backward-compat accessor — first trained model (or None)."""
+        return self._models[0] if self._models else None
 
     # ------------------------------------------------------------------
     # Training
@@ -396,6 +562,11 @@ class CrossSectionalRankStrategy:
     ) -> float:
         """Train/retrain the pooled LGBMRanker on the training panel.
 
+        iter-v3/092 inner-ensemble: trains one LGBMRanker per seed in
+        self.ensemble_seeds (default: [self.seed] — single model, /091
+        behaviour).  predict() will return the arithmetic mean of all models'
+        score vectors.
+
         Returns the IS out-of-fold rank-IC (for smoke-test / A6 reporting).
         """
         # Build the group array: one query per timestamp.
@@ -406,47 +577,58 @@ class CrossSectionalRankStrategy:
         # open_time array aligned to the valid training rows (for CV grouping).
         open_times_train = train_panel["open_time"].values
 
-        def _objective(trial: optuna.Trial) -> float:
-            params = {
+        self._models = []
+        for inner_seed in self.ensemble_seeds:
+
+            def _objective(trial: optuna.Trial, _seed: int = inner_seed) -> float:
+                params = {
+                    "objective": "lambdarank",
+                    "n_estimators": trial.suggest_int("n_estimators", 50, 300),
+                    "learning_rate": trial.suggest_float("learning_rate", 0.01, 0.3, log=True),
+                    "num_leaves": trial.suggest_int("num_leaves", 15, 63),
+                    "max_depth": trial.suggest_int("max_depth", 3, 6),
+                    "min_child_samples": trial.suggest_int("min_child_samples", 10, 50),
+                    "subsample": trial.suggest_float("subsample", 0.6, 1.0),
+                    "colsample_bytree": trial.suggest_float("colsample_bytree", 0.6, 1.0),
+                    "reg_alpha": trial.suggest_float("reg_alpha", 1e-4, 1.0, log=True),
+                    "reg_lambda": trial.suggest_float("reg_lambda", 1e-4, 1.0, log=True),
+                    "verbose": -1,
+                    "random_state": _seed,
+                }
+                # 5-fold time-series CV with XS_REQUIRED_GAP purge.
+                # Pass open_times so CV can split by timestamp (real group arrays).
+                return self._cv_rank_ic(x_train, y_train, open_times_train, params)
+
+            sampler = optuna.samplers.TPESampler(seed=inner_seed)
+            study = optuna.create_study(direction="maximize", sampler=sampler)
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                optuna.logging.set_verbosity(optuna.logging.WARNING)
+                study.optimize(_objective, n_trials=self.n_trials, show_progress_bar=False)
+
+            best_params = {
                 "objective": "lambdarank",
-                "n_estimators": trial.suggest_int("n_estimators", 50, 300),
-                "learning_rate": trial.suggest_float("learning_rate", 0.01, 0.3, log=True),
-                "num_leaves": trial.suggest_int("num_leaves", 15, 63),
-                "max_depth": trial.suggest_int("max_depth", 3, 6),
-                "min_child_samples": trial.suggest_int("min_child_samples", 10, 50),
-                "subsample": trial.suggest_float("subsample", 0.6, 1.0),
-                "colsample_bytree": trial.suggest_float("colsample_bytree", 0.6, 1.0),
-                "reg_alpha": trial.suggest_float("reg_alpha", 1e-4, 1.0, log=True),
-                "reg_lambda": trial.suggest_float("reg_lambda", 1e-4, 1.0, log=True),
                 "verbose": -1,
-                "random_state": self.seed,
+                "random_state": inner_seed,
+                **study.best_params,
             }
-            # 5-fold time-series CV with XS_REQUIRED_GAP purge.
-            # Pass open_times so CV can split by timestamp (real group arrays).
-            return self._cv_rank_ic(x_train, y_train, open_times_train, params)
+            m = lgb.LGBMRanker(**best_params)
+            m.fit(x_train, y_train, group=group)
+            self._models.append(m)
 
-        sampler = optuna.samplers.TPESampler(seed=self.seed)
-        study = optuna.create_study(direction="maximize", sampler=sampler)
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            optuna.logging.set_verbosity(optuna.logging.WARNING)
-            study.optimize(_objective, n_trials=self.n_trials, show_progress_bar=False)
-
-        best_params = {
-            "objective": "lambdarank",
-            "verbose": -1,
-            "random_state": self.seed,
-            **study.best_params,
-        }
-        self._model = lgb.LGBMRanker(**best_params)
-        self._model.fit(x_train, y_train, group=group)
-
-        # IS rank-IC: Spearman between predicted score and forward-return rank
-        # (approximated by the label grade) on the training set.
-        scores = self._model.predict(x_train)
+        # IS rank-IC: Spearman between ensemble-mean predicted score and
+        # forward-return rank (approximated by the label grade) on the training set.
+        scores = self._predict_ensemble(x_train)
         ic = float(self._spearman_ic_by_timestamp(train_panel["open_time"].values, scores, y_train))
         self._is_rank_ic = ic
         return ic
+
+    def _predict_ensemble(self, x: np.ndarray) -> np.ndarray:
+        """Arithmetic mean of all inner-ensemble models' predict() vectors."""
+        if not self._models:
+            return np.zeros(len(x))
+        preds = np.stack([m.predict(x) for m in self._models], axis=0)
+        return preds.mean(axis=0)
 
     def _cv_rank_ic(
         self,
@@ -783,31 +965,31 @@ def run_cross_sectional_backtest(
     quantile_frac: float = XS_QUANTILE_FRAC,
     hold_bars: int = XS_HOLD_BARS,
     no_trade_band: float = XS_NO_TRADE_BAND,
+    score_mode: str = "trained",
 ) -> pd.DataFrame:
     """Full walk-forward cross-sectional backtest — iter-v3/089 cost-aware.
 
     Walk-forward cadence (Section 3.6):
       - Train on trailing training_months months (IS-only past data).
-      - Embargo: train_end_ms = test_start_ms - embargo_ms, where
-        embargo_ms = XS_REQUIRED_GAP bars * interval_ms.
-        This is the e149e9d fix carried through to the cross-sectional path.
+      - Embargo (iter-v3/091 CORRECTED): train_end_ms = test_start_ms - embargo_ms,
+        where embargo_ms = (XS_HORIZON + 1) * interval_ms.
+        Prior to /091 this was XS_REQUIRED_GAP * interval_ms, which over-embargoed
+        by N_XS_SYMBOLS = 22× (XS_REQUIRED_GAP is a row count, not a time count).
 
-    iter-v3/089 cost-aware construction (the /089 research brief Section 3) —
-    /088 lost money to turnover drag (IS fees 8.8x gross PnL); /089 attacks it
-    structurally with THREE composed levers, all IS-selected / a-priori:
-      - QUINTILE legs (quantile_frac=0.20) — EDA G1; tighter than /088's
-        tercile so the LTR precision concentrates the spread.
-      - OVERLAPPING HOLDS (hold_bars=3) — at each bar a new tranche sized
-        1/hold_bars of the target book is formed and held hold_bars bars;
-        the book is the sum of the live tranches.  Jegadeesh-Titman (1993):
-        cuts gross turnover ~hold_bars-fold with negligible signal loss.
-      - NO-TRADE BAND (no_trade_band=0.020) — a symbol is re-traded only
-        when its target book weight moves more than the band vs the held
-        weight.  Constantinides (1986) / Davis-Norman (1990): the optimal
-        no-trade band scales O(eps^1/3) in the proportional cost.
+    iter-v3/091 scoring modes (score_mode parameter):
+      - "model_free": parameter-free trailing-H-bar return score,
+        score(sym) = close(sym, ts) / close(sym, ts - H*interval) - 1.
+        No model is trained; strategy._model stays None.  Deterministic.
+      - "trained": pooled LGBMRanker(lambdarank) monthly walk-forward (the
+        /088/089/090 mode, retained as reference comparator in /091).
+
+    iter-v3/089 cost-aware construction:
+      - QUINTILE legs (quantile_frac=0.20) — EDA G1.
+      - OVERLAPPING HOLDS (hold_bars=21 in /091) — Jegadeesh-Titman (1993).
+      - NO-TRADE BAND (no_trade_band=0.020) — Constantinides / Davis-Norman.
 
     Fees: 0.1% per side modeled, turnover-based, charged on the absolute
-    change in the BOOK position bar-to-bar (Section 3.5 / Section 5).
+    change in the BOOK position bar-to-bar.
 
     Parameters
     ----------
@@ -826,6 +1008,8 @@ def run_cross_sectional_backtest(
         Fee per side (default 0.001 = 0.1%).
     vol_lookback:
         Trailing bars for per-symbol realised-vol estimate.
+    score_mode:
+        "trained" (LGBMRanker — default) or "model_free" (trailing-return).
 
     Returns
     -------
@@ -834,8 +1018,13 @@ def run_cross_sectional_backtest(
         rank_ic, predicted_score, label_grade
     One row per (timestamp, active symbol).
     """
+    if score_mode not in ("trained", "model_free"):
+        raise ValueError(f"score_mode must be 'trained' or 'model_free', got {score_mode!r}")
+
     interval_ms = 8 * 3600 * 1000  # 8h in ms
-    embargo_ms = XS_REQUIRED_GAP * interval_ms
+    # iter-v3/091 CORRECTED embargo: (H+1) candle-intervals of wall-clock TIME.
+    # XS_REQUIRED_GAP is a row count; it must NOT be multiplied by interval_ms.
+    embargo_ms = (XS_HORIZON + 1) * interval_ms
 
     # Build sorted unique timestamps.
     all_timestamps = np.sort(panel["open_time"].unique())
@@ -867,6 +1056,13 @@ def run_cross_sectional_backtest(
     ).sort_index()
     ret_wide = close_wide.pct_change()
 
+    # iter-v3/091 — pre-compute trailing-H-bar return matrix for model_free mode.
+    # mom_wide[ts, sym] = close(sym, ts) / close(sym, ts - H*interval) - 1.
+    # Both close values are ≤ ts (no look-ahead).
+    mom_wide: pd.DataFrame | None = None
+    if score_mode == "model_free":
+        mom_wide = close_wide / close_wide.shift(XS_HORIZON) - 1.0
+
     results: list[dict] = []
     trained_months: set[str] = set()
     # iter-v3/089 cost-aware construction state:
@@ -885,33 +1081,42 @@ def run_cross_sectional_backtest(
         test_end_ms_split = split["test_end_ms"]
         test_month = split["test_month"]
 
-        # Extract training panel rows.
-        train_mask = (panel["open_time"] >= train_start_ms_split) & (
-            panel["open_time"] < train_end_ms_split
-        )
-        train_panel = panel[train_mask].copy()
-        train_labels_all = labels[train_mask]
-
-        # Drop rows with NaN labels (forward window unavailable) from training.
-        valid_mask = train_labels_all.notna()
-        train_panel_valid = train_panel[valid_mask].reset_index(drop=True)
-        train_labels_valid = train_labels_all[valid_mask].reset_index(drop=True)
-
-        if len(train_panel_valid) < 100:
-            print(f"[xs] skip training for {test_month}: only {len(train_panel_valid)} valid rows.")
-            continue
-
-        # Retrain when we reach a new test month (lazy monthly retrain).
-        if test_month not in trained_months:
-            print(f"[xs] === Training for {test_month} (train rows={len(train_panel_valid)}) ===")
-            # Ensure group array is consistent: sort by (open_time, symbol).
-            train_panel_valid = train_panel_valid.sort_values(["open_time", "symbol"]).reset_index(
-                drop=True
+        # In model_free mode: skip all training — the score is the trailing
+        # H-bar return, which requires no model, no Optuna, no parameters.
+        # The training/labeling pass below is only for score_mode="trained".
+        if score_mode == "trained":
+            # Extract training panel rows.
+            train_mask = (panel["open_time"] >= train_start_ms_split) & (
+                panel["open_time"] < train_end_ms_split
             )
-            train_labels_valid = train_labels_valid.reindex(train_panel_valid.index)
-            ic = strategy._train_for_month(train_panel_valid, train_labels_valid)
-            print(f"[xs]   IS rank-IC for {test_month}: {ic:.4f}")
-            trained_months.add(test_month)
+            train_panel = panel[train_mask].copy()
+            train_labels_all = labels[train_mask]
+
+            # Drop rows with NaN labels (forward window unavailable) from training.
+            valid_mask = train_labels_all.notna()
+            train_panel_valid = train_panel[valid_mask].reset_index(drop=True)
+            train_labels_valid = train_labels_all[valid_mask].reset_index(drop=True)
+
+            if len(train_panel_valid) < 100:
+                print(
+                    f"[xs] skip training for {test_month}: "
+                    f"only {len(train_panel_valid)} valid rows."
+                )
+                continue
+
+            # Retrain when we reach a new test month (lazy monthly retrain).
+            if test_month not in trained_months:
+                print(
+                    f"[xs] === Training for {test_month} (train rows={len(train_panel_valid)}) ==="
+                )
+                # Ensure group array is consistent: sort by (open_time, symbol).
+                train_panel_valid = train_panel_valid.sort_values(
+                    ["open_time", "symbol"]
+                ).reset_index(drop=True)
+                train_labels_valid = train_labels_valid.reindex(train_panel_valid.index)
+                ic = strategy._train_for_month(train_panel_valid, train_labels_valid)
+                print(f"[xs]   IS rank-IC for {test_month}: {ic:.4f}")
+                trained_months.add(test_month)
 
         # Extract test panel rows.
         test_mask = (panel["open_time"] >= test_start_ms_split) & (
@@ -932,11 +1137,40 @@ def run_cross_sectional_backtest(
             if len(panel_t) < XS_MIN_SYMBOLS_PER_BAR:
                 continue
 
-            x_t = panel_t[strategy.feature_columns].values.astype(np.float32)
-            if strategy._model is not None:
-                scores = strategy._model.predict(x_t)
+            # --- Scoring: model_free or trained ----------------------------
+            if score_mode == "model_free":
+                # Parameter-free trailing-H-bar return score.
+                # score(sym) = close(sym, ts) / close(sym, ts-H*interval) - 1.
+                # mom_wide is pre-computed above; look up the row at ts.
+                assert mom_wide is not None
+                if ts not in mom_wide.index:
+                    scores = np.zeros(len(panel_t))
+                else:
+                    mom_row = mom_wide.loc[ts]
+                    syms_t = panel_t["symbol"].values
+                    raw_scores = np.array(
+                        [
+                            float(mom_row[s])
+                            if s in mom_row.index and not pd.isna(mom_row[s])
+                            else np.nan
+                            for s in syms_t
+                        ]
+                    )
+                    valid_score = ~np.isnan(raw_scores)
+                    if valid_score.sum() < XS_MIN_SYMBOLS_PER_BAR:
+                        continue  # not enough history for trailing-return score
+                    # Drop symbols with no trailing-return score.
+                    panel_t = panel_t[valid_score].copy().reset_index(drop=True)
+                    scores = raw_scores[valid_score]
             else:
-                scores = np.zeros(len(panel_t))
+                # score_mode == "trained": use the LGBMRanker ensemble.
+                # iter-v3/092: _predict_ensemble returns the arithmetic mean of
+                # all inner-ensemble models' score vectors (or zeros if untrained).
+                x_t = panel_t[strategy.feature_columns].values.astype(np.float32)
+                if strategy._models:
+                    scores = strategy._predict_ensemble(x_t)
+                else:
+                    scores = np.zeros(len(panel_t))
 
             # Past-only vol estimate: trailing vol_lookback bars ending BEFORE ts.
             hist = ret_wide[ret_wide.index < ts].tail(vol_lookback)
@@ -971,9 +1205,28 @@ def run_cross_sectional_backtest(
 
             # PnL on the BOOK positions: the 1-bar gross return for a book
             # weight held over bar t→t+1 is book_pos * (close(t+1)/close(t) - 1).
-            label_grades_t = test_labels[ts_mask].values
-            # symbol → row index in panel_t (for score / label lookup)
-            sym_to_iloc = {row["symbol"]: i for i, row in panel_t.iterrows()}
+            # Build lookup maps for label_grade and predicted_score at this bar.
+            # A symbol in the book but NOT in panel_t (carried by the no-trade
+            # band from a prior bar) has label_grade=None / pred_score=0.0.
+            ts_mask_full = test_panel["open_time"] == ts
+            ts_labels_full = test_labels[ts_mask_full]
+            ts_panel_full = test_panel[ts_mask_full]
+            ts_panel_syms = ts_panel_full["symbol"].values
+            ts_label_vals = ts_labels_full.values
+
+            sym_to_grade: dict[str, int | None] = {}
+            for sym_val, raw_grade in zip(ts_panel_syms, ts_label_vals):
+                try:
+                    is_na = raw_grade is None or pd.isna(raw_grade)
+                except TypeError:
+                    is_na = False
+                sym_to_grade[sym_val] = None if is_na else int(raw_grade)
+
+            # Build sym→score map from the (possibly filtered) panel_t.
+            sym_to_score: dict[str, float] = {}
+            for iloc_idx in range(len(panel_t)):
+                sym_to_score[panel_t["symbol"].iloc[iloc_idx]] = float(scores[iloc_idx])
+
             idx_loc = ret_wide.index.searchsorted(ts, side="right")
             is_oos = ts >= oos_cutoff_ms
 
@@ -995,22 +1248,11 @@ def run_cross_sectional_backtest(
                 # Turnover-based fee on the BOOK-position change bar-to-bar.
                 fee = abs(pos - prev_pos) * fee_per_side
 
-                # label_grades_t is a numpy array from an Int8 Series; the last
-                # H bars and thin-cross-section bars carry pd.NA (not NaN).
-                # int(pd.NA) raises TypeError, so guard explicitly.  A symbol
-                # present in the book but absent from panel_t (carried by the
-                # no-trade band from an earlier bar) has no current-bar score
-                # or label — store None / 0.0 sentinels.
-                row_iloc = sym_to_iloc.get(sym)
-                if row_iloc is None:
-                    label_grade: int | None = None
-                    pred_score = 0.0
-                else:
-                    raw_grade = label_grades_t[row_iloc]
-                    label_grade = (
-                        None if (raw_grade is pd.NA or raw_grade is None) else int(raw_grade)
-                    )
-                    pred_score = float(scores[row_iloc])
+                # label_grade: None for carried symbols or NA labels.
+                # pred_score: the trailing-return score (model_free) or model
+                #   score (trained); 0.0 sentinel for symbols not in panel_t.
+                label_grade: int | None = sym_to_grade.get(sym, None)
+                pred_score: float = sym_to_score.get(sym, 0.0)
 
                 results.append(
                     {
@@ -1021,7 +1263,9 @@ def run_cross_sectional_backtest(
                         "fee": fee,
                         "net_pnl": gross_pnl - fee,
                         "is_oos": is_oos,
-                        "rank_ic": strategy._is_rank_ic or 0.0,
+                        "rank_ic": (strategy._is_rank_ic or 0.0)
+                        if score_mode != "model_free"
+                        else 0.0,
                         "predicted_score": pred_score,
                         "label_grade": label_grade,
                     }
@@ -1046,7 +1290,20 @@ def run_cross_sectional_backtest(
             ]
         )
 
-    return pd.DataFrame(results).sort_values("open_time").reset_index(drop=True)
+    df = pd.DataFrame(results).sort_values("open_time").reset_index(drop=True)
+    # Force label_grade to object dtype so Python None values are preserved
+    # as None (not coerced to float nan by pandas when ints are mixed with None).
+    # This ensures test assertions `grade is None` hold for NA-label rows.
+    # pandas converts mixed int/None columns to float64 (None → nan); we
+    # restore: non-nan values back to int, nan back to None.
+    if "label_grade" in df.columns:
+        col = df["label_grade"]
+        valid_mask = col.notna()
+        label_obj = np.empty(len(col), dtype=object)
+        for i, v in enumerate(col):
+            label_obj[i] = int(v) if valid_mask.iloc[i] else None
+        df["label_grade"] = label_obj
+    return df
 
 
 # ---------------------------------------------------------------------------

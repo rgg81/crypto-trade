@@ -1,0 +1,7 @@
+candidate,mean_abs_ic,ic_sign_consistent,quartile_stable_on_engine,redundancy_ok,isfold_above_parity_engine,best_gain_rank_of_15,VERDICT
+bch_adract_growth_14d_z90,0.02099,True,False,True,False,13.0,NO-GO
+bch_txcnt_growth_14d_z90,0.02838,True,False,True,False,13.0,NO-GO
+btc_adract_growth_14d_z90,0.01679,False,False,True,False,10.0,NO-GO
+btc_txcnt_growth_14d_z90,0.02129,False,False,True,False,7.0,NO-GO
+trx_adract_growth_14d_z90,0.02543,True,False,True,False,14.0,NO-GO
+trx_txcnt_growth_14d_z90,0.03396,True,True,True,False,12.0,NO-GO

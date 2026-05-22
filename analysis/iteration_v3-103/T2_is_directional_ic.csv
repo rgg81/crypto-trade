@@ -1,0 +1,8 @@
+candidate,ic_BCH,ic_LDO,ic_TRX,mean_abs_ic,sign_consistent_3sym,min_coverage_frac
+tsrank_dispersion_ratio,-0.0059,-0.1728,-0.1191,0.0992,True,1.0
+argmax_pullback_signed_20,0.0515,0.009,0.0905,0.0503,True,0.999
+extrema_recency_skew_30,-0.075,-0.0661,-0.0089,0.05,True,1.0
+vol_decayed_trend,-0.0095,-0.0968,0.009,0.0384,False,1.0
+corr_gated_momentum_5d,0.081,0.0109,0.0198,0.0372,True,1.0
+recency_weighted_momentum_5d,0.0146,-0.04,-0.0443,0.0329,False,1.0
+scaled_reversal_pressure_signed,0.0024,0.0681,0.0044,0.025,True,1.0

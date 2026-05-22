@@ -1,0 +1,5 @@
+candidate,base_auc_pooled,with_auc_pooled,pooled_lift,BCH_lift,LDO_lift,TRX_lift
+B1_eth_vs_sym_rv_50,0.4732,0.4794,0.0063,-0.0092,0.0215,0.0029
+B1a_log_eth_vs_sym_rv_50,0.4732,0.4791,0.0059,-0.0088,0.0215,0.0053
+B1c_eth_vs_sym_rv_100,0.4732,0.4753,0.0021,-0.0031,0.0042,-0.0042
+B1b_eth_vs_sym_rv_25,0.4732,0.4703,-0.0029,-0.0038,0.0162,0.0003

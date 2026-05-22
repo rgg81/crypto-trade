@@ -1,0 +1,7 @@
+angle,symbol,n_candles,uniq_mean,uniq_min,uniq_p10,uniq_p90,uniq_std,ess_frac,weight_mean,weight_std,weight_cv,win_rate_lo_tercile,win_rate_hi_tercile,win_rate_spread,edge_free_frac,best_edge_mean
+A_uniqueness,BCHUSDT,5727.0,0.0455,0.0455,0.0455,0.0455,0.0023,0.0455,,,,,,,,
+A_uniqueness,LDOUSDT,2741.0,0.0456,0.0455,0.0455,0.0455,0.0033,0.0456,,,,,,,,
+A_uniqueness,TRXUSDT,5669.0,0.0457,0.0455,0.0455,0.0455,0.0026,0.0457,,,,,,,,
+B_magnitude,BCHUSDT,,,,,,,,2.047,0.741,0.362,0.2211,0.8727,0.6517,0.4234,1.1553
+B_magnitude,LDOUSDT,,,,,,,,2.2,1.068,0.485,0.977,1.0,0.023,0.0077,10.9863
+B_magnitude,TRXUSDT,,,,,,,,1.52,0.686,0.452,0.9555,1.0,0.0445,0.0148,7.0854

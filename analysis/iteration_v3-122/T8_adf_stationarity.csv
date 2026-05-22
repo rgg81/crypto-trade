@@ -1,0 +1,13 @@
+candidate,symbol,n,adf_stat,p_value,stationary
+A1_eth_ret_14d,BCHUSDT,5606,-10.276,0.0,True
+A1_eth_ret_14d,LDOUSDT,2620,-6.193,0.0,True
+A1_eth_ret_14d,TRXUSDT,5548,-10.07,0.0,True
+A2_eth_vs_btc_ret_21d,BCHUSDT,5606,-7.231,0.0,True
+A2_eth_vs_btc_ret_21d,LDOUSDT,2620,-5.82,0.0,True
+A2_eth_vs_btc_ret_21d,TRXUSDT,5548,-7.078,0.0,True
+A3_eth_vs_btc_vol_diff_14d,BCHUSDT,5606,-7.242,0.0,True
+A3_eth_vs_btc_vol_diff_14d,LDOUSDT,2620,-4.662,9.9e-05,True
+A3_eth_vs_btc_vol_diff_14d,TRXUSDT,5548,-7.31,0.0,True
+A4_eth_ret_3d,BCHUSDT,5606,-11.844,0.0,True
+A4_eth_ret_3d,LDOUSDT,2620,-7.507,0.0,True
+A4_eth_ret_3d,TRXUSDT,5548,-11.586,0.0,True

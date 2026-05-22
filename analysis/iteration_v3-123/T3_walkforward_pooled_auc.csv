@@ -1,0 +1,5 @@
+candidate,pooled_auc,null_q95,p_value,clears_q95
+B1a_log_eth_vs_sym_rv_50,0.4915,0.5072,0.89,False
+B1c_eth_vs_sym_rv_100,0.4783,0.5072,0.99,False
+B1b_eth_vs_sym_rv_25,0.4745,0.5102,1.0,False
+B1_eth_vs_sym_rv_50,0.4694,0.5069,1.0,False

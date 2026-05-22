@@ -691,7 +691,7 @@ class XgboostStrategy:
             14_399_999: "4h",
             28_799_999: "8h",
             43_199_999: "12h",
-            86_399_999: "1d",
+            86_399_999: "24h",  # iter-v3/117: 24h bars named "24h" to match parquet suffix
         }
         best = "8h"
         best_dist = abs(diff - 28_799_999)

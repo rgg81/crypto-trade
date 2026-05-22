@@ -1,0 +1,7 @@
+angle,symbol,corr_weight_atr,corr_weight_fwdret,corr_weight_winner,labeled_win_rate,W0_cv,W1_cv,W2_zeroed_frac,W0_top_decile_mass
+C_weight_decomp,BCHUSDT,0.1454,-0.1115,0.5599,0.5764,,,,
+C_weight_decomp,LDOUSDT,0.117,1.0,0.1431,0.993,,,,
+C_weight_decomp,TRXUSDT,0.3663,0.9953,0.2057,0.9853,,,,
+D_reweight_shape,BCHUSDT,,,,,0.362,0.472,0.4234,0.1826
+D_reweight_shape,LDOUSDT,,,,,0.485,0.472,0.0077,0.2081
+D_reweight_shape,TRXUSDT,,,,,0.452,0.472,0.0148,0.2017

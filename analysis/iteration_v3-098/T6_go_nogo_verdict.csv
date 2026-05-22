@@ -1,0 +1,5 @@
+feature_set,g1_dShACC>=0.010,g2_CI_lo>0,g3_dPnL>0,g4_importance>=parity,SET_GO
++A,False,False,False,False,False
++D,False,False,False,False,False
++AD,False,False,False,False,False
+VERDICT,,,,,NO-GO

@@ -1,0 +1,5 @@
+candidate,base_auc_pooled,with_auc_pooled,pooled_lift,BCH_lift,LDO_lift,TRX_lift
+A1_eth_ret_14d,0.4732,0.48,0.0069,-0.0005,-0.0044,-0.0062
+A4_eth_ret_3d,0.4732,0.4744,0.0012,0.0001,-0.0034,-0.0044
+A3_eth_vs_btc_vol_diff_14d,0.4732,0.4739,0.0007,-0.0091,0.0203,-0.0071
+A2_eth_vs_btc_ret_21d,0.4732,0.4671,-0.006,0.0106,0.053,-0.0055

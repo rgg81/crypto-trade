@@ -1,0 +1,4 @@
+symbol,fold_a_best_trigger,fold_a_best_k,fold_a_lift,fold_b_static_sharpe,fold_b_early_exit_sharpe,fold_b_lift,fold_a_cell_helps_fold_b
+BCHUSDT,0.5,4,0.1296,2.5427,2.7861,0.2434,True
+LDOUSDT,1.0,3,0.2901,4.092,3.5626,-0.5294,False
+TRXUSDT,0.5,3,0.0624,1.7492,1.8292,0.08,True

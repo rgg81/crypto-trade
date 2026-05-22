@@ -1,0 +1,19 @@
+meta_feature,family,rationale,present_in_parquet
+hurst_200,regime,Hurst at 200-bar lookback; primary uses hurst_100/diff only,True
+adx_14,regime,"Wilder trend-strength; a gate input, not an M1 feature",True
+btc_vol_14d,regime,BTC realized vol regime; primary uses btc_ret only,True
+cross_asset_divergence_norm,regime,normalized cross-asset divergence,True
+vol_regime_x_momentum,regime,vol-regime x momentum interaction,True
+vol_transition_slope_20,regime,vol-regime transition slope (regime change rate),True
+atr_pct_rank_200,vol_state,ATR percentile rank; dispersion regime,True
+bb_width_pct_rank_100,vol_state,Bollinger-width percentile rank,True
+parkinson_gk_ratio_20,vol_state,Parkinson/Garman-Klass ratio (jump-vs-diffusion),True
+volume_cv_50,vol_state,volume coefficient of variation (flow stability),True
+range_efficiency_50,vol_state,range efficiency (trendiness of the path),True
+taker_buy_imbalance_20,microstructure,taker buy/sell imbalance,True
+obv_slope_50,microstructure,on-balance-volume slope,True
+funding_rate_zscore_30,funding,funding-rate z-score (positioning crowding),True
+funding_sign_persist_9,funding,funding-sign persistence (regime crowding),True
+basis_zscore_30,funding,perp-spot basis z-score,True
+candle_dow_sin,calendar,day-of-week sine encoding,True
+candle_dow_cos,calendar,day-of-week cosine encoding,True

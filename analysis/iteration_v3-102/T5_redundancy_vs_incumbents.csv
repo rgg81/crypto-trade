@@ -1,0 +1,19 @@
+alpha,note,max_abs_ic_vs_incumbent,argmax_incumbent,is_engineered_carveout,redundancy_gate_pass
+alpha053,pure time-series; no adaptation,0.0588,ema_spread_atr_20,False,True
+alpha053_regime_signed,ENGINEERED Category-2: alpha053 x sign(hurst-0.5),0.0588,ema_spread_atr_20,True,True
+alpha028,scale()->causal scale_ts; adv20 per-symbol,0.0965,ema_spread_atr_20,False,True
+alpha054,pure time-series; no adaptation,0.1403,vwap_dev_20,False,True
+alpha034,cs-rank-dropped (3 ranks stripped); per-symbol composite,0.1744,vwap_dev_20,False,True
+alpha012,pure time-series; no adaptation,0.1744,vwap_dev_20,False,True
+alpha043,pure time-series (Ts_Rank per-symbol); adv20 per-symbol,0.1862,vwap_dev_20,False,True
+alpha006,pure time-series; no adaptation,0.1885,ema_spread_atr_20,False,True
+alpha024,pure time-series; no adaptation,0.2627,range_realized_vol_50,False,True
+alpha101,pure time-series; SANITY ANCHOR (trivial body/range),0.3084,vwap_dev_20,False,True
+alpha049,pure time-series; no adaptation,0.3177,vwap_dev_20,False,True
+alpha051,pure time-series; no adaptation,0.3213,vwap_dev_20,False,True
+alpha023,pure time-series; no adaptation,0.3261,vwap_dev_20,False,True
+alpha068,cs-rank-dropped (2 ranks stripped); continuous difference,0.3623,vwap_dev_20,False,True
+alpha046,pure time-series; no adaptation,0.3629,vwap_dev_20,False,True
+alpha032,scale()->causal scale_ts; all inner time-series,0.466,vwap_dev_20,False,True
+alpha084,pure time-series (Ts_Rank per-symbol); vwap proxy,0.5569,vwap_dev_20,False,True
+alpha035,"pure time-series (all Ts_Rank, per-symbol)",0.5797,vwap_dev_20,False,True

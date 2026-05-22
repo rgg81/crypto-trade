@@ -1,0 +1,2 @@
+grid,agg_abs_ic_trend_scan,agg_abs_ic_triple_barrier,agg_abs_ic_ratio,n_cells,n_cells_improved,frac_cells_improved,wilcoxon_p_greater
+capped_5_8_13_21,0.03977,0.03034,1.3105,42,25,0.5952,0.013347

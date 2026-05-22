@@ -1,0 +1,282 @@
+{
+  "d24_ret_autocorr_lag1_50": {
+    "t3_pass_3_syms": 3,
+    "t4_pass_pooled": 1,
+    "t5_ranks": [
+      2,
+      1,
+      3
+    ],
+    "t5_max_rank": 3,
+    "t5_min_rank": 1,
+    "t6_lifts": [
+      0.0183,
+      0.0084,
+      0.0174
+    ],
+    "t6_positive_count": 3,
+    "t6_mean_lift": 0.0147,
+    "t7_pass": 1,
+    "score": 8.17
+  },
+  "d24_hurst_diff_100_50": {
+    "t3_pass_3_syms": 3,
+    "t4_pass_pooled": 1,
+    "t5_ranks": [
+      1,
+      4,
+      4
+    ],
+    "t5_max_rank": 4,
+    "t5_min_rank": 1,
+    "t6_lifts": [
+      0.0204,
+      -0.0079,
+      -0.0029
+    ],
+    "t6_positive_count": 1,
+    "t6_mean_lift": 0.0032,
+    "t7_pass": 1,
+    "score": 6.92
+  },
+  "d24_hurst_100": {
+    "t3_pass_3_syms": 3,
+    "t4_pass_pooled": 1,
+    "t5_ranks": [
+      7,
+      5,
+      11
+    ],
+    "t5_max_rank": 11,
+    "t5_min_rank": 5,
+    "t6_lifts": [
+      0.0078,
+      0.0193,
+      0.0033
+    ],
+    "t6_positive_count": 3,
+    "t6_mean_lift": 0.010133333333333333,
+    "t7_pass": 1,
+    "score": 6.913333333333334
+  },
+  "d24_regime_momentum_signed_5d": {
+    "t3_pass_3_syms": 3,
+    "t4_pass_pooled": 1,
+    "t5_ranks": [
+      12,
+      8,
+      13
+    ],
+    "t5_max_rank": 13,
+    "t5_min_rank": 8,
+    "t6_lifts": [
+      0.0075,
+      0.0269,
+      -0.0022
+    ],
+    "t6_positive_count": 2,
+    "t6_mean_lift": 0.010733333333333333,
+    "t7_pass": 1,
+    "score": 6.773333333333333
+  },
+  "d24_ret_skew_50": {
+    "t3_pass_3_syms": 3,
+    "t4_pass_pooled": 0,
+    "t5_ranks": [
+      4,
+      2,
+      2
+    ],
+    "t5_max_rank": 4,
+    "t5_min_rank": 2,
+    "t6_lifts": [
+      -0.0031,
+      0.0075,
+      0.0163
+    ],
+    "t6_positive_count": 2,
+    "t6_mean_lift": 0.006899999999999999,
+    "t7_pass": 1,
+    "score": 5.289999999999999
+  },
+  "d24_ret_kurt_200": {
+    "t3_pass_3_syms": 2,
+    "t4_pass_pooled": 0,
+    "t5_ranks": [
+      5,
+      8,
+      3
+    ],
+    "t5_max_rank": 8,
+    "t5_min_rank": 3,
+    "t6_lifts": [
+      0.0078,
+      0.0404,
+      -0.003
+    ],
+    "t6_positive_count": 2,
+    "t6_mean_lift": 0.015066666666666666,
+    "t7_pass": 1,
+    "score": 4.706666666666667
+  },
+  "d24_ret_skew_200": {
+    "t3_pass_3_syms": 3,
+    "t4_pass_pooled": 0,
+    "t5_ranks": [
+      1,
+      5,
+      7
+    ],
+    "t5_max_rank": 7,
+    "t5_min_rank": 1,
+    "t6_lifts": [
+      -0.0037,
+      -0.0136,
+      0.0058
+    ],
+    "t6_positive_count": 1,
+    "t6_mean_lift": -0.003833333333333333,
+    "t7_pass": 1,
+    "score": 3.9166666666666665
+  },
+  "d24_ret_kurt_50": {
+    "t3_pass_3_syms": 2,
+    "t4_pass_pooled": 0,
+    "t5_ranks": [
+      4,
+      1,
+      3
+    ],
+    "t5_max_rank": 4,
+    "t5_min_rank": 1,
+    "t6_lifts": [
+      -0.0153,
+      0.0004,
+      0.0057
+    ],
+    "t6_positive_count": 2,
+    "t6_mean_lift": -0.0030666666666666668,
+    "t7_pass": 1,
+    "score": 3.2933333333333334
+  },
+  "d24_range_realized_vol_50": {
+    "t3_pass_3_syms": 0,
+    "t4_pass_pooled": 0,
+    "t5_ranks": [
+      1,
+      3,
+      1
+    ],
+    "t5_max_rank": 3,
+    "t5_min_rank": 1,
+    "t6_lifts": [
+      0.008,
+      0.01,
+      -0.0086
+    ],
+    "t6_positive_count": 2,
+    "t6_mean_lift": 0.003133333333333334,
+    "t7_pass": 1,
+    "score": 2.013333333333333
+  },
+  "d24_max_dd_window_50": {
+    "t3_pass_3_syms": 0,
+    "t4_pass_pooled": 0,
+    "t5_ranks": [
+      9,
+      3,
+      13
+    ],
+    "t5_max_rank": 13,
+    "t5_min_rank": 3,
+    "t6_lifts": [
+      -0.0084,
+      0.0255,
+      0.0056
+    ],
+    "t6_positive_count": 2,
+    "t6_mean_lift": 0.007566666666666666,
+    "t7_pass": 1,
+    "score": 1.4566666666666666
+  },
+  "d24_sym_vs_btc_ret_7d": {
+    "t3_pass_3_syms": 0,
+    "t4_pass_pooled": 0,
+    "t5_ranks": [
+      13,
+      9,
+      12
+    ],
+    "t5_max_rank": 13,
+    "t5_min_rank": 9,
+    "t6_lifts": [
+      0.0038,
+      0.0125,
+      0.0023
+    ],
+    "t6_positive_count": 3,
+    "t6_mean_lift": 0.006200000000000001,
+    "t7_pass": 1,
+    "score": 1.32
+  },
+  "d24_btc_ret_14d": {
+    "t3_pass_3_syms": 0,
+    "t4_pass_pooled": 0,
+    "t5_ranks": [
+      6,
+      9,
+      11
+    ],
+    "t5_max_rank": 11,
+    "t5_min_rank": 6,
+    "t6_lifts": [
+      0.0008,
+      0.0084,
+      -0.0006
+    ],
+    "t6_positive_count": 2,
+    "t6_mean_lift": 0.0028666666666666667,
+    "t7_pass": 1,
+    "score": 1.1866666666666665
+  },
+  "d24_vwap_dev_20": {
+    "t3_pass_3_syms": 0,
+    "t4_pass_pooled": 0,
+    "t5_ranks": [
+      12,
+      12,
+      13
+    ],
+    "t5_max_rank": 13,
+    "t5_min_rank": 12,
+    "t6_lifts": [
+      0.0001,
+      0.0196,
+      -0.0084
+    ],
+    "t6_positive_count": 2,
+    "t6_mean_lift": 0.0037666666666666664,
+    "t7_pass": 1,
+    "score": 1.0766666666666667
+  },
+  "d24_ema_spread_atr_20": {
+    "t3_pass_3_syms": 0,
+    "t4_pass_pooled": 0,
+    "t5_ranks": [
+      13,
+      6,
+      15
+    ],
+    "t5_max_rank": 15,
+    "t5_min_rank": 6,
+    "t6_lifts": [
+      0.005,
+      -0.0014,
+      -0.0052
+    ],
+    "t6_positive_count": 1,
+    "t6_mean_lift": -0.0005333333333333333,
+    "t7_pass": 0,
+    "score": -1.5533333333333332
+  }
+}

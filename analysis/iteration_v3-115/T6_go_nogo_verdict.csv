@@ -1,0 +1,5 @@
+gate,detail,pass
+g1_label_validity,"balance_ok=3/3, label_differs=3/3",True
+g2_execution_coherence,"sanity_tb_exec_ok=3/3, /072-mismatch>=0.05=3/3",True
+g3_trade_book_gain_DECISIVE,hz_monthly_sharpe>=tb on 0/3 symbols,False
+VERDICT,GO iff g1 AND g2 AND g3 | T4_support=3/3 T5_clears_q95=True,False

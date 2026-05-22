@@ -1,0 +1,5 @@
+candidate,category,T2_r2,T3_pooled_auc,T3_clears_q95,T5_ranks_BCH_LDO_TRX,T5_gains_BCH_LDO_TRX,T7_pooled_lift,T9_ssc_risk,verdict
+A4_eth_ret_3d,(v) cross-asset ETH momentum (short-horizon),0.437,0.5081,True,15/11/10,2.97/4.01/4.25,0.0012,True,MARGINAL
+A3_eth_vs_btc_vol_diff_14d,(v) cross-asset ETH/BTC vol-regime,0.3264,0.4731,False,15/4/7,3.4/10.91/6.59,0.0007,True,WEAK
+A1_eth_ret_14d,(v) cross-asset ETH momentum,0.7017,0.4942,False,15/12/8,3.79/2.59/5.38,0.0069,False,REJECT-R2
+A2_eth_vs_btc_ret_21d,(v) cross-asset ETH/BTC relative-strength,0.113,0.5181,True,15/2/3,3.95/10.07/9.76,-0.006,True,REJECT

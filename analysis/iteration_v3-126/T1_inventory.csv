@@ -1,0 +1,4 @@
+symbol,n_24h_rows_IS,n_8h_rows_IS,first_24h_close_ms,last_24h_close_ms,min_non_nan_d24_feat,max_non_nan_d24_feat,feature_with_min_non_nan
+BCHUSDT,1909,5727,1577923199999,1742774399999,1709,1902,d24_ret_kurt_200
+LDOUSDT,914,2741,1663891199999,1742774399999,714,914,d24_ret_kurt_200
+TRXUSDT,1890,5669,1579132799999,1742774399999,1690,1890,d24_ret_kurt_200

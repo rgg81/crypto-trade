@@ -1,0 +1,2 @@
+recommended_features,C1_auc_lift_positive,C2_clears_perm_q95,C3_majority_symbols_positive,C4_gated_hit_lift_positive,n_criteria_cleared,pooled_auc_8h_only,pooled_auc_8h_plus_ortho4,pooled_perm_q95,verdict
+d_trend_slope_10;d_realvol_ratio;d_atr_pctrank_60;d_efficiency_10,True,False,False,True,2,0.4889,0.4982,0.5102,SHARPENED-GO

@@ -1,0 +1,4 @@
+trigger,n_oos_losers,n_oos_winners,oos_loser_mean,oos_winner_mean,oos_polarity,note
+btc_dd,9,3,3.626,4.4146,kill_LOW,"FENCED — OOS coverage/direction sizing only, not tuning"
+btc_vz,9,3,1.1438,0.9624,kill_HIGH,"FENCED — OOS coverage/direction sizing only, not tuning"
+ldo_vz,9,3,0.3092,0.2284,kill_HIGH,"FENCED — OOS coverage/direction sizing only, not tuning"

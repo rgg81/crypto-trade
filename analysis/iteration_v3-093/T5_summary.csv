@@ -1,0 +1,2 @@
+core_n_symbols,wide_n_symbols,best_fwd_return_feature,best_fwd_return_ic,best_fwd_return_horizon,best_vol_regime_feature,best_vol_regime_ic,best_vol_regime_effsize,mean_deleveraging_lift_H21,max_redundancy_vs_price,all_check4_pass,n_regime_ic_ge_0p05,n_regime_ic_measured
+3,21,f_sign_persist_9,-0.08215,21,f_rate,0.18187,0.3011,1.106,0.3211,True,8,39

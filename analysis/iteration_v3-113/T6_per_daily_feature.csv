@@ -1,0 +1,9 @@
+daily_feature,univariate_pooled_auc,mean_stacked_gain_rank,rank_of_total
+d_realvol_10,0.4844,8.0,22
+d_realvol_ratio,0.5048,11.67,22
+d_close_pos_20,0.5049,12.0,22
+d_trend_slope_10,0.5136,15.0,22
+d_ret_10d,0.5002,15.67,22
+d_atr_pctrank_60,0.5,16.33,22
+d_efficiency_10,0.5061,16.33,22
+d_ret_5d,0.4963,19.33,22

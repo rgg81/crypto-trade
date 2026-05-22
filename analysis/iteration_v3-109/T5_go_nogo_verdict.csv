@@ -1,0 +1,4 @@
+model,pooled_auc_lift_vs_lgbm,positive_thirds,gate_material_lift_ge_0p02,gate_stable_2of3_thirds,verdict
+M_mlp,-0.0102,1,False,False,NO-GO
+T_temporal_mlp,-0.0157,0,False,False,NO-GO
+C_logistic,-0.0352,0,False,False,NO-GO

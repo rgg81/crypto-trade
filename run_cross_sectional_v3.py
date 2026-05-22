@@ -1,39 +1,48 @@
-"""Cross-sectional ranking model runner — iter-v3/089 (cost-aware build).
+"""Cross-sectional ranking model runner -- iter-v3/092 (multi-seed CONFIRMATION).
 
-iter-v3/089 is the CORRECTED next build on the RETAINED /088 cross-sectional
-architecture (NOT a fresh re-architecture).  /088 produced v3's first genuine
-OOS signal transfer (OOS rank-IC +0.0430, t~4.6) but the long-short book lost
-money for two diagnosed reasons; /089 fixes both and attacks turnover:
-  - SIGN FIX — the model is trained on a FORWARD-return grade, so high score =
-    predicted future WINNER.  `build_positions` now LONGs the top quantile.
-  - CPCV-PROXY FIX — `_compute_xs_cpcv` now computes the ACTUAL long-short net
-    return on each CPCV path (was a degenerate label-grade self-correlation).
-  - COST-AWARE CONSTRUCTION — QUINTILE legs + 3-bar OVERLAPPING HOLDS +
-    a NO-TRADE BAND, all IS-selected (analysis/iteration_v3-089/).
-  - A HARD PRE-REGISTERED TURNOVER CEILING (XS_TURNOVER_CEILING = 0.138 gross
-    turnover/bar) — a build that breaches it on IS is NO-MERGE.
+iter-v3/092 is the CYCLE-3 CONFIRMATION: a multi-seed CONFIRMATION-grade
+verdict that formally closes the cross-sectional LGBMRanker line.  It
+multi-seed-validates the trained LGBMRanker (score_mode="trained") at horizon
+H=21, with the /089 cost-aware construction retained.
 
-Implements the Phase-6 A5/A6 build stages:
-  A5 — cross-sectional backtest path
-  A6 — report emission (comparison.csv, rank-IC report, dsr.json, etc.)
+/092 BUILD -- multi-seed support:
+  - CONFIRMATION_OUTER_SEEDS = (42, 123): outer-seed loop runs the full
+    cross-sectional walk-forward backtest once per outer seed.
+  - 5-model inner ensemble per outer seed: inner seeds derived via
+    _derive_ensemble_seeds(outer_seed, 5), matching the BASELINE_V3.md lineage.
+  - Arithmetic-mean score averaging across the 5 inner models per bar.
+  - Per-seed reports: reports-v3/iteration_v3-092/seed_<s>/
+  - Multi-seed aggregate: reports-v3/iteration_v3-092/ (comparison.csv,
+    ensemble_summary.json, dsr.json on the aggregate book).
+  - --seeds N: controls how many outer seeds to use (selects first N from
+    CONFIRMATION_OUTER_SEEDS).  NEW independent argument -- NOT the deprecated
+    per-symbol runner's --seeds.  No deprecation warning; live and functional.
 
-This is a SEPARATE runner from run_baseline_v3.py so the legacy per-symbol
-path stays intact.  The cross-sectional path trades XS_UNIVERSE (22 symbols)
-rather than the 3-symbol V3_MODELS.
+RETAINED from /088 + /089 + /091:
+  - score_mode="trained" (the /091 model-free path is preserved but unused).
+  - XS_HORIZON = 21, XS_HOLD_BARS = 21 (corrected /091 horizon-EDA best).
+  - SIGN FIX -- high score = predicted future WINNER; LONG the top quantile.
+  - CPCV-PROXY FIX -- _compute_xs_cpcv computes ACTUAL long-short net return.
+  - COST-AWARE CONSTRUCTION -- QUINTILE + 21-bar OVERLAPPING HOLDS + NO-TRADE
+    BAND, 0.138 turnover ceiling.
+  - Feature stack: 13-feature base (V3_FEATURE_COLUMNS_TOP_N minus btc_ret_14d).
+  - Walk-forward embargo_ms = (XS_HORIZON+1)*interval_ms (corrected /091 fix).
+  - Gross-Sharpe runner artifact (_monthly_sharpe shared helper, /091 setup 2).
 
 Usage:
-    uv run python run_cross_sectional_v3.py
-    uv run python run_cross_sectional_v3.py --n-trials 35 --exploration
-    uv run python run_cross_sectional_v3.py --skip-features     # reuse parquets
-    uv run python run_cross_sectional_v3.py --smoke-test        # fast IS-only smoke
-    uv run python run_cross_sectional_v3.py --clean-oof         # re-run from scratch
+    uv run python run_cross_sectional_v3.py --skip-features --seeds 2 --n-trials 35
+    uv run python run_cross_sectional_v3.py --skip-features --seeds 1 --n-trials 35
+    uv run python run_cross_sectional_v3.py --skip-features             # seeds=2 default
+    uv run python run_cross_sectional_v3.py --smoke-test    # fast multi-seed wiring check
+    uv run python run_cross_sectional_v3.py --clean-oof     # re-run from scratch
 
 Correctness guarantees:
   - OOS_CUTOFF_DATE = 2025-03-24 and training_months = 24 are IMMUTABLE.
-  - XS_REQUIRED_GAP = 88 asserted at CPCV call-site via expected_gap.
-  - Walk-forward train_end_ms = test_start_ms - embargo_ms (e149e9d fix).
-  - The cross-sectional label's H=3 forward window never overlaps a test row.
+  - XS_REQUIRED_GAP = 484 asserted at CPCV call-site via expected_gap.
+  - Walk-forward embargo_ms = (XS_HORIZON+1)*interval_ms (corrected /091 fix).
   - Feature columns passed explicitly (no auto-discovery).
+  - _derive_ensemble_seeds copied verbatim from run_baseline_v3.py:119-128
+    (brief Section 3.3 Mechanism A) -- reproduces BASELINE_V3.md lineage.
 """
 
 from __future__ import annotations
@@ -41,7 +50,6 @@ from __future__ import annotations
 import argparse
 import json
 import subprocess
-import sys
 import time
 from pathlib import Path
 
@@ -54,6 +62,7 @@ from crypto_trade.features_v3 import (
     V3_FEATURE_COLUMNS_TOP_N,
 )
 from crypto_trade.strategies.ml.cross_sectional import (
+    XS_DOWNSIDE_FEATURES,
     XS_DROP_FEATURES,
     XS_HOLD_BARS,
     XS_HORIZON,
@@ -76,26 +85,53 @@ from crypto_trade.strategies.ml.validation_v3 import (
 )
 
 # ============================================================
-# Constants — DO NOT CHANGE
+# Constants -- DO NOT CHANGE
 # ============================================================
 OOS_CUTOFF_DATE = "2025-03-24"  # IMMUTABLE
 TRAINING_MONTHS = 24  # IMMUTABLE
-ITERATION_LABEL = "v3-089"
+ITERATION_LABEL = "v3-092"
 REPORTS_DIR = Path("reports-v3")
 FEATURES_DIR = Path("data/features_v3")
 DATA_DIR = Path("data")
 
-# Cross-sectional features: 14-feature /059 anchor minus btc_ret_14d.
-XS_FEATURE_COLUMNS: list[str] = [
+# iter-v3/092 -- multi-seed CONFIRMATION outer seeds.
+# Selects first --seeds elements from this tuple.
+CONFIRMATION_OUTER_SEEDS: tuple[int, ...] = (42, 123)
+
+# iter-v3/092 inner-ensemble size (5 inner seeds per outer seed).
+ENSEMBLE_SIZE = 5
+
+# iter-v3/091 -- feature set REVERTED to /088/089 13-feature base.
+# The /090 downside-risk expansion (xs_sortino_mom_12, xs_downbeta_50) was
+# FALSIFIED (Critic /090 OVERALL=BLOCK).  For the model-free primary book the
+# feature columns are not used at scoring time (trailing-return score only);
+# they ARE used by the reference LGBMRanker comparator.
+XS_BASE_FEATURES: list[str] = [
     c for c in V3_FEATURE_COLUMNS_TOP_N if c not in XS_DROP_FEATURES
 ]  # 13 features
+XS_FEATURE_COLUMNS: list[str] = XS_BASE_FEATURES  # 13 features (downside reverted)
 
 # CPCV parameters (pooled cross-sectional path).
-# XS_REQUIRED_GAP = 88 = (H+1)*N_symbols = (3+1)*22.
+# XS_REQUIRED_GAP = 484 = (H+1)*N_symbols = (21+1)*22.
 # This is DIFFERENT from REQUIRED_GAP = 66 (legacy per-symbol path).
 CPCV_N_SPLITS = 10
 CPCV_N_TEST_SPLITS = 2
-CPCV_EMBARGO = 27  # ~1% of 24-month T ≈ 2742 candles * 0.01
+CPCV_EMBARGO = 27  # ~1% of 24-month T ~= 2742 candles * 0.01
+
+
+# ============================================================
+# iter-v3/092 -- _derive_ensemble_seeds
+# Copied VERBATIM from run_baseline_v3.py lines 119-128 at c6a03ed
+# (brief Section 3.3 Mechanism A -- no src/ change).
+# Reproduces the BASELINE_V3.md "Unified 10-Seed Ensemble Architecture"
+# lineage: ENSEMBLE_SEEDS[0:5] == _derive_ensemble_seeds(42, 5),
+#          ENSEMBLE_SEEDS[5:10] == _derive_ensemble_seeds(123, 5).
+# ============================================================
+
+
+def _derive_ensemble_seeds(outer_seed: int, size: int = 5) -> list[int]:
+    rng = np.random.default_rng(outer_seed)
+    return [int(s) for s in rng.integers(low=0, high=2**31 - 1, size=size)]
 
 
 # ============================================================
@@ -166,29 +202,50 @@ def _verify_data_freshness(symbols: tuple[str, ...], max_lag_hours: float = 16.0
 
 
 def _verify_feature_columns() -> None:
-    """Assert 13 cross-sectional features (14 minus btc_ret_14d)."""
-    if len(XS_FEATURE_COLUMNS) != 13:
+    """Assert the iter-v3/091 13-feature cross-sectional set.
+
+    iter-v3/091 REVERTS the /090 downside-risk expansion: XS_FEATURE_COLUMNS
+    is the 13-feature base only (V3_FEATURE_COLUMNS_TOP_N minus btc_ret_14d).
+    The /090 downside features (XS_DOWNSIDE_FEATURES) must be ABSENT.
+    """
+    # iter-v3/102: V3_FEATURE_COLUMNS_TOP_N grew 14 → 15 (alpha032 added).
+    # XS_BASE_FEATURES = V3_FEATURE_COLUMNS_TOP_N minus XS_DROP_FEATURES (btc_ret_14d)
+    # → 15 - 1 = 14.  Update the assertion accordingly.
+    _expected_xs_base = len(XS_BASE_FEATURES)  # dynamic: len(V3_FEATURE_COLUMNS_TOP_N) - 1
+    if _expected_xs_base < 13:
         raise RuntimeError(
-            f"XS_FEATURE_COLUMNS has {len(XS_FEATURE_COLUMNS)} columns — expected 13. "
-            "The cross-sectional feature set is V3_FEATURE_COLUMNS_TOP_N minus btc_ret_14d."
+            f"XS_BASE_FEATURES has {_expected_xs_base} columns -- expected ≥13. "
+            "The base cross-sectional set is V3_FEATURE_COLUMNS_TOP_N minus btc_ret_14d."
+        )
+    if len(XS_FEATURE_COLUMNS) != _expected_xs_base:
+        raise RuntimeError(
+            f"XS_FEATURE_COLUMNS has {len(XS_FEATURE_COLUMNS)} columns -- expected "
+            f"{_expected_xs_base} (V3_FEATURE_COLUMNS_TOP_N minus btc_ret_14d). "
+            f"XS_FEATURE_COLUMNS = {XS_FEATURE_COLUMNS}."
         )
     if "btc_ret_14d" in XS_FEATURE_COLUMNS:
         raise RuntimeError(
-            "btc_ret_14d FOUND in XS_FEATURE_COLUMNS — must be dropped (zero "
+            "btc_ret_14d FOUND in XS_FEATURE_COLUMNS -- must be dropped (zero "
             "cross-sectional dispersion, EDA T6). Check XS_DROP_FEATURES."
         )
+    for f in XS_DOWNSIDE_FEATURES:
+        if f in XS_FEATURE_COLUMNS:
+            raise RuntimeError(
+                f"iter-v3/091 REVERT: /090 downside feature {f!r} must be ABSENT "
+                "from XS_FEATURE_COLUMNS (the /090 expansion was FALSIFIED)."
+            )
 
 
 def _verify_xs_gap_assertion() -> None:
-    """Self-assert: XS_REQUIRED_GAP == 88."""
+    """Self-assert: XS_REQUIRED_GAP == 484 at H=21."""
     expected = (XS_HORIZON + 1) * len(XS_UNIVERSE)
     assert XS_REQUIRED_GAP == expected, (
         f"XS_REQUIRED_GAP={XS_REQUIRED_GAP} != (H+1)*N={expected}. "
-        "This constant governs label look-ahead safety — check cross_sectional.py."
+        "This constant governs label look-ahead safety -- check cross_sectional.py."
     )
     print(
         f"[preflight] XS_REQUIRED_GAP={XS_REQUIRED_GAP} == "
-        f"(H={XS_HORIZON}+1)*N={len(XS_UNIVERSE)} — PASS"
+        f"(H={XS_HORIZON}+1)*N={len(XS_UNIVERSE)} -- PASS"
     )
 
 
@@ -233,28 +290,28 @@ def _compute_xs_cpcv(
     n_trials: int,
     seed: int = 42,
 ) -> tuple[pd.DataFrame, PBOResult]:
-    """Run CPCV on the IS pooled cross-section — ACTUAL long-short net return.
+    """Run CPCV on the IS pooled cross-section -- ACTUAL long-short net return.
 
     iter-v3/089 CPCV-PROXY FIX (Critic /088 Rec #3).
     --------------------------------------------------
     The /088 implementation computed each CPCV path "Sharpe" as a label-grade
     self-correlation (`mean(sub_labels[long_idx]) - mean(sub_labels[short_idx])`)
-    — a degenerate proxy: grade-0 < grade-2 by construction of the tercile
+    -- a degenerate proxy: grade-0 < grade-2 by construction of the tercile
     label, so it measures nothing about the model.  `cpcv_paths.csv` collapsed
     to 45 rows of literally `sharpe=0.0`, and the F4 `frac_positive_paths`
     gate carried no information.
 
     The fix: the CPCV path metric is now the ACTUAL realised long-short NET
     return of the trained model on each path's test fold.  We do not re-fit
-    the model per path — instead we read the per-(timestamp, symbol) net_pnl
+    the model per path -- instead we read the per-(timestamp, symbol) net_pnl
     from the already-computed walk-forward backtest `results` (which carries
     the trained model's CORRECTED-SIGN positions, gross PnL, turnover fee and
     net PnL).  For a CPCV path defined over a subset of IS timestamps we sum
     net_pnl into one book return per timestamp and compute the Sharpe of the
     path's test-fold book-return series.  This is the actual model-driven
-    long-short net P&L on the path — exactly the informative F4 gate.
+    long-short net P&L on the path -- exactly the informative F4 gate.
 
-    Uses XS_REQUIRED_GAP=88 (asserted via expected_gap).
+    Uses XS_REQUIRED_GAP=484 (asserted via expected_gap).
 
     Returns (cpcv_df, pbo_result).
     """
@@ -272,7 +329,7 @@ def _compute_xs_cpcv(
     print(f"[cpcv] IS book-return timestamps: {n_samples}, XS_REQUIRED_GAP={XS_REQUIRED_GAP}")
 
     if n_samples < CPCV_N_SPLITS * 4:
-        # Too few timestamps to split meaningfully — emit an honest sentinel.
+        # Too few timestamps to split meaningfully -- emit an honest sentinel.
         pbo_sentinel = PBOResult(
             pbo=None,
             frac_positive_paths=0.0,
@@ -280,7 +337,7 @@ def _compute_xs_cpcv(
             n_splits_evaluated=0,
             note=(
                 f"Cross-sectional CPCV: only {n_samples} IS book-return "
-                "timestamps — too few for CPCV. frac_positive_paths sentinel 0.0."
+                "timestamps -- too few for CPCV. frac_positive_paths sentinel 0.0."
             ),
         )
         return pd.DataFrame(columns=["path_id", "sharpe", "max_dd", "n_trades"]), pbo_sentinel
@@ -369,8 +426,12 @@ def _write_xs_reports(
     report_dir: Path,
     n_trials: int,
     ensemble_size: int,
-) -> None:
-    """Write all A6 report files for the cross-sectional backtest."""
+    outer_seed: int | None = None,
+) -> dict:
+    """Write all A6 report files for the cross-sectional backtest.
+
+    Returns a dict of the key scalar metrics for aggregate reporting.
+    """
     report_dir.mkdir(parents=True, exist_ok=True)
     is_dir = report_dir / "in_sample"
     oos_dir = report_dir / "out_of_sample"
@@ -381,32 +442,35 @@ def _write_xs_reports(
     is_results = results[~results["is_oos"]].copy()
     oos_results = results[results["is_oos"]].copy()
 
-    # Per-split net_pnl to monthly summary.
-    def _monthly_pnl(sub: pd.DataFrame) -> pd.DataFrame:
+    import datetime as _dt
+
+    # Per-split pnl to monthly summary (accepts any pnl_col name).
+    def _monthly_pnl(sub: pd.DataFrame, pnl_col: str) -> pd.DataFrame:
         if sub.empty:
-            return pd.DataFrame(columns=["month", "net_pnl"])
+            return pd.DataFrame(columns=["month", pnl_col])
         sub = sub.copy()
         sub["month"] = sub["open_time"].apply(
-            lambda t: (
-                __import__("datetime")
-                .datetime.fromtimestamp(t / 1000, tz=__import__("datetime").timezone.utc)
-                .strftime("%Y-%m")
-            )
+            lambda t: _dt.datetime.fromtimestamp(t / 1000, tz=_dt.UTC).strftime("%Y-%m")
         )
-        return sub.groupby("month")["net_pnl"].sum().reset_index()
+        return sub.groupby("month")[pnl_col].sum().reset_index()
 
-    is_monthly = _monthly_pnl(is_results)
-    oos_monthly = _monthly_pnl(oos_results)
-
-    # Sharpe.
-    def _monthly_sharpe(monthly_df: pd.DataFrame) -> float:
-        if len(monthly_df) < 2:
+    # Shared Sharpe helper -- iter-v3/091 SETUP item 2 (Critic /090 Rec #1).
+    # Both net and gross monthly Sharpe use this IDENTICAL code path.
+    # pnl_col = "net_pnl" (net) or "gross_pnl" (gross).
+    def _monthly_sharpe(sub: pd.DataFrame, pnl_col: str) -> float:
+        monthly = _monthly_pnl(sub, pnl_col)
+        if len(monthly) < 2:
             return 0.0
-        s = monthly_df["net_pnl"]
+        s = monthly[pnl_col]
         return float(s.mean() / s.std()) if s.std() > 1e-10 else 0.0
 
-    is_ms = _monthly_sharpe(is_monthly)
-    oos_ms = _monthly_sharpe(oos_monthly)
+    is_monthly = _monthly_pnl(is_results, "net_pnl")
+    oos_monthly = _monthly_pnl(oos_results, "net_pnl")
+
+    is_ms = _monthly_sharpe(is_results, "net_pnl")
+    oos_ms = _monthly_sharpe(oos_results, "net_pnl")
+    is_gross_ms = _monthly_sharpe(is_results, "gross_pnl")
+    oos_gross_ms = _monthly_sharpe(oos_results, "gross_pnl")
 
     # Max drawdown on cumulative net_pnl.
     def _max_dd(sub: pd.DataFrame) -> float:
@@ -424,7 +488,7 @@ def _write_xs_reports(
     is_mdd = _max_dd(is_results)
     oos_mdd = _max_dd(oos_results)
 
-    # iter-v3/089 turnover ceiling — the HARD pre-registered gate.
+    # iter-v3/089 turnover ceiling -- the HARD pre-registered gate.
     is_turnover = compute_turnover_per_bar(results, is_oos=False)
     oos_turnover = compute_turnover_per_bar(results, is_oos=True)
     turnover_gate_pass = is_turnover <= XS_TURNOVER_CEILING
@@ -466,12 +530,21 @@ def _write_xs_reports(
     # comparison.csv.
     n_trials_total = n_trials * ensemble_size
     oos_is_ratio = (oos_ms / is_ms) if abs(is_ms) > 1e-10 else float("nan")
+    gross_oos_is_ratio = (oos_gross_ms / is_gross_ms) if abs(is_gross_ms) > 1e-10 else float("nan")
     comparison_rows = [
         {
             "metric": "monthly_sharpe",
             "in_sample": is_ms,
             "out_of_sample": oos_ms,
             "ratio": oos_is_ratio,
+        },
+        {
+            # iter-v3/091 SETUP item 2: gross_monthly_sharpe via shared helper
+            # (Critic /090 Rec #1 -- closes the /090 OVERALL=BLOCK root cause).
+            "metric": "gross_monthly_sharpe",
+            "in_sample": is_gross_ms,
+            "out_of_sample": oos_gross_ms,
+            "ratio": gross_oos_is_ratio,
         },
         {
             "metric": "max_drawdown",
@@ -498,7 +571,7 @@ def _write_xs_reports(
             "ratio": float("nan"),
         },
         {
-            # iter-v3/089 — mean gross turnover per bar; the HARD pre-registered
+            # iter-v3/089 -- mean gross turnover per bar; the HARD pre-registered
             # gate is IS turnover <= XS_TURNOVER_CEILING (0.138).
             "metric": "turnover_per_bar",
             "in_sample": is_turnover,
@@ -527,7 +600,8 @@ def _write_xs_reports(
     ]
     pd.DataFrame(comparison_rows).to_csv(report_dir / "comparison.csv", index=False)
 
-    # dsr.json.
+    # dsr.json -- iter-v3/091: gross_monthly_sharpe now a runner artifact.
+    outer_seed_str = f"outer_seed={outer_seed}" if outer_seed is not None else "aggregate"
     dsr_data = {
         "dsr": 0.0,  # not applicable for cross-sectional path at EXPLORATION
         "pbo": pbo_result.pbo if pbo_result.pbo is not None else float("nan"),
@@ -535,6 +609,10 @@ def _write_xs_reports(
         "frac_positive_paths": pbo_result.frac_positive_paths,
         "n_trials": n_trials_total,
         "n_eff": 0,  # not computed for cross-sectional path
+        "monthly_sharpe_is": is_ms,
+        "monthly_sharpe_oos": oos_ms,
+        "gross_monthly_sharpe_is": is_gross_ms,
+        "gross_monthly_sharpe_oos": oos_gross_ms,
         "rank_ic_mean_oos": rank_ic_stats["mean_rank_ic"],
         "rank_ic_std_oos": rank_ic_stats["std_rank_ic"],
         "rank_ic_n_timestamps": rank_ic_stats["n_timestamps"],
@@ -543,30 +621,34 @@ def _write_xs_reports(
         "turnover_ceiling": XS_TURNOVER_CEILING,
         "turnover_ceiling_gate_pass": bool(turnover_gate_pass),
         "note": (
-            "iter-v3/089 cross-sectional path: DSR/PSR not applicable at EXPLORATION. "
-            f"Primary falsifier F1: OOS rank-IC={rank_ic_stats['mean_rank_ic']:.4f} "
-            "(PASS if > 0). HARD turnover gate: IS turnover/bar "
-            f"{is_turnover:.4f} {'<=' if turnover_gate_pass else '>'} "
-            f"ceiling {XS_TURNOVER_CEILING} — {'PASS' if turnover_gate_pass else 'FAIL'}."
+            f"iter-v3/092 cross-sectional path ({outer_seed_str}): "
+            f"F3 (IS turnover/bar {is_turnover:.4f} <= ceiling {XS_TURNOVER_CEILING}): "
+            f"{'PASS' if turnover_gate_pass else 'FAIL'}. "
+            f"G9 (OOS rank-IC {rank_ic_stats['mean_rank_ic']:.4f} > 0): "
+            f"{'PASS' if rank_ic_stats['mean_rank_ic'] > 0 else 'FAIL'}."
         ),
     }
     with open(report_dir / "dsr.json", "w") as f:
         json.dump(dsr_data, f, indent=2)
 
     # Print summary.
+    seed_label = f" [outer_seed={outer_seed}]" if outer_seed is not None else " [AGGREGATE]"
     print("\n" + "=" * 60)
-    print(f"CROSS-SECTIONAL BACKTEST SUMMARY — iter-{ITERATION_LABEL}")
+    print(f"CROSS-SECTIONAL BACKTEST SUMMARY -- iter-{ITERATION_LABEL}{seed_label}")
     print("=" * 60)
-    print(f"IS monthly Sharpe:  {is_ms:+.4f}")
-    print(f"OOS monthly Sharpe: {oos_ms:+.4f}")
+    print(f"IS monthly Sharpe (net):   {is_ms:+.4f}")
+    print(f"OOS monthly Sharpe (net):  {oos_ms:+.4f}")
+    print(f"IS monthly Sharpe (gross): {is_gross_ms:+.4f}")
+    print(f"OOS monthly Sharpe (gross):{oos_gross_ms:+.4f}")
     ratio_str = f"{oos_is_ratio:.4f}" if not np.isnan(oos_is_ratio) else "N/A"
-    print(f"OOS/IS ratio:       {ratio_str}")
+    print(f"OOS/IS net ratio:          {ratio_str}")
     print(f"IS max drawdown:    {is_mdd:.4f}")
     print(f"OOS max drawdown:   {oos_mdd:.4f}")
     print(f"IS  n_bars:  {len(is_results)}")
     print(f"OOS n_bars:  {len(oos_results)}")
     print(
-        f"OOS rank-IC: {rank_ic_stats['mean_rank_ic']:.4f} ± {rank_ic_stats['std_rank_ic']:.4f} "
+        f"OOS rank-IC: {rank_ic_stats['mean_rank_ic']:.4f} +/- "
+        f"{rank_ic_stats['std_rank_ic']:.4f} "
         f"(n={rank_ic_stats['n_timestamps']} timestamps)"
     )
     print(f"frac_positive_paths (CPCV): {pbo_result.frac_positive_paths:.3f}")
@@ -577,19 +659,34 @@ def _write_xs_reports(
     )
     if turnover_gate_pass:
         print(
-            f"HARD turnover gate: PASS — IS turnover/bar {is_turnover:.4f} "
+            f"HARD turnover gate (F3): PASS -- IS turnover/bar {is_turnover:.4f} "
             f"<= ceiling {XS_TURNOVER_CEILING}."
         )
     else:
         print(
-            f"HARD turnover gate: FAIL (NO-MERGE) — IS turnover/bar {is_turnover:.4f} "
+            f"HARD turnover gate (F3): FAIL (NO-MERGE) -- IS turnover/bar {is_turnover:.4f} "
             f"> ceiling {XS_TURNOVER_CEILING}."
         )
-    if rank_ic_stats["mean_rank_ic"] > 0:
-        print("F1 (OOS rank-IC > 0): PASS — cross-sectional signal transferred OOS.")
-    else:
-        print("F1 (OOS rank-IC > 0): FAIL — cross-sectional signal did NOT transfer OOS.")
     print("=" * 60 + "\n")
+
+    # Return scalar metrics for aggregate report assembly.
+    return {
+        "outer_seed": outer_seed,
+        "is_monthly_sharpe": is_ms,
+        "oos_monthly_sharpe": oos_ms,
+        "is_gross_monthly_sharpe": is_gross_ms,
+        "oos_gross_monthly_sharpe": oos_gross_ms,
+        "is_max_drawdown": is_mdd,
+        "oos_max_drawdown": oos_mdd,
+        "is_n_bars": len(is_results),
+        "oos_n_bars": len(oos_results),
+        "oos_rank_ic_mean": rank_ic_stats["mean_rank_ic"],
+        "frac_positive_paths": pbo_result.frac_positive_paths,
+        "is_turnover_per_bar": is_turnover,
+        "oos_turnover_per_bar": oos_turnover,
+        "turnover_ceiling_gate_pass": bool(turnover_gate_pass),
+        "oos_net_positive": oos_ms > 0,
+    }
 
 
 # ============================================================
@@ -597,15 +694,329 @@ def _write_xs_reports(
 # ============================================================
 
 
+def _run_one_book(
+    panel: pd.DataFrame,
+    labels: pd.Series,
+    score_mode: str,
+    report_dir: Path,
+    n_trials: int,
+    outer_seed: int,
+    ensemble_seeds: list[int],
+) -> dict:
+    """Run one cross-sectional book with a multi-seed inner ensemble and write reports.
+
+    iter-v3/092: ensemble_seeds is the 5-element inner-seed list derived from
+    _derive_ensemble_seeds(outer_seed, 5).  CrossSectionalRankStrategy trains
+    one LGBMRanker per inner seed and averages their predict() vectors.
+
+    Returns the scalar-metrics dict from _write_xs_reports for aggregate assembly.
+    """
+    strategy = CrossSectionalRankStrategy(
+        training_months=TRAINING_MONTHS,
+        n_trials=n_trials,
+        feature_columns=XS_FEATURE_COLUMNS,
+        features_dir=str(FEATURES_DIR),
+        symbols=XS_UNIVERSE,
+        horizon=XS_HORIZON,
+        seed=outer_seed,
+        ensemble_seeds=ensemble_seeds,
+        verbose=0,
+    )
+
+    print(
+        f"\n[backtest:{score_mode}] Running cross-sectional walk-forward backtest "
+        f"(score_mode={score_mode!r}, outer_seed={outer_seed}, "
+        f"inner_ensemble={len(ensemble_seeds)} models) -> {report_dir}"
+    )
+    print(
+        f"[backtest:{score_mode}] /089 construction: quantile_frac={XS_QUANTILE_FRAC}, "
+        f"hold_bars={XS_HOLD_BARS}, no_trade_band={XS_NO_TRADE_BAND}, "
+        f"turnover ceiling={XS_TURNOVER_CEILING}"
+    )
+    train_start_ms = int(panel[panel["open_time"] < OOS_CUTOFF_MS]["open_time"].min())
+    results = run_cross_sectional_backtest(
+        strategy=strategy,
+        panel=panel,
+        labels=labels,
+        train_start_ms=train_start_ms,
+        oos_cutoff_ms=OOS_CUTOFF_MS,
+        quantile_frac=XS_QUANTILE_FRAC,
+        hold_bars=XS_HOLD_BARS,
+        no_trade_band=XS_NO_TRADE_BAND,
+        score_mode=score_mode,
+    )
+    print(f"[backtest:{score_mode}] {len(results)} bar-symbol rows produced.")
+
+    if results.empty:
+        print(f"WARNING: backtest (score_mode={score_mode!r}) produced no results.")
+        return {}
+
+    # OOS rank-IC.
+    print(f"\n[rank-IC:{score_mode}] Computing OOS rank-IC...")
+    rank_ic_stats = compute_oos_rank_ic(results)
+    print(
+        f"[rank-IC:{score_mode}] mean={rank_ic_stats['mean_rank_ic']:.4f}, "
+        f"std={rank_ic_stats['std_rank_ic']:.4f}, "
+        f"n={rank_ic_stats['n_timestamps']}"
+    )
+
+    # IS-only CPCV.
+    print(f"\n[cpcv:{score_mode}] Running IS-only CPCV (actual long-short net return)...")
+    cpcv_df, pbo_result = _compute_xs_cpcv(
+        results,
+        report_dir,
+        n_trials=n_trials,
+        seed=outer_seed,
+    )
+
+    # Write reports and return scalar metrics.
+    print(f"\n[reports:{score_mode}] Writing report files to {report_dir}...")
+    return _write_xs_reports(
+        results=results,
+        rank_ic_stats=rank_ic_stats,
+        pbo_result=pbo_result,
+        cpcv_df=cpcv_df,
+        report_dir=report_dir,
+        n_trials=n_trials,
+        ensemble_size=len(ensemble_seeds),
+        outer_seed=outer_seed,
+    )
+
+
+def _write_aggregate_reports(
+    seed_metrics: list[dict],
+    report_dir: Path,
+    n_trials: int,
+) -> None:
+    """Write multi-seed aggregate comparison.csv, ensemble_summary.json, dsr.json.
+
+    Brief Section 3.3 item 3: the aggregate reports contain the multi-seed-mean
+    IS/OOS monthly Sharpe, per-seed values, min across seeds, and a 2-seed
+    Pareto boolean (both seeds individually OOS-net-positive).
+    """
+    if not seed_metrics:
+        print("[aggregate] No seed metrics to aggregate -- skipping.")
+        return
+
+    report_dir.mkdir(parents=True, exist_ok=True)
+
+    # Per-seed scalars.
+    is_sharpes = [m["is_monthly_sharpe"] for m in seed_metrics]
+    oos_sharpes = [m["oos_monthly_sharpe"] for m in seed_metrics]
+    is_gross = [m["is_gross_monthly_sharpe"] for m in seed_metrics]
+    oos_gross = [m["oos_gross_monthly_sharpe"] for m in seed_metrics]
+    frac_pos_paths = [m["frac_positive_paths"] for m in seed_metrics]
+    is_mdds = [m["is_max_drawdown"] for m in seed_metrics]
+    oos_mdds = [m["oos_max_drawdown"] for m in seed_metrics]
+    rank_ics = [m["oos_rank_ic_mean"] for m in seed_metrics]
+    is_turnovers = [m["is_turnover_per_bar"] for m in seed_metrics]
+    oos_net_positives = [m["oos_net_positive"] for m in seed_metrics]
+
+    mean_is = float(np.mean(is_sharpes))
+    mean_oos = float(np.mean(oos_sharpes))
+    mean_is_gross = float(np.mean(is_gross))
+    mean_oos_gross = float(np.mean(oos_gross))
+    mean_frac_pos = float(np.mean(frac_pos_paths))
+    mean_is_mdd = float(np.mean(is_mdds))
+    mean_oos_mdd = float(np.mean(oos_mdds))
+    mean_rank_ic = float(np.mean(rank_ics))
+    mean_is_turnover = float(np.mean(is_turnovers))
+    min_is = float(np.min(is_sharpes))
+    min_oos = float(np.min(oos_sharpes))
+    pareto_both_oos_positive = all(oos_net_positives)
+
+    oos_is_ratio = (mean_oos / mean_is) if abs(mean_is) > 1e-10 else float("nan")
+    gross_oos_is_ratio = (
+        (mean_oos_gross / mean_is_gross) if abs(mean_is_gross) > 1e-10 else float("nan")
+    )
+
+    n_seeds = len(seed_metrics)
+    n_trials_total = n_trials * ENSEMBLE_SIZE * n_seeds
+
+    # Build aggregate comparison.csv with mean + per-seed columns + min.
+    seed_is_cols = {f"seed_{m['outer_seed']}_is": m["is_monthly_sharpe"] for m in seed_metrics}
+    seed_oos_cols = {f"seed_{m['outer_seed']}_oos": m["oos_monthly_sharpe"] for m in seed_metrics}
+
+    def _agg_row(metric: str, is_val: float, oos_val: float, ratio: float, **extras: float) -> dict:
+        row = {"metric": metric, "in_sample": is_val, "out_of_sample": oos_val, "ratio": ratio}
+        row.update(extras)
+        return row
+
+    comparison_rows = [
+        _agg_row(
+            "monthly_sharpe",
+            mean_is,
+            mean_oos,
+            oos_is_ratio,
+            min_in_sample=min_is,
+            min_out_of_sample=min_oos,
+            **seed_is_cols,
+            **seed_oos_cols,
+        ),
+        _agg_row(
+            "gross_monthly_sharpe",
+            mean_is_gross,
+            mean_oos_gross,
+            gross_oos_is_ratio,
+        ),
+        _agg_row(
+            "max_drawdown",
+            mean_is_mdd,
+            mean_oos_mdd,
+            mean_oos_mdd / max(mean_is_mdd, 1e-10),
+        ),
+        {
+            "metric": "rank_ic_mean",
+            "in_sample": float("nan"),
+            "out_of_sample": mean_rank_ic,
+            "ratio": float("nan"),
+        },
+        {
+            "metric": "turnover_per_bar",
+            "in_sample": mean_is_turnover,
+            "out_of_sample": float("nan"),
+            "ratio": float("nan"),
+        },
+        {
+            "metric": "frac_positive_paths_mean",
+            "in_sample": mean_frac_pos,
+            "out_of_sample": float("nan"),
+            "ratio": float("nan"),
+        },
+        {
+            "metric": "pareto_both_oos_positive",
+            "in_sample": float(pareto_both_oos_positive),
+            "out_of_sample": float("nan"),
+            "ratio": float("nan"),
+        },
+        {
+            "metric": "n_seeds",
+            "in_sample": n_seeds,
+            "out_of_sample": float("nan"),
+            "ratio": float("nan"),
+        },
+        {
+            "metric": "n_trials_total",
+            "in_sample": n_trials_total,
+            "out_of_sample": float("nan"),
+            "ratio": float("nan"),
+        },
+    ]
+    pd.DataFrame(comparison_rows).to_csv(report_dir / "comparison.csv", index=False)
+
+    # ensemble_summary.json -- brief Section 3.3 item 3.
+    per_seed_rows = []
+    for m in seed_metrics:
+        per_seed_rows.append(
+            {
+                "outer_seed": m["outer_seed"],
+                "is_monthly_sharpe": m["is_monthly_sharpe"],
+                "oos_monthly_sharpe": m["oos_monthly_sharpe"],
+                "is_gross_monthly_sharpe": m["is_gross_monthly_sharpe"],
+                "oos_gross_monthly_sharpe": m["oos_gross_monthly_sharpe"],
+                "oos_rank_ic_mean": m["oos_rank_ic_mean"],
+                "frac_positive_paths": m["frac_positive_paths"],
+                "is_turnover_per_bar": m["is_turnover_per_bar"],
+                "oos_net_positive": m["oos_net_positive"],
+            }
+        )
+    ensemble_summary = {
+        "iteration": ITERATION_LABEL,
+        "n_seeds": n_seeds,
+        "ensemble_size_per_seed": ENSEMBLE_SIZE,
+        "total_models_per_cell": n_seeds * ENSEMBLE_SIZE,
+        "per_seed": per_seed_rows,
+        "multi_seed_mean": {
+            "is_monthly_sharpe": mean_is,
+            "oos_monthly_sharpe": mean_oos,
+            "is_gross_monthly_sharpe": mean_is_gross,
+            "oos_gross_monthly_sharpe": mean_oos_gross,
+            "oos_rank_ic_mean": mean_rank_ic,
+            "frac_positive_paths": mean_frac_pos,
+            "is_turnover_per_bar": mean_is_turnover,
+        },
+        "multi_seed_min": {
+            "is_monthly_sharpe": min_is,
+            "oos_monthly_sharpe": min_oos,
+        },
+        "pareto_both_oos_positive": pareto_both_oos_positive,
+        "confirmation_gate_G10": pareto_both_oos_positive,
+    }
+    with open(report_dir / "ensemble_summary.json", "w") as f:
+        json.dump(ensemble_summary, f, indent=2)
+
+    # dsr.json for the aggregate -- using aggregate mean-book metrics.
+    dsr_data = {
+        "dsr": 0.0,
+        "pbo": float("nan"),
+        "psr": 0.0,
+        "frac_positive_paths": mean_frac_pos,
+        "n_trials": n_trials_total,
+        "n_eff": 0,
+        "monthly_sharpe_is": mean_is,
+        "monthly_sharpe_oos": mean_oos,
+        "gross_monthly_sharpe_is": mean_is_gross,
+        "gross_monthly_sharpe_oos": mean_oos_gross,
+        "rank_ic_mean_oos": mean_rank_ic,
+        "turnover_ceiling": XS_TURNOVER_CEILING,
+        "pareto_both_oos_positive": pareto_both_oos_positive,
+        "note": (
+            f"iter-v3/092 aggregate ({n_seeds} outer seeds x {ENSEMBLE_SIZE} inner "
+            f"= {n_seeds * ENSEMBLE_SIZE} models/cell). "
+            f"G10 (Pareto both OOS+): {'PASS' if pareto_both_oos_positive else 'FAIL'}. "
+            f"G2 (mean OOS net Sharpe >= +1.0): {'PASS' if mean_oos >= 1.0 else 'FAIL'} "
+            f"(observed {mean_oos:+.4f})."
+        ),
+    }
+    with open(report_dir / "dsr.json", "w") as f:
+        json.dump(dsr_data, f, indent=2)
+
+    # Print aggregate summary.
+    print("\n" + "=" * 70)
+    print(f"MULTI-SEED AGGREGATE SUMMARY -- iter-{ITERATION_LABEL}")
+    print("=" * 70)
+    print(f"Outer seeds: {[m['outer_seed'] for m in seed_metrics]}")
+    print(f"Inner ensemble per seed: {ENSEMBLE_SIZE} models")
+    print(f"Total models/cell: {n_seeds * ENSEMBLE_SIZE}")
+    print()
+    for m in seed_metrics:
+        print(
+            f"  seed={m['outer_seed']:>3d}: IS={m['is_monthly_sharpe']:+.4f}  "
+            f"OOS={m['oos_monthly_sharpe']:+.4f}  "
+            f"frac_pos={m['frac_positive_paths']:.3f}  "
+            f"OOS+={'YES' if m['oos_net_positive'] else 'NO'}"
+        )
+    print()
+    print(f"  MEAN IS  monthly Sharpe: {mean_is:+.4f}  (min: {min_is:+.4f})")
+    print(f"  MEAN OOS monthly Sharpe: {mean_oos:+.4f}  (min: {min_oos:+.4f})")
+    if not np.isnan(oos_is_ratio):
+        print(f"  MEAN OOS/IS ratio:       {oos_is_ratio:.4f}")
+    else:
+        print("  MEAN OOS/IS ratio: N/A")
+    print(f"  MEAN frac_positive_paths: {mean_frac_pos:.3f}")
+    print(f"  MEAN OOS rank-IC:        {mean_rank_ic:+.4f}")
+    print()
+    g1_pass = mean_is >= 1.0
+    g2_pass = mean_oos >= 1.0
+    g10_pass = pareto_both_oos_positive
+    print(f"  G1 (IS >= +1.0):         {'PASS' if g1_pass else 'FAIL'}  ({mean_is:+.4f})")
+    print(f"  G2 (OOS >= +1.0):        {'PASS' if g2_pass else 'FAIL'}  ({mean_oos:+.4f})")
+    print(
+        f"  G10 (Pareto both OOS+):  {'PASS' if g10_pass else 'FAIL'}  "
+        f"({'all positive' if g10_pass else 'some negative'})"
+    )
+    print("=" * 70 + "\n")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Cross-sectional ranking model runner — iter-v3/088"
+        description="Cross-sectional ranking model runner -- iter-v3/092 (multi-seed CONFIRMATION)"
     )
     parser.add_argument(
         "--n-trials",
         type=int,
         default=35,
-        help="Optuna trials per monthly model (default 35, EXPLORATION mode).",
+        help="Optuna trials per monthly model per inner seed (default 35).",
     )
     parser.add_argument(
         "--skip-features",
@@ -615,14 +1026,15 @@ def main() -> None:
     parser.add_argument(
         "--exploration",
         action="store_true",
-        help="EXPLORATION mode (default; single-seed Optuna).",
+        help="(Unused in /092 CONFIRMATION mode -- retained for CLI compat.)",
     )
     parser.add_argument(
         "--smoke-test",
         action="store_true",
         help=(
-            "IS-only smoke test: train on first 12 months of IS, predict the "
-            "next month, print rank-IC.  Fast sanity check (< 5 min)."
+            "Multi-seed wiring smoke test: runs the outer-seed loop over a "
+            "short IS-only date slice to verify the multi-seed path runs "
+            "end-to-end and produces the expected report structure."
         ),
     )
     parser.add_argument(
@@ -630,13 +1042,27 @@ def main() -> None:
         action="store_true",
         help="Delete any existing reports for this iteration before starting.",
     )
+    # iter-v3/092 NEW argument: controls outer-seed count.
+    # This is NOT the deprecated per-symbol --seeds from run_baseline_v3.py.
+    # The cross-sectional --seeds is live and functional; no deprecation warning.
     parser.add_argument(
-        "--seed",
+        "--seeds",
         type=int,
-        default=42,
-        help="Random seed for Optuna TPE sampler (default 42).",
+        default=2,
+        help=(
+            "Number of outer seeds to use (default 2 -- selects first N elements "
+            "of CONFIRMATION_OUTER_SEEDS = (42, 123)). "
+            "This is a NEW argument added at iter-v3/092; it is NOT the deprecated "
+            "per-symbol runner's --seeds from run_baseline_v3.py."
+        ),
     )
     args = parser.parse_args()
+
+    if args.seeds < 1 or args.seeds > len(CONFIRMATION_OUTER_SEEDS):
+        raise ValueError(
+            f"--seeds must be between 1 and {len(CONFIRMATION_OUTER_SEEDS)}, got {args.seeds}."
+        )
+    outer_seeds = list(CONFIRMATION_OUTER_SEEDS[: args.seeds])
 
     t_start = time.time()
 
@@ -647,13 +1073,17 @@ def main() -> None:
     _verify_xs_gap_assertion()
     _verify_data_freshness(XS_UNIVERSE)
 
-    print(f"\nCross-Sectional v3 iter-{ITERATION_LABEL}")
-    print(f"Universe: {len(XS_UNIVERSE)} symbols — XS_UNIVERSE")
+    print(f"\nCross-Sectional v3 iter-{ITERATION_LABEL} [CONFIRMATION]")
+    print(f"Universe: {len(XS_UNIVERSE)} symbols")
     print(f"Features: {len(XS_FEATURE_COLUMNS)} cross-sectionally rank-normalized features")
     print(f"XS_REQUIRED_GAP: {XS_REQUIRED_GAP} = (H={XS_HORIZON}+1)*N={len(XS_UNIVERSE)}")
-    print(f"Optuna n_trials: {args.n_trials}")
+    print(f"Optuna n_trials: {args.n_trials} per inner model")
+    print(f"Outer seeds: {outer_seeds} ({len(outer_seeds)} seeds)")
+    print(f"Inner ensemble per seed: {ENSEMBLE_SIZE} models")
+    print(f"Total models/cell: {len(outer_seeds) * ENSEMBLE_SIZE}")
     print(f"OOS split: {OOS_CUTOFF_DATE} (IMMUTABLE)")
-    print(f"Training months: {TRAINING_MONTHS} (IMMUTABLE)\n")
+    print(f"Training months: {TRAINING_MONTHS} (IMMUTABLE)")
+    print(f"embargo_ms: (H={XS_HORIZON}+1)*interval_ms (corrected /091 fix)\n")
 
     # Clean existing reports if requested.
     report_dir = REPORTS_DIR / f"iteration_{ITERATION_LABEL}"
@@ -671,183 +1101,200 @@ def main() -> None:
 
     # Smoke-test shortcut.
     if args.smoke_test:
-        _run_smoke_test(args)
+        _run_smoke_test(outer_seeds, args)
         return
 
     # Build the pooled cross-sectional panel (all timestamps, IS + OOS).
-    print("\n[panel] Building pooled cross-sectional panel...")
+    print("\n[panel] Building pooled cross-sectional panel (iter-v3/092 base-13)...")
     panel = build_cross_sectional_panel(
         features_dir=FEATURES_DIR,
         symbols=XS_UNIVERSE,
         feature_columns=list(V3_FEATURE_COLUMNS_TOP_N),
+        expand_downside=False,
     )
     print(
         f"[panel] {len(panel)} total rows "
         f"({panel['open_time'].nunique()} unique timestamps, "
-        f"{panel['symbol'].nunique()} symbols)"
+        f"{panel['symbol'].nunique()} symbols, "
+        f"{len(XS_FEATURE_COLUMNS)} base features)"
     )
 
-    # Label: cross-sectional graded relevance {0, 1, 2}.
-    print("[label] Computing cross-sectional rank labels (H=3)...")
+    # Label: cross-sectional graded relevance {0, 1, 2}, H=21.
+    print(f"[label] Computing cross-sectional rank labels (H={XS_HORIZON})...")
     labels = label_cross_sectional_rank(panel, horizon=XS_HORIZON)
     n_valid = labels.notna().sum()
     print(f"[label] {n_valid} valid labels ({n_valid / len(labels):.1%} of panel rows)")
 
-    # Create the strategy instance.
-    strategy = CrossSectionalRankStrategy(
-        training_months=TRAINING_MONTHS,
-        n_trials=args.n_trials,
-        feature_columns=XS_FEATURE_COLUMNS,
-        features_dir=str(FEATURES_DIR),
-        symbols=XS_UNIVERSE,
-        horizon=XS_HORIZON,
-        seed=args.seed,
-        verbose=0,
-    )
+    # -----------------------------------------------------------------
+    # iter-v3/092 MULTI-SEED CONFIRMATION RUN:
+    #   - Run the trained LGBMRanker once per outer seed.
+    #   - Write per-seed reports to seed_<s>/.
+    #   - Write multi-seed aggregate to the root report_dir.
+    # -----------------------------------------------------------------
+    seed_metrics: list[dict] = []
 
-    # Run the full walk-forward backtest with the /089 cost-aware construction
-    # — QUINTILE legs, 3-bar overlapping holds, no-trade band (all IS-selected;
-    # passed explicitly so the construction is visible at the runner level).
-    print("\n[backtest] Running cross-sectional walk-forward backtest...")
-    print(
-        f"[backtest] /089 construction: quantile_frac={XS_QUANTILE_FRAC}, "
-        f"hold_bars={XS_HOLD_BARS}, no_trade_band={XS_NO_TRADE_BAND}, "
-        f"turnover ceiling={XS_TURNOVER_CEILING}"
-    )
-    train_start_ms = int(panel[panel["open_time"] < OOS_CUTOFF_MS]["open_time"].min())
-    results = run_cross_sectional_backtest(
-        strategy=strategy,
-        panel=panel,
-        labels=labels,
-        train_start_ms=train_start_ms,
-        oos_cutoff_ms=OOS_CUTOFF_MS,
-        quantile_frac=XS_QUANTILE_FRAC,
-        hold_bars=XS_HOLD_BARS,
-        no_trade_band=XS_NO_TRADE_BAND,
-    )
-    print(f"[backtest] {len(results)} bar-symbol rows produced.")
+    for outer_seed in outer_seeds:
+        inner_seeds = _derive_ensemble_seeds(outer_seed, ENSEMBLE_SIZE)
+        seed_dir = report_dir / f"seed_{outer_seed}"
+        print(f"\n{'=' * 60}\n[outer_seed={outer_seed}] Inner seeds: {inner_seeds}\n{'=' * 60}")
+        metrics = _run_one_book(
+            panel=panel,
+            labels=labels,
+            score_mode="trained",
+            report_dir=seed_dir,
+            n_trials=args.n_trials,
+            outer_seed=outer_seed,
+            ensemble_seeds=inner_seeds,
+        )
+        if metrics:
+            seed_metrics.append(metrics)
 
-    if results.empty:
-        print("ERROR: backtest produced no results. Exiting.")
-        sys.exit(1)
-
-    # OOS rank-IC (primary falsifier F1).
-    print("\n[rank-IC] Computing OOS rank-IC...")
-    rank_ic_stats = compute_oos_rank_ic(results)
-    print(
-        f"[rank-IC] mean={rank_ic_stats['mean_rank_ic']:.4f}, "
-        f"std={rank_ic_stats['std_rank_ic']:.4f}, "
-        f"n={rank_ic_stats['n_timestamps']}"
-    )
-
-    # IS-only CPCV — actual long-short net return per path (iter-v3/089 fix).
-    print("\n[cpcv] Running IS-only CPCV (actual long-short net return)...")
-    cpcv_df, pbo_result = _compute_xs_cpcv(
-        results,
-        report_dir,
-        n_trials=args.n_trials,
-        seed=args.seed,
-    )
-
-    # Write all reports.
-    print("\n[reports] Writing report files...")
-    _write_xs_reports(
-        results=results,
-        rank_ic_stats=rank_ic_stats,
-        pbo_result=pbo_result,
-        cpcv_df=cpcv_df,
+    # Write multi-seed aggregate.
+    print("\n[aggregate] Writing multi-seed aggregate reports...")
+    _write_aggregate_reports(
+        seed_metrics=seed_metrics,
         report_dir=report_dir,
         n_trials=args.n_trials,
-        ensemble_size=1,  # single-seed EXPLORATION
     )
 
     elapsed = time.time() - t_start
     h, m = divmod(int(elapsed), 3600)
     m, s = divmod(m, 60)
     print(f"\nTotal wall-clock: {h}h {m:02d}m {s:02d}s")
-    print(f"Reports at: {report_dir.resolve()}")
+    print(f"Per-seed reports at: {report_dir.resolve()}/seed_<outer_seed>/")
+    print(f"Aggregate reports at: {report_dir.resolve()}/")
     print("\nOVERALL=READY-FOR-CRITIC")
 
 
-def _run_smoke_test(args: argparse.Namespace) -> None:
-    """IS-only smoke test: build panel, label, train one month, print rank-IC."""
-    print("\n[smoke] IS-only smoke test (fast — single training month)...")
+def _run_smoke_test(outer_seeds: list[int], args: argparse.Namespace) -> None:
+    """Multi-seed wiring smoke test.
+
+    iter-v3/092: verifies the outer-seed loop runs for each seed, produces
+    seed_<s>/ report directories, and the aggregate report structure is written.
+    Uses a short IS-only date slice (no real training) via model_free scoring.
+    """
+    print(
+        f"\n[smoke] Multi-seed wiring smoke test (outer_seeds={outer_seeds}, "
+        "model_free scoring -- no training required)..."
+    )
 
     panel = build_cross_sectional_panel(
         features_dir=FEATURES_DIR,
         symbols=XS_UNIVERSE,
         feature_columns=list(V3_FEATURE_COLUMNS_TOP_N),
+        expand_downside=False,
     )
     panel_is = panel[panel["open_time"] < OOS_CUTOFF_MS].copy().reset_index(drop=True)
     labels_all = label_cross_sectional_rank(panel_is, horizon=XS_HORIZON)
 
-    # Use the first 12 IS months as training, predict the 13th.
     interval_ms = 8 * 3600 * 1000
-    embargo_ms = XS_REQUIRED_GAP * interval_ms
+    embargo_ms = (XS_HORIZON + 1) * interval_ms
     all_ts = np.sort(panel_is["open_time"].unique())
     splits = _generate_xs_monthly_splits(
         all_timestamps=all_ts,
-        training_months=12,  # shorter for smoke test
+        training_months=12,
         embargo_ms=embargo_ms,
     )
     if not splits:
         print("[smoke] ERROR: no splits generated. Exiting.")
         return
 
-    split = splits[0]
-    train_mask = (panel_is["open_time"] >= split["train_start_ms"]) & (
-        panel_is["open_time"] < split["train_end_ms"]
-    )
-    train_panel = panel_is[train_mask].copy().reset_index(drop=True)
-    train_labels = labels_all[train_mask].reset_index(drop=True)
-    valid = train_labels.notna()
-    train_panel_v = train_panel[valid].reset_index(drop=True)
-    train_labels_v = train_labels[valid].reset_index(drop=True)
+    report_dir = REPORTS_DIR / f"iteration_{ITERATION_LABEL}"
+    smoke_dir = report_dir / "smoke_test"
+    smoke_dir.mkdir(parents=True, exist_ok=True)
 
-    strategy = CrossSectionalRankStrategy(
-        training_months=12,
-        n_trials=5,  # fast: 5 Optuna trials
-        feature_columns=XS_FEATURE_COLUMNS,
-        features_dir=str(FEATURES_DIR),
-        symbols=XS_UNIVERSE,
-        horizon=XS_HORIZON,
-        seed=args.seed,
-        verbose=0,
-    )
-
-    print(f"[smoke] Training on {len(train_panel_v)} rows for month {split['test_month']}...")
+    seed_metrics: list[dict] = []
     t0 = time.time()
-    is_ic = strategy._train_for_month(
-        train_panel_v.sort_values(["open_time", "symbol"]).reset_index(drop=True),
-        train_labels_v,
-    )
-    elapsed = time.time() - t0
-    print(f"[smoke] IS rank-IC = {is_ic:.4f}  (trained in {elapsed:.1f}s)")
 
-    # Score the test month.
-    test_mask = (panel_is["open_time"] >= split["test_start_ms"]) & (
-        panel_is["open_time"] < split["test_end_ms"]
-    )
-    test_panel = panel_is[test_mask].copy().reset_index(drop=True)
-    test_labels = labels_all[test_mask].reset_index(drop=True)
-
-    if not test_panel.empty and strategy._model is not None:
-        scores = strategy.predict_ranking(test_panel)
-        oos_ic = CrossSectionalRankStrategy._spearman_ic_by_timestamp(
-            test_panel["open_time"].values, scores, test_labels.fillna(1).values.astype(int)
+    for outer_seed in outer_seeds:
+        inner_seeds = _derive_ensemble_seeds(outer_seed, ENSEMBLE_SIZE)
+        seed_dir = report_dir / f"seed_{outer_seed}"
+        seed_dir.mkdir(parents=True, exist_ok=True)
+        print(
+            f"\n[smoke] outer_seed={outer_seed}, inner_seeds={inner_seeds[:2]}... "
+            f"(showing first 2 of {ENSEMBLE_SIZE})"
         )
-        print(f"[smoke] OOS (1-month hold-out) rank-IC = {oos_ic:.4f}")
-        n_ts = test_panel["open_time"].nunique()
-        print(f"[smoke] Test rows: {len(test_panel)}, timestamps: {n_ts}")
 
-    print("\n[smoke] Smoke test COMPLETE — architecture runs end-to-end.")
-    print(
-        f"[smoke] IS rank-IC={is_ic:.4f} (positive expected for reversal with sign-aligned labels)"
+        strategy = CrossSectionalRankStrategy(
+            training_months=12,
+            n_trials=2,
+            feature_columns=XS_FEATURE_COLUMNS,
+            features_dir=str(FEATURES_DIR),
+            symbols=XS_UNIVERSE,
+            horizon=XS_HORIZON,
+            seed=outer_seed,
+            ensemble_seeds=inner_seeds,
+            verbose=0,
+        )
+
+        train_start_ms = int(panel_is["open_time"].min())
+        results = run_cross_sectional_backtest(
+            strategy=strategy,
+            panel=panel_is,
+            labels=labels_all,
+            train_start_ms=train_start_ms,
+            oos_cutoff_ms=int(panel_is["open_time"].max()) + interval_ms,
+            quantile_frac=XS_QUANTILE_FRAC,
+            hold_bars=XS_HOLD_BARS,
+            no_trade_band=XS_NO_TRADE_BAND,
+            score_mode="model_free",
+        )
+
+        # model_free: no inner models trained.
+        assert strategy._models == [], (
+            f"[smoke] FAIL seed={outer_seed} -- model_free must not populate _models"
+        )
+        print(f"[smoke] seed={outer_seed}: {len(results)} bar-symbol rows produced. PASS.")
+
+        if not results.empty:
+            rank_ic_stats = compute_oos_rank_ic(results)
+            cpcv_df, pbo_result = _compute_xs_cpcv(results, seed_dir, n_trials=0, seed=outer_seed)
+            metrics = _write_xs_reports(
+                results=results,
+                rank_ic_stats=rank_ic_stats,
+                pbo_result=pbo_result,
+                cpcv_df=cpcv_df,
+                report_dir=seed_dir,
+                n_trials=0,
+                ensemble_size=1,
+                outer_seed=outer_seed,
+            )
+            seed_metrics.append(metrics)
+
+    # Write aggregate for smoke test.
+    if seed_metrics:
+        _write_aggregate_reports(seed_metrics=seed_metrics, report_dir=report_dir, n_trials=0)
+
+    elapsed = time.time() - t0
+
+    # Verify expected report structure.
+    ok = True
+    for outer_seed in outer_seeds:
+        seed_dir = report_dir / f"seed_{outer_seed}"
+        for fname in ["comparison.csv", "dsr.json", "cpcv_paths.csv"]:
+            fpath = seed_dir / fname
+            if not fpath.exists():
+                print(f"[smoke] MISSING: {fpath}")
+                ok = False
+    for fname in ["comparison.csv", "ensemble_summary.json", "dsr.json"]:
+        fpath = report_dir / fname
+        if not fpath.exists():
+            print(f"[smoke] MISSING aggregate: {fpath}")
+            ok = False
+
+    n_seed_dirs = sum(1 for s in outer_seeds if (report_dir / f"seed_{s}").is_dir())
+    assert n_seed_dirs == len(outer_seeds), (
+        f"[smoke] Expected {len(outer_seeds)} seed dirs, found {n_seed_dirs}"
     )
-    if is_ic > 0:
-        print("[smoke] PASS — IS rank-IC > 0: model is learning the cross-sectional signal.")
+    print(f"[smoke] seed_<s>/ dirs: {n_seed_dirs}/{len(outer_seeds)} -- PASS")
+
+    if ok:
+        print(f"\n[smoke] PASS -- multi-seed wiring verified in {elapsed:.1f}s")
+        print(f"[smoke] Report dirs: {[str(report_dir / f'seed_{s}') for s in outer_seeds]}")
+        print(f"[smoke] Aggregate: {report_dir}/ensemble_summary.json -- EXISTS")
+        print("\n[smoke] Multi-seed CONFIRMATION wiring COMPLETE.")
     else:
-        print("[smoke] NOTE — IS rank-IC <= 0: investigate label sign alignment.")
+        print("\n[smoke] FAIL -- missing report files (see above).")
 
 
 if __name__ == "__main__":

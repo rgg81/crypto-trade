@@ -1,0 +1,12 @@
+{
+  "T": 7.0,
+  "T_R": 6.0,
+  "N_days": 45,
+  "M_candles": 21,
+  "bch_brake_engaged": true,
+  "time_override_fired": true,
+  "last_bch_trade_taken": true,
+  "last_bch_trade_pnl": 1.0,
+  "n_traces": 3,
+  "deadlock_broken": true
+}

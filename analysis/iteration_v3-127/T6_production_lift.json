@@ -1,0 +1,12 @@
+{
+  "is_baseline_monthly_sharpe_oracle": 1.3108,
+  "is_with_brake_monthly_sharpe_oracle": 1.3456,
+  "is_sharpe_delta_oracle": 0.0348,
+  "ref_published_is_sharpe": 1.3108,
+  "ref_published_oos_sharpe": 0.9682,
+  "estimated_production_is_sharpe_band_low": 1.3282,
+  "estimated_production_is_sharpe_band_high": 1.363,
+  "estimated_production_oos_sharpe_band_low": 0.7682,
+  "estimated_production_oos_sharpe_band_high": 1.2682,
+  "caveat": "Single-seed frozen-baseline pattern + Optuna trajectory shift: production may deviate 30-50% from ORACLE estimate."
+}

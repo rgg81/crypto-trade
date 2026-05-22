@@ -1,0 +1,6 @@
+gate,value,pass
+g1_forcing_edge_free_frac>=0.15,0.2968,True
+g2_learnability_holdout_auc>=0.55,0.548,False
+g3_learnability_ci95_lo>0.50,0.5018,True
+g4_edge_gradient_top-bot>0,0.5074,True
+OVERALL,NO-GO,False

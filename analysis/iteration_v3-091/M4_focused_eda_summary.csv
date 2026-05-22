@@ -1,0 +1,16 @@
+metric,value
+M1_model_free_H21_net_spread_monthly_sharpe,0.2964
+M1_model_free_H21_gross_spread_monthly_sharpe,0.3388
+M1_model_free_H21_turnover_per_bar,0.0263
+M1_model_free_H21_max_symbol_concentration_pct,17.5
+M1a_fine_sweep_net_spread_min,0.2244
+M1a_fine_sweep_net_spread_max,0.3226
+M1b_subperiods_net_positive,2/3
+M2_trained_lgbmranker_H21_net_8trial,-0.0125
+M2_trained_lgbmranker_H21_net_35trial,0.0944
+M2_model_free_minus_trained_35trial_net,0.202
+M3_mean_abs_univariate_rank_ic_H3,0.0231
+M3_mean_abs_univariate_rank_ic_H21,0.017
+M3_H21_ranker_gain_pct_on_horizon_mismatched_features,68.0
+model_free_beats_trained_at_full_budget,True
+finding_verdict,CONFIRMED — model-free cross-sectional momentum at H=21 beats the trained LGBMRanker at the full 35-trial budget; the LGBMRanker degrades a real cross-sectional momentum signal

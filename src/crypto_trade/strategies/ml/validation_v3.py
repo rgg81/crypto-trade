@@ -73,7 +73,7 @@ from scipy.stats import norm
 #:                iter-v3/088 cross-sectional ranking model builds its own
 #:                pooled-CPCV gap in the Phase-6 path; this REQUIRED_GAP governs
 #:                the legacy per-symbol path that the new path supersedes.)
-REQUIRED_GAP: int = (21 + 1) * 3  # 66 — iter-v3/088: REVERT /087 6-sym (NEGATIVE) to 3-sym /059
+REQUIRED_GAP: int = (21 + 1) * 3  # 66 — iter-v3/112: BCH/LDO/TRX revert from /110–/111 4-sym
 
 # ---------------------------------------------------------------------------
 # CPCV — Combinatorial Purged Cross-Validation (AFML Ch. 12)

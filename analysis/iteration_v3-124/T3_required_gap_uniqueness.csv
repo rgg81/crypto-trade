@@ -1,0 +1,5 @@
+K_candles,per_cell_embargo,cross_cell_gap_REQUIRED_GAP,afml_uniqueness_weight_per_label,uniqueness_ratio_vs_K21,effective_sample_loss_pct,REQUIRED_GAP_delta_vs_K21,runner_override_needed
+21,22,66,0.02439,1.000,+0.00%,0,no
+42,43,129,0.01205,0.494,+50.60%,63,REQUIRED_GAP 66→129
+63,64,192,0.00800,0.328,+67.20%,126,REQUIRED_GAP 66→192
+84,85,255,0.00599,0.246,+75.45%,189,REQUIRED_GAP 66→255

@@ -78,28 +78,71 @@ class TestMarketOrder:
         assert params["quantity"] == ["0.001"]
 
 
-class TestStopOrders:
-    def test_stop_market_order(self):
+class TestAlgoConditionalOrders:
+    """SL/TP are placed via /fapi/v1/algoOrder with algoType=CONDITIONAL.
+
+    The legacy /fapi/v1/order endpoint returns -4120 for STOP_MARKET /
+    TAKE_PROFIT_MARKET as of 2025-12-09.
+    """
+
+    def test_stop_market_order_via_algo_endpoint(self):
         transport, captured = _capture_transport()
         client = _make_client(transport)
-        client.place_stop_market_order("BTCUSDT", "SELL", 57600.0, 0.001)
+        client.place_algo_stop_market_order("BTCUSDT", "SELL", 57600.0, 0.001)
 
         req = captured[0]
+        assert req.method == "POST"
+        assert "/fapi/v1/algoOrder" in str(req.url)
         params = dict(parse_qs(str(req.url.params)))
+        assert params["algoType"] == ["CONDITIONAL"]
         assert params["type"] == ["STOP_MARKET"]
-        assert params["stopPrice"] == ["57600.0"]
+        assert params["triggerPrice"] == ["57600.0"]
+        assert params["quantity"] == ["0.001"]
         assert params["reduceOnly"] == ["true"]
 
-    def test_take_profit_market_order(self):
+    def test_take_profit_market_order_via_algo_endpoint(self):
         transport, captured = _capture_transport()
         client = _make_client(transport)
-        client.place_take_profit_market_order("BTCUSDT", "SELL", 64800.0, 0.001)
+        client.place_algo_take_profit_market_order("BTCUSDT", "SELL", 64800.0, 0.001)
 
         req = captured[0]
+        assert "/fapi/v1/algoOrder" in str(req.url)
         params = dict(parse_qs(str(req.url.params)))
+        assert params["algoType"] == ["CONDITIONAL"]
         assert params["type"] == ["TAKE_PROFIT_MARKET"]
-        assert params["stopPrice"] == ["64800.0"]
+        assert params["triggerPrice"] == ["64800.0"]
         assert params["reduceOnly"] == ["true"]
+
+    def test_cancel_algo_order(self):
+        transport, captured = _capture_transport()
+        client = _make_client(transport)
+        client.cancel_algo_order("BTCUSDT", "1000000066764087")
+
+        req = captured[0]
+        assert req.method == "DELETE"
+        assert "/fapi/v1/algoOrder" in str(req.url)
+        params = dict(parse_qs(str(req.url.params)))
+        assert params["symbol"] == ["BTCUSDT"]
+        assert params["algoId"] == ["1000000066764087"]
+
+    def test_get_algo_order(self):
+        transport, captured = _capture_transport()
+        client = _make_client(transport)
+        client.get_algo_order("BTCUSDT", "1000000066764087")
+
+        req = captured[0]
+        assert req.method == "GET"
+        assert "/fapi/v1/algoOrder" in str(req.url)
+        params = dict(parse_qs(str(req.url.params)))
+        assert params["algoId"] == ["1000000066764087"]
+
+    def test_get_open_algo_orders(self):
+        def handler(request):
+            return httpx.Response(200, json=[])
+
+        client = _make_client(httpx.MockTransport(handler))
+        result = client.get_open_algo_orders("BTCUSDT")
+        assert result == []
 
 
 class TestQueryEndpoints:
@@ -156,3 +199,22 @@ class TestErrorHandling:
 
         with pytest.raises(httpx.HTTPStatusError):
             client.place_market_order("BTCUSDT", "BUY", 0.001)
+
+    def test_http_error_includes_response_body(self):
+        """Exception message must include Binance's response body so order rejections
+        (-4120, -2021, -1111, etc.) are diagnosable instead of being silently swallowed."""
+
+        def handler(request):
+            return httpx.Response(
+                400,
+                json={"code": -4120, "msg": "Order type not supported for this endpoint."},
+            )
+
+        client = _make_client(httpx.MockTransport(handler))
+
+        with pytest.raises(httpx.HTTPStatusError) as exc_info:
+            client.place_algo_stop_market_order("BTCUSDT", "SELL", 95.0, 0.001)
+
+        msg = str(exc_info.value)
+        assert "-4120" in msg
+        assert "Order type not supported" in msg

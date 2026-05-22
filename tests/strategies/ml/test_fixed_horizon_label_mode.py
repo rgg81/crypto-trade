@@ -346,3 +346,113 @@ def test_metalabeling_strategy_forwards_label_mode():
     assert strat_fh._m1.label_mode == "fixed_horizon", (
         f"label_mode='fixed_horizon' must propagate to M1; got '{strat_fh._m1.label_mode}'."
     )
+
+
+# ---------------------------------------------------------------------------
+# Test 7: iter-v3/115 integration — non-binding TP/SL barriers (×100) produce
+#         ≥99% timeout exits when paired with label_mode="fixed_horizon".
+# ---------------------------------------------------------------------------
+
+
+def test_iter115_nonbinding_barriers_produce_timeout_exits():
+    """Integration smoke test for iter-v3/115: coherent horizon-exit execution.
+
+    Verifies that a ×100 ATR multiplier makes TP/SL barriers non-binding so
+    that ≥99% of check_order calls resolve as 'timeout' (the coherent-horizon-
+    execution signature), even under extreme price moves within the 21-candle
+    window.
+
+    This is the end-to-end check that both axis components (label_mode and
+    execution geometry) landed together (per Section 3.5 / Section 9 of the
+    iter-v3/115 research brief, and per
+    feedback_v3_methodology_axis_integration_test.md).
+
+    The test uses check_order() directly (the backtest engine's order-resolution
+    function) with:
+      - atr_tp_multiplier = atr_sl_multiplier = 100.0
+      - natr_pct median ~3.7%  →  tp_pct = sl_pct = natr * 100 = 370%+
+      - 21-candle window at 8h / candle
+    We inject the worst-case price shock — a 50% single-candle move — to
+    confirm the ×100 barrier still does not fire before timeout.
+    """
+    from crypto_trade.backtest import Order, check_order
+
+    # Parameters matching the iter-v3/115 production config.
+    atr_multiplier = 100.0
+    natr_pct = 3.7  # IS median for BCH/LDO/TRX at 8h (Section 3.5 note)
+    tp_sl_pct = natr_pct * atr_multiplier / 100.0  # fraction: 3.7
+
+    entry_price = 100.0
+    # timeout = 21 candles × 8h × 60min/h × 60s/min × 1000ms/s
+    interval_ms = _CANDLE_MINUTES * 60 * 1000
+    timeout_ms = 21 * interval_ms
+
+    # Build a synthetic 25-candle run (21-candle window + 4 head-room).
+    # The 22nd+ candle carries open_time >= open_time[0] + timeout_ms, so it
+    # triggers the timeout branch in check_order.
+    n_candles = 25
+    open_times = [int(1_700_000_000_000 + i * interval_ms) for i in range(n_candles)]
+    close_times = [t + interval_ms - 1 for t in open_times]
+
+    # Extreme: single-candle 50% adverse move on candle 5.
+    # SL level for a long = entry * (1 - tp_sl_pct) = 100 * (1 - 3.70) = -270 → impossible.
+    # TP level for a long = entry * (1 + tp_sl_pct) = 100 * (1 + 3.70) = 470.
+    # Even a 50% spike to 150 does NOT reach 470 → barrier never fires.
+    rng = np.random.default_rng(7)
+    closes = entry_price + rng.standard_normal(n_candles).cumsum()
+    closes[5] = entry_price * 1.50  # +50% spike (worst realistic 8h move)
+    closes[10] = entry_price * 0.55  # -45% crash (worst realistic 8h move)
+    highs = np.maximum(closes, closes * 1.02)
+    lows = np.minimum(closes, closes * 0.98)
+
+    # Create one long order per candle position (all at the same entry to keep
+    # the SL/TP levels constant and make the assertion simple).
+    timeout_time = open_times[0] + timeout_ms
+
+    order = Order(
+        symbol="BCHUSDT",
+        direction=1,  # long
+        entry_price=entry_price,
+        amount_usd=100.0,
+        weight_factor=1.0,
+        stop_loss_price=entry_price * (1 - tp_sl_pct),
+        take_profit_price=entry_price * (1 + tp_sl_pct),
+        open_time=open_times[0],
+        timeout_time=timeout_time,
+        confidence=None,
+    )
+
+    results = []
+    for i in range(n_candles):
+        result = check_order(
+            order,
+            open_times[i],
+            closes[i],
+            highs[i],
+            lows[i],
+            close_times[i],
+            fee_pct=_FEE_PCT,
+        )
+        if result is not None:
+            results.append(result.exit_reason)
+            break  # stop at first close (mirrors backtest loop)
+
+    assert results, "check_order must eventually close the order within 25 candles."
+    assert results[0] == "timeout", (
+        f"iter-v3/115: non-binding ×100 ATR barriers must produce 'timeout' exit. "
+        f"Got '{results[0]}'. "
+        f"entry={entry_price}, tp_level={entry_price * (1 + tp_sl_pct):.2f}, "
+        f"sl_level={entry_price * (1 - tp_sl_pct):.2f} (natr_pct={natr_pct}, "
+        f"atr_multiplier={atr_multiplier}). "
+        "Check that atr_tp_multiplier=atr_sl_multiplier=100.0 in _build_v3_model "
+        "common_kwargs (Section 3.5 Change 2 of the iter-v3/115 research brief)."
+    )
+
+    # Sanity: confirm the price did NOT reach the barrier levels (the point of
+    # the ×100 multiplier — if this fails the test setup is wrong).
+    assert all(h < entry_price * (1 + tp_sl_pct) for h in highs[:21]), (
+        "Setup error: high price reached TP level — test is not testing non-binding barriers."
+    )
+    assert all(lo > entry_price * (1 - tp_sl_pct) for lo in lows[:21]), (
+        "Setup error: low price reached SL level — test is not testing non-binding barriers."
+    )

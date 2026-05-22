@@ -1,0 +1,10 @@
+family,new_feature,max_abs_ic_vs_incumbent,argmax_incumbent,redundancy_gate_pass
+A,of_taker_imb_z_20,0.2542,vwap_dev_20,True
+A,of_taker_ratio_mom_3,0.0424,ema_spread_atr_20,True
+A,of_signed_obv_slope_30,0.1333,ret_kurt_50,True
+A,of_amihud_log_20,0.3647,ret_kurt_200,True
+A,of_trade_intensity_z_20,0.1274,regime_momentum_signed_5d,True
+D,se_perm_entropy_50,0.0621,ret_skew_200,True
+D,se_sample_entropy_50,0.216,ret_kurt_50,True
+D,se_variance_ratio_2_50,0.9565,ret_autocorr_lag1_50,False
+D,se_ret_acf_lag2_50,0.1462,btc_ret_14d,True

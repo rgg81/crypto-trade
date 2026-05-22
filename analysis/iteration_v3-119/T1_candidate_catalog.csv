@@ -1,0 +1,7 @@
+candidate,category,motivation
+C1_obv_signed_volmom,(i) volume,OBV slope conditioned on volume-momentum regime. primitive_A=obv_slope_50 (orthogonal to price). primitive_B=volume_mom_ratio_20 threshold=1.0. NEW lineage — neither primitive in V3_FEATURE_COLUMNS.
+C2_vwap_signed_volcv,(i) volume,VWAP mean-reversion × volume-dispersion regime. primitive_A=vwap_dev_20. primitive_B=volume_cv_50 (NOT realized vol — second moment OF VOLUME). Rolling-median technique REUSED from /118 on DIFFERENT classifier.
+C3_ret5d_signed_skew50,(iii) tail,"5-day return × skew-sign. primitive_A=ret_5d. primitive_B=ret_skew_50. Algebraic form ~ /025 but regime classifier FUNDAMENTALLY DIFFERENT (tail/asymmetry, not long-memory)."
+C4_symvsbtc_signed_kurt50,(iii) tail,Cross-asset divergence × tail-regime. primitive_A=sym_vs_btc_ret_7d. primitive_B=ret_kurt_50 threshold=0 (excess-kurtosis natural cut). NOTE: substitutes value primitive vs /118 C6 fail (vwap × kurt).
+C5_maxdd_signed_skew200,(iii) tail,Drawdown magnitude × long-horizon skew regime. primitive_A=max_dd_window_50. primitive_B=ret_skew_200. NEW lineage — drawdown is path-property; skew is asymmetry; both in TOP_N as primitives but never composed.
+C6_ret5d_signed_tbi,(iv) microstructure,5-day momentum × order-flow regime. primitive_A=ret_5d. primitive_B=taker_buy_imbalance_20 (NOT tbr_zscore_30; raw imbalance — different primitive from /015 NEGATIVE TBR-derived feature).

@@ -1,0 +1,4 @@
+regime_variable,loser_mean,winner_mean,std_gap,separates_clean
+btc_dd_signed,-6.8709,-5.9475,-0.1888,False
+btc_ret_30d,0.0806,0.0036,0.475,False
+ldo_vs_btc_30d,-0.0729,0.1728,-1.2317,True

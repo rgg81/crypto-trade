@@ -21,6 +21,13 @@ applies the scalar LAST — a surviving non-NO_SIGNAL for an in-scope symbol on 
 BTC-bear/chop bar has its WEIGHT de-rated by config.regime_size_scalar_value.
 WEIGHT only — direction/tp/sl/timeout unchanged (holding-time-ORTHOGONAL).
 
+iter-v3/114: adds a kill_LOW variant of primitive 9 — LDO-realized-volatility
+kill_LOW trigger. _build_lookups populates _ldo_realvol_lookup when
+config.enable_ldo_realvol_gate is True. get_signal fires the new kill_LOW gate
+(alongside the existing BTC-trigger _regime_gate_fires) before any inner
+inference. Both triggers OR together under the primitive-9 umbrella so they
+remain composable for future iterations.
+
 Past-only contract:
   - BTC drawdown_30d at bar t = (close[t-1] - max(close[t-90:t-1])) / max(...)
     using .shift(1) so bar t CANNOT see its own close.
@@ -159,6 +166,57 @@ def _build_btc_trend_lookup(
     }
 
 
+def _build_ldo_realvol_lookup(
+    ldo_csv_path: Path,
+    lookback_bars: int = 90,
+) -> dict[str, np.ndarray]:
+    """iter-v3/114 primitive 9 kill_LOW variant: build per-bar LDO realized-vol z-score.
+
+    Byte-identical construction to the EDA's ``_shared.build_ldo_realvol_zscore``
+    (analysis/iteration_v3-114/_shared.py, EDA SHA d8a9725). Applied to LDO's
+    own price, mirroring ``_build_btc_regime_lookup``.
+
+    Parameters
+    ----------
+    ldo_csv_path
+        Path to data/LDOUSDT/8h.csv.
+    lookback_bars
+        Rolling window in bars for realized volatility (90 bars = 30 days at 8h).
+
+    Returns
+    -------
+    dict with keys:
+        "open_time"          np.ndarray[int64]  — LDO bar open_times, sorted asc.
+        "ldo_realvol_zscore" np.ndarray[float]  — realvol z-score, past-only via shift(1).
+
+    Past-only discipline (identical contract to ``_build_btc_regime_lookup``):
+        realvol at bar t uses log-return std from [t-lookback : t-1] only.
+        Uses .shift(1) so bar t's own close is NEVER included.
+        Expanding mean/std normalisation (conservative: applied to full series).
+    """
+    df = pd.read_csv(ldo_csv_path, usecols=["open_time", "close"])
+    df = df.sort_values("open_time").reset_index(drop=True)
+    df["close"] = df["close"].astype(float)
+
+    # Log returns — one period
+    df["log_ret"] = np.log(df["close"] / df["close"].shift(1))
+
+    # Rolling realized volatility (past-only via shift(1))
+    logret_shifted = df["log_ret"].shift(1)
+    rolling_std = logret_shifted.rolling(window=lookback_bars, min_periods=2).std()
+
+    # Expanding mean/std normalisation — conservative (applied to full series)
+    expanding_mean = rolling_std.expanding(min_periods=10).mean()
+    expanding_std = rolling_std.expanding(min_periods=10).std().replace(0.0, np.nan)
+
+    ldo_realvol_zscore = (rolling_std - expanding_mean) / expanding_std
+
+    return {
+        "open_time": df["open_time"].to_numpy(dtype=np.int64),
+        "ldo_realvol_zscore": ldo_realvol_zscore.to_numpy(dtype=np.float64),
+    }
+
+
 class RiskV3Wrapper(RiskV2Wrapper):
     """v3 variant of RiskV2Wrapper that uses V3_FEATURE_COLUMNS for z-score OOD.
 
@@ -179,6 +237,9 @@ class RiskV3Wrapper(RiskV2Wrapper):
         # iter-v3/075: BTC bull/bear-chop trend lookup (primitive 12) — populated
         # in _build_lookups when config.enable_regime_size_scalar is True.
         self._btc_trend_lookup: dict[str, np.ndarray] | None = None
+        # iter-v3/114: LDO realized-vol kill_LOW lookup — populated in _build_lookups
+        # when config.enable_ldo_realvol_gate is True.
+        self._ldo_realvol_lookup: dict[str, np.ndarray] | None = None
 
     def _build_lookups(self, master: pd.DataFrame) -> None:
         """Load v3 features and compute ADX per symbol — v3 parquet schema.
@@ -273,6 +334,17 @@ class RiskV3Wrapper(RiskV2Wrapper):
                     ma_window=self.config.regime_size_ma_window,
                 )
 
+        # iter-v3/114: build LDO realized-vol kill_LOW lookup (primitive 9 variant)
+        # if enabled. Uses data/LDOUSDT/8h.csv — LDO's own price, not BTC.
+        # Built once per compute_features call (once per retraining month).
+        if self.config.enable_ldo_realvol_gate and self.config.regime_gate_symbols:
+            ldo_csv = Path("data") / "LDOUSDT" / "8h.csv"
+            if ldo_csv.exists():
+                self._ldo_realvol_lookup = _build_ldo_realvol_lookup(
+                    ldo_csv,
+                    lookback_bars=self.config.ldo_realvol_lookback_bars,
+                )
+
     def _regime_gate_fires(self, symbol: str, open_time_ms: int) -> bool:
         """iter-v3/022 primitive 9: return True if regime-gate should kill this signal.
 
@@ -311,6 +383,47 @@ class RiskV3Wrapper(RiskV2Wrapper):
         vol_z_fires = abs(vz) > self.config.regime_vol_zscore_threshold
         return dd_fires or vol_z_fires
 
+    def _ldo_realvol_gate_fires(self, symbol: str, open_time_ms: int) -> bool:
+        """iter-v3/114 primitive 9 kill_LOW variant: fire when LDO is in low-vol regime.
+
+        Returns True when the symbol is in ``config.regime_gate_symbols`` AND the
+        most-recent LDO-realvol bar STRICTLY BEFORE ``open_time_ms`` has a finite
+        ``abs(ldo_realvol_zscore) < config.ldo_realvol_zscore_floor``.
+
+        Past-only contract (identical to ``_regime_gate_fires``):
+            ``np.searchsorted(..., side="left") - 1`` gives the last bar with
+            open_time STRICTLY LESS THAN the symbol's open_time. The current
+            bar's own LDO close is NEVER in the gate decision.
+
+        Returns False (gate does not fire) when:
+          - symbol not in regime_gate_symbols
+          - LDO realvol lookup not built (CSV missing / gate disabled)
+          - No LDO bar precedes open_time_ms
+          - ldo_realvol_zscore is NaN (warm-up period)
+          - abs(ldo_realvol_zscore) >= ldo_realvol_zscore_floor (not in low-vol regime)
+        """
+        if symbol not in self.config.regime_gate_symbols:
+            return False
+        if self._ldo_realvol_lookup is None:
+            return False
+
+        ldo_times = self._ldo_realvol_lookup["open_time"]
+        # searchsorted 'left' gives insertion point for open_time_ms.
+        # idx-1 = last bar with open_time STRICTLY LESS than open_time_ms.
+        # This is the past-only contract: current bar t is excluded.
+        idx = int(np.searchsorted(ldo_times, open_time_ms, side="left")) - 1
+        if idx < 0:
+            return False  # No past LDO bar — no data to gate on
+
+        vz = self._ldo_realvol_lookup["ldo_realvol_zscore"][idx]
+
+        if not np.isfinite(vz):
+            return False  # NaN in warm-up period — don't gate
+
+        # kill_LOW: fire when abs(ldo_realvol_zscore) is BELOW the floor
+        # (suppress trading in the low-realized-volatility chop regime).
+        return bool(abs(vz) < self.config.ldo_realvol_zscore_floor)
+
     def _regime_size_scalar(self, symbol: str, open_time_ms: int) -> float:
         """iter-v3/075 primitive 12: return the position-SIZE de-rate multiplier.
 
@@ -344,13 +457,16 @@ class RiskV3Wrapper(RiskV2Wrapper):
         return 1.0
 
     def get_signal(self, symbol: str, open_time: int):  # type: ignore[override]
-        """Override to apply regime gate (primitive 9), direction-block (primitive
+        """Override to apply primitive 9 (regime gate), direction-block (primitive
         10), and the BTC-trend-regime SIZE de-rate scalar (primitive 12) on top of
         the inherited gate cascade.
 
         Order:
-          1. primitive 9 (regime gate; iter-v3/022) — fires BEFORE inner inference.
-             A regime-stress bar produces NO_SIGNAL without ever consulting the model.
+          1. primitive 9 (regime gate; iter-v3/022 + /114) — fires BEFORE inner
+             inference. The combined fire condition is an OR of:
+               (a) BTC-stress trigger (enable_regime_gate; iter-v3/022)
+               (b) LDO-realvol kill_LOW trigger (enable_ldo_realvol_gate; iter-v3/114)
+             A fired bar produces NO_SIGNAL without ever consulting the model.
           2. Inherited gates 1-8 (RiskV2Wrapper) — applied to all surviving signals.
           3. primitive 10 (direction block; iter-v3/047) — fires AFTER inner inference.
              We need to know the direction the model picked, so the inner.get_signal
@@ -362,16 +478,31 @@ class RiskV3Wrapper(RiskV2Wrapper):
              its WEIGHT multiplied by config.regime_size_scalar_value. Direction,
              tp_pct, sl_pct are unchanged — the scalar is holding-time-ORTHOGONAL.
 
-        All three new primitives default off (enable_regime_gate=False;
-        block_long_for=(); enable_regime_size_scalar=False) so v1/v2/v3-prior
-        behavior is preserved.
+        All new primitives default off (enable_regime_gate=False;
+        enable_ldo_realvol_gate=False; block_long_for=();
+        enable_regime_size_scalar=False) so v1/v2/v3-prior behavior is preserved.
         """
-        # Regime gate fires FIRST — before ANY other gate including inner strategy.
+        # Primitive 9 fires FIRST — before ANY other gate including inner strategy.
         # This matches the EDA's per-bar candidate-signal suppression design:
         # by killing the signal before Optuna sees it, the training-data distribution
         # shifts to remove regime-stress bars from the optimization landscape.
-        if self.config.enable_regime_gate and symbol in self.config.regime_gate_symbols:
-            if self._regime_gate_fires(symbol, open_time):
+        #
+        # The combined primitive-9 fire condition is an OR of two trigger families:
+        #   (a) BTC-stress trigger (enable_regime_gate): kill when BTC is in
+        #       drawdown/high-vol stress (iter-v3/022 original; OFF in /114).
+        #   (b) LDO-realvol kill_LOW trigger (enable_ldo_realvol_gate): kill when
+        #       LDO is in a low-realized-volatility chop regime (iter-v3/114 new).
+        # Both triggers are OR-composed so they remain independently composable.
+        # A fire from either trigger increments GateStats.regime_gate_fires.
+        if symbol in self.config.regime_gate_symbols:
+            btc_stress_fires = self.config.enable_regime_gate and self._regime_gate_fires(
+                symbol, open_time
+            )
+            ldo_realvol_fires = (
+                self.config.enable_ldo_realvol_gate
+                and self._ldo_realvol_gate_fires(symbol, open_time)
+            )
+            if btc_stress_fires or ldo_realvol_fires:
                 stats = self._gate_stats.setdefault(symbol, GateStats())
                 stats.regime_gate_fires += 1
                 return NO_SIGNAL
@@ -439,4 +570,4 @@ class RiskV3Wrapper(RiskV2Wrapper):
         return out
 
 
-__all__ = ["RiskV3Wrapper"]
+__all__ = ["RiskV3Wrapper", "_build_ldo_realvol_lookup"]

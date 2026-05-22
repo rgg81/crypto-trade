@@ -1,0 +1,7 @@
+candidate,t2_pass,t3_pooled_auc,t3_p_value,t3_pass,t4_g1_per_symbol_pass_count,t4_pass,t5_rank_passes,t5_gain_passes,t5_pass,verdict
+C4_autocorr_signed_hurst,True,0.5381299930943958,0.0,True,2,False,0,0,False,PROMISING-INERT-RISK
+C2_ema_signed_hurst,True,0.5079986283622355,0.1,False,2,False,0,0,False,REJECT
+C3_ema_signed_volregime,True,0.4977369449764734,0.61,False,0,False,0,3,False,REJECT
+C1_vwap_signed_hurst,True,0.49604349580556073,0.72,False,1,False,0,0,False,REJECT
+C6_vwap_signed_kurt,True,0.494219905578097,0.86,False,0,False,0,1,False,REJECT
+C5_symvsbtc_signed_btctrend,True,0.49308565562549517,0.82,False,2,False,0,1,False,REJECT

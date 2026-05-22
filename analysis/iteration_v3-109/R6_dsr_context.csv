@@ -1,0 +1,8 @@
+quantity,value,note
+dsr_059,0.0,0.0 — /059 does NOT clear the DSR>0.95 significance bar
+dsr_relative_059,0.113363,"0.113 — relative-DSR formulation, still far below 0.95"
+pbo_059,0.1278,0.128 — PBO clears the <0.4 gate (not an overfit flag)
+psr_059,1.0,"1.0 — PSR>0 vs a zero benchmark; a weak bar, not significance"
+n_trials_059,1050.0,1050 Optuna trials in the /059 CONFIRMATION
+n_eff_059,19.0,19 effective trials after PCA on the trial-return matrix
+cpcv_frac_positive_paths,0.6444,0.644 of 45 CPCV paths positive — a thin-but-real tilt

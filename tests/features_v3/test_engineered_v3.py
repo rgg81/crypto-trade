@@ -43,9 +43,11 @@ from crypto_trade.features_v3.engineered_v3 import (
     add_engineered_v3_features,
     compute_cross_asset_divergence_norm,
     compute_efficiency_ratio_50,
+    compute_ema_signed_volregime,
     compute_fracdiff_d05_close,
     compute_regime_momentum_signed_3d,
     compute_regime_momentum_signed_5d,
+    compute_ret5d_signed_tbi,
     compute_vol_adj_autocorr,
 )
 
@@ -1887,3 +1889,419 @@ class TestRegimeMomentumSigned3d:
             "regime_momentum_signed_3d must not contain NaN after fillna(0.0). "
             f"NaN count: {rms3.isna().sum()}"
         )
+
+
+# ---------------------------------------------------------------------------
+# iter-v3/118 — compute_ema_signed_volregime
+# Change 5 (brief Section 3.5): past-only property + regime-sign correctness
+# ---------------------------------------------------------------------------
+
+
+def _make_esv_df(n: int = 250, seed: int = 42) -> pd.DataFrame:
+    """Create a minimal DataFrame with ema_spread_atr_20 and range_realized_vol_50."""
+    rng = np.random.default_rng(seed)
+    return pd.DataFrame(
+        {
+            "ema_spread_atr_20": rng.standard_normal(n),
+            "range_realized_vol_50": rng.uniform(0.005, 0.05, size=n),
+        }
+    )
+
+
+class TestEmaSignedVolregime:
+    """Tests for compute_ema_signed_volregime (iter-v3/118)."""
+
+    def test_past_only_property(self) -> None:
+        """A. ema_signed_volregime is past-only: appending future bars does not change t=220."""
+        df = _make_esv_df(n=250, seed=42)
+        out = compute_ema_signed_volregime(df)
+
+        # Extend with 2 extreme future bars
+        df_ext = pd.concat(
+            [
+                df,
+                pd.DataFrame(
+                    {
+                        "ema_spread_atr_20": [99.0, -99.0],
+                        "range_realized_vol_50": [0.99, 0.99],
+                    }
+                ),
+            ],
+            ignore_index=True,
+        )
+        out_ext = compute_ema_signed_volregime(df_ext)
+
+        # Value at bar 220 must be unchanged
+        v_orig = out.loc[220, "ema_signed_volregime"]
+        v_ext = out_ext.loc[220, "ema_signed_volregime"]
+        assert v_orig == pytest.approx(v_ext), (
+            f"Past-only violation: bar 220 changed from {v_orig} to {v_ext} "
+            "after appending future bars."
+        )
+
+    def test_nan_warmup_first_199_bars(self) -> None:
+        """B. First 199 bars must be NaN (rolling(200).median() needs 200 bars)."""
+        df = _make_esv_df(n=250, seed=7)
+        out = compute_ema_signed_volregime(df)
+
+        warmup = out["ema_signed_volregime"].iloc[:199]
+        assert warmup.isna().all(), (
+            f"Expected first 199 bars to be NaN; got {warmup.notna().sum()} non-NaN values."
+        )
+
+    def test_regime_sign_correctness_high_vol(self) -> None:
+        """C. When rv > median, sign = +1 → feature = +ema_spread_atr_20."""
+        # Construct rv that is ALWAYS above the rolling median (by making rv all 1.0
+        # except the first 200 bars which are 0.001 to set a low baseline median).
+        n = 300
+        rv = np.full(n, 0.001)
+        # From bar 200 onward, force rv >> baseline so sign is always +1.
+        rv[200:] = 1.0
+        ema = np.ones(n)
+
+        df = pd.DataFrame({"ema_spread_atr_20": ema, "range_realized_vol_50": rv})
+        out = compute_ema_signed_volregime(df)
+
+        feat = out["ema_signed_volregime"]
+        # At bar 250 (well into the stable zone), rv=1.0, median ≈ 0.001 → sign = +1
+        # → feature = ema * +1 = 1.0
+        val = feat.iloc[250]
+        assert not np.isnan(val), "Expected a valid value at bar 250."
+        assert val == pytest.approx(1.0, abs=1e-9), (
+            f"High-vol regime: expected ema_spread_atr_20 * (+1) = 1.0, got {val}."
+        )
+
+    def test_regime_sign_correctness_low_vol(self) -> None:
+        """D. When rv < median, sign = -1 → feature = -ema_spread_atr_20."""
+        # Invert: first 200 bars rv=1.0, then rv=0.001 → sign is -1 after bar 200.
+        n = 300
+        rv = np.full(n, 1.0)
+        rv[200:] = 0.001
+        ema = np.ones(n)
+
+        df = pd.DataFrame({"ema_spread_atr_20": ema, "range_realized_vol_50": rv})
+        out = compute_ema_signed_volregime(df)
+
+        feat = out["ema_signed_volregime"]
+        # At bar 250 (stable low-vol zone), rv=0.001, median ≈ 1.0 → sign = -1
+        # → feature = ema * (-1) = -1.0
+        val = feat.iloc[250]
+        assert not np.isnan(val), "Expected a valid value at bar 250."
+        assert val == pytest.approx(-1.0, abs=1e-9), (
+            f"Low-vol regime: expected ema_spread_atr_20 * (-1) = -1.0, got {val}."
+        )
+
+    def test_missing_primitives_returns_all_nan(self) -> None:
+        """E. Missing source primitives → column is all-NaN, no error raised."""
+        df_missing_ema = pd.DataFrame({"range_realized_vol_50": np.ones(50)})
+        out1 = compute_ema_signed_volregime(df_missing_ema)
+        assert out1["ema_signed_volregime"].isna().all(), (
+            "Missing ema_spread_atr_20 must produce all-NaN without error."
+        )
+
+        df_missing_rv = pd.DataFrame({"ema_spread_atr_20": np.ones(50)})
+        out2 = compute_ema_signed_volregime(df_missing_rv)
+        assert out2["ema_signed_volregime"].isna().all(), (
+            "Missing range_realized_vol_50 must produce all-NaN without error."
+        )
+
+    def test_zero_sign_treated_as_nan(self) -> None:
+        """F. When rv == median exactly (vol_diff == 0), sign = 0 → NaN propagation."""
+        n = 300
+        # Make rv constant throughout: median == rv → vol_diff == 0 → sign = 0 → NaN.
+        rv = np.full(n, 0.02)
+        ema = np.ones(n)
+        df = pd.DataFrame({"ema_spread_atr_20": ema, "range_realized_vol_50": rv})
+        out = compute_ema_signed_volregime(df)
+
+        # Bars 200+ (past warmup): sign(0) == 0 → replaced by NaN → feature is NaN.
+        feat = out["ema_signed_volregime"].iloc[200:]
+        assert feat.isna().all(), (
+            "When rv == rolling_median (vol_diff == 0.0), feature must be NaN. "
+            f"Non-NaN count: {feat.notna().sum()}."
+        )
+
+    def test_in_all_export(self) -> None:
+        """G. compute_ema_signed_volregime must be in __all__."""
+        from crypto_trade.features_v3 import engineered_v3
+
+        assert "compute_ema_signed_volregime" in engineered_v3.__all__, (
+            "compute_ema_signed_volregime must be in engineered_v3.__all__ "
+            "(iter-v3/118: new Category-2 composed feature)."
+        )
+
+
+# ---------------------------------------------------------------------------
+# iter-v3/119 — Change 5 + Change 6: unit test + adversarial integration test
+# compute_ret5d_signed_tbi (NEW 15th feature) + ABSENT assertion for
+# ema_signed_volregime (/118 REVERTED per Critic /118 Rec 3).
+# ---------------------------------------------------------------------------
+
+
+class TestRet5dSignedTbi:
+    """Adversarial tests for compute_ret5d_signed_tbi (iter-v3/119).
+
+    Change 5 spec (brief Section 3.5):
+    A. Past-only property — appending future bars does not alter t=50.
+    B. Sign correctness — positive TBI -> positive sign; negative TBI -> negative sign.
+    C. Zero TBI edge case — sign(0) treated as NaN (no signal).
+    D. NaN warm-up — first 15 bars NaN (ret_5d shift(15) dominates).
+    E. Missing column fallback — all-NaN, no error.
+    F. In __all__.
+    """
+
+    def _make_tbi_df(self, n: int = 100, seed: int = 42) -> pd.DataFrame:
+        rng = np.random.default_rng(seed)
+        close = np.exp(rng.standard_normal(n) * 0.02).cumprod() * 100
+        return pd.DataFrame(
+            {
+                "close": close,
+                "taker_buy_imbalance_20": rng.uniform(-0.5, 0.5, size=n),
+            }
+        )
+
+    def test_past_only(self) -> None:
+        """A. ret5d_signed_tbi is past-only: appending future bars does not alter t=50."""
+
+        df = self._make_tbi_df(n=100)
+        out = compute_ret5d_signed_tbi(df)
+        # Extend with two extreme future bars
+        df_ext = pd.concat(
+            [
+                df,
+                pd.DataFrame(
+                    {
+                        "close": [99999.0, 99999.0],
+                        "taker_buy_imbalance_20": [9.9, -9.9],
+                    }
+                ),
+            ],
+            ignore_index=True,
+        )
+        out_ext = compute_ret5d_signed_tbi(df_ext)
+        v_orig = out.loc[50, "ret5d_signed_tbi"]
+        v_ext = out_ext.loc[50, "ret5d_signed_tbi"]
+        assert v_orig == pytest.approx(v_ext), (
+            f"ret5d_signed_tbi at t=50 changed ({v_orig} -> {v_ext}) after appending "
+            "future bars — look-ahead violation detected."
+        )
+
+    def test_sign_correctness_positive_tbi(self) -> None:
+        """B. Positive TBI -> output sign matches sign of ret_5d."""
+
+        n = 50
+        # Monotonically rising close so ret_5d > 0 for all valid bars
+        close = np.linspace(100.0, 200.0, n)
+        tbi = np.full(n, 0.3)  # always positive
+        df = pd.DataFrame({"close": close, "taker_buy_imbalance_20": tbi})
+        out = compute_ret5d_signed_tbi(df)
+        valid = out["ret5d_signed_tbi"].dropna()
+        # With rising price and positive TBI: result = positive ret_5d * +1 > 0
+        assert (valid > 0).all(), (
+            "Expected all positive ret5d_signed_tbi values for rising price + positive TBI."
+        )
+
+    def test_sign_correctness_negative_tbi(self) -> None:
+        """B. Negative TBI -> sign flip applied to ret_5d."""
+
+        n = 50
+        close = np.linspace(100.0, 200.0, n)
+        tbi = np.full(n, -0.3)  # always negative
+        df = pd.DataFrame({"close": close, "taker_buy_imbalance_20": tbi})
+        out = compute_ret5d_signed_tbi(df)
+        valid = out["ret5d_signed_tbi"].dropna()
+        # With rising price and negative TBI: result = positive ret_5d * -1 < 0
+        assert (valid < 0).all(), (
+            "Expected all negative ret5d_signed_tbi values for rising price + negative TBI."
+        )
+
+    def test_zero_tbi_treated_as_nan(self) -> None:
+        """C. sign(0) = 0 -> treated as NaN (no signal)."""
+
+        n = 50
+        close = np.linspace(100.0, 200.0, n)
+        tbi = np.zeros(n)  # all zero
+        df = pd.DataFrame({"close": close, "taker_buy_imbalance_20": tbi})
+        out = compute_ret5d_signed_tbi(df)
+        # All valid bars (bar >= 15) should be NaN because sign(0) is masked
+        valid_idx = out.index[15:]
+        assert out.loc[valid_idx, "ret5d_signed_tbi"].isna().all(), (
+            "Expected all NaN for zero TBI (sign(0) must be treated as NaN)."
+        )
+
+    def test_nan_warmup(self) -> None:
+        """D. First 15 bars NaN (ret_5d shift(15) dominates)."""
+
+        df = self._make_tbi_df(n=100)
+        out = compute_ret5d_signed_tbi(df)
+        assert out["ret5d_signed_tbi"].iloc[:15].isna().all(), (
+            "First 15 bars must be NaN (ret_5d warm-up from log_close.shift(15))."
+        )
+
+    def test_missing_close_fallback(self) -> None:
+        """E. Missing 'close' column -> all-NaN, no error."""
+
+        rng7 = np.random.default_rng(7)
+        df = pd.DataFrame({"taker_buy_imbalance_20": rng7.uniform(-0.5, 0.5, 30)})
+        out = compute_ret5d_signed_tbi(df)
+        assert "ret5d_signed_tbi" in out.columns
+        assert out["ret5d_signed_tbi"].isna().all(), (
+            "Expected all-NaN when 'close' column is missing."
+        )
+
+    def test_missing_tbi_fallback(self) -> None:
+        """E. Missing 'taker_buy_imbalance_20' column -> all-NaN, no error."""
+
+        rng = np.random.default_rng(8)
+        df = pd.DataFrame({"close": np.exp(rng.standard_normal(30) * 0.02).cumprod() * 100})
+        out = compute_ret5d_signed_tbi(df)
+        assert "ret5d_signed_tbi" in out.columns
+        assert out["ret5d_signed_tbi"].isna().all(), (
+            "Expected all-NaN when 'taker_buy_imbalance_20' column is missing."
+        )
+
+    def test_in_all(self) -> None:
+        """F. compute_ret5d_signed_tbi must be in engineered_v3.__all__."""
+        from crypto_trade.features_v3 import engineered_v3
+
+        assert "compute_ret5d_signed_tbi" in engineered_v3.__all__, (
+            "compute_ret5d_signed_tbi must be in engineered_v3.__all__ "
+            "(iter-v3/119: add ret5d_signed_tbi; order-flow-regime × momentum)."
+        )
+
+
+class TestRet5dSignedTbiIntegration:
+    """Integration tests verifying ret5d_signed_tbi wiring — iter-v3/119 Change 6.
+
+    Per feedback_v3_methodology_axis_integration_test.md: end-to-end assertions
+    at the runtime call-site boundary, not just unit-level math.
+
+    5 mandatory assertions:
+    1. V3_FEATURE_COLUMNS includes 'ret5d_signed_tbi' at runtime.
+    2. V3_FEATURE_COLUMNS does NOT include 'ema_signed_volregime' (ABSENT assertion).
+    3. add_engineered_v3_features dispatches ret5d_signed_tbi (column in output).
+    4. Runner pre-flight n_features guard fires n == 15 (unchanged count).
+    5. Past-only invariant passes on synthetic panel (Change 5 test delegation).
+    """
+
+    def test_v3_feature_columns_contains_ret5d_signed_tbi(self) -> None:
+        """1. iter-v3/121-METHODOLOGY: ret5d_signed_tbi REVERTED — NOT in V3_FEATURE_COLUMNS.
+
+        Component B (C6 ret5d_signed_tbi) was dropped per /120 F3-DROP binding
+        pre-commitment + diary §6 Q4 + Critic FINAL `a49dd17`. V3_FEATURE_COLUMNS_TOP_N
+        reverts to the /059 canonical 14-feature stack. This test now asserts ABSENT.
+        compute_ret5d_signed_tbi is RETAINED in engineered_v3.py (code-museum).
+        """
+        from crypto_trade.features_v3 import V3_FEATURE_COLUMNS
+
+        # /121-METHODOLOGY: C6 REVERTED — ret5d_signed_tbi must be ABSENT
+        assert "ret5d_signed_tbi" not in V3_FEATURE_COLUMNS, (
+            "ret5d_signed_tbi FOUND in V3_FEATURE_COLUMNS — must be ABSENT at "
+            "iter-v3/121-METHODOLOGY (Component B REVERTED per /120 F3-DROP + "
+            "Critic FINAL `a49dd17`). Remove from V3_FEATURE_COLUMNS_TOP_N."
+        )
+        # iter-v3/127: REVERTED to 14 features (d24_ret_autocorr_lag1_50 DROPPED).
+        # /126 NEGATIVE-catastrophic; d24 joins the ABSENT-assertion ban.
+        assert len(V3_FEATURE_COLUMNS) == 14, (
+            f"V3_FEATURE_COLUMNS has {len(V3_FEATURE_COLUMNS)} columns — expected 14. "
+            "iter-v3/127: d24_ret_autocorr_lag1_50 REMOVED (/126 NEGATIVE-catastrophic). "
+            "V3_FEATURE_COLUMNS_TOP_N reverts to /121-canonical 14-feature anchor. "
+            "(ret5d_signed_tbi DROPPED at /121-METHODOLOGY; eth_vs_sym_rv_50 REMOVED at /124.)"
+        )
+        assert "d24_ret_autocorr_lag1_50" not in V3_FEATURE_COLUMNS, (
+            "d24_ret_autocorr_lag1_50 FOUND in V3_FEATURE_COLUMNS — must be ABSENT at "
+            "iter-v3/127 (/126 NEGATIVE-catastrophic; EDA methodology FALSIFIED). "
+            "Remove from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
+        )
+
+    def test_v3_feature_columns_absent_ema_signed_volregime(self) -> None:
+        """2. V3_FEATURE_COLUMNS must NOT include ema_signed_volregime (/119 ABSENT assertion)."""
+        from crypto_trade.features_v3 import V3_FEATURE_COLUMNS
+
+        assert "ema_signed_volregime" not in V3_FEATURE_COLUMNS, (
+            "ema_signed_volregime FOUND in V3_FEATURE_COLUMNS — must be ABSENT. "
+            "iter-v3/119 removedit (/118 NEGATIVE catastrophic; Critic /118 Rec 3). "
+            "Remove 'ema_signed_volregime' from V3_FEATURE_COLUMNS_TOP_N."
+        )
+
+    def test_add_engineered_v3_features_dispatches_ret5d_signed_tbi(self) -> None:
+        """3. add_engineered_v3_features must produce ret5d_signed_tbi column."""
+        n = 250
+        rng = np.random.default_rng(99)
+        df = pd.DataFrame(
+            {
+                "open_time": np.arange(n, dtype=np.int64) * 28800000,
+                "close": rng.uniform(100.0, 500.0, n),
+                "open": rng.uniform(100.0, 500.0, n),
+                "high": rng.uniform(500.0, 600.0, n),
+                "low": rng.uniform(50.0, 100.0, n),
+                "volume": rng.uniform(1000.0, 5000.0, n),
+                "symbol": "BCHUSDT",
+                # Minimal primitives needed by add_engineered_v3_features
+                "hurst_100": rng.uniform(0.3, 0.7, n),
+                "ema_spread_atr_20": rng.standard_normal(n),
+                "range_realized_vol_50": rng.uniform(0.005, 0.05, n),
+                "ret_autocorr_lag1_50": rng.uniform(-0.5, 0.5, n),
+                "btc_ret_14d": rng.standard_normal(n) * 0.05,
+                "vwap_dev_20": rng.standard_normal(n) * 0.01,
+                "atr_pct_rank_200": rng.uniform(0.0, 1.0, n),
+                "taker_buy_imbalance_20": rng.uniform(-0.5, 0.5, n),
+            }
+        )
+        out = add_engineered_v3_features(df)
+        assert "ret5d_signed_tbi" in out.columns, (
+            "add_engineered_v3_features must produce ret5d_signed_tbi. "
+            "Check the dispatch in engineered_v3.py."
+        )
+        # ema_signed_volregime is still dispatched (code-museum) so it should appear
+        # in the output DataFrame, but it must NOT be in V3_FEATURE_COLUMNS_TOP_N.
+        assert "ema_signed_volregime" in out.columns, (
+            "ema_signed_volregime column expected in add_engineered_v3_features output "
+            "(code-museum: function stays dispatched; just not in V3_FEATURE_COLUMNS_TOP_N)."
+        )
+
+    def test_n_features_guard_fires_at_14(self) -> None:
+        """4. iter-v3/127: Runner pre-flight n_features guard fires at 14.
+
+        iter-v3/127: d24_ret_autocorr_lag1_50 REMOVED (/126 NEGATIVE-catastrophic).
+        V3_FEATURE_COLUMNS_TOP_N reverts to /121-canonical 14-feature anchor.
+        Component B (ret5d_signed_tbi) reverted at /121-METHODOLOGY — not a factor here.
+        eth_vs_sym_rv_50 REMOVED at /124 — not a factor here.
+        """
+        from crypto_trade.features_v3 import V3_FEATURE_COLUMNS
+
+        n = len(V3_FEATURE_COLUMNS)
+        assert n == 14, (
+            f"Runner pre-flight guard expects 14 features at iter-v3/127; got {n}. "
+            "iter-v3/127: d24_ret_autocorr_lag1_50 REMOVED (/126 NEGATIVE-catastrophic). "
+            "V3_FEATURE_COLUMNS_TOP_N must have 14 elements "
+            "(/121-canonical 14-feature anchor)."
+        )
+
+    def test_past_only_via_unit_test(self) -> None:
+        """5. Past-only invariant: delegated to TestRet5dSignedTbi.test_past_only."""
+
+        rng = np.random.default_rng(42)
+        df = pd.DataFrame(
+            {
+                "close": np.exp(rng.standard_normal(100) * 0.02).cumprod() * 100,
+                "taker_buy_imbalance_20": rng.uniform(-0.5, 0.5, size=100),
+            }
+        )
+        out = compute_ret5d_signed_tbi(df)
+        df_ext = pd.concat(
+            [
+                df,
+                pd.DataFrame(
+                    {
+                        "close": [99999.0, 99999.0],
+                        "taker_buy_imbalance_20": [9.9, -9.9],
+                    }
+                ),
+            ],
+            ignore_index=True,
+        )
+        out_ext = compute_ret5d_signed_tbi(df_ext)
+        assert out.loc[50, "ret5d_signed_tbi"] == pytest.approx(
+            out_ext.loc[50, "ret5d_signed_tbi"]
+        ), "Past-only invariant failed: t=50 value changed after appending future bars."

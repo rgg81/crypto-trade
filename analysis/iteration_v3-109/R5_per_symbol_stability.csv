@@ -1,0 +1,4 @@
+symbol,is_net_pnl_pct,oos_net_pnl_pct,is_win_rate,oos_win_rate,is_pnl_share,oos_pnl_share,sign_preserved
+BCHUSDT,109.2322,26.5799,49.4,41.2,95.76,143.06,True
+TRXUSDT,3.953,6.465,34.2,41.7,3.47,34.8,True
+LDOUSDT,0.8863,-14.4648,33.3,25.0,0.78,-77.85,False

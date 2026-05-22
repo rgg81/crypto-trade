@@ -1,0 +1,4 @@
+metric,value
+static_loser_to_cf_winner,0
+static_winner_to_cf_loser,23
+net_win_count_change,-23

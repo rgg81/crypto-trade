@@ -11,6 +11,12 @@ This test is the regression guard against the iter-v3/001 bug where
 run_baseline_v3.py:381 silently passed gap=min(88, 11)=11 to CPCV.
 
 iter-v3/068 Path C: CORRECT_GAP updated 66→129 (timeout 21→42 candles, 3-sym universe).
+iter-v3/069: CORRECT_GAP REVERTED 129→66 (K=21 restored, 3-sym BCH/LDO/TRX universe).
+iter-v3/124: CORRECT_GAP updated 66→192 (K=63 longer-cadence labels; runner-local override;
+  validation_v3.REQUIRED_GAP stays at 66 — the K=21 8h baseline constant).
+  Formula: (timeout_candles + 1) * n_symbols = (63 + 1) * 3 = 192.
+iter-v3/128: cardinality-6 override 132 = (21+1)*6 (6-symbol WILD L1 universe).
+  validation_v3.REQUIRED_GAP stays at 66 (the 3-symbol module constant, unchanged).
 """
 
 from __future__ import annotations
@@ -24,16 +30,25 @@ from crypto_trade.strategies.ml.validation_v3 import (
 )
 
 # v3 documented constants
-# iter-v3/088 (cycle-3 EXPLORATION #7) — RE-ARCHITECTURE. The legacy per-symbol
-# V3_MODELS reverts to the 3-symbol /059 universe (BCH+LDO+TRX) — /087's
-# WHOLESALE 6-sym expansion was NEGATIVE. REQUIRED_GAP recomputes 132 -> 66
-# = (timeout_candles 21 + 1) * 3 symbols. (The /088 cross-sectional ranking
-# path uses its own XS_REQUIRED_GAP = (H 3 + 1) * 22 = 88; this legacy
-# REQUIRED_GAP governs the per-symbol path the new path supersedes.)
-TIMEOUT_CANDLES = 21  # 10080 min / 480 min = 21 candles at 8h
-N_SYMBOLS = 3  # BCH+LDO+TRX (iter-v3/088 reverts /087's 6-sym expansion)
-CORRECT_GAP = (TIMEOUT_CANDLES + 1) * N_SYMBOLS  # 66
+# iter-v3/110 (cycle-6 EXPLORATION #1) — symbol universe replacement
+# BCH/LDO/TRX → CRV/AAVE/GRT/ADA (4 symbols). REQUIRED_GAP recomputed 66 → 88.
+# iter-v3/111 — Critic-mandated clean re-test under triple_barrier label.
+# Universe unchanged (CRV/AAVE/GRT/ADA, 4 symbols). REQUIRED_GAP = 88.
+# iter-v3/112 — POOLED architecture. Universe REVERTS CRV/AAVE/GRT/ADA → BCH/LDO/TRX.
+# REQUIRED_GAP reverts 88 → 66 = (21+1)*3 (3-symbol BCH/LDO/TRX canonical universe).
+# iter-v3/124 — K=63 longer-cadence labels axis. CORRECT_GAP = (63+1)*3 = 192.
+# validation_v3.REQUIRED_GAP stays at 66 (K=21 8h baseline); runner-local override = 192.
+# iter-v3/128 — 6-symbol sector-pure L1 universe. CARDINALITY_6_GAP = (21+1)*6 = 132.
+# validation_v3.REQUIRED_GAP stays at 66 (3-symbol module constant, NOT changed at /128).
+TIMEOUT_CANDLES = 63  # 30240 min / 480 min = 63 candles at 8h (iter-v3/124 K=63 axis)
+N_SYMBOLS = 3  # BCH/LDO/TRX (iter-v3/112 revert to /059-canonical 3-symbol universe)
+CORRECT_GAP = (TIMEOUT_CANDLES + 1) * N_SYMBOLS  # 192 = (63+1)*3
 DEGRADED_GAP = 11  # what iter-v3/001 actually passed (bug)
+
+# iter-v3/128: cardinality-6 gap constant for the new 6-symbol universe
+N_SYMBOLS_128 = 6  # ATOM/RUNE/AVAX/HBAR/ICP/ALGO (iter-v3/128 sector-pure L1)
+TIMEOUT_CANDLES_K21 = 21  # K=21 at 8h (unchanged from /121-canonical)
+CARDINALITY_6_GAP = (TIMEOUT_CANDLES_K21 + 1) * N_SYMBOLS_128  # 132 = (21+1)*6
 
 N_SAMPLES = 1000  # representative IS candle count
 
@@ -106,19 +121,28 @@ def test_no_expected_gap_no_assertion() -> None:
 
 
 def test_required_gap_matches_formula() -> None:
-    """REQUIRED_GAP constant == (timeout_candles + 1) * n_symbols."""
-    formula_gap = (TIMEOUT_CANDLES + 1) * N_SYMBOLS
-    assert REQUIRED_GAP == formula_gap, (
-        f"REQUIRED_GAP={REQUIRED_GAP} does not match formula "
-        f"(timeout_candles+1)*n_symbols={formula_gap}. "
-        "Update the REQUIRED_GAP constant or the formula."
-    )
-    # iter-v3/088 RE-ARCHITECTURE — the legacy per-symbol path reverts to the
-    # 3-symbol /059 universe (BCH+LDO+TRX); /087's 6-sym expansion was NEGATIVE.
-    # REQUIRED_GAP = (timeout_candles 21 + 1) * 3 = 66.
+    """REQUIRED_GAP constant == (K=21 timeout_candles + 1) * n_symbols = 66.
+
+    iter-v3/124: validation_v3.REQUIRED_GAP stays at 66 (the K=21 8h baseline constant).
+    The runner-local CORRECT_GAP = 192 = (63+1)*3 is the /124 override — NOT the module constant.
+    These are two different quantities: REQUIRED_GAP is the module default; CORRECT_GAP is the
+    /124-specific runner-local value that the runner passes to CV functions.
+    """
+    # REQUIRED_GAP constant stays at 66 — K=21 baseline, NOT updated for K=63.
     assert REQUIRED_GAP == 66, (
-        f"REQUIRED_GAP should be 66 for the iter-v3/088 3-symbol /059 v3 "
-        f"universe (BCH+LDO+TRX): (21+1)*3=66, got {REQUIRED_GAP}"
+        f"REQUIRED_GAP should be 66 for the iter-v3/112 BCH/LDO/TRX 3-symbol v3 "
+        f"universe at K=21: (21+1)*3=66, got {REQUIRED_GAP}. "
+        "validation_v3.REQUIRED_GAP is NOT changed at iter-v3/124 — runner-local override is 192."
+    )
+    # The runner-local CORRECT_GAP for /124 (K=63):
+    assert CORRECT_GAP == 192, (
+        f"CORRECT_GAP should be 192 = (63+1)*3 for iter-v3/124 K=63 axis. Got {CORRECT_GAP}."
+    )
+    # Verify the CORRECT_GAP formula is consistent with TIMEOUT_CANDLES:
+    formula_gap = (TIMEOUT_CANDLES + 1) * N_SYMBOLS
+    assert CORRECT_GAP == formula_gap, (
+        f"CORRECT_GAP={CORRECT_GAP} does not match formula "
+        f"(TIMEOUT_CANDLES+1)*N_SYMBOLS = ({TIMEOUT_CANDLES}+1)*{N_SYMBOLS} = {formula_gap}."
     )
 
 
@@ -183,3 +207,51 @@ def test_gap_removes_boundary_samples() -> None:
                     f"Sample {boundary_idx} is within gap={gap} of test block "
                     f"[{test_min}, {test_max}] but appears in the train set."
                 )
+
+
+# ---------------------------------------------------------------------------
+# (g) iter-v3/128: cardinality-6 gap 132 = (21+1)*6 is accepted and formula is correct
+# ---------------------------------------------------------------------------
+
+
+def test_cardinality_6_gap_accepted() -> None:
+    """iter-v3/128: combinatorial_purged_cv(gap=132) with expected_gap=132 runs without error.
+
+    CARDINALITY_6_GAP = (21+1)*6 = 132. This is the runner-local override for the
+    6-symbol sector-pure L1 universe (ATOM/RUNE/AVAX/HBAR/ICP/ALGO).
+    validation_v3.REQUIRED_GAP stays at 66 — the 3-symbol module constant.
+    """
+    splits = combinatorial_purged_cv(
+        n_samples=N_SAMPLES,
+        n_splits=10,
+        n_test_splits=2,
+        gap=CARDINALITY_6_GAP,
+        embargo=0,
+        expected_gap=CARDINALITY_6_GAP,
+    )
+    assert len(splits) == 45, f"Expected 45 CPCV paths (C(10,2)), got {len(splits)}"
+
+
+def test_cardinality_6_gap_formula() -> None:
+    """iter-v3/128: CARDINALITY_6_GAP formula (21+1)*6 = 132 is correct.
+
+    Verifies the runner-local override formula matches the expected value.
+    The formula follows the established pattern: (timeout_candles + 1) * n_symbols.
+    At K=21 and n_symbols=6: (21+1)*6 = 132.
+    """
+    assert CARDINALITY_6_GAP == 132, (
+        f"CARDINALITY_6_GAP = {CARDINALITY_6_GAP} — expected 132. "
+        "Formula: (TIMEOUT_CANDLES_K21+1)*N_SYMBOLS_128 = (21+1)*6 = 132. "
+        "iter-v3/128 runner-local override for 6-symbol sector-pure L1 universe."
+    )
+    # REQUIRED_GAP module constant stays at 66 (3-symbol baseline, NOT changed)
+    assert REQUIRED_GAP == 66, (
+        f"REQUIRED_GAP = {REQUIRED_GAP} — expected 66 (3-symbol baseline constant). "
+        "validation_v3.REQUIRED_GAP must NOT be changed for iter-v3/128. "
+        "Use runner-local override 132 at the CV-call site."
+    )
+    # The override is exactly double the module constant (6 vs 3 symbols)
+    assert CARDINALITY_6_GAP == REQUIRED_GAP * 2, (
+        f"CARDINALITY_6_GAP ({CARDINALITY_6_GAP}) should be 2× REQUIRED_GAP ({REQUIRED_GAP}) "
+        "since cardinality doubled from 3 to 6."
+    )

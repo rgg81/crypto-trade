@@ -1,0 +1,5 @@
+gate,statistic,threshold,value,verdict,decision
+g1_separability,pooled minority-regime fraction,>= 0.2,0.4942,PASS,NO-GO
+g2_structure_diff,mean own-minus-other-regime held-out AUC gap,>= 0.04,-0.0033,FAIL,NO-GO
+g3_mixture_lift,mixture-minus-pooled held-out acc lift (mean; CI lo > 0),mean > 0 AND CI_lo > 0,0.0068,FAIL,NO-GO
+g4_mixture_pnl,mixture-minus-pooled held-out side-PnL lift (mean),mean > 0,-0.0155,FAIL,NO-GO

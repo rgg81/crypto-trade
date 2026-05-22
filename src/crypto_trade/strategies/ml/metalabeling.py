@@ -216,6 +216,7 @@ class MetaLabelingStrategy:
         oof_persist_path: Path | None = None,
         fast_mode: bool = False,
         label_mode: str = "triple_barrier",
+        trend_scan_grid: tuple[int, ...] = (5, 8, 13, 21),
     ) -> None:
         if not feature_columns:
             raise ValueError(
@@ -255,6 +256,7 @@ class MetaLabelingStrategy:
             oof_persist_path=oof_persist_path,
             fast_mode=fast_mode,
             label_mode=label_mode,
+            trend_scan_grid=trend_scan_grid,
         )
 
         # M1 training-window derived params (read after M1 trains)

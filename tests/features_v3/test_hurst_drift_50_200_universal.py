@@ -86,11 +86,9 @@ def test_hurst_drift_50_200_in_universal_feature_list() -> None:
     )
     n = len(V3_FEATURE_COLUMNS_TOP_N)
     assert n == 14, (
-        f"V3_FEATURE_COLUMNS_TOP_N has {n} elements -- expected 14 (the BASELINE_V3 "
-        "/059/060 14-feature anchor stack). iter-v3/087's SOLE axis is the WHOLESALE "
-        "V3_MODELS 3->6 expansion, NOT a feature change; the /086 perp-spot basis "
-        "family is REVERTED. hurst_drift_50_200 stays PARKED-ABSENT; "
-        "/082's funding family stays reverted. "
+        f"V3_FEATURE_COLUMNS_TOP_N has {n} elements -- expected 14 "
+        "(iter-v3/124: eth_vs_sym_rv_50 REMOVED; /121 BASELINE_V3 14-feature anchor restored). "
+        "hurst_drift_50_200 stays PARKED-ABSENT; /082's funding family stays reverted. "
         "Check V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
     )
     assert "regime_momentum_signed_3d" not in V3_FEATURE_COLUMNS_TOP_N, (
@@ -319,9 +317,8 @@ def test_v3_models_is_3_symbol_at_iter_v3_084() -> None:
         feats = features_for_symbol(sym)
         assert len(feats) == 14, (
             f"{sym} fallback returns {len(feats)} features -- expected 14 "
-            "(the BASELINE_V3 /059/060 14-feature anchor stack; the /086 perp-spot "
-            "basis family REVERTED at iter-v3/087); hurst_drift_50_200 stays "
-            "PARKED-ABSENT."
+            "(iter-v3/124: eth_vs_sym_rv_50 REMOVED; /121 14-feature anchor); "
+            "hurst_drift_50_200 stays PARKED-ABSENT."
         )
         assert "hurst_drift_50_200" not in feats, (
             f"{sym} fallback contains hurst_drift_50_200 -- must be ABSENT at iter-v3/065. "

@@ -1,0 +1,7 @@
+period,symbol,n_trades_baseline,n_trades_skipped,n_trades_with_brake,activations,time_overrides_fired,wpnl_baseline,wpnl_with_brake,wpnl_delta
+IS,BCHUSDT,85,1,84,1,1,81.166,86.572,5.406
+IS,LDOUSDT,9,0,9,1,1,12.796,12.796,0.0
+IS,TRXUSDT,79,2,77,2,2,-5.196,-5.224,-0.028
+OOS,BCHUSDT,35,1,34,1,1,35.832,28.873,-6.958
+OOS,LDOUSDT,12,3,9,2,2,-2.886,-2.416,0.47
+OOS,TRXUSDT,51,0,51,0,0,5.208,5.208,0.0

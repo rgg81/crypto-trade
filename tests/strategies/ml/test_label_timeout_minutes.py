@@ -4,7 +4,9 @@ Per iter-v3/068 Path C: universal labeling timeout widening from 10080 to 20160 
 Verifies that the labeling forward-scan window changes accordingly + the walk-forward
 embargo gap is recomputed via compute_embargo_candles helper.
 
-Five tests per brief Section 3 Sub-fix 7:
+iter-v3/124: adds Tests 6-7 for K=63 (label_timeout_minutes=30240, embargo=64, gap=192).
+
+Five original tests per brief Section 3 Sub-fix 7:
   1. test_label_timeout_minutes_default_preserved
        — verifies LightGbmStrategy stores label_timeout_minutes passed at init.
   2. test_label_timeout_minutes_iter068_value_20160
@@ -15,6 +17,12 @@ Five tests per brief Section 3 Sub-fix 7:
        — baseline /060 anchor embargo_candles=22 at label_timeout_minutes=10080.
   5. test_compute_embargo_candles_doubles_on_timeout_doubling
        — additional 21 candles purged per cell when timeout doubles 10080→20160.
+
+Two iter-v3/124 tests per brief Section 9 adversarial integration assertions:
+  6. test_compute_embargo_candles_iter124_value_64
+       — embargo_candles=64 at label_timeout_minutes=30240 + 8h interval.
+  7. test_label_timeout_minutes_iter124_value_30240
+       — iter-v3/124 K=63 value 30240 propagates correctly through LightGbmStrategy.
 """
 
 from __future__ import annotations
@@ -109,4 +117,46 @@ def test_compute_embargo_candles_doubles_on_timeout_doubling():
     assert e42 - e21 == 21, (
         f"Expected embargo gap delta=21 (doubled timeout); got {e42 - e21}. "
         "iter-v3/068: additional 21 candles purged per cell cross-cell gap 66→129."
+    )
+
+
+# ---------------------------------------------------------------------------
+# Test 6: iter-v3/124 K=63 embargo_candles=64 at label_timeout_minutes=30240
+# ---------------------------------------------------------------------------
+
+
+def test_compute_embargo_candles_iter124_value_64():
+    """iter-v3/124 K=63: embargo_candles=64 at label_timeout_minutes=30240 + 8h.
+
+    Per brief Section 9 adversarial integration assertion #6:
+    compute_embargo_candles(30240, 480) = 30240 // 480 + 1 = 63 + 1 = 64.
+    This is the per-cell embargo applied by the walk_forward.py CPCV at K=63.
+    """
+    embargo = compute_embargo_candles(30240, 480)
+    assert embargo == 64, (
+        f"Expected embargo_candles=64 (30240//480+1 = 63+1); got {embargo}. "
+        "iter-v3/124 K=63 Branch B: per-cell embargo must be 64 candles at 8h. "
+        "Check compute_embargo_candles in walk_forward.py."
+    )
+
+
+# ---------------------------------------------------------------------------
+# Test 7: iter-v3/124 K=63 label_timeout_minutes=30240 propagates correctly
+# ---------------------------------------------------------------------------
+
+
+def test_label_timeout_minutes_iter124_value_30240():
+    """iter-v3/124 K=63: label_timeout_minutes=30240 propagates correctly through LightGbmStrategy.
+
+    Per brief Section 9 adversarial integration assertion #7:
+    LightGbmStrategy(label_timeout_minutes=30240).label_timeout_minutes == 30240.
+    """
+    strat = LightGbmStrategy(
+        **_BASE_KWARGS,
+        label_timeout_minutes=30240,
+    )
+    assert strat.label_timeout_minutes == 30240, (
+        f"Expected label_timeout_minutes=30240; got {strat.label_timeout_minutes}. "
+        "iter-v3/124 K=63 Branch B: LightGbmStrategy must store label_timeout_minutes=30240. "
+        "Check lgbm.py __init__."
     )

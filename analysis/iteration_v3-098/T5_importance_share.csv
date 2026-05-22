@@ -1,0 +1,4 @@
+feature_set,n_new,n_total,uniform_parity_share,mean_importance_share,importance_gate_pass
++A,5,19,0.2632,0.169,False
++D,4,18,0.2222,0.1797,False
++AD,9,23,0.3913,0.3031,False

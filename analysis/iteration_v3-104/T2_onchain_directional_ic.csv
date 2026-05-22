@@ -1,0 +1,11 @@
+symbol,candidate,n,ic,p_value
+BCHUSDT,btc_adract_growth_14d_z90,5713,0.01644,0.21402
+BCHUSDT,btc_txcnt_growth_14d_z90,5713,0.03232,0.01455
+BCHUSDT,bch_adract_growth_14d_z90,5713,0.02099,0.11274
+BCHUSDT,bch_txcnt_growth_14d_z90,5713,0.02838,0.03198
+LDOUSDT,btc_adract_growth_14d_z90,2727,0.02908,0.12894
+LDOUSDT,btc_txcnt_growth_14d_z90,2727,-0.01274,0.50593
+TRXUSDT,btc_adract_growth_14d_z90,5655,-0.00484,0.71574
+TRXUSDT,btc_txcnt_growth_14d_z90,5655,0.0188,0.15744
+TRXUSDT,trx_adract_growth_14d_z90,5655,-0.02543,0.05581
+TRXUSDT,trx_txcnt_growth_14d_z90,5655,-0.03396,0.01064

@@ -1,0 +1,111 @@
+==============================================================================
+iter-v3/093 — DERIVATIVES-MICROSTRUCTURE EDA — IS-ONLY, walk-forward-faithful
+==============================================================================
+OOS_CUTOFF_MS = 1742774400000 (2025-03-24, IMMUTABLE)
+training_months = 24 (IMMUTABLE) — IS-test window = [first_kline+24mo, OOS_CUTOFF)
+
+Building CORE universe (BCH/LDO/TRX — the /059 per-symbol set):
+  [core] BCHUSDT: 3535 IS-test bars  2021-12-31 -> 2025-03-23  funding_cov=1.00  basis_cov=1.00
+  [core] LDOUSDT: 549 IS-test bars  2024-09-22 -> 2025-03-23  funding_cov=1.00  basis_cov=1.00
+  [core] TRXUSDT: 3477 IS-test bars  2022-01-15 -> 2025-03-23  funding_cov=1.00  basis_cov=1.00
+
+Building WIDE universe (derivatives-data-complete cross-check):
+  [wide] BCHUSDT: 3535 IS-test bars  2021-12-31 -> 2025-03-23  funding_cov=1.00  basis_cov=1.00
+  [wide] LDOUSDT: 549 IS-test bars  2024-09-22 -> 2025-03-23  funding_cov=1.00  basis_cov=1.00
+  [wide] TRXUSDT: 3477 IS-test bars  2022-01-15 -> 2025-03-23  funding_cov=1.00  basis_cov=1.00
+  [wide] GALAUSDT: 1657 IS-test bars  2023-09-18 -> 2025-03-23  funding_cov=0.98  basis_cov=1.00
+  [wide] HBARUSDT: 2212 IS-test bars  2023-03-17 -> 2025-03-23  funding_cov=1.00  basis_cov=1.00
+  [wide] ICPUSDT: 2047 IS-test bars  2023-05-11 -> 2025-03-23  funding_cov=0.97  basis_cov=1.00
+  [wide] RUNEUSDT: 2794 IS-test bars  2022-09-04 -> 2025-03-23  funding_cov=0.98  basis_cov=1.00
+  [wide] MANAUSDT: 2218 IS-test bars  2023-03-15 -> 2025-03-23  funding_cov=0.95  basis_cov=1.00
+  [wide] SANDUSDT: 2365 IS-test bars  2023-01-25 -> 2025-03-23  funding_cov=0.96  basis_cov=1.00
+  [wide] AAVEUSDT: 2668 IS-test bars  2022-10-16 -> 2025-03-23  funding_cov=1.00  basis_cov=1.00
+  [wide] AVAXUSDT: 2737 IS-test bars  2022-09-23 -> 2025-03-23  funding_cov=1.00  basis_cov=1.00
+  [wide] ATOMUSDT: 3423 IS-test bars  2022-02-07 -> 2025-03-23  funding_cov=1.00  basis_cov=1.00
+  [wide] ADAUSDT: 3444 IS-test bars  2022-01-31 -> 2025-03-23  funding_cov=0.96  basis_cov=1.00
+  [wide] ALGOUSDT: 3033 IS-test bars  2022-06-17 -> 2025-03-23  funding_cov=0.95  basis_cov=1.00
+  [wide] AXSUSDT: 2563 IS-test bars  2022-11-20 -> 2025-03-23  funding_cov=1.00  basis_cov=1.00
+  [wide] CHZUSDT: 2377 IS-test bars  2023-01-21 -> 2025-03-23  funding_cov=1.00  basis_cov=1.00
+  [wide] CRVUSDT: 2803 IS-test bars  2022-09-01 -> 2025-03-23  funding_cov=0.97  basis_cov=1.00
+  [wide] EOSUSDT: 3513 IS-test bars  2022-01-08 -> 2025-03-23  funding_cov=1.00  basis_cov=1.00
+  [wide] GRTUSDT: 2476 IS-test bars  2022-12-19 -> 2025-03-23  funding_cov=1.00  basis_cov=1.00
+  [wide] THETAUSDT: 3093 IS-test bars  2022-05-28 -> 2025-03-23  funding_cov=1.00  basis_cov=1.00
+  [wide] VETUSDT: 3387 IS-test bars  2022-02-14 -> 2025-03-23  funding_cov=0.90  basis_cov=1.00
+
+--- T1: forward-return IC (POOLED rows, |IC| descending) ---
+universe             feature  horizon_bars       ic  n_obs
+    core    f_sign_persist_9            21 -0.08215   7561
+    core              f_rate            21 -0.07552   7561
+    core    f_sign_persist_9             9 -0.06911   7561
+    core              f_rate             9 -0.06538   7561
+    core f_extreme_persist_9             9  0.05175   7561
+    wide   proxy_vol_surge_z            21  0.04874  56371
+    core              f_rate             3 -0.04572   7561
+    wide   proxy_vol_surge_z             9  0.04279  56371
+    wide    f_sign_persist_9            21 -0.04112  56371
+    core    f_sign_persist_9             3 -0.03846   7561
+    core f_extreme_persist_9             3  0.03714   7561
+    wide f_extreme_persist_9             9  0.03690  56371
+    wide              f_rate            21 -0.03494  56371
+    core   proxy_vol_surge_z             9  0.03284   7561
+
+--- T2: vol-REGIME IC — mean over symbols, per (universe, feature, H) ---
+            feature  horizon_bars  mean_regime_ic  mean_effsize  n_syms
+             f_rate            21        0.181867      0.301067       3
+   f_sign_persist_9            21        0.169893      0.383600       3
+f_extreme_persist_9             9        0.133227     -0.133400       3
+            b_level            21        0.098267      0.293100       3
+  proxy_vol_surge_z             3        0.083240      0.200433       3
+             f_rate             9        0.067343      0.120900       3
+             f_rate             3        0.057823      0.051467       3
+f_extreme_persist_9             3        0.057220     -0.137567       3
+   f_sign_persist_9             3        0.049193      0.085067       3
+  proxy_vol_surge_z            21        0.047853      0.101967       3
+   f_sign_persist_9             9        0.047513      0.105533       3
+f_extreme_persist_9            21        0.036663     -0.099300       3
+
+--- T3: deleveraging-risk state -> forward-stressed lift (mean over syms) ---
+universe  horizon_bars  mean_lift  mean_cond_fwd_ret  mean_n_risk  n_syms
+    core             3   1.326200           0.010227   155.666667       3
+    core             9   1.191033           0.022533   155.666667       3
+    core            21   1.106000           0.015597   155.666667       3
+    wide             3   1.374824           0.005051   147.714286      21
+    wide             9   1.233186           0.012783   147.714286      21
+    wide            21   1.155938           0.023740   147.714286      21
+
+--- T4: max |IC| of each derivatives feature vs any price feature ---
+      deriv_feature  max_abs_ic_vs_any_price_feature  check4_pass_ic_lt_0p70
+        f_zscore_30                          0.32107                    True
+             f_rate                          0.25361                    True
+            b_level                          0.23791                    True
+            f_mom_9                          0.23638                    True
+        b_zscore_30                          0.21832                    True
+   f_sign_persist_9                          0.20500                    True
+    proxy_taker_imb                          0.14791                    True
+            f_mom_3                          0.10166                    True
+  proxy_vol_surge_z                          0.09609                    True
+        fb_spread_z                          0.08876                    True
+f_extreme_persist_9                          0.07750                    True
+       b_momentum_3                          0.06245                    True
+          f_accel_3                          0.01794                    True
+
+--- T5: HEADLINE SUMMARY ---
+  core_n_symbols                         = 3
+  wide_n_symbols                         = 21
+  best_fwd_return_feature                = f_sign_persist_9
+  best_fwd_return_ic                     = -0.08215
+  best_fwd_return_horizon                = 21
+  best_vol_regime_feature                = f_rate
+  best_vol_regime_ic                     = 0.18187
+  best_vol_regime_effsize                = 0.3011
+  mean_deleveraging_lift_H21             = 1.106
+  max_redundancy_vs_price                = 0.3211
+  all_check4_pass                        = True
+  n_regime_ic_ge_0p05                    = 8
+  n_regime_ic_measured                   = 39
+
+==============================================================================
+EDA COMPLETE. Outputs in analysis/iteration_v3-093/.
+VERDICT BAR: vol-regime IC is the architecture-relevant signal — the
+re-architecture predicts a forward vol-regime, not a price barrier.
+==============================================================================

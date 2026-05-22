@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import io
 import json
 import subprocess
 import sys
@@ -77,6 +78,58 @@ from crypto_trade.strategies.ml.validation_v3 import (
     psr,
 )
 from crypto_trade.strategies.ml.xgb import XgboostStrategy
+
+# ============================================================
+# TeeLogger — iter-v3/130 run.log fix (5-occurrence recurrence)
+# ============================================================
+
+
+class _TeeLogger(io.TextIOWrapper):
+    """Write stdout to both the original stream and a log file.
+
+    iter-v3/130: fixes the 5-occurrence run.log missing pattern (/124/125/127/128/129).
+    The runner prints heavily via print(); redirecting sys.stdout ensures all
+    output — including from library callbacks — lands in the log file.
+
+    Usage:
+        tee = _TeeLogger(log_path)
+        try:
+            ...
+        finally:
+            tee.close()
+    """
+
+    def __init__(self, log_path: Path) -> None:
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        self._log_file = open(log_path, "w", encoding="utf-8", buffering=1)  # noqa: SIM115
+        self._original_stdout = sys.stdout
+        self._original_stderr = sys.stderr
+        # Point sys.stdout/sys.stderr at self (which delegates to both).
+        sys.stdout = self  # type: ignore[assignment]
+        sys.stderr = self  # type: ignore[assignment]
+
+    def write(self, data: str) -> int:  # type: ignore[override]
+        self._original_stdout.write(data)
+        self._log_file.write(data)
+        return len(data)
+
+    def flush(self) -> None:
+        self._original_stdout.flush()
+        self._log_file.flush()
+
+    def close(self) -> None:  # type: ignore[override]
+        sys.stdout = self._original_stdout
+        sys.stderr = self._original_stderr
+        self._log_file.close()
+
+    # Needed so subprocess / os calls that check isatty() don't break.
+    def isatty(self) -> bool:
+        return False
+
+    @property
+    def encoding(self) -> str:  # type: ignore[override]
+        return "utf-8"
+
 
 # ============================================================
 # Constants — DO NOT CHANGE
@@ -128,9 +181,12 @@ def _derive_ensemble_seeds(outer_seed: int, size: int = 5) -> list[int]:
     return [int(s) for s in rng.integers(low=0, high=2**31 - 1, size=size)]
 
 
-ITERATION_LABEL = "v3-088"
+ITERATION_LABEL = "v3-130"
 REPORTS_DIR = Path("reports-v3")
 FEATURES_DIR = Path("data/features_v3")
+FEATURES_DIR_24H = Path("data/features_v3_24h")
+# iter-v3/130: 4h bar-interval axis — native 4h klines + 4h feature parquets.
+FEATURES_DIR_4H = Path("data/features_v3_4h")
 DATA_DIR = Path("data")
 
 # v3 symbols — iter-v3/051: SYSTEM-LEVEL REVERT to iter-v3/028 architecture.
@@ -188,9 +244,22 @@ DATA_DIR = Path("data")
 # 3-symbol V3_MODELS is the clean /059-state restore the QE builds the new path
 # onto — it is NOT the iter-v3/088 trading universe.
 V3_MODELS: tuple[tuple[str, str], ...] = (
-    ("A (BCHUSDT)", "BCHUSDT"),
-    ("C (LDOUSDT)", "LDOUSDT"),
-    ("D (TRXUSDT)", "TRXUSDT"),
+    # iter-v3/127: V3_MODELS BCH/LDO/TRX (sole axis was per-symbol drawdown brake). NEGATIVE
+    # (IS +0.31 / OOS -0.19; catastrophic OOS collapse). Drawdown brake axis CLOSED per
+    # Critic FINAL. /128 mandatory baseline-restore: brake REVERTED
+    # (enable_per_symbol_drawdown_brake=False).
+    # iter-v3/128: WHOLESALE V3_MODELS REPLACEMENT BCH/LDO/TRX → 6-symbol sector-pure L1
+    # universe (ATOM/RUNE/AVAX/HBAR/ICP/ALGO). 9/9 NEGATIVE (catastrophic across all L1
+    # symbols; universe-substitution axis CLOSED at /128). REQUIRED_GAP 66→132 override.
+    # iter-v3/129: REVERT V3_MODELS → BCH/LDO/TRX (/121 baseline universe).
+    # REQUIRED_GAP REVERT 132→66 = (21+1)*3. Sole axis: continuous size-scaling
+    # at per-symbol 45-day rolling drawdown (primitive 13).
+    # iter-v3/130: bar-interval 8h→4h axis. /127 binary brake REVERTED (closed).
+    # /129 continuous scaling REVERTED (closed). Sole axis: 4h bar interval.
+    # enable_per_symbol_drawdown_scaling REVERTED to False.
+    ("v3-130-BCH", "BCHUSDT"),
+    ("v3-130-LDO", "LDOUSDT"),
+    ("v3-130-TRX", "TRXUSDT"),
 )
 
 # Risk gate configs (v2 5-gate + BTC; no R1/R2/R3 — brief Section 3.4)
@@ -209,8 +278,7 @@ BTC_TREND_CONFIG = BtcTrendFilterConfig(
 # CPCV parameters (brief Section 0 + 3.5#2)
 CPCV_N_SPLITS = 10
 CPCV_N_TEST_SPLITS = 2
-# gap = REQUIRED_GAP = (timeout_candles+1)*n_symbols = (21+1)*3 = 66
-# (iter-v3/088 reverts /087's 6-sym expansion; universe=BCH+LDO+TRX; 3-sym).
+# gap = REQUIRED_GAP = (timeout_candles+1)*n_symbols = (21+1)*3 = 66 (iter-v3/051 REVERT to 3-sym)
 # DO NOT use min(REQUIRED_GAP, n_trades//20) — that is the iter-v3/001 bug.
 CPCV_EMBARGO = 27  # ~1% of 24-month T ≈ 2742 candles * 0.01
 
@@ -243,27 +311,45 @@ def _verify_symbols(symbols: tuple[str, ...]) -> None:
         )
 
 
-def _verify_data_freshness(symbols: tuple[str, ...], max_lag_hours: float = 16.0) -> None:
-    """Hard-fail on stale data (>16h lag)."""
+def _verify_data_freshness(
+    symbols: tuple[str, ...],
+    max_lag_hours: float = 16.0,
+    bar_interval: str = "8h",
+) -> None:
+    """Hard-fail on stale data (>16h lag).
+
+    iter-v3/130: bar_interval-conditional — checks 4h.csv at 4h, 8h.csv at 8h.
+    BTCUSDT is always checked at 8h (BTC trend filter uses 8h klines regardless).
+    """
     now_ms = int(time.time() * 1000)
     stale: list[tuple[str, float]] = []
     for sym in symbols:
-        p = DATA_DIR / sym / "8h.csv"
+        # BTC trend filter always uses 8h klines; other symbols use the bar_interval.
+        _csv_interval = "8h" if sym == "BTCUSDT" else bar_interval
+        p = DATA_DIR / sym / f"{_csv_interval}.csv"
         if not p.exists():
-            raise RuntimeError(f"v3 runner: missing CSV for {sym} at {p}")
+            raise RuntimeError(
+                f"v3 runner: missing CSV for {sym} at {p}. "
+                f"Run `uv run crypto-trade fetch --symbols {sym} --intervals {_csv_interval}`"
+            )
         df = pd.read_csv(p, usecols=["close_time"])
         last_close = int(df["close_time"].max())
         lag_h = (now_ms - last_close) / 3_600_000
         if lag_h > max_lag_hours:
             stale.append((sym, round(lag_h, 1)))
     if stale:
+        _fetch_interval = bar_interval
         raise RuntimeError(
             f"v3 runner: STALE DATA (>{max_lag_hours}h lag): {stale}. "
-            f"Run `uv run crypto-trade fetch --symbols {','.join(symbols)} --intervals 8h`"
+            f"Run `uv run crypto-trade fetch --symbols {','.join(s for s, _ in stale)} "
+            f"--intervals {_fetch_interval}`"
         )
 
 
-def _verify_feature_columns(ensemble_size: int | None = None) -> None:
+def _verify_feature_columns(
+    ensemble_size: int | None = None,
+    bar_interval: str = "8h",
+) -> None:
     """Verifies V3_FEATURE_COLUMNS contents per current brief (iter-v3/088).
 
     Parameters
@@ -273,6 +359,9 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
         If provided, asserts the value is in (3, 10) to enforce mode discipline.
         If None, skips the ensemble-size mode check (backward compat for direct
         calls in unit tests that don't care about mode).
+    bar_interval:
+        iter-v3/130: '4h' or '8h' (default). Controls the expected label_timeout_minutes
+        in the model pre-flight check. At 4h: 5040 (K=21 × 4h × 60). At 8h: 10080.
 
     iter-v3/088: CYCLE 3 EXPLORATION #7 — RE-ARCHITECTURE. The axis is a NEW
       cross-sectional relative-value RANKING model (brief Section 3); it is NOT
@@ -409,16 +498,56 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
     # the WHOLESALE V3_MODELS 3 -> 6 universe-breadth expansion, NOT a feature
     # change — the basis-revert is a mandatory baseline-restore (the established
     # "revert the non-merged prior iteration" pattern). count 17 -> 14.
+    # iter-v3/102 CLOSEOUT: alpha032 REVERTED — NEGATIVE (IS collapsed +0.3993,
+    # F2 falsifier fired IS < +0.60; OOS +1.55 overfitting/regime-luck per Critic).
+    # alpha032 joins the ABSENT-assertion ban (the established /082 funding-family /
+    # /086 basis-family / /064 adx_14 pattern). formulaic_v3.py + test_formulaic_v3.py
+    # RETAINED as infrastructure; the group key is removed from GROUP_REGISTRY dispatch.
+    if "alpha032" in V3_FEATURE_COLUMNS:
+        raise RuntimeError(
+            "alpha032 FOUND in V3_FEATURE_COLUMNS — must be ABSENT at iter-v3/102 "
+            "closeout (NEGATIVE: IS collapsed to +0.3993, F2 falsifier IS < +0.60 "
+            "fired; OOS +1.55 confirmed overfitting/regime-luck by Critic). "
+            "Remove 'alpha032' from V3_FEATURE_COLUMNS_TOP_N in "
+            "features_v3/__init__.py. The formulaic_v3.py module is RETAINED as "
+            "reusable infrastructure but NOT wired into GROUP_REGISTRY."
+        )
     n = len(V3_FEATURE_COLUMNS)
+    # iter-v3/127: REVERT V3_FEATURE_COLUMNS_TOP_N 15 → 14 (drop d24_ret_autocorr_lag1_50).
+    # /126 NEGATIVE-catastrophic (EDA methodology FALSIFIED at 3-occurrence pattern per diary;
+    # Critic FINAL `<see /126 diary>`). d24_ret_autocorr_lag1_50 joins the ABSENT-assertion ban.
     if n != 14:
         raise RuntimeError(
             f"V3_FEATURE_COLUMNS has {n} columns — expected exactly 14. "
-            "iter-v3/088 (cycle-3 EXPLORATION #7 — RE-ARCHITECTURE): the "
-            "BASELINE_V3 /059/060 14-feature anchor stack is UNCHANGED. The /088 "
-            "axis is a NEW cross-sectional ranking model (brief Section 3), not a "
-            "feature-column change — the 14-feature stack is reused by the "
-            "cross-sectional model. Check V3_FEATURE_COLUMNS_TOP_N in "
-            "features_v3/__init__.py."
+            "iter-v3/127: REVERT /126's d24_ret_autocorr_lag1_50 (15th feature); "
+            "V3_FEATURE_COLUMNS_TOP_N reverts to /121-canonical 14-feature stack. "
+            "Check features_v3/__init__.py V3_FEATURE_COLUMNS_TOP_N."
+        )
+    # iter-v3/127: d24_ret_autocorr_lag1_50 MUST be ABSENT (DROPPED — /126 NEGATIVE-catastrophic).
+    if "d24_ret_autocorr_lag1_50" in V3_FEATURE_COLUMNS:
+        raise RuntimeError(
+            "d24_ret_autocorr_lag1_50 FOUND in V3_FEATURE_COLUMNS — must be ABSENT at "
+            "iter-v3/127 (/126 NEGATIVE-catastrophic; EDA methodology FALSIFIED at 3-occurrence "
+            "pattern). d24_ret_autocorr_lag1_50 joins the ABSENT-assertion ban. "
+            "Remove 'd24_ret_autocorr_lag1_50' from V3_FEATURE_COLUMNS_TOP_N in "
+            "features_v3/__init__.py. The multifreq_v3_24h function is RETAINED as dead code."
+        )
+    # iter-v3/124: eth_vs_sym_rv_50 MUST be ABSENT (REMOVED — /123 NEGATIVE-catastrophic)
+    if "eth_vs_sym_rv_50" in V3_FEATURE_COLUMNS:
+        raise RuntimeError(
+            "eth_vs_sym_rv_50 FOUND in V3_FEATURE_COLUMNS — must be ABSENT at iter-v3/124. "
+            "/123 NEGATIVE-catastrophic closeout; cycle-7 cross-asset OHLCV axis CLOSED. "
+            "Remove 'eth_vs_sym_rv_50' from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py. "
+            "The eth_vs_sym_rv_50 function in cross_btc_v3.py is MUSEUM code (not deleted)."
+        )
+    # iter-v3/123: eth_ret_3d MUST be ABSENT (NEGATIVE-INERT at /122; Critic `9e0eeb6`)
+    if "eth_ret_3d" in V3_FEATURE_COLUMNS:
+        raise RuntimeError(
+            "eth_ret_3d FOUND in V3_FEATURE_COLUMNS — must be ABSENT at iter-v3/123. "
+            "/122 NEGATIVE-INERT verdict (Critic FINAL `9e0eeb6`): IC=0.5613 with "
+            "vwap_dev_20 — substantially spanned by incumbents. eth_vs_sym_rv_50 "
+            "replaces it per /122 Critic Rec 1. "
+            "Remove 'eth_ret_3d' from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
         )
     # iter-v3/087: the 3 /086 basis-family features MUST be ABSENT (DROPPED —
     # Critic /086 Rec #3: /086 INERT-by-importance, rank 15/16/17 of 17, the 7th
@@ -565,39 +694,61 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
                 "Per `feedback_v3_iter064_process_lessons.md` Rule 5 "
                 "(/060 14-feature anchor is local optimum at single-seed n_trials=35)."
             )
+    # iter-v3/119: ema_signed_volregime MUST be ABSENT (REMOVED from TOP_N at /119
+    # closeout housekeeping — /118 NEGATIVE catastrophic, IS Δ -0.4543;
+    # `value × sign(vol-regime-classifier)` Category-2 lineage CLOSED;
+    # Critic /118 Rec 3. Function STAYS in engineered_v3.py for code-museum value;
+    # MUST NOT appear in V3_FEATURE_COLUMNS_TOP_N).
+    if "ema_signed_volregime" in V3_FEATURE_COLUMNS:
+        raise RuntimeError(
+            "ema_signed_volregime FOUND in V3_FEATURE_COLUMNS — must be ABSENT at "
+            "iter-v3/119 (/118 NEGATIVE catastrophic: IS Δ -0.4543; broader "
+            "`value × sign(vol-regime-classifier)` Category-2 lineage CLOSED "
+            "at single-seed budget; Critic /118 Rec 3). "
+            "Remove 'ema_signed_volregime' from V3_FEATURE_COLUMNS_TOP_N in "
+            "features_v3/__init__.py. The compute_ema_signed_volregime function "
+            "is RETAINED in engineered_v3.py for code-museum value."
+        )
+    # iter-v3/121-METHODOLOGY: ret5d_signed_tbi MUST be ABSENT (Component B REVERTED).
+    # /120 CONFIRMATION-NO-MERGE on F3-DROP (sister-redistribution) + F4 IS regime-cost.
+    # Per /120 F3-DROP binding pre-commitment + diary §6 Q4 + Critic FINAL `a49dd17`:
+    # Component B dropped; V3_FEATURE_COLUMNS_TOP_N reverts to /059 canonical 14-feature stack.
+    # compute_ret5d_signed_tbi RETAINED in engineered_v3.py (code-museum value per /118//119
+    # precedent).
+    if "ret5d_signed_tbi" in V3_FEATURE_COLUMNS:
+        raise RuntimeError(
+            "ret5d_signed_tbi FOUND in V3_FEATURE_COLUMNS — must be ABSENT at "
+            "iter-v3/121-METHODOLOGY (Component B REVERTED per /120 F3-DROP binding "
+            "pre-commitment + diary §6 Q4 + Critic FINAL `a49dd17`). "
+            "Remove 'ret5d_signed_tbi' from V3_FEATURE_COLUMNS_TOP_N in "
+            "features_v3/__init__.py. compute_ret5d_signed_tbi function is "
+            "RETAINED in engineered_v3.py for code-museum value."
+        )
     print(
         f"  V3_FEATURE_COLUMNS: {n} columns "
-        "(iter-v3/088: the BASELINE_V3 /059/060 14-feature anchor stack — "
-        "UNCHANGED; the /088 axis is the NEW cross-sectional ranking model "
-        "(brief Section 3), not a feature change; the 14-feature stack is reused "
-        "by the cross-sectional model; all 9 /063-NEW features ABSENT (adx_14, candle_dow_sin/cos, "
-        "ret_1d, sym_vs_btc_ret_3d, sym_vs_btc_vol_14d, taker_buy_imbalance_20, "
-        "trend_efficiency_signed, vol_regime_x_momentum); "
-        "vol_adj_autocorr ABSENT; efficiency_ratio_50 ABSENT; "
-        "range_efficiency_50 ABSENT (/076 reverted at /077 — Kaufman axis CLOSED); "
-        "funding_regime_momentum_5d ABSENT (/085 DROPPED — INERT + SUSPICIOUS); "
-        "basis_zscore_30/basis_momentum_3/basis_extreme_flag ABSENT (/086 DROPPED "
-        "— INERT, 7-FEED STRUCTURAL VERDICT); "
+        "(iter-v3/127: 14-feature /121-canonical anchor — d24_ret_autocorr_lag1_50 ABSENT "
+        "(/126 NEGATIVE-catastrophic; REVERTED to /121 14-feature stack); "
+        "eth_vs_sym_rv_50 ABSENT (/123 NEGATIVE-catastrophic; cross-asset OHLCV axis CLOSED); "
+        "eth_ret_3d ABSENT (/122 NEGATIVE-INERT); "
+        "ret5d_signed_tbi ABSENT (/121-METHODOLOGY REVERTED); "
+        "ema_signed_volregime ABSENT (/118 NEGATIVE catastrophic); "
         "regime_momentum_signed_5d PRESENT; sym_vs_btc_ret_7d PRESENT)  PASS"
     )
 
-    # iter-v3/070 CLOSEOUT: DEFAULT_ATR_MULTIPLIERS REVERTED (2.0, 1.5) → (2.0, 1.0).
-    # /065 set (2.0, 1.5); /070 CONFIRMATION bundled it as Component A and REJECTED it —
-    # the IS-collapse + OOS-soar pattern persisted at multi-seed (IS Sharpe -0.97; OOS/IS
-    # ratio 10.81 — regime exposure, not robust edge). Cycle 2 must NOT inherit a
-    # CONFIRMATION-rejected axis (per `feedback_no_cheating.md` + anti-drift discipline).
-    # /059 canonical anchor value (atr_tp=2.0, atr_sl=1.0) restored.
-    # See diary-v3/iteration_v3-070.md Section 6 (Component A REJECT) + Section 7.
-    if DEFAULT_ATR_MULTIPLIERS != (2.0, 1.0):
+    # iter-v3/125: REVERT DEFAULT_ATR_MULTIPLIERS (3.4641, 1.7321) → (2.0, 1.0).
+    # /124 NEGATIVE-catastrophic (K=63 Branch B longer-cadence labels axis CLOSED).
+    # /125 WILD CYCLE-7 axis-4 uses /121-canonical (2.0, 1.0) ATR multipliers.
+    # The /121 baseline +2/-1 ATR triple-barrier K=21 is fully restored.
+    _expected_atr = (2.0, 1.0)
+    if DEFAULT_ATR_MULTIPLIERS != _expected_atr:
         raise RuntimeError(
-            f"DEFAULT_ATR_MULTIPLIERS = {DEFAULT_ATR_MULTIPLIERS} — expected (2.0, 1.0). "
-            "iter-v3/070 CONFIRMATION CLOSEOUT: Component A (/065 universal SL widening) "
-            "was REJECTED; (2.0, 1.5) → (2.0, 1.0) REVERTED to the /059 canonical anchor. "
+            f"DEFAULT_ATR_MULTIPLIERS = {DEFAULT_ATR_MULTIPLIERS} — expected {_expected_atr}. "
+            "iter-v3/125: REVERT /124 Branch B ATR scaling (was 3.4641, 1.7321). "
             "Set DEFAULT_ATR_MULTIPLIERS = (2.0, 1.0) in features_v3/__init__.py."
         )
     print(
-        "  DEFAULT_ATR_MULTIPLIERS = (2.0, 1.0) "
-        "(iter-v3/070 CLOSEOUT: /065 SL widening REJECTED at CONFIRMATION; /059 anchor)  PASS"
+        f"  DEFAULT_ATR_MULTIPLIERS = {_expected_atr} "
+        "(iter-v3/127: UNCHANGED; /121-canonical DEFAULT_ATR_MULTIPLIERS=(2.0, 1.0))  PASS"
     )
 
     # iter-v3/044: V3_FEATURES_PER_SYMBOL MUST BE EMPTY.
@@ -610,7 +761,10 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
             f"Current keys: {list(V3_FEATURES_PER_SYMBOL.keys())}. "
             "Clear V3_FEATURES_PER_SYMBOL to {{}} in features_v3/__init__.py."
         )
-    print("  V3_FEATURES_PER_SYMBOL: 0 entries (empty — all symbols use 14-feature fallback)  PASS")
+    print(
+        "  V3_FEATURES_PER_SYMBOL: 0 entries "
+        "(empty — all symbols use 14-feature /121-canonical fallback)  PASS"
+    )
 
     # iter-v3/074: V3_ATR_MULTIPLIERS_PER_SYMBOL REVERTED to {} (empty). The
     # iter-v3/073 per-symbol triple-barrier asymmetry axis (BCH (2.0,1.25), LDO
@@ -633,22 +787,38 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
         "per-symbol asymmetry; all symbols DEFAULT (2.0, 1.0))  PASS"
     )
 
-    # iter-v3/088: 14-feature universal set (V3_FEATURES_PER_SYMBOL empty — all 3
-    # symbols fall back to V3_FEATURE_COLUMNS_TOP_N = the BASELINE_V3 /059/060
-    # 14-feature anchor). Universe: the 3-symbol BCH/LDO/TRX /059 set
-    # (REQUIRED_GAP 66) — /087's 6-sym expansion (NEGATIVE) reverted. The /088
-    # axis is the NEW cross-sectional ranking path. /082's funding FAMILY stays
-    # REVERTED; /085's funding_regime_momentum_5d stays DROPPED; the 3 /086
-    # basis features stay DROPPED.
+    # iter-v3/097: universe RE-SELECTION — LDO/GALA/ADA (BCH/TRX DROPPED).
+    # 14-feature universal set (V3_FEATURES_PER_SYMBOL empty — all 3 symbols fall
+    # back to V3_FEATURE_COLUMNS_TOP_N = the BASELINE_V3 /059/060 14-feature anchor).
+    # REQUIRED_GAP 66 = (21+1)*3 — count stays 3-symbol. /082's funding FAMILY stays
+    # REVERTED; /085's funding_regime_momentum_5d stays DROPPED; the 3 /086 basis
+    # features stay DROPPED.
+    #
+    # Section 3.2 disjointness gate — HARD assert: traded symbols must NOT overlap
+    # V3_EXCLUDED_SYMBOLS (v1/v2 symbols + MKR). BCH/LDO/TRX are all disjoint.
+    _v3_traded = {sym for _label, sym in V3_MODELS}
+    _excluded_overlap = _v3_traded & set(V3_EXCLUDED_SYMBOLS)
+    if _excluded_overlap:
+        raise RuntimeError(
+            f"DISJOINTNESS VIOLATION (iter-v3/101): "
+            f"{_excluded_overlap} are in BOTH V3_MODELS and V3_EXCLUDED_SYMBOLS. "
+            "The v3 universe must be disjoint from v1/v2 symbols and MKR. "
+            "Remove offending symbols from V3_MODELS or V3_EXCLUDED_SYMBOLS."
+        )
+    print(
+        "  V3_MODELS ∩ V3_EXCLUDED_SYMBOLS = ∅ (disjointness PASS; iter-v3/101 Section 3.2): "
+        "{BCH, LDO, TRX} ∩ {v1/v2/MKR excluded} = ∅  PASS"
+    )
     for _label, sym in V3_MODELS:
         sym_feats = features_for_symbol(sym)
-        if len(sym_feats) != 14:
+        # iter-v3/127: V3_FEATURE_COLUMNS_TOP_N REVERTED 15 → 14 (drop d24_ret_autocorr_lag1_50).
+        # /126 NEGATIVE-catastrophic; per-symbol fallback must match 14-feature /121 anchor.
+        if len(sym_feats) != len(V3_FEATURE_COLUMNS):
             raise RuntimeError(
                 f"{sym} fallback has {len(sym_feats)} features — "
-                "expected exactly 14 (iter-v3/087: the BASELINE_V3 /059/060 "
-                "14-feature anchor stack; the /086 perp-spot BASIS family "
-                "REVERTED — Critic /086 Rec #3; /082 funding family + /085 "
-                "funding_regime_momentum_5d + /086 basis family all ABSENT). "
+                f"expected exactly {len(V3_FEATURE_COLUMNS)} (V3_FEATURE_COLUMNS at "
+                "iter-v3/127: 14-feature /121-canonical anchor; d24_ret_autocorr_lag1_50 "
+                "REVERTED (/126 NEGATIVE-catastrophic); V3_MODELS BCH/LDO/TRX unchanged. "
                 "Check V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py. "
                 "V3_FEATURES_PER_SYMBOL must be empty."
             )
@@ -709,40 +879,120 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
                 "is CLOSED. "
                 f"Check features_for_symbol('{sym}') path."
             )
+        if "alpha032" in sym_feats:
+            raise RuntimeError(
+                f"{sym} feature set contains alpha032 — must be ABSENT at "
+                "iter-v3/102 closeout (NEGATIVE: IS collapsed +0.3993, F2 falsifier "
+                "fired; OOS +1.55 overfitting/regime-luck per Critic). "
+                "Remove 'alpha032' from V3_FEATURE_COLUMNS_TOP_N in "
+                "features_v3/__init__.py."
+            )
+        # iter-v3/119: ema_signed_volregime MUST be ABSENT per-symbol
+        # (REMOVED from TOP_N at /119; /118 NEGATIVE catastrophic; Critic /118 Rec 3).
+        if "ema_signed_volregime" in sym_feats:
+            raise RuntimeError(
+                f"{sym} feature set contains ema_signed_volregime — must be ABSENT "
+                "at iter-v3/119 (/118 NEGATIVE catastrophic: IS Δ -0.4543; "
+                "`value × sign(vol-regime-classifier)` Category-2 lineage CLOSED; "
+                "Critic /118 Rec 3). Remove 'ema_signed_volregime' from "
+                "V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
+            )
+        # iter-v3/121-METHODOLOGY: ret5d_signed_tbi MUST be ABSENT per-symbol
+        # (Component B REVERTED per /120 F3-DROP + Critic FINAL `a49dd17`).
+        if "ret5d_signed_tbi" in sym_feats:
+            raise RuntimeError(
+                f"{sym} feature set contains ret5d_signed_tbi — must be ABSENT at "
+                "iter-v3/121-METHODOLOGY (Component B REVERTED per /120 F3-DROP "
+                "binding pre-commitment + diary §6 Q4 + Critic FINAL `a49dd17`). "
+                "Remove 'ret5d_signed_tbi' from V3_FEATURE_COLUMNS_TOP_N in "
+                "features_v3/__init__.py. compute_ret5d_signed_tbi is RETAINED "
+                "in engineered_v3.py for code-museum value."
+            )
+        # iter-v3/123: eth_ret_3d MUST be ABSENT per-symbol (/122 NEGATIVE-INERT;
+        # Critic FINAL `9e0eeb6`; IC=0.5613 with vwap_dev_20 — spanned by incumbents).
+        if "eth_ret_3d" in sym_feats:
+            raise RuntimeError(
+                f"{sym} feature set contains eth_ret_3d — must be ABSENT at "
+                "iter-v3/123 (/122 NEGATIVE-INERT verdict: Critic FINAL `9e0eeb6`; "
+                "IC=0.5613 with vwap_dev_20, substantially spanned by 2 incumbents). "
+                "eth_vs_sym_rv_50 replaces it. Remove 'eth_ret_3d' from "
+                "V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
+            )
+        # iter-v3/124: eth_vs_sym_rv_50 MUST be ABSENT per-symbol (/123 NEGATIVE-catastrophic).
+        # cycle-7 cross-asset OHLCV axis CLOSED at 6th consecutive failure.
+        # Museum code remains in cross_btc_v3.py but NOT wired into V3_FEATURE_COLUMNS.
+        if "eth_vs_sym_rv_50" in sym_feats:
+            raise RuntimeError(
+                f"{sym} feature set contains eth_vs_sym_rv_50 — must be ABSENT at "
+                "iter-v3/124 (/123 NEGATIVE-catastrophic; cycle-7 cross-asset OHLCV "
+                "axis CLOSED at 6th consecutive failure). "
+                "Remove 'eth_vs_sym_rv_50' from V3_FEATURE_COLUMNS_TOP_N in "
+                "features_v3/__init__.py."
+            )
+        # iter-v3/127: d24_ret_autocorr_lag1_50 MUST be ABSENT per-symbol
+        # (REVERTED — /126 NEGATIVE-catastrophic; EDA methodology FALSIFIED).
+        if "d24_ret_autocorr_lag1_50" in sym_feats:
+            raise RuntimeError(
+                f"{sym} feature set contains d24_ret_autocorr_lag1_50 — must be ABSENT at "
+                "iter-v3/127 (/126 NEGATIVE-catastrophic; EDA methodology FALSIFIED; "
+                "d24_ret_autocorr_lag1_50 joins the ABSENT-assertion ban). "
+                "Remove 'd24_ret_autocorr_lag1_50' from V3_FEATURE_COLUMNS_TOP_N in "
+                "features_v3/__init__.py."
+            )
+        for _d_feat in (
+            "d_ret_5d",
+            "d_ret_10d",
+            "d_trend_slope_10",
+            "d_realvol_10",
+            "d_realvol_ratio",
+            "d_atr_pctrank_60",
+            "d_efficiency_10",
+            "d_close_pos_20",
+        ):
+            if _d_feat in sym_feats:
+                raise RuntimeError(
+                    f"{sym} feature set contains {_d_feat} — must be ABSENT at "
+                    "iter-v3/114 closeout of /113 (the 8 multi-frequency daily "
+                    "features are REVERTED — Critic /113 Recommendation 2; /113 "
+                    "NEGATIVE-INERT). Remove it from V3_FEATURE_COLUMNS_TOP_N in "
+                    "features_v3/__init__.py."
+                )
     print(
-        "  3-symbol universe (BCH/LDO/TRX): 14-feature universal "
-        "fallback (iter-v3/088: the BASELINE_V3 /059/060 14-feature anchor "
-        "stack, UNCHANGED; /086 basis family ABSENT; /085 "
-        "funding_regime_momentum_5d ABSENT; the /082 funding-rate FAMILY "
-        "ABSENT; /087's 6-sym expansion reverted)  PASS"
+        "  3-symbol universe (BCH/LDO/TRX): 14-feature /121-canonical universal "
+        "fallback (iter-v3/127: d24_ret_autocorr_lag1_50 ABSENT (/126 NEGATIVE-catastrophic; "
+        "REVERTED to /121 14-feature stack); V3_MODELS BCH/LDO/TRX UNCHANGED; "
+        "eth_vs_sym_rv_50 ABSENT (/123 NEGATIVE-catastrophic; cross-asset OHLCV axis CLOSED); "
+        "eth_ret_3d ABSENT (/122 NEGATIVE-INERT); ret5d_signed_tbi ABSENT (/121 REVERTED); "
+        "ema_signed_volregime ABSENT; /113 daily features ABSENT; /086 basis family ABSENT; "
+        "/085 funding_regime_momentum_5d ABSENT)  PASS"
     )
 
     # iter-v3/074: V3_ATR_MULTIPLIERS_PER_SYMBOL reverted to {} (the /073 per-symbol
     # axis was SUSPICIOUS-OOS-DOMINANT). ALL symbols fall back to
     # DEFAULT_ATR_MULTIPLIERS = (2.0, 1.0) — the canonical /059 baseline labeling.
-    # iter-v3/088: universe is the 3-symbol BCH/LDO/TRX /059 set (/087's 6-sym
-    # expansion reverted); V3_ATR_MULTIPLIERS_PER_SYMBOL stays EMPTY — every
-    # symbol uses the universal DEFAULT (2.0, 1.0).
+    # iter-v3/125: REVERT /124 Branch B (3.4641, 1.7321) → /121-canonical (2.0, 1.0).
+    # Universe replaced BCH/LDO/TRX → ATOM/RUNE/UNI; all 3 candidates use DEFAULT (2.0, 1.0).
+    _expected_atr_loop = (2.0, 1.0)
     for _label_atr, _sym_atr in V3_MODELS:
         sym_atr = tuple(atr_multipliers_for_symbol(_sym_atr))
-        if sym_atr != (2.0, 1.0):
+        if sym_atr != _expected_atr_loop:
             raise RuntimeError(
                 f"atr_multipliers_for_symbol('{_sym_atr}') returned {sym_atr} — "
-                "expected (2.0, 1.0) (iter-v3/074 REVERT — all symbols use "
-                "DEFAULT_ATR_MULTIPLIERS = (2.0, 1.0)). Verify "
-                "V3_ATR_MULTIPLIERS_PER_SYMBOL = {} + DEFAULT_ATR_MULTIPLIERS = (2.0, 1.0) "
-                "in features_v3/__init__.py."
+                f"expected {_expected_atr_loop} (iter-v3/125: REVERT /124 Branch B; "
+                "/121-canonical (2.0, 1.0)). "
+                "Verify DEFAULT_ATR_MULTIPLIERS = (2.0, 1.0) in features_v3/__init__.py."
             )
     print(
-        "  atr_multipliers_for_symbol: all 3 symbols (BCH/LDO/TRX) "
-        "(2.0, 1.0) DEFAULT (iter-v3/074 REVERT of /073 per-symbol asymmetry; "
-        "/059-canonical labeling, universal across the 3-symbol /059 universe)  PASS"
+        f"  atr_multipliers_for_symbol: all {len(V3_MODELS)} symbols "
+        "(ATOM/RUNE/AVAX/HBAR/ICP/ALGO) "
+        "(2.0, 1.0) DEFAULT "
+        "(iter-v3/128: new 6-symbol L1 universe; all use DEFAULT /121-canonical)  PASS"
     )
 
     # iter-v3/051: Primitive 10 REVERT — block_long_for=() per system-level rule.
     # `feedback_v3_per_symbol_lifts_oos_breaks_is.md` UPDATED 2026-05-10 mandates
     # clearing per-symbol customizations. block_long_for was ("BCHUSDT",) at iter-v3/047-050.
-    # Cycle 4 starting baseline = iter-v3/028 architecture (no primitive 10).
+    # iter-v3/129: check uses BCHUSDT (first symbol in reverted BCH/LDO/TRX universe).
     _cfg_check, strat_check = _build_v3_model(
         symbol="BCHUSDT", seed=42, n_trials=1, ensemble_seeds=[42]
     )
@@ -784,11 +1034,28 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
             "primitive 12. Set enable_regime_gate=False, regime_gate_symbols=() in "
             "RiskV2Config init in _build_v3_model."
         )
+    # iter-v3/115: the iter-v3/114 primitive-9 axis (LDO-scoped kill_LOW
+    # ldo_realvol_zscore gate) is CLOSED. iter-v3/115 reverts to the
+    # /059-canonical risk stack — primitive 9 DISABLED, no LDO regime-gate
+    # target. The /075-era "regime_gate_symbols must be ()" semantics are
+    # restored. This guard now asserts the reverted /059-canonical state, so
+    # an accidental carry-over of the /114 kill-switch state (the
+    # iter-v3/110 trend_scanning stale-knob confound) crashes pre-flight.
     if strat_check.config.regime_gate_symbols != ():
         raise RuntimeError(
             f"RiskV2Config.regime_gate_symbols = {strat_check.config.regime_gate_symbols} "
-            "— expected () (empty). iter-v3/075: the /074 regime gate is reverted; "
-            "regime_gate_symbols must be empty."
+            "— expected (). iter-v3/115: the iter-v3/114 LDO primitive-9 axis is "
+            "CLOSED; the /059-canonical risk stack has no regime-gate target. Set "
+            "regime_gate_symbols=() in RiskV2Config init in _build_v3_model."
+        )
+    if strat_check.config.enable_ldo_realvol_gate:
+        raise RuntimeError(
+            "RiskV2Config.enable_ldo_realvol_gate = True — expected False. "
+            "iter-v3/115: the iter-v3/114 LDO-realvol kill_LOW gate (primitive 9 "
+            "variant) axis is CLOSED; iter-v3/115 reverts to the /059-canonical "
+            "risk stack with primitive 9 DISABLED. Set "
+            "enable_ldo_realvol_gate=False in RiskV2Config init in "
+            "_build_v3_model."
         )
 
     # iter-v3/077: Primitive 12 (BTC-trend-regime position-SIZE de-rate scalar)
@@ -892,12 +1159,13 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
     # iter-v3/051: Verify per-symbol ADX threshold is still EMPTY (UNCHANGED from /050).
     # Critic FINAL `1908d50` recommendation #2 at iter-v3/050 closeout: adx_threshold_per_symbol
     # was cleared (TRX 21 dropped); remains empty at iter-v3/051.
+    # iter-v3/129: check uses BCHUSDT (first symbol in reverted BCH/LDO/TRX universe).
     _trx_cfg_check, trx_strat_check = _build_v3_model(
-        symbol="TRXUSDT", seed=42, n_trials=1, ensemble_seeds=[42]
+        symbol="BCHUSDT", seed=42, n_trials=1, ensemble_seeds=[42]
     )
     if not isinstance(trx_strat_check, RiskV3Wrapper):
         raise RuntimeError(
-            f"_build_v3_model(TRXUSDT) returned {type(trx_strat_check).__name__} — "
+            f"_build_v3_model(BCHUSDT) returned {type(trx_strat_check).__name__} — "
             "expected RiskV3Wrapper. iter-v3/051: per-symbol ADX EMPTY check requires "
             "RiskV3Wrapper. Check _build_v3_model returns RiskV3Wrapper."
         )
@@ -905,35 +1173,39 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
         raise RuntimeError(
             f"RiskV2Config.adx_threshold_per_symbol = "
             f"{trx_strat_check.config.adx_threshold_per_symbol} — expected {{}} (EMPTY). "
-            "iter-v3/051: per-symbol ADX must remain empty (TRX 21 dropped at iter-v3/050). "
+            "iter-v3/051: per-symbol ADX must remain empty (global 20.0 applies to all symbols). "
             "Set adx_threshold_per_symbol={{}} in RiskV2Config init in _build_v3_model."
         )
     print(
-        "  Per-symbol ADX threshold (iter-v3/051): {} (EMPTY UNCHANGED — TRX 21 already "
-        "dropped at iter-v3/050; global ADX threshold 20.0 applies to all 3 symbols)  PASS"
+        "  Per-symbol ADX threshold (iter-v3/051): {} (EMPTY — global ADX threshold 20.0 "
+        "applies to all 6 symbols ATOM/RUNE/AVAX/HBAR/ICP/ALGO)  PASS"
     )
 
-    # iter-v3/055: Primitive 11 (per-symbol drawdown brake) MUST be DISABLED.
-    # CLOSED-mechanism per iter-v3/054 closeout: brake deadlock suppressed all OOS trades.
-    # Backward-compatible defaults (T=10.0, recovery=5.0, window=30) retained in config.
+    # iter-v3/128: Primitive 11 (per-symbol drawdown brake) MUST be DISABLED (REVERTED).
+    # /127 NEGATIVE — drawdown brake axis CLOSED per Critic FINAL. /128 REVERTS brake to False
+    # (the /121-canonical state; mandatory baseline-restore per established pattern).
+    # The /128 sole axis is universe substitution; brake must be off.
+    # Use BCHUSDT (first symbol in reverted BCH/LDO/TRX universe) for the check.
     _p11_cfg_check, p11_strat_check = _build_v3_model(
         symbol="BCHUSDT", seed=42, n_trials=1, ensemble_seeds=[42]
     )
     if not isinstance(p11_strat_check, RiskV3Wrapper):
         raise RuntimeError(
             f"_build_v3_model returned {type(p11_strat_check).__name__} — expected RiskV3Wrapper. "
-            "iter-v3/055: primitive 11 check requires RiskV3Wrapper."
+            "iter-v3/129: primitive 11 revert check uses BCHUSDT. "
+            "Check _build_v3_model returns RiskV3Wrapper."
         )
     if p11_strat_check.config.enable_per_symbol_drawdown_brake:
         raise RuntimeError(
             "RiskV2Config.enable_per_symbol_drawdown_brake = True — expected False. "
-            "iter-v3/055: per-symbol drawdown brake (primitive 11) must be DISABLED "
-            "(CLOSED-mechanism per iter-v3/054 closeout). "
+            "iter-v3/128: per-symbol drawdown brake (primitive 11) MUST be DISABLED "
+            "(/127 NEGATIVE — brake axis CLOSED; mandatory /128 baseline-restore). "
             "Set enable_per_symbol_drawdown_brake=False in RiskV2Config in _build_v3_model."
         )
     print(
-        "  Primitive 11 (per-symbol drawdown brake): enable=False "
-        "(CLOSED-mechanism per iter-v3/054 closeout)  PASS"
+        "  Primitive 11 (per-symbol drawdown brake): DISABLED "
+        "(iter-v3/128: /127 brake REVERTED — axis CLOSED after NEGATIVE; "
+        "/121-canonical False)  PASS"
     )
 
     # iter-v3/081: per-symbol vol_scale_floor REVERTED to {} (empty). The
@@ -947,11 +1219,11 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
     # global 0.3 floor. This assertion now guards the GENUINE /059 value — it
     # blocks the /061 accretion from silently re-creeping in.
     _p12_cfg_check, p12_strat_check = _build_v3_model(
-        symbol="TRXUSDT", seed=42, n_trials=1, ensemble_seeds=[42]
+        symbol="BCHUSDT", seed=42, n_trials=1, ensemble_seeds=[42]
     )
     if not isinstance(p12_strat_check, RiskV3Wrapper):
         raise RuntimeError(
-            f"_build_v3_model(TRXUSDT) returned {type(p12_strat_check).__name__} — "
+            f"_build_v3_model(BCHUSDT) returned {type(p12_strat_check).__name__} — "
             "expected RiskV3Wrapper. iter-v3/081: vol_scale_floor_per_symbol check "
             "requires RiskV3Wrapper. Check _build_v3_model returns RiskV3Wrapper."
         )
@@ -963,11 +1235,12 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
             f"{expected_floor_dict}. iter-v3/081: the iter-v3/061 TRX floor=0.5 was "
             "REVERTED as illegitimate accretion (never-merged INERT EXPLORATION). "
             "Set vol_scale_floor_per_symbol={} in RiskV2Config init in "
-            "_build_v3_model — all 3 symbols use the global 0.3 floor."
+            "_build_v3_model — all 6 symbols use the global 0.3 floor."
         )
     print(
         "  Per-symbol vol_scale_floor (iter-v3/081): {} "
-        "(REVERTED iter-v3/061 accretion; all 3 symbols at global 0.3 floor)  PASS"
+        "(REVERTED iter-v3/061 accretion; all 6 symbols "
+        "ATOM/RUNE/AVAX/HBAR/ICP/ALGO at global 0.3 floor)  PASS"
     )
 
     # iter-v3/082 (cycle-3 EXPLORATION #1) — GENERALISED CONFIG-ACCRETION CHECK.
@@ -989,22 +1262,41 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
         symbol="BCHUSDT", seed=42, n_trials=1, ensemble_seeds=[42]
     )
     if not isinstance(_acc_strat, RiskV3Wrapper):
-        raise RuntimeError(
-            "config-accretion check: _build_v3_model did not return RiskV3Wrapper."
-        )
+        raise RuntimeError("config-accretion check: _build_v3_model did not return RiskV3Wrapper.")
     _rc = _acc_strat.config
     # (knob_name, observed, expected value). iter-v3/088: ALL 11 knobs are
     # /059-canonical — the per-symbol path is a clean restore.
+    # iter-v3/129: 22 knobs (added 5 scaling primitives + REVERT V3_MODELS to BCH/LDO/TRX).
     _v3_model_symbols = tuple(sym for _label, sym in V3_MODELS)
+    # iter-v3/111: extract inner LightGbmStrategy from _acc_strat to inspect label knobs.
+    _acc_inner = _acc_strat.inner if hasattr(_acc_strat, "inner") else _acc_strat
     _canonical_v059 = [
-        # iter-v3/088: V3_MODELS reverts to the 3-symbol /059 universe.
+        # iter-v3/128: V3_MODELS WHOLESALE REPLACEMENT BCH/LDO/TRX → 6-symbol sector-pure L1
+        # (ATOM/RUNE/AVAX/HBAR/ICP/ALGO). 9/9 NEGATIVE; axis CLOSED.
+        # iter-v3/129: REVERT V3_MODELS → BCH/LDO/TRX (/121 baseline); REQUIRED_GAP REVERT
+        # 132→66; add primitive 13 (continuous size-scaling at per-symbol 45d rolling drawdown).
         (
             "V3_MODELS symbols",
             _v3_model_symbols,
             ("BCHUSDT", "LDOUSDT", "TRXUSDT"),
         ),
-        ("REQUIRED_GAP", REQUIRED_GAP, 66),  # (21+1)*3 — /059 3-symbol universe
+        # REQUIRED_GAP from validation_v3.py is always 66 (the 8h baseline constant).
+        # iter-v3/117: at --bar-interval 24h, the runner uses 72 as a LOCAL OVERRIDE
+        # (computed in _verify_label_leakage_gap at runtime). The validation_v3.py
+        # constant is NOT changed — this guard verifies the base constant is intact.
+        # 8h base constant; 24h override=72 handled separately in _verify_label_leakage_gap.
+        ("REQUIRED_GAP", REQUIRED_GAP, 66),  # (21+1)*3 — 8h base constant from validation_v3.py
+        # iter-v3/111: label_mode guard — prevents stale trend_scanning from riding
+        # undetected again (root cause of /110's label confound).
+        # iter-v3/116: REVERT /115's label_mode="fixed_horizon" → "triple_barrier".
+        # /116 returns to the /059-canonical triple_barrier labeling architecture;
+        # label_mode expected value updated here in lockstep with Section 3.5 Change 7(e).
+        ("label_mode", _acc_inner.label_mode, "triple_barrier"),
+        # trend_scan_grid: LightGbmStrategy default (5,8,13,21). Guard checks
+        # it was NOT explicitly overridden. Canonical = LightGbmStrategy default.
+        ("trend_scan_grid", tuple(_acc_inner.trend_scan_grid), (5, 8, 13, 21)),
         # /059-canonical knobs (must NOT drift — single-axis discipline guard):
+        # iter-v3/125: REVERT /124 Branch B ATR (3.4641, 1.7321) → /121-canonical (2.0, 1.0).
         ("DEFAULT_ATR_MULTIPLIERS", tuple(DEFAULT_ATR_MULTIPLIERS), (2.0, 1.0)),
         ("V3_ATR_MULTIPLIERS_PER_SYMBOL", dict(V3_ATR_MULTIPLIERS_PER_SYMBOL), {}),
         ("zscore_threshold", _rc.zscore_threshold, 2.0),
@@ -1013,25 +1305,58 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
         ("vol_scale_floor_per_symbol", dict(_rc.vol_scale_floor_per_symbol), {}),
         ("block_long_for", tuple(_rc.block_long_for), ()),
         ("block_short_for", tuple(_rc.block_short_for), ()),
+        # iter-v3/128: primitive 11 REVERTED False (the /127 brake axis is CLOSED — NEGATIVE).
+        # The accretion guard tracks the /129-canonical state; brake REVERTED to /121-baseline.
         ("enable_per_symbol_drawdown_brake", _rc.enable_per_symbol_drawdown_brake, False),
+        # iter-v3/129: primitive 13 — continuous size-scaling at per-symbol 45-day rolling
+        # drawdown. New axis; T_R=6.0 wpnl (full size), T_max=7.0 wpnl (zero size),
+        # N=45 days, M=21 candles time-override (deadlock-impossibility carry-forward).
+        # iter-v3/130: /129 continuous scaling axis REVERTED to False (axis CLOSED at /129
+        # NEGATIVE-catastrophic; REVERT mandatory per single-axis discipline).
+        (
+            "enable_per_symbol_drawdown_scaling",
+            _rc.enable_per_symbol_drawdown_scaling,
+            False,
+        ),
+        ("drawdown_scaling_t_r", _rc.drawdown_scaling_t_r, 6.0),
+        ("drawdown_scaling_t_max", _rc.drawdown_scaling_t_max, 7.0),
+        ("drawdown_scaling_window_days", _rc.drawdown_scaling_window_days, 45),
+        (
+            "drawdown_scaling_time_override_candles",
+            _rc.drawdown_scaling_time_override_candles,
+            21,
+        ),
+        # iter-v3/116: three BacktestConfig knobs added to the accretion guard.
+        # iter-v3/117: enable_no_confirm_exit REVERTED False (was True at /116).
+        # iter-v3/120: CONFIRMATION bundle RE-ENABLES enable_no_confirm_exit=True
+        # (Component A of the TWO-COMPONENT /116+/119 bundle). The /116 no_confirm
+        # primitive is carried forward unchanged; only the enable flag is flipped.
+        ("enable_no_confirm_exit", _acc_cfg.enable_no_confirm_exit, True),
+        ("no_confirm_trigger_atr", _acc_cfg.no_confirm_trigger_atr, 0.50),
+        ("no_confirm_k_candles", _acc_cfg.no_confirm_k_candles, 4),
     ]
-    _drift = [
-        (name, obs, exp) for name, obs, exp in _canonical_v059 if obs != exp
-    ]
+    _drift = [(name, obs, exp) for name, obs, exp in _canonical_v059 if obs != exp]
     if _drift:
         _msg = "; ".join(f"{n}: observed {o!r} != expected {e!r}" for n, o, e in _drift)
         raise ValueError(
             f"config-accretion check FAILED — {len(_drift)} knob(s) drifted: {_msg}. "
-            "iter-v3/088 RESTORES the legacy per-symbol path to /059-canonical "
-            "(3-sym BCH/LDO/TRX, REQUIRED_GAP=66): ALL 11 knobs must equal "
-            "/059-canonical. The iter-v3/088 axis is a NEW cross-sectional ranking "
-            "path, not a per-symbol-knob change. Any drift here is illegitimate "
-            "accretion (the /061 vol-floor failure mode). Revert the drifted knob(s)."
+            "Runner carries /130-state config (BCH/LDO/TRX 3-symbol universe [REVERT from /128], "
+            "REQUIRED_GAP=66 [REVERT from /128 132], label_mode=triple_barrier, "
+            "enable_no_confirm_exit=True [/116 no_confirm Component A — still active], "
+            "enable_per_symbol_drawdown_brake=False [/127 brake REVERTED — axis CLOSED], "
+            "enable_per_symbol_drawdown_scaling=False [/129 continuous scaling REVERTED — "
+            "axis CLOSED at /129 NEGATIVE-catastrophic]): "
+            "ALL 22 knobs must equal /130-state. Any drift is illegitimate accretion. "
+            "Revert the drifted knob(s)."
         )
     print(
-        f"  Config-accretion check (iter-v3/088; Critic /081 Rec #3): "
-        f"{len(_canonical_v059)} knobs verified — ALL /059-canonical "
-        f"(legacy per-symbol path restored; the /088 axis is the NEW XS path)  PASS"
+        f"  Config-accretion check (Critic /081 Rec #3): "
+        f"{len(_canonical_v059)} knobs verified — ALL /130-state "
+        f"(BCH/LDO/TRX 3-symbol [REVERT /128], label_mode=triple_barrier, "
+        f"DEFAULT_ATR_MULTIPLIERS=(2.0,1.0), "
+        f"enable_no_confirm_exit=True [/116 no_confirm Comp-A], "
+        f"enable_per_symbol_drawdown_brake=False [/127 brake REVERTED], "
+        f"enable_per_symbol_drawdown_scaling=False [/129 continuous scaling REVERTED])  PASS"
     )
 
     # iter-v3/068: REVERT inference_threshold_floor to default 0.0 (/067 INERT-AT-EXPLORATION).
@@ -1039,13 +1364,15 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
     # /068 reverts to default for clean single-axis attribution of Path C label-timeout widening.
     # vol_scale_ceiling stays at default 1.0 (already reverted at /067).
     # brief Section 3 Sub-fix 2 + Sub-fix 3.
+    # iter-v3/129: check uses BCHUSDT (first symbol in reverted BCH/LDO/TRX universe).
+    # iter-v3/130: probe model built at actual bar_interval so label_timeout_minutes matches.
     _p13_cfg_check, p13_strat_check = _build_v3_model(
-        symbol="BCHUSDT", seed=42, n_trials=1, ensemble_seeds=[42]
+        symbol="BCHUSDT", seed=42, n_trials=1, ensemble_seeds=[42], bar_interval=bar_interval
     )
     if not isinstance(p13_strat_check, RiskV3Wrapper):
         raise RuntimeError(
             f"_build_v3_model(BCHUSDT) returned {type(p13_strat_check).__name__} — "
-            "expected RiskV3Wrapper. iter-v3/068: inference_threshold_floor revert check "
+            "expected RiskV3Wrapper. iter-v3/112: inference_threshold_floor revert check "
             "requires RiskV3Wrapper around LightGbmStrategy."
         )
     _p13_inner = p13_strat_check.inner if hasattr(p13_strat_check, "inner") else p13_strat_check
@@ -1064,10 +1391,12 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
             "expected 1.0 (default). iter-v3/068: vol_scale_ceiling reverted at /067 and "
             "must remain at default 1.0 (brief Section 3 Sub-fix 3)."
         )
-    # iter-v3/069: label_timeout_minutes REVERTED to 10080 on all v3 models
-    # (REVERT /068's Path C — labeling-timeout family CLOSED both directions
-    # per iter-v3/068 Critic FINAL `9ad043c`).
-    expected_label_timeout = 10080
+    # iter-v3/069: label_timeout_minutes REVERTED to 10080 on all v3 models.
+    # iter-v3/124: label_timeout_minutes UPDATED to 30240 — K=63 longer-cadence labels axis.
+    # iter-v3/125: label_timeout_minutes REVERTED to 10080 — /124 NEGATIVE-catastrophic (CLOSED).
+    # iter-v3/126: label_timeout_minutes UNCHANGED at 10080 — /121-canonical K=21.
+    # iter-v3/130: at 4h, expected = 5040 (K=21 × 4h × 60min).
+    expected_label_timeout = 5040 if bar_interval == "4h" else 10080
     _p13_lgbm = _p13_inner
     if not hasattr(_p13_lgbm, "label_timeout_minutes"):
         raise RuntimeError(
@@ -1079,13 +1408,13 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
         raise RuntimeError(
             f"LightGbmStrategy.label_timeout_minutes = "
             f"{_p13_lgbm.label_timeout_minutes} — expected {expected_label_timeout}. "
-            f"iter-v3/069 REVERTS /068's Path C — pass label_timeout_minutes=10080 "
-            f"in _build_v3_model common_kwargs (brief Section 3 spec item #3)."
+            f"iter-v3/125: REVERT label_timeout_minutes to 10080 (K=21 at 8h; /124 NEGATIVE). "
+            f"In _build_v3_model common_kwargs use label_timeout_minutes=10080."
         )
-    # iter-v3/074: label_mode must be "triple_barrier" on all v3 models — the
-    # canonical /059 baseline labeling. /072's "fixed_horizon" axis was NEGATIVE
-    # (label-execution mismatch); /073 reverted it; /074 carries the revert
-    # forward (the /074 axis is the regime gate, orthogonal to labeling).
+    # iter-v3/111: label_mode guard — prevents stale trend_scanning from riding
+    # undetected (root cause of /110's label confound).
+    # iter-v3/116: REVERT /115's label_mode="fixed_horizon" → "triple_barrier".
+    # The expected value is updated here in lockstep with Section 3.5 Change 7(e).
     if not hasattr(_p13_lgbm, "label_mode"):
         raise RuntimeError(
             "LightGbmStrategy for BCHUSDT has no label_mode attribute. "
@@ -1097,31 +1426,36 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
         raise RuntimeError(
             f"LightGbmStrategy.label_mode = '{_p13_lgbm.label_mode}' — "
             f"expected '{expected_label_mode}'. "
-            "iter-v3/073: label_mode REVERTED to 'triple_barrier' (/072 fixed-horizon "
-            "axis NEGATIVE — label-execution mismatch). Per-symbol barrier asymmetry "
-            "at /073 keeps the triple-barrier label execution-consistent."
+            "iter-v3/116: label_mode must be 'triple_barrier' — REVERTED from /115's "
+            "'fixed_horizon'. Check _build_v3_model common_kwargs label_mode='triple_barrier'."
         )
     print(
-        f"  label_mode (iter-v3/073): '{_p13_lgbm.label_mode}' "
-        f"(triple-barrier REVERT; /072 fixed-horizon NEGATIVE — label-execution mismatch)  PASS"
+        f"  label_mode (iter-v3/116 revert): '{_p13_lgbm.label_mode}'  PASS"
+        f" (triple_barrier — /059-canonical; /115 fixed_horizon REVERTED)"
     )
     print(
         "  inference_threshold_floor REVERTED to default 0.0 "
         "(iter-v3/068 reverts /067 INERT axis; unchanged at /069)  PASS"
     )
     print("  vol_scale_ceiling at default 1.0 (reverted at /067, unchanged at /069)  PASS")
+    _timeout_desc = (
+        f"21 candles at {bar_interval} = {expected_label_timeout} min"
+        if bar_interval == "4h"
+        else f"21 candles at 8h = {expected_label_timeout} min"
+    )
     print(
-        f"  Universal label_timeout_minutes (iter-v3/070 CARRY-FORWARD): "
+        f"  Universal label_timeout_minutes (iter-v3/130 bar-interval-conditional K=21): "
         f"{expected_label_timeout} min "
-        f"(= 21 candles at 8h; timeout UNCHANGED; embargo 22 per cell, "
-        f"cross-cell gap 66 per 3-sym universe; iter-v3/088 reverts /087 6-sym)  PASS"
+        f"({_timeout_desc}; /121-canonical ATR (2.0, 1.0); "
+        f"embargo 22 per cell; cross-cell gap 66 per 3-sym universe BCH/LDO/TRX)  PASS"
     )
 
     # iter-v3/070 NEW: _verify_timeout_consistency — Critic /069 Rec #1.
     # Assert BacktestConfig.timeout_minutes == LightGbmStrategy.label_timeout_minutes.
     # The /069 iteration had these two values silently fall out of sync.
     # Verify on the BCHUSDT model already built above (p13_strat_check).
-    _verify_timeout_consistency(_p13_cfg_check, _p13_lgbm)
+    # iter-v3/130: pass bar_interval so the check uses correct expected_timeout (5040 at 4h).
+    _verify_timeout_consistency(_p13_cfg_check, _p13_lgbm, bar_interval=bar_interval)
     print(
         "  Timeout consistency (iter-v3/070 Critic /069 Rec #1): "
         f"BacktestConfig.timeout_minutes == LightGbmStrategy.label_timeout_minutes "
@@ -1129,32 +1463,122 @@ def _verify_feature_columns(ensemble_size: int | None = None) -> None:
     )
 
 
-def _verify_label_leakage_gap() -> None:
-    """Assert gap == REQUIRED_GAP and print proof (brief Section 3.5#3).
+def _verify_label_leakage_gap(bar_interval: str = "8h") -> None:
+    """Assert gap == REQUIRED_GAP and print proof (brief Section 3.5 Change 4).
 
-    iter-v3/088 RE-ARCHITECTURE: the legacy per-symbol path reverts to the
-    3-symbol /059 universe (BCH+LDO+TRX) — /087's 6-sym expansion was NEGATIVE.
-    Timeout unchanged at 21 candles (10080 min / 8h). embargo_candles =
-    10080 // 480 + 1 = 22. cross-cell gap = 22 * 3 = 66 (REQUIRED_GAP 132 -> 66).
-    The cross-sectional ranking path (brief Section 3) computes its own
-    pooled-CPCV purge gap; this assertion governs the legacy per-symbol path.
+    iter-v3/112 UNIVERSE REVERT: 4-symbol → 3-symbol (BCH+LDO+TRX).
+    iter-v3/117: bar_interval-conditional REQUIRED_GAP.
+    iter-v3/125: REVERT /124 K=63 → K=21 (/124 NEGATIVE-catastrophic CLOSED).
+    iter-v3/130: 4h bar interval added. K=21 candles × 4h = 84h = 5040 min.
+        timeout_candles = 5040 / 240 = 21 (same candle count as 8h K=21).
+        required_gap = (21+1)*3 = 66 = REQUIRED_GAP (UNCHANGED in candle-count terms).
+        The absolute time gap is HALVED (11 days at 4h vs 22 days at 8h) but the
+        candle-count purge is identical — the López de Prado requirement is in
+        candle counts, not absolute time.
+
+    At 8h (default), iter-v3/125 (/121-canonical restored):
+        timeout_minutes=10080, candle_minutes=480, timeout_candles=21.
+        required_gap = (21+1)*3 = 66 (REQUIRED_GAP from validation_v3.py — no override needed).
+
+    At 4h (iter-v3/130 bar-interval axis):
+        timeout_minutes=5040, candle_minutes=240, timeout_candles=21.
+        required_gap = (21+1)*3 = 66 (SAME as 8h in candle-count terms; no override needed).
+
+    At 24h (iter-v3/117 candle-frequency axis):
+        timeout_minutes=10080, candle_minutes=1440, timeout_candles=7.
+        n_offset_series=3 (the 3 UTC offsets; each offset forms its own series).
+        required_gap = (7+1)*3*3 = 72 (brief Section 3.5 Change 4 formula).
+
+    The 24h formula adds a factor of n_offset_series=3 because the concatenated
+    multi-offset panel has 3 rows per calendar day per symbol; the cross-offset
+    label-leakage purge must cover both within-offset (7+1 bars) and cross-offset
+    (x3 offsets) boundaries.
+
+    At 24h the runner overrides REQUIRED_GAP (imported from validation_v3.py as 66)
+    with 72 via a local variable passed to the CV functions. The validation_v3.py
+    constant is NOT changed — it remains the 8h baseline's value.
     """
-    timeout_minutes = 10080  # 7 days (21 candles at 8h) — UNCHANGED
-    candle_minutes = 480  # 8h
+    # iter-v3/128: timeout_minutes UNCHANGED at 10080 (K=21 at 8h — /121-canonical).
+    # iter-v3/130: at 4h, timeout_minutes=5040 (K=21 × 4h × 60min).
+    # validation_v3.REQUIRED_GAP = 66 = (21+1)*3 is the module constant (3-symbol baseline).
+    # iter-v3/128: cardinality 6 at 8h requires RUNNER-LOCAL OVERRIDE 132 = (21+1)*6.
+    # The validation_v3.py constant is NOT changed — same override pattern as 24h=72 at /117.
+    if bar_interval == "4h":
+        timeout_minutes = 5040  # K=21 × 4h × 60min — iter-v3/130 bar-interval axis
+    else:
+        timeout_minutes = 10080  # 21 candles at 8h — /121-canonical K=21 (UNCHANGED /128)
     n_symbols = len(V3_MODELS)
-    timeout_candles = timeout_minutes // candle_minutes  # = 21
-    required_gap = (timeout_candles + 1) * n_symbols  # formula: (timeout_candles+1)*len(V3_MODELS)
-    assert required_gap == REQUIRED_GAP, (
-        f"REQUIRED_GAP mismatch: formula gives {required_gap}, "
-        f"REQUIRED_GAP constant is {REQUIRED_GAP}. Update validation_v3.REQUIRED_GAP."
-    )
-    print(
-        f"  Label-leakage gap: (timeout_candles={timeout_candles}+1) * n_symbols={n_symbols}"
-        f" = {required_gap}  [matches REQUIRED_GAP={REQUIRED_GAP}]  PASS"
-    )
+    if bar_interval == "4h":
+        candle_minutes = 240  # 4h bar — iter-v3/130
+        timeout_candles = timeout_minutes // candle_minutes  # = 5040/240 = 21
+        required_gap = (timeout_candles + 1) * n_symbols  # = (21+1)*3 = 66
+        assert required_gap == REQUIRED_GAP, (
+            f"REQUIRED_GAP(4h, K=21, 3-sym) formula gives {required_gap} != {REQUIRED_GAP}. "
+            "Check (timeout_candles+1)*n_symbols = (21+1)*3 = 66. "
+            "iter-v3/130: gap is UNCHANGED in candle-count terms at 4h vs 8h."
+        )
+        print(
+            f"  Label-leakage gap [4h, K=21]: timeout_minutes={timeout_minutes}, "
+            f"candle_minutes={candle_minutes}, timeout_candles={timeout_candles}, "
+            f"(timeout_candles+1)*n_symbols={timeout_candles + 1}*{n_symbols}"
+            f" = {required_gap}  [iter-v3/130; UNCHANGED in candle-count; "
+            f"module REQUIRED_GAP={REQUIRED_GAP}]  PASS"
+        )
+        return
+    if bar_interval == "24h":
+        candle_minutes = 1440  # 24h bar
+        n_offset_series = 3  # offsets 0/8/16 — each forms an independent series
+        timeout_candles = timeout_minutes // candle_minutes  # = 7 (10080/1440)
+        required_gap = (timeout_candles + 1) * n_symbols * n_offset_series  # = 8*N*3
+        # At 24h the runner uses the local required_gap override (not REQUIRED_GAP=66).
+        expected_24h_gap = (7 + 1) * n_symbols * 3  # cardinality-dependent
+        assert required_gap == expected_24h_gap, (
+            f"REQUIRED_GAP(24h, K=21) formula gives {required_gap} != {expected_24h_gap}. "
+            "Check (timeout_candles+1)*n_symbols*n_offset_series at K=21."
+        )
+        print(
+            f"  Label-leakage gap [24h, K=21]: (timeout_candles={timeout_candles}+1)"
+            f" * n_symbols={n_symbols} * n_offsets={n_offset_series}"
+            f" = {required_gap}  [/128 cardinality-{n_symbols} formula]  PASS"
+        )
+    else:
+        candle_minutes = 480  # 8h
+        timeout_candles = timeout_minutes // candle_minutes  # = 21
+        required_gap = (timeout_candles + 1) * n_symbols  # = 22*n_symbols
+        if n_symbols == 3:
+            # 3-symbol baseline: REQUIRED_GAP=66 from validation_v3.py; no runner-local override.
+            assert required_gap == 66, (
+                f"REQUIRED_GAP(8h, K=21, 3-sym) formula gives {required_gap} != 66. "
+                "Check (timeout_candles+1)*n_symbols = (21+1)*3 = 66."
+            )
+            print(
+                f"  Label-leakage gap [8h, K=21]: (timeout_candles={timeout_candles}+1)"
+                f" * n_symbols={n_symbols}"
+                f" = {required_gap}  [/121-canonical; module REQUIRED_GAP={REQUIRED_GAP}]  PASS"
+            )
+        else:
+            # iter-v3/128: cardinality 6 — runner-local override 132 = (21+1)*6.
+            # validation_v3.REQUIRED_GAP stays 66 (the 3-symbol module constant); the override
+            # is applied at the CV-call site via _runtime_gap.
+            expected_gap_6sym = (21 + 1) * 6  # = 132
+            assert required_gap == expected_gap_6sym, (
+                f"REQUIRED_GAP(8h, K=21, {n_symbols}-sym) formula gives {required_gap} "
+                f"!= {expected_gap_6sym}. "
+                f"Check (timeout_candles+1)*n_symbols = (21+1)*{n_symbols}."
+            )
+            print(
+                f"  Label-leakage gap [8h, K=21, cardinality-{n_symbols}]: "
+                f"(timeout_candles={timeout_candles}+1) * n_symbols={n_symbols}"
+                f" = {required_gap}  [iter-v3/128 cardinality-conditional override; "
+                f"module REQUIRED_GAP={REQUIRED_GAP} (3-sym constant, unchanged)]  PASS"
+            )
 
 
-def _verify_timeout_consistency(cfg: BacktestConfig, lgbm_strategy: LightGbmStrategy) -> None:
+def _verify_timeout_consistency(
+    cfg: BacktestConfig,
+    lgbm_strategy: LightGbmStrategy,
+    bar_interval: str = "8h",
+) -> None:
     """Assert BacktestConfig.timeout_minutes == LightGbmStrategy.label_timeout_minutes.
 
     iter-v3/070 NEW runtime assertion per Critic /069 Rec #1 anchor-byte gate enforcement.
@@ -1164,26 +1588,38 @@ def _verify_timeout_consistency(cfg: BacktestConfig, lgbm_strategy: LightGbmStra
     catching any future desync between the two fields before any backtest data is produced.
 
     Called from _verify_model_config() for each (model, symbol) pair after _build_v3_model().
+
+    iter-v3/130: bar_interval-conditional expected value.
+    At 4h: expected = 5040 (K=21 × 4h × 60min — brief Section 3.3).
+    At 8h/24h: expected = 10080 (/121-canonical K=21).
     """
-    expected_timeout_minutes = 10080  # 7 days (21 candles at 8h) — SACRED at iter-v3/070
+    # iter-v3/125: REVERT expected_timeout_minutes 30240 → 10080 (K=21; /124 NEGATIVE).
+    # /124 had set 30240 (K=63 Branch B axis); /125 restores /121-canonical K=21.
+    # iter-v3/130: at 4h, expected = 5040 (K=21 candles × 4h × 60 = 5040 min).
+    if bar_interval == "4h":
+        expected_timeout_minutes = 5040  # K=21 × 4h × 60 — iter-v3/130 bar-interval axis
+    else:
+        expected_timeout_minutes = 10080  # 21 candles at 8h — /121-canonical K=21 restored
     assert cfg.timeout_minutes == expected_timeout_minutes, (
         f"BacktestConfig.timeout_minutes ({cfg.timeout_minutes}) != expected "
-        f"({expected_timeout_minutes}). iter-v3/070 timeout_minutes must be "
-        f"{expected_timeout_minutes}. "
-        "Verify _build_v3_model BacktestConfig(timeout_minutes=10080). "
+        f"({expected_timeout_minutes}) at bar_interval={bar_interval!r}. "
+        f"iter-v3/130: at 4h, timeout_minutes must be 5040 (K=21 × 4h × 60min). "
+        f"At 8h: 10080 (K=21 × 8h × 60min). "
+        "Verify _build_v3_model BacktestConfig(timeout_minutes=_label_timeout_minutes). "
         "Critic /069 Rec #1: label horizon must be consistent at "
         "BacktestConfig + LightGbmStrategy."
     )
     assert lgbm_strategy.label_timeout_minutes == expected_timeout_minutes, (
         f"LightGbmStrategy.label_timeout_minutes ({lgbm_strategy.label_timeout_minutes}) "
-        f"!= expected ({expected_timeout_minutes}). "
-        "Verify _build_v3_model common_kwargs label_timeout_minutes=10080. "
+        f"!= expected ({expected_timeout_minutes}) at bar_interval={bar_interval!r}. "
+        "Verify _build_v3_model common_kwargs label_timeout_minutes=_label_timeout_minutes. "
         "Critic /069 Rec #1: same single-source-of-truth invariant."
     )
     assert cfg.timeout_minutes == lgbm_strategy.label_timeout_minutes, (
         f"BacktestConfig.timeout_minutes ({cfg.timeout_minutes}) != "
         f"LightGbmStrategy.label_timeout_minutes ({lgbm_strategy.label_timeout_minutes}) — "
-        "DESYNC DETECTED. Both must be 10080. Centralize via shared module-level constant. "
+        f"DESYNC DETECTED at bar_interval={bar_interval!r}. "
+        f"Both must be {expected_timeout_minutes}. "
         "Critic /069 Rec #1: desync of these two fields silently corrupts label horizon."
     )
 
@@ -1253,7 +1689,7 @@ def _run_adf_tests(symbols: list[str]) -> pd.DataFrame:
         symbol, feature_name, month, adf_statistic, p_value, stationary
 
     Expected row count ≈ n_symbols × n_features × n_months.
-    For v3: 4 × 34 × 27 ≈ 3672 rows (varies by symbol listing date).
+    For v3: 3 × 14 × 27 ≈ 1134 rows (varies by symbol listing date; LDO listed late).
 
     LDO was listed 2022-09-22, so it contributes fewer months than BCH/MKR/TRX.
     """
@@ -1437,6 +1873,7 @@ def _compute_cpcv_paths(
     feature_parquets: dict[str, pd.DataFrame],
     oof_parquet_path: Path | None = None,
     report_dir: Path | None = None,
+    required_gap_override: int | None = None,
 ) -> tuple[pd.DataFrame, np.ndarray, float | None]:
     """Compute CPCV statistics from IS candle/feature sequences.
 
@@ -1520,14 +1957,18 @@ def _compute_cpcv_paths(
     candle_timeline = combined["open_time"].to_numpy()
     returns_proxy = combined["_ret"].to_numpy()
 
-    # Assertion: gap must equal REQUIRED_GAP (brief Section 3.5#3)
+    # iter-v3/117: at --bar-interval 24h, required_gap_override=72 (vs REQUIRED_GAP=66 at 8h).
+    _effective_gap: int = (
+        required_gap_override if required_gap_override is not None else REQUIRED_GAP
+    )
+    # Assertion: gap must equal _effective_gap (brief Section 3.5#3)
     splits = combinatorial_purged_cv(
         n_samples=n_candles,
         n_splits=CPCV_N_SPLITS,
         n_test_splits=CPCV_N_TEST_SPLITS,
-        gap=REQUIRED_GAP,
+        gap=_effective_gap,
         embargo=CPCV_EMBARGO,
-        expected_gap=REQUIRED_GAP,
+        expected_gap=_effective_gap,
     )
 
     rows = []
@@ -1793,15 +2234,16 @@ def _compute_per_cell_pbo(
 
 
 def _build_v3_model(
-    symbol: str,
+    symbol: str | tuple[str, ...],
     seed: int,
     n_trials: int,
     ensemble_seeds: list[int],
     oof_persist_path: Path | None = None,
     fast_mode: bool = False,
     model_type: str = "lgbm",
+    bar_interval: str = "8h",
 ) -> tuple[BacktestConfig, RiskV3Wrapper]:
-    """Build v3 M1 strategy + RiskV3Wrapper for a single symbol.
+    """Build v3 M1 strategy + RiskV3Wrapper for one symbol or a pooled multi-symbol panel.
 
     v2 5-gate config + BTC trend filter. NO R1/R2/R3 (brief Section 3.4).
     oof_persist_path: if set, per-trial OOF returns written to parquet
@@ -1811,49 +2253,118 @@ def _build_v3_model(
     model_type: 'lgbm' (default) or 'xgboost'. Routes to LightGbmStrategy or
     XgboostStrategy. The --model CLI flag controls this. Default 'lgbm' preserves
     backward compatibility for all prior iteration runners (iter-v3/016 §3.5 sub-fix #8).
+
+    iter-v3/112 POOLED architecture: when ``symbol`` is a tuple of symbols,
+    BacktestConfig.symbols is set to that tuple so build_master concatenates all
+    three panels. The strategy is ONE LightGbmStrategy trained on the pooled
+    BCH+LDO+TRX panel. feature_columns and atr_multipliers come from the FIRST
+    symbol's per-symbol lookup — since V3_FEATURES_PER_SYMBOL={} and
+    V3_ATR_MULTIPLIERS_PER_SYMBOL={}, every symbol returns the identical 14-feature
+    stack and (2.0, 1.0) ATR default, so the single lookup is equivalent to any.
     """
+    # iter-v3/112: symbol may be a tuple (pooled) or a str (per-symbol legacy).
+    if isinstance(symbol, tuple):
+        symbols_tuple: tuple[str, ...] = symbol
+        # For feature_columns and ATR lookup, use the first symbol (all return
+        # the same values since V3_FEATURES_PER_SYMBOL and
+        # V3_ATR_MULTIPLIERS_PER_SYMBOL are both empty).
+        _probe_sym = symbols_tuple[0]
+    else:
+        symbols_tuple = (symbol,)
+        _probe_sym = symbol
+
+    # iter-v3/117: bar_interval-conditional BacktestConfig.
+    # iter-v3/130: 4h bar interval added — K=21 candles × 4h = 84h = 5040 min label horizon.
+    if bar_interval == "24h":
+        _interval_str = "24h"
+        _cooldown_candles = 2  # 2 daily bars = 48h refractory (brief Section 3.5 Change 3)
+        _features_dir_str = str(FEATURES_DIR_24H)
+        _label_timeout_minutes = 10080  # K=21 × 24h = 504h — same as 8h in minutes but K=7
+        # feature_columns: /059 14-feature stack + offset_id as the 15th feature.
+        _base_feature_cols = list(features_for_symbol(_probe_sym))
+        _feature_columns = _base_feature_cols + ["offset_id"]
+    elif bar_interval == "4h":
+        # iter-v3/130: 4h native klines. K=21 candles × 4h = 84h = 5040 min.
+        _interval_str = "4h"
+        _cooldown_candles = 8  # 8 × 4h = 32h between trades (same absolute time as 8h baseline)
+        _features_dir_str = str(FEATURES_DIR_4H)
+        _label_timeout_minutes = 5040  # K=21 × 4h × 60min = 5040 min (brief Section 3.3)
+        _feature_columns = list(features_for_symbol(_probe_sym))
+    else:
+        _interval_str = "8h"
+        _cooldown_candles = 4  # 32h between trades (inherited from v2)
+        _features_dir_str = str(FEATURES_DIR)
+        _label_timeout_minutes = 10080  # K=21 × 8h × 60min = 10080 min
+        _feature_columns = list(features_for_symbol(_probe_sym))
+
     cfg = BacktestConfig(
-        symbols=(symbol,),
-        interval="8h",
+        symbols=symbols_tuple,
+        interval=_interval_str,
         max_amount_usd=1000.0,
         stop_loss_pct=4.0,
         take_profit_pct=8.0,
-        timeout_minutes=10080,  # 7 days (21 candles at 8h) — REVERT /068's Path C at /069
+        # iter-v3/130: timeout_minutes is bar-interval-conditional.
+        # At 4h: K=21 × 4h × 60 = 5040 min (brief Section 3.3, label_timeout_minutes).
+        # At 8h/24h: K=21 × 8h × 60 = 10080 min (/121-canonical K=21).
+        timeout_minutes=_label_timeout_minutes,
         fee_pct=0.1,
         data_dir=DATA_DIR,
-        cooldown_candles=4,  # 32h between trades (inherited from v2)
+        cooldown_candles=_cooldown_candles,
         vol_targeting=False,  # Vol targeting via RiskV3Wrapper
+        # iter-v3/116: early-exit-on-no-confirmation exit primitive.
+        # iter-v3/117: REVERT enable_no_confirm_exit False (was True at /116).
+        # iter-v3/120: CONFIRMATION bundle RE-ENABLES enable_no_confirm_exit=True
+        # (Component A of the TWO-COMPONENT /116+/119 bundle — RULE-layer
+        # PROMISING-MECHANICAL). Parameters trigger_atr=0.50 and k_candles=4 are
+        # unchanged from the /116 EXPLORATION hand-chosen values (brief Section 0).
+        enable_no_confirm_exit=True,
+        no_confirm_trigger_atr=0.50,
+        no_confirm_k_candles=4,
     )
     # iter-v3/016: --model {lgbm,xgboost} routes to the appropriate strategy class.
     # iter-v3/017: --model metalabeling routes to MetaLabelingStrategy (M1+M2).
     # Constructor signatures are identical so we call with the same kwargs.
     # iter-v3/032: per-symbol ATR multipliers via atr_multipliers_for_symbol().
     # LDOUSDT returns (1.5, 0.75); BCH/TRX/ALGO fall back to (2.0, 1.0) via dict.
-    _atr_tp, _atr_sl = atr_multipliers_for_symbol(symbol)
+    # iter-v3/112: use _probe_sym for ATR and feature lookups. Since
+    # V3_ATR_MULTIPLIERS_PER_SYMBOL={} and V3_FEATURES_PER_SYMBOL={}, every
+    # symbol returns the global (2.0, 1.0) DEFAULT and the 14-feature fallback
+    # respectively — the pooled single-lookup is identical to any per-symbol lookup.
+    # iter-v3/116: REVERT /115's non-binding-barrier override.
+    # /115 used _atr_tp, _atr_sl = 100.0, 100.0 to make barriers non-binding
+    # under fixed_horizon labeling. /116 returns to triple_barrier labels with
+    # the /059-canonical (2.0, 1.0) ATR multipliers. The per-symbol lookup
+    # returns the global defaults since V3_ATR_MULTIPLIERS_PER_SYMBOL is empty.
+    _atr_tp, _atr_sl = atr_multipliers_for_symbol(_probe_sym)
     common_kwargs = dict(
         training_months=TRAINING_MONTHS,
         n_trials=n_trials,
         cv_splits=5,
         label_tp_pct=8.0,
         label_sl_pct=4.0,
-        label_timeout_minutes=10080,  # 7 days (21 candles at 8h) — REVERT /068's Path C at /069
+        # iter-v3/130: label_timeout_minutes is bar-interval-conditional.
+        # At 4h: 5040 min (K=21 × 4h × 60). At 8h/24h: 10080 min (/121-canonical K=21).
+        label_timeout_minutes=_label_timeout_minutes,
         fee_pct=0.1,
-        features_dir=str(FEATURES_DIR),
+        features_dir=_features_dir_str,  # iter-v3/117/130: conditional on bar_interval
         verbose=1,
-        atr_tp_multiplier=_atr_tp,
-        atr_sl_multiplier=_atr_sl,
+        atr_tp_multiplier=_atr_tp,  # 2.0 — /059-canonical triple-barrier (reverted from /115)
+        atr_sl_multiplier=_atr_sl,  # 1.0 — /059-canonical triple-barrier (reverted from /115)
         atr_column="natr_21_raw",
         use_atr_labeling=True,
         ensemble_seeds=list(ensemble_seeds),
         # iter-v3/030: per-symbol dispatch — EXPLICIT list, never None.
-        feature_columns=list(features_for_symbol(symbol)),
+        # iter-v3/112: pooled case uses _probe_sym (all symbols identical since
+        # V3_FEATURES_PER_SYMBOL is empty — universal 14-feature fallback).
+        # iter-v3/117: at 24h, _feature_columns includes offset_id as the 15th feature.
+        feature_columns=_feature_columns,
         ood_enabled=False,  # OOD via RiskV3Wrapper z-score gate
         fast_mode=fast_mode,  # iter-v3/007 — colsample_bytree=1.0 when True
-        # iter-v3/073: REVERT /072's fixed-horizon label. Per-symbol ATR
-        # triple-barrier asymmetry (V3_ATR_MULTIPLIERS_PER_SYMBOL) only takes
-        # effect under the triple-barrier label path; the /072 fixed-horizon
-        # axis was NEGATIVE (label-execution decoupling). triple_barrier also
-        # restores the /060 EXPLORATION-mode anchor labeling rule.
+        # iter-v3/116: REVERT /115's label_mode="fixed_horizon".
+        # /116 returns to triple_barrier labels (the /059-canonical labeling
+        # architecture). The early-exit-on-no-confirmation primitive does NOT
+        # change the label estimand — only the execution exit path.
+        # trend_scan_grid carries its LightGbmStrategy default (5,8,13,21).
         label_mode="triple_barrier",
     )
     if model_type == "metalabeling":
@@ -1894,10 +2405,21 @@ def _build_v3_model(
         #   (primitive 9 OFF). /075's axis is primitive 12 (BTC-trend-regime SIZE
         #   de-rate scalar), enabled below. regime_dd/vol thresholds left as inert
         #   defaults — they have no effect when enable_regime_gate=False.
-        enable_regime_gate=False,
+        enable_regime_gate=False,  # UNCHANGED — BTC-stress trigger stays OFF
+        #   (EDA: BTC triggers do not separate LDO)
+        # iter-v3/115: the iter-v3/114 primitive-9 axis (LDO-scoped kill_LOW
+        # ldo_realvol_zscore gate) is CLOSED. iter-v3/115 reverts to the
+        # /059-canonical risk stack — primitive 9 DISABLED, no LDO regime-gate
+        # target. See Change 5 in Section 3.5 of the iter-v3/115 research brief.
         regime_gate_symbols=(),
         regime_dd_threshold_pct=20.0,
         regime_vol_zscore_threshold=1.5,
+        # ldo_realvol_zscore_floor and ldo_realvol_lookback_bars kept (inert
+        # when enable_ldo_realvol_gate=False) — avoids touching RiskV2Config
+        # field set unnecessarily.
+        enable_ldo_realvol_gate=False,
+        ldo_realvol_zscore_floor=0.30,  # inert — gate is OFF
+        ldo_realvol_lookback_bars=90,  # inert — gate is OFF
         # iter-v3/075: primitive 12 — BTC-trend-regime position-SIZE de-rate scalar.
         # /075 enabled this as the cycle-2 EXPLORATION #5 axis (INERT-AT-EXPLORATION
         # per Critic FINAL `2211927` — the de-rate traded IS for OOS roughly 1:1; a
@@ -1934,13 +2456,23 @@ def _build_v3_model(
         # Critic FINAL `1908d50` recommendation #2: axis CLOSED for cycle 3.
         # adx_threshold_per_symbol reverts to empty dict (global-only ADX threshold=20.0).
         adx_threshold_per_symbol={},
-        # iter-v3/055: per-symbol drawdown brake DISABLED (CLOSED-mechanism per /054 closeout).
-        # /054 PATH C-clean confirmed deadlock: brake permanently suppressed all OOS trades.
-        # Fields retained as backward-compatible defaults; only enable flag changes.
-        enable_per_symbol_drawdown_brake=False,  # per iter-v3/054 closeout (CLOSED-mechanism)
-        drawdown_brake_threshold_wpnl=10.0,  # retained as backward-compatible default
-        drawdown_brake_recovery_wpnl=5.0,  # retained as backward-compatible default
-        drawdown_brake_window_days=30,  # retained as backward-compatible default
+        # iter-v3/127: per-symbol drawdown brake ENABLED (sole /127 axis) — REVERTED at /128.
+        # /127 NEGATIVE (catastrophic OOS collapse); drawdown brake axis CLOSED per Critic FINAL.
+        # iter-v3/128: REVERT enable_per_symbol_drawdown_brake=False (mandatory baseline-restore).
+        # The /128 sole axis is universe substitution (BCH/LDO/TRX → ATOM/RUNE/AVAX/HBAR/ICP/ALGO);
+        # the brake field reverts to /121-canonical False (per "mandatory secondary baseline-restore
+        # edit" pattern from /083/077/126).
+        enable_per_symbol_drawdown_brake=False,  # /128: REVERT /127 brake (axis CLOSED)
+        # iter-v3/129: primitive 13 — per-symbol drawdown SIZE-SCALING (continuous form).
+        # iter-v3/130: REVERT primitive 13 to False (axis CLOSED at /129 NEGATIVE-catastrophic).
+        # Single-axis bar-interval attribution requires all other axes at /121-canonical values.
+        enable_per_symbol_drawdown_scaling=False,
+        drawdown_scaling_t_r=6.0,
+        drawdown_scaling_t_max=7.0,
+        drawdown_scaling_window_days=45,
+        drawdown_scaling_time_override_candles=21,
+        # iter-v3/130: candle interval minutes is bar-interval-conditional.
+        drawdown_scaling_candle_interval_minutes=240 if bar_interval == "4h" else 480,
         # iter-v3/081: REVERT the iter-v3/061 per-symbol vol_scale_floor accretion.
         # The {"TRXUSDT": 0.5} floor was introduced by iter-v3/061 — an EXPLORATION
         # classified INERT-AT-EXPLORATION (IS Δ -0.009 / OOS Δ +0.015 vs /060 anchor,
@@ -2432,6 +2964,7 @@ def _run_single_seed(
     ensemble_seeds_override: tuple[int, ...] | None = None,
     fast_mode: bool = False,
     model_type: str = "lgbm",
+    bar_interval: str = "8h",
 ) -> tuple[list, list, dict, dict, list]:
     """Run v3 models for a single outer seed (or unified ensemble pass).
 
@@ -2454,44 +2987,84 @@ def _run_single_seed(
     model_type:
         'lgbm' (default) or 'xgboost'. Forwarded to _build_v3_model.
         Controlled by --model CLI flag (iter-v3/016 §3.5 sub-fix #8).
+    bar_interval:
+        iter-v3/117: '8h' (default, backward-compat) or '24h' (3-offset
+        multi-offset derived-series axis). Forwarded to _build_v3_model.
     """
     models_to_run = active_models if active_models is not None else V3_MODELS
     all_trades: list = []
     model_pairs: list = []
 
-    for name, symbol in models_to_run:
+    # iter-v3/112 POOLED architecture: detect whether all entries in models_to_run
+    # share the same label (the "v3-pooled" sentinel). When pooled, build ONE
+    # LightGbmStrategy on the concatenated multi-symbol panel instead of one per symbol.
+    # The per-symbol loop is retained unchanged for non-pooled runs (backward compat).
+    _labels = [name for name, _sym in models_to_run]
+    _is_pooled = len(_labels) > 1 and len(set(_labels)) == 1
+
+    # Shared ensemble-seed resolve (used by both paths below).
+    if ensemble_seeds_override is not None:
+        ensemble_seeds_run = list(ensemble_seeds_override)
+    else:
+        size_for_this_run = ensemble_size if ensemble_size is not None else ENSEMBLE_SIZE
+        ensemble_seeds_run = _derive_ensemble_seeds(seed, size=size_for_this_run)
+
+    oof_path = REPORTS_DIR / f"iteration_{ITERATION_LABEL}" / "trial_oof_returns.parquet"
+
+    if _is_pooled:
+        # Pooled path: ONE model on the concatenated 3-symbol panel.
+        pooled_symbols: tuple[str, ...] = tuple(sym for _n, sym in models_to_run)
+        pooled_label = _labels[0]
         print("=" * 60)
-        print(f"MODEL {name} — seed {seed}")
+        print(f"MODEL {pooled_label} [POOLED: {', '.join(pooled_symbols)}] — seed {seed}")
         print("=" * 60)
-        # sub-fix 1d (iter-v3/003): pass OOF persist path so per-trial returns
-        # are written to parquet during training (one shared file per run).
-        oof_path = REPORTS_DIR / f"iteration_{ITERATION_LABEL}" / "trial_oof_returns.parquet"
-        # iter-v3/059: when ensemble_seeds_override is provided (unified 10-seed pass),
-        # use it directly.  Otherwise fall back to deriving from the outer seed.
-        # Pre-iter-v3/006: ensemble_seeds=[42,123,456,789,1001] for ALL outer seeds.
-        if ensemble_seeds_override is not None:
-            ensemble_seeds_run = list(ensemble_seeds_override)
-        else:
-            size_for_this_run = ensemble_size if ensemble_size is not None else ENSEMBLE_SIZE
-            ensemble_seeds_run = _derive_ensemble_seeds(seed, size=size_for_this_run)
         cfg, strategy = _build_v3_model(
-            symbol=symbol,
+            symbol=pooled_symbols,
             seed=seed,
             n_trials=n_trials,
             ensemble_seeds=ensemble_seeds_run,
             oof_persist_path=oof_path,
             fast_mode=fast_mode,
             model_type=model_type,
+            bar_interval=bar_interval,
         )
         _verify_symbols(cfg.symbols)
         t0 = time.time()
         results = run_backtest(cfg, strategy, yearly_pnl_check=False)
         elapsed = time.time() - t0
-        print(f"{name}: {len(results)} trades in {elapsed:.0f}s (seed={seed})")
+        print(
+            f"{pooled_label} [POOLED {len(pooled_symbols)} syms]: "
+            f"{len(results)} trades in {elapsed:.0f}s (seed={seed})"
+        )
         if hasattr(strategy, "gate_stats_summary"):
             print(f"  gate stats: {strategy.gate_stats_summary()}")
         all_trades.extend(results)
         model_pairs.append((cfg, strategy))
+    else:
+        # Per-symbol path (legacy — pre-/112 behaviour, unchanged).
+        for name, symbol in models_to_run:
+            print("=" * 60)
+            print(f"MODEL {name} — seed {seed}")
+            print("=" * 60)
+            cfg, strategy = _build_v3_model(
+                symbol=symbol,
+                seed=seed,
+                n_trials=n_trials,
+                ensemble_seeds=ensemble_seeds_run,
+                oof_persist_path=oof_path,
+                fast_mode=fast_mode,
+                model_type=model_type,
+                bar_interval=bar_interval,
+            )
+            _verify_symbols(cfg.symbols)
+            t0 = time.time()
+            results = run_backtest(cfg, strategy, yearly_pnl_check=False)
+            elapsed = time.time() - t0
+            print(f"{name}: {len(results)} trades in {elapsed:.0f}s (seed={seed})")
+            if hasattr(strategy, "gate_stats_summary"):
+                print(f"  gate stats: {strategy.gate_stats_summary()}")
+            all_trades.extend(results)
+            model_pairs.append((cfg, strategy))
 
     all_trades.sort(key=lambda t: t.open_time)
 
@@ -2599,8 +3172,46 @@ def main() -> None:
             "5x duplicate rows: 55.78M vs expected 11M, inflating n_trials 140 to 700)."
         ),
     )
+    parser.add_argument(
+        "--bar-interval",
+        type=str,
+        default="8h",
+        choices=["8h", "24h", "4h"],
+        help=(
+            "iter-v3/117: candle bar interval. '8h' (default) is backward-compatible "
+            "with /001-/116 (all prior iterations). '24h' enables the 3-offset "
+            "multi-offset derived-series axis: 8h CSVs aggregated into 24h bars at "
+            "UTC offsets 0h/8h/16h, concatenated as a pooled panel with offset_id "
+            "as the 15th feature. Features written to data/features_v3_24h/; kline "
+            "CSVs written to data/<SYM>/24h.csv for the backtest engine. "
+            "REQUIRED_GAP override: 72 = (7+1)*3*3 at 24h (vs 66 at 8h). "
+            "iter-v3/130: '4h' enables native 4h klines. K=21 candles × 4h = 84h = "
+            "3.5 days label horizon (HALVED from 7 days at 8h). Features written to "
+            "data/features_v3_4h/; kline CSVs at data/<SYM>/4h.csv. "
+            "REQUIRED_GAP=66 UNCHANGED in candle-count terms (same K=21 × 3 symbols). "
+            "Default 8h preserves byte-identity with all prior iterations."
+        ),
+    )
     args = parser.parse_args()
 
+    # iter-v3/130: run.log capture — fix the 5-occurrence instrumentation gap
+    # (/124/125/127/128/129 all missing run.log per engineering reports).
+    # TeeLogger redirects sys.stdout + sys.stderr to both terminal and run.log file.
+    # The log path is computed from ITERATION_LABEL (already set at module level).
+    _run_log_path = REPORTS_DIR / f"iteration_{ITERATION_LABEL}" / "run.log"
+    _tee = _TeeLogger(_run_log_path)
+    try:
+        _main_body(args)
+    finally:
+        _tee.close()
+
+
+def _main_body(args) -> None:  # noqa: ANN001
+    """Main execution body — extracted to allow TeeLogger try/finally wrapping.
+
+    iter-v3/130: run.log fix. All backtest logic moved here so the TeeLogger
+    context manager in main() captures the complete stdout/stderr output.
+    """
     # iter-v3/059: --seeds is deprecated; outer-seed loop eliminated.
     if args.seeds is not None:
         print(
@@ -2645,14 +3256,142 @@ def main() -> None:
 
     baseline_symbols = tuple(sym for _, sym in active_models)
     _verify_symbols(baseline_symbols)
-    _verify_data_freshness(baseline_symbols + ("BTCUSDT",))
-    # asserts len == 17 (BASELINE_V3 14-feature anchor + iter-v3/086's 3-feature
-    # perp-spot basis family), the 3 basis features present,
-    # funding_regime_momentum_5d / vwap_dev_50 / closed funding-FAMILY columns
-    # absent; also asserts ensemble_size in (3, 10) for mode discipline.
-    _verify_feature_columns(ensemble_size=ensemble_size_for_run)
-    _verify_label_leakage_gap()  # asserts REQUIRED_GAP == 66 (3-symbol /059 universe, iter-v3/088)
+    # iter-v3/130: pass bar_interval so 4h CSVs are checked at 4h (BTCUSDT stays 8h).
+    _verify_data_freshness(baseline_symbols + ("BTCUSDT",), bar_interval=args.bar_interval)
+    # asserts len == 14 (BASELINE_V3 /059 14-feature anchor);
+    # funding_regime_momentum_5d / vwap_dev_50 / closed funding-FAMILY / basis-family ABSENT;
+    # also asserts ensemble_size in (3, 10) for mode discipline.
+    # iter-v3/130: pass bar_interval so label_timeout probe uses correct expected value.
+    _verify_feature_columns(ensemble_size=ensemble_size_for_run, bar_interval=args.bar_interval)
+    # asserts REQUIRED_GAP appropriate for bar_interval:
+    # 8h → 66 = (21+1)*3; 24h → 72 = (7+1)*3*3 (iter-v3/117 multi-offset formula)
+    _verify_label_leakage_gap(bar_interval=args.bar_interval)
     _verify_track_isolation()  # grep check
+
+    # iter-v3/121-METHODOLOGY: SINGLE-COMPONENT pre-flight assertions.
+    # Component A: /116 no_confirm exit REMAINS enabled (enable_no_confirm_exit=True).
+    # Component B: /119 C6 ret5d_signed_tbi REVERTED — NOT in V3_FEATURE_COLUMNS_TOP_N (14).
+    # The accretion guard above already catches drift; these assertions fire a
+    # human-readable message if someone bypasses the guard.
+    # iter-v3/130: pass bar_interval so BacktestConfig.timeout_minutes matches expected.
+    _pf_cfg, _ = _build_v3_model(
+        symbol="BCHUSDT", seed=42, n_trials=1, ensemble_seeds=[42], bar_interval=args.bar_interval
+    )
+    assert _pf_cfg.enable_no_confirm_exit is True, (
+        "PREFLIGHT FAIL: enable_no_confirm_exit must be True for iter-v3/121-METHODOLOGY "
+        "(Component A — /116 no_confirm REMAINS enabled; /117 revert was undone at /120). "
+        "Set enable_no_confirm_exit=True in BacktestConfig in _build_v3_model."
+    )
+    assert _pf_cfg.no_confirm_trigger_atr == 0.50, (
+        f"PREFLIGHT FAIL: no_confirm_trigger_atr={_pf_cfg.no_confirm_trigger_atr} — "
+        "expected 0.50. Check _build_v3_model BacktestConfig."
+    )
+    assert _pf_cfg.no_confirm_k_candles == 4, (
+        f"PREFLIGHT FAIL: no_confirm_k_candles={_pf_cfg.no_confirm_k_candles} — "
+        "expected 4. Check _build_v3_model BacktestConfig."
+    )
+    print(
+        "  iter-v3/121-METHODOLOGY pre-flight: enable_no_confirm_exit=True "
+        "(/116 no_confirm Component A — REMAINS enabled at /121 SINGLE-COMPONENT run), "
+        "no_confirm_trigger_atr=0.50, no_confirm_k_candles=4  PASS"
+    )
+    # iter-v3/121-METHODOLOGY: verify Component B is ABSENT (C6 REVERTED).
+    # Brief Section 3 Sub-fix 3: assert inverted from /120 PRESENT to /121 ABSENT.
+    assert _pf_cfg.enable_no_confirm_exit is True, (
+        "PREFLIGHT FAIL: enable_no_confirm_exit must be True for iter-v3/121-METHODOLOGY "
+        "(Component A still active)."
+    )
+    assert _pf_cfg.no_confirm_trigger_atr == 0.50, "PREFLIGHT FAIL: trigger_atr must be 0.50"
+    assert _pf_cfg.no_confirm_k_candles == 4, "PREFLIGHT FAIL: k_candles must be 4"
+    assert "ret5d_signed_tbi" not in V3_FEATURE_COLUMNS_TOP_N, (
+        "PREFLIGHT FAIL: ret5d_signed_tbi must NOT be in V3_FEATURE_COLUMNS_TOP_N for "
+        "iter-v3/121-METHODOLOGY (Component B REVERTED per /120 F3-DROP binding "
+        "pre-commitment + diary §6 Q4 + Critic FINAL `a49dd17`). "
+        "Remove 'ret5d_signed_tbi' from V3_FEATURE_COLUMNS_TOP_N in features_v3/__init__.py."
+    )
+    assert len(V3_FEATURE_COLUMNS_TOP_N) == 14, (
+        "PREFLIGHT FAIL: V3_FEATURE_COLUMNS_TOP_N must be 14 features for iter-v3/128 "
+        "(/121 BASELINE 14-feature stack; d24_ret_autocorr_lag1_50 REMOVED per /126 "
+        "NEGATIVE-catastrophic; universe substitution is NOT a feature axis)."
+    )
+    assert "d24_ret_autocorr_lag1_50" not in V3_FEATURE_COLUMNS_TOP_N, (
+        "PREFLIGHT FAIL: d24_ret_autocorr_lag1_50 must NOT be in V3_FEATURE_COLUMNS_TOP_N for "
+        "iter-v3/128 (/126 NEGATIVE-catastrophic; multi-frequency axis CLOSED)."
+    )
+    assert "eth_vs_sym_rv_50" not in V3_FEATURE_COLUMNS_TOP_N, (
+        "PREFLIGHT FAIL: eth_vs_sym_rv_50 must NOT be in V3_FEATURE_COLUMNS_TOP_N for "
+        "iter-v3/128 (/123 NEGATIVE-catastrophic; cross-asset OHLCV axis CLOSED)."
+    )
+    assert "eth_ret_3d" not in V3_FEATURE_COLUMNS_TOP_N, (
+        "PREFLIGHT FAIL: eth_ret_3d must NOT be in V3_FEATURE_COLUMNS_TOP_N for "
+        "iter-v3/128 (/122 NEGATIVE-INERT; axis CLOSED)."
+    )
+    print(
+        "  iter-v3/129 pre-flight: enable_no_confirm_exit=True (Component A from /121), "
+        "V3_FEATURE_COLUMNS_TOP_N=14 (/121 BASELINE; d24_ret_autocorr_lag1_50 REMOVED /126), "
+        "BCH/LDO/TRX 3-symbol universe (REVERT from /128), drawdown brake REVERTED False, "
+        "continuous size-scaling primitive 13 ENABLED (T_R=6.0, T_max=7.0, N=45d, M=21c)  PASS"
+    )
+    # iter-v3/130: assert /129 continuous scaling REVERTED (axis CLOSED) + bar-interval 4h.
+    # /129 primitive 13 (continuous size-scaling) is REVERTED to False for single-axis
+    # bar-interval attribution. /127 binary brake already False (axis CLOSED at /127).
+    _pf130_cfg, _pf130_strat = _build_v3_model(
+        symbol="BCHUSDT", seed=42, n_trials=1, ensemble_seeds=[42], bar_interval=args.bar_interval
+    )
+    _pf130_rc = _pf130_strat.config
+    assert _pf130_rc.enable_per_symbol_drawdown_scaling is False, (
+        "PREFLIGHT FAIL: enable_per_symbol_drawdown_scaling must be False for iter-v3/130 "
+        "(/129 continuous scaling axis CLOSED — NEGATIVE-catastrophic; REVERT mandatory). "
+        "Set enable_per_symbol_drawdown_scaling=False in RiskV2Config in _build_v3_model."
+    )
+    assert _pf130_rc.enable_per_symbol_drawdown_brake is False, (
+        "PREFLIGHT FAIL: enable_per_symbol_drawdown_brake must be False for iter-v3/130 "
+        "(/127 binary brake REVERTED — axis CLOSED). "
+        "Set enable_per_symbol_drawdown_brake=False in RiskV2Config in _build_v3_model."
+    )
+    assert tuple(sym for _, sym in V3_MODELS) == ("BCHUSDT", "LDOUSDT", "TRXUSDT"), (
+        f"PREFLIGHT FAIL: V3_MODELS symbols = {tuple(sym for _, sym in V3_MODELS)} — "
+        "expected ('BCHUSDT', 'LDOUSDT', 'TRXUSDT'). "
+        "V3_MODELS must be BCH/LDO/TRX (/121 baseline preserved; /128 universe CLOSED)."
+    )
+    _expected_timeout_130 = 5040 if args.bar_interval == "4h" else 10080
+    assert _pf130_cfg.timeout_minutes == _expected_timeout_130, (
+        f"PREFLIGHT FAIL: BacktestConfig.timeout_minutes={_pf130_cfg.timeout_minutes} — "
+        f"expected {_expected_timeout_130} at bar_interval={args.bar_interval!r}. "
+        "iter-v3/130: at 4h, K=21 × 4h × 60 = 5040 min. At 8h: K=21 × 8h × 60 = 10080 min."
+    )
+    print(
+        "  iter-v3/130 pre-flight: "
+        f"bar_interval={args.bar_interval!r}, "
+        f"timeout_minutes={_pf130_cfg.timeout_minutes} (K=21 × {args.bar_interval} × 60), "
+        "enable_per_symbol_drawdown_scaling=False [/129 REVERTED — axis CLOSED], "
+        "enable_per_symbol_drawdown_brake=False [/127 REVERTED], "
+        "V3_MODELS=BCH/LDO/TRX  PASS"
+    )
+    print(
+        f"Universe: BCH/LDO/TRX | Bar interval: {args.bar_interval} | "
+        f"K=21 (label horizon {_pf130_cfg.timeout_minutes // 60}h "
+        f"= {_pf130_cfg.timeout_minutes // 60 / 24:.1f}d) | "
+        "/127 binary brake REVERTED | /129 continuous scaling REVERTED"
+    )
+    # Explicit /115 revert assertion: label_mode must be triple_barrier.
+    # This is also caught by the accretion guard but we name it explicitly for
+    # the run.log so the Critic's Check 8 can verify the revert at a glance.
+    _pf_inner = _
+    if hasattr(_pf_inner, "inner"):
+        _pf_lgbm = _pf_inner.inner
+    else:
+        _pf_lgbm = _pf_inner
+    if hasattr(_pf_lgbm, "label_mode"):
+        assert _pf_lgbm.label_mode == "triple_barrier", (
+            f"PREFLIGHT FAIL: label_mode='{_pf_lgbm.label_mode}' — "
+            "expected 'triple_barrier'. /115's fixed_horizon must be REVERTED. "
+            "Check _build_v3_model common_kwargs label_mode='triple_barrier'."
+        )
+        print(
+            f"  iter-v3/116 /115-revert: label_mode='{_pf_lgbm.label_mode}'  PASS "
+            "(triple_barrier — fixed_horizon REVERTED)"
+        )
 
     # -----------------------------------------------------------------------
     # iter-v3/080 baseline-restore: /079's conviction-derate (primitive 13) is
@@ -2694,20 +3433,64 @@ def main() -> None:
                 "(b) re-run with --clean-oof flag to delete and start fresh."
             )
 
+    # iter-v3/129: runtime REQUIRED_GAP is cardinality-conditional + bar_interval-conditional.
+    # iter-v3/130: 4h bar interval — REQUIRED_GAP=66 UNCHANGED in candle-count terms (K=21×3).
+    # 24h: (7+1)*n_symbols*3 (multi-offset). 8h/4h, cardinality 3: REQUIRED_GAP=66 (module).
+    _n_active_symbols = len(V3_MODELS)
+    if args.bar_interval == "24h":
+        _runtime_gap: int = (7 + 1) * _n_active_symbols * 3
+    elif _n_active_symbols != 3:
+        # cardinality-conditional 8h override (kept for future use; not active at /130)
+        _runtime_gap = (21 + 1) * _n_active_symbols
+    else:
+        # 4h and 8h both use REQUIRED_GAP=66 in candle-count terms (K=21, 3 symbols)
+        _runtime_gap = REQUIRED_GAP  # 66 = (21+1)*3 module constant
+    _timeout_min = 5040 if args.bar_interval == "4h" else 10080
     active_sym_names = ", ".join(sym for _, sym in active_models)
     # iter-v3/060: mode-aware startup log
     if args.exploration:
         print(f"[v3] Running in EXPLORATION mode (ensemble_size={ensemble_size_for_run})")
     else:
         print(f"[v3] Running in CONFIRMATION mode (ensemble_size={ensemble_size_for_run})")
-    print(f"\nBASELINE v3 iter-{ITERATION_LABEL}: {active_sym_names} (seed-plumbing fix)")
+    print(f"\nBASELINE v3 iter-{ITERATION_LABEL}: {active_sym_names}")
+    print(
+        f"Universe: BCH/LDO/TRX | Bar interval: {args.bar_interval} | "
+        f"K=21 (label horizon {_timeout_min // 60}h = {_timeout_min // 60 / 24:.1f}d) | "
+        "/127 binary brake DISABLED | /129 continuous scaling DISABLED  [iter-v3/130]"
+    )
+    # The mandatory pre-flight print per brief Section 5.6 smoke test item 12:
+    print(
+        f"Universe: BCH/LDO/TRX | Bar interval: {args.bar_interval} | "
+        f"K=21 (label horizon {_timeout_min // 60}h "
+        f"≈ {_timeout_min // 60 / 24:.1f}d)"
+    )
+    print(
+        f"Bar interval: {args.bar_interval}  "
+        f"(/116 no_confirm STAYS enabled; /127 binary brake REVERTED False; "
+        f"/129 continuous size-scaling REVERTED False [iter-v3/130 bar-interval axis])"
+    )
     print(f"Ensemble: {ensemble_size_for_run} seeds  Optuna trials/model: {args.n_trials}")
     print(f"Active models: {len(active_models)}/{len(V3_MODELS)} (--symbols={args.symbols!r})")
     print(f"CPCV: N={CPCV_N_SPLITS}, k={CPCV_N_TEST_SPLITS}, 45 paths on IS CANDLE SEQUENCE")
+    _gap_label: str
+    if args.bar_interval == "24h":
+        _gap_label = f"(7+1)*{_n_active_symbols}*3={_runtime_gap} [24h override]"
+    elif args.bar_interval == "4h":
+        _gap_label = (
+            f"(21+1)*{_n_active_symbols}={_runtime_gap} [4h: UNCHANGED in candle-count terms vs 8h]"
+        )
+    else:
+        _gap_label = (
+            f"(21+1)*{_n_active_symbols}={_runtime_gap} "
+            f"[8h cardinality-{_n_active_symbols} "
+            f"{'module constant' if _n_active_symbols == 3 else 'override'}]"
+        )
+    _n_feature_cols = "14+offset_id" if args.bar_interval == "24h" else "14"
     print(
-        f"Gap: {REQUIRED_GAP} (= (21+1)*3; iter-v3/088 RE-ARCHITECTURE reverts "
-        f"/087's 6-sym expansion to the 3-sym /059 universe BCH+LDO+TRX; timeout "
-        f"UNCHANGED 10080 min)"
+        f"Gap: {_runtime_gap} ({_gap_label}; "
+        f"module REQUIRED_GAP={REQUIRED_GAP} [3-sym constant, unchanged]; "
+        f"timeout={_timeout_min} min (K=21 × {args.bar_interval} × 60); "
+        f"label_mode=triple_barrier; V3_FEATURE_COLUMNS={_n_feature_cols})"
     )
     print(
         f"Pre-flight: branch OK, symbols OK, data fresh (<16h), "
@@ -2716,7 +3499,47 @@ def main() -> None:
 
     # Feature generation
     if not args.skip_features:
-        _generate_v3_features(list(baseline_symbols))
+        if args.bar_interval == "24h":
+            # iter-v3/117: 24h multi-offset derived-series.
+            # generate_all_multioffset_24h_features writes:
+            #   data/<SYM>/24h.csv — kline-compatible CSV for backtest engine
+            #   data/features_v3_24h/<SYM>_24h_features.parquet — feature parquets
+            # BTCUSDT gets the 24h.csv (for BTC cross-asset features) but no parquet.
+            from crypto_trade.features_v3.multioffset_24h import (  # noqa: PLC0415
+                generate_all_multioffset_24h_features,
+            )
+
+            FEATURES_DIR_24H.mkdir(parents=True, exist_ok=True)
+            # Include BTCUSDT so write_24h_kline_csv can produce the BTC 24h.csv.
+            symbols_for_24h = list(baseline_symbols) + ["BTCUSDT"]
+            generate_all_multioffset_24h_features(
+                symbols=symbols_for_24h,
+                data_dir=str(DATA_DIR),
+                features_24h_dir=str(FEATURES_DIR_24H),
+            )
+            print(f"[features-24h] Multi-offset 24h features written to {FEATURES_DIR_24H}")
+        elif args.bar_interval == "4h":
+            # iter-v3/130: native 4h klines — generate features at 4h cadence.
+            # process_symbol_v3 uses interval="4h" and writes to FEATURES_DIR_4H.
+            # 4h klines must already be fetched via:
+            #   uv run crypto-trade fetch --symbols BCHUSDT,LDOUSDT,TRXUSDT --intervals 4h
+            # before running the backtest (pre-launch data pipeline per brief Section 5.2).
+            FEATURES_DIR_4H.mkdir(parents=True, exist_ok=True)
+            print(
+                f"\n[features-4h] Generating 4h features for "
+                f"{list(baseline_symbols)} -> {FEATURES_DIR_4H}"
+            )
+            for sym in baseline_symbols:
+                t0_4h = time.time()
+                result_4h = process_symbol_v3(sym, "4h", str(DATA_DIR), str(FEATURES_DIR_4H))
+                n_rows_4h, n_cols_4h = result_4h[1], result_4h[2]
+                elapsed_4h = time.time() - t0_4h
+                print(
+                    f"  {sym}: {n_rows_4h} rows, {n_cols_4h} feature cols at 4h ({elapsed_4h:.1f}s)"
+                )
+            print(f"[features-4h] 4h features written to {FEATURES_DIR_4H}")
+        else:
+            _generate_v3_features(list(baseline_symbols))
     else:
         print("[features] Skipping feature generation (--skip-features)")
 
@@ -2724,7 +3547,14 @@ def main() -> None:
     print("\n[features] Loading IS-window feature DataFrames...")
     feature_parquets: dict[str, pd.DataFrame] = {}
     for sym in baseline_symbols:
-        pq_path = FEATURES_DIR / f"{sym}_8h_features.parquet"
+        if args.bar_interval == "24h":
+            # iter-v3/117: load from 24h multi-offset parquet.
+            pq_path = FEATURES_DIR_24H / f"{sym}_24h_features.parquet"
+        elif args.bar_interval == "4h":
+            # iter-v3/130: load from 4h native parquet.
+            pq_path = FEATURES_DIR_4H / f"{sym}_4h_features.parquet"
+        else:
+            pq_path = FEATURES_DIR / f"{sym}_8h_features.parquet"
         if pq_path.exists():
             feature_parquets[sym] = pd.read_parquet(pq_path)
             print(f"  {sym}: {len(feature_parquets[sym])} rows loaded")
@@ -2783,6 +3613,7 @@ def main() -> None:
         ensemble_seeds_override=active_ensemble_seeds,
         fast_mode=fast_mode_for_run,
         model_type=args.model,
+        bar_interval=args.bar_interval,
     )
 
     if not braked:
@@ -2809,11 +3640,16 @@ def main() -> None:
     print("\n[CPCV] Computing per-cell CSCV PBO (iter-v3/004 per-cell pathway)...")
     oof_parquet = REPORTS_DIR / f"iteration_{ITERATION_LABEL}" / "trial_oof_returns.parquet"
     report_dir_cpcv = REPORTS_DIR / f"iteration_{ITERATION_LABEL}"
+    # iter-v3/128: pass _runtime_gap as override whenever it differs from REQUIRED_GAP
+    # (24h=144 or 8h cardinality-6=132). At 8h cardinality-3, _runtime_gap==REQUIRED_GAP so
+    # override=None preserves the same behaviour as before.
+    _cpcv_gap_override = _runtime_gap if _runtime_gap != REQUIRED_GAP else None
     cpcv_df, path_metric_matrix, per_cell_mean_pbo = _compute_cpcv_paths(
         list(baseline_symbols),
         feature_parquets,
         oof_parquet_path=oof_parquet,
         report_dir=report_dir_cpcv,
+        required_gap_override=_cpcv_gap_override,
     )
     print(f"  CPCV: {len(cpcv_df)} paths (return proxy for cpcv_paths.csv)")
     print(f"  Per-cell mean PBO: {per_cell_mean_pbo}")

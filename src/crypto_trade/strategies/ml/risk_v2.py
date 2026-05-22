@@ -112,6 +112,14 @@ class RiskV2Config:
     regime_vol_lookback_bars: int = 90  # 30 calendar days at 8h cadence
     regime_vol_zscore_threshold: float = 1.5  # IS-95th-percentile
 
+    # iter-v3/114: LDO-realized-volatility kill_LOW trigger variant (primitive 9).
+    # When enable_ldo_realvol_gate is True, primitive 9 ALSO fires for a symbol in
+    # regime_gate_symbols when abs(LDO-realvol-zscore) < ldo_realvol_zscore_floor
+    # (a kill_LOW gate: suppress in a LOW-volatility regime). Default OFF.
+    enable_ldo_realvol_gate: bool = False
+    ldo_realvol_zscore_floor: float = 0.30  # IS-calibrated (EDA SHA d8a9725, T3)
+    ldo_realvol_lookback_bars: int = 90  # 30 calendar days at 8h cadence
+
     # iter-v3/047: primitive 10 — direction-asymmetric kill switch.
     # Universally suppresses candidate signals of a specific direction for a specific
     # symbol. e.g. block_long_for=("BCHUSDT",) blocks ALL BCH LONG candidates regardless
@@ -164,6 +172,28 @@ class RiskV2Config:
     drawdown_brake_threshold_wpnl: float = 10.0  # engage when dd_30d >= this
     drawdown_brake_recovery_wpnl: float = 5.0  # disengage when dd_30d <= this
     drawdown_brake_window_days: int = 30  # rolling window for peak calculation
+    # iter-v3/127: Time-based override M (deadlock-breaker).
+    # When brake-ON, brake-OFF forced after M candles regardless of dd state.
+    # Prevents the /054 BCH+LDO OOS-start permanent-deadlock pattern.
+    # M=21 candles = 7 days at 8h base; 0 = disabled (legacy /054 behavior).
+    drawdown_brake_time_override_candles: int = 0  # 0 = disabled (legacy behavior)
+    drawdown_brake_candle_interval_minutes: int = 480  # 8h base; for time-override math
+
+    # iter-v3/129: primitive 13 — per-symbol drawdown SIZE-SCALING (continuous form).
+    # Distinct from primitive 11 (per_symbol_drawdown_brake; binary kill at /054/127).
+    # Continuous form preserves Optuna gradient: trades not deleted from training;
+    # contribution dampened proportionally to drawdown severity. Linear interpolation
+    # between T_R (full size) and T_max (zero size).
+    # Chosen config: T_R=6.0 wpnl (full size), T_max=7.0 wpnl (zero size);
+    # N=45 days lookback; M=21 candles time-override (deadlock-impossibility
+    # carry-forward from /127).
+    # Default OFF preserves all prior v1/v2/v3 behavior.
+    enable_per_symbol_drawdown_scaling: bool = False
+    drawdown_scaling_t_r: float = 6.0  # full-size threshold (wpnl)
+    drawdown_scaling_t_max: float = 7.0  # zero-size threshold (wpnl)
+    drawdown_scaling_window_days: int = 45  # rolling window for peak calculation
+    drawdown_scaling_time_override_candles: int = 21  # deadlock-breaker; 0 = disabled
+    drawdown_scaling_candle_interval_minutes: int = 480  # 8h base; for time-override math
 
     # iter-v3/075: primitive 12 — BTC-trend-regime position-SIZE de-rate scalar.
     # When BTC is in a bear/chop trend state (BTC close[t-1] < SMA_N(close)[t-1],
@@ -198,6 +228,30 @@ class RiskV2Config:
                 raise ValueError(
                     f"drawdown_brake_window_days must be > 0, got {self.drawdown_brake_window_days}"
                 )
+            # iter-v3/127: validate time-override config when M > 0
+            if self.drawdown_brake_time_override_candles > 0:
+                if self.drawdown_brake_candle_interval_minutes <= 0:
+                    raise ValueError(
+                        f"drawdown_brake_candle_interval_minutes must be > 0, got "
+                        f"{self.drawdown_brake_candle_interval_minutes}"
+                    )
+        if self.enable_per_symbol_drawdown_scaling:
+            if not (0 < self.drawdown_scaling_t_r < self.drawdown_scaling_t_max):
+                raise ValueError(
+                    f"drawdown scaling requires 0 < T_R ({self.drawdown_scaling_t_r}) "
+                    f"< T_max ({self.drawdown_scaling_t_max})"
+                )
+            if self.drawdown_scaling_window_days <= 0:
+                raise ValueError(
+                    f"drawdown_scaling_window_days must be > 0, got "
+                    f"{self.drawdown_scaling_window_days}"
+                )
+            if self.drawdown_scaling_time_override_candles > 0:
+                if self.drawdown_scaling_candle_interval_minutes <= 0:
+                    raise ValueError(
+                        f"drawdown_scaling_candle_interval_minutes must be > 0, got "
+                        f"{self.drawdown_scaling_candle_interval_minutes}"
+                    )
         if self.enable_regime_size_scalar:
             if not (0.0 < self.regime_size_scalar_value <= 1.0):
                 raise ValueError(
@@ -227,9 +281,13 @@ class GateStats:
         0  # iter-v3/047: direction-asymmetric kill switch fires (primitive 10)
     )
     drawdown_brake_fires: int = 0  # iter-v3/054: per-symbol drawdown brake fires (primitive 11)
+    # iter-v3/127: time-based override fires (deadlock-breaker)
+    drawdown_brake_time_overrides: int = 0
     regime_size_scalar_fires: int = (
         0  # iter-v3/075: BTC-trend-regime position-SIZE de-rate scalar fires (primitive 12)
     )
+    drawdown_scaling_fires: int = 0  # iter-v3/129: continuous size-scaling fires (primitive 13)
+    drawdown_scaling_time_overrides: int = 0  # iter-v3/129: time-override fires for primitive 13
 
     def vol_scale_mean(self) -> float:
         return self.vol_scale_sum / self.vol_scaled_signals if self.vol_scaled_signals else 1.0
@@ -282,6 +340,21 @@ class RiskV2Wrapper:
         self._brake_running_peak: dict[str, float] = {}
         self._brake_cum_wpnl: dict[str, float] = {}
         self._brake_on: dict[str, bool] = {}
+        # iter-v3/127: brake-ON close_time per symbol (for time-override deadlock-breaker).
+        # Stores the close_time_ms of the trade that triggered the most recent brake-ON.
+        # Used in get_signal to check if M candles have elapsed since engagement.
+        self._brake_on_close_time: dict[str, int] = {}
+        # iter-v3/129: per-symbol drawdown scaling state (primitive 13).
+        # _scaling_timeline[sym] = deque of (close_time_ms, cum_wpnl) for the last
+        # drawdown_scaling_window_days days of THIS symbol's closed trades.
+        # _scaling_running_peak[sym] = max cum_wpnl over _scaling_timeline[sym].
+        # _scaling_cum_wpnl[sym] = current cumulative weighted_pnl (from trade 1).
+        # _scaling_zero_since[sym] = open_time_ms when multiplier reached 0.0 (for
+        # time-override deadlock-breaker); None when multiplier > 0.
+        self._scaling_timeline: dict[str, deque[tuple[int, float]]] = {}
+        self._scaling_running_peak: dict[str, float] = {}
+        self._scaling_cum_wpnl: dict[str, float] = {}
+        self._scaling_zero_since: dict[str, int | None] = {}
 
     @property
     def atr_column(self) -> str:
@@ -343,6 +416,16 @@ class RiskV2Wrapper:
             # Cap (primitive 6) still applies independently of feature data.
             scale = 1.0
 
+        # 5.5. Per-symbol drawdown SIZE-SCALING (iter-v3/129, primitive 13).
+        # Continuous multiplicative dampening at per-symbol rolling drawdown.
+        # Distinct from primitive 11 (per_symbol_drawdown_brake; binary kill).
+        # Applied AFTER vol-scaling (gate 5) and BEFORE cap (gate 6).
+        # Time-based override M deadlock-breaker (carry-forward /127 logic):
+        # when multiplier has been 0.0 for >= M candles, force back to 1.0.
+        scaling_multiplier = 1.0
+        if self.config.enable_per_symbol_drawdown_scaling:
+            scaling_multiplier = self._compute_drawdown_scaling_multiplier(symbol, open_time, stats)
+
         # 6. Per-symbol PnL cap (iter-v3/020, primitive 8) — multiplicative scaling
         # Applied AFTER vol-scaling. Uses POSITIVE-share-only semantics: only caps
         # symbols whose rolling share > cap; never penalises negative-share drags.
@@ -359,11 +442,32 @@ class RiskV2Wrapper:
         # Applied AFTER vol-scaling and cap so all signal-modifying gates have fired first.
         # The brake fires on signals surviving the prior gate cascade (direction != 0 after
         # gates 1-6). Counter increments only when a non-zero signal is killed by the brake.
+        #
+        # iter-v3/127: time-based override deadlock-breaker.
+        # Check if brake-ON has elapsed >= M candles since engagement; force OFF if so.
+        # Must run BEFORE the brake-kill check so the override fires at the next signal
+        # arrival regardless of dd state (prevents the /054 permanent-deadlock pattern).
+        if (
+            self.config.enable_per_symbol_drawdown_brake
+            and self.config.drawdown_brake_time_override_candles > 0
+            and self._brake_on.get(symbol, False)
+        ):
+            override_ms = (
+                self.config.drawdown_brake_time_override_candles
+                * self.config.drawdown_brake_candle_interval_minutes
+                * 60
+                * 1000
+            )
+            brake_on_ts = self._brake_on_close_time.get(symbol, 0)
+            if open_time - brake_on_ts >= override_ms:
+                self._brake_on[symbol] = False
+                stats.drawdown_brake_time_overrides += 1
+
         if self.config.enable_per_symbol_drawdown_brake and self._brake_on.get(symbol, False):
             stats.drawdown_brake_fires += 1
             return NO_SIGNAL
 
-        new_weight = max(1, int(round(sig.weight * scale * cap_scale)))
+        new_weight = max(1, int(round(sig.weight * scale * cap_scale * scaling_multiplier)))
         return Signal(
             direction=sig.direction,
             weight=new_weight,
@@ -392,6 +496,8 @@ class RiskV2Wrapper:
             )
         # Primitive 11: per-symbol drawdown brake state update
         self._update_drawdown_brake(trade)
+        # Primitive 13: per-symbol drawdown scaling state update (iter-v3/129)
+        self._update_drawdown_scaling(trade)
 
     def _update_drawdown_brake(self, trade: TradeResult) -> None:
         """Update per-symbol drawdown brake state on each closed trade (primitive 11).
@@ -440,10 +546,114 @@ class RiskV2Wrapper:
         # State machine: engage / disengage
         if self._brake_on[sym]:
             if dd_30d <= self.config.drawdown_brake_recovery_wpnl:
-                self._brake_on[sym] = False  # disengage
+                self._brake_on[sym] = False  # disengage (state-based recovery)
         else:
             if dd_30d >= self.config.drawdown_brake_threshold_wpnl:
                 self._brake_on[sym] = True  # engage
+                # iter-v3/127: record engagement timestamp for time-override deadlock-breaker.
+                # Uses the trade's close_time as the reference point (most recent closed trade
+                # that crossed the threshold); get_signal checks open_time - this value.
+                self._brake_on_close_time[sym] = close_time
+
+    def _update_drawdown_scaling(self, trade: TradeResult) -> None:
+        """Update per-symbol drawdown scaling state on each closed trade (primitive 13).
+
+        Called by record_trade_result. No-op when enable_per_symbol_drawdown_scaling
+        is False (preserves backward compatibility with all prior behavior).
+
+        State-update logic (parallel to _update_drawdown_brake, Carver canonical):
+          1. Append (close_time_ms, cum_wpnl) to the per-symbol deque.
+          2. Expire entries older than drawdown_scaling_window_days from the front.
+          3. Compute running peak = max(cum_wpnl) over the in-window entries.
+          (The multiplier is computed lazily in _compute_drawdown_scaling_multiplier
+          at get_signal time, reading the current rolling state.)
+        """
+        if not self.config.enable_per_symbol_drawdown_scaling:
+            return
+
+        sym = trade.symbol
+
+        # Initialize per-symbol state on first trade
+        if sym not in self._scaling_timeline:
+            self._scaling_timeline[sym] = deque()
+            self._scaling_running_peak[sym] = 0.0
+            self._scaling_cum_wpnl[sym] = 0.0
+            self._scaling_zero_since[sym] = None
+
+        # Update cumulative wpnl
+        self._scaling_cum_wpnl[sym] += trade.weighted_pnl
+        self._scaling_timeline[sym].append((trade.close_time, self._scaling_cum_wpnl[sym]))
+
+        # Expire entries older than window_days from the front of the deque
+        window_ms = self.config.drawdown_scaling_window_days * 24 * 60 * 60 * 1000
+        cutoff = trade.close_time - window_ms
+        while self._scaling_timeline[sym] and self._scaling_timeline[sym][0][0] < cutoff:
+            self._scaling_timeline[sym].popleft()
+
+        # Compute running peak over the rolling window
+        if self._scaling_timeline[sym]:
+            self._scaling_running_peak[sym] = max(c for _, c in self._scaling_timeline[sym])
+
+    def _compute_drawdown_scaling_multiplier(
+        self, symbol: str, open_time: int, stats: GateStats
+    ) -> float:
+        """Compute the continuous size-scaling multiplier for a symbol at signal time.
+
+        Returns a float in [0.0, 1.0]:
+          - 1.0 when dd <= T_R (below full-size threshold)
+          - 0.0 when dd >= T_max (at or above zero-size threshold)
+          - Linear interpolation between T_R and T_max
+
+        Time-override deadlock-breaker (carry-forward from /127 binary brake M=21):
+          When multiplier reaches exactly 0.0 for the first time, records open_time
+          in _scaling_zero_since[symbol]. If the elapsed candles since that point
+          reach M (drawdown_scaling_time_override_candles * interval_ms), the
+          multiplier is forced back to 1.0 regardless of dd state.
+        """
+        if symbol not in self._scaling_timeline:
+            # No trades seen yet for this symbol — no dd, full size
+            return 1.0
+
+        # Time-override: if zero-since is set and M candles have elapsed, force 1.0
+        if self.config.drawdown_scaling_time_override_candles > 0:
+            zero_since = self._scaling_zero_since.get(symbol)
+            if zero_since is not None:
+                override_ms = (
+                    self.config.drawdown_scaling_time_override_candles
+                    * self.config.drawdown_scaling_candle_interval_minutes
+                    * 60
+                    * 1000
+                )
+                if open_time - zero_since >= override_ms:
+                    # Force back to full size; clear the zero-since marker
+                    self._scaling_zero_since[symbol] = None
+                    stats.drawdown_scaling_time_overrides += 1
+                    return 1.0
+
+        # Compute current drawdown from rolling peak
+        peak = self._scaling_running_peak.get(symbol, 0.0)
+        cum = self._scaling_cum_wpnl.get(symbol, 0.0)
+        dd = peak - cum
+
+        t_r = self.config.drawdown_scaling_t_r
+        t_max = self.config.drawdown_scaling_t_max
+
+        if dd <= t_r:
+            # Below full-size threshold — no dampening
+            self._scaling_zero_since[symbol] = None
+            return 1.0
+        elif dd >= t_max:
+            # At or above zero-size threshold — fully dampened
+            if self._scaling_zero_since.get(symbol) is None:
+                self._scaling_zero_since[symbol] = open_time
+            stats.drawdown_scaling_fires += 1
+            return 0.0
+        else:
+            # Linear interpolation in (t_r, t_max) — partial dampening
+            multiplier = (t_max - dd) / (t_max - t_r)
+            self._scaling_zero_since[symbol] = None  # not at zero
+            stats.drawdown_scaling_fires += 1
+            return multiplier
 
     # ------------------------------------------------------------------
     # Lookup construction
@@ -670,6 +880,12 @@ class RiskV2Wrapper:
                 "drawdown_brake_fire_rate": (
                     s.drawdown_brake_fires / s.signals_seen if s.signals_seen else 0.0
                 ),
+                "drawdown_brake_time_overrides": s.drawdown_brake_time_overrides,  # iter-v3/127
+                "drawdown_scaling_fires": s.drawdown_scaling_fires,  # iter-v3/129: primitive 13
+                "drawdown_scaling_fire_rate": (
+                    s.drawdown_scaling_fires / s.signals_seen if s.signals_seen else 0.0
+                ),
+                "drawdown_scaling_time_overrides": s.drawdown_scaling_time_overrides,
             }
         return out
 

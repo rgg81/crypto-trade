@@ -1,0 +1,15 @@
+iter-v3/090 — gross monthly Sharpe recompute (TASK 1 output)
+Method: per-calendar-month sum on open_time; Sharpe=mean/std (ddof=1); no annualization
+
+iter split  net_sharpe_comparison_csv  net_sharpe_recomputed  net_sharpe_match  gross_sharpe_recomputed
+ 089    IS                  -0.195953              -0.195953              True                 0.092485
+ 089   OOS                  -0.098453              -0.098453              True                 0.171676
+ 090    IS                  -0.230458              -0.230458              True                 0.077216
+ 090   OOS                  -0.077043              -0.077043              True                 0.155841
+
+F3 inputs:
+  /089 OOS gross monthly Sharpe — documented : +0.1717
+  /089 OOS gross monthly Sharpe — recomputed : +0.171676
+  /090 OOS gross monthly Sharpe — recomputed : +0.155841
+  F3 vs documented (+0.1717) : FIRES
+  F3 vs recomputed (+0.1717) : FIRES

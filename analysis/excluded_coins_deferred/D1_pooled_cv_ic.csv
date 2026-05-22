@@ -1,0 +1,3 @@
+pool,n_symbols,n_rows,pooled_cv_rank_ic
+majors_10,10,32517,0.05134
+altcoins_3,3,7657,0.0543

@@ -1,0 +1,20 @@
+{
+  "bar_interval_choice": "4h",
+  "rationale": "Option 1 (4h) per Critic FINAL Rec 1 PRIMARY + QR adjudication: (a) 2\u00d7 sample density at single-seed budget may reduce Optuna trajectory variance and surface /121-comparable trajectories (per /129 closeout lesson 3); (b) most structurally distinct from 8h baseline; (c) funding-cycle-half alignment (4h = 1/2 funding period); (d) Asia/EU/US-session quarter alignment.",
+  "label_horizon_hours_at_K21": 84,
+  "label_horizon_days_at_K21": 3.5,
+  "label_horizon_change_vs_8h": "HALVED (3.5d vs 7d)",
+  "expected_data_density_lift": "2.0\u00d7",
+  "expected_trade_rate_proxy": "346 IS trades (vs /121's 173) \u2014 assuming signal-emission rate invariant",
+  "runner_changes_required": [
+    "Add '4h' to --bar-interval choices",
+    "Implement 4h kline download via fetcher (--intervals 4h)",
+    "Adjust REQUIRED_GAP for 4h: REQUIRED_GAP_4h = (21+1) \u00d7 3 = 66 per /121 (UNCHANGED \u2014 gap is in candle count, not time)",
+    "Verify K=21 label_timeout_minutes at 4h: candles \u00d7 bar_interval_minutes",
+    "Adjust features_v3 cache paths for 4h",
+    "Run.log persistence MANDATORY (5-occurrence gap fix)"
+  ],
+  "data_caveat": "4h native kline data does NOT yet exist on disk. Setup commit MUST first download via `uv run crypto-trade fetch --symbols BCHUSDT,LDOUSDT,TRXUSDT --intervals 4h` before backtest launch. This EDA used 8h-derived proxies; the production 4h run will use actual 4h data.",
+  "anchor": "/121 multi-seed CONFIRMATION-MERGE BASELINE (PUBLIC IS +1.3108 / OOS +0.9682)",
+  "is_only_fence_compliance": "ALL T1-T5 computations use IS-only data (close_time < OOS_CUTOFF_MS)"
+}

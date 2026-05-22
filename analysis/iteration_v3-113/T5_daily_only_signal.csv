@@ -1,0 +1,2 @@
+model,observed_auc,null_q50,null_q95,p_value,clears_q95,n_perm
+daily-ONLY POOLED,0.5275,0.4997,0.5093,0.0,True,100

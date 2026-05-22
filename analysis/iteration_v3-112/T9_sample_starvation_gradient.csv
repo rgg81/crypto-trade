@@ -1,0 +1,2 @@
+spearman_rho_trainN_vs_auc,spearman_p_value,n_cells,mean_per_symbol_auc,min_train_n,max_train_n,interpretation
+-0.0827,0.7289,20,0.4983,370,5042,flat/negative rho => starvation mechanism NOT supported

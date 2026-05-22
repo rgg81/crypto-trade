@@ -1,0 +1,121 @@
+==============================================================================
+iter-v3/094 Phase-1 GO/NO-GO EDA — derivatives ORDER-FLOW return IC
+==============================================================================
+Universe: ['BCHUSDT', 'LDOUSDT', 'TRXUSDT']
+OOS_CUTOFF_MS = 1742774400000 (2025-03-24) — IMMUTABLE; OOS NEVER touched
+IS-eval window start = 1679616000000 (2023-03-24) — walk-forward-faithful
+/093 benchmark (price-myopic return-IC ceiling to beat): ~0.08
+Triple-barrier label: ATR(2.0,1.0), timeout=9 candles, Wilder ATR-14
+
+[BCHUSDT] bars=6987  IS-full(<OOS)=5727  IS-eval(2023-03-24..OOS)=2193
+    of_taker_imb                     IS-eval coverage = 1.000
+    of_oi_logdelta_1                 IS-eval coverage = 0.999
+    of_retail_lsr                    IS-eval coverage = 1.000
+    of_top_pos_lsr                   IS-eval coverage = 1.000
+    of_taker_lsr                     IS-eval coverage = 1.000
+[LDOUSDT] bars=4001  IS-full(<OOS)=2741  IS-eval(2023-03-24..OOS)=2193
+    of_taker_imb                     IS-eval coverage = 1.000
+    of_oi_logdelta_1                 IS-eval coverage = 0.999
+    of_retail_lsr                    IS-eval coverage = 1.000
+    of_top_pos_lsr                   IS-eval coverage = 1.000
+    of_taker_lsr                     IS-eval coverage = 1.000
+[TRXUSDT] bars=6929  IS-full(<OOS)=5669  IS-eval(2023-03-24..OOS)=2193
+    of_taker_imb                     IS-eval coverage = 1.000
+    of_oi_logdelta_1                 IS-eval coverage = 0.999
+    of_retail_lsr                    IS-eval coverage = 1.000
+    of_top_pos_lsr                   IS-eval coverage = 1.000
+    of_taker_lsr                     IS-eval coverage = 1.000
+
+------------------------------------------------------------------------------
+T1 — order-flow forward-RETURN IC, FULL IS panel (open_time < OOS).
+     SECONDARY reference only — NOT the GO/NO-GO gate.
+------------------------------------------------------------------------------
+  wrote T1 (171 rows)
+
+------------------------------------------------------------------------------
+T2 — order-flow forward-RETURN IC, WALK-FORWARD IS-EVAL window
+     (2023-03-24 .. OOS_CUTOFF) — PRIMARY GO/NO-GO TABLE.
+------------------------------------------------------------------------------
+  wrote T2 (171 rows)
+
+  T2 strongest |IC| per symbol (walk-forward IS-eval window):
+    BCHUSDT  of_oi_logdelta_9                 h= 9  IC=+0.1454  n=2191
+    BCHUSDT  of_retail_top_divergence         h=21  IC=+0.1095  n=2192
+    BCHUSDT  of_oi_logdelta_3                 h= 9  IC=+0.1007  n=2191
+    BCHUSDT  of_oi_logdelta_9                 h=21  IC=+0.0955  n=2191
+    BCHUSDT  of_retail_lsr_z30                h= 9  IC=-0.0725  n=2192
+    LDOUSDT  of_retail_top_divergence         h=21  IC=+0.1475  n=2192
+    LDOUSDT  of_retail_lsr                    h=21  IC=+0.1356  n=2192
+    LDOUSDT  of_top_acct_lsr                  h=21  IC=+0.1129  n=2192
+    LDOUSDT  of_retail_lsr_z30                h=21  IC=+0.1106  n=2192
+    LDOUSDT  of_top_acct_lsr_z30              h=21  IC=+0.1091  n=2192
+    TRXUSDT  of_top_pos_lsr                   h=21  IC=-0.1289  n=2192
+    TRXUSDT  of_oi_logdelta_9                 h= 3  IC=-0.0969  n=2191
+    TRXUSDT  of_oi_logdelta_9                 h= 9  IC=-0.0965  n=2191
+    TRXUSDT  of_top_acct_lsr                  h=21  IC=-0.0788  n=2192
+    TRXUSDT  of_oi_logdelta_3                 h= 9  IC=-0.0677  n=2191
+
+------------------------------------------------------------------------------
+T3 — order-flow IC vs the /059 TRIPLE-BARRIER LABEL, IS-eval window.
+     The label is the actual model target — IC here is the most
+     architecture-faithful predictability measure.
+------------------------------------------------------------------------------
+  wrote T3 (57 rows)
+
+  T3 strongest |IC| per symbol (vs triple-barrier label):
+    BCHUSDT  of_oi_logdelta_9                  IC=+0.1223  n=2191
+    BCHUSDT  of_oi_logdelta_3                  IC=+0.0872  n=2191
+    BCHUSDT  of_oi_logdelta_1                  IC=+0.0572  n=2191
+    BCHUSDT  of_oi_logdelta_z30                IC=+0.0497  n=2191
+    BCHUSDT  of_taker_imb_z30                  IC=+0.0423  n=2193
+    LDOUSDT  of_top_acct_lsr                   IC=+0.0617  n=2192
+    LDOUSDT  of_retail_lsr                     IC=+0.0603  n=2192
+    LDOUSDT  of_retail_top_divergence_z30      IC=+0.0473  n=2192
+    LDOUSDT  of_retail_top_divergence          IC=+0.0382  n=2192
+    LDOUSDT  of_retail_lsr_z30                 IC=+0.0370  n=2192
+    TRXUSDT  of_oi_logdelta_9                  IC=-0.1103  n=2191
+    TRXUSDT  of_oi_logdelta_3                  IC=-0.0691  n=2191
+    TRXUSDT  of_top_pos_lsr                    IC=-0.0536  n=2192
+    TRXUSDT  of_taker_lsr                      IC=+0.0295  n=2192
+    TRXUSDT  of_top_acct_lsr                   IC=-0.0277  n=2192
+
+------------------------------------------------------------------------------
+T4 — order-flow vs price-derived features: |corr| (orthogonality).
+------------------------------------------------------------------------------
+  wrote T4 (171 rows)  max |corr| vs price = 0.6015
+
+==============================================================================
+T5 — GO/NO-GO VERDICT
+==============================================================================
+
+Best |return-IC| per symbol (T2, walk-forward IS-eval window):
+  BCHUSDT: +0.1454
+  LDOUSDT: +0.1475
+  TRXUSDT: +0.1289
+  -> cross-symbol mean = 0.1406   max = 0.1475
+
+Best |barrier-label-IC| per symbol (T3, walk-forward IS-eval window):
+  BCHUSDT: +0.1223
+  LDOUSDT: +0.0617
+  TRXUSDT: +0.1103
+  -> cross-symbol mean = 0.0981   max = 0.1223
+
+------------------------------------------------------------------------------
+DECISION RULE
+------------------------------------------------------------------------------
+  GO requires ALL of:
+   (a) headline cross-symbol mean best |IC| > 0.120 (= 1.5 x /093 ceiling 0.08)
+       -> headline mean = 0.0981  [FAIL]
+   (b) >= 2 of 3 symbols individually clear the 0.08 ceiling
+       -> 2 of 3 symbols clear  [PASS]
+   (c) T2 (return-IC) corroborates — T2 cross-symbol mean > 0.08
+       -> T2 mean = 0.1406  [PASS]
+
+  ===> VERDICT: NO-GO
+
+  NO-GO: derivatives order-flow return-predictability sits at or near
+  the /093 ~0.08 price-myopic ceiling. The order-flow-DIRECTIONAL axis
+  is KILLED CHEAPLY at the EDA — exactly as fail-fast demands. No brief,
+  no backtest. See diary-v3/iteration_v3-094.md for the next-axis pivot.
+
+  wrote T5 — VERDICT = NO-GO

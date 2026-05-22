@@ -155,6 +155,7 @@ def seed_live_db_from_backtest(
     v2_trades_csvs: list[Path],
     live_config: LiveConfig,
     reseed: bool = False,
+    v3_trades_csvs: list[Path] | None = None,
 ) -> dict[str, int]:
     """Seed `db_path` with backtest trades, cooldown keys, and boundary keys.
 
@@ -162,7 +163,7 @@ def seed_live_db_from_backtest(
         db_path: target SQLite DB. Existing rows kept; UNIQUE constraint
             makes re-running idempotent (skipped_duplicate count surfaces
             already-seeded rows).
-        v1_trades_csvs / v2_trades_csvs: paths to backtest CSVs.
+        v1_trades_csvs / v2_trades_csvs / v3_trades_csvs: paths to backtest CSVs.
         live_config: drives symbol → model mapping and cooldown_candles.
         reseed: if True, overwrite seeded_through_* keys with the new
             CSV's boundary, even if the new value is lower than what's
@@ -171,8 +172,8 @@ def seed_live_db_from_backtest(
 
     Returns:
         counts dict with keys "v1_closed", "v1_open", "v2_closed", "v2_open",
-        "skipped_zero_weight", "skipped_unknown_symbol", "skipped_duplicate",
-        "cooldown_keys", "boundary_keys".
+        "v3_closed", "v3_open", "skipped_zero_weight", "skipped_unknown_symbol",
+        "skipped_duplicate", "cooldown_keys", "boundary_keys".
     """
     sym_to_model = _build_symbol_to_model(live_config.models)
     cooldown_candles_for = _resolve_cooldown_candles(live_config.models, live_config)
@@ -183,6 +184,8 @@ def seed_live_db_from_backtest(
         "v1_open": 0,
         "v2_closed": 0,
         "v2_open": 0,
+        "v3_closed": 0,
+        "v3_open": 0,
         "skipped_zero_weight": 0,
         "skipped_unknown_symbol": 0,
         "skipped_duplicate": 0,
@@ -244,6 +247,8 @@ def seed_live_db_from_backtest(
 
     _ingest(v1_trades_csvs, "v1")
     _ingest(v2_trades_csvs, "v2")
+    if v3_trades_csvs:
+        _ingest(v3_trades_csvs, "v3")
 
     # Seed cooldown_<model>_<symbol> engine_state keys
     for (model_name, sym), close_time in latest_close.items():

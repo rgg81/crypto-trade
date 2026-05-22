@@ -1,0 +1,4 @@
+feature_dropped,ic_ir_with,ic_ir_without,ic_ir_loss_on_removal,earns_its_slot
+cand_semidev_50,0.2303,0.2171,0.0132,True
+cand_sortino_mom_12,0.2303,0.2215,0.0088,True
+cand_downbeta_50,0.2303,0.2221,0.0083,True

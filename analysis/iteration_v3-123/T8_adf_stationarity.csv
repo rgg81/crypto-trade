@@ -1,0 +1,13 @@
+candidate,symbol,adf_stat,p_value,n,verdict
+B1_eth_vs_sym_rv_50,BCHUSDT,-3.6729,0.00451,2000,PASS
+B1_eth_vs_sym_rv_50,LDOUSDT,-3.5093,0.007751,2000,PASS
+B1_eth_vs_sym_rv_50,TRXUSDT,-3.5155,0.007598,2000,PASS
+B1a_log_eth_vs_sym_rv_50,BCHUSDT,-3.6513,0.004853,2000,PASS
+B1a_log_eth_vs_sym_rv_50,LDOUSDT,-3.6312,0.005191,2000,PASS
+B1a_log_eth_vs_sym_rv_50,TRXUSDT,-3.235,0.018048,2000,PASS
+B1b_eth_vs_sym_rv_25,BCHUSDT,-4.48,0.000214,2000,PASS
+B1b_eth_vs_sym_rv_25,LDOUSDT,-4.1492,0.000802,2000,PASS
+B1b_eth_vs_sym_rv_25,TRXUSDT,-4.3327,0.00039,2000,PASS
+B1c_eth_vs_sym_rv_100,BCHUSDT,-2.4085,0.139339,2000,FAIL
+B1c_eth_vs_sym_rv_100,LDOUSDT,-2.5042,0.11445,2000,FAIL
+B1c_eth_vs_sym_rv_100,TRXUSDT,-2.4643,0.124409,2000,FAIL

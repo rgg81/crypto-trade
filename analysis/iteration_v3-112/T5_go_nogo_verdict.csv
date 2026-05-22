@@ -1,0 +1,2 @@
+pooled_auc_lift_vs_per_symbol,positive_thirds,gate_material_lift_ge_0p010,gate_stable_2of3_thirds,pooled_mean_ic,per_symbol_mean_ic,ic_lift,verdict
+-0.0008,1,False,False,-0.0052,-0.0191,0.0139,NO-GO

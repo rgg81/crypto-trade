@@ -1,0 +1,16 @@
+symbol,feature,ts_ic_full,ts_half_signs,ts_quartile_signs,ts_quartile_stable,tb_half_signs,tb_quartile_signs
+BCHUSDT,ret_skew_50,-0.10066,--,----,True,--,-+-+
+BCHUSDT,ret_skew_200,-0.09537,--,---+,False,--,---+
+BCHUSDT,ema_spread_atr_20,-0.07934,+-,-+--,False,+-,-+--
+BCHUSDT,sym_vs_btc_ret_7d,-0.06805,--,----,True,--,--+-
+BCHUSDT,hurst_100,-0.06663,--,---+,False,-+,---+
+LDOUSDT,sym_vs_btc_ret_7d,-0.13198,--,+---,False,--,----
+LDOUSDT,ema_spread_atr_20,-0.12943,--,----,True,--,+---
+LDOUSDT,regime_momentum_signed_5d,-0.12566,--,----,True,--,----
+LDOUSDT,vwap_dev_20,-0.1147,--,----,True,--,----
+LDOUSDT,ret_kurt_50,0.11011,++,+-++,False,++,+-++
+TRXUSDT,ema_spread_atr_20,-0.05468,--,----,True,--,-+--
+TRXUSDT,range_realized_vol_50,-0.05288,+-,-+--,False,+-,-+--
+TRXUSDT,regime_momentum_signed_5d,-0.05075,--,----,True,--,-+--
+TRXUSDT,ret_skew_50,-0.03849,+-,-+--,False,+-,++--
+TRXUSDT,vwap_dev_20,-0.03455,--,----,True,+-,-+-+

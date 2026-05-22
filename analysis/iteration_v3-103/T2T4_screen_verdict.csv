@@ -1,0 +1,8 @@
+candidate,mean_abs_ic,sign_consistent,subperiod_stable,ADVANCES
+recency_weighted_momentum_5d,0.0329,False,True,False
+extrema_recency_skew_30,0.05,True,False,False
+vol_decayed_trend,0.0384,False,False,False
+corr_gated_momentum_5d,0.0372,True,False,False
+tsrank_dispersion_ratio,0.0992,True,False,False
+scaled_reversal_pressure_signed,0.025,True,False,False
+argmax_pullback_signed_20,0.0503,True,False,False

@@ -354,12 +354,12 @@ class TestLiveModePaperSafety:
         assert mgr.check_exchange_exits() == []
 
     def test_check_exchange_exits_real_id_still_polled(self, state):
-        """Regression — real numeric-ID trades still hit Binance."""
+        """Regression — real numeric-ID trades still hit Binance via the algo endpoint."""
         called: list[str] = []
 
         def handler(request):
             called.append(str(request.url.path))
-            return httpx.Response(200, json={"status": "NEW"})
+            return httpx.Response(200, json={"algoStatus": "NEW"})
 
         client = AuthenticatedBinanceClient(
             api_key="t",
@@ -371,7 +371,8 @@ class TestLiveModePaperSafety:
         )
         mgr = OrderManager(_live_config(), state, client)
         mgr.check_exchange_exits()
-        assert any("/fapi/v1/order" in p for p in called)
+        # SL/TP are algo orders — must hit /fapi/v1/algoOrder, NOT /fapi/v1/order.
+        assert any("/fapi/v1/algoOrder" in p for p in called), called
 
     def test_timeout_paper_trade_no_binance_call_but_db_closed(self, state):
         """Paper trade hitting timeout in --live mode must update DB without
@@ -431,7 +432,207 @@ class TestLiveModePaperSafety:
         mgr = OrderManager(_live_config(), state, client)
         mgr.check_timeouts(now_ms=3_000_000)
 
-        # Expect: 2 cancels (DELETE) + 1 market close (POST)
+        # Expect: 2 algo cancels (DELETE /fapi/v1/algoOrder) + 1 market close (POST)
         assert any(c == ("POST", "/fapi/v1/order") for c in calls), (
             f"Expected market-close POST among {calls}"
         )
+        # SL/TP cancels must hit the algo endpoint, not the legacy order endpoint.
+        assert any(c == ("DELETE", "/fapi/v1/algoOrder") for c in calls), (
+            f"Expected algo cancel among {calls}"
+        )
+
+
+class TestOpenTradeAtomicity:
+    """If SL or TP placement fails after entry fills, the entry must be rolled back
+    so we never leave a naked position on the exchange."""
+
+    def _capture_with_failures(self, fail_on_paths: set[str]):
+        """Mock transport that fails any POST whose path matches `fail_on_paths`."""
+        calls: list[tuple[str, str, str]] = []
+
+        def handler(request):
+            params = str(request.url.params)
+            calls.append((request.method, request.url.path, params))
+            if request.method == "POST" and request.url.path in fail_on_paths:
+                return httpx.Response(
+                    400,
+                    json={
+                        "code": -4120,
+                        "msg": "Order type not supported for this endpoint.",
+                    },
+                )
+            # Default: orderId for /fapi/v1/order, algoId for /fapi/v1/algoOrder
+            if "/algoOrder" in request.url.path:
+                return httpx.Response(200, json={"algoId": 555, "algoStatus": "NEW"})
+            return httpx.Response(200, json={"orderId": 12345, "status": "NEW"})
+
+        return httpx.MockTransport(handler), calls
+
+    def _live_mgr(self, state, transport):
+        client = AuthenticatedBinanceClient(
+            api_key="t", api_secret="t", transport=transport,
+        )
+        return OrderManager(
+            _live_config(), state, client,
+            quantity_precision={"BTCUSDT": 4},
+            tick_size={"BTCUSDT": 0.1},
+        )
+
+    def test_sl_placement_failure_rolls_back_entry(self, state):
+        """Entry succeeds; SL fails → entry must be market-closed and exception re-raised."""
+        # Fail every POST to /fapi/v1/algoOrder so SL placement raises.
+        transport, calls = self._capture_with_failures({"/fapi/v1/algoOrder"})
+        mgr = self._live_mgr(state, transport)
+
+        signal = Signal(direction=1, weight=100, tp_pct=8.0, sl_pct=4.0)
+        with pytest.raises(httpx.HTTPStatusError):
+            mgr.open_trade(
+                model_name="A", symbol="BTCUSDT", signal=signal,
+                entry_price=80000.0, candle_close_time=2_000_000,
+                candle_open_time=1_000_000, weight_factor=1.0,
+            )
+
+        # Sequence must be: entry POST /fapi/v1/order → SL POST /fapi/v1/algoOrder (fails)
+        # → close POST /fapi/v1/order with side=SELL.
+        order_posts = [c for c in calls if c[0] == "POST" and c[1] == "/fapi/v1/order"]
+        assert len(order_posts) == 2, f"Expected entry + close on /fapi/v1/order, got {order_posts}"
+        # The second POST should be the rollback close — opposite side.
+        close_params = order_posts[1][2]
+        assert "side=SELL" in close_params, (
+            f"Rollback close should be SELL (closing the long entry); params={close_params}"
+        )
+        # And no DB record was persisted because the exception bubbled before upsert.
+        assert state.get_open_trades() == []
+
+    def test_tp_placement_failure_rolls_back_entry_and_cancels_sl(self, state):
+        """Entry + SL succeed; TP fails → SL must be cancelled AND entry market-closed."""
+        # Use a stateful handler: succeed for first algoOrder POST (SL), fail for second (TP).
+        algo_post_count = [0]
+
+        def handler(request):
+            if request.url.path == "/fapi/v1/algoOrder" and request.method == "POST":
+                algo_post_count[0] += 1
+                if algo_post_count[0] == 1:
+                    return httpx.Response(200, json={"algoId": 100, "algoStatus": "NEW"})
+                # Second algoOrder POST = TP — fail it.
+                return httpx.Response(
+                    400, json={"code": -4131, "msg": "PERCENT_PRICE filter violation"},
+                )
+            if "/algoOrder" in request.url.path and request.method == "DELETE":
+                return httpx.Response(200, json={"algoId": 100, "code": "200", "msg": "success"})
+            return httpx.Response(200, json={"orderId": 12345, "status": "NEW"})
+
+        # Track all calls separately for assertion.
+        all_calls: list[tuple[str, str]] = []
+
+        def trace_handler(request):
+            all_calls.append((request.method, request.url.path))
+            return handler(request)
+
+        mgr = self._live_mgr(state, httpx.MockTransport(trace_handler))
+
+        signal = Signal(direction=1, weight=100, tp_pct=8.0, sl_pct=4.0)
+        with pytest.raises(httpx.HTTPStatusError):
+            mgr.open_trade(
+                model_name="A", symbol="BTCUSDT", signal=signal,
+                entry_price=80000.0, candle_close_time=2_000_000,
+                candle_open_time=1_000_000, weight_factor=1.0,
+            )
+
+        # Must have: entry POST → SL POST → TP POST (fails) → SL cancel DELETE → close POST.
+        kinds = [(m, p) for m, p in all_calls]
+        assert ("POST", "/fapi/v1/order") in kinds  # entry + close
+        assert kinds.count(("POST", "/fapi/v1/order")) == 2, f"entry+close, got {kinds}"
+        assert kinds.count(("POST", "/fapi/v1/algoOrder")) == 2, (
+            f"SL + TP attempts, got {kinds}"
+        )
+        assert ("DELETE", "/fapi/v1/algoOrder") in kinds, (
+            f"SL must be cancelled when TP fails; got {kinds}"
+        )
+        assert state.get_open_trades() == []
+
+
+class TestAlgoSLTPFillDetection:
+    """check_exchange_exits must detect SL/TP fills via algoStatus, not legacy `status`."""
+
+    def test_sl_fill_detected_from_algo_status_triggered(self, state):
+        """When the SL algo flips to TRIGGERED, the trade closes as stop_loss."""
+        def handler(request):
+            # Match SL or TP query
+            params = dict(p.split("=") for p in str(request.url.params).split("&") if "=" in p)
+            algo_id = params.get("algoId", "")
+            if request.method == "GET" and request.url.path == "/fapi/v1/algoOrder":
+                if algo_id == "111":  # SL
+                    return httpx.Response(200, json={
+                        "algoId": 111, "algoStatus": "TRIGGERED",
+                        "actualPrice": "57555.5", "triggerTime": 2_500_000,
+                    })
+                if algo_id == "222":  # TP — still open
+                    return httpx.Response(200, json={
+                        "algoId": 222, "algoStatus": "NEW",
+                        "actualPrice": "0", "triggerTime": 0,
+                    })
+            if request.method == "DELETE" and request.url.path == "/fapi/v1/algoOrder":
+                return httpx.Response(200, json={"code": "200", "msg": "success"})
+            return httpx.Response(200, json={})
+
+        client = AuthenticatedBinanceClient(
+            api_key="t", api_secret="t", transport=httpx.MockTransport(handler),
+        )
+        # Numeric (real) SL/TP IDs so is_paper_trade is False.
+        trade = LiveTrade(
+            id="t-sl", model_name="A", symbol="BTCUSDT", direction=1,
+            entry_price=60000.0, amount_usd=1000.0, weight_factor=1.0,
+            stop_loss_price=57600.0, take_profit_price=64800.0,
+            open_time=1_000_000, timeout_time=10**13, signal_time=999_000,
+            entry_order_id="9999", sl_order_id="111", tp_order_id="222",
+        )
+        state.upsert_trade(trade)
+        mgr = OrderManager(_live_config(), state, client)
+        closed = mgr.check_exchange_exits()
+
+        assert len(closed) == 1
+        stored = state.get_trade("t-sl")
+        assert stored.status == "closed"
+        assert stored.exit_reason == "stop_loss"
+        assert stored.exit_price == pytest.approx(57555.5)
+        assert stored.exit_time == 2_500_000
+
+    def test_tp_fill_detected_from_algo_status_finished(self, state):
+        """algoStatus=FINISHED is also a fill (Binance flips TRIGGERED→FINISHED)."""
+        def handler(request):
+            params = dict(p.split("=") for p in str(request.url.params).split("&") if "=" in p)
+            algo_id = params.get("algoId", "")
+            if request.method == "GET" and request.url.path == "/fapi/v1/algoOrder":
+                if algo_id == "333":  # SL — still open
+                    return httpx.Response(200, json={
+                        "algoId": 333, "algoStatus": "NEW",
+                        "actualPrice": "0", "triggerTime": 0,
+                    })
+                if algo_id == "444":  # TP — finished
+                    return httpx.Response(200, json={
+                        "algoId": 444, "algoStatus": "FINISHED",
+                        "actualPrice": "21.55", "triggerTime": 2_700_000,
+                    })
+            if request.method == "DELETE" and request.url.path == "/fapi/v1/algoOrder":
+                return httpx.Response(200, json={"code": "200", "msg": "success"})
+            return httpx.Response(200, json={})
+
+        client = AuthenticatedBinanceClient(
+            api_key="t", api_secret="t", transport=httpx.MockTransport(handler),
+        )
+        trade = LiveTrade(
+            id="t-tp", model_name="C", symbol="LINKUSDT", direction=1,
+            entry_price=20.0, amount_usd=1000.0, weight_factor=1.0,
+            stop_loss_price=19.2, take_profit_price=21.6,
+            open_time=1_000_000, timeout_time=10**13, signal_time=999_000,
+            entry_order_id="8888", sl_order_id="333", tp_order_id="444",
+        )
+        state.upsert_trade(trade)
+        mgr = OrderManager(_live_config(), state, client)
+        closed = mgr.check_exchange_exits()
+
+        assert len(closed) == 1
+        stored = state.get_trade("t-tp")
+        assert stored.exit_reason == "take_profit"
+        assert stored.exit_price == pytest.approx(21.55)

@@ -1,0 +1,5 @@
+candidate,BCH_rank,BCH_gain_pct,LDO_rank,LDO_gain_pct,TRX_rank,TRX_gain_pct
+B1a_log_eth_vs_sym_rv_50,14,4.66,1,14.0,5,9.25
+B1c_eth_vs_sym_rv_100,14,4.31,4,10.43,2,11.04
+B1_eth_vs_sym_rv_50,15,4.46,1,14.0,4,9.07
+B1b_eth_vs_sym_rv_25,15,4.39,3,11.7,3,10.58
