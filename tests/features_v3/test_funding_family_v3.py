@@ -165,8 +165,16 @@ def test_add_funding_family_missing_symbol_raises() -> None:
         add_funding_family_v3_features(df)
 
 
-def test_group_registry_contains_funding_family() -> None:
-    """The funding_family_v3 group is registered in GROUP_REGISTRY."""
+def test_funding_family_v3_NOT_in_group_registry_for_121_baseline() -> None:
+    """funding_family_v3 is NOT registered in /121-minimal GROUP_REGISTRY.
+
+    The funding_family_v3 feature family was tried at iter-v3/082 (cycle-3
+    EXPLORATION #1), classified SUSPICIOUS-OOS-DOMINANT, and dropped at /083.
+    The module is retained as research museum code (this test file still
+    covers the math in isolation) but is NOT in the /121-minimal registry —
+    re-adding it would re-introduce a data dependency on
+    ``data/funding_rates/<SYM>.csv`` that the /121 baseline does not need.
+    """
     from crypto_trade.features_v3 import GROUP_REGISTRY
 
-    assert "funding_family_v3" in GROUP_REGISTRY
+    assert "funding_family_v3" not in GROUP_REGISTRY

@@ -775,29 +775,83 @@ Why: failed iterations cherry-pick docs commits to `quant-research`. If diary is
 
 The Critic emits `review.md` content as message text; the orchestrator persists at `briefs-v3/iteration_v3-NNN/review.md`. Both files (engineering report + review.md) are committed together as a single `docs(iter-v3/NNN): engineering report + Critic review` commit. This co-commit makes the audit trail atomic — anyone reading git log sees the engineering output and the Critic verdict in one revision.
 
-### Merge Decision
+### Merge Decision — STRICT TRUNK DISCIPLINE (2026-05-22)
 
-After QR writes the diary with MERGE or NO-MERGE decision:
+**`quant-research` holds only the source of truth for what RUNS today.**
+Research artifacts (briefs, diaries, analysis scripts, reports) live on the
+iteration branch as the archaeological record — they are NOT brought to
+trunk regardless of MERGE / NO-MERGE outcome.
+
+What IS allowed on trunk via an iteration merge:
+- `src/` source code (feature modules, runners, risk wrappers, live engine
+  changes — anything in the production code path)
+- `tests/` test code that covers code now on trunk
+- `BASELINE_V3.md` (when the iteration updates the baseline)
+- Other top-level source files like `run_baseline_v3.py`, `pyproject.toml`,
+  `uv.lock` if the iteration legitimately bumps them
+- `CLAUDE.md`, `.claude/`, `.gitignore` if the iteration touches them
+
+What is NEVER allowed on trunk via an iteration merge:
+- `briefs-v3/iteration_v3-NNN/**` (research brief, phase5p5 gate,
+  engineering report, Critic review — these stay on the iteration branch)
+- `diary-v3/iteration_v3-NNN.md` (Phase 8 diary — stays on the branch)
+- `analysis/iteration_v3-NNN/**` (per-iteration EDA/diagnostic scripts and
+  their CSV outputs — stay on the branch)
+- `reports-v3/iteration_v3-NNN/**` (backtest output artifacts — already
+  excluded by historical pattern; still excluded)
+
+Note: shared cross-iteration documents like `briefs-v3/cycle*_plan.md` and
+`briefs-v3/exploration_catalog.md` ARE allowed on trunk (they aggregate
+state across many iterations, not a single iteration's artifact set).
 
 **MERGE** (iteration beats baseline AND Critic OVERALL=MERGE):
 ```bash
 git checkout quant-research
-git merge iteration-v3/NNN --no-ff -m "merge(iter-v3/NNN): [summary]"
-# Update BASELINE_V3.md with new metrics
-git add BASELINE_V3.md
-git commit -m "baseline-v3: update after iteration v3-NNN"
+
+# Cherry-pick ONLY the source/baseline commits the iteration produced.
+# Identify them by reading the iteration branch's git log and selecting
+# the feat/fix(iter-v3/NNN) code commits + the BASELINE_V3.md edit (if any).
+git cherry-pick <code-sha-1> <code-sha-2> ... <baseline-update-sha>
+
+# Tag the trunk commit that completes the merge
 git tag -a v0.v3-NNN -m "Iteration v3-NNN: OOS Sharpe X.XX, PBO Y.YY, PSR Z.ZZ"
 ```
 
+Do NOT use `git merge iteration-v3/NNN --no-ff`. A true merge brings the
+entire iteration history (including briefs, diaries, analysis, reports)
+into trunk via the second-parent chain, violating the strict-trunk rule.
+Cherry-pick is the only sanctioned vehicle.
+
+If multiple code commits need to land together as one trunk commit, use
+`git merge --squash iteration-v3/NNN` then selectively unstage the
+research artifacts with `git rm --cached -r briefs-v3/iteration_v3-NNN
+diary-v3/iteration_v3-NNN.md analysis/iteration_v3-NNN reports-v3/iteration_v3-NNN`
+before committing.
+
 **NO-MERGE** (iteration fails any gate OR Critic OVERALL=BLOCK):
 ```bash
-# Cherry-pick docs commits (gate, brief, engineering report + review, diary) to quant-research
-git checkout quant-research
-git cherry-pick <gate-sha> <brief-sha> <eng+review-sha> <diary-sha>
-# Iteration branch stays in repo as archaeological record
+# Bring NOTHING to trunk. The iteration branch holds the archaeological
+# record (brief, gate, engineering report, review, diary, analysis).
+# Future iterations reference the iteration branch + tag (v0.v3-NNN if
+# also tagged) for the dead-paths catalog.
+git tag -a v0.v3-NNN -m "Iteration v3-NNN: NO-MERGE — <one-line reason>"
+git push origin iteration-v3/NNN v0.v3-NNN
 ```
 
-Failed iteration diaries are cherry-picked even when code is not — the project values the dead-paths catalog.
+The exploration catalog at `briefs-v3/exploration_catalog.md` IS updated
+on trunk (one-line ledger entry per EXPLORATION) — that file aggregates
+the dead-paths catalog and is the trunk's index into iteration branches.
+Add the ledger entry via a small `docs(iter-v3/NNN): catalog entry`
+commit ON `quant-research` directly (not via a merge from the iteration
+branch).
+
+Why this is stricter than v1/v2:
+- v3 produces 10× more per-iteration artifacts than v1/v2 (10 EXPLORATIONs
+  per CONFIRMATION cycle; CPCV/PBO/PSR reports; Critic review.md; brief
+  Section 2 analysis scripts; etc.). Letting these accumulate on trunk
+  bloats the diff against `main` and clutters reviewers.
+- The /088 + /089 merge pattern that previously landed briefs + diaries
+  on trunk is RETIRED. Going forward those artifacts stay branch-local.
 
 ### Critic Review File Commit
 
