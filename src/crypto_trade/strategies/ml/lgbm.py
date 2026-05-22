@@ -809,11 +809,6 @@ class LightGbmStrategy:
                 f"[predict] {ts_str} {symbol} → {dir_label} (proba={confidence:.2f}{atr_str})"
             )
 
-        # iter-v3/080: flat weight=100 restored (reverts /079 conviction-derate).
-        # confidence is in scope (past-only, look-ahead-clean) and is now threaded
-        # as passive metadata into Signal → Order → TradeResult → trades.csv.
-        # iter-v3/132 live-integration merge: keep main's forensic decision_log
-        # (commit 62d56dc) AND v3's confidence passthrough (/080 revert).
         decision_log.log(
             {
                 "kind": "lgbm_signal",
