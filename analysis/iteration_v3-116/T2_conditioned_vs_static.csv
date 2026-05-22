@@ -1,0 +1,7 @@
+symbol,cond_var,n_entries,static_2to1_monthly_sharpe,conditioned_monthly_sharpe,sharpe_lift,static_full_panel_sharpe
+BCHUSDT,hurst_100,5628,2.2261,2.4936,0.2675,2.2546
+BCHUSDT,realvol_z,5678,2.2114,2.6229,0.4114,2.2546
+LDOUSDT,hurst_100,2642,2.1718,3.3315,1.1597,2.3804
+LDOUSDT,realvol_z,2692,2.4025,3.1669,0.7645,2.3804
+TRXUSDT,hurst_100,5570,1.4063,1.5554,0.1491,1.4196
+TRXUSDT,realvol_z,5620,1.3815,1.5169,0.1354,1.4196

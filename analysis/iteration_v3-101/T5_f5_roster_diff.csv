@@ -1,0 +1,9 @@
+anchor,symbol,n_anchor,n_iter,n_kept,n_added,n_removed,added_mean_dur,removed_mean_dur,duration_gap,f5_evaluable,f5_fires_symbol
+iter-v3/060 (3-seed EXPLORATION — matched),BCHUSDT,37,37,24,13,13,8.0,6.3846,1.6154,True,True
+iter-v3/060 (3-seed EXPLORATION — matched),LDOUSDT,11,12,7,5,4,9.6,9.5,0.1,True,False
+iter-v3/060 (3-seed EXPLORATION — matched),TRXUSDT,54,52,39,13,15,5.3077,6.2667,-0.959,True,False
+iter-v3/060 (3-seed EXPLORATION — matched),PORTFOLIO,102,101,70,31,32,7.129,6.7188,0.4103,True,False
+iter-v3/059 (10-seed CONFIRMATION — caveat only),BCHUSDT,34,37,19,18,15,7.0,7.6,-0.6,True,False
+iter-v3/059 (10-seed CONFIRMATION — caveat only),LDOUSDT,12,12,7,5,5,10.0,9.0,1.0,True,True
+iter-v3/059 (10-seed CONFIRMATION — caveat only),TRXUSDT,48,52,36,16,12,5.8125,4.0,1.8125,True,True
+iter-v3/059 (10-seed CONFIRMATION — caveat only),PORTFOLIO,94,101,62,39,32,6.8974,6.4688,0.4287,True,False

@@ -1,0 +1,2 @@
+is_best_trigger,is_best_std_gap,best_abs_std_gap_3_shipped,best_abs_std_gap_3_wider,any_clean_separation_gt_0p80,best_loser_hit_rate_positive_cf,verdict,pre_registered_modal_outcome
+ldo_vz,-0.742,0.742,1.2317,True,1.0,GO,PROMISING — gate suppresses a loss-dense LDO slice

@@ -1,0 +1,2 @@
+question,ldo_pooled_lift,ldo_pooled_clears_own_null_q95,ldo_gated_tail_lift,ldo_positive_lift_folds,verdict
+Is the LDO pooled AUC lift genuine signal?,0.0905,True,0.1259,2/4,LDO pooled lift is CREDIBLE — clears its own no-signal q95

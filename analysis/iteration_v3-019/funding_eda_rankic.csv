@@ -1,0 +1,10 @@
+symbol,feature,horizon_bars,horizon_days,n_pairs,rank_ic_spearman
+BCHUSDT,funding_rate_zscore_30,1,0.33,2192,-0.00022
+BCHUSDT,funding_rate_zscore_30,3,1.0,2190,-0.01937
+BCHUSDT,funding_rate_zscore_30,7,2.33,2186,-0.01033
+LDOUSDT,funding_rate_zscore_30,1,0.33,2192,-0.01007
+LDOUSDT,funding_rate_zscore_30,3,1.0,2190,-0.02287
+LDOUSDT,funding_rate_zscore_30,7,2.33,2186,-0.02342
+TRXUSDT,funding_rate_zscore_30,1,0.33,2192,0.01626
+TRXUSDT,funding_rate_zscore_30,3,1.0,2190,-0.02179
+TRXUSDT,funding_rate_zscore_30,7,2.33,2186,-0.0485

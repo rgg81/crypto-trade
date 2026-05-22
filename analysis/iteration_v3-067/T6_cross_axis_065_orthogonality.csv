@@ -1,0 +1,8 @@
+stage,065_axis_uses,067_path_d_uses,orthogonal
+feature_engineering,no change (uses V3_FEATURE_COLUMNS_TOP_N=14),no change,True
+label_generation,TRAIN-TIME triple-barrier sl_multiplier 1.0 → 1.5 (asymmetric vs tp_multiplier=2.0),no change (uses training labels as-is),True
+optuna_hyperparameter_search,"TPE explores hyperparams on changed labels (different sample weights, label distribution)","TPE unchanged; same suggest_float([0.50, 0.85]) range",True
+model_training,trained on changed labels,no change,True
+inference_time_prediction,no change to inference path,"AGGREGATION change: confidence_threshold = max(mean(per_seed), 0.60)",True
+risk_gate_stack,no change (7-primitive stack unchanged),no change,True
+trade_emission,different trades emitted (different model fit + different labels),different trades emitted (different threshold + same model fit),False

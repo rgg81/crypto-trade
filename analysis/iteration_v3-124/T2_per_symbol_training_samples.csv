@@ -1,0 +1,13 @@
+symbol,K_candles,is_candles_total,afml_eff_sample_size,sample_loss_pct_vs_K21,per_cell_embargo_candles,cross_cell_gap_candles,REQUIRED_GAP_at_K,wf_monthly_embargo_extra_candles_vs_K21,is_lowest_trade_count_sym
+BCHUSDT,21,5727,286,+0.00%,22,66,66,0,no
+BCHUSDT,42,5727,139,+51.22%,43,129,129,21,no
+BCHUSDT,63,5727,92,+67.74%,64,192,192,42,no
+BCHUSDT,84,5727,69,+75.90%,85,255,255,63,no
+LDOUSDT,21,2741,137,+0.00%,22,66,66,0,YES
+LDOUSDT,42,2741,66,+51.22%,43,129,129,21,YES
+LDOUSDT,63,2741,44,+67.74%,64,192,192,42,YES
+LDOUSDT,84,2741,33,+75.90%,85,255,255,63,YES
+TRXUSDT,21,5669,283,+0.00%,22,66,66,0,no
+TRXUSDT,42,5669,138,+51.22%,43,129,129,21,no
+TRXUSDT,63,5669,91,+67.74%,64,192,192,42,no
+TRXUSDT,84,5669,68,+75.90%,85,255,255,63,no

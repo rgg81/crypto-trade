@@ -1,0 +1,13 @@
+{
+  "dsr": 0.0,
+  "pbo": 0.0,
+  "pbo_note": "CSCV PBO on (45 paths, 50 strategies): PBO=0.0000 from 5000 IS/OOS splits. frac_positive_paths=0.574.",
+  "pbo_frac_positive_paths": 0.5738,
+  "pbo_path_sharpe_q25": -2.2965,
+  "pbo_path_sharpe_q50": 0.8045,
+  "pbo_path_sharpe_q75": 3.1319,
+  "psr": 1.0,
+  "n_trials": 1000,
+  "n_eff": 1,
+  "min_trl_months": 11.25
+}

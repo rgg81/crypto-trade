@@ -1,0 +1,8 @@
+metric,value
+T5_headline_mean_transfer_ic,0.06983
+within_symbol_mean_ic,0.07747
+n_positive_transfer_symbols,2
+transfer_sign_consistent,False
+GO_threshold_T5_min,0.03
+GO_threshold_min_positive,2
+VERDICT_GO,False

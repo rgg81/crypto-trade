@@ -1,0 +1,4 @@
+symbol,is_n_trades,is_wpnl_orig,is_wpnl_scaled,is_delta_wpnl,is_pct_trades_partial_scaled,is_mean_multiplier_when_active,oos_n_trades,oos_wpnl_orig,oos_wpnl_scaled,oos_delta_wpnl,oos_pct_trades_partial_scaled,oos_mean_multiplier_when_active
+BCHUSDT,85,81.166,63.919,-17.247,9.41,0.1718,35,35.832,22.862,-12.97,8.57,0.2676
+LDOUSDT,9,12.796,-0.121,-12.916,11.11,0.0,12,-2.886,-11.271,-8.385,41.67,0.1701
+TRXUSDT,79,-5.196,-0.891,4.305,5.06,0.4194,51,5.208,2.96,-2.248,3.92,0.4145

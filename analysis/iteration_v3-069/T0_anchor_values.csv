@@ -1,0 +1,33 @@
+metric,value,source
+monthly_sharpe_in_sample,0.8325,reports-v3/iteration_v3-060/comparison.csv:2
+monthly_sharpe_out_of_sample,0.1403,reports-v3/iteration_v3-060/comparison.csv:2
+max_drawdown_in_sample,31.8701,reports-v3/iteration_v3-060/comparison.csv:4
+max_drawdown_out_of_sample,35.7804,reports-v3/iteration_v3-060/comparison.csv:4
+n_trades_in_sample,159,reports-v3/iteration_v3-060/comparison.csv:7
+n_trades_out_of_sample,102,reports-v3/iteration_v3-060/comparison.csv:7
+weighted_pnl_total_in_sample,51.8906,reports-v3/iteration_v3-060/comparison.csv:10
+weighted_pnl_total_out_of_sample,5.4989,reports-v3/iteration_v3-060/comparison.csv:10
+dsr,0.0,reports-v3/iteration_v3-060/comparison.csv:11
+pbo,0.1278,reports-v3/iteration_v3-060/comparison.csv:12
+psr,0.9763,reports-v3/iteration_v3-060/comparison.csv:13
+BCH_OOS_weighted_pnl,1.9078,reports-v3/iteration_v3-060/comparison.csv:18 (per_symbol weighted_pnl col)
+LDO_OOS_weighted_pnl,-19.7208,reports-v3/iteration_v3-060/comparison.csv:19 (per_symbol weighted_pnl col)
+TRX_OOS_weighted_pnl,23.3119,reports-v3/iteration_v3-060/comparison.csv:20 (per_symbol weighted_pnl col)
+BCH_OOS_n_trades,37,reports-v3/iteration_v3-060/comparison.csv:18 (n_trades col)
+LDO_OOS_n_trades,11,reports-v3/iteration_v3-060/comparison.csv:19 (n_trades col)
+TRX_OOS_n_trades,54,reports-v3/iteration_v3-060/comparison.csv:20 (n_trades col)
+BCH_OOS_win_rate,32.4,reports-v3/iteration_v3-060/comparison.csv:18 (win_rate col)
+LDO_OOS_win_rate,18.2,reports-v3/iteration_v3-060/comparison.csv:19 (win_rate col)
+TRX_OOS_win_rate,48.1,reports-v3/iteration_v3-060/comparison.csv:20 (win_rate col)
+BCH_IS_n_trades,73,reports-v3/iteration_v3-060/in_sample/per_symbol.csv
+LDO_IS_n_trades,11,reports-v3/iteration_v3-060/in_sample/per_symbol.csv
+TRX_IS_n_trades,75,reports-v3/iteration_v3-060/in_sample/per_symbol.csv
+BCH_IS_win_rate,45.2,reports-v3/iteration_v3-060/in_sample/per_symbol.csv
+LDO_IS_win_rate,27.3,reports-v3/iteration_v3-060/in_sample/per_symbol.csv
+TRX_IS_win_rate,29.3,reports-v3/iteration_v3-060/in_sample/per_symbol.csv
+current_universe,BCH+LDO+TRX (3 symbols),run_baseline_v3.py:139-143 V3_MODELS
+current_required_gap,66,validation_v3.py:56 — will need 88 = (21+1)*4 for /069
+current_label_timeout_minutes,10080,run_baseline_v3.py — REVERT /068's 20160 back to 10080
+LDO_OOS_WR_iter060,18.2,reports-v3/iteration_v3-060/comparison.csv:19 — Critic /068 Rec #3 cite
+LDO_OOS_WR_iter064,7.1,diary-v3/iteration_v3-068.md:34 Critic /068 Rec #3 cite
+LDO_OOS_WR_iter068,8.3,diary-v3/iteration_v3-068.md:34 Critic /068 Rec #3 cite

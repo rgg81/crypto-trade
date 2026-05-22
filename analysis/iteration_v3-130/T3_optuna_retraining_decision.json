@@ -1,0 +1,20 @@
+{
+  "bar_interval_label": "4h",
+  "sample_density_multiplier": 2.0,
+  "n_configurations": 30,
+  "sharpe_mean": 0.3907849069791908,
+  "sharpe_std": 0.20062865072911706,
+  "sharpe_min": 0.1080358332636262,
+  "sharpe_q25": 0.2500263722577403,
+  "sharpe_q50": 0.3247926645223107,
+  "sharpe_q75": 0.5706865242503499,
+  "sharpe_max": 0.8041060476538858,
+  "frac_above_threshold_0p91": 0.0,
+  "frac_catastrophic_below_0p50": 0.6666666666666666,
+  "frac_neg": 0.0,
+  "gate_threshold_fraction": 0.6,
+  "gate_passed": false,
+  "interpretation": "FAIL: observed frac >= 0.91 = 0.0000, gate requires >= 0.6",
+  "baseline_121_is_monthly_sharpe_from_trades_csv": 0.366770496263693,
+  "PROXY_LIMITATION": "4h native data not yet on disk; simulator uses 8h-derived /121 IS trade roster as resample substrate. Sample density multiplier 2.0 simulates 4h-density via bootstrap upsampling within month-groups (preserves regime structure). The structural channel (Optuna-trajectory-shift) is invariant to density per feedback_v3_optuna_trajectory_shift_finding.md EXTENSION."
+}

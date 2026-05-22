@@ -1,0 +1,7 @@
+symbol,cond_var,real_lift,shuffle_mean_lift,shuffle_q95_lift,real_minus_shuffle_mean,real_beats_shuffle_q95
+BCHUSDT,hurst_100,0.2675,0.4288,0.5276,-0.1613,False
+BCHUSDT,realvol_z,0.4114,0.4473,0.5407,-0.0359,False
+LDOUSDT,hurst_100,1.1597,1.0676,1.1085,0.0921,True
+LDOUSDT,realvol_z,0.7645,1.3413,1.5336,-0.5768,False
+TRXUSDT,hurst_100,0.1491,0.1663,0.1979,-0.0172,False
+TRXUSDT,realvol_z,0.1354,0.1625,0.1899,-0.0271,False

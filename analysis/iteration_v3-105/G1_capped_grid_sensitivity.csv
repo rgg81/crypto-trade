@@ -1,0 +1,4 @@
+symbol,capped_h5_share,capped_h8_share,capped_h13_share,capped_h21_share,frac_bars_horizon_below_incumbent_21,capped_mean_abs_ic_trend_scan,capped_mean_abs_ic_triple_barrier,capped_fic_ratio,capped_n_features_improved_of_14
+BCHUSDT,0.1339,0.153,0.2207,0.4924,0.5076,0.03648,0.02559,1.4254,8
+LDOUSDT,0.1262,0.1605,0.2357,0.4776,0.5224,0.05696,0.04757,1.1974,8
+TRXUSDT,0.1401,0.1579,0.2267,0.4754,0.5246,0.02587,0.01787,1.4473,9

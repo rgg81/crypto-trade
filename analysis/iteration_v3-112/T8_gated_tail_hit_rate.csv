@@ -1,0 +1,3 @@
+architecture,weighted_gated_hit_rate,mean_gated_hit_rate,total_gated_n,n_cells
+per_symbol,0.5681818181818182,0.5681213438939794,2816.0,20.0
+pooled,0.5475852272727273,0.5475229072837398,2816.0,20.0

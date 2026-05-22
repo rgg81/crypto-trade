@@ -1,0 +1,4 @@
+aspect,iter_v3_113,iter_v3_114,delta
+V3_FEATURE_COLUMNS count,22,14,revert 22 -> 14 (drop /113 multi-frequency daily features)
+new feature families,8 daily features (CLOSED at /113),0,"none — risk axis, not a feature axis"
+IC gate (Critic Check 4),FAIL strict reading (4 daily features |IC|>0.70),non-applicable (no new features),Check 4 N/A

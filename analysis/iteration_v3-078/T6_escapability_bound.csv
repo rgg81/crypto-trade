@@ -1,0 +1,11 @@
+cohort,n_trades,win_rate_pct,net_pnl_pct,informational
+IS_BULL_LONG,57,36.8,13.8,OOS rows are escapability-bound evidence — feed no selection
+IS_BULL_SHORT,47,27.7,-14.29,OOS rows are escapability-bound evidence — feed no selection
+OOS_BULL_LONG,19,52.6,10.45,OOS rows are escapability-bound evidence — feed no selection
+OOS_BULL_SHORT,28,42.9,10.76,OOS rows are escapability-bound evidence — feed no selection
+IS_BULL_SHORT_BCHUSDT,23,34.8,10.61,OOS rows are escapability-bound evidence — feed no selection
+OOS_BULL_SHORT_BCHUSDT,8,50.0,11.27,OOS rows are escapability-bound evidence — feed no selection
+IS_BULL_SHORT_LDOUSDT,6,33.3,-1.16,OOS rows are escapability-bound evidence — feed no selection
+OOS_BULL_SHORT_LDOUSDT,8,25.0,-12.58,OOS rows are escapability-bound evidence — feed no selection
+IS_BULL_SHORT_TRXUSDT,18,16.7,-23.74,OOS rows are escapability-bound evidence — feed no selection
+OOS_BULL_SHORT_TRXUSDT,12,50.0,12.07,OOS rows are escapability-bound evidence — feed no selection

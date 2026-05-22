@@ -1,0 +1,13 @@
+{
+  "dsr": 0.0,
+  "pbo": null,
+  "pbo_note": "PBO undefined: path_metric_matrix has S=1 strategy axis. CSCV requires S>1. Descriptive: frac_positive_paths=0.600, path_sharpe_quartiles=(-0.537, 0.118, 1.028) from 45 paths.",
+  "pbo_frac_positive_paths": 0.6,
+  "pbo_path_sharpe_q25": -0.5366,
+  "pbo_path_sharpe_q50": 0.1175,
+  "pbo_path_sharpe_q75": 1.0278,
+  "psr": 1.0,
+  "n_trials": 1000,
+  "n_eff": 4,
+  "min_trl_months": 11.25
+}

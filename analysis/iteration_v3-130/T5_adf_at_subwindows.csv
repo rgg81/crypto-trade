@@ -1,0 +1,4 @@
+symbol,n_sub_windows,adf_pvalue_mean,adf_pvalue_max,adf_pvalue_min,adf_all_pass_at_p05
+BCHUSDT,5,1.7894577004993587e-08,8.944920474323815e-08,0.0,True
+LDOUSDT,2,0.0,0.0,0.0,True
+TRXUSDT,5,3.1359554225093375e-24,1.310725292408881e-23,0.0,True

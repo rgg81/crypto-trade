@@ -1,0 +1,17 @@
+{
+  "G1_optuna_retraining_simulator": {
+    "pass": false,
+    "frac_above_0p91": 0.4667,
+    "frac_catastrophic_below_0p50": 0.3,
+    "threshold": 0.6,
+    "load_bearing": true
+  },
+  "G2_deadlock_impossibility": {
+    "pass": true,
+    "consecutive_zeros": 0,
+    "M_candles": 21,
+    "load_bearing": true
+  },
+  "decision": "GO_HIGH_RISK",
+  "rationale": "G1 FAIL, G2 PASS. Per PRIME DIRECTIVE brief + backtest proceeds regardless; G1 FAIL triggers HIGH-RISK posture in Section 7 modal expectation distribution."
+}

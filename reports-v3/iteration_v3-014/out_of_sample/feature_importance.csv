@@ -1,0 +1,14 @@
+feature,importance
+ema_spread_atr_20,79.0
+ret_autocorr_lag1_50,67.0
+vwap_dev_20,64.0
+ret_kurt_50,60.0
+max_dd_window_50,54.0
+ret_skew_200,54.0
+range_realized_vol_50,53.0
+ret_kurt_200,46.0
+hurst_100,33.0
+hurst_diff_100_50,30.0
+btc_ret_14d,19.0
+ret_skew_50,19.0
+sym_vs_btc_ret_7d,12.0

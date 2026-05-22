@@ -1,0 +1,4 @@
+split,n_060,n_079,keys_added_079_vs_060,keys_removed_079_vs_060,note
+in_sample,159,159,0,0,key roster identical; /079 derate re-weighted only. /080 reverts the derate -> /080 roster == /060 on keys AND weight_factor. confidence column is report-only.
+out_of_sample,102,103,1,0,key roster identical; /079 derate re-weighted only. /080 reverts the derate -> /080 roster == /060 on keys AND weight_factor. confidence column is report-only.
+PROOF,—,—,—,—,"iter-v3/080 = /060-config exactly + (a) flat weight=100 restored + (b) `confidence` trades.csv column + (c) confidence_distribution.csv. (a) is a revert to the anchor; (b)+(c) are pure report emission with zero behavioral effect. => roster bit-identical to /060 => OOS/IS ratio is a mechanical identity, not an estimate => SUSPICIOUS mechanically near-impossible."

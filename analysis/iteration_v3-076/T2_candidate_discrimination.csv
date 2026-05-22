@@ -1,0 +1,5 @@
+candidate,col,is_bearchop_discrimination_auc,is_bull_discrimination_auc,is_bearchop_long_auc,is_bearchop_short_auc,abs_corr_with_direction,n_is_bearchop_trades_valid,feat_mean_is_bearchop,feat_mean_is_bull
+C1 range_compression_ratio (bb_width_pct_rank_100),C1_range_compression_ratio,0.5224,0.5128,0.5809,0.5073,0.1482,77,0.6316,0.6463
+C2 range_efficiency_50 (unsigned Kaufman path efficiency),C2_range_efficiency_50,0.657,0.5487,0.5809,0.6854,0.1147,77,0.1686,0.1543
+C3 abs_ret_autocorr_50 (|ret_autocorr_lag1_50|),C3_abs_ret_autocorr_50,0.5588,0.5686,0.6324,0.5208,0.0679,77,0.0991,0.097
+C4 realized_vol_pct_rank (atr_pct_rank_200),C4_realized_vol_pct_rank,0.5162,0.5176,0.614,0.526,0.0884,77,0.7304,0.7244

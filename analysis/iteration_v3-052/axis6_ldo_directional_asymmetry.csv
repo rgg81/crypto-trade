@@ -1,0 +1,5 @@
+window,direction,n_trades,n_wins,win_rate_pct,wpnl_total,avg_wpnl_per_trade,n_sl,n_tp,n_timeout,n_eod
+IS,LONG,6,2,33.33,5.5887,0.9314,4,2,0,0
+IS,SHORT,3,1,33.33,5.5663,1.8554,2,1,0,0
+OOS,LONG,2,1,50.0,4.986,2.493,1,1,0,0
+OOS,SHORT,11,2,18.18,-22.4246,-2.0386,9,2,0,0

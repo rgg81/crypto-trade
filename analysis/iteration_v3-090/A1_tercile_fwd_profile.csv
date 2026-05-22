@@ -1,0 +1,4 @@
+tercile,mean_fwd_return,vs_universe_mean
+bottom (predicted losers -> SHORT),0.004139,0.001521
+middle,0.002294,-0.000323
+top (predicted winners -> LONG),0.001518,-0.001099

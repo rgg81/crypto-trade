@@ -1,0 +1,6 @@
+field,value,description,code_location
+ensemble_size_exploration,3,ENSEMBLE_SEEDS[0:3] outer=42 lineage; subset of 10-seed unified ensemble,lgbm.py:131 + run_baseline_v3.py ENSEMBLE_SEEDS[:3]
+confidence_threshold_optuna_range,"[0.50, 0.85]","Optuna suggest_float per seed per (sym, month) cell",optimization.py:198
+confidence_threshold_aggregation,MEAN,_confidence_threshold = float(np.mean(self._confidence_thresholds)),lgbm.py:507
+proba_aggregation,MEAN,"proba = np.mean(all_proba, axis=0) across 3 seeds",lgbm.py:624
+trade_emission_gate,max(proba) >= mean_threshold,if confidence < self._confidence_threshold: return NO_SIGNAL,lgbm.py:635-645

@@ -1,0 +1,4 @@
+axis,go,headline
+A — regime-conditioned exit barrier,False,"NO-GO — g3a (shuffle placebo) FAIL 5/6: a RANDOM bucketing captures the same lift; per-bucket optima collapse to one grid corner (tp=1.0, sl=2.0). The regime variable carries NO information about the optimal barrier."
+B — scaled-entry (staged-entry path),False,NO-GO — negative lift in ALL 81 grid cells across all 3 symbols. Scaled entry adds size at a worse fill price (already up +trigger ATR); the small variance reduction does not compensate.
+C — early-exit-on-no-confirmation,False,"NO-GO on the formal gates — g2 mechanism FAIL: in 48/48 (trigger,K) cells the trades the rule cuts are POSITIVE-mean-PnL held-to-barrier (modestly below-average winners, NOT losers). The small IS lift in some cells (BCH +0.13, LDO +0.12, TRX +0.06 best) is grid-search-on-an-uptrend variance reduction, not a discovered loser-filter. g3 unstable on LDO (fold-A cell regresses fold B by -0.53)."

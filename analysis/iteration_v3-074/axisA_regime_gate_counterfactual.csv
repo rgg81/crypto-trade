@@ -1,0 +1,5 @@
+split,bucket,n_trades,weighted_pnl_sum,net_pnl_pct_sum,win_rate_pct,mean_duration_candles,median_duration_candles
+IS,SUPPRESSED_by_gate,3,1.0224,4.1865,66.7,14.667,21.0
+IS,KEPT,72,-25.8115,-27.23,27.8,5.639,4.0
+OOS,SUPPRESSED_by_gate,6,-1.0643,-1.7443,33.3,9.0,8.0
+OOS,KEPT,48,24.3762,32.5008,52.1,6.354,4.5

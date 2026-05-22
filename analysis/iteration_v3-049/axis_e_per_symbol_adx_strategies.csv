@@ -1,0 +1,5 @@
+strategy,BCH_threshold,LDO_threshold,TRX_threshold,ALGO_threshold,n_IS_blocked,IS_lift_wpnl,IS_lift_pct,n_OOS_blocked,OOS_cost_wpnl,OOS_cost_pct,NET_estimate_wpnl
+A_BCH21_TRX21,21,20,21,20,18,20.22,26.8,5,-0.17,-0.2,20.39
+B_BCH21_TRX22,21,20,22,20,25,18.68,24.8,7,-2.14,-2.2,20.82
+C_BCH21_only,21,20,20,20,9,15.45,20.5,3,-0.16,-0.2,15.61
+D_TRX21_only,20,20,21,20,9,4.77,6.3,2,-0.01,-0.0,4.77

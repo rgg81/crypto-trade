@@ -1,0 +1,15 @@
+feature,ic_BCH,ic_LDO,ic_TRX,sign_consistent
+max_dd_window_50,0.00569,0.03666,-0.04129,False
+ema_spread_atr_20,-0.04942,-0.10021,-0.07538,True
+ret_kurt_50,-0.00303,0.11727,-0.01927,False
+ret_skew_200,-0.02988,0.00836,-0.04787,False
+range_realized_vol_50,-0.02077,-0.00578,0.01186,False
+hurst_diff_100_50,0.00764,0.23962,-0.01601,False
+ret_kurt_200,0.03683,0.16802,0.00629,True
+hurst_100,-0.0227,0.20284,-0.04362,False
+btc_ret_14d,-0.00828,0.08794,-0.08933,False
+ret_skew_50,-0.05726,-0.05771,-0.04996,True
+vwap_dev_20,0.00582,-0.0319,0.00579,False
+ret_autocorr_lag1_50,0.06606,0.09603,-0.01118,False
+sym_vs_btc_ret_7d,0.00064,-0.07354,-0.00499,False
+regime_momentum_signed_5d,-0.01147,-0.0644,-0.03718,True

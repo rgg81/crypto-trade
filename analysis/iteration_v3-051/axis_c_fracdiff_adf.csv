@@ -1,0 +1,5 @@
+symbol,candidate,n_is_obs,adf_p_value,stationary_at_p005
+BCHUSDT,fracdiff_d05_close,5528,0.0,True
+LDOUSDT,fracdiff_d05_close,2542,0.0,True
+TRXUSDT,fracdiff_d05_close,5470,8e-06,True
+ALGOUSDT,fracdiff_d05_close,5026,8.6e-05,True

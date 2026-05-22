@@ -1,0 +1,4 @@
+split,full_roster_n,full_roster_mean_dur,full_roster_median_dur,kept_roster_n,kept_roster_mean_dur,kept_roster_median_dur,mean_dur_delta,median_dur_delta
+IS,75,6.0,4.0,72,5.6389,4.0,-0.3611,0.0
+OOS,54,6.6481,5.0,48,6.3542,4.5,-0.294,-0.5
+ALL,129,6.2713,4.0,120,5.925,4.0,-0.3463,0.0

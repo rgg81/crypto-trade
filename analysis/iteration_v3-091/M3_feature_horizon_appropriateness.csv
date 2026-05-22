@@ -1,0 +1,14 @@
+feature,univariate_rank_ic_H3,univariate_rank_ic_H21,abs_ic_H3_minus_H21,H21_ranker_gain_importance_pct
+range_realized_vol_50,-0.0608,-0.0557,0.0051,13.99
+ret_skew_200,-0.0282,-0.0022,0.0261,12.0
+max_dd_window_50,0.028,0.0266,0.0014,11.66
+ret_kurt_200,-0.0048,-0.0242,-0.0195,11.54
+ret_skew_50,-0.0203,-0.0052,0.0151,8.17
+ret_autocorr_lag1_50,-0.0068,-0.0179,-0.0111,8.01
+ema_spread_atr_20,-0.0331,-0.0146,0.0185,7.92
+ret_kurt_50,-0.0037,-0.0147,-0.011,6.76
+hurst_100,0.0026,0.0099,-0.0073,5.72
+sym_vs_btc_ret_7d,-0.0394,-0.02,0.0194,4.84
+vwap_dev_20,-0.0303,0.0145,0.0159,3.4
+hurst_diff_100_50,-0.0024,0.0012,0.0012,3.39
+regime_momentum_signed_5d,-0.0402,-0.0144,0.0258,2.59

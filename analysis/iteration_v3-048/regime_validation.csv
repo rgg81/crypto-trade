@@ -1,0 +1,58 @@
+# 1_btc_regime_summary
+metric,value
+n_total_btc_bars,6961.0
+n_stressed_btc_bars,965.0
+stressed_fire_rate_pct,13.863
+DD_threshold_pct,20.0
+vol_zscore_threshold,1.5
+
+# 3_all_symbols_regime_fire_rate_is
+label,axis,symbol,n_total,n_stressed,stressed_fire_rate_pct
+iter-v3/045 IS,regime_fire_rate,BCHUSDT,94,11,11.7
+iter-v3/045 IS,regime_fire_rate,TRXUSDT,85,5,5.88
+iter-v3/045 IS,regime_fire_rate,LDOUSDT,18,0,0.0
+iter-v3/045 IS,regime_fire_rate,ALGOUSDT,53,4,7.55
+
+# 3b_all_symbols_regime_fire_rate_oos
+label,axis,symbol,n_total,n_stressed,stressed_fire_rate_pct
+iter-v3/045 OOS,regime_fire_rate,BCHUSDT,38,2,5.26
+iter-v3/045 OOS,regime_fire_rate,TRXUSDT,46,5,10.87
+iter-v3/045 OOS,regime_fire_rate,LDOUSDT,13,0,0.0
+iter-v3/045 OOS,regime_fire_rate,ALGOUSDT,22,0,0.0
+
+# 4_trx_direction_regime_is
+label,axis,direction,regime,n_trades,wins,win_rate_pct,net_pnl_pct_sum,weighted_pnl_sum,avg_pnl_pct
+iter-v3/045 IS,TRX_dir_regime,LONG,HEALTHY,39,16,41.03,20.8732,6.3006,0.5352
+iter-v3/045 IS,TRX_dir_regime,LONG,STRESSED,3,2,66.67,3.894,1.04,1.298
+iter-v3/045 IS,TRX_dir_regime,SHORT,HEALTHY,41,11,26.83,-25.2256,-7.7243,-0.6153
+iter-v3/045 IS,TRX_dir_regime,SHORT,STRESSED,2,0,0.0,-6.8248,-5.4362,-3.4124
+
+# 4b_trx_direction_regime_oos
+label,axis,direction,regime,n_trades,wins,win_rate_pct,net_pnl_pct_sum,weighted_pnl_sum,avg_pnl_pct
+iter-v3/045 OOS,TRX_dir_regime,LONG,HEALTHY,21,13,61.9,18.9307,14.0987,0.9015
+iter-v3/045 OOS,TRX_dir_regime,LONG,STRESSED,1,1,100.0,1.9231,0.9038,1.9231
+iter-v3/045 OOS,TRX_dir_regime,SHORT,HEALTHY,20,9,45.0,10.1858,9.0042,0.5093
+iter-v3/045 OOS,TRX_dir_regime,SHORT,STRESSED,4,1,25.0,-1.7954,-0.7759,-0.4488
+
+# 5_counterfactual_p9_universal_is
+label,axis,metric,value
+iter-v3/045 IS,cf_regime_block_TRX_universal,bundle_total_weighted_pnl,75.3967
+iter-v3/045 IS,cf_regime_block_TRX_universal,TRX_stressed_blocked_weighted_pnl,-4.3962
+iter-v3/045 IS,cf_regime_block_TRX_universal,TRX_stressed_blocked_n_trades,5.0
+iter-v3/045 IS,cf_regime_block_TRX_universal,delta_from_blocking_TRX_stressed_universal,4.3962
+iter-v3/045 IS,cf_regime_block_TRX_universal,TRX_LONG_stressed_blocked_n_trades,3.0
+iter-v3/045 IS,cf_regime_block_TRX_universal,TRX_LONG_stressed_blocked_weighted_pnl,1.04
+iter-v3/045 IS,cf_regime_block_TRX_universal,TRX_SHORT_stressed_blocked_n_trades,2.0
+iter-v3/045 IS,cf_regime_block_TRX_universal,TRX_SHORT_stressed_blocked_weighted_pnl,-5.4362
+
+# 5b_counterfactual_p9_universal_oos
+label,axis,metric,value
+iter-v3/045 OOS,cf_regime_block_TRX_universal,bundle_total_weighted_pnl,96.9943
+iter-v3/045 OOS,cf_regime_block_TRX_universal,TRX_stressed_blocked_weighted_pnl,0.1279
+iter-v3/045 OOS,cf_regime_block_TRX_universal,TRX_stressed_blocked_n_trades,5.0
+iter-v3/045 OOS,cf_regime_block_TRX_universal,delta_from_blocking_TRX_stressed_universal,-0.1279
+iter-v3/045 OOS,cf_regime_block_TRX_universal,TRX_LONG_stressed_blocked_n_trades,1.0
+iter-v3/045 OOS,cf_regime_block_TRX_universal,TRX_LONG_stressed_blocked_weighted_pnl,0.9038
+iter-v3/045 OOS,cf_regime_block_TRX_universal,TRX_SHORT_stressed_blocked_n_trades,4.0
+iter-v3/045 OOS,cf_regime_block_TRX_universal,TRX_SHORT_stressed_blocked_weighted_pnl,-0.7759
+

@@ -1,0 +1,4 @@
+symbol,n_losers,mfe_mean,mfe_median,frac_mfe_ge_1
+BCHUSDT,42,0.651,0.538,0.214
+LDOUSDT,6,0.627,0.602,0.167
+TRXUSDT,52,0.563,0.421,0.231

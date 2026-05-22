@@ -1,0 +1,5 @@
+candidate,is_primary,category,T2_r2,T2_ic_vwap_dev_20,T2_ic_regime_momentum,T3_pooled_auc,T3_clears_q95,T5_ranks_BCH_LDO_TRX,T5_gains_BCH_LDO_TRX,T7_pooled_lift,T9_ssc_risk,verdict
+B1_eth_vs_sym_rv_50,True,(v) cross-asset ETH/sym vol-regime ratio (PRIMARY),0.3937,0.0687,0.0205,0.4694,False,15/1/4,4.46/14.0/9.07,0.0063,True,GO-SSC-RISK
+B1a_log_eth_vs_sym_rv_50,False,(v) cross-asset ETH/sym log-vol-ratio (sister: scale-symmetric),0.473,0.0664,0.0495,0.4915,False,14/1/5,4.66/14.0/9.25,0.0059,True,GO-SSC-RISK
+B1c_eth_vs_sym_rv_100,False,(v) cross-asset ETH/sym vol-ratio longer-cadence (sister: W=100),0.3951,0.0725,0.0024,0.4783,False,14/4/2,4.31/10.43/11.04,0.0021,True,MARGINAL
+B1b_eth_vs_sym_rv_25,False,(v) cross-asset ETH/sym vol-ratio shorter-cadence (sister: W=25),0.3152,0.0407,0.0522,0.4745,False,15/3/3,4.39/11.7/10.58,-0.0029,True,REJECT

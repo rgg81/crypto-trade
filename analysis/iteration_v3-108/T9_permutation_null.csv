@@ -1,0 +1,2 @@
+observed_held_out_auc,null_mean_auc,null_q05,null_q50,null_q95,permutation_p_value,n_permutations
+0.5878,0.5062,0.3542,0.503,0.6741,0.18,200

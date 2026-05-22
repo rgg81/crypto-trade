@@ -1,0 +1,11 @@
+symbol,candidate,half_signs,quartile_signs,half_stable,quartile_stable
+BCHUSDT,btc_adract_growth_14d_z90,+-,+-+-,False,False
+BCHUSDT,btc_txcnt_growth_14d_z90,++,++-+,True,False
+BCHUSDT,bch_adract_growth_14d_z90,++,++-+,True,False
+BCHUSDT,bch_txcnt_growth_14d_z90,++,++-+,True,False
+LDOUSDT,btc_adract_growth_14d_z90,+-,+++-,False,False
+LDOUSDT,btc_txcnt_growth_14d_z90,+-,-+-+,False,False
+TRXUSDT,btc_adract_growth_14d_z90,+-,++--,False,False
+TRXUSDT,btc_txcnt_growth_14d_z90,+-,+++-,False,False
+TRXUSDT,trx_adract_growth_14d_z90,-+,--++,False,False
+TRXUSDT,trx_txcnt_growth_14d_z90,--,----,True,True

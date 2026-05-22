@@ -1,0 +1,3 @@
+half,n,mean_within_half_ic
+bottom_half (low composite score),4743,0.05755
+top_half (high composite score),4743,0.01406

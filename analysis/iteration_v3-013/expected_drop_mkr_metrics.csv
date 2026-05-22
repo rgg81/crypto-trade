@@ -1,0 +1,5 @@
+slice,n_trades,n_wins,win_rate_pct,weighted_pnl_total,approx_monthly_sharpe,n_symbols,concentration_top_pct,top_symbol
+IS_full,286,110,38.46,73.4182,0.8096,4,72.82,BCHUSDT
+IS_no_MKR,209,84,40.19,78.7956,1.0088,3,67.85,BCHUSDT
+OOS_full,101,44,43.56,46.3634,1.5914,4,87.57,LDOUSDT
+OOS_no_MKR,85,40,47.06,61.8492,2.697,3,65.65,LDOUSDT

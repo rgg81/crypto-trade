@@ -1,0 +1,7 @@
+sample,symbol,n_trades,n_TP,pct_TP,n_SL,pct_SL,n_TIMEOUT,pct_TIMEOUT,n_NO_CONFIRM,pct_NO_CONFIRM,n_EOD,pct_EOD,avg_dur_all,median_dur,p75_dur
+in_sample,BCHUSDT,85,31,36.5%,39,45.9%,11,12.9%,4,4.7%,0,0.0%,7.73,5.0,13.0
+in_sample,LDOUSDT,9,3,33.3%,4,44.4%,0,0.0%,2,22.2%,0,0.0%,4.33,4.0,6.0
+in_sample,TRXUSDT,79,22,27.8%,48,60.8%,5,6.3%,4,5.1%,0,0.0%,6.08,4.0,8.5
+out_of_sample,BCHUSDT,35,15,42.9%,15,42.9%,2,5.7%,3,8.6%,0,0.0%,6.54,4.0,9.5
+out_of_sample,LDOUSDT,12,3,25.0%,8,66.7%,0,0.0%,1,8.3%,0,0.0%,7.00,4.0,9.2
+out_of_sample,TRXUSDT,51,21,41.2%,23,45.1%,1,2.0%,5,9.8%,1,2.0%,5.45,4.0,6.0

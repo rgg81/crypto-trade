@@ -1,0 +1,19 @@
+alpha,note,dShACC_mean,dShACC_ci_lo,dPnL_mean,importance_share,above_parity,mean_abs_ic,ic_sign_consistent_3sym,ic_sign_stable_frac,redundancy_max_ic,composite_score
+alpha032,scale()->causal scale_ts; all inner time-series,0.01373,-0.0085,0.2214,0.0325,False,0.0354,False,0.583,0.466,1.8973
+alpha043,pure time-series (Ts_Rank per-symbol); adv20 per-symbol,0.01242,-0.00719,0.1653,0.0165,False,0.0202,False,0.667,0.1862,1.4518
+alpha034,cs-rank-dropped (3 ranks stripped); per-symbol composite,0.00784,-0.01176,0.2347,0.0106,False,0.0137,False,0.667,0.1744,0.5763
+alpha051,pure time-series; no adaptation,0.00392,-0.01765,0.0597,0.009,False,0.0292,True,0.75,0.3213,0.5668
+alpha023,pure time-series; no adaptation,0.00588,-0.01111,0.1859,0.0065,False,0.0111,True,0.583,0.3261,0.5358
+alpha049,pure time-series; no adaptation,-0.00196,-0.02288,0.0565,0.0085,False,0.0359,True,0.833,0.3177,-0.0707
+alpha084,pure time-series (Ts_Rank per-symbol); vwap proxy,-0.00392,-0.02353,-0.0145,0.0121,False,0.0412,True,0.833,0.5569,-0.1572
+alpha101,pure time-series; SANITY ANCHOR (trivial body/range),-0.00131,-0.01699,0.0894,0.0087,False,0.0334,False,0.667,0.3084,-0.2252
+alpha028,scale()->causal scale_ts; adv20 per-symbol,0.00261,-0.01832,0.0657,0.0136,False,0.0145,False,0.583,0.0965,-0.3127
+alpha046,pure time-series; no adaptation,-0.00588,-0.02288,0.1044,0.0098,False,0.0299,True,0.583,0.3629,-0.8197
+alpha006,pure time-series; no adaptation,-0.00784,-0.02614,-0.053,0.0343,False,0.0306,True,0.667,0.1885,-0.8357
+alpha054,pure time-series; no adaptation,-0.00784,-0.02876,0.0916,0.0086,False,0.0422,False,0.667,0.1403,-1.2917
+alpha012,pure time-series; no adaptation,-0.00588,-0.02747,-0.0101,0.0106,False,0.008,False,0.667,0.1744,-1.6952
+alpha024,pure time-series; no adaptation,-0.00654,-0.03595,-0.0124,0.0576,False,0.0098,False,0.583,0.2627,-1.7632
+alpha053_regime_signed,ENGINEERED Category-2: alpha053 x sign(hurst-0.5),-0.01176,-0.03333,-0.0911,0.0064,False,0.0373,False,0.667,0.0588,-2.0322
+alpha053,pure time-series; no adaptation,-0.01176,-0.03333,-0.0911,0.0064,False,0.0373,False,0.667,0.0588,-2.0322
+alpha035,"pure time-series (all Ts_Rank, per-symbol)",-0.01503,-0.03791,0.0114,0.0137,False,0.0127,False,0.667,0.5797,-3.0072
+alpha068,cs-rank-dropped (2 ranks stripped); continuous difference,-0.01895,-0.04379,-0.0113,0.013,False,0.0279,False,0.5,0.3623,-3.5632

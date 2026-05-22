@@ -32,6 +32,10 @@ class Signal:
     weight: int  # 0-100
     tp_pct: float | None = None  # optional dynamic take-profit %
     sl_pct: float | None = None  # optional dynamic stop-loss %
+    # iter-v3/080: passive metadata field — M1 directional confidence scalar.
+    # max(P(long), P(short)) from the inner-ensemble mean predict_proba.
+    # No decision, barrier, gate, or model input ever reads this field.
+    confidence: float | None = None
 
 
 @dataclass(frozen=True)
@@ -70,6 +74,15 @@ class BacktestConfig:
     risk_drawdown_trigger_pct: float = 10.0
     risk_drawdown_scale_floor: float = 0.33
     risk_drawdown_scale_anchor_pct: float = 30.0  # full floor reached at this DD
+    # iter-v3/116: early-exit-on-no-confirmation exit primitive.
+    # When enabled, a trade that has not reached no_confirm_threshold_price
+    # (entry +/- trigger_atr * atr_distance in the favorable direction) within
+    # the first no_confirm_k_candles candles is closed at candle K's close
+    # (exit_reason = "no_confirm"). Default False preserves /059-canonical
+    # byte-identical behavior for all prior iterations.
+    enable_no_confirm_exit: bool = False
+    no_confirm_trigger_atr: float = 0.50
+    no_confirm_k_candles: int = 4
 
 
 @dataclass(frozen=True)
@@ -83,6 +96,18 @@ class Order:
     take_profit_price: float
     open_time: int
     timeout_time: int
+    # iter-v3/080: passive metadata — carried from Signal.confidence.
+    confidence: float | None = None
+    # iter-v3/116: early-exit-on-no-confirmation primitive.
+    # no_confirm_arm_time: close_time at end of K-candle observation window
+    #   (open_time + no_confirm_k_candles * interval_ms). Zero when flag is off.
+    # no_confirm_threshold_price: entry +/- trigger_atr * atr_distance in the
+    #   favorable direction. Zero when flag is off. When a candle's high/low
+    #   crosses this price before arm_time, the trade is marked confirmed and
+    #   proceeds to normal TP/SL/timeout; if it does not cross by arm_time the
+    #   trade exits at the candle's close with exit_reason="no_confirm".
+    no_confirm_arm_time: int = 0
+    no_confirm_threshold_price: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -94,7 +119,7 @@ class TradeResult:
     weight_factor: float
     open_time: int
     close_time: int
-    exit_reason: str  # "stop_loss" | "take_profit" | "timeout" | "end_of_data"
+    exit_reason: str  # "stop_loss" | "take_profit" | "timeout" | "end_of_data" | "no_confirm"
     pnl_pct: float
     fee_pct: float
     net_pnl_pct: float
@@ -106,6 +131,9 @@ class TradeResult:
     stop_loss_price: float = 0.0
     take_profit_price: float = 0.0
     timeout_time: int = 0
+    # iter-v3/080: passive metadata — M1 directional confidence scalar.
+    # Carried from Order.confidence. No decision path reads this field.
+    confidence: float | None = None
 
 
 @dataclass(frozen=True)

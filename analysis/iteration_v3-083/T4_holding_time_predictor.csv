@@ -1,0 +1,5 @@
+symbol,incumbent_mean_duration_candles,candidate_mean_duration_candles,duration_gap_candles,incumbent_median_duration,candidate_median_duration,candidate_timeout_trade_pct,incumbent_timeout_trade_pct,note
+ATOMUSDT,6.789,6.424,-0.365,5.0,5.0,4.6,7.4,label-implied proxy; production Optuna-tuned barriers biased it LOW
+FILUSDT,6.789,6.386,-0.403,5.0,4.0,5.0,7.4,label-implied proxy; production Optuna-tuned barriers biased it LOW
+ETCUSDT,6.789,6.874,0.085,5.0,5.0,7.2,7.4,label-implied proxy; production Optuna-tuned barriers biased it LOW
+AAVEUSDT,6.789,6.04,-0.749,5.0,4.0,4.4,7.4,label-implied proxy; production Optuna-tuned barriers biased it LOW

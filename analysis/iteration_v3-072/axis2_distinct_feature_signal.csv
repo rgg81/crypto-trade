@@ -1,0 +1,7 @@
+symbol,distinct_feature,n_bars,n_winner,auc,abs_auc_minus_half,verdict
+BCHUSDT,funding_rate_zscore_30,5697,3522,0.5067,0.0067,NEAR-ZERO-SIGNAL
+BCHUSDT,btc_funding_rate_zscore_30,5635,3477,0.5347,0.0347,NEAR-ZERO-SIGNAL
+LDOUSDT,funding_rate_zscore_30,2711,1614,0.4997,0.0003,NEAR-ZERO-SIGNAL
+LDOUSDT,btc_funding_rate_zscore_30,2645,1580,0.5109,0.0109,NEAR-ZERO-SIGNAL
+TRXUSDT,funding_rate_zscore_30,5597,3517,0.4899,0.0101,NEAR-ZERO-SIGNAL
+TRXUSDT,btc_funding_rate_zscore_30,5577,3513,0.5054,0.0054,NEAR-ZERO-SIGNAL

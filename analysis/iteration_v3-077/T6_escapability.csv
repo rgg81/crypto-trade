@@ -1,0 +1,10 @@
+finding,value
+IS win-trade mean duration (candles),9.431
+IS loss-trade mean duration (candles),4.525
+win/loss duration ratio,2.084
+IS stop_loss exit share,0.6352
+IS win-rate BULL months (%),32.7
+IS win-rate BEAR/CHOP months (%),43.6
+worst IS regime stratum,IS_BULL
+worst IS stratum monthly Sharpe,0.41
+diagnosis: directional-quality problem?,YES

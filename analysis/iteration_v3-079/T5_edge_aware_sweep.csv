@@ -1,0 +1,9 @@
+down_weighted_symbol,weight_multiplier,is_portfolio_monthly_sharpe,note
+TRXUSDT,1.0,0.8325,IS-Sharpe-monotonic in k => selecting k = OOS-tuning trap; REJECTED
+TRXUSDT,0.75,0.9465,IS-Sharpe-monotonic in k => selecting k = OOS-tuning trap; REJECTED
+TRXUSDT,0.5,1.0506,IS-Sharpe-monotonic in k => selecting k = OOS-tuning trap; REJECTED
+TRXUSDT,0.25,1.1409,IS-Sharpe-monotonic in k => selecting k = OOS-tuning trap; REJECTED
+TRXUSDT,0.0,1.2147,IS-Sharpe-monotonic in k => selecting k = OOS-tuning trap; REJECTED
+LDOUSDT,1.0,0.8325,IS-Sharpe-monotonic in k => selecting k = OOS-tuning trap; REJECTED
+LDOUSDT,0.5,0.8618,IS-Sharpe-monotonic in k => selecting k = OOS-tuning trap; REJECTED
+LDOUSDT,0.0,0.8657,IS-Sharpe-monotonic in k => selecting k = OOS-tuning trap; REJECTED

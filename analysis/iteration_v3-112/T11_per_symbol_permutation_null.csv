@@ -1,0 +1,4 @@
+symbol,auc_per_symbol_obs,auc_pooled_obs,pooled_lift,null_q05,null_q50,null_q95,pooled_clears_null_q95,per_symbol_clears_null_q95
+BCHUSDT,0.512,0.5003,-0.0117,0.4809,0.5009,0.5262,False,False
+LDOUSDT,0.4528,0.5432,0.0905,0.4277,0.4664,0.5162,True,False
+TRXUSDT,0.4789,0.4642,-0.0147,0.4588,0.4914,0.5267,False,False

@@ -1,0 +1,5 @@
+candidate,BCH_rank,BCH_gain_pct,LDO_rank,LDO_gain_pct,TRX_rank,TRX_gain_pct
+A1_eth_ret_14d,15,3.79,12,2.59,8,5.38
+A2_eth_vs_btc_ret_21d,15,3.95,2,10.07,3,9.76
+A3_eth_vs_btc_vol_diff_14d,15,3.4,4,10.91,7,6.59
+A4_eth_ret_3d,15,2.97,11,4.01,10,4.25

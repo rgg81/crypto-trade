@@ -1,0 +1,5 @@
+symbol,n_m1_fired_full_is,n_m2_pos,n_m2_neg,both_classes_present,approx_samples_per_month,per_month_cell_viable,m2_viability_flag
+BCHUSDT,73,33,40,True,2.81,False,THIN-PER-MONTH
+LDOUSDT,11,3,8,True,0.42,False,THIN-PER-MONTH
+TRXUSDT,75,22,53,True,2.88,False,THIN-PER-MONTH
+PORTFOLIO,159,58,101,True,6.12,False,THIN-PER-MONTH

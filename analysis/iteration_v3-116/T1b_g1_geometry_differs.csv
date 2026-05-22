@@ -1,0 +1,7 @@
+symbol,cond_var,n_buckets_resolved,distinct_geometries,max_tp_spread,max_sl_spread,g1_differs,note
+BCHUSDT,hurst_100,3,3,0.5,0.5,True,
+BCHUSDT,realvol_z,3,1,0.0,0.0,False,
+LDOUSDT,hurst_100,3,2,0.0,0.5,True,
+LDOUSDT,realvol_z,3,2,0.0,1.0,True,
+TRXUSDT,hurst_100,3,1,0.0,0.0,False,
+TRXUSDT,realvol_z,3,2,0.5,1.0,True,

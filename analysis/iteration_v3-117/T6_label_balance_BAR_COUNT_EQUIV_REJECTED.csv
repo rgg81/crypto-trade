@@ -1,0 +1,4 @@
+symbol,n_rows,p_label_1,imbalance_severity_pct,healthy
+BCHUSDT,5066,0.9913,49.13,False
+LDOUSDT,2080,0.6774,17.74,False
+TRXUSDT,5008,0.5923,9.23,True

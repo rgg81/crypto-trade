@@ -1,0 +1,5 @@
+candidate,pooled_auc,null_q95,p_value,clears_q95
+A2_eth_vs_btc_ret_21d,0.5181,0.5062,0.0,True
+A4_eth_ret_3d,0.5081,0.5069,0.03,True
+A1_eth_ret_14d,0.4942,0.5075,0.66,False
+A3_eth_vs_btc_vol_diff_14d,0.4731,0.509,1.0,False

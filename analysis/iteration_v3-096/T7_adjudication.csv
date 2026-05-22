@@ -1,0 +1,7 @@
+q,answer
+TRX_transfer_genuinely_negative,False
+TRX_transfer_indistinguishable_from_zero,True
+headline_no_LDO,0.03124
+headline_no_LDO_clears_0.030,True
+BCH_transfer_CI_excludes_zero,False
+LDO_transfer_CI_excludes_zero,False

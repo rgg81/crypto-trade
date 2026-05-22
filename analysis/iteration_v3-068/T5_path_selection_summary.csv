@@ -1,0 +1,6 @@
+path,stateless,universal,orthogonal_065,orthogonal_066,orthogonal_067,promising_viable,trade_floor_safe,score
+Path_A (K=7),YES,YES,YES,YES,YES,NO (NEGATIVE direction),YES (no trade-count drop),5/7
+Path_B (K=14),YES,YES,YES,YES,YES,NO (WEAKLY NEGATIVE),YES,5/7
+Path_C (K=42),YES,YES,YES,YES,YES,MARGINAL (INERT-band center; ~5% chance of PROMISING),YES,5/7 (marginal)
+Path_D (K=63),YES,YES,YES,YES,YES,NO (WEAKLY NEGATIVE — sample-uniqueness),YES,5/7
+Path_E (PASSIVE DIAGNOSTIC),—,—,—,—,—,NO (by design),—,DIAGNOSTIC

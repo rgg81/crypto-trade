@@ -1,0 +1,4 @@
+symbol,n_candles,tbdir_tb_exec_sharpe,tbdir_hz_exec_sharpe,hz_minus_tb_sharpe,hz_ge_tb,tbdir_tb_exec_mean_pct,tbdir_hz_exec_mean_pct,oracle_tb_sharpe_ctx,oracle_hz_sharpe_ctx
+BCHUSDT,5706,2.2487,1.1385,-1.1102,False,4.0291,6.1536,2.2487,1.6587
+LDOUSDT,2720,2.3649,1.5641,-0.8008,False,4.6005,6.1325,2.3649,2.565
+TRXUSDT,5648,1.4172,1.0446,-0.3725,False,3.1906,4.6073,1.4172,1.3806

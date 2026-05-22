@@ -1,0 +1,10 @@
+metric,value
+chosen_book,BCHUSDT+LDOUSDT+TRXUSDT+GALAUSDT+MANAUSDT+SANDUSDT
+book_size,6
+added_symbols,GALAUSDT+MANAUSDT+SANDUSDT
+incumbent_3_aggregate_sharpe,-0.0761
+chosen_book_aggregate_sharpe,+0.1610
+aggregate_sharpe_delta,+0.2371
+chosen_book_mean_pairwise_pnl_corr,+0.0869
+max_abs_duration_gap_added,0.181
+verdict,EXPANSION-WORTHWHILE — broader book aggregate Sharpe preserved/lifted

@@ -1,0 +1,4 @@
+symbol,n_is_total,n_valid_funding_raw,n_valid_funding_zscore_30,coverage_zscore_pct,date_start,date_end,funding_kline_align_pct
+BCHUSDT,2193,2193,2193,100.0,2023-03-24 00:00:00,2025-03-23 16:00:00,100.0
+LDOUSDT,2193,2193,2193,100.0,2023-03-24 00:00:00,2025-03-23 16:00:00,100.0
+TRXUSDT,2193,2193,2193,100.0,2023-03-24 00:00:00,2025-03-23 16:00:00,100.0

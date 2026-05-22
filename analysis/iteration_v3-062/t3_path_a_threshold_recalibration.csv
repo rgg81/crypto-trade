@@ -1,0 +1,7 @@
+iter,architecture,dsr_relative_observed,pass_at_0.95,pass_at_0.8,pass_at_0.7,pass_at_0.6,pass_at_0.55,pass_at_0.5,pass_at_0.4
+028,2-outer × 5-inner buggy WF,0.0,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL
+050,2-outer × 5-inner post-fix,0.0,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL
+058,2-outer × 5-inner post-fix,0.998164,PASS,PASS,PASS,PASS,PASS,PASS,PASS
+059,unified 10-seed,0.113363,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL
+060,EXPLORATION 3-seed --exploration,0.0,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL
+061,EXPLORATION 3-seed --exploration,0.0,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL,FAIL

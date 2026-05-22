@@ -1,0 +1,4 @@
+sub_period,window,mf_gross_monthly_sharpe,mf_net_monthly_sharpe,n_bars
+third_1,2020-04..2021-12,0.5808,0.5564,1798
+third_2,2021-12..2023-08,0.0219,-0.1039,1798
+third_3,2023-08..2025-03,0.2231,0.1552,1797

@@ -1,0 +1,13 @@
+symbol,feature,adf_p,stationary
+BCHUSDT,funding_sign_persist_9,0.0004541342256180908,True
+BCHUSDT,funding_momentum_3,2.7280708161751755e-30,True
+BCHUSDT,funding_accel_3,0.0,True
+BCHUSDT,funding_price_divergence_6,1.593813787145949e-22,True
+LDOUSDT,funding_sign_persist_9,4.901334640830723e-07,True
+LDOUSDT,funding_momentum_3,4.478408879394886e-21,True
+LDOUSDT,funding_accel_3,6.657271711949128e-30,True
+LDOUSDT,funding_price_divergence_6,2.2489957519520012e-13,True
+TRXUSDT,funding_sign_persist_9,1.1699983384673565e-06,True
+TRXUSDT,funding_momentum_3,1.5387417784688157e-29,True
+TRXUSDT,funding_accel_3,0.0,True
+TRXUSDT,funding_price_divergence_6,2.075280076628339e-20,True

@@ -6,6 +6,7 @@ Sharpe computed from actual trade returns (long_pnls / short_pnls).
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import lightgbm as lgb
@@ -101,6 +102,42 @@ def compute_sharpe_with_threshold(
     return sharpe
 
 
+def compute_per_candle_pnl(
+    y_proba: np.ndarray,
+    long_pnls: np.ndarray,
+    short_pnls: np.ndarray,
+    threshold: float,
+    ternary: bool = False,
+) -> np.ndarray:
+    """Compute per-candle PnL for validation set rows (pre-aggregation).
+
+    Returns a float64 array of length len(y_proba) where:
+    - rows below confidence threshold are assigned 0.0 (no trade)
+    - rows above threshold are assigned the realised long or short PnL
+
+    Used by _objective to build the per-trial OOF return buffer for
+    iter-v3/003 trial_oof_returns.parquet.
+    """
+    n = len(y_proba)
+    pnls_out = np.zeros(n, dtype=np.float64)
+    if ternary:
+        directional_proba = y_proba[:, [0, 2]]  # short, long columns
+        confidence = directional_proba.max(axis=1)
+        mask = confidence >= threshold
+        if mask.any():
+            dir_pred = directional_proba[mask].argmax(axis=1)
+            y_pred = np.where(dir_pred == 1, 1, -1)
+            pnls_out[mask] = np.where(y_pred == 1, long_pnls[mask], short_pnls[mask])
+    else:
+        confidence = y_proba.max(axis=1)
+        mask = confidence >= threshold
+        if mask.any():
+            pred_classes = y_proba[mask].argmax(axis=1)
+            y_pred = classes_to_labels(pred_classes)
+            pnls_out[mask] = np.where(y_pred == 1, long_pnls[mask], short_pnls[mask])
+    return pnls_out
+
+
 # ---------------------------------------------------------------------------
 # Label encoding: {-1, 1} <-> {0, 1} for binary, {-1, 0, 1} <-> {0, 1, 2} for ternary
 # ---------------------------------------------------------------------------
@@ -151,6 +188,9 @@ def _objective(
     open_times: np.ndarray | None = None,
     ternary: bool = False,
     cv_gap: int = 0,
+    train_month: str = "",
+    symbols_arr: np.ndarray | None = None,
+    oof_buffer: list[dict] | None = None,
 ) -> float:
     from sklearn.model_selection import TimeSeriesSplit
 
@@ -163,13 +203,19 @@ def _objective(
         training_days = trial.suggest_int("training_days", 10, 500, step=10)
 
     # LightGBM hyperparameters
+    # iter-v3/007 fast_mode: hardcode colsample_bytree=1.0 (skip Optuna suggest)
+    # to minimize per-seed feature-subsampling variance during fast exploration.
+    # Production runs (fast_mode=False) keep colsample in the search space.
+    fast_mode = trial.study.user_attrs.get("fast_mode", False)
     params = {
         "n_estimators": trial.suggest_int("n_estimators", 50, 500),
         "max_depth": trial.suggest_int("max_depth", 3, 5),
         "num_leaves": trial.suggest_int("num_leaves", 15, 127),
         "learning_rate": trial.suggest_float("learning_rate", 0.01, 0.3, log=True),
         "subsample": trial.suggest_float("subsample", 0.5, 1.0),
-        "colsample_bytree": trial.suggest_float("colsample_bytree", 0.3, 1.0),
+        "colsample_bytree": 1.0
+        if fast_mode
+        else trial.suggest_float("colsample_bytree", 0.3, 1.0),
         "min_child_samples": trial.suggest_int("min_child_samples", 5, 100),
         "reg_alpha": trial.suggest_float("reg_alpha", 1e-8, 10.0, log=True),
         "reg_lambda": trial.suggest_float("reg_lambda", 1e-8, 10.0, log=True),
@@ -223,7 +269,6 @@ def _objective(
             last_train_ms = int(open_times[train_idx[-1]])
             first_val_ms = int(open_times[val_idx[0]])
             gap_ms = first_val_ms - last_train_ms
-            gap_candles = len(train_features) - len(train_idx) - len(val_idx)  # approximate
             last_t = datetime.datetime.fromtimestamp(
                 last_train_ms / 1000, tz=datetime.UTC
             ).strftime("%Y-%m-%d %H:%M")
@@ -256,6 +301,29 @@ def _objective(
         )
         sharpes.append(sharpe)
 
+        # Sub-fix 1a (iter-v3/003): capture per-candle OOF returns for trial buffer
+        if oof_buffer is not None:
+            per_candle = compute_per_candle_pnl(
+                y_proba,
+                long_pnls[val_idx],
+                short_pnls[val_idx],
+                confidence_threshold,
+                ternary=ternary,
+            )
+            for local_i, global_i in enumerate(val_idx):
+                candle_ts = int(open_times[global_i]) if open_times is not None else int(global_i)
+                sym = str(symbols_arr[global_i]) if symbols_arr is not None else ""
+                oof_buffer.append(
+                    {
+                        "trial_id": trial.number,
+                        "symbol": sym,
+                        "train_month": train_month,
+                        "fold_idx": fold_k,
+                        "candle_open_time_ms": candle_ts,
+                        "oof_return": float(per_candle[local_i]),
+                    }
+                )
+
     mean_sharpe = float(np.mean(sharpes))
 
     if verbose > 0:
@@ -282,6 +350,10 @@ def optimize_and_train(
     train_end_ms: int | None = None,
     ternary: bool = False,
     cv_gap: int = 0,
+    oof_persist_path: Path | None = None,
+    train_month: str = "",
+    symbols_arr: np.ndarray | None = None,
+    fast_mode: bool = False,
 ) -> tuple[lgb.LGBMClassifier, list[str], float]:
     """Run Optuna optimization and return (model, columns, confidence_threshold).
 
@@ -291,6 +363,10 @@ def optimize_and_train(
 
     cv_gap: number of rows to exclude between training and validation folds,
     preventing label leakage from overlapping triple-barrier labels.
+
+    oof_persist_path: if set, per-trial OOF candle returns are appended to
+    this parquet file after study.optimize() returns (sub-fix 1b, iter-v3/003).
+    train_month and symbols_arr are embedded in each row for multi-symbol grouping.
     """
     import optuna
 
@@ -299,9 +375,14 @@ def optimize_and_train(
 
     sampler = optuna.samplers.TPESampler(seed=seed)
     study = optuna.create_study(direction="maximize", sampler=sampler)
+    # iter-v3/007: propagate fast_mode to _objective via study user_attrs
+    study.set_user_attr("fast_mode", fast_mode)
 
     if sample_weights is None:
         sample_weights = np.ones(len(train_labels), dtype=np.float64)
+
+    # Sub-fix 1a: shared mutable buffer; _objective appends rows per (trial, fold)
+    oof_buffer: list[dict] | None = [] if oof_persist_path is not None else None
 
     study.optimize(
         lambda trial: _objective(
@@ -318,9 +399,59 @@ def optimize_and_train(
             open_times=open_times,
             ternary=ternary,
             cv_gap=cv_gap,
+            train_month=train_month,
+            symbols_arr=symbols_arr,
+            oof_buffer=oof_buffer,
         ),
         n_trials=n_trials,
     )
+
+    # Sub-fix 1b: flush per-trial OOF buffer to parquet (append if file exists).
+    # iter-v3/082 infra fix: atomic write via write-to-temp + os.replace().
+    # to_parquet() in-place truncates then streams — a mid-write interruption
+    # leaves a file with no Parquet footer ("magic bytes not found") that
+    # corrupts every subsequent read.  os.replace() is atomic on POSIX: readers
+    # always see a complete old or complete new file, never a partial write.
+    # The writers are strictly serial (outer symbol loop + serial walk-forward
+    # months, study.optimize n_jobs=1), so no cross-writer lock is needed.
+    if oof_persist_path is not None and oof_buffer:
+        import os
+        import tempfile
+
+        import pandas as pd
+
+        oof_persist_path.parent.mkdir(parents=True, exist_ok=True)
+        new_df = pd.DataFrame(
+            oof_buffer,
+            columns=[
+                "trial_id",
+                "symbol",
+                "train_month",
+                "fold_idx",
+                "candle_open_time_ms",
+                "oof_return",
+            ],
+        )
+        if oof_persist_path.exists():
+            existing = pd.read_parquet(oof_persist_path)
+            combined = pd.concat([existing, new_df], ignore_index=True)
+        else:
+            combined = new_df
+        # Write to a sibling temp file, then atomically replace the target.
+        tmp_fd, tmp_name = tempfile.mkstemp(
+            dir=oof_persist_path.parent, suffix=".parquet.tmp"
+        )
+        try:
+            os.close(tmp_fd)
+            combined.to_parquet(tmp_name, index=False)
+            os.replace(tmp_name, oof_persist_path)
+        except Exception:
+            # Clean up temp file on failure; do not leave a partial write.
+            try:
+                os.unlink(tmp_name)
+            except OSError:
+                pass
+            raise
 
     best = study.best_params
     best_threshold = best.get("confidence_threshold", 0.50)
@@ -355,13 +486,15 @@ def optimize_and_train(
     final_weights = sample_weights[final_mask]
 
     # Retrain on full training data
+    # iter-v3/007: in fast_mode, colsample_bytree is hardcoded to 1.0 (not in
+    # the Optuna search space), so `best` won't contain it — use 1.0 directly.
     params = {
         "n_estimators": best["n_estimators"],
         "max_depth": best["max_depth"],
         "num_leaves": best["num_leaves"],
         "learning_rate": best["learning_rate"],
         "subsample": best["subsample"],
-        "colsample_bytree": best["colsample_bytree"],
+        "colsample_bytree": best.get("colsample_bytree", 1.0),
         "min_child_samples": best["min_child_samples"],
         "reg_alpha": best["reg_alpha"],
         "reg_lambda": best["reg_lambda"],

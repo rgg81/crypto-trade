@@ -1,0 +1,7 @@
+candidate,pooled_R2,T2_verdict,pooled_auc,p_value,clears_q95,n_g1_pass,T5_BCH,T5_LDO,T5_TRX,T7_pooled_lift,ssc_ratio,ssc_risk,max_carrier,verdict
+C6_ret5d_signed_tbi,0.5099,PASS-CARVEOUT,0.5653,1.0,False,2,rank11/15_gain55%,rank11/15_gain24%,rank15/15_gain12%,0.0083,1.48,False,LDOUSDT,GO
+C5_maxdd_signed_skew200,0.4663,PASS,0.5445,1.0,False,0,rank6/15_gain61%,rank11/15_gain30%,rank4/15_gain55%,0.006,2.21,True,BCHUSDT,GO-SSC-RISK
+C4_symvsbtc_signed_kurt50,0.7918,PASS-CARVEOUT,0.5717,1.0,False,1,rank15/15_gain18%,rank15/15_gain8%,rank15/15_gain7%,0.003,2.12,True,BCHUSDT,MARGINAL
+C1_obv_signed_volmom,0.0558,PASS,0.5627,1.0,False,1,rank5/15_gain69%,rank6/15_gain56%,rank8/15_gain31%,0.0019,7.77,True,LDOUSDT,MARGINAL
+C2_vwap_signed_volcv,0.0215,PASS,0.5635,1.0,False,2,rank10/15_gain58%,rank11/15_gain20%,rank14/15_gain15%,0.0003,19.71,True,LDOUSDT,MARGINAL
+C3_ret5d_signed_skew50,0.0694,PASS,0.566,1.0,False,1,rank12/15_gain46%,rank12/15_gain22%,rank13/15_gain15%,-0.0007,11.66,True,LDOUSDT,REJECT

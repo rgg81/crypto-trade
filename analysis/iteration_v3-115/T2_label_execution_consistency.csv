@@ -1,0 +1,4 @@
+symbol,dir_consistency_tb_exec,dir_consistency_hz_exec_072number,mismatch_frac_072,hzdir_under_tb_exec,sanity_tb_exec_ok
+BCHUSDT,1.0,0.739,0.261,0.739,True
+LDOUSDT,1.0,0.7004,0.2996,0.7004,True
+TRXUSDT,1.0,0.7465,0.2535,0.7465,True

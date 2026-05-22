@@ -1,0 +1,5 @@
+slice,bucket,n_trades,n_wins,win_rate_pct,weighted_pnl_total,share_of_slice_pct
+IS,>=25_KEEP,139,58,41.73,67.304,85.42
+IS,"[20,25)_KILL",70,26,37.14,11.4916,14.58
+OOS,>=25_KEEP,55,25,45.45,23.8216,38.52
+OOS,"[20,25)_KILL",30,15,50.0,38.0276,61.48

@@ -1,0 +1,4 @@
+universe,symbols,n_symbols,n_trades,win_rate,total_pnl,profit_factor,monthly_sharpe_proxy,top_symbol_pnl_share_pct,n_months
+incumbent_BCH_LDO_TRX,BCH+LDO+TRX,3,6642,0.4118,-1294.31,0.93,-0.2659,140.2,50
+U_A_CRV_AAVE_GRT,CRV+AAVE+GRT,3,6834,0.4633,1275.54,1.0401,0.1891,59.0,44
+U_B_CRV_AAVE_GRT_ADA,CRV+AAVE+GRT+ADA,4,9491,0.4774,2196.54,1.0501,0.2527,41.9,49

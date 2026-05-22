@@ -1,0 +1,7 @@
+symbol,cond_var,fold_b_n_entries,fold_b_static_sharpe,fold_b_conditioned_sharpe,fold_b_lift,fold_a_schedule_helps_fold_b
+BCHUSDT,hurst_100,2805,2.5427,2.9111,0.3685,True
+BCHUSDT,realvol_z,2805,2.5427,2.6245,0.0818,True
+LDOUSDT,hurst_100,1344,4.092,3.5864,-0.5057,False
+LDOUSDT,realvol_z,1344,4.092,5.4958,1.4038,True
+TRXUSDT,hurst_100,2805,1.7492,2.1042,0.355,True
+TRXUSDT,realvol_z,2805,1.7492,2.0073,0.2581,True

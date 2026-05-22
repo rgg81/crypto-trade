@@ -1,0 +1,14 @@
+{
+  "is_activations_total": 4,
+  "is_state_recoveries": 0,
+  "is_time_overrides": 4,
+  "is_trades_skipped": 3,
+  "is_trades_baseline": 173,
+  "is_trade_count_change_pct": -1.73,
+  "oos_activations_total": 3,
+  "oos_state_recoveries": 0,
+  "oos_time_overrides": 3,
+  "oos_trades_skipped": 4,
+  "oos_trades_baseline": 98,
+  "oos_trade_count_change_pct": -4.08
+}

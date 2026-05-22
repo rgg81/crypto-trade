@@ -1,0 +1,2 @@
+chosen_trigger,chosen_threshold,C1_trigger_separates,C2_suppressed_slice_loss_dense,C3_oracle_roster_removes_net_loss,C4_fire_rate_in_band,fire_rate,oracle_n_suppressed,oracle_cf_wpnl_delta,verdict
+abs_ldo_vz,1.6621,True,False,False,True,0.0803,0,-0.0,WEAK-GO

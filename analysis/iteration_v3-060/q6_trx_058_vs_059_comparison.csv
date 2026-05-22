@@ -1,0 +1,6 @@
+metric,value,weighted_pnl
+058_seed42 total trades,54,23.028299999999994
+059_unified total trades,48,4.164099999999997
+intersection (same open_time AND direction),40,
+only in /058 (consensus-dropped from /059),14,13.919500000000001
+only in /059 (consensus-added vs /058),8,-5.1696

@@ -1,0 +1,7 @@
+trigger,shipped_in_primitive9,is_std_gap,is_polarity,is_clean_sep,oos_std_gap_FENCED,oos_polarity_FENCED,is_oos_polarity_agree
+ldo_vs_btc_30d,False,-1.2317,kill_LOW,True,-0.4841,kill_LOW,True
+abs_ldo_vz,False,-0.742,kill_LOW,False,0.388,kill_HIGH,False
+btc_ret_30d,False,0.475,kill_HIGH,False,-0.4823,kill_LOW,False
+abs_btc_dd,True,0.1888,kill_HIGH,False,-0.2808,kill_LOW,False
+btc_dd_signed,False,-0.1888,kill_LOW,False,0.2808,kill_HIGH,False
+abs_btc_vz,True,0.0564,kill_HIGH,False,1.1156,kill_HIGH,True

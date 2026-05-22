@@ -1,0 +1,72 @@
+name,category,source,present_in_pq,compute_status,ic_carveout,notes
+hurst_100,regime,Hurst 1951; LdP AFML Ch.5,True,ready,False,BASELINE_V3 stack
+hurst_200,regime,Hurst 1951,True,ready,False,Longer horizon
+hurst_diff_100_50,regime,Cajueiro & Tabak 2005 RS literature,True,ready,False,BASELINE_V3 stack
+atr_pct_rank_200,regime,Wilder 1978 ATR; percentile-rank conditioning,True,ready,False,Vol regime indicator
+atr_pct_rank_500,regime,Wilder 1978 ATR,True,ready,False,Longer vol regime
+bb_width_pct_rank_100,regime,Bollinger 1992; %B width as squeeze indicator,True,ready,False,Range expansion gate
+cusum_reset_count_200,regime,Page 1954 CUSUM; LdP AFML Ch.17,True,ready,False,Structural break density
+ret_skew_50,tail_risk,Conrad-Dittmar-Ghysels 2013 (skew premium),True,ready,False,BASELINE_V3 stack
+ret_skew_100,tail_risk,Conrad-Dittmar-Ghysels 2013,True,ready,False,Longer horizon
+ret_skew_200,tail_risk,Conrad-Dittmar-Ghysels 2013,True,ready,False,BASELINE_V3 stack
+ret_kurt_50,tail_risk,Cont 2001 stylized facts on fat tails,True,ready,False,BASELINE_V3 stack
+ret_kurt_200,tail_risk,Cont 2001,True,ready,False,BASELINE_V3 stack
+range_realized_vol_50,tail_risk,Parkinson 1980; Andersen-Bollerslev 1998,True,ready,False,BASELINE_V3 stack
+max_dd_window_50,tail_risk,Carver 2015 vol targeting / drawdown stats,True,ready,False,BASELINE_V3 stack
+parkinson_vol_20,vol_estimator,Parkinson 1980 J. Business,True,ready,False,High-low only
+parkinson_vol_50,vol_estimator,Parkinson 1980,True,ready,False,Longer horizon
+garman_klass_vol_20,vol_estimator,Garman-Klass 1980 J. Business,True,ready,False,OHLC vol estimator
+parkinson_gk_ratio_20,vol_estimator,Sinclair 2013 Volatility Trading; ratio diagnostic,True,ready,False,Jump-detection ratio
+mom_accel_5_20,momentum,Carver 2019 leveraged trading; speed/accel decomposition,True,ready,False,Short-term accel
+mom_accel_20_100,momentum,Carver 2019,True,ready,False,Medium-term accel
+ema_spread_atr_20,momentum,Appel 1979 EMA; Wilder ATR normalization (Carver),True,ready,False,BASELINE_V3 stack
+ret_autocorr_lag1_50,momentum,Lo-MacKinlay 1988 variance ratio; rolling AC,True,ready,False,BASELINE_V3 stack
+ret_autocorr_lag5_50,momentum,Lo-MacKinlay 1988,True,ready,False,Weekly lag AC
+vwap_dev_20,volume_micro,Bertsimas-Lo 1998 execution; VWAP deviation as flow,True,ready,False,BASELINE_V3 stack
+vwap_dev_50,volume_micro,Bertsimas-Lo 1998,True,ready,False,Longer flow horizon
+volume_mom_ratio_20,volume_micro,Lee-Swaminathan 2000 volume turnover,True,ready,False,Vol ratio short/long
+volume_cv_50,volume_micro,Karpoff 1987 volume dispersion,True,ready,False,Volume CoV
+obv_slope_50,volume_micro,Granville 1963 OBV; rolling slope,True,ready,False,Accumulation/distribution
+hl_range_ratio_20,volume_micro,Brogaard et al. 2018 high-low range as info,True,ready,False,Range expansion
+close_pos_in_range_20,volume_micro,Williams %R 1973 close position,True,ready,False,Position in HL range
+candle_efficiency_20,microstructure,v2 iter-v2/043 microstructure suite,True,ready,False,Directional efficiency
+vol_transition_slope_20,microstructure,v2 microstructure suite; Parkinson slope,True,ready,False,Vol regime trend
+vol_return_divergence_30,microstructure,Karpoff 1987; volume-return z-divergence,True,ready,False,Volume-return decoupling
+kurt_ratio_50_200,microstructure,Cont 2001; short/long kurt ratio,True,ready,False,Tail regime ratio
+fracdiff_logclose_dstat,fracdiff,LdP AFML Ch.5 fractional diff; FracdiffStat auto-d*,True,ready,False,Memory-preserving stationary
+fracdiff_logvolume_dstat,fracdiff,LdP AFML Ch.5,True,ready,False,Volume fracdiff
+fracdiff_d05_close,fracdiff,LdP AFML Ch.5 d=0.5 fixed,True,ready,False,Fixed d=0.5
+btc_ret_3d,cross_asset,Liu-Tsyvinski 2021 cross-asset crypto factors,True,ready,False,BTC 3d return broadcast
+btc_ret_7d,cross_asset,Liu-Tsyvinski 2021,True,ready,False,BTC 7d return
+btc_ret_14d,cross_asset,Liu-Tsyvinski 2021,True,ready,False,BASELINE_V3 stack
+btc_vol_14d,cross_asset,Liu-Tsyvinski 2021; BTC vol broadcast,True,ready,False,BTC vol regime
+sym_vs_btc_ret_7d,cross_asset,Asness 1995 cross-sectional momentum,True,ready,False,BASELINE_V3 stack
+regime_momentum_signed_5d,engineered,iter-v3/025 EXPLORATION; LdP composed-feature methodology,True,ready,True,BASELINE_V3 stack; ret_5d × sign(hurst-0.5)
+cross_asset_divergence_norm,engineered,iter-v3/027 composed; Asness 1995 relative strength,True,ready,True,(sym_ret_7d - btc_ret_14d)/|vwap_dev_20|
+vol_normalized_ret_5d,engineered,iter-v3/048; Sinclair 2013 risk-norm return,True,ready,True,ret_5d / range_realized_vol_50
+hurst_drift_50_200,engineered,iter-v3/053; Hurst differencing,True,ready,True,Linear redundancy R²=1.0 vs hurst primitives
+funding_rate_zscore_30,funding,Ackerer-Hugonnier-Jermann 2024 perp futures; BIS WP 1087 2025,True,ready,False,Re-eval per BASELINE_V3 dead ideas
+btc_funding_rate_zscore_30,funding,BIS WP 1087 2025 cross-asset funding stress,True,ready,False,BTC funding broadcast
+tbr_zscore_30,microstructure,Brogaard et al. 2014 toxic flow; Hasbrouck 1991 trade direction,True,ready,False,Re-eval per BASELINE_V3 dead ideas
+taker_buy_imbalance_20,microstructure,Hasbrouck 1991 trade-direction inference; Easley-O'Hara 1992 PIN,False,easy,False,(tbr - 0.5) rolling mean 20-bar
+taker_buy_zscore_50,microstructure,Brogaard et al. 2014 directional flow,False,easy,False,Longer lookback variant
+vol_regime_x_momentum,engineered,Asness-Moskowitz 2013 momentum × vol regime,False,easy,True,ret_5d × (atr_pct_rank_200>0.5)
+trend_efficiency_signed,engineered,Kaufman 1995 ER; signed for direction,False,medium,True,ER × sign(ret_20)
+rsi_14,technical,Wilder 1978; mean-reversion canonical,False,easy,False,"Bounded [0,100] scale-invariant"
+rsi_28,technical,Wilder 1978,False,easy,False,Longer RSI
+stoch_k_14,technical,Lane 1957 stochastic oscillator,False,easy,False,%K stochastic
+macd_hist_norm,technical,Appel 1979 MACD; ATR-normalized hist,False,easy,False,(MACD-signal)/ATR
+cci_20,technical,Lambert 1980 CCI; mean-reversion oscillator,False,easy,False,Bounded oscillator
+williams_r_14,technical,Williams 1973 %R; overbought/oversold,False,easy,False,Negative bounded oscillator
+adx_14,technical,Wilder 1978 ADX trend strength,False,medium,False,Unsigned trend strength
+ret_1d,returns,Cont 2001 stylized facts; basic momentum,False,easy,False,Single-day log return
+ret_3d,returns,Cont 2001,False,easy,False,3-day log return
+ret_5d,returns,Asness 1995 cross-section,False,easy,False,5-day log return
+ret_20d,returns,Jegadeesh-Titman 1993 momentum,False,easy,False,20-day log return
+bb_pctb_20,technical,Bollinger 1992 %B,False,easy,False,Position within BB
+sym_vs_btc_ret_3d,cross_asset,Asness 1995,False,easy,False,Shorter cross-asset momentum
+sym_vs_btc_vol_14d,cross_asset,Liu-Tsyvinski 2021; vol divergence,False,easy,False,Symbol vs BTC vol gap
+candle_hour_sin,calendar,8h cadence: 4 candles per day; cyclical encoding,False,easy,False,Asia/EU/US session encoding
+candle_hour_cos,calendar,Cyclical encoding standard practice,False,easy,False,Asia/EU/US complement
+candle_dow_sin,calendar,Day-of-week effect; Heston-Sadka 2008 weekly cycle,False,easy,False,Weekly cycle encoding
+candle_dow_cos,calendar,Heston-Sadka 2008,False,easy,False,Weekly cycle complement

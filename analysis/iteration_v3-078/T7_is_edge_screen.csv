@@ -1,0 +1,7 @@
+symbol,status,is_monthly_sharpe,n_months,pct_positive_months,total_pnl_pct
+ADAUSDT,screened,0.617,59,54.2,1500.5
+ALGOUSDT,screened,0.283,55,54.5,789.4
+VETUSDT,screened,-0.107,59,49.2,-302.3
+LDOUSDT,screened,-0.55,28,42.9,-636.1
+AVAXUSDT,stale parquet (missing regime_momentum_signed_5d),,0,,
+HBARUSDT,stale parquet (missing regime_momentum_signed_5d),,0,,

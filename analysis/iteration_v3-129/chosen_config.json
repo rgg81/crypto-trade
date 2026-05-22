@@ -1,0 +1,9 @@
+{
+  "T_R": 6.0,
+  "T_max": 7.0,
+  "lookback_days": 45,
+  "time_override_candles": 21,
+  "scale_function": "linear: max(0, min(1, (T_max - dd) / (T_max - T_R)))",
+  "preserves_optuna_gradient": true,
+  "deadlock_impossibility_argument": "Continuous form: dd > T_max region narrow; multiplier > 0 for dd in [T_R, T_max] (state updates normally). Time-override M=21 candles guarantees brake-OFF even in pathological dd > T_max persistence. Rolling window N=45 days propagates scaled wpnl normally."
+}

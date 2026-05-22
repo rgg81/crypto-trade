@@ -1,0 +1,5 @@
+candidate,pooled_lift,max_abs_per_symbol,max_carrier,ssc_ratio,ssc_risk
+B1b_eth_vs_sym_rv_25,-0.0029,0.0162,LDOUSDT,5.65,True
+B1a_log_eth_vs_sym_rv_50,0.0059,0.0215,LDOUSDT,3.65,True
+B1_eth_vs_sym_rv_50,0.0063,0.0215,LDOUSDT,3.43,True
+B1c_eth_vs_sym_rv_100,0.0021,0.0042,TRXUSDT,2.02,True

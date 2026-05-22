@@ -1,0 +1,4 @@
+symbol,n_candles,tb_label_long_frac,hz_label_long_frac,tb_hz_label_agreement,balance_ok,label_differs
+BCHUSDT,5706,0.6174,0.4855,0.739,True,True
+LDOUSDT,2720,0.6309,0.4886,0.7004,True,True
+TRXUSDT,5648,0.671,0.5722,0.7465,True,True

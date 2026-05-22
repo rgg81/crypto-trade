@@ -1,0 +1,13 @@
+symbol,family_feature,max_ic_anchor,max_abs_ic
+BCHUSDT,funding_sign_persist_9,ret_skew_200,0.2580444998397184
+BCHUSDT,funding_momentum_3,vwap_dev_20,0.09875639097691936
+BCHUSDT,funding_accel_3,ret_skew_200,0.023131378017106498
+BCHUSDT,funding_price_divergence_6,ema_spread_atr_20,0.23916067822572148
+LDOUSDT,funding_sign_persist_9,ema_spread_atr_20,0.3049614353953095
+LDOUSDT,funding_momentum_3,vwap_dev_20,0.0999463734541754
+LDOUSDT,funding_accel_3,btc_ret_14d,0.038788965037632794
+LDOUSDT,funding_price_divergence_6,vwap_dev_20,0.306241596100665
+TRXUSDT,funding_sign_persist_9,btc_ret_14d,0.31492807203440654
+TRXUSDT,funding_momentum_3,vwap_dev_20,0.1369825920751694
+TRXUSDT,funding_accel_3,btc_ret_14d,0.03914687883875729
+TRXUSDT,funding_price_divergence_6,btc_ret_14d,0.2181835815027719

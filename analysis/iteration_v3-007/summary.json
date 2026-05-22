@@ -1,0 +1,123 @@
+{
+  "chosen_n": 14,
+  "n_total": 34,
+  "selected_features_top_n": [
+    "max_dd_window_50",
+    "vwap_dev_50",
+    "ema_spread_atr_20",
+    "ret_kurt_50",
+    "ret_skew_200",
+    "range_realized_vol_50",
+    "hurst_diff_100_50",
+    "ret_kurt_200",
+    "hurst_100",
+    "btc_ret_14d",
+    "ret_skew_50",
+    "vwap_dev_20",
+    "ret_autocorr_lag1_50",
+    "sym_vs_btc_ret_7d"
+  ],
+  "dropped_features": [
+    "volume_cv_50",
+    "fracdiff_logclose_dstat",
+    "parkinson_gk_ratio_20",
+    "obv_slope_50",
+    "volume_mom_ratio_20",
+    "mom_accel_20_100",
+    "btc_vol_14d",
+    "ret_autocorr_lag5_50",
+    "ret_skew_100",
+    "hurst_200",
+    "bb_width_pct_rank_100",
+    "btc_ret_7d",
+    "parkinson_vol_20",
+    "btc_ret_3d",
+    "fracdiff_logvolume_dstat",
+    "cusum_reset_count_200",
+    "hl_range_ratio_20",
+    "atr_pct_rank_500",
+    "mom_accel_5_20",
+    "atr_pct_rank_200"
+  ],
+  "selection_criterion": "mean_rank across iter-v3/006 (BCH-only seed=42 n_trials=10) and iter-v3/003 (full 4-symbol universe seed=42 n_trials=50). Top-N selected by ascending mean_rank. Both source feature_importance CSVs are IS-only by construction (computed during walk-forward training on data with timestamp < OOS_CUTOFF_DATE).",
+  "alternative_n_10": [
+    "max_dd_window_50",
+    "vwap_dev_50",
+    "ema_spread_atr_20",
+    "ret_kurt_50",
+    "ret_skew_200",
+    "range_realized_vol_50",
+    "hurst_diff_100_50",
+    "ret_kurt_200",
+    "hurst_100",
+    "btc_ret_14d"
+  ],
+  "alternative_n_20": [
+    "max_dd_window_50",
+    "vwap_dev_50",
+    "ema_spread_atr_20",
+    "ret_kurt_50",
+    "ret_skew_200",
+    "range_realized_vol_50",
+    "hurst_diff_100_50",
+    "ret_kurt_200",
+    "hurst_100",
+    "btc_ret_14d",
+    "ret_skew_50",
+    "vwap_dev_20",
+    "ret_autocorr_lag1_50",
+    "sym_vs_btc_ret_7d",
+    "volume_cv_50",
+    "fracdiff_logclose_dstat",
+    "parkinson_gk_ratio_20",
+    "obv_slope_50",
+    "volume_mom_ratio_20",
+    "mom_accel_20_100"
+  ],
+  "iter006_top_5": [
+    {
+      "feature": "ema_spread_atr_20",
+      "imp_006": 151.0
+    },
+    {
+      "feature": "vwap_dev_50",
+      "imp_006": 136.2
+    },
+    {
+      "feature": "hurst_diff_100_50",
+      "imp_006": 134.0
+    },
+    {
+      "feature": "max_dd_window_50",
+      "imp_006": 128.4
+    },
+    {
+      "feature": "vwap_dev_20",
+      "imp_006": 127.8
+    }
+  ],
+  "iter003_top_5": [
+    {
+      "feature": "max_dd_window_50",
+      "imp_003": 113.2
+    },
+    {
+      "feature": "ret_skew_200",
+      "imp_003": 105.8
+    },
+    {
+      "feature": "vwap_dev_50",
+      "imp_003": 101.8
+    },
+    {
+      "feature": "ret_kurt_50",
+      "imp_003": 86.8
+    },
+    {
+      "feature": "ema_spread_atr_20",
+      "imp_003": 84.0
+    }
+  ],
+  "near_zero_features_count_in_either_run": 2,
+  "near_zero_features_count_in_both_runs": 0
+}

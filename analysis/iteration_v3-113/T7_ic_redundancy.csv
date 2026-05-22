@@ -1,0 +1,9 @@
+daily_feature,nearest_8h_feature,ic_vs_nearest,max_abs_ic_vs_8h_stack,max_ic_partner,redundant_ic_gt_070
+d_ret_5d,regime_momentum_signed_5d,0.8487,0.8487,regime_momentum_signed_5d,True
+d_ret_10d,regime_momentum_signed_5d,0.5957,0.7728,ema_spread_atr_20,True
+d_trend_slope_10,ema_spread_atr_20,0.052,0.052,ema_spread_atr_20,False
+d_realvol_10,range_realized_vol_50,0.8057,0.8057,range_realized_vol_50,True
+d_realvol_ratio,range_realized_vol_50,-0.01,0.1775,sym_vs_btc_ret_7d,False
+d_atr_pctrank_60,range_realized_vol_50,0.2115,0.2115,range_realized_vol_50,False
+d_efficiency_10,hurst_100,0.0784,0.1105,ema_spread_atr_20,False
+d_close_pos_20,vwap_dev_20,0.5553,0.8491,ema_spread_atr_20,True

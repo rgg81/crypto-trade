@@ -1,0 +1,6 @@
+stat,iter_v3_001,interpretation
+frac_positive_paths,0.4444444444444444,>0.6 → edge; ~0.5 → coin-flip; <0.4 → anti-edge
+n_paths_total,45.0,"must be C(N, k) = 45 for N=10, k=2"
+path_sharpe_q25,-0.500924,
+path_sharpe_median,-0.084285,
+path_sharpe_q75,0.36964,

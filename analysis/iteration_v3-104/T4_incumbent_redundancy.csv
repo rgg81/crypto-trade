@@ -1,0 +1,11 @@
+symbol,candidate,max_abs_ic_vs_incumbent,nearest_incumbent,passes_0.70_gate
+BCHUSDT,btc_adract_growth_14d_z90,0.1898,ema_spread_atr_20,True
+BCHUSDT,btc_txcnt_growth_14d_z90,0.1666,btc_ret_14d,True
+BCHUSDT,bch_adract_growth_14d_z90,0.136,ema_spread_atr_20,True
+BCHUSDT,bch_txcnt_growth_14d_z90,0.0693,range_realized_vol_50,True
+LDOUSDT,btc_adract_growth_14d_z90,0.1092,ema_spread_atr_20,True
+LDOUSDT,btc_txcnt_growth_14d_z90,0.1077,ret_autocorr_lag1_50,True
+TRXUSDT,btc_adract_growth_14d_z90,0.1871,btc_ret_14d,True
+TRXUSDT,btc_txcnt_growth_14d_z90,0.1659,btc_ret_14d,True
+TRXUSDT,trx_adract_growth_14d_z90,0.1885,ret_autocorr_lag1_50,True
+TRXUSDT,trx_txcnt_growth_14d_z90,0.1499,ret_autocorr_lag1_50,True

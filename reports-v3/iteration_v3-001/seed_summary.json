@@ -1,0 +1,14 @@
+[
+  {
+    "seed": 42,
+    "trades": 308,
+    "oos_trades": 83,
+    "is_sharpe_monthly": -0.0746,
+    "oos_sharpe_monthly": 1.0955,
+    "oos_max_dd": 22.0437,
+    "oos_calmar": 1.7477,
+    "max_concentration_pct": 43.64,
+    "pbo": 0.0,
+    "btc_killed": 23
+  }
+]

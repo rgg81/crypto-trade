@@ -1,0 +1,2 @@
+C1_pooled_auc_lift_positive,C2_pooled_clears_perm_q95,C3_majority_symbols_positive,C4_pooled_gated_hit_lift_positive,n_criteria_cleared,pooled_auc_8h_only,pooled_auc_8h_plus_daily,pooled_perm_q95,verdict
+True,False,True,True,3,0.4889,0.5015,0.5088,GO

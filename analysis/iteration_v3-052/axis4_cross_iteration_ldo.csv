@@ -1,0 +1,7 @@
+iteration,config,ldo_is_trades,ldo_oos_trades,ldo_is_wpnl,ldo_oos_wpnl,ldo_is_wr_pct,ldo_oos_wr_pct
+iter-v3/028 (3-sym /028 baseline; multi-seed mean),3-sym BCH+LDO+TRX; default ATR; no primitive 10; multi-seed,10,14,5.0192,-22.0501,40.0,21.43
+iter-v3/045 (4-sym + per-sym ATR; single-seed PROMISING anchor),4-sym BCH+LDO+TRX+ALGO; per-sym ATR (LDO 2.0/1.5); no primitive 10,17,13,43.8974,9.3355,58.82,53.85
+iter-v3/047 (4-sym + per-sym ATR + primitive 10; single-seed),4-sym; per-sym ATR; primitive 10 = BCH LONG block,13,12,0.8486,-19.1331,46.15,33.33
+iter-v3/049 (4-sym + per-sym ATR + primitive 10 + ADX retune; single-seed),4-sym; per-sym ATR; primitive 10; ADX retune,13,12,0.8486,-19.1331,46.15,33.33
+iter-v3/050 seed=42 (CONFIRMATION; same head as /049),Same head as /049; CONFIRMATION-NO-MERGE-revert,13,12,0.8486,-19.1331,46.15,33.33
+iter-v3/051 (3-sym FULL REVERT; single-seed EXPLORATION),3-sym BCH+LDO+TRX; default ATR; no primitive 10; +fracdiff_d05_close,9,13,11.155,-17.4386,33.33,23.08

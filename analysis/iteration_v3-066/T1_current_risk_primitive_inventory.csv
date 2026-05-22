@@ -1,0 +1,11 @@
+primitive_id,primitive_name,formula,default_floor,default_ceiling,per_symbol_override,enable_flag,category,iteration_added
+0,Vol scaling (weight_factor formula),"clip(atr_pct_rank_200, floor, ceiling)",0.3,1.0,{'TRXUSDT': 0.5} (iter-v3/061 floor override only),enable_vol_scaling=True,WEIGHTING (multiplicative),iter-v2/001 (sign inverted iter-v2/002)
+1,Feature z-score OOD (zscore_threshold),abs((feat - feat_mean_IS) / feat_std_IS) > zscore_threshold,,,{} (none),enable_zscore_ood=True; zscore_threshold=2.0,BINARY KILL (universal),iter-v3/011 (zscore_threshold=2.0)
+2,Hurst regime check (hurst_100 percentile),"hurst_100 outside [Q05_IS, Q95_IS]",,,{} (none),enable_hurst_check=True,BINARY KILL (universal),iter-v2 prior; disabled iter-v3/022 then re-enabled
+3,ADX gate (adx_threshold),ADX_14 < adx_threshold,,,{} (TRX 21 dropped at iter-v3/050),enable_adx_gate=True; adx_threshold=20.0,BINARY KILL (universal),iter-v2 prior
+4,Low-vol filter (atr_pct_rank_200 threshold),atr_pct_rank_200 < low_vol_filter_threshold,,,{} (none),enable_low_vol_filter=True; low_vol_filter_threshold=0.33,BINARY KILL (universal),iter-v2/004
+5,Per-symbol PnL cap (max_per_symbol_pnl_share),scaled_weight if rolling_share > max_per_symbol_pnl_share,,0.4,{} (none),enable_per_symbol_cap=False (DISABLED iter-v3/020 PATH C),WEIGHTING (proportional),iter-v3/020 (PATH C closed; CLOSED-mechanism)
+6,Regime-conditional kill switch (primitive 9),BTC drawdown_30d > dd_threshold OR |BTC vol_zscore_30d| > vol_threshold,,,{} (none),enable_regime_gate=False (DISABLED iter-v3/023),BINARY KILL (per-symbol scope),"iter-v3/022 (PATH C, disabled iter-v3/023)"
+7,Direction-asymmetric kill switch (primitive 10),kill if direction == +1 and symbol in block_long_for,,,block_long_for=(),block_long_for=() (DISABLED iter-v3/051 SYSTEM-LEVEL REVERT),BINARY KILL (per-symbol),iter-v3/047 (reverted iter-v3/051)
+8,Per-symbol drawdown brake (primitive 11),pause symbol when 30-day cum_wpnl_dd >= threshold,10.0,5.0,{} (none),enable_per_symbol_drawdown_brake=False (CLOSED-mechanism iter-v3/054),STATEFUL KILL,iter-v3/054 (PATH C-clean closed)
+9,BTC trend filter (post-trade),kill trade if direction fights 14d BTC trend > 15%,,15.0,{} (none; all 3 symbols),BTC_TREND_CONFIG.enabled=True; threshold_pct=15.0,"BINARY KILL (post-trade, universal)",v2 inheritance

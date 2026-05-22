@@ -177,6 +177,58 @@ uv run python scripts/reconcile_full_oos.py --db data/testnet.db
 
 Field-by-field compare of closed trades in the DB against backtest CSVs across full OOS / March 2026 / April 2026 windows. Pass criterion: zero divergences except known data-extent artifacts (trades the backtest CSV marks `end_of_data` may close as `timeout` in live since live data extends past the CSV).
 
+### Testnet workflow — v3 track (iter-v3/121 baseline, added iter-v3/132)
+
+The v3 track deploys the iter-v3/121 baseline: BCH/LDO/TRX 8h universe, 14-feature `V3_FEATURE_COLUMNS_TOP_N`, LightGBM with 10-seed unified ensemble + n_trials=35, RiskV3Wrapper (subclasses RiskV2Wrapper; same gate stack), and the load-bearing **/116 no_confirm exit primitive** (`enable_no_confirm_exit=True`, `trigger_atr=0.50`, `k_candles=4`). The /127 binary brake and /129 continuous scaling are DISABLED (axes CLOSED).
+
+```
+# Step 1 — fetch klines (BTC + ETH mandatory; cross-asset features in /121)
+uv run crypto-trade fetch \
+  --symbols BCHUSDT,LDOUSDT,TRXUSDT,BTCUSDT,ETHUSDT \
+  --intervals 8h
+
+# Step 2 — generate v3 features
+uv run crypto-trade features \
+  --symbols BCHUSDT,LDOUSDT,TRXUSDT --interval 8h \
+  --track v3 --format parquet --workers 4
+
+# Step 3 — seed testnet DB from /121 trades CSVs
+uv run crypto-trade seed-live-db \
+  --db data/testnet.db --track v3 \
+  --v3-trades reports-v3/iteration_v3-121/in_sample/trades.csv \
+  --v3-trades reports-v3/iteration_v3-121/out_of_sample/trades.csv
+
+# Expected counts: v3_closed > 0, v3_open >= 1 (the end_of_data OOS row),
+# boundary_keys = 3 (one per symbol), cooldown_keys = 3
+
+# Step 4 — launch on testnet
+PYTHONUNBUFFERED=1 uv run crypto-trade live --testnet --track v3 \
+  --amount 100 --leverage 1
+```
+
+What you should see at startup, in addition to v1/v2-common banner output:
+- 3 model lines: `V3-BCH`, `V3-LDO`, `V3-TRX` each with `(ATR TP=2.0, SL=1.0)`
+- Kline-fetch line includes BTCUSDT + ETHUSDT (`_initial_setup` auto-adds them)
+- `[live] Refreshing features...` dispatches the v3 group through `crypto_trade.features_v3.run_features_v3` (which clears `_BTC_CACHE_V3` + `_ETH_CACHE_V3` at entry — critical for live↔backtest determinism)
+- `[live] Rebuilt no_confirm state for N SEEDED v3 trades (M already confirmed by past excursion)` after R1/R2/VT rebuild — only present if SEEDED open v3 trades exist (typically 1 row, the OOS end_of_data row)
+
+Track-specific behavior:
+- **/116 no_confirm fires in BOTH paper (dry-run + testnet paper rows) and real (`--live`) modes.** Paper goes through `OrderManager.check_dry_run_exit` (extended to call the shared `evaluate_order_with_no_confirm` helper). Real goes through the new `OrderManager.check_no_confirm_exit` called from `_tick` step 2b (runs AFTER `check_exchange_exits` so SL/TP-already-triggered on Binance wins).
+- **BTC-lag defer** generalized to cover v2 AND v3 symbols (was v2-only before /132). If Binance publishes BCH/LDO/TRX candles before BTC, v3 symbols are deferred to next tick — prevents `cross_btc_v3` NaN-merge that would diverge from backtest.
+
+**Decision-log forensic events specific to v3:**
+- `kind=lgbm_signal` — every prediction (also v1/v2)
+- `kind=cache_clear` with `cache=btc_v3` or `cache=eth_v3` — cross-asset cache invalidated
+- `kind=xsymbol_deferred_btc_lag` (renamed from `v2_deferred_btc_lag`) — BTC lagged this tick
+- `kind=no_confirm_trigger` — real-mode no_confirm exit fired (model, symbol, exit_price, threshold_price, arm_time logged)
+
+Reconciliation:
+```
+uv run python scripts/reconcile_full_oos.py --db data/testnet.db
+```
+
+Same script as v1/v2; closed trades in `data/testnet.db` for V3-{BCH,LDO,TRX} compared against the /121 OOS CSV row-by-row. Pass criterion identical: zero divergences except data-extent artifacts.
+
 ### `symbols` — Discover available symbols
 
 - `uv run crypto-trade symbols` — list from both API and data.binance.vision

@@ -1,0 +1,18 @@
+{
+  "gate_passed": false,
+  "frac_above_threshold_0p91": 0.4667,
+  "frac_catastrophic_below_0p50": 0.3,
+  "sharpe_mean": 0.9186,
+  "sharpe_std": 0.8409,
+  "sharpe_min": -1.1952,
+  "sharpe_max": 3.0362,
+  "sharpe_q25": 0.4657,
+  "sharpe_q50": 0.8052,
+  "sharpe_q75": 1.38,
+  "n_configurations": 30,
+  "n_seeds": 10,
+  "n_training_window_starts": 3,
+  "threshold_definition": "sharpe_scaled >= 0.91 (= /121 IS 1.3108 - 0.40 catastrophic threshold)",
+  "gate_threshold_fraction": 0.6,
+  "interpretation": "FAIL: observed frac >= 0.91 = 0.47, gate requires >= 0.60"
+}

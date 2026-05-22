@@ -1,0 +1,4 @@
+split,n_train,n_val,val_winners,val_losers,train_auc,val_auc,note,open_time_lo,open_time_hi
+sub_period_1,39,18,5,13,1.0,0.6154,,1643587199999,1679011199999
+sub_period_2,39,18,6,12,1.0,0.6667,,1679241599999,1712995199999
+sub_period_3,39,18,10,8,1.0,0.35,,1713167999999,1740959999999

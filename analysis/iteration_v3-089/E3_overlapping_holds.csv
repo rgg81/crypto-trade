@@ -1,0 +1,4 @@
+is_bars,is_gross_pnl,is_fee_total,is_net_pnl,fee_over_abs_gross,is_gross_monthly_sharpe,is_net_monthly_sharpe,mean_turnover_per_bar,mean_gross_book_per_bar,turnover_frac_of_book,max_symbol_concentration_pct,variant,hold_bars
+3357,0.1114,1.11925,-1.00786,10.047,0.0765,-0.5744,0.3334,0.5333,0.625,11.8,E3_quintile_hold1,1
+3357,-0.09343,0.50225,-0.59568,5.376,-0.0743,-0.4154,0.1496,0.5271,0.284,14.8,E3_quintile_hold3,3
+3357,-0.08989,0.2961,-0.38599,3.294,-0.0805,-0.32,0.0882,0.5182,0.17,14.6,E3_quintile_hold6,6

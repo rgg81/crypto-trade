@@ -1,0 +1,7 @@
+candidate,symbol,gain_rank_of_15,gain_share_pct,parity_share_pct,above_parity,isval_logloss_15feat,isval_logloss_14feat,logloss_delta_15_minus_14,is_fit_improved
+argmax_pullback_signed_20,BCHUSDT,15,0.0,6.667,False,0.683,0.68489,-0.00189,True
+argmax_pullback_signed_20,LDOUSDT,5,8.643,6.667,True,0.754,0.75161,0.00238,False
+argmax_pullback_signed_20,TRXUSDT,15,1.056,6.667,False,0.69181,0.69246,-0.00065,True
+corr_gated_momentum_5d,BCHUSDT,11,1.446,6.667,False,0.68327,0.68489,-0.00163,True
+corr_gated_momentum_5d,LDOUSDT,6,2.55,6.667,False,0.7504,0.75161,-0.00121,True
+corr_gated_momentum_5d,TRXUSDT,13,0.274,6.667,False,0.69045,0.69246,-0.00201,True

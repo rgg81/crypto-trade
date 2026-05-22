@@ -1,0 +1,4 @@
+symbol,n_candles,n_no_tp,no_tp_frac,n_edge_free,edge_free_frac,mean_best_edge_all,mean_best_edge_edge_free
+BCHUSDT,5677,2168,0.3819,1607,0.2831,4.1317,-3.8526
+LDOUSDT,2691,1102,0.4095,932,0.3463,4.6138,-5.0652
+TRXUSDT,5619,2115,0.3764,1612,0.2869,3.2454,-2.9055

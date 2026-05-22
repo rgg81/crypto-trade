@@ -1,0 +1,4 @@
+trigger,n_losers,n_winners,loser_mean,winner_mean,loser_range,winner_range,std_gap,correct_polarity,useful_direction,ranges_overlap
+btc_dd,6,3,6.8709,5.9475,1.751-15.406,1.653-9.919,0.1888,kill_HIGH,True,True
+btc_vz,6,3,0.5094,0.4981,0.158-0.774,0.399-0.580,0.0564,kill_HIGH,True,True
+ldo_vz,6,3,0.7028,1.0104,0.269-1.183,0.575-1.542,-0.742,kill_LOW,True,True

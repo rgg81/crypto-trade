@@ -1,0 +1,3 @@
+window,ldo_trades,ldo_long_n,ldo_short_n,ldo_long_wpnl,ldo_short_wpnl,ldo_wpnl_total,ldo_avg_wpnl_per_trade,ldo_wr_pct,ldo_sl_n,ldo_tp_n,ldo_timeout_n,ldo_eod_n,bundle_total_wpnl,ldo_pnl_share_pct
+IS,9,6,3,5.5887,5.5663,11.155,1.2394,33.33,6,3,0,0,30.3265,36.78
+OOS,13,2,11,4.986,-22.4246,-17.4386,-1.3414,23.08,10,3,0,0,17.4255,-100.08

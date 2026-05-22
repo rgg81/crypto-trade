@@ -1,0 +1,163 @@
+{
+  "G1_data_depth_30mo": {
+    "pass": true,
+    "per_symbol": [
+      {
+        "symbol": "ATOMUSDT",
+        "is_months": 62,
+        "g1_pass": true
+      },
+      {
+        "symbol": "RUNEUSDT",
+        "is_months": 55,
+        "g1_pass": true
+      },
+      {
+        "symbol": "AVAXUSDT",
+        "is_months": 55,
+        "g1_pass": true
+      },
+      {
+        "symbol": "HBARUSDT",
+        "is_months": 49,
+        "g1_pass": true
+      },
+      {
+        "symbol": "ICPUSDT",
+        "is_months": 47,
+        "g1_pass": true
+      },
+      {
+        "symbol": "ALGOUSDT",
+        "is_months": 58,
+        "g1_pass": true
+      }
+    ]
+  },
+  "G2_max_pairwise_ret_corr_lt_085": {
+    "pass": true,
+    "max_pairwise_abs_corr": 0.04056010803307363
+  },
+  "G3_adf_stationary_p_lt_e-3": {
+    "pass": true,
+    "per_symbol": [
+      {
+        "symbol": "ATOMUSDT",
+        "p_value": 0.0,
+        "stationary": true
+      },
+      {
+        "symbol": "RUNEUSDT",
+        "p_value": 0.0,
+        "stationary": true
+      },
+      {
+        "symbol": "AVAXUSDT",
+        "p_value": 0.0,
+        "stationary": true
+      },
+      {
+        "symbol": "HBARUSDT",
+        "p_value": 0.0,
+        "stationary": true
+      },
+      {
+        "symbol": "ICPUSDT",
+        "p_value": 5.559014881246793e-22,
+        "stationary": true
+      },
+      {
+        "symbol": "ALGOUSDT",
+        "p_value": 4.1145599214309833e-23,
+        "stationary": true
+      }
+    ]
+  },
+  "G4_auc_stability_range_lt_005": {
+    "informational_pass": false,
+    "per_symbol": [
+      {
+        "symbol": "ATOMUSDT",
+        "auc_mean": 0.5238053817376458,
+        "auc_range": 0.13778243341060326,
+        "g4_informational_pass": false
+      },
+      {
+        "symbol": "RUNEUSDT",
+        "auc_mean": 0.5314253492270742,
+        "auc_range": 0.05859137780237533,
+        "g4_informational_pass": false
+      },
+      {
+        "symbol": "AVAXUSDT",
+        "auc_mean": 0.5205108641985938,
+        "auc_range": 0.1648323346847842,
+        "g4_informational_pass": false
+      },
+      {
+        "symbol": "HBARUSDT",
+        "auc_mean": 0.45751121382047516,
+        "auc_range": 0.09008028616293073,
+        "g4_informational_pass": false
+      },
+      {
+        "symbol": "ICPUSDT",
+        "auc_mean": 0.4911772982419795,
+        "auc_range": 0.09489501233839942,
+        "g4_informational_pass": false
+      },
+      {
+        "symbol": "ALGOUSDT",
+        "auc_mean": 0.4452237706164363,
+        "auc_range": 0.12194624783649838,
+        "g4_informational_pass": false
+      }
+    ]
+  },
+  "G5_top3_rank_shift_lt_5": {
+    "informational_pass": false,
+    "per_symbol": [
+      {
+        "symbol": "ATOMUSDT",
+        "top3_max_shift": 5,
+        "g5_informational_pass": false
+      },
+      {
+        "symbol": "RUNEUSDT",
+        "top3_max_shift": 3,
+        "g5_informational_pass": true
+      },
+      {
+        "symbol": "AVAXUSDT",
+        "top3_max_shift": 3,
+        "g5_informational_pass": true
+      },
+      {
+        "symbol": "HBARUSDT",
+        "top3_max_shift": 5,
+        "g5_informational_pass": false
+      },
+      {
+        "symbol": "ICPUSDT",
+        "top3_max_shift": 7,
+        "g5_informational_pass": false
+      },
+      {
+        "symbol": "ALGOUSDT",
+        "top3_max_shift": 4,
+        "g5_informational_pass": true
+      }
+    ]
+  },
+  "G6_universe_pooled_auc_gt_051": {
+    "informational_pass": false,
+    "universe_pooled_auc_mean": 0.4949423129737008
+  },
+  "decision": {
+    "hard_gates_g1_g2_g3_pass": true,
+    "informational_gates_pass_count": 0,
+    "informational_gates_total": 3,
+    "go_no_go": "GO",
+    "note": "GO decision requires hard gates G1+G2+G3 ALL PASS. Informational gates G4+G5+G6 report rolling-endpoint methodology-fix flags. A GO with low informational-gate pass count signals HIGH-RISK posture (the rolling-endpoint EDA flags symbols whose AUC/rank-stability is unstable across 3 IS endpoint slices) \u2014 brief Section 6 must address."
+  }
+}

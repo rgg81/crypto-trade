@@ -149,12 +149,14 @@ def build_parser() -> argparse.ArgumentParser:
     )
     feat_parser.add_argument(
         "--track",
-        choices=["v1", "v2"],
+        choices=["v1", "v2", "v3"],
         default="v1",
         help=(
             "Feature catalog: v1=crypto_trade.features (193 baseline features); "
-            "v2=crypto_trade.features_v2 (34 v2 features). "
-            "When --track v2 and --output is omitted, default output dir is data/features_v2."
+            "v2=crypto_trade.features_v2 (34 v2 features); "
+            "v3=crypto_trade.features_v3 (v3 rigor-arm features, parquet only). "
+            "When --track v2/v3 and --output is omitted, default output dir is "
+            "data/features_v2 or data/features_v3 respectively."
         ),
     )
 
@@ -273,9 +275,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     live_parser.add_argument(
         "--track",
-        choices=["v1", "v2", "both"],
+        choices=["v1", "v2", "v3", "both"],
         default="v1",
-        help="Model preset: v1=BASELINE_MODELS, v2=V2_BASELINE_MODELS, both=COMBINED_MODELS (default: v1)",
+        help=(
+            "Model preset: v1=BASELINE_MODELS, v2=V2_BASELINE_MODELS, "
+            "v3=V3_BASELINE_MODELS (iter-v3/121), both=COMBINED_MODELS (default: v1)"
+        ),
     )
     # -- seed-live-db subcommand --
     seed_parser = subparsers.add_parser(
@@ -309,11 +314,18 @@ def build_parser() -> argparse.ArgumentParser:
         help="v2 backtest trades.csv (can repeat). Zero-weight rows skipped.",
     )
     seed_parser.add_argument(
+        "--v3-trades",
+        action="append",
+        type=str,
+        default=None,
+        help="v3 backtest trades.csv (can repeat for IS+OOS — iter-v3/121 baseline).",
+    )
+    seed_parser.add_argument(
         "--track",
-        choices=["v1", "v2", "both"],
+        choices=["v1", "v2", "v3", "both"],
         default="both",
         help="Which model preset to use for symbol→model mapping + cooldown_candles "
-        "resolution (default: both).",
+        "resolution (default: both — covers v1+v2; pass v3 for /121).",
     )
     seed_parser.add_argument(
         "--reseed",
@@ -323,6 +335,93 @@ def build_parser() -> argparse.ArgumentParser:
             "data extent, even if existing keys are higher. Default is "
             "monotonic advance (MAX(existing, new))."
         ),
+    )
+
+    # -- fetch-funding subcommand (iter-v3/019) --
+    ff_parser = subparsers.add_parser(
+        "fetch-funding",
+        help=(
+            "Fetch Binance Futures funding-rate history from /fapi/v1/fundingRate "
+            "and cache to data/funding_rates/<SYMBOL>.csv. Incremental — re-running "
+            "appends only new entries since last cached timestamp."
+        ),
+    )
+    ff_parser.add_argument(
+        "--symbols",
+        type=str,
+        required=True,
+        help="Comma-separated symbols (e.g. BCHUSDT,LDOUSDT,TRXUSDT)",
+    )
+    ff_parser.add_argument(
+        "--start",
+        type=str,
+        default=None,
+        help=(
+            "Earliest funding date as YYYY-MM-DD (default: 2019-01-01). "
+            "Ignored if cache already exists — incremental fetch resumes from "
+            "last cached timestamp."
+        ),
+    )
+    ff_parser.add_argument(
+        "--output-dir",
+        type=str,
+        default=None,
+        help="Directory for funding-rate CSVs (default: data/funding_rates/)",
+    )
+
+    # -- fetch-spot subcommand (iter-v3/086) --
+    fs_parser = subparsers.add_parser(
+        "fetch-spot",
+        help=(
+            "Fetch Binance SPOT 8h klines from data.binance.vision monthly archives "
+            "and cache to data/spot/<SYMBOL>/8h.csv. Incremental — re-running appends "
+            "only new candles. Timestamp normalisation: 16-digit microsecond epochs "
+            "(Binance spot archives 2025-01+) are converted to milliseconds."
+        ),
+    )
+    fs_parser.add_argument(
+        "--symbols",
+        type=str,
+        required=True,
+        help="Comma-separated symbols (e.g. BCHUSDT,LDOUSDT,TRXUSDT)",
+    )
+    fs_parser.add_argument(
+        "--intervals",
+        type=str,
+        default="8h",
+        help="Comma-separated intervals (default: 8h)",
+    )
+    fs_parser.add_argument(
+        "--output-dir",
+        type=str,
+        default=None,
+        help="Directory for spot-kline CSVs (default: data/spot/)",
+    )
+
+    # -- fetch-oi subcommand (iter-v3/093) --
+    foi_parser = subparsers.add_parser(
+        "fetch-oi",
+        help=(
+            "Fetch Binance Futures open-interest + long/short metrics from "
+            "data.binance.vision daily metrics archives and cache to "
+            "data/open_interest/<SYMBOL>/8h.csv. Incremental — re-running "
+            "appends only new rows. Schema: sum_open_interest, "
+            "sum_open_interest_value, count_toptrader_long_short_ratio, "
+            "sum_toptrader_long_short_ratio at 5-min granularity, "
+            "resampled to 8h."
+        ),
+    )
+    foi_parser.add_argument(
+        "--symbols",
+        type=str,
+        required=True,
+        help="Comma-separated symbols (e.g. BCHUSDT,LDOUSDT,TRXUSDT,BTCUSDT)",
+    )
+    foi_parser.add_argument(
+        "--output-dir",
+        type=str,
+        default=None,
+        help="Directory for OI CSVs (default: data/open_interest/)",
     )
 
     # -- portfolio-report subcommand --
@@ -380,6 +479,12 @@ def main() -> None:
         _cmd_portfolio_report(args, settings)
     elif args.command == "seed-live-db":
         _cmd_seed_live_db(args, settings)
+    elif args.command == "fetch-funding":
+        _cmd_fetch_funding(args, settings)
+    elif args.command == "fetch-spot":
+        _cmd_fetch_spot(args, settings)
+    elif args.command == "fetch-oi":
+        _cmd_fetch_oi(args, settings)
 
 
 def _cmd_fetch(args, settings) -> None:
@@ -655,9 +760,20 @@ def _cmd_features(args, settings) -> None:
     from pathlib import Path
 
     track = getattr(args, "track", "v1")
-    if track == "v2":
+    if track == "v3":
+        from crypto_trade.features_v3 import (
+            list_groups as _list_groups,
+        )
+        from crypto_trade.features_v3 import (
+            run_features_v3 as _run_features,
+        )
+
+        default_output = str(Path(settings.data_dir) / "features_v3")
+    elif track == "v2":
         from crypto_trade.features_v2 import (
             list_groups as _list_groups,
+        )
+        from crypto_trade.features_v2 import (
             run_features_v2 as _run_features,
         )
 
@@ -665,6 +781,8 @@ def _cmd_features(args, settings) -> None:
     else:
         from crypto_trade.features import (
             list_groups as _list_groups,
+        )
+        from crypto_trade.features import (
             run_features as _run_features,
         )
 
@@ -713,13 +831,12 @@ def _cmd_features(args, settings) -> None:
     print(f"  Symbols: {', '.join(symbols)} | Interval: {args.interval} | Workers: {args.workers}")
 
     output_format = getattr(args, "format", "csv")
-    if track == "v2":
-        # v2's run_features_v2 always emits all groups as parquet — no
-        # groups/output_format kwargs.
+    if track in ("v2", "v3"):
+        # v2/v3 feature runners always emit parquet — no groups/output_format kwargs.
         if output_format != "parquet":
             print(
-                f"NOTE: --format {output_format} ignored for --track v2 "
-                "(v2 features are parquet-only)",
+                f"NOTE: --format {output_format} ignored for --track {track} "
+                f"({track} features are parquet-only)",
                 file=sys.stderr,
             )
         results = _run_features(
@@ -795,8 +912,9 @@ def _cmd_live(args, settings) -> None:
     from crypto_trade.live.models import (
         BASELINE_MODELS,
         COMBINED_MODELS,
-        LiveConfig,
         V2_BASELINE_MODELS,
+        V3_BASELINE_MODELS,
+        LiveConfig,
     )
 
     groups = tuple(g.strip() for g in args.feature_groups.split(","))
@@ -805,7 +923,8 @@ def _cmd_live(args, settings) -> None:
     track_map = {
         "v1": BASELINE_MODELS,
         "v2": V2_BASELINE_MODELS,
-        "both": COMBINED_MODELS,
+        "v3": V3_BASELINE_MODELS,                # iter-v3/121 baseline (BCH/LDO/TRX)
+        "both": COMBINED_MODELS,                  # v1+v2 only (deliberate; v3 deploys alone)
     }
     selected_models = track_map[track]
     print(f"[live] Track: {track} ({len(selected_models)} models)")
@@ -908,14 +1027,16 @@ def _cmd_seed_live_db(args, settings) -> None:
     from crypto_trade.live.models import (
         BASELINE_MODELS,
         COMBINED_MODELS,
-        LiveConfig,
         V2_BASELINE_MODELS,
+        V3_BASELINE_MODELS,
+        LiveConfig,
     )
 
     track_map = {
         "v1": BASELINE_MODELS,
         "v2": V2_BASELINE_MODELS,
-        "both": COMBINED_MODELS,
+        "v3": V3_BASELINE_MODELS,                # iter-v3/121 baseline (BCH/LDO/TRX)
+        "both": COMBINED_MODELS,                  # v1+v2 only — v3 deploys alone
     }
     selected_models = track_map[args.track]
 
@@ -923,10 +1044,11 @@ def _cmd_seed_live_db(args, settings) -> None:
 
     v1_paths = [Path(p) for p in (args.v1_trades or [])]
     v2_paths = [Path(p) for p in (args.v2_trades or [])]
+    v3_paths = [Path(p) for p in (args.v3_trades or [])]
 
-    if not v1_paths and not v2_paths:
+    if not v1_paths and not v2_paths and not v3_paths:
         print(
-            "ERROR: provide at least one --v1-trades or --v2-trades CSV.",
+            "ERROR: provide at least one --v1-trades / --v2-trades / --v3-trades CSV.",
             file=sys.stderr,
         )
         sys.exit(2)
@@ -938,6 +1060,8 @@ def _cmd_seed_live_db(args, settings) -> None:
         print(f"[seed] v1 CSVs: {', '.join(str(p) for p in v1_paths)}")
     if v2_paths:
         print(f"[seed] v2 CSVs: {', '.join(str(p) for p in v2_paths)}")
+    if v3_paths:
+        print(f"[seed] v3 CSVs: {', '.join(str(p) for p in v3_paths)}")
     if args.reseed:
         print("[seed] reseed=True (boundary keys will be overwritten)")
 
@@ -947,6 +1071,7 @@ def _cmd_seed_live_db(args, settings) -> None:
         v2_trades_csvs=v2_paths,
         live_config=cfg,
         reseed=args.reseed,
+        v3_trades_csvs=v3_paths,
     )
 
     print()
@@ -963,6 +1088,559 @@ def _cmd_seed_live_db(args, settings) -> None:
         "seeded boundary (seeded_through_* keys) and produces trades only for candles "
         "after the seeded data."
     )
+
+
+def _cmd_fetch_funding(args, settings) -> None:
+    """Fetch funding-rate history from /fapi/v1/fundingRate and cache locally.
+
+    Iterates over each symbol, fetches incrementally from cache, and writes
+    data/funding_rates/<SYMBOL>.csv (schema: funding_time, funding_rate).
+
+    iter-v3/019: supports the NEW funding_rate_zscore_30 feature family.
+    """
+    import time as _time
+    from pathlib import Path
+
+    import httpx as _httpx
+    import pandas as _pd
+
+    symbols = [s.strip() for s in args.symbols.split(",")]
+    if args.output_dir:
+        output_dir = Path(args.output_dir)
+    else:
+        output_dir = Path(settings.data_dir) / "funding_rates"
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Default start: 2019-01-01 00:00:00 UTC in ms
+    default_start_ms = 1_546_300_800_000
+    if args.start:
+        from datetime import UTC, datetime
+
+        dt = datetime.strptime(args.start, "%Y-%m-%d").replace(tzinfo=UTC)
+        default_start_ms = int(dt.timestamp() * 1000)
+
+    funding_endpoint = "/fapi/v1/fundingRate"
+    fapi_base = "https://fapi.binance.com"
+
+    total_fetched = 0
+    for symbol in symbols:
+        cache_path = output_dir / f"{symbol}.csv"
+        print(f"\n[fetch-funding] {symbol} → {cache_path}")
+
+        # Load existing cache (incremental)
+        cached = _pd.DataFrame(columns=["funding_time", "funding_rate"])
+        start_ms = default_start_ms
+        if cache_path.exists():
+            cached = _pd.read_csv(cache_path)
+            if len(cached) > 0:
+                start_ms = int(cached["funding_time"].max()) + 1
+                resume_ts = _pd.to_datetime(start_ms, unit="ms")
+                print(f"  cache hit: {len(cached)} rows, resuming from {resume_ts}")
+
+        rows: list[dict] = []
+        current_start = start_ms
+        page = 0
+
+        with _httpx.Client(base_url=fapi_base, timeout=30.0) as http:
+            while True:
+                params = {"symbol": symbol, "limit": 1000, "startTime": current_start}
+                r = http.get(funding_endpoint, params=params)
+                r.raise_for_status()
+                data = r.json()
+                if not data:
+                    break
+                for d in data:
+                    rows.append(
+                        {
+                            "funding_time": int(d["fundingTime"]),
+                            "funding_rate": float(d["fundingRate"]),
+                        }
+                    )
+                page += 1
+                last_time = int(data[-1]["fundingTime"])
+                print(
+                    f"  page {page}: {len(data)} rows, last={_pd.to_datetime(last_time, unit='ms')}"
+                )
+                if len(data) < 1000:
+                    break
+                current_start = last_time + 1
+                _time.sleep(0.25)  # rate limit
+
+        new_df = _pd.DataFrame(rows)
+        if len(new_df) == 0 and len(cached) == 0:
+            print(f"  WARNING: no data fetched for {symbol}")
+            continue
+
+        full = _pd.concat([cached, new_df], ignore_index=True)
+        full = (
+            full.drop_duplicates(subset=["funding_time"], keep="last")
+            .sort_values("funding_time")
+            .reset_index(drop=True)
+        )
+        full.to_csv(cache_path, index=False)
+        total_fetched += len(new_df)
+        print(f"  saved {len(full)} total rows ({len(new_df)} new) → {cache_path}")
+
+    print(f"\n[fetch-funding] Done — {total_fetched} new rows across {len(symbols)} symbols")
+
+
+def _cmd_fetch_spot(args, settings) -> None:
+    """Fetch Binance SPOT klines from data.binance.vision monthly archives.
+
+    Writes data/spot/<SYMBOL>/<INTERVAL>.csv with the 11-column kline schema
+    (identical to the perp CSV schema). Incremental: re-running appends only
+    candles not already cached (dedup on open_time).
+
+    Timestamp normalisation (iter-v3/086 Section 3.2 — LOAD-BEARING):
+    Binance spot kline archives switched open_time/close_time from millisecond
+    (13-digit) to microsecond (16-digit) epochs at 2025-01. This function
+    normalises every timestamp to milliseconds so the spot CSVs join cleanly
+    with the millisecond perp CSVs on open_time. Without this normalisation a
+    microsecond open_time would never match a millisecond perp open_time.
+
+    Source: data.binance.vision/data/spot/monthly/klines/<SYM>/<IV>/<SYM>-<IV>-<YYYY-MM>.zip
+    Current month (not yet archived): Binance /api/v3/klines REST API fallback.
+    """
+    import csv as _csv
+    import io as _io
+    import time as _time
+    import zipfile as _zipfile
+    from datetime import UTC, datetime
+    from pathlib import Path
+
+    import httpx as _httpx
+
+    spot_archive_tmpl = (
+        "https://data.binance.vision/data/spot/monthly/klines/{sym}/{iv}/{sym}-{iv}-{ym}.zip"
+    )
+    spot_api_base = "https://api.binance.com"
+    kline_header = [
+        "open_time",
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume",
+        "close_time",
+        "quote_volume",
+        "trades",
+        "taker_buy_volume",
+        "taker_buy_quote_volume",
+    ]
+
+    def _to_ms(val: int) -> int:
+        """Normalise a Binance epoch value to milliseconds.
+
+        Binance spot archives switched from ms (13-digit) to µs (16-digit) at
+        2025-01. Anything >= 1e15 is a microsecond epoch — divide by 1000.
+        Unit test: _to_ms(1_735_689_600_000_000) == 1_735_689_600_000.
+        """
+        return val // 1000 if val >= 1_000_000_000_000_000 else val
+
+    def _month_range(start: str, end: str) -> list[str]:
+        sy, sm = (int(x) for x in start.split("-"))
+        ey, em = (int(x) for x in end.split("-"))
+        out: list[str] = []
+        y, m = sy, sm
+        while (y, m) <= (ey, em):
+            out.append(f"{y:04d}-{m:02d}")
+            m += 1
+            if m == 13:
+                m, y = 1, y + 1
+        return out
+
+    def _fetch_month_archive(http: _httpx.Client, sym: str, iv: str, ym: str) -> list[list[str]]:
+        """Download one monthly spot ZIP; return 11-col kline rows (ms-normalised)."""
+        url = spot_archive_tmpl.format(sym=sym, iv=iv, ym=ym)
+        for attempt in range(3):
+            try:
+                r = http.get(url, timeout=60.0)
+                if r.status_code in (403, 404) or not r.content.startswith(b"PK"):
+                    return []  # absent archive or NoSuchKey XML
+                r.raise_for_status()
+                zf = _zipfile.ZipFile(_io.BytesIO(r.content))
+                name = zf.namelist()[0]
+                rows: list[list[str]] = []
+                for line in zf.read(name).decode().splitlines():
+                    parts = line.split(",")
+                    if parts and parts[0].lstrip("-").isdigit():
+                        parts[0] = str(_to_ms(int(parts[0])))
+                        parts[6] = str(_to_ms(int(parts[6])))
+                        rows.append(parts[:11])
+                return rows
+            except (_httpx.HTTPError, _zipfile.BadZipFile) as exc:
+                if attempt == 2:
+                    raise
+                print(f"    retry {sym} {ym}: {exc}")
+                _time.sleep(2.0 * (attempt + 1))
+        return []
+
+    def _fetch_current_month_api(
+        http: _httpx.Client, sym: str, iv: str, since_ms: int
+    ) -> list[list[str]]:
+        """Fill the current (not-yet-archived) month via /api/v3/klines."""
+        rows: list[list[str]] = []
+        start = since_ms
+        while True:
+            params = {
+                "symbol": sym,
+                "interval": iv,
+                "startTime": start,
+                "limit": 1000,
+            }
+            r = http.get("/api/v3/klines", params=params)
+            r.raise_for_status()
+            data = r.json()
+            if not data:
+                break
+            for k in data:
+                ot = _to_ms(int(k[0]))
+                ct = _to_ms(int(k[6]))
+                now_ms = int(datetime.now(UTC).timestamp() * 1000)
+                if ct >= now_ms:
+                    continue  # forming candle — skip
+                rows.append(
+                    [
+                        str(ot),
+                        str(k[1]),
+                        str(k[2]),
+                        str(k[3]),
+                        str(k[4]),
+                        str(k[5]),
+                        str(ct),
+                        str(k[7]),
+                        str(k[8]),
+                        str(k[9]),
+                        str(k[10]),
+                    ]
+                )
+            if len(data) < 1000:
+                break
+            start = _to_ms(int(data[-1][6])) + 1
+            _time.sleep(0.25)
+        return rows
+
+    symbols = [s.strip() for s in args.symbols.split(",")]
+    intervals = [i.strip() for i in args.intervals.split(",")]
+    if args.output_dir:
+        output_root = Path(args.output_dir)
+    else:
+        output_root = Path(settings.data_dir) / "spot"
+    output_root.mkdir(parents=True, exist_ok=True)
+
+    # Widen the month range to cover historical spot depth (spot predates perp).
+    now_ym = datetime.now(UTC).strftime("%Y-%m")
+    months = _month_range("2018-01", now_ym)
+
+    total_new = 0
+    with (
+        _httpx.Client(timeout=60.0) as bulk_http,
+        _httpx.Client(base_url=spot_api_base, timeout=30.0) as api_http,
+    ):
+        for sym in symbols:
+            for iv in intervals:
+                out_dir = output_root / sym
+                out_dir.mkdir(parents=True, exist_ok=True)
+                out_csv = out_dir / f"{iv}.csv"
+
+                # Load existing cache (incremental dedup on open_time).
+                seen: set[int] = set()
+                existing: list[list[str]] = []
+                if out_csv.exists():
+                    with out_csv.open() as fh:
+                        rd = _csv.reader(fh)
+                        next(rd, None)  # skip header
+                        for row in rd:
+                            if row:
+                                existing.append(row)
+                                seen.add(int(row[0]))
+                    print(f"[fetch-spot] {sym}/{iv}: cache hit — {len(existing)} rows")
+                else:
+                    print(f"[fetch-spot] {sym}/{iv}: no cache — full fetch")
+
+                new_rows: list[list[str]] = []
+
+                # --- Bulk archive months ---
+                for ym in months:
+                    rows = _fetch_month_archive(bulk_http, sym, iv, ym)
+                    fresh = [r for r in rows if int(r[0]) not in seen]
+                    if fresh:
+                        new_rows.extend(fresh)
+                        seen.update(int(r[0]) for r in fresh)
+                    if rows:
+                        print(f"  {sym}/{iv} {ym}: {len(rows)} rows ({len(fresh)} new)")
+                    _time.sleep(0.05)  # light rate-limit courtesy
+
+                # --- Current month via REST API ---
+                last_ms = (
+                    max(int(r[0]) for r in (existing + new_rows)) if (existing or new_rows) else 0
+                )
+                api_rows = _fetch_current_month_api(api_http, sym, iv, last_ms + 1)
+                fresh_api = [r for r in api_rows if int(r[0]) not in seen]
+                if fresh_api:
+                    new_rows.extend(fresh_api)
+                    seen.update(int(r[0]) for r in fresh_api)
+                    print(f"  {sym}/{iv} API current-month: {len(fresh_api)} new rows")
+
+                combined = existing + new_rows
+                combined.sort(key=lambda r: int(r[0]))
+                with out_csv.open("w", newline="") as fh:
+                    wr = _csv.writer(fh)
+                    wr.writerow(kline_header)
+                    wr.writerows(combined)
+
+                total_new += len(new_rows)
+                if combined:
+                    first_ms = int(combined[0][0])
+                    last_ms_out = int(combined[-1][0])
+                    fd = datetime.fromtimestamp(first_ms / 1000, UTC).date()
+                    ld = datetime.fromtimestamp(last_ms_out / 1000, UTC).date()
+                    print(
+                        f"[fetch-spot] {sym}/{iv}: {len(combined)} total rows "
+                        f"({len(new_rows)} new) {fd} → {ld} → {out_csv}"
+                    )
+
+    print(f"\n[fetch-spot] Done — {total_new} new rows across {len(symbols)} symbols")
+
+
+def _cmd_fetch_oi(args, settings) -> None:
+    """Fetch Binance Futures open-interest metrics from data.binance.vision daily archives.
+
+    Downloads ``data/futures/um/daily/metrics/<SYM>/<SYM>-metrics-YYYY-MM-DD.zip``
+    daily ZIPs (5-min granularity), resamples to 8h, and writes
+    ``data/open_interest/<SYM>/8h.csv``.
+
+    Schema of cached 8h CSV (one row per 8h bar, open_time in ms):
+        open_time, sum_open_interest, sum_open_interest_value,
+        count_toptrader_long_short_ratio, sum_toptrader_long_short_ratio,
+        count_long_short_ratio, sum_taker_long_short_vol_ratio
+
+    Each column is resampled from the 5-min rows of the PREVIOUS fully-closed
+    8h period:
+        - sum_open_interest / sum_open_interest_value: LAST (snapshot at period close)
+        - count_* / sum_*: SUM (accumulate within the 8h window)
+
+    Incremental: re-running appends only new days not already cached.
+    Coverage: BTCUSDT from 2020-09-01; LDO/TRX/BCH from listing date.
+    """
+    import csv as _csv
+    import io as _io
+    import time as _time
+    import zipfile as _zipfile
+    from datetime import UTC, date, datetime, timedelta
+    from pathlib import Path
+
+    import httpx as _httpx
+
+    oi_archive_tmpl = (
+        "https://data.binance.vision/data/futures/um/daily/metrics/{sym}/{sym}-metrics-{ymd}.zip"
+    )
+
+    oi_8h_header = [
+        "open_time",
+        "sum_open_interest",
+        "sum_open_interest_value",
+        "count_toptrader_long_short_ratio",
+        "sum_toptrader_long_short_ratio",
+        "count_long_short_ratio",
+        "sum_taker_long_short_vol_ratio",
+    ]
+
+    # Binance Futures 8h bar boundaries: 00:00, 08:00, 16:00 UTC (ms).
+    _8h_ms = 8 * 3_600_000
+
+    def _floor_to_8h(ts_ms: int) -> int:
+        """Floor a millisecond timestamp to the containing 8h bar open_time."""
+        return (ts_ms // _8h_ms) * _8h_ms
+
+    def _fetch_day_zip(http: _httpx.Client, sym: str, ymd: str) -> list[list[str]] | None:
+        """Download one daily metrics ZIP; return raw 5-min rows or None if absent."""
+        url = oi_archive_tmpl.format(sym=sym, ymd=ymd)
+        for attempt in range(3):
+            try:
+                r = http.get(url, timeout=60.0)
+                if r.status_code in (403, 404):
+                    return None  # date not yet archived or symbol has no history
+                if not r.content.startswith(b"PK"):
+                    return None  # NoSuchKey XML or empty response
+                r.raise_for_status()
+                zf = _zipfile.ZipFile(_io.BytesIO(r.content))
+                name = zf.namelist()[0]
+                rows: list[list[str]] = []
+                for line in zf.read(name).decode().splitlines():
+                    parts = line.split(",")
+                    # schema: create_time, symbol, col1, col2, ...
+                    # create_time is "YYYY-MM-DD HH:MM:SS" — skip header line
+                    if parts and len(parts) >= 8 and parts[0][:4].isdigit() and "-" in parts[0]:
+                        rows.append(parts)
+                return rows
+            except (_httpx.HTTPError, _zipfile.BadZipFile) as exc:
+                if attempt == 2:
+                    print(f"  [fetch-oi] WARN: failed {sym} {ymd} after 3 attempts: {exc}")
+                    return None
+                _time.sleep(2.0 * (attempt + 1))
+        return None
+
+    def _resample_5min_to_8h(raw_rows: list[list[str]]) -> list[list[str]]:
+        """Resample 5-min metric rows to 8h bars.
+
+        Input row schema (from the ZIP, 8 cols):
+            create_time (ms), symbol, sum_open_interest, sum_open_interest_value,
+            count_toptrader_long_short_ratio, sum_toptrader_long_short_ratio,
+            count_long_short_ratio, sum_taker_long_short_vol_ratio
+
+        Output row schema (oi_8h_header, 7 cols):
+            open_time (ms), sum_open_interest (LAST), sum_open_interest_value (LAST),
+            count_toptrader_long_short_ratio (SUM), sum_toptrader_long_short_ratio (SUM),
+            count_long_short_ratio (SUM), sum_taker_long_short_vol_ratio (SUM)
+
+        Each output row represents the 8h bar STARTING at open_time. The 5-min rows
+        assigned to bar T are those with create_time in [T, T + 8h). The bar's OI
+        snapshot is the LAST 5-min value in that window (latest OI reading before
+        bar close). The flow metrics (count/sum) are accumulated across the window.
+
+        Past-only convention (enforced at the feature level via .shift(1) in
+        derivatives_state_v3.py): bar T's cached values are based on the 5-min
+        rows of the SAME bar period — no look-ahead because bar T's close_time is
+        T + 8h and the runner reads open_time-aligned snapshots that are then
+        shifted before feature construction.
+        """
+        if not raw_rows:
+            return []
+
+        # Parse to typed arrays
+        # create_time format: "YYYY-MM-DD HH:MM:SS" UTC
+        bars: dict[int, dict] = {}
+        for parts in raw_rows:
+            if len(parts) < 8:
+                continue
+            try:
+                # Parse "YYYY-MM-DD HH:MM:SS" -> ms epoch
+                dt = datetime.strptime(parts[0].strip(), "%Y-%m-%d %H:%M:%S").replace(tzinfo=UTC)
+                ts_ms = int(dt.timestamp() * 1000)
+            except (ValueError, OverflowError):
+                continue
+            bar_open = _floor_to_8h(ts_ms)
+            if bar_open not in bars:
+                bars[bar_open] = {
+                    "last_create_time": 0,
+                    "sum_oi": 0.0,
+                    "sum_oi_val": 0.0,
+                    "cnt_top_ls": 0.0,
+                    "sum_top_ls": 0.0,
+                    "cnt_ls": 0.0,
+                    "sum_tv_ls": 0.0,
+                }
+            b = bars[bar_open]
+            # Track the latest 5-min timestamp to get the LAST OI snapshot
+            if ts_ms > b["last_create_time"]:
+                b["last_create_time"] = ts_ms
+                try:
+                    b["sum_oi"] = float(parts[2]) if parts[2] else 0.0
+                    b["sum_oi_val"] = float(parts[3]) if parts[3] else 0.0
+                except (ValueError, IndexError):
+                    pass
+            # Accumulate flow metrics (SUM)
+            try:
+                b["cnt_top_ls"] += float(parts[4]) if parts[4] else 0.0
+                b["sum_top_ls"] += float(parts[5]) if parts[5] else 0.0
+                b["cnt_ls"] += float(parts[6]) if parts[6] else 0.0
+                b["sum_tv_ls"] += float(parts[7]) if parts[7] else 0.0
+            except (ValueError, IndexError):
+                pass
+
+        # Emit sorted 8h rows
+        result: list[list[str]] = []
+        for bar_open in sorted(bars.keys()):
+            b = bars[bar_open]
+            result.append(
+                [
+                    str(bar_open),
+                    f"{b['sum_oi']:.6f}",
+                    f"{b['sum_oi_val']:.6f}",
+                    f"{b['cnt_top_ls']:.6f}",
+                    f"{b['sum_top_ls']:.6f}",
+                    f"{b['cnt_ls']:.6f}",
+                    f"{b['sum_tv_ls']:.6f}",
+                ]
+            )
+        return result
+
+    symbols = [s.strip() for s in args.symbols.split(",")]
+    if args.output_dir:
+        output_root = Path(args.output_dir)
+    else:
+        output_root = Path(settings.data_dir) / "open_interest"
+    output_root.mkdir(parents=True, exist_ok=True)
+
+    # Date range: 2020-09-01 (earliest OI archive) to yesterday.
+    start_date = date(2020, 9, 1)
+    end_date = datetime.now(UTC).date() - timedelta(days=1)
+
+    total_new_rows = 0
+
+    with _httpx.Client(timeout=60.0) as http:
+        for sym in symbols:
+            out_dir = output_root / sym
+            out_dir.mkdir(parents=True, exist_ok=True)
+            out_csv = out_dir / "8h.csv"
+
+            # Load existing cache — dedup on open_time (ms)
+            seen_bar_times: set[int] = set()
+            existing_rows: list[list[str]] = []
+            if out_csv.exists():
+                with out_csv.open() as fh:
+                    rd = _csv.reader(fh)
+                    next(rd, None)  # skip header
+                    for row in rd:
+                        if row and row[0].isdigit():
+                            existing_rows.append(row)
+                            seen_bar_times.add(int(row[0]))
+                print(f"[fetch-oi] {sym}: cache hit — {len(existing_rows)} 8h rows")
+            else:
+                print(f"[fetch-oi] {sym}: no cache — full fetch from {start_date}")
+
+            new_rows: list[list[str]] = []
+            cur_date = start_date
+            days_fetched = 0
+
+            while cur_date <= end_date:
+                ymd = cur_date.strftime("%Y-%m-%d")
+                raw = _fetch_day_zip(http, sym, ymd)
+                if raw is not None:
+                    resampled = _resample_5min_to_8h(raw)
+                    fresh = [r for r in resampled if int(r[0]) not in seen_bar_times]
+                    if fresh:
+                        new_rows.extend(fresh)
+                        seen_bar_times.update(int(r[0]) for r in fresh)
+                    days_fetched += 1
+                    if days_fetched % 100 == 0:
+                        print(f"  [fetch-oi] {sym}: fetched {days_fetched} days so far ...")
+                _time.sleep(0.05)
+                cur_date += timedelta(days=1)
+
+            combined = existing_rows + new_rows
+            combined.sort(key=lambda r: int(r[0]))
+
+            with out_csv.open("w", newline="") as fh:
+                wr = _csv.writer(fh)
+                wr.writerow(oi_8h_header)
+                wr.writerows(combined)
+
+            total_new_rows += len(new_rows)
+            if combined:
+                first_ms = int(combined[0][0])
+                last_ms = int(combined[-1][0])
+                fd = datetime.fromtimestamp(first_ms / 1000, UTC).date()
+                ld = datetime.fromtimestamp(last_ms / 1000, UTC).date()
+                print(
+                    f"[fetch-oi] {sym}: {len(combined)} 8h rows "
+                    f"({len(new_rows)} new) {fd} → {ld} → {out_csv}"
+                )
+            else:
+                print(f"[fetch-oi] {sym}: no data found (symbol may have no OI archive)")
+
+    print(f"\n[fetch-oi] Done — {total_new_rows} new 8h rows across {len(symbols)} symbols")
 
 
 if __name__ == "__main__":

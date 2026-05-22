@@ -1,0 +1,9 @@
+symbol,close_time,transition,dd_30d,peak,reason,elapsed_candles_since_on
+TRXUSDT,1678809599999,ON,9.2911,13.621,drawdown_breach,0
+TRXUSDT,1683935999999,OFF,,,time_override,178
+BCHUSDT,1704182399999,ON,9.7636,27.4766,drawdown_breach,0
+BCHUSDT,1704873599999,OFF,,,time_override,24
+TRXUSDT,1711151999999,ON,7.4225,-3.072799999999998,drawdown_breach,0
+TRXUSDT,1712995199999,OFF,,,time_override,64
+LDOUSDT,1733875199999,ON,8.7533,-2.6018000000000003,drawdown_breach,0
+LDOUSDT,1734883199999,OFF,,,time_override,35

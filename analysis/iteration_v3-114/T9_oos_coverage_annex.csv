@@ -1,0 +1,2 @@
+chosen_trigger,chosen_threshold,n_oos_ldo_trades,n_oos_trigger_fires,oos_fire_coverage,gate_dead_on_arrival_oos,note
+abs_ldo_vz,1.6621,12,0,0.0,True,coverage-sizing ONLY; threshold fixed IS-only by T3

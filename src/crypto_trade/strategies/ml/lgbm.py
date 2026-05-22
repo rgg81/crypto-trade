@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -102,12 +103,39 @@ _INTERVAL_MINUTES = {
     "8h": 480,
     "12h": 720,
     "1d": 1440,
+    "24h": 1440,  # iter-v3/117: alias for "1d" — 24h bar interval for candle-frequency axis
 }
 
 
 def _interval_to_minutes(interval: str) -> int:
     """Convert interval string to minutes."""
     return _INTERVAL_MINUTES.get(interval, 480)
+
+
+def conviction_derate(
+    confidence: float,
+    c_floor: float = 0.50,
+    c_ref: float = 0.65,
+    w_min_frac: float = 0.50,
+) -> int:
+    """Conviction-DERATE map (iter-v3/079 primitive 13).
+
+    Maps the M1 ensemble's directional confidence scalar to a per-trade weight
+    in [50, 100].  The map is monotone non-decreasing in confidence and is a
+    pure de-rate: it never levers above the flat weight=100 baseline.
+
+    Parameters (a-priori, data-free constants):
+        c_floor    = 0.50  — coin-flip line → weight floor.
+        c_ref      = 0.65  — clear-conviction reference → full weight (100).
+        w_min_frac = 0.50  — weight floor as a fraction of 100.
+
+    Formula:
+        weight = round( 100 * clip( (confidence - c_floor) / (c_ref - c_floor),
+                                    w_min_frac, 1.0 ) )
+
+    Returns int in [50, 100] (compatible with Signal.weight int contract).
+    """
+    return round(100 * float(np.clip((confidence - c_floor) / (c_ref - c_floor), w_min_frac, 1.0)))
 
 
 class LightGbmStrategy:
@@ -138,6 +166,11 @@ class LightGbmStrategy:
         ood_enabled: bool = False,
         ood_features: list[str] | None = None,
         ood_cutoff_pct: float = 0.70,
+        oof_persist_path: Path | None = None,
+        fast_mode: bool = False,
+        inference_threshold_floor: float = 0.0,
+        label_mode: str = "triple_barrier",
+        trend_scan_grid: tuple[int, ...] = (5, 8, 13, 21),
     ) -> None:
         if not feature_columns:
             raise ValueError(
@@ -174,10 +207,23 @@ class LightGbmStrategy:
         self.ood_enabled = ood_enabled
         self.ood_features = list(ood_features) if ood_features else None
         self.ood_cutoff_pct = ood_cutoff_pct
+        # iter-v3/003: path for per-trial OOF return persistence (sub-fix 1c)
+        self._oof_persist_path: Path | None = oof_persist_path
+        # iter-v3/007: fast exploration mode (colsample fixed at 1.0 in optimization.py)
+        self._fast_mode: bool = fast_mode
+        # iter-v3/072: labeling mode — "triple_barrier" (default, backward-compat)
+        # or "fixed_horizon" (sign of N-candle-forward return; no barriers).
+        # iter-v3/105: "trend_scanning" (OLS trend, max-|t| horizon selection
+        # from *trend_scan_grid*). When label_mode != "trend_scanning", the
+        # grid is inert (backward-compatible for v1/v2 and all existing callers).
+        self.label_mode: str = label_mode
+        self.trend_scan_grid: tuple[int, ...] = tuple(trend_scan_grid)
+        # iter-v3/067 Path D: universal inference-time confidence-threshold floor.
+        # Default 0.0 = no floor (backward-compatible). Pass 0.60 to raise the bar
+        # for marginal-confidence trades (brief Section 3 Sub-fix 2).
+        self._inference_threshold_floor: float = float(inference_threshold_floor)
         if self.ood_enabled and not self.ood_features:
-            raise ValueError(
-                "ood_features must be specified when ood_enabled=True"
-            )
+            raise ValueError("ood_features must be specified when ood_enabled=True")
         self._ood_mean: np.ndarray | None = None
         self._ood_inv_cov: np.ndarray | None = None
         self._ood_cutoff: float | None = None
@@ -352,6 +398,8 @@ class LightGbmStrategy:
             atr_values=label_atr,
             verbose=self.verbose,
             neutral_threshold_pct=self.neutral_threshold_pct,
+            label_mode=self.label_mode,
+            trend_scan_grid=self.trend_scan_grid,
         )
 
         ternary = self.neutral_threshold_pct is not None
@@ -459,6 +507,10 @@ class LightGbmStrategy:
         self._models = []
         self._confidence_thresholds = []
 
+        # sub-fix 1c (iter-v3/003): per-ensemble-seed OOF persistence context
+        # symbols_arr aligns with feat_train rows (after keep_mask filtering)
+        train_symbols_arr = self._sym_arr[train_indices][keep_mask]
+
         for i, seed in enumerate(seeds):
             if self.verbose > 0 and len(seeds) > 1:
                 print(f"  [ensemble {i + 1}/{len(seeds)}] seed={seed}")
@@ -478,6 +530,10 @@ class LightGbmStrategy:
                     train_end_ms=split.train_end_ms,
                     ternary=ternary,
                     cv_gap=cv_gap,
+                    oof_persist_path=self._oof_persist_path,
+                    train_month=month_str,
+                    symbols_arr=train_symbols_arr,
+                    fast_mode=self._fast_mode,
                 )
                 self._models.append(model)
                 self._confidence_thresholds.append(confidence_threshold)
@@ -491,7 +547,14 @@ class LightGbmStrategy:
         # Use first model as primary (backward compat)
         self._model = self._models[0]
         self._selected_cols = selected_cols
-        self._confidence_threshold = float(np.mean(self._confidence_thresholds))
+        # iter-v3/067 Path D: apply universal inference-time confidence-threshold floor.
+        # Floor=0.60 raises the bar for marginal-confidence trades whose Optuna-inherited
+        # per-seed mean falls below 0.60 (brief Section 3 Sub-fix 1 + Sub-fix 2).
+        # Default floor=0.0 is a no-op, preserving backward compatibility for v1/v2/earlier v3.
+        # Ref: Critic /066 Rec #2 — Path D is a GATE modifier, not a WEIGHT modifier.
+        self._confidence_threshold = float(
+            max(np.mean(self._confidence_thresholds), self._inference_threshold_floor)
+        )
 
         # (e) Batch-load test month features
         symbols = list(dict.fromkeys(self._sym_arr))
@@ -510,9 +573,7 @@ class LightGbmStrategy:
         self._ood_cutoff = None
         self._month_ood_features = {}
         if self.ood_enabled and self.ood_features:
-            ood_cols_in_train = [
-                c for c in self.ood_features if c in train_feat_df.columns
-            ]
+            ood_cols_in_train = [c for c in self.ood_features if c in train_feat_df.columns]
             if len(ood_cols_in_train) < len(self.ood_features):
                 missing = set(self.ood_features) - set(ood_cols_in_train)
                 if self.verbose > 0:
@@ -522,9 +583,7 @@ class LightGbmStrategy:
                     print("  OOD: insufficient training samples — disabling for this month")
             else:
                 self._ood_feature_cols = ood_cols_in_train
-                train_ood_raw = train_feat_df[ood_cols_in_train].to_numpy(
-                    dtype=np.float64
-                )
+                train_ood_raw = train_feat_df[ood_cols_in_train].to_numpy(dtype=np.float64)
                 # Drop rows with NaN/inf before computing mean/cov
                 finite_mask = np.isfinite(train_ood_raw).all(axis=1)
                 train_ood = train_ood_raw[finite_mask]
@@ -543,12 +602,8 @@ class LightGbmStrategy:
                     try:
                         self._ood_inv_cov = np.linalg.pinv(cov + reg)
                         centered = train_ood - self._ood_mean
-                        distances = np.einsum(
-                            "ij,jk,ik->i", centered, self._ood_inv_cov, centered
-                        )
-                        self._ood_cutoff = float(
-                            np.quantile(distances, self.ood_cutoff_pct)
-                        )
+                        distances = np.einsum("ij,jk,ik->i", centered, self._ood_inv_cov, centered)
+                        self._ood_cutoff = float(np.quantile(distances, self.ood_cutoff_pct))
                         if self.verbose > 0:
                             print(
                                 f"  OOD: {len(ood_cols_in_train)} features, "
@@ -768,10 +823,17 @@ class LightGbmStrategy:
                 "direction": direction,
                 "tp_pct": tp_pct,
                 "sl_pct": sl_pct,
+                "confidence": confidence,
                 "decision": "signal",
             }
         )
-        return Signal(direction=direction, weight=100, tp_pct=tp_pct, sl_pct=sl_pct)
+        return Signal(
+            direction=direction,
+            weight=100,
+            tp_pct=tp_pct,
+            sl_pct=sl_pct,
+            confidence=confidence,
+        )
 
     @staticmethod
     def _detect_interval(master: pd.DataFrame) -> str:
@@ -789,7 +851,7 @@ class LightGbmStrategy:
             14_399_999: "4h",
             28_799_999: "8h",
             43_199_999: "12h",
-            86_399_999: "1d",
+            86_399_999: "24h",  # iter-v3/117: 24h bars named "24h" to match parquet suffix
         }
         best = "8h"
         best_dist = abs(diff - 28_799_999)

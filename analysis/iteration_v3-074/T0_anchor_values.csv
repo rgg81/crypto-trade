@@ -1,0 +1,8 @@
+anchor_metric,value,source
+monthly_sharpe_IS,0.8325,reports-v3/iteration_v3-060/comparison.csv:2 in_sample
+monthly_sharpe_OOS,0.1403,reports-v3/iteration_v3-060/comparison.csv:2 out_of_sample
+daily_sharpe_IS,1.7115,reports-v3/iteration_v3-060/comparison.csv:3 in_sample
+daily_sharpe_OOS,0.3659,reports-v3/iteration_v3-060/comparison.csv:3 out_of_sample
+n_trades_IS,159.0,reports-v3/iteration_v3-060/comparison.csv:7 in_sample
+n_trades_OOS,102,reports-v3/iteration_v3-060/comparison.csv:7 out_of_sample
+frac_positive_paths,0.6444,reports-v3/iteration_v3-060 dsr.json / cpcv_paths.csv (CPCV invariant)

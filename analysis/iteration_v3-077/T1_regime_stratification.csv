@@ -1,0 +1,4 @@
+stratum,n_months,total_pnl_pct,mean_monthly_pnl_pct,monthly_sharpe,pct_positive_months,n_trades
+IS_BEAR_CHOP,15,38.3862,2.5591,1.2909,46.7,55
+IS_BULL,18,13.5044,0.7502,0.41,33.3,104
+OOS_all (INFORMATIONAL),14,5.499,0.3928,0.1403,50.0,102

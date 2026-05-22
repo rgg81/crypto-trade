@@ -1,0 +1,5 @@
+gate,metric,value,detail,pass
+g1_geometry_differs,symbol x cond combos with g1_differs=True,4/6,"modal optimum cell (np.float64(1.0), np.float64(2.0)) chosen by 72% of all buckets — optimum is grid-corner-concentrated, the per-bucket 'difference' is <=1 grid step",True
+g2_conditioned_beats_static,symbols where conditioned schedule beats static 2:1 (IS-opt),3/3,worst symbol conditioned monthly Sharpe 1.5554 (floor 0.53); IS-OPTIMIZED CEILING — not a fenced estimate,True
+g3a_shuffle_placebo,symbol x cond combos where real lift beats shuffle q95,1/6,"0/6 combos have real_lift - shuffle_mean > +0.15 — a RANDOM bucketing captures the same/greater lift in 5 of 6 combos: the T2 lift is grid-search overfitting, NOT regime signal",False
+g3b_out_of_fold,symbol x cond combos where fold-A schedule helps fold B,5/6,fold B is the trend-favorable later IS half; a tighter-TP/wider-SL schedule helps any trending window (the /065 SL-widening lesson) — g3b alone cannot separate regime signal from that structural bias; g3a is the controlling test,True

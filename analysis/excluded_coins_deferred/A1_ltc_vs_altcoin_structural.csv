@@ -1,0 +1,5 @@
+symbol,is_rows,long_label_frac,mean_fwd_ret_pct,fwd_ret_std_pct,cv5_rank_ic
+LTCUSDT,3527,0.5106,0.2392,6.5774,0.0613
+LDOUSDT,581,0.537,0.7444,10.7567,0.17793
+BCHUSDT,3567,0.4558,-0.2762,6.7807,0.02542
+TRXUSDT,3509,0.5526,0.2752,4.5735,0.02907

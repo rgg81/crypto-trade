@@ -1,0 +1,75 @@
+{
+  "iter": "v3-004",
+  "input_parquet": "/home/roberto/crypto-trade/.worktrees/quant-research/reports-v3/iteration_v3-003/trial_oof_returns.parquet",
+  "oos_cutoff_ms": 1742774400000,
+  "per_cell_csv": "/home/roberto/crypto-trade/.worktrees/quant-research/analysis/iteration_v3-004/per_cell_pbo_results.csv",
+  "aggregated": {
+    "n_cells_total": 173,
+    "n_cells_rank_gt1": 173,
+    "n_cells_with_pbo": 173,
+    "mean_pbo": 0.1305248554913295,
+    "mean_pbo_smoothed": 0.1306725864567468,
+    "fisher_chi2": 2052.7198246304997,
+    "fisher_pbo_aggregated": 8.940236148332231e-240,
+    "median_pbo": 0.0,
+    "median_pbo_smoothed": 0.00019992003198720512,
+    "q25_pbo": 0.0,
+    "q75_pbo": 0.0538,
+    "q90_pbo": 0.5658000000000006,
+    "min_pbo": 0.0,
+    "max_pbo": 1.0,
+    "n_cells_pbo_gt_05": 21,
+    "n_cells_pbo_eq_1": 2,
+    "median_n_eff": 25,
+    "min_n_eff": 12,
+    "max_n_eff": 31,
+    "mean_vs_median_delta": 0.1305248554913295,
+    "fisher_vs_mean_delta": 0.1305248554913295,
+    "fisher_vs_median_delta": 8.940236148332231e-240,
+    "laplace_n_splits": 5000
+  },
+  "synthetic_validation": {
+    "overfit_cells": {
+      "per_cell_pbos": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "median": 1.0,
+      "min": 1.0,
+      "max": 1.0,
+      "fisher_chi2": 0.0039988003732134856,
+      "fisher_pbo": 1.0
+    },
+    "clean_cells": {
+      "per_cell_pbos": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0144,
+        0.358,
+        0.0,
+        0.0,
+        0.3048
+      ],
+      "median": 0.0,
+      "min": 0.0,
+      "max": 0.358,
+      "fisher_chi2": 132.13038516425007,
+      "fisher_pbo": 1.5512833552404358e-18
+    },
+    "median_delta": 1.0,
+    "validation_pairwise_separation": true,
+    "validation_median_delta_above_05": true,
+    "validation_overfit_above_07": true
+  }
+}

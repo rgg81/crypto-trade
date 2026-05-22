@@ -1,0 +1,4 @@
+symbol,natr_21_mean_pct,natr_21_median_pct,natr_21_p25_pct,natr_21_p75_pct,branch_A_TP_pct_at_mean_natr,branch_A_SL_pct_at_mean_natr,branch_B_TP_pct_at_mean_natr,branch_B_SL_pct_at_mean_natr,branch_A_TP_in_K63_sigma_units,branch_B_TP_in_K63_sigma_units,branch_A_TP_in_K21_sigma_units
+BCHUSDT,4.2140,3.6959,3.0309,4.9260,8.4281,4.2140,14.5978,7.2989,0.25σ,0.44σ,0.44σ
+LDOUSDT,5.3557,5.0068,4.1804,6.5031,10.7113,5.3557,18.5525,9.2763,0.25σ,0.44σ,0.44σ
+TRXUSDT,3.2675,2.6505,1.6532,4.1060,6.5351,3.2675,11.3191,5.6595,0.25σ,0.44σ,0.44σ

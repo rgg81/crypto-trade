@@ -1,0 +1,5 @@
+symbol,is_n,is_wpnl,is_winrate,is_avg_net,oos_n,oos_wpnl,oos_winrate,oos_avg_net,wpnl_sign_flip
+BCHUSDT,67,41.9154,44.7761,0.5216,25,-8.4440,48.0000,-0.2457,True
+LDOUSDT,17,46.6706,47.0588,3.0532,13,14.1233,38.4615,0.3436,False
+MKRUSDT,73,-123.0906,23.2877,-2.3786,15,20.4997,46.6667,1.1406,True
+TRXUSDT,68,24.7079,41.1765,0.3764,30,12.3479,56.6667,0.7522,False

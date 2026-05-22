@@ -1,0 +1,92 @@
+/home/roberto/crypto-trade/.worktrees/quant-research/.venv/lib/python3.13/site-packages/sklearn/utils/validation.py:2691: UserWarning: X does not have valid feature names, but LGBMClassifier was fitted with feature names
+  warnings.warn(
+/home/roberto/crypto-trade/.worktrees/quant-research/.venv/lib/python3.13/site-packages/sklearn/utils/validation.py:2691: UserWarning: X does not have valid feature names, but LGBMClassifier was fitted with feature names
+  warnings.warn(
+/home/roberto/crypto-trade/.worktrees/quant-research/.venv/lib/python3.13/site-packages/sklearn/utils/validation.py:2691: UserWarning: X does not have valid feature names, but LGBMClassifier was fitted with feature names
+  warnings.warn(
+/home/roberto/crypto-trade/.worktrees/quant-research/.venv/lib/python3.13/site-packages/sklearn/utils/validation.py:2691: UserWarning: X does not have valid feature names, but LGBMClassifier was fitted with feature names
+  warnings.warn(
+/home/roberto/crypto-trade/.worktrees/quant-research/.venv/lib/python3.13/site-packages/sklearn/utils/validation.py:2691: UserWarning: X does not have valid feature names, but LGBMClassifier was fitted with feature names
+  warnings.warn(
+/home/roberto/crypto-trade/.worktrees/quant-research/.venv/lib/python3.13/site-packages/sklearn/utils/validation.py:2691: UserWarning: X does not have valid feature names, but LGBMClassifier was fitted with feature names
+  warnings.warn(
+/home/roberto/crypto-trade/.worktrees/quant-research/.venv/lib/python3.13/site-packages/sklearn/utils/validation.py:2691: UserWarning: X does not have valid feature names, but LGBMClassifier was fitted with feature names
+  warnings.warn(
+/home/roberto/crypto-trade/.worktrees/quant-research/.venv/lib/python3.13/site-packages/sklearn/utils/validation.py:2691: UserWarning: X does not have valid feature names, but LGBMClassifier was fitted with feature names
+  warnings.warn(
+/home/roberto/crypto-trade/.worktrees/quant-research/.venv/lib/python3.13/site-packages/sklearn/utils/validation.py:2691: UserWarning: X does not have valid feature names, but LGBMClassifier was fitted with feature names
+  warnings.warn(
+/home/roberto/crypto-trade/.worktrees/quant-research/.venv/lib/python3.13/site-packages/sklearn/utils/validation.py:2691: UserWarning: X does not have valid feature names, but LGBMClassifier was fitted with feature names
+  warnings.warn(
+/home/roberto/crypto-trade/.worktrees/quant-research/.venv/lib/python3.13/site-packages/sklearn/utils/validation.py:2691: UserWarning: X does not have valid feature names, but LGBMClassifier was fitted with feature names
+  warnings.warn(
+/home/roberto/crypto-trade/.worktrees/quant-research/.venv/lib/python3.13/site-packages/sklearn/utils/validation.py:2691: UserWarning: X does not have valid feature names, but LGBMClassifier was fitted with feature names
+  warnings.warn(
+/home/roberto/crypto-trade/.worktrees/quant-research/.venv/lib/python3.13/site-packages/sklearn/utils/validation.py:2691: UserWarning: X does not have valid feature names, but LGBMClassifier was fitted with feature names
+  warnings.warn(
+/home/roberto/crypto-trade/.worktrees/quant-research/.venv/lib/python3.13/site-packages/sklearn/utils/validation.py:2691: UserWarning: X does not have valid feature names, but LGBMClassifier was fitted with feature names
+  warnings.warn(
+/home/roberto/crypto-trade/.worktrees/quant-research/.venv/lib/python3.13/site-packages/sklearn/utils/validation.py:2691: UserWarning: X does not have valid feature names, but LGBMClassifier was fitted with feature names
+  warnings.warn(
+/home/roberto/crypto-trade/.worktrees/quant-research/.venv/lib/python3.13/site-packages/sklearn/utils/validation.py:2691: UserWarning: X does not have valid feature names, but LGBMClassifier was fitted with feature names
+  warnings.warn(
+/home/roberto/crypto-trade/.worktrees/quant-research/.venv/lib/python3.13/site-packages/sklearn/utils/validation.py:2691: UserWarning: X does not have valid feature names, but LGBMClassifier was fitted with feature names
+  warnings.warn(
+/home/roberto/crypto-trade/.worktrees/quant-research/.venv/lib/python3.13/site-packages/sklearn/utils/validation.py:2691: UserWarning: X does not have valid feature names, but LGBMClassifier was fitted with feature names
+  warnings.warn(
+==============================================================================
+iter-v3/096 Phase-1 GO/NO-GO EDA — POOLED CROSS-SYMBOL MODEL
+Decisive premise: does the feature->label map TRANSFER across BCH/LDO/TRX?
+OOS_CUTOFF_MS = 1742774400000 (2025-03-24) — every row IS-only
+==============================================================================
+
+T1 — IS panel summary (per symbol, post-24mo-burnin, IS-only):
+ symbol  is_rows   is_first    is_last  long_label_frac  mean_tb_pnl
+BCHUSDT     3567 2021-12-21 2025-03-23           0.4558       3.5065
+LDOUSDT      581 2024-09-11 2025-03-23           0.5370       5.4913
+TRXUSDT     3509 2022-01-04 2025-03-23           0.5526       2.1228
+
+T2 — WITHIN-symbol benchmark (purged 5-fold CV rank-IC vs tb_label):
+  BCHUSDT: within-symbol CV rank-IC = +0.02542
+  LDOUSDT: within-symbol CV rank-IC = +0.17793
+  TRXUSDT: within-symbol CV rank-IC = +0.02907
+  -> within-symbol mean rank-IC = +0.07747
+
+T3 — LEAVE-ONE-SYMBOL-OUT cross-symbol TRANSFER rank-IC (the headline):
+  hold BCHUSDT: transfer IC = +0.06893 (within = +0.02542, retention = +271.19%)
+  hold LDOUSDT: transfer IC = +0.14703 (within = +0.17793, retention = +82.63%)
+  hold TRXUSDT: transfer IC = -0.00646 (within = +0.02907, retention = -22.21%)
+
+T4 — per-feature univariate IC sign consistency across symbols (diagnostic):
+                  feature   ic_BCH   ic_LDO   ic_TRX  sign_consistent
+         max_dd_window_50  0.00569  0.03666 -0.04129            False
+        ema_spread_atr_20 -0.04942 -0.10021 -0.07538             True
+              ret_kurt_50 -0.00303  0.11727 -0.01927            False
+             ret_skew_200 -0.02988  0.00836 -0.04787            False
+    range_realized_vol_50 -0.02077 -0.00578  0.01186            False
+        hurst_diff_100_50  0.00764  0.23962 -0.01601            False
+             ret_kurt_200  0.03683  0.16802  0.00629             True
+                hurst_100 -0.02270  0.20284 -0.04362            False
+              btc_ret_14d -0.00828  0.08794 -0.08933            False
+              ret_skew_50 -0.05726 -0.05771 -0.04996             True
+              vwap_dev_20  0.00582 -0.03190  0.00579            False
+     ret_autocorr_lag1_50  0.06606  0.09603 -0.01118            False
+        sym_vs_btc_ret_7d  0.00064 -0.07354 -0.00499            False
+regime_momentum_signed_5d -0.01147 -0.06440 -0.03718             True
+  -> 4/14 features have sign-consistent univariate IC across all 3 symbols
+
+==============================================================================
+GO / NO-GO VERDICT
+==============================================================================
+  T5 headline (mean LOSO cross-symbol transfer IC) : +0.06983
+  within-symbol benchmark mean IC                  : +0.07747
+  positive-transfer symbols                        : 2/3
+  transfer-IC sign consistent across symbols       : False
+  feature-level sign-consistent                    : 4/14
+  ----
+  gate 1  T5 >= 0.03            : PASS
+  gate 2  >= 2 positive symbols  : PASS
+  gate 3  transfer-IC sign consistent : FAIL
+  ----
+  VERDICT: NO-GO
+==============================================================================

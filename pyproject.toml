@@ -12,9 +12,10 @@ dependencies = [
     "pyarrow>=18.0",
     "tqdm>=4.66",
     "optuna>=3.0",
-    "scikit-learn>=1.5",
+    "scikit-learn>=1.8,<1.9",
     "quantstats>=0.0.62",
     "statsmodels>=0.14.6",
+    "xgboost>=2.0,<3.0",
 ]
 
 [project.scripts]
@@ -39,7 +40,7 @@ notebook = [
     "statsmodels>=0.14",
     "arch>=7.0",
     "hmmlearn>=0.3",
-    "scikit-learn>=1.5",
+    "scikit-learn>=1.8,<1.9",
     "jupyter>=1.0",
     "nbconvert>=7.0",
     "tqdm>=4.66",

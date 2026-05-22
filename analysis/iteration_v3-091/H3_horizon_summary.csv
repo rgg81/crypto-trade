@@ -1,0 +1,15 @@
+metric,value
+horizon_grid_bars,"[3, 7, 14, 21, 28, 35]"
+incumbent_horizon_bars,3
+incumbent_IS_net_spread_monthly_sharpe,-0.2917
+IS_best_horizon_bars,35
+IS_best_horizon_days,11.67
+IS_best_net_spread_monthly_sharpe,-0.0016
+IS_best_gross_spread_monthly_sharpe,0.0381
+IS_best_net_minus_incumbent_net,0.2901
+IS_best_xs_required_gap,792
+IS_best_turnover_per_bar,0.0147
+IS_best_fee_over_abs_gross,1.042
+gross_spread_peak_horizon_bars,3
+gross_spread_shape_is_interior_hump,False
+axis_verdict,HORIZON-CONFIRMED (a longer horizon beats hold=3 on IS net spread monthly Sharpe)

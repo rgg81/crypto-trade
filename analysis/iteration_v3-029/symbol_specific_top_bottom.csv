@@ -1,0 +1,4 @@
+symbol,top_7_features,bottom_7_features
+BCHUSDT,vwap_dev_20 | max_dd_window_50 | ema_spread_atr_20 | range_realized_vol_50 | ret_kurt_50 | ret_skew_200 | ret_kurt_200,ret_autocorr_lag1_50 | hurst_diff_100_50 | sym_vs_btc_ret_7d | regime_momentum_signed_5d | hurst_100 | ret_skew_50 | btc_ret_14d
+LDOUSDT,ret_skew_200 | ret_kurt_50 | ret_kurt_200 | vwap_dev_20 | hurst_diff_100_50 | btc_ret_14d | range_realized_vol_50,ret_skew_50 | ema_spread_atr_20 | max_dd_window_50 | sym_vs_btc_ret_7d | ret_autocorr_lag1_50 | regime_momentum_signed_5d | hurst_100
+TRXUSDT,range_realized_vol_50 | ret_kurt_50 | hurst_100 | ret_skew_200 | max_dd_window_50 | ret_autocorr_lag1_50 | vwap_dev_20,ret_kurt_200 | ema_spread_atr_20 | hurst_diff_100_50 | regime_momentum_signed_5d | ret_skew_50 | sym_vs_btc_ret_7d | btc_ret_14d

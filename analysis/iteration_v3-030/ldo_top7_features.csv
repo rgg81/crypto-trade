@@ -1,0 +1,8 @@
+feature,importance,rank
+ret_skew_200,264.4,1
+ret_kurt_50,245.0,2
+ret_kurt_200,238.8,3
+vwap_dev_20,238.2,4
+hurst_diff_100_50,236.8,5
+btc_ret_14d,231.6,6
+range_realized_vol_50,224.6,7

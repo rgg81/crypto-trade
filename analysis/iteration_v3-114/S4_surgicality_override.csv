@@ -1,0 +1,3 @@
+trigger,is_roster_std_gap,panel_fire_rate_at_is_best_thr,surgical,selected,reason
+ldo_vs_btc_30d,-1.2317,0.46-0.79,False,False,near-constant off-switch in the bear/chop IS window
+ldo_realvol_zscore,-0.742,0.13 (thr=0.30),True,True,surgical 13% binary switch; interpretable (2:1 ATR barrier needs movement); OOS loss-direction holds (5/7 OOS fires on losers)

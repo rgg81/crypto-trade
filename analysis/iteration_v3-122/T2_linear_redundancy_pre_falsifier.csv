@@ -1,0 +1,5 @@
+candidate,pooled_r2,top_primitive,top_abs_corr,verdict
+A2_eth_vs_btc_ret_21d,0.113,ema_spread_atr_20,0.2107,PASS
+A3_eth_vs_btc_vol_diff_14d,0.3264,max_dd_window_50,0.4144,PASS
+A4_eth_ret_3d,0.437,vwap_dev_20,0.5598,PASS
+A1_eth_ret_14d,0.7017,btc_ret_14d,0.8171,REJECT (R²>=0.70)

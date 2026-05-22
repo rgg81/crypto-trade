@@ -1,0 +1,15 @@
+metric,value
+n_majors_screened,10
+best_major,SOLUSDT
+best_major_cv_ic,0.06266
+best_vs_thin_floor_ratio,2.51
+best_vs_ldo_ratio,0.35
+n_genuine,2
+n_genuine_and_sign_stable,1
+n_borderline,0
+n_thin,8
+best_genuine_and_sign_stable_cv_ic,0.0613
+genuine_and_sign_stable_symbols,LTCUSDT
+ldo_class_majors,NONE
+majors_above_ldo,NONE
+verdict,EQUIVOCAL

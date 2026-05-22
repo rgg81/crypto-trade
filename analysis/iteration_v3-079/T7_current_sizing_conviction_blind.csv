@@ -1,0 +1,5 @@
+symbol,is_n_trades,corr_weightfactor_netpnl,corr_weightfactor_win,weight_factor_mean,weight_factor_std
+BCHUSDT,73,0.2358,0.2621,0.5756,0.3346
+LDOUSDT,11,0.1734,0.242,0.6127,0.32
+TRXUSDT,75,-0.1408,-0.1338,0.6188,0.3357
+ALL,159,0.0937,0.0683,0.5986,0.3328

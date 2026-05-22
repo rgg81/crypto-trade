@@ -1,0 +1,2 @@
+observed_per_symbol_auc,perm_null_mean,perm_null_q05,perm_null_q50,perm_null_q95,permutation_p_value,n_cells,n_permutations
+0.5076,0.554,0.5369,0.5537,0.5684,1.0,20,100

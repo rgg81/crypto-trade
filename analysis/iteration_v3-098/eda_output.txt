@@ -1,0 +1,65 @@
+==============================================================================
+iter-v3/098 Phase-1 GO/NO-GO EDA — FEATURE EXPANSION
+Decisive question: does expanding the 14-feature stack lift the
+per-symbol model's HELD-OUT-TAIL predictive power (OOS-robust proxy)?
+OOS_CUTOFF_MS = 1742774400000 (2025-03-24) — every row IS-only
+Label: /059 canonical triple-barrier, 10080-min = 21-candle timeout (vs /094's 9-candle — THE reconciliation fix)
+==============================================================================
+
+T1 — IS panel summary (per symbol, post-24mo-burnin, IS-only):
+ symbol  is_rows   is_first    is_last  tail_rows  long_label_frac
+BCHUSDT     3247 2021-12-21 2025-03-23        505           0.4552
+LDOUSDT      484 2024-09-11 2025-03-23        444           0.5517
+TRXUSDT     3224 2022-01-04 2025-03-23        438           0.5533
+
+T2 — candidate-family redundancy vs the 14 incumbents (max |Spearman| over pooled IS rows; gate <0.7):
+family             new_feature  max_abs_ic_vs_incumbent          argmax_incumbent  redundancy_gate_pass
+     A       of_taker_imb_z_20                   0.2542               vwap_dev_20                  True
+     A    of_taker_ratio_mom_3                   0.0424         ema_spread_atr_20                  True
+     A  of_signed_obv_slope_30                   0.1333               ret_kurt_50                  True
+     A        of_amihud_log_20                   0.3647              ret_kurt_200                  True
+     A of_trade_intensity_z_20                   0.1274 regime_momentum_signed_5d                  True
+     D      se_perm_entropy_50                   0.0621              ret_skew_200                  True
+     D    se_sample_entropy_50                   0.2160               ret_kurt_50                  True
+     D  se_variance_ratio_2_50                   0.9565      ret_autocorr_lag1_50                 False
+     D      se_ret_acf_lag2_50                   0.1462               btc_ret_14d                  True
+  -> 1/9 candidate features fail the |IC|<0.7 gate
+
+T3 — nested walk-forward HELD-OUT-TAIL evaluation per feature set:
+  (tail = last 6 IS months, 6 expanding folds, 22-candle embargo purge; strictly IS)
+feature_set  symbol  tail_n  tail_accuracy  tail_sum_pred_side_pnl
+       BASE BCHUSDT     505         0.5762                 280.053
+       BASE LDOUSDT     296         0.5135                   8.162
+       BASE TRXUSDT     438         0.5799                 415.857
+         +A BCHUSDT     505         0.5683                 137.622
+         +A LDOUSDT     296         0.5338                  28.637
+         +A TRXUSDT     438         0.5731                 201.717
+         +D BCHUSDT     505         0.5881                 204.194
+         +D LDOUSDT     296         0.5034                  -7.544
+         +D TRXUSDT     438         0.5753                 478.858
+        +AD BCHUSDT     505         0.5366                -211.461
+        +AD LDOUSDT     296         0.5405                 119.154
+        +AD TRXUSDT     438         0.5388                  94.137
+
+T4 — paired held-out-tail lift over BASE (block-bootstrap 95% CI):
+  dShACC = paired per-row accuracy(S) - accuracy(BASE), pooled across symbols.  CI lower bound > 0 required (the /096 discipline).
+feature_set  dShACC_mean  dShACC_ci_lo  dShACC_ci_hi  dPnL_mean  dPnL_ci_lo  dPnL_ci_hi  n_tail_rows
+         +A     -0.00081      -0.03876       0.03955    -0.2713     -1.0370      0.3826         1239
+         +D      0.00081      -0.03067       0.03309    -0.0231     -0.4189      0.3553         1239
+        +AD     -0.02421      -0.06860       0.01695    -0.5668     -1.4583      0.1410         1239
+
+T5 — multivariate gain-importance share of the new family (full-IS-panel fit; INERT if share < uniform parity):
+feature_set  n_new  n_total  uniform_parity_share  mean_importance_share  importance_gate_pass
+         +A      5       19                0.2632                 0.1690                 False
+         +D      4       18                0.2222                 0.1797                 False
+        +AD      9       23                0.3913                 0.3031                 False
+
+==============================================================================
+GO / NO-GO VERDICT  (pre-registered 4-gate rule)
+==============================================================================
+    +A: g1(dShACC>=0.01) FAIL | g2(CI_lo>0) FAIL | g3(dPnL>0) FAIL | g4(imp>=parity) FAIL  ->  no
+    +D: g1(dShACC>=0.01) FAIL | g2(CI_lo>0) FAIL | g3(dPnL>0) FAIL | g4(imp>=parity) FAIL  ->  no
+   +AD: g1(dShACC>=0.01) FAIL | g2(CI_lo>0) FAIL | g3(dPnL>0) FAIL | g4(imp>=parity) FAIL  ->  no
+  ----
+  OVERALL VERDICT: NO-GO
+==============================================================================

@@ -1,0 +1,60 @@
+{
+  "input_feature_count": 14,
+  "input_redundant_pairs": 2,
+  "input_redundant_pairs_detail": [
+    {
+      "feature_a": "vwap_dev_50",
+      "feature_b": "ema_spread_atr_20",
+      "abs_ic": 0.874624
+    },
+    {
+      "feature_a": "vwap_dev_50",
+      "feature_b": "vwap_dev_20",
+      "abs_ic": 0.793843
+    }
+  ],
+  "feature_appearance_in_pairs": {
+    "max_dd_window_50": 0,
+    "vwap_dev_50": 2,
+    "ema_spread_atr_20": 1,
+    "ret_kurt_50": 0,
+    "ret_skew_200": 0,
+    "range_realized_vol_50": 0,
+    "hurst_diff_100_50": 0,
+    "ret_kurt_200": 0,
+    "hurst_100": 0,
+    "btc_ret_14d": 0,
+    "ret_skew_50": 0,
+    "vwap_dev_20": 1,
+    "ret_autocorr_lag1_50": 0,
+    "sym_vs_btc_ret_7d": 0
+  },
+  "dropped_features": [
+    "vwap_dev_50"
+  ],
+  "drop_rationale": "vwap_dev_50 appears in BOTH redundant pairs (vwap_dev_50 \u00d7 ema_spread_atr_20 = 0.875 AND vwap_dev_50 \u00d7 vwap_dev_20 = 0.794). Dropping vwap_dev_50 eliminates BOTH redundancies in a single move (option (a) per Critic FINAL Recommendation 1, SHA a544621). Net feature count: 14 \u2192 13.",
+  "retained_feature_count": 13,
+  "retained_features": [
+    "max_dd_window_50",
+    "ema_spread_atr_20",
+    "ret_kurt_50",
+    "ret_skew_200",
+    "range_realized_vol_50",
+    "hurst_diff_100_50",
+    "ret_kurt_200",
+    "hurst_100",
+    "btc_ret_14d",
+    "ret_skew_50",
+    "vwap_dev_20",
+    "ret_autocorr_lag1_50",
+    "sym_vs_btc_ret_7d"
+  ],
+  "residual_pairs_above_threshold": 0,
+  "max_residual_abs_ic": 0.6601547513516433,
+  "max_residual_pair": [
+    "max_dd_window_50",
+    "range_realized_vol_50"
+  ],
+  "headroom_to_threshold": 0.0398452486483567,
+  "ic_threshold": 0.7
+}

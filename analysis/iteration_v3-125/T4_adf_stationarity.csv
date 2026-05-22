@@ -1,0 +1,10 @@
+symbol,feature,adf_pvalue,stationary_pass,n_obs
+ATOMUSDT,range_realized_vol_50_proxy,1.565984848781626e-06,True,5565
+ATOMUSDT,ret_kurt_50,2.1819805715758127e-13,True,5565
+ATOMUSDT,vwap_dev_20_proxy,2.669541391971367e-30,True,5596
+RUNEUSDT,range_realized_vol_50_proxy,5.3162871463088595e-06,True,4936
+RUNEUSDT,ret_kurt_50,3.176917470610451e-13,True,4936
+RUNEUSDT,vwap_dev_20_proxy,1.5363933942922666e-29,True,4967
+UNIUSDT,range_realized_vol_50_proxy,9.508572208753366e-07,True,4894
+UNIUSDT,ret_kurt_50,1.7527907047046235e-13,True,4894
+UNIUSDT,vwap_dev_20_proxy,5.873436544873875e-29,True,4925

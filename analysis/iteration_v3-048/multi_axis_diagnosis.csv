@@ -1,0 +1,155 @@
+# A1_trx_short_monthly_is
+label,axis,year_month,n_trades,wins,win_rate_pct,net_pnl_pct_sum,weighted_pnl_sum,n_sl,n_tp,n_to
+iter-v3/045 IS,A_TRX_SHORT,2022-02,1,0,0.0,-3.2616,-1.2394,1,0,0
+iter-v3/045 IS,A_TRX_SHORT,2022-03,3,2,66.67,1.6323,-2.7213,1,1,1
+iter-v3/045 IS,A_TRX_SHORT,2022-04,3,2,66.67,9.0947,8.6757,1,2,0
+iter-v3/045 IS,A_TRX_SHORT,2022-05,3,1,33.33,-2.7389,-1.4422,2,1,0
+iter-v3/045 IS,A_TRX_SHORT,2022-10,2,2,100.0,7.3532,5.5373,0,2,0
+iter-v3/045 IS,A_TRX_SHORT,2023-01,1,0,0.0,-2.5977,0.0,1,0,0
+iter-v3/045 IS,A_TRX_SHORT,2023-02,4,0,0.0,-10.005,-8.7405,4,0,0
+iter-v3/045 IS,A_TRX_SHORT,2023-05,2,0,0.0,-3.3671,-1.9998,2,0,0
+iter-v3/045 IS,A_TRX_SHORT,2023-06,1,0,0.0,-1.5896,-0.8902,1,0,0
+iter-v3/045 IS,A_TRX_SHORT,2023-07,2,0,0.0,-3.4836,-1.8711,2,0,0
+iter-v3/045 IS,A_TRX_SHORT,2023-09,1,0,0.0,-1.4327,-0.9743,1,0,0
+iter-v3/045 IS,A_TRX_SHORT,2023-10,2,0,0.0,-2.6125,-0.704,2,0,0
+iter-v3/045 IS,A_TRX_SHORT,2023-12,1,0,0.0,-2.0283,-1.8661,1,0,0
+iter-v3/045 IS,A_TRX_SHORT,2024-01,4,1,25.0,-3.1839,-4.004,3,1,0
+iter-v3/045 IS,A_TRX_SHORT,2024-03,1,1,100.0,4.3459,4.2155,0,1,0
+iter-v3/045 IS,A_TRX_SHORT,2024-07,3,1,33.33,-0.3547,0.407,2,1,0
+iter-v3/045 IS,A_TRX_SHORT,2024-08,2,0,0.0,-3.2966,-2.5918,2,0,0
+iter-v3/045 IS,A_TRX_SHORT,2024-10,1,0,0.0,-1.0221,-0.368,1,0,0
+iter-v3/045 IS,A_TRX_SHORT,2024-11,6,1,16.67,-13.5022,-2.5833,5,1,0
+
+# A1b_trx_short_monthly_oos
+label,axis,year_month,n_trades,wins,win_rate_pct,net_pnl_pct_sum,weighted_pnl_sum,n_sl,n_tp,n_to
+iter-v3/045 OOS,A_TRX_SHORT,2025-05,1,0,0.0,-2.2401,-2.2401,1,0,0
+iter-v3/045 OOS,A_TRX_SHORT,2025-06,3,2,66.67,5.5007,4.7892,1,2,0
+iter-v3/045 OOS,A_TRX_SHORT,2025-07,2,1,50.0,1.7684,1.8899,1,1,0
+iter-v3/045 OOS,A_TRX_SHORT,2025-09,1,0,0.0,-1.7233,-0.8789,1,0,0
+iter-v3/045 OOS,A_TRX_SHORT,2025-10,2,2,100.0,6.0738,4.0655,0,2,0
+iter-v3/045 OOS,A_TRX_SHORT,2025-11,5,1,20.0,-4.2916,-3.6574,4,1,0
+iter-v3/045 OOS,A_TRX_SHORT,2026-01,3,2,66.67,3.8607,3.5244,1,2,0
+iter-v3/045 OOS,A_TRX_SHORT,2026-02,3,1,33.33,0.1481,0.7595,2,1,0
+iter-v3/045 OOS,A_TRX_SHORT,2026-03,2,1,50.0,1.4514,1.5085,1,1,0
+iter-v3/045 OOS,A_TRX_SHORT,2026-05,2,0,0.0,-2.1577,-1.5323,2,0,0
+
+# A2_trx_short_yearly_is
+label,axis,year,n_trades,win_rate_pct,net_pnl_pct_sum,weighted_pnl_sum,avg_pnl_pct
+iter-v3/045 IS,A_TRX_SHORT_yearly,2022,12,58.33,12.0797,8.8101,1.0066
+iter-v3/045 IS,A_TRX_SHORT_yearly,2023,14,0.0,-27.1165,-17.046,-1.9369
+iter-v3/045 IS,A_TRX_SHORT_yearly,2024,17,23.53,-17.0136,-4.9246,-1.0008
+
+# A2b_trx_short_yearly_oos
+label,axis,year,n_trades,win_rate_pct,net_pnl_pct_sum,weighted_pnl_sum,avg_pnl_pct
+iter-v3/045 OOS,A_TRX_SHORT_yearly,2025,14,42.86,5.0879,3.9682,0.3634
+iter-v3/045 OOS,A_TRX_SHORT_yearly,2026,10,40.0,3.3025,4.2601,0.3303
+
+# A3_trx_short_exit_is
+label,axis,exit_reason,n_trades,pct_of_short,mean_pnl_pct,sum_pnl_pct
+iter-v3/045 IS,A_TRX_SHORT_exit,take_profit,10,23.26,4.2654,42.6543
+iter-v3/045 IS,A_TRX_SHORT_exit,stop_loss,32,74.42,-2.37,-75.8407
+iter-v3/045 IS,A_TRX_SHORT_exit,timeout,1,2.33,1.136,1.136
+
+# A3b_trx_short_exit_oos
+label,axis,exit_reason,n_trades,pct_of_short,mean_pnl_pct,sum_pnl_pct
+iter-v3/045 OOS,A_TRX_SHORT_exit,take_profit,10,41.67,3.039,30.3896
+iter-v3/045 OOS,A_TRX_SHORT_exit,stop_loss,14,58.33,-1.5714,-21.9992
+iter-v3/045 OOS,A_TRX_SHORT_exit,timeout,0,0.0,0.0,0.0
+
+# A4_trx_short_counterfactual
+label,axis,metric,value
+iter-v3/045 IS,A_TRX_SHORT_cf,all_trades_weighted_pnl,75.3967
+iter-v3/045 IS,A_TRX_SHORT_cf,TRX_SHORT_weighted_pnl,-13.1605
+iter-v3/045 IS,A_TRX_SHORT_cf,TRX_SHORT_n_trades,43.0
+iter-v3/045 IS,A_TRX_SHORT_cf,TRX_SHORT_WR_pct,25.58
+iter-v3/045 IS,A_TRX_SHORT_cf,BCH_LONG_weighted_pnl,-18.6781
+iter-v3/045 IS,A_TRX_SHORT_cf,BCH_LONG_n_trades,39.0
+iter-v3/045 IS,A_TRX_SHORT_cf,bundle_minus_TRX_SHORT (axis A alone),88.5572
+iter-v3/045 IS,A_TRX_SHORT_cf,bundle_minus_TRX_SHORT_minus_BCH_LONG (axis A + P10),107.2353
+iter-v3/045 IS,A_TRX_SHORT_cf,delta_axis_A_alone,13.1605
+iter-v3/045 IS,A_TRX_SHORT_cf,delta_axis_A_plus_P10,31.8386
+iter-v3/045 OOS,A_TRX_SHORT_cf,all_trades_weighted_pnl,96.9943
+iter-v3/045 OOS,A_TRX_SHORT_cf,TRX_SHORT_weighted_pnl,8.2283
+iter-v3/045 OOS,A_TRX_SHORT_cf,TRX_SHORT_n_trades,24.0
+iter-v3/045 OOS,A_TRX_SHORT_cf,TRX_SHORT_WR_pct,41.67
+iter-v3/045 OOS,A_TRX_SHORT_cf,BCH_LONG_weighted_pnl,-4.2379
+iter-v3/045 OOS,A_TRX_SHORT_cf,BCH_LONG_n_trades,21.0
+iter-v3/045 OOS,A_TRX_SHORT_cf,bundle_minus_TRX_SHORT (axis A alone),88.766
+iter-v3/045 OOS,A_TRX_SHORT_cf,bundle_minus_TRX_SHORT_minus_BCH_LONG (axis A + P10),93.0039
+iter-v3/045 OOS,A_TRX_SHORT_cf,delta_axis_A_alone,-8.2283
+iter-v3/045 OOS,A_TRX_SHORT_cf,delta_axis_A_plus_P10,-3.9904
+
+# B1_algo_direction_asymmetry
+label,axis,direction,n_trades,wins,win_rate_pct,net_pnl_pct_sum,weighted_pnl_sum,avg_net_pnl_pct
+iter-v3/045 IS,B_ALGO_direction,LONG,26,9,34.62,-55.169,-37.5224,-2.1219
+iter-v3/045 IS,B_ALGO_direction,SHORT,27,12,44.44,21.1153,39.9914,0.782
+iter-v3/045 OOS,B_ALGO_direction,LONG,6,4,66.67,22.5536,20.999,3.7589
+iter-v3/045 OOS,B_ALGO_direction,SHORT,16,10,62.5,47.6177,32.1214,2.9761
+
+# B2_algo_long_yearly_is
+label,axis,year,n_trades,wins,win_rate_pct,net_pnl_pct_sum,weighted_pnl_sum
+iter-v3/045 IS,B_ALGO_LONG_yearly,2022,2,1,50.0,1.2149,0.222
+iter-v3/045 IS,B_ALGO_LONG_yearly,2023,5,2,40.0,1.4201,-0.1671
+iter-v3/045 IS,B_ALGO_LONG_yearly,2024,12,4,33.33,-19.2872,-17.6867
+iter-v3/045 IS,B_ALGO_LONG_yearly,2025,7,2,28.57,-38.5168,-19.8906
+
+# C1_ldo_direction_asymmetry
+label,axis,direction,n_trades,wins,win_rate_pct,net_pnl_pct_sum,weighted_pnl_sum,avg_net_pnl_pct
+iter-v3/045 IS,C_LDO_direction,LONG,6,4,66.67,40.8884,30.4337,6.8147
+iter-v3/045 IS,C_LDO_direction,SHORT,12,6,50.0,13.6629,13.4637,1.1386
+iter-v3/045 OOS,C_LDO_direction,LONG,2,2,100.0,17.9667,17.2839,8.9834
+iter-v3/045 OOS,C_LDO_direction,SHORT,11,5,45.45,-7.7303,-7.9484,-0.7028
+
+# D1_bch_short_monthly_is
+label,axis,year_month,n_trades,wins,win_rate_pct,net_pnl_pct_sum,weighted_pnl_sum
+iter-v3/045 IS,D_BCH_SHORT,2022-02,3,1,33.33,-0.8334,-0.2516
+iter-v3/045 IS,D_BCH_SHORT,2022-03,3,0,0.0,-11.5458,-4.5254
+iter-v3/045 IS,D_BCH_SHORT,2022-04,1,1,100.0,7.7109,7.2482
+iter-v3/045 IS,D_BCH_SHORT,2022-07,3,1,33.33,-0.0358,-3.5943
+iter-v3/045 IS,D_BCH_SHORT,2022-08,2,0,0.0,-8.5891,-3.4474
+iter-v3/045 IS,D_BCH_SHORT,2022-09,3,2,66.67,4.6743,1.27
+iter-v3/045 IS,D_BCH_SHORT,2023-01,4,1,25.0,-2.3475,-0.6653
+iter-v3/045 IS,D_BCH_SHORT,2023-02,3,1,33.33,0.4818,4.4713
+iter-v3/045 IS,D_BCH_SHORT,2023-03,2,1,50.0,3.2745,-1.4555
+iter-v3/045 IS,D_BCH_SHORT,2023-04,1,0,0.0,-2.7677,-0.9687
+iter-v3/045 IS,D_BCH_SHORT,2023-08,1,0,0.0,-3.594,-1.7251
+iter-v3/045 IS,D_BCH_SHORT,2023-09,1,0,0.0,-3.4257,-2.2267
+iter-v3/045 IS,D_BCH_SHORT,2023-10,3,2,66.67,9.8322,3.5897
+iter-v3/045 IS,D_BCH_SHORT,2023-11,2,2,100.0,13.8872,11.922
+iter-v3/045 IS,D_BCH_SHORT,2024-01,4,2,50.0,8.5687,9.395
+iter-v3/045 IS,D_BCH_SHORT,2024-02,3,1,33.33,-0.199,0.0
+iter-v3/045 IS,D_BCH_SHORT,2024-04,2,2,100.0,21.8151,19.0341
+iter-v3/045 IS,D_BCH_SHORT,2024-05,1,1,100.0,5.1934,1.8177
+iter-v3/045 IS,D_BCH_SHORT,2024-07,1,0,0.0,-3.8985,-1.6764
+iter-v3/045 IS,D_BCH_SHORT,2024-08,2,2,100.0,9.7788,8.8107
+iter-v3/045 IS,D_BCH_SHORT,2024-09,1,0,0.0,-2.86,-0.9724
+iter-v3/045 IS,D_BCH_SHORT,2024-10,3,1,33.33,-0.6159,1.1508
+iter-v3/045 IS,D_BCH_SHORT,2024-11,3,1,33.33,-2.4381,0.0
+iter-v3/045 IS,D_BCH_SHORT,2024-12,1,0,0.0,-6.3873,-4.6627
+iter-v3/045 IS,D_BCH_SHORT,2025-03,2,2,100.0,13.0127,10.9903
+
+# E1_feature_importance_summary
+axis,feature,mean_rank,min_rank,max_rank,std_rank
+E_feature_importance,range_realized_vol_50,3.0,1,4,1.22
+E_feature_importance,ret_kurt_50,4.25,1,8,2.59
+E_feature_importance,max_dd_window_50,4.25,2,9,2.86
+E_feature_importance,ret_skew_200,4.75,1,6,2.17
+E_feature_importance,ret_skew_50,5.5,1,8,2.69
+E_feature_importance,ema_spread_atr_20,5.75,2,10,3.77
+E_feature_importance,hurst_100,7.5,3,11,2.96
+E_feature_importance,vwap_dev_20,7.75,4,12,2.86
+E_feature_importance,btc_ret_14d,8.25,3,11,3.11
+E_feature_importance,ret_kurt_200,8.5,5,11,2.6
+E_feature_importance,ret_autocorr_lag1_50,10.0,8,12,1.41
+E_feature_importance,sym_vs_btc_ret_7d,10.5,5,13,3.2
+E_feature_importance,hurst_diff_100_50,11.5,5,14,3.77
+E_feature_importance,regime_momentum_signed_5d,13.5,13,14,0.5
+
+# E2_candidate_engineered_features
+feature_name,formula,rationale,ic_risk,category,implementation_loc
+tail_signed_momentum_5d,ret_5d × sign(ret_skew_50),Signs ret_5d by recent skew direction. Skew is rank-2 for ALGO and rank-7 for BCH+TRX importance — model uses skew. Signing momentum by skew sign differentiates 'momentum into right tail' (positive skew + positive ret) vs 'momentum into left tail' (negative skew + negative ret) which are behaviorally different regimes (continuation vs panic).,Composed from ret_5d (no primitive feature) + ret_skew_50; expected |IC| with ret_skew_50 ~0.4-0.6 (Category 2 carve-out applies).,Category 2 (composed),engineered_v3.py: add compute_tail_signed_momentum_5d(); register in V3_FEATURE_COLUMNS_TOP_N (15th feature).
+vol_normalized_ret_5d,ret_5d / (range_realized_vol_50 + epsilon),"Vol-normalized return: how unusual is this 5d return given recent vol regime? range_realized_vol_50 is rank-1/14 for TRX, rank-3/14 for BCH+ALGO. Risk- normalized momentum is the canonical Sharpe-like ratio. Compositionally distinct from regime_momentum_signed_5d (sign by hurst regime, not vol- normalize).",Composed from ret_5d + range_realized_vol_50; expected |IC| with range_realized_vol_50 ~0.3-0.5; with ret_5d direction ~0.7+ (Category 2 carve-out applies).,Category 2 (composed),engineered_v3.py: add compute_vol_normalized_ret_5d().
+btc_aligned_ret_7d,sym_ret_7d × sign(btc_ret_14d),"BTC-regime-aligned momentum: positive when sym moves WITH BTC trend. btc_ret_14d is rank-9 for ALGO+TRX+BCH (mid-importance). Discriminates 'sym aligned with BTC' (high-correlation regime, positive sign) from 'sym diverged from BTC' (decoupling regime, negative sign). Distinct from regime_momentum_signed_5d (signs by hurst, not BTC).",Composed from sym_vs_btc_ret_7d (rank-12 for portfolio) + btc_ret_14d; expected |IC| with sym_vs_btc_ret_7d ~0.6-0.8 (Category 2 carve-out).,Category 2 (composed),engineered_v3.py: add compute_btc_aligned_ret_7d().
+drawdown_signed_momentum,ret_5d × sign(max_dd_window_50 + threshold),"Sign momentum by recent drawdown state. max_dd_window_50 is rank-1 for portfolio importance (universally top-utilized feature). Signing momentum by drawdown discriminates 'rebound from drawdown' (negative dd + positive ret = sign positive) vs 'continued decline' (negative dd + negative ret = sign negative). Captures mean-reversion signal absent from regime_momentum (which signs by hurst regime, not drawdown).",Composed from ret_5d + max_dd_window_50; expected |IC| with max_dd_window_50 ~0.3-0.5 (Category 2 carve-out).,Category 2 (composed),engineered_v3.py: add compute_drawdown_signed_momentum().
+kurtosis_regime_momentum,ret_5d × sign(ret_kurt_50 - 3.0),"Sign momentum by excess kurtosis. ret_kurt_50 is rank-3 for BCH+ALGO+TRX (high importance). Discriminates 'momentum in fat-tail regime' (kurt > 3 = recent extreme moves, sign positive) from 'momentum in normal regime' (kurt < 3 = quiet market, sign negative). Distinct from regime_momentum (hurst signing) and tail_signed_momentum (skew signing).",Composed from ret_5d + ret_kurt_50; expected |IC| with ret_kurt_50 ~0.3-0.5 (Category 2 carve-out).,Category 2 (composed),engineered_v3.py: add compute_kurtosis_regime_momentum().
+

@@ -1,0 +1,5 @@
+candidate,pooled_lift,max_abs_per_symbol,max_carrier,ssc_ratio,ssc_risk
+A3_eth_vs_btc_vol_diff_14d,0.0007,0.0203,LDOUSDT,28.13,True
+A2_eth_vs_btc_ret_21d,-0.006,0.053,LDOUSDT,8.81,True
+A4_eth_ret_3d,0.0012,0.0044,TRXUSDT,3.63,True
+A1_eth_ret_14d,0.0069,0.0062,TRXUSDT,0.9,False

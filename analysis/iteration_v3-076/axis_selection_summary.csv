@@ -1,0 +1,3 @@
+design_parameter,value,selection_function,selection_inputs,oos_used
+feature choice (PARAMETER 1),C2_range_efficiency_50,"_pick_feature(t2,t3)",T2 is_bearchop_discrimination_auc (IS-only) + T3 regime_sign_abs_corr (calendar IS/OOS label),False
+feature window (PARAMETER 2),parquet-primitive window (a-priori; no sweep),a-priori constant,n/a (data-free),False

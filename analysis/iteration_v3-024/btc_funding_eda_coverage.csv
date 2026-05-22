@@ -1,0 +1,4 @@
+symbol,n_total_is_bars,n_nan_btc_funding_z,n_valid_btc_funding_z,coverage_pct,passes_floor
+BCHUSDT,2193,0,2193,100.0,True
+LDOUSDT,2193,0,2193,100.0,True
+TRXUSDT,2193,0,2193,100.0,True

@@ -1,0 +1,11 @@
+{
+  "T_R": 6.0,
+  "T_max": 7.0,
+  "N_days": 45,
+  "M_candles": 21,
+  "adversarial_trade_count": 101,
+  "consecutive_zeros_after_trigger": 0,
+  "time_override_correct": true,
+  "deadlock_impossible": true,
+  "argument_summary": "Continuous form: dd > T_max region narrow; multiplier > 0 for dd in [T_R, T_max] (state updates normally). Time-override M=21 candles guarantees brake-OFF even in pathological dd > T_max persistence. Rolling window N=45 days propagates scaled wpnl normally."
+}

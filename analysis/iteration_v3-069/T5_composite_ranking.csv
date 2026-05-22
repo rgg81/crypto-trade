@@ -1,0 +1,6 @@
+symbol,feat_proximity_score_035,complementarity_score_020,data_quality_score_020,liquidity_score_015,trade_rate_score_010,composite,mean_z_dist,mean_abs_corr,gate1_pass,gate2_pass
+ADAUSDT,0.2468,0.504,1.0,0.8639,0.426,0.5594,0.6524,0.496,True,True
+FILUSDT,0.1235,0.4665,1.0,0.7812,0.466,0.5003,0.7592,0.5335,True,True
+ATOMUSDT,0.1326,0.4695,1.0,0.6748,0.398,0.4814,0.7513,0.5305,True,True
+ALGOUSDT,0.0284,0.508,1.0,0.5942,0.472,0.4479,0.8416,0.492,True,True
+VETUSDT,0.0,0.4416,1.0,0.5277,0.448,0.4123,0.8662,0.5584,True,True

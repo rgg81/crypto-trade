@@ -1,0 +1,5 @@
+symbol,auc_8h_only,auc_8h_plus_daily,auc_lift,lift_positive
+BCHUSDT,0.4983,0.4931,-0.0052,False
+LDOUSDT,0.4801,0.5083,0.0281,True
+TRXUSDT,0.4518,0.4657,0.0139,True
+POOLED,0.4889,0.5015,0.0126,True

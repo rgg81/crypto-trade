@@ -1,0 +1,2 @@
+chosen_trigger,chosen_threshold,n_is_ldo_trades,n_suppressed,n_kept,suppressed_wpnl_sum,kept_wpnl_sum,baseline_wpnl_sum,counterfactual_wpnl_delta,suppressed_were_losers,suppressed_were_winners
+abs_ldo_vz,1.6621,9,0,9,0.0,8.9253,8.9253,-0.0,0,0

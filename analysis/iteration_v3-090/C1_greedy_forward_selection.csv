@@ -1,0 +1,4 @@
+step,feature_added,composite_ic_ir,marginal_delta_ic_ir,accepted
+1,cand_semidev_50,0.2144,0.0163,True
+2,cand_sortino_mom_12,0.2221,0.0077,True
+3,cand_downbeta_50,0.2303,0.0083,True

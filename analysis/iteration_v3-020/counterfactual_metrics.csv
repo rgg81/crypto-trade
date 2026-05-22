@@ -1,0 +1,4 @@
+scenario,is_monthly_sharpe,oos_monthly_sharpe,is_top_share_pct,oos_top_share_pct,is_n_capped,oos_n_capped
+anchor (no cap),0.4563,0.2343,78.72,152.01,0,0
+static_full_window_cap_040,0.3969,-0.1276,67.24,259.85,97,86
+rolling_90_bars_cap_040,0.219,-0.0305,106.97,1693.32,18,8

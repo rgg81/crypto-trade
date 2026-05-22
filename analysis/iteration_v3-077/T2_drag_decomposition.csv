@@ -1,0 +1,9 @@
+cut,n_trades,win_rate_pct,net_pnl_pct,win_mean_dur,loss_mean_dur
+symbol=BCHUSDT,73,45.2,79.45,10.21,4.08
+symbol=LDOUSDT,11,27.3,-11.44,4.33,5.12
+symbol=TRXUSDT,75,29.3,-23.04,8.95,4.77
+regime=BULL,104,32.7,-0.49,9.09,4.9
+regime=BEAR/CHOP,55,43.6,45.45,9.92,3.68
+exit_reason=stop_loss,101,0.0,-316.27,,4.52
+exit_reason=take_profit,49,100.0,332.07,7.31,
+exit_reason=timeout,9,100.0,29.16,21.0,

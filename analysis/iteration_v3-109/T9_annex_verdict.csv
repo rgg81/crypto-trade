@@ -1,0 +1,4 @@
+finding,result,detail
+best MLP capacity beats LightGBM,False,best=mlp_deep_64_32_16 auc=0.4935 vs lgbm 0.5000
+LightGBM real-label AUC clears the permutation q95 (any extractable directional signal),False,real 0.4970 vs null q95 0.5228; p=0.640
+ANNEX VERDICT,NO-GO confirmed — no model class extracts signal,"the NULL is a property of the 14-feature / triple-barrier / BCH-LDO-TRX data, not of the neural architecture"

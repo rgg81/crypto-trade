@@ -1,0 +1,7 @@
+candidate,pooled_auc,null_q95,p_value,clears_q95
+C4_symvsbtc_signed_kurt50,0.5717,0.593,1.0,False
+C3_ret5d_signed_skew50,0.566,0.5933,1.0,False
+C6_ret5d_signed_tbi,0.5653,0.5953,1.0,False
+C2_vwap_signed_volcv,0.5635,0.5933,1.0,False
+C1_obv_signed_volmom,0.5627,0.5939,1.0,False
+C5_maxdd_signed_skew200,0.5445,0.595,1.0,False

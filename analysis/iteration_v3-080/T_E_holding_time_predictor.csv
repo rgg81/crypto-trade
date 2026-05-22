@@ -1,0 +1,3 @@
+split,n_trades,mean_duration_candles_060,predicted_full_roster_duration_delta,predicted_trades_added,predicted_trades_removed,basis
+in_sample,159,6.3145,0.0000,0,0,byte-identical /060-config labeling + model + seeds => identical per-trade barriers; report column touches no barrier; added & removed sets BOTH empty (degenerate sub-channel)
+out_of_sample,102,6.4608,0.0000,0,0,byte-identical /060-config labeling + model + seeds => identical per-trade barriers; report column touches no barrier; added & removed sets BOTH empty (degenerate sub-channel)

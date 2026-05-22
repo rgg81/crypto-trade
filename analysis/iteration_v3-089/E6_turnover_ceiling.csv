@@ -1,0 +1,8 @@
+metric,value
+best_IS_net_Sharpe_variant,E4_band_0.02
+best_IS_net_monthly_sharpe,-0.3147
+best_variant_turnover_per_bar,0.1199
+best_variant_turnover_frac_of_book,0.22
+E1_baseline_turnover_per_bar,0.3252
+proposed_turnover_ceiling_per_bar,0.138
+ceiling_rationale,gross-turnover-per-bar HARD gate = best-IS-variant turnover x1.15 headroom; any /089 build whose mean gross turnover/bar EXCEEDS this is NO-MERGE

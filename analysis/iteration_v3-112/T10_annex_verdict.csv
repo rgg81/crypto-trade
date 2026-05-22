@@ -1,0 +1,4 @@
+control,finding,signal_present
+A_permutation_null,"observed per-symbol AUC 0.5076 vs null q95 0.5684, p=1.000",False
+B_gated_tail,gated-tail hit rate: pooled 0.5476 vs per-symbol 0.5682 (lift -0.0206),False
+C_sample_starvation_gradient,"Spearman rho(train_n, per-symbol AUC) = -0.0827, p=0.729",False

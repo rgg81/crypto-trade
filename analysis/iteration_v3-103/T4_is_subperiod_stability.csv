@@ -1,0 +1,8 @@
+candidate,ic_early_BCH,ic_late_BCH,ic_early_LDO,ic_late_LDO,ic_early_TRX,ic_late_TRX,stable_BCH,stable_LDO,stable_TRX,all_3sym_stable
+recency_weighted_momentum_5d,0.0092,0.0142,-0.0928,-0.0354,-0.0176,-0.0726,True,True,True,True
+extrema_recency_skew_30,-0.0059,-0.1462,-0.1306,-0.1368,0.0448,-0.0583,True,True,False,False
+vol_decayed_trend,0.0061,-0.0201,0.0447,-0.2325,0.001,0.0183,False,False,True,False
+corr_gated_momentum_5d,0.0539,0.0998,0.1658,-0.1362,0.0254,0.0113,True,False,True,False
+tsrank_dispersion_ratio,0.0174,-0.0246,-0.0294,-0.3504,-0.1248,-0.1166,False,True,True,False
+scaled_reversal_pressure_signed,-0.0162,0.0174,0.0436,0.0509,-0.0414,0.0462,False,True,False,False
+argmax_pullback_signed_20,0.1232,-0.0037,0.1221,0.0573,0.1024,0.0812,False,True,True,False

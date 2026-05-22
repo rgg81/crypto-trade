@@ -181,6 +181,12 @@ def run_backtest(
     results: list[TradeResult] = []
     total_signals = 0
 
+    # iter-v3/116: early-exit-on-no-confirmation confirmed tracking.
+    # Keyed by id(Order). True once the order's favorable excursion has crossed
+    # no_confirm_threshold_price. Cleared when the order resolves.
+    # Only populated / consulted when config.enable_no_confirm_exit is True.
+    _no_confirm_confirmed: dict[int, bool] = {}
+
     # Per-symbol daily PnL tracking for vol targeting (iter 147)
     # symbol -> {YYYY-MM-DD -> sum of net_pnl_pct that closed on that day}
     vt_per_sym_daily: dict[str, dict[str, float]] = {}
@@ -236,18 +242,33 @@ def run_backtest(
 
         # (a) Check open order for this symbol
         if sym in open_orders:
-            result = check_order(
-                open_orders[sym],
+            _order = open_orders[sym]
+            # iter-v3/132: no_confirm bookkeeping now lives in the shared
+            # ``evaluate_order_with_no_confirm`` helper (used by both backtest
+            # loop and live engine). Same-bar precedence: TP > SL > no_confirm
+            # > timeout. State key is id(order) for the backtest's
+            # process-local Order identity.
+            result = evaluate_order_with_no_confirm(
+                _order,
                 ot,
                 float(open_arr[i]),
                 float(high_arr[i]),
                 float(low_arr[i]),
+                float(close_arr[i]),
                 int(close_time_arr[i]),
                 config.fee_pct,
+                enable_no_confirm=config.enable_no_confirm_exit,
+                no_confirm_state=_no_confirm_confirmed,
+                state_key=id(_order),
             )
             if result is not None:
                 results.append(result)
                 del open_orders[sym]
+                # iter-v3/020: per-symbol cap state feedback — call record_trade_result
+                # on the strategy if it exposes the hook (RiskV2/V3Wrapper only).
+                # Uses hasattr to stay backward-compatible with all other strategies.
+                if hasattr(strategy, "record_trade_result"):
+                    strategy.record_trade_result(result)
                 # Record per-symbol daily PnL for vol targeting lookback
                 if config.vol_targeting:
                     close_date_str = _day_of(result.close_time)
@@ -316,8 +337,7 @@ def run_backtest(
                             )
                             if cum_n >= 20 and cum_pnl < 0:
                                 raise EarlyStopError(
-                                    f"Year 1+2 cumulative: PnL={cum_pnl:+.1f}% "
-                                    f"({cum_n} trades)",
+                                    f"Year 1+2 cumulative: PnL={cum_pnl:+.1f}% ({cum_n} trades)",
                                     results,
                                     total_signals,
                                 )
@@ -375,6 +395,9 @@ def run_backtest(
                     vt_scale=vt_scale,
                 )
                 open_orders[sym] = order
+                # iter-v3/116: register the order in the no_confirm confirmed dict
+                if config.enable_no_confirm_exit and order.no_confirm_arm_time > 0:
+                    _no_confirm_confirmed[id(order)] = False
                 if verbose > 0:
                     _flush_predict_log(strategy)
                     _log_trade_open(order)
@@ -508,6 +531,85 @@ def check_order(
     return make_result(order, order.take_profit_price, close_time, "take_profit", fee_pct)
 
 
+def evaluate_order_with_no_confirm(
+    order: Order,
+    open_time: int,
+    open_price: float,
+    high: float,
+    low: float,
+    close_price: float,
+    close_time: int,
+    fee_pct: float,
+    *,
+    enable_no_confirm: bool,
+    no_confirm_state: dict,
+    state_key,
+) -> TradeResult | None:
+    """Per-candle close-check for an open Order — incorporates /116 no_confirm.
+
+    Single source of truth for the iter-v3/116 no_confirm primitive. Used by
+    both the backtest loop AND the live engine (catch-up + tick paper-trade
+    paths) so the bookkeeping math is identical by construction.
+
+    Bookkeeping pattern:
+    - ``no_confirm_state`` is a mutable mapping ``{state_key: confirmed_bool}``
+      that survives across candles (set True once favorable excursion crosses
+      threshold; entry popped when the trade closes).
+    - ``state_key`` is ``id(order)`` for the backtest loop (process-local
+      Order identity) or ``(model_name, symbol, trade_id)`` for the live
+      engine (Order objects rebuilt from DB rows; id() not stable).
+    - This function MUTATES no_confirm_state in place.
+
+    Same-bar precedence (per iter-v3/116 brief §3.5 Change 6): TP > SL >
+    no_confirm > timeout. The check_order helper handles TP/SL/timeout
+    semantics; this function layers the no_confirm gate on top, deferring
+    to check_order whenever no_confirm doesn't fire.
+    """
+    # No-op fast path: no_confirm disabled OR order doesn't carry an arm_time
+    # (orders created before /116 — back-compat).
+    if not enable_no_confirm or order.no_confirm_arm_time <= 0:
+        result = check_order(order, open_time, open_price, high, low, close_time, fee_pct)
+        return result
+
+    confirmed = no_confirm_state.get(state_key, False)
+
+    # Update confirmation status: has favorable excursion reached the threshold?
+    if not confirmed:
+        if order.direction == 1:
+            confirmed = high >= order.no_confirm_threshold_price
+        else:
+            confirmed = low <= order.no_confirm_threshold_price
+        if confirmed:
+            no_confirm_state[state_key] = True
+
+    # Fire no_confirm exit: arm_time reached on this candle AND still unconfirmed.
+    # TP/SL take priority on the same bar — check them first.
+    if not confirmed and close_time >= order.no_confirm_arm_time:
+        if order.direction == 1:
+            sl_hit = low <= order.stop_loss_price
+            tp_hit = high >= order.take_profit_price
+        else:
+            sl_hit = high >= order.stop_loss_price
+            tp_hit = low <= order.take_profit_price
+        if sl_hit or tp_hit:
+            # TP/SL wins — delegate to check_order for correct price disambiguation
+            result = check_order(
+                order, open_time, open_price, high, low, close_time, fee_pct
+            )
+        else:
+            # No TP/SL: fire no_confirm at candle close
+            result = make_result(order, close_price, close_time, "no_confirm", fee_pct)
+        no_confirm_state.pop(state_key, None)
+        return result
+
+    # Normal path: delegate TP/SL/timeout to check_order.
+    result = check_order(order, open_time, open_price, high, low, close_time, fee_pct)
+    if result is not None:
+        # Order resolved by TP/SL/timeout — clean up confirmed tracking.
+        no_confirm_state.pop(state_key, None)
+    return result
+
+
 def compute_vt_scale(
     per_sym_daily_pnl: dict[str, dict[str, float]],
     symbol: str,
@@ -587,6 +689,39 @@ def create_order(
     open_time = close_time
     timeout_time = open_time + config.timeout_minutes * 60 * 1000
 
+    # iter-v3/116: early-exit-on-no-confirmation primitive.
+    # Derive atr_distance from Signal.sl_pct (the SL distance in pct terms).
+    # At the v3-canonical sl_mult=1.0, sl_pct == 1.0 * NATR, so atr_distance is exact.
+    # no_confirm_arm_time: close_time at end of the K-candle observation window.
+    # iter-v3/124 FIX: interval_ms derived from config.interval string (not hardcoded //21).
+    # The prior `timeout_minutes // 21` was correct only at K=21 (10080 // 21 = 480 min);
+    # at K=63 (30240 // 21 = 1440 min) it would silently use 24h candle size instead of 8h.
+    _interval_ms_map: dict[str, int] = {
+        "1m": 60_000,
+        "3m": 180_000,
+        "5m": 300_000,
+        "15m": 900_000,
+        "30m": 1_800_000,
+        "1h": 3_600_000,
+        "4h": 14_400_000,
+        "8h": 28_800_000,
+        "12h": 43_200_000,
+        "1d": 86_400_000,
+        "24h": 86_400_000,
+    }
+    no_confirm_arm_time = 0
+    no_confirm_threshold_price = 0.0
+    if config.enable_no_confirm_exit and signal.sl_pct is not None:
+        # Derive interval from config.interval string; fall back to 480 min (8h) default.
+        interval_ms = _interval_ms_map.get(config.interval, 28_800_000)
+        no_confirm_arm_time = open_time + config.no_confirm_k_candles * interval_ms
+        # sl_pct already carries 1 * ATR in pct; trigger_pct = trigger_atr * sl_pct
+        trigger_pct = config.no_confirm_trigger_atr * sl_pct  # sl_pct already divided by 100 above
+        if signal.direction == 1:  # Long: must reach above entry
+            no_confirm_threshold_price = entry_price * (1.0 + trigger_pct)
+        else:  # Short: must reach below entry
+            no_confirm_threshold_price = entry_price * (1.0 - trigger_pct)
+
     return Order(
         symbol=symbol,
         direction=signal.direction,
@@ -597,6 +732,9 @@ def create_order(
         take_profit_price=take_profit_price,
         open_time=open_time,
         timeout_time=timeout_time,
+        confidence=signal.confidence,
+        no_confirm_arm_time=no_confirm_arm_time,
+        no_confirm_threshold_price=no_confirm_threshold_price,
     )
 
 
@@ -632,4 +770,5 @@ def make_result(
         stop_loss_price=order.stop_loss_price,
         take_profit_price=order.take_profit_price,
         timeout_time=order.timeout_time,
+        confidence=order.confidence,
     )

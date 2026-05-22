@@ -1,0 +1,7 @@
+symbol,top3_features,top3_max_shift,g5_stability
+ATOMUSDT,"max_dd_window_50,ret_kurt_200,ret_kurt_50",5,HIGH_RISK
+RUNEUSDT,"ret_skew_200,ret_skew_50,range_realized_vol_50",3,PASS
+AVAXUSDT,"max_dd_window_50,range_realized_vol_50,ret_kurt_200",3,PASS
+HBARUSDT,"max_dd_window_50,range_realized_vol_50,ret_skew_200",5,HIGH_RISK
+ICPUSDT,"range_realized_vol_50,ret_skew_50,hurst_100",7,HIGH_RISK
+ALGOUSDT,"ret_kurt_200,ret_skew_200,ret_kurt_50",4,PASS

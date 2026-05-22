@@ -1,0 +1,6 @@
+path,dropped_pct_low,dropped_pct_high,is_trades_dropped_low,is_trades_dropped_high,oos_trades_dropped_low,oos_trades_dropped_high,is_trades_remaining_low,is_trades_remaining_high,oos_trades_remaining_low,oos_trades_remaining_high,description
+Path_A_median_threshold,0.05,0.1,8,16,5,10,143,151,92,97,Median replaces mean confidence_threshold across 3 seeds
+Path_B_median_proba,0.05,0.1,8,16,5,10,143,151,92,97,Median replaces mean per-candle proba across 3 seeds
+Path_C_fixed_055,0.1,0.3,16,48,10,31,111,143,71,92,Fixed threshold 0.55 replaces per-cell Optuna mean
+Path_D_tighten_060,0.3,0.5,48,80,31,51,79,111,51,71,"Tightening: max(inherited, 0.60) at inference time"
+Path_E_vote_2of3,0.1,0.25,16,40,10,26,119,143,76,92,Require 2 of 3 seeds to agree on direction (vote)

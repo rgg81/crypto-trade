@@ -1,0 +1,15 @@
+feature,rank_BCH,rank_LDO,rank_TRX,rank_range,norm_std,classification
+hurst_100,12,14,3,11,0.1183,HIGH-DISP-SYMBOL-SPECIFIC
+max_dd_window_50,2,10,5,8,0.081,HIGH-DISP-SYMBOL-SPECIFIC
+btc_ret_14d,14,6,14,8,0.1963,HIGH-DISP-SYMBOL-SPECIFIC
+ret_autocorr_lag1_50,8,12,6,6,0.0407,HIGH-DISP-SYMBOL-SPECIFIC
+range_realized_vol_50,4,7,1,6,0.075,HIGH-DISP-SYMBOL-SPECIFIC
+ema_spread_atr_20,3,9,9,6,0.0812,HIGH-DISP-SYMBOL-SPECIFIC
+vwap_dev_20,1,4,7,6,0.1116,HIGH-DISP-SYMBOL-SPECIFIC
+ret_skew_50,13,8,12,5,0.1551,MID-DISP
+ret_skew_200,6,1,4,5,0.118,MID-DISP
+hurst_diff_100_50,9,5,10,5,0.1299,MID-DISP
+ret_kurt_200,7,3,8,5,0.1178,MID-DISP
+ret_kurt_50,5,2,2,3,0.0693,MID-DISP
+sym_vs_btc_ret_7d,10,11,13,3,0.063,MID-DISP
+regime_momentum_signed_5d,11,13,11,2,0.0601,LOW-DISP-SHARED

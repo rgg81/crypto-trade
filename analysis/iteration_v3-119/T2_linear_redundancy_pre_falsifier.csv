@@ -1,0 +1,7 @@
+candidate,pooled_R2,top_primitive,top_abs_corr,verdict
+C2_vwap_signed_volcv,0.0215,regime_momentum_signed_5d,0.1063,PASS
+C1_obv_signed_volmom,0.0558,sym_vs_btc_ret_7d,0.1927,PASS
+C3_ret5d_signed_skew50,0.0694,sym_vs_btc_ret_7d,0.193,PASS
+C5_maxdd_signed_skew200,0.4663,ret_skew_200,0.5583,PASS
+C6_ret5d_signed_tbi,0.5099,regime_momentum_signed_5d,0.7059,PASS-CARVEOUT
+C4_symvsbtc_signed_kurt50,0.7918,sym_vs_btc_ret_7d,0.8881,PASS-CARVEOUT

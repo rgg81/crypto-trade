@@ -1,0 +1,24 @@
+{
+  "n_outer_seeds_demo": 5,
+  "n_inner_seeds_per_ensemble": 5,
+  "demo_outer_seeds": [
+    42,
+    17,
+    100,
+    999,
+    8675309
+  ],
+  "n_pairs_off_diagonal": 10,
+  "max_off_diagonal_overlap": 0,
+  "min_off_diagonal_overlap": 0,
+  "n_pairs_with_zero_overlap": 10,
+  "legacy_ensemble_seeds": [
+    42,
+    123,
+    456,
+    789,
+    1001
+  ],
+  "n_demo_seeds_reproducing_legacy": 0,
+  "total_demo_inner_seeds_shared_with_legacy": 0
+}

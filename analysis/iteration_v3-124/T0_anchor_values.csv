@@ -1,0 +1,16 @@
+metric,value,source
+monthly_sharpe_in_sample,1.3108,reports-v3/iteration_v3-121/comparison.csv:2
+monthly_sharpe_out_of_sample,0.9682,reports-v3/iteration_v3-121/comparison.csv:2
+max_drawdown_in_sample,26.3816,reports-v3/iteration_v3-121/comparison.csv:4
+max_drawdown_out_of_sample,25.7040,reports-v3/iteration_v3-121/comparison.csv:4
+n_trades_in_sample,173,reports-v3/iteration_v3-121/comparison.csv:7
+n_trades_out_of_sample,98,reports-v3/iteration_v3-121/comparison.csv:7
+BCH_OOS_weighted_pnl,35.8314,reports-v3/iteration_v3-121/comparison.csv per_symbol block
+LDO_OOS_weighted_pnl,-2.8864,reports-v3/iteration_v3-121/comparison.csv per_symbol block
+TRX_OOS_weighted_pnl,5.2077,reports-v3/iteration_v3-121/comparison.csv per_symbol block
+current_K_candles,21,10080 min / 480 min = 21 (run_baseline_v3.py)
+current_label_timeout_minutes,10080,run_baseline_v3.py:2076 / 2112
+current_REQUIRED_GAP,66,validation_v3.py:76 = (21+1)*3
+current_ATR_TP_mult,2.0,"features_v3/__init__.py:438 DEFAULT_ATR_MULTIPLIERS = (2.0, 1.0)"
+current_ATR_SL_mult,1.0,features_v3/__init__.py:438
+OOS_CUTOFF_MS,1742774400000,config.py:8 — 2025-03-24 00:00:00 UTC (IMMUTABLE)

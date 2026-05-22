@@ -1,0 +1,8 @@
+cut,n_trades,win_rate_pct,net_pnl_pct,mean_dur
+symbol=BCHUSDT,73,45.2,79.45,6.85
+symbol=LDOUSDT,11,27.3,-11.44,4.91
+symbol=TRXUSDT,75,29.3,-23.04,6.0
+"regime=BULL,dir=LONG",57,36.8,13.8,6.4
+"regime=BULL,dir=SHORT",47,27.7,-14.29,6.11
+"regime=BEAR/CHOP,dir=LONG",21,47.6,14.9,6.14
+"regime=BEAR/CHOP,dir=SHORT",34,41.2,30.56,6.56

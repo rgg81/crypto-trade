@@ -1,0 +1,4 @@
+channel,metric,predicted_count,denominator,predicted_pct,inertia_floor_pct,above_inertia_floor
+LDO_panel_candles,IS LDO candles suppressed (training-panel reshape),219,2728,8.03,8.0,True
+LDO_roster_trades,/059 LDO IS roster trades suppressed (ORACLE T4),0,9,0.0,8.0,False
+portfolio_roster_trades,/059 PORTFOLIO IS roster shift (WRONG metric for per-symbol axis),0,171,0.0,8.0,False

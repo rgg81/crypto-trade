@@ -1,0 +1,4 @@
+regime,n_months,total_wpnl_pct,mean_monthly_pnl_pct,std_monthly_pnl_pct,monthly_sharpe,pct_positive_months,n_trades
+IS_bear_chop,19,-6.8733,-0.3618,5.7156,-0.2193,26.3,77
+IS_bull,15,58.764,3.9176,7.3342,1.8504,53.3,82
+OOS_uptrend,14,5.4988,0.3928,9.7003,0.1403,50.0,102

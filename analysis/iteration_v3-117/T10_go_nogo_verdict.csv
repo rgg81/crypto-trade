@@ -1,0 +1,6 @@
+gate,value,threshold,pass_
+"g1 (per-symbol q95 clears, >=2/3)",0/3 symbols clear q95,>=2,False
+g2 (pooled q95 clears),"observed=0.5823, q95=0.5104",observed > q95,True
+"g3 (per-offset cells > 0.5, >=6/9)",6/9 cells > 0.5,>=6,True
+g4 SOFT (per-symbol n_rows >= 1500),"{'BCHUSDT': 5108, 'LDOUSDT': 2122, 'TRXUSDT': 5050}",>=1500 each,True
+VERDICT (g1 AND g2 AND g3),NO-GO,all three hard gates,False
