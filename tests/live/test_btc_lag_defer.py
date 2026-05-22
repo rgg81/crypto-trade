@@ -158,6 +158,62 @@ def test_btc_lagging_fetch_doesnt_help_v2_deferred(tmp_path: Path) -> None:
     assert "SOLUSDT" not in new_candles  # deferred to next tick
 
 
+def test_v3_symbol_deferred_when_btc_lags(tmp_path: Path) -> None:
+    """v3 (BCH/LDO/TRX) is covered by the same BTC-lag defer as v2.
+
+    iter-v3/132 generalized ``_defer_v2_if_btc_lagging`` →
+    ``_defer_xsymbol_if_btc_lagging`` so the filter runs for any runner
+    whose ``risk_wrapper in ("v2", "v3")``. cross_btc_v3 (like cross_btc)
+    left-merges BTC by open_time — stale BTC silently NaN-fills btc_ret_*
+    and breaks live↔backtest determinism for v3 models too.
+
+    Mirrors the v2 ``test_btc_lagging_fetch_doesnt_help_v2_deferred`` case
+    but with the V3-BCH baseline model.
+    """
+    from crypto_trade.live.models import V3_BASELINE_MODELS
+
+    # Replace v2 default with the V3-BCH model.
+    _write_8h_csv(tmp_path / "BTCUSDT" / "8h.csv", 1_700_000_000_000)
+    bch_only = tuple(m for m in V3_BASELINE_MODELS if m.symbols == ("BCHUSDT",))
+    assert bch_only, "V3_BASELINE_MODELS must contain V3-BCH"
+    cfg = LiveConfig(
+        data_dir=tmp_path,
+        features_dir=tmp_path / "features",
+        models=bch_only,
+        db_path=tmp_path / "engine.db",
+    )
+    engine = LiveEngine(cfg)
+
+    interval_ms = 8 * 60 * 60 * 1000
+    v3_ot = 1_700_000_000_000
+    # BTC CSV one candle behind the v3 ot; mocked refresh doesn't help.
+    _write_8h_csv(tmp_path / "BTCUSDT" / "8h.csv", v3_ot - interval_ms)
+    new_candles = {"BCHUSDT": _kline(v3_ot)}
+
+    with patch("crypto_trade.live.engine.refresh_klines") as refresh:
+        engine._defer_xsymbol_if_btc_lagging(new_candles)
+    assert refresh.call_count == 1  # tried fetching BTC
+    assert "BCHUSDT" not in new_candles  # deferred to next tick
+
+
+def test_back_compat_alias_dispatches_to_xsymbol_helper(tmp_path: Path) -> None:
+    """``_defer_v2_if_btc_lagging`` is preserved as a thin alias for back-compat.
+
+    The function was renamed in iter-v3/132 (to cover v2+v3) but the old
+    name remains so existing callers + tests that reference it keep working.
+    """
+    engine = _make_engine(tmp_path)
+    interval_ms = 8 * 60 * 60 * 1000
+    v2_ot = 1_700_000_000_000
+    _write_8h_csv(tmp_path / "BTCUSDT" / "8h.csv", v2_ot - interval_ms)
+    new_candles = {"SOLUSDT": _kline(v2_ot)}
+
+    with patch("crypto_trade.live.engine.refresh_klines") as refresh:
+        engine._defer_v2_if_btc_lagging(new_candles)
+    assert refresh.call_count == 1
+    assert "SOLUSDT" not in new_candles  # alias still defers
+
+
 def test_only_late_v2_symbols_are_deferred(tmp_path: Path) -> None:
     """A v2 symbol whose ot is <= BTC's extent stays in; only late ones are dropped."""
     from crypto_trade.live.models import V2_BASELINE_MODELS

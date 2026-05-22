@@ -215,8 +215,17 @@ class XgboostStrategy:
         # feature_columns is required (validated in __init__) — no auto-discovery
         self._all_feature_cols = list(self.feature_columns)
 
-        # Generate monthly splits
-        self._splits = generate_monthly_splits(self._open_time_arr, self.training_months)
+        # Generate monthly splits with a labeler-aware embargo at the train/test
+        # boundary. ``generate_monthly_splits`` requires ``label_timeout_minutes``
+        # + ``interval_minutes`` since main's lookahead-bias fix (commit 5566a69)
+        # — mirrors LightGbmStrategy.compute_features (lgbm.py:269-275).
+        interval_minutes = _interval_to_minutes(self._interval)
+        self._splits = generate_monthly_splits(
+            self._open_time_arr,
+            self.training_months,
+            label_timeout_minutes=self.label_timeout_minutes,
+            interval_minutes=interval_minutes,
+        )
         self._split_map = {s.test_month: s for s in self._splits}
 
         if self.verbose > 0:

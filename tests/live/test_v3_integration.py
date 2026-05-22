@@ -19,6 +19,18 @@ Phase 7):
 PRIMARY parity test (backtest reproduction at byte-equal /121) is run as
 a separate full-cycle backtest reproduction outside the pytest suite;
 see CLAUDE.md "v3 live deploy walkthrough" section.
+
+Test style note (PR #3 reviewer feedback): structural checks below prefer
+``inspect.signature`` (parameter introspection — refactor-stable) and
+``isinstance`` / ``hasattr`` (object introspection) over
+``inspect.getsource`` string matching. Where ``inspect.getsource`` is
+still used (e.g. asserting one method is called *after* another inside
+``_tick``), the failure mode is documented in the test docstring and
+behavioral coverage exists elsewhere:
+  - v3 BTC-lag deferral covered behaviorally in
+    ``tests/live/test_btc_lag_defer.py::test_v3_symbol_deferred_when_btc_lags``.
+  - v2-alias delegation covered behaviorally by
+    ``tests/live/test_btc_lag_defer.py::test_back_compat_alias_dispatches_to_xsymbol_helper``.
 """
 
 from __future__ import annotations
@@ -173,51 +185,108 @@ def test_refresh_features_by_track_dispatches_v3() -> None:
 # ----- Phase 3: _refresh_groups + _defer_xsymbol_if_btc_lagging -----
 
 
-def test_engine_defer_xsymbol_covers_v3() -> None:
-    """_defer_xsymbol_if_btc_lagging filters by risk_wrapper in ('v2','v3')."""
+def test_engine_defer_xsymbol_method_exists() -> None:
+    """``_defer_xsymbol_if_btc_lagging`` method is present + signed correctly.
+
+    Behavioral coverage for the v2+v3 risk_wrapper filter and the
+    ``xsymbol_deferred_btc_lag`` decision_log payload lives in
+    ``tests/live/test_btc_lag_defer.py`` (real engine + mocked refresh +
+    deferral assertions). This test just guards the public surface.
+    """
     import inspect
 
     from crypto_trade.live.engine import LiveEngine
 
-    src = inspect.getsource(LiveEngine._defer_xsymbol_if_btc_lagging)
-    assert 'risk_wrapper in ("v2", "v3")' in src
-    assert "xsymbol_deferred_btc_lag" in src
+    assert hasattr(LiveEngine, "_defer_xsymbol_if_btc_lagging")
+    sig = inspect.signature(LiveEngine._defer_xsymbol_if_btc_lagging)
+    assert {"self", "new_candles"}.issubset(sig.parameters)
 
 
 def test_engine_refresh_groups_emits_v3_track() -> None:
-    """_refresh_groups recognizes the v3 track and emits a v3 group."""
-    import inspect
+    """_refresh_groups returns a v3 entry when a v3 model is configured.
 
+    Behavioral check: instantiate ``LiveEngine`` with the V3-BCH baseline
+    model and assert ``_refresh_groups`` produces a ('v3', ...) tuple.
+    """
     from crypto_trade.live.engine import LiveEngine
+    from crypto_trade.live.models import LiveConfig, V3_BASELINE_MODELS
 
-    src = inspect.getsource(LiveEngine._refresh_groups)
-    assert 'wrapper == "v3"' in src
-    assert "v3_syms" in src or "v3_dir" in src
+    bch_only = tuple(m for m in V3_BASELINE_MODELS if m.symbols == ("BCHUSDT",))
+    # Engine needs a BTC kline CSV for the init-time trend-filter sanity check.
+    import pandas as pd
+
+    btc_dir = Path(__file__).parent / "_tmp_refresh_groups_btc"
+    btc_dir.mkdir(parents=True, exist_ok=True)
+    btc_csv = btc_dir / "BTCUSDT" / "8h.csv"
+    btc_csv.parent.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(
+        [
+            {
+                "open_time": 1_700_000_000_000,
+                "open": 100.0,
+                "high": 101.0,
+                "low": 99.0,
+                "close": 100.5,
+                "volume": 1000.0,
+                "close_time": 1_700_000_000_000 + 8 * 3600 * 1000 - 1,
+                "quote_asset_volume": 1.0,
+                "number_of_trades": 1,
+                "taker_buy_base_asset_volume": 1.0,
+                "taker_buy_quote_asset_volume": 1.0,
+                "ignore": 0,
+            }
+        ]
+    ).to_csv(btc_csv, index=False)
+    try:
+        cfg = LiveConfig(
+            data_dir=btc_dir,
+            features_dir=btc_dir / "features",
+            models=bch_only,
+            db_path=btc_dir / "engine.db",
+        )
+        engine = LiveEngine(cfg)
+        groups = engine._refresh_groups(("BCHUSDT",))
+        tracks = [g[2] for g in groups]
+        assert "v3" in tracks
+    finally:
+        import shutil
+
+        shutil.rmtree(btc_dir, ignore_errors=True)
 
 
-def test_engine_v2_alias_back_compat_preserved() -> None:
-    """_defer_v2_if_btc_lagging alias exists for back-compat with v2-only tests."""
-    import inspect
+def test_engine_v2_alias_method_exists() -> None:
+    """``_defer_v2_if_btc_lagging`` alias still present for back-compat.
 
+    Behavioral dispatch through the alias is tested in
+    ``test_btc_lag_defer.py::test_back_compat_alias_dispatches_to_xsymbol_helper``.
+    """
     from crypto_trade.live.engine import LiveEngine
 
     assert hasattr(LiveEngine, "_defer_v2_if_btc_lagging")
-    src = inspect.getsource(LiveEngine._defer_v2_if_btc_lagging)
-    assert "_defer_xsymbol_if_btc_lagging" in src  # alias delegates
 
 
 # ----- Phase 4: ModelRunner v3 wrapper -----
 
 
-def test_modelrunner_v3_wrapper_branch_exists() -> None:
-    """ModelRunner.__init__ has a v3 branch that wraps inner in RiskV3Wrapper."""
-    import inspect
+def test_modelrunner_v3_wraps_inner_in_risk_v3_wrapper() -> None:
+    """ModelRunner wraps a v3 ModelConfig's strategy in RiskV3Wrapper.
 
+    Behavioral check: instantiate ModelRunner with a V3 baseline model and
+    assert ``runner.strategy`` is a RiskV3Wrapper (subclass of RiskV2Wrapper).
+    Reformatting ModelRunner.__init__ won't break this — only changing the
+    wrapper class will, which IS the contract under test.
+    """
     from crypto_trade.live.engine import ModelRunner
+    from crypto_trade.live.models import LiveConfig, V3_BASELINE_MODELS
+    from crypto_trade.strategies.ml.lgbm import LightGbmStrategy
+    from crypto_trade.strategies.ml.risk_v3 import RiskV3Wrapper
 
-    src = inspect.getsource(ModelRunner.__init__)
-    assert 'risk_wrapper == "v3"' in src
-    assert "RiskV3Wrapper" in src
+    bch_model = next(m for m in V3_BASELINE_MODELS if m.symbols == ("BCHUSDT",))
+    live_cfg = LiveConfig(models=(bch_model,))
+    runner = ModelRunner(bch_model, live_cfg)
+    assert isinstance(runner.strategy, RiskV3Wrapper)
+    # Inner strategy access used elsewhere should still resolve through wrapper.
+    assert isinstance(runner.inner_strategy, LightGbmStrategy)
 
 
 # ----- Phase 5a: evaluate_order_with_no_confirm shared helper -----
@@ -438,15 +507,19 @@ def test_trade_to_order_derives_no_confirm_short() -> None:
 
 
 def test_check_dry_run_exit_no_confirm_kwarg_back_compat() -> None:
-    """check_dry_run_exit without no_confirm kwargs still works (v1/v2 path)."""
+    """check_dry_run_exit signature accepts the no_confirm kwargs introduced
+    in iter-v3/132 for v3 paper-trade evaluation (Phase 5b/c).
+
+    Signature-level check is refactor-stable: ruff formatting, comment edits,
+    and helper extractions can't break it. Only removing the kwarg can.
+    """
     import inspect
 
     from crypto_trade.live.order_manager import OrderManager
 
-    src = inspect.getsource(OrderManager.check_dry_run_exit)
-    assert "enable_no_confirm" in src
-    # back-compat path: when enable_no_confirm=False, calls bare check_order
-    assert "check_order(" in src
+    sig = inspect.signature(OrderManager.check_dry_run_exit)
+    assert "enable_no_confirm" in sig.parameters
+    assert "no_confirm_state" in sig.parameters
 
 
 # ----- Phase 5d: real-mode check_no_confirm_exit -----
@@ -515,15 +588,11 @@ def test_seed_live_db_v3_kwarg_exists() -> None:
     assert "v3_trades_csvs" in sig.parameters
 
 
-def test_seed_live_db_counts_dict_has_v3_keys() -> None:
-    """counts dict includes v3_closed / v3_open keys."""
-    import inspect
-
-    from crypto_trade.live.db_seeder import seed_live_db_from_backtest
-
-    src = inspect.getsource(seed_live_db_from_backtest)
-    assert '"v3_closed": 0' in src
-    assert '"v3_open": 0' in src
+# test_seed_live_db_counts_dict_has_v3_keys was removed: the behavioral test
+# below (test_seed_live_db_v3_empty_run) calls seed_live_db_from_backtest and
+# asserts both "v3_closed" and "v3_open" are present in the returned dict,
+# which catches a missing-key regression more robustly than string-matching
+# the source.
 
 
 def test_seed_live_db_v3_empty_run(tmp_path: Path) -> None:
