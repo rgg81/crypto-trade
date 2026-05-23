@@ -73,7 +73,7 @@ Three sibling tracks. The user can run `/quant-iteration-v1` (this skill), `/qua
 - Phase 7.4 (LM Master post-mortem)
 - BLOCK-PENDING-FIX verdict semantics
 - Axis Rotation Discipline (mandatory family rotation every 5 EXPs)
-- HIGH-RISK axis declaration (brief Section 2 — opt-in multi-seed validation, NOT mandatory in v1)
+- HIGH-RISK axis declaration (brief Section 2.5 — mitigation = pre-commit to CONFIRMATION at next iter; NO seed-count bump at EXPLORATION; ENSEMBLE_SIZE=3 is non-negotiable per [[v1-seed-count-non-negotiable]])
 - Path Forward section mandatory on every Critic BLOCK verdict
 
 ---
@@ -328,12 +328,18 @@ Every brief Section 2 must declare:
 
 - **Declaration**: HIGH-RISK | NORMAL-RISK
 - **Reason**: <one sentence>
-- **Mitigation (HIGH-RISK only, optional)**: <if HIGH-RISK, QR may opt into multi-seed validation at this iteration (set `ENSEMBLE_SIZE=10` instead of `3`) OR pre-commit to running this axis at CONFIRMATION budget once it passes EXPLORATION-PROMISING>
+- **Mitigation (HIGH-RISK only)**: <if HIGH-RISK, QR MUST pre-commit to running this axis at CONFIRMATION budget (ENSEMBLE_SIZE=10) at iter-v1/NNN+1 if iter-v1/NNN produces EXPLORATION-PROMISING. No multi-seed validation at THIS iteration — EXPLORATION ALWAYS uses 3 inner seeds; CONFIRMATION is the ONLY 10-seed path.>
 ```
 
-In v1 (vs v3 lightweight footing): HIGH-RISK declaration is MANDATORY but multi-seed validation is OPT-IN. The QR can declare HIGH-RISK and choose to run at single-seed anyway, but the diary then must record the choice and the OOS outcome.
+**SEED COUNT — NON-NEGOTIABLE (per user directive 2026-05-23, [[v1-seed-count-non-negotiable]]):**
+- EXPLORATION = 3 inner seeds (`V1_EXPLORATION_ENSEMBLE_SIZE=3`), ALWAYS — even HIGH-RISK
+- CONFIRMATION = 10 inner seeds (`V1_CONFIRMATION_ENSEMBLE_SIZE=10`), ONLY at CONFIRMATION
+- NO outer-seed loop in v1 (single-pass inner ensemble, matches v3 post-/059 design)
+- HIGH-RISK declaration is MANDATORY but does NOT permit a seed-count bump
+- The HIGH-RISK mitigation is ONLY "pre-commit to CONFIRMATION at next iteration if PROMISING"
+- Diary records the HIGH-RISK declaration + the PROMISING-triggers-CONFIRMATION pre-commit
 
-If the iteration accumulates 3+ HIGH-RISK single-seed EXPLORATIONs producing >1σ negative deltas, the next HIGH-RISK iteration becomes mandatorily multi-seed (codified at that point via a feedback rule update). This soft enforcement is the lighter footing — we don't preemptively impose v3's strict multi-seed mandate, but we have a tripwire.
+If the iteration accumulates 3+ HIGH-RISK EXPLORATIONs producing >1σ negative deltas, the next HIGH-RISK iteration MUST be deferred to CONFIRMATION budget — i.e., CONFIRMATION at iter-v1/NNN+1 becomes mandatory rather than opt-in. This is the lighter-footing tripwire (vs v3's strict pre-emption).
 
 ---
 
@@ -1008,7 +1014,7 @@ TYPE: EXPLORATION  (or CONFIRMATION)
 ### Section 2.5 — HIGH-RISK Axis Declaration (v1-only)
 - Declaration: HIGH-RISK | NORMAL-RISK
 - Reason: <one sentence>
-- Mitigation (HIGH-RISK only, optional): <multi-seed validation opt-in OR pre-commit to CONFIRMATION>
+- Mitigation (HIGH-RISK only): <pre-commit to running this axis at CONFIRMATION budget (ENSEMBLE_SIZE=10) at iter-v1/NNN+1 if PROMISING; NO multi-seed at THIS iteration>
 
 ## Section 3 — Proposed Changes
 - Symbols: <added / removed / kept; rationale; V1_EXCLUDED_SYMBOLS check>
@@ -1241,7 +1247,7 @@ The legacy `/quant-iteration` skill is **deprecated** — `.claude/commands/quan
 - v1 universe must exclude all v2+v3 symbols (V1_EXCLUDED_SYMBOLS enforced at runtime).
 - Track isolation: v1 NEVER imports from `crypto_trade.features_v2` (v2) or `crypto_trade.features_v3` (v3).
 - Axis Rotation Discipline: every 5 same-family EXPLORATIONs triggers mandatory family rotation.
-- HIGH-RISK declaration is mandatory in every brief Section 2.5. Multi-seed validation is opt-in (lighter footing than v3).
+- HIGH-RISK declaration is mandatory in every brief Section 2.5. Mitigation is pre-commit to CONFIRMATION at next iter — NOT a seed-count bump. EXPLORATION ALWAYS uses 3 inner seeds, even HIGH-RISK ([[v1-seed-count-non-negotiable]]).
 - "QR uses IS data" — Phase 5 brief must contain numerical tables from a committed `analysis/iteration_v1-NNN/*.py` script.
 - Pre-registered failure-mode prediction (Section 7) and MERGE/NO-MERGE criteria (Section 8) are MANDATORY in every v1 brief.
 - BLOCK-FINAL from the Critic is FINAL. Re-running after a fix is selection bias (BLOCK-PENDING-FIX is the only sanctioned single-rerun mechanism).
