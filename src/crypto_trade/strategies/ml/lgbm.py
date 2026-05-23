@@ -171,6 +171,7 @@ class LightGbmStrategy:
         inference_threshold_floor: float = 0.0,
         label_mode: str = "triple_barrier",
         trend_scan_grid: tuple[int, ...] = (5, 8, 13, 21),
+        bounds_profile: str = "default",
     ) -> None:
         if not feature_columns:
             raise ValueError(
@@ -211,6 +212,11 @@ class LightGbmStrategy:
         self._oof_persist_path: Path | None = oof_persist_path
         # iter-v3/007: fast exploration mode (colsample fixed at 1.0 in optimization.py)
         self._fast_mode: bool = fast_mode
+        # iter-v1/002: Optuna hyperparameter bounds profile.
+        # "default" = original 193-feature bounds (all tracks except v1_pruned).
+        # "v1_pruned" = tighter bounds for 40-feature pruned set per LM Master
+        # Phase 4.5 Recs #1–3. Forwarded to optimization.optimize_and_train.
+        self._bounds_profile: str = bounds_profile
         # iter-v3/072: labeling mode — "triple_barrier" (default, backward-compat)
         # or "fixed_horizon" (sign of N-candle-forward return; no barriers).
         # iter-v3/105: "trend_scanning" (OLS trend, max-|t| horizon selection
@@ -493,9 +499,7 @@ class LightGbmStrategy:
         # symbol-by-symbol), so one candle of time = n_symbols rows.
         if self.cv_label_gap:
             interval_minutes = _interval_to_minutes(self._interval)
-            embargo_candles = compute_embargo_candles(
-                self.label_timeout_minutes, interval_minutes
-            )
+            embargo_candles = compute_embargo_candles(self.label_timeout_minutes, interval_minutes)
             n_symbols = len(set(self._sym_arr[train_indices]))
             cv_gap = embargo_candles * n_symbols
         else:
@@ -534,6 +538,7 @@ class LightGbmStrategy:
                     train_month=month_str,
                     symbols_arr=train_symbols_arr,
                     fast_mode=self._fast_mode,
+                    bounds_profile=self._bounds_profile,
                 )
                 self._models.append(model)
                 self._confidence_thresholds.append(confidence_threshold)
@@ -715,7 +720,9 @@ class LightGbmStrategy:
                     "ensemble_proba": proba,
                     "per_seed_probas": [p for p in all_proba],
                     "feat_hash": decision_log.hash_features(feat_row),
-                    "feat_values": {c: float(feat_row[i]) for i, c in enumerate(self._selected_cols)},
+                    "feat_values": {
+                        c: float(feat_row[i]) for i, c in enumerate(self._selected_cols)
+                    },
                     "decision": "skipped:below_threshold",
                 }
             )

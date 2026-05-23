@@ -71,6 +71,7 @@ from crypto_trade.features_v1 import (
     V1_BASELINE_UNIVERSE,
     V1_EXCLUDED_SYMBOLS,
     V1_FEATURE_COLUMNS,
+    V1_FEATURE_COLUMNS_PRUNED,
     V1_OOD_FEATURE_COLUMNS,
     assert_v1_universe,
 )
@@ -129,12 +130,30 @@ def run_model(
     n_trials: int,
     ensemble_size: int,
     oof_persist_path: Path | None = None,
+    feature_columns: list[str] | None = None,
+    bounds_profile: str = "default",
 ):
-    """Run a single v1 sub-model (A/C/D/E) under the corrected walk-forward."""
+    """Run a single v1 sub-model (A/C/D/E) under the corrected walk-forward.
+
+    Parameters
+    ----------
+    feature_columns
+        Explicit feature column list. Defaults to V1_FEATURE_COLUMNS (193 cols).
+        Pass list(V1_FEATURE_COLUMNS_PRUNED) for iter-v1/002+ pruned runs.
+        MUST be non-empty — LightGbmStrategy raises if None or empty.
+    bounds_profile
+        Optuna search bounds profile. "default" for 193-feature runs;
+        "v1_pruned" for 40-feature pruned runs (LM Master Recs #1–3).
+    """
+    effective_feature_columns = (
+        feature_columns if feature_columns is not None else list(V1_FEATURE_COLUMNS)
+    )
     print("=" * 60)
     print(
         f"MODEL {name}: {', '.join(symbols)} "
-        f"(R1={apply_r1} R2={apply_r2} R3=on, n_trials={n_trials}, ENSEMBLE_SIZE={ensemble_size})"
+        f"(R1={apply_r1} R2={apply_r2} R3=on, n_trials={n_trials}, "
+        f"ENSEMBLE_SIZE={ensemble_size}, features={len(effective_feature_columns)}, "
+        f"bounds={bounds_profile})"
     )
     print("=" * 60)
     config = BacktestConfig(
@@ -173,11 +192,12 @@ def run_model(
         atr_sl_multiplier=atr_sl,
         use_atr_labeling=True,
         ensemble_seeds=_derive_ensemble_seeds(ensemble_size),
-        feature_columns=list(V1_FEATURE_COLUMNS),
+        feature_columns=effective_feature_columns,
         ood_enabled=True,
         ood_features=list(V1_OOD_FEATURE_COLUMNS),
         ood_cutoff_pct=BASELINE_OOD_CUTOFF_PCT,
         oof_persist_path=oof_persist_path,
+        bounds_profile=bounds_profile,
     )
     t0 = time.time()
     results = run_backtest(config, strategy, yearly_pnl_check=False)
@@ -224,14 +244,22 @@ def _load_features_for_adf_ic(
     symbols: tuple[str, ...],
     features_dir: str,
     interval: str,
+    feature_columns: list[str] | None = None,
 ) -> pd.DataFrame | None:
     """Load and concatenate IS-window feature parquets for ADF + IC computation.
 
+    Parameters
+    ----------
+    feature_columns
+        Columns to select from each parquet. Defaults to V1_FEATURE_COLUMNS
+        (193 cols). Pass list(V1_FEATURE_COLUMNS_PRUNED) for pruned-feature runs
+        so the ADF/IC outputs reflect the 40-column space actually used for training.
+
     Returns
     -------
-    DataFrame with V1_FEATURE_COLUMNS as columns (IS rows only) or None if
-    no parquets found.
+    DataFrame with the requested columns (IS rows only) or None if no parquets found.
     """
+    _cols = feature_columns if feature_columns is not None else list(V1_FEATURE_COLUMNS)
     dfs = []
     for sym in symbols:
         parquet_path = Path(features_dir) / f"{sym}_{interval}_features.parquet"
@@ -246,8 +274,8 @@ def _load_features_for_adf_ic(
         # IS-only filter: open_time < OOS_CUTOFF_MS
         if "open_time" in df.columns:
             df = df[df["open_time"] < OOS_CUTOFF_MS].copy()
-        # Keep only V1_FEATURE_COLUMNS that exist in this parquet
-        avail = [c for c in V1_FEATURE_COLUMNS if c in df.columns]
+        # Keep only the requested columns that exist in this parquet
+        avail = [c for c in _cols if c in df.columns]
         if avail:
             dfs.append(df[avail])
 
@@ -310,6 +338,7 @@ def _run_methodology_reporting(
     features_dir: str,
     interval: str,
     oof_parquet_path: Path | None,
+    feature_columns: list[str] | None = None,
 ) -> None:
     """Run all iter-v1/001 methodology reporting passes AFTER generate_iteration_reports().
 
@@ -344,6 +373,11 @@ def _run_methodology_reporting(
     oof_parquet_path
         Path to the per-trial OOF parquet from optimization.py.  May be None
         when the backtest did not set oof_persist_path (falls back to naive n_trials).
+    feature_columns
+        Columns used for training — controls which columns the ADF and IC
+        outputs are computed on. Defaults to V1_FEATURE_COLUMNS (193 cols).
+        Pass list(V1_FEATURE_COLUMNS_PRUNED) for iter-v1/002+ pruned runs so
+        the methodology artifacts reflect the 40-col training space.
     """
     # Path Forward #2 (Critic Phase 6.0): fail-fast rather than silently falling back
     # to naive_fallback, which would mechanically violate brief F3 + Section 8 criterion 4.
@@ -508,7 +542,7 @@ def _run_methodology_reporting(
     # 5. adf_test.csv (IS features only — per brief Section 2 IS-only discipline)
     # ---------------------------------------------------------------------------
     print("[run_baseline_v1] Loading IS features for ADF test...")
-    feature_df = _load_features_for_adf_ic(symbols, features_dir, interval)
+    feature_df = _load_features_for_adf_ic(symbols, features_dir, interval, feature_columns)
     if feature_df is not None and not feature_df.empty:
         write_adf_test_csv(is_dir, feature_df, label="IS")
         # OOS dir gets the same ADF result (feature stationarity is IS-calibrated)
@@ -588,6 +622,28 @@ def main() -> None:
         default=None,
         help="Comma-separated symbols (default: V1_BASELINE_UNIVERSE).",
     )
+    parser.add_argument(
+        "--pruned-features",
+        action="store_true",
+        help=(
+            "Use V1_FEATURE_COLUMNS_PRUNED (40 features) instead of V1_FEATURE_COLUMNS "
+            "(193 features). Activates the 'v1_pruned' Optuna bounds profile per "
+            "LM Master Phase 4.5 Recs #1–3. Introduced for iter-v1/002."
+        ),
+    )
+    parser.add_argument(
+        "--outer-seeds",
+        type=int,
+        default=1,
+        help=(
+            "Number of outer seeds for multi-seed validation. Default=1 (current "
+            "single-pass behavior). Set to 2 for iter-v1/002's HIGH-RISK "
+            "mitigation (outer seeds [42, 123], each running ENSEMBLE_SIZE inner "
+            "models). Each outer seed uses the same inner-ensemble seed roster "
+            "([42, 123, ...] up to ENSEMBLE_SIZE); results are averaged across "
+            "outer seeds. Wall-clock scales linearly."
+        ),
+    )
     args = parser.parse_args()
 
     # Resolve symbols
@@ -649,91 +705,168 @@ def main() -> None:
             f"(mode default was {default_size})"
         )
 
+    # Resolve feature columns + Optuna bounds profile.
+    # --pruned-features activates V1_FEATURE_COLUMNS_PRUNED (40 cols) and the
+    # "v1_pruned" bounds profile (tighter num_leaves/colsample/min_child_samples).
+    # Default keeps V1_FEATURE_COLUMNS (193 cols) and "default" bounds.
+    if getattr(args, "pruned_features", False):
+        active_feature_columns = list(V1_FEATURE_COLUMNS_PRUNED)
+        bounds_profile = "v1_pruned"
+    else:
+        active_feature_columns = list(V1_FEATURE_COLUMNS)
+        bounds_profile = "default"
+
+    # Resolve outer-seed count.
+    # --outer-seeds N runs the full model set N times, each time using the same
+    # inner-ensemble seeds (ENSEMBLE_SEEDS[:ensemble_size]).  Outer seeds are
+    # drawn from ENSEMBLE_SEEDS roster (first N entries).  Default 1 = single-pass
+    # (backward-compatible with all prior runs).
+    n_outer_seeds: int = getattr(args, "outer_seeds", 1)
+    if n_outer_seeds < 1 or n_outer_seeds > len(ENSEMBLE_SEEDS):
+        sys.exit(f"ERROR: --outer-seeds must be in [1, {len(ENSEMBLE_SEEDS)}]; got {n_outer_seeds}")
+    outer_seed_list: list[int] = list(ENSEMBLE_SEEDS[:n_outer_seeds])
+
     print(f"v1 RUNNER mode={mode_label} iteration={iteration_label}")
     print(f"  symbols: {symbols}")
     print(f"  ENSEMBLE_SIZE: {ensemble_size}")
     print(f"  ensemble_seeds: {_derive_ensemble_seeds(ensemble_size)}")
     print(f"  n_trials per cell: {n_trials}")
-    print(f"  V1_FEATURE_COLUMNS: {len(V1_FEATURE_COLUMNS)} columns")
+    print(f"  feature_columns: {len(active_feature_columns)} columns")
+    print(f"  bounds_profile: {bounds_profile}")
+    print(f"  outer_seeds: {outer_seed_list} ({n_outer_seeds} outer seed(s))")
     print(f"  V1_EXCLUDED_SYMBOLS: {V1_EXCLUDED_SYMBOLS}")
     print()
+
+    # Validate active feature list is non-empty (hard guard per feature-pinning rules).
+    if not active_feature_columns:
+        sys.exit("ERROR: active_feature_columns is empty — cannot train.")
 
     # A7 guard — clear stale OOF parquet from any prior run before training starts.
     # optimization.py appends rows; a leftover file from a crashed/partial run would
     # silently pollute the PCA-N_eff matrix with rows from a different trial budget.
     OOF_PARQUET_PATH.unlink(missing_ok=True)
 
-    # Determine per-symbol model assignments
-    # V1_BASELINE_UNIVERSE = (BTC, ETH, LINK, LTC, DOT)
-    # Models: A (pooled BTC+ETH), C (LINK), D (LTC), E (DOT)
-    # For non-baseline universes, each symbol gets its own model unless
-    # the brief specifies pooling (iter-v1/NNN brief Section 3 controls).
-    if set(symbols) == set(V1_BASELINE_UNIVERSE):
-        results_a = run_model(
-            "A (BTC/ETH)",
-            ("BTCUSDT", "ETHUSDT"),
-            atr_tp=2.9,
-            atr_sl=1.45,
-            apply_r1=False,
-            n_trials=n_trials,
-            ensemble_size=ensemble_size,
-            oof_persist_path=OOF_PARQUET_PATH,
-        )
-        results_c = run_model(
-            "C (LINK + R1)",
-            ("LINKUSDT",),
-            atr_tp=3.5,
-            atr_sl=1.75,
-            apply_r1=True,
-            n_trials=n_trials,
-            ensemble_size=ensemble_size,
-            oof_persist_path=OOF_PARQUET_PATH,
-        )
-        results_d = run_model(
-            "D (LTC + R1)",
-            ("LTCUSDT",),
-            atr_tp=3.5,
-            atr_sl=1.75,
-            apply_r1=True,
-            n_trials=n_trials,
-            ensemble_size=ensemble_size,
-            oof_persist_path=OOF_PARQUET_PATH,
-        )
-        results_e = run_model(
-            "E (DOT + R1 + R2)",
-            ("DOTUSDT",),
-            atr_tp=3.5,
-            atr_sl=1.75,
-            apply_r1=True,
-            apply_r2=True,
-            n_trials=n_trials,
-            ensemble_size=ensemble_size,
-            oof_persist_path=OOF_PARQUET_PATH,
-        )
-        all_results = results_a + results_c + results_d + results_e
-        breakdown = (
-            f"({len(results_a)} A + {len(results_c)} C + {len(results_d)} D + {len(results_e)} E)"
-        )
-    else:
-        # Custom universe — single pooled model unless brief specifies otherwise.
-        # iter-v1/NNN brief Section 3 should declare per-symbol model assignment.
-        results = run_model(
-            "POOLED",
-            symbols,
-            atr_tp=2.9,
-            atr_sl=1.45,
-            apply_r1=False,
-            n_trials=n_trials,
-            ensemble_size=ensemble_size,
-            oof_persist_path=OOF_PARQUET_PATH,
-        )
-        all_results = results
-        breakdown = f"(POOLED {len(results)} trades across {len(symbols)} symbols)"
+    # -------------------------------------------------------------------------
+    # Outer-seed loop.
+    #
+    # For iter-v1/002 multi-seed HIGH-RISK mitigation (brief Section 2.5.1):
+    #   --outer-seeds 2 → outer_seed_list = [42, 123]
+    #   Each outer seed uses the same inner-ensemble seeds from ENSEMBLE_SEEDS roster.
+    #
+    # The brief specifies: "outer seeds [42, 123]; inner-ensemble seeds per
+    # outer-seed: [42, 123, 456] (consistent with v1 EXPLORATION default of 3-inner)."
+    # Both outer seeds run identically configured models and share the same
+    # OOF_PARQUET_PATH accumulation (appended, not replaced).  Trade results
+    # are unioned across all outer seeds before report generation.
+    #
+    # When n_outer_seeds=1 (default) this collapses to the original single-pass
+    # flow with zero change in wall-clock or output.
+    # -------------------------------------------------------------------------
+    all_results = []
+    for outer_idx, _outer_seed in enumerate(outer_seed_list):
+        if n_outer_seeds > 1:
+            print(f"\n{'=' * 60}")
+            print(f"OUTER SEED {outer_idx + 1}/{n_outer_seeds} (seed={_outer_seed})")
+            print(f"{'=' * 60}\n")
+
+        # Determine per-symbol model assignments
+        # V1_BASELINE_UNIVERSE = (BTC, ETH, LINK, LTC, DOT)
+        # Models: A (pooled BTC+ETH), C (LINK), D (LTC), E (DOT)
+        # For non-baseline universes, each symbol gets its own model unless
+        # the brief specifies pooling (iter-v1/NNN brief Section 3 controls).
+        if set(symbols) == set(V1_BASELINE_UNIVERSE):
+            results_a = run_model(
+                f"A (BTC/ETH) outer={_outer_seed}" if n_outer_seeds > 1 else "A (BTC/ETH)",
+                ("BTCUSDT", "ETHUSDT"),
+                atr_tp=2.9,
+                atr_sl=1.45,
+                apply_r1=False,
+                n_trials=n_trials,
+                ensemble_size=ensemble_size,
+                oof_persist_path=OOF_PARQUET_PATH,
+                feature_columns=active_feature_columns,
+                bounds_profile=bounds_profile,
+            )
+            results_c = run_model(
+                f"C (LINK + R1) outer={_outer_seed}" if n_outer_seeds > 1 else "C (LINK + R1)",
+                ("LINKUSDT",),
+                atr_tp=3.5,
+                atr_sl=1.75,
+                apply_r1=True,
+                n_trials=n_trials,
+                ensemble_size=ensemble_size,
+                oof_persist_path=OOF_PARQUET_PATH,
+                feature_columns=active_feature_columns,
+                bounds_profile=bounds_profile,
+            )
+            results_d = run_model(
+                f"D (LTC + R1) outer={_outer_seed}" if n_outer_seeds > 1 else "D (LTC + R1)",
+                ("LTCUSDT",),
+                atr_tp=3.5,
+                atr_sl=1.75,
+                apply_r1=True,
+                n_trials=n_trials,
+                ensemble_size=ensemble_size,
+                oof_persist_path=OOF_PARQUET_PATH,
+                feature_columns=active_feature_columns,
+                bounds_profile=bounds_profile,
+            )
+            results_e = run_model(
+                (
+                    f"E (DOT + R1 + R2) outer={_outer_seed}"
+                    if n_outer_seeds > 1
+                    else "E (DOT + R1 + R2)"
+                ),
+                ("DOTUSDT",),
+                atr_tp=3.5,
+                atr_sl=1.75,
+                apply_r1=True,
+                apply_r2=True,
+                n_trials=n_trials,
+                ensemble_size=ensemble_size,
+                oof_persist_path=OOF_PARQUET_PATH,
+                feature_columns=active_feature_columns,
+                bounds_profile=bounds_profile,
+            )
+            seed_results = results_a + results_c + results_d + results_e
+            if n_outer_seeds > 1:
+                print(
+                    f"\nOuter seed {_outer_seed}: {len(seed_results)} trades "
+                    f"({len(results_a)} A + {len(results_c)} C + "
+                    f"{len(results_d)} D + {len(results_e)} E)"
+                )
+        else:
+            # Custom universe — single pooled model unless brief specifies otherwise.
+            # iter-v1/NNN brief Section 3 should declare per-symbol model assignment.
+            seed_results = run_model(
+                f"POOLED outer={_outer_seed}" if n_outer_seeds > 1 else "POOLED",
+                symbols,
+                atr_tp=2.9,
+                atr_sl=1.45,
+                apply_r1=False,
+                n_trials=n_trials,
+                ensemble_size=ensemble_size,
+                oof_persist_path=OOF_PARQUET_PATH,
+                feature_columns=active_feature_columns,
+                bounds_profile=bounds_profile,
+            )
+
+        all_results.extend(seed_results)
+
+    breakdown = f"({len(all_results)} trades across {n_outer_seeds} outer seed(s))"
 
     all_results.sort(key=lambda t: t.close_time)
     print(f"\nCombined: {len(all_results)} trades {breakdown}")
     if not all_results:
         sys.exit(1)
+
+    # Per-outer-seed trade-count breakdown for multi-seed runs (informational).
+    if n_outer_seeds > 1:
+        print(
+            f"[run_baseline_v1] Multi-seed summary: {n_outer_seeds} outer seeds "
+            f"× {ensemble_size} inner ensemble seeds × {n_trials} Optuna trials. "
+            f"Total trades unioned: {len(all_results)}."
+        )
 
     # Reports written to reports-v1/iteration_v1-<label>/ (parallel to v2/v3 layout).
     report_dir = generate_iteration_reports(
@@ -767,11 +900,13 @@ def main() -> None:
         features_dir="data/features",
         interval="8h",
         oof_parquet_path=OOF_PARQUET_PATH,
+        feature_columns=active_feature_columns,
     )
 
     print(
         f"\nMode: {mode_label}. ENSEMBLE_SIZE={ensemble_size}. n_trials={n_trials}. "
-        f"Iteration: {iteration_label}."
+        f"outer_seeds={n_outer_seeds}. features={len(active_feature_columns)}. "
+        f"bounds={bounds_profile}. Iteration: {iteration_label}."
     )
     if mode_label == "BASELINE":
         print(

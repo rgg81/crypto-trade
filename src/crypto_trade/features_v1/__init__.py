@@ -70,8 +70,73 @@ V1_BASELINE_UNIVERSE: tuple[str, ...] = (
 # (NEVER pass None — column ordering matters for LightGBM colsample_bytree).
 V1_FEATURE_COLUMNS: tuple[str, ...] = tuple(BASELINE_FEATURE_COLUMNS)
 
+# iter-v1/002: IC-pruned feature set (193 → 40 features).
+# Produced by analysis/iteration_v1-002/ic_pruning_audit.py (committed e71ef74).
+# Applied LM Master Phase 4.5 swap: drop mom_mom_5, add stat_kurtosis_20.
+# Selection criteria:
+#   - Eliminates all 3 cross-family IC > 0.70 pairs (MR↔momentum +0.85,
+#     trend↔volatility +0.82, trend↔volume -0.72).
+#   - Drops all 13 raw-α ADF-failing features (trend EMAs/SMAs + cumulative
+#     volume primitives).
+#   - Within-family sister-window deduplication to one representative per
+#     sub-family kernel.
+# Properties: 40/40 pass ADF raw-α=0.05 stationarity; alphabetically sorted.
+# DO NOT MODIFY V1_FEATURE_COLUMNS — this is an ADDITIONAL constant.
+V1_FEATURE_COLUMNS_PRUNED: tuple[str, ...] = (
+    "cal_dow_norm",
+    "cal_hour_norm",
+    "interact_natr_x_adx",
+    "interact_ret1_x_natr",
+    "interact_ret1_x_ret3",
+    "interact_rsi_x_adx",
+    "interact_rsi_x_natr",
+    "interact_stoch_x_adx",
+    "mom_macd_hist_12_26_9",
+    "mom_macd_line_12_26_9",
+    "mom_roc_10",
+    "mom_rsi_14",
+    "mom_stoch_d_14",
+    "mom_stoch_k_14",
+    "mom_willr_14",
+    "mr_pct_from_high_20",
+    "mr_pct_from_low_20",
+    "mr_rsi_extreme_14",
+    "stat_autocorr_lag5",
+    "stat_kurtosis_20",  # LM Master Phase 4.5 swap: drop mom_mom_5, add stat_kurtosis_20
+    "stat_log_return_1",
+    "stat_return_5",
+    "stat_skew_20",
+    "trend_adx_14",
+    "trend_aroon_osc_14",
+    "trend_aroon_osc_50",
+    "trend_ema_cross_5_12",
+    "trend_minus_di_14",
+    "trend_plus_di_14",
+    "trend_supertrend_14_3",
+    "vol_atr_14",
+    "vol_bb_bandwidth_20",
+    "vol_cmf_14",
+    "vol_mfi_14",
+    "vol_natr_14",
+    "vol_range_spike_24",
+    "vol_range_spike_72",
+    "vol_taker_buy_ratio",
+    "vol_volume_pctchg_5",
+    "vol_volume_rel_20",
+)
+
+# Sanity guard: confirm the pruned set has exactly 40 features.
+assert len(V1_FEATURE_COLUMNS_PRUNED) == 40, (
+    f"V1_FEATURE_COLUMNS_PRUNED must have exactly 40 features; got {len(V1_FEATURE_COLUMNS_PRUNED)}"
+)
+
 # Out-of-distribution detection feature subset (16 scale-invariant features
 # used by the R3 Mahalanobis gate). Re-exported for v1 runner.
+# CRITICAL: V1_OOD_FEATURE_COLUMNS is DECOUPLED from V1_FEATURE_COLUMNS_PRUNED.
+# Only 3 of 16 OOD features overlap with the pruned set; the other 13 are loaded
+# from the full parquet column set (lgbm.py:576 reads from train_feat_df.columns
+# which is the full parquet, NOT the 40-pruned feature_columns subset).
+# DO NOT substitute V1_FEATURE_COLUMNS_PRUNED as ood_features in the runner.
 V1_OOD_FEATURE_COLUMNS: tuple[str, ...] = tuple(OOD_FEATURE_COLUMNS)
 
 # ---------------------------------------------------------------------------
@@ -97,6 +162,7 @@ __all__ = [
     "V1_EXCLUDED_SYMBOLS",
     "V1_BASELINE_UNIVERSE",
     "V1_FEATURE_COLUMNS",
+    "V1_FEATURE_COLUMNS_PRUNED",
     "V1_OOD_FEATURE_COLUMNS",
     "assert_v1_universe",
 ]

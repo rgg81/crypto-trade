@@ -191,6 +191,7 @@ def _objective(
     train_month: str = "",
     symbols_arr: np.ndarray | None = None,
     oof_buffer: list[dict] | None = None,
+    bounds_profile: str = "default",
 ) -> float:
     from sklearn.model_selection import TimeSeriesSplit
 
@@ -206,17 +207,28 @@ def _objective(
     # iter-v3/007 fast_mode: hardcode colsample_bytree=1.0 (skip Optuna suggest)
     # to minimize per-seed feature-subsampling variance during fast exploration.
     # Production runs (fast_mode=False) keep colsample in the search space.
+    #
+    # bounds_profile — selects the Optuna search bounds for key hyperparameters:
+    #   "default"   — original bounds calibrated for the 193-feature v1/v2/v3 stack.
+    #   "v1_pruned" — tighter bounds for iter-v1/002+ 40-feature pruned set per LM
+    #                 Master Phase 4.5 Recs #1–3:
+    #                   num_leaves upper 127 → 63  (depth-5 max = 31 leaves; 63 is 2×)
+    #                   colsample_bytree lower 0.3 → 0.5  (40 deduped features; IC-stripped)
+    #                   min_child_samples lower 5 → 20    (regularise small per-cell windows)
+    #                 max_depth [3,5] UNCHANGED (Rec #4 adopted as no-op).
+    #   Unknown profiles fall back to "default" silently (forward-compat).
+    _pruned = bounds_profile == "v1_pruned"
     fast_mode = trial.study.user_attrs.get("fast_mode", False)
     params = {
         "n_estimators": trial.suggest_int("n_estimators", 50, 500),
         "max_depth": trial.suggest_int("max_depth", 3, 5),
-        "num_leaves": trial.suggest_int("num_leaves", 15, 127),
+        "num_leaves": trial.suggest_int("num_leaves", 15, 63 if _pruned else 127),
         "learning_rate": trial.suggest_float("learning_rate", 0.01, 0.3, log=True),
         "subsample": trial.suggest_float("subsample", 0.5, 1.0),
         "colsample_bytree": 1.0
         if fast_mode
-        else trial.suggest_float("colsample_bytree", 0.3, 1.0),
-        "min_child_samples": trial.suggest_int("min_child_samples", 5, 100),
+        else trial.suggest_float("colsample_bytree", 0.5 if _pruned else 0.3, 1.0),
+        "min_child_samples": trial.suggest_int("min_child_samples", 20 if _pruned else 5, 100),
         "reg_alpha": trial.suggest_float("reg_alpha", 1e-8, 10.0, log=True),
         "reg_lambda": trial.suggest_float("reg_lambda", 1e-8, 10.0, log=True),
         "random_state": seed,
@@ -354,6 +366,7 @@ def optimize_and_train(
     train_month: str = "",
     symbols_arr: np.ndarray | None = None,
     fast_mode: bool = False,
+    bounds_profile: str = "default",
 ) -> tuple[lgb.LGBMClassifier, list[str], float]:
     """Run Optuna optimization and return (model, columns, confidence_threshold).
 
@@ -367,6 +380,13 @@ def optimize_and_train(
     oof_persist_path: if set, per-trial OOF candle returns are appended to
     this parquet file after study.optimize() returns (sub-fix 1b, iter-v3/003).
     train_month and symbols_arr are embedded in each row for multi-symbol grouping.
+
+    bounds_profile: selects the Optuna hyperparameter search bounds.
+        "default"   — original bounds for the 193-feature v1/v2/v3 stack.
+        "v1_pruned" — tighter bounds for iter-v1/002+ 40-feature pruned set per
+                      LM Master Phase 4.5 Recs #1–3 (num_leaves≤63,
+                      colsample≥0.5, min_child_samples≥20). v3 and v2 are
+                      NOT affected — they continue with "default".
     """
     import optuna
 
@@ -402,6 +422,7 @@ def optimize_and_train(
             train_month=train_month,
             symbols_arr=symbols_arr,
             oof_buffer=oof_buffer,
+            bounds_profile=bounds_profile,
         ),
         n_trials=n_trials,
     )
@@ -438,9 +459,7 @@ def optimize_and_train(
         else:
             combined = new_df
         # Write to a sibling temp file, then atomically replace the target.
-        tmp_fd, tmp_name = tempfile.mkstemp(
-            dir=oof_persist_path.parent, suffix=".parquet.tmp"
-        )
+        tmp_fd, tmp_name = tempfile.mkstemp(dir=oof_persist_path.parent, suffix=".parquet.tmp")
         try:
             os.close(tmp_fd)
             combined.to_parquet(tmp_name, index=False)
