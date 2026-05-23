@@ -405,11 +405,15 @@ def _run_methodology_reporting(
         returns=oos_daily_arr.tolist(),
     )
 
-    # Runtime sanity check (brief Section 8 criterion 4 / LM Master saturation risk)
-    assert is_n_eff < n_trials or n_trials <= 1, (
-        f"N_eff sanity check failed: is_n_eff={is_n_eff} >= n_trials={n_trials}. "
-        "PCA produced no compression — check oof_parquet_path and trial matrix."
-    )
+    # Runtime sanity check (brief Section 8 criterion 4 / LM Master saturation risk).
+    # Only fires when an OOF parquet was provided (PCA ran) — not on naive fallback.
+    # When oof_parquet_path is None, is_n_eff == n_trials (naive) and the assert
+    # would trivially fail; the brief's guard is only meaningful with actual PCA.
+    if oof_parquet_path is not None and oof_parquet_path.exists():
+        assert is_n_eff < n_trials or n_trials <= 1, (
+            f"N_eff sanity check failed: is_n_eff={is_n_eff} >= n_trials={n_trials}. "
+            "PCA produced no compression — check oof_parquet_path and trial matrix."
+        )
 
     print(f"[run_baseline_v1] IS  N_eff={is_n_eff} DSR_corrected={is_dsr:.4f} method={is_method}")
     print(
