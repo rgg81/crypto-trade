@@ -631,19 +631,6 @@ def main() -> None:
             "LM Master Phase 4.5 Recs #1–3. Introduced for iter-v1/002."
         ),
     )
-    parser.add_argument(
-        "--outer-seeds",
-        type=int,
-        default=1,
-        help=(
-            "Number of outer seeds for multi-seed validation. Default=1 (current "
-            "single-pass behavior). Set to 2 for iter-v1/002's HIGH-RISK "
-            "mitigation (outer seeds [42, 123], each running ENSEMBLE_SIZE inner "
-            "models). Each outer seed uses the same inner-ensemble seed roster "
-            "([42, 123, ...] up to ENSEMBLE_SIZE); results are averaged across "
-            "outer seeds. Wall-clock scales linearly."
-        ),
-    )
     args = parser.parse_args()
 
     # Resolve symbols
@@ -716,16 +703,6 @@ def main() -> None:
         active_feature_columns = list(V1_FEATURE_COLUMNS)
         bounds_profile = "default"
 
-    # Resolve outer-seed count.
-    # --outer-seeds N runs the full model set N times, each time using the same
-    # inner-ensemble seeds (ENSEMBLE_SEEDS[:ensemble_size]).  Outer seeds are
-    # drawn from ENSEMBLE_SEEDS roster (first N entries).  Default 1 = single-pass
-    # (backward-compatible with all prior runs).
-    n_outer_seeds: int = getattr(args, "outer_seeds", 1)
-    if n_outer_seeds < 1 or n_outer_seeds > len(ENSEMBLE_SEEDS):
-        sys.exit(f"ERROR: --outer-seeds must be in [1, {len(ENSEMBLE_SEEDS)}]; got {n_outer_seeds}")
-    outer_seed_list: list[int] = list(ENSEMBLE_SEEDS[:n_outer_seeds])
-
     print(f"v1 RUNNER mode={mode_label} iteration={iteration_label}")
     print(f"  symbols: {symbols}")
     print(f"  ENSEMBLE_SIZE: {ensemble_size}")
@@ -733,7 +710,6 @@ def main() -> None:
     print(f"  n_trials per cell: {n_trials}")
     print(f"  feature_columns: {len(active_feature_columns)} columns")
     print(f"  bounds_profile: {bounds_profile}")
-    print(f"  outer_seeds: {outer_seed_list} ({n_outer_seeds} outer seed(s))")
     print(f"  V1_EXCLUDED_SYMBOLS: {V1_EXCLUDED_SYMBOLS}")
     print()
 
@@ -747,126 +723,91 @@ def main() -> None:
     OOF_PARQUET_PATH.unlink(missing_ok=True)
 
     # -------------------------------------------------------------------------
-    # Outer-seed loop.
+    # Single-pass flat model loop.
     #
-    # For iter-v1/002 multi-seed HIGH-RISK mitigation (brief Section 2.5.1):
-    #   --outer-seeds 2 → outer_seed_list = [42, 123]
-    #   Each outer seed uses the same inner-ensemble seeds from ENSEMBLE_SEEDS roster.
+    # v1 skill design: EXPLORATION = ENSEMBLE_SIZE=3 inner seeds, single-pass.
+    #                  CONFIRMATION = ENSEMBLE_SIZE=10 inner seeds, single-pass.
+    # HIGH-RISK mitigation (iter-v1/002): opt-in to --ensemble-size 10 (CONFIRMATION-
+    # grade inner ensemble) via CLI flag; NO outer-seed loop.
     #
-    # The brief specifies: "outer seeds [42, 123]; inner-ensemble seeds per
-    # outer-seed: [42, 123, 456] (consistent with v1 EXPLORATION default of 3-inner)."
-    # Both outer seeds run identically configured models and share the same
-    # OOF_PARQUET_PATH accumulation (appended, not replaced).  Trade results
-    # are unioned across all outer seeds before report generation.
-    #
-    # When n_outer_seeds=1 (default) this collapses to the original single-pass
-    # flow with zero change in wall-clock or output.
+    # V1_BASELINE_UNIVERSE = (BTC, ETH, LINK, LTC, DOT)
+    # Models: A (pooled BTC+ETH), C (LINK), D (LTC), E (DOT)
+    # For non-baseline universes, each symbol gets its own model unless
+    # the brief specifies pooling (iter-v1/NNN brief Section 3 controls).
     # -------------------------------------------------------------------------
-    all_results = []
-    for outer_idx, _outer_seed in enumerate(outer_seed_list):
-        if n_outer_seeds > 1:
-            print(f"\n{'=' * 60}")
-            print(f"OUTER SEED {outer_idx + 1}/{n_outer_seeds} (seed={_outer_seed})")
-            print(f"{'=' * 60}\n")
+    all_results: list = []
 
-        # Determine per-symbol model assignments
-        # V1_BASELINE_UNIVERSE = (BTC, ETH, LINK, LTC, DOT)
-        # Models: A (pooled BTC+ETH), C (LINK), D (LTC), E (DOT)
-        # For non-baseline universes, each symbol gets its own model unless
-        # the brief specifies pooling (iter-v1/NNN brief Section 3 controls).
-        if set(symbols) == set(V1_BASELINE_UNIVERSE):
-            results_a = run_model(
-                f"A (BTC/ETH) outer={_outer_seed}" if n_outer_seeds > 1 else "A (BTC/ETH)",
-                ("BTCUSDT", "ETHUSDT"),
-                atr_tp=2.9,
-                atr_sl=1.45,
-                apply_r1=False,
-                n_trials=n_trials,
-                ensemble_size=ensemble_size,
-                oof_persist_path=OOF_PARQUET_PATH,
-                feature_columns=active_feature_columns,
-                bounds_profile=bounds_profile,
-            )
-            results_c = run_model(
-                f"C (LINK + R1) outer={_outer_seed}" if n_outer_seeds > 1 else "C (LINK + R1)",
-                ("LINKUSDT",),
-                atr_tp=3.5,
-                atr_sl=1.75,
-                apply_r1=True,
-                n_trials=n_trials,
-                ensemble_size=ensemble_size,
-                oof_persist_path=OOF_PARQUET_PATH,
-                feature_columns=active_feature_columns,
-                bounds_profile=bounds_profile,
-            )
-            results_d = run_model(
-                f"D (LTC + R1) outer={_outer_seed}" if n_outer_seeds > 1 else "D (LTC + R1)",
-                ("LTCUSDT",),
-                atr_tp=3.5,
-                atr_sl=1.75,
-                apply_r1=True,
-                n_trials=n_trials,
-                ensemble_size=ensemble_size,
-                oof_persist_path=OOF_PARQUET_PATH,
-                feature_columns=active_feature_columns,
-                bounds_profile=bounds_profile,
-            )
-            results_e = run_model(
-                (
-                    f"E (DOT + R1 + R2) outer={_outer_seed}"
-                    if n_outer_seeds > 1
-                    else "E (DOT + R1 + R2)"
-                ),
-                ("DOTUSDT",),
-                atr_tp=3.5,
-                atr_sl=1.75,
-                apply_r1=True,
-                apply_r2=True,
-                n_trials=n_trials,
-                ensemble_size=ensemble_size,
-                oof_persist_path=OOF_PARQUET_PATH,
-                feature_columns=active_feature_columns,
-                bounds_profile=bounds_profile,
-            )
-            seed_results = results_a + results_c + results_d + results_e
-            if n_outer_seeds > 1:
-                print(
-                    f"\nOuter seed {_outer_seed}: {len(seed_results)} trades "
-                    f"({len(results_a)} A + {len(results_c)} C + "
-                    f"{len(results_d)} D + {len(results_e)} E)"
-                )
-        else:
-            # Custom universe — single pooled model unless brief specifies otherwise.
-            # iter-v1/NNN brief Section 3 should declare per-symbol model assignment.
-            seed_results = run_model(
-                f"POOLED outer={_outer_seed}" if n_outer_seeds > 1 else "POOLED",
-                symbols,
-                atr_tp=2.9,
-                atr_sl=1.45,
-                apply_r1=False,
-                n_trials=n_trials,
-                ensemble_size=ensemble_size,
-                oof_persist_path=OOF_PARQUET_PATH,
-                feature_columns=active_feature_columns,
-                bounds_profile=bounds_profile,
-            )
-
-        all_results.extend(seed_results)
-
-    breakdown = f"({len(all_results)} trades across {n_outer_seeds} outer seed(s))"
+    if set(symbols) == set(V1_BASELINE_UNIVERSE):
+        results_a = run_model(
+            "A (BTC/ETH)",
+            ("BTCUSDT", "ETHUSDT"),
+            atr_tp=2.9,
+            atr_sl=1.45,
+            apply_r1=False,
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+        )
+        results_c = run_model(
+            "C (LINK + R1)",
+            ("LINKUSDT",),
+            atr_tp=3.5,
+            atr_sl=1.75,
+            apply_r1=True,
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+        )
+        results_d = run_model(
+            "D (LTC + R1)",
+            ("LTCUSDT",),
+            atr_tp=3.5,
+            atr_sl=1.75,
+            apply_r1=True,
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+        )
+        results_e = run_model(
+            "E (DOT + R1 + R2)",
+            ("DOTUSDT",),
+            atr_tp=3.5,
+            atr_sl=1.75,
+            apply_r1=True,
+            apply_r2=True,
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+        )
+        all_results = results_a + results_c + results_d + results_e
+    else:
+        # Custom universe — single pooled model unless brief specifies otherwise.
+        # iter-v1/NNN brief Section 3 should declare per-symbol model assignment.
+        all_results = run_model(
+            "POOLED",
+            symbols,
+            atr_tp=2.9,
+            atr_sl=1.45,
+            apply_r1=False,
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+        )
 
     all_results.sort(key=lambda t: t.close_time)
-    print(f"\nCombined: {len(all_results)} trades {breakdown}")
+    print(f"\nCombined: {len(all_results)} trades")
     if not all_results:
         sys.exit(1)
-
-    # Per-outer-seed trade-count breakdown for multi-seed runs (informational).
-    if n_outer_seeds > 1:
-        print(
-            f"[run_baseline_v1] Multi-seed summary: {n_outer_seeds} outer seeds "
-            f"× {ensemble_size} inner ensemble seeds × {n_trials} Optuna trials. "
-            f"Total trades unioned: {len(all_results)}."
-        )
 
     # Reports written to reports-v1/iteration_v1-<label>/ (parallel to v2/v3 layout).
     report_dir = generate_iteration_reports(
@@ -905,7 +846,7 @@ def main() -> None:
 
     print(
         f"\nMode: {mode_label}. ENSEMBLE_SIZE={ensemble_size}. n_trials={n_trials}. "
-        f"outer_seeds={n_outer_seeds}. features={len(active_feature_columns)}. "
+        f"features={len(active_feature_columns)}. "
         f"bounds={bounds_profile}. Iteration: {iteration_label}."
     )
     if mode_label == "BASELINE":

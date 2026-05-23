@@ -10,7 +10,6 @@ Covers:
 - LM Master swap applied (mom_mom_5 absent, stat_kurtosis_20 present)
 - Pruned set is alphabetically sorted (required for deterministic column ordering)
 - --pruned-features CLI flag toggles feature_columns to V1_FEATURE_COLUMNS_PRUNED
-- --outer-seeds CLI flag toggles outer_seed_list
 - Optuna bounds profile "v1_pruned" applies tighter bounds vs "default"
 
 Run:
@@ -21,8 +20,6 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-
-import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -158,7 +155,6 @@ class TestPrunedFeaturesCliFlag:
         parser.add_argument("--ensemble-size", type=int, default=None)
         parser.add_argument("--symbols", type=str, default=None)
         parser.add_argument("--pruned-features", action="store_true")
-        parser.add_argument("--outer-seeds", type=int, default=1)
         args = parser.parse_args(argv)
 
         from crypto_trade.features_v1 import V1_FEATURE_COLUMNS, V1_FEATURE_COLUMNS_PRUNED
@@ -195,60 +191,6 @@ class TestPrunedFeaturesCliFlag:
         )
         result_default = self._parse_and_resolve_features(["--exploration", "--iteration", "2"])
         assert len(result_pruned["feature_columns"]) != len(result_default["feature_columns"])
-
-
-class TestOuterSeedsCliFlag:
-    """Verify --outer-seeds flag parsing in run_baseline_v1.py."""
-
-    def _parse_outer_seeds(self, argv: list[str]) -> int:
-        """Parse argv and return the resolved n_outer_seeds integer."""
-        import argparse
-
-        parser = argparse.ArgumentParser()
-        parser.add_argument("--iteration", type=int, default=None)
-        parser.add_argument("--baseline-mode", action="store_true")
-        parser.add_argument("--exploration", action="store_true")
-        parser.add_argument("--confirmation", action="store_true")
-        parser.add_argument("--n-trials", type=int, default=35)
-        parser.add_argument("--ensemble-size", type=int, default=None)
-        parser.add_argument("--symbols", type=str, default=None)
-        parser.add_argument("--pruned-features", action="store_true")
-        parser.add_argument("--outer-seeds", type=int, default=1)
-        args = parser.parse_args(argv)
-
-        from run_baseline_v1 import ENSEMBLE_SEEDS
-
-        n_outer_seeds = getattr(args, "outer_seeds", 1)
-        if n_outer_seeds < 1 or n_outer_seeds > len(ENSEMBLE_SEEDS):
-            raise SystemExit(
-                f"ERROR: --outer-seeds must be in [1, {len(ENSEMBLE_SEEDS)}]; got {n_outer_seeds}"
-            )
-        return n_outer_seeds
-
-    def test_default_outer_seeds_is_1(self) -> None:
-        """Without --outer-seeds, default is 1 (single-pass, backward-compatible)."""
-        n = self._parse_outer_seeds(["--exploration", "--iteration", "2"])
-        assert n == 1
-
-    def test_outer_seeds_2_for_iter_v1_002(self) -> None:
-        """--outer-seeds 2 resolves to 2 (iter-v1/002 HIGH-RISK mitigation spec)."""
-        n = self._parse_outer_seeds(
-            ["--exploration", "--iteration", "2", "--pruned-features", "--outer-seeds", "2"]
-        )
-        assert n == 2
-
-    def test_outer_seeds_max_is_10(self) -> None:
-        """--outer-seeds 10 resolves to 10 (ENSEMBLE_SEEDS roster length)."""
-        n = self._parse_outer_seeds(["--exploration", "--iteration", "2", "--outer-seeds", "10"])
-        assert n == 10
-
-    def test_outer_seeds_0_rejected(self) -> None:
-        with pytest.raises(SystemExit, match="must be in"):
-            self._parse_outer_seeds(["--exploration", "--iteration", "2", "--outer-seeds", "0"])
-
-    def test_outer_seeds_11_rejected(self) -> None:
-        with pytest.raises(SystemExit, match="must be in"):
-            self._parse_outer_seeds(["--exploration", "--iteration", "2", "--outer-seeds", "11"])
 
 
 class TestOptunaBoundsProfile:
