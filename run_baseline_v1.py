@@ -101,6 +101,11 @@ V1_CONFIRMATION_ENSEMBLE_SIZE: int = 10
 #: BASELINE_V1.md anchor — the corrected walk-forward stack reproduces this set.
 BASELINE_OOD_CUTOFF_PCT: float = 0.70
 
+#: Stable path for the per-trial OOF return parquet (iter-v1/001 methodology axis).
+#: optimization.py appends rows here when LightGbmStrategy.oof_persist_path is set.
+#: Cleared at runner start to harden against A7 append-accumulation from prior runs.
+OOF_PARQUET_PATH: Path = Path("data") / "v1_iter_001_trial_oof.parquet"
+
 
 def _derive_ensemble_seeds(size: int) -> list[int]:
     """Return the first `size` seeds from the ENSEMBLE_SEEDS roster.
@@ -123,6 +128,7 @@ def run_model(
     apply_r2: bool = False,
     n_trials: int,
     ensemble_size: int,
+    oof_persist_path: Path | None = None,
 ):
     """Run a single v1 sub-model (A/C/D/E) under the corrected walk-forward."""
     print("=" * 60)
@@ -171,6 +177,7 @@ def run_model(
         ood_enabled=True,
         ood_features=list(V1_OOD_FEATURE_COLUMNS),
         ood_cutoff_pct=BASELINE_OOD_CUTOFF_PCT,
+        oof_persist_path=oof_persist_path,
     )
     t0 = time.time()
     results = run_backtest(config, strategy, yearly_pnl_check=False)
@@ -338,6 +345,16 @@ def _run_methodology_reporting(
         Path to the per-trial OOF parquet from optimization.py.  May be None
         when the backtest did not set oof_persist_path (falls back to naive n_trials).
     """
+    # Path Forward #2 (Critic Phase 6.0): fail-fast rather than silently falling back
+    # to naive_fallback, which would mechanically violate brief F3 + Section 8 criterion 4.
+    # The assert fires after the backtest has run, so the parquet must exist by now.
+    assert oof_parquet_path is not None and Path(oof_parquet_path).exists(), (
+        f"oof_parquet_path missing or does not exist: {oof_parquet_path!r} — "
+        "naive_fallback would violate brief F3 + Section 8 criterion 4 "
+        "(n_eff = n_trials_naive triggers NO-MERGE). "
+        "Ensure oof_persist_path=OOF_PARQUET_PATH is passed to every LightGbmStrategy call."
+    )
+
     print("\n[run_baseline_v1] === iter-v1/001 methodology reporting ===")
 
     # Split trades
@@ -588,6 +605,11 @@ def main() -> None:
     print(f"  V1_EXCLUDED_SYMBOLS: {V1_EXCLUDED_SYMBOLS}")
     print()
 
+    # A7 guard — clear stale OOF parquet from any prior run before training starts.
+    # optimization.py appends rows; a leftover file from a crashed/partial run would
+    # silently pollute the PCA-N_eff matrix with rows from a different trial budget.
+    OOF_PARQUET_PATH.unlink(missing_ok=True)
+
     # Determine per-symbol model assignments
     # V1_BASELINE_UNIVERSE = (BTC, ETH, LINK, LTC, DOT)
     # Models: A (pooled BTC+ETH), C (LINK), D (LTC), E (DOT)
@@ -602,6 +624,7 @@ def main() -> None:
             apply_r1=False,
             n_trials=n_trials,
             ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
         )
         results_c = run_model(
             "C (LINK + R1)",
@@ -611,6 +634,7 @@ def main() -> None:
             apply_r1=True,
             n_trials=n_trials,
             ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
         )
         results_d = run_model(
             "D (LTC + R1)",
@@ -620,6 +644,7 @@ def main() -> None:
             apply_r1=True,
             n_trials=n_trials,
             ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
         )
         results_e = run_model(
             "E (DOT + R1 + R2)",
@@ -630,6 +655,7 @@ def main() -> None:
             apply_r2=True,
             n_trials=n_trials,
             ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
         )
         all_results = results_a + results_c + results_d + results_e
         breakdown = (
@@ -646,6 +672,7 @@ def main() -> None:
             apply_r1=False,
             n_trials=n_trials,
             ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
         )
         all_results = results
         breakdown = f"(POOLED {len(results)} trades across {len(symbols)} symbols)"
@@ -670,10 +697,10 @@ def main() -> None:
     # iter-v1/001 methodology reporting — post-hoc; does NOT change predictions
     # or trade roster. Appends PSR + N_eff rows to comparison.csv and writes
     # dsr.json, adf_test.csv, ic_matrix.csv for both IS and OOS halves.
-    # oof_parquet_path: optimization.py writes this when oof_persist_path is set.
-    # The v1 runner does NOT yet set oof_persist_path in the LightGbmStrategy call
-    # (that wiring lands when the brief explicitly enables it); for now we pass None
-    # and fall back to the naive n_trials DSR correction.
+    # oof_parquet_path: optimization.py appended rows here during training
+    # (oof_persist_path=OOF_PARQUET_PATH was passed to each LightGbmStrategy call).
+    # The same fixed path is passed here so _run_methodology_reporting can load
+    # the PCA-N_eff matrix and avoid the naive_fallback path.
     # -------------------------------------------------------------------------
     is_dir = report_dir / "in_sample"
     oos_dir = report_dir / "out_of_sample"
@@ -686,7 +713,7 @@ def main() -> None:
         symbols=symbols,
         features_dir="data/features",
         interval="8h",
-        oof_parquet_path=None,  # CPCV OOF parquet deferred to iter-v1/002+
+        oof_parquet_path=OOF_PARQUET_PATH,
     )
 
     print(
