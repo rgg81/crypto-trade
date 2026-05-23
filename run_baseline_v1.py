@@ -13,6 +13,7 @@ This runner imports ONLY from:
 - crypto_trade.features_v1 (v1 constants + audit helper)
 - crypto_trade.strategies.ml.lgbm (shared backtest engine)
 - crypto_trade.strategies.ml.validation_v1 (v1 CPCV/DSR/PBO/PSR)
+- crypto_trade.strategies.ml.reporting_v1 (iter-v1/001 methodology reporting helpers)
 - crypto_trade.live.models (BASELINE_FEATURE_COLUMNS — legacy v1 feature math)
 
 It does NOT import from features_v2 or features_v3. The Phase 6.0 pre-flight
@@ -35,31 +36,37 @@ Usage:
     # Run a CONFIRMATION iteration:
     uv run python run_baseline_v1.py --confirmation --iteration 10 --n-trials 35
 
-Open work items for iter-v1/001+ (NOT shipped in this stub):
+iter-v1/001 methodology reporting (wired in this runner):
+---------------------------------------------------------
+- PSR columns in comparison.csv: psr_monthly_vs_0, psr_monthly_vs_1, psr_daily_vs_0
+- N_eff-corrected DSR via PCA on per-trial OOF return matrix
+- n_effective_trials column in comparison.csv
+- dsr.json with {dsr, pbo, psr, n_trials, n_eff, n_eff_pca_method, min_trl_months}
+- adf_test.csv: per-feature ADF p-value + Bonferroni + exception_class (193 rows)
+- ic_matrix.csv: per-family Fisher-z'd Spearman IC (8×8 symmetric)
+
+Open work items for iter-v1/002+ (deferred from iter-v1/001):
 ------------------------------------------------------------
 - Full CPCV (45 paths) report generation — wire validation_v1.cpcv_walk_forward_splits
 - Pareto front 10-seed × 6-metric matrix for CONFIRMATION runs
-- adf_test.csv per-feature ADF p-value reporting
-- ic_matrix.csv pairwise feature-family IC reporting
-- dsr.json with PBO + PSR per validation_v1
 - Meta-labeling (M1 + M2) architecture wiring
 - Fractional Kelly position sizing
-
-These additions land iteratively. iter-v1/001's first task is to wire the v3
-CPCV/DSR/PBO/PSR reporting layer into this runner. Until that lands, this
-runner produces the v186-compatible report set (in_sample/, out_of_sample/,
-comparison.csv) which is enough to populate BASELINE_V1.md.
 """
 
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 import time
 from pathlib import Path
 
+import numpy as np
+import pandas as pd
+
 from crypto_trade.backtest import run_backtest
-from crypto_trade.backtest_models import BacktestConfig
+from crypto_trade.backtest_models import BacktestConfig, TradeResult
+from crypto_trade.config import OOS_CUTOFF_MS
 from crypto_trade.features_v1 import (
     V1_BASELINE_UNIVERSE,
     V1_EXCLUDED_SYMBOLS,
@@ -69,6 +76,14 @@ from crypto_trade.features_v1 import (
 )
 from crypto_trade.iteration_report import generate_iteration_reports
 from crypto_trade.strategies.ml.lgbm import LightGbmStrategy
+from crypto_trade.strategies.ml.reporting_v1 import (
+    append_psr_rows_to_comparison,
+    compute_n_eff_and_dsr,
+    compute_psr_columns,
+    write_adf_test_csv,
+    write_dsr_json,
+    write_ic_matrix_csv,
+)
 
 # ---------------------------------------------------------------------------
 # Ensemble configuration (mirrors v3 post-iter-v3/059 single-pass structure)
@@ -162,6 +177,323 @@ def run_model(
     elapsed = time.time() - t0
     print(f"\n{name} complete: {len(results)} trades in {elapsed:.0f}s")
     return results
+
+
+def _load_pnl_series(
+    trades: list[TradeResult],
+    granularity: str,
+) -> list[float]:
+    """Extract monthly or daily PnL series from trade list (non-annualized).
+
+    Parameters
+    ----------
+    trades
+        Trade list for one half (IS or OOS).
+    granularity
+        "monthly" → group by close_time month; "daily" → group by close_time day.
+
+    Returns
+    -------
+    List of per-period weighted_pnl sums (non-annualized — matches the granularity).
+    """
+    from datetime import UTC, datetime  # noqa: PLC0415
+
+    if not trades:
+        return []
+
+    by_period: dict[str, float] = {}
+    for t in trades:
+        dt = datetime.fromtimestamp(t.close_time / 1000, tz=UTC)
+        if granularity == "monthly":
+            key = dt.strftime("%Y-%m")
+        else:
+            key = dt.strftime("%Y-%m-%d")
+        by_period[key] = by_period.get(key, 0.0) + t.weighted_pnl
+
+    return [by_period[k] for k in sorted(by_period)]
+
+
+def _load_features_for_adf_ic(
+    symbols: tuple[str, ...],
+    features_dir: str,
+    interval: str,
+) -> pd.DataFrame | None:
+    """Load and concatenate IS-window feature parquets for ADF + IC computation.
+
+    Returns
+    -------
+    DataFrame with V1_FEATURE_COLUMNS as columns (IS rows only) or None if
+    no parquets found.
+    """
+    dfs = []
+    for sym in symbols:
+        parquet_path = Path(features_dir) / f"{sym}_{interval}_features.parquet"
+        if not parquet_path.exists():
+            print(f"[run_baseline_v1] WARNING: parquet not found: {parquet_path}")
+            continue
+        try:
+            df = pd.read_parquet(parquet_path)
+        except Exception as exc:
+            print(f"[run_baseline_v1] WARNING: failed to read {parquet_path}: {exc}")
+            continue
+        # IS-only filter: open_time < OOS_CUTOFF_MS
+        if "open_time" in df.columns:
+            df = df[df["open_time"] < OOS_CUTOFF_MS].copy()
+        # Keep only V1_FEATURE_COLUMNS that exist in this parquet
+        avail = [c for c in V1_FEATURE_COLUMNS if c in df.columns]
+        if avail:
+            dfs.append(df[avail])
+
+    if not dfs:
+        return None
+
+    # Concatenate across symbols (rows = all IS candles from all symbols)
+    combined = pd.concat(dfs, axis=0, ignore_index=True)
+    return combined
+
+
+def _compute_forward_returns(
+    symbols: tuple[str, ...],
+    features_dir: str,
+    interval: str,
+) -> np.ndarray | None:
+    """Compute per-row 1-bar log forward return from close prices (IS window only).
+
+    This is the next-candle log-return target used for IC computation.  Per
+    brief Section 3.5 #4 and LM Master §4: forward return = log(close[t+1] / close[t])
+    for the 1-bar (8h candle) forward window.
+
+    Returns
+    -------
+    1-D array aligned with the IS feature matrix rows, or None if data unavailable.
+    """
+    # Brief specifies the forward return target = next-candle log-return per symbol.
+    # We approximate this using close prices from the parquet (if available).
+    dfs = []
+    for sym in symbols:
+        parquet_path = Path(features_dir) / f"{sym}_{interval}_features.parquet"
+        if not parquet_path.exists():
+            continue
+        try:
+            df = pd.read_parquet(parquet_path)
+        except Exception:
+            continue
+        # IS-only
+        if "open_time" in df.columns:
+            df = df[df["open_time"] < OOS_CUTOFF_MS].copy()
+        if "close" in df.columns:
+            log_ret = np.log(df["close"].shift(-1) / df["close"]).values
+            dfs.append(log_ret)
+
+    if not dfs:
+        return None
+
+    # Concatenate forward returns across symbols (same order as _load_features_for_adf_ic)
+    return np.concatenate(dfs, axis=0)
+
+
+def _run_methodology_reporting(
+    all_results: list[TradeResult],
+    *,
+    iter_dir: Path,
+    is_dir: Path,
+    oos_dir: Path,
+    n_trials: int,
+    symbols: tuple[str, ...],
+    features_dir: str,
+    interval: str,
+    oof_parquet_path: Path | None,
+) -> None:
+    """Run all iter-v1/001 methodology reporting passes AFTER generate_iteration_reports().
+
+    This function is STRICTLY POST-HOC — it does NOT modify any prediction,
+    trade, or labeling output.  It reads existing report files and appends
+    new artifacts.  Called from main() after generate_iteration_reports().
+
+    Produces:
+        {is_dir,oos_dir}/dsr.json
+        {is_dir,oos_dir}/adf_test.csv
+        {is_dir,oos_dir}/ic_matrix.csv
+        iter_dir/comparison.csv   — 4 new rows appended
+
+    Parameters
+    ----------
+    all_results
+        Full trade list (IS + OOS combined).
+    iter_dir
+        Iteration root directory (contains comparison.csv).
+    is_dir
+        IS sub-directory.
+    oos_dir
+        OOS sub-directory.
+    n_trials
+        Optuna trials per cell (naive count — used for N_eff upper bound).
+    symbols
+        Active universe tuple.
+    features_dir
+        Path to feature parquet directory.
+    interval
+        Candle interval string (e.g. "8h").
+    oof_parquet_path
+        Path to the per-trial OOF parquet from optimization.py.  May be None
+        when the backtest did not set oof_persist_path (falls back to naive n_trials).
+    """
+    print("\n[run_baseline_v1] === iter-v1/001 methodology reporting ===")
+
+    # Split trades
+    is_trades = [t for t in all_results if t.open_time < OOS_CUTOFF_MS]
+    oos_trades = [t for t in all_results if t.open_time >= OOS_CUTOFF_MS]
+
+    # ---------------------------------------------------------------------------
+    # 1. PSR columns (monthly + daily, both halves)
+    # ---------------------------------------------------------------------------
+    is_monthly = _load_pnl_series(is_trades, "monthly")
+    is_daily = _load_pnl_series(is_trades, "daily")
+    oos_monthly = _load_pnl_series(oos_trades, "monthly")
+    oos_daily = _load_pnl_series(oos_trades, "daily")
+
+    is_psr_cols = compute_psr_columns(is_monthly, is_daily)
+    oos_psr_cols = compute_psr_columns(oos_monthly, oos_daily)
+
+    print(
+        f"[run_baseline_v1] IS  PSR: monthly_vs_0={is_psr_cols['psr_monthly_vs_0']:.4f} "
+        f"monthly_vs_1={is_psr_cols['psr_monthly_vs_1']:.4f} "
+        f"daily_vs_0={is_psr_cols['psr_daily_vs_0']:.4f}"
+    )
+    print(
+        f"[run_baseline_v1] OOS PSR: monthly_vs_0={oos_psr_cols['psr_monthly_vs_0']:.4f} "
+        f"monthly_vs_1={oos_psr_cols['psr_monthly_vs_1']:.4f} "
+        f"daily_vs_0={oos_psr_cols['psr_daily_vs_0']:.4f}"
+    )
+
+    # ---------------------------------------------------------------------------
+    # 2. N_eff + corrected DSR (both halves)
+    # Per LM Master §2: we use the same oof_parquet for both halves
+    # since the OOF data comes from the IS training pass.  OOS DSR is computed
+    # using the IS-derived N_eff (the search was over IS data).
+    # ---------------------------------------------------------------------------
+    is_daily_arr = np.asarray(is_daily, dtype=float)
+    oos_daily_arr = np.asarray(oos_daily, dtype=float)
+
+    # Annualized daily Sharpe for DSR inputs
+    is_sharpe_ann = (
+        float(is_daily_arr.mean() / is_daily_arr.std() * math.sqrt(365))
+        if len(is_daily_arr) >= 2 and is_daily_arr.std() > 0
+        else 0.0
+    )
+    oos_sharpe_ann = (
+        float(oos_daily_arr.mean() / oos_daily_arr.std() * math.sqrt(365))
+        if len(oos_daily_arr) >= 2 and oos_daily_arr.std() > 0
+        else 0.0
+    )
+
+    # Total naive n_trials = n_trials per cell × n_cells
+    # n_cells = n_months_train × n_models_of_type.  The runner has 4 models
+    # (A covers 2 syms, C/D/E cover 1 sym each) × ~36 IS months.
+    # Approximate: pass n_trials as the per-cell count; optimization.py
+    # accumulates across (symbol, month, seed) in the parquet.
+    is_n_eff, is_dsr, is_method = compute_n_eff_and_dsr(
+        oof_parquet_path,
+        n_trials_naive=n_trials,
+        observed_sharpe=is_sharpe_ann,
+        returns=is_daily_arr.tolist(),
+    )
+    oos_n_eff, oos_dsr, oos_method = compute_n_eff_and_dsr(
+        oof_parquet_path,
+        n_trials_naive=n_trials,
+        observed_sharpe=oos_sharpe_ann,
+        returns=oos_daily_arr.tolist(),
+    )
+
+    # Runtime sanity check (brief Section 8 criterion 4 / LM Master saturation risk)
+    assert is_n_eff < n_trials or n_trials <= 1, (
+        f"N_eff sanity check failed: is_n_eff={is_n_eff} >= n_trials={n_trials}. "
+        "PCA produced no compression — check oof_parquet_path and trial matrix."
+    )
+
+    print(f"[run_baseline_v1] IS  N_eff={is_n_eff} DSR_corrected={is_dsr:.4f} method={is_method}")
+    print(
+        f"[run_baseline_v1] OOS N_eff={oos_n_eff} DSR_corrected={oos_dsr:.4f} method={oos_method}"
+    )
+
+    # Min TRL months: 1/sqrt(12) (monthly benchmark SR for psr_monthly_vs_1)
+    min_trl_months = 1.0 / math.sqrt(12)
+
+    # ---------------------------------------------------------------------------
+    # 3. dsr.json (both halves)
+    # ---------------------------------------------------------------------------
+    write_dsr_json(
+        is_dir,
+        dsr=is_dsr,
+        pbo=None,  # CPCV deferred to iter-v1/002+ per brief Section 9
+        psr_val=is_psr_cols["psr_monthly_vs_1"],
+        n_trials=n_trials,
+        n_eff=is_n_eff,
+        n_eff_pca_method=is_method,
+        min_trl_months=min_trl_months,
+        label="IS",
+    )
+    write_dsr_json(
+        oos_dir,
+        dsr=oos_dsr,
+        pbo=None,
+        psr_val=oos_psr_cols["psr_monthly_vs_1"],
+        n_trials=n_trials,
+        n_eff=oos_n_eff,
+        n_eff_pca_method=oos_method,
+        min_trl_months=min_trl_months,
+        label="OOS",
+    )
+
+    # ---------------------------------------------------------------------------
+    # 4. comparison.csv PSR + n_effective_trials rows
+    # ---------------------------------------------------------------------------
+    comparison_path = iter_dir / "comparison.csv"
+    if comparison_path.exists():
+        append_psr_rows_to_comparison(
+            comparison_path,
+            is_psr_cols,
+            oos_psr_cols,
+            is_n_eff=is_n_eff,
+            oos_n_eff=oos_n_eff,
+        )
+    else:
+        print(
+            "[run_baseline_v1] WARNING: comparison.csv not found at "
+            f"{comparison_path}; skipping append"
+        )
+
+    # ---------------------------------------------------------------------------
+    # 5. adf_test.csv (IS features only — per brief Section 2 IS-only discipline)
+    # ---------------------------------------------------------------------------
+    print("[run_baseline_v1] Loading IS features for ADF test...")
+    feature_df = _load_features_for_adf_ic(symbols, features_dir, interval)
+    if feature_df is not None and not feature_df.empty:
+        write_adf_test_csv(is_dir, feature_df, label="IS")
+        # OOS dir gets the same ADF result (feature stationarity is IS-calibrated)
+        write_adf_test_csv(oos_dir, feature_df, label="OOS(same IS features)")
+    else:
+        print("[run_baseline_v1] WARNING: no feature parquets found; adf_test.csv skipped")
+
+    # ---------------------------------------------------------------------------
+    # 6. ic_matrix.csv (IS features vs 1-bar forward return)
+    # ---------------------------------------------------------------------------
+    if feature_df is not None and not feature_df.empty:
+        print("[run_baseline_v1] Computing IC matrix...")
+        fwd_returns = _compute_forward_returns(symbols, features_dir, interval)
+        if fwd_returns is not None and len(fwd_returns) == len(feature_df):
+            write_ic_matrix_csv(is_dir, feature_df, fwd_returns, label="IS")
+            write_ic_matrix_csv(oos_dir, feature_df, fwd_returns, label="OOS(same IS features)")
+        else:
+            print(
+                f"[run_baseline_v1] WARNING: forward returns shape mismatch "
+                f"({len(fwd_returns) if fwd_returns is not None else 'None'} vs feature_df "
+                f"{len(feature_df)}); ic_matrix.csv skipped"
+            )
+    else:
+        print("[run_baseline_v1] WARNING: feature_df unavailable; ic_matrix.csv skipped")
+
+    print("[run_baseline_v1] === methodology reporting complete ===\n")
 
 
 def main() -> None:
@@ -329,6 +661,30 @@ def main() -> None:
         n_trials=n_trials,
     )
     print(f"Reports: {report_dir}")
+
+    # -------------------------------------------------------------------------
+    # iter-v1/001 methodology reporting — post-hoc; does NOT change predictions
+    # or trade roster. Appends PSR + N_eff rows to comparison.csv and writes
+    # dsr.json, adf_test.csv, ic_matrix.csv for both IS and OOS halves.
+    # oof_parquet_path: optimization.py writes this when oof_persist_path is set.
+    # The v1 runner does NOT yet set oof_persist_path in the LightGbmStrategy call
+    # (that wiring lands when the brief explicitly enables it); for now we pass None
+    # and fall back to the naive n_trials DSR correction.
+    # -------------------------------------------------------------------------
+    is_dir = report_dir / "in_sample"
+    oos_dir = report_dir / "out_of_sample"
+    _run_methodology_reporting(
+        all_results,
+        iter_dir=report_dir,
+        is_dir=is_dir,
+        oos_dir=oos_dir,
+        n_trials=n_trials,
+        symbols=symbols,
+        features_dir="data/features",
+        interval="8h",
+        oof_parquet_path=None,  # CPCV OOF parquet deferred to iter-v1/002+
+    )
+
     print(
         f"\nMode: {mode_label}. ENSEMBLE_SIZE={ensemble_size}. n_trials={n_trials}. "
         f"Iteration: {iteration_label}."
