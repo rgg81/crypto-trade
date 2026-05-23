@@ -50,6 +50,15 @@ reports-v2/
 models-v2/
 analysis-v2/
 
+# v1 track artifacts (refactored 2026-05-23) — regenerable per iteration
+# Strict trunk discipline: iteration_v1-*/ subdirs (briefs, diaries, reports,
+# analysis) stay branch-local; only the shared catalog + BASELINE_V1.md +
+# directory .gitkeep land on quant-research trunk.
+reports-v1/iteration_v1-*/
+briefs-v1/iteration_v1-*/
+diary-v1/iteration_v1-*.md
+analysis/iteration_v1-*/
+
 # Parquet artifacts inside reports-v3/ (e.g., trial_oof_returns.parquet)
 # can exceed GitHub's 100MB limit. Keep CSV/JSON reports tracked; never
 # commit parquet files into reports-v3 again. Other parquet locations
