@@ -13,6 +13,7 @@ Reports four buckets:
 Usage:
   uv run python scripts/compare_baseline_vs_db.py --track v1
   uv run python scripts/compare_baseline_vs_db.py --track v2
+  uv run python scripts/compare_baseline_vs_db.py --track v3
 """
 
 from __future__ import annotations
@@ -39,10 +40,27 @@ SYMBOL_TO_MODEL_V2: dict[str, str] = {
     "NEARUSDT": "V2-NEAR",
 }
 
+# v3 single-symbol models per V3_BASELINE_MODELS (iter-v3/121 canonical).
+# BCH/LDO/TRX with per-symbol V3-* model names.
+SYMBOL_TO_MODEL_V3: dict[str, str] = {
+    "BCHUSDT": "V3-BCH",
+    "LDOUSDT": "V3-LDO",
+    "TRXUSDT": "V3-TRX",
+}
 
-def load_backtest_trades(csv_paths: list[Path], sym_to_model: dict[str, str]) -> list[dict]:
-    """Read every CSV row, return list of {model, symbol, direction, open_time, entry, exit, ...}."""
+
+def load_backtest_trades(
+    csv_paths: list[Path], sym_to_model: dict[str, str]
+) -> tuple[list[dict], int]:
+    """Read every CSV row, return (rows, n_zero_weight_skipped).
+
+    Zero-``weight_factor`` rows are filtered out: those are trades the v2/v3
+    BTC-trend-filter killed at backtest time and the seeder drops by design
+    (see ``seed-live-db --help`` docs and ``db_seeder.py``). They would
+    otherwise be falsely reported as MISSING_IN_DB.
+    """
     rows: list[dict] = []
+    n_zero_skipped = 0
     for p in csv_paths:
         if not p.exists():
             print(f"  WARN: missing {p}")
@@ -54,6 +72,11 @@ def load_backtest_trades(csv_paths: list[Path], sym_to_model: dict[str, str]) ->
                 model = sym_to_model.get(sym)
                 if model is None:
                     continue
+                wf_raw = r.get("weight_factor", "1.0")
+                wf = float(wf_raw) if wf_raw not in ("", None) else 1.0
+                if wf == 0.0:
+                    n_zero_skipped += 1
+                    continue
                 rows.append({
                     "model": model,
                     "symbol": sym,
@@ -64,7 +87,7 @@ def load_backtest_trades(csv_paths: list[Path], sym_to_model: dict[str, str]) ->
                     "exit_reason": r["exit_reason"],
                     "source": p.name,
                 })
-    return rows
+    return rows, n_zero_skipped
 
 
 def load_db_trades(db_path: Path, models: set[str]) -> list[dict]:
@@ -106,7 +129,7 @@ def iso(ms: int) -> str:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--track", choices=["v1", "v2"], required=True)
+    parser.add_argument("--track", choices=["v1", "v2", "v3"], required=True)
     parser.add_argument("--db", default="data/testnet.db")
     args = parser.parse_args()
 
@@ -116,12 +139,21 @@ def main() -> int:
             Path("reports/iteration_186/out_of_sample/trades.csv"),
         ]
         sym_to_model = SYMBOL_TO_MODEL_V1
-    else:
+    elif args.track == "v2":
         csv_paths = [
             Path("reports-v2/iteration_v2-069/in_sample/trades.csv"),
             Path("reports-v2/iteration_v2-069/out_of_sample/trades.csv"),
         ]
         sym_to_model = SYMBOL_TO_MODEL_V2
+    else:  # v3
+        # iter-v3/130 — the /121 canonical baseline as re-run on 2026-05-22 with
+        # all main-trunk fixes applied (BTC-lag defer, candle-aligned cooldown).
+        # Drives the V3_BASELINE_MODELS (V3-BCH/LDO/TRX) seeded into testnet.db.
+        csv_paths = [
+            Path("reports-v3/iteration_v3-130/in_sample/trades.csv"),
+            Path("reports-v3/iteration_v3-130/out_of_sample/trades.csv"),
+        ]
+        sym_to_model = SYMBOL_TO_MODEL_V3
 
     print(f"=== Comparison for {args.track} ===\n")
     print("CSV sources:")
@@ -129,10 +161,10 @@ def main() -> int:
         print(f"  {p}")
     print()
 
-    backtest = load_backtest_trades(csv_paths, sym_to_model)
+    backtest, n_zero_skipped = load_backtest_trades(csv_paths, sym_to_model)
     models = set(sym_to_model.values())
     db = load_db_trades(Path(args.db), models)
-    print(f"Backtest trades: {len(backtest)}")
+    print(f"Backtest trades: {len(backtest)} (excludes {n_zero_skipped} zero-weight rows the seeder drops by design)")
     print(f"DB trades:       {len(db)}")
     print()
 
