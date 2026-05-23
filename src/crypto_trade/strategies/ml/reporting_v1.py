@@ -332,9 +332,15 @@ def compute_n_eff_and_dsr(
             n_eff = n_trials_naive
             method_used = f"naive_fallback_exception:{type(exc).__name__}"
 
-    # Sanity check: n_eff must be strictly less than n_trials_naive (LM Master invariant)
+    # Sanity check: n_eff must be at most n_trials_naive (LM Master invariant).
+    # Equality (n_eff == n_trials_naive) is a valid PCA outcome meaning all trials
+    # are linearly independent in the OOF return space — not a wiring bug.
+    # The _no_compression suffix in method_used distinguishes this from naive_fallback
+    # (naive_fallback = parquet not wired; no_compression = parquet wired, PCA ran,
+    # but found no redundancy).  iter-v1/001 post-mortem: 5 symbols × 53 train-months
+    # × 5 fold_idx collapsed to 50 unique trial_id keys — genuinely independent.
     if n_eff >= n_trials_naive and n_trials_naive > 1:
-        # PCA produced no compression — use naive but flag it
+        # PCA produced no compression — keep n_eff at n_trials_naive and flag it
         n_eff = n_trials_naive
         method_used = method_used + "_no_compression"
 
