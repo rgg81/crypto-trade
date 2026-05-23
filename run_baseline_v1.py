@@ -550,6 +550,19 @@ def main() -> None:
         help="Optuna trials per (symbol, month) cell. Default 35 (matches v3).",
     )
     parser.add_argument(
+        "--ensemble-size",
+        type=int,
+        default=None,
+        help=(
+            "Override the mode-derived ENSEMBLE_SIZE.  Useful for methodology-axis "
+            "iterations that require a specific ensemble size for byte-identity "
+            "against the baseline anchor (e.g. --exploration --ensemble-size 5 "
+            "--n-trials 50 for iter-v1/001 trade-roster byte-identity).  "
+            "Must be in [1, 10].  Overrides the mode default (3 for EXPLORATION, "
+            "10 for CONFIRMATION) without touching any other mode semantics."
+        ),
+    )
+    parser.add_argument(
         "--symbols",
         type=str,
         default=None,
@@ -595,6 +608,26 @@ def main() -> None:
         reports_dir = "reports-v1"
     else:
         sys.exit("ERROR: must specify --baseline-mode, --exploration, or --confirmation")
+
+    # --ensemble-size override: applies after mode defaults are set.
+    # Designed for methodology-axis iterations (e.g. iter-v1/001) that need a
+    # specific ensemble size for byte-identity against the baseline anchor without
+    # clobbering the baseline reports directory.  --baseline-mode is intentionally
+    # excluded from the override path (it has its own sacred fixed values).
+    if args.ensemble_size is not None and not args.baseline_mode:
+        if args.ensemble_size < 1 or args.ensemble_size > len(ENSEMBLE_SEEDS):
+            sys.exit(
+                f"ERROR: --ensemble-size must be in [1, {len(ENSEMBLE_SEEDS)}]; "
+                f"got {args.ensemble_size}"
+            )
+        ensemble_size = args.ensemble_size
+        default_size = (
+            V1_EXPLORATION_ENSEMBLE_SIZE if args.exploration else V1_CONFIRMATION_ENSEMBLE_SIZE
+        )
+        print(
+            f"[run_baseline_v1] --ensemble-size override: {ensemble_size} "
+            f"(mode default was {default_size})"
+        )
 
     print(f"v1 RUNNER mode={mode_label} iteration={iteration_label}")
     print(f"  symbols: {symbols}")
