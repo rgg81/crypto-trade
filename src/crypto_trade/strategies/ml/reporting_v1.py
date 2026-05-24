@@ -8,7 +8,12 @@ v1 runner:
     2. ``compute_n_eff_and_dsr``      — N_eff-corrected DSR via PCA on the
                                         per-trial OOF return matrix loaded from
                                         the oof_persist_path parquet.
+                                        iter-v1/008: refactored to per-cell PCA
+                                        aggregation (aggfunc="mean") as PRIMARY.
+                                        Legacy global-flatten kept as secondary.
     3. ``write_dsr_json``             — consolidated dsr.json artifact.
+                                        iter-v1/008: extended schema with per-cell
+                                        n_eff fields.
     4. ``write_adf_test_csv``         — per-feature ADF + Bonferroni p-values
                                         + exception_class (193 rows).
     5. ``write_ic_matrix_csv``        — per-family Spearman IC matrix (Fisher-z
@@ -40,10 +45,34 @@ Usage (runner snippet)
     )
 
     psr_cols = compute_psr_columns(monthly_returns_is, daily_returns_is, label="IS")
-    n_eff, dsr_val = compute_n_eff_and_dsr(oof_parquet_path, n_trials_total, sharpe)
+    n_eff, dsr_val, method = compute_n_eff_and_dsr(
+        oof_parquet_path, n_trials_total, sharpe, returns
+    )
     write_dsr_json(report_dir, dsr_val, n_trials, n_eff, psr_val, min_trl_months)
     write_adf_test_csv(report_dir, feature_df)
     write_ic_matrix_csv(report_dir, feature_df, forward_returns)
+
+iter-v1/008 per-cell PCA refactor (aggfunc="mean")
+---------------------------------------------------
+The original global-flatten strategy in ``_pca_n_eff_from_parquet`` (now renamed
+``_pca_n_eff_global_flatten``) collapses ALL (symbol × train_month × trial) rows
+into a single flat matrix.  This saturates at n_eff = n_trials_naive because all
+50 (or 35) unique trial IDs are present across the combined pool.
+
+The new ``_per_cell_n_eff_from_parquet`` function operates per (symbol, train_month)
+cell.  Within each cell, ``pivot_table(aggfunc="mean")`` is used because each
+(trial_id, candle_open_time_ms) pair appears MULTIPLE TIMES in the parquet (once
+per walk-forward fold that covers the candle's train-month).  Using aggfunc="first"
+silently discards 2/3 of that fold information; aggfunc="mean" aggregates honestly.
+
+Empirical calibration on /005 proxy (n_trials=35, /005 config):
+  aggfunc="first" → per-cell n_eff median 20 (upper bound)
+  aggfunc="mean"  → per-cell n_eff median ~11 (corrected)
+LM Master single-cell calibration at BASELINE_V1 config (ETHUSDT 2022-01):
+  aggfunc="mean"  → n_eff = 9
+
+The BASELINE_V1 anchor (n_trials=50, 193 features, default bounds) is predicted
+to yield n_eff_per_cell_median in [10, 18] with point estimate ~11-13.
 """
 
 from __future__ import annotations
@@ -289,7 +318,12 @@ def compute_n_eff_and_dsr(
     *,
     n_eff_pca_method: str = "auto",
 ) -> tuple[int, float, str]:
-    """Load OOF parquet, build global trial-return matrix, compute N_eff + corrected DSR.
+    """Load OOF parquet, compute per-cell N_eff (PRIMARY) + corrected DSR.
+
+    iter-v1/008: refactored to use ``_per_cell_n_eff_from_parquet`` as PRIMARY
+    estimator.  The legacy ``_pca_n_eff_global_flatten`` (formerly
+    ``_pca_n_eff_from_parquet``) is kept for back-compat side-by-side reporting
+    but its result does NOT feed into the returned n_eff or dsr_corrected.
 
     Parameters
     ----------
@@ -298,21 +332,20 @@ def compute_n_eff_and_dsr(
         oof_persist_path is set.  If None or not found, falls back to using
         n_trials_naive (same as the existing naive DSR).
     n_trials_naive
-        Total Optuna trials across all (symbol, train_month) cells.  Used as
-        fallback when the parquet is unavailable and as sanity-check upper-bound
-        for N_eff.
+        Optuna trials per (symbol, train_month) cell.  Used as fallback when
+        the parquet is unavailable and as the NaN-guard threshold.
     observed_sharpe
         Annualized Sharpe (daily granularity) used for DSR computation.
     returns
         Daily return series for DSR skew/kurtosis inputs.
     n_eff_pca_method
-        "auto" selects eigvalsh (default; exact on smaller-dim cov).
+        "auto" selects eigvalsh per-cell (default).  Passed to sub-functions.
 
     Returns
     -------
     (n_eff, dsr_corrected, method_used)
-        n_eff           — effective trial count (1 ≤ n_eff ≤ n_trials_naive)
-        dsr_corrected   — DSR computed with n_eff (replaces naive n_trials)
+        n_eff           — per-cell-median effective trial count (1 ≤ n_eff ≤ n_trials_naive)
+        dsr_corrected   — DSR computed with n_eff (per-cell median)
         method_used     — string describing the PCA estimator used
     """
     n_eff = n_trials_naive
@@ -320,14 +353,16 @@ def compute_n_eff_and_dsr(
 
     if oof_parquet_path is not None and Path(oof_parquet_path).exists():
         try:
-            n_eff, method_used = _pca_n_eff_from_parquet(
+            per_cell_result = _per_cell_n_eff_from_parquet(
                 Path(oof_parquet_path),
                 n_trials_naive,
-                n_eff_pca_method,
             )
+            n_eff = per_cell_result["n_eff_per_cell_median"]
+            method_used = "eigvalsh_cov_per_cell_median_aggfunc_mean"
         except Exception as exc:
             print(
-                f"[reporting_v1] WARNING: N_eff PCA failed ({exc}); falling back to naive n_trials"
+                f"[reporting_v1] WARNING: per-cell N_eff PCA failed ({exc}); "
+                "falling back to naive n_trials"
             )
             n_eff = n_trials_naive
             method_used = f"naive_fallback_exception:{type(exc).__name__}"
@@ -337,8 +372,7 @@ def compute_n_eff_and_dsr(
     # are linearly independent in the OOF return space — not a wiring bug.
     # The _no_compression suffix in method_used distinguishes this from naive_fallback
     # (naive_fallback = parquet not wired; no_compression = parquet wired, PCA ran,
-    # but found no redundancy).  iter-v1/001 post-mortem: 5 symbols × 53 train-months
-    # × 5 fold_idx collapsed to 50 unique trial_id keys — genuinely independent.
+    # but found no redundancy).
     if n_eff >= n_trials_naive and n_trials_naive > 1:
         # PCA produced no compression — keep n_eff at n_trials_naive and flag it
         n_eff = n_trials_naive
@@ -354,21 +388,187 @@ def compute_n_eff_and_dsr(
     return n_eff, dsr_corrected, method_used
 
 
-def _pca_n_eff_from_parquet(
+def _per_cell_n_eff_from_parquet(
+    parquet_path: Path,
+    n_trials_naive: int,
+) -> dict[str, Any]:
+    """Per-cell N_eff via PCA, aggregated via median across cells.
+
+    iter-v1/008 PRIMARY estimator.  Operates per (symbol, train_month) cell,
+    uses ``aggfunc="mean"`` in pivot_table so that multiple walk-forward fold
+    occurrences of the same (trial_id, candle_open_time_ms) pair are aggregated
+    honestly rather than silently discarded (aggfunc="first" defect — LM Master
+    Phase 4.5 Rec #1 ADOPTED).
+
+    Parquet schema (from optimization.py):
+        trial_id, symbol, train_month, fold_idx, candle_open_time_ms, oof_return
+
+    Returns
+    -------
+    dict with keys:
+        n_eff_per_cell_median       — int, median across cells (PRIMARY)
+        n_eff_per_cell_trimmed_mean — int, 10%-trimmed mean (LM Master Rec #2)
+        n_eff_per_cell_p25          — int, 25th percentile
+        n_eff_per_cell_p75          — int, 75th percentile
+        n_eff_per_cell_min          — int
+        n_eff_per_cell_max          — int
+        n_eff_per_cell_by_symbol    — dict[str, int], per-symbol median (Rec #2 + Risk #3)
+        n_cells                     — int, total cells processed
+    """
+    from scipy.stats import trim_mean  # noqa: PLC0415
+
+    df = pd.read_parquet(parquet_path)
+
+    # Validate schema
+    required_cols = {"trial_id", "oof_return"}
+    missing = required_cols - set(df.columns)
+    if missing:
+        raise ValueError(f"OOF parquet missing columns: {missing}. Found: {list(df.columns)}")
+
+    # Time axis: candle_open_time_ms preferred; fall back to fold_idx
+    if "candle_open_time_ms" in df.columns:
+        time_col = "candle_open_time_ms"
+    elif "fold_idx" in df.columns:
+        time_col = "fold_idx"
+    else:
+        raise ValueError("OOF parquet has no time-axis column (candle_open_time_ms or fold_idx)")
+
+    # Drop NaN oof_return rows (incomplete trials) BEFORE grouping
+    df = df.dropna(subset=["oof_return"])
+    if df.empty:
+        return {
+            "n_eff_per_cell_median": n_trials_naive,
+            "n_eff_per_cell_trimmed_mean": n_trials_naive,
+            "n_eff_per_cell_p25": n_trials_naive,
+            "n_eff_per_cell_p75": n_trials_naive,
+            "n_eff_per_cell_min": n_trials_naive,
+            "n_eff_per_cell_max": n_trials_naive,
+            "n_eff_per_cell_by_symbol": {},
+            "n_cells": 0,
+        }
+
+    # Group by (symbol, train_month) cells; fall back to single group if columns absent
+    if "symbol" in df.columns and "train_month" in df.columns:
+        group_cols = ["symbol", "train_month"]
+    elif "symbol" in df.columns:
+        group_cols = ["symbol"]
+    else:
+        # No grouping columns — treat entire parquet as a single cell
+        group_cols = []
+
+    per_cell_n_eff: list[int] = []
+    # For by-symbol aggregation: symbol → list[n_eff_per_cell]
+    by_symbol_cells: dict[str, list[int]] = {}
+
+    if group_cols:
+        cells = df.groupby(group_cols)
+        n_cells = cells.ngroups
+        for key, cell_df in cells:
+            cell_n_eff = _compute_cell_n_eff(cell_df, time_col, n_trials_naive)
+            per_cell_n_eff.append(cell_n_eff)
+            # Track by symbol for LM Master Risk #3 diagnostic
+            if "symbol" in df.columns:
+                sym = key[0] if isinstance(key, tuple) else str(key)
+                by_symbol_cells.setdefault(sym, []).append(cell_n_eff)
+    else:
+        # Single-cell path
+        cell_n_eff = _compute_cell_n_eff(df, time_col, n_trials_naive)
+        per_cell_n_eff = [cell_n_eff]
+        n_cells = 1
+
+    if not per_cell_n_eff:
+        return {
+            "n_eff_per_cell_median": n_trials_naive,
+            "n_eff_per_cell_trimmed_mean": n_trials_naive,
+            "n_eff_per_cell_p25": n_trials_naive,
+            "n_eff_per_cell_p75": n_trials_naive,
+            "n_eff_per_cell_min": n_trials_naive,
+            "n_eff_per_cell_max": n_trials_naive,
+            "n_eff_per_cell_by_symbol": {},
+            "n_cells": 0,
+        }
+
+    arr = np.array(per_cell_n_eff, dtype=float)
+
+    # Per-symbol medians (LM Master Phase 4.5 Risk #3 diagnostic)
+    n_eff_by_symbol: dict[str, int] = {
+        sym: int(np.median(np.array(vals))) for sym, vals in by_symbol_cells.items()
+    }
+
+    return {
+        "n_eff_per_cell_median": int(np.median(arr)),
+        "n_eff_per_cell_trimmed_mean": int(trim_mean(arr, 0.10)),
+        "n_eff_per_cell_p25": int(np.percentile(arr, 25)),
+        "n_eff_per_cell_p75": int(np.percentile(arr, 75)),
+        "n_eff_per_cell_min": int(arr.min()),
+        "n_eff_per_cell_max": int(arr.max()),
+        "n_eff_per_cell_by_symbol": n_eff_by_symbol,
+        "n_cells": n_cells,
+    }
+
+
+def _compute_cell_n_eff(
+    cell_df: pd.DataFrame,
+    time_col: str,
+    n_trials_naive: int,
+) -> int:
+    """Compute n_eff for a single (symbol, train_month) cell via PCA.
+
+    Uses aggfunc="mean" so multiple walk-forward fold occurrences of the same
+    (trial_id, candle_open_time_ms) pair are averaged honestly.
+
+    LM Master Phase 4.5 Rec #1 ADOPTED:
+        Each (trial_id, candle_open_time_ms) pair appears multiple times (once
+        per walk-forward fold that covers the candle).  aggfunc="first" silently
+        drops 2/3 of fold info; aggfunc="mean" aggregates honestly.
+        Empirical impact on BTCUSDT 2022-01: first → n_eff=19; mean → n_eff=11.
+    """
+    # LM Master Phase 4.5 Risk #2: NaN guard for variable-trial-count cells
+    unique_trials = cell_df["trial_id"].nunique()
+    if unique_trials < n_trials_naive:
+        print(
+            f"[reporting_v1] WARNING: per-cell PCA: cell has {unique_trials} unique trials "
+            f"(< n_trials_naive={n_trials_naive}); pruner may be active or cell is partial"
+        )
+
+    # Pivot: rows = trial_id, cols = time steps, values = oof_return
+    # aggfunc="mean": folds that cover the same candle → averaged OOF return
+    try:
+        pivot = cell_df.pivot_table(
+            index="trial_id",
+            columns=time_col,
+            values="oof_return",
+            aggfunc="mean",  # CRITICAL: LM Master Phase 4.5 Rec #1 ADOPTED
+        )
+    except Exception as exc:
+        print(f"[reporting_v1] WARNING: pivot_table failed in cell: {exc}; using 1")
+        return 1
+
+    n_rows = pivot.shape[0]
+    if n_rows < 2 or pivot.shape[1] < 2:
+        return 1
+
+    # Fill NaN with 0 (neutral — no contribution from missing time periods)
+    mat = pivot.fillna(0.0).to_numpy(dtype=float)
+
+    return int(n_effective_trials(mat))
+
+
+def _pca_n_eff_global_flatten(
     parquet_path: Path,
     n_trials_naive: int,
     method: str,
 ) -> tuple[int, str]:
-    """Load OOF parquet and return (n_eff, method_used).
+    """Load OOF parquet and return (n_eff, method_used) via GLOBAL row-axis flatten.
 
-    Parquet schema (from optimization.py sub-fix 1b):
-        trial_id, symbol, train_month, fold_idx, candle_open_time_ms, oof_return
+    LEGACY (iter-v1/001) estimator — renamed from ``_pca_n_eff_from_parquet`` at
+    iter-v1/008.  Kept for back-compat side-by-side reporting.  Does NOT feed
+    into ``compute_n_eff_and_dsr`` primary path; only used for comparison.
 
-    Strategy:
-    1. Pivot into a (n_unique_trials × n_unique_candles) matrix.
-    2. NaN-pad short rows (different symbols/months have different time ranges).
-    3. Fill NaN with 0 (neutral — no contribution to covariance from missing periods).
-    4. Call n_effective_trials() on the matrix.
+    The global flatten collapses ALL (symbol × train_month × trial) rows into a
+    single flat matrix.  This saturates at n_eff = n_trials_naive because all
+    unique trial IDs are present across the combined pool (iter-v1/001 post-mortem:
+    5 symbols × 53 train-months × 5 fold_idx collapsed to 50 unique trial_id keys).
     """
     df = pd.read_parquet(parquet_path)
 
@@ -379,7 +579,6 @@ def _pca_n_eff_from_parquet(
         raise ValueError(f"OOF parquet missing columns: {missing}. Found: {list(df.columns)}")
 
     # Create a unique row key = (symbol, train_month, trial_id) — each cell's trial
-    # The brief specifies flattening ALL (symbol × month) trial-OOF cells into ONE matrix.
     if "symbol" in df.columns and "train_month" in df.columns:
         df["_trial_key"] = (
             df["symbol"].astype(str)
@@ -531,6 +730,15 @@ def write_dsr_json(
     n_eff_pca_method: str,
     min_trl_months: float,
     label: str = "",
+    # iter-v1/008 per-cell N_eff fields (optional; None = not yet computed)
+    n_eff_per_cell_median: int | None = None,
+    n_eff_per_cell_trimmed_mean: int | None = None,
+    n_eff_per_cell_p25: int | None = None,
+    n_eff_per_cell_p75: int | None = None,
+    n_eff_per_cell_min: int | None = None,
+    n_eff_per_cell_max: int | None = None,
+    n_eff_per_cell_by_symbol: dict[str, int] | None = None,
+    n_cells: int | None = None,
 ) -> Path:
     """Write consolidated dsr.json to report_dir/dsr.json.
 
@@ -546,33 +754,73 @@ def write_dsr_json(
     psr_val
         PSR (monthly, vs 1.0) — the merge-gate column value.
     n_trials
-        Total Optuna trials (naive count for reference).
+        Optuna trials per (symbol, train_month) cell (naive count for reference).
     n_eff
-        Effective trial count from PCA (1 ≤ n_eff ≤ n_trials).
+        Effective trial count from per-cell PCA median (iter-v1/008 PRIMARY).
+        For pre-/008 runs this is the global-flatten n_eff (back-compat).
+        1 ≤ n_eff ≤ n_trials.
     n_eff_pca_method
         String describing the PCA estimator used.
     min_trl_months
         Minimum monthly SR benchmark for DSR (expressed at monthly frequency).
     label
         Optional label ("IS" or "OOS") for logging.
+    n_eff_per_cell_median
+        iter-v1/008: median n_eff across (symbol, train_month) cells.
+        None when per-cell refactor not yet run (pre-/008 callers).
+    n_eff_per_cell_trimmed_mean
+        iter-v1/008: 10%-trimmed mean across cells (LM Master Rec #2).
+    n_eff_per_cell_p25, n_eff_per_cell_p75
+        iter-v1/008: IQR bounds across cells.
+    n_eff_per_cell_min, n_eff_per_cell_max
+        iter-v1/008: range bounds across cells.
+    n_eff_per_cell_by_symbol
+        iter-v1/008: per-symbol median dict (LM Master Risk #3 diagnostic).
+    n_cells
+        iter-v1/008: total (symbol, train_month) cells processed.
     """
     payload: dict[str, Any] = {
         "dsr": round(dsr, 6),
         "pbo": pbo,  # null when CPCV deferred — brief Section 9 approves this
         "psr": round(psr_val, 6),
         "n_trials": n_trials,
+        # Legacy field kept for back-compat; iter-v1/008+ this equals n_eff_per_cell_median
         "n_eff": n_eff,
         "n_eff_pca_method": n_eff_pca_method,
         "min_trl_months": round(min_trl_months, 6),
     }
+    # iter-v1/008 per-cell fields — only emitted when the per-cell refactor ran
+    if n_eff_per_cell_median is not None:
+        payload["n_eff_per_cell_median"] = n_eff_per_cell_median
+        payload["n_eff_method_per_cell"] = "eigvalsh_cov_per_cell_median_aggfunc_mean"
+    if n_eff_per_cell_trimmed_mean is not None:
+        payload["n_eff_per_cell_trimmed_mean"] = n_eff_per_cell_trimmed_mean
+    if n_eff_per_cell_p25 is not None:
+        payload["n_eff_per_cell_p25"] = n_eff_per_cell_p25
+    if n_eff_per_cell_p75 is not None:
+        payload["n_eff_per_cell_p75"] = n_eff_per_cell_p75
+    if n_eff_per_cell_min is not None:
+        payload["n_eff_per_cell_min"] = n_eff_per_cell_min
+    if n_eff_per_cell_max is not None:
+        payload["n_eff_per_cell_max"] = n_eff_per_cell_max
+    if n_eff_per_cell_by_symbol is not None:
+        payload["n_eff_per_cell_by_symbol"] = n_eff_per_cell_by_symbol
+    if n_cells is not None:
+        payload["n_cells"] = n_cells
+
     out_path = report_dir / "dsr.json"
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with open(out_path, "w") as f:
         json.dump(payload, f, indent=2)
     if label:
+        per_cell_str = (
+            f" n_eff_per_cell_median={n_eff_per_cell_median}"
+            if n_eff_per_cell_median is not None
+            else ""
+        )
         print(
             f"[reporting_v1] {label} dsr.json written: "
-            f"dsr={dsr:.4f} n_eff={n_eff} psr={psr_val:.4f}"
+            f"dsr={dsr:.4f} n_eff={n_eff}{per_cell_str} psr={psr_val:.4f}"
         )
     return out_path
 
@@ -930,12 +1178,19 @@ def append_psr_rows_to_comparison(
     oos_psr_cols: dict[str, float],
     is_n_eff: int,
     oos_n_eff: int,
+    *,
+    is_n_eff_per_cell_median: int | None = None,
+    oos_n_eff_per_cell_median: int | None = None,
 ) -> None:
     """Append PSR and n_effective_trials rows to an existing comparison.csv.
 
     Called AFTER generate_iteration_reports() has written comparison.csv.
-    Appends 4 new rows: psr_monthly_vs_0, psr_monthly_vs_1, psr_daily_vs_0,
-    n_effective_trials.
+    Appends 4 rows: psr_monthly_vs_0, psr_monthly_vs_1, psr_daily_vs_0,
+    n_effective_trials (legacy global-flatten).
+
+    iter-v1/008: also appends ``n_eff_per_cell_median`` row when the per-cell
+    refactor ran.  Pass ``is_n_eff_per_cell_median`` and
+    ``oos_n_eff_per_cell_median`` to enable the new row.
 
     Parameters
     ----------
@@ -946,9 +1201,13 @@ def append_psr_rows_to_comparison(
     oos_psr_cols
         Dict from compute_psr_columns() for OOS half.
     is_n_eff
-        Effective trial count from IS half PCA.
+        Effective trial count from IS half PCA (global-flatten legacy).
     oos_n_eff
-        Effective trial count from OOS half PCA.
+        Effective trial count from OOS half PCA (global-flatten legacy).
+    is_n_eff_per_cell_median
+        iter-v1/008: per-cell median n_eff for IS half. None = not yet computed.
+    oos_n_eff_per_cell_median
+        iter-v1/008: per-cell median n_eff for OOS half. None = not yet computed.
     """
 
     def _ratio(oos_v: float | int, is_v: float | int) -> str:
@@ -983,12 +1242,28 @@ def append_psr_rows_to_comparison(
         ],
     ]
 
+    # iter-v1/008: per-cell median row (emitted when per-cell refactor ran)
+    if is_n_eff_per_cell_median is not None and oos_n_eff_per_cell_median is not None:
+        new_rows.append(
+            [
+                "n_eff_per_cell_median",
+                str(is_n_eff_per_cell_median),
+                str(oos_n_eff_per_cell_median),
+                _ratio(oos_n_eff_per_cell_median, is_n_eff_per_cell_median),
+            ]
+        )
+
     with open(comparison_csv_path, "a", newline="") as f:
         writer = csv.writer(f)
         writer.writerows(new_rows)
 
+    per_cell_str = (
+        f" n_eff_per_cell_median IS={is_n_eff_per_cell_median} OOS={oos_n_eff_per_cell_median}"
+        if is_n_eff_per_cell_median is not None
+        else ""
+    )
     print(
         f"[reporting_v1] comparison.csv updated: "
         f"psr_monthly_vs_0/1, psr_daily_vs_0, n_effective_trials appended. "
-        f"IS n_eff={is_n_eff} OOS n_eff={oos_n_eff}"
+        f"IS n_eff={is_n_eff} OOS n_eff={oos_n_eff}{per_cell_str}"
     )

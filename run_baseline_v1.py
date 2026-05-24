@@ -78,6 +78,7 @@ from crypto_trade.features_v1 import (
 from crypto_trade.iteration_report import generate_iteration_reports
 from crypto_trade.strategies.ml.lgbm import LightGbmStrategy
 from crypto_trade.strategies.ml.reporting_v1 import (
+    _per_cell_n_eff_from_parquet,
     append_psr_rows_to_comparison,
     compute_n_eff_and_dsr,
     compute_psr_columns,
@@ -103,9 +104,13 @@ V1_CONFIRMATION_ENSEMBLE_SIZE: int = 10
 BASELINE_OOD_CUTOFF_PCT: float = 0.70
 
 #: Stable path for the per-trial OOF return parquet (iter-v1/001 methodology axis).
+#: iter-v1/008: RESTORED to iteration-stamped path (originally from /003 commit 976ce75).
+#: The path is overridden in main() after iteration_label is resolved:
+#:   OOF_PARQUET_PATH = Path("data") / f"v1_iter_{iteration_label}_trial_oof.parquet"
+#: The sentinel below is overwritten before any backtest code runs.
 #: optimization.py appends rows here when LightGbmStrategy.oof_persist_path is set.
 #: Cleared at runner start to harden against A7 append-accumulation from prior runs.
-OOF_PARQUET_PATH: Path = Path("data") / "v1_iter_001_trial_oof.parquet"
+OOF_PARQUET_PATH: Path = Path("data") / "v1_iter_SENTINEL_trial_oof.parquet"
 
 
 def _derive_ensemble_seeds(size: int) -> list[int]:
@@ -491,6 +496,36 @@ def _run_methodology_reporting(
         f"[run_baseline_v1] OOS N_eff={oos_n_eff} DSR_corrected={oos_dsr:.4f} method={oos_method}"
     )
 
+    # ---------------------------------------------------------------------------
+    # 2b. Per-cell N_eff (iter-v1/008 PRIMARY estimator via _per_cell_n_eff_from_parquet)
+    # Called AFTER compute_n_eff_and_dsr so that the per-cell dict can be wired
+    # into write_dsr_json + append_psr_rows_to_comparison below.
+    # Both IS and OOS use the same OOF parquet (OOF data is IS-derived; OOS DSR
+    # is computed using the IS-calibrated n_eff — per LM Master §2).
+    # ---------------------------------------------------------------------------
+    per_cell_result: dict | None = None
+    if oof_parquet_path is not None and Path(oof_parquet_path).exists():
+        try:
+            per_cell_result = _per_cell_n_eff_from_parquet(
+                Path(oof_parquet_path),
+                n_trials,
+            )
+            print(
+                f"[run_baseline_v1] per-cell N_eff: "
+                f"median={per_cell_result['n_eff_per_cell_median']} "
+                f"trimmed_mean={per_cell_result['n_eff_per_cell_trimmed_mean']} "
+                f"p25={per_cell_result['n_eff_per_cell_p25']} "
+                f"p75={per_cell_result['n_eff_per_cell_p75']} "
+                f"n_cells={per_cell_result['n_cells']} "
+                f"by_symbol={per_cell_result['n_eff_per_cell_by_symbol']}"
+            )
+        except Exception as exc:
+            print(
+                f"[run_baseline_v1] WARNING: _per_cell_n_eff_from_parquet failed ({exc}); "
+                "per-cell fields will be absent from dsr.json"
+            )
+            per_cell_result = None
+
     # Min TRL months: 1/sqrt(12) (monthly benchmark SR for psr_monthly_vs_1)
     min_trl_months = 1.0 / math.sqrt(12)
 
@@ -507,6 +542,21 @@ def _run_methodology_reporting(
         n_eff_pca_method=is_method,
         min_trl_months=min_trl_months,
         label="IS",
+        # iter-v1/008 per-cell fields
+        n_eff_per_cell_median=(
+            per_cell_result["n_eff_per_cell_median"] if per_cell_result else None
+        ),
+        n_eff_per_cell_trimmed_mean=(
+            per_cell_result["n_eff_per_cell_trimmed_mean"] if per_cell_result else None
+        ),
+        n_eff_per_cell_p25=(per_cell_result["n_eff_per_cell_p25"] if per_cell_result else None),
+        n_eff_per_cell_p75=(per_cell_result["n_eff_per_cell_p75"] if per_cell_result else None),
+        n_eff_per_cell_min=(per_cell_result["n_eff_per_cell_min"] if per_cell_result else None),
+        n_eff_per_cell_max=(per_cell_result["n_eff_per_cell_max"] if per_cell_result else None),
+        n_eff_per_cell_by_symbol=(
+            per_cell_result["n_eff_per_cell_by_symbol"] if per_cell_result else None
+        ),
+        n_cells=(per_cell_result["n_cells"] if per_cell_result else None),
     )
     write_dsr_json(
         oos_dir,
@@ -518,10 +568,25 @@ def _run_methodology_reporting(
         n_eff_pca_method=oos_method,
         min_trl_months=min_trl_months,
         label="OOS",
+        # Same per-cell fields: OOF is IS-derived; same parquet used for both halves
+        n_eff_per_cell_median=(
+            per_cell_result["n_eff_per_cell_median"] if per_cell_result else None
+        ),
+        n_eff_per_cell_trimmed_mean=(
+            per_cell_result["n_eff_per_cell_trimmed_mean"] if per_cell_result else None
+        ),
+        n_eff_per_cell_p25=(per_cell_result["n_eff_per_cell_p25"] if per_cell_result else None),
+        n_eff_per_cell_p75=(per_cell_result["n_eff_per_cell_p75"] if per_cell_result else None),
+        n_eff_per_cell_min=(per_cell_result["n_eff_per_cell_min"] if per_cell_result else None),
+        n_eff_per_cell_max=(per_cell_result["n_eff_per_cell_max"] if per_cell_result else None),
+        n_eff_per_cell_by_symbol=(
+            per_cell_result["n_eff_per_cell_by_symbol"] if per_cell_result else None
+        ),
+        n_cells=(per_cell_result["n_cells"] if per_cell_result else None),
     )
 
     # ---------------------------------------------------------------------------
-    # 4. comparison.csv PSR + n_effective_trials rows
+    # 4. comparison.csv PSR + n_effective_trials + n_eff_per_cell_median rows
     # ---------------------------------------------------------------------------
     comparison_path = iter_dir / "comparison.csv"
     if comparison_path.exists():
@@ -531,6 +596,12 @@ def _run_methodology_reporting(
             oos_psr_cols,
             is_n_eff=is_n_eff,
             oos_n_eff=oos_n_eff,
+            is_n_eff_per_cell_median=(
+                per_cell_result["n_eff_per_cell_median"] if per_cell_result else None
+            ),
+            oos_n_eff_per_cell_median=(
+                per_cell_result["n_eff_per_cell_median"] if per_cell_result else None
+            ),
         )
     else:
         print(
@@ -703,6 +774,14 @@ def main() -> None:
         active_feature_columns = list(V1_FEATURE_COLUMNS)
         bounds_profile = "default"
 
+    # iter-v1/008: restore /003-era iteration-stamped OOF_PARQUET_PATH.
+    # The global OOF_PARQUET_PATH is overridden here BEFORE the unlink() guard below
+    # so that each iteration preserves its own parquet and future per-cell N_eff
+    # re-evaluations can reproduce the exact /008 analysis.
+    # Pattern mirrors /003 commit 976ce75 (partial-merge infrastructure).
+    global OOF_PARQUET_PATH  # noqa: PLW0603
+    OOF_PARQUET_PATH = Path("data") / f"v1_iter_{iteration_label}_trial_oof.parquet"
+
     print(f"v1 RUNNER mode={mode_label} iteration={iteration_label}")
     print(f"  symbols: {symbols}")
     print(f"  ENSEMBLE_SIZE: {ensemble_size}")
@@ -710,6 +789,7 @@ def main() -> None:
     print(f"  n_trials per cell: {n_trials}")
     print(f"  feature_columns: {len(active_feature_columns)} columns")
     print(f"  bounds_profile: {bounds_profile}")
+    print(f"  OOF_PARQUET_PATH: {OOF_PARQUET_PATH}")
     print(f"  V1_EXCLUDED_SYMBOLS: {V1_EXCLUDED_SYMBOLS}")
     print()
 
