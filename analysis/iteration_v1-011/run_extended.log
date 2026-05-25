@@ -1,0 +1,159 @@
+# iter-v1/011 — Extended R5 BINARY KILL oracle EDA — 2026-05-25 03:44:44 UTC
+Universe: ('BTCUSDT', 'ETHUSDT', 'LINKUSDT', 'LTCUSDT', 'DOTUSDT')
+OOS_CUTOFF_MS: 1742774400000
+
+## Path A — LOW-threshold high-kill sweep (kill_high; skip if NATR > thr)
+### BASELINE roster
+  roster half direction  threshold_pct  n_trades_baseline  n_trades_kept  n_skipped  skip_rate  sharpe_baseline  sharpe_oracle  sharpe_delta  wpnl_total_baseline  wpnl_total_oracle
+baseline   IS kill_high           3.00                620            320        300   0.483871         0.091012      -0.060683     -0.151695              51.4530           -18.7890
+baseline   IS kill_high           3.25                620            363        257   0.414516         0.091012      -0.051283     -0.142295              51.4530           -16.7667
+baseline   IS kill_high           3.50                620            403        217   0.350000         0.091012      -0.121934     -0.212946              51.4530           -44.2170
+baseline   IS kill_high           3.75                620            442        178   0.287097         0.091012      -0.054455     -0.145467              51.4530           -21.2083
+baseline   IS kill_high           4.00                620            480        140   0.225806         0.091012      -0.159315     -0.250326              51.4530           -63.7588
+baseline   IS kill_high           4.25                620            506        114   0.183871         0.091012      -0.067169     -0.158181              51.4530           -30.3329
+baseline   IS kill_high           4.50                620            529         91   0.146774         0.091012      -0.063601     -0.154612              51.4530           -27.7773
+baseline   IS kill_high           4.75                620            544         76   0.122581         0.091012      -0.049032     -0.140043              51.4530           -21.1749
+baseline   IS kill_high           5.00                620            557         63   0.101613         0.091012      -0.053509     -0.144521              51.4530           -23.0982
+baseline  OOS kill_high           3.00                189            104         85   0.449735         0.170983       0.027329     -0.143654              38.1344             4.1299
+baseline  OOS kill_high           3.25                189            118         71   0.375661         0.170983      -0.080870     -0.251853              38.1344           -12.5347
+baseline  OOS kill_high           3.50                189            137         52   0.275132         0.170983       0.031299     -0.139684              38.1344             4.8740
+baseline  OOS kill_high           3.75                189            151         38   0.201058         0.170983       0.094864     -0.076119              38.1344            17.7381
+baseline  OOS kill_high           4.00                189            160         29   0.153439         0.170983       0.059326     -0.111657              38.1344            12.0809
+baseline  OOS kill_high           4.25                189            167         22   0.116402         0.170983       0.076129     -0.094854              38.1344            17.9770
+baseline  OOS kill_high           4.50                189            174         15   0.079365         0.170983       0.107795     -0.063188              38.1344            24.5043
+baseline  OOS kill_high           4.75                189            178         11   0.058201         0.170983       0.058086     -0.112897              38.1344            12.2762
+baseline  OOS kill_high           5.00                189            179         10   0.052910         0.170983       0.086371     -0.084612              38.1344            18.3258
+
+### /010 EXPLORATION roster
+roster half direction  threshold_pct  n_trades_baseline  n_trades_kept  n_skipped  skip_rate  sharpe_baseline  sharpe_oracle  sharpe_delta  wpnl_total_baseline  wpnl_total_oracle
+v1-010   IS kill_high           3.00                663            351        312   0.470588         0.199211       0.153087     -0.046124             132.7219            53.5120
+v1-010   IS kill_high           3.25                663            395        268   0.404223         0.199211       0.158730     -0.040481             132.7219            60.7239
+v1-010   IS kill_high           3.50                663            440        223   0.336350         0.199211       0.122379     -0.076832             132.7219            59.7793
+v1-010   IS kill_high           3.75                663            479        184   0.277526         0.199211       0.118333     -0.080877             132.7219            67.2927
+v1-010   IS kill_high           4.00                663            504        159   0.239819         0.199211       0.048468     -0.150742             132.7219            30.6512
+v1-010   IS kill_high           4.25                663            539        124   0.187029         0.199211       0.116269     -0.082942             132.7219            76.5010
+v1-010   IS kill_high           4.50                663            572         91   0.137255         0.199211       0.167866     -0.031345             132.7219           115.6539
+v1-010   IS kill_high           4.75                663            584         79   0.119155         0.199211       0.187322     -0.011888             132.7219           130.6195
+v1-010   IS kill_high           5.00                663            600         63   0.095023         0.199211       0.191063     -0.008148             132.7219           132.9655
+v1-010  OOS kill_high           3.00                210            120         90   0.428571         0.187563       0.294048      0.106485              34.9818            43.9894
+v1-010  OOS kill_high           3.25                210            140         70   0.333333         0.187563       0.454118      0.266555              34.9818            69.1778
+v1-010  OOS kill_high           3.50                210            149         61   0.290476         0.187563       0.358774      0.171211              34.9818            51.6714
+v1-010  OOS kill_high           3.75                210            162         48   0.228571         0.187563       0.411929      0.224365              34.9818            61.6485
+v1-010  OOS kill_high           4.00                210            174         36   0.171429         0.187563       0.267679      0.080115              34.9818            46.2150
+v1-010  OOS kill_high           4.25                210            181         29   0.138095         0.187563       0.194072      0.006509              34.9818            31.9391
+v1-010  OOS kill_high           4.50                210            189         21   0.100000         0.187563       0.218504      0.030941              34.9818            37.9012
+v1-010  OOS kill_high           4.75                210            192         18   0.085714         0.187563       0.250549      0.062985              34.9818            42.0696
+v1-010  OOS kill_high           5.00                210            197         13   0.061905         0.187563       0.237502      0.049939              34.9818            42.4043
+
+## Path B — INVERTED low-kill sweep (kill_low; skip if NATR < thr)
+### BASELINE roster
+  roster half direction  threshold_pct  n_trades_baseline  n_trades_kept  n_skipped  skip_rate  sharpe_baseline  sharpe_oracle  sharpe_delta  wpnl_total_baseline  wpnl_total_oracle
+baseline   IS  kill_low           2.00                620            528         92   0.148387         0.091012       0.116586      0.025574              51.4530            63.8301
+baseline   IS  kill_low           2.25                620            469        151   0.243548         0.091012       0.165344      0.074332              51.4530            91.2485
+baseline   IS  kill_low           2.50                620            413        207   0.333871         0.091012       0.131289      0.040277              51.4530            73.4984
+baseline   IS  kill_low           2.75                620            356        264   0.425806         0.091012       0.104469      0.013457              51.4530            57.8106
+baseline   IS  kill_low           3.00                620            300        320   0.516129         0.091012       0.138140      0.047129              51.4530            70.2420
+baseline   IS  kill_low           3.25                620            257        363   0.585484         0.091012       0.133544      0.042532              51.4530            68.2197
+baseline   IS  kill_low           3.50                620            217        403   0.650000         0.091012       0.220880      0.129868              51.4530            95.6700
+baseline   IS  kill_low           3.75                620            178        442   0.712903         0.091012       0.149420      0.058408              51.4530            72.6613
+baseline   IS  kill_low           4.00                620            140        480   0.774194         0.091012       0.239992      0.148980              51.4530           115.2118
+baseline  OOS  kill_low           2.00                189            155         34   0.179894         0.170983       0.216949      0.045966              38.1344            48.5825
+baseline  OOS  kill_low           2.25                189            139         50   0.264550         0.170983       0.140926     -0.030057              38.1344            28.0547
+baseline  OOS  kill_low           2.50                189            122         67   0.354497         0.170983       0.129475     -0.041508              38.1344            23.1449
+baseline  OOS  kill_low           2.75                189            106         83   0.439153         0.170983       0.279423      0.108440              38.1344            42.9382
+baseline  OOS  kill_low           3.00                189             85        104   0.550265         0.170983       0.254865      0.083882              38.1344            34.0045
+baseline  OOS  kill_low           3.25                189             71        118   0.624339         0.170983       0.386107      0.215124              38.1344            50.6691
+baseline  OOS  kill_low           3.50                189             52        137   0.724868         0.170983       0.330364      0.159381              38.1344            33.2604
+baseline  OOS  kill_low           3.75                189             38        151   0.798942         0.170983       0.200304      0.029321              38.1344            20.3963
+baseline  OOS  kill_low           4.00                189             29        160   0.846561         0.170983       0.358819      0.187836              38.1344            26.0535
+
+### /010 EXPLORATION roster
+roster half direction  threshold_pct  n_trades_baseline  n_trades_kept  n_skipped  skip_rate  sharpe_baseline  sharpe_oracle  sharpe_delta  wpnl_total_baseline  wpnl_total_oracle
+v1-010   IS  kill_low           2.00                663            555        108   0.162896         0.199211       0.233254      0.034043             132.7219           148.8121
+v1-010   IS  kill_low           2.25                663            492        171   0.257919         0.199211       0.169224     -0.029987             132.7219           103.6979
+v1-010   IS  kill_low           2.50                663            426        237   0.357466         0.199211       0.151478     -0.047733             132.7219            90.9470
+v1-010   IS  kill_low           2.75                663            367        296   0.446456         0.199211       0.176603     -0.022608             132.7219            93.1881
+v1-010   IS  kill_low           3.00                663            312        351   0.529412         0.199211       0.176794     -0.022417             132.7219            79.2099
+v1-010   IS  kill_low           3.25                663            268        395   0.595777         0.199211       0.160716     -0.038495             132.7219            71.9980
+v1-010   IS  kill_low           3.50                663            223        440   0.663650         0.199211       0.170184     -0.029027             132.7219            72.9426
+v1-010   IS  kill_low           3.75                663            184        479   0.722474         0.199211       0.174136     -0.025075             132.7219            65.4292
+v1-010   IS  kill_low           4.00                663            159        504   0.760181         0.199211       0.291848      0.092637             132.7219           102.0707
+v1-010  OOS  kill_low           2.00                210            170         40   0.190476         0.187563       0.302858      0.115295              34.9818            54.8398
+v1-010  OOS  kill_low           2.25                210            156         54   0.257143         0.187563       0.204177      0.016614              34.9818            36.1983
+v1-010  OOS  kill_low           2.50                210            136         74   0.352381         0.187563       0.138343     -0.049220              34.9818            23.2131
+v1-010  OOS  kill_low           2.75                210            116         94   0.447619         0.187563       0.148121     -0.039443              34.9818            20.7553
+v1-010  OOS  kill_low           3.00                210             90        120   0.571429         0.187563      -0.087732     -0.275295              34.9818            -9.0076
+v1-010  OOS  kill_low           3.25                210             70        140   0.666667         0.187563      -0.332352     -0.519915              34.9818           -34.1960
+v1-010  OOS  kill_low           3.50                210             61        149   0.709524         0.187563      -0.173882     -0.361445              34.9818           -16.6896
+v1-010  OOS  kill_low           3.75                210             48        162   0.771429         0.187563      -0.333354     -0.520918              34.9818           -26.6667
+v1-010  OOS  kill_low           4.00                210             36        174   0.828571         0.187563      -0.233284     -0.420847              34.9818           -11.2332
+
+## Per-symbol NATR×PnL pattern (does inversion hold per-symbol?)
+### BASELINE OOS per-symbol NATR×PnL
+  roster half   symbol natr_bucket  n_trades       wr  mean_net_pnl_pct  sum_weighted_pnl
+baseline  OOS  BTCUSDT        <2.5        31 0.451613          0.715997            2.6776
+baseline  OOS  BTCUSDT       2.5-3         2 0.500000          1.855250            3.7105
+baseline  OOS  BTCUSDT       3-3.5         2 0.500000          3.631750            7.2635
+baseline  OOS  ETHUSDT        <2.5        13 0.307692         -0.357400           12.3800
+baseline  OOS  ETHUSDT       2.5-3        15 0.200000         -1.643613           -7.6471
+baseline  OOS  ETHUSDT       3-3.5         6 0.666667          3.433683           10.7710
+baseline  OOS  ETHUSDT       3.5-4         7 0.428571         -0.768771            1.8575
+baseline  OOS  ETHUSDT         4-5         3 1.000000          5.561700           14.6977
+baseline  OOS  ETHUSDT          >5         2 0.500000          0.074850            0.1497
+baseline  OOS LINKUSDT        <2.5         5 0.200000         -1.499800           -1.5195
+baseline  OOS LINKUSDT       2.5-3         7 0.428571          1.536071            7.7579
+baseline  OOS LINKUSDT       3-3.5         5 0.200000         -1.314760           -7.1175
+baseline  OOS LINKUSDT       3.5-4         5 0.800000          4.767700           11.7576
+baseline  OOS LINKUSDT         4-5         3 0.666667         -0.272067           -0.2693
+baseline  OOS LINKUSDT          >5         3 1.000000          4.844167           10.7302
+baseline  OOS  LTCUSDT        <2.5        16 0.250000         -0.883344           -0.6310
+baseline  OOS  LTCUSDT       2.5-3         5 0.200000         -1.511440           -7.5572
+baseline  OOS  LTCUSDT       3-3.5         6 0.333333         -0.555783           -6.8140
+baseline  OOS  LTCUSDT       3.5-4         4 0.500000         -3.157325           -3.6137
+baseline  OOS  LTCUSDT         4-5         3 0.333333         -3.197900           -9.5937
+baseline  OOS  DOTUSDT        <2.5         2 0.500000          1.654250            2.0824
+baseline  OOS  DOTUSDT       2.5-3         8 0.125000         -3.055425           -7.1237
+baseline  OOS  DOTUSDT       3-3.5        14 0.357143         -0.331257           -3.3589
+baseline  OOS  DOTUSDT       3.5-4         7 0.428571          0.475357           -2.7945
+baseline  OOS  DOTUSDT         4-5        10 0.400000         -0.748390            1.4102
+baseline  OOS  DOTUSDT          >5         5 0.800000          6.377560            8.9287
+
+## Confidence × NATR cross-tab
+### BASELINE OOS confidence × NATR
+  roster half natr_bucket conf_bucket  n_trades       wr  mean_net_pnl_pct  sum_weighted_pnl
+baseline  OOS          <3   0.55-0.65         8 0.125000         -2.011863          -10.1075
+baseline  OOS          <3   0.65-0.75        24 0.333333         -0.344175          -11.2719
+baseline  OOS          <3       >0.75        72 0.333333         -0.258486           25.5093
+baseline  OOS         3-5   0.55-0.65         1 1.000000          9.974700            9.9747
+baseline  OOS         3-5   0.65-0.75         9 0.333333         -1.389367           -8.0590
+baseline  OOS         3-5       >0.75        65 0.476923          0.366088           12.2802
+baseline  OOS          >5   0.65-0.75         2 0.500000          2.775500            1.7487
+baseline  OOS          >5       >0.75         8 0.875000          5.127375           18.0599
+
+## Calibration summary — best threshold in F2 band
+
+### kill_high — baseline
+  STRICT band [10%, 60%]: best thr 3.75% skip 20.11% Δ -0.0761
+  RELAXED band [5%, 30%]: best thr 4.5% skip 7.94% Δ -0.0632
+  UNCONSTRAINED best: thr 4.5% skip 7.94% Δ -0.0632
+
+### kill_high — v1-010
+  STRICT band [10%, 60%]: best thr 3.25% skip 33.33% Δ +0.2666
+  RELAXED band [5%, 30%]: best thr 3.75% skip 22.86% Δ +0.2244
+  UNCONSTRAINED best: thr 3.25% skip 33.33% Δ +0.2666
+
+### kill_low — baseline
+  STRICT band [10%, 60%]: best thr 2.75% skip 43.92% Δ +0.1084
+  RELAXED band [5%, 30%]: best thr 2.0% skip 17.99% Δ +0.0460
+  UNCONSTRAINED best: thr 3.25% skip 62.43% Δ +0.2151
+
+### kill_low — v1-010
+  STRICT band [10%, 60%]: best thr 2.0% skip 19.05% Δ +0.1153
+  RELAXED band [5%, 30%]: best thr 2.0% skip 19.05% Δ +0.1153
+  UNCONSTRAINED best: thr 2.0% skip 19.05% Δ +0.1153
+
+Outputs written:
+  /home/roberto/crypto-trade/.worktrees/quant-research/analysis/iteration_v1-011/low_threshold_high_kill_oracle.csv
+  /home/roberto/crypto-trade/.worktrees/quant-research/analysis/iteration_v1-011/inverted_low_kill_oracle.csv
+  /home/roberto/crypto-trade/.worktrees/quant-research/analysis/iteration_v1-011/per_symbol_natr_pnl_pattern.csv
+  /home/roberto/crypto-trade/.worktrees/quant-research/analysis/iteration_v1-011/confidence_x_natr_table.csv
