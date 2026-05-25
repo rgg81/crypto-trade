@@ -70,3 +70,78 @@ LM Master Phase 4.5 fired AFTER QR Phase 5 brief authoring (post-`5506507`) rath
 Net: no brief revisions required; LM Master content is integrated retroactively as Section 3.7 of brief is structurally LM-Master-response-aware (QR pre-authored "If LM Master suggests per-symbol calibration: defer to /011 CONFIRMATION" — exactly what LM Master recommends).
 
 Proceeding to Phase 5.5 gate.
+
+---
+
+# LightGBM Master Advisor — iter-v1/010 — Phase 7.4 (Post-Mortem)
+
+## Context Read
+- Iteration outcome (`comparison.csv`): IS Sharpe **+0.7530** (vs baseline +0.2829, Δ **+0.4701**), OOS Sharpe **+0.6354** (vs baseline +0.6637, Δ **-0.0283**), OOS/IS ratio 0.8439, R5 fire rate IS 23.23% / OOS 18.57%.
+- Brief Section 1 hypothesis: "Uniform 4.0% vol-target ceiling caps the LINK+LTC+DOT high-NATR overshoot tail without re-routing entries; oracle predicts -36pp IS / -0.020 OOS Δ."
+- My Phase 4.5 call: PROMISING-INERT verdict-class (~70% HIGH-confidence), basin-shift unlikely (~10-15%), F2/F4 pass.
+
+## Calibration Update — Track Record 0/8 Directional + 2 PARTIAL
+
+**Verdict class correct (PROMISING-INERT band at OOS Δ -0.0283).** Basin-shift call **directionally wrong**: the +0.47 IS lift is a textbook Optuna re-routing event, not the ~85% roster-identity I anchored on. Roster intersection is 165/663 = **24.9% on IS** and **17.1% on OOS**. I underweighted three factors:
+
+1. **Config mismatch with baseline**: baseline is 5-seed ENSEMBLE × n_trials=50 = 250 fits/cell; /010 is 3-seed × n_trials=35 = 105 fits/cell. The 24.9% intersection isn't pure R5 — it's R5 + halved Optuna budget + reduced seed averaging. My "roster ~85% identical to oracle" assumed apples-to-apples; reality compared apples-to-pears.
+2. **R5's gradient signal was nonzero on the loss surface**: 74.8% of /010 IS trades sit at weight<0.5 (vs baseline 69.7%) — a 5pp shift that I dismissed as below SNR floor. It was AT the floor.
+3. **The "modal outcome" assumption was wrong for single-seed=42 EXPLORATIONs**: at this Optuna budget every R-primitive change WILL find a new basin because the search space is over-parameterized relative to the trial count.
+
+**Calibration update**: future Phase 4.5 directional confidence on Optuna basin-shift events should be **LOW by default** when (a) the runner config differs materially from the anchor's, OR (b) the axis touches the position-sizing weight (multiplies into the loss directly). Verdict-class predictions remain HIGH-confidence; signed-delta predictions remain banned.
+
+## IS Optuna Basin Shift Mechanism
+
+Per-symbol IS deltas tell the story (`reports-v1/iteration_v1-010/in_sample/per_symbol.csv`):
+
+| Symbol | Baseline IS net_pnl | /010 IS net_pnl | Δ | WR baseline | WR /010 |
+|---|---|---|---|---|---|
+| LTC | +3.27 | **+79.98** | **+76.7** | 39.5% | **47.3%** |
+| LINK | +72.06 | +32.33 | -39.7 | 45.2% | 42.1% |
+| DOT | +26.62 | +17.99 | -8.6 | 41.9% | 44.4% |
+| ETH | -13.70 | -19.40 | -5.7 | 38.6% | 34.5% |
+| BTC | -37.28 | -44.16 | -6.9 | 33.6% | 36.4% |
+
+**Mechanism: NOT "lower-NATR entries" or "higher-conviction signals." Optuna re-routed Model D (LTC) into a fundamentally different prediction basin.** LTC WR jumped 39.5 → 47.3 (+7.8pp), trade count dropped 124 → 110 (-11%), avg PnL went 0.026% → 0.727% (28× per-trade). LTC alone explains the +0.47 IS lift; LINK degradation partially offsets but LTC dominates. R5 didn't "cap the LTC tail" — it changed which trades Optuna selected to take in the first place, by reshaping the position-sizing-weighted loss surface seen during n_trials=35 search.
+
+This is **not the v3/020 pattern** (proportional scaling fails universally). This is a **single-symbol IS lottery** at single-seed=42 — LTC's re-route is exactly the kind of result that dissolves at multi-seed CONFIRMATION per `feedback_v3_single_seed_frozen_baseline.md`. The OOS LTC remains -43.5 (vs baseline -47.2; Δ +3.7pp — marginal), confirming the basin was found in-sample but didn't generalize.
+
+## OOS Marginal-Negative is Genuine Information
+
+OOS Δ = -0.0283 IS NOT v3/020 universal-fail replication. It's a **null result at OOS** dominated by basin-shift noise: BTC +11.7pp / DOT +27.2pp / LINK +46.7pp positive contributions are netted out by ETH -14.1pp + LTC -3.7pp negatives, and the OOS Sharpe denominator includes the extra exposure variance from the new roster. The "proportional scaling fails universally" v3/020 finding does NOT replicate at v1 — at v1, R5 produces a **non-pathological null** with positive OOS contribution from 3 of 5 symbols. This is genuinely different from v3 BCH+LDO+TRX where proportional scaling caused symmetric OOS degradation. **R5 proportional-scaling family at v1 is INERT, not toxic.**
+
+## F4 Verdict — PASS Confirmed
+
+Counted degenerate trades (`|exit-entry|/entry < 1e-4`): **IS=0, OOS=0**. R5 is position-sizing only; no label/feature surface modified; no degenerate predictor risk. F4 PASS.
+
+## Feature Importance Triage
+
+**`feature_importance.csv` does NOT exist for /010** (only `reports-v1/iteration_v1-007/feature_importance.csv` survives). The runner doesn't emit per-iteration feature importance at v1 EXPLORATION budget. Cannot verify whether vol_natr_14 importance jumped under R5. This is an instrumentation gap that should be closed if v1 continues investigating R-layer primitives — recommend QE add `_write_feature_importance` to v1 runner at /011 setup (the v3 fix from iter-v3/016 hasn't been ported).
+
+For reference, in /007 Model A (BTC+ETH) `vol_natr_14` ranked **6th of 40** at gain=7238.7 (behind aroon_osc_50, autocorr_lag5, atr_14, natr_x_adx, macd_line). R5 making vol_natr_14 "free to use" could theoretically jump it to top-3, but without /010's CSV we cannot confirm.
+
+## Path for /011 — Confirm LM Master Phase 4.5 Recommendation
+
+Per brief Section 11 + Phase 4.5 §3 PROMISING-INERT branch: **/011 PIVOTS to UNUSED `risk-primitive` BINARY family — regime-conditional kill switch.** Confirmed, with refinement:
+
+**Concrete /011 axis**: "skip entry if NATR_14 > 7%" (binary kill, not proportional scale). The threshold 7% is the **universe p90 of NATR_14**; at p75 ≈ 4.7% the cap is too tight (would kill ~25% of trades). p90 ≈ 7% kills ~10% — same fire-rate band as /010's 23%/18.6% but as a hard binary cutoff. EDA basis: re-use /010's vol_natr_14 distribution analysis from briefs-v1/iteration_v1-010/research_brief.md Section 2.3.
+
+**Why binary, not another proportional family**: v3/020 + v1/010 jointly establish proportional scaling's INERT/marginal-NEGATIVE corridor across both universes. Binary kill is the architecturally-orthogonal sister primitive — it injects state-discontinuity into the prediction → position-sizing pipeline rather than smoothly attenuating exposure. STATELESS per `feedback_v3_oracle_eda_validity.md` — oracle EDA on /010's roster is fully valid.
+
+## Suspicious Patterns for Critic Phase 7.5
+
+1. **LTC IS basin-shift is the entire +0.47 lift.** Per-symbol delta table above. Critic Check 6 (per-symbol concentration) should flag: LTC alone went from 6.42% of total PnL to **119.84%** — concentration at one symbol > 100% means LTC drove the entire portfolio gain and other symbols offset. This is the "narrow basin" pattern from `feedback_v3_concentration_is_signal.md` adapted to single-symbol.
+2. **OOS roster overlap with baseline is 17.1%, far below the "stateless mod" expectation of ~85%.** R5 fired on 23% of trade-candidates IS but produced 75% roster turnover — the additional turnover is Optuna basin re-routing, not R5 mechanical filtering. Critic Check 3 (PBO) should be sensitive to this; n_effective_trials=13 and n_eff_per_cell_min=5. LTC at n_eff=12 means LTC's 0.7530 IS Sharpe rests on the thinnest evidence.
+3. **PSR_monthly_vs_0 dropped IS=0.876 / OOS=0.760** (vs aspirational 0.95) — the IS lift is statistically fragile. DSR_corrected=0.000 (vs baseline negative DSR) is informationally null, not informationally positive.
+
+## What This Iteration Confirms / Refutes About Prior LM Master Advisory
+
+**Confirmed**: F2 fire-rate band (23.2%/18.6% in [10%, 60%] — PASS at 85% predicted), F4 no degeneracy (PASS at 95% predicted), verdict-class PROMISING-INERT (PASS at 70% predicted).
+
+**Refuted**: "Optuna basin shift unlikely (~10-15%)" — observed massive basin shift on LTC. The mechanism reasoning was sound (n_trials=35 single-seed has limited basin-discovery power) but the LTC re-route at the position-weighted loss surface was exactly the basin Optuna found. My probability estimate was off by ~3-4× on the upside.
+
+**New rule for Phase 4.5 going forward**: when the axis multiplies the loss directly (position-sizing weight, label weight, sample weight), basin-shift probability is HIGH (40-60%) at single-seed budgets, NOT 10-15%. Document this in the next /011 advisory.
+
+## Closing Note for Critic (Phase 7.5)
+
+Critic should focus Check 6 (concentration) on LTC's 119.84% pct_of_total_pnl IS — single-symbol drives the entire IS lift. Check 3 (PBO) deserves attention given n_eff_per_cell_min=5 (one cell on extremely thin evidence). The /010 verdict is genuinely PROMISING-INERT (OOS Δ -0.0283 within [-0.05, +0.05] band) and the marginal-NEGATIVE call is honest — but the IS +0.47 is not durable signal and should not influence /011 staging.
