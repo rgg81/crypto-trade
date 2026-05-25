@@ -963,14 +963,21 @@ def main() -> None:
     if sigma_source_arg == "ewma14d":
         sigma_k_tp_arg = float(getattr(args, "label_sigma_k_tp", 1.06))
         sigma_k_sl_arg = float(getattr(args, "label_sigma_k_sl", 0.53))
-        # Auto-disable R5-BINARY-KILL for axis isolation when ewma14d is active.
+        # AXIS ISOLATION: disable BOTH R5 axes (proportional vol-target AND
+        # binary-kill) when σ_t labeling is active. /014 tests the labeling
+        # axis only; comparison anchor is BASELINE_V1 which has no R5.
         if r5_kill_low_natr_enabled:
             print(
                 "[run_baseline_v1] AXIS-ISOLATION: sigma_source=ewma14d auto-disables "
                 "R5-BINARY-KILL (Section 0.2 + 3.4 axis isolation rule)"
             )
             r5_kill_low_natr_enabled = False
-            r5_vol_target_enabled = True  # restore historical default
+        if r5_vol_target_enabled:
+            print(
+                "[run_baseline_v1] AXIS-ISOLATION: sigma_source=ewma14d auto-disables "
+                "R5 vol-target ceiling (clean single-axis test vs BASELINE_V1)"
+            )
+            r5_vol_target_enabled = False
         print(
             f"[run_baseline_v1] σ_t labeling ENABLED: k_tp={sigma_k_tp_arg} "
             f"k_sl={sigma_k_sl_arg} halflife={sigma_halflife_days_arg}d "
