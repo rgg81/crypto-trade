@@ -331,6 +331,40 @@ Per `briefs-v1/iteration_v1-010/review.md` §"Recommendations to QR":
 
 The ONLY axis change is the BacktestConfig R5-BINARY-KILL enable + threshold 2.0%.
 
+### 3.6 LM Master Phase 4.5 recommendations response (post-issuance retro-amend)
+
+Per `briefs-v1/iteration_v1-011/lgbm_advisor.md` Phase 4.5 (committed at `f6e0515` AFTER this brief was authored — compaction-ordering pattern same as /010):
+
+**Hyperparameter Rec #1 — Keep n_trials=35, ENSEMBLE_SIZE=3, single-seed=42 UNCHANGED**:
+- **ADOPTED**: matches brief Section 3.5 already. No change required.
+
+**Hyperparameter Rec #2 — Pin `feature_fraction = 1.0` in v1_pruned bounds for /011**:
+- **DEFERRED to /012 CONFIRMATION**: rejection rationale — pinning feature_fraction would create a NEW bounds_profile variant ("v1_pruned_v011") that breaks direct comparability with /010's bounds_profile=v1_pruned. The cross-roster oracle EDA (Section 2) used the EXISTING bounds_profile and produced cross-roster sign-agreement; introducing a new bounds variant would re-couple axis effect with bounds-profile effect, undoing the isolation LM Master is trying to achieve. If /011 is PROMISING, /012 CONFIRMATION can incorporate feature_fraction pinning as part of CONFIRMATION-spec hygiene (analogous to v3 CONFIRMATION pinning). If /011 is NEGATIVE / INERT / OVERSHOOT-FLAG, feature_fraction pin is moot.
+- **Trade-off acknowledged**: keeping feature_fraction tunable introduces 15-20% basin-shift contribution per LM Master Rec #2 estimate. Brief Section 5.1 P10/P90 width already wide enough to absorb this; Section 8 OVERSHOOT-FLAG class handles the worst case.
+
+**Hyperparameter Rec #3 — NO min_data_in_leaf adjustment**:
+- **ADOPTED**: matches brief Section 3.5 already (v1_pruned defaults preserved). No change required.
+
+**Feature Rec #1 — NO feature changes**:
+- **ADOPTED**: matches brief Section 3.5 (V1_FEATURE_COLUMNS_PRUNED unchanged at 40 cols). No change required.
+
+**Saturation Risk Rec #1 — Cross-roster magnitude divergence interpretation**:
+- **ADOPTED into Section 5.1**: LM Master's P50 ≈ +0.05 prediction (closer to BASELINE oracle than /010 oracle) is consistent with brief Section 5.1 base-case +0.05 to +0.12 oracle range. Brief Section 5.1 P10/P90 width respects LM Master's "sign robust, magnitude basin-dependent" assessment.
+
+**Saturation Risk Rec #2 — F6 roster-overlap diagnostic 70-78% expected**:
+- **NOTED into Section 4 F6**: LM Master's "65-70% suspicious-not-tripwire" band is informational; brief F6 tripwire at 61% remains correct (catastrophic basin-shift threshold). 65-70% would land as PROMISING-with-basin-suspicion at Phase 7 evaluation; not a hard verdict trigger.
+
+**Saturation Risk Rec #3 — Per-symbol concentration asymmetric vs /010 (ETH/LTC/DOT-led)**:
+- **NOTED into Section 7 Failure Modes**: LM Master's prediction that /011 OOS gainers will be ETH/DOT-led (NOT LTC-led like /010) is testable at Phase 7. Brief Section 4 F2.5 (per-symbol concentration ≤ 30% of OOS PnL) remains the binding constraint.
+
+**Basin-shift probability revision (entry-filter axis = 20-30%)**:
+- **ADOPTED into Section 5.1 + Section 7**: LM Master's NEW calibration — entry-filter axes (R5-BINARY-KILL class) at 20-30% basin-shift, vs 40-60% for weight-touching axes — is acknowledged in Section 5.1 ("the brief's predicted band still respects the conservative prior"). Section 7 Failure Mode 4 narrowed scope to "entry-filter basin-shift" risk.
+
+**Modal verdict probability distribution**:
+- **DOCUMENTED**: LM Master P(PROMISING) ~45% / P(PROMISING-INERT) ~30% / P(OVERSHOOT-FLAG) ~15% / P(NEGATIVE) ~10% is the strongest verdict-class signal in v1 cycle-2 to date. Brief Section 8 verdict gates are pre-registered for ALL four classes; the LM Master prior informs expectation but does NOT bind verdict assignment (which is mechanical from F1-F6 + 4-class gates).
+
+**Net**: LM Master Phase 4.5 produced 1 actionable hyperparameter rec (feature_fraction pin) which is DEFERRED to /012 for axis-isolation reasons. All other recs are ADOPTED or NOTED into existing brief sections. No further amendments required. Brief is finalized for Phase 5.5 gate.
+
 ---
 
 ## Section 4 — Falsifiers and Behavioral Predictors
