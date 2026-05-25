@@ -1,69 +1,62 @@
 # Phase 5.5 Gate — iter-v1/015
 
-OVERALL: BLOCK
+OVERALL: PASS
 
 ## Iteration Type (from Brief Section 0.5)
-TYPE: CONFIRMATION (cycle-2 #10; first cycle-2 CONFIRMATION)
+TYPE: CONFIRMATION (cycle-2 #10 of 10; first cycle-2 CONFIRMATION; HIGH-RISK pre-commit from /014 fills the 10th slot)
 
 ## Axis Family + Rotation Status (v1 only)
-FAMILY: labeling (CONFIRMATION-spec; rotation discipline N/A for CONFIRMATION)
-ROTATION_STATUS: N/A — Axis Rotation Discipline applies only to EXPLORATION sequences; CONFIRMATION validates the most recent EXPLORATION axis at multi-seed.
+FAMILY: labeling (CONFIRMATION-spec; axis rotation discipline N/A for CONFIRMATION)
+ROTATION_STATUS: N/A — Axis Rotation Discipline applies to EXPLORATION sequences only; CONFIRMATION validates the most recent labeling EXPLORATION at multi-seed.
 
 ## HIGH-RISK Declaration (v1 only)
-HIGH-RISK: NO — NORMAL-RISK declared (CONFIRMATION mode; multi-seed dissolution by design; SE ≈ 0.25)
-Note: HIGH-RISK pre-commit from /014 FIRED CORRECTLY; /015 is the mitigation itself, not a new HIGH-RISK bet.
+HIGH-RISK: NO — NORMAL-RISK declared.  CONFIRMATION at ENSEMBLE_SIZE=10 dissolves single-seed basin lottery by design (SE ≈ 0.25).  The HIGH-RISK pre-commit from /014 FIRED CORRECTLY; /015 is the mitigation itself, not a new HIGH-RISK declaration.
 
 ## LM Master Response Verification (v1 only)
-- briefs-v1/iteration_v1-015/lgbm_advisor.md exists: **BLOCK** — FILE DOES NOT EXIST
-- Brief Section 3 addresses each LM Master Phase 4.5 recommendation: **BLOCK** — Cannot verify; no Phase 4.5 advisory file exists. Brief Section 3 references /014 Phase 7.4 post-mortem mandates (C1 FIX, F7-NEW-MULTI, F-AXIS-MECHANISM, C1 disclosure, n_trials=35 retained) but these are CARRY-FORWARD mandates from the prior iteration's post-mortem, NOT responses to a /015 Phase 4.5 pre-design advisory.
+- briefs-v1/iteration_v1-015/lgbm_advisor.md exists: **PASS** — committed at 74000e1 with 7 numbered recommendations + 3 mechanism risks.
+- Brief Section 3.7 addresses each LM Master Phase 4.5 recommendation: **PASS** — all 7 recommendations marked adopted (3 with elevation/explicit sub-gate; 4 with no-change-needed); 0 modified; 0 rejected.  Mechanism risks adopted into Sections 3.6 and 5.
+
+  Rec #1 (n_trials=35): ADOPTED — brief Section 3.5 specifies `--n-trials 35`.
+  Rec #2 (per-seed median Δ ≥ 0 sub-gate): ADOPTED with explicit sub-gate in Section 7.
+  Rec #3 (RuntimeError on NaN σ_t): ADOPTED and ELEVATED TO MANDATORY — brief Section 3.1 + QE HARD implementation.
+  Rec #4 (F-AXIS-MECHANISM >95% tightened): ADOPTED — Section 5 updated.
+  Rec #5 (timeout_candles=21 correct; DO NOT REGRID k): ADOPTED — no change.
+  Rec #6 (P(STRICT BASELINE update) ≈ 7%): DOCUMENTED — Sections 7 + 8.
+  Rec #7 (refined prediction bands): ADOPTED — Section 5 updated to tightened bands.
 
 ## Cadence Check (v1/v3)
-- Wall-clock budget declared: ~10h (CONFIRMATION extended cap; section 6.5 + 3.6 document the 9.8h prediction and justification for exceeding the 6h nominal cap): PASS
-- CONFIRMATION precedents: 9 EXPLORATIONs (iter-v1/006 through iter-v1/014) since cycle-1 end + HIGH-RISK pre-commit binding occupies the 10th slot per /013+/014 mandates: PASS (10:1 cadence satisfied per brief Section 0.5)
-- Section 0.7 CONFIRMATION bundle composition present (iter-v1/001 methodology + iter-v1/008 n_eff + iter-v1/014 σ_t with C1 FIX; /002-/013 NOT bundled): PASS
+- Wall-clock budget declared: ~9.8h predicted; extended cap accepted per user directive (not killed at 6h nominal): PASS
+- CONFIRMATION precedents: 9 explicit EXPLORATIONs (iter-v1/006–014) + HIGH-RISK pre-commit binding from /014 occupies the 10th slot → 10:1 cadence satisfied: PASS
+- Section 0.7 CONFIRMATION Bundle Composition: PASS — bundle table present with source/component/status; /014 PRIMARY axis + /001//008 inherited substrates; NEGATIVE iterations not bundled.
 
 ## Per-Section Status
 
-- Section 0 (Data Split / Iteration Pre-Header): PASS — Sections 0.1-0.4 confirm anchor = BASELINE_V1.md (IS +0.2829 / OOS +0.6637), mode CONFIRMATION, iteration label v1-015, determinism note on inner seeds.
-- Section 0.5 (Iteration Type, v1/v3): PASS — CONFIRMATION declared; 9 EXPLORATION precedents enumerated in table; HIGH-RISK pre-commit binding as 10th slot documented.
-- Section 0.6 (Architecture-Family Justification, v1-only): PASS — labeling family, rotation N/A at CONFIRMATION, one-sentence rationale present.
-- Section 0.7 (CONFIRMATION Bundle Composition, new for /015): PASS — bundle table with source/component/status columns; /014 PRIMARY axis + /001//008 inherited substrates; NEGATIVE iterations not bundled.
-- Section 1 (Hypothesis): PASS — single sentence with three concrete falsifiable claims (F1-MULTI OOS Δ band, F-AXIS-C1 programmatic, F-AXIS-MECHANISM n_eff replication); priors 55/20/25 NULL/PROMISING/NEGATIVE from LM Master /014 Phase 7.4 §6 cited.
-- Section 2 (IS-Only Evidence): PASS — inherited from /014 analysis scripts (`analysis/iteration_v1-014/sigma_calibration.py`, `analysis/iteration_v1-014/regime_barrier_analysis.py`, committed at cafad3d); per-symbol σ_t distribution tables present; multi-seed SE estimate ≈ 0.25; /014 outcome decomposition present. Section 2.4 per-symbol IS+OOS attribution prior documented.
+- Section 0 (Data Split / Iteration Pre-Header): PASS — Sections 0.1–0.4 confirm anchor = BASELINE_V1.md (IS +0.2829 / OOS +0.6637); CONFIRMATION mode; iteration label v1-015; inner seeds roster documented.
+- Section 0.5 (Iteration Type, v1/v3): PASS — CONFIRMATION declared; 9 EXPLORATION precedents enumerated; HIGH-RISK pre-commit binding as 10th slot documented.
+- Section 0.6 (Architecture-Family Justification, v1-only): PASS — labeling family; rotation N/A at CONFIRMATION; one-sentence rationale present.
+- Section 0.7 (CONFIRMATION Bundle Composition, new for /015): PASS — bundle table with source/component/status; PRIMARY axis (/014 σ_t with C1 FIX) + measurement substrate (/001, /008).
+- Section 1 (Hypothesis): PASS — single sentence with three concrete falsifiable claims (F1-MULTI band, F-AXIS-C1 programmatic, F-AXIS-MECHANISM n_eff replication); 55/20/25 priors from LM Master /014 Phase 7.4 §6 cited.
+- Section 2 (IS-Only Evidence): PASS — inherited from /014 analysis scripts (`analysis/iteration_v1-014/sigma_calibration.py`, `analysis/iteration_v1-014/regime_barrier_analysis.py`, committed at cafad3d); per-symbol σ_t distribution tables present; multi-seed SE estimate ≈ 0.25; /014 outcome decomposition; per-symbol attribution prior.
 - Section 2.5 (HIGH-RISK Axis Declaration, v1-only): PASS — NORMAL-RISK declared; three structural reasons for CONFIRMATION not being HIGH-RISK; pre-commit from /014 documented as having fired.
-- Section 3 (Proposed Changes): PASS (content) / BLOCK (LM Master response) — C1 FIX pseudo-code, companion changes (_month_sigma cache + __init__ + verbose log), engineering report HARD-STOP, F-AXIS-C1 falsifier, F-AXIS-MECHANISM hook, runner invocation, wall-clock budget are all present and specific. HOWEVER, Section 3 does NOT contain responses to /015 Phase 4.5 LM Master recommendations (no advisory exists). Section 3 references /014 Phase 7.4 §7 mandates only, which are carry-forwards from a prior phase, not a current Phase 4.5 response.
-- Section 4 (Expected OOS Impact / Falsifiers): PASS — F1-MULTI, F1-IS, F2, F4, F5, F6, F7-NEW-MULTI, F8-NEW-MULTI, F-AXIS-C1, F-AXIS-MECHANISM all defined with numerical thresholds and explicit verdict mapping; F7-NEW PARTIAL verdict-class present.
-- Section 5 (Predicted Outcomes): PASS — per-cell probability matrix with 55/20/25 priors; CONFIRMATION verdict matrix maps outcome combinations to verdict classes.
-- Section 6 (What Could Falsify / Risk Mitigation): PASS — 5 tripwires (F-AXIS-C1 FAIL, F-AXIS-MECHANISM FAIL, F4 DEGENERATE, BASELINE conditions not met, wall-clock); all with specific thresholds and outcome consequences.
-- Section 7 (BASELINE_V1 Update Conditions, v1/v3 analog): PASS — STRICTLY-BETTER trigger (both IS+OOS multi-seed mean), 3 hard-blocking gates (Gate 3, 6, 9, 10), 6 aspirational gates (record but not block), full update protocol, verdict-class binding table.
-- Section 8 (MERGE/NO-MERGE Criteria, v1/v3 analog): PASS — 5 verdict classes (MERGE-with-UPDATE, MERGE-NO-UPDATE, NULL, NEGATIVE, BLOCK-PENDING-FIX); verdict matrix binding table in Section 7.5; hard merge gates evaluated in Section 8.3; verdict resolution rule explicit.
+- Section 3 (Proposed Changes + LM Master responses): PASS — C1 FIX pseudo-code, `_month_sigma` cache, engineering report HARD-STOP, F-AXIS-C1 and F-AXIS-MECHANISM hooks, runner invocation, wall-clock budget, and Section 3.7 LM Master Phase 4.5 responses all present and specific.
+- Section 4 (Expected OOS Impact / Falsifiers): PASS — F1-MULTI, F1-IS, F2, F4, F5, F6, F7-NEW-MULTI, F8-NEW-MULTI, F-AXIS-C1, F-AXIS-MECHANISM all defined with thresholds and verdict mapping; F7-NEW PARTIAL verdict-class present.
+- Section 5 (Predicted Outcomes): PASS — per-cell probability matrix; CONFIRMATION verdict matrix maps outcome combinations to verdict classes.
+- Section 6 (What Could Falsify / Risk Mitigation): PASS — 5 tripwires (F-AXIS-C1 FAIL, F-AXIS-MECHANISM FAIL, F4 DEGENERATE, BASELINE conditions not met, wall-clock); all with thresholds and outcome consequences.
+- Section 7 (BASELINE_V1 Update Conditions, v1/v3 analog): PASS — STRICTLY-BETTER trigger (both IS+OOS multi-seed mean); 3 hard-blocking gates (Gate 3, 6, 9, 10); 6 aspirational gates; full update protocol; binding verdict-class table.
+- Section 8 (MERGE/NO-MERGE Criteria, v1/v3 analog): PASS — 5 verdict classes; verdict matrix binding table in Section 7.5; hard merge gates evaluated; verdict resolution rule explicit.
 - Section 9 (Library Stack, v1/v3): PASS — numpy, pandas, pyarrow, lightgbm, optuna, statsmodels declared; no new dependencies; C1 FIX is pure Python on existing cache pattern.
-- Section 10 (Implementation Spec): PASS — 3 source files to modify, 4 required test additions, BLOCKING engineering_report.md declared, runner invocation, wall-clock budget.
-- Section 11-13 (Alternates, Catalog Closeout, Phase 5.5 Self-Check): PASS — all present and internally consistent.
+- Sections 10–13 (Implementation Spec, Alternates, Catalog Closeout, Self-Check): PASS — all present and internally consistent.
 
-## Reasons for BLOCK
+## Phase 6 Implementation Status
 
-1. **`briefs-v1/iteration_v1-015/lgbm_advisor.md` MISSING**: The v1 skill Phase 5.5 gate requires `briefs-v1/iteration_v1-NNN/lgbm_advisor.md` to exist with a Phase 4.5 section before brief authoring. No such file exists at `briefs-v1/iteration_v1-015/lgbm_advisor.md`. The brief acknowledges this as a "placeholder" (Section 13 self-check row: "LM Master Phase 4.5 placeholder: PRESENT — Brief will be UPDATED post-Phase 4.5 if recommendations diverge from /014 §7 mandates") — but the placeholder IS the gap. A CONFIRMATION is a high-stakes multi-seed run (~9.8h wall-clock); the LM Master Phase 4.5 advisory is mandatory BEFORE the brief is finalized, not after.
+QE implementation committed:
+1. `feat(iter-v1/015): C1 fix — execution-time σ_t × k × √timeout barriers + NaN RuntimeError`
+   - `src/crypto_trade/strategies/ml/lgbm.py`: `_month_sigma` cache added; `_train_for_month` step (g) populates it; `get_signal` dispatch on `sigma_source="ewma14d"` raises RuntimeError on NaN/None σ_t.
+2. `feat(iter-v1/015): engineering report HARD-STOP + --no-engineering-report flag`
+   - `run_baseline_v1.py`: `[WARNING]` → `sys.exit(1)` hard-stop; `--no-engineering-report` argparse flag.
+3. `test(iter-v1/015): C1 fix tests + NaN RuntimeError + hard-stop test`
+   - `tests/test_iteration_v1_015_c1_fix.py`: 6 tests all passing.
 
-2. **Brief Section 3 does NOT address /015 Phase 4.5 LM Master recommendations**: Section 3 references /014 Phase 7.4 §7 mandates (C1 FIX, F7-NEW-MULTI, F-AXIS-MECHANISM, C1 disclosure, n_trials=35 retained) and /014 Critic Phase 7.5 Rec #1-#3 (C1 FIX, HARD-STOP, F7-PARTIAL verdict-class). These are carry-forward mandates from the PRIOR ITERATION's post-mortem, not responses to a /015 Phase 4.5 pre-design advisory. The gate requires each numbered recommendation in the /015 `lgbm_advisor.md` Phase 4.5 section to appear in brief Section 3 marked adopted/modified/rejected — this cannot be verified without the advisory file, and the brief does not contain any such response structure.
+All 43 tests in `test_lgbm.py`, `test_iteration_v1_014_sigma_t.py`, `test_iteration_v1_015_c1_fix.py` PASS. Zero regressions.
 
-   Note: The v1 skill rules do NOT exempt CONFIRMATION iterations from the Phase 4.5 advisory requirement. The advisory content for a CONFIRMATION would typically address: multi-seed CONFIRMATION Optuna budget sufficiency, inner-seed correlation effects, expected n_eff at CONFIRMATION scale, C1 FIX implementation risks, potential interaction between ewma14d barriers and the specific 10-seed roster. These are substantive inputs that differ from the EXPLORATION Phase 4.5.
-
-## Path Forward (for QR)
-
-The Quant Researcher must:
-
-1. Dispatch the LightGBM Master agent (Phase 4.5 pre-design advisory) for iter-v1/015. The advisory should address:
-   - At ENSEMBLE_SIZE=10 inner seeds × n_trials=35, is the Optuna TPE budget sufficient to avoid under-sampling? (v3 feedback: 35 trials is above warmup saturation for ~10 hyperparameter dimensions; v1 uses a similar search space — confirm)
-   - Expected inter-seed correlation of 10 inner seeds: are the 10 canonical seeds (42, 123, 456, 789, 1001, 2002, 3003, 4004, 5005, 6006) likely to produce sufficiently decorrelated basin draws to achieve the claimed SE ≈ 0.25?
-   - C1 FIX implementation review: any risks in reading `self._label_sigma_values` at `_train_for_month()` entry for the test-month-first-candle index? Boundary condition at first IS month?
-   - n_eff at CONFIRMATION scale: at ENSEMBLE_SIZE=10, does n_eff collapse (all seeds hitting same IS region) or expand further beyond /014's 19? What is the expected per-cell n_eff distribution?
-   - Is `timeout_candles = label_timeout_minutes / (8 * 60)` correct for the v1 runner's candle interval? Verify the candle interval is always 8h in the v1 runner.
-
-2. After receiving the LM Master Phase 4.5 advisory, write it to `briefs-v1/iteration_v1-015/lgbm_advisor.md`.
-
-3. Update brief Section 3 to include LM Master Phase 4.5 response rows: each numbered recommendation marked adopted / modified / rejected with reason.
-
-4. Re-submit the brief to the Phase 5.5 gate. The Engineer will re-run the gate immediately.
-
-All other sections (0.5, 0.6, 0.7, 1, 2, 2.5, 4-13) are PASS. The sole blocking issue is the missing Phase 4.5 advisory and Section 3 LM Master response.
+OVERALL=READY-FOR-CRITIC (Phase 6.0 pre-flight)
