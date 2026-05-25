@@ -80,6 +80,7 @@ from crypto_trade.strategies.ml.lgbm import LightGbmStrategy
 from crypto_trade.strategies.ml.reporting_v1 import (
     _per_cell_n_eff_from_parquet,
     append_psr_rows_to_comparison,
+    append_r5_rows_to_comparison,
     compute_n_eff_and_dsr,
     compute_psr_columns,
     write_adf_test_csv,
@@ -346,6 +347,10 @@ def _run_methodology_reporting(
     interval: str,
     oof_parquet_path: Path | None,
     feature_columns: list[str] | None = None,
+    r5_signals_is: int = 0,
+    r5_fires_is: int = 0,
+    r5_signals_oos: int = 0,
+    r5_fires_oos: int = 0,
 ) -> None:
     """Run all iter-v1/001 methodology reporting passes AFTER generate_iteration_reports().
 
@@ -605,6 +610,12 @@ def _run_methodology_reporting(
                 per_cell_result["n_eff_per_cell_median"] if per_cell_result else None
             ),
         )
+        # ---------------------------------------------------------------------------
+        # 4b. comparison.csv R5 fire-rate IS/OOS rows (iter-v1/010 reporting patch)
+        # ---------------------------------------------------------------------------
+        r5_fire_rate_is = (r5_fires_is / r5_signals_is) if r5_signals_is > 0 else 0.0
+        r5_fire_rate_oos = (r5_fires_oos / r5_signals_oos) if r5_signals_oos > 0 else 0.0
+        append_r5_rows_to_comparison(comparison_path, r5_fire_rate_is, r5_fire_rate_oos)
     else:
         print(
             "[run_baseline_v1] WARNING: comparison.csv not found at "
@@ -870,10 +881,12 @@ def main() -> None:
             bounds_profile=bounds_profile,
         )
         all_results = results_a + results_c + results_d + results_e
+        # Aggregate R5 IS/OOS split counters across all four models (iter-v1/010).
+        _r5_model_results = [results_a, results_c, results_d, results_e]
     else:
         # Custom universe — single pooled model unless brief specifies otherwise.
         # iter-v1/NNN brief Section 3 should declare per-symbol model assignment.
-        all_results = run_model(
+        _pooled = run_model(
             "POOLED",
             symbols,
             atr_tp=2.9,
@@ -885,6 +898,14 @@ def main() -> None:
             feature_columns=active_feature_columns,
             bounds_profile=bounds_profile,
         )
+        all_results = _pooled
+        _r5_model_results = [_pooled]
+
+    # Aggregate R5 IS/OOS split counters from BacktestResult attributes.
+    agg_r5_signals_is = sum(getattr(r, "r5_signals_is", 0) for r in _r5_model_results)
+    agg_r5_fires_is = sum(getattr(r, "r5_fires_is", 0) for r in _r5_model_results)
+    agg_r5_signals_oos = sum(getattr(r, "r5_signals_oos", 0) for r in _r5_model_results)
+    agg_r5_fires_oos = sum(getattr(r, "r5_fires_oos", 0) for r in _r5_model_results)
 
     all_results.sort(key=lambda t: t.close_time)
     print(f"\nCombined: {len(all_results)} trades")
@@ -924,6 +945,10 @@ def main() -> None:
         interval="8h",
         oof_parquet_path=OOF_PARQUET_PATH,
         feature_columns=active_feature_columns,
+        r5_signals_is=agg_r5_signals_is,
+        r5_fires_is=agg_r5_fires_is,
+        r5_signals_oos=agg_r5_signals_oos,
+        r5_fires_oos=agg_r5_fires_oos,
     )
 
     print(

@@ -16,6 +16,7 @@ from crypto_trade.backtest_models import (
     Strategy,
     TradeResult,
 )
+from crypto_trade.config import OOS_CUTOFF_MS
 from crypto_trade.kline_array import load_kline_array
 from crypto_trade.storage import csv_path
 
@@ -197,6 +198,12 @@ def run_backtest(
     # Populated at init when config.risk_r5_vol_target_enabled is True.
     r5_natr_lookup: dict[tuple[str, int], float] = {}
     r5_fires = 0
+    # IS/OOS split counters (iter-v1/010 R5 reporting patch).
+    # Partitioned by open_time vs OOS_CUTOFF_MS from config.py.
+    r5_signals_is: int = 0
+    r5_fires_is: int = 0
+    r5_signals_oos: int = 0
+    r5_fires_oos: int = 0
     if config.risk_r5_vol_target_enabled:
         import pyarrow.parquet as pq  # noqa: PLC0415
 
@@ -428,10 +435,20 @@ def run_backtest(
                 # R5 — vol-target ceiling (iter-v1/010); AFTER R2, ALL MODELS
                 if config.risk_r5_vol_target_enabled:
                     _natr = r5_natr_lookup.get((sym, ot), float("nan"))
+                    # IS/OOS signal counter — partitioned by OOS_CUTOFF_MS.
+                    if ot < OOS_CUTOFF_MS:
+                        r5_signals_is += 1
+                    else:
+                        r5_signals_oos += 1
                     if not math.isnan(_natr):
                         r5_scale = min(1.0, float(config.risk_r5_vol_target_pct) / max(_natr, 0.01))
                         if r5_scale < 1.0:
                             r5_fires += 1
+                            # IS/OOS fire counter — partitioned by OOS_CUTOFF_MS.
+                            if ot < OOS_CUTOFF_MS:
+                                r5_fires_is += 1
+                            else:
+                                r5_fires_oos += 1
                         vt_scale = vt_scale * r5_scale
                 order = create_order(
                     sym,
@@ -484,18 +501,44 @@ def run_backtest(
 
     results.sort(key=lambda r: r.close_time)
 
-    if config.risk_r5_vol_target_enabled and total_signals > 0:
-        print(
-            f"[R5] fired on {r5_fires} of {total_signals} signals "
-            f"({100.0 * r5_fires / total_signals:.1f}%) at "
-            f"vol_target_pct={config.risk_r5_vol_target_pct}%"
-        )
+    if config.risk_r5_vol_target_enabled:
+        # Three-line IS/OOS split summary (iter-v1/010 R5 reporting patch).
+        _r5_total = r5_signals_is + r5_signals_oos
+        _r5_all_fires = r5_fires_is + r5_fires_oos
+        if r5_signals_is > 0:
+            print(
+                f"[R5] IS:  fired on {r5_fires_is} of {r5_signals_is} signals "
+                f"({100.0 * r5_fires_is / r5_signals_is:.1f}%)"
+            )
+        else:
+            print("[R5] IS:  fired on 0 of 0 signals (0.0%)")
+        if r5_signals_oos > 0:
+            print(
+                f"[R5] OOS: fired on {r5_fires_oos} of {r5_signals_oos} signals "
+                f"({100.0 * r5_fires_oos / r5_signals_oos:.1f}%)"
+            )
+        else:
+            print("[R5] OOS: fired on 0 of 0 signals (0.0%)")
+        if _r5_total > 0:
+            print(
+                f"[R5] ALL: fired on {_r5_all_fires} of {_r5_total} signals "
+                f"({100.0 * _r5_all_fires / _r5_total:.1f}%)"
+            )
+        else:
+            print("[R5] ALL: fired on 0 of 0 signals (0.0%)")
 
     if profile_memory:
         _mem_report("after backtest loop")
         tracemalloc.stop()
 
-    return BacktestResult(results, total_signals)
+    return BacktestResult(
+        results,
+        total_signals,
+        r5_signals_is=r5_signals_is,
+        r5_fires_is=r5_fires_is,
+        r5_signals_oos=r5_signals_oos,
+        r5_fires_oos=r5_fires_oos,
+    )
 
 
 def build_master(

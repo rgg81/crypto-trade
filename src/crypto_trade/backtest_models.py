@@ -160,8 +160,28 @@ class BacktestResult(list):
     many times the strategy fired (direction != 0, weight > 0), which may
     exceed ``len(self)`` when signals are skipped because an order is
     already open for that symbol.
+
+    iter-v1/010 R5 IS/OOS split counters
+    -------------------------------------
+    r5_signals_is, r5_fires_is   : signal count and R5 fire count for
+                                   candles with open_time < OOS_CUTOFF_MS.
+    r5_signals_oos, r5_fires_oos : same for open_time >= OOS_CUTOFF_MS.
+    All four default to 0 when R5 is disabled.
     """
 
-    def __init__(self, trades: list[TradeResult], total_signals: int = 0):
+    def __init__(
+        self,
+        trades: list[TradeResult],
+        total_signals: int = 0,
+        *,
+        r5_signals_is: int = 0,
+        r5_fires_is: int = 0,
+        r5_signals_oos: int = 0,
+        r5_fires_oos: int = 0,
+    ):
         super().__init__(trades)
         self.total_signals = total_signals
+        self.r5_signals_is = r5_signals_is
+        self.r5_fires_is = r5_fires_is
+        self.r5_signals_oos = r5_signals_oos
+        self.r5_fires_oos = r5_fires_oos

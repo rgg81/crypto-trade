@@ -208,3 +208,141 @@ class TestR5VolTargetEnabled:
             "vol_natr_14 must be in V1_FEATURE_COLUMNS_PRUNED to guarantee R5 NATR lookup "
             "finds values in the feature parquet. Check features_v1/__init__.py."
         )
+
+
+class TestR5IsOosSplitCounters:
+    """Tests for IS/OOS partitioned R5 fire counters (iter-v1/010 reporting patch).
+
+    Validates that the counter logic correctly partitions signals and fires
+    across the OOS_CUTOFF_MS boundary without relying on the full backtest
+    engine (which requires live data files).
+    """
+
+    def test_oos_cutoff_ms_value(self) -> None:
+        """OOS_CUTOFF_MS must equal 1742774400000 (2025-03-24 00:00:00 UTC)."""
+        from crypto_trade.config import OOS_CUTOFF_MS
+
+        assert OOS_CUTOFF_MS == 1742774400000, (
+            f"OOS_CUTOFF_MS={OOS_CUTOFF_MS} does not match 2025-03-24 00:00:00 UTC. "
+            "Sacred constant must not be changed."
+        )
+
+    def test_backtest_result_r5_attributes_default_zero(self) -> None:
+        """BacktestResult initialises all four R5 split counters to 0 by default."""
+        from crypto_trade.backtest_models import BacktestResult
+
+        br = BacktestResult([])
+        assert br.r5_signals_is == 0
+        assert br.r5_fires_is == 0
+        assert br.r5_signals_oos == 0
+        assert br.r5_fires_oos == 0
+
+    def test_backtest_result_r5_attributes_explicit(self) -> None:
+        """BacktestResult accepts explicit R5 IS/OOS split counter values."""
+        from crypto_trade.backtest_models import BacktestResult
+
+        br = BacktestResult(
+            [],
+            total_signals=100,
+            r5_signals_is=70,
+            r5_fires_is=28,
+            r5_signals_oos=30,
+            r5_fires_oos=9,
+        )
+        assert br.r5_signals_is == 70
+        assert br.r5_fires_is == 28
+        assert br.r5_signals_oos == 30
+        assert br.r5_fires_oos == 9
+        assert br.total_signals == 100
+
+    def test_counter_partitioning_logic(self) -> None:
+        """Simulate the backtest loop's IS/OOS partitioning across the cutoff.
+
+        Uses a mock candle stream: 5 IS candles + 3 OOS candles, R5 enabled.
+        natr=8% for all candles → r5_scale=0.5 → R5 fires on every candle.
+        """
+        from crypto_trade.config import OOS_CUTOFF_MS
+
+        vol_target_pct = 4.0
+        # 5 IS open_times (before cutoff), 3 OOS open_times (at/after cutoff)
+        is_open_times = [OOS_CUTOFF_MS - (i + 1) * 28_800_000 for i in range(5)]
+        oos_open_times = [OOS_CUTOFF_MS + i * 28_800_000 for i in range(3)]
+        all_open_times = is_open_times + oos_open_times
+
+        # NATR = 8% for every candle (> 4% vol_target → R5 fires each time)
+        natr_lookup = {ot: 8.0 for ot in all_open_times}
+
+        r5_signals_is = 0
+        r5_fires_is = 0
+        r5_signals_oos = 0
+        r5_fires_oos = 0
+
+        for ot in all_open_times:
+            _natr = natr_lookup.get(ot, float("nan"))
+            if ot < OOS_CUTOFF_MS:
+                r5_signals_is += 1
+            else:
+                r5_signals_oos += 1
+            if not math.isnan(_natr):
+                r5_scale = min(1.0, vol_target_pct / max(_natr, 0.01))
+                if r5_scale < 1.0:
+                    if ot < OOS_CUTOFF_MS:
+                        r5_fires_is += 1
+                    else:
+                        r5_fires_oos += 1
+
+        assert r5_signals_is == 5, f"Expected 5 IS signals; got {r5_signals_is}"
+        assert r5_signals_oos == 3, f"Expected 3 OOS signals; got {r5_signals_oos}"
+        assert r5_fires_is == 5, f"Expected 5 IS fires (natr=8%>4%); got {r5_fires_is}"
+        assert r5_fires_oos == 3, f"Expected 3 OOS fires (natr=8%>4%); got {r5_fires_oos}"
+
+    def test_counter_no_fire_when_natr_below_threshold(self) -> None:
+        """When natr < vol_target_pct, r5_scale == 1.0 and no fire is counted."""
+        from crypto_trade.config import OOS_CUTOFF_MS
+
+        vol_target_pct = 4.0
+        ot_is = OOS_CUTOFF_MS - 28_800_000  # one candle before cutoff
+        ot_oos = OOS_CUTOFF_MS  # one candle at cutoff
+
+        r5_signals_is = 0
+        r5_fires_is = 0
+        r5_signals_oos = 0
+        r5_fires_oos = 0
+
+        for ot, natr in [(ot_is, 2.0), (ot_oos, 3.5)]:  # both < 4.0 → no fire
+            if ot < OOS_CUTOFF_MS:
+                r5_signals_is += 1
+            else:
+                r5_signals_oos += 1
+            if not math.isnan(natr):
+                r5_scale = min(1.0, vol_target_pct / max(natr, 0.01))
+                if r5_scale < 1.0:
+                    if ot < OOS_CUTOFF_MS:
+                        r5_fires_is += 1
+                    else:
+                        r5_fires_oos += 1
+
+        assert r5_signals_is == 1
+        assert r5_signals_oos == 1
+        assert r5_fires_is == 0, f"R5 should not fire when natr < vol_target; got {r5_fires_is}"
+        assert r5_fires_oos == 0, f"R5 should not fire when natr < vol_target; got {r5_fires_oos}"
+
+    def test_fire_rate_fraction_formula(self) -> None:
+        """r5_fire_rate = fires / signals computes correctly for IS and OOS halves."""
+        r5_signals_is = 70
+        r5_fires_is = 28
+        r5_signals_oos = 30
+        r5_fires_oos = 9
+
+        rate_is = r5_fires_is / r5_signals_is if r5_signals_is > 0 else 0.0
+        rate_oos = r5_fires_oos / r5_signals_oos if r5_signals_oos > 0 else 0.0
+
+        assert abs(rate_is - 0.4) < 1e-9, f"IS fire rate {rate_is} != 0.4"
+        assert abs(rate_oos - 0.3) < 1e-9, f"OOS fire rate {rate_oos} != 0.3"
+
+    def test_fire_rate_zero_signals_returns_zero(self) -> None:
+        """When signals == 0, fire rate defaults to 0.0 (no ZeroDivisionError)."""
+        r5_signals_is = 0
+        r5_fires_is = 0
+        rate_is = r5_fires_is / r5_signals_is if r5_signals_is > 0 else 0.0
+        assert rate_is == 0.0
