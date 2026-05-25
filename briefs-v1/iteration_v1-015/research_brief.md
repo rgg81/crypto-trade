@@ -353,7 +353,41 @@ Per BASELINE_V1.md §"Wall-clock (5-seed ENSEMBLE)": 7h 0m for 5-seed baseline. 
 
 This EXCEEDS the 6h CONFIRMATION cap from `feedback_v3_cadence_discipline.md`. **FLAG for Phase 5.5 gate**: either (a) reduce n_trials below 35 (against memory `feedback_v3_confirmation_n_trials_35.md`), or (b) reduce ENSEMBLE_SIZE below 10 (against canonical CONFIRMATION spec), or (c) accept extended cap (precedent: iter-v3/018 ran 4.54h after which v3 cap raised to 6h; /015 may need v1 cap update to ~10h).
 
-**Adopted plan**: launch at canonical spec (`--confirmation --ensemble-size 10 --n-trials 35`) and monitor; if approaching 9-10h, do NOT kill (CONFIRMATION integrity > wall-clock budget). Document the wall-clock outcome in engineering report. Update `feedback_v1_cadence_discipline.md` (NEW file at /015 closeout) codifying v1 CONFIRMATION wall-clock cap empirically.
+**Adopted plan**: launch at canonical spec (`--confirmation --ensemble-size 10 --n-trials 35`) and monitor; if approaching 9-10h, do NOT kill (CONFIRMATION integrity > wall-clock budget). Document the wall-clock outcome in engineering report. Update `feedback_v1_cadence_discipline.md` (NEW file at /015 closeout) codifying v1 CONFIRMATION wall-clock cap empirically. User authorized 2026-05-25: "we can tolerate the confirmation a bit more time".
+
+### 3.7 LM Master Phase 4.5 recommendations response (post-issuance retro-amend at `5c7ae36`+ commit)
+
+Per `briefs-v1/iteration_v1-015/lgbm_advisor.md` Phase 4.5 (committed at LM Master dispatch following Phase 5.5 BLOCK on missing advisor file):
+
+**Rec #1 — Keep n_trials=35; do NOT bump to 50** (350 fits/cell sufficient; n_eff=19 indicates 19 effective trials; bump to 50 lifts n_eff to ~22-25 at +43% wall-clock cost):
+- **ADOPTED**. Brief Section 3.5 specifies `--n-trials 35` already. No change required.
+
+**Rec #2 — 10 seeds clears verdict-class but NOT strictly-better at +0.3 band; ADD per-seed median Δ ≥ 0 as robustness sub-gate**:
+- **ADOPTED with explicit sub-gate in Section 7**. Section 7 BASELINE_V1 update conditions now require: (a) STRICTLY beats both halves on multi-seed mean, AND (b) ≥5/10 seeds positive OOS Δ (per-seed median Δ ≥ 0 sub-gate). At STRICT-BETTER detection band, observed lift ≥ +0.50 OOS Δ recommended to clear noise floor at 2-SE.
+
+**Rec #3 — Explicit RuntimeError on σ_t=NaN at execution-time (3-line code change)**:
+- **ADOPTED and ELEVATED TO MANDATORY** in Section 3.1 C1 FIX implementation. Brief Section 3.1 amended: when `sigma_source == "ewma14d"` AND lookup returns None/NaN at execution-time, raise `RuntimeError(f"σ_t unavailable for {key}; refusing silent NATR fallback")`. F-AXIS-C1 falsifier additionally pre-registers "NaN-skip count = 0 for IS test candles".
+
+**Rec #4 — F-AXIS-MECHANISM at >95% PASS (TIGHTEN from 80%)**:
+- **ADOPTED**. Section 5 predicted-outcomes table updated: F-AXIS-MECHANISM ≥7/10 seeds n_eff ≥ 17 at >95% confidence (labels seed-independent; n_eff bound by label-distribution shape).
+
+**Rec #5 — timeout_candles=21, √21 calibration sound; DO NOT REGRID k_tp/k_sl**:
+- **ADOPTED**. Brief Section 3.1 keeps k_tp=1.06, k_sl=0.53 from /014 EDA. Axis isolation preserved.
+
+**Rec #6 — P(STRICT BASELINE update) ≈ 7% unconditional**:
+- **DOCUMENTED**. Section 7 + Section 8 verdict-class probabilities updated: P(MERGE-with-UPDATE) ≈ 7% / P(MERGE-NO-UPDATE) ≈ 13% / P(NULL) ≈ 55% / P(NEGATIVE) ≈ 25% per LM Master decomposition.
+
+**Rec #7 — Refined predictions (F1-MULTI [-0.25, +0.25] tightened; F-AXIS-C1 >97%; F7-NEW-MULTI ~60%; F8-NEW-MULTI ~75%)**:
+- **ADOPTED**. Section 5 predicted-outcomes table updated to refined bands.
+
+**Mechanism Risks ADOPTED into Section 6 (tripwires)**:
+- Risk 1 (wall-clock 9.8-12h; DO NOT KILL at 10h): added to Section 3.6 already
+- Risk 2 (LTC C1-WINDFALL inversion → LTC IS+OOS DOWN at /015 with C1 fixed): added to Section 5 per-symbol predictions
+- Risk 3 (ETH IS-catastrophe recovery → portfolio IS net PnL ~+0 ± 30 at multi-seed mean): added to Section 5
+
+**What LM Master did NOT recommend, brief acknowledges**: ENSEMBLE_SIZE=5 over 10 (SE→0.36 makes STRICT-BETTER unreachable); k_tp/k_sl re-grid (axis isolation); min_data_in_leaf bump (defer to /016); halflife sweep (defer to /016).
+
+**Net**: LM Master Phase 4.5 produced 7 numbered recommendations + 3 risk callouts. Adopted: 7 (3 with elevation/explicit-sub-gate; 4 with no-change-needed because brief already aligned). Modified: 0. Rejected: 0. Brief finalized for re-submission to Phase 5.5 gate.
 
 ---
 
