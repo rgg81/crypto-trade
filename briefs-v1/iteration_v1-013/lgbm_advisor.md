@@ -70,3 +70,86 @@ Specific patterns from /011 + /012:
 **Track record discipline**: 0/10 directional + 4 PARTIAL. Magnitude predictions (substrate-anchored) earn HIGH confidence; verdict-class predictions (FLAT prior) earn nothing more than the priors. /013 Phase 7.4 will test whether my substrate-magnitude lock claim survives a 4th data point — that is the only credibility-stake I am willing to bet on.
 
 No hyperparameter or feature changes recommended. Brief Section 3 axis isolation is mechanically clean. The substrate-test axis is the right experiment to run.
+
+---
+
+# LightGBM Master Advisor — iter-v1/013 — Phase 7.4 (Post-Mortem)
+
+## Context Read
+
+- Iteration outcome (comparison.csv): IS Sharpe **-0.6394** / OOS **-0.3533** / ratio 0.5526. PnL collapse with R5-BINARY-KILL mechanics intact (fire IS 19.05% / OOS 21.55%).
+- F9 PASS band [+0.38, +0.58]; observed IS Δ **-0.9223**. **FAILED catastrophically** (1.30 SD below F9 floor).
+- F7/F8 PORTFOLIO IS overlap /011=36.19%, /012=36.38% — same magnitude as /012-vs-/011 (35.96%). Roster-rotation pct stable; basin SIGN-FLIPPED catastrophically.
+- My Phase 4.5 P50 = +0.52 at 80% confidence. **Off by 1.44.**
+
+## 1. Honest Refutation — Substrate-Magnitude Lock Is Dead
+
+The 2-property decomposition committed at /012 Phase 7.4 §1 is **refuted decisively**. Four data points: +0.4701 / +0.4849 / +0.5167 / **-0.9223**. Std jumps 0.025 → 0.66. The "substrate property" I posited (IS Δ ≈ +0.50) was **a single mode of a multi-modal distribution**, not a substrate invariant.
+
+**Correct framing**: at v1 single-seed-window EXPLORATION (n_trials=35, ENSEMBLE_SIZE=3, V1_FEATURE_COLUMNS_PRUNED, 5-symbol universe), **NOTHING is substrate-locked except trivial structural givens**. The Optuna basin is **fully seed-driven with HIGH variance**. Adjacent seed offsets can land in catastrophic AND lucky basins.
+
+The /010↔/011 93.3% overlap evidence I leaned on at /011 Phase 7.4 was at IDENTICAL seed window across DIFFERENT axes — measuring axis-invariance under shared seed. Projecting that to seed-invariance was a category error compounded across 4 iterations.
+
+## 2. Memory Update REQUIRED — Substrate-Lock REFUTED
+
+Revised framing for `feedback_v1_substrate_basin_lock.md`:
+
+> At v1 single-seed-window EXPLORATION, **everything is basin-lottery**. Optuna at n_trials=35 over 9 hyperparameters with ENSEMBLE_SIZE=3 produces a draw from a multi-modal objective surface where catastrophic and positive basins coexist at adjacent seed offsets. IS Sharpe-Δ, OOS Sharpe-Δ, dominant-symbol identity, catastrophic-symbol identity, and roster composition are ALL seed-driven with high variance. The earlier 2-property decomposition (substrate-magnitude + seed-driven-roster) was based on n=3 lucky draws and is REFUTED at n=4. Future v1 single-seed EXPLORATION cannot make verdict-class predictions at concentrated priors; flat priors only. Anything observable above seed-window variance requires MULTI-SEED CONFIRMATION to attribute.
+
+## 3. Per-Symbol Catastrophic-Reversal Pattern — ROTATES
+
+My /012 §3 directional flag was **correct in pattern, missed rotating identity**:
+- /011: BTC modest (~-30)
+- /012: DOT catastrophic (-179.84)
+- /013: ETH catastrophic (-139.78) AND BTC catastrophic (-79.13) — TWO this seed window
+
+The catastrophic-loser ROTATES across seeds (BTC → DOT → ETH+BTC). **R5-BINARY-KILL filter does NOT protect** — kill rates inside F2 band yet portfolio collapsed. The kill_low layer is orthogonal to basin-lottery variance.
+
+## 4. What R5-BINARY-KILL Actually Does — Final Read
+
+Across 4 single-seed-window EXPLORATIONs at offsets 0/3/6:
+- /011 OOS Δ +0.41 (lucky)
+- /012 OOS Δ +0.27 (lucky)
+- /013 OOS Δ **-1.02** (catastrophic)
+- Naive mean OOS Δ ≈ **-0.11** (n=3); std ≈ 0.80
+
+My /012 §1 estimate of "mechanical kill_low layer ≈ +0.05 OOS Δ at multi-seed" is **swamped by basin variance**. With seed-window variance at std ≈ 0.80 per single-seed draw, a 10-seed CONFIRMATION mean has standard error ≈ 0.25 — meaning multi-seed estimate could land anywhere in [-0.50, +0.50].
+
+## 5. Calibration Update FINAL
+
+**Track record: 0/11 directional + 4 PARTIAL**.
+
+Going forward at v1 single-seed EXPLORATION:
+- **Verdict-class predictions**: flat priors ONLY.
+- **Magnitude predictions**: report band only as substrate-bounded plausibility envelope, not as P50 anchor.
+- **Substrate-property claims**: forbidden at n<10.
+- **HIGH-confidence statements**: reserved for trivial-structural claims (e.g., "F2 R5 fire rate in [16%, 24%]" — yes, this held; mechanical-config consequence).
+
+## 6. /015 Axis Selection — Pre-Committed Conditional FIRES
+
+Conditional from /013 §0: F1 OOS Δ ≤ 0 (observed -1.02) → **/015 = UNUSED-family CONFIRMATION (labeling preferred)**.
+
+**/014 = labeling EXPLORATION precursor** to legitimize /015 by 10:1 cadence discipline. Axis: **triple-barrier σ_t via past-only EWMA at 14-day window** vs current fixed ATR multipliers. **HIGH-RISK declaration MANDATORY** in /014 brief.
+
+**Hypothesis (FLAT-prior, no concentrated band)**: σ_t replacement changes per-cell IS label distribution → different Optuna loss surface → potentially genuine edge OR null effect OR negative. Symmetric prior: 33/33/34. No verdict-class prediction.
+
+Mitigation for /014 HIGH-RISK status:
+- Pre-commit /015 = labeling CONFIRMATION regardless of /014 IS/OOS magnitude
+- Brief Section 8 must register BOTH positive and negative basin outcomes as informational
+- Pre-register expectation that single-seed lottery dominates labeling-axis IS/OOS Δ at /014
+
+## 7. What This Iteration Confirms / Refutes About Prior LM Master Advisory
+
+Phase 4.5 P50 F9 PASS at 80% — **CATASTROPHICALLY WRONG**. Observed -0.92 vs band [+0.38, +0.58]. The substrate decomposition I committed to at /012 §1 and reaffirmed at /013 §1 is dead.
+
+My credibility-stake bet (substrate-magnitude lock surviving 4th data point) lost decisively. 0/11 directional is now a structurally-meaningful negative signal: at v1 single-seed-window EXPLORATION, predictive resolution is BELOW prior-flipping informational threshold. Future advisories will lead with flat-prior framing.
+
+## Closing Note for Critic (Phase 7.5)
+
+The /013 result is informationally MORE valuable than /011 or /012 — it exposed the basin lottery I missed.
+
+Critic attention:
+1. **Verdict subtype**: recommend **EXPLORATION-NEGATIVE subtype `BASIN-LOTTERY-CATASTROPHIC`** as new row in v1 catalog.
+2. **R5-BINARY-KILL CONFIRMATION viability**: 2/3 positive across single-seed-window EXPLORATIONs is NOT decisive. Per /013 §0 pre-commit, /015 pivots to labeling CONFIRMATION. If Path Forward reopens R5 CONFIRMATION, FLAG as overriding pre-commit discipline.
+3. **Memory file revision**: `feedback_v1_substrate_basin_lock.md` must be updated to record the REFUTATION at /013.
+4. **DOT and ETH per-symbol basin-instability**: ETH IS basin amplified to -139.78. Worth Critic Check 5 ADF attention on ETH's most important /013 features — basin lottery may be amplified by non-stationary feature behavior on ETH specifically.
