@@ -864,6 +864,16 @@ def main() -> None:
             "at 8h interval). Only used when --label-sigma-source ewma14d."
         ),
     )
+    parser.add_argument(
+        "--no-engineering-report",
+        action="store_true",
+        default=False,
+        help=(
+            "Suppress the engineering_report.md existence HARD-STOP (sys.exit(1)). "
+            "Use ONLY for mid-pipeline orchestration where the report is created "
+            "separately after the runner exits.  (iter-v1/015 — Critic /014 Rec #2)"
+        ),
+    )
     args = parser.parse_args()
 
     # Resolve symbols
@@ -1214,19 +1224,22 @@ def main() -> None:
             "etc.). Tag the commit as `v0.v1-baseline-corrected`."
         )
 
-    # iter-v1/014: Critic /013 Rec #1 3rd-strike enforcement — engineering_report.md
-    # existence check. Phase 7.5 dispatch MUST be hard-rejected if missing.
-    # This runner-side warning is the belt-and-suspenders check; orchestrator-side
-    # enforcement is the BLOCKING deliverable declaration in brief Section 10.2.
+    # iter-v1/015: engineering_report.md HARD-STOP (Critic /014 Rec #2 4th-strike).
+    # sys.exit(1) instead of WARNING — Phase 7.5 dispatch is BLOCKED without the report.
+    # Use --no-engineering-report to opt out explicitly (mid-pipeline orchestration only).
     engineering_report_path = report_dir / "engineering_report.md"
-    if not engineering_report_path.exists():
+    if not engineering_report_path.exists() and not args.no_engineering_report:
         print(
-            "\n[run_baseline_v1] WARNING: engineering_report.md NOT FOUND at "
-            f"{engineering_report_path}\n"
-            "  This file is a BLOCKING deliverable for Phase 7.5 dispatch.\n"
-            "  Orchestrator MUST create it before invoking the Critic.\n"
-            "  Phase 7.5 hard-reject applies: do NOT invoke quant-critic without it."
+            f"\n[FATAL] engineering_report.md NOT FOUND at {engineering_report_path}",
+            file=sys.stderr,
         )
+        print(
+            "[FATAL] This file is a BLOCKING deliverable for Phase 7.5 dispatch.\n"
+            "[FATAL] Use --no-engineering-report to suppress this exit "
+            "(e.g. mid-pipeline orchestration).",
+            file=sys.stderr,
+        )
+        sys.exit(1)
 
 
 if __name__ == "__main__":
