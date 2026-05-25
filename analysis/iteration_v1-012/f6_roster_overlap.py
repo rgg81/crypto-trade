@@ -189,7 +189,10 @@ def main() -> int:
         "--target",
         required=True,
         type=Path,
-        help="Target iteration reports dir (must contain in_sample/trades.csv + out_of_sample/trades.csv)",
+        help=(
+            "Target iteration reports dir "
+            "(must contain in_sample/trades.csv + out_of_sample/trades.csv)"
+        ),
     )
     parser.add_argument(
         "--reference",
@@ -276,7 +279,10 @@ def main() -> int:
         print(f"    {name} = {path}")
     print()
     print("Portfolio overlap (target_in_reference %):")
-    print(f"  {'half':<5} {'reference':<20} {'n_target':>10} {'n_ref':>10} {'n_overlap':>10} {'pct':>10}")
+    print(
+        f"  {'half':<5} {'reference':<20} {'n_target':>10} {'n_ref':>10} "
+        f"{'n_overlap':>10} {'pct':>10}"
+    )
     for row in all_rows:
         if row["symbol"] == "PORTFOLIO":
             print(
