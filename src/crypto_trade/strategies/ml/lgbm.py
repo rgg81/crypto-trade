@@ -278,6 +278,10 @@ class LightGbmStrategy:
         self._month_features: dict[tuple[str, int], np.ndarray] = {}
         # ATR cache for dynamic barriers
         self._month_natr: dict[tuple[str, int], float] = {}
+        # iter-v1/015 C1 FIX: σ_t cache for execution-time barriers (ewma14d path).
+        # Populated in _train_for_month() when sigma_source="ewma14d", mirroring
+        # _month_natr.  Key = (symbol, open_time_ms) of test-month-first-candle.
+        self._month_sigma: dict[tuple[str, int], float] = {}
         # Per-row ATR values for dynamic labeling (price units)
         self._label_atr_values: np.ndarray | None = None
         # iter-v1/014: per-row past-only EWMA σ_t values for σ_t-scaled labeling.
@@ -752,6 +756,22 @@ class LightGbmStrategy:
             for key, arr in natr_data.items():
                 self._month_natr[key] = float(arr[0])
 
+        # (g) iter-v1/015 C1 FIX: populate σ_t cache for execution-time barriers.
+        # When sigma_source="ewma14d", read _label_sigma_values for every candle
+        # in the test window and cache by (symbol, open_time_ms) — same key space
+        # as _month_natr so get_signal can look up per-candle sigma identically.
+        # This ensures execution-time barriers match label-time barriers (C1 FIX).
+        self._month_sigma = {}
+        if self.sigma_source == "ewma14d" and self._label_sigma_values is not None:
+            test_mask = (self._open_time_arr >= split.test_start_ms) & (
+                self._open_time_arr < split.test_end_ms
+            )
+            test_indices = np.where(test_mask)[0]
+            for idx in test_indices:
+                sym = str(self._sym_arr[idx])
+                ot = int(self._open_time_arr[idx])
+                self._month_sigma[(sym, ot)] = float(self._label_sigma_values[idx])
+
         if self.verbose > 0:
             print(
                 f"  Model trained for {month_str}: "
@@ -901,10 +921,27 @@ class LightGbmStrategy:
             pred_class = int(np.argmax(proba))
             direction = int(classes_to_labels(np.array([pred_class]))[0])
 
-        # Compute dynamic TP/SL from ATR if configured
+        # Compute dynamic TP/SL: dispatch on sigma_source.
+        # - "natr" (default): BIT-IDENTICAL to pre-/015 behavior.
+        # - "ewma14d" (iter-v1/015 C1 FIX): σ_t × k × √timeout × 100 at execution-time,
+        #   matching the label-time formula.  Raises RuntimeError on NaN/missing σ_t
+        #   (per LM Master Phase 4.5 Rec #3 mandate — refuse silent NATR fallback).
         tp_pct = None
         sl_pct = None
-        if self.atr_tp_multiplier is not None:
+        if self.sigma_source == "ewma14d":
+            sigma = self._month_sigma.get(key)
+            if sigma is None or np.isnan(sigma):
+                raise RuntimeError(
+                    f"σ_t unavailable for {key}; refusing silent NATR fallback. "
+                    "Ensure _label_sigma_values is populated and the candle is in "
+                    "the test window.  (iter-v1/015 C1 FIX — LM Master Rec #3)"
+                )
+            interval_minutes = _interval_to_minutes(self._interval)
+            timeout_candles = self.label_timeout_minutes / interval_minutes
+            sqrt_timeout = float(np.sqrt(timeout_candles))
+            tp_pct = float(sigma * self.sigma_k_tp * sqrt_timeout * 100.0)
+            sl_pct = float(sigma * self.sigma_k_sl * sqrt_timeout * 100.0)
+        elif self.atr_tp_multiplier is not None:
             natr = self._month_natr.get(key)
             if natr is not None and natr > 0:
                 tp_pct = natr * self.atr_tp_multiplier
@@ -918,7 +955,9 @@ class LightGbmStrategy:
             dir_label = "LONG" if direction == 1 else "SHORT"
             ts_str = _ms_to_datetime(open_time)
             atr_str = ""
-            if tp_pct is not None:
+            if tp_pct is not None and self.sigma_source == "ewma14d":
+                atr_str = f" σ_t-TP={tp_pct:.1f}%/σ_t-SL={sl_pct:.1f}%"
+            elif tp_pct is not None:
                 atr_str = f" TP={tp_pct:.1f}%/SL={sl_pct:.1f}%"
             self._last_predict_log = (
                 f"[predict] {ts_str} {symbol} → {dir_label} (proba={confidence:.2f}{atr_str})"
