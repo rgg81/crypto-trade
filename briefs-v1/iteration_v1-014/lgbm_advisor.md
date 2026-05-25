@@ -92,3 +92,99 @@ Track record: **0/11 directional + 4 PARTIAL**.
 **Single non-ignorable point**: F7-NEW per-symbol exit-mix direction is the ONLY axis-attribution-clean falsifier at /014. F1/F3 are basin-lottery-dominated and provide essentially zero mechanism information per /013 §5. **QR/Critic should NOT weight /014's F1/F3 verdict-class heavily** in /015 design.
 
 **Two concerns about cycle-2 catalog discipline**: (1) HIGH-RISK declaration is FIRST in cycle-2 — pre-commit /015 binding is entire mitigation, do not erode it; (2) post-/015 if labeling multi-seed-NULL, /016 should pivot to UNUSED-UNUSED family (universe or model-arch), NOT another labeling sub-axis re-calibration (basin-fishing trap).
+
+---
+
+# LightGBM Master Advisor — iter-v1/014 — Phase 7.4 (Post-Mortem)
+
+## Context Read
+- Iteration outcome: IS Sharpe **-0.6112** / OOS Sharpe **+0.1828** / ratio **-0.2991** (sign-flipped). F1 NEGATIVE (Δ -0.4809), F3 NEGATIVE-catastrophic (Δ -0.8941), F8-NEW PASS (598 ∈ [466, 776]).
+- Engineering: σ_t lookahead-clean verified; F8-NEW PASS; Critic Concern C1 (barrier-source label/execution inconsistency) UNRESOLVED.
+- /015 = labeling CONFIRMATION binding (FIRED per pre-commit).
+
+## 1. n_eff Structural Finding — DURABLE EVIDENCE Despite NEGATIVE Verdict
+
+**n_eff jumped 13 → 19 (per-cell median; range 14-22) — FIRST material shift in v1 cycle-2.** Per dsr.json, BTC/ETH=20, LINK/LTC=18, DOT=19. /008-/013 all stayed at 13. This is the **strongest mechanism evidence in 12 iterations** that σ_t labeling diversified the Optuna loss surface as predicted in Phase 4.5 §2 ("partial-shift scenario").
+
+**Durable structural evidence** independent of /014's F1/F3 magnitudes. The 33/33/34 FLAT prior governs BASIN DRAW; n_eff governs LOSS SURFACE GEOMETRY. /014 produced a NEGATIVE basin draw on a RICHER surface — independent. At /015 multi-seed, n_eff=19 should REPLICATE; if it does, mechanism robustness CONFIRMED regardless of F1 direction.
+
+## 2. F7-NEW Evaluation — 4/5 PASS (PARTIAL per Brief 8-cell matrix)
+
+Per IS exit-mix comparison (014 vs baseline):
+
+| Symbol | Pred TO | Obs ΔTO | Match |
+|---|---|---|---|
+| BTCUSDT | UP | +4.2pp | YES |
+| ETHUSDT | UP | **-3.2pp** | **NO** |
+| LINKUSDT | DOWN | -8.9pp | YES |
+| LTCUSDT | DOWN | -2.4pp | YES |
+| DOTUSDT | DOWN | -3.2pp | YES |
+
+**F7-NEW = PARTIAL.** Mechanism IS sound on 4/5 symbols. ETH is the rogue — TO% DECREASED (-3.2pp) instead of increased; SL% INCREASED (+8.4pp). ETH's "wider labels" should have meant MORE timeouts, but execution-time NATR barriers (Concern C1) overruled label-time wider σ_t barriers. This is the **first observable signature of C1 in trade data**.
+
+## 3. Critic Concern C1 — Load-Bearing IS Catastrophe Explanation
+
+**C1 is the load-bearing IS catastrophe explanation, not basin lottery alone.**
+
+- Label-time: σ_t × k (BTC/ETH ~13% WIDER than NATR-current; alts ~7% TIGHTER)
+- Execution-time: NATR × atr_mult (UNCHANGED — 2.9/3.5 multipliers)
+- For BTC/ETH: label says "TP at +5.91% (σ_t-wider)" but execution closes at +5.06% (NATR-narrower) → systematic positive labeling bias → Optuna trains on labels saying "many TPs hit" but execution realizes fewer → IS basin penalty
+- For LTC: tighter labels + wider execution = trades ride LONGER than predicted → C1 WINDFALL
+
+**LTC win AND BTC/ETH catastrophe are BOTH C1 signatures.** C1 unresolved is the proximate cause of /014's per-symbol pattern.
+
+C1 disclosure is **MANDATORY** in /015 engineering report. Critic will FAIL Check 8 if /015 doesn't address.
+
+## 4. LTC IS+OOS Winner — Phase 4.5 Prediction INVERTED
+
+My Phase 4.5 §2 prediction: "LTC = catastrophic candidate; largest barrier compression at -7.6%." **WRONG.** LTC was the WINNER on both halves (IS +95.51 / OOS +24.49 / WR 47.7% IS / 50.0% OOS).
+
+**Mechanism**: tighter LTC barriers produced MORE labeled TPs per IS row (28.1% TP rate vs 20.2% baseline — biggest TP% jump). LTC's strongly-trending IS regime had dense short-horizon TP opportunities the σ_t-tighter labels captured. Combined with NATR-wider execution (C1 inverted-direction for alts), execution exits SURVIVED LONGER than labels predicted. Asymmetric C1 windfall for alts, asymmetric C1 penalty for BTC/ETH. **C1 is proximate cause of LTC win AND BTC/ETH catastrophe simultaneously.**
+
+## 5. Calibration Update — Track Record 0/12 Directional + 5 PARTIAL
+
+Update: **0/12 directional + 5 PARTIAL** (F8-NEW PASS, σ_t lookahead-clean, n_eff prediction correct, F7-NEW 4/5 PARTIAL, FLAT prior calibrated).
+
+Mechanism predictions (lookahead-clean, n_eff diversification, exit-mix 4/5) are RELIABLE; directional F1/F3 predictions remain at 0/12. **Phase 4.5 priors will keep FLAT 33/33/34 for verdict-class. NEW addition: mechanism-level PARTIAL claims (n_eff, F7-NEW direction) at MEDIUM confidence.** Stop predicting per-symbol catastrophic candidates — 0/4 in cycle-2.
+
+## 6. /015 CONFIRMATION Multi-Seed Prior — Updated
+
+Phase 4.5 §5 pre-registered **60% NULL / 25% PROMISING / 15% NEGATIVE**. /014 single-seed OOS Δ = -0.48; single-seed std ≈ 0.80; 10-seed SE ≈ 0.25. Observed -0.48 is 1.9 SE below 0 — boundary territory.
+
+**Updated /015 prior**: **55% NULL / 20% PROMISING / 25% NEGATIVE**. Marginal NEGATIVE bump (+10pp) because (a) C1 unresolved amplifies negative draws asymmetrically; (b) IS -0.89 is unprecedented in cycle-2. PROMISING shrinks (-5pp) because LTC IS+OOS positive depends on C1's asymmetric windfall; at multi-seed the C1 windfall doesn't replicate cleanly.
+
+**Modal multi-seed outcome remains NULL.**
+
+## 7. /015 Brief Design Recommendations
+
+**Mandatory for /015 brief**:
+
+1. **C1 FIX — execute-time barriers ALSO use σ_t × k_tp/k_sl**. Without this, /015 measures confounded experiment. NOT a "2nd axis" — COMPLETES the labeling axis. Per /014 evidence (ETH ΔSL +8.4pp; LTC C1-windfall +7.9pp ΔTP), C1 unresolved corrupts F1/F3 measurement. **HIGH-CONFIDENCE recommendation.**
+
+2. **Per-symbol F7-NEW direction stability across 10 seeds**: pre-register table where each cell is "matches/10 seeds". If ETH matches 2/10 even at multi-seed → ETH-specific wiring defect. If ETH matches 7-10/10 → /014's ETH deviation was single-seed artifact.
+
+3. **n_eff multi-seed verification**: pre-register "n_eff ≥ 17 across at least 7/10 seeds". If n_eff collapses to 13 at multi-seed, loss-surface diversification was single-seed artifact (unlikely; n_eff bound by label-distribution shape).
+
+4. **Engineering report MUST disclose C1 status**: explicitly state whether C1 was fixed for /015 and per-symbol label/execution barrier ratios. Critic Check 8 demands this.
+
+5. **Hyperparameter recommendation**: keep n_trials=35; raise min_data_in_leaf upper bound to 500 IF C1 fixed (per Phase 4.5 Rec #2). If C1 NOT fixed, leave bounds unchanged (axis isolation).
+
+## What This Iteration Confirms / Refutes About Prior LM Master Advisory
+
+**CONFIRMED (3)**: FLAT prior calibrated; σ_t lookahead-clean at 95%; F8-NEW band at 80%. **MECHANISM-LEVEL ACCURATE.**
+
+**REFUTED (2)**: LTC catastrophic-candidate (INVERTED — LTC was winner); per-row label-divergence 20% (UNDER-predicted; n_eff jump suggests deeper structural change).
+
+**SURPRISE (1)**: Concern C1 is mechanically load-bearing — both LTC win and ETH catastrophe are C1 signatures. **Future Phase 4.5: when Critic preflight flags barrier-source / label-source consistency, escalate to "mechanism explanation candidate" in §1.**
+
+## Closing Note for Critic (Phase 7.5)
+
+Three items for Critic 8-check pass:
+
+1. **Check 8 (axis attribution)**: F7-NEW 4/5 PARTIAL with ETH deviant — verify engineering report discloses ETH exit-mix AND addresses C1 inconsistency. This is C1 surface-in-data event.
+
+2. **Check 5 (ADF)**: n_eff jumped 13→19 indicating richer per-cell loss surface — re-verify ADF stationarity on σ_t-labeled labels (NOT just raw σ_t feature). If labels show non-stationarity at IS→OOS boundary, catastrophic IS may have non-stationarity component alongside C1.
+
+3. **/015 axis pre-commit erosion risk**: brief Section 11 pre-commits /015 = labeling CONFIRMATION binding. Critic should REFUSE any /015 brief that pivots off labeling AND INSIST /015 includes C1 fix per §7. The C1 fix COMPLETES the labeling axis (not 2nd axis).
+
+Honest summary: /014 mechanism worked (4/5 F7-NEW, n_eff diversification, lookahead-clean); /014 basin was NEGATIVE with C1 amplifying asymmetry. /015 multi-seed with C1 FIXED is the genuine test. Modal outcome NULL (55%) but experiment is finally well-posed.
