@@ -182,6 +182,8 @@ def run_model(
         risk_drawdown_trigger_pct=7.0,
         risk_drawdown_scale_floor=0.33,
         risk_drawdown_scale_anchor_pct=15.0,
+        risk_r5_vol_target_enabled=True,
+        risk_r5_vol_target_pct=4.0,
     )
     strategy = LightGbmStrategy(
         training_months=24,

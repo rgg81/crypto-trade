@@ -83,6 +83,14 @@ class BacktestConfig:
     enable_no_confirm_exit: bool = False
     no_confirm_trigger_atr: float = 0.50
     no_confirm_k_candles: int = 4
+    # Risk mitigation R5 (iter-v1/010): per-symbol vol-target ceiling.
+    # When enabled, caps weight_factor by min(1.0, risk_r5_vol_target_pct /
+    # max(vol_natr_14, 0.01)). vol_natr_14 is read from per-symbol feature
+    # parquets at backtest init. Applied AFTER R2 in the vt_scale pipeline.
+    # Default disabled — restoring risk_r5_vol_target_enabled=False preserves
+    # byte-identical behavior for all iterations through iter-v1/009.
+    risk_r5_vol_target_enabled: bool = False
+    risk_r5_vol_target_pct: float = 4.0
 
 
 @dataclass(frozen=True)

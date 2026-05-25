@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime
+import math
 import tracemalloc
 from pathlib import Path
 
@@ -190,6 +191,44 @@ def run_backtest(
     # Per-symbol daily PnL tracking for vol targeting (iter 147)
     # symbol -> {YYYY-MM-DD -> sum of net_pnl_pct that closed on that day}
     vt_per_sym_daily: dict[str, dict[str, float]] = {}
+
+    # Risk R5 tracking — vol-target ceiling (iter-v1/010)
+    # (symbol, open_time_ms) → vol_natr_14 value from feature parquet.
+    # Populated at init when config.risk_r5_vol_target_enabled is True.
+    r5_natr_lookup: dict[tuple[str, int], float] = {}
+    r5_fires = 0
+    if config.risk_r5_vol_target_enabled:
+        import pyarrow.parquet as pq  # noqa: PLC0415
+
+        features_dir = Path(config.data_dir) / "features"
+        for _sym in config.symbols:
+            feat_path = features_dir / f"{_sym}_{config.interval}_features.parquet"
+            if feat_path.exists():
+                tab = pq.read_table(feat_path, columns=["open_time", "vol_natr_14"])
+                ots = tab.column("open_time").to_numpy()
+                natrs = tab.column("vol_natr_14").to_numpy()
+                mask = ~np.isnan(natrs.astype(float))
+                for _ot, _natr in zip(ots[mask], natrs[mask], strict=True):
+                    r5_natr_lookup[(_sym, int(_ot))] = float(_natr)
+            else:
+                print(f"[R5] WARNING: feature parquet not found for {_sym}: {feat_path}")
+        # A14 dead-feed pre-screen: if vol_natr_14 is suspiciously constant for any symbol
+        # (> 10% of rows identical to mean within 0.001 tolerance), error loudly.
+        for _sym in config.symbols:
+            sym_natrs = [v for (s, _), v in r5_natr_lookup.items() if s == _sym]
+            if len(sym_natrs) > 10:
+                _mean = float(np.mean(sym_natrs))
+                _const_frac = sum(1 for v in sym_natrs if abs(v - _mean) < 0.001) / len(sym_natrs)
+                if _const_frac > 0.10:
+                    raise ValueError(
+                        f"[R5] A14 DEAD-FEED: vol_natr_14 for {_sym} is suspiciously constant "
+                        f"({_const_frac:.1%} of rows within 0.001 of mean {_mean:.4f}). "
+                        f"Check data/features/{_sym}_{config.interval}_features.parquet."
+                    )
+        print(
+            f"[R5] NATR lookup built: {len(r5_natr_lookup)} entries across "
+            f"{len(config.symbols)} symbols (vol_target_pct={config.risk_r5_vol_target_pct}%)"
+        )
 
     # Signal cooldown tracking
     cooldown_until: dict[str, int] = {}  # symbol → earliest open_time for new trade
@@ -386,6 +425,14 @@ def run_backtest(
                         span = min(1.0, (dd_pct - trigger) / (anchor - trigger))
                         r2_scale = 1.0 - span * (1.0 - floor)
                         vt_scale = vt_scale * r2_scale
+                # R5 — vol-target ceiling (iter-v1/010); AFTER R2, ALL MODELS
+                if config.risk_r5_vol_target_enabled:
+                    _natr = r5_natr_lookup.get((sym, ot), float("nan"))
+                    if not math.isnan(_natr):
+                        r5_scale = min(1.0, float(config.risk_r5_vol_target_pct) / max(_natr, 0.01))
+                        if r5_scale < 1.0:
+                            r5_fires += 1
+                        vt_scale = vt_scale * r5_scale
                 order = create_order(
                     sym,
                     signal,
@@ -436,6 +483,13 @@ def run_backtest(
             )
 
     results.sort(key=lambda r: r.close_time)
+
+    if config.risk_r5_vol_target_enabled and total_signals > 0:
+        print(
+            f"[R5] fired on {r5_fires} of {total_signals} signals "
+            f"({100.0 * r5_fires / total_signals:.1f}%) at "
+            f"vol_target_pct={config.risk_r5_vol_target_pct}%"
+        )
 
     if profile_memory:
         _mem_report("after backtest loop")
@@ -593,9 +647,7 @@ def evaluate_order_with_no_confirm(
             tp_hit = low <= order.take_profit_price
         if sl_hit or tp_hit:
             # TP/SL wins — delegate to check_order for correct price disambiguation
-            result = check_order(
-                order, open_time, open_price, high, low, close_time, fee_pct
-            )
+            result = check_order(order, open_time, open_price, high, low, close_time, fee_pct)
         else:
             # No TP/SL: fire no_confirm at candle close
             result = make_result(order, close_price, close_time, "no_confirm", fee_pct)
