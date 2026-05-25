@@ -240,11 +240,37 @@ Plus inherited project-level merge gates:
 
 ## Iteration Cadence Discipline
 
-### Hard rules (inherited from v3 — proven)
+### Hard rules (inherited from v3 — proven; ENFORCED FROM CYCLE-3 v1 per user directive 2026-05-25)
 
-1. **EXPLORATION wall-clock HARD CAP: 2h.** Engineer kills the backtest if it exceeds 2h. Default config: `--exploration --n-trials 35`. Single-axis variation only.
+**NON-NEGOTIABLE from cycle-3 onwards (user directive 2026-05-25):**
 
-2. **CONFIRMATION wall-clock HARD CAP: 6h.** Default `--n-trials 35`, `ENSEMBLE_SIZE=10`. Engineer kills if exceeds 6h.
+> "The QR should choose a combination of symbols, features, candles, Optuna iterations to fit in the exploration (3 seeds) and the confirmation (10 seeds). That's non negotiable from now on."
+
+**Two dimensions FIXED (no QR/QE override):**
+- Seed count: 3 inner seeds EXPLORATION / 10 inner seeds CONFIRMATION
+- Wall-clock cap: 2h EXPLORATION / 6h CONFIRMATION
+
+**Four dimensions QR-TUNABLE to fit the budget** (compress in this order):
+1. **n_trials**: 35 → 30 → 25 (Optuna TPE saturation tolerance; floor ~10)
+2. **features**: 40 (PRUNED) → 30 → 20 (if axis isn't feature-family)
+3. **candles**: 8h → 12h → daily (only if axis allows; re-anchor required)
+4. **symbols**: 5 → 4 → 3 (if axis isn't universe)
+
+**MANDATORY brief Section 3.6 (wall-clock estimate)**:
+- Explicit wall-clock prediction from prior-iteration linear scaling
+- Estimate ≤ cap with ≥20% margin
+- Compression decisions documented if not at default
+- Trade-off rationale (what's sacrificed for what)
+
+**Phase 5.5 BLOCK criterion (NEW)**: if wall-clock estimate > cap OR no explicit estimate present, BLOCK. QR must revise brief.
+
+**Engineer KILL criterion**: orchestrator kills backtest if runtime exceeds cap × 1.2 (20% tolerance margin).
+
+1. **EXPLORATION wall-clock HARD CAP: 2h.** Default config: `--exploration --n-trials 35 --pruned-features` (5-sym × 40-feat × 35-trial × 3-seed ≈ 1.5h). Engineer kills if exceeds 2.4h (cap × 1.2). Single-axis variation only.
+
+2. **CONFIRMATION wall-clock HARD CAP: 6h.** Default `--confirmation --n-trials 35` + ENSEMBLE_SIZE=10. Engineer kills if exceeds 7.2h. Note: iter-v1/015 ran 9.8-12h as one-time user-authorized exception; cycle-3 onwards STRICTLY enforced.
+
+**Historical context**: /001-/014 had variable wall-clock; /008 baseline-anchor ran 8h (one-time post-hoc tolerance); /015 launched 9.8-12h ETA (user authorized as one-time exception). **Cycle-3 (/016+) onwards: no further exceptions without explicit user override.**
 
 3. **CONFIRMATION requires 10 EXPLORATION precedents.** A CONFIRMATION iteration's brief Section 0.5 MUST list ≥10 EXPLORATION iter-v1/NNN ids completed since the last CONFIRMATION (or since iter-v1/001 if no prior CONFIRMATION). Phase 5.5 gate verifies this count from `briefs-v1/exploration_catalog.md`.
 
