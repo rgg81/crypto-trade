@@ -80,6 +80,7 @@ from crypto_trade.strategies.ml.lgbm import LightGbmStrategy
 from crypto_trade.strategies.ml.reporting_v1 import (
     _per_cell_n_eff_from_parquet,
     append_psr_rows_to_comparison,
+    append_r5_binary_kill_rows_to_comparison,
     append_r5_rows_to_comparison,
     compute_n_eff_and_dsr,
     compute_psr_columns,
@@ -138,6 +139,10 @@ def run_model(
     oof_persist_path: Path | None = None,
     feature_columns: list[str] | None = None,
     bounds_profile: str = "default",
+    r5_vol_target_enabled: bool = True,
+    r5_vol_target_pct: float = 4.0,
+    r5_kill_low_natr_enabled: bool = False,
+    r5_kill_low_natr_min_pct: float = 2.0,
 ):
     """Run a single v1 sub-model (A/C/D/E) under the corrected walk-forward.
 
@@ -150,6 +155,16 @@ def run_model(
     bounds_profile
         Optuna search bounds profile. "default" for 193-feature runs;
         "v1_pruned" for 40-feature pruned runs (LM Master Recs #1–3).
+    r5_vol_target_enabled
+        Enable R5 proportional vol-target ceiling (iter-v1/010). Default True
+        (historical default). Set False for iter-v1/011 binary-kill isolation.
+    r5_vol_target_pct
+        Vol-target ceiling percentage for R5 proportional scaling (default 4.0%).
+    r5_kill_low_natr_enabled
+        Enable R5-BINARY-KILL entry filter (iter-v1/011). Default False.
+        When True, skips entries where NATR_14 < r5_kill_low_natr_min_pct.
+    r5_kill_low_natr_min_pct
+        NATR_14 floor for binary kill (default 2.0% per iter-v1/011 EDA).
     """
     effective_feature_columns = (
         feature_columns if feature_columns is not None else list(V1_FEATURE_COLUMNS)
@@ -183,8 +198,10 @@ def run_model(
         risk_drawdown_trigger_pct=7.0,
         risk_drawdown_scale_floor=0.33,
         risk_drawdown_scale_anchor_pct=15.0,
-        risk_r5_vol_target_enabled=True,
-        risk_r5_vol_target_pct=4.0,
+        risk_r5_vol_target_enabled=r5_vol_target_enabled,
+        risk_r5_vol_target_pct=r5_vol_target_pct,
+        risk_r5_kill_low_natr_enabled=r5_kill_low_natr_enabled,
+        risk_r5_kill_low_natr_min_pct=r5_kill_low_natr_min_pct,
     )
     strategy = LightGbmStrategy(
         training_months=24,
@@ -351,6 +368,10 @@ def _run_methodology_reporting(
     r5_fires_is: int = 0,
     r5_signals_oos: int = 0,
     r5_fires_oos: int = 0,
+    r5_kill_signals_is: int = 0,
+    r5_kill_fires_is: int = 0,
+    r5_kill_signals_oos: int = 0,
+    r5_kill_fires_oos: int = 0,
 ) -> None:
     """Run all iter-v1/001 methodology reporting passes AFTER generate_iteration_reports().
 
@@ -616,6 +637,15 @@ def _run_methodology_reporting(
         r5_fire_rate_is = (r5_fires_is / r5_signals_is) if r5_signals_is > 0 else 0.0
         r5_fire_rate_oos = (r5_fires_oos / r5_signals_oos) if r5_signals_oos > 0 else 0.0
         append_r5_rows_to_comparison(comparison_path, r5_fire_rate_is, r5_fire_rate_oos)
+        # ---------------------------------------------------------------------------
+        # 4c. comparison.csv R5-BINARY-KILL fire-rate rows (iter-v1/011 reporting)
+        # Fixes D-RPRT-001: IS value in in_sample column, OOS value in out_of_sample.
+        # ---------------------------------------------------------------------------
+        r5_kill_rate_is = r5_kill_fires_is / r5_kill_signals_is if r5_kill_signals_is > 0 else 0.0
+        r5_kill_rate_oos = (
+            r5_kill_fires_oos / r5_kill_signals_oos if r5_kill_signals_oos > 0 else 0.0
+        )
+        append_r5_binary_kill_rows_to_comparison(comparison_path, r5_kill_rate_is, r5_kill_rate_oos)
     else:
         print(
             "[run_baseline_v1] WARNING: comparison.csv not found at "
@@ -715,6 +745,26 @@ def main() -> None:
             "LM Master Phase 4.5 Recs #1–3. Introduced for iter-v1/002."
         ),
     )
+    parser.add_argument(
+        "--r5-binary-kill-enabled",
+        action="store_true",
+        help=(
+            "Enable R5-BINARY-KILL entry filter (iter-v1/011). Skips entries where "
+            "NATR_14 at signal time is strictly below --r5-binary-kill-min-natr. "
+            "When enabled, R5 proportional vol-target ceiling is DISABLED for axis "
+            "isolation. Default: off."
+        ),
+    )
+    parser.add_argument(
+        "--r5-binary-kill-min-natr",
+        type=float,
+        default=2.0,
+        help=(
+            "NATR_14 floor for R5-BINARY-KILL (percent, default 2.0). "
+            "Entries where NATR_14 < this value are skipped. "
+            "Only evaluated when --r5-binary-kill-enabled is set."
+        ),
+    )
     args = parser.parse_args()
 
     # Resolve symbols
@@ -787,6 +837,22 @@ def main() -> None:
         active_feature_columns = list(V1_FEATURE_COLUMNS)
         bounds_profile = "default"
 
+    # iter-v1/011: R5 risk config resolution.
+    # --r5-binary-kill-enabled flips to binary-kill mode and DISABLES proportional
+    # vol-target scaling for axis isolation (per brief Section 3.1 + Section 3.5).
+    r5_vol_target_enabled = True  # historical default (active through /010)
+    r5_vol_target_pct = 4.0
+    r5_kill_low_natr_enabled = False
+    r5_kill_low_natr_min_pct = 2.0
+    if getattr(args, "r5_binary_kill_enabled", False):
+        r5_kill_low_natr_enabled = True
+        r5_kill_low_natr_min_pct = float(getattr(args, "r5_binary_kill_min_natr", 2.0))
+        r5_vol_target_enabled = False  # disable /010 proportional scaling for isolation
+        print(
+            f"[run_baseline_v1] R5-BINARY-KILL enabled: kill_low_natr_min_pct="
+            f"{r5_kill_low_natr_min_pct}% | R5 vol-target DISABLED for axis isolation"
+        )
+
     # iter-v1/008: restore /003-era iteration-stamped OOF_PARQUET_PATH.
     # The global OOF_PARQUET_PATH is overridden here BEFORE the unlink() guard below
     # so that each iteration preserves its own parquet and future per-cell N_eff
@@ -804,6 +870,8 @@ def main() -> None:
     print(f"  bounds_profile: {bounds_profile}")
     print(f"  OOF_PARQUET_PATH: {OOF_PARQUET_PATH}")
     print(f"  V1_EXCLUDED_SYMBOLS: {V1_EXCLUDED_SYMBOLS}")
+    print(f"  r5_vol_target_enabled: {r5_vol_target_enabled}")
+    print(f"  r5_kill_low_natr_enabled: {r5_kill_low_natr_enabled}")
     print()
 
     # Validate active feature list is non-empty (hard guard per feature-pinning rules).
@@ -830,6 +898,13 @@ def main() -> None:
     # -------------------------------------------------------------------------
     all_results: list = []
 
+    # Shared R5 kwargs passed to every run_model call.
+    _r5_kwargs = dict(
+        r5_vol_target_enabled=r5_vol_target_enabled,
+        r5_vol_target_pct=r5_vol_target_pct,
+        r5_kill_low_natr_enabled=r5_kill_low_natr_enabled,
+        r5_kill_low_natr_min_pct=r5_kill_low_natr_min_pct,
+    )
     if set(symbols) == set(V1_BASELINE_UNIVERSE):
         results_a = run_model(
             "A (BTC/ETH)",
@@ -842,6 +917,7 @@ def main() -> None:
             oof_persist_path=OOF_PARQUET_PATH,
             feature_columns=active_feature_columns,
             bounds_profile=bounds_profile,
+            **_r5_kwargs,
         )
         results_c = run_model(
             "C (LINK + R1)",
@@ -854,6 +930,7 @@ def main() -> None:
             oof_persist_path=OOF_PARQUET_PATH,
             feature_columns=active_feature_columns,
             bounds_profile=bounds_profile,
+            **_r5_kwargs,
         )
         results_d = run_model(
             "D (LTC + R1)",
@@ -866,6 +943,7 @@ def main() -> None:
             oof_persist_path=OOF_PARQUET_PATH,
             feature_columns=active_feature_columns,
             bounds_profile=bounds_profile,
+            **_r5_kwargs,
         )
         results_e = run_model(
             "E (DOT + R1 + R2)",
@@ -879,9 +957,10 @@ def main() -> None:
             oof_persist_path=OOF_PARQUET_PATH,
             feature_columns=active_feature_columns,
             bounds_profile=bounds_profile,
+            **_r5_kwargs,
         )
         all_results = results_a + results_c + results_d + results_e
-        # Aggregate R5 IS/OOS split counters across all four models (iter-v1/010).
+        # Aggregate R5 IS/OOS split counters across all four models (iter-v1/010+).
         _r5_model_results = [results_a, results_c, results_d, results_e]
     else:
         # Custom universe — single pooled model unless brief specifies otherwise.
@@ -897,6 +976,7 @@ def main() -> None:
             oof_persist_path=OOF_PARQUET_PATH,
             feature_columns=active_feature_columns,
             bounds_profile=bounds_profile,
+            **_r5_kwargs,
         )
         all_results = _pooled
         _r5_model_results = [_pooled]
@@ -906,6 +986,11 @@ def main() -> None:
     agg_r5_fires_is = sum(getattr(r, "r5_fires_is", 0) for r in _r5_model_results)
     agg_r5_signals_oos = sum(getattr(r, "r5_signals_oos", 0) for r in _r5_model_results)
     agg_r5_fires_oos = sum(getattr(r, "r5_fires_oos", 0) for r in _r5_model_results)
+    # Aggregate R5-BINARY-KILL IS/OOS split counters (iter-v1/011).
+    agg_r5_kill_signals_is = sum(getattr(r, "r5_kill_signals_is", 0) for r in _r5_model_results)
+    agg_r5_kill_fires_is = sum(getattr(r, "r5_kill_fires_is", 0) for r in _r5_model_results)
+    agg_r5_kill_signals_oos = sum(getattr(r, "r5_kill_signals_oos", 0) for r in _r5_model_results)
+    agg_r5_kill_fires_oos = sum(getattr(r, "r5_kill_fires_oos", 0) for r in _r5_model_results)
 
     all_results.sort(key=lambda t: t.close_time)
     print(f"\nCombined: {len(all_results)} trades")
@@ -949,6 +1034,10 @@ def main() -> None:
         r5_fires_is=agg_r5_fires_is,
         r5_signals_oos=agg_r5_signals_oos,
         r5_fires_oos=agg_r5_fires_oos,
+        r5_kill_signals_is=agg_r5_kill_signals_is,
+        r5_kill_fires_is=agg_r5_kill_fires_is,
+        r5_kill_signals_oos=agg_r5_kill_signals_oos,
+        r5_kill_fires_oos=agg_r5_kill_fires_oos,
     )
 
     print(

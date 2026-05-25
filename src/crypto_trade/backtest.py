@@ -193,18 +193,23 @@ def run_backtest(
     # symbol -> {YYYY-MM-DD -> sum of net_pnl_pct that closed on that day}
     vt_per_sym_daily: dict[str, dict[str, float]] = {}
 
-    # Risk R5 tracking — vol-target ceiling (iter-v1/010)
-    # (symbol, open_time_ms) → vol_natr_14 value from feature parquet.
-    # Populated at init when config.risk_r5_vol_target_enabled is True.
+    # Risk R5 tracking — vol-target ceiling (iter-v1/010) and binary-kill
+    # (iter-v1/011). (symbol, open_time_ms) → vol_natr_14 from feature parquet.
+    # Populated at init when either R5 variant is enabled.
     r5_natr_lookup: dict[tuple[str, int], float] = {}
     r5_fires = 0
-    # IS/OOS split counters (iter-v1/010 R5 reporting patch).
+    # IS/OOS split counters (iter-v1/010 R5 proportional-scaling reporting).
     # Partitioned by open_time vs OOS_CUTOFF_MS from config.py.
     r5_signals_is: int = 0
     r5_fires_is: int = 0
     r5_signals_oos: int = 0
     r5_fires_oos: int = 0
-    if config.risk_r5_vol_target_enabled:
+    # IS/OOS split counters (iter-v1/011 R5-BINARY-KILL reporting).
+    r5_kill_signals_is: int = 0
+    r5_kill_fires_is: int = 0
+    r5_kill_signals_oos: int = 0
+    r5_kill_fires_oos: int = 0
+    if config.risk_r5_vol_target_enabled or config.risk_r5_kill_low_natr_enabled:
         import pyarrow.parquet as pq  # noqa: PLC0415
 
         features_dir = Path(config.data_dir) / "features"
@@ -232,9 +237,14 @@ def run_backtest(
                         f"({_const_frac:.1%} of rows within 0.001 of mean {_mean:.4f}). "
                         f"Check data/features/{_sym}_{config.interval}_features.parquet."
                     )
+        _r5_mode = (
+            "vol_target_pct=" + f"{config.risk_r5_vol_target_pct}%"
+            if config.risk_r5_vol_target_enabled
+            else "binary_kill_min_natr=" + f"{config.risk_r5_kill_low_natr_min_pct}%"
+        )
         print(
             f"[R5] NATR lookup built: {len(r5_natr_lookup)} entries across "
-            f"{len(config.symbols)} symbols (vol_target_pct={config.risk_r5_vol_target_pct}%)"
+            f"{len(config.symbols)} symbols ({_r5_mode})"
         )
 
     # Signal cooldown tracking
@@ -413,6 +423,25 @@ def run_backtest(
         signal = strategy.get_signal(sym, ot)
         if signal.direction != 0 and signal.weight > 0:
             total_signals += 1
+            # R5-BINARY-KILL (iter-v1/011) — entry-time NATR floor; STATELESS gate.
+            # Evaluated FIRST, before cooldown / vt_scale / R2. When enabled, skips
+            # the entry entirely if vol_natr_14 < risk_r5_kill_low_natr_min_pct.
+            # Safety: if the key is absent or NaN, entry proceeds unconditionally.
+            if config.risk_r5_kill_low_natr_enabled:
+                _natr_kill = r5_natr_lookup.get((sym, ot), float("nan"))
+                if ot < OOS_CUTOFF_MS:
+                    r5_kill_signals_is += 1
+                else:
+                    r5_kill_signals_oos += 1
+                if not math.isnan(_natr_kill) and _natr_kill < float(
+                    config.risk_r5_kill_low_natr_min_pct
+                ):
+                    # Kill this entry — NATR below the low-NATR floor threshold.
+                    if ot < OOS_CUTOFF_MS:
+                        r5_kill_fires_is += 1
+                    else:
+                        r5_kill_fires_oos += 1
+                    continue
             if (
                 sym not in open_orders
                 and ot >= cooldown_until.get(sym, 0)
@@ -502,7 +531,7 @@ def run_backtest(
     results.sort(key=lambda r: r.close_time)
 
     if config.risk_r5_vol_target_enabled:
-        # Three-line IS/OOS split summary (iter-v1/010 R5 reporting patch).
+        # Three-line IS/OOS split summary (iter-v1/010 R5 proportional-scaling).
         _r5_total = r5_signals_is + r5_signals_oos
         _r5_all_fires = r5_fires_is + r5_fires_oos
         if r5_signals_is > 0:
@@ -527,6 +556,28 @@ def run_backtest(
         else:
             print("[R5] ALL: fired on 0 of 0 signals (0.0%)")
 
+    if config.risk_r5_kill_low_natr_enabled:
+        # Three-line IS/OOS split summary (iter-v1/011 R5-BINARY-KILL).
+        _kill_total = r5_kill_signals_is + r5_kill_signals_oos
+        _kill_all_fires = r5_kill_fires_is + r5_kill_fires_oos
+        _is_rate = 100.0 * r5_kill_fires_is / r5_kill_signals_is if r5_kill_signals_is > 0 else 0.0
+        _oos_rate = (
+            100.0 * r5_kill_fires_oos / r5_kill_signals_oos if r5_kill_signals_oos > 0 else 0.0
+        )
+        _all_rate = 100.0 * _kill_all_fires / _kill_total if _kill_total > 0 else 0.0
+        print(
+            f"[R5-BINARY-KILL] IS:  fired on {r5_kill_fires_is} of "
+            f"{r5_kill_signals_is} signals ({_is_rate:.2f}%)"
+        )
+        print(
+            f"[R5-BINARY-KILL] OOS: fired on {r5_kill_fires_oos} of "
+            f"{r5_kill_signals_oos} signals ({_oos_rate:.2f}%)"
+        )
+        print(
+            f"[R5-BINARY-KILL] ALL: fired on {_kill_all_fires} of "
+            f"{_kill_total} signals ({_all_rate:.2f}%)"
+        )
+
     if profile_memory:
         _mem_report("after backtest loop")
         tracemalloc.stop()
@@ -538,6 +589,10 @@ def run_backtest(
         r5_fires_is=r5_fires_is,
         r5_signals_oos=r5_signals_oos,
         r5_fires_oos=r5_fires_oos,
+        r5_kill_signals_is=r5_kill_signals_is,
+        r5_kill_fires_is=r5_kill_fires_is,
+        r5_kill_signals_oos=r5_kill_signals_oos,
+        r5_kill_fires_oos=r5_kill_fires_oos,
     )
 
 

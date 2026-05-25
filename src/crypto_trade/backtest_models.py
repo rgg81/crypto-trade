@@ -91,6 +91,16 @@ class BacktestConfig:
     # byte-identical behavior for all iterations through iter-v1/009.
     risk_r5_vol_target_enabled: bool = False
     risk_r5_vol_target_pct: float = 4.0
+    # Risk mitigation R5-BINARY-KILL (iter-v1/011): entry-time NATR floor.
+    # When enabled, skips entry entirely if vol_natr_14 at signal time is
+    # strictly below risk_r5_kill_low_natr_min_pct. This is a state-discontinuous
+    # entry filter — structurally orthogonal to /010's proportional-scaling subtype.
+    # Evaluated BEFORE cooldown / vt_scale / R2 (pre-confidence-gate).
+    # Safety: if NATR is unavailable (NaN / missing lookup key), entry proceeds.
+    # Default disabled — preserves byte-identical behavior for all iterations
+    # through iter-v1/010.
+    risk_r5_kill_low_natr_enabled: bool = False
+    risk_r5_kill_low_natr_min_pct: float = 2.0
 
 
 @dataclass(frozen=True)
@@ -167,6 +177,13 @@ class BacktestResult(list):
                                    candles with open_time < OOS_CUTOFF_MS.
     r5_signals_oos, r5_fires_oos : same for open_time >= OOS_CUTOFF_MS.
     All four default to 0 when R5 is disabled.
+
+    iter-v1/011 R5-BINARY-KILL IS/OOS split counters
+    -------------------------------------------------
+    r5_kill_signals_is, r5_kill_fires_is   : signal count and binary-kill
+                                            fire count for IS half.
+    r5_kill_signals_oos, r5_kill_fires_oos : same for OOS half.
+    All four default to 0 when R5-BINARY-KILL is disabled.
     """
 
     def __init__(
@@ -178,6 +195,10 @@ class BacktestResult(list):
         r5_fires_is: int = 0,
         r5_signals_oos: int = 0,
         r5_fires_oos: int = 0,
+        r5_kill_signals_is: int = 0,
+        r5_kill_fires_is: int = 0,
+        r5_kill_signals_oos: int = 0,
+        r5_kill_fires_oos: int = 0,
     ):
         super().__init__(trades)
         self.total_signals = total_signals
@@ -185,3 +206,7 @@ class BacktestResult(list):
         self.r5_fires_is = r5_fires_is
         self.r5_signals_oos = r5_signals_oos
         self.r5_fires_oos = r5_fires_oos
+        self.r5_kill_signals_is = r5_kill_signals_is
+        self.r5_kill_fires_is = r5_kill_fires_is
+        self.r5_kill_signals_oos = r5_kill_signals_oos
+        self.r5_kill_fires_oos = r5_kill_fires_oos
