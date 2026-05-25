@@ -518,6 +518,7 @@ class LightGbmStrategy:
             neutral_threshold_pct=self.neutral_threshold_pct,
             label_mode=self.label_mode,
             trend_scan_grid=self.trend_scan_grid,
+            interval_minutes=_interval_to_minutes(self._interval),  # iter-v1/015 C1 FIX
         )
 
         ternary = self.neutral_threshold_pct is not None

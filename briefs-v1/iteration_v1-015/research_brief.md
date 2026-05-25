@@ -214,6 +214,23 @@ Three structural reasons CONFIRMATION is NOT HIGH-RISK:
 
 ### 3.1 C1 FIX (PRIMARY MANDATE; completes labeling axis)
 
+**[CRITIC PHASE 6.0 BLOCK RESOLUTION — PATH 1 FIX APPLIED 2026-05-25]**
+
+Critic Phase 6.0 identified a label-time vs execution-time barrier formula asymmetry that constituted a CRITICAL methodology defect:
+- `labeling.py:356-357` computed `tp_dist = sigma_k_tp * sig * entry` with NO √timeout factor — labels were 1.70% wide for BTC
+- `lgbm.py:941-943` computed `tp_pct = sigma * sigma_k_tp * sqrt(timeout) * 100` WITH √timeout — execution barriers were 7.82% wide for BTC
+- Execution barriers were 4.58× wider than label barriers (458% scaling error)
+
+The /014 calibration EDA (`analysis/iteration_v1-014/sigma_calibration.py:31-36`) and LM Master Rec #5 BOTH assumed σ_t × k × √21 = 7.82% at portfolio-median. The brief claimed 7.82% labels, but `labeling.py` was actually testing 1.70% labels (no √timeout).
+
+**PATH 1 FIX APPLIED**: `labeling.py` now includes the √timeout factor, matching the calibration EDA intent:
+- Added `interval_minutes: int = 480` parameter to `label_trades()` signature (backward-compatible default)
+- Pre-computed `_sqrt_timeout_lbl = sqrt(timeout_minutes / interval_minutes)` before the per-candle loop
+- Updated `tp_dist = sigma_k_tp * sig * _sqrt_timeout_lbl * entry` and `sl_dist = sigma_k_sl * sig * _sqrt_timeout_lbl * entry`
+- `lgbm.py` call to `label_trades` now passes `interval_minutes=_interval_to_minutes(self._interval)`
+
+**Implication for /015 scope**: /014 was implicitly testing 1.70% labels (not 7.82% as brief claimed). /015 with Path 1 fix tests the labeling axis at the calibrated 7.82% magnitude for the FIRST TIME. This means /015 is testing a different label substrate than /014 — multi-seed CONFIRMATION measures the well-posed (path 1 fixed) labeling axis for the first time.
+
 **`src/crypto_trade/strategies/ml/lgbm.py` lines 905-915** (currently always uses NATR; needs dispatch on `self.sigma_source`):
 
 CURRENT (`lgbm.py:905-915` per Bash audit):

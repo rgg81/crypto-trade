@@ -187,19 +187,22 @@ def test_sigma_t_labeling_off_parity() -> None:
 
 
 def test_sigma_t_barrier_math() -> None:
-    """Synthetic 1-trade case: sigma × k_tp × entry gives correct barrier distances.
+    """Synthetic 1-trade case: sigma × k_tp × sqrt(timeout_candles) × entry gives correct barriers.
 
-    We call label_trades directly with a known sigma_values array and verify
-    that the barrier prices are computed as:
-      tp_price = entry + sigma_k_tp × sigma × entry
-      sl_price = entry - sigma_k_sl × sigma × entry
+    iter-v1/015 C1 FIX: label_trades now includes the sqrt(timeout_candles) factor
+    to match execution-time barriers in lgbm.py. We call label_trades directly with
+    a known sigma_values array and verify that the barrier distances are computed as:
+      tp_dist = sigma_k_tp × sigma × sqrt(timeout_minutes / interval_minutes) × entry
+      sl_dist = sigma_k_sl × sigma × sqrt(timeout_minutes / interval_minutes) × entry
     """
     from crypto_trade.strategies.ml.labeling import label_trades
 
     # Build master with 50 forward candles to scan; entry at candle 5
     n = 50
     base_price = 1000.0
-    master = _make_master(n_rows=n, base_price=base_price)
+    candle_interval_ms = 8 * 60 * 60 * 1000  # 8h
+    interval_minutes = 480  # 8h
+    master = _make_master(n_rows=n, base_price=base_price, candle_interval_ms=candle_interval_ms)
 
     # Set entry at candle 5 (candidate_indices = [5])
     entry_idx = 5
@@ -213,45 +216,51 @@ def test_sigma_t_barrier_math() -> None:
     k_tp = 1.06
     k_sl = 0.53
 
-    # Expected barriers (from entry = base_price * (1 + 0.01 * 5) = 1050.0)
+    # timeout = 44 candles × 8h = 352h
+    timeout_minutes = interval_minutes * 44  # 44 candles forward
+    timeout_candles = timeout_minutes / interval_minutes  # = 44.0
+    sqrt_timeout = math.sqrt(timeout_candles)  # √44
+
+    # Expected barriers (iter-v1/015 C1 FIX: includes √timeout factor)
     entry_price = base_price * (1.0 + 0.01 * entry_idx)  # = 1050.0
-    expected_tp_dist = k_tp * sigma_known * entry_price
-    expected_sl_dist = k_sl * sigma_known * entry_price
+    expected_tp_dist = k_tp * sigma_known * sqrt_timeout * entry_price
+    expected_sl_dist = k_sl * sigma_known * sqrt_timeout * entry_price
     expected_tp_price = entry_price + expected_tp_dist
     expected_sl_price = entry_price - expected_sl_dist
 
-    # Run label_trades; prices are monotonically increasing so TP is never hit
-    # and label resolves to timeout or forward_return sign.
+    # Run label_trades with interval_minutes so it computes the √timeout factor.
+    # The closes are monotonically increasing so SL is never hit.
+    # With sqrt(44)≈6.633, TP is at entry * (1 + k_tp * sigma * sqrt_timeout)
+    # = 1050 * (1 + 1.06 * 0.02 * 6.633) ≈ 1050 * 1.1406 ≈ 1197.6 — well above
+    # the 44-candle forward range → resolves as timeout.
     labels, weights, long_pnls, short_pnls = label_trades(
         master,
         candidate_indices,
         tp_pct=999.0,  # dummy (not used in sigma path)
         sl_pct=999.0,  # dummy
-        timeout_minutes=8 * 60 * 44,  # scan 44 candles forward (not all 50)
+        timeout_minutes=timeout_minutes,
         sigma_values=sigma_values,
         sigma_k_tp=k_tp,
         sigma_k_sl=k_sl,
+        interval_minutes=interval_minutes,
     )
 
     # Verify we get 1 output
     assert len(labels) == 1
     assert len(weights) == 1
 
-    # The closes are monotonically increasing (base_price * 1.01^i), so the price
-    # never drops to SL. TP is at entry * (1 + k_tp * sigma) = 1050 * 1.0212 = ~1072.26.
-    # At i=7: close = 1000 * 1.07 = 1070 < 1072.26 → not TP hit
-    # At i=8: close = 1000 * 1.08 = 1080 > 1072.26 → but check high.
-    # high[j] = close[j] * 1.02, so high[7] = 1070 * 1.02 = 1091.4 > 1072.26 → TP HIT
-    # We just verify the function ran without error and produced valid output.
+    # The function ran without error and produced valid output.
     assert labels[0] in (-1, 0, 1), f"label must be -1, 0, or 1; got {labels[0]}"
     assert np.isfinite(weights[0]), "weight must be finite"
 
-    # Verify barrier math: expected TP = 1072.26 range
-    assert abs(expected_tp_price - (entry_price * (1 + k_tp * sigma_known))) < 1e-6, (
-        "TP barrier formula mismatch"
+    # Verify the C1-FIX barrier formula (sqrt_timeout included):
+    expected_tp_from_formula = entry_price * (1 + k_tp * sigma_known * sqrt_timeout)
+    expected_sl_from_formula = entry_price * (1 - k_sl * sigma_known * sqrt_timeout)
+    assert abs(expected_tp_price - expected_tp_from_formula) < 1e-6, (
+        "TP barrier formula mismatch — C1 FIX: must include sqrt(timeout_candles)"
     )
-    assert abs(expected_sl_price - (entry_price * (1 - k_sl * sigma_known))) < 1e-6, (
-        "SL barrier formula mismatch"
+    assert abs(expected_sl_price - expected_sl_from_formula) < 1e-6, (
+        "SL barrier formula mismatch — C1 FIX: must include sqrt(timeout_candles)"
     )
 
 

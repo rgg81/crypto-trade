@@ -230,6 +230,7 @@ def label_trades(
     neutral_threshold_pct: float | None = None,
     label_mode: str = "triple_barrier",
     trend_scan_grid: tuple[int, ...] = (5, 8, 13, 21),
+    interval_minutes: int = 480,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """Label each candidate candle as 1 (long), -1 (short), or 0 (neutral).
 
@@ -262,6 +263,13 @@ def label_trades(
                     Ignored when sigma_values is None.
         sigma_k_sl: SL multiplier for σ_t-scaled barriers (e.g. 0.53).
                     Ignored when sigma_values is None.
+        interval_minutes: Candle interval in minutes (e.g. 480 for 8h). Only
+                    used in the sigma_values path (iter-v1/015 C1 FIX) to
+                    compute sqrt(timeout_candles) for label-time barriers:
+                      tp_dist = sigma_k_tp × sigma × sqrt(timeout_minutes /
+                               interval_minutes) × entry
+                    Default 480 (8h) matches the v1 baseline interval.
+                    All non-sigma paths ignore this parameter.
         verbose: If > 0, print detailed labeling info for a random subset.
         verbose_samples: Number of random samples to print (default 20).
         label_mode: Labeling rule to use. Default ``"triple_barrier"``
@@ -326,6 +334,12 @@ def label_trades(
         symbol_indices[sym] = np.where(sym_arr == sym)[0]
 
     use_atr = atr_values is not None
+    # iter-v1/015 C1 FIX: pre-compute sqrt(timeout_candles) for sigma path.
+    # timeout_candles = timeout_minutes / interval_minutes (e.g. 10080/480 = 21 for 8h).
+    # This factor aligns label-time barriers with execution-time barriers in lgbm.py.
+    # Non-sigma paths never read this variable.
+    _timeout_candles_lbl = timeout_minutes / max(interval_minutes, 1)
+    _sqrt_timeout_lbl = float(np.sqrt(_timeout_candles_lbl))
     # iter-v1/014: σ_t-scaled barriers. All three must be provided simultaneously.
     # When active this path TAKES PRIORITY over use_atr. sigma_values must have
     # already been shifted by 1 candle (.shift(1)) at computation time so that
@@ -348,13 +362,16 @@ def label_trades(
         pos = np.searchsorted(sym_idx, idx)
 
         if use_sigma:
-            # iter-v1/014: σ_t-scaled barriers (past-only EWMA; .shift(1) applied
-            # upstream in _load_sigma_for_master). Fall back to 2% of entry if NaN.
+            # iter-v1/015 C1 FIX: σ_t-scaled barriers include √timeout_candles factor
+            # to match execution-time barriers in lgbm.py (lgbm.py:941-943).
+            # Formula: tp_dist = sigma_k_tp × sigma × sqrt(timeout_candles) × entry
+            # Past-only EWMA; .shift(1) applied upstream in _load_sigma_for_master.
+            # Fall back to 2% of entry if sigma is NaN (warmup rows).
             sig = float(sigma_values[idx])  # type: ignore[index]
             if np.isnan(sig) or sig <= 0.0:
                 sig = 0.02
-            tp_dist = sigma_k_tp * sig * entry  # type: ignore[operator]
-            sl_dist = sigma_k_sl * sig * entry  # type: ignore[operator]
+            tp_dist = sigma_k_tp * sig * _sqrt_timeout_lbl * entry  # type: ignore[operator]
+            sl_dist = sigma_k_sl * sig * _sqrt_timeout_lbl * entry  # type: ignore[operator]
         elif use_atr:
             atr = float(atr_values[idx]) if not np.isnan(atr_values[idx]) else entry * 0.02
             tp_dist = atr * tp_pct  # tp_pct is ATR multiplier
