@@ -172,6 +172,10 @@ class LightGbmStrategy:
         label_mode: str = "triple_barrier",
         trend_scan_grid: tuple[int, ...] = (5, 8, 13, 21),
         bounds_profile: str = "default",
+        sigma_source: str = "natr",
+        sigma_k_tp: float | None = None,
+        sigma_k_sl: float | None = None,
+        sigma_halflife_candles: int = 42,
     ) -> None:
         if not feature_columns:
             raise ValueError(
@@ -224,6 +228,26 @@ class LightGbmStrategy:
         # grid is inert (backward-compatible for v1/v2 and all existing callers).
         self.label_mode: str = label_mode
         self.trend_scan_grid: tuple[int, ...] = tuple(trend_scan_grid)
+        # iter-v1/014: σ_t-scaled barrier labeling source.
+        # sigma_source = "natr" (default) → existing NATR_21×atr_mult path (BIT-IDENTICAL).
+        # sigma_source = "ewma14d" → past-only EWMA σ_t barriers at sigma_halflife_candles.
+        # When "ewma14d", sigma_k_tp and sigma_k_sl MUST be provided.
+        # BARRIER-SOURCE CONSISTENCY: when "ewma14d", BOTH label-time barriers (in
+        # label_trades via sigma_values) AND execution-time barriers (atr_tp_multiplier /
+        # atr_sl_multiplier plumbed through BacktestConfig) SHOULD use σ_t-scaled values.
+        # The runner achieves execution-side consistency by passing the same effective
+        # k values via the BacktestConfig stop_loss_pct / take_profit_pct path (runner
+        # responsibility per Section 10.1 RESOLUTION in iter-v1/014 brief).
+        if sigma_source not in ("natr", "ewma14d"):
+            raise ValueError(f"sigma_source must be 'natr' or 'ewma14d'; got {sigma_source!r}")
+        if sigma_source == "ewma14d" and (sigma_k_tp is None or sigma_k_sl is None):
+            raise ValueError(
+                "sigma_k_tp and sigma_k_sl must be provided when sigma_source='ewma14d'"
+            )
+        self.sigma_source: str = sigma_source
+        self.sigma_k_tp: float | None = sigma_k_tp
+        self.sigma_k_sl: float | None = sigma_k_sl
+        self.sigma_halflife_candles: int = int(sigma_halflife_candles)
         # iter-v3/067 Path D: universal inference-time confidence-threshold floor.
         # Default 0.0 = no floor (backward-compatible). Pass 0.60 to raise the bar
         # for marginal-confidence trades (brief Section 3 Sub-fix 2).
@@ -256,6 +280,9 @@ class LightGbmStrategy:
         self._month_natr: dict[tuple[str, int], float] = {}
         # Per-row ATR values for dynamic labeling (price units)
         self._label_atr_values: np.ndarray | None = None
+        # iter-v1/014: per-row past-only EWMA σ_t values for σ_t-scaled labeling.
+        # Populated in compute_features() when sigma_source="ewma14d".
+        self._label_sigma_values: np.ndarray | None = None
 
     def compute_features(self, master: pd.DataFrame) -> None:
         """Lightweight setup: store master and generate splits. No training."""
@@ -302,6 +329,24 @@ class LightGbmStrategy:
         else:
             self._label_atr_values = None
 
+        # iter-v1/014: σ_t-scaled barriers — load past-only EWMA σ_t per row.
+        # _load_sigma_for_master applies .shift(1) INSIDE the method to guarantee
+        # strict past-only (no future return leaks into labeling). See A2 guard.
+        if self.sigma_source == "ewma14d":
+            self._label_sigma_values = self._load_sigma_for_master()
+            if self.verbose > 0:
+                valid = ~np.isnan(self._label_sigma_values)
+                p10 = float(np.nanpercentile(self._label_sigma_values, 10))
+                p50 = float(np.nanpercentile(self._label_sigma_values, 50))
+                p90 = float(np.nanpercentile(self._label_sigma_values, 90))
+                print(
+                    f"[lgbm] σ_t labeling (ewma14d halflife={self.sigma_halflife_candles}c): "
+                    f"{valid.sum()}/{len(self._label_sigma_values)} rows valid | "
+                    f"p10={p10:.5f} p50={p50:.5f} p90={p90:.5f}"
+                )
+        else:
+            self._label_sigma_values = None
+
     def _load_atr_for_master(self) -> np.ndarray:
         """Load per-candle ATR values (price units) aligned with master rows."""
         from pathlib import Path
@@ -336,6 +381,53 @@ class LightGbmStrategy:
             atr_values[sym_indices] = close_arr[sym_indices] * natr_vals / 100.0
 
         return atr_values
+
+    def _load_sigma_for_master(self) -> np.ndarray:
+        """Load per-candle past-only EWMA σ_t values aligned with master rows.
+
+        iter-v1/014 — A2 anti-pattern guard (forward-window σ_t):
+
+        The EWMA standard deviation is computed from close-to-close log-returns
+        using ``pd.Series.ewm(halflife=N, adjust=False).std()``. CRITICALLY, the
+        result is then **shifted forward by 1 candle** via ``.shift(1)`` so that
+        sigma_t[i] contains only information from returns[0..i-1] — i.e. strictly
+        past data. Without this shift, sigma_t[i] would incorporate return[i] (the
+        current candle's return) into the barrier distance used to label candle i,
+        creating look-ahead bias in the training labels.
+
+        This shift is the MANDATORY past-only safety guard. Any reader modifying
+        this method MUST preserve the ``.shift(1)`` call. The test suite in
+        ``tests/test_iteration_v1_014_sigma_t.py::test_sigma_t_is_past_only``
+        verifies this property numerically.
+        """
+        assert self._master is not None, "_load_sigma_for_master called before compute_features"
+        n = len(self._master)
+        sigma_values = np.full(n, np.nan, dtype=np.float64)
+
+        for sym in np.unique(self._sym_arr):
+            sym_mask = self._sym_arr == sym
+            sym_indices = np.where(sym_mask)[0]
+
+            # Extract close prices for this symbol in master row order
+            close_sym = self._master["close"].values[sym_indices].astype(np.float64)
+
+            if len(close_sym) < 2:
+                continue
+
+            # Log-returns: ret[i] = log(close[i] / close[i-1])
+            # ret[0] is NaN (no prior close for the first row)
+            log_ret = pd.Series(np.log(close_sym / np.roll(close_sym, 1)))
+            log_ret.iloc[0] = np.nan
+
+            # Past-only EWMA std: halflife in candles.
+            # MANDATORY .shift(1): sigma at position i = std of returns[0..i-1].
+            # DO NOT REMOVE .shift(1) — it is the A2 lookahead-safety guard.
+            ewma_std = log_ret.ewm(halflife=self.sigma_halflife_candles, adjust=False).std()
+            ewma_std_shifted = ewma_std.shift(1)  # A2 GUARD — past-only
+
+            sigma_values[sym_indices] = ewma_std_shifted.to_numpy(dtype=np.float64)
+
+        return sigma_values
 
     def _train_for_month(self, month_str: str) -> None:
         """Train a model for the given month. Called lazily from get_signal."""
@@ -384,16 +476,29 @@ class LightGbmStrategy:
             print(f"  Samples per month: {', '.join(dist_parts)}")
 
         # (b) Label all training samples (with fee-aware returns)
-        # When use_atr_labeling is enabled, pass per-candle ATR values so
-        # labeling barriers scale with each symbol's volatility.
-        if self._label_atr_values is not None:
+        # iter-v1/014: σ_t-scaled barriers TAKE PRIORITY when sigma_source="ewma14d".
+        # Otherwise fall through to existing ATR or fixed-percentage paths.
+        # Both label-time AND execution-time barriers use σ_t when ewma14d (runner
+        # responsibility per Section 10.1 RESOLUTION in iter-v1/014 brief).
+        if self._label_sigma_values is not None:
+            # σ_t-scaled path (iter-v1/014): atr_values is NOT passed.
+            # tp_pct / sl_pct are ignored; barrier distances computed inside
+            # label_trades via sigma_values × sigma_k_tp/sl × entry.
+            label_tp = self.label_tp_pct  # used as dummy; not evaluated in sigma path
+            label_sl = self.label_sl_pct
+            label_atr = None
+            label_sigma = self._label_sigma_values
+        elif self._label_atr_values is not None:
+            # Existing ATR path: tp_pct / sl_pct are ATR multipliers.
             label_tp = self.atr_tp_multiplier
             label_sl = self.atr_sl_multiplier or self.atr_tp_multiplier / 2.0
             label_atr = self._label_atr_values
+            label_sigma = None
         else:
             label_tp = self.label_tp_pct
             label_sl = self.label_sl_pct
             label_atr = None
+            label_sigma = None
         train_labels, train_weights, long_pnls, short_pnls = label_trades(
             self._master,
             train_indices,
@@ -402,6 +507,9 @@ class LightGbmStrategy:
             self.label_timeout_minutes,
             fee_pct=self.fee_pct,
             atr_values=label_atr,
+            sigma_values=label_sigma,
+            sigma_k_tp=self.sigma_k_tp if label_sigma is not None else None,
+            sigma_k_sl=self.sigma_k_sl if label_sigma is not None else None,
             verbose=self.verbose,
             neutral_threshold_pct=self.neutral_threshold_pct,
             label_mode=self.label_mode,

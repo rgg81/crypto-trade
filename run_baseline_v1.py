@@ -161,6 +161,10 @@ def run_model(
     r5_kill_low_natr_enabled: bool = False,
     r5_kill_low_natr_min_pct: float = 2.0,
     ensemble_seeds_offset: int = 0,
+    sigma_source: str = "natr",
+    sigma_k_tp: float | None = None,
+    sigma_k_sl: float | None = None,
+    sigma_halflife_days: int = 14,
 ):
     """Run a single v1 sub-model (A/C/D/E) under the corrected walk-forward.
 
@@ -189,16 +193,29 @@ def run_model(
         SUBSTRATE-DISSOLUTION PROBE uses offset=3 to select DISJOINT inner seeds
         from /011 ([789, 1001, 2002] vs /011's [42, 123, 456]) while remaining
         inside the canonical CONFIRMATION roster.
+    sigma_source
+        iter-v1/014 — barrier labeling source. "natr" (default) preserves
+        BIT-IDENTICAL behaviour to /013. "ewma14d" activates past-only EWMA
+        σ_t-scaled barriers at sigma_halflife_days half-life.
+    sigma_k_tp
+        TP barrier multiplier for σ_t path (e.g. 1.06). Only used when
+        sigma_source="ewma14d".
+    sigma_k_sl
+        SL barrier multiplier for σ_t path (e.g. 0.53). Only used when
+        sigma_source="ewma14d".
+    sigma_halflife_days
+        Half-life in calendar days for EWMA σ_t (default 14 = 42 candles at 8h).
     """
     effective_feature_columns = (
         feature_columns if feature_columns is not None else list(V1_FEATURE_COLUMNS)
     )
+    sigma_halflife_candles = sigma_halflife_days * 3  # 3 candles per day at 8h
     print("=" * 60)
     print(
         f"MODEL {name}: {', '.join(symbols)} "
         f"(R1={apply_r1} R2={apply_r2} R3=on, n_trials={n_trials}, "
         f"ENSEMBLE_SIZE={ensemble_size}, features={len(effective_feature_columns)}, "
-        f"bounds={bounds_profile})"
+        f"bounds={bounds_profile}, sigma_source={sigma_source})"
     )
     print("=" * 60)
     config = BacktestConfig(
@@ -247,6 +264,10 @@ def run_model(
         ood_cutoff_pct=BASELINE_OOD_CUTOFF_PCT,
         oof_persist_path=oof_persist_path,
         bounds_profile=bounds_profile,
+        sigma_source=sigma_source,
+        sigma_k_tp=sigma_k_tp,
+        sigma_k_sl=sigma_k_sl,
+        sigma_halflife_candles=sigma_halflife_candles,
     )
     t0 = time.time()
     results = run_backtest(config, strategy, yearly_pnl_check=False)
@@ -802,6 +823,47 @@ def main() -> None:
             "Must satisfy offset + ENSEMBLE_SIZE <= 10."
         ),
     )
+    # iter-v1/014: σ_t-scaled barrier labeling flags.
+    parser.add_argument(
+        "--label-sigma-source",
+        choices=["natr", "ewma14d"],
+        default="natr",
+        help=(
+            "Barrier labeling source. 'natr' (default) preserves BIT-IDENTICAL "
+            "behaviour to /013. 'ewma14d' activates past-only EWMA σ_t-scaled "
+            "barriers at --label-sigma-halflife-days half-life. When 'ewma14d', "
+            "R5-BINARY-KILL is auto-disabled for axis isolation."
+        ),
+    )
+    parser.add_argument(
+        "--label-sigma-k-tp",
+        type=float,
+        default=1.06,
+        help=(
+            "TP barrier multiplier for σ_t-scaled labeling (default 1.06, "
+            "calibrated by volume-weighted portfolio-median ATR match per "
+            "iter-v1/014 EDA Section 2.3). Only used when --label-sigma-source ewma14d."
+        ),
+    )
+    parser.add_argument(
+        "--label-sigma-k-sl",
+        type=float,
+        default=0.53,
+        help=(
+            "SL barrier multiplier for σ_t-scaled labeling (default 0.53, "
+            "calibrated by volume-weighted portfolio-median ATR match per "
+            "iter-v1/014 EDA Section 2.3). Only used when --label-sigma-source ewma14d."
+        ),
+    )
+    parser.add_argument(
+        "--label-sigma-halflife-days",
+        type=int,
+        default=14,
+        help=(
+            "Half-life in calendar days for EWMA σ_t (default 14 = 42 candles "
+            "at 8h interval). Only used when --label-sigma-source ewma14d."
+        ),
+    )
     args = parser.parse_args()
 
     # Resolve symbols
@@ -890,6 +952,31 @@ def main() -> None:
             f"{r5_kill_low_natr_min_pct}% | R5 vol-target DISABLED for axis isolation"
         )
 
+    # iter-v1/014: σ_t-scaled barrier labeling config resolution.
+    # DEFAULT sigma_source="natr" → BIT-IDENTICAL to /013 with no behaviour change.
+    # When sigma_source="ewma14d", R5-BINARY-KILL is auto-disabled (axis isolation:
+    # /014 tests the labeling axis only, not R5; Section 0.2 + Section 3.4).
+    sigma_source_arg = getattr(args, "label_sigma_source", "natr")
+    sigma_k_tp_arg: float | None = None
+    sigma_k_sl_arg: float | None = None
+    sigma_halflife_days_arg = int(getattr(args, "label_sigma_halflife_days", 14))
+    if sigma_source_arg == "ewma14d":
+        sigma_k_tp_arg = float(getattr(args, "label_sigma_k_tp", 1.06))
+        sigma_k_sl_arg = float(getattr(args, "label_sigma_k_sl", 0.53))
+        # Auto-disable R5-BINARY-KILL for axis isolation when ewma14d is active.
+        if r5_kill_low_natr_enabled:
+            print(
+                "[run_baseline_v1] AXIS-ISOLATION: sigma_source=ewma14d auto-disables "
+                "R5-BINARY-KILL (Section 0.2 + 3.4 axis isolation rule)"
+            )
+            r5_kill_low_natr_enabled = False
+            r5_vol_target_enabled = True  # restore historical default
+        print(
+            f"[run_baseline_v1] σ_t labeling ENABLED: k_tp={sigma_k_tp_arg} "
+            f"k_sl={sigma_k_sl_arg} halflife={sigma_halflife_days_arg}d "
+            f"({sigma_halflife_days_arg * 3} candles at 8h)"
+        )
+
     # iter-v1/008: restore /003-era iteration-stamped OOF_PARQUET_PATH.
     # The global OOF_PARQUET_PATH is overridden here BEFORE the unlink() guard below
     # so that each iteration preserves its own parquet and future per-cell N_eff
@@ -928,6 +1015,10 @@ def main() -> None:
     print(f"  V1_EXCLUDED_SYMBOLS: {V1_EXCLUDED_SYMBOLS}")
     print(f"  r5_vol_target_enabled: {r5_vol_target_enabled}")
     print(f"  r5_kill_low_natr_enabled: {r5_kill_low_natr_enabled}")
+    print(f"  sigma_source: {sigma_source_arg}")
+    if sigma_source_arg == "ewma14d":
+        print(f"  sigma_k_tp: {sigma_k_tp_arg}  sigma_k_sl: {sigma_k_sl_arg}")
+        print(f"  sigma_halflife_days: {sigma_halflife_days_arg}")
     print()
 
     # Validate active feature list is non-empty (hard guard per feature-pinning rules).
@@ -954,15 +1045,20 @@ def main() -> None:
     # -------------------------------------------------------------------------
     all_results: list = []
 
-    # Shared R5 kwargs passed to every run_model call.
+    # Shared kwargs passed to every run_model call.
     # iter-v1/012: ensemble_seeds_offset threaded through so all 4 models
     # (A pooled, C LINK, D LTC, E DOT) use the SAME inner-seed window.
+    # iter-v1/014: sigma_source + sigma_k_tp/sl/halflife threaded through.
     _r5_kwargs = dict(
         r5_vol_target_enabled=r5_vol_target_enabled,
         r5_vol_target_pct=r5_vol_target_pct,
         r5_kill_low_natr_enabled=r5_kill_low_natr_enabled,
         r5_kill_low_natr_min_pct=r5_kill_low_natr_min_pct,
         ensemble_seeds_offset=ensemble_seeds_offset,
+        sigma_source=sigma_source_arg,
+        sigma_k_tp=sigma_k_tp_arg,
+        sigma_k_sl=sigma_k_sl_arg,
+        sigma_halflife_days=sigma_halflife_days_arg,
     )
     if set(symbols) == set(V1_BASELINE_UNIVERSE):
         results_a = run_model(
@@ -1109,6 +1205,20 @@ def main() -> None:
             "\nBASELINE-MODE complete. Update BASELINE_V1.md with the headline "
             "metrics from comparison.csv (monthly_sharpe, max_drawdown, n_trades, "
             "etc.). Tag the commit as `v0.v1-baseline-corrected`."
+        )
+
+    # iter-v1/014: Critic /013 Rec #1 3rd-strike enforcement — engineering_report.md
+    # existence check. Phase 7.5 dispatch MUST be hard-rejected if missing.
+    # This runner-side warning is the belt-and-suspenders check; orchestrator-side
+    # enforcement is the BLOCKING deliverable declaration in brief Section 10.2.
+    engineering_report_path = report_dir / "engineering_report.md"
+    if not engineering_report_path.exists():
+        print(
+            "\n[run_baseline_v1] WARNING: engineering_report.md NOT FOUND at "
+            f"{engineering_report_path}\n"
+            "  This file is a BLOCKING deliverable for Phase 7.5 dispatch.\n"
+            "  Orchestrator MUST create it before invoking the Critic.\n"
+            "  Phase 7.5 hard-reject applies: do NOT invoke quant-critic without it."
         )
 
 
