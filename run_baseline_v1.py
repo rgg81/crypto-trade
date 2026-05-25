@@ -115,15 +115,32 @@ BASELINE_OOD_CUTOFF_PCT: float = 0.70
 OOF_PARQUET_PATH: Path = Path("data") / "v1_iter_SENTINEL_trial_oof.parquet"
 
 
-def _derive_ensemble_seeds(size: int) -> list[int]:
-    """Return the first `size` seeds from the ENSEMBLE_SEEDS roster.
+def _derive_ensemble_seeds(size: int, offset: int = 0) -> list[int]:
+    """Return `size` seeds from the ENSEMBLE_SEEDS roster starting at `offset`.
 
     Single-pass structure: no outer seed loop. The runner trains `size` models
     in parallel (one per inner seed) and averages predictions at signal time.
+
+    Parameters
+    ----------
+    size
+        Number of inner seeds to use. Must be in [1, len(ENSEMBLE_SEEDS)].
+    offset
+        Starting index into ENSEMBLE_SEEDS. Default 0 reproduces canonical
+        EXPLORATION/CONFIRMATION seed windows ([42, 123, 456, ...]).
+        Used by iter-v1/012 SUBSTRATE-DISSOLUTION PROBE (offset=3 selects
+        DISJOINT inner seeds [789, 1001, 2002] from /011's [42, 123, 456]
+        while staying inside the canonical CONFIRMATION roster). Must satisfy
+        offset + size <= len(ENSEMBLE_SEEDS).
     """
     if size < 1 or size > len(ENSEMBLE_SEEDS):
         raise ValueError(f"ENSEMBLE_SIZE must be in [1, {len(ENSEMBLE_SEEDS)}]; got {size}")
-    return list(ENSEMBLE_SEEDS[:size])
+    if offset < 0 or offset + size > len(ENSEMBLE_SEEDS):
+        raise ValueError(
+            f"ensemble seed window out of range: offset={offset} + size={size} "
+            f"exceeds len(ENSEMBLE_SEEDS)={len(ENSEMBLE_SEEDS)}"
+        )
+    return list(ENSEMBLE_SEEDS[offset : offset + size])
 
 
 def run_model(
@@ -143,6 +160,7 @@ def run_model(
     r5_vol_target_pct: float = 4.0,
     r5_kill_low_natr_enabled: bool = False,
     r5_kill_low_natr_min_pct: float = 2.0,
+    ensemble_seeds_offset: int = 0,
 ):
     """Run a single v1 sub-model (A/C/D/E) under the corrected walk-forward.
 
@@ -165,6 +183,12 @@ def run_model(
         When True, skips entries where NATR_14 < r5_kill_low_natr_min_pct.
     r5_kill_low_natr_min_pct
         NATR_14 floor for binary kill (default 2.0% per iter-v1/011 EDA).
+    ensemble_seeds_offset
+        Starting index into ENSEMBLE_SEEDS for inner seed selection. Default 0
+        reproduces canonical EXPLORATION/CONFIRMATION seed windows. iter-v1/012
+        SUBSTRATE-DISSOLUTION PROBE uses offset=3 to select DISJOINT inner seeds
+        from /011 ([789, 1001, 2002] vs /011's [42, 123, 456]) while remaining
+        inside the canonical CONFIRMATION roster.
     """
     effective_feature_columns = (
         feature_columns if feature_columns is not None else list(V1_FEATURE_COLUMNS)
@@ -216,7 +240,7 @@ def run_model(
         atr_tp_multiplier=atr_tp,
         atr_sl_multiplier=atr_sl,
         use_atr_labeling=True,
-        ensemble_seeds=_derive_ensemble_seeds(ensemble_size),
+        ensemble_seeds=_derive_ensemble_seeds(ensemble_size, offset=ensemble_seeds_offset),
         feature_columns=effective_feature_columns,
         ood_enabled=True,
         ood_features=list(V1_OOD_FEATURE_COLUMNS),
@@ -765,6 +789,19 @@ def main() -> None:
             "Only evaluated when --r5-binary-kill-enabled is set."
         ),
     )
+    parser.add_argument(
+        "--ensemble-seeds-offset",
+        type=int,
+        default=0,
+        help=(
+            "Starting index into ENSEMBLE_SEEDS for inner seed selection. "
+            "Default 0 reproduces canonical EXPLORATION/CONFIRMATION seed windows "
+            "([42, 123, 456, ...]). iter-v1/012 SUBSTRATE-DISSOLUTION PROBE uses "
+            "--ensemble-seeds-offset 3 to select DISJOINT inner seeds [789, 1001, 2002] "
+            "from /011's [42, 123, 456], staying inside the canonical CONFIRMATION roster. "
+            "Must satisfy offset + ENSEMBLE_SIZE <= 10."
+        ),
+    )
     args = parser.parse_args()
 
     # Resolve symbols
@@ -861,10 +898,29 @@ def main() -> None:
     global OOF_PARQUET_PATH  # noqa: PLW0603
     OOF_PARQUET_PATH = Path("data") / f"v1_iter_{iteration_label}_trial_oof.parquet"
 
+    # Resolve ensemble-seeds offset. Default 0 = canonical seed window.
+    # iter-v1/012 SUBSTRATE-DISSOLUTION PROBE: offset=3 selects DISJOINT inner
+    # seeds [789, 1001, 2002] vs /011's [42, 123, 456] while staying inside the
+    # canonical CONFIRMATION roster (so /015 multi-seed CONFIRMATION naturally
+    # subsumes both /011's and /012's basin draws).
+    # --baseline-mode forces offset=0 (sacred reproduction of historical v186).
+    ensemble_seeds_offset = (
+        0 if args.baseline_mode else int(getattr(args, "ensemble_seeds_offset", 0))
+    )
+    if ensemble_seeds_offset != 0 and not args.baseline_mode:
+        print(
+            f"[run_baseline_v1] --ensemble-seeds-offset {ensemble_seeds_offset} "
+            f"(SUBSTRATE-DISSOLUTION PROBE — canonical offset is 0)"
+        )
+
     print(f"v1 RUNNER mode={mode_label} iteration={iteration_label}")
     print(f"  symbols: {symbols}")
     print(f"  ENSEMBLE_SIZE: {ensemble_size}")
-    print(f"  ensemble_seeds: {_derive_ensemble_seeds(ensemble_size)}")
+    print(
+        f"  ensemble_seeds: "
+        f"{_derive_ensemble_seeds(ensemble_size, offset=ensemble_seeds_offset)} "
+        f"(offset={ensemble_seeds_offset})"
+    )
     print(f"  n_trials per cell: {n_trials}")
     print(f"  feature_columns: {len(active_feature_columns)} columns")
     print(f"  bounds_profile: {bounds_profile}")
@@ -899,11 +955,14 @@ def main() -> None:
     all_results: list = []
 
     # Shared R5 kwargs passed to every run_model call.
+    # iter-v1/012: ensemble_seeds_offset threaded through so all 4 models
+    # (A pooled, C LINK, D LTC, E DOT) use the SAME inner-seed window.
     _r5_kwargs = dict(
         r5_vol_target_enabled=r5_vol_target_enabled,
         r5_vol_target_pct=r5_vol_target_pct,
         r5_kill_low_natr_enabled=r5_kill_low_natr_enabled,
         r5_kill_low_natr_min_pct=r5_kill_low_natr_min_pct,
+        ensemble_seeds_offset=ensemble_seeds_offset,
     )
     if set(symbols) == set(V1_BASELINE_UNIVERSE):
         results_a = run_model(
