@@ -99,3 +99,106 @@ Bundle Δ target at /027 multi-seed: +0.6637 baseline + LINK +0.80 + ETH +0.50 =
 3. Layer C 10-param visibility audit
 4. H1 falsifier evaluation against pre-registered thresholds
 5. H2 feature-signature Spearman rank correlation pre-registered band
+
+---
+
+# LightGBM Master Post-Mortem — iter-v1/021 — Phase 7.4
+
+## Context Read
+
+- **Iteration outcome (comparison.csv)**: Model A pool (BTC+ETH 2-sym) IS Sharpe **-0.83** / OOS Sharpe **+0.33** / ratio -0.40. 287 IS trades, 95 OOS trades. n_eff per cell median 21.
+- **Brief headline finding**: H1 (training-time pool-anchor parameter divergence) requires per-param |Δ|>0.30 on ≥50% of months per Section 4.3 9-cell matrix.
+- **Reality of run**: ENSEMBLE_SIZE=1, seed=42 single-seed; Pool = BTC+ETH 2-sym (NOT 5-sym); BTC-only Model H n_trials=18; 106 parquet rows; 53 pool + 53 BTC-only (per `_train_for_month` call cadence).
+
+## 1. Phase 4.5 vs Phase 7.4 Prediction Reality
+
+Recalibrated /021 priors (H1 45/40/15; H2 70/20/10) land where evidence resolves. **H1 = CONFIRMED BORDERLINE** (4/10 params shifted on ≥50% months — directly in brief's 4-5 band) matches 45% CONFIRMED + 40% MIXED tail well. **H2 is structurally UNDETERMINED at /021** due to instrumentation defect (Pool Model_A feature_importance CSV all zeros).
+
+## 2. H1 Falsifier Evaluation — CONFIRMED BORDERLINE
+
+| Param | median \|Δ\| | mean \|Δ\| | P90 \|Δ\| | % > 0.30 |
+|---|---:|---:|---:|---:|
+| confidence_threshold | 0.3303 | 0.3507 | 0.6769 | **54.7%** |
+| n_estimators | 0.2444 | 0.3031 | 0.5707 | 43.4% |
+| max_depth | 0.5000 | 0.4245 | 0.9000 | **73.6%** |
+| num_leaves | 0.2917 | 0.3263 | 0.6417 | 49.1% |
+| learning_rate | 0.2233 | 0.3168 | 0.7475 | 35.9% |
+| subsample | 0.3065 | 0.3329 | 0.6550 | **54.7%** |
+| colsample_bytree | 0.2432 | 0.2965 | 0.6172 | 43.4% |
+| min_child_samples | 0.2875 | 0.2993 | 0.5900 | 47.2% |
+| reg_alpha | 0.2465 | 0.3009 | 0.6022 | 39.6% |
+| reg_lambda | 0.3595 | 0.3497 | 0.6824 | **60.4%** |
+
+- **# of 10 params shifted on ≥50% of months: 4/10** (`confidence_threshold`, `max_depth`, `subsample`, `reg_lambda`)
+- **# of key {confidence_threshold, n_estimators, num_leaves, min_child_samples} shifted: 1/4** (only `confidence_threshold`)
+
+Per brief Section 4.3: **4/10 = CONFIRMED BORDERLINE band**. HIGH-CONFIDENCE gate (≥6 shifted AND ≥2 key) NOT cleared.
+
+**Caveat — n_trials disparity confound**: Pool n_trials=35; BTC-only n_trials=18. TPE warmup variance inflates parameter-Δ at n_trials=18. Flagged in Phase 4.5 §1.
+
+## 3. H2 Falsifier Evaluation — UNDETERMINED (Instrumentation Defect)
+
+**`feature_importance_POOL_Model_A.csv` is ALL ZEROS across 40 features.** Total gain sum = 0.0 for Pool. BTC-only Model_H total gain = 98,881.78. Naïve Spearman ρ = -0.04 (tie-break artifact on all-zero series). NOT a true cohort-signature divergence measurement.
+
+**Root cause**: write-side defect at `run_baseline_v1.py:560-585`. Pool strategy `_models` may have been written only on LAST training month OR `_iter021_fi_strategies` captured stale references. BTC-only wrote correctly. Layer C parquet confirms pool was TRAINED correctly (all 11 hyperparams non-null) — defect is WRITE-side, not training-side.
+
+**H2 non-evaluable at /021**. Cannot place verdict cell.
+
+## 4. Joint H1×H2 Verdict Cell
+
+- H1 = **CONFIRMED BORDERLINE**
+- H2 = **UNDETERMINED**
+
+Coerced verdict: **"H1 CONFIRMED BORDERLINE × H2 UNRESOLVED" → /022 = LTC-only specialization (cadence-preserved)**, with MANDATORY pool feature_importance defect fix as /022 prerequisite.
+
+## 5. Mechanism Analysis — Channel Support
+
+- **C1 (shared normalization)**: SUPPORTED. `confidence_threshold` 54.7% — normalization compromise across BTC+ETH labels.
+- **C2 (label-timing co-location)**: WEAKLY SUPPORTED. `max_depth` 73.6% — pool composition shifts Optuna basin via shallower/deeper trees.
+- **C3 (abs_pnl weighting)**: NEUTRAL. `reg_lambda` 60.4% but `reg_alpha` 39.6% — inconsistent co-shift.
+
+**Strongest channels**: C1 + C2. H1 mechanism EXISTS but doesn't dominate.
+
+## 6. Layer B Determinism — NOT Bit-Identical, EXPECTED Divergence
+
+| Slice | Baseline (5-sym pool, BTC slice) | /021 (2-sym pool, BTC slice) | Delta |
+|---|---:|---:|---:|
+| IS BTC trades | 113 | 141 | +28 |
+| IS ETH trades | 145 | 146 | +1 |
+| OOS BTC trades | 35 | 47 | +12 |
+| OOS ETH trades | 46 | 48 | +2 |
+
+**Layer B FAILS bit-identity** — but for STRUCTURALLY EXPECTED reason. Baseline used 5-sym pool; /021 Model A used 2-sym pool. Different training-data composition → different Optuna best_params per month → different trade rosters. NOT a `params_persist_path` regression; IS a brief-design ambiguity. Recommend Critic Phase 7.5 re-frame as "Pool composition divergence, NOT params_persist_path defect" → PASS-WITH-NOTE.
+
+## 7. Track Record Honest Update
+
+Pre-/021: 0/3 directional, 1/1 methodology, 1/1 alternative-branch utility.
+
+Post-/021 updates:
+- **H1 directional prior (45/40/15)**: BORDERLINE-correct. 45% CONFIRMED captured directional truth better than QR's 55%. Score: **0.5/1 directional credit**.
+- **H2 directional prior (70/20/10)**: Non-evaluable. No credit/discredit.
+- **Methodology call (reject n_trials=3 + log-grep; mandate §3.1)**: PROVEN CORRECT. §3.1 captured 11/11 hyperparams across 106 rows with zero nulls. **Score: 2/2 methodology credit**.
+- **Layer C 10-param visibility mandate**: PROVEN ESSENTIAL. Without it, H1 falsifier blind on 50% of dimensions.
+
+**Updated track record**: H1 directional 0.5/4 (one new BORDERLINE-correct), methodology 2/2 (100%), alternative-branch utility 1/1. Methodology calls remain LM Master's strongest lane.
+
+## 8. /022 Routing per Section 11.7
+
+- H1 = CONFIRMED BORDERLINE (4 of 10 params shifted; 1 of 4 key params shifted)
+- H2 = UNDETERMINED
+
+**Routing recommendation: /022 = LTC-only specialization** (cadence-preserved). NOT accelerated /027. HIGH-CONFIDENCE gate (≥6 + ≥2 key) NOT cleared.
+
+**/022 prerequisite**: fix `_write_feature_importance` Pool-CSV all-zero defect at `run_baseline_v1.py:560-585`. Low-cost code fix; doesn't require backtest re-run for /021 closeout but is mandatory for any /022+ H1+H2 joint diagnostic.
+
+## 9. Most Important Phase 7.4 Finding
+
+**H1 mechanism EXISTS at BORDERLINE strength (4/10 params shift on ≥50% of months, dominated by `confidence_threshold`, `max_depth`, `subsample`, `reg_lambda`); H2 is non-evaluable at /021 due to a Pool feature_importance write-side defect that QE must fix before any further H1/H2 joint diagnostic is methodologically sound.**
+
+## Closing Note for Critic (Phase 7.5)
+
+Three things Critic 8-check pass should specifically attend to:
+
+1. **Pool feature_importance all-zero defect** — Check 7/8. WRITE-side bug at `run_baseline_v1.py:560-585`. Recommend BLOCK-PENDING-FIX with QE patch before /022.
+2. **Layer B BLOCK-FINAL re-interpretation** — Check 6 (determinism). Letter of brief: BLOCK-FINAL on bit-identity fail; intent: "no params_persist_path regression." Pool composition (5-sym vs 2-sym) is actual cause. Recommend PASS-WITH-NOTE.
+3. **H1 BORDERLINE verdict with n_trials disparity confound** — Check 4 (IC validity). n_trials=35 vs 18 asymmetry inflates parameter-Δ via TPE warmup variance. Without equalizing, BORDERLINE is /021's ceiling. Future replicate at matched n_trials would help (deferred).
