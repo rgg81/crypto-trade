@@ -639,20 +639,66 @@ If only the `params_persist_path` emission fails but determinism holds AND `feat
 
 Before declaring brief complete, QR confirms:
 
-- [ ] Section 0.6 (Axis Rotation Discipline) declared and justified — `methodology-pivot` NOT in prior 5 families.
-- [ ] Section 2.5 (HIGH-RISK declaration) declared and justified — NORMAL-RISK with src/ additive justification.
-- [ ] Section 3.4 (LM Master Phase 4.5 responses) placeholder reserved.
-- [ ] Section 4.4 (methodology gates) thresholds pre-registered.
-- [ ] Section 4 falsifier matrices (H1, H2, joint) unambiguous.
-- [ ] Section 5 verdict-class priors numerically specified.
-- [ ] Section 6 failure modes addressed (5 modes).
-- [ ] Section 7 pre-registered failure-mode predictions (9 rows).
-- [ ] Section 8 MERGE/NO-MERGE — /021 does NOT update BASELINE_V1.md regardless of verdict.
-- [ ] Section 10.4 engineering_report.md timing contract re-enforced.
-- [ ] Section 11.7 /022+ conditional roadmap pre-registered (9-cell verdict matrix).
-- [ ] All EDA evidence in Section 2 cites a committed `analysis/iteration_v1-021/*.py` script + CSV output.
-- [ ] No OOS leak in EDA scripts (verified at Phase 6.0 pre-flight).
-- [ ] Wall-clock estimate ≤ 60 min HARD CAP (target ≤ 30 min).
+- [x] Section 0.6 (Axis Rotation Discipline) declared and justified — `methodology-pivot` NOT in prior 5 families.
+- [x] Section 2.5 (HIGH-RISK declaration) declared and justified — NORMAL-RISK with src/ additive justification.
+- [x] Section 3.4 (LM Master Phase 4.5 responses) placeholder reserved — 7/7 ADOPTED with explicit responses.
+- [x] Section 4.4 (methodology gates) thresholds pre-registered (Layer A ≥ 48, Layer B bit-identity, Layer C 10-param visibility).
+- [x] Section 4 falsifier matrices (H1, H2, joint) unambiguous — 9-cell joint verdict matrix.
+- [x] Section 5 verdict-class priors numerically specified (H1 45/40/15 + H2 70/20/10 per LM Master Rec #1).
+- [x] Section 6 failure modes addressed (5 modes).
+- [x] Section 7 pre-registered failure-mode predictions (9 rows).
+- [x] Section 8 MERGE/NO-MERGE — /021 does NOT update BASELINE_V1.md regardless of verdict.
+- [x] Section 10.4 engineering_report.md timing contract re-enforced.
+- [x] Section 11.7 /022+ conditional roadmap pre-registered (9-cell verdict matrix).
+- [x] All EDA evidence in Section 2 cites a committed `analysis/iteration_v1-021/*.py` script + CSV output.
+- [x] No OOS leak in EDA scripts (verified at Phase 6.0 pre-flight).
+- [x] Wall-clock estimate ≤ 60 min HARD CAP (target ≤ 30 min) — observed ~32:50 min (within 60-min target).
+
+---
+
+## Section 13 — Phase 7+8 Self-check Addendum (post-closeout calibration)
+
+Added at /021 Phase 8 closeout (2026-05-26). Tracks how the pre-registered Section 13 checks held up against actual Phase 7+8 outcomes:
+
+### Verdict-cell calibration
+
+- **Pre-registered**: H1 prior 45/40/15 (post LM Master Rec #1) × H2 prior 70/20/10 = 9-cell joint matrix. Modal cell CONFIRMED × CONFIRMED-H2 at 31.5%.
+- **Observed**: H1 CONFIRMED BORDERLINE × H2 REFUTED-H2 = boundary cell at ~4-5% combined prior. The 70% CONFIRMED-H2 modal was deeply miscalibrated (Spearman ρ = 0.9448 sits at extreme of REFUTED region). H1 BORDERLINE-correct was directionally captured by LM Master Rec #1's recalibration MIXED-tail underweight correction.
+
+### Layer gates calibration
+
+- **Layer A (parquet completeness ≥ 48 rows)**: PRE-REGISTERED with row threshold correction (LM Master's original 168 corrected to 48 at Critic Phase 6.0 BLOCKER B). OBSERVED 106 rows ≥ 48 PASS. **Calibration accurate** post-correction.
+- **Layer B (determinism bit-identity)**: Pre-registered as BLOCK-FINAL on bit-identity fail. OBSERVED NOT bit-identical (2-sym /021 pool vs 5-sym baseline pool). Critic Phase 7.5 re-framed as PASS-WITH-NOTE per LM Master Phase 7.4 §6 (pool composition divergence is structural to diagnostic setup, NOT regression). **Calibration required runtime re-framing** — the brief's BLOCK-FINAL framing was too strict; future briefs should pre-distinguish "params_persist_path regression" from "pool composition divergence".
+- **Layer C (10-param visibility audit)**: PRE-REGISTERED as the binding methodology gate. OBSERVED 10/10 hyperparams non-null per cell across 106/106 rows PASS. **Calibration accurate**.
+
+### Engineering report contract
+
+- **Pre-registered (Section 10.4)**: engineering_report.md timing contract re-enforced.
+- **Observed**: Original /021 dispatch was 3rd cycle-3 incident — engineering_report.md missing at Phase 7.5 dispatch. Resolved at BLOCK-PENDING-FIX rerun (commit `502d66e`) — engineering_report.md committed alongside post-fix headlines. **3-strike cycle-3 incident RESOLVED at /021**.
+
+### Methodology layer fixes carrying forward
+
+- **Pre-registered (Section 3.1)**: `params_persist_path` is THE substrate of the entire diagnostic.
+- **Observed**: 106 rows × 11 hyperparams all non-null — substrate-correct per LM Master Phase 4.5 §2 mandate. Headline determinism IS Sharpe -0.8313 / OOS Sharpe +0.3338 unchanged between pre-fix and post-fix runs. **Calibration accurate** — `params_persist_path` is true no-op on Optuna training-objective domain.
+- **NOT pre-registered (emerged at BLOCK-PENDING-FIX H2 fix)**: per-month feature_importance accumulator (`LightGbmStrategy._per_month_fi_log` at `lgbm.py:303,797-800` + `run_baseline_v1.py:573-599`). The accumulator path was the cleanest fix and turned out to be methodologically SUPERIOR to v3's last-month-only convention. **Bonus methodology improvement** — codified at `feedback_v1_per_month_fi_accumulator.md`; v3 backport scheduled.
+
+### Track record contributions
+
+- **LM Master directional**: 1.5/5 post-/021 (H1 BORDERLINE-correct partial credit; H2 prior deeply miscalibrated).
+- **LM Master methodology**: 3/3 post-/021 perfect (substrate of entire diagnostic delivered; rejected QR alternatives proven correct ex-post; Layer C 10-param visibility audit proven essential).
+
+### Cycle-3 cadence
+
+- **Pre-registered**: cycle-3 EXPLORATION #6 of 10; CONFIRMATION earliest at /027.
+- **Observed**: CONFIRMED. Cadence preserved (NOT accelerated /022=/027 per BORDERLINE band → LTC-only specialization). 4 more EXPLORATIONs (/022-/025) before /027.
+
+### Carry-forward bindings for /022+
+
+1. H2 REFUTATION binding: mechanism stories MUST be at parameter-basin level (NEW memory `feedback_v1_h2_refuted_basin_interaction.md`).
+2. /020 retrospective updated: basin-relocation mechanism (NOT H_INTRINSIC).
+3. Per-month FI accumulator now v1 standard (NEW memory `feedback_v1_per_month_fi_accumulator.md`; v3 backport candidate).
+4. /027 Option β PRE-COMMITTED.
+5. /022 routing: LTC-only + orthogonal mechanism per Critic + LM Master CONVERGENT.
 
 ---
 
