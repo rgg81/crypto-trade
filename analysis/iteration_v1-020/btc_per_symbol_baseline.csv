@@ -1,0 +1,5 @@
+source,trades,wins,win_rate,net_pnl_pct,avg_pnl_pct,pct_of_total_pnl,note
+baseline_in_sample,113,38,33.6,-37.2760,-0.3299,-73.11,BTC IS net PnL contribution = -37.28% (WORST in baseline IS); WR 33.6% lowest of 5
+baseline_out_of_sample,35,16,45.7,33.1700,0.9477,133.38,BTC OOS net PnL contribution = +33.17% (SECOND HIGHEST contributor); WR jumps to 45.7%
+iter017_in_sample (universe +SOL),129,40,31.0,-93.8107,-0.7272,-73.34,BTC IS net PnL CATASTROPHIC -93.81% under universe expansion; WR 31.0% lowest
+iter017_out_of_sample (universe +SOL),52,19,36.5,15.1148,0.2907,30.22,BTC OOS net PnL still POSITIVE +15.11% under /017 universe expansion (rotation preserved)
