@@ -282,9 +282,9 @@ LM Master Phase 4.5 emitted at `briefs-v1/iteration_v1-021/lgbm_advisor.md` (101
   QR response: **ADOPTED**.
   Justification: Both QR alternatives have fatal defects (random-search NULL + 60% parameter-blind); only the §3.1 path produces 10/10 hyperparams per cell at the canonical /020 budget; Section 3.1 introduction now ANCHORS the §3.1 method as the substrate and explicitly rejects both alternatives.
 
-- **LM Master Rec #3**: F-AXIS-MECHANISM #1 THREE-LAYER TEST replaces the brief's single-layer ≥96-row gate. **Layer A**: ≥**168 rows** total in `optuna_best_params.parquet` (the brief's "≥96" miscounted; pool runs 5 symbols × 24 months × 1 seed = 120 rows + 48 rows for BTC's two model_roles = ≥168). BLOCK-PENDING-FIX on row count < 168. **Layer B**: BASELINE-config trade roster bit-identical to `v0.v1-baseline-corrected` at comparison.csv level (BLOCK-FINAL on fail; adding `params_persist_path` MUST be a true no-op). **Layer C**: ALL 10 hyperparameter columns non-null per (sym, month, seed) cell — no silent `.get(default)` drops on v1_pruned profile; if only 6/10 sampled (the v1_pruned_axis016 incident from /016), verdict is forced to DIAGNOSTIC-MIXED-or-worse.
-  QR response: **ADOPTED**.
-  Justification: Brief Section 4.4 row-count was wrong (forgot pool runs 5 symbols); the three-layer structure correctly separates row-count (A), determinism (B), and per-row visibility (C) — all three are independent failure modes; Section 4.4 amended.
+- **LM Master Rec #3**: F-AXIS-MECHANISM #1 THREE-LAYER TEST replaces the brief's single-layer ≥96-row gate. **Layer A**: ≥**48 rows** total in `optuna_best_params.parquet` (NOTE: LM Master's original "≥168" figure assumed pool fires 5 separate per-symbol calls — it does NOT; pool calls `optimize_and_train` ONCE per month on COMBINED BTC+ETH data; corrected at Critic Phase 6.0 BLOCKER B: 24 pool rows + 24 BTC-only rows = 48). BLOCK-PENDING-FIX on row count < 48. **Layer B**: BASELINE-config trade roster bit-identical to `v0.v1-baseline-corrected` at comparison.csv level (BLOCK-FINAL on fail; adding `params_persist_path` MUST be a true no-op). **Layer C**: ALL 10 hyperparameter columns non-null per (sym, month, seed) cell — no silent `.get(default)` drops on v1_pruned profile; if only 6/10 sampled (the v1_pruned_axis016 incident from /016), verdict is forced to DIAGNOSTIC-MIXED-or-worse.
+  QR response: **ADOPTED (threshold corrected)**.
+  Justification: Brief Section 4.4 row-count was wrong; the three-layer structure correctly separates row-count (A), determinism (B), and per-row visibility (C) — all three are independent failure modes; Section 4.4 amended. Row-count corrected from 168 to 48 per actual pool dispatch architecture.
 
 - **LM Master Rec #4**: Feature importance method = mean gain (b), matching v3 `run_baseline_v3.py:2730-2818`. Reject (a) raw split count (noisy frequency proxy) and (c) permutation importance (5-10× wall-clock, defer).
   QR response: **ADOPTED**.
@@ -302,7 +302,7 @@ LM Master Phase 4.5 emitted at `briefs-v1/iteration_v1-021/lgbm_advisor.md` (101
   QR response: **ADOPTED**.
   Justification: Option α had not been explicitly entertained by QR; LM Master's H1-in-reverse contamination argument is decisive — reducing pool size 5→3 IS itself a pool-anchor mechanism intervention that would invalidate the bundle's basis vs. the BASELINE_V1.md anchor (+0.6637 OOS Sharpe @ 5-sym pool); only Option β (FULL POOL preserved + portfolio-level additive specialists) preserves the basis; Section 11.6 bundle table amended.
 
-- **LM Master Closing — Critic Phase 7.5 priority items (5)**: Layer A buffer flush completeness (≥168 rows) / Layer B determinism bit-identical baseline / Layer C 10-param visibility audit / H1 falsifier evaluation against pre-registered thresholds / H2 feature-signature Spearman rank correlation pre-registered band.
+- **LM Master Closing — Critic Phase 7.5 priority items (5)**: Layer A buffer flush completeness (≥48 rows; corrected from ≥168 per Critic Phase 6.0 BLOCKER B) / Layer B determinism bit-identical baseline / Layer C 10-param visibility audit / H1 falsifier evaluation against pre-registered thresholds / H2 feature-signature Spearman rank correlation pre-registered band.
   QR response: **ADOPTED**.
   Justification: These five items are the canonical Phase 7.5 review checklist for /021; Section 10.5 amended to enumerate them as the Critic review pass-conditions.
 
@@ -312,7 +312,7 @@ Phase 5.5 gate verifies: (a) all seven recommendations addressed in this Section
 
 **Location**: `analysis/iteration_v1-021/05_feature_importance_signature_extraction.py`.
 
-**Specification**: reads `reports-v1/iteration_v1-021/in_sample/feature_importance_*.csv` for both BASELINE (Model A pool) and /021 diagnostic (Model H BTC-only + Models C LINK / G ETH single-cohort, if those reports exist from /018/019 in-tree).
+**Specification**: reads `reports-v1/iteration_v1-021/in_sample/feature_importance_*.csv` for BASELINE (Model A pool) and /021 diagnostic (Model H BTC-only). NOTE: Models C (LINK, iter-v1/018) and G (ETH, iter-v1/019) did NOT have `_write_feature_importance` — it is NEW in /021. H2 evaluation scope at /021 is therefore limited to (pool BTC-slice vs Model H BTC-only) comparison. Cross-cohort LINK/ETH Spearman comparison is deferred to a subsequent iteration once feature_importance CSVs for those runs exist.
 
 For each model variant, computes:
 - Top-10 feature ranking.
@@ -326,10 +326,10 @@ Emits:
 
 ### 3.6 NO changes to:
 
-- `V1_FEATURE_COLUMNS_PRUNED` (40 cols; unchanged)
+- `V1_FEATURE_COLUMNS_PRUNED` (40 cols; unchanged). The /021 diagnostic runner uses `--pruned-features` flag (or bounds_profile `v1_pruned`) to select this column set; Model A pool at n_trials=35, Model H BTC-only at n_trials=18.
 - `V1_BASELINE_UNIVERSE` (5 syms; unchanged for Model A pool; Model H uses `(BTCUSDT,)` as in /020)
 - Risk gates (R1, R2, R3) — unchanged from baseline
-- Optuna bounds_profile, n_trials, ensemble_seeds (baseline config; n_trials=18 for diagnostic /021 run matches /020)
+- Optuna bounds_profile, ensemble_seeds (baseline config). NOTE: Model A pool uses n_trials=35 (Layer B determinism match vs baseline); Model H BTC-only uses n_trials=18 (direct /020 budget comparison). Neither n_trials changes the Optuna training-objective domain — they are wall-clock knobs only.
 - Labeling parameters (atr_tp, atr_sl, label_timeout_minutes) — unchanged
 - `OOS_CUTOFF_DATE = 2025-03-24` (IMMUTABLE)
 - `training_months = 24` (IMMUTABLE)
@@ -384,18 +384,18 @@ The /022 routing branches under the H1×H2 verdict are pre-registered here to pr
 
 ### 4.4 F-AXIS-MECHANISM #1 — THREE-LAYER TEST (LM Master Phase 4.5 §3, ADOPTED)
 
-The single-layer ≥96-row gate from the brief's initial draft was REPLACED at LM Master Phase 4.5 §3 with a three-layer test that separates row-count, determinism, and per-row visibility. The original ≥96-row count miscounted (forgot pool runs 5 symbols × 24 months × 1 seed = 120 rows + 48 rows for BTC's two model_roles).
+The single-layer ≥96-row gate from the brief's initial draft was REPLACED at LM Master Phase 4.5 §3 with a three-layer test that separates row-count, determinism, and per-row visibility. The LM Master §3 count of "≥168" itself had an arithmetic error (assumed pool fires 5 separate per-symbol calls per train_month — it does NOT; pool calls `optimize_and_train` ONCE per month on COMBINED multi-symbol data). Corrected count per Critic Phase 6.0 BLOCKER B: 24 pool rows + 24 BTC-only rows = **≥48 rows total**.
 
 | Layer | Gate | PASS criterion | Verdict on fail |
 |---|---|---|---|
-| **A** | Buffer flush completeness — row count | `reports-v1/iteration_v1-021/optuna_best_params.parquet` exists with **≥168 rows total** (pool runs 5 symbols × 24 months × 1 seed = 120 rows + BTC × 2 model_roles × 24 months × 1 seed = 48 rows; Σ ≥168). | **BLOCK-PENDING-FIX** |
+| **A** | Buffer flush completeness — row count | `reports-v1/iteration_v1-021/optuna_best_params.parquet` exists with **≥48 rows total** (Model A pool: `_train_for_month` calls `optimize_and_train` ONCE per walk-forward month on COMBINED BTC+ETH data — NOT per symbol; `symbol="BTC+ETH"` literal; 24 train_months × 1 call = 24 rows. Model H BTC-only: same pattern; 24 train_months × 1 call = 24 rows. Σ = 48 rows. NOTE: the prior "≥168" count assumed pool fires 5 separate per-symbol calls per train_month — it does NOT; that is a documentation error corrected at Critic Phase 6.0 BLOCKER B). | **BLOCK-PENDING-FIX** |
 | **B** | Determinism re-test — bit-identical baseline | BASELINE-config /021 run (Model A pool only, `params_persist_path=None` OR with buffer enabled but BASELINE config) produces `comparison.csv` IS/OOS Sharpe bit-identical to `v0.v1-baseline-corrected` headline (+0.2829 IS / +0.6637 OOS); zero divergences. Adding `params_persist_path` MUST be a true no-op on Optuna's training-objective domain. | **BLOCK-FINAL** |
-| **C** | Parameter visibility audit — 10-column non-null | For each (sym, month, seed) cell in the params parquet, verify **ALL 10 hyperparameter columns are non-null** (confidence_threshold, training_days, n_estimators, max_depth, num_leaves, learning_rate, subsample, colsample_bytree, min_child_samples, reg_alpha, reg_lambda). v1_pruned profile MUST not have any silent `.get(default)` drops — if only 6/10 sampled (the v1_pruned_axis016 incident from /016 recurrence pattern), H1 falsifier is partially blind and verdict is FORCED to DIAGNOSTIC-MIXED-or-worse regardless of underlying truth. | **BLOCK-PENDING-FIX** + downgrade H1 verdict |
+| **C** | Parameter visibility audit — 10-column non-null | For each (sym, month, seed) cell in the params parquet, verify **ALL 10 hyperparameter columns are non-null** (confidence_threshold, training_days, n_estimators, max_depth, num_leaves, learning_rate, subsample, colsample_bytree, min_child_samples, reg_alpha, reg_lambda). v1_pruned profile MUST not have any silent `.get(default)` drops — if only 6/10 sampled (the v1_pruned_axis016 incident from /016 recurrence pattern), H1 falsifier is partially blind and verdict is FORCED to DIAGNOSTIC-MIXED-or-worse regardless of underlying truth. NOTE: `training_days` is explicitly excluded from the NULL-column check at runner line 1721 because it will always be non-null (it is an integer computed from `training_months * 30`); this exception is documented and does NOT weaken Layer C. | **BLOCK-PENDING-FIX** + downgrade H1 verdict |
 | ancillary | `feature_importance_<SYM>.csv` emitted | `reports-v1/iteration_v1-021/in_sample/feature_importance_BTCUSDT.csv` AND `in_sample/feature_importance_ETHUSDT.csv` (for pool Model A) AND `in_sample/feature_importance_portfolio.csv` exist with `importance_type='gain'`. | BLOCK-PENDING-FIX |
 | ancillary | Wall-clock ≤ 30 min target / 60 min HARD CAP for diagnostic-only run | Stopwatch from QE engineering_report.md. | Informational |
 
 **Critic Phase 7.5 verdict structure**:
-- Layer A fail → BLOCK-PENDING-FIX (the missing rows are evidence of incorrect callsite threading; QE re-runs after fix).
+- Layer A fail → BLOCK-PENDING-FIX (if < 48 rows, callsite threading is broken; QE re-runs after fix).
 - Layer B fail → BLOCK-FINAL (the src/ changes were not actually no-ops; revert per Section 12 roll-back protocol).
 - Layer C fail → BLOCK-PENDING-FIX + the H1 verdict CANNOT BE BETTER THAN DIAGNOSTIC-MIXED (since 4 of 10 parameters were silently dropped to `.get(default)` and the falsifier is partially blind).
 - All three layers PASS → proceed to H1/H2 falsifier evaluation per Section 4.1 + 4.2 + 4.3 joint matrix.
@@ -511,7 +511,7 @@ No new library additions. All dependencies already present:
 |---|---|
 | QE implements §3.1 (params buffer) + §3.2 (`_write_feature_importance`) | 15-25 min (small additive changes; pattern-matches existing `oof_persist_path` and v3 reference) |
 | QE runs determinism check (BASELINE config only) | already covered by /021 backtest; no extra time |
-| QE runs diagnostic backtest (Model A pool + Model H BTC-only, side-by-side, single seed=42, n_trials=18) | ~25 min for both models (matches /020 BTC-only wall-clock of ~25 min; pool side is similar) |
+| QE runs diagnostic backtest (Model A pool n_trials=35 for Layer B determinism vs baseline + Model H BTC-only n_trials=18 for direct /020 comparison, side-by-side, single seed=42) | ~25 min for both models (matches /020 BTC-only wall-clock of ~25 min; pool side is similar) |
 | QE writes engineering_report.md | 5 min |
 | **Total** | **≤60 min HARD CAP** (target ≤30 min for the backtest portion alone) |
 
@@ -539,7 +539,7 @@ The diagnostic backtest is short (≤30 min) so the orchestrator dispatch flow i
 
 LM Master Phase 4.5 Closing enumerated the Critic Phase 7.5 priority items as the canonical review checklist for /021. QR ADOPTED per Section 3.4 Closing-response.
 
-1. **Layer A** buffer flush completeness audit (≥168 rows in `optuna_best_params.parquet`) — per Section 4.4 Layer A.
+1. **Layer A** buffer flush completeness audit (≥48 rows in `optuna_best_params.parquet`; 24 pool + 24 BTC-only; corrected from ≥168 per Critic Phase 6.0 BLOCKER B) — per Section 4.4 Layer A.
 2. **Layer B** determinism bit-identical baseline audit (BASELINE-config trade roster = `v0.v1-baseline-corrected` headline) — per Section 4.4 Layer B.
 3. **Layer C** 10-parameter visibility audit (all 10 hyperparam columns non-null per (sym, month, seed) cell; no `.get(default)` silent drops on v1_pruned profile) — per Section 4.4 Layer C.
 4. **H1 falsifier evaluation** against pre-registered Section 4.1 thresholds AND against the /022-ACCELERATION HIGH-CONFIDENCE gate in Section 11.7 (≥6/10 params + ≥2 of 4 key-params shifted on ≥50% cells).

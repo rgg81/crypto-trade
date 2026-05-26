@@ -502,3 +502,41 @@ class TestIter021DispatchGuard:
         assert "V1_ITER021_UNIVERSE" in source, (
             "The /021 dispatch must reference V1_ITER021_UNIVERSE constant"
         )
+
+    def test_baseline_if_excludes_v1_021_label(self) -> None:
+        """The baseline 'if set(symbols) == set(V1_BASELINE_UNIVERSE)' block MUST include
+        'and iteration_label != "v1-021"' guard.
+
+        Without this guard, ANY 5-sym pool invocation — including /021 — matches the
+        baseline 'if' and NEVER reaches the /021 elif. The /021 dispatch is dead code
+        unless the baseline 'if' excludes the 'v1-021' iteration_label.
+
+        This test verifies the dispatch ordering fix from Critic Phase 6.0 BLOCKER A.
+        """
+        import inspect
+
+        import run_baseline_v1
+
+        source = inspect.getsource(run_baseline_v1)
+
+        # The baseline if-block must contain the exclusion guard
+        assert 'iteration_label != "v1-021"' in source, (
+            "The baseline 'if set(symbols) == set(V1_BASELINE_UNIVERSE)' block MUST include "
+            "'and iteration_label != \"v1-021\"' exclusion guard. "
+            "Without it, V1_ITER021_UNIVERSE == V1_BASELINE_UNIVERSE means the /021 elif "
+            "is dead code and the /021 dispatch is never reached."
+        )
+
+        # The baseline if must appear BEFORE the /021 elif in source order
+        idx_baseline_if = source.find('set(V1_BASELINE_UNIVERSE) and iteration_label != "v1-021"')
+        idx_021_elif = source.find('set(V1_ITER021_UNIVERSE) and iteration_label == "v1-021"')
+
+        assert idx_baseline_if != -1, (
+            "Could not locate baseline 'if' with exclusion guard in source"
+        )
+        assert idx_021_elif != -1, "Could not locate /021 'elif' block in source"
+        assert idx_baseline_if < idx_021_elif, (
+            f"Baseline 'if' (pos={idx_baseline_if}) must appear BEFORE /021 'elif' "
+            f"(pos={idx_021_elif}) in source order — the dispatch must fall through "
+            "to the elif when iteration_label == 'v1-021'."
+        )

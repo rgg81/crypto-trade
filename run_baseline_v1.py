@@ -1362,7 +1362,7 @@ def main() -> None:
     # iter-v1/021: store strategies for post-dispatch _write_feature_importance call.
     # Non-/021 iterations leave this empty; the post-dispatch call is a no-op.
     _iter021_fi_strategies: list[tuple[str, object]] = []
-    if set(symbols) == set(V1_BASELINE_UNIVERSE):
+    if set(symbols) == set(V1_BASELINE_UNIVERSE) and iteration_label != "v1-021":
         results_a, faxm_a, _strat_a = run_model(
             "A (BTC/ETH)",
             ("BTCUSDT", "ETHUSDT"),
@@ -1708,14 +1708,20 @@ def main() -> None:
         ]
         print(
             f"[iter-v1/021] params parquet: {PARAMS_PARQUET_PATH} "
-            f"(Layer A: expect ≥168 rows after run)"
+            f"(Layer A: expect ≥48 rows after run — 24 pool + 24 BTC-only)"
         )
-        # Verify Layer A row count after backtest
+        # Verify Layer A row count after backtest.
+        # Corrected arithmetic (Critic Phase 6.0 BLOCKER B):
+        #   Model A pool: _train_for_month calls optimize_and_train ONCE per walk-forward month
+        #     on COMBINED BTC+ETH data — NOT per-symbol. symbol field = "BTC+ETH" literal.
+        #     24 train_months × 1 call = 24 rows.
+        #   Model H BTC-only: same pattern. 24 train_months × 1 call = 24 rows.
+        #   Total = 48 rows (NOT 168; the 168 assumed per-symbol breakdown which pool does not do).
         if PARAMS_PARQUET_PATH.exists():
             _params_df = pd.read_parquet(PARAMS_PARQUET_PATH)
             print(
                 f"[iter-v1/021] Layer A audit: {len(_params_df)} rows in params parquet "
-                f"(≥168 required; PASS={len(_params_df) >= 168})"
+                f"(≥48 required; PASS={len(_params_df) >= 48})"
             )
             _missing = _params_df.isnull().any()
             _missing_cols = [c for c, v in _missing.items() if v and c not in ("training_days",)]
