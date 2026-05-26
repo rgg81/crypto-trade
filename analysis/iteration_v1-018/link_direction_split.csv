@@ -1,0 +1,5 @@
+split,direction,n_trades,wins,win_rate,total_net_pnl_pct,avg_pnl_pct
+IS,long,82,39,0.4756,92.7396,1.131
+IS,short,64,27,0.4219,-20.6788,-0.3231
+OOS,long,10,4,0.4,3.6183,0.3618
+OOS,short,18,10,0.5556,30.6162,1.7009
