@@ -1009,7 +1009,11 @@ def main() -> None:
     # iter-v1/011: R5 risk config resolution.
     # --r5-binary-kill-enabled flips to binary-kill mode and DISABLES proportional
     # vol-target scaling for axis isolation (per brief Section 3.1 + Section 3.5).
-    r5_vol_target_enabled = True  # historical default (active through /010)
+    # iter-v1/017 cycle-3 discipline: BASELINE_V1 anchor (`f8bc12c`) was measured
+    # WITHOUT R5 (run_baseline_v1.py at that commit had zero R5 mentions). For
+    # axis-isolated comparison vs BASELINE_V1, R5 vol-target defaults OFF in
+    # cycle-3+. /010 era reruns must explicitly enable (no flag exposed yet).
+    r5_vol_target_enabled = False  # cycle-3+ default — matches BASELINE_V1 anchor
     r5_vol_target_pct = 4.0
     r5_kill_low_natr_enabled = False
     r5_kill_low_natr_min_pct = 2.0
