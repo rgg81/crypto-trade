@@ -819,14 +819,107 @@ If /020 verdict is BLOCK-PENDING-FIX (Critic isolated specific defect):
 
 ## Section 13 — Self-Check Template (populate at Phase 8)
 
-**RESERVED — populated at Phase 8 closeout with Phase 7 evaluation reconciliation.**
+**POPULATED at Phase 8 closeout 2026-05-26 with Phase 7 evaluation reconciliation. Verdict: EXPLORATION-NEGATIVE Catastrophic-NEGATIVE (Section 8 Row 6).**
 
-To be filled with:
-- Phase 4.5 LM Master prior accuracy
-- Section 5 verdict prior accuracy (QR prediction track update)
-- F-AXIS #1/2/3 observation reconciliation
-- IS_H1 regime-binding observation vs H_INTRINSIC prediction
-- BTC trade-id Jaccard vs baseline BTC roster (PROMISING-MECHANICAL check)
-- Lessons for v1 cycle-3 catalog
-- Updates to verdict-cell decision protocol if needed
-- /027 LOAD-BEARING component status update
+### 13.1 Phase 4.5 LM Master prior accuracy
+
+LM Master pre-EDA prior: PROMISING 25% / INERT 50% / NEGATIVE 25%. Post-EDA adopted prior (Section 5 ADOPTED): PROMISING 20% / INERT 60% (40% no-effect + 20% preserved-asymmetric) / NEGATIVE 20% (13% basin + 5% INTRINSIC + **2% CATASTROPHIC**).
+
+**Observed: NEGATIVE-CATASTROPHIC (2% tail materialized; modal INERT 60% REFUTED).**
+
+Three directional calls staked at Phase 4.5; all three REFUTED at Phase 7.4:
+1. INERT-no-effect modal 40% — REFUTED (2% tail materialized; modal off 0.86σ in opposite direction)
+2. Jaccard prediction [0.10, 0.25] higher than /018+/019 ≈ 0.04 — REFUTED (observed 0.084 combined; OOS 0.048 BIT-IDENTICAL to /018+/019 alternative branch)
+3. BTC-only's /027 role as DIVERSIFICATION not ADDITIVE EDGE — VINDICATED in direction but UNDERSTATED magnitude (actual NEGATIVE additive, not diversification-neutral)
+
+Net Phase 4.5 directional track on /020: **0/3 calls**. 1/1 methodology call (n_eff = 9 PASS exact). 1/1 alternative-branch pre-registration utility (§4 Jaccard ≈ 0.04 alternative branch realized — only PRE-REGISTERED branch prevented post-mortem confessional mode).
+
+LM Master cumulative track after /020: 3/17 → **3/20 directional** (was 3/17 at /019; now 0/3 added). Mechanism-level: 9/17 → 9/20.
+
+### 13.2 Section 5 verdict prior accuracy (QR prediction track update)
+
+QR Section 5 POST-EDA prior matched LM Master Phase 4.5 §1 ADOPTED (Section 5 explicitly adopted §1 refined priors). Same 60% modal INERT prior; same 2% CATASTROPHIC tail.
+
+**Observed: NEGATIVE-CATASTROPHIC.** Modal MISSED; tail materialized.
+
+QR verdict-class directional track after /020: 3/17 → **3/18** (no new directional hit; modal INERT 60% prior REFUTED with 2% tail materialized). The QR + LM Master modal-INERT prior at 60% was wrong by a factor of 30× on modal-band match.
+
+### 13.3 F-AXIS #1/2/3 observation reconciliation
+
+| F-AXIS | Pre-registered | Observed | Status | Detail |
+|---|---|---|---|---|
+| **#1 Dispatch correctness** | per_symbol.csv 100% BTCUSDT IS+OOS | 100% BTCUSDT both halves; trades.csv 175 BTC rows / 0 other | **PASS** | Model H exclusive dispatch via V1_ITER020_UNIVERSE guard worked cleanly |
+| **#2 Trade-count band (LOAD-BEARING)** | QR [70, 150] IS / [25, 55] OOS; LM tighter [79, 147] IS / [25, 46] OOS | IS 122 ∈ both bands; OOS 53 ∈ QR ∈ ¬LM (+7) | **PASS (QR); LM BREACH-HIGH +7 INFORMATIONAL** | LM Master sub-bands sit INSIDE QR blocking band; only QR breaches trigger F-AXIS #2 BREACH |
+| **#3 IS_H1 regime-binding** | IS_H1 ∈ [−45%, −15%] PASS | IS_H1 = **−21.95%** (engineering_report.md §3) inside band | **BORDERLINE PASS (resolved from Critic INDETERMINATE)** | Critic estimated −19.4% pending engineering_report.md. Computed exact −21.95%; regime-bound CHARACTER preserved with Δ +14.06pp vs baseline IS_H1 = −36.01% |
+| **#4 n_eff_per_cell** | LM Master point estimate 9 ∈ [7, 10] | observed **9** | **PASS EXACT** | matches LM Master point estimate; /019 §5 methodology calibration accurate |
+
+**Compound F-AXIS verdict**: PASS on mechanism (#1 + #3 + #4 PASS; #2 PASS at QR blocking band). Catastrophic verdict at F1 fires DESPITE F-AXIS PASS — F-AXIS mechanism checks confirmed dispatch + partial IS regime preservation; OOS Sharpe Δ at −0.86 is the load-bearing falsifier (Section 8 Row 6: "band-violation OK" on F-AXIS at Catastrophic-NEGATIVE).
+
+### 13.4 IS_H1 regime-binding observation vs H_INTRINSIC prediction
+
+**Predicted** (Section 0.4 EDA H_INTRINSIC): IS_H1 catastrophic regime-bound character preserved at cohort isolation. IS_H1 ∈ [−45%, −15%] band.
+
+**Observed**: IS_H1 = **−21.95%** inside band near upper boundary. Regime-bound CHARACTER preserved BUT magnitude reduced from baseline IS_H1 = −36.01% (Δ +14.06pp). BTC-only Optuna trajectory at narrower scope partially escaped IS_H1 catastrophic magnitude but did not dissolve it.
+
+**Interpretation**: H_INTRINSIC at the IS_H1 regime-binding test is BORDERLINE PASS — the regime-bound finding holds qualitatively. However, this is NOT the load-bearing finding. The load-bearing finding is **H_INTRINSIC REFUTED at training-time granularity** — BTC's OOS positive rotation was POOL-CONFERRED via 3 channels (LM Master Phase 7.4 §3). The IS regime constraint is partial; the OOS pool-conferred rotation collapsed catastrophically.
+
+**Updated mental model**: The Section 0.4 EDA framing "H_INTRINSIC + H_POOL_ANCHOR refuted" is a methodological false-negative. Monthly aggregate Pearson ρ ≈ −0.022 does NOT imply training-time pool independence. Cohort isolation success requires (a) independent positive prior at pool level (LINK case) OR (b) ORTHOGONAL mechanism added on top of isolation (ETH+gate case) — NOT pool-anchor-refutation per se.
+
+### 13.5 BTC trade-id Jaccard vs baseline BTC roster (PROMISING-MECHANICAL check)
+
+| Scope | /020 BTC-only | Baseline BTC-in-pool | Overlap | Union | **Jaccard** |
+|---|---|---|---|---|---|
+| IS | 122 trades | 113 trades | 21 | 214 | **0.0981** |
+| OOS | 53 trades | 35 trades | 4 | 84 | **0.0476** |
+| Combined | 175 | 148 | 25 | 298 | **0.0839** |
+
+**Verdict**: Jaccard 0.084 combined << 0.50 threshold → **NEW SIGNAL SOURCE (NOT PROMISING-MECHANICAL)** but with NEGATIVE Sharpe Δ. Basin relocation took /020 into a worse region of feature space. Containment 4/35 = 11.4% OOS — /020 retained only 4 of baseline's 35 OOS BTC trades; the other 49 OOS trades are net-new from BTC-only Optuna basin. The new basin produces NET-NEGATIVE OOS Sharpe — the pool-trained basin's OOS positive (+33.17%) was a structurally adverse target for BTC-alone training.
+
+**Pre-registration outcome (Section 6.6)**: LM Master Phase 4.5 §4 predicted Jaccard ∈ [0.10, 0.25] (HIGHER than /018+/019). Observed 0.084 (LOWER than the predicted lower bound). The alternative-branch interpretation pre-registered at LM Master Phase 4.5 §4 ("If observed Jaccard ≈ 0.04: pool independence claim is at higher-than-monthly granularity") was the realized branch.
+
+### 13.6 Lessons for v1 cycle-3 catalog
+
+Six lessons codified at diary Phase 8 (see `diary-v1/iteration_v1-020.md` §"6 LESSONS for v1 Cycle-3 Catalog"):
+
+1. **H_INTRINSIC REFUTED AT TRAINING-TIME GRANULARITY** — monthly aggregate ρ ≈ 0 misleading. Codified rule for future per-cohort EXPLORATIONs.
+2. **Per-cohort isolation requires independent positive prior OR orthogonal mechanism** (NOT pool-anchor refutation per se). Three-cohort comparison establishes the principle.
+3. **Training-time pool-anchor diagnostic is the load-bearing substrate** (NOT monthly aggregate). /021 adds the diagnostic.
+4. **Engineering report timing contract — 2nd cycle-3 incident**. Permanent fix at orchestrator layer needed.
+5. **Anchor proxy formalization required at /027** (Critic Rec #2). Use comparison.csv sharpe semantics, not monthly proxy.
+6. **/027 bundle constrained — 2 specialists + BTC-IN-POOL** (NOT 4-6 specialists; BTC-only EXCLUDED).
+
+### 13.7 Updates to verdict-cell decision protocol
+
+**No new verdict-cell row added**. Section 8 Row 6 (F1 Δ ≤ −0.55 → NEGATIVE-CATASTROPHIC with band-violation OK on F-AXIS) is the binding falsifier and fired correctly. The protocol functioned as designed.
+
+**Methodology note** (carry-forward to /021+ briefs): the "(band-violation OK)" clause in Row 6 is important — F-AXIS mechanism checks can PASS while F1 OOS Sharpe Δ fires Catastrophic. This is exactly what /020 demonstrates: F-AXIS-MECHANISM #1 + #3 + #4 PASS + F-AXIS-MECHANISM #2 PASS at QR blocking band, BUT F1 OOS Sharpe Δ = −0.86 catastrophic. **Mechanism-correct dispatch + regime-binding preservation does NOT imply edge preservation when the pool was load-bearing for the OOS rotation.**
+
+### 13.8 /027 LOAD-BEARING component status update
+
+| Specialist | Status after /020 | /027 multi-seed regression target |
+|---|---|---|
+| LINK-only /018 | VALIDATED — LOAD-BEARING | **+0.80** |
+| ETH-only + BTC-trend gate /019 | VALIDATED — LOAD-BEARING | **+0.50** |
+| **BTC-only /020** | **NEGATIVE Catastrophic — EXCLUDED from /027** | **EXCLUDED** |
+| LTC-only /021+ | PENDING (depends on /021 methodology diagnostic outcome) | — |
+| DOT-only /022+ | PENDING | — |
+
+**Bundle composition**: 2/4-6 specialists viable. BTC-only Model H EXCLUDED; BTC enters /027 IN POOL via Model A (no architectural change vs baseline for BTC). Projected portfolio Sharpe lift +0.85 to +1.05 with 2 specialists + BTC-IN-POOL pooled anchor; cross-correlation < 0.40 between LINK and ETH+gate roster Sharpe paths still required per Critic /019 Rec #3 pre-validation.
+
+**/021 forward direction**: methodology pivot per Critic Phase 7.5 Path Forward #1 + LM Master Phase 7.4 §5 hybrid Option C + B. Add `_write_feature_importance` per (model, symbol, train_month) emission to v1 runner + per-fold Optuna best-trial parameter delta between BTC-in-pool Model A and BTC-only Model H at SAME seed=42. ~25 min wall-clock; family `methodology-pivot` (REUSE 6th catalog family `methodology` from /001).
+
+**/022 verdict-conditional staging**:
+- If /021 diagnostic confirms LM Master §3 mechanism: /022 = /027 CONFIRMATION moved up with 2-specialist bundle (LINK + ETH+gate) regressing against BTC-in-pool baseline.
+- If /021 shows LTC and/or DOT pool-INDEPENDENT: /022 = continue cohort coverage selectively with pool-independent cohort isolation.
+
+### 13.9 Memory entry — Durable lesson
+
+Codified at `/home/roberto/.claude/projects/-home-roberto-crypto-trade/memory/feedback_v1_h_intrinsic_refuted_at_btc.md`:
+
+**Lead**: Per-cohort isolation success requires either (a) independent positive prior at pool level OR (b) orthogonal mechanism added — NOT pool-anchor-refutation per se.
+
+**Why**: established at /020 closeout (2026-05-26 LM Master Phase 7.4 §3 + Critic Phase 7.5 §Recommendations §3); monthly aggregate ρ ≈ -0.022 was methodological false-negative for training-time pool dependence.
+
+**How to apply**: future per-cohort EXPLORATIONs must NOT rely on monthly-aggregate pool-independence diagnostic as predictive evidence of isolation viability; instead require training-time diagnostic (Optuna best-trial parameter delta between pool and cohort-only at SAME seed) OR add orthogonal mechanism (gate / feature / labeling).
+
+Cross-references: `feedback_v1_per_cohort_exploration_strategy` (refined; not refuted), `feedback_promising_mechanical_subtype`.
