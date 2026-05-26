@@ -177,6 +177,9 @@ class LightGbmStrategy:
         sigma_k_sl: float | None = None,
         sigma_halflife_candles: int = 42,
         sample_weight_mode: str = "abs_pnl",
+        params_persist_path: Path | None = None,
+        model_role: str = "",
+        symbol: str = "",
     ) -> None:
         if not feature_columns:
             raise ValueError(
@@ -215,6 +218,15 @@ class LightGbmStrategy:
         self.ood_cutoff_pct = ood_cutoff_pct
         # iter-v3/003: path for per-trial OOF return persistence (sub-fix 1c)
         self._oof_persist_path: Path | None = oof_persist_path
+        # iter-v1/021: path for Optuna best_params persistence (pool-anchor H1 diagnostic)
+        self._params_persist_path: Path | None = params_persist_path
+        # iter-v1/021: model role string embedded in params parquet rows
+        # (e.g. "Model_A_pool", "Model_H_BTC"). Runner sets this when constructing strategy.
+        self._model_role: str = model_role
+        # iter-v1/021: symbol descriptor embedded in params parquet rows
+        # For pooled models (A), caller passes e.g. "BTC+ETH"; for single-cohort
+        # models (H), caller passes the single symbol (e.g. "BTCUSDT").
+        self._symbol: str = symbol
         # iter-v3/007: fast exploration mode (colsample fixed at 1.0 in optimization.py)
         self._fast_mode: bool = fast_mode
         # iter-v1/002: Optuna hyperparameter bounds profile.
@@ -729,6 +741,9 @@ class LightGbmStrategy:
                     symbols_arr=train_symbols_arr,
                     fast_mode=self._fast_mode,
                     bounds_profile=self._bounds_profile,
+                    params_persist_path=self._params_persist_path,
+                    model_role=self._model_role,
+                    symbol=self._symbol,
                 )
                 self._models.append(model)
                 self._confidence_thresholds.append(confidence_threshold)

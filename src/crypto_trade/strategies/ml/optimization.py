@@ -373,6 +373,9 @@ def optimize_and_train(
     symbols_arr: np.ndarray | None = None,
     fast_mode: bool = False,
     bounds_profile: str = "default",
+    params_persist_path: Path | None = None,
+    model_role: str = "",
+    symbol: str = "",
 ) -> tuple[lgb.LGBMClassifier, list[str], float]:
     """Run Optuna optimization and return (model, columns, confidence_threshold).
 
@@ -397,6 +400,18 @@ def optimize_and_train(
                               and colsample_bytree=1.0 pinned (LM Master Rec #2
                               ADOPTED-CONDITIONAL; isolates the sample-weighting axis
                               from sub-sampling perturbations in Optuna search).
+
+    params_persist_path: if set, after study.optimize() completes, append ONE row to
+        the parquet at this path capturing study.best_params + metadata per
+        (model_role, symbol, train_month, seed). iter-v1/021 H1 diagnostic.
+        Uses atomic write via tempfile.mkstemp + os.replace (same pattern as
+        oof_persist_path). NO .get(default) silent drops — all 11 hyperparameter
+        columns are written explicitly; pinned values (subsample=1.0 for
+        v1_pruned_axis016; colsample_bytree=1.0 for fast_mode) are written as the
+        pinned constant, NOT silently dropped to a default.
+    model_role: caller-provided model identifier (e.g. "Model_A_pool",
+        "Model_H_BTC"). Embedded in each params_persist_path row.
+    symbol: caller-provided symbol (e.g. "BTCUSDT"). Embedded in each row.
     """
     import optuna
 
@@ -484,6 +499,85 @@ def optimize_and_train(
 
     best = study.best_params
     best_threshold = best.get("confidence_threshold", 0.50)
+
+    # iter-v1/021: flush Optuna best_params to params_persist_path parquet.
+    # Captures all 11 hyperparameter columns per (model_role, symbol, train_month, seed)
+    # for the pool-anchor training-time diagnostic (H1 falsifier).
+    #
+    # CRITICAL: NO .get(default) silent drops.
+    # - For v1_pruned_axis016 (subsample=1.0 pinned), write the pinned constant 1.0
+    #   explicitly — the TPE search never suggested subsample/colsample, so they are
+    #   absent from best, but the EFFECTIVE value is known (the pinned constant).
+    # - For fast_mode (colsample_bytree=1.0 hardcoded), write 1.0 explicitly.
+    # - If a key is unexpectedly absent from best, log a WARNING to stderr so the
+    #   Phase 7.5 Layer C audit can catch the partial-visibility issue.
+    if params_persist_path is not None:
+        import os
+        import sys
+        import tempfile
+
+        import pandas as pd
+
+        _is_axis016 = bounds_profile == "v1_pruned_axis016"
+        _is_fast = fast_mode  # resolved above via study.user_attrs
+
+        def _get_param(key: str, pinned_value: float | int | None = None) -> float | int:
+            """Retrieve a param with explicit logging on miss (no silent drop)."""
+            if key in best:
+                return best[key]
+            if pinned_value is not None:
+                return pinned_value
+            print(
+                f"[params_persist_path] WARNING: key {key!r} missing from study.best_params "
+                f"for model_role={model_role!r} symbol={symbol!r} train_month={train_month!r} "
+                f"seed={seed}; bounds_profile={bounds_profile!r}. "
+                "H1 falsifier visibility is PARTIAL for this row.",
+                file=sys.stderr,
+            )
+            return float("nan")
+
+        # subsample: pinned at 1.0 for v1_pruned_axis016; otherwise sampled
+        _subsample_pinned = 1.0 if _is_axis016 else None
+        # colsample_bytree: pinned at 1.0 for fast_mode OR v1_pruned_axis016; otherwise sampled
+        _colsample_pinned = 1.0 if (_is_fast or _is_axis016) else None
+
+        params_row = {
+            "model_role": model_role,
+            "symbol": symbol,
+            "train_month": train_month,
+            "seed": seed,
+            "best_objective_value": float(study.best_value),
+            "confidence_threshold": _get_param("confidence_threshold"),
+            "training_days": _get_param("training_days") if "training_days" in best else None,
+            "n_estimators": _get_param("n_estimators"),
+            "max_depth": _get_param("max_depth"),
+            "num_leaves": _get_param("num_leaves"),
+            "learning_rate": _get_param("learning_rate"),
+            "subsample": _get_param("subsample", _subsample_pinned),
+            "colsample_bytree": _get_param("colsample_bytree", _colsample_pinned),
+            "min_child_samples": _get_param("min_child_samples"),
+            "reg_alpha": _get_param("reg_alpha"),
+            "reg_lambda": _get_param("reg_lambda"),
+        }
+
+        params_persist_path.parent.mkdir(parents=True, exist_ok=True)
+        new_params_df = pd.DataFrame([params_row])
+        if params_persist_path.exists():
+            existing_params = pd.read_parquet(params_persist_path)
+            combined_params = pd.concat([existing_params, new_params_df], ignore_index=True)
+        else:
+            combined_params = new_params_df
+        tmp_fd, tmp_name = tempfile.mkstemp(dir=params_persist_path.parent, suffix=".parquet.tmp")
+        try:
+            os.close(tmp_fd)
+            combined_params.to_parquet(tmp_name, index=False)
+            os.replace(tmp_name, params_persist_path)
+        except Exception:
+            try:
+                os.unlink(tmp_name)
+            except OSError:
+                pass
+            raise
 
     if verbose > 0:
         best_trial = study.best_trial

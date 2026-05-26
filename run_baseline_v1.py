@@ -170,6 +170,28 @@ V1_ITER019_BTC_GATE_ENABLED: bool = True
 #: BTCUSDT is in V1_BASELINE_UNIVERSE.
 V1_ITER020_UNIVERSE: tuple[str, ...] = ("BTCUSDT",)
 
+#: iter-v1/021: METHODOLOGY PIVOT — diagnostic run of BOTH Model A pool (5-sym) AND
+#: Model H (BTC-only) side-by-side at n_trials=18 seed=42 to capture Optuna best-trial
+#: parameters per (model_role, symbol, train_month, seed) for the H1 pool-anchor falsifier.
+#: Also adds _write_feature_importance for the H2 feature-signature diagnostic.
+#:
+#: The FULL 5-symbol pool universe is used for the dispatch trigger (set equality).
+#: All 5 symbols are needed because Model A pool trains on BTC+ETH and Models C/D/E
+#: are BIT-IDENTICAL to baseline; Model H (BTC-only) runs as a second model dispatched
+#: alongside Model A pool.
+V1_ITER021_UNIVERSE: tuple[str, ...] = (
+    "BTCUSDT",
+    "ETHUSDT",
+    "LINKUSDT",
+    "LTCUSDT",
+    "DOTUSDT",
+)
+
+#: iter-v1/021: stable path for Optuna best-params parquet (H1 diagnostic substrate).
+#: Written by optimize_and_train when params_persist_path is set.
+#: Cleared at runner start (same pattern as OOF_PARQUET_PATH) to prevent accumulation.
+PARAMS_PARQUET_PATH: Path = Path("data") / "v1_iter_SENTINEL_optuna_best_params.parquet"
+
 #: BASELINE_V1.md anchor — the corrected walk-forward stack reproduces this set.
 BASELINE_OOD_CUTOFF_PCT: float = 0.70
 
@@ -234,6 +256,9 @@ def run_model(
     sigma_k_sl: float | None = None,
     sigma_halflife_days: int = 14,
     sample_weight_mode: str = "abs_pnl",
+    params_persist_path: Path | None = None,
+    model_role: str = "",
+    symbol: str = "",
 ):
     """Run a single v1 sub-model (A/C/D/E) under the corrected walk-forward.
 
@@ -345,13 +370,17 @@ def run_model(
         sigma_k_sl=sigma_k_sl,
         sigma_halflife_candles=sigma_halflife_candles,
         sample_weight_mode=sample_weight_mode,
+        params_persist_path=params_persist_path,
+        model_role=model_role,
+        symbol=symbol,
     )
     t0 = time.time()
     results = run_backtest(config, strategy, yearly_pnl_check=False)
     elapsed = time.time() - t0
     print(f"\n{name} complete: {len(results)} trades in {elapsed:.0f}s")
     # iter-v1/016: expose F-AXIS-MECHANISM log so the runner can write f_axis_mechanism.csv.
-    return results, strategy._faxm_log
+    # iter-v1/021: also return the strategy object for _write_feature_importance access.
+    return results, strategy._faxm_log, strategy
 
 
 def _load_pnl_series(
@@ -473,6 +502,119 @@ def _compute_forward_returns(
 
     # Concatenate forward returns across symbols (same order as _load_features_for_adf_ic)
     return np.concatenate(dfs, axis=0)
+
+
+def _write_feature_importance(
+    strategies: list[tuple[str, object]],
+    feature_columns: list[str],
+    report_dir: Path,
+) -> None:
+    """Write per-model feature importance CSVs from trained LightGbmStrategy objects.
+
+    iter-v1/021: Ported from run_baseline_v3.py:2730-2818 (iter-v3/017).
+    Differences from v3:
+    - Uses ``feature_columns`` (the active v1 feature list, e.g. V1_FEATURE_COLUMNS_PRUNED)
+      as the fallback feature list instead of V3_FEATURE_COLUMNS.
+    - Output naming: ``feature_importance_<MODEL_NAME>.csv`` for per-model and
+      ``feature_importance_portfolio.csv`` for the portfolio aggregate.
+    - Importance method: ``importance_type='gain'`` per LM Master Phase 4.5 §4 mandate
+      (LOCKED in brief Section 3.2). Raw split count (noisier) and permutation
+      importance (deferred) are NOT used.
+    - Scope: last walk-forward month's model state (lazy monthly training — same
+      scope as v3's ``_write_feature_importance``). Per-month aggregation is deferred
+      per LM Master Phase 7.4 §6 outstanding gap.
+    - Emits to ``in_sample/`` ONLY (per v3/017 fix — duplicating to OOS is misleading
+      since the model state is IS-anchored at last-month training).
+
+    Parameters
+    ----------
+    strategies
+        List of (name_str, LightGbmStrategy-or-subclass) tuples. ``name_str`` is
+        used as the per-model CSV filename suffix.
+    feature_columns
+        The active feature column list the models were trained on.
+    report_dir
+        Root report directory (CSVs written to ``report_dir / "in_sample"``).
+
+    Notes
+    -----
+    LightGbmStrategy exposes ``feature_importances_`` on the underlying
+    LGBMClassifier models stored in ``_models``. Each model's gain-importance
+    array is indexed by position against ``feature_columns``. Ensemble members
+    (multiple seeds) are averaged together per feature.
+    """
+    import csv as _csv  # noqa: PLC0415
+
+    if not strategies:
+        return
+
+    cols = list(feature_columns)
+    if not cols:
+        return
+
+    is_dir = report_dir / "in_sample"
+    is_dir.mkdir(parents=True, exist_ok=True)
+
+    portfolio: dict[str, float] = {c: 0.0 for c in cols}
+
+    for name_str, strat in strategies:
+        # Access the inner LightGbmStrategy (strategies passed directly here)
+        inner = strat.inner if hasattr(strat, "inner") else strat
+
+        if not hasattr(inner, "_models") or not inner._models:
+            continue
+
+        # Gather gain-importance across all ensemble members (seeds)
+        col_vals: dict[str, list[float]] = {c: [] for c in cols}
+        for model in inner._models:
+            if not hasattr(model, "feature_importances_"):
+                continue
+            fi_arr = model.feature_importances_
+            # LightGBM returns gain importance when importance_type='gain' is
+            # NOT explicitly passed to feature_importances_ — the attribute reflects
+            # the importance_type used at training time. We train with default LGBMClassifier
+            # which defaults to split-count importance via feature_importances_.
+            # To get GAIN importance, use booster_.feature_importance(importance_type='gain').
+            if hasattr(model, "booster_"):
+                fi_arr = model.booster_.feature_importance(importance_type="gain")
+            for i, c in enumerate(cols):
+                if i < len(fi_arr):
+                    col_vals[c].append(float(fi_arr[i]))
+
+        if not any(col_vals.values()):
+            continue
+
+        rows: list[dict] = []
+        for col in cols:
+            vals = col_vals.get(col, [])
+            mean_fi = float(np.mean(vals)) if vals else 0.0
+            rows.append({"feature_name": col, "mean_gain": round(mean_fi, 4)})
+            portfolio[col] += mean_fi
+
+        # Sort descending by mean_gain and add rank
+        rows.sort(key=lambda r: r["mean_gain"], reverse=True)
+        for rank, row in enumerate(rows, start=1):
+            row["importance_rank"] = rank
+
+        out_path = is_dir / f"feature_importance_{name_str}.csv"
+        _fi_fields = ["feature_name", "mean_gain", "importance_rank"]
+        with open(out_path, "w", newline="") as fh:
+            writer = _csv.DictWriter(fh, fieldnames=_fi_fields)
+            writer.writeheader()
+            writer.writerows(rows)
+        print(f"[run_baseline_v1] Feature importance: {out_path.name} ({len(rows)} features)")
+
+    # Portfolio aggregate CSV
+    port_rows = [{"feature_name": c, "mean_gain": round(portfolio[c], 4)} for c in cols]
+    port_rows.sort(key=lambda r: r["mean_gain"], reverse=True)
+    for rank, row in enumerate(port_rows, start=1):
+        row["importance_rank"] = rank
+    port_path = is_dir / "feature_importance_portfolio.csv"
+    with open(port_path, "w", newline="") as fh:
+        writer = _csv.DictWriter(fh, fieldnames=["feature_name", "mean_gain", "importance_rank"])
+        writer.writeheader()
+        writer.writerows(port_rows)
+    print(f"[run_baseline_v1] Feature importance portfolio: {port_path.name}")
 
 
 def _run_methodology_reporting(
@@ -1217,8 +1359,11 @@ def main() -> None:
     )
     # iter-v1/016: collect F-AXIS-MECHANISM logs from all model runs.
     _all_faxm_logs: list[dict] = []
+    # iter-v1/021: store strategies for post-dispatch _write_feature_importance call.
+    # Non-/021 iterations leave this empty; the post-dispatch call is a no-op.
+    _iter021_fi_strategies: list[tuple[str, object]] = []
     if set(symbols) == set(V1_BASELINE_UNIVERSE):
-        results_a, faxm_a = run_model(
+        results_a, faxm_a, _strat_a = run_model(
             "A (BTC/ETH)",
             ("BTCUSDT", "ETHUSDT"),
             atr_tp=2.9,
@@ -1231,7 +1376,7 @@ def main() -> None:
             bounds_profile=bounds_profile,
             **_r5_kwargs,
         )
-        results_c, faxm_c = run_model(
+        results_c, faxm_c, _strat_c = run_model(
             "C (LINK + R1)",
             ("LINKUSDT",),
             atr_tp=3.5,
@@ -1244,7 +1389,7 @@ def main() -> None:
             bounds_profile=bounds_profile,
             **_r5_kwargs,
         )
-        results_d, faxm_d = run_model(
+        results_d, faxm_d, _strat_d = run_model(
             "D (LTC + R1)",
             ("LTCUSDT",),
             atr_tp=3.5,
@@ -1257,7 +1402,7 @@ def main() -> None:
             bounds_profile=bounds_profile,
             **_r5_kwargs,
         )
-        results_e, faxm_e = run_model(
+        results_e, faxm_e, _strat_e = run_model(
             "E (DOT + R1 + R2)",
             ("DOTUSDT",),
             atr_tp=3.5,
@@ -1280,7 +1425,7 @@ def main() -> None:
         # Models A/C/D/E are BIT-IDENTICAL to baseline dispatch above.
         # NEW Model F (SOL): atr=2.9/1.45 (Model A profile), R3-only (no R1/R2),
         # bounds_profile=v1_pruned (same as A/C/D/E), single-symbol isolated.
-        results_a, faxm_a = run_model(
+        results_a, faxm_a, _strat_a = run_model(
             "A (BTC/ETH)",
             ("BTCUSDT", "ETHUSDT"),
             atr_tp=2.9,
@@ -1293,7 +1438,7 @@ def main() -> None:
             bounds_profile=bounds_profile,
             **_r5_kwargs,
         )
-        results_c, faxm_c = run_model(
+        results_c, faxm_c, _strat_c = run_model(
             "C (LINK + R1)",
             ("LINKUSDT",),
             atr_tp=3.5,
@@ -1306,7 +1451,7 @@ def main() -> None:
             bounds_profile=bounds_profile,
             **_r5_kwargs,
         )
-        results_d, faxm_d = run_model(
+        results_d, faxm_d, _strat_d = run_model(
             "D (LTC + R1)",
             ("LTCUSDT",),
             atr_tp=3.5,
@@ -1319,7 +1464,7 @@ def main() -> None:
             bounds_profile=bounds_profile,
             **_r5_kwargs,
         )
-        results_e, faxm_e = run_model(
+        results_e, faxm_e, _strat_e = run_model(
             "E (DOT + R1 + R2)",
             ("DOTUSDT",),
             atr_tp=3.5,
@@ -1334,7 +1479,7 @@ def main() -> None:
             **_r5_kwargs,
         )
         # Model F — SOL: single-symbol, R3-only (sister to Model A), ATR 2.9/1.45.
-        results_f, faxm_f = run_model(
+        results_f, faxm_f, _strat_f = run_model(
             "F (SOL)",
             ("SOLUSDT",),
             atr_tp=2.9,
@@ -1362,7 +1507,7 @@ def main() -> None:
         # Single-axis isolation: ONLY the SYMBOL DIMENSION changes (5→1 symbol).
         # Zero changes to features, labeling, risk gates, or Optuna bounds.
         # F-AXIS-MECHANISM #1: trades.csv must contain ONLY LINKUSDT rows.
-        results_c, faxm_c = run_model(
+        results_c, faxm_c, _strat_c = run_model(
             "C (LINK + R1)",
             ("LINKUSDT",),
             atr_tp=3.5,
@@ -1399,7 +1544,7 @@ def main() -> None:
         assert set(symbols) == {"ETHUSDT"}, (
             f"iter-v1/019 guard: expected {{ETHUSDT}}, got {set(symbols)}"
         )
-        results_g, faxm_g = run_model(
+        results_g, faxm_g, _strat_g = run_model(
             "G (ETH-only + R3 + BTC-trend gate)",
             ("ETHUSDT",),
             atr_tp=2.9,
@@ -1459,7 +1604,7 @@ def main() -> None:
         assert set(symbols) == {"BTCUSDT"}, (
             f"iter-v1/020 guard: expected {{BTCUSDT}}, got {set(symbols)}"
         )
-        results_h, faxm_h = run_model(
+        results_h, faxm_h, _strat_h = run_model(
             "H (BTC-only + R3)",
             ("BTCUSDT",),
             atr_tp=2.9,
@@ -1475,10 +1620,122 @@ def main() -> None:
         _all_faxm_logs = faxm_h
         all_results = results_h
         _r5_model_results = [results_h]
+    elif set(symbols) == set(V1_ITER021_UNIVERSE) and iteration_label == "v1-021":
+        # iter-v1/021: METHODOLOGY PIVOT diagnostic.
+        # Dispatches TWO models side-by-side at n_trials=18 seed=42:
+        #   - Model A pool (BTC+ETH, 5-sym universe, BASELINE config) for Layer B determinism
+        #     AND feature importance baseline.
+        #   - Model H (BTC-only, same config as /020) for pool-anchor H1 diagnostic.
+        # Models C (LINK), D (LTC), E (DOT) are NOT dispatched (not relevant to H1/H2).
+        # params_persist_path is SET for BOTH models so H1 parquet is populated.
+        #
+        # NOTE: The full 5-sym universe is passed as the `symbols` argument to this
+        # branch but Model A only trains on BTC+ETH (same as baseline) and Model H
+        # only trains on BTC. The universe constant V1_ITER021_UNIVERSE matches
+        # V1_BASELINE_UNIVERSE — the iteration_label guard above disambiguates.
+        assert set(symbols) == set(V1_ITER021_UNIVERSE), (
+            f"iter-v1/021 guard: expected {{BTCUSDT,ETHUSDT,LINKUSDT,LTCUSDT,DOTUSDT}}, "
+            f"got {set(symbols)}"
+        )
+
+        # Override PARAMS_PARQUET_PATH to the iteration-stamped path
+        global PARAMS_PARQUET_PATH  # noqa: PLW0603
+        PARAMS_PARQUET_PATH = Path("data") / f"v1_iter_{iteration_label}_optuna_best_params.parquet"
+        # Clear stale params parquet (same pattern as OOF_PARQUET_PATH)
+        PARAMS_PARQUET_PATH.unlink(missing_ok=True)
+        print(f"[iter-v1/021] PARAMS_PARQUET_PATH: {PARAMS_PARQUET_PATH}")
+
+        # Model A pool (BTC+ETH, BASELINE config, n_trials=35 for Layer B bit-identity)
+        # Brief Layer B: pool config at n_trials=35 MUST produce bit-identical comparison.csv
+        # to v0.v1-baseline-corrected — adding params_persist_path MUST be a no-op.
+        _n_trials_pool = 35  # Layer B: match baseline n_trials exactly
+        print(
+            f"[iter-v1/021] Model A pool: n_trials={_n_trials_pool} seed=42 "
+            f"(Layer B determinism — must match v0.v1-baseline-corrected)"
+        )
+        results_a, faxm_a, _strat_a = run_model(
+            "A (BTC/ETH pool — /021 Layer B)",
+            ("BTCUSDT", "ETHUSDT"),
+            atr_tp=2.9,
+            atr_sl=1.45,
+            apply_r1=False,
+            n_trials=_n_trials_pool,
+            ensemble_size=1,  # single seed=42 only (diagnostic; matches /020)
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            params_persist_path=PARAMS_PARQUET_PATH,
+            model_role="Model_A_pool",
+            symbol="BTC+ETH",
+            **_r5_kwargs,
+        )
+
+        # Model H (BTC-only, n_trials=18 seed=42 — matches /020 canonical budget)
+        print(
+            "[iter-v1/021] Model H BTC-only: n_trials=18 seed=42 "
+            "(H1 diagnostic — matches /020 canonical budget)"
+        )
+        results_h, faxm_h, _strat_h = run_model(
+            "H (BTC-only — /021 H1 diagnostic)",
+            ("BTCUSDT",),
+            atr_tp=2.9,
+            atr_sl=1.45,
+            apply_r1=False,
+            n_trials=18,  # matches /020; H1 falsifier requires SAME budget as /020
+            ensemble_size=1,  # single seed=42 only (diagnostic)
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            params_persist_path=PARAMS_PARQUET_PATH,
+            model_role="Model_H_BTC",
+            symbol="BTCUSDT",
+            **_r5_kwargs,
+        )
+
+        # For the diagnostic, the trade results are the POOL results only
+        # (Model H BTC-only is a separate diagnostic model; combining with pool
+        # would double-count BTC trades). Layer B determinism is verified by
+        # comparing Model A pool's comparison.csv to v0.v1-baseline-corrected.
+        _all_faxm_logs = faxm_a + faxm_h
+        all_results = results_a  # Pool results only for official reports
+        _r5_model_results = [results_a]
+
+        # Feature importance is written AFTER report_dir is resolved (post-dispatch).
+        # Store strategies reference for the post-dispatch call.
+        _iter021_fi_strategies = [
+            ("POOL_Model_A", _strat_a),
+            ("BTC_Model_H", _strat_h),
+        ]
+        print(
+            f"[iter-v1/021] params parquet: {PARAMS_PARQUET_PATH} "
+            f"(Layer A: expect ≥168 rows after run)"
+        )
+        # Verify Layer A row count after backtest
+        if PARAMS_PARQUET_PATH.exists():
+            _params_df = pd.read_parquet(PARAMS_PARQUET_PATH)
+            print(
+                f"[iter-v1/021] Layer A audit: {len(_params_df)} rows in params parquet "
+                f"(≥168 required; PASS={len(_params_df) >= 168})"
+            )
+            _missing = _params_df.isnull().any()
+            _missing_cols = [c for c, v in _missing.items() if v and c not in ("training_days",)]
+            if _missing_cols:
+                print(
+                    f"[iter-v1/021] Layer C WARNING: NULL values in {_missing_cols} "
+                    "— H1 falsifier is partially blind",
+                    file=sys.stderr,
+                )
+            else:
+                print("[iter-v1/021] Layer C audit: all mandatory param columns non-null. PASS")
+        else:
+            print(
+                "[iter-v1/021] Layer A WARNING: params parquet NOT FOUND after run",
+                file=sys.stderr,
+            )
     else:
         # Custom universe — single pooled model unless brief specifies otherwise.
         # iter-v1/NNN brief Section 3 should declare per-symbol model assignment.
-        _pooled, faxm_pooled = run_model(
+        _pooled, faxm_pooled, _strat_pooled = run_model(
             "POOLED",
             symbols,
             atr_tp=2.9,
@@ -1521,6 +1778,18 @@ def main() -> None:
         n_trials=n_trials,
     )
     print(f"Reports: {report_dir}")
+
+    # -------------------------------------------------------------------------
+    # iter-v1/021: write feature importance CSVs (H2 diagnostic, post-dispatch).
+    # _iter021_fi_strategies is populated only when iteration_label == "v1-021".
+    # For all other iterations, this is a no-op (empty list).
+    # -------------------------------------------------------------------------
+    if _iter021_fi_strategies:
+        _write_feature_importance(
+            _iter021_fi_strategies,
+            feature_columns=active_feature_columns,
+            report_dir=report_dir,
+        )
 
     # -------------------------------------------------------------------------
     # iter-v1/001 methodology reporting — post-hoc; does NOT change predictions
