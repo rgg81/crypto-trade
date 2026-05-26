@@ -108,3 +108,72 @@ Three specific calls staked:
 1. Compress n_trials 20→18 upfront (HIGH — wall-clock discipline)
 2. F-AXIS-MECHANISM PASS by construction does NOT imply edge — Critic Check 8 should note
 3. Modal /016 NULL with per-symbol reshuffling but flat portfolio Sharpe
+
+---
+
+# LightGBM Master Advisor — iter-v1/016 — Phase 7.4 (Post-Mortem)
+
+## Context Read
+
+- Verdict cell: **EXPLORATION-NEGATIVE-catastrophic** (cell 6 per brief Section 8 — F1 OOS Δ = -1.669 < -0.55; F3 IS Δ = -0.588 < -0.30)
+- F-AXIS-MECHANISM: **PASS by construction** (Kish=1.0000 ×205 cells; per-symbol balance 0.500/0.500; timeout=0.0) — exactly as Phase 4.5 §11 predicted
+- n_eff_per_cell: **9** (BELOW Phase 4.5 §3 predicted band [10, 20]) — NEW mechanism prediction REFUTED
+- Wall-clock: ~50min total run, 75% margin — first cycle-3 wall-clock discipline empirically validated
+
+## Mechanism Call — uniform weighting REMOVED informative Bayesian prior
+
+Phase 4.5 §3 closing line ("weight-removal at LEAST as likely to HURT IS Sharpe as help it") landed in catastrophic direction. The 40/35/25 net-helpful/harmful/no-op split UNDERSTATED harm magnitude — but directional NET-HARMFUL bucket realized.
+
+**Catalog implication**: `abs(labeled_pnl)` weighting is **STRUCTURAL to v1's edge**, not removable artifact. High-magnitude trades (LINK 74.70%, ETH 47.46%, DOT 44.43%) carry genuine forward signal that the gradient needs to upweight. Brief's "per-symbol asymmetry" framing was the WRONG diagnostic — asymmetry was *load-bearing*, not noise. **Sample-weighting axis CLOSED at v1 baseline-labels** — no future EXPLORATION explores `uniform`, `uniqueness_only` (Spearman 0.997 with baseline per QR EDA), or related uniformization modes.
+
+## n_eff_per_cell DROP from 13 → 9 — REFUTES Phase 4.5 §3 prediction
+
+Predicted [10, 20] reasoning "n_eff_per_cell is loss-surface-shape-bound, not weight-bound". **Refuted.** Observed median 9.
+
+**Mechanism revision (NEW)**: weight-magnitude variation itself contributes to per-cell loss-surface diversity. Compressing weight range [1, 10] → [1, 1] made Optuna's per-trial loss surfaces MORE similar across trials → PCA-on-trial-returns substrate collapsed. Update mental model: n_eff_per_cell has TWO drivers (label-shape AND weight-distribution), not just label-shape.
+
+## F-AXIS-MECHANISM PASS by construction — Phase 4.5 §1 warning vindicated
+
+Kish=1.0000 (math). Model A balance 0.500/0.500 (math). Timeout=0.0 (labels untouched). All three sub-checks PASS — yet OOS Sharpe -1.00. **This iteration is the definitive proof case** for future briefs: F-AXIS-MECHANISM PASS does NOT imply edge. Critic should add to Check 8 catalog as the v1 reference case.
+
+## Per-symbol structural pattern UNCHANGED
+
+ETH catastrophic continuation is the SAME pattern present at /014/015. Sample-weighting was the wrong lever — ETH's OOS drag is regime-conditioned (likely 2025-Q1 to 2026-Q1 ETH-specific weakness), not weight-distribution-conditioned.
+
+ETH OOS Δ trajectory across cycle-2/3:
+- /014: -41.18 (single-seed)
+- /015: -23.29 (multi-seed)
+- /016: **-51.46** (single-seed sample-weighting)
+
+Three different axes; ETH catastrophic across all. **STRUCTURAL property**, not iteration-specific. Future axes targeting ETH: regime-conditional kill switch, per-symbol drawdown brake, OR universe pruning (remove ETH if next 2 iters fail).
+
+## Calibration update
+
+- Verdict-class directional: **1/14** (unchanged — Phase 4.5 33/33/34 correctly placed NEGATIVE)
+- Mechanism-level: **6/14** (n_eff prediction REFUTED; F-AXIS-MECHANISM construction-PASS VERIFIED per warning)
+- NEW refuted: "n_eff_per_cell is label-shape-bound only" — both label-shape AND weight-distribution contribute
+- NEW confirmed: F-AXIS-MECHANISM PASS by construction does NOT imply edge — definitively proven
+
+## /017 axis recommendation — UNIVERSE EXPANSION
+
+Per Phase 4.5 §6 pre-staging ("/016 NEGATIVE → XGBoost OR universe") + user XGBoost-slower flag:
+
+**RECOMMEND UNIVERSE EXPANSION at /017**:
+- Add 1-2 symbols from V1_EXCLUDED_SYMBOLS (XRP, SOL, NEAR, DOGE — match cycle-2 OOS-rich profiles, NOT BTC-correlated)
+- ENSEMBLE_SIZE=3, n_trials=18 default (6-symbol universe ~1.7h estimate; 7-symbol tight)
+- Single-axis: universe ONLY. NO weighting change (revert `abs_pnl` baseline). NO labeling change.
+- Pre-emptive falsifier: if ETH OOS Δ at /017 still catastrophic (≤-0.50), basin is REGIME-bound NOT universe-bound — pivot /018 to ETH-specific exclusion/regime gate
+
+**XGBoost deferred to /018+** (need wall-clock smoke test characterization). `uniqueness_only` SKIPPED per Spearman 0.997 to uniform — closes axis cleanly.
+
+## Cycle-3 cadence sanity check
+
+/016 = #1 of 10 EXPLORATIONs. CONFIRMATION earliest /026. Wall-clock discipline empirically validated (50min total). Phase 4.5 Rec #1 (pre-emptive n_trials 20→18) adopted and ran fine — keep n_trials=18 as cycle-3 default unless universe push to 6-7 symbols (drop to n_trials=15 if smoke test >1.7h).
+
+## Closing Note for Critic Phase 7.5
+
+Two items:
+
+1. **Check 8 (axis attribution)**: F-AXIS-MECHANISM PASSed by mathematical construction with OOS Sharpe -1.00. Canonical exemplar of "wiring test ≠ edge test" — add to Check 8 catalog as v1 reference case.
+
+2. **Check 4/5 (IS/OOS divergence)**: ETH per-symbol pattern is STRUCTURAL across /014, /015, /016 — same direction (OOS catastrophic) across THREE axes (labeling, weighting now). Basin property worth flagging as forward concern. Critic does NOT need to BLOCK — but mention in Path Forward that /017's universe expansion brief should explicitly acknowledge the ETH structural drag.
