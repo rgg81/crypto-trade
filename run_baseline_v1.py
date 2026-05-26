@@ -202,6 +202,11 @@ shows +10.79% IS / +12.45% OOS lift (both halves positive).
 LOCAL to runner. assert set(symbols) == {"LTCUSDT"} guard fires for this branch.
 """
 
+#: iter-v1/023: full V1_BASELINE_UNIVERSE (5-sym) with funding-rate z-score feature family.
+#: Feature-family EXPLORATION cycle-3 #8/10. V1_FEATURE_COLUMNS_PRUNED 40 → 42.
+#: Dispatch is handled by the iteration_label == "v1-023" elif branch.
+#: Feature importance for all 4 models collected via _post_dispatch_fi_strategies.
+
 #: Gate configuration constants (frozen for /022; tunable at /023+ verdict-conditional).
 V1_ITER022_BTC_GATE_LOOKBACK_BARS: int = 42  # 14 days at 8h (matches /019)
 V1_ITER022_BTC_GATE_THRESHOLD_PCT: float = 4.0  # -4% BTC 14d return (TIGHTER than /019's 8%)
@@ -1407,10 +1412,109 @@ def main() -> None:
     )
     # iter-v1/016: collect F-AXIS-MECHANISM logs from all model runs.
     _all_faxm_logs: list[dict] = []
-    # iter-v1/021: store strategies for post-dispatch _write_feature_importance call.
-    # Non-/021 iterations leave this empty; the post-dispatch call is a no-op.
-    _iter021_fi_strategies: list[tuple[str, object]] = []
-    if set(symbols) == set(V1_BASELINE_UNIVERSE) and iteration_label != "v1-021":
+    # iter-v1/021+: store strategies for post-dispatch _write_feature_importance call.
+    # Renamed from _iter021_fi_strategies to _post_dispatch_fi_strategies (iter-v1/022
+    # Critic Rec #2 CARRY-FORWARD: refactor literal name to generic). Non-feature-importance
+    # iterations leave this empty; the post-dispatch call is a no-op.
+    _post_dispatch_fi_strategies: list[tuple[str, object]] = []
+    if set(symbols) == set(V1_BASELINE_UNIVERSE) and iteration_label == "v1-023":
+        # iter-v1/023: funding-rate z-score feature family (cycle-3 #8/10).
+        # Feature-family EXPLORATION: adds funding_rate_zscore_30 + funding_rate_zscore_90
+        # to V1_FEATURE_COLUMNS_PRUNED (40 → 42). Full 5-symbol universe; 4 models A/C/D/E.
+        # The funding features are in the parquets (regenerated with add_funding_v1_features
+        # via the features CLI before backtest). V1_FEATURE_COLUMNS_PRUNED already contains
+        # the 2 new columns — no runner-side feature injection needed since lgbm.py reads
+        # the feature parquets which now carry the funding columns.
+        #
+        # Pre-flight assertions (per brief Section 3.3):
+        # - funding_rate_zscore_30 + funding_rate_zscore_90 must be in active_feature_columns
+        # - Both columns must be present in the feature parquets (verified by LightGbmStrategy
+        #   at training time — raises on missing feature_columns)
+        assert "funding_rate_zscore_30" in active_feature_columns, (
+            "iter-v1/023 pre-flight: funding_rate_zscore_30 not in active_feature_columns. "
+            "Ensure --pruned-features is set and V1_FEATURE_COLUMNS_PRUNED has funding cols."
+        )
+        assert "funding_rate_zscore_90" in active_feature_columns, (
+            "iter-v1/023 pre-flight: funding_rate_zscore_90 not in active_feature_columns. "
+            "Ensure --pruned-features is set and V1_FEATURE_COLUMNS_PRUNED has funding cols."
+        )
+        pos30 = active_feature_columns.index("funding_rate_zscore_30")
+        pos90 = active_feature_columns.index("funding_rate_zscore_90")
+        print(
+            f"[iter-v1/023] Funding-rate feature family ACTIVE: "
+            f"funding_rate_zscore_30@{pos30} "
+            f"funding_rate_zscore_90@{pos90} "
+            f"/ {len(active_feature_columns)} total features"
+        )
+        results_a, faxm_a, _strat_a = run_model(
+            "A (BTC/ETH)",
+            ("BTCUSDT", "ETHUSDT"),
+            atr_tp=2.9,
+            atr_sl=1.45,
+            apply_r1=False,
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            **_r5_kwargs,
+        )
+        results_c, faxm_c, _strat_c = run_model(
+            "C (LINK + R1)",
+            ("LINKUSDT",),
+            atr_tp=3.5,
+            atr_sl=1.75,
+            apply_r1=True,
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            **_r5_kwargs,
+        )
+        results_d, faxm_d, _strat_d = run_model(
+            "D (LTC + R1)",
+            ("LTCUSDT",),
+            atr_tp=3.5,
+            atr_sl=1.75,
+            apply_r1=True,
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            **_r5_kwargs,
+        )
+        results_e, faxm_e, _strat_e = run_model(
+            "E (DOT + R1 + R2)",
+            ("DOTUSDT",),
+            atr_tp=3.5,
+            atr_sl=1.75,
+            apply_r1=True,
+            apply_r2=True,
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            **_r5_kwargs,
+        )
+        _all_faxm_logs = faxm_a + faxm_c + faxm_d + faxm_e
+        all_results = results_a + results_c + results_d + results_e
+        # Aggregate R5 IS/OOS split counters across all four models (iter-v1/010+).
+        _r5_model_results = [results_a, results_c, results_d, results_e]
+        # Feature importance for all 4 models (F-AXIS-MECHANISM #1 dual gate: rank + gain-share).
+        # All 4 models required per LM Master §4 recommendation and Section 4.2.
+        _post_dispatch_fi_strategies = [
+            ("Model_A_pool", _strat_a),
+            ("Model_C_LINK", _strat_c),
+            ("Model_D_LTC", _strat_d),
+            ("Model_E_DOT", _strat_e),
+        ]
+    elif set(symbols) == set(V1_BASELINE_UNIVERSE) and iteration_label != "v1-021":
+        # Generic baseline-universe dispatch (non-/023, non-/021 iterations).
+        # Models A/C/D/E with V1_BASELINE_UNIVERSE symbols. BIT-IDENTICAL to historical
+        # v186 baseline when active_feature_columns=list(V1_FEATURE_COLUMNS) + n_trials=50.
         results_a, faxm_a, _strat_a = run_model(
             "A (BTC/ETH)",
             ("BTCUSDT", "ETHUSDT"),
@@ -1750,7 +1854,7 @@ def main() -> None:
 
         # Feature importance is written AFTER report_dir is resolved (post-dispatch).
         # Store strategies reference for the post-dispatch call.
-        _iter021_fi_strategies = [
+        _post_dispatch_fi_strategies = [
             ("POOL_Model_A", _strat_a),
             ("BTC_Model_H", _strat_h),
         ]
@@ -1895,13 +1999,17 @@ def main() -> None:
     print(f"Reports: {report_dir}")
 
     # -------------------------------------------------------------------------
-    # iter-v1/021: write feature importance CSVs (H2 diagnostic, post-dispatch).
-    # _iter021_fi_strategies is populated only when iteration_label == "v1-021".
+    # iter-v1/021+: write feature importance CSVs (post-dispatch).
+    # _post_dispatch_fi_strategies is populated when iteration_label is one of:
+    #   "v1-021" (methodology pivot — H1/H2 diagnostic)
+    #   "v1-023" (funding-rate feature family — F-AXIS-MECHANISM #1 dual gate)
     # For all other iterations, this is a no-op (empty list).
+    # Renamed from _iter021_fi_strategies → _post_dispatch_fi_strategies
+    # (iter-v1/022 Critic Rec #2 CARRY-FORWARD: generic name per /022 review.md).
     # -------------------------------------------------------------------------
-    if _iter021_fi_strategies:
+    if _post_dispatch_fi_strategies:
         _write_feature_importance(
-            _iter021_fi_strategies,
+            _post_dispatch_fi_strategies,
             feature_columns=active_feature_columns,
             report_dir=report_dir,
         )

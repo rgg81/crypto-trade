@@ -89,6 +89,8 @@ V1_FEATURE_COLUMNS: tuple[str, ...] = tuple(BASELINE_FEATURE_COLUMNS)
 V1_FEATURE_COLUMNS_PRUNED: tuple[str, ...] = (
     "cal_dow_norm",
     "cal_hour_norm",
+    "funding_rate_zscore_30",  # iter-v1/023: NEW — funding-rate z-score 30-bar (10-day)
+    "funding_rate_zscore_90",  # iter-v1/023: NEW — funding-rate z-score 90-bar (30-day)
     "interact_natr_x_adx",
     "interact_ret1_x_natr",
     "interact_ret1_x_ret3",
@@ -129,9 +131,10 @@ V1_FEATURE_COLUMNS_PRUNED: tuple[str, ...] = (
     "vol_volume_rel_20",
 )
 
-# Sanity guard: confirm the pruned set has exactly 40 features.
-assert len(V1_FEATURE_COLUMNS_PRUNED) == 40, (
-    f"V1_FEATURE_COLUMNS_PRUNED must have exactly 40 features; got {len(V1_FEATURE_COLUMNS_PRUNED)}"
+# Sanity guard: confirm the pruned set has exactly 42 features.
+# iter-v1/023: extended 40 → 42 by adding funding_rate_zscore_30 + funding_rate_zscore_90.
+assert len(V1_FEATURE_COLUMNS_PRUNED) == 42, (
+    f"V1_FEATURE_COLUMNS_PRUNED must have exactly 42 features; got {len(V1_FEATURE_COLUMNS_PRUNED)}"
 )
 
 # Out-of-distribution detection feature subset (16 scale-invariant features
@@ -169,4 +172,5 @@ __all__ = [
     "V1_FEATURE_COLUMNS_PRUNED",
     "V1_OOD_FEATURE_COLUMNS",
     "assert_v1_universe",
+    # iter-v1/023: funding-rate feature family (add_funding_v1_features imported on demand)
 ]
