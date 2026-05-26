@@ -131,6 +131,10 @@ QR EDA findings UPDATE the prior toward INERT-stronger (H_POOL_ANCHOR REFUTED at
 
 **Critical interpretation note**: BTC's IS-OOS asymmetric rotation prior (the IS-NEG / OOS-POS asymmetry) is the structural signature under test. /020 is **NOT a directional-flip experiment** (unlike /019 which targeted ETH's negative drag). It is a **PRESERVATION experiment**: can cohort isolation preserve BTC's OOS positive without amplifying the IS catastrophic? The verdict cell thresholds in Section 4 are calibrated to PRESERVATION semantics: PROMISING = OOS preserved or accentuated, NEGATIVE = OOS lost.
 
+**LM Master Phase 4.5 §1 mechanism distinction footnote (ADOPTED at Section 3.4)**: PROMISING tail mechanism = "Optuna basin reorganization at single-cohort labels" NOT "intrinsic-edge surfaces under isolation" (which was the Section 0.4 framing). The pool-independence finding ρ ≈ −0.022 (Section 2.4) means the pooled BTC-conditional optimum is close to BTC-only's basin; PROMISING magnitude band is narrow (Δ +0.10 to +0.25). This refines the falsification logic at small magnitudes: a PROMISING outcome ∈ [+0.20, +0.25] does not imply a NEW edge mechanism — it implies basin reorganization at the single-cohort label distribution.
+
+**LM Master Phase 4.5 §5 modal verdict interpretation note (ADOPTED)**: /020 is the DIAGNOSTIC EXPLORATION confirming pool-independence rather than a likely edge candidate; bundle role at /027 is informational baseline + DIVERSIFICATION ingredient NOT additive Sharpe contribution — distinct from /018 LINK (additive +0.80) and /019 ETH+gate (additive +0.50). See Section 11.6 bundle composition table for verdict-conditional /027 substrate logic.
+
 ---
 
 ## Section 2 — IS-Only Evidence (EDA results)
@@ -347,24 +351,47 @@ uv run python run_baseline_v1.py \
 
 ### 3.4 LM Master Phase 4.5 Responses
 
-**RESERVED PLACEHOLDER** — to be populated AFTER LM Master Phase 4.5 advisory fires.
+LM Master Phase 4.5 advisory fired at `briefs-v1/iteration_v1-020/lgbm_advisor.md` (118 lines). Twelve recommendation items addressed below. All twelve resolve to ADOPTED (with two of them downgraded to INFORMATIONAL CROSS-REFERENCE since they correspond to actions the brief already encodes). Zero rejected, zero modified-with-reservation. The LM Master advisory is convergent with QR brief design; refinements LM Master proposes either sharpen priors at the subtype level (item 1), introduce explicit pre-registered bands for falsifier predictions (items 3, 4, 5), or codify Critic 7.5 watch items (item 12).
 
-Phase 4.5 LM Master is dispatched by the orchestrator AFTER this brief is committed. The advisory file lands at `briefs-v1/iteration_v1-020/lgbm_advisor.md` and contains recommendations addressing:
-- BTC-only structural prior (LM Master pre-EDA prior was PROMISING 25% / INERT 50% / NEGATIVE 25% per prompt).
-- Optuna n_trials + ENSEMBLE_SIZE retention.
-- BTC-specific feature suggestions (informational; will NOT be adopted at /020 per pure-isolation discipline).
-- Saturation risks (single-cohort + single-seed lottery; LM Master /019 PROMISING-tail miss at +0.30 above predicted band suggests basin variance can swing favorably).
-- F-AXIS-MECHANISM hierarchy (per /019 Critic Rec #2, when |anchor IS Sharpe| < 0.10, F7 sign-agreement is N/A and F-AXIS #2 trade count + F-AXIS #1 dispatch correctness become LOAD-BEARING).
+#### ADOPTED (without modification)
 
-After LM Master fires, this Section will be edited to enumerate:
-- Adopted (without modification)
-- Adopted (with modification)
-- Rejected (with reasons)
-- Informational confirmations
-- Verdict-interpretation principle if LM Master proposes one
-- Most important LM Master flag if any
+- **§1 Adjusted priors PROMISING 20% / INERT 60% modal / NEGATIVE 20%** — ADOPTED. The LM Master refinement splits the INERT modal into INERT-no-effect (|Δ|<0.10) at 40% + INERT-preserved-asymmetric (|Δ|∈[0.10, 0.20]) at 20%. This is a sharpening (not a rebalancing) of QR's brief 20/55/25. The H_POOL_ANCHOR REFUTED finding (Section 2.4, ρ ≈ −0.022) is the EDA basis. Section 5 priors REFINED per this item — see edits at Section 5.
+- **§1 Mechanism distinction** — ADOPTED as footnote to Section 1 hypothesis and as PROMISING-conditional reasoning at Section 11.2. PROMISING tail mechanism = "Optuna basin reorganization at single-cohort labels" NOT "intrinsic-edge surfaces under isolation". The pool-independence finding means the pooled BTC-conditional optimum is close to BTC-only basin; PROMISING magnitude would be small (LM Master estimate Δ +0.10 to +0.25).
+- **§2 F-AXIS-MECHANISM #2 trade-count LM Master tighter sub-bands** — ADOPTED as annotation in Section 4 F-AXIS-MECHANISM #2 row. LM Master point estimates: **IS ~105 (band [79, 147])**, **OOS ~34 (band [25, 46])**. These sit INSIDE QR brief's blocking bands ([70, 150] IS / [25, 55] OOS). The QR brief band remains the BLOCKING band for F-AXIS #2 BREACH-low/BREACH-high; the LM Master tighter sub-bands are INFORMATIONAL — observed values outside LM Master's tighter sub-bands but inside QR's blocking band would inform LM Master prediction calibration at Phase 7.4 BUT WOULD NOT trigger BREACH.
+- **§3 n_eff_per_cell point estimate 9 (band [7, 10])** — ADOPTED. Replaces F-AXIS-MECHANISM #4 informational band [6, 10] with refined LM Master prediction [7, 10] point estimate 9. Matches /018 LINK-only (n_eff = 9). Recorded as INFORMATIONAL.
+- **§4 Jaccard pre-registered prediction 0.10-0.25** — ADOPTED as PRE-REGISTERED Phase 7.4 falsifier in Section 6.6 (PROMISING-MECHANICAL adjacency). Section 6.6 edited to encode the pre-registered band. Verdict thresholds:
+  - **Jaccard < 0.20**: NEW signal source (lower-than-LM-prediction-band; pool independence claim is at higher-than-monthly granularity).
+  - **Jaccard ∈ [0.20, 0.50]**: mixed mechanism (partial basin reorganization + partial label-noise restructuring). MODAL outcome at single-seed=42.
+  - **Jaccard > 0.50**: PROMISING-MECHANICAL classification per `feedback_promising_mechanical_subtype.md`. /027 bundle treats BTC-only as "strictly accretive component decision" NOT "new edge ingredient" — non-compoundable.
+- **§5 Most important point: modal verdict INERT-no-effect; /020 = DIAGNOSTIC EXPLORATION; bundle role at /027 = DIVERSIFICATION not ADDITIVE EDGE** — ADOPTED as Section 1 hypothesis interpretation note + Section 11.6 bundle composition table.
+- **§6 /021+ verdict-conditional pre-staging — modal /021 = LTC-only specialization (80% combined probability)** — ADOPTED into Section 11.7 verdict-conditional roadmap. LM Master matrix replaces QR's prior DOT-first staging. New /021 default cell: LTC-only specialization. NEGATIVE-basin (13% probability) → 2-symbol pooled cohort (BTC+ETH separated). NEGATIVE-INTRINSIC (5%) → methodology pivot to `_write_feature_importance` add. NEGATIVE-CATASTROPHIC (2%) → closeout-reconciliation.
+- **§7 Hyperparameter recommendations — KEEP all frozen** — ADOPTED. n_trials=18, ENSEMBLE_SIZE=3, V1_FEATURE_COLUMNS_PRUNED, bounds_profile=v1_pruned, apply_r1=False, seeds=[42, 123, 456]. Zero deviation from brief.
+- **§8 Cycle-3 specialist bundle update — BTC-only's /027 role = DIVERSIFICATION baseline (NOT additive Sharpe contribution)** — ADOPTED into Section 11.6 bundle composition table. /027 logic flow updated: if /020 is INERT-no-effect, /027 bundle includes BTC IN POOL (via Model A) NOT BTC-only (via Model H). /020 purpose is to DETERMINE the right BTC representation. The /020 ROLE in /027 if PROMISING ≠ ROLE if INERT-no-effect.
+- **§12 Critic Phase 7.5 priority items** — ADOPTED all five items as Critic 7.5 watch items in Section 10 closeout protocol:
+  1. F-AXIS-MECHANISM #1 dispatch correctness (binary pass).
+  2. F-AXIS-MECHANISM #2 trade count LOAD-BEARING — LM Master pre-registered tighter sub-bands.
+  3. F-AXIS-MECHANISM #3 IS_H1 catastrophic preservation (regime-binding test).
+  4. F7 INVERTED framing: H_INTRINSIC PREDICTS IS-NEG/OOS-POS sign-mismatch; SAME-SIGN-POSITIVE → PROMISING-IS-DISSOLVED surprise outcome. Critic Check 11 (verdict-cell interpretation) must apply inverted framing.
+  5. Cross-iteration anchor stability: BTC-in-pool baseline (−37.28% IS / +33.17% OOS) verified at Phase 6 engineering_report.md against baseline CSV.
 
-Phase 5.5 gate will BLOCK if this section remains as a placeholder when LM Master has fired. The placeholder must be replaced with concrete LM Master responses before Phase 5.5 gate dispatch.
+#### INFORMATIONAL CROSS-REFERENCE (no action required; aligns with QR design)
+
+- **§ Saturation Risks — single-seed=42 basin lottery on UNIQUE-prior cohort + INERT-no-effect attribution disambiguation at single-seed** — INFORMATIONAL CROSS-REFERENCE. Section 5 priors already encode this (NEGATIVE tail at 20%; HIGH-RISK declaration at Section 2.5 covers the basin-lottery downside-band reasoning). No incremental brief action.
+- **§ What LM did NOT recommend — no multi-seed, no gate, no `_write_feature_importance` add at /020, no Optuna bounds tightening, no apply_r1=True** — INFORMATIONAL CROSS-REFERENCE. Brief design already encodes pure-isolation discipline; LM Master agreement is confirmation, no incremental brief action.
+
+#### Rejected (with reasons)
+
+NONE.
+
+#### Modal verdict interpretation principle (LM Master proposed)
+
+LM Master proposes the modal verdict interpretation principle: **"/020 is the DIAGNOSTIC EXPLORATION confirming pool-independence rather than a likely edge candidate; bundle role at /027 is informational baseline + diversification ingredient NOT additive Sharpe contribution — distinct from /018 LINK (additive +0.80) and /019 ETH+gate (additive +0.50)."** ADOPTED as the verdict-interpretation principle applied at Phase 7+8 closeout reasoning.
+
+#### Most important LM Master flag
+
+**F-AXIS-MECHANISM #2 trade-count band is the LOAD-BEARING diagnostic** given small IS anchor (|Sharpe| ≈ 0.12 at noise floor). Pre-registered LM Master tighter sub-bands (IS [79, 147] point ~105 / OOS [25, 46] point ~34) sit INSIDE QR's blocking band [70, 150] / [25, 55]. If observed outside QR's brief blocking bands → BLOCK-PENDING-FIX or NEGATIVE-COHORT-FAIL per Section 8 row 8. The Jaccard test at Phase 7.4 is the second-most-load-bearing diagnostic.
+
+Phase 5.5 PASS criterion (LM Master responses present and concrete) satisfied by this Section.
 
 ### 3.5 Axis Family Declaration (v1 mandatory)
 
@@ -496,9 +523,9 @@ OOS lower bound 25 = standard cycle-3 floor; OOS upper bound 55 covers /017 BTC 
 The single-axis isolation is the SYMBOL DIMENSION only.
 
 - **F-AXIS #1 — Dispatch correctness** **[LOAD-BEARING — no gate, no specialization]**: ONLY Model H runs; trades.csv contains only BTCUSDT rows (zero rows for ETH/LINK/LTC/DOT). PASS criterion: `df['symbol'].unique() == ['BTCUSDT']`. Failure indicates the elif branch dispatch was bypassed or Model A/C/D/E ran by mistake.
-- **F-AXIS #2 — BTC trade-count band + cohort isolation correctness** **[LOAD-BEARING per Critic /019 Rec #2 + Section 4 F7 noise-floor caveat]**: BTC IS trades ∈ [70, 150], BTC OOS trades ∈ [25, 55]. Failure indicates Model H is not training correctly or single-cohort scope is being violated by an unintended cross-symbol leak.
+- **F-AXIS #2 — BTC trade-count band + cohort isolation correctness** **[LOAD-BEARING per Critic /019 Rec #2 + Section 4 F7 noise-floor caveat]**: BTC IS trades ∈ [70, 150], BTC OOS trades ∈ [25, 55]. Failure indicates Model H is not training correctly or single-cohort scope is being violated by an unintended cross-symbol leak. **LM Master tighter sub-bands (Phase 4.5; INFORMATIONAL — not blocking)**: IS point estimate ~105 with sub-band [79, 147]; OOS point estimate ~34 with sub-band [25, 46]. LM Master sub-bands sit INSIDE the QR blocking band — values outside the sub-band but inside the QR blocking band do NOT trigger F-AXIS #2 BREACH; they inform LM Master prediction calibration at Phase 7.4. ONLY breaches of the QR blocking band ([70, 150] / [25, 55]) trigger F-AXIS #2 BREACH-low or BREACH-high.
 - **F-AXIS #3 — IS_H1 catastrophic preservation (regime-binding test)**: Sub-mechanism check on whether H_INTRINSIC holds at the regime level. Pre-registered band: BTC-only IS_H1 net_pnl ∈ [−45%, −15%] (preservation of pool's IS_H1 catastrophic −36.01% within ±15pp). If observed BTC-only IS_H1 net_pnl ≥ −10% → H1 catastrophic DISSOLVED under cohort isolation → H_INTRINSIC partially false (regime is NOT the binding constraint at single-cohort; pool training may have been amplifying H1 catastrophic). If observed IS_H1 net_pnl ≤ −60% → catastrophic AMPLIFIED → cohort isolation harmful. Backtest must report IS_H1 net_pnl in engineering_report.md (Section 10.4).
-- **F-AXIS-MECHANISM #4 — n_eff_per_cell band [6, 10]** **[INFORMATIONAL per /017 + /019 LM Master §5 correction methodology]**: BTC-only cohort training row count ≈ 113-130 IS labels (between /018 LINK's 154 and /019 ETH's 159, slightly compressed). Predicted n_eff band [6, 10] based on training row count proxy (NOT post-hoc kept trade count). INFORMATIONAL. If observed n_eff < 6 → mechanism issue, flag at Phase 7.4.
+- **F-AXIS-MECHANISM #4 — n_eff_per_cell band [7, 10] (LM Master refined; point estimate 9)** **[INFORMATIONAL per /017 + /019 LM Master §5 correction methodology + LM Master /020 §3]**: BTC-only cohort training row count ≈ 113-130 IS labels (between /018 LINK's 154 and /019 ETH's 159, slightly compressed). LM Master Phase 4.5 §3 refines predicted n_eff band to **[7, 10] with point estimate 9** (matching /018 LINK-only n_eff=9). Based on training row count proxy (NOT post-hoc kept trade count). INFORMATIONAL. If observed n_eff < 7 → mechanism issue, flag at Phase 7.4.
 
 ### F-PORTFOLIO (informational; cannot determine verdict)
 
@@ -512,15 +539,18 @@ Per /016/017/018/019 closeouts: cycle-3 LM Master + QR mechanism-level predictio
 
 LM Master pre-EDA prior (from prompt): PROMISING 25% / INERT 50% / NEGATIVE 25%. Modal INERT.
 
-QR POST-EDA prior (this brief — UPDATE FROM LM PRIOR after EDA diagnostics):
+QR POST-EDA prior (this brief — REFINED per LM Master Phase 4.5 §1 subtype split):
 
-- **PROMISING (Δ ≥ +0.20 OOS Sharpe AND OOS net_pnl Δ ≥ +15pp)**: **20%** (QR DOWN from LM Master 25% — EDA H_POOL_ANCHOR REFUTED makes "cohort isolation amplifies edge" less likely; PROMISING requires Optuna basin-lottery favorable + intrinsic edge preservation surfacing in OOS).
-- **INERT (Δ ∈ [−0.20, +0.20] OOS Sharpe)**: **55%** (QR UP from LM Master 50% — modal cell strengthened by EDA; regime-bound IS catastrophic + statistically independent BTC-ETH in pool both support modal INERT preservation).
-- **NEGATIVE (Δ ≤ −0.20 OOS Sharpe)**: **25%** (QR UNCHANGED from LM Master — basin-lottery downside band; BTC-only single-seed=42 lottery could land in a worse basin than pool; BUT the OOS positive prior 4/5 across baseline + /014-/017 provides structural support).
+- **PROMISING (Δ ≥ +0.20 OOS Sharpe AND OOS net_pnl Δ ≥ +15pp)**: **20%** (EDA H_POOL_ANCHOR REFUTED makes "cohort isolation amplifies edge" less likely; PROMISING requires Optuna basin-lottery favorable + intrinsic edge preservation surfacing in OOS). PROMISING tail mechanism per LM Master §1 = "Optuna basin reorganization at single-cohort labels" NOT "intrinsic-edge surfaces under isolation"; magnitude band Δ +0.10 to +0.25 (narrow).
+- **INERT (Δ ∈ [−0.20, +0.20] OOS Sharpe)**: **60%** (LM Master §1 refinement: INERT modal STRENGTHENS from QR 55% to 60% under EDA pool-independence ρ ≈ 0; split into subtypes):
+  - **INERT-no-effect** (|Δ| < 0.10): **40%** subset (MODAL CELL — Optuna basin converges close to pooled BTC-conditional optimum).
+  - **INERT-preserved-asymmetric** (|Δ| ∈ [0.10, 0.20]): **20%** subset (BTC's IS-NEG/OOS-POS asymmetric rotation preserved with small magnitude).
+- **NEGATIVE (Δ ≤ −0.20 OOS Sharpe)**: **20%** (LM Master §1 reduces from QR 25% — independent-pool finding REDUCES "pool was load-bearing" failure mode):
+  - **NEGATIVE-basin** (Δ ∈ [−0.55, −0.20]): **13%** subset (basin-lottery downside band).
   - **NEGATIVE-INTRINSIC** (Δ ≤ −0.55, dissolves OOS positive): **5%** subset (would refute both H_INTRINSIC and H_POOL_ANCHOR; require new explanation).
-  - **NEGATIVE-CATASTROPHIC** (catastrophic-NEGATIVE): **3%** subset.
+  - **NEGATIVE-CATASTROPHIC**: **2%** subset (LM Master §1: reduced from QR 3% — no plausible mechanism given ρ ≈ 0).
 
-LM Master Phase 4.5 will be asked to confirm/refine these post-EDA priors in Section 3.4 update.
+LM Master Phase 4.5 §1 ADOPTED — these refined post-EDA priors are the brief's prediction-track-of-record (recorded at Section 3.4).
 
 **Three specific mechanism predictions** (informational):
 
@@ -566,6 +596,16 @@ BTC OOS at /015 was the only outlier among baseline+/014-/017 (−7.18% net_pnl,
 ### 6.6 PROMISING-MECHANICAL adjacency (LM Master watch; Critic Check 14)
 
 Per /018 closeout LESSON #3 + /019 closeout LESSON #5 — if /020 verdict is PROMISING but BTC-only kept-trade roster preserves >80% Jaccard with baseline BTC-in-pool roster, classify as PROMISING-MECHANICAL (loss-surface optimization, not new edge). Phase 7.4 LM Master will compute trade_id Jaccard between /020 BTC-only roster and baseline BTC pool roster.
+
+**Pre-registered Jaccard band (LM Master Phase 4.5 §4 ADOPTED as falsifier; PRE-REGISTERED before Phase 6 backtest)**:
+
+| Observed Jaccard | Verdict implication | Mechanism |
+|---|---|---|
+| **< 0.20** | NEW signal source | LOWER than LM Master prediction band; pool independence claim is at higher-than-monthly granularity (within-month label timing IS coupling BTC+ETH). SURPRISE outcome relative to /018+/019 (which observed 0.04). |
+| **∈ [0.20, 0.50]** | mixed mechanism (partial basin reorganization + partial label-noise restructuring) | MODAL outcome at single-seed=42. INSIDE LM Master prediction band [0.10, 0.25] when extended to upper limit 0.50. |
+| **> 0.50** | **PROMISING-MECHANICAL classification** | /027 bundle: BTC-only specialist becomes "strictly accretive component decision" NOT "new edge ingredient" — NON-COMPOUNDABLE per `feedback_promising_mechanical_subtype.md`. |
+
+**LM Master Phase 4.5 §4 pre-registered point estimate band**: [0.10, 0.25] — HIGHER than /018=0.04 and /019=0.04 because Model H mirrors Model A's BTC-conditional optimum at pure isolation (no gate, no specialization knob).
 
 This adjacency does NOT change the brief design; it informs Phase 7.4 + Phase 7.5 classification and /027 bundle treatment (PROMISING-MECHANICAL = strictly accretive component decision, NOT new edge ingredient, NON-COMPOUNDABLE per `feedback_promising_mechanical_subtype.md`).
 
@@ -638,6 +678,16 @@ After Phase 5.5 PASS:
 - Verify F1/F3 calibration: anchor numbers cited match baseline CSV.
 - Critic mini-Check 14 (axis family declaration): per-cohort-specialization-BTC is NEW; orthogonality justification in Section 0.6.
 
+### 10.1.b LM Master Phase 7.5 Critic watch items (ADOPTED from LM Master §12)
+
+The Phase 7.5 Critic must apply the following five LM Master-flagged watch items at verdict-cell interpretation:
+
+1. **F-AXIS-MECHANISM #1 — dispatch correctness binary pass**: `df['symbol'].unique() == ['BTCUSDT']` MUST be true on trades.csv (no fallthrough/double-dispatch).
+2. **F-AXIS-MECHANISM #2 — trade count LOAD-BEARING**: QR blocking band IS [70, 150] / OOS [25, 55] is THE blocking band. LM Master tighter sub-bands IS ~105 [79, 147] / OOS ~34 [25, 46] are INFORMATIONAL (inform Phase 7.4 prediction calibration only).
+3. **F-AXIS-MECHANISM #3 — IS_H1 catastrophic preservation (regime-binding test)**: IS_H1 net_pnl ∈ [−45%, −15%]. Observation ≥ −10% → H_INTRINSIC partially refuted at regime level; observation ≤ −60% → cohort isolation harmful.
+4. **F7 INVERTED framing**: H_INTRINSIC PREDICTS IS-NEG / OOS-POS sign mismatch (the structural signature). SAME-SIGN-POSITIVE outcome (both IS and OOS positive) = PROMISING-IS-DISSOLVED SURPRISE outcome — verdict cell must apply inverted framing (not traditional same-sign = consistency). Critic Check 11 must apply this inversion.
+5. **Cross-iteration anchor stability check**: BTC-in-pool baseline anchors (−37.28% IS net_pnl / +33.17% OOS net_pnl) MUST be verified at Phase 6 engineering_report.md against the baseline_corrected comparison.csv (Section 10.4 contract). Any drift in anchor numbers between brief and engineering_report indicates baseline regression and blocks Phase 7.5 PASS.
+
 ### 10.2 Data freshness
 
 8h klines for BTCUSDT under `data/BTCUSDT/8h.csv` must have `close_time` within 16h of measurement time. `crypto-trade fetch --symbols BTCUSDT --intervals 8h` runs before backtest if stale. ETH/LINK/LTC/DOT data NOT NEEDED at backtest time (cohort isolation); kept on disk for /021+ continuity.
@@ -687,9 +737,9 @@ After Phase 6 backtest, BTC-only IS roster will be deterministic given (1) `--sy
 
 ### 11.2 BTC-only specialist provisional standing at /027
 
-If /020 is **PROMISING (verdict cell row 1 or 2)**: BTC-only specialist becomes a **3rd CONDITIONAL LOAD-BEARING component** for /027 CONFIRMATION bundle, after LINK-only specialist (/018) and ETH-only + gate specialist (/019). Multi-seed regression target at /027 estimated [+0.30, +0.50] (proxy to /019's compression from +0.65 → +0.50 anchor).
+If /020 is **PROMISING (verdict cell row 1 or 2)**: BTC-only specialist becomes a **3rd CONDITIONAL LOAD-BEARING component** for /027 CONFIRMATION bundle, after LINK-only specialist (/018) and ETH-only + gate specialist (/019). Multi-seed regression target at /027 estimated [+0.10, +0.25] **(REVISED DOWN per LM Master §1 mechanism distinction**: PROMISING tail mechanism = "Optuna basin reorganization at single-cohort labels" NOT "intrinsic-edge surfaces under isolation"; narrow magnitude band).
 
-If /020 is **INERT (verdict cell row 3, modal)**: BTC-only specialist is a 3rd CONDITIONAL but downgraded candidate; /027 bundle decision depends on cross-correlation with LINK + ETH+gate specialists (Section 11.6 mandate).
+If /020 is **INERT (verdict cell row 3, modal — INERT-no-effect at 40% subset per Section 5 LM Master refinement)**: BTC-only specialist is a DIVERSIFICATION-baseline ingredient (per LM Master §5 + Section 11.6 bundle composition table) — NOT additive Sharpe contribution. /027 substrate uses BTC IN POOL (via Model A) NOT BTC-only (Model H). Decision depends on cross-correlation with LINK + ETH+gate specialists (Section 11.6 mandate).
 
 If /020 is **NEGATIVE (verdict cell row 5 or 6)**: BTC-only specialist DROPPED for /027; /021-/026 explorations continue. /027 bundle from 2 specialists (LINK + ETH+gate) + alternative cohort or pooled-2sym candidates.
 
@@ -702,8 +752,9 @@ If PROMISING at single-seed=42: project single-seed magnitude × compression fac
 At /027:
 - LINK-only specialist target: +0.80 multi-seed anchor (from /018).
 - ETH-only + gate specialist target: +0.50 multi-seed anchor (from /019).
-- BTC-only specialist target: +0.30 multi-seed anchor (provisional from /020, if PROMISING).
-- Projected portfolio Sharpe with 3 specialists at cross-correlation < 0.40: ≈ +1.00 monthly OOS Sharpe (within MERGE floor +1.0).
+- BTC-only specialist target: +0.10 to +0.25 multi-seed anchor (provisional from /020, if PROMISING — **REVISED DOWN from prior +0.30 per LM Master Phase 4.5 §1 narrow PROMISING mechanism band**). If INERT-no-effect (MODAL), BTC contribution is DIVERSIFICATION baseline ≈ 0; bundle substrate uses BTC IN POOL (Model A) instead.
+- Projected portfolio Sharpe with 3 specialists at cross-correlation < 0.40 (PROMISING-cell BTC contribution): ≈ +0.80-+0.95 monthly OOS Sharpe (at or below MERGE floor +1.0; LM Master narrower BTC band tightens portfolio target).
+- Projected portfolio Sharpe with 2 specialists + Model A BTC-in-pool (INERT-cell BTC representation, MODAL): ≈ +0.65-+0.75 monthly OOS Sharpe (LINK + ETH+gate edge + BTC pool diversification baseline).
 - If cross-correlation > 0.60: bundle dilution; /027 may drop the most-correlated specialist.
 
 ### 11.5 LM Master Phase 7.4 mandate
@@ -715,16 +766,38 @@ Phase 7.4 LM Master post-mortem evaluates:
 4. Optuna trial CV per cell (basin-lottery diagnosis).
 5. Recommended /021+ axis from BTC-only outcome.
 
-### 11.6 /027 cross-correlation pre-validation (Critic /019 Rec #3)
+### 11.6 /027 cross-correlation pre-validation (Critic /019 Rec #3) + LM Master §8 bundle composition
 
 **Pre-registered carry-forward**: at /027 CONFIRMATION brief design, cross-correlation between LINK-only specialist (/018) roster monthly Sharpe path, ETH-only + gate (/019) roster monthly Sharpe path, AND BTC-only (/020) roster monthly Sharpe path **must be computed PRE-bundling**. If any pairwise cross-correlation > 0.60, the more-correlated specialist is DROPPED from the /027 bundle, replaced by a candidate from /021-/026 with lower cross-correlation. This is binding for /027 brief design.
 
+**LM Master Phase 4.5 §8 ADOPTED — bundle composition table** (BTC-only role is verdict-conditional; DIVERSIFICATION baseline vs ADDITIVE edge):
+
+| Specialist | /020 Verdict-conditional | Single-seed Δ | /027 multi-seed regression target | Bundle role |
+|---|---|---|---|---|
+| LINK-only /018 | PROMISING-INERT favorable (LOCKED) | +0.16 | **+0.80** anchor | Edge ingredient (additive) |
+| ETH-only + gate /019 | PROMISING (LOCKED) | +0.65 | **+0.50** anchor | Edge ingredient (additive, low cross-corr) |
+| **BTC-only /020** | if INERT-no-effect (MODAL) | **predicted 0 to +0.10** | **predicted 0 to +0.10** | **DIVERSIFICATION baseline (LM Master §5: NOT additive edge)** |
+| **BTC-only /020** | if PROMISING | predicted +0.10 to +0.25 | +0.10 to +0.25 (multi-seed compression × 0.65-0.80) | Edge ingredient (additive, smaller magnitude than LINK/ETH+gate) |
+| **BTC-only /020** | if NEGATIVE | — | — | DROPPED from /027 substrate |
+| LTC-only /021 (modal next axis per §11.7) | PENDING | TBD | TBD | TBD |
+
+**/027 logic flow (LM Master §8 ADOPTED)**: if /020 is INERT-no-effect, the /027 bundle should include **BTC IN POOL (via Model A)** NOT BTC-only (via Model H). The /020 PURPOSE is to determine the RIGHT BTC REPRESENTATION for /027. If /020 PROMISING, /027 substrate uses BTC-only Model H; if INERT, /027 substrate uses BTC-in-pool Model A; if NEGATIVE, BTC representation is dropped or limited to ensemble with reduced weighting.
+
 ### 11.7 Verdict-conditional /021+ pre-staging
 
-- **/020 PROMISING** → /021 = DOT-only single-cohort specialization (per-cohort-specialization-DOT; NEW 12th family). DOT had IS +96.07 at /017 catastrophic-positive rotation; DOT structural IS positive, OOS approximately flat. Tests DOT's intrinsic IS-driven edge under cohort isolation. Alternative: LTC-only (per-cohort-specialization-LTC; NEW 13th family) — LTC was worst OOS contributor at baseline (−47.25%); tests NEGATIVE-prior cohort under isolation alone (no gate, similar to /020's design for BTC's IS-NEG anchor).
-- **/020 INERT (modal)** → /021 = same options as PROMISING; pure cohort isolation methodology validates as 3/3 INERT-or-PROMISING across LINK + ETH + BTC = ROBUST EXPLORATION methodology. Sequence DOT → LTC or LTC → DOT at /021/022.
-- **/020 NEGATIVE** → /021 = REVISIT 2-symbol POOLED cohort BTC+ETH SEPARATED (BTC alone + ETH alone, no pool, no gate). This tests "pooling helps Model A's symbols" at small scale. Alternative: methodology refinement (per LM Master /019 Phase 7.4 §6 — feature_importance.csv emission to v1 runner).
-- **/020 BLOCK-PENDING-FIX** → /021 = same axis re-launched after fix (single rerun allowance per `quant-iteration-v1` skill).
+**LM Master Phase 4.5 §6 ADOPTED — verdict-conditional /021 staging matrix (replaces prior QR DOT-first staging)**. Modal /021 = LTC-only specialization (combined 80% probability across PROMISING + INERT-no-effect + INERT-preserved-asymmetric):
+
+| /020 Verdict | Probability | /021 Axis | Family Declaration |
+|---|---|---|---|
+| **PROMISING** (Δ ≥ +0.20) | 20% | LTC-only specialization | per-cohort-specialization-LTC (NEW 12th family) |
+| **INERT-no-effect** (\|Δ\|<0.10, MODAL) | 40% | LTC-only specialization | per-cohort-specialization-LTC (NEW 12th family) |
+| **INERT-preserved-asymmetric** (\|Δ\|∈[0.10, 0.20]) | 20% | LTC-only specialization | per-cohort-specialization-LTC (NEW 12th family) |
+| **NEGATIVE-basin** (Δ ∈ [−0.55, −0.20]) | 13% | 2-symbol POOLED cohort BTC+ETH SEPARATED (no pool, no gate; tests "pooling helps Model A's symbols" at small scale) | methodology-pivot |
+| **NEGATIVE-INTRINSIC** (Δ ≤ −0.55) | 5% | methodology pivot: `_write_feature_importance` add per LM Master /019 Phase 7.4 §6 | methodology-pivot |
+| **NEGATIVE-CATASTROPHIC** | 2% | closeout-reconciliation (NOT EXPLORATION); cycle-3 may close early if catastrophic-mechanism cannot be explained | catalog-closure |
+| **BLOCK-PENDING-FIX** | — | same axis re-launched after fix (single rerun allowance per `quant-iteration-v1` skill) | per-cohort-specialization-BTC (retained) |
+
+**Note (LM Master §6 deviation from QR prior staging)**: LM Master REPLACES QR's prior DOT-first default with LTC-first across all PROMISING/INERT cells. Rationale: LTC was worst OOS contributor at baseline (−47.25%) — tests NEGATIVE-prior cohort under cohort-isolation alone (no gate, mirroring /020's design for BTC's IS-NEG anchor). DOT-first deferred to /022 conditional.
 
 ---
 
