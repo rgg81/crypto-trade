@@ -100,6 +100,8 @@ Cycle-3 EXPLORATION position: **#8 of 10**. Remaining slots: /024 + /025 + (opti
 
 **Direction of expected lift**: positive F1 OOS Sharpe Δ if the model learns the regime conditioning; INERT verdict if importance rank reproduces v3 pattern; negative if Optuna overfit at higher Optuna budget pattern.
 
+**ORACLE EDA caveat (LM Master §2 DOWNGRADE, 2026-05-27)**: the +78.55% IS net PnL in z30 ∈ [-2, -1] band is **descriptively valid but NOT a quantitative predictor of /023 OOS Sharpe Δ**. Per /022 BTC + LTC Jaccard 0.10/0.09 vs baseline pool roster, single-axis feature additions produce ~90% NEW trade rosters under single-seed retraining (basin relocation). The IS-anchored mechanism (negative funding band = short-crowded mean-reversion setup) is causal and roster-agnostic, but the **specific +78.55% PnL share will NOT reproduce** in the /023 retrained trade roster. Per-symbol texture also matters: DOT extreme-negative band is only 4 trades (sparse), and LTC negative-band shows -12.08% in counter-direction — the +78.55% is BTC+LINK+DOT-dominated, NOT universal. Section 2.7 expands. Hypothesis is interpreted as **mechanism support** NOT **outcome forecast**.
+
 ---
 
 ## Section 2 — IS-only Evidence (numerical tables from committed analysis)
@@ -263,17 +265,26 @@ The ORACLE EDA shows **IS-anchored mechanism support** (negative funding band is
 
 **No risk-primitive changes** (R1/R2/R3 unchanged). No labeling changes. No symbol changes. Pure feature-family addition.
 
-### 3.4 LM Master Phase 4.5 Responses (RESERVED)
+### 3.4 LM Master Phase 4.5 Responses
 
-This section reserved for LM Master Phase 4.5 responses. To be populated AFTER Phase 4.5 dispatch and BEFORE Phase 5.5 gate.
+LM Master advisory `briefs-v1/iteration_v1-023/lgbm_advisor.md` was dispatched at Phase 4.5 and provides 8 recommendations across §1-§8. QR response below; **all 8 ADOPTED**.
 
-LM Master will:
-- Provide 2-4 hyperparameter recommendations specific to funding-rate feature addition (e.g. colsample_bytree adjustments, max_depth interaction-search optimization).
-- Provide 1-2 feature-engineering alternatives or additions (e.g. funding regime indicators, funding momentum, funding-price divergence).
-- Predict importance rank for funding_rate_zscore_30 + 90.
-- Predict verdict-class priors (PROMISING / INERT / NEGATIVE) based on v3 prior + v1 structural differences.
+| LM rec | Topic | QR action | Brief sections updated |
+|---|---|---|---|
+| §1 | v3 axis closure DOES NOT BIND v1 literally (non-OHLCV funding survives /124 closure) but v3's 4-data-point funding catalog transfers as empirical prior | **ADOPT — no brief change** | Section 0.4 already cites the 4-data-point catalog; LM Master §1 reinforces the load-bearing transfer |
+| §2 | ORACLE EDA +78.55% DOWNGRADED as quantitative predictor per /022 basin-relocation lesson (Jaccard 0.10/0.09 = ~90% new roster) | **ADOPT** | Section 1 caveat appended; Section 2.7 Section 2 hypothesis interpretation strengthened |
+| §3 | Recalibrate verdict priors **12/8/52/18/8/2** (LM Master) vs QR 15/10/45/15/10/5 — v3 4-point precedent dominant + colsample lottery 42-col less likely than 40-col | **ADOPT** | Section 5.1 priors REPLACED 15/10/45/15/10/5 → **12/8/52/18/8/2** |
+| §4 | F-AXIS #1 STRENGTHEN with gain-share check (CRITICAL): rank-only insufficient per v3/082 evidence; tighten INERT to BOTH rank ≥ 32/42 on ≥ 3 cohorts AND family combined gain share < 4.0%; PROMISING-clean to rank ≤ 14/42 on ≥ 2 cohorts AND combined gain share ≥ 4.0% | **ADOPT** | Section 4.2 F-AXIS #1 falsifier table REWRITTEN with rank + gain-share dual gate; per-cohort gap-share data per cohort mandated as Critic Phase 7.5 watch item |
+| §5 | n_eff_per_cell band tighten lower [4, 10] → **[5, 10]** (pool A 2× rows raises floor) | **ADOPT** | Section 4.2 F-AXIS-MECHANISM #3 band updated; Section 8 row format inherits |
+| §6 | /024+ verdict-conditional pre-staging: PROMISING → funding family expansion ONE AT A TIME (per `feedback_v3_engineered_features_dont_stack.md` SAME-FAMILY); INERT modal → per-cohort drawdown brake; NEG-CAT → multi-seed HIGH-RISK + open-interest delta | **ADOPT** | Section 11.7 NEW staging matrix; Section 11.1/11.3/11.5 cross-referenced |
+| §7 | Most important point: v1 pool Model A architectural advantage probably not large enough to break v3 4-data-point precedent at single-seed n_trials=18; verdict will diagnose feature-family limitation vs model-architecture-conditional signal | **ADOPT — no brief change** | Section 5 modal INERT 52% reflects this; Section 6.1/6.2 + Section 11.3 capture the diagnostic |
+| §8 | /027 bundle composition: if PROMISING, funding-family contributes ~+0.20 to bundle Σ; realistic target +1.30-1.50 with correlation drag | **ADOPT** | Section 11.6 updated (note: 11.6 below RENAMED to "bundle composition impact" sub-row to disambiguate from /011 n_eff degenerate row, which moves to 11.8) |
 
-QR response will adopt, modify, or reject each recommendation with brief justification. Section 5.5 gate verifies LM Master integration.
+**Track-record context**: LM Master entering /023 with H1 directional 2/3 + methodology 2/2 (per advisory §"Context Read"). At /022 LM Master predicted CAT-tail upweighting which fired; /023 LM Master MODE shift INERT 45% → 52% adopted in line with `feedback_iteration_quality.md` deference to LM Master tail-class re-weighting when ≥ 5pp.
+
+**No LM Master recommendation REJECTED.** No MODIFIED beyond Section 5 + Section 4.2 numeric updates. Brief Section 3 (feature implementation) and Section 9 (no new deps) inherit LM Master §1 / §4 / §5 / §6 / §8 without code changes — implementation is unchanged (2 features funding_rate_zscore_30 + funding_rate_zscore_90). Single-seed=42 + n_trials=18 + ENSEMBLE_SIZE=3 + V1_FEATURE_COLUMNS_PRUNED 42 cols UNCHANGED.
+
+**Phase 5.5 gate**: this section satisfies the "brief must address each LM Master recommendation" rule. Each rec is explicitly cited and either ADOPTED (with brief section traceability) or NOT MODIFIED (justified in-place). No REJECTED items.
 
 ---
 
@@ -291,20 +302,31 @@ QR response will adopt, modify, or reject each recommendation with brief justifi
 
 ### 4.2 F-AXIS-MECHANISM falsifiers (mechanism integrity)
 
-**F-AXIS-MECHANISM #1 — Feature importance rank** (load-bearing per v3 prior):
-- `funding_rate_zscore_30` importance rank ≥ rank 15/42 (top-third) on **≥ 2 of 5 symbols** at IS using per-month FI accumulator from /021.
-- IF rank 38-42/42 (bottom-quartile) on **all 5 symbols** OR all 5 cohorts under 5% gain share → **INERT-by-importance** (v3 INERT pattern reproduces; axis CLOSED for cycle-3).
-- IF rank 15-30/42 mid-table with non-trivial gain share (3-10%) → **PROMISING-INERT-PARTIAL** (uncertain mechanism).
-- IF rank ≤ 14/42 (top-third) on ≥ 2 of 5 cohorts → **PROMISING clean** (model learned the feature).
+**F-AXIS-MECHANISM #1 — Feature importance rank + family gain-share (DUAL GATE)** (load-bearing per v3 prior; LM Master §4 STRENGTHENED 2026-05-27):
+
+Per LM Master §4 CRITICAL recommendation: rank-only insufficient because v3/082 4-feature family ranked mid (15-18 of 18) but combined gain share 9.90% (per-feature 2.475% < uniform-parity 5.56%) — load-bearing INERT diagnostic. v1 uniform-parity at 42 cols = 2.38%; 2-feature family combined uniform-parity threshold = 4.76%. **Strict per-cohort gain-share data is mandatory pre-Phase 7.5 deliverable.**
+
+Per LM Master §4 thresholds:
+
+| Outcome class | RANK gate | GAIN-SHARE gate | Required cohort coverage |
+|---|---|---|---|
+| **INERT-by-importance** (axis CLOSED) | rank ≥ 32/42 (bottom-quartile) | family combined < 4.0% gain share | ≥ 3 of 5 cohorts |
+| **PROMISING-clean** (bundleable) | rank ≤ 14/42 (top-third) | family combined ≥ 4.0% gain share | ≥ 2 of 5 cohorts |
+| **PROMISING-INERT-PARTIAL** | rank 15-31/42 mid-table | family combined 1.5-4.0% | any cohort coverage; downgrade to PROMISING-INERT-FAVORABLE if F1 ≥ +0.10 |
+| **NEGATIVE classifier-misclassification** | any | any | F1 Sharpe alone dominates (Section 4.1) |
+
+**Per-cohort gap-share data per cohort** is a MANDATORY Critic Phase 7.5 watch item — `feature_importance.csv` per (model, symbol) must include `gain_share` column (LightGBM split-importance / sum × 100); aggregated as `funding_family_gain_share_per_cohort.csv` deliverable in Phase 6 engineering report. Without per-cohort gain-share data, F-AXIS #1 classifier cannot fire → Critic BLOCK.
+
+**Old QR threshold (rank-only)**: rank ≤ 14/42 ≥ 2 cohorts → PROMISING. **DEPRECATED 2026-05-27 per LM Master §4 / §9.**
 
 **F-AXIS-MECHANISM #2 — Trade count**:
 - IS trade count ∈ [500, 750] (baseline 621 ± 20%): expected if feature addition does NOT dramatically reshape trade emission rate.
 - OOS trade count ∈ [140, 240] (baseline 189 ± 25%): same.
 - OUTSIDE either band → trade-rate destabilization; flag for diary inspection.
 
-**F-AXIS-MECHANISM #3 — n_eff_per_cell** (per /008 methodology substrate):
-- Expected band: [4, 10] per LM Master's pre-/008 modal at ~8.
-- < 4 → label-collapse; ≥ 12 → over-dispersed.
+**F-AXIS-MECHANISM #3 — n_eff_per_cell** (per /008 methodology substrate; LM Master §5 TIGHTENED 2026-05-27):
+- Expected band: **[5, 10]** (LM Master modal at ~8). Pool Model A 2× rows raises lower floor from QR's initial 4 to LM Master's 5.
+- < 5 → label-collapse; ≥ 12 → over-dispersed.
 
 **F-AXIS-MECHANISM #4 — IC with existing features** (Critic Check 4 BINDING):
 - Already pre-verified in Section 2.3: ALL 25 IC values < 0.7 threshold. POST-/023 check: re-verify with full 40-feature comparison (not just top-5) — Critic Phase 7.5 may compute full IC matrix.
@@ -318,18 +340,24 @@ See Section 8.
 
 ## Section 5 — Predicted Verdict Priors
 
-### 5.1 Pre-LM Master baseline priors (QR's initial probability mass)
+### 5.1 Verdict priors — LM Master Phase 4.5 RECALIBRATED (BINDING)
 
-| Verdict class | Prior probability | Rationale |
-|---|---|---|
-| **PROMISING (F1 Δ ≥ +0.10 + F-AXIS #1 ≥ rank 14/42)** | **15%** | Mechanism IS-anchored (ORACLE EDA +78.55%); v1 pool Model A architectural difference vs v3 |
-| **PROMISING-INERT-FAVORABLE (F1 Δ ≥ +0.10 + F-AXIS #1 rank ≥ 15/42)** | 10% | Lift attributable to colsample noise; "feature works but model doesn't load it" |
-| **INERT (F1 Δ ∈ [-0.30, +0.10) + F-AXIS #1 rank ≥ 30/42)** | **45%** | v3 4-data-point precedent dominant; INERT-by-importance most likely modal |
-| **NEGATIVE clean (F1 Δ ∈ [-0.55, -0.30))** | 15% | v3/023 pattern at higher Optuna budget; possible if Optuna overfits IS to noise |
-| **NEGATIVE-CATASTROPHIC (F1 Δ ≤ -0.55)** | 10% | Tail; pool Model A interaction with funding may relocate basin pathologically |
-| **PROMISING-METHODOLOGY (substrate finding)** | 5% | Less likely — /023 is feature-family, not methodology |
+Per LM Master Phase 4.5 §3 (advisory `briefs-v1/iteration_v1-023/lgbm_advisor.md`), QR's initial priors 15/10/45/15/10/5 RECALIBRATED to **12/8/52/18/8/2** at Phase 4.5 closeout. The shifts: PROMISING −3pp (v3 4-point precedent dominant), PROMISING-INERT-FAV −2pp (colsample lottery on 42-col surface less likely than 40-col), **INERT +7pp** (v3/019 + /082 importance-rank evidence stronger), NEGATIVE clean +3pp (v3/023 INERT-at-higher-budget pattern at n_trials=18 mid-zone), NEGATIVE-CAT −2pp (NEW input lower CAT risk than gate per /020/022 base rate), PROMISING-METHOD −3pp (feature-family axis NOT methodology by construction).
 
-**Total**: 100%. **Modal: INERT at 45%** following v3 4-data-point precedent.
+| Verdict class | QR initial | **LM Master RECALIBRATED (BINDING)** | Rationale |
+|---|---|---|---|
+| **PROMISING (F1 Δ ≥ +0.10 + F-AXIS #1 PROMISING-clean)** | 15% | **12%** | Mechanism IS-anchored (ORACLE EDA +78.55%); v1 pool Model A architectural difference vs v3; downweighted by v3 4-data-point precedent |
+| **PROMISING-INERT-FAVORABLE (F1 Δ ≥ +0.10 + F-AXIS #1 NOT PROMISING-clean)** | 10% | **8%** | Lift attributable to colsample noise; 42-col surface less lottery-prone than 40-col |
+| **INERT (F1 Δ ∈ [-0.30, +0.10) + F-AXIS #1 INERT)** | 45% | **52% (MODAL)** | v3 4-data-point precedent dominant; INERT-by-importance most likely modal; v3/019 + /082 importance-rank evidence dominant |
+| **NEGATIVE clean (F1 Δ ∈ [-0.55, -0.30))** | 15% | **18%** | v3/023 pattern at higher Optuna budget; n_trials=18 mid-zone above v3 INERT-threshold 10 + below v3/023 active-harm 35 — non-trivial risk |
+| **NEGATIVE-CATASTROPHIC (F1 Δ ≤ -0.55)** | 10% | **8%** | Tail; NEW input feature lower CAT risk than gate primitives (/020/022 base rate); pool Model A still risk |
+| **PROMISING-METHODOLOGY (substrate finding)** | 5% | **2%** | NEW feature family is NOT methodology axis by construction |
+
+**Total**: 100%. **Modal: INERT at 52%** (LM Master shift +7pp vs QR initial); PROMISING tail compressed to 20% combined (was 25%). Per `feedback_iteration_quality.md` LM Master deference rule at ≥ 5pp tail-class re-weighting, QR ADOPTS LM Master priors as BINDING for Section 8 row pre-registration.
+
+**Mass-shifting catalysts already fired** at LM Master Phase 4.5 (Section 5.2 sub-rules redundant; preserved for audit):
+- LM Master §4 mandates F-AXIS #1 gain-share check; without it, /023 verdict mis-classification risk ~15pp per LM Master §9. Section 4.2 below codifies the dual gate.
+- LM Master §5 n_eff band [5, 10] tightens QR's [4, 10] lower bound — Section 4.2 F-AXIS-MECHANISM #3 updated.
 
 ### 5.2 Mass-shifting catalysts (will adjust at LM Master Phase 4.5)
 
@@ -399,17 +427,17 @@ LM Master Phase 4.5 will produce its own verdict-class priors at `briefs-v1/iter
 
 ## Section 8 — MERGE/NO-MERGE Verdict Matrix
 
-| Row | F1 OOS Sharpe Δ | F3 IS Sharpe Δ | F-AXIS #1 rank | n_eff | Verdict |
+| Row | F1 OOS Sharpe Δ | F3 IS Sharpe Δ | F-AXIS #1 (rank + gain-share) | n_eff | Verdict |
 |---|---|---|---|---|---|
-| 1 | ≥ +0.10 | ≥ +0.10 | ≤ 14/42 ≥ 2 cohorts | 4-10 | **PROMISING (clean)** — /027 bundle candidate |
-| 2 | ≥ +0.10 | ≥ +0.10 | ≥ 15/42 all cohorts | 4-10 | PROMISING-INERT-FAVORABLE — NOT bundleable, catalog only |
-| 3 | ≥ +0.10 | ≥ +0.10 | mid 15-30/42 | 4-10 | PROMISING-INERT-PARTIAL — investigate at /024, NOT bundle |
-| 4 | ≥ +0.10 | ∈ [-0.10, +0.10) | any | 4-10 | PROMISING-WEAK — sign-consistent but IS noise |
-| 5 | ∈ [-0.10, +0.10) | any | any | 4-10 | INERT — axis CLOSED for cycle-3 |
-| 6 | ∈ [-0.55, -0.10) | any | any | 4-10 | NEGATIVE clean — axis CLOSED |
-| 7 | ≤ -0.55 | any | any | 4-10 | **NEGATIVE-CATASTROPHIC** — 3rd cycle-3 HIGH-RISK NEG-CAT → next HIGH-RISK mandatorily multi-seed |
-| 8 | any | ≤ -0.30 | any | 4-10 | IS-catastrophic — reject regardless of OOS |
-| 9 | any | any | any | < 4 OR ≥ 12 | n_eff degenerate — methodology issue, separate diary section |
+| 1 | ≥ +0.10 | ≥ +0.10 | rank ≤ 14/42 + gain-share ≥ 4.0% on ≥ 2 cohorts | 5-10 | **PROMISING (clean)** — /027 bundle candidate |
+| 2 | ≥ +0.10 | ≥ +0.10 | rank ≥ 15/42 all cohorts OR gain-share < 4.0% all cohorts | 5-10 | PROMISING-INERT-FAVORABLE — NOT bundleable, catalog only |
+| 3 | ≥ +0.10 | ≥ +0.10 | rank 15-31/42 mid-table + gain-share 1.5-4.0% | 5-10 | PROMISING-INERT-PARTIAL — investigate at /024, NOT bundle |
+| 4 | ≥ +0.10 | ∈ [-0.10, +0.10) | any | 5-10 | PROMISING-WEAK — sign-consistent but IS noise |
+| 5 | ∈ [-0.10, +0.10) | any | rank ≥ 32/42 on ≥ 3 cohorts + gain-share < 4.0% | 5-10 | **INERT-by-importance** — v3 4-data-point precedent reproduces; axis CLOSED for cycle-3 |
+| 6 | ∈ [-0.55, -0.10) | any | any | 5-10 | NEGATIVE clean — axis CLOSED |
+| 7 | ≤ -0.55 | any | any | 5-10 | **NEGATIVE-CATASTROPHIC** — 3rd cycle-3 HIGH-RISK NEG-CAT → next HIGH-RISK mandatorily multi-seed |
+| 8 | any | ≤ -0.30 | any | 5-10 | IS-catastrophic — reject regardless of OOS |
+| 9 | any | any | any | < 5 OR ≥ 12 | n_eff degenerate — methodology issue, separate diary section |
 | 10 | any | any | any (matters) | any | If F-AXIS #4 IC > 0.7 anywhere → Critic Check 4 FAIL → BLOCK |
 
 **NO-MERGE if** Row 5, 6, 7, 8, 9, OR 10 fires. **MERGE candidate to /027 bundle if** Row 1 fires (clean PROMISING).
@@ -524,11 +552,39 @@ Same as 11.3. Axis CLOSED for cycle-3.
 
 **Mandatory multi-seed HIGH-RISK** at /024 (3rd cycle-3 HIGH-RISK NEG-CAT rule). /024 likely STILL HIGH-RISK at multi-seed (drawdown brake = risk-primitive change; open-interest = NEW feature family). Brief Section 2.5 must declare multi-seed mitigation BINDING.
 
-### 11.6 If /023 = sample-size-too-small (n_eff < 4)
+### 11.6 /027 bundle composition impact (LM Master §8 ADOPT, 2026-05-27)
 
-Methodology issue (NOT a mechanism finding). /024 advances to /024's original menu (NOT funding-related); /023 catalogued as NEGATIVE n_eff-degenerate. Investigate label-horizon × funding-regime interaction in separate analysis.
+Per LM Master §8 advisory:
 
-### 11.7 DOT pre-classification (Critic /022 Rec mandatory before any further per-cohort axis)
+**IF /023 = PROMISING (clean)**: funding-family becomes 3rd alpha-enhancement component to /027 bundle:
+- Baseline pool + LINK specialist (/018) + ETH+gate specialist (/019) ≈ Σ +1.30 OOS Sharpe nominal
+- Funding-family /023 contribution **+0.20 OOS Sharpe estimate** (LM Master §8 anchor; subject to correlation drag)
+- **Realistic bundle target: +1.30 to +1.50 OOS Sharpe under multi-seed correlation drag**
+- **Pre-validation requirement**: cross-correlation of /023 funding-family signals with /018 LINK + /019 ETH+gate signals must be ρ < 0.40 at multi-seed pre-bundle (LM Master §8 BINDING). If ρ ≥ 0.40, funding-family is correlation-redundant → drop from /027 bundle.
+
+**IF /023 = PROMISING-INERT-FAVORABLE or INERT or NEGATIVE clean**: /027 bundle UNCHANGED at +1.20-1.50 OOS Sharpe target (pool + LINK + ETH+gate only; no /023 contribution; correlation-drag estimate from /018 + /019 joint multi-seed).
+
+**IF /023 = NEGATIVE-CATASTROPHIC**: /027 bundle UNCHANGED at +1.20-1.50; AND /024 mandatory multi-seed HIGH-RISK kicks in (Section 11.5).
+
+### 11.7 LM Master /024 staging matrix (LM Master §6 ADOPT, 2026-05-27)
+
+Per LM Master §6 verdict-conditional pre-staging:
+
+| /023 verdict | LM Master /024 axis | Family | Mode | Justification |
+|---|---|---|---|---|
+| **PROMISING (clean)** | Funding-FAMILY expansion ONE AT A TIME (sign-persist, momentum) | `feature-family` (NEW REPEAT) | single-seed=42, ENSEMBLE_SIZE=3, n_trials=18 | Per `feedback_v3_engineered_features_dont_stack.md` SAME-FAMILY rule (2026-05-11 ITER-V3/052 Critic `34e7c2f`); stack 2 z-windows + 1 NEW = 3 funding-family features max; stacking experiments deferred to /027 multi-seed |
+| **PROMISING-INERT-FAVORABLE** | Open-interest delta (NEW sister non-OHLCV family) | `feature-family` | single-seed=42 EXPLORATION | Funding axis is "lift without mechanism" → NOT bundleable; advance to fresh NEW feature family OR pivot to per-cohort drawdown brake |
+| **INERT (modal 52%)** | Per-cohort drawdown brake | `risk-primitive` | single-seed=42 EXPLORATION; **mandatory deadlock-impossibility proof** per A8 catalog + iter-v3/054 lesson | LM Master §6 explicit; Critic /022 Path Forward #2 |
+| **NEGATIVE clean (18%)** | Per-cohort drawdown brake OR open-interest delta family | `risk-primitive` OR `feature-family` | single-seed=42 EXPLORATION | LM Master §6 explicit; advance to fresh NEW family |
+| **NEGATIVE-CATASTROPHIC (8%)** | Open-interest delta family at MULTI-SEED | `feature-family` | **MANDATORY multi-seed HIGH-RISK** (3rd cycle-3 NEG-CAT triggers forward mandate per Section 11.5) | LM Master §6 explicit; concurrent with 3+ cycle-3 HIGH-RISK rule |
+
+**Decision binding**: /024 brief Section 0.6 (Architecture-Family Justification) MUST cite this matrix and the /023 verdict that triggered the row.
+
+### 11.8 If /023 = sample-size-too-small (n_eff < 5)
+
+Methodology issue (NOT a mechanism finding). /024 advances to /024's original menu (NOT funding-related); /023 catalogued as NEGATIVE n_eff-degenerate. Investigate label-horizon × funding-regime interaction in separate analysis. (Lower bound was 4 in QR initial; tightened to **5** per LM Master §5 + Section 4.2 F-AXIS-MECHANISM #3 update.)
+
+### 11.9 DOT pre-classification (Critic /022 Rec mandatory before any further per-cohort axis)
 
 Per /022 NEW memory: if /023 PROMISING or PROMISING-INERT-FAVORABLE AND /024 routes back to per-cohort axis (e.g. DOT-only specialist), DOT prior class MUST be pre-classified using the same `_classify_LTC()`-style framework. Pre-classified at /023 closeout (post-Phase 7 evaluation) for /024 readiness:
 
@@ -573,25 +629,25 @@ Brief authoring discipline (pre-Phase 5.5 gate):
 - [x] Section 2 IS-only numerical evidence from committed analysis (analysis/iteration_v1-023/ at commit c3f4551)
 - [x] Section 2.5 HIGH-RISK declaration + mitigation (single-seed OPT-IN with pre-commit)
 - [x] Section 3 Proposed Changes (NEW module + V1_FEATURE_COLUMNS_PRUNED 40→42 + runner wiring)
-- [x] Section 3.4 RESERVED for LM Master Phase 4.5 responses
-- [x] Section 4 Falsifiers (F1, F3 + F-AXIS-MECHANISM #1-4)
-- [x] Section 5 Predicted verdict priors (modal INERT 45% per v3 4-data-point precedent)
+- [x] Section 3.4 LM Master Phase 4.5 responses (8 ADOPTED, 0 REJECTED; 2026-05-27)
+- [x] Section 4 Falsifiers (F1, F3 + F-AXIS-MECHANISM #1-4); F-AXIS #1 DUAL GATE rank + gain-share (LM Master §4); n_eff band [5, 10] (LM Master §5)
+- [x] Section 5 Predicted verdict priors RECALIBRATED 12/8/52/18/8/2 (LM Master §3 BINDING; modal INERT 52%)
 - [x] Section 6 Failure modes (A-E catalogued)
 - [x] Section 7 Pre-registered failure-mode predictions + LM Master adjudication
 - [x] Section 8 MERGE/NO-MERGE verdict matrix (10 rows)
 - [x] Section 9 Library stack (no new deps)
 - [x] Section 10 Run protocol + engineering_report BINDING contract (per /022 Critic Rec #1 CARRY-FORWARD)
-- [x] Section 11 Conditional /024+ roadmap (7 sub-branches)
+- [x] Section 11 Conditional /024+ roadmap (9 sub-branches; 11.6 /027 bundle + 11.7 LM Master /024 staging matrix added)
 - [x] Section 12 Roll-back protocol
 - [x] Section 13 Self-check (this section)
 
 ### 13.1 v3 prior addressed head-on?
 
-YES — Section 0.4 cites 4-data-point v3 NEGATIVE/INERT verdict catalog with per-iteration failure modes; Section 0.4 structural-difference table identifies pool Model A architecture as the v1 ↔ v3 lever; Section 5 priors set modal INERT at 45% reflecting v3 prior dominance; Section 11.3 INERT-modal Path Forward pivots cleanly to /024 alternatives.
+YES — Section 0.4 cites 4-data-point v3 NEGATIVE/INERT verdict catalog with per-iteration failure modes; Section 0.4 structural-difference table identifies pool Model A architecture as the v1 ↔ v3 lever; Section 5 priors set **modal INERT at 52%** (LM Master RECALIBRATED, was QR initial 45%) reflecting v3 prior dominance; Section 11.3 INERT-modal Path Forward pivots cleanly to /024 alternatives per LM Master §6 staging matrix.
 
 ### 13.2 ORACLE EDA caveat acknowledged?
 
-YES — Section 2.7 explicitly notes ORACLE EDA is descriptively valid but does NOT predict /023 trade-roster outcome; mechanism is causal not roster-specific; /022 BTC + LTC Jaccard 0.084-0.10 single-axis basin-relocation precedent cited.
+YES — Section 1 caveat ADDED at LM Master §2 ADOPT (2026-05-27) downgrading ORACLE EDA +78.55% as quantitative predictor; Section 2.7 already noted descriptive validity caveat (mechanism causal not roster-specific); /022 BTC + LTC Jaccard 0.084-0.10 single-axis basin-relocation precedent cited in BOTH sections.
 
 ### 13.3 Anchor-frame BINDING locked?
 
@@ -601,8 +657,12 @@ YES — Section 0.3 lists portfolio comparison.csv "sharpe" semantics (daily-ann
 
 YES — Section 10.4 explicitly cites /022 Critic FINAL Rec #1 BINDING; brief encodes orchestrator-level expectation; pre-commit document content list provided.
 
+### 13.5 LM Master Phase 4.5 integration complete?
+
+YES — Section 3.4 populated 2026-05-27 with 8 LM Master recommendations + QR responses (all ADOPTED, 0 REJECTED). Brief Section 5 priors RECALIBRATED 15/10/45/15/10/5 → 12/8/52/18/8/2 (LM Master §3). Section 4.2 F-AXIS #1 falsifier DUAL GATE rank + gain-share (LM Master §4 CRITICAL). Section 4.2 F-AXIS-MECHANISM #3 n_eff band [5, 10] (LM Master §5). Section 1 ORACLE EDA caveat (LM Master §2). Section 11.6 /027 bundle composition (LM Master §8). Section 11.7 LM Master /024 staging matrix (LM Master §6). Per-cohort gain-share data mandated as Critic Phase 7.5 watch item (LM Master §4 final point). Phase 5.5 gate "brief must address each LM Master recommendation" SATISFIED.
+
 ---
 
-**Brief authored by QR Phase 5 at iter-v1/023 startup. Anchor: `v0.v1-baseline-corrected` (`f8bc12c`). Cycle-3 EXPLORATION #8/10. Axis family `feature-family` (NEW; 3-way CONVERGENT routing). HIGH-RISK declared single-seed mitigation. Modal predicted verdict: INERT (45%) per v3 4-data-point precedent dominance.**
+**Brief authored by QR Phase 5 at iter-v1/023 startup. Section 3.4 amended 2026-05-27 with LM Master Phase 4.5 responses (all 8 ADOPTED). Anchor: `v0.v1-baseline-corrected` (`f8bc12c`). Cycle-3 EXPLORATION #8/10. Axis family `feature-family` (NEW; 3-way CONVERGENT routing). HIGH-RISK declared single-seed mitigation. Modal predicted verdict: INERT (LM Master RECALIBRATED to 52%) per v3 4-data-point precedent dominance.**
 
-**Next phase**: Phase 4.5 LM Master pre-design advisory → Section 3.4 QR responses → Phase 5.5 Engineer gate.
+**Next phase**: Phase 5.5 Engineer gate → Phase 6 implementation + backtest.
