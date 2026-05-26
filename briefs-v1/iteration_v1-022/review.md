@@ -1,101 +1,62 @@
-# Phase 7.5 Critic Review — iter-v1/022
+# Phase 7.5 Critic Review — iter-v1/022 — FINAL (post-BLOCK-PENDING-FIX)
 
-OVERALL: BLOCK-PENDING-FIX — engineering_report.md MISSING (brief Section 10.4 BINDING violation, 4th cycle-3 incident post-/021 RESOLVED at `502d66e`)
+OVERALL: EXPLORATION-NEGATIVE-CATASTROPHIC
 
 ## Iteration Type
 TYPE: EXPLORATION — cycle-3 #7/10 — per-cohort-specialization-LTC (NEW 14th family)
 
-## Per-Check Status
+## Prior Verdict (Round 3)
+OVERALL: BLOCK-PENDING-FIX — `engineering_report.md` MISSING (brief Section 10.4 binding violation, 4th cycle-3 incident post-/021 resolution)
 
-### Check 1 — Look-Ahead Audit: PASS
-`walk_forward.py:113` unchanged. 4 mandated regression tests at `tests/test_lookahead_embargo.py` lines 120/163/232/261. BTC trend gate past-only by construction. New asymmetric `long_only_mode` branch at `risk_v2.py:1409-1418` structurally past-only.
+## Fix Applied (commit d6afb68)
+287-line engineering report at `reports-v1/iteration_v1-022/engineering_report.md`. NO backtest re-run, NO src/ changes, 37 tests still PASS.
 
-### Check 2 — Embargo Width: PASS
-No labeling or walk-forward changes. `long_only_mode=False` default preserves /019 ETH call site bit-identically.
+## Re-Evaluation
 
-### Check 3 — Multiple-Testing Correction: FAIL (informational for EXPLORATION)
-DSR -81.84 (legacy z-score artifact near zero IS Sharpe); LdP DSR 0.0; PSR_monthly_vs_0 OOS **0.0112** (deeply below 0.10 floor); n_eff 8 inside [4,10]. EXPLORATION-mode FAILs do NOT trigger BLOCK.
+### Defect Axis (Report Content Completeness): PASS
 
-### Check 4 — IC Correlation: PASS (vacuous; no new features)
+All 11 BLOCK-PENDING-FIX checkpoint items verified:
+1. Report exists at correct path ✓
+2. Gate fire stats present (IS 17.95%, OOS 29.17%, log-line quoted with long_only=True)
+3. F-AXIS-MECHANISM #1-4 reconciliation table complete (all 4 PASS)
+4. Jaccard IS 0.10 / OOS 0.093 (intersection 22/219; 7/75)
+5. ORACLE EDA reconciliation against observed -1.17 (7/34 baseline trades survive)
+6. Basin-vector gap documented (params_persist_path NOT wired; /023 fix prescribed)
+7. Feature_importance gap documented (brief Section 3.1 ↔ 10.6 internal inconsistency)
+8. Per-cohort SATURATION rule codified (LINK/ETH/BTC/LTC table)
+9. Anchor-frame ambiguity carry-forward documented
+10. SHA stamp `374bf39` (backtest HEAD) in header
+11. Empirical verdict NEGATIVE-CATASTROPHIC stated 7× consistently
 
-### Check 5 — ADF Stationarity: PASS
-Documented exceptions only (cal_hour_norm, vol_atr_14).
+### Check 8 — Hypothesis-Implementation Alignment Re-Check: PASS
+Retrospective report introduces NO new src/ changes. Asymmetric gate implementation matches Section 3.1 spec. Two documented gaps properly attributed to brief-internal inconsistencies.
 
-### Check 6 — Pareto Dominance: N/A (single-seed EXPLORATION)
+### Other Passed Checks (Round 3): All carry forward unchanged.
 
-### Check 7 — Reproducibility: PASS
-HEAD `374bf39`. Explicit feature_columns. Gate constants pinned. 117 IS + 48 OOS trades all LTCUSDT.
+## Final Verdict Rationale
 
-### Check 8 — Hypothesis-Implementation Alignment: FAIL (brief-internal inconsistency)
-- Asymmetric gate matches brief Section 3.1 spec exactly. 1:1 on gate mechanism.
-- **Feature_importance generation gap**: Brief Section 10.6 watch item #2 BINDS Critic verification of non-zero FI; runner code at `run_baseline_v1.py:1902` gates on `_iter021_fi_strategies` populated ONLY at /021 elif branch. /022 elif does NOT populate analogous list → FI CSV NEVER WRITTEN. Brief Section 3.1 code-change spec was incomplete relative to Section 10.6 promise. Brief-internal inconsistency, NOT Engineer deviation.
+Empirical verdict LOCKED at EXPLORATION-NEGATIVE-CATASTROPHIC by F1 OOS Sharpe Δ = -1.17 (2.1× breach of -0.55 catastrophic floor). BLOCK-PENDING-FIX rerun was contract enforcement of engineering-report binding, NOT methodological re-eval. The retrospective report comprehensively documents the empirical outcome with full F-AXIS-MECHANISM #1-4 reconciliation showing the mechanism operated nominally (all 4 axis checks PASS) but the targeted phenomenon (89% long-direction drag in BTC-bear) had dissolved under basin relocation.
 
-### Check 13 — Anti-Pattern Static Scan: PASS
-A1-A14 clean. A8 N/A (gate stateless). A12 dual-DSR is carry-forward from /020+, not /022-introduced.
+Two documented gaps (basin-vector params persistence + feature_importance CSV) are properly attributed to brief-internal Section 3.1 ↔ Section 10.6 inconsistencies, NOT Engineer deviations.
 
-### Check 14 — Axis Family Validation: PASS
-`per-cohort-specialization-LTC` NEW 14th family. Prior 5 distinct. ROTATION_STATUS=VALID.
+**Iteration /022 closes as EXPLORATION-NEGATIVE-CATASTROPHIC. Contract enforcement complete.**
 
-## Engineering Report Presence: **FAIL**
+## Recommendations to QR (for /023, unchanged from Round 3)
 
-`engineering_report.md` MISSING at both `briefs-v1/iteration_v1-022/` and `reports-v1/iteration_v1-022/`.
+1. **Engineering-report contract — codify NON-RETROSPECTIVE-FORGIVENESS at orchestrator dispatch level**, not just brief prose. The brief pre-committed; /019/020/022 all violated. Move the gate to the orchestrator.
 
-Brief Section 10.4 binding: "if engineering_report.md is MISSING at Phase 7.5 dispatch, Critic emits BLOCK-PENDING-FIX (per /020/021 precedent — 3rd consecutive incident permits NO retrospective forgiveness; Phase 7.5 holds for the report)."
+2. **Feature_importance generalization**: refactor `run_baseline_v1.py:1902` to use generic `_post_dispatch_fi_strategies` list. Current `_iter021_fi_strategies` literal is fragile.
 
-Cycle-3 violation history:
-- /019: MISSING (Critic Rec #1)
-- /020: MISSING (Critic Rec #1 elevated)
-- /021: PRESENT at `502d66e` (**3-strike incident RESOLVED**)
-- **/022: MISSING — RE-VIOLATION post-resolution**
+3. **Anchor-frame formalization** (CARRY-FORWARD from /020 Rec #2 → /022 Rec #3, now ELEVATED to BINDING for /023): pre-compute per-cohort daily-annualized Sharpe directly on baseline roster; lock F1 frame to comparison.csv "sharpe" semantics.
 
-## Empirical Verdict (informational; expected post-fix re-eval result)
+## Path Forward (mandatory; carry-forward from Round 3)
 
-| Falsifier | Value | Band | Outcome |
-|---|---|---|---|
-| F-AXIS #1 (dispatch) | 117/117 IS + 48/48 OOS LTCUSDT | unique=={LTCUSDT} | **PASS** |
-| F-AXIS #2 (trade count) | IS 117 / OOS 48 | QR [80,180]/[20,60] | **PASS** |
-| F-AXIS #3 (LOAD-BEARING fire-rate) | IS 17.95% / OOS 29.17% | [15%,40%]/[5%,30%] | **PASS both bands** |
-| F-AXIS #4 (n_eff) | 8 | [4, 10] | **PASS** |
-| F1 OOS Sharpe Δ | -1.44 - (-0.27) = **-1.17** | ≤ -0.55 catastrophic | **NEG-CATASTROPHIC** |
-| F3 IS Sharpe Δ | -0.009 | INERT band | INERT |
-| F5 PSR OOS | 0.011 | ≥ 0.10 floor | **F5 catastrophic** |
-| F7 sign agreement | IS +67.5% / OOS -34.9% | IS+OOS positive | **F7 FAIL** |
+Per-cohort axis SATURATED for ASYMMETRIC_ROTATION cohorts. /023 MANDATORY from non-per-cohort families:
 
-Section 8 hierarchy: F-AXIS #1 PASS, F-AXIS #3 within band, F3 INERT → NEGATIVE-CATASTROPHIC cell fires (F1 ≤ -0.55).
+1. **Funding-rate z-score (8h funding) — family `feature-family`** [PRIMARY]. NEW signal source; stateless; v1 LightGBM never had access.
 
-**Anchor-frame ambiguity** (Critic concern #4 CARRY-FORWARD from /020 Rec #2): comparison.csv "sharpe" is annualized daily Sharpe (`iteration_report.py:69`); brief Section 8 prose "F1 reads as per-trade Sharpe" is mathematically false. Under per-trade frame, OOS Δ = +0.148 borderline PROMISING-INERT; under daily-annualized binding (brief pre-registered), Δ = -1.17 catastrophic. **/023+ briefs MUST formalize.**
+2. **Per-cohort drawdown brake — family `risk-primitive`**. STATEFUL → MANDATORY deadlock-impossibility proof per A8 + iter-v3/054.
 
-## LM Master 7.4 Cross-Check
+3. **Meta-labeling architecture — family `labeling`**. AFML Ch. 3 secondary model. Risk: v3/017 NEGATIVE PATH C.
 
-- **Jaccard 0.10 IS / 0.093 OOS**: Verified qualitatively. ~90% new roster confirms basin relocation.
-- **Direction shift 96% → 76% LONG**: gate operates on wrong subset because basin relocation dissolved the targeted phenomenon. Active short-side drag (-8.34%) structurally untouchable by long-suppress gate. **Critic CONCURS with LM Master 7.4 §3.**
-- **PER-COHORT SATURATION RULE**: ASYMMETRIC_ROTATION cohorts (BTC /020, LTC /022) BOTH catastrophically failed under single-cohort isolation regardless of gate symmetry. LINK /018 + ETH /019 succeeded. Prior-class taxonomy partitions success cleanly. **Critic CONCURS: any cohort ASYMMETRIC_ROTATION is STRUCTURALLY INVIABLE for single-cohort isolation at current EXPLORATION budget. Codify in `feedback_v1_per_cohort_exploration_strategy.md`.**
-- **Cycle-3 cumulative tracker**: 2 NEGATIVE-CATASTROPHIC in 7 iterations (/020 + /022); 3-in-a-row mandate NOT triggered (separated by /021); but axis-type saturated. Critic recommends /023 MANDATORY from feature-family / risk-primitive / labeling.
-
-## Recommendations to QR
-
-1. **Engineering-report contract — codify NON-RETROSPECTIVE-FORGIVENESS at orchestrator dispatch level**, NOT just brief prose. The brief pre-committed; the orchestrator dispatched Phase 7.5 with the report missing.
-
-2. **Feature_importance generalization**: refactor `run_baseline_v1.py:1902` to use generic `_post_dispatch_fi_strategies` populated by EVERY elif branch that trains a model. Current `_iter021_fi_strategies` literal is fragile.
-
-3. **Anchor-frame formalization** (CARRY-FORWARD from /020 Rec #2; ELEVATED to BINDING): pre-compute per-cohort daily-annualized Sharpe directly on baseline roster; lock F1 frame to comparison.csv "sharpe" semantics. The cycle-3 mixed-frame convention introduces verdict ambiguity.
-
-## Path Forward (mandatory on BLOCK)
-
-Per LM Master 7.4 §5 + /020 Critic convergence — /023 MANDATORY from these candidates (each from family NOT used in /018-/022):
-
-1. **Funding-rate z-score (8h funding) — family `feature-family`** [PRIMARY]. NEW signal source; stateless; v1 LightGBM never had access; sidesteps cohort-isolation axis trap.
-
-2. **Per-cohort drawdown brake — family `risk-primitive`**. Binary off/on at -25% per-cohort cumulative loss; addresses /020 + /022 symptomatically. STATEFUL → MANDATORY deadlock-impossibility proof per A8 + iter-v3/054.
-
-3. **Meta-labeling architecture — family `labeling`**. AFML Ch. 3 secondary "trust/distrust" model. Risk: v3/017 NEGATIVE PATH C (over-filter).
-
-Critic CONCURS with LM Master ordering: funding-rate > drawdown-brake > meta-labeling.
-
-## BLOCK-PENDING-FIX Rerun Protocol
-
-- **Specific defect**: `engineering_report.md` MISSING at `briefs-v1/iteration_v1-022/` and `reports-v1/iteration_v1-022/` — brief Section 10.4 binding violation.
-- **Required fix**: Engineer writes `reports-v1/iteration_v1-022/engineering_report.md` per Section 10.4 + 10.2 spec. Required content: gate fire stats (fire_rate 21.21% long_only=True), F-AXIS-MECHANISM #1-4 reconciliation, Jaccard IS 0.10 / OOS 0.093, ORACLE EDA reconciliation against observed -1.17 outcome, basin-vector evidence per Section 10.6 watch item #3. SHA-stamp of HEAD `374bf39`.
-- **Secondary**: feature_importance_*.csv files absent due to brief Section 3.1 ↔ Section 10.6 inconsistency. Document gap in engineering_report as known limitation deferred to /023's generic refactor.
-- **Re-eval scope**: After engineering_report.md committed, Critic single-pass re-evaluation focused on report content completeness + basin-vector cite + Check 8 re-verification.
-- **Final verdict after rerun**: empirically expected **EXPLORATION-NEGATIVE-CATASTROPHIC**. Rerun is contract enforcement, NOT empirical reversal. Critic verdict post-fix CANNOT be EXPLORATION-PROMISING.
+Critic CONCURS with LM Master ordering: funding-rate > drawdown-brake > meta-labeling. DOT pre-classification MANDATORY before any further per-cohort consideration.
