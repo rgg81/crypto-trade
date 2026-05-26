@@ -115,6 +115,18 @@ V1_ITER017_UNIVERSE: tuple[str, ...] = (
     "SOLUSDT",  # NEW — Model F (iter-v1/017 universe expansion)
 )
 
+#: iter-v1/018: LINK-only single-cohort EXPLORATION (cycle-3 #3 of 10).
+#:
+#: USER STRATEGIC PIVOT 2026-05-26 (feedback_v1_per_cohort_exploration_strategy.md):
+#: EXPLORATIONs test per-cohort specializations; CONFIRMATION /027 bundles
+#: specialists for diversification edge. iter-v1/018 is the FIRST per-cohort
+#: EXPLORATION — LINK structural OOS prior is strongest at 8/8 iterations positive.
+#:
+#: LOCAL to runner — NOT shared via features_v1/__init__.py (only CONFIRMATION-MERGE
+#: updates V1_BASELINE_UNIVERSE). Single-symbol subset of V1_BASELINE_UNIVERSE.
+#: assert_v1_universe() accepts {LINKUSDT} because LINKUSDT is NOT in V1_EXCLUDED_SYMBOLS.
+V1_ITER018_UNIVERSE: tuple[str, ...] = ("LINKUSDT",)
+
 #: BASELINE_V1.md anchor — the corrected walk-forward stack reproduces this set.
 BASELINE_OOD_CUTOFF_PCT: float = 0.70
 
@@ -1297,6 +1309,33 @@ def main() -> None:
         all_results = results_a + results_c + results_d + results_e + results_f
         # Aggregate R5 IS/OOS split counters across all five models.
         _r5_model_results = [results_a, results_c, results_d, results_e, results_f]
+    elif set(symbols) == set(V1_ITER018_UNIVERSE):
+        # iter-v1/018: LINK-only single-cohort EXPLORATION (cycle-3 #3 of 10).
+        # USER STRATEGIC PIVOT 2026-05-26: per-cohort specialization axis.
+        # ONLY Model C (LINK + R1 + R3) dispatched.
+        # Models A (BTC+ETH), D (LTC), E (DOT) DROPPED — single-axis isolation.
+        # All Model C parameters are BIT-IDENTICAL to the baseline dispatch above:
+        #   atr_tp=3.5, atr_sl=1.75, apply_r1=True, bounds_profile=v1_pruned.
+        # Single-axis isolation: ONLY the SYMBOL DIMENSION changes (5→1 symbol).
+        # Zero changes to features, labeling, risk gates, or Optuna bounds.
+        # F-AXIS-MECHANISM #1: trades.csv must contain ONLY LINKUSDT rows.
+        results_c, faxm_c = run_model(
+            "C (LINK + R1)",
+            ("LINKUSDT",),
+            atr_tp=3.5,
+            atr_sl=1.75,
+            apply_r1=True,
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            **_r5_kwargs,
+        )
+        _all_faxm_logs = faxm_c
+        all_results = results_c
+        # Single model — no aggregation across multiple models needed.
+        _r5_model_results = [results_c]
     else:
         # Custom universe — single pooled model unless brief specifies otherwise.
         # iter-v1/NNN brief Section 3 should declare per-symbol model assignment.
