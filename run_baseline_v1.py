@@ -538,10 +538,17 @@ def _write_feature_importance(
 
     Notes
     -----
-    LightGbmStrategy exposes ``feature_importances_`` on the underlying
-    LGBMClassifier models stored in ``_models``. Each model's gain-importance
-    array is indexed by position against ``feature_columns``. Ensemble members
-    (multiple seeds) are averaged together per feature.
+    iter-v1/021 BLOCK-PENDING-FIX H2: reads from ``_per_month_fi_log`` instead of
+    ``inner._models``.  ``_models`` is reset to ``[]`` at the start of each
+    walk-forward month in ``_train_for_month``; a post-dispatch read captures
+    stale (empty) state for any model whose last month finished before the others.
+    ``_per_month_fi_log`` is accumulated inside ``_train_for_month`` after the
+    ensemble loop, immediately after ``self._confidence_threshold`` is set, so it
+    is always written while ``_models`` is still populated for that month.
+
+    Aggregation: across months, mean gain per feature (arithmetic mean of per-month
+    means, unweighted by trade count — consistent with the per-month equal-weight
+    pattern in the v3 reference at run_baseline_v3.py:2778-2783).
     """
     import csv as _csv  # noqa: PLC0415
 
@@ -561,25 +568,45 @@ def _write_feature_importance(
         # Access the inner LightGbmStrategy (strategies passed directly here)
         inner = strat.inner if hasattr(strat, "inner") else strat
 
-        if not hasattr(inner, "_models") or not inner._models:
-            continue
-
-        # Gather gain-importance across all ensemble members (seeds)
-        col_vals: dict[str, list[float]] = {c: [] for c in cols}
-        for model in inner._models:
-            if not hasattr(model, "feature_importances_"):
+        # iter-v1/021 BLOCK-PENDING-FIX H2: use _per_month_fi_log (stale-safe)
+        # instead of _models (stale after each _train_for_month call resets _models=[]).
+        fi_log = getattr(inner, "_per_month_fi_log", [])
+        if not fi_log:
+            # Fallback: attempt legacy _models path (for strategies that do not yet
+            # populate _per_month_fi_log — backward compatibility).
+            if not hasattr(inner, "_models") or not inner._models:
+                print(
+                    f"[_write_feature_importance] WARNING: {name_str} has empty "
+                    f"_per_month_fi_log AND empty _models — skipping (all-zero CSV avoided)."
+                )
                 continue
-            fi_arr = model.feature_importances_
-            # LightGBM returns gain importance when importance_type='gain' is
-            # NOT explicitly passed to feature_importances_ — the attribute reflects
-            # the importance_type used at training time. We train with default LGBMClassifier
-            # which defaults to split-count importance via feature_importances_.
-            # To get GAIN importance, use booster_.feature_importance(importance_type='gain').
-            if hasattr(model, "booster_"):
-                fi_arr = model.booster_.feature_importance(importance_type="gain")
-            for i, c in enumerate(cols):
-                if i < len(fi_arr):
-                    col_vals[c].append(float(fi_arr[i]))
+
+        if fi_log:
+            # Primary path: aggregate mean gain across all walk-forward months.
+            col_vals: dict[str, list[float]] = {c: [] for c in cols}
+            for month_entry in fi_log:
+                mg = month_entry.get("mean_gain", {})
+                for c in cols:
+                    if c in mg:
+                        col_vals[c].append(mg[c])
+            # If _per_month_fi_log present but all values still 0 (edge case), warn.
+            total_gain = sum(v for vals in col_vals.values() for v in vals)
+            if total_gain == 0.0:
+                print(
+                    f"[_write_feature_importance] WARNING: {name_str} _per_month_fi_log "
+                    f"present ({len(fi_log)} months) but all gains are 0.0 — "
+                    f"model may have trained with empty feature arrays."
+                )
+        else:
+            # Legacy fallback: read from _models (last walk-forward month only).
+            col_vals = {c: [] for c in cols}
+            for model in inner._models:
+                fi_arr = model.feature_importances_
+                if hasattr(model, "booster_"):
+                    fi_arr = model.booster_.feature_importance(importance_type="gain")
+                for i, c in enumerate(cols):
+                    if i < len(fi_arr):
+                        col_vals[c].append(float(fi_arr[i]))
 
         if not any(col_vals.values()):
             continue

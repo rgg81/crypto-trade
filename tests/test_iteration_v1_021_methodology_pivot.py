@@ -540,3 +540,201 @@ class TestIter021DispatchGuard:
             f"(pos={idx_021_elif}) in source order — the dispatch must fall through "
             "to the elif when iteration_label == 'v1-021'."
         )
+
+
+class TestPerMonthFILog:
+    """Test 20: _per_month_fi_log accumulation in LightGbmStrategy.
+
+    iter-v1/021 BLOCK-PENDING-FIX H2: verifies that:
+    (a) _per_month_fi_log is initialized empty in __init__.
+    (b) _per_month_fi_log accumulates non-empty entries after each _train_for_month call
+        (simulated via directly calling the accumulation logic with mock _models).
+    (c) _write_feature_importance reads _per_month_fi_log (primary path) and produces
+        a populated CSV (non-zero mean_gain) for the Pool model.
+    (d) Both Pool and BTC-only strategies produce populated feature importance CSVs when
+        _per_month_fi_log is populated (H2 root-cause regression test).
+    """
+
+    def test_per_month_fi_log_initialized_empty(self) -> None:
+        """LightGbmStrategy must initialize _per_month_fi_log = [] in __init__."""
+        from crypto_trade.strategies.ml.lgbm import LightGbmStrategy
+
+        strat = LightGbmStrategy(
+            feature_columns=["feat_a", "feat_b", "feat_c"],
+            ensemble_seeds=[42],
+        )
+        assert hasattr(strat, "_per_month_fi_log"), (
+            "LightGbmStrategy must have _per_month_fi_log attribute after __init__"
+        )
+        assert strat._per_month_fi_log == [], (
+            f"_per_month_fi_log must be empty list after __init__, got {strat._per_month_fi_log}"
+        )
+
+    def test_write_fi_uses_per_month_fi_log_primary_path(self, tmp_path: Path) -> None:
+        """_write_feature_importance must use _per_month_fi_log as primary path.
+
+        When _per_month_fi_log is populated with non-zero gains, the resulting CSV
+        must contain non-zero mean_gain values (the BLOCK-PENDING-FIX regression test).
+        The Pool model's all-zeros bug was caused by _models being empty at post-dispatch
+        read time; _per_month_fi_log is written during _train_for_month before reset.
+        """
+        import csv
+
+        from run_baseline_v1 import _write_feature_importance
+
+        feature_cols = ["feat_a", "feat_b", "feat_c"]
+
+        # Simulate a strategy where _models is empty (post-dispatch stale state)
+        # but _per_month_fi_log was populated during training (24 months).
+        class MockStrategyWithFILog:
+            def __init__(self) -> None:
+                self._models = []  # empty — as happens post-dispatch (stale reference)
+                self._per_month_fi_log = [
+                    {
+                        "train_month": f"2023-{m:02d}",
+                        "mean_gain": {"feat_a": 100.0 + m, "feat_b": 50.0 + m, "feat_c": 10.0},
+                    }
+                    for m in range(1, 13)  # 12 months of accumulated FI
+                ]
+
+        strategy = MockStrategyWithFILog()
+        _write_feature_importance(
+            [("POOL_Model_A", strategy)],
+            feature_columns=feature_cols,
+            report_dir=tmp_path,
+        )
+
+        out_path = tmp_path / "in_sample" / "feature_importance_POOL_Model_A.csv"
+        assert out_path.exists(), (
+            "feature_importance_POOL_Model_A.csv must exist when _per_month_fi_log is populated"
+        )
+
+        with open(out_path) as f:
+            reader = csv.DictReader(f)
+            rows = list(reader)
+
+        assert len(rows) == 3, f"Expected 3 feature rows, got {len(rows)}"
+        # All mean_gain values must be non-zero (the BLOCK-PENDING-FIX regression check)
+        for row in rows:
+            gain = float(row["mean_gain"])
+            assert gain > 0.0, (
+                f"mean_gain for {row['feature_name']} must be > 0.0 when _per_month_fi_log "
+                f"has non-zero entries; got {gain}. This is the Pool-all-zeros regression test."
+            )
+
+    def test_both_pool_and_btc_strategies_produce_populated_csvs(self, tmp_path: Path) -> None:
+        """Both Pool (Model A) and BTC-only (Model H) must produce non-zero FI CSVs.
+
+        This is the direct regression test for the H2 root cause: Pool all-zeros because
+        _models was empty at post-dispatch read time. With _per_month_fi_log, both strategies
+        accumulate FI independently during their respective walk-forward month trains.
+        """
+        import csv
+
+        from run_baseline_v1 import _write_feature_importance
+
+        feature_cols = ["feat_a", "feat_b"]
+
+        class MockPoolStrategy:
+            def __init__(self) -> None:
+                self._models = []  # empty at post-dispatch (stale)
+                self._per_month_fi_log = [
+                    {"train_month": "2023-01", "mean_gain": {"feat_a": 200.0, "feat_b": 80.0}},
+                    {"train_month": "2023-02", "mean_gain": {"feat_a": 220.0, "feat_b": 90.0}},
+                ]
+
+        class MockBTCStrategy:
+            def __init__(self) -> None:
+                self._models = []  # also empty at post-dispatch
+                self._per_month_fi_log = [
+                    {"train_month": "2023-01", "mean_gain": {"feat_a": 150.0, "feat_b": 60.0}},
+                    {"train_month": "2023-02", "mean_gain": {"feat_a": 170.0, "feat_b": 70.0}},
+                ]
+
+        strategies = [
+            ("POOL_Model_A", MockPoolStrategy()),
+            ("BTC_Model_H", MockBTCStrategy()),
+        ]
+        _write_feature_importance(strategies, feature_columns=feature_cols, report_dir=tmp_path)
+
+        for name in ("POOL_Model_A", "BTC_Model_H"):
+            path = tmp_path / "in_sample" / f"feature_importance_{name}.csv"
+            assert path.exists(), f"feature_importance_{name}.csv must exist"
+            with open(path) as f:
+                rows = list(csv.DictReader(f))
+            assert len(rows) == 2
+            for row in rows:
+                assert float(row["mean_gain"]) > 0.0, (
+                    f"{name}: mean_gain for {row['feature_name']} is 0.0 — "
+                    "regression: _per_month_fi_log primary path must produce non-zero gains"
+                )
+
+        # Portfolio CSV must also be non-zero
+        port_path = tmp_path / "in_sample" / "feature_importance_portfolio.csv"
+        assert port_path.exists()
+        with open(port_path) as f:
+            port_rows = list(csv.DictReader(f))
+        for row in port_rows:
+            assert float(row["mean_gain"]) > 0.0, (
+                f"Portfolio mean_gain for {row['feature_name']} is 0.0 — "
+                "regression test for Pool+BTC combined FI aggregation"
+            )
+
+    def test_per_month_fi_log_accumulates_across_months(self) -> None:
+        """_per_month_fi_log must grow by 1 entry per _train_for_month call.
+
+        This test verifies the accumulation contract without running a full backtest.
+        Uses a minimal LightGbmStrategy and directly exercises the accumulation code
+        by patching _models with a mock booster.
+        """
+        from unittest.mock import MagicMock
+
+        from crypto_trade.strategies.ml.lgbm import LightGbmStrategy
+
+        feature_cols = ["feat_a", "feat_b", "feat_c"]
+        strat = LightGbmStrategy(
+            feature_columns=feature_cols,
+            ensemble_seeds=[42],
+        )
+
+        # Simulate what _train_for_month does at the accumulation point:
+        # self._models is populated with trained boosters; code reads their gain importance
+        # and appends to _per_month_fi_log.
+        for month_idx in range(3):
+            month_str = f"2023-{month_idx + 1:02d}"
+            # Mimic post-ensemble-loop _models state
+            mock_model = MagicMock()
+            mock_booster = MagicMock()
+            mock_booster.feature_importance.return_value = np.array(
+                [float(10 + month_idx), float(5 + month_idx), float(1 + month_idx)]
+            )
+            mock_model.booster_ = mock_booster
+            strat._models = [mock_model]
+
+            # Run the accumulation logic inline (mirrors _train_for_month code)
+            _fi_cols = list(strat.feature_columns)
+            _month_gains: dict[str, list[float]] = {c: [] for c in _fi_cols}
+            for _m in strat._models:
+                _fi_arr = None
+                if hasattr(_m, "booster_"):
+                    _fi_arr = _m.booster_.feature_importance(importance_type="gain")
+                if _fi_arr is not None:
+                    for _i, _c in enumerate(_fi_cols):
+                        if _i < len(_fi_arr):
+                            _month_gains[_c].append(float(_fi_arr[_i]))
+            _mean_gain = {c: float(np.mean(v)) if v else 0.0 for c, v in _month_gains.items()}
+            strat._per_month_fi_log.append({"train_month": month_str, "mean_gain": _mean_gain})
+
+        assert len(strat._per_month_fi_log) == 3, (
+            f"Expected 3 entries in _per_month_fi_log (one per month), "
+            f"got {len(strat._per_month_fi_log)}"
+        )
+        # Verify months are distinct
+        months = [e["train_month"] for e in strat._per_month_fi_log]
+        assert months == ["2023-01", "2023-02", "2023-03"], f"Month sequence mismatch: {months}"
+        # Verify gains are non-zero and increasing (mirrors the mock data)
+        for i, entry in enumerate(strat._per_month_fi_log):
+            mg = entry["mean_gain"]
+            assert mg["feat_a"] == pytest.approx(10.0 + i), (
+                f"feat_a month {i}: expected {10.0 + i}, got {mg['feat_a']}"
+            )

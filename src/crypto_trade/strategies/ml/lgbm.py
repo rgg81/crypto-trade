@@ -292,6 +292,16 @@ class LightGbmStrategy:
         # Empty list when sample_weight_mode="abs_pnl" (default) to avoid noise in baseline.
         self._faxm_log: list[dict] = []
 
+        # iter-v1/021 BLOCK-PENDING-FIX H2: per-month feature importance log.
+        # _train_for_month resets self._models = [] at each month start, so
+        # post-dispatch reads of _models capture stale/empty state for models
+        # that finish their last walk-forward month before the others.  This log
+        # accumulates {train_month: str, mean_gain: dict[feat -> float]} across
+        # ALL walk-forward months, making _write_feature_importance stale-safe.
+        # Initialized to empty; populated unconditionally in _train_for_month
+        # whenever self._models is non-empty after the ensemble loop.
+        self._per_month_fi_log: list[dict] = []
+
         # Set during compute_features
         self._master: pd.DataFrame | None = None
         self._sym_arr: np.ndarray = np.array([])
@@ -765,6 +775,29 @@ class LightGbmStrategy:
         self._confidence_threshold = float(
             max(np.mean(self._confidence_thresholds), self._inference_threshold_floor)
         )
+
+        # iter-v1/021 BLOCK-PENDING-FIX H2: accumulate per-month mean gain per feature.
+        # Done here (after ensemble loop, before _models is reset next month) so
+        # _write_feature_importance can aggregate across months instead of reading
+        # stale post-dispatch _models.  Uses booster_.feature_importance('gain')
+        # matching the importance_type='gain' mandate in LM Master Phase 4.5 §4.
+        _fi_cols = list(self.feature_columns)
+        if _fi_cols and self._models:
+            _month_gains: dict[str, list[float]] = {c: [] for c in _fi_cols}
+            for _m in self._models:
+                _fi_arr: np.ndarray | None = None
+                if hasattr(_m, "booster_"):
+                    _fi_arr = _m.booster_.feature_importance(importance_type="gain")
+                elif hasattr(_m, "feature_importances_"):
+                    _fi_arr = _m.feature_importances_
+                if _fi_arr is not None:
+                    for _i, _c in enumerate(_fi_cols):
+                        if _i < len(_fi_arr):
+                            _month_gains[_c].append(float(_fi_arr[_i]))
+            _mean_gain: dict[str, float] = {
+                c: float(np.mean(v)) if v else 0.0 for c, v in _month_gains.items()
+            }
+            self._per_month_fi_log.append({"train_month": month_str, "mean_gain": _mean_gain})
 
         # (e) Batch-load test month features
         symbols = list(dict.fromkeys(self._sym_arr))
