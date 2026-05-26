@@ -414,22 +414,93 @@ uv run python run_baseline_v1.py \
 
 ### 3.4 LM Master Phase 4.5 Responses
 
-*RESERVED — to be populated after Phase 4.5 LM Master advisory (`briefs-v1/iteration_v1-022/lgbm_advisor.md`) fires.*
+LM Master advisory committed at `briefs-v1/iteration_v1-022/lgbm_advisor.md` (HEAD `79fd7fa`, 90 lines). Below: line-by-line QR responses with adopted/modified/rejected labels. Per `quant-iteration-v1.md` Phase 5.5 gate: brief MUST address each LM Master recommendation; failure to address triggers Phase 5.5 BLOCK.
 
-**Pre-staged QR commitments** (subject to LM Master review):
-- Section 3.1 code change: 2 src/ files; one new dataclass kwarg; one new elif branch
-- Gate threshold 4% (not /019's 8%) — pre-committed per ORACLE EDA dominance over symmetric variants
-- Asymmetric (long-only) mode — pre-committed per direction asymmetry attribution
-- Single-seed ENSEMBLE_SIZE=3 — per cycle-3 EXPLORATION budget
-- Wall-clock estimate ~25 min (matching /018/019/020 single-cohort)
+**Track record entering /022** (LM Master §Context): H1 directional 0.5/4, methodology 2/2, alternative-branch utility 1/1 — confirms MEDIUM-HIGH confidence in calibrated recommendations.
 
-**To be addressed in Phase 4.5 response (anticipated)**:
-- LM Master may flag PROMISING-MECHANICAL adjacency (Section 6.7 already covers this)
-- LM Master may propose alternative thresholds (3%, 5%, 6%); QR pre-commits to 4% (ORACLE EDA showed both halves positive at 4%; sensitivity check deferred to /023 if /022 PROMISING-INERT or directional borderline)
-- LM Master may propose Optuna bounds modifications; QR pre-commits to baseline v1_pruned bounds (per /021 H2 REFUTATION, mechanism is at parameter-basin level; bound modification is a separate axis)
-- LM Master may propose n_eff_per_cell prediction band; QR pre-commits to F-AXIS-MECHANISM #4 informational
+#### 3.4.1 LM Master §1 — H2 REFUTATION binding compliance (BASIN-VECTOR evidence mandate)
 
-**Adopted/Modified/Rejected sections** to be filled by QR after reading `lgbm_advisor.md`.
+**LM Master**: PASS framing check, but Phase 7.4 verdict assignment MUST cite **Optuna best_params shifts (basin vector evidence) via params_persist_path infrastructure from /021**, NOT feature_importance rank-shift evidence. Without this discipline, /021 H2 REFUTATION binding is at risk of soft-rebinding through linguistic slippage.
+
+**QR**: **ADOPTED**. Updated Section 10 closeout protocol — Phase 7.4 LM Master post-mortem mandate added: any verdict assignment that cites mechanism MUST reference `optuna_studies/iter-v1-022_*.params.json` (basin-vector / best_params shift) as the primary evidence channel. Feature_importance rank-shifts are INFORMATIONAL ONLY at this iter (single-cohort Model D'-LTC-only feature_importance is well-defined — no pool-aggregation defect like /021 — but does NOT constitute basin-vector evidence). Critic Phase 7.5 watch list (Section 10.6) includes this check.
+
+#### 3.4.2 LM Master §2 — ORACLE EDA validity confirmed but DO NOT cite Δ as predicted /022 outcome
+
+**LM Master**: STATELESS carve-out applies for `longsuppress_btc_trend_gate@4%` (no deadlock risk; valid ORACLE EDA basis). BUT IS Δ +10.79% / OOS Δ +12.45% are post-hoc projections on baseline Model D LTC roster (pool-trained, 124 IS / 34 OOS); /022 retrains in single-cohort isolation so actual roster differs. Per /019 §3 empirical: gate efficacy compressed at retraining (EDA projected +0.30 OOS Sharpe; observed +0.6990 — actually MORE; Jaccard 0.04 = mechanism NOT roster-locked). For LTC, basin-relocation risk is real and BIDIRECTIONAL. QR should NOT cite ORACLE EDA Δ as predicted /022 outcome — only as mechanism validation evidence.
+
+**QR**: **ADOPTED**. Section 1 hypothesis framing tightened — H1 falsification logic at Section 1 remains anchored on PER-TRADE Sharpe (F1) bands, NOT on raw PnL ORACLE EDA projections. Section 2.7 already explicitly carries the "EDA prediction is informational; mechanism story basis" caveat. F1 prediction band (Section 5 priors) does NOT cite ORACLE EDA Δ as anchor; instead anchors on basin-relocation-aware modal-INERT framework. Section 4 F1 cell already states "EDA prediction (informational)" — preserved. No further numerical edits needed; framing is already QR-LM aligned.
+
+#### 3.4.3 LM Master §3 — Recalibrated verdict priors 8/12/40/20/10/10
+
+**LM Master**: QR's 15/10/45/12/8/10 underweights negative tail. Reasons: (a) ASYMMETRIC threshold tuning IS harder than symmetric (LTC longs-only @ -4% narrower band than /019 ETH @ ±8%), (b) /020 ASYMMETRIC_ROTATION cohort went catastrophic — basin-relocation applies to LTC equally, (c) PROMISING tail at 25% needs basin to land favorably AND gate efficacy to exceed EDA upper bound ~10× — that's 8-15% not 25%. Recalibrated: PROMISING 8% / PROMISING-INERT 12% / INERT 40% (still modal) / NEGATIVE 20% / NEGATIVE-INTRINSIC 10% / NEGATIVE-CATASTROPHIC 10%.
+
+**QR**: **ADOPTED**. Section 5 priors updated 15/10/45/12/8/10 → **8/12/40/20/10/10** with full LM Master rationale embedded. PROMISING+PROMISING-INERT favorable tail: 25% → **20%**. NEGATIVE total (clean+intrinsic+catastrophic): 30% → **40%**. INERT modal: 45% → **40%** (LM Master correctly notes gate is causally targeted, so pure null less likely than /020 BTC NEGATIVE-CATASTROPHIC at 60% INERT prior).
+
+#### 3.4.4 LM Master §4 F-AXIS #2 — trade band tighter sub-band [70, 160] IS / [18, 50] OOS
+
+**LM Master**: QR's [80, 180] / [20, 60] wider on lower bound. LM tighter: IS [70, 160] modal 100; OOS [18, 50] modal 28. Phase 7.4 measures exact roster.
+
+**QR**: **ADOPTED as informational sub-band annotation; QR blocking band KEPT.** Section 4 F-AXIS #2 row updated with LM Master tighter informational sub-band [70, 160] IS / [18, 50] OOS modal 100/28 annotated separately. QR's [80, 180] / [20, 60] remains the F8 BREACH thresholds (blocking band) because: (a) LM tighter is informational projection, (b) QR's wider band is safer for verdict-call discrimination at single-seed lottery variance, (c) Phase 7.4 post-mortem will report exact roster against BOTH bands. Two-band reporting is dual-band annotation pattern from /019 §F-AXIS-MECHANISM precedent.
+
+#### 3.4.5 LM Master §4 F-AXIS #3 — fire-rate band [15%, 40%] IS / [5%, 30%] OOS LOAD-BEARING; NEGATIVE-UNDER-FIRE if OOS <5%
+
+**LM Master**: Predicted band [15%, 40%] IS / [5%, 30%] OOS LOAD-BEARING. NEGATIVE-UNDER-FIRE classification if OOS <5% (cohort-isolation already removed BTC-bear regime trades → gate effectively off).
+
+**QR**: **ADOPTED.** Section 4 F-AXIS #3 row already has LOAD-BEARING marker (carried from QR Section 2.6 + LM /019 Rec § 9 forward-binding). Falsifier explicit: OOS fire rate < 5% → NEGATIVE-UNDER-FIRE verdict cell (Section 8 hierarchy preserved). Section 4 F-AXIS #3 LOAD-BEARING rationale tightened to cite LM Master §4 reasoning: "F1 anchor at extreme negative end of v1 cohorts (−0.27 per-trade), so F1 OOS Sharpe Δ has reduced diagnostic power around INERT/NEGATIVE boundary; F-AXIS #3 is mechanism-level, pre-registered, binary — strongest verdict-disambiguator." Critic Phase 7.5 watch list (Section 10.6) flags F-AXIS #3 fire-rate as priority diagnostic.
+
+#### 3.4.6 LM Master §5 — n_eff_per_cell band [6, 10]
+
+**LM Master**: Predicted n_eff_per_cell point estimate 8, band [6, 10]. QR's 7-modal / [4, 9] too pessimistic on lower bound. ACCEPT QR's 7-modal but widen upper to 10.
+
+**QR**: **ADOPTED.** Section 4 F-AXIS-MECHANISM #4 band updated: QR point 7 / band [4, 9] → QR point 7 (preserved) / **band [4, 10]** (upper widened per LM). Section 5 + Section 13.7 pre-registered prediction priors echo this update. n_eff_per_cell is INFORMATIONAL only (per /017 closeout demotion); but band-band coverage matters for Phase 7.4 calibration tracking.
+
+#### 3.4.7 LM Master §6 — Jaccard band narrowed to [0.03, 0.20] modal 0.06
+
+**LM Master**: Per /018 LINK 0.04 / /019 ETH 0.04 / /020 BTC 0.084 empirical history — single-cohort retraining produces ~95% NEW roster regardless of cohort prior class at single-seed=42 n_trials=18 ENSEMBLE_SIZE=3 budget. Predicted LTC /022 vs baseline LTC-in-pool Jaccard: 0.04-0.10, modal 0.06. PROMISING-MECHANICAL classification (Jaccard ≥ 0.80) is NEAR-ZERO. QR's [0.05, 0.35] correct lower but wider than empirical — recommend narrow to [0.03, 0.20].
+
+**QR**: **ADOPTED.** Section 7 Jaccard pre-registered band updated: QR [0.05, 0.35] → **LM Master [0.03, 0.20] modal 0.06** (LM empirical narrowing). PROMISING-MECHANICAL adjacency (Jaccard ≥ 0.80) classification in Section 6.7 + Section 8 verdict matrix retained — it is a structural classification rule, not a prediction. Modal 0.06 is the central prediction. Phase 7.4 LM Master post-mortem computes Jaccard.
+
+#### 3.4.8 LM Master §7 — /023+ verdict-conditional pre-staging
+
+**LM Master**: PROMISING (8%) → /023 DOT-only (LAST single-cohort untested). PROMISING-INERT (12%) → /023 DOT-only (cohort-coverage closure scientific value). INERT (40% modal) → /023 DOT-only. NEGATIVE (20%) or NEGATIVE-INTRINSIC (10%) → /023 NEW-family axis (funding-rate or per-cohort drawdown brake). NEGATIVE-CATASTROPHIC (10%) → /023 NEW-family axis (NOT closeout + jump to /027). DO NOT collapse cadence.
+
+**QR**: **ADOPTED.** Section 11.7 (renumbered as Section 11.1 — verdict-conditional /023 routing matrix) updated with LM Master /023 staging matrix. Note: Section 11.1 already exists with verdict-conditional routing aligned with LM Master logic; LM Master §7 confirms QR /023 routing matrix EXCEPT QR's PROMISING-MECHANICAL cell was "NEW family (funding-rate)" — LM Master logic implies INERT-mapping at PROMISING-MECHANICAL ⇒ /023 = DOT-only. Updated Section 11.1 PROMISING-MECHANICAL row to **/023 = DOT-only** (alignment with LM Master closure logic — PROMISING-MECHANICAL is non-compoundable; cohort coverage closure is the scientific play). LM Master cadence-discipline mandate (NO closeout-jump-to-/027 on NEGATIVE-CATASTROPHIC) carried forward as binding constraint.
+
+#### 3.4.9 LM Master §8 — Most important point (F-AXIS #3 LOAD-BEARING supersedes F1 magnitude at extreme negative anchor)
+
+**LM Master**: /022's verdict is dominated by basin-relocation × gate fire-rate interaction. F-AXIS #3 fire-rate empirical observation is the LOAD-BEARING diagnostic, NOT F1 magnitude alone. F1 anchor at extreme negative reduces F1 diagnostic power around INERT/NEGATIVE boundary.
+
+**QR**: **ADOPTED.** Section 4 F1 introduction updated with LM Master Section 8 hierarchy clarification: F-AXIS #3 supersedes F1 magnitude at extreme negative anchor. Section 8 verdict matrix hierarchy preserves: F-AXIS #3 (under-fire/over-kill cells) ranks above F1 magnitude (NEGATIVE-INTRINSIC/CATASTROPHIC). Section 8 entry rule strict adherence to thresholds — LM Master logic is structurally embedded.
+
+#### 3.4.10 LM Master §9 — /027 3-specialist bundle (LINK + ETH+gate + LTC+gate) at LTC PROMISING
+
+**LM Master**: If LTC PROMISING (8%) or PROMISING-INERT (12%): 3-specialist bundle on FULL POOL preserved (Option β extended). LINK-only specialist (+0.80 anchor at multi-seed) + ETH-only + symmetric gate (+0.50 anchor) + **LTC-only + asymmetric long-suppress gate (NEW; +0.30 anchor at multi-seed)**. Nominal Σ_independent +2.26. Realistic with correlation drag: **+1.20 to +1.50 OOS Sharpe** (raises ceiling vs 2-specialist /021 §7 estimate of +1.10-1.30). Multi-seed CONFIRMATION mandatory cross-correlation pre-validation: LTC+gate paths vs LINK paths AND vs ETH+gate paths — both < 0.40 required.
+
+**QR**: **ADOPTED.** Section 11.6 bundle composition table updated with 3-specialist projection. Section 11.4 /027 target Δ updated: prior estimate +1.10-1.30 OOS Sharpe (2-specialist /021 §7) → **+1.20-1.50 OOS Sharpe** (3-specialist if LTC PROMISING or PROMISING-INERT). Cross-correlation pre-validation constraint < 0.40 between (LTC+gate, LINK) AND (LTC+gate, ETH+gate) seed paths carried as Phase 7.4 LM Master post-mortem mandate (already in /027 spec at Section 11.4).
+
+#### 3.4.11 LM Master Closing — Critic Phase 7.5 priority items
+
+**LM Master**: 4 priority items: (1) F-AXIS #3 fire-rate against pre-registered [15%, 40%] IS / [5%, 30%] OOS — LOAD-BEARING. (2) Layer C single-cohort feature_importance defect check. (3) Basin relocation evidence (Optuna best_params shift) — BASIN-VECTOR not feature-importance. (4) Jaccard against baseline LTC-in-pool — empirical [0.03, 0.20].
+
+**QR**: **ADOPTED.** Section 10.6 (NEW — Critic Phase 7.5 Watch List) created with these 4 priority items as the binding Critic dispatch surface. Each item maps to a specific brief section: (1) → §4 F-AXIS #3 + §10 closeout protocol; (2) → §10.3 step 7 + §6.5 stateless gate sanity; (3) → §3.4.1 basin-vector mandate + §10.6; (4) → §7 Jaccard pre-registered band.
+
+#### 3.4.12 Summary of edits made for LM Master ADOPTION
+
+| LM § | Action | Brief location edited |
+|---|---|---|
+| §1 BASIN-VECTOR | ADOPT | §10.6 (NEW Critic Phase 7.5 watch list); §3.4.1 |
+| §2 ORACLE EDA caveat | ADOPT | §1 framing (preserved); §2.7 (already explicit) |
+| §3 priors 8/12/40/20/10/10 | ADOPT | §5 (replace numerics) |
+| §4 F-AXIS #2 sub-band | ADOPT informational | §4 F-AXIS #2 row |
+| §4 F-AXIS #3 LOAD-BEARING | ADOPT | §4 F-AXIS #3 row (preserved); §10.6 |
+| §5 n_eff band [4, 10] | ADOPT | §4 F-AXIS-MECHANISM #4; §13.7 |
+| §6 Jaccard [0.03, 0.20] modal 0.06 | ADOPT | §7 Jaccard row |
+| §7 /023 staging | ADOPT | §11.1 routing matrix |
+| §8 F-AXIS #3 supersedes F1 hierarchy | ADOPT | §4 F1 intro; §8 hierarchy (already aligned) |
+| §9 /027 3-specialist +1.20-1.50 | ADOPT | §11.6 bundle composition table; §11.4 target Δ |
+| Closing Critic 4 items | ADOPT | §10.6 (NEW) |
+
+**No rejections. No partial modifications beyond §4 F-AXIS #2 dual-band annotation pattern (informational + blocking).** Track-record-warranted MEDIUM-HIGH confidence in LM Master calibration justifies full adoption of numerical recalibrations.
 
 ### 3.5 Axis Family Declaration (v1 mandatory)
 
@@ -457,13 +528,17 @@ Decomposition:
 
 ## Section 4 — Falsifiers (F1-F8 + F-AXIS-MECHANISM)
 
-Per `feedback_v1_per_cohort_exploration_strategy.md`: per-cohort EXPLORATION. F1 + F8 thresholds adapt to LTC-only cohort scale, NOT portfolio-level. Per `feedback_v3_promising_mechanical_subtype.md` + /019 closeout LESSON #3: F-AXIS-MECHANISM #3 (fire-rate band) is LOAD-BEARING for verdict disambiguation.
+Per `feedback_v1_per_cohort_exploration_strategy.md`: per-cohort EXPLORATION. F1 + F8 thresholds adapt to LTC-only cohort scale, NOT portfolio-level. Per `feedback_v3_promising_mechanical_subtype.md` + /019 closeout LESSON #3 + LM Master /022 §8 hierarchy: F-AXIS-MECHANISM #3 (fire-rate band) is LOAD-BEARING for verdict disambiguation.
+
+**Falsifier hierarchy at /022 (LM Master §8 ADOPTED, Section 3.4.9)**: F-AXIS-MECHANISM #3 fire-rate SUPERSEDES F1 magnitude at extreme negative anchor. F1 anchor (LTC OOS per-trade Sharpe −0.27) is at the negative extreme of v1 cohorts, so F1 OOS Sharpe Δ has reduced diagnostic power around the INERT/NEGATIVE boundary. F-AXIS #3 is mechanism-level, pre-registered, binary — it is the strongest single verdict-disambiguator. Critic Phase 7.5 should evaluate F-AXIS #3 BEFORE F1 magnitude when assigning verdict cell.
 
 ### F1 — LTC-only OOS per-trade Sharpe Δ vs LTC-in-pool OOS per-trade Sharpe anchor
 
 **Anchor**: LTC-in-pool OOS per-trade Sharpe = **−0.2670** (from `ltc_prior_class.csv`).
 
 (Note: brief uses per-trade Sharpe instead of /019's monthly Sharpe proxy because per-trade is what `comparison.csv` "sharpe" field actually reports at single-cohort scale; this anchor is the literal `sharpe_per_trade` column at OOS_DIR for LTC. Anchor frame consistency is enforced by post-Phase-7 engineering_report.md.)
+
+(LM Master §8 hierarchy note: F1 magnitude has reduced diagnostic power at extreme negative anchor; F-AXIS #3 fire-rate is the LOAD-BEARING verdict-disambiguator for /022.)
 
 | Verdict cell | F1 OOS per-trade Sharpe Δ band | Absolute OOS per-trade Sharpe |
 |---|---|---|
@@ -533,9 +608,14 @@ OOS lower bound 20 = baseline LTC OOS 34 - gate kill ~15% - margin; OOS upper bo
 The single-axis isolation is the SYMBOL DIMENSION + STATELESS GATE.
 
 - **F-AXIS #1 — Dispatch correctness**: ONLY Model D' runs; trades.csv contains only LTCUSDT rows (zero rows for BTC/ETH/LINK/DOT/SOL). PASS criterion: `df['symbol'].unique() == ['LTCUSDT']`.
-- **F-AXIS #2 — LTC trade-count and PnL within band**: LTC IS trades ∈ [80, 180], LTC OOS trades ∈ [20, 60], LTC OOS net PnL > −20% preferred (flips ASYMMETRIC_ROTATION-INVERSE prior). LOAD-BEARING per /020 Lesson — basin relocation can shift trade roster materially; trade count outside band may indicate basin-relocation catastrophic.
-- **F-AXIS #3 — Gate fire-rate within pre-registered band** **[LOAD-BEARING per LM Master /019 Rec § 9 carry-forward]**: IS gate fire rate ∈ [15%, 40%], OOS gate fire rate ∈ [5%, 30%] per Section 2.6 ORACLE EDA. Failure indicates gate threshold or BTC indicator computation broken. **LOAD-BEARING rationale**: F1 anchor is at the negative extreme of v1 cohorts (−0.27 per-trade), so F1 OOS Sharpe Δ has reduced diagnostic power around the INERT/NEGATIVE boundary; F-AXIS #3 is mechanism-level, pre-registered, and binary — it is the strongest single verdict-disambiguator. Critic Phase 7.5 should evaluate F-AXIS #3 BEFORE F1 magnitude when assigning verdict cell.
-- **F-AXIS-MECHANISM #4 — n_eff_per_cell band [4, 8]** **[INFORMATIONAL per /017 closeout demotion]**: LTC-only cohort + 25% gate fire rate IS → LTC IS trades post-gate ~93 (vs LINK-only /018 ~154; ETH-only /019 ~120). Smaller training rows + post-hoc gate roster trim → narrower Optuna trial diversity. /018 hit n_eff=9, /019 hit n_eff=9 (LM /019 prediction nominal), /020 hit n_eff=9 (exact match). QR prediction for /022: n_eff_per_cell point estimate 7 (LTC's lower IS trade volume + 25% kill rate); band [4, 9]. INFORMATIONAL only.
+- **F-AXIS #2 — LTC trade-count and PnL within band** (DUAL-BAND ANNOTATION per LM Master §4 ADOPTED, Section 3.4.4):
+  - **QR blocking band (F8 BREACH thresholds; preserved)**: LTC IS trades ∈ [80, 180], LTC OOS trades ∈ [20, 60].
+  - **LM Master informational sub-band (annotation only)**: LTC IS [70, 160] modal 100; LTC OOS [18, 50] modal 28.
+  - LTC OOS net PnL > −20% preferred (flips ASYMMETRIC_ROTATION-INVERSE prior). LOAD-BEARING per /020 Lesson — basin relocation can shift trade roster materially; trade count outside QR blocking band indicates F8 BREACH (verdict cells NEGATIVE-OVER-KILL / NEGATIVE-UNDER-FIRE candidates). Phase 7.4 LM Master post-mortem reports observed count against BOTH bands.
+- **F-AXIS #3 — Gate fire-rate within pre-registered band** **[LOAD-BEARING per LM Master /019 Rec § 9 carry-forward + LM /022 §4-§8 reaffirmation, Section 3.4.5 + 3.4.9 ADOPTED]**: IS gate fire rate ∈ [15%, 40%], OOS gate fire rate ∈ [5%, 30%] per Section 2.6 ORACLE EDA. Failure indicates gate threshold or BTC indicator computation broken.
+  - **LOAD-BEARING rationale (LM /022 §8)**: F1 anchor at extreme negative end (−0.27 per-trade) → F1 OOS Sharpe Δ has reduced diagnostic power around INERT/NEGATIVE boundary; F-AXIS #3 is mechanism-level, pre-registered, binary — strongest single verdict-disambiguator. Critic Phase 7.5 evaluates F-AXIS #3 BEFORE F1 magnitude.
+  - **NEGATIVE-UNDER-FIRE classification (LM /022 §4 + §8)**: if observed OOS fire rate < 5% → cohort-isolation has already removed BTC-bear regime trades; gate effectively OFF; basin produced LTC-only roster without bear-regime exposure → mechanism cannot fire → NEGATIVE-UNDER-FIRE verdict cell (Section 8 hierarchy).
+- **F-AXIS-MECHANISM #4 — n_eff_per_cell band [4, 10]** **[INFORMATIONAL per /017 closeout demotion; LM Master §5 ADOPTED, Section 3.4.6 — upper widened 9 → 10]**: LTC-only cohort + 25% gate fire rate IS → LTC IS trades post-gate ~93 (vs LINK-only /018 ~154; ETH-only /019 ~120). Smaller training rows + post-hoc gate roster trim → narrower Optuna trial diversity. /018 hit n_eff=9, /019 hit n_eff=9 (LM /019 prediction nominal), /020 hit n_eff=9 (exact match). QR prediction for /022: n_eff_per_cell point estimate 7 (LTC's lower IS trade volume + 25% kill rate); **band [4, 10]** (LM widened upper from 9 to 10; LM modal 8). INFORMATIONAL only.
 
 ### F-PORTFOLIO (informational; cannot determine verdict)
 
@@ -547,21 +627,23 @@ Portfolio-level Sharpe (LTC-only = 1 model = portfolio) compared to v1 baseline 
 
 Per /016/017/018/019/020/021 closeouts: cycle-3 LM Master + QR mechanism-level predictions track FLAT priors at EXPLORATION single-seed level. /020 BTC priors (INERT 60% modal) catastrophically REFUTED by actual NEGATIVE-CATASTROPHIC outcome.
 
-**Verdict prior 25/45/30** (modal INERT; reflects PROMISING bar HIGH because anchor is worst-in-portfolio, and NEGATIVE-CATASTROPHIC tail wider per /020 precedent):
+**Verdict priors UPDATED 2026-05-26 per LM Master §3 recalibration** (Section 3.4.3 ADOPTED): QR initial 15/10/45/12/8/10 → **LM Master 8/12/40/20/10/10**. LM Master rationale: (a) ASYMMETRIC threshold tuning IS harder than symmetric — LTC longs-only @ -4% targets narrower band than /019 ETH @ ±8%, (b) /020 BTC ASYMMETRIC_ROTATION precedent went catastrophic — basin-relocation mechanism applies to LTC equally, (c) PROMISING tail at 25% (QR initial) requires basin to land favorably AND gate efficacy to exceed ORACLE EDA upper bound by ~10× — that's 8-15%, not 25%.
 
-- **PROMISING (Δ ≥ +0.37 per-trade Sharpe)**: **15%** — gate flips both halves to positive at single-seed=42 Optuna trajectory; matches /019 ETH+gate pattern. ORACLE EDA projects modest Δ (~+0.04); large Δ requires basin to land favorably AND gate efficacy to be at upper EDA estimate.
-- **PROMISING-INERT (Δ ∈ [+0.17, +0.37))**: **10%** — gate reduces drag enough to clear OOS Sharpe to ≥ −0.10 absolute but not into positive territory.
-- **INERT (Δ ∈ [−0.13, +0.17))**: **45%** — modal cell per per-cohort methodology; basin relocation absorbs some gate lift; single-seed lottery wide.
-- **NEGATIVE (Δ ≤ −0.13)**: **20%** — basin relocates to worse OOS subset (mirror /020 pattern at LTC scale); gate fire rate within band but absolute OOS still ≤ −0.40.
-  - **NEGATIVE-INTRINSIC** (Δ ≤ −0.28 + F-AXIS #3 PASS): **8%** subset — gate works mechanically but LTC drag isn't BTC-trend-conditional in OOS regime.
-  - **NEGATIVE-CATASTROPHIC** (Δ ≤ −0.28; mirror /020 catastrophic): **10%** subset (raised from /020's 2% per /020 actuals).
+**Verdict prior 20/40/40** (modal INERT 40%; favorable tail tightened 25%→20%; negative tail widened 30%→40%):
 
-**Predicted modal cell**: INERT 45%. Predicted favorable tail (PROMISING + PROMISING-INERT) = 25%. Predicted negative tail (NEGATIVE + NEGATIVE-INTRINSIC + NEGATIVE-CATASTROPHIC) = 30%. **NOTE**: weighted toward NEGATIVE relative to /019's modal-INERT priors because LTC's anchor is the worst-in-portfolio and /020 confirmed basin-relocation catastrophic for asymmetric-rotation cohorts.
+- **PROMISING (Δ ≥ +0.37 per-trade Sharpe)**: **8%** (QR initial 15% → LM 8%) — gate flips both halves to positive at single-seed=42 Optuna trajectory; matches /019 ETH+gate pattern. ORACLE EDA projects modest Δ (~+0.04); large Δ requires basin to land favorably AND gate efficacy to be at upper EDA estimate.
+- **PROMISING-INERT (Δ ∈ [+0.17, +0.37))**: **12%** (QR initial 10% → LM 12%) — gate reduces drag enough to clear OOS Sharpe to ≥ −0.10 absolute but not into positive territory.
+- **INERT (Δ ∈ [−0.13, +0.17))**: **40%** (QR initial 45% → LM 40%) — modal cell per per-cohort methodology; basin relocation absorbs some gate lift; single-seed lottery wide. LM correctly notes: gate is causally targeted, so pure null less likely than /020 BTC NEGATIVE-CATASTROPHIC at 60% INERT prior.
+- **NEGATIVE clean (Δ ≤ −0.13)**: **20%** (QR initial 12% → LM 20%) — basin relocates to worse OOS subset (mirror /020 pattern at LTC scale); gate fire rate within band but absolute OOS still ≤ −0.40.
+- **NEGATIVE-INTRINSIC (Δ ≤ −0.28 + F-AXIS #3 PASS)**: **10%** (QR initial 8% → LM 10%) — gate works mechanically but LTC drag isn't BTC-trend-conditional in OOS regime.
+- **NEGATIVE-CATASTROPHIC (Δ ≤ −0.28; mirror /020 catastrophic)**: **10%** (preserved) — mirror /020 BTC outcome; ASYMMETRIC_ROTATION cohort × pure isolation pathway.
+
+**Predicted modal cell**: INERT 40%. Predicted favorable tail (PROMISING + PROMISING-INERT) = **20%** (LM tighter than QR 25%). Predicted negative tail (NEGATIVE + NEGATIVE-INTRINSIC + NEGATIVE-CATASTROPHIC) = **40%** (LM wider than QR 30%). **NOTE**: distribution weighted toward NEGATIVE relative to /019's modal-INERT priors because LTC's anchor is the worst-in-portfolio AND /020 confirmed basin-relocation catastrophic for asymmetric-rotation cohorts AND LM Master MEDIUM-HIGH calibration confidence track record (post-/021 H1 0.5/1 directional credit) warrants full prior adoption.
 
 Two specific mechanism predictions (informational):
 
-1. **Gate fire rate at observation**: predicted IS 25.8%, OOS 14.7% (per ORACLE EDA; /019 had predicted-observed gap ~0pp). If IS observed < 15% or > 40%, gate threshold or computation broken (F-AXIS #3 falsifier).
-2. **F-AXIS #2 trade band**: at OOS predicted ~30 trades after gate (cf. baseline 34 OOS LTC trades pre-gate; 3-seed ensemble factor ~1.0x at single-cohort + 14.7% gate kill ~ -5 trades).
+1. **Gate fire rate at observation**: predicted IS 25.8%, OOS 14.7% (per ORACLE EDA; /019 had predicted-observed gap ~0pp). If IS observed < 15% or > 40%, gate threshold or computation broken (F-AXIS #3 falsifier). LM Master §5 widens F-AXIS-MECHANISM #4 n_eff band: QR point 7 / band [4, 9] → **point 7 / band [4, 10]** (upper widened from 9 to 10).
+2. **F-AXIS #2 trade band**: at OOS predicted ~30 trades after gate (cf. baseline 34 OOS LTC trades pre-gate; 3-seed ensemble factor ~1.0x at single-cohort + 14.7% gate kill ~ -5 trades). LM Master tighter sub-band annotation: IS [70, 160] modal 100; OOS [18, 50] modal 28 (informational only; QR F8 BREACH band [80, 180] / [20, 60] is blocking).
 
 ---
 
@@ -618,7 +700,7 @@ Adding `long_only_mode` kwarg to `BtcTrendFilterConfig` in `risk_v2.py` is a BAC
 - LTC-only PSR_monthly_vs_1: expected to be very low (anchor is −0.27 per-trade; matching +1.0 unlikely at single-symbol EXPLORATION). INFORMATIONAL.
 - Pareto front: N/A (single-seed EXPLORATION).
 - Gate stats JSON: `gate_stats_dict` written to engineering_report.md per /017/019/020/021 Rec.
-- LTC Jaccard vs baseline LTC roster (combined IS+OOS): pre-registered band [0.05, 0.35] — wider lower bound than /020 BTC (Jaccard 0.084 catastrophic) because the gate is causally targeted at LTC's drag class. Phase 7.4 LM Master computes this.
+- LTC Jaccard vs baseline LTC roster (combined IS+OOS): **pre-registered band [0.03, 0.20] modal 0.06 per LM Master §6 ADOPTED (Section 3.4.7)** — narrowed from QR initial [0.05, 0.35]. LM rationale: empirical history /018 LINK 0.04 / /019 ETH 0.04 / /020 BTC 0.084 shows single-cohort retraining produces ~95% NEW roster regardless of cohort prior class at single-seed=42 n_trials=18 ENSEMBLE_SIZE=3 budget; PROMISING-MECHANICAL classification (Jaccard ≥ 0.80) is NEAR-ZERO probability. Phase 7.4 LM Master computes this.
 
 ---
 
@@ -715,22 +797,35 @@ Per skill `4cb8972` split-engineer dispatch:
 
 Engineer kills the backtest if wall-clock exceeds **45 minutes** (1.7× projected 26 min). Per `feedback_v1_wall_clock_discipline_enforced.md`, 2h is the cycle-3 EXPLORATION HARD CAP; 45 min internal kill-switch is well below cap.
 
+### 10.6 Critic Phase 7.5 Watch List (LM Master Closing ADOPTED, Section 3.4.11)
+
+Per LM Master closing recommendations 4 priority items, Critic Phase 7.5 dispatch surface includes:
+
+1. **F-AXIS #3 fire-rate against pre-registered band [15%, 40%] IS / [5%, 30%] OOS — LOAD-BEARING**: Critic evaluates this BEFORE F1 magnitude per LM §8 hierarchy. NEGATIVE-UNDER-FIRE classification mandatory if observed OOS fire rate < 5% (cohort-isolation has already removed BTC-bear regime trades; gate effectively off).
+2. **Layer C single-cohort feature_importance defect check**: /021 pool aggregation defect (all-zeros feature_importance) was Model D pooled artifact; single-symbol Model D'-LTC-only feature_importance is well-defined by construction at /022 — but Critic verifies actual non-zero importance values across all 13 walk-forward months in `reports-v1/iteration_v1-022/in_sample/feature_importance_*.csv`. Defect recurrence would be implementation issue not basin-level.
+3. **Basin relocation evidence (Optuna best_params shift) — BASIN-VECTOR not feature-importance** (LM §1 binding compliance + Section 3.4.1): /021 H2 REFUTATION binding requires Phase 7.4 verdict assignment cite Optuna best_params shifts from `optuna_studies/iter-v1-022_*.params.json` as primary basin-vector evidence channel. Feature_importance rank-shifts are INFORMATIONAL ONLY at this iter. Critic flags any verdict text that uses feature_importance as mechanism evidence (rebinding-by-slippage risk).
+4. **Jaccard against baseline LTC-in-pool — empirical [0.03, 0.20] modal 0.06** (LM §6 narrowed band, Section 3.4.7): Phase 7.4 LM Master post-mortem computes trade_id Jaccard between `reports-v1/iteration_v1-baseline/in_sample/trades.csv` (LTC rows; pool roster) and `reports-v1/iteration_v1-022/in_sample/trades.csv` (gate-applied /022 roster). PROMISING-MECHANICAL classification (Jaccard ≥ 0.80) is NEAR-ZERO probability; modal 0.06 prediction.
+
 ---
 
 ## Section 11 — Alternates for /023+ (cycle-3 eighth EXPLORATION onwards)
 
-### 11.1 Verdict-conditional /023 routing
+### 11.1 Verdict-conditional /023 routing (LM Master §7 ADOPTED, Section 3.4.8)
 
-| /022 verdict | /023 primary axis | /023 rationale |
-|---|---|---|
-| **PROMISING** | DOT-only + orthogonal mechanism | Cohort coverage complete (LINK/ETH/BTC/LTC → DOT next); DOT IS +96.07% at /017 catastrophic-positive rotation suggests ASYMMETRIC_ROTATION; needs orthogonal mechanism |
-| **PROMISING-INERT** | DOT-only + orthogonal mechanism | Same — proceed with cohort coverage |
-| **PROMISING-MECHANICAL** | NEW family — funding-rate features (per Critic /020 Path Forward #2) | Move from RE-USE primitive to NEW signal source |
-| **NEGATIVE-INTRINSIC** | LTC + DIFFERENT mechanism (vol-regime gate OR LTC-on-chain features at feature-family) | LTC drag isn't BTC-trend-conditional; new mechanism needed |
-| **NEGATIVE-CATASTROPHIC** | NEW family — funding-rate OR per-cohort drawdown brake (binary off/on) | Mirror /020 → /021 methodology pivot pattern; structural axis pivot |
-| **NEGATIVE-OVER-KILL** | LTC-only + WIDER gate threshold (5% or 6%) | Gate threshold retune; one EXPLORATION before pivoting |
-| **NEGATIVE-UNDER-FIRE** | LTC-only + TIGHTER gate threshold (3%) + symmetric mode | Gate threshold + mode retune |
-| **NEGATIVE-IS-COLLAPSE** | LTC + sample-weighting OR feature-family axis | IS basin inversion requires substrate-level intervention |
+LM Master /022 §7 staging matrix integrated. Key changes from QR initial: (a) PROMISING-MECHANICAL row moved to DOT-only (LM closure logic — PROMISING-MECHANICAL is non-compoundable, cohort coverage closure is the scientific play, NOT NEW family pivot); (b) NEGATIVE-CATASTROPHIC explicit cadence-discipline binding (DO NOT collapse cadence by jumping to /027); (c) INERT modal cell explicitly routed to DOT-only (last single-cohort untested).
+
+| /022 verdict | LM Master Prior | /023 primary axis | /023 rationale |
+|---|---|---|---|
+| **PROMISING** | 8% | DOT-only + orthogonal mechanism | Cohort coverage complete (LINK/ETH/BTC/LTC → DOT next, LAST single-cohort untested); DOT IS +96.07% at /017 suggests ASYMMETRIC_ROTATION; needs orthogonal mechanism |
+| **PROMISING-INERT** | 12% | DOT-only + orthogonal mechanism | LM Master §7: cohort-coverage closure has scientific value; proceed with cohort coverage |
+| **PROMISING-MECHANICAL** | NEAR-ZERO (per Jaccard prior [0.03, 0.20]) | DOT-only (LM §7 ADOPTED — was: NEW family) | LM closure logic: PROMISING-MECHANICAL is non-compoundable; cohort coverage closure DOT-only is the scientific play |
+| **INERT** | 40% (modal) | DOT-only (LM §7 explicit) | Last single-cohort untested; cohort-coverage closure scientific value |
+| **NEGATIVE clean** | 20% | NEW-family axis (funding-rate OR per-cohort drawdown brake) | LM §7: structural axis pivot; LM Master cadence-discipline NO closeout-jump |
+| **NEGATIVE-INTRINSIC** | 10% | NEW-family axis (funding-rate OR per-cohort drawdown brake) | LM §7 + QR: LTC drag NOT BTC-trend-conditional; LTC-specific alt mechanism considered but feature-family pivot dominant per LM cohort-saturation logic |
+| **NEGATIVE-CATASTROPHIC** | 10% | **NEW-family axis (NOT closeout-jump-to-/027)** | LM §7 CADENCE BINDING: DO NOT collapse cadence; structural pivot to NEW family (funding-rate per Critic /020 Path Forward #2 OR per-cohort drawdown brake) |
+| **NEGATIVE-OVER-KILL** | (sub-cell of NEGATIVE-clean) | LTC-only + WIDER gate threshold (5% or 6%) | Gate threshold retune; one EXPLORATION before pivoting |
+| **NEGATIVE-UNDER-FIRE** | (sub-cell of NEGATIVE-clean) | LTC-only + TIGHTER gate threshold (3%) + symmetric mode | LM §4 + §8 LOAD-BEARING falsifier; gate threshold + mode retune |
+| **NEGATIVE-IS-COLLAPSE** | (catastrophic sub-cell) | LTC + sample-weighting OR feature-family axis | IS basin inversion requires substrate-level intervention |
 
 ### 11.2 /024-/025 = methodology + bundle composition work (FLEXIBLE)
 
@@ -755,9 +850,11 @@ Bundle architecture: FULL POOL (5 symbols unchanged — A/C/D/E baseline) + alph
 - **LTC-only + BTC-trend long-suppress gate (Model D')** — **/022 candidate (THIS iter)** if PROMISING or PROMISING-INERT
 - DOT specialist or DOT-in-pool — TBD /023
 
-**/027 Target Δ at multi-seed**: nominal +1.96 if specialists are independent; realistic with correlation drag + multi-seed variance reduction: **+1.10 to +1.30 OOS Sharpe** (per /021 §7).
+**/027 Target Δ at multi-seed**:
+- **2-specialist bundle (LINK + ETH+gate; if /022 INERT/NEGATIVE)**: realistic +1.10 to +1.30 OOS Sharpe (per /021 §7).
+- **3-specialist bundle (LINK + ETH+gate + LTC+gate; if /022 PROMISING or PROMISING-INERT) — LM Master §9 ADOPTED**: nominal +2.26 (Σ_independent: LINK +0.80 + ETH+gate +0.50 + LTC+gate +0.30); realistic with correlation drag + multi-seed variance reduction: **+1.20 to +1.50 OOS Sharpe** (LM §9 RAISES ceiling vs 2-specialist /021 §7 estimate by +0.10-0.20).
 
-Required gates at /027: IS Sharpe > 1.0 + OOS Sharpe > 1.0 multi-seed mean + OOS/IS ≥ 0.5 + Top-symbol ≤ 30% OOS PnL + 10-seed validation (mean SR > 0, ≥7/10 profitable) + Cross-correlation < 0.40 between specialist Sharpe paths + Pre-computed BTC-in-pool annualized-daily-Sharpe (NO proxy).
+Required gates at /027: IS Sharpe > 1.0 + OOS Sharpe > 1.0 multi-seed mean + OOS/IS ≥ 0.5 + Top-symbol ≤ 30% OOS PnL + 10-seed validation (mean SR > 0, ≥7/10 profitable) + Cross-correlation < 0.40 between specialist Sharpe paths (LM §9 mandate: BOTH (LTC+gate, LINK) AND (LTC+gate, ETH+gate) at 3-specialist) + Pre-computed BTC-in-pool annualized-daily-Sharpe (NO proxy).
 
 ### 11.5 Lessons forward-binding (codified at this brief)
 
@@ -767,22 +864,46 @@ Per /021 closeout:
 3. **Per-month FI accumulation now on trunk** — methodologically superior to v3 last-month-snapshot; carries forward to /022 reports automatically
 4. **Engineering report timing contract** — codified at Section 10.4
 
-### 11.6 /022 forward-binding mandates for /023+
+### 11.6 /022 forward-binding mandates for /023+ + /027 3-specialist bundle composition (LM Master §9 ADOPTED, Section 3.4.10)
+
+**/027 bundle composition table — LM Master §9 3-specialist projection** (CONDITIONAL on /022 PROMISING or PROMISING-INERT):
+
+| Component | Multi-seed Sharpe anchor | Source iter | Notes |
+|---|---|---|---|
+| Pool baseline (5 sym, A/C/D/E unchanged) | +0.6637 (OOS portfolio per BASELINE_V1.md) | baseline | ANCHOR |
+| LINK-only specialist (Model C) | **+0.80** | /018 PROMISING-INERT-FAVORABLE | LM /019 multi-seed anchor |
+| ETH-only + symmetric BTC-trend gate (Model G) | **+0.50** | /019 PROMISING | LM /019 multi-seed anchor |
+| **LTC-only + asymmetric long-suppress gate (Model D') — NEW** | **+0.30** (multi-seed target) | **/022 candidate** | LM §9 target if /022 PROMISING |
+| Σ_independent nominal | **+2.26** | (3-specialist) | nominal sum if specialists uncorrelated |
+| **Σ_realistic with correlation drag** | **+1.20 to +1.50 OOS Sharpe** | LM §9 ADOPTED | RAISES ceiling vs 2-specialist /021 §7 estimate (+1.10-1.30) |
+
+**LM Master cross-correlation pre-validation mandate (Section 3.4.10 ADOPTED, Phase 7.4 LM Master post-mortem at /027 CONFIRMATION)**:
+- ρ(LTC+gate seed paths, LINK seed paths) < 0.40 required
+- ρ(LTC+gate seed paths, ETH+gate seed paths) < 0.40 required
+- If either correlation ≥ 0.40 → specialist drops or bundle re-architected
+
+**/023+ forward-binding** (LM Master §7 staging carried forward):
 
 If /022 PROMISING / PROMISING-INERT:
-- /023 = DOT-only with orthogonal mechanism (cohort coverage; pre-classify DOT prior class)
-- /027 substrate gains LTC+gate specialist (alongside LINK + ETH+gate)
-- Multi-seed CONFIRMATION includes cross-correlation pre-validation between LTC+gate, LINK, ETH+gate paths
+- /023 = DOT-only with orthogonal mechanism (LM §7: cohort coverage complete; pre-classify DOT prior class per /021 Rec #1)
+- /027 substrate gains LTC+gate specialist (alongside LINK + ETH+gate); target +1.20-1.50 OOS Sharpe at multi-seed
+- Multi-seed CONFIRMATION cross-correlation pre-validation MANDATORY (LM Master §9 ADOPTED)
+
+If /022 INERT (LM Master 40% modal):
+- /023 = DOT-only (LM §7: cohort-coverage closure scientific value)
+- /027 substrate does NOT gain LTC specialist; LTC stays in pool D
+- Bundle composition remains 2-specialist (LINK + ETH+gate) at /027 target +1.10-1.30 (per /021 §7)
 
 If /022 NEGATIVE-INTRINSIC:
-- /023 = LTC + DIFFERENT mechanism OR /023 = pivot to feature-family (funding-rate)
-- LTC drag is not BTC-trend-conditional — load-bearing finding
+- /023 = NEW-family axis (funding-rate per Critic /020 Path Forward #2 OR per-cohort drawdown brake) per LM §7
+- LTC drag is not BTC-trend-conditional — load-bearing finding for /023+ axis selection
 - /027 substrate does NOT gain LTC specialist; LTC stays in pool D
 
 If /022 NEGATIVE-CATASTROPHIC:
-- /023 = pivot to NEW family (funding-rate per Critic /020 Path Forward #2 OR per-cohort drawdown brake)
-- LTC ASYMMETRIC_ROTATION-INVERSE prior is structurally unbreakable at single-axis EXPLORATION budget
+- /023 = NEW-family axis (funding-rate OR per-cohort drawdown brake) — **LM §7 CADENCE BINDING: NOT closeout-jump-to-/027**
+- LTC ASYMMETRIC_ROTATION-INVERSE prior is structurally unbreakable at single-axis EXPLORATION budget; mirror /020 → /021 methodology pivot pattern
 - /027 substrate does NOT gain LTC specialist
+- Cadence discipline binding: 3 more EXPLORATIONs at /024-/026 before /027 CONFIRMATION
 
 ### 11.7 LTC threshold sensitivity matrix (deferred to /023 if /022 borderline)
 
@@ -836,7 +957,7 @@ Per `feedback_v1_phase5_self_check.md` + /021 Section 13 Addendum precedent:
 - [x] Section 2 (IS-Only Evidence) — numerical tables from `analysis/iteration_v1-022/`
 - [x] Section 2.5 (HIGH-RISK Axis Declaration) — HIGH-RISK declared
 - [x] Section 3 (Implementation Spec) — code change + CLI + pinned values + LM Master placeholder
-- [x] Section 3.4 (LM Master Phase 4.5 Responses) — RESERVED placeholder
+- [x] Section 3.4 (LM Master Phase 4.5 Responses) — POPULATED with 11 adopted recommendations (Section 3.4.1-3.4.12) post-Phase-4.5 amendment commit
 - [x] Section 3.5 (Axis Family Declaration) — explicit
 - [x] Section 3.6 (Wall-Clock Estimate) — 26 min
 - [x] Section 4 (Falsifiers F1-F8 + F-AXIS-MECHANISM) — all 4 sub-checks + LOAD-BEARING markings
@@ -885,13 +1006,18 @@ Per `feedback_v1_phase5_self_check.md` + /021 Section 13 Addendum precedent:
 
 ### 13.7 Pre-registered prediction priors (for Phase 7+8 calibration tracking)
 
-- Verdict prior 25/45/30 (PROMISING+PROMISING-INERT / INERT / NEGATIVE)
-- Modal cell: INERT 45%
-- Favorable tail: 25% PROMISING + PROMISING-INERT
-- Negative tail: 30% NEGATIVE + NEGATIVE-INTRINSIC + NEGATIVE-CATASTROPHIC
-- F-AXIS #3 fire rate predictions: IS 25.8%, OOS 14.7%
-- F-AXIS #2 OOS trade count point estimate: 30 (band [20, 60])
-- F-AXIS #4 n_eff_per_cell point estimate: 7 (band [4, 9])
+LM Master /022 Phase 4.5 ADOPTED in full (Section 3.4):
+
+- **Verdict priors 8/12/40/20/10/10** (PROMISING / PROMISING-INERT / INERT / NEGATIVE clean / NEGATIVE-INTRINSIC / NEGATIVE-CATASTROPHIC) — LM Master §3 (was QR initial 15/10/45/12/8/10).
+- **Modal cell**: INERT 40% (was QR initial 45%).
+- **Favorable tail**: 20% PROMISING + PROMISING-INERT (was QR initial 25%).
+- **Negative tail**: 40% NEGATIVE + NEGATIVE-INTRINSIC + NEGATIVE-CATASTROPHIC (was QR initial 30%).
+- F-AXIS #3 fire rate predictions: IS 25.8%, OOS 14.7%. NEGATIVE-UNDER-FIRE if OOS < 5% (LM §4 LOAD-BEARING falsifier).
+- F-AXIS #2 OOS trade count: QR blocking band [20, 60] (preserved) + LM Master informational sub-band [18, 50] modal 28 (LM §4 ADOPTED).
+- F-AXIS #2 IS trade count: QR blocking band [80, 180] (preserved) + LM Master informational sub-band [70, 160] modal 100 (LM §4 ADOPTED).
+- F-AXIS-MECHANISM #4 n_eff_per_cell: point 7 (preserved) / **band [4, 10]** (LM §5 widened upper from 9 to 10; LM modal 8).
+- **Jaccard band**: [0.03, 0.20] modal 0.06 (LM §6; was QR initial [0.05, 0.35]).
+- **/027 3-specialist target Δ**: +1.20 to +1.50 OOS Sharpe (LM §9 ADOPTED) if LTC PROMISING; +1.10 to +1.30 (preserved /021 §7) if LTC INERT/NEGATIVE.
 
 ---
 
