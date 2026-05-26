@@ -306,15 +306,37 @@ uv run python run_baseline_v1.py \
 - `apply_r1 = True` (Model C baseline — R1 cool-down active for LINK).
 - `apply_r2 = False` (Model C baseline — R2 is Model E only).
 
-### 3.4 LM Master Phase 4.5 responses (PLACEHOLDER — to be filled after LM Master fires)
+### 3.4 LM Master Phase 4.5 responses (committed at lgbm_advisor.md)
 
-LM Master Phase 4.5 fires AFTER this brief drafting. This section will be amended with QR responses to each LM Master recommendation:
+LM Master Phase 4.5 fired post-brief at `briefs-v1/iteration_v1-018/lgbm_advisor.md`. QR responses to each recommendation:
 
-- **Recommendation 1**: TBD → QR response: TBD (adopted / modified with reason / rejected with reason)
-- **Recommendation 2**: TBD → QR response: TBD
-- **Recommendation 3**: TBD → QR response: TBD
+**Rec #1 — KEEP n_trials=18; do NOT compress to 15**:
+- **ADOPTED**. Section 3.3 specifies n_trials=18 already; compressing saves ~1-2 min at no wall-clock pressure (12-18 min predicted with 78+ min margin). TPE warmup at 18 stays above ~10 saturation even at single-symbol's ~140 rows/month.
 
-This subsection is a Phase 5.5 BLOCK condition if LM Master fires but brief doesn't echo each recommendation. **Drafting note for LM Master**: Pre-design questions worth analyzing: (a) at single-symbol cohort with n_trials=18, what's the Optuna trial budget basin diversity for LINK-only loss surface vs LINK-in-pool? (b) Predicted n_eff_per_cell band for LINK-only single-symbol training (LM Master n_eff [8, 13] band is for 5-sym pooled; single-symbol may differ). (c) Single-symbol single-seed=42 basin lottery risk — should ENSEMBLE_SIZE be raised to 5 for /018, or accept basin-lottery for first per-cohort EXPLORATION?
+**Rec #2 — Accept current Optuna bounds**:
+- **ADOPTED**. v1_pruned bounds unchanged for /018. Single-axis SYMBOL DIMENSION isolation maintained. Phase 7.4 post-mortem will read actual best-trial trajectories.
+
+**Rec #3 — KEEP ENSEMBLE_SIZE=3**:
+- **ADOPTED**. Single-axis isolation overrides raising to 5. /027 CONFIRMATION raises to 10 (multi-seed handles basin-lottery dissolution). Brief Section 3.3 keeps 3.
+
+**LM Master verdict-class adjustment ADOPTED into Section 5**: PROMISING 30% / **INERT 45% modal (PROMISING-INERT specifically)** / NEGATIVE 20% / NEGATIVE-INTRINSIC 5%. LINK 8/8 OOS-positive structural pattern earns MEDIUM directional confidence at per-cohort level (NOT verdict-class FLAT).
+
+**LM Master MATHEMATICAL clarification CRITICAL — DOCUMENTED into Section 1**: "LINK-alone beats portfolio +31% IS / +23% OOS" is **MATHEMATICAL DILUTION ACCOUNTING** (removing 4 drag/neutral contributors lifts aggregate), NOT edge discovery. H1 question is "can LINK-only TRAINING preserve LINK's edge?" — measures LINK-only-trained LINK Sharpe vs LINK-in-pool-trained LINK Sharpe (+0.8184 anchor). Brief Section 1 + Section 4 F1 anchoring correctly target this.
+
+**Saturation risks ADOPTED into Section 6**:
+- Single-cohort single-seed=42 basin lottery (HIGH-RISK) — wide ±0.40 OOS Sharpe variance band; NEGATIVE-INTRINSIC verdict should be "basin-lottery-conditional FALSIFICATION" NOT terminal closure
+- Predicted n_eff_per_cell band [4, 9] for single-cohort (corrected from /017's [8, 13] for 5-sym pooled)
+- LINK direction-asymmetry inheritance: pool may have implicitly balanced direction; LINK-only may overshoot direction-asymmetrically (Phase 7.4 to flag)
+
+**/019+ conditional pre-staging ADOPTED into Section 11**:
+- PROMISING → /019 = ETH-only with BTC-trend conditional gate (per /017 pre-commit)
+- PROMISING-INERT (modal) → /019 = ETH-only regime gate (diversify cohort coverage before stacking LINK specializations)
+- NEGATIVE → /019 = LINK+SOL 2-symbol pooled (test pool-co-training requirement)
+- NEGATIVE-INTRINSIC → /019 = ETH-only regime gate; LINK-specialization sub-cycle CLOSED
+
+**LM Master /017 +XRP recommendation SUPERSEDED**: LM Master acknowledges QR's per-cohort pivot is mechanically tighter axis than +XRP universe continuation.
+
+**Net**: 3 hyperparameter recs + 4 risk callouts + verdict-class adjustment + mathematical clarification ALL ADOPTED. Brief finalized for Phase 5.5 gate.
 
 ### 3.5 Axis Family Declaration (v1 mandatory)
 
