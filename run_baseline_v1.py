@@ -88,6 +88,11 @@ from crypto_trade.strategies.ml.reporting_v1 import (
     write_dsr_json,
     write_ic_matrix_csv,
 )
+from crypto_trade.strategies.ml.risk_v2 import (
+    BtcTrendFilterConfig,
+    apply_btc_trend_filter,
+    load_btc_klines_for_filter,
+)
 
 # ---------------------------------------------------------------------------
 # Ensemble configuration (mirrors v3 post-iter-v3/059 single-pass structure)
@@ -126,6 +131,26 @@ V1_ITER017_UNIVERSE: tuple[str, ...] = (
 #: updates V1_BASELINE_UNIVERSE). Single-symbol subset of V1_BASELINE_UNIVERSE.
 #: assert_v1_universe() accepts {LINKUSDT} because LINKUSDT is NOT in V1_EXCLUDED_SYMBOLS.
 V1_ITER018_UNIVERSE: tuple[str, ...] = ("LINKUSDT",)
+
+#: iter-v1/019: ETH-only single-cohort EXPLORATION + direction-aware BTC-trend gate
+#:              (cycle-3 #4 of 10; per-cohort-specialization-ETH; NEW 10th axis family).
+#:
+#: USER STRATEGIC PIVOT 2026-05-26 cycle-3 #4 EXPLORATION:
+#: per-cohort-specialization-ETH. ETH has strongest NEGATIVE per-symbol structural
+#: prior (5/5 IS-OOS negative across baseline + /014-/017).
+#: Direction-aware BTC-trend gate at +-8% on BTC 14d return kills counter-trend ETH
+#: entries; IS EDA shows +42.47% PnL lift with cross-year stability (H1 +6.33% / H2 +36.15%).
+#:
+#: LOCAL to runner — NOT shared via features_v1/__init__.py (only CONFIRMATION-MERGE
+#: updates V1_BASELINE_UNIVERSE). assert_v1_universe() accepts {ETHUSDT} because
+#: ETHUSDT is NOT in V1_EXCLUDED_SYMBOLS.
+V1_ITER019_UNIVERSE: tuple[str, ...] = ("ETHUSDT",)
+
+#: Gate configuration constants (frozen for /019 per brief Section 3.3 + LM Master §6.4).
+#: Tunable at /020+ verdict-conditional (TIGHTER +-5% if under-fire, WIDER +-12% if over-kill).
+V1_ITER019_BTC_GATE_LOOKBACK_BARS: int = 42  # 14 days at 8h cadence
+V1_ITER019_BTC_GATE_THRESHOLD_PCT: float = 8.0  # +-8% BTC 14d return
+V1_ITER019_BTC_GATE_ENABLED: bool = True
 
 #: BASELINE_V1.md anchor — the corrected walk-forward stack reproduces this set.
 BASELINE_OOD_CUTOFF_PCT: float = 0.70
@@ -1336,6 +1361,67 @@ def main() -> None:
         all_results = results_c
         # Single model — no aggregation across multiple models needed.
         _r5_model_results = [results_c]
+    elif set(symbols) == set(V1_ITER019_UNIVERSE):
+        # iter-v1/019: ETH-only single-cohort EXPLORATION + stateless BTC-trend gate
+        # (cycle-3 #4 of 10; per-cohort-specialization-ETH; NEW 10th axis family).
+        # USER STRATEGIC PIVOT 2026-05-26: per-cohort specialization axis.
+        #
+        # Dispatch — ONLY Model G (ETH-only; mirrors Model A's apply_r1=False semantics;
+        # ATR 2.9/1.45 matches Model A which trained ETH in pool).
+        # Models A (BTC+ETH pooled), C (LINK), D (LTC), E (DOT) DROPPED.
+        # Single-axis isolation: SYMBOL DIMENSION (5 sym -> 1 sym) + post-hoc gate.
+        #
+        # The BTC-trend gate is a STATELESS post-hoc trade-stream filter applied AFTER
+        # the model produces its trade roster. Deadlock-impossible by construction
+        # (numpy boolean mask; no persistent state). Brief Section 6.5 proof.
+        #
+        # F-AXIS-MECHANISM #1: trades.csv must contain ONLY ETHUSDT rows.
+        # F-AXIS-MECHANISM #2: ETH IS [80,200] / OOS [25,90] trade band.
+        # F-AXIS-MECHANISM #3: gate fire rate IS [10%,30%] / OOS [5%,35%] LOAD-BEARING.
+        assert set(symbols) == {"ETHUSDT"}, (
+            f"iter-v1/019 guard: expected {{ETHUSDT}}, got {set(symbols)}"
+        )
+        results_g, faxm_g = run_model(
+            "G (ETH-only + R3 + BTC-trend gate)",
+            ("ETHUSDT",),
+            atr_tp=2.9,
+            atr_sl=1.45,
+            apply_r1=False,
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            **_r5_kwargs,
+        )
+        # Apply stateless direction-aware BTC-trend gate as post-hoc trade-stream filter.
+        # Gate kills counter-trend ETH trades: ETH long when BTC ret14 < -8%, or
+        # ETH short when BTC ret14 > +8%. IS EDA: +42.47% PnL lift, cross-year stable.
+        # load_btc_klines_for_filter() reads data/BTCUSDT/8h.csv (must be fresh
+        # per Section 10.3 pre-flight check: close_time within 16h of measurement time).
+        btc_open_times, btc_closes = load_btc_klines_for_filter()
+        gate_cfg = BtcTrendFilterConfig(
+            lookback_bars=V1_ITER019_BTC_GATE_LOOKBACK_BARS,
+            threshold_pct=V1_ITER019_BTC_GATE_THRESHOLD_PCT,
+            enabled=V1_ITER019_BTC_GATE_ENABLED,
+        )
+        results_g, gate_stats = apply_btc_trend_filter(
+            results_g,
+            btc_open_times,
+            btc_closes,
+            gate_cfg,
+        )
+        gate_stats_dict = gate_stats.as_dict()
+        print(
+            f"[iter-v1/019 BTC-trend gate] "
+            f"normal={gate_stats_dict['n_normal']} "
+            f"warmup={gate_stats_dict['n_warmup']} "
+            f"killed={gate_stats_dict['n_killed']}/{gate_stats_dict['n_total']} "
+            f"fire_rate={gate_stats_dict['fire_rate']:.2%}"
+        )
+        _all_faxm_logs = faxm_g
+        all_results = results_g
+        _r5_model_results = [results_g]
     else:
         # Custom universe — single pooled model unless brief specifies otherwise.
         # iter-v1/NNN brief Section 3 should declare per-symbol model assignment.
