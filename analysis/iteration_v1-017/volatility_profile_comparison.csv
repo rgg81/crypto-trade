@@ -1,0 +1,5 @@
+symbol,role,is_ret_std_pct,is_abs_p95_pct,is_abs_p99_pct,is_skew,is_kurtosis
+LINKUSDT,baseline,3.2415,6.6652,11.3798,-0.3736,5.2082
+DOTUSDT,baseline,3.1247,6.4873,11.6641,-0.1706,7.6083
+SOLUSDT,candidate,3.6847,7.5207,12.4507,0.2504,8.4117
+XRPUSDT,candidate,3.0441,5.9868,11.8371,0.0322,17.4609

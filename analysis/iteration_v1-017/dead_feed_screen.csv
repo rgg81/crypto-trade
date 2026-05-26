@@ -1,0 +1,8 @@
+symbol,is_candidate,max_consecutive_flat_close,max_consecutive_flat_ohlc,num_zero_volume_candles,dead_feed_flag
+BTCUSDT,False,1,0,0,False
+ETHUSDT,False,1,0,0,False
+LINKUSDT,False,1,0,0,False
+LTCUSDT,False,1,0,0,False
+DOTUSDT,False,1,0,0,False
+SOLUSDT,True,1,0,0,False
+XRPUSDT,True,2,0,0,False

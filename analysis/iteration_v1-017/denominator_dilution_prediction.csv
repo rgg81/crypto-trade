@@ -1,0 +1,6 @@
+scenario,new_portfolio_OOS_PnL_pct,ETH_share_pct_after_dilution,ETH_share_delta_vs_baseline_pct_pts
+SOL_OOS_PnL=-10.0,14.87,18.49,7.44
+SOL_OOS_PnL=-5.0,19.87,13.84,2.78
+SOL_OOS_PnL=0.0,24.87,11.06,0.0
+SOL_OOS_PnL=5.0,29.87,9.21,-1.85
+SOL_OOS_PnL=10.0,34.87,7.89,-3.17

@@ -1,0 +1,4 @@
+arch,model_count,scaling_cost_vs_baseline_x,rationale
+Add SOL as ISOLATED Model F (single-symbol),5,1.25,preserves baseline A/C/D/E semantics; SOL gets dedicated model with single-symbol per-symbol Optuna
+Add SOL to POOLED-A (BTC+ETH+SOL),4,1.2,smaller model count; risk of confounding by changing Model A's training distribution
+Single fully-pooled 6-symbol model,1,1.5,ABANDONS baseline architecture entirely; this is the runner's CURRENT 'else' branch; CONFOUNDS universe axis with model-arch axis

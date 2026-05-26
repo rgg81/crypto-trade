@@ -1,0 +1,8 @@
+symbol,is_candidate,is_corr_vs_BTC
+BTCUSDT,False,1.0
+ETHUSDT,False,0.8327
+LINKUSDT,False,0.6856
+LTCUSDT,False,0.751
+DOTUSDT,False,0.6948
+SOLUSDT,True,0.6164
+XRPUSDT,True,0.5946
