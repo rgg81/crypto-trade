@@ -152,6 +152,24 @@ V1_ITER019_BTC_GATE_LOOKBACK_BARS: int = 42  # 14 days at 8h cadence
 V1_ITER019_BTC_GATE_THRESHOLD_PCT: float = 8.0  # +-8% BTC 14d return
 V1_ITER019_BTC_GATE_ENABLED: bool = True
 
+#: iter-v1/020: BTC-only single-cohort EXPLORATION (cycle-3 #5 of 10).
+#:
+#: USER STRATEGIC PIVOT 2026-05-26 cycle-3 #5 EXPLORATION:
+#: per-cohort-specialization-BTC (NEW 11th axis family). BTC has UNIQUE IS-OOS
+#: asymmetric rotation prior: 5/5 IS-NEGATIVE (mean -38.12%) + 4/5 OOS-POSITIVE
+#: (mean +7.70%) across baseline + /014-/017. EDA diagnostics support H_INTRINSIC
+#: (regime-bound IS catastrophic in IS_H1; Pearson(BTC,ETH) monthly = -0.0220
+#: in pool → labels statistically independent, H_POOL_ANCHOR refuted at ρ ≈ 0).
+#:
+#: Pure cohort isolation: NO BTC-trend gate, NO new feature, NO new labeling.
+#: Tests whether cohort isolation ALONE restructures BTC's asymmetric rotation
+#: or whether a specialization knob is required at later iters.
+#:
+#: LOCAL to runner — NOT shared via features_v1/__init__.py (only CONFIRMATION-MERGE
+#: updates V1_BASELINE_UNIVERSE). assert_v1_universe() accepts {BTCUSDT} because
+#: BTCUSDT is in V1_BASELINE_UNIVERSE.
+V1_ITER020_UNIVERSE: tuple[str, ...] = ("BTCUSDT",)
+
 #: BASELINE_V1.md anchor — the corrected walk-forward stack reproduces this set.
 BASELINE_OOD_CUTOFF_PCT: float = 0.70
 
@@ -1422,6 +1440,41 @@ def main() -> None:
         _all_faxm_logs = faxm_g
         all_results = results_g
         _r5_model_results = [results_g]
+    elif set(symbols) == set(V1_ITER020_UNIVERSE):
+        # iter-v1/020: BTC-only single-cohort EXPLORATION (cycle-3 #5 of 10).
+        # USER STRATEGIC PIVOT 2026-05-26: per-cohort specialization axis.
+        #
+        # Dispatch — ONLY Model H (BTC-only; mirrors Model A's apply_r1=False
+        # apply_r2=False semantics; ATR 2.9/1.45 matches Model A which trained
+        # BTC in pool).
+        # Models A (BTC+ETH pooled), C (LINK), D (LTC), E (DOT) DROPPED.
+        # Single-axis isolation: SYMBOL DIMENSION (5 sym -> 1 sym).
+        # NO gate, NO new feature, NO new labeling — pure cohort isolation.
+        #
+        # F-AXIS-MECHANISM #1: trades.csv must contain ONLY BTCUSDT rows.
+        # F-AXIS-MECHANISM #2: BTC IS [70,150] / OOS [25,55] trade band.
+        # F-AXIS-MECHANISM #3 (load-bearing per /019 Critic Rec #2 at |IS Sharpe| ≈ 0.12):
+        #   IS_H1 net_pnl preserved catastrophic per regime-binding hypothesis;
+        #   pre-registered band [−45%, −15%] (Section 4 F-AXIS #3).
+        assert set(symbols) == {"BTCUSDT"}, (
+            f"iter-v1/020 guard: expected {{BTCUSDT}}, got {set(symbols)}"
+        )
+        results_h, faxm_h = run_model(
+            "H (BTC-only + R3)",
+            ("BTCUSDT",),
+            atr_tp=2.9,
+            atr_sl=1.45,
+            apply_r1=False,
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            **_r5_kwargs,
+        )
+        _all_faxm_logs = faxm_h
+        all_results = results_h
+        _r5_model_results = [results_h]
     else:
         # Custom universe — single pooled model unless brief specifies otherwise.
         # iter-v1/NNN brief Section 3 should declare per-symbol model assignment.
