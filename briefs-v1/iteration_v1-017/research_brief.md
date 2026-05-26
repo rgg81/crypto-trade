@@ -285,9 +285,38 @@ elif set(symbols) == set(V1_ITER017_UNIVERSE):
 
 (LM Master is invoked at Phase 4.5 PRIOR to brief authoring; Phase 4.5 recommendations land in `briefs-v1/iteration_v1-017/lgbm_advisor.md`. As of brief authoring, the LM Master Phase 4.5 file is **PENDING** and will be appended by orchestrator before Phase 5.5 gate. Brief Section 3.4 receives an "Adopted/Modified/Rejected per recommendation" reply for each LM Master rec.)
 
-### 3.4 (Reserved) Response to LM Master Phase 4.5 recommendations
+### 3.4 Response to LM Master Phase 4.5 recommendations (committed at `7294b58`)
 
-To be authored after `briefs-v1/iteration_v1-017/lgbm_advisor.md` Phase 4.5 section is committed by orchestrator. Brief Section 3.4 will contain explicit "Adopted" / "Modified" / "Rejected" responses to each of LM Master's 2-4 hyperparameter recommendations + 1-2 feature-engineering ideas + saturation risks + confidence assessment, per v1-Specific Disciplines §1.
+Per `briefs-v1/iteration_v1-017/lgbm_advisor.md`:
+
+**Rec #1 — KEEP n_trials=18; do NOT compress to 15** (false economy on HIGH-RISK axis):
+- **ADOPTED**. Section 3.6 already specifies n_trials=18. Contingency: drop to 15 ONLY if QE pre-flight at 50% completion projects wall-clock >72min. Pre-emptive compression rejected per LM Master argument that buffer above TPE warmup ~10 should stay at 80% (n_trials=18) not 50% (n_trials=15) for HIGH-RISK axis.
+
+**Rec #2 — 6-symbol over 7-symbol (DO NOT add XRP to /017)**:
+- **ADOPTED**. Section 3.1 implements 6-sym V1_BASELINE_UNIVERSE with SOL only. XRP deferred to /018 alternate per Section 11.2 (rationale: XRP kurtosis 17.46 is structural red flag; single-axis isolation preserves attribution; sequential single-axis adds preferred over multi-symbol bundle).
+
+**Rec #3 — ETH regime-lock probability 75%; /018 PRIMARY = ETH-specific kill switch (if /017 NEGATIVE/INERT on ETH)**:
+- **ADOPTED**. Section 11.3 mandates /018 PRIMARY = ETH-specific kill switch (BTC-trend conditional OR per-symbol drawdown brake) if /017 OOS shows ETH still catastrophic (≤-0.30). Universe expansion as second-attempt (XRP) is alternate B per LM Master /016 Phase 7.4 §6.
+
+**SOL mechanism predictions DOCUMENTED into Section 5**:
+- SOL IS direction NEUTRAL→POSITIVE 60/30/10
+- SOL OOS HIGH-VARIANCE 40/35/25
+- IS abs PnL share band [8%, 25%]
+- OOS PnL band [-35%, +35%]
+
+**n_eff_per_cell prediction band [11, 17]** ADOPTED into Section 4 F-AXIS-MECHANISM thresholds.
+
+**Verdict-class prediction PROMISING 30% / NULL 35% / NEGATIVE 35%** documented (matches Section 5 FLAT priors with mild adjustment).
+
+**F-AXIS-MECHANISM SOL share ∈ [5%, 40%] band** ADOPTED with both extremes (< 5% under-firing → BLOCK-PENDING-FIX; > 40% lottery → concentration violation NOT edge) pre-registered.
+
+**Saturation risks ADOPTED into Section 6/7**:
+- Single-seed=42 frozen-baseline pattern (Critic must verify A/C/D/E trade-roster identity vs /016)
+- HIGH-RISK declaration soft (1st cycle-3 HIGH-RISK; /015 LESSON forward-mandate accumulates across 3)
+
+**What LM Master did NOT recommend, brief acknowledges**: no multi-seed at /017 (HIGH-RISK forward-mandate not triggered); no Model F bounds tighter than v1_pruned; XGBoost deferred to /018+; no ETH-specific features (multi-axis violation); R1/R2 NOT applied to Model F (R3-only sister to A).
+
+**Net**: 3 staked calls ADOPTED + saturation risks + predictions documented. Brief finalized for Phase 5.5 re-submission.
 
 ### 3.5 (Sub-section continues for any axis-spec amendments after LM Master)
 
