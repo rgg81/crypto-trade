@@ -102,6 +102,19 @@ V1_EXPLORATION_ENSEMBLE_SIZE: int = 3
 #: CONFIRMATION ensemble size — full statistical rigor.
 V1_CONFIRMATION_ENSEMBLE_SIZE: int = 10
 
+#: iter-v1/017: 6-symbol universe for EXPLORATION.
+#: LOCAL to runner — NOT shared via features_v1/__init__.py (only CONFIRMATION-MERGE
+#: updates V1_BASELINE_UNIVERSE). Adding SOLUSDT as isolated Model F preserves
+#: baseline A/C/D/E semantics for clean single-axis attribution.
+V1_ITER017_UNIVERSE: tuple[str, ...] = (
+    "BTCUSDT",
+    "ETHUSDT",
+    "LINKUSDT",
+    "LTCUSDT",
+    "DOTUSDT",
+    "SOLUSDT",  # NEW — Model F (iter-v1/017 universe expansion)
+)
+
 #: BASELINE_V1.md anchor — the corrected walk-forward stack reproduces this set.
 BASELINE_OOD_CUTOFF_PCT: float = 0.70
 
@@ -1203,6 +1216,83 @@ def main() -> None:
         all_results = results_a + results_c + results_d + results_e
         # Aggregate R5 IS/OOS split counters across all four models (iter-v1/010+).
         _r5_model_results = [results_a, results_c, results_d, results_e]
+    elif set(symbols) == set(V1_ITER017_UNIVERSE):
+        # iter-v1/017: 6-symbol universe expansion (cycle-3 #2).
+        # Models A/C/D/E are BIT-IDENTICAL to baseline dispatch above.
+        # NEW Model F (SOL): atr=2.9/1.45 (Model A profile), R3-only (no R1/R2),
+        # bounds_profile=v1_pruned (same as A/C/D/E), single-symbol isolated.
+        results_a, faxm_a = run_model(
+            "A (BTC/ETH)",
+            ("BTCUSDT", "ETHUSDT"),
+            atr_tp=2.9,
+            atr_sl=1.45,
+            apply_r1=False,
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            **_r5_kwargs,
+        )
+        results_c, faxm_c = run_model(
+            "C (LINK + R1)",
+            ("LINKUSDT",),
+            atr_tp=3.5,
+            atr_sl=1.75,
+            apply_r1=True,
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            **_r5_kwargs,
+        )
+        results_d, faxm_d = run_model(
+            "D (LTC + R1)",
+            ("LTCUSDT",),
+            atr_tp=3.5,
+            atr_sl=1.75,
+            apply_r1=True,
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            **_r5_kwargs,
+        )
+        results_e, faxm_e = run_model(
+            "E (DOT + R1 + R2)",
+            ("DOTUSDT",),
+            atr_tp=3.5,
+            atr_sl=1.75,
+            apply_r1=True,
+            apply_r2=True,
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            **_r5_kwargs,
+        )
+        # Model F — SOL: single-symbol, R3-only (sister to Model A), ATR 2.9/1.45.
+        results_f, faxm_f = run_model(
+            "F (SOL)",
+            ("SOLUSDT",),
+            atr_tp=2.9,
+            atr_sl=1.45,
+            apply_r1=False,
+            apply_r2=False,
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            **_r5_kwargs,
+        )
+        _all_faxm_logs = faxm_a + faxm_c + faxm_d + faxm_e + faxm_f
+        all_results = results_a + results_c + results_d + results_e + results_f
+        # Aggregate R5 IS/OOS split counters across all five models.
+        _r5_model_results = [results_a, results_c, results_d, results_e, results_f]
     else:
         # Custom universe — single pooled model unless brief specifies otherwise.
         # iter-v1/NNN brief Section 3 should declare per-symbol model assignment.

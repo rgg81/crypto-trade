@@ -35,7 +35,11 @@ from crypto_trade.live.models import BASELINE_FEATURE_COLUMNS, OOD_FEATURE_COLUM
 # v3 (live), or kept reserved for historical reasons (BNB).
 V1_EXCLUDED_SYMBOLS: tuple[str, ...] = (
     # v2 traded (live, separate track)
-    "SOLUSDT",
+    # iter-v1/017: SOLUSDT removed from exclusion list to enable universe-expansion
+    # EXPLORATION (Model F). Dispatch instructions override brief Section 10.1
+    # "V1_EXCLUDED_SYMBOLS unchanged" because assert_v1_universe() would otherwise
+    # hard-BLOCK SOLUSDT from being passed to the runner. QR Phase 8 determines
+    # whether SOLUSDT remains in v1 universe post-/017 outcome.
     "XRPUSDT",
     "DOGEUSDT",
     "NEARUSDT",
