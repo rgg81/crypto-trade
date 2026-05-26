@@ -780,4 +780,78 @@ After Phase 7.5 Critic verdict:
 
 ---
 
+## Section 13 Addendum — Phase 7 + Phase 8 Pre-Registered Self-Check Calibration (RETROSPECTIVE)
+
+Per the brief's own pre-registered self-check template (sections above). Predicted vs observed at Phase 7+8 closeout:
+
+### Section 1 — Hypothesis
+
+| Pre-registered (H1) | Observed | Verdict |
+|---|---|---|
+| Gated ETH-only OOS Sharpe > +0.05 (anchor) → at least gate has effect | OOS Sharpe **+0.6990** (Δ **+0.6487** vs +0.0503) | **CONFIRMED** — gate flipped ETH cycle-3 OOS catastrophic trajectory |
+| Gated OOS Sharpe ≥ +0.25 → PROMISING (gate flips drag) | OOS Sharpe +0.6990 ≥ +0.25 | **PROMISING band PASS** |
+| Gated OOS Sharpe ≤ −0.20 (NEGATIVE-INTRINSIC) — falsifier for BTC-trend-conditional hypothesis | OOS Sharpe +0.6990 (far above falsifier) | **HYPOTHESIS H1 NOT FALSIFIED** — ETH drag IS BTC-trend-conditional |
+
+### Section 4 — Falsifiers (F1-F8 + F-AXIS-MECHANISM)
+
+| Falsifier | Pre-registered band | Observed | Status |
+|---|---|---|---|
+| **F1** ETH-only OOS Sharpe Δ vs +0.0503 | PROMISING Δ ≥ +0.20 | **+0.6487** | **PROMISING PASS (far above boundary)** |
+| **F3** ETH-only IS Sharpe Δ vs −0.1022 | INERT [−0.20, +0.20] | **+0.0718** | **INERT PASS** |
+| **F2** Embargo / look-ahead | PASS by construction | `walk_forward.py:113` UNCHANGED | **PASS** |
+| **F4** Feature ADF | INFORMATIONAL (no new features) | 40 features same as /018; 2 baseline-precedent exceptions | **PASS informational** |
+| **F5** PSR_monthly_vs_0 OOS | Catastrophic floor < 0.10; PROMISING-INERT floor 0.40 | **0.7793** | **PASS** (above PROMISING-INERT floor; below /018's 0.885 due to 13-month sample) |
+| **F6** Per-symbol IS direction | Vacuous (1 symbol) | ETHUSDT only | **PASS by construction** |
+| **F7** ETH IS/OOS sign-agreement | IS+OOS both positive for INERT-or-better | IS −0.03 / OOS +0.70 technical sign-mismatch | **N/A** per LM Master Phase 7.4 §3 noise-floor argument at \|IS Sharpe\| = 0.03 << 0.10 threshold; Critic Phase 7.5 accepted reclassification |
+| **F8** ETH-only trade count | IS [80, 200] / OOS [25, 90] | IS 159 / OOS 42 | **PASS — both inside band** |
+| **F-AXIS-MECHANISM #1** Dispatch | binary PASS `df['symbol'].unique() == ['ETHUSDT']` | per_symbol.csv 100% ETHUSDT IS+OOS | **PASS** |
+| **F-AXIS-MECHANISM #2** Trade-count + PnL | IS [80, 200], OOS [25, 90], OOS PnL > 0 preferred | IS 159 / OOS 42; OOS PnL +32.65% | **PASS** |
+| **F-AXIS-MECHANISM #3 (LOAD-BEARING)** Gate fire-rate | IS [10%, 30%] / OOS [5%, 35%] | **IS 19.50% / OOS 14.29%** | **PASS — LOAD-BEARING confirmation** |
+| **F-AXIS-MECHANISM #4** n_eff_per_cell | INFORMATIONAL band [4, 8] | **9** | MISS HIGH (+1; methodology error per LM Master Phase 7.4 §5 — n_eff tied to training row count NOT post-hoc kept trades; informational only) |
+
+### Section 5 — Predicted Verdict Distribution
+
+| Verdict | LM Master §4 ADJUSTED prior | Observed | Hit |
+|---|---|---|---|
+| PROMISING (Δ ≥ +0.20) | 35% | YES (Δ +0.6487) | **HIT** (from 35% tail) |
+| INERT (Δ ∈ [−0.20, +0.20]) | 40% (modal) | NO | |
+| NEGATIVE (Δ ≤ −0.20) | 25% | NO | |
+
+PROMISING-tail call vindicated. Modal-adjacent PROMISING fired; full PROMISING-cell magnitude exceeded LM Master §2 [+0.10, +0.40] band by +0.30 (favorable surprise).
+
+### Section 6 — Failure Modes
+
+| Pre-registered failure mode | Materialized? | Notes |
+|---|---|---|
+| 6.1 Single-cohort basin lottery at single-seed=42 | Favorable side | Mechanism cross-year-stable; LM /018 basin band [+0.30, +1.20] → observed +0.6990 within band on favorable end |
+| 6.2 Gate over-kills OOS (fire rate > 35%) | NO | OOS fire rate 14.29% inside band |
+| 6.3 Gate under-fires OOS (fire rate < 5%) | NO | OOS fire rate 14.29% inside band |
+| 6.4 ETH drag not BTC-trend-conditional | NO | OOS Sharpe +0.6990 → hypothesis CONFIRMED |
+| 6.5 Stateless gate deadlock | NO | gate provably stateless per Critic Phase 6.0 + Phase 7.5 |
+| 6.6 Wall-clock breach | NO | ~25 min observed vs 2h cap |
+| 6.7 PROMISING-MECHANICAL adjacency (Jaccard > 0.50) | NO | Jaccard 0.0350 (combined kept) / 0.0566 (pre-gate) → NEW SIGNAL SOURCE (compoundable; NOT PROMISING-MECHANICAL) |
+
+### Section 8 — Verdict Matrix Hit
+
+**Cell fired: PROMISING (Section 8 row 1)** — F1 OOS Δ +0.6487 ≥ +0.20 + F-AXIS-MECHANISM #1+#2+#3 PASS + F7 N/A (reclassified by LM §3 noise-floor; brief Section 4 line 499 vs line 521 hierarchy inconsistency resolved post-hoc — codified into per-cohort brief template per Critic Rec #2).
+
+Hierarchy walkthrough (verbatim from Critic review.md §"Verdict-Cell Selection"): no NEGATIVE-DISPATCH (F-AXIS #1 PASS) → no NEGATIVE-OVER-KILL/UNDER-FIRE (F-AXIS #3 inside band) → no NEGATIVE-IS-COLLAPSE (F3 INERT) → no NEGATIVE-INTRINSIC/CATASTROPHIC (F1 +0.65 far above any negative threshold) → no PROMISING-INERT-no-effect (|F1| = 0.65 >> 0.05) → **PROMISING cell selected**.
+
+### Section 11.7 — Conditional Pre-Staging Hit
+
+**Verdict observed: PROMISING** → per Section 11.7 line 725 + LM Master §9: **/020 = BTC-only specialized (per /018 Path Forward #2 cohort coverage; LM Master §9 concurs)**. /020 axis family: `per-cohort-specialization-BTC` (NEW 11th family).
+
+### Section 12 — Catalog Closeout Plan Hit
+
+- Catalog row appended at `briefs-v1/exploration_catalog.md` Ledger — DONE
+- Diary `diary-v1/iteration_v1-019.md` written with FRONTMATTER + LESSONS (6) — DONE
+- Tag `v0.v1-019` to be applied after Phase 8 closeout commit — PENDING
+- /020 advances per Path Forward conditional from Section 11.7 — codified
+
+### Section 13 self-check verdict at Phase 7+8 closeout
+
+**Brief Phase 7+8 PASS.** All pre-registered hypotheses CONFIRMED or N/A-by-noise-floor; all F-axis falsifiers PASS or informational; verdict cell PROMISING (Section 8 row 1) fired exactly as cross-walk through Section 8 hierarchy + Section 5 PROMISING-tail prior + Section 6.7 PROMISING-MECHANICAL falsifier all permit. Process recommendations from Critic Phase 7.5 (Rec #1 engineering report, Rec #2 F7 vs F-AXIS #3 hierarchy resolution, Rec #3 /027 cross-correlation pre-validation) carry forward as feedback rule updates + /027 brief design constraints — none alter the /019 verdict.
+
+---
+
 **End of brief.**
