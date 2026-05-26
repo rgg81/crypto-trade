@@ -227,6 +227,8 @@ The HIGH-RISK gate is NOT triggered. Phase 5.5 verifies via the src/ diff (no Op
 
 ### 3.1 Add `params_persist_path` buffer to `optimize_and_train`
 
+**LM Master Phase 4.5 §6 mandate (ADOPTED)**: this §3.1 implementation IS the substrate of the entire /021 diagnostic. If `params_persist_path` has partial-coverage bug (only 6 of 10 hyperparams written), the H1 falsifier becomes partially blind and verdict is forced to DIAGNOSTIC-MIXED regardless of underlying truth. Phase 5.5 BLOCK gate INCLUDES static code-review: every key in `study.best_params` for v1_pruned bounds_profile is written, NO `.get(default)` silent drops. Critic Phase 6.0 must verify on QE's src/ diff. The two QR-proposed methodology alternatives at Section 3.4 (n_trials=3 re-run + log-grep fallback) are REJECTED per LM Master §2; only the params buffer at the canonical /020 budget (n_trials=18, seed=42) is admissible — ~25 min wall-clock side-by-side BASELINE-config + Model H run with the new buffer.
+
 **Location**: `src/crypto_trade/strategies/ml/optimization.py`, function `optimize_and_train` (lines 356-499).
 
 **Specification**:
@@ -249,6 +251,7 @@ The HIGH-RISK gate is NOT triggered. Phase 5.5 verifies via the src/ diff (no Op
 - Use `V1_FEATURE_COLUMNS_PRUNED` as the fallback feature list (not V3_FEATURE_COLUMNS).
 - Emit to `report_dir / "in_sample" / "feature_importance_<SYMBOL>.csv"` per model.
 - Emit `report_dir / "in_sample" / "feature_importance_portfolio.csv"` (sum across models).
+- **Feature importance method LOCKED to `importance_type='gain'`** (mean gain, cumulative loss-reduction per feature). Per LM Master Phase 4.5 §4 (ADOPTED): matches v3 `run_baseline_v3.py:2730-2818` convention; Spearman rank well-defined; H2 falsifier comparisons interpretable. Alternatives REJECTED: raw split count `(a)` is noisy (captures "feature used in ≥1 split" frequency, not predictive power); permutation importance `(c)` is most trustworthy but costs ~5-10× wall-clock and is deferred.
 - For the baseline pool config: emit ONLY the Model A pool feature importance (which is the BTC+ETH combined slot in baseline).
 - For the diagnostic /021 run: emit feature_importance for Model A pool config AND Model H BTC-only config (the diagnostic runs BOTH side-by-side at the same seed=42 + same n_trials=18 used at /020).
 - v1 reuses v3's last-month-only convention per Critic Clar 3 (iter-v3/017) — feature_importance reflects the LAST walk-forward month's trained models, NOT a per-month aggregate. Per-month feature importance would require a separate buffer in `_train_for_month` and is OUT OF SCOPE for /021 (LM Master Phase 7.4 §6 outstanding gap addresses the last-month-snapshot first; per-month aggregation is a future iteration).
@@ -267,19 +270,43 @@ Emits:
 - `analysis/iteration_v1-021/optuna_param_delta_summary.csv` — per-parameter aggregate (mean Δ, std Δ, %|Δ|>threshold, n_cells_breached).
 - `analysis/iteration_v1-021/h1_verdict.csv` — single-row verdict (DIAGNOSTIC-CONFIRMED/MIXED/REFUTED based on Section 4 falsifier thresholds).
 
-### 3.4 RESERVED for LM Master Phase 4.5 responses
+### 3.4 LM Master Phase 4.5 responses
 
-LM Master Phase 4.5 fires AFTER this brief. The orchestrator's Phase 4.5 dispatch produces `briefs-v1/iteration_v1-021/lgbm_advisor.md`. Upon LM Master's emission, this Section 3.4 is filled in with QR's explicit response to each LM Master recommendation (ADOPT / MODIFY / REJECT + one-sentence justification per `feedback_v3_brief_parameter_provenance.md`).
+LM Master Phase 4.5 emitted at `briefs-v1/iteration_v1-021/lgbm_advisor.md` (101 lines) AFTER this brief's initial draft. The seven LM Master recommendations are addressed below with QR's explicit response per `feedback_v3_brief_parameter_provenance.md`. All seven items ADOPTED; downstream sections (3.1 introduction, 3.2 importance method lock, 4.4 methodology gates, 5 priors, 11.6 bundle table, 11.7 routing matrix, 10 closeout protocol) amended in place.
 
-Placeholder format (filled at Phase 4.5 close):
+- **LM Master Rec #1**: Recalibrated H1 verdict-class priors **CONFIRMED 45% / MIXED 40% / REFUTED 15%** (vs QR's 55/30/15) — Spearman 0.26 dominates over Pearson 0.59 (the latter inflated by shared positive sign in 90%+ months); mean-OOF-return is a noisy upper-bound proxy for direct parameter delta; n_trials disparity (35 pool vs 18 BTC-only) confounds best-trial parameters at warm-up vs saturated TPE.
+  QR response: **ADOPTED**.
+  Justification: LM Master's three-point argument is methodologically tighter than QR's (which leaned on Pearson 0.59); the MIXED-tail underweight at QR's 30% is the directly addressable gap; Section 5 priors updated.
 
-```
-- LM Master Rec #N: <recommendation summary>
-  QR response: ADOPTED / MODIFIED / REJECTED
-  Justification: <one sentence>
-```
+- **LM Master Rec #2**: REJECT both QR-proposed Section 3.4 methodology alternatives. (a) n_trials=3 re-run is BELOW TPE warmup (first 5-10 trials = pure random search), yielding a NULL diagnostic dressed in compute; (b) log-grep is structurally incomplete (6/10 hyperparams never printed: subsample, colsample_bytree, min_child_samples, reg_alpha, reg_lambda) AND /020 has no run.log file at all. MANDATE: §3.1 implementation IS the diagnostic; ~25 min side-by-side BASELINE-config + Model H at n_trials=18 seed=42 with the new buffer.
+  QR response: **ADOPTED**.
+  Justification: Both QR alternatives have fatal defects (random-search NULL + 60% parameter-blind); only the §3.1 path produces 10/10 hyperparams per cell at the canonical /020 budget; Section 3.1 introduction now ANCHORS the §3.1 method as the substrate and explicitly rejects both alternatives.
 
-Phase 5.5 gate will BLOCK if any LM Master Phase 4.5 recommendation is NOT addressed here.
+- **LM Master Rec #3**: F-AXIS-MECHANISM #1 THREE-LAYER TEST replaces the brief's single-layer ≥96-row gate. **Layer A**: ≥**168 rows** total in `optuna_best_params.parquet` (the brief's "≥96" miscounted; pool runs 5 symbols × 24 months × 1 seed = 120 rows + 48 rows for BTC's two model_roles = ≥168). BLOCK-PENDING-FIX on row count < 168. **Layer B**: BASELINE-config trade roster bit-identical to `v0.v1-baseline-corrected` at comparison.csv level (BLOCK-FINAL on fail; adding `params_persist_path` MUST be a true no-op). **Layer C**: ALL 10 hyperparameter columns non-null per (sym, month, seed) cell — no silent `.get(default)` drops on v1_pruned profile; if only 6/10 sampled (the v1_pruned_axis016 incident from /016), verdict is forced to DIAGNOSTIC-MIXED-or-worse.
+  QR response: **ADOPTED**.
+  Justification: Brief Section 4.4 row-count was wrong (forgot pool runs 5 symbols); the three-layer structure correctly separates row-count (A), determinism (B), and per-row visibility (C) — all three are independent failure modes; Section 4.4 amended.
+
+- **LM Master Rec #4**: Feature importance method = mean gain (b), matching v3 `run_baseline_v3.py:2730-2818`. Reject (a) raw split count (noisy frequency proxy) and (c) permutation importance (5-10× wall-clock, defer).
+  QR response: **ADOPTED**.
+  Justification: Mean gain is the v3 convention and gives interpretable Spearman rank for H2; Section 3.2 now LOCKS `importance_type='gain'` as the only admissible setting.
+
+- **LM Master Rec #5**: /022 conditional staging — **HIGH-CONFIDENCE H1 CONFIRMED gate ≥6/10 params shifted on ≥50% of (sym, month) cells AND ≥2 of {confidence_threshold, n_estimators, num_leaves, min_child_samples} shifted** → accelerated /022 = /027. **Borderline (4-5/10)** → /022 = LTC-only specialization. **H1 MIXED / REFUTED** → /022 = LTC-only specialization (cadence preserved).
+  QR response: **ADOPTED**.
+  Justification: The brief's previous /022 routing in Section 11.7 used ≥4/10 + ≥1 key-param as the H1 CONFIRMED bar — which is the H1 verdict threshold itself, NOT a separate /022-acceleration gate. LM Master's distinction is correct: cadence violation (skipping /023-/026) requires HIGHER confidence than H1 CONFIRMED-floor; ≥6/10 + ≥2 key-params is the right /022-acceleration threshold; Section 11.7 amended.
+
+- **LM Master Rec #6**: Most important single-sentence directional call — §3.1 implementation IS the substrate.
+  QR response: **ADOPTED**.
+  Justification: Section 3.1 introduction now opens with the LM Master §6 framing as the anchor sentence; downstream gates derive from §3.1 substrate correctness.
+
+- **LM Master Rec #7**: /027 bundle architecture = **Option β (FULL POOL preserved + specialists as alpha-enhancement)** with signal-level merge logic + pre-committed weight rule. REJECT Option α (reduced pool from 5→3 syms shifts BTC's basin via H1-in-reverse, which would CONTAMINATE the diagnostic's basis assumption). Multi-seed bundle Δ target: +1.10 to +1.30; must clear Sharpe 1.0 floor merge gate.
+  QR response: **ADOPTED**.
+  Justification: Option α had not been explicitly entertained by QR; LM Master's H1-in-reverse contamination argument is decisive — reducing pool size 5→3 IS itself a pool-anchor mechanism intervention that would invalidate the bundle's basis vs. the BASELINE_V1.md anchor (+0.6637 OOS Sharpe @ 5-sym pool); only Option β (FULL POOL preserved + portfolio-level additive specialists) preserves the basis; Section 11.6 bundle table amended.
+
+- **LM Master Closing — Critic Phase 7.5 priority items (5)**: Layer A buffer flush completeness (≥168 rows) / Layer B determinism bit-identical baseline / Layer C 10-param visibility audit / H1 falsifier evaluation against pre-registered thresholds / H2 feature-signature Spearman rank correlation pre-registered band.
+  QR response: **ADOPTED**.
+  Justification: These five items are the canonical Phase 7.5 review checklist for /021; Section 10.5 amended to enumerate them as the Critic review pass-conditions.
+
+Phase 5.5 gate verifies: (a) all seven recommendations addressed in this Section 3.4, (b) downstream sections amended consistently (Section 3.1 intro + Section 3.2 importance method lock + Section 4.4 three-layer test + Section 5 priors + Section 11.6 bundle table + Section 11.7 routing matrix + Section 10.5 Critic priority items).
 
 ### 3.5 NEW script: `analysis/iteration_v1-021/05_feature_importance_signature_extraction.py`
 
@@ -355,32 +382,40 @@ Emits:
 
 The /022 routing branches under the H1×H2 verdict are pre-registered here to prevent post-hoc rationalization.
 
-### 4.4 Methodology gate falsifier (Phase 6 implementation must satisfy)
+### 4.4 F-AXIS-MECHANISM #1 — THREE-LAYER TEST (LM Master Phase 4.5 §3, ADOPTED)
 
-| Gate | PASS criterion |
-|---|---|
-| `params_persist_path` flushed | `reports-v1/iteration_v1-021/optuna_best_params.parquet` exists with ≥ (24 months × 2 model_roles × 1 seed) = 48 rows for BTC; ≥ (24 months × 2 model_roles × 1 seed) = 48 rows for ETH if Model A pool is run; total ≥ 96 rows minimum |
-| `feature_importance_<SYM>.csv` emitted | `reports-v1/iteration_v1-021/in_sample/feature_importance_BTCUSDT.csv` AND `in_sample/feature_importance_ETHUSDT.csv` (for pool Model A run) AND `in_sample/feature_importance_portfolio.csv` exist |
-| Determinism: BASELINE configuration trade roster bit-identical to v0.v1-baseline-corrected | Run /021 BASELINE half (Model A pool only, no diagnostic) and verify `comparison.csv` IS/OOS Sharpe is bit-identical to `BASELINE_V1.md` headline (+0.2829 IS / +0.6637 OOS); zero divergences |
-| Wall-clock ≤ 30 min for diagnostic-only run (NOT a full baseline re-run) | Stopwatch from QE engineering_report.md |
+The single-layer ≥96-row gate from the brief's initial draft was REPLACED at LM Master Phase 4.5 §3 with a three-layer test that separates row-count, determinism, and per-row visibility. The original ≥96-row count miscounted (forgot pool runs 5 symbols × 24 months × 1 seed = 120 rows + 48 rows for BTC's two model_roles).
 
-If any methodology gate fails, Critic Phase 7.5 verdict is **BLOCK-PENDING-FIX**. If both methodology gates fail or the trade-roster determinism gate fails (indicating accidental src/ change that broke baseline), verdict is **BLOCK-FINAL**.
+| Layer | Gate | PASS criterion | Verdict on fail |
+|---|---|---|---|
+| **A** | Buffer flush completeness — row count | `reports-v1/iteration_v1-021/optuna_best_params.parquet` exists with **≥168 rows total** (pool runs 5 symbols × 24 months × 1 seed = 120 rows + BTC × 2 model_roles × 24 months × 1 seed = 48 rows; Σ ≥168). | **BLOCK-PENDING-FIX** |
+| **B** | Determinism re-test — bit-identical baseline | BASELINE-config /021 run (Model A pool only, `params_persist_path=None` OR with buffer enabled but BASELINE config) produces `comparison.csv` IS/OOS Sharpe bit-identical to `v0.v1-baseline-corrected` headline (+0.2829 IS / +0.6637 OOS); zero divergences. Adding `params_persist_path` MUST be a true no-op on Optuna's training-objective domain. | **BLOCK-FINAL** |
+| **C** | Parameter visibility audit — 10-column non-null | For each (sym, month, seed) cell in the params parquet, verify **ALL 10 hyperparameter columns are non-null** (confidence_threshold, training_days, n_estimators, max_depth, num_leaves, learning_rate, subsample, colsample_bytree, min_child_samples, reg_alpha, reg_lambda). v1_pruned profile MUST not have any silent `.get(default)` drops — if only 6/10 sampled (the v1_pruned_axis016 incident from /016 recurrence pattern), H1 falsifier is partially blind and verdict is FORCED to DIAGNOSTIC-MIXED-or-worse regardless of underlying truth. | **BLOCK-PENDING-FIX** + downgrade H1 verdict |
+| ancillary | `feature_importance_<SYM>.csv` emitted | `reports-v1/iteration_v1-021/in_sample/feature_importance_BTCUSDT.csv` AND `in_sample/feature_importance_ETHUSDT.csv` (for pool Model A) AND `in_sample/feature_importance_portfolio.csv` exist with `importance_type='gain'`. | BLOCK-PENDING-FIX |
+| ancillary | Wall-clock ≤ 30 min target / 60 min HARD CAP for diagnostic-only run | Stopwatch from QE engineering_report.md. | Informational |
+
+**Critic Phase 7.5 verdict structure**:
+- Layer A fail → BLOCK-PENDING-FIX (the missing rows are evidence of incorrect callsite threading; QE re-runs after fix).
+- Layer B fail → BLOCK-FINAL (the src/ changes were not actually no-ops; revert per Section 12 roll-back protocol).
+- Layer C fail → BLOCK-PENDING-FIX + the H1 verdict CANNOT BE BETTER THAN DIAGNOSTIC-MIXED (since 4 of 10 parameters were silently dropped to `.get(default)` and the falsifier is partially blind).
+- All three layers PASS → proceed to H1/H2 falsifier evaluation per Section 4.1 + 4.2 + 4.3 joint matrix.
 
 ---
 
 ## Section 5 — Predicted verdict-class priors
 
-**H1 priors** (from `analysis/iteration_v1-021/h1_verdict_class_priors.csv`):
-- DIAGNOSTIC-CONFIRMED **55%**
-- DIAGNOSTIC-MIXED **30%**
-- DIAGNOSTIC-REFUTED **15%**
+**H1 priors** — RECALIBRATED per LM Master Phase 4.5 §1 (ADOPTED). Original QR draft (55/30/15) was based on Pearson 0.59 + 3-channel mechanism plausibility; LM Master's three-point recalibration argues Spearman 0.26 (the rank-correlation, not Pearson) is the substrate signal AND mean-OOF-return is a noisy upper-bound on direct parameter delta AND n_trials disparity (35 pool vs 18 BTC-only) confounds best-trial parameters. The MIXED tail at QR's 30% was the underweighted region — partial channel signal across 1-2 of {C1, C2, C3} is the modal interior outcome.
 
-**H2 priors** (from `analysis/iteration_v1-021/h2_verdict_class_priors.csv`):
+- DIAGNOSTIC-CONFIRMED **45%** (was 55%; LM Master §1)
+- DIAGNOSTIC-MIXED **40%** (was 30%; LM Master §1 — modal-tail upweighted)
+- DIAGNOSTIC-REFUTED **15%** (unchanged)
+
+**H2 priors** (from `analysis/iteration_v1-021/h2_verdict_class_priors.csv`) — unchanged:
 - DIAGNOSTIC-CONFIRMED-H2 **70%**
 - DIAGNOSTIC-MIXED-H2 **20%**
 - DIAGNOSTIC-REFUTED-H2 **10%**
 
-**Joint H1×H2 modal prior**: DIAGNOSTIC-CONFIRMED + DIAGNOSTIC-CONFIRMED-H2 = **0.55 × 0.70 = 38.5%** (modal). DIAGNOSTIC-CONFIRMED + DIAGNOSTIC-MIXED-H2 = 11%. Joint REFUTED+REFUTED = 1.5%.
+**Joint H1×H2 modal prior** (recalibrated): DIAGNOSTIC-CONFIRMED + DIAGNOSTIC-CONFIRMED-H2 = **0.45 × 0.70 = 31.5%** (modal). DIAGNOSTIC-MIXED + DIAGNOSTIC-CONFIRMED-H2 = **0.40 × 0.70 = 28%** (close second; together ~60% of joint mass anchors on H2-CONFIRMED-with-H1-mixed-or-confirmed). Joint REFUTED+REFUTED = 1.5%.
 
 **Critic Phase 7.5 verdict mapping (H1-anchored)**:
 - DIAGNOSTIC-CONFIRMED → EXPLORATION-PROMISING-METHODOLOGY (modal)
@@ -388,8 +423,8 @@ If any methodology gate fails, Critic Phase 7.5 verdict is **BLOCK-PENDING-FIX**
 - DIAGNOSTIC-REFUTED → EXPLORATION-NEGATIVE (LM Master §3 mechanism wrong)
 
 **Bayesian priors update plan (Section 4.3 joint matrix)**:
-- If H1 prior shifts to >65% CONFIRMED after Phase 4.5 LM Master input, declare HIGH-CONFIDENCE diagnostic and prepare /022 = /027 CONFIRMATION moved up brief in parallel during Phase 6 wait.
-- If H1 prior drops to <40% CONFIRMED after Phase 4.5, declare LOW-CONFIDENCE diagnostic; /022 = LTC-only specialization is fallback regardless.
+- If H1 posterior at Phase 7.5 lands on CONFIRMED with HIGH-CONFIDENCE per LM Master Rec #5 (≥6/10 params + ≥2 of {confidence_threshold, n_estimators, num_leaves, min_child_samples} shifted on ≥50% cells), /022 = /027 CONFIRMATION moved up.
+- If H1 posterior lands on CONFIRMED-borderline (4-5/10 params) OR on MIXED OR on REFUTED, /022 = LTC-only specialization (cadence preserved). The HIGH-CONFIDENCE gate (LM Master Rec #5) is the only valid /022-acceleration trigger.
 
 ---
 
@@ -500,44 +535,76 @@ No new library additions. All dependencies already present:
 
 The diagnostic backtest is short (≤30 min) so the orchestrator dispatch flow is: Phase 6 launches → backtest completes → QE writes engineering_report.md IN THE SAME COMMIT as comparison.csv → Critic Phase 7.5 dispatches.
 
-### 10.5 Pass conditions for Phase 7.5 Critic review
+### 10.5 Pass conditions for Phase 7.5 Critic review — LM Master Closing 5 priority items (ADOPTED)
 
-- Methodology gates (Section 4.4) all PASS.
-- H1 falsifier evaluated against thresholds.
-- H2 falsifier evaluated against thresholds.
-- Joint H1×H2 verdict cell determined per Section 4.3 matrix.
-- /022 routing recommendation written into Phase 7.5 review.
+LM Master Phase 4.5 Closing enumerated the Critic Phase 7.5 priority items as the canonical review checklist for /021. QR ADOPTED per Section 3.4 Closing-response.
+
+1. **Layer A** buffer flush completeness audit (≥168 rows in `optuna_best_params.parquet`) — per Section 4.4 Layer A.
+2. **Layer B** determinism bit-identical baseline audit (BASELINE-config trade roster = `v0.v1-baseline-corrected` headline) — per Section 4.4 Layer B.
+3. **Layer C** 10-parameter visibility audit (all 10 hyperparam columns non-null per (sym, month, seed) cell; no `.get(default)` silent drops on v1_pruned profile) — per Section 4.4 Layer C.
+4. **H1 falsifier evaluation** against pre-registered Section 4.1 thresholds AND against the /022-ACCELERATION HIGH-CONFIDENCE gate in Section 11.7 (≥6/10 params + ≥2 of 4 key-params shifted on ≥50% cells).
+5. **H2 feature-signature Spearman rank correlation** evaluation against pre-registered Section 4.2 band (ρ<0.5 → CONFIRMED, 0.5≤ρ≤0.8 → MIXED, ρ>0.8 → REFUTED).
+
+Joint H1×H2 verdict cell determined per Section 4.3 matrix. /022 routing recommendation per Section 11.7 HIGH-CONFIDENCE stratification written into Phase 7.5 review.
 
 ---
 
 ## Section 11 — Bundle composition + /027 roadmap (forward-looking)
 
-### 11.6 Current bundle composition after /020 (carry-forward from /020 diary)
+### 11.6 /027 bundle architecture — Option β FULL POOL + alpha-enhancement specialists (LM Master Phase 4.5 §7, ADOPTED)
 
-| Specialist | Status after /020 | Single-seed Δ | /027 multi-seed regression target |
-|---|---|---|---|
-| LINK-only /018 | VALIDATED — LOAD-BEARING | +0.16 | +0.80 |
-| ETH-only + BTC-trend gate /019 | VALIDATED — LOAD-BEARING | +0.65 | +0.50 |
-| BTC-only /020 | NEGATIVE Catastrophic — EXCLUDED from /027 | −0.86 | EXCLUDED |
-| LTC-only /022+ | PENDING (depends on /021 H1 outcome) | — | — |
-| DOT-only /022+ | PENDING (depends on /021 H1 outcome) | — | — |
-| Pooled cohorts /023-/026 | PENDING | — | — |
+LM Master Phase 4.5 §7 recommended **Option β** (FULL POOL preserved + specialists as alpha-enhancement) and REJECTED **Option α** (reduced pool 5→3 syms shifts BTC's basin via H1-in-reverse, contaminating the diagnostic's basis assumption). QR ADOPTED Option β per Section 3.4 Rec #7 — the H1-in-reverse contamination argument is decisive: reducing pool size IS itself a pool-anchor mechanism intervention that would invalidate the bundle's basis vs. the BASELINE_V1.md anchor (+0.6637 OOS Sharpe @ 5-sym pool).
 
-### 11.7 /022+ conditional roadmap per /021 H1 outcome
+**Architecture invariants**:
+- **Model A pool UNCHANGED at 5 symbols** (BTC, ETH, LINK, LTC, DOT) — preserves baseline determinism and the BASELINE_V1.md anchor.
+- Specialists are **PORTFOLIO-LEVEL ADDITIVE** (allocate fresh capital on top of pool signal; NOT a swap-out of pool slots).
+- **Signal-level merge logic** with pre-committed weight rule: specialist gets a fixed % of pool's per-symbol allocation when in directional agreement; 0% when in disagreement. The exact weight % is locked at /027 brief writeup (~30% draft per LM Master §7) and CANNOT be tuned at multi-seed run-time.
 
-**Routing table (formal pre-registration)**:
+**Bundle composition table**:
 
-| /021 H1 verdict | /021 H2 verdict | /022 (next iter) | /023-/026 plan | /027 CONFIRMATION timing |
+| Component | Provenance | Bundle role | Single-seed Δ | Multi-seed target Δ |
 |---|---|---|---|---|
-| CONFIRMED | CONFIRMED | /022 = /027 CONFIRMATION moved up | Skip /023-/026 in cycle-3 | /022 = /027 |
-| CONFIRMED | MIXED | /022 = /027 CONFIRMATION moved up | Skip /023-/026 in cycle-3 | /022 = /027 |
-| CONFIRMED | REFUTED | /022 = /027 CONFIRMATION moved up (with caution) | Skip /023-/026 in cycle-3 | /022 = /027 |
+| Model A pool (5 syms, unchanged) | `BASELINE_V1.md` (+0.2829 IS / +0.6637 OOS) | Pool baseline (basis) | 0 | 0 |
+| LINK-only specialist (Model C) | /018 PROMISING-INERT-favorable | Alpha-enhancement on LINK | +0.16 | **+0.80** |
+| ETH-only + BTC-trend gate specialist (Model G) | /019 PROMISING | Alpha-enhancement on ETH | +0.65 | **+0.50** |
+| BTC | via Model A pool (NO specialist) | Pool-routed; /020 NEGATIVE Catastrophic — EXCLUDED from specialist bundle | — | — |
+| LTC, DOT | via Model A pool (NO specialists pending /021 H1 outcome) | If /021 H1 CONFIRMED → also pool-routed (LM Master §3 mechanism implies BTC-pattern); if /021 H1 MIXED/REFUTED → individual specialists may be queued per Section 11.7 routing | — | — |
+
+**Bundle Δ target at /027 multi-seed**: nominal Σ = +0.6637 baseline + LINK +0.80 + ETH +0.50 = +1.96 if independent. Realistic with correlation drag: **+1.10 to +1.30**. Multi-seed regression MUST demonstrate ≥+1.0 OOS Sharpe to clear the Sharpe 1.0 floor merge gate (`feedback_sharpe_floor.md`).
+
+**Why Option α is REJECTED**: dropping LINK + ETH from the pool to make a "3-sym pool with 2 specialists" structure would change the pool from 5 syms to 3 syms — itself a pool-anchor mechanism intervention. If H1 is even partially CONFIRMED, shifting the pool composition shifts BTC's basin in the OPPOSITE direction (away from the BASELINE_V1.md anchor). The /027 bundle would no longer be measurable against a stable baseline. Option β preserves the basis and lets specialists add ADDITIVE alpha at portfolio level without contaminating the pool's training-time mechanism.
+
+### 11.7 /022+ conditional roadmap per /021 H1 outcome — HIGH-CONFIDENCE THRESHOLD (LM Master Phase 4.5 §5, ADOPTED)
+
+LM Master Phase 4.5 §5 ADOPTED — separates H1-CONFIRMED-floor (Section 4.1 threshold ≥4/10 + ≥1 key-param) from /022-ACCELERATION-floor (Section 11.7 threshold ≥6/10 + ≥2 key-params). The brief's previous Section 11.7 conflated the two and treated H1-CONFIRMED-floor as the /022-acceleration trigger; LM Master correctly argued the cadence violation (skipping /023-/026) requires HIGHER confidence than H1-CONFIRMED-floor alone, because the alternative is PREDICTABLE-NEGATIVE under H1 across LTC + DOT (replicating BTC pattern).
+
+**H1 verdict-class definitions (recalled from Section 4.1)**:
+- DIAGNOSTIC-CONFIRMED: ≥50% (sym, month) cells show |Δ|>threshold on **≥4 of 10 params** AND **≥1 of {confidence_threshold, n_estimators, num_leaves, min_child_samples}** shifted.
+- DIAGNOSTIC-MIXED: 20-50% cells OR shift confined to 1-2 param families.
+- DIAGNOSTIC-REFUTED: <20% cells OR direction-random.
+
+**/022-ACCELERATION HIGH-CONFIDENCE gate (LM Master Rec #5)**:
+- **HIGH-CONFIDENCE H1 CONFIRMED**: ≥50% (sym, month) cells show |Δ|>threshold on **≥6 of 10 params** AND **≥2 of {confidence_threshold, n_estimators, num_leaves, min_child_samples}** shifted.
+- **BORDERLINE H1 CONFIRMED**: ≥50% cells on 4-5 of 10 params (i.e., H1 CONFIRMED-floor met but ≥6/10 + ≥2 key-params NOT met).
+
+**Routing table (formal pre-registration; LM Master §5 stratification)**:
+
+| /021 H1 verdict + confidence | /021 H2 verdict | /022 (next iter) | /023-/026 plan | /027 CONFIRMATION timing |
+|---|---|---|---|---|
+| HIGH-CONFIDENCE CONFIRMED (≥6/10 + ≥2 key-params) | CONFIRMED | **/022 = /027 CONFIRMATION moved up** | Skip /023-/026 in cycle-3 | /022 = /027 |
+| HIGH-CONFIDENCE CONFIRMED (≥6/10 + ≥2 key-params) | MIXED | **/022 = /027 CONFIRMATION moved up** | Skip /023-/026 in cycle-3 | /022 = /027 |
+| HIGH-CONFIDENCE CONFIRMED (≥6/10 + ≥2 key-params) | REFUTED | **/022 = /027 CONFIRMATION moved up (with caution)** | Skip /023-/026 in cycle-3 | /022 = /027 |
+| BORDERLINE CONFIRMED (4-5/10) | CONFIRMED | /022 = LTC-only specialization | DOT-only at /023 OR mechanism-augmented LTC | /027 at end |
+| BORDERLINE CONFIRMED (4-5/10) | MIXED | /022 = LTC-only specialization | DOT deferred to cycle-4 | /027 at end |
+| BORDERLINE CONFIRMED (4-5/10) | REFUTED | /022 = LTC-only + orthogonal mechanism | /023 = DOT-only similar | /027 at end |
 | MIXED | CONFIRMED | /022 = LTC-only specialization | DOT-only at /023 OR mechanism-augmented LTC | /027 at end |
 | MIXED | MIXED | /022 = LTC-only specialization | DOT deferred to cycle-4 | /027 at end |
 | MIXED | REFUTED | /022 = LTC-only + orthogonal mechanism | /023 = DOT-only similar | /027 at end |
 | REFUTED | CONFIRMED | /022 = LTC-only specialization | DOT-only at /023 | /027 at end |
 | REFUTED | MIXED | /022 = LTC-only specialization | DOT deferred to cycle-4 | /027 at end |
 | REFUTED | REFUTED | /022 = LTC-only specialization | DOT-only at /023 | /027 at end |
+
+**Justification for the HIGH-CONFIDENCE threshold**: the 4-EXPLORATION savings (/023-/026 ~ 2-3 hours wall-clock) is justified ONLY when the alternative is PREDICTABLE-NEGATIVE with high posterior confidence. At H1-CONFIRMED-floor (4 of 10), 6 of 10 hyperparams could still be in low-impact channels — LTC/DOT may have a different mechanism load. At HIGH-CONFIDENCE (≥6/10 + ≥2 key-params), the 3-channel framework (C1+C2+C3) has substantial evidence across all key load-bearing parameters, and the LTC/DOT outcomes are mechanically predictable. At BORDERLINE, cadence is safer than the credibility cost of /027 revealing nothing.
 
 ### 11.8 Anchor proxy formalization for /027 (Critic Phase 7.5 Rec #2 from /020 closeout)
 
