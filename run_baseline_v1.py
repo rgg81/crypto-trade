@@ -187,6 +187,27 @@ V1_ITER021_UNIVERSE: tuple[str, ...] = (
     "DOTUSDT",
 )
 
+V1_ITER022_UNIVERSE: tuple[str, ...] = ("LTCUSDT",)
+"""iter-v1/022 cohort: LTC-only with stateless long-suppression BTC-trend gate.
+
+USER STRATEGIC PIVOT 2026-05-26 cycle-3 #7 EXPLORATION:
+per-cohort-specialization-LTC (NEW 14th family). LTC is the WORST OOS contributor
+in baseline (-47.25% / -0.27 per-trade Sharpe). LTC has the strongest directional
+asymmetry of any v1 cohort: 89% of OOS loss in LONG direction; OOS shorts neutral.
+
+Long-suppression BTC-trend gate at -4% on 42-bar BTC return (14 days at 8h) kills
+LTC long entries when BTC is in bear regime; LTC shorts UNRESTRICTED. IS ORACLE EDA
+shows +10.79% IS / +12.45% OOS lift (both halves positive).
+
+LOCAL to runner. assert set(symbols) == {"LTCUSDT"} guard fires for this branch.
+"""
+
+#: Gate configuration constants (frozen for /022; tunable at /023+ verdict-conditional).
+V1_ITER022_BTC_GATE_LOOKBACK_BARS: int = 42  # 14 days at 8h (matches /019)
+V1_ITER022_BTC_GATE_THRESHOLD_PCT: float = 4.0  # -4% BTC 14d return (TIGHTER than /019's 8%)
+V1_ITER022_BTC_GATE_ENABLED: bool = True
+V1_ITER022_BTC_GATE_LONG_ONLY: bool = True  # NEW asymmetric mode (long-suppression only)
+
 #: iter-v1/021: stable path for Optuna best-params parquet (H1 diagnostic substrate).
 #: Written by optimize_and_train when params_persist_path is set.
 #: Cleared at runner start (same pattern as OOF_PARQUET_PATH) to prevent accumulation.
@@ -1765,6 +1786,67 @@ def main() -> None:
                 "[iter-v1/021] Layer A WARNING: params parquet NOT FOUND after run",
                 file=sys.stderr,
             )
+    elif set(symbols) == set(V1_ITER022_UNIVERSE):
+        # iter-v1/022: LTC-only single-cohort EXPLORATION + stateless long-suppression
+        # BTC-trend gate (cycle-3 #7 of 10; per-cohort-specialization-LTC; NEW 14th family).
+        # USER STRATEGIC PIVOT 2026-05-26: per-cohort specialization axis.
+        #
+        # Dispatch — ONLY Model D' (LTC-only; mirrors Model D semantics with apply_r1=True
+        # which baseline Model D uses; ATR 3.5/1.75 matches Model D's per-symbol config).
+        # Models A (BTC+ETH pooled), C (LINK), D (LTC pooled), E (DOT) DROPPED.
+        # Single-axis isolation: SYMBOL DIMENSION (5 sym -> 1 sym) + post-hoc
+        # direction-asymmetric BTC-trend gate as the specialization.
+        # The gate is STATELESS post-hoc trade-stream filter (no model retrain; mirrors
+        # /019 BtcTrendFilterConfig pattern but asymmetric long_only_mode=True).
+        #
+        # F-AXIS-MECHANISM #1: trades.csv must contain ONLY LTCUSDT rows.
+        # F-AXIS-MECHANISM #2: LTC IS [80, 180] / OOS [20, 60] trade band.
+        # F-AXIS-MECHANISM #3 (LOAD-BEARING per LM Master /022 §4+§8): gate fire rate
+        #   IS in [15%, 40%] / OOS in [5%, 30%]. OOS < 5% → NEGATIVE-UNDER-FIRE.
+        assert set(symbols) == {"LTCUSDT"}, (
+            f"iter-v1/022 guard: expected {{LTCUSDT}}, got {set(symbols)}"
+        )
+        results_dprime, faxm_dprime, _strat_dprime = run_model(
+            "D' (LTC-only + R1 + R3 + BTC-trend long-suppress gate)",
+            ("LTCUSDT",),
+            atr_tp=3.5,
+            atr_sl=1.75,
+            apply_r1=True,  # NOTE: baseline Model D has R1; preserved for LTC cohort
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            **_r5_kwargs,
+        )
+        # Apply stateless long-suppression BTC-trend gate as post-hoc filter.
+        # ASYMMETRIC: kills only LTC longs (direction=+1) when BTC ret_42 < -4%;
+        # LTC shorts UNRESTRICTED (long_only_mode=True).
+        btc_open_times, btc_closes = load_btc_klines_for_filter()
+        gate_cfg = BtcTrendFilterConfig(
+            lookback_bars=V1_ITER022_BTC_GATE_LOOKBACK_BARS,
+            threshold_pct=V1_ITER022_BTC_GATE_THRESHOLD_PCT,
+            enabled=V1_ITER022_BTC_GATE_ENABLED,
+            long_only_mode=V1_ITER022_BTC_GATE_LONG_ONLY,
+        )
+        results_dprime, gate_stats = apply_btc_trend_filter(
+            results_dprime,
+            btc_open_times,
+            btc_closes,
+            gate_cfg,
+        )
+        gate_stats_dict = gate_stats.as_dict()
+        print(
+            f"[iter-v1/022 BTC-trend long-suppress gate] "
+            f"normal={gate_stats_dict['n_normal']} "
+            f"warmup={gate_stats_dict['n_warmup']} "
+            f"killed={gate_stats_dict['n_killed']}/{gate_stats_dict['n_total']} "
+            f"fire_rate={gate_stats_dict['fire_rate']:.2%} "
+            f"long_only={V1_ITER022_BTC_GATE_LONG_ONLY}"
+        )
+        _all_faxm_logs = faxm_dprime
+        all_results = results_dprime
+        _r5_model_results = [results_dprime]
     else:
         # Custom universe — single pooled model unless brief specifies otherwise.
         # iter-v1/NNN brief Section 3 should declare per-symbol model assignment.
