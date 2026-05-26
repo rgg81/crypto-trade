@@ -1,0 +1,7 @@
+label,cohort_symbol,iteration,isolation_mode,knob_added,prior_class,is_trades,is_win_rate,is_net_pnl_pct,oos_trades,oos_win_rate,oos_net_pnl_pct,portfolio_is_sharpe,portfolio_oos_sharpe
+BTC_in_pool_baseline,BTCUSDT,iteration_v1-baseline,pool,none,ASYMMETRIC_ROTATION,113,33.6,-37.2760,35,45.7,33.1700,0.2829,0.6637
+LINK_in_pool_baseline,LINKUSDT,iteration_v1-baseline,pool,none,POSITIVE_EVERYWHERE,146,45.2,72.0612,28,50.0,34.2343,0.2829,0.6637
+ETH_in_pool_baseline,ETHUSDT,iteration_v1-baseline,pool,none,NEGATIVE_EVERYWHERE,145,38.6,-13.6995,46,39.1,2.7548,0.2829,0.6637
+LINK_only_018,LINKUSDT,iteration_v1-018,single_cohort,none,POSITIVE_EVERYWHERE,154,41.6,52.5750,48,50.0,53.7952,0.3407,0.9789
+ETH_only_plus_gate_019,ETHUSDT,iteration_v1-019,single_cohort,BTC_trend_gate,NEGATIVE_EVERYWHERE,159,38.4,-3.1795,42,47.6,32.6485,-0.0304,0.6990
+BTC_only_020,BTCUSDT,iteration_v1-020,single_cohort,none,ASYMMETRIC_ROTATION,122,41.0,-23.2520,53,45.3,0.9916,-0.5914,-0.5566

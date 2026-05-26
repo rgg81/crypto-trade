@@ -1,0 +1,4 @@
+verdict_class,definition,prior_pct,/022_routing
+DIAGNOSTIC-CONFIRMED,"≥50% of (sym, month) cells show |Δ|>threshold on ≥4 of 10 params AND ≥1 of {confidence_threshold, n_estimators, num_leaves, min_child_samples} param family shifted",55,/027 CONFIRMATION moved up with 2-specialist (LINK+ETH+gate) + BTC IN POOL bundle
+DIAGNOSTIC-MIXED,"20-50% of (sym, month) cells show |Δ|>threshold OR shift confined to 1-2 param families",30,Selective cohort coverage; bundle ETH+gate +/- LINK only; LTC and DOT TBD per partial signature
+DIAGNOSTIC-REFUTED,"<20% of (sym, month) cells show |Δ|>threshold OR LM Master §3 mechanism wrong",15,LTC-only specialization (LM Master Phase 4.5 §6 fallback); per-cohort axis viable for remaining cohorts under intrinsic-only mechanism

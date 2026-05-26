@@ -1,0 +1,4 @@
+verdict_class,definition,prior_pct
+DIAGNOSTIC-CONFIRMED-H2,≥3 features in top-10 importance differ between Model A pool (BTC slice) and Models C/G/H single-cohort,70
+DIAGNOSTIC-MIXED-H2,1-2 features in top-10 differ; or Spearman rank corr 0.5 ≤ ρ ≤ 0.8,20
+DIAGNOSTIC-REFUTED-H2,Spearman rank corr > 0.8 across model variants — same features used in similar order; per-cohort specialization is about different KNOBS not different features,10
