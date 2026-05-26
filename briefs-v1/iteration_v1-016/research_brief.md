@@ -224,7 +224,33 @@ Rationale for choosing UNIFORM over UNIQUENESS_ONLY:
 
 ### 3.5 Response to LM Master Phase 4.5 recommendations
 
-(To be appended after orchestrator invokes LM Master Phase 4.5; format: "Adopted/Modified/Rejected per recommendation" with specific reasoning.)
+Per `briefs-v1/iteration_v1-016/lgbm_advisor.md` Phase 4.5 (committed at `a273c94`):
+
+**Rec #1 — PRE-EMPTIVELY COMPRESS n_trials 20 → 18 (HIGH confidence)**:
+- **ADOPTED**. /016 launch invocation will use `--n-trials 18` (not 20). Effect: 18/20 = 0.90× = ~6 min saved → upper bound 1.58h → **21% margin secured upfront** (vs 12.5% with n_trials=20). n_trials=18 stays well above TPE warmup ~10.
+- Section 3.6.3 amendment: revised launch invocation uses --n-trials 18.
+
+**Rec #2 — Pin `feature_fraction=1.0` AND `bagging_fraction=1.0` (MEDIUM confidence)**:
+- **ADOPTED-CONDITIONAL**. QE Phase 6.0 will check whether Optuna search currently includes these dimensions in v1_pruned bounds_profile. If yes, pin to 1.0 for /016 only (single-axis isolation). If no, no change needed. Either way, /016 axis is sample-weighting alone — Optuna's `feature_fraction`/`bagging_fraction` perturbations would confound F-AXIS-MECHANISM attribution.
+
+**Rec #3 — n_eff RESTORATION: HIGH confidence Kish→1.000; LOW confidence n_eff_per_cell**:
+- **ADOPTED** as predicted-outcome refinement. Section 5 updated: F-AXIS-MECHANISM #1 (Kish > 0.95) at >99% PASS; n_eff_per_cell stays [10, 20] range (LM Master prediction — uniform weighting does NOT restore /015's collapse because that was label-shape-bound, not weight-bound). NEW falsifier nuance: F-AXIS-MECHANISM PASS by construction is a WIRING test, NOT edge test (per LM Master closing note Critic 7.5 Pre-flag #1).
+
+**Rec #4 — `min_data_in_leaf` upper bound: do NOT change**:
+- **ADOPTED**. Baseline bounds appropriate for per-month training rows. Axis isolation preserved.
+
+**Mechanism call ADOPTED**: 40% net-helpful / 35% net-harmful / 25% net-no-op. abs(labeled_pnl) baked Bayesian prior; uniform removes it. Verdict-class prior REVISED from 55/20/25 to **FLAT 33/33/34** per LM Master argument that LightGBM gradient scale-invariance to global multipliers does NOT extend to per-row weight RATIO changes. Section 5 updated.
+
+**5 Risks ADOPTED into Section 6 / 7**:
+- F-AXIS-MECHANISM false-PASS risk (wiring test not edge test) — Section 6
+- n_eff_per_cell prediction NEW band [10, 20] — Section 4 falsifier addition
+- Per-symbol concentration may REVERSE (PROMISING-MECHANICAL pattern) — Section 7
+- Wall-clock overshoot (mitigated by Rec #1) — Section 3.6 amend
+- Basin-lottery direction undetermined — Section 5
+
+**Modal /016 outcome (LM Master)**: NULL with F-AXIS-MECHANISM CLEAN PASS — closes axis at uniform after one shot. /017 = uniqueness_only alternate OR pivot.
+
+**Net**: 4 LM Master recommendations + 5 risk callouts. Adopted: 4 (Rec #1 + #3 + #4 unconditional; Rec #2 conditional on QE Phase 6.0 check). Modified: 0. Rejected: 0. Brief finalized for re-submission to Phase 5.5 gate.
 
 ### 3.6 Wall-clock estimate (CRITICAL — Phase 5.5 BLOCK if missing)
 
