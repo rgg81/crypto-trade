@@ -88,3 +88,104 @@ If LTC PROMISING (8%) or PROMISING-INERT (12%):
 2. Layer C single-cohort feature_importance defect check.
 3. Basin relocation evidence (Optuna best_params shift) — BASIN-VECTOR not feature-importance.
 4. Jaccard against baseline LTC-in-pool — empirical [0.03, 0.20].
+
+---
+
+# LightGBM Master Post-Mortem — iter-v1/022 — Phase 7.4
+
+## Context Read
+
+- IS Sharpe **-0.0046** / OOS Sharpe **-1.4407**. F1 OOS Sharpe Δ = **-1.17** (NEGATIVE-CATASTROPHIC; ~10× the -0.55 floor). 117 IS / 48 OOS trades (both inside QR band).
+- F-AXIS #3 gate fire-rate: IS 17.95% / OOS 29.17% — **inside pre-registered [15%, 40%] / [5%, 30%] bands**. Gate operated as designed.
+- Brief Section 1 hypothesis REFUTED catastrophically.
+
+## 1. Phase 4.5 vs Phase 7.4 prediction reality
+
+LM Master priors 8/12/40/20/10/10. Observed: **NEGATIVE-CATASTROPHIC** — 10% tail materialized.
+
+| Prediction | Observed | Verdict |
+|---|---|---|
+| F-AXIS #2 IS [70,160], OOS [18,50] | 117 / 48 | **HIT** |
+| F-AXIS #3 IS [15%,40%], OOS [5%,30%] | 17.95% / 29.17% | **HIT** |
+| n_eff [6,10] | 8 | **HIT** |
+| Jaccard [0.03, 0.20] modal 0.06 | IS 0.10 / OOS 0.093 | **HIT** |
+| F1 OOS Δ (NEG-CAT 10% tail) | -1.17 | **HIT NEG-CAT** |
+| Closing call: "F-AXIS #3 LOAD-BEARING, not F1 magnitude" | F-AXIS #3 PASSED yet F1 collapsed | **VINDICATED** |
+
+**All 4 F-axes PASSED yet iteration is catastrophic.** Mechanism ≠ outcome.
+
+## 2. Jaccard computation
+
+| Window | Intersection | Union | **Jaccard** |
+|---|---|---|---|
+| IS (vs baseline 124 trades) | 22 | 219 | **0.1005** |
+| OOS (vs baseline 34 trades) | 7 | 75 | **0.0933** |
+
+~90% NEW roster on both windows. Confirms /020-precedent basin relocation. The asymmetric gate's ORACLE EDA Δ +12.45% was projected on a 34-trade baseline roster; only 7 of those appear in /022 OOS — EDA descriptively true but operationally irrelevant.
+
+## 3. Gate-fired-but-didn't-work analysis
+
+**Baseline OOS LTC drag direction**: longs -45.44% / total -47.25% → **96% LONG-direction**.
+
+**/022 retrained OOS LTC drag direction**: longs -26.54% / total -34.88% → **76% LONG-direction**. Shorts now contribute -8.34% (vs -1.81% baseline — short drag grew **4.6×**).
+
+The asymmetric long-suppress gate is OPERATING ON THE WRONG SUBSET. Even at OOS fire-rate 29.17% (heavy engagement), it cannot touch the short-side -8.34% drag because by design it only blocks longs.
+
+**Worse**: /022 IS PnL distribution shows the basin is FUNDAMENTALLY DIFFERENT — IS longs +44.54% / shorts +23.00% (both POSITIVE). The 89% IS direction-asymmetric pattern that justified the brief is GONE in the retrained basin. OOS roster expressed regime-rotation drag from BOTH directions; gate blocked only one side.
+
+**Verdict**: /021 H2 binding holds. Mechanism (asymmetric gate at -4% BTC ret_42) is causally targeted at a phenomenon (89% long-drag-in-BTC-bear) that is a property of the BASELINE LTC-in-pool basin. When basin relocated (~90% new trades), the targeted phenomenon evaporated, and the gate continued firing on an unrelated 29% slice.
+
+## 4. Per-cohort axis SATURATED — rule update
+
+| Cohort | Prior class | Mechanism | Outcome |
+|---|---|---|---|
+| LINK | POSITIVE_EVERYWHERE | pure isolation | **PROMISING +0.80** ✓ |
+| ETH | counter-trend OOS drag (symmetric) | ±8% symmetric gate | **PROMISING +0.50** ✓ |
+| BTC (/020) | ASYMMETRIC_ROTATION | pure isolation | **NEG-CAT -0.86** ✗ |
+| LTC (/022) | ASYMMETRIC_ROTATION-INVERSE | asymmetric long-suppress gate | **NEG-CAT -1.17** ✗ |
+
+**Rule (post-/022)**: Any cohort classified as `ASYMMETRIC_ROTATION_*` is INVIABLE for single-cohort isolation regardless of gate symmetry. Dominant failure mode: BASIN RELOCATION dissolves the asymmetry on which the gate's targeting depends. **Per-cohort isolation axis SATURATED.**
+
+**DOT pre-classification mandatory for /023**: If DOT class = POSITIVE_EVERYWHERE or MILD_PROMISING, isolation may be viable. If DOT class = ASYMMETRIC_ROTATION, **predict NEG-CAT a third time**. Do NOT default /023 to DOT-only.
+
+## 5. /023 routing — NEW-family axis MANDATORY
+
+Per Phase 4.5 §7: NEGATIVE-CATASTROPHIC (10%) → /023 = NEW-family axis (NOT closeout-jump-to-/027).
+
+Consecutive-CATASTROPHIC tracker: /020 + /022 = **2 in cycle-3** (separated by /021 PROMISING-METHODOLOGY). Forward-binding mandate at 3; not triggered, but second catastrophe on SAME AXIS-TYPE is decisive evidence axis-type is saturated.
+
+NEW-family candidates not used in last 5 EXPLORATIONs:
+
+| Candidate | Family | Justification |
+|---|---|---|
+| **Funding-rate feature family** | NEW feature family (non-OHLCV) | Cycle-3 has NOT tested. NEW signal source, stateless, production-proven. STRONGEST recommendation. |
+| Per-cohort drawdown brake (R2-like) | NEW risk-primitive | Addresses /020 + /022 symptomatically. STATEFUL — requires deadlock-impossibility proof. |
+| Microstructure z-score features | NEW feature family | Available at 8h cadence. Risk: iter-v3/015 microstructure went INERT at n_trials=10. |
+
+**Strongest recommendation: funding-rate feature family**: (a) NEW signal source, (b) stateless, (c) production-proven, (d) v1 LightGBM never had access, (e) sidesteps cohort-isolation axis trap.
+
+## 6. /027 bundle composition update
+
+| Slot | Source | Status | Multi-seed Δ |
+|---|---|---|---|
+| LINK-only specialist | /018 | ✓ Confirmed PROMISING | **+0.80** |
+| ETH-only + symmetric gate | /019 | ✓ Confirmed PROMISING | **+0.50** |
+| BTC | /020 NEG-CAT | ✗ specialist eliminated; **stays IN POOL** | baseline-only |
+| LTC | /022 NEG-CAT | ✗ specialist eliminated; **stays IN POOL** | baseline-only |
+| DOT | /023+ TBD | TBD pending NEW-family axis routing | TBD |
+
+Bundle Δ target at /027 multi-seed: **+1.10 to +1.30 OOS Sharpe** (2 specialists) + DOT TBD + funding-rate axis pending. Catastrophic outcomes /020 + /022 SUBTRACTED candidate specialists but did NOT poison pool.
+
+## 7. Track record update
+
+LM Master priors at /022: 8% / 12% / 40% / 20% / 10% / 10%. Observed: **NEGATIVE-CATASTROPHIC (10% tail).**
+
+- F-axis micro-mechanics: 4/4 hit (F2 IS, F2 OOS, F3 IS, F3 OOS) + Jaccard inside band + n_eff inside band.
+- Verdict-class probability: NEG-CAT was 10% (third-rarest tail); materialized. Directional CREDIT for raising NEG total to 40% vs QR's 30%.
+- Most important prediction VINDICATED: "F-AXIS #3 LOAD-BEARING disambiguator, not F1 magnitude — anchor at extreme negative reduces F1 diagnostic power."
+
+Cumulative LM Master track record after /022: H1 directional 1/2 on catastrophes (correctly flagged /020-type risk for /022), methodology 2/2, asymmetric-gate downside flagged correctly. **Verdict probability skew earned credit.**
+
+## 8. Most important Phase 7.4 finding
+
+**The asymmetric long-suppress gate operated within pre-registered fire-rate bands AND fired at the wrong trades — confirming the /021 H2 REFUTATION binding empirically: gate-targeting mechanisms operate at TRADE-ROSTER LEVEL, but basin relocation at single-seed cohort isolation produces ~90% NEW rosters where the targeted phenomenon (89% long-direction drag in BTC-bear) has dissolved, leaving the gate firing on an unrelated 29% slice. Per-cohort isolation is now structurally SATURATED for any cohort classified ASYMMETRIC_ROTATION, regardless of gate symmetry.**
