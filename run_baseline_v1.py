@@ -987,6 +987,11 @@ def main() -> None:
             f"{sample_weight_mode_arg!r} → bounds_profile upgraded to "
             f"'v1_pruned_axis016' (subsample=colsample_bytree=1.0 pinned)"
         )
+    # AXIS ISOLATION: when sample_weight_mode != "abs_pnl", disable BOTH R5 axes
+    # (proportional vol-target AND binary-kill). /016 tests the sample-weighting
+    # axis only; comparison anchor is BASELINE_V1 which has NO R5 enabled.
+    # Pattern mirrors /014 σ_t labeling axis isolation fix.
+    _disable_r5_for_sample_weighting = sample_weight_mode_arg != "abs_pnl"
 
     # iter-v1/011: R5 risk config resolution.
     # --r5-binary-kill-enabled flips to binary-kill mode and DISABLES proportional
@@ -1003,6 +1008,22 @@ def main() -> None:
             f"[run_baseline_v1] R5-BINARY-KILL enabled: kill_low_natr_min_pct="
             f"{r5_kill_low_natr_min_pct}% | R5 vol-target DISABLED for axis isolation"
         )
+    # iter-v1/016 axis isolation: when sample_weight_mode != "abs_pnl", disable BOTH R5
+    # axes so the sample-weighting axis is tested against BASELINE_V1 anchor (no R5).
+    if _disable_r5_for_sample_weighting:
+        if r5_vol_target_enabled:
+            print(
+                "[run_baseline_v1] AXIS-ISOLATION: sample_weight_mode="
+                f"{sample_weight_mode_arg!r} auto-disables R5 vol-target ceiling "
+                "(clean single-axis test vs BASELINE_V1)"
+            )
+            r5_vol_target_enabled = False
+        if r5_kill_low_natr_enabled:
+            print(
+                "[run_baseline_v1] AXIS-ISOLATION: sample_weight_mode="
+                f"{sample_weight_mode_arg!r} auto-disables R5-BINARY-KILL"
+            )
+            r5_kill_low_natr_enabled = False
 
     # iter-v1/014: σ_t-scaled barrier labeling config resolution.
     # DEFAULT sigma_source="natr" → BIT-IDENTICAL to /013 with no behaviour change.
