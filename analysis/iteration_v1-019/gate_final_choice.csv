@@ -1,0 +1,2 @@
+indicator,lookback_bars,lookback_days,threshold_pct,rule_long_kill,rule_short_kill,is_skip_pct,is_baseline_pnl_pct,is_gated_pnl_pct,is_lift_pct,oos_skip_pct_PROJECTED,oos_lift_pct_PROJECTED
+btc_ret_14d,42,14,8.0,skip ETH long entry when BTC 14d return < -8%,skip ETH short entry when BTC 14d return > +8%,17.24137931034483,-13.699799999999996,28.773700000000005,42.4735,17.391304347826086,7.844299999999999

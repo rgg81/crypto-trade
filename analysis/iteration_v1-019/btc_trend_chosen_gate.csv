@@ -1,0 +1,2 @@
+indicator,gate_mode,n_total,n_skipped,skip_pct,baseline_pnl_pct,gated_pnl_pct,lift_pct,gated_wr_pct,gated_avg_pnl
+I2_threshold_medium_>10%,kill_large_counter_move,145,21,14.482758620689657,-13.699799999999996,19.785999999999987,33.48579999999998,41.12903225806452,0.15956451612903216
