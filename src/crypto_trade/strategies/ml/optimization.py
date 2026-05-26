@@ -217,16 +217,22 @@ def _objective(
     #                   min_child_samples lower 5 → 20    (regularise small per-cell windows)
     #                 max_depth [3,5] UNCHANGED (Rec #4 adopted as no-op).
     #   Unknown profiles fall back to "default" silently (forward-compat).
-    _pruned = bounds_profile == "v1_pruned"
+    _pruned = bounds_profile in ("v1_pruned", "v1_pruned_axis016")
+    # iter-v1/016: "v1_pruned_axis016" pins subsample=1.0 and colsample_bytree=1.0 for
+    # sample-weighting axis isolation (LM Master Rec #2 ADOPTED-CONDITIONAL).
+    # subsample and colsample are tuned in the normal v1_pruned search space —
+    # leaving them free would confound F-AXIS-MECHANISM attribution for /016.
+    # This profile is /016-only; future iterations revert to "v1_pruned".
+    _pin_subsampling = bounds_profile == "v1_pruned_axis016"
     fast_mode = trial.study.user_attrs.get("fast_mode", False)
     params = {
         "n_estimators": trial.suggest_int("n_estimators", 50, 500),
         "max_depth": trial.suggest_int("max_depth", 3, 5),
         "num_leaves": trial.suggest_int("num_leaves", 15, 63 if _pruned else 127),
         "learning_rate": trial.suggest_float("learning_rate", 0.01, 0.3, log=True),
-        "subsample": trial.suggest_float("subsample", 0.5, 1.0),
+        "subsample": 1.0 if _pin_subsampling else trial.suggest_float("subsample", 0.5, 1.0),
         "colsample_bytree": 1.0
-        if fast_mode
+        if (fast_mode or _pin_subsampling)
         else trial.suggest_float("colsample_bytree", 0.5 if _pruned else 0.3, 1.0),
         "min_child_samples": trial.suggest_int("min_child_samples", 20 if _pruned else 5, 100),
         "reg_alpha": trial.suggest_float("reg_alpha", 1e-8, 10.0, log=True),
@@ -382,11 +388,15 @@ def optimize_and_train(
     train_month and symbols_arr are embedded in each row for multi-symbol grouping.
 
     bounds_profile: selects the Optuna hyperparameter search bounds.
-        "default"   — original bounds for the 193-feature v1/v2/v3 stack.
-        "v1_pruned" — tighter bounds for iter-v1/002+ 40-feature pruned set per
-                      LM Master Phase 4.5 Recs #1–3 (num_leaves≤63,
-                      colsample≥0.5, min_child_samples≥20). v3 and v2 are
-                      NOT affected — they continue with "default".
+        "default"          — original bounds for the 193-feature v1/v2/v3 stack.
+        "v1_pruned"        — tighter bounds for iter-v1/002+ 40-feature pruned set per
+                             LM Master Phase 4.5 Recs #1–3 (num_leaves≤63,
+                             colsample≥0.5, min_child_samples≥20). v3 and v2 are
+                             NOT affected — they continue with "default".
+        "v1_pruned_axis016" — iter-v1/016 only: v1_pruned bounds PLUS subsample=1.0
+                              and colsample_bytree=1.0 pinned (LM Master Rec #2
+                              ADOPTED-CONDITIONAL; isolates the sample-weighting axis
+                              from sub-sampling perturbations in Optuna search).
     """
     import optuna
 

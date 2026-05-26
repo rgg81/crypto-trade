@@ -176,6 +176,7 @@ class LightGbmStrategy:
         sigma_k_tp: float | None = None,
         sigma_k_sl: float | None = None,
         sigma_halflife_candles: int = 42,
+        sample_weight_mode: str = "abs_pnl",
     ) -> None:
         if not feature_columns:
             raise ValueError(
@@ -248,6 +249,18 @@ class LightGbmStrategy:
         self.sigma_k_tp: float | None = sigma_k_tp
         self.sigma_k_sl: float | None = sigma_k_sl
         self.sigma_halflife_candles: int = int(sigma_halflife_candles)
+        # iter-v1/016: sample-weighting axis — controls per-row weight assignment.
+        # "abs_pnl"        (default) — BIT-IDENTICAL to baseline; keeps label_trades output.
+        # "uniform"        — replaces train_weights with np.ones(n); Kish n_eff = 1.000.
+        # "uniqueness_only" — replaces train_weights with raw compute_sample_uniqueness output
+        #                     (NOT multiplied by abs_pnl — the prior multiply was a near-no-op
+        #                     per EDA Section 2.5: Spearman 0.997 after multiply).
+        _valid_modes = {"abs_pnl", "uniform", "uniqueness_only"}
+        if sample_weight_mode not in _valid_modes:
+            raise ValueError(
+                f"sample_weight_mode must be one of {_valid_modes}; got {sample_weight_mode!r}"
+            )
+        self.sample_weight_mode: str = sample_weight_mode
         # iter-v3/067 Path D: universal inference-time confidence-threshold floor.
         # Default 0.0 = no floor (backward-compatible). Pass 0.60 to raise the bar
         # for marginal-confidence trades (brief Section 3 Sub-fix 2).
@@ -259,6 +272,13 @@ class LightGbmStrategy:
         self._ood_cutoff: float | None = None
         self._ood_feature_cols: list[str] = []
         self._month_ood_features: dict[tuple[str, int], np.ndarray] = {}
+
+        # iter-v1/016: F-AXIS-MECHANISM logging buffer.
+        # Each _train_for_month call appends one dict per (model_tag, month) cell with
+        # Kish n_eff ratio, per-symbol weight share (Model A only), and timeout_fallback_share.
+        # The runner reads strategy._faxm_log after backtest completion and writes the CSV.
+        # Empty list when sample_weight_mode="abs_pnl" (default) to avoid noise in baseline.
+        self._faxm_log: list[dict] = []
 
         # Set during compute_features
         self._master: pd.DataFrame | None = None
@@ -523,6 +543,30 @@ class LightGbmStrategy:
 
         ternary = self.neutral_threshold_pct is not None
 
+        # (b1.5) iter-v1/016: sample_weight_mode axis — REPLACES abs_pnl weights when mode
+        # is "uniform" or "uniqueness_only".  Must execute BEFORE the legacy sample_uniqueness
+        # multiplier block (b2) below so that modes are independent, not composed.
+        # "abs_pnl" (default) keeps train_weights exactly as returned by label_trades.
+        if self.sample_weight_mode == "uniform":
+            train_weights = np.ones(len(train_weights), dtype=np.float64)
+            if self.verbose > 0:
+                print("  [sample_weight_mode=uniform] weights replaced with np.ones(n)")
+        elif self.sample_weight_mode == "uniqueness_only":
+            uniq_replace = compute_sample_uniqueness(
+                train_indices,
+                self.label_timeout_minutes,
+                self._open_time_arr,
+                self._sym_arr,
+            )
+            train_weights = uniq_replace.astype(np.float64)
+            if self.verbose > 0:
+                print(
+                    f"  [sample_weight_mode=uniqueness_only] weights replaced with raw "
+                    f"uniqueness: min={uniq_replace.min():.4f}, "
+                    f"mean={uniq_replace.mean():.4f}, max={uniq_replace.max():.4f}"
+                )
+        # "abs_pnl" — no change; label_trades output already in train_weights
+
         # (b2) Apply sample uniqueness weighting (AFML Ch. 4)
         if self.sample_uniqueness:
             uniq = compute_sample_uniqueness(
@@ -553,6 +597,39 @@ class LightGbmStrategy:
                     f"min={decay.min():.3f}, mean={decay.mean():.3f}, "
                     f"max={decay.max():.3f}"
                 )
+
+        # (b4) iter-v1/016: F-AXIS-MECHANISM cell logging.
+        # Log Kish n_eff ratio, per-symbol weight share (pooled models), and
+        # timeout_fallback_share for the F-AXIS-MECHANISM compound falsifier.
+        # Only appends when sample_weight_mode != "abs_pnl" (active axis run).
+        if self.sample_weight_mode != "abs_pnl":
+            _w = train_weights
+            _kish_n_eff = float((_w.sum()) ** 2 / (_w**2).sum()) if _w.sum() > 0 else 0.0
+            _n_actual = len(_w)
+            _kish_ratio = _kish_n_eff / _n_actual if _n_actual > 0 else 0.0
+            # Per-symbol weight share (for pooled model-A BTC+ETH attribution).
+            _syms_in_cell = self._sym_arr[train_indices]
+            _unique_syms = sorted(set(_syms_in_cell))
+            _per_sym_share: dict[str, float] = {}
+            _total_w = float(_w.sum())
+            for _s in _unique_syms:
+                _mask = _syms_in_cell == _s
+                _per_sym_share[_s] = float(_w[_mask].sum()) / _total_w if _total_w > 0 else 0.0
+            # Timeout fallback share (labels == 0 in triple-barrier = timeout class).
+            # Neutral labels from neutral_threshold_pct are also 0 — safe approximation
+            # since /016 uses binary labels (neutral_threshold_pct=None).
+            _timeout_share = float((train_labels == 0).mean())
+            _cell: dict = {
+                "month": month_str,
+                "n_actual": _n_actual,
+                "kish_n_eff": round(_kish_n_eff, 2),
+                "kish_ratio": round(_kish_ratio, 4),
+                "timeout_fallback_share": round(_timeout_share, 4),
+                "weight_mode": self.sample_weight_mode,
+            }
+            for _s, _share in _per_sym_share.items():
+                _cell[f"weight_share_{_s}"] = round(_share, 4)
+            self._faxm_log.append(_cell)
 
         if self.verbose > 0:
             n_long = int((train_labels == 1).sum())

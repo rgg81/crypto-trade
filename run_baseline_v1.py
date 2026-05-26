@@ -165,6 +165,7 @@ def run_model(
     sigma_k_tp: float | None = None,
     sigma_k_sl: float | None = None,
     sigma_halflife_days: int = 14,
+    sample_weight_mode: str = "abs_pnl",
 ):
     """Run a single v1 sub-model (A/C/D/E) under the corrected walk-forward.
 
@@ -177,6 +178,8 @@ def run_model(
     bounds_profile
         Optuna search bounds profile. "default" for 193-feature runs;
         "v1_pruned" for 40-feature pruned runs (LM Master Recs #1–3).
+        "v1_pruned_axis016" for /016 sample-weighting axis isolation
+        (pins subsample=colsample_bytree=1.0 per LM Master Rec #2).
     r5_vol_target_enabled
         Enable R5 proportional vol-target ceiling (iter-v1/010). Default True
         (historical default). Set False for iter-v1/011 binary-kill isolation.
@@ -205,6 +208,11 @@ def run_model(
         sigma_source="ewma14d".
     sigma_halflife_days
         Half-life in calendar days for EWMA σ_t (default 14 = 42 candles at 8h).
+    sample_weight_mode
+        iter-v1/016 — per-row weight mode for LightGBM training.
+        "abs_pnl" (default) = BIT-IDENTICAL baseline behavior.
+        "uniform" = np.ones(n); Kish n_eff = 1.000; selected for /016.
+        "uniqueness_only" = raw AFML uniqueness replacing abs_pnl.
     """
     effective_feature_columns = (
         feature_columns if feature_columns is not None else list(V1_FEATURE_COLUMNS)
@@ -268,12 +276,14 @@ def run_model(
         sigma_k_tp=sigma_k_tp,
         sigma_k_sl=sigma_k_sl,
         sigma_halflife_candles=sigma_halflife_candles,
+        sample_weight_mode=sample_weight_mode,
     )
     t0 = time.time()
     results = run_backtest(config, strategy, yearly_pnl_check=False)
     elapsed = time.time() - t0
     print(f"\n{name} complete: {len(results)} trades in {elapsed:.0f}s")
-    return results
+    # iter-v1/016: expose F-AXIS-MECHANISM log so the runner can write f_axis_mechanism.csv.
+    return results, strategy._faxm_log
 
 
 def _load_pnl_series(
@@ -874,6 +884,22 @@ def main() -> None:
             "separately after the runner exits.  (iter-v1/015 — Critic /014 Rec #2)"
         ),
     )
+    # iter-v1/016: sample-weighting axis.
+    # Controls per-row weight assignment to LightGBM during training.
+    # "abs_pnl"         (default) — BIT-IDENTICAL to baseline; uses label_trades abs PnL weights.
+    # "uniform"         — replaces with np.ones(n); Kish n_eff = 1.000; selected for /016.
+    # "uniqueness_only" — replaces with raw López de Prado uniqueness (NOT multiplied by abs_pnl).
+    parser.add_argument(
+        "--sample-weight-mode",
+        choices=["abs_pnl", "uniform", "uniqueness_only"],
+        default="abs_pnl",
+        help=(
+            "Sample weighting mode for LightGBM training (iter-v1/016). "
+            "'abs_pnl' (default) is BIT-IDENTICAL to baseline. "
+            "'uniform' passes np.ones(n) — selected for /016. "
+            "'uniqueness_only' replaces with raw AFML uniqueness (replaces, not multiplies)."
+        ),
+    )
     args = parser.parse_args()
 
     # Resolve symbols
@@ -945,6 +971,22 @@ def main() -> None:
     else:
         active_feature_columns = list(V1_FEATURE_COLUMNS)
         bounds_profile = "default"
+
+    # iter-v1/016: sample-weighting axis config resolution.
+    # Resolve mode from --sample-weight-mode (default "abs_pnl" = BIT-IDENTICAL to baseline).
+    # When mode is "uniform" or "uniqueness_only" AND --pruned-features is active,
+    # escalate bounds_profile to "v1_pruned_axis016" to additionally pin
+    # subsample=1.0 and colsample_bytree=1.0 (LM Master Rec #2 ADOPTED-CONDITIONAL).
+    # This ensures only the sample-weighting axis is free in Optuna — no subsampling
+    # perturbations can confound F-AXIS-MECHANISM attribution.
+    sample_weight_mode_arg = getattr(args, "sample_weight_mode", "abs_pnl")
+    if sample_weight_mode_arg != "abs_pnl" and bounds_profile == "v1_pruned":
+        bounds_profile = "v1_pruned_axis016"
+        print(
+            f"[run_baseline_v1] iter-v1/016 axis isolation: sample_weight_mode="
+            f"{sample_weight_mode_arg!r} → bounds_profile upgraded to "
+            f"'v1_pruned_axis016' (subsample=colsample_bytree=1.0 pinned)"
+        )
 
     # iter-v1/011: R5 risk config resolution.
     # --r5-binary-kill-enabled flips to binary-kill mode and DISABLES proportional
@@ -1036,6 +1078,7 @@ def main() -> None:
     if sigma_source_arg == "ewma14d":
         print(f"  sigma_k_tp: {sigma_k_tp_arg}  sigma_k_sl: {sigma_k_sl_arg}")
         print(f"  sigma_halflife_days: {sigma_halflife_days_arg}")
+    print(f"  sample_weight_mode: {sample_weight_mode_arg}")
     print()
 
     # Validate active feature list is non-empty (hard guard per feature-pinning rules).
@@ -1066,6 +1109,7 @@ def main() -> None:
     # iter-v1/012: ensemble_seeds_offset threaded through so all 4 models
     # (A pooled, C LINK, D LTC, E DOT) use the SAME inner-seed window.
     # iter-v1/014: sigma_source + sigma_k_tp/sl/halflife threaded through.
+    # iter-v1/016: sample_weight_mode threaded through for sample-weighting axis.
     _r5_kwargs = dict(
         r5_vol_target_enabled=r5_vol_target_enabled,
         r5_vol_target_pct=r5_vol_target_pct,
@@ -1075,10 +1119,13 @@ def main() -> None:
         sigma_source=sigma_source_arg,
         sigma_k_tp=sigma_k_tp_arg,
         sigma_k_sl=sigma_k_sl_arg,
+        sample_weight_mode=sample_weight_mode_arg,
         sigma_halflife_days=sigma_halflife_days_arg,
     )
+    # iter-v1/016: collect F-AXIS-MECHANISM logs from all model runs.
+    _all_faxm_logs: list[dict] = []
     if set(symbols) == set(V1_BASELINE_UNIVERSE):
-        results_a = run_model(
+        results_a, faxm_a = run_model(
             "A (BTC/ETH)",
             ("BTCUSDT", "ETHUSDT"),
             atr_tp=2.9,
@@ -1091,7 +1138,7 @@ def main() -> None:
             bounds_profile=bounds_profile,
             **_r5_kwargs,
         )
-        results_c = run_model(
+        results_c, faxm_c = run_model(
             "C (LINK + R1)",
             ("LINKUSDT",),
             atr_tp=3.5,
@@ -1104,7 +1151,7 @@ def main() -> None:
             bounds_profile=bounds_profile,
             **_r5_kwargs,
         )
-        results_d = run_model(
+        results_d, faxm_d = run_model(
             "D (LTC + R1)",
             ("LTCUSDT",),
             atr_tp=3.5,
@@ -1117,7 +1164,7 @@ def main() -> None:
             bounds_profile=bounds_profile,
             **_r5_kwargs,
         )
-        results_e = run_model(
+        results_e, faxm_e = run_model(
             "E (DOT + R1 + R2)",
             ("DOTUSDT",),
             atr_tp=3.5,
@@ -1131,13 +1178,14 @@ def main() -> None:
             bounds_profile=bounds_profile,
             **_r5_kwargs,
         )
+        _all_faxm_logs = faxm_a + faxm_c + faxm_d + faxm_e
         all_results = results_a + results_c + results_d + results_e
         # Aggregate R5 IS/OOS split counters across all four models (iter-v1/010+).
         _r5_model_results = [results_a, results_c, results_d, results_e]
     else:
         # Custom universe — single pooled model unless brief specifies otherwise.
         # iter-v1/NNN brief Section 3 should declare per-symbol model assignment.
-        _pooled = run_model(
+        _pooled, faxm_pooled = run_model(
             "POOLED",
             symbols,
             atr_tp=2.9,
@@ -1150,6 +1198,7 @@ def main() -> None:
             bounds_profile=bounds_profile,
             **_r5_kwargs,
         )
+        _all_faxm_logs = faxm_pooled
         all_results = _pooled
         _r5_model_results = [_pooled]
 
@@ -1211,6 +1260,41 @@ def main() -> None:
         r5_kill_signals_oos=agg_r5_kill_signals_oos,
         r5_kill_fires_oos=agg_r5_kill_fires_oos,
     )
+
+    # iter-v1/016: write f_axis_mechanism.csv for F-AXIS-MECHANISM falsifier.
+    # Only emits when sample_weight_mode != "abs_pnl" (active axis run) AND
+    # _all_faxm_logs is non-empty. Safe no-op for baseline and all other iterations.
+    if _all_faxm_logs:
+        import csv as _csv  # noqa: PLC0415
+
+        faxm_path = report_dir / "f_axis_mechanism.csv"
+        all_keys: list[str] = []
+        for _row in _all_faxm_logs:
+            for _k in _row:
+                if _k not in all_keys:
+                    all_keys.append(_k)
+        with faxm_path.open("w", newline="") as _fh:
+            writer = _csv.DictWriter(_fh, fieldnames=all_keys, extrasaction="ignore")
+            writer.writeheader()
+            for _row in _all_faxm_logs:
+                writer.writerow(_row)
+        print(f"[run_baseline_v1] F-AXIS-MECHANISM log: {len(_all_faxm_logs)} cells → {faxm_path}")
+        # Emit summary stats for F-AXIS-MECHANISM falsifier checks.
+        if _all_faxm_logs:
+            _kish_ratios = [r["kish_ratio"] for r in _all_faxm_logs if "kish_ratio" in r]
+            _timeout_shares = [
+                r["timeout_fallback_share"] for r in _all_faxm_logs if "timeout_fallback_share" in r
+            ]
+            if _kish_ratios:
+                print(
+                    f"  Kish ratio: mean={sum(_kish_ratios) / len(_kish_ratios):.4f} "
+                    f"min={min(_kish_ratios):.4f} max={max(_kish_ratios):.4f}"
+                )
+            if _timeout_shares:
+                print(
+                    f"  Timeout share: mean={sum(_timeout_shares) / len(_timeout_shares):.4f} "
+                    f"max={max(_timeout_shares):.4f}"
+                )
 
     print(
         f"\nMode: {mode_label}. ENSEMBLE_SIZE={ensemble_size}. n_trials={n_trials}. "
