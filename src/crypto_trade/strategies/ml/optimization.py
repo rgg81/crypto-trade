@@ -517,12 +517,14 @@ def optimize_and_train(
     # Retrain on full training data
     # iter-v3/007: in fast_mode, colsample_bytree is hardcoded to 1.0 (not in
     # the Optuna search space), so `best` won't contain it — use 1.0 directly.
+    # iter-v1/016: v1_pruned_axis016 also pins subsample=1.0 (not suggested),
+    # so apply the same .get(..., 1.0) safety fallback.
     params = {
         "n_estimators": best["n_estimators"],
         "max_depth": best["max_depth"],
         "num_leaves": best["num_leaves"],
         "learning_rate": best["learning_rate"],
-        "subsample": best["subsample"],
+        "subsample": best.get("subsample", 1.0),
         "colsample_bytree": best.get("colsample_bytree", 1.0),
         "min_child_samples": best["min_child_samples"],
         "reg_alpha": best["reg_alpha"],
