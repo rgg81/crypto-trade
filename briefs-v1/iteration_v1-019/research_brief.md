@@ -356,11 +356,56 @@ uv run python run_baseline_v1.py \
 - `apply_r2 = False` (Model E only; ETH is not Model E).
 - **GATE: `lookback_bars=42, threshold_pct=8.0, enabled=True`** (frozen for /019).
 
-### 3.4 LM Master Phase 4.5 responses
+### 3.4 LM Master Phase 4.5 Responses
 
-**Section 3.4 RESERVED for LM Master Phase 4.5 output.** LM Master fires AFTER this brief is committed. QR will amend this section in Phase 5.5 with explicit response to each LM Master recommendation per the v1 dynamic improvement #1 (LM Master Coordination). Brief will be re-committed with adopted/modified/rejected response markers before Phase 5.5 gate handoff.
+Per the advisory at `briefs-v1/iteration_v1-019/lgbm_advisor.md` (commit `62e5056`).
 
-(Awaiting LM Master Phase 4.5 advisory at `briefs-v1/iteration_v1-019/lgbm_advisor.md`.)
+**Section 3.4 introduction (LM Master §1 informational confirmation)**: LM Master §1 independently confirms that the QR's EDA pivot from symmetric framing to direction-aware gating is mechanistically superior — the per-cell asymmetric economics (+0.62% / −0.87% / −0.26% / +0.37%) cannot be captured by any symmetric gate. LM Master further confirms that this is **NOT a v2/019 SAME-pattern re-discovery**: the direction-aware mechanism is general but the per-symbol economics on ETH (this iter) differ from SOL/XRP/DOGE/NEAR (v2/019). Re-using `apply_btc_trend_filter` from `risk_v2.py` is CODE re-use, NOT signal re-use; /027 multi-seed validation on the ETH cohort with v1's labeling + 5-feature stack + Model A semantics retains its first-validation value.
+
+### Adopted (without modification)
+
+- **[#3] Verdict-interpretation principle (LM §2)** → integrated as the verdict-interpretation principle block below; PROMISING here is a directional flip success, NOT edge discovery; /027 bundle contribution via diversification not absolute Sharpe.
+- **[#4] Realistic /019 IS lift +13% to +25% PnL → IS Sharpe ~+0.15 to +0.40 / Δ +0.25 to +0.50 (LM §3)** → cross-referenced at Section 4 F3 row (Section 4 F3 already cites +0.25-+0.50 band; LM Master independently confirms the calibration).
+- **[#5] Verdict-class priors adjusted to 35% PROMISING / 40% INERT / 25% NEGATIVE (LM §4)** → Section 5 row updated.
+- **[#6] n_eff_per_cell prediction [4, 8] band (LM §5; LOWER than /018's 9)** → added as F-AXIS-MECHANISM #4 informational row in Section 4 (informational only per /017 closeout demotion; if observed n_eff < 4 flagged at Phase 7.4).
+- **[#7] KEEP n_trials=18 (LM §6.1)** → already pinned at Section 3.3.
+- **[#8] KEEP ENSEMBLE_SIZE=3 (LM §6.2)** → already pinned at Section 3.3.
+- **[#9] Accept current Optuna bounds; do NOT modify (LM §6.3)** → no Optuna bounds modification in Section 3.1/3.3.
+- **[#10] LEAVE gate constants frozen (LM §6.4)** → `lookback_bars=42, threshold_pct=8.0, enabled=True` pinned at Section 3.3; /020+ verdict-conditional retunes per Section 11.7.
+- **[#16] F-AXIS-MECHANISM #3 fire-rate test elevated to LOAD-BEARING (LM §9)** → "LOAD-BEARING" marker added to Section 4 F-AXIS #3 row.
+- **[#17] /020+ verdict-conditional pre-staging matrix (LM §9)** → Section 11.7 cross-references LM Master §9 (numerical content already matches; explicit attribution added).
+
+### Adopted (with modification)
+
+- (none — all adopted recommendations integrated without modification)
+
+### Rejected
+
+- (none — LM Master recommendations are fully aligned with QR brief design)
+
+### Informational confirmations (LM Master agrees with existing brief content; no edit needed)
+
+- **[#1] Direction-aware gate mechanistically superior to symmetric framing (LM §1)** → already at Section 0.4 + 2.3.
+- **[#2] NOT a v2/019 SAME-pattern re-discovery (LM §1)** → already at Section 0.4; LM Master §1 confirms.
+- **[#11] Single-cohort + single-seed basin lottery HIGH-RISK (LM §7)** → already declared at Section 2.5; cross-reference confirmed.
+- **[#12] Gate fire-rate band [10%, 30%] IS / [5%, 35%] OOS correctly wide (LM §7)** → Section 2.6 + Section 4 F-AXIS #3 band confirmed wide.
+- **[#13] Re-training divergence risk absorbed by F-AXIS #3 fire-rate band (LM §7)** → already designed at Section 4 F-AXIS #3; mechanism-level test by construction.
+- **[#14] PROMISING-MECHANICAL adjacent (Critic Check 14 watch; LM §7)** → added as a sub-bullet in Section 5 Failure-mode framing (Section 6.7 adjacency note).
+- **[#15] What LM did NOT recommend (LM §8)** → cross-referencing reasoning is sound; no multi-seed, no tighter gate at /019, no Optuna tightening, no pre-emptive vendoring (vendoring is Phase 5.5/Critic-conditional fallback per Section 3.1), no Optuna direction-asymmetry, no F8 tightening — all consistent with QR brief design.
+- **[#18] Cross-track import risk (LM §8)** → already documented at Section 3.1 as Phase 5.5/Critic fallback (vendor `risk_v1_gates.py` if cross-import BLOCKed); LM Master concurs with fallback approach.
+
+### Verdict-interpretation principle (LM Master §2)
+
+PROMISING here is a **directional flip success** (gate did its job, flipping ETH's 4/4 OOS-negative cycle-3 trajectory toward neutral-or-positive), NOT an edge-discovery milestone. This is structurally different from /018's LINK-only PROMISING-INERT favorable at +0.98, where the verdict meant "preserved a strong existing edge." For /019, PROMISING means "found a small directional signal in a structurally NEGATIVE cohort." Both are legitimate /027 bundle candidates, but the bundle math differs:
+
+- LINK-only specialist /027 multi-seed mean projection: **+0.80 anchor** (per /018 Phase 7.4 §5).
+- ETH-only + gate /019 multi-seed mean projection: **~+0.15 anchor band, possibly [+0.10, +0.40]** (per LM Master §2).
+
+At /027, ETH+gate contributes via **low cross-correlation to LINK**, not via absolute Sharpe magnitude. A modest absolute Sharpe is acceptable for a diversification ingredient. This principle propagates downstream: Critic Phase 7.5 verdict cell selection should weight directional-flip + mechanism-level F-AXIS #3 PASS more heavily than absolute F1 Sharpe magnitude for /019 specifically.
+
+### Most important LM Master flag (LM Master §9)
+
+**F-AXIS-MECHANISM #3 (gate fire-rate band) is LOAD-BEARING for verdict disambiguation despite the small F1 anchor magnitude.** The small absolute anchor (+0.0503) means F1 OOS Sharpe Δ has reduced diagnostic power — modest gate efficacy clears PROMISING easily, modest gate harm clears NEGATIVE easily, and the noise floor of single-seed Optuna basin lottery can swamp F1. The fire-rate test, however, is **mechanism-level and prediction-pre-registered**: if observed OOS fire rate falls below 5% (under-fire), ETH cohort exposure is unmitigated → catastrophic almost certain. If OOS fire rate exceeds 35% (over-kill), gate is regime-shifted from IS. The fire-rate test is binary, pre-registered, and load-bearing on cell selection. Critic Phase 7.5 should evaluate F-AXIS #3 BEFORE F1 magnitude when assigning verdict cell.
 
 ### 3.5 Axis Family Declaration (v1 mandatory)
 
@@ -473,7 +518,8 @@ The single-axis isolation is the SYMBOL DIMENSION + STATELESS GATE.
 
 - **F-AXIS #1 — Dispatch correctness**: ONLY Model G runs; trades.csv contains only ETHUSDT rows (zero rows for BTC/LINK/LTC/DOT/SOL). PASS criterion: `df['symbol'].unique() == ['ETHUSDT']`.
 - **F-AXIS #2 — ETH trade-count and PnL within band**: ETH IS trades ∈ [80, 200], ETH OOS trades ∈ [25, 90], ETH OOS PnL > 0 preferred (flips structural prior). Failure indicates Model G is not training correctly or gate is over-killing.
-- **F-AXIS #3 — Gate fire-rate within pre-registered band**: IS gate fire rate ∈ [10%, 30%], OOS gate fire rate ∈ [5%, 35%] per `gate_fire_rate_band.csv`. Failure indicates gate threshold or BTC indicator computation broken.
+- **F-AXIS #3 — Gate fire-rate within pre-registered band** **[LOAD-BEARING per LM Master §9]**: IS gate fire rate ∈ [10%, 30%], OOS gate fire rate ∈ [5%, 35%] per `gate_fire_rate_band.csv`. Failure indicates gate threshold or BTC indicator computation broken. **LOAD-BEARING rationale**: F1 anchor is small absolute (+0.0503), so F1 OOS Sharpe Δ has reduced diagnostic power; F-AXIS #3 is mechanism-level, pre-registered, and binary — it is the strongest single verdict-disambiguator. Critic Phase 7.5 should evaluate F-AXIS #3 BEFORE F1 magnitude when assigning verdict cell.
+- **F-AXIS-MECHANISM #4 — n_eff_per_cell band [4, 8]** **[INFORMATIONAL per /017 closeout; LM Master §5 prediction]**: ETH-only cohort + 17% gate fire rate → ETH IS trades post-gate ~120 (vs LINK-only /018 154). Smaller training rows + post-hoc gate roster trim → narrower Optuna trial diversity. LM Master predicts n_eff band [4, 8] (LINK-only /018 hit 9). INFORMATIONAL only. If observed n_eff < 4 → mechanism issue, flag at Phase 7.4.
 
 ### F-PORTFOLIO (informational; cannot determine verdict)
 
@@ -481,15 +527,15 @@ Portfolio-level Sharpe (ETH-only = 1 model = portfolio) compared to v1 baseline 
 
 ---
 
-## Section 5 — Predicted Verdict Distribution (FLAT priors per cycle-3 lessons)
+## Section 5 — Predicted Verdict Distribution (FLAT priors per cycle-3 lessons; LM Master §4 ADJUSTED)
 
 Per /016/017/018 closeouts: cycle-3 LM Master + QR mechanism-level predictions track FLAT priors at EXPLORATION single-seed level. /018's PROMISING-INERT favorable was correctly predicted modal (45% prior).
 
-**Verdict prior FLAT 30/40/30** (modal INERT per per-cohort methodology):
+**Verdict prior 35/40/25** (modal INERT; LM Master §4 ADJUSTED from QR initial 30/40/30):
 
-- **PROMISING (Δ ≥ +0.20)**: **30%** — IS EDA shows +42% IS PnL lift; if signal generalizes to OOS, F1 PROMISING reachable. ETH structural NEGATIVE prior 4/4 means lift must overcome a strong adverse trend. Single-seed basin lottery wide.
-- **INERT (Δ ∈ [−0.20, +0.20])**: **40%** — gate works directionally but smaller-than-EDA effect at OOS Optuna trajectory; modal cell per per-cohort methodology.
-- **NEGATIVE (Δ ≤ −0.20)**: **30%** — cohort isolation drag exposes ETH's structural NEGATIVE prior before gate can fully compensate; OR gate over-kills OOS roster.
+- **PROMISING (Δ ≥ +0.20)**: **35%** (LM Master §4 raised from QR 30%) — IS EDA shows +42% IS PnL lift; if signal generalizes to OOS, F1 PROMISING reachable. ETH structural NEGATIVE prior 4/4 means even modest gate lift produces large Δ vs essentially-zero anchor (+0.05). Single-seed basin lottery wide but PROMISING bar is +0.25 absolute — small mechanism win produces large Δ vs zero anchor.
+- **INERT (Δ ∈ [−0.20, +0.20])**: **40%** (unchanged) — gate works directionally but smaller-than-EDA effect at OOS Optuna trajectory; modal cell per per-cohort methodology; basin lottery wide; gate works directionally but anchor +0.05 leaves narrow path.
+- **NEGATIVE (Δ ≤ −0.20)**: **25%** (LM Master §4 lowered from QR 30%) — cohort isolation drag exposes ETH's structural NEGATIVE prior before gate can fully compensate; OR gate over-kills OOS roster. NEGATIVE bar is −0.15 absolute; would require gate to ACTIVELY HARM the cohort — possible but less likely given EDA cross-year stability.
   - **NEGATIVE-INTRINSIC** (Δ ≤ −0.55, falsifies BTC-trend-conditional drag hypothesis): **8%** subset.
   - **NEGATIVE-CATASTROPHIC** (catastrophic-NEGATIVE; structural prior dominates regardless of gate): **5%** subset.
 
@@ -532,6 +578,10 @@ Verified at code-review time (Phase 6.0 will re-check).
 ### 6.6 Wall-clock breach (low probability)
 
 26 min predicted with 78% margin. Even worst-case 2× linear scaling stays under 1h. Kill-switch at 45 min provides additional safety. No realistic path to 2h breach.
+
+### 6.7 PROMISING-MECHANICAL adjacency risk (LM Master §7; Critic Check 14 watch)
+
+The gate is mechanism re-use from v2/019, applied post-hoc to a retrained trade stream. **If the verdict is PROMISING but the kept-trade roster preserves >80% of the EDA baseline kept-trade roster (trade_id Jaccard)**, classify the iteration as PROMISING-MECHANICAL — a non-compoundable signal source. Phase 7.4 LM Master post-mortem will verify via trade_id Jaccard between EDA baseline kept set and /019 backtest kept set. This adjacency does NOT change the Phase 5 brief design; it informs Phase 7.4 + Phase 7.5 classification and /027 bundle treatment (PROMISING-MECHANICAL = strictly accretive component decision, NOT new edge ingredient — non-compoundable across iterations per `feedback_promising_mechanical_subtype.md`).
 
 ---
 
@@ -670,14 +720,16 @@ Projected bundle composition (conditional):
 
 ### 11.7 Conditional pre-staging on /019 outcomes
 
-- **PROMISING**: /020 = BTC-only specialized (per /018 Path Forward #2 cohort coverage)
-- **PROMISING-INERT (modal)**: /020 = BTC-only specialized (same as PROMISING)
-- **PROMISING-INERT-no-effect**: /020 = ETH-only with TIGHTER gate threshold (±5% or ±10% — single dimension re-tune)
-- **NEGATIVE-INERT**: /020 = BTC-only specialized; ETH cohort DROPPED for /027
-- **NEGATIVE-INTRINSIC**: /020 = ETH-only with ON-CHAIN gate (defer if data infrastructure not ready) OR pivot to BTC-only
-- **NEGATIVE-CATASTROPHIC**: /020 = BTC-only specialized; ETH+gate path closed for cycle-3
-- **NEGATIVE-OVER-KILL**: /020 = ETH-only with WIDER gate threshold (±12% or ±15%) at /020 — single dimension re-tune
-- **NEGATIVE-UNDER-FIRE**: /020 = ETH-only with TIGHTER gate threshold (±5%) at /020 — single dimension re-tune
+The matrix below cross-references **LM Master §9** independent pre-staging recommendations (advisor commit `62e5056`); QR and LM Master converge on the verdict-conditional /020+ assignments. LM Master §9 specifically reinforces NEGATIVE-INTRINSIC as a "load-bearing finding for /024+ on-chain feature axis" (ETH drag not BTC-trend-conditional → on-chain hypothesis required) AND NEGATIVE-CATASTROPHIC as "ETH cohort path closed for cycle-3."
+
+- **PROMISING**: /020 = BTC-only specialized (per /018 Path Forward #2 cohort coverage; LM Master §9 concurs)
+- **PROMISING-INERT (modal)**: /020 = BTC-only specialized (same as PROMISING; LM Master §9 concurs)
+- **PROMISING-INERT-no-effect**: /020 = ETH-only with TIGHTER gate threshold (±5% or ±10% — single dimension re-tune; LM Master §9 concurs)
+- **NEGATIVE-INERT**: /020 = BTC-only specialized; ETH cohort DROPPED for /027 (LM Master §9 concurs)
+- **NEGATIVE-INTRINSIC**: /020 = BTC-only specialized; ETH+gate axis PERMANENTLY CLOSED (LM Master §9 framing — load-bearing finding for /024+ on-chain feature axis); on-chain ETH gate deferred to /024+ if data infrastructure ready
+- **NEGATIVE-CATASTROPHIC**: /020 = BTC-only specialized; ETH+gate path closed for cycle-3 (LM Master §9 concurs)
+- **NEGATIVE-OVER-KILL**: /020 = ETH-only with WIDER gate threshold (±12% or ±15%) at /020 — single dimension re-tune (LM Master §9 concurs)
+- **NEGATIVE-UNDER-FIRE**: /020 = ETH-only with TIGHTER gate threshold (±5%) at /020 — single dimension re-tune (LM Master §9 concurs)
 
 ---
 
@@ -708,23 +760,23 @@ After Phase 7.5 Critic verdict:
 - Section 2 — numerical EDA tables committed at `2028c1d`? YES (12 files including 5 source scripts under analysis/iteration_v1-019/).
 - Section 2.5 — HIGH-RISK declaration explicit? YES (HIGH-RISK; single-cohort + gate = 2 changes but per-cohort methodology bundle).
 - Section 3 — implementation spec specifies src/ file changes (single)? YES (`run_baseline_v1.py` only; v2 `risk_v2.apply_btc_trend_filter` IMPORTED unchanged).
-- Section 3.4 — LM Master responses placeholder? YES (Phase 5.5 BLOCK condition flagged).
+- Section 3.4 — LM Master responses populated? YES (amended in-place after LM Master advisory `62e5056`; 10 adopted, 0 modified, 0 rejected, 8 informational confirmations; verdict-interpretation principle + LOAD-BEARING flag integrated).
 - Section 3.5 — axis family declared with cohort framing? YES.
 - Section 3.6 — wall-clock estimate explicit, ≥20% margin? YES (26 min predicted; 78% margin against 2h cap; 70+ min buffer against 1.6h BLOCK threshold).
 - Section 4 — F1-F8 falsifiers pre-registered + F-AXIS-MECHANISM 3-sub-check including gate fire rate band? YES.
 - Section 4 — F1 anchored against ETH-in-pool OOS Sharpe +0.0503 (not portfolio)? YES.
 - Section 4 — F8 cohort-scale trade band? YES (IS [80, 200] / OOS [25, 90]).
 - Section 4 — F-AXIS #3 gate fire rate pre-registered IS [10%, 30%] / OOS [5%, 35%]? YES.
-- Section 5 — verdict prior FLAT-ish? YES (30/40/30 with INERT modal).
-- Section 6 — failure modes characterized including stateless deadlock check (Critic A8)? YES (6 modes including over-kill, under-fire, BTC-trend-not-conditional, basin lottery, stateless deadlock).
+- Section 5 — verdict prior FLAT-ish? YES (35/40/25 with INERT modal; LM Master §4 ADJUSTED from QR initial 30/40/30).
+- Section 6 — failure modes characterized including stateless deadlock check (Critic A8)? YES (7 modes including over-kill, under-fire, BTC-trend-not-conditional, basin lottery, stateless deadlock, PROMISING-MECHANICAL adjacency).
 - Section 8 — verdict matrix per-cohort + gate variant with NEGATIVE-OVER-KILL / NEGATIVE-UNDER-FIRE / PROMISING-INERT-no-effect subtypes? YES.
 - Section 9 — library stack declared (risk_v2 BTC filter re-use)? YES.
 - Section 10 — implementation spec critical detail (engineering report, kill-switch, BTC kline staleness check)? YES.
-- Section 11 — alternates for /020+ + conditional pre-staging matrix? YES (7 verdict-conditional next-axis assignments).
+- Section 11 — alternates for /020+ + conditional pre-staging matrix? YES (7 verdict-conditional next-axis assignments; LM Master §9 cross-referenced).
 - Section 12 — catalog closeout plan? YES.
 - Section 13 — this checklist? YES.
 
-**Self-check verdict**: brief PASS for Phase 5.5 gate as of authoring time (LM Master Phase 4.5 responses pending; Section 3.4 will be amended in Phase 5.5 cycle after LM Master fires).
+**Self-check verdict**: brief PASS for Phase 5.5 gate (LM Master Phase 4.5 responses INTEGRATED at Section 3.4 post-advisory commit `62e5056`).
 
 ---
 
