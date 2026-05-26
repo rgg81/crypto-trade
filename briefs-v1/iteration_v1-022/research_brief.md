@@ -1021,4 +1021,88 @@ LM Master /022 Phase 4.5 ADOPTED in full (Section 3.4):
 
 ---
 
+## Section 13 — Phase 7+8 Self-check Addendum (post-closeout calibration)
+
+Added at /022 Phase 8 closeout (2026-05-26). Tracks how the pre-registered Section 13 checks held up against actual Phase 7+8 outcomes.
+
+### Verdict-cell calibration
+
+- **Pre-registered (Section 5)**: LM Master priors 8/12/40/20/10/10. Modal cell INERT 40%; NEG total 40% (NEG clean 20% + NEG-INTRINSIC 10% + NEG-CAT 10%); PROMISING tail 20%.
+- **Observed**: **EXPLORATION-NEGATIVE-CATASTROPHIC** (Section 8 Row 6 — F1 OOS Sharpe Δ −1.17 ≤ −0.55 threshold). The 10% NEG-CAT tail materialized — modal INERT 40% REFUTED.
+- **Per LM Master Phase 4.5 §8 closing point**: "F-AXIS #3 LOAD-BEARING disambiguator, not F1 magnitude — anchor at extreme negative reduces F1 diagnostic power around INERT/NEGATIVE boundary." This pre-registration was VINDICATED at /022 — ALL 4 F-AXIS-MECHANISM checks PASSED yet F1 catastrophic. **Mechanism ≠ outcome.**
+- **Calibration synthesis**: LM Master priors were materially better-calibrated than QR's initial 15/10/45/12/8/10. The LM Master 10pp shift from PROMISING/INERT tails into NEGATIVE tails captured the observed tail outcome; QR's initial 30% NEG total + 8% NEG-CAT was systematically too tight.
+
+### F-AXIS-MECHANISM 4/4 PASS calibration (Section 4)
+
+- **Pre-registered F-AXIS #1 dispatch**: `df['symbol'].unique() == ['LTCUSDT']`. **PASS** (117 IS + 48 OOS all LTCUSDT).
+- **Pre-registered F-AXIS #2 trade count**:
+  - QR blocking band IS [80, 180] / OOS [20, 60]. **PASS** both (117 / 48).
+  - LM Master informational sub-band IS [70, 160] modal 100 / OOS [18, 50] modal 28. **PASS** both bands (above modal but inside band).
+- **Pre-registered F-AXIS #3 gate fire rate (LOAD-BEARING)**:
+  - IS [15%, 40%]: **PASS** at 17.95% (21/117).
+  - OOS [5%, 30%]: **PASS** at 29.17% (14/48) — near top of band.
+  - Neither NEGATIVE-OVER-KILL (>30% OOS) nor NEGATIVE-UNDER-FIRE (<5% OOS) triggered. The gate operated nominally per design.
+- **Pre-registered F-AXIS #4 n_eff_per_cell**: LM Master modal 8 / band [6, 10]. **PASS EXACT** (observed 8).
+
+**Methodology calibration accurate**: 6/6 mechanism-level micro-mechanics HIT. LM Master methodology track 4/4 = 100% perfect.
+
+### Jaccard calibration (Section 3.4.7 + 7)
+
+- **Pre-registered (LM Master §6 ADOPTED, Section 3.4.7)**: [0.03, 0.20] modal 0.06.
+- **Observed**: IS 0.1005 (22/219) / OOS 0.0933 (7/75). **PASS** both inside band, above modal.
+- **Interpretation**: ~90% NEW roster on both windows confirms basin relocation per /020 BTC precedent (Jaccard 0.084 OOS). The retrained basin produced fundamentally different roster where the targeted phenomenon (89% long-direction drag) dissolved.
+
+### Anchor-frame ambiguity discovered (Section 8 + Critic Check 8)
+
+- **Pre-registered (Section 8 anchor frame integrity)**: F1 and F3 read `comparison.csv` "sharpe" field; brief Section 1 anchor stated as LTC-in-pool per-trade Sharpe (IS +0.0038 / OOS −0.2670).
+- **Critic Check 8 finding (review.md)**: `comparison.csv` "sharpe" field is daily-annualized (per `iteration_report.py:69`), NOT per-trade. The two frames produce divergent verdicts:
+  - Daily-annualized (binding): Δ = −1.17 → NEGATIVE-CATASTROPHIC.
+  - Per-trade (informational): Δ ≈ +0.148 → borderline PROMISING-INERT.
+- **Resolution**: Section 8 pre-registration binds to daily-annualized via comparison.csv anchor. **Verdict ROBUST under binding frame.**
+- **Carry-forward action**: ELEVATED to BINDING for /023 — pre-compute per-cohort daily-annualized Sharpe directly on baseline roster; lock F1 frame to comparison.csv "sharpe" semantics. CARRY-FORWARD from /020 Rec #2 → /022 Rec #3 BINDING.
+
+### Engineering report contract calibration (Section 10.4)
+
+- **Pre-registered (Section 10.4)**: engineering_report.md BLOCKING per Critic /020/021 Rec #1; no Phase 7.5 Critic dispatch without engineering_report.md present.
+- **Observed**: engineering_report.md MISSING at Phase 7.5 dispatch on `374bf39`. Critic emitted BLOCK-PENDING-FIX at `53dffd4`. **4th cycle-3 engineering_report contract incident — RE-VIOLATION post-/021 resolution.**
+- **Resolution**: retrospective fix `d6afb68` per BLOCK-PENDING-FIX protocol (287-line engineering_report.md from existing CSVs, zero backtest re-run, 37 tests still PASS). Defect axis (report content completeness) PASS at re-evaluation.
+- **Carry-forward action (NOT QR scope)**: Critic Phase 7.5 FINAL Recommendation #1 — codify NON-RETROSPECTIVE-FORGIVENESS at orchestrator dispatch level. Brief-level contracts cannot enforce; SKILL-LAYER fix required. 4 incidents across 4 iterations (/019/020/021 initial/022) confirms.
+
+### LM Master Phase 4.5 prediction calibration
+
+| Phase 4.5 prediction | Observed | Hit/Miss |
+|---|---|---|
+| Verdict-class modal INERT 40% | NEG-CAT (10% tail) | **MISS modal; HIT tail (LM Master tighter than QR)** |
+| F-AXIS #2 IS [70, 160] modal 100 | 117 | **HIT inside band, above modal** |
+| F-AXIS #2 OOS [18, 50] modal 28 | 48 | **HIT inside band, above modal** |
+| F-AXIS #3 IS [15%, 40%] LOAD-BEARING | 17.95% | **HIT** |
+| F-AXIS #3 OOS [5%, 30%] LOAD-BEARING | 29.17% | **HIT (near top)** |
+| F-AXIS #4 n_eff_per_cell point 8 band [6, 10] | 8 | **HIT EXACT** |
+| Jaccard [0.03, 0.20] modal 0.06 | IS 0.10 / OOS 0.093 | **HIT band both windows** |
+| LM §8 closing: F-AXIS #3 LOAD-BEARING not F1 magnitude | F-AXIS #3 PASS yet F1 catastrophic | **VINDICATED (diagnostic scenario pre-registered exactly)** |
+
+### Track record contributions
+
+- **LM Master directional**: 1.5/6 post-/022 → 25% directional accuracy (modal misses continue at single-seed EXPLORATION on non-POSITIVE_EVERYWHERE cohorts).
+- **LM Master methodology**: 4/4 post-/022 = 100% perfect (mechanism-level prediction 6/6 micro-mechanics hit; F-AXIS #3 LOAD-BEARING designation VINDICATED).
+- **LM Master tail upweighting reliability at non-POSITIVE_EVERYWHERE cohorts (n=2)**: /020 LM raised NEG total + tail materialized; /022 LM raised NEG tail 30→40% + 10% NEG-CAT tail materialized. Pattern: at single-seed EXPLORATION on non-POSITIVE_EVERYWHERE cohort priors, LM Master's negative-tail upweighting is reliably directionally correct, even when modal misses.
+
+### Cycle-3 cadence
+
+- **Pre-registered (Section 0.5)**: cycle-3 EXPLORATION #7 of 10; CONFIRMATION earliest at /027.
+- **Observed**: CONFIRMED. Cadence preserved at 7/10 (NOT accelerated /022=/027 per NEG-CAT). 3 more EXPLORATIONs (/023-/025) + sanity (/026) before /027.
+
+### Carry-forward bindings for /023+
+
+1. **Per-cohort isolation axis SATURATED for ASYMMETRIC_ROTATION cohorts at n=2** (NEW memory `feedback_v1_per_cohort_saturation_asymmetric_rotation.md`). Future v1 single-cohort EXPLORATIONs require POSITIVE_EVERYWHERE or counter-trend-symmetric cohort class with pre-classification.
+2. **Anchor-frame ambiguity ELEVATED to BINDING for /023** — pre-compute daily-annualized Sharpe; lock to comparison.csv "sharpe" semantics.
+3. **/027 bundle composition LOCKED**: 2 specialists (LINK +0.80 + ETH+gate +0.50) + FULL POOL preserved (BTC + LTC + DOT in pool).
+4. **/023 routing 3-WAY CONVERGENT**: funding-rate z-score (PRIMARY) > per-cohort drawdown brake (STATEFUL deadlock proof MANDATORY) > meta-labeling (v3/017 NEG PATH C risk).
+5. **DOT pre-classification MANDATORY** before any further per-cohort consideration — if DOT class = ASYMMETRIC_ROTATION, predict NEG-CAT a third time.
+6. **Engineering report contract orchestrator-layer fix REQUIRED** (NOT QR scope) — NON-RETROSPECTIVE-FORGIVENESS at dispatch level.
+7. **Basin-vector + feature_importance gaps DEFERRED to /023** — wire params_persist_path in /023 elif branch; refactor _post_dispatch_fi_strategies generic list.
+8. **LM Master priors over QR initial pass** at single-seed EXPLORATIONs on non-POSITIVE_EVERYWHERE cohort priors — tail upweighting reliably directionally correct.
+
+---
+
 **END OF BRIEF.** Phase 4.5 LM Master dispatch is the next step.
