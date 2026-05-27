@@ -1,0 +1,7 @@
+metric,computed_v1_026,baseline_v1_anchor,match
+is_sharpe_comparison_csv,+0.2829,+0.2829,YES
+oos_sharpe_comparison_csv,+0.6637,+0.6637,YES
+is_trades_comparison_csv,621,621,YES
+oos_trades_comparison_csv,189,189,YES
+is_sharpe_monthly_agg_info_only,+0.3285,(no anchor; from monthly_pnl.csv via sqrt(12)),—
+oos_sharpe_monthly_agg_info_only,+0.5722,(no anchor; from monthly_pnl.csv via sqrt(12)),—
