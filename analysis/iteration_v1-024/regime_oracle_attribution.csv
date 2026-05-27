@@ -1,0 +1,5 @@
+cohort,n_extreme_trades,n_normal_trades,baseline_extreme_pnl_pct,baseline_normal_pnl_pct,baseline_total_pnl_pct,oracle_extreme_pnl_pct,oracle_normal_pnl_pct,oracle_total_pnl_pct,oracle_delta_vs_baseline_pp
+Pool_A_BTCETH,40,212,-22.3387,-3.5359,-25.8746,0.0,28.3671,28.3671,54.2417
+Model_C_LINK,17,129,23.0444,73.3562,96.4006,39.7662,87.2024,126.9686,30.568
+Model_D_LTC,17,107,-4.2107,9.0495,4.8388,14.7671,32.0699,46.837,41.9982
+Model_E_DOT,8,85,0.1527,-16.341,-16.1883,0.217,0.0,0.217,16.4053
