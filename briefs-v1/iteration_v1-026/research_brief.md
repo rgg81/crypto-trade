@@ -1,7 +1,9 @@
 # iter-v1/026 — Pre-CONFIRMATION Cross-Correlation Sanity Check (Research Brief)
 
 **Status**: NOT an EXPLORATION axis. Pre-CONFIRMATION sanity slot before /027.
-**Verdict**: **YELLOW** (one required-pair breach; one new pair breach surfaced).
+**Verdict**: **GREEN-WITH-FIX** (Critic remediation #1 applied; replacement-pool
+production-semantic correlations both PASS; /027 = METHODOLOGY VALIDATION, NOT
+merge candidate).
 **Routing**: see Section 4 below.
 
 ---
@@ -323,12 +325,14 @@ on the bundle composition**, not a methodological artifact:
 | Question | Answer |
 |---|---|
 | 3-pair cross-correlation mandate verdict | **YELLOW** (1 of 2 required-pair breach: pool×LINK OOS +0.526) |
+| Replacement-pool production-semantic verdict (Critic rem. #1) | **GREEN** (both pairs PASS; pool_minus_LINK_ETH×LINK OOS +0.494, pool_minus_LINK_ETH×ETH OOS −0.141) |
 | 5-Model bundle 10-pair check | **YELLOW** (1 of 10 pair breach: C_link × E_dot OOS +0.603) |
 | Bundle Sharpe target [+1.10, +1.30] achievable? | **NO** (single-seed reference +0.57; multi-seed regression worsens this) |
 | BASELINE_V1 anchor stable? | YES (bit-exact match) |
-| /027 GREEN-LIGHT? | **YELLOW** — proceed with modified target band [+0.40, +0.75] and explicit acknowledgment that bundle composition has structural ceiling |
+| /027 GREEN-LIGHT? | **GREEN-WITH-FIX** — proceed under METHODOLOGY VALIDATION framing; realistic target band [+0.40, +0.75] |
 | /027 RED-BLOCK? | NO |
-| Required modifications to /027 brief | (1) Realistic target band, (2) Flag C × E breach for Phase 7 attribution, (3) Consider dropping E |
+| /027 framing | METHODOLOGY VALIDATION (multi-seed validation of cycle-3 per-cohort architecture), NOT a merge candidate |
+| Required modifications to /027 brief | (1) Realistic target band [+0.40, +0.75] NOT [+1.10, +1.30], (2) Flag C × E breach for Phase 7 attribution, (3) Consider dropping E |
 
 ---
 
@@ -357,7 +361,7 @@ on the bundle composition**, not a methodological artifact:
 
 - `analysis/iteration_v1-026/cross_correlation_analysis.py`
 - `analysis/iteration_v1-026/diagnose_oos_pool_link.py`
-- `analysis/iteration_v1-026/bundle_replacement_analysis.py`
+- `analysis/iteration_v1-026/bundle_replacement_analysis.py` (updated: +spearman, +replacement_pool_correlation.csv write — Critic rem. #1)
 - `analysis/iteration_v1-026/bundle_5model_estimate.py`
 - `analysis/iteration_v1-026/full_5model_cross_corr.py`
 - `analysis/iteration_v1-026/diagnose_roster_overlap.py`
@@ -366,7 +370,9 @@ on the bundle composition**, not a methodological artifact:
 - `analysis/iteration_v1-026/baseline_stability.csv`
 - `analysis/iteration_v1-026/oos_pool_link_diagnostic.csv`
 - `analysis/iteration_v1-026/bundle_replacement_validation.csv`
+- `analysis/iteration_v1-026/replacement_pool_correlation.csv` (NEW — Critic remediation #1)
 - `analysis/iteration_v1-026/bundle_5model_estimate.csv`
 - `analysis/iteration_v1-026/full_5model_cross_corr.csv`
 - `briefs-v1/iteration_v1-026/research_brief.md` (this file)
-- `briefs-v1/iteration_v1-026/sanity_check_report.md` (one-page summary)
+- `briefs-v1/iteration_v1-026/sanity_check_report.md` (one-page summary; updated GREEN-WITH-FIX)
+- `briefs-v1/iteration_v1-026/critic_review.md` (NEW — Critic adjudication summary)
