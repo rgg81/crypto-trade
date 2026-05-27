@@ -343,6 +343,23 @@ class RegimeRoutedStrategy:
             stats.n_normal_fired += 1
             return normal_signal
 
+    def compute_features(self, master: pd.DataFrame) -> None:
+        """Propagate compute_features() to both sub-strategies.
+
+        The backtest engine calls strategy.compute_features(master) once per
+        run_backtest() invocation to give each strategy the full master DataFrame
+        before the inference loop begins.  Both inner sub-strategies need this
+        call so they can store the master, build monthly splits, and populate
+        their feature caches for training + inference.
+
+        IMPORTANT: each sub-strategy receives the SAME full master — the
+        training-time partition (data_filter_callback) is applied INSIDE each
+        LightGbmStrategy._train_for_month(), not here.  This matches the design
+        described in the module docstring (Point 1: training-time partition).
+        """
+        self.extreme_strategy.compute_features(master)
+        self.normal_strategy.compute_features(master)
+
     def skip(self) -> None:
         """Propagate skip() to both sub-strategies."""
         self.extreme_strategy.skip()

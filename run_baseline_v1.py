@@ -66,7 +66,7 @@ import numpy as np
 import pandas as pd
 
 from crypto_trade.backtest import run_backtest
-from crypto_trade.backtest_models import BacktestConfig, TradeResult
+from crypto_trade.backtest_models import BacktestConfig, BacktestResult, TradeResult
 from crypto_trade.config import OOS_CUTOFF_MS
 from crypto_trade.features_v1 import (
     V1_BASELINE_UNIVERSE,
@@ -435,6 +435,200 @@ def run_model(
     # iter-v1/016: expose F-AXIS-MECHANISM log so the runner can write f_axis_mechanism.csv.
     # iter-v1/021: also return the strategy object for _write_feature_importance access.
     return results, strategy._faxm_log, strategy
+
+
+def build_lgbm_strategy(
+    atr_tp: float,
+    atr_sl: float,
+    *,
+    n_trials: int,
+    ensemble_size: int,
+    oof_persist_path: Path | None = None,
+    feature_columns: list[str] | None = None,
+    bounds_profile: str = "default",
+    r5_vol_target_enabled: bool = True,
+    r5_vol_target_pct: float = 4.0,
+    r5_kill_low_natr_enabled: bool = False,
+    r5_kill_low_natr_min_pct: float = 2.0,
+    ensemble_seeds_offset: int = 0,
+    sigma_source: str = "natr",
+    sigma_k_tp: float | None = None,
+    sigma_k_sl: float | None = None,
+    sigma_halflife_days: int = 14,
+    sample_weight_mode: str = "abs_pnl",
+    params_persist_path: Path | None = None,
+    model_role: str = "",
+    symbol: str = "",
+    data_filter_callback: Callable[[pd.DataFrame], np.ndarray] | None = None,
+) -> LightGbmStrategy:
+    """Build a LightGbmStrategy WITHOUT running a backtest.
+
+    Factory function used by run_regime_cohort() to construct inner sub-strategies
+    for RegimeRoutedStrategy before they are wrapped and dispatched via a SINGLE
+    run_backtest() call on the wrapper.
+
+    Parameters match run_model() exactly (minus the name/symbols/apply_r1/apply_r2
+    arguments which belong to the BacktestConfig, not the strategy).  All semantics
+    are identical to run_model() — this is just the strategy-construction portion
+    separated from the backtest-execution portion.
+
+    This function does NOT call run_backtest().  The caller (run_regime_cohort) is
+    responsible for wrapping the returned strategy in RegimeRoutedStrategy and then
+    calling run_backtest() exactly ONCE on the wrapper.
+    """
+    effective_feature_columns = (
+        feature_columns if feature_columns is not None else list(V1_FEATURE_COLUMNS)
+    )
+    sigma_halflife_candles = sigma_halflife_days * 3  # 3 candles per day at 8h
+    return LightGbmStrategy(
+        training_months=24,
+        n_trials=n_trials,
+        cv_splits=5,
+        label_tp_pct=8.0,
+        label_sl_pct=4.0,
+        label_timeout_minutes=10080,
+        fee_pct=0.1,
+        features_dir="data/features",
+        verbose=1,
+        atr_tp_multiplier=atr_tp,
+        atr_sl_multiplier=atr_sl,
+        use_atr_labeling=True,
+        ensemble_seeds=_derive_ensemble_seeds(ensemble_size, offset=ensemble_seeds_offset),
+        feature_columns=effective_feature_columns,
+        ood_enabled=True,
+        ood_features=list(V1_OOD_FEATURE_COLUMNS),
+        ood_cutoff_pct=BASELINE_OOD_CUTOFF_PCT,
+        oof_persist_path=oof_persist_path,
+        bounds_profile=bounds_profile,
+        sigma_source=sigma_source,
+        sigma_k_tp=sigma_k_tp,
+        sigma_k_sl=sigma_k_sl,
+        sigma_halflife_candles=sigma_halflife_candles,
+        sample_weight_mode=sample_weight_mode,
+        params_persist_path=params_persist_path,
+        model_role=model_role,
+        symbol=symbol,
+        data_filter_callback=data_filter_callback,
+    )
+
+
+def build_backtest_config(
+    symbols: tuple[str, ...],
+    *,
+    apply_r1: bool,
+    apply_r2: bool = False,
+    r5_vol_target_enabled: bool = True,
+    r5_vol_target_pct: float = 4.0,
+    r5_kill_low_natr_enabled: bool = False,
+    r5_kill_low_natr_min_pct: float = 2.0,
+) -> BacktestConfig:
+    """Build a BacktestConfig WITHOUT running a backtest.
+
+    Factory function used by run_regime_cohort() to construct the BacktestConfig
+    for a RegimeRoutedStrategy cohort.  Parameters and semantics are identical to
+    the BacktestConfig construction inside run_model().
+
+    Note: atr_tp / atr_sl are LightGbmStrategy parameters (labeling), NOT
+    BacktestConfig parameters.  BacktestConfig uses fixed stop_loss_pct=4.0 and
+    take_profit_pct=8.0 as percentage caps for the backtest engine.
+
+    This function does NOT call run_backtest().
+    """
+    return BacktestConfig(
+        symbols=symbols,
+        interval="8h",
+        max_amount_usd=1000.0,
+        stop_loss_pct=4.0,
+        take_profit_pct=8.0,
+        timeout_minutes=10080,
+        fee_pct=0.1,
+        data_dir=Path("data"),
+        cooldown_candles=2,
+        vol_targeting=True,
+        vt_target_vol=0.3,
+        vt_lookback_days=45,
+        vt_min_scale=0.33,
+        vt_max_scale=2.0,
+        risk_consecutive_sl_limit=3 if apply_r1 else None,
+        risk_consecutive_sl_cooldown_candles=27 if apply_r1 else 0,
+        risk_drawdown_scale_enabled=apply_r2,
+        risk_drawdown_trigger_pct=7.0,
+        risk_drawdown_scale_floor=0.33,
+        risk_drawdown_scale_anchor_pct=15.0,
+        risk_r5_vol_target_enabled=r5_vol_target_enabled,
+        risk_r5_vol_target_pct=r5_vol_target_pct,
+        risk_r5_kill_low_natr_enabled=r5_kill_low_natr_enabled,
+        risk_r5_kill_low_natr_min_pct=r5_kill_low_natr_min_pct,
+    )
+
+
+def run_regime_cohort(
+    name: str,
+    extreme_strategy: LightGbmStrategy,
+    normal_strategy: LightGbmStrategy,
+    config: BacktestConfig,
+    regime_config: RegimeGateConfig,
+    cohort_name: str = "",
+) -> tuple[BacktestResult, list[dict], RegimeRoutedStrategy]:
+    """Run ONE backtest via RegimeRoutedStrategy wrapper (iter-v1/024 regime dispatch).
+
+    This is the CORRECT dispatch path for regime-conditional cohorts.  It:
+    1. Wraps extreme_strategy + normal_strategy in a RegimeRoutedStrategy.
+    2. Calls run_backtest() EXACTLY ONCE on the wrapper.
+    3. Returns (results, combined_faxm_log, wrapper).
+
+    The inner strategies must have been constructed with build_lgbm_strategy() and
+    their respective data_filter_callback (make_extreme_filter / make_normal_filter).
+    They must NOT have been passed to run_backtest() individually — doing so would
+    run independent backtests on regime-partitioned training data and bypass the
+    inference-time routing logic entirely (the defect this function fixes).
+
+    The combined faxm_log merges extreme._faxm_log + normal._faxm_log so the runner's
+    F-AXIS-MECHANISM reporting is complete across both sub-strategies.
+
+    Parameters
+    ----------
+    name:
+        Display name for logging (e.g. "Model_A_regime (BTC/ETH regime-routed)").
+    extreme_strategy:
+        LightGbmStrategy built with data_filter_callback=make_extreme_filter(...).
+        NOT previously passed to run_backtest().
+    normal_strategy:
+        LightGbmStrategy built with data_filter_callback=make_normal_filter(...).
+        NOT previously passed to run_backtest().
+    config:
+        BacktestConfig for the cohort's symbols + risk gates.
+    regime_config:
+        RegimeGateConfig specifying threshold + z30_column + enabled.
+    cohort_name:
+        Label for engineering report gate stats (e.g. "Pool_A").
+
+    Returns
+    -------
+    (results, combined_faxm_log, wrapper)
+        results: BacktestResult from run_backtest(config, wrapper).
+        combined_faxm_log: extreme._faxm_log + normal._faxm_log.
+        wrapper: the RegimeRoutedStrategy instance (for gate stats + FI access).
+    """
+    wrapper = RegimeRoutedStrategy(
+        extreme_strategy=extreme_strategy,
+        normal_strategy=normal_strategy,
+        config=regime_config,
+        cohort_name=cohort_name,
+    )
+    print("=" * 60)
+    print(
+        f"MODEL {name}: {', '.join(config.symbols)} "
+        f"(REGIME-ROUTED via RegimeRoutedStrategy, cohort={cohort_name})"
+    )
+    print("=" * 60)
+    t0 = time.time()
+    results = run_backtest(config, wrapper, yearly_pnl_check=False)
+    elapsed = time.time() - t0
+    print(f"\n{name} complete: {len(results)} trades in {elapsed:.0f}s")
+    # Merge faxm logs from both sub-strategies.
+    combined_faxm: list[dict] = list(extreme_strategy._faxm_log) + list(normal_strategy._faxm_log)
+    return results, combined_faxm, wrapper
 
 
 def _load_pnl_series(
@@ -1582,14 +1776,14 @@ def main() -> None:
         _normal_filter = make_normal_filter(V1_ITER024_Z30_COLUMN, V1_ITER024_REGIME_THRESHOLD)
 
         # ----------------------------------------------------------------
-        # Model A — Pool BTC+ETH: 2 sub-models
+        # Model A — Pool BTC+ETH: 2 sub-models via RegimeRoutedStrategy
+        # FIXED (BLOCK-PENDING-FIX): build inner strategies WITHOUT running
+        # run_backtest on them individually; wrap in RegimeRoutedStrategy;
+        # call run_backtest ONCE on the wrapper so get_signal() IS reached.
         # ----------------------------------------------------------------
-        results_a_ext, faxm_a_ext, _strat_a_ext = run_model(
-            "Model_A_extreme (BTC/ETH extreme)",
-            ("BTCUSDT", "ETHUSDT"),
+        _strat_a_ext = build_lgbm_strategy(
             atr_tp=2.9,
             atr_sl=1.45,
-            apply_r1=False,
             n_trials=n_trials,
             ensemble_size=ensemble_size,
             oof_persist_path=OOF_PARQUET_PATH,
@@ -1600,12 +1794,9 @@ def main() -> None:
             data_filter_callback=_extreme_filter,
             **_r5_kwargs,
         )
-        results_a_norm, faxm_a_norm, _strat_a_norm = run_model(
-            "Model_A_normal (BTC/ETH normal)",
-            ("BTCUSDT", "ETHUSDT"),
+        _strat_a_norm = build_lgbm_strategy(
             atr_tp=2.9,
             atr_sl=1.45,
-            apply_r1=False,
             n_trials=n_trials,
             ensemble_size=ensemble_size,
             oof_persist_path=OOF_PARQUET_PATH,
@@ -1616,22 +1807,37 @@ def main() -> None:
             data_filter_callback=_normal_filter,
             **_r5_kwargs,
         )
-        _strat_a_regime = RegimeRoutedStrategy(
-            extreme_strategy=_strat_a_ext,
-            normal_strategy=_strat_a_norm,
-            config=_regime_config,
+        _cfg_a = build_backtest_config(
+            ("BTCUSDT", "ETHUSDT"),
+            apply_r1=False,
+            apply_r2=False,
+            **{
+                k: v
+                for k, v in _r5_kwargs.items()
+                if k
+                in (
+                    "r5_vol_target_enabled",
+                    "r5_vol_target_pct",
+                    "r5_kill_low_natr_enabled",
+                    "r5_kill_low_natr_min_pct",
+                )
+            },
+        )
+        results_a, faxm_a, _strat_a_regime = run_regime_cohort(
+            "Model_A_regime (BTC/ETH regime-routed)",
+            _strat_a_ext,
+            _strat_a_norm,
+            _cfg_a,
+            _regime_config,
             cohort_name="Pool_A",
         )
 
         # ----------------------------------------------------------------
-        # Model C — LINK: 2 sub-models
+        # Model C — LINK: 2 sub-models via RegimeRoutedStrategy
         # ----------------------------------------------------------------
-        results_c_ext, faxm_c_ext, _strat_c_ext = run_model(
-            "Model_C_extreme (LINK extreme)",
-            ("LINKUSDT",),
+        _strat_c_ext = build_lgbm_strategy(
             atr_tp=3.5,
             atr_sl=1.75,
-            apply_r1=True,
             n_trials=n_trials,
             ensemble_size=ensemble_size,
             oof_persist_path=OOF_PARQUET_PATH,
@@ -1642,12 +1848,9 @@ def main() -> None:
             data_filter_callback=_extreme_filter,
             **_r5_kwargs,
         )
-        results_c_norm, faxm_c_norm, _strat_c_norm = run_model(
-            "Model_C_normal (LINK normal)",
-            ("LINKUSDT",),
+        _strat_c_norm = build_lgbm_strategy(
             atr_tp=3.5,
             atr_sl=1.75,
-            apply_r1=True,
             n_trials=n_trials,
             ensemble_size=ensemble_size,
             oof_persist_path=OOF_PARQUET_PATH,
@@ -1658,22 +1861,37 @@ def main() -> None:
             data_filter_callback=_normal_filter,
             **_r5_kwargs,
         )
-        _strat_c_regime = RegimeRoutedStrategy(
-            extreme_strategy=_strat_c_ext,
-            normal_strategy=_strat_c_norm,
-            config=_regime_config,
+        _cfg_c = build_backtest_config(
+            ("LINKUSDT",),
+            apply_r1=True,
+            apply_r2=False,
+            **{
+                k: v
+                for k, v in _r5_kwargs.items()
+                if k
+                in (
+                    "r5_vol_target_enabled",
+                    "r5_vol_target_pct",
+                    "r5_kill_low_natr_enabled",
+                    "r5_kill_low_natr_min_pct",
+                )
+            },
+        )
+        results_c, faxm_c, _strat_c_regime = run_regime_cohort(
+            "Model_C_regime (LINK regime-routed)",
+            _strat_c_ext,
+            _strat_c_norm,
+            _cfg_c,
+            _regime_config,
             cohort_name="Model_C_LINK",
         )
 
         # ----------------------------------------------------------------
-        # Model D — LTC: 2 sub-models
+        # Model D — LTC: 2 sub-models via RegimeRoutedStrategy
         # ----------------------------------------------------------------
-        results_d_ext, faxm_d_ext, _strat_d_ext = run_model(
-            "Model_D_extreme (LTC extreme)",
-            ("LTCUSDT",),
+        _strat_d_ext = build_lgbm_strategy(
             atr_tp=3.5,
             atr_sl=1.75,
-            apply_r1=True,
             n_trials=n_trials,
             ensemble_size=ensemble_size,
             oof_persist_path=OOF_PARQUET_PATH,
@@ -1684,12 +1902,9 @@ def main() -> None:
             data_filter_callback=_extreme_filter,
             **_r5_kwargs,
         )
-        results_d_norm, faxm_d_norm, _strat_d_norm = run_model(
-            "Model_D_normal (LTC normal)",
-            ("LTCUSDT",),
+        _strat_d_norm = build_lgbm_strategy(
             atr_tp=3.5,
             atr_sl=1.75,
-            apply_r1=True,
             n_trials=n_trials,
             ensemble_size=ensemble_size,
             oof_persist_path=OOF_PARQUET_PATH,
@@ -1700,16 +1915,35 @@ def main() -> None:
             data_filter_callback=_normal_filter,
             **_r5_kwargs,
         )
-        _strat_d_regime = RegimeRoutedStrategy(
-            extreme_strategy=_strat_d_ext,
-            normal_strategy=_strat_d_norm,
-            config=_regime_config,
+        _cfg_d = build_backtest_config(
+            ("LTCUSDT",),
+            apply_r1=True,
+            apply_r2=False,
+            **{
+                k: v
+                for k, v in _r5_kwargs.items()
+                if k
+                in (
+                    "r5_vol_target_enabled",
+                    "r5_vol_target_pct",
+                    "r5_kill_low_natr_enabled",
+                    "r5_kill_low_natr_min_pct",
+                )
+            },
+        )
+        results_d, faxm_d, _strat_d_regime = run_regime_cohort(
+            "Model_D_regime (LTC regime-routed)",
+            _strat_d_ext,
+            _strat_d_norm,
+            _cfg_d,
+            _regime_config,
             cohort_name="Model_D_LTC",
         )
 
         # ----------------------------------------------------------------
         # Model E — DOT: BASELINE single-model (DOT excluded from regime routing)
         # Per LM Master §1: 8 IS extreme trades — degenerate; direction reversed.
+        # DOT path unchanged — uses run_model() directly (no regime wrapper).
         # ----------------------------------------------------------------
         results_e, faxm_e, _strat_e = run_model(
             "Model_E_baseline (DOT baseline)",
@@ -1730,33 +1964,16 @@ def main() -> None:
         )
 
         # ----------------------------------------------------------------
-        # Merge results from all 7 sub-models
-        # Note: run_model() returns individual sub-model backtests.
-        # All 6 regime sub-model results + DOT baseline combined.
+        # Merge results: 3 regime-wrapped cohorts + DOT baseline.
+        # results_a/c/d are BacktestResults from run_regime_cohort() —
+        # each produced by a SINGLE run_backtest(wrapper) call.
         # ----------------------------------------------------------------
-        _all_faxm_logs = (
-            faxm_a_ext + faxm_a_norm + faxm_c_ext + faxm_c_norm + faxm_d_ext + faxm_d_norm + faxm_e
-        )
-        all_results = (
-            results_a_ext
-            + results_a_norm
-            + results_c_ext
-            + results_c_norm
-            + results_d_ext
-            + results_d_norm
-            + results_e
-        )
-        _r5_model_results = [
-            results_a_ext,
-            results_a_norm,
-            results_c_ext,
-            results_c_norm,
-            results_d_ext,
-            results_d_norm,
-            results_e,
-        ]
-        # Feature importance for all 7 sub-models (F-AXIS #5 gain-share recurrence check).
-        # Sub-strategies accessed directly for _write_feature_importance emission.
+        _all_faxm_logs = faxm_a + faxm_c + faxm_d + faxm_e
+        all_results = results_a + results_c + results_d + results_e
+        _r5_model_results = [results_a, results_c, results_d, results_e]
+        # Feature importance: inner sub-strategies (for gain-share recurrence check).
+        # Post-dispatch FI collection from inner LightGbmStrategy instances, not wrappers,
+        # because _write_feature_importance needs _models / _selected_cols attributes.
         _post_dispatch_fi_strategies = [
             ("Model_A_extreme", _strat_a_ext),
             ("Model_A_normal", _strat_a_norm),
