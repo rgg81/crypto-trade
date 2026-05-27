@@ -88,3 +88,70 @@ Nominal Σ = +1.61 OOS Sharpe. Realistic with correlation drag (regime-condition
 2. RegimeRoutedStrategy wrapper at signal-time (no look-ahead)
 3. Gain-share recurrence check across regimes per cohort
 4. Cross-correlation analysis present for /027 bundle pre-validation
+
+---
+
+# LightGBM Master Advisor — iter-v1/024 — Phase 7.4 (Post-Mortem DIAGNOSTIC)
+
+## Context
+- comparison.csv BIT-IDENTICAL to /023 (Sharpe +0.4121/+0.4606, 694/257 trades, all metrics)
+- ALL 3 extreme sub-models produced empty `_models` (skip rate 100%)
+- Wrapper architecture correct; data partition layer broken
+
+## 1. Why extreme sub-models trained nothing — STRUCTURAL DEFECT, NOT THINNESS
+
+ROOT CAUSE: **column-resolution bug** in `make_extreme_filter`, NOT partition thinness.
+
+Logs show repeated "0 rows after filter" for ALL 240 month×cohort training cells. EDA Section 2.1 had 1573/709/802 extreme bars — those rows physically exist. So extreme returning literal **0** means the column is MISSING, not the bars.
+
+**Smoking gun** at `src/crypto_trade/strategies/regime_gate_v1.py:181-185`:
+```python
+def _filter(df):
+    if z30_column not in df.columns:
+        return np.zeros(len(df), dtype=bool)  # all-False fallback
+```
+Complementary normal filter at line 207-210 returns **all-True** when column missing. Asymmetric fallback → extreme empty (skip) + normal full (= /023 baseline = bit-identical comparison.csv).
+
+`self._master` passed to `_train_for_month` at `lgbm.py:525` does NOT contain `funding_rate_zscore_30`. Even though V1_FEATURE_COLUMNS_PRUNED includes it, the column lands in feature-cache view but not `self._master` that filter callback receives.
+
+**Pre-launch miss (mine)**: Phase 4.5 §4(a) flagged look-ahead risk in wrapper but didn't recommend `len(extreme_filter(sample))>0` precondition assertion. 3-line unit test would have caught this in seconds.
+
+## 2. Bit-identity to /023 — MECHANISM BYPASS
+
+Every Optuna call landed on the NORMAL partition only. Normal filter returns all-True when column missing → trained on FULL window = /023 baseline. Same seed=42 + same n_trials=18 + same ENSEMBLE_SIZE=3 + same hyperparameter bounds + same training rows → identical best_params → identical trade roster.
+
+This is NOT basin invariance. It is **mechanism bypass at the data-loading layer**. The wrapper did its job (`regime_gate_v1.py:319-344` dispatches via skip-month fallback to normal because `_is_extreme_model_trained_for_month()` always returns False). Training-data partition is where the bug lives.
+
+## 3. F-AXIS #1 Dispatch Correctness BLOCK
+
+Brief Section 4.2 pre-registered: "7 unique model_name values". Observed: **4** (3 normal + DOT baseline). 3 extreme feature_importance CSVs absent at `reports-v1/iteration_v1-024/in_sample/`.
+
+Section 5 mass-shifting trigger #2: "IF EXTREME sub-model trade count < 5 IS for ≥1 cohort → Row 9 n_eff degenerate." All 3 cohorts violate (0 trades each).
+
+## 4. Architectural lesson — BOLD direction for /025
+
+Reject options A/B/C/E (each insufficient or wrong). **Recommend BLOCK-PENDING-FIX with 3-line patch**:
+
+1. Replace silent zero-mask fallback at `regime_gate_v1.py:181-185` with hard `raise ValueError("Required column missing")`
+2. Trace runner master-construction to ensure funding_rate_zscore_30 propagates
+3. Add 3-line unit test: `make_extreme_filter('funding_rate_zscore_30', 1.5)(master_sample)` returns mask with ≥1 True
+
+Re-run /024-A same config (seed=42, n_trials=18, ENSEMBLE_SIZE=3). Mechanism gets a fair test.
+
+## 5. Verdict cell assignment — Row 9 BLOCK-PENDING-FIX
+
+Per pre-registered Section 8 Row 9: "F-AXIS #1 dispatch fail → BLOCK-PENDING-FIX". F1 OOS Δ -0.2031 is MEANINGLESS as signal evaluator because mechanism under test was bypassed. Treating as Row 6 NEGATIVE-clean would conflate mechanism bypass with learned-negative outcome.
+
+**Critic Phase 7.5 verdict: BLOCK-PENDING-FIX** with required action: fix `regime_gate_v1.py:181-185` + trace runner master-construction + 3-line unit test + re-run /024-A.
+
+## 6. Most important point
+
+**The /024 outcome is not a refutation of regime-conditional architecture — it is a 3-line column-resolution defect masquerading as a null-result. Bit-identity to /023 IS the diagnostic that mechanism was bypassed at data layer rather than producing INERT signal. Closing the model-arch axis on this evidence would be the wrong call.**
+
+## 7. Calibration miss
+
+My Phase 4.5 priors 12/7/48/20/10/3 are UNDERDETERMINED. The verdict (Row 9 BLOCK-PENDING-FIX) was not in my prior distribution. **Lesson**: future Phase 4.5 advisories on data-pipeline axes MUST include "column-presence assertion in filter callback" as Implementation Risk item with explicit unit test specification.
+
+Prior recommendations that materialized correctly: DOT mitigation (§1), wrapper-at-signal-time no-look-ahead (§4a), skip-month fallback design (§4c).
+
+Prior that missed: F-AXIS #5 gain-share recurrence (cannot evaluate because extreme sub-models didn't exist — needs precondition assertion).
