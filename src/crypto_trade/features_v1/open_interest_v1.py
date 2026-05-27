@@ -220,14 +220,32 @@ def add_oi_delta_v1_features(
     # ------------------------------------------------------------------
     # Align OI to kline frame via left-merge on open_time (ms int)
     # 8h bars are exactly aligned; no rounding needed unlike funding jitter.
+    #
+    # NOTE: ka.df (the source of df) has open_time as BOTH the datetime index
+    # AND a millisecond-int column.  pandas raises:
+    #   ValueError: 'open_time' is both an index level and a column label.
+    # when merging on="open_time" in that situation.
+    # Workaround: add a merge key column with a different name (_oi_merge_key),
+    # merge on that, then drop it.  Mirrors the funding_v1 open_time_aligned
+    # pattern (avoids resetting the index which would lose the datetime index).
     # ------------------------------------------------------------------
+    df = df.copy()
+    df["_oi_merge_key"] = df["open_time"].astype("int64")
+
+    oi_df_keyed = oi_df[["open_time", "sum_open_interest"]].copy()
+    oi_df_keyed["_oi_merge_key"] = oi_df_keyed["open_time"].astype("int64")
+
     merged = df.merge(
-        oi_df[["open_time", "sum_open_interest"]],
-        on="open_time",
+        oi_df_keyed[["_oi_merge_key", "sum_open_interest"]],
+        on="_oi_merge_key",
         how="left",
-    )
+    ).drop(columns=["_oi_merge_key"])
+
     # Restore original index alignment
     merged.index = df.index
+
+    # Clean up the merge key from df (df is already a copy)
+    df = df.drop(columns=["_oi_merge_key"])
 
     oi_series = merged["sum_open_interest"].astype(float)
 

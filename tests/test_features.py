@@ -57,7 +57,8 @@ def _make_ohlcv_df(n: int = 500) -> pd.DataFrame:
 
 def test_list_groups():
     groups = list_groups()
-    assert len(groups) == 9
+    # iter-v1/023 added funding_v1 (10 groups); iter-v1/025 added open_interest_v1 (11 groups).
+    assert len(groups) == 11
     expected = {
         "momentum",
         "volatility",
@@ -68,12 +69,15 @@ def test_list_groups():
         "interaction",
         "calendar",
         "entropy_cusum",
+        "funding_v1",  # iter-v1/023
+        "open_interest_v1",  # iter-v1/025
     }
     assert set(groups) == expected
 
 
 def test_registry_has_all_groups():
-    assert len(GROUP_REGISTRY) == 9
+    # iter-v1/023 added funding_v1; iter-v1/025 added open_interest_v1.
+    assert len(GROUP_REGISTRY) == 11
 
 
 # ---------------------------------------------------------------------------
@@ -173,12 +177,30 @@ class TestMeanReversion:
 
 
 class TestGenerateAll:
+    # iter-v1/023 and iter-v1/025 added funding_v1 and open_interest_v1 groups which
+    # require a 'symbol' column and external CSV caches — not suitable for this generic
+    # OHLCV integration test. Exclude them and test only the non-v1-specific groups.
+    _NON_V1_GROUPS = [
+        g
+        for g in [
+            "momentum",
+            "volatility",
+            "trend",
+            "volume",
+            "mean_reversion",
+            "statistical",
+            "interaction",
+            "calendar",
+            "entropy_cusum",
+        ]
+    ]
+
     def test_all_groups(self):
         df = _make_ohlcv_df(300)
         original_cols = set(df.columns)
-        result = generate_features(df, list_groups())
+        result = generate_features(df, self._NON_V1_GROUPS)
         new_cols = [c for c in result.columns if c not in original_cols]
-        # Should have ~165 features across all groups
+        # Should have ~165 features across all non-v1 groups
         assert len(new_cols) >= 100
         assert len(result) == 300  # row count unchanged
 
@@ -192,7 +214,7 @@ class TestGenerateAll:
     def test_no_rows_lost(self):
         df = _make_ohlcv_df(500)
         n = len(df)
-        result = generate_features(df, list_groups())
+        result = generate_features(df, self._NON_V1_GROUPS)
         assert len(result) == n
 
 

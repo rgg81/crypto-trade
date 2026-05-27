@@ -177,6 +177,15 @@ from crypto_trade.features_v1.funding_v1 import (  # noqa: E402
     add_funding_v1_features as _add_funding_v1_features,
 )
 
+# iter-v1/025: open-interest delta z-score feature family.
+# Mirrors the funding_v1 pattern: add_oi_delta_v1_features lives in
+# features_v1/ (v1 track), called here via the legacy features registry so
+# that `uv run crypto-trade features --track v1 --groups open_interest_v1` writes
+# oi_delta_30_z90 to the v1 parquets.
+from crypto_trade.features_v1.open_interest_v1 import (  # noqa: E402
+    add_oi_delta_v1_features as _add_oi_delta_v1_features,
+)
+
 _register("momentum", add_momentum_features)
 _register("volatility", add_volatility_features)
 _register("trend", add_trend_features)
@@ -187,6 +196,7 @@ _register("interaction", add_interaction_features)
 _register("calendar", add_calendar_features)
 _register("entropy_cusum", add_entropy_cusum_features)
 _register("funding_v1", _add_funding_v1_features)  # iter-v1/023
+_register("open_interest_v1", _add_oi_delta_v1_features)  # iter-v1/025
 
 __all__ = [
     "GROUP_REGISTRY",

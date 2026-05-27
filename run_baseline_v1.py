@@ -323,6 +323,8 @@ def run_model(
     model_role: str = "",
     symbol: str = "",
     data_filter_callback: Callable[[pd.DataFrame], np.ndarray] | None = None,
+    nan_skip_columns: list[str] | None = None,
+    nan_skip_threshold: float = 0.5,
 ):
     """Run a single v1 sub-model (A/C/D/E) under the corrected walk-forward.
 
@@ -443,6 +445,8 @@ def run_model(
         model_role=model_role,
         symbol=symbol,
         data_filter_callback=data_filter_callback,
+        nan_skip_columns=nan_skip_columns,
+        nan_skip_threshold=nan_skip_threshold,
     )
     t0 = time.time()
     results = run_backtest(config, strategy, yearly_pnl_check=False)
@@ -2072,6 +2076,9 @@ def main() -> None:
         )
 
         # Models A/C/D/E — same risk-gate config as /023 baseline
+        # iter-v1/025: pass nan_skip_columns so LightGbmStrategy excludes per-(symbol, month)
+        # cells where >50% of oi_delta_30_z90 values are NaN (LM Master §5(a) ADOPTED).
+        _025_nan_skip = [V1_ITER025_OI_DELTA_COLUMN]
         results_a, faxm_a, _strat_a = run_model(
             "A (BTC/ETH)",
             ("BTCUSDT", "ETHUSDT"),
@@ -2083,6 +2090,7 @@ def main() -> None:
             oof_persist_path=OOF_PARQUET_PATH,
             feature_columns=active_feature_columns,
             bounds_profile=bounds_profile,
+            nan_skip_columns=_025_nan_skip,
             **_r5_kwargs,
         )
         results_c, faxm_c, _strat_c = run_model(
@@ -2096,6 +2104,7 @@ def main() -> None:
             oof_persist_path=OOF_PARQUET_PATH,
             feature_columns=active_feature_columns,
             bounds_profile=bounds_profile,
+            nan_skip_columns=_025_nan_skip,
             **_r5_kwargs,
         )
         results_d, faxm_d, _strat_d = run_model(
@@ -2109,6 +2118,7 @@ def main() -> None:
             oof_persist_path=OOF_PARQUET_PATH,
             feature_columns=active_feature_columns,
             bounds_profile=bounds_profile,
+            nan_skip_columns=_025_nan_skip,
             **_r5_kwargs,
         )
         results_e, faxm_e, _strat_e = run_model(
@@ -2123,6 +2133,7 @@ def main() -> None:
             oof_persist_path=OOF_PARQUET_PATH,
             feature_columns=active_feature_columns,
             bounds_profile=bounds_profile,
+            nan_skip_columns=_025_nan_skip,
             **_r5_kwargs,
         )
         _all_faxm_logs = faxm_a + faxm_c + faxm_d + faxm_e
@@ -2136,6 +2147,26 @@ def main() -> None:
             ("Model_D_LTC", _strat_d),
             ("Model_E_DOT", _strat_e),
         ]
+
+        # iter-v1/025: emit per-(symbol, month) NaN-fraction skip log to oi_coverage_check.csv.
+        # Merges logs from all 4 strategies; labels each row with the model name.
+        # This is the DELIVERABLE per brief Section 10.5 and Critic D2 fix.
+        _025_nan_log_rows: list[dict] = []
+        for _model_name, _strat_obj in _post_dispatch_fi_strategies:
+            for _row in _strat_obj._nan_skip_log:
+                _025_nan_log_rows.append({"model": _model_name, **_row})
+        if _025_nan_log_rows:
+            _reports_dir025_final = (
+                Path(reports_dir) if "reports_dir" in dir() else Path("reports-v1/iteration_v1-025")
+            )
+            _reports_dir025_final.mkdir(parents=True, exist_ok=True)
+            _cov_path = _reports_dir025_final / "oi_coverage_check.csv"
+            _pd.DataFrame(_025_nan_log_rows).to_csv(_cov_path, index=False)
+            _n_skipped = sum(1 for r in _025_nan_log_rows if r["skipped"])
+            print(
+                f"[iter-v1/025] nan_skip_log: {len(_025_nan_log_rows)} (symbol, month) checks; "
+                f"{_n_skipped} skipped. Written to {_cov_path}"
+            )
 
     elif set(symbols) == set(V1_BASELINE_UNIVERSE) and iteration_label not in (
         "v1-021",

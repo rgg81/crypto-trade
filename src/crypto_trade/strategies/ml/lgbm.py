@@ -183,6 +183,8 @@ class LightGbmStrategy:
         symbol: str = "",
         data_filter_callback: Callable[[pd.DataFrame], np.ndarray] | None = None,
         data_filter_columns: list[str] | None = None,
+        nan_skip_columns: list[str] | None = None,
+        nan_skip_threshold: float = 0.5,
     ) -> None:
         if not feature_columns:
             raise ValueError(
@@ -249,6 +251,18 @@ class LightGbmStrategy:
         self._data_filter_columns: list[str] | None = (
             list(data_filter_columns) if data_filter_columns else None
         )
+        # iter-v1/025: per-(symbol, month) NaN-fraction skip guard.
+        # When set, any symbol whose training-fold slice has > nan_skip_threshold
+        # fraction of NaN values in ANY of the listed columns is excluded from
+        # that month's training fold.  Default None = no guard (backward-compat).
+        # Implements LM Master §5(a) ADOPTED recommendation for oi_delta_30_z90.
+        self._nan_skip_columns: list[str] | None = (
+            list(nan_skip_columns) if nan_skip_columns else None
+        )
+        self._nan_skip_threshold: float = float(nan_skip_threshold)
+        # Accumulates per-(symbol, month) NaN-fraction rows for oi_coverage_check.csv.
+        # Keys: symbol, month, column, nan_fraction, skipped.
+        self._nan_skip_log: list[dict] = []
         # iter-v3/007: fast exploration mode (colsample fixed at 1.0 in optimization.py)
         self._fast_mode: bool = fast_mode
         # iter-v1/002: Optuna hyperparameter bounds profile.
@@ -761,6 +775,60 @@ class LightGbmStrategy:
         long_pnls = long_pnls[keep_mask]
         short_pnls = short_pnls[keep_mask]
         train_open_times = self._open_time_arr[train_indices][keep_mask]
+
+        # iter-v1/025: per-(symbol, month) NaN-fraction skip guard (LM Master §5(a) ADOPTED).
+        # For each symbol in train_feat_df, if ANY nan_skip_columns column has >nan_skip_threshold
+        # fraction of NaN values, that symbol's rows are excluded from this month's fold.
+        # Backward-compat: _nan_skip_columns=None skips this block entirely.
+        if self._nan_skip_columns:
+            _skip_syms: set[str] = set()
+            _check_cols = [c for c in self._nan_skip_columns if c in train_feat_df.columns]
+            if _check_cols and "symbol" in train_feat_df.columns:
+                for _sym_name, _sym_group in train_feat_df.groupby("symbol"):
+                    for _col in _check_cols:
+                        _nan_frac = float(_sym_group[_col].isna().mean())
+                        _skipped = _nan_frac > self._nan_skip_threshold
+                        self._nan_skip_log.append(
+                            {
+                                "symbol": str(_sym_name),
+                                "month": month_str,
+                                "column": _col,
+                                "nan_fraction": round(_nan_frac, 4),
+                                "skipped": _skipped,
+                            }
+                        )
+                        if _skipped:
+                            _skip_syms.add(str(_sym_name))
+            if _skip_syms:
+                if self.verbose > 0:
+                    print(
+                        f"  [nan_skip] Excluding symbols with >{self._nan_skip_threshold:.0%} "
+                        f"NaN in {self._nan_skip_columns}: {sorted(_skip_syms)}"
+                    )
+                # Build mask: keep only rows whose symbol is NOT in _skip_syms.
+                # train_feat_df is aligned to train_indices after keep_mask.
+                _has_sym = "symbol" in train_feat_df.columns
+                _sym_col = train_feat_df["symbol"].values if _has_sym else None
+                if _sym_col is not None:
+                    _sym_keep = np.array([str(s) not in _skip_syms for s in _sym_col])
+                    train_feat_df = train_feat_df[_sym_keep].reset_index(drop=True)
+                    train_labels = train_labels[_sym_keep]
+                    train_weights = train_weights[_sym_keep]
+                    long_pnls = long_pnls[_sym_keep]
+                    short_pnls = short_pnls[_sym_keep]
+                    train_open_times = train_open_times[_sym_keep]
+                    if self.verbose > 0:
+                        print(
+                            f"  [nan_skip] {len(train_feat_df)} rows remain after "
+                            f"excluding {len(_skip_syms)} symbol(s)"
+                        )
+                    if len(train_feat_df) < 10:
+                        if self.verbose > 0:
+                            print(
+                                f"  Skipping {month_str}: only {len(train_feat_df)} rows "
+                                "after nan_skip exclusion"
+                            )
+                        return
 
         available_feat_cols = [c for c in self._all_feature_cols if c in train_feat_df.columns]
         feat_train = train_feat_df[available_feat_cols].values

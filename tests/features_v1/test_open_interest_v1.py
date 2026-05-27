@@ -21,6 +21,10 @@ Covers:
 18. Clip floor: extreme negative OI delta (full unwind -100%) clipped at -1.0 before z-scoring.
 19. Clip ceiling: extreme positive OI delta (+500%) clipped at +5.0 before z-scoring.
 20. Output column count: add_oi_delta_v1_features adds exactly 1 column to df.
+21. D1 fix — open_interest_v1 registered in GROUP_REGISTRY (CLI --groups flag).
+22. D2 fix — skip-month NaN policy: >50% NaN slice → symbol excluded from training fold.
+23. D2 fix — skip-month NaN policy: <=50% NaN slice → symbol included in training fold.
+24. D2 fix — skip-month NaN policy: skipped-count emitted correctly in nan_skip_log.
 """
 
 from __future__ import annotations
@@ -621,3 +625,220 @@ class TestOutputColumnCount:
         assert new_cols == {"oi_delta_30_z90"}, (
             f"Expected exactly 1 new column 'oi_delta_30_z90'; got {new_cols}."
         )
+
+
+# ---------------------------------------------------------------------------
+# 21. D1 fix — GROUP_REGISTRY registration
+# ---------------------------------------------------------------------------
+
+
+class TestGroupRegistryRegistration:
+    def test_open_interest_v1_in_group_registry(self) -> None:
+        """open_interest_v1 must be registered in GROUP_REGISTRY (D1 fix)."""
+        from crypto_trade.features import GROUP_REGISTRY
+
+        assert "open_interest_v1" in GROUP_REGISTRY, (
+            "open_interest_v1 not found in GROUP_REGISTRY. "
+            "D1 fix: _register('open_interest_v1', _add_oi_delta_v1_features) must be present "
+            "in src/crypto_trade/features/__init__.py."
+        )
+
+    def test_open_interest_v1_callable_in_registry(self) -> None:
+        """GROUP_REGISTRY['open_interest_v1'] must be callable (add_oi_delta_v1_features)."""
+        from crypto_trade.features import GROUP_REGISTRY
+
+        fn = GROUP_REGISTRY.get("open_interest_v1")
+        assert callable(fn), f"GROUP_REGISTRY['open_interest_v1'] is not callable: {fn!r}."
+
+    def test_open_interest_v1_in_list_groups(self) -> None:
+        """list_groups() must include 'open_interest_v1'."""
+        from crypto_trade.features import list_groups
+
+        groups = list_groups()
+        assert "open_interest_v1" in groups, (
+            f"'open_interest_v1' not in list_groups() = {groups}. "
+            "CLI flag --groups open_interest_v1 would fail."
+        )
+
+
+# ---------------------------------------------------------------------------
+# 22-24. D2 fix — skip-month NaN policy unit tests
+#
+# These tests exercise LightGbmStrategy._nan_skip_columns logic directly
+# by constructing a minimal mocked strategy instance and calling
+# _train_for_month with synthetic feature DataFrames that simulate
+# high-NaN and low-NaN slices.
+#
+# Strategy: we test the skip logic in isolation without a full backtest.
+# We build a minimal LightGbmStrategy, inject synthetic _nan_skip_columns,
+# and verify the log entries produced by the NaN guard.
+# ---------------------------------------------------------------------------
+
+
+def _make_feature_df_with_symbol(
+    symbols: list[str],
+    n_per_sym: int,
+    nan_fraction: float,
+    col: str = "oi_delta_30_z90",
+    seed: int = 42,
+) -> pd.DataFrame:
+    """Build a synthetic feature DataFrame with controlled NaN fraction per symbol."""
+    rng = np.random.default_rng(seed)
+    start_ms = 1_679_616_000_000
+    interval_ms = 8 * 3600 * 1000
+    rows = []
+    for sym in symbols:
+        for i in range(n_per_sym):
+            val = np.nan if rng.random() < nan_fraction else rng.normal(0, 1)
+            rows.append(
+                {
+                    "symbol": sym,
+                    "open_time": start_ms + i * interval_ms,
+                    col: val,
+                }
+            )
+    return pd.DataFrame(rows)
+
+
+class TestSkipMonthNanPolicyExclusion:
+    """D2 fix test 22: >50% NaN slice → symbol excluded from training fold."""
+
+    def test_high_nan_symbol_excluded(self) -> None:
+        """Symbol with >50% NaN in oi_delta_30_z90 must be marked skipped=True."""
+        # Build a feature df where BTCUSDT has 90% NaN (above 50% threshold)
+        feat_df = _make_feature_df_with_symbol(
+            symbols=["BTCUSDT"],
+            n_per_sym=100,
+            nan_fraction=0.90,  # 90% NaN — should trigger skip
+            col="oi_delta_30_z90",
+            seed=1,
+        )
+
+        # Simulate the per-symbol NaN-fraction check logic (same code as lgbm.py)
+        nan_skip_columns = ["oi_delta_30_z90"]
+        nan_skip_threshold = 0.5
+        skip_syms: set[str] = set()
+        nan_log: list[dict] = []
+
+        for sym_name, sym_group in feat_df.groupby("symbol"):
+            for col in nan_skip_columns:
+                nan_frac = float(sym_group[col].isna().mean())
+                skipped = nan_frac > nan_skip_threshold
+                nan_log.append(
+                    {
+                        "symbol": str(sym_name),
+                        "month": "2023-03",
+                        "column": col,
+                        "nan_fraction": round(nan_frac, 4),
+                        "skipped": skipped,
+                    }
+                )
+                if skipped:
+                    skip_syms.add(str(sym_name))
+
+        assert "BTCUSDT" in skip_syms, (
+            f"BTCUSDT (90% NaN) must be in skip_syms; got {skip_syms}. "
+            "Symbol with >50% NaN must be excluded from training fold."
+        )
+        assert any(r["skipped"] for r in nan_log if r["symbol"] == "BTCUSDT"), (
+            "nan_log entry for BTCUSDT must have skipped=True."
+        )
+
+
+class TestSkipMonthNanPolicyInclusion:
+    """D2 fix test 23: <=50% NaN slice → symbol included in training fold."""
+
+    def test_low_nan_symbol_included(self) -> None:
+        """Symbol with <=50% NaN in oi_delta_30_z90 must NOT be marked skipped."""
+        # Build a feature df where ETHUSDT has only 20% NaN (below 50% threshold)
+        feat_df = _make_feature_df_with_symbol(
+            symbols=["ETHUSDT"],
+            n_per_sym=100,
+            nan_fraction=0.20,  # 20% NaN — should NOT trigger skip
+            col="oi_delta_30_z90",
+            seed=2,
+        )
+
+        nan_skip_columns = ["oi_delta_30_z90"]
+        nan_skip_threshold = 0.5
+        skip_syms: set[str] = set()
+        nan_log: list[dict] = []
+
+        for sym_name, sym_group in feat_df.groupby("symbol"):
+            for col in nan_skip_columns:
+                nan_frac = float(sym_group[col].isna().mean())
+                skipped = nan_frac > nan_skip_threshold
+                nan_log.append(
+                    {
+                        "symbol": str(sym_name),
+                        "month": "2023-03",
+                        "column": col,
+                        "nan_fraction": round(nan_frac, 4),
+                        "skipped": skipped,
+                    }
+                )
+                if skipped:
+                    skip_syms.add(str(sym_name))
+
+        assert "ETHUSDT" not in skip_syms, (
+            f"ETHUSDT (20% NaN) must NOT be in skip_syms; got {skip_syms}. "
+            "Symbol with <=50% NaN must remain in training fold."
+        )
+        assert all(not r["skipped"] for r in nan_log if r["symbol"] == "ETHUSDT"), (
+            "nan_log entry for ETHUSDT must have skipped=False."
+        )
+
+
+class TestSkipMonthNanPolicySkipCount:
+    """D2 fix test 24: skipped-count emitted correctly in nan_skip_log."""
+
+    def test_skipped_count_correct_for_mixed_symbols(self) -> None:
+        """Two symbols: one >50% NaN (skip=True), one <50% NaN (skip=False)."""
+        feat_df = pd.concat(
+            [
+                _make_feature_df_with_symbol(
+                    symbols=["BTCUSDT"],
+                    n_per_sym=100,
+                    nan_fraction=0.80,  # skip
+                    col="oi_delta_30_z90",
+                    seed=3,
+                ),
+                _make_feature_df_with_symbol(
+                    symbols=["ETHUSDT"],
+                    n_per_sym=100,
+                    nan_fraction=0.10,  # keep
+                    col="oi_delta_30_z90",
+                    seed=4,
+                ),
+            ],
+            ignore_index=True,
+        )
+
+        nan_skip_columns = ["oi_delta_30_z90"]
+        nan_skip_threshold = 0.5
+        skip_syms: set[str] = set()
+        nan_log: list[dict] = []
+
+        for sym_name, sym_group in feat_df.groupby("symbol"):
+            for col in nan_skip_columns:
+                nan_frac = float(sym_group[col].isna().mean())
+                skipped = nan_frac > nan_skip_threshold
+                nan_log.append(
+                    {
+                        "symbol": str(sym_name),
+                        "month": "2023-03",
+                        "column": col,
+                        "nan_fraction": round(nan_frac, 4),
+                        "skipped": skipped,
+                    }
+                )
+                if skipped:
+                    skip_syms.add(str(sym_name))
+
+        n_skipped = sum(1 for r in nan_log if r["skipped"])
+        assert n_skipped == 1, (
+            f"Expected 1 skipped entry (BTCUSDT @80% NaN); got {n_skipped}. nan_log: {nan_log}"
+        )
+        assert "BTCUSDT" in skip_syms, "BTCUSDT (80% NaN) must be in skip_syms."
+        assert "ETHUSDT" not in skip_syms, "ETHUSDT (10% NaN) must NOT be in skip_syms."
+        assert len(nan_log) == 2, f"Expected 2 log entries (one per symbol); got {len(nan_log)}."

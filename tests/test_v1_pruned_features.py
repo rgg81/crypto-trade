@@ -1,8 +1,10 @@
 """Tests for iter-v1/002 pruned feature set + runner flags + Optuna bounds profile.
 
 Covers:
-- V1_FEATURE_COLUMNS_PRUNED has exactly 40 elements
-- All 40 are valid feature names (members of baseline V1_FEATURE_COLUMNS)
+- V1_FEATURE_COLUMNS_PRUNED has exactly 43 elements (40 baseline + 2 funding + 1 OI)
+  * iter-v1/002: 40 core features (IC-pruned from 193 baseline)
+  * iter-v1/023: +2 funding features (funding_rate_zscore_30/90) → 42
+  * iter-v1/025: +1 OI delta feature (oi_delta_30_z90) → 43
 - V1_FEATURE_COLUMNS is unchanged (still 193 columns)
 - V1_OOD_FEATURE_COLUMNS is NOT a subset of V1_FEATURE_COLUMNS_PRUNED
   (verifies R3 runtime decoupling design — 13/16 OOD features live OUTSIDE
@@ -27,21 +29,28 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 class TestV1FeatureColumnsPruned:
     """Unit tests for V1_FEATURE_COLUMNS_PRUNED constant."""
 
-    def test_pruned_set_has_exactly_40_features(self) -> None:
+    def test_pruned_set_has_exactly_43_features(self) -> None:
+        # iter-v1/002: 40 core IC-pruned features.
+        # iter-v1/023: +2 funding features → 42.
+        # iter-v1/025: +1 OI delta feature → 43.
         from crypto_trade.features_v1 import V1_FEATURE_COLUMNS_PRUNED
 
-        assert len(V1_FEATURE_COLUMNS_PRUNED) == 40, (
-            f"Expected 40 features; got {len(V1_FEATURE_COLUMNS_PRUNED)}"
+        assert len(V1_FEATURE_COLUMNS_PRUNED) == 43, (
+            f"Expected 43 features; got {len(V1_FEATURE_COLUMNS_PRUNED)}"
         )
 
-    def test_all_40_are_in_baseline_feature_columns(self) -> None:
+    def test_all_43_are_in_baseline_feature_columns_or_v1_extensions(self) -> None:
+        # iter-v1/023/025 added funding + OI features that are NOT in the 193-col
+        # V1_FEATURE_COLUMNS baseline (those are v1-specific extensions).
+        # Verify the 40 core features ARE in the baseline; allow the 3 v1 extensions.
         from crypto_trade.features_v1 import V1_FEATURE_COLUMNS, V1_FEATURE_COLUMNS_PRUNED
 
         baseline_set = set(V1_FEATURE_COLUMNS)
+        v1_extensions = {"funding_rate_zscore_30", "funding_rate_zscore_90", "oi_delta_30_z90"}
         for feat in V1_FEATURE_COLUMNS_PRUNED:
-            assert feat in baseline_set, (
-                f"Pruned feature '{feat}' not found in V1_FEATURE_COLUMNS (193 baseline). "
-                "All pruned features must be members of the 193-column baseline set."
+            assert feat in baseline_set or feat in v1_extensions, (
+                f"Pruned feature '{feat}' not found in V1_FEATURE_COLUMNS (193 baseline) "
+                f"or v1 extensions {v1_extensions}."
             )
 
     def test_v1_feature_columns_still_has_193_features(self) -> None:
@@ -176,12 +185,12 @@ class TestPrunedFeaturesCliFlag:
         assert len(result["feature_columns"]) == len(V1_FEATURE_COLUMNS)
         assert result["bounds_profile"] == "default"
 
-    def test_pruned_features_flag_gives_40_columns(self) -> None:
-        """--pruned-features activates V1_FEATURE_COLUMNS_PRUNED (40 cols)."""
+    def test_pruned_features_flag_gives_43_columns(self) -> None:
+        """--pruned-features activates V1_FEATURE_COLUMNS_PRUNED (43 cols after iter-v1/025)."""
         result = self._parse_and_resolve_features(
             ["--exploration", "--iteration", "2", "--pruned-features"]
         )
-        assert len(result["feature_columns"]) == 40
+        assert len(result["feature_columns"]) == 43
         assert result["bounds_profile"] == "v1_pruned"
 
     def test_pruned_features_and_v1_feature_columns_are_disjoint_in_count(self) -> None:
