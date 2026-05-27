@@ -793,6 +793,48 @@ Pre-Phase-6 self-check (QR own verification):
 7. **Anti-cheating: walk_forward.py:113 unchanged** (`train_end_ms = test_start_ms - embargo_ms`); BASELINE_V1.md unchanged; OOS_CUTOFF_DATE = 2025-03-24 unchanged.
 8. **Section 3 LM Master response (Section 3.4)**: **POPULATED 2026-05-27** post-Phase-4.5 advisory. 9/9 recommendations ADOPTED (priors recalibrated to 22/8/22/30/12/4/2; F-AXIS #1 DUAL GATE tightened with breadth check; HARD BLOCK on OI fetch ≥3/5 symbols ≥1000 IS rows; skip-month NaN policy; per-fold rank emission; 3-component vs 2-component bundle matrix; /026 staging matrix; 5 Critic Phase 7.5 priority items). Phase 5.5 gate verifies Section 3.4 is populated before Phase 6.0 dispatch — **VERIFIED**.
 
+### Section 13.9 — Phase 7+8 Self-Check Addendum (post-closeout)
+
+Appended 2026-05-27 at Phase 8 diary closeout commit. Reconciles Phase 5 pre-registered priors against observed Phase 7 verdict + Phase 8 catalog routing.
+
+1. **Pre-registered verdict-class priors vs observed**:
+   - LM Master Phase 4.5 §2 BINDING priors: PROMISING-clean 22% / PROMISING-INERT-FAV 8% / INERT 22% / LEARNED-NEG **30% (MODAL)** / NEGATIVE-INERT 12% / NEG-CAT 4% / AUTO-REJECT 2%.
+   - **Observed**: F1 OOS Δ = **-1.40** (deep NEG-CAT band ≤ -0.55, 2.5× threshold) × F-AXIS #1 DUAL GATE 4/4 PROMISING-clean × F3 IS Δ +0.05 (F3 INERT, NOT both-side collapse).
+   - **Modal CATEGORY (LEARNED-NEG family) hit**; magnitude tail (NEG-CAT 4%) MATERIALIZED but should have been priced 15-20% per LM Master Phase 7.4 §5 self-acknowledged miscalibration (rank-4 / 7.49% gain narrow basin pre-disposed to catastrophic magnitude vs /023's rank-12 / 5.40% wider basin).
+
+2. **Verdict cell**: LEARNED-NEGATIVE-CATASTROPHIC (NEW v1 verdict cell; catalogued at `feedback_v1_pool_a_new_feature_lneg.md`). Pre-registered Section 8 Row 7 (F1 magnitude OVERRIDES DUAL GATE classification at NEG-CAT band) FIRED. Per `feedback_no_cheating.md` + `feedback_v1_learned_negative_subtype.md`, LEARNED-NEGATIVE-CATASTROPHIC is a diary catalog cell, NOT verdict elevation.
+
+3. **Q1 sign-flip correction (LM Master §1(B) miscalibration)**:
+   - LM Master Phase 7.4 §1(B) claimed Q1 OOS PnL = **-30.78** sign-flip (dominant attribution channel; DERIVED FROM IS-EDA regime windows via forward-return regression).
+   - Actual realized-trade attribution from `oracle_q4_oos_attribution.csv` (BLOCK-PENDING-FIX retrospective fix `449ab6e` #5): Q1 OOS PnL = **+24.63** (SURVIVED — no sign flip).
+   - DOMINANT OOS LOSS CHANNEL is **Q3 mid (DEAD ZONE) -57.44 from 55 trades** (30.9% WR; ~70% of net OOS loss). EDA correctly identified Q3 as dead zone (Sharpe-proxy +0.04 ≈ 0); model's basin RELOCATED entries INTO Q3 under OOS regime shift.
+   - Q4 ORACLE SURVIVED **+25.97** (43.2% WR) — brief Section 2.6 ORACLE prediction was DIRECTIONALLY CORRECT; model just didn't concentrate there.
+   - Q5 strong-pos collapsed **-54.84** under joint cross-asset OI regime shift (perp-funding cycle post-halving).
+
+4. **Distribution-level Sharpe-proxy vs realized-trade attribution measurement-frame gap**: codified at NEW memory `feedback_v1_oracle_eda_trade_attribution.md`. Brief Phase 1-2 ORACLE EDA MUST include BOTH frames; gap analysis identifies highest EDA mis-prediction risk bands.
+
+5. **n=2 LEARNED-NEGATIVE pattern at v1 Pool Model A + single-seed n_trials=18**: established at /025 closeout; codified at NEW memory `feedback_v1_pool_a_new_feature_lneg.md`.
+   - /023: funding family LEARNED-NEG clean (Pool A rank 11 / 6.88% gain; F1 OOS Δ -0.20)
+   - /025: OI delta family LEARNED-NEG-CATASTROPHIC (Pool A rank 4 / 7.49% gain; F1 OOS Δ -1.40)
+   - Same architecture-budget configuration + different feature data class → same LEARNED-NEG direction; magnitude tracks basin-pull intensity (rank position) + joint cross-asset co-movement extent.
+   - Cycle-4 axis selection MUST structurally disqualify NEW-feature-to-Pool-Model-A axes at single-seed; require per-symbol specialists OR orthogonal-mechanism rule layers OR multi-seed budget.
+
+6. **Methodology track 6/6 = 100% PERFECT post-/025**:
+   - DUAL GATE F-AXIS #1 strengthening at /023 (rank + gain-share; LM Master Phase 4.5 §3 ADOPTED): LOAD-BEARING. Without it, /025 rank-only F-AXIS #1 would have classified rank 4 on 4 cohorts as PROMISING-clean creating verdict cell ambiguity with F1 NEG-CAT.
+   - DUAL GATE breadth check at /025 (rank ≤ 20/43 on ≥ 3 cohorts): LOAD-BEARING. Without it, asymmetric breadth would produce uninterpretable verdict.
+   - HARD BLOCK on OI fetch (5/5 symbols ≥ 1000 IS rows pre-flight gate): LOAD-BEARING. Without it, /025 would have evaluated DUAL GATE on BTC only (only symbol with OI archived pre-fetch); breadth metric would have collapsed.
+
+7. **LM Master directional track 2/8 = 25%**: consistent modal-miss on non-POSITIVE_EVERYWHERE axes at single-seed EXPLORATION. NEG-band tail upweighting reliable 5/5 at /020 + /022 + /023 + /024 + /025; F-AXIS-level pattern detection is the LM Master strength.
+
+8. **Wall-clock discipline lesson codified** at memory `feedback_v1_axis_selection_data_fetch_budget.md` (added 2026-05-27 mid-/025 per user directive). External data fetch is INSIDE the 2h EXPLORATION budget, not a precondition outside it. /025 OI fetch (~60 min for 4 symbols) was a one-time exception; cycle-4 axis selection MUST audit fetch cost.
+
+9. **/025 axis selection rationale post-mortem (closeout)**:
+   - Selected OI delta over liquidations-delta (substitutable) per LM Master Phase 7.4 §7 PRIMARY + Critic Phase 7.5 Path Forward #1 PRIMARY + user diversification mandate 3-way convergence.
+   - Cycle-3 search space at single-seed EXPLORATION budget has converged: NEW feature families to Pool A CLOSED; only per-cohort specialist axes with INDEPENDENT priors (LINK /018 + ETH+gate /019) survived OOS.
+   - /027 substrate LOCKED at 2 specialists; multi-seed mandate ACTIVE (4 cycle-3 ≥ 1σ NEG events trigger).
+
+10. **Engineering report contract**: 6th cycle-3 absent-at-Phase-7.5-dispatch incident (`501e1e7` BLOCK-PENDING-FIX); retrospective fix `449ab6e` committed 5 artifacts. Orchestrator-layer fix (NON-RETROSPECTIVE-FORGIVENESS at dispatch) still PENDING; tracked separately as SKILL-LAYER work.
+
 ---
 
 **End of brief.**
