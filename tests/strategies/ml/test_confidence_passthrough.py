@@ -213,9 +213,11 @@ class TestWeightIsFlat100:
         from crypto_trade.strategies.ml.lgbm import LightGbmStrategy
 
         source = inspect.getsource(LightGbmStrategy.get_signal)
-        assert "weight = 100" in source, (
-            "LightGbmStrategy.get_signal must use 'weight = 100' (flat, /079 revert). "
-            "Found source does not contain 'weight = 100'."
+        # Accept both assignment style (weight = 100) and kwarg style (weight=100,)
+        # The intent is flat weight=100, not conviction_derate (/079 revert).
+        assert ("weight = 100" in source) or ("weight=100," in source), (
+            "LightGbmStrategy.get_signal must use weight=100 (flat, /079 revert). "
+            "Found source does not contain 'weight = 100' or 'weight=100,'."
         )
 
     def test_get_signal_source_does_not_call_conviction_derate(self) -> None:

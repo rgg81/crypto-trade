@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime
+from collections.abc import Callable
 from pathlib import Path
 
 import numpy as np
@@ -180,6 +181,7 @@ class LightGbmStrategy:
         params_persist_path: Path | None = None,
         model_role: str = "",
         symbol: str = "",
+        data_filter_callback: Callable[[pd.DataFrame], np.ndarray] | None = None,
     ) -> None:
         if not feature_columns:
             raise ValueError(
@@ -227,6 +229,14 @@ class LightGbmStrategy:
         # For pooled models (A), caller passes e.g. "BTC+ETH"; for single-cohort
         # models (H), caller passes the single symbol (e.g. "BTCUSDT").
         self._symbol: str = symbol
+        # iter-v1/024: optional training-data partition callback.
+        # Callable[[pd.DataFrame], np.ndarray] — receives the master DataFrame
+        # slice for train_indices and returns a boolean mask.  Applied BEFORE
+        # labeling in _train_for_month().  Default None = no filter (backward-
+        # compatible; bit-identical to all pre-/024 runs).
+        self._data_filter_callback: Callable[[pd.DataFrame], np.ndarray] | None = (
+            data_filter_callback
+        )
         # iter-v3/007: fast exploration mode (colsample fixed at 1.0 in optimization.py)
         self._fast_mode: bool = fast_mode
         # iter-v1/002: Optuna hyperparameter bounds profile.
@@ -505,6 +515,21 @@ class LightGbmStrategy:
             (self._open_time_arr >= split.train_start_ms)
             & (self._open_time_arr < split.train_end_ms)
         )[0]
+
+        # iter-v1/024: apply regime-partition filter (data_filter_callback).
+        # The callback receives a slice of the master DataFrame for train_indices
+        # and returns a boolean mask.  Applied BEFORE labeling so the sub-model
+        # sees only its regime's training rows.
+        # Default None → no filter; backward-compatible (bit-identical to pre-/024).
+        if self._data_filter_callback is not None and len(train_indices) > 0:
+            _filter_mask = self._data_filter_callback(self._master.iloc[train_indices])
+            train_indices = train_indices[_filter_mask]
+            if self.verbose > 0:
+                print(
+                    f"  [data_filter] Partition: {len(train_indices)} rows after filter "
+                    f"(from full window)"
+                )
+
         if len(train_indices) < 10:
             if self.verbose > 0:
                 print(f"  Skipping {month_str}: only {len(train_indices)} train samples")

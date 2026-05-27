@@ -59,6 +59,7 @@ import argparse
 import math
 import sys
 import time
+from collections.abc import Callable
 from pathlib import Path
 
 import numpy as np
@@ -92,6 +93,12 @@ from crypto_trade.strategies.ml.risk_v2 import (
     BtcTrendFilterConfig,
     apply_btc_trend_filter,
     load_btc_klines_for_filter,
+)
+from crypto_trade.strategies.regime_gate_v1 import (
+    RegimeGateConfig,
+    RegimeRoutedStrategy,
+    make_extreme_filter,
+    make_normal_filter,
 )
 
 # ---------------------------------------------------------------------------
@@ -213,6 +220,20 @@ V1_ITER022_BTC_GATE_THRESHOLD_PCT: float = 4.0  # -4% BTC 14d return (TIGHTER th
 V1_ITER022_BTC_GATE_ENABLED: bool = True
 V1_ITER022_BTC_GATE_LONG_ONLY: bool = True  # NEW asymmetric mode (long-suppression only)
 
+#: iter-v1/024: regime-conditional sub-model architecture constants.
+#: MODEL-ARCH axis: 3 cohorts (Pool A, LINK, LTC) × 2 sub-models + 1 cohort (DOT) × 1 = 7 total.
+#: DOT excluded from regime conditioning per LM Master §1 (8 IS extreme trades — degenerate).
+#: Funding-rate z-score regime threshold: |funding_rate_zscore_30| > 1.5 → extreme regime.
+V1_ITER024_UNIVERSE: tuple[str, ...] = (
+    "BTCUSDT",
+    "ETHUSDT",
+    "LINKUSDT",
+    "LTCUSDT",
+    "DOTUSDT",
+)
+V1_ITER024_REGIME_THRESHOLD: float = 1.5  # |z30| > 1.5 → extreme regime (EDA Section 2.3)
+V1_ITER024_Z30_COLUMN: str = "funding_rate_zscore_30"  # past-only by .shift(1) in feature pipeline
+
 #: iter-v1/021: stable path for Optuna best-params parquet (H1 diagnostic substrate).
 #: Written by optimize_and_train when params_persist_path is set.
 #: Cleared at runner start (same pattern as OOF_PARQUET_PATH) to prevent accumulation.
@@ -285,6 +306,7 @@ def run_model(
     params_persist_path: Path | None = None,
     model_role: str = "",
     symbol: str = "",
+    data_filter_callback: Callable[[pd.DataFrame], np.ndarray] | None = None,
 ):
     """Run a single v1 sub-model (A/C/D/E) under the corrected walk-forward.
 
@@ -332,6 +354,11 @@ def run_model(
         "abs_pnl" (default) = BIT-IDENTICAL baseline behavior.
         "uniform" = np.ones(n); Kish n_eff = 1.000; selected for /016.
         "uniqueness_only" = raw AFML uniqueness replacing abs_pnl.
+    data_filter_callback
+        iter-v1/024 — optional training-data partition callback.
+        Callable[[pd.DataFrame], np.ndarray] returning a boolean mask.
+        Applied to train_indices BEFORE labeling in _train_for_month().
+        Default None = no filter (backward-compatible).
     """
     effective_feature_columns = (
         feature_columns if feature_columns is not None else list(V1_FEATURE_COLUMNS)
@@ -399,6 +426,7 @@ def run_model(
         params_persist_path=params_persist_path,
         model_role=model_role,
         symbol=symbol,
+        data_filter_callback=data_filter_callback,
     )
     t0 = time.time()
     results = run_backtest(config, strategy, yearly_pnl_check=False)
@@ -1511,8 +1539,245 @@ def main() -> None:
             ("Model_D_LTC", _strat_d),
             ("Model_E_DOT", _strat_e),
         ]
-    elif set(symbols) == set(V1_BASELINE_UNIVERSE) and iteration_label != "v1-021":
-        # Generic baseline-universe dispatch (non-/023, non-/021 iterations).
+    elif set(symbols) == set(V1_ITER024_UNIVERSE) and iteration_label == "v1-024":
+        # iter-v1/024: regime-conditional sub-model architecture (cycle-3 #9/10).
+        # MODEL-ARCH axis: first multi-model architecture in v1 history.
+        # 3 cohorts (Pool A, LINK, LTC) × 2 sub-models + 1 cohort (DOT) × 1 = 7 sub-models.
+        # DOT excluded from regime conditioning (8 IS extreme trades — degenerate per LM Master §1).
+        #
+        # Training-time partition:
+        #   Each sub-model receives a data_filter_callback that selects only its regime
+        #   rows from the training window.  The callback reads funding_rate_zscore_30
+        #   from the master DataFrame (already past-only via .shift(1) in feature pipeline).
+        #
+        # Inference-time dispatch:
+        #   RegimeRoutedStrategy wrapper calls both sub-strategies' get_signal(),
+        #   then dispatches based on past-only z30 from the feature cache.
+        #
+        # Feature columns: V1_FEATURE_COLUMNS_PRUNED 42 cols (funding cols included).
+        # Risk gates: UNCHANGED from /023 baseline (R1/R2/R3 per cohort).
+
+        # Pre-flight: funding columns must be in active_feature_columns.
+        assert V1_ITER024_Z30_COLUMN in active_feature_columns, (
+            f"iter-v1/024 pre-flight: {V1_ITER024_Z30_COLUMN} not in active_feature_columns. "
+            "Ensure --pruned-features is set and V1_FEATURE_COLUMNS_PRUNED has funding cols."
+        )
+        assert "funding_rate_zscore_90" in active_feature_columns, (
+            "iter-v1/024 pre-flight: funding_rate_zscore_90 not in active_feature_columns. "
+            "Ensure --pruned-features is set and V1_FEATURE_COLUMNS_PRUNED has funding cols."
+        )
+        print(
+            f"[iter-v1/024] Regime-conditional dispatch ACTIVE: "
+            f"{V1_ITER024_Z30_COLUMN} threshold=|{V1_ITER024_REGIME_THRESHOLD}|; "
+            f"7 sub-models (Pool A ×2 + LINK ×2 + LTC ×2 + DOT ×1)"
+        )
+
+        # Build shared regime gate config
+        _regime_config = RegimeGateConfig(
+            threshold=V1_ITER024_REGIME_THRESHOLD,
+            z30_column=V1_ITER024_Z30_COLUMN,
+            enabled=True,
+        )
+        _extreme_filter = make_extreme_filter(V1_ITER024_Z30_COLUMN, V1_ITER024_REGIME_THRESHOLD)
+        _normal_filter = make_normal_filter(V1_ITER024_Z30_COLUMN, V1_ITER024_REGIME_THRESHOLD)
+
+        # ----------------------------------------------------------------
+        # Model A — Pool BTC+ETH: 2 sub-models
+        # ----------------------------------------------------------------
+        results_a_ext, faxm_a_ext, _strat_a_ext = run_model(
+            "Model_A_extreme (BTC/ETH extreme)",
+            ("BTCUSDT", "ETHUSDT"),
+            atr_tp=2.9,
+            atr_sl=1.45,
+            apply_r1=False,
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            model_role="Model_A_extreme",
+            symbol="BTC+ETH",
+            data_filter_callback=_extreme_filter,
+            **_r5_kwargs,
+        )
+        results_a_norm, faxm_a_norm, _strat_a_norm = run_model(
+            "Model_A_normal (BTC/ETH normal)",
+            ("BTCUSDT", "ETHUSDT"),
+            atr_tp=2.9,
+            atr_sl=1.45,
+            apply_r1=False,
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            model_role="Model_A_normal",
+            symbol="BTC+ETH",
+            data_filter_callback=_normal_filter,
+            **_r5_kwargs,
+        )
+        _strat_a_regime = RegimeRoutedStrategy(
+            extreme_strategy=_strat_a_ext,
+            normal_strategy=_strat_a_norm,
+            config=_regime_config,
+            cohort_name="Pool_A",
+        )
+
+        # ----------------------------------------------------------------
+        # Model C — LINK: 2 sub-models
+        # ----------------------------------------------------------------
+        results_c_ext, faxm_c_ext, _strat_c_ext = run_model(
+            "Model_C_extreme (LINK extreme)",
+            ("LINKUSDT",),
+            atr_tp=3.5,
+            atr_sl=1.75,
+            apply_r1=True,
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            model_role="Model_C_extreme",
+            symbol="LINKUSDT",
+            data_filter_callback=_extreme_filter,
+            **_r5_kwargs,
+        )
+        results_c_norm, faxm_c_norm, _strat_c_norm = run_model(
+            "Model_C_normal (LINK normal)",
+            ("LINKUSDT",),
+            atr_tp=3.5,
+            atr_sl=1.75,
+            apply_r1=True,
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            model_role="Model_C_normal",
+            symbol="LINKUSDT",
+            data_filter_callback=_normal_filter,
+            **_r5_kwargs,
+        )
+        _strat_c_regime = RegimeRoutedStrategy(
+            extreme_strategy=_strat_c_ext,
+            normal_strategy=_strat_c_norm,
+            config=_regime_config,
+            cohort_name="Model_C_LINK",
+        )
+
+        # ----------------------------------------------------------------
+        # Model D — LTC: 2 sub-models
+        # ----------------------------------------------------------------
+        results_d_ext, faxm_d_ext, _strat_d_ext = run_model(
+            "Model_D_extreme (LTC extreme)",
+            ("LTCUSDT",),
+            atr_tp=3.5,
+            atr_sl=1.75,
+            apply_r1=True,
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            model_role="Model_D_extreme",
+            symbol="LTCUSDT",
+            data_filter_callback=_extreme_filter,
+            **_r5_kwargs,
+        )
+        results_d_norm, faxm_d_norm, _strat_d_norm = run_model(
+            "Model_D_normal (LTC normal)",
+            ("LTCUSDT",),
+            atr_tp=3.5,
+            atr_sl=1.75,
+            apply_r1=True,
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            model_role="Model_D_normal",
+            symbol="LTCUSDT",
+            data_filter_callback=_normal_filter,
+            **_r5_kwargs,
+        )
+        _strat_d_regime = RegimeRoutedStrategy(
+            extreme_strategy=_strat_d_ext,
+            normal_strategy=_strat_d_norm,
+            config=_regime_config,
+            cohort_name="Model_D_LTC",
+        )
+
+        # ----------------------------------------------------------------
+        # Model E — DOT: BASELINE single-model (DOT excluded from regime routing)
+        # Per LM Master §1: 8 IS extreme trades — degenerate; direction reversed.
+        # ----------------------------------------------------------------
+        results_e, faxm_e, _strat_e = run_model(
+            "Model_E_baseline (DOT baseline)",
+            ("DOTUSDT",),
+            atr_tp=3.5,
+            atr_sl=1.75,
+            apply_r1=True,
+            apply_r2=True,
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            model_role="Model_E_baseline",
+            symbol="DOTUSDT",
+            # NO data_filter_callback — DOT uses full training set (baseline)
+            **_r5_kwargs,
+        )
+
+        # ----------------------------------------------------------------
+        # Merge results from all 7 sub-models
+        # Note: run_model() returns individual sub-model backtests.
+        # All 6 regime sub-model results + DOT baseline combined.
+        # ----------------------------------------------------------------
+        _all_faxm_logs = (
+            faxm_a_ext + faxm_a_norm + faxm_c_ext + faxm_c_norm + faxm_d_ext + faxm_d_norm + faxm_e
+        )
+        all_results = (
+            results_a_ext
+            + results_a_norm
+            + results_c_ext
+            + results_c_norm
+            + results_d_ext
+            + results_d_norm
+            + results_e
+        )
+        _r5_model_results = [
+            results_a_ext,
+            results_a_norm,
+            results_c_ext,
+            results_c_norm,
+            results_d_ext,
+            results_d_norm,
+            results_e,
+        ]
+        # Feature importance for all 7 sub-models (F-AXIS #5 gain-share recurrence check).
+        # Sub-strategies accessed directly for _write_feature_importance emission.
+        _post_dispatch_fi_strategies = [
+            ("Model_A_extreme", _strat_a_ext),
+            ("Model_A_normal", _strat_a_norm),
+            ("Model_C_extreme", _strat_c_ext),
+            ("Model_C_normal", _strat_c_norm),
+            ("Model_D_extreme", _strat_d_ext),
+            ("Model_D_normal", _strat_d_norm),
+            ("Model_E_baseline", _strat_e),
+        ]
+        # Expose regime wrappers for gate stats (engineering report).
+        _iter024_regime_wrappers = {
+            "Pool_A": _strat_a_regime,
+            "Model_C_LINK": _strat_c_regime,
+            "Model_D_LTC": _strat_d_regime,
+        }
+    elif set(symbols) == set(V1_BASELINE_UNIVERSE) and iteration_label not in (
+        "v1-021",
+        "v1-023",
+        "v1-024",
+    ):
+        # Generic baseline-universe dispatch (non-/021, non-/023, non-/024 iterations).
         # Models A/C/D/E with V1_BASELINE_UNIVERSE symbols. BIT-IDENTICAL to historical
         # v186 baseline when active_feature_columns=list(V1_FEATURE_COLUMNS) + n_trials=50.
         results_a, faxm_a, _strat_a = run_model(
@@ -2003,6 +2268,7 @@ def main() -> None:
     # _post_dispatch_fi_strategies is populated when iteration_label is one of:
     #   "v1-021" (methodology pivot — H1/H2 diagnostic)
     #   "v1-023" (funding-rate feature family — F-AXIS-MECHANISM #1 dual gate)
+    #   "v1-024" (regime-conditional sub-models — 7 sub-models × gain-share recurrence)
     # For all other iterations, this is a no-op (empty list).
     # Renamed from _iter021_fi_strategies → _post_dispatch_fi_strategies
     # (iter-v1/022 Critic Rec #2 CARRY-FORWARD: generic name per /022 review.md).
