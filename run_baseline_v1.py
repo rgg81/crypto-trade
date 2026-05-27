@@ -250,6 +250,45 @@ V1_ITER025_OI_DELTA_COLUMN: str = "oi_delta_30_z90"
 V1_ITER025_OI_MIN_IS_ROWS: int = 1000  # HARD BLOCK threshold per LM Master §4
 V1_ITER025_OI_MIN_COVERED: int = 3  # ≥3/5 symbols must clear the HARD BLOCK
 
+#: iter-v1/027: CYCLE-3 CONFIRMATION METHODOLOGY VALIDATION.
+#: 5-Model replacement bundle: Pool A (BTC+ETH baseline pool training) + Model C'
+#: (LINK specialist /018) + Model D (LTC baseline) + Model E (DOT baseline) +
+#: Model G (ETH+gate specialist /019 with asymmetric long-suppress BTC-trend gate).
+#:
+#: REPLACEMENT SEMANTICS: at trade aggregation, drop Model A's ETH trades and
+#: keep ONLY Model G's ETH trades. Model C' is LINK-only by construction.
+#: Effective per-cohort dispatch: BTC <- Model A pool, ETH <- Model G specialist,
+#: LINK <- Model C' specialist, LTC <- Model D, DOT <- Model E.
+#:
+#: BASELINE-FROZEN: 40-col feature set (V1_FEATURE_COLUMNS_PRUNED 43 MINUS
+#: funding_rate_zscore_30, funding_rate_zscore_90, oi_delta_30_z90 per /023+/025
+#: NEGATIVE verdicts). Brief §3.3: "NOT 42, NOT 43; OI and funding EXCLUDED".
+#:
+#: NO-MERGE pre-committed. BASELINE_V1.md UNCHANGED regardless of /027 outcome.
+#: LOCAL to runner — NOT shared via features_v1/__init__.py.
+V1_ITER027_UNIVERSE: tuple[str, ...] = (
+    "BTCUSDT",
+    "ETHUSDT",
+    "LINKUSDT",
+    "LTCUSDT",
+    "DOTUSDT",
+)
+
+#: ETH+gate specialist constants — BIT-IDENTICAL to /019 config.
+V1_ITER027_ETH_GATE_LOOKBACK_BARS: int = 42  # 14 days at 8h cadence
+V1_ITER027_ETH_GATE_THRESHOLD_PCT: float = 8.0  # +-8% BTC 14d return
+V1_ITER027_ETH_GATE_ENABLED: bool = True
+V1_ITER027_ETH_GATE_LONG_ONLY: bool = False  # symmetric direction-aware (/019 mode)
+
+#: Funding+OI columns excluded from /027 substrate (NEGATIVE verdicts at /023+/025).
+_V1_ITER027_EXCLUDED_COLS: frozenset[str] = frozenset(
+    {
+        "funding_rate_zscore_30",
+        "funding_rate_zscore_90",
+        "oi_delta_30_z90",
+    }
+)
+
 #: iter-v1/021: stable path for Optuna best-params parquet (H1 diagnostic substrate).
 #: Written by optimize_and_train when params_persist_path is set.
 #: Cleared at runner start (same pattern as OOF_PARQUET_PATH) to prevent accumulation.
@@ -2168,11 +2207,343 @@ def main() -> None:
                 f"{_n_skipped} skipped. Written to {_cov_path}"
             )
 
+    elif set(symbols) == set(V1_ITER027_UNIVERSE) and iteration_label == "v1-027":
+        # iter-v1/027: CYCLE-3 CONFIRMATION METHODOLOGY VALIDATION.
+        # 5-Model replacement bundle at multi-seed (--seeds 2 × ENSEMBLE_SIZE=5 = 10 paths/cell).
+        #
+        # REPLACEMENT SEMANTICS (signal-level merge, NOT additive):
+        #   - LINK trades  → Model C' (specialist /018), NOT baseline Model C.
+        #   - ETH trades   → Model G (specialist /019 + BTC-trend gate), NOT Model A pool.
+        #   - BTC trades   → Model A pool (BTC slice only; ETH slice DROPPED at filter).
+        #   - LTC trades   → Model D (baseline).
+        #   - DOT trades   → Model E (baseline).
+        #
+        # FEATURE COLUMNS: 40-col BASELINE-FROZEN subset of V1_FEATURE_COLUMNS_PRUNED (43):
+        #   funding_rate_zscore_30, funding_rate_zscore_90, oi_delta_30_z90 EXCLUDED per
+        #   /023+/025 NEGATIVE verdicts. Brief §3.3: "NOT 42, NOT 43".
+        #
+        # F-AXIS-MECHANISM #1 — HARD-ASSERT MANDATE (LM Master §5 ADOPTED):
+        #   Three runtime asserts fire BEFORE comparison.csv emission.
+        # F-AXIS-MECHANISM #2 — cross-correlation multi-seed < 0.50 check.
+        # F-AXIS-MECHANISM #3 — per-specialist OOS Sharpe bands (C' [+0.50,+0.80]; G [+0.30,+0.50]).
+        # F-AXIS-MECHANISM #4 — DSR (CONFIRMATION-mode) check.
+        # F-AXIS-MECHANISM #5 — PBO < 0.40 (CSCV multi-seed).
+        #
+        # Deliverables (Section 10.5):
+        #   specialist_stability.csv  — per-(inner,outer) seed OOS Sharpe for C' and G.
+        #   replacement_filter_audit.csv — pre/post-filter counts per model per symbol.
+        #   pareto_2seed.csv          — 2-seed Pareto front bundle analysis.
+
+        # Build 40-col BASELINE-FROZEN feature list (strip funding+OI NEGATIVE variants).
+        _027_feature_columns: list[str] = [
+            c for c in V1_FEATURE_COLUMNS_PRUNED if c not in _V1_ITER027_EXCLUDED_COLS
+        ]
+        assert len(_027_feature_columns) == 40, (
+            f"iter-v1/027: expected 40 BASELINE-FROZEN feature columns, got "
+            f"{len(_027_feature_columns)}. Excluded: {_V1_ITER027_EXCLUDED_COLS}"
+        )
+        print(
+            f"[iter-v1/027] Feature columns: {len(_027_feature_columns)} (40-col "
+            f"BASELINE-FROZEN; excluded funding×2 + OI×1)"
+        )
+
+        # Model A — Pool BTC+ETH (baseline config; R3 only; ATR 2.9/1.45).
+        # ETH slice will be DROPPED at replacement filter below.
+        results_a_pool, faxm_a, _strat_a = run_model(
+            "A (BTC+ETH pool)",
+            ("BTCUSDT", "ETHUSDT"),
+            atr_tp=2.9,
+            atr_sl=1.45,
+            apply_r1=False,
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=_027_feature_columns,
+            bounds_profile=bounds_profile,
+            **_r5_kwargs,
+        )
+
+        # Model C' — LINK specialist (/018 config; R1+R3; ATR 3.5/1.75).
+        results_c_spec, faxm_c, _strat_c = run_model(
+            "C' (LINK specialist /018)",
+            ("LINKUSDT",),
+            atr_tp=3.5,
+            atr_sl=1.75,
+            apply_r1=True,
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=_027_feature_columns,
+            bounds_profile=bounds_profile,
+            **_r5_kwargs,
+        )
+
+        # Model D — LTC baseline (R1+R3; ATR 3.5/1.75).
+        results_d, faxm_d, _strat_d = run_model(
+            "D (LTC + R1)",
+            ("LTCUSDT",),
+            atr_tp=3.5,
+            atr_sl=1.75,
+            apply_r1=True,
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=_027_feature_columns,
+            bounds_profile=bounds_profile,
+            **_r5_kwargs,
+        )
+
+        # Model E — DOT baseline (R1+R2+R3; ATR 3.5/1.75).
+        results_e, faxm_e, _strat_e = run_model(
+            "E (DOT + R1 + R2)",
+            ("DOTUSDT",),
+            atr_tp=3.5,
+            atr_sl=1.75,
+            apply_r1=True,
+            apply_r2=True,
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=_027_feature_columns,
+            bounds_profile=bounds_profile,
+            **_r5_kwargs,
+        )
+
+        # Model G — ETH specialist (/019 config; R3 only; ATR 2.9/1.45 matching Model A).
+        # BTC-trend gate applied post-hoc as stateless filter (BIT-IDENTICAL to /019).
+        results_g_raw, faxm_g, _strat_g = run_model(
+            "G (ETH-only + R3 + BTC-trend gate)",
+            ("ETHUSDT",),
+            atr_tp=2.9,
+            atr_sl=1.45,
+            apply_r1=False,
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=_027_feature_columns,
+            bounds_profile=bounds_profile,
+            **_r5_kwargs,
+        )
+
+        # Apply stateless direction-aware BTC-trend gate (BIT-IDENTICAL to /019).
+        # Gate kills counter-trend ETH trades: ETH long when BTC ret14 < -8%, or
+        # ETH short when BTC ret14 > +8%. Warmup floor of 42 bars; past-only np.searchsorted.
+        btc_open_times, btc_closes = load_btc_klines_for_filter()
+        _027_gate_cfg = BtcTrendFilterConfig(
+            lookback_bars=V1_ITER027_ETH_GATE_LOOKBACK_BARS,
+            threshold_pct=V1_ITER027_ETH_GATE_THRESHOLD_PCT,
+            enabled=V1_ITER027_ETH_GATE_ENABLED,
+        )
+        results_g_spec, _027_gate_stats = apply_btc_trend_filter(
+            results_g_raw,
+            btc_open_times,
+            btc_closes,
+            _027_gate_cfg,
+        )
+        _027_gate_dict = _027_gate_stats.as_dict()
+        print(
+            f"[iter-v1/027 ETH+gate BTC-trend gate] "
+            f"normal={_027_gate_dict['n_normal']} "
+            f"warmup={_027_gate_dict['n_warmup']} "
+            f"killed={_027_gate_dict['n_killed']}/{_027_gate_dict['n_total']} "
+            f"fire_rate={_027_gate_dict['fire_rate']:.2%}"
+        )
+
+        # REPLACEMENT SEMANTICS: drop Model A's ETH trades; keep BTC slice only.
+        results_a_btc_only = [r for r in results_a_pool if r.symbol == "BTCUSDT"]
+
+        # ----------------------------------------------------------------
+        # F-AXIS-MECHANISM #1 — HARD ASSERTS (LM Master §5 MANDATE, brief §3.4)
+        # These fire BEFORE comparison.csv emission.
+        # ----------------------------------------------------------------
+        assert set(r.symbol for r in results_a_btc_only) == {"BTCUSDT"}, (
+            "F-AXIS #1: Pool A leakage — ETH trades not dropped; "
+            f"symbols found: {set(r.symbol for r in results_a_btc_only)}"
+        )
+        assert all(r.symbol == "LINKUSDT" for r in results_c_spec), (
+            "F-AXIS #1: C' LINK contamination — non-LINK symbols found in Model C' results; "
+            f"symbols: {set(r.symbol for r in results_c_spec)}"
+        )
+        assert all(r.symbol == "ETHUSDT" for r in results_g_spec), (
+            "F-AXIS #1: G ETH contamination — non-ETH symbols found in Model G results; "
+            f"symbols: {set(r.symbol for r in results_g_spec)}"
+        )
+        # Verify zero ETH trades from Pool A bleed-through after filter.
+        _027_all_results_combined = (
+            results_a_btc_only + results_c_spec + results_d + results_e + results_g_spec
+        )
+        _027_pool_a_eth_bleed = sum(
+            1
+            for r in _027_all_results_combined
+            if r.symbol == "ETHUSDT" and "A (BTC+ETH pool)" in r.model_name
+        )
+        assert _027_pool_a_eth_bleed == 0, (
+            f"F-AXIS #1: Pool A ETH bleed-through after filter — "
+            f"{_027_pool_a_eth_bleed} ETH trades from Pool A still present"
+        )
+        print(
+            f"[iter-v1/027] F-AXIS #1 hard-asserts: PASS "
+            f"(Pool A BTC-only={len(results_a_btc_only)} trades, "
+            f"C' LINK-only={len(results_c_spec)} trades, "
+            f"G ETH-only={len(results_g_spec)} trades, "
+            f"Pool-A-ETH-bleed=0)"
+        )
+
+        # Aggregate all 5 model results (replacement semantics applied above).
+        _all_faxm_logs = faxm_a + faxm_c + faxm_d + faxm_e + faxm_g
+        all_results = results_a_btc_only + results_c_spec + results_d + results_e + results_g_spec
+        _r5_model_results = [
+            results_a_btc_only,
+            results_c_spec,
+            results_d,
+            results_e,
+            results_g_spec,
+        ]
+        _post_dispatch_fi_strategies = [
+            ("Model_A_pool", _strat_a),
+            ("Model_C_LINK_spec", _strat_c),
+            ("Model_D_LTC", _strat_d),
+            ("Model_E_DOT", _strat_e),
+            ("Model_G_ETH_spec", _strat_g),
+        ]
+
+        # ----------------------------------------------------------------
+        # METHODOLOGY VALIDATION DELIVERABLES (Section 10.5)
+        # ----------------------------------------------------------------
+        import pandas as _pd027  # noqa: PLC0415
+
+        _027_report_dir = Path(reports_dir) / f"iteration_v1-{iteration_label.split('-')[-1]}"
+        _027_report_dir.mkdir(parents=True, exist_ok=True)
+
+        # 1. replacement_filter_audit.csv — pre/post counts per model per symbol.
+        _027_filter_rows: list[dict] = []
+        # Pool A: ETH dropped, BTC retained.
+        _027_pool_a_eth_pre = sum(1 for r in results_a_pool if r.symbol == "ETHUSDT")
+        _027_pool_a_btc_pre = sum(1 for r in results_a_pool if r.symbol == "BTCUSDT")
+        _027_filter_rows += [
+            {
+                "model": "A (BTC+ETH pool)",
+                "symbol": "ETHUSDT",
+                "pre_filter_trades": _027_pool_a_eth_pre,
+                "post_filter_trades": 0,
+                "dropped_count": _027_pool_a_eth_pre,
+                "dropped_reason": "replacement_to_specialist_G",
+            },
+            {
+                "model": "A (BTC+ETH pool)",
+                "symbol": "BTCUSDT",
+                "pre_filter_trades": _027_pool_a_btc_pre,
+                "post_filter_trades": _027_pool_a_btc_pre,
+                "dropped_count": 0,
+                "dropped_reason": "retained",
+            },
+        ]
+        # C' LINK: no filter applied (specialist already LINK-only by construction).
+        for _sym in ("LINKUSDT",):
+            _cnt = sum(1 for r in results_c_spec if r.symbol == _sym)
+            _027_filter_rows.append(
+                {
+                    "model": "C' (LINK specialist /018)",
+                    "symbol": _sym,
+                    "pre_filter_trades": _cnt,
+                    "post_filter_trades": _cnt,
+                    "dropped_count": 0,
+                    "dropped_reason": "specialist_by_construction",
+                }
+            )
+        # G ETH: gate killed some trades (raw → filtered).
+        _027_g_raw_cnt = len(results_g_raw)
+        _027_g_spec_cnt = len(results_g_spec)
+        _027_filter_rows.append(
+            {
+                "model": "G (ETH-only + BTC-trend gate)",
+                "symbol": "ETHUSDT",
+                "pre_filter_trades": _027_g_raw_cnt,
+                "post_filter_trades": _027_g_spec_cnt,
+                "dropped_count": _027_g_raw_cnt - _027_g_spec_cnt,
+                "dropped_reason": "btc_trend_gate_kill",
+            }
+        )
+        # D LTC, E DOT: no filter.
+        for _model_lbl, _res_list, _sym in [
+            ("D (LTC + R1)", results_d, "LTCUSDT"),
+            ("E (DOT + R1 + R2)", results_e, "DOTUSDT"),
+        ]:
+            _cnt = len(_res_list)
+            _027_filter_rows.append(
+                {
+                    "model": _model_lbl,
+                    "symbol": _sym,
+                    "pre_filter_trades": _cnt,
+                    "post_filter_trades": _cnt,
+                    "dropped_count": 0,
+                    "dropped_reason": "retained",
+                }
+            )
+        _027_audit_path = _027_report_dir / "replacement_filter_audit.csv"
+        _pd027.DataFrame(_027_filter_rows).to_csv(_027_audit_path, index=False)
+        print(f"[iter-v1/027] replacement_filter_audit.csv → {_027_audit_path}")
+
+        # 2. specialist_stability.csv — per-(model, seed) OOS Sharpe placeholder.
+        # The per-seed Sharpe is computed by _run_methodology_reporting from comparison.csv;
+        # the runner emits a stub here; the engineering report fills in from seed-level logs.
+        # Full specialist-level seed breakdown is available from _strat_c._seed_oos_sharpes
+        # and _strat_g._seed_oos_sharpes if the LightGbmStrategy emits them.
+        # Stub: emit available model-level summary.
+        def _oos_monthly_sharpe(res_list: list) -> float:
+            """Compute OOS monthly Sharpe from a trade result list (post-cutoff only)."""
+            from src.crypto_trade.backtest_report import summarize  # noqa: PLC0415
+
+            _cutoff_ms = int(_pd027.Timestamp("2025-03-24", tz="UTC").timestamp() * 1000)
+            _oos = [r for r in res_list if r.open_time >= _cutoff_ms]
+            if not _oos:
+                return float("nan")
+            try:
+                _summ = summarize(_oos)
+                return float(_summ.monthly_sharpe)
+            except Exception:  # noqa: BLE001
+                return float("nan")
+
+        _027_specialist_rows: list[dict] = [
+            {
+                "specialist": "C' (LINK specialist /018)",
+                "model_label": "Model_C_LINK_spec",
+                "oos_sharpe": _oos_monthly_sharpe(results_c_spec),
+                "oos_trades": sum(
+                    1
+                    for r in results_c_spec
+                    if r.open_time
+                    >= int(_pd027.Timestamp("2025-03-24", tz="UTC").timestamp() * 1000)
+                ),
+                "note": "multi-seed mean (inner×outer); per-seed breakdown deferred to eng report",
+            },
+            {
+                "specialist": "G (ETH+gate specialist /019)",
+                "model_label": "Model_G_ETH_spec",
+                "oos_sharpe": _oos_monthly_sharpe(results_g_spec),
+                "oos_trades": sum(
+                    1
+                    for r in results_g_spec
+                    if r.open_time
+                    >= int(_pd027.Timestamp("2025-03-24", tz="UTC").timestamp() * 1000)
+                ),
+                "note": "multi-seed mean (inner×outer); per-seed breakdown deferred to eng report",
+            },
+        ]
+        _027_stability_path = _027_report_dir / "specialist_stability.csv"
+        _pd027.DataFrame(_027_specialist_rows).to_csv(_027_stability_path, index=False)
+        print(f"[iter-v1/027] specialist_stability.csv → {_027_stability_path}")
+
+        # Note: pareto_2seed.csv is written by _run_methodology_reporting from comparison.csv;
+        # the --seeds 2 outer structure produces 2 rows in the Pareto table.
+        # specialist_stability.csv above provides the per-specialist OOS Sharpe means.
+
     elif set(symbols) == set(V1_BASELINE_UNIVERSE) and iteration_label not in (
         "v1-021",
         "v1-023",
         "v1-024",
         "v1-025",
+        "v1-027",
     ):
         # Generic baseline-universe dispatch (non-/021, non-/023, non-/024, non-/025 iterations).
         # Models A/C/D/E with V1_BASELINE_UNIVERSE symbols. BIT-IDENTICAL to historical
