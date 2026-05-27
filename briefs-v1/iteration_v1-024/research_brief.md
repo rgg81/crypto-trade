@@ -794,3 +794,26 @@ User's verbatim: "be bold. diversification is the key. multiple smaller models e
 - /025 staging matrix (LM Master §7 ADOPTED) prioritizes OI delta family over drawdown brake under modal INERT.
 
 This is NOT an incremental tweak. It is a STRUCTURAL ARCHITECTURE shift from "pool-with-features" to "regime-conditional-sub-models" for the 3 cohorts where sign-flip evidence is clean (Pool A, LINK, LTC). If PROMISING, /027 bundle gains a 3rd genuinely-novel alpha-enhancement component at LM Master-estimated +1.30-1.55 OOS Sharpe target. If NEGATIVE, the architectural ceiling for current cohort/feature/risk substrate is rigorously bounded.
+
+---
+
+### 13.8 Phase 7+8 self-check addendum (2026-05-27 post-Critic-FINAL `1e5f7bc`)
+
+**Verdict materialized**: EXPLORATION-NEGATIVE clean (FINAL after BLOCK-PENDING-FIX rerun at `67341d7`). Section 8 Row 7 F3 IS-catastrophic auto-reject (IS Δ -0.86 ≤ -0.30) AND Row 4 F-AXIS #5 gain-share recurrence FAIL 2/3 cohorts (Pool A 7.21% < 9.16%, LINK 5.16% < 7.67%, LTC PASS) fired INDEPENDENTLY. F1 OOS Δ +0.0956 INERT-band 4bp shy of PROMISING; pre-registered band binding per `feedback_no_cheating.md` + /023 3bp precedent — NOT reclassified upward.
+
+**Pre-registered priors vs observed**:
+- LM Master modal INERT 48% MISSED by F3 auto-reject path (path not in prior distribution at sufficient mass).
+- LM Master NEG-CAT 10% tail PARTIALLY MATERIALIZED at IS side (F3 IS Δ -0.86 in NEG-CAT band; F1 OOS Δ +0.0956 INERT not in NEG-band).
+- LM Master NEG-clean 20% directional credit for NEG-band materialization (4/4 tail upweighting at /020 + /022 + /023 + /024 cycle-3 lineage).
+
+**F-AXIS #5 gain-share recurrence empirically PROVEN as INERT-detector**: LM Master Phase 4.5 §3 ADOPTED added the recurrence check (extreme sub-model funding-family gain share MUST EXCEED normal sub-model's per cohort) as 5th F-AXIS-MECHANISM row. At /024 observed FAIL 2/3 cohorts — the load-bearing diagnostic that distinguished MECHANISM-BYPASS (Phase 7.4 §1 silent-fallback defect; pre-fix bit-identical to /023) from genuine partition-non-specialization (post-fix; sub-models do not learn regime-specialized features at v1 single-seed budget). Methodology track 5/5 PERFECT at /024.
+
+**Dispatch defect catalogued — silent zero-mask fallback**: pre-fix `regime_gate_v1.py:181-185` had asymmetric silent fallback (extreme all-False / normal all-True when column missing); `self._master` did not contain `funding_rate_zscore_30` (parquet-only column; not in kline-CSV-derived `_master`). Bit-identical-to-/023 comparison.csv was the smoking gun. NEW memory `feedback_v1_dispatch_defect_silent_fallback.md` catalogues: future data-partition primitives MUST hard-raise on missing column; precondition assertions belong in Phase 4.5 / 6.0 checklists; 3-line unit test mandate. Rule applies to ALL TRACKS (architecture-agnostic).
+
+**Structural finding catalogued — /021 H2 REFUTED extends to sub-model level**: regime-partition sub-models do NOT learn regime-specialized features at v1 single-seed n_trials=18 ENSEMBLE_SIZE=3 EXPLORATION budget. F-AXIS #5 FAIL 2/3 cohorts is direct mechanism falsifier. NEW memory `feedback_v1_regime_partition_non_specialization.md` codifies: future regime-partition / sub-model architectural axes MUST select ONE of (a) multi-seed CONFIRMATION budget OR (b) broader extreme partition threshold OR (c) deferred to /027+ CONFIRMATION sub-component. Cannot retry at single-seed EXPLORATION with knob variations.
+
+**User mandate "multiple smaller models per regime" cannot be tested at single-seed budget**: the F-AXIS #5 FAIL 2/3 cohorts reveals that LightGBM-at-single-seed n_trials=18 ENSEMBLE_SIZE=3 treats the funding-extremity partition as essentially noise in Pool A and LINK extreme sub-models. The architectural complexity (1.75× baseline) + thin extreme partition + Optuna budget compound to IS basin catastrophic collapse (-100.42% IS net PnL; max DD doubled; F3 -0.86). The mechanism may exist at multi-seed CONFIRMATION budget OR at broader extreme partition threshold OR with a different partition variable; the /024 outcome closes the SPECIFIC test (funding-extremity at 1.5 threshold at single-seed n_trials=18 ENSEMBLE_SIZE=3 EXPLORATION budget); it does NOT close the GENERAL mechanism. Deferred to /027+ CONFIRMATION OR future cycle.
+
+**/027 bundle UNCHANGED at 2 specialists**: regime-conditional architecture EXCLUDED per F-AXIS #5 FAIL + F3 IS-CAT (sub-models do not contribute positive alpha at v1 single-seed EXPLORATION budget; LM Master §5 estimated +0.15; observed NEGATIVE). LINK +0.80 + ETH+gate +0.50 LOCKED. Cycle-3 substrate has STABILIZED at 2 specialists since /019; 5 consecutive cycle-3 EXPLORATIONs (/020, /022, /023, /024, soon /025) have all produced EXCLUDED outcomes rather than additions.
+
+**/025 axis selection: OI DELTA FAMILY (PRIMARY)** per CONVERGENT routing — LM Master Phase 7.4 §7 PRIMARY + Critic Phase 7.5 Path Forward #1 PRIMARY + user "diversification" mandate continues via NEW non-OHLCV signal source. /025 cycle-3 EXPLORATION #10 of 10; final cycle-3 EXPLORATION before /026 sanity slot + /027 CONFIRMATION earliest.
