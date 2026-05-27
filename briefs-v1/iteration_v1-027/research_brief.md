@@ -430,13 +430,48 @@ uv run python run_baseline_v1.py \
 
 ### 3.4 LM Master Phase 4.5 Responses
 
-**RESERVED for Phase 4.5 dispatch** — LM Master fires after this brief lands; this Section 3.4 is populated by a follow-up commit that:
-1. Reads `briefs-v1/iteration_v1-027/lgbm_advisor.md` (Phase 4.5 emission).
-2. For each numbered recommendation: marks Adopted / Adopted with modification / Rejected; cross-references brief section affected.
-3. Documents verdict-class prior adjustments (Section 5 below) if LM Master tail re-weights ≥ 5 pp.
-4. Confirms or revises wall-clock estimate (Section 3.6 below) if LM Master adjusts.
+LM Master Phase 4.5 advisory at `briefs-v1/iteration_v1-027/lgbm_advisor.md` has fired. Cycle-3 LM Master methodology track is 6/6 PERFECT (load-bearing at /025 DUAL GATE + HARD BLOCK). This Section processes each numbered recommendation; cross-references are propagated into Sections 4 / 5 / 10.5 / 11 below.
 
-Phase 5.5 BLOCKS if Section 3.4 is empty AFTER Phase 4.5 LM Master commits `lgbm_advisor.md`.
+**§1 — Multi-seed regression magnitudes**: 18-22% (NOT 50%) because ENSEMBLE_SIZE=5 inner collapses half the basin variance before outer-seed averaging. Per-specialist modal projections: **C' LINK +0.78** (band [+0.55, +0.85]); **G ETH+gate +0.52** (band [+0.32, +0.62]). Applied to /026 reference +0.5722, specialists regressed contribute ~-0.11 portfolio Sharpe → **bundle modal multi-seed OOS Sharpe = +0.45 to +0.50**, sitting at the NEGATIVE-leaning edge of pre-registered [+0.40, +0.75]. → **ADOPTED**. Section 4 F-AXIS-MECHANISM #3 updated with per-specialist bands ±0.25 (C' [+0.53, +1.03] from +0.78 mode; G [+0.27, +0.77] from +0.52 mode); Section 4 F1 calibration note revised; Section 5 priors recalibrated (see §6 below).
+
+**§2 — Cross-correlation at multi-seed**:
+- pool×LINK_spec +0.4935 single-seed is 2-month-driven (2025-08, 2025-11 risk-on rallies) → multi-seed averages asymmetrically → **DISSOLVES to predicted +0.35-0.42** (basin lottery). PASS gate at <0.50.
+- C_link × E_dot +0.6027 single-seed is signal-level co-movement (LINK + DOT share altcoin/L1 regime) → multi-seed WILL NOT dissolve → **STAYS at predicted +0.55-0.60**. Binding cycle-4 finding: the 5-Model bundle carries unresolvable altcoin concentration at this composition.
+→ **ADOPTED**. Section 4 F-AXIS-MECHANISM #1 (correlation table) updated with directional predictions for both pairs. Section 11 cycle-4 staging makes C×E altcoin de-concentration mechanism MANDATORY regardless of /027 verdict (see §9 below).
+
+**§3 — Bundle composition stability**: outer-seed-cap-2 empirical → ±0.20 single specialist, ±0.30 5-model bundle. At modal +0.45-0.50 mean, the 2-seed Pareto spans **[+0.25, +0.70]**. Engineering report MUST emit `specialist_stability.csv` with per-(inner, outer) seed OOS Sharpe to make the regression distribution visible at Phase 7.4 LM Master post-mortem. → **ADOPTED**. Section 10.5 deliverables updated; falsifier band for 2-seed Pareto added to Section 4.
+
+**§4 — DSR borderline at modal +0.45**: n_trials=35 × 2 outer seeds = 70 trials → E[max_SR] ≈ 3.10 (CONFIRMATION-mode methodology); annualized observed Sharpe +0.45 × √12 ≈ 1.56 → **DSR modal +0.45**, BELOW 0.50 F-AXIS #4 threshold. PBO modal 0.38 → F-AXIS #5 PASS. PSR_monthly_vs_0 modal 0.85 (informational); PSR_monthly_vs_1 modal 0.13 (INERT, merge gate not applicable at NO-MERGE pre-commit). → **ADOPTED**. Section 4 F-AXIS-MECHANISM #4 calibration note added: at modal +0.45 outcome, DSR alone CANNOT distinguish PROMISING-METHODOLOGY from INERT — verdict elevation under F-AXIS #3 specialist-stability rules supersedes.
+
+**§5 — F-AXIS #1 dispatch hard-asserts MANDATE**: per /024 dispatch-defect lesson, brief §3.1 replacement filter is correct-in-form but UNCHECKED. Runner MUST emit three hard-asserts BEFORE `comparison.csv` writes:
+```python
+assert set(r.symbol for r in results_a_btc_only) == {"BTCUSDT"}, "F-AXIS #1: Pool A leakage"
+assert all(r.model_name in {"C' (LINK specialist /018)", "C_prime", "C'"} for r in results_c_spec), "F-AXIS #1: C' contamination"
+assert sum(1 for r in all_results if r.symbol == "ETHUSDT" and r.model_name == "A (BTC+ETH pool)") == 0, "F-AXIS #1: Pool A ETH bleed-through after filter"
+```
+Plus `replacement_filter_audit.csv` deliverable per §10.5. → **ADOPTED**. Section 3.1 amended (see implementation amendment in next commit pass); Section 4 F-AXIS-MECHANISM #1 now declares hard-assert mandate explicitly; Section 10.5 audit CSV added.
+
+**§6 — Verdict priors RECALIBRATED to 30/30/35/25/6/4**:
+
+| Verdict | QR /027 v1 | LM Master | Δ | Rationale |
+|---|---:|---:|---:|---|
+| PROMISING-METHODOLOGY | 50% | **30%** | -20pp | modal bundle +0.45-0.50 lands at NEG edge of [+0.40, +0.75] |
+| INERT | 30% | **35%** | +5pp | structural ceiling at +0.50 (LTC drag + C×E altcoin concentration) |
+| NEGATIVE | 15% | **25%** | +10pp | LTC -1.05 drag + C×E +0.60 push deeper than F-AXIS #3 bands |
+| NEGATIVE-BELOW-BAND | 5% | **6%** | +1pp | absolute < +0.40 floor breach risk |
+| BLOCK | 5% | **4%** | -1pp | brief structurally sound; falsifiers well-pre-registered |
+
+→ **ADOPTED**. Section 5 below replaced with this distribution. The modal shifts from PROMISING-METHODOLOGY to INERT — methodology partially validated but lift unstable at multi-seed.
+
+**§7 — Most important point**: STRUCTURAL CEILING at OOS Sharpe ~+0.50 driven by (a) Model D LTC -1.05 drag (irrecoverable within /027 scope) and (b) C_link × E_dot +0.60 OOS Pearson altcoin concentration. Single-seed regression magnitude alone cannot break this ceiling. Modal multi-seed lands INERT (35%), which validates per-cohort architecture as STABLE but NOT LIFT-PRODUCING at current 5-Model composition. → **ADOPTED**. Section 1 hypothesis amended at next commit pass to acknowledge ceiling; Section 11.1 / 11.2 framing reflects that even PROMISING-METHODOLOGY does NOT unblock LTC-drag and C×E concentration for cycle-4.
+
+**§8 — --seeds 2 budget DEFENSIBLE**: v3 precedent (`feedback_v3_outer_seed_cap_2_v3.md`) caps at 2 outer; v1 /015 ran identical config 9.8-12h; methodology-validation framing → variance-reduction need moderate; pushing to --seeds 5 → 9-15h serial → VIOLATES 6h cap. LM Master endorses --seeds 2 at /027; /028+ targeting merge-floor pushes to --seeds 3-5 with parallel infrastructure. → **ADOPTED** (validates Section 3.2 CLI invocation unchanged).
+
+**§9 — /028+ cycle-4 staging — D-specialist MANDATORY regardless of /027 verdict**: LTC -1.05 is the dominant ceiling; D-specialist axis is unconditional cycle-4 priority. C_link × E_dot +0.60 OOS Pearson is cycle-4 axis SEED regardless of /027 verdict — altcoin de-concentration mechanism required (per-symbol weight cap on LINK+DOT OR DOT specialist with anti-LINK gate). → **ADOPTED**. Section 11 below restructured: §11.1 / §11.2 / §11.3 all converge on D-specialist + C×E concentration mechanism as unconditional cycle-4 priorities (the verdict-conditional branching now layers ABOVE this unconditional MANDATORY axis).
+
+**Net summary**: LM Master's 9 recommendations all adopted as written. The modal-prediction divergence (QR +0.55 ↔ LM Master +0.45-0.50) is 1 magnitude — within normal pre-design uncertainty. The structural amendment is: brief now correctly priors INERT (35%) as modal, recognizes LTC drag + C×E concentration as ceiling drivers, mandates F-AXIS #1 hard-asserts, mandates `specialist_stability.csv` + `replacement_filter_audit.csv` as Phase 7.4 deliverables, and pre-commits cycle-4 D-specialist + C×E de-concentration axes regardless of /027 outcome.
+
+**Phase 5.5 gate**: Section 3.4 NO LONGER empty post-amendment; PASS.
 
 ### 3.5 Axis Family Declaration (v1 mandatory)
 
@@ -565,35 +600,52 @@ OOS upper bound 300 covers /026 5-Model single-seed estimate (205 OOS trades) pl
 
 ### F-AXIS-MECHANISM (5 sub-checks; binding cell disambiguators)
 
-**F-AXIS #1 — Replacement-pool dispatch correctness**: `trades.csv` per-symbol cohort source verification:
+**F-AXIS #1 — Replacement-pool dispatch correctness (HARD-ASSERT MANDATE per LM Master §5)**: `trades.csv` per-symbol cohort source verification:
 - LINK trades originate ONLY from Model C' (specialist /018 architecture). Zero LINK trades from baseline Model C — Model C is NOT dispatched in /027.
 - ETH trades originate ONLY from Model G (specialist /019 architecture + asymmetric long-suppress BTC-trend gate). Zero ETH trades from Model A's pool training — Model A's ETH slice is DROPPED at replacement filter.
 - BTC trades originate ONLY from Model A's BTC slice (pool training).
 - LTC trades originate ONLY from Model D.
 - DOT trades originate ONLY from Model E.
 
-PASS criterion: per-trade `model_name` column in `trades.csv` matches the cohort-source mapping above. F-AXIS #1 is the ENGINEERING dispatch-correctness check; mismatched mapping at /027 is a process-integrity violation.
+**HARD-ASSERT MANDATE (per LM Master Phase 4.5 §5 and /024 dispatch-defect lesson)**: the runner MUST execute three asserts BEFORE `comparison.csv` emission. Failure = `AssertionError` raises and aborts the run before any reports are written:
 
-**F-AXIS #2 — Cross-correlation preservation at multi-seed**: cross-correlation between replacement-pool and specialist monthly returns must STAY < 0.50 at multi-seed mean.
+```python
+assert set(r.symbol for r in results_a_btc_only) == {"BTCUSDT"}, \
+    "F-AXIS #1: Pool A leakage — ETH slice not dropped at replacement filter"
+assert all(r.model_name in {"C' (LINK specialist /018)", "C_prime", "C'"} 
+           for r in results_c_spec), \
+    "F-AXIS #1: C' contamination — baseline Model C trades present in C' specialist"
+assert sum(1 for r in all_results 
+           if r.symbol == "ETHUSDT" and r.model_name == "A (BTC+ETH pool)") == 0, \
+    "F-AXIS #1: Pool A ETH bleed-through after filter"
+```
 
-| Pair | /026 single-seed OOS Pearson | /027 multi-seed expected band |
-|---|---:|---|
-| pool_minus_LINK_ETH × LINK_specialist | +0.4935 | < 0.50 |
-| pool_minus_LINK_ETH × ETH+gate_specialist | -0.1412 | < 0.50 |
-| C_link_spec × E_dot (5-Model 10-pair view) | +0.6027 (Spearman +0.425) | flagged for Phase 7 attribution |
+The runner additionally emits `replacement_filter_audit.csv` per Section 10.5 (pre-filter / post-filter trade counts per model, dropped-symbol attribution).
 
-If multi-seed C_link × E_dot Pearson stays > 0.50, the altcoin/L1 joint concentration is structural (Critic /026 Finding 3 confirmed).
+PASS criterion: per-trade `model_name` column in `trades.csv` matches the cohort-source mapping above AND all three hard-asserts evaluated TRUE at runtime AND `replacement_filter_audit.csv` shows Pool A pre-filter has ETH trades and post-filter has none. F-AXIS #1 is the ENGINEERING dispatch-correctness check; mismatched mapping at /027 is a process-integrity violation; missing hard-asserts at Phase 6.0 Critic pre-flight is a BLOCK condition.
 
-**F-AXIS #3 — Per-specialist Sharpe stability at multi-seed**: each specialist's OOS Sharpe must regress from single-seed within calibrated band:
+**F-AXIS #2 — Cross-correlation preservation at multi-seed (DIRECTIONAL PREDICTIONS per LM Master §2)**: cross-correlation between replacement-pool and specialist monthly returns must STAY < 0.50 for the two replacement pairs at multi-seed mean; the C×E altcoin pair is expected to STAY > +0.55 (signal-level co-movement, NOT basin lottery).
 
-| Specialist | Single-seed OOS Sharpe | Multi-seed mean expected band | F-AXIS #3 PASS |
+| Pair | /026 single-seed OOS Pearson | LM Master §2 multi-seed prediction | Gate behavior |
 |---|---:|---|---|
-| Model C' (LINK) | +0.9789 | [+0.50, +0.80] | OOS Sharpe in band |
-| Model G (ETH+gate) | +0.6990 | [+0.30, +0.50] | OOS Sharpe in band |
+| pool_minus_LINK_ETH × LINK_specialist | +0.4935 | DISSOLVES → **[+0.35, +0.42]** modal +0.38 (basin lottery; 2 of 15 risk-on months drive single-seed) | <0.50 PASS expected at multi-seed |
+| pool_minus_LINK_ETH × ETH+gate_specialist | -0.1412 | UNCHANGED (already independent at single-seed) | <0.50 PASS by construction |
+| C_link_spec × E_dot (5-Model 10-pair view) | +0.6027 (Spearman +0.425) | STAYS → **[+0.55, +0.60]** modal +0.58 (signal-level altcoin co-movement; multi-seed WILL NOT dissolve) | flagged for Phase 7 attribution; >+0.55 → C×E de-concentration MANDATORY cycle-4 axis |
 
-F-AXIS #3 PASS = both specialists in band → methodology validated.
-F-AXIS #3 FAIL on LINK = specialist regresses below +0.50 → /018's PROMISING was basin-lottery favorable, not signal-stable.
-F-AXIS #3 FAIL on ETH+gate = specialist regresses below +0.30 → /019's PROMISING was basin-lottery favorable, not signal-stable.
+If multi-seed pool×LINK Pearson does NOT dissolve to predicted band (i.e., STAYS > +0.45), the LM Master §2 mechanism prediction is falsified and the replacement-pool independence claim is revised at Phase 7.4 LM Master post-mortem. If multi-seed C_link × E_dot Pearson DOES dissolve below +0.50, the altcoin joint concentration is basin lottery (NOT signal level) and the cycle-4 D-specialist + C×E de-concentration priority can be DOWNGRADED. Both outcomes are pre-registered for Phase 7.4 binding finding.
+
+**F-AXIS #3 — Per-specialist Sharpe stability at multi-seed (PER-SPECIALIST BANDS ±0.25 per LM Master §1)**: each specialist's OOS Sharpe must land within the LM Master modal ±0.25 spread centered on §1 modes (NOT the previous QR-derived mid-range bands). LM Master modal magnitudes apply 18-22% regression to single-seed (NOT 50%) because ENSEMBLE_SIZE=5 inner already collapses half the basin variance.
+
+| Specialist | Single-seed OOS Sharpe | LM Master §1 modal mean | LM Master ±0.25 spread band | F-AXIS #3 PASS |
+|---|---:|---:|---|---|
+| Model C' (LINK) | +0.9789 | **+0.78** (regress 20%) | **[+0.53, +1.03]** | OOS Sharpe in band |
+| Model G (ETH+gate) | +0.6990 | **+0.52** (regress 26%) | **[+0.27, +0.77]** | OOS Sharpe in band |
+
+F-AXIS #3 PASS = both specialists in their respective LM Master bands → methodology validated (specialists STABLE under multi-seed).
+F-AXIS #3 FAIL on LINK = C' OOS Sharpe < +0.53 → /018's PROMISING was basin-lottery favorable, not signal-stable; verdict elevates to NEGATIVE.
+F-AXIS #3 FAIL on ETH+gate = G OOS Sharpe < +0.27 → /019's PROMISING was basin-lottery favorable, not signal-stable; verdict elevates to NEGATIVE.
+
+Cross-check at Phase 7.4 LM Master post-mortem: actual per-specialist standard deviation (computed across 10 paths from `specialist_stability.csv` per Section 10.5) versus LM Master §3 prediction (±0.20 single specialist, ±0.30 5-model bundle). If observed std > ±0.40 for a single specialist, the basin-variance compression assumption is falsified for that specialist family.
 
 **F-AXIS #4 — DSR threshold (relaxed for METHODOLOGY VALIDATION)**: multi-seed CONFIRMATION-mode DSR > **0.50** (relaxed from MERGE-gate 0.95).
 
@@ -615,21 +667,23 @@ F-AXIS #3 FAIL on ETH+gate = specialist regresses below +0.30 → /019's PROMISI
 
 ## Section 5 — Predicted Verdict Distribution
 
-Per Section 0.2 framing + Critic /026 binding remediation #2 + LM Master cycle-3 6/6 PERFECT methodology track:
+Per Section 0.2 framing + Critic /026 binding remediation #2 + LM Master Phase 4.5 recalibration (§3.4 §6 above) + LM Master cycle-3 6/6 PERFECT methodology track:
 
-**Verdict priors (modal: PROMISING-METHODOLOGY 50%)**:
+**Verdict priors RECALIBRATED per LM Master Phase 4.5 (modal: INERT 35%)**:
 
-- **PROMISING-METHODOLOGY (50%)**: multi-seed mean OOS Sharpe Δ ∈ [+0.10, +0.40] (absolute [+0.65, +0.75]); F-AXIS #1/2/3/4/5 PASS; methodology validated. /027 single-seed reference +0.57 → multi-seed [+0.65, +0.75] requires specialists to HOLD at +0.80/+0.50 anchors AND replacement-pool BTC slice to maintain lift. This is the MODAL outcome because /018+/019 had structurally INDEPENDENT priors (Critic /026 Finding 2: replacement-pool correlations both PASS).
-- **INERT (30%)**: Δ ∈ [-0.10, +0.10] (absolute [+0.55, +0.65]); specialists hold but no lift over baseline. Multi-seed regresses single-seed slightly favorable draws; bundle structure (LTC drag, DOT flat) caps upside. Cycle-3 closing finding: methodology partially validated, lift uncertain.
-- **NEGATIVE (15%)**: Δ < -0.10 (absolute could still be in [+0.40, +0.55]); multi-seed regression deeper than expected; specialists' single-seed lift dissolves. Possible if /018's +0.98 single-seed was deeper into basin lottery favorable tail than LM Master projection.
-- **NEGATIVE-BELOW-BAND (5%)**: absolute OOS Sharpe < +0.40; pre-registered band breach; methodology refuted at multi-seed. Combined with multi-seed C_link × E_dot Pearson breach preserved at multi-seed → joint altcoin concentration crystallizes.
-- **BLOCK (5%)** (split — 3% BLOCK-PENDING-FIX | 2% BLOCK-FINAL): Phase 7.5 Critic Check finds methodology defect — e.g., F-AXIS #1 dispatch incorrect (LINK trades from baseline Model C instead of Model C' specialist; ETH trades from Model A's pool slice instead of Model G), F-AXIS #2 multi-seed cross-correlation regression breach, or F-AXIS #4/5 DSR/PBO threshold breach.
+- **PROMISING-METHODOLOGY (30%)**: multi-seed mean OOS Sharpe Δ ∈ [+0.10, +0.40] (absolute [+0.65, +0.75]); F-AXIS #1/2/3/4/5 PASS; methodology validated. /027 single-seed reference +0.57 → multi-seed [+0.65, +0.75] requires BOTH specialists to HOLD at the upper edge of LM Master per-specialist bands (C' near +0.85, G near +0.62) AND replacement-pool BTC slice to maintain lift AND C×E altcoin correlation to dissolve unexpectedly at multi-seed. LM Master modal projection of bundle +0.45-0.50 places this outcome at the favorable tail of the distribution. **Prior LOWERED 50% → 30% per LM Master §6** (modal bundle lands at NEGATIVE-leaning edge of pre-registered band).
+- **INERT (35% — NEW MODAL)**: Δ ∈ [-0.10, +0.10] (absolute [+0.55, +0.65]); specialists hold but no lift over baseline. Multi-seed regresses single-seed slightly favorable draws (C' to modal +0.78; G to modal +0.52); bundle structure (LTC drag, DOT flat, C×E altcoin co-movement) caps upside at the +0.50 STRUCTURAL CEILING (LM Master §7). Cycle-3 closing finding: methodology partially validated (specialists STABLE) but lift unstable at multi-seed composition. **Prior RAISED 30% → 35% per LM Master §6** — this becomes the modal verdict.
+- **NEGATIVE (25%)**: Δ < -0.10 (absolute could still be in [+0.40, +0.55]); multi-seed regression deeper than LM Master projection; specialists' single-seed lift dissolves further OR LTC drag amplifies OR C×E correlation pushes joint altcoin tail. Possible if /018's +0.98 single-seed was deeper into basin lottery favorable tail than LM Master projection (C' regresses below +0.55 lower band) OR if D LTC -1.05 drag intensifies at multi-seed coverage. **Prior RAISED 15% → 25% per LM Master §6** — LTC drag + C×E concentration are dominant tail-risk drivers.
+- **NEGATIVE-BELOW-BAND (6%)**: absolute OOS Sharpe < +0.40; pre-registered band breach; methodology refuted at multi-seed. Combined with multi-seed C_link × E_dot Pearson STAYING > +0.55 (per LM Master §2 prediction) → joint altcoin concentration crystallizes simultaneously with LTC drag → bundle structural ceiling collapses through floor. **Prior RAISED 5% → 6% per LM Master §6**.
+- **BLOCK (4%)** (split — 2.5% BLOCK-PENDING-FIX | 1.5% BLOCK-FINAL): Phase 7.5 Critic Check finds methodology defect — e.g., F-AXIS #1 dispatch incorrect (LINK trades from baseline Model C instead of Model C' specialist; ETH trades from Model A's pool slice instead of Model G — but Section 3.4 §5 / Section 4 F-AXIS #1 hard-assert mandate reduces this risk by design), F-AXIS #2 multi-seed cross-correlation regression unexpected breach, F-AXIS #3 specialist Sharpe out-of-band, or F-AXIS #4/5 DSR/PBO threshold breach. **Prior LOWERED 5% → 4% per LM Master §6** (brief structurally sound; falsifiers well-pre-registered).
 
-**Two specific mechanism predictions**:
+**Three specific mechanism predictions (mechanism #1 + #2 recalibrated per LM Master §1 / §2)**:
 
-1. **Multi-seed per-specialist Sharpe**: Model C' OOS Sharpe in [+0.50, +0.80] (mean +0.70 prior); Model G OOS Sharpe in [+0.30, +0.50] (mean +0.40 prior). If C' < +0.50 or G < +0.30 → F-AXIS #3 FAIL on the corresponding specialist; verdict elevates to NEGATIVE.
+1. **Multi-seed per-specialist Sharpe (RECALIBRATED per LM Master §1)**: Model C' OOS Sharpe modal **+0.78** (band [+0.53, +1.03] = ±0.25 spread); Model G OOS Sharpe modal **+0.52** (band [+0.27, +0.77] = ±0.25 spread). If C' < +0.53 or G < +0.27 → F-AXIS #3 FAIL on the corresponding specialist; verdict elevates to NEGATIVE. The QR prior of C' mean +0.70 / G mean +0.40 was below LM Master's modal projection; both bands now centered on LM Master's +0.78 / +0.52 modes.
 
 2. **Bundle MaxDD**: /026 single-seed reference shows bundle MaxDD = 49.18% (vs baseline 33.77%; +15.4pp). Multi-seed could either expand (if LTC drag amplifies under wider seed coverage) or contract (if seed averaging dampens drawdown peaks). Predicted band: bundle OOS MaxDD ∈ [35%, 55%].
+
+3. **Cross-correlation directional predictions (NEW per LM Master §2)**: pool×LINK_spec single-seed +0.4935 → multi-seed DISSOLVES to **[+0.35, +0.42]** (basin-lottery driver: 2 of 15 risk-on months). C_link × E_dot single-seed +0.6027 → multi-seed STAYS at **[+0.55, +0.60]** (signal-level altcoin co-movement; binding cycle-4 finding). If C×E < +0.50 at multi-seed → cycle-4 axis priorities re-rank; if STAYS > +0.55 → C×E de-concentration MANDATORY cycle-4 axis (LM Master §9).
 
 ---
 
@@ -789,9 +843,13 @@ Engineering_report.md MUST emit (per cycle-3 codified rule + Critic /025 Recomme
 
 ### 10.5 Methodology validation specific artifacts
 
-NEW for /027 (methodology-validation framing):
-- `reports-v1/iteration_v1-027/specialist_stability.csv` — per-specialist (C', G) per-seed OOS Sharpe across 10 paths (5 inner × 2 outer); columns: `specialist, inner_seed, outer_seed, oos_sharpe, oos_trades, oos_pnl_pct`.
-- `reports-v1/iteration_v1-027/replacement_filter_audit.csv` — per-model pre-replacement vs post-replacement trade count; columns: `model, pre_filter_trades, post_filter_trades, dropped_symbol, dropped_count`. Verifies F-AXIS #1 dispatch correctness.
+NEW for /027 (methodology-validation framing); both REQUIRED per LM Master Phase 4.5 §3 (`specialist_stability.csv`) and §5 (`replacement_filter_audit.csv`):
+
+- **`reports-v1/iteration_v1-027/specialist_stability.csv`** — per-specialist (C', G) per-seed OOS Sharpe across the 10 model paths (5 inner × 2 outer); columns: `specialist, inner_seed, outer_seed, oos_sharpe, oos_trades, oos_pnl_pct, is_sharpe`. Phase 7.4 LM Master post-mortem reads this CSV to compute the actual per-specialist standard deviation across 10 paths and cross-check against LM Master §3 prediction (±0.20 single specialist). Provides the distributional view that the F-AXIS #3 modal-band check cannot — namely, whether the modal is reached by tight cluster (acceptable) vs wide spread with the mode at the middle (unstable). If observed std > ±0.40 for a specialist, the basin-variance compression assumption is falsified for that specialist family at Phase 7.4.
+
+- **`reports-v1/iteration_v1-027/replacement_filter_audit.csv`** — per-model pre-replacement vs post-replacement trade count; columns: `model, symbol, pre_filter_trades, post_filter_trades, dropped_count, dropped_reason`. Required rows: Pool A pre-filter ETH count > 0 with post-filter ETH count == 0 AND `dropped_reason == "replacement_to_specialist_G"`; Pool A pre-filter BTC count > 0 with post-filter BTC count == pre-filter BTC count AND `dropped_reason == "retained"`. Verifies F-AXIS #1 dispatch correctness as a tabular auditable artifact independent of the runtime hard-asserts.
+
+- **2-seed Pareto deliverable**: `reports-v1/iteration_v1-027/pareto_2seed.csv` — per-outer-seed bundle OOS Sharpe with mean and Pareto-frontier flag. Pre-registered LM Master §3 band: 2-seed Pareto spans [+0.25, +0.70] around modal +0.45-0.50. If Pareto seeds straddle (one above +0.55, one below +0.35), the 5-model bundle is composition-unstable and Phase 7.4 flags as binding cycle-4 finding.
 
 ---
 
@@ -799,26 +857,35 @@ NEW for /027 (methodology-validation framing):
 
 Per Critic /025 Path Forward + Critic /026 Option C + /025 closeout structural verdict + LM Master Phase 7.4 §6 from /025:
 
-**The cycle-4 axis selection depends on /027 outcome**. Three branches:
+**The cycle-4 axis selection layers a verdict-conditional branch ABOVE two UNCONDITIONAL MANDATORY priorities** (per LM Master Phase 4.5 §9 — these fire regardless of /027 verdict because both are STRUCTURAL CEILING drivers identified at /026 + /027 pre-design):
 
-### 11.1 If /027 PROMISING-METHODOLOGY
+**UNCONDITIONAL MANDATORY cycle-4 priorities (LM Master §9 binding)**:
 
-Cycle-4 first EXPLORATION = **3-symbol pool composition test (BTC+ETH+LINK with specialists overriding)** per Critic /026 Option C:
-- Test whether pool size matters: does a 3-sym pool (drop LTC + DOT) preserve specialist lift while removing the LTC drag?
-- This is the natural follow-on: methodology validated → optimize bundle composition for absolute Sharpe.
-- Alternative cycle-4 axis #1: DOT-specialist with NEW risk gate (Critic /025 Path Forward Option 1) — extend LINK/ETH+gate proven architecture to DOT.
+1. **D-specialist EXPLORATION MANDATORY**: LTC drag at OOS Sharpe -1.05 is the single dominant ceiling on the current 5-Model bundle (LM Master §7 STRUCTURAL CEILING analysis). The D-specialist axis is unconditional cycle-4 priority irrespective of whether /027 confirms PROMISING-METHODOLOGY or lands INERT/NEGATIVE. Specialist architecture: long-suppression gate (analogue of Model G's BTC-trend gate, applied to LTC against an alt-cycle indicator) OR regime-conditional kill switch OR sample-weighting against LTC IS examples.
+2. **C×E altcoin de-concentration MANDATORY**: the C_link × E_dot +0.6027 single-seed OOS Pearson is predicted by LM Master §2 to STAY at +0.55-+0.60 at multi-seed (signal-level altcoin co-movement, NOT basin lottery). Cycle-4 must include an EXPLORATION that breaks this concentration: per-symbol weight cap on LINK+DOT pair OR DOT specialist with anti-LINK regime gate OR universe-expansion to dilute altcoin share. If /027 Phase 7.4 result reveals C×E DID dissolve to <+0.50 at multi-seed (falsifies LM Master §2 prediction), this priority can be DOWNGRADED at /028 brief — otherwise MANDATORY.
 
-### 11.2 If /027 INERT
+**Verdict-conditional branch ABOVE these two MANDATORY axes (selects cycle-4 first EXPLORATION variant)**:
 
-Cycle-4 = **D-specialist mandatory** (Critic /025 Path Forward Option 1, refined):
-- LTC has OOS Sharpe -1.05 in baseline (worst contributor). A LTC specialist with intervention (long-suppression gate, regime gate, on-chain alt-cycle feature) is the single highest-leverage axis to lift bundle Sharpe.
-- Sister axes: sample-weighting (Critic /025 Path Forward Option 2; UNUSED cycle-3) OR XGBoost head-to-head (Critic /025 Path Forward Option 3).
+### 11.1 If /027 PROMISING-METHODOLOGY (LM Master prior 30%)
 
-### 11.3 If /027 NEGATIVE or NEGATIVE-BELOW-BAND
+Cycle-4 first EXPLORATION pairs MANDATORY #1 (D-specialist) with **3-symbol pool composition test (BTC+ETH+LINK)** per Critic /026 Option C — natural next step is to optimize composition AFTER methodology validated:
+- Hypothesis: 3-sym pool (drop LTC + DOT from pool training; LINK + ETH come from specialists; D + E run as full specialists) preserves specialist lift while removing LTC drag from pool co-training.
+- D-specialist still fires in parallel — even with PROMISING-METHODOLOGY, LTC -1.05 OOS Sharpe is structural drag the D-specialist axis directly addresses.
+- C×E de-concentration mechanism layered on top via DOT-specialist sub-axis (extend LINK/ETH+gate proven architecture).
 
-Cycle-4 = **methodology pivot — re-question per-cohort axis fundamentally**:
-- The per-cohort specialization architecture refuted at multi-seed → structurally different approach needed.
-- Options: structural architectural change (e.g., LightGBM → XGBoost mandate per `feedback_v3_iter016_xgboost_mandate.md` transfer prior), meta-labeling (per `feedback_v3_iter017_metalabeling_mandate.md` transfer prior), or multi-axis EXPLORATIONs at higher compute budget.
+### 11.2 If /027 INERT (LM Master prior 35% — MODAL)
+
+Cycle-4 first EXPLORATION leads with MANDATORY #1 (D-specialist) AS the primary axis (most-leveraged unblocking move on STRUCTURAL CEILING):
+- Architecture options for D-specialist: long-suppression gate (analogue of Model G's BTC-trend gate); regime gate (Hurst-100 vol-of-vol); on-chain alt-cycle feature (cross-asset BTC dominance z-score).
+- C×E de-concentration MANDATORY runs as sister axis: per-symbol weight cap OR DOT-specialist with anti-LINK gate.
+- Sister structural axes: sample-weighting (Critic /025 Path Forward Option 2; UNUSED cycle-3) OR XGBoost head-to-head (Critic /025 Path Forward Option 3) — deferred to cycle-4 EXPLORATION #2 onward.
+
+### 11.3 If /027 NEGATIVE or NEGATIVE-BELOW-BAND (LM Master combined prior 31%)
+
+Cycle-4 = **methodology pivot — re-question per-cohort axis fundamentally** WITH MANDATORY #1 + #2 still active:
+- Even at NEGATIVE verdict, the D-specialist axis remains the highest-leverage candidate because LTC drag is mechanism-independent of per-cohort architecture choice. C×E de-concentration likewise applies regardless of cohort framing.
+- Pivot options for the cycle-4 PRIMARY structural axis: LightGBM → XGBoost mandate (per `feedback_v3_iter016_xgboost_mandate.md` transfer prior), meta-labeling (per `feedback_v3_iter017_metalabeling_mandate.md` transfer prior), labeling-mode pivot (sigma_source NATR → realized-vol), or multi-axis EXPLORATIONs at higher compute budget.
+- D-specialist (MANDATORY #1) layers ABOVE the architectural pivot — even if cohort framing pivots, LTC -1.05 still drags as long as LTC is in the universe.
 
 ### 11.4 NEW-feature-to-Pool-A is CLOSED for cycle-4 EXPLORATION budget
 
