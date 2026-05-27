@@ -2027,7 +2027,7 @@ def main() -> None:
         # If fewer → raise AssertionError; QE returns BLOCK-PENDING-FIX.
         import pandas as _pd
 
-        _OOS_CUTOFF_MS = int(_pd.Timestamp("2025-03-24", tz="UTC").timestamp() * 1000)
+        _oos_cutoff_ms = int(_pd.Timestamp("2025-03-24", tz="UTC").timestamp() * 1000)
         _oi_data_dir = Path("data")
         _oi_covered: int = 0
         _oi_per_symbol: dict[str, dict] = {}
@@ -2037,7 +2037,7 @@ def main() -> None:
                 _oi_per_symbol[_sym] = {"status": "MISSING", "is_rows": 0}
                 continue
             _oi_df_check = _pd.read_csv(_oi_path)
-            _is_rows = int((_oi_df_check["open_time"] < _OOS_CUTOFF_MS).sum())
+            _is_rows = int((_oi_df_check["open_time"] < _oos_cutoff_ms).sum())
             _status = "PRESENT" if _is_rows >= V1_ITER025_OI_MIN_IS_ROWS else "INSUFFICIENT"
             _oi_per_symbol[_sym] = {"status": _status, "is_rows": _is_rows}
             if _is_rows >= V1_ITER025_OI_MIN_IS_ROWS:
