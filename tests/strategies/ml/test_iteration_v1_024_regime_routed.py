@@ -22,6 +22,10 @@ Test coverage:
     D_ext, D_norm, E_baseline.
 17. Skip-month fallback: extreme sub-model with no models routes to normal.
 18. RegimeGateStats fire-rate properties computed correctly.
+19. (BLOCK-PENDING-FIX) make_extreme_filter raises ValueError on missing z30 column.
+20. (BLOCK-PENDING-FIX) make_normal_filter raises ValueError on missing z30 column.
+21. (BLOCK-PENDING-FIX) make_extreme_filter returns nonzero mask when z30 present.
+22. (BLOCK-PENDING-FIX) LightGbmStrategy accepts data_filter_columns without error.
 """
 
 from __future__ import annotations
@@ -30,6 +34,7 @@ from unittest.mock import MagicMock
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from crypto_trade.backtest_models import Signal
 from crypto_trade.strategies.regime_gate_v1 import (
@@ -520,4 +525,115 @@ def test_regime_gate_stats_fire_rate_properties():
     assert 0.10 <= stats.extreme_fire_rate <= 0.18, (
         f"extreme_fire_rate {stats.extreme_fire_rate:.3f} must be in [0.10, 0.18] "
         f"(per Section 4.2 F-AXIS #3 fire-rate band)"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Test 19: (BLOCK-PENDING-FIX) make_extreme_filter raises on missing column
+# ---------------------------------------------------------------------------
+
+
+def test_extreme_filter_raises_on_missing_column():
+    """make_extreme_filter must raise ValueError when z30 column is absent.
+
+    BLOCK-PENDING-FIX: the original silent all-False fallback masked the defect
+    where _master (kline-only DataFrame) did not contain funding_rate_zscore_30.
+    The fix replaces the silent fallback with a hard raise so the root cause is
+    immediately surfaced instead of silently producing empty extreme partitions.
+    """
+    flt = make_extreme_filter(_Z30_COL, _THRESHOLD)
+    df_no_funding = pd.DataFrame(
+        {
+            "open_time": [1_000_000, 2_000_000, 3_000_000],
+            "close": [100.0, 101.0, 99.0],
+            "symbol": ["BTCUSDT", "BTCUSDT", "BTCUSDT"],
+        }
+    )
+    with pytest.raises(ValueError, match="Required column"):
+        flt(df_no_funding)
+
+
+# ---------------------------------------------------------------------------
+# Test 20: (BLOCK-PENDING-FIX) make_normal_filter raises on missing column
+# ---------------------------------------------------------------------------
+
+
+def test_normal_filter_raises_on_missing_column():
+    """make_normal_filter must raise ValueError when z30 column is absent.
+
+    Symmetric with test 19 — normal filter previously returned all-True
+    (full partition), which let the normal sub-model train on all rows and
+    hide the fact that the extreme sub-model had zero rows.
+    """
+    flt = make_normal_filter(_Z30_COL, _THRESHOLD)
+    df_no_funding = pd.DataFrame(
+        {
+            "open_time": [1_000_000, 2_000_000],
+            "close": [100.0, 101.0],
+        }
+    )
+    with pytest.raises(ValueError, match="Required column"):
+        flt(df_no_funding)
+
+
+# ---------------------------------------------------------------------------
+# Test 21: (BLOCK-PENDING-FIX) make_extreme_filter returns nonzero mask
+# ---------------------------------------------------------------------------
+
+
+def test_extreme_filter_returns_nonzero_mask_with_sample_data():
+    """make_extreme_filter returns >=1 True when sample data includes |z30|>threshold.
+
+    Confirms the filter is actually selective once the funding column is present,
+    i.e., the mechanism is alive and would partition the training data correctly.
+    """
+    flt = make_extreme_filter(_Z30_COL, _THRESHOLD)
+    df_with_funding = pd.DataFrame(
+        {
+            "open_time": [1_000_000, 2_000_000, 3_000_000, 4_000_000, 5_000_000],
+            _Z30_COL: [0.0, 2.0, -2.5, 0.5, 1.8],  # indices 1, 2, 4 are extreme
+        }
+    )
+    mask = flt(df_with_funding)
+    assert mask.sum() >= 1, f"Expected >=1 extreme bar; got {mask.sum()}"
+    assert mask[1], "z30=2.0 must be classified as extreme"
+    assert mask[2], "z30=-2.5 must be classified as extreme"
+    assert mask[4], "z30=1.8 must be classified as extreme"
+    assert not mask[0], "z30=0.0 must NOT be classified as extreme"
+    assert not mask[3], "z30=0.5 must NOT be classified as extreme"
+
+
+# ---------------------------------------------------------------------------
+# Test 22: (BLOCK-PENDING-FIX) LightGbmStrategy accepts data_filter_columns
+# ---------------------------------------------------------------------------
+
+
+def test_lgbm_strategy_accepts_data_filter_columns():
+    """LightGbmStrategy can be instantiated with data_filter_columns without raising.
+
+    BLOCK-PENDING-FIX: data_filter_columns is the new parameter that lists
+    which feature-parquet columns must be loaded and merged into the master
+    slice before calling data_filter_callback.  Without this parameter,
+    the callback received a kline-only DataFrame that never contained
+    funding_rate_zscore_30, producing silent all-False/all-True masks.
+    """
+    from crypto_trade.strategies.ml.lgbm import LightGbmStrategy
+
+    callback = make_extreme_filter(_Z30_COL, _THRESHOLD)
+    filter_cols = [_Z30_COL]
+
+    strat = LightGbmStrategy(
+        training_months=24,
+        n_trials=5,
+        feature_columns=["feat_a", "feat_b", "funding_rate_zscore_30"],
+        ensemble_seeds=[42],
+        data_filter_callback=callback,
+        data_filter_columns=filter_cols,
+    )
+    assert strat._data_filter_callback is callback, (
+        "data_filter_callback must be stored as _data_filter_callback"
+    )
+    assert strat._data_filter_columns == filter_cols, (
+        f"data_filter_columns must be stored as _data_filter_columns; "
+        f"got {strat._data_filter_columns}"
     )

@@ -180,9 +180,13 @@ def make_extreme_filter(
 
     def _filter(df: pd.DataFrame) -> np.ndarray:
         if z30_column not in df.columns:
-            # If the funding column is missing, return all-False (empty partition).
-            # This triggers the skip-month policy (< 100 rows → skip).
-            return np.zeros(len(df), dtype=bool)
+            raise ValueError(
+                f"Required column '{z30_column}' missing from filter DataFrame. "
+                f"Available columns: {list(df.columns)[:20]}... "
+                f"Ensure LightGbmStrategy is constructed with "
+                f"data_filter_columns=['{z30_column}'] so the column is loaded "
+                f"from parquet and merged before the filter callback is invoked."
+            )
         z_vals = df[z30_column].values
         # NaN → normal (excluded from extreme partition)
         return np.where(
@@ -206,8 +210,13 @@ def make_normal_filter(
 
     def _filter(df: pd.DataFrame) -> np.ndarray:
         if z30_column not in df.columns:
-            # If the funding column is missing, return all-True (full partition).
-            return np.ones(len(df), dtype=bool)
+            raise ValueError(
+                f"Required column '{z30_column}' missing from filter DataFrame. "
+                f"Available columns: {list(df.columns)[:20]}... "
+                f"Ensure LightGbmStrategy is constructed with "
+                f"data_filter_columns=['{z30_column}'] so the column is loaded "
+                f"from parquet and merged before the filter callback is invoked."
+            )
         z_vals = df[z30_column].values
         # NaN → normal (included in normal partition)
         not_extreme = np.where(

@@ -460,6 +460,7 @@ def build_lgbm_strategy(
     model_role: str = "",
     symbol: str = "",
     data_filter_callback: Callable[[pd.DataFrame], np.ndarray] | None = None,
+    data_filter_columns: list[str] | None = None,
 ) -> LightGbmStrategy:
     """Build a LightGbmStrategy WITHOUT running a backtest.
 
@@ -509,6 +510,7 @@ def build_lgbm_strategy(
         model_role=model_role,
         symbol=symbol,
         data_filter_callback=data_filter_callback,
+        data_filter_columns=data_filter_columns,
     )
 
 
@@ -1792,6 +1794,7 @@ def main() -> None:
             model_role="Model_A_extreme",
             symbol="BTC+ETH",
             data_filter_callback=_extreme_filter,
+            data_filter_columns=[V1_ITER024_Z30_COLUMN],
             **_r5_kwargs,
         )
         _strat_a_norm = build_lgbm_strategy(
@@ -1805,6 +1808,7 @@ def main() -> None:
             model_role="Model_A_normal",
             symbol="BTC+ETH",
             data_filter_callback=_normal_filter,
+            data_filter_columns=[V1_ITER024_Z30_COLUMN],
             **_r5_kwargs,
         )
         _cfg_a = build_backtest_config(
@@ -1846,6 +1850,7 @@ def main() -> None:
             model_role="Model_C_extreme",
             symbol="LINKUSDT",
             data_filter_callback=_extreme_filter,
+            data_filter_columns=[V1_ITER024_Z30_COLUMN],
             **_r5_kwargs,
         )
         _strat_c_norm = build_lgbm_strategy(
@@ -1859,6 +1864,7 @@ def main() -> None:
             model_role="Model_C_normal",
             symbol="LINKUSDT",
             data_filter_callback=_normal_filter,
+            data_filter_columns=[V1_ITER024_Z30_COLUMN],
             **_r5_kwargs,
         )
         _cfg_c = build_backtest_config(
@@ -1900,6 +1906,7 @@ def main() -> None:
             model_role="Model_D_extreme",
             symbol="LTCUSDT",
             data_filter_callback=_extreme_filter,
+            data_filter_columns=[V1_ITER024_Z30_COLUMN],
             **_r5_kwargs,
         )
         _strat_d_norm = build_lgbm_strategy(
@@ -1913,6 +1920,7 @@ def main() -> None:
             model_role="Model_D_normal",
             symbol="LTCUSDT",
             data_filter_callback=_normal_filter,
+            data_filter_columns=[V1_ITER024_Z30_COLUMN],
             **_r5_kwargs,
         )
         _cfg_d = build_backtest_config(

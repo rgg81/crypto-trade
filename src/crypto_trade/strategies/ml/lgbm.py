@@ -182,6 +182,7 @@ class LightGbmStrategy:
         model_role: str = "",
         symbol: str = "",
         data_filter_callback: Callable[[pd.DataFrame], np.ndarray] | None = None,
+        data_filter_columns: list[str] | None = None,
     ) -> None:
         if not feature_columns:
             raise ValueError(
@@ -230,12 +231,23 @@ class LightGbmStrategy:
         # models (H), caller passes the single symbol (e.g. "BTCUSDT").
         self._symbol: str = symbol
         # iter-v1/024: optional training-data partition callback.
-        # Callable[[pd.DataFrame], np.ndarray] — receives the master DataFrame
-        # slice for train_indices and returns a boolean mask.  Applied BEFORE
-        # labeling in _train_for_month().  Default None = no filter (backward-
-        # compatible; bit-identical to all pre-/024 runs).
+        # Callable[[pd.DataFrame], np.ndarray] — receives a DataFrame whose
+        # columns include at minimum the kline columns from master PLUS any
+        # columns listed in data_filter_columns (loaded from parquet and merged
+        # before calling the callback).  Applied BEFORE labeling in
+        # _train_for_month().  Default None = no filter (backward-compatible;
+        # bit-identical to all pre-/024 runs).
         self._data_filter_callback: Callable[[pd.DataFrame], np.ndarray] | None = (
             data_filter_callback
+        )
+        # iter-v1/024: list of feature-parquet columns that must be present in
+        # the DataFrame passed to data_filter_callback.  When non-empty, these
+        # columns are loaded from parquet (via lookup_features) and left-joined
+        # onto the master slice before calling the callback.  Required because
+        # self._master is built from kline CSVs only and does NOT contain
+        # feature columns such as funding_rate_zscore_30.
+        self._data_filter_columns: list[str] | None = (
+            list(data_filter_columns) if data_filter_columns else None
         )
         # iter-v3/007: fast exploration mode (colsample fixed at 1.0 in optimization.py)
         self._fast_mode: bool = fast_mode
@@ -517,12 +529,44 @@ class LightGbmStrategy:
         )[0]
 
         # iter-v1/024: apply regime-partition filter (data_filter_callback).
-        # The callback receives a slice of the master DataFrame for train_indices
-        # and returns a boolean mask.  Applied BEFORE labeling so the sub-model
-        # sees only its regime's training rows.
+        # The callback receives a DataFrame slice that includes all kline columns
+        # from master PLUS any columns listed in _data_filter_columns (loaded
+        # from parquet and merged by open_time+symbol key before calling the
+        # callback).  Applied BEFORE labeling so the sub-model sees only its
+        # regime's training rows.
         # Default None → no filter; backward-compatible (bit-identical to pre-/024).
         if self._data_filter_callback is not None and len(train_indices) > 0:
-            _filter_mask = self._data_filter_callback(self._master.iloc[train_indices])
+            _master_slice = self._master.iloc[train_indices].copy()
+
+            # Enrich the slice with parquet columns needed by the filter.
+            # _data_filter_columns is set when the filter reads columns NOT in
+            # the kline-only master (e.g. funding_rate_zscore_30).
+            if self._data_filter_columns:
+                _filter_lookups = [
+                    (str(self._sym_arr[i]), int(self._open_time_arr[i])) for i in train_indices
+                ]
+                _filter_feat_df = lookup_features(
+                    _filter_lookups,
+                    self.features_dir,
+                    self._interval,
+                    columns=self._data_filter_columns,
+                )
+                if not _filter_feat_df.empty:
+                    # left-join on open_time + symbol so kline rows without a
+                    # parquet match get NaN (the filter's NaN → normal fallback
+                    # handles them correctly).
+                    _filter_feat_df = _filter_feat_df.rename(columns={"open_time": "__ot__"})
+                    _master_slice = _master_slice.assign(__ot__=_master_slice["open_time"])
+                    # Add symbol column to filter feat df for the merge key
+                    if "symbol" not in _filter_feat_df.columns:
+                        pass  # lookup_features already adds symbol
+                    _master_slice = _master_slice.merge(
+                        _filter_feat_df,
+                        on=["__ot__", "symbol"],
+                        how="left",
+                    ).drop(columns=["__ot__"])
+
+            _filter_mask = self._data_filter_callback(_master_slice)
             train_indices = train_indices[_filter_mask]
             if self.verbose > 0:
                 print(
