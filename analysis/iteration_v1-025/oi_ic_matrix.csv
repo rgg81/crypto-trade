@@ -1,0 +1,11 @@
+symbol,oi_feature,baseline_feature,ic_spearman,n_pairs
+BTCUSDT,oi_delta_30,mom_rsi_14,0.1071,4959
+BTCUSDT,oi_delta_30,vol_atr_14,-0.0611,4959
+BTCUSDT,oi_delta_30,vol_natr_14,-0.0539,4959
+BTCUSDT,oi_delta_30,stat_log_return_1,0.0361,4959
+BTCUSDT,oi_delta_30,mom_macd_hist_12_26_9,0.1234,4959
+BTCUSDT,oi_delta_30_z90,mom_rsi_14,0.1208,4684
+BTCUSDT,oi_delta_30_z90,vol_atr_14,-0.0657,4684
+BTCUSDT,oi_delta_30_z90,vol_natr_14,-0.1166,4684
+BTCUSDT,oi_delta_30_z90,stat_log_return_1,0.0387,4684
+BTCUSDT,oi_delta_30_z90,mom_macd_hist_12_26_9,0.1531,4684
