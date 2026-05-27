@@ -107,6 +107,7 @@ V1_FEATURE_COLUMNS_PRUNED: tuple[str, ...] = (
     "mr_pct_from_high_20",
     "mr_pct_from_low_20",
     "mr_rsi_extreme_14",
+    "oi_delta_30_z90",  # iter-v1/025: NEW — open-interest delta z-score (90-bar window)
     "stat_autocorr_lag5",
     "stat_kurtosis_20",  # LM Master Phase 4.5 swap: drop mom_mom_5, add stat_kurtosis_20
     "stat_log_return_1",
@@ -131,10 +132,11 @@ V1_FEATURE_COLUMNS_PRUNED: tuple[str, ...] = (
     "vol_volume_rel_20",
 )
 
-# Sanity guard: confirm the pruned set has exactly 42 features.
+# Sanity guard: confirm the pruned set has exactly 43 features.
 # iter-v1/023: extended 40 → 42 by adding funding_rate_zscore_30 + funding_rate_zscore_90.
-assert len(V1_FEATURE_COLUMNS_PRUNED) == 42, (
-    f"V1_FEATURE_COLUMNS_PRUNED must have exactly 42 features; got {len(V1_FEATURE_COLUMNS_PRUNED)}"
+# iter-v1/025: extended 42 → 43 by adding oi_delta_30_z90 (open-interest delta z-score).
+assert len(V1_FEATURE_COLUMNS_PRUNED) == 43, (
+    f"V1_FEATURE_COLUMNS_PRUNED must have exactly 43 features; got {len(V1_FEATURE_COLUMNS_PRUNED)}"
 )
 
 # Out-of-distribution detection feature subset (16 scale-invariant features
@@ -173,4 +175,5 @@ __all__ = [
     "V1_OOD_FEATURE_COLUMNS",
     "assert_v1_universe",
     # iter-v1/023: funding-rate feature family (add_funding_v1_features imported on demand)
+    # iter-v1/025: OI delta feature family (add_oi_delta_v1_features imported on demand)
 ]

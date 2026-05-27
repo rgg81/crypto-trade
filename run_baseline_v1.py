@@ -234,6 +234,22 @@ V1_ITER024_UNIVERSE: tuple[str, ...] = (
 V1_ITER024_REGIME_THRESHOLD: float = 1.5  # |z30| > 1.5 → extreme regime (EDA Section 2.3)
 V1_ITER024_Z30_COLUMN: str = "funding_rate_zscore_30"  # past-only by .shift(1) in feature pipeline
 
+#: iter-v1/025: OI delta feature-family EXPLORATION (cycle-3 #10/10 — LAST EXPLORATION).
+#: Single feature addition: oi_delta_30_z90 (open-interest 30-bar delta, 90-bar z-score).
+#: V1_FEATURE_COLUMNS_PRUNED 42 → 43. Full 5-symbol V1_BASELINE_UNIVERSE.
+#: Dispatch: analogue of /023 funding-family dispatch. No model-arch change.
+#: HARD BLOCK: ≥3/5 symbols must have ≥1000 IS rows in data/open_interest/<SYM>/8h.csv.
+V1_ITER025_UNIVERSE: tuple[str, ...] = (
+    "BTCUSDT",
+    "ETHUSDT",
+    "LINKUSDT",
+    "LTCUSDT",
+    "DOTUSDT",
+)
+V1_ITER025_OI_DELTA_COLUMN: str = "oi_delta_30_z90"
+V1_ITER025_OI_MIN_IS_ROWS: int = 1000  # HARD BLOCK threshold per LM Master §4
+V1_ITER025_OI_MIN_COVERED: int = 3  # ≥3/5 symbols must clear the HARD BLOCK
+
 #: iter-v1/021: stable path for Optuna best-params parquet (H1 diagnostic substrate).
 #: Written by optimize_and_train when params_persist_path is set.
 #: Cleared at runner start (same pattern as OOF_PARQUET_PATH) to prevent accumulation.
@@ -1997,12 +2013,137 @@ def main() -> None:
             "Model_C_LINK": _strat_c_regime,
             "Model_D_LTC": _strat_d_regime,
         }
+    elif set(symbols) == set(V1_ITER025_UNIVERSE) and iteration_label == "v1-025":
+        # iter-v1/025: OI delta feature-family EXPLORATION (cycle-3 #10/10 — LAST).
+        # Single feature addition: oi_delta_30_z90 (V1_FEATURE_COLUMNS_PRUNED 42 → 43).
+        # Dispatch mirrors /023 funding-family pattern: 4 models A/C/D/E, same risk gates.
+        #
+        # HARD BLOCK precondition (LM Master §4 BINDING, brief Section 3.6):
+        # ≥3/5 symbols must have ≥1000 IS rows in data/open_interest/<SYM>/8h.csv.
+        # If fewer → raise AssertionError; QE returns BLOCK-PENDING-FIX.
+        import pandas as _pd
+
+        _OOS_CUTOFF_MS = int(_pd.Timestamp("2025-03-24", tz="UTC").timestamp() * 1000)
+        _oi_data_dir = Path("data")
+        _oi_covered: int = 0
+        _oi_per_symbol: dict[str, dict] = {}
+        for _sym in V1_ITER025_UNIVERSE:
+            _oi_path = _oi_data_dir / "open_interest" / _sym / "8h.csv"
+            if not _oi_path.exists():
+                _oi_per_symbol[_sym] = {"status": "MISSING", "is_rows": 0}
+                continue
+            _oi_df_check = _pd.read_csv(_oi_path)
+            _is_rows = int((_oi_df_check["open_time"] < _OOS_CUTOFF_MS).sum())
+            _status = "PRESENT" if _is_rows >= V1_ITER025_OI_MIN_IS_ROWS else "INSUFFICIENT"
+            _oi_per_symbol[_sym] = {"status": _status, "is_rows": _is_rows}
+            if _is_rows >= V1_ITER025_OI_MIN_IS_ROWS:
+                _oi_covered += 1
+
+        # Emit oi_coverage_check.csv (required deliverable per brief Section 10.5)
+        _reports_dir025 = (
+            Path(reports_dir) if "reports_dir" in dir() else Path("reports-v1/iteration_v1-025")
+        )
+        _reports_dir025.mkdir(parents=True, exist_ok=True)
+        _coverage_rows = [{"symbol": sym, **info} for sym, info in _oi_per_symbol.items()]
+        _pd.DataFrame(_coverage_rows).to_csv(_reports_dir025 / "oi_coverage_check.csv", index=False)
+        print(
+            f"[iter-v1/025] OI coverage: {_oi_covered}/{len(V1_ITER025_UNIVERSE)} symbols "
+            f"≥{V1_ITER025_OI_MIN_IS_ROWS} IS rows. Per-symbol: {_oi_per_symbol}"
+        )
+        print(f"[iter-v1/025] oi_coverage_check.csv written to {_reports_dir025}")
+
+        assert _oi_covered >= V1_ITER025_OI_MIN_COVERED, (
+            f"[iter-v1/025] OI coverage HARD BLOCK: only {_oi_covered}/{len(V1_ITER025_UNIVERSE)} "
+            f"symbols have ≥{V1_ITER025_OI_MIN_IS_ROWS} IS rows. "
+            f"Per-symbol: {_oi_per_symbol}. "
+            f"Run: uv run crypto-trade fetch-oi --symbols ETHUSDT,LINKUSDT,LTCUSDT,DOTUSDT"
+        )
+
+        # Pre-flight: OI delta column must be in active_feature_columns
+        assert V1_ITER025_OI_DELTA_COLUMN in active_feature_columns, (
+            f"iter-v1/025 pre-flight: {V1_ITER025_OI_DELTA_COLUMN} not in active_feature_columns. "
+            "Ensure --pruned-features is set and V1_FEATURE_COLUMNS_PRUNED has oi_delta_30_z90."
+        )
+        pos_oi = active_feature_columns.index(V1_ITER025_OI_DELTA_COLUMN)
+        print(
+            f"[iter-v1/025] OI delta feature ACTIVE: "
+            f"{V1_ITER025_OI_DELTA_COLUMN}@{pos_oi} "
+            f"/ {len(active_feature_columns)} total features"
+        )
+
+        # Models A/C/D/E — same risk-gate config as /023 baseline
+        results_a, faxm_a, _strat_a = run_model(
+            "A (BTC/ETH)",
+            ("BTCUSDT", "ETHUSDT"),
+            atr_tp=2.9,
+            atr_sl=1.45,
+            apply_r1=False,
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            **_r5_kwargs,
+        )
+        results_c, faxm_c, _strat_c = run_model(
+            "C (LINK + R1)",
+            ("LINKUSDT",),
+            atr_tp=3.5,
+            atr_sl=1.75,
+            apply_r1=True,
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            **_r5_kwargs,
+        )
+        results_d, faxm_d, _strat_d = run_model(
+            "D (LTC + R1)",
+            ("LTCUSDT",),
+            atr_tp=3.5,
+            atr_sl=1.75,
+            apply_r1=True,
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            **_r5_kwargs,
+        )
+        results_e, faxm_e, _strat_e = run_model(
+            "E (DOT + R1 + R2)",
+            ("DOTUSDT",),
+            atr_tp=3.5,
+            atr_sl=1.75,
+            apply_r1=True,
+            apply_r2=True,
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            **_r5_kwargs,
+        )
+        _all_faxm_logs = faxm_a + faxm_c + faxm_d + faxm_e
+        all_results = results_a + results_c + results_d + results_e
+        _r5_model_results = [results_a, results_c, results_d, results_e]
+        # Feature importance for all 4 models (F-AXIS #1 DUAL GATE: rank + gain-share + breadth).
+        # Per LM Master §3 TIGHTENING: breadth check requires ≥3 cohorts at rank ≤20/43.
+        _post_dispatch_fi_strategies = [
+            ("Model_A_pool", _strat_a),
+            ("Model_C_LINK", _strat_c),
+            ("Model_D_LTC", _strat_d),
+            ("Model_E_DOT", _strat_e),
+        ]
+
     elif set(symbols) == set(V1_BASELINE_UNIVERSE) and iteration_label not in (
         "v1-021",
         "v1-023",
         "v1-024",
+        "v1-025",
     ):
-        # Generic baseline-universe dispatch (non-/021, non-/023, non-/024 iterations).
+        # Generic baseline-universe dispatch (non-/021, non-/023, non-/024, non-/025 iterations).
         # Models A/C/D/E with V1_BASELINE_UNIVERSE symbols. BIT-IDENTICAL to historical
         # v186 baseline when active_feature_columns=list(V1_FEATURE_COLUMNS) + n_trials=50.
         results_a, faxm_a, _strat_a = run_model(
