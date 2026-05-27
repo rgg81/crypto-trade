@@ -79,6 +79,20 @@ Mechanism:
 
 ---
 
+### Section 1 close — LM Master §1 + §7 framing (ADOPTED)
+
+**The load-bearing structural claim of this brief (per LM Master Phase 4.5 §1 and §7)**:
+
+> The ORACLE Q4 mild-positive band (z90 ∈ [+0.29, +0.95], Sharpe-proxy +1.68) is a **single-split depth-3-learnable pattern**, structurally stronger than any single ORACLE band funding /023 ever produced. OI delta has structurally HIGHER PROMISING probability than /023 funding had — BUT the 4-of-5 missing OI data MUST be fetched and verified ≥1000 IS rows per symbol before Phase 6 launches (HARD BLOCK), or the F-AXIS #1 DUAL GATE evaluation degenerates to BTC-only and the verdict is uninterpretable.
+
+Two reasons Q4 is depth-3-learnable in a way that /023 funding was not:
+1. **Single-split carve**: at depth 3, one split on `oi_delta_30_z90 ∈ [+0.29, +0.95]` cleanly isolates Q4's +1.68 Sharpe-proxy band. /023 funding required depth-3 composition (sign-flip at extreme tails — at least 2 splits to compose AND maintain conditional). Single-split > 2-split-composition in EXPLORATION-budget compute (n_trials=18, ENSEMBLE_SIZE=3).
+2. **Magnitude**: Q4 Sharpe-proxy +1.68 is **2.4× /023 funding's strongest mid-band**. The signal-to-noise ratio in the load-bearing carve region is materially stronger than the LEARNED-NEGATIVE precedent.
+
+This is the load-bearing reason for the prior shift from QR's 18% → 22% PROMISING-clean (Section 5 below), and the load-bearing reason the HARD BLOCK on OI fetch (Section 3.6) is BINDING rather than soft.
+
+---
+
 ## Section 2 — IS-Only Evidence
 
 All EDA runs at `analysis/iteration_v1-025/oi_eda.py` (committed). Restricted to `open_time < OOS_CUTOFF_DATE = 2025-03-24`.
@@ -249,6 +263,22 @@ def add_oi_delta_v1_features(
 
 **Track isolation**: ZERO imports from `crypto_trade.features_v2` or `crypto_trade.features_v3`. The OI compute math is COPIED (not imported) from the v3 derivatives panel logic. Verified at Phase 6.0 pre-flight.
 
+**Skip-month policy (LM Master §5(a) ADOPTED)**: For the 2020-01 → 2020-09 NaN window on BTC/ETH/LINK/LTC (pre-OI-archive-start) and any other gaps where the 90-bar z-score is undefined, the runner SKIPS that calendar month for that symbol's per-month training:
+
+```python
+# In _train_for_month, after feature loading:
+nan_frac = train_df["oi_delta_30_z90"].isna().mean()
+if nan_frac > 0.5:
+    # > 50% NaN: skip this (symbol, month) from training fold
+    # — equivalent to how cooldown-affected months are handled
+    train_df = train_df[train_df["symbol"] != sym_with_high_nan]
+```
+
+This is preferred over an `oi_isnull` indicator column because:
+- Simpler — no new feature; no new V1_FEATURE_COLUMNS_PRUNED entry
+- LightGBM cannot synthesize a curve-fit `(symbol_dummy × NaN_indicator)` interaction that could memorize 2020 pre-OI history as a fixed label-correlated regime
+- The runner already exits trades during cooldown; the skip-month is mechanically analogous
+
 ### 3.2 V1_FEATURE_COLUMNS_PRUNED: 42 → 43
 
 Add `oi_delta_30_z90` to V1_FEATURE_COLUMNS_PRUNED (alphabetically sorted insertion just after `mom_*` and just before `mr_*`). Wait — alphabetically the insertion point is just after `interact_stoch_x_adx` (last "i" prefix) and before `mom_macd_hist_12_26_9`. Let me check: the full pruned list is sorted alphabetically. "oi_delta_30_z90" sits between `mom_*` and `mr_*` alphabetically:
@@ -278,9 +308,47 @@ Per `feedback_v3_engineered_features_dont_stack.md` SAME-FAMILY rule, the brief 
 
 This deviates from /023 which added BOTH `funding_rate_zscore_30` AND `funding_rate_zscore_90`. /023 was a 30-bar AND 90-bar window pair across the SAME primitive (funding); /025 chose the z90 as the dominant primitive because: (a) v3 used 30-bar z-score by default; v1 already has funding_rate_zscore_30 covering the 30-bar window; (b) the 90-bar window is smoother and more robust to OI data jitter; (c) extending to 43 features instead of 44 minimizes loss-surface perturbation.
 
-### 3.4 RESERVED for LM Master Phase 4.5
+### 3.4 LM Master Phase 4.5 responses
 
-This section will be populated after Phase 4.5 LM Master advisory. Per dispatch instructions: brief Section 3 MUST explicitly address each LM Master recommendation (adopted / modified / rejected with reason).
+Per dispatch instructions, brief Section 3 MUST explicitly address each LM Master recommendation. LM Master advisory at `briefs-v1/iteration_v1-025/lgbm_advisor.md` (HEAD `9502ecd`). Each recommendation below is tagged ADOPTED / MODIFIED / REJECTED with reason.
+
+**Recommendation §1 (most important point — close)**: Q4 mild-positive band (z90 ∈ [+0.29, +0.95], Sharpe-proxy +1.68) is single-split depth-3-learnable AND structurally stronger than any single ORACLE band funding /023 ever produced; OI delta has higher PROMISING probability than /023 funding; BUT 4-of-5 missing OI data MUST clear HARD BLOCK before Phase 6 launches.
+- **Status**: **ADOPTED**. Reflected in Section 1 (hypothesis upweighted), Section 5 (prior recalibration), and Section 3.6 + 6.1 + 10.1 (HARD BLOCK precondition). The "depth-3 carves Q4 with one split" claim is the load-bearing structural argument — recorded as the Section 1 close.
+
+**Recommendation §2 (Verdict-prior recalibration 22/8/22/30/12/4/2)**: PROMISING-clean 18% → 22%; INERT 25% → 22%; LEARNED-NEGATIVE 30% unchanged; NEGATIVE-INERT 13% → 12%. Net PROMISING tail 26% → 30% (vs /023's 20%).
+- **Status**: **ADOPTED**. Section 5 priors revised below.
+- Rationale endorsed: Q4 Sharpe-proxy +1.68 is 2.4× /023 funding's strongest mid-band; LightGBM depth-3 carves Q4 in a single split; this is a structurally easier learning task than funding's depth-3 directional sign-flip composition.
+
+**Recommendation §3 (F-AXIS #1 DUAL GATE TIGHTEN with breadth check)**: PROMISING-clean now requires `rank ≤14/43 AND gain ≥4.0% on ≥2 cohorts AND z90 rank ≤20/43 on ≥3 cohorts (breadth check)`.
+- **Status**: **ADOPTED**. Section 4 F-AXIS #1 updated.
+- Rationale endorsed: without the breadth check, 2-cohort PROMISING could be BTC+ETH-only while LINK/LTC/DOT silently NaN-degrade — exactly the failure mode the OI coverage HARD BLOCK is designed to prevent. The breadth check is a second-layer integrity guard.
+
+**Recommendation §4 (HARD BLOCK on OI fetch — CRITICAL)**: ETH/LINK/LTC/DOT MISSING; require ≥3/5 symbols ≥1000 IS rows pre-launch; precondition assertion at Phase 6.0; no silent NaN-feature degradation.
+- **Status**: **ADOPTED (BINDING)**. Reflected in Section 3.6 (precondition tightened), Section 6.1 (BLOCK-PENDING-FIX path), Section 10.1 (Phase 6.0 contract minimum-coverage assertion), and Section 10.6 (pre-flight check upgraded).
+- Implementation: pre-launch assertion `for sym in {BTC,ETH,LINK,LTC,DOT}USDT: assert exists(data/open_interest/sym/8h.csv) AND row_count(IS) ≥ 1000`. **Minimum 3/5 symbols with ≥1000 IS rows** to permit DUAL GATE ≥2-cohort evaluation; below that → BLOCK-PENDING-FIX. Echoes /024 dispatch-defect lesson.
+
+**Recommendation §5(a) (NaN regime risk — 2020-01 → 2020-09 OI missing)**: skip-month policy OR `oi_isnull` indicator. LM Master recommends skip-month (simpler; no extra feature).
+- **Status**: **ADOPTED** (skip-month). Section 3.1 implementation note added; Section 6 failure modes updated.
+- Implementation: in `add_oi_delta_v1_features`, if the SYMBOL's OI cache has < 90 consecutive valid rows preceding any training month (i.e., the 90-bar z-score window is undefined), that calendar month is SKIPPED for that symbol — the runner omits rows in `_train_for_month` for that symbol. This is simpler than maintaining a learnable `oi_isnull` indicator that LightGBM could combine with `symbol_dummy` to create a curve-fit interaction.
+
+**Recommendation §5(b) (z90 stationarity hides regime shifts)**: emit per-fold rank in engineering report; predict z90 importance will be REGIME-CONDITIONAL across folds.
+- **Status**: **ADOPTED**. Section 10.4 engineering report contract updated to require `oi_delta_30_z90` per-fold importance rank table across the 24 walk-forward months (one row per (symbol, fold) pair).
+- Diagnostic threshold: if std-of-rank across folds > 8 (LM Master Critic Phase 7.5 priority item #3) → PROMISING-FEATURE-MECHANICAL classification (sister of PROMISING-MECHANICAL; non-compoundable signal source).
+
+**Recommendation §6 (/027 CONFIRMATION bundle composition matrix)**: 3-component for PROMISING (LINK + ETH+gate + OI-aware pool; target +1.30 to +1.50); 2-component otherwise (target +1.10 to +1.30); cross-correlation pre-validation MANDATORY if /025 PROMISING.
+- **Status**: **ADOPTED**. Section 11.6 below updated with the full matrix.
+- Cross-correlation pre-validation spec: Pearson(monthly_returns_OI-aware-pool, LINK_specialist) < 0.50 AND Pearson(OI-aware-pool, ETH+gate) < 0.50 — both BINDING. If either ≥ 0.50, OI-aware pool stays in the bundle but the QR notes the correlation drag in /027 brief Section 7 prediction.
+
+**Recommendation §7 (Most important point — duplicate of §1)**: see §1 above.
+- **Status**: **ADOPTED**. Section 1 closes with the depth-3-learnable + HARD BLOCK framing.
+
+**Recommendation §8 (/026 verdict-conditional staging matrix)**: PROMISING → /026 = pre-CONFIRMATION sanity (cross-corr check); PROMISING-INERT-FAV → /026 = OI momentum composed feature; INERT/LEARNED-NEG/NEG → /026 = methodology pre-CONFIRMATION sanity; NEG-CAT → /026 = methodology + cycle-3 ≥1σ count → multi-seed mandate.
+- **Status**: **ADOPTED**. Section 11.7 below updated with the full staging matrix (replaces the prior "borderline rotation discipline" sub-section, which is preserved as Section 11.8 for the rotation-discipline argument).
+
+**Recommendation §9 (Critic Phase 7.5 priority items)**: 5 items — (1) coverage verification; (2) DUAL GATE breadth; (3) per-fold rank stability std>8 → PROMISING-FEATURE-MECHANICAL; (4) OOS-only IC reconfirmation; (5) ORACLE Q4 OOS reconciliation.
+- **Status**: **ADOPTED**. Section 10 closeout (new Section 10.8 below) lists all 5 items as Critic Phase 7.5 explicit checks. The engineering report Section 7 + Section 8 deliverables now cover items 3 + 5 directly; items 1 + 2 + 4 are Critic checks against the comparison.csv + feature_importance.csv outputs.
+
+**Net adoption tally**: 9/9 LM Master recommendations ADOPTED (zero MODIFIED, zero REJECTED). This is the highest LM Master adoption rate across v1 cycle-3 EXPLORATIONs (/023 = 4/5; /024 = 3/4) and reflects the unusually well-formed OI-delta hypothesis — Q4 depth-3-learnable mechanism + clean Phase 1 EDA + binding HARD BLOCK on data preconditions.
 
 ### 3.5 `run_baseline_v1.py` dispatch
 
@@ -292,9 +360,45 @@ A new elif branch `V1_ITER025_UNIVERSE = V1_BASELINE_UNIVERSE` (5 sym) and `iter
 
 The default baseline path (iteration_label != "v1-025") is UNCHANGED — backward-compatible additive infrastructure.
 
-### 3.6 Data fetch precondition
+### 3.6 Data fetch precondition — HARD BLOCK (LM Master §4 BINDING)
 
-Phase 6 cannot launch until `data/open_interest/{ETH,LINK,LTC,DOT}USDT/8h.csv` exist. The fetch is in-flight at Phase 1 EDA time (background subprocess, started 2026-05-27 ~13:31 UTC). If still incomplete at Phase 6.0, the orchestrator/QE waits for fetch completion or aborts.
+Per LM Master Phase 4.5 §4 (CRITICAL — ADOPTED BINDING), **Phase 6 cannot launch** until the OI coverage precondition is satisfied:
+
+**Precondition (HARD BLOCK)**:
+```python
+# Asserted at Phase 6.0 pre-flight; QE returns BLOCK-PENDING-FIX on FAIL.
+required_symbols = ["BTCUSDT", "ETHUSDT", "LINKUSDT", "LTCUSDT", "DOTUSDT"]
+min_is_rows = 1000
+oi_cutoff_ms = int(pd.Timestamp("2025-03-24", tz="UTC").timestamp() * 1000)
+
+covered = 0
+per_symbol = {}
+for sym in required_symbols:
+    oi_path = Path("data/open_interest") / sym / "8h.csv"
+    if not oi_path.exists():
+        per_symbol[sym] = {"status": "MISSING", "is_rows": 0}
+        continue
+    oi_df = pd.read_csv(oi_path)
+    is_rows = (oi_df["open_time"] < oi_cutoff_ms).sum()
+    per_symbol[sym] = {"status": "PRESENT" if is_rows >= min_is_rows else "INSUFFICIENT", "is_rows": is_rows}
+    if is_rows >= min_is_rows:
+        covered += 1
+
+# HARD BLOCK threshold: ≥3/5 symbols with ≥1000 IS rows
+assert covered >= 3, f"OI coverage HARD BLOCK: only {covered}/5 symbols ≥{min_is_rows} IS rows; per_symbol={per_symbol}"
+```
+
+**Rationale (per LM Master §4)**:
+- F-AXIS #1 DUAL GATE evaluation requires ≥2-cohort PROMISING signal AND ≥3-cohort breadth check (Section 4 above). With <3 symbols having OI coverage, the breadth check is structurally undefined.
+- "No silent NaN-feature degradation" — echo of /024 dispatch-defect lesson where silent zero-mask fallback corrupted the regime-conditional sub-model assignment. The Phase 6.0 pre-flight FAIL-FAST is the precondition guardrail.
+- The OI fetch is in-flight at Phase 1 EDA time (background subprocess, started 2026-05-27 ~13:31 UTC). If still incomplete at Phase 6.0, QE returns BLOCK-PENDING-FIX with `oi_coverage_check.csv` listing per-symbol status; QR re-runs fetch and re-dispatches (Single BLOCK-PENDING-FIX rerun allowed per v1 discipline; see Section 12 roll-back).
+
+**NaN regime policy (LM Master §5(a) ADOPTED — skip-month)**:
+- For the 2020-01 → 2020-09 NaN window on BTC/ETH/LINK/LTC (pre-OI archive start), the `add_oi_delta_v1_features` skip-month logic excludes calendar months where the 90-bar z-score is undefined for the symbol from that symbol's per-month training data.
+- Implementation: in `_train_for_month`, when a symbol's training-window slice has > 50% rows with NaN `oi_delta_30_z90`, that symbol is excluded from that month's training fold (similar to how cooldown-affected months are handled).
+- Engineering report Section 7 emits `oi_coverage_check.csv` per-symbol per-fold to make this transparent.
+
+**Deliverable (binding)**: `reports-v1/iteration_v1-025/oi_coverage_check.csv` — emitted in Phase 6.0 pre-flight; included in Section 10.5 deliverables list.
 
 ---
 
@@ -309,15 +413,22 @@ Phase 6 cannot launch until `data/open_interest/{ETH,LINK,LTC,DOT}USDT/8h.csv` e
 | **NEG-clean** | [-0.55, -0.10] | EXCLUDE; LEARNED-NEGATIVE if F-AXIS #1 DUAL GATE PASSES; else INERT-by-importance |
 | **NEG-CAT** | ≤ -0.55 | EXCLUDE; trips multi-seed mandate for /026+ HIGH-RISK |
 
-### F-AXIS #1 — DUAL GATE (rank + family gain share) — PROMISING-clean detector
+### F-AXIS #1 — DUAL GATE (rank + family gain share + BREADTH CHECK) — PROMISING-clean detector
 
-Per LM Master Phase 4.5 §4 strengthening at /023 (now BINDING for all feature-family axes), PROMISING-clean requires BOTH:
-- **rank ≤ 14/43** (top-third in feature_importance ranking) on **≥ 2 cohorts** (of Pool A + Model C / D / E)
-- AND **family gain share ≥ 4.0%** on the same ≥ 2 cohorts (where "family gain share" is the sum of `oi_delta_30_z90`'s importance fraction across its model)
+Per LM Master Phase 4.5 §3 TIGHTENING (ADOPTED), PROMISING-clean now requires **ALL THREE** sub-gates:
 
-Uniform parity at 43 cols = 100% / 43 = **2.33% per feature**. A 4.0% threshold = 1.7× parity. This is the same multiplicative standard used at /023.
+1. **Rank gate**: `rank ≤ 14/43` (top-third in feature_importance ranking) on **≥ 2 cohorts** (of Pool A + Model C / D / E)
+2. **Gain share gate**: `family gain share ≥ 4.0%` on the SAME **≥ 2 cohorts** as the rank gate (where "family gain share" is `oi_delta_30_z90`'s importance fraction within its model)
+3. **NEW Breadth check gate**: `oi_delta_30_z90 rank ≤ 20/43` on **≥ 3 cohorts** (a softer breadth bar that prevents BTC+ETH-only PROMISING while LINK/LTC/DOT silently NaN-degrade)
 
-If F-AXIS #1 DUAL GATE FAILS on all cohorts → INERT-by-importance regardless of F1 outcome. If it PASSES on ≥ 2 cohorts AND F1 NEGATIVE → LEARNED-NEGATIVE sub-classifier (carries forward to OI delta dead-paths catalog if applicable).
+Uniform parity at 43 cols = 100% / 43 = **2.33% per feature**. A 4.0% threshold = 1.7× parity (same multiplicative standard used at /023). The breadth threshold of 20/43 = ~47% percentile is a structural sanity bar — even a NaN-degraded feature should not place above this rank on coverage-degraded symbols.
+
+**Verdict logic at F-AXIS #1**:
+- Sub-gates 1 + 2 + 3 ALL PASS → DUAL GATE PASS (PROMISING-clean conditional on F1 ≥ +0.10)
+- Sub-gates 1 + 2 PASS but breadth check FAILS (rank ≤14 + gain ≥4% on 2 cohorts, but rank ≤20 on only ≤2 cohorts) → **PROMISING-BTC-ETH-ONLY** (new sub-classification; signals OI-fetch coverage issue OR BTC+ETH-specific load-bearing; flagged for /026 cross-correlation investigation)
+- Sub-gates 1 + 2 FAIL on all cohorts → INERT-by-importance regardless of F1 outcome
+- Sub-gates 1 + 2 PASS on ≥ 2 cohorts AND F1 NEGATIVE → LEARNED-NEGATIVE sub-classifier (carries forward to OI delta dead-paths catalog if applicable)
+- Sub-gates 1 + 2 + 3 ALL PASS AND F1 NEGATIVE → LEARNED-NEGATIVE-BREADTH (strongest LN sub-classification — the feature is broadly load-bearing across cohorts AND OOS fails; the rarest and most informative LN outcome)
 
 ### F-AXIS #2 — Trade count
 
@@ -375,32 +486,33 @@ Baseline IS Sharpe = +0.2829. IS-CAT threshold = +0.2829 - 0.30 = -0.0171 (so an
 
 ## Section 5 — Predicted verdict priors
 
-QR initial estimate (informed by /023 LEARNED-NEGATIVE precedent and BTC EDA):
+Post-LM-Master-Phase-4.5 priors (LM Master §2 recommendation ADOPTED):
 
-| Verdict | Prior | Rationale |
-|---|---|---|
-| PROMISING-clean | **18%** | BTC ORACLE Q4 Sharpe-proxy +1.68 is suggestive; OI-funding orthogonality confirmed; but /023 funding produced 5.40% gain share and NEGATIVE OOS — similar fate likely |
-| PROMISING-INERT-FAVORABLE | 8% | Rare — feature ranks high but OOS lift small; would require both F1 ≥+0.10 AND DUAL GATE FAIL |
-| INERT | 25% | F-AXIS #1 DUAL GATE FAIL on ≥3 cohorts (matches v3 OI INERT pattern at iter-v3/123 — closely related primitive class) + F1 in [-0.10, +0.10] |
-| LEARNED-NEGATIVE | **30%** | Most likely per /023 precedent transferring: v1 Pool A learns funding (above parity); could equally learn OI but OOS realization fails. Modal expectation. |
-| NEGATIVE-INERT | 13% | F1 ∈ [-0.55, -0.10] AND DUAL GATE FAIL — sub-modal |
-| NEG-CAT | 4% | OI delta is feature-family, not model-arch; basin-relocation risk lower; very unlikely |
-| AUTO-REJECT (F3 IS-CAT) | 2% | OI delta as single-feature addition unlikely to collapse IS basin |
+| Verdict | QR initial | LM Master | **FINAL (ADOPTED)** | Rationale |
+|---|---|---|---|---|
+| PROMISING-clean | 18% | 22% | **22%** | Q4 ORACLE Sharpe-proxy +1.68 is 2.4× /023's strongest mid-band; depth-3 carves Q4 single-split |
+| PROMISING-INERT-FAVORABLE | 8% | 8% | **8%** | unchanged |
+| INERT | 25% | 22% | **22%** | Q4 depth-3-easy; less likely INERT than /023's funding which required depth-3 directional composition (-3pp) |
+| LEARNED-NEGATIVE | 30% | 30% | **30%** | /023 pattern remains structural prior; OI is sister-primitive class and could repeat the LEARNED-but-OOS-fails pattern (UNCHANGED) |
+| NEGATIVE-INERT | 13% | 12% | **12%** | sub-modal; slight (-1pp) compression vs QR estimate |
+| NEG-CAT | 4% | 4% | **4%** | OI delta is feature-family, not model-arch; basin-relocation risk lower (UNCHANGED) |
+| AUTO-REJECT (F3 IS-CAT) | 2% | 2% | **2%** | OI delta as single-feature addition unlikely to collapse IS basin (UNCHANGED) |
 
-**Modal expectation**: **LEARNED-NEGATIVE 30%** — matches /023 pattern; OI delta is signal-bearing but tail-load-bearing (OI extremes precede liquidations, but LightGBM-at-single-seed averages over the tail).
+**Net shift**: PROMISING tail (PROMISING-clean + PROMISING-INERT-FAVORABLE) = 26% QR → **30% FINAL** (vs /023's 20%, vs /024's ~14%). This is the highest pre-EXPLORATION PROMISING-tail allocation across cycle-3 EXPLORATIONs.
 
-**Tail upweighting per LM Master deference rule** (n=5 confirmation at /024): LM Master is expected to upweight NEGATIVE-band by ≥5pp. After Phase 4.5, this section may revise.
+**Modal expectation**: **LEARNED-NEGATIVE 30% AND PROMISING-clean 22% (joint tail 52%)** — the modal is still LEARNED-NEGATIVE by single-bucket mass but the PROMISING+LN combined mass (52%) is the dominant outcome arc. Either Q4 carves cleanly into OOS (PROMISING) or it carves cleanly into IS but doesn't transfer (LN).
 
-**Predicted F-AXIS #1 outcome**: DUAL GATE PASS on Pool A + LINK (2 cohorts; LINK from /023 had 12/14 rank for funding z30; OI is sister-primitive). DUAL GATE may FAIL on LTC + DOT (smaller cohorts; thinner OI extreme bands).
+**Predicted F-AXIS #1 outcome** (revised post-LM-Master): DUAL GATE PASS on Pool A + LINK + ETH (3 cohorts; ETH added because LM Master breadth check elevated importance of ETH coverage — see §3 above). DUAL GATE may FAIL on LTC + DOT (smaller cohorts; thinner OI extreme bands; OI fetch coverage may also be partial 2020 listings). Breadth-check z90 rank ≤20/43 on ≥3 cohorts is the new structural target: expect Pool A + LINK + ETH all pass z90 rank, with LTC + DOT marginal.
 
 ---
 
 ## Section 6 — Failure modes
 
-### 6.1 OI data unavailable → BLOCK-PENDING-FIX
+### 6.1 OI data unavailable → BLOCK-PENDING-FIX (LM Master §4 HARD BLOCK)
 
-- Pre-Phase-6: if `data/open_interest/{SYM}/8h.csv` missing for any of ETH/LINK/LTC/DOT, QE returns BLOCK-PENDING-FIX with engineering report listing missing symbols. QR re-runs fetch and re-dispatches.
-- **Current status**: fetch in flight as of 2026-05-27 13:31 UTC; ETA ETH/LINK/LTC/DOT by ~13:50-14:30 UTC. Phase 6 launch contingent on fetch completion.
+- **Pre-Phase-6.0 (HARD BLOCK)**: per Section 3.6, if `data/open_interest/{SYM}/8h.csv` row count IS rows < 1000 for any symbol AND fewer than 3/5 symbols have ≥1000 IS rows, QE returns BLOCK-PENDING-FIX with engineering report Section 1 listing per-symbol coverage from `oi_coverage_check.csv`. QR re-runs fetch and re-dispatches (one rerun allowed; see Section 12 roll-back).
+- **NaN regime (2020-01 → 2020-09)**: per skip-month policy (Section 3.6), affected symbols are excluded from those months' training folds. NOT a BLOCK condition.
+- **Current status**: fetch in flight as of 2026-05-27 13:31 UTC; ETA ETH/LINK/LTC/DOT by ~13:50-14:30 UTC. Phase 6 launch contingent on fetch completion AND HARD BLOCK precondition pass.
 
 ### 6.2 OI delta = INERT-by-importance (most likely per /023 LEARNED-NEGATIVE pattern transferring)
 
@@ -527,25 +639,42 @@ Per `feedback_v1_engineering_report_binding.md` (cataloged at /023): the enginee
 - `reports-v1/iteration_v1-025/comparison.csv` (IS + OOS metrics)
 - `reports-v1/iteration_v1-025/in_sample/per_symbol.csv` + `out_of_sample/per_symbol.csv`
 - `reports-v1/iteration_v1-025/in_sample/feature_importance.csv` per model (A_combined, C, D, E)
+- `reports-v1/iteration_v1-025/in_sample/feature_importance_per_fold.csv` — **NEW per LM Master §5(b)**: per-fold (24 walk-forward months × symbol) `oi_delta_30_z90` rank for regime-conditional stability check
 - `reports-v1/iteration_v1-025/in_sample/trades.csv` + `out_of_sample/trades.csv`
+- `reports-v1/iteration_v1-025/oi_coverage_check.csv` — **NEW per LM Master §4**: per-symbol OI cache existence + IS row count + coverage status (emitted in Phase 6.0 pre-flight)
 - `reports-v1/iteration_v1-025/adf_test.csv` — ADF p-value per OI feature per symbol (informational)
 - `reports-v1/iteration_v1-025/ic_matrix.csv` — IC pairs (OI features vs baseline TOP5 + vs funding family)
+- `reports-v1/iteration_v1-025/ic_matrix_oos.csv` — **NEW per LM Master §9 item 4**: OOS-only IC reconfirmation for (oi_delta_30_z90, funding_rate_zscore_30) and (oi_delta_30_z90, mom_macd_hist_12_26_9)
+- `reports-v1/iteration_v1-025/oracle_q4_oos_attribution.csv` — **NEW per LM Master §9 item 5**: OOS trade-roster distribution by `oi_delta_30_z90` quintile (for ORACLE Q4 band reconciliation)
 - `reports-v1/iteration_v1-025/dsr.json` — DSR + PSR + n_eff_per_cell median (informational EXPLORATION-mode)
 - `reports-v1/iteration_v1-025/engineering_report.md`
 
-### 10.6 Pre-flight checks (Phase 6.0)
+### 10.6 Pre-flight checks (Phase 6.0) — HARD BLOCK gates
 
+**HARD BLOCK checks (Phase 6.0 cannot launch if any FAIL)**:
 - `grep -r "from crypto_trade.features_v2" src/crypto_trade/features_v1/` → empty (track isolation)
 - `grep -r "from crypto_trade.features_v3" src/crypto_trade/features_v1/` → empty
 - `assert V1_FEATURE_COLUMNS_PRUNED has 43 unique cols`
 - `assert "oi_delta_30_z90" in V1_FEATURE_COLUMNS_PRUNED`
-- `assert data/open_interest/{BTC,ETH,LINK,LTC,DOT}USDT/8h.csv all exist`
-- Anti-pattern static scan (no `np.zeros` or `np.nan` silent-fill fallback in oi_delta_v1.py)
+- **(NEW per LM Master §4 BINDING)** OI coverage HARD BLOCK: `for sym in {BTC,ETH,LINK,LTC,DOT}USDT: read data/open_interest/sym/8h.csv; count IS rows (open_time < OOS_CUTOFF_MS)`. Emit `oi_coverage_check.csv`. Assert `≥3/5 symbols with ≥1000 IS rows`. If FAIL → BLOCK-PENDING-FIX.
+- Anti-pattern static scan: no `np.zeros` or `np.nan` silent-fill fallback in `oi_delta_v1.py`; the feature loader MUST raise `FileNotFoundError` on missing OI cache (no silent NaN-feature degradation — echo of /024 dispatch-defect lesson)
 - `walk_forward.py:113` regression check: `train_end_ms = test_start_ms - embargo_ms` (not just `test_start_ms`)
 
 ### 10.7 Wall-clock kill switch
 
 - 45 min soft target; 90 min alarm; 2h HARD CAP (engineer kills backtest if exceeded)
+
+### 10.8 Critic Phase 7.5 closeout — explicit priority items (LM Master §9 ADOPTED)
+
+Per LM Master Phase 4.5 §9 (ADOPTED), the Critic Phase 7.5 review checklist for /025 closeout explicitly includes:
+
+1. **Coverage verification (FIRST)**: Open `oi_coverage_check.csv` and verify ETH/LINK/LTC/DOT OI cache existed at Phase 6.0 with ≥1000 IS rows; verify ≥3/5 symbols cleared the HARD BLOCK. **BLOCK if not (post-hoc invalidation of dispatch)**.
+2. **DUAL GATE breadth check**: per-cohort F-AXIS #1 evaluation — confirm `rank ≤14/43 AND gain ≥4.0% on ≥2 cohorts AND rank ≤20/43 on ≥3 cohorts (breadth)`. If breadth fails while sub-gates 1+2 pass → reclassify as PROMISING-BTC-ETH-ONLY.
+3. **Per-fold rank stability**: open feature_importance.csv per fold (24 walk-forward months); compute std-of-rank for `oi_delta_30_z90` across folds. If std > 8 → REGIME-CONDITIONAL importance → PROMISING-FEATURE-MECHANICAL classification (per `feedback_v3_promising_feature_mechanical.md` sister rule); non-compoundable signal source.
+4. **OOS-only IC reconfirmation**: compute `IC(oi_delta_30_z90, funding_rate_zscore_30)` and `IC(oi_delta_30_z90, mom_macd_hist_12_26_9)` on OOS data ONLY (vs IS-only at Phase 1 EDA). If OOS |IC| > 0.5 on any pair → flag as IS/OOS regime drift in OOS feature correlations.
+5. **ORACLE Q4 band attribution reconciliation OOS**: if `oi_delta_30_z90` Q4 band (z90 ∈ [+0.29, +0.95]) is NOT well-represented in the OOS trade roster — i.e., the model emits trades but those trades' OI z90 distribution doesn't cluster in Q4 — then PROMISING → reclassify LEARNED-NEGATIVE (basin relocation: the IS Q4 carve didn't transfer to OOS). Engineering report Section 8 emits the OI z90 distribution per IS/OOS trade-roster.
+
+The Critic verdict at Phase 7.5 explicitly chains all 5 items; if any FAIL → BLOCK-PENDING-FIX or reclassification with verdict downgrade.
 
 ---
 
@@ -586,16 +715,55 @@ Per `feedback_v1_engineering_report_binding.md` (cataloged at /023): the enginee
 - /027 LINK or ETH+gate specialist top-symbol concentration > 30% → NO-MERGE
 - All gates PASS + bundle Pareto-non-dominated → CONFIRMATION-MERGE; BASELINE_V1.md UPDATES
 
-### 11.6 /027 bundle architectural choice points
+### 11.6 /027 CONFIRMATION bundle composition matrix (LM Master §6 ADOPTED)
 
-- **Pool architecture choice**: 5-sym vs cohort-isolation hybrid. Per cycle-3 finding (per-cohort axis SATURATED for ASYMMETRIC_ROTATION cohorts), the bundle uses FULL 5-sym pool (Models A/C/D/E unchanged from baseline; BTC + LTC + DOT in pool; LINK + ETH have specialist replacement via Model C' and Model G respectively).
-- **Specialist dispatch**: LINK signal from Model C' overrides Model C in the bundle; ETH signal from Model G overrides Model A's ETH slice via the regime-gate. The bundle's per-symbol dispatch logic is the focus of /026 pre-CONFIRMATION sanity.
+Per LM Master Phase 4.5 §6 — full bundle-composition matrix by /025 verdict:
 
-### 11.7 Borderline rotation discipline at /025
+| /025 verdict | /027 components | OOS target | Cross-correlation pre-validation |
+|---|---|---|---|
+| **PROMISING-clean (22%)** | 3-component: (1) LINK specialist Model C', (2) ETH+gate specialist Model G, (3) **OI-aware pool** (5-sym A/C/D/E with `oi_delta_30_z90`) | **+1.30 to +1.50** under correlation drag | **MANDATORY**: Pearson(monthly_returns_OI-aware-pool, LINK_specialist) < 0.50 AND Pearson(OI-aware-pool, ETH+gate) < 0.50 |
+| **PROMISING-INERT-FAVORABLE (8%)** | 2-component: LINK + ETH+gate (OI catalog informational, NOT in bundle) | +1.10 to +1.30 | NOT REQUIRED (no 3rd component) |
+| **PROMISING-BTC-ETH-ONLY** (sub-classification per Section 4 above) | 2-component: LINK + ETH+gate (OI documented as coverage-limited, NOT bundled) | +1.10 to +1.30 | NOT REQUIRED |
+| **INERT (22%)** | 2-component: LINK + ETH+gate | +1.10 to +1.30 | NOT REQUIRED |
+| **LEARNED-NEGATIVE (30%)** | 2-component: LINK + ETH+gate (OI catalogued 2nd LEARNED-NEGATIVE non-OHLCV primitive alongside funding) | +1.10 to +1.30 | NOT REQUIRED |
+| **NEGATIVE-INERT (12%)** | 2-component: LINK + ETH+gate | +1.10 to +1.30 | NOT REQUIRED |
+| **NEG-CAT (4%)** | 2-component: LINK + ETH+gate + cycle-3 ≥1σ NEG count → multi-seed mandate trips for /026 if HIGH-RISK | +1.10 to +1.30 | NOT REQUIRED |
+| **AUTO-REJECT F3 IS-CAT (2%)** | 2-component: LINK + ETH+gate | +1.10 to +1.30 | NOT REQUIRED |
+
+**Bundle architecture (cross-verdict invariants)**:
+- Pool: 5-sym (Models A/C/D/E unchanged from baseline; BTC + LTC + DOT in pool always)
+- Specialist dispatch: LINK signal from Model C' overrides Model C; ETH signal from Model G overrides Model A's ETH slice via regime-gate
+- Multi-seed config: ENSEMBLE_SIZE=10, --seeds 5 (5 inner × 5 outer = 25 paths/cell), --n-trials 35
+- /027 wall-clock: 3-component ~9-12h; 2-component ~6-8h
+
+**Cross-correlation pre-validation gate (PROMISING-clean only)**:
+- If either Pearson < 0.50 condition FAILS → OI-aware pool stays in the bundle BUT the /027 brief Section 7 (predictions) records the correlation drag as a quantitative discount on the +1.30 to +1.50 target
+- If BOTH pass → the 3-component target stands at +1.30 to +1.50
+- The pre-validation runs in /026 (per Section 11.7 below); /027 commits to bundle composition AFTER /026 cross-corr check completes
+
+### 11.7 /026 staging matrix (LM Master §8 ADOPTED)
+
+Per LM Master Phase 4.5 §8 — full /026 verdict-conditional staging:
+
+| /025 verdict | /026 axis | /026 deliverable |
+|---|---|---|
+| **PROMISING-clean (22%)** | **Pre-CONFIRMATION sanity** (cross-correlation pre-validation between OI-aware pool, LINK specialist, ETH+gate specialist) | `reports-v1/iteration_v1-026/cross_corr_validation.csv` — Pearson(monthly_returns) pairwise across the 3 components; methodology pre-CONFIRMATION sanity in same iteration |
+| **PROMISING-INERT-FAVORABLE (8%)** | OI momentum composed feature (Category-2 LR-PF; algebraic identity; e.g., `oi_delta_30_z90 × sign(oi_delta_30_z90.lag1 - 0)` to test mean-reversion vs continuation) | Sharpe-Δ primary falsifier per `feedback_v3_lr_pf_methodology.md`; importance ≥30 threshold per `feedback_v3_engineered_feature_pivot.md`; **NOT** stacked with /025's `oi_delta_30_z90` (SAME-FAMILY rule) |
+| **INERT (22%)** | Methodology pre-CONFIRMATION sanity; no new EXPLORATION axis; proceed to /027 | Methodology smoke-test on /027 dispatch infrastructure |
+| **LEARNED-NEGATIVE (30%)** | Same as INERT (methodology pre-CONFIRMATION sanity); OI cataloged as 2nd LEARNED-NEGATIVE non-OHLCV primitive | Dead-paths catalog entry `feedback_v1_oi_delta_learned_negative.md` |
+| **NEGATIVE-INERT (12%)** | Same as INERT | (same as INERT) |
+| **NEG-CAT (4%)** | Methodology only; cycle-3 ≥1σ NEG count reaches 4 → mandatory multi-seed for future HIGH-RISK declarations | Multi-seed mandate cataloged as feedback rule update |
+| **AUTO-REJECT F3 IS-CAT (2%)** | Methodology only; AUTO-REJECT cataloged | (same as INERT) |
+
+**Cross-/026-verdict invariant**: /026 NEVER opens a new EXPLORATION axis in the feature-family rotation (which is locked-out at /026 by rotation discipline; see Section 11.8 below). /026 is exclusively pre-CONFIRMATION sanity OR composed-feature sanity OR methodology sanity.
+
+**Net effect**: in all 7 verdicts above, /026 is a "narrow" iteration — small scope, fast wall-clock (≤2h cadence cap), single deliverable. The cycle-3 ledger advances /025 EXPLORATION → /026 narrow → /027 CONFIRMATION cleanly.
+
+### 11.8 Borderline rotation discipline at /025 (preserved from prior Section 11.7)
 
 - Per Section 0.6: family `feature-family` REPEAT (after /023 funding). Critic §11.7 permission applies. /024 Critic Path Forward #1 explicitly endorsed this. No rotation violation.
 - For /026 (if /025 PROMISING/INERT/LN/NEG-CAT): the prior 5 going into /026 = {/021 methodology, /022 cohort-LTC, /023 feature-family, /024 model-arch, /025 feature-family}. /026 rotation: 2 of 5 prior are `feature-family` → /026 MUST NOT be `feature-family` (rotation discipline kicks in).
-- /026 candidates: `labeling` (meta-labeling — /023 NEGATIVE PATH C precedent in v3), `risk-primitive` (per-cohort drawdown brake — STATEFUL deadlock proof mandatory), `universe` (extended pool), `model-arch` (different from regime-conditional — e.g., XGBoost head-to-head per /017's mandate). The /026 axis is decided at /025 closeout.
+- Per Section 11.7 above: /026 is narrow (pre-CONFIRMATION sanity OR composed-feature OR methodology) — NOT a new feature-family axis. Rotation discipline satisfied.
 
 ---
 
@@ -623,7 +791,7 @@ Pre-Phase-6 self-check (QR own verification):
 5. **/027 CONFIRMATION pre-staged**: Section 11 covers all 5 verdict outcomes.
 6. **Engineering report BINDING**: Section 10.4 documents requirements.
 7. **Anti-cheating: walk_forward.py:113 unchanged** (`train_end_ms = test_start_ms - embargo_ms`); BASELINE_V1.md unchanged; OOS_CUTOFF_DATE = 2025-03-24 unchanged.
-8. **Section 3 LM Master response** (Section 3.4) RESERVED until Phase 4.5 advisory completes. Phase 5.5 gate verifies this section is populated before Phase 6.0 dispatch.
+8. **Section 3 LM Master response (Section 3.4)**: **POPULATED 2026-05-27** post-Phase-4.5 advisory. 9/9 recommendations ADOPTED (priors recalibrated to 22/8/22/30/12/4/2; F-AXIS #1 DUAL GATE tightened with breadth check; HARD BLOCK on OI fetch ≥3/5 symbols ≥1000 IS rows; skip-month NaN policy; per-fold rank emission; 3-component vs 2-component bundle matrix; /026 staging matrix; 5 Critic Phase 7.5 priority items). Phase 5.5 gate verifies Section 3.4 is populated before Phase 6.0 dispatch — **VERIFIED**.
 
 ---
 
