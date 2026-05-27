@@ -60,16 +60,18 @@ Cycle-3 EXPLORATION position: **#9 of 10**. Remaining slots: /024 + /025 + (opti
 
 ### 0.7 Wall-clock estimate
 
-Each sub-model is trained on partition of the cohort's training rows:
+Each sub-model is trained on partition of the cohort's training rows (post-LM Master §1 DOT excluded from regime conditioning):
 - Pool A extreme partition: ~14% × ~5727 × 2 syms = ~1573 IS bars
 - Pool A normal partition: ~86% × ~5727 × 2 syms = ~9582 IS bars
-- LINK/LTC/DOT extreme partition: ~709-802 / ~5025-5687 bars
+- LINK/LTC extreme partition: ~709-802 IS bars; normal: ~4853-4855 IS bars
+- DOT: BASELINE Model E (no regime conditioning) — ~4975 IS bars
 
-Per-cohort dispatch = 2 × ENSEMBLE_SIZE=3 sub-models. Walk-forward window = same 24m as baseline. Trade-stream merge is post-hoc (negligible compute).
+Per-cohort dispatch (Pool A, LINK, LTC) = 2 × ENSEMBLE_SIZE=3 sub-models. DOT dispatch = 1 × ENSEMBLE_SIZE=3 (baseline). Walk-forward window = same 24m as baseline.
 
-- Pool A: 2× of baseline Model A (Pool A is the slowest cohort, ~2.5h at full ENSEMBLE / 50 trials) ≈ 30 min at ENSEMBLE=3 + n_trials=18 + 2 sub-models = ~30-40 min.
-- LINK + LTC + DOT: each ~10-15 min at 2× sub-models = ~30-45 min total.
-- **Estimate: 60-80 min** (target above 60-min ideal but acceptable for first multi-model-arch iteration).
+- Pool A: 2× sub-models at ENSEMBLE=3 + n_trials=18 = ~30-40 min.
+- LINK + LTC: each ~10-15 min at 2× sub-models = ~20-30 min total.
+- DOT: ~5-8 min (baseline, single sub-model).
+- **Estimate: 55-78 min** (slight reduction vs original 60-80 min estimate from removing DOT's 2nd sub-model).
 - HARD CAP **2h** (cycle-3 EXPLORATION discipline `4cb8972`).
 
 ---
@@ -239,11 +241,23 @@ Regime gate is STATELESS (no signal-emission state propagation; z30 at bar t is 
 
 ### 3.1 NEW source module: `src/crypto_trade/strategies/regime_gate_v1.py`
 
+**Architecture (post-LM Master §1 + §4(a) ADOPTED)**: regime-conditional dispatch applies to **Pool A + LINK + LTC ONLY** (3 cohorts × 2 sub-models = 6 sub-models). **Model E (DOT) remains on baseline single-model dispatch** (1 sub-model). **Total = 7 sub-models** (not 8).
+
+Routing happens via a `RegimeRoutedStrategy` **wrapper at signal-time** (NOT in-strategy callback at prediction time). Per LM Master §4(a), this prevents look-ahead conflation between training-row partition and inference-routing.
+
 Implements:
 - `RegimeGateConfig(threshold=1.5, z30_column="funding_rate_zscore_30", enabled=True)` — frozen dataclass; mirror of `BtcTrendFilterConfig` structural pattern.
-- `route_trades_by_regime(trades_extreme, trades_normal, master_df, config)` — post-hoc trade-stream router. Given two trade lists (from extreme sub-model + normal sub-model) and a master kline DF (for z30 lookup at each trade's open_time), returns the routed trade list: for each trade, look up z30 at its open_time, choose the trade from the matched sub-model's roster. STATELESS (numpy boolean mask; no persistent state).
+- `class RegimeRoutedStrategy`: composes two `LightGbmStrategy` sub-instances (`extreme_strategy`, `normal_strategy`) + `RegimeGateConfig`. Implements the `Strategy` protocol. `get_signal(symbol, open_time)` looks up past-only `funding_rate_zscore_30` at `open_time` (parquet column already `.shift(1)` past-only) and dispatches to the regime-matched sub-strategy. STATELESS wrapper; no persistent state outside the wrapped sub-strategies' own state.
 - `evaluate_regime_at_signal(z30_value, config)` — single-signal helper returning regime label (live-engine parity).
-- `RegimeGateStats` — diagnostic dataclass: n_extreme_fired, n_normal_fired, n_routed, fire-rate.
+- `RegimeGateStats` — diagnostic dataclass: n_extreme_fired, n_normal_fired, n_routed, fire-rate (used by engineering report only; NOT trade-routing).
+
+**No `route_trades_by_regime` post-hoc helper** (early design from prior brief version). Routing is wrapper-at-signal-time exclusively. Per LM Master §4(a) the wrapper architecture is the ONLY correct implementation; conflating the training callback with inference routing is the look-ahead failure mode.
+
+**Dispatch in `run_baseline_v1.py:V1_ITER024`**:
+- Pool A: train 2 `LightGbmStrategy` instances (extreme `data_filter`, normal `data_filter`) → wrap in `RegimeRoutedStrategy`.
+- LINK: same.
+- LTC: same.
+- DOT: train 1 `LightGbmStrategy` instance with NO `data_filter` → baseline Model E unchanged.
 
 **Track isolation**: ZERO imports from `crypto_trade.features_v2` or `crypto_trade.features_v3`. Module lives under `strategies/` (not `features_v1/`).
 
@@ -283,20 +297,95 @@ The callback is also applied at inference time inside `get_signal()` to enforce 
 
 ### 3.4 LM Master Phase 4.5 Responses
 
-**LM Master Phase 4.5 has NOT YET been dispatched for /024**. Once dispatched, this section is updated with QR responses per Phase 4.5 protocol. Brief Section 3.4 below RESERVED for LM Master responses; the brief commits at Phase 5 close with this section noting "LM Master Phase 4.5 PENDING — Section 3.4 will be populated post-advisory at brief revision commit".
+LM Master Phase 4.5 advisory committed at `briefs-v1/iteration_v1-024/lgbm_advisor.md`. Seven recommendation blocks; QR responses below — **all ADOPTED** (no MODIFIED, no REJECTED).
 
-Convergent priors carried from /023 LM Master advisory (Phase 7.4 §4 Option B):
-- LM Master /023 recommended regime-conditional architecture as PRIMARY for /024.
-- LM Master /023 §4 mandated DUAL GATE strengthening at /023; equivalent mandate at /024 likely on per-sub-model gain-share check (each sub-model's funding-feature importance × regime-matched-trade rate).
-- LM Master /023 §5 tightened n_eff band to [5, 10] at 40-col profile; per-sub-model n_eff is critical given THIN extreme partition (Pool A extreme = ~14% of baseline rows).
+#### §1 — DOT MITIGATION MANDATORY (drop DOT from regime-conditional dispatch)
 
-QR EXPECTS LM Master to:
-1. Raise INERT mass to 50-55% (LEARNED-NEGATIVE / basin-relocation lessons from /023 transferred).
-2. Tighten extreme sub-model importance gate (rank ≤ 14/42 on ≥ 2 cohorts is the /023 DUAL GATE; for /024 may add per-cohort sub-model gain-share floor).
-3. Recommend either ROUTING-FIRE-RATE BAND (e.g. extreme sub-model fires on 10-18% of bars × cohort) OR per-cohort sub-model trade-count floor (extreme sub-model emits ≥3 trades/month IS to avoid model degeneracy at single-seed).
-4. Provide its own verdict-class priors (modal INERT 45-55%; PROMISING-clean 12-15%; PROMISING-INERT-FAV 6-10%; NEG clean 15-20%; NEG-CAT 5-10%; PROMISING-METHODOLOGY 2-5%).
+**LM Master**: DOT extreme partition = 8 IS trades (3 shorts). Per-cell n_eff under walk-forward × 24 monthly cells = 0.33 trades — DEGENERATE. Direction reversal (longs +0.64% / shorts −1.70%) is statistically indistinguishable from noise at n=3 shorts. Sub-model will lock onto whichever direction first month's basin happens to favor and propagate across OOS.
 
-This section will be UPDATED at brief revision commit post-Phase 4.5.
+**QR response**: **ADOPTED**. DOT stays on baseline single-model dispatch (Model E unchanged). Regime-conditional architecture covers Pool A + LINK + LTC ONLY = **7 sub-models** (Pool A × 2 + LINK × 2 + LTC × 2 + DOT × 1, not 8). Structural mitigation — preserves the 3 cohorts with clean direction sign-flip evidence (Section 2.2: Pool A +8.56pp short EXTREME; LINK +51.94pp short EXTREME; LTC +18.10pp short EXTREME) and removes the DOT outlier (extreme longs +0.22% / shorts −5.09% reversed direction, per Section 2.5 already flagged Mode E). LM Master's REJECTED alternative (pooling DOT-extreme bars into LINK/LTC extreme) also rejected here for cohort-isolation violation.
+
+**Downstream propagation**:
+- Section 3.1 updated: RegimeRoutedStrategy wraps Pool A + LINK + LTC sub-models; DOT uses Model E baseline unchanged.
+- Section 4.2 F-AXIS-MECHANISM #1 updated: 7 sub-models (`Model_A_extreme`, `Model_A_normal`, `Model_C_extreme`, `Model_C_normal`, `Model_D_extreme`, `Model_D_normal`, `Model_E_baseline`); `per_cohort_per_regime_breakdown.csv` = 7 rows.
+- Section 6.5 (Mode E) updated: Mode E REMOVED as failure mode (DOT no longer in regime conditioning).
+- Section 10.2 dispatch updated: 3 cohorts × 2 sub-models + 1 cohort × 1 sub-model = 7 LightGBM sub-models trained.
+
+#### §2 — Recalibrated verdict-class priors 12/7/48/20/10/3
+
+**LM Master**: PROMISING 12% / PROMISING-INERT-FAV 7% / **INERT 48% (MODAL)** / NEG clean 20% / NEG-CAT 10% / PROMISING-METHODOLOGY 3%. Rationale: modal INERT shifts 42→48% (2× sub-models compound basin-relocation surface at single-seed n_trials=18). NEG-CAT slightly compressed 12→10% (averaging effect across 2 sub-models reduces single-axis tail).
+
+**QR response**: **ADOPTED** (>5pp shift in modal INERT triggers `feedback_iteration_quality.md` deference rule; QR adopts LM Master priors). Section 5 below updated to LM Master priors.
+
+#### §3 — F-AXIS-MECHANISM strengthening (5 rows, not 4)
+
+**LM Master**: 5 F-AXIS-MECHANISM rows:
+- **#1 Dispatch**: 7 sub-models (post-DOT-mitigation). Engineering report MUST emit `per_cohort_per_regime_breakdown.csv` with 7 rows.
+- **#2 Trade-count floor** (NEW LOAD-BEARING): per-cohort EXTREME sub-model emits ≥ **5 IS trades AND ≥ 3 OOS trades**. Otherwise sub-model is degenerate. DOT excluded.
+- **#3 Regime-gate fire-rate** (TIGHTEN): per-cohort IS [10%, 18%] AND OOS [8%, 22%] (was IS [8%, 25%] / OOS [5%, 30%]). Tightened because /023 EDA Section 2.3 persistence 0.15-0.18 bounds fire rate structurally — no Optuna-knob moves it.
+- **#4 n_eff_per_cell** (EXTREME): [2, 8] (was [3, 9]). Lower bound 2 not 3 — Pool A ext 66 bars/month × 5×5 CV = 13/fold; LINK/LTC ext even tighter.
+- **#5 Gain-share recurrence** (NEW LOAD-BEARING): per-sub-model funding-z30 + z90 family gain share reported. **Extreme sub-model's funding gain share MUST EXCEED normal sub-model's per cohort** — if not, partition is not specializing (Mode A INERT diagnostic strengthened, this is the LOAD-BEARING /023 lesson transferred).
+
+**QR response**: **ADOPTED**. Section 4.2 below updated: 5 F-AXIS-MECHANISM rows (was 4); gain-share recurrence is the load-bearing #5.
+
+#### §4 — Implementation risks (a)+(b)+(c)
+
+**LM Master**:
+- (a) **Look-ahead in regime gate**: USE `RegimeRoutedStrategy` wrapper at signal-time, NOT in-strategy callback at prediction time. Conflating training-row partition (callback in `_train_for_month()`) with inference-routing (wrapper at `get_signal()`) risks wrapper firing on bar t with z30(t) that includes bar t's own funding-rate.
+- (b) **Label-mixing**: extreme sub-model's `binary_logloss` will run 5-15% higher than normal sub-model's due to skewed label distribution at barriers — may confuse EDA-band predictor; advise tolerance.
+- (c) **Sub-model month-skipping under thin partition**: pre-commit policy — if extreme sub-model skip-month, route ALL of that month's bars (both regimes) through normal sub-model.
+
+**QR response**: **ADOPTED (all 3)**.
+- Risk (a) propagated to Section 3.1 (RegimeRoutedStrategy wrapper at signal-time confirmed) and Section 10.1 Phase 6.0 pre-flight (Critic static scan must verify wrapper uses past-only z30 via `.shift(1)` parquet column, not in-tick z30(t)).
+- Risk (b) propagated to Section 10.3 (binary_logloss tolerance band noted; do not flag 5-15% higher as anomaly).
+- Risk (c) propagated to Section 10.3 below as NEW skip-month routing policy: extreme sub-model skip-month → route ALL bars in that month through normal sub-model for that cohort. STATELESS routing preserved.
+
+#### §5 — /027 bundle target +1.30 to +1.55; cross-correlation pre-validation MANDATORY
+
+**LM Master**: 3-component bundle composition:
+- Pool baseline OOS +0.66
+- LINK specialist /018 +0.50 estimate
+- ETH+gate /019 +0.30 estimate
+- Regime-conditional /024 **+0.15 estimate** (modest; partition mechanism shared across cohorts → correlated with LINK funding-extreme exposure)
+
+Nominal Σ = +1.61 OOS Sharpe. Realistic with correlation drag (ρ ≈ 0.45 LINK × regime-conditional both ride funding-z30 extreme): **+1.30 to +1.55** (previously /027 staging matrix had +1.30-1.60 nominal). **Cross-correlation pre-validation MANDATORY at /027**: Pearson(monthly_returns_regime_conditional, monthly_returns_LINK_specialist) **< 0.50**; else regime-conditional alpha is largely redundant.
+
+**QR response**: **ADOPTED**. Section 11.6 below updated to +1.30 to +1.55 (tighter ceiling than +1.30-1.60) with mandatory cross-correlation pre-validation gate.
+
+#### §7 — /025 verdict-conditional staging matrix REFINEMENT
+
+**LM Master**:
+- **PROMISING (12%)** → /025 = /027 prep + `cross_correlation_check_alpha_components.py` (LINK × ETH+gate × regime-conditional monthly returns Pearson/Spearman).
+- **PROMISING-INERT-FAV (7%)** → /025 = **OI delta family** (NEW non-OHLCV per cycle-7 v3 carve-out): `oi_delta_30 = (open_interest_t − open_interest_t-30) / open_interest_t-30` z-scored on 90-bar window. Importance target: rank ≤14/43 on ≥2 cohorts + gain share ≥4.0%.
+- **INERT (48% MODAL)** → /025 = **OI delta family** (PRIMARY) — NOT per-cohort drawdown brake (STATEFUL deadlock risk per iter-v3/054; per-cohort dampening primitives CLOSED in v3 transfer prior). Drawdown brake demoted.
+- **NEGATIVE clean (20%)** → /025 = OI delta family at single-seed.
+- **NEGATIVE-CATASTROPHIC (10%)** → 3rd cycle-3 >1σ HIGH-RISK NEG-CAT trips mandatory multi-seed at /025. /027 reverts to 2-component (pool + LINK + ETH+gate); regime-conditional CLOSED for v1.
+
+**QR response**: **ADOPTED**. Section 11.7 below updated. Key change vs original Section 11: under INERT (modal 48%), /025 pivots to **OI delta family (NEW non-OHLCV feature family)** NOT per-cohort drawdown brake. Drawdown brake demoted to /026 sanity slot or beyond. Rationale: v3 transfer prior (iter-v3/054 STATEFUL deadlock + iter-v3/020 per-cohort dampening CLOSED) shows drawdown brake at single-seed is high deadlock risk + low expected lift.
+
+#### §Closing — Critic Phase 7.5 watch items
+
+**LM Master** flags 4 priority items for Critic Phase 7.5:
+1. DOT mitigation present in implementation (7 sub-models not 8)
+2. RegimeRoutedStrategy wrapper at signal-time (no look-ahead)
+3. Gain-share recurrence check across regimes per cohort (F-AXIS #5)
+4. Cross-correlation analysis present for /027 bundle pre-validation
+
+**QR response**: **ADOPTED — Critic Phase 7.5 watch list pre-committed**. Section 10.4 engineering report BINDING contract extended below: engineering_report.md MUST document items 1-3 (item 4 deferred to /027); Critic Phase 7.5 will verify per-cohort × per-regime breakdown CSV has 7 rows (not 8), wrapper-not-callback architecture for inference, and F-AXIS #5 gain-share recurrence column populated per cohort.
+
+#### Summary table — LM Master recommendation × QR disposition
+
+| # | LM Master recommendation | QR disposition | Brief section updated |
+|---|---|---|---|
+| §1 | DOT mitigation: 7 sub-models | ADOPTED | 3.1, 4.2, 5, 6.5, 10.2, 10.4 |
+| §2 | Priors 12/7/48/20/10/3 | ADOPTED | 5 |
+| §3 | F-AXIS strengthening (5 rows; #5 gain-share NEW) | ADOPTED | 4.2 |
+| §4(a) | Wrapper at signal-time, not callback | ADOPTED | 3.1, 10.1 |
+| §4(b) | binary_logloss tolerance | ADOPTED | 10.3 |
+| §4(c) | Skip-month routing policy | ADOPTED | 10.3 |
+| §5 | /027 target +1.30 to +1.55; cross-corr ρ<0.50 | ADOPTED | 11.6 |
+| §7 | /025 staging: PROMISING-INERT-FAV/INERT/NEG → OI delta | ADOPTED | 11.7 |
+| Closing | Critic 7.5 watch (4 items) | ADOPTED | 10.4 |
 
 ---
 
@@ -312,27 +401,36 @@ This section will be UPDATED at brief revision commit post-Phase 4.5.
 | F3 IS Sharpe Δ vs anchor +0.2829 | ≥ +0.10 | IS-positive; sign-consistent if F1 also positive |
 | F3 IS Sharpe Δ | ≤ -0.30 | IS-catastrophic; reject regardless of OOS |
 
-### 4.2 F-AXIS-MECHANISM falsifiers (mechanism integrity)
+### 4.2 F-AXIS-MECHANISM falsifiers (mechanism integrity — 5 rows post-LM Master §3 ADOPTED)
 
 **F-AXIS-MECHANISM #1 — Dispatch correctness (binary)** (LOAD-BEARING):
-- Each cohort produces 2 sub-model trade rosters labeled `extreme_<cohort>` and `normal_<cohort>` in `trades.csv` (NEW `model_name` column distinguishes).
-- 8 unique `model_name` values in `trades.csv`: `Model_A_extreme`, `Model_A_normal`, `Model_C_extreme`, `Model_C_normal`, `Model_D_extreme`, `Model_D_normal`, `Model_E_extreme`, `Model_E_normal`.
-- Engineering report MUST emit `per_cohort_per_regime_breakdown.csv` (8 rows × 12 columns: trades, wins, win_rate, net_pnl_pct, weighted_pnl, mean_z30_at_open, max_z30, min_z30, regime, cohort, train_bars, oos_trades).
+- Pool A + LINK + LTC each produce 2 sub-model trade rosters labeled `<cohort>_extreme` and `<cohort>_normal`; DOT produces 1 baseline roster.
+- **7 unique `model_name` values** in `trades.csv` (post-DOT-mitigation per LM Master §1): `Model_A_extreme`, `Model_A_normal`, `Model_C_extreme`, `Model_C_normal`, `Model_D_extreme`, `Model_D_normal`, `Model_E_baseline`.
+- Engineering report MUST emit `per_cohort_per_regime_breakdown.csv` (**7 rows** × 14 columns: cohort, regime, train_bars, trades_is, trades_oos, win_rate_is, win_rate_oos, net_pnl_is, net_pnl_oos, sharpe_is, sharpe_oos, mean_z30_at_open, funding_z_family_gain_share, n_eff_per_cell).
 
-**F-AXIS-MECHANISM #2 — Trade count bands**:
-- IS trade count ∈ [400, 850] (baseline 621 ± 35% — wider band than /023's [500, 750] because regime partition reshapes trade emission rate).
+**F-AXIS-MECHANISM #2 — Trade-count bands** (LM Master §3 EXTREME floor NEW LOAD-BEARING):
+- IS trade count ∈ [400, 850] (baseline 621 ± 35%).
 - OOS trade count ∈ [120, 280] (baseline 189 ± 30%).
-- OUTSIDE either band → trade-rate destabilization; flag for diary inspection.
+- **NEW LOAD-BEARING per LM Master §3**: per-cohort EXTREME sub-model (Pool A, LINK, LTC) emits **≥ 5 IS trades AND ≥ 3 OOS trades**. Otherwise extreme sub-model is degenerate; downgrade verdict to Row 9 (n_eff degenerate).
+- DOT excluded from EXTREME floor (DOT uses single Model E baseline).
+- OUTSIDE either portfolio-level band → trade-rate destabilization; flag for diary inspection.
 
-**F-AXIS-MECHANISM #3 — Regime gate fire rate** (per-cohort):
-- Per-cohort extreme sub-model fire rate (its share of cohort total IS trades) ∈ [8%, 25%] — baseline EDA shows 9-16% across cohorts.
-- Per-cohort extreme sub-model fire rate OOS ∈ [5%, 30%] — wider OOS band per /022 + /023 precedent that OOS fire rates can drift.
-- Falsifier: if any cohort's extreme fire rate IS or OOS falls outside the band → regime gate not engaging; downgrade F-AXIS #1.
+**F-AXIS-MECHANISM #3 — Regime gate fire rate** (per-cohort; TIGHTENED per LM Master §3):
+- Per-cohort extreme sub-model fire rate (its share of cohort total IS trades) ∈ **[10%, 18%]** IS (TIGHTENED from [8%, 25%]).
+- Per-cohort extreme sub-model fire rate OOS ∈ **[8%, 22%]** (TIGHTENED from [5%, 30%]).
+- Rationale: /023 EDA Section 2.3 persistence flip-rate 0.15-0.18 bounds fire rate structurally; no Optuna-knob moves it.
+- Falsifier: if any of {Pool A, LINK, LTC} extreme fire rate IS or OOS falls outside tightened band → regime gate not engaging; downgrade F-AXIS #1.
 
-**F-AXIS-MECHANISM #4 — Per-cohort sub-model n_eff_per_cell** (per /008 methodology substrate):
-- Per-cohort EXTREME sub-model n_eff_per_cell ∈ **[3, 9]** (thin partition expected; THIN floor at 3 reflects 700-1573 bars vs baseline 5000-11000).
-- Per-cohort NORMAL sub-model n_eff_per_cell ∈ [5, 10] (matches /023).
-- Falsifier: if extreme sub-model n_eff_per_cell < 3 → label-collapse; if ≥ 12 → over-dispersed.
+**F-AXIS-MECHANISM #4 — Per-cohort sub-model n_eff_per_cell** (TIGHTENED EXTREME per LM Master §3):
+- Per-cohort EXTREME sub-model n_eff_per_cell ∈ **[2, 8]** (LOWER bound 2 not 3; Pool A ext 66 bars/month × 5×5 CV = 13/fold; LINK/LTC ext even tighter). UPPER bound 8 not 9.
+- Per-cohort NORMAL sub-model n_eff_per_cell ∈ [5, 10] (unchanged).
+- Falsifier: if extreme sub-model n_eff_per_cell < 2 → label-collapse; if ≥ 12 → over-dispersed.
+
+**F-AXIS-MECHANISM #5 — Gain-share recurrence check (NEW LOAD-BEARING — LM Master §3)**:
+- Engineering report MUST emit per-sub-model `funding_z_family_gain_share` (sum of LightGBM `gain` importance across `funding_rate_zscore_30` + `funding_rate_zscore_90` columns, normalized as % of total feature-importance gain).
+- **Recurrence requirement**: for each of {Pool A, LINK, LTC}, **EXTREME sub-model's funding gain share MUST EXCEED NORMAL sub-model's funding gain share**.
+- Mechanism: if extreme sub-model does NOT lean on funding-z family more than normal sub-model, the partition is not specializing; LightGBM treats partition as noise. This is the Mode A INERT diagnostic strengthened by the /023 LEARNED-NEGATIVE evidence (portfolio funding gain share 5.40% at pool LEARNED) — partition's success requires AMPLIFIED reliance in extreme sub-model.
+- Falsifier: if EXTREME funding gain share ≤ NORMAL for ≥ 2 of {Pool A, LINK, LTC} → partition non-specializing; downgrade F-AXIS #1 to Mode A INERT (Row 4) regardless of OOS Sharpe Δ.
 
 ### 4.3 Composite verdict matrix (Section 8 row format)
 
@@ -342,23 +440,28 @@ See Section 8.
 
 ## Section 5 — Predicted Verdict Priors
 
-### 5.1 Verdict priors (QR initial; awaiting LM Master Phase 4.5 RECALIBRATION)
+### 5.1 Verdict priors — RECALIBRATED to LM Master Phase 4.5 (LM Master §2 ADOPTED)
 
-| Verdict class | QR initial (pre-LM) | Rationale |
-|---|---|---|
-| **PROMISING (F1 Δ ≥ +0.10 + F-AXIS #1 PROMISING)** | **15%** | ORACLE +143pp ceiling suggests room; LEARNED-NEGATIVE at /023 means signal IS present but mis-extracted at pool — regime partition theoretically fixes this; but basin-relocation dissolution + thin extreme partition + DOT outlier = downweighted from naive +30% |
-| **PROMISING-INERT-FAVORABLE (F1 Δ ≥ +0.10 + F-AXIS #1 not clean)** | **8%** | Lift via Optuna basin lottery on partition; less likely than feature-family /023 because 2 sub-models doubles the lottery surface but also doubles parameter-space cost |
-| **INERT (F1 Δ ∈ [-0.30, +0.10) + F-AXIS #1 INERT)** | **42% (MODAL)** | Most likely: regime partition fragments training data, both sub-models under-train, predictions converge to pool baseline behavior |
-| **NEGATIVE clean (F1 Δ ∈ [-0.55, -0.30))** | **18%** | Thin extreme partition (DOT 8 trades; LINK/LTC 17 trades) → extreme sub-model overfits; OOS routes into the overfit zone |
-| **NEGATIVE-CATASTROPHIC (F1 Δ ≤ -0.55)** | **12%** | Higher than /023 (8%) because multi-model architecture is FIRST in v1 — basin-relocation across 2 sub-models is multiplicative; DOT outlier (3 trades short, contrary direction) could anchor sub-model to wrong direction |
-| **PROMISING-METHODOLOGY (substrate finding)** | **5%** | Architectural axis may surface methodology insights (e.g. partition-stability diagnostic) without compoundable edge |
+| Verdict class | QR initial | LM Master | **ADOPTED (LM Master)** | Rationale |
+|---|---|---|---|---|
+| **PROMISING (F1 Δ ≥ +0.10 + F-AXIS #1 PROMISING + F-AXIS #5 gain-share recurrence)** | 15% | 12% | **12%** | Signal IS present (/023 LEARNED) and partition mechanism is sound; but 2× sub-models compound basin relocation at single-seed n_trials=18 — downweighted from QR-naive 15% |
+| **PROMISING-INERT-FAVORABLE (F1 Δ ≥ +0.10 + F-AXIS #1 not clean)** | 8% | 7% | **7%** | 2× sub-model parameter-space doubles lottery surface AND doubles dilution cost; net wash compared to QR's 8% |
+| **INERT (F1 Δ ∈ [-0.30, +0.10) + F-AXIS #1 INERT)** | 42% | **48% (MODAL)** | **48% (MODAL)** | Multi-model failure mode: both sub-models at single-seed n_trials=18 land in pool-baseline-like basins (thin extreme subsets at MID Optuna budget are under-fit twin of high-budget INERT). +6pp toward modal vs QR initial |
+| **NEGATIVE clean (F1 Δ ∈ [-0.55, -0.30))** | 18% | 20% | **20%** | DOT mitigation already adopted (§1) reduces DOT-outlier risk but doesn't eliminate it; LTC normal-regime counter-direction (NORMAL D shorts −4.01% sum) means normal sub-model may underperform pool |
+| **NEGATIVE-CATASTROPHIC (F1 Δ ≤ -0.55)** | 12% | 10% | **10%** | 2× sub-models means errors can OFFSET (averaging effect across cohorts); reduces CAT tail vs single-axis catastrophes /020/022 — compressed 2pp from QR initial |
+| **PROMISING-METHODOLOGY (substrate finding)** | 5% | 3% | **3%** | model-arch axis NOT primarily methodology; compressed 2pp from QR initial |
 
-**Total**: 100%. **Modal: INERT at 42%** (LM Master may shift toward NEG +5pp per /023 LEARNED-NEGATIVE precedent transferring; PROMISING tail compressed to ~23% combined).
+**Total**: 100%. **Modal: INERT at 48%** (LM Master shift from QR's 42% by +6pp triggers `feedback_iteration_quality.md` deference rule — QR adopts LM Master priors).
 
-**Mass-shifting catalysts (post-LM Master Phase 4.5)**:
-- IF LM Master predicts INERT modal ≥ 50% AND tail-weight NEG ≥ 25% → QR adopts LM Master priors per `feedback_iteration_quality.md` deference rule at ≥ 5pp.
-- IF LM Master predicts PROMISING modal ≥ 30% → unusual; QR investigates; likely indicates LM Master sees strong basin-stability evidence.
-- IF LM Master adds per-cohort sub-model gain-share gate → Section 4.2 F-AXIS-MECHANISM #1 strengthened.
+**Key recalibration drivers (LM Master §2)**:
+- 2 sub-models × n_trials=18 × ENSEMBLE_SIZE=3 = 6 effective tree-build paths per cohort per month vs baseline's 3. Compute doubled but variance NOT halved because each sub-model sees half the data.
+- Multi-model failure mode at MID Optuna budget: under-fit twin of high-budget INERT.
+- 2× sub-models reduce single-axis CAT tail through averaging; PROMISING tail compressed (PROMISING + PROMISING-INERT-FAV: 23% → 19%).
+
+**Mass-shifting trigger catalogue (post-Phase 7.5 Critic review feedback)**:
+- IF F-AXIS #5 gain-share recurrence FAILS for ≥ 2 cohorts at observed outcome → reassign verdict to Mode A INERT (Row 4) regardless of OOS Δ.
+- IF DOT mitigation NOT present in implementation (Critic Phase 6.0 detects 8 model_names not 7) → BLOCK iteration before Phase 6 dispatch.
+- IF EXTREME sub-model trade count < 5 IS for ≥ 1 cohort → Row 9 n_eff degenerate verdict.
 
 ---
 
@@ -396,13 +499,14 @@ See Section 8.
 
 **Diagnostic**: Optuna lottery at 2× sub-model parameter space surface produced a better-luck combination. NOT bundleable.
 
-### 6.5 Mode E: DOT outlier dominates
+### 6.5 Mode E REMOVED per LM Master §1 (DOT mitigation ADOPTED)
 
-**Pattern**: DOT sub-models (extreme partition only 8 trades) produce noisy trade rosters that diverge from other 3 cohorts. Pool A + LINK + LTC sub-models PROMISING but DOT sub-models NEG. Portfolio F1 Δ mixed (~0).
+Original brief Mode E ("DOT outlier dominates") predicted DOT 8-trade extreme partition would produce noisy trade rosters polluting portfolio aggregate. **LM Master §1 ADOPTED**: DOT excluded from regime conditioning entirely. Model E uses baseline single-model dispatch unchanged. Mode E failure mode is structurally PRECLUDED at the architecture level.
 
-**Diagnostic**: per-cohort breakdown shows DOT (extreme + normal) is the source of drag.
-
-**Implication**: future /024 variant could exclude DOT from regime conditioning (DOT stays in baseline pool dispatch).
+**Residual DOT risk** (tracked under Mode B NEGATIVE):
+- DOT baseline (Model E) behavior is bit-identical to baseline portfolio (uses same training rows, same labels, same Optuna seed). DOT contribution to /024 portfolio aggregate is identical to its baseline contribution.
+- Any /024 portfolio drag attributable to DOT is the BASELINE DOT drag, not a /024-introduced drag.
+- Engineering report must include DOT baseline comparison row (Model_E_baseline vs baseline Model E) to confirm bit-identity within seed=42 reproduction.
 
 ---
 
@@ -422,19 +526,20 @@ LM Master Phase 4.5 produces verdict-class priors at `briefs-v1/iteration_v1-024
 
 ## Section 8 — MERGE/NO-MERGE Verdict Matrix
 
-| Row | F1 OOS Sharpe Δ | F3 IS Sharpe Δ | F-AXIS #1 (8 sub-models per regime) | F-AXIS #3 fire rate | n_eff | Verdict |
-|---|---|---|---|---|---|---|
-| 1 | ≥ +0.10 | ≥ +0.10 | 8 sub-models dispatched; per-cohort breakdown shows partition signal; extreme sub-model short-bias evident | per-cohort IS [8%, 25%] | extreme [3,9], normal [5,10] | **PROMISING (clean)** — /027 bundle candidate |
-| 2 | ≥ +0.10 | ≥ +0.10 | 8 sub-models dispatched but extreme + normal sub-model trade rosters ≥ 30% overlap baseline | any | extreme [3,9] | PROMISING-INERT-FAVORABLE — NOT bundleable, catalog only |
-| 3 | ≥ +0.10 | ∈ [-0.10, +0.10) | partial | any | extreme [3,9] | PROMISING-WEAK — sign-consistent but IS noise |
-| 4 | ∈ [-0.10, +0.10) | any | INERT (sub-models converge to pool) | any | extreme [3,9] | **INERT** — architectural mechanism CLOSED for cycle-3 |
-| 5 | ∈ [-0.55, -0.10) | any | any | any | extreme [3,9] | NEGATIVE clean — axis CLOSED for cycle-3 |
-| 6 | ≤ -0.55 | any | any | any | any | **NEGATIVE-CATASTROPHIC** — 3rd cycle-3 HIGH-RISK NEG-CAT formally trips multi-seed mandate for /025 |
-| 7 | any | ≤ -0.30 | any | any | any | IS-catastrophic — reject regardless of OOS |
-| 8 | any | any | any | per-cohort outside [8%, 25%] IS or [5%, 30%] OOS for ≥ 2 cohorts | any | F-AXIS #3 FAIL — regime gate not engaging; downgrade to INERT |
-| 9 | any | any | any | any | extreme < 3 OR ≥ 12 for ≥ 2 cohorts | n_eff degenerate — methodology issue, separate diary section |
+| Row | F1 OOS Sharpe Δ | F3 IS Sharpe Δ | F-AXIS #1 (7 sub-models post-DOT-mitigation) | F-AXIS #3 fire rate | F-AXIS #5 gain-share | n_eff | Verdict |
+|---|---|---|---|---|---|---|---|
+| 1 | ≥ +0.10 | ≥ +0.10 | 7 sub-models dispatched; per-cohort breakdown shows partition signal; extreme short-bias evident | per-cohort IS [10%, 18%] | EXTREME > NORMAL for ≥ 2 of {A,C,D} | extreme [2,8], normal [5,10] | **PROMISING (clean)** — /027 bundle candidate |
+| 2 | ≥ +0.10 | ≥ +0.10 | 7 sub-models dispatched but extreme + normal trade rosters ≥ 30% overlap baseline | any | any | extreme [2,8] | PROMISING-INERT-FAVORABLE — NOT bundleable, catalog only |
+| 3 | ≥ +0.10 | ∈ [-0.10, +0.10) | partial | any | any | extreme [2,8] | PROMISING-WEAK — sign-consistent but IS noise |
+| 4 | ∈ [-0.10, +0.10) | any | INERT (sub-models converge to pool) OR F-AXIS #5 FAIL (≥2 cohorts EXTREME ≤ NORMAL gain share) | any | any | extreme [2,8] | **INERT** — architectural mechanism CLOSED for cycle-3 |
+| 5 | ∈ [-0.55, -0.10) | any | any | any | any | extreme [2,8] | NEGATIVE clean — axis CLOSED for cycle-3 |
+| 6 | ≤ -0.55 | any | any | any | any | any | **NEGATIVE-CATASTROPHIC** — 3rd cycle-3 HIGH-RISK NEG-CAT formally trips multi-seed mandate for /025 |
+| 7 | any | ≤ -0.30 | any | any | any | any | IS-catastrophic — reject regardless of OOS |
+| 8 | any | any | any | per-cohort outside [10%, 18%] IS or [8%, 22%] OOS for ≥ 2 of {A,C,D} | any | any | F-AXIS #3 FAIL — regime gate not engaging; downgrade to INERT |
+| 9 | any | any | per-cohort EXTREME sub-model IS < 5 trades OR OOS < 3 trades for ≥ 1 of {A,C,D} | any | any | any | F-AXIS #2 EXTREME FLOOR FAIL — sub-model degenerate; methodology issue, separate diary section |
+| 10 | any | any | any | any | any | extreme < 2 OR ≥ 12 for ≥ 2 of {A,C,D} | n_eff degenerate — methodology issue, separate diary section |
 
-**NO-MERGE if** Row 4, 5, 6, 7, 8, OR 9 fires. **MERGE candidate to /027 bundle if** Row 1 fires (clean PROMISING).
+**NO-MERGE if** Row 4, 5, 6, 7, 8, 9, OR 10 fires. **MERGE candidate to /027 bundle if** Row 1 fires (clean PROMISING).
 
 ---
 
@@ -452,21 +557,23 @@ LM Master Phase 4.5 produces verdict-class priors at `briefs-v1/iteration_v1-024
 
 ### 10.1 Pre-Phase 6 gates
 
-- Phase 5.5 gate (Engineer): verifies brief sections 0.5/0.6/2.5/3.4 present; verifies LM Master integration; verifies cadence + axis rotation rules.
-- Phase 6.0 pre-flight (Critic): static scan for look-ahead in `regime_gate_v1.py` (z30 lookup must use `.shift(1)` via parquet column already past-only); `data_filter_callback` integration with `_train_for_month()` must preserve walk-forward boundaries; `train_end_ms = test_start_ms - embargo_ms` regression check.
+- Phase 5.5 gate (Engineer): verifies brief sections 0.5/0.6/2.5/3.4 present; verifies LM Master integration (Section 3.4 ADOPT responses); verifies cadence + axis rotation rules; verifies 7-sub-model architecture (DOT excluded per LM Master §1).
+- Phase 6.0 pre-flight (Critic): static scan for look-ahead in `regime_gate_v1.py` (`RegimeRoutedStrategy.get_signal()` must read z30 from parquet column already `.shift(1)` past-only, NOT compute z30 in-tick); `data_filter_callback` integration with `_train_for_month()` must preserve walk-forward boundaries; `train_end_ms = test_start_ms - embargo_ms` regression check. **Per LM Master §4(a) ADOPTED**: confirm `RegimeRoutedStrategy` wraps sub-strategies at signal-time (no callback inside `get_signal()` of either sub-strategy).
 
 ### 10.2 Engineering dispatch parameters
 
 - Single-seed EXPLORATION: `--seed 42`, `--n-trials 18`, `ENSEMBLE_SIZE=3`, V1_FEATURE_COLUMNS_PRUNED 42 cols (unchanged from /023 — keeps funding columns since regime gate reads z30 from parquet).
-- Universe: full V1_BASELINE_UNIVERSE (BTC, ETH, LINK, LTC, DOT). 4 cohorts × 2 sub-models = **8 LightGBM sub-models trained**.
+- Universe: full V1_BASELINE_UNIVERSE (BTC, ETH, LINK, LTC, DOT).
+- **Architecture (post-LM Master §1 ADOPTED)**: 3 cohorts × 2 sub-models (Pool A, Model C, Model D) + 1 cohort × 1 sub-model (Model E DOT baseline) = **7 LightGBM sub-models trained**.
 - No HIGH-RISK multi-seed validation opt-in (per Section 2.5 — single-seed for axis isolation).
 
-### 10.3 Kill criteria
+### 10.3 Kill criteria + skip-month routing policy
 
 - Wall-clock > 110 min → engineer SIGTERM the backtest; document in engineering_report.md.
 - Feature pipeline failure (parquet missing funding columns) → BLOCK; no F-AXIS-MECHANISM evaluation.
-- Any sub-model fails to train (extreme partition < 100 rows for a (cohort, month) cell) → graceful degrade (sub-model skip-month); document in engineering_report.md.
-- Per-cohort EXTREME sub-model trade count < 5 IS total → suggests partition too thin; document but do not BLOCK.
+- Any extreme sub-model fails to train (extreme partition < 100 rows for a (cohort, month) cell) → **route ALL bars of that month through normal sub-model** for that cohort (per LM Master §4(c) skip-month routing policy ADOPTED). STATELESS; both sub-strategies remain `LightGbmStrategy` instances and `RegimeRoutedStrategy` wrapper falls back to `normal_strategy` for the affected month. Document skip-month occurrences in engineering_report.md.
+- Per-cohort EXTREME sub-model trade count < 5 IS total OR < 3 OOS total → F-AXIS-MECHANISM #2 EXTREME FLOOR FAIL → Row 9 verdict (n_eff degenerate); document and proceed to Phase 7 evaluation.
+- **binary_logloss tolerance (LM Master §4(b) ADOPTED)**: extreme sub-model `binary_logloss` may run 5-15% higher than normal sub-model due to skewed label distribution at barriers. Do NOT flag this as anomaly in engineering_report.md.
 
 ### 10.4 Engineering report — BINDING contract (6th cycle-3 incident risk at /024)
 
@@ -475,14 +582,24 @@ LM Master Phase 4.5 produces verdict-class priors at `briefs-v1/iteration_v1-024
 This brief LOAD-BEARINGLY pre-commits: **NO Phase 7.5 Critic dispatch without `reports-v1/iteration_v1-024/engineering_report.md` present**. Incident rate of 5/5 cycle-3 iterations confirms brief-level contracts insufficient; the orchestrator-layer fix is the actual solution but is OUT-OF-SCOPE for this brief (skill-maintainer scope per /023 Rec #3).
 
 **Pre-commit content** (engineering_report.md must document):
-1. Implementation summary (NEW src/crypto_trade/strategies/regime_gate_v1.py + data_filter_callback in LightGbmStrategy + V1_ITER024 dispatch + run_baseline_v1.py 8-sub-model orchestration).
-2. Backtest configuration (single-seed=42, ENSEMBLE_SIZE=3, n_trials=18, V1_FEATURE_COLUMNS_PRUNED 42 cols, V1_BASELINE_UNIVERSE 5 syms, 4 cohorts × 2 sub-models).
-3. Wall-clock + per-sub-model timing breakdown (8 sub-models).
-4. F-AXIS-MECHANISM #1-4 measurement values + thresholds (per-cohort × per-regime breakdown CSV).
+1. Implementation summary (NEW src/crypto_trade/strategies/regime_gate_v1.py with `RegimeRoutedStrategy` wrapper at signal-time + data_filter_callback in LightGbmStrategy + V1_ITER024 dispatch + run_baseline_v1.py 7-sub-model orchestration).
+2. Backtest configuration (single-seed=42, ENSEMBLE_SIZE=3, n_trials=18, V1_FEATURE_COLUMNS_PRUNED 42 cols, V1_BASELINE_UNIVERSE 5 syms, **3 cohorts × 2 sub-models + 1 cohort × 1 sub-model = 7 sub-models** post-LM Master §1 DOT mitigation).
+3. Wall-clock + per-sub-model timing breakdown (7 sub-models).
+4. F-AXIS-MECHANISM #1-5 measurement values + thresholds (per-cohort × per-regime breakdown CSV with 14 columns, including `funding_z_family_gain_share` for F-AXIS #5 verification).
 5. ALL test commands run + outputs (tests/strategies/test_regime_gate_v1.py).
-6. Anomaly notes (sub-model skip-months, thin partitions, DOT outlier behavior) + reproduce command.
+6. Anomaly notes (sub-model skip-months per §4(c) policy, thin partitions, DOT baseline bit-identity verification) + reproduce command.
+7. **LM Master §1+§4(a)+§3 watch-item verifications** (per Critic Phase 7.5 pre-commit):
+   - 7 unique `model_name` values in `trades.csv` (not 8 — DOT excluded from regime conditioning).
+   - `RegimeRoutedStrategy` wraps at signal-time (architecture is wrapper not in-strategy callback at `get_signal()`).
+   - F-AXIS #5 gain-share recurrence column populated for each of {Pool A, LINK, LTC}.
 
-**Mandatory deliverable**: `per_cohort_per_regime_breakdown.csv` (8 rows = 4 cohorts × 2 regimes) with columns: cohort, regime, train_bars, trades_is, trades_oos, win_rate_is, win_rate_oos, net_pnl_is, net_pnl_oos, sharpe_is, sharpe_oos, mean_z30_at_open.
+**Mandatory deliverable**: `per_cohort_per_regime_breakdown.csv` (**7 rows** = Pool A × 2 + LINK × 2 + LTC × 2 + DOT × 1 baseline) with **14 columns**: cohort, regime, train_bars, trades_is, trades_oos, win_rate_is, win_rate_oos, net_pnl_is, net_pnl_oos, sharpe_is, sharpe_oos, mean_z30_at_open, funding_z_family_gain_share, n_eff_per_cell.
+
+**Critic Phase 7.5 watch items (LM Master Closing ADOPTED — pre-committed)**:
+1. DOT mitigation present in implementation (7 sub-models not 8). VERIFY via `model_name` value count in trades.csv.
+2. `RegimeRoutedStrategy` wrapper at signal-time (no look-ahead). VERIFY via static scan of `get_signal()` in `regime_gate_v1.py`.
+3. F-AXIS #5 gain-share recurrence check across regimes per cohort. VERIFY via `funding_z_family_gain_share` column in per_cohort_per_regime_breakdown.csv with EXTREME > NORMAL recurrence test for ≥ 2 of {A, C, D}.
+4. Cross-correlation analysis present for /027 bundle pre-validation. DEFERRED to /025 (PROMISING path) or /027 (CONFIRMATION path); not in /024 engineering report.
 
 ### 10.5 Test suite additions
 
@@ -532,29 +649,56 @@ uv run python run_baseline_v1.py \
 
 **/027 substrate UNCHANGED** vs /023 post-state (pool + LINK + ETH+gate; no /024 contribution).
 
-### 11.3 If /024 = INERT — Row 4 (MODAL)
+### 11.3 If /024 = INERT — Row 4 (MODAL — 48%)
 
-**/025 priority**: per-cohort drawdown brake — family `risk-primitive`; STATEFUL → MANDATORY deadlock-impossibility proof per A8 catalog + iter-v3/054 lesson.
+**/025 priority (SUPERSEDED by Section 11.7 LM Master §7 ADOPTED)**: **OI delta family** (NEW non-OHLCV feature family per cycle-7 v3 carve-out). Drawdown brake DEMOTED to /026 sanity slot.
 
-**/027 substrate UNCHANGED** vs /023 post-state.
+OI delta primitive: `oi_delta_30 = (open_interest_t − open_interest_t-30) / open_interest_t-30` z-scored on 90-bar window. Family `feature-family` (NEW family — different from /023's funding family). Target: rank ≤14/43 on ≥2 cohorts + gain share ≥4.0%.
+
+**/027 substrate UNCHANGED** vs /023 post-state (pool + LINK + ETH+gate; no /024 contribution; OI delta result feeds into /027 only if PROMISING).
 
 ### 11.4 If /024 = NEGATIVE clean — Row 5
 
-Same as 11.3. Axis CLOSED for cycle-3.
+Same as 11.3 (OI delta family). Regime-conditional axis CLOSED for cycle-3.
 
 ### 11.5 If /024 = NEGATIVE-CATASTROPHIC — Row 6
 
 **3rd cycle-3 >1σ HIGH-RISK NEG-CAT trip**: /025 mandatory multi-seed HIGH-RISK iteration. /025 axis: open-interest delta family at multi-seed (NEW non-OHLCV feature family) OR per-cohort drawdown brake at multi-seed.
 
-### 11.6 /027 bundle composition impact
+### 11.6 /027 bundle composition impact (LM Master §5 ADOPTED — target +1.30 to +1.55)
 
-- **/024 PROMISING** → 3rd alpha-enhancement (regime-conditional architecture) → bundle target +1.30-1.60.
+3-component bundle composition (LM Master estimate):
+- Pool baseline OOS +0.66
+- LINK specialist (/018) +0.50 estimate
+- ETH+gate (/019) +0.30 estimate
+- **Regime-conditional /024 +0.15 estimate** (modest because partition mechanism shared across cohorts → correlated with LINK funding-extreme exposure)
+
+Nominal Σ = +1.61 OOS Sharpe. **Realistic with correlation drag (LM Master estimate ρ(LINK × regime-conditional) ≈ 0.45 — both ride funding-z30 extreme): +1.30 to +1.55** (TIGHTENED ceiling from original brief +1.30-1.60).
+
+**Cross-correlation pre-validation MANDATORY at /027**:
+- Pearson(monthly_returns_regime_conditional, monthly_returns_LINK_specialist) **< 0.50** at single-seed reproduction at iter-v1/027 setup.
+- Pearson(monthly_returns_regime_conditional, monthly_returns_ETH_gate) ≥ 0.30 acceptable (different mechanism).
+- IF ρ ≥ 0.50 between regime-conditional and LINK → /024 alpha is largely redundant; /027 reweights regime-conditional component down or drops.
+
+**Bundle paths by /024 verdict**:
+- **/024 PROMISING (Row 1)** → 3rd alpha-enhancement (regime-conditional architecture) → bundle target **+1.30 to +1.55**.
 - **/024 PROMISING-INERT-FAVORABLE / INERT / NEG clean** → bundle UNCHANGED at +1.20-1.50 (pool + LINK + ETH+gate).
-- **/024 NEG-CAT** → bundle UNCHANGED + /025 mandatory multi-seed.
+- **/024 NEG-CAT (Row 6)** → bundle UNCHANGED + /025 mandatory multi-seed; regime-conditional CLOSED for v1.
 
-### 11.7 LM Master /025 staging matrix (placeholder until Phase 4.5)
+### 11.7 LM Master Phase 4.5 /025 staging matrix (LM Master §7 ADOPTED)
 
-LM Master Phase 4.5 will produce a similar /025 staging matrix in `lgbm_advisor.md`. QR will adopt LM Master staging if it differs materially from Section 11.1-11.5 above.
+LM Master §7 produced verdict-conditional /025 staging matrix; QR ADOPTED in full. Key change vs original brief Section 11.3: **under INERT (modal 48%), /025 pivots to OI delta family** (NEW non-OHLCV feature family per cycle-7 v3 carve-out) **NOT per-cohort drawdown brake**. Drawdown brake demoted because v3 transfer prior (iter-v3/054 STATEFUL deadlock + iter-v3/020 per-cohort dampening CLOSED) shows drawdown brake at single-seed is high deadlock risk + low expected lift.
+
+| /024 verdict | /025 axis (LM Master §7) | Rationale |
+|---|---|---|
+| **PROMISING (12%)** | /027 prep + `cross_correlation_check_alpha_components.py` (Pearson/Spearman LINK × ETH+gate × regime-conditional monthly returns) | Pre-validate bundle composition before /027 CONFIRMATION |
+| **PROMISING-INERT-FAVORABLE (7%)** | **OI delta family** (NEW non-OHLCV): `oi_delta_30 = (oi_t − oi_t-30) / oi_t-30` z-scored on 90-bar window | NEW feature family per cycle-7 v3 carve-out; importance target rank ≤14/43 on ≥2 cohorts + gain share ≥4.0% |
+| **INERT (48% MODAL)** | **OI delta family (PRIMARY)** — NOT per-cohort drawdown brake | Drawdown brake DEMOTED to /026 sanity slot per v3 transfer prior (iter-v3/054 STATEFUL deadlock; iter-v3/020 per-cohort dampening CLOSED) |
+| **NEGATIVE clean (20%)** | OI delta family at single-seed | Feature-family pivot mirrors PROMISING-INERT-FAV staging at single-seed budget |
+| **NEGATIVE-CATASTROPHIC (10%)** | **3rd cycle-3 >1σ HIGH-RISK NEG-CAT** trips mandatory multi-seed at /025; axis = OI delta family OR per-cohort drawdown brake at multi-seed | Mandatory multi-seed per Section 2.5 rule; regime-conditional axis CLOSED for v1 |
+| **PROMISING-METHODOLOGY (3%)** | Catalog methodology finding; /025 advances to OI delta family | Methodology insight is non-compoundable per `feedback_v3_promising_mechanical_subtype.md` |
+
+**Drawdown brake formal demotion**: per LM Master §7, drawdown brake is DEMOTED from /025 primary slot to /026 sanity slot (or beyond). Section 11.3-11.5 original drawdown-brake routing is SUPERSEDED by this LM Master §7 staging matrix.
 
 ### 11.8 If /024 = sample-size-too-small (Row 9)
 
@@ -598,15 +742,15 @@ Per `feedback_v3_baseline_update_policy.md`: only CONFIRMATION-MERGE updates bas
 - [x] Section 1 (Hypothesis with mechanism story)
 - [x] Section 2 (IS-only Evidence — 5 EDA tables from committed scripts)
 - [x] Section 2.5 (HIGH-RISK declaration)
-- [x] Section 3 (Proposed Changes; 3.4 LM Master responses RESERVED PENDING)
-- [x] Section 4 (Falsifiers — F1 + F-AXIS-MECHANISM #1-4)
-- [x] Section 5 (Predicted verdict priors; QR initial, awaiting LM Master recalibration)
-- [x] Section 6 (Failure modes A-E)
+- [x] Section 3 (Proposed Changes; 3.4 LM Master responses ADOPTED — 7 recommendations, all ADOPT)
+- [x] Section 4 (Falsifiers — F1 + F-AXIS-MECHANISM #1-5; #5 gain-share recurrence NEW LOAD-BEARING per LM Master §3 ADOPTED)
+- [x] Section 5 (Predicted verdict priors RECALIBRATED to LM Master 12/7/48/20/10/3 per LM Master §2 ADOPTED)
+- [x] Section 6 (Failure modes A-D; Mode E REMOVED per LM Master §1 DOT mitigation ADOPTED)
 - [x] Section 7 (Pre-registered failure-mode predictions, mass-shifting rules)
-- [x] Section 8 (MERGE/NO-MERGE verdict matrix — 9 rows)
+- [x] Section 8 (MERGE/NO-MERGE verdict matrix — 10 rows; F-AXIS #2 EXTREME FLOOR + F-AXIS #5 added)
 - [x] Section 9 (Library stack)
-- [x] Section 10 (Run protocol — gates, dispatch, kill, engineering report, tests, reproduce)
-- [x] Section 11 (Conditional roadmap /025+; 11.6 /027 bundle impact; 11.7 LM Master staging placeholder)
+- [x] Section 10 (Run protocol — gates, dispatch, kill, engineering report with 7 sub-models + Critic Phase 7.5 watch items per LM Master Closing ADOPTED)
+- [x] Section 11 (Conditional roadmap /025+; 11.6 /027 bundle target +1.30 to +1.55 per LM Master §5 ADOPTED; 11.7 LM Master §7 staging matrix ADOPTED — OI delta primary under INERT, drawdown brake DEMOTED)
 - [x] Section 12 (Roll-back; trunk merge plan)
 - [x] Section 13 (Self-check — this section)
 
@@ -644,9 +788,9 @@ User's verbatim: "be bold. diversification is the key. multiple smaller models e
 
 **This iteration is GENUINELY BOLD**:
 - First multi-model architecture in v1 history (20+ iterations).
-- 8 sub-models trained (vs 4 baseline) — 2× architectural complexity.
-- Direct test of user's "smaller models per regime" thesis with ORACLE-quantified ceiling (+143pp IS theoretical max).
+- **7 sub-models trained** (vs 4 baseline) — 1.75× architectural complexity (post-LM Master §1 DOT mitigation; DOT stays on baseline single-model).
+- Direct test of user's "smaller models per regime" thesis with ORACLE-quantified ceiling (+127pp IS theoretical max excluding DOT's +16pp ceiling).
 - HIGH-RISK declaration MANDATORY (Critic /023 Path Forward #2).
-- /025 staging matrix preserves 5 alternative axes if /024 fails.
+- /025 staging matrix (LM Master §7 ADOPTED) prioritizes OI delta family over drawdown brake under modal INERT.
 
-This is NOT an incremental tweak. It is a STRUCTURAL ARCHITECTURE shift from "pool-with-features" to "regime-conditional-sub-models". If PROMISING, /027 bundle gains a 3rd genuinely-novel alpha-enhancement component. If NEGATIVE, the architectural ceiling for current cohort/feature/risk substrate is rigorously bounded.
+This is NOT an incremental tweak. It is a STRUCTURAL ARCHITECTURE shift from "pool-with-features" to "regime-conditional-sub-models" for the 3 cohorts where sign-flip evidence is clean (Pool A, LINK, LTC). If PROMISING, /027 bundle gains a 3rd genuinely-novel alpha-enhancement component at LM Master-estimated +1.30-1.55 OOS Sharpe target. If NEGATIVE, the architectural ceiling for current cohort/feature/risk substrate is rigorously bounded.
