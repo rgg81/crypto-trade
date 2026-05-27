@@ -665,4 +665,80 @@ YES — Section 3.4 populated 2026-05-27 with 8 LM Master recommendations + QR r
 
 **Brief authored by QR Phase 5 at iter-v1/023 startup. Section 3.4 amended 2026-05-27 with LM Master Phase 4.5 responses (all 8 ADOPTED). Anchor: `v0.v1-baseline-corrected` (`f8bc12c`). Cycle-3 EXPLORATION #8/10. Axis family `feature-family` (NEW; 3-way CONVERGENT routing). HIGH-RISK declared single-seed mitigation. Modal predicted verdict: INERT (LM Master RECALIBRATED to 52%) per v3 4-data-point precedent dominance.**
 
+---
+
+## Section 13.6 — Phase 7+8 Self-Check Addendum (post-closeout calibration)
+
+Appended at /023 Phase 8 closeout (2026-05-27 Critic Phase 7.5 FINAL `4c8cab4` post-BLOCK-PENDING-FIX retrospective engineering_report.md fix `c9471ee`).
+
+### Verdict outcome vs pre-registered priors
+
+- **Pre-registered priors (LM Master Phase 4.5 BINDING)**: 12/8/52/18/8/2 (PROMISING / PROMISING-INERT-FAV / INERT / NEGATIVE clean / NEGATIVE-CAT / PROMISING-METHOD)
+- **Observed verdict**: NEGATIVE clean (Section 8 Row 6) — **18% tail materialized**
+- **Modal INERT 52% MISSED by 3bp inside threshold** (F1 OOS Sharpe Δ -0.2031 vs threshold -0.20)
+- **Verdict cell COLLISION**: F-AXIS #1 DUAL GATE PROMISING-clean on 3 of 4 cohorts (Pool A 6.88%, LINK 5.65%, DOT 5.49% above 4.0% gate; LTC 3.66% borderline FAIL) × F1 OOS Sharpe Δ NEGATIVE = **LEARNED-NEGATIVE sub-classifier** catalogued per `feedback_v1_learned_negative_subtype.md`
+
+### F-AXIS-MECHANISM reconciliation
+
+| Falsifier | Pre-registered | Observed | Outcome |
+|---|---|---|---|
+| F-AXIS #1 DUAL GATE rank + gain-share | rank ≤ 14/42 + gain ≥ 4.0% on ≥ 2 cohorts | 3/4 cohorts PASS (Pool A + LINK + DOT) | **PROMISING-clean per gate** (verdict cell collision with F1) |
+| F-AXIS #2 IS trade count | [500, 750] | 694 | PASS |
+| F-AXIS #2 OOS trade count | [140, 240] | 257 (+17 over upper) | overshoot anomaly (documented in engineering_report.md) |
+| F-AXIS #3 n_eff_per_cell | [5, 10] modal 8 | 9 | **PASS EXACT MID-BAND** (LM Master §5 binding) |
+| F-AXIS #4 IC | < 0.7 all pairs | max 0.4384 | PASS |
+| F1 OOS daily-annualized Sharpe Δ | ≥ +0.10 PROMISING; [-0.55, -0.10) NEG-clean | **-0.2031** | **NEGATIVE clean (3bp inside threshold)** |
+| F3 IS Sharpe Δ | INERT band | +0.1292 | INERT (no IS collapse) |
+
+### LM Master Phase 4.5 §4 DUAL GATE strengthening — LOAD-BEARING
+
+LM Master Phase 4.5 §4 mandated DUAL GATE rank + family gain-share check as CRITICAL strengthening over QR's initial rank-only F-AXIS #1. **Without this strengthening, /023 verdict mis-classification risk was ~15pp per LM Master §9.** Observed:
+- Portfolio gain share 5.40% > 4.76% (2.38%/feature × 2 features) uniform parity threshold = **above-parity** (NOT v3 INERT pattern)
+- Pool A gain share 6.88% = 1.4× uniform parity (architectural lever materialized partially)
+- 3 of 4 cohorts cleanly PROMISING-clean per DUAL GATE (Pool A + LINK + DOT)
+- Yet F1 OOS Sharpe Δ NEGATIVE → verdict cell COLLISION → **LEARNED-NEGATIVE** sub-classifier diagnosed correctly
+
+LM Master methodology track at /023: 6/6 = 100% perfect. Without LM Master DUAL GATE strengthening, the verdict would have classified ambiguously between PROMISING-clean (per rank-only) and NEGATIVE clean (per F1).
+
+### Track record (post-/023)
+
+- LM Master directional: **2.5/7 = 36% modal accuracy** (consistent pattern at non-POSITIVE_EVERYWHERE axes; NEG-band tail upweighting reliable at /020/022/023 = 3-of-3 directionally correct on NEG tail)
+- LM Master methodology: **6/6 = 100% perfect** (DUAL GATE gain-share check load-bearing at /023)
+- Verdict-class directional cycle-3: 4/24 (no new directional hit; modal INERT 52% missed by 3bp; NEG-clean 18% tail captured direction)
+- Mechanism-level cycle-3: 12/24 (NEW Critic Phase 7.5 FINAL PASS post-BLOCK-PENDING-FIX rerun; DUAL GATE per-cohort gain-share 4/4 measured PASS; engineering report retrospective rebuild PASS)
+
+### Engineering report 5th cycle-3 incident — orchestrator-layer fix REQUIRED
+
+5th cycle-3 engineering_report violation (/019 + /020 + /021 + /022 + **/023**). Brief Section 10.4 pre-commit contract has failed 5 of 5 cycle-3 iterations to enforce. Skill-layer / orchestrator-layer NON-RETROSPECTIVE-FORGIVENESS fix REQUIRED — gate Phase 7.5 dispatch on file existence check at the dispatch level (orchestrator layer), with automatic BLOCK-PENDING-FIX emission without Critic intervention.
+
+### v1-vs-v3 architectural distinction codified
+
+LEARNED-NEGATIVE sub-classifier at /023 codifies the v1-vs-v3 architectural distinction:
+- **v3 (per-symbol 3-cohort)**: 4-data-point funding catalog at INERT-by-importance (gain share below uniform parity; feature NEVER picked)
+- **v1 Pool A (joint BTC+ETH)**: LEARNED-NEGATIVE (gain share 6.88% above parity; feature IS picked but OOS realization fails)
+- **Mechanism**: pool's joint loss surface enables `funding × symbol-dummy` splits at depth 3-5 — v3's per-symbol architecture mechanically cannot represent this interaction
+- **Forward implication**: REGIME-CONDITIONAL SUB-MODELS at /024 explicitly tests "harvest the tail edge that LightGBM-at-single-seed mean-averages away" hypothesis
+
+### /024 axis: REGIME-CONDITIONAL SUB-MODELS (model-arch family)
+
+Per user "multiple smaller models per regime" directive + LM Master Phase 7.4 §4 PRIMARY + Critic Phase 7.5 Path Forward CONVERGENT routing:
+
+- **/024 PRIMARY**: regime-conditional sub-models (model-arch family). Train 2 sub-models per cohort partitioned by `|funding_z30| > 1.5` vs `≤ 1.5`; combine via stateless regime gate. HIGH-RISK MANDATORY. Wall-clock 60-90 min EXPLORATION.
+- **/024 Secondary**: per-cohort drawdown brake (risk-primitive). STATEFUL → MANDATORY deadlock-impossibility proof. Brief Section 11.4 pre-committed default if regime-conditional encounters QE-blocking complexity.
+- **/024 Tertiary**: open-interest delta (feature-family REPEAT, borderline rotation per Section 11.7 permits).
+
+### Cycle-3 ledger post-/023
+
+- 8 cycle-3 EXPLORATIONs (/016-/023): 2 PROMISING (/018, /019) + 1 PROMISING-METHODOLOGY (/021) + 3 NEGATIVE clean (/016, /017, /023) + 2 NEGATIVE-CATASTROPHIC (/020, /022) + 0 merges
+- /023 = first NEW v1 feature family with portfolio gain share above uniform parity (5.40% > 4.76%); funding-family LEARNED but NOT bundleable
+- /027 substrate UNCHANGED at 2 specialists (LINK +0.80 + ETH+gate +0.50)
+- Cycle-3 EXPLORATION cadence: **#8 of 10**; sequential /024 + /025 + (optional sanity /026) before /027 CONFIRMATION earliest
+- BASELINE_V1.md UNCHANGED at `v0.v1-baseline-corrected` (`f8bc12c`)
+
+### Brief authoring discipline retrospective
+
+The brief Section 5 priors RECALIBRATED 15/10/45/15/10/5 → 12/8/52/18/8/2 at LM Master Phase 4.5 §3 BINDING. The 18% NEG-clean tail was the second-largest LM Master prior — adopting LM Master priors over QR initial pass directly improved verdict-tail coverage. The Section 4.2 F-AXIS #1 DUAL GATE strengthening (rank + gain-share) was the load-bearing methodology call. Both adoptions follow `feedback_iteration_quality.md` LM Master deference rule at ≥ 5pp tail re-weighting. **The /023 brief authoring process correctly anticipated the verdict tail at single-seed EXPLORATION budget** — the 18% NEG-clean materialization is within the LM Master-recalibrated prior distribution, and the LEARNED-NEGATIVE sub-classifier emerged from the load-bearing DUAL GATE diagnostic exactly as Phase 4.5 §4 anticipated.
+
+**Anchor**: `v0.v1-baseline-corrected` (`f8bc12c`). **Verdict**: EXPLORATION-NEGATIVE clean. **Sub-classifier**: LEARNED-NEGATIVE (catalogued). **/024 axis**: regime-conditional sub-models. **Merge**: NO-MERGE; BASELINE_V1.md UNCHANGED.
+
 **Next phase**: Phase 5.5 Engineer gate → Phase 6 implementation + backtest.
