@@ -92,3 +92,74 @@ Pool Model A 2-sym BTC+ETH gets ~2× rows; C/D/E same as v3 per-symbol. Adding 2
 2. Pool Model A specifically — funding rank/gain in pool A vs Models C/D/E (architectural lever evidence).
 3. ORACLE EDA per-symbol texture: confirm LTC counter-direction preserved post-retrain (basin-relocation check).
 4. n_eff per-cell against pre-registered [5, 10] band.
+
+---
+
+# LightGBM Master Post-Mortem — iter-v1/023 — Phase 7.4
+
+## Context Read
+- IS Sharpe +0.4121 / OOS Sharpe **+0.4606** / 694 IS / 257 OOS / WR OOS 44.0% / PSR OOS 0.66 / n_eff 9
+- **F1 OOS Δ = 0.4606 − 0.6637 = −0.2031** (3bp inside NEGATIVE band; threshold −0.20)
+- **F3 IS Δ = +0.1292** → INERT
+- DUAL GATE gain shares: Pool A **6.88%**, LINK C **5.65%**, LTC D **3.66%**, DOT E **5.49%**, portfolio **5.40%**
+- Funding ranks (z90/z30 of 42): Pool **11/12**, LINK **11/12**, LTC **14/18**, DOT **10/18**
+
+## 1. Phase 4.5 vs Phase 7.4 prediction reality
+
+Priors **12/8/52/18/8/2**. Observed verdict in 8% NEGATIVE-clean tail just past −0.20 (3bp from modal INERT). Gain-share check I mandated as Phase 4.5 §4 CRITICAL — load-bearing. v1's 5.40% portfolio gain share clears uniform-parity (2.38%/feature); v3/082 was 9.90%/4 = 2.475%/feature (BELOW parity). **v1 LEARNS funding; v3 did NOT.**
+
+## 2. F-AXIS #1 DUAL GATE adjudication — VERDICT CELL COLLISION
+
+DUAL GATE PROMISING-clean (rank ≤14/42 + gain ≥4.0% on ≥2 cohorts):
+- Pool A: ranks 11+12, gain 6.88% — **PASS**
+- LINK C: ranks 11+12, gain 5.65% — **PASS**
+- DOT E: rank 10 (z90 PASS), gain 5.49% — **PASS**
+- LTC D: ranks 14+18, gain 3.66% — borderline FAIL
+
+**3 of 4 cohorts cleanly PROMISING-clean** — but F1 OOS Δ NEGATIVE. New verdict cell: **LEARNED-NEGATIVE** (information ingested + OOS realization failed). Distinct from v3 INERT-by-importance.
+
+## 3. Why funding LEARNED but didn't HELP
+
+(a) **z90 outranks z30 in 3 of 4 cohorts**: the longer-window (regime-level) feature carries more gain. Trees treat z90 as slow-moving regime indicator; z30 marginally used. But LightGBM at depth 3-5 cannot easily compose `funding × momentum × volatility` three-way interactions in 9 effective trials.
+
+(b) **Pool A vs single-symbol gap (6.88% vs 3.66%)**: joint BTC+ETH loss surface lets trees use `funding × symbol-dummy` splits. Architecture advantage materialized; not enough to flip OOS sign.
+
+(c) **ORACLE +78.55% extreme-negative band evaporated**: per /021/022 basin-relocation pattern, OOS roster likely doesn't contain the z30 ∈ [-2,-1] events at training distribution. LightGBM at single-seed finds the MEAN funding effect (~zero); ORACLE-tail edge is left on the table.
+
+**Synthesis**: funding is **mean-informative but tail-load-bearing**. v1 LightGBM learns the average; the tail (+78.55% concentration) requires explicit regime gating.
+
+## 4. Bold implication for /024 — REGIME-CONDITIONAL FUNDING (matches user directive)
+
+User mandate: "be bold; diversification; multiple smaller models per regime". /023 finding ENABLES this directly:
+
+**Option A — REGIME-GATE WRAPPER** (safest): entry signal fires only when `|funding_z30| > 1.5` OR baseline gate. STATELESS, no retraining. Harvests +78.55% band edge.
+
+**Option B (RECOMMENDED PRIMARY for /024)** — **REGIME-CONDITIONAL SUB-MODELS**: train 2 sub-models per cohort — `|z30|>1.5` subset and `|z30|≤1.5` subset. Combine at inference via regime gate. **Directly tests user's "multiple smaller models per regime" thesis.** Wall-clock 2× ENSEMBLE_SIZE per cohort → ~80 min EXPLORATION. Extreme subset ~14% × 5727 = 800 bars per symbol — borderline thin but feasible.
+
+**Option C — FUNDING-PERSISTENCE INTERACTION**: composed feature `funding_extreme_persist = sign(funding_z30) × min(consecutive_bars_above_threshold, 24)`. Engineered-feature fallback per `feedback_v3_engineered_feature_pivot.md`.
+
+**Decision: Option B PRIMARY for /024** (matches user "multiple smaller models per regime" directive).
+
+## 5. /027 bundle composition impact
+
+Funding-family does NOT join /027 as alpha component (F1 NEGATIVE). LEARNING signal suggests it COULD contribute IF /024 regime-conditional succeeds. /027 stays at 2 specialists + pool baseline until /024 outcome known.
+
+## 6. n_eff_per_cell observed = 9
+
+Exact modal hit on my predicted [5, 10] band. Optuna search stable; basin relocation is OOS-failure driver, NOT search instability.
+
+## 7. Critic Phase 7.5 priority items
+
+(a) Verdict cell collision (DUAL GATE PROMISING-clean vs F1 NEGATIVE). Recommend NEW cell LEARNED-NEGATIVE. 3bp distance from INERT should NOT be exploited to reclassify upward per `feedback_no_cheating.md`.
+(b) z30 ranks worse than z90 in 3 of 4 cohorts — Critic Check 5 ADF stationarity on z90 OOS-only.
+(c) LTC D funding-z30 rank 18/42 — Critic Check 4 OOS-only IC reconfirmation.
+
+## 8. Track record
+
+LM Master priors at /023: PROMISING tail 20%, INERT modal 52%, NEGATIVE 18%. Observed: NEGATIVE-clean 3bp from INERT. Modal call ~accurate. **Gain-share check (Phase 4.5 §4 CRITICAL) was the load-bearing diagnostic** that distinguished v1 (LEARNS) from v3 (DID NOT). Methodology 3/3 perfect.
+
+Cumulative entering /024: H1 directional 2/4; methodology 3/3.
+
+## 9. Most important Phase 7.4 finding
+
+**Funding-rate is the first v1 feature family with ABOVE-uniform-parity family gain share (5.40% vs 2.38%) AND borderline-NEGATIVE F1 OOS Δ (-0.20) — the LEARNED-BUT-NOT-HELPFUL verdict cell exposes the regime-conditional structure required for /024 BOLD design (multiple smaller models per regime, per user directive).**
