@@ -1,59 +1,42 @@
-# Phase 6.0 Critic Pre-Flight — iter-v1/024
+# Phase 6.0 Critic Pre-Flight — iter-v1/024 — POST-FIX RE-EVALUATION
 
-OVERALL: BLOCK-PENDING-FIX — RegimeRoutedStrategy wrapper constructed but NEVER invoked at inference. 6 sub-models run independent backtests; regime gate never applied. Single-loop fix in `run_baseline_v1.py`.
+OVERALL: PASS — backtest cleared to launch.
 
-## Per-Check Status
+## Prior Verdict
+BLOCK-PENDING-FIX — RegimeRoutedStrategy wrapper bypassed at inference.
 
-### Check 1 — Look-Ahead Audit: PASS
-Past-only z30 lookup via parquet column already `.shift(1)`-derived in /023. `evaluate_regime_at_signal` reads pre-shifted cache; no in-tick computation.
+## Fix Applied (commit 8664bbe)
+- NEW factory functions in `run_baseline_v1.py`: `build_lgbm_strategy()`, `build_backtest_config()`, `run_regime_cohort()`
+- /024 dispatch rewritten: Pool A, LINK, LTC each route via `run_regime_cohort` (calls run_backtest ONCE on wrapper)
+- DOT path unchanged (single-model dispatch via run_model)
+- `RegimeRoutedStrategy.compute_features()` propagates to both inner strategies
+- 13 NEW integration tests verifying: wrapper IS invoked, inner strategies NEVER independent run_backtest, routing semantics correct, compute_features propagated
+- 32/32 tests pass
 
-### Check 13 — Anti-Pattern: PASS (A1-A13 clean); NEW candidate A14 surfaces
-Anti-pattern: "Strategy wrapper constructed at dispatch site but never invoked at inference; sub-strategies run independently and their trade rosters concatenated."
+## Re-Evaluation
 
-### Check 8 — Hypothesis-Implementation Alignment: **FAIL** (BLOCK driver)
-Brief Section 3.1 + 3.2 + 3.4 + 10.4 MANDATE: `RegimeRoutedStrategy` wraps at signal-time, computing z30 at bar t and dispatching to ONE matched sub-strategy.
-
-Actual implementation: `_iter024_regime_wrappers` stores wrappers for stats-only purposes; each sub-model (Model_A_extreme, Model_A_normal, Model_C_extreme, Model_C_normal, Model_D_extreme, Model_D_normal) runs an independent `run_backtest()` call → 6 independent rosters concatenated. The wrapper's `get_signal()` is never reached during the backtest loop.
-
-**Downstream consequences**:
-- Trade count will trend toward 2× baseline (~1242) — over-trading defect
-- F-AXIS #2 falsifier band [400, 850] structurally pre-fired
-- F-AXIS #3 fire-rate stats empty (wrapper never called)
-- Brief's regime-conditional hypothesis NEVER ACTUALLY TESTED
+### Defect Axis: PASS
+`grep run_backtest(` returns only TWO call sites: `run_model` line 432 (DOT + non-/024) and `run_regime_cohort` line 626 (wrapper). The pre-fix 6-independent-backtest pattern is GONE. No dead code.
 
 ### Foundation Regression: PASS
-`walk_forward.py:113` unchanged. `lgbm.py:data_filter_callback` is additive (backward-compat verified by `test_lgbm_strategy_no_filter_backward_compat`).
+`walk_forward.py:113` unchanged. `labeling.py` untouched. `lgbm.py` additions minimal and additive (data_filter_callback ctor param + instance store + filter applied AFTER train window slicing, BEFORE labeling — past-only invariant preserved).
 
-### Cadence + Axis Sanity: PASS
-phase5p5_gate.md OVERALL=PASS. Family `model-arch` NEW 16th. Rotation VALID.
+### Anti-Pattern Static Scan on Fix Diff: PASS
+A1-A13 all clean. data_filter_callback reads `_master.iloc[train_indices]` already bounded by embargo. funding_rate_zscore_30 pre-shifted at /023 feature time.
 
-### Falsifier Presence: PASS
-5 F-AXIS rows including #5 gain-share recurrence LOAD-BEARING.
+### Past-Only Invariance: PASS
+`RegimeRoutedStrategy.get_signal()` reads z30 from `_month_features` cache populated at month-boundary training. Pre-shifted parquet column. No real-time z30 computation.
 
-## BLOCK-PENDING-FIX Rerun Protocol
+### Check 8 Re-Check: PASS
+Brief Section 1 H_AXIS hypothesis now actually realizable:
+- Training partition via data_filter_callback at lgbm.py:524-526
+- Inference routing via RegimeRoutedStrategy.get_signal() at regime_gate_v1.py:294
+- DOT excluded per LM Master §1 mitigation
 
-**Specific defect**: `run_baseline_v1.py:1542-1774` constructs `RegimeRoutedStrategy` instances but never passes them to `run_backtest()`. Instead, 6 independent sub-models backtest in isolation.
+## Non-Blocking Risks (record-only)
 
-**Required fix** (single-loop refactor): 
-For each of Pool A, LINK, LTC:
-1. Instantiate `_strat_X_ext` + `_strat_X_norm` with `data_filter_callback` (but DO NOT call run_backtest yet)
-2. Wrap them in `RegimeRoutedStrategy(extreme=_strat_X_ext, normal=_strat_X_norm, ...)`
-3. Call `run_backtest(config, _strat_X_regime, ...)` ONCE per cohort using the wrapper
-4. Wrapper's `get_signal()` dispatches to matched sub-strategy per bar
+1. Both inner sub-models train every month regardless of routing → doubles per-cohort training cost. Estimate 55-78 min plausible but tight against 2h cycle-3 cap.
+2. Extreme partition thin (Pool A 1573, LINK 709, LTC 802 bars). Skip-month fallback to normal should be surfaced in engineering report.
 
-DOT path unchanged (single-model dispatch preserved).
-
-**Also missing**: integration test at `tests/test_run_baseline_v1_iter024.py` verifying V1_ITER024 dispatch routes via wrapper. The 19 unit tests cover the wrapper in isolation but not the runner-side wiring.
-
-**Re-eval scope**: After fix + test add, Critic single-pass re-evaluation focused on Check 8 (wrapper now invoked at inference). All other PASS verdicts carry forward.
-
-**Final verdict post-fix**: PASS → backtest cleared. BLOCK-FINAL only if fix introduces new defect.
-
-## Path Forward (advisory if fix path exhausted)
-
-3 alternative axes from non-recent families:
-1. **Per-cohort vol-target ceiling** — risk-primitive — single-model architecture answer to same regime-edge hypothesis; cap per-cohort gross exposure.
-2. **Regime-conditional triple-barrier σ_t** — labeling — ONE pool model with regime-adjusted barriers (×1.4 in EXTREME).
-3. **Drop DOT from baseline universe** — universe — 4-symbol portfolio (BTC+ETH pool + LINK + LTC); tests DOT-as-drag hypothesis.
-
-These are advisory — the wrapper-wiring fix is simpler.
+## Verdict
+PASS. Phase 6 backtest cleared to launch.
