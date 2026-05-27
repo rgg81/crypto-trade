@@ -1,0 +1,3 @@
+feature_a,feature_b,ic_spearman,n_obs,threshold_05,verdict
+oi_delta_30_z90,funding_rate_zscore_30,0.1171,5912,PASS,ORTHOGONAL
+oi_delta_30_z90,funding_rate_zscore_90,0.2019,5912,PASS,ORTHOGONAL

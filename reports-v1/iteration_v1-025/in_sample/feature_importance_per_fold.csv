@@ -1,0 +1,6 @@
+status,reason,oi_delta_30_z90_aggregate_rank_pool_a,oi_delta_30_z90_aggregate_rank_link,oi_delta_30_z90_aggregate_rank_ltc,oi_delta_30_z90_aggregate_rank_dot
+DEFERRED,per-fold importance log not enabled in /025 runner — runner outputs aggregated importance across all walk-forward months only,4,5,5,4
+note_aggregate_ranks_from_feature_importance_csvs,Pool_A rank 4 / LINK rank 5 / LTC rank 5 / DOT rank 4 — these are cross-fold averages not per-fold distributions,4,5,5,4
+note_oof_parquet_contents,v1_iter_v1-025_trial_oof.parquet contains (trial_id symbol train_month fold_idx candle_open_time_ms oof_return) — no feature importance column,,,,
+note_reconstruction_path,Per-fold rank stability requires per-fold importance log emission at runner level — not implemented in /025 dispatch; deferred to /026+ if LM Master std-of-rank > 8 diagnostic is required,,,,
+note_lm_master_guidance,LM Master §5(b) mandated per-fold rank in engineering report; std-of-rank > 8 would trigger PROMISING-FEATURE-MECHANICAL classification; with aggregate rank consistently 4-5/43 the feature is uniformly mid-table but per-fold variance is unknown,,,,
