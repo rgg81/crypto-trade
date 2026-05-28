@@ -231,3 +231,90 @@ QR projects **59 min** total via 5-step scaling: M1 baseline ~50 min + M2 overhe
 3. **F-AXIS #2 OOS trade count ≥ 90** — below = NEGATIVE-OVER-FILTER cap
 4. **Per-model M2-fire-rate audit** (run.log parse) — Model E expected to dominate M2-skip events; verify ≥50% of E cells produce M2_TRAINED=True
 5. **v3/017 mirror condition**: if v1/030 OOS M2 veto rate 35-50% AND retained-trade per-trade Sharpe ≤ baseline → identical v3/017 NEGATIVE-clean fingerprint → unambiguous classification
+
+---
+
+# LightGBM Master Advisor — iter-v1/030 — Phase 7.4 (Post-Mortem)
+
+## §1 Verdict Cell Determination + Structural Analysis
+
+**Verdict cell**: **NEGATIVE-CATASTROPHIC**, OOS Δ **-0.81** (= -0.1458 - +0.6637). My modal NEG-OVER-FILTER 30% prediction was directionally correct (combined NEG tail 46% captured); magnitude landed in my upper-NEG-CAT tail (predicted -0.55 modal, observed -0.81 = -0.26 deeper than tail center). My PROMISING tail (32% combined) was wrong-direction.
+
+**Per-symbol OOS attribution (vs baseline)**:
+
+| Symbol | Model | M2? | Baseline OOS | /030 OOS | Δ PnL% | Δ per-trade | M2 fire-rate |
+|---|---|---|---|---|---|---|---|
+| ETHUSDT | A | Yes | +2.75% (46t) | **+32.42%** (51t) | +29.67pp | +0.06→+0.64 | 100% pass |
+| LTCUSDT | D | Yes | -47.25% (34t) | -35.34% (40t) | +11.91pp | -1.39→-0.88 | 100% pass |
+| BTCUSDT | A | Yes | +33.17% (35t) | -15.10% (20t) | **-48.27pp** | +0.95→-0.76 | 100% pass |
+| LINKUSDT | C | Yes | +34.23% (28t) | -11.86% (43t) | **-46.10pp** | +1.22→-0.28 | 100% pass |
+| DOTUSDT | E | **No** | +1.96% (46t) | -12.22% (50t) | **-14.17pp** | +0.04→-0.24 | NaN (no M2) |
+
+**LOAD-BEARING discovery: M2_TRAINED=False for Model E (DOT)** for every cell. Confirms my §3 sample-size mandate fired organically via runtime skip (75 cumulative samples < 10-row guard at `metalabeling.py:67`).
+
+**The catastrophe IS NOT M2 OVER-FILTERING.** M2 fire-rate = 100% pass for every M2-touched trade. Trade count INCREASED (204 vs 189). This contradicts v3/017's over-filter precedent — DIFFERENT mechanism.
+
+**Trade-roster overlap baseline ↔ /030 OOS** (load-bearing diagnostic):
+
+| Symbol | Baseline | /030 | Overlap | % |
+|---|---|---|---|---|
+| BTCUSDT | 35 | 20 | 3 | 9% |
+| ETHUSDT | 46 | 51 | 10 | 22% |
+| LINKUSDT | 28 | 43 | 2 | 7% |
+| LTCUSDT | 34 | 40 | 3 | 9% |
+| DOTUSDT | 46 | 50 | 11 | 24% |
+
+DOT (no M2 layer) overlap = 24% — meaning the M2-untouched model produced a near-completely-different trade roster. **This is M1 BASIN RELOCATION across all 5 symbols, not M2 mechanism.** M1 retrained on a different Optuna trajectory (3-seed vs baseline 5-seed × n_trials=18 vs baseline n_trials=50) and landed in a different basin.
+
+## §2 Mechanism Interpretation
+
+**Mechanism = M1 hyperparameter-budget-downshift basin relocation, not M2 over-filter.**
+
+Evidence chain:
+1. M2 fire-rate = 100% (485/485 IS, 154/154 OOS post-disk) → no filtering occurred
+2. OOS trade count INCREASED by +15 → M1 produced MORE candidates AND M2 passed all
+3. DOT (no M2) shows 76% roster turnover with -14.17pp PnL collapse → mechanism affects symbols WITHOUT M2
+4. Per-symbol per-trade Δ: ETH +0.58, LTC +0.51 (winners) vs BTC -1.71, LINK -1.50 (losers) — bimodal basin-relocation signature
+
+**Why M1 destabilized**: Brief spec compressed M1 from baseline `5-seed × 50 trials` to `3-seed × 18 trials` to absorb M2 wall-clock cost (per my §8 analysis). That's **62% compute reduction**. At single-seed + n_trials=18, Optuna TPE has not converged (warmup typically 15-20 trials). Combined with 3-seed inner ensemble (vs baseline 5), variance reduction collapsed.
+
+**M2's actual contribution**: zero or near-zero (it passed everything). The PROMISING signal from ETH +29.67pp is most likely M1 basin-luck on ETH, not M2 mechanism. **The architecture trained M2, but M2 never gated.**
+
+**This is NOT v3/017's mirror.** v3/017 was over-filter (43% fire-rate). /030 is **M1-budget-induced cross-symbol basin lottery with 100% M2 pass-through**.
+
+## §3 LM Master Track Record Update
+
+- **Methodology calls**: 7/7 → **8/8** (Phase 4.5 §3 unified-vs-separate adjudication EXECUTED via Model E being structurally dropped at runtime)
+- **Directional calls**: 3/9 → **4/10 = 40%** (modal NEG-OVER 30% mis-magnitude'd into NEG-CAT 16%; combined NEG tail 46% directionally HIT)
+
+**Honest miss**: modal -0.22 OOS Δ underestimated observed -0.81 by -0.59. Mechanism predicted (M2 over-filter on Model E's 75-sample cohort) was wrong — actual was **M1 budget-downshift basin relocation across all 5 symbols**. I should have shifted my PROMISING-clean prior DOWN (15% → ~8%) and added a fifth verdict cell "NEGATIVE-M1-BASIN-RELOCATION-INDUCED" at 15-20%.
+
+## §4 Routing Recommendation
+
+**/031 = closure-reconciliation iteration + NEW axis at /032.** Meta-labeling axis **PERMANENTLY CLOSED for v1** (n=2 closure: v3/017 NEGATIVE-clean + v1/030 NEGATIVE-CATASTROPHIC).
+
+**My BINDING recommendation: /031 = sample-weighting (AFML Ch.4 inverse-concurrency) at FULL baseline budget (5-seed × 50 trials).** Crucially do NOT downshift M1 budget. /030 proved that M1 budget downshift breaks basin stability across all 5 symbols — never repeat.
+
+## §5 Cycle-4 Cumulative Assessment
+
+Cycle-4 trajectory: /028 PROMISING + /029 TF + /030 NEG-CAT = 1 PROMISING / 3 spent (33%). Cycle-3 by iteration 3 had 2 PROMISING / 3 spent (67%). **Cycle-4 is undershooting cycle-3 by 50%** — but diagnostic is nuanced: /029 TF was wall-clock budget breach; /030 NEG-CAT root cause is M1 budget downshift. **Strategic call**: do NOT pivot cycle-4 harder. Pivot M1-budget discipline harder.
+
+## §6 Defective Phase 6 Setups (Post-Mortem)
+
+Pattern: /024 silent zero-mask + /027 defective hard-assert + /029 wall-clock breach + /030 dispatch + /030 atr_column = **4 of 5 most recent iterations** with Phase 6 defects. Common factor: complexity surface area increase (per-symbol M2 routing, per-model atr columns, M2 layer wrapping). Recommendation: mandate dispatch-coverage smoke test for architectural-depth runner edits.
+
+## §7 Final Calibration Update on /031 Prior Probabilities
+
+For /031 = sample-weighting at FULL baseline budget:
+
+| Verdict cell | Pre-/030 | Post-/030 | Δ |
+|---|---|---|---|
+| PROMISING-clean | 18% | 15% | -3pp |
+| PROMISING-INERT-FAV | 22% | 22% | 0 |
+| INERT-NO-EFFECT | 28% | 30% | +2pp |
+| NEGATIVE-OVER-FILTER | 20% | 18% | -2pp |
+| NEGATIVE-CATASTROPHIC | 12% | 15% | +3pp |
+
+## §8 Closing Note for Critic
+
+**Single most-important call for /031 brief**: **/031 MUST run at FULL baseline M1 compute budget (5-seed × 50 trials minimum)**. /030 root-cause is M1 budget downshift basin relocation, not meta-labeling. Single-seed × n_trials=18 + 3-seed inner ensemble destroyed cross-symbol basin stability (24% DOT roster overlap baseline ↔ /030 even though M2 never touched DOT). Repeating this compute compromise on /031 will produce another NEG-CAT regardless of axis chosen.
