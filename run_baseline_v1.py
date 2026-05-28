@@ -4149,26 +4149,37 @@ def main() -> None:
     # -------------------------------------------------------------------------
     is_dir = report_dir / "in_sample"
     oos_dir = report_dir / "out_of_sample"
-    _run_methodology_reporting(
-        all_results,
-        iter_dir=report_dir,
-        is_dir=is_dir,
-        oos_dir=oos_dir,
-        n_trials=n_trials,
-        symbols=symbols,
-        features_dir="data/features",
-        interval="8h",
-        oof_parquet_path=OOF_PARQUET_PATH,
-        feature_columns=active_feature_columns,
-        r5_signals_is=agg_r5_signals_is,
-        r5_fires_is=agg_r5_fires_is,
-        r5_signals_oos=agg_r5_signals_oos,
-        r5_fires_oos=agg_r5_fires_oos,
-        r5_kill_signals_is=agg_r5_kill_signals_is,
-        r5_kill_fires_is=agg_r5_kill_fires_is,
-        r5_kill_signals_oos=agg_r5_kill_signals_oos,
-        r5_kill_fires_oos=agg_r5_kill_fires_oos,
-    )
+    # Skip _run_methodology_reporting for frozen-HP validation runs: no Optuna
+    # search = no OOF parquet = n_eff / PSR / ADF metrics are N/A.  The core
+    # comparison.csv with IS/OOS Sharpe is already written by generate_iteration_reports;
+    # that is all we need for basin-lottery decomposition.
+    if frozen_hp_mode_arg == "none":
+        _run_methodology_reporting(
+            all_results,
+            iter_dir=report_dir,
+            is_dir=is_dir,
+            oos_dir=oos_dir,
+            n_trials=n_trials,
+            symbols=symbols,
+            features_dir="data/features",
+            interval="8h",
+            oof_parquet_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            r5_signals_is=agg_r5_signals_is,
+            r5_fires_is=agg_r5_fires_is,
+            r5_signals_oos=agg_r5_signals_oos,
+            r5_fires_oos=agg_r5_fires_oos,
+            r5_kill_signals_is=agg_r5_kill_signals_is,
+            r5_kill_fires_is=agg_r5_kill_fires_is,
+            r5_kill_signals_oos=agg_r5_kill_signals_oos,
+            r5_kill_fires_oos=agg_r5_kill_fires_oos,
+        )
+    else:
+        print(
+            f"[run_baseline_v1] frozen_hp_mode={frozen_hp_mode_arg!r}: "
+            "skipping _run_methodology_reporting (no OOF parquet; n_eff/PSR/ADF N/A). "
+            "Core comparison.csv Sharpe sufficient for basin-lottery decomposition."
+        )
 
     # iter-v1/016: write f_axis_mechanism.csv for F-AXIS-MECHANISM falsifier.
     # Only emits when sample_weight_mode != "abs_pnl" (active axis run) AND
