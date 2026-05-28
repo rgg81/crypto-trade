@@ -1819,6 +1819,28 @@ def main() -> None:
         ),
     )
     # -----------------------------------------------------------------------
+    # Iteration-label override (validation sub-runs — framework/032+).
+    #
+    # When provided, overrides the auto-formatted iteration_label derived from
+    # --iteration NNN (which would produce "v1-NNN").  Use for frozen-HP
+    # validation sub-runs that reuse the same --iteration integer but need a
+    # distinct dispatch branch + report directory, e.g.:
+    #   --iteration 28 --iteration-label v1-028-frozen-hp
+    # The override label is validated against an allowlist to prevent accidental
+    # dispatch to wrong elif branches.
+    # -----------------------------------------------------------------------
+    parser.add_argument(
+        "--iteration-label",
+        type=str,
+        default=None,
+        dest="iteration_label_override",
+        metavar="LABEL",
+        help=(
+            "Override iteration_label (e.g. 'v1-028-frozen-hp') for frozen-HP "
+            "validation sub-runs.  Allowlisted: v1-028-frozen-hp."
+        ),
+    )
+    # -----------------------------------------------------------------------
     # Multi-outer-seed statistical validation (Component 1 — framework/032+).
     #
     # LIVE-TRADING CONTRACT (IMMUTABLE):
@@ -1909,6 +1931,22 @@ def main() -> None:
         reports_dir = "reports-v1"
     else:
         sys.exit("ERROR: must specify --baseline-mode, --exploration, or --confirmation")
+
+    # --iteration-label override: applies after the auto-formatted iteration_label.
+    # Only allowlisted labels are accepted — prevents accidental dispatch misrouting.
+    _iteration_label_allowlist = {
+        "v1-028-frozen-hp",
+    }
+    if getattr(args, "iteration_label_override", None) is not None:
+        _override = args.iteration_label_override.strip()
+        if _override not in _iteration_label_allowlist:
+            sys.exit(
+                f"ERROR: --iteration-label '{_override}' not in allowlist "
+                f"{sorted(_iteration_label_allowlist)}. "
+                "Add the label to _iteration_label_allowlist before using it."
+            )
+        iteration_label = _override
+        print(f"  [iteration-label override] '{iteration_label}' (allowlisted)")
 
     # --ensemble-size override: applies after mode defaults are set.
     # Designed for methodology-axis iterations (e.g. iter-v1/001) that need a
@@ -3676,6 +3714,75 @@ def main() -> None:
         _r5_model_results = [results_d028]
         _post_dispatch_fi_strategies = [("Model_D_LTC_specialist", _strat_d028)]
 
+    elif set(symbols) == set(V1_ITER028_UNIVERSE) and iteration_label == "v1-028-frozen-hp":
+        # validation/iter028-frozen-hp: basin-lottery re-validation of /028 PROMISING.
+        #
+        # Purpose: decompose /028's +0.598 OOS Δ into axis_share vs basin_share.
+        # /028 axis = atr_sl=1.0 (tighter SL than baseline 1.75).
+        # This sub-run keeps EVERY hyperparameter IDENTICAL to the baseline (frozen HP
+        # from data/v1_baseline_frozen_hp.parquet, Model D rows) but applies atr_sl=1.0.
+        # No Optuna search — basin cannot migrate.
+        #
+        # Decomposition anchors:
+        #   baseline_oos  = LTC-in-pool OOS Sharpe = -0.267 (per-trade, per /028 review)
+        #   /028_main_oos = /028 comparison.csv OOS Sharpe = +0.3310
+        #   /028_frozen_oos = this run's OOS Sharpe
+        #
+        #   axis_share  = /028_frozen_oos - baseline_oos
+        #   basin_share = /028_main_oos - /028_frozen_oos
+        #   total_share = /028_main_oos - baseline_oos = +0.598
+        #
+        # Verdict thresholds:
+        #   axis_share >= +0.20 → PROMISING-AXIS-CONFIRMED
+        #   axis_share +0.10..+0.20 → PROMISING-AXIS-PARTIAL
+        #   axis_share < +0.10  → PROMISING-BASIN-ONLY
+        #
+        # Budget: frozen HP = no Optuna → wall-clock ~5-10 min.
+        assert set(symbols) == {"LTCUSDT"}, (
+            f"iter-v1/028-frozen-hp guard: expected {{LTCUSDT}}, got {set(symbols)}"
+        )
+        assert len(active_feature_columns) == 43, (
+            f"iter-v1/028-frozen-hp guard: expected 43 V1_FEATURE_COLUMNS_PRUNED cols, "
+            f"got {len(active_feature_columns)}"
+        )
+        assert frozen_hp_mode_arg == "baseline_v1", (
+            f"iter-v1/028-frozen-hp guard: expected --frozen-hp-mode baseline_v1, "
+            f"got {frozen_hp_mode_arg!r}. Pass --frozen-hp-mode baseline_v1."
+        )
+        assert _frozen_hp_parquet_path is not None and _frozen_hp_parquet_path.exists(), (
+            f"iter-v1/028-frozen-hp guard: frozen HP parquet not found: {_frozen_hp_parquet_path}"
+        )
+        print(
+            f"[iter-v1/028-frozen-hp] FROZEN-HP basin-lottery re-validation of /028 PROMISING. "
+            f"LTC-only, atr_sl=1.0 (axis), atr_tp=3.5, apply_r1=True. "
+            f"ENSEMBLE_SIZE={ensemble_size} (inner), Optuna DISABLED (frozen baseline HP). "
+            f"frozen_hp_parquet={_frozen_hp_parquet_path}. "
+            f"Baseline anchor OOS Sharpe=-0.267; /028 main OOS=+0.3310; total Δ=+0.598. "
+            f"Wall-clock estimate: 5-10 min (no Optuna)."
+        )
+        results_d028fhp, faxm_d028fhp, _strat_d028fhp = run_model(
+            "D' (LTC-only + atr_sl=1.0 + frozen baseline HP)",
+            ("LTCUSDT",),
+            atr_tp=3.5,  # UNCHANGED — matches /028 axis spec
+            atr_sl=1.0,  # AXIS CHANGE — tighter SL (same as /028 main)
+            apply_r1=True,  # UNCHANGED
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            model_role="D",  # matches frozen HP parquet 'model' column
+            **_r5_kwargs,
+        )
+        print(
+            f"[iter-v1/028-frozen-hp] LTC-only D' frozen-HP: {len(results_d028fhp)} trades "
+            f"(atr_sl=1.0, baseline HP frozen, no basin migration)"
+        )
+        _all_faxm_logs = faxm_d028fhp
+        all_results = results_d028fhp
+        _r5_model_results = [results_d028fhp]
+        _post_dispatch_fi_strategies = [("Model_D_LTC_specialist_frozen_hp", _strat_d028fhp)]
+
     elif set(symbols) == set(V1_ITER029_UNIVERSE) and iteration_label == "v1-029":
         # iter-v1/029: DOT-only single-cohort EXPLORATION + symmetric BTC-trend gate ±8%.
         # Cycle-4 EXPLORATION #2 of 10. Axis family: per-cohort-specialization-DOT-v2 (16th).
@@ -4042,26 +4149,37 @@ def main() -> None:
     # -------------------------------------------------------------------------
     is_dir = report_dir / "in_sample"
     oos_dir = report_dir / "out_of_sample"
-    _run_methodology_reporting(
-        all_results,
-        iter_dir=report_dir,
-        is_dir=is_dir,
-        oos_dir=oos_dir,
-        n_trials=n_trials,
-        symbols=symbols,
-        features_dir="data/features",
-        interval="8h",
-        oof_parquet_path=OOF_PARQUET_PATH,
-        feature_columns=active_feature_columns,
-        r5_signals_is=agg_r5_signals_is,
-        r5_fires_is=agg_r5_fires_is,
-        r5_signals_oos=agg_r5_signals_oos,
-        r5_fires_oos=agg_r5_fires_oos,
-        r5_kill_signals_is=agg_r5_kill_signals_is,
-        r5_kill_fires_is=agg_r5_kill_fires_is,
-        r5_kill_signals_oos=agg_r5_kill_signals_oos,
-        r5_kill_fires_oos=agg_r5_kill_fires_oos,
-    )
+    # Skip _run_methodology_reporting for frozen-HP validation runs: no Optuna
+    # search = no OOF parquet = n_eff / PSR / ADF metrics are N/A.  The core
+    # comparison.csv with IS/OOS Sharpe is already written by generate_iteration_reports;
+    # that is all we need for basin-lottery decomposition.
+    if frozen_hp_mode_arg == "none":
+        _run_methodology_reporting(
+            all_results,
+            iter_dir=report_dir,
+            is_dir=is_dir,
+            oos_dir=oos_dir,
+            n_trials=n_trials,
+            symbols=symbols,
+            features_dir="data/features",
+            interval="8h",
+            oof_parquet_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            r5_signals_is=agg_r5_signals_is,
+            r5_fires_is=agg_r5_fires_is,
+            r5_signals_oos=agg_r5_signals_oos,
+            r5_fires_oos=agg_r5_fires_oos,
+            r5_kill_signals_is=agg_r5_kill_signals_is,
+            r5_kill_fires_is=agg_r5_kill_fires_is,
+            r5_kill_signals_oos=agg_r5_kill_signals_oos,
+            r5_kill_fires_oos=agg_r5_kill_fires_oos,
+        )
+    else:
+        print(
+            f"[run_baseline_v1] frozen_hp_mode={frozen_hp_mode_arg!r}: "
+            "skipping _run_methodology_reporting (no OOF parquet; n_eff/PSR/ADF N/A). "
+            "Core comparison.csv Sharpe sufficient for basin-lottery decomposition."
+        )
 
     # iter-v1/016: write f_axis_mechanism.csv for F-AXIS-MECHANISM falsifier.
     # Only emits when sample_weight_mode != "abs_pnl" (active axis run) AND

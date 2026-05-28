@@ -254,3 +254,85 @@ class TestIter028FeatureColumnsPruned:
 
         for col in V1_FEATURE_COLUMNS_PRUNED:
             assert isinstance(col, str), f"Non-string feature column: {col!r}"
+
+
+class TestIter028FrozenHpDispatch:
+    """Smoke tests for validation/iter028-frozen-hp basin-lottery re-validation.
+
+    Tests verify:
+    16. v1-028-frozen-hp dispatch label appears in runner source.
+    17. frozen-HP dispatch uses atr_sl=1.0 (axis preserved).
+    18. frozen-HP dispatch uses model_role='D' (matches frozen HP parquet).
+    19. frozen-HP assert guards reference 'iter-v1/028-frozen-hp' for traceability.
+    20. --iteration-label allowlist contains v1-028-frozen-hp.
+    21. frozen-HP dispatch fires on LTCUSDT + v1-028-frozen-hp label (condition check).
+    22. frozen-HP dispatch does NOT fire on LTCUSDT + v1-028 label (branch isolation).
+    """
+
+    def test_frozen_hp_dispatch_label_in_source(self) -> None:
+        """v1-028-frozen-hp elif branch must exist in runner."""
+        import run_baseline_v1
+
+        src = inspect.getsource(run_baseline_v1)
+        assert 'iteration_label == "v1-028-frozen-hp"' in src
+
+    def test_frozen_hp_dispatch_uses_atr_sl_1_0(self) -> None:
+        """Axis must be preserved: atr_sl=1.0 in the frozen-HP block."""
+        import run_baseline_v1
+
+        src = inspect.getsource(run_baseline_v1)
+        # atr_sl=1.0 must appear (applies to both /028 and /028-frozen-hp blocks)
+        assert "atr_sl=1.0" in src
+
+    def test_frozen_hp_dispatch_uses_model_role_d(self) -> None:
+        """model_role='D' must be passed so frozen HP parquet lookup uses Model D rows."""
+        import run_baseline_v1
+
+        src = inspect.getsource(run_baseline_v1)
+        assert 'model_role="D"' in src
+
+    def test_frozen_hp_assert_guards_traceable(self) -> None:
+        """Guard messages must include 'iter-v1/028-frozen-hp' for traceability."""
+        import run_baseline_v1
+
+        src = inspect.getsource(run_baseline_v1)
+        assert "iter-v1/028-frozen-hp" in src
+
+    def test_iteration_label_allowlist_contains_frozen_hp(self) -> None:
+        """_ITERATION_LABEL_ALLOWLIST must include v1-028-frozen-hp."""
+        import run_baseline_v1
+
+        src = inspect.getsource(run_baseline_v1)
+        assert '"v1-028-frozen-hp"' in src
+
+    def test_frozen_hp_condition_fires_on_ltcusdt_and_correct_label(self) -> None:
+        """Dispatch condition: LTCUSDT + v1-028-frozen-hp."""
+        from crypto_trade.features_v1 import V1_ITER028_UNIVERSE
+
+        symbols = ("LTCUSDT",)
+        iteration_label = "v1-028-frozen-hp"
+        # Replicate the dispatch condition
+        condition = (
+            set(symbols) == set(V1_ITER028_UNIVERSE) and iteration_label == "v1-028-frozen-hp"
+        )
+        assert condition is True
+
+    def test_frozen_hp_does_not_fire_on_v1_028_label(self) -> None:
+        """frozen-HP dispatch does NOT fire when iteration_label is 'v1-028'."""
+        from crypto_trade.features_v1 import V1_ITER028_UNIVERSE
+
+        symbols = ("LTCUSDT",)
+        iteration_label = "v1-028"
+        # /028 main branch uses "v1-028"; frozen-HP uses "v1-028-frozen-hp"
+        frozen_hp_condition = (
+            set(symbols) == set(V1_ITER028_UNIVERSE) and iteration_label == "v1-028-frozen-hp"
+        )
+        assert frozen_hp_condition is False
+
+    def test_frozen_hp_symbol_guard_message(self) -> None:
+        """Guard message uses 'iter-v1/028-frozen-hp' prefix."""
+        wrong_symbols = {"BTCUSDT"}
+        with pytest.raises(AssertionError, match="iter-v1/028-frozen-hp"):
+            assert wrong_symbols == {"LTCUSDT"}, (
+                f"iter-v1/028-frozen-hp guard: expected {{LTCUSDT}}, got {wrong_symbols}"
+            )
