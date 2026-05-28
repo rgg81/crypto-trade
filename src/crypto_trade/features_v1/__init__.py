@@ -184,6 +184,26 @@ LOCAL to runner constant. NOT shared; CONFIRMATION-MERGE updates V1_BASELINE_UNI
 assert set(symbols) == {"LTCUSDT"} guard fires for this dispatch branch.
 """
 
+
+V1_ITER029_UNIVERSE: tuple[str, ...] = ("DOTUSDT",)
+"""iter-v1/029 cohort: DOT-only E-specialist + symmetric BTC-trend gate ±8% (mirror /019).
+
+Cycle-4 EXPLORATION #2 of 10. Axis family: per-cohort-specialization-DOT-v2 (NEW 16th family).
+Mechanism: post-hoc stateless direction-aware BTC-trend gate at ±8% on BTC 14d return (42 bars).
+Gate semantics: kill LONG when BTC ret_42 < -8% (counter-trend long into dump); kill SHORT when
+BTC ret_42 > +8% (counter-trend short into rally). Symmetric — mirrors /019 ETH spec exactly.
+
+LM Master HYBRID class: FRAGILE-POSITIVE-WITH-LONG-COUNTER-TREND-DRAG. DOT OOS LONG weak-up-BTC
+bucket (-8.47% / 7 tr / WR 28.6%) is the ETH /019 fingerprint. Path C recommended.
+
+Model E semantics: R1=ON, R2=OFF, R3=ON, atr_tp=3.5, atr_sl=1.75 (UNCHANGED from baseline).
+NORMAL-RISK declaration: post-Optuna gate does NOT change Optuna's training-objective domain.
+ENSEMBLE_SIZE=10, n_trials=35, single-seed=42 (EXPLORATION budget; ~30-45 min wall-clock).
+
+LOCAL to runner constant. NOT shared; CONFIRMATION-MERGE updates V1_BASELINE_UNIVERSE.
+assert set(symbols) == {"DOTUSDT"} and iteration_label == "v1-029" guard fires for dispatch.
+"""
+
 __all__ = [
     "V1_EXCLUDED_SYMBOLS",
     "V1_BASELINE_UNIVERSE",
@@ -192,6 +212,7 @@ __all__ = [
     "V1_OOD_FEATURE_COLUMNS",
     "assert_v1_universe",
     "V1_ITER028_UNIVERSE",
+    "V1_ITER029_UNIVERSE",
     # iter-v1/023: funding-rate feature family (add_funding_v1_features imported on demand)
     # iter-v1/025: OI delta feature family (add_oi_delta_v1_features imported on demand)
 ]

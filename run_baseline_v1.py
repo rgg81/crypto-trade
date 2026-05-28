@@ -74,6 +74,7 @@ from crypto_trade.features_v1 import (
     V1_FEATURE_COLUMNS,
     V1_FEATURE_COLUMNS_PRUNED,
     V1_ITER028_UNIVERSE,
+    V1_ITER029_UNIVERSE,
     V1_OOD_FEATURE_COLUMNS,
     assert_v1_universe,
 )
@@ -289,6 +290,17 @@ _V1_ITER027_EXCLUDED_COLS: frozenset[str] = frozenset(
         "oi_delta_30_z90",
     }
 )
+
+#: iter-v1/029: DOT-only E-specialist + symmetric BTC-trend gate ±8% (mirror /019).
+#: Cycle-4 EXPLORATION #2/10. Axis family: per-cohort-specialization-DOT-v2 (NEW 16th).
+#: Path C per LM Master §4 BINDING recommendation. NORMAL-RISK (post-Optuna gate only).
+#: Gate spec: lookback_bars=42 (14 days at 8h), threshold_pct=8.0 (±8% BTC 14d return),
+#:   enabled=True, long_only_mode=False (symmetric — mirrors /019 exactly).
+#: Model E semantics: R1=ON, R2=OFF, R3=ON, atr_tp=3.5, atr_sl=1.75 (FROZEN).
+#: ENSEMBLE_SIZE=10, n_trials=35, single-seed=42 (EXPLORATION; ~30-45 min wall-clock).
+V1_ITER029_BTC_GATE_LOOKBACK_BARS: int = 42  # 14 days at 8h cadence (mirror /019)
+V1_ITER029_BTC_GATE_THRESHOLD_PCT: float = 8.0  # +-8% BTC 14d return (mirror /019)
+V1_ITER029_BTC_GATE_ENABLED: bool = True
 
 #: iter-v1/021: stable path for Optuna best-params parquet (H1 diagnostic substrate).
 #: Written by optimize_and_train when params_persist_path is set.
@@ -3033,6 +3045,87 @@ def main() -> None:
         all_results = results_d028
         _r5_model_results = [results_d028]
         _post_dispatch_fi_strategies = [("Model_D_LTC_specialist", _strat_d028)]
+
+    elif set(symbols) == set(V1_ITER029_UNIVERSE) and iteration_label == "v1-029":
+        # iter-v1/029: DOT-only single-cohort EXPLORATION + symmetric BTC-trend gate ±8%.
+        # Cycle-4 EXPLORATION #2 of 10. Axis family: per-cohort-specialization-DOT-v2 (16th).
+        # LM Master HYBRID class FRAGILE-POSITIVE-WITH-LONG-COUNTER-TREND-DRAG → Path C.
+        #
+        # Model E semantics: R1=ON, R2=OFF, R3=ON, atr_tp=3.5, atr_sl=1.75 (FROZEN from
+        # baseline DOT per brief §3.2 + §3.3). Gate is the ONLY axis change vs DOT-in-pool.
+        #
+        # Gate: stateless direction-aware symmetric BTC-trend gate at ±8% on BTC 14d return.
+        #   Kill LONG when BTC ret_42 < -8%  (counter-trend long into BTC dump).
+        #   Kill SHORT when BTC ret_42 > +8%  (counter-trend short into BTC rally).
+        #   Symmetric long_only_mode=False — BIT-IDENTICAL to /019 ETH gate spec.
+        #
+        # F-AXIS-MECHANISM #1: trades.csv must contain ONLY DOTUSDT rows.
+        # F-AXIS-MECHANISM #2: IS [62, 130] / OOS [22, 55] trade band.
+        # F-AXIS-MECHANISM #3 (LOAD-BEARING): IS gate fire-rate [10%, 30%] modal 18%;
+        #   OOS gate fire-rate [5%, 30%] modal 15%. OOS < 5% → UNDER-FIRE cap (INERT).
+        # F-AXIS-MECHANISM #5 (LOAD-BEARING): OOS TP-exit count >= 2. If < 2 → INERT cap.
+        assert set(symbols) == {"DOTUSDT"}, (
+            f"iter-v1/029 guard: expected {{DOTUSDT}}, got {set(symbols)}"
+        )
+        assert len(active_feature_columns) == 43, (
+            f"iter-v1/029 guard: expected 43 V1_FEATURE_COLUMNS_PRUNED cols, "
+            f"got {len(active_feature_columns)}"
+        )
+        results_e029, faxm_e029, _strat_e029 = run_model(
+            "E' (DOT-only + R1 + R3 + BTC-trend gate)",
+            ("DOTUSDT",),
+            atr_tp=3.5,  # UNCHANGED — matches Model E baseline per brief §3.2
+            atr_sl=1.75,  # UNCHANGED — matches Model E baseline (gate is the only axis)
+            apply_r1=True,  # ON — Model E baseline has R1 consecutive-SL cooldown
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            **_r5_kwargs,
+        )
+        # Apply stateless symmetric BTC-trend gate as post-hoc trade-stream filter.
+        # Gate kills counter-trend DOT trades: DOT long when BTC ret_42 < -8%, or
+        # DOT short when BTC ret_42 > +8%. Symmetric (long_only_mode=False = default).
+        # IS/OOS fire-rates logged separately for F-AXIS #3 LOAD-BEARING diagnostic.
+        # load_btc_klines_for_filter() reads data/BTCUSDT/8h.csv (must be fresh
+        # per pre-flight check: close_time within 16h of measurement time).
+        btc_open_times_029, btc_closes_029 = load_btc_klines_for_filter()
+        gate_cfg_029 = BtcTrendFilterConfig(
+            lookback_bars=V1_ITER029_BTC_GATE_LOOKBACK_BARS,
+            threshold_pct=V1_ITER029_BTC_GATE_THRESHOLD_PCT,
+            enabled=V1_ITER029_BTC_GATE_ENABLED,
+        )
+        # Split IS/OOS to log separate fire-rate stats for F-AXIS #3 monitoring.
+        results_e029_is = [t for t in results_e029 if t.open_time < OOS_CUTOFF_MS]
+        results_e029_oos = [t for t in results_e029 if t.open_time >= OOS_CUTOFF_MS]
+        results_e029_is_gated, gate_stats_is = apply_btc_trend_filter(
+            results_e029_is, btc_open_times_029, btc_closes_029, gate_cfg_029
+        )
+        results_e029_oos_gated, gate_stats_oos = apply_btc_trend_filter(
+            results_e029_oos, btc_open_times_029, btc_closes_029, gate_cfg_029
+        )
+        gs_is = gate_stats_is.as_dict()
+        gs_oos = gate_stats_oos.as_dict()
+        print(
+            f"[iter-v1/029] BTC-trend gate IS fire-rate: "
+            f"{gs_is['n_killed']}/{gs_is['n_total']} = {gs_is['fire_rate']:.2%} "
+            f"(normal={gs_is['n_normal']} warmup={gs_is['n_warmup']})"
+        )
+        print(
+            f"[iter-v1/029] BTC-trend gate OOS fire-rate: "
+            f"{gs_oos['n_killed']}/{gs_oos['n_total']} = {gs_oos['fire_rate']:.2%} "
+            f"(normal={gs_oos['n_normal']} warmup={gs_oos['n_warmup']})"
+        )
+        # F-AXIS #5: OOS TP-exit count diagnostic (LOAD-BEARING — < 2 caps verdict).
+        oos_tp_count = sum(1 for t in results_e029_oos_gated if t.exit_reason == "take_profit")
+        print(f"[iter-v1/029] OOS TP-exit count: {oos_tp_count}")
+        # Recombine gated IS + OOS back into all_results.
+        results_e029 = results_e029_is_gated + results_e029_oos_gated
+        _all_faxm_logs = faxm_e029
+        all_results = results_e029
+        _r5_model_results = [results_e029]
+        _post_dispatch_fi_strategies = [("Model_E_DOT_specialist", _strat_e029)]
 
     else:
         # Custom universe — single pooled model unless brief specifies otherwise.
