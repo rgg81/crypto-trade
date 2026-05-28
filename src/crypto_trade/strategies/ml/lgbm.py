@@ -188,6 +188,7 @@ class LightGbmStrategy:
         data_filter_columns: list[str] | None = None,
         nan_skip_columns: list[str] | None = None,
         nan_skip_threshold: float = 0.5,
+        frozen_hp_parquet: Path | None = None,
     ) -> None:
         if not feature_columns:
             raise ValueError(
@@ -266,6 +267,14 @@ class LightGbmStrategy:
         # Accumulates per-(symbol, month) NaN-fraction rows for oi_coverage_check.csv.
         # Keys: symbol, month, column, nan_fraction, skipped.
         self._nan_skip_log: list[dict] = []
+        # iter-v1/032: frozen HP parquet path for basin-lottery ablation.
+        # When set, Optuna search is SKIPPED entirely. Per (model, month, inner_seed)
+        # the pre-extracted best hyperparameters from the baseline run are used to
+        # train LightGBM directly. Only sample_weight_mode varies vs the baseline.
+        # None = normal Optuna search (default, backward-compatible).
+        self._frozen_hp_parquet: Path | None = frozen_hp_parquet
+        # Cached DataFrame (loaded once on first _train_for_month call).
+        self._frozen_hp_df: pd.DataFrame | None = None
         # iter-v3/007: fast exploration mode (colsample fixed at 1.0 in optimization.py)
         self._fast_mode: bool = fast_mode
         # iter-v1/002: Optuna hyperparameter bounds profile.
@@ -900,34 +909,91 @@ class LightGbmStrategy:
         # symbols_arr aligns with feat_train rows (after keep_mask filtering)
         train_symbols_arr = self._sym_arr[train_indices][keep_mask]
 
+        # iter-v1/032: lazy-load frozen HP DataFrame on first call.
+        if self._frozen_hp_parquet is not None and self._frozen_hp_df is None:
+            self._frozen_hp_df = pd.read_parquet(self._frozen_hp_parquet)
+            if self.verbose > 0:
+                print(
+                    f"  [frozen_hp] Loaded {len(self._frozen_hp_df)} rows from "
+                    f"{self._frozen_hp_parquet}"
+                )
+
         for i, seed in enumerate(seeds):
             if self.verbose > 0 and len(seeds) > 1:
                 print(f"  [ensemble {i + 1}/{len(seeds)}] seed={seed}")
             try:
-                model, selected_cols, confidence_threshold = optimize_and_train(
-                    feat_train,
-                    train_labels,
-                    available_feat_cols,
-                    long_pnls,
-                    short_pnls,
-                    self.n_trials,
-                    self.cv_splits,
-                    seed,
-                    self.verbose,
-                    sample_weights=train_weights,
-                    open_times=train_open_times,
-                    train_end_ms=split.train_end_ms,
-                    ternary=ternary,
-                    cv_gap=cv_gap,
-                    oof_persist_path=self._oof_persist_path,
-                    train_month=month_str,
-                    symbols_arr=train_symbols_arr,
-                    fast_mode=self._fast_mode,
-                    bounds_profile=self._bounds_profile,
-                    params_persist_path=self._params_persist_path,
-                    model_role=self._model_role,
-                    symbol=self._symbol,
-                )
+                # iter-v1/032: when frozen HP is enabled, skip Optuna and train
+                # directly with the baseline's best hyperparameters for this cell.
+                if self._frozen_hp_df is not None:
+                    _model_key = self._model_role  # e.g. "A", "C", "D", "E"
+                    _row_mask = (
+                        (self._frozen_hp_df["model"] == _model_key)
+                        & (self._frozen_hp_df["month"] == month_str)
+                        & (self._frozen_hp_df["inner_seed"] == seed)
+                    )
+                    _hp_rows = self._frozen_hp_df[_row_mask]
+                    if _hp_rows.empty:
+                        if self.verbose > 0:
+                            print(
+                                f"  [frozen_hp] WARNING: no baseline HP for model="
+                                f"{_model_key!r} month={month_str!r} seed={seed}; "
+                                f"skipping this seed"
+                            )
+                        continue
+                    _hp = _hp_rows.iloc[0]
+                    import lightgbm as lgb_direct
+
+                    _lgbm_params = {
+                        "n_estimators": int(_hp["n_estimators"]),
+                        "max_depth": int(_hp["max_depth"]),
+                        "num_leaves": int(_hp["num_leaves"]),
+                        "learning_rate": float(_hp["learning_rate"]),
+                        "subsample": float(_hp["subsample"]),
+                        "colsample_bytree": float(_hp["colsample_bytree"]),
+                        "min_child_samples": int(_hp["min_child_samples"]),
+                        "reg_alpha": float(_hp["reg_alpha"]),
+                        "reg_lambda": float(_hp["reg_lambda"]),
+                        "random_state": seed,
+                        "n_jobs": -1,
+                        "verbose": -1,
+                    }
+                    confidence_threshold = float(_hp["confidence_threshold"])
+                    _clf = lgb_direct.LGBMClassifier(**_lgbm_params)
+                    _clf.fit(feat_train, train_labels, sample_weight=train_weights)
+                    model = _clf
+                    selected_cols = available_feat_cols
+                    if self.verbose > 0:
+                        print(
+                            f"  [frozen_hp] Trained with baseline HP: "
+                            f"n_est={_lgbm_params['n_estimators']} "
+                            f"depth={_lgbm_params['max_depth']} "
+                            f"ct={confidence_threshold:.3f}"
+                        )
+                else:
+                    model, selected_cols, confidence_threshold = optimize_and_train(
+                        feat_train,
+                        train_labels,
+                        available_feat_cols,
+                        long_pnls,
+                        short_pnls,
+                        self.n_trials,
+                        self.cv_splits,
+                        seed,
+                        self.verbose,
+                        sample_weights=train_weights,
+                        open_times=train_open_times,
+                        train_end_ms=split.train_end_ms,
+                        ternary=ternary,
+                        cv_gap=cv_gap,
+                        oof_persist_path=self._oof_persist_path,
+                        train_month=month_str,
+                        symbols_arr=train_symbols_arr,
+                        fast_mode=self._fast_mode,
+                        bounds_profile=self._bounds_profile,
+                        params_persist_path=self._params_persist_path,
+                        model_role=self._model_role,
+                        symbol=self._symbol,
+                    )
                 self._models.append(model)
                 self._confidence_thresholds.append(confidence_threshold)
             except Exception as exc:

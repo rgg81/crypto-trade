@@ -407,6 +407,7 @@ def run_model(
     data_filter_callback: Callable[[pd.DataFrame], np.ndarray] | None = None,
     nan_skip_columns: list[str] | None = None,
     nan_skip_threshold: float = 0.5,
+    frozen_hp_parquet: Path | None = None,
 ):
     """Run a single v1 sub-model (A/C/D/E) under the corrected walk-forward.
 
@@ -529,6 +530,7 @@ def run_model(
         data_filter_callback=data_filter_callback,
         nan_skip_columns=nan_skip_columns,
         nan_skip_threshold=nan_skip_threshold,
+        frozen_hp_parquet=frozen_hp_parquet,
     )
     t0 = time.time()
     results = run_backtest(config, strategy, yearly_pnl_check=False)
@@ -1612,6 +1614,22 @@ def main() -> None:
             "(symbol, training_window) — iter-v1/031 axis."
         ),
     )
+    # iter-v1/032: frozen HP mode for basin-lottery ablation.
+    # When "baseline_v1", Optuna search is skipped and each (model, month, seed) cell
+    # uses the per-cell best HP extracted from the baseline run's Optuna log.
+    # Only sample_weight_mode varies vs baseline — isolates the sample-weighting signal
+    # from basin migration (the confound identified at /031 closeout).
+    parser.add_argument(
+        "--frozen-hp-mode",
+        choices=["none", "baseline_v1"],
+        default="none",
+        help=(
+            "Frozen HP mode for iter-v1/032 basin-lottery ablation. "
+            "'none' (default) = normal Optuna search. "
+            "'baseline_v1' = skip Optuna; use baseline per-cell best HP from "
+            "data/v1_baseline_frozen_hp.parquet + apply sample_weight_mode."
+        ),
+    )
     args = parser.parse_args()
 
     # Resolve symbols
@@ -1816,6 +1834,21 @@ def main() -> None:
         print(f"  sigma_k_tp: {sigma_k_tp_arg}  sigma_k_sl: {sigma_k_sl_arg}")
         print(f"  sigma_halflife_days: {sigma_halflife_days_arg}")
     print(f"  sample_weight_mode: {sample_weight_mode_arg}")
+
+    # iter-v1/032: frozen HP mode resolution.
+    frozen_hp_mode_arg = getattr(args, "frozen_hp_mode", "none")
+    _frozen_hp_parquet_path: Path | None = None
+    if frozen_hp_mode_arg == "baseline_v1":
+        _frozen_hp_parquet_path = Path("data") / "v1_baseline_frozen_hp.parquet"
+        if not _frozen_hp_parquet_path.exists():
+            sys.exit(
+                f"ERROR: frozen HP parquet not found: {_frozen_hp_parquet_path}. "
+                "Run the baseline log extraction script first."
+            )
+        print(f"  frozen_hp_mode: baseline_v1 ({_frozen_hp_parquet_path})")
+        print("  [iter-v1/032] Optuna search DISABLED — using baseline per-cell best HP")
+    else:
+        print(f"  frozen_hp_mode: {frozen_hp_mode_arg} (normal Optuna search)")
     print()
 
     # Validate active feature list is non-empty (hard guard per feature-pinning rules).
@@ -1847,6 +1880,7 @@ def main() -> None:
     # (A pooled, C LINK, D LTC, E DOT) use the SAME inner-seed window.
     # iter-v1/014: sigma_source + sigma_k_tp/sl/halflife threaded through.
     # iter-v1/016: sample_weight_mode threaded through for sample-weighting axis.
+    # iter-v1/032: frozen_hp_parquet threaded through for basin-lottery ablation.
     _r5_kwargs = dict(
         r5_vol_target_enabled=r5_vol_target_enabled,
         r5_vol_target_pct=r5_vol_target_pct,
@@ -1858,6 +1892,7 @@ def main() -> None:
         sigma_k_sl=sigma_k_sl_arg,
         sample_weight_mode=sample_weight_mode_arg,
         sigma_halflife_days=sigma_halflife_days_arg,
+        frozen_hp_parquet=_frozen_hp_parquet_path,
     )
     # iter-v1/016: collect F-AXIS-MECHANISM logs from all model runs.
     _all_faxm_logs: list[dict] = []
@@ -2792,6 +2827,117 @@ def main() -> None:
         all_results = results_a031 + results_c031 + results_d031 + results_e031
         _r5_model_results = [results_a031, results_c031, results_d031, results_e031]
 
+    elif iteration_label == "v1-032" and set(symbols) == set(V1_BASELINE_UNIVERSE):
+        # iter-v1/032: FROZEN-HP basin-lottery ablation.
+        # Cycle-4 EXPLORATION #5/10. Axis family: sample-weighting (NINTH family).
+        #
+        # Purpose: disambiguate sample-weighting axis-edge from basin lottery in
+        # /031's +1.04 OOS Sharpe. ONLY change vs baseline:
+        #   sample_weight_mode=composite_inv_concurrency
+        # Optuna search is DISABLED — per (model, month, seed) cell uses baseline's
+        # best HP from data/v1_baseline_frozen_hp.parquet (no basin migration possible).
+        #
+        # Interpretation:
+        #   OOS Sharpe >= +1.0  → sample-weighting axis CONFIRMED (edge attributable)
+        #   OOS Sharpe ≈ +0.66 ± 0.15 → axis INERT; /031's +1.04 was basin lottery
+        #   OOS Sharpe < baseline → axis HARMFUL
+        #
+        # Budget: 5-seed inner ensemble (ENSEMBLE_SIZE=5), NO Optuna — wall-clock ~10-20 min.
+        assert set(symbols) == set(V1_BASELINE_UNIVERSE), (
+            f"iter-v1/032 guard: expected V1_BASELINE_UNIVERSE, got {set(symbols)}"
+        )
+        assert len(active_feature_columns) == 43, (
+            f"iter-v1/032 guard: expected 43 V1_FEATURE_COLUMNS_PRUNED cols, "
+            f"got {len(active_feature_columns)}"
+        )
+        assert sample_weight_mode_arg == "composite_inv_concurrency", (
+            f"iter-v1/032 guard: expected sample_weight_mode=composite_inv_concurrency, "
+            f"got {sample_weight_mode_arg!r}. Pass --sample-weight-mode composite_inv_concurrency."
+        )
+        assert frozen_hp_mode_arg == "baseline_v1", (
+            f"iter-v1/032 guard: expected --frozen-hp-mode baseline_v1, "
+            f"got {frozen_hp_mode_arg!r}. Pass --frozen-hp-mode baseline_v1."
+        )
+        assert _frozen_hp_parquet_path is not None and _frozen_hp_parquet_path.exists(), (
+            f"iter-v1/032 guard: frozen HP parquet not found: {_frozen_hp_parquet_path}"
+        )
+        print(
+            f"[iter-v1/032] FROZEN-HP ablation: composite_inv_concurrency + baseline hp "
+            f"(basin-lottery elimination). "
+            f"Models A/C/D/E, V1_BASELINE_UNIVERSE, V1_FEATURE_COLUMNS_PRUNED 43 cols. "
+            f"ENSEMBLE_SIZE={ensemble_size} (inner 5-seed), Optuna DISABLED. "
+            f"frozen_hp_parquet={_frozen_hp_parquet_path}. "
+            f"Wall-clock estimate: 10-20 min (no Optuna)."
+        )
+        # Note: model_role is passed as "A"/"C"/"D"/"E" (short name) to match the
+        # frozen HP parquet's 'model' column (extracted from baseline log).
+        results_a032, faxm_a032, _strat_a032 = run_model(
+            "A (BTC/ETH)",
+            ("BTCUSDT", "ETHUSDT"),
+            atr_tp=2.9,
+            atr_sl=1.45,
+            apply_r1=False,
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            model_role="A",
+            **_r5_kwargs,
+        )
+        results_c032, faxm_c032, _strat_c032 = run_model(
+            "C (LINK + R1)",
+            ("LINKUSDT",),
+            atr_tp=3.5,
+            atr_sl=1.75,
+            apply_r1=True,
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            model_role="C",
+            **_r5_kwargs,
+        )
+        results_d032, faxm_d032, _strat_d032 = run_model(
+            "D (LTC + R1)",
+            ("LTCUSDT",),
+            atr_tp=3.5,
+            atr_sl=1.75,
+            apply_r1=True,
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            model_role="D",
+            **_r5_kwargs,
+        )
+        results_e032, faxm_e032, _strat_e032 = run_model(
+            "E (DOT + R1 + R2)",
+            ("DOTUSDT",),
+            atr_tp=3.5,
+            atr_sl=1.75,
+            apply_r1=True,
+            apply_r2=True,
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            model_role="E",
+            **_r5_kwargs,
+        )
+        _all_faxm_logs = faxm_a032 + faxm_c032 + faxm_d032 + faxm_e032
+        all_results = results_a032 + results_c032 + results_d032 + results_e032
+        _r5_model_results = [results_a032, results_c032, results_d032, results_e032]
+        _post_dispatch_fi_strategies = [
+            ("A (BTC/ETH)", _strat_a032),
+            ("C (LINK)", _strat_c032),
+            ("D (LTC)", _strat_d032),
+            ("E (DOT)", _strat_e032),
+        ]
+
     elif set(symbols) == set(V1_BASELINE_UNIVERSE) and iteration_label not in (
         "v1-021",
         "v1-023",
@@ -2800,6 +2946,7 @@ def main() -> None:
         "v1-027",
         "v1-030",
         "v1-031",
+        "v1-032",
     ):
         # Generic baseline-universe dispatch.
         # Non-/021/023/024/025/027/030/031 iterations. Models A/C/D/E with
