@@ -167,6 +167,23 @@ def assert_v1_universe(symbols: list[str] | tuple[str, ...]) -> None:
         )
 
 
+V1_ITER028_UNIVERSE: tuple[str, ...] = ("LTCUSDT",)
+"""iter-v1/028 cohort: LTC-only D-specialist with tighter atr_sl=1.0 (vs baseline 1.75).
+
+Cycle-4 EXPLORATION #1 of 10. Axis family: per-cohort-specialization-LTC-v2 (NEW 15th family).
+Mechanism: upstream ATR-based SL magnitude clip. atr_sl is upstream of triple-barrier label
+generation — tightening 1.75→1.0 narrows the lower barrier by 43%, shifts class balance (MORE
+-1 labels with SMALLER magnitudes), AND relocates the Optuna basin under retraining (TWO
+basin-relocation vectors per LM Master Rec #2 ADOPTED). PARTIAL basin inoculation; NOT immune.
+
+HIGH-RISK declaration: per-cohort isolation + labeling-parameter modification both change
+Optuna's training-objective domain. Mitigation: ENSEMBLE_SIZE=10 (v1-runner-compatible; maps
+variance budget to inner ensemble per feedback_v1_ensemble.md since v1 runner has no --seeds).
+
+LOCAL to runner constant. NOT shared; CONFIRMATION-MERGE updates V1_BASELINE_UNIVERSE.
+assert set(symbols) == {"LTCUSDT"} guard fires for this dispatch branch.
+"""
+
 __all__ = [
     "V1_EXCLUDED_SYMBOLS",
     "V1_BASELINE_UNIVERSE",
@@ -174,6 +191,7 @@ __all__ = [
     "V1_FEATURE_COLUMNS_PRUNED",
     "V1_OOD_FEATURE_COLUMNS",
     "assert_v1_universe",
+    "V1_ITER028_UNIVERSE",
     # iter-v1/023: funding-rate feature family (add_funding_v1_features imported on demand)
     # iter-v1/025: OI delta feature family (add_oi_delta_v1_features imported on demand)
 ]

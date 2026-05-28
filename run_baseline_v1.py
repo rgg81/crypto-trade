@@ -73,6 +73,7 @@ from crypto_trade.features_v1 import (
     V1_EXCLUDED_SYMBOLS,
     V1_FEATURE_COLUMNS,
     V1_FEATURE_COLUMNS_PRUNED,
+    V1_ITER028_UNIVERSE,
     V1_OOD_FEATURE_COLUMNS,
     assert_v1_universe,
 )
@@ -2923,7 +2924,7 @@ def main() -> None:
                 "[iter-v1/021] Layer A WARNING: params parquet NOT FOUND after run",
                 file=sys.stderr,
             )
-    elif set(symbols) == set(V1_ITER022_UNIVERSE):
+    elif set(symbols) == set(V1_ITER022_UNIVERSE) and iteration_label == "v1-022":
         # iter-v1/022: LTC-only single-cohort EXPLORATION + stateless long-suppression
         # BTC-trend gate (cycle-3 #7 of 10; per-cohort-specialization-LTC; NEW 14th family).
         # USER STRATEGIC PIVOT 2026-05-26: per-cohort specialization axis.
@@ -2984,6 +2985,55 @@ def main() -> None:
         _all_faxm_logs = faxm_dprime
         all_results = results_dprime
         _r5_model_results = [results_dprime]
+
+    elif set(symbols) == set(V1_ITER028_UNIVERSE) and iteration_label == "v1-028":
+        # iter-v1/028: D' specialist (LTC-only) + tighter ATR-based SL (atr_sl=1.0 vs 1.75).
+        # Cycle-4 EXPLORATION #1 of 10. Axis family: per-cohort-specialization-LTC-v2 (15th).
+        #
+        # KEY MECHANISM: atr_sl=1.0 (changed from baseline 1.75 Model D).
+        # atr_sl is upstream of triple-barrier label generation — tightening 1.75→1.0
+        # narrows the lower barrier by 43%, shifts class balance (MORE -1 labels with
+        # SMALLER magnitudes), AND relocates the Optuna basin. TWO basin-relocation
+        # vectors (LM Master Rec #2 ADOPTED). PARTIAL basin inoculation, NOT immunity.
+        #
+        # HIGH-RISK variance budget: ENSEMBLE_SIZE=10 (v1-runner-compatible; no --seeds
+        # flag in v1 argparse; maps to inner ensemble per feedback_v1_ensemble.md).
+        #
+        # F-AXIS-MECHANISM #1: trades.csv must contain ONLY LTCUSDT rows.
+        # F-AXIS-MECHANISM #2: IS [80,180] / OOS [20,60] trade band.
+        # F-AXIS-MECHANISM #3 (COUNTER-INTUITIVE per LM Master Rec #4): tighter SL →
+        #   INCREASES SL fire-rate. Predicted OOS SL fire-rate 75-90% (vs baseline 62%).
+        # F-AXIS-MECHANISM #5 (LOAD-BEARING per LM Master Rec #6): OOS TP-exit count.
+        #   If TP-count=0 OOS, verdict CANNOT exceed PROMISING-INERT regardless of F1.
+        assert set(symbols) == {"LTCUSDT"}, (
+            f"iter-v1/028 guard: expected {{LTCUSDT}}, got {set(symbols)}"
+        )
+        assert len(active_feature_columns) == 43, (
+            f"iter-v1/028 guard: expected 43 V1_FEATURE_COLUMNS_PRUNED cols, "
+            f"got {len(active_feature_columns)}"
+        )
+        results_d028, faxm_d028, _strat_d028 = run_model(
+            "D' (LTC-only + tighter SL)",
+            ("LTCUSDT",),
+            atr_tp=3.5,  # UNCHANGED — matches Model D baseline per brief §3.3
+            atr_sl=1.0,  # CHANGED from 1.75 — tighter SL is the axis (KEY parameter)
+            apply_r1=True,  # UNCHANGED — Model D baseline has R1 consecutive-SL cooldown
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            **_r5_kwargs,
+        )
+        print(
+            f"[iter-v1/028] LTC-only D' specialist: {len(results_d028)} trades "
+            f"(atr_sl=1.0 vs baseline 1.75; ensemble_size={ensemble_size})"
+        )
+        _all_faxm_logs = faxm_d028
+        all_results = results_d028
+        _r5_model_results = [results_d028]
+        _post_dispatch_fi_strategies = [("Model_D_LTC_specialist", _strat_d028)]
+
     else:
         # Custom universe — single pooled model unless brief specifies otherwise.
         # iter-v1/NNN brief Section 3 should declare per-symbol model assignment.
