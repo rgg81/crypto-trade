@@ -79,6 +79,7 @@ from crypto_trade.features_v1 import (
     assert_v1_universe,
 )
 from crypto_trade.iteration_report import generate_iteration_reports
+from crypto_trade.strategies.ml.basin_diagnostics import emit_basin_diagnostics_summary
 from crypto_trade.strategies.ml.lgbm import LightGbmStrategy
 from crypto_trade.strategies.ml.metalabeling import MetaLabelingStrategy
 from crypto_trade.strategies.ml.reporting_v1 import (
@@ -1452,6 +1453,193 @@ def _run_methodology_reporting(
     print("[run_baseline_v1] === methodology reporting complete ===\n")
 
 
+# ---------------------------------------------------------------------------
+# Multi-outer-seed + auto-frozen-HP helper functions (framework/032+)
+# ---------------------------------------------------------------------------
+
+#: Outer seed offset table.  Offset i selects inner seeds starting at position
+#: i in ENSEMBLE_SEEDS. offsets=[0,5,10,15,20] select disjoint inner-seed
+#: windows of up to 5 seeds each (though with ENSEMBLE_SIZE<=10 they may
+#: overlap when offset+size>10; callers must verify offset+size<=len(ENSEMBLE_SEEDS)).
+_OUTER_SEED_OFFSETS: tuple[int, ...] = (0, 5, 10, 15, 20)
+
+#: Canonical outer seed identifier corresponding to offset=0 (the live model).
+V1_CANONICAL_OUTER_SEED: int = 42  # live engine uses this path exclusively
+
+
+def _compute_comparison_sharpe(comparison_csv: Path) -> float | None:
+    """Return OOS monthly_sharpe from a comparison.csv, or None if unavailable."""
+    if not comparison_csv.exists():
+        return None
+    try:
+        df = pd.read_csv(comparison_csv)
+        row = df[df["metric"] == "monthly_sharpe"]
+        if row.empty:
+            return None
+        return float(row.iloc[0]["out_of_sample"])
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _emit_magnitude_decomposition(
+    report_dir: Path,
+    main_oos_sharpe: float | None,
+    frozen_hp_oos_sharpe: float | None,
+    baseline_oos_sharpe: float | None,
+) -> None:
+    """Write magnitude_decomposition.json to report_dir.
+
+    Computes:
+        axis_share   = frozen_hp_OOS - baseline_OOS
+        basin_share  = main_OOS - frozen_hp_OOS
+        total_share  = main_OOS - baseline_OOS
+
+    All values are OOS monthly Sharpe deltas vs baseline.
+
+    Args:
+        report_dir: Root iteration report directory.
+        main_oos_sharpe: OOS Sharpe from the main (axis) run.
+        frozen_hp_oos_sharpe: OOS Sharpe from the frozen-HP run.
+        baseline_oos_sharpe: OOS Sharpe from the BASELINE_V1.md anchor.
+    """
+    import json as _json  # noqa: PLC0415
+
+    def _delta(a: float | None, b: float | None) -> float | None:
+        return round(a - b, 4) if (a is not None and b is not None) else None
+
+    axis_share = _delta(frozen_hp_oos_sharpe, baseline_oos_sharpe)
+    basin_share = _delta(main_oos_sharpe, frozen_hp_oos_sharpe)
+    total_share = _delta(main_oos_sharpe, baseline_oos_sharpe)
+
+    result = {
+        "main_oos_sharpe": main_oos_sharpe,
+        "frozen_hp_oos_sharpe": frozen_hp_oos_sharpe,
+        "baseline_oos_sharpe": baseline_oos_sharpe,
+        "axis_share": axis_share,
+        "basin_share": basin_share,
+        "total_share": total_share,
+        "verdict": (
+            "PROMISING-AXIS-CONFIRMED"
+            if (axis_share is not None and axis_share >= 0.20)
+            else (
+                "PROMISING-AXIS-PARTIAL"
+                if (axis_share is not None and 0.10 <= axis_share < 0.20)
+                else (
+                    "PROMISING-BASIN-ONLY"
+                    if (axis_share is not None and axis_share < 0.10)
+                    else "UNKNOWN"
+                )
+            )
+        ),
+        "note": (
+            "axis_share = frozen_hp_OOS - baseline_OOS  (axis signal, HP held constant). "
+            "basin_share = main_OOS - frozen_hp_OOS  (basin migration, Optuna free). "
+            "PROMISING-AXIS-CONFIRMED: axis>=+0.20. "
+            "PROMISING-AXIS-PARTIAL: axis in [+0.10, +0.20). "
+            "PROMISING-BASIN-ONLY: axis<+0.10 (lift was basin lottery)."
+        ),
+    }
+
+    out_path = report_dir / "magnitude_decomposition.json"
+    with open(out_path, "w") as f:
+        _json.dump(result, f, indent=2, default=str)
+    print(
+        f"[magnitude_decomposition] axis_share={axis_share} "
+        f"basin_share={basin_share} total_share={total_share} "
+        f"→ verdict={result['verdict']}"
+    )
+    print(f"[magnitude_decomposition] written to {out_path}")
+
+
+def _run_multi_seed_aggregate(
+    report_dir: Path,
+    n_seeds: int,
+    seed_dirs: list[Path],
+) -> None:
+    """Aggregate per-seed comparison.csv into comparison_multi_seed.csv.
+
+    Reads each seed_dir/comparison.csv, extracts OOS monthly_sharpe, and
+    emits a summary CSV with mean/std/min/max across outer seeds.
+
+    Args:
+        report_dir: Root iteration report directory (comparison_multi_seed.csv
+                    is written here).
+        n_seeds: Number of outer seeds.
+        seed_dirs: List of per-seed report directories (one per outer seed).
+    """
+    rows = []
+    for seed_dir in seed_dirs:
+        comp_csv = seed_dir / "comparison.csv"
+        sharpe = _compute_comparison_sharpe(comp_csv)
+        rows.append(
+            {
+                "seed_dir": str(seed_dir.name),
+                "oos_monthly_sharpe": sharpe,
+            }
+        )
+
+    df = pd.DataFrame(rows)
+    sharpes = df["oos_monthly_sharpe"].dropna().tolist()
+
+    summary = {
+        "n_seeds": n_seeds,
+        "n_valid": len(sharpes),
+        "mean_oos_sharpe": round(float(np.mean(sharpes)), 4) if sharpes else None,
+        "std_oos_sharpe": round(float(np.std(sharpes, ddof=1)), 4) if len(sharpes) > 1 else None,
+        "min_oos_sharpe": round(float(np.min(sharpes)), 4) if sharpes else None,
+        "max_oos_sharpe": round(float(np.max(sharpes)), 4) if sharpes else None,
+        "n_profitable_seeds": sum(1 for s in sharpes if s is not None and s > 0),
+        "pct_profitable": round(
+            sum(1 for s in sharpes if s is not None and s > 0) / len(sharpes) * 100, 1
+        )
+        if sharpes
+        else None,
+    }
+
+    # Per-seed rows
+    for i, seed_dir in enumerate(seed_dirs):
+        comp_csv = seed_dir / "comparison.csv"
+        if comp_csv.exists():
+            try:
+                comp_df = pd.read_csv(comp_csv)
+                # Add all metrics from this seed to the aggregate
+                for _, mrow in comp_df.iterrows():
+                    rows.append(
+                        {
+                            "seed_dir": str(seed_dir.name),
+                            "metric": mrow.get("metric", ""),
+                            "in_sample": mrow.get("in_sample", None),
+                            "out_of_sample": mrow.get("out_of_sample", None),
+                            "ratio": mrow.get("ratio", None),
+                        }
+                    )
+            except Exception:  # noqa: BLE001
+                pass
+
+    # Write per-seed summary CSV
+    summary_rows = []
+    for i, seed_dir in enumerate(seed_dirs):
+        sharpe = _compute_comparison_sharpe(seed_dir / "comparison.csv")
+        summary_rows.append(
+            {
+                "outer_seed_id": seed_dir.name.replace("seed_", ""),
+                "oos_monthly_sharpe": sharpe,
+                "profitable": (sharpe is not None and sharpe > 0),
+            }
+        )
+    summary_df = pd.DataFrame(summary_rows)
+    out_path = report_dir / "comparison_multi_seed.csv"
+    summary_df.to_csv(out_path, index=False)
+
+    print(
+        f"[multi_seed] n={n_seeds} mean_sharpe={summary['mean_oos_sharpe']} "
+        f"std={summary['std_oos_sharpe']} "
+        f"profitable={summary['n_profitable_seeds']}/{summary['n_valid']} "
+        f"({summary['pct_profitable']}%)"
+    )
+    print(f"[multi_seed] aggregate written to {out_path}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="v1 baseline runner — refactored 2026-05-23")
     parser.add_argument(
@@ -1628,6 +1816,57 @@ def main() -> None:
             "'none' (default) = normal Optuna search. "
             "'baseline_v1' = skip Optuna; use baseline per-cell best HP from "
             "data/v1_baseline_frozen_hp.parquet + apply sample_weight_mode."
+        ),
+    )
+    # -----------------------------------------------------------------------
+    # Multi-outer-seed statistical validation (Component 1 — framework/032+).
+    #
+    # LIVE-TRADING CONTRACT (IMMUTABLE):
+    # --seeds only generates STATISTICAL VALIDATION reports.  The live engine
+    # ALWAYS runs single-outer-seed=42 (the canonical inner-ensemble-averaged
+    # prediction path).  Multi-outer-seed reports are VALIDATION ARTIFACTS ONLY
+    # and are NEVER read by the live engine.  The live-compatible path is
+    # reports-v1/iteration_v1-NNN/seed_42/ (outer_seed_id=42, offset=0).
+    # This contract is verified by: live/engine.py never importing basin_diagnostics
+    # and never referencing reports-v1/<NNN>/seed_*/. Audited at framework/032+.
+    # -----------------------------------------------------------------------
+    parser.add_argument(
+        "--seeds",
+        type=int,
+        default=1,
+        metavar="N",
+        help=(
+            "Number of outer seeds for multi-seed statistical validation (default 1). "
+            "When N > 1, the entire walk-forward is repeated N times with different "
+            "ensemble_seeds_offset (offsets: 0, 5, 10, 15, 20 for N=5). Each outer "
+            "seed's reports are written to reports-v1/iteration_v1-NNN/seed_{id}/. "
+            "Aggregate multi-seed comparison is written to comparison_multi_seed.csv. "
+            "LIVE-TRADING CONTRACT: live engine uses single-outer-seed=42 ONLY. "
+            "Multi-outer-seed reports are STATISTICAL VALIDATION artifacts only."
+        ),
+    )
+    # -----------------------------------------------------------------------
+    # Auto-frozen-HP control companion run (Component 3 — framework/032+).
+    #
+    # When enabled, after the main backtest completes, an automatic second
+    # sub-run is launched with --frozen-hp-mode baseline_v1, keeping all other
+    # parameters identical.  Both runs' reports persist under main/ and frozen_hp/.
+    # The axis-attributable magnitude decomposition is computed automatically
+    # and written to magnitude_decomposition.json.
+    #
+    # This makes the /032 frozen-HP ablation methodology AUTOMATIC for any
+    # EXPLORATION iteration — no manual post-hoc ablation needed.
+    # -----------------------------------------------------------------------
+    parser.add_argument(
+        "--auto-frozen-hp-control",
+        action="store_true",
+        default=False,
+        help=(
+            "Auto-launch a frozen-HP companion run after the main backtest "
+            "(framework/032+). Requires data/v1_baseline_frozen_hp.parquet to exist. "
+            "Main reports written to <report_dir>/main/; frozen-HP reports to "
+            "<report_dir>/frozen_hp/. Magnitude decomposition emitted to "
+            "<report_dir>/magnitude_decomposition.json."
         ),
     )
     args = parser.parse_args()
@@ -3859,6 +4098,25 @@ def main() -> None:
                     f"max={max(_timeout_shares):.4f}"
                 )
 
+    # -------------------------------------------------------------------------
+    # framework/032+: basin diagnostics auto-emission (Component 2).
+    # Emits V1/V2/V3 basin-lottery metrics automatically after every backtest.
+    # The trials parquet (OOF_PARQUET_PATH) is populated by optimization.py
+    # during training. The baseline OOS trades CSV is read from
+    # reports-v1/iteration_v1-baseline/out_of_sample/trades.csv (must exist).
+    # -------------------------------------------------------------------------
+    if mode_label != "BASELINE":
+        _diagnostics_dir = report_dir / "basin_diagnostics"
+        _baseline_oos_trades = Path("reports-v1/iteration_v1-baseline/out_of_sample/trades.csv")
+        _main_oos_trades = report_dir / "out_of_sample" / "trades.csv"
+        emit_basin_diagnostics_summary(
+            diagnostics_dir=_diagnostics_dir,
+            trials_parquet=OOF_PARQUET_PATH,
+            main_trades_oos=_main_oos_trades,
+            baseline_trades_oos=_baseline_oos_trades,
+            symbols=list(symbols),
+        )
+
     print(
         f"\nMode: {mode_label}. ENSEMBLE_SIZE={ensemble_size}. n_trials={n_trials}. "
         f"features={len(active_feature_columns)}. "
@@ -3887,6 +4145,236 @@ def main() -> None:
             file=sys.stderr,
         )
         sys.exit(1)
+
+    # -------------------------------------------------------------------------
+    # framework/032+: multi-outer-seed statistical validation (Component 1).
+    #
+    # When --seeds N is passed (N > 1), emit a seed_42/ subdirectory for the
+    # canonical outer seed (already complete above), then launch N-1 additional
+    # subprocess runs with ensemble_seeds_offset=5,10,... each writing to
+    # seed_{offset}/ subdirectory.  Finally aggregate into comparison_multi_seed.csv.
+    #
+    # LIVE-TRADING CONTRACT: seed_42/ is the only path the live engine reads.
+    # Multi-outer-seed reports are STATISTICAL VALIDATION artifacts only.
+    # The live engine does NOT import basin_diagnostics and does NOT reference
+    # the seed_*/ subdirectories.  This contract is audited at framework/032+.
+    # -------------------------------------------------------------------------
+    n_outer_seeds = int(getattr(args, "seeds", 1))
+    auto_frozen_hp = bool(getattr(args, "auto_frozen_hp_control", False))
+
+    if n_outer_seeds > 1 and mode_label != "BASELINE":
+        import subprocess  # noqa: PLC0415
+
+        if n_outer_seeds > len(_OUTER_SEED_OFFSETS):
+            print(
+                f"[multi_seed] WARNING: --seeds {n_outer_seeds} exceeds available "
+                f"offset table ({len(_OUTER_SEED_OFFSETS)}). Capping at "
+                f"{len(_OUTER_SEED_OFFSETS)}.",
+                file=sys.stderr,
+            )
+            n_outer_seeds = len(_OUTER_SEED_OFFSETS)
+
+        # The main run above used offset=0 → seed_42 (canonical live path).
+        # Move its reports to seed_42/ subdirectory.
+        seed_42_dir = report_dir / f"seed_{V1_CANONICAL_OUTER_SEED}"
+        if not seed_42_dir.exists():
+            import shutil  # noqa: PLC0415
+
+            seed_42_dir.mkdir(parents=True, exist_ok=True)
+            # Move existing report contents into seed_42/
+            for child in list(report_dir.iterdir()):
+                if child.name not in (f"seed_{V1_CANONICAL_OUTER_SEED}",):
+                    # Skip already-moved items; move everything else
+                    try:
+                        shutil.move(str(child), str(seed_42_dir / child.name))
+                    except Exception as _exc:  # noqa: BLE001
+                        print(
+                            f"[multi_seed] WARNING: could not move {child} → "
+                            f"{seed_42_dir / child.name}: {_exc}",
+                            file=sys.stderr,
+                        )
+        print(f"[multi_seed] Canonical (outer_seed=42 offset=0) reports → {seed_42_dir}")
+
+        # Build CLI args for sub-runs (strip --seeds; add --ensemble-seeds-offset N).
+        # We reconstruct sys.argv minus the --seeds flag and any --ensemble-seeds-offset.
+        base_argv = [a for a in sys.argv[1:] if a != "--seeds"]
+        # Remove any existing --ensemble-seeds-offset args
+        _filtered_argv = []
+        _skip_next = False
+        for _a in base_argv:
+            if _skip_next:
+                _skip_next = False
+                continue
+            if _a.startswith("--ensemble-seeds-offset"):
+                if "=" not in _a:
+                    _skip_next = True
+                continue
+            _filtered_argv.append(_a)
+        base_argv = _filtered_argv
+
+        seed_dirs: list[Path] = [seed_42_dir]
+
+        for seed_idx in range(1, n_outer_seeds):
+            offset = _OUTER_SEED_OFFSETS[seed_idx]
+            # offset encodes the ensemble_seeds_offset; use it as seed ID label
+            seed_label = f"offset{offset}"
+            seed_dir = report_dir / f"seed_{seed_label}"
+            print(
+                f"\n[multi_seed] Launching outer seed {seed_idx + 1}/{n_outer_seeds} "
+                f"(offset={offset}) → {seed_dir}"
+            )
+
+            # Verify offset+ensemble_size <= len(ENSEMBLE_SEEDS)
+            if offset + ensemble_size > len(ENSEMBLE_SEEDS):
+                print(
+                    f"[multi_seed] WARNING: offset={offset} + ensemble_size={ensemble_size} "
+                    f"> {len(ENSEMBLE_SEEDS)} (ENSEMBLE_SEEDS length). Skipping this seed.",
+                    file=sys.stderr,
+                )
+                continue
+
+            sub_argv = [
+                sys.executable,
+                str(Path(__file__).resolve()),
+                *base_argv,
+                f"--ensemble-seeds-offset={offset}",
+                "--no-engineering-report",  # sub-runs don't need engineering_report
+            ]
+            # Override output dir — we can't directly override the report dir from
+            # CLI, but the sub-run writes to the same iteration label. After it
+            # completes we'll move its output from the standard path to seed_dir.
+            result_proc = subprocess.run(
+                sub_argv,
+                capture_output=True,
+                text=True,
+            )
+            print(result_proc.stdout[-4000:] if result_proc.stdout else "(no stdout)")
+            if result_proc.returncode != 0:
+                print(
+                    f"[multi_seed] Sub-run offset={offset} FAILED (rc={result_proc.returncode}). "
+                    f"stderr:\n{result_proc.stderr[-2000:]}",
+                    file=sys.stderr,
+                )
+                continue
+
+            # Move the sub-run's standard report_dir to seed_dir
+            import shutil as _shutil  # noqa: PLC0415
+
+            sub_report_dir = report_dir  # sub-run writes to same label
+            if sub_report_dir.exists():
+                seed_dir.mkdir(parents=True, exist_ok=True)
+                for _child in list(sub_report_dir.iterdir()):
+                    if _child.name.startswith("seed_"):
+                        continue  # don't move existing seed dirs
+                    try:
+                        _shutil.move(str(_child), str(seed_dir / _child.name))
+                    except Exception as _exc:  # noqa: BLE001
+                        print(
+                            f"[multi_seed] WARNING: move failed {_child} → "
+                            f"{seed_dir / _child.name}: {_exc}",
+                            file=sys.stderr,
+                        )
+            seed_dirs.append(seed_dir)
+
+        # Aggregate all seed comparison.csv files
+        _run_multi_seed_aggregate(report_dir, n_outer_seeds, seed_dirs)
+
+    # -------------------------------------------------------------------------
+    # framework/032+: auto-frozen-HP companion run (Component 3).
+    #
+    # When --auto-frozen-hp-control is passed, after the main backtest completes:
+    # 1. Move main reports to <report_dir>/main/
+    # 2. Run a second sub-run with --frozen-hp-mode baseline_v1
+    # 3. Move frozen-HP reports to <report_dir>/frozen_hp/
+    # 4. Emit magnitude_decomposition.json to <report_dir>/
+    # -------------------------------------------------------------------------
+    if auto_frozen_hp and mode_label not in ("BASELINE",) and frozen_hp_mode_arg == "none":
+        import shutil as _shutil2  # noqa: PLC0415
+        import subprocess as _subprocess2  # noqa: PLC0415
+
+        frozen_hp_parquet_check = Path("data") / "v1_baseline_frozen_hp.parquet"
+        if not frozen_hp_parquet_check.exists():
+            print(
+                "[auto_frozen_hp] WARNING: data/v1_baseline_frozen_hp.parquet not found. "
+                "Skipping auto-frozen-HP companion run. Generate it first with the "
+                "baseline frozen-HP extraction script.",
+                file=sys.stderr,
+            )
+        else:
+            # 1. Move main run's reports to main/ subdirectory
+            main_sub_dir = report_dir / "main"
+            main_sub_dir.mkdir(parents=True, exist_ok=True)
+            for _child in list(report_dir.iterdir()):
+                if _child.name in ("main", "frozen_hp"):
+                    continue
+                try:
+                    _shutil2.move(str(_child), str(main_sub_dir / _child.name))
+                except Exception as _exc:  # noqa: BLE001
+                    print(
+                        f"[auto_frozen_hp] WARNING: move failed {_child} → "
+                        f"{main_sub_dir / _child.name}: {_exc}",
+                        file=sys.stderr,
+                    )
+            print(f"[auto_frozen_hp] Main reports moved to {main_sub_dir}")
+
+            # 2. Launch frozen-HP sub-run
+            base_argv_fhp = [a for a in sys.argv[1:]]
+            # Add --frozen-hp-mode baseline_v1
+            base_argv_fhp += ["--frozen-hp-mode", "baseline_v1"]
+            # Remove --auto-frozen-hp-control to avoid infinite recursion
+            base_argv_fhp = [a for a in base_argv_fhp if a != "--auto-frozen-hp-control"]
+
+            print(
+                "\n[auto_frozen_hp] Launching frozen-HP companion run "
+                "(--frozen-hp-mode baseline_v1)..."
+            )
+            fhp_proc = _subprocess2.run(
+                [
+                    sys.executable,
+                    str(Path(__file__).resolve()),
+                    *base_argv_fhp,
+                    "--no-engineering-report",
+                ],
+                capture_output=True,
+                text=True,
+            )
+            print(fhp_proc.stdout[-4000:] if fhp_proc.stdout else "(no stdout)")
+            if fhp_proc.returncode != 0:
+                print(
+                    f"[auto_frozen_hp] Frozen-HP sub-run FAILED (rc={fhp_proc.returncode}). "
+                    f"stderr:\n{fhp_proc.stderr[-2000:]}",
+                    file=sys.stderr,
+                )
+            else:
+                # 3. Move frozen-HP reports to frozen_hp/ subdirectory
+                fhp_sub_dir = report_dir / "frozen_hp"
+                fhp_sub_dir.mkdir(parents=True, exist_ok=True)
+                for _child in list(report_dir.iterdir()):
+                    if _child.name in ("main", "frozen_hp"):
+                        continue
+                    try:
+                        _shutil2.move(str(_child), str(fhp_sub_dir / _child.name))
+                    except Exception as _exc:  # noqa: BLE001
+                        print(
+                            f"[auto_frozen_hp] WARNING: move failed {_child} → "
+                            f"{fhp_sub_dir / _child.name}: {_exc}",
+                            file=sys.stderr,
+                        )
+                print(f"[auto_frozen_hp] Frozen-HP reports moved to {fhp_sub_dir}")
+
+                # 4. Compute and emit magnitude decomposition
+                main_sharpe = _compute_comparison_sharpe(main_sub_dir / "comparison.csv")
+                fhp_sharpe = _compute_comparison_sharpe(fhp_sub_dir / "comparison.csv")
+                # Baseline OOS Sharpe is read from BASELINE_V1.md comparison.csv if available
+                baseline_report = Path("reports-v1/iteration_v1-baseline/comparison.csv")
+                baseline_sharpe = _compute_comparison_sharpe(baseline_report)
+
+                _emit_magnitude_decomposition(
+                    report_dir,
+                    main_oos_sharpe=main_sharpe,
+                    frozen_hp_oos_sharpe=fhp_sharpe,
+                    baseline_oos_sharpe=baseline_sharpe,
+                )
 
 
 if __name__ == "__main__":
