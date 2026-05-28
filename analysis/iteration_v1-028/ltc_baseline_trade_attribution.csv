@@ -1,0 +1,5 @@
+sample,direction,n_trades,n_wins,win_rate_pct,net_pnl_pct,weighted_pnl_pct,avg_pnl_pct,median_pnl_pct,std_pnl_pct,per_trade_sharpe,share_of_pnl_pct
+IS,long,74,27,36.49,-10.8223,13.0921,-0.1462,-3.0404,6.8605,-0.0213,-330.64
+IS,short,50,22,44.0,14.0954,-8.2533,0.2819,-3.6696,7.0084,0.0402,430.64
+OOS,long,19,5,26.32,-45.4432,-36.6824,-2.3917,-3.9737,5.2421,-0.4563,96.18
+OOS,short,15,5,33.33,-1.8052,8.4728,-0.1203,-2.8696,5.0426,-0.0239,3.82
