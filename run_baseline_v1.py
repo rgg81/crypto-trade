@@ -2707,8 +2707,9 @@ def main() -> None:
         "v1-024",
         "v1-025",
         "v1-027",
+        "v1-030",
     ):
-        # Generic baseline-universe dispatch (non-/021, non-/023, non-/024, non-/025 iterations).
+        # Generic baseline-universe dispatch (non-/021, non-/023, non-/024, non-/025, non-/030 iterations).
         # Models A/C/D/E with V1_BASELINE_UNIVERSE symbols. BIT-IDENTICAL to historical
         # v186 baseline when active_feature_columns=list(V1_FEATURE_COLUMNS) + n_trials=50.
         results_a, faxm_a, _strat_a = run_model(
