@@ -1,0 +1,2 @@
+is_total_pnl_pct,is_top3_veto_lift_pct,is_top3_veto_rate,oos_total_pnl_pct,oos_top3_veto_lift_pct,oos_top3_veto_rate,stability_h1_h2_top3_overlap,stability_assessment,meta_labeling_oracle_max_lift_is_pnl_pct,meta_labeling_oracle_max_lift_oos_pnl_pct
+50.98259999999999,77.87040000000002,0.3188405797101449,24.870000000000008,58.54600000000001,0.2962962962962963,1,MODERATE,93.3151,60.1495

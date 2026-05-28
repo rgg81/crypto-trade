@@ -1,0 +1,2 @@
+precedent_iter,precedent_budget,precedent_wall_clock_at_cap_hit_h,precedent_walk_forward_pct_at_cap_hit,projected_029_full_hours,salvage_budget,salvage_compute_fraction,salvage_projected_minutes,salvage_projected_hours,fits_2h_cap,fits_90min_target,potential_signal
+/029 DOT,10/35,2.0011111111111113,0.1,20.011111111111113,3/18,0.15428571428571428,185.24571428571429,3.0874285714285716,False,False,INFEASIBLE
