@@ -18,6 +18,9 @@ from crypto_trade.strategies.ml.optimization import (
     classes_to_labels,
     optimize_and_train,
 )
+from crypto_trade.strategies.ml.sample_weighting import (
+    compute_composite_inv_concurrency_weights,
+)
 from crypto_trade.strategies.ml.walk_forward import (
     MonthSplit,
     compute_embargo_candles,
@@ -303,7 +306,7 @@ class LightGbmStrategy:
         # "uniqueness_only" — replaces train_weights with raw compute_sample_uniqueness output
         #                     (NOT multiplied by abs_pnl — the prior multiply was a near-no-op
         #                     per EDA Section 2.5: Spearman 0.997 after multiply).
-        _valid_modes = {"abs_pnl", "uniform", "uniqueness_only"}
+        _valid_modes = {"abs_pnl", "uniform", "uniqueness_only", "composite_inv_concurrency"}
         if sample_weight_mode not in _valid_modes:
             raise ValueError(
                 f"sample_weight_mode must be one of {_valid_modes}; got {sample_weight_mode!r}"
@@ -670,6 +673,39 @@ class LightGbmStrategy:
                     f"uniqueness: min={uniq_replace.min():.4f}, "
                     f"mean={uniq_replace.mean():.4f}, max={uniq_replace.max():.4f}"
                 )
+        elif self.sample_weight_mode == "composite_inv_concurrency":
+            # iter-v1/031: inv_concurrency_only sample-weighting axis.
+            # weight_t = (1 / c_at_entry(t)) / mean(1/c_at_entry) per (symbol, training_window).
+            # c_at_entry(t) = count of label windows ACTIVE at bar t (past-only; no future
+            # contamination). Mean-renormalized so each symbol's weights sum to N_sym.
+            # F-AXIS #1 wiring print: emitted ONCE per (model, month) cell at this site —
+            # BEFORE the ensemble seed loop so the print fires once per cell (not 5× per seed).
+            _interval_minutes = _interval_to_minutes(self._interval)
+            _interval_ms = _interval_minutes * 60_000
+            _label_timeout_bars = self.label_timeout_minutes // _interval_minutes
+            # Build boolean train_mask aligned with master frame
+            _n_master = len(self._open_time_arr)
+            _train_mask = np.zeros(_n_master, dtype=bool)
+            _train_mask[train_indices] = True
+            _inv_conc_weights = compute_composite_inv_concurrency_weights(
+                self._open_time_arr,
+                self._sym_arr,
+                _train_mask,
+                _label_timeout_bars,
+                _interval_ms,
+            )
+            _w_mean = float(_inv_conc_weights.mean())
+            _w_std = float(_inv_conc_weights.std())
+            _n_w = len(_inv_conc_weights)
+            _kish_n_eff_conc = float((_inv_conc_weights.sum()) ** 2 / (_inv_conc_weights**2).sum())
+            _kish_conc = _kish_n_eff_conc / _n_w if _n_w > 0 else 0.0
+            print(
+                f"  [sample_weight_mode=composite_inv_concurrency] "
+                f"cell=({self._model_role or 'model'}, {month_str}) "
+                f"weight_mean={_w_mean:.4f} weight_std={_w_std:.4f} "
+                f"kish={_kish_conc:.4f}"
+            )
+            train_weights = _inv_conc_weights
         # "abs_pnl" — no change; label_trades output already in train_weights
 
         # (b2) Apply sample uniqueness weighting (AFML Ch. 4)

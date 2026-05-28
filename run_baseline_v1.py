@@ -630,7 +630,7 @@ def run_meta_model(
         verbose=1,
         atr_tp_multiplier=atr_tp,
         atr_sl_multiplier=atr_sl,
-        atr_column="vol_natr_21",  # v1 parquet schema (MetaLabelingStrategy default natr_21_raw is v3 schema)
+        atr_column="vol_natr_21",  # v1 parquet schema (v3 default is natr_21_raw)
         use_atr_labeling=True,
         ensemble_seeds=_derive_ensemble_seeds(ensemble_size, offset=ensemble_seeds_offset),
         feature_columns=effective_feature_columns,
@@ -1601,13 +1601,15 @@ def main() -> None:
     # "uniqueness_only" — replaces with raw López de Prado uniqueness (NOT multiplied by abs_pnl).
     parser.add_argument(
         "--sample-weight-mode",
-        choices=["abs_pnl", "uniform", "uniqueness_only"],
+        choices=["abs_pnl", "uniform", "uniqueness_only", "composite_inv_concurrency"],
         default="abs_pnl",
         help=(
-            "Sample weighting mode for LightGBM training (iter-v1/016). "
+            "Sample weighting mode for LightGBM training (iter-v1/016/031). "
             "'abs_pnl' (default) is BIT-IDENTICAL to baseline. "
             "'uniform' passes np.ones(n) — selected for /016. "
-            "'uniqueness_only' replaces with raw AFML uniqueness (replaces, not multiplies)."
+            "'uniqueness_only' replaces with raw AFML uniqueness (replaces, not multiplies). "
+            "'composite_inv_concurrency' uses scalar 1/c_at_entry(t) mean-renormalized per "
+            "(symbol, training_window) — iter-v1/031 axis."
         ),
     )
     args = parser.parse_args()
@@ -2702,6 +2704,94 @@ def main() -> None:
         # the --seeds 2 outer structure produces 2 rows in the Pareto table.
         # specialist_stability.csv above provides the per-specialist OOS Sharpe means.
 
+    elif iteration_label == "v1-031" and set(symbols) == set(V1_BASELINE_UNIVERSE):
+        # iter-v1/031: composite_inv_concurrency sample-weighting axis.
+        # Cycle-4 EXPLORATION #4/10. Axis family: sample-weighting (NINTH family).
+        #
+        # Architecture: BIT-IDENTICAL to generic baseline dispatch (Models A/C/D/E with
+        # V1_BASELINE_UNIVERSE and V1_FEATURE_COLUMNS_PRUNED 43 cols). The ONLY axis
+        # change is sample_weight_mode=composite_inv_concurrency threaded via _r5_kwargs.
+        # Budget: 5-seed inner ensemble (ENSEMBLE_SIZE=5) × 50 trials — EXPLORATION-WITH-
+        # BUDGET-EXCEPTION per LM Master §8 / /030 §8 BINDING mandate.
+        #
+        # Pre-flight assertions (per /028/030 pattern):
+        assert set(symbols) == set(V1_BASELINE_UNIVERSE), (
+            f"iter-v1/031 guard: expected V1_BASELINE_UNIVERSE, got {set(symbols)}"
+        )
+        assert len(active_feature_columns) == 43, (
+            f"iter-v1/031 guard: expected 43 V1_FEATURE_COLUMNS_PRUNED cols, "
+            f"got {len(active_feature_columns)}"
+        )
+        assert sample_weight_mode_arg == "composite_inv_concurrency", (
+            f"iter-v1/031 guard: expected sample_weight_mode=composite_inv_concurrency, "
+            f"got {sample_weight_mode_arg!r}. Pass --sample-weight-mode composite_inv_concurrency."
+        )
+        print(
+            f"[iter-v1/031] composite_inv_concurrency sample-weighting dispatch: "
+            f"Models A/C/D/E, V1_BASELINE_UNIVERSE, V1_FEATURE_COLUMNS_PRUNED 43 cols. "
+            f"ENSEMBLE_SIZE={ensemble_size} (inner 5-seed), n_trials={n_trials}. "
+            f"sample_weight_mode=composite_inv_concurrency. "
+            f"bounds_profile={bounds_profile}. "
+            f"EXPLORATION-WITH-BUDGET-EXCEPTION: wall-clock modal 3.6h / hard cap 6h / "
+            f"kill-switch 5.0h."
+        )
+        results_a031, faxm_a031, _strat_a031 = run_model(
+            "A (BTC/ETH)",
+            ("BTCUSDT", "ETHUSDT"),
+            atr_tp=2.9,
+            atr_sl=1.45,
+            apply_r1=False,
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            **_r5_kwargs,
+        )
+        results_c031, faxm_c031, _strat_c031 = run_model(
+            "C (LINK + R1)",
+            ("LINKUSDT",),
+            atr_tp=3.5,
+            atr_sl=1.75,
+            apply_r1=True,
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            **_r5_kwargs,
+        )
+        results_d031, faxm_d031, _strat_d031 = run_model(
+            "D (LTC + R1)",
+            ("LTCUSDT",),
+            atr_tp=3.5,
+            atr_sl=1.75,
+            apply_r1=True,
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            **_r5_kwargs,
+        )
+        results_e031, faxm_e031, _strat_e031 = run_model(
+            "E (DOT + R1 + R2)",
+            ("DOTUSDT",),
+            atr_tp=3.5,
+            atr_sl=1.75,
+            apply_r1=True,
+            apply_r2=True,
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            **_r5_kwargs,
+        )
+        _all_faxm_logs = faxm_a031 + faxm_c031 + faxm_d031 + faxm_e031
+        all_results = results_a031 + results_c031 + results_d031 + results_e031
+        _r5_model_results = [results_a031, results_c031, results_d031, results_e031]
+
     elif set(symbols) == set(V1_BASELINE_UNIVERSE) and iteration_label not in (
         "v1-021",
         "v1-023",
@@ -2709,9 +2799,11 @@ def main() -> None:
         "v1-025",
         "v1-027",
         "v1-030",
+        "v1-031",
     ):
-        # Generic baseline-universe dispatch (non-/021, non-/023, non-/024, non-/025, non-/030 iterations).
-        # Models A/C/D/E with V1_BASELINE_UNIVERSE symbols. BIT-IDENTICAL to historical
+        # Generic baseline-universe dispatch.
+        # Non-/021/023/024/025/027/030/031 iterations. Models A/C/D/E with
+        # V1_BASELINE_UNIVERSE symbols. BIT-IDENTICAL to historical
         # v186 baseline when active_feature_columns=list(V1_FEATURE_COLUMNS) + n_trials=50.
         results_a, faxm_a, _strat_a = run_model(
             "A (BTC/ETH)",
