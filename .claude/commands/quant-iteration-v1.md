@@ -213,6 +213,13 @@ V1_EXPLORATION_ENSEMBLE_SIZE = 3  # inner seeds for EXPLORATION
 V1_CONFIRMATION_ENSEMBLE_SIZE = 10  # inner seeds for CONFIRMATION
 ENSEMBLE_SEEDS = (42, 123, 456, 789, 1001, 2002, 3003, 4004, 5005, 6006)
                   # first 3 for EXPLORATION, all 10 for CONFIRMATION
+V1_OUTER_SEEDS_VALIDATION_ONLY = True
+# LIVE-TRADING CONTRACT (IMMUTABLE, established framework/032+):
+# Multi-outer-seed statistical validation (--seeds N) produces STATISTICAL
+# VALIDATION artifacts only. The live engine ALWAYS runs single-outer-seed=42
+# (inner-ensemble-averaged predictions). Live ONLY reads seed_42/ reports.
+# Multi-outer-seed reports (seed_offset5/, etc.) are NEVER read by the live engine.
+# Any change to this contract REQUIRES explicit user directive + diary entry.
 ```
 
 Plus the v1 hard thresholds (mirroring v3):
@@ -277,6 +284,8 @@ Plus inherited project-level merge gates:
 4. **CONFIRMATION = bundle of best EXPLORATIONS.** The CONFIRMATION brief Section 3 lists which features/symbols/labels are imported from which prior EXPLORATION iter-v1/NNN ids. Not a fresh hypothesis — a curated combination.
 
 5. **Only CONFIRMATION-MERGE updates BASELINE_V1.md.** EXPLORATION-PROMISING is a forward-pointer, not a baseline change. EXPLORATION-NEGATIVE is recorded in the catalog but never affects baseline.
+
+6. **Basin-lottery framework auto-companion (framework/032+).** Any EXPLORATION iteration that receives a NEG-BASIN verdict (V3 Jaccard < 15%) OR a BLOCK-FINAL with "basin migration suspected" note is AUTOMATICALLY paired with a frozen-HP companion run (--auto-frozen-hp-control) as the remediation path. The Critic MUST NOT issue a second BLOCK-FINAL on the same axis until the frozen-HP companion has been evaluated. The frozen-HP run isolates the axis signal from basin migration — its result determines whether the axis has real signal (PROMISING-AXIS-PARTIAL/CONFIRMED) or is a pure lottery (PROMISING-BASIN-ONLY).
 
 The 10:1 ratio is the only cadence constraint. No daily/weekly limit — if 10 EXPLORATIONs complete in 6h of compute, the CONFIRMATION can launch immediately after.
 
@@ -447,11 +456,12 @@ If iter-v1/001 produces an EXPLORATION-PROMISING verdict, the candidate is logge
 | **6.0 Critic pre-flight** | **Critic** | Brief, QE's src/ diff (after QE Phase 6 setup commit) | `briefs-v1/iteration_v1-NNN/critic_preflight.md` (PASS or BLOCK) |
 | 6. Implementation + backtest | QE | Brief, both gates=PASS | `src/` commits, reports, `comparison.csv`, companion files, engineering report |
 | **7.4 LM Master post-mortem** | **LM** | Engineering report, reports artifacts | `briefs-v1/iteration_v1-NNN/lgbm_advisor.md` (Phase 7.4 appended) |
-| **7.5 Critic Review** | **Critic** | Brief, code, reports, lgbm_advisor | `briefs-v1/iteration_v1-NNN/review.md` (8+1 checks + OVERALL + Path Forward) |
+| **7.45 Joint adjudication** | **QR reads LM + Critic** | lgbm_advisor.md Phase 7.4 + basin_diagnostics.json | QR reconciliation note (informal; resolves LM ↔ Critic disagreements before Phase 7.5) |
+| **7.5 Critic Review** | **Critic** | Brief, code, reports, lgbm_advisor, basin_diagnostics | `briefs-v1/iteration_v1-NNN/review.md` (8+1 checks + OVERALL + Path Forward) |
 | 7. OOS evaluation | QR | OOS reports, review.md, lgbm_advisor.md | Evaluation memo (informal; integrates Critic + LM findings) |
 | 8. Diary + merge decision | QR | All above | `diary-v1/iteration_v1-NNN.md` (MERGE or NO-MERGE) |
 
-Four gates are MANDATORY: **Phase 4.5, 5.5, 6.0, 7.5**. Skipping any is a process-integrity violation. Phase 7.4 LM Master post-mortem is mandatory in deliverable but does not BLOCK.
+Four gates are MANDATORY: **Phase 4.5, 5.5, 6.0, 7.5**. Skipping any is a process-integrity violation. Phase 7.4 LM Master post-mortem is mandatory in deliverable but does not BLOCK. Phase 7.45 joint adjudication is an OPTIONAL informal QR step — it has no artifact requirement but is the recommended pattern when LM Master Phase 7.4 and the basin_diagnostics FAIL verdict conflict with Critic's preliminary findings.
 
 ---
 
@@ -760,6 +770,13 @@ Constraints honored: each proposed axis is from a family the QR has NOT used in 
 
 The Critic's Path Forward is advisory — QR can adopt, modify, or reject the suggestions. It exists to prevent the QR from feeling "dead-ended" by a BLOCK verdict.
 
+**Strengthened Constructive Mandate (framework/032+):** A BLOCK verdict without a credible Path Forward is a Critic methodology failure, not a rigor signal. Every blocked verdict MUST propose axes that are:
+- From DIFFERENT families than the last 5 EXPLORATIONs (Rotation Discipline enforced in suggestions too)
+- Specific enough to be directly actionable by the QR (not vague "try different features")
+- Ranked by expected signal-to-noise ratio given the iteration history
+
+If the Critic cannot propose 2 credible alternatives, the Critic MUST explicitly state this constraint (e.g., "axis family space is exhausted — recommend user directive to expand search space") rather than offering generic advice.
+
 ### Verdict mechanics (round structure inherited from v3, with v1 additions)
 
 **Round 1 — PRELIMINARY review** (same as v3 — preliminary findings + clarifications requested).
@@ -769,6 +786,57 @@ The Critic's Path Forward is advisory — QR can adopt, modify, or reject the su
 **Round 3 — FINAL Verdict** (updated v1 set): one of `EXPLORATION-PROMISING / EXPLORATION-NEGATIVE / CONFIRMATION-MERGE / BLOCK-PENDING-FIX / BLOCK-FINAL`.
 
 If verdict is `BLOCK-PENDING-FIX`, an additional ROUND 4 (post-fix re-evaluation, single pass) determines the iteration's final status.
+
+**BLOCK-FINAL definition (framework/032+):** A BLOCK-FINAL verdict means the iteration is CLOSED with NO-MERGE status. The following are true:
+- No further re-runs within this iter-v1/NNN are permitted
+- The next iteration (iter-v1/NNN+1) starts fresh with a new brief
+- Diary records the failure mode and the Critic's PATH FORWARD suggestions as the recommended next axes
+- The Critic's Path Forward from a BLOCK-FINAL carries special weight: QR should treat the top suggestion as the default next axis unless there's strong IS evidence against it
+
+**Nota bene on BLOCK-FINAL vs NEG-BASIN verdicts:** A BLOCK-FINAL that includes a NEG-BASIN-RELOCATION verdict (V3 Jaccard < 15%) does NOT preclude future PROMISING verdicts from the same axis family. The basin lottery result is a DIAGNOSTIC, not a permanent veto. The frozen-HP companion run (framework/032+) is the standard remediation path for any NEG-BASIN verdict — re-evaluate the axis under frozen HP to isolate the axis signal from basin migration.
+
+---
+
+## Verdict Cells (framework/032+)
+
+All verdict cells used in v1. Established through iteration history; new cells added as methodology evolves.
+
+### EXPLORATION verdict cells
+
+| Verdict | OOS Sharpe Δ | Condition | Next step |
+|---|---|---|---|
+| `EXPLORATION-PROMISING` | ≥ +0.05 | Clean single-seed lift, V3 Jaccard ≥ 15%, no confound flagged | Log to catalog, candidate for CONFIRMATION bundle |
+| `EXPLORATION-NEGATIVE` | < 0 OR < +0.05 | No signal; may include sub-verdicts below | Log to catalog as dead-end; next EXPLORATION |
+| `PROMISING-AXIS-CONFIRMED` | frozen-HP Δ ≥ +0.20 AND multi-seed mean ≥ +0.20 | Axis signal isolated from basin, multi-seed validated | Strong CONFIRMATION candidate; brief Section 3 must note the frozen-HP + multi-seed evidence |
+| `PROMISING-AXIS-PARTIAL` | frozen-HP Δ ≥ +0.20 (single-seed) | Axis signal isolated, single-seed not validated | CONFIRMATION REQUIRED next iteration to verify multi-seed mean |
+| `PROMISING-BASIN-ONLY` | frozen-HP Δ < +0.10 | Main lift was basin lottery; frozen HP shows no axis signal | Dead-end for THIS axis configuration; different feature construction or different axis family required |
+| `NEGATIVE-no-effect` | main Δ ≈ 0 (within ±0.10 of baseline) | Axis had no effect; saturated or under-powered | Log to catalog; try higher n_trials or different axis |
+| `NEG-BASIN-RELOCATION-W-POSITIVE-F1` | main Δ > 0 but V3 Jaccard < 15% | /031 established: main lift is basin lottery, not axis | Mandatory frozen-HP companion run (framework/032+ auto-companion rule) |
+| `AXIS-ISOLATION-ABLATION` | any | Companion frozen-HP run; not a primary EXPLORATION | Provides axis_share / basin_share decomposition; feeds PROMISING-AXIS-* verdict |
+
+### CONFIRMATION verdict cells
+
+| Verdict | Condition | Next step |
+|---|---|---|
+| `CONFIRMATION-MERGE` | All gates PASS; DSR > 0.95; PBO < 0.4; PSR > 0.95; Sharpe floors met | Update BASELINE_V1.md; tag commit |
+| `CONFIRMATION-BLOCK` | ≥1 gate fails; Critic verdict non-MERGE | No baseline update; iterate on failed gates |
+| `BLOCK-PENDING-FIX` | One specific isolable defect; NOT multi-defect | QE one-shot fix + re-run; next verdict is PASS or BLOCK-FINAL |
+| `BLOCK-FINAL` | Irrecoverable (multi-defect OR methodology issue OR second BLOCK after BLOCK-PENDING-FIX) | NO-MERGE; next iter fresh brief |
+
+### Magnitude Decomposition (framework/032+)
+
+Whenever `magnitude_decomposition.json` exists (auto-generated by `--auto-frozen-hp-control`), the Critic MUST incorporate its verdict into the Phase 7.5 review. The decomposition supercedes ad-hoc post-hoc judgments about basin migration.
+
+```
+axis_share   = frozen_hp_OOS - baseline_OOS   → axis-attributable edge
+basin_share  = main_OOS - frozen_hp_OOS       → basin migration (lottery)
+total_share  = main_OOS - baseline_OOS        → headline delta
+```
+
+The Critic applies these thresholds (same as PROMISING-* cells above):
+- axis_share ≥ +0.20 → PROMISING-AXIS-CONFIRMED (if also validated by multi-seed)
+- axis_share ∈ [+0.10, +0.20) → PROMISING-AXIS-PARTIAL (CONFIRMATION required)
+- axis_share < +0.10 → PROMISING-BASIN-ONLY (dead-end for this axis configuration)
 
 ---
 
