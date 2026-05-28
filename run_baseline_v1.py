@@ -80,6 +80,7 @@ from crypto_trade.features_v1 import (
 )
 from crypto_trade.iteration_report import generate_iteration_reports
 from crypto_trade.strategies.ml.lgbm import LightGbmStrategy
+from crypto_trade.strategies.ml.metalabeling import MetaLabelingStrategy
 from crypto_trade.strategies.ml.reporting_v1 import (
     _per_cell_n_eff_from_parquet,
     append_psr_rows_to_comparison,
@@ -302,6 +303,35 @@ V1_ITER029_BTC_GATE_LOOKBACK_BARS: int = 42  # 14 days at 8h cadence (mirror /01
 V1_ITER029_BTC_GATE_THRESHOLD_PCT: float = 8.0  # +-8% BTC 14d return (mirror /019)
 V1_ITER029_BTC_GATE_ENABLED: bool = True
 
+#: iter-v1/030: 3-separate M2 meta-labeling layer on top of M1 baseline dispatch.
+#: Axis family: meta-labeling (NEW NINTH family; UNUSED in v1 across cycles 1-3).
+#: Cycle-4 EXPLORATION #3/10. Anchor: BASELINE_V1.md v0.v1-baseline-corrected.
+#:
+#: Architecture:
+#:   - Models A/C/D each get a per-model M2 binary LGBMClassifier.
+#:   - Model E (DOT) is EXCLUDED per LM Master §3 sample-size binding call
+#:     (75 cumulative M1-positives < LightGBM threshold for 45-feature × n_trials=18).
+#:   - M2 input: 43 V1_FEATURE_COLUMNS_PRUNED + m1_confidence + m1_direction = 45 dims.
+#:   - M2 threshold: 0.5 PINNED (single-axis discipline).
+#:   - n_trials_m2: 18 (LM Master §2.3 ADOPTED; TPE warmup ≥15 trials required).
+#:   - bounds_profile_m2: "v1_030" (LM Master §2 tightened bounds).
+#:   - scale_pos_weight = n_neg/n_pos explicit per cell (NOT is_unbalance=True).
+#:
+#: F-AXIS-MECHANISM (pre-registered, verdict-capping):
+#:   F-AXIS #1: M2-trained cells ≥ 80 of 159 expected (53 months × 3 models A/C/D)
+#:   F-AXIS #2: OOS trades ∈ [95, 165] modal 130; OOS < 90 → NEG-OVER cap
+#:   F-AXIS #3: M2-pass OOS WR ≥ 48% (LOAD-BEARING; verdict-positive determinant)
+#:   F-AXIS #5: OOS TP-exit ≥ 15; Model D OOS TP ≥ 3 (LOAD-BEARING; LTC-long veto)
+#:
+V1_ITER030_N_TRIALS_M2: int = 18  # LM Master §2.3 ADOPTED
+V1_ITER030_BOUNDS_PROFILE_M2: str = "v1_030"  # LM Master §2 tightened bounds
+V1_ITER030_M2_THRESHOLD: float = 0.5  # PINNED (single-axis discipline; not tuned)
+V1_ITER030_M2_CELLS_EXPECTED: int = 159  # 53 months × 3 models (A/C/D; E EXCLUDED)
+V1_ITER030_M2_CELLS_MIN: int = 80  # F-AXIS #1 threshold (≥50% of expected)
+V1_ITER030_OOS_TRADES_FLOOR: int = 90  # F-AXIS #2 critical threshold (OOS < 90 → NEG-OVER cap)
+V1_ITER030_OOS_TP_FLOOR: int = 15  # F-AXIS #5 overall OOS TP-exit floor
+V1_ITER030_MODEL_D_OOS_TP_FLOOR: int = 3  # F-AXIS #5 Model D LOAD-BEARING floor
+
 #: iter-v1/021: stable path for Optuna best-params parquet (H1 diagnostic substrate).
 #: Written by optimize_and_train when params_persist_path is set.
 #: Cleared at runner start (same pattern as OOF_PARQUET_PATH) to prevent accumulation.
@@ -507,6 +537,126 @@ def run_model(
     # iter-v1/016: expose F-AXIS-MECHANISM log so the runner can write f_axis_mechanism.csv.
     # iter-v1/021: also return the strategy object for _write_feature_importance access.
     return results, strategy._faxm_log, strategy
+
+
+def run_meta_model(
+    name: str,
+    symbols: tuple[str, ...],
+    atr_tp: float,
+    atr_sl: float,
+    *,
+    apply_r1: bool,
+    apply_r2: bool = False,
+    n_trials: int,
+    ensemble_size: int,
+    n_trials_m2: int = V1_ITER030_N_TRIALS_M2,
+    bounds_profile_m2: str = V1_ITER030_BOUNDS_PROFILE_M2,
+    oof_persist_path: Path | None = None,
+    feature_columns: list[str] | None = None,
+    bounds_profile: str = "default",
+    r5_vol_target_enabled: bool = True,
+    r5_vol_target_pct: float = 4.0,
+    r5_kill_low_natr_enabled: bool = False,
+    r5_kill_low_natr_min_pct: float = 2.0,
+    ensemble_seeds_offset: int = 0,
+    sigma_source: str = "natr",
+    sigma_k_tp: float | None = None,
+    sigma_k_sl: float | None = None,
+    sigma_halflife_days: int = 14,
+    sample_weight_mode: str = "abs_pnl",
+):
+    """Run a single v1 sub-model with M2 meta-labeling (iter-v1/030).
+
+    Mirrors run_model() but creates MetaLabelingStrategy instead of
+    LightGbmStrategy.  M2 is a binary LGBMClassifier trained on M1-positive
+    bars per training window; it vetoes M1 signals where M2 confidence < 0.5.
+
+    M2 input: feature_columns (43 V1_FEATURE_COLUMNS_PRUNED) + m1_confidence
+    + m1_direction = 45-dim (include_m1_direction=True, per brief §3.3).
+
+    Model E (DOT) MUST NOT be dispatched through this function — use run_model()
+    directly for DOT (sample-size floor mandate, LM Master §3).
+
+    Returns (results, faxm_log, strategy) same as run_model().
+    """
+    effective_feature_columns = (
+        feature_columns if feature_columns is not None else list(V1_FEATURE_COLUMNS)
+    )
+    sigma_halflife_candles = sigma_halflife_days * 3  # 3 candles per day at 8h
+    print("=" * 60)
+    print(
+        f"MODEL {name} [M2-META]: {', '.join(symbols)} "
+        f"(R1={apply_r1} R2={apply_r2} R3=on, n_trials={n_trials}, "
+        f"n_trials_m2={n_trials_m2}, bounds_m2={bounds_profile_m2}, "
+        f"ENSEMBLE_SIZE={ensemble_size}, features={len(effective_feature_columns)}, "
+        f"bounds={bounds_profile})"
+    )
+    print("=" * 60)
+    config = BacktestConfig(
+        symbols=symbols,
+        interval="8h",
+        max_amount_usd=1000.0,
+        stop_loss_pct=4.0,
+        take_profit_pct=8.0,
+        timeout_minutes=10080,
+        fee_pct=0.1,
+        data_dir=Path("data"),
+        cooldown_candles=2,
+        vol_targeting=True,
+        vt_target_vol=0.3,
+        vt_lookback_days=45,
+        vt_min_scale=0.33,
+        vt_max_scale=2.0,
+        risk_consecutive_sl_limit=3 if apply_r1 else None,
+        risk_consecutive_sl_cooldown_candles=27 if apply_r1 else 0,
+        risk_drawdown_scale_enabled=apply_r2,
+        risk_drawdown_trigger_pct=7.0,
+        risk_drawdown_scale_floor=0.33,
+        risk_drawdown_scale_anchor_pct=15.0,
+        risk_r5_vol_target_enabled=r5_vol_target_enabled,
+        risk_r5_vol_target_pct=r5_vol_target_pct,
+        risk_r5_kill_low_natr_enabled=r5_kill_low_natr_enabled,
+        risk_r5_kill_low_natr_min_pct=r5_kill_low_natr_min_pct,
+    )
+    strategy = MetaLabelingStrategy(
+        training_months=24,
+        n_trials=n_trials,
+        cv_splits=5,
+        label_tp_pct=8.0,
+        label_sl_pct=4.0,
+        label_timeout_minutes=10080,
+        fee_pct=0.1,
+        features_dir="data/features",
+        verbose=1,
+        atr_tp_multiplier=atr_tp,
+        atr_sl_multiplier=atr_sl,
+        use_atr_labeling=True,
+        ensemble_seeds=_derive_ensemble_seeds(ensemble_size, offset=ensemble_seeds_offset),
+        feature_columns=effective_feature_columns,
+        ood_enabled=True,
+        ood_features=list(V1_OOD_FEATURE_COLUMNS),
+        ood_cutoff_pct=BASELINE_OOD_CUTOFF_PCT,
+        oof_persist_path=oof_persist_path,
+        n_trials_m2=n_trials_m2,
+        bounds_profile_m2=bounds_profile_m2,
+        include_m1_direction=True,
+        # v1-specific M1 params (threaded from run_meta_model signature)
+        bounds_profile=bounds_profile,
+        sigma_source=sigma_source,
+        sigma_k_tp=sigma_k_tp,
+        sigma_k_sl=sigma_k_sl,
+        sigma_halflife_candles=sigma_halflife_candles,
+        sample_weight_mode=sample_weight_mode,
+    )
+    t0 = time.time()
+    results = run_backtest(config, strategy, yearly_pnl_check=False)
+    elapsed = time.time() - t0
+    print(f"\n{name} [M2-META] complete: {len(results)} trades in {elapsed:.0f}s")
+    # Return same (results, faxm_log, strategy) tuple as run_model().
+    # MetaLabelingStrategy delegates to M1 for _faxm_log; the M1 strategy is
+    # accessible as strategy._m1 — expose M1's faxm_log.
+    m1_faxm = getattr(strategy._m1, "_faxm_log", [])
+    return results, m1_faxm, strategy
 
 
 def build_lgbm_strategy(
@@ -3127,6 +3277,183 @@ def main() -> None:
         _r5_model_results = [results_e029]
         _post_dispatch_fi_strategies = [("Model_E_DOT_specialist", _strat_e029)]
 
+    elif iteration_label == "v1-030" and set(symbols) == set(V1_BASELINE_UNIVERSE):
+        # iter-v1/030: META-LABELING M2 layer — 3 separate M2 classifiers (A/C/D).
+        # Cycle-4 EXPLORATION #3/10. Axis family: meta-labeling (NEW NINTH family).
+        #
+        # Architecture:
+        #   - Models A/C/D: MetaLabelingStrategy (M1 = LightGbmStrategy wrapped by M2).
+        #     M2 is a per-model binary LGBMClassifier (n_trials_m2=18, bounds="v1_030").
+        #     M2 input: 43 V1_FEATURE_COLUMNS_PRUNED + m1_confidence + m1_direction = 45 dims.
+        #     M2 threshold: 0.5 PINNED (single-axis discipline; not tuned at /030).
+        #   - Model E (DOT): plain LightGbmStrategy — Model E EXCLUDED from M2 per
+        #     LM Master §3 binding call (75 cumulative M1-positives < LightGBM
+        #     classifier threshold for 45-feature × n_trials_m2=18).
+        #
+        # Pre-flight assertions:
+        assert set(symbols) == set(V1_BASELINE_UNIVERSE), (
+            f"iter-v1/030 guard: expected V1_BASELINE_UNIVERSE, got {set(symbols)}"
+        )
+        assert len(active_feature_columns) == 43, (
+            f"iter-v1/030 guard: expected 43 V1_FEATURE_COLUMNS_PRUNED cols, "
+            f"got {len(active_feature_columns)}"
+        )
+        print(
+            f"[iter-v1/030] META-LABELING dispatch: 3 M2 classifiers (A/C/D), "
+            f"Model E EXCLUDED (LM Master §3 sample-size mandate). "
+            f"n_trials_m2={V1_ITER030_N_TRIALS_M2}, bounds_m2={V1_ITER030_BOUNDS_PROFILE_M2}, "
+            f"M2_threshold={V1_ITER030_M2_THRESHOLD} PINNED, "
+            f"M2_expected_cells={V1_ITER030_M2_CELLS_EXPECTED} "
+            f"(min_pass={V1_ITER030_M2_CELLS_MIN})"
+        )
+        # --- Model A: BTC+ETH pooled + M2 meta-labeling ---
+        results_a030, faxm_a030, _strat_a030 = run_meta_model(
+            "A (BTC/ETH + M2)",
+            ("BTCUSDT", "ETHUSDT"),
+            atr_tp=2.9,
+            atr_sl=1.45,
+            apply_r1=False,
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            n_trials_m2=V1_ITER030_N_TRIALS_M2,
+            bounds_profile_m2=V1_ITER030_BOUNDS_PROFILE_M2,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            **_r5_kwargs,
+        )
+        print(
+            f"[iter-v1/030] Model A: {len(results_a030)} trades "
+            f"(M2 active — BTC+ETH pooled; M2_cells expected ~53)"
+        )
+        # --- Model C: LINK specialist + M2 meta-labeling ---
+        results_c030, faxm_c030, _strat_c030 = run_meta_model(
+            "C (LINK + R1 + M2)",
+            ("LINKUSDT",),
+            atr_tp=3.5,
+            atr_sl=1.75,
+            apply_r1=True,
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            n_trials_m2=V1_ITER030_N_TRIALS_M2,
+            bounds_profile_m2=V1_ITER030_BOUNDS_PROFILE_M2,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            **_r5_kwargs,
+        )
+        print(
+            f"[iter-v1/030] Model C: {len(results_c030)} trades "
+            f"(M2 active — LINK specialist; M2_cells expected ~53)"
+        )
+        # --- Model D: LTC specialist + M2 meta-labeling ---
+        results_d030, faxm_d030, _strat_d030 = run_meta_model(
+            "D (LTC + R1 + M2)",
+            ("LTCUSDT",),
+            atr_tp=3.5,
+            atr_sl=1.75,
+            apply_r1=True,
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            n_trials_m2=V1_ITER030_N_TRIALS_M2,
+            bounds_profile_m2=V1_ITER030_BOUNDS_PROFILE_M2,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            **_r5_kwargs,
+        )
+        print(
+            f"[iter-v1/030] Model D: {len(results_d030)} trades "
+            f"(M2 active — LTC specialist; M2_cells expected ~53)"
+        )
+        # --- Model E: DOT specialist — plain LightGbmStrategy (NO M2) ---
+        # Model E EXCLUDED from M2 per LM Master §3 sample-size binding call.
+        # DOT trades pass through M1 directly with no M2 filtering applied.
+        results_e030, faxm_e030, _strat_e030 = run_model(
+            "E (DOT + R1 + NO-M2)",
+            ("DOTUSDT",),
+            atr_tp=3.5,
+            atr_sl=1.75,
+            apply_r1=True,
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            **_r5_kwargs,
+        )
+        print(
+            f"[iter-v1/030] Model E: {len(results_e030)} trades "
+            f"(M2 EXCLUDED — DOT; 75 cumulative M1-pos < LightGBM threshold; "
+            f"m2_passed=NaN for all DOT trades)"
+        )
+        # --- F-AXIS instrumentation (post-dispatch) ---
+        # F-AXIS #1: M2-trained cells count (target ≥ 80 of 159 expected).
+        # Track via M2_TRAINED=True/False prints in metalabeling.py (run.log parse).
+        # The MetaLabelingStrategy logs per-month M2_TRAINED status unconditionally.
+        all_results_m2 = results_a030 + results_c030 + results_d030  # M2-filtered trades
+        all_results_e = results_e030  # M2-excluded trades (pass-through)
+        # F-AXIS #2: OOS trade count diagnostic.
+        oos_m2_trades = [t for t in all_results_m2 if t.open_time >= OOS_CUTOFF_MS]
+        oos_e_trades = [t for t in all_results_e if t.open_time >= OOS_CUTOFF_MS]
+        oos_total = len(oos_m2_trades) + len(oos_e_trades)
+        print(
+            f"[iter-v1/030] F-AXIS #2 OOS trade count: {oos_total} "
+            f"(M2-filtered A/C/D: {len(oos_m2_trades)}, Model E pass-through: {len(oos_e_trades)}) "
+            f"[target band: 95-165 modal 130; CRITICAL floor: {V1_ITER030_OOS_TRADES_FLOOR}]"
+        )
+        # F-AXIS #1 HARD ASSERT: OOS trade count >= 50 (LM Master §9 Q8 item 3).
+        # Fires if M2 over-filters AND Model E also produces 0 trades OOS.
+        # Per brief Section 3.3: M2-skip is legitimate per-cell; aggregate check only.
+        if oos_total < V1_ITER030_OOS_TRADES_FLOOR:
+            print(
+                f"[iter-v1/030] F-AXIS #1 HARD ASSERT FAIL: OOS trades {oos_total} "
+                f"< floor {V1_ITER030_OOS_TRADES_FLOOR} → TECHNICAL FAILURE",
+                file=sys.stderr,
+            )
+            sys.exit(2)  # TECHNICAL FAILURE exit code per LM Master §9 Q8 item 3
+        # F-AXIS #3: M2 fire-rate per model (IS and OOS separately).
+        # All trades in results_a/c/d_030 HAVE passed M2 (by construction —
+        # MetaLabelingStrategy.get_signal() only returns signal when M2 passes).
+        # M2-filtered trades = baseline trades that WERE NOT vetoed by M2.
+        # We cannot directly count M2-skips from trade results alone;
+        # the count is available in run.log via M2_TRAINED=True/False lines.
+        # Per model OOS trade counts (F-AXIS #3 monitoring):
+        oos_a = [t for t in results_a030 if t.open_time >= OOS_CUTOFF_MS]
+        oos_c = [t for t in results_c030 if t.open_time >= OOS_CUTOFF_MS]
+        oos_d = [t for t in results_d030 if t.open_time >= OOS_CUTOFF_MS]
+        oos_tp_a = sum(1 for t in oos_a if t.exit_reason == "take_profit")
+        oos_tp_c = sum(1 for t in oos_c if t.exit_reason == "take_profit")
+        oos_tp_d = sum(1 for t in oos_d if t.exit_reason == "take_profit")
+        oos_tp_total = oos_tp_a + oos_tp_c + oos_tp_d
+        print(
+            f"[iter-v1/030] F-AXIS #5 OOS TP-exit count: {oos_tp_total} total "
+            f"(A:{oos_tp_a}, C:{oos_tp_c}, D:{oos_tp_d}) "
+            f"[floor: {V1_ITER030_OOS_TP_FLOOR}; Model D LOAD-BEARING floor: "
+            f"{V1_ITER030_MODEL_D_OOS_TP_FLOOR}]"
+        )
+        if oos_tp_d < V1_ITER030_MODEL_D_OOS_TP_FLOOR:
+            print(
+                f"[iter-v1/030] F-AXIS #5 Model D OOS TP WARNING: {oos_tp_d} < "
+                f"{V1_ITER030_MODEL_D_OOS_TP_FLOOR} LOAD-BEARING floor. "
+                f"Verdict CAPS at PROMISING-INERT regardless of headline Sharpe Δ "
+                f"(LTC-long catastrophe pre-vet failure per LM Master §5 + /028 §6 transfer).",
+                file=sys.stderr,
+            )
+        # M2 fire-rate per model IS/OOS.
+        is_a = [t for t in results_a030 if t.open_time < OOS_CUTOFF_MS]
+        is_c = [t for t in results_c030 if t.open_time < OOS_CUTOFF_MS]
+        is_d = [t for t in results_d030 if t.open_time < OOS_CUTOFF_MS]
+        print(
+            f"[iter-v1/030] Post-M2 trade counts — "
+            f"IS: A={len(is_a)}, C={len(is_c)}, D={len(is_d)} | "
+            f"OOS: A={len(oos_a)}, C={len(oos_c)}, D={len(oos_d)}"
+        )
+        # Aggregate.
+        _all_faxm_logs = faxm_a030 + faxm_c030 + faxm_d030 + faxm_e030
+        all_results = all_results_m2 + all_results_e
+        _r5_model_results = [results_a030, results_c030, results_d030, results_e030]
+
     else:
         # Custom universe — single pooled model unless brief specifies otherwise.
         # iter-v1/NNN brief Section 3 should declare per-symbol model assignment.
@@ -3173,6 +3500,39 @@ def main() -> None:
         n_trials=n_trials,
     )
     print(f"Reports: {report_dir}")
+
+    # -------------------------------------------------------------------------
+    # iter-v1/030: annotate trades.csv with m2_passed column (post-hoc).
+    # Per LM Master §9 Q8 item 4: m2_passed = 1 for M2-filtered trades (A/C/D),
+    # NaN = M2 inactive (Model E / DOT trades pass through unmodified).
+    # TradeResult is frozen — annotation is applied via CSV post-processing on
+    # the already-written trades.csv files from generate_iteration_reports().
+    # -------------------------------------------------------------------------
+    if iteration_label == "v1-030":
+        # Build a set of (open_time, symbol) keys for M2-active trades (A/C/D).
+        # Model E trades have m2_passed=NaN (absent = inactive).
+        _m2_active_keys: set[tuple[int, str]] = {
+            (t.open_time, t.symbol) for t in (results_a030 + results_c030 + results_d030)
+        }
+        for _sub_dir in ("in_sample", "out_of_sample"):
+            _csv_path = report_dir / _sub_dir / "trades.csv"
+            if not _csv_path.exists():
+                continue
+            _df = pd.read_csv(_csv_path)
+            # m2_passed: 1.0 for M2-active models (A/C/D); NaN for Model E (DOT)
+            _df["m2_passed"] = _df.apply(
+                lambda row: (
+                    1.0
+                    if (int(row["open_time"]), row["symbol"]) in _m2_active_keys
+                    else float("nan")
+                ),
+                axis=1,
+            )
+            _df.to_csv(_csv_path, index=False)
+        print(
+            f"[iter-v1/030] m2_passed column added to trades.csv "
+            f"(M2-active keys: {len(_m2_active_keys)}; Model E DOT = NaN)"
+        )
 
     # -------------------------------------------------------------------------
     # iter-v1/021+: write feature importance CSVs (post-dispatch).
