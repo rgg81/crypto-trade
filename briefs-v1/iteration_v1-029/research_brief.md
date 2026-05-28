@@ -23,7 +23,7 @@ LM Master adjudicated DOT as **HYBRID class FRAGILE-POSITIVE-WITH-LONG-COUNTER-T
 
 ### 0.3 DOT prior class (Phase 1 numerical evidence)
 
-From `analysis/iteration_v1-029/dot_classification.csv` (committed at `bbab148`):
+From `analysis/iteration_v1-029/dot_classification.csv` (committed at `0d7a090`):
 
 | Metric | DOT IS | DOT OOS |
 |---|---|---|
@@ -77,7 +77,7 @@ LM Master directional track entering /029: 3/9 = 33%; methodology 7/7 perfect. T
 
 ## Section 1 — DOT EDA (IS-only numerical evidence)
 
-All numbers cite committed CSVs at `analysis/iteration_v1-029/`. Script: `dot_cohort_classification.py` (committed `bbab148`).
+All numbers cite committed CSVs at `analysis/iteration_v1-029/`. Script: `dot_cohort_classification.py` (committed `0d7a090`).
 
 ### 1.1 Direction-split attribution (`dot_direction_split.csv`)
 
@@ -216,7 +216,7 @@ Per `feedback_v1_oracle_eda_trade_attribution.md`, all feature-family briefs mus
 
 **Sharpe-proxy distribution** (forward-return regression on BTC trend bucket): not separately required because the realized-trade attribution is already published and is the direct mechanism evidence. The /025 OI-delta Q1 sign-flip basin-relocation lesson does not apply at /029 because the BTC-trend gate has NO basin-relocation risk on labels (it is a post-Optuna trade-stream filter; labels are computed identically to baseline DOT-in-pool).
 
-**Mandate satisfied**. CSV: `analysis/iteration_v1-029/dot_btc_trend_bucket.csv` (16 cells; committed `bbab148`).
+**Mandate satisfied**. CSV: `analysis/iteration_v1-029/dot_btc_trend_bucket.csv` (16 cells; committed `0d7a090`).
 
 ---
 
@@ -426,29 +426,78 @@ A/C/D/F/G dispatch branches dropped via `set(symbols)==set(V1_ITER029_UNIVERSE)`
 
 ---
 
-## Section 6 — Symbol Exclusion
+## Section 6 — Risk Management Design
 
-**`V1_EXCLUDED_SYMBOLS` unchanged.** No symbols added or removed from the v1 baseline universe (`V1_BASELINE_UNIVERSE = (BTCUSDT, ETHUSDT, LINKUSDT, LTCUSDT, DOTUSDT)`). /029 narrows to `V1_ITER029_UNIVERSE = (DOTUSDT,)` only for the iter-v1/029 dispatch branch — baseline universe constant is untouched.
+Structured gate-stack table for /029 (mirror /028 §6 structure with explicit fire-rate and attribution columns per Phase 5.5 gate requirement):
+
+| Gate | State | IS fire-rate (pred) | OOS fire-rate (pred) | Regime coverage | Gate-attribution estimate |
+|---|---|---|---|---|---|
+| R1 cooldown (post-2SL 15d) | ON | ~5-10% of trades blocked (per Model E baseline) | ~5-10% of trades blocked | All regimes (cascade-streak prevention) | +0.05-0.10 OOS Sharpe (informational; Model E baseline component) |
+| R2 weighted DD scaling | **OFF** | n/a (Path C constraint) | n/a | n/a | n/a (R2 OFF for DOT-only single-cohort; mirror /018 LINK + /019 ETH precedent) |
+| R3 Mahalanobis OOD | ON | ~2% trades blocked (16 scale-invariant features, 70th-pctl cutoff) | ~3-5% trades blocked (OOD regimes more frequent OOS) | OOD regimes (off-distribution months — e.g., 2025-09 catastrophic) | +0.02-0.05 OOS Sharpe (project-wide always-on) |
+| BTC-trend gate ±8% (NEW) | ON | **18% modal [10%, 30%]** | **15% modal [5%, 30%]** | Weak-up / strong-up / weak-down / strong-down BTC buckets (counter-trend kill) | **+0.20-0.40 OOS Sharpe (PROMISING band per LM Master §5)** |
+
+### 6.1 Regime coverage narrative
+
+- **BTC-trend gate (NEW, LOAD-BEARING)** covers DOT's identified OOS LONG-counter-trend-weak-up-BTC failure mode (−8.47% / 7 tr / WR 28.6%, the dominant OOS LONG drag bucket in `dot_btc_trend_bucket.csv`). The symmetric ±8% framing also kills the LONG strong-down counter-trend bucket (−5.80% / 5 tr) and the OOS SHORT strong-up counter-trend bucket (+5.59% / 7 tr). NET arithmetic recovery estimate: kill OOS LONG strong-down (−5.80%) + kill OOS LONG weak-up at threshold (−8.47%) − kill OOS SHORT strong-up (+5.59%) = **+8.68% gross OOS PnL recovery** if gate fires symmetrically as designed.
+- **R3 (Mahalanobis OOD)** catches off-distribution months (e.g., 2025-09 catastrophic-month patterns). Orthogonal to BTC-trend gate: R3 fires on feature-space distance from training distribution; gate fires on raw BTC return regime. Both may co-fire in extreme-regime months.
+- **R1 (cooldown)** prevents drawdown stacking on micro-streaks (2 consecutive stop-losses → 15d pause). Orthogonal to gate and R3; complements at the trade-stream-streak level.
+- **R2 (DD brake)** explicitly OFF. The H1/H2 regime instability (DOT IS H1 −18.19% / IS H2 +44.82%) means a re-occurrence of an H1-style catastrophic regime in OOS has no drawdown-triggered defense. This is the highest-residual-risk channel and is explicitly flagged in Section 7 (Failure-Mode Prediction §2).
+
+### 6.2 Gate-off vs gate-on PnL attribution (IS-calibrated)
+
+From `dot_btc_trend_bucket.csv` IS rows (full 56-trade IS LONG + 37-trade IS SHORT roster):
+- **IS LONG strong-down bucket** (BTC 14d < −8%): +23.42% IS PnL (KILLED by gate; IS sacrifice if gate fires here)
+- **IS SHORT strong-up bucket** (BTC 14d > +8%): −38.00% IS PnL catastrophic (KILLED by gate; IS GAIN)
+- Net IS gate effect (rough): −23.42% (sacrifice LONG strong-down wins) + 38.00% (kill SHORT strong-up catastrophe) = **+14.58% IS PnL recovery if gate fires symmetrically per spec**
+
+This IS calibration shows the gate has historical evidence of POSITIVE NET effect on the IS sample. The mechanism transfer to OOS is the open question (verdict Δ); the gate is at minimum a defensible IS-calibrated intervention.
+
+### 6.3 Verdict-capping reminders (forensic monitoring at Phase 7)
+
+- F-AXIS #3 OOS fire-rate < 5% → UNDER-FIRE → INERT-NO-EFFECT verdict cap
+- F-AXIS #3 OOS fire-rate > 35% → OVER-KILL → NEGATIVE-INERT verdict cap
+- F-AXIS #5 OOS TP-exit count < 2 → mechanism degenerates to loss-clipping-only → PROMISING-INERT verdict cap
 
 ---
 
-## Section 7 — Reproducibility
+## Section 7 — Pre-Registered Failure-Mode Prediction
 
-- **HEAD commit (post-Phase 5.5)**: TBD (orchestrator will dispatch QE Phase 6 to commit src/ changes; Phase 5.5 gate verifies brief readiness BEFORE Phase 6)
-- **Seed**: 42 (single outer seed)
-- **ENSEMBLE_SIZE**: 10 (inner ensemble seeds — LightGBM strategy internal)
-- **n_trials**: 35 (Optuna budget)
-- **Bounds profile**: `v1_pruned` (UNCHANGED)
-- **Feature columns**: `list(V1_FEATURE_COLUMNS_PRUNED)` (43 cols; explicit per `feedback_explicit_feature_columns.md`)
-- **Universe**: `V1_ITER029_UNIVERSE = ("DOTUSDT",)`
-- **Gate constants**: lookback_bars=42, threshold_pct=8.0, enabled=True (mirror /019 verbatim)
-- **OOS_CUTOFF_DATE = 2025-03-24** (UNCHANGED; sacred constant)
-- **training_months = 24** (UNCHANGED; sacred constant)
-- **Embargo**: `walk_forward.py:113` carries `train_end_ms = test_start_ms - embargo_ms` (post-/058 FIX UNCHANGED)
-- **`oof_persist_path`**: `data/v1_iter_v1-029_oof.parquet`
-- **`params_persist_path`**: `data/v1_iter_v1-029_optuna_best_params.parquet` (carry-forward /021 infrastructure)
-- **`feature_importance_path`**: `feature_importance_E_DOTUSDT.csv` (carry-forward /021 + /023 _post_dispatch_fi_strategies refactor)
-- **Reports directory**: `reports-v1/iteration_v1-029/`
+Forward-looking prediction of the most plausible OOS failure modes for /029, with metric signatures pre-registered for Phase 8 diary verification.
+
+### 7.1 GATE OVER-KILL (most likely failure mode at OOS fire-rate > 30%)
+
+The symmetric ±8% BTC-trend gate kills BOTH counter-trend LONG positions (the catastrophic OOS LONG strong-down at −5.80% / 5 tr AND the OOS LONG weak-up at −8.47% / 7 tr) AND counter-trend SHORT positions (the +5.59% OOS SHORT strong-up bucket — a *positive* counter-trend channel). If OOS BTC-regime distribution is heavily weighted toward extremes (strong-up + strong-down both > 30% of bars), the gate fires too often and kills the +5.59% profitable counter-trend SHORTS along with the catastrophic counter-trend LONGS. Net gate effect = INERT or NEGATIVE because the gate is symmetric and cannot distinguish "kill the catastrophic LONG bucket" from "kill the profitable SHORT bucket" within the same extreme-BTC regime.
+
+**Metric signature** (Phase 8 diary verification):
+- OOS fire-rate > 30% (above modal 15% upper edge of [5%, 30%] band)
+- OOS TP-exit count < 2 (gate destroys high-TP trades; would also trigger F-AXIS #5 cap)
+- OOS Sharpe Δ in [−0.30, −0.10] band (mild NEGATIVE-CLEAN, not catastrophic)
+- Trade-roster diff vs DOT-in-pool baseline: > 35% of OOS LONG strong-up + SHORT strong-down trades preserved (gate alignment correct on positive buckets), but > 80% of OOS SHORT strong-up trades killed
+- Verdict cell: Row 3 (NEGATIVE-INERT) or Row 4 (PROMISING-INERT, if F-AXIS #5 caps at < 2 TP)
+
+### 7.2 H1-CATASTROPHIC BASIN-FLIP (second-most-likely)
+
+DOT's IS H1 catastrophic (−18.19% / 59 trades) / H2 recovery (+44.82% / 34 trades) means Optuna's single-seed=42 basin search at n_trials=35 may relocate from H2-fit (baseline DOT-in-pool's de-facto best-recent-window basin) to H1-fit (catastrophic-window-dominant basin) at the per-cohort isolation. If the OOS test set (Apr 2025 – Mar 2026) lands closer to H1 regime patterns (high vol, drawdown-prone, counter-trend dominant), the H1-fit basin under-performs because H1's market-microstructure dynamics may differ from OOS. R2 is OFF for DOT-only single-cohort (Model E semantics differ from baseline portfolio R2 weighting; mirror /018 LINK + /019 ETH single-cohort precedent), so no drawdown-triggered defense if H1-similar catastrophic regime materializes.
+
+**Metric signature** (Phase 8 diary verification):
+- OOS Sharpe Δ < −0.20 (NEGATIVE-CLEAN or NEGATIVE-CATASTROPHIC, Row 8)
+- OOS H1-pattern months (high vol, > 20 trades/month, WR < 35%) cluster underperform OOS H2-pattern months (lower vol, < 15 trades/month, WR > 40%)
+- IS Sharpe stays close to DOT-in-pool baseline (+0.0398 per-trade) — basin relocation primarily affects OOS, not IS
+- Trade roster shifts > 25% vs DOT-in-pool baseline (Optuna found a different basin under single-cohort training)
+- Verdict cell: Row 8 (NEGATIVE-CLEAN or NEGATIVE-CATASTROPHIC)
+
+### 7.3 SHORT-DOMINANT BASIN LOTTERY (third-most-likely)
+
+DOT IS has 95% LONG-biased basin (+25.39% IS LONG PnL vs +1.24% IS SHORT PnL) in the DOT-in-pool baseline (under pooled training across BTC+ETH+LINK+LTC+DOT). Under DOT-only single-cohort retraining at single-seed=42, Optuna may bounce to a SHORT-dominant decision boundary — mirroring the ETH /019 surprise pattern where IS was LONG-bias but OOS was SHORT-carrier. If the OOS SHORT-dominant basin happens to catch the +3.56% OOS SHORT net carry (per `dot_direction_split.csv` OOS SHORT 26 trades / WR 42.3% / +0.0180 Sharpe), this scenario actually LIFTS OOS Δ; if the SHORT-dominant basin misaligns with the +5.59% OOS SHORT strong-up bucket (or the gate kills it), this drags OOS Δ down.
+
+**Metric signature** (Phase 8 diary verification):
+- OOS LONG count drops to < 10 trades (vs baseline 20) and OOS SHORT count ramps to > 40 (vs baseline 26)
+- IS LONG count similarly drops to ~30 (vs baseline 56) and IS SHORT count ramps to ~60 (vs baseline 37)
+- OOS Sharpe Δ outcome conditional on whether SHORT-basin catches +5.59% strong-up carry:
+  - If gate preserves the +5.59% bucket AND SHORT-basin catches it: Δ ∈ [+0.20, +0.50] (Row 5 PROMISING)
+  - If gate kills the +5.59% bucket (symmetric ±8% kills it) OR SHORT-basin misaligns: Δ ∈ [−0.30, +0.05] (Row 7 INERT or Row 8 NEGATIVE)
+- This failure mode interacts strongly with 7.1 (GATE OVER-KILL); they may co-occur
 
 ---
 
@@ -471,18 +520,74 @@ Pre-commit to verdict cells (mirror /028 format; 8 rows):
 
 ---
 
-## Section 9 — Test Suite Mandate (per `feedback_v1_defensive_check_must_be_tested.md`)
+## Section 9 — Library Stack Declaration
+
+Verified via `uv run python -c "import lightgbm, optuna, numpy, pandas, statsmodels; print(...)"` and individual import checks at brief Phase 5.5 fix authoring time:
+
+```
+mlfinlab: NOT INSTALLED (fallback: in-tree implementations in src/crypto_trade/; no mlfinlab API call invoked at /029)
+mlfinpy: NOT INSTALLED (fallback: same in-tree path; not invoked at /029)
+pypbo: N/A (EXPLORATION — PBO is informational-only for single-seed runs; not invoked)
+fracdiff: NOT INSTALLED (no new features at /029 — V1_FEATURE_COLUMNS_PRUNED frozen from /028; fracdiff/ADF flow not invoked)
+statsmodels: 0.14.6 (informational; not invoked at /029 — no new feature-family stationarity checks)
+lightgbm: 4.6.0 (load-bearing — baseline strategy)
+optuna: 4.8.0 (load-bearing — n_trials=35 hyperparameter search)
+numpy: 2.2.6 (load-bearing)
+pandas: 3.0.0 (load-bearing)
+```
+
+### 9.1 Invocation status for /029
+
+- **lightgbm** (4.6.0): LOAD-BEARING. Model E baseline LightGBM strategy with `v1_pruned` bounds profile.
+- **optuna** (4.8.0): LOAD-BEARING. n_trials=35 single-seed=42 search per LM Master §2.5 ADOPTED.
+- **numpy / pandas**: LOAD-BEARING. Trade-roster + feature-matrix + gate-fire arithmetic.
+- **statsmodels** (0.14.6): NOT INVOKED. No new feature ADF stationarity checks at /029 (frozen 43-col `V1_FEATURE_COLUMNS_PRUNED`).
+- **mlfinlab / mlfinpy**: NOT INSTALLED in this worktree environment. /029 does NOT invoke either — gate logic, walk-forward, embargo, and triple-barrier labels use in-tree implementations under `src/crypto_trade/`. No fallback gap exists because no mlfinlab API surface is called.
+- **pypbo**: N/A. PBO is a CONFIRMATION-mode methodology gate (multi-seed Pareto + > 20 strategy sets); at single-seed EXPLORATION it is informational only and not invoked.
+- **fracdiff**: NOT INSTALLED. /029 has zero new features, so the ADF/fracdiff flow for new-feature stationarity validation is N/A. If a future EXPLORATION introduces new features requiring fractional differentiation (cycle-4 /030+ feature-family axis), `fracdiff>=0.10` will need to be installed at that brief.
+
+### 9.2 No version bumps required at /029
+
+The runner change at /029 is a single `elif set(symbols) == set(V1_ITER029_UNIVERSE)` dispatch branch + 4 new constants + import of existing `risk_v2.BtcTrendFilterConfig` + `apply_btc_trend_filter`. No new library dependency. No version bumps. `uv.lock` UNCHANGED.
+
+---
+
+## Section 10 — Reproducibility, Symbol Exclusion, Test Suite Mandate
+
+### 10.1 Reproducibility
+
+- **HEAD commit (post-Phase 5.5 fix)**: see Phase 5.5 re-gate dispatch SHA
+- **Seed**: 42 (single outer seed)
+- **ENSEMBLE_SIZE**: 10 (inner ensemble seeds — LightGBM strategy internal)
+- **n_trials**: 35 (Optuna budget)
+- **Bounds profile**: `v1_pruned` (UNCHANGED)
+- **Feature columns**: `list(V1_FEATURE_COLUMNS_PRUNED)` (43 cols; explicit per `feedback_explicit_feature_columns.md`)
+- **Universe**: `V1_ITER029_UNIVERSE = ("DOTUSDT",)`
+- **Gate constants**: lookback_bars=42, threshold_pct=8.0, enabled=True (mirror /019 verbatim)
+- **OOS_CUTOFF_DATE = 2025-03-24** (UNCHANGED; sacred constant)
+- **training_months = 24** (UNCHANGED; sacred constant)
+- **Embargo**: `walk_forward.py:113` carries `train_end_ms = test_start_ms - embargo_ms` (post-/058 FIX UNCHANGED)
+- **`oof_persist_path`**: `data/v1_iter_v1-029_oof.parquet`
+- **`params_persist_path`**: `data/v1_iter_v1-029_optuna_best_params.parquet` (carry-forward /021 infrastructure)
+- **`feature_importance_path`**: `feature_importance_E_DOTUSDT.csv` (carry-forward /021 + /023 _post_dispatch_fi_strategies refactor)
+- **Reports directory**: `reports-v1/iteration_v1-029/`
+
+### 10.2 Symbol Exclusion
+
+**`V1_EXCLUDED_SYMBOLS` unchanged.** No symbols added or removed from the v1 baseline universe (`V1_BASELINE_UNIVERSE = (BTCUSDT, ETHUSDT, LINKUSDT, LTCUSDT, DOTUSDT)`). /029 narrows to `V1_ITER029_UNIVERSE = (DOTUSDT,)` only for the iter-v1/029 dispatch branch — baseline universe constant is untouched.
+
+### 10.3 Test Suite Mandate (per `feedback_v1_defensive_check_must_be_tested.md`)
 
 For QE Phase 6 implementation:
 
-### 9.1 Required regression tests at `tests/test_lookahead_embargo.py` (4 mandated)
+#### 10.3.1 Required regression tests at `tests/test_lookahead_embargo.py` (4 mandated)
 
 - Line 120: walk-forward train_end_ms < test_start_ms invariant
 - Line 163: embargo_ms positive and applied to BOTH leading and trailing test boundary
 - Line 232: triple-barrier σ_t uses past-only EWMA (no labeling-window contamination)
 - Line 261: BTC-trend gate input uses BTC kline data with close_time < signal-time t (past-only via np.searchsorted right−1)
 
-### 9.2 New tests at `tests/test_iteration_v1_029.py` (6+ required)
+#### 10.3.2 New tests at `tests/test_iteration_v1_029.py` (6+ required)
 
 - `test_v1_iter029_universe_constant`: `V1_ITER029_UNIVERSE == ("DOTUSDT",)`
 - `test_v1_iter029_dispatch_branch_pass`: `set(symbols) == set(V1_ITER029_UNIVERSE)` triggers Model E + gate path
@@ -492,7 +597,7 @@ For QE Phase 6 implementation:
 - `test_v1_iter029_btc_gate_fire_at_positive_threshold`: gate kills SHORT when BTC 14d return > +8% (sample-instance unit test)
 - `test_v1_iter029_btc_gate_pass_mild_regime`: gate passes trades when BTC 14d return ∈ [−8%, +8%]
 
-### 9.3 ANY new hard-assert MUST include sample-instance unit test (the /027 lesson)
+#### 10.3.3 ANY new hard-assert MUST include sample-instance unit test (the /027 lesson)
 
 The /027 CONFIRMATION crashed at a hard-assert with `AttributeError: 'TradeResult' object has no attribute 'model_name'` — the defensive runtime check was itself defective. **Mandate**: every hard-assert added in /029 src/ MUST have a corresponding test that instantiates the real object and verifies the assert path. This includes any AssertionError or ValueError raise inside the dispatch logic.
 
