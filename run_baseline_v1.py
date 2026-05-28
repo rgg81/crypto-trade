@@ -630,6 +630,7 @@ def run_meta_model(
         verbose=1,
         atr_tp_multiplier=atr_tp,
         atr_sl_multiplier=atr_sl,
+        atr_column="vol_natr_21",  # v1 parquet schema (MetaLabelingStrategy default natr_21_raw is v3 schema)
         use_atr_labeling=True,
         ensemble_seeds=_derive_ensemble_seeds(ensemble_size, offset=ensemble_seeds_offset),
         feature_columns=effective_feature_columns,
