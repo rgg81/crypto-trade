@@ -52,25 +52,25 @@ This is the SINGLE LEVER that distinguishes /028 from /022. The /022 mechanism f
 4. In the retrained basin, the targeted asymmetry DISSOLVED (76% long retrained vs 96% baseline; OOS short drag grew 4.6×).
 5. The pre-entry gate by construction cannot touch trades it doesn't see, and acts on a property that no longer exists.
 
-**The right mechanism for /028 must be BASIN-RELOCATION-ORTHOGONAL** — operate on properties that survive retraining regardless of which trades the model selects.
+**The right mechanism for /028 must be BASIN-RELOCATION-INOCULATED** — operate on properties that survive retraining as much as possible. Note (LM Master Rec #2): no mechanism is truly basin-orthogonal-by-construction when it changes labels upstream. `atr_sl` is PARTIAL inoculation, not immunity.
 
 EDA-derived candidate ranking (`analysis/iteration_v1-028/ltc_mechanism_robustness_predictions.csv`):
 
-| Candidate | Δ on baseline roster | Basin-orthogonal? | Notes |
+| Candidate | Δ on baseline roster | Basin inoculation | Notes |
 |---|---:|---|---|
-| **E_tighter_atr_sl** (cap loss at -3%) | **+36.17%** | **YES — post-entry SL acts on price path** | universal magnitude clip; mechanism survives roster change |
-| C_meta_labeling (conf > 0.85) | +15.56% | NO — conf is basin output | OOS conf calibration INVERTED ([0.85,1.00) = 23% WR) |
+| **E_tighter_atr_sl** (cap loss at -3%) | **+36.17%** | **PARTIAL — SL trigger basin-survivable, BUT atr_sl upstream of label generation shifts class balance** | LM Master Rec #2: BOTH basin AND label distribution shift simultaneously. Mechanism more roster-robust than /022's pre-entry gate but NOT immune. |
+| C_meta_labeling (conf > 0.85) | +15.56% | NONE — conf is basin output | OOS conf calibration INVERTED ([0.85,1.00) = 23% WR) |
 | F_prior_month_drawdown_gate | +2.88% | MEDIUM — stateful but not targeted | only 1 month qualifies; weak signal |
 | A_R5_vol_ceiling | +0.77% | PARTIAL | proxy via |pnl|; real impl needs NATR ex-ante |
-| B_feature_subset | N/A — requires backtest | YES — substrate change | full retrain required; no closed-form proxy |
-| D_sample_weighting | N/A — requires backtest | YES — substrate change | full retrain required; no closed-form proxy |
+| B_feature_subset | N/A — requires backtest | NONE — substrate change is the basin | full retrain required; no closed-form proxy |
+| D_sample_weighting | N/A — requires backtest | NONE — substrate change is the basin | full retrain required; no closed-form proxy |
 
-**Selected**: **E_tighter_atr_sl per-cohort tuning** for LTC-only Model D' specialist. Quantitative target = baseline `atr_sl=1.75` → **`atr_sl=1.0`** (cap typical loss at ~3% instead of ~5.25%, with TP unchanged at `atr_tp=3.5`).
+**Selected**: **E_tighter_atr_sl per-cohort tuning** for LTC-only Model D' specialist. Quantitative target = baseline `atr_sl=1.75` → **`atr_sl=1.0`** (cap typical loss at ~3% instead of ~5.25%, with TP unchanged at `atr_tp=3.5`). Expected modal lift OOS Sharpe Δ +0.25 to +0.45 (LM Master Rec #5: basin-survival ratio 0.5-0.7 caps the +36% baseline-roster lift).
 
 **Why E ranks #1**:
-1. Largest predicted Δ on the baseline roster (+36% PnL → ~+0.8 OOS Sharpe lift if mechanism survives basin relocation at proportional scale).
-2. **Post-entry mechanism — basin-relocation-orthogonal by construction**. The SL fires when the realized price path crosses a multiple of ATR; it does not select trades, and its trigger condition is invariant under model retraining (LTC's volatility regime is not basin-dependent).
-3. **GENUINELY DIFFERENT from /022**. /022 = pre-entry filter targeting basin-contingent direction asymmetry; /028 = post-entry magnitude clip targeting basin-invariant loss-tail distribution. The /022 failure mode (gate fires + asymmetry dissolves + trades remain unaffected) does NOT apply.
+1. Largest predicted Δ on the baseline roster (+36% PnL → ~+0.8 OOS Sharpe lift IF mechanism survives basin relocation at proportional scale; LM Master Rec #5 caps expected survival at 0.5-0.7 → modal lift +18-25% PnL → OOS Sharpe Δ +0.25 to +0.45).
+2. **PARTIAL basin inoculation** (LM Master Rec #2 REFRAMING — supersedes initial "basin-relocation-orthogonal by construction"). atr_sl is **upstream of triple-barrier label generation** (`triple_barrier_labels` reads `atr_sl_multiplier` to set the lower barrier). Tightening 1.75→1.0 narrows lower barrier by 43% and changes the LABELS LightGBM trains on. Class balance shifts: MORE -1 labels with SMALLER magnitudes. The mechanism shifts BOTH basin (Optuna best_params) AND label class distribution simultaneously — TWO basin-relocation vectors, not zero. SL trigger condition still acts on realized price path (a substrate-invariant property) and is more roster-robust than /022's pre-entry asymmetric gate, but the basin Jaccard vs baseline is expected at 0.05-0.15 (similar /022's 0.093).
+3. **GENUINELY DIFFERENT from /022**. /022 = pre-entry filter targeting basin-contingent direction asymmetry; /028 = upstream triple-barrier parameter + post-entry magnitude clip targeting basin-survivable loss-tail distribution. The /022 failure mode (gate fires + asymmetry dissolves + trades remain unaffected) does NOT apply (the SL fires on price path, not on a basin-contingent property), but a DIFFERENT failure mode applies: label class balance shift may relocate Optuna away from the regions where the +36% counterfactual lift was concentrated.
 4. Addresses the EDA's dominant loss channel: stop_loss exits account for 21 of 34 baseline OOS trades and -97.9% of total loss — meta-mechanism in the data, not a researcher-imposed gate.
 5. Stateless — no deadlock risk, no STATEFUL gate proof needed.
 
@@ -103,15 +103,16 @@ Phase 4.5 advisory expected after this Phase 5 brief commits. Brief Section 3.4 
 
 ## Section 1 — Hypothesis
 
-**H_028**: LTC-only training (Model D' specialist substrate) **+ tighter ATR-based stop-loss multiplier (atr_sl=1.0 vs baseline 1.75)** caps the dominant loss channel of LTC OOS (stop-loss exits at -5 to -7% magnitude) without sacrificing the upside (take-profit and timeout-positive trades are largely untouched). The mechanism is BASIN-RELOCATION-ORTHOGONAL because:
+**H_028**: LTC-only training (Model D' specialist substrate) **+ tighter ATR-based stop-loss multiplier (atr_sl=1.0 vs baseline 1.75)** caps the dominant loss channel of LTC OOS (stop-loss exits at -5 to -7% magnitude) at the cost of converting some take-profit-eligible trades into earlier SL fires. The mechanism is **PARTIAL basin inoculation** (LM Master Rec #2):
 
-(a) The SL trigger fires on the realized price path crossing a multiple of ATR — a property of price dynamics, NOT of the trade-selection decision.
-(b) LTC's 8h volatility regime (ATR scale) is substrate-invariant across LTC-in-pool baseline vs LTC-only retrained: both train on the same LTC kline data, only the universe composition changes the loss surface, not the volatility regime.
-(c) Therefore the mechanism's targeting (loss magnitude > 3% in ATR-normalized units) survives the 79% basin relocation observed in /022.
+(a) The SL trigger fires on the realized price path crossing a multiple of ATR — a property of price dynamics that is more roster-robust than /022's pre-entry asymmetric gate.
+(b) HOWEVER, `atr_sl` is upstream of triple-barrier label generation: tightening 1.75→1.0 narrows the lower barrier by 43%, shifts class balance (MORE -1 labels with SMALLER magnitudes), AND relocates the Optuna basin under retraining. So the mechanism shifts BOTH basin AND label class distribution — TWO basin-relocation vectors.
+(c) LTC's 8h volatility regime (ATR scale) is substrate-invariant; the trigger CONDITION survives basin relocation, but the EFFECTIVE roster the mechanism operates on does not.
+(d) Therefore the +36% baseline-roster counterfactual is bounded by the basin-survival ratio (LM Master Rec #5 estimates 0.5-0.7) → expected lift +18-25% PnL → OOS Sharpe Δ +0.25 to +0.45.
 
-**Predicted outcome** (per Section 5 priors below): modal verdict INERT or PROMISING-INERT-favorable, with the long-tail towards PROMISING reachable only if both substrate-change basin relocation lands favorably AND tighter SL ratio mechanism survives at the new roster's loss-tail distribution.
+**Predicted outcome** (per Section 5 priors below): modal verdict PROMISING-INERT-favorable (LM Master Rec #5 territory), with the long-tail towards PROMISING reachable only if basin-survival ratio lands ≥0.7 AND F-AXIS #5 OOS TP-exit count ≥1 (LM Master Rec #6: if all 4 baseline OOS TP-eligible trades convert to SL, the mechanism degenerates to loss-clipping-only and verdict cannot exceed PROMISING-INERT regardless of F1).
 
-**Predicted F1 OOS Sharpe Δ band**: [-0.15, +0.55]. NEG-CAT (-0.55+) tail downweighted vs /022 because the mechanism is fundamentally different from the saturation-rule failure mode; PROMISING (+0.55+) tail upweighted vs /022 because the EDA counterfactual is +36% on the baseline roster (a 5× larger pre-mechanism signal than /022's +12% EDA).
+**Predicted F1 OOS Sharpe Δ band**: [-0.15, +0.55]. Modal +0.25-0.45 per LM Master Rec #5. NEG-CAT (-0.55+) tail at 13% (LM Master Rec #3) — ASYMMETRIC_ROTATION prior class binds NEG-CAT ≥10% AND label class balance shift adds a 2nd basin-relocation vector; not orthogonal-by-construction immunity.
 
 ---
 
@@ -207,18 +208,15 @@ The /022 asymmetric long-suppress gate would have done nothing for 2026-04 (all 
 - LTC-only universe: optimization target changes from "Sharpe across 5 cohort substrate" to "Sharpe on LTC-only substrate"
 - atr_sl=1.0 vs 1.75: triple-barrier upper/lower barriers move, label class balance shifts
 
-**Mitigation (HIGH-RISK opt-in per v1 lighter footing)**:
+**Mitigation (HIGH-RISK with v1-runner-compatible variance budget)**:
 
-Per `feedback_v3_iter017_meta_labeling_mandate.md` and v1's optional multi-seed: **single-seed=42 EXPLORATION budget** (consistent with /016-/025 single-axis tests). Multi-seed validation deferred to /038+ CONFIRMATION if /028 produces PROMISING-class verdict.
+Cycle-3 §5.4 multi-seed mandate has TRIPPED (cumulative ≥1σ negative count reached 5). The mandate binds HIGH-RISK axes. /028 IS HIGH-RISK. Multi-seed variance budget REQUIRED.
 
-**Why opt-in is appropriate here**:
-- Cumulative ≥1σ negative count reached 5 in cycle-3 (per `cycle3_closeout.md` §5.4). The multi-seed mandate has TRIPPED.
-- However, the multi-seed mandate per cycle-3 §5.4 binds **HIGH-RISK axes**. /028 IS HIGH-RISK.
-- **OVERRIDE**: this iteration BIND mits MULTI-SEED. Set `--seeds 2` minimum for /028 in run command (per cycle-4 §5.4 inheritance). ENSEMBLE_SIZE remains 3 at EXPLORATION budget; n_trials=35.
+**v1 runner has NO `--seeds` flag** (LM Master Rec #1 MECHANICAL — `--seeds 2 --ensemble-size 3` would FAIL at argparse). Variance budget mapped to **inner ensemble** per v1-style 10-seed ensemble convention (`feedback_v1_ensemble.md`).
 
-**Effective config**: `--seeds 2 --ensemble-size 3 --n-trials 35`. Estimated wall-clock 25-40 min (LTC-only single-cohort with 2 outer seeds; per /022 baseline 9 min × 2 seeds × moderate Optuna scaling ≈ 30 min).
+**Effective config (CORRECTED per LM Master Rec #1)**: `--exploration --iteration 028 --pruned-features --n-trials 35 --ensemble-size 10`. Estimated wall-clock ~30 min (CONFIRMATION-mode variance budget at EXPLORATION axis; LTC-only single-cohort). Mode tag stays EXPLORATION (n_trials=35 NOT 50).
 
-**HIGH-RISK declaration with multi-seed mitigation** is the WORKING POSITION that survived cycle-3 §5.4 review.
+**HIGH-RISK declaration with `--ensemble-size 10` variance mitigation** is the cycle-4 working position.
 
 ---
 
@@ -235,8 +233,9 @@ V1_ITER028_UNIVERSE: tuple[str, ...] = ("LTCUSDT",)
 # In run_baseline_v1.py, NEW elif branch (estimate ~50 lines):
 elif set(symbols) == set(V1_ITER028_UNIVERSE) and iteration_label == "v1-028":
     # iter-v1/028: D-specialist (LTC-only) + tighter atr_sl (1.0 vs 1.75 baseline)
-    # Single-cohort substrate change + post-entry magnitude clip.
-    # Mechanism is basin-relocation-orthogonal by construction.
+    # Single-cohort substrate change + upstream triple-barrier param change.
+    # Mechanism is PARTIAL basin inoculation (atr_sl is upstream of label
+    # generation; shifts BOTH basin AND label class distribution).
     results_d, faxm_d, _strat_d = run_model(
         "D' (LTC-only + tighter SL)",
         ("LTCUSDT",),
@@ -264,26 +263,38 @@ uv run python run_baseline_v1.py \
     --symbols LTCUSDT \
     --iteration-label v1-028 \
     --exploration \
-    --seeds 2 \
-    --ensemble-size 3 \
+    --ensemble-size 10 \
     --n-trials 35 \
     --reports-dir reports-v1/iteration_v1-028
 ```
+
+**CORRECTION (LM Master Rec #1 ADOPTED)**: v1 runner argparse does NOT have a `--seeds` flag (would fail at argparse). Variance budget mapped to inner ensemble (`--ensemble-size 10`) per v1-style 10-seed ensemble convention (`feedback_v1_ensemble.md`). CONFIRMATION-mode variance budget at EXPLORATION axis (single-cohort cost ≈ 30 min). Mode tag stays EXPLORATION (n_trials=35 NOT 50).
 
 ### 3.3 Pinned values
 
 - `V1_ITER028_UNIVERSE = ("LTCUSDT",)` — single-cohort
 - `atr_sl = 1.0` (CHANGED; baseline = 1.75); `atr_tp = 3.5` (UNCHANGED)
 - `apply_r1 = True` (UNCHANGED — Model D baseline has R1 consecutive-SL cooldown)
-- `seeds = (42, 123)` (multi-seed mitigation per cycle-3 §5.4)
-- `ensemble_size = 3`
+- `ensemble_size = 10` (CORRECTED from 3 per LM Master Rec #1)
 - `n_trials = 35`
 - `V1_FEATURE_COLUMNS_PRUNED` (43 cols — baseline pruned feature set, no feature changes)
 - `feature_columns_pinned = list(V1_FEATURE_COLUMNS_PRUNED)` — MANDATORY per v1 skill
 
 ### 3.4 LM Master Phase 4.5 Responses
 
-**RESERVED FOR LM MASTER PHASE 4.5 ADVISORY** (filled in by QR after Phase 4.5 fires).
+LM Master `briefs-v1/iteration_v1-028/lgbm_advisor.md` issued 7 recommendations across MECHANICAL, REFRAMING, PRIORS, F-AXIS, INOCULATION, MOST-IMPORTANT, /029-STAGING. Per-recommendation responses:
+
+| # | LM Master rec | Response | Rationale |
+|---|---|---|---|
+| 1 | MECHANICAL: `--ensemble-size 10 --n-trials 35` (NO `--seeds`; v1 runner has no `--seeds` flag) | **ADOPTED** | Brief §3.2/3.3 invocation CORRECTED. v1 runner argparse does not accept `--seeds`. Variance budget mapped to inner ensemble (ensemble_size=10) per v1-style 10-seed ensemble convention (`feedback_v1_ensemble.md`). |
+| 2 | REFRAMING: `atr_sl` is upstream of triple-barrier label generation; NOT basin-orthogonal — PARTIAL basin inoculation only (BOTH basin AND label class distribution shift) | **ADOPTED** | §0.4 + §1 reframing updated. Phase 7.4 verdict assignment will compare TWO basin-relocation dimensions: (a) Optuna best_params shift (basin vector), (b) label class balance shift (training distribution vector). |
+| 3 | PRIORS: 12/18/35/22/13 (vs QR 15/20/35/20/10); NEG total 35% vs QR 30%; PROMISING tail compressed | **ADOPTED** | §5.1 priors updated. NEG-CAT raised to 13% per ASYMMETRIC_ROTATION binding + 2nd basin-relocation vector argument. PROMISING -3pp (basin-survival ratio 0.5-0.7 caps lift below +0.40). |
+| 4 | F-AXIS: pre-register #1 LTC-only PASS; #2 trade-count IS [70,150] / OOS [22,55]; #3 SL fire-rate COUNTER-INTUITIVE 75-90% (tighter SL → MORE fires, not less); #4 n_eff [6,10]; **#5 exit-reason distribution LOAD-BEARING** (TP=0 OOS → verdict capped PROMISING-INERT) | **ADOPTED** | F-AXIS hierarchy refactored. §4 now adds F-AXIS #5 (exit-reason distribution: OOS SL 75-90% / TP 0-8% / timeout 10-20%) as LOAD-BEARING. F-AXIS #3 SL fire-rate counter-intuitive prediction codified (75-90%, not 50-70%). LM Master's tighter trade-count bands (LM [70,150]/[22,55]) noted alongside QR's wider [80,180]/[20,60]. |
+| 5 | INOCULATION: PARTIAL not IMMUNITY — baseline-roster +36% × basin-survival ratio 0.5-0.7 = expected /028 lift +18-25% PnL → OOS Sharpe Δ +0.25 to +0.45 (PROMISING-INERT-FAV modal) | **ADOPTED** | §0.4 + §1 narrative updated. Predicted F1 band §1 refined: modal +0.25-0.45 (PROMISING-INERT-FAV territory); PROMISING-tier (Δ≥+0.40) requires survival ratio ≥0.7. |
+| 6 | MOST-IMPORTANT: F-AXIS #5 TP-exit count is LOAD-BEARING (NOT F-AXIS #3 SL fire-rate); baseline LTC OOS had 4 TP exits contributing +31.64% PnL; if atr_sl=1.0 converts ≥2 of 4 to SL at retrained roster, net effect collapses below +0.20 OOS Sharpe Δ regardless of clean-clipping of moderate-loss bucket | **ADOPTED** | F-AXIS hierarchy refactored §4: F-AXIS #5 replaces F-AXIS #3 as the LOAD-BEARING diagnostic. §6.2 Failure Mode 6.2 (Tighter SL clips winners) reframed: not just bounded risk but PRIMARY verdict-determining variable. |
+| 7 | /029-STAGING: PROMISING → DOT-specialist; PROMISING-INERT-FAV → DOT-specialist; INERT → sample-weighting (López de Prado AFML Ch.4 inverse-concurrency; UNUSED in v1); NEG-clean → sample-weighting; NEG-CAT → FUNDAMENTAL RE-QUESTION (3rd NEG-CAT same prior class closes per-cohort axis permanently); XGBoost OR universe contraction | **ADOPTED** | §11.7 NEW: verdict-conditional /029 staging per LM Master §7 matrix. Replaces §11.1 routing (kept §11.1 for cycle-4 thematic context but §11.7 binds /029 specifically per LM Master). |
+
+**Methodology track**: LM Master Phase 4.5 invocation #6 (cycle-3 was 5/5 methodology + 4/8 directional). Trust budget: methodology recs (#1) ADOPTED unconditionally. Directional recs (#2-7) ADOPTED per merit (consistent with cycle-3 4/8 directional record — LM Master's tail-upweighting was reliably directionally correct).
 
 ### 3.5 Axis Family Declaration (v1 mandatory)
 
@@ -300,7 +311,7 @@ uv run python run_baseline_v1.py \
 - **High estimate**: 60 min (Optuna TPE variance at n_trials=35 × 2 seeds)
 - **Hard cap**: 2h (skill EXPLORATION cap)
 - **Kill-switch**: 90 min (engineer terminates if wall-clock exceeds 1.5h projected against the 2h cap)
-- **Baseline reference**: /022 single-cohort LTC-only single-seed=42 ran 541 s (~9 min). /028 = 2 seeds + larger n_trials (35 vs 18 at /022) ≈ 2× = ~30 min modal.
+- **Baseline reference**: /022 single-cohort LTC-only single-seed=42 + ensemble_size=3 ran 541 s (~9 min). /028 = ensemble_size=10 + n_trials=35 (vs 18 at /022) ≈ 3.3× = ~30 min modal.
 
 ---
 
@@ -352,19 +363,24 @@ LTC-only dispatch ensures 100% LTC trades. F-AXIS #1 (per Section 4.X) verifies.
 ### F8 — LTC-only trade count band
 
 - **QR band**: IS trades ∈ [80, 180]; OOS trades ∈ [20, 60]
-- **LM Master band** (to be populated post-Phase-4.5)
-- Tighter SL is expected to INCREASE trade count slightly (R1 cooldown fires more often after more stop-losses; net effect uncertain; trade count band wide).
+- **LM Master band** (Rec #4 ADOPTED): IS [70, 150] modal 105 / OOS [22, 55] modal 35
+- **ADOPTED pass band**: QR-wider [80, 180] / [20, 60] (more permissive — minimum-floor envelope). LM Master modals (105/35) used as expected-value reference.
+- Tighter SL is expected to DECREASE trade count slightly via R1 cooldown engagement (tighter SL → more SL fires → R1 cooldown engages more → fewer trades net; effect direction reversed from initial QR guess per LM Master Rec #4).
 
-### F-AXIS-MECHANISM (compound 4-sub-check; LOAD-BEARING per /022 lesson)
+### F-AXIS-MECHANISM (compound 5-sub-check; F-AXIS #5 LOAD-BEARING per LM Master Rec #6)
 
-These verify the MECHANISM operates as designed independent of F1 magnitude:
+These verify the MECHANISM operates as designed independent of F1 magnitude. **Hierarchy refactored per LM Master Rec #4 + Rec #6**: F-AXIS #5 (TP-exit count) is the LOAD-BEARING diagnostic for /028, REPLACING F-AXIS #3 SL fire-rate as the verdict-determining variable (F-AXIS #3 was load-bearing at /022; at /028 the SL fire-rate is mechanically forced upward by the tighter SL and is no longer the binding constraint).
 
-- **F-AXIS #1 dispatch**: `df['symbol'].unique() == ['LTCUSDT']` ✓ (single-cohort)
-- **F-AXIS #2 SL fire rate**: `(df['exit_reason'] == 'stop_loss').mean() ∈ [0.40, 0.75]` (tighter SL means MORE SL fires per trade exit; baseline LTC OOS SL share was 62%; expect 50-70%)
-- **F-AXIS #3 loss magnitude clip**: `(df[df['exit_reason']=='stop_loss']['net_pnl_pct'].mean()) ∈ [-3.5%, -2.5%]` (tighter SL caps SL fires near -3%; baseline was -5 to -7%)
-- **F-AXIS #4 n_eff_per_cell ∈ [6, 10]** (consistent with /022; tighter SL doesn't change Optuna budget but may shift label class balance — see LM Master Phase 4.5 for refinement)
+- **F-AXIS #1 dispatch** (LM Master pre-registered): `df['symbol'].unique() == ['LTCUSDT']` ✓ — BINARY PASS
+- **F-AXIS #2 trade-count band** (LM Master tighter, QR wider): LM IS [70, 150] modal 105 / OOS [22, 55] modal 35 (tighter SL → R1 cooldown engages more); QR safety-margin IS [80, 180] / OOS [20, 60]. **ADOPTED**: pass band = QR-wider IS [80,180] / OOS [20,60], LM Master modals (105/35) used as expected values.
+- **F-AXIS #3 SL fire-rate at OOS** — **COUNTER-INTUITIVE prediction** (LM Master Rec #4): tighter SL → INCREASES SL fire-rate (NOT decreases). Predicted OOS SL fire-rate **75-90%** (vs baseline 62%). If observed < 60% → **UNDERFIRING** (basin avoided SL trigger → INERT). If > 90% → **OVERFIRING** ("3% lottery tickets" pattern). PASS band: 60-90%.
+- **F-AXIS #4 n_eff_per_cell**: [6, 10] modal 8 (atr_sl change shifts class balance ~10-20%; marginal TPE convergence impact per LM Master Rec #4).
+- **F-AXIS #5 exit-reason distribution OOS** — **LOAD-BEARING** (LM Master Rec #6): predicted OOS SL 75-90% / TP 0-8% / timeout 10-20% (baseline 62/12/26).
+  - **CRITICAL CONSTRAINT**: If OOS TP-exit count = 0, ALL upside is lost (the 4 baseline TP exits contributed +31.64% PnL; if atr_sl=1.0 converts all of them to SL, mechanism net effect = pure loss-clipping with no upside retention) → **verdict CANNOT exceed PROMISING-INERT regardless of F1 OOS Sharpe magnitude**.
+  - If OOS TP-exit count = 1, mechanism partially retains upside; verdict can reach PROMISING-INERT-FAV but not PROMISING.
+  - If OOS TP-exit count ≥ 2, mechanism retains material upside; PROMISING reachable.
 
-**Reconciliation discipline (CARRY-FORWARD from /022 §4)**: F-AXIS-MECHANISM passing on its own does NOT imply F1 success. /022 had 4/4 F-AXIS PASS with F1 catastrophic — mechanism ≠ outcome. /028 F1 verdict = OOS Sharpe direction independent of F-AXIS-MECHANISM.
+**Reconciliation discipline (CARRY-FORWARD from /022 §4)**: F-AXIS-MECHANISM passing on its own does NOT imply F1 success. /022 had 4/4 F-AXIS PASS with F1 catastrophic — mechanism ≠ outcome. **NEW (/028)**: F-AXIS #5 FAILURE (TP-exit count = 0) acts as an explicit verdict CEILING regardless of F1 — this is the LOAD-BEARING diagnostic LM Master Rec #6 codifies.
 
 ### F-PORTFOLIO (informational; cannot determine verdict)
 
@@ -376,57 +392,64 @@ Single-cohort LTC-only run; no portfolio metric meaningful. INFORMATIONAL.
 
 Per `feedback_v1_per_cohort_saturation_asymmetric_rotation.md` ASYMMETRIC_ROTATION prior class baseline + mechanism-specific upgrades:
 
-### 5.1 QR initial priors (pre-LM-Master)
+### 5.1 Priors (LM Master Rec #3 ADOPTED — supersedes QR initial 15/20/35/20/10)
 
-| Verdict class | Probability |
-|---|---|
-| PROMISING (F1 ≥ +0.40) | **15%** |
-| PROMISING-INERT-favorable (+0.20 ≤ F1 < +0.40) | **20%** |
-| INERT-no-effect (-0.20 ≤ F1 < +0.20) | **35%** |
-| NEGATIVE-clean (-0.55 < F1 < -0.20) | **20%** |
-| NEGATIVE-CATASTROPHIC (F1 ≤ -0.55) | **10%** |
+| Verdict class | QR initial | LM Master | ADOPTED |
+|---|---|---|---|
+| PROMISING (F1 ≥ +0.40) | 15% | 12% | **12%** |
+| PROMISING-INERT-favorable (+0.20 ≤ F1 < +0.40) | 20% | 18% | **18%** |
+| INERT-no-effect (-0.20 ≤ F1 < +0.20) | 35% | 35% | **35%** |
+| NEGATIVE-clean (-0.55 < F1 < -0.20) | 20% | 22% | **22%** |
+| NEGATIVE-CATASTROPHIC (F1 ≤ -0.55) | 10% | 13% | **13%** |
+
+NEG total **35%** vs QR's initial 30%. PROMISING tail compressed 35% → 30% per LM Master Rec #5 PARTIAL inoculation argument (basin-survival ratio caps lift below +0.40 in modal case).
 
 ### 5.2 Rationale
 
-**Why PROMISING tail is HIGHER (15%) vs /022's 5%**:
+**Why PROMISING tail at 12%** (LM Master Rec #3):
 - /022 EDA mechanism counterfactual: +12.45% OOS Δ on baseline roster (small lift)
 - /028 EDA mechanism counterfactual: **+36.17% OOS Δ on baseline roster** (3× larger lift)
-- Larger pre-mechanism signal supports higher PROMISING tail at the same basin-survival probability.
-- **CRITICAL**: this assumes basin-survival probability is ≈ 50-60% (mechanism's basin-orthogonality property). If basin survival is closer to /022's failure (effectively 0% — mechanism dissolved), the +36% is illusory.
+- Larger pre-mechanism signal supports a non-trivial PROMISING tail; basin-survival ratio 0.5-0.7 caps modal lift at +18-25% PnL → OOS Sharpe Δ +0.25 to +0.45.
+- PROMISING-tier (Δ≥+0.40) reachable only if survival ratio ≥0.7 AND F-AXIS #5 OOS TP-exit count ≥1.
 
-**Why NEG-CAT tail is LOWER (10%) vs /022's also 10%**:
-- /028 mechanism (post-entry SL) is structurally different from /022 mechanism (pre-entry gate). The /022 NEG-CAT mode (gate dissolves under basin relocation) does NOT apply.
-- However, ASYMMETRIC_ROTATION cohort prior class still binds NEG-CAT at 10-15% per saturation rule; /028 keeps 10% as a conservative lower bound.
-- Possible NEG-CAT modes: (a) tighter SL clips winners that would have recovered (false-loss conversion), (b) basin relocation finds a worse roster than baseline (mechanism does nothing).
+**Why NEG-CAT tail at 13%** (LM Master Rec #3, raised from 10%):
+- ASYMMETRIC_ROTATION prior class binds NEG-CAT ≥10% per saturation rule.
+- atr_sl change adds a 2nd basin-relocation vector (label class balance shift in addition to Optuna best_params shift), elevating tail by +3pp.
+- Possible NEG-CAT modes: (a) tighter SL clips winners that would have recovered (false-loss conversion of all 4 baseline TP exits), (b) basin relocation finds a worse roster than baseline + label distribution shift compounds.
 
-**Why INERT modal is HIGHER (35%) vs /022's also ~40%**:
-- The mechanism is BASIN-ORTHOGONAL, so the basin-relocation failure mode (which gave /022 its NEG-CAT) maps to INERT here (the SL fires, trades clip, but basin moves elsewhere). The expected outcome on a NEW basin where SL fires equally is INERT — clipping losses + smaller gains = wash.
-- Pre-Phase-4.5 LM Master will likely retune; expect /028 to retain ~30-40% INERT modal.
+**Why INERT modal at 35%** (unchanged):
+- PARTIAL inoculation means the basin-relocation failure mode of /022 maps PARTIALLY to INERT here (the SL fires, trades clip, but basin moves elsewhere AND label distribution shifts). The expected outcome on a NEW basin where SL fires equally is INERT — clipping losses + smaller gains = wash.
 
-### 5.3 LM Master priors slot
+### 5.3 LM Master priors — ADOPTED (per Rec #3)
 
-LM Master Phase 4.5 will provide refined priors (likely similar magnitude but different bin shape per /022 lesson — LM Master tail upweighting was reliably directionally correct at 4/4 mechanism-level forecasts in cycle-3). QR will adopt or contrast post-Phase-4.5.
+LM Master Phase 4.5 priors 12/18/35/22/13 ADOPTED in §5.1 above. NEG total 35% (vs QR initial 30%); PROMISING tail compressed 35% → 30% per LM Master Rec #5 PARTIAL inoculation argument. Track-record context: LM Master tail upweighting was reliably directionally correct at 4/4 mechanism-level forecasts in cycle-3.
 
 ---
 
 ## Section 6 — Failure Modes
 
-### 6.1 Single-cohort basin lottery at multi-seed=2
+### 6.1 Single-cohort basin lottery with ensemble_size=10 variance budget
 
-Single-cohort isolation IS basin lottery; 2 outer seeds is the minimum mitigation. If both seeds land in adverse basins (basin lottery × 2), /028 NEG-CAT outcome materializes.
+Single-cohort isolation IS basin lottery. v1 runner has no `--seeds` flag (LM Master Rec #1); variance mitigation maps to inner ensemble (`--ensemble-size 10`). If the basin lands adversely despite the 10-model inner ensemble averaging, /028 NEG-CAT outcome materializes.
 
-**Mitigation**: explicit 2-seed average reported in comparison.csv (handled by runner). Per-seed Sharpe variance flagged in engineering_report.md.
+**Mitigation**: inner-ensemble (10 LightGBM models, distinct seeds) averaged at predict time. Per-seed model-level variance internal to ensemble; comparison.csv reports the ensemble-averaged metrics. Phase 7.4 LM Master post-mortem inspects inner-ensemble prediction variance via `forensic.jsonl` decision log if available.
 
-### 6.2 Tighter SL clips winners
+### 6.2 Tighter SL clips winners — PRIMARY verdict-determining variable (LM Master Rec #6 LOAD-BEARING)
 
-A tighter SL converts some near-stop trades that would have recovered into realized losses (false-loss conversion). This is a known SL-tuning trade-off.
+A tighter SL converts some near-stop trades that would have recovered into realized losses (false-loss conversion). **This is the DOMINANT verdict-determining variable for /028**, not a bounded SL-tuning trade-off.
 
 **Empirical bound** (from baseline 34-trade OOS roster):
-- Trades with `exit_reason == 'take_profit'` (4 OOS trades = 12% of OOS) cleared the +TP barrier. At `atr_sl=1.0`, NONE of these would convert to stop-losses (the SL fires before TP, but TP fires require crossing +3.5×ATR — if SL is now 1.0×ATR, the SL fires earlier, before TP can fire).
-- This is a real risk: take-profit trades are bounded by the SL/TP race condition. At baseline `atr_sl=1.75`, TP fired 4× OOS. At `atr_sl=1.0`, some of these may convert to SL fires.
-- Mechanism's net effect = (loss-tail clip from -5/-7% to -3%) vs (TP conversion to SL = +5% lost per converted trade × N converted).
+- Baseline LTC OOS had **4 TP exits** contributing **+31.64% PnL**. At baseline `atr_sl=1.75`, TP fired 4× OOS.
+- At `atr_sl=1.0`, the SL fires earlier (1.0×ATR) than the TP target (3.5×ATR). Any trade where the price path crosses -1.0×ATR before +3.5×ATR converts to a SL fire.
+- **LM Master Rec #6 codifies**: if atr_sl=1.0 converts ≥2 of 4 baseline TP exits to SL fires at the retrained roster, mechanism net effect = (loss-tail clip from -5/-7% to -3%) - (TP→SL conversion cost ≈ +5% lost per converted trade × N converted) → **net effect collapses below +0.20 OOS Sharpe Δ regardless of how cleanly it clips the moderate-loss bucket**.
+- **F-AXIS #5 ceiling**: If OOS TP-exit count = 0, ALL upside is lost; verdict cannot exceed PROMISING-INERT regardless of F1 magnitude (the mechanism degenerates to PROMISING-MECHANICAL loss-clipping-only).
 
-**Quantitative check**: if 2 of 4 TP trades convert to SL, net change = +36% PnL (loss clip gain) - 8% (TP→SL conversion cost) = ~+28%. Mechanism still net positive.
+**Quantitative scenarios** (baseline-roster descriptive; basin-survival adjusted at the retrained roster):
+- 0 of 4 TP→SL: full +36% retained → if survival ratio ≥0.7 → PROMISING (+0.40+)
+- 1 of 4 TP→SL: ~+31% retained → if survival ratio ≥0.7 → PROMISING-INERT-FAV (+0.30)
+- 2 of 4 TP→SL: ~+27% retained → modal PROMISING-INERT-FAV / borderline PROMISING
+- 3 of 4 TP→SL: ~+22% retained → PROMISING-INERT-FAV ceiling (loss-clipping dominates)
+- 4 of 4 TP→SL: ~+18% retained → PROMISING-INERT verdict ceiling (PROMISING-MECHANICAL — non-compoundable)
 
 ### 6.3 R1 cooldown saturation (per Model D baseline)
 
@@ -438,11 +461,23 @@ Tighter SL means more SL fires; R1 cooldown (K=3 consecutive SL → 27-candle co
 
 The atr_sl change is a CONFIG modification at training time. No state propagation. No deadlock-impossibility proof needed (vs STATEFUL mechanisms like /054 v3 drawdown brake).
 
-### 6.5 Basin still lottery despite orthogonality
+### 6.5 Basin lottery + label class balance shift — TWO basin-relocation vectors (LM Master Rec #2 ADOPTED)
 
-The mechanism is basin-orthogonal, but the trade ROSTER is still basin-determined. If the new basin places no trades in volatile regimes, the SL never fires and the mechanism is wasted. The +36% counterfactual is ONLY descriptive on the BASELINE roster.
+The mechanism is PARTIAL basin inoculation, NOT full orthogonality. The trade ROSTER is basin-determined AND the labels LightGBM trains on shift:
 
-**This is the dominant risk for /028**. The mechanism IS robust, but only when it fires. The new roster may have fewer SL-eligible trades.
+**Vector 1 — Optuna best_params shift (basin vector)**: tighter SL changes the loss surface Optuna optimizes against. Best_params relocate. Expected basin Jaccard vs baseline 0.05-0.15 (similar /022's 0.093).
+
+**Vector 2 — Label class balance shift (training distribution vector)**: atr_sl is upstream of `triple_barrier_labels`. Tightening the lower barrier by 43% (1.75→1.0):
+- Increases the count of -1 labels (lower barrier hit more often)
+- Decreases magnitude of -1 labels (each labeled loss is now smaller)
+- The labeled positive/negative ratio shifts, and within negatives the magnitude distribution shifts
+- LightGBM trains on a DIFFERENT label distribution → different decision boundaries → different basin emerges
+
+**Dominant risk**: If both vectors land adversely (basin relocates AND label distribution shift relocates Optuna into a region where the new roster has fewer SL-eligible volatile-regime trades), the mechanism is wasted. The +36% counterfactual is ONLY descriptive on the BASELINE roster.
+
+**Phase 7.4 verdict assignment** MUST compare BOTH vectors:
+- (a) Optuna best_params shift report (basin diagnostic)
+- (b) Label class balance vs baseline LTC training (count +1 / -1 / 0 — Critic Phase 7.5 priority item #2 per LM Master Phase 4.5 closing)
 
 ### 6.6 PROMISING-MECHANICAL adjacency risk
 
@@ -525,7 +560,7 @@ reports-v1/iteration_v1-028/
 - [ ] `atr_sl=1.0` literal in the new elif branch
 - [ ] kline data fresh (`data/LTCUSDT/8h.csv` mtime within 16h)
 - [ ] V1_FEATURE_COLUMNS_PRUNED has 43 features (assert in runner)
-- [ ] 2 outer seeds (42, 123) properly passed via `--seeds 2`
+- [ ] `--ensemble-size 10` properly passed (LM Master Rec #1 ADOPTED — v1 runner has no `--seeds` flag; inner ensemble is the variance budget)
 - [ ] Phase 5.5 gate PASS commit referenced in engineer setup commit
 
 ### 10.4 Engineer launch protocol — engineering report blocking
@@ -583,6 +618,20 @@ Bundling decision deferred until cycle-4 EXPLORATIONs complete. Earliest at /038
 - **Per-cohort with ATR/SL tuning** is a DIFFERENT axis class from per-cohort with regime gates. Mechanism class distinguishes families.
 - **HIGH-RISK + multi-seed mitigation** combo is the cycle-4 default for any axis touching Optuna training-objective domain.
 
+### 11.7 /029 verdict-conditional staging per LM Master Rec #7 (ADOPTED — supersedes §11.1 for /029 binding)
+
+Per LM Master Phase 4.5 §7 matrix:
+
+| /028 verdict | /029 axis | Rationale |
+|---|---|---|
+| **PROMISING (12%)** | **DOT-specialist** (DOT pre-classification + DOT-only specialist; pre-classify against ASYMMETRIC_ROTATION rule per LM Master /022 §5 carry-forward) | PROMISING outcome confirms per-cohort axis viable when EDA-driven + basin-relevant. DOT is the remaining unclassified cohort. C×E altcoin de-concentration deferred to /030+. |
+| **PROMISING-INERT-FAV (18%)** | **DOT-specialist** (same as PROMISING) | Same routing per LM Master Rec #7 — partial mechanism survival is sufficient evidence to extend per-cohort axis to DOT. |
+| **INERT (35% modal)** | **Sample-weighting** (López de Prado AFML Ch.4 inverse-concurrency weighting; UNUSED in v1 catalog — substrate change orthogonal to cycle-3 axes) | INERT outcome indicates per-cohort + ATR-axis saturation; pivot to substrate-level sample-weighting (a NEVER-TRIED axis in v1). |
+| **NEG-clean (22%)** | **Sample-weighting** (same as INERT) | INERT + NEG-clean both route to sample-weighting per LM Master Rec #7. |
+| **NEG-CAT (13%)** | **FUNDAMENTAL RE-QUESTION** — XGBoost head-to-head OR universe contraction (drop LTC entirely) | **3rd NEG-CAT in same prior class (/020 + /022 + /028) CLOSES per-cohort axis PERMANENTLY** per LM Master Rec #7. Substrate-change pivot mandatory. |
+
+**Binding**: §11.7 SUPERSEDES §11.1 for /029 axis selection. §11.1 retained for cycle-4 thematic context.
+
 ---
 
 ## Section 12 — Catalog Closeout Plan (Phase 8)
@@ -610,7 +659,7 @@ QR self-check matrix per v1 skill §"Phase 5.5 Gate":
 | 2 — IS-Only Evidence (numerical tables) | YES | YES | §2.1-2.7 from committed analysis script `5f76b4a` |
 | 2.5 — HIGH-RISK Axis Declaration | YES (v1 mandatory) | YES | HIGH-RISK + multi-seed mitigation declared |
 | 3 — Implementation Spec | YES | YES | §3.1-3.6 single src/ file change |
-| 3.4 — LM Master Phase 4.5 Responses | RESERVED | RESERVED | filled post-Phase-4.5 |
+| 3.4 — LM Master Phase 4.5 Responses | YES | YES (ADOPTED 7/7) | per Rec #1-7 ADOPTED with rationale |
 | 3.5 — Axis Family Declaration | YES | YES | NEW 15th family + Critic Check 14 verification path |
 | 3.6 — Wall-Clock Estimate | YES (BLOCK if missing) | YES | 30 min modal, 90 min kill |
 | 4 — Falsifiers (F1-F8 + F-AXIS-MECHANISM) | YES | YES | per /022 carry-forward |
@@ -624,7 +673,7 @@ QR self-check matrix per v1 skill §"Phase 5.5 Gate":
 | 12 — Catalog Closeout Plan | YES | YES | Phase 8 actions |
 | 13 — Phase 5.5 self-check | YES | YES | (this section) |
 
-**Phase 5.5 readiness**: ALL sections complete except RESERVED §3.4 + §5.3 LM Master slots. Phase 4.5 LM Master advisory expected NEXT.
+**Phase 5.5 readiness**: ALL sections complete; §3.4 + §5.3 LM Master slots ADOPTED post-Phase-4.5 advisory. Brief ready for Phase 5.5 gate evaluation.
 
 ---
 
