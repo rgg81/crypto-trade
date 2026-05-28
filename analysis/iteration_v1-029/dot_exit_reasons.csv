@@ -1,0 +1,8 @@
+sample,exit_reason,count,share_pct
+IS,stop_loss,47,50.538
+IS,timeout,26,27.957
+IS,take_profit,20,21.505
+OOS,stop_loss,26,56.522
+OOS,timeout,11,23.913
+OOS,take_profit,8,17.391
+OOS,end_of_data,1,2.174
