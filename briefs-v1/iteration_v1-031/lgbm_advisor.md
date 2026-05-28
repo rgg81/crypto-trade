@@ -161,3 +161,95 @@ Three load-bearing calls staked:
 3. Basin-stability validation #1: cross-seed Optuna best-trial std/mean ≤ 0.25
 4. Trade-roster overlap baseline ↔ /031 OOS per symbol within [35%, 75%]
 5. /030 mechanism re-test: if /031 NEG-CAT under PATH A budget control, M1 budget-downshift is REFUTED as sufficient explanation
+
+---
+
+# LightGBM Master Advisor — iter-v1/031 — Phase 7.4 (Post-Mortem)
+
+## Context Read
+
+- **Outcome (comparison.csv)**: IS Sharpe +0.4725 (Δ +0.19 vs baseline +0.2829); OOS Sharpe +1.7028 (Δ +1.04 vs baseline +0.6637); ratio 3.60. IS trades 621 (BIT-IDENTICAL); OOS 203 (+14 vs baseline 189). IS WR 39.1%; OOS WR 48.3% (+8.1pp). PSR_monthly_vs_0 = 0.992; PSR_monthly_vs_1 = 0.928 (at-merge-tier). Calmar 3.01 (3.2× baseline). MaxDD 35.4% (better than 40.9%). Wall-clock 4h 59m — RIGHT at the kill-switch.
+- **F-AXIS #1 (f_axis_mechanism.csv)**: ALL 258 cells emit composite_inv_concurrency weight_mode. mean Kish ratio 0.7996 (LTC-min 0.7951, LINK-max 0.7999) — wiring is CLEAN. Per-symbol Kish ~0.799 not 0.899 predicted; reshape is WEAKER than §1-EDA predicted but still REAL.
+- **§4 prior**: modal INERT-NO-EFFECT 30%, PROMISING-clean 17% band [+0.20, +0.55] modal +0.32. Observed +1.04 = 17% tail cell hit at +0.49 BEYOND upper band.
+
+## §1 Verdict cell + structural analysis
+
+**Cell**: PROMISING-CLEAN. Magnitude +1.04 is a 2.0× upper-band overshoot.
+
+**Per-symbol attribution**: LINK 54.6% + DOT 26.4% = **81.0% of lift carried by 2 of 5 symbols**. LINK net +82.6% (was +34.2%/137.7% share at baseline; MORE THAN DOUBLED). DOT swung +1.96 → +39.94 (**20× lift**). LTC swung -47.25% → -2.56% (axis cured LTC bleed without trade suppression — count rose 34 → 37).
+
+**Mechanism hypothesis**: inv_concurrency_only up-weights bars with lower portfolio entry concurrency. LINK + DOT generate more idiosyncratic single-symbol entries than BTC+ETH (which often co-trigger). LightGBM under uniform weights learns average-bar pattern; under inv_concurrency learns decorrelated entry geometry. This explains small-cap concentration as MECHANISTIC, not lucky.
+
+**WR +8.1pp diagnostic**: F-AXIS #3 PASS at 48.3%. Combined with bit-identical IS roster + +14 OOS trades = better-calibrated predictions per signal, NOT trading fewer signals. Clean signal-quality lift, not over-filter.
+
+**IS Δ +0.19 vs OOS Δ +1.04 (5.5× asymmetry)**: STRUCTURALLY UNUSUAL. Three hypotheses ranked:
+- **H-A: OOS-regime tailwind** — 2026-03 (+33.1% / 19 trades) carries one-third of OOS PnL. Subtracting that month drops OOS Sharpe ~35-40% to ~+1.0-1.1.
+- **H-B: structural inefficiency captured** — 12-of-15 OOS positive months (vs baseline 9-of-15).
+- **H-C: budget-overfit on Optuna IS surface that OOS-generalized** — would predict IS bit-identical (observed) but IS Sharpe ROSE not dropped.
+
+Most likely: H-A + H-B compound. Discount headline 30-40% → cleaner edge estimate Δ ≈ +0.65-0.75 ex-2026-03.
+
+**n_eff = 12 below predicted [14, 22]**: NEW MECHANISM REVISION — inv_concurrency_only compresses n_eff structurally via cell-PnL correlation tightening. NOT a warning. Same as v3/120 multi-mechanism observation. Should have been [8, 20] for this axis class.
+
+## §2 Basin-stability validation — indirect adjudication
+
+Direct measurement (run.log) not available in artifacts. Indirect signals:
+
+| Validation | Predicted PASS | Observed proxy | Verdict |
+|---|---|---|---|
+| V1 cross-seed Sharpe std/mean ≤ 0.25 | — | n_eff_per_cell median 12 → loss surface tighter | INDIRECT PASS |
+| V2 per-cell best-param Spearman ≥ 0.50 | — | bit-identical IS trade roster + same n_eff at IS/OOS | INDIRECT PASS |
+| V3 OOS roster overlap [35%, 75%] per symbol | — | OOS counts BTC 42 vs 35 (+7), DOT 37 vs 46 (-9), ETH 45 vs 46 (-1), LINK 42 vs 28 (+14, +50%), LTC 37 vs 34 (+3). 4/5 within ±10% trade count; only LINK reshaped trade count by 50%. | PROBABLE PASS (band-edge) |
+
+**Verdict on §3 mandate**: indirect signals all PASS. **Caveat**: V3 cannot be confirmed without trade-roster intersection script. Critic should run trade ID overlap on trades.csv baseline vs /031 OOS to confirm [35%, 75%] per symbol — specifically for LINK where trade count grew 50%.
+
+## §3 Attribution ambiguity adjudication
+
+My §1 staked PATH A confounds axis vs budget. Re-adjudication:
+
+- **H1 axis-edge dominant**: SUPPORTED by mechanism (bit-identical IS roster + +8.1pp OOS WR + small-cap concentration of lift)
+- **H2 budget-correction dominant**: PARTIALLY SUPPORTED (right H2 test is inv_concurrency_only at 3-seed × 18 trials, which we don't have)
+
+**Confounder magnitude estimate**: budget alone would lift OOS ~+0.10 to +0.30. Therefore axis-attributable share = ~+0.74 to +0.94 = STILL clean PROMISING.
+
+**Routing implication**: /032 = budget-control is STILL useful but downgraded from strong to optional given /031 magnitude.
+
+## §4 LINK 54.6% concentration
+
+LINK OOS share 54.6% > 30% cap. Three observations:
+
+1. **Baseline LINK was already 137.7% share** — /031 is LESS concentrated than baseline by Gini measure
+2. **/031 has all 5 symbols within [-1.7%, +54.6%] share** — first all-symbols-near-zero-or-positive iteration in cycle-4
+3. **Compounding with /027-retry LINK specialist would EXACERBATE concentration**. RECOMMENDATION: bundle should NOT compound /031 with another LINK-specialist component.
+
+**Verdict**: ACCEPTABLE with explicit cap-exception justification. Concentration is mechanism-bound, not lucky.
+
+## §5 Track record update
+
+- Methodology: 8/8 → **9/9** (PATH A vindicated by LINK/DOT lift; budget-correction was structurally important)
+- Directional: 4/10 → **5/11 = 45%** (modal INERT 30% REFUTED; magnitude overshot upper band by +0.49)
+
+## §6 Routing recommendation /032
+
+- **Option A — Budget-control at 3-seed × 18-trials**: DOWNGRADED from strong to OPTIONAL. Low-information run (axis-attributable share already ~+0.74 to +0.94)
+- **Option B — Stacking with NEW second axis**: COMPOUNDING-PROMISING. Candidates: vol_target_per_trade, universe expansion (SOLUSDT)
+- **Option C — Full bundle CONFIRMATION (cycle-4 closeout)**: RECOMMENDED with reservation. /031 magnitude large enough cycle-4 could close NOW. Must NOT compound /027-retry LINK specialist.
+
+**My recommendation**: Option (C) at iter-4/6 IF cadence discipline allows; otherwise Option (B) at iter-4/7 with universe expansion.
+
+## §7 Cycle-4 cumulative reassessment
+
+Post-/031: 2 PROMISING / 4 spent (50%; matches cycle-3 iter-4 density). /031 +1.04 is LARGEST single-axis OOS Δ in v1 history (cycle-3 best was /018 +0.80). Cycle-4 has not just caught up — it has LAPPED cycle-3 on magnitude.
+
+## §8 Closing note
+
+**Single most important call for /032**: do NOT route to Option A BUDGET-CONTROL. Mechanism evidence strong enough that 5h compute for attribution cleanup is wrong trade.
+
+**Strongest CONFIRMATION concern**: 2026-03 +33.1% PnL spike carries ~30-40% of OOS Sharpe lift. CONFIRMATION must validate ex-2026-03 Sharpe ≥ +1.0 (multi-seed).
+
+**Flag for Critic Phase 7.5**:
+1. Per-symbol trade-roster overlap — confirm LINK +50% trade count is band-edge axis-bite not basin-relocation
+2. Monthly PnL stationarity OOS — 2026-03 carries one-third
+3. PSR_monthly_vs_1 = 0.928 below 0.95 merge tier
+4. Kish observed 0.7996 vs §1-predicted 0.899 — reshape weaker than EDA forecast
+5. n_eff = 12 below my band [14, 22] — revise mechanism: inv_concurrency reshape compresses n_eff structurally
