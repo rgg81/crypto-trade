@@ -11,7 +11,7 @@
 
 ## Section 0 — Hypothesis
 
-**H1 (PRIMARY)**: The full Option B bundle — 4 PROMISING ingredients from cycle-3 (/018 LINK, /019 ETH+gate) and cycle-4 (/028 LTC+atr_sl=1.0, /031 composite_inv_concurrency) — clears the +1.0 OOS Sharpe hard merge floor at multi-seed (`--seeds 2` outer × `ENSEMBLE_SIZE=5` inner) with axis-component-only attribution from /031 (basin component dissolves at multi-seed per /032 frozen-HP isolation evidence).
+**H1 (PRIMARY)**: The full Option B bundle — 4 PROMISING ingredients from cycle-3 (/018 LINK, /019 ETH+gate) and cycle-4 (/028 LTC+atr_sl=1.0, /031 composite_inv_concurrency) — clears the +1.0 OOS Sharpe hard merge floor at CONFIRMATION-standard multi-seed (`--seeds 1` outer × `ENSEMBLE_SIZE=10` inner per `V1_CONFIRMATION_ENSEMBLE_SIZE = 10`) with axis-component-only attribution from /031 (basin component dissolves at multi-seed per /032 frozen-HP isolation evidence).
 
 **H1a (fallback)**: If H1 fails, the per-cohort specialist architecture (Models C', G, D') WITHOUT /031 still produces OOS Sharpe ≥ +0.80 with reduced LTC drag (load-bearing).
 
@@ -33,28 +33,34 @@
 
 Per `feedback_v1_substrate_basin_lock.md`: this is the FIRST credible bundle path to +1.0 since v1 began. NOT bundling now defers the substrate-validation question indefinitely. The user mandate at task prompt explicitly authorizes /033 = bundle CONFIRMATION.
 
-**Wall-clock CAP**: 6h (skill default, restored 2026-05-29).
+**Wall-clock CAP**: **CONFIRMATION-EXCEPTION** — 12h hard cap, 10h kill-switch (user-authorized 2026-05-29 "Let's go A" directive). Skill default is 6h; /033 declares explicit exception so the brief honors `V1_CONFIRMATION_ENSEMBLE_SIZE = 10` inner.
+
+**CONFIRMATION-EXCEPTION declaration**:
+- /033 is the FIRST v1 CONFIRMATION since /027 TF (no verdict produced).
+- ENSEMBLE_SIZE=10 inner is CONFIRMATION standard per `V1_CONFIRMATION_ENSEMBLE_SIZE = 10`; running at ES=5 would be a DEVIATION from CONFIRMATION-spec, not an alignment.
+- User directive 2026-05-29 ("Let's go A") explicitly authorizes the wall-clock breach so the CONFIRMATION runs at full inner-ensemble width.
+- Modal wall-clock projection ~9h (50% over 6h skill default) — explicitly declared as CONFIRMATION-EXCEPTION, not silent budget creep.
 
 **Wall-clock target estimate** (5-step scaling per `feedback_v1_label_rate_wall_clock_scaling.md`):
 
 Step 1 — Precedent iteration: BASELINE_V1 5-seed × 50 trials × 5 syms × 53 months = **7h observed** (BASELINE_V1.md "Wall-clock 5-seed ENSEMBLE: 7h 0m total").
 Step 2 — Precedent label count: ~621 IS trades + ~189 OOS = 810 total over 53 months across 5 syms.
-Step 3 — Current iteration expected label count: bundle alters per-cohort label distributions. /028 reduces LTC label count by ~40% (atr_sl=1.0 narrower SL); /019 ETH gate reduces ETH OOS trades by ~10%; /018 LINK isolation produces 154 IS trades (+5% vs baseline LINK 146); /031 sample-weighting does NOT change label count, only weights. Net effect: **~5% reduction in total labels**.
-Step 4 — Scaling factor: 0.95× labels × (2 outer / 5 inner anchor) × (35 trials / 50 trials) × ENSEMBLE_SIZE adjustment.
+Step 3 — Current iteration expected label count: bundle alters per-cohort label distributions. /028 reduces LTC label count by ~40% (atr_sl=1.0 narrower SL); /019 ETH gate reduces ETH OOS trades by ~10%; /018 LINK isolation produces 154 IS trades (+5% vs baseline LINK 146); /031 sample-weighting does NOT change label count, only weights. Net effect: **~5% reduction in total labels** (label-rate factor 0.95-1.0; modeled as 1.0 conservatively).
+Step 4 — Scaling factor: `(10 inner / 5 inner anchor) × (35 trials / 50 trials) × (1 outer / 1 anchor) × 1.0 label factor = 2.0 × 0.7 × 1.0 × 1.0 = 1.40`. Projection: 7h × 1.40 = **9.8h modal**.
 
-- **Option ES=5 (RECOMMENDED)**: `0.95 × (5/5) × (35/50) × (2 outer / 1 anchor) = 0.95 × 0.7 × 2 = 1.33`. Projection: 7h × 1.33 = **9.31h** — **EXCEEDS 6h cap**.
-- **Option ES=5 + reduce to --seeds 1 outer**: `0.95 × 0.7 × 1 = 0.665`. Projection: 7h × 0.665 = **4.66h** — **INSIDE 6h cap with 22% margin**.
+- **Selected (Option A per user directive)**: `--seeds 1` outer × `ENSEMBLE_SIZE=10` inner × `n_trials=35`. Wall-clock projection ~**9-10h modal**, hard cap 12h.
+- (Rejected) Option ES=5: would be sub-CONFIRMATION-spec; user explicitly chose ES=10.
 
-Step 5 — Sanity: scaling > 1.5 = bust cap mandates adjustment. The 2 outer × 5 inner × 35 trials configuration BUSTS the cap. **Adjusted recommendation: --seeds 1 outer × ENSEMBLE_SIZE=5 inner × n_trials=35 = single-pass 5-seed at 35 trials. Wall-clock projection: 4.66h.**
+Step 5 — Sanity: scaling factor 1.40 EXCEEDS 1.0 — CONFIRMATION-EXCEPTION mandated. Cap raised 6h → 12h with explicit user authorization. Kill-switch at 10h gives 2h safety margin before hard cap.
 
-**DECISION**: SINGLE-PASS `--seeds 1` × ENSEMBLE_SIZE=5 × n_trials=35 to stay inside 6h cap.
+**DECISION**: SINGLE-PASS `--seeds 1` × ENSEMBLE_SIZE=10 × n_trials=35 under CONFIRMATION-EXCEPTION wall-clock budget.
 
-This is a DEVIATION from the task prompt's "N=2-3 outer recommended". Justification:
-1. /027 burned 13h on `--seeds 2` × ENSEMBLE_SIZE=5 × n_trials=35 — empirical evidence the requested config BUSTS 6h cap by 2.2x.
-2. The 6h cap was REINSTATED today by user directive (skill revert).
-3. Multi-seed validation question: single-pass 5-seed inner ensemble produces 5 model trajectories per cell — sufficient seed diversity for the Pareto criterion at v1 (per `feedback_v1_seed_count_non_negotiable.md`: "v1 CONFIRMATION = 10 inner seeds always" — relaxed here to 5 by the task prompt's explicit option).
+Justification:
+1. /027 burned 13h on `--seeds 2` × ENSEMBLE_SIZE=5 × n_trials=35 — empirical evidence that 2 outer × 5 inner busts even 12h cap. /033 stays at `--seeds 1` outer × 10 inner = 10 models/cell (vs /027's 10 models/cell from 2×5); same total model count, single outer pass avoids the 2x outer multiplier.
+2. ENSEMBLE_SIZE=10 IS the CONFIRMATION standard per `V1_CONFIRMATION_ENSEMBLE_SIZE`. /033 ALIGNS with spec, does not deviate.
+3. Single outer × 10 inner produces 10 model trajectories per cell — same total seed diversity as /027 spec (2×5) without the outer-multiplier wall-clock cost. Pareto-non-dominated computation at `--seeds 1` is non-meaningful (one outer seed = one point on Pareto); skill's Pareto gate explicitly waived for /033 by user directive (LM Master Q9 pre-empted).
 
-Kill-switch armed at 5.0h (LM Master /030 protocol).
+Kill-switch armed at **10.0h** (LM Master /030 protocol; raised from 5.0h to match CONFIRMATION-EXCEPTION budget).
 
 ---
 
@@ -138,10 +144,10 @@ Pearson on **monthly weighted_pnl** series, sourced from each specialist's `trad
 **Key lessons /033 MUST inherit**:
 1. **Defensive runtime checks must be unit-tested with REAL `TradeResult` instances** (`feedback_v1_defensive_check_must_be_tested.md`). /030 lessons codify this in the test suite mandate (Section 10).
 2. **Wall-clock observability** at month-boundary granularity is mandatory. CONFIRMATION runner must emit `[wall_clock] <model>/<month> elapsed <X>s` log line per walk-forward month so the 6h cap can be projected before half-run.
-3. **`--seeds 2` outer DOES bust 6h cap** at ES=5 × n_trials=35 × 5 syms.
+3. **`--seeds 2` outer × ES=5 inner = 10 models/cell with 2x outer-pass overhead BUSTS 6h cap**. /033 architecturally improves to `--seeds 1` outer × ES=10 inner = same 10 models/cell with single outer pass — projected 9-10h vs /027's 13h.
 
 /033 DEVIATES from /027 by:
-- `--seeds 1` instead of `--seeds 2` (wall-clock budget)
+- `--seeds 1` outer × `ENSEMBLE_SIZE=10` inner (vs /027's `--seeds 2` × ES=5); same 10 models/cell total but single outer pass; CONFIRMATION-EXCEPTION declared
 - ADDS /028 LTC+atr_sl=1.0 specialist (Model D → Model D'); /027 used baseline Model D
 - ADDS /031 sample-weighting wrapper (Option B); /027 used baseline abs_pnl
 
@@ -194,7 +200,7 @@ Pearson on **monthly weighted_pnl** series, sourced from each specialist's `trad
 3. Training loss surface (composite_inv_concurrency reshapes weight distribution)
 4. Per-symbol model dispatch (Model C' / D' / G replace baseline equivalents)
 
-**Mitigation (CONFIRMATION-default)**: CONFIRMATION-spec at `--seeds 1` × ES=5 × n_trials=35 is ALREADY at multi-seed-validation-equivalent level (5 inner seeds). Per `feedback_v1_seed_count_non_negotiable.md`: HIGH-RISK mitigation in v1 is "pre-commit to CONFIRMATION at next iteration" — /033 IS the CONFIRMATION, so the mitigation is already in flight.
+**Mitigation (CONFIRMATION-default)**: CONFIRMATION-spec at `--seeds 1` outer × `ENSEMBLE_SIZE=10` inner × `n_trials=35` honors `V1_CONFIRMATION_ENSEMBLE_SIZE = 10` exactly. Per `feedback_v1_seed_count_non_negotiable.md` ("v1 CONFIRMATION = 10 inner seeds always") — /033 ALIGNS with the non-negotiable rule. HIGH-RISK mitigation in v1 is "pre-commit to CONFIRMATION at next iteration" — /033 IS that CONFIRMATION at full inner-ensemble width.
 
 **Lighter footing**: /033 ALSO runs Option A in shadow analysis from the same OOF parquet (axis-isolation post-hoc — compute the bundle WITHOUT /031 weighting from the same trades). This is COMPUTE-FREE post-hoc analytical decomposition; mandated by Section 7 Path Forward.
 
@@ -217,16 +223,18 @@ Pearson on **monthly weighted_pnl** series, sourced from each specialist's `trad
 ### Section 3.2 — Runner CLI
 
 ```bash
-uv run python run_baseline_v1.py \
+PYTHONUNBUFFERED=1 uv run python run_baseline_v1.py \
   --confirmation \
   --iteration 33 \
   --n-trials 35 \
-  --ensemble-size 5 \
+  --ensemble-size 10 \
   --seeds 1 \
   --pruned-features \
   --bundle-iter33 \
   --sample-weight-mode composite_inv_concurrency \
-  --output-dir reports-v1/iteration_v1-033
+  --no-engineering-report \
+  --output-dir reports-v1/iteration_v1-033 \
+  > logs/v1_iter033.log 2>&1
 ```
 
 (QE may need to add `--bundle-iter33` flag to the runner; the implementation must dispatch Models A/C'/D'/G/E per Section 3.1 table.)
@@ -249,13 +257,13 @@ The brief HAS NOT yet been reviewed by LM Master; these are the 10 questions /03
 
 1. **Q1** — Does Pool A degeneration to BTC-only (after Model G removes ETH) trigger pooling-loss collapse? Pool A baseline trained on 258 IS BTC+ETH trades; BTC-slice alone = 113 IS trades. Below 80-trade Optuna budget viability floor?
 2. **Q2** — Should Model A retain ETH-slice training samples (multi-task) while routing ETH OOS predictions to Model G (head replacement)? Lighter dispatch alternative.
-3. **Q3** — Multi-seed `--seeds 1` × ES=5 inner: is this sufficient seed-diversity for the bundle's HIGH-RISK declaration? OR should Q3 escalate to `--seeds 2` and ACCEPT wall-clock breach (CONFIRMATION-EXCEPTION)?
+3. **Q3** — Multi-seed `--seeds 1` outer × `ENSEMBLE_SIZE=10` inner: USER-RESOLVED 2026-05-29 ("Let's go A") — CONFIRMATION-standard ES=10 is the chosen spec under CONFIRMATION-EXCEPTION wall-clock. **Open sub-question for LM Master**: at `--seeds 1` outer, is the single-outer-seed adequate for the bundle's HIGH-RISK declaration? Does 10 inner ensemble sufficiently substitute for the 2-outer Pareto computation, or is there irreducible single-outer-seed risk that ablation (Q5/Q7) should hedge against?
 4. **Q4** — composite_inv_concurrency at sub-budget n_trials=35 (vs /031's n_trials=50): does the Optuna basin landscape under inv_concurrency at 35 trials still reach the +0.21 axis-attributable region from /032's 50-trial isolation?
 5. **Q5** — /028's atr_sl=1.0 LABEL shift interacts with composite_inv_concurrency (weight per overlapping label horizon): does narrower SL → shorter label window → LOWER concurrency → HIGHER weight on LTC labels? Could this REGRESS LTC performance vs /028's stand-alone +0.598?
-6. **Q6** — Model G's BTC-trend gate (±8% lookback=42) was calibrated single-seed; at multi-seed ES=5 + composite_inv_concurrency, does the gate fire-rate remain in /019's [12%, 24%] band, or does training-time reweighting drift it OUT?
+6. **Q6** — Model G's BTC-trend gate (±8% lookback=42) was calibrated single-seed; at `ENSEMBLE_SIZE=10` + composite_inv_concurrency, does the gate fire-rate remain in /019's [12%, 24%] band, or does training-time reweighting drift it OUT?
 7. **Q7** — Per-cohort Model C' / D' / G + sample weighting STACKED: per `feedback_v3_engineered_features_dont_stack.md` (v3 lesson) sister-stacking at single-seed produces basin-lottery artifacts. Is the v3 lesson APPLICABLE here? Or is this DIFFERENT (mechanism-layer stacking, not feature-layer stacking)?
 8. **Q8** — n_effective_trials prediction: /031 showed n_eff=12 (compression signal). What's the prediction for /033 BUNDLE at n_trials=35? Expected ∈ [10, 18]? Below 10 = budget collapse?
-9. **Q9** — Pareto-non-dominated seed: with `--seeds 1` outer, no Pareto computation possible. Does this require relaxing skill's Pareto gate for /033 (justified by wall-clock cap), OR escalate `--seeds 2`?
+9. **Q9** — Pareto-non-dominated seed: with `--seeds 1` outer, no multi-outer Pareto computation possible. USER-RESOLVED 2026-05-29: Pareto gate WAIVED for /033 (wall-clock CONFIRMATION-EXCEPTION already declared; 10 inner ensemble substitutes for outer-seed diversity). LM Master Q9 narrows to: is single-outer-seed × 10-inner empirically a stronger or weaker generalization signal than 2-outer × 5-inner (same total 10 models/cell), independent of wall-clock budget?
 10. **Q10** — Failure mode prediction: most-likely catastrophic failure path? (a) Pool A collapse from ETH removal; (b) /028 LTC interaction with composite_inv_concurrency destroys /028 gain; (c) bundle additivity assumption fails (specialists cannibalize each other at multi-seed); (d) sample-weighting basin lottery dissolves at multi-seed without axis lift recovery.
 
 ---
@@ -282,8 +290,8 @@ The brief HAS NOT yet been reviewed by LM Master; these are the 10 questions /03
 |---|---|---|
 | Pool A degenerates (BTC-only) at < 113 IS trades | MEDIUM | Q1 → LM Master decision. If MEDIUM-confidence collapse, escalate to Q2 multi-task ETH-in-training-but-Model-G-at-prediction. |
 | /028 LTC × composite_inv_concurrency interaction reverses /028 +0.598 | MEDIUM | F3 per-cohort sign check (LTC must be ≥ 0 in bundle) + Phase 7.4 LM Master post-mortem cite per-symbol attribution shift. |
-| Multi-seed lottery dissolves /031 axis lift | LOW-MEDIUM | /032 frozen-HP gave +0.21 clean attribution; /033 is multi-seed at 5 inner seeds — should converge to axis median. If F1 < +0.10, axis dissolved. |
-| Wall-clock breach 6h cap | LOW | Single-pass `--seeds 1` × ES=5; projected 4.66h; kill-switch at 5.0h. Month-boundary logging. |
+| Multi-seed lottery dissolves /031 axis lift | LOW | /032 frozen-HP gave +0.21 clean attribution; /033 runs at CONFIRMATION-standard 10 inner seeds — should converge to axis median with tighter envelope than 5-inner. If F1 < +0.10, axis dissolved. |
+| Wall-clock breach CONFIRMATION-EXCEPTION 12h cap | LOW-MEDIUM | Single-outer `--seeds 1` × ES=10 × n_trials=35; projected ~9-10h modal; kill-switch armed at 10.0h with 2h safety margin before 12h hard cap. Month-boundary logging mandatory. |
 | /027-style `r.model_name` defective hard-assert | LOW | Test suite Section 10 mandates "real-instance TradeResult tests"; /030+ catch-all exclusion of /033 universe; CI integration smoke. |
 | n_eff collapse < 10 (budget bust) | LOW-MEDIUM | F4 ∈ [10, 25] verdict matrix routes BLOCK-PENDING-FIX (re-run at n_trials=50). |
 
@@ -306,7 +314,7 @@ The brief HAS NOT yet been reviewed by LM Master; these are the 10 questions /03
 
 Per `feedback_v1_methodology_probe_discipline.md`, pre-register the 5 most-likely failure mechanisms BEFORE the run:
 
-1. **POOL-A-COLLAPSE**: Removing ETH from Model A pool drops IS training set from 258 to 113 trades. LightGBM with `n_trials=35` × ES=5 may underfit BTC-only → BTC OOS Sharpe regression below baseline +0.502 by >0.30. Mechanism signature: F3 BTC negative + n_eff < 8 + IS BTC trade count >100 + Optuna best-trial Sharpe std > 0.5 per seed.
+1. **POOL-A-COLLAPSE**: Removing ETH from Model A pool drops IS training set from 258 to 113 trades. LightGBM with `n_trials=35` × `ENSEMBLE_SIZE=10` may underfit BTC-only → BTC OOS Sharpe regression below baseline +0.502 by >0.30. Mechanism signature: F3 BTC negative + n_eff < 8 + IS BTC trade count >100 + Optuna best-trial Sharpe std > 0.5 per seed.
 
 2. **LTC-INTERACTION-NEGATIVE**: composite_inv_concurrency × atr_sl=1.0 stacks two label-distribution changes. Concurrency at narrow SL is LOWER (shorter label horizon) → weight per LTC label is HIGHER → over-weights rare LTC label rows → over-fits. Mechanism signature: F3 LTC negative + LTC trade count drops below 30 OOS + LTC IS trade count drops below 100.
 
@@ -314,7 +322,7 @@ Per `feedback_v1_methodology_probe_discipline.md`, pre-register the 5 most-likel
 
 4. **SAMPLE-WEIGHTING-DISSOLVES**: /031's +0.21 axis-only lift (per /032 frozen-HP) was at full 5-sym pool training. Per-cohort specialists (Model C' LINK-only) train on different label distributions where concurrency is mechanically lower (single-symbol). composite_inv_concurrency may have NO effect on single-cohort training. Mechanism signature: F4 n_eff ≥ 20 (axis didn't compress trial diversity) + F1 between baseline and Option A projection (+0.66 to +0.70).
 
-5. **BASIN-LOTTERY-DOMINATES**: per /031 V3 ≈ 12% trade-roster overlap with baseline showed basin relocation can produce either +1.04 OR -1.04 OOS Δ depending on lottery draw. /033 at multi-seed should reduce lottery variance but 5 inner seeds may not be enough. Mechanism signature: F1 outside [-0.10, +0.40] band (basin-lottery extreme draw) + per-seed Pareto front median std > 0.40 OOS Sharpe.
+5. **BASIN-LOTTERY-DOMINATES**: per /031 V3 ≈ 12% trade-roster overlap with baseline showed basin relocation can produce either +1.04 OR -1.04 OOS Δ depending on lottery draw. /033 at CONFIRMATION-standard 10 inner seeds should substantially reduce lottery variance vs single-seed EXPLORATIONs; residual lottery from single outer seed is the irreducible risk per LM Master Q3/Q9. Mechanism signature: F1 outside [-0.10, +0.40] band (basin-lottery extreme draw) + per-inner-seed best-trial Sharpe std > 0.40 OOS at cell level.
 
 ---
 
@@ -367,9 +375,9 @@ V1_BASELINE_UNIVERSE = ("BTCUSDT", "ETHUSDT", "LINKUSDT", "LTCUSDT", "DOTUSDT")
 
 - `OOS_CUTOFF_DATE = 2025-03-24` (sacred, immutable)
 - `training_months = 24` (sacred, immutable)
-- Inner seeds: `[42, 123, 456, 789, 1001]` (first 5 of canonical ENSEMBLE_SEEDS roster)
+- Inner seeds: first 10 of canonical ENSEMBLE_SEEDS roster (`V1_CONFIRMATION_ENSEMBLE_SIZE = 10`)
 - Outer seed: 42 (default offset; --seeds 1)
-- `--n-trials 35`, `--pruned-features`, `--ensemble-size 5`, `--confirmation`
+- `--n-trials 35`, `--pruned-features`, `--ensemble-size 10`, `--confirmation`, `--sample-weight-mode composite_inv_concurrency`, `--no-engineering-report`
 - Walk-forward: `train_end_ms = test_start_ms - embargo_ms` (foundation discipline, NEVER regressed)
 - LightGBM determinism: `deterministic=True, force_row_wise=True` (per baseline anchor)
 - HEAD commit at runner launch: to be captured at Phase 6 launch
@@ -401,10 +409,35 @@ All 14 tests MUST pass before Phase 6 launch. Phase 5.5 gate verifies test names
 
 After Phase 7 evaluation, QR's Phase 8 diary will adopt Critic's Path Forward verbatim and propose /034 candidates based on /033 verdict cell:
 
-- **Row 1 MERGE**: BASELINE_V1.md updated to /033 bundle. /034 = first post-/033 EXPLORATION; family selection per Critic Path Forward.
+- **Row 1 MERGE**: BASELINE_V1.md updated to /033 bundle. /034 = first sequential-ablation step (see Section 11.1 ablation roadmap).
 - **Row 2 BLOCK-PENDING-FIX**: rerun reporting layer; /034 deferred pending re-eval.
-- **Row 3 CONFIRMATION-PARTIAL**: /034 = isolated axis dissection (separate runs for each ingredient at single-seed). Determine which ingredient(s) actually contribute.
+- **Row 3 CONFIRMATION-PARTIAL**: /034 = first sequential-ablation step (per Section 11.1) prioritized to identify which ingredient(s) compound positively.
 - **Row 4 CONFIRMATION-INERT**: /034 = NEW axis family (universe expansion or NEW feature family); per-cohort + sample-weighting branches CLOSE for v1 cycle-4.
 - **Row 5 NEGATIVE catastrophic**: /034 = forensic diagnostic of which sub-mechanism broke; substrate composition flagged as anti-pattern.
 - **Row 6 BLOCK-FINAL (F2/F3/F5 fail)**: mechanism integrity broken; /034 routes to mechanism repair (single-axis EXPLORATION, NOT bundle).
 - **Row 7 BLOCK-PENDING-FIX (n_eff fail)**: /033 rerun at n_trials=50.
+
+---
+
+## Section 11.1 — Sequential Ablation Roadmap (user directive 2026-05-29)
+
+User directive: "next time remove one of the models. Then the next confirmation you can use it the excluded one, then little by little we bundle the best ones."
+
+The ablation roadmap converts /033's full bundle into a sequential minimal-bundle discovery process:
+
+| Iter | Spec | Composition | Drop / Swap | Goal |
+|---|---|---|---|---|
+| **/033** | CONFIRMATION-spec (`--seeds 1` × ES=10 × n_trials=35) | Full bundle: Model A (BTC-only) + Model C' (LINK) + Model D' (LTC+atr_sl=1.0) + Model G (ETH+gate) + Model E (DOT) + composite_inv_concurrency on ALL | — | Establish full-bundle reference point |
+| **/034** | CONFIRMATION-spec (same) | /033 minus ONE specialist (specialist TBD per /033 attribution result) | Drop weakest per-cohort contributor identified at /033 Phase 7 (LM Master + Critic recommendation) | Test whether minus-one bundle preserves or exceeds /033 |
+| **/035** | CONFIRMATION-spec (same) | /034 baseline; swap-in /033's excluded specialist replaced by NEXT candidate variant | Swap dropped slot with NEXT specialist variant (per Phase 8 Critic Path Forward) | Add diversity at the dropped cohort with alternative mechanism |
+| **/036+** | CONFIRMATION-spec (same) | Iterate: drop weakest, swap-in strongest variant per ablation analytics | Sequential minimal-bundle search | Converge on minimal best-performing bundle |
+
+Each step uses identical CONFIRMATION-spec (`--seeds 1` outer × `ENSEMBLE_SIZE=10` inner × `n_trials=35`) under CONFIRMATION-EXCEPTION wall-clock (12h cap, 10h kill-switch). The 10:1 cadence rule is RELAXED for the ablation chain — sequential CONFIRMATION ablation is its own discovery mode, NOT EXPLORATION-bundle-CONFIRMATION cycling.
+
+**Selection criteria for which specialist to drop at /034**:
+1. /033 Phase 7 per-cohort attribution (lowest OOS Sharpe contribution from F3 sign-check decomposition)
+2. LM Master Phase 7.4 post-mortem (which mechanism failed independence assumption)
+3. Critic Phase 7.5 verdict + Path Forward recommendation
+4. Specialist trade-roster overlap with peers (highest pairwise OOS correlation → cannibalization candidate)
+
+**Stopping criterion**: minimal bundle when sequential ablation produces 3 consecutive NO-LIFT (≤ +0.05 OOS Δ vs prior step) — declare minimum-information-content set converged.
