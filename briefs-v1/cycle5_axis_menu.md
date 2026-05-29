@@ -1,126 +1,139 @@
 # Cycle-5 EXPLORATION Axis Menu — drafted 2026-05-29
 
-## Discipline reminders
+## Discipline reminders (locked 2026-05-29)
 
-- **Skill v1 (reverted)**: EXPLORATION default n_trials=18, ENSEMBLE_SIZE=3, 2h wall-clock cap
-- **Anchor**: BASELINE_V1.md +0.6637 OOS Sharpe (193-feature; valid as stable reference regardless of iteration feature count)
-- **Single-axis discipline**: each EXPLORATION varies ONE element only
-- **Comparison**: F1 OOS Sharpe Δ vs baseline; Critic checks anti-cheating + anti-look-ahead + methodology
-- **70/30 rule**: 70% NEW signal sources (features/symbols), 30% architecture/risk
+- **Wall-clock**: EXPLORATION 2h cap, kill at 2.4h (20% margin). CONFIRMATION 8h cap, kill at 9.6h. NO exceptions — Phase 6.0 Critic BLOCKS if estimated modal > cap.
+- **No Optuna parallelization, no caching attempts** — user-confirmed tried-and-failed; sequential single-cell is production reality.
+- **Single-cohort preference** — fast wall-clock, clean attribution.
+- **Diversification is multiplier, not source** — Sharpe lift comes from NEW SIGNAL (features/labels) first; diversification then bundles. AAVE/ATOM dropped because adding symbols without new signal adds noise.
+- **Anchor**: BASELINE_V1.md +0.6637 OOS Sharpe (193-feature; valid as stable reference regardless of iteration feature count).
+- **Single-axis discipline**: each EXPLORATION varies ONE element only.
+- **Comparison**: F1 OOS Sharpe Δ vs baseline; Critic checks anti-cheating + anti-look-ahead + methodology + wall-clock.
+- **NO side scripts** — verdict from `comparison.csv` only; no `analysis/iteration_v1-NNN/*.py` diagnostic generation.
 
 ## Strategic framing for cycle-5
 
-Cycles 1-4 explored most STRUCTURAL axes within current symbol set / OHLCV features / triple-barrier labels. Cycle-5 should pivot toward:
-1. **Crypto-native signals NOT derivable from OHLCV** — liquidations, funding velocity, basis, on-chain proxies. Highest-prior axes since v3 cycle-7 closed cross-asset OHLCV; v1 has NOT systematically explored crypto microstructure.
-2. **Universe expansion** — 5 symbols (BTC/ETH/LINK/LTC/DOT) is small. Adding 1-2 new cohorts at a time tests denominator expansion.
-3. **Labeling architecture** — triple-barrier σ_t has been the only labeling primitive since /014. Trend-scanning (AFML Ch.5) is the natural NEXT.
+User-aligned priors (2026-05-29): Sharpe lift comes from signal sources first, diversification multiplies. AAVE/ATOM universe-expansion dropped from initial menu — replaced with stronger signal-source candidates.
 
-## Proposed 10 EXPLORATIONs
+Cycle-5 pivots toward:
+1. **Crypto-native signals NOT derivable from OHLCV** — liquidations, funding velocity, basis, on-chain proxies. Highest-prior axes since v3 cycle-7 closed cross-asset OHLCV; v1 has NOT systematically explored crypto microstructure. → /034-/038
+2. **Labeling architecture** — triple-barrier σ_t has been the only labeling primitive since /014. Trend-scanning (AFML Ch.5) is the natural NEXT. → /039
+3. **Risk primitives + architecture** — protect existing alpha, build runtime safeguards. → /040-/043
 
-### Wave 1 — NEW signal sources (4 iterations; 70% rule)
+## Proposed 10 EXPLORATIONs (revised 2026-05-29)
+
+### Wave 1 — NEW signal sources (5 iterations; signal-first priority)
 
 **/034 — Liquidations volume z-score (NEW feature family)**
-- Data: Binance forced-liquidation feed (`fapi/v1/forceOrders` historical / sourceable via aggregated daily CSV)
-- Feature: per-symbol 24h liquidation USD volume z-score over 30-day window
-- Hypothesis: liquidation cascades precede mean-reversion (squeeze) or trend acceleration; sign-conditional alpha
-- Wall-clock: 1.5h (5 syms × n_trials=18 × pruned + data fetch ~15 min)
-- Risk: data fetch cost (per /025 lesson — count as inside budget); fall back to publicly available daily-aggregate if API rate-limited
+- Data: Binance forced-liquidation feed (Coinglass / Binance public force-order CSV)
+- Feature: per-symbol 24h liquidation USD volume z-score over 30d window
+- Hypothesis: liquidation cascades → mean-reversion (squeeze) OR trend acceleration; sign-conditional alpha
+- Wall-clock: 1.5h modal / 2.4h cap
 
-**/035 — Open-interest velocity (NEW feature; orthogonal to /025 OI level)**
-- Feature: OI 24h rate-of-change normalized by 90d std (OI velocity z-score)
-- /025 tested OI LEVEL z-score and got LEARNED-NEG-CAT
-- VELOCITY captures regime change (OI building up before move); structurally different from level
-- Wall-clock: 1.2h (data already cached from /025)
+**/035 — Open-interest velocity (orthogonal to /025 OI level)**
+- Feature: OI 24h rate-of-change / 90d std (velocity z-score)
+- /025 tested OI LEVEL → LEARNED-NEG-CAT. Velocity captures REGIME CHANGE; structurally different
+- Wall-clock: 1.2h modal / 2.4h cap
 
-**/036 — Volume imbalance feature (taker_buy / quote ratio)**
-- Feature: `taker_buy_volume / quote_volume` z-score over 14-day window (already partial in `vol_taker_buy_ratio`; this is the z-scored version)
-- Hypothesis: high taker-buy ratio = aggressive buying → trend continuation prior; low ratio = mean-reversion setup
-- Wall-clock: 1.0h (no new data; feature computed in-place)
+**/036 — Funding-rate velocity (sign-conditional, NEW)**
+- Feature: 24h funding rate change normalized by 30d std
+- /023 tested funding LEVEL z-score → LEARNED-NEG. VELOCITY signal independent
+- Hypothesis: positive funding velocity → leverage building → squeeze setup. Negative funding velocity → short stress → potential bounce
+- Wall-clock: 1.0h modal / 2.4h cap
 
-**/037 — Volatility-of-volatility (VVIX-equivalent)**
-- Feature: std of `vol_natr_21` over rolling 60-day window
-- Captures regime instability; high VVIX → uncertain market, lower signal quality expected
-- Could be USED as feature OR as REGIME GATE (Wave 3 candidate); EXPLORATION tests it as feature first
-- Wall-clock: 0.8h
+**/037 — Volume imbalance z-score**
+- Feature: `taker_buy_volume / quote_volume` z-score over 14d window (z-scored version of existing `vol_taker_buy_ratio`)
+- Hypothesis: high taker-buy = aggressive buying → trend continuation prior
+- Wall-clock: 1.0h modal / 2.4h cap
 
-### Wave 2 — Universe expansion (2 iterations)
+**/038 — On-chain proxy: exchange net flow (BOLD)**
+- Feature: estimated Binance net exchange flow (deposits − withdrawals) z-score over 14d (from publicly aggregated data feeds — Glassnode-style proxies or CryptoQuant if available; fallback to derived-from-OI as a coarse proxy)
+- Untouched signal category in v1; structurally orthogonal to OHLCV + funding + OI
+- Wall-clock: 1.8h modal / 2.4h cap (data fetch cost factored)
+- Risk: data availability fallback — if no clean source, replace with **basis (perp − spot) z-score** as alternative signal-source NEW family
 
-**/038 — Add AAVE (single new symbol, pure isolation)**
-- Add AAVEUSDT to V1_EXCLUDED_SYMBOLS removal list
-- Train Model F (AAVE specialist): single-cohort like /018 LINK approach
-- 4+ years Binance Futures history; mid-cap; idiosyncratic alpha potential
-- Wall-clock: 1.0h (single-cohort fast)
+### Wave 2 — Labels (1 iteration)
 
-**/039 — Add ATOM (single new symbol, pure isolation)**
-- Add ATOMUSDT specialist
-- Cosmos ecosystem; different correlation profile than EVM tokens
-- Wall-clock: 1.0h
+**/039 — Trend-scanning labels (López de Prado AFML Ch.5)**
+- Replace triple-barrier σ_t with Wald-test trend-direction labels over forward 21-bar window
+- HIGH-RISK declared (changes Optuna training-objective domain)
+- Wall-clock: 1.8h modal / 2.4h cap
 
-### Wave 3 — Structural architecture (4 iterations; 30% rule)
+### Wave 3 — Risk + architecture (4 iterations)
 
-**/040 — Trend-scanning labels (López de Prado AFML Ch.5)**
-- Replace triple-barrier σ_t with Wald-test trend-direction labels
-- Labels = sign of statistically-significant trend over forward 21-bar window (Bailey + López de Prado §5.5)
-- HIGH-RISK declared (changes labeling = Optuna training objective domain)
-- Wall-clock: 1.8h (labeling rebuild + retrain)
+**/040 — Sortino objective in Optuna**
+- Optuna objective = mean / downside_std instead of mean / std
+- Trains model to maximize downside-protected return
+- Wall-clock: 1.0h modal / 2.4h cap
 
-**/041 — Sortino objective in Optuna (downside-only deviation)**
-- Optuna objective = mean / downside_std (Sortino) instead of mean / std (Sharpe)
-- Trains model to maximize downside-protected return; should improve Calmar at modest Sharpe cost
-- Wall-clock: 1.0h (just objective function change)
+**/041 — Per-symbol vol-target ceiling**
+- Pre-trade: if symbol's 14d RV > 80th percentile trailing 90d, scale down position by 0.5×
+- Stateless gate orthogonal to /010 R5 (which was floor)
+- Wall-clock: 0.8h modal / 2.4h cap
 
-**/042 — Per-symbol vol-target ceiling (NEW risk primitive)**
-- Pre-trade: if symbol's 14-day realized vol > 80th percentile of trailing 90-day, scale down position by 0.5×
-- Stateless gate; orthogonal to /010 R5 (which was vol-target floor)
-- Wall-clock: 0.8h (post-Optuna gate)
+**/042 — Cross-symbol correlation gate**
+- Pre-trade: if BTC ↔ ETH 30d correlation > 0.90, kill non-BTC/ETH trades
+- Forces diversification only when correlation actually provides it
+- Stateless gate
+- Wall-clock: 0.8h modal / 2.4h cap
 
-**/043 — Cross-symbol correlation gate**
-- Pre-trade: if BTC ↔ ETH 30-day correlation > 0.90, kill non-BTC/ETH trades
-- Forces diversification when major coins co-move (no diversification benefit available)
-- Stateless gate; addresses /027/032 concentration concern at architectural level
-- Wall-clock: 0.8h
+**/043 — Per-trade Kelly sizing**
+- Replace uniform position sizing with `f* = (μ × (b+1) − 1) / b` where μ = predicted edge (LightGBM proba × magnitude), b = TP/SL ratio
+- Sizing scales with model confidence × edge magnitude — more informative trades get larger positions
+- Wall-clock: 1.0h modal / 2.4h cap
 
 ## Cadence + Routing
 
-- /034–/043 are 10 EXPLORATIONs at v1 standard config (n_trials=18, ENSEMBLE_SIZE=3, 2h cap)
-- Estimated cycle-5 total wall-clock: ~11-12h aggregate (1-2h per iteration)
+- /034-/043 are 10 EXPLORATIONs at v1 standard (n_trials=18, ENSEMBLE_SIZE=3, 2h cap / 2.4h kill)
+- Estimated cycle-5 aggregate wall-clock: ~12-14h across all 10 (1-2h each)
 - After /043 → **/044 CONFIRMATION** = bundle of PROMISING ingredients from /034-/043
-- /044 substrate determined by which axes fire PROMISING (≥ +0.20 OOS Sharpe Δ at single-seed)
+- /044 substrate determined by which axes fire PROMISING (F1 OOS Sharpe Δ ≥ +0.20)
 
-## Critic scope reminder (per skill v1 reverted)
+## Execution order (run in this sequence)
 
-Critic checks anti-cheating, anti-look-ahead, anti-methodology-mistake, anti-seed-fragility. **NOT** trade-roster overlap. **NOT** basin-lottery framing. Each EXPLORATION measured against BASELINE_V1.md +0.6637 OOS Sharpe stable anchor — different configs producing different trades is expected and correct.
+1. /034 Liquidations (highest novelty, may have data fetch overhead)
+2. /035 OI velocity (low data risk, cached from /025)
+3. /036 Funding velocity (cached from /023)
+4. /037 Volume imbalance (no data fetch)
+5. /038 On-chain exchange flow (BOLD; falls back to basis if data unavailable)
+6. /039 Trend-scanning labels (structural label change)
+7. /040 Sortino objective (loss function change)
+8. /041 Per-symbol vol-target ceiling (stateless gate)
+9. /042 Cross-symbol correlation gate (stateless gate)
+10. /043 Per-trade Kelly sizing (sizing change)
 
-## Open questions for QR to decide at each iteration
+Front-load high-novelty signal axes; risk + sizing changes at end.
 
-1. Data fetch for liquidations (/034) — is the historical feed accessible? If not, fall back to Coinglass aggregated daily.
-2. Trend-scanning (/040) HIGH-RISK declaration — should we run it at CONFIRMATION-spec wall-clock instead?
-3. Order of execution — Wave 1 (signal sources) first vs Wave 2 (universe) first?
+## Critic scope (locked 2026-05-29)
 
-## Order recommendation
+Critic checks:
+1. Anti-cheating (no OOS tuning, no IS window trimming)
+2. Anti-look-ahead (walk_forward.py:113, embargo, past-only labels/features)
+3. Anti-methodology-mistake (CV gap, training_months, dispatch defects)
+4. Anti-seed-fragility (reproducible with same seed)
+5. **Wall-clock validation (Mini-Check L) is BLOCKING** — if modal > cap, BLOCK + brief must reduce scope
 
-Run in this order to maximize info:
-1. /034 Liquidations (highest novelty)
-2. /035 OI velocity (low data risk, fast)
-3. /037 VVIX feature (no data fetch)
-4. /036 Volume imbalance (no data fetch)
-5. /038 AAVE specialist (test universe expansion fast)
-6. /040 Trend-scanning labels (NEW labeling architecture)
-7. /039 ATOM specialist
-8. /041 Sortino objective
-9. /042 Per-symbol vol-target ceiling
-10. /043 Cross-symbol correlation gate
+Critic does NOT:
+- Compare trade-roster overlap (V3 metric retired)
+- Demand frozen-HP ablations
+- Generate side scripts or supplementary diagnostics
+- Authorize wall-clock exceptions
 
-Sequenced to front-load high-novelty axes; structural changes after fast feature-additions.
+## Backtest improvements to build into runner (anti-issue prevention at source)
+
+These are CODE changes to backtest itself, not side scripts:
+1. **Runtime wiring assert**: `assert lightgbm_model._actual_sample_weight is not None when sample_weight_mode != "uniform"` — fail fast at trial 0
+2. **Reproducibility smoke test**: 60-second test runs single cell baseline seed=42, asserts bit-identical across 2 invocations. Pre-Phase-6 gate.
+3. **Live-engine parity test**: same model loaded by backtest + live produces bit-identical predictions on same bar
+4. **Wall-clock projection**: runner emits `[wall_clock] model=X month=Y elapsed=Zs projected_total=Wh` per month. Kill BEFORE cap, not after.
+5. **Foundation regression expansion**: more tests in tests/test_lookahead_embargo.py covering edge cases
+
+These build during cycle-5 execution (1 per 2-3 iterations) — not a separate framework project.
 
 ## What I'd defend if pushed
 
-**Most novel + highest expected lift**: /034 Liquidations + /040 Trend-scanning labels
-**Lowest-risk fastest wins**: /037 VVIX + /042 per-symbol vol ceiling
-**Boldest bet**: /038-/039 AAVE+ATOM universe expansion (if both PROMISING → cycle-6 could bundle 7-symbol universe)
+**Highest expected lift**: /034 Liquidations + /039 Trend-scanning labels (true new signal sources)
+**Lowest-risk fast wins**: /037 Volume imbalance + /041 Per-symbol vol ceiling
+**Boldest bet**: /038 On-chain exchange flow — UNTOUCHED signal category; success unlocks cycle-6+ on-chain feature family
 
-If you want to TRIM the list, the 2 I'd cut first: /039 ATOM (redundant with /038 AAVE in spirit) and /036 volume imbalance (incremental on existing volume features).
-
-If you want to BOLD the list further: replace /041 Sortino with **on-chain feature family** (Glassnode-style proxies: SOPR, MVRV, exchange inflow/outflow) — this is the BIG untouched signal category. Same wall-clock; higher upside; higher data-fetch risk.
-
-Your call on edits before /033 finishes. Otherwise this menu is what I'll execute starting once /033's verdict lands.
+If data fetch for /034 or /038 takes > 30 min in budget, swap to next-priority axis and revisit data fetch separately.
