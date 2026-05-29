@@ -49,7 +49,7 @@ Three sibling tracks. The user can run `/quant-iteration-v1` (this skill), `/qua
 | EXPLORATION ENSEMBLE_SIZE | 3 (matches v3) | n/a (no cadence) | 3 |
 | CONFIRMATION ENSEMBLE_SIZE | 10 (matches v3) | n/a | 10 |
 | Outer seed loop | None — single-pass inner ensemble (matches v3 post-/059) | 5 outer seeds (v1-style) | None |
-| Wall-clock caps | EXPLORATION 2h / CONFIRMATION 6h | no formal cap | EXPLORATION 2h / CONFIRMATION 6h |
+| Wall-clock caps | EXPLORATION 2h (kill 2.4h) / CONFIRMATION 8h (kill 9.6h) — 20% margin both | no formal cap | EXPLORATION 2h / CONFIRMATION 6h |
 | Cadence | 10:1 EXPLORATION:CONFIRMATION | none | 10:1 |
 | Auto-trigger | `iter-v1/NNN`, `BASELINE_V1`, `Phase 4.5`, `Phase 6.0`, `Phase 7.4`, `lgbm_advisor`, `LightGBM Master` | `iter-v2/NNN`, `BASELINE_V2.md` | `iter-v3/NNN`, `BASELINE_V3.md` |
 
@@ -290,7 +290,7 @@ Plus inherited project-level merge gates:
 
 1. **EXPLORATION wall-clock HARD CAP: 2h.** Engineer kills if exceeds 2.4h (cap × 1.2). Single-axis variation only.
 
-2. **CONFIRMATION wall-clock HARD CAP: 6h.** Default `--confirmation --n-trials 35` + ENSEMBLE_SIZE=10. Engineer kills if exceeds 7.2h (cap × 1.2).
+2. **CONFIRMATION wall-clock HARD CAP: 8h.** Default `--confirmation --n-trials 35` + ENSEMBLE_SIZE=10. Engineer kills if exceeds 9.6h (cap × 1.2). NO "CONFIRMATION-EXCEPTION" framing — if brief modal > 8h, Phase 6.0 Critic BLOCKS and brief must reduce scope.
 
 3. **CONFIRMATION requires 10 EXPLORATION precedents.** A CONFIRMATION iteration's brief Section 0.5 MUST list ≥10 EXPLORATION iter-v1/NNN ids completed since the last CONFIRMATION (or since iter-v1/001 if no prior CONFIRMATION). Phase 5.5 gate verifies this count from `briefs-v1/exploration_catalog.md`.
 
@@ -522,7 +522,7 @@ The Engineer reads `briefs-v1/iteration_v1-NNN/research_brief.md` and verifies:
 - **Section 0 — Data Split declaration.** Confirms `OOS_CUTOFF_DATE = 2025-03-24` and `training_months = 24` are unchanged. Names the IS window and OOS window in absolute dates.
 - **Section 0.5 — Iteration Type Declaration.** ONE of:
   - `TYPE: EXPLORATION` — single-axis variation. **Wall-clock budget HARD CAP: 2h.** Uses `--exploration` flag (`V1_EXPLORATION_ENSEMBLE_SIZE=3`, n_trials=18 default). Single-axis variation. Critic scores Checks 1, 2, 4, 5, 6, 8, 14 (methodology + look-ahead + axis-family axes only). Edge thresholds (Check 3 DSR/PSR/Sharpe) are SKIPPED. Critic emits `EXPLORATION-PROMISING` (signal found, candidate for CONFIRMATION inclusion) or `EXPLORATION-NEGATIVE` (no signal, recorded in catalog).
-  - `TYPE: CONFIRMATION` — production config. Uses default `V1_CONFIRMATION_ENSEMBLE_SIZE=10`, full Optuna search space. Default `--n-trials 35`. **Wall-clock budget HARD CAP: 6h.** Critic scores all 8+1 checks AND optional 9-12 including Check 3 DSR/PSR thresholds. Critic emits `CONFIRMATION-MERGE`, `CONFIRMATION-BLOCK`, `BLOCK-PENDING-FIX`, or `BLOCK-FINAL`. **Only CONFIRMATION-MERGE updates BASELINE_V1.md.**
+  - `TYPE: CONFIRMATION` — production config. Uses default `V1_CONFIRMATION_ENSEMBLE_SIZE=10`, full Optuna search space. Default `--n-trials 35`. **Wall-clock budget HARD CAP: 8h** (kill 9.6h with 20% margin). Critic scores all 8+1 checks AND optional 9-12 including Check 3 DSR/PSR thresholds. Critic emits `CONFIRMATION-MERGE`, `CONFIRMATION-BLOCK`, `BLOCK-PENDING-FIX`, or `BLOCK-FINAL`. **Only CONFIRMATION-MERGE updates BASELINE_V1.md.**
   - Brief MUST justify the type choice in 1-2 sentences. CONFIRMATION iterations require ≥10 EXPLORATION-PROMISING precedents (referenced by iter-v1/NNN ids) unless first-iteration.
 - **Section 0.6 — Architecture-Family Justification (v1-only).** Per the Axis Rotation Discipline section above. BLOCK if rotation rule violated.
 - **Section 1 — Hypothesis.** ONE sentence. What changes and why we expect OOS improvement. Vague hypotheses BLOCK; specific testable hypotheses PASS.
