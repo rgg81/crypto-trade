@@ -3222,6 +3222,185 @@ def main() -> None:
             ("E (DOT)", _strat_e032),
         ]
 
+    elif iteration_label == "v1-033" and set(symbols) == set(V1_BASELINE_UNIVERSE):
+        # iter-v1/033: CYCLE-4 CONFIRMATION BUNDLE — Option B.
+        # 4 PROMISING specialists + composite_inv_concurrency wrapper.
+        # --seeds 1 outer × ENSEMBLE_SIZE=10 inner × n_trials=35 (CONFIRMATION-EXCEPTION).
+        #
+        # 5-model dispatch:
+        #   Model A — BTC-only pool (after ETH removal to Model G)
+        #   Model C' — LINK specialist (/018)
+        #   Model D' — LTC specialist + atr_sl=1.0 (/028)
+        #   Model G  — ETH-only + symmetric BTC-trend gate (/019: lookback=42, ±8%)
+        #   Model E  — DOT baseline
+        # composite_inv_concurrency applied to ALL 5 models.
+        #
+        # F-AXIS #1 hard-asserts (per /027 LESSON + feedback_v1_defensive_check_must_be_tested.md):
+        #   - Model A symbols ⊆ {BTCUSDT, ETHUSDT} (pool trains on both; BTC retained for OOS)
+        #   - Model C' symbols == {LINKUSDT}
+        #   - Model D' symbols == {LTCUSDT}
+        #   - Model G symbols == {ETHUSDT}
+        #   - Model E symbols == {DOTUSDT}
+        # All asserts use trade.symbol (REAL TradeResult attribute — NOT trade.model_name).
+        print(
+            f"[iter-v1/033] CONFIRMATION bundle: A pool + C' LINK + D' LTC atr_sl=1.0 "
+            f"+ G ETH+gate + E DOT, all with composite_inv_concurrency. "
+            f"ENSEMBLE_SIZE={ensemble_size} (inner), seeds=1 (outer), n_trials={n_trials}. "
+            f"CONFIRMATION-EXCEPTION wall-clock 12h hard cap / 10h kill-switch."
+        )
+
+        # Model A — BTC+ETH pool (composite_inv_concurrency; R3 only; ATR 2.9/1.45).
+        # ETH slice will be DROPPED via replacement-semantics filter below
+        # (Model G takes ETH exclusively).
+        results_a, faxm_a, _strat_a = run_model(
+            "A (BTC+ETH pool + composite_inv_concurrency)",
+            ("BTCUSDT", "ETHUSDT"),
+            atr_tp=2.9,
+            atr_sl=1.45,
+            apply_r1=False,
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            sample_weight_mode="composite_inv_concurrency",
+            **_r5_kwargs,
+        )
+
+        # Model C' — LINK specialist (/018 config; R1+R3; ATR 2.9/1.45).
+        results_c, faxm_c, _strat_c = run_model(
+            "C' (LINK specialist + composite_inv_concurrency)",
+            ("LINKUSDT",),
+            atr_tp=2.9,
+            atr_sl=1.45,
+            apply_r1=True,
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            sample_weight_mode="composite_inv_concurrency",
+            **_r5_kwargs,
+        )
+
+        # Model D' — LTC specialist + atr_sl=1.0 (/028 config; R1+R3; ATR 3.5/1.0).
+        results_d, faxm_d, _strat_d = run_model(
+            "D' (LTC + atr_sl=1.0 + composite_inv_concurrency)",
+            ("LTCUSDT",),
+            atr_tp=3.5,
+            atr_sl=1.0,
+            apply_r1=True,
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            sample_weight_mode="composite_inv_concurrency",
+            **_r5_kwargs,
+        )
+
+        # Model G — ETH-only specialist (R3 only; ATR 2.9/1.45 matching Model A).
+        # BTC-trend gate applied post-hoc as stateless filter (BIT-IDENTICAL to /019 + /027 spec).
+        results_g_raw, faxm_g, _strat_g = run_model(
+            "G (ETH-only + composite_inv_concurrency, pre-gate)",
+            ("ETHUSDT",),
+            atr_tp=2.9,
+            atr_sl=1.45,
+            apply_r1=False,
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            sample_weight_mode="composite_inv_concurrency",
+            **_r5_kwargs,
+        )
+
+        # Apply stateless direction-aware BTC-trend gate (/019 spec: lookback=42, ±8%).
+        # Reuses V1_ITER027_ETH_GATE_* constants which match /019 spec exactly.
+        btc_open_times_g, btc_closes_g = load_btc_klines_for_filter()
+        _033_gate_cfg = BtcTrendFilterConfig(
+            lookback_bars=V1_ITER027_ETH_GATE_LOOKBACK_BARS,
+            threshold_pct=V1_ITER027_ETH_GATE_THRESHOLD_PCT,
+            enabled=V1_ITER027_ETH_GATE_ENABLED,
+        )
+        results_g, _033_gate_stats = apply_btc_trend_filter(
+            results_g_raw,
+            btc_open_times_g,
+            btc_closes_g,
+            _033_gate_cfg,
+        )
+        _033_gs = _033_gate_stats.as_dict()
+        print(
+            f"[iter-v1/033] G ETH BTC-trend gate: "
+            f"normal={_033_gs['n_normal']} "
+            f"warmup={_033_gs['n_warmup']} "
+            f"killed={_033_gs['n_killed']}/{_033_gs['n_total']} "
+            f"fire_rate={_033_gs['fire_rate']:.2%}"
+        )
+
+        # Model E — DOT baseline (R1+R2+R3; ATR 2.9/1.45; composite_inv_concurrency).
+        results_e, faxm_e, _strat_e = run_model(
+            "E (DOT baseline + composite_inv_concurrency)",
+            ("DOTUSDT",),
+            atr_tp=2.9,
+            atr_sl=1.45,
+            apply_r1=True,
+            apply_r2=True,
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            sample_weight_mode="composite_inv_concurrency",
+            **_r5_kwargs,
+        )
+
+        # REPLACEMENT SEMANTICS: drop Model A's ETH trades; keep BTC slice only.
+        results_a_btc_only = [r for r in results_a if r.symbol == "BTCUSDT"]
+
+        # ----------------------------------------------------------------
+        # F-AXIS #1 — HARD ASSERTS (per /027 LESSON + brief Section 3.3)
+        # Use REAL TradeResult.symbol attribute — NOT .model_name (per /027 crash).
+        # ----------------------------------------------------------------
+        _033_a_syms = set(r.symbol for r in results_a_btc_only)
+        _033_c_syms = set(r.symbol for r in results_c)
+        _033_d_syms = set(r.symbol for r in results_d)
+        _033_g_syms = set(r.symbol for r in results_g)
+        _033_e_syms = set(r.symbol for r in results_e)
+
+        assert _033_a_syms.issubset({"BTCUSDT"}), (
+            f"F-AXIS #1: Model A non-BTC after ETH-drop filter: {_033_a_syms - {'BTCUSDT'}}"
+        )
+        assert _033_c_syms == {"LINKUSDT"}, f"F-AXIS #1: Model C' non-LINK: {_033_c_syms}"
+        assert _033_d_syms == {"LTCUSDT"}, f"F-AXIS #1: Model D' non-LTC: {_033_d_syms}"
+        assert _033_g_syms == {"ETHUSDT"}, f"F-AXIS #1: Model G non-ETH: {_033_g_syms}"
+        assert _033_e_syms == {"DOTUSDT"}, f"F-AXIS #1: Model E non-DOT: {_033_e_syms}"
+        print(
+            f"[iter-v1/033] F-AXIS #1 hard-asserts: PASS "
+            f"(A BTC-only={len(results_a_btc_only)}, "
+            f"C'={len(results_c)}, D'={len(results_d)}, "
+            f"G={len(results_g)}, E={len(results_e)} trades)"
+        )
+
+        # Aggregate all 5 model results.
+        _all_faxm_logs = faxm_a + faxm_c + faxm_d + faxm_g + faxm_e
+        all_results = results_a_btc_only + results_c + results_d + results_g + results_e
+        _r5_model_results = [
+            results_a_btc_only,
+            results_c,
+            results_d,
+            results_g,
+            results_e,
+        ]
+        _post_dispatch_fi_strategies = [
+            ("Model_A_pool", _strat_a),
+            ("Model_C_LINK", _strat_c),
+            ("Model_D_LTC_atr_sl_1.0", _strat_d),
+            ("Model_G_ETH_gate", _strat_g),
+            ("Model_E_DOT", _strat_e),
+        ]
+
     elif set(symbols) == set(V1_BASELINE_UNIVERSE) and iteration_label not in (
         "v1-021",
         "v1-023",
@@ -3231,9 +3410,10 @@ def main() -> None:
         "v1-030",
         "v1-031",
         "v1-032",
+        "v1-033",
     ):
         # Generic baseline-universe dispatch.
-        # Non-/021/023/024/025/027/030/031 iterations. Models A/C/D/E with
+        # Non-/021/023/024/025/027/030/031/032/033 iterations. Models A/C/D/E with
         # V1_BASELINE_UNIVERSE symbols. BIT-IDENTICAL to historical
         # v186 baseline when active_feature_columns=list(V1_FEATURE_COLUMNS) + n_trials=50.
         results_a, faxm_a, _strat_a = run_model(
