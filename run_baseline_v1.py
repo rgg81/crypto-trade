@@ -3263,7 +3263,6 @@ def main() -> None:
             oof_persist_path=OOF_PARQUET_PATH,
             feature_columns=active_feature_columns,
             bounds_profile=bounds_profile,
-            sample_weight_mode="composite_inv_concurrency",
             **_r5_kwargs,
         )
 
@@ -3279,7 +3278,6 @@ def main() -> None:
             oof_persist_path=OOF_PARQUET_PATH,
             feature_columns=active_feature_columns,
             bounds_profile=bounds_profile,
-            sample_weight_mode="composite_inv_concurrency",
             **_r5_kwargs,
         )
 
@@ -3295,7 +3293,6 @@ def main() -> None:
             oof_persist_path=OOF_PARQUET_PATH,
             feature_columns=active_feature_columns,
             bounds_profile=bounds_profile,
-            sample_weight_mode="composite_inv_concurrency",
             **_r5_kwargs,
         )
 
@@ -3312,7 +3309,6 @@ def main() -> None:
             oof_persist_path=OOF_PARQUET_PATH,
             feature_columns=active_feature_columns,
             bounds_profile=bounds_profile,
-            sample_weight_mode="composite_inv_concurrency",
             **_r5_kwargs,
         )
 
@@ -3352,7 +3348,6 @@ def main() -> None:
             oof_persist_path=OOF_PARQUET_PATH,
             feature_columns=active_feature_columns,
             bounds_profile=bounds_profile,
-            sample_weight_mode="composite_inv_concurrency",
             **_r5_kwargs,
         )
 

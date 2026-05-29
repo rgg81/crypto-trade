@@ -372,6 +372,13 @@ def test_bundle_iter33_sample_weight_composite_inv_concurrency_active():
 
     Brief Section 3.1: composite_inv_concurrency on ALL models (A, C', D', G, E).
     Per /031 spec: per-symbol mean-normalization applied.
+
+    The kwarg is passed via _r5_kwargs (populated from CLI --sample-weight-mode), NOT
+    duplicated explicitly in each run_model() call. The test verifies:
+    1. _r5_kwargs is built inside the /033 block (carries the kwarg via CLI).
+    2. No explicit duplicate sample_weight_mode= in any run_model() call (would cause
+       TypeError: got multiple values for keyword argument).
+    3. All 5 run_model() calls inside the /033 block use **_r5_kwargs.
     """
     source = Path("run_baseline_v1.py").read_text()
 
@@ -390,12 +397,26 @@ def test_bundle_iter33_sample_weight_composite_inv_concurrency_active():
                 break
     iter033_src = "\n".join(iter033_lines)
 
-    # Count occurrences — must be >= 5 (one per model call)
-    count = iter033_src.count('sample_weight_mode="composite_inv_concurrency"')
-    assert count >= 5, (
-        f"sample_weight_mode='composite_inv_concurrency' appears {count} times in /033 block. "
-        f"Expected ≥5 (one per model A/C'/D'/G/E). "
-        f"All 5 models must receive composite_inv_concurrency per brief Section 3.1."
+    # Must NOT have explicit duplicate passes — that causes TypeError at runtime.
+    dup_count = iter033_src.count('sample_weight_mode="composite_inv_concurrency"')
+    assert dup_count == 0, (
+        f"sample_weight_mode='composite_inv_concurrency' appears {dup_count} times as an "
+        f"explicit kwarg in /033 run_model() calls. Expected 0 — the kwarg must flow through "
+        f"**_r5_kwargs only (CLI --sample-weight-mode already sets it). Duplicate explicit "
+        f"passes cause TypeError: got multiple values for keyword argument."
+    )
+
+    # _r5_kwargs must be present (it carries sample_weight_mode from the CLI).
+    assert "_r5_kwargs" in iter033_src, (
+        "_r5_kwargs not found in /033 block — composite_inv_concurrency won't be passed."
+    )
+
+    # All 5 run_model() calls must unpack **_r5_kwargs.
+    r5_unpack_count = iter033_src.count("**_r5_kwargs")
+    assert r5_unpack_count >= 5, (
+        f"**_r5_kwargs appears {r5_unpack_count} times in /033 block. "
+        f"Expected ≥5 (one per model A/C'/D'/G/E) so composite_inv_concurrency "
+        f"reaches every model via the CLI kwarg."
     )
 
 
