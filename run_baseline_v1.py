@@ -79,7 +79,10 @@ from crypto_trade.features_v1 import (
     assert_v1_universe,
 )
 from crypto_trade.iteration_report import generate_iteration_reports
-from crypto_trade.strategies.ml.basin_diagnostics import emit_basin_diagnostics_summary
+from crypto_trade.strategies.ml.basin_diagnostics import (
+    derive_basin_trials_from_oof_parquet,
+    emit_basin_diagnostics_summary,
+)
 from crypto_trade.strategies.ml.lgbm import LightGbmStrategy
 from crypto_trade.strategies.ml.metalabeling import MetaLabelingStrategy
 from crypto_trade.strategies.ml.reporting_v1 import (
@@ -1669,8 +1672,12 @@ def main() -> None:
     parser.add_argument(
         "--n-trials",
         type=int,
-        default=35,
-        help="Optuna trials per (symbol, month) cell. Default 35 (matches v3).",
+        default=50,
+        help=(
+            "Optuna trials per (symbol, month) cell. Default 50 (standardised at "
+            "2026-05-29: matches BASELINE_V1 n_trials=50; eliminates budget-mismatch "
+            "confounder vs baseline anchor — see feedback_v1_trial_budget_standardization.md)."
+        ),
     )
     parser.add_argument(
         "--ensemble-size",
@@ -4219,17 +4226,33 @@ def main() -> None:
     # -------------------------------------------------------------------------
     # framework/032+: basin diagnostics auto-emission (Component 2).
     # Emits V1/V2/V3 basin-lottery metrics automatically after every backtest.
-    # The trials parquet (OOF_PARQUET_PATH) is populated by optimization.py
-    # during training. The baseline OOS trades CSV is read from
+    #
+    # Bug fix (2026-05-29): OOF_PARQUET_PATH stores candle-level OOF returns
+    # with schema [trial_id, symbol, train_month, fold_idx, candle_open_time_ms,
+    # oof_return] for N_eff/DSR computation.  V1/V2 basin diagnostics need
+    # per-trial Sharpe with schema [outer_seed, model, month, inner_seed,
+    # trial_number, sharpe].  We derive the basin-trials parquet from the OOF
+    # parquet via derive_basin_trials_from_oof_parquet before calling the summary.
+    #
+    # The baseline OOS trades CSV is read from
     # reports-v1/iteration_v1-baseline/out_of_sample/trades.csv (must exist).
     # -------------------------------------------------------------------------
     if mode_label != "BASELINE":
         _diagnostics_dir = report_dir / "basin_diagnostics"
         _baseline_oos_trades = Path("reports-v1/iteration_v1-baseline/out_of_sample/trades.csv")
         _main_oos_trades = report_dir / "out_of_sample" / "trades.csv"
+        # Derive basin-trials parquet (per-trial Sharpe) from OOF candle-return parquet.
+        _basin_trials_parquet = Path("data") / f"v1_iter_{iteration_label}_basin_trials.parquet"
+        _basin_trials_parquet.unlink(missing_ok=True)
+        derive_basin_trials_from_oof_parquet(
+            OOF_PARQUET_PATH,
+            _basin_trials_parquet,
+            outer_seed=ensemble_seeds_offset,  # encode outer seed offset as seed label
+            model_name=iteration_label,
+        )
         emit_basin_diagnostics_summary(
             diagnostics_dir=_diagnostics_dir,
-            trials_parquet=OOF_PARQUET_PATH,
+            trials_parquet=_basin_trials_parquet,
             main_trades_oos=_main_oos_trades,
             baseline_trades_oos=_baseline_oos_trades,
             symbols=list(symbols),
@@ -4250,8 +4273,17 @@ def main() -> None:
     # iter-v1/015: engineering_report.md HARD-STOP (Critic /014 Rec #2 4th-strike).
     # sys.exit(1) instead of WARNING — Phase 7.5 dispatch is BLOCKED without the report.
     # Use --no-engineering-report to opt out explicitly (mid-pipeline orchestration only).
+    #
+    # Bug fix (2026-05-29): when --seeds N > 1, the main process (seed 0) runs here
+    # as the canonical outer-seed pass.  Its reports will be moved to seed_42/ below,
+    # and the engineering_report.md is created SEPARATELY by the orchestrator after all
+    # seeds complete.  Suppress the FATAL exit for multi-seed runs (same effect as
+    # --no-engineering-report, but automatic — avoids requiring the caller to remember
+    # the flag when also passing --seeds N).
+    _n_outer_seeds_peek = int(getattr(args, "seeds", 1))
+    _suppress_eng_report_check = args.no_engineering_report or (_n_outer_seeds_peek > 1)
     engineering_report_path = report_dir / "engineering_report.md"
-    if not engineering_report_path.exists() and not args.no_engineering_report:
+    if not engineering_report_path.exists() and not _suppress_eng_report_check:
         print(
             f"\n[FATAL] engineering_report.md NOT FOUND at {engineering_report_path}",
             file=sys.stderr,
@@ -4259,7 +4291,9 @@ def main() -> None:
         print(
             "[FATAL] This file is a BLOCKING deliverable for Phase 7.5 dispatch.\n"
             "[FATAL] Use --no-engineering-report to suppress this exit "
-            "(e.g. mid-pipeline orchestration).",
+            "(e.g. mid-pipeline orchestration).\n"
+            "[FATAL] When using --seeds N > 1, this check is auto-suppressed for the "
+            "main (seed 0) pass — sub-runs already pass --no-engineering-report.",
             file=sys.stderr,
         )
         sys.exit(1)

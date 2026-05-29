@@ -49,7 +49,7 @@ Three sibling tracks. The user can run `/quant-iteration-v1` (this skill), `/qua
 | EXPLORATION ENSEMBLE_SIZE | 3 (matches v3) | n/a (no cadence) | 3 |
 | CONFIRMATION ENSEMBLE_SIZE | 10 (matches v3) | n/a | 10 |
 | Outer seed loop | None — single-pass inner ensemble (matches v3 post-/059) | 5 outer seeds (v1-style) | None |
-| Wall-clock caps | EXPLORATION 2h / CONFIRMATION 6h | no formal cap | EXPLORATION 2h / CONFIRMATION 6h |
+| Wall-clock caps | EXPLORATION 6h / CONFIRMATION 24h | no formal cap | EXPLORATION 2h / CONFIRMATION 6h |
 | Cadence | 10:1 EXPLORATION:CONFIRMATION | none | 10:1 |
 | Auto-trigger | `iter-v1/NNN`, `BASELINE_V1`, `Phase 4.5`, `Phase 6.0`, `Phase 7.4`, `lgbm_advisor`, `LightGBM Master` | `iter-v2/NNN`, `BASELINE_V2.md` | `iter-v3/NNN`, `BASELINE_V3.md` |
 
@@ -255,13 +255,22 @@ Plus inherited project-level merge gates:
 
 **Two dimensions FIXED (no QR/QE override):**
 - Seed count: 3 inner seeds EXPLORATION / 10 inner seeds CONFIRMATION
-- Wall-clock cap: 2h EXPLORATION / 6h CONFIRMATION
+- Wall-clock cap: 6h EXPLORATION / 24h CONFIRMATION (updated 2026-05-29 from 2h/6h — n_trials standardised at 50 triples the per-cell compute vs n_trials=18 default)
 
-**Four dimensions QR-TUNABLE to fit the budget** (compress in this order):
-1. **n_trials**: 35 → 30 → 25 (Optuna TPE saturation tolerance; floor ~10)
-2. **features**: 40 (PRUNED) → 30 → 20 (if axis isn't feature-family)
-3. **candles**: 8h → 12h → daily (only if axis allows; re-anchor required)
-4. **symbols**: 5 → 4 → 3 (if axis isn't universe)
+**v1 trial budget — STANDARDISED at n_trials=50 (2026-05-29):**
+- ALL v1 iterations (EXPLORATION and CONFIRMATION) use `--n-trials 50` by default.
+- This matches the BASELINE_V1 anchor which was produced at n_trials=50.
+- Reason: /033 single-seed revealed baseline-at-n_trials=50 yields OOS Sharpe +0.66 but
+  baseline-at-n_trials=35 collapses to -0.28 (Δ -0.95). Budget-mismatch was producing
+  apples-to-oranges iteration verdicts. Standardising eliminates this confounder.
+- Compression is ALLOWED only under resource pressure: n_trials floor = 35 (Optuna TPE
+  saturation tolerance). Below 35 is PROHIBITED for v1 — it risks diverging from the anchor.
+- See `feedback_v1_trial_budget_standardization.md`.
+
+**Three dimensions QR-TUNABLE to fit the budget** (compress in this order):
+1. **features**: 40 (PRUNED) → 30 → 20 (if axis isn't feature-family)
+2. **candles**: 8h → 12h → daily (only if axis allows; re-anchor required)
+3. **symbols**: 5 → 4 → 3 (if axis isn't universe)
 
 **MANDATORY brief Section 3.6 (wall-clock estimate)**:
 - Explicit wall-clock prediction from prior-iteration linear scaling
@@ -273,11 +282,11 @@ Plus inherited project-level merge gates:
 
 **Engineer KILL criterion**: orchestrator kills backtest if runtime exceeds cap × 1.2 (20% tolerance margin).
 
-1. **EXPLORATION wall-clock HARD CAP: 2h.** Default config: `--exploration --n-trials 35 --pruned-features` (5-sym × 40-feat × 35-trial × 3-seed ≈ 1.5h). Engineer kills if exceeds 2.4h (cap × 1.2). Single-axis variation only.
+1. **EXPLORATION wall-clock HARD CAP: 6h.** Default config: `--exploration --n-trials 50 --pruned-features` (5-sym × 40-feat × 50-trial × 3-seed ≈ 3-5h). Engineer kills if exceeds 7.2h (cap × 1.2). Single-axis variation only.
 
-2. **CONFIRMATION wall-clock HARD CAP: 6h.** Default `--confirmation --n-trials 35` + ENSEMBLE_SIZE=10. Engineer kills if exceeds 7.2h. Note: iter-v1/015 ran 9.8-12h as one-time user-authorized exception; cycle-3 onwards STRICTLY enforced.
+2. **CONFIRMATION wall-clock HARD CAP: 24h.** Default `--confirmation --n-trials 50` + ENSEMBLE_SIZE=10. Engineer kills if exceeds 28.8h. Note: iter-v1/015 ran 9.8-12h as one-time user-authorized exception under old n_trials=35 default; cycle-3 onwards cap × 1.2 strictly enforced.
 
-**Historical context**: /001-/014 had variable wall-clock; /008 baseline-anchor ran 8h (one-time post-hoc tolerance); /015 launched 9.8-12h ETA (user authorized as one-time exception). **Cycle-3 (/016+) onwards: no further exceptions without explicit user override.**
+**Historical context**: /001-/014 had variable wall-clock; /008 baseline-anchor ran 8h (one-time post-hoc tolerance); /015 launched 9.8-12h ETA (user authorized as one-time exception). /033 revealed the n_trials budget mismatch problem; all cycle-5+ iterations use n_trials=50.
 
 3. **CONFIRMATION requires 10 EXPLORATION precedents.** A CONFIRMATION iteration's brief Section 0.5 MUST list ≥10 EXPLORATION iter-v1/NNN ids completed since the last CONFIRMATION (or since iter-v1/001 if no prior CONFIRMATION). Phase 5.5 gate verifies this count from `briefs-v1/exploration_catalog.md`.
 
@@ -511,8 +520,8 @@ The Engineer reads `briefs-v1/iteration_v1-NNN/research_brief.md` and verifies:
 
 - **Section 0 — Data Split declaration.** Confirms `OOS_CUTOFF_DATE = 2025-03-24` and `training_months = 24` are unchanged. Names the IS window and OOS window in absolute dates.
 - **Section 0.5 — Iteration Type Declaration.** ONE of:
-  - `TYPE: EXPLORATION` — single-axis variation. **Wall-clock budget HARD CAP: 2h.** Uses `--exploration` flag (`V1_EXPLORATION_ENSEMBLE_SIZE=3`, n_trials=35 default). Single-axis variation. Critic scores Checks 1, 2, 4, 5, 6, 8, 14 (methodology + look-ahead + axis-family axes only). Edge thresholds (Check 3 DSR/PSR/Sharpe) are SKIPPED. Critic emits `EXPLORATION-PROMISING` (signal found, candidate for CONFIRMATION inclusion) or `EXPLORATION-NEGATIVE` (no signal, recorded in catalog).
-  - `TYPE: CONFIRMATION` — production config. Uses default `V1_CONFIRMATION_ENSEMBLE_SIZE=10`, full Optuna search space. Default `--n-trials 35`. **Wall-clock budget HARD CAP: 6h.** Critic scores all 8+1 checks AND optional 9-12 including Check 3 DSR/PSR thresholds. Critic emits `CONFIRMATION-MERGE`, `CONFIRMATION-BLOCK`, `BLOCK-PENDING-FIX`, or `BLOCK-FINAL`. **Only CONFIRMATION-MERGE updates BASELINE_V1.md.**
+  - `TYPE: EXPLORATION` — single-axis variation. **Wall-clock budget HARD CAP: 6h** (updated 2026-05-29 from 2h — n_trials standardised at 50). Uses `--exploration` flag (`V1_EXPLORATION_ENSEMBLE_SIZE=3`, n_trials=50 standard). Single-axis variation. Critic scores Checks 1, 2, 4, 5, 6, 8, 14 (methodology + look-ahead + axis-family axes only). Edge thresholds (Check 3 DSR/PSR/Sharpe) are SKIPPED. Critic emits `EXPLORATION-PROMISING` (signal found, candidate for CONFIRMATION inclusion) or `EXPLORATION-NEGATIVE` (no signal, recorded in catalog).
+  - `TYPE: CONFIRMATION` — production config. Uses default `V1_CONFIRMATION_ENSEMBLE_SIZE=10`, full Optuna search space. Default `--n-trials 50` (standardised 2026-05-29). **Wall-clock budget HARD CAP: 24h** (updated 2026-05-29 from 6h). Critic scores all 8+1 checks AND optional 9-12 including Check 3 DSR/PSR thresholds. Critic emits `CONFIRMATION-MERGE`, `CONFIRMATION-BLOCK`, `BLOCK-PENDING-FIX`, or `BLOCK-FINAL`. **Only CONFIRMATION-MERGE updates BASELINE_V1.md.**
   - Brief MUST justify the type choice in 1-2 sentences. CONFIRMATION iterations require ≥10 EXPLORATION-PROMISING precedents (referenced by iter-v1/NNN ids) unless first-iteration.
 - **Section 0.6 — Architecture-Family Justification (v1-only).** Per the Axis Rotation Discipline section above. BLOCK if rotation rule violated.
 - **Section 1 — Hypothesis.** ONE sentence. What changes and why we expect OOS improvement. Vague hypotheses BLOCK; specific testable hypotheses PASS.
@@ -560,7 +569,7 @@ ROTATION_STATUS: VALID  (or BLOCKED — same as last 5)
 HIGH-RISK: NO  (or YES, mitigation = <opted-in multi-seed | none>)
 
 ## Cadence Check
-- Wall-clock budget declared: <2h for EXPLORATION / <6h for CONFIRMATION>: PASS / BLOCK
+- Wall-clock budget declared: <6h for EXPLORATION / <24h for CONFIRMATION>: PASS / BLOCK
 - (CONFIRMATION only) EXPLORATION precedents since last CONFIRMATION: <count, ≥10 required>: PASS / BLOCK
 - (CONFIRMATION only) Section 3 lists imported variations from prior EXPLORATIONs: PASS / BLOCK
 
@@ -1086,7 +1095,7 @@ The brief at `briefs-v1/iteration_v1-NNN/research_brief.md` MUST contain all 11 
 
 ## Section 0.5 — Iteration Type Declaration
 TYPE: EXPLORATION  (or CONFIRMATION)
-- Wall-clock budget: <2h for EXP / 6h for CONF>
+- Wall-clock budget: <6h for EXP / 24h for CONF> (n_trials=50 standard)
 - (CONF only) EXPLORATION precedents since last CONF: <list iter-v1/NNN ids; must be ≥10>
 - Justification: <1-2 sentences>
 

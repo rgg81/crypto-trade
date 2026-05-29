@@ -495,3 +495,160 @@ class TestFoundationRegression:
         assert "test_start_ms - embargo_ms" in region, (
             "walk_forward.py must have: train_end_ms = test_start_ms - embargo_ms"
         )
+
+
+# ---------------------------------------------------------------------------
+# Tests 21-25: Bug fixes — multi-seed FATAL suppression + trial parquet schema
+# ---------------------------------------------------------------------------
+
+
+class TestMultiSeedFatalSuppression:
+    def test_seeds_flag_suppresses_engineering_report_fatal(self) -> None:
+        """When --seeds N > 1, the runner must NOT exit 1 on missing engineering_report.md.
+
+        Verify the source code carries the auto-suppression logic:
+        _suppress_eng_report_check = args.no_engineering_report or (_n_outer_seeds_peek > 1)
+        """
+        source = Path("run_baseline_v1.py").read_text()
+        assert "_n_outer_seeds_peek" in source, (
+            "Bug 1 fix missing: _n_outer_seeds_peek variable not found in runner. "
+            "Multi-seed runs must auto-suppress engineering_report.md FATAL."
+        )
+        assert "_suppress_eng_report_check" in source, (
+            "Bug 1 fix missing: _suppress_eng_report_check variable not found in runner."
+        )
+        # Confirm the logic ties _n_outer_seeds_peek > 1 to suppression
+        assert "_n_outer_seeds_peek > 1" in source, (
+            "Bug 1 fix missing: condition `_n_outer_seeds_peek > 1` not found. "
+            "The multi-seed suppression must check seeds > 1 explicitly."
+        )
+
+    def test_no_engineering_report_flag_still_works(self) -> None:
+        """--no-engineering-report flag must still suppress the check independently."""
+        source = Path("run_baseline_v1.py").read_text()
+        assert "no_engineering_report" in source, (
+            "--no-engineering-report flag or variable missing from runner."
+        )
+        # The combined condition must include args.no_engineering_report
+        assert "args.no_engineering_report" in source, (
+            "args.no_engineering_report must appear in the suppression condition."
+        )
+
+
+class TestTrialParquetSchema:
+    def test_derive_basin_trials_produces_6_required_columns(self, tmp_path: Path) -> None:
+        """derive_basin_trials_from_oof_parquet must produce outer_seed, model, month,
+        inner_seed, trial_number, sharpe columns.
+        """
+        from crypto_trade.strategies.ml.basin_diagnostics import (
+            derive_basin_trials_from_oof_parquet,
+        )
+
+        # Build a minimal OOF parquet (the actual schema from optimization.py)
+        rows = []
+        for trial_id in range(3):
+            for i in range(10):
+                rows.append(
+                    {
+                        "trial_id": trial_id,
+                        "symbol": "BTCUSDT",
+                        "train_month": "2023-01",
+                        "fold_idx": i,
+                        "candle_open_time_ms": 1_000_000 + i * 28800_000,
+                        "oof_return": (trial_id * 0.01) + (i * 0.001) - 0.005,
+                    }
+                )
+        oof_path = tmp_path / "oof.parquet"
+        pd.DataFrame(rows).to_parquet(oof_path, index=False)
+
+        basin_path = tmp_path / "basin_trials.parquet"
+        derive_basin_trials_from_oof_parquet(oof_path, basin_path, outer_seed=42, model_name="A")
+
+        assert basin_path.exists(), "Basin-trials parquet was not written"
+        df = pd.read_parquet(basin_path)
+        required = {"outer_seed", "model", "month", "inner_seed", "trial_number", "sharpe"}
+        missing = required - set(df.columns)
+        assert not missing, f"Basin-trials parquet missing required columns: {missing}"
+
+    def test_v1_computation_runs_on_derived_parquet(self, tmp_path: Path) -> None:
+        """compute_v1_cross_seed_variance must succeed when fed a parquet derived
+        from derive_basin_trials_from_oof_parquet (end-to-end V1 pipeline check).
+        """
+        from crypto_trade.strategies.ml.basin_diagnostics import (
+            compute_v1_cross_seed_variance,
+            derive_basin_trials_from_oof_parquet,
+        )
+
+        rows = []
+        for trial_id in range(5):
+            for i in range(8):
+                rows.append(
+                    {
+                        "trial_id": trial_id,
+                        "symbol": "ETHUSDT",
+                        "train_month": "2023-06",
+                        "fold_idx": i,
+                        "candle_open_time_ms": 1_600_000_000_000 + i * 28_800_000,
+                        "oof_return": 0.002 * trial_id - 0.001 * i,
+                    }
+                )
+        oof_path = tmp_path / "oof_v1.parquet"
+        pd.DataFrame(rows).to_parquet(oof_path, index=False)
+        basin_path = tmp_path / "basin_v1.parquet"
+        derive_basin_trials_from_oof_parquet(oof_path, basin_path, outer_seed=0)
+
+        # V1 should not raise KeyError
+        result = compute_v1_cross_seed_variance(basin_path)
+        assert not result.empty, "V1 cross-seed variance returned empty DataFrame"
+        assert "std_sharpe" in result.columns
+
+    def test_v2_computation_runs_on_derived_parquet(self, tmp_path: Path) -> None:
+        """compute_v2_per_cell_spearman must succeed on a derived parquet."""
+        from crypto_trade.strategies.ml.basin_diagnostics import (
+            compute_v2_per_cell_spearman,
+            derive_basin_trials_from_oof_parquet,
+        )
+
+        rows = []
+        for trial_id in range(4):
+            for i in range(6):
+                rows.append(
+                    {
+                        "trial_id": trial_id,
+                        "symbol": "LINKUSDT",
+                        "train_month": "2022-11",
+                        "fold_idx": i,
+                        "candle_open_time_ms": 1_500_000_000_000 + i * 28_800_000,
+                        "oof_return": 0.001 * trial_id,
+                    }
+                )
+        oof_path = tmp_path / "oof_v2.parquet"
+        pd.DataFrame(rows).to_parquet(oof_path, index=False)
+        basin_path = tmp_path / "basin_v2.parquet"
+        derive_basin_trials_from_oof_parquet(oof_path, basin_path, outer_seed=0)
+
+        result = compute_v2_per_cell_spearman(basin_path)
+        # Single inner_seed=0 → all cells get NaN spearman (not an error)
+        assert "mean_spearman" in result.columns
+
+    def test_v3_roster_overlap_regression(self, tmp_path: Path) -> None:
+        """V3 (Jaccard) must still work independently of the parquet fix (regression)."""
+        from crypto_trade.strategies.ml.basin_diagnostics import compute_v3_roster_overlap
+
+        main_csv = _make_trades_csv(tmp_path, name="reg_main", symbols=["BTCUSDT"], n_per_sym=4)
+        base_csv = _make_trades_csv(tmp_path, name="reg_base", symbols=["BTCUSDT"], n_per_sym=4)
+        result = compute_v3_roster_overlap(main_csv, base_csv)
+        global_row = result[result["symbol"] == "ALL"].iloc[0]
+        assert abs(global_row["jaccard"] - 1.0) < 1e-9, "V3 regression: identical rosters != 1.0"
+
+    def test_missing_oof_parquet_is_noop(self, tmp_path: Path) -> None:
+        """derive_basin_trials_from_oof_parquet must not raise when OOF parquet missing."""
+        from crypto_trade.strategies.ml.basin_diagnostics import (
+            derive_basin_trials_from_oof_parquet,
+        )
+
+        nonexistent = tmp_path / "does_not_exist.parquet"
+        output = tmp_path / "out.parquet"
+        # Must be a no-op (no exception, no output file)
+        derive_basin_trials_from_oof_parquet(nonexistent, output)
+        assert not output.exists(), "Output should not be created when OOF parquet is missing"

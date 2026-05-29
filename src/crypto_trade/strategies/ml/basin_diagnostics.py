@@ -281,6 +281,120 @@ def compute_v3_roster_overlap(
 
 
 # ---------------------------------------------------------------------------
+# OOF-parquet → basin-trials-parquet bridge
+# ---------------------------------------------------------------------------
+
+# Annualisation factor for 8h candles: 365.25 * 3 candles/day
+_CANDLES_PER_YEAR_8H: float = 365.25 * 3.0
+
+
+def derive_basin_trials_from_oof_parquet(
+    oof_parquet_path: Path,
+    output_path: Path,
+    *,
+    outer_seed: int = 42,
+    model_name: str = "combined",
+) -> None:
+    """Derive the basin-diagnostics trials parquet from the OOF candle-return parquet.
+
+    The OOF parquet produced by optimization.py has schema:
+        trial_id, symbol, train_month, fold_idx, candle_open_time_ms, oof_return
+
+    The basin-diagnostics V1/V2 functions expect schema:
+        outer_seed, model, month, inner_seed, trial_number, sharpe
+
+    This bridge function aggregates OOF returns per (trial_id, symbol, train_month)
+    cell into a per-trial annualised Sharpe ratio, then renames columns to match
+    the expected schema.  ``inner_seed`` is set to 0 (single pseudo-seed) since the
+    OOF parquet does not record inner_seed.
+
+    If oof_parquet_path does not exist or has no valid rows after NaN-drop, this is
+    a no-op and a warning is logged.
+
+    Args:
+        oof_parquet_path: Path to the OOF candle-return parquet (from optimization.py).
+        output_path: Path to write the derived basin-trials parquet.
+        outer_seed: Outer seed label to embed in the output (default 42 = canonical).
+        model_name: Model label to embed in the output (default "combined").
+    """
+    if not oof_parquet_path.exists():
+        log.warning(
+            "derive_basin_trials_from_oof_parquet: %s not found; skipping derivation.",
+            oof_parquet_path,
+        )
+        return
+
+    df = pd.read_parquet(oof_parquet_path)
+    required = {"trial_id", "oof_return"}
+    missing = required - set(df.columns)
+    if missing:
+        log.warning(
+            "derive_basin_trials_from_oof_parquet: OOF parquet missing columns %s; "
+            "skipping derivation.",
+            missing,
+        )
+        return
+
+    df = df.dropna(subset=["oof_return"])
+    if df.empty:
+        log.warning(
+            "derive_basin_trials_from_oof_parquet: OOF parquet has no non-NaN rows; "
+            "skipping derivation."
+        )
+        return
+
+    # Determine grouping: prefer (symbol, train_month) per-cell; fall back gracefully.
+    group_cols = ["trial_id"]
+    if "train_month" in df.columns:
+        group_cols = ["trial_id", "train_month"]
+    if "symbol" in df.columns and "train_month" in df.columns:
+        group_cols = ["trial_id", "symbol", "train_month"]
+
+    rows = []
+    for key, cell in df.groupby(group_cols):
+        returns = cell["oof_return"].values.astype(float)
+        if len(returns) < 2:
+            continue
+        mu = float(np.mean(returns))
+        sigma = float(np.std(returns, ddof=1))
+        sharpe = (mu / sigma * np.sqrt(_CANDLES_PER_YEAR_8H)) if sigma > 0.0 else 0.0
+
+        if isinstance(key, tuple):
+            trial_id = int(key[0])
+            month = str(key[1]) if len(key) > 1 else "unknown"
+        else:
+            trial_id = int(key)
+            month = "unknown"
+
+        rows.append(
+            {
+                "outer_seed": outer_seed,
+                "model": model_name,
+                "month": month,
+                "inner_seed": 0,  # OOF parquet does not record inner_seed
+                "trial_number": trial_id,
+                "sharpe": sharpe,
+            }
+        )
+
+    if not rows:
+        log.warning(
+            "derive_basin_trials_from_oof_parquet: no rows produced (too few returns per cell); "
+            "skipping write."
+        )
+        return
+
+    out_df = pd.DataFrame(rows)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    out_df.to_parquet(output_path, index=False)
+    log.info(
+        "derive_basin_trials_from_oof_parquet: derived %d rows → %s",
+        len(rows),
+        output_path,
+    )
+
+
+# ---------------------------------------------------------------------------
 # Trials parquet emitter (called at end of each run_model invocation)
 # ---------------------------------------------------------------------------
 
