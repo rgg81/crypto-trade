@@ -206,6 +206,28 @@ LOCAL to runner constant. NOT shared; CONFIRMATION-MERGE updates V1_BASELINE_UNI
 assert set(symbols) == {"DOTUSDT"} and iteration_label == "v1-029" guard fires for dispatch.
 """
 
+V1_ITER036_UNIVERSE: tuple[str, ...] = ("LINKUSDT", "DOTUSDT")
+"""iter-v1/036 cohort: LINK + DOT 2-specialist bundle with trend-scanning labels.
+
+Cycle-5 EXPLORATION #3 of 10. Axis family: per-cohort-specialization (REPEAT-JUSTIFIED;
+directly isolates /035's bimodal finding: LINK +74.68pp / DOT +111.67pp OOS at
+trend-scanning in 5-cohort dispatch).
+
+Architecture: Model C' (LINK only, R1+R3 ON, atr_tp=3.5, atr_sl=1.75) +
+Model E (DOT only, R1+R2+R3 ON, atr_tp=3.5, atr_sl=1.75). BOTH use trend-scanning
+labels. Model A pool, Model D LTC, Model G ETH SKIPPED.
+
+HIGH-RISK declaration: 2-mechanism stack — (1) per-cohort isolation (universe
+substitution 5→2 cohort, removing large-cap Optuna averaging) + (2) trend-scanning
+labels (already HIGH-RISK at /035; training-objective domain change). Single-seed
+OPT-OUT per cycle-5 EXPLORATION standard. ENSEMBLE_SIZE=3, n_trials=18, seed=42.
+
+LOCAL to runner constant. NOT shared; CONFIRMATION-MERGE updates V1_BASELINE_UNIVERSE.
+assert set(symbols) == {"LINKUSDT", "DOTUSDT"} guard fires in dispatch branch.
+assert label_mode_arg == "trend_scanning" guard fires in dispatch branch.
+"""
+
+
 __all__ = [
     "V1_EXCLUDED_SYMBOLS",
     "V1_BASELINE_UNIVERSE",
@@ -215,6 +237,7 @@ __all__ = [
     "assert_v1_universe",
     "V1_ITER028_UNIVERSE",
     "V1_ITER029_UNIVERSE",
+    "V1_ITER036_UNIVERSE",
     # iter-v1/023: funding-rate feature family (add_funding_v1_features imported on demand)
     # iter-v1/025: OI delta feature family (add_oi_delta_v1_features imported on demand)
 ]

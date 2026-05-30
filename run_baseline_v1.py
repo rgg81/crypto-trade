@@ -75,6 +75,7 @@ from crypto_trade.features_v1 import (
     V1_FEATURE_COLUMNS_PRUNED,
     V1_ITER028_UNIVERSE,
     V1_ITER029_UNIVERSE,
+    V1_ITER036_UNIVERSE,
     V1_OOD_FEATURE_COLUMNS,
     assert_v1_universe,
 )
@@ -3591,6 +3592,91 @@ def main() -> None:
             ("Model_E_DOT", _strat_e),
         ]
 
+    elif iteration_label == "v1-036" and set(symbols) == set(V1_ITER036_UNIVERSE):
+        # iter-v1/036: cycle-5 EXPLORATION #3/10 — per-cohort isolation of /035's bimodal signal.
+        # Tests whether LINK +74.68pp / DOT +111.67pp OOS lifts from /035 survive when the
+        # large-cap cohorts (BTC/ETH/LTC) are REMOVED from the portfolio.
+        # HIGH-RISK: 2-mechanism stack — (1) per-cohort isolation (universe 5→2 substitution,
+        # removing large-cap Optuna averaging) + (2) trend-scanning labels (already HIGH-RISK
+        # at /035; training-objective domain change). Single-seed OPT-OUT per cycle-5 standard.
+        # Model A pool, Model D LTC, Model G ETH SKIPPED — ONLY Model C' (LINK) + Model E (DOT).
+        # V1_FEATURE_COLUMNS_PRUNED 43 cols UNCHANGED. No new feature module needed.
+        assert label_mode_arg == "trend_scanning", (
+            f"iter-v1/036 pre-flight FAIL: expected --label-mode trend_scanning "
+            f"but got {label_mode_arg!r}. "
+            "Pass --label-mode trend_scanning to activate the per-cohort-trend-scanning axis. "
+            "iter-v1/036 tests /035's bimodal LINK+DOT finding at per-cohort isolation — "
+            "trend_scanning labels are the required context (not a new axis change)."
+        )
+        print(
+            f"[iter-v1/036] PER-COHORT-TREND-SCANNING ACTIVE: "
+            f"models=Model_C_LINK + Model_E_DOT, "
+            f"label_mode={label_mode_arg}, "
+            f"trend_scan_grid=(5, 8, 13, 21), "
+            f"ENSEMBLE_SIZE={ensemble_size} (inner), "
+            f"n_trials={n_trials}, "
+            f"seeds=1 (outer=42). "
+            f"HIGH-RISK: 2-mechanism stack (per-cohort isolation + trend-scanning labels). "
+            f"Features: {len(active_feature_columns)} cols (V1_FEATURE_COLUMNS_PRUNED UNCHANGED)."
+        )
+        # Model C': LINK specialist + trend_scanning labels
+        # R1=ON (consecutive-SL cool-down); R3=ON (Mahalanobis OOD gate) — baseline Model C config
+        results_c036, faxm_c036, _strat_c036 = run_model(
+            "C' (LINK + R1)",
+            ("LINKUSDT",),
+            atr_tp=3.5,
+            atr_sl=1.75,
+            apply_r1=True,
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            **_r5_kwargs,
+        )
+        # Model E: DOT specialist + trend_scanning labels
+        # R1=ON, R2=ON (drawdown brake), R3=ON — baseline Model E config
+        results_e036, faxm_e036, _strat_e036 = run_model(
+            "E (DOT + R1 + R2)",
+            ("DOTUSDT",),
+            atr_tp=3.5,
+            atr_sl=1.75,
+            apply_r1=True,
+            apply_r2=True,
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            **_r5_kwargs,
+        )
+
+        # F-AXIS #6 dispatch verification: assert per-cohort isolation enforced
+        c036_symbols = {r.symbol for r in results_c036}
+        e036_symbols = {r.symbol for r in results_e036}
+        assert c036_symbols.issubset({"LINKUSDT"}), (
+            f"[iter-v1/036] Model C' produced non-LINK results: {c036_symbols - {'LINKUSDT'}}. "
+            "Per-cohort isolation failed — Model C' must trade LINKUSDT only."
+        )
+        assert e036_symbols.issubset({"DOTUSDT"}), (
+            f"[iter-v1/036] Model E produced non-DOT results: {e036_symbols - {'DOTUSDT'}}. "
+            "Per-cohort isolation failed — Model E must trade DOTUSDT only."
+        )
+
+        print(
+            f"[iter-v1/036] Bundle dispatch verified: "
+            f"C'={len(results_c036)} trades (LINK) "
+            f"E={len(results_e036)} trades (DOT)"
+        )
+
+        _all_faxm_logs = faxm_c036 + faxm_e036
+        all_results = results_c036 + results_e036
+        _r5_model_results = [results_c036, results_e036]
+        _post_dispatch_fi_strategies = [
+            ("Model_C_LINK_trend_scan_specialist", _strat_c036),
+            ("Model_E_DOT_trend_scan_specialist", _strat_e036),
+        ]
+
     elif set(symbols) == set(V1_BASELINE_UNIVERSE) and iteration_label not in (
         "v1-021",
         "v1-023",
@@ -3603,6 +3689,7 @@ def main() -> None:
         "v1-033",
         "v1-034",
         "v1-035",
+        "v1-036",
     ):
         # Generic baseline-universe dispatch.
         # Non-/021/023/024/025/027/030/031/032/033/034/035 iterations. Models A/C/D/E with
