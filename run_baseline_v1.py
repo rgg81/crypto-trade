@@ -405,6 +405,7 @@ def run_model(
     sigma_k_sl: float | None = None,
     sigma_halflife_days: int = 14,
     sample_weight_mode: str = "abs_pnl",
+    label_mode: str = "triple_barrier",
     params_persist_path: Path | None = None,
     model_role: str = "",
     symbol: str = "",
@@ -528,6 +529,7 @@ def run_model(
         sigma_k_sl=sigma_k_sl,
         sigma_halflife_candles=sigma_halflife_candles,
         sample_weight_mode=sample_weight_mode,
+        label_mode=label_mode,
         params_persist_path=params_persist_path,
         model_role=model_role,
         symbol=symbol,
@@ -1809,6 +1811,23 @@ def main() -> None:
             "(symbol, training_window) — iter-v1/031 axis."
         ),
     )
+    # iter-v1/035: label-mode selection.
+    # "triple_barrier" (default) is BIT-IDENTICAL to baseline.
+    # "trend_scanning" replaces path-dependent TP/SL-first-hit labels with
+    # regression-significance OLS labels (Wald t-stat, grid 5/8/13/21 bars).
+    # HIGH-RISK axis: changes Optuna's training-objective domain.
+    parser.add_argument(
+        "--label-mode",
+        choices=["triple_barrier", "fixed_horizon", "trend_scanning"],
+        default="triple_barrier",
+        help=(
+            "Label generation mode for LightGBM training (iter-v1/035). "
+            "'triple_barrier' (default) is BIT-IDENTICAL to baseline. "
+            "'trend_scanning' replaces triple-barrier with OLS Wald-test horizon "
+            "selection (AFML Ch.5 §5.5; grid 5/8/13/21 bars) — iter-v1/035 axis. "
+            "'fixed_horizon' uses fixed forward-return at timeout horizon."
+        ),
+    )
     # iter-v1/032: frozen HP mode for basin-lottery ablation.
     # When "baseline_v1", Optuna search is skipped and each (model, month, seed) cell
     # uses the per-cell best HP extracted from the baseline run's Optuna log.
@@ -1994,6 +2013,7 @@ def main() -> None:
     # This ensures only the sample-weighting axis is free in Optuna — no subsampling
     # perturbations can confound F-AXIS-MECHANISM attribution.
     sample_weight_mode_arg = getattr(args, "sample_weight_mode", "abs_pnl")
+    label_mode_arg = getattr(args, "label_mode", "triple_barrier")
     if sample_weight_mode_arg != "abs_pnl" and bounds_profile == "v1_pruned":
         bounds_profile = "v1_pruned_axis016"
         print(
@@ -2118,6 +2138,7 @@ def main() -> None:
         print(f"  sigma_k_tp: {sigma_k_tp_arg}  sigma_k_sl: {sigma_k_sl_arg}")
         print(f"  sigma_halflife_days: {sigma_halflife_days_arg}")
     print(f"  sample_weight_mode: {sample_weight_mode_arg}")
+    print(f"  label_mode: {label_mode_arg}")
 
     # iter-v1/032: frozen HP mode resolution.
     frozen_hp_mode_arg = getattr(args, "frozen_hp_mode", "none")
@@ -2165,6 +2186,7 @@ def main() -> None:
     # iter-v1/014: sigma_source + sigma_k_tp/sl/halflife threaded through.
     # iter-v1/016: sample_weight_mode threaded through for sample-weighting axis.
     # iter-v1/032: frozen_hp_parquet threaded through for basin-lottery ablation.
+    # iter-v1/035: label_mode threaded through for trend-scanning labels axis.
     _r5_kwargs = dict(
         r5_vol_target_enabled=r5_vol_target_enabled,
         r5_vol_target_pct=r5_vol_target_pct,
@@ -2175,6 +2197,7 @@ def main() -> None:
         sigma_k_tp=sigma_k_tp_arg,
         sigma_k_sl=sigma_k_sl_arg,
         sample_weight_mode=sample_weight_mode_arg,
+        label_mode=label_mode_arg,
         sigma_halflife_days=sigma_halflife_days_arg,
         frozen_hp_parquet=_frozen_hp_parquet_path,
     )
@@ -3479,6 +3502,95 @@ def main() -> None:
             ("Model_E_DOT", _strat_e),
         ]
 
+    elif iteration_label == "v1-035" and set(symbols) == set(V1_BASELINE_UNIVERSE):
+        # iter-v1/035: cycle-5 EXPLORATION #2/10 — trend-scanning labels axis.
+        # STRUCTURAL label-mode change: triple-barrier TP/SL-first-hit →
+        # OLS regression-significance (Wald t-stat, grid 5/8/13/21 bars, AFML Ch.5 §5.5).
+        # HIGH-RISK declaration: changes Optuna training-objective domain via per-row
+        # weight distribution shift (TB ~8.5% modal → TS ~2.5% modal, 3.3-4.6× scale shift).
+        # NO new feature module needed; NO feature regen needed. V1_FEATURE_COLUMNS_PRUNED
+        # 43 cols UNCHANGED. Execution-side ATR barriers unchanged (atr_tp/atr_sl per model
+        # are for exits, not labeling — trend-scanning ONLY changes the M1 supervised target).
+        # All other config IDENTICAL to baseline: 4 models A/C/D/E, same atr_tp/atr_sl,
+        # same R-gate config, same V1_FEATURE_COLUMNS_PRUNED.
+        assert label_mode_arg == "trend_scanning", (
+            f"iter-v1/035 pre-flight FAIL: expected --label-mode trend_scanning "
+            f"but got {label_mode_arg!r}. "
+            "Pass --label-mode trend_scanning to activate the trend-scanning axis."
+        )
+        print(
+            f"[iter-v1/035] TREND-SCANNING-LABEL ACTIVE: "
+            f"label_mode={label_mode_arg}, "
+            f"trend_scan_grid=(5, 8, 13, 21), "
+            f"ENSEMBLE_SIZE={ensemble_size} (inner), "
+            f"n_trials={n_trials}, "
+            f"seeds=1 (outer=42). "
+            f"HIGH-RISK: training-objective domain changed. "
+            f"Features: {len(active_feature_columns)} cols (V1_FEATURE_COLUMNS_PRUNED UNCHANGED)."
+        )
+        results_a, faxm_a, _strat_a = run_model(
+            "A (BTC/ETH)",
+            ("BTCUSDT", "ETHUSDT"),
+            atr_tp=2.9,
+            atr_sl=1.45,
+            apply_r1=False,
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            **_r5_kwargs,
+        )
+        results_c, faxm_c, _strat_c = run_model(
+            "C (LINK + R1)",
+            ("LINKUSDT",),
+            atr_tp=3.5,
+            atr_sl=1.75,
+            apply_r1=True,
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            **_r5_kwargs,
+        )
+        results_d, faxm_d, _strat_d = run_model(
+            "D (LTC + R1)",
+            ("LTCUSDT",),
+            atr_tp=3.5,
+            atr_sl=1.75,
+            apply_r1=True,
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            **_r5_kwargs,
+        )
+        results_e, faxm_e, _strat_e = run_model(
+            "E (DOT + R1 + R2)",
+            ("DOTUSDT",),
+            atr_tp=3.5,
+            atr_sl=1.75,
+            apply_r1=True,
+            apply_r2=True,
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            **_r5_kwargs,
+        )
+        _all_faxm_logs = faxm_a + faxm_c + faxm_d + faxm_e
+        all_results = results_a + results_c + results_d + results_e
+        _r5_model_results = [results_a, results_c, results_d, results_e]
+        _post_dispatch_fi_strategies = [
+            ("Model_A_pool", _strat_a),
+            ("Model_C_LINK", _strat_c),
+            ("Model_D_LTC", _strat_d),
+            ("Model_E_DOT", _strat_e),
+        ]
+
     elif set(symbols) == set(V1_BASELINE_UNIVERSE) and iteration_label not in (
         "v1-021",
         "v1-023",
@@ -3490,9 +3602,10 @@ def main() -> None:
         "v1-032",
         "v1-033",
         "v1-034",
+        "v1-035",
     ):
         # Generic baseline-universe dispatch.
-        # Non-/021/023/024/025/027/030/031/032/033 iterations. Models A/C/D/E with
+        # Non-/021/023/024/025/027/030/031/032/033/034/035 iterations. Models A/C/D/E with
         # V1_BASELINE_UNIVERSE symbols. BIT-IDENTICAL to historical
         # v186 baseline when active_feature_columns=list(V1_FEATURE_COLUMNS) + n_trials=50.
         results_a, faxm_a, _strat_a = run_model(
