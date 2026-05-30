@@ -3396,6 +3396,89 @@ def main() -> None:
             ("Model_E_DOT", _strat_e),
         ]
 
+    elif iteration_label == "v1-034" and set(symbols) == set(V1_BASELINE_UNIVERSE):
+        # iter-v1/034: cycle-5 EXPLORATION #1/10 — basis z-score feature family.
+        # NEW feature: basis_zscore_30 (perp-spot basis z-score, 30-bar window).
+        # V1_FEATURE_COLUMNS_PRUNED extended 43 → 44 (basis_zscore_30 at alphabetical pos 0).
+        # Feature parquets must be regenerated with --groups basis_v1 before running.
+        # ALL other config IDENTICAL to baseline: 4 models A/C/D/E, same ATR/R-gate/etc.
+        # NORMAL-RISK declaration (pure feature-add; no training-objective domain change).
+        assert "basis_zscore_30" in active_feature_columns, (
+            "iter-v1/034 pre-flight: basis_zscore_30 not in active_feature_columns. "
+            "Ensure --pruned-features is set and V1_FEATURE_COLUMNS_PRUNED has basis col. "
+            "Also regenerate feature parquets: "
+            "uv run crypto-trade features --track v1 --groups basis_v1 --format parquet"
+        )
+        pos_basis = active_feature_columns.index("basis_zscore_30")
+        print(
+            f"[iter-v1/034] BASIS-Z30 ACTIVE: basis_zscore_30@{pos_basis} "
+            f"/ {len(active_feature_columns)} total features. "
+            f"Feature-family axis (NEW data class: perp-spot basis). "
+            f"ENSEMBLE_SIZE={ensemble_size} (inner), seeds=1 (outer), n_trials={n_trials}."
+        )
+        results_a, faxm_a, _strat_a = run_model(
+            "A (BTC/ETH)",
+            ("BTCUSDT", "ETHUSDT"),
+            atr_tp=2.9,
+            atr_sl=1.45,
+            apply_r1=False,
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            **_r5_kwargs,
+        )
+        results_c, faxm_c, _strat_c = run_model(
+            "C (LINK + R1)",
+            ("LINKUSDT",),
+            atr_tp=3.5,
+            atr_sl=1.75,
+            apply_r1=True,
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            **_r5_kwargs,
+        )
+        results_d, faxm_d, _strat_d = run_model(
+            "D (LTC + R1)",
+            ("LTCUSDT",),
+            atr_tp=3.5,
+            atr_sl=1.75,
+            apply_r1=True,
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            **_r5_kwargs,
+        )
+        results_e, faxm_e, _strat_e = run_model(
+            "E (DOT + R1 + R2)",
+            ("DOTUSDT",),
+            atr_tp=3.5,
+            atr_sl=1.75,
+            apply_r1=True,
+            apply_r2=True,
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            **_r5_kwargs,
+        )
+        _all_faxm_logs = faxm_a + faxm_c + faxm_d + faxm_e
+        all_results = results_a + results_c + results_d + results_e
+        _r5_model_results = [results_a, results_c, results_d, results_e]
+        _post_dispatch_fi_strategies = [
+            ("Model_A_pool", _strat_a),
+            ("Model_C_LINK", _strat_c),
+            ("Model_D_LTC", _strat_d),
+            ("Model_E_DOT", _strat_e),
+        ]
+
     elif set(symbols) == set(V1_BASELINE_UNIVERSE) and iteration_label not in (
         "v1-021",
         "v1-023",
@@ -3406,6 +3489,7 @@ def main() -> None:
         "v1-031",
         "v1-032",
         "v1-033",
+        "v1-034",
     ):
         # Generic baseline-universe dispatch.
         # Non-/021/023/024/025/027/030/031/032/033 iterations. Models A/C/D/E with

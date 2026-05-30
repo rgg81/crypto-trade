@@ -168,6 +168,15 @@ from crypto_trade.features.trend import add_trend_features  # noqa: E402
 from crypto_trade.features.volatility import add_volatility_features  # noqa: E402
 from crypto_trade.features.volume import add_volume_features  # noqa: E402
 
+# iter-v1/034: basis (perp-spot) z-score feature family.
+# Mirrors the funding_v1 / open_interest_v1 pattern: add_basis_v1_features lives in
+# features_v1/ (v1 track), called here via the legacy features registry so
+# that `uv run crypto-trade features --track v1 --groups basis_v1` writes
+# basis_zscore_30 to the v1 parquets.
+from crypto_trade.features_v1.basis_v1 import (  # noqa: E402
+    add_basis_v1_features as _add_basis_v1_features,
+)
+
 # iter-v1/023: funding-rate z-score feature family.
 # The wrapper preserves track isolation: add_funding_v1_features lives in
 # features_v1/ (v1 track), called here via the legacy features registry so
@@ -197,6 +206,7 @@ _register("calendar", add_calendar_features)
 _register("entropy_cusum", add_entropy_cusum_features)
 _register("funding_v1", _add_funding_v1_features)  # iter-v1/023
 _register("open_interest_v1", _add_oi_delta_v1_features)  # iter-v1/025
+_register("basis_v1", _add_basis_v1_features)  # iter-v1/034
 
 __all__ = [
     "GROUP_REGISTRY",

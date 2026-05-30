@@ -87,6 +87,7 @@ V1_FEATURE_COLUMNS: tuple[str, ...] = tuple(BASELINE_FEATURE_COLUMNS)
 # Properties: 40/40 pass ADF raw-α=0.05 stationarity; alphabetically sorted.
 # DO NOT MODIFY V1_FEATURE_COLUMNS — this is an ADDITIONAL constant.
 V1_FEATURE_COLUMNS_PRUNED: tuple[str, ...] = (
+    "basis_zscore_30",  # iter-v1/034: NEW — basis (perp-spot) z-score 30-bar
     "cal_dow_norm",
     "cal_hour_norm",
     "funding_rate_zscore_30",  # iter-v1/023: NEW — funding-rate z-score 30-bar (10-day)
@@ -132,11 +133,12 @@ V1_FEATURE_COLUMNS_PRUNED: tuple[str, ...] = (
     "vol_volume_rel_20",
 )
 
-# Sanity guard: confirm the pruned set has exactly 43 features.
+# Sanity guard: confirm the pruned set has exactly 44 features.
 # iter-v1/023: extended 40 → 42 by adding funding_rate_zscore_30 + funding_rate_zscore_90.
 # iter-v1/025: extended 42 → 43 by adding oi_delta_30_z90 (open-interest delta z-score).
-assert len(V1_FEATURE_COLUMNS_PRUNED) == 43, (
-    f"V1_FEATURE_COLUMNS_PRUNED must have exactly 43 features; got {len(V1_FEATURE_COLUMNS_PRUNED)}"
+# iter-v1/034: extended 43 → 44 by adding basis_zscore_30 (perp-spot basis z-score).
+assert len(V1_FEATURE_COLUMNS_PRUNED) == 44, (
+    f"V1_FEATURE_COLUMNS_PRUNED must have exactly 44 features; got {len(V1_FEATURE_COLUMNS_PRUNED)}"
 )
 
 # Out-of-distribution detection feature subset (16 scale-invariant features
