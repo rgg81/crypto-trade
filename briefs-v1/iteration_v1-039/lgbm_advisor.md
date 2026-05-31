@@ -95,3 +95,66 @@ Relevant files referenced:
 - `/home/roberto/crypto-trade/.worktrees/quant-research/briefs-v1/iteration_v1-036/review.md`
 - `/home/roberto/crypto-trade/.worktrees/quant-research/briefs-v1/iteration_v1-039/axis_rejected.md`
 - `/home/roberto/crypto-trade/.worktrees/quant-research/briefs-v1/iteration_v1-039/lgbm_advisor.md` (prior — DD-brake axis; this advisory supersedes for retargeted axis)
+
+
+---
+
+# LightGBM Master Advisor — iter-v1/039 — Phase 7.4 (Post-Mortem)
+
+## Context Read
+- Iteration outcome (`comparison.csv`): IS Sharpe **-0.1530**, OOS Sharpe **+1.0393**, OOS PSR_vs_1 0.481, DSR -11.47, MaxDD 27.52%.
+- Anchor reframe: vs **/036 substrate** (the load-bearing anchor per Phase 4.5): IS Δ **-0.24**, OOS Δ **-0.71** (NEG-CAT band, threshold < -0.45 per Section 11.6).
+- Engineering claim: F1 fires NEG-CAT vs /036; F2 wiring confirmed; bundle ratio IS/OOS = -6.79 (severe IS/OOS inversion).
+- Phase 4.5 priors: PROMISING-DOT-ONLY 22% (modal), NEG-COLLISION 22%, NEG-CATASTROPHIC 5%. **Observed = NEG-CATASTROPHIC. Prior was miscalibrated (5% materialized).**
+
+## F-AXIS Falsifier Table
+
+| # | Falsifier | Threshold | Observed | Verdict |
+|---|---|---|---|---|
+| F1 | OOS Sharpe Δ vs /036 | NEG-CAT < -0.45 | **-0.71** | **FIRES NEG-CAT** |
+| F2 | Wiring banner + asserts | banner + 2 flags + 44 features | `PER-COHORT-SORTINO-HYBRID ACTIVE` line 4 of log; label_mode=trend_scanning, optuna_objective=sortino, models=C_LINK+E_DOT, features=44, n_trials=18 | **PASS** |
+| F3 | Per-symbol OOS PnL routing | DOT≥70 / 40-60 balanced / LINK≥70 / NEG-bundle | **LINK 60.66% / DOT 39.34%** — balanced range, but **both absolute Δ vs /036 NEGATIVE** (LINK -40.45pp, DOT -69.23pp) | **NEG-bundle → COLLISION** |
+| F4 | Bundle OOS Δ vs /036 | PROMISING [+0.10, +0.30] / INERT [-0.15, +0.10] / NEG < -0.15 | **-0.71** | **NEG-COLLISION + dissolution band** |
+| F5 | Wall-clock cap 60 min | from log ISO timestamps 06:10:39 → 06:29:17 | **~18m 38s** | **PASS** |
+| F6 | OOS trade-roster Jaccard vs /036 | <0.30 basin-migration; 0.50-0.85 clean compounding | **0.306 portfolio** (LINK 0.243 / DOT 0.370) | **BASIN-MIGRATION-NEG** (below 0.30 band; not silent no-op) |
+| F7 | Basin diagnostics (cross-seed) | J ≥ 0.40 | **J=0.088 V3 FAIL; GLOBAL=FAIL** | **FAIL** (confirms single-seed lottery, not reproducible architecture) |
+
+## Per-Symbol Routing Classification
+
+Phase 4.5 Section 11.6 routing matrix on OOS PnL share alone says **40-60 balanced → mechanisms ORTHOGONAL**. That reading is **structurally misleading here** — the balanced *share* is computed over a roster whose absolute PnL collapsed (both symbols hurt vs /036). Correct reading per F3 evidence: **NEG-bundle COLLISION** (both per-symbol Δ vs /036 < -20pp). Within the collision, DOT was hurt ~70% more than LINK in absolute PnL — the opposite of /037's DOT-Sortino-affinity. The mechanism observed at /037 (DOT-Sortino dominance) does NOT replicate when label substrate changes to trend-scanning.
+
+## Mechanism Resolution: UNIVERSE-INDEPENDENT-NEGATIVE
+
+Per /037 open question: does Sortino survive on /036's LINK+DOT trend-scan substrate?  **Answer: NO. Sortino is *substrate-DEPENDENT and substrate-DESTRUCTIVE* on the 2-cohort trend-scan stack.** LINK lost 40pp absolute OOS PnL; DOT lost 69pp. /037's pattern (DOT carries via Sortino, LINK hurt) is **not** the constant — Sortino on trend-scanning destroys both. The /037 DOT-skew was a 5-cohort × triple-barrier confound, NOT an intrinsic Sortino-DOT affinity. **Sortino × trend-scanning labels combine to over-narrow the loss-surface basin** (Optuna trial-value range -10.0 to +9.75 with std 1.60 across 5346 trials — wide value range but stdev modest; the binding constraint is single-seed basin lottery on a sparser label set, confirmed by V3 cross-seed J=0.088).
+
+## Hyperparameter / Search Stability Observations
+
+- **5346 total Optuna trials** logged (≈297 cells × 18); trial-value distribution skewed negative (mean -0.51, 54% trials < 0). Sortino loss surface has more "no-edge" basins than Sharpe's — consistent with prediction Section 4.5 ¶3 (sparser labels under trend-scanning compound with Sortino's downside-clip-degenerate-when-no-downside).
+- IS Sharpe -0.15 with OOS Sharpe +1.04 is the inverse pattern of a well-trained model (IS should be ≥ OOS in a non-leaky setup). This signals **the held-out OOS window happened to favor whatever direction Sortino arbitrarily picked** — not a learned edge. Confirmed by V3 J=0.088 basin diagnostic.
+- Top-3 feature importance virtually identical across LINK + DOT models (`vol_atr_14`, `trend_aroon_osc_50`, `oi_delta_30_z90`/`stat_skew_20`). Features are not the failure point; **the objective function is**.
+
+## /044 Routing Implication — LOAD-BEARING
+
+Per Section 11.6 + Phase 4.5 ¶7: **NEG-CAT → /044 = /036 ALONE; axis-family hybrid CLOSED.** Confirmed without revision.
+
+- **Sortino axis CLOSED at v1**: tried on baseline 5-cohort (/037 → DOT-skew divergence) and on /036 2-cohort trend-scan (/039 → bilateral collision). Both rosters basin-migrated (J=0.088 cross-seed at /039; J=0.102 at /037). Two substrate-distinct failures = axis exhausted.
+- **/044 CONFIRMATION substrate = /036 ALONE** (LINK+DOT trend-scan specialist, Sharpe objective, ENSEMBLE_SIZE=10, --seeds 10, n_trials=35). Do NOT bundle Sortino as a strictly-accretive sister.
+- The /036 OOS +1.7465 single-seed remains the multi-seed validation target. If /044 multi-seed mean OOS < +1.0, the /036 lift was a single-seed lottery and cycle-5 closes without a merge.
+
+## Confirmation / Refutation of Phase 4.5 Advisory
+
+Phase 4.5 prior table assigned 5% to NEG-CATASTROPHIC (< -0.40 vs /036). Observed -0.71. **The 5% was an underestimate.** I anchored the modal outcome on /037 evidence (DOT-Sortino affinity) without weighting the structural risk that /036's lift was *itself* a single-seed basin artifact — when you change the loss surface, you re-roll the basin, and the new draw collapsed. **Lesson for future advisories**: when the substrate is single-seed unreplicated (as /036 was), the prior for ANY axis-stacking on that substrate to underperform must shift ≥30% NEG mass, not ≤27%. Updating prior calibration for /044+ post-mortems.
+
+F2 wiring prediction PASS. F3 routing matrix was structurally inadequate (predicted via PnL share alone; share matrix doesn't distinguish "balanced positive" from "balanced collapsed" — needs absolute-Δ overlay). Recommending Section 11.6 be amended in future briefs.
+
+## Closing Note for Critic (Phase 7.5)
+
+Critic Check 6 (PSR/DSR) should note: OOS PSR_vs_1 = 0.481 < 0.95 floor; DSR_corrected = -11.47 catastrophic. **The +1.04 OOS Sharpe is not statistically distinguishable from noise** given the IS-OOS inversion (IS -0.15). The basin_diagnostics V3 FAIL (J=0.088) is the most damning artifact — single-seed reproducibility for this configuration is essentially absent. Critic should flag this iteration as **closeout-only, do not re-explore**, and rule the **Sortino axis CLOSED for v1** (two substrate-distinct failures /037 + /039 satisfy the dead-axis threshold).
+
+Relevant files:
+- `/home/roberto/crypto-trade/.worktrees/quant-research/reports-v1/iteration_v1-039/comparison.csv`
+- `/home/roberto/crypto-trade/.worktrees/quant-research/reports-v1/iteration_v1-039/out_of_sample/per_symbol.csv`
+- `/home/roberto/crypto-trade/.worktrees/quant-research/reports-v1/iteration_v1-039/basin_diagnostics/basin_diagnostics.json`
+- `/home/roberto/crypto-trade/.worktrees/quant-research/reports-v1/iteration_v1-036/out_of_sample/per_symbol.csv`
+- `/home/roberto/crypto-trade/.worktrees/quant-research/logs/v1_iter039.log`
+- `/home/roberto/crypto-trade/.worktrees/quant-research/briefs-v1/iteration_v1-039/lgbm_advisor.md` (Phase 4.5 advisory — this section appends Phase 7.4)
