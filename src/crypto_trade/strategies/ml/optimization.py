@@ -253,6 +253,7 @@ def _objective(
     symbols_arr: np.ndarray | None = None,
     oof_buffer: list[dict] | None = None,
     bounds_profile: str = "default",
+    min_child_samples_lower_bound: int | None = None,
 ) -> float:
     from sklearn.model_selection import TimeSeriesSplit
 
@@ -295,7 +296,16 @@ def _objective(
         "colsample_bytree": 1.0
         if (fast_mode or _pin_subsampling)
         else trial.suggest_float("colsample_bytree", 0.5 if _pruned else 0.3, 1.0),
-        "min_child_samples": trial.suggest_int("min_child_samples", 20 if _pruned else 5, 100),
+        "min_child_samples": trial.suggest_int(
+            "min_child_samples",
+            # iter-v1/041: min_child_samples_lower_bound threads a per-iteration
+            # Optuna lower bound override.  When set, overrides the v1_pruned default
+            # of 20.  None = BIT-IDENTICAL to prior behaviour (20 for pruned, 5 otherwise).
+            min_child_samples_lower_bound
+            if min_child_samples_lower_bound is not None
+            else (20 if _pruned else 5),
+            100,
+        ),
         "reg_alpha": trial.suggest_float("reg_alpha", 1e-8, 10.0, log=True),
         "reg_lambda": trial.suggest_float("reg_lambda", 1e-8, 10.0, log=True),
         "random_state": seed,
@@ -449,6 +459,7 @@ def optimize_and_train(
     model_role: str = "",
     symbol: str = "",
     optuna_objective: str = "sharpe",
+    min_child_samples_lower_bound: int | None = None,
 ) -> tuple[lgb.LGBMClassifier, list[str], float]:
     """Run Optuna optimization and return (model, columns, confidence_threshold).
 
@@ -490,6 +501,10 @@ def optimize_and_train(
     model_role: caller-provided model identifier (e.g. "Model_A_pool",
         "Model_H_BTC"). Embedded in each params_persist_path row.
     symbol: caller-provided symbol (e.g. "BTCUSDT"). Embedded in each row.
+    min_child_samples_lower_bound: iter-v1/041 — when set, overrides the
+        per-profile default Optuna lower bound for min_child_samples.
+        None = BIT-IDENTICAL to prior behaviour (20 for v1_pruned, 5 for default).
+        Use 50 for iter-v1/041 triple-barrier tighten (denser-label noise mitigation).
     """
     import optuna
 
@@ -533,6 +548,7 @@ def optimize_and_train(
             symbols_arr=symbols_arr,
             oof_buffer=oof_buffer,
             bounds_profile=bounds_profile,
+            min_child_samples_lower_bound=min_child_samples_lower_bound,
         ),
         n_trials=n_trials,
     )

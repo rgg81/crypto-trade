@@ -190,6 +190,7 @@ class LightGbmStrategy:
         nan_skip_threshold: float = 0.5,
         frozen_hp_parquet: Path | None = None,
         optuna_objective: str = "sharpe",
+        min_child_samples_lower_bound: int | None = None,
     ) -> None:
         if not feature_columns:
             raise ValueError(
@@ -291,6 +292,11 @@ class LightGbmStrategy:
                 f"optuna_objective must be 'sharpe' or 'sortino'; got {optuna_objective!r}"
             )
         self._optuna_objective: str = optuna_objective
+        # iter-v1/041: Optuna min_child_samples lower bound override.
+        # None = BIT-IDENTICAL to prior behaviour (20 for v1_pruned, 5 for default).
+        # Set to 50 for iter-v1/041 triple-barrier tighten (denser-label noise mitigation:
+        # larger leaf populations average out per-leaf noise from shorter-horizon labels).
+        self._min_child_samples_lower_bound: int | None = min_child_samples_lower_bound
         # iter-v3/072: labeling mode — "triple_barrier" (default, backward-compat)
         # or "fixed_horizon" (sign of N-candle-forward return; no barriers).
         # iter-v3/105: "trend_scanning" (OLS trend, max-|t| horizon selection
@@ -1003,6 +1009,7 @@ class LightGbmStrategy:
                         model_role=self._model_role,
                         symbol=self._symbol,
                         optuna_objective=self._optuna_objective,
+                        min_child_samples_lower_bound=self._min_child_samples_lower_bound,
                     )
                 self._models.append(model)
                 self._confidence_thresholds.append(confidence_threshold)

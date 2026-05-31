@@ -420,6 +420,7 @@ def run_model(
     vol_ceiling_enabled: bool = False,
     vol_ceiling_scale: float = 0.5,
     vol_ceiling_thresholds: dict | None = None,
+    min_child_samples_lower_bound: int | None = None,
 ):
     """Run a single v1 sub-model (A/C/D/E) under the corrected walk-forward.
 
@@ -548,6 +549,7 @@ def run_model(
         nan_skip_threshold=nan_skip_threshold,
         frozen_hp_parquet=frozen_hp_parquet,
         optuna_objective=optuna_objective,
+        min_child_samples_lower_bound=min_child_samples_lower_bound,
     )
     t0 = time.time()
     results = run_backtest(config, strategy, yearly_pnl_check=False)
@@ -1892,6 +1894,54 @@ def main() -> None:
             "upside variance (Sortino/Sharpe ratio 3.0-4.0x across v1 cohorts)."
         ),
     )
+    # iter-v1/041: ATR multiplier overrides for triple-barrier tighten axis.
+    # When set, BOTH atr_tp_mult and atr_sl_mult UNIFORMLY override all per-model
+    # defaults (Pool A 2.9/1.45 and C/D/E 3.5/1.75) with a single pair of values.
+    # TP/SL ratio must be preserved at 2.0 (caller's responsibility — no auto-check).
+    # Default None = BIT-IDENTICAL to prior behaviour (per-model baseline defaults).
+    parser.add_argument(
+        "--atr-tp-mult",
+        type=float,
+        default=None,
+        dest="atr_tp_mult",
+        metavar="FLOAT",
+        help=(
+            "iter-v1/041: uniform ATR TP multiplier override for all models. "
+            "When set, replaces per-model baseline defaults (Pool A 2.9, C/D/E 3.5). "
+            "Default None = use per-model baseline values (BIT-IDENTICAL). "
+            "iter-v1/041 uses 1.5 (ratio 2.0 preserved; atr_sl_mult=0.75 paired)."
+        ),
+    )
+    parser.add_argument(
+        "--atr-sl-mult",
+        type=float,
+        default=None,
+        dest="atr_sl_mult",
+        metavar="FLOAT",
+        help=(
+            "iter-v1/041: uniform ATR SL multiplier override for all models. "
+            "When set, replaces per-model baseline defaults (Pool A 1.45, C/D/E 1.75). "
+            "Default None = use per-model baseline values (BIT-IDENTICAL). "
+            "iter-v1/041 uses 0.75 (ratio 2.0 preserved; atr_tp_mult=1.5 paired)."
+        ),
+    )
+    # iter-v1/041: min_child_samples Optuna lower bound override.
+    # When set, replaces the v1_pruned default of 20 with the given value.
+    # Default None = BIT-IDENTICAL to prior behaviour.
+    parser.add_argument(
+        "--min-data-in-leaf-min",
+        type=int,
+        default=None,
+        dest="min_data_in_leaf_min",
+        metavar="INT",
+        help=(
+            "iter-v1/041: Optuna min_child_samples lower bound override. "
+            "When set, replaces v1_pruned default lower bound of 20. "
+            "Default None = BIT-IDENTICAL to prior behaviour. "
+            "iter-v1/041 uses 50 (denser-label noise mitigation: larger leaf "
+            "populations average out per-leaf noise from shorter-horizon labels)."
+        ),
+    )
     # iter-v1/032: frozen HP mode for basin-lottery ablation.
     # When "baseline_v1", Optuna search is skipped and each (model, month, seed) cell
     # uses the per-cell best HP extracted from the baseline run's Optuna log.
@@ -2278,6 +2328,25 @@ def main() -> None:
         print("  [iter-v1/032] Optuna search DISABLED — using baseline per-cell best HP")
     else:
         print(f"  frozen_hp_mode: {frozen_hp_mode_arg} (normal Optuna search)")
+
+    # iter-v1/041: ATR multiplier override resolution.
+    # None = BIT-IDENTICAL to prior behaviour (per-model baseline defaults used in dispatch).
+    atr_tp_mult_arg: float | None = getattr(args, "atr_tp_mult", None)
+    atr_sl_mult_arg: float | None = getattr(args, "atr_sl_mult", None)
+    if atr_tp_mult_arg is not None or atr_sl_mult_arg is not None:
+        print(
+            f"  [iter-v1/041] ATR multiplier override: atr_tp_mult={atr_tp_mult_arg} "
+            f"atr_sl_mult={atr_sl_mult_arg} (uniform across all models)"
+        )
+
+    # iter-v1/041: min_child_samples Optuna lower bound override resolution.
+    # None = BIT-IDENTICAL to prior behaviour (20 for v1_pruned, 5 for default).
+    min_data_in_leaf_min_arg: int | None = getattr(args, "min_data_in_leaf_min", None)
+    if min_data_in_leaf_min_arg is not None:
+        print(
+            f"  [iter-v1/041] min_child_samples lower bound override: "
+            f"{min_data_in_leaf_min_arg} (was 20 for v1_pruned)"
+        )
     print()
 
     # Validate active feature list is non-empty (hard guard per feature-pinning rules).
@@ -4258,6 +4327,126 @@ def main() -> None:
             ("Model_E_DOT", _strat_e),
         ]
 
+    elif iteration_label == "v1-041" and set(symbols) == set(V1_BASELINE_UNIVERSE):
+        # iter-v1/041: cycle-5 EXPLORATION #8/10 — triple-barrier TIGHTEN.
+        # Uniform shrink of ATR multipliers across all 4 cohorts:
+        #   atr_tp_mult 2.9/3.5 → 1.5 (uniform)
+        #   atr_sl_mult 1.45/1.75 → 0.75 (uniform)
+        #   TP/SL ratio 2.0 PRESERVED
+        # Paired defensive mitigation: min_child_samples Optuna lower bound 20 → 50.
+        # AXIS PURPOSE: test whether denser short-horizon triple-barrier labels
+        # (predicted 2.55×–3.00× IS density lift) lift OOS Sharpe via √N count gain,
+        # or whether chop-noise dominance and fee-drag artifact dominate.
+        # All other config IDENTICAL to baseline: features, R1/R2/R3, objective.
+        assert atr_tp_mult_arg == 1.5, (
+            f"iter-v1/041 pre-flight FAIL: expected --atr-tp-mult 1.5 "
+            f"but got {atr_tp_mult_arg!r}. "
+            "iter-v1/041 uniform tighten requires atr_tp_mult=1.5 exactly. "
+            "Run with: --atr-tp-mult 1.5 --atr-sl-mult 0.75"
+        )
+        assert atr_sl_mult_arg == 0.75, (
+            f"iter-v1/041 pre-flight FAIL: expected --atr-sl-mult 0.75 "
+            f"but got {atr_sl_mult_arg!r}. "
+            "iter-v1/041 uniform tighten requires atr_sl_mult=0.75 exactly. "
+            "Run with: --atr-tp-mult 1.5 --atr-sl-mult 0.75"
+        )
+        assert min_data_in_leaf_min_arg == 50, (
+            f"iter-v1/041 pre-flight FAIL: expected --min-data-in-leaf-min 50 "
+            f"but got {min_data_in_leaf_min_arg!r}. "
+            "iter-v1/041 paired mitigation requires min_data_in_leaf_min=50 exactly. "
+            "Run with: --min-data-in-leaf-min 50"
+        )
+        assert label_mode_arg == "triple_barrier", (
+            f"iter-v1/041 pre-flight FAIL: expected --label-mode triple_barrier "
+            f"but got {label_mode_arg!r}. "
+            "iter-v1/041 stays within triple-barrier family (NOT trend-scanning). "
+            "Run with: --label-mode triple_barrier"
+        )
+        assert vol_ceiling_mode_arg == "none", (
+            f"iter-v1/041 pre-flight FAIL: expected --vol-ceiling-mode none "
+            f"but got {vol_ceiling_mode_arg!r}. "
+            "iter-v1/041 does NOT carry over /038 vol-ceiling (CLOSED axis)."
+        )
+        print(
+            "[run_baseline_v1] === iter-v1/041 --- labeling tighten triple-barrier: "
+            "atr_tp_mult=1.5/atr_sl_mult=0.75 (was Pool A 2.9/1.45, C-E 3.5/1.75); "
+            "ratio 2.0 preserved; min_data_in_leaf floor 50; cycle-5 EXP-8 ==="
+        )
+        print(
+            f"[iter-v1/041] TRIPLE-BARRIER TIGHTEN ACTIVE: "
+            f"uniform atr_tp_mult={atr_tp_mult_arg}/atr_sl_mult={atr_sl_mult_arg} "
+            f"(was Pool A 2.9/1.45, C/D/E 3.5/1.75); "
+            f"min_data_in_leaf_lower_bound={min_data_in_leaf_min_arg} (was 20); "
+            f"ENSEMBLE_SIZE={ensemble_size} (inner), seeds=1 (outer=42), "
+            f"n_trials={n_trials}, features={len(active_feature_columns)} cols"
+        )
+        results_a, faxm_a, _strat_a = run_model(
+            "A (BTC/ETH)",
+            ("BTCUSDT", "ETHUSDT"),
+            atr_tp=atr_tp_mult_arg,
+            atr_sl=atr_sl_mult_arg,
+            apply_r1=False,
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            min_child_samples_lower_bound=min_data_in_leaf_min_arg,
+            **_r5_kwargs,
+        )
+        results_c, faxm_c, _strat_c = run_model(
+            "C (LINK + R1)",
+            ("LINKUSDT",),
+            atr_tp=atr_tp_mult_arg,
+            atr_sl=atr_sl_mult_arg,
+            apply_r1=True,
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            min_child_samples_lower_bound=min_data_in_leaf_min_arg,
+            **_r5_kwargs,
+        )
+        results_d, faxm_d, _strat_d = run_model(
+            "D (LTC + R1)",
+            ("LTCUSDT",),
+            atr_tp=atr_tp_mult_arg,
+            atr_sl=atr_sl_mult_arg,
+            apply_r1=True,
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            min_child_samples_lower_bound=min_data_in_leaf_min_arg,
+            **_r5_kwargs,
+        )
+        results_e, faxm_e, _strat_e = run_model(
+            "E (DOT + R1 + R2)",
+            ("DOTUSDT",),
+            atr_tp=atr_tp_mult_arg,
+            atr_sl=atr_sl_mult_arg,
+            apply_r1=True,
+            apply_r2=True,
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            min_child_samples_lower_bound=min_data_in_leaf_min_arg,
+            **_r5_kwargs,
+        )
+        _all_faxm_logs = faxm_a + faxm_c + faxm_d + faxm_e
+        all_results = results_a + results_c + results_d + results_e
+        _r5_model_results = [results_a, results_c, results_d, results_e]
+        _post_dispatch_fi_strategies = [
+            ("Model_A_pool", _strat_a),
+            ("Model_C_LINK", _strat_c),
+            ("Model_D_LTC", _strat_d),
+            ("Model_E_DOT", _strat_e),
+        ]
+
     elif set(symbols) == set(V1_BASELINE_UNIVERSE) and iteration_label not in (
         "v1-021",
         "v1-023",
@@ -4275,9 +4464,10 @@ def main() -> None:
         "v1-038",
         "v1-039",
         "v1-040",
+        "v1-041",
     ):
         # Generic baseline-universe dispatch.
-        # Non-/021/.../039 iterations. Models A/C/D/E
+        # Non-/021/.../040 iterations. Models A/C/D/E
         # with V1_BASELINE_UNIVERSE symbols. BIT-IDENTICAL to historical
         # v186 baseline when active_feature_columns=list(V1_FEATURE_COLUMNS) + n_trials=50.
         results_a, faxm_a, _strat_a = run_model(
