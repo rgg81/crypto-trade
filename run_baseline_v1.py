@@ -91,6 +91,7 @@ from crypto_trade.strategies.ml.reporting_v1 import (
     append_psr_rows_to_comparison,
     append_r5_binary_kill_rows_to_comparison,
     append_r5_rows_to_comparison,
+    append_vol_ceiling_rows_to_comparison,
     compute_n_eff_and_dsr,
     compute_psr_columns,
     write_adf_test_csv,
@@ -415,6 +416,9 @@ def run_model(
     nan_skip_threshold: float = 0.5,
     frozen_hp_parquet: Path | None = None,
     optuna_objective: str = "sharpe",
+    vol_ceiling_enabled: bool = False,
+    vol_ceiling_scale: float = 0.5,
+    vol_ceiling_thresholds: dict | None = None,
 ):
     """Run a single v1 sub-model (A/C/D/E) under the corrected walk-forward.
 
@@ -505,6 +509,9 @@ def run_model(
         risk_r5_vol_target_pct=r5_vol_target_pct,
         risk_r5_kill_low_natr_enabled=r5_kill_low_natr_enabled,
         risk_r5_kill_low_natr_min_pct=r5_kill_low_natr_min_pct,
+        vol_ceiling_enabled=vol_ceiling_enabled,
+        vol_ceiling_scale=vol_ceiling_scale,
+        vol_ceiling_thresholds=vol_ceiling_thresholds or {},
     )
     strategy = LightGbmStrategy(
         training_months=24,
@@ -578,6 +585,9 @@ def run_meta_model(
     label_mode: str = "triple_barrier",
     frozen_hp_parquet: Path | None = None,
     optuna_objective: str = "sharpe",
+    vol_ceiling_enabled: bool = False,
+    vol_ceiling_scale: float = 0.5,
+    vol_ceiling_thresholds: dict | None = None,
 ):
     """Run a single v1 sub-model with M2 meta-labeling (iter-v1/030).
 
@@ -636,6 +646,9 @@ def run_meta_model(
         risk_r5_vol_target_pct=r5_vol_target_pct,
         risk_r5_kill_low_natr_enabled=r5_kill_low_natr_enabled,
         risk_r5_kill_low_natr_min_pct=r5_kill_low_natr_min_pct,
+        vol_ceiling_enabled=vol_ceiling_enabled,
+        vol_ceiling_scale=vol_ceiling_scale,
+        vol_ceiling_thresholds=vol_ceiling_thresholds or {},
     )
     strategy = MetaLabelingStrategy(
         training_months=24,
@@ -1166,6 +1179,10 @@ def _run_methodology_reporting(
     r5_kill_fires_is: int = 0,
     r5_kill_signals_oos: int = 0,
     r5_kill_fires_oos: int = 0,
+    vol_ceiling_signals_is: int = 0,
+    vol_ceiling_fires_is: int = 0,
+    vol_ceiling_signals_oos: int = 0,
+    vol_ceiling_fires_oos: int = 0,
 ) -> None:
     """Run all iter-v1/001 methodology reporting passes AFTER generate_iteration_reports().
 
@@ -1440,6 +1457,16 @@ def _run_methodology_reporting(
             r5_kill_fires_oos / r5_kill_signals_oos if r5_kill_signals_oos > 0 else 0.0
         )
         append_r5_binary_kill_rows_to_comparison(comparison_path, r5_kill_rate_is, r5_kill_rate_oos)
+        # ---------------------------------------------------------------------------
+        # 4d. comparison.csv vol-ceiling fire-rate rows (iter-v1/038 F-AXIS #2 reporting)
+        # ---------------------------------------------------------------------------
+        vol_ceil_rate_is = (
+            vol_ceiling_fires_is / vol_ceiling_signals_is if vol_ceiling_signals_is > 0 else 0.0
+        )
+        vol_ceil_rate_oos = (
+            vol_ceiling_fires_oos / vol_ceiling_signals_oos if vol_ceiling_signals_oos > 0 else 0.0
+        )
+        append_vol_ceiling_rows_to_comparison(comparison_path, vol_ceil_rate_is, vol_ceil_rate_oos)
     else:
         print(
             "[run_baseline_v1] WARNING: comparison.csv not found at "
@@ -1953,6 +1980,55 @@ def main() -> None:
             "<report_dir>/magnitude_decomposition.json."
         ),
     )
+    # -----------------------------------------------------------------------
+    # iter-v1/038: per-symbol rv-based vol-ceiling (risk-primitive axis, cycle-5 EXP-5).
+    #
+    # --vol-ceiling-mode {none, per_symbol}  (default none → BIT-IDENTICAL baseline)
+    #   'none'       = no ceiling gate; byte-identical to all prior runs.
+    #   'per_symbol' = ceiling fires when symbol's rv_30d_ann > IS-derived p75 threshold.
+    #
+    # --vol-ceiling-pct INT  (default 75, range [50, 95])
+    #   Percentile of IS rv_30d_ann distribution used as per-symbol threshold.
+    #   Must be 75 for iter-v1/038 pre-flight assert.
+    #
+    # --vol-ceiling-scale FLOAT  (default 0.5, range [0.1, 1.0])
+    #   Position-sizing multiplier when the ceiling fires (0.5 = half-size entry).
+    #   Must be 0.5 for iter-v1/038 pre-flight assert.
+    # -----------------------------------------------------------------------
+    parser.add_argument(
+        "--vol-ceiling-mode",
+        choices=["none", "per_symbol"],
+        default="none",
+        help=(
+            "Per-symbol rv-based vol-ceiling mode (iter-v1/038). "
+            "'none' (default) = no ceiling gate; BIT-IDENTICAL to all prior runs. "
+            "'per_symbol' = ceiling fires when symbol's rolling 30d annualized "
+            "realized vol (rv_30d_ann) exceeds its IS-derived p75 threshold. "
+            "Position size is scaled by --vol-ceiling-scale when the ceiling fires."
+        ),
+    )
+    parser.add_argument(
+        "--vol-ceiling-pct",
+        type=float,
+        default=75.0,
+        metavar="PCT",
+        help=(
+            "Percentile of IS rv_30d_ann distribution used as per-symbol ceiling "
+            "threshold (iter-v1/038). Range [50, 95]. Default 75 (p75). "
+            "iter-v1/038 pre-flight asserts this is 75."
+        ),
+    )
+    parser.add_argument(
+        "--vol-ceiling-scale",
+        type=float,
+        default=0.5,
+        metavar="SCALE",
+        help=(
+            "Position-sizing multiplier when the vol ceiling fires (iter-v1/038). "
+            "Range [0.1, 1.0]. Default 0.5 (half-size). "
+            "iter-v1/038 pre-flight asserts this is 0.5."
+        ),
+    )
     args = parser.parse_args()
 
     # Resolve symbols
@@ -2178,6 +2254,15 @@ def main() -> None:
     print(f"  label_mode: {label_mode_arg}")
     print(f"  optuna_objective: {optuna_objective_arg}")
 
+    # iter-v1/038: vol-ceiling mode resolution.
+    vol_ceiling_mode_arg = getattr(args, "vol_ceiling_mode", "none")
+    vol_ceiling_pct_arg = float(getattr(args, "vol_ceiling_pct", 75.0))
+    vol_ceiling_scale_arg = float(getattr(args, "vol_ceiling_scale", 0.5))
+    print(f"  vol_ceiling_mode: {vol_ceiling_mode_arg}")
+    if vol_ceiling_mode_arg != "none":
+        print(f"  vol_ceiling_pct: {vol_ceiling_pct_arg}")
+        print(f"  vol_ceiling_scale: {vol_ceiling_scale_arg}")
+
     # iter-v1/032: frozen HP mode resolution.
     frozen_hp_mode_arg = getattr(args, "frozen_hp_mode", "none")
     _frozen_hp_parquet_path: Path | None = None
@@ -2240,7 +2325,50 @@ def main() -> None:
         sigma_halflife_days=sigma_halflife_days_arg,
         frozen_hp_parquet=_frozen_hp_parquet_path,
         optuna_objective=optuna_objective_arg,
+        vol_ceiling_enabled=vol_ceiling_mode_arg == "per_symbol",
+        vol_ceiling_scale=vol_ceiling_scale_arg,
+        vol_ceiling_thresholds=None,  # populated below when per_symbol mode is active
     )
+
+    # iter-v1/038: pre-compute per-symbol vol-ceiling thresholds from IS-only data.
+    # Done ONCE before the dispatch loop so all run_model calls share the same
+    # static thresholds (avoids re-computing per model call).
+    # IS-only: close_time < OOS_CUTOFF_MS (2025-03-24 00:00 UTC) — look-ahead safe.
+    if vol_ceiling_mode_arg == "per_symbol":
+        import pandas as pd  # noqa: PLC0415
+        import pyarrow.parquet as pq  # noqa: PLC0415
+
+        from crypto_trade.risk.vol_ceiling import compute_per_symbol_vol_ceiling  # noqa: PLC0415
+
+        _vc_features_dir = Path("data") / "features"
+        _vc_klines_frames = []
+        for _vc_sym in symbols:
+            _feat_path = _vc_features_dir / f"{_vc_sym}_8h_features.parquet"
+            if _feat_path.exists():
+                _vc_tab = pq.read_table(_feat_path, columns=["open_time", "close_time", "close"])
+                _vc_df = _vc_tab.to_pandas()
+                _vc_df["symbol"] = _vc_sym
+                _vc_klines_frames.append(_vc_df)
+            else:
+                print(f"[VOL-CEIL/038] WARNING: parquet not found for {_vc_sym}: {_feat_path}")
+        _vc_thresholds_computed: dict = {}
+        if _vc_klines_frames:
+            _vc_panel = pd.concat(_vc_klines_frames, ignore_index=True)
+            for _vc_sym in symbols:
+                _thr = compute_per_symbol_vol_ceiling(
+                    _vc_panel,
+                    _vc_sym,
+                    lookback_bars=90,
+                    percentile=vol_ceiling_pct_arg,
+                )
+                _vc_thresholds_computed[_vc_sym] = _thr
+                print(
+                    f"[VOL-CEIL/038] {_vc_sym}: IS rv_p{vol_ceiling_pct_arg:.0f} threshold = "
+                    f"{_thr:.4f} (rv_30d_ann; scale_factor={vol_ceiling_scale_arg:.2f}x above)"
+                )
+        # Update _r5_kwargs with computed thresholds so all run_model dispatches inherit them
+        _r5_kwargs["vol_ceiling_thresholds"] = _vc_thresholds_computed
+
     # iter-v1/016: collect F-AXIS-MECHANISM logs from all model runs.
     _all_faxm_logs: list[dict] = []
     # iter-v1/021+: store strategies for post-dispatch _write_feature_importance call.
@@ -3801,6 +3929,108 @@ def main() -> None:
             ("Model_E_DOT", _strat_e),
         ]
 
+    elif iteration_label == "v1-038" and set(symbols) == set(V1_BASELINE_UNIVERSE):
+        # iter-v1/038: cycle-5 EXPLORATION #5/10 — risk-primitive axis.
+        # Tests whether applying a 0.5x pre-trade size scaling when a symbol's
+        # rolling 30d annualized realized vol (rv_30d_ann) exceeds its IS-derived
+        # p75 threshold reduces tail downside on BTC/LTC (EDA §4 asymmetry positive)
+        # without sacrificing LINK/DOT positive-expectancy mid-vol regime trades
+        # (EDA §3 HOSTILE per-symbol linear prediction for LINK/DOT).
+        # NORMAL-RISK: stateless pre-trade gate; does NOT alter Optuna training objective.
+        # Config: vol_ceiling_mode=per_symbol, pct=75, scale=0.5, lookback_bars=90.
+        assert vol_ceiling_mode_arg == "per_symbol", (
+            f"iter-v1/038 pre-flight FAIL: expected --vol-ceiling-mode per_symbol "
+            f"but got {vol_ceiling_mode_arg!r}. "
+            "Pass --vol-ceiling-mode per_symbol to activate the per-symbol rv-ceiling axis. "
+            "iter-v1/038 tests the vol-ceiling risk-primitive — per_symbol is the required mode."
+        )
+        assert 70.0 <= vol_ceiling_pct_arg <= 80.0, (
+            f"iter-v1/038 pre-flight FAIL: expected --vol-ceiling-pct in [70, 80] "
+            f"but got {vol_ceiling_pct_arg}. "
+            "iter-v1/038 brief specifies pct=75 (p75 IS threshold)."
+        )
+        assert abs(vol_ceiling_scale_arg - 0.5) < 1e-9, (
+            f"iter-v1/038 pre-flight FAIL: expected --vol-ceiling-scale 0.5 "
+            f"but got {vol_ceiling_scale_arg}. "
+            "iter-v1/038 brief specifies scale_factor=0.5 (half-size entry)."
+        )
+        assert set(symbols) == set(V1_BASELINE_UNIVERSE), (
+            f"iter-v1/038 pre-flight FAIL: expected V1_BASELINE_UNIVERSE symbols "
+            f"(BTC+ETH+LINK+LTC+DOT) but got {sorted(symbols)}."
+        )
+        print(
+            f"[iter-v1/038] VOL-CEILING ACTIVE: mode={vol_ceiling_mode_arg!r}, "
+            f"pct={vol_ceiling_pct_arg:.0f}, scale={vol_ceiling_scale_arg:.2f}, "
+            f"symbols={'+'.join(s.replace('USDT', '') for s in sorted(symbols))}, "
+            f"lookback_bars=90 (30d at 8h), "
+            f"ENSEMBLE_SIZE={ensemble_size} (inner), seeds=1 (outer), "
+            f"n_trials={n_trials}, features={len(active_feature_columns)} cols "
+            f"(V1_FEATURE_COLUMNS_PRUNED UNCHANGED). "
+            f"Models: A (BTC+ETH) + C (LINK) + D (LTC) + E (DOT) — baseline 4-model topology."
+        )
+        results_a, faxm_a, _strat_a = run_model(
+            "A (BTC/ETH)",
+            ("BTCUSDT", "ETHUSDT"),
+            atr_tp=2.9,
+            atr_sl=1.45,
+            apply_r1=False,
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            **_r5_kwargs,
+        )
+        results_c, faxm_c, _strat_c = run_model(
+            "C (LINK + R1)",
+            ("LINKUSDT",),
+            atr_tp=3.5,
+            atr_sl=1.75,
+            apply_r1=True,
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            **_r5_kwargs,
+        )
+        results_d, faxm_d, _strat_d = run_model(
+            "D (LTC + R1)",
+            ("LTCUSDT",),
+            atr_tp=3.5,
+            atr_sl=1.75,
+            apply_r1=True,
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            **_r5_kwargs,
+        )
+        results_e, faxm_e, _strat_e = run_model(
+            "E (DOT + R1 + R2)",
+            ("DOTUSDT",),
+            atr_tp=3.5,
+            atr_sl=1.75,
+            apply_r1=True,
+            apply_r2=True,
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            **_r5_kwargs,
+        )
+        _all_faxm_logs = faxm_a + faxm_c + faxm_d + faxm_e
+        all_results = results_a + results_c + results_d + results_e
+        _r5_model_results = [results_a, results_c, results_d, results_e]
+        _post_dispatch_fi_strategies = [
+            ("Model_A_pool", _strat_a),
+            ("Model_C_LINK", _strat_c),
+            ("Model_D_LTC", _strat_d),
+            ("Model_E_DOT", _strat_e),
+        ]
+
     elif set(symbols) == set(V1_BASELINE_UNIVERSE) and iteration_label not in (
         "v1-021",
         "v1-023",
@@ -3815,10 +4045,11 @@ def main() -> None:
         "v1-035",
         "v1-036",
         "v1-037",
+        "v1-038",
     ):
         # Generic baseline-universe dispatch.
-        # Non-/021/023/024/025/027/030/031/032/033/034/035/036/037 iterations. Models A/C/D/E with
-        # V1_BASELINE_UNIVERSE symbols. BIT-IDENTICAL to historical
+        # Non-/021/023/024/025/027/030/031/032/033/034/035/036/037/038 iterations. Models A/C/D/E
+        # with V1_BASELINE_UNIVERSE symbols. BIT-IDENTICAL to historical
         # v186 baseline when active_feature_columns=list(V1_FEATURE_COLUMNS) + n_trials=50.
         results_a, faxm_a, _strat_a = run_model(
             "A (BTC/ETH)",
@@ -4662,6 +4893,15 @@ def main() -> None:
     agg_r5_kill_fires_is = sum(getattr(r, "r5_kill_fires_is", 0) for r in _r5_model_results)
     agg_r5_kill_signals_oos = sum(getattr(r, "r5_kill_signals_oos", 0) for r in _r5_model_results)
     agg_r5_kill_fires_oos = sum(getattr(r, "r5_kill_fires_oos", 0) for r in _r5_model_results)
+    # Aggregate vol-ceiling IS/OOS split counters (iter-v1/038).
+    agg_vol_ceil_signals_is = sum(
+        getattr(r, "vol_ceiling_signals_is", 0) for r in _r5_model_results
+    )
+    agg_vol_ceil_fires_is = sum(getattr(r, "vol_ceiling_fires_is", 0) for r in _r5_model_results)
+    agg_vol_ceil_signals_oos = sum(
+        getattr(r, "vol_ceiling_signals_oos", 0) for r in _r5_model_results
+    )
+    agg_vol_ceil_fires_oos = sum(getattr(r, "vol_ceiling_fires_oos", 0) for r in _r5_model_results)
 
     all_results.sort(key=lambda t: t.close_time)
     print(f"\nCombined: {len(all_results)} trades")
@@ -4764,6 +5004,10 @@ def main() -> None:
             r5_kill_fires_is=agg_r5_kill_fires_is,
             r5_kill_signals_oos=agg_r5_kill_signals_oos,
             r5_kill_fires_oos=agg_r5_kill_fires_oos,
+            vol_ceiling_signals_is=agg_vol_ceil_signals_is,
+            vol_ceiling_fires_is=agg_vol_ceil_fires_is,
+            vol_ceiling_signals_oos=agg_vol_ceil_signals_oos,
+            vol_ceiling_fires_oos=agg_vol_ceil_fires_oos,
         )
     else:
         print(

@@ -209,6 +209,41 @@ def run_backtest(
     r5_kill_fires_is: int = 0
     r5_kill_signals_oos: int = 0
     r5_kill_fires_oos: int = 0
+    # iter-v1/038: per-symbol rv-ceiling fire-rate tracking.
+    # (symbol, open_time_ms) → rv_30d_ann at entry bar (computed from close prices).
+    # Populated at init when vol_ceiling_enabled is True.
+    # IS/OOS split counters (iter-v1/038 vol-ceiling reporting).
+    vol_ceiling_rv_lookup: dict[tuple[str, int], float] = {}
+    vol_ceiling_signals_is: int = 0
+    vol_ceiling_fires_is: int = 0
+    vol_ceiling_signals_oos: int = 0
+    vol_ceiling_fires_oos: int = 0
+    if config.vol_ceiling_enabled:
+        from crypto_trade.risk.vol_ceiling import compute_rv_30d_ann_at_bar  # noqa: PLC0415
+
+        _vc_thresholds: dict[str, float] = (
+            config.vol_ceiling_thresholds if config.vol_ceiling_thresholds else {}
+        )
+        # Build rv_30d_ann lookup for each symbol from the already-built master df.
+        # Uses past-only closes (compute_rv_30d_ann_at_bar already enforces look-ahead
+        # safety by slicing closes[:idx+1]).
+        for _vc_sym in config.symbols:
+            _vc_sym_df = master[master["symbol"] == _vc_sym].sort_values("open_time")
+            _vc_closes = _vc_sym_df["close"].to_numpy(dtype=float)
+            _vc_ots = _vc_sym_df["open_time"].to_numpy(dtype=int)
+            for _vc_idx in range(len(_vc_closes)):
+                _rv = compute_rv_30d_ann_at_bar(_vc_closes, _vc_idx, lookback_bars=90)
+                vol_ceiling_rv_lookup[(_vc_sym, int(_vc_ots[_vc_idx]))] = _rv
+        _vc_total_entries = len(vol_ceiling_rv_lookup)
+        print(
+            f"[VOL-CEIL/038] rv_30d_ann lookup built: {_vc_total_entries} entries "
+            f"across {len(config.symbols)} symbols"
+        )
+        for _vc_sym, _vc_thr in _vc_thresholds.items():
+            print(
+                f"[VOL-CEIL/038] threshold {_vc_sym}: rv_p{75:.0f} = {_vc_thr:.4f} "
+                f"(scale_factor={config.vol_ceiling_scale:.2f}x when rv > threshold)"
+            )
     if config.risk_r5_vol_target_enabled or config.risk_r5_kill_low_natr_enabled:
         import pyarrow.parquet as pq  # noqa: PLC0415
 
@@ -479,6 +514,24 @@ def run_backtest(
                             else:
                                 r5_fires_oos += 1
                         vt_scale = vt_scale * r5_scale
+                # iter-v1/038: per-symbol rv-ceiling (risk-primitive axis).
+                # Evaluated AFTER R5 NATR-ceiling, AFTER R2, in the vt_scale pipeline.
+                # Stateless: apply_vol_ceiling returns scale_factor (0.5) when
+                # rv_30d_ann > per-symbol IS-derived threshold, else 1.0.
+                if config.vol_ceiling_enabled:
+                    _vc_rv = vol_ceiling_rv_lookup.get((sym, ot), float("nan"))
+                    _vc_thr = (config.vol_ceiling_thresholds or {}).get(sym, float("nan"))
+                    if ot < OOS_CUTOFF_MS:
+                        vol_ceiling_signals_is += 1
+                    else:
+                        vol_ceiling_signals_oos += 1
+                    if not math.isnan(_vc_rv) and not math.isnan(_vc_thr):
+                        if _vc_rv > _vc_thr:
+                            if ot < OOS_CUTOFF_MS:
+                                vol_ceiling_fires_is += 1
+                            else:
+                                vol_ceiling_fires_oos += 1
+                            vt_scale = vt_scale * float(config.vol_ceiling_scale)
                 order = create_order(
                     sym,
                     signal,
@@ -578,6 +631,35 @@ def run_backtest(
             f"{_kill_total} signals ({_all_rate:.2f}%)"
         )
 
+    if config.vol_ceiling_enabled:
+        # Three-line IS/OOS split summary (iter-v1/038 vol-ceiling).
+        _vc_total = vol_ceiling_signals_is + vol_ceiling_signals_oos
+        _vc_all_fires = vol_ceiling_fires_is + vol_ceiling_fires_oos
+        _vc_is_rate = (
+            100.0 * vol_ceiling_fires_is / vol_ceiling_signals_is
+            if vol_ceiling_signals_is > 0
+            else 0.0
+        )
+        _vc_oos_rate = (
+            100.0 * vol_ceiling_fires_oos / vol_ceiling_signals_oos
+            if vol_ceiling_signals_oos > 0
+            else 0.0
+        )
+        _vc_all_rate = 100.0 * _vc_all_fires / _vc_total if _vc_total > 0 else 0.0
+        print(
+            f"[VOL-CEIL/038] IS:  fired on {vol_ceiling_fires_is} of "
+            f"{vol_ceiling_signals_is} signals ({_vc_is_rate:.2f}%) "
+            f"[F-AXIS#2: wiring proof]"
+        )
+        print(
+            f"[VOL-CEIL/038] OOS: fired on {vol_ceiling_fires_oos} of "
+            f"{vol_ceiling_signals_oos} signals ({_vc_oos_rate:.2f}%)"
+        )
+        print(
+            f"[VOL-CEIL/038] ALL: fired on {_vc_all_fires} of "
+            f"{_vc_total} signals ({_vc_all_rate:.2f}%) [scale={config.vol_ceiling_scale:.2f}x]"
+        )
+
     if profile_memory:
         _mem_report("after backtest loop")
         tracemalloc.stop()
@@ -593,6 +675,10 @@ def run_backtest(
         r5_kill_fires_is=r5_kill_fires_is,
         r5_kill_signals_oos=r5_kill_signals_oos,
         r5_kill_fires_oos=r5_kill_fires_oos,
+        vol_ceiling_signals_is=vol_ceiling_signals_is,
+        vol_ceiling_fires_is=vol_ceiling_fires_is,
+        vol_ceiling_signals_oos=vol_ceiling_signals_oos,
+        vol_ceiling_fires_oos=vol_ceiling_fires_oos,
     )
 
 

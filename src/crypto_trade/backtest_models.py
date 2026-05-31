@@ -101,6 +101,18 @@ class BacktestConfig:
     # through iter-v1/010.
     risk_r5_kill_low_natr_enabled: bool = False
     risk_r5_kill_low_natr_min_pct: float = 2.0
+    # iter-v1/038: per-symbol rv-based vol-ceiling (risk-primitive axis, cycle-5 EXP-5).
+    # When enabled, multiplies vt_scale by vol_ceiling_scale at entry time when the
+    # symbol's rolling 30d annualized realized vol (rv_30d_ann, past-only) exceeds its
+    # IS-derived per-symbol percentile threshold.  Thresholds are pre-computed ONCE at
+    # run start from IS-only data (close_time < OOS_CUTOFF) and stored in
+    # vol_ceiling_thresholds dict (symbol -> threshold float).
+    # Applied AFTER R5 vol-target (NATR-based), in the vt_scale pipeline.
+    # Default disabled — preserves byte-identical behavior for all iterations through
+    # iter-v1/037.
+    vol_ceiling_enabled: bool = False
+    vol_ceiling_scale: float = 0.5
+    vol_ceiling_thresholds: dict = None  # type: ignore[assignment]  # symbol -> threshold float
 
 
 @dataclass(frozen=True)
@@ -184,6 +196,13 @@ class BacktestResult(list):
                                             fire count for IS half.
     r5_kill_signals_oos, r5_kill_fires_oos : same for OOS half.
     All four default to 0 when R5-BINARY-KILL is disabled.
+
+    iter-v1/038 vol-ceiling IS/OOS split counters
+    ----------------------------------------------
+    vol_ceiling_signals_is, vol_ceiling_fires_is   : signal count and ceiling
+                                                     fire count for IS half.
+    vol_ceiling_signals_oos, vol_ceiling_fires_oos : same for OOS half.
+    All four default to 0 when vol_ceiling_enabled is False.
     """
 
     def __init__(
@@ -199,6 +218,10 @@ class BacktestResult(list):
         r5_kill_fires_is: int = 0,
         r5_kill_signals_oos: int = 0,
         r5_kill_fires_oos: int = 0,
+        vol_ceiling_signals_is: int = 0,
+        vol_ceiling_fires_is: int = 0,
+        vol_ceiling_signals_oos: int = 0,
+        vol_ceiling_fires_oos: int = 0,
     ):
         super().__init__(trades)
         self.total_signals = total_signals
@@ -210,3 +233,7 @@ class BacktestResult(list):
         self.r5_kill_fires_is = r5_kill_fires_is
         self.r5_kill_signals_oos = r5_kill_signals_oos
         self.r5_kill_fires_oos = r5_kill_fires_oos
+        self.vol_ceiling_signals_is = vol_ceiling_signals_is
+        self.vol_ceiling_fires_is = vol_ceiling_fires_is
+        self.vol_ceiling_signals_oos = vol_ceiling_signals_oos
+        self.vol_ceiling_fires_oos = vol_ceiling_fires_oos

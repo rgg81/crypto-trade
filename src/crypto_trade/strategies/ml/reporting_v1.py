@@ -1385,3 +1385,57 @@ def append_r5_binary_kill_rows_to_comparison(
         f"r5_binary_kill_fire_rate_is={r5_kill_fire_rate_is:.4f} "
         f"r5_binary_kill_fire_rate_oos={r5_kill_fire_rate_oos:.4f} appended."
     )
+
+
+def append_vol_ceiling_rows_to_comparison(
+    comparison_csv_path: Path,
+    vol_ceiling_fire_rate_is: float,
+    vol_ceiling_fire_rate_oos: float,
+) -> None:
+    """Append vol_ceiling_fire_rate_is and vol_ceiling_fire_rate_oos rows.
+
+    F-AXIS #2 wiring proof for iter-v1/038 (per-symbol rv-ceiling risk-primitive).
+    Schema: [metric, in_sample, out_of_sample, ratio].
+    Baseline value is 0.0 (ceiling not enabled on baseline).
+    Ratio is OOS/IS; emitted as '—' when IS fire rate is 0.
+
+    Parameters
+    ----------
+    comparison_csv_path
+        Absolute path to the existing comparison.csv.
+    vol_ceiling_fire_rate_is
+        Fraction of IS candidate signals where vol ceiling fired (0.0–1.0).
+    vol_ceiling_fire_rate_oos
+        Fraction of OOS candidate signals where vol ceiling fired (0.0–1.0).
+    """
+
+    def _ratio(oos_v: float, is_v: float) -> str:
+        if is_v == 0:
+            return "—"
+        return f"{oos_v / is_v:.4f}"
+
+    new_rows = [
+        [
+            "vol_ceiling_fire_rate_is",
+            f"{vol_ceiling_fire_rate_is:.6f}",
+            f"{vol_ceiling_fire_rate_oos:.6f}",
+            _ratio(vol_ceiling_fire_rate_oos, vol_ceiling_fire_rate_is),
+        ],
+        [
+            "vol_ceiling_fire_rate_oos",
+            f"{vol_ceiling_fire_rate_is:.6f}",
+            f"{vol_ceiling_fire_rate_oos:.6f}",
+            _ratio(vol_ceiling_fire_rate_oos, vol_ceiling_fire_rate_is),
+        ],
+    ]
+
+    with open(comparison_csv_path, "a", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerows(new_rows)
+
+    print(
+        f"[reporting_v1] comparison.csv updated: "
+        f"vol_ceiling_fire_rate_is={vol_ceiling_fire_rate_is:.4f} "
+        f"vol_ceiling_fire_rate_oos={vol_ceiling_fire_rate_oos:.4f} appended "
+        f"[iter-v1/038 F-AXIS#2 wiring proof]."
+    )
