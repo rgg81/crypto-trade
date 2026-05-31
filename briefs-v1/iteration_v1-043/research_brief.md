@@ -52,6 +52,16 @@
   scales sub-linearly). Conservative band 12-25 min. Report layer ~3 min.
   Modal total ~18 min — well INSIDE skill default 2h cap.
 
+**Walk-forward semantics (NEW-SKILL 2026-05-31)**: IS (pre-2025-03-24) and
+OOS (post-2025-03-24) both undergo the SAME monthly train-predict mechanic
+with embargo at every fold boundary (60+ monthly retrains across the IS
+window alone; one of those refit families is the LINK-only trend-scan
+specialist). OOS is NOT a held-out generalization oracle; it is the
+researcher-honesty window. /043 is a REGIME-SPECIALIST diagnostic
+(LINK-alone is intrinsically a per-cohort/regime specialist), not a
+universal-predictor validation. The OOS Sharpe band [+0.83, +1.53] is one
+realization of /036's OOS regime mix, NOT proof of generalization.
+
 ---
 
 ## Section 0.6 — Axis-Family Rotation (v1-only) — REPEAT-COMBO JUSTIFICATION
@@ -210,39 +220,59 @@ lowers Scenario A prior probability from naive ~35-40% to 20% (EDA §4 §5).
 
 ---
 
-## Section 2 — F-AXIS #1 — F1 OOS Sharpe Δ vs /036 anchor (+1.7465)
+## Section 2 — F-AXIS #1 — Regime-aware 9-band verdict matrix (NEW-SKILL 2026-05-31)
 
-**Anchor**: /036 OOS Sharpe **+1.7465** (substrate baseline; same labels,
-features, risk-gates, seed, n_trials, ENSEMBLE_SIZE as /043). NOT
-BASELINE_V1's +0.6637 — H1b anchor selection is pre-registered per /039
-closeout discipline (Phase 5.5 gate violation if anchor not pre-declared).
+**Anchor**: /036 OOS Sharpe **+1.7465** is the SUBSTRATE-baseline anchor at the
+bundle level; **per-regime sharpe_R(/036 LINK-leg)** is the regime-conditional
+anchor for /043 attribution (read from `briefs-v1/_meta/baseline_seed_regime_matrix.csv`
+when emitted; computed from /036 OOS LINK-only trades.csv decomposed by
+regime tag in the interim). NOT BASELINE_V1's +0.6637 — H1b anchor selection
+is pre-registered per /039 closeout discipline.
 
-| Band | OOS Sharpe Δ vs /036 | OOS absolute | Verdict subtype |
-|---|---|---|---|
-| Δ ≥ 0 | ≥ +1.7465 | PROMISING-LINK-LOAD-BEARING (DOT was diluting) | EXPLORATION-PROMISING-CLEAN |
-| −0.35 ≤ Δ < 0 | +1.40 to +1.75 | PROMISING-MARGINAL — LINK retains most edge | EXPLORATION-PROMISING-INERT-FAV |
-| −0.90 ≤ Δ < −0.35 | +0.85 to +1.40 | **PAIRING-PARTIAL MODAL** — LINK is load-bearing signal, DOT diversifies risk | **EXPLORATION-INERT-PROBE-CONCLUSIVE** |
-| −1.30 ≤ Δ < −0.90 | +0.45 to +0.85 | LINK-DEPENDS-ON-DOT — pairing irreducible | EXPLORATION-NEGATIVE |
-| Δ < −1.30 | < +0.45 | NEG-CAT — single-cohort lottery / Optuna basin collapse | EXPLORATION-NEGATIVE-CATASTROPHIC |
+**Canonical 9-band regime-aware verdict matrix** (replaces the prior bespoke
+5-band; bands now resolve over per-regime Sharpe Δ relative to σ_R, NOT
+bundle OOS Sharpe Δ alone):
 
-**Modal band prior (EDA + intrinsic-anchor integrated)**:
-
-| Outcome | Probability | OOS Sharpe band |
+| Band | Definition (per-regime Sharpe Δ vs /036 LINK-leg) | Bundle-Sharpe correlate (informational) |
 |---|---|---|
-| PROMISING-CLEAN (Δ ≥ 0) | **20%** | ≥ +1.75 |
-| PROMISING-INERT-FAV (Δ ∈ [−0.35, 0)) | 17% | +1.40 to +1.75 |
-| **PAIRING-PARTIAL MODAL (Δ ∈ [−0.90, −0.35))** | **38%** | **+0.85 to +1.40** |
-| LINK-DEPENDS-ON-DOT (Δ ∈ [−1.30, −0.90)) | 17% | +0.45 to +0.85 |
-| NEG-CAT (Δ < −1.30) | 8% | < +0.45 |
+| **UNIVERSAL** | Δ ≥ +σ_R in ≥ 3 regimes AND Δ ≥ −σ_R in ALL regimes | bundle Sharpe ≥ +1.75 |
+| **REGIME-SPECIALIST-IS** *(MODAL)* | Δ ≥ +σ_R in target regime(s) (bull-2025-08, recovery-2025-11) AND Δ ≥ −σ_R in non-target regimes | bundle Sharpe ∈ [+0.85, +1.75] |
+| **REGIME-SPECIALIST-OOS** | Same as IS-specialist but holds in OOS regime tags | bundle Sharpe ∈ [+0.85, +1.75] OOS |
+| **TAIL-CONTROL** | max_dd_R ≤ max_dd_R(baseline) − σ_dd_R in vol-spike regime AND sharpe_R ≥ −σ_R elsewhere | bundle DD improvement >5pp |
+| **EXPLORATION-PROMISING** | Δ ∈ (0, +σ_R) in any regime AND no regime regresses > σ_R | bundle Sharpe Δ ∈ (−0.35, 0) |
+| **TRUE-NEG** | Δ < −σ_R in target regime(s) AND Δ < 0 in ≥ half of non-target | bundle Sharpe Δ ∈ [−1.30, −0.35) |
+| **NEGATIVE-no-effect** | \|Δ\| ≤ 0.1·σ_R in all regimes (mechanism did not fire) | bundle Sharpe Δ ≈ 0 with Jaccard > 95% |
+| **LEARNED-NEG** | Δ < −σ_R in target regime AND mechanism degraded by axis (e.g., cohort removal kills load-bearing signal) | bundle Sharpe Δ < −0.90 |
+| **WALK-FORWARD-LEAKAGE** | IS Sharpe ≫ OOS Sharpe with abnormal regime asymmetry; embargo violation suspicion | flagged by Critic Check 1 |
 
-**Modal**: PAIRING-PARTIAL [Δ ∈ −0.90, −0.35)] at 38% weight. Combined
-PROMISING mass 37% (PROMISING + PROMISING-INERT-FAV); PAIRING-PARTIAL +
-LINK-DEPENDS combined NEG-vs-/036 mass 55%; NEG-CAT tail 8%.
+**Modal verdict (38% MODAL)**: **REGIME-SPECIALIST-IS** — LINK-alone
+preserves /036 LINK-leg Sharpe in bull-2025-08 (+54%) and recovery-2025-11
+(+39.7%) target regimes within σ_R, while non-target chop regimes (2025-Q2,
+2026-03) drag as expected by mechanism. This is the CONCLUSIVE diagnostic
+outcome (NOT a failure): it confirms LINK is a load-bearing regime-specialist
+contributor to /036 and routes /044 toward a regime-aware bundle composition.
 
-**Predicted modal F1 outcome**: OOS bundle Sharpe **~+1.23** (intrinsic
-anchor; Δ −0.52 vs /036, inside PAIRING-PARTIAL band).
+**Per-regime band probabilities (EDA + intrinsic-anchor integrated)**:
 
-**F1 modal band**: **[+0.83, +1.53]** (intrinsic ±0.30 Optuna drift envelope).
+| Verdict band | Probability | Bundle OOS Sharpe correlate |
+|---|---|---|
+| UNIVERSAL | 5% | ≥ +1.75 with all regimes positive Δ |
+| **REGIME-SPECIALIST-IS** *(MODAL)* | **38%** | **+0.85 to +1.75** target-regime preserved |
+| REGIME-SPECIALIST-OOS | 12% | OOS specifically preserves bull/recovery |
+| TAIL-CONTROL | 5% | DD reduction in vol-spike regime |
+| EXPLORATION-PROMISING | 15% | mid-band, no regime regresses > σ_R |
+| TRUE-NEG | 12% | target regime fails |
+| NEGATIVE-no-effect | 5% | Jaccard > 95% silent-no-op |
+| LEARNED-NEG | 5% | cohort-removal damages mechanism |
+| WALK-FORWARD-LEAKAGE | 3% | flagged by Critic |
+
+**Predicted modal F1 outcome**: bundle OOS Sharpe **~+1.23** (intrinsic
+anchor), classified as **REGIME-SPECIALIST-IS** — bull/recovery target
+regimes preserved within σ_R of /036 LINK-leg, chop regimes drag as
+mechanism-expected.
+
+**F1 bundle-Sharpe modal band**: **[+0.83, +1.53]** (intrinsic ±0.30 Optuna
+drift envelope) — informational only; verdict resolves on per-regime Δ.
 
 ---
 
@@ -271,6 +301,14 @@ anchor; Δ −0.52 vs /036, inside PAIRING-PARTIAL band).
   NORMAL-RISK + single-seed is the default cycle-5 EXPLORATION footing.
 - **HIGH-RISK SINGLE-SEED counter**: NORMAL-RISK declaration resets the
   HIGH-RISK counter for this iteration.
+- **NEW-SKILL note (2026-05-31)**: under the relative-regime-Pareto merge
+  framework, an EXPLORATION-level OOS Sharpe Δ in a "negative" band (e.g.,
+  the modal Δ ≈ −0.52 vs /036 portfolio) does NOT auto-block the iteration.
+  Verdict resolves on per-regime Δ vs σ_R (Section 2 9-band matrix), and
+  /043's expected outcome is REGIME-SPECIALIST-IS — a CONCLUSIVE diagnostic
+  result, not a failure. The single-seed budget is appropriate for this
+  EXPLORATION-level diagnostic; multi-seed validation is deferred to /044
+  CONFIRMATION per the substrate-routing tree in Section 8.
 
 ---
 
@@ -423,6 +461,17 @@ Total: 2 files, ~260 lines net.
    banner; verify trades.csv contains ONLY LINKUSDT rows; verify
    `iteration_label="v1-043"` lines in log present.
 8. Read `reports-v1/iteration_v1-043/comparison.csv` for F1 verdict.
+9. **QE Phase 6 deliverable (NEW-SKILL 2026-05-31)**: emit
+   `reports-v1/iteration_v1-043/regime_attribution.csv` per schema
+   `regime_tag, in_sample, candidate_sharpe, candidate_max_dd,
+   candidate_trade_count, baseline_sharpe, baseline_max_dd,
+   baseline_trade_count` for /043 vs /036 LINK-leg subset (the substrate
+   anchor) AND vs BASELINE_V1 LINK rows. Regime tagger reads
+   `briefs-v1/_meta/regime_tagger.py` (or its analog) and assigns each
+   trade close_time to one of {bull, chop, recovery, vol-spike} (fallback
+   to ad-hoc per-month tagging using EDA §3 monthly LINK PnL bands if
+   the canonical tagger has not yet been emitted at /043's run time;
+   tagging methodology documented in Phase 8 diary).
 
 ---
 
@@ -652,7 +701,63 @@ true-LINK-insufficiency.
 
 ---
 
-## Section 10 — Anti-Cheating Self-Check
+## Section 10 — Regime Attribution Plan (NEW-SKILL 2026-05-31, MANDATORY)
+
+- **Target regime(s)**: /043 LINK-only trend-scan specialist is hypothesized
+  to be load-bearing in **{bull-2025-Q3 (LINK +54.02% in 2025-08),
+  recovery-2025-Q4 (LINK +39.67% in 2025-11), bull-2025-10 (LINK +24.51%)}**.
+  Secondary target: positive-momentum tail months (2026-04 +15.67%, 2026-05
+  +10.86%).
+- **Off-regime expectation (drag, mechanism-predicted)**: chop and downtrend
+  alt regimes — 2025-04 (−23.54%), 2025-05 (−16.07%), 2025-07 (−11.75%),
+  2026-03 (−7.48%) — produce negative LINK PnL by mechanism; DOT
+  risk-diversification absent at the portfolio σ level (this is the design
+  trade-off, not a defect).
+- **Mechanism**: trend-scanning labels (Wald-t on slope, grid 5/8/13/21)
+  detect persistent directional moves; LINK has stronger trend persistence
+  in alt-rotation / bull-altcoin regimes than during BTC-dominance phases.
+  LINK alone exposes the unbuffered monthly-return distribution
+  (σ_monthly = 20.41% from EDA §3), so portfolio σ rises in chop while
+  monthly mean stays at LINK's ~7.26%.
+- **Bundle role**: **REGIME-SPECIALIST-IS candidate** for alt-trending
+  regimes (bull, recovery). Pairs naturally with BASELINE_V1 (which covers
+  BTC-led / pool-A regimes) and with /037 Sortino 5-cohort (which targets
+  chop-regime downside control) in a /044 portfolio composition. Under the
+  regime-ensemble framework, /044-A's substrate decision is no longer
+  binary "LINK-only OR LINK+DOT" — each component (LINK-trend-scan,
+  DOT-as-diversifier, Sortino-5coh chop-handler) can carry a distinct
+  bundle role if regime attribution shows non-overlapping regime coverage.
+- **Composition simulation**: if /043 lands REGIME-SPECIALIST-IS, simulate
+  /044 candidate bundle = {/043 LINK-trend-scan specialist}
+  + {/036 LINK+DOT as DIVERSIFIER variant (DOT carries the chop-regime risk
+  damping that LINK-alone lacks)} + {/037 Sortino 5-cohort chop-regime
+  contributor}. Per-regime sharpe_R contributions decomposed and stacked
+  via IS-only walk-forward overlay.
+- **Regime-aware falsifier (PRIMARY, supersedes the bundle-OOS-Sharpe-Δ
+  prior)**: if **per-regime Sharpe Δ vs /036 LINK-leg subset in the target
+  regimes (bull-2025-08, recovery-2025-11) is < −σ_R** (where σ_R is the
+  per-regime Sharpe σ from /036 multi-month bootstrap; ad-hoc ±0.30 used if
+  formal σ_R unavailable at /043 run-time) → hypothesis REFUTED (LEARNED-NEG
+  band, mechanism degraded by cohort removal). Within ±σ_R → mechanism
+  preserved (REGIME-SPECIALIST-IS band). Outside +σ_R → UNIVERSAL or
+  REGIME-SPECIALIST-IS-strong.
+- **Per-regime baseline-comparison criteria (for /044 routing input, NOT
+  /043 MERGE — /043 is EXPLORATION)**:
+
+  ```
+  /043 candidate component is ADOPTED into /044-A bundle iff:
+    FOR target regimes R ∈ {bull-2025-08, recovery-2025-11, bull-2025-10}:
+      sharpe_R(/043) ≥ sharpe_R(/036 LINK-leg) − σ_R
+    AND FOR off-target regimes R ∈ {chop-2025-Q2, downtrend-2026-03}:
+      max_dd_R(/043) ≤ max_dd_R(/036 LINK-leg) + σ_dd_R
+    AND EXISTS R* ∈ target regimes:
+      sharpe_R*(/043) > sharpe_R*(/036 LINK-leg) − σ_R*
+  DSR / PBO / PSR are INFORMATIONAL per-regime; not auto-block.
+  ```
+
+---
+
+## Section 10.5 — Anti-Cheating Self-Check
 
 - [x] EDA reads IS-only (`reports-v1/iteration_v1-036/in_sample/trades.csv`
       for LINK-leg reconstruction reference; the /036 OOS trades.csv consumed
@@ -677,13 +782,13 @@ true-LINK-insufficiency.
 
 ## Section 11 — LM Master Response Map (Phase 4.5)
 
-**Status**: LM Master Phase 4.5 advisor (`briefs-v1/iteration_v1-043/lgbm_advisor.md`)
-has NOT been emitted at the time of brief authoring (file not present in
-`briefs-v1/iteration_v1-043/`). Per v1 LM Master discipline, when the
-advisor is delayed/absent, the QR brief must EXPLICITLY note the absence
-and proceed using EDA + prior LM Master directional guidance from adjacent
-iterations (here: /036 LM Master, /039 LM Master, /042 LM Master) as the
-substitute prior.
+**Status**: LM Master Phase 4.5 advisor file
+`briefs-v1/iteration_v1-043/lgbm_advisor.md` **DOES exist** (audit
+correction 2026-05-31; the earlier "absent" note was incorrect). The
+per-recommendation response map below addresses the actual advisor
+deliverable; the adjacent-iteration substitute-prior synthesis is
+retained as INFORMATIONAL secondary because the brief structure was
+originally authored before the file was located.
 
 **Substitute prior synthesis (from adjacent LM Master files)**:
 
@@ -734,25 +839,55 @@ true insufficiency.
 
 ---
 
-## Section 11.6 — Locked Numerical MERGE/NO-MERGE Thresholds (/044 routing)
+## Section 11.6 — Pre-Registered Per-Regime Baseline-Comparison Criteria (NEW-SKILL 2026-05-31)
 
-EXPLORATION at single-seed = NO direct MERGE. MERGE eligibility requires
-/044 multi-seed CONFIRMATION. Pre-registered numerical thresholds for
-/043 routing to /044 substrate selection:
+/043 is **EXPLORATION** — no direct MERGE. Evaluation is **regime-attribution
+clarity** (Critic Check 3c at Phase 7.5), NOT bundle-level Pareto (Critic
+Check 3d, which applies at /044 CONFIRMATION). Pre-registered per-regime
+criteria for /044 routing decisions:
 
-| /043 outcome (OOS Sharpe absolute) | OOS Sharpe Δ vs /036 (+1.7465) | /044-A spec |
-|---|---|---|
-| **≥ +1.75** | **Δ ≥ 0** PROMISING-LINK-LOAD-BEARING | /044-A = LINK-ONLY multi-seed (`--symbols LINKUSDT --label-mode trend_scanning --pruned-features --seeds 2 --n-trials 35 --ensemble-size 5`); DOT DROPPED; concentration cap exception with explicit Phase 7 justification |
-| **+1.40 to +1.75** | **Δ ∈ [−0.35, 0)** PROMISING-INERT-FAV | /044-A = LINK+DOT pairing multi-seed (same spec, `--symbols LINKUSDT,DOTUSDT`); LINK is the load-bearing leg; DOT diversification benefit < 0.35 measured at /043 |
-| **+0.85 to +1.40** | **Δ ∈ [−0.90, −0.35) MODAL** PAIRING-PARTIAL | /044-A = LINK+DOT pairing multi-seed (same spec); diary documents LINK contributes most of OOS edge, DOT provides 0.35-0.90 Sharpe via portfolio-σ diversification |
-| **+0.45 to +0.85** | **Δ ∈ [−1.30, −0.90)** LINK-DEPENDS-ON-DOT | /044-A = LINK+DOT pairing multi-seed with PAIRING-MANDATORY constraint; pairing is irreducible primitive |
-| **< +0.45** | **Δ < −1.30** NEG-CAT (8% tail) | /044-A = LINK+DOT pairing multi-seed forced; /045 EXPLORATION = LINK-only multi-seed=2 disambiguation |
+**/044 CONFIRMATION evaluation will be per-regime Pareto vs the current
+BASELINE_V1 anchor (read from `briefs-v1/_meta/baseline_seed_regime_matrix.csv`
+when emitted; ad-hoc per-regime decomposition of BASELINE_V1 OOS trades.csv
+in the interim):**
 
-**ABSOLUTE MERGE GATES** (apply at /044 CONFIRMATION ONLY, not /043):
-IS Sharpe > 1.0 AND OOS Sharpe > 1.0 AND OOS/IS ratio ≥ 0.5 AND OOS
-trades ≥ 130 AND DSR > 0.95 AND PBO < 0.40 AND PSR > 0.95 AND top-symbol
-concentration ≤ 30% of OOS PnL. /043 EXPLORATION does NOT evaluate against
-these.
+```
+/044-A MERGE iff:
+  FOR EVERY tagged regime R present in IS or OOS:
+    sharpe_R(candidate) ≥ sharpe_R(baseline) − σ_R
+    AND max_dd_R(candidate) ≤ max_dd_R(baseline) + σ_dd_R
+    AND trade_count_R(candidate) ≥ 0.5 × trade_count_R(baseline)
+  AND EXISTS R*:
+    sharpe_R*(candidate) > sharpe_R*(baseline) + σ_R*
+       OR max_dd_R*(candidate) < max_dd_R*(baseline) − σ_dd_R*
+  AND methodology integrity intact (Critic Checks 1, 2, 5, 7, 8, ADF)
+
+DSR / PBO / PSR are INFORMATIONAL (reported per-regime); NOT auto-block gates.
+NO absolute Sharpe / OOS-trade / concentration floors at /044 evaluation.
+```
+
+**/044 substrate-routing decision tree (binding on /044-A, informed by
+/043's 9-band verdict from Section 2)**:
+
+| /043 verdict band | /044-A substrate spec |
+|---|---|
+| **UNIVERSAL** (Δ ≥ +σ_R in ≥3 regimes) | LINK-ONLY multi-seed (`--symbols LINKUSDT --label-mode trend_scanning --pruned-features --seeds 2 --n-trials 35 --ensemble-size 5`); DOT dropped; concentration noted with regime-coverage justification |
+| **REGIME-SPECIALIST-IS** *(MODAL)* | LINK+DOT pairing multi-seed (same spec, `--symbols LINKUSDT,DOTUSDT`); LINK is the bull/recovery regime leg, DOT is the chop-regime risk diversifier; per-regime decomposition documented |
+| **REGIME-SPECIALIST-OOS** | Same as IS-specialist; flag OOS-specific specialization in diary |
+| **TAIL-CONTROL** | LINK-only multi-seed with explicit tail-regime focus; bundle composition flagged for /045 EXPLORATION |
+| **EXPLORATION-PROMISING** | LINK+DOT pairing multi-seed (default substrate retained); flag for /045 amplification |
+| **TRUE-NEG / LEARNED-NEG** | LINK+DOT pairing multi-seed with PAIRING-MANDATORY constraint; pairing is irreducible |
+| **NEGATIVE-no-effect** | BLOCK-PENDING-FIX (silent-no-op suspected; F-AXIS #2/#5 must clear before /044) |
+| **WALK-FORWARD-LEAKAGE** | BLOCK-FINAL; do not proceed to /044 |
+
+**Note on demoted absolute thresholds (PRE-2026-05-31 reframe)**: prior
+versions of this brief cited `IS Sharpe > 1.0 AND OOS Sharpe > 1.0 AND
+OOS/IS ratio ≥ 0.5 AND OOS trades ≥ 130 AND DSR > 0.95 AND PBO < 0.40
+AND PSR > 0.95 AND top-symbol concentration ≤ 30%` as ABSOLUTE MERGE GATES.
+Under the relative-regime-Pareto framework (skill rev. 2026-05-31), these
+8 thresholds are **DEMOTED to INFORMATIONAL** (reported per-regime in the
+/044 evaluation but NOT auto-block gates). Methodology-integrity gates
+(Critic Checks 1, 2, 5, 7, 8 + ADF) remain HARD.
 
 **Cross-cutting LOCK** (from /039 closeout): regardless of /043 outcome,
 /044-B = /037 multi-seed Sortino 5-cohort SEPARATE CONFIRMATION is LOCKED.
@@ -812,8 +947,24 @@ No new library dependency.
 - [x] Brief Section 11.7 Library Stack Declaration.
 - [x] `/030 LESSON`: `"v1-043"` added to baseline catch-all exclusion tuple
       planned in §3.1.
+- [x] **NEW-SKILL 2026-05-31 compliance**:
+  - Section 0.5 walk-forward semantics paragraph PRESENT (IS/OOS as
+    researcher-honesty windows, not held-out generalization oracle).
+  - Section 2 verdict matrix REWRITTEN to canonical 9-band regime-aware
+    (UNIVERSAL / REGIME-SPECIALIST-IS / REGIME-SPECIALIST-OOS / TAIL-CONTROL
+    / EXPLORATION-PROMISING / TRUE-NEG / NEGATIVE-no-effect / LEARNED-NEG
+    / WALK-FORWARD-LEAKAGE); MODAL verdict = REGIME-SPECIALIST-IS (38%).
+  - Section 2.5 NORMAL-RISK declaration acknowledges no auto-block from
+    EXPLORATION-level OOS Sharpe Δ.
+  - Section 10 NEW — Regime Attribution Plan present (target regimes,
+    mechanism, off-regime expectation, bundle role, composition
+    simulation, regime-aware falsifier).
+  - Section 11.6 REWRITTEN — absolute MERGE thresholds DEMOTED to
+    INFORMATIONAL; relative-regime-Pareto criteria pre-registered.
+  - Section 3.7 step 9 — QE Phase 6 deliverable
+    `regime_attribution.csv` schema specified.
 
-Ready for Phase 5.5 gate review.
+Ready for Phase 5.5 gate review under NEW-SKILL 2026-05-31.
 
 ---
 
