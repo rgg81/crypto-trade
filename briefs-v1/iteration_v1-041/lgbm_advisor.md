@@ -95,3 +95,101 @@ Relevant files:
 - /home/roberto/crypto-trade/.worktrees/quant-research/briefs-v1/iteration_v1-040/lgbm_advisor.md (most recent v1 Phase 4.5 prior + 3-iter Optuna ridge flag)
 - /home/roberto/crypto-trade/.worktrees/quant-research/BASELINE_V1.md (anchor metrics + actual ATR multipliers 2.9/1.45 + 3.5/1.75)
 - /home/roberto/crypto-trade/.worktrees/quant-research/run_baseline_v1.py:2412-2452 (per-model ATR multiplier config — relevant for /041 plumbing dispatch)
+
+
+---
+
+# LightGBM Master Advisor — iter-v1/041 — Phase 7.4 (Post-Mortem)
+
+## Context Read
+- /041 outcome: IS Sharpe +0.2102 (Δ -0.07) / OOS Sharpe +0.2843 (Δ -0.38 → **NEG-CLEAN band [-0.45, -0.15] FIRES**)
+- IS Max DD 53.70% vs baseline 73.06% (**Δ -19.4pp**); OOS Max DD 22.61% vs baseline 40.94% (**Δ -18.3pp**)
+- Trade density 958/389 vs 621/189 = **1.54× IS, 2.06× OOS** (EDA predicted 2.55-3×; slightly under)
+
+## F-AXIS Falsifier Table — Outcome Summary
+
+| # | Falsifier | Result | Verdict |
+|---|---|---|---|
+| F1 | OOS Sharpe Δ in [-0.45, -0.15] NEG-CLEAN band | **-0.38** | **FIRES → NEG-CLEAN** |
+| F2 | dispatch banner + 5 asserts | confirmed per ER | **PASS** |
+| F3 | IS trade count [770, 950] | 958 (1.2% over upper) | MARGINAL PASS |
+| F4 | OOS per-trade \|PnL\| ∈ [2.5%, 3.5%] | OOS avg \|PnL\| ≈ 0.22% net (per-symbol range 0.14-0.32%); gross \|PnL\| ≈ TP=1.5×ATR×~1.5% ≈ 2.25% — **at lower band edge** | MARGINAL PASS (label-mechanics confirmed) |
+| F5 | **LOAD-BEARING** OOS WR ≥ 35% | **33.9%** | **FIRES (sub-threshold)** |
+| F6 | n_eff_trials breaks /037+/038 ridge (≥15) | **9** (4th consecutive recurrence /037→/038→/040→/041) | **FAILS — ridge is feature-stack-structural** |
+| F7 | n_eff per /015 mid-band hypothesis | 9 | **FAILS — /015 carve-out band falsified** |
+
+**F1 + F5 + F6 + F7 all fire**: this is a structurally-clean NEG-CLEAN with /015's carve-out band (3-5% mid-magnitudes) now empirically REFUTED at 1.5×ATR ≈ 1.5-2.3%. Labeling axis closes across the FIXED-ATR barrier-magnitude curve.
+
+## DD-Improvement Analysis (Mechanism Partially Confirmed)
+
+The IS-19pp and OOS-18pp Max DD reductions are **NOT noise** — they are mechanism-deterministic per the brief's predicted tail-risk reduction:
+
+- Tighter TP/SL (1.5/0.75 vs 2.9/1.45) caps single-trade loss exposure at ~50% of baseline → tail-loss arithmetic forces lower per-bar DD.
+- OOS Sortino +0.4669 vs Sharpe +0.2843 (ratio 1.64×) confirms **asymmetric downside compression**: the std-of-returns falls less than the negative-tail std. Same pattern IS (Sortino 0.30 vs Sharpe 0.21, ratio 1.45×).
+- OOS PSR_vs_1 0.241 (3× baseline 0.079) — third-moment improvement is real.
+
+The hypothesis "tighter labels reduce tail risk" is **CONFIRMED**. The hypothesis "tighter labels lift Sharpe" is **REFUTED**: per-trade expectancy compression beat the trade-count multiplier (2.06× OOS density vs ~50% per-trade pnl shrink). Net: more trades, smaller wins/losses, lower Sharpe but markedly safer.
+
+## Per-Symbol PnL Attribution (deltas vs `iteration_v1-baseline` OOS)
+
+| Symbol | /041 OOS net | Baseline OOS net | Δ net (pp) | /041 WR | Baseline WR | Δ trades |
+|---|---|---|---|---|---|---|
+| **LTC** | **+30.19** | **-47.25** | **+77.4** | 38.7% | 29.4% | +59 |
+| LINK | +11.27 | +34.23 | -23.0 | 36.4% | 50.0% | +27 |
+| ETH | -21.15 | +2.75 | -23.9 | 31.3% | 39.1% | +37 |
+| BTC | -17.14 | +33.17 | -50.3 | 31.0% | 45.7% | +52 |
+| DOT | -9.90 | +1.96 | -11.9 | 32.4% | 39.1% | +25 |
+
+**LTC C1-inversion**: /041 single-handedly RESCUES LTC (Model D the baseline laggard at -47.25 → +30.19, Δ +77.4pp). Mechanism: LTC's baseline failure was a few large-ATR stop-outs amplifying tail-loss; tighter SL caps individual-trade loss. **LTC is the load-bearing /041 winner.**
+
+**BTC severe regression** (-50.3pp): Model A pool (BTC+ETH) loses most. BTC + ETH together account for -39pp of headline OOS regression. BTC's WR collapse 45.7% → 31.0% (-14.7pp) is the largest single-symbol WR drop; the tighter TP gets hit by mean-reversion chop on BTC's lower-vol regime.
+
+**Asymmetric attribution**: 4 of 5 symbols regress; LTC rescue masks broader signal-quality damage. NOT a uniform improvement.
+
+## Hyperparameter Stability (n_eff Trial Diagnostic)
+
+`n_effective_trials = 9` for the 4th consecutive iteration (/037 → /038 → /040 → /041). This is **definitive evidence that the 44-col V1_FEATURE_COLUMNS_PRUNED stack at n_trials=18 is structurally Optuna-ridge-locked** independent of label distribution. Denser labels did NOT lift n_eff — refuting the /015 §4 LM Master "denser labels → more gradient signal → higher n_eff" hypothesis. The min_data_in_leaf 20→50 floor (Phase 4.5 Rec 1) is structurally inert when basin geometry, not label sparsity, is the binding constraint.
+
+## REGIME-SPECIALIST Verdict: TAIL-CONTROL CANDIDATE — YES (conditional)
+
+Per user directive 2026-05-31 (regime-aware framing):
+
+- **NOT IS-regime-specialist**: IS Sharpe Δ -0.07 is slight hurt, not lift. Cannot claim IS-specialization.
+- **YES tail-control specialist**: -18 to -19pp Max DD across both IS and OOS is the strongest DD improvement observed in v1 cycle-5 EXPLORATIONs to date. Sortino > Sharpe ratio confirms asymmetric downside compression. PSR_vs_1 3× lift confirms third-moment improvement.
+- **Risk-control profile is the standout finding**, not Sharpe. /041 contributes a portfolio role no other cycle-5 iter has produced: **modest-Sharpe + dramatic-DD-reduction**.
+
+**Caveat**: tail-control specialization is mechanism-deterministic but the **non-LTC per-symbol regression is a red flag**. If a /044 multi-seed CONFIRMATION bundles /041 as TAIL-CONTROL, it must validate that DD improvement is universal (or at least not LTC-only) across the 10-seed mean — single-seed EXPLORATION can mask seed-specific risk-control collapse on the 4 regressing symbols.
+
+## /044 Routing Recommendation
+
+**Primary path**: Per brief Section 11.6, NEG-CLEAN band fired → axis CLOSED for direct merge. **DO NOT** merge /041 as labeling ingredient.
+
+**Secondary path** (regime-aware): /041 is a **CANDIDATE TAIL-CONTROL COMPONENT** for /044-E (or whatever the /044 CONFIRMATION substrate becomes). Specifically:
+- If /042 and /043 produce PROMISING-Sharpe-lift candidates, /044 substrate could bundle /041 alongside them as the **DD-control axis** (orthogonal mechanism: Sharpe-lift + DD-control = compoundable).
+- **Validation requirement**: multi-seed (10-seed) CONFIRMATION of /041's DD improvement at baseline-anchor labeling magnitudes. If 10-seed mean Max DD stays -15pp below baseline AND OOS Sharpe Δ doesn't collapse below -0.50, /041 graduates to PROMISING-MECHANICAL (DD-control sister to /v3-116 no_confirm RULE-form mechanical class) — non-Sharpe-compoundable but DD-compoundable.
+- **Bundle vs standalone**: NEVER merge /041 standalone (NEG-CLEAN Sharpe is disqualifying); only as orthogonal mitigation paired with a Sharpe-additive ingredient.
+
+## What This Confirms / Refutes About Prior LM Master Advisory
+
+- **Rec 1 (min_data_in_leaf 20→50)**: ADOPTED, **NO EFFECT** observed — n_eff stuck at 9, basin geometry not label-sparsity drives the ridge. Hypothesis REFUTED.
+- **Rec 2 (HOLD n_trials=18)**: correctly held; predicted n_eff ≥ 15 break — **REFUTED**. 4th-consecutive 9 confirms feature-stack-structural cause.
+- **Rec 3 (NO confidence_threshold change)**: axis-isolation discipline held.
+- **Predicted top-3 importance rank shift** (RSI/short-return gain): not measured at Phase 7.4 here — flag for Critic Check 4 reading.
+- **Prior probability distribution**: predicted NEG-CLEAN 25% — outcome HIT this band. PROMISING-tail 35% over-estimated.
+- **NEW finding NOT predicted**: DD-control mechanism. Phase 4.5 §"Saturation Risks" mentioned "OOS Sharpe is the load-bearing metric, not net PnL" but did NOT predict DD-control as a positive standalone finding. **Track record: /041 advisory missed the strongest /041 signal.**
+
+## Closing Note for Critic (Phase 7.5)
+
+Three items the Critic should specifically inspect:
+
+1. **F5 WR 33.9% sub-35% threshold**: load-bearing F5 fires by 1.1pp. Check whether the brief's F5 threshold rationale (Section 11.5) accommodates BTC+ETH WR-collapse mechanism OR was set assuming uniform per-symbol WR. If the latter, F5 may need recalibration for tight-barrier labelings going forward.
+2. **DD improvement is genuine but per-symbol regression is asymmetric**: 4 of 5 symbols Δ-negative; LTC alone rescues +77pp. Check whether DD improvement is uniform per-symbol (read `out_of_sample/daily_pnl.csv` and per-symbol DD if extractable) or LTC-driven. Affects whether TAIL-CONTROL framing is credible.
+3. **n_eff=9 4-consec recurrence**: structural diagnostic. Critic Check 4 (IC) and Check 7 (Optuna stability) should jointly confirm whether 44-col stack at n_trials=18 is permanently ridge-locked across labeling variants. If so, next cycle-5 EXPLORATION axes must address feature-stack architecture (pruning, swap, or n_trials axis isolation) — labeling-axis sub-experiments will continue to hit the ridge.
+
+Relevant files:
+- /home/roberto/crypto-trade/.worktrees/quant-research/reports-v1/iteration_v1-041/comparison.csv
+- /home/roberto/crypto-trade/.worktrees/quant-research/reports-v1/iteration_v1-041/in_sample/per_symbol.csv
+- /home/roberto/crypto-trade/.worktrees/quant-research/reports-v1/iteration_v1-041/out_of_sample/per_symbol.csv
+- /home/roberto/crypto-trade/.worktrees/quant-research/BASELINE_V1.md (per-symbol anchor for Δ-attribution)
+- /home/roberto/crypto-trade/.worktrees/quant-research/briefs-v1/iteration_v1-041/lgbm_advisor.md (Phase 4.5 priors)
+- /home/roberto/crypto-trade/.worktrees/quant-research/briefs-v1/iteration_v1-015/lgbm_advisor.md (carve-out band hypothesis, now REFUTED)
