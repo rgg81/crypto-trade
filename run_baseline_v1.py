@@ -4565,7 +4565,7 @@ def main() -> None:
         results_a = run_backtest(_config_a_042, _strat_a_042, yearly_pnl_check=False)
         _elapsed_a = time.time() - _t0_a
         print(f"\nModel A (BTC/ETH) XGB complete: {len(results_a)} trades in {_elapsed_a:.0f}s")
-        faxm_a = _strat_a_042._faxm_log
+        faxm_a = getattr(_strat_a_042, "_faxm_log", [])
 
         _config_c_042 = BacktestConfig(
             symbols=("LINKUSDT",),
@@ -4614,7 +4614,7 @@ def main() -> None:
         results_c = run_backtest(_config_c_042, _strat_c_042, yearly_pnl_check=False)
         _elapsed_c = time.time() - _t0_c
         print(f"\nModel C (LINK + R1) XGB complete: {len(results_c)} trades in {_elapsed_c:.0f}s")
-        faxm_c = _strat_c_042._faxm_log
+        faxm_c = getattr(_strat_c_042, "_faxm_log", [])
 
         _config_d_042 = BacktestConfig(
             symbols=("LTCUSDT",),
@@ -4663,7 +4663,7 @@ def main() -> None:
         results_d = run_backtest(_config_d_042, _strat_d_042, yearly_pnl_check=False)
         _elapsed_d = time.time() - _t0_d
         print(f"\nModel D (LTC + R1) XGB complete: {len(results_d)} trades in {_elapsed_d:.0f}s")
-        faxm_d = _strat_d_042._faxm_log
+        faxm_d = getattr(_strat_d_042, "_faxm_log", [])
 
         _config_e_042 = BacktestConfig(
             symbols=("DOTUSDT",),
@@ -4714,7 +4714,7 @@ def main() -> None:
         print(
             f"\nModel E (DOT + R1 + R2) XGB complete: {len(results_e)} trades in {_elapsed_e:.0f}s"
         )
-        faxm_e = _strat_e_042._faxm_log
+        faxm_e = getattr(_strat_e_042, "_faxm_log", [])
 
         _all_faxm_logs = faxm_a + faxm_c + faxm_d + faxm_e
         all_results = results_a + results_c + results_d + results_e
