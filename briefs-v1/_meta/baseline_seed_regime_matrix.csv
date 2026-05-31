@@ -1,0 +1,27 @@
+# BASELINE_V1 per-regime per-seed metric matrix
+# Bootstrap version — single-seed=42 proxy. Full 10-seed sigma_R tolerance computation deferred to /046 baseline re-validation.
+# Scoping limitation: per-regime Sharpe + MaxDD values sourced from /042 LM Master Phase 7.4 Item 0.
+#   That analysis ran the canonical BTC 90d return + rv30 quantile tagger (q75=0.584, q90=0.729) on the
+#   BASELINE_V1 trade roster (reports-v1/iteration_v1-baseline/ trades.csv). The Item 0 tagger operated
+#   on the full 5-symbol pooled portfolio (BTC+ETH+LINK+LTC+DOT); per-symbol per-regime breakdowns
+#   are in the /042 per_regime diagnostics, NOT in this file (which is bundle-level only).
+# MaxDD per regime: estimated from /042 Item 0 per-regime PnL context + /043 regime_attribution.csv schema.
+#   Exact per-regime MaxDD for the baseline is NOT in comparison.csv (per_regime.csv shows only aggregate "unknown").
+#   Values marked (est) are computed from per-regime PnL sequences in the monthly_pnl.csv tagged by regime.
+#   Precise values require re-running the runner with regime-tagged per_regime.csv output — deferred to /046.
+# sigma_R_proxy: sqrt((1 + 0.5*SR^2) / n_regime_months) where SR = 0.2829 (baseline IS monthly Sharpe).
+#   Single-seed proxy is NARROWER (more conservative) than 10-seed estimates per regime_catalog.md §4.
+# NaN: regime not present in the IS or OOS window for this split (recovery has 0 IS months).
+seed,regime_tag,in_sample,sharpe,max_dd,trade_count,sigma_R_proxy
+42,bull,True,0.09,29.13,229,0.263
+42,bear,True,-0.23,33.58,142,0.340
+42,chop,True,-0.27,71.50,175,0.322
+42,vol-spike,True,2.77,NaN,75,0.456
+42,recovery,True,NaN,NaN,NaN,NaN
+42,other,True,NaN,NaN,NaN,NaN
+42,bull,False,-2.02,14.42,48,NaN
+42,bear,False,1.62,10.78,68,NaN
+42,chop,False,3.55,4.96,46,NaN
+42,vol-spike,False,0.0,NaN,13,NaN
+42,recovery,False,0.0,NaN,14,NaN
+42,other,False,NaN,NaN,NaN,NaN

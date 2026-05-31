@@ -1,0 +1,20 @@
+# BASELINE_V1 metric anchors — single-seed=42, v0.v1-baseline-corrected (2026-05-23 corrected walk-forward)
+# Source: reports-v1/iteration_v1-baseline/comparison.csv + BASELINE_V1.md headline section
+# Role: anchor for RELATIVE-REGIME-PARETO comparison (merge_v1_relative_regime_pareto_proposal.md)
+# Under the RELATIVE framework, DSR/PBO/PSR are INFORMATIONAL (not hard gates).
+# Bootstrap version — single-seed=42 proxy. Full 10-seed sigma computation deferred to /046 baseline re-validation.
+# NOTE: dsr_baseline and psr_* values read from comparison.csv + BASELINE_V1.md §Higher-granularity.
+#       pbo is NOT computed for the baseline (CPCV not yet wired into run_baseline_v1.py — see BASELINE_V1.md Outstanding Tasks).
+metric,in_sample,out_of_sample,baseline_v1_anchor
+sharpe,0.2829,0.6637,0.6637
+sortino,0.3205,0.7697,0.7697
+max_drawdown,73.06,40.94,40.94
+win_rate,39.9,40.2,40.2
+profit_factor,1.0603,1.1564,1.1564
+total_trades,621,189,189
+calmar_ratio,0.7399,0.9314,0.9314
+dsr,-93.7974,-35.6554,-35.6554
+total_net_pnl,54.0532,38.1342,38.1342
+psr_monthly_vs_0,0.9770,0.9890,0.9890
+psr_monthly_vs_1,0.0003,0.0789,0.0789
+psr_daily_vs_0,1.0000,1.0000,1.0000
