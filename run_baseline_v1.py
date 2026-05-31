@@ -104,6 +104,7 @@ from crypto_trade.strategies.ml.risk_v2 import (
     apply_btc_trend_filter,
     load_btc_klines_for_filter,
 )
+from crypto_trade.strategies.ml.xgb import XgboostStrategy
 from crypto_trade.strategies.regime_gate_v1 import (
     RegimeGateConfig,
     RegimeRoutedStrategy,
@@ -2080,6 +2081,18 @@ def main() -> None:
             "iter-v1/038 pre-flight asserts this is 0.5."
         ),
     )
+    parser.add_argument(
+        "--model",
+        choices=["lgbm", "xgboost"],
+        default="lgbm",
+        help=(
+            "ML library to use for training (iter-v1/042). "
+            "'lgbm' (default) = LightGbmStrategy — BIT-IDENTICAL to all prior runs. "
+            "'xgboost' = XgboostStrategy with tree_method='hist' + grow_policy='depthwise' "
+            "+ n_jobs=1 (depth-wise level-wise growth, no GOSS). "
+            "iter-v1/042 pre-flight asserts --model xgboost."
+        ),
+    )
     args = parser.parse_args()
 
     # Resolve symbols
@@ -2347,6 +2360,14 @@ def main() -> None:
             f"  [iter-v1/041] min_child_samples lower bound override: "
             f"{min_data_in_leaf_min_arg} (was 20 for v1_pruned)"
         )
+
+    # iter-v1/042: ML library selection.
+    # "lgbm" (default) = LightGbmStrategy — BIT-IDENTICAL to all prior iterations.
+    # "xgboost" = XgboostStrategy with tree_method='hist' + grow_policy='depthwise' +
+    # n_jobs=1 (depth-wise level-wise growth, no GOSS). Pure library swap with all
+    # other parameters (features, labels, universe, risk gates, Optuna objective) UNCHANGED.
+    model_type_arg: str = getattr(args, "model", "lgbm")
+    print(f"  model_type: {model_type_arg}")
     print()
 
     # Validate active feature list is non-empty (hard guard per feature-pinning rules).
@@ -4447,6 +4468,264 @@ def main() -> None:
             ("Model_E_DOT", _strat_e),
         ]
 
+    elif iteration_label == "v1-042" and set(symbols) == set(V1_BASELINE_UNIVERSE):
+        # iter-v1/042: cycle-5 EXPLORATION #9/10 — MODEL-ARCH library swap.
+        # Pure substitution: LightGbmStrategy → XgboostStrategy at constant
+        # data / labels / features / risk gates / Optuna objective.
+        # XGBoost: tree_method='hist', grow_policy='depthwise', n_jobs=1,
+        # random_state=seed, scale_pos_weight=n_neg/n_pos (computed per-fit).
+        # Optuna: 6 hp (num_leaves DROPPED — no-op under depthwise growth).
+        # max_depth ∈ [3, 5] enforced in optimization_xgb.py (LM Master Rec 1).
+        # ENSEMBLE_SIZE=3 inner seeds (42, 123, 456); single outer seed=42.
+        # All per-model ATR tp/sl at baseline defaults (no /041 carry-over).
+        assert model_type_arg == "xgboost", (
+            f"iter-v1/042 pre-flight FAIL: expected --model xgboost "
+            f"but got {model_type_arg!r}. "
+            "This iteration REQUIRES the XGBoost library. "
+            "Run with: --model xgboost"
+        )
+        assert label_mode_arg == "triple_barrier", (
+            f"iter-v1/042 pre-flight FAIL: expected --label-mode triple_barrier "
+            f"but got {label_mode_arg!r}. "
+            "iter-v1/042 labeling is UNCHANGED from baseline (triple_barrier). "
+            "Run with: --label-mode triple_barrier (default)"
+        )
+        assert optuna_objective_arg == "sharpe", (
+            f"iter-v1/042 pre-flight FAIL: expected --optuna-objective sharpe "
+            f"but got {optuna_objective_arg!r}. "
+            "iter-v1/042 Optuna objective is UNCHANGED from baseline (Sharpe, NOT Sortino). "
+            "Run with: --optuna-objective sharpe (default)"
+        )
+        assert vol_ceiling_mode_arg == "none", (
+            f"iter-v1/042 pre-flight FAIL: expected --vol-ceiling-mode none "
+            f"but got {vol_ceiling_mode_arg!r}. "
+            "iter-v1/042 does NOT carry over /038 vol-ceiling (CLOSED axis). "
+            "Run with: --vol-ceiling-mode none (default)"
+        )
+        assert atr_tp_mult_arg is None, (
+            f"iter-v1/042 pre-flight FAIL: expected no --atr-tp-mult override "
+            f"but got {atr_tp_mult_arg!r}. "
+            "iter-v1/042 uses baseline ATR defaults per cohort (no /041 carry-over). "
+            "Do NOT pass --atr-tp-mult for this iteration."
+        )
+        print(
+            "[run_baseline_v1] === iter-v1/042 — MODEL-ARCH library swap "
+            "LightGBM → XGBoost (depth-wise + hist; cycle-5 EXP-9/10) ==="
+        )
+        print(
+            f"[iter-v1/042] XGBOOST ACTIVE: tree_method=hist grow_policy=depthwise "
+            f"n_jobs=1 / {len(active_feature_columns)} features / "
+            f"ENSEMBLE_SIZE={ensemble_size} / n_trials={n_trials}"
+        )
+        _ensemble_seeds_042 = _derive_ensemble_seeds(ensemble_size, offset=ensemble_seeds_offset)
+        _config_a_042 = BacktestConfig(
+            symbols=("BTCUSDT", "ETHUSDT"),
+            interval="8h",
+            max_amount_usd=1000.0,
+            stop_loss_pct=4.0,
+            take_profit_pct=8.0,
+            timeout_minutes=10080,
+            fee_pct=0.1,
+            data_dir=Path("data"),
+            cooldown_candles=2,
+            vol_targeting=True,
+            vt_target_vol=0.3,
+            vt_lookback_days=45,
+            vt_min_scale=0.33,
+            vt_max_scale=2.0,
+            risk_consecutive_sl_limit=None,
+            risk_consecutive_sl_cooldown_candles=0,
+            risk_drawdown_scale_enabled=False,
+            risk_drawdown_trigger_pct=7.0,
+            risk_drawdown_scale_floor=0.33,
+            risk_drawdown_scale_anchor_pct=15.0,
+        )
+        _strat_a_042 = XgboostStrategy(
+            training_months=24,
+            n_trials=n_trials,
+            cv_splits=5,
+            label_tp_pct=8.0,
+            label_sl_pct=4.0,
+            label_timeout_minutes=10080,
+            fee_pct=0.1,
+            features_dir="data/features",
+            verbose=1,
+            atr_tp_multiplier=2.9,
+            atr_sl_multiplier=1.45,
+            atr_column="vol_natr_21",
+            use_atr_labeling=True,
+            ensemble_seeds=list(_ensemble_seeds_042),
+            feature_columns=list(active_feature_columns),
+            ood_enabled=True,
+            ood_features=list(V1_OOD_FEATURE_COLUMNS),
+            ood_cutoff_pct=BASELINE_OOD_CUTOFF_PCT,
+            oof_persist_path=OOF_PARQUET_PATH,
+        )
+        _t0_a = time.time()
+        results_a = run_backtest(_config_a_042, _strat_a_042, yearly_pnl_check=False)
+        _elapsed_a = time.time() - _t0_a
+        print(f"\nModel A (BTC/ETH) XGB complete: {len(results_a)} trades in {_elapsed_a:.0f}s")
+        faxm_a = _strat_a_042._faxm_log
+
+        _config_c_042 = BacktestConfig(
+            symbols=("LINKUSDT",),
+            interval="8h",
+            max_amount_usd=1000.0,
+            stop_loss_pct=4.0,
+            take_profit_pct=8.0,
+            timeout_minutes=10080,
+            fee_pct=0.1,
+            data_dir=Path("data"),
+            cooldown_candles=2,
+            vol_targeting=True,
+            vt_target_vol=0.3,
+            vt_lookback_days=45,
+            vt_min_scale=0.33,
+            vt_max_scale=2.0,
+            risk_consecutive_sl_limit=3,
+            risk_consecutive_sl_cooldown_candles=27,
+            risk_drawdown_scale_enabled=False,
+            risk_drawdown_trigger_pct=7.0,
+            risk_drawdown_scale_floor=0.33,
+            risk_drawdown_scale_anchor_pct=15.0,
+        )
+        _strat_c_042 = XgboostStrategy(
+            training_months=24,
+            n_trials=n_trials,
+            cv_splits=5,
+            label_tp_pct=8.0,
+            label_sl_pct=4.0,
+            label_timeout_minutes=10080,
+            fee_pct=0.1,
+            features_dir="data/features",
+            verbose=1,
+            atr_tp_multiplier=3.5,
+            atr_sl_multiplier=1.75,
+            atr_column="vol_natr_21",
+            use_atr_labeling=True,
+            ensemble_seeds=list(_ensemble_seeds_042),
+            feature_columns=list(active_feature_columns),
+            ood_enabled=True,
+            ood_features=list(V1_OOD_FEATURE_COLUMNS),
+            ood_cutoff_pct=BASELINE_OOD_CUTOFF_PCT,
+            oof_persist_path=OOF_PARQUET_PATH,
+        )
+        _t0_c = time.time()
+        results_c = run_backtest(_config_c_042, _strat_c_042, yearly_pnl_check=False)
+        _elapsed_c = time.time() - _t0_c
+        print(f"\nModel C (LINK + R1) XGB complete: {len(results_c)} trades in {_elapsed_c:.0f}s")
+        faxm_c = _strat_c_042._faxm_log
+
+        _config_d_042 = BacktestConfig(
+            symbols=("LTCUSDT",),
+            interval="8h",
+            max_amount_usd=1000.0,
+            stop_loss_pct=4.0,
+            take_profit_pct=8.0,
+            timeout_minutes=10080,
+            fee_pct=0.1,
+            data_dir=Path("data"),
+            cooldown_candles=2,
+            vol_targeting=True,
+            vt_target_vol=0.3,
+            vt_lookback_days=45,
+            vt_min_scale=0.33,
+            vt_max_scale=2.0,
+            risk_consecutive_sl_limit=3,
+            risk_consecutive_sl_cooldown_candles=27,
+            risk_drawdown_scale_enabled=False,
+            risk_drawdown_trigger_pct=7.0,
+            risk_drawdown_scale_floor=0.33,
+            risk_drawdown_scale_anchor_pct=15.0,
+        )
+        _strat_d_042 = XgboostStrategy(
+            training_months=24,
+            n_trials=n_trials,
+            cv_splits=5,
+            label_tp_pct=8.0,
+            label_sl_pct=4.0,
+            label_timeout_minutes=10080,
+            fee_pct=0.1,
+            features_dir="data/features",
+            verbose=1,
+            atr_tp_multiplier=3.5,
+            atr_sl_multiplier=1.75,
+            atr_column="vol_natr_21",
+            use_atr_labeling=True,
+            ensemble_seeds=list(_ensemble_seeds_042),
+            feature_columns=list(active_feature_columns),
+            ood_enabled=True,
+            ood_features=list(V1_OOD_FEATURE_COLUMNS),
+            ood_cutoff_pct=BASELINE_OOD_CUTOFF_PCT,
+            oof_persist_path=OOF_PARQUET_PATH,
+        )
+        _t0_d = time.time()
+        results_d = run_backtest(_config_d_042, _strat_d_042, yearly_pnl_check=False)
+        _elapsed_d = time.time() - _t0_d
+        print(f"\nModel D (LTC + R1) XGB complete: {len(results_d)} trades in {_elapsed_d:.0f}s")
+        faxm_d = _strat_d_042._faxm_log
+
+        _config_e_042 = BacktestConfig(
+            symbols=("DOTUSDT",),
+            interval="8h",
+            max_amount_usd=1000.0,
+            stop_loss_pct=4.0,
+            take_profit_pct=8.0,
+            timeout_minutes=10080,
+            fee_pct=0.1,
+            data_dir=Path("data"),
+            cooldown_candles=2,
+            vol_targeting=True,
+            vt_target_vol=0.3,
+            vt_lookback_days=45,
+            vt_min_scale=0.33,
+            vt_max_scale=2.0,
+            risk_consecutive_sl_limit=3,
+            risk_consecutive_sl_cooldown_candles=27,
+            risk_drawdown_scale_enabled=True,
+            risk_drawdown_trigger_pct=7.0,
+            risk_drawdown_scale_floor=0.33,
+            risk_drawdown_scale_anchor_pct=15.0,
+        )
+        _strat_e_042 = XgboostStrategy(
+            training_months=24,
+            n_trials=n_trials,
+            cv_splits=5,
+            label_tp_pct=8.0,
+            label_sl_pct=4.0,
+            label_timeout_minutes=10080,
+            fee_pct=0.1,
+            features_dir="data/features",
+            verbose=1,
+            atr_tp_multiplier=3.5,
+            atr_sl_multiplier=1.75,
+            atr_column="vol_natr_21",
+            use_atr_labeling=True,
+            ensemble_seeds=list(_ensemble_seeds_042),
+            feature_columns=list(active_feature_columns),
+            ood_enabled=True,
+            ood_features=list(V1_OOD_FEATURE_COLUMNS),
+            ood_cutoff_pct=BASELINE_OOD_CUTOFF_PCT,
+            oof_persist_path=OOF_PARQUET_PATH,
+        )
+        _t0_e = time.time()
+        results_e = run_backtest(_config_e_042, _strat_e_042, yearly_pnl_check=False)
+        _elapsed_e = time.time() - _t0_e
+        print(
+            f"\nModel E (DOT + R1 + R2) XGB complete: {len(results_e)} trades in {_elapsed_e:.0f}s"
+        )
+        faxm_e = _strat_e_042._faxm_log
+
+        _all_faxm_logs = faxm_a + faxm_c + faxm_d + faxm_e
+        all_results = results_a + results_c + results_d + results_e
+        _r5_model_results = [results_a, results_c, results_d, results_e]
+        _post_dispatch_fi_strategies = [
+            ("Model_A_xgboost_pool", _strat_a_042),
+            ("Model_C_xgboost_LINK", _strat_c_042),
+            ("Model_D_xgboost_LTC", _strat_d_042),
+            ("Model_E_xgboost_DOT", _strat_e_042),
+        ]
+
     elif set(symbols) == set(V1_BASELINE_UNIVERSE) and iteration_label not in (
         "v1-021",
         "v1-023",
@@ -4465,9 +4744,10 @@ def main() -> None:
         "v1-039",
         "v1-040",
         "v1-041",
+        "v1-042",
     ):
         # Generic baseline-universe dispatch.
-        # Non-/021/.../040 iterations. Models A/C/D/E
+        # Non-/021/.../042 iterations. Models A/C/D/E
         # with V1_BASELINE_UNIVERSE symbols. BIT-IDENTICAL to historical
         # v186 baseline when active_feature_columns=list(V1_FEATURE_COLUMNS) + n_trials=50.
         results_a, faxm_a, _strat_a = run_model(
