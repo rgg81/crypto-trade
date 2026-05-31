@@ -265,6 +265,32 @@ assert optuna_objective_arg == "sortino" guard fires in dispatch branch.
 assert vol_ceiling_mode_arg == "none" guard fires in dispatch branch (/038 NO carry-over).
 """
 
+V1_ITER043_UNIVERSE: tuple[str, ...] = ("LINKUSDT",)
+"""iter-v1/043 cohort: LINK-only 1-specialist with trend-scanning labels.
+
+Cycle-5 EXPLORATION #10 of 10 (CADENCE COMPLETE — /044 CONFIRMATION can launch after
+/043 closeout). Axis family: per-cohort-specialization × labeling REPEAT-COMBO.
+
+Architecture: Model C' LINK only (R1+R3 ON, atr_tp=3.5, atr_sl=1.75). LINK uses
+trend-scanning labels with grid (5, 8, 13, 21). Model A pool, Model D LTC, Model E DOT,
+Model G ETH SKIPPED.
+
+NORMAL-RISK declaration: composition of two previously-shipped, audited mechanisms
+(/036 per-cohort isolation + /035 trend-scanning). No new Optuna training-objective
+domain change. No new src/ helper modules. ENSEMBLE_SIZE=3, n_trials=18, seed=42.
+
+LOAD-BEARING PURPOSE: /044 substrate-composition diagnostic. Resolves whether /036's
+LINK+DOT OOS lift (+1.7465) is LINK-carried (DOT was passenger) or pairing-carried
+(DOT provides essential risk-diversification at portfolio σ level). Cannot be answered
+without single-cohort LINK isolation at /036's exact config.
+
+LOCAL to runner constant. NOT shared; CONFIRMATION-MERGE updates V1_BASELINE_UNIVERSE.
+assert set(symbols) == {"LINKUSDT"} guard fires in dispatch branch.
+assert label_mode_arg == "trend_scanning" guard fires in dispatch branch.
+assert optuna_objective_arg in ("sharpe", None) guard fires in dispatch branch.
+assert model_type_arg == "lgbm" guard fires in dispatch branch (/042 XGBoost NO carry-over).
+"""
+
 
 __all__ = [
     "V1_EXCLUDED_SYMBOLS",
@@ -278,6 +304,7 @@ __all__ = [
     "V1_ITER029_UNIVERSE",
     "V1_ITER036_UNIVERSE",
     "V1_ITER039_UNIVERSE",
+    "V1_ITER043_UNIVERSE",
     # iter-v1/023: funding-rate feature family (add_funding_v1_features imported on demand)
     # iter-v1/025: OI delta feature family (add_oi_delta_v1_features imported on demand)
     # iter-v1/040: composed feature family (add_composed_v1_features imported on demand)

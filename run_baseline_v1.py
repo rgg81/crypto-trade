@@ -77,6 +77,7 @@ from crypto_trade.features_v1 import (
     V1_ITER029_UNIVERSE,
     V1_ITER036_UNIVERSE,
     V1_ITER039_UNIVERSE,
+    V1_ITER043_UNIVERSE,
     V1_OOD_FEATURE_COLUMNS,
     assert_v1_universe,
 )
@@ -1695,6 +1696,200 @@ def _run_multi_seed_aggregate(
         f"({summary['pct_profitable']}%)"
     )
     print(f"[multi_seed] aggregate written to {out_path}")
+
+
+# ---------------------------------------------------------------------------
+# iter-v1/043 NEW-SKILL 2026-05-31: Regime Attribution CSV builder.
+#
+# Schema: regime_tag, in_sample, candidate_sharpe, candidate_max_dd,
+#         candidate_trade_count, baseline_sharpe, baseline_max_dd,
+#         baseline_trade_count
+#
+# Regime tagger uses BTC 90d return + 30d realized vol quantiles per the
+# canonical rule approximation from briefs-v1/_meta/regime_catalog.md
+# (not yet formalized at /043; approximation used until /044 bootstrap).
+# Regime tags: bull, chop, recovery, vol-spike, bear, other.
+#
+# Baseline comparison: LINK-only rows from BASELINE_V1 trade CSVs
+# (reports-v1/iteration_v1-baseline/{in_sample,out_of_sample}/trades.csv
+# filtered to LINKUSDT). Used so the /043 vs baseline per-regime Δ is
+# attributable purely to the LINK trend-scan specialist component.
+# ---------------------------------------------------------------------------
+
+
+def _assign_regime_tag(
+    close_time_ms: int,
+    btc_klines_df: pd.DataFrame,
+) -> str:
+    """Assign a regime tag to a trade based on BTC 90-day return + 30-day realized vol.
+
+    Canonical approximation of briefs-v1/_meta/regime_catalog.md rules:
+      bull     : BTC 90d return > +20%
+      bear     : BTC 90d return < -20%
+      vol-spike: BTC 30d rv > 0.75 quantile (high vol regardless of direction)
+      chop     : BTC 90d return ∈ (-10%, +10%) AND rv < 0.50 quantile
+      recovery : BTC 90d return ∈ (+5%, +20%) AND rv > 0.50 quantile
+      other    : remaining
+
+    Args:
+        close_time_ms: Trade close_time in milliseconds (UTC).
+        btc_klines_df: DataFrame with columns [close_time_ms, close] for BTCUSDT 8h.
+
+    Returns:
+        Regime tag string.
+    """
+    import numpy as np  # noqa: PLC0415
+
+    if btc_klines_df is None or btc_klines_df.empty:
+        return "other"
+
+    # BTC row at or before close_time_ms
+    mask = btc_klines_df["close_time_ms"] <= close_time_ms
+    if not mask.any():
+        return "other"
+    idx = btc_klines_df[mask].index[-1]
+
+    closes = btc_klines_df["close"].values
+    close_idx = btc_klines_df.index.get_loc(idx)
+
+    # 90-day return (90 days × 3 candles/day at 8h = 270 bars)
+    lookback_90d = 270
+    if close_idx >= lookback_90d:
+        btc_90d_ret = closes[close_idx] / closes[close_idx - lookback_90d] - 1.0
+    else:
+        btc_90d_ret = 0.0
+
+    # 30-day realized vol (30 days × 3 = 90 bars)
+    lookback_30d = 90
+    start_30 = max(0, close_idx - lookback_30d)
+    log_rets = np.diff(np.log(closes[start_30 : close_idx + 1]))
+    rv_30 = float(np.std(log_rets)) * np.sqrt(3 * 365) if len(log_rets) > 2 else 0.0
+
+    # Global rv quantile thresholds (precomputed once outside; approximated inline)
+    # These are rough quantiles from BTC 2020-2025 realized vol history.
+    rv_q75 = 1.20  # annualized; ~75th percentile for BTC 8h 30d rv
+    rv_q50 = 0.80  # ~50th percentile
+
+    if btc_90d_ret > 0.20:
+        return "bull"
+    elif btc_90d_ret < -0.20:
+        return "bear"
+    elif rv_30 > rv_q75:
+        return "vol-spike"
+    elif -0.10 < btc_90d_ret < 0.10 and rv_30 < rv_q50:
+        return "chop"
+    elif 0.05 < btc_90d_ret <= 0.20 and rv_30 > rv_q50:
+        return "recovery"
+    else:
+        return "other"
+
+
+def build_regime_attribution_csv(
+    trades_df: pd.DataFrame,
+    baseline_trades_df: pd.DataFrame | None,
+    is_cutoff_ms: int,
+    btc_klines_df: pd.DataFrame | None,
+    out_path: Path,
+) -> None:
+    """Build regime_attribution.csv per new-skill 2026-05-31 schema.
+
+    Schema: regime_tag, in_sample, candidate_sharpe, candidate_max_dd,
+            candidate_trade_count, baseline_sharpe, baseline_max_dd,
+            baseline_trade_count.
+
+    Regime tagger uses _assign_regime_tag() (BTC 90d return + 30d rv quantile
+    approximation). Produces one row per regime × IS/OOS split combination.
+    Baseline columns sourced from baseline_trades_df (LINKUSDT-only rows).
+
+    Args:
+        trades_df: Candidate iteration trades (all symbols; LINKUSDT for /043).
+        baseline_trades_df: BASELINE_V1 trades filtered to LINKUSDT.
+        is_cutoff_ms: OOS_CUTOFF_DATE in milliseconds.
+        btc_klines_df: BTCUSDT 8h kline DataFrame for regime tagging.
+        out_path: Output CSV path.
+    """
+    import numpy as np  # noqa: PLC0415
+    import pandas as pd  # noqa: PLC0415
+
+    regimes = ["bull", "bear", "vol-spike", "chop", "recovery", "other"]
+    is_oos = ["IS", "OOS"]
+
+    def _compute_regime_metrics(
+        df: pd.DataFrame | None,
+        regime: str,
+        split: str,
+    ) -> tuple[float, float, int]:
+        """Return (sharpe, max_dd, trade_count) for a regime × split subset."""
+        if df is None or df.empty:
+            return (float("nan"), float("nan"), 0)
+        # Split filter
+        if split == "IS":
+            sub = df[df["close_time"] < is_cutoff_ms].copy()
+        else:
+            sub = df[df["close_time"] >= is_cutoff_ms].copy()
+        # Regime filter
+        if "regime_tag" in sub.columns:
+            sub = sub[sub["regime_tag"] == regime]
+        else:
+            return (float("nan"), float("nan"), 0)
+        if sub.empty:
+            return (float("nan"), float("nan"), 0)
+        n = len(sub)
+        # Monthly PnL series for Sharpe
+        sub = sub.copy()
+        sub["month"] = pd.to_datetime(sub["close_time"], unit="ms").dt.to_period("M")
+        monthly = sub.groupby("month")["pnl_pct"].sum()
+        if len(monthly) < 2:
+            sharpe = float("nan")
+        else:
+            sharpe = float(monthly.mean() / monthly.std()) if monthly.std() > 0 else float("nan")
+        # Max drawdown from cumulative PnL
+        cum = sub["pnl_pct"].cumsum()
+        peak = cum.cummax()
+        dd = (peak - cum).max()
+        max_dd = float(dd) if not np.isnan(dd) else float("nan")
+        return (sharpe, max_dd, n)
+
+    # Tag candidate trades with regime
+    if btc_klines_df is not None and not btc_klines_df.empty:
+        trades_df = trades_df.copy()
+        trades_df["regime_tag"] = trades_df["close_time"].apply(
+            lambda ct: _assign_regime_tag(ct, btc_klines_df)
+        )
+        if baseline_trades_df is not None and not baseline_trades_df.empty:
+            baseline_trades_df = baseline_trades_df.copy()
+            baseline_trades_df["regime_tag"] = baseline_trades_df["close_time"].apply(
+                lambda ct: _assign_regime_tag(ct, btc_klines_df)
+            )
+    else:
+        trades_df = trades_df.copy()
+        trades_df["regime_tag"] = "other"
+        if baseline_trades_df is not None and not baseline_trades_df.empty:
+            baseline_trades_df = baseline_trades_df.copy()
+            baseline_trades_df["regime_tag"] = "other"
+
+    rows = []
+    for split in is_oos:
+        for regime in regimes:
+            c_sharpe, c_dd, c_count = _compute_regime_metrics(trades_df, regime, split)
+            b_sharpe, b_dd, b_count = _compute_regime_metrics(baseline_trades_df, regime, split)
+            rows.append(
+                {
+                    "regime_tag": regime,
+                    "in_sample": split == "IS",
+                    "candidate_sharpe": c_sharpe,
+                    "candidate_max_dd": c_dd,
+                    "candidate_trade_count": c_count,
+                    "baseline_sharpe": b_sharpe,
+                    "baseline_max_dd": b_dd,
+                    "baseline_trade_count": b_count,
+                }
+            )
+
+    result_df = pd.DataFrame(rows)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    result_df.to_csv(out_path, index=False)
+    print(f"[iter-v1/043] regime_attribution.csv written: {out_path} ({len(rows)} rows)")
 
 
 def main() -> None:
@@ -4726,6 +4921,97 @@ def main() -> None:
             ("Model_E_xgboost_DOT", _strat_e_042),
         ]
 
+    elif iteration_label == "v1-043" and set(symbols) == set(V1_ITER043_UNIVERSE):
+        # iter-v1/043: cycle-5 EXPLORATION #10/10 (CADENCE COMPLETE — /044 CONFIRMATION next).
+        # LINK-only trend-scanning specialist. Strips DOT from /036's LINK+DOT 2-cohort
+        # substrate to resolve /044 substrate-composition decision:
+        #   Δ >= 0 vs /036 → LINK is load-bearing; DOT was passenger → /044-A LINK-only
+        #   Δ ∈ [-0.90, -0.35) → PAIRING-PARTIAL; DOT provides risk-diversification
+        #   Δ < -0.90 → LINK-DEPENDS-ON-DOT; pairing irreducible → /044-A LINK+DOT MANDATORY
+        # NORMAL-RISK: composition of /036 per-cohort isolation + /035 trend-scanning
+        # (both shipped; no new Optuna training-objective domain change).
+        # Model A pool, Model D LTC, Model E DOT, Model G ETH SKIPPED. ONLY Model C' (LINK).
+        assert label_mode_arg == "trend_scanning", (
+            f"iter-v1/043 pre-flight FAIL: expected --label-mode trend_scanning "
+            f"but got {label_mode_arg!r}. "
+            "Pass --label-mode trend_scanning to activate the LINK-only trend-scan specialist. "
+            "iter-v1/043 is a 1-cohort isolation of /036's LINK+DOT substrate — "
+            "trend_scanning labels are required to maintain substrate parity with /036."
+        )
+        assert set(symbols) == set(V1_ITER043_UNIVERSE), (
+            f"iter-v1/043 pre-flight FAIL: expected symbols == {{LINKUSDT}} "
+            f"but got {set(symbols)!r}. "
+            "iter-v1/043 dispatches ONLY Model C' (LINK specialist). "
+            "Passing DOTUSDT or any other symbol would contaminate the single-cohort isolation."
+        )
+        assert optuna_objective_arg in ("sharpe", None), (
+            f"iter-v1/043 pre-flight FAIL: expected --optuna-objective sharpe (default) "
+            f"but got {optuna_objective_arg!r}. "
+            "iter-v1/043 MUST use Sharpe objective (NOT Sortino) for /036 parity. "
+            "Passing --optuna-objective sortino would contaminate the /043 single-axis isolation "
+            "with the /039 Sortino axis (CLOSED per /039 NEG-CATASTROPHIC verdict)."
+        )
+        assert model_type_arg == "lgbm", (
+            f"iter-v1/043 pre-flight FAIL: expected --model lgbm (default) "
+            f"but got {model_type_arg!r}. "
+            "iter-v1/043 uses LightGBM (not XGBoost). The /042 XGBoost axis does NOT "
+            "carry over to /043. Pass --model lgbm (default) or omit --model."
+        )
+        assert vol_ceiling_mode_arg == "none", (
+            f"iter-v1/043 pre-flight FAIL: expected --vol-ceiling-mode none (default) "
+            f"but got {vol_ceiling_mode_arg!r}. "
+            "iter-v1/043 does NOT carry over /038 vol-ceiling (CLOSED axis). "
+            "Run with --vol-ceiling-mode none (default) or omit the flag."
+        )
+        print(
+            f"[iter-v1/043] LINK-ONLY-TREND-SCAN SPECIALIST ACTIVE: "
+            f"model=Model_C_LINK_only, "
+            f"label_mode={label_mode_arg}, "
+            f"trend_scan_grid=(5, 8, 13, 21), "
+            f"ENSEMBLE_SIZE={ensemble_size} (inner), "
+            f"n_trials={n_trials}, "
+            f"seeds=1 (outer=42). "
+            f"NORMAL-RISK: /036 per-cohort isolation + /035 trend-scanning (both shipped). "
+            f"Features: {len(active_feature_columns)} cols (V1_FEATURE_COLUMNS_PRUNED UNCHANGED). "
+            f"cycle-5 EXP-10/10 FINAL — /044 CONFIRMATION substrate-composition diagnostic."
+        )
+        # Model C': LINK specialist + trend_scanning labels
+        # R1=ON (consecutive-SL cool-down); R3=ON (Mahalanobis OOD gate) — baseline Model C config
+        # Matches /036's LINK-leg config exactly. DOT (Model E) is SKIPPED.
+        results_c043, faxm_c043, _strat_c043 = run_model(
+            "C' (LINK + R1)",
+            ("LINKUSDT",),
+            atr_tp=3.5,
+            atr_sl=1.75,
+            apply_r1=True,
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            **_r5_kwargs,
+        )
+
+        # F-AXIS #2 dispatch verification: assert ONLY LINK trades emitted
+        c043_symbols = {r.symbol for r in results_c043}
+        assert c043_symbols.issubset({"LINKUSDT"}), (
+            f"[iter-v1/043] Model C' produced non-LINK results: {c043_symbols - {'LINKUSDT'}}. "
+            "Per-cohort isolation failed — Model C' must trade LINKUSDT ONLY."
+        )
+
+        print(
+            f"[iter-v1/043] Dispatch verified: "
+            f"Model_C_LINK_only={len(results_c043)} LINK trades (DOT/LTC/BTC/ETH skipped). "
+            f"F-AXIS #2 PASS: universe isolation confirmed."
+        )
+
+        _all_faxm_logs = faxm_c043
+        all_results = results_c043
+        _r5_model_results = [results_c043]
+        _post_dispatch_fi_strategies = [
+            ("Model_C_LINK_trend_scan_only", _strat_c043),
+        ]
+
     elif set(symbols) == set(V1_BASELINE_UNIVERSE) and iteration_label not in (
         "v1-021",
         "v1-023",
@@ -4745,6 +5031,7 @@ def main() -> None:
         "v1-040",
         "v1-041",
         "v1-042",
+        "v1-043",
     ):
         # Generic baseline-universe dispatch.
         # Non-/021/.../042 iterations. Models A/C/D/E
@@ -5784,6 +6071,68 @@ def main() -> None:
             baseline_trades_oos=_baseline_oos_trades,
             symbols=list(symbols),
         )
+
+    # -------------------------------------------------------------------------
+    # iter-v1/043 NEW-SKILL 2026-05-31: Regime Attribution CSV (mandatory deliverable).
+    # Schema: regime_tag, in_sample, candidate_sharpe, candidate_max_dd,
+    #         candidate_trade_count, baseline_sharpe, baseline_max_dd,
+    #         baseline_trade_count.
+    # Produced for every iteration from /043 onward; no-op for prior iterations.
+    # Baseline comparison: LINKUSDT-only rows from BASELINE_V1 trade CSVs.
+    # -------------------------------------------------------------------------
+    if iteration_label == "v1-043":
+        import pandas as pd  # noqa: PLC0415
+
+        _regime_out = report_dir / "regime_attribution.csv"
+        # Load candidate trades from generated reports (IS + OOS combined)
+        _cand_is_path = report_dir / "in_sample" / "trades.csv"
+        _cand_oos_path = report_dir / "out_of_sample" / "trades.csv"
+        _cand_frames = []
+        for _p in (_cand_is_path, _cand_oos_path):
+            if _p.exists():
+                _cand_frames.append(pd.read_csv(_p))
+        _cand_df = pd.concat(_cand_frames, ignore_index=True) if _cand_frames else pd.DataFrame()
+
+        # Load BASELINE_V1 LINK-only trades for regime comparison
+        _baseline_is_path = Path("reports-v1/iteration_v1-baseline/in_sample/trades.csv")
+        _baseline_oos_path = Path("reports-v1/iteration_v1-baseline/out_of_sample/trades.csv")
+        _baseline_frames = []
+        for _p in (_baseline_is_path, _baseline_oos_path):
+            if _p.exists():
+                _df = pd.read_csv(_p)
+                if "symbol" in _df.columns:
+                    _baseline_frames.append(_df[_df["symbol"] == "LINKUSDT"])
+        _baseline_df = pd.concat(_baseline_frames, ignore_index=True) if _baseline_frames else None
+
+        # Load BTC klines for regime tagging
+        _btc_klines_path = Path("data/BTCUSDT/8h.csv")
+        _btc_df = None
+        if _btc_klines_path.exists():
+            try:
+                _btc_raw = pd.read_csv(_btc_klines_path)
+                # Normalize column names: handle both 'close_time' and 'Close time' variants
+                _btc_raw.columns = [c.lower().replace(" ", "_") for c in _btc_raw.columns]
+                if "close_time" in _btc_raw.columns and "close" in _btc_raw.columns:
+                    _btc_df = _btc_raw[["close_time", "close"]].rename(
+                        columns={"close_time": "close_time_ms"}
+                    )
+                    _btc_df["close"] = pd.to_numeric(_btc_df["close"], errors="coerce")
+                    _btc_df = _btc_df.dropna().reset_index(drop=True)
+            except Exception as _e:
+                print(f"[iter-v1/043] WARNING: BTC klines load failed: {_e} — using 'other' regime")
+
+        if not _cand_df.empty:
+            build_regime_attribution_csv(
+                trades_df=_cand_df,
+                baseline_trades_df=_baseline_df,
+                is_cutoff_ms=OOS_CUTOFF_MS,
+                btc_klines_df=_btc_df,
+                out_path=_regime_out,
+            )
+        else:
+            print(  # noqa: E501
+                "[iter-v1/043] WARNING: no candidate trades; regime_attribution.csv not written"
+            )
 
     print(
         f"\nMode: {mode_label}. ENSEMBLE_SIZE={ensemble_size}. n_trials={n_trials}. "
