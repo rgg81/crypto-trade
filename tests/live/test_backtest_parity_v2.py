@@ -13,6 +13,7 @@ Comparison rules:
   - filter both streams to ``open_time >= 2025-03-24`` (OOS cutoff)
   - sort by (open_time, symbol) before assert_frame_equal
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -101,7 +102,7 @@ def test_v2_live_catchup_matches_backtest(tmp_path):
     (Task 4 of the catch-up state-seeding plan).
     """
     from crypto_trade.live.engine import LiveEngine
-    from crypto_trade.live.models import LiveConfig, V2_BASELINE_MODELS
+    from crypto_trade.live.models import V2_BASELINE_MODELS, LiveConfig
 
     cfg = LiveConfig(
         models=V2_BASELINE_MODELS,
@@ -135,5 +136,7 @@ def test_v2_live_catchup_matches_backtest(tmp_path):
         f"trade count mismatch: live={len(live_window)} vs backtest={len(bt_window)}"
     )
     pd.testing.assert_frame_equal(
-        live_window[TRADE_COLS], bt_window[TRADE_COLS], check_exact=True,
+        live_window[TRADE_COLS],
+        bt_window[TRADE_COLS],
+        check_exact=True,
     )

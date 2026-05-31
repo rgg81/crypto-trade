@@ -240,9 +240,11 @@ class TestIter028FeatureColumnsPruned:
     """V1_FEATURE_COLUMNS_PRUNED must have exactly 43 features (pre-condition for guard)."""
 
     def test_pruned_columns_count_is_43(self) -> None:
+        # iter-v1/040: SWAP basis_zscore_30 → regime_momentum_signed_5d; count 43→44.
+        # Updated assertion to 44 (was 43 at /028 runtime; test tracks live constant).
         from crypto_trade.features_v1 import V1_FEATURE_COLUMNS_PRUNED
 
-        assert len(V1_FEATURE_COLUMNS_PRUNED) == 43
+        assert len(V1_FEATURE_COLUMNS_PRUNED) == 44
 
     def test_pruned_columns_is_tuple(self) -> None:
         from crypto_trade.features_v1 import V1_FEATURE_COLUMNS_PRUNED

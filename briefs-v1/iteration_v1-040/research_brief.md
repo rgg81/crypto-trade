@@ -639,4 +639,96 @@ Ready for Phase 6 dispatch.
 
 ---
 
+---
+
+## Section 11 — LM Master Response Map (iter-v1/040 lgbm_advisor.md)
+
+`briefs-v1/iteration_v1-040/lgbm_advisor.md` — 3 HP recommendations + 1 feature-engineering recommendation.
+
+| # | Recommendation | Adjudication | Reason |
+|---|---|---|---|
+| HP-1 | Bump Optuna `colsample_bytree` upper bound 0.85 → 0.95 [MEDIUM] | **REJECTED** | Single-axis isolation discipline (cycle-5 doctrine). Changing the Optuna search-space colsample bounds is a SECOND simultaneous variable on top of the feature swap — violates one-variable-at-a-time. F-AXIS #2 importance rank gate will detect colsample-theft at the current bounds. If /040 lands INERT-by-importance, /041 brief can re-evaluate the colsample bounds as its own axis. |
+| HP-2 | Keep `n_trials=18` + `ENSEMBLE_SIZE=3` (DO NOT raise) [HIGH] | **ADOPTED** | n_trials=18, ENSEMBLE_SIZE=3 per v1 EXPLORATION standard. Unchanged from Section 5.1 configuration locks. |
+| HP-3 | Hold `learning_rate` Optuna bounds [0.01, 0.1] [HIGH] | **ADOPTED** | LR bounds unchanged from baseline. Feature-swap axes do NOT motivate LR retuning per LM Master. Unchanged from Section 5.1 configuration locks. |
+| FE-1 | ADD `regime_momentum_signed_5d` (single feature, no stacking); use BYTE-FOR-BYTE copy from `features_v3/regime_v3.py:34-75` + `engineered_v3.py:36-91` | **ADOPTED** | Core of /040 axis. Implementation in `composed_v1.py`. No stacking — single feature ADD (paired with basis_zscore_30 DROP for constant n_features=44). |
+
+**HP-1 rejection rationale**: LM Master Rec HP-1 is a hyperparameter search-space change (colsample_bytree upper bound), not a feature change. Adding it simultaneously with the feature swap creates two-variable confounding, which violates cycle-5 single-axis isolation doctrine. F-AXIS #2 (importance rank gate) is the built-in diagnostic for colsample-theft — it will fire correctly under the current bounds. If colsample-theft dominates and /040 lands INERT-by-importance, the colsample bound is the natural /041 axis.
+
+---
+
+## Section 11.5 — Pre-Registered Failure-Mode Prediction
+
+**Most plausible failure mode**: RSI colsample-theft INERT.
+
+`regime_momentum_signed_5d` has |IC|=0.80 with `mom_rsi_14`. In v1's 44-feature stack, `mom_rsi_14` consistently ranks 1-3 across all 5 cohorts. At n_trials=18 + LightGBM colsample_bytree sampling, the composed feature and RSI compete for the same "momentum" split budget in each tree. The most probable failure path is:
+
+1. The composed feature IS learned (importance rank ≥ 30 in 2-3 cohorts — F2 PASS-CONDITIONAL), but
+2. RSI absorbs the marginal split budget that would otherwise go to the composed feature, so
+3. OOS Sharpe Δ lands in [+0.05, +0.20] (PROMISING-INERT-FAV) — the model learns the 15-bar horizon
+   but the Optuna basin doesn't shift because RSI captures most of the correlated signal.
+
+What the gates should catch: F-AXIS #2 importance rank ≥ 30 in < 2 cohorts triggers INERT-LEARNED-NEG;
+F-AXIS #1 OOS Δ < -0.10 triggers NEGATIVE. The F1/F2 joint matrix in Section 4 routes the verdict.
+
+**Second failure mode**: regime-decay NEG. If the 2022-2024 IS trending regimes don't persist into
+OOS (2023-03-24 to 2025-03-24), the 15-bar momentum primitive decays in mean-reverting OOS regimes
+and generates incorrect directional signals → F1 Δ < -0.10 (NEGATIVE-no-effect). Probability: 15%.
+
+**Diagnostic signatures**: IS Sharpe < baseline (regime_momentum is IS-harmful as well as OOS-harmful),
+IS importance rank ≥ 31 in ALL 5 cohorts (F2 FAIL → INERT-LEARNED-NEG regardless of F1).
+
+---
+
+## Section 11.6 — Pre-Registered MERGE/NO-MERGE Numerical Criteria
+
+Locked BEFORE backtest runs. EXPLORATION status: /040 cannot directly MERGE; verdict feeds /044
+CONFIRMATION substrate decision. Numerical thresholds define substrate routing.
+
+| F1 Verdict Band | OOS Sharpe Δ vs BASELINE_V1 (+0.6637) | F2 Gate | Routing Decision |
+|---|---|---|---|
+| PROMISING-CLEAN-EXCEPTIONAL | Δ ≥ +0.50 | importance rank 1-5 in ≥ 3/5 cohorts | /044 CONFIRMATION substrate (HIGH confidence) |
+| PROMISING-CLEAN | +0.20 ≤ Δ < +0.50 | importance rank ≤ 30 in ≥ 2/5 cohorts | /044 substrate candidate |
+| PROMISING-INERT-FAV | +0.05 ≤ Δ < +0.20 | importance ≥ 30 in ≥ 2/5 cohorts | /041 stacking experiment OR /044 substrate at low confidence |
+| INERT | -0.10 ≤ Δ < +0.05 | importance ≥ 30 in 0/5 cohorts | composed-feature axis CLOSED; /041 NEW axis |
+| NEGATIVE | Δ < -0.10 | any | composed-feature axis CLOSED at v1; /041 NEW axis |
+
+**Absolute MERGE gate for /044 CONFIRMATION** (forward-declared):
+- OOS monthly Sharpe ≥ +1.8 (vs BASELINE +0.6637)
+- OOS/IS ratio ≥ 0.50
+- OOS trade count ≥ 130
+- DSR > 0.95 (CONFIRMATION-mode, n_trials=35)
+- PBO < 0.40
+- PSR > 0.95
+- Top-symbol ≤ 30% of OOS wpnl
+
+These gates do NOT apply to /040 EXPLORATION itself (no direct MERGE path). They are forward-declared
+here per pre-registration discipline to eliminate post-hoc rationalization at /044 brief.
+
+---
+
+## Section 11.7 — Library Stack Declaration
+
+| Library | Version | Role | Available? |
+|---|---|---|---|
+| lightgbm | ≥ 4.0 (installed in venv) | LightGBM training (LightGbmStrategy) | YES |
+| optuna | ≥ 3.0 (installed in venv) | Hyperparameter search | YES |
+| numpy | ≥ 1.24 (installed in venv) | Hurst R/S computation, ret_5d math | YES |
+| pandas | ≥ 2.0 (installed in venv) | DataFrame manipulation | YES |
+| scipy.stats | installed with scipy | ADF test in EDA only (not in runner) | YES |
+| mlfinlab | N/A | NOT USED | N/A |
+| mlfinpy | N/A | NOT USED | N/A |
+| pypbo | N/A | NOT USED | N/A |
+| fracdiff | N/A | NOT USED | N/A |
+
+**Hurst R/S implementation**: pure NumPy rolling computation. BYTE-FOR-BYTE copy from
+`src/crypto_trade/features_v3/regime_v3.py:34-75` (`_hurst_rs` + `_rolling_hurst`).
+No external Hurst library required. The v3 implementation is already in the codebase
+(passing all v3 tests) and is copied verbatim to `composed_v1.py` to maintain v1 track
+isolation (no cross-track imports permitted).
+
+**No fallbacks required**: all libraries are stdlib or already installed in the project venv.
+No mlfinlab licensing risk. No fracdiff version conflict.
+
+---
+
 **END OF BRIEF**

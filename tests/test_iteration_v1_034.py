@@ -7,8 +7,8 @@ Covers:
     (catch-all guard per /030 LESSON feedback_v1_dispatch_baseline_catchall_exclusion.md).
 9.  test_v1_034_dispatch_branch_exists — runner source contains "v1-034" dispatch branch
     (existence check via inspect.getsource).
-10. test_v1_034_basis_zscore_30_in_pruned_features — basis_zscore_30 in
-    V1_FEATURE_COLUMNS_PRUNED.
+10. test_v1_034_basis_zscore_30_in_pruned_features — basis_zscore_30 was added at /034
+    but DROPPED at /040 (3-consec INERT). Now checks V1_RETIRED_FEATURE_COLUMNS.
 11. test_v1_034_pruned_features_length_44 — V1_FEATURE_COLUMNS_PRUNED has 44 columns.
 12. test_v1_034_foundation_regression_walk_forward_embargo — walk_forward.py:113 carry
     embargo discipline (train_end_ms < test_start_ms).
@@ -80,12 +80,22 @@ def test_v1_034_dispatch_branch_exists() -> None:
 
 
 def test_v1_034_basis_zscore_30_in_pruned_features() -> None:
-    """basis_zscore_30 must be present in V1_FEATURE_COLUMNS_PRUNED."""
-    from crypto_trade.features_v1 import V1_FEATURE_COLUMNS_PRUNED
+    """basis_zscore_30 was added at /034 but DROPPED at /040 (3-consec INERT).
 
-    assert "basis_zscore_30" in V1_FEATURE_COLUMNS_PRUNED, (
-        "basis_zscore_30 not found in V1_FEATURE_COLUMNS_PRUNED. "
-        "It should have been added at iter-v1/034 (features_v1/__init__.py)."
+    After iter-v1/040, basis_zscore_30 is in V1_RETIRED_FEATURE_COLUMNS (not in
+    V1_FEATURE_COLUMNS_PRUNED). This test now verifies the retired state.
+    """
+    from crypto_trade.features_v1 import V1_FEATURE_COLUMNS_PRUNED, V1_RETIRED_FEATURE_COLUMNS
+
+    # After /040: basis_zscore_30 MUST be in RETIRED, NOT in PRUNED.
+    assert "basis_zscore_30" not in V1_FEATURE_COLUMNS_PRUNED, (
+        "basis_zscore_30 is still in V1_FEATURE_COLUMNS_PRUNED. "
+        "iter-v1/040 dropped basis_zscore_30 (3-consec INERT across /034, /037, /038). "
+        "It should now be in V1_RETIRED_FEATURE_COLUMNS only."
+    )
+    assert "basis_zscore_30" in V1_RETIRED_FEATURE_COLUMNS, (
+        "basis_zscore_30 not found in V1_RETIRED_FEATURE_COLUMNS. "
+        "iter-v1/040 retired basis_zscore_30; add it to V1_RETIRED_FEATURE_COLUMNS."
     )
 
 

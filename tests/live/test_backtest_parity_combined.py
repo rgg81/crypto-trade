@@ -19,6 +19,7 @@ Gated behind ``-m parity``; skipped by default. Run with::
     rm -f data/dry_run.db
     uv run pytest tests/live/test_backtest_parity_combined.py -m parity -v
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -77,7 +78,7 @@ def test_combined_catchup_matches_both_backtests(tmp_path):
         db_path=tmp_path / "combined.db",
         data_dir=DATA_DIR,
         features_dir=V1_FEATURES_DIR,  # v2 runners override per-model
-        catch_up_lookback_days=400,    # full OOS replay since 2025-03-24
+        catch_up_lookback_days=400,  # full OOS replay since 2025-03-24
     )
     engine = LiveEngine(cfg)
     engine.catch_up_only()
@@ -101,7 +102,9 @@ def test_combined_catchup_matches_both_backtests(tmp_path):
         f"v1 trade count mismatch: live={len(live_v1)} vs backtest={len(bt_v1_window)}"
     )
     pd.testing.assert_frame_equal(
-        live_v1[TRADE_COLS], bt_v1_window[TRADE_COLS], check_exact=True,
+        live_v1[TRADE_COLS],
+        bt_v1_window[TRADE_COLS],
+        check_exact=True,
     )
 
     # ---- v2 slice (full OOS window) ----
@@ -121,7 +124,9 @@ def test_combined_catchup_matches_both_backtests(tmp_path):
         f"v2 trade count mismatch: live={len(live_v2)} vs backtest={len(bt_v2_window)}"
     )
     pd.testing.assert_frame_equal(
-        live_v2[TRADE_COLS], bt_v2_window[TRADE_COLS], check_exact=True,
+        live_v2[TRADE_COLS],
+        bt_v2_window[TRADE_COLS],
+        check_exact=True,
     )
 
     # ---- April 2026 sanity check ----

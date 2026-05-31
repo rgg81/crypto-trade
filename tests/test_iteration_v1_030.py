@@ -752,11 +752,20 @@ class TestIter030FoundationEmbargoRegression:
 
 
 def _get_030_dispatch_source() -> str:
-    """Return the /030 elif branch source from run_baseline_v1.main for inspection."""
+    """Return the /030 elif branch source from run_baseline_v1.main for inspection.
+
+    Searches for the elif dispatch branch (iteration_label == "v1-030") to avoid
+    matching the catch-all exclusion tuple which also contains "v1-030" as a literal.
+    """
     from run_baseline_v1 import main
 
     src = inspect.getsource(main)
-    start = src.find('"v1-030"')
+    # Search for the elif dispatch branch, not the exclusion tuple
+    marker = 'iteration_label == "v1-030"'
+    start = src.find(marker)
+    if start == -1:
+        # Fallback: search for "v1-030" literal (old behavior)
+        start = src.find('"v1-030"')
     if start == -1:
         return ""
     return src[start : start + 8000]

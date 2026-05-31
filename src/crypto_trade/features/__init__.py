@@ -208,6 +208,16 @@ _register("funding_v1", _add_funding_v1_features)  # iter-v1/023
 _register("open_interest_v1", _add_oi_delta_v1_features)  # iter-v1/025
 _register("basis_v1", _add_basis_v1_features)  # iter-v1/034
 
+# iter-v1/040: composed feature family (regime_momentum_signed_5d = ret_5d × sign(hurst_100 − 0.5)).
+# BYTE-FOR-BYTE Hurst math from features_v3/regime_v3.py; v1-track-isolated (no cross-track import).
+# Registered here so `uv run crypto-trade features --track v1 --groups composed_v1` writes
+# regime_momentum_signed_5d to v1 parquets.
+from crypto_trade.features_v1.composed_v1 import (  # noqa: E402
+    add_composed_v1_features as _add_composed_v1_features,
+)
+
+_register("composed_v1", _add_composed_v1_features)  # iter-v1/040
+
 __all__ = [
     "GROUP_REGISTRY",
     "generate_features",

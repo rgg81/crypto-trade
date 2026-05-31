@@ -147,12 +147,20 @@ class TestTrainTestEmbargo:
         df_truncated = df_full[df_full["open_time"] < test_start_ms].copy().reset_index(drop=True)
 
         labels_full, weights_full, longs_full, shorts_full = label_trades(
-            df_full, train_idx, tp_pct=3.0, sl_pct=1.5,
-            timeout_minutes=self._TIMEOUT, fee_pct=0.1,
+            df_full,
+            train_idx,
+            tp_pct=3.0,
+            sl_pct=1.5,
+            timeout_minutes=self._TIMEOUT,
+            fee_pct=0.1,
         )
         labels_trunc, weights_trunc, longs_trunc, shorts_trunc = label_trades(
-            df_truncated, train_idx, tp_pct=3.0, sl_pct=1.5,
-            timeout_minutes=self._TIMEOUT, fee_pct=0.1,
+            df_truncated,
+            train_idx,
+            tp_pct=3.0,
+            sl_pct=1.5,
+            timeout_minutes=self._TIMEOUT,
+            fee_pct=0.1,
         )
 
         np.testing.assert_array_equal(labels_full, labels_trunc)
@@ -179,12 +187,20 @@ class TestTrainTestEmbargo:
         df_truncated = df_full[df_full["open_time"] < test_start_ms].copy().reset_index(drop=True)
 
         labels_full, weights_full, longs_full, _ = label_trades(
-            df_full, train_idx_buggy, tp_pct=3.0, sl_pct=1.5,
-            timeout_minutes=self._TIMEOUT, fee_pct=0.1,
+            df_full,
+            train_idx_buggy,
+            tp_pct=3.0,
+            sl_pct=1.5,
+            timeout_minutes=self._TIMEOUT,
+            fee_pct=0.1,
         )
         labels_trunc, weights_trunc, longs_trunc, _ = label_trades(
-            df_truncated, train_idx_buggy, tp_pct=3.0, sl_pct=1.5,
-            timeout_minutes=self._TIMEOUT, fee_pct=0.1,
+            df_truncated,
+            train_idx_buggy,
+            tp_pct=3.0,
+            sl_pct=1.5,
+            timeout_minutes=self._TIMEOUT,
+            fee_pct=0.1,
         )
 
         # The bug surfaces as differing PnLs (sometimes labels) on the late

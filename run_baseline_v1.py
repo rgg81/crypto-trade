@@ -4139,6 +4139,125 @@ def main() -> None:
             ("Model_E_DOT_sortino_trend_scan_specialist", _strat_e039),
         ]
 
+    elif iteration_label == "v1-040" and set(symbols) == set(V1_BASELINE_UNIVERSE):
+        # iter-v1/040: cycle-5 EXPLORATION #7/10 — composed feature SWAP.
+        # DROP basis_zscore_30 (3-consec INERT) + ADD regime_momentum_signed_5d.
+        # Feature-engineering axis: pure feature SWAP (DROP 1 INERT + ADD 1 COMPOSED).
+        # V1_FEATURE_COLUMNS_PRUNED stays at 44 cols (basis_zscore_30 DROPPED,
+        # regime_momentum_signed_5d ADDED).
+        # regime_momentum_signed_5d = ret_5d × sign(hurst_100 − 0.5)
+        # where ret_5d is 15-bar (120h = 5 days) log return.
+        # EDA FINDING: sign(hurst_100 − 0.5) = +1 in 100% of IS samples (all 5 v1 syms).
+        # Composed feature is mechanically equivalent to ret_5d (15-bar log return).
+        # v3 /025 PROMISING (IS +0.50/OOS +0.84) + /028 CONFIRMATION-MERGE attributed
+        # to the NEW 15-bar horizon (v1 longest prior = stat_log_return_5 at 5-bar=40h).
+        # NORMAL-RISK: no training-objective domain change, labels, universe, arch change.
+        # All other config IDENTICAL to baseline: 4 models A/C/D/E.
+        assert "regime_momentum_signed_5d" in active_feature_columns, (
+            "iter-v1/040 pre-flight FAIL: regime_momentum_signed_5d not in active_feature_columns. "
+            "Ensure --pruned-features is set AND V1_FEATURE_COLUMNS_PRUNED"
+            " contains regime_momentum_signed_5d. "
+            "Regenerate: uv run crypto-trade features --track v1 --groups composed_v1"
+            " --interval 8h --format parquet"
+            " --symbols BTCUSDT,ETHUSDT,LINKUSDT,LTCUSDT,DOTUSDT --workers 4"
+        )
+        assert "basis_zscore_30" not in active_feature_columns, (
+            "iter-v1/040 pre-flight FAIL: basis_zscore_30 still in active_feature_columns. "
+            "basis_zscore_30 was DROPPED (3-consec INERT) and must NOT appear in"
+            " V1_FEATURE_COLUMNS_PRUNED as of iter-v1/040. "
+            "Check V1_FEATURE_COLUMNS_PRUNED in src/crypto_trade/features_v1/__init__.py."
+        )
+        assert vol_ceiling_mode_arg == "none", (
+            f"iter-v1/040 pre-flight FAIL: expected --vol-ceiling-mode none "
+            f"but got {vol_ceiling_mode_arg!r}. "
+            "iter-v1/040 does NOT carry over /038 vol-ceiling (CLOSED axis)."
+        )
+        assert label_mode_arg == "triple_barrier", (
+            f"iter-v1/040 pre-flight FAIL: expected --label-mode triple_barrier "
+            f"but got {label_mode_arg!r}. "
+            "iter-v1/040 uses triple-barrier labels (UNCHANGED from baseline)."
+        )
+        assert optuna_objective_arg == "sharpe", (
+            f"iter-v1/040 pre-flight FAIL: expected --optuna-objective sharpe "
+            f"but got {optuna_objective_arg!r}. "
+            "iter-v1/040 uses Sharpe objective (NOT Sortino — orthogonal to /037)."
+        )
+        pos_regime_mom = active_feature_columns.index("regime_momentum_signed_5d")
+        print(
+            "[run_baseline_v1] === iter-v1/040 --- composed feature SWAP: "
+            "DROP basis_zscore_30 (INERT-3-consec), "
+            "ADD regime_momentum_signed_5d (v3-PROVEN; cycle-5 EXP-7) ==="
+        )
+        print(
+            f"[iter-v1/040] COMPOSED-FEATURE ACTIVE: regime_momentum_signed_5d@{pos_regime_mom} "
+            f"/ {len(active_feature_columns)} features; basis_zscore_30 DROPPED. "
+            f"v3-PROVEN: /025 PROMISING (IS +0.50 / OOS +0.84) + /028 CONFIRMATION-MERGE. "
+            f"EDA: hurst_100=+1 everywhere → feature ≡ ret_5d (15-bar 120h log return). "
+            f"ENSEMBLE_SIZE={ensemble_size} (inner), seeds=1 (outer=42), n_trials={n_trials}."
+        )
+        results_a, faxm_a, _strat_a = run_model(
+            "A (BTC/ETH)",
+            ("BTCUSDT", "ETHUSDT"),
+            atr_tp=2.9,
+            atr_sl=1.45,
+            apply_r1=False,
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            **_r5_kwargs,
+        )
+        results_c, faxm_c, _strat_c = run_model(
+            "C (LINK + R1)",
+            ("LINKUSDT",),
+            atr_tp=3.5,
+            atr_sl=1.75,
+            apply_r1=True,
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            **_r5_kwargs,
+        )
+        results_d, faxm_d, _strat_d = run_model(
+            "D (LTC + R1)",
+            ("LTCUSDT",),
+            atr_tp=3.5,
+            atr_sl=1.75,
+            apply_r1=True,
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            **_r5_kwargs,
+        )
+        results_e, faxm_e, _strat_e = run_model(
+            "E (DOT + R1 + R2)",
+            ("DOTUSDT",),
+            atr_tp=3.5,
+            atr_sl=1.75,
+            apply_r1=True,
+            apply_r2=True,
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            **_r5_kwargs,
+        )
+        _all_faxm_logs = faxm_a + faxm_c + faxm_d + faxm_e
+        all_results = results_a + results_c + results_d + results_e
+        _r5_model_results = [results_a, results_c, results_d, results_e]
+        _post_dispatch_fi_strategies = [
+            ("Model_A_pool", _strat_a),
+            ("Model_C_LINK", _strat_c),
+            ("Model_D_LTC", _strat_d),
+            ("Model_E_DOT", _strat_e),
+        ]
+
     elif set(symbols) == set(V1_BASELINE_UNIVERSE) and iteration_label not in (
         "v1-021",
         "v1-023",
@@ -4155,6 +4274,7 @@ def main() -> None:
         "v1-037",
         "v1-038",
         "v1-039",
+        "v1-040",
     ):
         # Generic baseline-universe dispatch.
         # Non-/021/.../039 iterations. Models A/C/D/E

@@ -87,7 +87,6 @@ V1_FEATURE_COLUMNS: tuple[str, ...] = tuple(BASELINE_FEATURE_COLUMNS)
 # Properties: 40/40 pass ADF raw-α=0.05 stationarity; alphabetically sorted.
 # DO NOT MODIFY V1_FEATURE_COLUMNS — this is an ADDITIONAL constant.
 V1_FEATURE_COLUMNS_PRUNED: tuple[str, ...] = (
-    "basis_zscore_30",  # iter-v1/034: NEW — basis (perp-spot) z-score 30-bar
     "cal_dow_norm",
     "cal_hour_norm",
     "funding_rate_zscore_30",  # iter-v1/023: NEW — funding-rate z-score 30-bar (10-day)
@@ -109,6 +108,7 @@ V1_FEATURE_COLUMNS_PRUNED: tuple[str, ...] = (
     "mr_pct_from_low_20",
     "mr_rsi_extreme_14",
     "oi_delta_30_z90",  # iter-v1/025: NEW — open-interest delta z-score (90-bar window)
+    "regime_momentum_signed_5d",  # iter-v1/040: composed momentum; replaces basis_zscore_30
     "stat_autocorr_lag5",
     "stat_kurtosis_20",  # LM Master Phase 4.5 swap: drop mom_mom_5, add stat_kurtosis_20
     "stat_log_return_1",
@@ -137,8 +137,21 @@ V1_FEATURE_COLUMNS_PRUNED: tuple[str, ...] = (
 # iter-v1/023: extended 40 → 42 by adding funding_rate_zscore_30 + funding_rate_zscore_90.
 # iter-v1/025: extended 42 → 43 by adding oi_delta_30_z90 (open-interest delta z-score).
 # iter-v1/034: extended 43 → 44 by adding basis_zscore_30 (perp-spot basis z-score).
+# iter-v1/040: SWAP basis_zscore_30 (3-consec INERT DROP) → regime_momentum_signed_5d (ADD).
+#              Count stays at 44 (DROP 1 + ADD 1).
 assert len(V1_FEATURE_COLUMNS_PRUNED) == 44, (
     f"V1_FEATURE_COLUMNS_PRUNED must have exactly 44 features; got {len(V1_FEATURE_COLUMNS_PRUNED)}"
+)
+
+# Columns explicitly NOT in V1_FEATURE_COLUMNS_PRUNED but which may still appear in
+# legacy parquet files (from older iterations that included them). The runner must
+# NOT pick these up as training features.
+# iter-v1/040: basis_zscore_30 DROPPED from V1_FEATURE_COLUMNS_PRUNED (3-consec INERT per
+#              /034, /037, /038 importance audits; mean rank 27.67/44). Added here so any
+#              residual basis_zscore_30 column in legacy parquets is explicitly NOT treated
+#              as a training feature by the runner.
+V1_RETIRED_FEATURE_COLUMNS: tuple[str, ...] = (
+    "basis_zscore_30",  # iter-v1/040: retired (3-consec INERT; replaced by regime_momentum_signed_5d)  # noqa: E501
 )
 
 # Out-of-distribution detection feature subset (16 scale-invariant features
@@ -259,6 +272,7 @@ __all__ = [
     "V1_FEATURE_COLUMNS",
     "V1_FEATURE_COLUMNS_PRUNED",
     "V1_OOD_FEATURE_COLUMNS",
+    "V1_RETIRED_FEATURE_COLUMNS",
     "assert_v1_universe",
     "V1_ITER028_UNIVERSE",
     "V1_ITER029_UNIVERSE",
@@ -266,4 +280,5 @@ __all__ = [
     "V1_ITER039_UNIVERSE",
     # iter-v1/023: funding-rate feature family (add_funding_v1_features imported on demand)
     # iter-v1/025: OI delta feature family (add_oi_delta_v1_features imported on demand)
+    # iter-v1/040: composed feature family (add_composed_v1_features imported on demand)
 ]

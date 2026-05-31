@@ -378,16 +378,24 @@ class TestLiveModePaperSafety:
         """Paper trade hitting timeout in --live mode must update DB without
         calling place_market_order — that would OPEN a real position!"""
         calls: list[tuple[str, str]] = []
+
         def handler(request):
             calls.append((request.method, str(request.url.path)))
             return httpx.Response(200, json={"orderId": 999})
+
         client = AuthenticatedBinanceClient(
-            api_key="t", api_secret="t", transport=httpx.MockTransport(handler),
+            api_key="t",
+            api_secret="t",
+            transport=httpx.MockTransport(handler),
         )
-        _open_paper_trade(state, id="seeded-late",
-                          entry_order_id="SEEDED",
-                          sl_order_id=None, tp_order_id=None,
-                          timeout_time=2_000_000)
+        _open_paper_trade(
+            state,
+            id="seeded-late",
+            entry_order_id="SEEDED",
+            sl_order_id=None,
+            tp_order_id=None,
+            timeout_time=2_000_000,
+        )
         mgr = OrderManager(_live_config(), state, client)
 
         closed = mgr.check_timeouts(now_ms=3_000_000)
@@ -398,18 +406,27 @@ class TestLiveModePaperSafety:
 
     def test_timeout_catchup_trade_no_binance_call(self, state):
         calls: list[tuple[str, str]] = []
+
         def handler(request):
             calls.append((request.method, str(request.url.path)))
             return httpx.Response(200, json={"orderId": 999})
+
         client = AuthenticatedBinanceClient(
-            api_key="t", api_secret="t", transport=httpx.MockTransport(handler),
+            api_key="t",
+            api_secret="t",
+            transport=httpx.MockTransport(handler),
         )
-        _open_paper_trade(state, id="cu-late", direction=-1,
-                          entry_order_id="CATCHUP-deadbeef",
-                          sl_order_id="CATCHUP-feedface",
-                          tp_order_id="CATCHUP-12345678",
-                          stop_loss_price=62400.0, take_profit_price=55200.0,
-                          timeout_time=2_000_000)
+        _open_paper_trade(
+            state,
+            id="cu-late",
+            direction=-1,
+            entry_order_id="CATCHUP-deadbeef",
+            sl_order_id="CATCHUP-feedface",
+            tp_order_id="CATCHUP-12345678",
+            stop_loss_price=62400.0,
+            take_profit_price=55200.0,
+            timeout_time=2_000_000,
+        )
         mgr = OrderManager(_live_config(), state, client)
         closed = mgr.check_timeouts(now_ms=3_000_000)
         assert len(closed) == 1
@@ -419,16 +436,24 @@ class TestLiveModePaperSafety:
     def test_timeout_real_id_still_calls_market_order(self, state):
         """Regression — real numeric-ID timeout still goes through Binance close path."""
         calls: list[tuple[str, str]] = []
+
         def handler(request):
             calls.append((request.method, str(request.url.path)))
             return httpx.Response(200, json={"orderId": 999})
+
         client = AuthenticatedBinanceClient(
-            api_key="t", api_secret="t", transport=httpx.MockTransport(handler),
+            api_key="t",
+            api_secret="t",
+            transport=httpx.MockTransport(handler),
         )
-        _open_paper_trade(state, id="real-late",
-                          entry_order_id="9876543210",
-                          sl_order_id="111", tp_order_id="222",
-                          timeout_time=2_000_000)
+        _open_paper_trade(
+            state,
+            id="real-late",
+            entry_order_id="9876543210",
+            sl_order_id="111",
+            tp_order_id="222",
+            timeout_time=2_000_000,
+        )
         mgr = OrderManager(_live_config(), state, client)
         mgr.check_timeouts(now_ms=3_000_000)
 
@@ -470,10 +495,14 @@ class TestOpenTradeAtomicity:
 
     def _live_mgr(self, state, transport):
         client = AuthenticatedBinanceClient(
-            api_key="t", api_secret="t", transport=transport,
+            api_key="t",
+            api_secret="t",
+            transport=transport,
         )
         return OrderManager(
-            _live_config(), state, client,
+            _live_config(),
+            state,
+            client,
             quantity_precision={"BTCUSDT": 4},
             tick_size={"BTCUSDT": 0.1},
         )
@@ -487,9 +516,13 @@ class TestOpenTradeAtomicity:
         signal = Signal(direction=1, weight=100, tp_pct=8.0, sl_pct=4.0)
         with pytest.raises(httpx.HTTPStatusError):
             mgr.open_trade(
-                model_name="A", symbol="BTCUSDT", signal=signal,
-                entry_price=80000.0, candle_close_time=2_000_000,
-                candle_open_time=1_000_000, weight_factor=1.0,
+                model_name="A",
+                symbol="BTCUSDT",
+                signal=signal,
+                entry_price=80000.0,
+                candle_close_time=2_000_000,
+                candle_open_time=1_000_000,
+                weight_factor=1.0,
             )
 
         # Sequence must be: entry POST /fapi/v1/order → SL POST /fapi/v1/algoOrder (fails)
@@ -516,7 +549,8 @@ class TestOpenTradeAtomicity:
                     return httpx.Response(200, json={"algoId": 100, "algoStatus": "NEW"})
                 # Second algoOrder POST = TP — fail it.
                 return httpx.Response(
-                    400, json={"code": -4131, "msg": "PERCENT_PRICE filter violation"},
+                    400,
+                    json={"code": -4131, "msg": "PERCENT_PRICE filter violation"},
                 )
             if "/algoOrder" in request.url.path and request.method == "DELETE":
                 return httpx.Response(200, json={"algoId": 100, "code": "200", "msg": "success"})
@@ -534,18 +568,20 @@ class TestOpenTradeAtomicity:
         signal = Signal(direction=1, weight=100, tp_pct=8.0, sl_pct=4.0)
         with pytest.raises(httpx.HTTPStatusError):
             mgr.open_trade(
-                model_name="A", symbol="BTCUSDT", signal=signal,
-                entry_price=80000.0, candle_close_time=2_000_000,
-                candle_open_time=1_000_000, weight_factor=1.0,
+                model_name="A",
+                symbol="BTCUSDT",
+                signal=signal,
+                entry_price=80000.0,
+                candle_close_time=2_000_000,
+                candle_open_time=1_000_000,
+                weight_factor=1.0,
             )
 
         # Must have: entry POST → SL POST → TP POST (fails) → SL cancel DELETE → close POST.
         kinds = [(m, p) for m, p in all_calls]
         assert ("POST", "/fapi/v1/order") in kinds  # entry + close
         assert kinds.count(("POST", "/fapi/v1/order")) == 2, f"entry+close, got {kinds}"
-        assert kinds.count(("POST", "/fapi/v1/algoOrder")) == 2, (
-            f"SL + TP attempts, got {kinds}"
-        )
+        assert kinds.count(("POST", "/fapi/v1/algoOrder")) == 2, f"SL + TP attempts, got {kinds}"
         assert ("DELETE", "/fapi/v1/algoOrder") in kinds, (
             f"SL must be cancelled when TP fails; got {kinds}"
         )
@@ -557,35 +593,58 @@ class TestAlgoSLTPFillDetection:
 
     def test_sl_fill_detected_from_algo_status_triggered(self, state):
         """When the SL algo flips to TRIGGERED, the trade closes as stop_loss."""
+
         def handler(request):
             # Match SL or TP query
             params = dict(p.split("=") for p in str(request.url.params).split("&") if "=" in p)
             algo_id = params.get("algoId", "")
             if request.method == "GET" and request.url.path == "/fapi/v1/algoOrder":
                 if algo_id == "111":  # SL
-                    return httpx.Response(200, json={
-                        "algoId": 111, "algoStatus": "TRIGGERED",
-                        "actualPrice": "57555.5", "triggerTime": 2_500_000,
-                    })
+                    return httpx.Response(
+                        200,
+                        json={
+                            "algoId": 111,
+                            "algoStatus": "TRIGGERED",
+                            "actualPrice": "57555.5",
+                            "triggerTime": 2_500_000,
+                        },
+                    )
                 if algo_id == "222":  # TP — still open
-                    return httpx.Response(200, json={
-                        "algoId": 222, "algoStatus": "NEW",
-                        "actualPrice": "0", "triggerTime": 0,
-                    })
+                    return httpx.Response(
+                        200,
+                        json={
+                            "algoId": 222,
+                            "algoStatus": "NEW",
+                            "actualPrice": "0",
+                            "triggerTime": 0,
+                        },
+                    )
             if request.method == "DELETE" and request.url.path == "/fapi/v1/algoOrder":
                 return httpx.Response(200, json={"code": "200", "msg": "success"})
             return httpx.Response(200, json={})
 
         client = AuthenticatedBinanceClient(
-            api_key="t", api_secret="t", transport=httpx.MockTransport(handler),
+            api_key="t",
+            api_secret="t",
+            transport=httpx.MockTransport(handler),
         )
         # Numeric (real) SL/TP IDs so is_paper_trade is False.
         trade = LiveTrade(
-            id="t-sl", model_name="A", symbol="BTCUSDT", direction=1,
-            entry_price=60000.0, amount_usd=1000.0, weight_factor=1.0,
-            stop_loss_price=57600.0, take_profit_price=64800.0,
-            open_time=1_000_000, timeout_time=10**13, signal_time=999_000,
-            entry_order_id="9999", sl_order_id="111", tp_order_id="222",
+            id="t-sl",
+            model_name="A",
+            symbol="BTCUSDT",
+            direction=1,
+            entry_price=60000.0,
+            amount_usd=1000.0,
+            weight_factor=1.0,
+            stop_loss_price=57600.0,
+            take_profit_price=64800.0,
+            open_time=1_000_000,
+            timeout_time=10**13,
+            signal_time=999_000,
+            entry_order_id="9999",
+            sl_order_id="111",
+            tp_order_id="222",
         )
         state.upsert_trade(trade)
         mgr = OrderManager(_live_config(), state, client)
@@ -600,33 +659,56 @@ class TestAlgoSLTPFillDetection:
 
     def test_tp_fill_detected_from_algo_status_finished(self, state):
         """algoStatus=FINISHED is also a fill (Binance flips TRIGGERED→FINISHED)."""
+
         def handler(request):
             params = dict(p.split("=") for p in str(request.url.params).split("&") if "=" in p)
             algo_id = params.get("algoId", "")
             if request.method == "GET" and request.url.path == "/fapi/v1/algoOrder":
                 if algo_id == "333":  # SL — still open
-                    return httpx.Response(200, json={
-                        "algoId": 333, "algoStatus": "NEW",
-                        "actualPrice": "0", "triggerTime": 0,
-                    })
+                    return httpx.Response(
+                        200,
+                        json={
+                            "algoId": 333,
+                            "algoStatus": "NEW",
+                            "actualPrice": "0",
+                            "triggerTime": 0,
+                        },
+                    )
                 if algo_id == "444":  # TP — finished
-                    return httpx.Response(200, json={
-                        "algoId": 444, "algoStatus": "FINISHED",
-                        "actualPrice": "21.55", "triggerTime": 2_700_000,
-                    })
+                    return httpx.Response(
+                        200,
+                        json={
+                            "algoId": 444,
+                            "algoStatus": "FINISHED",
+                            "actualPrice": "21.55",
+                            "triggerTime": 2_700_000,
+                        },
+                    )
             if request.method == "DELETE" and request.url.path == "/fapi/v1/algoOrder":
                 return httpx.Response(200, json={"code": "200", "msg": "success"})
             return httpx.Response(200, json={})
 
         client = AuthenticatedBinanceClient(
-            api_key="t", api_secret="t", transport=httpx.MockTransport(handler),
+            api_key="t",
+            api_secret="t",
+            transport=httpx.MockTransport(handler),
         )
         trade = LiveTrade(
-            id="t-tp", model_name="C", symbol="LINKUSDT", direction=1,
-            entry_price=20.0, amount_usd=1000.0, weight_factor=1.0,
-            stop_loss_price=19.2, take_profit_price=21.6,
-            open_time=1_000_000, timeout_time=10**13, signal_time=999_000,
-            entry_order_id="8888", sl_order_id="333", tp_order_id="444",
+            id="t-tp",
+            model_name="C",
+            symbol="LINKUSDT",
+            direction=1,
+            entry_price=20.0,
+            amount_usd=1000.0,
+            weight_factor=1.0,
+            stop_loss_price=19.2,
+            take_profit_price=21.6,
+            open_time=1_000_000,
+            timeout_time=10**13,
+            signal_time=999_000,
+            entry_order_id="8888",
+            sl_order_id="333",
+            tp_order_id="444",
         )
         state.upsert_trade(trade)
         mgr = OrderManager(_live_config(), state, client)

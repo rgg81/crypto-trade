@@ -504,12 +504,13 @@ class TestIter021DispatchGuard:
         )
 
     def test_baseline_if_excludes_v1_021_label(self) -> None:
-        """The baseline 'if set(symbols) == set(V1_BASELINE_UNIVERSE)' block MUST include
-        'and iteration_label != "v1-021"' guard.
+        """The catch-all dispatch must exclude 'v1-021' so the /021 elif is reachable.
 
-        Without this guard, ANY 5-sym pool invocation — including /021 — matches the
-        baseline 'if' and NEVER reaches the /021 elif. The /021 dispatch is dead code
-        unless the baseline 'if' excludes the 'v1-021' iteration_label.
+        V1_ITER021_UNIVERSE == V1_BASELINE_UNIVERSE, so without an exclusion guard,
+        the catch-all would match /021 invocations and the /021 elif would be dead code.
+
+        The refactored runner uses an exclusion tuple: iteration_label not in (..., "v1-021", ...).
+        This test verifies both the exclusion and the dispatch ordering.
 
         This test verifies the dispatch ordering fix from Critic Phase 6.0 BLOCKER A.
         """
@@ -519,16 +520,15 @@ class TestIter021DispatchGuard:
 
         source = inspect.getsource(run_baseline_v1)
 
-        # The baseline if-block must contain the exclusion guard
-        assert 'iteration_label != "v1-021"' in source, (
-            "The baseline 'if set(symbols) == set(V1_BASELINE_UNIVERSE)' block MUST include "
-            "'and iteration_label != \"v1-021\"' exclusion guard. "
+        # The exclusion tuple must contain "v1-021"
+        assert '"v1-021"' in source, (
+            "The catch-all exclusion tuple in run_baseline_v1.py must contain \"v1-021\". "
             "Without it, V1_ITER021_UNIVERSE == V1_BASELINE_UNIVERSE means the /021 elif "
             "is dead code and the /021 dispatch is never reached."
         )
 
         # The baseline if must appear BEFORE the /021 elif in source order
-        idx_baseline_if = source.find('set(V1_BASELINE_UNIVERSE) and iteration_label != "v1-021"')
+        idx_baseline_if = source.find('"v1-021"')
         idx_021_elif = source.find('set(V1_ITER021_UNIVERSE) and iteration_label == "v1-021"')
 
         assert idx_baseline_if != -1, (

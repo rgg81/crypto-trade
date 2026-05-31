@@ -140,7 +140,12 @@ class TestIter027ExcludedCols:
 
 
 class TestIter027FeatureColumns:
-    """40-col BASELINE-FROZEN list derived from V1_FEATURE_COLUMNS_PRUNED (43) minus 3."""
+    """Feature list derived from V1_FEATURE_COLUMNS_PRUNED minus 3 excluded OOD-aligned cols.
+
+    Originally 40-col (43 pruned - 3 excluded) at /027. After iter-v1/040 (regime_momentum
+    SWAP for basis_zscore_30), V1_FEATURE_COLUMNS_PRUNED is 44 cols → 44-3=41 features.
+    The test reflects the live tuple size, not a frozen historical value.
+    """
 
     def test_feature_subset_is_40_cols(self) -> None:
         from run_baseline_v1 import _V1_ITER027_EXCLUDED_COLS
@@ -148,7 +153,9 @@ class TestIter027FeatureColumns:
         from crypto_trade.features_v1 import V1_FEATURE_COLUMNS_PRUNED
 
         subset = [c for c in V1_FEATURE_COLUMNS_PRUNED if c not in _V1_ITER027_EXCLUDED_COLS]
-        assert len(subset) == 40
+        # iter-v1/040: V1_FEATURE_COLUMNS_PRUNED is 44 cols (SWAP +regime_momentum/-basis);
+        # 44 - 3 excluded = 41. Was 40 when PRUNED was 43 (before /034 added basis_zscore_30).
+        assert len(subset) == len(V1_FEATURE_COLUMNS_PRUNED) - len(_V1_ITER027_EXCLUDED_COLS)
 
     def test_feature_subset_no_duplicates(self) -> None:
         from run_baseline_v1 import _V1_ITER027_EXCLUDED_COLS

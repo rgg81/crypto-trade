@@ -244,19 +244,13 @@ def test_engine_r1_arms_cooldown_after_k_sls(tmp_path):
     candle_ms = engine._candle_duration_ms
 
     # 2 consecutive SLs: streak=2, no cooldown yet
-    engine._record_trade_close_for_risk(
-        _make_closed_live_trade("C", "LINKUSDT", "stop_loss", 1000)
-    )
-    engine._record_trade_close_for_risk(
-        _make_closed_live_trade("C", "LINKUSDT", "stop_loss", 2000)
-    )
+    engine._record_trade_close_for_risk(_make_closed_live_trade("C", "LINKUSDT", "stop_loss", 1000))
+    engine._record_trade_close_for_risk(_make_closed_live_trade("C", "LINKUSDT", "stop_loss", 2000))
     assert engine._sl_streak["LINKUSDT"] == 2
     assert "LINKUSDT" not in engine._risk_cooldown_until
 
     # 3rd SL hits threshold: streak resets, cooldown armed
-    engine._record_trade_close_for_risk(
-        _make_closed_live_trade("C", "LINKUSDT", "stop_loss", 3000)
-    )
+    engine._record_trade_close_for_risk(_make_closed_live_trade("C", "LINKUSDT", "stop_loss", 3000))
     assert engine._sl_streak["LINKUSDT"] == 0
     assert engine._risk_cooldown_until["LINKUSDT"] == 3000 + 27 * candle_ms
 
@@ -343,9 +337,7 @@ def test_engine_r2_records_weighted_pnl_and_peak(tmp_path):
     assert engine._peak_weighted_pnl["E"] == cum1
 
     # SL trade: drops cum below peak
-    engine._record_trade_close_for_risk(
-        _make_closed_live_trade("E", "DOTUSDT", "stop_loss", 2000)
-    )
+    engine._record_trade_close_for_risk(_make_closed_live_trade("E", "DOTUSDT", "stop_loss", 2000))
     cum2 = engine._cum_weighted_pnl["E"]
     assert cum2 < cum1
     assert engine._peak_weighted_pnl["E"] == cum1  # peak unchanged
@@ -380,12 +372,8 @@ def test_engine_rebuild_risk_state_from_db(tmp_path):
         engine._state.upsert_trade(
             _make_closed_live_trade("C", "LINKUSDT", "stop_loss", ts + i * 100)
         )
-    engine._state.upsert_trade(
-        _make_closed_live_trade("E", "DOTUSDT", "take_profit", ts + 1000)
-    )
-    engine._state.upsert_trade(
-        _make_closed_live_trade("E", "DOTUSDT", "stop_loss", ts + 2000)
-    )
+    engine._state.upsert_trade(_make_closed_live_trade("E", "DOTUSDT", "take_profit", ts + 1000))
+    engine._state.upsert_trade(_make_closed_live_trade("E", "DOTUSDT", "stop_loss", ts + 2000))
 
     # Wipe in-memory state, then rebuild from DB.
     engine._sl_streak = {}

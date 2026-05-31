@@ -1,4 +1,5 @@
 """Tests for the combined v1+v2 portfolio reporter (Task 12)."""
+
 from __future__ import annotations
 
 import math
@@ -71,9 +72,7 @@ def test_combined_report_aggregates_trades():
 
 
 def test_combined_report_handles_empty_inputs():
-    rep = build_combined_report(
-        ReportInputs(v1_trades=pd.DataFrame(), v2_trades=pd.DataFrame())
-    )
+    rep = build_combined_report(ReportInputs(v1_trades=pd.DataFrame(), v2_trades=pd.DataFrame()))
     assert rep.total_trades == 0
     assert rep.combined_weighted_pnl == 0.0
     assert rep.combined_sharpe_monthly == 0.0

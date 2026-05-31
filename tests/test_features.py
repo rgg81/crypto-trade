@@ -58,7 +58,8 @@ def _make_ohlcv_df(n: int = 500) -> pd.DataFrame:
 def test_list_groups():
     groups = list_groups()
     # iter-v1/023 added funding_v1 (10 groups); iter-v1/025 added open_interest_v1 (11 groups).
-    assert len(groups) == 11
+    # iter-v1/034 added basis_v1 (12 groups); iter-v1/040 added composed_v1 (13 groups).
+    assert len(groups) == 13
     expected = {
         "momentum",
         "volatility",
@@ -71,13 +72,16 @@ def test_list_groups():
         "entropy_cusum",
         "funding_v1",  # iter-v1/023
         "open_interest_v1",  # iter-v1/025
+        "basis_v1",  # iter-v1/034
+        "composed_v1",  # iter-v1/040
     }
     assert set(groups) == expected
 
 
 def test_registry_has_all_groups():
     # iter-v1/023 added funding_v1; iter-v1/025 added open_interest_v1.
-    assert len(GROUP_REGISTRY) == 11
+    # iter-v1/034 added basis_v1; iter-v1/040 added composed_v1.
+    assert len(GROUP_REGISTRY) == 13
 
 
 # ---------------------------------------------------------------------------

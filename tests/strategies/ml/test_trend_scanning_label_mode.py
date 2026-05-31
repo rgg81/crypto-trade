@@ -514,8 +514,7 @@ def test_trend_scanning_integration_smoke():
         )
         unique_labels = set(labels.tolist())
         assert unique_labels.issubset({-1, 1}), (
-            f"trend_scanning labels from IS window must be in {{-1, +1}}; "
-            f"got {unique_labels}"
+            f"trend_scanning labels from IS window must be in {{-1, +1}}; got {unique_labels}"
         )
         assert len(unique_labels) == 2, (
             f"trend_scanning labels on IS window must be non-degenerate "
