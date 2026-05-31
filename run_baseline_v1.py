@@ -414,6 +414,7 @@ def run_model(
     nan_skip_columns: list[str] | None = None,
     nan_skip_threshold: float = 0.5,
     frozen_hp_parquet: Path | None = None,
+    optuna_objective: str = "sharpe",
 ):
     """Run a single v1 sub-model (A/C/D/E) under the corrected walk-forward.
 
@@ -538,6 +539,7 @@ def run_model(
         nan_skip_columns=nan_skip_columns,
         nan_skip_threshold=nan_skip_threshold,
         frozen_hp_parquet=frozen_hp_parquet,
+        optuna_objective=optuna_objective,
     )
     t0 = time.time()
     results = run_backtest(config, strategy, yearly_pnl_check=False)
@@ -573,12 +575,20 @@ def run_meta_model(
     sigma_k_sl: float | None = None,
     sigma_halflife_days: int = 14,
     sample_weight_mode: str = "abs_pnl",
+    label_mode: str = "triple_barrier",
+    frozen_hp_parquet: Path | None = None,
+    optuna_objective: str = "sharpe",
 ):
     """Run a single v1 sub-model with M2 meta-labeling (iter-v1/030).
 
     Mirrors run_model() but creates MetaLabelingStrategy instead of
     LightGbmStrategy.  M2 is a binary LGBMClassifier trained on M1-positive
     bars per training window; it vetoes M1 signals where M2 confidence < 0.5.
+
+    label_mode, frozen_hp_parquet, optuna_objective: accepted for _r5_kwargs
+    compatibility but ignored by MetaLabelingStrategy (M1 in /030 uses baseline
+    triple_barrier labels and Sharpe objective; meta-labeling axis is orthogonal
+    to label-mode and loss-function axes).
 
     M2 input: feature_columns (43 V1_FEATURE_COLUMNS_PRUNED) + m1_confidence
     + m1_direction = 45-dim (include_m1_direction=True, per brief §3.3).
@@ -693,12 +703,19 @@ def build_lgbm_strategy(
     symbol: str = "",
     data_filter_callback: Callable[[pd.DataFrame], np.ndarray] | None = None,
     data_filter_columns: list[str] | None = None,
+    label_mode: str = "triple_barrier",
+    frozen_hp_parquet: Path | None = None,
+    optuna_objective: str = "sharpe",
 ) -> LightGbmStrategy:
     """Build a LightGbmStrategy WITHOUT running a backtest.
 
     Factory function used by run_regime_cohort() to construct inner sub-strategies
     for RegimeRoutedStrategy before they are wrapped and dispatched via a SINGLE
     run_backtest() call on the wrapper.
+
+    label_mode, frozen_hp_parquet, optuna_objective: forwarded to LightGbmStrategy
+    ctor (iter-v1/037 _r5_kwargs compatibility; default "sharpe" is BIT-IDENTICAL
+    to all pre-/037 callers).
 
     Parameters match run_model() exactly (minus the name/symbols/apply_r1/apply_r2
     arguments which belong to the BacktestConfig, not the strategy).  All semantics
@@ -743,6 +760,9 @@ def build_lgbm_strategy(
         symbol=symbol,
         data_filter_callback=data_filter_callback,
         data_filter_columns=data_filter_columns,
+        label_mode=label_mode,
+        frozen_hp_parquet=frozen_hp_parquet,
+        optuna_objective=optuna_objective,
     )
 
 
@@ -1829,6 +1849,21 @@ def main() -> None:
             "'fixed_horizon' uses fixed forward-return at timeout horizon."
         ),
     )
+    # iter-v1/037: Optuna study objective metric.
+    # "sharpe" (default) is BIT-IDENTICAL to all pre-/037 callers.
+    # "sortino" activates the loss-function axis (NEW 12th family in v1 catalog).
+    parser.add_argument(
+        "--optuna-objective",
+        choices=["sharpe", "sortino"],
+        default="sharpe",
+        help=(
+            "Optuna study objective metric (iter-v1/037). "
+            "'sharpe' (default) is BIT-IDENTICAL to baseline. "
+            "'sortino' uses mean/downside_std — iter-v1/037 loss-function axis. "
+            "Targets right-skewed PnL distributions where Sharpe penalizes "
+            "upside variance (Sortino/Sharpe ratio 3.0-4.0x across v1 cohorts)."
+        ),
+    )
     # iter-v1/032: frozen HP mode for basin-lottery ablation.
     # When "baseline_v1", Optuna search is skipped and each (model, month, seed) cell
     # uses the per-cell best HP extracted from the baseline run's Optuna log.
@@ -2015,6 +2050,7 @@ def main() -> None:
     # perturbations can confound F-AXIS-MECHANISM attribution.
     sample_weight_mode_arg = getattr(args, "sample_weight_mode", "abs_pnl")
     label_mode_arg = getattr(args, "label_mode", "triple_barrier")
+    optuna_objective_arg = getattr(args, "optuna_objective", "sharpe")
     if sample_weight_mode_arg != "abs_pnl" and bounds_profile == "v1_pruned":
         bounds_profile = "v1_pruned_axis016"
         print(
@@ -2140,6 +2176,7 @@ def main() -> None:
         print(f"  sigma_halflife_days: {sigma_halflife_days_arg}")
     print(f"  sample_weight_mode: {sample_weight_mode_arg}")
     print(f"  label_mode: {label_mode_arg}")
+    print(f"  optuna_objective: {optuna_objective_arg}")
 
     # iter-v1/032: frozen HP mode resolution.
     frozen_hp_mode_arg = getattr(args, "frozen_hp_mode", "none")
@@ -2188,6 +2225,7 @@ def main() -> None:
     # iter-v1/016: sample_weight_mode threaded through for sample-weighting axis.
     # iter-v1/032: frozen_hp_parquet threaded through for basin-lottery ablation.
     # iter-v1/035: label_mode threaded through for trend-scanning labels axis.
+    # iter-v1/037: optuna_objective threaded through for loss-function axis.
     _r5_kwargs = dict(
         r5_vol_target_enabled=r5_vol_target_enabled,
         r5_vol_target_pct=r5_vol_target_pct,
@@ -2201,6 +2239,7 @@ def main() -> None:
         label_mode=label_mode_arg,
         sigma_halflife_days=sigma_halflife_days_arg,
         frozen_hp_parquet=_frozen_hp_parquet_path,
+        optuna_objective=optuna_objective_arg,
     )
     # iter-v1/016: collect F-AXIS-MECHANISM logs from all model runs.
     _all_faxm_logs: list[dict] = []
@@ -3677,6 +3716,91 @@ def main() -> None:
             ("Model_E_DOT_trend_scan_specialist", _strat_e036),
         ]
 
+    elif iteration_label == "v1-037" and set(symbols) == set(V1_BASELINE_UNIVERSE):
+        # iter-v1/037: cycle-5 EXPLORATION #4/10 — loss-function axis (NEW 12th family).
+        # Tests whether replacing Optuna's per-trial scoring from Sharpe (mean/std) to
+        # Sortino (mean/downside_std) surfaces HP regions that Sharpe under-rewards.
+        # EDA: Sortino/Sharpe ratio 3.0-4.0x across all 4 cohorts (right-skewed returns).
+        # NORMAL-RISK (changes only the scalar Optuna aggregate, NOT the training-objective
+        # domain — labels, features, search space, weights all UNCHANGED).
+        # Models A/C/D/E: IDENTICAL config to baseline catch-all EXCEPT optuna_objective.
+        assert optuna_objective_arg == "sortino", (
+            f"iter-v1/037 pre-flight FAIL: expected --optuna-objective sortino "
+            f"but got {optuna_objective_arg!r}. "
+            "Pass --optuna-objective sortino to activate the Sortino loss-function axis. "
+            "iter-v1/037 tests Optuna Sortino objective — sortino is the required mode."
+        )
+        print(
+            f"[iter-v1/037] SORTINO OBJECTIVE: optuna_objective={optuna_objective_arg!r}. "
+            f"Loss-function axis (NEW 12th family). "
+            f"ENSEMBLE_SIZE={ensemble_size} (inner), seeds=1 (outer), n_trials={n_trials}. "
+            f"Features: {len(active_feature_columns)} cols (V1_FEATURE_COLUMNS_PRUNED UNCHANGED). "
+            f"Labels: triple_barrier (UNCHANGED). Weights: abs_pnl (UNCHANGED). "
+            f"Models: A (BTC+ETH) + C (LINK) + D (LTC) + E (DOT) — baseline 4-model bundle."
+        )
+        results_a, faxm_a, _strat_a = run_model(
+            "A (BTC/ETH)",
+            ("BTCUSDT", "ETHUSDT"),
+            atr_tp=2.9,
+            atr_sl=1.45,
+            apply_r1=False,
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            **_r5_kwargs,
+        )
+        results_c, faxm_c, _strat_c = run_model(
+            "C (LINK + R1)",
+            ("LINKUSDT",),
+            atr_tp=3.5,
+            atr_sl=1.75,
+            apply_r1=True,
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            **_r5_kwargs,
+        )
+        results_d, faxm_d, _strat_d = run_model(
+            "D (LTC + R1)",
+            ("LTCUSDT",),
+            atr_tp=3.5,
+            atr_sl=1.75,
+            apply_r1=True,
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            **_r5_kwargs,
+        )
+        results_e, faxm_e, _strat_e = run_model(
+            "E (DOT + R1 + R2)",
+            ("DOTUSDT",),
+            atr_tp=3.5,
+            atr_sl=1.75,
+            apply_r1=True,
+            apply_r2=True,
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            **_r5_kwargs,
+        )
+        _all_faxm_logs = faxm_a + faxm_c + faxm_d + faxm_e
+        all_results = results_a + results_c + results_d + results_e
+        _r5_model_results = [results_a, results_c, results_d, results_e]
+        _post_dispatch_fi_strategies = [
+            ("Model_A_pool", _strat_a),
+            ("Model_C_LINK", _strat_c),
+            ("Model_D_LTC", _strat_d),
+            ("Model_E_DOT", _strat_e),
+        ]
+
     elif set(symbols) == set(V1_BASELINE_UNIVERSE) and iteration_label not in (
         "v1-021",
         "v1-023",
@@ -3690,9 +3814,10 @@ def main() -> None:
         "v1-034",
         "v1-035",
         "v1-036",
+        "v1-037",
     ):
         # Generic baseline-universe dispatch.
-        # Non-/021/023/024/025/027/030/031/032/033/034/035 iterations. Models A/C/D/E with
+        # Non-/021/023/024/025/027/030/031/032/033/034/035/036/037 iterations. Models A/C/D/E with
         # V1_BASELINE_UNIVERSE symbols. BIT-IDENTICAL to historical
         # v186 baseline when active_feature_columns=list(V1_FEATURE_COLUMNS) + n_trials=50.
         results_a, faxm_a, _strat_a = run_model(

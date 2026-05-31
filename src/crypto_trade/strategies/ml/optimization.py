@@ -102,6 +102,67 @@ def compute_sharpe_with_threshold(
     return sharpe
 
 
+def compute_sortino_with_threshold(
+    y_proba: np.ndarray,
+    long_pnls: np.ndarray,
+    short_pnls: np.ndarray,
+    threshold: float,
+    min_trades: int = 20,
+    ternary: bool = False,
+) -> float:
+    """Compute Sortino from actual PnLs, filtering by prediction confidence.
+
+    Sortino = mean(pnls) / downside_std(pnls)
+    where downside_std = std of pnls[pnls < 0] (ddof=0).
+
+    Returns -10.0 penalty if:
+      - fewer than min_trades survive the confidence filter
+      - fewer than 2 downside trades exist (downside_std undefined or zero)
+      - downside_std is zero (all downside trades identical)
+      - |Sortino| > 100 (numerical overflow guard, mirrors Sharpe path)
+
+    Only difference from compute_sharpe_with_threshold: denominator is the
+    standard deviation of NEGATIVE-PnL trades only (right-skew-aware).
+    Same confidence masking, same prediction logic, same class mapping.
+
+    iter-v1/037: loss-function axis (NEW 12th family in v1 catalog).
+    """
+    if ternary:
+        # 3-class: [short=0, neutral=1, long=2]
+        directional_proba = y_proba[:, [0, 2]]  # short, long
+        confidence = directional_proba.max(axis=1)
+        mask = confidence >= threshold
+        n_trades = int(mask.sum())
+        if n_trades < min_trades:
+            return -10.0
+        dir_pred = directional_proba[mask].argmax(axis=1)
+        y_pred = np.where(dir_pred == 1, 1, -1)
+    else:
+        confidence = y_proba.max(axis=1)
+        mask = confidence >= threshold
+        n_trades = int(mask.sum())
+        if n_trades < min_trades:
+            return -10.0
+        pred_classes = y_proba[mask].argmax(axis=1)
+        y_pred = classes_to_labels(pred_classes)
+
+    pnls = np.where(y_pred == 1, long_pnls[mask], short_pnls[mask])
+
+    mean = pnls.mean()
+    downside = pnls[pnls < 0]
+    if len(downside) < 2:
+        # No meaningful downside distribution — return penalty rather than +inf or NaN
+        return -10.0
+    down_std = downside.std()
+    if down_std == 0:
+        return -10.0
+
+    sortino = float(mean / down_std)
+    if abs(sortino) > 100:
+        return -10.0
+    return sortino
+
+
 def compute_per_candle_pnl(
     y_proba: np.ndarray,
     long_pnls: np.ndarray,
@@ -267,7 +328,7 @@ def _objective(
         )
 
     w = train_weights
-    sharpes: list[float] = []
+    scores: list[float] = []
     feat_df = pd.DataFrame(train_features, columns=all_columns)
 
     import datetime
@@ -310,14 +371,23 @@ def _objective(
         # Predict and filter by confidence threshold
         y_proba = model.predict_proba(feat_val)
 
-        sharpe = compute_sharpe_with_threshold(
+        # iter-v1/037: dispatch to Sortino or Sharpe based on study user_attr
+        _optuna_objective = trial.study.user_attrs.get("optuna_objective", "sharpe")
+        if _optuna_objective == "sortino":
+            score_fn = compute_sortino_with_threshold
+        elif _optuna_objective == "sharpe":
+            score_fn = compute_sharpe_with_threshold
+        else:
+            raise ValueError(f"Unknown optuna_objective: {_optuna_objective!r}")
+
+        score = score_fn(
             y_proba,
             long_pnls[val_idx],
             short_pnls[val_idx],
             confidence_threshold,
             ternary=ternary,
         )
-        sharpes.append(sharpe)
+        scores.append(score)
 
         # Sub-fix 1a (iter-v3/003): capture per-candle OOF returns for trial buffer
         if oof_buffer is not None:
@@ -342,15 +412,17 @@ def _objective(
                     }
                 )
 
-    mean_sharpe = float(np.mean(sharpes))
+    mean_score = float(np.mean(scores))
 
     if verbose > 0:
+        # Label the metric in the log based on the active objective
+        _obj_label = trial.study.user_attrs.get("optuna_objective", "sharpe").capitalize()
         print(
-            f"    [trial {trial.number}] Sharpe={mean_sharpe:.4f} "
-            f"(folds: {', '.join(f'{s:.4f}' for s in sharpes)})"
+            f"    [trial {trial.number}] {_obj_label}={mean_score:.4f} "
+            f"(folds: {', '.join(f'{s:.4f}' for s in scores)})"
         )
 
-    return mean_sharpe
+    return mean_score
 
 
 def optimize_and_train(
@@ -376,12 +448,18 @@ def optimize_and_train(
     params_persist_path: Path | None = None,
     model_role: str = "",
     symbol: str = "",
+    optuna_objective: str = "sharpe",
 ) -> tuple[lgb.LGBMClassifier, list[str], float]:
     """Run Optuna optimization and return (model, columns, confidence_threshold).
 
     Uses all feature columns (no group/period selection).
     Confidence threshold is optimized by Optuna and applied at inference time.
-    Sharpe is computed from actual trade returns filtered by threshold.
+    Sharpe (or Sortino when optuna_objective='sortino') is computed from actual
+    trade returns filtered by threshold.
+
+    optuna_objective: 'sharpe' (default, BIT-IDENTICAL to all pre-/037 callers)
+        or 'sortino' (iter-v1/037 loss-function axis). Propagated to _objective
+        via study user_attrs so the lambda closure is stateless.
 
     cv_gap: number of rows to exclude between training and validation folds,
     preventing label leakage from overlapping triple-barrier labels.
@@ -422,6 +500,13 @@ def optimize_and_train(
     study = optuna.create_study(direction="maximize", sampler=sampler)
     # iter-v3/007: propagate fast_mode to _objective via study user_attrs
     study.set_user_attr("fast_mode", fast_mode)
+    # iter-v1/037: propagate optuna_objective to _objective via study user_attrs.
+    # Default "sharpe" is BIT-IDENTICAL to all pre-/037 callers.
+    if optuna_objective not in ("sharpe", "sortino"):
+        raise ValueError(
+            f"optuna_objective must be 'sharpe' or 'sortino'; got {optuna_objective!r}"
+        )
+    study.set_user_attr("optuna_objective", optuna_objective)
 
     if sample_weights is None:
         sample_weights = np.ones(len(train_labels), dtype=np.float64)

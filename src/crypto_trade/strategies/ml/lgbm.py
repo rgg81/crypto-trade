@@ -189,6 +189,7 @@ class LightGbmStrategy:
         nan_skip_columns: list[str] | None = None,
         nan_skip_threshold: float = 0.5,
         frozen_hp_parquet: Path | None = None,
+        optuna_objective: str = "sharpe",
     ) -> None:
         if not feature_columns:
             raise ValueError(
@@ -282,6 +283,14 @@ class LightGbmStrategy:
         # "v1_pruned" = tighter bounds for 40-feature pruned set per LM Master
         # Phase 4.5 Recs #1–3. Forwarded to optimization.optimize_and_train.
         self._bounds_profile: str = bounds_profile
+        # iter-v1/037: Optuna study objective metric.
+        # "sharpe" (default) = mean/std — BIT-IDENTICAL to all pre-/037 callers.
+        # "sortino" = mean/downside_std — loss-function axis (NEW 12th family).
+        if optuna_objective not in ("sharpe", "sortino"):
+            raise ValueError(
+                f"optuna_objective must be 'sharpe' or 'sortino'; got {optuna_objective!r}"
+            )
+        self._optuna_objective: str = optuna_objective
         # iter-v3/072: labeling mode — "triple_barrier" (default, backward-compat)
         # or "fixed_horizon" (sign of N-candle-forward return; no barriers).
         # iter-v3/105: "trend_scanning" (OLS trend, max-|t| horizon selection
@@ -993,6 +1002,7 @@ class LightGbmStrategy:
                         params_persist_path=self._params_persist_path,
                         model_role=self._model_role,
                         symbol=self._symbol,
+                        optuna_objective=self._optuna_objective,
                     )
                 self._models.append(model)
                 self._confidence_thresholds.append(confidence_threshold)
