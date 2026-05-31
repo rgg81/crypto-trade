@@ -1892,6 +1892,526 @@ def build_regime_attribution_csv(
     print(f"[iter-v1/043] regime_attribution.csv written: {out_path} ({len(rows)} rows)")
 
 
+# ---------------------------------------------------------------------------
+# iter-v1/044: Bundle aggregator (CONFIRMATION-MERGE-PORTFOLIO).
+#
+# Merges per-component frozen trade rosters at the trade-roster level using
+# deterministic weights.  Weights are specified as a dict {component_label: float}
+# where component_labels ∈ {"baseline", "v1-036", "v1-043"} (or any valid
+# component sub-dir name under the bundle output directory).
+#
+# Aggregation rule (per research_brief.md Section 3.2):
+#   For each (symbol, open_time) cell:
+#     active = {c : pnl_c[cell] exists}   (a component is "active" in a cell
+#               if it emitted ≥1 trade in that cell)
+#     if active is empty → no bundle trade
+#     bundle_pnl[cell] = Σ_{c∈active} (w_c / Σ_{c'∈active} w_{c'}) * pnl_c[cell]
+#
+# This is proportional-weight renormalization: if only P0 trades in a cell,
+# P0's effective weight = 1.0 (not 0.50) preserving unit-leverage.
+#
+# Outputs (all under bundle_out_dir/):
+#   in_sample/aggregated_trades.csv   — IS bundle trades with weighted_pnl column
+#   out_of_sample/aggregated_trades.csv — OOS bundle trades
+#   comparison.csv                    — bundle IS/OOS/ratio metrics table
+#   regime_attribution.csv            — per-regime bundle vs BASELINE_V1
+#   per_component_correlation.csv     — pairwise daily-PnL correlations
+#   component_substitution.csv        — per-component drop-impact on bundle metrics
+# ---------------------------------------------------------------------------
+
+
+def _load_component_trades(component_dir: Path, split: str) -> pd.DataFrame:
+    """Load IS or OOS trades.csv for a component sub-dir.
+
+    Args:
+        component_dir: Path to component output dir (contains in_sample/ out_of_sample/).
+        split: "in_sample" or "out_of_sample".
+
+    Returns:
+        DataFrame of trades, empty if not found.
+    """
+    import pandas as pd  # noqa: PLC0415
+
+    trades_path = component_dir / split / "trades.csv"
+    if trades_path.exists():
+        try:
+            return pd.read_csv(trades_path)
+        except Exception as _e:  # noqa: BLE001
+            print(f"[bundle_aggregator] WARNING: could not load {trades_path}: {_e}")
+    return pd.DataFrame()
+
+
+def _compute_bundle_metrics(trades_df: pd.DataFrame, is_cutoff_ms: int) -> dict:
+    """Compute headline IS/OOS metrics from an aggregated trades DataFrame.
+
+    Args:
+        trades_df: DataFrame with columns: close_time, weighted_pnl.
+        is_cutoff_ms: OOS cutoff as millisecond timestamp.
+
+    Returns:
+        Dict with keys: is_monthly_sharpe, oos_monthly_sharpe, is_max_dd, oos_max_dd,
+        is_n_trades, oos_n_trades, is_win_rate, oos_win_rate,
+        is_profit_factor, oos_profit_factor.
+    """
+    import pandas as pd  # noqa: PLC0415
+
+    def _split_metrics(sub: pd.DataFrame) -> dict:
+        if sub.empty:
+            return {
+                "monthly_sharpe": float("nan"),
+                "max_dd": float("nan"),
+                "n_trades": 0,
+                "win_rate": float("nan"),
+                "profit_factor": float("nan"),
+            }
+        sub = sub.copy()
+        sub["month"] = pd.to_datetime(sub["close_time"], unit="ms").dt.to_period("M")
+        monthly = sub.groupby("month")["weighted_pnl"].sum()
+        sharpe = (
+            float(monthly.mean() / monthly.std())
+            if len(monthly) >= 2 and monthly.std() > 0
+            else float("nan")
+        )
+        cum = sub["weighted_pnl"].cumsum()
+        peak = cum.cummax()
+        max_dd = float((peak - cum).max()) if len(cum) > 0 else float("nan")
+        n = len(sub)
+        wins = (sub["weighted_pnl"] > 0).sum()
+        win_rate = float(wins / n) if n > 0 else float("nan")
+        pos_sum = sub.loc[sub["weighted_pnl"] > 0, "weighted_pnl"].sum()
+        neg_sum = abs(sub.loc[sub["weighted_pnl"] < 0, "weighted_pnl"].sum())
+        pf = float(pos_sum / neg_sum) if neg_sum > 0 else float("nan")
+        return {
+            "monthly_sharpe": sharpe,
+            "max_dd": max_dd,
+            "n_trades": n,
+            "win_rate": win_rate,
+            "profit_factor": pf,
+        }
+
+    is_sub = trades_df[trades_df["close_time"] < is_cutoff_ms]
+    oos_sub = trades_df[trades_df["close_time"] >= is_cutoff_ms]
+    is_m = _split_metrics(is_sub)
+    oos_m = _split_metrics(oos_sub)
+    result: dict = {}
+    for k, v in is_m.items():
+        result[f"is_{k}"] = v
+    for k, v in oos_m.items():
+        result[f"oos_{k}"] = v
+    return result
+
+
+def bundle_aggregator(
+    component_dirs: dict[str, Path],
+    weights: dict[str, float],
+    is_cutoff_ms: int,
+    btc_klines_path: Path | None,
+    bundle_out_dir: Path,
+    baseline_component_dir: Path | None = None,
+) -> None:
+    """Aggregate 3 component trade rosters into bundle-level metrics.
+
+    Implements the weighted-PnL trade-roster aggregation algorithm from
+    research_brief.md Section 3.2:
+      - For each (symbol, open_time) cell, collect active components (those
+        that emitted a trade in that cell).
+      - Renormalize weights over active components (proportional redistribution).
+      - Weighted PnL = Σ (renorm_weight × pnl) over active components.
+
+    Args:
+        component_dirs: {component_label: Path to component output dir}.
+            Each dir must contain in_sample/trades.csv and out_of_sample/trades.csv.
+        weights: {component_label: float weight}.  Must sum to 1.0 ± 1e-6.
+        is_cutoff_ms: OOS cutoff timestamp in milliseconds.
+        btc_klines_path: Path to BTCUSDT/8h.csv for regime tagging.  May be None.
+        bundle_out_dir: Output directory for bundle artifacts.
+        baseline_component_dir: Path to baseline component dir for regime_attribution
+            baseline comparison.  Defaults to component_dirs.get("baseline").
+    """
+    import pandas as pd  # noqa: PLC0415
+
+    # Validate weights sum
+    total_weight = sum(weights.values())
+    if abs(total_weight - 1.0) > 1e-6:
+        raise ValueError(
+            f"[bundle_aggregator] weights sum to {total_weight:.8f} ≠ 1.0 ± 1e-6. "
+            "Weights must exactly sum to 1.0."
+        )
+
+    bundle_out_dir.mkdir(parents=True, exist_ok=True)
+    print(
+        f"[bundle_aggregator] START: {len(component_dirs)} components, "
+        f"weights={weights}, is_cutoff_ms={is_cutoff_ms}"
+    )
+
+    # ---------------------------------------------------------------------------
+    # Step 1 — Load per-component trade rosters (IS + OOS combined).
+    # ---------------------------------------------------------------------------
+    component_trades: dict[str, pd.DataFrame] = {}
+    for comp_label, comp_dir in component_dirs.items():
+        is_df = _load_component_trades(comp_dir, "in_sample")
+        oos_df = _load_component_trades(comp_dir, "out_of_sample")
+        frames = [f for f in [is_df, oos_df] if not f.empty]
+        if frames:
+            df = pd.concat(frames, ignore_index=True)
+        else:
+            df = pd.DataFrame()
+        component_trades[comp_label] = df
+        print(f"[bundle_aggregator] {comp_label}: {len(df)} trades loaded from {comp_dir}")
+
+    # ---------------------------------------------------------------------------
+    # Step 2 — Build bundle trade roster via weighted-PnL aggregation.
+    #
+    # Cell key: (symbol, open_time).  Each cell collects contributions from active
+    # components.  Active = component emitted ≥1 trade in that cell.
+    # PnL column: prefer "pnl_pct" (standard TradeResult column); fall back to "pnl".
+    # ---------------------------------------------------------------------------
+    def _get_pnl_col(df: pd.DataFrame) -> str:
+        """Return the PnL column name present in df."""
+        for c in ("pnl_pct", "pnl"):
+            if c in df.columns:
+                return c
+        raise KeyError(
+            f"[bundle_aggregator] No pnl column found in trades; cols={list(df.columns)}"
+        )
+
+    # Collect all (symbol, open_time) cells across all components
+    all_cells: dict[tuple, dict[str, pd.Series]] = {}
+    for comp_label, df in component_trades.items():
+        if df.empty:
+            continue
+        pnl_col = _get_pnl_col(df)
+        for _, row in df.iterrows():
+            key = (str(row.get("symbol", "")), int(row.get("open_time", 0)))
+            if key not in all_cells:
+                all_cells[key] = {}
+            all_cells[key][comp_label] = row
+            # Normalize pnl_pct alias
+            if pnl_col != "pnl_pct":
+                all_cells[key][comp_label] = row.copy()
+                all_cells[key][comp_label]["pnl_pct"] = float(row[pnl_col])
+
+    print(f"[bundle_aggregator] total unique (symbol, open_time) cells: {len(all_cells)}")
+
+    # Build aggregated trade rows
+    bundle_rows = []
+    for (symbol, open_time), comp_rows in all_cells.items():
+        active_comps = list(comp_rows.keys())
+        # Renormalize weights over active components
+        active_weight_sum = sum(weights.get(c, 0.0) for c in active_comps)
+        if active_weight_sum <= 0.0:
+            # Should not happen if weights are positive; skip silently
+            continue
+        renorm = {c: weights.get(c, 0.0) / active_weight_sum for c in active_comps}
+        # Weighted PnL
+        weighted_pnl = sum(
+            renorm[c] * float(comp_rows[c].get("pnl_pct", 0.0)) for c in active_comps
+        )
+        # Use the first active component's row as the base for non-PnL columns
+        base_row = dict(comp_rows[active_comps[0]])
+        base_row["symbol"] = symbol
+        base_row["open_time"] = open_time
+        base_row["weighted_pnl"] = weighted_pnl
+        base_row["pnl_pct"] = weighted_pnl  # alias for regime-attribution compat
+        base_row["active_components"] = ",".join(sorted(active_comps))
+        base_row["weight_sum"] = active_weight_sum
+        bundle_rows.append(base_row)
+
+    bundle_df = pd.DataFrame(bundle_rows)
+    if "close_time" not in bundle_df.columns and bundle_rows:
+        # Fallback: close_time may be absent; set from open_time as approximation
+        bundle_df["close_time"] = bundle_df["open_time"]
+    bundle_df = bundle_df.sort_values("close_time").reset_index(drop=True)
+
+    # ---------------------------------------------------------------------------
+    # Step 3 — Split IS/OOS and write aggregated_trades.csv
+    # ---------------------------------------------------------------------------
+    is_bundle = bundle_df[bundle_df["close_time"] < is_cutoff_ms].copy()
+    oos_bundle = bundle_df[bundle_df["close_time"] >= is_cutoff_ms].copy()
+
+    for split_name, split_df in (("in_sample", is_bundle), ("out_of_sample", oos_bundle)):
+        split_dir = bundle_out_dir / split_name
+        split_dir.mkdir(parents=True, exist_ok=True)
+        trades_out = split_dir / "aggregated_trades.csv"
+        split_df.to_csv(trades_out, index=False)
+        print(f"[bundle_aggregator] {split_name}: {len(split_df)} bundle trades → {trades_out}")
+
+    # ---------------------------------------------------------------------------
+    # Step 4 — Compute and write comparison.csv (bundle IS/OOS/ratio metrics)
+    # ---------------------------------------------------------------------------
+    metrics = _compute_bundle_metrics(bundle_df, is_cutoff_ms)
+
+    def _safe_ratio(oos: float, is_: float) -> float:
+        if math.isnan(oos) or math.isnan(is_) or is_ == 0.0:
+            return float("nan")
+        return round(oos / is_, 4)
+
+    comp_rows_out = [
+        {
+            "metric": "monthly_sharpe",
+            "in_sample": metrics["is_monthly_sharpe"],
+            "out_of_sample": metrics["oos_monthly_sharpe"],
+            "ratio": _safe_ratio(metrics["oos_monthly_sharpe"], metrics["is_monthly_sharpe"]),
+        },
+        {
+            "metric": "max_drawdown",
+            "in_sample": metrics["is_max_dd"],
+            "out_of_sample": metrics["oos_max_dd"],
+            "ratio": _safe_ratio(metrics["oos_max_dd"], metrics["is_max_dd"]),
+        },
+        {
+            "metric": "n_trades",
+            "in_sample": metrics["is_n_trades"],
+            "out_of_sample": metrics["oos_n_trades"],
+            "ratio": _safe_ratio(metrics["oos_n_trades"], metrics["is_n_trades"]),
+        },
+        {
+            "metric": "win_rate",
+            "in_sample": metrics["is_win_rate"],
+            "out_of_sample": metrics["oos_win_rate"],
+            "ratio": _safe_ratio(metrics["oos_win_rate"], metrics["is_win_rate"]),
+        },
+        {
+            "metric": "profit_factor",
+            "in_sample": metrics["is_profit_factor"],
+            "out_of_sample": metrics["oos_profit_factor"],
+            "ratio": _safe_ratio(metrics["oos_profit_factor"], metrics["is_profit_factor"]),
+        },
+    ]
+    comp_csv_path = bundle_out_dir / "comparison.csv"
+    pd.DataFrame(comp_rows_out).to_csv(comp_csv_path, index=False)
+    print(
+        f"[bundle_aggregator] comparison.csv: IS Sharpe={metrics['is_monthly_sharpe']:.4f} "
+        f"OOS Sharpe={metrics['oos_monthly_sharpe']:.4f} → {comp_csv_path}"
+    )
+
+    # ---------------------------------------------------------------------------
+    # Step 5 — Build regime_attribution.csv for the bundle
+    # ---------------------------------------------------------------------------
+    # Load BTC klines for regime tagging
+    btc_df: pd.DataFrame | None = None
+    if btc_klines_path is not None and btc_klines_path.exists():
+        try:
+            _btc_raw = pd.read_csv(btc_klines_path)
+            _btc_raw.columns = [c.lower().replace(" ", "_") for c in _btc_raw.columns]
+            if "close_time" in _btc_raw.columns and "close" in _btc_raw.columns:
+                btc_df = _btc_raw[["close_time", "close"]].rename(
+                    columns={"close_time": "close_time_ms"}
+                )
+                btc_df["close"] = pd.to_numeric(btc_df["close"], errors="coerce")
+                btc_df = btc_df.dropna().reset_index(drop=True)
+        except Exception as _e:  # noqa: BLE001
+            print(f"[bundle_aggregator] WARNING: BTC klines load failed: {_e}")
+
+    # Baseline trades: from baseline component dir (for per-regime comparison)
+    _baseline_dir = baseline_component_dir or component_dirs.get("baseline")
+    baseline_all_df: pd.DataFrame | None = None
+    if _baseline_dir is not None:
+        _b_is = _load_component_trades(_baseline_dir, "in_sample")
+        _b_oos = _load_component_trades(_baseline_dir, "out_of_sample")
+        _b_frames = [f for f in [_b_is, _b_oos] if not f.empty]
+        if _b_frames:
+            baseline_all_df = pd.concat(_b_frames, ignore_index=True)
+
+    regime_out = bundle_out_dir / "regime_attribution.csv"
+    build_regime_attribution_csv(
+        trades_df=bundle_df,
+        baseline_trades_df=baseline_all_df,
+        is_cutoff_ms=is_cutoff_ms,
+        btc_klines_df=btc_df,
+        out_path=regime_out,
+    )
+
+    # ---------------------------------------------------------------------------
+    # Step 6 — Pairwise daily-PnL correlations (per_component_correlation.csv)
+    # ---------------------------------------------------------------------------
+    # Build daily PnL series per component
+    comp_daily: dict[str, pd.Series] = {}
+    for comp_label, df in component_trades.items():
+        if df.empty:
+            continue
+        pnl_col = _get_pnl_col(df)
+        df2 = df.copy()
+        df2["date"] = pd.to_datetime(df2["close_time"], unit="ms").dt.date
+        daily = df2.groupby("date")[pnl_col].sum()
+        comp_daily[comp_label] = daily
+
+    # Align all series to the same date index
+    if comp_daily:
+        aligned = pd.DataFrame(comp_daily).fillna(0.0)
+        corr_rows = []
+        labels = list(comp_daily.keys())
+        for i in range(len(labels)):
+            for j in range(i + 1, len(labels)):
+                la, lb = labels[i], labels[j]
+                if la in aligned.columns and lb in aligned.columns:
+                    corr_val = float(aligned[[la, lb]].corr().iloc[0, 1])
+                else:
+                    corr_val = float("nan")
+                # Compute Jaccard between trade rosters (shared (symbol, open_time) cells)
+                set_a = (
+                    set(
+                        zip(
+                            component_trades[la].get("symbol", pd.Series([])),
+                            component_trades[la].get("open_time", pd.Series([])).astype(int),
+                        )
+                    )
+                    if not component_trades[la].empty
+                    else set()
+                )
+                set_b = (
+                    set(
+                        zip(
+                            component_trades[lb].get("symbol", pd.Series([])),
+                            component_trades[lb].get("open_time", pd.Series([])).astype(int),
+                        )
+                    )
+                    if not component_trades[lb].empty
+                    else set()
+                )
+                inter = len(set_a & set_b)
+                union = len(set_a | set_b)
+                jaccard = float(inter / union) if union > 0 else float("nan")
+                corr_rows.append(
+                    {
+                        "pair": f"{la}x{lb}",
+                        "daily_pnl_corr": round(corr_val, 4),
+                        "trade_jaccard": round(jaccard, 4),
+                    }
+                )
+        corr_csv = bundle_out_dir / "per_component_correlation.csv"
+        pd.DataFrame(corr_rows).to_csv(corr_csv, index=False)
+        print(f"[bundle_aggregator] per_component_correlation.csv → {corr_csv}")
+
+    # ---------------------------------------------------------------------------
+    # Step 7 — Component substitution test (component_substitution.csv)
+    # ---------------------------------------------------------------------------
+    # For each component c: drop c, renormalize remaining weights, compute bundle metrics.
+    sub_rows = []
+    for dropped in component_dirs:
+        remaining = {c: w for c, w in weights.items() if c != dropped}
+        remaining_sum = sum(remaining.values())
+        if remaining_sum <= 0.0:
+            continue
+        remaining_renorm = {c: w / remaining_sum for c, w in remaining.items()}
+        # Build reduced bundle
+        reduced_rows = []
+        for (sym, ot), comp_row_map in all_cells.items():
+            active_comps_r = [c for c in comp_row_map if c in remaining_renorm]
+            if not active_comps_r:
+                continue
+            active_sum_r = sum(remaining_renorm.get(c, 0.0) for c in active_comps_r)
+            if active_sum_r <= 0.0:
+                continue
+            renorm_r = {c: remaining_renorm[c] / active_sum_r for c in active_comps_r}
+            wpnl = sum(
+                renorm_r[c] * float(comp_row_map[c].get("pnl_pct", 0.0)) for c in active_comps_r
+            )
+            base = dict(comp_row_map[active_comps_r[0]])
+            base["symbol"] = sym
+            base["open_time"] = ot
+            base["weighted_pnl"] = wpnl
+            base["pnl_pct"] = wpnl
+            reduced_rows.append(base)
+        if not reduced_rows:
+            continue
+        reduced_df = pd.DataFrame(reduced_rows)
+        if "close_time" not in reduced_df.columns:
+            reduced_df["close_time"] = reduced_df["open_time"]
+        reduced_df = reduced_df.sort_values("close_time").reset_index(drop=True)
+        red_metrics = _compute_bundle_metrics(reduced_df, is_cutoff_ms)
+        sub_rows.append(
+            {
+                "dropped_component": dropped,
+                "remaining_components": ",".join(sorted(remaining.keys())),
+                "remaining_weights": str({c: round(w, 4) for c, w in remaining_renorm.items()}),
+                "is_monthly_sharpe_without": red_metrics["is_monthly_sharpe"],
+                "oos_monthly_sharpe_without": red_metrics["oos_monthly_sharpe"],
+                "is_n_trades_without": red_metrics["is_n_trades"],
+                "oos_n_trades_without": red_metrics["oos_n_trades"],
+                "bundle_is_sharpe": metrics["is_monthly_sharpe"],
+                "bundle_oos_sharpe": metrics["oos_monthly_sharpe"],
+                "is_sharpe_delta": (
+                    red_metrics["is_monthly_sharpe"] - metrics["is_monthly_sharpe"]
+                    if not (
+                        math.isnan(red_metrics["is_monthly_sharpe"])
+                        or math.isnan(metrics["is_monthly_sharpe"])
+                    )
+                    else float("nan")
+                ),
+                "oos_sharpe_delta": (
+                    red_metrics["oos_monthly_sharpe"] - metrics["oos_monthly_sharpe"]
+                    if not (
+                        math.isnan(red_metrics["oos_monthly_sharpe"])
+                        or math.isnan(metrics["oos_monthly_sharpe"])
+                    )
+                    else float("nan")
+                ),
+            }
+        )
+
+    sub_csv = bundle_out_dir / "component_substitution.csv"
+    pd.DataFrame(sub_rows).to_csv(sub_csv, index=False)
+    print(f"[bundle_aggregator] component_substitution.csv → {sub_csv}")
+
+    print(
+        f"[bundle_aggregator] COMPLETE. bundle_out_dir={bundle_out_dir} | "
+        f"IS Sharpe={metrics['is_monthly_sharpe']:.4f} "
+        f"OOS Sharpe={metrics['oos_monthly_sharpe']:.4f} "
+        f"IS n_trades={metrics['is_n_trades']} OOS n_trades={metrics['oos_n_trades']}"
+    )
+
+
+def _parse_bundle_config(bundle_config_str: str) -> dict[str, float]:
+    """Parse '--bundle-config' string into {component: weight} dict.
+
+    Format: "component:weight,component:weight,..."
+    Example: "baseline:0.50,v1-036:0.30,v1-043:0.20"
+
+    Valid component names: "baseline", "v1-NNN" (e.g. "v1-036", "v1-043").
+
+    Args:
+        bundle_config_str: Raw CLI string.
+
+    Returns:
+        Dict mapping component label → float weight.
+
+    Raises:
+        ValueError: On malformed input or weight sum != 1.0.
+    """
+    _valid_components = {"baseline", "v1-036", "v1-043"}
+    result: dict[str, float] = {}
+    for part in bundle_config_str.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        if ":" not in part:
+            raise ValueError(
+                f"[bundle_config] Invalid token {part!r}: expected 'component:weight'. "
+                "Example: 'baseline:0.50,v1-036:0.30,v1-043:0.20'"
+            )
+        comp, weight_str = part.split(":", 1)
+        comp = comp.strip()
+        if comp not in _valid_components:
+            raise ValueError(
+                f"[bundle_config] Unknown component {comp!r}. "
+                f"Valid components: {sorted(_valid_components)}"
+            )
+        try:
+            weight = float(weight_str.strip())
+        except ValueError:
+            raise ValueError(
+                f"[bundle_config] Invalid weight {weight_str!r} for component {comp!r}: "
+                "must be a float."
+            )
+        result[comp] = weight
+
+    total = sum(result.values())
+    if abs(total - 1.0) > 1e-6:
+        raise ValueError(f"[bundle_config] weights sum to {total:.8f} ≠ 1.0 ± 1e-6. Got: {result}")
+    return result
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="v1 baseline runner — refactored 2026-05-23")
     parser.add_argument(
@@ -2288,6 +2808,43 @@ def main() -> None:
             "iter-v1/042 pre-flight asserts --model xgboost."
         ),
     )
+    # iter-v1/044: bundle-config flag for CONFIRMATION-MERGE-PORTFOLIO dispatch.
+    # Format: "component:weight,component:weight,...", e.g.
+    # "baseline:0.50,v1-036:0.30,v1-043:0.20"
+    # Valid component names: "baseline", "v1-NNN" (e.g. "v1-036", "v1-043").
+    # Weights must sum to 1.0 ± 1e-6.  Requires --confirmation mode.
+    parser.add_argument(
+        "--bundle-config",
+        type=str,
+        default=None,
+        dest="bundle_config",
+        metavar="SPEC",
+        help=(
+            "CONFIRMATION-MERGE-PORTFOLIO bundle spec (iter-v1/044). "
+            "Format: 'component:weight,...'. Example: "
+            "'baseline:0.50,v1-036:0.30,v1-043:0.20'. "
+            "Weights must sum to 1.0 ± 1e-6. Requires --confirmation. "
+            "Triggers sequential sub-run + post-hoc bundle aggregation; "
+            "no new LightGBM training (reuses frozen component artifacts)."
+        ),
+    )
+    # iter-v1/044: output-dir override for bundle sub-runs.
+    # When set, overrides the standard reports-v1/iteration_v1-<label>/ path.
+    # Used by bundle sub-runs to write component artifacts under the bundle dir.
+    parser.add_argument(
+        "--output-dir",
+        type=str,
+        default=None,
+        dest="output_dir_override",
+        metavar="DIR",
+        help=(
+            "Override output directory (iter-v1/044 bundle sub-runs). "
+            "Default: reports-v1/iteration_v1-<label>/. "
+            "Used internally by bundle dispatch to route component reports "
+            "under reports-v1/iteration_v1-044/{component}/."
+        ),
+    )
+
     args = parser.parse_args()
 
     # Resolve symbols
@@ -2333,6 +2890,7 @@ def main() -> None:
     # Only allowlisted labels are accepted — prevents accidental dispatch misrouting.
     _iteration_label_allowlist = {
         "v1-028-frozen-hp",
+        "v1-044",
     }
     if getattr(args, "iteration_label_override", None) is not None:
         _override = args.iteration_label_override.strip()
@@ -5012,6 +5570,218 @@ def main() -> None:
             ("Model_C_LINK_trend_scan_only", _strat_c043),
         ]
 
+    elif iteration_label == "v1-044":
+        # iter-v1/044: CONFIRMATION-MERGE-PORTFOLIO (cycle-5 CONFIRMATION 1/1).
+        # 3-component bundle: BASELINE_V1 (w=0.50) + /036 (w=0.30) + /043 (w=0.20).
+        #
+        # Architecture: sequential sub-run dispatch (one subprocess per component)
+        # followed by post-hoc bundle_aggregator() on the frozen trade CSVs.
+        # No new LightGBM training at the bundle level — each component sub-run
+        # runs the existing dispatch path at --seeds 2 --n-trials 35 --ensemble-size 5.
+        #
+        # LIVE-TRADING CONTRACT: bundle sub-runs produce STATISTICAL VALIDATION
+        # artifacts only.  The live engine reads single-outer-seed=42 component
+        # reports, not the bundle aggregate.  Bundle comparison.csv is the QR/Critic
+        # deliverable for MERGE evaluation.
+        import shutil as _shutil_044  # noqa: PLC0415
+        import subprocess as _subprocess_044  # noqa: PLC0415
+
+        bundle_config_arg: str | None = getattr(args, "bundle_config", None)
+        assert bundle_config_arg is not None, (
+            "iter-v1/044 pre-flight FAIL: --bundle-config is required for v1-044 dispatch. "
+            "Example: --bundle-config 'baseline:0.50,v1-036:0.30,v1-043:0.20'"
+        )
+
+        # Parse and validate bundle config
+        _bundle_weights = _parse_bundle_config(bundle_config_arg)
+
+        # Validate all 3 expected components are present
+        _expected_comps = {"baseline", "v1-036", "v1-043"}
+        assert set(_bundle_weights.keys()) == _expected_comps, (
+            f"iter-v1/044 pre-flight FAIL: expected components {_expected_comps}, "
+            f"got {set(_bundle_weights.keys())}. "
+            "All 3 components required for the /044 bundle."
+        )
+
+        # Assert --confirmation mode (must be used)
+        assert mode_label == "CONFIRMATION", (
+            f"iter-v1/044 pre-flight FAIL: expected --confirmation mode "
+            f"but got mode={mode_label!r}. "
+            "Run with: --confirmation --bundle-config '...' --iteration 44"
+        )
+
+        # Resolve outer seed count from CLI (n_outer_seeds not yet set at this dispatch point).
+        _n_seeds_044 = int(getattr(args, "seeds", 1))
+
+        print(
+            f"\n[iter-v1/044] CONFIRMATION-MERGE-PORTFOLIO ACTIVE: "
+            f"components={[f'{c}:{w}' for c, w in _bundle_weights.items()]}, "
+            f"--seeds {_n_seeds_044}, --n-trials {n_trials}, "
+            f"--ensemble-size {ensemble_size}"
+        )
+
+        # -----------------------------------------------------------------------
+        # Bundle output directory layout:
+        #   reports-v1/iteration_v1-044/
+        #     baseline/   → component baseline sub-run artifacts
+        #     v1-036/     → component /036 sub-run artifacts
+        #     v1-043/     → component /043 sub-run artifacts
+        #     bundle/     → aggregated bundle metrics
+        # -----------------------------------------------------------------------
+        _bundle_iter_dir = Path("reports-v1") / "iteration_v1-044"
+        _bundle_iter_dir.mkdir(parents=True, exist_ok=True)
+
+        # Component sub-run specs:
+        # Each entry: (component_label, --iteration N or --baseline-mode, extra_args)
+        # --pruned-features is added for v1-036 and v1-043 (they use V1_FEATURE_COLUMNS_PRUNED)
+        # --label-mode trend_scanning is added for v1-036 and v1-043
+        _component_sub_run_specs: list[tuple[str, list[str]]] = [
+            (
+                "baseline",
+                [
+                    "--baseline-mode",
+                    "--n-trials",
+                    str(n_trials),
+                    "--ensemble-size",
+                    str(ensemble_size),
+                    "--seeds",
+                    str(_n_seeds_044),
+                    "--no-engineering-report",
+                ],
+            ),
+            (
+                "v1-036",
+                [
+                    "--confirmation",
+                    "--iteration",
+                    "36",
+                    "--symbols",
+                    "LINKUSDT,DOTUSDT",
+                    "--pruned-features",
+                    "--label-mode",
+                    "trend_scanning",
+                    "--n-trials",
+                    str(n_trials),
+                    "--ensemble-size",
+                    str(ensemble_size),
+                    "--seeds",
+                    str(_n_seeds_044),
+                    "--no-engineering-report",
+                ],
+            ),
+            (
+                "v1-043",
+                [
+                    "--confirmation",
+                    "--iteration",
+                    "43",
+                    "--symbols",
+                    "LINKUSDT",
+                    "--pruned-features",
+                    "--label-mode",
+                    "trend_scanning",
+                    "--n-trials",
+                    str(n_trials),
+                    "--ensemble-size",
+                    str(ensemble_size),
+                    "--seeds",
+                    str(_n_seeds_044),
+                    "--no-engineering-report",
+                ],
+            ),
+        ]
+
+        _component_dirs: dict[str, Path] = {}
+        _sub_run_elapsed: dict[str, float] = {}
+
+        for _comp_label, _comp_argv in _component_sub_run_specs:
+            _comp_start = time.time()
+            print(
+                f"\n[iter-v1/044] === Sub-run START: {_comp_label} "
+                f"argv_extra={_comp_argv[:6]}... ==="
+            )
+            _comp_proc_argv = [
+                sys.executable,
+                str(Path(__file__).resolve()),
+                *_comp_argv,
+            ]
+            _comp_proc = _subprocess_044.run(
+                _comp_proc_argv,
+                capture_output=False,  # stream stdout/stderr live for wall-clock visibility
+                text=True,
+            )
+            _comp_elapsed = time.time() - _comp_start
+            _sub_run_elapsed[_comp_label] = _comp_elapsed
+            if _comp_proc.returncode != 0:
+                print(
+                    f"\n[iter-v1/044] Sub-run {_comp_label} FAILED "
+                    f"(rc={_comp_proc.returncode}, elapsed={_comp_elapsed:.0f}s). "
+                    "Check stdout above for error details.",
+                    file=sys.stderr,
+                )
+                sys.exit(_comp_proc.returncode)
+
+            # Determine the standard output path for this component
+            if _comp_label == "baseline":
+                _comp_natural_dir = Path("reports-v1") / "iteration_v1-baseline"
+            elif _comp_label == "v1-036":
+                _comp_natural_dir = Path("reports-v1") / "iteration_v1-036"
+            elif _comp_label == "v1-043":
+                _comp_natural_dir = Path("reports-v1") / "iteration_v1-043"
+            else:
+                _comp_natural_dir = Path("reports-v1") / f"iteration_{_comp_label}"
+
+            # Move (or copy if already in target) to bundle component sub-dir
+            _comp_target_dir = _bundle_iter_dir / _comp_label
+            if _comp_natural_dir.exists():
+                if _comp_target_dir.exists():
+                    _shutil_044.rmtree(_comp_target_dir)
+                _shutil_044.copytree(str(_comp_natural_dir), str(_comp_target_dir))
+                print(
+                    f"[iter-v1/044] {_comp_label}: artifacts copied "
+                    f"{_comp_natural_dir} → {_comp_target_dir} "
+                    f"({_comp_elapsed:.0f}s)"
+                )
+            else:
+                print(
+                    f"[iter-v1/044] WARNING: expected sub-run output {_comp_natural_dir} "
+                    f"not found after sub-run {_comp_label}.",
+                    file=sys.stderr,
+                )
+            _component_dirs[_comp_label] = _comp_target_dir
+
+        # -----------------------------------------------------------------------
+        # All 3 sub-runs complete.  Run post-hoc bundle aggregation.
+        # -----------------------------------------------------------------------
+        print(
+            f"\n[iter-v1/044] === Sub-run wall-clocks: "
+            f"{', '.join(f'{c}={t:.0f}s' for c, t in _sub_run_elapsed.items())} ==="
+        )
+        print("\n[iter-v1/044] === POST-HOC BUNDLE AGGREGATION START ===")
+
+        _bundle_out_dir = _bundle_iter_dir / "bundle"
+        _btc_klines_path = Path("data") / "BTCUSDT" / "8h.csv"
+
+        bundle_aggregator(
+            component_dirs=_component_dirs,
+            weights=_bundle_weights,
+            is_cutoff_ms=OOS_CUTOFF_MS,
+            btc_klines_path=_btc_klines_path,
+            bundle_out_dir=_bundle_out_dir,
+            baseline_component_dir=_component_dirs.get("baseline"),
+        )
+
+        print("\n[iter-v1/044] CONFIRMATION-MERGE-PORTFOLIO complete.")
+        print(f"  bundle dir:   {_bundle_out_dir}")
+        print(f"  component dirs: {list(_component_dirs.keys())}")
+        print(
+            f"\nPhase 6 complete (iter-v1/044). "
+            f"Create engineering_report.md at {_bundle_iter_dir}/engineering_report.md "
+            f"and then invoke Phase 7.5 Critic."
+        )
+        # Bundle dispatch terminates here — no fall-through to standard reporting path.
+        sys.exit(0)
+
     elif set(symbols) == set(V1_BASELINE_UNIVERSE) and iteration_label not in (
         "v1-021",
         "v1-023",
@@ -5032,6 +5802,7 @@ def main() -> None:
         "v1-041",
         "v1-042",
         "v1-043",
+        "v1-044",
     ):
         # Generic baseline-universe dispatch.
         # Non-/021/.../042 iterations. Models A/C/D/E
