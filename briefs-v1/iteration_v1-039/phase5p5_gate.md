@@ -1,60 +1,49 @@
 # Phase 5.5 Gate — iter-v1/039
 
-OVERALL: BLOCK
+OVERALL: PASS
 
 ## Iteration Type (from Brief Section 0.5)
 TYPE: EXPLORATION
 
 ## Axis Family + Rotation Status
 FAMILY: loss-function × per-cohort-specialization (DOUBLE-REPEAT COMBO)
-ROTATION_STATUS: VALID (prior 5 disperse across 5 distinct families: feature-family, labeling, per-cohort-specialization, loss-function, risk-primitive — no monoculture)
+ROTATION_STATUS: VALID (prior 5 EXPLORATIONs disperse across 5 distinct families: feature-family /034, labeling /035, per-cohort-specialization /036, loss-function /037, risk-primitive /038 — no monoculture; double-REPEAT justified as stacking-interaction-probe per Section 0.6 three-mitigation argument)
 
 ## HIGH-RISK Declaration
 HIGH-RISK: YES (rotation rule — double-REPEAT COMBO with NEG-DOMINANT 60% prior)
-Mitigation: single-seed OPT-OUT (brief Section 2.5 justifies; IF PROMISING → /044 multi-seed validates per HIGH-RISK escalation rule)
+Mitigation: single-seed OPT-OUT (brief Section 2.5 justifies; counter at 1/3 — below auto-upgrade threshold; IF PROMISING → /044 multi-seed validates per HIGH-RISK escalation rule)
 
 ## LM Master Response Verification
-- briefs-v1/iteration_v1-039/lgbm_advisor.md exists: PASS (file exists)
-- Brief Section 3 addresses each LM Master recommendation: BLOCK
+- briefs-v1/iteration_v1-039/lgbm_advisor.md exists: PASS (retargeted Phase 4.5 file present with header "Phase 4.5 (Pre-Design, RETARGETED AXIS)" — per-cohort Sortino × specialist hybrid axis, 7 numbered recommendations)
+- Brief Section 3 addresses each LM Master recommendation: PASS
 
-  The lgbm_advisor.md Phase 4.5 was authored for the REJECTED drawdown-brake axis
-  (not the current Sortino × specialist hybrid). Brief Section 11 acknowledges this
-  explicitly: "A re-issued LM Master advisor on the CURRENT axis is requested at
-  Phase 5.5 / 6.0 closeout."
-
-  The gate rule requires each numbered recommendation in lgbm_advisor.md to appear
-  in Section 3 as adopted / modified / rejected with reason — even if the reason is
-  "REJECTED — applies to prior drawdown-brake axis, not current Sortino × specialist
-  dispatch." The brief's Section 3 contains NO response map for recommendations #1,
-  #2, or #3 from lgbm_advisor.md. Section 11 pre-registers expectations for a NEW
-  LM Master advisory but does not address the existing one.
-
-  Resolution: QR must add a response map to Section 3 (or Section 11) marking each
-  of the three recommendations adopted / modified / rejected with one-sentence reason.
-  Example: "Rec #1 Hold HP grid constant — ADOPTED (v1 EXPLORATION standard n_trials=18
-  applies to Sortino × specialist dispatch identically)."
+  Brief Section 11 (remediated) contains a 7-row response map citing each LM Master
+  recommendation by number and section heading, with adjudication (5 ADOPTED, 1 MODIFIED,
+  1 ADOPTED including new F-AXIS #6 Jaccard). All 7 recommendations addressed with one-
+  sentence reason per recommendation. Gate requirement satisfied.
 
 ## Cadence Check
 - Wall-clock budget declared: 2h hard cap for EXPLORATION: PASS (Section 0.5 states "2h hard cap")
 - EXPLORATION precedents since last CONFIRMATION: 6 of 10 (4 to go before /044 can launch): PASS (≥10 not yet required; CONFIRMATION not launching)
 
 ## Per-Section Status
-- Section 0 (Data Split): PASS — OOS_CUTOFF_DATE = 2025-03-24 and training_months = 24 confirmed sacred in Section 3.3 table and Section 10
-- Section 0.5 (Iteration Type, v1/v3): PASS — TYPE: EXPLORATION declared, cadence 6/10 stated, wall-clock estimate and 2h hard cap present
-- Section 0.6 (Architecture-Family Justification, v1-only): PASS — double-REPEAT COMBO justified with 3 explicit mitigations + /044 routing implication; prior 5 families listed; rotation status VALID per rule (5 distinct families in prior 5)
-- Section 1 (Hypothesis): PASS — H1 3-sentence primary + H1a mechanism + H1b falsifiable; specific: "Sortino objective layered on /036 LINK+DOT trend-scanning 2-cohort substrate"; OOS delta falsifier present
-- Section 2 (IS-Only Evidence): PASS — F-AXIS #1 verdict matrix with 6 bands + probabilities; EDA prior from IS-only /036 + /037 trades cited (Jaccard 0.1381, Sortino/Sharpe ratio 1.22); committed EDA script referenced (analysis/iteration_v1-039/eda.py in axis_rejected.md)
-- Section 2.5 (HIGH-RISK Axis Declaration, v1-only): PASS — HIGH-RISK by rotation rule declared; NORMAL-RISK by mechanism explained; single-seed budget choice justified with counter at 1/3
-- Section 3 (Proposed Changes): PASS with CAVEAT — implementation design is clear (elif dispatch + catch-all + 13 tests, NO new src/ code); CAVEAT: LM Master response map MISSING (see LM Master block above — this is the primary BLOCK reason)
-- Section 4 (Expected OOS Impact): PASS — F-AXIS #2-#7 with pass/fail criteria, modal prediction +1.42 OOS Sharpe, explicit falsifiers H1b + §9 triggers
-- Section 5 (Risk Mitigation): PASS — Section 5 references §3.3 table confirming R1/R2/R3 gates identical to /036 baseline; no new risk changes required
-- Section 6 (Risk Management Design): PASS — Section 6 references §3.3 configuration table; risk gates inherited from /036 (R1 ON C'/E, R2 ON E, R3 ON both); fire-rate predictions implicit in /036 inheritance
-- Section 7 (Failure-Mode Prediction, v1/v3): MISSING/INVALID — Section 7 in brief is "Expected Report Shape" (4-way comparison table format). The gate mandates a pre-registered failure-mode prediction paragraph (1-2 paragraphs forward-looking: how the iteration most plausibly fails OOS, what gates should catch, what failure looks like in metrics). The failure scenario IS present in Section 9 as "Mechanism failure scenario (PREDICTED FAILURE MODE)" — but it is under the wrong section number and the gate checks for Section 7 by name/intent. The QR must either retitle Section 7 to "Pre-Registered Failure-Mode Prediction" or add an explicit Section 7 sub-section.
-- Section 8 (MERGE/NO-MERGE Criteria, v1/v3): MISSING/INVALID — Section 8 in brief is "Path Forward Predictions (/044 routing implications)". The gate mandates locked NUMERICAL thresholds before the backtest runs (e.g., "MERGE iff OOS_monthly_Sharpe ≥ X AND PBO < Y"). Section 8 provides OUTCOME QUADRANT ROUTING (PROMISING → SINGLE CONFIRMATION, INERT → SEPARATE, etc.) but NOT locked numerical MERGE/NO-MERGE thresholds. No row like "MERGE iff OOS Sharpe Δ ≥ +0.10 AND IS > 1.0 AND OOS > 1.0" appears. The QR must add explicit pre-registered numerical criteria.
-- Section 9 (Library Stack, v1/v3): MISSING — Section 9 in brief is "Behavioral-effect predictor". No library stack declaration exists. The gate mandates which versions of mlfinlab/mlfinpy/pypbo/fracdiff are used (or which fallbacks and why). Even "no external ML-finance libraries used in this iteration; LightGBM + Optuna + NumPy only" would satisfy the intent.
+- Section 0 (Data Split): PASS — OOS_CUTOFF_DATE = 2025-03-24 and training_months = 24 confirmed sacred in Section 3.3 table and Section 10 anti-cheating self-check
+- Section 0.5 (Iteration Type, v1/v3): PASS — TYPE: EXPLORATION declared, cadence 6/10 stated, wall-clock estimate and 2h hard cap present in Section 0.5
+- Section 0.6 (Architecture-Family Justification, v1-only): PASS — double-REPEAT COMBO justified with 3 explicit mitigations (orthogonal interaction question / /044 routing implication / no new src/ code); prior 5 families enumerated (/034 feature-family, /035 labeling, /036 per-cohort-specialization, /037 loss-function, /038 risk-primitive); rotation status VALID per discipline (5 distinct families, no monoculture); one-sentence rationale present
+- Section 1 (Hypothesis): PASS — H1 3-sentence primary hypothesis with specific mechanism; H1a mechanism with EDA prior (Sortino/Sharpe 1.22, Jaccard 0.1381); H1b falsifiable with OOS delta falsifier band and Sortino-DOT-dependence prediction
+- Section 2 (IS-Only Evidence): PASS — F-AXIS #1 verdict matrix with 6 bands + probability distribution (NEG-CLEAN 40% MODAL / NEG-CAT 20% / INERT 23% / PROMISING-INERT-FAV 17% / PROMISING-CLEAN 7%); EDA prior from IS-only /036 + /037 trades cited (Jaccard 0.1381, Sortino/Sharpe ratio 1.22 on /036 substrate); EDA script referenced (analysis/iteration_v1-039/eda.py)
+- Section 2.5 (HIGH-RISK Axis Declaration, v1-only): PASS — HIGH-RISK by rotation rule declared; NORMAL-RISK by mechanism explained (no Optuna training-objective domain change); single-seed budget choice justified with counter at 1/3
+- Section 3 (Proposed Changes): PASS — implementation design clear (elif dispatch + catch-all exclusion + 13 tests, NO new src/ code); Section 11 (remediated) contains 7-row LM Master response map with adopted/modified/rejected adjudication for all 7 recommendations; F6 Jaccard recommendation INTEGRATED into Section 4 as F-AXIS #6
+- Section 4 (Expected OOS Impact): PASS — F-AXIS #2-#7 falsifiers present (wiring/dispatch, per-symbol sign-match, bundle Sharpe band, wall-clock, Jaccard, trade-count); modal prediction OOS Sharpe ~+1.42 (Δ -0.33 vs /036 anchor); explicit falsifiers H1b + §9 triggers
+- Section 5 (Risk Mitigation): PASS — Section 5 cross-references §3.3 configuration table; R1/R2/R3 gates identical to /036 substrate (R1 ON C'/E, R2 ON E only, R3 ON both cutoff 0.70 16 features); no new risk changes; no carry-over from /038 vol-ceiling (CLOSED axis)
+- Section 6 (Risk Management Design): PASS — §3.3 configuration table documents all risk primitives inherited from /036; fire-rate predictions implicit in /036 inheritance; 8-primitive equivalents (R1 consecutive-SL cool-down, R2 drawdown brake, R3 OOD Mahalanobis gate) documented with per-model ON/OFF spec
+- Section 7 (Failure-Mode Prediction, v1/v3): PASS (remediated) — Section 11.5 "Pre-Registered Failure-Mode Prediction" added: 3-paragraph forward-looking failure scenario predicting basin migration on sparser trend-scan label surface, gates that should catch the failure (F-AXIS #4 OOS Δ + F-AXIS #6 Jaccard + Sortino downside-std), and failure metric signatures (IS Sharpe Δ < 0, OOS Δ vs /036 < -0.10, OOS Max DD > 28%, per-symbol LINK+DOT both < +30pp)
+- Section 8 (MERGE/NO-MERGE Criteria, v1/v3): PASS (remediated) — Section 11.6 "Locked Numerical MERGE/NO-MERGE Thresholds" added: 6-row outcome table with specific OOS Sharpe Δ thresholds (PROMISING-CLEAN ≥ +0.10; INERT ∈ [-0.20, 0); NEG-CLEAN ∈ [-0.45, -0.20); NEG-CAT < -0.45; PROMISING-DOT-ONLY routing); absolute merge gates listed (IS > 1.0 AND OOS > 1.0 AND OOS/IS ≥ 0.5 AND OOS trades ≥ 130 AND DSR > 0.95 AND PBO < 0.40 AND PSR > 0.95 AND top-symbol ≤ 30%); EXPLORATION status noted (no direct MERGE; /044 multi-seed CONFIRMATION required)
+- Section 9 (Library Stack, v1/v3): PASS (remediated) — Section 11.7 "Library Stack Declaration" added: standard stack only (LightGBM, Optuna, NumPy/Pandas/Polars, scipy.stats); explicitly states NOT used (mlfinlab, mlfinpy, pypbo, fracdiff); Sortino implementation referenced at optimization.py:compute_sortino_with_threshold (NumPy primitives only)
 
-## Reasons (BLOCK)
-- Section 3 / Section 11: LM Master response map absent. Each of the 3 numbered recommendations in lgbm_advisor.md Phase 4.5 must be addressed in Section 3 as adopted/modified/rejected with reason. Brief Section 11 acknowledges the mismatch and requests re-issue but does NOT discharge the existing advisory. The QR must add a response map — even one-liners like "REJECTED — rec applies to drawdown-brake (rejected axis), not current Sortino × specialist hybrid" are sufficient per the gate rule.
-- Section 7: Missing as a named gate section. The failure-mode prediction paragraph exists in Section 9 under "Mechanism failure scenario" but the gate requires it under Section 7 with the explicit mandate: 1-2 paragraphs predicting how the iteration most plausibly fails OOS, what gates catch it, what failure metrics look like. The content in Section 9 partially satisfies this but the QR should promote it to a clearly labeled Section 7.
-- Section 8: Missing locked numerical MERGE/NO-MERGE thresholds. "MERGE iff OOS Sharpe Δ ≥ +0.10 AND OOS Sharpe absolute ≥ +1.75 AND IS Sharpe > 0 AND OOS trades ≥ 80" or equivalent must be pre-registered before Phase 6 runs.
-- Section 9: Missing Library Stack Declaration. Must declare which library versions are in use (even a negative declaration: "no mlfinlab/mlfinpy; standard stack LightGBM/Optuna/NumPy/Pandas only").
+## Reasons (if BLOCK)
+N/A — OVERALL: PASS. All 4 prior BLOCK reasons remediated:
+1. LM Master response map: Section 11 replaced with 7-row response map for retargeted advisor — RESOLVED
+2. Section 7 failure-mode prediction: Section 11.5 added as explicit "Pre-Registered Failure-Mode Prediction" — RESOLVED
+3. Section 8 MERGE/NO-MERGE thresholds: Section 11.6 added with locked numerical criteria — RESOLVED
+4. Section 9 library stack: Section 11.7 added with standard-stack declaration and explicit NOT-used list — RESOLVED

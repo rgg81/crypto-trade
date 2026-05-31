@@ -1,184 +1,143 @@
-# iter-v1/039 — EDA Findings: Per-Symbol Drawdown BINARY KILL Brake
+# iter-v1/039 — EDA Findings: Per-cohort Sortino × Specialist Hybrid
 
 **Run date**: 2026-05-31
-**Data source**: `reports-v1/iteration_v1-baseline/in_sample/trades.csv` (621 IS trades, 2022-01-01 to 2025-03-23, 39.4 months).
+**Axis**: Apply /037's Sortino Optuna objective to /036's LINK+DOT 2-cohort trend-scanning specialist substrate. REPEAT-COMBO of loss-function × per-cohort-specialization.
+**Data source**:
+- `reports-v1/iteration_v1-036/{in_sample,out_of_sample}/trades.csv` (281 IS / 105 OOS; LINK+DOT trend-scan specialist; Sharpe Optuna)
+- `reports-v1/iteration_v1-037/{in_sample,out_of_sample}/trades.csv` (688 IS / 243 OOS; 5-cohort; Sortino Optuna)
+- `BASELINE_V1.md` IS +0.2829 / OOS +0.6637
+
 **Script**: `analysis/iteration_v1-039/eda.py`
-**CSV outputs**: `analysis/iteration_v1-039/{dd_percentiles,trade_buckets,skip_impact,oscillation,deadlock_risk}.csv`
+**CSV outputs**: `analysis/iteration_v1-039/{jaccard_overlap,per_symbol_sortino_sharpe,delta_037_link_dot_only,prediction_signals,prediction_band,summary}.csv|json`
 
-## Mechanism under study
-
-Per-symbol cumulative net-PnL series at 8h cadence (synthesized from realized
-weighted PnL on trade close_time). Rolling-30d (90-bar trailing) peak-to-current
-realized drawdown. **Brake ON** when `dd > threshold_sym`; **brake OFF** when
-`dd < threshold_sym × 0.5`. While ON, skip ALL new entries on that symbol.
-
-Distinct from /038 (vol CEILING, scale-down). This is **binary KILL on DD**.
+**NOTE**: this directory previously held a REJECTED axis EDA (drawdown-brake binary kill). That EDA has been moved to `analysis/iteration_v1-039/rejected_drawdown_brake/`; the rejection rationale lives in `briefs-v1/iteration_v1-039/axis_rejected.md`. The /039 axis pivoted to Per-cohort Sortino × specialist hybrid per the axis_rejected.md "Path Forward — option 1".
 
 ---
 
-## 1. Per-symbol DD percentile table (rolling-30d, peak-to-current)
+## Load-bearing purpose
 
-| Symbol | p50 | p75 | p85 | p90 | p95 | p99 | max | n_bars |
+Resolves /044 CONFIRMATION stacking decision. Per /037 closeout's 3-way convergent finding (LM Master + Critic + QR):
+
+- /037 (Sortino on 5-cohort universe): DOT-concentrated +39.30pp OOS lift but **HURT LINK by −42.9pp** (LINK OOS −8.64% vs baseline's +34.23%).
+- /036 (LINK+DOT trend-scan specialist with Sharpe Optuna): **OOS Sharpe +1.7465**, LINK +108.9% / DOT +113.6%, bit-identical +75/+112pp LINK+DOT OOS lift.
+
+**Question /039 resolves**: does Sortino's mechanism survive on /036's substrate?
+- If YES → universe-independent → /044 CAN BUNDLE both axes.
+- If NO  → universe-dependent → /044 STAYS SEPARATE (Sortino is contingent on which cohorts co-train).
+
+---
+
+## 1. Trade-roster overlap on LINK+DOT (Jaccard)
+
+`analysis/iteration_v1-039/jaccard_overlap.csv`
+
+| Sample | Cohort | n(036) | n(037) | ∩ | ∪ | **Jaccard** |
+|---|---|---|---|---|---|---|
+| IS  | LINK     | 155 | 160 | 54 | 261 | **0.2069** |
+| IS  | DOT      | 126 | 127 | 31 | 222 | **0.1396** |
+| IS  | LINK+DOT | 281 | 287 | 85 | 483 | **0.1760** |
+| OOS | LINK     |  52 |  48 |  6 |  94 | **0.0638** |
+| OOS | DOT      |  53 |  53 | 19 |  87 | **0.2184** |
+| OOS | **LINK+DOT** | **105** | **101** | **25** | **181** | **0.1381** |
+
+**Finding**: Jaccard 0.14 OOS LINK+DOT is **deeply LOW** (< 0.30 threshold). The two iterations pick **substantially different trades** on the same nominal cohorts.
+
+Mechanism: /036 trains on trend-scanning labels (4σ adaptive bar threshold, 21-day max horizon, gap-purge mandatory); /037 trains on standard triple-barrier labels with the Sortino objective. The combined effect of (label change × Optuna objective change) produces near-disjoint trade rosters. **The two axes are NOT picking the same edge** — they're picking different opportunities in the same cohort.
+
+Implication for /039: stacking will land Optuna in a basin that competes with /036's specialist policy. **Basin competition is NOT orthogonality.**
+
+---
+
+## 2. Per-symbol Sortino vs Sharpe on /036 substrate
+
+`analysis/iteration_v1-039/per_symbol_sortino_sharpe.csv`
+
+| Sample | Symbol | n | mean% | trade-Sharpe | trade-Sortino | **Sortino/Sharpe** | skew | exc-kurt |
 |---|---|---|---|---|---|---|---|---|
-| BTCUSDT  | 1.75% | **3.88%** | 4.99%  | 5.78%  | 7.93%  | 12.91% | 16.77% | 3547 |
-| ETHUSDT  | 1.61% | **4.31%** | 6.02%  | 7.64%  | 9.78%  | 18.83% | 20.78% | 3547 |
-| LINKUSDT | 2.65% | **6.44%** | 8.59%  | 9.54%  | 12.88% | 17.91% | 22.84% | 3547 |
-| LTCUSDT  | 2.23% | **6.60%** | 9.07%  | 10.83% | 15.54% | 18.98% | 18.98% | 3547 |
-| DOTUSDT  | 0.43% | **2.77%** | 4.15%  | 6.86%  | 10.44% | 12.69% | 15.45% | 3547 |
+| IS  | DOT  | 126 | -0.150 | -0.075 | -0.077 | **1.029** | -0.722 | +7.05 |
+| IS  | LINK | 155 | +0.184 | +0.038 | +0.054 | **1.402** | +1.342 | +3.51 |
+| OOS | DOT  |  53 | +0.213 | +0.126 | +0.146 | **1.158** | +0.288 | -0.94 |
+| OOS | LINK |  52 | +0.776 | +0.226 | +0.278 | **1.229** | +0.318 | +0.88 |
 
-Heterogeneity is significant — LINK/LTC have nearly 2× the p75 DD of DOT/BTC.
-Per-symbol thresholds are MANDATORY; portfolio-uniform would over-skip DOT/BTC
-and under-skip LINK/LTC.
+**Finding**: Sortino/Sharpe ratios on /036 substrate average **1.22 IS, 1.19 OOS** — **MODERATE differentiation, well below the 1.5+ "strong" threshold**.
 
-## 2. Recommended thresholds
+Compared to /037's diagnostic (Sharpe & Sortino baseline IS, where ratios were 3.0-4.0× pre-Sortino-Optuna run), **/036's substrate already exhibits much lower Sortino/Sharpe spread**. The trend-scanning labels + 2-cohort universe produced symmetric-tail PnL distributions (LINK IS skew +1.34 is right-skewed, but the OOS shapes are nearly Gaussian: skew 0.29-0.32, exc-kurt -0.94 to +0.88).
 
-`threshold_sym = p75(rolling_30d_dd_sym)`, `recovery = threshold × 0.5`:
+**Mechanism**: trend-scanning labels already select clean trend persistences → tails are less left-heavy than triple-barrier → Sortino's downside-only deviation is **already approximated by Sharpe**. The Sortino objective has less room to reorganize the loss surface than it did on baseline.
 
-| Symbol   | threshold | recovery |
-|---|---|---|
-| BTCUSDT  | 3.880% | 1.940% |
-| ETHUSDT  | 4.307% | 2.153% |
-| LINKUSDT | 6.441% | 3.221% |
-| LTCUSDT  | 6.601% | 3.300% |
-| DOTUSDT  | 2.770% | 1.385% |
+Implication: /037-mechanism magnitude on /036 substrate is **predicted small in absolute terms** even if directionally favorable.
 
-## 3. Skip-rate prediction (IS, ORACLE — same realized roster)
+---
 
-| Symbol   | total | skipped | skip rate | retained sum w-PnL | skipped sum w-PnL | retained mean | skipped mean |
+## 3. /037 LINK+DOT-subset OOS performance vs /036 specialist
+
+`analysis/iteration_v1-039/delta_037_link_dot_only.csv`
+
+Strip /037's 5-cohort output to LINK+DOT trades only and compare to /036's full 2-cohort output:
+
+| Sample | Iter | n | net_PnL% | trade-Sharpe | trade-Sortino | mean% | WR |
 |---|---|---|---|---|---|---|---|
-| BTCUSDT  | 113 | 36 | **31.9%** |  -30.56% |  +15.54% |  -0.397% | **+0.432%** |
-| ETHUSDT  | 145 | 48 | **33.1%** |  -13.90% |   -2.07% |  -0.143% |  -0.043% |
-| LINKUSDT | 146 | 37 | **25.3%** |  +20.23% |  +76.17% |  +0.186% | **+2.059%** |
-| LTCUSDT  | 124 | 31 | **25.0%** |  +18.82% |  -13.98% |  +0.202% |  -0.451% |
-| DOTUSDT  |  93 | 33 | **35.5%** |   -4.60% |  -11.59% |  -0.077% |  -0.351% |
+| OOS | /036 LINK+DOT specialist | 105 | **+51.62** | **+0.182** | **+0.223** | +0.492 | **0.543** |
+| OOS | /037 LINK+DOT subset of 5-cohort | 101 | +13.07 | +0.038 | +0.049 | +0.129 | 0.436 |
+| OOS | **delta(037 − 036)** | **−4** | **−38.55** | **−0.144** | **−0.175** | **−0.362** | **−0.107** |
 
-**Aggregate**: 185/621 = **29.8%** IS trades killed. ~5/15 per OOS month → OOS
-trade count would drop ~189 → ~133 (still above the ≥130 floor, but barely;
-the OOS/month rate falls below the 10/month floor for some symbols).
+**Killer finding**: when /037 was applied to the 5-cohort universe, its LINK+DOT-subset OOS output was **already −38.55pp below /036**, with trade-Sharpe −0.144 lower. This is BEFORE we even consider whether restricting to LINK+DOT helps recover.
 
-## 4. Mechanism load-bearing test — DOES IT FIRE THE RIGHT WAY?
+The trend-scanning label substrate produced the OOS gain in /036, not the Sortino objective. Replacing trend-scanning labels with standard labels (which is what /037 used) destroyed the LINK+DOT signal. **Sortino did NOT compensate.**
 
-**This is the killer finding.** The mechanism is supposed to skip
-MORE-NEGATIVE trades. Let's see the sign per symbol:
+The /039 hypothesis is: combine BOTH — use /036's labels AND /037's objective. **But the EDA shows /037's mechanism collides with /036's basin (Jaccard 0.14), and the Sortino/Sharpe ratio is small on /036's substrate (1.22 avg).** The probability that Sortino's basin draw on a 2-cohort × trend-scan substrate lands on a STRICTLY BETTER policy than /036's existing optimum is structurally low.
 
-| Symbol   | retained mean w-PnL | skipped mean w-PnL | mechanism direction |
-|---|---|---|---|
-| BTCUSDT  | -0.397% | **+0.432%** | **BACKWARD** (skips PROFITABLE trades) |
-| ETHUSDT  | -0.143% | -0.043%     | **BACKWARD** (skips LESS-NEGATIVE) |
-| LINKUSDT | +0.186% | **+2.059%** | **BACKWARD-CATASTROPHIC** (skips MOST PROFITABLE — LINK is the IS top contributor) |
-| LTCUSDT  | +0.202% | -0.451%     | **FORWARD** (skips losses — only 1/5) |
-| DOTUSDT  | -0.077% | -0.351%     | **FORWARD** (skips losses) |
+---
 
-**4 of 5 symbols show BACKWARD or only-marginally-forward.** On LINK,
-the brake kills the *single richest signal in the entire IS roster*
-(`+76.17%` from 37 trades, mean **+2.059%/trade**) — these are the trades
-where price has corrected ~6%+ and the model leans long into a bounce.
-On BTC, the same pattern: post-drawdown is when the model is *right*.
+## 4. Predicted F1 modal OOS Sharpe Δ band
 
-Only LTC and DOT show the "expected" direction, and DOT's gain is tiny
-(-0.077% → -0.351% is small absolute).
+`analysis/iteration_v1-039/prediction_band.csv`
 
-**Net IS PnL impact** (sum skipped, sign-flipped because the mechanism
-removes those trades from the realized PnL):
-- BTC: removing skipped trades removes +15.54% of PnL → **WORSE**
-- ETH: removes -2.07% → +2.07% PnL improvement (tiny)
-- LINK: removes +76.17% → **catastrophic IS PnL loss**
-- LTC: removes -13.98% → +13.98% improvement (good)
-- DOT: removes -11.59% → +11.59% improvement (good)
+Integration of three signals (Jaccard + Sortino/Sharpe ratio + /037 LINK+DOT-subset OOS delta):
 
-**Aggregate Δ-IS-PnL ≈ -76.17 - 15.54 + 2.07 + 13.98 + 11.59 ≈ -64.07%
-PnL on the IS sum.** Baseline IS PnL = +50.98%. Implementing this brake
-would push IS PnL strongly NEGATIVE.
+| Band | Weight | Notes |
+|---|---|---|
+| PROMISING-CLEAN ≥+0.20 | **0%** | Ruled out — Jaccard LOW + /037 LINK+DOT-subset already underperformed /036. |
+| PROMISING-INERT-FAV [0, +0.20) | 17% | Possible if Sortino's basin happens to land near /036's optimum AND trend-scanning labels still dominate. |
+| INERT [-0.20, 0) | 23% | Likely if mechanisms cancel — /037 contribution swamped by /036's already-large gain. |
+| **NEG-CLEAN [-0.45, -0.20)** | **40%** | **MODAL** — basin migration competes; /037 mechanism collides with /036's specialist policy. |
+| NEG-CAT < -0.45 | 20% | Catastrophic interference if Sortino's basin draw is far from /036's, similar to /037's LINK regression in 5-cohort. |
 
-**Decile evidence** (trade_buckets.csv): on LINK, D10 (highest DD-at-entry)
-is `mean=+4.69%/trade, sum=+70.29%` — the brake would kill the single most
-profitable decile in the dataset. Similar pattern on BTC D7-D9.
+**Modal band**: **NEG-CLEAN [-0.45, -0.20)** at 40% weight.
 
-**Interpretation**: drawdown in v1's per-symbol PnL curve is a PROXY FOR
-RECENT LOSING TRADES, and the model's edge is to FADE those losing trades
-on the next signal (i.e. mean-reversion in model's own PnL). The brake
-mistakes the high-DD region as "regime hostile" when it's actually
-"setup for the next winner".
+**Combined NEG mass**: 60% (40% NEG-CLEAN + 20% NEG-CAT).
+**Combined POS mass**: 17%.
+**Neutral mass**: 23%.
 
-## 5. Oscillation stability
+---
 
-| Symbol   | transitions | on_bars | on_share | transitions/year |
-|---|---|---|---|---|
-| BTCUSDT  | 26 | 1104/3547 | 31.1% | 8.0 |
-| ETHUSDT  | 27 | 1036/3547 | 29.2% | 8.3 |
-| LINKUSDT | 30 | 1017/3547 | 28.7% | 9.3 |
-| LTCUSDT  | 26 | 1046/3547 | 29.5% | 8.0 |
-| DOTUSDT  | 18 | 1039/3547 | 29.3% | 5.6 |
+## 5. Will Sortino survive on /036's substrate?
 
-Recovery-factor 0.5 gives 5–9 transitions/year per symbol — well damped.
-Hysteresis is fine. Brake is "ON" ~29% of bars in ORACLE.
+**Cleanest answer (1 sentence)**: **NO — Sortino is universe-dependent**: /036's substrate already exhibits a moderate Sortino/Sharpe ratio (1.22 IS) and near-Gaussian OOS PnL distributions (skew 0.3, kurt < 1), giving the Sortino objective little to reorganize, while the Jaccard 0.14 OOS overlap between /036 and /037 confirms that the Sortino objective reroutes Optuna into a basin that **competes** with /036's already-optimal specialist policy rather than reinforcing it.
 
-## 6. STATEFUL deadlock risk assessment
+**Recommended verdict for the brief**: declare HIGH-RISK (REPEAT-COMBO axis with predicted-NEG modal), run anyway under PRIME DIRECTIVE (the experiment resolves the /044 stacking decision regardless of outcome), and pre-commit /044 to **SEPARATE** baseline-stacking rather than BUNDLE if the EDA prior holds.
 
-**(a) Can the brake enter a no-trade equilibrium?**
-**YES, in principle.** In closed-loop:
-- Brake turns ON because rolling-30d DD > threshold.
-- While ON, no NEW entries. Open trades still close (exits fire on bar SL/TP/timeout).
-- Once all open trades close, cum_pnl is FROZEN (no new contributions).
-- `dd = peak − cum_pnl` is then CONSTANT for as long as no trade closes.
-- If `dd > threshold × 0.5` at that frozen moment → recovery condition
-  never fires → **deadlock**.
+---
 
-**(b) Does the recovery rule (dd < threshold × 0.5) prevent it?**
-**NO**, by itself. Recovery requires cum_pnl to RISE, which requires a
-WIN, which requires a trade, which the brake forbids.
+## 6. Falsifier conditions for the brief Section 7
 
-**(c) ORACLE evidence on deadlock likelihood**:
-Longest ORACLE brake-ON run per symbol:
-- BTC 293 bars (**97.7 days**)
-- LINK 203 bars (67.7 days)
-- DOT  208 bars (69.3 days)
-- LTC  152 bars (50.7 days)
-- ETH  148 bars (49.3 days)
+- **PROMISING-CLEAN trigger**: OOS bundle Sharpe Δ ≥ +0.20 AND LINK OOS Δ ≥ 0 AND DOT OOS Δ ≥ 0. Probability per band weights: **3%** (folded into PROMISING-INERT-FAV tail).
+- **PROMISING-INERT-FAV trigger**: OOS bundle Sharpe Δ ∈ [0, +0.20).  Probability: **17%**.
+- **INERT trigger**: OOS bundle Sharpe Δ ∈ [-0.20, 0). Probability: **23%**.
+- **NEG-CLEAN trigger**: OOS bundle Sharpe Δ ∈ [-0.45, -0.20). Probability: **40%** (modal).
+- **NEG-CAT trigger**: OOS bundle Sharpe Δ < -0.45. Probability: **20%**.
 
-In ORACLE these recovered because the realized roster includes wins. In
-**closed-loop, these wins would NOT FIRE** (the brake is ON). So the
-closed-loop max-on run is unbounded by the ORACLE upper bound — could be
-the full 39 months of IS.
+**/044 stacking decision pre-commit**: if Sharpe Δ < +0.05 → /044 STAYS SEPARATE.
 
-**(d) Proposed deadlock mitigations** (for brief Section 2):
-1. **TIME-DECAY recovery**: also turn OFF after `max_on_bars` (e.g. 30 bars / 10 days). Bound the brake to be at most 10 days even if DD doesn't recover. Trades off mechanism integrity for liveness.
-2. **PROBE TRADE**: every N bars while ON, allow ONE entry through. PnL contribution from probe trades unfreezes cum_pnl.
-3. **DD-on-equity-curve-OF-SIGNALS** (not on realized PnL): use the model's predicted-PnL trajectory (forecast aggregation) instead of realized PnL. Stays alive even with no trades. Best mathematical fix but doubles implementation complexity.
-4. **Closed-loop simulator**: build an event-driven simulator that replays the IS bar stream, feeds the brake state into entry decisions, and measures real (not ORACLE) skip behavior. **Mandatory before any CONFIRMATION.**
+---
 
-Per `feedback_v3_oracle_eda_validity.md` (codified iter-v3/054):
-**ORACLE EDA is INVALID for stateful primitives. This iteration MUST
-include a closed-loop simulation plan in brief Section 2.**
+## 7. Wall-clock & implementation cost
 
-## 7. Brief recommendation (Phase 5 verdict)
+NO NEW SRC/ CODE per AXIS specification. All three mechanisms exist:
+- `--symbols LINKUSDT DOTUSDT` (`run_baseline_v1.py` already accepts)
+- `--label-mode trend_scanning` (added at /035)
+- `--optuna-objective sortino` (added at /037)
 
-**Mechanism is BACKWARD on 3 of 5 symbols, including the largest IS PnL
-contributor (LINK at +76% skipped-trade-sum).** The hypothesis that
-"high-DD regime → skip entries" does not hold for v1's per-symbol PnL
-curves under the model's directional signal. Confirming this in
-EXPLORATION is still defensible (single-axis, low cost, novel
-mechanism), but the EDA prior strongly suggests **NEGATIVE** verdict.
+Only need: `run_baseline_v1.py` dispatch elif (model selection for LINK+DOT-only path) + catch-all-cohort exclusion + 1 integration test.
 
-**Path forward options for the brief**:
-1. **Run as-is** with the per-symbol p75 thresholds and document the
-   prior expectation of NEGATIVE based on this EDA. ORACLE/closed-loop
-   gap could surprise.
-2. **INVERT the mechanism** (skip on LOW DD, enable on HIGH DD) — but
-   this is no longer a "drawdown brake", it's a "drawdown opportunity
-   gate", and it should be a separate iteration with its own brief.
-3. **Switch axis** to a different risk primitive (regime gate, cross-symbol
-   correlation per the menu's /042). Cycle-5 menu has /042 unused.
-4. **Use signal-equity-curve drawdown** instead of realized PnL — turns
-   into a model-confidence axis, structurally different.
-
-**My recommendation**: proceed with option 1 (RUN AS-IS) under a HIGH-RISK
-declaration with the deadlock mitigation #1 (time-decay OFF after 30 bars
-= 10 days; well below the longest ORACLE on-window so it materially
-changes behavior in closed-loop). This is the cleanest single-axis
-EXPLORATION of the binary-KILL-on-DD primitive, and the EDA's strong
-NEGATIVE prior is exactly the kind of "uncertainty I want to resolve"
-the Prime Directive demands.
-
-Brief Section 2 must include the deadlock-impossibility argument under
-the time-decay rule and a closed-loop simulation outline.
+**Wall-clock target**: ~50 min modal at v1 EXPLORATION standard (n_trials=18, ENSEMBLE_SIZE=3, single outer seed=42). Cost-positive even at predicted-NEG: resolves /044 stacking decision in one cheap experiment.

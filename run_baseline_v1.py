@@ -76,6 +76,7 @@ from crypto_trade.features_v1 import (
     V1_ITER028_UNIVERSE,
     V1_ITER029_UNIVERSE,
     V1_ITER036_UNIVERSE,
+    V1_ITER039_UNIVERSE,
     V1_OOD_FEATURE_COLUMNS,
     assert_v1_universe,
 )
@@ -4031,6 +4032,113 @@ def main() -> None:
             ("Model_E_DOT", _strat_e),
         ]
 
+    elif iteration_label == "v1-039" and set(symbols) == set(V1_ITER039_UNIVERSE):
+        # iter-v1/039: cycle-5 EXPLORATION #6/10 — per-cohort Sortino × specialist hybrid.
+        # DOUBLE-REPEAT COMBO: loss-function × per-cohort-specialization stacking-interaction
+        # probe of /036 (PROMISING-CLEAN LINK+DOT trend-scan) and /037 (PROMISING-CLEAN
+        # Sortino loss-function). Resolves /044 CONFIRMATION routing: do the two PROMISING
+        # axes COMPOUND on the same substrate or COMPETE (basin collision)?
+        # HIGH-RISK by rotation rule (double-REPEAT + NEG-DOMINANT 60% prior);
+        # NORMAL-RISK by mechanism (no Optuna training-objective domain change).
+        # Model A pool, Model D LTC SKIPPED — ONLY Model C' (LINK) + Model E (DOT).
+        # V1_FEATURE_COLUMNS_PRUNED 44 cols UNCHANGED. No new src/ code.
+        assert label_mode_arg == "trend_scanning", (
+            f"iter-v1/039 pre-flight FAIL: expected --label-mode trend_scanning "
+            f"but got {label_mode_arg!r}. "
+            "Pass --label-mode trend_scanning to activate the per-cohort Sortino × "
+            "specialist hybrid axis. iter-v1/039 layers Sortino onto /036's "
+            "trend-scanning 2-cohort substrate — trend_scanning labels are required."
+        )
+        assert optuna_objective_arg == "sortino", (
+            f"iter-v1/039 pre-flight FAIL: expected --optuna-objective sortino "
+            f"but got {optuna_objective_arg!r}. "
+            "Pass --optuna-objective sortino to activate the Sortino loss-function "
+            "component. iter-v1/039 stacks /037's Sortino objective on /036's "
+            "trend-scanning specialist substrate."
+        )
+        assert set(symbols) == set(V1_ITER039_UNIVERSE), (
+            f"iter-v1/039 pre-flight FAIL: expected V1_ITER039_UNIVERSE "
+            f"{{LINKUSDT, DOTUSDT}} but got {sorted(symbols)}. "
+            "iter-v1/039 dispatches only the LINK + DOT 2-cohort specialist universe."
+        )
+        assert vol_ceiling_mode_arg == "none", (
+            f"iter-v1/039 pre-flight FAIL: expected --vol-ceiling-mode none "
+            f"but got {vol_ceiling_mode_arg!r}. "
+            "iter-v1/039 does NOT carry over the /038 vol-ceiling risk-primitive "
+            "(CLOSED axis). vol_ceiling_mode must be none."
+        )
+        print(
+            "[run_baseline_v1] === iter-v1/039 --- per-cohort Sortino x specialist hybrid "
+            "(loss-function x per-cohort REPEAT-COMBO; cycle-5 EXP-6) ==="
+        )
+        print(
+            f"[iter-v1/039] PER-COHORT-SORTINO-HYBRID ACTIVE: "
+            f"models=Model_C_LINK + Model_E_DOT, "
+            f"label_mode={label_mode_arg}, "
+            f"optuna_objective={optuna_objective_arg}, "
+            f"ENSEMBLE_SIZE={ensemble_size}, "
+            f"n_trials={n_trials}, "
+            f"seeds=1, "
+            f"features={len(active_feature_columns)} cols"
+        )
+        # Model C' (LINK only): trend-scanning labels + Sortino objective
+        # R1=ON (consecutive-SL cool-down); R3=ON (Mahalanobis OOD gate) — identical to /036
+        results_c039, faxm_c039, _strat_c039 = run_model(
+            "C' (LINK + R1)",
+            ("LINKUSDT",),
+            atr_tp=3.5,
+            atr_sl=1.75,
+            apply_r1=True,
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            **_r5_kwargs,
+        )
+        # Model E (DOT only): trend-scanning labels + Sortino objective
+        # R1=ON, R2=ON (drawdown brake), R3=ON — identical to /036
+        results_e039, faxm_e039, _strat_e039 = run_model(
+            "E (DOT + R1 + R2)",
+            ("DOTUSDT",),
+            atr_tp=3.5,
+            atr_sl=1.75,
+            apply_r1=True,
+            apply_r2=True,
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            **_r5_kwargs,
+        )
+
+        # F-AXIS #2 dispatch verification: assert per-cohort isolation enforced
+        c039_symbols = {r.symbol for r in results_c039}
+        e039_symbols = {r.symbol for r in results_e039}
+        assert c039_symbols.issubset({"LINKUSDT"}), (
+            f"[iter-v1/039] Model C' produced non-LINK results: {c039_symbols - {'LINKUSDT'}}. "
+            "Per-cohort isolation failed — Model C' must trade LINKUSDT only."
+        )
+        assert e039_symbols.issubset({"DOTUSDT"}), (
+            f"[iter-v1/039] Model E produced non-DOT results: {e039_symbols - {'DOTUSDT'}}. "
+            "Per-cohort isolation failed — Model E must trade DOTUSDT only."
+        )
+
+        print(
+            f"[iter-v1/039] Bundle dispatch verified: "
+            f"C'={len(results_c039)} trades (LINK) "
+            f"E={len(results_e039)} trades (DOT)"
+        )
+
+        _all_faxm_logs = faxm_c039 + faxm_e039
+        all_results = results_c039 + results_e039
+        _r5_model_results = [results_c039, results_e039]
+        _post_dispatch_fi_strategies = [
+            ("Model_C_LINK_sortino_trend_scan_specialist", _strat_c039),
+            ("Model_E_DOT_sortino_trend_scan_specialist", _strat_e039),
+        ]
+
     elif set(symbols) == set(V1_BASELINE_UNIVERSE) and iteration_label not in (
         "v1-021",
         "v1-023",
@@ -4046,9 +4154,10 @@ def main() -> None:
         "v1-036",
         "v1-037",
         "v1-038",
+        "v1-039",
     ):
         # Generic baseline-universe dispatch.
-        # Non-/021/023/024/025/027/030/031/032/033/034/035/036/037/038 iterations. Models A/C/D/E
+        # Non-/021/.../039 iterations. Models A/C/D/E
         # with V1_BASELINE_UNIVERSE symbols. BIT-IDENTICAL to historical
         # v186 baseline when active_feature_columns=list(V1_FEATURE_COLUMNS) + n_trials=50.
         results_a, faxm_a, _strat_a = run_model(

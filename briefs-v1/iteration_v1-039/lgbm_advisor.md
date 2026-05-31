@@ -1,74 +1,97 @@
-# LightGBM Master Advisor — iter-v1/039 — Phase 4.5 (Pre-Design)
+# LightGBM Master Advisor — iter-v1/039 — Phase 4.5 (Pre-Design, RETARGETED AXIS)
 
 ## Context Read
-- Track: v1, baseline `v0.v1-baseline-corrected` (IS Sharpe +0.2829 / OOS Sharpe +0.6637 / 621 IS trades / 189 OOS trades / R2 fire rate IS 71.2%, OOS 63.0%).
-- Prior iter /038 still running — same risk-primitive family, different mechanism (vol CEILING scale-down vs /039 binary KILL on DD).
-- QR's tentative axis: per-symbol p75 rolling-30d DD binary brake; per-symbol thresholds (BTC 3.88%, ETH 4.31%, LINK 6.44%, LTC 6.60%, DOT 2.77%); recovery = threshold × 0.5.
-- EDA prior (`eda_findings.md` §4): **mechanism BACKWARD on 3 of 5 symbols** — skipped trades on LINK mean +2.059%/trade vs retained +0.186%; aggregate Δ-IS-PnL ≈ **−64.07%** on the IS sum. This is a NEGATIVE-prior axis.
+- Track: v1, baseline `v0.v1-baseline-corrected` (IS +0.2829 / OOS +0.6637).
+- **Axis pivot**: DD-brake REJECTED at EDA stage (mechanism BACKWARD 3/5 sym; LINK skipped-trade mean +2.06%/trade). New axis = **Per-cohort Sortino × LINK+DOT specialist hybrid** (Path Forward #1 from `axis_rejected.md`).
+- /036 substrate: LINK+DOT trend-scan specialists, OOS Sharpe +1.7465 (Δ +1.08, **largest single-seed lift in v1 history**), 50/50 PnL split (LINK 48.94% / DOT 51.06%), 105 OOS trades.
+- /037 Sortino on 5-cohort baseline: OOS Δ +0.18 but mechanism DIVERGENT — DOT carried 78.62% OOS PnL, LINK -42.9pp HURT; Jaccard 0.102 (basin-relocation).
+- Config: `--symbols LINKUSDT,DOTUSDT --label-mode trend_scanning --optuna-objective sortino --ensemble-size 3 --n-trials 18 --seeds 1`.
 
-## Recommended Hyperparameter Direction
+## Mechanism Interaction Prediction (LOAD-BEARING)
 
-### 1. Hold HP grid CONSTANT vs /038
-- **What**: `num_leaves [16,63]`, `max_depth [3,7]`, `min_data_in_leaf [20,300]`, `learning_rate [0.01,0.1]`, `lambda_l1 [0,3]`, `lambda_l2 [0,3]`, `feature_fraction [0.5,1.0]`, `bagging_fraction [0.5,1.0]`, `bagging_freq [0,10]` — same Optuna bounds as `run_baseline_v1.py` default. `n_trials=18`, single seed=42, ENSEMBLE_SIZE=3.
-- **Why**: brake fires POST-prediction at the gate layer; model training is UNCHANGED. Mixing HP search with the gate axis breaks single-axis isolation (Critic Check 14 Axis Family violation).
-- **Risk**: zero — guaranteed clean attribution.
+Trend-scanning labels produce ~40% fewer labels per training-window than triple-barrier (significance threshold on Wald-t over forward window kills marginal/chop bars). Sortino objective penalizes IS downside-std. **Combined effect**: Sortino searches a SPARSER loss surface for low-downside-std basins.
 
-### 2. FLAG confidence_threshold compensation incentive (DO NOT pin, but instrument)
-- **What**: Optuna may LOWER `confidence_threshold` to recover the ~30% skipped trade volume (more entries at threshold=lower offsets the binary kill). Brief Section 3 must record per-cell `best_confidence_threshold` and compare distribution against /038 + baseline.
-- **Why**: gate-kill ~30% IS trades is a large incentive; Optuna's IS objective sees the kill as "model is wrong on those candidates" and will tilt toward lower-threshold/higher-recall regions to refill the trade count.
-- **Risk**: if observed `confidence_threshold` drops > 15% vs baseline, the axis is no longer "binary kill on DD" alone — it's compounded with a threshold migration. Flag as MIXED-AXIS in post-mortem.
+Two regime predictions:
+1. **PROMISING-CLEAN if** /036's labels select for "stable trends" but residual IS downside-std is the binding constraint (Sortino reselects HP toward LINK-tail-protection). Predicted lift: OOS Δ over /036's +1.08 by +0.10 to +0.30 → **Δ vs baseline +1.18 to +1.38**.
+2. **NEG / INERT if** /036 already exhausts the downside-clip degree-of-freedom (trend-scanning's significance filter mechanically removes chop trades = primary downside source). Sortino has no incremental gradient signal → reduces to /036 numeric or worse via basin lottery.
 
-### 3. ensemble_size = 3, n_trials = 18 (EXPLORATION-spec)
-- **What**: no bump. Drawdown brake is deterministic rule on backtest PnL state — no prediction-variance source for the inner ensemble to reduce. n_trials=18 single-seed=42 is adequate.
-- **Why**: gate firing is independent of model stochasticity. Ensemble averaging gives nothing to the gate decision.
-- **Risk**: none.
+Per /037 evidence (downside-std GREW +11.7% under Sortino on 5-cohort), the mechanism-as-stated is REFUTED at v1 — Sortino's actual basin behavior on v1 is right-tail concentration, not left-tail clipping.
 
-## Recommended Feature-Engineering Direction
+## Per-Symbol Concentration Sensitivity (DECISIVE DIAGNOSTIC)
 
-**NONE this iteration.** This is a pure RULE-layer / risk-primitive axis. V1_FEATURE_COLUMNS (193 cols) unchanged. Feature-importance sanity check (see post-mortem hint below) is verification, not engineering.
+/037 produced DOT 78.62% / LINK -42.9pp on 5-cohort. /036 produced 50/50 LINK+DOT on 2-cohort. **The 78/22 vs 50/50 fork is the load-bearing falsifier**:
 
-## Saturation Risks to Flag
+| /039 observed split | Interpretation | Routing |
+|---|---|---|
+| **DOT ≥ 70% / LINK ≤ 30%** | /037 DOT-skew is INTRINSIC TO SORTINO (substrate-independent); LINK incompatible with Sortino regardless of label-mode | PROMISING-DOT-ONLY; /044 = DOT-Sortino-trend-scan specialist alone |
+| **40-60% / 40-60% (balanced)** | /037 DOT-skew was 5-cohort confound; Sortino COMPOUNDS with /036 substrate cleanly | PROMISING-CLEAN; /044 = full hybrid CONFIRMATION substrate |
+| **LINK ≥ 70% / DOT ≤ 30%** | Sortino × trend-scan inverts /037 asymmetry; unprecedented; flag for multi-seed | PROMISING-LINK-ONLY (suspicious; needs /044 multi-seed isolation) |
+| **NEG bundle (both < +0.20 over /036)** | Mechanisms COLLIDE; non-orthogonal at single-seed | INERT; cycle-5 routing unchanged |
 
-**(a) Mechanism-backward EDA is the dominant signal.** LINK's skipped-trade mean of +2.059%/trade (vs retained +0.186%) means the brake removes the SINGLE RICHEST DECILE of the IS roster. This is not a "tunable knob" — inverting the threshold won't fix it because the brake's hypothesis (high-DD → hostile regime) is REFUTED for v1's per-symbol PnL on a momentum-leaning model. Brief Section 0/2 must declare HIGH-RISK and the EDA NEGATIVE prior explicitly.
+This is the cleanest mechanism diagnostic available in cycle-5 — the answer directly resolves the /037 closeout open question (Recommendation 2 from /037 review: "pre-register Sortino × /036 stacking compounding test").
 
-**(b) STATEFUL DEADLOCK risk — BACKTEST vs LIVE asymmetry.** At backtest layer, `cum_pnl` is computed from the full UN-GATED realized roster as a counterfactual reference (the brake reads PnL history that includes trades the brake itself would have suppressed). **No deadlock at backtest** because `dd` keeps moving regardless of gate decisions. At LIVE deployment, `cum_pnl` is real-only (brake's own suppression freezes the curve) — ORACLE longest-on runs of 97.7d BTC / 67.7d LINK / 69.3d DOT could become UNBOUNDED in closed-loop. **Brief Section 2 MUST acknowledge: "Backtest uses counterfactual full-history PnL; live deployment requires deadlock-impossibility instrumentation (time-decay max_on_bars OR probe-trade OR signal-equity-curve substitute) before testnet handoff."** Per `feedback_v3_oracle_eda_validity.md` (iter-v3/054 deadlock precedent), this is the load-bearing structural caveat — closed-loop simulator OR time-decay recovery rule mandatory pre-CONFIRMATION.
+## n_trials=18 Adequacy Analysis
 
-**(c) Trade-count floor margin is THIN.** EDA predicts 189 → ~133 OOS trades (29.8% kill rate). The skill's ≥130 OOS floor holds barely; per-symbol OOS-trades/month for DOT/LTC may dip BELOW the 10/month floor. F-AXIS #4 should track per-symbol monthly trade count, not just portfolio aggregate.
+For 2 cohorts at n_trials=18 → **9 trials/cohort effective search density**. Compare:
+- Baseline 5-cohort: 18/5 = 3.6 trials/cohort (Optuna shares budget across pool)
+- /036 2-cohort: 18/2 = 9 trials/cohort
+- /039 2-cohort + Sortino: 9 trials/cohort BUT on a sparser label set (trend-scanning ~60% labels of triple-barrier)
 
-## Falsifier Formulation for Brief Section 4
+The search-density-per-label is roughly 18/2 × (1/0.6) = **15-effective trials/cohort/label-density** — well ABOVE the /037 n_effective_trials=9 ceiling that caused basin-narrowness FAIL in /037 (F-AXIS #3 Jaccard 0.102). Net: **n_trials=18 is ADEQUATE — do not bump.** Single-seed is the binding constraint, not trial budget.
 
-- **F-AXIS #2 wiring**: dispatch banner `[v1-039] drawdown_brake ARMED for {sym}: threshold={thresh:.3%} recovery={rec:.3%}` for all 5 symbols at strategy init; runtime assert `brake_state in {ON, OFF}` per bar. PASS = banner ≥5 lines + zero assert failures.
-- **F-AXIS #3 LOAD-BEARING per-symbol mechanism**: per-symbol skip rate ∈ [EDA_pred − 10%, EDA_pred + 10%]. BTC ∈ [21.9%, 41.9%], ETH ∈ [23.1%, 43.1%], LINK ∈ [15.3%, 35.3%], LTC ∈ [15.0%, 35.0%], DOT ∈ [25.5%, 45.5%]. Three or more symbols outside band = mechanism-wiring FAIL.
-- **F-AXIS #4 trade-count**: IS trade count = 621 − N_skipped where N_skipped ∈ [167, 203] (185 ± 10%). Binary kill is deterministic — no model retraining gate semantic — so observed N_skipped should match counterfactual ORACLE within rounding except for the closed-loop-vs-counterfactual gap (TBD: small if brake fires on full-history PnL; large if on real-only PnL). Brief MUST specify which PnL feed the implementation uses.
-- **F-AXIS #5 wall-clock**: ~50 min anchored on /038 (gate adds a constant-time per-bar check; no model retraining cost). Cap at 75 min hard.
-- **F-AXIS #6 (recommended new) feature-importance stability**: top-5 feature ranks per cohort (A/C/D/E) match baseline ±2 positions across all 4 cohorts. Brake is post-prediction, so importance MUST be unchanged. FAIL = wiring defect (gate reading state inside training loop).
+## F-AXIS Falsifier Recommendations
 
-## What I Did NOT Recommend, and Why
+- **F2 wiring**: dispatch banner `[iter-v1/039] PER-COHORT-SORTINO-HYBRID ACTIVE` with **2 asserts**: `label_mode_arg == "trend_scanning"` AND `optuna_objective_arg == "sortino"` AND `set(symbols) == {"LINKUSDT", "DOTUSDT"}`. Verify per-cell Sortino values logged in run.log; spot-check 3 cells have non-NaN downside_std.
+- **F3 per-symbol PnL Δ LOAD-BEARING**: LINK OOS PnL Δ vs /036 ∈ [-20pp, +30pp]; DOT OOS PnL Δ vs /036 ∈ [-20pp, +30pp]. Outside band → mechanism diverged. **The SIGN match (both positive OR both negative) determines orthogonality vs collision.**
+- **F4 bundle Δ band**: OOS Δ vs **/036 anchor +1.7465** (not baseline) ∈ [+0.10, +0.30] PROMISING; [-0.15, +0.10] INERT (stacking failure); < -0.15 NEG-COLLISION. Anchor against /036 because /036 is the substrate; comparing against baseline obscures the compounding question.
+- **F5 wall-clock**: anchor /036 ~25 min (2 cohorts, same config). Sortino adds negligible cost (one mask + std on subset). Modal 25-35 min; hard cap 60 min.
+- **F6 (recommended NEW) trade-roster Jaccard vs /036**: PRIMARY mechanism diagnostic. Jaccard ∈ [0.50, 0.85] = clean compounding (basin reuse with marginal Sortino re-selection). < 0.30 = basin migration (PROMISING-BASIN-RELOCATION subtype, needs multi-seed). > 0.95 = TECHNICAL-FAILURE-SILENT-NO-OP (Sortino didn't activate). Jaccard < 0.20 with /037-style DOT-skew = /037 mechanism reproduced on 2-cohort.
 
-- **No HP grid widening / narrowing**: clean single-axis isolation; HP-axis trades belong in a separate iteration.
-- **No mechanism INVERSION** ("skip on LOW DD, enable on HIGH DD"): mechanically interesting per EDA §4 evidence (skipped-trade mean is HIGHER than retained on BTC+LINK), but that's a DIFFERENT primitive — separate brief. Flag in /039 closeout diary for /040 candidate.
-- **No closed-loop simulator implementation this iteration**: simulator is INFRA (~2 days), not an EXPLORATION axis. /039's deliverable is the ORACLE-evidence verdict + structural insight. If closed-loop is mandatory pre-CONFIRMATION, /045+ adds it.
+## Saturation / Double-REPEAT Check
+
+This axis is a **double-REPEAT**:
+- **Loss-function family**: last used /037 (1 iter ago). 2-iter recurrence allowed; 5+ same-family forbidden. Counter at 2 of 5.
+- **Per-cohort-specialization family**: last used /036 (3 iter ago, with /037 + /038 between). Counter at 2 of 5.
+
+Both within tolerance per `feedback_v3_strict_10_to_1_cadence.md`. Acceptability ground: the axis is the **direct compoundability test of two previously-PROMISING axes** — Critic /037 closeout Rec 2 explicitly pre-registered this stacking probe. NOT a third independent attempt at either family. Acknowledge in brief Section 0.6 as JUSTIFIED double-REPEAT, not unconstrained rotation.
+
+**Prior probability distribution** (calibrated against /037 mechanism failure + /036 substrate strength):
+
+| Outcome | Prior |
+|---|---|
+| PROMISING-CLEAN (Δ vs /036 ≥ +0.10, balanced 50/50) | 18% |
+| PROMISING-DOT-ONLY (Δ vs /036 ≥ +0.10 but DOT-skewed > 70%) | 22% |
+| PROMISING-LINK-ONLY (Δ vs /036 ≥ +0.10 but LINK-skewed > 70%) | 5% |
+| PROMISING-INERT-FAV / INERT (Δ vs /036 ∈ [-0.15, +0.10]) | 28% |
+| NEG-COLLISION (Δ vs /036 < -0.15; mechanisms collide) | 22% |
+| NEG-CATASTROPHIC (Δ vs /036 < -0.40; substrate dissolution) | 5% |
+
+Combined PROMISING 45% vs combined NEG 27%. **PROMISING-DOT-ONLY is the modal outcome (22%)** — consistent with /037's DOT-Sortino-affinity observation and /036's bimodal LINK+DOT discovery; Sortino mathematically rewards DOT's lower-variance trade roster more than LINK's.
+
+## What I Did NOT Recommend
+
+- **No `class_weight='balanced'` adjustment** — trend-scanning produces 3-class labels with natural ~33/33/33 split (significance-filtered to whichever class survives Wald-t); class imbalance is not the bottleneck.
+- **No `min_data_in_leaf` bump** despite sparser labels — Sortino's basin selection at single-seed is sensitive to leaf-data minimums but bumping breaks single-axis isolation (mixes with loss-function change). Defer to /044 CONFIRMATION multi-seed if PROMISING.
+- **No feature subset pruning** — V1_FEATURE_COLUMNS_PRUNED (43 cols) is the /036 substrate; preserving feature space ensures clean compounding attribution.
+
+## /044 Routing Implication (Predicted)
+
+If F4 PROMISING-CLEAN (18% prior) → /044 CONFIRMATION = **Sortino × LINK+DOT trend-scan specialist** 10-seed validation; bundle substrate locked.
+
+If F4 PROMISING-DOT-ONLY (22% prior, modal) → /044 splits: either (a) DOT-Sortino-trend-scan specialist alone OR (b) /036 + /037 as SEPARATE strictly-accretive decisions (per `feedback_v3_promising_mechanical_subtype.md` — non-compoundable across iterations). LM Master leans toward (b) — preserves /036's 50/50 diversification.
+
+If F4 INERT/NEG (55% combined prior, modal regime) → **mechanisms collide; /044 CONFIRMATION = /036 ALONE** (single-axis trend-scan specialist). /037 Sortino reverts to standalone candidate for /045+ EXPLORATION on a DIFFERENT substrate (e.g. baseline 5-cohort triple-barrier — already tested at /037 and found mechanism-divergent, so effectively axis CLOSED).
+
+**The 45% PROMISING prior is the highest of any v1 cycle-5 EXPLORATION since /036.** The directness of the compoundability question + /037's open-question pre-registration justify this iteration regardless of outcome.
 
 ## Closing Note
 
-**Confidence rating: MEDIUM — high confidence of NON-ZERO behavioral effect (the gate WILL fire and WILL skip ~185 trades), but LOW confidence of NON-NEGATIVE Sharpe outcome.** Probability distribution: PROMISING 10% / INERT 15% / NEGATIVE 60% / NEGATIVE-CATASTROPHIC 15%. The EDA's mechanism-backward finding on LINK is the load-bearing signal — proceeding as a clean single-axis test of the binary-KILL-on-DD primitive is defensible because v1 needs to PROVE the EDA prior in closed-loop and definitively close the axis. Single most important non-ignorable: **Brief Section 2 must explicitly state the counterfactual-vs-real PnL feed choice** AND **declare deadlock-impossibility live-deployment caveat** per `feedback_v3_oracle_eda_validity.md`. Without that wording, /039 cannot legitimately graduate to CONFIRMATION even if it passes EXPLORATION.
+**Confidence: MEDIUM-HIGH on non-zero effect, MEDIUM on PROMISING direction.** The DOT-skew under Sortino is the single most likely outcome — and is itself informative for /044 routing whether PROMISING or INERT. **Single most important non-ignorable**: brief Section 4 verdict matrix MUST anchor against /036 (+1.7465), NOT against baseline (+0.6637) — otherwise a +0.30 numeric over baseline looks like PROMISING when it's actually a -0.78 collision against the actual substrate. The /037 closeout already documented the compounding-test pre-registration; the brief should cite that pre-registration verbatim in Section 0 to lock the anchor selection.
 
----
-
-## Report-Back (under 300 words)
-
-**Three strongest LM Master recommendations:**
-
-1. **Hold HP grid CONSTANT** (same Optuna bounds as /038; n_trials=18, single seed=42, ENSEMBLE_SIZE=3). Gate fires POST-prediction so model HP space is irrelevant; mixing breaks single-axis attribution and Critic Check 14.
-
-2. **FLAG confidence_threshold compensation incentive in Brief Section 3.** Binary kill at ~30% IS trade rate creates a strong Optuna incentive to LOWER `confidence_threshold` to refill recall. Instrument per-cell `best_confidence_threshold` distribution vs baseline; flag MIXED-AXIS in post-mortem if drop > 15%.
-
-3. **Add F-AXIS #6 feature-importance stability falsifier.** Top-5 ranks per cohort (A/C/D/E) must match baseline within ±2 positions. Brake is post-prediction so importance MUST be unchanged — divergence = wiring defect (gate state leaking into training loop). Cheap sanity check.
-
-**Confidence that axis produces non-zero behavioral effect: HIGH** (~95%). EDA shows gate will fire on ~29.8% IS trades (185/621), ~5/15 OOS trades/month. F-AXIS #4 trade-count will register clear delta.
-
-**Confidence axis produces NON-NEGATIVE Sharpe: LOW** (~10% PROMISING / 15% INERT / 60% NEGATIVE / 15% catastrophic). LINK's skipped-trade mean of +2.059%/trade vs retained +0.186%/trade means the brake removes the IS roster's richest decile. Mechanism is BACKWARD on 3 of 5 symbols.
-
-**Stateful-deadlock pre-flight recommendation:** Brief Section 2 MUST explicitly state which PnL feed the implementation uses — **counterfactual full-history PnL (backtest-safe, no deadlock possible) vs real-only PnL (live-faithful but deadlock-vulnerable)**. ORACLE longest-on runs (BTC 97.7d / LINK 67.7d / DOT 69.3d) become UNBOUNDED in closed-loop real-only. Per `feedback_v3_oracle_eda_validity.md` (iter-v3/054 deadlock precedent), pre-CONFIRMATION graduation requires EITHER (a) time-decay recovery `max_on_bars=30` (~10 days) OR (b) probe-trade mechanism OR (c) closed-loop simulator with formal deadlock-impossibility proof. Without explicit Section 2 wording, /039 cannot legitimately graduate past EXPLORATION.
-
-File written to: `/home/roberto/crypto-trade/.worktrees/quant-research/briefs-v1/iteration_v1-039/lgbm_advisor.md` (Phase 4.5 section content above; orchestrator will persist).
+Relevant files referenced:
+- `/home/roberto/crypto-trade/.worktrees/quant-research/briefs-v1/iteration_v1-037/lgbm_advisor.md`
+- `/home/roberto/crypto-trade/.worktrees/quant-research/briefs-v1/iteration_v1-037/review.md`
+- `/home/roberto/crypto-trade/.worktrees/quant-research/briefs-v1/iteration_v1-036/research_brief.md`
+- `/home/roberto/crypto-trade/.worktrees/quant-research/briefs-v1/iteration_v1-036/review.md`
+- `/home/roberto/crypto-trade/.worktrees/quant-research/briefs-v1/iteration_v1-039/axis_rejected.md`
+- `/home/roberto/crypto-trade/.worktrees/quant-research/briefs-v1/iteration_v1-039/lgbm_advisor.md` (prior — DD-brake axis; this advisory supersedes for retargeted axis)

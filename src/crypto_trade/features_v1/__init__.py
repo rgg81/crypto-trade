@@ -227,6 +227,31 @@ assert set(symbols) == {"LINKUSDT", "DOTUSDT"} guard fires in dispatch branch.
 assert label_mode_arg == "trend_scanning" guard fires in dispatch branch.
 """
 
+V1_ITER039_UNIVERSE: tuple[str, ...] = ("LINKUSDT", "DOTUSDT")
+"""iter-v1/039 cohort: LINK + DOT 2-specialist bundle with trend-scanning labels +
+Sortino Optuna objective (DOUBLE-REPEAT COMBO: loss-function × per-cohort-specialization).
+
+Cycle-5 EXPLORATION #6 of 10. Axis family: loss-function × per-cohort-specialization
+(stacking-interaction-probe of /036 per-cohort-specialization + /037 loss-function).
+Load-bearing /044 CONFIRMATION routing decision: resolves whether Sortino and per-cohort
+trend-scanning COMPOUND on the same substrate or COMPETE (basin collision).
+
+Architecture: Model C' (LINK only, R1+R3 ON, atr_tp=3.5, atr_sl=1.75) +
+Model E (DOT only, R1+R2+R3 ON, atr_tp=3.5, atr_sl=1.75). BOTH use trend-scanning
+labels AND Sortino Optuna objective. Model A pool, Model D LTC SKIPPED.
+
+HIGH-RISK declaration: rotation-rule HIGH-RISK (double-REPEAT COMBO with NEG-DOMINANT
+60% prior); NORMAL-RISK by mechanism (NO Optuna training-objective domain change;
+only per-trial scalar aggregate changes from Sharpe to Sortino). Single-seed OPT-OUT
+per cycle-5 EXPLORATION standard. ENSEMBLE_SIZE=3, n_trials=18, seed=42.
+
+LOCAL to runner constant. NOT shared; CONFIRMATION-MERGE updates V1_BASELINE_UNIVERSE.
+assert set(symbols) == {"LINKUSDT", "DOTUSDT"} guard fires in dispatch branch.
+assert label_mode_arg == "trend_scanning" guard fires in dispatch branch.
+assert optuna_objective_arg == "sortino" guard fires in dispatch branch.
+assert vol_ceiling_mode_arg == "none" guard fires in dispatch branch (/038 NO carry-over).
+"""
+
 
 __all__ = [
     "V1_EXCLUDED_SYMBOLS",
@@ -238,6 +263,7 @@ __all__ = [
     "V1_ITER028_UNIVERSE",
     "V1_ITER029_UNIVERSE",
     "V1_ITER036_UNIVERSE",
+    "V1_ITER039_UNIVERSE",
     # iter-v1/023: funding-rate feature family (add_funding_v1_features imported on demand)
     # iter-v1/025: OI delta feature family (add_oi_delta_v1_features imported on demand)
 ]
