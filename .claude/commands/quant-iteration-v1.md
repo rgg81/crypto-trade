@@ -199,6 +199,52 @@ These constants live in `src/crypto_trade/config.py`.
 
 ---
 
+## Merge Principle — Relative Regime Pareto-Dominance (2026-05-31)
+
+**MERGE-PRINCIPLE (canonical, one sentence):**
+
+> A candidate bundle becomes the new BASELINE_V1 if and only if, under every tagged regime, the candidate is Pareto-better-or-equal to the current baseline on the bundle metric vector (within one baseline-seed-σ tolerance), AND strictly better in at least one regime, AND methodology integrity is intact.
+
+Three load-bearing words:
+
+- **Pareto.** No regime is allowed to regress materially (> 1σ_R below baseline). Cross-regime trade-offs ("we lost chop, but gained bull") are NOT acceptable. The candidate must DOMINATE the baseline on the per-regime surface — not re-shuffle edge.
+- **Regime.** Comparison is always within-regime (bull / alt-rotation / chop / bear / vol-spike / liquidation-cascade / ETF-flow / recovery / …). Aggregated OOS-Sharpe-vs-OOS-Sharpe hides regime-mix effects when IS regime mix differs from OOS regime mix.
+- **Relative.** No absolute Sharpe / DSR / PBO / PSR floors. Every edge metric is compared against the corresponding metric on the current baseline, with tolerance scaled to the baseline's own seed-to-seed noise on that regime. Numbers remain only where they enforce methodology integrity.
+
+Three corollaries:
+
+1. **The bundle is the product.** Components are evaluated as bundle contributors; MERGE evaluation lives at the bundle level.
+2. **OOS is one regime realization, not a generalization oracle.** A candidate that ties baseline on every IS-tagged regime AND ties baseline on the OOS-tagged regime is a MERGE candidate even if headline OOS Sharpe is unchanged.
+3. **Statistical-significance metrics inform; they do not gate.** DSR / PBO / PSR are reported per-regime AND bundle-level. They do NOT auto-trigger BLOCK.
+
+### Methodology Gates (HARD; PRESERVED)
+
+The only absolute pass/fail gates — they enforce INTEGRITY, not EDGE:
+
+- **No look-ahead** (Critic Check 1)
+- **Embargo applied** at every walk-forward fold boundary (Critic Check 2)
+- **CV gap correct** = `(timeout_candles + 1) × n_symbols`
+- **Reproducibility checksum match** — same flags + HEAD → same outputs (Critic Check 7)
+- **No OOS tuning** — researcher discipline (Critic Check 8)
+- **Feature-column pinning** — V1_FEATURE_COLUMNS_PRUNED enforced
+- **Forming-candle drop** — `fetcher.py: if k.close_time < now_ms`
+- **ADF stationarity** — features have unit-root rejection where declared (Critic Check 5)
+
+These are non-negotiable. The "no specific numbers" directive applies to EDGE metrics, NOT INTEGRITY metrics.
+
+### Operational Artifacts (one-time + per-iteration)
+
+- `briefs-v1/_meta/baseline_metric_anchors.csv` — bundle-level DSR/PBO/PSR/Sharpe/MaxDD for current BASELINE_V1.
+- `briefs-v1/_meta/baseline_seed_regime_matrix.csv` — per-regime per-seed Sharpe / max_dd / trade_count for the current baseline (10 seeds × N regimes). Used to compute σ_R and σ_dd_R tolerance bands.
+- `briefs-v1/_meta/regime_catalog.md` — canonical regime tag definitions.
+- `reports-v1/iteration_v1-NNN/regime_attribution.csv` — per-iteration deliverable; schema: `regime_tag, in_sample, candidate_sharpe, candidate_max_dd, candidate_trade_count, baseline_sharpe, baseline_max_dd, baseline_trade_count`.
+
+Each MERGE updates the baseline anchor files; the next candidate must clear the new bar. By design (Pareto monotonicity): the framework has no upper edge ceiling.
+
+Full elaboration in `briefs-v1/_meta/merge_v1_relative_regime_pareto_proposal.md`.
+
+---
+
 ## Four Roles
 
 You operate as ONE of four roles for each phase. In autopilot mode (default), you switch roles automatically — no need to ask.
@@ -276,40 +322,44 @@ V1_OUTER_SEEDS_VALIDATION_ONLY = True
 # Any change to this contract REQUIRES explicit user directive + diary entry.
 ```
 
-Plus the v1 hard thresholds (mirroring v3):
+Plus the v1 statistical anchors (mirroring v3 — **INFORMATIONAL, NOT auto-BLOCK** per merge-criteria reframe 2026-05-31):
 
 ```
-DSR_threshold = 0.95     # Deflated Sharpe Ratio
-PBO_threshold = 0.40     # Probability of Backtest Overfitting (LOWER is better)
-PSR_threshold = 0.95     # Probabilistic Sharpe Ratio
-IC_threshold  = 0.70     # |IC_pearson| between feature families (LOWER is better)
-ADF_threshold = 0.05     # ADF p-value (LOWER is better — rejects unit root)
+DSR_threshold = 0.95     # Deflated Sharpe Ratio — REFERENCE; below → diary justification required
+PBO_threshold = 0.40     # Probability of Backtest Overfitting (LOWER is better) — REFERENCE
+PSR_threshold = 0.95     # Probabilistic Sharpe Ratio — REFERENCE
+IC_threshold  = 0.70     # |IC_pearson| between feature families (LOWER is better) — REFERENCE
+ADF_threshold = 0.05     # ADF p-value (LOWER is better — rejects unit root) — METHODOLOGY (HARD)
 ```
+
+These are **REFERENCE ANCHORS** for diary reporting and significance audit. A candidate bundle that fails any of these thresholds is NOT automatically blocked — the merge gate is per-regime Pareto-dominance vs the current BASELINE_V1 (see "Merge Principle — Relative Regime Pareto-Dominance" below). DSR/PBO/PSR regressions below threshold require diary justification (e.g., "candidate's DSR is 0.92 below 0.95 reference, but candidate Pareto-dominates baseline across all 5 tagged regimes — significance reduction attributable to bundle's lower trade variance from regime-conditional dispatch"). The `ADF_threshold` remains a HARD methodology gate (stationarity is integrity, not edge).
 
 Plus inherited project-level merge gates — applied DIFFERENTLY to **component EXPLORATIONs** vs **bundle CONFIRMATIONs**:
 
-### Bundle-level (full-stack CONFIRMATION-MERGE gates)
+### Bundle-level (full-stack CONFIRMATION-MERGE criteria — RELATIVE REGIME PARETO)
 
-The bundle as a whole must clear:
+The bundle as a whole must clear, by reference to the current BASELINE_V1 anchor:
 
-- Bundle IS monthly Sharpe > 1.0
-- Bundle OOS monthly Sharpe > 1.0
-- Bundle OOS / IS Sharpe ratio ≥ 0.5 (the bundle, NOT any single component)
-- ≥10 trades/month OOS, ≥130 OOS total trades (bundle aggregate)
-- Top symbol concentration ≤ 30% of OOS PnL (or explicit exception)
-- 10-seed pre-MERGE validation: mean Sharpe > 0, ≥7/10 profitable
-- DSR > 0.95, PBO < 0.4, PSR > 0.95
+- **Per-regime Pareto-better-or-equal** vs baseline on every tagged regime R present in IS or OOS: `sharpe_R(candidate) ≥ sharpe_R(baseline) − σ_R` AND `max_dd_R(candidate) ≤ max_dd_R(baseline) + σ_dd_R` AND `trade_count_R(candidate) ≥ 0.5 × trade_count_R(baseline)` (rare-regime carve-out per §B.5 of `briefs-v1/_meta/merge_v1_relative_regime_pareto_proposal.md`).
+- **At least one regime STRICTLY better** (`sharpe_R > baseline_sharpe_R + σ_R` OR `max_dd_R < baseline_max_dd_R − σ_dd_R`).
+- **Methodology integrity intact** (no look-ahead, embargo applied, gap correct, no OOS tuning, reproducibility checksum match) — see "Methodology Gates (HARD; PRESERVED)" rule in Critic checks.
+- **10-seed validation: per-regime mean Sharpe_R(candidate) ≥ per-regime mean Sharpe_R(baseline)** AND seed-distribution dominance ratio ≥ 0.5 (at least 5 of 10 candidate-seed within-regime Sharpes beat the baseline's median seed within-regime Sharpe).
 
-### Component-level (EXPLORATION-PROMISING evaluation)
+`σ_R` and `σ_dd_R` are baseline-seed-noise tolerances (one σ across the baseline's 10-seed within-regime Sharpe / max_dd distribution) — computed once at baseline commit and stored in `briefs-v1/_meta/baseline_seed_regime_matrix.csv`.
 
-A component candidate is evaluated on:
+**NO absolute Sharpe / DSR / PBO / PSR floors at the bundle level.** DSR / PBO / PSR are reported per-regime and bundle-level as INFORMATIONAL (see "Statistical-Significance Metrics" section below).
 
-- Within-regime Sharpe (NOT OOS/IS ratio) — at least one tagged regime with Sharpe > 1.0 and within-regime trade count ≥ 30
-- Regime-attribution clarity — the component's PnL should concentrate in specific tagged regimes, not be scattered noise
-- Bundle composition lift — adding this component to the current bundle (by stacking / dispatch simulation on IS) should improve at least one regime's bundle-attributed Sharpe by ≥ 0.10
-- Methodology floors NOT relaxed: no look-ahead, embargo applied, gap correct, no OOS tuning
+### Component-level (EXPLORATION-PROMISING evaluation — BASELINE-RELATIVE)
 
-**A component can be `REGIME-SPECIALIST-IS` with OOS/IS < 0.5 IF regime attribution explains the gap.** The bundle CONFIRMATION enforces OOS/IS at the bundle level.
+A component candidate is evaluated by reference to the current BASELINE_V1 anchor:
+
+- **Within-regime Sharpe Δ vs baseline** — at least one tagged regime where `sharpe_R(candidate) > sharpe_R(baseline) + σ_R` (materially positive vs baseline's own seed noise on that regime).
+- **No regime regression > 1σ_R** — on every other tagged regime, `sharpe_R(candidate) ≥ sharpe_R(baseline) − σ_R`. A regime that materially REGRESSES makes the candidate a TRADED-EDGE candidate, not a clean PROMISING.
+- **Regime-attribution clarity** — the component's PnL concentrates in specific tagged regimes; not scattered noise. LM Master Phase 7.4 Regime Attribution Table is the artifact.
+- **Bundle composition lift (qualitative)** — adding the component to the current bundle (by stacking / dispatch simulation on IS) should improve at least one regime's bundle-attributed Sharpe materially (≥ 1σ_R on that regime).
+- **Methodology floors NOT relaxed** — no look-ahead, embargo applied, gap correct, no OOS tuning. These remain HARD per §C of the proposal.
+
+**A component can be `REGIME-SPECIALIST-IS` with OOS/IS < 0.5 IF regime attribution explains the gap.** The bundle CONFIRMATION enforces per-regime Pareto-dominance at the bundle level — NOT an OOS/IS ratio.
 
 **Any METHODOLOGY-gate failure = NO-MERGE.** Regime mismatch is NOT a methodology failure; researcher overfit IS. Use the WALK-FORWARD-LEAKAGE verdict cell for actual leakage.
 
@@ -587,7 +637,7 @@ The Engineer reads `briefs-v1/iteration_v1-NNN/research_brief.md` and verifies:
 - **Section 5 — Risk Mitigation.** R1/R2/R3 / 7-gate / new-gate changes; IS-calibrated thresholds; simulated effect on prior iterations.
 - **Section 6 — Risk Management Design.** 8-primitive table or v1 equivalent; fire-rate predictions; regime coverage analysis.
 - **Section 7 — Pre-Registered Failure-Mode Prediction.** 1–2 paragraphs predicting how this iteration most plausibly fails OOS, what the gates should catch, what the failure looks like in metrics. Phase 8 diary verifies this prediction against actual outcomes.
-- **Section 8 — Pre-Registered MERGE/NO-MERGE Numerical Criteria.** Locked numerical thresholds before backtest. Example: "MERGE iff `OOS_monthly_Sharpe ≥ +1.8` AND `PBO < 0.4` AND `PSR > 0.95` AND no symbol > 35% of OOS wpnl".
+- **Section 8 — Pre-Registered Per-Regime Baseline-Comparison Criteria.** Locked per-regime comparison plan vs current BASELINE_V1, BEFORE backtest. Format: "MERGE iff for every tagged regime R, `sharpe_R(candidate) ≥ sharpe_R(baseline) − σ_R` AND `max_dd_R(candidate) ≤ max_dd_R(baseline) + σ_dd_R`; AND on at least one regime R*, `sharpe_R*(candidate) > sharpe_R*(baseline) + σ_R*`." Diary auto-populates the per-regime comparison table from `regime_attribution.csv`. NO absolute Sharpe / DSR / PBO / PSR floors.
 - **Section 9 — Library Stack Declaration.** Versions of mlfinlab/mlfinpy/pypbo/fracdiff used.
 - **Section 10 — Regime Attribution Plan.** Target regime(s) + mechanism + off-regime expectation + bundle role + composition simulation + regime-aware falsifier. MANDATORY for EVERY iteration. (NEW 2026-05-31 regime-ensemble mandate.)
 - **Section 11 — Bundle Composition** (CONFIRMATION-PORTFOLIO only). Components included + composition method + regime coverage table + pairwise correlation table + component substitution test + bundle-level OOS/IS prediction.
@@ -907,20 +957,20 @@ A CONFIRMATION can be EITHER a single-axis validation OR a **multi-component POR
 
 | Verdict | Condition | Next step |
 |---|---|---|
-| `CONFIRMATION-MERGE` (single-axis) | One axis validated multi-seed; all bundle-level gates PASS (DSR > 0.95; PBO < 0.4; PSR > 0.95; bundle Sharpe floors; bundle OOS/IS ≥ 0.5) | Update BASELINE_V1.md; tag commit |
-| `CONFIRMATION-MERGE-PORTFOLIO` (multi-component) | N components combined; bundle-level gates PASS at composite; component substitution test PASS (every component contributes ≥ +0.05 bundle OOS Sharpe OR fills a unique regime); regime coverage table shows ≥3 distinct regimes covered | Update BASELINE_V1.md as new bundle stack; tag commit |
+| `CONFIRMATION-MERGE` (single-axis) | One axis validated multi-seed; bundle is Pareto-better-or-equal to current baseline on every tagged regime AND strictly better on ≥1 regime; methodology integrity intact (no look-ahead, embargo, gap, reproducibility) | Update BASELINE_V1.md; tag commit |
+| `CONFIRMATION-MERGE-PORTFOLIO` (multi-component) | N components combined; the COMPOSITE bundle is Pareto-better-or-equal to current baseline on every tagged regime AND strictly better on ≥1 regime; component substitution test PASS (every component is justified by regime-specialist role OR Pareto-positive marginal within-regime contribution); methodology integrity intact | Update BASELINE_V1.md as new bundle stack; tag commit |
 | `CONFIRMATION-BLOCK` | ≥1 BUNDLE-level gate fails; Critic verdict non-MERGE | No baseline update; iterate on failed gates |
 | `BLOCK-PENDING-FIX` | One specific isolable defect; NOT multi-defect | QE one-shot fix + re-run; next verdict is PASS or BLOCK-FINAL |
 | `BLOCK-FINAL` | Irrecoverable (multi-defect OR methodology issue OR second BLOCK after BLOCK-PENDING-FIX OR `WALK-FORWARD-LEAKAGE`) | NO-MERGE; next iter fresh brief |
 
 ### Portfolio Composition Rules (`CONFIRMATION-MERGE-PORTFOLIO` only)
 
-1. **Weights:** components combined via stacking, regime-conditional dispatch, or weighted ensemble. Weights must be DETERMINISTIC (no in-sample tuning of weights on OOS).
-2. **Regime coverage:** the bundle must cover ≥ 3 distinct tagged regimes. A component that duplicates another's regime coverage requires a Sharpe lift ≥ 0.30 over the substitute to remain in the bundle.
-3. **Correlation diversification:** pairwise OOS daily-return correlation between components ≤ 0.70 (LOWER preferred). Cite per-pair correlations in brief Section 11.
-4. **Component substitution test:** for every component, predict bundle OOS Sharpe WITHOUT that component. A component contributing < +0.05 bundle OOS Sharpe AND failing to fill a unique regime must be justified or dropped.
-5. **At least one anchor:** the bundle must contain ≥ 1 component that, on its own, clears the standalone IS Sharpe > 1.0 + OOS Sharpe > 0.5 floor. Pure-specialist bundles (no anchor) are speculative and require an explicit user-directive exception.
-6. **Bundle gates** (DSR, PBO, PSR, OOS/IS ≥ 0.5, ≥10 trades/month OOS, top-symbol ≤ 30%) all evaluated at the BUNDLE level — not per component.
+1. **Weights:** components combined via stacking, regime-conditional dispatch, or weighted ensemble. Weights must be DETERMINISTIC (no in-sample tuning of weights on OOS). UNCHANGED.
+2. **Regime coverage:** the bundle must cover EVERY tagged regime that the current BASELINE_V1 covers, Pareto-better-or-equal per §B of the proposal. No absolute "≥ 3 regimes" floor. A component that duplicates another's regime coverage stays in the bundle if it contributes a materially positive within-regime lift (≥ 1σ_R) on its target regime; otherwise dropped at the substitution test.
+3. **Correlation diversification:** LOWER pairwise OOS daily-return correlation between components is PREFERRED but NOT BLOCKING. Cite per-pair correlations in brief Section 11; if any pair > 0.70, the diary must include a one-paragraph "correlation justification" explaining why the duplicate-axis exposure is acceptable (e.g., one component is regime-specialist, the other anchor). NO AUTO-BLOCK on correlation.
+4. **Component substitution test:** for every component, predict bundle within-regime metrics WITHOUT that component. A component that fails to Pareto-improve the bundle on at least one tagged regime (vs baseline) AND fails to fill a regime the bundle would otherwise lose (vs baseline coverage) must be justified or dropped.
+5. **At least one anchor:** the bundle must contain ≥ 1 component that, on its own, performs Pareto-better-or-equal to the BASELINE_V1 anchor on the regime the baseline covers best. Pure-specialist bundles (no anchor) require an explicit user-directive exception. NO absolute IS Sharpe > 1.0 / OOS Sharpe > 0.5 floor.
+6. **Bundle MERGE evaluation** lives in the "Bundle-level (full-stack CONFIRMATION-MERGE criteria — RELATIVE REGIME PARETO)" section above. DSR / PBO / PSR / OOS/IS ratio / trade-count / concentration are reported but INFORMATIONAL; per-regime Pareto-dominance is the gate.
 
 ---
 
@@ -949,13 +999,15 @@ metric, in_sample, out_of_sample, ratio
 - `n_trials` — total Optuna trials
 - `n_effective_trials` — PCA on trial-return matrix at 95% cumulative variance threshold
 
-### Hard Thresholds
+### Reported Statistical-Significance Metrics (INFORMATIONAL, NOT gating)
 
-- **DSR > 0.95** — required for MERGE
-- **PBO < 0.4** — required for MERGE (LOWER is better)
-- **PSR > 0.95** — required for MERGE
+- **DSR (Deflated Sharpe Ratio)** — reported per-regime AND bundle-level. The diary records `DSR(candidate)` vs `DSR(baseline)`. If `DSR(candidate) < DSR(baseline)` on bundle OR on any tagged regime, the diary includes a "DSR-regression justification" paragraph. NOT a MERGE gate.
+- **PBO (Probability of Backtest Overfitting)** — reported bundle-level. Diary flags any `PBO(candidate) > PBO(baseline) + 0.10`. NOT a MERGE gate.
+- **PSR (Probabilistic Sharpe Ratio)** — reported per-regime. Diary acknowledges `PSR(candidate) < PSR(baseline)` on any regime. NOT a MERGE gate.
 
-**Any single threshold failure = automatic NO-MERGE.** Critic enforces this in Check 3.
+**The MERGE gate is per-regime Pareto-dominance vs baseline** (Critic Check 3d). DSR / PBO / PSR are decision-support, not pass/fail predicates. A candidate that ties baseline on every regime but has slightly worse DSR is an Optuna-trajectory noise artifact, NOT an edge regression — the relative-Pareto framework treats it accordingly.
+
+**Methodology-integrity gates remain HARD and BLOCKING** (no look-ahead, embargo applied, gap correct, reproducibility checksum match — see "Methodology Gates (HARD; PRESERVED)" in the Merge Principle section). These are the only absolute gates.
 
 ---
 
@@ -1217,8 +1269,15 @@ TYPE: EXPLORATION  (or CONFIRMATION)
 ## Section 7 — Pre-Registered Failure-Mode Prediction
 <1-2 paragraphs predicting how this iteration most plausibly fails OOS, what the gates should catch, what the failure looks like in metrics>
 
-## Section 8 — Pre-Registered MERGE/NO-MERGE Numerical Criteria
-<locked numerical thresholds before backtest. Example: "MERGE iff OOS_monthly_Sharpe ≥ +1.8 AND PBO < 0.4 AND PSR > 0.95 AND no symbol > 35% of OOS wpnl">
+## Section 8 — Pre-Registered Per-Regime Baseline-Comparison Criteria
+<locked per-regime comparison plan vs current BASELINE_V1, BEFORE backtest.>
+
+- **Regimes to evaluate** (from briefs-v1/_meta/regime_catalog.md): bull, alt-rotation, chop, bear, vol-spike, liquidation-cascade, ETF-flow, recovery (or subset present in IS/OOS).
+- **Per-regime Pareto criteria** (read baseline numbers from briefs-v1/_meta/baseline_seed_regime_matrix.csv):
+  - For every regime R present: `sharpe_R(candidate) ≥ sharpe_R(baseline) − σ_R` AND `max_dd_R(candidate) ≤ max_dd_R(baseline) + σ_dd_R` AND `trade_count_R(candidate) ≥ 0.5 × trade_count_R(baseline)`.
+  - On at least one regime R*: `sharpe_R*(candidate) > sharpe_R*(baseline) + σ_R*` OR `max_dd_R*(candidate) < max_dd_R*(baseline) − σ_dd_R*`.
+- **DSR / PBO / PSR**: reported per-regime + bundle-level; flagged in diary if materially regressed vs baseline anchor, but NOT a MERGE gate.
+- **Methodology integrity gates** (HARD, BLOCKING): no look-ahead, embargo applied, gap correct, reproducibility checksum match.
 
 ## Section 9 — Library Stack Declaration
 - mlfinlab: 1.4 (or mlfinpy <version> if fallback)
@@ -1281,7 +1340,7 @@ QR's `diary-v1/iteration_v1-NNN.md`:
 - Check 3a (DSR/PSR — methodology gate): PASS / FAIL  (CONFIRMATION-only; EXPLORATION skips)
 - Check 3b (PBO — selection-bias gate): PASS / FAIL  (CONFIRMATION-only)
 - Check 3c (Regime attribution clarity — component-candidate gate): PASS / WARN / FAIL  (EXPLORATION + CONFIRMATION)
-- Check 3d (BUNDLE-level OOS/IS ≥ 0.5): PASS / FAIL  (BUNDLE-CONFIRMATION-only; component EXPLORATIONs EXEMPT)
+- Check 3d (BUNDLE-level per-regime Pareto-dominance vs BASELINE_V1: candidate ≥ baseline within σ on EVERY tagged regime AND strictly better on ≥1 regime): PASS / FAIL  (BUNDLE-CONFIRMATION-only; component EXPLORATIONs EXEMPT — they use within-regime Δ vs baseline per Check 3c)
 - Check 4 (IC): PASS / FAIL
 - Check 5 (ADF): PASS / FAIL
 - Check 6 (Pareto): PASS / WARN
@@ -1451,7 +1510,7 @@ The legacy `/quant-iteration` skill is **deprecated** — `.claude/commands/quan
 - Phase 6.0 Critic pre-flight is the second structural defense — catches issues BEFORE compute is spent.
 - BLOCK-PENDING-FIX grants exactly ONE rerun. After it, verdict is final (PASS or BLOCK-FINAL).
 - Path Forward section is MANDATORY on every Critic BLOCK verdict.
-- PBO ≥ 0.4 is automatic NO-MERGE. Same for DSR < 0.95 and PSR < 0.95.
+- **MERGE Principle: per-regime Pareto-dominance vs current BASELINE_V1.** Candidate must Pareto-better-or-equal baseline on EVERY tagged regime (within σ_R tolerance) AND strictly better on ≥1 regime. No absolute Sharpe / DSR / PBO / PSR floors — these are reported INFORMATIONAL per-regime and bundle-level, diary-flagged on material regression, but NOT auto-blocking. Methodology-integrity gates (look-ahead, embargo, gap, reproducibility) remain HARD. See "Merge Principle — Relative Regime Pareto-Dominance" section.
 - v1 universe must exclude all v2+v3 symbols (V1_EXCLUDED_SYMBOLS enforced at runtime).
 - Track isolation: v1 NEVER imports from `crypto_trade.features_v2` (v2) or `crypto_trade.features_v3` (v3).
 - Axis Rotation Discipline: every 5 same-family EXPLORATIONs triggers mandatory family rotation.
