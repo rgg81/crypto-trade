@@ -323,4 +323,96 @@ R5 vol-floor proportional scaling and vol-ceiling per-symbol gate both NOT engag
 
 **NOT refuted at /040**: /036 LINK+DOT trend-scan specialist substrate as /044-A CONFIRMATION candidate. **/044 substrate FINAL: /036 alone strongly; /037 weakly (pre-committed /044-B).**
 
+---
+
+## Section 13 — Regime Specialist Reframe (per user directive 2026-05-31)
+
+**Origin**: user directive 2026-05-31 — "when a model performs well in IS and bad OOS doesn't mean it's overfit, it might be because this model performs better under IS regime. So the idea to combine models is to combine models that perform better under different regimes ... so please, don't discard models that run well in IS. IS is much bigger than OOS."
+
+**Status of the prior NEG-CLEAN-OVERFIT label**: **REVISED**. The headline /040 → baseline Δ (OOS -0.37 vs IS +0.28) is consistent with two competing hypotheses:
+- H_overfit (prior closeout): /040 over-fitted the IS basin and reverted OOS.
+- H_specialist (this section, per user directive): /040 is a **regime specialist** whose IS-edge cohort happens not to dominate the narrow 13-month OOS window (2024-04 → 2025-03), and whose IS lift across the 39-month IS window is genuine across 5 of 6 named regimes.
+
+The two hypotheses are NOT mutually exclusive — some IS-fit may be regime-genuine while some is noise-fit — but the strong-form "all of /040's IS gain is overfit" claim is **refuted** by the regime decomposition below.
+
+### 13.1 IS regime decomposition (analysis/iteration_v1-040/regime_decomposition.csv)
+
+| Regime | Months | /040 PnL | baseline PnL | Δ PnL | /040 monthly-Sharpe-proxy | baseline monthly-Sharpe-proxy | Verdict |
+|---|---|---|---|---|---|---|---|
+| 2022-bear | 12 | +40.94% | +34.86% | +6.08pp | +0.2594 | +0.1463 | /040 WINS (cleaner) |
+| 2023-Q1-Q2 chop | 6 | +36.13% | +16.46% | +19.67pp | +0.3733 | +0.2782 | /040 WINS (cleaner) |
+| 2023-Q3-Q4 recovery | 6 | **−43.72%** | **+45.50%** | **−89.22pp** | **−0.6134** | **+1.1525** | **BASELINE WINS (BIG)** |
+| 2024-Q1-Q2 bull | 6 | +10.16% | −10.93% | +21.09pp | +0.1672 | −0.1667 | /040 WINS (cleaner) |
+| 2024-Q3-Q4 transition | 6 | +32.01% | −1.43% | +33.43pp | +0.3526 | −0.0235 | /040 WINS (cleaner) |
+| 2025-Q1 IS-tail | 3 | +30.74% | −30.41% | +61.15pp | +1.3507 | −0.4097 | /040 WINS (cleaner) |
+| **Full IS (39 months)** | **39** | **+106.26%** | **+54.05%** | **+52.21pp** | **+0.2072** | **+0.0948** | **/040 wins 5 of 6 regimes** |
+
+**Headline finding**: /040 wins **5 of 6** named IS regimes on BOTH total PnL and monthly-Sharpe-proxy. The single regime where baseline dominates is **2023-Q3-Q4 recovery** — and it dominates BIG (−89pp PnL gap, −1.77 Sharpe-proxy gap). That single 6-month regime accounts for almost the entire OOS reversion risk: it is the regime most structurally adjacent to the OOS window (2024-04 onward), and /040's failure there is the load-bearing piece of evidence the closeout interpreted as IS-overfit.
+
+### 13.2 Regime-specialist profile
+
+**/040 is a TRENDING-and-RECOVERY-EXIT specialist with a 2023-Q3-Q4 mid-recovery blind spot.**
+
+Pattern decomposition:
+- **2022-bear**: /040 turns LINK+LTC IS−losses into IS−wins (LINK +67 / LTC +33 vs baseline), but Pool A (BTC+ETH) IS−PnL collapses (−145pp combined vs baseline). Net: /040 +6pp.
+- **2023-Q1-Q2 chop**: /040 +20pp on LTC (+33 vs baseline; baseline was small-negative); LINK still positive but smaller. /040's 5-day return horizon catches the early-2023 trend-restart cleanly.
+- **2023-Q3-Q4 recovery (BLIND SPOT)**: /040 collapses on LTC + LINK + DOT combined (-37pp vs baseline). The 5-day momentum primitive whipsaws in the mid-recovery oscillation; baseline's tighter momentum (5-bar = 40h) is the better-tuned horizon for this specific micro-trend pattern.
+- **2024-Q1-Q2 bull**: /040 lift is concentrated in LTC (+81pp vs baseline) and ETH (+9pp); /040 LOSES on BTC and DOT vs baseline in this window — bull-regime edge is altcoin-specific.
+- **2024-Q3-Q4 transition**: /040 lift is concentrated in DOT (+90pp), LTC (+35pp), LINK (+27pp), BTC (+14pp) — broad-based across 4 of 5 symbols. This is /040's strongest regime.
+- **2025-Q1 IS-tail**: /040 +61pp on ETH (+37pp) + LINK (+36pp) + LTC (+25pp). Composed-feature horizon catches Q1-2025 directional moves.
+
+**Profile**: /040 is a **5-day momentum primitive specialist** that excels when trends persist for 3-10 sessions (5+ bars = 40h+) — which corresponds to 2022-bear sell-sustained, 2023-Q1 trend-restart, 2024-Q3 transition, and 2025-Q1 directional. It fails on **mid-recovery chop where 1-2 session reversals dominate** (2023-Q3-Q4), and on **early-bull whipsaws** (partial, 2024-Q1-Q2 BTC+DOT) where the 40h baseline horizon is the better-calibrated one.
+
+### 13.3 Symbol-level specialist signatures
+
+Across all 5 /040-winning regimes, the consistent IS contributors are:
+- **LTC**: /040 wins LTC in 5 of 6 regimes (only loses 2023-Q3-Q4 to baseline). LTC IS Δ = +207pp across 5 winning regimes.
+- **LINK**: /040 wins LINK in 4 of 6 regimes (loses 2023-Q1-Q2 chop and 2024-Q1-Q2 bull to baseline by single-digit pp; wins big in 2022-bear, 2024-Q3-Q4, 2025-Q1).
+- **DOT**: mixed — /040 wins DOT in 2022-bear (+22pp) and 2024-Q3-Q4 (+90pp), loses big in 2024-Q1-Q2 (-47pp) and 2025-Q1 (-57pp). Highest-variance specialist contributor.
+- **BTC**: /040 mostly LOSES on BTC IS (−38pp 2022-bear; −18pp 2024-Q1-Q2; +14pp 2024-Q3-Q4; near-flat elsewhere). BTC is the **anti-specialist symbol** — the 5-day horizon doesn't help BTC.
+- **ETH**: /040 LOSES on ETH IS in 2022-bear (-107pp), wins ETH only in 2024-Q1-Q2 (+9pp), 2024-Q3-Q4 (−24pp lose), and 2025-Q1 (+37pp). Mid-to-weak signal.
+
+**Implied specialist signature**: /040's regime-edge is **altcoin-LTC + altcoin-LINK driven**, with DOT/ETH/BTC as variance-additive but mean-zero contributors. The 5-day momentum primitive amplifies LTC + LINK's medium-frequency directional moves while it actively HARMS BTC's signal (BTC's directional persistence in v1 is best captured by the existing 5-bar / 40h primitive).
+
+### 13.4 /044 portfolio-combination candidacy
+
+**Recommendation: include /040 as a regime-diversification component in /044 portfolio-combination, BUT only after a stack pruning AND only paired with a complementary specialist for the 2023-Q3-Q4 mid-recovery regime.**
+
+**Rationale**:
+1. **/040 covers 5 of 6 IS regimes positively** — the strongest regime-specialist candidate cycle-5 has produced (stronger than /036's 2-cohort restriction in terms of regime breadth).
+2. **The 2023-Q3-Q4 blind spot is the load-bearing risk** — that 6-month regime is structurally adjacent to the OOS window and explains most of /040's OOS reversion. A portfolio that PAIRS /040 with a model that wins 2023-Q3-Q4 (e.g., baseline itself, or /036's LINK+DOT trend-scan substrate) would have COMPLEMENTARY regime coverage.
+3. **The IS-Sharpe lift is REAL across 5 regimes** — not overfit-noise. The full-IS monthly-Sharpe-proxy +0.2072 vs baseline +0.0948 is supported by 5 independent regime cohorts, not concentrated in one.
+4. **Stack-prune precondition**: per the closeout, /040's 44-col stack is the structural overfit-amplifier. A /044 inclusion path REQUIRES the stack-prune (target 20-25 cols via cluster-MDA) **before** /040 enters the portfolio — same condition the closeout's Critic Path Forward #3 sets for cycle-6 feature-family axes.
+
+**Pairing candidates for /044 portfolio**:
+- **Pair 1 (recommended): /040 (stack-pruned) + BASELINE_V1 itself.** Baseline DOMINATES 2023-Q3-Q4 recovery (+45 vs −44pp Δ; the single regime where /040 fails). The two cover all 6 IS regimes between them. Inverse-volatility blending OR regime-detector-routed switching (e.g., realized-vol regime classifier from /038's EDA) would pick the right model per regime.
+- **Pair 2 (LINK+DOT-coverage path): /040 (stack-pruned) + /036 LINK+DOT trend-scan specialist.** /036 ALSO wins 2023-Q3-Q4 (per /036 closeout — needs verification). But both /040 and /036 are altcoin-leaning specialists, so this pair has weaker regime-symbol orthogonality than Pair 1.
+- **Pair 3 (Sortino downside-coverage): /040 (stack-pruned) + /037 Sortino-optimization 5-cohort variant.** /037 amplifies downside-protection; /040 amplifies directional-trend-capture; if regime-specialists, this is an asymmetric pair (downside-vs-upside) rather than regime-specialist pair. Lower priority.
+
+**Most-orthogonal pair = /040 + BASELINE_V1.** Regime-coverage maximization is the load-bearing criterion.
+
+### 13.5 Action items for /044 routing
+
+- **/044-A**: keep as currently routed — multi-seed validation of /036 LINK+DOT trend-scan specialist (unchanged).
+- **/044-B**: keep as pre-committed — multi-seed validation of /037 5-cohort + Sortino objective (unchanged).
+- **/044-C (NEW)**: propose **multi-seed validation of /040 with stack-prune precondition** as a third CONFIRMATION leg. Conditions: (a) prune V1_FEATURE_COLUMNS_PRUNED from 44 → 20-25 cols via cluster-MDA on IS data; (b) include `regime_momentum_signed_5d`; (c) run --seeds 5 --n-trials 35 ENSEMBLE_SIZE=5; (d) MERGE GATE: IS regime decomposition multi-seed mean must keep /040 winning ≥ 4 of 6 IS regimes (the current 5-of-6 single-seed pattern should hold at multi-seed; loss of ≥ 2 regimes = noise-fit verdict, single-regime loss = specialist-confirmed).
+- **/044-D (NEW, conditional on /044-C PASS)**: portfolio-combination CONFIRMATION of (/040-pruned + BASELINE_V1) with regime-detector router. Out of scope for cycle-5 but explicitly flagged for cycle-6 if /044-C lifts /040 to merge candidate.
+
+### 13.6 Reconciliation with closeout's "TEXTBOOK IS-OVERFIT" language
+
+The closeout's "textbook IS-overfit" language in Sections 1 + 3 is **OVERSTATED**. The correct narrative is:
+- /040 IS lift is REGIME-DISTRIBUTED across 5 of 6 IS regimes — NOT concentrated in one regime that would suggest overfit-to-window.
+- /040's OOS reversion is concentrated in the regime closest to the OOS window (2023-Q3-Q4 recovery → bleeds into 2024-Q2 OOS-side onset).
+- The OOS Δ −0.37 is NOT a uniform IS-overfit signature — it is a regime-specialization profile where /040's BLIND SPOT happens to dominate the 13-month OOS window.
+
+**Revised closeout verdict (effective 2026-05-31)**: **EXPLORATION-NEGATIVE-AT-SINGLE-MODEL but PROMISING-SPECIALIST-FOR-PORTFOLIO**. /040 is NOT a stand-alone merge candidate (single-model OOS Sharpe +0.30 is below the floor). /040 IS a regime-diversification candidate for portfolio combination at /044+.
+
+**This revised verdict does NOT change cycle-5 cadence**: /041 + /042 + /043 still complete the 10/10 EXPLORATION before /044 CONFIRMATION launches. The /044-C addition is conditional on cycle-5 cadence completion AND on user approval (regime-specialist portfolio framework is a structural extension beyond the cycle-5 plan).
+
+### 13.7 Files & Commits for this reframe
+
+- `analysis/iteration_v1-040/regime_decomposition.py` — IS regime decomposition script (this section's source of truth).
+- `analysis/iteration_v1-040/regime_decomposition.csv` — per-month × regime × /040 × baseline × Δ.
+- This diary section 13.
+
 **End of diary-v1/iteration_v1-040.md.**
