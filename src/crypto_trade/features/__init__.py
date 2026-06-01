@@ -225,6 +225,16 @@ _register("composed_v1", _add_composed_v1_features)  # iter-v1/040
 # but is intentionally NOT registered in GROUP_REGISTRY — `crypto-trade features` will
 # not write skew_zscore_21 to v1 parquets.
 
+# iter-v1/048: microstructure feature family (trade_count_zscore_30 = rolling-30bar
+# z-score of number_of_trades kline primitive). UNUSED-primitive defense post-/047
+# NEG-CLEAN-PRE-EDA. Registered here so `uv run crypto-trade features --track v1
+# --groups microstructure_v1` writes trade_count_zscore_30 to v1 parquets.
+from crypto_trade.features_v1.microstructure_v1 import (  # noqa: E402
+    add_microstructure_v1_features as _add_microstructure_v1_features,
+)
+
+_register("microstructure_v1", _add_microstructure_v1_features)  # iter-v1/048
+
 __all__ = [
     "GROUP_REGISTRY",
     "generate_features",

@@ -114,6 +114,7 @@ V1_FEATURE_COLUMNS_PRUNED: tuple[str, ...] = (
     "stat_log_return_1",
     "stat_return_5",
     "stat_skew_20",
+    "trade_count_zscore_30",  # iter-v1/048: rolling-30bar z-score of number_of_trades (UNUSED)
     "trend_adx_14",
     "trend_aroon_osc_14",
     "trend_aroon_osc_50",
@@ -133,7 +134,7 @@ V1_FEATURE_COLUMNS_PRUNED: tuple[str, ...] = (
     "vol_volume_rel_20",
 )
 
-# Sanity guard: confirm the pruned set has exactly 44 features.
+# Sanity guard: confirm the pruned set has exactly 45 features.
 # iter-v1/023: extended 40 → 42 by adding funding_rate_zscore_30 + funding_rate_zscore_90.
 # iter-v1/025: extended 42 → 43 by adding oi_delta_30_z90 (open-interest delta z-score).
 # iter-v1/034: extended 43 → 44 by adding basis_zscore_30 (perp-spot basis z-score).
@@ -143,8 +144,12 @@ V1_FEATURE_COLUMNS_PRUNED: tuple[str, ...] = (
 #              (|IC|=0.8132 vs stat_skew_20; ABORT threshold 0.60). skew_zscore_21
 #              REVERTED. Count restored 45 → 44. statistical_v1 group de-registered
 #              from GROUP_REGISTRY but the module file kept for future-iter reuse.
-assert len(V1_FEATURE_COLUMNS_PRUNED) == 44, (
-    f"V1_FEATURE_COLUMNS_PRUNED must have exactly 44 features; got {len(V1_FEATURE_COLUMNS_PRUNED)}"
+# iter-v1/048: extended 44 → 45 by adding trade_count_zscore_30 (rolling-30bar
+#              z-score of number_of_trades kline primitive; UNUSED-primitive
+#              defense post-/047 NEG-CLEAN-PRE-EDA; cycle-6 feature-family
+#              EXPLORATION 3/10).
+assert len(V1_FEATURE_COLUMNS_PRUNED) == 45, (
+    f"V1_FEATURE_COLUMNS_PRUNED must have exactly 45 features; got {len(V1_FEATURE_COLUMNS_PRUNED)}"
 )
 
 # Columns explicitly NOT in V1_FEATURE_COLUMNS_PRUNED but which may still appear in
@@ -312,4 +317,5 @@ __all__ = [
     # iter-v1/023: funding-rate feature family (add_funding_v1_features imported on demand)
     # iter-v1/025: OI delta feature family (add_oi_delta_v1_features imported on demand)
     # iter-v1/040: composed feature family (add_composed_v1_features imported on demand)
+    # iter-v1/048: microstructure feature family (add_microstructure_v1_features imported on demand)
 ]

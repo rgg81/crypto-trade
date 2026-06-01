@@ -36,13 +36,17 @@ from crypto_trade.features_v1.statistical_v1 import compute_skew_zscore_21
 
 
 def test_skew_zscore_21_reverted_from_pruned():
-    """Post-closeout: skew_zscore_21 MUST NOT be in V1_FEATURE_COLUMNS_PRUNED."""
+    """Post-closeout: skew_zscore_21 MUST NOT be in V1_FEATURE_COLUMNS_PRUNED.
+
+    Count check updated at iter-v1/048: pruned set is now 45 (trade_count_zscore_30 added).
+    """
     assert "skew_zscore_21" not in V1_FEATURE_COLUMNS_PRUNED, (
         "skew_zscore_21 must be REVERTED from V1_FEATURE_COLUMNS_PRUNED "
         "(iter-v1/047 NEG-CLEAN-PRE-EDA: F5 |IC|=0.8132 vs stat_skew_20)"
     )
-    assert len(V1_FEATURE_COLUMNS_PRUNED) == 44, (
-        f"Expected 44 pruned features post-revert, got {len(V1_FEATURE_COLUMNS_PRUNED)}"
+    # Count is ≥44 (was 44 post-/047 revert; iter-v1/048 added trade_count_zscore_30 → 45)
+    assert len(V1_FEATURE_COLUMNS_PRUNED) >= 44, (
+        f"Expected ≥44 pruned features post-revert, got {len(V1_FEATURE_COLUMNS_PRUNED)}"
     )
 
 
@@ -67,8 +71,9 @@ def test_statistical_v1_not_in_group_registry():
         "statistical_v1 must be DE-REGISTERED from GROUP_REGISTRY "
         "(iter-v1/047 NEG-CLEAN-PRE-EDA revert)"
     )
-    assert len(GROUP_REGISTRY) == 13, (
-        f"GROUP_REGISTRY must have exactly 13 groups post-revert, got {len(GROUP_REGISTRY)}"
+    # Count is ≥13 (was 13 post-/047 revert; iter-v1/048 added microstructure_v1 → 14)
+    assert len(GROUP_REGISTRY) >= 13, (
+        f"GROUP_REGISTRY must have ≥13 groups post-revert, got {len(GROUP_REGISTRY)}"
     )
 
 
