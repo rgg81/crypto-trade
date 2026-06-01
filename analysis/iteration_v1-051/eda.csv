@@ -1,0 +1,58 @@
+check,symbol,feature,metric,value,status,note
+ADF,DOTUSDT,dot_vs_btc_ret_ratio_30,p_value,0.0,PASS,informational — no BLOCK
+IC_pearson,DOTUSDT,cal_dow_norm,ic_abs,0.010277378605110554,PASS,informational — no BLOCK
+IC_pearson,DOTUSDT,cal_hour_norm,ic_abs,0.012004536807236241,PASS,informational — no BLOCK
+IC_pearson,DOTUSDT,funding_rate_zscore_30,ic_abs,0.022940854727605257,PASS,informational — no BLOCK
+IC_pearson,DOTUSDT,funding_rate_zscore_90,ic_abs,0.0008540881916733604,PASS,informational — no BLOCK
+IC_pearson,DOTUSDT,interact_natr_x_adx,ic_abs,0.07945918802177125,PASS,informational — no BLOCK
+IC_pearson,DOTUSDT,interact_ret1_x_natr,ic_abs,0.0029398438872967423,PASS,informational — no BLOCK
+IC_pearson,DOTUSDT,interact_ret1_x_ret3,ic_abs,0.03389719793184975,PASS,informational — no BLOCK
+IC_pearson,DOTUSDT,interact_rsi_x_adx,ic_abs,0.017623686165502916,PASS,informational — no BLOCK
+IC_pearson,DOTUSDT,interact_rsi_x_natr,ic_abs,0.007104717083155287,PASS,informational — no BLOCK
+IC_pearson,DOTUSDT,interact_stoch_x_adx,ic_abs,0.017190304677807917,PASS,informational — no BLOCK
+IC_pearson,DOTUSDT,long_short_zscore_30,ic_abs,0.0031302850114647237,PASS,informational — no BLOCK
+IC_pearson,DOTUSDT,mom_macd_hist_12_26_9,ic_abs,0.020348913345616688,PASS,informational — no BLOCK
+IC_pearson,DOTUSDT,mom_macd_line_12_26_9,ic_abs,0.01103890664974817,PASS,informational — no BLOCK
+IC_pearson,DOTUSDT,mom_roc_10,ic_abs,0.03878333518006074,PASS,informational — no BLOCK
+IC_pearson,DOTUSDT,mom_rsi_14,ic_abs,0.0010885731550553791,PASS,informational — no BLOCK
+IC_pearson,DOTUSDT,mom_stoch_d_14,ic_abs,0.002616956136469843,PASS,informational — no BLOCK
+IC_pearson,DOTUSDT,mom_stoch_k_14,ic_abs,0.008001855249924668,PASS,informational — no BLOCK
+IC_pearson,DOTUSDT,mom_willr_14,ic_abs,0.014857892536294867,PASS,informational — no BLOCK
+IC_pearson,DOTUSDT,mr_pct_from_high_20,ic_abs,0.05323362655092802,PASS,informational — no BLOCK
+IC_pearson,DOTUSDT,mr_pct_from_low_20,ic_abs,0.04461397155519697,PASS,informational — no BLOCK
+IC_pearson,DOTUSDT,mr_rsi_extreme_14,ic_abs,0.012555654074491421,PASS,informational — no BLOCK
+IC_pearson,DOTUSDT,oi_delta_30_z90,ic_abs,0.054703199180052696,PASS,informational — no BLOCK
+IC_pearson,DOTUSDT,regime_momentum_signed_5d,ic_abs,0.020637996678068316,PASS,informational — no BLOCK
+IC_pearson,DOTUSDT,stat_autocorr_lag5,ic_abs,0.03653171357510815,PASS,informational — no BLOCK
+IC_pearson,DOTUSDT,stat_kurtosis_20,ic_abs,0.018496923353476538,PASS,informational — no BLOCK
+IC_pearson,DOTUSDT,stat_log_return_1,ic_abs,0.004774415419293233,PASS,informational — no BLOCK
+IC_pearson,DOTUSDT,stat_return_5,ic_abs,0.0034248971914269018,PASS,informational — no BLOCK
+IC_pearson,DOTUSDT,stat_skew_20,ic_abs,0.01861113444763403,PASS,informational — no BLOCK
+IC_pearson,DOTUSDT,trend_adx_14,ic_abs,0.12460952842156908,PASS,informational — no BLOCK
+IC_pearson,DOTUSDT,trend_aroon_osc_14,ic_abs,0.012514229272019152,PASS,informational — no BLOCK
+IC_pearson,DOTUSDT,trend_aroon_osc_50,ic_abs,0.033989607954520246,PASS,informational — no BLOCK
+IC_pearson,DOTUSDT,trend_ema_cross_5_12,ic_abs,0.014193840734178804,PASS,informational — no BLOCK
+IC_pearson,DOTUSDT,trend_minus_di_14,ic_abs,0.025455565825024368,PASS,informational — no BLOCK
+IC_pearson,DOTUSDT,trend_plus_di_14,ic_abs,0.0008043542304252402,PASS,informational — no BLOCK
+IC_pearson,DOTUSDT,trend_supertrend_14_3,ic_abs,0.0267446515165813,PASS,informational — no BLOCK
+IC_pearson,DOTUSDT,vol_atr_14,ic_abs,0.0007646299269301988,PASS,informational — no BLOCK
+IC_pearson,DOTUSDT,vol_bb_bandwidth_20,ic_abs,0.08438124420622878,PASS,informational — no BLOCK
+IC_pearson,DOTUSDT,vol_cmf_14,ic_abs,0.000401829649374354,PASS,informational — no BLOCK
+IC_pearson,DOTUSDT,vol_mfi_14,ic_abs,0.013014227120369154,PASS,informational — no BLOCK
+IC_pearson,DOTUSDT,vol_natr_14,ic_abs,0.04253146946490168,PASS,informational — no BLOCK
+IC_pearson,DOTUSDT,vol_range_spike_24,ic_abs,0.032351649897018324,PASS,informational — no BLOCK
+IC_pearson,DOTUSDT,vol_range_spike_72,ic_abs,0.056608499369973836,PASS,informational — no BLOCK
+IC_pearson,DOTUSDT,vol_taker_buy_ratio,ic_abs,0.015187275733293001,PASS,informational — no BLOCK
+IC_pearson,DOTUSDT,vol_volume_pctchg_5,ic_abs,0.019141941159375356,PASS,informational — no BLOCK
+IC_pearson,DOTUSDT,vol_volume_rel_20,ic_abs,0.01605785437501651,PASS,informational — no BLOCK
+dist_stats,DOTUSDT,dot_vs_btc_ret_ratio_30,n,4906.0,INFO,informational
+dist_stats,DOTUSDT,dot_vs_btc_ret_ratio_30,mean,0.013015950713705999,INFO,informational
+dist_stats,DOTUSDT,dot_vs_btc_ret_ratio_30,std,1.1065588749207995,INFO,informational
+dist_stats,DOTUSDT,dot_vs_btc_ret_ratio_30,min,-6.957781720726583,INFO,informational
+dist_stats,DOTUSDT,dot_vs_btc_ret_ratio_30,p25,-0.3741215443548384,INFO,informational
+dist_stats,DOTUSDT,dot_vs_btc_ret_ratio_30,median,0.019964945658099954,INFO,informational
+dist_stats,DOTUSDT,dot_vs_btc_ret_ratio_30,p75,0.42598367461263287,INFO,informational
+dist_stats,DOTUSDT,dot_vs_btc_ret_ratio_30,max,5.89012559015664,INFO,informational
+dist_stats,DOTUSDT,dot_vs_btc_ret_ratio_30,skew,-0.39084192343765106,INFO,informational
+dist_stats,DOTUSDT,dot_vs_btc_ret_ratio_30,kurt,4.635076663358712,INFO,informational
+dist_stats,DOTUSDT,dot_vs_btc_ret_ratio_30,pct_nan,0.023681592039800994,INFO,informational
