@@ -1,0 +1,2 @@
+indicator,rule,is_skip_pct,is_pnl_lift_pct,is_avg_pnl_sep_pct,predicted_oos_skip_pct
+I3_ema12_v_ema26,gate ON if BTC_EMA_12 > BTC_EMA_26,52.41379310344828,2.1970999999999954,-0.13779658657513344,43.47826086956522

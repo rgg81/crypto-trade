@@ -312,5 +312,61 @@ The historical headline (v0.186 = OOS Sharpe +1.735) was inflated by leaked labe
 - **2026-04-22** — Historical v0.186 baseline tagged on `main` (R3 OOD gate added; OOS Sharpe +1.735 — later found to be inflated by walk-forward lookahead bias).
 - **2026-05-13** — Walk-forward fix `5566a69`: `train_end_ms = test_start_ms - embargo_ms`. Baseline re-ran; corrected stats captured in `BASELINE.md` (OOS Sharpe +0.827 / 184 trades).
 - **2026-05-23** — v1 refactored. `BASELINE_V1.md` created (this file) with corrected stats on fresh data. The legacy `BASELINE.md` is kept for backward compatibility but `BASELINE_V1.md` is the canonical anchor for new v1 iterations.
+- **2026-05-26** — Cycle-2 CLOSES NO-MERGE at iter-v1/015 CONFIRMATION-NEGATIVE catastrophic (tag `v0.v1-015`). 10 iterations, 1 PROMISING-METHODOLOGY (/008 non-compoundable) + 9 NEGATIVE + 0 merges. Anchor numbers UNCHANGED — see Cycle-2 Outcomes section below.
 
 Future v1 iterations update **this** file (`BASELINE_V1.md`) on CONFIRMATION-MERGE per the skill's git workflow.
+
+---
+
+## Cycle-2 Outcomes (2026-05-23 → 2026-05-26)
+
+**Cycle-2 CLOSES NO-MERGE.** v1 BASELINE_V1.md anchor numbers UNCHANGED at `v0.v1-baseline-corrected` (`f8bc12c`). Cycle-2 iteration ledger and per-iteration verdicts are in `briefs-v1/exploration_catalog.md` and `diary-v1/iteration_v1-*.md`.
+
+**Iteration ledger (cycle-2)**:
+
+| iter | family | verdict |
+|---|---|---|
+| /006 | universe | EXPLORATION-NEGATIVE (DEGENERATE_PREDICTOR) |
+| /007 | feature-family | EXPLORATION-NEGATIVE (NEGATIVE-NEGATIVE compound) |
+| **/008** | **methodology** | **EXPLORATION-PROMISING-METHODOLOGY** (n_eff PCA per-cell median; non-compoundable measurement substrate) |
+| /009 | feature-family | EXPLORATION-NEGATIVE (NEGATIVE-NEGATIVE compound) |
+| /010 | risk-primitive | EXPLORATION-NEGATIVE (PROMISING-INERT-with-IS-basin-shift) |
+| /011 | risk-primitive | EXPLORATION-NEGATIVE (catastrophic-basin-shift) |
+| /012 | methodology-substrate-test | EXPLORATION-NEGATIVE (BASIN-INHERITANCE-WITH-MECHANICAL-CLEANUP-PARTIAL) |
+| /013 | methodology-substrate-test | EXPLORATION-NEGATIVE (BASIN-LOTTERY-CATASTROPHIC) |
+| /014 | labeling | EXPLORATION-NEGATIVE (Cell-5 + PARTIAL-F7 + DURABLE-n_eff-MECHANISM) |
+| **/015** | **labeling** (CONFIRMATION) | **CONFIRMATION-NEGATIVE catastrophic** |
+
+**Cycle-2 verdict distribution**: 0 pure PROMISING / 1 PROMISING-METHODOLOGY non-compoundable (/008) / 9 NEGATIVE / 1 CONFIRMATION-NEGATIVE catastrophic / **0 edge ingredients merged**.
+
+### Cycle-2 Structural Contributions (DURABLE — carry forward to cycle-3+)
+
+1. **iter-v1/008 — n_eff PCA per-cell median** (`PROMISING-METHODOLOGY`, non-compoundable). Measurement substrate; informs all v1 brief Section 7 F-AXIS-MECHANISM falsifiers and Section 8 verdict matrices. Not bundled into any CONFIRMATION as an "edge ingredient" — but the substrate that makes F-AXIS-MECHANISM measurable.
+
+2. **iter-v1/015 — n_eff barrier-magnitude curve** (NEW structural finding, codified at `feedback_v1_n_eff_barrier_magnitude_curve.md`). **n_eff is a CURVE in barrier-magnitude space, not a monotone-increasing function.** /014 at 1.70% labels → n_eff = 19; /015 at 7.82% labels → n_eff = 3 collapsed via timeout-fallback dominance. **Optimum likely in 3-5% middle range.** Forward-binding mandate: before any cycle-3+ labeling sub-axis EXPLORATION, run the n_eff calibration sweep at {1.5%, 2.5%, 3.5%, 5.0%, 7.82%} and establish n_eff ≥ 15 preservation band BEFORE selecting CONFIRMATION magnitude. Critic Phase 6.0 verifies the sweep at brief Section 2/7.
+
+### Cycle-2 Methodology Lessons
+
+- **DURABLE-EVIDENCE-OUTWEIGHS-EDA**: at /014 closeout, Critic + LM Master + Phase 6.0 + QR ALL converged on Path 1 (theoretically clean) over Path 2 (preserve durable n_eff=19 signal). Path 1 was empirically wrong; Path 2 was empirically right. **When prior iteration produces DURABLE STRUCTURAL EVIDENCE on a specific implementation, that evidence should OUTWEIGH EDA-prescribed magnitudes.** Future briefs Section 2/3 must explicitly tag durable-evidence claims + dissolution-risk reasoning when re-implementing axes.
+
+- **LM Master mechanism-deterministic predictions earn MEDIUM confidence** (with "mechanism-deterministic" disclaimer). /015 produced FIRST DIRECTIONAL HIT in 13 v1 iterations: 3/3 per-symbol C1-inversion verified (LTC IS+OOS DOWN ✓, ETH IS+OOS UP ✓, BTC IS UP ✓). Mechanism-level track 6/13 PARTIAL+; verdict-class magnitude track remains 0/13 (FLAT priors).
+
+- **HIGH-RISK pre-commit binding mitigation battle-tested**: /014 was the first cycle-2 HIGH-RISK declaration; /015 binding pre-commit fired regardless of /014's catastrophic basin draw — mitigation discipline functioning as designed. Cumulative compute saved across /003-/013 non-firings ≈ 54h; firing at /014→/015 was correct.
+
+### Cycle-2 Closes — v1 Basin-Lock Pattern
+
+v1 cycle-2 mirrors v3 cycle-7 saturation pattern (cf. `feedback_v3_cycle7_terminal_finding.md`): bounded by the prevailing architecture's local-optimum basin at single-axis EXPLORATION+CONFIRMATION resolution. The catalog is dispersed (no axis monoculture across 7 families touched) but each single-axis intervention is either INERT or NEGATIVE within v1's basin. **The basin is the binding constraint, NOT the axis selection.**
+
+Cycle-3 considerations:
+1. Multi-axis composition at the CONFIRMATION layer (e.g., universe expansion + sample-weighting bundled)
+2. Explicit basin-escape mechanisms (universe denominator expansion; XGBoost depth-wise model swap)
+3. NEW UNUSED families (`sample-weighting`) with explicit single-axis isolation first
+4. Wall-clock discipline enforced: 2h EXPLORATION / 6h CONFIRMATION caps per skill `4cb8972` (non-negotiable per user directive 2026-05-25); /015 was the last user-authorized exception
+
+### Cycle-2 Dead Paths (do not retry without new evidence)
+
+- Per-leg differentiated Optuna bounds (/005 F2 ρ STRUCTURAL-locked at 0.95 across radically different axis interventions)
+- ATR-multiplier per-leg asymmetry (/004 ETH SL-noise-floor death — absolute SL distance < 1.5× NATR_p50 red line)
+- σ_t labeling at 7.82% portfolio-median magnitude (/015 n_eff collapse via timeout-fallback dominance)
+- Methodology-substrate-test family at single-seed (/012/013 effectively NEGATIVE; basin-substrate properties at single-seed are not the binding lever)
+- 7-feature INERT pruning beyond V1_FEATURE_COLUMNS_PRUNED 40-col target (/009 NEGATIVE-NEGATIVE compound)

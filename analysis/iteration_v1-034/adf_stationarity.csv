@@ -1,0 +1,6 @@
+symbol,n_obs,adf_stat,p_value,stationary_at_5%
+BTCUSDT,5697,-15.4851,0.0,True
+ETHUSDT,5697,-20.676,0.0,True
+LINKUSDT,5648,-20.7228,0.0,True
+LTCUSDT,5657,-18.0421,0.0,True
+DOTUSDT,4995,-17.8491,0.0,True

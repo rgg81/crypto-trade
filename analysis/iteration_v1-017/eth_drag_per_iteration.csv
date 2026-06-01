@@ -1,0 +1,5 @@
+iteration,axis,ETH_IS_PnL_pct,ETH_OOS_PnL_pct,portfolio_IS_PnL_pct,portfolio_OOS_PnL_pct,ETH_IS_share_pct,ETH_OOS_share_pct
+baseline,baseline,-13.6995,2.7548,50.9829,24.8692,-26.87,11.08
+014,labeling-σ_t-LABEL-only,-99.7269,-41.1768,-126.9926,3.308,78.53,-1244.76
+015,labeling-σ_t-symmetric-multi-seed,17.3356,-23.2852,40.7482,29.6703,42.54,-78.48
+016,sample-weighting-uniform,-46.4666,-51.4605,-95.4574,-67.9806,48.68,75.7

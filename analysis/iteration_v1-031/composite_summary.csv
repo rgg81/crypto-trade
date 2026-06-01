@@ -1,0 +1,2 @@
+n_total_candidates,rho_portfolio_composite_vs_uniqueness,rho_portfolio_composite_vs_inv_concurrency,rho_portfolio_composite_vs_baseline_abs_pnl,verdict_axis_orthogonal,frac_composite_below_0p5,frac_composite_above_1p5,composite_mean,composite_std,composite_min,composite_max,concurrency_max_overall
+27774,0.29724944317178514,0.1268162697478899,-0.020401731370997784,True,0.0,0.005796788363217398,1.0,5.600502809669079,0.6315949476721394,264.98186054776994,22.0

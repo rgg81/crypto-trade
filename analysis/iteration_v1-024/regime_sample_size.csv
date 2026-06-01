@@ -1,0 +1,5 @@
+cohort,symbols,is_bars,extreme_bars,normal_bars,extreme_pct,is_trades_total,is_trades_extreme,is_trades_normal,trades_extreme_pct
+Pool_A_BTCETH,BTCUSDT+ETHUSDT,11155,1573,9582,0.141,252,40,212,0.1587
+Model_C_LINK,LINKUSDT,5562,709,4853,0.1275,146,17,129,0.1164
+Model_D_LTC,LTCUSDT,5657,802,4855,0.1418,124,17,107,0.1371
+Model_E_DOT,DOTUSDT,4975,726,4249,0.1459,93,8,85,0.086

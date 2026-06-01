@@ -1,0 +1,6 @@
+symbol,threshold_pct,n_total,n_skipped,skip_rate_pct,retained_sum_w_pnl,skipped_sum_w_pnl,retained_mean_w_pnl,skipped_mean_w_pnl
+BTCUSDT,3.8805,113,36,31.86,-30.5625,15.5365,-0.3969,0.4316
+ETHUSDT,4.3067,145,48,33.10,-13.8992,-2.0738,-0.1433,-0.0432
+LINKUSDT,6.4411,146,37,25.34,20.2306,76.1700,0.1856,2.0586
+LTCUSDT,6.6005,124,31,25.00,18.8171,-13.9783,0.2023,-0.4509
+DOTUSDT,2.7698,93,33,35.48,-4.5956,-11.5927,-0.0766,-0.3513

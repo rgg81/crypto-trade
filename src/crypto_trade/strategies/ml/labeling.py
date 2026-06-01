@@ -222,11 +222,15 @@ def label_trades(
     timeout_minutes: int,
     fee_pct: float = 0.1,
     atr_values: np.ndarray | None = None,
+    sigma_values: np.ndarray | None = None,
+    sigma_k_tp: float | None = None,
+    sigma_k_sl: float | None = None,
     verbose: int = 0,
     verbose_samples: int = 20,
     neutral_threshold_pct: float | None = None,
     label_mode: str = "triple_barrier",
     trend_scan_grid: tuple[int, ...] = (5, 8, 13, 21),
+    interval_minutes: int = 480,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """Label each candidate candle as 1 (long), -1 (short), or 0 (neutral).
 
@@ -246,6 +250,26 @@ def label_trades(
         atr_values: If provided, array of ATR values per master row.
                     TP = atr * tp_pct, SL = atr * sl_pct (tp_pct/sl_pct
                     become ATR multipliers instead of percentages).
+        sigma_values: iter-v1/014 — EWMA σ_t per master row (past-only,
+                    already shifted by 1 candle at computation time via
+                    `.shift(1)` in `_load_sigma_for_master()`). When ALL
+                    THREE of sigma_values, sigma_k_tp, sigma_k_sl are
+                    provided, barrier distances are computed as:
+                      tp_dist = sigma_k_tp × sigma_values[idx] × entry
+                      sl_dist = sigma_k_sl × sigma_values[idx] × entry
+                    This replaces the atr_values path entirely when active.
+                    Default None preserves BIT-IDENTICAL behaviour to /013.
+        sigma_k_tp: TP multiplier for σ_t-scaled barriers (e.g. 1.06).
+                    Ignored when sigma_values is None.
+        sigma_k_sl: SL multiplier for σ_t-scaled barriers (e.g. 0.53).
+                    Ignored when sigma_values is None.
+        interval_minutes: Candle interval in minutes (e.g. 480 for 8h). Only
+                    used in the sigma_values path (iter-v1/015 C1 FIX) to
+                    compute sqrt(timeout_candles) for label-time barriers:
+                      tp_dist = sigma_k_tp × sigma × sqrt(timeout_minutes /
+                               interval_minutes) × entry
+                    Default 480 (8h) matches the v1 baseline interval.
+                    All non-sigma paths ignore this parameter.
         verbose: If > 0, print detailed labeling info for a random subset.
         verbose_samples: Number of random samples to print (default 20).
         label_mode: Labeling rule to use. Default ``"triple_barrier"``
@@ -310,6 +334,17 @@ def label_trades(
         symbol_indices[sym] = np.where(sym_arr == sym)[0]
 
     use_atr = atr_values is not None
+    # iter-v1/015 C1 FIX: pre-compute sqrt(timeout_candles) for sigma path.
+    # timeout_candles = timeout_minutes / interval_minutes (e.g. 10080/480 = 21 for 8h).
+    # This factor aligns label-time barriers with execution-time barriers in lgbm.py.
+    # Non-sigma paths never read this variable.
+    _timeout_candles_lbl = timeout_minutes / max(interval_minutes, 1)
+    _sqrt_timeout_lbl = float(np.sqrt(_timeout_candles_lbl))
+    # iter-v1/014: σ_t-scaled barriers. All three must be provided simultaneously.
+    # When active this path TAKES PRIORITY over use_atr. sigma_values must have
+    # already been shifted by 1 candle (.shift(1)) at computation time so that
+    # sigma_values[i] uses only returns observed at candles strictly before i.
+    use_sigma = sigma_values is not None and sigma_k_tp is not None and sigma_k_sl is not None
     tp_mult = tp_pct / 100.0
     sl_mult = sl_pct / 100.0
 
@@ -326,7 +361,18 @@ def label_trades(
         sym_idx = symbol_indices[sym]
         pos = np.searchsorted(sym_idx, idx)
 
-        if use_atr:
+        if use_sigma:
+            # iter-v1/015 C1 FIX: σ_t-scaled barriers include √timeout_candles factor
+            # to match execution-time barriers in lgbm.py (lgbm.py:941-943).
+            # Formula: tp_dist = sigma_k_tp × sigma × sqrt(timeout_candles) × entry
+            # Past-only EWMA; .shift(1) applied upstream in _load_sigma_for_master.
+            # Fall back to 2% of entry if sigma is NaN (warmup rows).
+            sig = float(sigma_values[idx])  # type: ignore[index]
+            if np.isnan(sig) or sig <= 0.0:
+                sig = 0.02
+            tp_dist = sigma_k_tp * sig * _sqrt_timeout_lbl * entry  # type: ignore[operator]
+            sl_dist = sigma_k_sl * sig * _sqrt_timeout_lbl * entry  # type: ignore[operator]
+        elif use_atr:
             atr = float(atr_values[idx]) if not np.isnan(atr_values[idx]) else entry * 0.02
             tp_dist = atr * tp_pct  # tp_pct is ATR multiplier
             sl_dist = atr * sl_pct  # sl_pct is ATR multiplier

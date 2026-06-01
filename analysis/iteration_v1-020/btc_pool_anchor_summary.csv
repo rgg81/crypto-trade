@@ -1,0 +1,12 @@
+metric,value
+n_months_common (BTC and ETH both traded),29
+n_months_btc_only,2
+n_months_eth_only,5
+"pearson(BTC, ETH) monthly net_pnl",-0.0220
+"spearman(BTC, ETH) monthly net_pnl",+0.0227
+same_sign_months (both positive OR both negative),15 / 29
+"opposite_sign_months (one positive, one negative)",14 / 29
+btc_total_is_net_pnl_pct (across common months),-18.5402
+eth_total_is_net_pnl_pct (across common months),-10.9668
+btc_mean_monthly_pnl,-0.6393
+eth_mean_monthly_pnl,-0.3782

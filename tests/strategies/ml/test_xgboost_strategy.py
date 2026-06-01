@@ -205,12 +205,12 @@ def test_xgboost_strategy_compute_features_smoke():
 
 def test_optimization_xgb_reexports_label_helpers():
     """optimization_xgb re-exports label conversion helpers from optimization."""
+    import numpy as np
+
     from crypto_trade.strategies.ml.optimization_xgb import (
         classes_to_labels,
         labels_to_classes,
     )
-
-    import numpy as np
 
     labels = np.array([-1, 1, 1, -1])
     classes = labels_to_classes(labels)

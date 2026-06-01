@@ -1,0 +1,6 @@
+symbol,model,baseline_oos_sharpe,specialist_oos_sharpe,specialist
+BTC,A (Pool BTC-slice),0.502,0.502,BASELINE (no change)
+ETH,G (ETH + BTC-trend gate),1.0215,0.699,/019 ETH+gate
+LINK,C' (LINK specialist),0.884,0.9789,/018 LINK
+LTC,D' (LTC + atr_sl=1.0),-1.1305,0.331,/028 LTC+atr_sl=1.0
+DOT,E (DOT baseline),-0.094,-0.094,BASELINE (no change)

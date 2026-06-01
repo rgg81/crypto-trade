@@ -55,9 +55,7 @@ class TestCombinatorialPurgedCV:
 
     def test_gap_reduces_train_size(self) -> None:
         """A larger gap should reduce train set size."""
-        splits_no_gap = combinatorial_purged_cv(
-            n_samples=1000, n_splits=10, n_test_splits=2, gap=0
-        )
+        splits_no_gap = combinatorial_purged_cv(n_samples=1000, n_splits=10, n_test_splits=2, gap=0)
         splits_with_gap = combinatorial_purged_cv(
             n_samples=1000, n_splits=10, n_test_splits=2, gap=50
         )

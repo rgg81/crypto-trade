@@ -1,0 +1,2 @@
+anchor_iter,anchor_wallclock_min,anchor_axis,iter019_axis,delta_min,rationale_delta,predicted_total_min,kill_switch_min,cap_min,margin_pct
+iter-v1/018,25,"LINK-only (1 sym, n_trials=18, ENSEMBLE_SIZE=3)",ETH-only + BTC-trend gate (post-hoc filter),1,"ETH-only scale identical to LINK-only (1 sym, same config). Gate is a post-hoc trade-stream filter; adds <1 min (numpy mask + BTC klines load).",26,60,120,78.33333333333333

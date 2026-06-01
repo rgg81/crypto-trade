@@ -1,0 +1,7 @@
+scenario,symbols,n_trials,ensemble_size,features,predicted_min,predicted_hr,margin_pct,passes_20pct_margin,passes_cap
+/016 baseline-anchor,5,18,3,40,50.0,0.83,58.3,True,True
+/017 PRIMARY 6-sym (BTC+ETH+LINK+LTC+DOT+SOL),6,18,3,40,60.0,1.0,50.0,True,True
+/017 ALT 6-sym (+XRP instead of SOL),6,18,3,40,60.0,1.0,50.0,True,True
+/017 ALT 7-sym (+SOL +XRP),7,18,3,40,70.0,1.17,41.7,True,True
+/017 COMPRESSED 7-sym (-3 n_trials),7,15,3,40,58.3,0.97,51.4,True,True
+/017 COMPRESSED 6-sym (-3 n_trials),6,15,3,40,50.0,0.83,58.3,True,True

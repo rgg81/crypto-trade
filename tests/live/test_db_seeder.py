@@ -16,8 +16,6 @@ from crypto_trade.live.models import (
     BASELINE_MODELS,
     COMBINED_MODELS,
     LiveConfig,
-    ModelConfig,
-    V2_BASELINE_MODELS,
 )
 from crypto_trade.live.state_store import StateStore
 
@@ -46,9 +44,7 @@ def _toy_trades_csv(path: Path, rows: list[dict]) -> None:
     for r in rows:
         r.setdefault("stop_loss_price", float(r["entry_price"]) * 0.95)
         r.setdefault("take_profit_price", float(r["entry_price"]) * 1.10)
-        r.setdefault(
-            "timeout_time", int(r["open_time"]) + 7 * 24 * 3600 * 1000
-        )
+        r.setdefault("timeout_time", int(r["open_time"]) + 7 * 24 * 3600 * 1000)
     df = pd.DataFrame(rows)
     df = df[cols]
     df.to_csv(path, index=False)
@@ -413,16 +409,38 @@ def test_seed_end_of_data_without_risk_columns_raises(tmp_path):
     csv_path = tmp_path / "old_format.csv"
     with open(csv_path, "w", newline="") as f:
         w = _csv.writer(f)
-        w.writerow([
-            "symbol", "direction", "entry_price", "exit_price", "weight_factor",
-            "open_time", "close_time", "exit_reason", "pnl_pct", "fee_pct",
-            "net_pnl_pct", "weighted_pnl",
-        ])
-        w.writerow([
-            "ETHUSDT", -1, 100.0, 105.0, 1.0,
-            1_700_300_000_000, 1_700_400_000_000, "end_of_data",
-            -5.0, 0.1, -5.1, -5.1,
-        ])
+        w.writerow(
+            [
+                "symbol",
+                "direction",
+                "entry_price",
+                "exit_price",
+                "weight_factor",
+                "open_time",
+                "close_time",
+                "exit_reason",
+                "pnl_pct",
+                "fee_pct",
+                "net_pnl_pct",
+                "weighted_pnl",
+            ]
+        )
+        w.writerow(
+            [
+                "ETHUSDT",
+                -1,
+                100.0,
+                105.0,
+                1.0,
+                1_700_300_000_000,
+                1_700_400_000_000,
+                "end_of_data",
+                -5.0,
+                0.1,
+                -5.1,
+                -5.1,
+            ]
+        )
 
     cfg = LiveConfig(models=BASELINE_MODELS, data_dir=tmp_path)
     db = tmp_path / "seed.db"

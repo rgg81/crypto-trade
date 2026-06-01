@@ -1,0 +1,11 @@
+parameter,expected_direction_btc_only_vs_pool,expected_magnitude_pct_delta,primary_channel,falsifier_threshold_pct,h1_supporting_evidence_if_breached
+confidence_threshold,lower (less stringent),20-40%,C2+C3,|Δ| > 15%,yes — confidence basin reorganization at single-cohort label distribution
+n_estimators,lower (smaller capacity),30-50%,C2,|Δ| > 25%,yes — capacity adapts to label volume
+max_depth,lower or flat,10-30%,C1+C2,|Δ| > 20%,yes — depth scales with feature joint distribution
+num_leaves,lower (smaller capacity),20-40%,C1,|Δ| > 25%,yes — leaf count adapts to feature space volume
+learning_rate,higher (smaller set permits),15-30%,C2,|Δ| > 20%,moderate — lr is multi-mechanism coupled
+subsample,indeterminate,5-15%,C1,|Δ| > 15%,weak — subsample is least channel-sensitive
+colsample_bytree,higher (fewer features needed for single cohort),10-25%,C1,|Δ| > 15%,yes — feature selection adapts to single cohort label spectrum
+min_child_samples,lower (smaller set),30-50%,C2+C3,|Δ| > 25%,yes — child-sample threshold scales with label volume
+reg_alpha,indeterminate (log-scale),30-50%,C2,|log10(Δ)| > 0.5,moderate — log-scale param; high natural variance
+reg_lambda,indeterminate (log-scale),30-50%,C2,|log10(Δ)| > 0.5,moderate — same as reg_alpha

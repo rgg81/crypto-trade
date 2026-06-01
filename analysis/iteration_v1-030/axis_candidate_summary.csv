@@ -1,0 +1,6 @@
+candidate,family,primary_signal,secondary,potential,wallclock_risk,structural_fit
+1_sample_weighting,sample-weighting (NEW; UNUSED in v1),mean_concurrency=8.98 (H=9),avg_uniqueness=0.112,STRONG,LOW (no new feature compute; only loss-weights),Orthogonal mechanism class; bypasses Pool A LEARNED-NEG family rule
+2_meta_labeling,meta-labeling (NEW; UNUSED in v1),top3_worst_cells_loss_share=37.0%,is_win_rate=39.9%,STRONG,MODERATE (M2 classifier trains on M1 outcomes; smaller dataset),Orthogonal mechanism class; bypasses Pool A LEARNED-NEG family rule
+3_trend_scanning,labeling (REPEAT NEW sub-type; UNUSED in v1),timeout_share=24.5%,timeout_wr=74.3%,MODERATE,HIGH (changes label distribution → label-rate scaling risk like /029),Labeling axis; risks /015 cycle-2 n_eff barrier-curve replay
+4_fracdiff,feature-family (transformation; NEW kernel),avg_adf_p_pruned_features=0.0000,n_nonstationary_at_alpha_05=0,WEAK,MODERATE (fracdiff coefficients computed; new columns add to Pool A),NEW feature family to Pool A → STRUCTURALLY DISQUALIFIED per pool_a_new_feature_lneg rule unless multi-seed
+5_dot_salvage_at_3_18,per-cohort (REPEAT — cohort-coverage CLOSED at /029),projected_wall_clock=185min,compute_fraction=0.154,INFEASIBLE,HIGH,Cohort-coverage CLOSED per LM Master /029 §7; doesn't count as NEW family

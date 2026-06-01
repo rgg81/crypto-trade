@@ -102,6 +102,67 @@ def compute_sharpe_with_threshold(
     return sharpe
 
 
+def compute_sortino_with_threshold(
+    y_proba: np.ndarray,
+    long_pnls: np.ndarray,
+    short_pnls: np.ndarray,
+    threshold: float,
+    min_trades: int = 20,
+    ternary: bool = False,
+) -> float:
+    """Compute Sortino from actual PnLs, filtering by prediction confidence.
+
+    Sortino = mean(pnls) / downside_std(pnls)
+    where downside_std = std of pnls[pnls < 0] (ddof=0).
+
+    Returns -10.0 penalty if:
+      - fewer than min_trades survive the confidence filter
+      - fewer than 2 downside trades exist (downside_std undefined or zero)
+      - downside_std is zero (all downside trades identical)
+      - |Sortino| > 100 (numerical overflow guard, mirrors Sharpe path)
+
+    Only difference from compute_sharpe_with_threshold: denominator is the
+    standard deviation of NEGATIVE-PnL trades only (right-skew-aware).
+    Same confidence masking, same prediction logic, same class mapping.
+
+    iter-v1/037: loss-function axis (NEW 12th family in v1 catalog).
+    """
+    if ternary:
+        # 3-class: [short=0, neutral=1, long=2]
+        directional_proba = y_proba[:, [0, 2]]  # short, long
+        confidence = directional_proba.max(axis=1)
+        mask = confidence >= threshold
+        n_trades = int(mask.sum())
+        if n_trades < min_trades:
+            return -10.0
+        dir_pred = directional_proba[mask].argmax(axis=1)
+        y_pred = np.where(dir_pred == 1, 1, -1)
+    else:
+        confidence = y_proba.max(axis=1)
+        mask = confidence >= threshold
+        n_trades = int(mask.sum())
+        if n_trades < min_trades:
+            return -10.0
+        pred_classes = y_proba[mask].argmax(axis=1)
+        y_pred = classes_to_labels(pred_classes)
+
+    pnls = np.where(y_pred == 1, long_pnls[mask], short_pnls[mask])
+
+    mean = pnls.mean()
+    downside = pnls[pnls < 0]
+    if len(downside) < 2:
+        # No meaningful downside distribution — return penalty rather than +inf or NaN
+        return -10.0
+    down_std = downside.std()
+    if down_std == 0:
+        return -10.0
+
+    sortino = float(mean / down_std)
+    if abs(sortino) > 100:
+        return -10.0
+    return sortino
+
+
 def compute_per_candle_pnl(
     y_proba: np.ndarray,
     long_pnls: np.ndarray,
@@ -192,6 +253,7 @@ def _objective(
     symbols_arr: np.ndarray | None = None,
     oof_buffer: list[dict] | None = None,
     bounds_profile: str = "default",
+    min_child_samples_lower_bound: int | None = None,
 ) -> float:
     from sklearn.model_selection import TimeSeriesSplit
 
@@ -217,18 +279,33 @@ def _objective(
     #                   min_child_samples lower 5 → 20    (regularise small per-cell windows)
     #                 max_depth [3,5] UNCHANGED (Rec #4 adopted as no-op).
     #   Unknown profiles fall back to "default" silently (forward-compat).
-    _pruned = bounds_profile == "v1_pruned"
+    _pruned = bounds_profile in ("v1_pruned", "v1_pruned_axis016")
+    # iter-v1/016: "v1_pruned_axis016" pins subsample=1.0 and colsample_bytree=1.0 for
+    # sample-weighting axis isolation (LM Master Rec #2 ADOPTED-CONDITIONAL).
+    # subsample and colsample are tuned in the normal v1_pruned search space —
+    # leaving them free would confound F-AXIS-MECHANISM attribution for /016.
+    # This profile is /016-only; future iterations revert to "v1_pruned".
+    _pin_subsampling = bounds_profile == "v1_pruned_axis016"
     fast_mode = trial.study.user_attrs.get("fast_mode", False)
     params = {
         "n_estimators": trial.suggest_int("n_estimators", 50, 500),
         "max_depth": trial.suggest_int("max_depth", 3, 5),
         "num_leaves": trial.suggest_int("num_leaves", 15, 63 if _pruned else 127),
         "learning_rate": trial.suggest_float("learning_rate", 0.01, 0.3, log=True),
-        "subsample": trial.suggest_float("subsample", 0.5, 1.0),
+        "subsample": 1.0 if _pin_subsampling else trial.suggest_float("subsample", 0.5, 1.0),
         "colsample_bytree": 1.0
-        if fast_mode
+        if (fast_mode or _pin_subsampling)
         else trial.suggest_float("colsample_bytree", 0.5 if _pruned else 0.3, 1.0),
-        "min_child_samples": trial.suggest_int("min_child_samples", 20 if _pruned else 5, 100),
+        "min_child_samples": trial.suggest_int(
+            "min_child_samples",
+            # iter-v1/041: min_child_samples_lower_bound threads a per-iteration
+            # Optuna lower bound override.  When set, overrides the v1_pruned default
+            # of 20.  None = BIT-IDENTICAL to prior behaviour (20 for pruned, 5 otherwise).
+            min_child_samples_lower_bound
+            if min_child_samples_lower_bound is not None
+            else (20 if _pruned else 5),
+            100,
+        ),
         "reg_alpha": trial.suggest_float("reg_alpha", 1e-8, 10.0, log=True),
         "reg_lambda": trial.suggest_float("reg_lambda", 1e-8, 10.0, log=True),
         "random_state": seed,
@@ -261,7 +338,7 @@ def _objective(
         )
 
     w = train_weights
-    sharpes: list[float] = []
+    scores: list[float] = []
     feat_df = pd.DataFrame(train_features, columns=all_columns)
 
     import datetime
@@ -304,14 +381,23 @@ def _objective(
         # Predict and filter by confidence threshold
         y_proba = model.predict_proba(feat_val)
 
-        sharpe = compute_sharpe_with_threshold(
+        # iter-v1/037: dispatch to Sortino or Sharpe based on study user_attr
+        _optuna_objective = trial.study.user_attrs.get("optuna_objective", "sharpe")
+        if _optuna_objective == "sortino":
+            score_fn = compute_sortino_with_threshold
+        elif _optuna_objective == "sharpe":
+            score_fn = compute_sharpe_with_threshold
+        else:
+            raise ValueError(f"Unknown optuna_objective: {_optuna_objective!r}")
+
+        score = score_fn(
             y_proba,
             long_pnls[val_idx],
             short_pnls[val_idx],
             confidence_threshold,
             ternary=ternary,
         )
-        sharpes.append(sharpe)
+        scores.append(score)
 
         # Sub-fix 1a (iter-v3/003): capture per-candle OOF returns for trial buffer
         if oof_buffer is not None:
@@ -336,15 +422,17 @@ def _objective(
                     }
                 )
 
-    mean_sharpe = float(np.mean(sharpes))
+    mean_score = float(np.mean(scores))
 
     if verbose > 0:
+        # Label the metric in the log based on the active objective
+        _obj_label = trial.study.user_attrs.get("optuna_objective", "sharpe").capitalize()
         print(
-            f"    [trial {trial.number}] Sharpe={mean_sharpe:.4f} "
-            f"(folds: {', '.join(f'{s:.4f}' for s in sharpes)})"
+            f"    [trial {trial.number}] {_obj_label}={mean_score:.4f} "
+            f"(folds: {', '.join(f'{s:.4f}' for s in scores)})"
         )
 
-    return mean_sharpe
+    return mean_score
 
 
 def optimize_and_train(
@@ -367,12 +455,22 @@ def optimize_and_train(
     symbols_arr: np.ndarray | None = None,
     fast_mode: bool = False,
     bounds_profile: str = "default",
+    params_persist_path: Path | None = None,
+    model_role: str = "",
+    symbol: str = "",
+    optuna_objective: str = "sharpe",
+    min_child_samples_lower_bound: int | None = None,
 ) -> tuple[lgb.LGBMClassifier, list[str], float]:
     """Run Optuna optimization and return (model, columns, confidence_threshold).
 
     Uses all feature columns (no group/period selection).
     Confidence threshold is optimized by Optuna and applied at inference time.
-    Sharpe is computed from actual trade returns filtered by threshold.
+    Sharpe (or Sortino when optuna_objective='sortino') is computed from actual
+    trade returns filtered by threshold.
+
+    optuna_objective: 'sharpe' (default, BIT-IDENTICAL to all pre-/037 callers)
+        or 'sortino' (iter-v1/037 loss-function axis). Propagated to _objective
+        via study user_attrs so the lambda closure is stateless.
 
     cv_gap: number of rows to exclude between training and validation folds,
     preventing label leakage from overlapping triple-barrier labels.
@@ -382,11 +480,31 @@ def optimize_and_train(
     train_month and symbols_arr are embedded in each row for multi-symbol grouping.
 
     bounds_profile: selects the Optuna hyperparameter search bounds.
-        "default"   — original bounds for the 193-feature v1/v2/v3 stack.
-        "v1_pruned" — tighter bounds for iter-v1/002+ 40-feature pruned set per
-                      LM Master Phase 4.5 Recs #1–3 (num_leaves≤63,
-                      colsample≥0.5, min_child_samples≥20). v3 and v2 are
-                      NOT affected — they continue with "default".
+        "default"          — original bounds for the 193-feature v1/v2/v3 stack.
+        "v1_pruned"        — tighter bounds for iter-v1/002+ 40-feature pruned set per
+                             LM Master Phase 4.5 Recs #1–3 (num_leaves≤63,
+                             colsample≥0.5, min_child_samples≥20). v3 and v2 are
+                             NOT affected — they continue with "default".
+        "v1_pruned_axis016" — iter-v1/016 only: v1_pruned bounds PLUS subsample=1.0
+                              and colsample_bytree=1.0 pinned (LM Master Rec #2
+                              ADOPTED-CONDITIONAL; isolates the sample-weighting axis
+                              from sub-sampling perturbations in Optuna search).
+
+    params_persist_path: if set, after study.optimize() completes, append ONE row to
+        the parquet at this path capturing study.best_params + metadata per
+        (model_role, symbol, train_month, seed). iter-v1/021 H1 diagnostic.
+        Uses atomic write via tempfile.mkstemp + os.replace (same pattern as
+        oof_persist_path). NO .get(default) silent drops — all 11 hyperparameter
+        columns are written explicitly; pinned values (subsample=1.0 for
+        v1_pruned_axis016; colsample_bytree=1.0 for fast_mode) are written as the
+        pinned constant, NOT silently dropped to a default.
+    model_role: caller-provided model identifier (e.g. "Model_A_pool",
+        "Model_H_BTC"). Embedded in each params_persist_path row.
+    symbol: caller-provided symbol (e.g. "BTCUSDT"). Embedded in each row.
+    min_child_samples_lower_bound: iter-v1/041 — when set, overrides the
+        per-profile default Optuna lower bound for min_child_samples.
+        None = BIT-IDENTICAL to prior behaviour (20 for v1_pruned, 5 for default).
+        Use 50 for iter-v1/041 triple-barrier tighten (denser-label noise mitigation).
     """
     import optuna
 
@@ -397,6 +515,13 @@ def optimize_and_train(
     study = optuna.create_study(direction="maximize", sampler=sampler)
     # iter-v3/007: propagate fast_mode to _objective via study user_attrs
     study.set_user_attr("fast_mode", fast_mode)
+    # iter-v1/037: propagate optuna_objective to _objective via study user_attrs.
+    # Default "sharpe" is BIT-IDENTICAL to all pre-/037 callers.
+    if optuna_objective not in ("sharpe", "sortino"):
+        raise ValueError(
+            f"optuna_objective must be 'sharpe' or 'sortino'; got {optuna_objective!r}"
+        )
+    study.set_user_attr("optuna_objective", optuna_objective)
 
     if sample_weights is None:
         sample_weights = np.ones(len(train_labels), dtype=np.float64)
@@ -423,6 +548,7 @@ def optimize_and_train(
             symbols_arr=symbols_arr,
             oof_buffer=oof_buffer,
             bounds_profile=bounds_profile,
+            min_child_samples_lower_bound=min_child_samples_lower_bound,
         ),
         n_trials=n_trials,
     )
@@ -475,6 +601,85 @@ def optimize_and_train(
     best = study.best_params
     best_threshold = best.get("confidence_threshold", 0.50)
 
+    # iter-v1/021: flush Optuna best_params to params_persist_path parquet.
+    # Captures all 11 hyperparameter columns per (model_role, symbol, train_month, seed)
+    # for the pool-anchor training-time diagnostic (H1 falsifier).
+    #
+    # CRITICAL: NO .get(default) silent drops.
+    # - For v1_pruned_axis016 (subsample=1.0 pinned), write the pinned constant 1.0
+    #   explicitly — the TPE search never suggested subsample/colsample, so they are
+    #   absent from best, but the EFFECTIVE value is known (the pinned constant).
+    # - For fast_mode (colsample_bytree=1.0 hardcoded), write 1.0 explicitly.
+    # - If a key is unexpectedly absent from best, log a WARNING to stderr so the
+    #   Phase 7.5 Layer C audit can catch the partial-visibility issue.
+    if params_persist_path is not None:
+        import os
+        import sys
+        import tempfile
+
+        import pandas as pd
+
+        _is_axis016 = bounds_profile == "v1_pruned_axis016"
+        _is_fast = fast_mode  # resolved above via study.user_attrs
+
+        def _get_param(key: str, pinned_value: float | int | None = None) -> float | int:
+            """Retrieve a param with explicit logging on miss (no silent drop)."""
+            if key in best:
+                return best[key]
+            if pinned_value is not None:
+                return pinned_value
+            print(
+                f"[params_persist_path] WARNING: key {key!r} missing from study.best_params "
+                f"for model_role={model_role!r} symbol={symbol!r} train_month={train_month!r} "
+                f"seed={seed}; bounds_profile={bounds_profile!r}. "
+                "H1 falsifier visibility is PARTIAL for this row.",
+                file=sys.stderr,
+            )
+            return float("nan")
+
+        # subsample: pinned at 1.0 for v1_pruned_axis016; otherwise sampled
+        _subsample_pinned = 1.0 if _is_axis016 else None
+        # colsample_bytree: pinned at 1.0 for fast_mode OR v1_pruned_axis016; otherwise sampled
+        _colsample_pinned = 1.0 if (_is_fast or _is_axis016) else None
+
+        params_row = {
+            "model_role": model_role,
+            "symbol": symbol,
+            "train_month": train_month,
+            "seed": seed,
+            "best_objective_value": float(study.best_value),
+            "confidence_threshold": _get_param("confidence_threshold"),
+            "training_days": _get_param("training_days") if "training_days" in best else None,
+            "n_estimators": _get_param("n_estimators"),
+            "max_depth": _get_param("max_depth"),
+            "num_leaves": _get_param("num_leaves"),
+            "learning_rate": _get_param("learning_rate"),
+            "subsample": _get_param("subsample", _subsample_pinned),
+            "colsample_bytree": _get_param("colsample_bytree", _colsample_pinned),
+            "min_child_samples": _get_param("min_child_samples"),
+            "reg_alpha": _get_param("reg_alpha"),
+            "reg_lambda": _get_param("reg_lambda"),
+        }
+
+        params_persist_path.parent.mkdir(parents=True, exist_ok=True)
+        new_params_df = pd.DataFrame([params_row])
+        if params_persist_path.exists():
+            existing_params = pd.read_parquet(params_persist_path)
+            combined_params = pd.concat([existing_params, new_params_df], ignore_index=True)
+        else:
+            combined_params = new_params_df
+        tmp_fd, tmp_name = tempfile.mkstemp(dir=params_persist_path.parent, suffix=".parquet.tmp")
+        try:
+            os.close(tmp_fd)
+            combined_params.to_parquet(tmp_name, index=False)
+            os.replace(tmp_name, params_persist_path)
+        except Exception:
+            try:
+                os.unlink(tmp_name)
+            except OSError:
+                pass
+            raise
+
     if verbose > 0:
         best_trial = study.best_trial
         print(f"  Optuna: {n_trials} trials, best Sharpe = {best_trial.value:.4f}")
@@ -507,12 +712,14 @@ def optimize_and_train(
     # Retrain on full training data
     # iter-v3/007: in fast_mode, colsample_bytree is hardcoded to 1.0 (not in
     # the Optuna search space), so `best` won't contain it — use 1.0 directly.
+    # iter-v1/016: v1_pruned_axis016 also pins subsample=1.0 (not suggested),
+    # so apply the same .get(..., 1.0) safety fallback.
     params = {
         "n_estimators": best["n_estimators"],
         "max_depth": best["max_depth"],
         "num_leaves": best["num_leaves"],
         "learning_rate": best["learning_rate"],
-        "subsample": best["subsample"],
+        "subsample": best.get("subsample", 1.0),
         "colsample_bytree": best.get("colsample_bytree", 1.0),
         "min_child_samples": best["min_child_samples"],
         "reg_alpha": best["reg_alpha"],

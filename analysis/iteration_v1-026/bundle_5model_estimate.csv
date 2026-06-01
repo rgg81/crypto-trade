@@ -1,0 +1,15 @@
+sample,component,n_trades,n_months,sharpe_monthly_sqrt12,maxdd_pct
+in_sample,A_btc_approx,113,35,-0.2521,51.71
+in_sample,C_link_spec,154,38,+0.3818,41.77
+in_sample,D_ltc,124,37,+0.0535,29.77
+in_sample,E_dot,93,30,-0.3599,30.11
+in_sample,G_eth_spec,159,36,-0.0331,29.09
+in_sample,BUNDLE_sum_5_components,643,39,+0.0640,51.39
+in_sample,BASELINE_FULL_POOL_5_sym,621,39,+0.3285,57.84
+out_of_sample,A_btc_approx,35,12,+0.4520,15.59
+out_of_sample,C_link_spec,48,15,+1.0858,21.95
+out_of_sample,D_ltc,34,13,-1.0502,29.06
+out_of_sample,E_dot,46,14,-0.0911,5.46
+out_of_sample,G_eth_spec,42,12,+0.6768,15.62
+out_of_sample,BUNDLE_sum_5_components,205,15,+0.5700,49.18
+out_of_sample,BASELINE_FULL_POOL_5_sym,189,15,+0.5722,33.77

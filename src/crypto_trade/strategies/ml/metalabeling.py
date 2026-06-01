@@ -29,6 +29,23 @@ Look-ahead audit (non-negotiable):
   No future candle is observed.
 
 Reference: iter-v3/017 research brief §2.4 pseudocode + §3.5 sub-fix #1.
+
+iter-v1/030 additions:
+  - ``bounds_profile`` parameter on ``_train_m2_binary``: "v3" preserves the
+    original iter-v3/017 search ranges; "v1_030" applies the tightened LM
+    Master §2 bounds (n_estimators [50,200], max_depth [2,4], num_leaves
+    [7,31], learning_rate [0.02,0.10], min_child_samples [8,30],
+    reg_alpha/reg_lambda [0.01,5], colsample_bytree [0.4,0.8]).
+  - ``scale_pos_weight`` explicit per cell under "v1_030" profile (replaces
+    is_unbalance=True).
+  - Fold-skip when any fold has < ``min_pos_per_fold`` positive labels (3 by
+    default, per LM Master §2 stratification fallback).
+  - ``n_trials_m2`` parameter on ``MetaLabelingStrategy.__init__``: decouples
+    M2 Optuna budget from M1 (default keeps backwards-compat at M1's n_trials;
+    /030 passes 18 explicitly).
+  - ``include_m1_direction`` parameter: when True the M2 input vector appends
+    M1's predicted direction as a second extra feature after m1_confidence
+    (45-dim for /030 vs 14-dim for v3/017).
 """
 
 from __future__ import annotations
@@ -55,12 +72,29 @@ def _train_m2_binary(
     seed: int,
     fast_mode: bool,
     verbose: int,
+    bounds_profile: str = "v3",
+    min_pos_per_fold: int = 3,
 ) -> lgb.LGBMClassifier | None:
     """Train M2 LGBMClassifier via Optuna on the M1-positive subset.
 
     M2 confidence threshold is PINNED at 0.5 (not tuned — single-axis
-    discipline).  All other LightGBM hyperparams use the same search space
-    as M1 (brief §3.2).
+    discipline).  All other LightGBM hyperparams use the search space
+    defined by ``bounds_profile``.
+
+    Parameters
+    ----------
+    bounds_profile
+        "v3" — original iter-v3/017 search ranges (backwards-compatible).
+        "v1_030" — LM Master §2 tightened bounds for iter-v1/030:
+          n_estimators [50,200], max_depth [2,4], num_leaves [7,31],
+          learning_rate [0.02,0.10] log, min_child_samples [8,30],
+          reg_alpha/reg_lambda [0.01,5] log, colsample_bytree [0.4,0.8].
+          Uses explicit scale_pos_weight = n_neg/n_pos instead of
+          is_unbalance=True.
+    min_pos_per_fold
+        Minimum positive-label count required in a TimeSeriesSplit fold for
+        that fold to be included in scoring (LM Master §2 stratification
+        fallback, default 3).  Folds with fewer positive labels are skipped.
 
     Returns None if training fails or training set is too small.
     """
@@ -74,13 +108,18 @@ def _train_m2_binary(
     if verbose > 0:
         print(
             f"  [M2] Training binary classifier: {len(m2_features)} samples, "
-            f"{n_pos} TP-hits (M2=1), {n_neg} SL/timeout (M2=0)"
+            f"{n_pos} TP-hits (M2=1), {n_neg} SL/timeout (M2=0) "
+            f"[bounds_profile={bounds_profile}]"
         )
 
     if n_pos == 0 or n_neg == 0:
         if verbose > 0:
             print("  [M2] Degenerate labels (all 0 or all 1) — skipping M2")
         return None
+
+    # Compute explicit scale_pos_weight for v1_030 profile (LM Master §2).
+    # More deterministic than is_unbalance=True which uses internal heuristic.
+    spw_explicit = float(n_neg) / float(n_pos) if n_pos > 0 else 1.0
 
     import optuna  # noqa: PLC0415
 
@@ -91,28 +130,52 @@ def _train_m2_binary(
     def _m2_objective(trial: optuna.Trial) -> float:
         from sklearn.model_selection import TimeSeriesSplit  # noqa: PLC0415
 
-        col_frac = 1.0 if fast_mode else trial.suggest_float("colsample_bytree", 0.3, 1.0)
-        params = {
-            "n_estimators": trial.suggest_int("n_estimators", 50, 500),
-            "max_depth": trial.suggest_int("max_depth", 3, 5),
-            "num_leaves": trial.suggest_int("num_leaves", 15, 127),
-            "learning_rate": trial.suggest_float("learning_rate", 0.01, 0.3, log=True),
-            "subsample": trial.suggest_float("subsample", 0.5, 1.0),
-            "colsample_bytree": col_frac,
-            "min_child_samples": trial.suggest_int("min_child_samples", 5, 50),
-            "reg_alpha": trial.suggest_float("reg_alpha", 1e-8, 10.0, log=True),
-            "reg_lambda": trial.suggest_float("reg_lambda", 1e-8, 10.0, log=True),
-            "objective": "binary",
-            "is_unbalance": True,
-            "random_state": seed,
-            "verbosity": -1,
-        }
+        if bounds_profile == "v1_030":
+            col_frac = 1.0 if fast_mode else trial.suggest_float("colsample_bytree", 0.4, 0.8)
+            params = {
+                "n_estimators": trial.suggest_int("n_estimators", 50, 200),
+                "max_depth": trial.suggest_int("max_depth", 2, 4),
+                "num_leaves": trial.suggest_int("num_leaves", 7, 31),
+                "learning_rate": trial.suggest_float("learning_rate", 0.02, 0.10, log=True),
+                "subsample": trial.suggest_float("subsample", 0.5, 1.0),
+                "colsample_bytree": col_frac,
+                "min_child_samples": trial.suggest_int("min_child_samples", 8, 30),
+                "reg_alpha": trial.suggest_float("reg_alpha", 0.01, 5.0, log=True),
+                "reg_lambda": trial.suggest_float("reg_lambda", 0.01, 5.0, log=True),
+                "objective": "binary",
+                "scale_pos_weight": spw_explicit,
+                "random_state": seed,
+                "verbosity": -1,
+            }
+        else:
+            # "v3" — original iter-v3/017 search ranges (backwards-compatible)
+            col_frac = 1.0 if fast_mode else trial.suggest_float("colsample_bytree", 0.3, 1.0)
+            params = {
+                "n_estimators": trial.suggest_int("n_estimators", 50, 500),
+                "max_depth": trial.suggest_int("max_depth", 3, 5),
+                "num_leaves": trial.suggest_int("num_leaves", 15, 127),
+                "learning_rate": trial.suggest_float("learning_rate", 0.01, 0.3, log=True),
+                "subsample": trial.suggest_float("subsample", 0.5, 1.0),
+                "colsample_bytree": col_frac,
+                "min_child_samples": trial.suggest_int("min_child_samples", 5, 50),
+                "reg_alpha": trial.suggest_float("reg_alpha", 1e-8, 10.0, log=True),
+                "reg_lambda": trial.suggest_float("reg_lambda", 1e-8, 10.0, log=True),
+                "objective": "binary",
+                "is_unbalance": True,
+                "random_state": seed,
+                "verbosity": -1,
+            }
+
         n_splits = min(3, max(2, len(m2_features) // 10))
         tscv = TimeSeriesSplit(n_splits=n_splits)
         fold_scores: list[float] = []
         feat_df = pd.DataFrame(m2_features)
         for train_idx, val_idx in tscv.split(m2_features):
             if len(train_idx) < 5 or len(val_idx) < 2:
+                continue
+            # LM Master §2 stratification fallback: skip fold if < min_pos_per_fold
+            # positives in val to avoid degenerate F1 from empty positive val fold.
+            if int((m2_labels[val_idx] == 1).sum()) < min_pos_per_fold:
                 continue
             m = lgb.LGBMClassifier(**params)
             m.fit(feat_df.iloc[train_idx], m2_labels[train_idx])
@@ -134,25 +197,43 @@ def _train_m2_binary(
     study.optimize(_m2_objective, n_trials=n_trials)
 
     best = study.best_params
-    final_params = {
-        "n_estimators": best.get("n_estimators", 100),
-        "max_depth": best.get("max_depth", 3),
-        "num_leaves": best.get("num_leaves", 31),
-        "learning_rate": best.get("learning_rate", 0.1),
-        "subsample": best.get("subsample", 0.8),
-        "colsample_bytree": best.get("colsample_bytree", 1.0),
-        "min_child_samples": best.get("min_child_samples", 20),
-        "reg_alpha": best.get("reg_alpha", 1e-8),
-        "reg_lambda": best.get("reg_lambda", 1e-8),
-        "objective": "binary",
-        "is_unbalance": True,
-        "random_state": seed,
-        "verbosity": -1,
-    }
+    if bounds_profile == "v1_030":
+        final_params = {
+            "n_estimators": best.get("n_estimators", 100),
+            "max_depth": best.get("max_depth", 3),
+            "num_leaves": best.get("num_leaves", 15),
+            "learning_rate": best.get("learning_rate", 0.05),
+            "subsample": best.get("subsample", 0.8),
+            "colsample_bytree": best.get("colsample_bytree", 0.6),
+            "min_child_samples": best.get("min_child_samples", 15),
+            "reg_alpha": best.get("reg_alpha", 0.1),
+            "reg_lambda": best.get("reg_lambda", 0.1),
+            "objective": "binary",
+            "scale_pos_weight": spw_explicit,
+            "random_state": seed,
+            "verbosity": -1,
+        }
+    else:
+        final_params = {
+            "n_estimators": best.get("n_estimators", 100),
+            "max_depth": best.get("max_depth", 3),
+            "num_leaves": best.get("num_leaves", 31),
+            "learning_rate": best.get("learning_rate", 0.1),
+            "subsample": best.get("subsample", 0.8),
+            "colsample_bytree": best.get("colsample_bytree", 1.0),
+            "min_child_samples": best.get("min_child_samples", 20),
+            "reg_alpha": best.get("reg_alpha", 1e-8),
+            "reg_lambda": best.get("reg_lambda", 1e-8),
+            "objective": "binary",
+            "is_unbalance": True,
+            "random_state": seed,
+            "verbosity": -1,
+        }
     if verbose > 0:
         print(
             f"  [M2] Optuna: {n_trials} trials, best F1={study.best_value:.4f} "
-            f"(n_est={final_params['n_estimators']}, depth={final_params['max_depth']})"
+            f"(n_est={final_params['n_estimators']}, depth={final_params['max_depth']}, "
+            f"profile={bounds_profile})"
         )
 
     m2_model = lgb.LGBMClassifier(**final_params)
@@ -217,7 +298,37 @@ class MetaLabelingStrategy:
         fast_mode: bool = False,
         label_mode: str = "triple_barrier",
         trend_scan_grid: tuple[int, ...] = (5, 8, 13, 21),
+        n_trials_m2: int | None = None,
+        bounds_profile_m2: str = "v3",
+        include_m1_direction: bool = False,
+        # v1-specific M1 params (passed through to LightGbmStrategy)
+        bounds_profile: str = "default",
+        sigma_source: str = "natr",
+        sigma_k_tp: float | None = None,
+        sigma_k_sl: float | None = None,
+        sigma_halflife_candles: int = 42,
+        sample_weight_mode: str = "abs_pnl",
     ) -> None:
+        """Initialise MetaLabelingStrategy (M1 + M2 binary classifier).
+
+        Parameters
+        ----------
+        n_trials_m2
+            Optuna trial budget for M2 (separate from M1).  Defaults to
+            ``n_trials`` (M1 budget) when None, preserving backwards compat
+            with iter-v3/017.  iter-v1/030 passes 18 explicitly per LM
+            Master §2.3.
+        bounds_profile_m2
+            Hyperparameter search bounds for M2.  "v3" = original
+            iter-v3/017 ranges.  "v1_030" = LM Master §2 tightened bounds
+            with explicit scale_pos_weight.
+        include_m1_direction
+            When True, append M1's predicted direction (±1 encoded as float)
+            to the M2 input vector as a second extra feature after
+            m1_confidence.  Makes the M2 feature vector 45-dim for /030
+            (43 V1 features + m1_confidence + m1_direction) vs 14-dim for
+            v3/017 (13 V3 features + m1_confidence).
+        """
         if not feature_columns:
             raise ValueError(
                 "feature_columns must be explicitly specified — pass the explicit "
@@ -232,6 +343,10 @@ class MetaLabelingStrategy:
         self.ensemble_seeds = ensemble_seeds
         self._fast_mode = fast_mode
         self._verbose = verbose
+        # iter-v1/030 additions
+        self._n_trials_m2: int = n_trials_m2 if n_trials_m2 is not None else n_trials
+        self._bounds_profile_m2: str = bounds_profile_m2
+        self._include_m1_direction: bool = include_m1_direction
 
         # Build M1: full LightGbmStrategy (unchanged from iter-v3/013)
         self._m1 = LightGbmStrategy(
@@ -257,6 +372,13 @@ class MetaLabelingStrategy:
             fast_mode=fast_mode,
             label_mode=label_mode,
             trend_scan_grid=trend_scan_grid,
+            # v1-specific params threaded through to M1 (iter-v1/030)
+            bounds_profile=bounds_profile,
+            sigma_source=sigma_source,
+            sigma_k_tp=sigma_k_tp,
+            sigma_k_sl=sigma_k_sl,
+            sigma_halflife_candles=sigma_halflife_candles,
+            sample_weight_mode=sample_weight_mode,
         )
 
         # M1 training-window derived params (read after M1 trains)
@@ -266,7 +388,10 @@ class MetaLabelingStrategy:
         # M2 state per calendar month
         self._m2_model: lgb.LGBMClassifier | None = None
         self._m2_active: bool = False
-        self._m2_feature_cols: list[str] = list(feature_columns) + ["m1_confidence"]
+        _m2_extra_cols = ["m1_confidence"]
+        if include_m1_direction:
+            _m2_extra_cols.append("m1_direction")
+        self._m2_feature_cols: list[str] = list(feature_columns) + _m2_extra_cols
         # Dict {(symbol, open_time): np.ndarray[14]} — populated per training month
         self._m2_month_features: dict[tuple[str, int], np.ndarray] = {}
         # Track current month for lazy M2 training
@@ -491,13 +616,18 @@ class MetaLabelingStrategy:
             # TP hit iff net return > 0 (fee already deducted by label_trades)
             m2_labels_full[flat_i] = 1 if pnl > 0.0 else 0
 
-        # Step 5: build M2 features (13 V3 features + M1 confidence) for positive subset
+        # Step 5: build M2 features for positive subset
+        # Dim = len(feature_columns) + 1 (m1_confidence) [+ 1 (m1_direction) if enabled]
         m2_pos_idx = np.where(m1_positive_mask)[0]
-        feat_train_m1_pos = feat_train[m2_pos_idx]  # [n_m1_pos, 13]
+        feat_train_m1_pos = feat_train[m2_pos_idx]  # [n_m1_pos, n_features]
         m1_conf_m1_pos = m1_confidence_arr[m2_pos_idx]  # [n_m1_pos]
-        m2_features_pos = np.concatenate(
-            [feat_train_m1_pos, m1_conf_m1_pos.reshape(-1, 1)], axis=1
-        )  # [n_m1_pos, 14]
+        extra_cols = [m1_conf_m1_pos.reshape(-1, 1)]
+        if self._include_m1_direction:
+            # m1_direction: +1.0 = long predicted, -1.0 = short predicted
+            m1_pred_cls_arr = np.argmax(m1_proba_train, axis=1)  # [n_train]
+            m1_dir_m1_pos = np.where(m1_pred_cls_arr[m2_pos_idx] == 1, 1.0, -1.0).reshape(-1, 1)
+            extra_cols.append(m1_dir_m1_pos)
+        m2_features_pos = np.concatenate([feat_train_m1_pos, *extra_cols], axis=1)
         m2_labels_pos = m2_labels_full[m2_pos_idx]
 
         if self._verbose > 0:
@@ -513,51 +643,70 @@ class MetaLabelingStrategy:
         m2_model = _train_m2_binary(
             m2_features=m2_features_pos,
             m2_labels=m2_labels_pos,
-            n_trials=self._m1.n_trials,
+            n_trials=self._n_trials_m2,
             seed=m2_seed,
             fast_mode=self._fast_mode,
             verbose=self._verbose,
+            bounds_profile=self._bounds_profile_m2,
         )
 
         if m2_model is None:
-            if self._verbose > 0:
-                print("  [M2] Training returned None — M2 inactive for this month")
+            # Per LM Master §9 Q8 item 6: log M2_TRAINED status with month_str.
+            print(
+                f"  [M2] M2_TRAINED=False month={month_str} n_pos={n_m1_pos} "
+                f"n_samples={len(m2_features_pos)} (training returned None)"
+            )
             return
 
         self._m2_model = m2_model
         self._m2_active = True
 
-        # Step 7: populate M2 test-month feature cache (14-dim)
+        # Step 7: populate M2 test-month feature cache (N-dim)
         # We need M1 confidence for test-month candles — compute lazily at
         # predict time from M1's _month_features and _models.
-        # Pre-populate an (symbol, open_time) → 13-feature row cache for the
-        # test month; the 14th feature (M1 confidence) is added at predict time.
+        # Pre-populate an (symbol, open_time) → base-feature row cache for the
+        # test month; the extra features (M1 confidence [+ M1 direction]) are
+        # added at predict time.
         self._m2_month_features = {}  # will be filled per-candle in get_signal
 
-        if self._verbose > 0:
-            print(f"  [M2] M2 trained and active for {month_str}")
+        # Per LM Master §9 Q8 item 6: log M2_TRAINED status with month_str.
+        print(
+            f"  [M2] M2_TRAINED=True month={month_str} n_pos={n_m1_pos} "
+            f"n_samples={len(m2_features_pos)} n_trials_m2={self._n_trials_m2} "
+            f"bounds={self._bounds_profile_m2}"
+        )
 
     def _get_m2_features(self, symbol: str, open_time: int) -> np.ndarray | None:
-        """Build 14-dim M2 input for the given candle.
+        """Build N-dim M2 input for the given candle.
 
-        Reads M1's cached 13-feature row, appends M1's prediction probability
-        (already computed by M1.get_signal in the same candle tick).
+        Reads M1's cached base-feature row, appends:
+          - M1's prediction probability (m1_confidence) — always present.
+          - M1's predicted direction as float (m1_direction) — only when
+            ``include_m1_direction=True`` (iter-v1/030: 45-dim total).
 
         We re-run M1 proba computation on the cached feature row to get a fresh
         M1 confidence value for M2's input.  This is safe: M1._month_features
         and M1._models are already set for this month.
+
+        Returns None if the candle is not in M1's feature cache.
         """
         key = (symbol, open_time)
         feat_row = self._m1._month_features.get(key)
         if feat_row is None:
             return None
 
-        # Re-compute M1 confidence (identical to what M1.get_signal computed)
+        # Re-compute M1 confidence + direction (identical to what M1.get_signal computed)
         feat_df = pd.DataFrame(feat_row.reshape(1, -1), columns=self._m1._selected_cols)
         all_proba = [m.predict_proba(feat_df)[0] for m in self._m1._models]
         m1_proba = np.mean(all_proba, axis=0)
         m1_confidence = float(m1_proba.max())
+        # m1_direction: +1.0 for long prediction (class index 1), -1.0 for short (class index 0)
+        m1_pred_cls = int(np.argmax(m1_proba))
+        m1_direction = 1.0 if m1_pred_cls == 1 else -1.0
 
-        # Build 14-dim vector
-        m2_input = np.concatenate([feat_row, [m1_confidence]])
+        extra = [m1_confidence]
+        if self._include_m1_direction:
+            extra.append(m1_direction)
+
+        m2_input = np.concatenate([feat_row, extra])
         return m2_input

@@ -1267,3 +1267,175 @@ def append_psr_rows_to_comparison(
         f"psr_monthly_vs_0/1, psr_daily_vs_0, n_effective_trials appended. "
         f"IS n_eff={is_n_eff} OOS n_eff={oos_n_eff}{per_cell_str}"
     )
+
+
+def append_r5_rows_to_comparison(
+    comparison_csv_path: Path,
+    r5_fire_rate_is: float,
+    r5_fire_rate_oos: float,
+) -> None:
+    """Append r5_fire_rate_is and r5_fire_rate_oos rows to an existing comparison.csv.
+
+    Called AFTER append_psr_rows_to_comparison().  The anchor (baseline) value
+    for both rows is 0.0 because R5 was not enabled on the baseline.  The
+    ratio column is omitted (``—``) when the IS fire rate is 0.
+
+    Parameters
+    ----------
+    comparison_csv_path
+        Absolute path to the existing comparison.csv.
+    r5_fire_rate_is
+        Fraction of IS order-eligible signals where R5 fired (0.0 – 1.0).
+    r5_fire_rate_oos
+        Fraction of OOS order-eligible signals where R5 fired (0.0 – 1.0).
+    """
+    anchor_is = 0.0  # R5 not enabled on baseline
+    anchor_oos = 0.0
+
+    def _ratio(oos_v: float, is_v: float) -> str:
+        if is_v == 0:
+            return "—"
+        return f"{oos_v / is_v:.4f}"
+
+    new_rows = [
+        [
+            "r5_fire_rate_is",
+            f"{anchor_is:.6f}",
+            f"{r5_fire_rate_is:.6f}",
+            _ratio(r5_fire_rate_is, anchor_is),
+        ],
+        [
+            "r5_fire_rate_oos",
+            f"{anchor_oos:.6f}",
+            f"{r5_fire_rate_oos:.6f}",
+            _ratio(r5_fire_rate_oos, anchor_oos),
+        ],
+    ]
+
+    with open(comparison_csv_path, "a", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerows(new_rows)
+
+    print(
+        f"[reporting_v1] comparison.csv updated: r5_fire_rate_is={r5_fire_rate_is:.4f} "
+        f"r5_fire_rate_oos={r5_fire_rate_oos:.4f} appended."
+    )
+
+
+def append_r5_binary_kill_rows_to_comparison(
+    comparison_csv_path: Path,
+    r5_kill_fire_rate_is: float,
+    r5_kill_fire_rate_oos: float,
+) -> None:
+    """Append r5_binary_kill_fire_rate_is and r5_binary_kill_fire_rate_oos rows.
+
+    Fixes the D-RPRT-001 defect from iter-v1/010: each row now places the IS
+    fire rate in the ``in_sample`` column and the OOS fire rate in the
+    ``out_of_sample`` column, matching the standard comparison.csv schema
+    (metric, in_sample, out_of_sample, ratio).
+
+    Both rows carry the same IS and OOS values — the metric name records which
+    half is the primary subject of that row.  The ratio column is OOS/IS for
+    each row.  When IS fire rate is 0, ratio is emitted as '—'.
+
+    Called AFTER append_r5_rows_to_comparison() (which handles /010's
+    proportional-scaling fire-rate rows).  The anchor (baseline) value for
+    both rows is 0.0 because R5-BINARY-KILL was not enabled on the baseline.
+
+    Parameters
+    ----------
+    comparison_csv_path
+        Absolute path to the existing comparison.csv.
+    r5_kill_fire_rate_is
+        Fraction of IS candidate signals where R5-BINARY-KILL fired (0.0–1.0).
+    r5_kill_fire_rate_oos
+        Fraction of OOS candidate signals where R5-BINARY-KILL fired (0.0–1.0).
+    """
+
+    def _ratio(oos_v: float, is_v: float) -> str:
+        if is_v == 0:
+            return "—"
+        return f"{oos_v / is_v:.4f}"
+
+    # Schema: [metric, in_sample, out_of_sample, ratio]
+    # Both rows carry IS rate in in_sample and OOS rate in out_of_sample.
+    # This is the D-RPRT-001 fix: values belong in the column that matches
+    # the sample-half label, not inverted.
+    new_rows = [
+        [
+            "r5_binary_kill_fire_rate_is",
+            f"{r5_kill_fire_rate_is:.6f}",
+            f"{r5_kill_fire_rate_oos:.6f}",
+            _ratio(r5_kill_fire_rate_oos, r5_kill_fire_rate_is),
+        ],
+        [
+            "r5_binary_kill_fire_rate_oos",
+            f"{r5_kill_fire_rate_is:.6f}",
+            f"{r5_kill_fire_rate_oos:.6f}",
+            _ratio(r5_kill_fire_rate_oos, r5_kill_fire_rate_is),
+        ],
+    ]
+
+    with open(comparison_csv_path, "a", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerows(new_rows)
+
+    print(
+        f"[reporting_v1] comparison.csv updated: "
+        f"r5_binary_kill_fire_rate_is={r5_kill_fire_rate_is:.4f} "
+        f"r5_binary_kill_fire_rate_oos={r5_kill_fire_rate_oos:.4f} appended."
+    )
+
+
+def append_vol_ceiling_rows_to_comparison(
+    comparison_csv_path: Path,
+    vol_ceiling_fire_rate_is: float,
+    vol_ceiling_fire_rate_oos: float,
+) -> None:
+    """Append vol_ceiling_fire_rate_is and vol_ceiling_fire_rate_oos rows.
+
+    F-AXIS #2 wiring proof for iter-v1/038 (per-symbol rv-ceiling risk-primitive).
+    Schema: [metric, in_sample, out_of_sample, ratio].
+    Baseline value is 0.0 (ceiling not enabled on baseline).
+    Ratio is OOS/IS; emitted as '—' when IS fire rate is 0.
+
+    Parameters
+    ----------
+    comparison_csv_path
+        Absolute path to the existing comparison.csv.
+    vol_ceiling_fire_rate_is
+        Fraction of IS candidate signals where vol ceiling fired (0.0–1.0).
+    vol_ceiling_fire_rate_oos
+        Fraction of OOS candidate signals where vol ceiling fired (0.0–1.0).
+    """
+
+    def _ratio(oos_v: float, is_v: float) -> str:
+        if is_v == 0:
+            return "—"
+        return f"{oos_v / is_v:.4f}"
+
+    new_rows = [
+        [
+            "vol_ceiling_fire_rate_is",
+            f"{vol_ceiling_fire_rate_is:.6f}",
+            f"{vol_ceiling_fire_rate_oos:.6f}",
+            _ratio(vol_ceiling_fire_rate_oos, vol_ceiling_fire_rate_is),
+        ],
+        [
+            "vol_ceiling_fire_rate_oos",
+            f"{vol_ceiling_fire_rate_is:.6f}",
+            f"{vol_ceiling_fire_rate_oos:.6f}",
+            _ratio(vol_ceiling_fire_rate_oos, vol_ceiling_fire_rate_is),
+        ],
+    ]
+
+    with open(comparison_csv_path, "a", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerows(new_rows)
+
+    print(
+        f"[reporting_v1] comparison.csv updated: "
+        f"vol_ceiling_fire_rate_is={vol_ceiling_fire_rate_is:.4f} "
+        f"vol_ceiling_fire_rate_oos={vol_ceiling_fire_rate_oos:.4f} appended "
+        f"[iter-v1/038 F-AXIS#2 wiring proof]."
+    )

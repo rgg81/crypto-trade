@@ -1,0 +1,3 @@
+sample,baseline_trades,iter022_trades,overlap_trades,jaccard,baseline_only_trades,baseline_only_net_pnl_pct,iter022_only_trades,iter022_only_net_pnl_pct,overlap_baseline_net_pnl_pct
+IS,124,117,22,0.1005,102,-27.0978,95,59.3635,30.3709
+OOS,34,48,7,0.0933,27,-38.7079,41,-36.9759,-8.5405

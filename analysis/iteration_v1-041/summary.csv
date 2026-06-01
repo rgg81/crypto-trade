@@ -1,0 +1,10 @@
+,value
+is_baseline_trades,621.0
+is_projected_trades_low,1582.0
+is_projected_trades_high,1863.0
+oos_baseline_trades,189.0
+oos_projected_trades_low,480.0
+oos_projected_trades_high,567.0
+is_baseline_mean_abs_pnl_pct,5.699363285024155
+is_tight_mean_abs_pnl_pct,3.025932873827527
+pnl_magnitude_ratio_tight_over_baseline,0.5309247230789048

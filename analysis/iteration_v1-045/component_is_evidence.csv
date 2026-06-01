@@ -1,0 +1,6 @@
+component_id,universe,source_iter,is_n_trades,is_sharpe,is_pnl,is_max_dd,is_win_rate
+C-BTC,BTCUSDT,iteration_v1-012,65,-0.2117,-3.1284,44.3259,0.3846
+C-ETH,ETHUSDT,iteration_v1-042,132,0.7116,17.1754,41.7206,0.4091
+C-LINK,LINKUSDT,iteration_v1-011,149,1.267,53.118,36.1347,0.4295
+C-LTC,LTCUSDT,iteration_v1-040,117,3.7569,123.6234,26.1326,0.4701
+C-DOT,DOTUSDT,iteration_v1-031,117,2.4012,51.7528,15.4915,0.4786

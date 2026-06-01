@@ -1,0 +1,6 @@
+scenario,computation,value
+Naive RMS uncorrelated (upper bound),sqrt(sum(s_i^2) / n),0.6029
+Naive average per-symbol (lower bound),sum(s_i) / n,0.4834
+Half-diversified (sum/sqrt(n)),sum(s_i) / sqrt(n),1.0809
+Option A multi-seed deflated (× 0.65 lottery),half-div × 0.65,0.7026
+Option B (A + /031 axis-only +0.21),Option A + 0.21,0.9126

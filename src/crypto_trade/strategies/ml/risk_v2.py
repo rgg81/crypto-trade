@@ -1273,6 +1273,16 @@ class BtcTrendFilterConfig:
     lookback_bars: int = 42
     threshold_pct: float = 20.0
     enabled: bool = True
+    long_only_mode: bool = False
+    """When True, only kills LONG trades in a BTC bear regime (ret < -threshold_pct).
+
+    SHORT trades pass through unrestricted regardless of BTC direction.
+    Default False preserves the original symmetric behavior (kills longs in bear
+    AND shorts in bull).
+
+    Added for iter-v1/022 LTC-only + asymmetric long-suppression BTC-trend gate.
+    The /019 ETH call site does NOT pass this kwarg → default=False bit-identical.
+    """
 
 
 @dataclass
@@ -1338,6 +1348,9 @@ def evaluate_btc_trend_filter_one_signal(
     if close_then == 0.0:
         return False
     btc_ret_pct = (close_now / close_then - 1.0) * 100.0
+    if config.long_only_mode:
+        # Asymmetric: only kill longs when BTC is bearish.
+        return direction == 1 and btc_ret_pct < -config.threshold_pct
     return (direction == -1 and btc_ret_pct > config.threshold_pct) or (
         direction == 1 and btc_ret_pct < -config.threshold_pct
     )
@@ -1393,9 +1406,16 @@ def apply_btc_trend_filter(
         # BTC N-bar return = (close_now / close_n_bars_ago - 1) * 100
         btc_ret_pct = (btc_closes[idx] / btc_closes[idx - config.lookback_bars] - 1) * 100
 
-        should_kill = (trade.direction == -1 and btc_ret_pct > config.threshold_pct) or (
-            trade.direction == 1 and btc_ret_pct < -config.threshold_pct
-        )
+        if config.long_only_mode:
+            # Asymmetric: only kill LONG trades when BTC is in a bear regime.
+            # SHORT trades are unrestricted regardless of BTC direction.
+            # iter-v1/022 LTC-only long-suppression gate at -4% threshold.
+            should_kill = trade.direction == 1 and btc_ret_pct < -config.threshold_pct
+        else:
+            # Symmetric (original behavior): kill longs in bear AND shorts in bull.
+            should_kill = (trade.direction == -1 and btc_ret_pct > config.threshold_pct) or (
+                trade.direction == 1 and btc_ret_pct < -config.threshold_pct
+            )
 
         if should_kill:
             stats.n_killed += 1

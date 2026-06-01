@@ -93,7 +93,9 @@ def test_past_only_no_lookahead() -> None:
         b = base[col].iloc[: perturb_idx - 5]  # margin for the longest window
         p = perturbed[col].iloc[: perturb_idx - 5]
         pd.testing.assert_series_equal(
-            b, p, check_names=False,
+            b,
+            p,
+            check_names=False,
             obj=f"{col} changed at a bar BEFORE the perturbed future rate",
         )
 
@@ -124,9 +126,7 @@ def test_accel_is_second_difference_of_momentum() -> None:
     expected = mom - mom.shift(FUNDING_MOMENTUM_WINDOW)
     m = accel.notna() & expected.notna()
     assert m.sum() > 100
-    np.testing.assert_allclose(
-        accel[m].to_numpy(), expected[m].to_numpy(), rtol=1e-9, atol=1e-12
-    )
+    np.testing.assert_allclose(accel[m].to_numpy(), expected[m].to_numpy(), rtol=1e-9, atol=1e-12)
 
 
 def test_sign_persist_range() -> None:
@@ -143,9 +143,7 @@ def test_add_funding_family_registry_entry() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         data_dir = Path(tmp)
         (data_dir / "funding_rates").mkdir()
-        _make_funding_df().to_csv(
-            data_dir / "funding_rates" / "BCHUSDT.csv", index=False
-        )
+        _make_funding_df().to_csv(data_dir / "funding_rates" / "BCHUSDT.csv", index=False)
         out = add_funding_family_v3_features(_make_kline_df(), data_dir=data_dir)
         for col in FUNDING_FAMILY_COLUMNS:
             assert col in out.columns

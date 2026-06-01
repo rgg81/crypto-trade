@@ -1,0 +1,3 @@
+scope,expected_fire_rate_pct,acceptable_low_pct,acceptable_high_pct,rationale
+IS,17.24137931034483,10.0,30.0,Lower bound 10% — gate is materially active; below this the threshold is effectively off and the iteration is a knob tweak in disguise. Upper bound 30% — gate is not over-killing; above this we starve the cohort of OOS samples and F8 OOS-trade-count band may breach.
+OOS_PROJECTED,17.391304347826086,5.0,35.0,"Wider band — OOS Optuna trajectory in /019 will differ from baseline's, so the roster shifts. Lower 5% admits regimes with few large BTC moves; upper 35% triggers F8 breach if OOS gated trade count < 25."

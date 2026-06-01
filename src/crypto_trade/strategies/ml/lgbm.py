@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime
+from collections.abc import Callable
 from pathlib import Path
 
 import numpy as np
@@ -16,6 +17,9 @@ from crypto_trade.strategies.ml.labeling import compute_sample_uniqueness, label
 from crypto_trade.strategies.ml.optimization import (
     classes_to_labels,
     optimize_and_train,
+)
+from crypto_trade.strategies.ml.sample_weighting import (
+    compute_composite_inv_concurrency_weights,
 )
 from crypto_trade.strategies.ml.walk_forward import (
     MonthSplit,
@@ -172,6 +176,21 @@ class LightGbmStrategy:
         label_mode: str = "triple_barrier",
         trend_scan_grid: tuple[int, ...] = (5, 8, 13, 21),
         bounds_profile: str = "default",
+        sigma_source: str = "natr",
+        sigma_k_tp: float | None = None,
+        sigma_k_sl: float | None = None,
+        sigma_halflife_candles: int = 42,
+        sample_weight_mode: str = "abs_pnl",
+        params_persist_path: Path | None = None,
+        model_role: str = "",
+        symbol: str = "",
+        data_filter_callback: Callable[[pd.DataFrame], np.ndarray] | None = None,
+        data_filter_columns: list[str] | None = None,
+        nan_skip_columns: list[str] | None = None,
+        nan_skip_threshold: float = 0.5,
+        frozen_hp_parquet: Path | None = None,
+        optuna_objective: str = "sharpe",
+        min_child_samples_lower_bound: int | None = None,
     ) -> None:
         if not feature_columns:
             raise ValueError(
@@ -210,6 +229,54 @@ class LightGbmStrategy:
         self.ood_cutoff_pct = ood_cutoff_pct
         # iter-v3/003: path for per-trial OOF return persistence (sub-fix 1c)
         self._oof_persist_path: Path | None = oof_persist_path
+        # iter-v1/021: path for Optuna best_params persistence (pool-anchor H1 diagnostic)
+        self._params_persist_path: Path | None = params_persist_path
+        # iter-v1/021: model role string embedded in params parquet rows
+        # (e.g. "Model_A_pool", "Model_H_BTC"). Runner sets this when constructing strategy.
+        self._model_role: str = model_role
+        # iter-v1/021: symbol descriptor embedded in params parquet rows
+        # For pooled models (A), caller passes e.g. "BTC+ETH"; for single-cohort
+        # models (H), caller passes the single symbol (e.g. "BTCUSDT").
+        self._symbol: str = symbol
+        # iter-v1/024: optional training-data partition callback.
+        # Callable[[pd.DataFrame], np.ndarray] — receives a DataFrame whose
+        # columns include at minimum the kline columns from master PLUS any
+        # columns listed in data_filter_columns (loaded from parquet and merged
+        # before calling the callback).  Applied BEFORE labeling in
+        # _train_for_month().  Default None = no filter (backward-compatible;
+        # bit-identical to all pre-/024 runs).
+        self._data_filter_callback: Callable[[pd.DataFrame], np.ndarray] | None = (
+            data_filter_callback
+        )
+        # iter-v1/024: list of feature-parquet columns that must be present in
+        # the DataFrame passed to data_filter_callback.  When non-empty, these
+        # columns are loaded from parquet (via lookup_features) and left-joined
+        # onto the master slice before calling the callback.  Required because
+        # self._master is built from kline CSVs only and does NOT contain
+        # feature columns such as funding_rate_zscore_30.
+        self._data_filter_columns: list[str] | None = (
+            list(data_filter_columns) if data_filter_columns else None
+        )
+        # iter-v1/025: per-(symbol, month) NaN-fraction skip guard.
+        # When set, any symbol whose training-fold slice has > nan_skip_threshold
+        # fraction of NaN values in ANY of the listed columns is excluded from
+        # that month's training fold.  Default None = no guard (backward-compat).
+        # Implements LM Master §5(a) ADOPTED recommendation for oi_delta_30_z90.
+        self._nan_skip_columns: list[str] | None = (
+            list(nan_skip_columns) if nan_skip_columns else None
+        )
+        self._nan_skip_threshold: float = float(nan_skip_threshold)
+        # Accumulates per-(symbol, month) NaN-fraction rows for oi_coverage_check.csv.
+        # Keys: symbol, month, column, nan_fraction, skipped.
+        self._nan_skip_log: list[dict] = []
+        # iter-v1/032: frozen HP parquet path for basin-lottery ablation.
+        # When set, Optuna search is SKIPPED entirely. Per (model, month, inner_seed)
+        # the pre-extracted best hyperparameters from the baseline run are used to
+        # train LightGBM directly. Only sample_weight_mode varies vs the baseline.
+        # None = normal Optuna search (default, backward-compatible).
+        self._frozen_hp_parquet: Path | None = frozen_hp_parquet
+        # Cached DataFrame (loaded once on first _train_for_month call).
+        self._frozen_hp_df: pd.DataFrame | None = None
         # iter-v3/007: fast exploration mode (colsample fixed at 1.0 in optimization.py)
         self._fast_mode: bool = fast_mode
         # iter-v1/002: Optuna hyperparameter bounds profile.
@@ -217,6 +284,19 @@ class LightGbmStrategy:
         # "v1_pruned" = tighter bounds for 40-feature pruned set per LM Master
         # Phase 4.5 Recs #1–3. Forwarded to optimization.optimize_and_train.
         self._bounds_profile: str = bounds_profile
+        # iter-v1/037: Optuna study objective metric.
+        # "sharpe" (default) = mean/std — BIT-IDENTICAL to all pre-/037 callers.
+        # "sortino" = mean/downside_std — loss-function axis (NEW 12th family).
+        if optuna_objective not in ("sharpe", "sortino"):
+            raise ValueError(
+                f"optuna_objective must be 'sharpe' or 'sortino'; got {optuna_objective!r}"
+            )
+        self._optuna_objective: str = optuna_objective
+        # iter-v1/041: Optuna min_child_samples lower bound override.
+        # None = BIT-IDENTICAL to prior behaviour (20 for v1_pruned, 5 for default).
+        # Set to 50 for iter-v1/041 triple-barrier tighten (denser-label noise mitigation:
+        # larger leaf populations average out per-leaf noise from shorter-horizon labels).
+        self._min_child_samples_lower_bound: int | None = min_child_samples_lower_bound
         # iter-v3/072: labeling mode — "triple_barrier" (default, backward-compat)
         # or "fixed_horizon" (sign of N-candle-forward return; no barriers).
         # iter-v3/105: "trend_scanning" (OLS trend, max-|t| horizon selection
@@ -224,6 +304,38 @@ class LightGbmStrategy:
         # grid is inert (backward-compatible for v1/v2 and all existing callers).
         self.label_mode: str = label_mode
         self.trend_scan_grid: tuple[int, ...] = tuple(trend_scan_grid)
+        # iter-v1/014: σ_t-scaled barrier labeling source.
+        # sigma_source = "natr" (default) → existing NATR_21×atr_mult path (BIT-IDENTICAL).
+        # sigma_source = "ewma14d" → past-only EWMA σ_t barriers at sigma_halflife_candles.
+        # When "ewma14d", sigma_k_tp and sigma_k_sl MUST be provided.
+        # BARRIER-SOURCE CONSISTENCY: when "ewma14d", BOTH label-time barriers (in
+        # label_trades via sigma_values) AND execution-time barriers (atr_tp_multiplier /
+        # atr_sl_multiplier plumbed through BacktestConfig) SHOULD use σ_t-scaled values.
+        # The runner achieves execution-side consistency by passing the same effective
+        # k values via the BacktestConfig stop_loss_pct / take_profit_pct path (runner
+        # responsibility per Section 10.1 RESOLUTION in iter-v1/014 brief).
+        if sigma_source not in ("natr", "ewma14d"):
+            raise ValueError(f"sigma_source must be 'natr' or 'ewma14d'; got {sigma_source!r}")
+        if sigma_source == "ewma14d" and (sigma_k_tp is None or sigma_k_sl is None):
+            raise ValueError(
+                "sigma_k_tp and sigma_k_sl must be provided when sigma_source='ewma14d'"
+            )
+        self.sigma_source: str = sigma_source
+        self.sigma_k_tp: float | None = sigma_k_tp
+        self.sigma_k_sl: float | None = sigma_k_sl
+        self.sigma_halflife_candles: int = int(sigma_halflife_candles)
+        # iter-v1/016: sample-weighting axis — controls per-row weight assignment.
+        # "abs_pnl"        (default) — BIT-IDENTICAL to baseline; keeps label_trades output.
+        # "uniform"        — replaces train_weights with np.ones(n); Kish n_eff = 1.000.
+        # "uniqueness_only" — replaces train_weights with raw compute_sample_uniqueness output
+        #                     (NOT multiplied by abs_pnl — the prior multiply was a near-no-op
+        #                     per EDA Section 2.5: Spearman 0.997 after multiply).
+        _valid_modes = {"abs_pnl", "uniform", "uniqueness_only", "composite_inv_concurrency"}
+        if sample_weight_mode not in _valid_modes:
+            raise ValueError(
+                f"sample_weight_mode must be one of {_valid_modes}; got {sample_weight_mode!r}"
+            )
+        self.sample_weight_mode: str = sample_weight_mode
         # iter-v3/067 Path D: universal inference-time confidence-threshold floor.
         # Default 0.0 = no floor (backward-compatible). Pass 0.60 to raise the bar
         # for marginal-confidence trades (brief Section 3 Sub-fix 2).
@@ -235,6 +347,23 @@ class LightGbmStrategy:
         self._ood_cutoff: float | None = None
         self._ood_feature_cols: list[str] = []
         self._month_ood_features: dict[tuple[str, int], np.ndarray] = {}
+
+        # iter-v1/016: F-AXIS-MECHANISM logging buffer.
+        # Each _train_for_month call appends one dict per (model_tag, month) cell with
+        # Kish n_eff ratio, per-symbol weight share (Model A only), and timeout_fallback_share.
+        # The runner reads strategy._faxm_log after backtest completion and writes the CSV.
+        # Empty list when sample_weight_mode="abs_pnl" (default) to avoid noise in baseline.
+        self._faxm_log: list[dict] = []
+
+        # iter-v1/021 BLOCK-PENDING-FIX H2: per-month feature importance log.
+        # _train_for_month resets self._models = [] at each month start, so
+        # post-dispatch reads of _models capture stale/empty state for models
+        # that finish their last walk-forward month before the others.  This log
+        # accumulates {train_month: str, mean_gain: dict[feat -> float]} across
+        # ALL walk-forward months, making _write_feature_importance stale-safe.
+        # Initialized to empty; populated unconditionally in _train_for_month
+        # whenever self._models is non-empty after the ensemble loop.
+        self._per_month_fi_log: list[dict] = []
 
         # Set during compute_features
         self._master: pd.DataFrame | None = None
@@ -254,8 +383,15 @@ class LightGbmStrategy:
         self._month_features: dict[tuple[str, int], np.ndarray] = {}
         # ATR cache for dynamic barriers
         self._month_natr: dict[tuple[str, int], float] = {}
+        # iter-v1/015 C1 FIX: σ_t cache for execution-time barriers (ewma14d path).
+        # Populated in _train_for_month() when sigma_source="ewma14d", mirroring
+        # _month_natr.  Key = (symbol, open_time_ms) of test-month-first-candle.
+        self._month_sigma: dict[tuple[str, int], float] = {}
         # Per-row ATR values for dynamic labeling (price units)
         self._label_atr_values: np.ndarray | None = None
+        # iter-v1/014: per-row past-only EWMA σ_t values for σ_t-scaled labeling.
+        # Populated in compute_features() when sigma_source="ewma14d".
+        self._label_sigma_values: np.ndarray | None = None
 
     def compute_features(self, master: pd.DataFrame) -> None:
         """Lightweight setup: store master and generate splits. No training."""
@@ -302,6 +438,24 @@ class LightGbmStrategy:
         else:
             self._label_atr_values = None
 
+        # iter-v1/014: σ_t-scaled barriers — load past-only EWMA σ_t per row.
+        # _load_sigma_for_master applies .shift(1) INSIDE the method to guarantee
+        # strict past-only (no future return leaks into labeling). See A2 guard.
+        if self.sigma_source == "ewma14d":
+            self._label_sigma_values = self._load_sigma_for_master()
+            if self.verbose > 0:
+                valid = ~np.isnan(self._label_sigma_values)
+                p10 = float(np.nanpercentile(self._label_sigma_values, 10))
+                p50 = float(np.nanpercentile(self._label_sigma_values, 50))
+                p90 = float(np.nanpercentile(self._label_sigma_values, 90))
+                print(
+                    f"[lgbm] σ_t labeling (ewma14d halflife={self.sigma_halflife_candles}c): "
+                    f"{valid.sum()}/{len(self._label_sigma_values)} rows valid | "
+                    f"p10={p10:.5f} p50={p50:.5f} p90={p90:.5f}"
+                )
+        else:
+            self._label_sigma_values = None
+
     def _load_atr_for_master(self) -> np.ndarray:
         """Load per-candle ATR values (price units) aligned with master rows."""
         from pathlib import Path
@@ -337,6 +491,53 @@ class LightGbmStrategy:
 
         return atr_values
 
+    def _load_sigma_for_master(self) -> np.ndarray:
+        """Load per-candle past-only EWMA σ_t values aligned with master rows.
+
+        iter-v1/014 — A2 anti-pattern guard (forward-window σ_t):
+
+        The EWMA standard deviation is computed from close-to-close log-returns
+        using ``pd.Series.ewm(halflife=N, adjust=False).std()``. CRITICALLY, the
+        result is then **shifted forward by 1 candle** via ``.shift(1)`` so that
+        sigma_t[i] contains only information from returns[0..i-1] — i.e. strictly
+        past data. Without this shift, sigma_t[i] would incorporate return[i] (the
+        current candle's return) into the barrier distance used to label candle i,
+        creating look-ahead bias in the training labels.
+
+        This shift is the MANDATORY past-only safety guard. Any reader modifying
+        this method MUST preserve the ``.shift(1)`` call. The test suite in
+        ``tests/test_iteration_v1_014_sigma_t.py::test_sigma_t_is_past_only``
+        verifies this property numerically.
+        """
+        assert self._master is not None, "_load_sigma_for_master called before compute_features"
+        n = len(self._master)
+        sigma_values = np.full(n, np.nan, dtype=np.float64)
+
+        for sym in np.unique(self._sym_arr):
+            sym_mask = self._sym_arr == sym
+            sym_indices = np.where(sym_mask)[0]
+
+            # Extract close prices for this symbol in master row order
+            close_sym = self._master["close"].values[sym_indices].astype(np.float64)
+
+            if len(close_sym) < 2:
+                continue
+
+            # Log-returns: ret[i] = log(close[i] / close[i-1])
+            # ret[0] is NaN (no prior close for the first row)
+            log_ret = pd.Series(np.log(close_sym / np.roll(close_sym, 1)))
+            log_ret.iloc[0] = np.nan
+
+            # Past-only EWMA std: halflife in candles.
+            # MANDATORY .shift(1): sigma at position i = std of returns[0..i-1].
+            # DO NOT REMOVE .shift(1) — it is the A2 lookahead-safety guard.
+            ewma_std = log_ret.ewm(halflife=self.sigma_halflife_candles, adjust=False).std()
+            ewma_std_shifted = ewma_std.shift(1)  # A2 GUARD — past-only
+
+            sigma_values[sym_indices] = ewma_std_shifted.to_numpy(dtype=np.float64)
+
+        return sigma_values
+
     def _train_for_month(self, month_str: str) -> None:
         """Train a model for the given month. Called lazily from get_signal."""
         self._model = None
@@ -367,6 +568,53 @@ class LightGbmStrategy:
             (self._open_time_arr >= split.train_start_ms)
             & (self._open_time_arr < split.train_end_ms)
         )[0]
+
+        # iter-v1/024: apply regime-partition filter (data_filter_callback).
+        # The callback receives a DataFrame slice that includes all kline columns
+        # from master PLUS any columns listed in _data_filter_columns (loaded
+        # from parquet and merged by open_time+symbol key before calling the
+        # callback).  Applied BEFORE labeling so the sub-model sees only its
+        # regime's training rows.
+        # Default None → no filter; backward-compatible (bit-identical to pre-/024).
+        if self._data_filter_callback is not None and len(train_indices) > 0:
+            _master_slice = self._master.iloc[train_indices].copy()
+
+            # Enrich the slice with parquet columns needed by the filter.
+            # _data_filter_columns is set when the filter reads columns NOT in
+            # the kline-only master (e.g. funding_rate_zscore_30).
+            if self._data_filter_columns:
+                _filter_lookups = [
+                    (str(self._sym_arr[i]), int(self._open_time_arr[i])) for i in train_indices
+                ]
+                _filter_feat_df = lookup_features(
+                    _filter_lookups,
+                    self.features_dir,
+                    self._interval,
+                    columns=self._data_filter_columns,
+                )
+                if not _filter_feat_df.empty:
+                    # left-join on open_time + symbol so kline rows without a
+                    # parquet match get NaN (the filter's NaN → normal fallback
+                    # handles them correctly).
+                    _filter_feat_df = _filter_feat_df.rename(columns={"open_time": "__ot__"})
+                    _master_slice = _master_slice.assign(__ot__=_master_slice["open_time"])
+                    # Add symbol column to filter feat df for the merge key
+                    if "symbol" not in _filter_feat_df.columns:
+                        pass  # lookup_features already adds symbol
+                    _master_slice = _master_slice.merge(
+                        _filter_feat_df,
+                        on=["__ot__", "symbol"],
+                        how="left",
+                    ).drop(columns=["__ot__"])
+
+            _filter_mask = self._data_filter_callback(_master_slice)
+            train_indices = train_indices[_filter_mask]
+            if self.verbose > 0:
+                print(
+                    f"  [data_filter] Partition: {len(train_indices)} rows after filter "
+                    f"(from full window)"
+                )
+
         if len(train_indices) < 10:
             if self.verbose > 0:
                 print(f"  Skipping {month_str}: only {len(train_indices)} train samples")
@@ -384,16 +632,29 @@ class LightGbmStrategy:
             print(f"  Samples per month: {', '.join(dist_parts)}")
 
         # (b) Label all training samples (with fee-aware returns)
-        # When use_atr_labeling is enabled, pass per-candle ATR values so
-        # labeling barriers scale with each symbol's volatility.
-        if self._label_atr_values is not None:
+        # iter-v1/014: σ_t-scaled barriers TAKE PRIORITY when sigma_source="ewma14d".
+        # Otherwise fall through to existing ATR or fixed-percentage paths.
+        # Both label-time AND execution-time barriers use σ_t when ewma14d (runner
+        # responsibility per Section 10.1 RESOLUTION in iter-v1/014 brief).
+        if self._label_sigma_values is not None:
+            # σ_t-scaled path (iter-v1/014): atr_values is NOT passed.
+            # tp_pct / sl_pct are ignored; barrier distances computed inside
+            # label_trades via sigma_values × sigma_k_tp/sl × entry.
+            label_tp = self.label_tp_pct  # used as dummy; not evaluated in sigma path
+            label_sl = self.label_sl_pct
+            label_atr = None
+            label_sigma = self._label_sigma_values
+        elif self._label_atr_values is not None:
+            # Existing ATR path: tp_pct / sl_pct are ATR multipliers.
             label_tp = self.atr_tp_multiplier
             label_sl = self.atr_sl_multiplier or self.atr_tp_multiplier / 2.0
             label_atr = self._label_atr_values
+            label_sigma = None
         else:
             label_tp = self.label_tp_pct
             label_sl = self.label_sl_pct
             label_atr = None
+            label_sigma = None
         train_labels, train_weights, long_pnls, short_pnls = label_trades(
             self._master,
             train_indices,
@@ -402,13 +663,74 @@ class LightGbmStrategy:
             self.label_timeout_minutes,
             fee_pct=self.fee_pct,
             atr_values=label_atr,
+            sigma_values=label_sigma,
+            sigma_k_tp=self.sigma_k_tp if label_sigma is not None else None,
+            sigma_k_sl=self.sigma_k_sl if label_sigma is not None else None,
             verbose=self.verbose,
             neutral_threshold_pct=self.neutral_threshold_pct,
             label_mode=self.label_mode,
             trend_scan_grid=self.trend_scan_grid,
+            interval_minutes=_interval_to_minutes(self._interval),  # iter-v1/015 C1 FIX
         )
 
         ternary = self.neutral_threshold_pct is not None
+
+        # (b1.5) iter-v1/016: sample_weight_mode axis — REPLACES abs_pnl weights when mode
+        # is "uniform" or "uniqueness_only".  Must execute BEFORE the legacy sample_uniqueness
+        # multiplier block (b2) below so that modes are independent, not composed.
+        # "abs_pnl" (default) keeps train_weights exactly as returned by label_trades.
+        if self.sample_weight_mode == "uniform":
+            train_weights = np.ones(len(train_weights), dtype=np.float64)
+            if self.verbose > 0:
+                print("  [sample_weight_mode=uniform] weights replaced with np.ones(n)")
+        elif self.sample_weight_mode == "uniqueness_only":
+            uniq_replace = compute_sample_uniqueness(
+                train_indices,
+                self.label_timeout_minutes,
+                self._open_time_arr,
+                self._sym_arr,
+            )
+            train_weights = uniq_replace.astype(np.float64)
+            if self.verbose > 0:
+                print(
+                    f"  [sample_weight_mode=uniqueness_only] weights replaced with raw "
+                    f"uniqueness: min={uniq_replace.min():.4f}, "
+                    f"mean={uniq_replace.mean():.4f}, max={uniq_replace.max():.4f}"
+                )
+        elif self.sample_weight_mode == "composite_inv_concurrency":
+            # iter-v1/031: inv_concurrency_only sample-weighting axis.
+            # weight_t = (1 / c_at_entry(t)) / mean(1/c_at_entry) per (symbol, training_window).
+            # c_at_entry(t) = count of label windows ACTIVE at bar t (past-only; no future
+            # contamination). Mean-renormalized so each symbol's weights sum to N_sym.
+            # F-AXIS #1 wiring print: emitted ONCE per (model, month) cell at this site —
+            # BEFORE the ensemble seed loop so the print fires once per cell (not 5× per seed).
+            _interval_minutes = _interval_to_minutes(self._interval)
+            _interval_ms = _interval_minutes * 60_000
+            _label_timeout_bars = self.label_timeout_minutes // _interval_minutes
+            # Build boolean train_mask aligned with master frame
+            _n_master = len(self._open_time_arr)
+            _train_mask = np.zeros(_n_master, dtype=bool)
+            _train_mask[train_indices] = True
+            _inv_conc_weights = compute_composite_inv_concurrency_weights(
+                self._open_time_arr,
+                self._sym_arr,
+                _train_mask,
+                _label_timeout_bars,
+                _interval_ms,
+            )
+            _w_mean = float(_inv_conc_weights.mean())
+            _w_std = float(_inv_conc_weights.std())
+            _n_w = len(_inv_conc_weights)
+            _kish_n_eff_conc = float((_inv_conc_weights.sum()) ** 2 / (_inv_conc_weights**2).sum())
+            _kish_conc = _kish_n_eff_conc / _n_w if _n_w > 0 else 0.0
+            print(
+                f"  [sample_weight_mode=composite_inv_concurrency] "
+                f"cell=({self._model_role or 'model'}, {month_str}) "
+                f"weight_mean={_w_mean:.4f} weight_std={_w_std:.4f} "
+                f"kish={_kish_conc:.4f}"
+            )
+            train_weights = _inv_conc_weights
+        # "abs_pnl" — no change; label_trades output already in train_weights
 
         # (b2) Apply sample uniqueness weighting (AFML Ch. 4)
         if self.sample_uniqueness:
@@ -440,6 +762,39 @@ class LightGbmStrategy:
                     f"min={decay.min():.3f}, mean={decay.mean():.3f}, "
                     f"max={decay.max():.3f}"
                 )
+
+        # (b4) iter-v1/016: F-AXIS-MECHANISM cell logging.
+        # Log Kish n_eff ratio, per-symbol weight share (pooled models), and
+        # timeout_fallback_share for the F-AXIS-MECHANISM compound falsifier.
+        # Only appends when sample_weight_mode != "abs_pnl" (active axis run).
+        if self.sample_weight_mode != "abs_pnl":
+            _w = train_weights
+            _kish_n_eff = float((_w.sum()) ** 2 / (_w**2).sum()) if _w.sum() > 0 else 0.0
+            _n_actual = len(_w)
+            _kish_ratio = _kish_n_eff / _n_actual if _n_actual > 0 else 0.0
+            # Per-symbol weight share (for pooled model-A BTC+ETH attribution).
+            _syms_in_cell = self._sym_arr[train_indices]
+            _unique_syms = sorted(set(_syms_in_cell))
+            _per_sym_share: dict[str, float] = {}
+            _total_w = float(_w.sum())
+            for _s in _unique_syms:
+                _mask = _syms_in_cell == _s
+                _per_sym_share[_s] = float(_w[_mask].sum()) / _total_w if _total_w > 0 else 0.0
+            # Timeout fallback share (labels == 0 in triple-barrier = timeout class).
+            # Neutral labels from neutral_threshold_pct are also 0 — safe approximation
+            # since /016 uses binary labels (neutral_threshold_pct=None).
+            _timeout_share = float((train_labels == 0).mean())
+            _cell: dict = {
+                "month": month_str,
+                "n_actual": _n_actual,
+                "kish_n_eff": round(_kish_n_eff, 2),
+                "kish_ratio": round(_kish_ratio, 4),
+                "timeout_fallback_share": round(_timeout_share, 4),
+                "weight_mode": self.sample_weight_mode,
+            }
+            for _s, _share in _per_sym_share.items():
+                _cell[f"weight_share_{_s}"] = round(_share, 4)
+            self._faxm_log.append(_cell)
 
         if self.verbose > 0:
             n_long = int((train_labels == 1).sum())
@@ -481,6 +836,60 @@ class LightGbmStrategy:
         short_pnls = short_pnls[keep_mask]
         train_open_times = self._open_time_arr[train_indices][keep_mask]
 
+        # iter-v1/025: per-(symbol, month) NaN-fraction skip guard (LM Master §5(a) ADOPTED).
+        # For each symbol in train_feat_df, if ANY nan_skip_columns column has >nan_skip_threshold
+        # fraction of NaN values, that symbol's rows are excluded from this month's fold.
+        # Backward-compat: _nan_skip_columns=None skips this block entirely.
+        if self._nan_skip_columns:
+            _skip_syms: set[str] = set()
+            _check_cols = [c for c in self._nan_skip_columns if c in train_feat_df.columns]
+            if _check_cols and "symbol" in train_feat_df.columns:
+                for _sym_name, _sym_group in train_feat_df.groupby("symbol"):
+                    for _col in _check_cols:
+                        _nan_frac = float(_sym_group[_col].isna().mean())
+                        _skipped = _nan_frac > self._nan_skip_threshold
+                        self._nan_skip_log.append(
+                            {
+                                "symbol": str(_sym_name),
+                                "month": month_str,
+                                "column": _col,
+                                "nan_fraction": round(_nan_frac, 4),
+                                "skipped": _skipped,
+                            }
+                        )
+                        if _skipped:
+                            _skip_syms.add(str(_sym_name))
+            if _skip_syms:
+                if self.verbose > 0:
+                    print(
+                        f"  [nan_skip] Excluding symbols with >{self._nan_skip_threshold:.0%} "
+                        f"NaN in {self._nan_skip_columns}: {sorted(_skip_syms)}"
+                    )
+                # Build mask: keep only rows whose symbol is NOT in _skip_syms.
+                # train_feat_df is aligned to train_indices after keep_mask.
+                _has_sym = "symbol" in train_feat_df.columns
+                _sym_col = train_feat_df["symbol"].values if _has_sym else None
+                if _sym_col is not None:
+                    _sym_keep = np.array([str(s) not in _skip_syms for s in _sym_col])
+                    train_feat_df = train_feat_df[_sym_keep].reset_index(drop=True)
+                    train_labels = train_labels[_sym_keep]
+                    train_weights = train_weights[_sym_keep]
+                    long_pnls = long_pnls[_sym_keep]
+                    short_pnls = short_pnls[_sym_keep]
+                    train_open_times = train_open_times[_sym_keep]
+                    if self.verbose > 0:
+                        print(
+                            f"  [nan_skip] {len(train_feat_df)} rows remain after "
+                            f"excluding {len(_skip_syms)} symbol(s)"
+                        )
+                    if len(train_feat_df) < 10:
+                        if self.verbose > 0:
+                            print(
+                                f"  Skipping {month_str}: only {len(train_feat_df)} rows "
+                                "after nan_skip exclusion"
+                            )
+                        return
+
         available_feat_cols = [c for c in self._all_feature_cols if c in train_feat_df.columns]
         feat_train = train_feat_df[available_feat_cols].values
 
@@ -515,31 +924,93 @@ class LightGbmStrategy:
         # symbols_arr aligns with feat_train rows (after keep_mask filtering)
         train_symbols_arr = self._sym_arr[train_indices][keep_mask]
 
+        # iter-v1/032: lazy-load frozen HP DataFrame on first call.
+        if self._frozen_hp_parquet is not None and self._frozen_hp_df is None:
+            self._frozen_hp_df = pd.read_parquet(self._frozen_hp_parquet)
+            if self.verbose > 0:
+                print(
+                    f"  [frozen_hp] Loaded {len(self._frozen_hp_df)} rows from "
+                    f"{self._frozen_hp_parquet}"
+                )
+
         for i, seed in enumerate(seeds):
             if self.verbose > 0 and len(seeds) > 1:
                 print(f"  [ensemble {i + 1}/{len(seeds)}] seed={seed}")
             try:
-                model, selected_cols, confidence_threshold = optimize_and_train(
-                    feat_train,
-                    train_labels,
-                    available_feat_cols,
-                    long_pnls,
-                    short_pnls,
-                    self.n_trials,
-                    self.cv_splits,
-                    seed,
-                    self.verbose,
-                    sample_weights=train_weights,
-                    open_times=train_open_times,
-                    train_end_ms=split.train_end_ms,
-                    ternary=ternary,
-                    cv_gap=cv_gap,
-                    oof_persist_path=self._oof_persist_path,
-                    train_month=month_str,
-                    symbols_arr=train_symbols_arr,
-                    fast_mode=self._fast_mode,
-                    bounds_profile=self._bounds_profile,
-                )
+                # iter-v1/032: when frozen HP is enabled, skip Optuna and train
+                # directly with the baseline's best hyperparameters for this cell.
+                if self._frozen_hp_df is not None:
+                    _model_key = self._model_role  # e.g. "A", "C", "D", "E"
+                    _row_mask = (
+                        (self._frozen_hp_df["model"] == _model_key)
+                        & (self._frozen_hp_df["month"] == month_str)
+                        & (self._frozen_hp_df["inner_seed"] == seed)
+                    )
+                    _hp_rows = self._frozen_hp_df[_row_mask]
+                    if _hp_rows.empty:
+                        if self.verbose > 0:
+                            print(
+                                f"  [frozen_hp] WARNING: no baseline HP for model="
+                                f"{_model_key!r} month={month_str!r} seed={seed}; "
+                                f"skipping this seed"
+                            )
+                        continue
+                    _hp = _hp_rows.iloc[0]
+                    import lightgbm as lgb_direct
+
+                    _lgbm_params = {
+                        "n_estimators": int(_hp["n_estimators"]),
+                        "max_depth": int(_hp["max_depth"]),
+                        "num_leaves": int(_hp["num_leaves"]),
+                        "learning_rate": float(_hp["learning_rate"]),
+                        "subsample": float(_hp["subsample"]),
+                        "colsample_bytree": float(_hp["colsample_bytree"]),
+                        "min_child_samples": int(_hp["min_child_samples"]),
+                        "reg_alpha": float(_hp["reg_alpha"]),
+                        "reg_lambda": float(_hp["reg_lambda"]),
+                        "random_state": seed,
+                        "n_jobs": -1,
+                        "verbose": -1,
+                    }
+                    confidence_threshold = float(_hp["confidence_threshold"])
+                    _clf = lgb_direct.LGBMClassifier(**_lgbm_params)
+                    _clf.fit(feat_train, train_labels, sample_weight=train_weights)
+                    model = _clf
+                    selected_cols = available_feat_cols
+                    if self.verbose > 0:
+                        print(
+                            f"  [frozen_hp] Trained with baseline HP: "
+                            f"n_est={_lgbm_params['n_estimators']} "
+                            f"depth={_lgbm_params['max_depth']} "
+                            f"ct={confidence_threshold:.3f}"
+                        )
+                else:
+                    model, selected_cols, confidence_threshold = optimize_and_train(
+                        feat_train,
+                        train_labels,
+                        available_feat_cols,
+                        long_pnls,
+                        short_pnls,
+                        self.n_trials,
+                        self.cv_splits,
+                        seed,
+                        self.verbose,
+                        sample_weights=train_weights,
+                        open_times=train_open_times,
+                        train_end_ms=split.train_end_ms,
+                        ternary=ternary,
+                        cv_gap=cv_gap,
+                        oof_persist_path=self._oof_persist_path,
+                        train_month=month_str,
+                        symbols_arr=train_symbols_arr,
+                        fast_mode=self._fast_mode,
+                        bounds_profile=self._bounds_profile,
+                        params_persist_path=self._params_persist_path,
+                        model_role=self._model_role,
+                        symbol=self._symbol,
+                        optuna_objective=self._optuna_objective,
+                        min_child_samples_lower_bound=self._min_child_samples_lower_bound,
+                    )
                 self._models.append(model)
                 self._confidence_thresholds.append(confidence_threshold)
             except Exception as exc:
@@ -560,6 +1031,29 @@ class LightGbmStrategy:
         self._confidence_threshold = float(
             max(np.mean(self._confidence_thresholds), self._inference_threshold_floor)
         )
+
+        # iter-v1/021 BLOCK-PENDING-FIX H2: accumulate per-month mean gain per feature.
+        # Done here (after ensemble loop, before _models is reset next month) so
+        # _write_feature_importance can aggregate across months instead of reading
+        # stale post-dispatch _models.  Uses booster_.feature_importance('gain')
+        # matching the importance_type='gain' mandate in LM Master Phase 4.5 §4.
+        _fi_cols = list(self.feature_columns)
+        if _fi_cols and self._models:
+            _month_gains: dict[str, list[float]] = {c: [] for c in _fi_cols}
+            for _m in self._models:
+                _fi_arr: np.ndarray | None = None
+                if hasattr(_m, "booster_"):
+                    _fi_arr = _m.booster_.feature_importance(importance_type="gain")
+                elif hasattr(_m, "feature_importances_"):
+                    _fi_arr = _m.feature_importances_
+                if _fi_arr is not None:
+                    for _i, _c in enumerate(_fi_cols):
+                        if _i < len(_fi_arr):
+                            _month_gains[_c].append(float(_fi_arr[_i]))
+            _mean_gain: dict[str, float] = {
+                c: float(np.mean(v)) if v else 0.0 for c, v in _month_gains.items()
+            }
+            self._per_month_fi_log.append({"train_month": month_str, "mean_gain": _mean_gain})
 
         # (e) Batch-load test month features
         symbols = list(dict.fromkeys(self._sym_arr))
@@ -643,6 +1137,22 @@ class LightGbmStrategy:
             )
             for key, arr in natr_data.items():
                 self._month_natr[key] = float(arr[0])
+
+        # (g) iter-v1/015 C1 FIX: populate σ_t cache for execution-time barriers.
+        # When sigma_source="ewma14d", read _label_sigma_values for every candle
+        # in the test window and cache by (symbol, open_time_ms) — same key space
+        # as _month_natr so get_signal can look up per-candle sigma identically.
+        # This ensures execution-time barriers match label-time barriers (C1 FIX).
+        self._month_sigma = {}
+        if self.sigma_source == "ewma14d" and self._label_sigma_values is not None:
+            test_mask = (self._open_time_arr >= split.test_start_ms) & (
+                self._open_time_arr < split.test_end_ms
+            )
+            test_indices = np.where(test_mask)[0]
+            for idx in test_indices:
+                sym = str(self._sym_arr[idx])
+                ot = int(self._open_time_arr[idx])
+                self._month_sigma[(sym, ot)] = float(self._label_sigma_values[idx])
 
         if self.verbose > 0:
             print(
@@ -793,10 +1303,27 @@ class LightGbmStrategy:
             pred_class = int(np.argmax(proba))
             direction = int(classes_to_labels(np.array([pred_class]))[0])
 
-        # Compute dynamic TP/SL from ATR if configured
+        # Compute dynamic TP/SL: dispatch on sigma_source.
+        # - "natr" (default): BIT-IDENTICAL to pre-/015 behavior.
+        # - "ewma14d" (iter-v1/015 C1 FIX): σ_t × k × √timeout × 100 at execution-time,
+        #   matching the label-time formula.  Raises RuntimeError on NaN/missing σ_t
+        #   (per LM Master Phase 4.5 Rec #3 mandate — refuse silent NATR fallback).
         tp_pct = None
         sl_pct = None
-        if self.atr_tp_multiplier is not None:
+        if self.sigma_source == "ewma14d":
+            sigma = self._month_sigma.get(key)
+            if sigma is None or np.isnan(sigma):
+                raise RuntimeError(
+                    f"σ_t unavailable for {key}; refusing silent NATR fallback. "
+                    "Ensure _label_sigma_values is populated and the candle is in "
+                    "the test window.  (iter-v1/015 C1 FIX — LM Master Rec #3)"
+                )
+            interval_minutes = _interval_to_minutes(self._interval)
+            timeout_candles = self.label_timeout_minutes / interval_minutes
+            sqrt_timeout = float(np.sqrt(timeout_candles))
+            tp_pct = float(sigma * self.sigma_k_tp * sqrt_timeout * 100.0)
+            sl_pct = float(sigma * self.sigma_k_sl * sqrt_timeout * 100.0)
+        elif self.atr_tp_multiplier is not None:
             natr = self._month_natr.get(key)
             if natr is not None and natr > 0:
                 tp_pct = natr * self.atr_tp_multiplier
@@ -810,7 +1337,9 @@ class LightGbmStrategy:
             dir_label = "LONG" if direction == 1 else "SHORT"
             ts_str = _ms_to_datetime(open_time)
             atr_str = ""
-            if tp_pct is not None:
+            if tp_pct is not None and self.sigma_source == "ewma14d":
+                atr_str = f" σ_t-TP={tp_pct:.1f}%/σ_t-SL={sl_pct:.1f}%"
+            elif tp_pct is not None:
                 atr_str = f" TP={tp_pct:.1f}%/SL={sl_pct:.1f}%"
             self._last_predict_log = (
                 f"[predict] {ts_str} {symbol} → {dir_label} (proba={confidence:.2f}{atr_str})"

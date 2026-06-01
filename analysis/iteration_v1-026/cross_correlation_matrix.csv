@@ -1,0 +1,10 @@
+sample,pair,n_months,pearson,spearman
+in_sample,pool_x_LINK,38,+0.0601,+0.0901
+in_sample,pool_x_ETHgate,39,-0.0795,+0.0034
+in_sample,LINK_x_ETHgate,38,-0.2572,-0.2085
+out_of_sample,pool_x_LINK,15,+0.5260,+0.4893
+out_of_sample,pool_x_ETHgate,13,-0.1042,-0.1813
+out_of_sample,LINK_x_ETHgate,13,+0.1269,+0.2088
+combined,pool_x_LINK,53,+0.1904,+0.2049
+combined,pool_x_ETHgate,52,-0.0855,-0.0389
+combined,LINK_x_ETHgate,52,-0.1035,-0.0024

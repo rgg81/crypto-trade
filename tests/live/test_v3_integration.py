@@ -37,11 +37,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
 from crypto_trade.backtest import evaluate_order_with_no_confirm
-from crypto_trade.backtest_models import Order, TradeResult
-
+from crypto_trade.backtest_models import Order
 
 # ----- Phase 1: V3_BASELINE_MODELS configuration -----
 
@@ -131,10 +128,10 @@ def test_v3_baseline_risk_wrapper_value() -> None:
 
 def test_clear_btc_cache_v3_resets_to_none() -> None:
     """clear_btc_cache_v3() sets _BTC_CACHE_V3 back to None."""
-    import crypto_trade.features_v3.cross_btc_v3 as cb
-
     # Prime the cache with a placeholder DataFrame
     import pandas as pd
+
+    import crypto_trade.features_v3.cross_btc_v3 as cb
 
     cb._BTC_CACHE_V3 = pd.DataFrame({"open_time": [1, 2, 3]})
     assert cb._BTC_CACHE_V3 is not None
@@ -144,8 +141,9 @@ def test_clear_btc_cache_v3_resets_to_none() -> None:
 
 def test_clear_eth_cache_v3_resets_to_none() -> None:
     """clear_eth_cache_v3() sets _ETH_CACHE_V3 back to None."""
-    import crypto_trade.features_v3.cross_btc_v3 as cb
     import pandas as pd
+
+    import crypto_trade.features_v3.cross_btc_v3 as cb
 
     cb._ETH_CACHE_V3 = pd.DataFrame({"open_time": [1, 2, 3]})
     assert cb._ETH_CACHE_V3 is not None
@@ -209,7 +207,7 @@ def test_engine_refresh_groups_emits_v3_track() -> None:
     model and assert ``_refresh_groups`` produces a ('v3', ...) tuple.
     """
     from crypto_trade.live.engine import LiveEngine
-    from crypto_trade.live.models import LiveConfig, V3_BASELINE_MODELS
+    from crypto_trade.live.models import V3_BASELINE_MODELS, LiveConfig
 
     bch_only = tuple(m for m in V3_BASELINE_MODELS if m.symbols == ("BCHUSDT",))
     # Engine needs a BTC kline CSV for the init-time trend-filter sanity check.
@@ -277,7 +275,7 @@ def test_modelrunner_v3_wraps_inner_in_risk_v3_wrapper() -> None:
     wrapper class will, which IS the contract under test.
     """
     from crypto_trade.live.engine import ModelRunner
-    from crypto_trade.live.models import LiveConfig, V3_BASELINE_MODELS
+    from crypto_trade.live.models import V3_BASELINE_MODELS, LiveConfig
     from crypto_trade.strategies.ml.lgbm import LightGbmStrategy
     from crypto_trade.strategies.ml.risk_v3 import RiskV3Wrapper
 
@@ -324,7 +322,13 @@ def test_evaluate_no_confirm_disabled_falls_through_to_check_order() -> None:
     state: dict = {}
     # No SL/TP hit, no timeout — should return None
     result = evaluate_order_with_no_confirm(
-        order, 1000, 300.0, 301.0, 299.5, 300.5, 28_800_000,
+        order,
+        1000,
+        300.0,
+        301.0,
+        299.5,
+        300.5,
+        28_800_000,
         fee_pct=0.1,
         enable_no_confirm=False,
         no_confirm_state=state,
@@ -535,9 +539,17 @@ def test_check_no_confirm_exit_method_exists() -> None:
     sig = inspect.signature(OrderManager.check_no_confirm_exit)
     params = set(sig.parameters)
     expected = {
-        "self", "trade", "candle_high", "candle_low", "candle_close",
-        "candle_close_time", "no_confirm_trigger_atr", "no_confirm_k_candles",
-        "interval_ms", "no_confirm_state", "model_name",
+        "self",
+        "trade",
+        "candle_high",
+        "candle_low",
+        "candle_close",
+        "candle_close_time",
+        "no_confirm_trigger_atr",
+        "no_confirm_k_candles",
+        "interval_ms",
+        "no_confirm_state",
+        "model_name",
     }
     assert expected.issubset(params)
 
@@ -623,9 +635,7 @@ def test_cli_seed_live_db_has_v3_trades_flag() -> None:
 
     parser = build_parser()
     # Find seed-live-db subparser
-    subparsers = next(
-        a for a in parser._actions if a.__class__.__name__ == "_SubParsersAction"
-    )
+    subparsers = next(a for a in parser._actions if a.__class__.__name__ == "_SubParsersAction")
     seed_p = subparsers.choices["seed-live-db"]
     actions = {a.option_strings[0] if a.option_strings else a.dest for a in seed_p._actions}
     assert "--v3-trades" in actions
@@ -640,9 +650,7 @@ def test_cli_live_track_v3() -> None:
     from crypto_trade.main import build_parser
 
     parser = build_parser()
-    subparsers = next(
-        a for a in parser._actions if a.__class__.__name__ == "_SubParsersAction"
-    )
+    subparsers = next(a for a in parser._actions if a.__class__.__name__ == "_SubParsersAction")
     live_p = subparsers.choices["live"]
     track_action = next(a for a in live_p._actions if "--track" in a.option_strings)
     assert "v3" in track_action.choices

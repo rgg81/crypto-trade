@@ -1,0 +1,157 @@
+# iter-v1/011 — R5 BINARY KILL oracle EDA — 2026-05-25 03:43:13 UTC
+Universe: ('BTCUSDT', 'ETHUSDT', 'LINKUSDT', 'LTCUSDT', 'DOTUSDT')
+OOS_CUTOFF_MS: 1742774400000
+
+## Phase 1.1 — Per-symbol ENTRY-TIME NATR_14 distribution
+
+### BASELINE roster
+  roster half    symbol  n_trades     mean      p10      p25      p50      p75      p85      p90      p95      p99
+baseline   IS   BTCUSDT       113 2.284774 1.277298 1.697484 2.108488 2.663121 2.990025 3.227420 4.296423 6.727698
+baseline   IS   ETHUSDT       145 3.138396 1.925258 2.217015 2.817963 3.803830 4.254643 4.734636 5.651559 7.152896
+baseline   IS  LINKUSDT       146 4.013350 2.461741 2.962324 3.767347 4.593451 5.136622 5.534966 7.170648 9.938993
+baseline   IS   LTCUSDT       123 3.271325 2.120294 2.526370 3.003452 3.811288 4.191089 4.760234 5.395558 7.498805
+baseline   IS   DOTUSDT        93 3.371503 2.016646 2.405335 3.032631 3.924182 4.568957 5.361943 6.116181 7.184534
+baseline   IS PORTFOLIO       620 3.250192 1.805254 2.275250 2.958183 3.904482 4.450315 5.008405 5.758565 8.429775
+baseline  OOS   BTCUSDT        35 1.977396 1.475599 1.520197 1.953592 2.270053 2.428387 2.527677 2.854350 3.331095
+baseline  OOS   ETHUSDT        46 3.037768 2.012723 2.388949 2.822600 3.500758 3.877768 4.016674 4.261116 6.692732
+baseline  OOS  LINKUSDT        28 3.418652 2.399664 2.757839 3.223282 3.862211 4.523680 4.776700 5.376264 5.717665
+baseline  OOS   LTCUSDT        34 2.719233 1.683077 1.962438 2.657402 3.293193 3.727340 3.867600 4.228471 4.694414
+baseline  OOS   DOTUSDT        46 3.695699 2.730834 3.121552 3.425551 4.130230 4.382501 4.861034 5.450820 6.512578
+baseline  OOS PORTFOLIO       189 3.000659 1.712564 2.201822 2.892502 3.558564 4.014711 4.300318 4.923160 6.254616
+
+### /010 EXPLORATION roster
+roster half    symbol  n_trades     mean      p10      p25      p50      p75      p85      p90      p95       p99
+v1-010   IS   BTCUSDT       132 2.315499 1.412506 1.693373 2.090945 2.561527 3.097755 3.281327 3.859566  6.859243
+v1-010   IS   ETHUSDT       145 2.965051 1.668628 2.137963 2.711281 3.428416 3.962390 4.150844 5.041401  7.444109
+v1-010   IS  LINKUSDT       152 3.957668 2.557313 2.940764 3.709901 4.641262 5.085332 5.377287 5.708020 10.119158
+v1-010   IS   LTCUSDT       110 3.288707 2.017595 2.442310 2.922508 3.947319 4.357626 4.603365 5.413230  7.542355
+v1-010   IS   DOTUSDT       124 3.349597 2.017163 2.422791 2.992590 4.091890 4.574808 5.266320 5.760961  6.741382
+v1-010   IS PORTFOLIO       663 3.188916 1.715290 2.222200 2.904420 3.918166 4.390235 4.967047 5.569866  7.877552
+v1-010  OOS   BTCUSDT        38 1.894718 1.212075 1.495230 1.878365 2.377057 2.495129 2.623699 2.720659  2.881647
+v1-010  OOS   ETHUSDT        39 2.936148 1.965209 2.265944 2.707901 3.375704 3.798122 3.907269 4.354224  6.377109
+v1-010  OOS  LINKUSDT        48 3.664671 2.454350 2.884854 3.621936 4.347817 5.103878 5.364966 5.546559  5.778473
+v1-010  OOS   LTCUSDT        37 2.733381 1.694806 1.939781 2.739896 3.268329 3.827327 3.946648 4.460151  4.863154
+v1-010  OOS   DOTUSDT        48 3.485529 2.630604 2.863597 3.197436 4.070343 4.353626 4.689441 5.014817  5.642772
+v1-010  OOS PORTFOLIO       210 3.004065 1.675040 2.195407 2.876750 3.696334 4.100024 4.405211 5.069894  5.759702
+
+## Phase 1.2 — Per-symbol skip rate + PnL Δ at each threshold (BASELINE roster)
+  roster half    symbol  threshold_pct  n_trades_baseline  n_trades_kept  n_skipped  skip_rate  wpnl_baseline  wpnl_kept  wpnl_delta
+baseline   IS PORTFOLIO            5.5                620            579         41   0.066129        51.4530   -23.2605    -74.7135
+baseline   IS PORTFOLIO            6.0                620            594         26   0.041935        51.4530    12.9529    -38.5001
+baseline   IS PORTFOLIO            6.5                620            598         22   0.035484        51.4530     9.9599    -41.4931
+baseline   IS PORTFOLIO            7.0                620            603         17   0.027419        51.4530    13.3687    -38.0843
+baseline   IS PORTFOLIO            7.5                620            611          9   0.014516        51.4530     8.5589    -42.8941
+baseline   IS PORTFOLIO            8.0                620            612          8   0.012903        51.4530     8.4132    -43.0398
+baseline   IS PORTFOLIO            9.0                620            615          5   0.008065        51.4530    23.0653    -28.3877
+baseline  OOS PORTFOLIO            5.5                189            182          7   0.037037        38.1344    32.3732     -5.7612
+baseline  OOS PORTFOLIO            6.0                189            186          3   0.015873        38.1344    38.2397      0.1053
+baseline  OOS PORTFOLIO            6.5                189            187          2   0.010582        38.1344    38.4019      0.2675
+baseline  OOS PORTFOLIO            7.0                189            188          1   0.005291        38.1344    37.8607     -0.2737
+baseline  OOS PORTFOLIO            7.5                189            189          0   0.000000        38.1344    38.1344      0.0000
+baseline  OOS PORTFOLIO            8.0                189            189          0   0.000000        38.1344    38.1344      0.0000
+baseline  OOS PORTFOLIO            9.0                189            189          0   0.000000        38.1344    38.1344      0.0000
+
+## Phase 1.2b — Per-symbol skip rate + PnL Δ at each threshold (/010 roster)
+roster half    symbol  threshold_pct  n_trades_baseline  n_trades_kept  n_skipped  skip_rate  wpnl_baseline  wpnl_kept  wpnl_delta
+v1-010   IS PORTFOLIO            5.5                663            627         36   0.054299       132.7219   167.1025     34.3806
+v1-010   IS PORTFOLIO            6.0                663            640         23   0.034691       132.7219   163.0753     30.3534
+v1-010   IS PORTFOLIO            6.5                663            643         20   0.030166       132.7219   155.4913     22.7694
+v1-010   IS PORTFOLIO            7.0                663            652         11   0.016591       132.7219   153.6932     20.9713
+v1-010   IS PORTFOLIO            7.5                663            654          9   0.013575       132.7219   147.5787     14.8568
+v1-010   IS PORTFOLIO            8.0                663            657          6   0.009050       132.7219   147.9826     15.2607
+v1-010   IS PORTFOLIO            9.0                663            660          3   0.004525       132.7219   139.2709      6.5490
+v1-010  OOS PORTFOLIO            5.5                210            203          7   0.033333        34.9818    35.3550      0.3732
+v1-010  OOS PORTFOLIO            6.0                210            209          1   0.004762        34.9818    34.9262     -0.0556
+v1-010  OOS PORTFOLIO            6.5                210            209          1   0.004762        34.9818    34.9262     -0.0556
+v1-010  OOS PORTFOLIO            7.0                210            209          1   0.004762        34.9818    34.9262     -0.0556
+v1-010  OOS PORTFOLIO            7.5                210            210          0   0.000000        34.9818    34.9818      0.0000
+v1-010  OOS PORTFOLIO            8.0                210            210          0   0.000000        34.9818    34.9818      0.0000
+v1-010  OOS PORTFOLIO            9.0                210            210          0   0.000000        34.9818    34.9818      0.0000
+
+## Phase 1.3 — Oracle monthly Sharpe Δ by threshold (both rosters)
+### BASELINE roster
+  roster half  threshold_pct  n_trades_baseline  n_trades_kept  n_skipped  skip_rate  sharpe_baseline  sharpe_oracle  sharpe_delta  wpnl_total_baseline  wpnl_total_oracle
+baseline   IS            5.5                620            579         41   0.066129         0.091012      -0.051474     -0.142485              51.4530           -23.2605
+baseline   IS            6.0                620            594         26   0.041935         0.091012       0.025284     -0.065728              51.4530            12.9529
+baseline   IS            6.5                620            598         22   0.035484         0.091012       0.019624     -0.071388              51.4530             9.9599
+baseline   IS            7.0                620            603         17   0.027419         0.091012       0.026725     -0.064287              51.4530            13.3687
+baseline   IS            7.5                620            611          9   0.014516         0.091012       0.017217     -0.073795              51.4530             8.5589
+baseline   IS            8.0                620            612          8   0.012903         0.091012       0.016922     -0.074090              51.4530             8.4132
+baseline   IS            9.0                620            615          5   0.008065         0.091012       0.044080     -0.046931              51.4530            23.0653
+baseline  OOS            5.5                189            182          7   0.037037         0.170983       0.144473     -0.026510              38.1344            32.3732
+baseline  OOS            6.0                189            186          3   0.015873         0.170983       0.171257      0.000274              38.1344            38.2397
+baseline  OOS            6.5                189            187          2   0.010582         0.170983       0.171789      0.000806              38.1344            38.4019
+baseline  OOS            7.0                189            188          1   0.005291         0.170983       0.169646     -0.001337              38.1344            37.8607
+baseline  OOS            7.5                189            189          0   0.000000         0.170983       0.170983      0.000000              38.1344            38.1344
+baseline  OOS            8.0                189            189          0   0.000000         0.170983       0.170983      0.000000              38.1344            38.1344
+baseline  OOS            9.0                189            189          0   0.000000         0.170983       0.170983      0.000000              38.1344            38.1344
+
+### /010 EXPLORATION roster
+roster half  threshold_pct  n_trades_baseline  n_trades_kept  n_skipped  skip_rate  sharpe_baseline  sharpe_oracle  sharpe_delta  wpnl_total_baseline  wpnl_total_oracle
+v1-010   IS            5.5                663            627         36   0.054299         0.199211       0.243644      0.044433             132.7219           167.1025
+v1-010   IS            6.0                663            640         23   0.034691         0.199211       0.236731      0.037520             132.7219           163.0753
+v1-010   IS            6.5                663            643         20   0.030166         0.199211       0.226772      0.027561             132.7219           155.4913
+v1-010   IS            7.0                663            652         11   0.016591         0.199211       0.226005      0.026794             132.7219           153.6932
+v1-010   IS            7.5                663            654          9   0.013575         0.199211       0.219035      0.019824             132.7219           147.5787
+v1-010   IS            8.0                663            657          6   0.009050         0.199211       0.220098      0.020887             132.7219           147.9826
+v1-010   IS            9.0                663            660          3   0.004525         0.199211       0.208312      0.009101             132.7219           139.2709
+v1-010  OOS            5.5                210            203          7   0.033333         0.187563       0.190067      0.002504              34.9818            35.3550
+v1-010  OOS            6.0                210            209          1   0.004762         0.187563       0.187365     -0.000198              34.9818            34.9262
+v1-010  OOS            6.5                210            209          1   0.004762         0.187563       0.187365     -0.000198              34.9818            34.9262
+v1-010  OOS            7.0                210            209          1   0.004762         0.187563       0.187365     -0.000198              34.9818            34.9262
+v1-010  OOS            7.5                210            210          0   0.000000         0.187563       0.187563      0.000000              34.9818            34.9818
+v1-010  OOS            8.0                210            210          0   0.000000         0.187563       0.187563      0.000000              34.9818            34.9818
+v1-010  OOS            9.0                210            210          0   0.000000         0.187563       0.187563      0.000000              34.9818            34.9818
+
+## Phase 1.4 — Top-20 highest-NATR baseline trades (would be killed at low thresholds)
+### Top 5 by NATR — BASELINE OOS
+  roster half   symbol  direction     open_time exit_reason  natr_14  weight_factor  net_pnl_pct  weighted_pnl
+baseline  OOS  ETHUSDT          1 1744271999999     timeout 7.298548         1.0000       0.2737        0.2737
+baseline  OOS  DOTUSDT          1 1760543999999     timeout 6.782538         0.1089      -4.9695       -0.5412
+baseline  OOS  DOTUSDT         -1 1772438399999     timeout 6.182627         0.1089       1.4894        0.1622
+baseline  OOS  ETHUSDT          1 1770508799999     timeout 5.952291         1.0000      -0.1240       -0.1240
+baseline  OOS LINKUSDT         -1 1755763199999     timeout 5.791105         0.3300       5.6750        1.8727
+
+## Phase 1.5 — Exit-reason distribution by NATR bucket
+### BASELINE roster
+  roster half natr_bucket  n_trades       wr  mean_net_pnl_pct  sum_weighted_pnl  stop_loss_share  take_profit_share  timeout_share
+baseline   IS          <3       320 0.362500         -0.176566          -18.7890         0.593750           0.253125       0.153125
+baseline   IS         3-5       237 0.405063         -0.159110           -4.3092         0.523207           0.189873       0.286920
+baseline   IS         5-7        46 0.586957          2.140748           36.4669         0.326087           0.173913       0.500000
+baseline   IS         7-9        12 0.416667          0.997742            9.6966         0.333333           0.000000       0.666667
+baseline   IS          >9         5 0.600000          5.373860           28.3877         0.200000           0.200000       0.600000
+baseline  OOS          <3       104 0.317308         -0.413136            4.1299         0.634615           0.250000       0.105769
+baseline  OOS         3-5        75 0.466667          0.283548           14.1959         0.466667           0.173333       0.346667
+baseline  OOS         5-7         9 0.777778          5.144033           19.5349         0.000000           0.111111       0.888889
+baseline  OOS         7-9         1 1.000000          0.273700            0.2737         0.000000           0.000000       1.000000
+baseline  OOS          >9         0      NaN               NaN            0.0000              NaN                NaN            NaN
+
+### /010 EXPLORATION roster
+roster half natr_bucket  n_trades       wr  mean_net_pnl_pct  sum_weighted_pnl  stop_loss_share  take_profit_share  timeout_share
+v1-010   IS          <3       351 0.418803          0.241395           53.5120         0.544160           0.259259       0.196581
+v1-010   IS         3-5       249 0.397590          0.184070           79.4535         0.485944           0.224900       0.289157
+v1-010   IS         5-7        52 0.384615         -0.414650           20.7277         0.480769           0.173077       0.346154
+v1-010   IS         7-9         8 0.250000         -3.432613          -14.4223         0.375000           0.000000       0.625000
+v1-010   IS          >9         3 0.333333         -4.933133           -6.5490         0.333333           0.000000       0.666667
+v1-010  OOS          <3       120 0.416667          0.662238           43.9894         0.516667           0.300000       0.158333
+v1-010  OOS         3-5        77 0.467532          0.163651           -1.5851         0.454545           0.155844       0.389610
+v1-010  OOS         5-7        12 0.583333          0.642308           -7.4781         0.333333           0.083333       0.583333
+v1-010  OOS         7-9         1 1.000000          0.273700            0.0556         0.000000           0.000000       1.000000
+v1-010  OOS          >9         0      NaN               NaN            0.0000              NaN                NaN            NaN
+
+## Phase 1.6 — Calibration summary: best OOS Δ threshold + F2 fire rate
+
+### Roster: baseline
+  best OOS Δ = +0.0008 at threshold 6.5% (skip rate 1.058%, 2 of 189 OOS trades killed)
+  NO threshold puts skip rate in F2 band [10%, 60%] for baseline OOS
+
+### Roster: v1-010
+  best OOS Δ = +0.0025 at threshold 5.5% (skip rate 3.333%, 7 of 210 OOS trades killed)
+  NO threshold puts skip rate in F2 band [10%, 60%] for v1-010 OOS
+
+Outputs written:
+  /home/roberto/crypto-trade/.worktrees/quant-research/analysis/iteration_v1-011/entry_time_natr_distribution.csv
+  /home/roberto/crypto-trade/.worktrees/quant-research/analysis/iteration_v1-011/binary_kill_per_symbol_pnl.csv
+  /home/roberto/crypto-trade/.worktrees/quant-research/analysis/iteration_v1-011/oracle_sharpe_delta.csv
+  /home/roberto/crypto-trade/.worktrees/quant-research/analysis/iteration_v1-011/top_high_natr_trades.csv
+  /home/roberto/crypto-trade/.worktrees/quant-research/analysis/iteration_v1-011/exit_reason_by_natr_bucket.csv

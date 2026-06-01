@@ -1,0 +1,9 @@
+quintile,z90_range_lower,z90_range_upper,is_eda_sharpe_proxy,n_oos_trades,oos_net_pnl,oos_win_rate_pct,is_to_oos_sign_flip,note
+Q1_neg_extreme,-10.0,-1.05,+1.05,46,+24.63,41.3,NO,Q1 SURVIVED OOS positive — no sign flip; LM Master §1(B) -30.78 figure does not match actual trade attribution (LM used IS-EDA regime windows not realized-trade join)
+Q2,-1.05,-0.31,+0.73,61,-16.32,37.7,NO,Moderate-negative OI zone; OOS negative drag
+Q3_mid,-0.31,+0.29,+0.04,55,-57.44,30.9,YES_IS_WAS_ZERO,Dominant OOS loss channel (-57.44 from 55 trades); IS near-zero Sharpe proxy confirmed dead zone; OOS amplified downside
+Q4_ORACLE,+0.29,+0.95,+1.68,44,+25.97,43.2,NO,SURVIVED OOS positive as brief predicted; consistent with LM Master §1(B) +22.45 figure (close); model did NOT concentrate here
+Q5_pos_extreme,+0.95,+10.0,+0.60,52,-54.84,30.8,YES,Q5 COLLAPSED OOS — consistent with LM Master -56.41; strong-positive OI = over-extended zone; LightGBM learned IS Q5 as viable but OOS regime shifted
+NaN_oi_missing,-,-,-,3,-3.57,0.0,-,3 OOS trades missing OI data (BTC 2 + DOT 1 beyond OI archive end); excluded from quintile analysis
+total,-,-,-,261,-81.57,36.0,-,Sum check: 46+61+55+44+52+3=261 trades; 24.63-16.32-57.44+25.97-54.84-3.57=-81.57
+lm_master_note,-,-,-,-,-,-,-,LM Master Phase 7.4 §1(B) Q1 -30.78 discrepancy: LM analysis used IS-EDA quintile regime windows (aggregate forward-return by z90 bin) not realized trade-attribution join; direct join from trades.csv + OI feature is authoritative

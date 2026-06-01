@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime
+import math
 import tracemalloc
 from pathlib import Path
 
@@ -15,6 +16,7 @@ from crypto_trade.backtest_models import (
     Strategy,
     TradeResult,
 )
+from crypto_trade.config import OOS_CUTOFF_MS
 from crypto_trade.kline_array import load_kline_array
 from crypto_trade.storage import csv_path
 
@@ -190,6 +192,95 @@ def run_backtest(
     # Per-symbol daily PnL tracking for vol targeting (iter 147)
     # symbol -> {YYYY-MM-DD -> sum of net_pnl_pct that closed on that day}
     vt_per_sym_daily: dict[str, dict[str, float]] = {}
+
+    # Risk R5 tracking — vol-target ceiling (iter-v1/010) and binary-kill
+    # (iter-v1/011). (symbol, open_time_ms) → vol_natr_14 from feature parquet.
+    # Populated at init when either R5 variant is enabled.
+    r5_natr_lookup: dict[tuple[str, int], float] = {}
+    r5_fires = 0
+    # IS/OOS split counters (iter-v1/010 R5 proportional-scaling reporting).
+    # Partitioned by open_time vs OOS_CUTOFF_MS from config.py.
+    r5_signals_is: int = 0
+    r5_fires_is: int = 0
+    r5_signals_oos: int = 0
+    r5_fires_oos: int = 0
+    # IS/OOS split counters (iter-v1/011 R5-BINARY-KILL reporting).
+    r5_kill_signals_is: int = 0
+    r5_kill_fires_is: int = 0
+    r5_kill_signals_oos: int = 0
+    r5_kill_fires_oos: int = 0
+    # iter-v1/038: per-symbol rv-ceiling fire-rate tracking.
+    # (symbol, open_time_ms) → rv_30d_ann at entry bar (computed from close prices).
+    # Populated at init when vol_ceiling_enabled is True.
+    # IS/OOS split counters (iter-v1/038 vol-ceiling reporting).
+    vol_ceiling_rv_lookup: dict[tuple[str, int], float] = {}
+    vol_ceiling_signals_is: int = 0
+    vol_ceiling_fires_is: int = 0
+    vol_ceiling_signals_oos: int = 0
+    vol_ceiling_fires_oos: int = 0
+    if config.vol_ceiling_enabled:
+        from crypto_trade.risk.vol_ceiling import compute_rv_30d_ann_at_bar  # noqa: PLC0415
+
+        _vc_thresholds: dict[str, float] = (
+            config.vol_ceiling_thresholds if config.vol_ceiling_thresholds else {}
+        )
+        # Build rv_30d_ann lookup for each symbol from the already-built master df.
+        # Uses past-only closes (compute_rv_30d_ann_at_bar already enforces look-ahead
+        # safety by slicing closes[:idx+1]).
+        for _vc_sym in config.symbols:
+            _vc_sym_df = master[master["symbol"] == _vc_sym].sort_values("open_time")
+            _vc_closes = _vc_sym_df["close"].to_numpy(dtype=float)
+            _vc_ots = _vc_sym_df["open_time"].to_numpy(dtype=int)
+            for _vc_idx in range(len(_vc_closes)):
+                _rv = compute_rv_30d_ann_at_bar(_vc_closes, _vc_idx, lookback_bars=90)
+                vol_ceiling_rv_lookup[(_vc_sym, int(_vc_ots[_vc_idx]))] = _rv
+        _vc_total_entries = len(vol_ceiling_rv_lookup)
+        print(
+            f"[VOL-CEIL/038] rv_30d_ann lookup built: {_vc_total_entries} entries "
+            f"across {len(config.symbols)} symbols"
+        )
+        for _vc_sym, _vc_thr in _vc_thresholds.items():
+            print(
+                f"[VOL-CEIL/038] threshold {_vc_sym}: rv_p{75:.0f} = {_vc_thr:.4f} "
+                f"(scale_factor={config.vol_ceiling_scale:.2f}x when rv > threshold)"
+            )
+    if config.risk_r5_vol_target_enabled or config.risk_r5_kill_low_natr_enabled:
+        import pyarrow.parquet as pq  # noqa: PLC0415
+
+        features_dir = Path(config.data_dir) / "features"
+        for _sym in config.symbols:
+            feat_path = features_dir / f"{_sym}_{config.interval}_features.parquet"
+            if feat_path.exists():
+                tab = pq.read_table(feat_path, columns=["open_time", "vol_natr_14"])
+                ots = tab.column("open_time").to_numpy()
+                natrs = tab.column("vol_natr_14").to_numpy()
+                mask = ~np.isnan(natrs.astype(float))
+                for _ot, _natr in zip(ots[mask], natrs[mask], strict=True):
+                    r5_natr_lookup[(_sym, int(_ot))] = float(_natr)
+            else:
+                print(f"[R5] WARNING: feature parquet not found for {_sym}: {feat_path}")
+        # A14 dead-feed pre-screen: if vol_natr_14 is suspiciously constant for any symbol
+        # (> 10% of rows identical to mean within 0.001 tolerance), error loudly.
+        for _sym in config.symbols:
+            sym_natrs = [v for (s, _), v in r5_natr_lookup.items() if s == _sym]
+            if len(sym_natrs) > 10:
+                _mean = float(np.mean(sym_natrs))
+                _const_frac = sum(1 for v in sym_natrs if abs(v - _mean) < 0.001) / len(sym_natrs)
+                if _const_frac > 0.10:
+                    raise ValueError(
+                        f"[R5] A14 DEAD-FEED: vol_natr_14 for {_sym} is suspiciously constant "
+                        f"({_const_frac:.1%} of rows within 0.001 of mean {_mean:.4f}). "
+                        f"Check data/features/{_sym}_{config.interval}_features.parquet."
+                    )
+        _r5_mode = (
+            "vol_target_pct=" + f"{config.risk_r5_vol_target_pct}%"
+            if config.risk_r5_vol_target_enabled
+            else "binary_kill_min_natr=" + f"{config.risk_r5_kill_low_natr_min_pct}%"
+        )
+        print(
+            f"[R5] NATR lookup built: {len(r5_natr_lookup)} entries across "
+            f"{len(config.symbols)} symbols ({_r5_mode})"
+        )
 
     # Signal cooldown tracking
     cooldown_until: dict[str, int] = {}  # symbol → earliest open_time for new trade
@@ -367,6 +458,25 @@ def run_backtest(
         signal = strategy.get_signal(sym, ot)
         if signal.direction != 0 and signal.weight > 0:
             total_signals += 1
+            # R5-BINARY-KILL (iter-v1/011) — entry-time NATR floor; STATELESS gate.
+            # Evaluated FIRST, before cooldown / vt_scale / R2. When enabled, skips
+            # the entry entirely if vol_natr_14 < risk_r5_kill_low_natr_min_pct.
+            # Safety: if the key is absent or NaN, entry proceeds unconditionally.
+            if config.risk_r5_kill_low_natr_enabled:
+                _natr_kill = r5_natr_lookup.get((sym, ot), float("nan"))
+                if ot < OOS_CUTOFF_MS:
+                    r5_kill_signals_is += 1
+                else:
+                    r5_kill_signals_oos += 1
+                if not math.isnan(_natr_kill) and _natr_kill < float(
+                    config.risk_r5_kill_low_natr_min_pct
+                ):
+                    # Kill this entry — NATR below the low-NATR floor threshold.
+                    if ot < OOS_CUTOFF_MS:
+                        r5_kill_fires_is += 1
+                    else:
+                        r5_kill_fires_oos += 1
+                    continue
             if (
                 sym not in open_orders
                 and ot >= cooldown_until.get(sym, 0)
@@ -386,6 +496,42 @@ def run_backtest(
                         span = min(1.0, (dd_pct - trigger) / (anchor - trigger))
                         r2_scale = 1.0 - span * (1.0 - floor)
                         vt_scale = vt_scale * r2_scale
+                # R5 — vol-target ceiling (iter-v1/010); AFTER R2, ALL MODELS
+                if config.risk_r5_vol_target_enabled:
+                    _natr = r5_natr_lookup.get((sym, ot), float("nan"))
+                    # IS/OOS signal counter — partitioned by OOS_CUTOFF_MS.
+                    if ot < OOS_CUTOFF_MS:
+                        r5_signals_is += 1
+                    else:
+                        r5_signals_oos += 1
+                    if not math.isnan(_natr):
+                        r5_scale = min(1.0, float(config.risk_r5_vol_target_pct) / max(_natr, 0.01))
+                        if r5_scale < 1.0:
+                            r5_fires += 1
+                            # IS/OOS fire counter — partitioned by OOS_CUTOFF_MS.
+                            if ot < OOS_CUTOFF_MS:
+                                r5_fires_is += 1
+                            else:
+                                r5_fires_oos += 1
+                        vt_scale = vt_scale * r5_scale
+                # iter-v1/038: per-symbol rv-ceiling (risk-primitive axis).
+                # Evaluated AFTER R5 NATR-ceiling, AFTER R2, in the vt_scale pipeline.
+                # Stateless: apply_vol_ceiling returns scale_factor (0.5) when
+                # rv_30d_ann > per-symbol IS-derived threshold, else 1.0.
+                if config.vol_ceiling_enabled:
+                    _vc_rv = vol_ceiling_rv_lookup.get((sym, ot), float("nan"))
+                    _vc_thr = (config.vol_ceiling_thresholds or {}).get(sym, float("nan"))
+                    if ot < OOS_CUTOFF_MS:
+                        vol_ceiling_signals_is += 1
+                    else:
+                        vol_ceiling_signals_oos += 1
+                    if not math.isnan(_vc_rv) and not math.isnan(_vc_thr):
+                        if _vc_rv > _vc_thr:
+                            if ot < OOS_CUTOFF_MS:
+                                vol_ceiling_fires_is += 1
+                            else:
+                                vol_ceiling_fires_oos += 1
+                            vt_scale = vt_scale * float(config.vol_ceiling_scale)
                 order = create_order(
                     sym,
                     signal,
@@ -437,11 +583,103 @@ def run_backtest(
 
     results.sort(key=lambda r: r.close_time)
 
+    if config.risk_r5_vol_target_enabled:
+        # Three-line IS/OOS split summary (iter-v1/010 R5 proportional-scaling).
+        _r5_total = r5_signals_is + r5_signals_oos
+        _r5_all_fires = r5_fires_is + r5_fires_oos
+        if r5_signals_is > 0:
+            print(
+                f"[R5] IS:  fired on {r5_fires_is} of {r5_signals_is} signals "
+                f"({100.0 * r5_fires_is / r5_signals_is:.1f}%)"
+            )
+        else:
+            print("[R5] IS:  fired on 0 of 0 signals (0.0%)")
+        if r5_signals_oos > 0:
+            print(
+                f"[R5] OOS: fired on {r5_fires_oos} of {r5_signals_oos} signals "
+                f"({100.0 * r5_fires_oos / r5_signals_oos:.1f}%)"
+            )
+        else:
+            print("[R5] OOS: fired on 0 of 0 signals (0.0%)")
+        if _r5_total > 0:
+            print(
+                f"[R5] ALL: fired on {_r5_all_fires} of {_r5_total} signals "
+                f"({100.0 * _r5_all_fires / _r5_total:.1f}%)"
+            )
+        else:
+            print("[R5] ALL: fired on 0 of 0 signals (0.0%)")
+
+    if config.risk_r5_kill_low_natr_enabled:
+        # Three-line IS/OOS split summary (iter-v1/011 R5-BINARY-KILL).
+        _kill_total = r5_kill_signals_is + r5_kill_signals_oos
+        _kill_all_fires = r5_kill_fires_is + r5_kill_fires_oos
+        _is_rate = 100.0 * r5_kill_fires_is / r5_kill_signals_is if r5_kill_signals_is > 0 else 0.0
+        _oos_rate = (
+            100.0 * r5_kill_fires_oos / r5_kill_signals_oos if r5_kill_signals_oos > 0 else 0.0
+        )
+        _all_rate = 100.0 * _kill_all_fires / _kill_total if _kill_total > 0 else 0.0
+        print(
+            f"[R5-BINARY-KILL] IS:  fired on {r5_kill_fires_is} of "
+            f"{r5_kill_signals_is} signals ({_is_rate:.2f}%)"
+        )
+        print(
+            f"[R5-BINARY-KILL] OOS: fired on {r5_kill_fires_oos} of "
+            f"{r5_kill_signals_oos} signals ({_oos_rate:.2f}%)"
+        )
+        print(
+            f"[R5-BINARY-KILL] ALL: fired on {_kill_all_fires} of "
+            f"{_kill_total} signals ({_all_rate:.2f}%)"
+        )
+
+    if config.vol_ceiling_enabled:
+        # Three-line IS/OOS split summary (iter-v1/038 vol-ceiling).
+        _vc_total = vol_ceiling_signals_is + vol_ceiling_signals_oos
+        _vc_all_fires = vol_ceiling_fires_is + vol_ceiling_fires_oos
+        _vc_is_rate = (
+            100.0 * vol_ceiling_fires_is / vol_ceiling_signals_is
+            if vol_ceiling_signals_is > 0
+            else 0.0
+        )
+        _vc_oos_rate = (
+            100.0 * vol_ceiling_fires_oos / vol_ceiling_signals_oos
+            if vol_ceiling_signals_oos > 0
+            else 0.0
+        )
+        _vc_all_rate = 100.0 * _vc_all_fires / _vc_total if _vc_total > 0 else 0.0
+        print(
+            f"[VOL-CEIL/038] IS:  fired on {vol_ceiling_fires_is} of "
+            f"{vol_ceiling_signals_is} signals ({_vc_is_rate:.2f}%) "
+            f"[F-AXIS#2: wiring proof]"
+        )
+        print(
+            f"[VOL-CEIL/038] OOS: fired on {vol_ceiling_fires_oos} of "
+            f"{vol_ceiling_signals_oos} signals ({_vc_oos_rate:.2f}%)"
+        )
+        print(
+            f"[VOL-CEIL/038] ALL: fired on {_vc_all_fires} of "
+            f"{_vc_total} signals ({_vc_all_rate:.2f}%) [scale={config.vol_ceiling_scale:.2f}x]"
+        )
+
     if profile_memory:
         _mem_report("after backtest loop")
         tracemalloc.stop()
 
-    return BacktestResult(results, total_signals)
+    return BacktestResult(
+        results,
+        total_signals,
+        r5_signals_is=r5_signals_is,
+        r5_fires_is=r5_fires_is,
+        r5_signals_oos=r5_signals_oos,
+        r5_fires_oos=r5_fires_oos,
+        r5_kill_signals_is=r5_kill_signals_is,
+        r5_kill_fires_is=r5_kill_fires_is,
+        r5_kill_signals_oos=r5_kill_signals_oos,
+        r5_kill_fires_oos=r5_kill_fires_oos,
+        vol_ceiling_signals_is=vol_ceiling_signals_is,
+        vol_ceiling_fires_is=vol_ceiling_fires_is,
+        vol_ceiling_signals_oos=vol_ceiling_signals_oos,
+        vol_ceiling_fires_oos=vol_ceiling_fires_oos,
+    )
 
 
 def build_master(
@@ -593,9 +831,7 @@ def evaluate_order_with_no_confirm(
             tp_hit = low <= order.take_profit_price
         if sl_hit or tp_hit:
             # TP/SL wins — delegate to check_order for correct price disambiguation
-            result = check_order(
-                order, open_time, open_price, high, low, close_time, fee_pct
-            )
+            result = check_order(order, open_time, open_price, high, low, close_time, fee_pct)
         else:
             # No TP/SL: fire no_confirm at candle close
             result = make_result(order, close_price, close_time, "no_confirm", fee_pct)

@@ -1,0 +1,7 @@
+step,duration_min,source
+Anchor: /019 ETH-only at ENSEMBLE_SIZE=3 + n_trials=18 + V1_FEATURE_COLUMNS_PRUNED,25,/019 diary 'wall-clock ~25 min' + 548s = 9.1 min Model G compute
+"BTC-only at identical scale (1 sym, R3-only, no R1/R2)",20-25,BTC has comparable training-row count to ETH; expect parity
+No post-hoc gate (no BTC-trend filter; pure cohort isolation),0,vs /019 which had ~1 min gate overhead
+"Methodology + reporting overhead (CPCV, PSR, DSR on 1-model trade roster)",3,Same as /019
+TOTAL PROJECTED,23-28 (mid-point 25 min),78%+ margin vs 2h cap; well below 1.6h Phase 5.5 BLOCK threshold
+Kill-switch threshold,45,1.8x projected mid-point; well below 2h cap

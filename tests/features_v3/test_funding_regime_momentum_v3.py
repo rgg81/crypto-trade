@@ -109,9 +109,7 @@ def test_composition_correctness() -> None:
     f["open_time_aligned"] = (f["funding_time"] // 60_000) * 60_000
     k = kline.copy()
     k["open_time_aligned"] = (k["open_time"] // 60_000) * 60_000
-    merged = k.merge(
-        f[["open_time_aligned", "funding_rate"]], on="open_time_aligned", how="left"
-    )
+    merged = k.merge(f[["open_time_aligned", "funding_rate"]], on="open_time_aligned", how="left")
     merged.index = kline.index
     r = merged["funding_rate"].astype(float)
     fr_lag = r.shift(1)
@@ -119,9 +117,7 @@ def test_composition_correctness() -> None:
     fz = (r - fr_lag.rolling(w, min_periods=w).mean()) / (
         fr_lag.rolling(w, min_periods=w).std(ddof=1) + 1e-9
     )
-    expected = kline["regime_momentum_signed_5d"].astype(float) * np.sign(fz).replace(
-        0.0, np.nan
-    )
+    expected = kline["regime_momentum_signed_5d"].astype(float) * np.sign(fz).replace(0.0, np.nan)
 
     m = out["funding_regime_momentum_5d"].notna() & expected.notna()
     assert m.sum() > 100, "too few comparable (non-NaN) bars"
@@ -248,9 +244,7 @@ def test_idempotency() -> None:
     funding = _make_funding_df(n=250)
     a = compute_funding_regime_momentum_5d(kline, funding)
     b = compute_funding_regime_momentum_5d(kline, funding)
-    pd.testing.assert_series_equal(
-        a["funding_regime_momentum_5d"], b["funding_regime_momentum_5d"]
-    )
+    pd.testing.assert_series_equal(a["funding_regime_momentum_5d"], b["funding_regime_momentum_5d"])
 
 
 def test_add_funding_regime_momentum_registry_entry() -> None:

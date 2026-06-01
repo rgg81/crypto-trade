@@ -83,6 +83,36 @@ class BacktestConfig:
     enable_no_confirm_exit: bool = False
     no_confirm_trigger_atr: float = 0.50
     no_confirm_k_candles: int = 4
+    # Risk mitigation R5 (iter-v1/010): per-symbol vol-target ceiling.
+    # When enabled, caps weight_factor by min(1.0, risk_r5_vol_target_pct /
+    # max(vol_natr_14, 0.01)). vol_natr_14 is read from per-symbol feature
+    # parquets at backtest init. Applied AFTER R2 in the vt_scale pipeline.
+    # Default disabled — restoring risk_r5_vol_target_enabled=False preserves
+    # byte-identical behavior for all iterations through iter-v1/009.
+    risk_r5_vol_target_enabled: bool = False
+    risk_r5_vol_target_pct: float = 4.0
+    # Risk mitigation R5-BINARY-KILL (iter-v1/011): entry-time NATR floor.
+    # When enabled, skips entry entirely if vol_natr_14 at signal time is
+    # strictly below risk_r5_kill_low_natr_min_pct. This is a state-discontinuous
+    # entry filter — structurally orthogonal to /010's proportional-scaling subtype.
+    # Evaluated BEFORE cooldown / vt_scale / R2 (pre-confidence-gate).
+    # Safety: if NATR is unavailable (NaN / missing lookup key), entry proceeds.
+    # Default disabled — preserves byte-identical behavior for all iterations
+    # through iter-v1/010.
+    risk_r5_kill_low_natr_enabled: bool = False
+    risk_r5_kill_low_natr_min_pct: float = 2.0
+    # iter-v1/038: per-symbol rv-based vol-ceiling (risk-primitive axis, cycle-5 EXP-5).
+    # When enabled, multiplies vt_scale by vol_ceiling_scale at entry time when the
+    # symbol's rolling 30d annualized realized vol (rv_30d_ann, past-only) exceeds its
+    # IS-derived per-symbol percentile threshold.  Thresholds are pre-computed ONCE at
+    # run start from IS-only data (close_time < OOS_CUTOFF) and stored in
+    # vol_ceiling_thresholds dict (symbol -> threshold float).
+    # Applied AFTER R5 vol-target (NATR-based), in the vt_scale pipeline.
+    # Default disabled — preserves byte-identical behavior for all iterations through
+    # iter-v1/037.
+    vol_ceiling_enabled: bool = False
+    vol_ceiling_scale: float = 0.5
+    vol_ceiling_thresholds: dict = None  # type: ignore[assignment]  # symbol -> threshold float
 
 
 @dataclass(frozen=True)
@@ -152,8 +182,58 @@ class BacktestResult(list):
     many times the strategy fired (direction != 0, weight > 0), which may
     exceed ``len(self)`` when signals are skipped because an order is
     already open for that symbol.
+
+    iter-v1/010 R5 IS/OOS split counters
+    -------------------------------------
+    r5_signals_is, r5_fires_is   : signal count and R5 fire count for
+                                   candles with open_time < OOS_CUTOFF_MS.
+    r5_signals_oos, r5_fires_oos : same for open_time >= OOS_CUTOFF_MS.
+    All four default to 0 when R5 is disabled.
+
+    iter-v1/011 R5-BINARY-KILL IS/OOS split counters
+    -------------------------------------------------
+    r5_kill_signals_is, r5_kill_fires_is   : signal count and binary-kill
+                                            fire count for IS half.
+    r5_kill_signals_oos, r5_kill_fires_oos : same for OOS half.
+    All four default to 0 when R5-BINARY-KILL is disabled.
+
+    iter-v1/038 vol-ceiling IS/OOS split counters
+    ----------------------------------------------
+    vol_ceiling_signals_is, vol_ceiling_fires_is   : signal count and ceiling
+                                                     fire count for IS half.
+    vol_ceiling_signals_oos, vol_ceiling_fires_oos : same for OOS half.
+    All four default to 0 when vol_ceiling_enabled is False.
     """
 
-    def __init__(self, trades: list[TradeResult], total_signals: int = 0):
+    def __init__(
+        self,
+        trades: list[TradeResult],
+        total_signals: int = 0,
+        *,
+        r5_signals_is: int = 0,
+        r5_fires_is: int = 0,
+        r5_signals_oos: int = 0,
+        r5_fires_oos: int = 0,
+        r5_kill_signals_is: int = 0,
+        r5_kill_fires_is: int = 0,
+        r5_kill_signals_oos: int = 0,
+        r5_kill_fires_oos: int = 0,
+        vol_ceiling_signals_is: int = 0,
+        vol_ceiling_fires_is: int = 0,
+        vol_ceiling_signals_oos: int = 0,
+        vol_ceiling_fires_oos: int = 0,
+    ):
         super().__init__(trades)
         self.total_signals = total_signals
+        self.r5_signals_is = r5_signals_is
+        self.r5_fires_is = r5_fires_is
+        self.r5_signals_oos = r5_signals_oos
+        self.r5_fires_oos = r5_fires_oos
+        self.r5_kill_signals_is = r5_kill_signals_is
+        self.r5_kill_fires_is = r5_kill_fires_is
+        self.r5_kill_signals_oos = r5_kill_signals_oos
+        self.r5_kill_fires_oos = r5_kill_fires_oos
+        self.vol_ceiling_signals_is = vol_ceiling_signals_is
+        self.vol_ceiling_fires_is = vol_ceiling_fires_is
+        self.vol_ceiling_signals_oos = vol_ceiling_signals_oos
+        self.vol_ceiling_fires_oos = vol_ceiling_fires_oos

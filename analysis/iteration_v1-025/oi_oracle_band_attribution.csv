@@ -1,0 +1,6 @@
+symbol,band,n_obs,z90_min,z90_max,mean_fwd_log_ret_bp,std_fwd_log_ret_bp,sum_fwd_log_ret_pct,sharpe_proxy
+BTCUSDT,Q1 (extreme negative),937,-10.0,-1.0535,5.81,193.27,54.4151,0.9943
+BTCUSDT,Q2,937,-1.05,-0.3106,4.48,183.26,41.9942,0.8093
+BTCUSDT,Q3 (mid),936,-0.31,0.2933,0.13,177.3,1.256,0.025
+BTCUSDT,Q4,937,0.2937,0.9452,9.1,179.76,85.2987,1.6758
+BTCUSDT,Q5 (extreme positive),937,0.9455,3.8491,3.49,190.06,32.7187,0.6079

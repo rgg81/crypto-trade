@@ -1,0 +1,4 @@
+scenario,label,ETH_OOS_share_threshold,ETH_OOS_pnl_threshold,implication
+A,ETH-still-catastrophic,ETH share remains > 40% of (absolute) portfolio PnL,ETH OOS PnL ≤ -20,regime-bound; /018 pivots to ETH-specific kill switch (Critic /016 Path Forward #3)
+B,Benign-dilution,ETH share drops to ≤ 30% of (absolute) portfolio PnL,"ETH OOS PnL ∈ [-15, +5]",universe expansion works at denominator level; consider further expansion
+C,ETH-recovery,ETH share neutral OR positive contributor,ETH OOS PnL ≥ 0,model-architecture-driven recovery (single-symbol model dispatch)
