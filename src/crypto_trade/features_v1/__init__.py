@@ -330,6 +330,26 @@ assert "dot_vs_btc_ret_ratio_30" in active_feature_columns guard fires in dispat
 """
 
 
+V1_ITER051_UNIVERSE: tuple[str, ...] = ("DOTUSDT",)
+"""iter-v1/051 cohort: DOT-only multi-seed re-validation of iter-v1/050.
+
+Cycle-6 EXPLORATION #6 of 10. Axis family: validation (multi-seed re-validation sub-type).
+Same cohort as /050: DOTUSDT only. NO new feature; NO vol-spike regime gate (was 0% fire
+rate / INERT at /050 — dropped for simplicity). V1_FEATURE_COLUMNS_PRUNED (46 cols) unchanged.
+
+NORMAL-RISK declaration: seed variation does not change Optuna training-objective domain.
+Multi-seed validation: --seeds 4 (outer seed offsets 0, 5, 10, 15 from ENSEMBLE_SEEDS roster).
+ENSEMBLE_SIZE=3, n_trials=18.
+
+BTC klines loaded for cross-asset feature computation only (BTCUSDT is NOT traded).
+
+LOCAL to runner constant. NOT shared; CONFIRMATION-MERGE updates V1_BASELINE_UNIVERSE.
+assert set(symbols) == {"DOTUSDT"} guard fires in dispatch branch.
+assert "dot_vs_btc_ret_ratio_30" in active_feature_columns guard fires in dispatch branch.
+assert len(active_feature_columns) == 46 guard fires in dispatch branch.
+"""
+
+
 __all__ = [
     "V1_EXCLUDED_SYMBOLS",
     "V1_BASELINE_UNIVERSE",
@@ -344,6 +364,7 @@ __all__ = [
     "V1_ITER039_UNIVERSE",
     "V1_ITER043_UNIVERSE",
     "V1_ITER050_UNIVERSE",
+    "V1_ITER051_UNIVERSE",
     # iter-v1/023: funding-rate feature family (add_funding_v1_features imported on demand)
     # iter-v1/025: OI delta feature family (add_oi_delta_v1_features imported on demand)
     # iter-v1/040: composed feature family (add_composed_v1_features imported on demand)
