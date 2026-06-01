@@ -382,6 +382,35 @@ assert len(active_feature_columns) == 48 guard fires in dispatch branch.
 """
 
 
+V1_ITER053_UNIVERSE: tuple[str, ...] = ("BTCUSDT",)
+"""iter-v1/053 cohort: BTC-only specialist head (multi-seed re-validation of /052).
+
+Cycle-6 EXPLORATION #8 of 10. Axis family: validation (multi-seed re-validation sub-type;
+no new feature or gate axis). Features UNCHANGED from /052: btc_funding_rate_8h_impulse
+(rank 38/48 INERT) + btc_funding_spread_30_90 (rank 4/48 STRONGLY LEARNED).
+V1_FEATURE_COLUMNS_PRUNED = 48 cols (UNCHANGED).
+
+NORMAL-RISK declaration: seed variation only (no Optuna training-objective domain change).
+Multi-seed: --seeds 3, _OUTER_SEED_OFFSETS=(0,3,6), ENSEMBLE_SIZE=3, n_trials=18.
+Outer seed pools (fully disjoint): offset0=[42,123,456], offset3=[789,1001,2002],
+offset6=[3003,4004,5005].
+
+Architecture: Model A_BTC_specialist (BTC only). R3=ON, R1=OFF, R2=OFF. atr_tp=3.5,
+atr_sl=1.75 (unchanged from /052 and baseline Model A).
+
+Both-or-neither revert rule (from LM Master Rec 1 at /052) BINDING:
+  SPECIALIST-CONFIRMED or PARTIAL-CONFIRMED → RETAIN both features.
+  NEG-CLEAN-MULTI-SEED or BASIN-LOTTERY → REVERT both features.
+
+Defined INDEPENDENTLY from V1_ITER052_UNIVERSE (per LM Master Flag C at /053 Phase 4.5) to
+allow independent revert/keep decisions without coupling /052 and /053 constants.
+assert set(symbols) == {"BTCUSDT"} guard fires in dispatch branch.
+assert "btc_funding_rate_8h_impulse" in active_feature_columns guard fires in dispatch branch.
+assert "btc_funding_spread_30_90" in active_feature_columns guard fires in dispatch branch.
+assert len(active_feature_columns) == 48 guard fires in dispatch branch.
+"""
+
+
 __all__ = [
     "V1_EXCLUDED_SYMBOLS",
     "V1_BASELINE_UNIVERSE",
@@ -398,6 +427,7 @@ __all__ = [
     "V1_ITER050_UNIVERSE",
     "V1_ITER051_UNIVERSE",
     "V1_ITER052_UNIVERSE",
+    "V1_ITER053_UNIVERSE",
     # iter-v1/023: funding-rate feature family (add_funding_v1_features imported on demand)
     # iter-v1/025: OI delta feature family (add_oi_delta_v1_features imported on demand)
     # iter-v1/040: composed feature family (add_composed_v1_features imported on demand)
