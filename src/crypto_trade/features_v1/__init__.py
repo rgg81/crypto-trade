@@ -109,6 +109,7 @@ V1_FEATURE_COLUMNS_PRUNED: tuple[str, ...] = (
     "mr_rsi_extreme_14",
     "oi_delta_30_z90",  # iter-v1/025: NEW — open-interest delta z-score (90-bar window)
     "regime_momentum_signed_5d",  # iter-v1/040: composed momentum; replaces basis_zscore_30
+    "skew_zscore_21",  # iter-v1/047: NEW — rolling-skew z-score (21-bar inner, 90-bar z-norm)
     "stat_autocorr_lag5",
     "stat_kurtosis_20",  # LM Master Phase 4.5 swap: drop mom_mom_5, add stat_kurtosis_20
     "stat_log_return_1",
@@ -133,14 +134,16 @@ V1_FEATURE_COLUMNS_PRUNED: tuple[str, ...] = (
     "vol_volume_rel_20",
 )
 
-# Sanity guard: confirm the pruned set has exactly 44 features.
+# Sanity guard: confirm the pruned set has exactly 45 features.
 # iter-v1/023: extended 40 → 42 by adding funding_rate_zscore_30 + funding_rate_zscore_90.
 # iter-v1/025: extended 42 → 43 by adding oi_delta_30_z90 (open-interest delta z-score).
 # iter-v1/034: extended 43 → 44 by adding basis_zscore_30 (perp-spot basis z-score).
 # iter-v1/040: SWAP basis_zscore_30 (3-consec INERT DROP) → regime_momentum_signed_5d (ADD).
 #              Count stays at 44 (DROP 1 + ADD 1).
-assert len(V1_FEATURE_COLUMNS_PRUNED) == 44, (
-    f"V1_FEATURE_COLUMNS_PRUNED must have exactly 44 features; got {len(V1_FEATURE_COLUMNS_PRUNED)}"
+# iter-v1/047: extended 44 → 45 by adding skew_zscore_21 (rolling-skew z-score,
+#              21-bar inner window, 90-bar z-norm; cycle-6 feature-family EXPLORATION 2/10).
+assert len(V1_FEATURE_COLUMNS_PRUNED) == 45, (
+    f"V1_FEATURE_COLUMNS_PRUNED must have exactly 45 features; got {len(V1_FEATURE_COLUMNS_PRUNED)}"
 )
 
 # Columns explicitly NOT in V1_FEATURE_COLUMNS_PRUNED but which may still appear in
