@@ -59,6 +59,8 @@ def test_list_groups():
     groups = list_groups()
     # iter-v1/023 added funding_v1 (10 groups); iter-v1/025 added open_interest_v1 (11 groups).
     # iter-v1/034 added basis_v1 (12 groups); iter-v1/040 added composed_v1 (13 groups).
+    # iter-v1/047 added statistical_v1 (14 groups), then REVERTED at closeout
+    # (NEG-CLEAN-PRE-EDA: F5 |IC|=0.81 vs stat_skew_20) → back to 13 groups.
     assert len(groups) == 13
     expected = {
         "momentum",
@@ -81,6 +83,7 @@ def test_list_groups():
 def test_registry_has_all_groups():
     # iter-v1/023 added funding_v1; iter-v1/025 added open_interest_v1.
     # iter-v1/034 added basis_v1; iter-v1/040 added composed_v1.
+    # iter-v1/047 added statistical_v1, then REVERTED at closeout (NEG-CLEAN-PRE-EDA).
     assert len(GROUP_REGISTRY) == 13
 
 

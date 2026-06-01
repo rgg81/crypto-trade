@@ -139,6 +139,10 @@ V1_FEATURE_COLUMNS_PRUNED: tuple[str, ...] = (
 # iter-v1/034: extended 43 → 44 by adding basis_zscore_30 (perp-spot basis z-score).
 # iter-v1/040: SWAP basis_zscore_30 (3-consec INERT DROP) → regime_momentum_signed_5d (ADD).
 #              Count stays at 44 (DROP 1 + ADD 1).
+# iter-v1/047: NEG-CLEAN-PRE-EDA — pre-launch F5 IC orthogonality gate FAILED
+#              (|IC|=0.8132 vs stat_skew_20; ABORT threshold 0.60). skew_zscore_21
+#              REVERTED. Count restored 45 → 44. statistical_v1 group de-registered
+#              from GROUP_REGISTRY but the module file kept for future-iter reuse.
 assert len(V1_FEATURE_COLUMNS_PRUNED) == 44, (
     f"V1_FEATURE_COLUMNS_PRUNED must have exactly 44 features; got {len(V1_FEATURE_COLUMNS_PRUNED)}"
 )
