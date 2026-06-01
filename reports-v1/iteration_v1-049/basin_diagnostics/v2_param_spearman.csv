@@ -1,0 +1,6 @@
+outer_seed,model,month,mean_spearman,n_inner_seeds
+0,v1-049,BTCUSDT,,1
+0,v1-049,DOTUSDT,,1
+0,v1-049,ETHUSDT,,1
+0,v1-049,LINKUSDT,,1
+0,v1-049,LTCUSDT,,1

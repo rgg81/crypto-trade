@@ -82,6 +82,47 @@ Three sibling tracks. The user can run `/quant-iteration-v1` (this skill), `/qua
 
 ---
 
+## EDA Discipline (revised 2026-06-01)
+
+**EDA is RESEARCH — it exists to INFORM hypothesis design, not to gate iteration progress.**
+
+User directive 2026-06-01: "EDA shouldn't block an iteration. EDA is research, the time we need to spend to find out new ideas. If we stop here, doesn't make sense."
+
+### What changed
+
+The `NEG-CLEAN-PRE-EDA` verdict and pre-launch ABORT semantics on F4/F5 are RETIRED as of 2026-06-01. Two consecutive aborts at iter-v1/047 and iter-v1/048 (skew_zscore_21 |IC|=0.81; trade_count_zscore_30 |IC|=0.91) produced ZERO learning — just blocked compute. Empirical evidence (run the backtest, see what happens) supersedes a-priori theoretical orthogonality gates. High-IC features may still be useful in regime-specialized contexts; aborting forecloses that learning.
+
+iter-v1/047 and iter-v1/048 are RETROACTIVELY-RECLASSIFIED as `PROCEDURAL-ABORT-DEPRECATED` in the exploration catalog. Their verdicts are kept for historical record; the methodology no longer supports this outcome.
+
+### Required EDA outputs (MANDATORY — artifact discipline preserved)
+
+EDA scripts and outputs are still **required** for Phase 5.5 PASS. The artifact must EXIST; its VALUES are informational:
+
+- `analysis/iteration_v1-NNN/eda.py` (or named equivalently) — committed before Phase 5 brief authoring
+- `analysis/iteration_v1-NNN/eda.csv` — produced by the script; contains at minimum: per-feature ADF p-values, pairwise IC orthogonality matrix, distribution stats (mean, std, skew, kurtosis, % NaN)
+- The script MUST run on IS data ONLY (grep clean for OOS patterns — Check 17 IS-only weight provenance is orthogonal to this; the check here is IS-window discipline in the EDA script itself)
+
+Phase 5.5 BLOCKS on: (a) EDA script does not exist on disk, (b) `eda.csv` is missing, (c) EDA script greps positive for OOS-side patterns (loads or filters on post-`OOS_CUTOFF_DATE` data). Phase 5.5 does NOT block on IC values or ADF p-values regardless of magnitude.
+
+### How EDA values are used (informational only)
+
+- **Brief Section 2** reports EDA values verbatim: "new feature `basis_zscore_30` has |IC|=0.62 with `stat_skew_20` — expect partial substitution in trees; hypothesis accounts for this by targeting LTX-regime specifically where stat_skew is less predictive."
+- **Critic Phase 6.0** may REFERENCE EDA values in `critic_preflight.md` commentary but CANNOT BLOCK on them. Phrasing: "NOTE: |IC|=0.62 with stat_skew_20 — trees may redistribute importance without net Sharpe improvement; monitor feature_importance.csv post-run." Not a BLOCK.
+- **Critic Phase 7.5** Check 4 (IC) and Check 5 (ADF) are INFORMATIONAL. Critic reports values, contextualizes them, but does NOT emit FAIL verdicts on F4/F5 values alone. Backtest evidence supersedes pre-hoc theory.
+- **Phase 8 diary** documents EDA predictions vs actual outcomes (e.g., "predicted partial substitution; observed — feature ranked 8/40, sister feature dropped to rank 22/40; net IS Sharpe +0.12 as hypothesized").
+
+### Remaining BLOCK conditions related to EDA
+
+Only three EDA-related conditions still BLOCK the gate:
+
+1. **EDA script does not exist** — artifact discipline failure (Phase 5.5 BLOCK).
+2. **EDA CSV (`eda.csv`) is missing** — artifact discipline failure (Phase 5.5 BLOCK).
+3. **EDA script loads or filters IN OOS-side data** — IS-honesty violation (Phase 5.5 BLOCK; same as Check 17 provenance logic applied to analysis scripts).
+
+Everything else — IC values, ADF p-values, distribution outliers — is INFORMATIONAL. The iteration proceeds to backtest regardless.
+
+---
+
 ## Before You Start
 
 Read these files in order, EVERY time this skill is triggered:
@@ -228,7 +269,7 @@ The only absolute pass/fail gates — they enforce INTEGRITY, not EDGE:
 - **No OOS tuning** — researcher discipline (Critic Check 8)
 - **Feature-column pinning** — V1_FEATURE_COLUMNS_PRUNED enforced
 - **Forming-candle drop** — `fetcher.py: if k.close_time < now_ms`
-- **ADF stationarity** — features have unit-root rejection where declared (Critic Check 5)
+- **ADF stationarity** — INFORMATIONAL only (Critic Check 5 is now informational per 2026-06-01 revision; see "EDA Discipline" section below). Not a hard methodology gate.
 - **Backtest-Live Parity** — bundle composition method must produce IDENTICAL trade decisions in backtest and at `live/engine.py:_tick`, using only same-time-snapshot per-component signals + each component's own internal sizing weight (Critic Check 15 — CONFIRMATION-PORTFOLIO only)
 - **No Coin Overlap Across Bundle Components** — in a bundle, each coin is owned by EXACTLY ONE component (universe partition is pairwise-disjoint) (Critic Check 16 — CONFIRMATION-PORTFOLIO only)
 - **IS-Only Weight Calibration** — bundle weights derived from IS-window data only by a committed `analysis/iteration_v1-NNN/weight_calibration.py`; weights pre-registered in brief Section 11 BEFORE Phase 6 launches; no OOS metric appears in the derivation chain (Critic Check 17 — CONFIRMATION-PORTFOLIO only)
@@ -331,11 +372,11 @@ Plus the v1 statistical anchors (mirroring v3 — **INFORMATIONAL, NOT auto-BLOC
 DSR_threshold = 0.95     # Deflated Sharpe Ratio — REFERENCE; below → diary justification required
 PBO_threshold = 0.40     # Probability of Backtest Overfitting (LOWER is better) — REFERENCE
 PSR_threshold = 0.95     # Probabilistic Sharpe Ratio — REFERENCE
-IC_threshold  = 0.70     # |IC_pearson| between feature families (LOWER is better) — REFERENCE
-ADF_threshold = 0.05     # ADF p-value (LOWER is better — rejects unit root) — METHODOLOGY (HARD)
+IC_threshold  = 0.70     # |IC_pearson| between feature families (LOWER is better) — INFORMATIONAL (revised 2026-06-01)
+ADF_threshold = 0.05     # ADF p-value (LOWER is better — rejects unit root) — INFORMATIONAL (revised 2026-06-01)
 ```
 
-These are **REFERENCE ANCHORS** for diary reporting and significance audit. A candidate bundle that fails any of these thresholds is NOT automatically blocked — the merge gate is per-regime Pareto-dominance vs the current BASELINE_V1 (see "Merge Principle — Relative Regime Pareto-Dominance" below). DSR/PBO/PSR regressions below threshold require diary justification (e.g., "candidate's DSR is 0.92 below 0.95 reference, but candidate Pareto-dominates baseline across all 5 tagged regimes — significance reduction attributable to bundle's lower trade variance from regime-conditional dispatch"). The `ADF_threshold` remains a HARD methodology gate (stationarity is integrity, not edge).
+These are **REFERENCE ANCHORS** for diary reporting and significance audit. A candidate bundle that fails any of these thresholds is NOT automatically blocked — the merge gate is per-regime Pareto-dominance vs the current BASELINE_V1 (see "Merge Principle — Relative Regime Pareto-Dominance" below). DSR/PBO/PSR regressions below threshold require diary justification (e.g., "candidate's DSR is 0.92 below 0.95 reference, but candidate Pareto-dominates baseline across all 5 tagged regimes — significance reduction attributable to bundle's lower trade variance from regime-conditional dispatch"). The `ADF_threshold` and `IC_threshold` are now INFORMATIONAL per the 2026-06-01 EDA Discipline revision — see "EDA Discipline" section. EDA values are reported in the diary and brief Section 2 for research traceability, but they do NOT gate Phase 5.5, Phase 6.0, or backtest launch.
 
 Plus inherited project-level merge gates — applied DIFFERENTLY to **component EXPLORATIONs** vs **bundle CONFIRMATIONs**:
 
@@ -1392,8 +1433,8 @@ QR's `diary-v1/iteration_v1-NNN.md`:
 - Check 3b (PBO — selection-bias gate): PASS / FAIL  (CONFIRMATION-only)
 - Check 3c (Regime attribution clarity — component-candidate gate): PASS / WARN / FAIL  (EXPLORATION + CONFIRMATION)
 - Check 3d (BUNDLE-level per-regime Pareto-dominance vs BASELINE_V1: candidate ≥ baseline within σ on EVERY tagged regime AND strictly better on ≥1 regime): PASS / FAIL  (BUNDLE-CONFIRMATION-only; component EXPLORATIONs EXEMPT — they use within-regime Δ vs baseline per Check 3c)
-- Check 4 (IC): PASS / FAIL
-- Check 5 (ADF): PASS / FAIL
+- Check 4 (IC): INFORMATIONAL — |IC| values reported; not a gate (revised 2026-06-01)
+- Check 5 (ADF): INFORMATIONAL — ADF p-values reported; not a gate (revised 2026-06-01)
 - Check 6 (Pareto): PASS / WARN
 - Check 7 (Reproducibility): PASS / FAIL
 - Check 8 (Hypothesis-Implementation Alignment): PASS / FAIL

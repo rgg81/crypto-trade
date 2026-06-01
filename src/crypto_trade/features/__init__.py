@@ -218,6 +218,18 @@ from crypto_trade.features_v1.composed_v1 import (  # noqa: E402
 
 _register("composed_v1", _add_composed_v1_features)  # iter-v1/040
 
+# iter-v1/049: long/short positioning feature family (long_short_zscore_30).
+# Source column: sum_toptrader_long_short_ratio from data/open_interest/<SYMBOL>/8h.csv
+# (already cached by fetch-oi). Non-kline data class; structurally orthogonal to all 44
+# existing V1_FEATURE_COLUMNS_PRUNED features (OHLCV, funding_rate, open_interest, calendar).
+# Registered here so `uv run crypto-trade features --track v1 --groups longshort_v1` writes
+# long_short_zscore_30 to v1 parquets.
+from crypto_trade.features_v1.longshort_v1 import (  # noqa: E402
+    add_longshort_v1_features as _add_longshort_v1_features,
+)
+
+_register("longshort_v1", _add_longshort_v1_features)  # iter-v1/049
+
 # iter-v1/047: statistical higher-moment feature family (skew_zscore_21) was REVERTED
 # at closeout (NEG-CLEAN-PRE-EDA: pre-launch F5 IC orthogonality gate FAILED at
 # |IC|=0.8132 vs stat_skew_20; ABORT threshold 0.60). The statistical_v1 module file

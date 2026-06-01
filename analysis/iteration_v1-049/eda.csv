@@ -1,0 +1,55 @@
+check_type,symbol,feature,value,threshold,pass,note
+ADF,BTCUSDT,long_short_zscore_30,0.0,0.05,1,p < 0.05 required for stationarity (ADF regression=c maxlag=10)
+ADF,ETHUSDT,long_short_zscore_30,0.0,0.05,1,p < 0.05 required for stationarity (ADF regression=c maxlag=10)
+ADF,LINKUSDT,long_short_zscore_30,0.0,0.05,1,p < 0.05 required for stationarity (ADF regression=c maxlag=10)
+ADF,LTCUSDT,long_short_zscore_30,0.0,0.05,1,p < 0.05 required for stationarity (ADF regression=c maxlag=10)
+ADF,DOTUSDT,long_short_zscore_30,0.0,0.05,1,p < 0.05 required for stationarity (ADF regression=c maxlag=10)
+IC_pearson,pooled,cal_hour_norm,0.250511,0.3,1,
+IC_pearson,pooled,funding_rate_zscore_90,0.222082,0.3,1,
+IC_pearson,pooled,trend_minus_di_14,0.206319,0.3,1,
+IC_pearson,pooled,mom_rsi_14,0.203916,0.3,1,
+IC_pearson,pooled,trend_ema_cross_5_12,0.199686,0.3,1,
+IC_pearson,pooled,interact_rsi_x_adx,0.197631,0.3,1,
+IC_pearson,pooled,funding_rate_zscore_30,0.195457,0.3,1,
+IC_pearson,pooled,regime_momentum_signed_5d,0.192838,0.3,1,
+IC_pearson,pooled,trend_plus_di_14,0.189853,0.3,1,
+IC_pearson,pooled,interact_rsi_x_natr,0.188303,0.3,1,
+IC_pearson,pooled,mom_stoch_d_14,0.182952,0.3,1,
+IC_pearson,pooled,mom_roc_10,0.175735,0.3,1,
+IC_pearson,pooled,vol_mfi_14,0.175294,0.3,1,
+IC_pearson,pooled,interact_stoch_x_adx,0.173025,0.3,1,
+IC_pearson,pooled,mom_stoch_k_14,0.17227,0.3,1,
+IC_pearson,pooled,stat_skew_20,0.171249,0.3,1,
+IC_pearson,pooled,trend_aroon_osc_14,0.164769,0.3,1,
+IC_pearson,pooled,mr_pct_from_high_20,0.152097,0.3,1,
+IC_pearson,pooled,trend_supertrend_14_3,0.141077,0.3,1,
+IC_pearson,pooled,mom_willr_14,0.13575,0.3,1,
+IC_pearson,pooled,mr_rsi_extreme_14,0.130668,0.3,1,
+IC_pearson,pooled,stat_return_5,0.121794,0.3,1,
+IC_pearson,pooled,vol_cmf_14,0.096953,0.3,1,
+IC_pearson,pooled,mom_macd_hist_12_26_9,0.09444,0.3,1,
+IC_pearson,pooled,trend_aroon_osc_50,0.091059,0.3,1,
+IC_pearson,pooled,mom_macd_line_12_26_9,0.088468,0.3,1,
+IC_pearson,pooled,mr_pct_from_low_20,0.086166,0.3,1,
+IC_pearson,pooled,oi_delta_30_z90,0.073731,0.3,1,
+IC_pearson,pooled,vol_atr_14,0.057297,0.3,1,
+IC_pearson,pooled,vol_volume_rel_20,0.056027,0.3,1,
+IC_pearson,pooled,vol_volume_pctchg_5,0.052921,0.3,1,
+IC_pearson,pooled,stat_kurtosis_20,0.046199,0.3,1,
+IC_pearson,pooled,vol_natr_14,0.034377,0.3,1,
+IC_pearson,pooled,vol_range_spike_24,0.026983,0.3,1,
+IC_pearson,pooled,trend_adx_14,0.023644,0.3,1,
+IC_pearson,pooled,vol_range_spike_72,0.023403,0.3,1,
+IC_pearson,pooled,interact_natr_x_adx,0.021294,0.3,1,
+IC_pearson,pooled,cal_dow_norm,0.012835,0.3,1,
+IC_pearson,pooled,interact_ret1_x_natr,0.010162,0.3,1,
+IC_pearson,pooled,stat_log_return_1,0.009532,0.3,1,
+IC_pearson,pooled,vol_taker_buy_ratio,0.008219,0.3,1,
+IC_pearson,pooled,stat_autocorr_lag5,0.006503,0.3,1,
+IC_pearson,pooled,vol_bb_bandwidth_20,0.005825,0.3,1,
+IC_pearson,pooled,interact_ret1_x_ret3,0.002507,0.3,1,
+dist_stats,BTCUSDT,long_short_zscore_30,-0.031108,,1,n=4195 mean=-0.0311 std=1.2057 skew=0.0408 kurt=0.9281 p05=-1.7558 p95=1.8473 min=-5.2421 max=5.2947
+dist_stats,ETHUSDT,long_short_zscore_30,0.085034,,1,n=2765 mean=0.0850 std=1.2109 skew=-0.0969 kurt=0.6814 p05=-1.7132 p95=1.8473 min=-5.2323 max=5.2947
+dist_stats,LINKUSDT,long_short_zscore_30,0.169225,,1,n=2765 mean=0.1692 std=1.2373 skew=-0.0403 kurt=0.1623 p05=-1.5150 p95=2.0600 min=-5.1933 max=5.2947
+dist_stats,LTCUSDT,long_short_zscore_30,0.099743,,1,n=3215 mean=0.0997 std=1.1606 skew=-0.0252 kurt=0.8566 p05=-1.5286 p95=1.9524 min=-5.1089 max=5.2947
+dist_stats,DOTUSDT,long_short_zscore_30,0.130672,,1,n=2765 mean=0.1307 std=1.2401 skew=-0.0544 kurt=0.3047 p05=-1.6273 p95=2.0785 min=-5.2810 max=5.2947
