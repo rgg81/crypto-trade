@@ -1,0 +1,6 @@
+component_id,source_iter,source_trades_path,universe,is_sharpe,is_n_trades,score,rank
+C-BTC,iteration_v1-025,/home/roberto/crypto-trade/.worktrees/quant-research/reports-v1/iteration_v1-025/in_sample/trades.csv,BTCUSDT,0.458522,114,0.457513,1
+C-ETH,iteration_v1-009,/home/roberto/crypto-trade/.worktrees/quant-research/reports-v1/iteration_v1-009/in_sample/trades.csv,ETHUSDT,2.222298,140,1.557379,2
+C-LINK,iteration_v1-025,/home/roberto/crypto-trade/.worktrees/quant-research/reports-v1/iteration_v1-025/in_sample/trades.csv,LINKUSDT,2.387491,103,1.597294,3
+C-LTC,iteration_v1-025,/home/roberto/crypto-trade/.worktrees/quant-research/reports-v1/iteration_v1-025/in_sample/trades.csv,LTCUSDT,4.982091,61,3.086855,4
+C-DOT,iteration_v1-031,/home/roberto/crypto-trade/.worktrees/quant-research/reports-v1/iteration_v1-031/in_sample/trades.csv,DOTUSDT,2.401207,117,1.627924,5
