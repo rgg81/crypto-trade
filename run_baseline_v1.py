@@ -81,6 +81,7 @@ from crypto_trade.features_v1 import (
     V1_ITER050_UNIVERSE,
     V1_ITER051_UNIVERSE,
     V1_ITER052_UNIVERSE,
+    V1_ITER053_UNIVERSE,
     V1_OOD_FEATURE_COLUMNS,
     assert_v1_universe,
 )
@@ -5978,10 +5979,10 @@ def main() -> None:
         results_a052, faxm_a052, _strat_a052 = run_model(
             "A_BTC_specialist (R3-only)",
             ("BTCUSDT",),
-            atr_tp=3.5,   # UNCHANGED — matches Model A baseline BTC config
+            atr_tp=3.5,  # UNCHANGED — matches Model A baseline BTC config
             atr_sl=1.75,  # UNCHANGED — matches Model A baseline BTC config
-            apply_r1=False,   # OFF — Model A baseline (no R1 on BTC)
-            apply_r2=False,   # OFF — Model A baseline (no R2 on BTC)
+            apply_r1=False,  # OFF — Model A baseline (no R1 on BTC)
+            apply_r2=False,  # OFF — Model A baseline (no R2 on BTC)
             n_trials=n_trials,
             ensemble_size=ensemble_size,
             oof_persist_path=OOF_PARQUET_PATH,
@@ -6006,6 +6007,104 @@ def main() -> None:
         all_results = results_a052
         _r5_model_results = [results_a052]
         _post_dispatch_fi_strategies = [("Model_A_BTC_specialist", _strat_a052)]
+
+    elif iteration_label == "v1-053" and set(symbols) == set(V1_ITER053_UNIVERSE):
+        # iter-v1/053: BTC-only multi-seed re-validation of /052 (cycle-6 EXP-8/10).
+        # Axis family: validation (multi-seed re-validation sub-type; no new feature/gate).
+        #
+        # Design: same as /052 but with --seeds 3 outer seeds (offsets 0, 3, 6) injected
+        # via run_iteration_053.py monkey-patch: run_baseline_v1._OUTER_SEED_OFFSETS=(0,3,6).
+        # Outer seed pools (fully disjoint within ENSEMBLE_SEEDS 10-element roster):
+        #   offset=0 → inner pool [42, 123, 456]   (reproduces /052 bit-exactly)
+        #   offset=3 → inner pool [789, 1001, 2002]
+        #   offset=6 → inner pool [3003, 4004, 5005]
+        #
+        # Feature stack: V1_FEATURE_COLUMNS_PRUNED (48 cols; UNCHANGED from /052).
+        #   btc_funding_rate_8h_impulse (rank 38/48 INERT at /052; retained both-or-neither)
+        #   btc_funding_spread_30_90   (rank 4/48 STRONGLY LEARNED at /052)
+        #
+        # Architecture: Model A_BTC_specialist. R3=ON, R1=OFF, R2=OFF. atr_tp=3.5,
+        # atr_sl=1.75 (unchanged from /052 and baseline Model A).
+        #
+        # NORMAL-RISK: seed variation only (no Optuna training-objective domain change).
+        # ENSEMBLE_SIZE=3, n_trials=18. Wall-clock cap: ≤ 2h per outer seed.
+        #
+        # Multi-seed verdict bands (pre-registered in brief Section 8):
+        #   mean IS Δ ≥ +0.85 AND max-min ≤ 0.5 → SPECIALIST-CONFIRMED
+        #   mean IS Δ ∈ [+0.30, +0.85) → PARTIAL-CONFIRMED
+        #   mean IS Δ < +0.30 → NEG-CLEAN-MULTI-SEED (revert both features)
+        #
+        # Basin-lottery threshold: max-min > 0.5 (TIGHTENED from /051's 1.0 due to
+        # concentrated single-driver btc_funding_spread_30_90 at rank 4/48).
+        #
+        # Trade-rate floor: mean IS ≥ 50 AND mean OOS ≥ 10.
+        # Seed=42 sanity: offset=0 must reproduce /052 IS Sharpe ±0.0005.
+        assert set(symbols) == {"BTCUSDT"}, (
+            f"iter-v1/053 guard: expected {{BTCUSDT}}, got {set(symbols)}"
+        )
+        assert "btc_funding_rate_8h_impulse" in active_feature_columns, (
+            "iter-v1/053 pre-flight FAIL: btc_funding_rate_8h_impulse not in "
+            "active_feature_columns. "
+            "Ensure --pruned-features is set and V1_FEATURE_COLUMNS_PRUNED has 48 cols "
+            "(both features retained from /052 per both-or-neither rule). "
+            "No parquet regen needed — features already present from /052."
+        )
+        assert "btc_funding_spread_30_90" in active_feature_columns, (
+            "iter-v1/053 pre-flight FAIL: btc_funding_spread_30_90 not in "
+            "active_feature_columns. "
+            "Ensure --pruned-features is set and V1_FEATURE_COLUMNS_PRUNED has 48 cols. "
+            "No parquet regen needed — features already present from /052."
+        )
+        assert len(active_feature_columns) == 48, (
+            f"iter-v1/053 guard: expected 48 V1_FEATURE_COLUMNS_PRUNED cols, "
+            f"got {len(active_feature_columns)}. "
+            "V1_FEATURE_COLUMNS_PRUNED must be 48 (UNCHANGED from /052; "
+            "btc_funding_rate_8h_impulse + btc_funding_spread_30_90 retained)."
+        )
+        print(
+            f"[iter-v1/053] BTC-ONLY MULTI-SEED RE-VALIDATION ACTIVE: "
+            f"features=btc_funding_rate_8h_impulse (rank38@/052 INERT) + "
+            f"btc_funding_spread_30_90 (rank4@/052 STRONGLY-LEARNED) — 48 cols unchanged. "
+            f"_OUTER_SEED_OFFSETS={_OUTER_SEED_OFFSETS} (scope-patched by runner). "
+            f"ENSEMBLE_SIZE={ensemble_size} (inner), n_trials={n_trials}. "
+            f"NORMAL-RISK: seed variation only. cycle-6 EXP-8/10. "
+            f"Verdict bands: mean IS Δ ≥ +0.85 + max-min ≤ 0.5 SPECIALIST-CONFIRMED / "
+            f"[+0.30, +0.85) PARTIAL-CONFIRMED / < +0.30 NEG-CLEAN-MULTI-SEED."
+        )
+        # Model A_BTC_specialist: BTC only + R3 ON, R1 OFF, R2 OFF.
+        # feature_columns = V1_FEATURE_COLUMNS_PRUNED (48 cols — UNCHANGED from /052).
+        # Both funding features already in parquet from /052 regen; no regen required.
+        results_a053, faxm_a053, _strat_a053 = run_model(
+            "A_BTC_specialist (R3-only)",
+            ("BTCUSDT",),
+            atr_tp=3.5,  # UNCHANGED — matches /052 + Model A baseline BTC config
+            atr_sl=1.75,  # UNCHANGED — matches /052 + Model A baseline BTC config
+            apply_r1=False,  # OFF — Model A baseline (no R1 on BTC)
+            apply_r2=False,  # OFF — Model A baseline (no R2 on BTC)
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            **_r5_kwargs,
+        )
+
+        # Cohort isolation sanity: assert ONLY BTCUSDT trades emitted
+        a053_symbols = {r.symbol for r in results_a053}
+        assert a053_symbols.issubset({"BTCUSDT"}), (
+            f"[iter-v1/053] Model A_BTC produced non-BTC results: {a053_symbols - {'BTCUSDT'}}. "
+            "Per-cohort isolation failed — iter-v1/053 must trade BTCUSDT ONLY."
+        )
+        print(
+            f"[iter-v1/053] Dispatch verified: "
+            f"BTC-only={len(results_a053)} trades (R3=ON, R1=OFF, R2=OFF). "
+            f"Cohort isolation PASS: universe guard confirmed."
+        )
+
+        _all_faxm_logs = faxm_a053
+        all_results = results_a053
+        _r5_model_results = [results_a053]
+        _post_dispatch_fi_strategies = [("Model_A_BTC_specialist_multiseed", _strat_a053)]
 
     elif iteration_label == "v1-044":
         # iter-v1/044: CONFIRMATION-MERGE-PORTFOLIO (cycle-5 CONFIRMATION 1/1).
