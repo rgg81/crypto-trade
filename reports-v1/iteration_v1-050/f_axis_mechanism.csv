@@ -1,0 +1,2 @@
+iter,gate,is_fire_rate,oos_fire_rate,is_killed,oos_killed,btc_vol_q75_is,conf_threshold
+v1-050,vol_spike_regime,0.0,0.0,0,0,0.020230071905756115,0.55
