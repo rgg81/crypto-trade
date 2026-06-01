@@ -117,13 +117,12 @@ def test_pruned_size_48() -> None:
     from crypto_trade.features_v1 import V1_FEATURE_COLUMNS_PRUNED
 
     n = len(V1_FEATURE_COLUMNS_PRUNED)
-    assert n == 48, (
-        f"V1_FEATURE_COLUMNS_PRUNED expected 48 features (post iter-v1/057 REVERT); got {n}. "
+    assert n == 49, (
+        f"V1_FEATURE_COLUMNS_PRUNED expected 49 features (post iter-v1/058 ADD); got {n}. "
         "History: /054 dropped impulse (48→47); /055 adds eth_vs_btc_ret_ratio_30 (47→48); "
-        "/057 added ltc_vs_btc_ret_ratio_30 (48→49) then REVERTED at closeout (49→48). "
-        "If n == 49: ltc_vs_btc_ret_ratio_30 revert was NOT applied at /057 closeout. "
-        "If n == 47: eth_vs_btc_ret_ratio_30 was NOT added — check /055 implementation. "
-        "If n < 47: something was accidentally removed."
+        "/057 added ltc ratio (48→49) then REVERTED (49→48); /058 added btc_oi_delta_5_z30 (48→49). "
+        "If n == 48: /058 ADD was NOT applied. "
+        "If n < 48: something was accidentally removed."
     )
 
 

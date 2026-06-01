@@ -379,16 +379,18 @@ def test_feature_col_count_btc() -> None:
         "C1-BTC dispatch branch excludes it (ETH cross-asset; NaN for BTC rows)."
     )
 
-    # Verify the derived 47-col BTC-only stack is correct
-    # Exclude both ETH and LTC cross-asset features (both NaN for BTC rows):
-    # V1_FEATURE_COLUMNS_PRUNED has 49 cols; excluding eth + ltc ratio → 47 BTC-only cols.
+    # Verify the derived BTC-only stack is correct.
+    # Exclude ETH and LTC cross-asset features (NaN for BTC rows):
+    # At /058: V1_FEATURE_COLUMNS_PRUNED has 49 cols; ltc_vs_btc_ret_ratio_30 was
+    # REVERTED at /057 closeout (NOT in pruned set); only eth_vs_btc_ret_ratio_30 excluded.
+    # 49 - 1 (eth only) = 48 BTC-only cols (btc_oi_delta_5_z30 ADDED at /058 is included).
     _btc_excl = {"eth_vs_btc_ret_ratio_30", "ltc_vs_btc_ret_ratio_30"}
     btc_cols = [c for c in V1_FEATURE_COLUMNS_PRUNED if c not in _btc_excl]
-    assert len(btc_cols) == 47, (
+    assert len(btc_cols) == 48, (
         f"After excluding eth_vs_btc_ret_ratio_30 and ltc_vs_btc_ret_ratio_30, "
-        f"expected 47 BTC-only cols, got {len(btc_cols)}. "
-        "C1-BTC dispatch branch uses this filtered list. "
-        "V1_FEATURE_COLUMNS_PRUNED is 49 (post /057 ADD); BTC-only = 49 - 2 = 47."
+        f"expected 48 BTC-only cols (49 total - 1 eth; ltc was reverted at /057), "
+        f"got {len(btc_cols)}. "
+        "btc_oi_delta_5_z30 was added at /058 — verify it is in V1_FEATURE_COLUMNS_PRUNED."
     )
     assert "btc_funding_spread_30_90" in btc_cols, (
         "btc_funding_spread_30_90 missing from 47-col BTC-only stack."

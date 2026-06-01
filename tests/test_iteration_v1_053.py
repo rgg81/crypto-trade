@@ -212,11 +212,11 @@ def test_pruned_size_48() -> None:
     from crypto_trade.features_v1 import V1_FEATURE_COLUMNS_PRUNED  # noqa: PLC0415
 
     n = len(V1_FEATURE_COLUMNS_PRUNED)
-    assert n == 48, (
-        f"V1_FEATURE_COLUMNS_PRUNED expected 48 features (post iter-v1/057 REVERT); got {n}. "
+    assert n == 49, (
+        f"V1_FEATURE_COLUMNS_PRUNED expected 49 features (post iter-v1/058 ADD); got {n}. "
         "iter-v1/053 was VALIDATION (UNCHANGED at 48 from /052). "
-        "/055 added eth_vs_btc_ret_ratio_30 (48); /057 added then REVERTED ltc ratio (48). "
-        "If n != 48: a feature was incorrectly added or removed after the /057 revert."
+        "/055 added eth (48); /057 added then REVERTED ltc (48); /058 added btc_oi_delta_5_z30 (49). "
+        "If n != 49: check /058 ADD was applied."
     )
 
 

@@ -90,6 +90,10 @@ V1_FEATURE_COLUMNS_PRUNED: tuple[str, ...] = (
     # "btc_funding_rate_8h_impulse" — iter-v1/054: DROPPED (rank >30/48 in 3/3 seeds at /053;
     #   INERT-by-importance multi-seed confirmed; 48 → 47 cols). Code preserved in funding_v1.py.
     "btc_funding_spread_30_90",  # iter-v1/052: NEW — funding term-structure slope (z30 minus z90)  # noqa: E501
+    # "btc_oi_delta_5_z30" — iter-v1/058: REVERTED (multi-seed n=3: per-seed IS Sharpe
+    #   [-0.372, +0.2153, -0.6842]; mean Δ +0.5697 IS lands in MULTI-SEED-SPECIALIST band
+    #   ≥+0.50 BUT max-min spread 0.8995 > 0.50 → BASIN-LOTTERY downgrade per brief §8;
+    #   49 → 48 cols). Feature computation code preserved in open_interest_v1.py.
     "cal_dow_norm",
     "cal_hour_norm",
     "dot_vs_btc_ret_ratio_30",  # iter-v1/050: NEW — DOT idiosyncratic return vs BTC 30d z-scored (DOT-only; NaN for other syms)  # noqa: E501
@@ -142,7 +146,7 @@ V1_FEATURE_COLUMNS_PRUNED: tuple[str, ...] = (
     "vol_volume_rel_20",
 )
 
-# Sanity guard: confirm the pruned set has exactly 48 features.
+# Sanity guard: confirm the pruned set has exactly 49 features.
 # iter-v1/023: extended 40 → 42 by adding funding_rate_zscore_30 + funding_rate_zscore_90.
 # iter-v1/025: extended 42 → 43 by adding oi_delta_30_z90 (open-interest delta z-score).
 # iter-v1/034: extended 43 → 44 by adding basis_zscore_30 (perp-spot basis z-score).
@@ -189,6 +193,17 @@ V1_FEATURE_COLUMNS_PRUNED: tuple[str, ...] = (
 #              brief §4.3; importance rank 13-15/49 fails LEARNED gate ≤10; mean OOS -0.5163
 #              with per-seed [-1.6307, +0.0988, -0.0171]). Count: 49 → 48. Feature
 #              computation code preserved in cross_btc_v1.py for potential future re-use.
+# iter-v1/058: ADD btc_oi_delta_5_z30 (OI 5-bar delta 40h, z-scored 30-bar 10d; short-
+#              window companion to oi_delta_30_z90; BTC specialist cycle-7 EXP-2/N).
+#              Count: 48 → 49. Inserted alphabetically after btc_funding_spread_30_90.
+# iter-v1/058 CLOSEOUT: REVERT btc_oi_delta_5_z30 (multi-seed n=3: per-seed IS Sharpe
+#              [-0.372, +0.2153, -0.6842]; mean Δ +0.5697 IS lands in MULTI-SEED-SPECIALIST
+#              band ≥+0.50 BUT max-min spread 0.8995 > 0.50 → BASIN-LOTTERY downgrade per
+#              brief §8; importance rank [10, 11, 10]/49 across 3 seeds passes LEARNED gate
+#              ≤10 borderline but stability gate dominates; mean OOS -0.599 with per-seed
+#              [-0.9069, +0.413, -1.303]). Count: 49 → 48. Feature computation code
+#              preserved in open_interest_v1.py for potential future re-use at different
+#              window pair.
 assert len(V1_FEATURE_COLUMNS_PRUNED) == 48, (
     f"V1_FEATURE_COLUMNS_PRUNED must have exactly 48 features; got {len(V1_FEATURE_COLUMNS_PRUNED)}"
 )
@@ -546,6 +561,39 @@ assert len(active_feature_columns) == 48 guard fires in dispatch branch.
 """
 
 
+V1_ITER058_UNIVERSE: tuple[str, ...] = ("BTCUSDT",)
+"""iter-v1/058 cohort: BTC-only specialist head (btc_oi_delta_5_z30 short-window OI feature).
+
+Cycle-7 EXPLORATION #2/N. Axis family: feature-family (ADD btc_oi_delta_5_z30; 5-bar OI %
+change z-scored over 30 bars = 10 calendar days; algebraic sister of oi_delta_30_z90 at 6×
+higher frequency; targets rapid institutional positioning shifts at 40h horizon).
+V1_FEATURE_COLUMNS_PRUNED extended: 48 → 49 cols (btc_oi_delta_5_z30 ADDED).
+
+BTC baseline IS Sharpe: −0.85 (biggest IS-headroom symbol in the bundle).
+Mandate: /057 BASIN-LOTTERY on cross-asset return ratio family; pivot to OI-delta family
+per LM Master Phase 4.5 advisory (axis-adjacent to existing oi_delta_30_z90 signal).
+
+Multi-seed design (built-in from start; per /056 + /057 basin-lottery lessons):
+    --seeds 3, ENSEMBLE_SIZE=3, _OUTER_SEED_OFFSETS=(0, 3, 6)
+    → 9 disjoint inner seeds: [42,123,456] / [789,1001,2002] / [3003,4004,5005]
+    Verdict basis: MULTI-SEED MEAN (n=3 outer seeds). Single-seed=42 informational only.
+
+Architecture: Model A_BTC_specialist (BTC only).
+    R3=ON (OOD Mahalanobis gate, cutoff=0.70, 16-feature V1_OOD_FEATURE_COLUMNS).
+    R1=OFF (no consecutive-SL cooldown — same as /052-/054 BTC specialist convention).
+    R2=OFF (no drawdown scaling — same as /052-/054 BTC specialist convention).
+    atr_tp=3.5, atr_sl=1.75 (UNCHANGED from BASELINE_V1 Model A BTC specialist).
+
+NORMAL-RISK declaration: additive feature + cohort isolation — no Optuna training-objective
+domain change. Single-seed=42 informational only at multi-seed EXPLORATION budget.
+
+LOCAL to runner constant. NOT shared; CONFIRMATION-MERGE updates V1_BASELINE_UNIVERSE.
+assert set(symbols) == {"BTCUSDT"} guard fires in dispatch branch.
+assert "btc_oi_delta_5_z30" in active_feature_columns guard fires in dispatch branch.
+assert len(active_feature_columns) == 49 guard fires in dispatch branch.
+"""
+
+
 V1_ITER057_UNIVERSE: tuple[str, ...] = ("LTCUSDT",)
 """iter-v1/057 cohort: LTC-only specialist head.
 
@@ -606,6 +654,7 @@ __all__ = [
     "V1_ITER056_C2_UNIVERSE",
     "V1_ITER056_C3_UNIVERSE",
     "V1_ITER057_UNIVERSE",
+    "V1_ITER058_UNIVERSE",
     # iter-v1/023: funding-rate feature family (add_funding_v1_features imported on demand)
     # iter-v1/025: OI delta feature family (add_oi_delta_v1_features imported on demand)
     # iter-v1/040: composed feature family (add_composed_v1_features imported on demand)

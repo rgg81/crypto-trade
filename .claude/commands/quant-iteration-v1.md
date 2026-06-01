@@ -123,6 +123,105 @@ Everything else — IC values, ADF p-values, distribution outliers — is INFORM
 
 ---
 
+## Basin-Lottery Vigilance (2026-06-02)
+
+**User directive 2026-06-02:** "everytime you see this basin lottery, i want some actions to be taken. don't let our workflow fail. We need to stay vigilant."
+
+The basin-lottery is the failure mode where Optuna's walk-forward hyperparameter search lands in a high-IS local optimum that is narrow, fragile, and non-reproducible across seeds. The IS Sharpe looks PROMISING; OOS degrades catastrophically. Single-seed EXPLORATION at v1's 3-inner-seed budget is structurally susceptible. Four consecutive near-misses (/050 /054 /055 /057) established the empirical 4/4 lottery rate for single-seed PROMISING verdicts.
+
+This section codifies automatic detection thresholds and mandatory phase-specific responses. **Vigilance is not optional — it is a workflow gate.**
+
+### Detection Thresholds (Lottery Flags)
+
+| Diagnostic | Threshold | Flag Label | Source |
+|---|---|---|---|
+| Per-seed IS Sharpe spread (max − min across inner seeds) | > 0.50 | `SPREAD-HIGH` | /034 BASIN-LOTTERY confirmed at spread 0.77 |
+| Pairwise outer-seed trade-roster Jaccard similarity (median) | < 0.40 | `JACCARD-LOW` | /056 basin diagnostics; AFML Ch. 4 |
+| Cross-seed hyperparameter Spearman ρ (top-3 Optuna params) | < 0.50 | `PARAM-UNSTABLE` | /056 Critic recommendation |
+| n_effective_trials / n_trials | < 60% | `SEARCH-SATURATED` | /056 had ~3–9 of 18–35 effective (Optuna saturated low) |
+| Single-seed PROMISING with n_outer_seeds = 1 | ALWAYS | `TENTATIVE` | /050 /054 /055 /057 — 4/4 lottery rate |
+
+**`n_effective_trials`** = rank of the trial-return PCA matrix required to explain ≥ 95% cumulative variance. Reported in `dsr.json` as `n_eff`. If `n_eff / n_trials < 0.60`, Optuna has effectively searched a subspace far smaller than declared — lottery risk elevated regardless of headline IS Sharpe.
+
+### Automatic Actions by Phase
+
+**Phase 4.5 (LM Master pre-design advisory):**
+- Any prior EXPLORATION or CONFIRMATION in the last 5 iterations where IS Sharpe spread exceeded 0.50 OR Jaccard median fell below 0.40 MUST be flagged in the LM advisor's "Saturation risks to flag" section.
+- If the proposed axis is HIGH-RISK (changes Optuna's training-objective domain), the LM advisor MUST specify a multi-seed validation plan: expected per-seed spread band, recommended n_outer_seeds (minimum 3 for EXPLORATION), expected Jaccard range.
+- LM advisor MUST list the expected per-seed IS Sharpe spread as a pre-registered prediction BEFORE the backtest runs. Format: "Expected per-seed IS Sharpe spread: [low, high]." This is compared against actuals in Phase 7.4.
+
+**Phase 5.5 (Engineer gate):**
+- Brief MUST declare `seeds_config` explicitly in Section 0.5: inner-seed count (3 for EXPLORATION, 10 for CONFIRMATION) AND whether any outer-seed validation is planned.
+- Single-seed EXPLORATIONs (n_outer_seeds = 1) are PERMITTED under the existing `[[v1-seed-count-non-negotiable]]` directive BUT require:
+  1. Brief Section 2.5 HIGH-RISK declaration acknowledging basin-lottery risk explicitly (one sentence: "This single-seed EXPLORATION is susceptible to basin-lottery; result is TENTATIVE pending multi-seed re-validation at next iter if PROMISING.").
+  2. Brief Section 4 pre-registers the multi-seed re-validation condition: "IF verdict is EXPLORATION-PROMISING OR PROMISING-TENTATIVE, next iter MUST be HIGH-RISK CONFIRMATION at ENSEMBLE_SIZE=10 OR a 3-outer-seed EXPLORATION re-validation before CONFIRMATION inclusion."
+- Phase 5.5 BLOCKS if: (a) Section 2.5 is missing the basin-lottery acknowledgment on a single-seed EXPLORATION, OR (b) Section 4 is missing the multi-seed re-validation pre-registration. This is NOT a new section requirement — it is an additional required sentence inside existing sections.
+
+**Phase 6.0 (Critic pre-flight):**
+- Critic MUST verify that the `_OUTER_SEED_OFFSETS` monkey-patch (or equivalent multi-seed dispatch) produces disjoint outer seeds when n_outer_seeds ≥ 3: `offset + ENSEMBLE_SIZE ≤ len(ENSEMBLE_SEEDS)` for each offset. A misconfigured seed dispatch that silently re-uses the same inner seeds across "outer" runs is a hidden lottery-amplifier.
+- If n_outer_seeds = 1 (single-seed EXPLORATION), Critic MUST explicitly note: "Single-seed EXPLORATION — result is TENTATIVE pending multi-seed re-validation per brief Section 4 pre-registration." This note appears in `critic_preflight.md` under "Cadence + Axis Sanity" even on OVERALL=PASS.
+
+**Phase 7.5 (Critic adversarial review):**
+Critic MUST compute the following lottery diagnostics from `reports-v1/iteration_v1-NNN/` artifacts. These are MANDATORY computations — not optional checks.
+
+1. **Per-seed IS Sharpe spread** — from `pareto_front.csv` (CONFIRMATION) or inner-seed logs (EXPLORATION). Report max − min across all inner seeds.
+2. **Trade-roster Jaccard (median pairwise)** — from `in_sample/trades.csv` per-seed subsets. Compute for inner seeds if available; note if un-computable from available artifacts.
+3. **Hyperparameter Spearman ρ** — from Optuna study artifacts or `run.log` trial output. Compute rank correlation of best-trial HP values across seeds for top-3 parameters.
+4. **n_effective_trials / n_trials ratio** — from `dsr.json` (`n_eff / n_trials`).
+
+**Automatic downgrade rules (applied BEFORE verdict tier selection):**
+
+| Flag triggered | Automatic downgrade |
+|---|---|
+| `SPREAD-HIGH` (per-seed IS spread > 0.50) | Verdict downgrades ONE tier: `EXPLORATION-PROMISING` → `PROMISING-TENTATIVE`; `REGIME-SPECIALIST-IS` → `MULTI-SEED-WEAK-BASIN-LOTTERY`; `UNIVERSAL` → `PROMISING-TENTATIVE` |
+| `JACCARD-LOW` (Jaccard median < 0.40) | Flag `BASIN-LOTTERY-INSTABILITY` appended to verdict label (e.g., `EXPLORATION-PROMISING-BASIN-LOTTERY-INSTABILITY`); diary MUST include one-paragraph instability explanation |
+| `TENTATIVE` (single-seed PROMISING, n_outer_seeds = 1) | Verdict is `PROMISING-TENTATIVE`; Rec 3 of Critic review is BINDING: "next iter MUST be multi-seed re-validation at ENSEMBLE_SIZE=10 or 3-outer-seed EXPLORATION before CONFIRMATION inclusion" |
+| `SEARCH-SATURATED` (n_eff / n_trials < 60%) | Flag `SEARCH-SATURATED` appended to verdict label; diary MUST include recommendation: n_trials increase OR HP-space narrowing in next iter |
+
+Downgrades compound: a `SPREAD-HIGH` + `TENTATIVE` PROMISING becomes `PROMISING-TENTATIVE` (not further downgraded — the tiers are already aligned). A `SPREAD-HIGH` + `JACCARD-LOW` on `REGIME-SPECIALIST-IS` becomes `MULTI-SEED-WEAK-BASIN-LOTTERY-BASIN-LOTTERY-INSTABILITY`.
+
+**Phase 8 (Diary + roster):**
+- Diary MUST include a "Basin-Lottery Audit" subsection in the "What Worked / What Failed" block:
+  - Per-seed IS Sharpe spread (reported or "un-computable — single seed")
+  - Jaccard median (reported or "un-computable — insufficient outer seeds")
+  - Hyperparameter Spearman ρ (reported or "un-computable")
+  - n_eff / n_trials ratio (from dsr.json)
+  - Any lottery flags triggered + downgrade applied
+- Exploration catalog row MUST include per-seed-spread and Jaccard columns: `| iter-v1-NNN | date | axis | family | IS Sharpe Δ | OOS Sharpe | verdict | basin_lottery_flags | per_seed_spread | jaccard_median | confirmation candidate? |`
+
+### CONFIRMATION-PORTFOLIO Promotion Rule (Basin-Lottery Tightened)
+
+A component is eligible for CONFIRMATION-PORTFOLIO bundle inclusion if and only if ALL of the following pass:
+
+1. **Multi-seed mean IS Sharpe Δ ≥ +0.20** (PARTIAL-band or better) vs BASELINE_V1 anchor.
+2. **Max–min seed spread ≤ 0.50** (`SPREAD-HIGH` flag is disqualifying — component must undergo multi-seed re-validation first).
+3. **Per-seed trade-roster Jaccard median ≥ 0.40** (`JACCARD-LOW` flag is disqualifying without multi-seed re-validation).
+4. **OOS n_trades ≥ 50 per single-symbol specialist** (TIGHTENED from legacy ≥ 10; see "Trade-Rate Floor Tightened" below). Specialists with OOS 30–50 trades require 7-outer-seed multi-seed validation OR fall back to BASELINE_V1 anchor.
+5. **Importance rank stable (top-15 across ≥ 2 of 3 inner seeds)** — verifiable from per-seed `feature_importance.csv` artifacts.
+
+A `PROMISING-TENTATIVE` verdict (single-seed, no multi-seed re-validation yet) does NOT qualify for CONFIRMATION bundle inclusion. The component must first complete a 3-outer-seed or ENSEMBLE_SIZE=10 re-validation and produce a verdict of `EXPLORATION-PROMISING` (no TENTATIVE tag) before bundle eligibility.
+
+### Trade-Rate Floor Tightened (2026-06-02)
+
+Per the /056//057 forensic, OOS trade-count floors for per-single-symbol specialists are tightened:
+
+- **OOS n_trades ≥ 50** per single-symbol specialist (was ≥ 10 per project-level gate, ≥ 130 at bundle level).
+- Specialists with OOS 30–50 trades are PROVISIONAL: eligible only with 7-outer-seed multi-seed validation confirming mean IS Sharpe Δ > +0.20 AND spread ≤ 0.50.
+- Specialists with OOS < 30 trades are INELIGIBLE for bundle inclusion regardless of multi-seed results. Low-trade-count Sharpe is structurally unreliable.
+- The bundle-level trade-rate floor (≥ 130 OOS total across all components) is UNCHANGED.
+
+These tightened floors are EFFECTIVE from 2026-06-02 onward. Prior EXPLORATION verdicts are NOT retroactively re-evaluated — but any component proposed for a CONFIRMATION bundle after this date is evaluated under the new floors.
+
+### Workflow-Failure Prevention (from /056 lesson)
+
+Three mechanical safeguards against aggregator crash and wall-clock runaway:
+
+1. **Per-iteration-label outputs MUST persist to per-component subdirs BEFORE the next sub-run starts.** In multi-component CONFIRMATION-PORTFOLIO runs, Component B's sub-run MUST NOT begin until Component A's reports are written to `reports-v1/iteration_v1-NNN/C_A/in_sample/` etc. The QE runner MUST validate artifact presence between sub-runs. An aggregator that reads a per-component subdir before it exists will crash and produce a half-computed `comparison.csv` — exactly the /056 `C1_BTC/in_sample/` missing-dir crash.
+2. **Aggregator validates component report presence BEFORE attempting concatenation.** The final aggregation step MUST `assert all(Path(f).exists() for f in expected_component_files)` before pandas concat. If any component artifact is missing → aggregator emits a clear error ("Component A in_sample/trades.csv not found — check sub-run log") and exits with non-zero status, preserving the partial artifacts for diagnosis.
+3. **Wall-clock cap monitoring.** If any sub-run exceeds 2× the brief Section 3.6 estimated wall-clock for that component, the QE or orchestrator MUST report status before continuing. Format: "Sub-run for Component A exceeded 2× estimate (estimated 45 min, elapsed 92 min). Proceeding — no kill-switch per 2026-05-30 directive. Adjust next-iter estimate." This is a reporting requirement, NOT a kill-switch.
+
+---
+
 ## Before You Start
 
 Read these files in order, EVERY time this skill is triggered:
@@ -992,6 +1091,8 @@ All verdict cells used in v1. The classification recognizes that under walk-forw
 | `REGIME-SPECIALIST-OOS` | ≤ +0.05 (and ≥ −0.20) | ≥ +0.10 | concentrated in OOS regimes | Bundle candidate (OOS-recurring regimes) | **PRESERVE for /044+ bundle** — log with regime tag |
 | `TAIL-CONTROL` | any | any | reduces max_dd / OOS_min_month_pnl by ≥ 20% | Risk overlay | **PRESERVE for /044+ bundle** — evaluated on tail metrics, not Sharpe |
 | `EXPLORATION-PROMISING` | ≥ +0.05 | ≥ +0.05 | lift present, not yet regime-attributed | TBD — pending attribution | Log to catalog; next EXP or CONFIRMATION inclusion |
+| `PROMISING-TENTATIVE` | ≥ +0.05 | ≥ +0.05 | single-seed PROMISING; basin-lottery risk unresolved | TBD — TENTATIVE pending multi-seed | MUST run multi-seed re-validation (3-outer-seed or ENSEMBLE_SIZE=10) before CONFIRMATION inclusion; NOT eligible for bundle as-is |
+| `MULTI-SEED-WEAK-BASIN-LOTTERY` | ≥ +0.10 IS (weak) | negative or near-zero | IS lift concentrated in non-reproducible basin; per-seed spread > 0.50 | None — IS lift is lottery artifact | Dead-paths catalog with BASIN-LOTTERY tag; pivot axis; do NOT retest at higher budget |
 | `TRUE-NEG` / `EXPLORATION-NEGATIVE` | ≤ 0 IS | ≤ 0 OOS | no regime gives lift; mechanism falsified | None | Dead-paths catalog |
 | `NEGATIVE-no-effect` | within ±0.10 baseline | within ±0.10 | axis had no effect; saturated or under-powered | None | Catalog; try higher n_trials or pivot axis |
 | `LEARNED-NEG` | mixed | OOS catastrophic | lost a regime QR expected to capture | None | Dead-paths + regime-tag the failure mechanism |
@@ -1442,7 +1543,8 @@ QR's `diary-v1/iteration_v1-NNN.md`:
 - Check 15 (Backtest-Live Parity): PASS / FAIL / N/A  (v1-only, CONFIRMATION-PORTFOLIO-only)
 - Check 16 (Universe Disjointness): PASS / FAIL / N/A  (v1-only, CONFIRMATION-PORTFOLIO-only)
 - Check 17 (Bundle Weight IS-Only Provenance): PASS / FAIL / N/A  (v1-only, CONFIRMATION-PORTFOLIO-only)
-- OVERALL: UNIVERSAL | REGIME-SPECIALIST-IS | REGIME-SPECIALIST-OOS | TAIL-CONTROL | EXPLORATION-PROMISING | EXPLORATION-NEGATIVE / TRUE-NEG | LEARNED-NEG | NEGATIVE-no-effect | CONFIRMATION-MERGE | CONFIRMATION-MERGE-PORTFOLIO | BLOCK-PENDING-FIX → final | BLOCK-FINAL | WALK-FORWARD-LEAKAGE | BUNDLE-PARITY-VIOLATION | BUNDLE-UNIVERSE-OVERLAP | BUNDLE-WEIGHT-OOS-LEAK
+- OVERALL: UNIVERSAL | REGIME-SPECIALIST-IS | REGIME-SPECIALIST-OOS | TAIL-CONTROL | EXPLORATION-PROMISING | PROMISING-TENTATIVE | MULTI-SEED-WEAK-BASIN-LOTTERY | EXPLORATION-NEGATIVE / TRUE-NEG | LEARNED-NEG | NEGATIVE-no-effect | CONFIRMATION-MERGE | CONFIRMATION-MERGE-PORTFOLIO | BLOCK-PENDING-FIX → final | BLOCK-FINAL | WALK-FORWARD-LEAKAGE | BUNDLE-PARITY-VIOLATION | BUNDLE-UNIVERSE-OVERLAP | BUNDLE-WEIGHT-OOS-LEAK
+- Basin-Lottery Audit: per_seed_spread=<value or "un-computable"> | jaccard_median=<value or "un-computable"> | n_eff_ratio=<n_eff/n_trials> | flags=<SPREAD-HIGH / JACCARD-LOW / TENTATIVE / SEARCH-SATURATED / none> | downgrade_applied=<yes/no>
 
 ## Path Forward (from Critic, if any BLOCK)
 <copy Critic's Path Forward verbatim — these become candidates for next iter's brief>
@@ -1619,5 +1721,7 @@ The legacy `/quant-iteration` skill is **deprecated** — `.claude/commands/quan
 - Sacred constants are sacred. `OOS_CUTOFF_DATE = 2025-03-24` and `training_months = 24` never change.
 - `walk_forward.py:113` carries `train_end_ms = test_start_ms - embargo_ms`. The iter-v3/058 fix is law — anything else is the iter-v3/057-style bug.
 - LM Master is the missing "creator" role from v3 cycle-7's diagnosis. QR + LM Master + QE + Critic = the four-role v1 workflow.
+
+- **Basin-Lottery Vigilance is a workflow gate, not an advisory.** Per-seed IS Sharpe spread > 0.50 → `SPREAD-HIGH` → automatic verdict downgrade. Jaccard median < 0.40 → `JACCARD-LOW` → `BASIN-LOTTERY-INSTABILITY` tag. Single-seed PROMISING → `PROMISING-TENTATIVE` → MUST complete multi-seed re-validation before CONFIRMATION inclusion. n_eff / n_trials < 60% → `SEARCH-SATURATED` → recommend n_trials increase or HP-space narrowing. All lottery diagnostics are MANDATORY computations in Phase 7.5 — not optional checks. LM Master Phase 4.5 MUST pre-register expected per-seed spread. Phase 8 diary MUST include a "Basin-Lottery Audit" subsection. Promotion to CONFIRMATION bundle is BLOCKED for any component carrying unresolved `SPREAD-HIGH` or `JACCARD-LOW` flags.
 
 The v1 refactor turns informal best-practices into structural gates AND adds a creator role to prevent the QR↔Critic loop from running out of ideas. The structure makes it harder to fool yourself, and harder to fool yourself is the entire game.
