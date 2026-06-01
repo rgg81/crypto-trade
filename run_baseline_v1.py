@@ -2897,6 +2897,9 @@ def main() -> None:
     _iteration_label_allowlist = {
         "v1-028-frozen-hp",
         "v1-044",
+        "v1-056-C1-BTC",
+        "v1-056-C2-ETH",
+        "v1-056-C3-DOT",
     }
     if getattr(args, "iteration_label_override", None) is not None:
         _override = args.iteration_label_override.strip()
@@ -6291,6 +6294,174 @@ def main() -> None:
         all_results = results_a055
         _r5_model_results = [results_a055]
         _post_dispatch_fi_strategies = [("Model_A_ETH_specialist", _strat_a055)]
+
+    elif iteration_label == "v1-056-C1-BTC" and set(symbols) == {"BTCUSDT"}:
+        # iter-v1/056 C1-BTC: CONFIRMATION-budget BTC specialist sub-run.
+        # Axis family: CONFIRMATION (re-measures /054 impulse-drop-confirmed at ens-size=10).
+        # Feature stack: 47-col BTC-only stack:
+        #   - btc_funding_spread_30_90 RETAINED (rank 4-10/48 STABLE at /053)
+        #   - btc_funding_rate_8h_impulse DROPPED (rank >30/48 INERT at /053-/054)
+        #   - eth_vs_btc_ret_ratio_30 EXCLUDED (ETH cross-asset signal; NaN for all BTC rows;
+        #     added to V1_FEATURE_COLUMNS_PRUNED at /055 but irrelevant for BTC specialist —
+        #     excluded here to maintain the /054 47-col stack for BTC).
+        # Architecture: Model A_BTC_specialist (R3=ON, R1=OFF, R2=OFF). atr_tp=3.5, atr_sl=1.75.
+        # CONFIRMATION budget: ensemble_size=10, n_trials=35. Single outer seed (--seeds 1).
+        assert "btc_funding_spread_30_90" in active_feature_columns, (
+            "iter-v1/056-C1-BTC guard: btc_funding_spread_30_90 not in active_feature_columns. "
+            "Ensure --pruned-features is set (V1_FEATURE_COLUMNS_PRUNED)."
+        )
+        assert "btc_funding_rate_8h_impulse" not in active_feature_columns, (
+            "iter-v1/056-C1-BTC guard: btc_funding_rate_8h_impulse IS in active_feature_columns. "
+            "It must be DROPPED at /056-C1-BTC (same as /054). "
+            "Check V1_FEATURE_COLUMNS_PRUNED in features_v1/__init__.py."
+        )
+        # Exclude eth_vs_btc_ret_ratio_30 for BTC-only specialist:
+        # This feature was added at /055 for ETH-only specialist. For BTC rows it would be
+        # all-NaN (BTC's ETH idiosyncratic ratio is undefined). Excluding it here preserves
+        # the /054 47-col BTC specialist stack and avoids passing an all-NaN feature column
+        # to LightGBM for the BTC cohort.
+        _btc_056_feature_columns = [
+            c for c in active_feature_columns if c != "eth_vs_btc_ret_ratio_30"
+        ]
+        assert len(_btc_056_feature_columns) == 47, (
+            f"iter-v1/056-C1-BTC guard: expected 47 BTC-only feature cols after excluding "
+            f"eth_vs_btc_ret_ratio_30, got {len(_btc_056_feature_columns)}. "
+            "V1_FEATURE_COLUMNS_PRUNED should be 48 (47 + eth_vs_btc); "
+            "after exclusion, BTC specialist sees 47 cols."
+        )
+        print(
+            f"[iter-v1/056-C1-BTC] BTC CONFIRMATION SPECIALIST ACTIVE: "
+            f"features=47-col BTC stack (impulse DROPPED, spread RETAINED, "
+            f"eth_vs_btc EXCLUDED). "
+            f"R3=ON, R1=OFF, R2=OFF. atr_tp=3.5, atr_sl=1.75. "
+            f"ENSEMBLE_SIZE={ensemble_size} (inner), n_trials={n_trials}. "
+            f"CONFIRMATION budget: ens-size=10, n_trials=35 (up from EXPLORATION 3/18)."
+        )
+        results_a056_btc, faxm_a056_btc, _strat_a056_btc = run_model(
+            "A_BTC_specialist_C1_056 (R3-only)",
+            ("BTCUSDT",),
+            atr_tp=3.5,
+            atr_sl=1.75,
+            apply_r1=False,
+            apply_r2=False,
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=_btc_056_feature_columns,  # 47-col BTC-only stack
+            bounds_profile=bounds_profile,
+            **_r5_kwargs,
+        )
+        a056_btc_syms = {r.symbol for r in results_a056_btc}
+        assert a056_btc_syms.issubset({"BTCUSDT"}), (
+            f"[iter-v1/056-C1-BTC] cohort isolation FAIL: {a056_btc_syms - {'BTCUSDT'}}"
+        )
+        print(
+            f"[iter-v1/056-C1-BTC] Dispatch verified: "
+            f"BTC-only={len(results_a056_btc)} trades (R3=ON, R1=OFF, R2=OFF)."
+        )
+        _all_faxm_logs = faxm_a056_btc
+        all_results = results_a056_btc
+        _r5_model_results = [results_a056_btc]
+        _post_dispatch_fi_strategies = [("Model_A_BTC_specialist_C1_056", _strat_a056_btc)]
+
+    elif iteration_label == "v1-056-C2-ETH" and set(symbols) == {"ETHUSDT"}:
+        # iter-v1/056 C2-ETH: CONFIRMATION-budget ETH specialist sub-run.
+        # Axis family: CONFIRMATION (re-measures /055 ETH specialist at ens-size=10).
+        # Feature stack: V1_FEATURE_COLUMNS_PRUNED (48 cols; eth_vs_btc_ret_ratio_30 ADDED
+        #   per /055). Model A_ETH_specialist (R3=ON, R1=OFF, R2=OFF). atr_tp=3.5, sl=1.75.
+        # CONFIRMATION budget: ensemble_size=10, n_trials=35. Single outer seed (--seeds 1).
+        assert "eth_vs_btc_ret_ratio_30" in active_feature_columns, (
+            "iter-v1/056-C2-ETH guard: eth_vs_btc_ret_ratio_30 not in active_feature_columns. "
+            "Ensure --pruned-features is set (V1_FEATURE_COLUMNS_PRUNED 48 cols)."
+        )
+        _n_eth_cols = len(active_feature_columns)
+        assert _n_eth_cols == 48, (
+            f"iter-v1/056-C2-ETH guard: expected 48 feature cols, got {_n_eth_cols}."
+        )
+        print(
+            f"[iter-v1/056-C2-ETH] ETH CONFIRMATION SPECIALIST ACTIVE: "
+            f"features=V1_FEATURE_COLUMNS_PRUNED (48 cols; eth_vs_btc_ret_ratio_30 ADDED). "
+            f"R3=ON, R1=OFF, R2=OFF. atr_tp=3.5, atr_sl=1.75. "
+            f"ENSEMBLE_SIZE={ensemble_size} (inner), n_trials={n_trials}. "
+            f"CONFIRMATION budget: ens-size=10, n_trials=35."
+        )
+        results_a056_eth, faxm_a056_eth, _strat_a056_eth = run_model(
+            "A_ETH_specialist_C2_056 (R3-only)",
+            ("ETHUSDT",),
+            atr_tp=3.5,
+            atr_sl=1.75,
+            apply_r1=False,
+            apply_r2=False,
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            **_r5_kwargs,
+        )
+        a056_eth_syms = {r.symbol for r in results_a056_eth}
+        assert a056_eth_syms.issubset({"ETHUSDT"}), (
+            f"[iter-v1/056-C2-ETH] cohort isolation FAIL: {a056_eth_syms - {'ETHUSDT'}}"
+        )
+        print(
+            f"[iter-v1/056-C2-ETH] Dispatch verified: "
+            f"ETH-only={len(results_a056_eth)} trades (R3=ON, R1=OFF, R2=OFF)."
+        )
+        _all_faxm_logs = faxm_a056_eth
+        all_results = results_a056_eth
+        _r5_model_results = [results_a056_eth]
+        _post_dispatch_fi_strategies = [("Model_A_ETH_specialist_C2_056", _strat_a056_eth)]
+
+    elif iteration_label == "v1-056-C3-DOT" and set(symbols) == {"DOTUSDT"}:
+        # iter-v1/056 C3-DOT: CONFIRMATION-budget DOT specialist sub-run.
+        # Axis family: CONFIRMATION (re-measures /050-/051 DOT specialist at ens-size=10).
+        # Feature stack: V1_FEATURE_COLUMNS_PRUNED (48 cols; dot_vs_btc_ret_ratio_30 present).
+        #   Note: eth_vs_btc_ret_ratio_30 also in the 48-col stack — will be NaN for DOTUSDT
+        #   (cross-asset ETH signal undefined for DOT; LightGBM handles NaN natively).
+        # Architecture: Model E_DOT_specialist (R3=ON, R1=ON, R2=ON). atr_tp=3.5, atr_sl=1.75.
+        #   Same as BASELINE_V1 Model E for DOT.
+        # CONFIRMATION budget: ensemble_size=10, n_trials=35. Single outer seed (--seeds 1).
+        assert "dot_vs_btc_ret_ratio_30" in active_feature_columns, (
+            "iter-v1/056-C3-DOT guard: dot_vs_btc_ret_ratio_30 not in active_feature_columns. "
+            "Ensure --pruned-features is set (V1_FEATURE_COLUMNS_PRUNED 48 cols)."
+        )
+        _n_dot_cols = len(active_feature_columns)
+        assert _n_dot_cols == 48, (
+            f"iter-v1/056-C3-DOT guard: expected 48 feature cols, got {_n_dot_cols}."
+        )
+        print(
+            f"[iter-v1/056-C3-DOT] DOT CONFIRMATION SPECIALIST ACTIVE: "
+            f"features=V1_FEATURE_COLUMNS_PRUNED (48 cols; dot_vs_btc_ret_ratio_30 present). "
+            f"R3=ON, R1=ON (K=3,C=27), R2=ON (7%/15%/0.33). atr_tp=3.5, atr_sl=1.75. "
+            f"ENSEMBLE_SIZE={ensemble_size} (inner), n_trials={n_trials}. "
+            f"CONFIRMATION budget: ens-size=10, n_trials=35."
+        )
+        results_e056_dot, faxm_e056_dot, _strat_e056_dot = run_model(
+            "E_DOT_specialist_C3_056 (R1+R2+R3)",
+            ("DOTUSDT",),
+            atr_tp=3.5,
+            atr_sl=1.75,
+            apply_r1=True,   # ON — Model E baseline R1 (consecutive-SL cooldown)
+            apply_r2=True,   # ON — Model E baseline R2 (drawdown-triggered scaling)
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            **_r5_kwargs,
+        )
+        a056_dot_syms = {r.symbol for r in results_e056_dot}
+        assert a056_dot_syms.issubset({"DOTUSDT"}), (
+            f"[iter-v1/056-C3-DOT] cohort isolation FAIL: {a056_dot_syms - {'DOTUSDT'}}"
+        )
+        print(
+            f"[iter-v1/056-C3-DOT] Dispatch verified: "
+            f"DOT-only={len(results_e056_dot)} trades (R1=ON, R2=ON, R3=ON)."
+        )
+        _all_faxm_logs = faxm_e056_dot
+        all_results = results_e056_dot
+        _r5_model_results = [results_e056_dot]
+        _post_dispatch_fi_strategies = [("Model_E_DOT_specialist_C3_056", _strat_e056_dot)]
 
     elif iteration_label == "v1-044":
         # iter-v1/044: CONFIRMATION-MERGE-PORTFOLIO (cycle-5 CONFIRMATION 1/1).
