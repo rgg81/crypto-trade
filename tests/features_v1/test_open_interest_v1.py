@@ -325,12 +325,14 @@ class TestV1FeatureColumnsPruned:
         from crypto_trade.features_v1 import V1_FEATURE_COLUMNS_PRUNED
 
         n = len(V1_FEATURE_COLUMNS_PRUNED)
-        assert n == 49, (
-            f"V1_FEATURE_COLUMNS_PRUNED expected 49; got {n}. "
+        assert n == 48, (
+            f"V1_FEATURE_COLUMNS_PRUNED expected 48; got {n}. "
             "iter-v1/050 adds dot_vs_btc_ret_ratio_30 (45→46). "
             "iter-v1/052 adds btc_funding_rate_8h_impulse + btc_funding_spread_30_90 (46→48). "
             "iter-v1/055 adds eth_vs_btc_ret_ratio_30 (47→48). "
-            "iter-v1/057 adds ltc_vs_btc_ret_ratio_30 (48→49)."
+            "iter-v1/057 REVERT ltc_vs_btc_ret_ratio_30 (BASIN-LOTTERY). "
+            "iter-v1/058 REVERT btc_oi_delta_5_z30 (BASIN-LOTTERY spread 0.8995). "
+            "Steady-state count: 48."
         )
 
     def test_oi_delta_30_z90_present(self) -> None:

@@ -90,7 +90,10 @@ V1_FEATURE_COLUMNS_PRUNED: tuple[str, ...] = (
     # "btc_funding_rate_8h_impulse" — iter-v1/054: DROPPED (rank >30/48 in 3/3 seeds at /053;
     #   INERT-by-importance multi-seed confirmed; 48 → 47 cols). Code preserved in funding_v1.py.
     "btc_funding_spread_30_90",  # iter-v1/052: NEW — funding term-structure slope (z30 minus z90)  # noqa: E501
-    "btc_oi_delta_5_z30",  # iter-v1/058: NEW — OI 5-bar delta (40h) z-scored over 30 bars (10d)  # noqa: E501
+    # "btc_oi_delta_5_z30" — iter-v1/058: REVERTED (multi-seed n=3: per-seed IS Sharpe
+    #   [-0.372, +0.2153, -0.6842]; mean Δ +0.5697 IS lands in MULTI-SEED-SPECIALIST band
+    #   ≥+0.50 BUT max-min spread 0.8995 > 0.50 → BASIN-LOTTERY downgrade per brief §8;
+    #   49 → 48 cols). Feature computation code preserved in open_interest_v1.py.
     "cal_dow_norm",
     "cal_hour_norm",
     "dot_vs_btc_ret_ratio_30",  # iter-v1/050: NEW — DOT idiosyncratic return vs BTC 30d z-scored (DOT-only; NaN for other syms)  # noqa: E501
@@ -193,8 +196,16 @@ V1_FEATURE_COLUMNS_PRUNED: tuple[str, ...] = (
 # iter-v1/058: ADD btc_oi_delta_5_z30 (OI 5-bar delta 40h, z-scored 30-bar 10d; short-
 #              window companion to oi_delta_30_z90; BTC specialist cycle-7 EXP-2/N).
 #              Count: 48 → 49. Inserted alphabetically after btc_funding_spread_30_90.
-assert len(V1_FEATURE_COLUMNS_PRUNED) == 49, (
-    f"V1_FEATURE_COLUMNS_PRUNED must have exactly 49 features; got {len(V1_FEATURE_COLUMNS_PRUNED)}"
+# iter-v1/058 CLOSEOUT: REVERT btc_oi_delta_5_z30 (multi-seed n=3: per-seed IS Sharpe
+#              [-0.372, +0.2153, -0.6842]; mean Δ +0.5697 IS lands in MULTI-SEED-SPECIALIST
+#              band ≥+0.50 BUT max-min spread 0.8995 > 0.50 → BASIN-LOTTERY downgrade per
+#              brief §8; importance rank [10, 11, 10]/49 across 3 seeds passes LEARNED gate
+#              ≤10 borderline but stability gate dominates; mean OOS -0.599 with per-seed
+#              [-0.9069, +0.413, -1.303]). Count: 49 → 48. Feature computation code
+#              preserved in open_interest_v1.py for potential future re-use at different
+#              window pair.
+assert len(V1_FEATURE_COLUMNS_PRUNED) == 48, (
+    f"V1_FEATURE_COLUMNS_PRUNED must have exactly 48 features; got {len(V1_FEATURE_COLUMNS_PRUNED)}"
 )
 
 # Columns explicitly NOT in V1_FEATURE_COLUMNS_PRUNED but which may still appear in

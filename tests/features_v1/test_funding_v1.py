@@ -358,7 +358,7 @@ class TestTwoWindowOutput:
 
 class TestV1FeatureColumnsPruned:
     def test_length_is_43(self) -> None:
-        """V1_FEATURE_COLUMNS_PRUNED must have exactly 47 features after iter-v1/054.
+        """V1_FEATURE_COLUMNS_PRUNED must have exactly 48 features after iter-v1/058.
 
         History: 40 (baseline) → 42 (/023: +zscore_30/90) → 43 (/025: +oi_delta)
                               → 44 (/034→/040: +basis→+regime_momentum swap)
@@ -367,17 +367,19 @@ class TestV1FeatureColumnsPruned:
                               → 48 (/052: +impulse +spread)
                               → 48 (/053: UNCHANGED)
                               → 47 (/054: DROP impulse — INERT 3/3 seeds)
+                              → 48 (/055: +eth_vs_btc_ret_ratio_30)
+                              → 49 (/057: +ltc_vs_btc_ret_ratio_30) → 48 (/057 REVERT — BASIN-LOTTERY)
+                              → 49 (/058: +btc_oi_delta_5_z30) → 48 (/058 REVERT — BASIN-LOTTERY spread 0.8995)
         """
         from crypto_trade.features_v1 import V1_FEATURE_COLUMNS_PRUNED
 
         n = len(V1_FEATURE_COLUMNS_PRUNED)
-        assert n == 49, (
-            f"V1_FEATURE_COLUMNS_PRUNED expected 49; got {n}. "
-            "iter-v1/054: 48→47 (DROP btc_funding_rate_8h_impulse; INERT in 3/3 seeds at /053). "
+        assert n == 48, (
+            f"V1_FEATURE_COLUMNS_PRUNED expected 48; got {n}. "
+            "iter-v1/057 REVERT: 49→48 (-ltc_vs_btc_ret_ratio_30; BASIN-LOTTERY spread 0.765). "
+            "iter-v1/058 REVERT: 49→48 (-btc_oi_delta_5_z30; BASIN-LOTTERY spread 0.8995). "
             "iter-v1/055: 47→48 (+eth_vs_btc_ret_ratio_30). "
-            "iter-v1/057: 48→49 (+ltc_vs_btc_ret_ratio_30). "
-            "iter-v1/052: 46→48 (+btc_funding_rate_8h_impulse +btc_funding_spread_30_90). "
-            "iter-v1/050: 45→46 (+dot_vs_btc_ret_ratio_30)."
+            "iter-v1/054: 48→47 (DROP btc_funding_rate_8h_impulse; INERT 3/3 seeds at /053)."
         )
 
     def test_zscore_30_present(self) -> None:
