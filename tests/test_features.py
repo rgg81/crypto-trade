@@ -59,7 +59,8 @@ def test_list_groups():
     groups = list_groups()
     # iter-v1/023 added funding_v1 (10 groups); iter-v1/025 added open_interest_v1 (11 groups).
     # iter-v1/034 added basis_v1 (12 groups); iter-v1/040 added composed_v1 (13 groups).
-    assert len(groups) == 13
+    # iter-v1/047 added statistical_v1 (14 groups).
+    assert len(groups) == 14
     expected = {
         "momentum",
         "volatility",
@@ -74,6 +75,7 @@ def test_list_groups():
         "open_interest_v1",  # iter-v1/025
         "basis_v1",  # iter-v1/034
         "composed_v1",  # iter-v1/040
+        "statistical_v1",  # iter-v1/047
     }
     assert set(groups) == expected
 
@@ -81,7 +83,8 @@ def test_list_groups():
 def test_registry_has_all_groups():
     # iter-v1/023 added funding_v1; iter-v1/025 added open_interest_v1.
     # iter-v1/034 added basis_v1; iter-v1/040 added composed_v1.
-    assert len(GROUP_REGISTRY) == 13
+    # iter-v1/047 added statistical_v1.
+    assert len(GROUP_REGISTRY) == 14
 
 
 # ---------------------------------------------------------------------------
