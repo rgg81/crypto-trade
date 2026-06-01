@@ -5703,9 +5703,7 @@ def main() -> None:
                         _btc_vol_050[_i] = _math_050.sqrt(_var_v)
 
                 # Build open_time → vol_value lookup dict
-                _ot_to_vol_050 = {
-                    _btc_ot_050[_i]: _btc_vol_050[_i] for _i in range(_n050)
-                }
+                _ot_to_vol_050 = {_btc_ot_050[_i]: _btc_vol_050[_i] for _i in range(_n050)}
 
                 # Compute q75 from IS training-data BTC bars ONLY (no OOS peek)
                 _is_vols_050 = [
@@ -5736,12 +5734,8 @@ def main() -> None:
                 )
 
                 # Apply gate: split IS/OOS to log separate fire-rate stats
-                _results_is_050 = [
-                    t for t in results_e050 if t.open_time < OOS_CUTOFF_MS
-                ]
-                _results_oos_050 = [
-                    t for t in results_e050 if t.open_time >= OOS_CUTOFF_MS
-                ]
+                _results_is_050 = [t for t in results_e050 if t.open_time < OOS_CUTOFF_MS]
+                _results_oos_050 = [t for t in results_e050 if t.open_time >= OOS_CUTOFF_MS]
 
                 def _apply_vol_spike_gate_050(
                     trades: list,
@@ -5896,10 +5890,10 @@ def main() -> None:
         results_e051, faxm_e051, _strat_e051 = run_model(
             "E'' (DOT + R1 + R2 + no-gate)",
             ("DOTUSDT",),
-            atr_tp=3.5,   # UNCHANGED — matches Model E baseline
+            atr_tp=3.5,  # UNCHANGED — matches Model E baseline
             atr_sl=1.75,  # UNCHANGED — matches Model E baseline
-            apply_r1=True,   # ON — Model E baseline R1 (consecutive-SL cooldown)
-            apply_r2=True,   # ON — Model E baseline R2 (drawdown-triggered scaling)
+            apply_r1=True,  # ON — Model E baseline R1 (consecutive-SL cooldown)
+            apply_r2=True,  # ON — Model E baseline R2 (drawdown-triggered scaling)
             n_trials=n_trials,
             ensemble_size=ensemble_size,
             oof_persist_path=OOF_PARQUET_PATH,
@@ -7349,19 +7343,29 @@ def main() -> None:
                         )
         print(f"[multi_seed] Canonical (outer_seed=42 offset=0) reports → {seed_42_dir}")
 
-        # Build CLI args for sub-runs (strip --seeds; add --ensemble-seeds-offset N).
-        # We reconstruct sys.argv minus the --seeds flag and any --ensemble-seeds-offset.
-        base_argv = [a for a in sys.argv[1:] if a != "--seeds"]
-        # Remove any existing --ensemble-seeds-offset args
+        # Build CLI args for sub-runs (strip --seeds + its value; add --ensemble-seeds-offset N).
+        # We reconstruct sys.argv minus the --seeds flag (and its value) and any
+        # --ensemble-seeds-offset.  Both flags may appear as "--flag VALUE" (two tokens) or
+        # "--flag=VALUE" (one token).
         _filtered_argv = []
         _skip_next = False
-        for _a in base_argv:
+        for _a in sys.argv[1:]:
             if _skip_next:
                 _skip_next = False
                 continue
-            if _a.startswith("--ensemble-seeds-offset"):
-                if "=" not in _a:
-                    _skip_next = True
+            # Strip --seeds flag + its value (two-token form)
+            if _a == "--seeds":
+                _skip_next = True
+                continue
+            # Strip --seeds=N (one-token form)
+            if _a.startswith("--seeds="):
+                continue
+            # Strip --ensemble-seeds-offset flag + its value (two-token form)
+            if _a == "--ensemble-seeds-offset":
+                _skip_next = True
+                continue
+            # Strip --ensemble-seeds-offset=N (one-token form)
+            if _a.startswith("--ensemble-seeds-offset="):
                 continue
             _filtered_argv.append(_a)
         base_argv = _filtered_argv
