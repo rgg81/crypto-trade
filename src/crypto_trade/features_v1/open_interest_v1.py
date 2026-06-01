@@ -1,4 +1,5 @@
 """v1 open-interest delta features — iter-v1/025 (feature-family EXPLORATION #10/10 cycle-3).
+iter-v1/058: added ``btc_oi_delta_5_z30`` (5-bar delta, 30-bar z-score; short-window companion).
 
 Track-isolated: ZERO imports from crypto_trade.features_v2 or crypto_trade.features_v3.
 The OI compute math is COPIED (not imported) from the v3 derivatives panel logic to
@@ -10,11 +11,17 @@ buildup (squeeze pressure); persistent negative OI delta = confirmed deleveragin
 (momentum continuation). OI delta is z-scored over a 90-bar window to normalize
 for secular OI growth (BTC OI in 2026 ~100k contracts vs 2020 ~40k).
 
-Single feature exported:
+Features exported:
   - ``oi_delta_30_z90``: 30-bar OI % change, z-scored over a 90-bar past-only window.
     This is the primary v1-025 feature. Raw oi_delta_30 is NOT added to avoid
     SAME-FAMILY same-window stacking (brief Section 3.3 /
     feedback_v3_engineered_features_dont_stack.md).
+  - ``btc_oi_delta_5_z30``: 5-bar OI % change (40h horizon), z-scored over a 30-bar
+    (10-day) past-only window. iter-v1/058 NEW feature. Targets rapid institutional
+    positioning shifts not captured by the slower 30-bar accumulation window.
+    Computed for ALL symbols (universal, not BTC-only), but only BTCUSDT is traded
+    in /058 cohort. LightGBM handles NaN natively for non-BTC symbols.
+    Burn-in: first 5 + 30 = 35 rows NaN (shorter than oi_delta_30_z90's 120 rows).
 
 Data source:
     ``data/open_interest/<SYMBOL>/8h.csv`` — cached CSV from /fapi/v1/openInterest.
@@ -24,16 +31,18 @@ Data source:
 Look-ahead discipline:
     OI delta at bar t uses ONLY past OI levels:
         oi_delta_30[t] = (oi[t] - oi[t-30]) / oi[t-30]
+        oi_delta_5[t]  = (oi[t] - oi[t-5])  / oi[t-5]   (iter-v1/058)
 
-    The 90-bar z-score uses ONLY past delta values via shift(1):
+    The z-score window uses ONLY past delta values via shift(1):
         z90[t] = (oi_delta_30[t] - mean(delta[t-90]...delta[t-1]))
                  / std(delta[t-90]...delta[t-1])
+        z30[t] = (oi_delta_5[t]  - mean(delta5[t-30]...delta5[t-1]))
+                 / std(delta5[t-30]...delta5[t-1])          (iter-v1/058)
 
     Past-only is enforced by:
-    (a) oi_delta_30: the 30-bar lookback uses .shift(lookback) — no bar-t value
-        enters the denominator.
-    (b) z90 rolling stats: the rolling mean/std uses s_shifted = oi_delta.shift(1),
-        so bar t's own delta does NOT enter bar t's rolling stats.
+    (a) oi_delta: the lookback uses .shift(lookback) — no bar-t value in denominator.
+    (b) z-score rolling stats: uses s_shifted = oi_delta.shift(1), so bar t's own
+        delta does NOT enter bar t's rolling stats.
 
     Unit-test ``tests/features_v1/test_open_interest_v1.py`` enforces this invariant.
 
@@ -49,11 +58,15 @@ Skip-month NaN policy (LM Master §5(a) ADOPTED):
 
 Outlier clipping:
     oi_delta_30: clipped to [-1.0, +5.0] (BTC OI floor approx; -100% = full unwind).
-    oi_delta_30_z90: clipped to [-10, +10] to prevent LightGBM training instability.
+    oi_delta_5:  clipped to [-1.0, +5.0] (same clip convention as oi_delta_30).
+    oi_delta_30_z90:     clipped to [-10, +10] to prevent LightGBM training instability.
+    btc_oi_delta_5_z30:  clipped to [-10, +10] (same convention).
 
 Burn-in:
     - oi_delta_30: first 30 rows NaN (lookback warm-up)
     - oi_delta_30_z90: first 30 + 90 = 120 rows NaN (delta warm-up + z-score warm-up)
+    - oi_delta_5:  first 5 rows NaN (lookback warm-up)  (iter-v1/058)
+    - btc_oi_delta_5_z30: first 5 + 30 = 35 rows NaN    (iter-v1/058)
 
 Track isolation enforcement:
     Phase 6.0 pre-flight Critic verifies:
@@ -70,13 +83,20 @@ import numpy as np
 import pandas as pd
 
 # Rolling window constants (8h cadence: 3 bars/day)
-OI_DELTA_LOOKBACK: int = 30  # 10-day delta window
-OI_ZSCORE_WINDOW: int = 90  # 30-day z-score window
+OI_DELTA_LOOKBACK: int = 30  # 10-day delta window (oi_delta_30_z90)
+OI_ZSCORE_WINDOW: int = 90  # 30-day z-score window (oi_delta_30_z90)
 
-# Clip thresholds
+# iter-v1/058: short-window companion constants
+OI_DELTA_LOOKBACK_5: int = 5  # 40h delta window (btc_oi_delta_5_z30)
+OI_ZSCORE_WINDOW_30: int = 30  # 10-day z-score window (btc_oi_delta_5_z30)
+
+# Clip thresholds (shared between both features)
 OI_DELTA_CLIP_LOW: float = -1.0  # -100% floor (full deleveraging)
 OI_DELTA_CLIP_HIGH: float = 5.0  # +500% ceiling (extreme OI surge)
 OI_ZSCORE_CLIP: float = 10.0  # z-score clip (same as funding_v1 convention)
+
+# Column name for the iter-v1/058 short-window feature
+OI_DELTA_5_Z30_COLUMN: str = "btc_oi_delta_5_z30"
 
 # Default data directory for OI cache
 _DEFAULT_DATA_DIR: Path = Path("data")
@@ -263,12 +283,129 @@ def add_oi_delta_v1_features(
     return df
 
 
+def add_oi_delta_5_z30_feature(
+    df: pd.DataFrame,
+    data_dir: Path | str = _DEFAULT_DATA_DIR,
+    delta_window: int = OI_DELTA_LOOKBACK_5,
+    zscore_window: int = OI_ZSCORE_WINDOW_30,
+    zscore_clip: float = OI_ZSCORE_CLIP,
+) -> pd.DataFrame:
+    """Load cached OI data for ``df``'s symbol and add btc_oi_delta_5_z30 column.
+
+    iter-v1/058: short-window companion to ``oi_delta_30_z90``.
+    Computes 5-bar (40h) OI % change, z-scored over a 30-bar (10-day) past-only window.
+
+    The feature is computed for ALL symbols (universal, not BTC-only). In the /058 runner,
+    only BTCUSDT is traded. LightGBM handles NaN natively for non-BTC symbols in future
+    multi-symbol contexts.
+
+    Parameters
+    ----------
+    df:
+        Kline DataFrame with ``symbol`` and ``open_time`` (ms int) columns.
+    data_dir:
+        Root data directory (default ``data/``). Reads from
+        ``data_dir/open_interest/<SYMBOL>/8h.csv``.
+    delta_window:
+        Lookback for OI % change (default 5 bars = 40h at 8h cadence).
+    zscore_window:
+        Rolling window for z-score normalization (default 30 bars = 10 days).
+    zscore_clip:
+        Absolute clip for the z-score output (default 10.0).
+
+    Returns
+    -------
+    pd.DataFrame
+        Input df (copy) with ``btc_oi_delta_5_z30`` column appended.
+        Rows where OI data is absent get NaN.
+        First (delta_window + zscore_window - 1) rows are NaN by construction.
+
+    Raises
+    ------
+    FileNotFoundError
+        If the OI cache for the symbol does not exist.
+    KeyError
+        If ``df`` does not contain the ``symbol`` column.
+
+    Notes
+    -----
+    Look-ahead discipline:
+    - delta_5[t] = (oi[t] - oi[t-5]) / oi[t-5] uses .shift(delta_window) — past-only.
+    - z30 uses s_shifted = oi_delta.shift(1): bar t's rolling stats see only
+      bars t-zscore_window…t-1 (NOT bar t itself).
+    This mirrors the exact past-only pattern in ``add_oi_delta_v1_features``.
+
+    Burn-in: first 5 + 30 = 35 rows NaN (shorter than oi_delta_30_z90's 120 rows).
+    """
+    data_dir = Path(data_dir)
+
+    if "symbol" not in df.columns:
+        raise KeyError(
+            "df must contain a 'symbol' column for open_interest_v1 btc_oi_delta_5_z30 feature. "
+            "Set df['symbol'] = '<SYMBOL>' before calling add_oi_delta_5_z30_feature."
+        )
+
+    symbol = df["symbol"].iloc[0]
+    oi_path = data_dir / "open_interest" / symbol / "8h.csv"
+
+    if not oi_path.exists():
+        raise FileNotFoundError(
+            f"OI cache not found: {oi_path}. "
+            f"Run: uv run crypto-trade fetch-oi --symbols {symbol} --intervals 8h"
+        )
+
+    oi_df = pd.read_csv(oi_path)
+
+    if len(oi_df) == 0:
+        df = df.copy()
+        df[OI_DELTA_5_Z30_COLUMN] = np.nan
+        return df
+
+    # ------------------------------------------------------------------
+    # Align OI to kline frame via left-merge on open_time (ms int).
+    # Same pattern as add_oi_delta_v1_features to avoid index collisions.
+    # ------------------------------------------------------------------
+    df = df.copy()
+    df["_oi5_merge_key"] = df["open_time"].astype("int64")
+
+    oi_df_keyed = oi_df[["open_time", "sum_open_interest"]].copy()
+    oi_df_keyed["_oi5_merge_key"] = oi_df_keyed["open_time"].astype("int64")
+
+    merged = df.merge(
+        oi_df_keyed[["_oi5_merge_key", "sum_open_interest"]],
+        on="_oi5_merge_key",
+        how="left",
+    ).drop(columns=["_oi5_merge_key"])
+
+    merged.index = df.index
+    df = df.drop(columns=["_oi5_merge_key"])
+
+    oi_series = merged["sum_open_interest"].astype(float)
+
+    # Compute past-only OI delta z-score (5-bar delta, 30-bar z-score)
+    oi_delta_5_z30 = compute_oi_delta_zscore(
+        oi_series,
+        delta_window=delta_window,
+        zscore_window=zscore_window,
+        zscore_clip=zscore_clip,
+    )
+
+    df = df.copy()
+    df[OI_DELTA_5_Z30_COLUMN] = oi_delta_5_z30.values
+
+    return df
+
+
 __all__ = [
     "OI_DELTA_LOOKBACK",
     "OI_ZSCORE_WINDOW",
+    "OI_DELTA_LOOKBACK_5",
+    "OI_ZSCORE_WINDOW_30",
     "OI_DELTA_CLIP_LOW",
     "OI_DELTA_CLIP_HIGH",
     "OI_ZSCORE_CLIP",
+    "OI_DELTA_5_Z30_COLUMN",
     "compute_oi_delta_zscore",
     "add_oi_delta_v1_features",
+    "add_oi_delta_5_z30_feature",
 ]

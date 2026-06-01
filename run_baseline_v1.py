@@ -85,6 +85,7 @@ from crypto_trade.features_v1 import (
     V1_ITER054_UNIVERSE,
     V1_ITER055_UNIVERSE,
     V1_ITER057_UNIVERSE,
+    V1_ITER058_UNIVERSE,
     V1_OOD_FEATURE_COLUMNS,
     assert_v1_universe,
 )
@@ -6556,6 +6557,94 @@ def main() -> None:
         all_results = results_d057
         _r5_model_results = [results_d057]
         _post_dispatch_fi_strategies = [("Model_D_LTC_specialist_057", _strat_d057)]
+
+    elif iteration_label == "v1-058" and set(symbols) == set(V1_ITER058_UNIVERSE):
+        # iter-v1/058: BTC-only specialist head (cycle-7 EXPLORATION 2/N).
+        # Axis family: feature-family (ADD btc_oi_delta_5_z30; 5-bar OI % change z-scored
+        #   over 30 bars = 10-day window; algebraic sister of oi_delta_30_z90 at 6× higher
+        #   frequency; targets rapid institutional positioning shifts at 40h horizon).
+        # V1_FEATURE_COLUMNS_PRUNED: 48 → 49 cols (btc_oi_delta_5_z30 ADDED).
+        # BTC baseline IS Sharpe: −0.85 (biggest IS-headroom symbol in the bundle).
+        # Mandate: /057 BASIN-LOTTERY (cross-asset return ratio); pivot to OI-delta family.
+        #
+        # Architecture: Model_A_BTC_specialist (BTC only).
+        #   R3=ON  (OOD Mahalanobis gate, cutoff=0.70, 16-feature V1_OOD_FEATURE_COLUMNS)
+        #   R1=OFF (no consecutive-SL cooldown — same as /052-/054 BTC specialist convention)
+        #   R2=OFF (no drawdown scaling — same as /052-/054 BTC specialist convention)
+        #   atr_tp=3.5, atr_sl=1.75 (UNCHANGED from BASELINE_V1 Model A BTC specialist)
+        #
+        # Feature stack: V1_FEATURE_COLUMNS_PRUNED (49 cols; btc_oi_delta_5_z30 ADDED).
+        # NORMAL-RISK: additive feature + cohort isolation (no Optuna domain change).
+        # Multi-seed: --seeds 3, _OUTER_SEED_OFFSETS=(0,3,6) via monkey-patch in run_iteration_058.
+        # Verdict basis: MULTI-SEED MEAN (n=3 outer seeds). Single-seed=42 is informational only.
+        #
+        # Verdict bands (brief Section 4; multi-seed MEAN IS Δ vs BTC baseline −0.85):
+        #   Mean IS Δ ≥ +0.50 → MULTI-SEED-SPECIALIST-CANDIDATE
+        #   Mean IS Δ ∈ [+0.20, +0.50) → MULTI-SEED-PARTIAL-CONFIRMED
+        #   Mean IS Δ ∈ [+0.05, +0.20) → MULTI-SEED-WEAK
+        #   Mean IS Δ ∈ (-0.05, +0.05) → NEG-INERT
+        #   Mean IS Δ < -0.05 → NEG-CLEAN; btc_oi_delta_5_z30 reverted
+        #   Max-min spread > 0.50 → BASIN-LOTTERY downgrade
+        assert set(symbols) == {"BTCUSDT"}, (
+            f"iter-v1/058 guard: expected {{BTCUSDT}}, got {set(symbols)}"
+        )
+        assert "btc_oi_delta_5_z30" in active_feature_columns, (
+            "iter-v1/058 pre-flight FAIL: btc_oi_delta_5_z30 not in active_feature_columns. "
+            "Ensure --pruned-features is set and V1_FEATURE_COLUMNS_PRUNED has 49 cols "
+            "(btc_oi_delta_5_z30 ADDED at /058). "
+            "Run: uv run crypto-trade features --symbols BTCUSDT "
+            "--interval 8h --track v1 --format parquet --workers 4"
+        )
+        assert len(active_feature_columns) == 49, (
+            f"iter-v1/058 guard: expected 49 V1_FEATURE_COLUMNS_PRUNED cols, "
+            f"got {len(active_feature_columns)}. "
+            "V1_FEATURE_COLUMNS_PRUNED must be 49 at /058 (48 + 1 btc_oi_delta_5_z30). "
+            "If len == 48: btc_oi_delta_5_z30 was NOT added — check __init__.py."
+        )
+        print(
+            f"[iter-v1/058] BTC-ONLY SPECIALIST HEAD ACTIVE: "
+            f"features=V1_FEATURE_COLUMNS_PRUNED (49 cols; btc_oi_delta_5_z30 ADDED). "
+            f"R1=OFF, R2=OFF, R3=ON (OOD cutoff=0.70). "
+            f"atr_tp=3.5, atr_sl=1.75 (Model A BTC specialist convention). "
+            f"ENSEMBLE_SIZE={ensemble_size} (inner), n_trials={n_trials}. "
+            f"NORMAL-RISK: additive feature + cohort isolation (no Optuna domain change). "
+            f"cycle-7 EXP-2/N. BTC baseline IS −0.85; target: mean multi-seed IS Δ ≥ +0.05."
+        )
+        # Model A_BTC_specialist: BTC only + R1 OFF, R2 OFF, R3 ON.
+        # feature_columns = V1_FEATURE_COLUMNS_PRUNED (49 cols; btc_oi_delta_5_z30 ADDED).
+        # btc_oi_delta_5_z30 must be in the BTCUSDT parquet (from /058 regen via feature pipeline).
+        results_a058, faxm_a058, _strat_a058 = run_model(
+            "A_BTC_specialist (R3)",
+            ("BTCUSDT",),
+            atr_tp=3.5,   # UNCHANGED — matches BTC specialist convention + BASELINE_V1 Model A
+            atr_sl=1.75,  # UNCHANGED — matches BTC specialist convention + BASELINE_V1 Model A
+            apply_r1=False,   # OFF — same as /052-/054 BTC specialist convention
+            apply_r2=False,   # OFF — same as /052-/054 BTC specialist convention
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            **_r5_kwargs,
+        )
+
+        # Cohort isolation sanity: assert ONLY BTCUSDT trades emitted
+        a058_symbols = {r.symbol for r in results_a058}
+        assert a058_symbols.issubset({"BTCUSDT"}), (
+            f"[iter-v1/058] Model A_BTC produced non-BTC results: {a058_symbols - {'BTCUSDT'}}. "
+            "Per-cohort isolation failed — iter-v1/058 must trade BTCUSDT ONLY."
+        )
+        print(
+            f"[iter-v1/058] Dispatch verified: "
+            f"BTC-only={len(results_a058)} trades (R1=OFF, R2=OFF, R3=ON). "
+            f"Cohort isolation PASS: universe guard confirmed. "
+            f"atr_tp=3.5, atr_sl=1.75 (Model A BTC specialist convention)."
+        )
+
+        _all_faxm_logs = faxm_a058
+        all_results = results_a058
+        _r5_model_results = [results_a058]
+        _post_dispatch_fi_strategies = [("Model_A_BTC_specialist_058", _strat_a058)]
 
     elif iteration_label == "v1-044":
         # iter-v1/044: CONFIRMATION-MERGE-PORTFOLIO (cycle-5 CONFIRMATION 1/1).

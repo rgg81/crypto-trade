@@ -110,7 +110,7 @@ def test_ltc_vs_btc_ret_ratio_30_in_pruned() -> None:
 
 
 def test_pruned_size_49() -> None:
-    """V1_FEATURE_COLUMNS_PRUNED must have exactly 48 features post iter-v1/057 REVERT.
+    """V1_FEATURE_COLUMNS_PRUNED must have exactly 49 features at iter-v1/058 (post-/057 revert + /058 ADD).
 
     History:
         40 (baseline /002) → 42 (/023) → 43 (/025) → 44 (/034→/040) → 45 (/049)
@@ -120,16 +120,19 @@ def test_pruned_size_49() -> None:
         → 48 (/055 ADD eth_vs_btc_ret_ratio_30)
         → 49 (/057 ADD ltc_vs_btc_ret_ratio_30) — pre-closeout
         → 48 (/057 CLOSEOUT REVERT — BASIN-LOTTERY downgrade)
+        → 49 (/058 ADD btc_oi_delta_5_z30 — short-window OI delta)
+    NOTE: This test function name is misleadingly named "test_pruned_size_49" from /057 era;
+    at /058 the expected count IS 49 again (btc_oi_delta_5_z30 added).
     """
     from crypto_trade.features_v1 import V1_FEATURE_COLUMNS_PRUNED
 
     n = len(V1_FEATURE_COLUMNS_PRUNED)
-    assert n == 48, (
-        f"V1_FEATURE_COLUMNS_PRUNED expected 48 features at iter-v1/057 closeout; got {n}. "
-        "History: /055 added eth_vs_btc_ret_ratio_30 (47→48); "
-        "/057 added ltc_vs_btc_ret_ratio_30 (48→49) and REVERTED at closeout (49→48). "
-        "If n == 49: revert was NOT applied — check /057 closeout implementation. "
-        "If n < 48: something was accidentally removed."
+    assert n == 49, (
+        f"V1_FEATURE_COLUMNS_PRUNED expected 49 features at iter-v1/058; got {n}. "
+        "History: /057 REVERTED ltc_vs_btc_ret_ratio_30 (49→48); "
+        "/058 ADDED btc_oi_delta_5_z30 (48→49). "
+        "If n == 48: /058 ADD was NOT applied — check /058 closeout implementation. "
+        "If n < 48 or n > 49: something was unexpectedly removed or double-added."
     )
 
 
@@ -320,28 +323,28 @@ def test_features_base_hash_changed_vs_056() -> None:
         "If they are equal, the pre-registered hash constants are wrong."
     )
 
-    # Post-/057-CLOSEOUT-REVERT: live V1_FEATURE_COLUMNS_PRUNED matches the 48-col hash
-    # (ltc_vs_btc_ret_ratio_30 was ADDED at iter-v1/057 launch then REVERTED at closeout).
+    # Post-/057-CLOSEOUT-REVERT + /058-ADD: live V1_FEATURE_COLUMNS_PRUNED is now at 49 cols
+    # (ltc_vs_btc_ret_ratio_30 REVERTED at /057, btc_oi_delta_5_z30 ADDED at /058).
+    # The live hash will differ from BOTH the /057 49-col hash AND the /057 48-col hash.
     from crypto_trade.features_v1 import V1_FEATURE_COLUMNS_PRUNED
 
     live_hash = _compute_features_hash(V1_FEATURE_COLUMNS_PRUNED)
-    assert live_hash == expected_48col, (
-        f"Live V1_FEATURE_COLUMNS_PRUNED hash does not match pre-registered 48-col hash "
-        f"after /057 closeout REVERT.\n"
-        f"  pre-registered 49-col (pre-revert): {expected_49col}\n"
-        f"  pre-registered 48-col (post-revert): {expected_48col}\n"
-        f"  live computed                      : {live_hash}\n"
-        "If live == 49-col hash: revert was NOT applied — check closeout implementation. "
-        "Verify the REVERT is in effect (48 cols expected post-/057 closeout)."
+
+    # At /058: live must differ from the /057 pre-revert 49-col hash (different feature set)
+    assert live_hash != expected_49col, (
+        f"Live V1_FEATURE_COLUMNS_PRUNED hash matches the /057 pre-revert 49-col reference "
+        f"(ltc_vs_btc_ret_ratio_30 added). At /058 the feature set should be different "
+        f"(btc_oi_delta_5_z30 added instead).\n"
+        f"  live computed: {live_hash}\n"
+        f"  expected_49col (/057 pre-revert): {expected_49col}"
     )
 
-    # Verify the live hash differs from the 49-col reference (revert applied)
-    assert live_hash != expected_49col, (
-        f"Live V1_FEATURE_COLUMNS_PRUNED hash matches the 49-col pre-revert reference:\n"
+    # At /058: live must also differ from the /057 post-revert 48-col hash (btc_oi_delta_5_z30 was added)
+    assert live_hash != expected_48col, (
+        f"Live V1_FEATURE_COLUMNS_PRUNED hash matches the /057 48-col post-revert reference. "
+        f"This means btc_oi_delta_5_z30 (/058 ADD) was NOT applied.\n"
         f"  live computed: {live_hash}\n"
-        f"  expected_49col: {expected_49col}\n"
-        "ltc_vs_btc_ret_ratio_30 is still in V1_FEATURE_COLUMNS_PRUNED — the /057 closeout "
-        "REVERT was not applied."
+        f"  expected_48col (/057 post-revert): {expected_48col}"
     )
 
     print(f"  [OK] expected_49col hash = {expected_49col[:16]}...")

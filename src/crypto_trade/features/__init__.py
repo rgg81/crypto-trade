@@ -158,7 +158,7 @@ def run_features(
 # Auto-register all feature groups on import
 # ---------------------------------------------------------------------------
 
-from crypto_trade.features.calendar import add_calendar_features  # noqa: E402
+from crypto_trade.features.calendar import add_calendar_features  # noqa: E402, I001
 from crypto_trade.features.entropy_cusum import add_entropy_cusum_features  # noqa: E402
 from crypto_trade.features.interaction import add_interaction_features  # noqa: E402
 from crypto_trade.features.mean_reversion import add_mean_reversion_features  # noqa: E402
@@ -196,9 +196,25 @@ from crypto_trade.features_v1.funding_v1 import (  # noqa: E402
 # features_v1/ (v1 track), called here via the legacy features registry so
 # that `uv run crypto-trade features --track v1 --groups open_interest_v1` writes
 # oi_delta_30_z90 to the v1 parquets.
-from crypto_trade.features_v1.open_interest_v1 import (  # noqa: E402
+# iter-v1/058: also imports add_oi_delta_5_z30_feature for the short-window companion.
+# The combined wrapper _add_oi_delta_all_v1_features calls both to write both columns
+# in a single `--groups open_interest_v1` pass.
+from crypto_trade.features_v1.open_interest_v1 import (  # noqa: E402, I001
+    add_oi_delta_5_z30_feature as _add_oi_delta_5_z30_feature,
     add_oi_delta_v1_features as _add_oi_delta_v1_features,
 )
+
+
+def _add_oi_delta_all_v1_features(df: pd.DataFrame) -> pd.DataFrame:
+    """Combined wrapper: add oi_delta_30_z90 + btc_oi_delta_5_z30 in one pass.
+
+    iter-v1/058: both OI features are written when calling
+    ``uv run crypto-trade features --track v1 --groups open_interest_v1``.
+    """
+    df = _add_oi_delta_v1_features(df)
+    df = _add_oi_delta_5_z30_feature(df)
+    return df
+
 
 _register("momentum", add_momentum_features)
 _register("volatility", add_volatility_features)
@@ -210,7 +226,7 @@ _register("interaction", add_interaction_features)
 _register("calendar", add_calendar_features)
 _register("entropy_cusum", add_entropy_cusum_features)
 _register("funding_v1", _add_funding_v1_features)  # iter-v1/023
-_register("open_interest_v1", _add_oi_delta_v1_features)  # iter-v1/025
+_register("open_interest_v1", _add_oi_delta_all_v1_features)  # iter-v1/025+058
 _register("basis_v1", _add_basis_v1_features)  # iter-v1/034
 
 # iter-v1/040: composed feature family (regime_momentum_signed_5d = ret_5d × sign(hurst_100 − 0.5)).
