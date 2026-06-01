@@ -453,6 +453,52 @@ assert len(active_feature_columns) == 47 guard fires in dispatch branch.
 """
 
 
+V1_ITER056_C1_UNIVERSE: tuple[str, ...] = ("BTCUSDT",)
+"""iter-v1/056 C1-BTC: CONFIRMATION-budget BTC specialist sub-run.
+
+Cycle-6 CONFIRMATION 1/1. Re-measures /054 impulse-drop-confirmed at ens-size=10, n_trials=35.
+Feature stack: V1_FEATURE_COLUMNS_PRUNED (47 cols; btc_funding_spread_30_90 RETAINED,
+btc_funding_rate_8h_impulse DROPPED per /054).
+Architecture: Model A_BTC_specialist (R3=ON, R1=OFF, R2=OFF). atr_tp=3.5, atr_sl=1.75.
+
+LOCAL to runner constant. NOT shared; CONFIRMATION-MERGE updates V1_BASELINE_UNIVERSE.
+assert set(symbols) == {"BTCUSDT"} guard fires in dispatch branch.
+assert "btc_funding_spread_30_90" in active_feature_columns guard fires.
+assert "btc_funding_rate_8h_impulse" not in active_feature_columns guard fires.
+assert len(active_feature_columns) == 47 guard fires in dispatch branch.
+"""
+
+
+V1_ITER056_C2_UNIVERSE: tuple[str, ...] = ("ETHUSDT",)
+"""iter-v1/056 C2-ETH: CONFIRMATION-budget ETH specialist sub-run.
+
+Cycle-6 CONFIRMATION 1/1. Re-measures /055 ETH specialist at ens-size=10, n_trials=35.
+Feature stack: V1_FEATURE_COLUMNS_PRUNED (48 cols; eth_vs_btc_ret_ratio_30 ADDED per /055).
+Architecture: Model A_ETH_specialist (R3=ON, R1=OFF, R2=OFF). atr_tp=3.5, atr_sl=1.75.
+
+LOCAL to runner constant. NOT shared; CONFIRMATION-MERGE updates V1_BASELINE_UNIVERSE.
+assert set(symbols) == {"ETHUSDT"} guard fires in dispatch branch.
+assert "eth_vs_btc_ret_ratio_30" in active_feature_columns guard fires.
+assert len(active_feature_columns) == 48 guard fires in dispatch branch.
+"""
+
+
+V1_ITER056_C3_UNIVERSE: tuple[str, ...] = ("DOTUSDT",)
+"""iter-v1/056 C3-DOT: CONFIRMATION-budget DOT specialist sub-run.
+
+Cycle-6 CONFIRMATION 1/1. Re-measures /050-/051 DOT specialist at ens-size=10, n_trials=35.
+Feature stack: V1_FEATURE_COLUMNS_PRUNED (48 cols; dot_vs_btc_ret_ratio_30 present;
+eth_vs_btc_ret_ratio_30 NaN for DOTUSDT — LightGBM handles NaN natively).
+Architecture: Model E_DOT_specialist (R3=ON, R1=ON K=3/C=27, R2=ON 7%/15%/0.33).
+atr_tp=3.5, atr_sl=1.75 (same as BASELINE_V1 Model E).
+
+LOCAL to runner constant. NOT shared; CONFIRMATION-MERGE updates V1_BASELINE_UNIVERSE.
+assert set(symbols) == {"DOTUSDT"} guard fires in dispatch branch.
+assert "dot_vs_btc_ret_ratio_30" in active_feature_columns guard fires.
+assert len(active_feature_columns) == 48 guard fires in dispatch branch.
+"""
+
+
 V1_ITER055_UNIVERSE: tuple[str, ...] = ("ETHUSDT",)
 """iter-v1/055 cohort: ETH-only specialist head.
 
@@ -506,6 +552,9 @@ __all__ = [
     "V1_ITER053_UNIVERSE",
     "V1_ITER054_UNIVERSE",
     "V1_ITER055_UNIVERSE",
+    "V1_ITER056_C1_UNIVERSE",
+    "V1_ITER056_C2_UNIVERSE",
+    "V1_ITER056_C3_UNIVERSE",
     # iter-v1/023: funding-rate feature family (add_funding_v1_features imported on demand)
     # iter-v1/025: OI delta feature family (add_oi_delta_v1_features imported on demand)
     # iter-v1/040: composed feature family (add_composed_v1_features imported on demand)
