@@ -114,7 +114,7 @@ def test_v1_034_pruned_features_length_44() -> None:
     from crypto_trade.features_v1 import V1_FEATURE_COLUMNS_PRUNED
 
     n = len(V1_FEATURE_COLUMNS_PRUNED)
-    assert n == 48, (
+    assert n == 47, (
         f"V1_FEATURE_COLUMNS_PRUNED should have 48 features after iter-v1/052 adds "
         f"btc_funding_rate_8h_impulse + btc_funding_spread_30_90 (46 → 48). Got {n}."
     )

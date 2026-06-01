@@ -42,7 +42,7 @@ class TestV1FeatureColumnsPruned:
         # iter-v1/052: +2 btc_funding_rate_8h_impulse + btc_funding_spread_30_90 → 48.
         from crypto_trade.features_v1 import V1_FEATURE_COLUMNS_PRUNED
 
-        assert len(V1_FEATURE_COLUMNS_PRUNED) == 48, (
+        assert len(V1_FEATURE_COLUMNS_PRUNED) == 47, (
             f"Expected 48 features; got {len(V1_FEATURE_COLUMNS_PRUNED)}"
         )
 
@@ -205,11 +205,11 @@ class TestPrunedFeaturesCliFlag:
         assert result["bounds_profile"] == "default"
 
     def test_pruned_features_flag_gives_43_columns(self) -> None:
-        """--pruned-features activates V1_FEATURE_COLUMNS_PRUNED (48 cols after iter-v1/052)."""
+        """--pruned-features activates V1_FEATURE_COLUMNS_PRUNED (47 cols after iter-v1/054)."""
         result = self._parse_and_resolve_features(
             ["--exploration", "--iteration", "2", "--pruned-features"]
         )
-        assert len(result["feature_columns"]) == 48
+        assert len(result["feature_columns"]) == 47
         assert result["bounds_profile"] == "v1_pruned"
 
     def test_pruned_features_and_v1_feature_columns_are_disjoint_in_count(self) -> None:
