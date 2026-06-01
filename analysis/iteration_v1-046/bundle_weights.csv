@@ -1,0 +1,6 @@
+component_id,weight,derivation_method,is_window_start,is_window_end
+C-BTC,0.2,equal,2021-03-24,2025-03-24
+C-ETH,0.2,equal,2021-03-24,2025-03-24
+C-LINK,0.2,equal,2021-03-24,2025-03-24
+C-LTC,0.2,equal,2021-03-24,2025-03-24
+C-DOT,0.2,equal,2021-03-24,2025-03-24
