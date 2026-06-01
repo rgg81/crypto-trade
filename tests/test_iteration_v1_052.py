@@ -152,12 +152,11 @@ def test_pruned_size_48() -> None:
     from crypto_trade.features_v1 import V1_FEATURE_COLUMNS_PRUNED  # noqa: PLC0415
 
     n = len(V1_FEATURE_COLUMNS_PRUNED)
-    assert n == 47, (
-        f"V1_FEATURE_COLUMNS_PRUNED expected 48 features (46 + 2 new funding transforms); "
+    assert n == 49, (
+        f"V1_FEATURE_COLUMNS_PRUNED expected 49 features (post iter-v1/057 ADD); "
         f"got {n}. "
-        "iter-v1/052 ADDs btc_funding_rate_8h_impulse + btc_funding_spread_30_90 "
-        "(both-or-neither; alphabetically inserted). "
-        "History: ...→ 46 (/050 ADD dot_vs_btc_ret_ratio_30) → 48 (/052 ADD 2 cols)."
+        "History: ...→ 46 (/050 ADD dot_vs_btc_ret_ratio_30) → 48 (/052 ADD 2 cols) "
+        "→ 47 (/054 DROP impulse) → 48 (/055 ADD eth ratio) → 49 (/057 ADD ltc ratio)."
     )
 
 
