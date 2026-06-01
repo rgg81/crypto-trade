@@ -237,15 +237,16 @@ class TestFoundationRegression:
 
 
 class TestIter028FeatureColumnsPruned:
-    """V1_FEATURE_COLUMNS_PRUNED must have exactly 45 features (current live constant)."""
+    """V1_FEATURE_COLUMNS_PRUNED must have exactly 46 features (current live constant)."""
 
     def test_pruned_columns_count_is_43(self) -> None:
         # iter-v1/040: SWAP basis_zscore_30 → regime_momentum_signed_5d; count 43→44.
         # iter-v1/049: ADD long_short_zscore_30; count 44→45.
-        # Test tracks live constant (was 43 at /028 runtime; now 45 at /049).
+        # iter-v1/050: ADD dot_vs_btc_ret_ratio_30; count 45→46.
+        # Test tracks live constant (was 43 at /028 runtime; now 46 at /050).
         from crypto_trade.features_v1 import V1_FEATURE_COLUMNS_PRUNED
 
-        assert len(V1_FEATURE_COLUMNS_PRUNED) == 45
+        assert len(V1_FEATURE_COLUMNS_PRUNED) == 46
 
     def test_pruned_columns_is_tuple(self) -> None:
         from crypto_trade.features_v1 import V1_FEATURE_COLUMNS_PRUNED

@@ -316,17 +316,18 @@ class TestMissingSymbolColumn:
 
 class TestV1FeatureColumnsPruned:
     def test_length_is_43(self) -> None:
-        """V1_FEATURE_COLUMNS_PRUNED must have exactly 45 features after iter-v1/049.
+        """V1_FEATURE_COLUMNS_PRUNED must have exactly 46 features after iter-v1/050.
 
         History: 40 (baseline) → 42 (/023: +funding) → 43 (/025: +oi_delta)
                  → 44 (/034→/040: basis→regime_momentum swap) → 45 (/049: +long_short_zscore_30)
+                 → 46 (/050: +dot_vs_btc_ret_ratio_30)
         """
         from crypto_trade.features_v1 import V1_FEATURE_COLUMNS_PRUNED
 
         n = len(V1_FEATURE_COLUMNS_PRUNED)
-        assert n == 45, (
-            f"V1_FEATURE_COLUMNS_PRUNED expected 45; got {n}. "
-            "iter-v1/049 adds long_short_zscore_30 (44→45)."
+        assert n == 46, (
+            f"V1_FEATURE_COLUMNS_PRUNED expected 46; got {n}. "
+            "iter-v1/050 adds dot_vs_btc_ret_ratio_30 (45→46)."
         )
 
     def test_oi_delta_30_z90_present(self) -> None:

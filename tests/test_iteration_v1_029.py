@@ -415,10 +415,11 @@ class TestIter029SourceWiring:
     def test_feature_columns_pruned_has_43_cols(self) -> None:
         # iter-v1/040: SWAP basis_zscore_30 → regime_momentum_signed_5d; count 43→44.
         # iter-v1/049: ADD long_short_zscore_30; count 44→45.
-        # Updated assertion to 45 (was 43 at /029 runtime; test tracks live constant).
+        # Updated assertion to 46 (was 43 at /029 runtime; test tracks live constant).
+        # iter-v1/050 adds dot_vs_btc_ret_ratio_30: 45 → 46.
         from crypto_trade.features_v1 import V1_FEATURE_COLUMNS_PRUNED
 
-        assert len(V1_FEATURE_COLUMNS_PRUNED) == 45
+        assert len(V1_FEATURE_COLUMNS_PRUNED) == 46
 
     def test_v1_029_gate_is_symmetric_not_long_only(self) -> None:
         """Gate is symmetric (long_only_mode=False default) — mirrors /019 ETH spec."""

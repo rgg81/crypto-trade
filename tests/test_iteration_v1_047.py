@@ -46,8 +46,8 @@ def test_skew_zscore_21_reverted_from_pruned():
         "skew_zscore_21 must be REVERTED from V1_FEATURE_COLUMNS_PRUNED "
         "(iter-v1/047 NEG-CLEAN-PRE-EDA: F5 |IC|=0.8132 vs stat_skew_20)"
     )
-    assert len(V1_FEATURE_COLUMNS_PRUNED) == 45, (
-        f"Expected 45 pruned features (44 post-/047/048 revert + /049 ADD), "
+    assert len(V1_FEATURE_COLUMNS_PRUNED) == 46, (
+        f"Expected 46 pruned features (45 post-/049 ADD + /050 ADD dot_vs_btc_ret_ratio_30), "
         f"got {len(V1_FEATURE_COLUMNS_PRUNED)}"
     )
 
@@ -73,9 +73,9 @@ def test_statistical_v1_not_in_group_registry():
         "statistical_v1 must be DE-REGISTERED from GROUP_REGISTRY "
         "(iter-v1/047 NEG-CLEAN-PRE-EDA revert)"
     )
-    # Count is 14 post-/049 (13 post-/047/048 revert + 1 longshort_v1 added at /049).
-    assert len(GROUP_REGISTRY) == 14, (
-        f"GROUP_REGISTRY must have exactly 14 groups post-/049, got {len(GROUP_REGISTRY)}"
+    # Count is 15 post-/050 (14 post-/049 + 1 cross_btc_v1 added at /050).
+    assert len(GROUP_REGISTRY) == 15, (
+        f"GROUP_REGISTRY must have exactly 15 groups post-/050, got {len(GROUP_REGISTRY)}"
     )
 
 

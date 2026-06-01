@@ -89,6 +89,7 @@ V1_FEATURE_COLUMNS: tuple[str, ...] = tuple(BASELINE_FEATURE_COLUMNS)
 V1_FEATURE_COLUMNS_PRUNED: tuple[str, ...] = (
     "cal_dow_norm",
     "cal_hour_norm",
+    "dot_vs_btc_ret_ratio_30",  # iter-v1/050: NEW — DOT idiosyncratic return vs BTC 30d z-scored (DOT-only; NaN for other syms)  # noqa: E501
     "funding_rate_zscore_30",  # iter-v1/023: NEW — funding-rate z-score 30-bar (10-day)
     "funding_rate_zscore_90",  # iter-v1/023: NEW — funding-rate z-score 90-bar (30-day)
     "interact_natr_x_adx",
@@ -134,7 +135,7 @@ V1_FEATURE_COLUMNS_PRUNED: tuple[str, ...] = (
     "vol_volume_rel_20",
 )
 
-# Sanity guard: confirm the pruned set has exactly 45 features.
+# Sanity guard: confirm the pruned set has exactly 46 features.
 # iter-v1/023: extended 40 → 42 by adding funding_rate_zscore_30 + funding_rate_zscore_90.
 # iter-v1/025: extended 42 → 43 by adding oi_delta_30_z90 (open-interest delta z-score).
 # iter-v1/034: extended 43 → 44 by adding basis_zscore_30 (perp-spot basis z-score).
@@ -154,8 +155,11 @@ V1_FEATURE_COLUMNS_PRUNED: tuple[str, ...] = (
 #              module file kept for future-iter reuse.
 # iter-v1/049: extended 44 → 45 by adding long_short_zscore_30 (top-trader long/short
 #              account ratio z-score, 30-bar window; non-kline data class from OI cache).
-assert len(V1_FEATURE_COLUMNS_PRUNED) == 45, (
-    f"V1_FEATURE_COLUMNS_PRUNED must have exactly 45 features; got {len(V1_FEATURE_COLUMNS_PRUNED)}"
+# iter-v1/050: extended 45 → 46 by adding dot_vs_btc_ret_ratio_30 (DOT idiosyncratic
+#              return vs BTC 30d, z-scored 90-bar; DOT-only cross-asset signal; NaN for
+#              other symbols; loaded from data/BTCUSDT/8h.csv at feature-gen time).
+assert len(V1_FEATURE_COLUMNS_PRUNED) == 46, (
+    f"V1_FEATURE_COLUMNS_PRUNED must have exactly 46 features; got {len(V1_FEATURE_COLUMNS_PRUNED)}"
 )
 
 # Columns explicitly NOT in V1_FEATURE_COLUMNS_PRUNED but which may still appear in
@@ -307,6 +311,25 @@ assert model_type_arg == "lgbm" guard fires in dispatch branch (/042 XGBoost NO 
 """
 
 
+V1_ITER050_UNIVERSE: tuple[str, ...] = ("DOTUSDT",)
+"""iter-v1/050 cohort: DOT-only regime-gated specialist.
+
+Cycle-6 EXPLORATION #5 of 10. Axis family: feature-family + risk-primitive (compound;
+single DOT-specialist mechanism). NEW feature dot_vs_btc_ret_ratio_30 (cross-asset
+idiosyncratic ratio) + vol-spike regime gate (post-prediction, stateless).
+
+NORMAL-RISK declaration: additive feature (no Optuna domain change) + post-prediction
+stateless gate (no Optuna domain change). Single-seed OPT-OUT per EXPLORATION standard.
+ENSEMBLE_SIZE=3, n_trials=18, seed=42.
+
+BTC klines loaded for feature computation only (BTCUSDT is NOT traded).
+
+LOCAL to runner constant. NOT shared; CONFIRMATION-MERGE updates V1_BASELINE_UNIVERSE.
+assert set(symbols) == {"DOTUSDT"} guard fires in dispatch branch.
+assert "dot_vs_btc_ret_ratio_30" in active_feature_columns guard fires in dispatch branch.
+"""
+
+
 __all__ = [
     "V1_EXCLUDED_SYMBOLS",
     "V1_BASELINE_UNIVERSE",
@@ -320,6 +343,7 @@ __all__ = [
     "V1_ITER036_UNIVERSE",
     "V1_ITER039_UNIVERSE",
     "V1_ITER043_UNIVERSE",
+    "V1_ITER050_UNIVERSE",
     # iter-v1/023: funding-rate feature family (add_funding_v1_features imported on demand)
     # iter-v1/025: OI delta feature family (add_oi_delta_v1_features imported on demand)
     # iter-v1/040: composed feature family (add_composed_v1_features imported on demand)
@@ -328,4 +352,6 @@ __all__ = [
     #              Module file kept on disk as dead code for future-iter reuse.
     # iter-v1/049: long/short positioning feature family (add_longshort_v1_features imported
     #              on demand via features/__init__.py GROUP_REGISTRY longshort_v1 entry).
+    # iter-v1/050: cross-BTC idiosyncratic ratio feature family (add_cross_btc_v1_features
+    #              imported on demand via features/__init__.py GROUP_REGISTRY cross_btc_v1 entry).
 ]
