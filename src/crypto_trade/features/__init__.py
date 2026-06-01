@@ -218,15 +218,12 @@ from crypto_trade.features_v1.composed_v1 import (  # noqa: E402
 
 _register("composed_v1", _add_composed_v1_features)  # iter-v1/040
 
-# iter-v1/047: statistical higher-moment feature family (skew_zscore_21 = rolling-21bar
-# realized skewness z-normalized over 90 bars). Cycle-6 feature-family EXPLORATION 2/10.
-# Registered here so `uv run crypto-trade features --track v1 --groups statistical_v1`
-# writes skew_zscore_21 to v1 parquets.
-from crypto_trade.features_v1.statistical_v1 import (  # noqa: E402
-    add_statistical_v1_features as _add_statistical_v1_features,
-)
-
-_register("statistical_v1", _add_statistical_v1_features)  # iter-v1/047
+# iter-v1/047: statistical higher-moment feature family (skew_zscore_21) was REVERTED
+# at closeout (NEG-CLEAN-PRE-EDA: pre-launch F5 IC orthogonality gate FAILED at
+# |IC|=0.8132 vs stat_skew_20; ABORT threshold 0.60). The statistical_v1 module file
+# is kept on disk (clean code, future-iter ready for non-skew higher-moment primitives)
+# but is intentionally NOT registered in GROUP_REGISTRY — `crypto-trade features` will
+# not write skew_zscore_21 to v1 parquets.
 
 __all__ = [
     "GROUP_REGISTRY",
