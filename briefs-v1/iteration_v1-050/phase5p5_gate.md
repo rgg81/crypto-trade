@@ -1,4 +1,4 @@
-# Phase 5.5 Gate — iter-v1/050
+# Phase 5.5 Gate — iter-v1/050 (retry)
 
 OVERALL: BLOCK
 
@@ -7,120 +7,115 @@ TYPE: EXPLORATION
 
 ## Axis Family + Rotation Status
 FAMILY: feature-family + risk-primitive (compound; single DOT-specialist mechanism)
-ROTATION_STATUS: VALID — last 5 families: methodology, feature-family, feature-family,
-feature-family, feature-family+risk-primitive. Not all 5 same family. Rotation discipline
-honored.
+ROTATION_STATUS: VALID — last 5 families (from catalog): /046 methodology, /047 feature-family,
+/048 feature-family, /049 feature-family, /050 feature-family+risk-primitive. Not all 5 same
+family (methodology at /046 breaks monoculture). Rotation discipline honored.
 
 ## HIGH-RISK Declaration
-HIGH-RISK: NO — additive feature (NORMAL-RISK) + post-prediction stateless gate (NORMAL-RISK).
+HIGH-RISK: NO — additive feature NORMAL-RISK (45→46 cols; no Optuna-objective-domain change) +
+post-prediction stateless regime gate NORMAL-RISK (operates after Optuna training).
+No multi-seed mitigation required at EXPLORATION budget; Rec 3 pre-registers multi-seed
+validation at /051 or /054 conditional on PROMISING verdict.
 
 ## LM Master Response Verification
-- briefs-v1/iteration_v1-050/lgbm_advisor.md exists: **BLOCK** — file is absent.
-  Brief Section 3.3 claims a "cycle-6 velocity mandate" exempts LM advisor dispatch.
-  No such rule is documented in ITERATION_PLAN_8H_V1.md, BASELINE_V1.md, or any
-  memory/feedback file. ITERATION_PLAN_8H_V1.md §"Thirteen phases" states explicitly:
-  "Four gates are MANDATORY: Phase 4.5, 5.5, 6.0, 7.5. Skipping any is a
-  process-integrity violation." and §"Do NOT" section states "NEVER skip the Phase 4.5
-  LM Master advisory". Self-asserted exemptions in the brief do not override the
-  workflow spec.
-- Brief Section 3 addresses LM Master recommendations: **BLOCK** (conditional on above —
-  no lgbm_advisor.md means no recommendations to address; gate blocked regardless).
+- briefs-v1/iteration_v1-050/lgbm_advisor.md exists: PASS — file present at commit 8054700
+  (authored 2026-06-01; Phase 4.5 section present with 3 numbered recommendations).
+- Brief Section 3.5 addresses each LM Master recommendation: PASS
+  - Rec 1 (regime gate is load-bearing; attribution analysis required): ADOPTED — dispatch
+    runner logs regime_gate_fire_rate_is + regime_gate_fire_rate_oos per-regime in
+    comparison.csv; post-mortem disambiguation protocol specified.
+  - Rec 2 (trade-rate floor risk at ≥30% fire rate): ADOPTED — F-AXIS #4 pre-registered
+    IS ≥ 50 / OOS ≥ 10 floor; downgrade clause bound in Section 8.2.
+  - Rec 3 (single-seed lottery risk; multi-seed pre-registration): ADOPTED CONDITIONAL —
+    PROMISING verdict triggers /051 or /054 multi-seed re-validation at seeds [123, 456,
+    789]; binding pre-registration in Section 3.5 and confirmed in Section 8.
 
 ## Cadence Check
-- Wall-clock budget declared: <= 2h for EXPLORATION: PASS
-- CONFIRMATION only checks: N/A (EXPLORATION)
-
-## /049 Mandate Override Check
-Brief Section 0.0 states "/050 per user mandate: regime-specialist approach for DOT
-(per user mandate 2026-06-01)" and Section 0.6 states "user mandate (2026-06-01) for
-per-symbol regime-specialist EXPLORATIONs." diary-v1/iteration_v1-049.md §5 Path Forward
-declared "/050 = model-arch axis (MANDATORY)" with one documented alternative:
-"cycle-7 closure with /045 ALT_1 substrate multi-seed validation IF user override."
-Brief claims user override occurred (feature-family + risk-primitive axis selected
-instead of model-arch). This override is ASSERTED in the brief but cannot be verified
-from code or documentation alone. If the user issued this override, the QR must add a
-brief Section 0.7 (Override Declaration) with explicit user directive text + date, and
-re-author the brief. Without documented evidence, the gate treats the mandate violation
-as an ambiguity requiring QR clarification, not a hard BLOCK on its own — the hard BLOCKs
-are the missing mandatory sections listed below.
-
-## long_short_zscore_30 Presence Check (INFORMATIONAL)
-V1_FEATURE_COLUMNS_PRUNED contains long_short_zscore_30 (46 total = 45 including
-long_short_zscore_30 + 1 dot_vs_btc_ret_ratio_30). The exploration catalog's /049 row
-states "feature REVERTED" but also says "handled in /050 setup." The /050 setup commit
-(9af77db) did NOT remove long_short_zscore_30 — it was intentionally retained in the
-45-column starting state. The brief counts 45→46 treating long_short_zscore_30 as
-already present. This is a catalog-narrative vs code discrepancy but the code is
-internally consistent. INFORMATIONAL — not a BLOCK.
+- Wall-clock budget declared: ≤ 2h for EXPLORATION: PASS
+- EXPLORATION 5/10 of cycle-6: PASS (cadence within 10-iter cycle)
+- CONFIRMATION checks: N/A (TYPE=EXPLORATION)
 
 ## Per-Section Status
-- Section 0 (Data Split): PASS — OOS_CUTOFF_MS=1742774400000 (2025-03-24), training_months=24
-  immutable; IS and OOS windows named; DOTUSDT cohort + BTC klines for feature only.
-- Section 0.5 (Iteration Type): PASS — EXPLORATION, cycle-6 slot 5/10.
-- Section 0.6 (Architecture-Family Justification): PASS — last 5 families listed; compound
-  feature-family+risk-primitive; VALID rotation.
-- Section 1 (Hypothesis): PASS — specific: "flip DOT IS Sharpe from -1.23 to >= 0 via
-  cross-asset idiosyncratic ratio + vol-spike gate."
-- Section 2 (IS-Only Evidence): PASS — informational per EDA rule change bf2c812; DOT IS
-  Sharpe/trades from BASELINE_V1.md; feature design rationale; vol-spike gate design;
-  predicted IC. No committed analysis script required under EDA-informational mandate.
-- Section 2.5 (HIGH-RISK Axis Declaration): PASS — NORMAL-RISK declared with explicit
-  reasoning for both mechanisms.
-- Section 3 (Proposed Changes): CONDITIONAL PASS pending lgbm_advisor.md. Enumerated
-  changes are substantive; LM Master response exemption claim BLOCKED.
-- Section 4 (Expected OOS Impact): PASS — F-AXIS #1-#5 table with PROMISING/PARTIAL/
-  NEG-CLEAN thresholds; explicit falsifiers; F-AXIS #5 marked informational only.
-- Section 5 (Risk Mitigation): PASS — R1/R2/R3 active per BASELINE_V1; new regime gate
-  IS-calibrated with q75 IS-only threshold.
-- Section 6 (Risk Management Design): PASS — 8-primitive table with fire-rate prediction.
-- Section 7 (Failure-Mode Prediction): **MISSING** — section not present in brief.
-- Section 8 (MERGE/NO-MERGE Numerical Criteria): **MISSING** — section not present in brief.
-- Section 9 (Library Stack Declaration): **MISSING** — section not present in brief.
-
-## Lint Audit (Phase 6.0 pre-commit check, run at gate time)
-run_baseline_v1.py had 2 ruff errors introduced by the /050 dispatch block:
-  - E501 line too long (comment at line 5616)
-  - N806 uppercase variable _REGIME_GATE_CONF_THRESHOLD_050 (renamed lowercase)
-Both fixed by QE at gate time. ruff check now passes. Tests still pass (13/13).
+- Section 0 (Data Split): PASS — OOS_CUTOFF_MS=1742774400000 (2025-03-24 UTC), training_months=24
+  both IMMUTABLE; IS window (data start → 2025-03-24) and OOS window (2025-03-24 → data end)
+  named; DOTUSDT-only traded cohort + BTC klines for feature computation declared.
+- Section 0.5 (Iteration Type): PASS — TYPE=EXPLORATION, cycle-6 slot 5/10 with prior 4 slots
+  enumerated (/046-/049).
+- Section 0.6 (Architecture-Family Justification): PASS — table of last 5 EXPLORATION families
+  present; axis family declared as feature-family+risk-primitive (compound DOT-specialist);
+  ROTATION_STATUS=VALID with explicit reasoning.
+- Section 1 (Hypothesis): PASS — specific ONE-sentence hypothesis: "Adding
+  dot_vs_btc_ret_ratio_30 + vol-spike regime gate will flip DOT IS Sharpe from −1.23 to ≥ 0."
+  Mechanism described (idiosyncratic alpha periods vs BTC-contagion vol-spike periods). Specific
+  enough: names the feature, names the gate, names the expected direction and magnitude.
+- Section 2 (IS-Only Numerical Evidence): **BLOCK** — EDA artifact missing.
+  The v1 skill (quant-iteration-v1.md §"EDA Discipline (revised 2026-06-01)") states explicitly:
+  "EDA scripts and outputs are still REQUIRED for Phase 5.5 PASS. Phase 5.5 BLOCKS on: (a) EDA
+  script does not exist on disk, (b) eda.csv is missing." The directory
+  `analysis/iteration_v1-050/` was created but is EMPTY — no `eda.py` (or equivalent), no
+  `eda.csv`. Note: the brief's Section 2 content (DOT baseline stats from BASELINE_V1.md,
+  feature design rationale, predicted IC) is informational and passes the VALUES test. The
+  artifact existence requirement is separate and categorical. Previous gate (commit 65f75b1)
+  erred by granting PASS on Section 2 without checking for the artifact — that error is corrected
+  here. Committed script path required: `analysis/iteration_v1-050/eda.py` (or named
+  equivalently) + `analysis/iteration_v1-050/eda.csv`.
+- Section 2.5 (HIGH-RISK Axis Declaration): PASS — NORMAL-RISK declared; explicit reasoning for
+  both mechanisms (additive feature + post-prediction stateless gate); DOT-only cohort precedent
+  at /029 cited.
+- Section 3 (Proposed Changes): PASS — enumerated: (3.1) feature add dot_vs_btc_ret_ratio_30
+  with module spec; (3.2) vol-spike regime gate implementation; (3.4) feature column count
+  update 45→46 with assert. LM Master responses addressed in Section 3.5. All changes are
+  enumerated.
+- Section 4 (Expected OOS Impact): PASS — F-AXIS #1–#5 table with PROMISING/PARTIAL/NEG-CLEAN
+  numerical thresholds; F-AXIS #5 (IC) explicitly marked informational only (never blocking,
+  per EDA Discipline revision). Explicit falsifiers present.
+- Section 5 (Risk Mitigation): PASS — R1/R2/R3 stack confirmed active for DOT; new regime gate
+  (R-GATE /050) described as post-prediction stateless gate with IS-calibrated q75 threshold.
+- Section 6 (Risk Management Design): PASS — 8-primitive table present; gate fire-rate
+  prediction in [8%, 20%] IS; vol-spike gate classified under BTC-contagion primitive.
+- Section 7 (Failure-Mode Prediction): PASS — 2-paragraph section present. Most plausible OOS
+  failure identified (feature INERT-OOS-overfit; DOT/BTC ratio distribution shift between IS
+  2021-2024 and OOS Q1 2025+ macro context). Modal failure scenario explicitly described
+  (PROMISING-PARTIAL with gate fire rate mismatch IS→OOS). Load-bearing mechanism identified
+  (regime gate vs feature). Forward-falsifier structure intact for Phase 8 diary verification.
+- Section 8 (Pre-Registered MERGE/NO-MERGE Criteria): PASS — Sections 8.1–8.6 present.
+  Primary numerical criterion: DOT IS Sharpe Δ thresholds with 4 verdict bands
+  (PROMISING-SPECIALIST ≥+1.23, PROMISING-PARTIAL +0.50–+1.23, NEG-INERT −0.05–+0.50,
+  NEG-CLEAN ≤−0.05). Trade-rate floor gating (8.2), gate fire-rate reporting (8.3), IS MaxDD
+  regression check (8.4), OOS forensic-only declaration (8.5), per-regime Pareto secondary (8.6).
+  All thresholds declared BEFORE backtest runs — pre-registration intact.
+- Section 9 (Library Stack Declaration): PASS — Table present; all components are existing
+  pins (lightgbm, scipy, pandas, numpy, stdlib); no new deps; no mlfinlab/mlfinpy/pypbo/fracdiff
+  in scope; explicitly stated: "No NEW pip / uv adds."
 
 ## Reasons (BLOCK)
-1. **lgbm_advisor.md MISSING** — Phase 4.5 LM Master advisory is a MANDATORY gate per
-   ITERATION_PLAN_8H_V1.md. Brief Section 3.3's "cycle-6 velocity mandate" exemption is
-   self-asserted and has no documented basis in any workflow doc or memory file. QR must
-   dispatch the LM Master (quant-lm-master role) with current context before authoring
-   the brief, then ensure brief Section 3 addresses each Phase 4.5 recommendation.
-2. **Section 7 MISSING** — Brief must include 1-2 paragraphs predicting how /050 most
-   plausibly fails OOS: e.g., DOT IS Sharpe may flip positive from single-seed variance
-   (not genuine signal); vol-spike gate may have insufficient IS coverage to learn from;
-   single-symbol DOT IS sample (93 trades before gate) is too small for reliable
-   attribution. This section is verified against Phase 8 diary outcomes.
-3. **Section 8 MISSING** — Pre-registered MERGE/NO-MERGE numerical criteria are required
-   before the backtest launches to prevent post-hoc rationalization. Must include locked
-   thresholds, e.g. "PROMISING iff DOT IS Sharpe Δ >= +0.50 AND IS trades >= 50 AND
-   gate fire-rate IS in [5%, 30%]." Must be written before any backtest output is seen.
-4. **Section 9 MISSING** — Library Stack Declaration must enumerate which versions of
-   mlfinlab/mlfinpy/pypbo/fracdiff are used or explicitly state they are absent with
-   fallback. Required to catch library availability risks early.
+1. **Section 2 — EDA artifact MISSING**: `analysis/iteration_v1-050/` directory exists but
+   is empty. Per quant-iteration-v1.md §"EDA Discipline (revised 2026-06-01)", Phase 5.5 BLOCKS
+   when the EDA script does not exist on disk AND when `eda.csv` is missing. Both are absent.
+   The VALUES in brief Section 2 are informational and acceptable; the ARTIFACT existence is a
+   separate hard requirement. Required artifacts before re-submission:
+   - `analysis/iteration_v1-050/eda.py` (or equivalent name) — committed, IS-data-only,
+     grep-clean for OOS-side patterns.
+   - `analysis/iteration_v1-050/eda.csv` — produced by the script, at minimum containing
+     per-feature ADF p-values + pairwise IC + distribution stats for `dot_vs_btc_ret_ratio_30`
+     vs V1_FEATURE_COLUMNS_PRUNED (IS window only).
 
 ## Path Forward for QR
-1. Dispatch LM Master (Phase 4.5) with: BASELINE_V1.md, last 3 diaries
-   (diary-v1/iteration_v1-047.md, -048.md, -049.md), brief Sections 1-3, and
-   the cross_btc_v1.py module. Ask for: hyperparameter recommendations for DOT-only
-   3-ENSEMBLE_SIZE run; feature-engineering risks for cross-asset ratio at 90-bar zscore;
-   regime-gate calibration advice; saturation risks at n_trials=18 for DOT-only cohort
-   (93 IS trades total). LM Master emits briefs-v1/iteration_v1-050/lgbm_advisor.md.
-2. Add Section 7 (Failure-Mode Prediction): predict the most plausible failure mode for
-   /050. At minimum: single-seed DOT IS variance will mask whether the feature adds
-   genuine signal; vol-spike gate may not fire enough IS to produce observable Sharpe
-   contribution at n_trials=18; cross-asset ratio warmup (90 bars = 30 days) reduces
-   effective IS training sample from 93 to ~75 trades.
-3. Add Section 8 (Pre-Registered MERGE/NO-MERGE Criteria): lock thresholds before
-   backtest. For an EXPLORATION, typical form: "PROMISING iff F-AXIS #1 PASS (DOT IS
-   Sharpe Δ >= +0.50) AND F-AXIS #3 PASS (gate fire-rate IS in [5%, 30%]) AND F-AXIS #4
-   PASS (IS >= 50 trades)."
-4. Add Section 9 (Library Stack Declaration): enumerate versions in use; if mlfinlab not
-   available, state stdlib fallback for CPCV/PBO/PSR.
-5. If the user override of the /049 model-arch mandate is real, add a brief Section 0.7
-   with the exact user directive text and date so future readers can understand why /050
-   chose feature-family+risk-primitive instead of model-arch.
-6. Re-submit brief; QE re-runs Phase 5.5 gate.
+1. Create `analysis/iteration_v1-050/eda.py`: load IS parquets for DOTUSDT
+   (open_time < OOS_CUTOFF_MS), compute dot_vs_btc_ret_ratio_30 for IS window, compute
+   pairwise IC vs top-10 V1_FEATURE_COLUMNS_PRUNED features, compute ADF p-value, compute
+   distribution stats. Grep-clean: no `oos`, no `out_of_sample`, no date filter
+   ≥ OOS_CUTOFF_DATE.
+2. Produce and commit `analysis/iteration_v1-050/eda.csv`.
+3. Optionally update brief Section 2 to reference actual computed values (IC, ADF p-value,
+   distribution stats) instead of "predicted ~0.25–0.30" estimates — not required for gate
+   PASS but improves Phase 8 diary traceability.
+4. Re-submit; QE re-runs Phase 5.5 gate.
+
+## Note on Previous Gate Error
+The first gate attempt (commit 65f75b1) granted Section 2 a PASS with the comment "No
+committed analysis script required under EDA-informational mandate." That was incorrect: the
+EDA Discipline revision decouples VALUES (informational, no longer blocking on IC/ADF
+magnitudes) from ARTIFACT EXISTENCE (still required, Phase 5.5 hard block). This retry
+corrects that error. All other section verdicts from the previous gate are unchanged or
+upgraded (lgbm_advisor.md + Sections 7/8/9 now all PASS).
