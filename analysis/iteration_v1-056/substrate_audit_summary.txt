@@ -1,0 +1,20 @@
+Substrate Audit Summary — iter-v1/056
+========================================================================
+Roster: /home/roberto/crypto-trade/.worktrees/quant-research/briefs-v1/_meta/regime_specialist_roster.csv
+OOS_CUTOFF_MS: 1742774400000 (2025-03-24)
+
+Per-component results:
+CID        Symbol       Source          IS_lift   OOS_in_score  is_only_clean
+------------------------------------------------------------------------
+C1-BTC     BTCUSDT      v1-054          +1.1114          False           True
+C2-ETH     ETHUSDT      v1-055          +0.4018          False           True
+C3-DOT     DOTUSDT      v1-051          +0.9945          False           True
+C4-LINK    LINKUSDT     baseline        +0.0000          False           True
+C5-LTC     LTCUSDT      baseline        +0.0000          False           True
+
+Universe disjoint:  PASS
+Weight sum OK:      PASS (1.00000000)
+All is_only_clean:  PASS
+OVERALL:            PASS
+
+/045 contrast: /045 used 0.5*OOS_Sharpe + 0.3*IS_Sharpe + 0.2*OOS_n/100. /056 uses IS_lift only (delta vs baseline per-symbol IS Sharpe). C4-LINK and C5-LTC are frozen baseline anchors — no scoring step.
