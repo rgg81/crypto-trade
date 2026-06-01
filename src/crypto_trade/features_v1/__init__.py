@@ -103,7 +103,9 @@ V1_FEATURE_COLUMNS_PRUNED: tuple[str, ...] = (
     "interact_rsi_x_natr",
     "interact_stoch_x_adx",
     "long_short_zscore_30",  # iter-v1/049: NEW — top-trader long/short ratio z-score (30-bar)
-    "ltc_vs_btc_ret_ratio_30",  # iter-v1/057: NEW — LTC idiosyncratic return vs BTC 30d z-scored (LTC-only; NaN for other syms)  # noqa: E501
+    # "ltc_vs_btc_ret_ratio_30" — iter-v1/057: REVERTED (multi-seed mean Δ +0.1082 IS,
+    #   max-min spread 0.765 → BASIN-LOTTERY downgrade; importance rank 13-15/49 fails
+    #   LEARNED gate ≤10; 49 → 48 cols). Feature computation code preserved in cross_btc_v1.py.
     "mom_macd_hist_12_26_9",
     "mom_macd_line_12_26_9",
     "mom_roc_10",
@@ -181,8 +183,14 @@ V1_FEATURE_COLUMNS_PRUNED: tuple[str, ...] = (
 #              90-bar; LTC-only specialist head; direct algebraic mirror of /055
 #              eth_vs_btc_ret_ratio_30; cycle-7 EXPLORATION 1/N). Count: 48 → 49.
 #              Inserted alphabetically between long_short_zscore_30 and mom_macd_hist_12_26_9.
-assert len(V1_FEATURE_COLUMNS_PRUNED) == 49, (
-    f"V1_FEATURE_COLUMNS_PRUNED must have exactly 49 features; got {len(V1_FEATURE_COLUMNS_PRUNED)}"
+# iter-v1/057 CLOSEOUT: REVERT ltc_vs_btc_ret_ratio_30 (multi-seed n=3: per-seed IS Sharpe
+#              [0.736, 0.1276, -0.029]; mean Δ +0.1082 IS lands in MULTI-SEED-WEAK band
+#              [+0.05, +0.20); max-min spread 0.765 > 0.50 → BASIN-LOTTERY downgrade per
+#              brief §4.3; importance rank 13-15/49 fails LEARNED gate ≤10; mean OOS -0.5163
+#              with per-seed [-1.6307, +0.0988, -0.0171]). Count: 49 → 48. Feature
+#              computation code preserved in cross_btc_v1.py for potential future re-use.
+assert len(V1_FEATURE_COLUMNS_PRUNED) == 48, (
+    f"V1_FEATURE_COLUMNS_PRUNED must have exactly 48 features; got {len(V1_FEATURE_COLUMNS_PRUNED)}"
 )
 
 # Columns explicitly NOT in V1_FEATURE_COLUMNS_PRUNED but which may still appear in

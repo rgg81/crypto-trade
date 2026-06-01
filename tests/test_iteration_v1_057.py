@@ -88,17 +88,19 @@ def _compute_features_hash(cols: tuple[str, ...]) -> str:
 
 
 def test_ltc_vs_btc_ret_ratio_30_in_pruned() -> None:
-    """ltc_vs_btc_ret_ratio_30 must be present in V1_FEATURE_COLUMNS_PRUNED at iter-v1/057.
+    """iter-v1/057 CLOSEOUT REVERT: ltc_vs_btc_ret_ratio_30 must be ABSENT post-revert.
 
-    /057 ADD mandate: ltc_vs_btc_ret_ratio_30 added to V1_FEATURE_COLUMNS_PRUNED (48 → 49 cols).
-    Alphabetically inserted between long_short_zscore_30 and mom_macd_hist_12_26_9.
+    /057 added then REVERTED ltc_vs_btc_ret_ratio_30 at closeout (multi-seed n=3:
+    mean Δ IS +0.1082 → MULTI-SEED-WEAK band; max-min spread 0.765 → BASIN-LOTTERY
+    downgrade; importance ranks 13-15/49 fail LEARNED gate ≤10). 49 → 48 cols.
+    Feature computation code preserved in cross_btc_v1.py.
     """
     from crypto_trade.features_v1 import V1_FEATURE_COLUMNS_PRUNED
 
-    assert "ltc_vs_btc_ret_ratio_30" in V1_FEATURE_COLUMNS_PRUNED, (
-        "ltc_vs_btc_ret_ratio_30 not found in V1_FEATURE_COLUMNS_PRUNED. "
-        "Ensure iter-v1/057 ADD is present in features_v1/__init__.py. "
-        "Expected insertion between long_short_zscore_30 and mom_macd_hist_12_26_9."
+    assert "ltc_vs_btc_ret_ratio_30" not in V1_FEATURE_COLUMNS_PRUNED, (
+        "ltc_vs_btc_ret_ratio_30 still present in V1_FEATURE_COLUMNS_PRUNED. "
+        "iter-v1/057 closeout REVERTED the feature; it must NOT be in the pruned set. "
+        "Check src/crypto_trade/features_v1/__init__.py — the line should be commented out."
     )
 
 
@@ -108,7 +110,7 @@ def test_ltc_vs_btc_ret_ratio_30_in_pruned() -> None:
 
 
 def test_pruned_size_49() -> None:
-    """V1_FEATURE_COLUMNS_PRUNED must have exactly 49 features at iter-v1/057.
+    """V1_FEATURE_COLUMNS_PRUNED must have exactly 48 features post iter-v1/057 REVERT.
 
     History:
         40 (baseline /002) → 42 (/023) → 43 (/025) → 44 (/034→/040) → 45 (/049)
@@ -116,16 +118,17 @@ def test_pruned_size_49() -> None:
         → 48 (/052 ADD btc_funding_rate_8h_impulse + btc_funding_spread_30_90)
         → 47 (/054 DROP btc_funding_rate_8h_impulse)
         → 48 (/055 ADD eth_vs_btc_ret_ratio_30)
-        → 49 (/057 ADD ltc_vs_btc_ret_ratio_30)
+        → 49 (/057 ADD ltc_vs_btc_ret_ratio_30) — pre-closeout
+        → 48 (/057 CLOSEOUT REVERT — BASIN-LOTTERY downgrade)
     """
     from crypto_trade.features_v1 import V1_FEATURE_COLUMNS_PRUNED
 
     n = len(V1_FEATURE_COLUMNS_PRUNED)
-    assert n == 49, (
-        f"V1_FEATURE_COLUMNS_PRUNED expected 49 features at iter-v1/057; got {n}. "
+    assert n == 48, (
+        f"V1_FEATURE_COLUMNS_PRUNED expected 48 features at iter-v1/057 closeout; got {n}. "
         "History: /055 added eth_vs_btc_ret_ratio_30 (47→48); "
-        "/057 adds ltc_vs_btc_ret_ratio_30 (48→49). "
-        "If n == 48: ltc_vs_btc_ret_ratio_30 was NOT added — check /057 implementation. "
+        "/057 added ltc_vs_btc_ret_ratio_30 (48→49) and REVERTED at closeout (49→48). "
+        "If n == 49: revert was NOT applied — check /057 closeout implementation. "
         "If n < 48: something was accidentally removed."
     )
 
@@ -317,27 +320,28 @@ def test_features_base_hash_changed_vs_056() -> None:
         "If they are equal, the pre-registered hash constants are wrong."
     )
 
-    # Live V1_FEATURE_COLUMNS_PRUNED must match the 49-col hash (ltc feature added)
+    # Post-/057-CLOSEOUT-REVERT: live V1_FEATURE_COLUMNS_PRUNED matches the 48-col hash
+    # (ltc_vs_btc_ret_ratio_30 was ADDED at iter-v1/057 launch then REVERTED at closeout).
     from crypto_trade.features_v1 import V1_FEATURE_COLUMNS_PRUNED
 
     live_hash = _compute_features_hash(V1_FEATURE_COLUMNS_PRUNED)
-    assert live_hash == expected_49col, (
-        f"Live V1_FEATURE_COLUMNS_PRUNED hash does not match pre-registered 49-col hash.\n"
-        f"  pre-registered 49-col: {expected_49col}\n"
-        f"  pre-registered 48-col: {expected_48col}\n"
-        f"  live computed        : {live_hash}\n"
-        "If live == 48-col hash: ltc_vs_btc_ret_ratio_30 was NOT added to "
-        "V1_FEATURE_COLUMNS_PRUNED. Check src/crypto_trade/features_v1/__init__.py. "
-        "Verify the ADD (and ONLY the ADD) is in effect (49 cols expected at /057)."
+    assert live_hash == expected_48col, (
+        f"Live V1_FEATURE_COLUMNS_PRUNED hash does not match pre-registered 48-col hash "
+        f"after /057 closeout REVERT.\n"
+        f"  pre-registered 49-col (pre-revert): {expected_49col}\n"
+        f"  pre-registered 48-col (post-revert): {expected_48col}\n"
+        f"  live computed                      : {live_hash}\n"
+        "If live == 49-col hash: revert was NOT applied — check closeout implementation. "
+        "Verify the REVERT is in effect (48 cols expected post-/057 closeout)."
     )
 
-    # Verify the live hash also differs from the 48-col reference
-    assert live_hash != expected_48col, (
-        f"Live V1_FEATURE_COLUMNS_PRUNED hash matches the 48-col reference hash:\n"
+    # Verify the live hash differs from the 49-col reference (revert applied)
+    assert live_hash != expected_49col, (
+        f"Live V1_FEATURE_COLUMNS_PRUNED hash matches the 49-col pre-revert reference:\n"
         f"  live computed: {live_hash}\n"
-        f"  expected_48col: {expected_48col}\n"
-        "ltc_vs_btc_ret_ratio_30 appears to NOT be in V1_FEATURE_COLUMNS_PRUNED. "
-        "The /057 feature-add was not applied."
+        f"  expected_49col: {expected_49col}\n"
+        "ltc_vs_btc_ret_ratio_30 is still in V1_FEATURE_COLUMNS_PRUNED — the /057 closeout "
+        "REVERT was not applied."
     )
 
     print(f"  [OK] expected_49col hash = {expected_49col[:16]}...")
@@ -461,7 +465,7 @@ def test_ltc_compute_function_importable() -> None:
 @pytest.mark.parametrize(
     "feature_name,expected_in_pruned",
     [
-        ("ltc_vs_btc_ret_ratio_30", True),  # ADDED at /057
+        ("ltc_vs_btc_ret_ratio_30", False),  # ADDED at /057, REVERTED at closeout (BASIN-LOTTERY)
         ("eth_vs_btc_ret_ratio_30", True),  # ADDED at /055; must still be present
         ("dot_vs_btc_ret_ratio_30", True),  # ADDED at /050; must still be present
         ("btc_funding_spread_30_90", True),  # RETAINED at /054; must still be present
@@ -478,9 +482,9 @@ def test_feature_presence_parametrized(feature_name: str, expected_in_pruned: bo
     assert actual == expected_in_pruned, (
         f"Feature {feature_name!r}: expected in_pruned={expected_in_pruned}, "
         f"got {actual}. "
-        f"V1_FEATURE_COLUMNS_PRUNED has {len(V1_FEATURE_COLUMNS_PRUNED)} cols at /057. "
-        f"At /057: ltc_vs_btc_ret_ratio_30 ADDED; btc_funding_rate_8h_impulse DROPPED at /054; "
-        f"all other features unchanged."
+        f"V1_FEATURE_COLUMNS_PRUNED has {len(V1_FEATURE_COLUMNS_PRUNED)} cols at /057 closeout. "
+        f"At /057 closeout: ltc_vs_btc_ret_ratio_30 REVERTED (BASIN-LOTTERY); "
+        f"btc_funding_rate_8h_impulse DROPPED at /054; all other features unchanged."
     )
 
 
