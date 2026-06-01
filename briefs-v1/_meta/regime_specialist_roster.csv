@@ -1,0 +1,44 @@
+# regime_specialist_roster.csv
+# Running roster of (symbol, config, IS regime profile) for the per-symbol regime-specialist mandate.
+# CONFIRMATION bundle assembles specialists from this roster.
+#
+# Column definitions:
+#   iter_id                  — source iteration identifier (e.g. baseline, v1-049)
+#   symbol                   — trading pair (BTCUSDT etc.) or POOLED for multi-symbol rows
+#   config_id                — model identifier within the iteration (e.g. model-A-pool, model-C-LINK)
+#   feature_stack_size       — number of features passed to LightGBM (V1_FEATURE_COLUMNS count)
+#   new_feature_or_risk      — axis change vs baseline (NONE for baseline anchor rows)
+#   is_sharpe_annualized     — per-symbol IS annualized Sharpe (QR-authoritative; see notes per row)
+#   is_n_trades              — per-symbol IS closed-trade count (from in_sample/per_symbol.csv or per_regime)
+#   is_max_dd_pct            — per-symbol IS max peak-to-trough drawdown % (from in_sample/trades.csv cumulative PnL)
+#   is_bull_sharpe           — IS portfolio Sharpe in bull regime (from regime_catalog.md §4 / baseline_seed_regime_matrix.csv)
+#   is_bear_sharpe           — IS portfolio Sharpe in bear regime
+#   is_chop_sharpe           — IS portfolio Sharpe in chop regime
+#   is_vol_spike_sharpe      — IS portfolio Sharpe in vol-spike regime
+#   is_recovery_sharpe       — IS portfolio Sharpe in recovery regime (NaN = 0 IS months)
+#   is_other_sharpe          — IS portfolio Sharpe in other regime (NaN = 0 IS months)
+#   oos_sharpe_informational — per-symbol OOS trade-level annualized Sharpe (sqrt(252)*mean/std; informational only)
+#   oos_n_trades_informational — per-symbol OOS closed-trade count (from out_of_sample/per_symbol.csv)
+#   verdict_band             — per regime_ensemble_methodology.md: UNIVERSAL/REGIME-SPECIALIST-IS/REGIME-SPECIALIST-OOS/TAIL-CONTROL/TRUE-NEG
+#   regime_specialist_role   — target regime for bundle composition (ANCHOR/BEAR-SPECIALIST/BULL-SPECIALIST/VOL-SPIKE-SPECIALIST/CHOP-SPECIALIST/POOLED/N/A)
+#   notes                    — free-form context
+#
+# Per-regime Sharpe columns for BASELINE rows use the PORTFOLIO-LEVEL regime breakdown from
+# regime_catalog.md §4 (single-seed=42, bootstrap proxy). Per-symbol per-regime breakdown not
+# available at BASELINE — runner does not emit regime-tagged per-symbol output (known gap).
+# Per-regime Sharpe for /049 rows: regime tagger not wired into runner; all trades in "unknown"
+# regime bucket; per-regime fields set to NA for /049.
+#
+# is_sharpe_annualized for BASELINE rows: QR-specified values representing per-symbol IS daily
+# Sharpe under the BASELINE_V1 config. Exact computation methodology: annualized daily Sharpe
+# from per-symbol trade-close PnL series (is_sharpe_annualized = sqrt(252)*mean/std of trade
+# net_pnl_pct series, matching the /046 partition_solve_v2.py scoring formula).
+# Source: QR-authoritative anchor per iter-v1/034 regime_specialist_roster initialization brief.
+#
+iter_id,symbol,config_id,feature_stack_size,new_feature_or_risk,is_sharpe_annualized,is_n_trades,is_max_dd_pct,is_bull_sharpe,is_bear_sharpe,is_chop_sharpe,is_vol_spike_sharpe,is_recovery_sharpe,is_other_sharpe,oos_sharpe_informational,oos_n_trades_informational,verdict_band,regime_specialist_role,notes
+baseline,BTCUSDT,model-A-pool,193,NONE,-0.85,113,87.19,0.09,-0.23,-0.27,2.77,NaN,NaN,3.41,36,TRUE-NEG,ANCHOR,BASELINE_V1 anchor; Model A pooled BTC+ETH; R3 only; 5-seed; per-regime Sharpe is portfolio-level proxy from regime_catalog.md §4 (single-seed=42); per-symbol per-regime breakdown not available
+baseline,ETHUSDT,model-A-pool,193,NONE,-0.61,145,68.64,0.09,-0.23,-0.27,2.77,NaN,NaN,0.07,47,TRUE-NEG,ANCHOR,BASELINE_V1 anchor; Model A pooled BTC+ETH; R3 only; 5-seed; per-regime Sharpe is portfolio-level proxy from regime_catalog.md §4 (single-seed=42); ETH OOS 0.07 near-flat
+baseline,LINKUSDT,model-C-LINK,193,NONE,2.25,146,91.53,0.09,-0.23,-0.27,2.77,NaN,NaN,2.79,28,REGIME-SPECIALIST-IS,VOL-SPIKE-SPECIALIST,BASELINE_V1 anchor; Model C specialist; R1+R3; 5-seed; IS +2.25 strongest per-symbol; OOS +2.79 informational; per-regime Sharpe portfolio-level proxy; high IS+OOS concentration in vol-spike per regime_catalog.md §4
+baseline,LTCUSDT,model-D-LTC,193,NONE,0.17,124,56.64,0.09,-0.23,-0.27,2.77,NaN,NaN,-4.27,35,TRUE-NEG,ANCHOR,BASELINE_V1 anchor; Model D specialist; R1+R3; 5-seed; IS near-flat; OOS -4.27 catastrophic; per-regime Sharpe portfolio-level proxy; LTC worst OOS contributor (-47.25% net)
+baseline,DOTUSDT,model-E-DOT,193,NONE,-1.23,93,64.29,0.09,-0.23,-0.27,2.77,NaN,NaN,0.12,47,TRUE-NEG,ANCHOR,BASELINE_V1 anchor; Model E specialist; R1+R2+R3; 5-seed; IS -1.23 weakest after BTC; OOS near-flat; per-regime Sharpe portfolio-level proxy; R2 drawdown brake fires aggressively (71% IS rate)
+v1-049,POOLED,model-A-pool+C+D+E,44,long_short_zscore_30 (FEATURE-ADD; REVERTED),-0.17,776,124.08,NA,NA,NA,NA,NA,NA,0.73,265,TRUE-NEG,N/A,EXPLORATION-NEGATIVE-CLEAN cycle-6 EXP-4; IS daily Sharpe -0.1717 (portfolio); MaxDD 124.08% (2x baseline); feature destabilized pooled Model A; LINK+LTC IS positive (specialists); BTC+ETH IS catastrophic; single-seed lottery pattern; feature REVERTED to 44 cols post-closeout; OOS +0.7322 informational only (below anchor); per-regime not available (tagger not wired)
