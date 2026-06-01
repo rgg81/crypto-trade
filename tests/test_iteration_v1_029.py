@@ -416,7 +416,8 @@ class TestIter029SourceWiring:
         # iter-v1/040: SWAP basis_zscore_30 → regime_momentum_signed_5d; count 43→44.
         # iter-v1/049: ADD long_short_zscore_30; count 44→45.
         # Updated assertion to 48 (was 43 at /029 runtime; test tracks live constant).
-        # iter-v1/050: 45 → 46; iter-v1/052: 46 → 48.
+        # iter-v1/050: 45 → 46; iter-v1/052: 46 → 48; iter-v1/054: 48 → 47;
+        # iter-v1/055: 47 → 48; iter-v1/057 ADD: 48 → 49 then REVERT: 49 → 48.
         from crypto_trade.features_v1 import V1_FEATURE_COLUMNS_PRUNED
 
         assert len(V1_FEATURE_COLUMNS_PRUNED) == 48

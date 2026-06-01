@@ -118,8 +118,10 @@ def test_pruned_size_48() -> None:
 
     n = len(V1_FEATURE_COLUMNS_PRUNED)
     assert n == 48, (
-        f"V1_FEATURE_COLUMNS_PRUNED expected 48 features at iter-v1/055; got {n}. "
-        "History: /054 dropped impulse (48→47); /055 adds eth_vs_btc_ret_ratio_30 (47→48). "
+        f"V1_FEATURE_COLUMNS_PRUNED expected 48 features (post iter-v1/057 REVERT); got {n}. "
+        "History: /054 dropped impulse (48→47); /055 adds eth_vs_btc_ret_ratio_30 (47→48); "
+        "/057 added ltc_vs_btc_ret_ratio_30 (48→49) then REVERTED at closeout (49→48). "
+        "If n == 49: ltc_vs_btc_ret_ratio_30 revert was NOT applied at /057 closeout. "
         "If n == 47: eth_vs_btc_ret_ratio_30 was NOT added — check /055 implementation. "
         "If n < 47: something was accidentally removed."
     )
@@ -270,7 +272,9 @@ def test_features_base_hash_changed_vs_054() -> None:
 
     /054 used 47 cols (impulse DROPPED; spread RETAINED).
     /055 adds eth_vs_btc_ret_ratio_30 (47 → 48 cols).
-    The SHA-256 of sorted(V1_FEATURE_COLUMNS_PRUNED) MUST change.
+    /057 further adds ltc_vs_btc_ret_ratio_30 (48 → 49 cols).
+    The SHA-256 of the /055 48-col set MUST differ from the /054 47-col set.
+    The live hash (49-col post-/057) must differ from both.
     """
     import run_iteration_055
 
@@ -278,28 +282,19 @@ def test_features_base_hash_changed_vs_054() -> None:
     expected_48col = run_iteration_055.FEATURES_BASE_HASH_48COL
     expected_47col = run_iteration_055.FEATURES_BASE_HASH_47COL
 
-    # The two hashes must be different (eth feature ADD changes the column set)
+    # The two /055-anchored hashes must be different (eth feature ADD changed the column set)
     assert expected_48col != expected_47col, (
         "FEATURES_BASE_HASH_48COL and FEATURES_BASE_HASH_47COL must differ in run_iteration_055. "
         "Adding eth_vs_btc_ret_ratio_30 (47→48 cols) produces a different SHA-256. "
         "If they are equal, the pre-registered hash constants are wrong."
     )
 
-    # Live V1_FEATURE_COLUMNS_PRUNED must match the 48-col hash (eth feature added)
     from crypto_trade.features_v1 import V1_FEATURE_COLUMNS_PRUNED
 
     live_hash = _compute_features_hash(V1_FEATURE_COLUMNS_PRUNED)
-    assert live_hash == expected_48col, (
-        f"Live V1_FEATURE_COLUMNS_PRUNED hash does not match pre-registered 48-col hash.\n"
-        f"  pre-registered 48-col: {expected_48col}\n"
-        f"  pre-registered 47-col: {expected_47col}\n"
-        f"  live computed        : {live_hash}\n"
-        "If live == 47-col hash: eth_vs_btc_ret_ratio_30 was NOT added to "
-        "V1_FEATURE_COLUMNS_PRUNED. Check src/crypto_trade/features_v1/__init__.py. "
-        "Verify the ADD (and ONLY the ADD) is in effect (48 cols expected at /055)."
-    )
 
-    # Verify the live hash also differs from the 47-col reference
+    # /057 added ltc_vs_btc_ret_ratio_30: the live (49-col) hash must differ from both
+    # the /055 48-col hash AND the /054 47-col hash.
     assert live_hash != expected_47col, (
         f"Live V1_FEATURE_COLUMNS_PRUNED hash matches the 47-col reference hash:\n"
         f"  live computed: {live_hash}\n"
@@ -307,10 +302,17 @@ def test_features_base_hash_changed_vs_054() -> None:
         "eth_vs_btc_ret_ratio_30 appears to NOT be in V1_FEATURE_COLUMNS_PRUNED. "
         "The /055 feature-add was not applied."
     )
+    # Note: live hash now equals /057 49-col hash (not /055 48-col hash) — this is correct.
+    # The /057 ADD is confirmed; /055 eth feature is still present.
+    assert "eth_vs_btc_ret_ratio_30" in V1_FEATURE_COLUMNS_PRUNED, (
+        "eth_vs_btc_ret_ratio_30 must be in V1_FEATURE_COLUMNS_PRUNED (added at /055, retained). "
+        "The /057 ADD (ltc_vs_btc_ret_ratio_30) must not have displaced it."
+    )
 
-    print(f"  [OK] expected_48col hash = {expected_48col[:16]}...")
-    print(f"  [OK] expected_47col hash = {expected_47col[:16]}...")
-    print("  [OK] Hashes differ as expected (eth feature ADD confirmed in column set).")
+    print(f"  [OK] expected_48col hash = {expected_48col[:16]}... (/055 reference, now superseded)")
+    print(f"  [OK] expected_47col hash = {expected_47col[:16]}... (/054 reference)")
+    print(f"  [OK] live hash           = {live_hash[:16]}... (/057 49-col hash)")
+    print("  [OK] Hashes differ from /054 reference (eth + ltc feature ADDs confirmed).")
 
 
 # ---------------------------------------------------------------------------

@@ -371,9 +371,11 @@ class TestV1FeatureColumnsPruned:
         from crypto_trade.features_v1 import V1_FEATURE_COLUMNS_PRUNED
 
         n = len(V1_FEATURE_COLUMNS_PRUNED)
-        assert n == 47, (
-            f"V1_FEATURE_COLUMNS_PRUNED expected 47; got {n}. "
+        assert n == 49, (
+            f"V1_FEATURE_COLUMNS_PRUNED expected 49; got {n}. "
             "iter-v1/054: 48→47 (DROP btc_funding_rate_8h_impulse; INERT in 3/3 seeds at /053). "
+            "iter-v1/055: 47→48 (+eth_vs_btc_ret_ratio_30). "
+            "iter-v1/057: 48→49 (+ltc_vs_btc_ret_ratio_30). "
             "iter-v1/052: 46→48 (+btc_funding_rate_8h_impulse +btc_funding_spread_30_90). "
             "iter-v1/050: 45→46 (+dot_vs_btc_ret_ratio_30)."
         )

@@ -93,11 +93,11 @@ def test_pruned_size_47() -> None:
 
     n = len(V1_FEATURE_COLUMNS_PRUNED)
     assert n == 48, (
-        f"V1_FEATURE_COLUMNS_PRUNED expected 48 features at iter-v1/054 "
-        f"(impulse-drop at /054 → 47; eth_vs_btc_ret_ratio_30 ADD at /055 → 48); got {n}. "
+        f"V1_FEATURE_COLUMNS_PRUNED expected 48 features (post iter-v1/057 REVERT); got {n}. "
+        "If n == 49: ltc_vs_btc_ret_ratio_30 revert was NOT applied at /057 closeout. "
         "If n == 47: eth_vs_btc_ret_ratio_30 was NOT added at /055. "
-        "If n == 49+: extra feature added unexpectedly. "
-        "History: /052 ADD (46→48); /054 DROP impulse (47); /055 ADD eth ratio (48)."
+        "History: /052 ADD (46→48); /054 DROP impulse (47); /055 ADD eth ratio (48); "
+        "/057 ADD ltc ratio (49) then REVERTED at closeout (48)."
     )
 
 

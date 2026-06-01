@@ -103,6 +103,9 @@ V1_FEATURE_COLUMNS_PRUNED: tuple[str, ...] = (
     "interact_rsi_x_natr",
     "interact_stoch_x_adx",
     "long_short_zscore_30",  # iter-v1/049: NEW — top-trader long/short ratio z-score (30-bar)
+    # "ltc_vs_btc_ret_ratio_30" — iter-v1/057: REVERTED (multi-seed mean Δ +0.1082 IS,
+    #   max-min spread 0.765 → BASIN-LOTTERY downgrade; importance rank 13-15/49 fails
+    #   LEARNED gate ≤10; 49 → 48 cols). Feature computation code preserved in cross_btc_v1.py.
     "mom_macd_hist_12_26_9",
     "mom_macd_line_12_26_9",
     "mom_roc_10",
@@ -176,6 +179,16 @@ V1_FEATURE_COLUMNS_PRUNED: tuple[str, ...] = (
 #              dot_vs_btc_ret_ratio_30; cycle-6 EXPLORATION 10/10 FINAL). Count: 47 → 48.
 #              Inserted alphabetically between dot_vs_btc_ret_ratio_30 and
 #              funding_rate_zscore_30.
+# iter-v1/057: ADD ltc_vs_btc_ret_ratio_30 (LTC idiosyncratic return vs BTC 30d, z-scored
+#              90-bar; LTC-only specialist head; direct algebraic mirror of /055
+#              eth_vs_btc_ret_ratio_30; cycle-7 EXPLORATION 1/N). Count: 48 → 49.
+#              Inserted alphabetically between long_short_zscore_30 and mom_macd_hist_12_26_9.
+# iter-v1/057 CLOSEOUT: REVERT ltc_vs_btc_ret_ratio_30 (multi-seed n=3: per-seed IS Sharpe
+#              [0.736, 0.1276, -0.029]; mean Δ +0.1082 IS lands in MULTI-SEED-WEAK band
+#              [+0.05, +0.20); max-min spread 0.765 > 0.50 → BASIN-LOTTERY downgrade per
+#              brief §4.3; importance rank 13-15/49 fails LEARNED gate ≤10; mean OOS -0.5163
+#              with per-seed [-1.6307, +0.0988, -0.0171]). Count: 49 → 48. Feature
+#              computation code preserved in cross_btc_v1.py for potential future re-use.
 assert len(V1_FEATURE_COLUMNS_PRUNED) == 48, (
     f"V1_FEATURE_COLUMNS_PRUNED must have exactly 48 features; got {len(V1_FEATURE_COLUMNS_PRUNED)}"
 )
@@ -533,6 +546,43 @@ assert len(active_feature_columns) == 48 guard fires in dispatch branch.
 """
 
 
+V1_ITER057_UNIVERSE: tuple[str, ...] = ("LTCUSDT",)
+"""iter-v1/057 cohort: LTC-only specialist head.
+
+Cycle-7 EXPLORATION #1/N. Axis family: feature-family (ADD ltc_vs_btc_ret_ratio_30;
+direct algebraic mirror of /055 eth_vs_btc_ret_ratio_30 for LTC-only specialist head).
+V1_FEATURE_COLUMNS_PRUNED extended: 48 → 49 cols (ltc_vs_btc_ret_ratio_30 ADDED).
+
+LTC baseline IS Sharpe: +0.17 (second-worst IS; worst OOS OOD divergence: OOS -4.27).
+Mandate: /056 CONFIRMATION-BLOCK established cycle-7 EXP-1 mandate for LTC specialist.
+Multi-seed BUILT IN from start: --seeds 3, ensemble_size=3, _OUTER_SEED_OFFSETS=(0,3,6).
+Verdict basis: MULTI-SEED MEAN (n=3 outer seeds). Single-seed=42 is informational only.
+
+NORMAL-RISK declaration: additive feature + cohort isolation — no Optuna training-objective
+domain change. Multi-seed: --seeds 3 at ENSEMBLE_SIZE=3. n_trials=18.
+
+Architecture: Model_D_LTC_specialist (LTC only).
+  R1=ON (K=3 consecutive SL limit, C=27 candle cooldown — same as BASELINE_V1 Model D)
+  R2=OFF (no drawdown scaling — same as BASELINE_V1 Model D)
+  R3=ON (OOD Mahalanobis gate, cutoff=0.70, 16-feature V1_OOD_FEATURE_COLUMNS)
+  atr_tp=3.5, atr_sl=1.75 (UNCHANGED from BASELINE_V1 Model D specialist convention).
+
+BTC klines loaded for cross-asset feature computation only (BTCUSDT is NOT traded).
+
+Verdict bands (brief Section 4 F-AXIS #1, multi-seed MEAN):
+  Mean IS Δ ≥ +0.50 → MULTI-SEED-SPECIALIST-CANDIDATE; pre-register cycle-7 CONFIRMATION
+  Mean IS Δ ∈ [+0.20, +0.50) → MULTI-SEED-PARTIAL-CONFIRMED; pre-register cycle-7 CONFIRMATION
+  Mean IS Δ ∈ [+0.05, +0.20) → MULTI-SEED-WEAK; no CONFIRMATION; LTC stays pooled
+  Mean IS Δ ∈ (-0.05, +0.05) → NEG-INERT; no signal; ltc_vs_btc_ret_ratio_30 stays in pruned
+  Mean IS Δ < -0.05 → NEG-CLEAN; ltc_vs_btc_ret_ratio_30 reverted from V1_FEATURE_COLUMNS_PRUNED
+
+LOCAL to runner constant. NOT shared; CONFIRMATION-MERGE updates V1_BASELINE_UNIVERSE.
+assert set(symbols) == {"LTCUSDT"} guard fires in dispatch branch.
+assert "ltc_vs_btc_ret_ratio_30" in active_feature_columns guard fires in dispatch branch.
+assert len(active_feature_columns) == 49 guard fires in dispatch branch.
+"""
+
+
 __all__ = [
     "V1_EXCLUDED_SYMBOLS",
     "V1_BASELINE_UNIVERSE",
@@ -555,6 +605,7 @@ __all__ = [
     "V1_ITER056_C1_UNIVERSE",
     "V1_ITER056_C2_UNIVERSE",
     "V1_ITER056_C3_UNIVERSE",
+    "V1_ITER057_UNIVERSE",
     # iter-v1/023: funding-rate feature family (add_funding_v1_features imported on demand)
     # iter-v1/025: OI delta feature family (add_oi_delta_v1_features imported on demand)
     # iter-v1/040: composed feature family (add_composed_v1_features imported on demand)
