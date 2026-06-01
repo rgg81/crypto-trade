@@ -1,0 +1,3 @@
+symbol,n_main,n_baseline,n_intersection,n_union,jaccard
+DOTUSDT,47,47,9,85,0.10588235294117647
+ALL,47,47,9,85,0.10588235294117647
