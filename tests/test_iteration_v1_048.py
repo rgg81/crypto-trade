@@ -50,8 +50,9 @@ def test_trade_count_zscore_30_reverted_from_pruned():
         "trade_count_zscore_30 must be REVERTED from V1_FEATURE_COLUMNS_PRUNED "
         "(iter-v1/048 NEG-CLEAN-PRE-EDA: F5 |IC|=0.9063 vs vol_volume_rel_20)"
     )
-    assert len(V1_FEATURE_COLUMNS_PRUNED) == 46, (
-        f"Expected 46 pruned features (45 post-/049 + /050 ADD dot_vs_btc_ret_ratio_30), "
+    assert len(V1_FEATURE_COLUMNS_PRUNED) == 48, (
+        f"Expected 48 pruned features "
+        f"(46 post-/050 ADD + /052 ADD btc_funding_rate_8h_impulse + btc_funding_spread_30_90), "
         f"got {len(V1_FEATURE_COLUMNS_PRUNED)}"
     )
 

@@ -80,6 +80,7 @@ from crypto_trade.features_v1 import (
     V1_ITER043_UNIVERSE,
     V1_ITER050_UNIVERSE,
     V1_ITER051_UNIVERSE,
+    V1_ITER052_UNIVERSE,
     V1_OOD_FEATURE_COLUMNS,
     assert_v1_universe,
 )
@@ -5918,6 +5919,93 @@ def main() -> None:
         all_results = results_e051
         _r5_model_results = [results_e051]
         _post_dispatch_fi_strategies = [("Model_E_DOT_no_gate_multiseed", _strat_e051)]
+
+    elif iteration_label == "v1-052" and set(symbols) == set(V1_ITER052_UNIVERSE):
+        # iter-v1/052: BTC-only specialist head (cycle-6 EXP-7/10).
+        # Axis family: feature-family — ADD btc_funding_rate_8h_impulse + btc_funding_spread_30_90.
+        # V1_FEATURE_COLUMNS_PRUNED extended 46 → 48 cols.
+        #
+        # Architecture: Model A_BTC_specialist (BTC only).
+        #   R1=OFF (same as baseline Model A — no R1 on BTC per IS analysis showing
+        #           mean-reverting WR at late streaks; R1 would hurt BTC)
+        #   R2=OFF (same as baseline Model A — no R2 on BTC)
+        #   R3=ON  (same as baseline Model A — R3 OOD gate active, cutoff=0.70)
+        #   atr_tp=3.5, atr_sl=1.75 (UNCHANGED from baseline Model A)
+        #
+        # Feature stack: V1_FEATURE_COLUMNS_PRUNED (48 cols; 2 new funding transforms).
+        # NORMAL-RISK: additive features + cohort isolation (no Optuna domain change).
+        # ENSEMBLE_SIZE=3, n_trials=18, single-seed=42. Wall-clock cap: ≤ 2h.
+        # Pre-registered verdict bands (brief Section 4, F-AXIS #1):
+        #   IS Sharpe Δ >= +0.85 → PROMISING-SPECIALIST (flip-positive)
+        #   +0.30 <= IS Sharpe Δ < +0.85 → PROMISING-PARTIAL
+        #   +0.05 <= IS Sharpe Δ < +0.30 → PROMISING-WEAK
+        #   (-0.05, +0.05) → NEG-INERT
+        #   < -0.05 → NEGATIVE-CLEAN
+        assert set(symbols) == {"BTCUSDT"}, (
+            f"iter-v1/052 guard: expected {{BTCUSDT}}, got {set(symbols)}"
+        )
+        assert "btc_funding_rate_8h_impulse" in active_feature_columns, (
+            "iter-v1/052 pre-flight FAIL: btc_funding_rate_8h_impulse not in "
+            "active_feature_columns. "
+            "Ensure --pruned-features set and V1_FEATURE_COLUMNS_PRUNED has 48 cols. "
+            "Run: uv run crypto-trade features --symbols BTCUSDT "
+            "--interval 8h --track v1 --format parquet --workers 4"
+        )
+        assert "btc_funding_spread_30_90" in active_feature_columns, (
+            "iter-v1/052 pre-flight FAIL: btc_funding_spread_30_90 not in "
+            "active_feature_columns. "
+            "Ensure --pruned-features set and V1_FEATURE_COLUMNS_PRUNED has 48 cols. "
+            "Run: uv run crypto-trade features --symbols BTCUSDT "
+            "--interval 8h --track v1 --format parquet --workers 4"
+        )
+        assert len(active_feature_columns) == 48, (
+            f"iter-v1/052 guard: expected 48 V1_FEATURE_COLUMNS_PRUNED cols, "
+            f"got {len(active_feature_columns)}. "
+            "V1_FEATURE_COLUMNS_PRUNED should be 48 (post iter-v1/052 ADD 2 funding transforms)."
+        )
+        print(
+            f"[iter-v1/052] BTC-ONLY SPECIALIST ACTIVE: "
+            f"features=btc_funding_rate_8h_impulse + btc_funding_spread_30_90 (48 cols), "
+            f"R3=ON, R1=OFF, R2=OFF (baseline Model A for BTC). "
+            f"ENSEMBLE_SIZE={ensemble_size} (inner), n_trials={n_trials}. "
+            f"NORMAL-RISK: additive features + cohort isolation (no Optuna domain change). "
+            f"cycle-6 EXP-7/10. Verdict bands: IS Sharpe Δ >= +0.85 SPECIALIST / "
+            f"[+0.30, +0.85) PARTIAL / [+0.05, +0.30) WEAK / NEG-INERT / NEGATIVE-CLEAN."
+        )
+        # Model A_BTC_specialist: BTC only + R3 ON, R1 OFF, R2 OFF.
+        # feature_columns = V1_FEATURE_COLUMNS_PRUNED (48 cols including 2 new funding features).
+        # btc_funding_rate_8h_impulse and btc_funding_spread_30_90 must be in the parquet.
+        results_a052, faxm_a052, _strat_a052 = run_model(
+            "A_BTC_specialist (R3-only)",
+            ("BTCUSDT",),
+            atr_tp=3.5,   # UNCHANGED — matches Model A baseline BTC config
+            atr_sl=1.75,  # UNCHANGED — matches Model A baseline BTC config
+            apply_r1=False,   # OFF — Model A baseline (no R1 on BTC)
+            apply_r2=False,   # OFF — Model A baseline (no R2 on BTC)
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            **_r5_kwargs,
+        )
+
+        # F-AXIS #2 sanity: assert ONLY BTCUSDT trades emitted
+        a052_symbols = {r.symbol for r in results_a052}
+        assert a052_symbols.issubset({"BTCUSDT"}), (
+            f"[iter-v1/052] Model A_BTC produced non-BTC results: {a052_symbols - {'BTCUSDT'}}. "
+            "Per-cohort isolation failed — iter-v1/052 must trade BTCUSDT ONLY."
+        )
+        print(
+            f"[iter-v1/052] Dispatch verified: "
+            f"BTC-only={len(results_a052)} trades (R3=ON, R1=OFF, R2=OFF). "
+            f"F-AXIS #2 sanity PASS: universe isolation confirmed."
+        )
+
+        _all_faxm_logs = faxm_a052
+        all_results = results_a052
+        _r5_model_results = [results_a052]
+        _post_dispatch_fi_strategies = [("Model_A_BTC_specialist", _strat_a052)]
 
     elif iteration_label == "v1-044":
         # iter-v1/044: CONFIRMATION-MERGE-PORTFOLIO (cycle-5 CONFIRMATION 1/1).

@@ -178,12 +178,17 @@ from crypto_trade.features_v1.basis_v1 import (  # noqa: E402
 )
 
 # iter-v1/023: funding-rate z-score feature family.
-# The wrapper preserves track isolation: add_funding_v1_features lives in
+# iter-v1/052: EXTENDED to also write btc_funding_rate_8h_impulse + btc_funding_spread_30_90.
+# The wrapper preserves track isolation: add_funding_v1_extended_features lives in
 # features_v1/ (v1 track), called here via the legacy features registry so
 # that `uv run crypto-trade features --track v1 --groups funding_v1` writes
-# funding_rate_zscore_30 + funding_rate_zscore_90 to the v1 parquets.
+# funding_rate_zscore_30 + funding_rate_zscore_90 + btc_funding_rate_8h_impulse +
+# btc_funding_spread_30_90 to the v1 parquets.
+# Backward-compatible: the 4-column extended function still produces z30 + z90
+# (required by all prior iterations that use --pruned-features). The 2 new columns
+# are present in the parquet but are only selected by feature_columns in /052+.
 from crypto_trade.features_v1.funding_v1 import (  # noqa: E402
-    add_funding_v1_features as _add_funding_v1_features,
+    add_funding_v1_extended_features as _add_funding_v1_features,
 )
 
 # iter-v1/025: open-interest delta z-score feature family.

@@ -87,6 +87,8 @@ V1_FEATURE_COLUMNS: tuple[str, ...] = tuple(BASELINE_FEATURE_COLUMNS)
 # Properties: 40/40 pass ADF raw-α=0.05 stationarity; alphabetically sorted.
 # DO NOT MODIFY V1_FEATURE_COLUMNS — this is an ADDITIONAL constant.
 V1_FEATURE_COLUMNS_PRUNED: tuple[str, ...] = (
+    "btc_funding_rate_8h_impulse",  # iter-v1/052: NEW — funding-rate shock detector (normalized 1st-diff / 90-bar rolling std)  # noqa: E501
+    "btc_funding_spread_30_90",  # iter-v1/052: NEW — funding term-structure slope (z30 minus z90)  # noqa: E501
     "cal_dow_norm",
     "cal_hour_norm",
     "dot_vs_btc_ret_ratio_30",  # iter-v1/050: NEW — DOT idiosyncratic return vs BTC 30d z-scored (DOT-only; NaN for other syms)  # noqa: E501
@@ -135,7 +137,7 @@ V1_FEATURE_COLUMNS_PRUNED: tuple[str, ...] = (
     "vol_volume_rel_20",
 )
 
-# Sanity guard: confirm the pruned set has exactly 46 features.
+# Sanity guard: confirm the pruned set has exactly 48 features.
 # iter-v1/023: extended 40 → 42 by adding funding_rate_zscore_30 + funding_rate_zscore_90.
 # iter-v1/025: extended 42 → 43 by adding oi_delta_30_z90 (open-interest delta z-score).
 # iter-v1/034: extended 43 → 44 by adding basis_zscore_30 (perp-spot basis z-score).
@@ -158,8 +160,13 @@ V1_FEATURE_COLUMNS_PRUNED: tuple[str, ...] = (
 # iter-v1/050: extended 45 → 46 by adding dot_vs_btc_ret_ratio_30 (DOT idiosyncratic
 #              return vs BTC 30d, z-scored 90-bar; DOT-only cross-asset signal; NaN for
 #              other symbols; loaded from data/BTCUSDT/8h.csv at feature-gen time).
-assert len(V1_FEATURE_COLUMNS_PRUNED) == 46, (
-    f"V1_FEATURE_COLUMNS_PRUNED must have exactly 46 features; got {len(V1_FEATURE_COLUMNS_PRUNED)}"
+# iter-v1/052: extended 46 → 48 by adding btc_funding_rate_8h_impulse (funding shock
+#              detector; normalized 1st-diff of funding_rate over 90-bar rolling std) and
+#              btc_funding_spread_30_90 (term-structure slope; z30 minus z90). Both are
+#              non-OHLCV funding-rate derived features for the BTC-specialist head.
+#              Inserted alphabetically at positions 0 and 1.
+assert len(V1_FEATURE_COLUMNS_PRUNED) == 48, (
+    f"V1_FEATURE_COLUMNS_PRUNED must have exactly 48 features; got {len(V1_FEATURE_COLUMNS_PRUNED)}"
 )
 
 # Columns explicitly NOT in V1_FEATURE_COLUMNS_PRUNED but which may still appear in
@@ -350,6 +357,31 @@ assert len(active_feature_columns) == 46 guard fires in dispatch branch.
 """
 
 
+V1_ITER052_UNIVERSE: tuple[str, ...] = ("BTCUSDT",)
+"""iter-v1/052 cohort: BTC-only specialist head.
+
+Cycle-6 EXPLORATION #7 of 10. Axis family: feature-family (funding-rate derived transforms;
+non-OHLCV primitive class). NEW features: btc_funding_rate_8h_impulse (shock detector) +
+btc_funding_spread_30_90 (term-structure slope; z30 minus z90). V1_FEATURE_COLUMNS_PRUNED
+extended 46 → 48 cols.
+
+NORMAL-RISK declaration: additive features + cohort isolation (no Optuna domain change).
+Single-seed=42 (EXPLORATION standard). ENSEMBLE_SIZE=3, n_trials=18.
+
+Per-symbol architecture mandate: BTC-only specialist replacing pooled Model A for BTCUSDT.
+R3=ON, R1=OFF, R2=OFF (same as baseline Model A for BTC).
+
+BTC klines are the TRADED symbol (BTCUSDT). Funding-rate cache loaded from
+data/funding_rates/BTCUSDT.csv at feature-gen time.
+
+LOCAL to runner constant. NOT shared; CONFIRMATION-MERGE updates V1_BASELINE_UNIVERSE.
+assert set(symbols) == {"BTCUSDT"} guard fires in dispatch branch.
+assert "btc_funding_rate_8h_impulse" in active_feature_columns guard fires in dispatch branch.
+assert "btc_funding_spread_30_90" in active_feature_columns guard fires in dispatch branch.
+assert len(active_feature_columns) == 48 guard fires in dispatch branch.
+"""
+
+
 __all__ = [
     "V1_EXCLUDED_SYMBOLS",
     "V1_BASELINE_UNIVERSE",
@@ -365,6 +397,7 @@ __all__ = [
     "V1_ITER043_UNIVERSE",
     "V1_ITER050_UNIVERSE",
     "V1_ITER051_UNIVERSE",
+    "V1_ITER052_UNIVERSE",
     # iter-v1/023: funding-rate feature family (add_funding_v1_features imported on demand)
     # iter-v1/025: OI delta feature family (add_oi_delta_v1_features imported on demand)
     # iter-v1/040: composed feature family (add_composed_v1_features imported on demand)

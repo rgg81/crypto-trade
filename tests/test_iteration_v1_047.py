@@ -46,8 +46,9 @@ def test_skew_zscore_21_reverted_from_pruned():
         "skew_zscore_21 must be REVERTED from V1_FEATURE_COLUMNS_PRUNED "
         "(iter-v1/047 NEG-CLEAN-PRE-EDA: F5 |IC|=0.8132 vs stat_skew_20)"
     )
-    assert len(V1_FEATURE_COLUMNS_PRUNED) == 46, (
-        f"Expected 46 pruned features (45 post-/049 ADD + /050 ADD dot_vs_btc_ret_ratio_30), "
+    assert len(V1_FEATURE_COLUMNS_PRUNED) == 48, (
+        f"Expected 48 pruned features "
+        f"(46 post-/050 ADD + /052 ADD 2 btc funding transforms), "
         f"got {len(V1_FEATURE_COLUMNS_PRUNED)}"
     )
 
