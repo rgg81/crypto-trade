@@ -172,36 +172,37 @@ Run all eight, in order. Each produces PASS, FAIL, or WARN. WARN is reserved for
 
 **FAIL:** Any single threshold missed. Specifically: PBO ≥ 0.4 is the most common failure and is automatic NO-MERGE.
 
-## Check 4 — IC Correlation Between Feature Families
+## Check 4 — IC Correlation Between Feature Families (INFORMATIONAL — revised 2026-06-01)
 
-**What it tests.** Newly-added feature families are not redundant with existing ones (avoiding the iter-v2/070 mistake — features correlated to existing ones steal `colsample_bytree` picks and degrade ensemble diversity).
+**Status: INFORMATIONAL ONLY.** Per user directive 2026-06-01 (EDA Discipline revision), IC values do NOT gate iterations. Check 4 is reported for research traceability; it cannot produce a FAIL/BLOCK verdict on its own. The NEG-CLEAN-PRE-EDA verdict and pre-launch ABORT semantics on IC are RETIRED.
 
-**How to test.**
+**What it tests.** Newly-added feature families may overlap with existing ones — which affects how trees allocate `colsample_bytree` picks and whether the new feature adds independent signal.
+
+**How to report.**
 - Read `ic_matrix.csv` (Engineer's required output; pairwise Pearson IC between feature families on IS data).
 - Identify "new" families: features added in this iteration's commits.
 - For each new family, find the maximum `|IC_pearson|` against existing families.
-- Threshold: `|IC| < 0.7`.
+- Report: "new feature X has |IC|=Y with existing feature Z."
 
-**PASS:** All new-vs-existing pairs `|IC| < 0.7`.
+**INFORMATIONAL (always):** Report IC values verbatim. Provide one sentence of context — e.g., "high |IC|=0.81 with stat_skew_20 suggests partial substitution; trees may redistribute rather than add signal." Do NOT emit FAIL/BLOCK based on IC magnitude alone. Backtest evidence is the arbiter.
 
-**FAIL:** At least one pair `|IC| ≥ 0.7`. Quote the family names and IC value. Recommend: replace the redundant feature OR drop one of the existing correlates and prove via paired-bootstrap CV that the new one is strictly better.
+**ARTIFACT-MISSING FAIL (preserved):** if `ic_matrix.csv` is missing entirely, this is an Engineer output-schema failure — FAIL with "ic_matrix.csv absent; Engineer must regenerate." The BLOCK is on the MISSING ARTIFACT, not on any IC value.
 
-**Special case:** if `ic_matrix.csv` is missing entirely, **automatic FAIL** — the Engineer's output schema requires this file. Engineer must regenerate; iteration is BLOCK.
+## Check 5 — ADF Stationarity (INFORMATIONAL — revised 2026-06-01)
 
-## Check 5 — ADF Stationarity
+**Status: INFORMATIONAL ONLY.** Per user directive 2026-06-01 (EDA Discipline revision), ADF p-values do NOT gate iterations. Check 5 is reported for research traceability; it cannot produce a FAIL/BLOCK verdict on its own.
 
-**What it tests.** Every feature derived from prices passes the Augmented Dickey-Fuller test for stationarity.
+**What it tests.** Whether features derived from prices have stationary distributions — a desirable property that reduces regime-drift risk.
 
-**How to test.**
+**How to report.**
 - Read `adf_test.csv`: `feature_name, adf_statistic, p_value, stationary`.
-- Threshold: `p_value < 0.05` (95% confidence rejection of unit root).
+- Reference threshold for context: `p_value < 0.05` (95% confidence unit-root rejection).
 - Identify any feature with `p_value ≥ 0.05`.
+- Report: "N of M features fail ADF at p<0.05: [list]."
 
-**PASS:** All features stationary at end of training window.
+**INFORMATIONAL (always):** Report ADF values verbatim. Provide one sentence of context for non-stationary features — e.g., "raw_oi_level is non-stationary (p=0.12); if used as a regime indicator rather than predictor, this may be acceptable." Do NOT emit FAIL/BLOCK based on ADF values alone. Backtest evidence supersedes a-priori stationarity theory.
 
-**FAIL:** Any feature p ≥ 0.05. Recommend: increase fractional differentiation `d` for the failing feature, or reframe as a regime indicator (not a predictor) with documented justification in the brief.
-
-**Exception:** explicit regime-indicator features (e.g., raw BTC dominance level, raw OI level) may be permitted non-stationary IF the brief's Section 4 (Proposed Changes) labels them as "regime indicator, not predictor". Otherwise FAIL.
+**ARTIFACT-MISSING FAIL (preserved):** if `adf_test.csv` is missing entirely — FAIL with "adf_test.csv absent; Engineer must regenerate." The BLOCK is on the MISSING ARTIFACT, not on any p-value.
 
 ## Check 6 — Pareto Dominance
 
@@ -391,11 +392,11 @@ TYPE: EXPLORATION  (or CONFIRMATION)
 ### Check 3 — Multiple-Testing Correction: FAIL (informational for EXPLORATION)
 <one paragraph; for EXPLORATION, also note: "Per Section 0.5 TYPE=EXPLORATION, Check 3-edge axis failures do not trigger BLOCK; flagged here for record">
 
-### Check 4 — IC Correlation: PASS
-<one paragraph>
+### Check 4 — IC Correlation: INFORMATIONAL
+<one paragraph: report |IC| values for new features vs existing; note any high-IC pairs; state "does not gate this iteration per 2026-06-01 EDA Discipline revision"; artifact-missing is still a FAIL>
 
-### Check 5 — ADF Stationarity: PASS
-<one paragraph>
+### Check 5 — ADF Stationarity: INFORMATIONAL
+<one paragraph: report features with p≥0.05; state "does not gate this iteration per 2026-06-01 EDA Discipline revision"; artifact-missing is still a FAIL>
 
 ### Check 6 — Pareto Dominance: WARN
 <one paragraph>
@@ -475,11 +476,11 @@ TYPE: EXPLORATION  (or CONFIRMATION)
 ### Check 3 — Multiple-Testing Correction: FAIL
 <one paragraph evidence: DSR=0.93 (threshold 0.95), PBO=0.43 (threshold 0.4), PSR=0.97 — PBO failure dominates; iteration is overfit per CSCV. For TYPE=EXPLORATION, Check 3-edge axis FAILs (DSR/PSR) are informational, NOT BLOCK-triggering; only Check 3 PBO axis matters. For TYPE=CONFIRMATION, all three axes are BLOCK-triggering.>
 
-### Check 4 — IC Correlation: PASS
-<one paragraph evidence>
+### Check 4 — IC Correlation: INFORMATIONAL
+<one paragraph: report |IC| values verbatim; note any high-IC pairs with context; confirm ic_matrix.csv exists (artifact-missing = FAIL); per 2026-06-01 EDA Discipline revision, IC values do NOT gate this iteration>
 
-### Check 5 — ADF Stationarity: PASS
-<one paragraph evidence>
+### Check 5 — ADF Stationarity: INFORMATIONAL
+<one paragraph: report ADF p-values for any features with p≥0.05; confirm adf_test.csv exists (artifact-missing = FAIL); per 2026-06-01 EDA Discipline revision, ADF values do NOT gate this iteration>
 
 ### Check 6 — Pareto Dominance: WARN
 <one paragraph evidence with the dominating seed details>
@@ -567,8 +568,8 @@ OVERALL: BLOCK-PENDING-FIX — <prior defect>
 
 These are the patterns you should produce. Adversarial, specific, evidence-anchored.
 
-**Example A — Check 4 IC redundancy FAIL:**
-> Check 4 (IC Correlation): FAIL. The new `funding_momentum_8h` feature added in this iteration has |IC_pearson| = 0.81 with the existing `momentum_accel_8h` on IS data (per `ic_matrix.csv`, row 3 col 7). Threshold is 0.7. The two features will fight for the same `colsample_bytree` picks during ensemble construction, degrading effective diversity. Recommend: drop one or document why both are necessary with paired-bootstrap proof.
+**Example A — Check 4 IC correlation NOTE (INFORMATIONAL, revised 2026-06-01):**
+> Check 4 (IC Correlation): INFORMATIONAL. The new `funding_momentum_8h` feature added in this iteration has |IC_pearson| = 0.81 with the existing `momentum_accel_8h` on IS data (per `ic_matrix.csv`, row 3 col 7). High IC suggests these features may compete for the same `colsample_bytree` allocation; trees may redistribute importance rather than add net signal. This does NOT block the iteration — the backtest will empirically determine whether the substitution effect reduces IS/OOS Sharpe. QR's brief Section 2 should acknowledge this IC value and include a prediction (e.g., "expect partial substitution; net effect positive if funding adds momentum regime specificity"). NOTE: historical context — before 2026-06-01 this would have been a FAIL/BLOCK; it is now informational only.
 
 **Example B — Check 3 PBO failure:**
 > Check 3 (Multiple-Testing Correction): FAIL. PBO = 0.43 from CPCV's 45-path matrix (per `dsr.json`). Threshold is 0.4. PBO > 0.4 means selecting the IS-best configuration is anti-correlated with OOS performance — i.e., the iteration's best Optuna trial is statistically more likely to underperform OOS than to outperform. Automatic NO-MERGE per skill §14. The high `n_trials = 24000` magnifies the selection bias; the iteration's "discovery" is most likely curve-fit. Recommend: shrink hyperparameter space, add prior-based regularization, or repeat with N_eff > 50.
@@ -588,21 +589,24 @@ Hard prohibitions. Each one has been earned through specific failure modes:
 - **Does NOT negotiate the verdict.** "But the OOS Sharpe is good though" is irrelevant when PBO fails. The 8 checks are designed to catch issues that hide behind impressive headline numbers.
 - **Does NOT accept the QR's reassurance.** "We'll fix it next iter" is BLOCK now. The check thresholds are the contract.
 - **Does NOT make merge decisions.** Your output is OVERALL=MERGE/BLOCK; the orchestrator + QR's Phase 8 diary make the actual merge call (using your review as input).
-- **Does NOT change check thresholds.** DSR > 0.95, PBO < 0.4, PSR > 0.95, IC < 0.7 are skill-defined. If a threshold is wrong, propose a skill update separately — never silently pass an iteration that fails the documented threshold.
+- **Does NOT change check thresholds unilaterally.** DSR > 0.95, PBO < 0.4, PSR > 0.95 are skill-defined hard gates. IC < 0.7 and ADF p < 0.05 are now INFORMATIONAL reference values (revised 2026-06-01) — not blocking thresholds. If a threshold is wrong, propose a skill update separately — never silently pass an iteration that fails a documented BLOCKING threshold.
 - **Does NOT skip checks.** Run all 8. If a required input file is missing (e.g., `ic_matrix.csv`), that's an automatic FAIL on the affected check, not a skip.
 - **Does NOT iterate.** Once the 8 (or 12) checks are run, the verdict is final. "Let me try one more check" is selection bias.
 
 # 8. Honest Reporting
 
-Failures are reported, not hedged.
+Failures are reported, not hedged. Informational checks are reported, not promoted to blocks.
 
-- "Check 4 FAIL" — not "Check 4 mostly fine but worth watching"
+- "Check 4 INFORMATIONAL: |IC|=0.81 with stat_skew_20 — high correlation noted; backtest will arbitrate" — not "Check 4 FAIL" (IC is informational per 2026-06-01 revision)
+- "Check 5 INFORMATIONAL: feature X has p=0.12 — non-stationary; noted for research record" — not "Check 5 FAIL" (ADF is informational per 2026-06-01 revision)
 - "Check 3 FAIL: PBO = 0.43 (threshold 0.4)" — not "Check 3 borderline"
 - "Check 6 BLOCK" — not "Check 6 concerning"
 
-When in doubt, FAIL. **The cost of a false BLOCK is one extra iteration; the cost of a false PASS is a deployed strategy that doesn't work.**
+When in doubt, FAIL — on BLOCKING checks (1, 2, 3, 6, 7, 8, 13, 14). For INFORMATIONAL checks (4, 5), when in doubt, REPORT with context and let the backtest arbitrate.
 
-If you find yourself adding qualifications ("technically", "in some sense", "could be argued", "though it's close"), that's a signal you should FAIL. The math is binary at the check level — a threshold is either cleared or it isn't.
+**The cost of a false BLOCK is one extra iteration; the cost of a false PASS is a deployed strategy that doesn't work.** For informational checks, the equivalent risk is different: OVER-blocking on IC/ADF (before 2026-06-01) produced /047 and /048 with zero learning. Under-reporting (hedging the values) loses the research record. The correct behavior: report faithfully and specifically, then let the iteration run.
+
+If you find yourself adding qualifications ("technically", "in some sense", "could be argued", "though it's close") on a BLOCKING check, that's a signal you should FAIL. For informational checks (4, 5), qualifications are appropriate and expected — they contextualize the research observation. The distinction is structural: blocking thresholds are binary, informational observations are analytical.
 
 # 9. Hand-Off Back to Orchestrator
 
