@@ -1,4 +1,8 @@
-outer_seed_id,oos_monthly_sharpe,profitable
-42,,False
-offset3,,False
-offset6,,False
+outer_seed_id,is_sharpe,oos_sharpe,is_trades,oos_trades,is_max_drawdown_pct,is_win_rate,oos_win_rate,profitable_oos
+42,-0.1138,-0.1453,125,47,21.36,46.4,40.4,False
+offset3,-0.5808,-0.1201,115,51,29.94,38.3,49.0,False
+offset6,-0.0118,1.0787,116,47,22.62,40.5,51.1,True
+mean,-0.2355,0.2711,118.7,48.3,24.64,41.7,46.8,
+std,0.3034,0.6964,5.51,2.31,4.69,4.18,5.52,
+min,-0.5808,-0.1453,115,47,21.36,38.3,40.4,
+max,-0.0118,1.0787,125,51,29.94,46.4,51.1,
