@@ -92,7 +92,7 @@ Total candidate (iter, coin) cells: ~100-130 (less than nominal 38×5=190 becaus
 
 ### 2.2 /045 ALT_1 — per-component IS evidence (anchor; from `analysis/iteration_v1-045/component_is_evidence.csv`)
 
-| Component | Source iter | Universe | IS Sharpe | IS n_trades | IS_n_trades_norm (n/100) | score_is_alt1_components = 0.6·IS_Sh + 0.4·norm |
+| Component | Source iter | Universe | IS Sharpe | IS n_trades | IS_n_trades_norm (n/250) | score_is_alt1_components = 0.6·IS_Sh + 0.4·norm |
 |---|---|---|---:|---:|---:|---:|
 | C-BTC | v1-012 | {BTC} | **−0.21** | 65 | 0.65 | 0.140 |
 | C-ETH | v1-042 | {ETH} | +0.71 | 132 | 1.32 | 0.954 |
@@ -160,7 +160,7 @@ Committed BEFORE Phase 6.0 Critic pre-flight. Pure stdlib + pandas; no LightGBM,
 2. SCORE: for each (iter, coin) cell:
    - IS_Sharpe = annualized daily Sharpe of cell's PnL series (sqrt(252) × mean/std).
    - IS_n_trades = count of cells' rows.
-   - IS_n_trades_norm = IS_n_trades / 100 (matching /045's trade-norm convention).
+   - IS_n_trades_norm = IS_n_trades / 250. (Normalization factor 250, vs initial proposal 100, per LM Master Phase 4.5 Rec 2 — limits per-coin trade-count contribution to ~20% effective weight, reducing multiple-comparison inflation.)
    - score_is = 0.6 * IS_Sharpe + 0.4 * IS_n_trades_norm.
 
 3. GATE: per-coin sample-size floor.
@@ -219,7 +219,7 @@ LM Master risk flags — response map:
 | **Flag A — IS-overfit-on-a-different-axis (best-of-N inflation)** | Acknowledged in brief Section 4 F1 (deflated floor). The IS-only substrate is OOS-leak-free by construction but NOT IS-overfit-free; /047 multi-seed re-validation is still mandatory for MERGE-worthiness regardless of /046 verdict. |
 | **Flag B — IS-only substrate may have WORSE OOS than ALT_1 (not a /046 failure)** | **EXPLICITLY DOCUMENTED in §4 F4.** OOS metrics are computed and reported in `comparison_vs_alt1.csv` for diagnostic interpretation but are NOT used as /046 success criteria. Brief Section 4 explicit language: "Critic CANNOT cite IS-only substrate OOS Sharpe < ALT_1 OOS Sharpe as evidence of /046 failure — that re-introduces the OOS-aware selection bias /046 is designed to detect." |
 | **Flag C — Tiebreaker convention (IS n_trades desc, not asc)** | **ADOPTED (modification vs outline).** Tiebreaker hierarchy in §3.1 step 4 uses IS_n_trades DESCENDING (more trades = more reliable estimate). Outline's original ascending was flipped per LM Master advice. |
-| **Flag D — Score formula effective-weight calculation** | **DOCUMENTED.** `IS_n_trades/100` ranges roughly [0.2, 1.5] for the inventory (20-150 IS trades after sample-size gate); IS_Sharpe ranges roughly [−0.5, +4]. Trade-count contributes ~[0.08, 0.6] (effective ~15-25% weight on the score, not the nominal 40%); IS_Sharpe contributes ~[−0.3, +2.4] (effective ~75-85%). Trade-count acts as a soft tiebreaker more than a co-equal criterion. This is the INTENDED behavior — /046 tests whether the score reproduces /045's substrate; the effective-weight distribution is documented for transparency, not adjusted. |
+| **Flag D — Score formula effective-weight calculation** | **DOCUMENTED.** `IS_n_trades/250` ranges roughly [0.08, 0.60] for the inventory (20-150 IS trades after sample-size gate); IS_Sharpe ranges roughly [−0.5, +4]. Trade-count contributes ~[0.032, 0.24] to the score (effective ~8-15% weight, not the nominal 40%); IS_Sharpe dominates at effective ~85-92%. Trade-count acts as a soft tiebreaker more than a co-equal criterion. The /250 denominator (vs the initial /100 proposal) was adopted per LM Master Rec 2 to limit per-coin trade-count influence and reduce multiple-comparison inflation. This is the INTENDED behavior — /046 tests whether the score reproduces /045's substrate; the effective-weight distribution is documented for transparency, not adjusted. |
 
 LM Master overall confidence MEDIUM-HIGH; modal prior PROMISING-DIVERGENCE 45%. QR concurs with the prior distribution (Section 7).
 
@@ -308,7 +308,7 @@ LM Master overall confidence MEDIUM-HIGH; modal prior PROMISING-DIVERGENCE 45%. 
 - Load `reports-v1/iteration_v1-{iter}/in_sample/trades.csv` ONLY.
 - Assert `close_time < OOS_CUTOFF_MS` at load time; raise on violation.
 - For each (iter, coin) cell: compute IS daily Sharpe (annualised) and IS n_trades.
-- Compute `score_is = 0.6 · IS_Sharpe + 0.4 · IS_n_trades / 100`.
+- Compute `score_is = 0.6 · IS_Sharpe + 0.4 · IS_n_trades / 250`.
 - Per coin, rank candidates by `score_is` descending; pick top-1 via tiebreaker hierarchy (§3.1 step 4).
 - Emit `partition_solve_v2.csv` with per-coin top-3.
 

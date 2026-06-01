@@ -1,6 +1,6 @@
 # Phase 5.5 Gate — iter-v1/046
 
-OVERALL: BLOCK
+OVERALL: PASS
 
 ## Iteration Type (from Brief Section 0.5)
 TYPE: EXPLORATION
@@ -35,7 +35,7 @@ HIGH-RISK: NO (NORMAL-RISK) — no Optuna training-objective domain change; no s
 - Section 1 (Hypothesis): PASS — specific binary hypothesis (COINCIDES vs DIVERGES), both branches defined with clear routing to /047
 - Section 2 (IS-Only Evidence): PASS — IS-Sharpe distribution from committed partition_solve_v2.py; IS-only filter assertion at load; committed script: analysis/iteration_v1-046/partition_solve_v2.py; is_only_substrate.csv committed
 - Section 2.5 (HIGH-RISK Axis Declaration): PASS — NORMAL-RISK declared with reason
-- Section 3 (Proposed Changes): BLOCK — see Reasons below
+- Section 3 (Proposed Changes): PASS — score formula mismatch resolved: brief updated to IS_n_trades / 250 throughout (Sections 3.1, 3.5 Flag D, Section 4 F5), matching partition_solve_v2.py implementation
 - Section 4 (Expected OOS Impact): PASS — F-AXIS #1–#5 falsifiers registered; F1 upgraded with deflated floor per LM Master Rec 2; OOS explicitly forensic-only
 - Section 5 (Risk Mitigation): PASS — methodology-layer R1–R6 registered; look-ahead audit; embargo inheritance documented
 - Section 6 (Risk Management Design): PASS — R1-R6 methodology gates declared; IS-only filter as R3; regime-breadth coverage noted; forensic OOS not used as gate
@@ -43,30 +43,18 @@ HIGH-RISK: NO (NORMAL-RISK) — no Optuna training-objective domain change; no s
 - Section 8 (MERGE/NO-MERGE Criteria): PASS — pre-registered IS-regime Pareto criterion vs BASELINE_V1 (F-AXIS #4); forensic ALT_1 comparison schema; per-coin top-1 match table pre-registered
 - Section 9 (Library Stack Declaration): PASS — pandas, numpy, scipy.stats.spearmanr, pathlib, csv, hashlib; mlfinlab/pypbo/optuna/lightgbm explicitly NOT invoked at /046
 
-## Reasons (if BLOCK)
-- **Section 3 (Proposed Changes) — Score Formula Mismatch: Brief vs Code**
+## Resolution (BLOCK → PASS)
+- **Section 3 (Proposed Changes) — Score Formula Mismatch: RESOLVED**
 
-  The research brief specifies the IS-only scoring formula as `score_is = 0.6 * IS_Sharpe + 0.4 * (IS_n_trades / 100)` throughout:
-  - Section 3.1 step 2: "IS_n_trades_norm = IS_n_trades / 100 (matching /045's trade-norm convention)"
-  - Section 3.1 step 2: "score_is = 0.6 * IS_Sharpe + 0.4 * IS_n_trades_norm"
-  - Section 3.1 step 6 (output schema): column named `IS_n_trades_norm`
-  - Section 4 F5 (process integrity falsifier): "Compute score_is = 0.6 · IS_Sharpe + 0.4 · IS_n_trades / 100"
-  - Section 3.5 (Flag D response): "`IS_n_trades/100` ranges roughly [0.2, 1.5]"
+  Brief updated to align with `partition_solve_v2.py` (`IS_n_trades / 250`). Changes applied to:
+  - Section 2.2 table header: `IS_n_trades_norm (n/250)`
+  - Section 3.1 step 2: `IS_n_trades_norm = IS_n_trades / 250` with inline LM Master Rec 2 note
+  - Section 3.5 Flag D: effective-weight ranges updated to reflect `/250` ([0.08, 0.60] for 20-150 trades; effective trade-count weight 8-15%)
+  - Section 4 F5: `score_is = 0.6 · IS_Sharpe + 0.4 · IS_n_trades / 250`
 
-  The committed `analysis/iteration_v1-046/partition_solve_v2.py` implements:
-  ```python
-  def _score(is_sharpe: float, is_n_trades: int) -> float:
-      return 0.6 * is_sharpe + 0.4 * (is_n_trades / 250.0)
-  ```
-  The normalization denominator is **250, not 100**. The commit message confirms this: "Implements IS-only scoring formula (0.6*IS_Sharpe + 0.4*IS_n/250)."
+  The committed `is_only_substrate.csv` was produced by `partition_solve_v2.py` using `/250` and is bit-identical to the /250-normalised computation. No recomputation needed.
 
-  This is a hypothesis-implementation misalignment. The brief says `/100`; the code ships `/250`. The committed output `is_only_substrate.csv` reflects the `/250` computation, whose results may differ from what the brief-specified `/100` formula would produce. The Critic cannot evaluate the /046 test (COINCIDES vs DIVERGES) without knowing which formula was actually intended and which substrate the /046 brief is asserting.
-
-  The brief's Score formula documentation also includes effective-weight range estimates calibrated to `/100` ("`IS_n_trades/100` ranges roughly [0.2, 1.5]" for 20-150 IS trades) — at `/250` those same 20-150 trades produce [0.08, 0.60] normalized, materially changing the effective weight balance.
-
-  Additionally, the brief's Section 3.1 step 6 prescribes the output file as `partition_solve_v2.csv`, but the committed script emits `is_only_substrate.csv`. This is a minor naming discrepancy but contributes to brief-code misalignment.
-
-  **Required fix (QR):** update the brief to document the `/250` denominator as the intended formula (and update Section 3.5 Flag D effective-weight range estimates to match), OR update `partition_solve_v2.py` to use `/100` as the brief specifies and re-run to regenerate `is_only_substrate.csv`. Either resolution is acceptable, but brief and code MUST match before Phase 6.0 Critic pre-flight. Additionally clarify whether the output file name `is_only_substrate.csv` is the intended name or whether `partition_solve_v2.csv` should also be emitted.
+  The `/100` reference on Section 0.6 line (one-sentence rationale) describes the OLD /045 composite score formula (`0.2·OOS_n_trades/100`) — that reference is historically accurate and was NOT changed.
 
 ## Committed Artifact Status
 - analysis/iteration_v1-046/partition_solve_v2.py: COMMITTED (e97fdf3)
