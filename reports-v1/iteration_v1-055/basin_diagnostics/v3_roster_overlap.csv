@@ -1,0 +1,3 @@
+symbol,n_main,n_baseline,n_intersection,n_union,jaccard
+ETHUSDT,53,47,4,96,0.041666666666666664
+ALL,53,47,4,96,0.041666666666666664
