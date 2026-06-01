@@ -82,6 +82,7 @@ from crypto_trade.features_v1 import (
     V1_ITER051_UNIVERSE,
     V1_ITER052_UNIVERSE,
     V1_ITER053_UNIVERSE,
+    V1_ITER054_UNIVERSE,
     V1_OOD_FEATURE_COLUMNS,
     assert_v1_universe,
 )
@@ -6105,6 +6106,102 @@ def main() -> None:
         all_results = results_a053
         _r5_model_results = [results_a053]
         _post_dispatch_fi_strategies = [("Model_A_BTC_specialist_multiseed", _strat_a053)]
+
+    elif iteration_label == "v1-054" and set(symbols) == set(V1_ITER054_UNIVERSE):
+        # iter-v1/054: BTC-only impulse-drop attribution test (cycle-6 EXP-9/10).
+        # Axis family: feature-family (feature-pruning sub-axis).
+        # CHANGE vs /052-/053: DROP btc_funding_rate_8h_impulse from V1_FEATURE_COLUMNS_PRUNED.
+        #   btc_funding_rate_8h_impulse: DROPPED (rank >30/48 in 3/3 outer seeds at /053;
+        #     INERT-by-importance multi-seed confirmed). Code preserved in funding_v1.py.
+        #   btc_funding_spread_30_90: RETAINED (rank 4-10/48 STABLE in 3/3 seeds at /053).
+        #   V1_FEATURE_COLUMNS_PRUNED: 48 → 47 cols.
+        #
+        # Architecture: Model A_BTC_specialist (BTC only).
+        #   R1=OFF (same as baseline Model A — no R1 on BTC)
+        #   R2=OFF (same as baseline Model A — no R2 on BTC)
+        #   R3=ON  (same as baseline Model A — R3 OOD gate active, cutoff=0.70)
+        #   atr_tp=3.5, atr_sl=1.75 (UNCHANGED from /052-/053 and baseline Model A)
+        #
+        # Feature stack: V1_FEATURE_COLUMNS_PRUNED (47 cols; impulse DROPPED).
+        # NORMAL-RISK: dropping one INERT feature does NOT change Optuna's training-objective
+        # domain. Single-seed=42 (EXPLORATION standard). ENSEMBLE_SIZE=3, n_trials=18.
+        #
+        # Pre-registered verdict bands (brief Section 4, F-AXIS #1):
+        #   Spread IS >= +0.16 → IMPULSE-DROP-CONFIRMED (47-col stack permanent)
+        #   Spread IS ∈ [0, +0.16) → IMPULSE-DROP-MARGINAL (/055 CONFIRMATION at 48 cols)
+        #   Spread IS < 0 → IMPULSE-DROP-DEGRADES (restore impulse; /055 at 48 cols)
+        #   IS trades < 50 → NEGATIVE-INSUFFICIENT-TRADES (regardless of IS Sharpe)
+        assert set(symbols) == {"BTCUSDT"}, (
+            f"iter-v1/054 guard: expected {{BTCUSDT}}, got {set(symbols)}"
+        )
+        assert "btc_funding_spread_30_90" in active_feature_columns, (
+            "iter-v1/054 pre-flight FAIL: btc_funding_spread_30_90 not in "
+            "active_feature_columns. "
+            "Ensure --pruned-features is set and V1_FEATURE_COLUMNS_PRUNED has 47 cols "
+            "(spread RETAINED; impulse DROPPED at /054). "
+            "Run: uv run crypto-trade features --symbols BTCUSDT "
+            "--interval 8h --track v1 --format parquet --workers 4"
+        )
+        assert "btc_funding_rate_8h_impulse" not in active_feature_columns, (
+            "iter-v1/054 pre-flight FAIL: btc_funding_rate_8h_impulse IS in "
+            "active_feature_columns — it must be DROPPED at /054. "
+            "Check src/crypto_trade/features_v1/__init__.py: the impulse entry must be "
+            "commented out (NOT deleted; computation code preserved in funding_v1.py). "
+            "Ensure --pruned-features is set so V1_FEATURE_COLUMNS_PRUNED (47 cols) is used."
+        )
+        assert len(active_feature_columns) == 47, (
+            f"iter-v1/054 guard: expected 47 V1_FEATURE_COLUMNS_PRUNED cols, "
+            f"got {len(active_feature_columns)}. "
+            "V1_FEATURE_COLUMNS_PRUNED must be 47 at /054 (48 - 1 impulse-drop). "
+            "If len == 48: btc_funding_rate_8h_impulse was NOT dropped — check __init__.py."
+        )
+        print(
+            f"[iter-v1/054] BTC-ONLY IMPULSE-DROP ATTRIBUTION TEST ACTIVE: "
+            f"features=V1_FEATURE_COLUMNS_PRUNED (47 cols; btc_funding_rate_8h_impulse DROPPED; "
+            f"btc_funding_spread_30_90 RETAINED). "
+            f"R3=ON, R1=OFF, R2=OFF (baseline Model A for BTC). "
+            f"atr_tp=3.5, atr_sl=1.75 (UNCHANGED from /052-/053 + baseline Model A). "
+            f"ENSEMBLE_SIZE={ensemble_size} (inner), n_trials={n_trials}. "
+            f"NORMAL-RISK: impulse-drop (INERT feature removal; no Optuna domain change). "
+            f"cycle-6 EXP-9/10. Verdict bands: IS >= +0.16 IMPULSE-DROP-CONFIRMED / "
+            f"[0, +0.16) MARGINAL / < 0 DEGRADES."
+        )
+        # Model A_BTC_specialist: BTC only + R3 ON, R1 OFF, R2 OFF.
+        # feature_columns = V1_FEATURE_COLUMNS_PRUNED (47 cols; impulse DROPPED, spread RETAINED).
+        # btc_funding_spread_30_90 must be in the parquet (from /052 regen; no new regen needed).
+        # btc_funding_rate_8h_impulse may still appear as a parquet column (not passed to LightGBM).
+        results_a054, faxm_a054, _strat_a054 = run_model(
+            "A_BTC_specialist (R3-only)",
+            ("BTCUSDT",),
+            atr_tp=3.5,  # UNCHANGED — matches /052-/053 + Model A baseline BTC config
+            atr_sl=1.75,  # UNCHANGED — matches /052-/053 + Model A baseline BTC config
+            apply_r1=False,  # OFF — Model A baseline (no R1 on BTC)
+            apply_r2=False,  # OFF — Model A baseline (no R2 on BTC)
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            **_r5_kwargs,
+        )
+
+        # Cohort isolation sanity: assert ONLY BTCUSDT trades emitted
+        a054_symbols = {r.symbol for r in results_a054}
+        assert a054_symbols.issubset({"BTCUSDT"}), (
+            f"[iter-v1/054] Model A_BTC produced non-BTC results: {a054_symbols - {'BTCUSDT'}}. "
+            "Per-cohort isolation failed — iter-v1/054 must trade BTCUSDT ONLY."
+        )
+        print(
+            f"[iter-v1/054] Dispatch verified: "
+            f"BTC-only={len(results_a054)} trades (R3=ON, R1=OFF, R2=OFF). "
+            f"Cohort isolation PASS: universe guard confirmed. "
+            f"atr_tp=3.5, atr_sl=1.75 (NOT pooled 2.9/1.45 — BTC specialist Model_A config)."
+        )
+
+        _all_faxm_logs = faxm_a054
+        all_results = results_a054
+        _r5_model_results = [results_a054]
+        _post_dispatch_fi_strategies = [("Model_A_BTC_specialist", _strat_a054)]
 
     elif iteration_label == "v1-044":
         # iter-v1/044: CONFIRMATION-MERGE-PORTFOLIO (cycle-5 CONFIRMATION 1/1).

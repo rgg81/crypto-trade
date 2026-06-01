@@ -87,7 +87,8 @@ V1_FEATURE_COLUMNS: tuple[str, ...] = tuple(BASELINE_FEATURE_COLUMNS)
 # Properties: 40/40 pass ADF raw-α=0.05 stationarity; alphabetically sorted.
 # DO NOT MODIFY V1_FEATURE_COLUMNS — this is an ADDITIONAL constant.
 V1_FEATURE_COLUMNS_PRUNED: tuple[str, ...] = (
-    "btc_funding_rate_8h_impulse",  # iter-v1/052: NEW — funding-rate shock detector (normalized 1st-diff / 90-bar rolling std)  # noqa: E501
+    # "btc_funding_rate_8h_impulse" — iter-v1/054: DROPPED (rank >30/48 in 3/3 seeds at /053;
+    #   INERT-by-importance multi-seed confirmed; 48 → 47 cols). Code preserved in funding_v1.py.
     "btc_funding_spread_30_90",  # iter-v1/052: NEW — funding term-structure slope (z30 minus z90)  # noqa: E501
     "cal_dow_norm",
     "cal_hour_norm",
@@ -165,8 +166,13 @@ V1_FEATURE_COLUMNS_PRUNED: tuple[str, ...] = (
 #              btc_funding_spread_30_90 (term-structure slope; z30 minus z90). Both are
 #              non-OHLCV funding-rate derived features for the BTC-specialist head.
 #              Inserted alphabetically at positions 0 and 1.
-assert len(V1_FEATURE_COLUMNS_PRUNED) == 48, (
-    f"V1_FEATURE_COLUMNS_PRUNED must have exactly 48 features; got {len(V1_FEATURE_COLUMNS_PRUNED)}"
+# iter-v1/054: DROP btc_funding_rate_8h_impulse (rank >30/48 in 3/3 outer seeds at /053;
+#              INERT-by-importance multi-seed confirmed). btc_funding_spread_30_90 RETAINED
+#              (rank 4-10/48 in 3/3 seeds at /053; STABLE confirmed). Count: 48 → 47.
+#              Feature computation code preserved in funding_v1.py (restore path for /055
+#              IMPULSE-DROP-DEGRADES verdict if needed).
+assert len(V1_FEATURE_COLUMNS_PRUNED) == 47, (
+    f"V1_FEATURE_COLUMNS_PRUNED must have exactly 47 features; got {len(V1_FEATURE_COLUMNS_PRUNED)}"
 )
 
 # Columns explicitly NOT in V1_FEATURE_COLUMNS_PRUNED but which may still appear in
@@ -411,6 +417,37 @@ assert len(active_feature_columns) == 48 guard fires in dispatch branch.
 """
 
 
+V1_ITER054_UNIVERSE: tuple[str, ...] = ("BTCUSDT",)
+"""iter-v1/054 cohort: BTC-only specialist head (impulse-drop attribution test).
+
+Cycle-6 EXPLORATION #9 of 10. Axis family: feature-family (feature-pruning sub-axis;
+DROP btc_funding_rate_8h_impulse from V1_FEATURE_COLUMNS_PRUNED; KEEP btc_funding_spread_30_90).
+V1_FEATURE_COLUMNS_PRUNED extended: 48 → 47 cols (impulse DROPPED; spread RETAINED).
+
+Triggering mandate: /053 PARTIAL-CONFIRMED (mean IS Δ +0.8102; impulse rank >30/48 in 3/3
+seeds; spread rank 4-10/48 in 3/3 seeds). /053 LM Master Rec 1 conditional FIRES: impulse-drop
+revaluation at /054.
+
+NORMAL-RISK declaration: dropping one INERT feature (rank >30 multi-seed confirmed) does NOT
+change Optuna's training-objective domain. Single-seed=42 (EXPLORATION standard).
+ENSEMBLE_SIZE=3, n_trials=18.
+
+Decision tree (brief Section 4 F-AXIS #1):
+  Spread IS ≥ +0.16 → IMPULSE-DROP-CONFIRMED (impulse permanently removed; 47-col stack)
+  Spread IS ∈ [0, +0.16) → IMPULSE-DROP-MARGINAL (retain both; /055 CONFIRMATION at 48 cols)
+  Spread IS < 0 → IMPULSE-DROP-DEGRADES (restore impulse; /055 CONFIRMATION at 48 cols)
+
+Feature computation code for btc_funding_rate_8h_impulse is PRESERVED in funding_v1.py.
+The runner does NOT pass it to LightGBM feature_columns (47-col V1_FEATURE_COLUMNS_PRUNED).
+
+LOCAL to runner constant. NOT shared; CONFIRMATION-MERGE updates V1_BASELINE_UNIVERSE.
+assert set(symbols) == {"BTCUSDT"} guard fires in dispatch branch.
+assert "btc_funding_spread_30_90" in active_feature_columns guard fires.
+assert "btc_funding_rate_8h_impulse" not in active_feature_columns guard fires.
+assert len(active_feature_columns) == 47 guard fires in dispatch branch.
+"""
+
+
 __all__ = [
     "V1_EXCLUDED_SYMBOLS",
     "V1_BASELINE_UNIVERSE",
@@ -428,6 +465,7 @@ __all__ = [
     "V1_ITER051_UNIVERSE",
     "V1_ITER052_UNIVERSE",
     "V1_ITER053_UNIVERSE",
+    "V1_ITER054_UNIVERSE",
     # iter-v1/023: funding-rate feature family (add_funding_v1_features imported on demand)
     # iter-v1/025: OI delta feature family (add_oi_delta_v1_features imported on demand)
     # iter-v1/040: composed feature family (add_composed_v1_features imported on demand)

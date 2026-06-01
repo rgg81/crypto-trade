@@ -117,19 +117,24 @@ def test_btc_only_cohort() -> None:
 
 
 def test_features_in_pruned() -> None:
-    """Both new features must be present in V1_FEATURE_COLUMNS_PRUNED.
+    """btc_funding_spread_30_90 must be present in V1_FEATURE_COLUMNS_PRUNED.
 
-    iter-v1/052 ADDs btc_funding_rate_8h_impulse and btc_funding_spread_30_90
-    to V1_FEATURE_COLUMNS_PRUNED. Both must appear together (both-or-neither rule).
+    iter-v1/052 ADDed btc_funding_rate_8h_impulse and btc_funding_spread_30_90.
+    iter-v1/054 DROPPED btc_funding_rate_8h_impulse (INERT in 3/3 seeds at /053).
+    At current state (post-/054): only btc_funding_spread_30_90 remains.
     """
     from crypto_trade.features_v1 import V1_FEATURE_COLUMNS_PRUNED  # noqa: PLC0415
 
-    for col in ("btc_funding_rate_8h_impulse", "btc_funding_spread_30_90"):
-        assert col in V1_FEATURE_COLUMNS_PRUNED, (
-            f"{col!r} not found in V1_FEATURE_COLUMNS_PRUNED. "
-            f"Both btc_funding_rate_8h_impulse and btc_funding_spread_30_90 must be "
-            f"added together (both-or-neither rule — brief Section 3.1)."
-        )
+    # Spread was added at /052 and retained through /054.
+    assert "btc_funding_spread_30_90" in V1_FEATURE_COLUMNS_PRUNED, (
+        "btc_funding_spread_30_90 not found in V1_FEATURE_COLUMNS_PRUNED. "
+        "This feature was added at iter-v1/052 and retained through /054."
+    )
+    # Impulse was added at /052 but DROPPED at /054 (INERT in 3/3 seeds at /053).
+    assert "btc_funding_rate_8h_impulse" not in V1_FEATURE_COLUMNS_PRUNED, (
+        "btc_funding_rate_8h_impulse should NOT be in V1_FEATURE_COLUMNS_PRUNED. "
+        "It was dropped at iter-v1/054 (INERT confirmed in 3/3 outer seeds at /053)."
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -147,7 +152,7 @@ def test_pruned_size_48() -> None:
     from crypto_trade.features_v1 import V1_FEATURE_COLUMNS_PRUNED  # noqa: PLC0415
 
     n = len(V1_FEATURE_COLUMNS_PRUNED)
-    assert n == 48, (
+    assert n == 47, (
         f"V1_FEATURE_COLUMNS_PRUNED expected 48 features (46 + 2 new funding transforms); "
         f"got {n}. "
         "iter-v1/052 ADDs btc_funding_rate_8h_impulse + btc_funding_spread_30_90 "

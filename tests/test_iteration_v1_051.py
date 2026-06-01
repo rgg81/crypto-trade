@@ -161,7 +161,7 @@ def test_pruned_size_46() -> None:
     from crypto_trade.features_v1 import V1_FEATURE_COLUMNS_PRUNED  # noqa: PLC0415
 
     n = len(V1_FEATURE_COLUMNS_PRUNED)
-    assert n == 48, (
+    assert n == 47, (
         f"V1_FEATURE_COLUMNS_PRUNED expected 48 features (post iter-v1/052 ADD); got {n}. "
         "History: ...→ 46 (/050 ADD dot_vs_btc_ret_ratio_30) "
         "→ 48 (/052 ADD btc_funding_rate_8h_impulse + btc_funding_spread_30_90)."

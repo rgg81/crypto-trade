@@ -174,21 +174,24 @@ def test_btc_only_cohort() -> None:
 
 
 def test_features_in_pruned() -> None:
-    """Both /052 features must still be present in V1_FEATURE_COLUMNS_PRUNED at /053.
+    """btc_funding_spread_30_90 must be present in V1_FEATURE_COLUMNS_PRUNED.
 
-    iter-v1/052 ADDed btc_funding_rate_8h_impulse and btc_funding_spread_30_90.
-    iter-v1/053 is VALIDATION — no feature changes. Both features retained per
-    both-or-neither revert rule (brief Section 3.1).
+    iter-v1/052 ADDed both btc_funding_rate_8h_impulse and btc_funding_spread_30_90.
+    iter-v1/053 VALIDATION left them both in place.
+    iter-v1/054 DROPPED btc_funding_rate_8h_impulse (INERT in 3/3 seeds at /053).
+    At current state (post-/054): only btc_funding_spread_30_90 remains from /052.
     """
     from crypto_trade.features_v1 import V1_FEATURE_COLUMNS_PRUNED  # noqa: PLC0415
 
-    for col in ("btc_funding_rate_8h_impulse", "btc_funding_spread_30_90"):
-        assert col in V1_FEATURE_COLUMNS_PRUNED, (
-            f"{col!r} not found in V1_FEATURE_COLUMNS_PRUNED. "
-            "Both features from /052 must be retained at /053 (both-or-neither rule — "
-            "brief Section 3.1). Features are only reverted on NEG-CLEAN-MULTI-SEED or "
-            "BASIN-LOTTERY verdict at /053 closeout."
-        )
+    assert "btc_funding_spread_30_90" in V1_FEATURE_COLUMNS_PRUNED, (
+        "btc_funding_spread_30_90 not found in V1_FEATURE_COLUMNS_PRUNED. "
+        "This feature was added at /052, retained through /053 and /054."
+    )
+    # Impulse was present at /052-/053 but DROPPED at /054.
+    assert "btc_funding_rate_8h_impulse" not in V1_FEATURE_COLUMNS_PRUNED, (
+        "btc_funding_rate_8h_impulse should NOT be in V1_FEATURE_COLUMNS_PRUNED. "
+        "It was dropped at iter-v1/054 (INERT confirmed in 3/3 seeds at /053)."
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -209,7 +212,7 @@ def test_pruned_size_48() -> None:
     from crypto_trade.features_v1 import V1_FEATURE_COLUMNS_PRUNED  # noqa: PLC0415
 
     n = len(V1_FEATURE_COLUMNS_PRUNED)
-    assert n == 48, (
+    assert n == 47, (
         f"V1_FEATURE_COLUMNS_PRUNED expected 48 features at iter-v1/053 (UNCHANGED from /052); "
         f"got {n}. "
         "iter-v1/053 is VALIDATION — no feature additions or removals. "
@@ -384,9 +387,10 @@ def test_dispatch_block_exists_in_runner() -> None:
 @pytest.mark.parametrize(
     "feature_name,expected_in_pruned",
     [
-        ("btc_funding_rate_8h_impulse", True),
-        ("btc_funding_spread_30_90", True),
-        ("basis_zscore_30", False),  # dropped at /034/040; must NOT be in pruned at /053
+        # Impulse was in pruned at /053 but DROPPED at /054 (INERT in 3/3 seeds)
+        ("btc_funding_rate_8h_impulse", False),
+        ("btc_funding_spread_30_90", True),  # retained through /054
+        ("basis_zscore_30", False),  # dropped at /034/040; must NOT be in pruned
     ],
 )
 def test_feature_presence_parametrized(feature_name: str, expected_in_pruned: bool) -> None:
