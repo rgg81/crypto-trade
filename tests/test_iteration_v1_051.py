@@ -2,7 +2,7 @@
 
 Covers 6 mandatory tests:
 
-1.  test_seeds_config — runner requests 4 outer seeds (SEEDS_DEFAULT == 4).
+1.  test_seeds_config — runner requests 3 outer seeds (SEEDS_DEFAULT == 3).
 2.  test_no_regime_gate — dispatch block has NO vol-spike regime gate logic.
 3.  test_dot_only_cohort — V1_ITER051_UNIVERSE is exactly {"DOTUSDT"}.
 4.  test_feature_in_pruned — dot_vs_btc_ret_ratio_30 present in V1_FEATURE_COLUMNS_PRUNED.
@@ -33,17 +33,18 @@ def _compute_features_hash(cols: tuple[str, ...]) -> str:
 
 
 def test_seeds_config() -> None:
-    """Runner SEEDS_DEFAULT must be 4 (4 outer seeds: offsets 0, 5, 10, 15).
+    """Runner SEEDS_DEFAULT must be 3 (3 outer seeds: offsets 0, 3, 6).
 
-    Brief Section 3.2: --seeds 4 is the design choice for multi-seed re-validation
-    (outer seeds at ENSEMBLE_SEEDS offsets 0, 5, 10, 15).
+    Brief Section 3.2: --seeds 3 is the design choice for multi-seed re-validation.
+    Offsets [0, 3, 6] satisfy run_baseline_v1.py:7382 constraint: offset+ensemble_size ≤ 10.
+    Inner seed windows: [42,123,456], [789,1001,2002], [3003,4004,5005] — fully disjoint.
     """
     import run_iteration_051 as runner  # noqa: PLC0415
 
-    assert runner.SEEDS_DEFAULT == 4, (
-        f"Expected SEEDS_DEFAULT=4 (4 outer seeds for multi-seed re-validation), "
-        f"got {runner.SEEDS_DEFAULT}. Brief Section 3.2 mandates 4 outer seeds "
-        "(offsets 0, 5, 10, 15 from ENSEMBLE_SEEDS roster)."
+    assert runner.SEEDS_DEFAULT == 3, (
+        f"Expected SEEDS_DEFAULT=3 (3 outer seeds for multi-seed re-validation), "
+        f"got {runner.SEEDS_DEFAULT}. Brief Section 3.2 mandates 3 outer seeds "
+        "(offsets 0, 3, 6 from ENSEMBLE_SEEDS roster; satisfies offset+ensemble_size ≤ 10)."
     )
 
 

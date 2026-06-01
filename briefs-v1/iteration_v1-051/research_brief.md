@@ -13,8 +13,8 @@
   not a single-seed lottery artifact.
 - **Anchor**: iter-v1/050 PROMISING-PARTIAL closeout (IS Δ +1.1162; single seed=42); DOT IS
   Sharpe baseline -1.23 (BASELINE_V1.md `f8bc12c`).
-- **Mode**: EXPLORATION budget (n_trials=18, --seeds 4, ENSEMBLE_SIZE=3; wall-clock cap ≤ 2h
-  per seed × 4 seeds ≈ total ≤ 8h; EXPLORATION wall-clock applies per-seed, not aggregate)
+- **Mode**: EXPLORATION budget (n_trials=18, --seeds 3, ENSEMBLE_SIZE=3; wall-clock cap ≤ 2h
+  per seed × 3 seeds ≈ total ≤ 6h; EXPLORATION wall-clock applies per-seed, not aggregate)
 
 ---
 
@@ -42,8 +42,8 @@
   - /049: feature-family (long_short_zscore_30) — NEGATIVE
   - /050: feature-family + risk-primitive (DOT regime specialist) — PROMISING-PARTIAL
   - /051: validation (multi-seed re-validation of /050) — **THIS ITER**
-- **Cadence**: n_trials=18, ENSEMBLE_SIZE=3, --seeds 4. Wall-clock cap ≤ 2h per outer seed
-  (EXPLORATION standard); 4 outer seeds run sequentially = up to 8h total. Each outer seed is
+- **Cadence**: n_trials=18, ENSEMBLE_SIZE=3, --seeds 3. Wall-clock cap ≤ 2h per outer seed
+  (EXPLORATION standard); 3 outer seeds run sequentially = up to 6h total. Each outer seed is
   a separate EXPLORATION-budget run.
 
 ---
@@ -138,21 +138,21 @@ complexity without effect. /051 removes it.
 - Same n_trials=18, ENSEMBLE_SIZE=3
 - **NO vol-spike regime gate** (zero gate logic in dispatch block)
 
-### 3.2 Multi-Seed Validation: --seeds 4
+### 3.2 Multi-Seed Validation: --seeds 3
 
-Pass `--seeds 4` to `run_baseline_v1.main()`. The framework executes:
+Pass `--seeds 3` to `run_baseline_v1.main()`. The framework executes 3 outer × 3 inner = 9 disjoint seeds:
 - Outer seed 0 (offset=0) → inner seeds [42, 123, 456] → `seed_42/` (canonical; matches /050
   deterministic baseline for sanity check)
-- Outer seed 1 (offset=5) → inner seeds [2002, 3003, 4004] → `seed_offset5/`
-- Outer seed 2 (offset=10) → inner seeds [5005, 6006, 42] (wraps: offset+size may exceed 10)
-  → `seed_offset10/`
-- Outer seed 3 (offset=15) → inner seeds from ENSEMBLE_SEEDS[15:18] (if available; framework
-  caps at `len(ENSEMBLE_SEEDS)`) → `seed_offset15/`
+- Outer seed 1 (offset=3) → inner seeds [789, 1001, 2002] → `seed_offset3/`
+- Outer seed 2 (offset=6) → inner seeds [3003, 4004, 5005] → `seed_offset6/`
 
-Note: the framework offsets 5, 10, 15 select different windows of the ENSEMBLE_SEEDS roster
-`(42, 123, 456, 789, 1001, 2002, 3003, 4004, 5005, 6006)`. The goal is 4 statistically
-independent outer-seed draws to measure IS Sharpe Δ variance. The framework handles the
-sub-run dispatch and aggregation automatically.
+Offsets chosen so offset+ensemble_size ≤ 10 per run_baseline_v1.py:7382 constraint. Inner seed
+windows: offset 0 = [42, 123, 456]; offset 3 = [789, 1001, 2002]; offset 6 = [3003, 4004, 5005].
+Fully disjoint (no seed reuse across outer seeds).
+
+Note: ENSEMBLE_SEEDS roster is `(42, 123, 456, 789, 1001, 2002, 3003, 4004, 5005, 6006)` (len=10).
+The goal is 3 statistically independent outer-seed draws to measure IS Sharpe Δ variance. The
+framework handles the sub-run dispatch and aggregation automatically.
 
 ### 3.3 LM Master Response Map (from /050's lgbm_advisor.md Rec 3)
 
@@ -162,7 +162,8 @@ the execution leg of that conditional adoption.)
 
 LM Master's Rec 3 mandated: "if /050 verdict ∈ {PROMISING-SPECIALIST, PROMISING-PARTIAL},
 /051 OR /054 MUST be multi-seed re-validation." /050 hit PROMISING-PARTIAL (IS Δ +1.1162).
-/051 is the immediate execution, applying seeds [offset=0,5,10,15] per framework convention.
+/051 is the immediate execution, applying seeds [offset=0,3,6] per framework constraint
+(offset+ensemble_size ≤ 10; 3 outer × 3 inner = 9 fully-disjoint seeds).
 
 ---
 
@@ -217,17 +218,18 @@ Multi-seed mean IS Δ is the load-bearing statistic. No new risk primitives adde
 **Modal failure (LOTTERY-CONFIRMED-NEGATIVE, ~35% prior)**: /050's +1.1162 IS Δ was a
 favorable basin draw at seed=42. DOT's small cohort (93 BASELINE IS trades → 125 at /050)
 means each CV fold has ~7-15 effective signals — a handful of correctly-timed DOT trades at
-seed=42 can inflate apparent Sharpe. If the other 3 outer seeds land in unfavorable basins,
-the mean IS Δ falls below +0.50 → LOTTERY-CONFIRMED-NEGATIVE → revert feature. This is the
-most dangerous outcome because it unwinds the 46-col feature set.
+seed=42 can inflate apparent Sharpe. If the other 2 outer seeds (offsets 3, 6) land in
+unfavorable basins, the mean IS Δ across n=3 seeds falls below +0.50 →
+LOTTERY-CONFIRMED-NEGATIVE → revert feature. This is the most dangerous outcome because it
+unwinds the 46-col feature set.
 
 **Second most likely (PROMISING-PARTIAL-CONFIRMED, ~45% prior)**: the feature's information
 content is real but moderate. The seed=42 canonical run happens to capture DOT's partial
 idiosyncratic-alpha regime in IS particularly well; other seeds see the same partial lift at
-lower magnitude. Mean IS Δ lands in [+0.50, +1.23) → confirms PARTIAL, triggers F1-PARTIAL
-verdict for /055 design. Feature retained.
+lower magnitude. Mean IS Δ across n=3 seeds lands in [+0.50, +1.23) → confirms PARTIAL,
+triggers F1-PARTIAL verdict for /055 design. Feature retained.
 
-**Least likely (PROMISING-SPECIALIST-CONFIRMED, ~10% prior)**: all 4 outer seeds produce
+**Least likely (PROMISING-SPECIALIST-CONFIRMED, ~10% prior)**: all 3 outer seeds produce
 consistent IS Δ ≥ +1.23 lift (DOT flips fully positive across all seeds). Would indicate
 `dot_vs_btc_ret_ratio_30` is a robust signal, not basin-specific. Unlikely given DOT's small
 cohort and the observed /050 IS Sharpe of -0.1138 (still negative; near but not above zero).
@@ -243,7 +245,7 @@ All thresholds declared before backtest runs; cannot be post-hoc renegotiated.
 
 ### 8.1 Primary Verdict (multi-seed mean IS Δ)
 
-DOT baseline IS Sharpe = **-1.23** (BASELINE_V1.md). Mean IS Δ = mean across all 4 outer seeds
+DOT baseline IS Sharpe = **-1.23** (BASELINE_V1.md). Mean IS Δ = mean across all 3 outer seeds
 of (per-seed DOT IS Sharpe) minus (-1.23).
 
 | Verdict | Condition |

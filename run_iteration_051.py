@@ -9,9 +9,12 @@ Axis:
     Same DOT-only cohort + V1_FEATURE_COLUMNS_PRUNED (46 cols) as iter-v1/050.
     Changes vs /050:
         (1) Vol-spike regime gate DROPPED (was 0%% IS/OOS fire rate — INERT).
-        (2) --seeds 4: runs 4 outer seed draws (offsets 0, 5, 10, 15 from
+        (2) --seeds 3: runs 3 outer seed draws (offsets 0, 3, 6 from
             ENSEMBLE_SEEDS = [42, 123, 456, 789, 1001, 2002, 3003, 4004, 5005, 6006]).
-            Outer seed IDs: seed_42 (offset=0), seed_offset5, seed_offset10, seed_offset15.
+            Offsets satisfy run_baseline_v1.py:7382 constraint: offset+ensemble_size ≤ 10.
+            Inner seed windows: offset 0 = [42, 123, 456]; offset 3 = [789, 1001, 2002];
+            offset 6 = [3003, 4004, 5005]. Fully disjoint (no seed reuse across outer seeds).
+            Outer seed IDs: seed_42 (offset=0), seed_offset3, seed_offset6.
 
 Pre-registered verdict bands (brief Section 8):
     mean IS Delta >= +1.23 → PROMISING-SPECIALIST-CONFIRMED
@@ -24,7 +27,7 @@ Sacred constants (DO NOT CHANGE):
     ENSEMBLE_SEEDS = (42, 123, 456, 789, 1001, ...)  (first 3 used per outer seed)
 
 Invocation:
-    # Default (EXPLORATION mode, n_trials=18, seeds=4, ensemble_size=3):
+    # Default (EXPLORATION mode, n_trials=18, seeds=3, ensemble_size=3):
     uv run python run_iteration_051.py
 
     # Override n_trials (e.g. to 35 for sensitivity check — NOT default):
@@ -38,9 +41,8 @@ Invocation:
 
 Output paths:
     reports-v1/iteration_v1-051/seed_42/          (canonical outer seed, offset=0)
-    reports-v1/iteration_v1-051/seed_offset5/     (outer seed, offset=5)
-    reports-v1/iteration_v1-051/seed_offset10/    (outer seed, offset=10)
-    reports-v1/iteration_v1-051/seed_offset15/    (outer seed, offset=15)
+    reports-v1/iteration_v1-051/seed_offset3/     (outer seed, offset=3)
+    reports-v1/iteration_v1-051/seed_offset6/     (outer seed, offset=6)
     reports-v1/iteration_v1-051/comparison_multi_seed.csv  (multi-seed aggregate)
     reports-v1/iteration_v1-051/run.log
 
@@ -90,7 +92,7 @@ FEATURES_BASE_HASH_EXPECTED: str = _COMPUTED_HASH_AT_DEFINITION
 ITERATION_LABEL: str = "v1-051"
 ITERATION_NUMBER: int = 51
 N_TRIALS_DEFAULT: int = 18  # EXPLORATION standard (brief Section 0.5)
-SEEDS_DEFAULT: int = 4  # 4 outer seeds: offsets 0, 5, 10, 15 (brief Section 3.2)
+SEEDS_DEFAULT: int = 3  # 3 outer seeds: offsets 0, 3, 6 (brief Section 3.2)
 ENSEMBLE_SIZE: int = 3  # EXPLORATION inner-ensemble size (brief Section 0.5)
 
 
@@ -113,8 +115,9 @@ def _parse_args() -> argparse.Namespace:
         default=SEEDS_DEFAULT,
         help=(
             f"Number of outer seeds (default {SEEDS_DEFAULT}). "
-            "Uses ENSEMBLE_SEEDS offsets [0, 5, 10, 15] → "
-            "seed_42 / seed_offset5 / seed_offset10 / seed_offset15."
+            "Uses ENSEMBLE_SEEDS offsets [0, 3, 6] → "
+            "seed_42 / seed_offset3 / seed_offset6. "
+            "Offsets satisfy run_baseline_v1.py:7382: offset+ensemble_size ≤ 10."
         ),
     )
     p.add_argument(
@@ -186,7 +189,7 @@ def main() -> None:
             "dot_vs_btc_ret_ratio_30" in V1_FEATURE_COLUMNS_PRUNED,
         )
         print("  Vol-spike regime gate: DROPPED (was 0%% fire rate / INERT at /050)")
-        print(f"  Seeds: {args.seeds} outer seeds (offsets 0, 5, 10, 15)")
+        print(f"  Seeds: {args.seeds} outer seeds (offsets 0, 3, 6)")
         print("  Column list:")
         for i, col in enumerate(V1_FEATURE_COLUMNS_PRUNED):
             print(f"    {i:02d}: {col}")
@@ -211,7 +214,7 @@ def main() -> None:
     print("iter-v1/051 — DOT-only multi-seed re-validation (no regime gate)")
     print(f"  ITERATION_LABEL        : {ITERATION_LABEL}")
     print(f"  n_trials               : {args.n_trials}")
-    print(f"  outer seeds            : {args.seeds} (offsets 0, 5, 10, 15 from ENSEMBLE_SEEDS)")
+    print(f"  outer seeds            : {args.seeds} (offsets 0,3,6 ENSEMBLE_SEEDS; 3x3=9 disjoint)")
     print(f"  ensemble_size          : {ENSEMBLE_SIZE} (inner)")
     n_cols = len(V1_FEATURE_COLUMNS_PRUNED)
     print(f"  feature_columns        : {n_cols} cols (V1_FEATURE_COLUMNS_PRUNED; from /050)")
