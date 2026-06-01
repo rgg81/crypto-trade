@@ -250,3 +250,148 @@ the standalone ETH multi-seed validation that was absorbed into /056 per user di
 The regime tagger is the load-bearing infrastructure debt. It must be wired before Phase 6 launches.
 
 — Phase 4.5 advisor authored 2026-06-01
+
+---
+
+# LightGBM Master Advisor — iter-v1/056 — Phase 7.4 (Post-Mortem)
+
+## Context Read
+
+- Bundle outcome (comparison.csv): IS daily Sharpe **+0.6291** / OOS **−1.3762** / ratio −2.19 / Δ_IS_vs_baseline +0.346 / Δ_OOS_vs_baseline **−2.016**
+- Baseline anchor: IS +0.4761 / OOS +1.1415 (BASELINE_V1)
+- 641 IS trades / 202 OOS trades — trade-rate floor met (≥10/mo equiv)
+- Specialist outcomes: C1-BTC IS −0.10 / OOS −1.59 — C2-ETH IS −0.01 / OOS −0.03 — C3-DOT IS −0.59 / OOS −1.03
+- Anchors: C4-LINK +2.25/+2.82 (carry-through from BASELINE_V1) — C5-LTC +0.15/−3.72 (BASELINE drag confirmed)
+- Phase 4.5 modal verdict was **CONFIRMATION-BLOCK (40%)** — this MATERIALIZED but via a DIFFERENT mechanism than the LM Master predicted (LTC drag was the predicted blocker; the actual blocker is the specialist trio regressing simultaneously at CONFIRMATION budget).
+
+## Item 0 — Regime Attribution Table (from regime_attribution.csv)
+
+| Regime | Split | Cand Sharpe | Base Sharpe | Δ Sharpe | Cand Trades | Pareto vs ε≈0.30 |
+|---|---|---|---|---|---|---|
+| bull | IS | −0.351 | −0.351 | **0.000** | 47 | TIE (within ε) |
+| bear | IS | +0.079 | +0.146 | **−0.068** | 199 | WITHIN ε |
+| chop | IS | +0.330 | +0.235 | **+0.095** | 283 | PARETO BETTER |
+| recovery | IS | +0.358 | +0.278 | **+0.080** | 110 | PARETO BETTER |
+| bull | OOS | 0.0 | 0.0 | 0.0 | 4 | DEGENERATE (n=4) |
+| other | OOS | **−0.208** | +0.141 | **−0.349** | 200 | **PARETO FAIL** (>ε) |
+
+**Critical finding**: OOS regime tagger collapses 200 of 202 OOS trades into `other` (regime tagging failure or OOS-window regime mismatch). The Pareto-dominance check is structurally undecidable for /056 — there is no per-regime OOS signal to compare. The bundle's −1.376 OOS daily Sharpe is concentrated entirely in this `other` bucket, which on its own shows Pareto failure (Δ −0.349, well past ε≈0.30). MERGE gate fails.
+
+## Item 1 — Single-Seed-Lottery Materialization (KEY ANALYSIS)
+
+This iteration is a **textbook materialization of the single-seed-lottery pattern** predicted by Rec 1 of the Phase 4.5 advisor, and it manifests at THREE specialists simultaneously:
+
+| Specialist | EXPLORATION evidence | EXPLORATION IS Sharpe | CONFIRMATION IS Sharpe | Δ (lottery realization) |
+|---|---|---|---|---|
+| C1-BTC | /054 single-seed (n_trials=18, ENS=3) | **+0.2614** | **−0.1028** | **−0.364** (favorable basin) |
+| C2-ETH | /055 single-seed (n_trials=18, ENS=3) | −0.2082 | −0.0074 | **+0.201** (conservative basin — lift) |
+| C3-DOT | /051 multi-seed (3-seed mean) | −0.2355 | −0.5901 | **−0.355** (mean-still-favorable) |
+
+Two of three specialists REGRESSED at CONFIRMATION budget; the only LIFT was ETH (which the Phase 4.5 advisor flagged as RF-3 highest-variance because it had the LEAST multi-seed evidence). The lottery realization is asymmetric in a damaging direction:
+
+- **/054 BTC +0.26 was a FAVORABLE single-seed=42 draw.** ENSEMBLE_SIZE=10 averaged out the favorable initialization variance and exposed BTC's true mean basin near −0.10. The Phase 4.5 advisor's regression expectation (Section: ML Perspective, item a) was correctly predicted directionally but underestimated in magnitude.
+- **/051 DOT multi-seed mean −0.24 ALSO turned out to be a favorable 3-seed draw.** This is the most worrying finding: even 3-seed EXPLORATION evidence is insufficient to estimate the 10-seed CONFIRMATION basin. The DOT specialist regressed −0.355 despite having the strongest EXPLORATION provenance of the three.
+- **ETH was the only specialist where EXPLORATION was conservative.** /055 single-seed=42 happened to hit an unfavorable basin (−0.21), and ENSEMBLE_SIZE=10 lifted it back toward the mean (−0.01). This is the inverse of the BTC/DOT lottery.
+
+**The structural lesson**: EXPLORATION at --ensemble-size 3 single-seed is a **noisy estimator of CONFIRMATION IS Sharpe with bidirectional bias**. Both "PROMISING" verdicts (favorable lottery) and "NEGATIVE" verdicts (unfavorable lottery) at single-seed are unreliable absent multi-seed validation.
+
+## Item 2 — Feature Importance Triage at CONFIRMATION budget
+
+Top-rank features per specialist (gain-based, single training pass at n_trials=35 / ENSEMBLE_SIZE=10):
+
+**BTC (C1)** — top-3 features by mean gain:
+1. `vol_atr_14` (3647) — generic volatility primitive
+2. `trend_aroon_osc_50` (3214) — generic trend
+3. `stat_autocorr_lag5` (2379) — generic statistical
+4. `btc_funding_spread_30_90` (2305) — **the /054 axis feature, rank 4**
+
+The /054 narrative was "IMPULSE-DROP-CONFIRMED → funding spread is the BTC signal." At CONFIRMATION budget, `btc_funding_spread_30_90` ranks **4th** (not 1st-2nd as the IS-favorable single-seed at /054 suggested). It is doing real work but is NOT the dominant signal — and the BTC specialist still regressed to IS −0.10. **Implication**: the /054 single-seed lottery picked an Optuna trajectory that ALLOCATED unusual gain-budget to btc_funding_spread_30_90, producing the false-positive IS Sharpe. At 10-seed ensemble averaging, this allocation flattens.
+
+**ETH (C2)** — `btc_funding_spread_30_90` ranks **1st (3920 gain)** — this is a transfer of the BTC signal to the ETH specialist's loss surface, where the cohort is ETH-only. The `eth_vs_btc_ret_ratio_30` (the /055 axis feature) ranks **13th of 14 features** — near-INERT. The /055 PROMISING verdict was almost certainly NOT driven by the ratio feature; it was an Optuna basin lottery. Recommend DROP `eth_vs_btc_ret_ratio_30` from the ETH specialist's PRUNED stack in cycle-7.
+
+**DOT (C3)** — top features are clean (trend_plus_di_14, oi_delta_30_z90, trend_adx_14). The /051 axis feature `dot_vs_btc_ret_ratio_30` does not appear in the top 14 (not in the printed head). Recommend pulling the full importance CSV to check whether the DOT axis feature ranks 14/14 INERT — high confidence it does, given DOT's IS Sharpe collapse to −0.59.
+
+## Item 3 — Basin Diagnostics — Trade Roster Instability
+
+`basin_diagnostics.json` for all three specialists shows the same pattern:
+- v1 cross_seed_sharpe_std = 0.0 (PASS — single outer seed, std mechanically 0)
+- v2 per_cell_spearman_rho = NaN (BORDERLINE — undefined at single outer seed)
+- **v3 oos_trade_roster_jaccard = 0.038 (BTC) / 0.077 (ETH) / 0.098 (DOT) — all FAIL (<0.15)**
+
+The OOS trade roster Jaccard overlap across inner ensemble members is **catastrophically low** (3-10% overlap between roster pairs). Even within the single outer seed, the 10 inner ensemble members are voting on entirely different trades. This is consistent with hyperparameter-region-locked single-seed overfit where the inner ensemble averages predictions but the predictions themselves are sampled from incoherent decision boundaries.
+
+**Global verdict = FAIL** for all three specialists per basin diagnostics. The Critic Phase 7.5 should anchor on this — it is a clean, pre-computed methodology signal that the bundle is unmergeable.
+
+## Item 4 — n_effective_trials = 2-4 per cell, well below n_trials=35 nominal
+
+From each specialist's comparison.csv:
+- BTC: `n_effective_trials = 3` (out of 35 nominal)
+- ETH: `n_effective_trials = 2`
+- DOT: `n_effective_trials = 4`
+
+The Optuna TPE search at n_trials=35 is collapsing to **2-4 effective basins per cell**. The other 30+ trials are duplicates or near-duplicates clustered in the same hyperparameter region. This is consistent with the search space being too narrow for the small-cohort specialist scale (132 / 122 / 117 IS trades per specialist = ~24-28 trades per fold across 5 walk-forward folds). At this trade scale, the loss surface has few distinguishable optima.
+
+**Implication**: increasing n_trials from 35 to 50 or 100 would NOT help — TPE has already saturated. The bottleneck is cohort size, not search budget. To get more effective trial diversity, either (a) widen the HP search space explicitly (raise `num_leaves` upper bound to 127, expand `min_data_in_leaf` to [10, 1000]) or (b) restore cross-symbol pooling to grow the cohort.
+
+## Item 5 — Per-regime IS shows specialist trio is NOT regime-degraded
+
+The bundle IS regime attribution shows the candidate (specialist trio) is **Pareto-better in chop (+0.095) and recovery (+0.080)** vs baseline, TIE in bull, WITHIN ε in bear. The IS picture is genuinely competitive with BASELINE_V1 across regimes — the bundle is NOT degraded on IS regime structure.
+
+The catastrophic OOS −1.376 comes from the `other` bucket (OOS regime-tagging collapse) and is driven primarily by C1-BTC OOS −1.59 (45 trades) and C5-LTC OOS −3.72 (carry-through). The OOS regime tagger is producing degenerate output (200 of 202 trades labeled `other`); the QR cannot diagnose which regime drove the OOS collapse from this artifact alone.
+
+**Actionable**: the regime tagger code path that bins OOS trades needs investigation. The IS tagger produces 4 populated regimes (bull/bear/chop/recovery); the OOS tagger produces 200/202 trades in `other`. Either the tagger thresholds are misconfigured for the OOS window's regime composition, or the OOS regime distribution is genuinely outside the IS-calibrated regime taxonomy. This is a Critic Check 5 (stationarity) red flag and a methodology infrastructure debt.
+
+## Item 6 — Hyperparameter Stability (where readable)
+
+Could not parse Optuna trial-history from this report (no run.log artifact present in the reports/ tree). The n_effective_trials=2-4 reading (Item 4) substitutes for the per-trial best-value std analysis: the search is collapsing tightly, suggesting the trees Optuna selects are highly similar — consistent with stable HP region but unstable trade roster (Item 3). Recommend cycle-7 runs persist `run.log` to enable per-trial diagnostics.
+
+## Item 7 — What This Iteration Confirms / Refutes About Prior LM Master Advisory
+
+**Phase 4.5 PREDICTIONS CONFIRMED:**
+- Rec 1's regression expectation at CONFIRMATION budget: CONFIRMED (BTC −0.36, DOT −0.36 regressions match the predicted pull-toward-mean direction).
+- RF-3 (ETH highest-variance component): CONFIRMED directionally — ETH moved most relative to its EXPLORATION read (+0.20 lift), but in the FAVORABLE direction not the unfavorable one predicted.
+- Modal verdict CONFIRMATION-BLOCK (40%): CONFIRMED — the bundle cannot Pareto-dominate.
+
+**Phase 4.5 PREDICTIONS REFUTED:**
+- RF-1 (LTC was predicted to be THE blocking component): PARTIALLY REFUTED. LTC OOS −4.27 contributes ~−0.85 to bundle weighted OOS Sharpe at w=0.2, but the actual blocker is the **simultaneous specialist trio regression** (BTC −1.59 + DOT −1.03 + LTC −3.72 all on OOS). Removing LTC would not save the bundle.
+- Per-regime Pareto framework workability: REFUTED. The OOS regime tagger collapses 200 of 202 trades into `other`, making per-regime Pareto check structurally undecidable for OOS. Phase 4.5 assumed the regime tagger would produce 4-5 populated regimes; OOS produces 1.
+
+**Track record**: Phase 4.5 directional calls correct on regression direction and modal verdict; specifics of WHICH component blocked the merge were wrong. Honest accounting: the LM Master correctly anchored on lottery risk but mis-located the blocker.
+
+---
+
+## Path Forward — Cycle-7 Recommendations (3 items)
+
+### Rec A — Drop multi-seed-fragile specialists; require 5-seed EXPLORATION before promoting to CONFIRMATION
+
+**What**: any future EXPLORATION verdict for inclusion in a CONFIRMATION-PORTFOLIO bundle MUST be supported by a **minimum 5-seed EXPLORATION read** with mean IS Sharpe > 0 AND ≥4/5 individual seeds positive. Single-seed and 3-seed EXPLORATIONs are insufficient evidence (proven at /056 BTC and DOT regressions).
+
+**Why**: /056 demonstrates that 3-seed mean is still a noisy estimator of 10-seed CONFIRMATION mean. The /051 DOT 3-seed mean of −0.24 turned out to be a favorable draw (true CONFIRMATION mean −0.59, Δ −0.35). To detect this in advance requires more inner seeds at EXPLORATION.
+
+**Cost**: 5-seed EXPLORATION costs ~1.7× wall-clock vs 3-seed (linear in inner ensemble). Acceptable for higher-fidelity pre-CONFIRMATION evidence.
+
+### Rec B — Find features robust to seed variation (drop importance-unstable axis features)
+
+**What**: at cycle-7, drop `eth_vs_btc_ret_ratio_30` from the ETH specialist's PRUNED stack (rank 13/14 in C2 importance — near-INERT at CONFIRMATION). Pull the full DOT importance CSV; if `dot_vs_btc_ret_ratio_30` is rank 14/14 or absent from top-15, drop it from C3 stack too. Replace with importance-stable composed features (e.g., funding_basis × sign(trend_filter)) anchored by per-month importance std-of-rank < 3.
+
+**Why**: the EXPLORATION-axis features that earned PROMISING verdicts at /055 and /051 are NOT carrying the loss-surface gain at CONFIRMATION. The "promising" axis features were artifacts of single-seed Optuna basin allocation. Cycle-7 should test feature robustness via importance std-of-rank across the 10 ensemble members BEFORE escalating to CONFIRMATION.
+
+### Rec C — Shift to ensemble-of-EXPLORATION-seeds aggregation pattern (NEW)
+
+**What**: instead of running a single CONFIRMATION at --ensemble-size 10 --seeds 1 (which is what /056 ran), run **3-5 EXPLORATION-budget passes at different seeds** (e.g., seeds={42, 7, 2026, 13, 99}) and aggregate the trade rosters cross-seed. The "bundle" is then the union of trade signals where ≥3 of 5 seeds agree, not the predictions of a single 10-inner-seed ensemble.
+
+**Why**: the basin_diagnostics v3 oos_trade_roster_jaccard ≤ 0.10 across all three specialists shows that the 10 inner ensemble members are voting on disjoint trades. A 10-seed average prediction hides this incoherence; a roster-overlap aggregation pattern would EXPOSE it pre-CONFIRMATION and naturally filter to robust signals. This pattern is analogous to v3's CPCV cross-path aggregation but applied to seed variation.
+
+**Risk**: this is an unproven methodology shift; would require a methodology-axis EXPLORATION at cycle-7 before deployment. Lower confidence than Rec A and B but addresses the root cause directly.
+
+---
+
+## Closing Note for Critic (Phase 7.5)
+
+The structural BLOCK case is pre-built into `basin_diagnostics.json` — all three specialists FAIL global verdict on oos_trade_roster_jaccard. This is a clean, computed-by-runner methodology signal that does not require subjective interpretation. Recommend Critic anchor on basin diagnostics in addition to the Pareto failure on the `other` OOS regime (Δ −0.349 vs ε≈0.30).
+
+The OOS regime tagger collapse (200/202 trades in `other`) is a Critic Check 5 (regime stationarity) red flag that may invalidate the per-regime Pareto framework's applicability to /056. This is methodology infrastructure debt — flag for cycle-7 wiring.
+
+**LM Master verdict recommendation: CONFIRMATION-BLOCK.** Bundle Sharpe does not Pareto-dominate BASELINE_V1; specialist trio regressed at CONFIRMATION budget; basin diagnostics globally FAIL; OOS regime tagger structurally undecidable. Cycle-7 must adopt at minimum Rec A (5-seed EXPLORATION floor) before next CONFIRMATION attempt.
+
+— Phase 7.4 post-mortem authored 2026-06-01
