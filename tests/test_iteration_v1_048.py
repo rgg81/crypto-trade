@@ -210,16 +210,27 @@ _SYMBOLS = ["BTCUSDT", "ETHUSDT", "LINKUSDT", "LTCUSDT", "DOTUSDT"]
 
 def _column_in_parquets() -> bool:
     """Return True if trade_count_zscore_30 column is present in any v1 parquet."""
+    try:
+        import pyarrow.parquet as pq  # noqa: PLC0415
+    except ImportError:
+        pq = None  # type: ignore[assignment]
+
     for sym in _SYMBOLS:
         path = _V1_PARQUET_DIR / f"{sym}_8h_features.parquet"
         if not path.exists():
             continue
         try:
-            cols = pd.read_parquet(path, columns=[]).columns.tolist()
+            if pq is not None:
+                schema = pq.read_schema(path)
+                if "trade_count_zscore_30" in schema.names:
+                    return True
+            else:
+                # Fallback: read full parquet (slower but no pyarrow dependency)
+                df = pd.read_parquet(path)
+                if "trade_count_zscore_30" in df.columns:
+                    return True
         except Exception:
             continue
-        if "trade_count_zscore_30" in cols:
-            return True
     return False
 
 
