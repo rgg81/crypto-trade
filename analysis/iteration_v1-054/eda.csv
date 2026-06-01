@@ -1,0 +1,59 @@
+check,symbol,feature,metric,value,status,note
+ADF,BTCUSDT,btc_funding_spread_30_90,p_value,5.0240148081460105e-24,PASS,informational — no BLOCK; idempotent re-run from /052
+IC_pearson,BTCUSDT,btc_funding_spread_30_90 vs cal_dow_norm,ic_abs,0.011348334742992797,PASS,informational — no BLOCK
+IC_pearson,BTCUSDT,btc_funding_spread_30_90 vs cal_hour_norm,ic_abs,0.03045457319926683,PASS,informational — no BLOCK
+IC_pearson,BTCUSDT,btc_funding_spread_30_90 vs dot_vs_btc_ret_ratio_30,ic_abs,,SKIP,informational — no BLOCK
+IC_pearson,BTCUSDT,btc_funding_spread_30_90 vs funding_rate_zscore_30,ic_abs,0.5173371782548241,MODERATE_IC (informational) abs=0.5173,informational — no BLOCK
+IC_pearson,BTCUSDT,btc_funding_spread_30_90 vs funding_rate_zscore_90,ic_abs,0.1315001692014111,PASS,informational — no BLOCK
+IC_pearson,BTCUSDT,btc_funding_spread_30_90 vs interact_natr_x_adx,ic_abs,0.0003254396090435279,PASS,informational — no BLOCK
+IC_pearson,BTCUSDT,btc_funding_spread_30_90 vs interact_ret1_x_natr,ic_abs,0.003924325830229123,PASS,informational — no BLOCK
+IC_pearson,BTCUSDT,btc_funding_spread_30_90 vs interact_ret1_x_ret3,ic_abs,0.0033099708071146925,PASS,informational — no BLOCK
+IC_pearson,BTCUSDT,btc_funding_spread_30_90 vs interact_rsi_x_adx,ic_abs,0.1170448384657053,PASS,informational — no BLOCK
+IC_pearson,BTCUSDT,btc_funding_spread_30_90 vs interact_rsi_x_natr,ic_abs,0.07594948756071263,PASS,informational — no BLOCK
+IC_pearson,BTCUSDT,btc_funding_spread_30_90 vs interact_stoch_x_adx,ic_abs,0.026959708074341594,PASS,informational — no BLOCK
+IC_pearson,BTCUSDT,btc_funding_spread_30_90 vs long_short_zscore_30,ic_abs,0.03855781925776142,PASS,informational — no BLOCK
+IC_pearson,BTCUSDT,btc_funding_spread_30_90 vs mom_macd_hist_12_26_9,ic_abs,0.14285001538249456,PASS,informational — no BLOCK
+IC_pearson,BTCUSDT,btc_funding_spread_30_90 vs mom_macd_line_12_26_9,ic_abs,0.11536283391539234,PASS,informational — no BLOCK
+IC_pearson,BTCUSDT,btc_funding_spread_30_90 vs mom_roc_10,ic_abs,0.01925039274134621,PASS,informational — no BLOCK
+IC_pearson,BTCUSDT,btc_funding_spread_30_90 vs mom_rsi_14,ic_abs,0.07600204576214556,PASS,informational — no BLOCK
+IC_pearson,BTCUSDT,btc_funding_spread_30_90 vs mom_stoch_d_14,ic_abs,0.02981740759894571,PASS,informational — no BLOCK
+IC_pearson,BTCUSDT,btc_funding_spread_30_90 vs mom_stoch_k_14,ic_abs,0.025465450699128676,PASS,informational — no BLOCK
+IC_pearson,BTCUSDT,btc_funding_spread_30_90 vs mom_willr_14,ic_abs,0.014470306075850384,PASS,informational — no BLOCK
+IC_pearson,BTCUSDT,btc_funding_spread_30_90 vs mr_pct_from_high_20,ic_abs,0.01810982308907645,PASS,informational — no BLOCK
+IC_pearson,BTCUSDT,btc_funding_spread_30_90 vs mr_pct_from_low_20,ic_abs,0.021117487951343026,PASS,informational — no BLOCK
+IC_pearson,BTCUSDT,btc_funding_spread_30_90 vs mr_rsi_extreme_14,ic_abs,0.07583169528115541,PASS,informational — no BLOCK
+IC_pearson,BTCUSDT,btc_funding_spread_30_90 vs oi_delta_30_z90,ic_abs,0.061046983881376506,PASS,informational — no BLOCK
+IC_pearson,BTCUSDT,btc_funding_spread_30_90 vs regime_momentum_signed_5d,ic_abs,0.001565434189303412,PASS,informational — no BLOCK
+IC_pearson,BTCUSDT,btc_funding_spread_30_90 vs stat_autocorr_lag5,ic_abs,0.014750653770361735,PASS,informational — no BLOCK
+IC_pearson,BTCUSDT,btc_funding_spread_30_90 vs stat_kurtosis_20,ic_abs,0.01766092725439175,PASS,informational — no BLOCK
+IC_pearson,BTCUSDT,btc_funding_spread_30_90 vs stat_log_return_1,ic_abs,0.005900786654999004,PASS,informational — no BLOCK
+IC_pearson,BTCUSDT,btc_funding_spread_30_90 vs stat_return_5,ic_abs,0.023198759994095215,PASS,informational — no BLOCK
+IC_pearson,BTCUSDT,btc_funding_spread_30_90 vs stat_skew_20,ic_abs,0.03956010494506814,PASS,informational — no BLOCK
+IC_pearson,BTCUSDT,btc_funding_spread_30_90 vs trend_adx_14,ic_abs,0.07497040373798078,PASS,informational — no BLOCK
+IC_pearson,BTCUSDT,btc_funding_spread_30_90 vs trend_aroon_osc_14,ic_abs,0.025671507014352262,PASS,informational — no BLOCK
+IC_pearson,BTCUSDT,btc_funding_spread_30_90 vs trend_aroon_osc_50,ic_abs,0.19465260935905757,PASS,informational — no BLOCK
+IC_pearson,BTCUSDT,btc_funding_spread_30_90 vs trend_ema_cross_5_12,ic_abs,0.008521566341788064,PASS,informational — no BLOCK
+IC_pearson,BTCUSDT,btc_funding_spread_30_90 vs trend_minus_di_14,ic_abs,0.0588760479083688,PASS,informational — no BLOCK
+IC_pearson,BTCUSDT,btc_funding_spread_30_90 vs trend_plus_di_14,ic_abs,0.04682169149752475,PASS,informational — no BLOCK
+IC_pearson,BTCUSDT,btc_funding_spread_30_90 vs trend_supertrend_14_3,ic_abs,0.0874373814705513,PASS,informational — no BLOCK
+IC_pearson,BTCUSDT,btc_funding_spread_30_90 vs vol_atr_14,ic_abs,0.0497542066632022,PASS,informational — no BLOCK
+IC_pearson,BTCUSDT,btc_funding_spread_30_90 vs vol_bb_bandwidth_20,ic_abs,0.01097998338675834,PASS,informational — no BLOCK
+IC_pearson,BTCUSDT,btc_funding_spread_30_90 vs vol_cmf_14,ic_abs,0.005965486639330272,PASS,informational — no BLOCK
+IC_pearson,BTCUSDT,btc_funding_spread_30_90 vs vol_mfi_14,ic_abs,0.006559947735626344,PASS,informational — no BLOCK
+IC_pearson,BTCUSDT,btc_funding_spread_30_90 vs vol_natr_14,ic_abs,0.029357829015989746,PASS,informational — no BLOCK
+IC_pearson,BTCUSDT,btc_funding_spread_30_90 vs vol_range_spike_24,ic_abs,0.00011478498547171201,PASS,informational — no BLOCK
+IC_pearson,BTCUSDT,btc_funding_spread_30_90 vs vol_range_spike_72,ic_abs,0.02327639605559224,PASS,informational — no BLOCK
+IC_pearson,BTCUSDT,btc_funding_spread_30_90 vs vol_taker_buy_ratio,ic_abs,0.008993096892929094,PASS,informational — no BLOCK
+IC_pearson,BTCUSDT,btc_funding_spread_30_90 vs vol_volume_pctchg_5,ic_abs,0.024187777629521876,PASS,informational — no BLOCK
+IC_pearson,BTCUSDT,btc_funding_spread_30_90 vs vol_volume_rel_20,ic_abs,0.021628585379379277,PASS,informational — no BLOCK
+dist_stats,BTCUSDT,btc_funding_spread_30_90,n,5575.0,INFO,informational
+dist_stats,BTCUSDT,btc_funding_spread_30_90,mean,-0.024808057232553967,INFO,informational
+dist_stats,BTCUSDT,btc_funding_spread_30_90,std,0.9171852683238603,INFO,informational
+dist_stats,BTCUSDT,btc_funding_spread_30_90,min,-10.204374843625823,INFO,informational
+dist_stats,BTCUSDT,btc_funding_spread_30_90,p25,-0.38893627274595455,INFO,informational
+dist_stats,BTCUSDT,btc_funding_spread_30_90,median,0.006738598140757501,INFO,informational
+dist_stats,BTCUSDT,btc_funding_spread_30_90,p75,0.3944128318637461,INFO,informational
+dist_stats,BTCUSDT,btc_funding_spread_30_90,max,10.029402125631757,INFO,informational
+dist_stats,BTCUSDT,btc_funding_spread_30_90,skew,-1.6478632415592775,INFO,informational
+dist_stats,BTCUSDT,btc_funding_spread_30_90,kurt,40.17464330859427,INFO,informational
+dist_stats,BTCUSDT,btc_funding_spread_30_90,pct_nan,0.026540946394272742,INFO,informational
