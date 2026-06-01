@@ -95,9 +95,9 @@ def test_v1_040_pruned_features_count_44() -> None:
     """
     from crypto_trade.features_v1 import V1_FEATURE_COLUMNS_PRUNED
 
-    assert len(V1_FEATURE_COLUMNS_PRUNED) == 45, (
-        f"V1_FEATURE_COLUMNS_PRUNED has {len(V1_FEATURE_COLUMNS_PRUNED)} features; expected 45. "
-        "iter-v1/049 adds long_short_zscore_30 (+1): count advances 44 → 45."
+    assert len(V1_FEATURE_COLUMNS_PRUNED) == 46, (
+        f"V1_FEATURE_COLUMNS_PRUNED has {len(V1_FEATURE_COLUMNS_PRUNED)} features; expected 46. "
+        "iter-v1/050 adds dot_vs_btc_ret_ratio_30 (+1): count advances 45 → 46."
     )
 
 

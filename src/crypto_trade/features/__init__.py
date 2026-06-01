@@ -230,6 +230,17 @@ from crypto_trade.features_v1.longshort_v1 import (  # noqa: E402
 
 _register("longshort_v1", _add_longshort_v1_features)  # iter-v1/049
 
+# iter-v1/050: cross-BTC idiosyncratic ratio feature family (dot_vs_btc_ret_ratio_30).
+# DOT-only signal: for DOTUSDT, computes (DOT 30d return) / (BTC 30d return) z-scored 90-bar.
+# For all other symbols the column is NaN (DOT-only cohort in /050 runner).
+# Registered here so `uv run crypto-trade features --track v1 --groups cross_btc_v1` writes
+# dot_vs_btc_ret_ratio_30 to v1 parquets.
+from crypto_trade.features_v1.cross_btc_v1 import (  # noqa: E402
+    add_cross_btc_v1_features as _add_cross_btc_v1_features,
+)
+
+_register("cross_btc_v1", _add_cross_btc_v1_features)  # iter-v1/050
+
 # iter-v1/047: statistical higher-moment feature family (skew_zscore_21) was REVERTED
 # at closeout (NEG-CLEAN-PRE-EDA: pre-launch F5 IC orthogonality gate FAILED at
 # |IC|=0.8132 vs stat_skew_20; ABORT threshold 0.60). The statistical_v1 module file

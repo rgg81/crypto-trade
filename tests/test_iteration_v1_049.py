@@ -107,13 +107,13 @@ def test_import_smoke_test() -> None:
 
 
 def test_v1_feature_columns_pruned_length_45() -> None:
-    """V1_FEATURE_COLUMNS_PRUNED must have exactly 45 features after iter-v1/049."""
+    """V1_FEATURE_COLUMNS_PRUNED must have exactly 46 features after iter-v1/050 ADD."""
     from crypto_trade.features_v1 import V1_FEATURE_COLUMNS_PRUNED
 
     n = len(V1_FEATURE_COLUMNS_PRUNED)
-    assert n == 45, (
-        f"V1_FEATURE_COLUMNS_PRUNED expected 45 features after iter-v1/049 ADD; got {n}. "
-        "History: 40 (baseline) → 42 (/023) → 43 (/025) → 44 (/034→/040) → 45 (/049)."
+    assert n == 46, (
+        f"V1_FEATURE_COLUMNS_PRUNED expected 46 features after iter-v1/050 ADD; got {n}. "
+        "History: 40 (baseline) → 42 (/023) → 43 (/025) → 44 (/034→/040) → 45 (/049) → 46 (/050)."
     )
 
 
