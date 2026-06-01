@@ -173,18 +173,56 @@ Implemented in `run_iteration_050.py` dispatch block inside `run_baseline_v1.py`
 - Fire rate logged per split to comparison.csv.
 - No persistent state (STATELESS — ORACLE EDA validity confirmed).
 
-### 3.3 LM Master Response
-
-Per cycle-6 per-symbol-regime-specialist velocity mandate: "LM advisor for cycle-6 single-symbol
-iters is informational; brief proceeds without separate dispatch per velocity mandate."
-No `lgbm_advisor.md` for /050 — this is explicitly sanctioned by the cycle-6 velocity rule.
-
 ### 3.4 Feature Column Count Update
 
 V1_FEATURE_COLUMNS_PRUNED: 45 → 46 (add `dot_vs_btc_ret_ratio_30` at position after `cal_*` /
 before `funding_*` alphabetically — `d` < `f`).
 
 Update `assert len(V1_FEATURE_COLUMNS_PRUNED) == 46` in features_v1/__init__.py.
+
+---
+
+## Section 3.5 — LM Master Response Map
+
+LM Master advisor materialized at `briefs-v1/iteration_v1-050/lgbm_advisor.md` (Phase 4.5,
+orchestrator-authored from structured priors). Three recommendations addressed below; brief
+Section 3 design incorporates all three.
+
+### Rec 1 — Regime gate is the load-bearing change; attribution analysis required
+**Status: ADOPTED.**
+
+LM Master flags that `dot_vs_btc_ret_ratio_30` is theoretically clean but composed-feature
+additions have historically been INERT in v1 (rank 18-25/45). The mechanical IS Sharpe lift
+comes from the regime gate's trade-set restriction, not the feature itself.
+
+**Implementation**: the dispatch runner (Section 3.2) logs `regime_gate_fire_rate_is` and
+`regime_gate_fire_rate_oos` per-regime + per-window in `comparison.csv` so the closeout
+post-mortem can disambiguate feature contribution (via importance rank) vs gate contribution
+(via trade-count drop and fire-rate × per-regime PnL).
+
+### Rec 2 — Trade-rate floor risk (≥30% gate fire rate may breach IS 50-trade floor)
+**Status: ADOPTED.**
+
+LM Master warns that 93 IS trades × 30%+ gate fire rate = 60-65 IS trades, borderline against
+the IS ≥ 50 / OOS ≥ 10 floor.
+
+**Implementation**: F-AXIS #4 (trade-rate floor) is already pre-registered in Section 4 with
+PASS (IS ≥ 50) / PARTIAL (30-50) / FAIL (< 30) bands. Closeout verdict downgrades regardless
+of Sharpe lift if IS < 50 OR OOS < 10 OOS trades. Section 8 reaffirms this gate.
+
+### Rec 3 — Single-seed=42 lottery risk; pre-register multi-seed validation
+**Status: ADOPTED CONDITIONAL.**
+
+LM Master cites the /045 + /046 BLOCK lesson — PROMISING at single-seed must be
+multi-seed-validated before MERGE consideration. DOT's small cohort (93 IS trades) compounds
+the n_eff problem.
+
+**Pre-registration** (binding here): **if /050 closeout verdict ∈ {PROMISING-SPECIALIST,
+PROMISING-PARTIAL}, /051 OR /054 MUST be multi-seed re-validation of /050's exact config at
+seeds [123, 456, 789]** (3 outer seeds, same n_trials=18, same ENSEMBLE_SIZE=3, same feature
+stack, same regime gate, same DOT-only cohort). No new axis variation in the multi-seed
+re-validation. Multi-seed mean DOT IS Sharpe vs single-seed determines whether the lift
+survives seed randomization. Cannot be renegotiated post-hoc.
 
 ---
 
@@ -228,3 +266,98 @@ IS-calibrated threshold: q75 of `btc_realized_vol_30` from 24-month IS training 
 
 Predicted gate fire rate (IS): vol-spike gate 8–20% (q75 threshold fires ~25% of time; confidence
 filter < 0.55 additionally restricts to ~8–20% of total signals).
+
+---
+
+## Section 7 — Failure-Mode Prediction
+
+**Most plausible OOS failure (feature INERT-OOS-overfit)**: `dot_vs_btc_ret_ratio_30` captures
+the DOT idiosyncratic regime structure of the IS period (2021-2024 chop cycles + 2024 recovery
++ early 2025 bull setup) which may NOT generalize to OOS Q1 2025 onward (which sits in a
+distinct macro context — post-ETF-flow regime, BTC-dominance phase shift). The DOT/BTC ratio
+distribution shifts with the altcoin cycle phase, and the IS-fitted z-score reference window
+(90 bars) may misclassify OOS regimes. **Mitigation**: the regime gate (Section 3.2) is the
+load-bearing mechanism, NOT the feature. The gate's thresholds are purely IS-period q75 of
+`btc_realized_vol_30` and are applied unchanged to OOS — even if the feature is IS-overfit
+and INERT on OOS, the gate's mechanical IS Sharpe lift via trade-set restriction should
+partially survive OOS via the same drop-bad-trades mechanic (cross-asset OHLCV vol-spike
+regime IS a real recurring phenomenon, not a feature-specific artifact).
+
+**Modal failure scenario (PROMISING-PARTIAL with multi-seed mandate)**: feature is INERT
+(rank 25-35/46 as LM Master predicts) but gate fire rate ~20-30% on IS produces a partial
+IS Sharpe lift of +0.5 to +1.0 (not full flip to ≥ 0). On OOS, the gate fires on rarer
+vol-spike events (OOS contains fewer Q1 2025 vol-spike episodes than the 2021-2024 IS window
+on average) and the OOS Δ is null or marginally negative. Verdict: **PROMISING-PARTIAL**
+under Section 8 thresholds, triggering Rec 3's multi-seed re-validation mandate at /051 or
+/054 to determine if the partial lift survives seed randomization on the small DOT cohort
+before any CONFIRMATION-bundling consideration.
+
+---
+
+## Section 8 — Pre-Registered Comparison Criteria
+
+Numerical thresholds (binding; cannot be post-hoc renegotiated). DOT baseline IS Sharpe =
+**−1.23** (from BASELINE_V1.md). All criteria evaluated on IS (OOS forensic only per /046
+PROMISING-DIVERGENCE discipline).
+
+### 8.1 DOT IS Sharpe (primary criterion)
+
+| Verdict | DOT IS Sharpe Δ vs −1.23 | Resulting DOT IS Sharpe |
+|---|---|---|
+| **PROMISING-SPECIALIST** | Δ ≥ +1.23 | DOT IS Sharpe ≥ 0 (flip-positive) |
+| **PROMISING-PARTIAL** | +0.50 ≤ Δ < +1.23 | DOT IS Sharpe ∈ [−0.73, 0) |
+| **NEG-INERT** | −0.05 < Δ < +0.50 | DOT IS Sharpe ∈ [−1.28, −0.73) |
+| **NEG-CLEAN** | Δ ≤ −0.05 | DOT IS Sharpe ≤ −1.28 |
+
+### 8.2 Trade-Rate Floor (gating)
+
+- **PASS**: IS trades ≥ 50 AND OOS trades ≥ 10.
+- **FAIL → downgrade**: IS < 50 OR OOS < 10 → verdict downgrades one band (PROMISING-SPECIALIST
+  → PROMISING-PARTIAL; PROMISING-PARTIAL → NEG-INERT) regardless of Sharpe lift. Pre-registered
+  per Rec 2.
+
+### 8.3 Gate Fire Rate (informational)
+
+- `regime_gate_fire_rate_is` and `regime_gate_fire_rate_oos` REPORTED to comparison.csv.
+- No specific threshold gates PROMISING verdict — reported for attribution analysis (Rec 1).
+- Expected band per Section 6: IS 8–20%.
+
+### 8.4 IS MaxDD (regression check)
+
+- DOT baseline IS MaxDD = **64.29%** (from BASELINE_V1.md DOT row).
+- **PASS**: IS MaxDD ≤ 80%.
+- **WARNING**: IS MaxDD > 80% flagged as REGRESSION (does not downgrade verdict, but recorded
+  in closeout for /051 / /054 follow-up consideration).
+
+### 8.5 OOS Metrics (forensic only)
+
+- OOS DOT Sharpe, OOS DOT trades, OOS Δ vs baseline: **FORENSIC ONLY** per /046
+  PROMISING-DIVERGENCE discipline. Not a /050 success criterion. Reported in closeout for
+  pattern recognition only; does NOT gate verdict.
+
+### 8.6 Per-Regime Pareto (secondary)
+
+- Six standard regimes (vol-low / vol-mid / vol-high × trend-up / trend-down).
+- **PASS**: at least 2 of 6 regimes Pareto-positive (DOT Sharpe ≥ baseline regime Sharpe).
+- Does not gate verdict but recorded for closeout post-mortem and future CONFIRMATION-bundling
+  attribution.
+
+---
+
+## Section 9 — Library Stack Declaration
+
+No new dependencies vs BASELINE_V1.
+
+| Component | Version | Source |
+|---|---|---|
+| Python | 3.13 | system / pyproject.toml |
+| lightgbm | existing pin | .venv (from `pyproject.toml`) |
+| scipy | existing pin | .venv (compute / stats) |
+| pandas | existing pin | .venv (feature merge + rolling) |
+| numpy | existing pin | .venv (arithmetic + clipping) |
+| stdlib | 3.13 builtin | `csv`, `math`, `datetime` |
+
+No NEW pip / uv adds. No version bumps. No alternative ML frameworks. `compute_dot_vs_btc_ret_ratio_30`
+uses pandas `pct_change` + `rolling` only; vol-spike gate uses stdlib `csv` for fire-rate
+logging and numpy for q75 computation. All implementations stay inside the existing
+`src/crypto_trade/features_v1/` and `run_baseline_v1.py` perimeters.
