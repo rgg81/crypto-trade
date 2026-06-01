@@ -214,3 +214,79 @@ def test_features_base_hash_unchanged_vs_050() -> None:
         assert all(c in "0123456789abcdef" for c in h), (
             f"/{label} features-base-hash contains non-hex characters: {h!r}"
         )
+
+
+# ---------------------------------------------------------------------------
+# 7. test_outer_seed_offsets_patched
+# ---------------------------------------------------------------------------
+
+
+def test_outer_seed_offsets_patched() -> None:
+    """run_iteration_051.py must monkey-patch run_baseline_v1._OUTER_SEED_OFFSETS to (0, 3, 6).
+
+    Rationale: the framework default (0, 5, 10, 15, 20) silently skips offset 10 at
+    ENSEMBLE_SIZE=3 because 10 + 3 = 13 > 10 (len(ENSEMBLE_SEEDS) = 10).  The patch
+    sets (0, 3, 6), which gives three fully-disjoint inner-seed windows:
+      offset 0 → [42, 123, 456]
+      offset 3 → [789, 1001, 2002]
+      offset 6 → [3003, 4004, 5005]
+    All three satisfy offset + ENSEMBLE_SIZE (3) ≤ 10 — no silent skip.
+
+    This test verifies:
+      (a) The patch source text is present in run_iteration_051.py.
+      (b) Applying the patch to a fresh import of run_baseline_v1 yields (0, 3, 6).
+      (c) All three offsets produce valid windows at ENSEMBLE_SIZE=3 (offset+3 ≤ 10).
+      (d) The framework SOURCE file at line 1524 still declares (0, 5, 10, 15, 20)
+          — confirms the patch is scope-limited and did not bleed into the framework.
+    """
+    import re
+
+    import run_baseline_v1 as rbv1
+
+    # (a) Patch source text present in run_iteration_051.py
+    runner_path = Path(__file__).parent.parent / "run_iteration_051.py"
+    src = runner_path.read_text()
+    assert "_OUTER_SEED_OFFSETS = (0, 3, 6)" in src, (
+        "run_iteration_051.py must contain the monkey-patch line "
+        "`run_baseline_v1._OUTER_SEED_OFFSETS = (0, 3, 6)`. "
+        "Without it the framework default (0,5,10,15,20) silently skips offset 10 "
+        "at ENSEMBLE_SIZE=3 (10+3>10), producing only 2 effective seeds instead of 3."
+    )
+
+    # (b) Applying the patch yields (0, 3, 6)
+    rbv1._OUTER_SEED_OFFSETS = (0, 3, 6)
+    assert rbv1._OUTER_SEED_OFFSETS == (0, 3, 6), (
+        f"After monkey-patch, run_baseline_v1._OUTER_SEED_OFFSETS expected (0, 3, 6), "
+        f"got {rbv1._OUTER_SEED_OFFSETS}."
+    )
+
+    # (c) All offsets valid at ENSEMBLE_SIZE=3 (offset + 3 <= 10)
+    ensemble_size = 3
+    ensemble_seeds_len = 10  # len([42, 123, 456, 789, 1001, 2002, 3003, 4004, 5005, 6006])
+    for offset in (0, 3, 6):
+        assert offset + ensemble_size <= ensemble_seeds_len, (
+            f"Offset {offset} + ensemble_size {ensemble_size} = {offset + ensemble_size} "
+            f"> {ensemble_seeds_len} (len(ENSEMBLE_SEEDS)). "
+            "This offset would be silently skipped by the runner's guard at "
+            "run_baseline_v1.py:7382."
+        )
+
+    # (d) Framework SOURCE file default is still (0, 5, 10, 15, 20) — scope-limited
+    framework_path = Path(__file__).parent.parent / "run_baseline_v1.py"
+    framework_src = framework_path.read_text()
+    pattern = r"_OUTER_SEED_OFFSETS\s*:\s*tuple\[int,\s*\.\.\.\]\s*=\s*(\([^)]+\))"
+    m = re.search(pattern, framework_src)
+    assert m is not None, (
+        "Could not find `_OUTER_SEED_OFFSETS: tuple[int, ...] = (...)` in "
+        "run_baseline_v1.py. Framework source structure may have changed — "
+        "update this test."
+    )
+    raw = m.group(1).strip("()").split(",")
+    framework_default = tuple(int(x.strip()) for x in raw if x.strip())
+    assert framework_default == (0, 5, 10, 15, 20), (
+        f"run_baseline_v1.py framework default changed from (0,5,10,15,20) "
+        f"to {framework_default}. "
+        "The /051 monkey-patch is SCOPE-LIMITED — it must NOT modify the framework "
+        "source file. Restore run_baseline_v1.py:1524 to "
+        "`_OUTER_SEED_OFFSETS: tuple[int, ...] = (0, 5, 10, 15, 20)`."
+    )

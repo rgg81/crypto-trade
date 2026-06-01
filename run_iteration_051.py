@@ -252,6 +252,13 @@ def main() -> None:
     # Import and invoke the v1 runner.
     import run_baseline_v1  # noqa: PLC0415  (local import to defer argv replacement)
 
+    # iter-v1/051 scope-limited offset override: disjoint outer seeds at ENSEMBLE_SIZE=3.
+    # Framework default (0,5,10,15,20) silently skips offset 10 because 10+3>10 (len=10);
+    # (0,3,6) gives three fully-disjoint windows: [42,123,456], [789,1001,2002], [3003,4004,5005].
+    # DO NOT change run_baseline_v1._OUTER_SEED_OFFSETS in the framework file — this patch
+    # is scope-limited to this runner module only.
+    run_baseline_v1._OUTER_SEED_OFFSETS = (0, 3, 6)
+
     run_baseline_v1.main()
 
 

@@ -33,8 +33,8 @@ itself (which /051 IS).
     ADOPTED — runner constants N_TRIALS_DEFAULT=18, ENSEMBLE_SIZE=3 unchanged from /050.
 
 ## Cadence Check
-- Wall-clock budget declared: ≤ 2h per outer seed (EXPLORATION standard); 4 outer seeds
-  sequential = up to 8h total per EXPLORATION-per-seed rule: PASS
+- Wall-clock budget declared: ≤ 2h per outer seed (EXPLORATION standard); 3 outer seeds
+  sequential = up to 6h total per EXPLORATION-per-seed rule: PASS
 - EXPLORATION 6/10 of cycle-6: PASS (cadence within 10-iter cycle)
 - CONFIRMATION checks: N/A (TYPE=EXPLORATION)
 
@@ -59,8 +59,10 @@ itself (which /051 IS).
 - Section 2.5 (HIGH-RISK Axis Declaration): PASS — NORMAL-RISK declared; explicit reasoning
   for both mechanisms (seed offset change + gate drop); no Optuna domain change.
 - Section 3 (Proposed Changes): PASS — enumerated: (3.1) vol-spike regime gate dropped with
-  explicit INERT citation; (3.2) --seeds 4 multi-seed framework dispatch with seed offset
-  table; (3.3) LM Master Rec 3 ADOPTED EXECUTION response present.
+  explicit INERT citation; (3.2) --seeds 3 multi-seed framework dispatch with offset override
+  (0,3,6) patched via run_iteration_051.py monkey-patch; framework default (0,5,10,15,20)
+  unchanged at run_baseline_v1.py:1524; (3.3) LM Master Rec 3 ADOPTED EXECUTION response
+  present.
 - Section 4 (Expected OOS Impact): PASS — F1 through F5 falsifier table present with
   PROMISING-SPECIALIST-CONFIRMED / PROMISING-PARTIAL-CONFIRMED / LOTTERY-CONFIRMED-NEGATIVE
   verdict bands; numerical thresholds declared before backtest.
