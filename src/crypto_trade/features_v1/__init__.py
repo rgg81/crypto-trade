@@ -114,7 +114,6 @@ V1_FEATURE_COLUMNS_PRUNED: tuple[str, ...] = (
     "stat_log_return_1",
     "stat_return_5",
     "stat_skew_20",
-    "trade_count_zscore_30",  # iter-v1/048: rolling-30bar z-score of number_of_trades (UNUSED)
     "trend_adx_14",
     "trend_aroon_osc_14",
     "trend_aroon_osc_50",
@@ -144,12 +143,16 @@ V1_FEATURE_COLUMNS_PRUNED: tuple[str, ...] = (
 #              (|IC|=0.8132 vs stat_skew_20; ABORT threshold 0.60). skew_zscore_21
 #              REVERTED. Count restored 45 → 44. statistical_v1 group de-registered
 #              from GROUP_REGISTRY but the module file kept for future-iter reuse.
-# iter-v1/048: extended 44 → 45 by adding trade_count_zscore_30 (rolling-30bar
-#              z-score of number_of_trades kline primitive; UNUSED-primitive
-#              defense post-/047 NEG-CLEAN-PRE-EDA; cycle-6 feature-family
-#              EXPLORATION 3/10).
-assert len(V1_FEATURE_COLUMNS_PRUNED) == 45, (
-    f"V1_FEATURE_COLUMNS_PRUNED must have exactly 45 features; got {len(V1_FEATURE_COLUMNS_PRUNED)}"
+# iter-v1/048: NEG-CLEAN-PRE-EDA — pre-launch F5 IC orthogonality gate FAILED
+#              (|IC|=0.9063 vs vol_volume_rel_20; ABORT threshold 0.60). The
+#              "UNUSED-primitive" defense REFUTED: number_of_trades is empirically
+#              tied to the volume cluster (rank-1 vol_volume_rel_20 0.9063, rank-2
+#              vol_range_spike_24 0.7908, rank-3 vol_range_spike_72 0.7322).
+#              trade_count_zscore_30 REVERTED. Count restored 45 → 44.
+#              microstructure_v1 group de-registered from GROUP_REGISTRY but the
+#              module file kept for future-iter reuse.
+assert len(V1_FEATURE_COLUMNS_PRUNED) == 44, (
+    f"V1_FEATURE_COLUMNS_PRUNED must have exactly 44 features; got {len(V1_FEATURE_COLUMNS_PRUNED)}"
 )
 
 # Columns explicitly NOT in V1_FEATURE_COLUMNS_PRUNED but which may still appear in
@@ -317,5 +320,7 @@ __all__ = [
     # iter-v1/023: funding-rate feature family (add_funding_v1_features imported on demand)
     # iter-v1/025: OI delta feature family (add_oi_delta_v1_features imported on demand)
     # iter-v1/040: composed feature family (add_composed_v1_features imported on demand)
-    # iter-v1/048: microstructure feature family (add_microstructure_v1_features imported on demand)
+    # iter-v1/048: microstructure_v1 group was DE-REGISTERED from GROUP_REGISTRY at
+    #              closeout (NEG-CLEAN-PRE-EDA: |IC|=0.9063 vs vol_volume_rel_20).
+    #              Module file kept on disk as dead code for future-iter reuse.
 ]

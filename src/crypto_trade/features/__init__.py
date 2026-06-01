@@ -225,15 +225,19 @@ _register("composed_v1", _add_composed_v1_features)  # iter-v1/040
 # but is intentionally NOT registered in GROUP_REGISTRY — `crypto-trade features` will
 # not write skew_zscore_21 to v1 parquets.
 
-# iter-v1/048: microstructure feature family (trade_count_zscore_30 = rolling-30bar
-# z-score of number_of_trades kline primitive). UNUSED-primitive defense post-/047
-# NEG-CLEAN-PRE-EDA. Registered here so `uv run crypto-trade features --track v1
-# --groups microstructure_v1` writes trade_count_zscore_30 to v1 parquets.
-from crypto_trade.features_v1.microstructure_v1 import (  # noqa: E402
-    add_microstructure_v1_features as _add_microstructure_v1_features,
-)
-
-_register("microstructure_v1", _add_microstructure_v1_features)  # iter-v1/048
+# iter-v1/048: microstructure feature family (trade_count_zscore_30) was REVERTED
+# at closeout (NEG-CLEAN-PRE-EDA: pre-launch F5 IC orthogonality gate FAILED at
+# |IC|=0.9063 vs vol_volume_rel_20; ABORT threshold 0.60). The microstructure_v1
+# module file is kept on disk (clean code, future-iter ready for non-kline
+# microstructure primitives e.g. funding-rate momentum, OI-velocity, basis delta)
+# but is intentionally NOT registered in GROUP_REGISTRY — `crypto-trade features`
+# will not write trade_count_zscore_30 to v1 parquets. The "UNUSED kline primitive"
+# defense is REFUTED: number_of_trades is empirically tied to the volume cluster
+# (top-3 |IC|: vol_volume_rel_20 0.9063, vol_range_spike_24 0.7908,
+# vol_range_spike_72 0.7322). Two consecutive cycle-6 ABORTs (/047 + /048) confirm
+# the v1 internal-kline feature space is empirically dense; cycle-6 NEW feature
+# families MUST come from NON-kline data sources (long/short ratio, on-chain,
+# funding/OI new transforms, cross-asset macro).
 
 __all__ = [
     "GROUP_REGISTRY",

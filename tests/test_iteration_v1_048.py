@@ -1,60 +1,108 @@
 """Tests for iter-v1/048: trade_count_zscore_30 feature dispatch.
 
-Axis: ADD ``trade_count_zscore_30`` (rolling-30bar z-score of the ``trades`` kline
-field, which is Binance's ``number_of_trades``) to V1_FEATURE_COLUMNS_PRUNED (44 → 45).
+CLOSEOUT STATUS: **NEG-CLEAN-PRE-EDA** (verdict 2026-06-01).
 
-Module: src/crypto_trade/features_v1/microstructure_v1.py (NEW)
+The pre-launch F5 IC orthogonality gate fired: max |IC| = 0.9063 (Pearson, pooled IS)
+vs ``vol_volume_rel_20``, which is **above the ABORT threshold 0.60**. The "UNUSED
+kline primitive" defense post-/047 is REFUTED — ``number_of_trades`` is empirically
+tied to the volume cluster despite the theoretical primitive-orthogonality argument
+(rank-1 ``vol_volume_rel_20`` 0.9063, rank-2 ``vol_range_spike_24`` 0.7908, rank-3
+``vol_range_spike_72`` 0.7322 — three concurrent ABORT-triggers).
 
-Test plan (≥6 tests):
-  1. test_v1_pruned_has_45_features        — column list + count
-  2. test_past_only                         — no-lookahead invariant (core discipline)
-  3. test_warmup_nan                        — first 29 bars NaN (min_periods=30)
-  4. test_zscore_normalization_approximate  — post-warmup mean ≈ 0, std ≈ 1
-  5. test_trades_column_read               — module reads ``trades`` (not a wrong alias)
-  6. test_track_isolation                   — no v2/v3 imports in module
-  7. test_microstructure_v1_in_registry     — group registered in GROUP_REGISTRY (14 groups)
-  8. test_parquet_integration               — trade_count_zscore_30 present in v1 parquet
-     (skipped if parquets not yet regenerated)
+No backtest was launched. ``trade_count_zscore_30`` was REVERTED from
+V1_FEATURE_COLUMNS_PRUNED (45 → 44). The ``microstructure_v1`` group was
+de-registered from GROUP_REGISTRY (14 → 13 groups). The ``microstructure_v1``
+Python module file is kept on disk as dead code (clean code, ready for future-iter
+reuse with a non-kline microstructure primitive — funding-rate momentum,
+OI-velocity, basis delta).
+
+These tests now ASSERT THE REVERTED STATE — ``trade_count_zscore_30`` MUST NOT be
+in V1_FEATURE_COLUMNS_PRUNED. The computation-correctness / no-lookahead / window
+alignment tests are retained against the (still-present)
+``compute_trade_count_zscore_30`` helper, since the module is preserved. The
+parquet integration test is skipped unconditionally because the parquets no longer
+include the column.
 """
 
 from __future__ import annotations
 
 import inspect
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import pytest
 
-from crypto_trade.features_v1 import V1_FEATURE_COLUMNS_PRUNED, microstructure_v1
+from crypto_trade.features_v1 import V1_FEATURE_COLUMNS, V1_FEATURE_COLUMNS_PRUNED, microstructure_v1
 from crypto_trade.features_v1.microstructure_v1 import compute_trade_count_zscore_30
 
 # ---------------------------------------------------------------------------
-# 1. Column list — confirm 44 → 45 extension
+# 1. Column list tests — assert REVERTED state
 # ---------------------------------------------------------------------------
 
 
-def test_v1_pruned_has_45_features():
-    """V1_FEATURE_COLUMNS_PRUNED must have exactly 45 features and include the new one."""
-    assert len(V1_FEATURE_COLUMNS_PRUNED) == 45, (
-        f"Expected 45 pruned features, got {len(V1_FEATURE_COLUMNS_PRUNED)}"
+def test_trade_count_zscore_30_reverted_from_pruned():
+    """Post-closeout: trade_count_zscore_30 MUST NOT be in V1_FEATURE_COLUMNS_PRUNED."""
+    assert "trade_count_zscore_30" not in V1_FEATURE_COLUMNS_PRUNED, (
+        "trade_count_zscore_30 must be REVERTED from V1_FEATURE_COLUMNS_PRUNED "
+        "(iter-v1/048 NEG-CLEAN-PRE-EDA: F5 |IC|=0.9063 vs vol_volume_rel_20)"
     )
-    assert "trade_count_zscore_30" in V1_FEATURE_COLUMNS_PRUNED, (
-        "trade_count_zscore_30 must be in V1_FEATURE_COLUMNS_PRUNED"
+    assert len(V1_FEATURE_COLUMNS_PRUNED) == 44, (
+        f"Expected 44 pruned features post-revert, got {len(V1_FEATURE_COLUMNS_PRUNED)}"
+    )
+
+
+def test_full_feature_columns_unchanged():
+    """V1_FEATURE_COLUMNS (the legacy 193-col set) is unchanged by /048 revert."""
+    assert isinstance(V1_FEATURE_COLUMNS, tuple), "V1_FEATURE_COLUMNS must be a tuple"
+    assert len(V1_FEATURE_COLUMNS) == 193, (
+        f"V1_FEATURE_COLUMNS must remain at 193 cols, got {len(V1_FEATURE_COLUMNS)}"
+    )
+    assert "trade_count_zscore_30" not in V1_FEATURE_COLUMNS, (
+        "trade_count_zscore_30 must NOT appear in V1_FEATURE_COLUMNS (was never in BASELINE_FEATURE_COLUMNS)"  # noqa: E501
+    )
+    # vol_volume_rel_20 (the empirical volume-cluster anchor for F5 failure) IS in
+    # the full set — produced by legacy volume.py and untouched by the /048 revert.
+    assert "vol_volume_rel_20" in V1_FEATURE_COLUMNS, (
+        "vol_volume_rel_20 (rank-1 F5 collinearity anchor) must remain in V1_FEATURE_COLUMNS"
+    )
+
+
+def test_microstructure_v1_not_in_group_registry():
+    """microstructure_v1 group is de-registered from GROUP_REGISTRY post-revert."""
+    from crypto_trade.features import GROUP_REGISTRY  # noqa: PLC0415
+
+    assert "microstructure_v1" not in GROUP_REGISTRY, (
+        "microstructure_v1 must be DE-REGISTERED from GROUP_REGISTRY "
+        "(iter-v1/048 NEG-CLEAN-PRE-EDA revert)"
+    )
+    assert len(GROUP_REGISTRY) == 13, (
+        f"GROUP_REGISTRY must have exactly 13 groups post-revert, got {len(GROUP_REGISTRY)}"
     )
 
 
 # ---------------------------------------------------------------------------
-# 2. No-lookahead invariant (core discipline check)
+# 2. Computation correctness — module preserved on disk, helper still works
 # ---------------------------------------------------------------------------
 
 
-def test_past_only():
-    """trade_count_zscore_30[t] does not use trades[t+k] for any k > 0.
-
-    Perturbing only the FINAL bar of the ``trades`` series must NOT change any
-    earlier bar of ``trade_count_zscore_30``.
+def test_trade_count_zscore_30_helper_still_functional():
+    """The compute_trade_count_zscore_30 helper is preserved on disk (dead-code module);
+    we keep the smoke test so any future-iter reuse starts from a working baseline.
     """
+    rng = np.random.default_rng(seed=42)
+    base = rng.integers(10_000, 100_000, size=300).astype(float)
+    df = pd.DataFrame({"trades": base})
+
+    result = compute_trade_count_zscore_30(df)
+
+    assert "trade_count_zscore_30" in result.columns
+    # window=30, min_periods=30 => first 29 bars NaN
+    assert result["trade_count_zscore_30"].iloc[:29].isna().all()
+    assert not np.isnan(result["trade_count_zscore_30"].iloc[40])
+
+
+def test_trade_count_zscore_30_no_lookahead():
+    """No-lookahead invariant: perturbing trades[-1] does not affect z-score[<-1]."""
     rng = np.random.default_rng(42)
     base = rng.integers(10_000, 100_000, size=300).astype(float)
 
@@ -62,7 +110,7 @@ def test_past_only():
     df1 = compute_trade_count_zscore_30(df1)
 
     df2 = pd.DataFrame({"trades": base.copy()})
-    df2.loc[df2.index[-1], "trades"] = base[-1] * 100  # perturb FINAL bar only
+    df2.loc[df2.index[-1], "trades"] = base[-1] * 100
     df2 = compute_trade_count_zscore_30(df2)
 
     pd.testing.assert_series_equal(
@@ -70,89 +118,6 @@ def test_past_only():
         df2["trade_count_zscore_30"].iloc[:-1],
         check_names=False,
     )
-
-
-# ---------------------------------------------------------------------------
-# 3. Warmup NaN (min_periods=30)
-# ---------------------------------------------------------------------------
-
-
-def test_warmup_nan():
-    """First 29 bars (indices 0-28) are NaN; bar 30 onward has values (min_periods=30)."""
-    rng = np.random.default_rng(42)
-    base = rng.integers(10_000, 100_000, size=200).astype(float)
-    df = compute_trade_count_zscore_30(pd.DataFrame({"trades": base}))
-
-    assert df["trade_count_zscore_30"].iloc[:29].isna().all(), (
-        "First 29 bars must be NaN (window=30, min_periods=30)"
-    )
-    assert df["trade_count_zscore_30"].iloc[30:].notna().any(), (
-        "At least one bar beyond index 30 must be non-NaN"
-    )
-
-
-# ---------------------------------------------------------------------------
-# 4. Z-score normalization quality (approximate)
-# ---------------------------------------------------------------------------
-
-
-def test_zscore_normalization_approximate():
-    """Post-warmup mean ≈ 0 and std ≈ 1 across a long i.i.d. series."""
-    rng = np.random.default_rng(42)
-    base = rng.integers(10_000, 100_000, size=5_000).astype(float)
-    df = compute_trade_count_zscore_30(pd.DataFrame({"trades": base}))
-    post = df["trade_count_zscore_30"].iloc[30:].dropna()
-
-    assert abs(post.mean()) < 0.2, f"Mean drift too large: {post.mean():.4f}"
-    assert 0.7 < post.std() < 1.5, f"Std drift out of range: {post.std():.4f}"
-
-
-# ---------------------------------------------------------------------------
-# 5. Correct kline column name — ``trades`` (not number_of_trades alias)
-# ---------------------------------------------------------------------------
-
-
-def test_trades_column_read():
-    """Module reads the ``trades`` kline column (Binance field 8 = number_of_trades).
-
-    Verifies the source references ``"trades"`` (the actual kline DataFrame column
-    name from models.Kline.trades / kline_array).  The Binance documentation calls
-    this ``number_of_trades``; the codebase exposes it as ``trades``.
-    """
-    src = inspect.getsource(microstructure_v1)
-    # The module must reference the actual DataFrame column name "trades"
-    assert '"trades"' in src or "'trades'" in src, (
-        'microstructure_v1 must reference the "trades" kline column'
-    )
-    # Verify no runtime df["number_of_trades"] key access (would KeyError).
-    # The string "number_of_trades" may appear in docstrings/comments — that is fine.
-    # We check that compute_trade_count_zscore_30 function body (excluding docstring)
-    # uses "trades", not "number_of_trades", as the DataFrame key.
-    import ast  # noqa: PLC0415
-
-    tree = ast.parse(src)
-    for node in ast.walk(tree):
-        if isinstance(node, ast.FunctionDef) and node.name == "compute_trade_count_zscore_30":
-            # Skip the docstring (first statement if it is an Expr/Constant)
-            body_stmts = node.body
-            if (
-                body_stmts
-                and isinstance(body_stmts[0], ast.Expr)
-                and isinstance(body_stmts[0].value, ast.Constant)
-            ):
-                body_stmts = body_stmts[1:]
-            body_src = "\n".join(ast.unparse(s) for s in body_stmts)
-            assert "number_of_trades" not in body_src, (
-                "compute_trade_count_zscore_30 must not access df['number_of_trades']; "
-                "use df['trades'] (actual kline column name)"
-            )
-            assert "trades" in body_src, "compute_trade_count_zscore_30 must access df['trades']"
-            break
-
-
-# ---------------------------------------------------------------------------
-# 6. Track isolation — no v2/v3 imports
-# ---------------------------------------------------------------------------
 
 
 def test_track_isolation():
@@ -184,87 +149,15 @@ def test_track_isolation():
 
 
 # ---------------------------------------------------------------------------
-# 7. Registry — microstructure_v1 registered, GROUP_REGISTRY now has 14 groups
+# 3. Parquet integration — skipped post-revert (column no longer in parquets)
 # ---------------------------------------------------------------------------
 
 
-def test_microstructure_v1_in_registry():
-    """microstructure_v1 must be registered in GROUP_REGISTRY (14 groups post-/048)."""
-    from crypto_trade.features import GROUP_REGISTRY  # noqa: PLC0415
-
-    assert "microstructure_v1" in GROUP_REGISTRY, (
-        "microstructure_v1 must be registered in GROUP_REGISTRY"
-    )
-    assert len(GROUP_REGISTRY) == 14, (
-        f"GROUP_REGISTRY must have exactly 14 groups post-/048, got {len(GROUP_REGISTRY)}"
-    )
-
-
-# ---------------------------------------------------------------------------
-# 8. Parquet integration — trade_count_zscore_30 present after feature regen
-# ---------------------------------------------------------------------------
-
-_V1_PARQUET_DIR = Path("data/features")
-_SYMBOLS = ["BTCUSDT", "ETHUSDT", "LINKUSDT", "LTCUSDT", "DOTUSDT"]
-
-
-def _column_in_parquets() -> bool:
-    """Return True if trade_count_zscore_30 column is present in any v1 parquet."""
-    try:
-        import pyarrow.parquet as pq  # noqa: PLC0415
-    except ImportError:
-        pq = None  # type: ignore[assignment]
-
-    for sym in _SYMBOLS:
-        path = _V1_PARQUET_DIR / f"{sym}_8h_features.parquet"
-        if not path.exists():
-            continue
-        try:
-            if pq is not None:
-                schema = pq.read_schema(path)
-                if "trade_count_zscore_30" in schema.names:
-                    return True
-            else:
-                # Fallback: read full parquet (slower but no pyarrow dependency)
-                df = pd.read_parquet(path)
-                if "trade_count_zscore_30" in df.columns:
-                    return True
-        except Exception:
-            continue
-    return False
-
-
-_COLUMN_REGENERATED = _column_in_parquets()
-
-
-@pytest.mark.skipif(
-    not _COLUMN_REGENERATED,
-    reason=(
-        "trade_count_zscore_30 not yet in v1 parquets — run: "
-        "uv run crypto-trade features --symbols BTCUSDT,ETHUSDT,LINKUSDT,LTCUSDT,DOTUSDT "
-        "--interval 8h --track v1 --format parquet --workers 4"
-    ),
+@pytest.mark.skip(
+    reason="iter-v1/048 NEG-CLEAN-PRE-EDA closeout: trade_count_zscore_30 reverted from "
+    "V1_FEATURE_COLUMNS_PRUNED and microstructure_v1 de-registered from GROUP_REGISTRY. "
+    "Parquets regenerated post-revert do not include the column."
 )
-def test_parquet_integration():
-    """trade_count_zscore_30 must be present in at least one v1 symbol parquet."""
-    found_col = False
-    for sym in _SYMBOLS:
-        path = _V1_PARQUET_DIR / f"{sym}_8h_features.parquet"
-        if not path.exists():
-            continue
-        df = pd.read_parquet(path, columns=None)
-        if "trade_count_zscore_30" in df.columns:
-            found_col = True
-            # Spot-check: post-warmup rows should not be all NaN
-            post = df["trade_count_zscore_30"].iloc[30:]
-            assert post.notna().any(), (
-                f"{sym}: trade_count_zscore_30 post-warmup is all NaN — "
-                "check feature pipeline wiring"
-            )
-            break
-    assert found_col, (
-        "trade_count_zscore_30 not found in any v1 parquet. "
-        "Re-run: uv run crypto-trade features "
-        "--symbols BTCUSDT,ETHUSDT,LINKUSDT,LTCUSDT,DOTUSDT "
-        "--interval 8h --track v1 --format parquet --workers 4"
-    )
+def test_trade_count_zscore_30_parquet():
+    """Skipped — column intentionally absent from v1 parquets post-revert."""
+    pass
