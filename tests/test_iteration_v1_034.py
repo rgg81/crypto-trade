@@ -105,17 +105,18 @@ def test_v1_034_basis_zscore_30_in_pruned_features() -> None:
 
 
 def test_v1_034_pruned_features_length_44() -> None:
-    """V1_FEATURE_COLUMNS_PRUNED must have exactly 46 features after /050 ADD.
+    """V1_FEATURE_COLUMNS_PRUNED must have exactly 48 features after /052 ADD.
 
     History: /034 added basis_zscore_30 (43→44); /040 swapped to regime_momentum (44);
-    /049 added long_short_zscore_30 (44→45); /050 added dot_vs_btc_ret_ratio_30 (45→46).
+    /049 added long_short_zscore_30 (44→45); /050 added dot_vs_btc_ret_ratio_30 (45→46);
+    /052 added btc_funding_rate_8h_impulse + btc_funding_spread_30_90 (46→48).
     """
     from crypto_trade.features_v1 import V1_FEATURE_COLUMNS_PRUNED
 
     n = len(V1_FEATURE_COLUMNS_PRUNED)
-    assert n == 46, (
-        f"V1_FEATURE_COLUMNS_PRUNED should have 46 features after iter-v1/050 adds "
-        f"dot_vs_btc_ret_ratio_30 (45 → 46). Got {n}."
+    assert n == 48, (
+        f"V1_FEATURE_COLUMNS_PRUNED should have 48 features after iter-v1/052 adds "
+        f"btc_funding_rate_8h_impulse + btc_funding_spread_30_90 (46 → 48). Got {n}."
     )
 
 

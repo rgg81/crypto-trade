@@ -153,16 +153,18 @@ def test_pruned_size_46() -> None:
     """V1_FEATURE_COLUMNS_PRUNED must have exactly 46 features (unchanged from /050).
 
     Brief Section 3: no V1_FEATURE_COLUMNS_PRUNED change at /051.
-    History: 40 (baseline) → 42 (/023) → 43 (/025) → 44 (/034→/040) → 45 (/049) → 46 (/050 ADD).
-    /051 = multi-seed re-validation only; feature count must remain 46.
+    History: 40 → 42 (/023) → 43 (/025) → 44 (/034→/040) → 45 (/049) → 46 (/050 ADD)
+             → 48 (/052 ADD btc_funding_rate_8h_impulse + btc_funding_spread_30_90).
+    /051 = multi-seed re-validation only; no feature changes at /051.
+    /052 subsequently extended to 48; the live constant reflects post-/052 state.
     """
     from crypto_trade.features_v1 import V1_FEATURE_COLUMNS_PRUNED  # noqa: PLC0415
 
     n = len(V1_FEATURE_COLUMNS_PRUNED)
-    assert n == 46, (
-        f"V1_FEATURE_COLUMNS_PRUNED expected 46 features (unchanged from /050); got {n}. "
-        "iter-v1/051 must NOT change the feature column count — it is a seed-validation "
-        "iteration only. History: ...→ 45 (/049) → 46 (/050 ADD dot_vs_btc_ret_ratio_30)."
+    assert n == 48, (
+        f"V1_FEATURE_COLUMNS_PRUNED expected 48 features (post iter-v1/052 ADD); got {n}. "
+        "History: ...→ 46 (/050 ADD dot_vs_btc_ret_ratio_30) "
+        "→ 48 (/052 ADD btc_funding_rate_8h_impulse + btc_funding_spread_30_90)."
     )
 
 

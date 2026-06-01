@@ -369,9 +369,10 @@ class TestV1FeatureColumnsPruned:
         from crypto_trade.features_v1 import V1_FEATURE_COLUMNS_PRUNED
 
         n = len(V1_FEATURE_COLUMNS_PRUNED)
-        assert n == 46, (
-            f"V1_FEATURE_COLUMNS_PRUNED expected 46; got {n}. "
-            "iter-v1/050: 45→46 (+dot_vs_btc_ret_ratio_30 DOT cross-BTC idiosyncratic ratio)."
+        assert n == 48, (
+            f"V1_FEATURE_COLUMNS_PRUNED expected 48; got {n}. "
+            "iter-v1/050: 45→46 (+dot_vs_btc_ret_ratio_30). "
+            "iter-v1/052: 46→48 (+btc_funding_rate_8h_impulse +btc_funding_spread_30_90)."
         )
 
     def test_zscore_30_present(self) -> None:

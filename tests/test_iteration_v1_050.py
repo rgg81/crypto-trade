@@ -273,13 +273,19 @@ def test_synthetic_btc_ratio() -> None:
 
 
 def test_pruned_size_46() -> None:
-    """V1_FEATURE_COLUMNS_PRUNED must have exactly 46 features after iter-v1/050."""
+    """V1_FEATURE_COLUMNS_PRUNED must have exactly 48 features (post iter-v1/052 ADD).
+
+    iter-v1/050 ADD extended 45→46 (dot_vs_btc_ret_ratio_30).
+    iter-v1/052 subsequently extended 46→48 (btc_funding_rate_8h_impulse + btc_funding_spread_30_90).
+    The live constant reflects the post-/052 state.
+    """
     from crypto_trade.features_v1 import V1_FEATURE_COLUMNS_PRUNED
 
     n = len(V1_FEATURE_COLUMNS_PRUNED)
-    assert n == 46, (
-        f"V1_FEATURE_COLUMNS_PRUNED expected 46 features after iter-v1/050 ADD; got {n}. "
-        "History: 40 (baseline) → 42 (/023) → 43 (/025) → 44 (/034→/040) → 45 (/049) → 46 (/050)."
+    assert n == 48, (
+        f"V1_FEATURE_COLUMNS_PRUNED expected 48 features (post iter-v1/052 ADD); got {n}. "
+        "History: ...→ 45 (/049) → 46 (/050 ADD dot_vs_btc_ret_ratio_30) "
+        "→ 48 (/052 ADD btc_funding_rate_8h_impulse + btc_funding_spread_30_90)."
     )
 
 
