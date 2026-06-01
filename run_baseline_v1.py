@@ -84,6 +84,7 @@ from crypto_trade.features_v1 import (
     V1_ITER053_UNIVERSE,
     V1_ITER054_UNIVERSE,
     V1_ITER055_UNIVERSE,
+    V1_ITER057_UNIVERSE,
     V1_OOD_FEATURE_COLUMNS,
     assert_v1_universe,
 )
@@ -6315,24 +6316,26 @@ def main() -> None:
             "It must be DROPPED at /056-C1-BTC (same as /054). "
             "Check V1_FEATURE_COLUMNS_PRUNED in features_v1/__init__.py."
         )
-        # Exclude eth_vs_btc_ret_ratio_30 for BTC-only specialist:
-        # This feature was added at /055 for ETH-only specialist. For BTC rows it would be
-        # all-NaN (BTC's ETH idiosyncratic ratio is undefined). Excluding it here preserves
-        # the /054 47-col BTC specialist stack and avoids passing an all-NaN feature column
-        # to LightGBM for the BTC cohort.
+        # Exclude ETH and LTC cross-asset ratio features for BTC-only specialist:
+        # eth_vs_btc_ret_ratio_30 (added at /055) is all-NaN for BTC rows.
+        # ltc_vs_btc_ret_ratio_30 (added at /057) is all-NaN for BTC rows.
+        # Excluding both preserves the /054 47-col BTC specialist stack and avoids
+        # passing all-NaN feature columns to LightGBM for the BTC cohort.
+        # V1_FEATURE_COLUMNS_PRUNED is now 49 (post /057); 49 - 2 = 47 BTC-only cols.
+        _btc_056_excl = {"eth_vs_btc_ret_ratio_30", "ltc_vs_btc_ret_ratio_30"}
         _btc_056_feature_columns = [
-            c for c in active_feature_columns if c != "eth_vs_btc_ret_ratio_30"
+            c for c in active_feature_columns if c not in _btc_056_excl
         ]
         assert len(_btc_056_feature_columns) == 47, (
             f"iter-v1/056-C1-BTC guard: expected 47 BTC-only feature cols after excluding "
-            f"eth_vs_btc_ret_ratio_30, got {len(_btc_056_feature_columns)}. "
-            "V1_FEATURE_COLUMNS_PRUNED should be 48 (47 + eth_vs_btc); "
-            "after exclusion, BTC specialist sees 47 cols."
+            f"eth_vs_btc_ret_ratio_30 and ltc_vs_btc_ret_ratio_30, "
+            f"got {len(_btc_056_feature_columns)}. "
+            "V1_FEATURE_COLUMNS_PRUNED should be 49 (post /057 ADD); 49 - 2 = 47 BTC-only cols."
         )
         print(
             f"[iter-v1/056-C1-BTC] BTC CONFIRMATION SPECIALIST ACTIVE: "
             f"features=47-col BTC stack (impulse DROPPED, spread RETAINED, "
-            f"eth_vs_btc EXCLUDED). "
+            f"eth_vs_btc + ltc_vs_btc EXCLUDED). "
             f"R3=ON, R1=OFF, R2=OFF. atr_tp=3.5, atr_sl=1.75. "
             f"ENSEMBLE_SIZE={ensemble_size} (inner), n_trials={n_trials}. "
             f"CONFIRMATION budget: ens-size=10, n_trials=35 (up from EXPLORATION 3/18)."
@@ -6441,8 +6444,8 @@ def main() -> None:
             ("DOTUSDT",),
             atr_tp=3.5,
             atr_sl=1.75,
-            apply_r1=True,   # ON — Model E baseline R1 (consecutive-SL cooldown)
-            apply_r2=True,   # ON — Model E baseline R2 (drawdown-triggered scaling)
+            apply_r1=True,  # ON — Model E baseline R1 (consecutive-SL cooldown)
+            apply_r2=True,  # ON — Model E baseline R2 (drawdown-triggered scaling)
             n_trials=n_trials,
             ensemble_size=ensemble_size,
             oof_persist_path=OOF_PARQUET_PATH,
@@ -6462,6 +6465,97 @@ def main() -> None:
         all_results = results_e056_dot
         _r5_model_results = [results_e056_dot]
         _post_dispatch_fi_strategies = [("Model_E_DOT_specialist_C3_056", _strat_e056_dot)]
+
+    elif iteration_label == "v1-057" and set(symbols) == set(V1_ITER057_UNIVERSE):
+        # iter-v1/057: LTC-only specialist head (cycle-7 EXPLORATION 1/N).
+        # Axis family: feature-family (ADD ltc_vs_btc_ret_ratio_30; direct algebraic mirror
+        #   of /055 eth_vs_btc_ret_ratio_30 for LTC-only specialist head).
+        # V1_FEATURE_COLUMNS_PRUNED: 48 → 49 cols (ltc_vs_btc_ret_ratio_30 ADDED).
+        # LTC baseline IS Sharpe: +0.17 (biggest IS/OOS divergence: OOS -4.27).
+        # Mandate: /056 CONFIRMATION-BLOCK established cycle-7; /056 Rec A: multi-seed from start.
+        #
+        # Architecture: Model_D_LTC_specialist (LTC only).
+        #   R1=ON  (K=3 consecutive SL limit, C=27 candle cooldown — same as BASELINE_V1 Model D)
+        #   R2=OFF (no drawdown scaling — same as BASELINE_V1 Model D)
+        #   R3=ON  (OOD Mahalanobis gate, cutoff=0.70, 16-feature V1_OOD_FEATURE_COLUMNS)
+        #   atr_tp=3.5, atr_sl=1.75 (UNCHANGED from BASELINE_V1 Model D specialist convention)
+        #
+        # Feature stack: V1_FEATURE_COLUMNS_PRUNED (49 cols; ltc_vs_btc_ret_ratio_30 ADDED).
+        # BTC klines loaded for feature computation only (BTCUSDT NOT traded).
+        # NORMAL-RISK: additive feature + cohort isolation (no Optuna domain change).
+        # Multi-seed: --seeds 3, _OUTER_SEED_OFFSETS=(0,3,6) via monkey-patch in run_iteration_057
+        # Verdict basis: MULTI-SEED MEAN (n=3 outer seeds). Single-seed=42 is informational only.
+        #
+        # Verdict bands (brief Section 4 F-AXIS #1, multi-seed MEAN):
+        #   Mean IS Δ ≥ +0.50 → MULTI-SEED-SPECIALIST-CANDIDATE
+        #   Mean IS Δ ∈ [+0.20, +0.50) → MULTI-SEED-PARTIAL-CONFIRMED
+        #   Mean IS Δ ∈ [+0.05, +0.20) → MULTI-SEED-WEAK
+        #   Mean IS Δ ∈ (-0.05, +0.05) → NEG-INERT
+        #   Mean IS Δ < -0.05 → NEG-CLEAN; ltc_vs_btc_ret_ratio_30 reverted
+        #   Max-min spread > 0.50 → BASIN-LOTTERY downgrade
+        #   IS trades < 60 per seed → overfit flag
+        assert set(symbols) == {"LTCUSDT"}, (
+            f"iter-v1/057 guard: expected {{LTCUSDT}}, got {set(symbols)}"
+        )
+        assert "ltc_vs_btc_ret_ratio_30" in active_feature_columns, (
+            "iter-v1/057 pre-flight FAIL: ltc_vs_btc_ret_ratio_30 not in "
+            "active_feature_columns. "
+            "Ensure --pruned-features is set and V1_FEATURE_COLUMNS_PRUNED has 49 cols "
+            "(ltc_vs_btc_ret_ratio_30 ADDED at /057). "
+            "Run: uv run crypto-trade features --symbols BTCUSDT,LTCUSDT "
+            "--interval 8h --track v1 --format parquet --workers 4"
+        )
+        assert len(active_feature_columns) == 49, (
+            f"iter-v1/057 guard: expected 49 V1_FEATURE_COLUMNS_PRUNED cols, "
+            f"got {len(active_feature_columns)}. "
+            "V1_FEATURE_COLUMNS_PRUNED must be 49 at /057 (48 + 1 ltc_vs_btc_ret_ratio_30). "
+            "If len == 48: ltc_vs_btc_ret_ratio_30 was NOT added — check __init__.py."
+        )
+        print(
+            f"[iter-v1/057] LTC-ONLY SPECIALIST HEAD ACTIVE: "
+            f"features=V1_FEATURE_COLUMNS_PRUNED (49 cols; ltc_vs_btc_ret_ratio_30 ADDED). "
+            f"R1=ON (K=3/C=27), R2=OFF, R3=ON (OOD cutoff=0.70). "
+            f"atr_tp=3.5, atr_sl=1.75 (Model D specialist convention). "
+            f"ENSEMBLE_SIZE={ensemble_size} (inner), n_trials={n_trials}. "
+            f"NORMAL-RISK: additive feature + cohort isolation (no Optuna domain change). "
+            f"cycle-7 EXP-1/N. LTC baseline IS +0.17 / OOS -4.27; target: mean IS Δ ≥ +0.20."
+        )
+        # Model D_LTC_specialist: LTC only + R1 ON, R2 OFF, R3 ON.
+        # feature_columns = V1_FEATURE_COLUMNS_PRUNED (49 cols; ltc_vs_btc_ret_ratio_30 ADDED).
+        # ltc_vs_btc_ret_ratio_30 must be in the LTCUSDT parquet (from /057 regen;
+        #   needs BTCUSDT+LTCUSDT regeneration with cross_btc_v1 LTC branch).
+        results_d057, faxm_d057, _strat_d057 = run_model(
+            "D_LTC_specialist (R1+R3)",
+            ("LTCUSDT",),
+            atr_tp=3.5,  # UNCHANGED — matches specialist convention + BASELINE_V1 Model D config
+            atr_sl=1.75,  # UNCHANGED — matches specialist convention + BASELINE_V1 Model D config
+            apply_r1=True,  # ON — same as BASELINE_V1 Model D (K=3 consecutive SL, C=27 cooldown)
+            apply_r2=False,  # OFF — same as BASELINE_V1 Model D (no drawdown scaling for LTC)
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            **_r5_kwargs,
+        )
+
+        # Cohort isolation sanity: assert ONLY LTCUSDT trades emitted
+        d057_symbols = {r.symbol for r in results_d057}
+        assert d057_symbols.issubset({"LTCUSDT"}), (
+            f"[iter-v1/057] Model D_LTC produced non-LTC results: {d057_symbols - {'LTCUSDT'}}. "
+            "Per-cohort isolation failed — iter-v1/057 must trade LTCUSDT ONLY."
+        )
+        print(
+            f"[iter-v1/057] Dispatch verified: "
+            f"LTC-only={len(results_d057)} trades (R1=ON K=3/C=27, R2=OFF, R3=ON). "
+            f"Cohort isolation PASS: universe guard confirmed. "
+            f"atr_tp=3.5, atr_sl=1.75 (Model D specialist convention)."
+        )
+
+        _all_faxm_logs = faxm_d057
+        all_results = results_d057
+        _r5_model_results = [results_d057]
+        _post_dispatch_fi_strategies = [("Model_D_LTC_specialist_057", _strat_d057)]
 
     elif iteration_label == "v1-044":
         # iter-v1/044: CONFIRMATION-MERGE-PORTFOLIO (cycle-5 CONFIRMATION 1/1).

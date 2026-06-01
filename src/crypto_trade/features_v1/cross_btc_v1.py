@@ -1,13 +1,14 @@
-"""v1 cross-BTC idiosyncratic ratio features — iter-v1/050 (DOT) + iter-v1/055 (ETH).
+"""v1 cross-BTC idiosyncratic ratio features — iter-v1/050 (DOT) + /055 (ETH) + /057 (LTC).
 
 Feature-family EXPLORATION:
 - iter-v1/050 EXPLORATION #5/10 cycle-6 (DOT cross-asset ratio)
 - iter-v1/055 EXPLORATION #10/10 cycle-6 FINAL (ETH cross-asset ratio)
+- iter-v1/057 EXPLORATION #1/N cycle-7 (LTC cross-asset ratio; algebraic mirror of /055)
 
 Track-isolated: ZERO imports from crypto_trade.features_v2 or crypto_trade.features_v3.
 
-This module provides cross-asset features measuring DOT's and ETH's idiosyncratic return
-relative to BTC market beta, z-scored for stationarity.
+This module provides cross-asset features measuring DOT's, ETH's, and LTC's idiosyncratic
+return relative to BTC market beta, z-scored for stationarity.
 
 Feature: ``dot_vs_btc_ret_ratio_30``
 -------------------------------------
@@ -38,6 +39,23 @@ Computation:
 
 For non-ETHUSDT symbols: the feature is NaN (ETH-only signal; other symbols are unaffected
 at training time since run_iteration_055 uses ETH-only cohort).
+
+Feature: ``ltc_vs_btc_ret_ratio_30``
+-------------------------------------
+iter-v1/057 EXPLORATION #1/N cycle-7. Direct algebraic mirror of
+``eth_vs_btc_ret_ratio_30`` for LTC-only specialist head. Captures phases where LTCUSDT's
+30-bar price return DECOUPLES from BTC's 30-bar return — LTC idiosyncratic momentum vs BTC
+market beta contagion. LTC has lower correlation with BTC (~0.65 vs ETH ~0.85), producing
+higher ratio variance and potentially more information content for the LightGBM model.
+
+Computation:
+    ltc_ret_30[t]  = ltc_close.pct_change(30)[t]     (past-only 30-bar return)
+    btc_ret_30[t]  = btc_close.pct_change(30)[t]     (past-only 30-bar return)
+    ratio[t]       = ltc_ret_30[t] / btc_ret_30[t]   (replace inf/nan with NaN; clip ±10)
+    zscore[t]      = rolling_zscore_90bar(ratio[t])   (clip ±10)
+
+For non-LTCUSDT symbols: the feature is NaN (LTC-only signal; other symbols are unaffected
+at training time since run_iteration_057 uses LTC-only cohort).
 
 Data source:
     BTC close prices from ``data_dir/BTCUSDT/8h.csv`` (standard kline CSV).
@@ -102,11 +120,17 @@ FEATURE_COLUMN: str = "dot_vs_btc_ret_ratio_30"
 #: Column name of the ETH output feature (iter-v1/055).
 ETH_FEATURE_COLUMN: str = "eth_vs_btc_ret_ratio_30"
 
+#: Column name of the LTC output feature (iter-v1/057).
+LTC_FEATURE_COLUMN: str = "ltc_vs_btc_ret_ratio_30"
+
 #: Symbol for which the DOT feature is meaningful. NaN for all other symbols.
 TARGET_SYMBOL: str = "DOTUSDT"
 
 #: Symbol for which the ETH feature is meaningful (iter-v1/055). NaN for all other symbols.
 ETH_TARGET_SYMBOL: str = "ETHUSDT"
+
+#: Symbol for which the LTC feature is meaningful (iter-v1/057). NaN for all other symbols.
+LTC_TARGET_SYMBOL: str = "LTCUSDT"
 
 #: BTC symbol name used for cross-asset data loading.
 BTC_SYMBOL: str = "BTCUSDT"
@@ -269,6 +293,85 @@ def compute_eth_vs_btc_ret_ratio_30(
 
 
 # ---------------------------------------------------------------------------
+# LTC cross-asset ratio (iter-v1/057)
+# ---------------------------------------------------------------------------
+
+
+def compute_ltc_vs_btc_ret_ratio_30(
+    df_ltc: pd.DataFrame,
+    df_btc: pd.DataFrame,
+    lookback: int = RATIO_LOOKBACK,
+    zscore_window: int = ZSCORE_WINDOW,
+    ratio_clip: float = RATIO_CLIP,
+    zscore_clip: float = ZSCORE_CLIP,
+) -> pd.Series:
+    """Compute the LTC-vs-BTC 30-bar return ratio, z-scored over 90 bars.
+
+    Direct algebraic mirror of ``compute_eth_vs_btc_ret_ratio_30`` for LTCUSDT.
+    Captures LTC idiosyncratic momentum vs BTC market beta. LTC has lower correlation
+    with BTC (~0.65) than ETH (~0.85), producing higher ratio variance and potentially
+    more information content for the LightGBM model.
+
+    Parameters
+    ----------
+    df_ltc:
+        LTCUSDT kline DataFrame with a ``close`` column and ``open_time`` (ms int) index
+        or column. Must be aligned and sorted by time (ascending).
+    df_btc:
+        BTCUSDT kline DataFrame with a ``close`` column aligned to ``df_ltc`` by
+        ``open_time``.
+    lookback:
+        Number of bars for pct_change return computation (default 30 = 10 days at 8h).
+    zscore_window:
+        Rolling window for z-score computation (default 90 = 30 days at 8h).
+    ratio_clip:
+        Absolute clip threshold for raw ratio before z-scoring (default 10.0).
+    zscore_clip:
+        Absolute clip threshold for final z-scored output (default 10.0).
+
+    Returns
+    -------
+    pd.Series
+        Past-only z-scored ratio aligned to ``df_ltc``'s index.
+        First ``zscore_window - 1`` rows are NaN (rolling warm-up dominates).
+        Rows where BTC return is zero (or NaN) produce NaN (no division by zero).
+
+    Notes
+    -----
+    **Past-only invariant**: identical to ``compute_dot_vs_btc_ret_ratio_30``.
+    ``pct_change(lookback)`` at bar t uses close[t-lookback]...close[t] — all past data.
+    The z-score window uses ratio[t-zscore_window+1]...ratio[t] — all past data.
+    """
+    # Extract close series (reset index for alignment safety)
+    ltc_close = df_ltc["close"].reset_index(drop=True).astype(float)
+    btc_close = df_btc["close"].reset_index(drop=True).astype(float)
+
+    # 30-bar percentage returns (past-only by pct_change definition)
+    ltc_ret = ltc_close.pct_change(lookback)
+    btc_ret = btc_close.pct_change(lookback)
+
+    # Ratio: LTC / BTC; replace zero-denominator and inf with NaN
+    with np.errstate(divide="ignore", invalid="ignore"):
+        ratio_raw = ltc_ret / btc_ret
+
+    # Replace inf/-inf introduced by btc_ret == 0 with NaN
+    ratio_raw = ratio_raw.replace([np.inf, -np.inf], np.nan)
+
+    # Clip extreme ratios before z-scoring
+    ratio_clipped = ratio_raw.clip(-ratio_clip, ratio_clip)
+
+    # Rolling 90-bar z-score (past-only)
+    rmean = ratio_clipped.rolling(window=zscore_window, min_periods=zscore_window).mean()
+    rstd = ratio_clipped.rolling(window=zscore_window, min_periods=zscore_window).std(ddof=1)
+
+    # Divide, handling rolling_std == 0 (constant ratio window)
+    zscore = (ratio_clipped - rmean) / rstd.replace(0, np.nan)
+
+    # Final clip
+    return zscore.clip(-zscore_clip, zscore_clip)
+
+
+# ---------------------------------------------------------------------------
 # Feature injection
 # ---------------------------------------------------------------------------
 
@@ -359,10 +462,15 @@ def add_cross_btc_v1_features(
 
     - **DOTUSDT**: computes ``dot_vs_btc_ret_ratio_30`` (iter-v1/050). Loads BTC klines from
       ``data_dir/BTCUSDT/<interval>.csv``, aligns by ``open_time``, computes ratio.
-      Adds a NaN ``eth_vs_btc_ret_ratio_30`` column for V1_FEATURE_COLUMNS_PRUNED compliance.
+      Adds NaN ``eth_vs_btc_ret_ratio_30`` and ``ltc_vs_btc_ret_ratio_30`` columns for
+      V1_FEATURE_COLUMNS_PRUNED compliance.
     - **ETHUSDT**: computes ``eth_vs_btc_ret_ratio_30`` (iter-v1/055). Same loading/alignment.
-      Adds a NaN ``dot_vs_btc_ret_ratio_30`` column for V1_FEATURE_COLUMNS_PRUNED compliance.
-    - **All other symbols**: both columns added as NaN (neither feature applies; columns must
+      Adds NaN ``dot_vs_btc_ret_ratio_30`` and ``ltc_vs_btc_ret_ratio_30`` columns for
+      V1_FEATURE_COLUMNS_PRUNED compliance.
+    - **LTCUSDT**: computes ``ltc_vs_btc_ret_ratio_30`` (iter-v1/057). Same loading/alignment.
+      Adds NaN ``dot_vs_btc_ret_ratio_30`` and ``eth_vs_btc_ret_ratio_30`` columns for
+      V1_FEATURE_COLUMNS_PRUNED compliance.
+    - **All other symbols**: all three columns added as NaN (no feature applies; columns must
       still exist for V1_FEATURE_COLUMNS_PRUNED compliance at model training time).
 
     Parameters
@@ -386,15 +494,15 @@ def add_cross_btc_v1_features(
     Returns
     -------
     pd.DataFrame
-        Copy of ``df`` with ``dot_vs_btc_ret_ratio_30`` and ``eth_vs_btc_ret_ratio_30``
-        columns appended.
+        Copy of ``df`` with ``dot_vs_btc_ret_ratio_30``, ``eth_vs_btc_ret_ratio_30``,
+        and ``ltc_vs_btc_ret_ratio_30`` columns appended.
 
     Raises
     ------
     KeyError:
         If ``df`` is missing a required column (``symbol``, ``open_time``, ``close``).
     FileNotFoundError:
-        If BTC kline CSV is not found at the expected path for DOT or ETH symbol.
+        If BTC kline CSV is not found at the expected path for DOT, ETH, or LTC symbol.
         (Not raised for other symbols — NaN columns added silently.)
 
     Notes
@@ -415,7 +523,7 @@ def add_cross_btc_v1_features(
     df = df.copy()
 
     if symbol == TARGET_SYMBOL:
-        # DOTUSDT: compute dot_vs_btc_ret_ratio_30; ETH column is NaN
+        # DOTUSDT: compute dot_vs_btc_ret_ratio_30; ETH and LTC columns are NaN
         df_btc_aligned = _load_btc_aligned(df, data_dir, interval)
         zscore_series = compute_dot_vs_btc_ret_ratio_30(
             df_dot=df,
@@ -427,9 +535,10 @@ def add_cross_btc_v1_features(
         )
         df[FEATURE_COLUMN] = zscore_series.values
         df[ETH_FEATURE_COLUMN] = np.nan
+        df[LTC_FEATURE_COLUMN] = np.nan
 
     elif symbol == ETH_TARGET_SYMBOL:
-        # ETHUSDT: compute eth_vs_btc_ret_ratio_30 (iter-v1/055); DOT column is NaN
+        # ETHUSDT: compute eth_vs_btc_ret_ratio_30 (iter-v1/055); DOT and LTC columns are NaN
         df_btc_aligned = _load_btc_aligned(df, data_dir, interval)
         zscore_series = compute_eth_vs_btc_ret_ratio_30(
             df_eth=df,
@@ -441,11 +550,28 @@ def add_cross_btc_v1_features(
         )
         df[ETH_FEATURE_COLUMN] = zscore_series.values
         df[FEATURE_COLUMN] = np.nan
+        df[LTC_FEATURE_COLUMN] = np.nan
 
-    else:
-        # Non-DOT, non-ETH symbols: both columns are NaN
+    elif symbol == LTC_TARGET_SYMBOL:
+        # LTCUSDT: compute ltc_vs_btc_ret_ratio_30 (iter-v1/057); DOT and ETH columns are NaN
+        df_btc_aligned = _load_btc_aligned(df, data_dir, interval)
+        zscore_series = compute_ltc_vs_btc_ret_ratio_30(
+            df_ltc=df,
+            df_btc=df_btc_aligned,
+            lookback=lookback,
+            zscore_window=zscore_window,
+            ratio_clip=ratio_clip,
+            zscore_clip=zscore_clip,
+        )
+        df[LTC_FEATURE_COLUMN] = zscore_series.values
         df[FEATURE_COLUMN] = np.nan
         df[ETH_FEATURE_COLUMN] = np.nan
+
+    else:
+        # Non-DOT, non-ETH, non-LTC symbols: all three columns are NaN
+        df[FEATURE_COLUMN] = np.nan
+        df[ETH_FEATURE_COLUMN] = np.nan
+        df[LTC_FEATURE_COLUMN] = np.nan
 
     return df
 
@@ -495,11 +621,14 @@ __all__ = [
     "ZSCORE_CLIP",
     "FEATURE_COLUMN",
     "ETH_FEATURE_COLUMN",
+    "LTC_FEATURE_COLUMN",
     "TARGET_SYMBOL",
     "ETH_TARGET_SYMBOL",
+    "LTC_TARGET_SYMBOL",
     "BTC_SYMBOL",
     "compute_dot_vs_btc_ret_ratio_30",
     "compute_eth_vs_btc_ret_ratio_30",
+    "compute_ltc_vs_btc_ret_ratio_30",
     "add_cross_btc_v1_features",
     "compute_btc_realized_vol_30",
 ]
