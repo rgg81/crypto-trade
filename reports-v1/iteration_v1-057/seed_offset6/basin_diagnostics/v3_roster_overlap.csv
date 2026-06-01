@@ -1,0 +1,3 @@
+symbol,n_main,n_baseline,n_intersection,n_union,jaccard
+LTCUSDT,49,35,11,73,0.1506849315068493
+ALL,49,35,11,73,0.1506849315068493
