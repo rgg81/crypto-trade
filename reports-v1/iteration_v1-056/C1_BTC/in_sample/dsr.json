@@ -1,0 +1,20 @@
+{
+  "dsr": 0.0,
+  "pbo": null,
+  "psr": 0.045668,
+  "n_trials": 35,
+  "n_eff": 3,
+  "n_eff_pca_method": "eigvalsh_cov_per_cell_median_aggfunc_mean",
+  "min_trl_months": 0.288675,
+  "n_eff_per_cell_median": 3,
+  "n_eff_method_per_cell": "eigvalsh_cov_per_cell_median_aggfunc_mean",
+  "n_eff_per_cell_trimmed_mean": 3,
+  "n_eff_per_cell_p25": 2,
+  "n_eff_per_cell_p75": 4,
+  "n_eff_per_cell_min": 1,
+  "n_eff_per_cell_max": 6,
+  "n_eff_per_cell_by_symbol": {
+    "BTCUSDT": 3
+  },
+  "n_cells": 54
+}

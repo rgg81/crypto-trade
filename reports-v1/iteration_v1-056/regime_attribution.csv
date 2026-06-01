@@ -1,0 +1,11 @@
+regime_tag,split,candidate_sharpe,candidate_max_dd,candidate_trade_count,baseline_sharpe,baseline_max_dd,baseline_trade_count
+bull,IS,-0.351,11.4731,47,-0.3514,52.4709,50
+bear,IS,0.0785,18.1506,199,0.1463,60.8758,222
+chop,IS,0.3299,5.9172,283,0.2348,44.6318,224
+recovery,IS,0.3581,4.1355,110,0.2782,31.194,124
+other,IS,0.0,0.0,0,0.0,0.0,0
+bull,OOS,0.0,1.0592,4,0.0,5.2961,3
+bear,OOS,0.0,0.0,0,0.0,0.0,0
+chop,OOS,0.0,0.0,0,0.0,0.0,0
+recovery,OOS,0.0,0.0,0,0.0,0.0,0
+other,OOS,-0.2082,13.5592,200,0.1405,35.6482,191

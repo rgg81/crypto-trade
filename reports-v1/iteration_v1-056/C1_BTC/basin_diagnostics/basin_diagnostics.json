@@ -1,0 +1,24 @@
+{
+  "v1": {
+    "metric": "cross_seed_sharpe_std",
+    "value": 0.0,
+    "pass_threshold": 0.3,
+    "fail_threshold": 0.6,
+    "verdict": "PASS"
+  },
+  "v2": {
+    "metric": "per_cell_spearman_rho",
+    "value": NaN,
+    "pass_threshold": 0.5,
+    "fail_threshold": 0.2,
+    "verdict": "BORDERLINE"
+  },
+  "v3": {
+    "metric": "oos_trade_roster_jaccard",
+    "value": 0.038461538461538464,
+    "pass_threshold": 0.4,
+    "fail_threshold": 0.15,
+    "verdict": "FAIL"
+  },
+  "global_verdict": "FAIL"
+}
