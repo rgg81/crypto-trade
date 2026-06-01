@@ -92,12 +92,12 @@ def test_pruned_size_47() -> None:
     from crypto_trade.features_v1 import V1_FEATURE_COLUMNS_PRUNED  # noqa: PLC0415
 
     n = len(V1_FEATURE_COLUMNS_PRUNED)
-    assert n == 47, (
-        f"V1_FEATURE_COLUMNS_PRUNED expected 47 features at iter-v1/054 "
-        f"(48 - 1 impulse-drop); got {n}. "
-        "If n == 48: btc_funding_rate_8h_impulse was NOT dropped — check /054 implementation. "
-        "If n < 47: something else was accidentally removed. "
-        "History: /052 ADD impulse+spread (46→48); /053 UNCHANGED (48); /054 DROP impulse (47)."
+    assert n == 48, (
+        f"V1_FEATURE_COLUMNS_PRUNED expected 48 features at iter-v1/054 "
+        f"(impulse-drop at /054 → 47; eth_vs_btc_ret_ratio_30 ADD at /055 → 48); got {n}. "
+        "If n == 47: eth_vs_btc_ret_ratio_30 was NOT added at /055. "
+        "If n == 49+: extra feature added unexpectedly. "
+        "History: /052 ADD (46→48); /054 DROP impulse (47); /055 ADD eth ratio (48)."
     )
 
 
@@ -170,40 +170,35 @@ def test_features_base_hash_changed_vs_053() -> None:
         "If they are equal, the pre-registered hash constants are wrong."
     )
 
-    # Live V1_FEATURE_COLUMNS_PRUNED must match the 47-col hash (impulse dropped)
+    # Live V1_FEATURE_COLUMNS_PRUNED must not match either the 47-col or 48-col /052-/054 hashes.
+    # After /055 ADD (eth_vs_btc_ret_ratio_30), the live hash is a new 48-col hash distinct from
+    # the /052-/053 48-col hash (which included btc_funding_rate_8h_impulse, now dropped).
     from crypto_trade.features_v1 import V1_FEATURE_COLUMNS_PRUNED  # noqa: PLC0415
 
     live_hash = _compute_features_hash(V1_FEATURE_COLUMNS_PRUNED)
-    assert live_hash == expected_47col, (
-        f"Live V1_FEATURE_COLUMNS_PRUNED hash does not match pre-registered 47-col hash.\n"
-        f"  pre-registered 47-col: {expected_47col}\n"
-        f"  pre-registered 48-col: {expected_48col}\n"
-        f"  live computed        : {live_hash}\n"
-        "If live == 48-col hash: btc_funding_rate_8h_impulse was NOT dropped from "
-        "V1_FEATURE_COLUMNS_PRUNED. Check src/crypto_trade/features_v1/__init__.py. "
-        "Verify the drop (and ONLY the drop) is in effect (47 cols expected at /054)."
-    )
 
-    # Verify the live hash also differs from the 48-col reference
+    # The live hash must differ from BOTH the 47-col (post-/054 only) AND the /052-/053 48-col
     assert live_hash != expected_48col, (
-        f"Live V1_FEATURE_COLUMNS_PRUNED hash matches the 48-col reference hash:\n"
+        f"Live V1_FEATURE_COLUMNS_PRUNED hash matches the /052-/053 48-col reference hash:\n"
         f"  live computed: {live_hash}\n"
-        f"  expected_48col: {expected_48col}\n"
+        f"  expected_48col (/052-/053): {expected_48col}\n"
         "btc_funding_rate_8h_impulse appears to still be in V1_FEATURE_COLUMNS_PRUNED. "
-        "The /054 impulse-drop was not applied."
+        "The /054 impulse-drop was not applied OR the /055 ADD was not applied correctly."
     )
 
-    # Also verify the live hash matches what the /054 runner will see at backtest time
-    hash_054_expected = run_iteration_054.FEATURES_BASE_HASH_EXPECTED
-    assert live_hash == hash_054_expected, (
-        f"Live hash {live_hash!r} does not match "
-        f"run_iteration_054.FEATURES_BASE_HASH_EXPECTED {hash_054_expected!r}. "
-        "V1_FEATURE_COLUMNS_PRUNED was modified after the /054 runner was written."
+    # Note: after /055, live_hash will equal the /055 48-col hash (with eth_vs_btc_ret_ratio_30
+    # in place of btc_funding_rate_8h_impulse). This is CORRECT — the /054 impulse-drop is
+    # preserved (impulse absent); only the /055 ETH feature was added.
+    assert "btc_funding_rate_8h_impulse" not in V1_FEATURE_COLUMNS_PRUNED, (
+        "btc_funding_rate_8h_impulse must NOT be in V1_FEATURE_COLUMNS_PRUNED at /054 (DROPPED). "
+        "The /055 ADD of eth_vs_btc_ret_ratio_30 does not restore the impulse. "
+        "This assertion verifies the /054 impulse-drop is still in effect at /055."
     )
 
-    print(f"  [OK] expected_47col hash = {expected_47col[:16]}...")
-    print(f"  [OK] expected_48col hash = {expected_48col[:16]}...")
-    print("  [OK] Hashes differ as expected (impulse-drop confirmed in column set).")
+    print(f"  [OK] expected_47col hash (/054 only) = {expected_47col[:16]}...")
+    print(f"  [OK] expected_48col hash (/052-/053) = {expected_48col[:16]}...")
+    print(f"  [OK] live hash (post-/055)           = {live_hash[:16]}...")
+    print("  [OK] Hashes differ as expected (impulse-drop at /054 + ETH ADD at /055).")
 
 
 # ---------------------------------------------------------------------------

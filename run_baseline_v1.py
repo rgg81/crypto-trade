@@ -83,6 +83,7 @@ from crypto_trade.features_v1 import (
     V1_ITER052_UNIVERSE,
     V1_ITER053_UNIVERSE,
     V1_ITER054_UNIVERSE,
+    V1_ITER055_UNIVERSE,
     V1_OOD_FEATURE_COLUMNS,
     assert_v1_universe,
 )
@@ -6202,6 +6203,94 @@ def main() -> None:
         all_results = results_a054
         _r5_model_results = [results_a054]
         _post_dispatch_fi_strategies = [("Model_A_BTC_specialist", _strat_a054)]
+
+    elif iteration_label == "v1-055" and set(symbols) == set(V1_ITER055_UNIVERSE):
+        # iter-v1/055: ETH-only specialist head (cycle-6 EXPLORATION 10/10 FINAL).
+        # Axis family: feature-family (ADD eth_vs_btc_ret_ratio_30; direct algebraic mirror
+        #   of /050 dot_vs_btc_ret_ratio_30 for ETH-only specialist head).
+        # V1_FEATURE_COLUMNS_PRUNED: 47 → 48 cols (eth_vs_btc_ret_ratio_30 ADDED).
+        # ETH baseline IS Sharpe: -0.61 (second-worst of 5 symbols; 145 IS trades).
+        # Mandate: /054 catalog row pre-registered this as the ETH specialist axis.
+        #
+        # Architecture: Model_A_ETH_specialist (ETH only).
+        #   R1=OFF (same as baseline Model A — no R1 on ETH)
+        #   R2=OFF (same as baseline Model A — no R2 on ETH)
+        #   R3=ON  (same as baseline Model A — R3 OOD gate active, cutoff=0.70)
+        #   atr_tp=3.5, atr_sl=1.75 (UNCHANGED from specialist convention)
+        #
+        # Feature stack: V1_FEATURE_COLUMNS_PRUNED (48 cols; eth_vs_btc_ret_ratio_30 ADDED).
+        # BTC klines loaded for feature computation only (BTCUSDT NOT traded).
+        # NORMAL-RISK: additive feature + cohort isolation (no Optuna domain change).
+        # Single-seed=42 (EXPLORATION standard). ENSEMBLE_SIZE=3, n_trials=18.
+        #
+        # Verdict bands (brief Section 4, F-AXIS #1):
+        #   IS >= 0.00 (Δ >= +0.61) → SPECIALIST-CANDIDATE; pre-register /057 ETH multi-seed
+        #   IS ∈ [-0.31, 0.00) (Δ ∈ [+0.30, +0.61)) → PARTIAL; pre-register /057 ETH multi-seed
+        #   IS ∈ [-0.56, -0.31) (Δ ∈ [+0.05, +0.30)) → WEAK; no multi-seed; ETH stays pooled
+        #   IS ∈ (-0.66, -0.56) (Δ ∈ (-0.05, +0.05)) → NEG-INERT; no signal added
+        #   IS < -0.66 (Δ < -0.05) → NEG-CLEAN; eth_vs_btc_ret_ratio_30 reverted
+        #   IS trades < 50 → NEGATIVE-INSUFFICIENT-TRADES
+        assert set(symbols) == {"ETHUSDT"}, (
+            f"iter-v1/055 guard: expected {{ETHUSDT}}, got {set(symbols)}"
+        )
+        assert "eth_vs_btc_ret_ratio_30" in active_feature_columns, (
+            "iter-v1/055 pre-flight FAIL: eth_vs_btc_ret_ratio_30 not in "
+            "active_feature_columns. "
+            "Ensure --pruned-features is set and V1_FEATURE_COLUMNS_PRUNED has 48 cols "
+            "(eth_vs_btc_ret_ratio_30 ADDED at /055). "
+            "Run: uv run crypto-trade features --symbols BTCUSDT,ETHUSDT "
+            "--interval 8h --track v1 --format parquet --workers 4"
+        )
+        assert len(active_feature_columns) == 48, (
+            f"iter-v1/055 guard: expected 48 V1_FEATURE_COLUMNS_PRUNED cols, "
+            f"got {len(active_feature_columns)}. "
+            "V1_FEATURE_COLUMNS_PRUNED must be 48 at /055 (47 + 1 eth_vs_btc_ret_ratio_30). "
+            "If len == 47: eth_vs_btc_ret_ratio_30 was NOT added — check __init__.py."
+        )
+        print(
+            f"[iter-v1/055] ETH-ONLY SPECIALIST HEAD ACTIVE: "
+            f"features=V1_FEATURE_COLUMNS_PRUNED (48 cols; eth_vs_btc_ret_ratio_30 ADDED). "
+            f"R3=ON, R1=OFF, R2=OFF (baseline Model A for ETH). "
+            f"atr_tp=3.5, atr_sl=1.75 (specialist convention). "
+            f"ENSEMBLE_SIZE={ensemble_size} (inner), n_trials={n_trials}. "
+            f"NORMAL-RISK: additive feature + cohort isolation (no Optuna domain change). "
+            f"cycle-6 EXP-10/10 FINAL. ETH baseline IS -0.61; flip-positive target IS >= 0.00."
+        )
+        # Model A_ETH_specialist: ETH only + R3 ON, R1 OFF, R2 OFF.
+        # feature_columns = V1_FEATURE_COLUMNS_PRUNED (48 cols; eth_vs_btc_ret_ratio_30 ADDED).
+        # eth_vs_btc_ret_ratio_30 must be in the parquet (from /055 regen; needs BTCUSDT+ETHUSDT).
+        results_a055, faxm_a055, _strat_a055 = run_model(
+            "A_ETH_specialist (R3-only)",
+            ("ETHUSDT",),
+            atr_tp=3.5,  # UNCHANGED — matches specialist convention + baseline Model A ETH config
+            atr_sl=1.75,  # UNCHANGED — matches specialist convention + baseline Model A ETH config
+            apply_r1=False,  # OFF — Model A baseline (no R1 on ETH)
+            apply_r2=False,  # OFF — Model A baseline (no R2 on ETH)
+            n_trials=n_trials,
+            ensemble_size=ensemble_size,
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile=bounds_profile,
+            **_r5_kwargs,
+        )
+
+        # Cohort isolation sanity: assert ONLY ETHUSDT trades emitted
+        a055_symbols = {r.symbol for r in results_a055}
+        assert a055_symbols.issubset({"ETHUSDT"}), (
+            f"[iter-v1/055] Model A_ETH produced non-ETH results: {a055_symbols - {'ETHUSDT'}}. "
+            "Per-cohort isolation failed — iter-v1/055 must trade ETHUSDT ONLY."
+        )
+        print(
+            f"[iter-v1/055] Dispatch verified: "
+            f"ETH-only={len(results_a055)} trades (R3=ON, R1=OFF, R2=OFF). "
+            f"Cohort isolation PASS: universe guard confirmed. "
+            f"atr_tp=3.5, atr_sl=1.75 (NOT pooled 2.9/1.45 — ETH specialist Model_A config)."
+        )
+
+        _all_faxm_logs = faxm_a055
+        all_results = results_a055
+        _r5_model_results = [results_a055]
+        _post_dispatch_fi_strategies = [("Model_A_ETH_specialist", _strat_a055)]
 
     elif iteration_label == "v1-044":
         # iter-v1/044: CONFIRMATION-MERGE-PORTFOLIO (cycle-5 CONFIRMATION 1/1).

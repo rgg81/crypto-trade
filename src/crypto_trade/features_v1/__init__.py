@@ -93,6 +93,7 @@ V1_FEATURE_COLUMNS_PRUNED: tuple[str, ...] = (
     "cal_dow_norm",
     "cal_hour_norm",
     "dot_vs_btc_ret_ratio_30",  # iter-v1/050: NEW — DOT idiosyncratic return vs BTC 30d z-scored (DOT-only; NaN for other syms)  # noqa: E501
+    "eth_vs_btc_ret_ratio_30",  # iter-v1/055: NEW — ETH idiosyncratic return vs BTC 30d z-scored (ETH-only; NaN for other syms)  # noqa: E501
     "funding_rate_zscore_30",  # iter-v1/023: NEW — funding-rate z-score 30-bar (10-day)
     "funding_rate_zscore_90",  # iter-v1/023: NEW — funding-rate z-score 90-bar (30-day)
     "interact_natr_x_adx",
@@ -169,10 +170,14 @@ V1_FEATURE_COLUMNS_PRUNED: tuple[str, ...] = (
 # iter-v1/054: DROP btc_funding_rate_8h_impulse (rank >30/48 in 3/3 outer seeds at /053;
 #              INERT-by-importance multi-seed confirmed). btc_funding_spread_30_90 RETAINED
 #              (rank 4-10/48 in 3/3 seeds at /053; STABLE confirmed). Count: 48 → 47.
-#              Feature computation code preserved in funding_v1.py (restore path for /055
-#              IMPULSE-DROP-DEGRADES verdict if needed).
-assert len(V1_FEATURE_COLUMNS_PRUNED) == 47, (
-    f"V1_FEATURE_COLUMNS_PRUNED must have exactly 47 features; got {len(V1_FEATURE_COLUMNS_PRUNED)}"
+#              Feature computation code preserved in funding_v1.py (restore path if needed).
+# iter-v1/055: ADD eth_vs_btc_ret_ratio_30 (ETH idiosyncratic return vs BTC 30d, z-scored
+#              90-bar; ETH-only specialist head; direct algebraic mirror of /050
+#              dot_vs_btc_ret_ratio_30; cycle-6 EXPLORATION 10/10 FINAL). Count: 47 → 48.
+#              Inserted alphabetically between dot_vs_btc_ret_ratio_30 and
+#              funding_rate_zscore_30.
+assert len(V1_FEATURE_COLUMNS_PRUNED) == 48, (
+    f"V1_FEATURE_COLUMNS_PRUNED must have exactly 48 features; got {len(V1_FEATURE_COLUMNS_PRUNED)}"
 )
 
 # Columns explicitly NOT in V1_FEATURE_COLUMNS_PRUNED but which may still appear in
@@ -448,6 +453,40 @@ assert len(active_feature_columns) == 47 guard fires in dispatch branch.
 """
 
 
+V1_ITER055_UNIVERSE: tuple[str, ...] = ("ETHUSDT",)
+"""iter-v1/055 cohort: ETH-only specialist head.
+
+Cycle-6 EXPLORATION #10 of 10 FINAL. Axis family: feature-family (ADD eth_vs_btc_ret_ratio_30;
+direct algebraic mirror of /050 dot_vs_btc_ret_ratio_30 for ETH-only specialist head).
+V1_FEATURE_COLUMNS_PRUNED extended: 47 → 48 cols (eth_vs_btc_ret_ratio_30 ADDED).
+
+ETH baseline IS Sharpe: -0.61 (second-worst of 5 symbols; 145 IS trades).
+Mandate: /054 catalog row pre-registered ETH specialist as the /055 mandate
+  ("biggest unexplored IS-negative remaining; mirror /050-/052 cross-asset feature design").
+
+NORMAL-RISK declaration: additive feature + cohort isolation — no Optuna training-objective
+domain change. Single-seed=42 (EXPLORATION standard). ENSEMBLE_SIZE=3, n_trials=18.
+
+Architecture: Model_A_ETH_specialist (ETH only).
+  R3=ON, R1=OFF, R2=OFF (same as baseline Model A for ETH).
+  atr_tp=3.5, atr_sl=1.75 (UNCHANGED from baseline Model A + /050-/054 specialist convention).
+
+BTC klines are loaded for cross-asset feature computation only (BTCUSDT is NOT traded).
+
+Verdict bands (brief Section 4 F-AXIS #1):
+  IS ≥ 0.00 (Δ ≥ +0.61) → SPECIALIST-CANDIDATE; pre-register /057 ETH multi-seed
+  IS ∈ [-0.31, 0.00) (Δ ∈ [+0.30, +0.61)) → PARTIAL; pre-register /057 ETH multi-seed
+  IS ∈ [-0.56, -0.31) (Δ ∈ [+0.05, +0.30)) → WEAK; no multi-seed; ETH stays pooled
+  IS ∈ (-0.66, -0.56) (Δ ∈ (-0.05, +0.05)) → NEG-INERT; no signal added
+  IS < -0.66 (Δ < -0.05) → NEG-CLEAN; feature reverted from V1_FEATURE_COLUMNS_PRUNED
+
+LOCAL to runner constant. NOT shared; CONFIRMATION-MERGE updates V1_BASELINE_UNIVERSE.
+assert set(symbols) == {"ETHUSDT"} guard fires in dispatch branch.
+assert "eth_vs_btc_ret_ratio_30" in active_feature_columns guard fires in dispatch branch.
+assert len(active_feature_columns) == 48 guard fires in dispatch branch.
+"""
+
+
 __all__ = [
     "V1_EXCLUDED_SYMBOLS",
     "V1_BASELINE_UNIVERSE",
@@ -466,6 +505,7 @@ __all__ = [
     "V1_ITER052_UNIVERSE",
     "V1_ITER053_UNIVERSE",
     "V1_ITER054_UNIVERSE",
+    "V1_ITER055_UNIVERSE",
     # iter-v1/023: funding-rate feature family (add_funding_v1_features imported on demand)
     # iter-v1/025: OI delta feature family (add_oi_delta_v1_features imported on demand)
     # iter-v1/040: composed feature family (add_composed_v1_features imported on demand)
