@@ -105,13 +105,17 @@ def test_v1_034_basis_zscore_30_in_pruned_features() -> None:
 
 
 def test_v1_034_pruned_features_length_44() -> None:
-    """V1_FEATURE_COLUMNS_PRUNED must have exactly 44 features after /034."""
+    """V1_FEATURE_COLUMNS_PRUNED must have exactly 45 features after /049 ADD.
+
+    History: /034 added basis_zscore_30 (43→44); /040 swapped to regime_momentum (44);
+    /049 added long_short_zscore_30 (44→45).
+    """
     from crypto_trade.features_v1 import V1_FEATURE_COLUMNS_PRUNED
 
     n = len(V1_FEATURE_COLUMNS_PRUNED)
-    assert n == 44, (
-        f"V1_FEATURE_COLUMNS_PRUNED should have 44 features after iter-v1/034 adds "
-        f"basis_zscore_30 (43 → 44). Got {n}."
+    assert n == 45, (
+        f"V1_FEATURE_COLUMNS_PRUNED should have 45 features after iter-v1/049 adds "
+        f"long_short_zscore_30 (44 → 45). Got {n}."
     )
 
 

@@ -358,18 +358,19 @@ class TestTwoWindowOutput:
 
 class TestV1FeatureColumnsPruned:
     def test_length_is_43(self) -> None:
-        """V1_FEATURE_COLUMNS_PRUNED must have exactly 44 features after iter-v1/034.
+        """V1_FEATURE_COLUMNS_PRUNED must have exactly 45 features after iter-v1/049.
 
         History: 40 (baseline) → 42 (iter-v1/023: +funding_rate_zscore_30/90)
                               → 43 (iter-v1/025: +oi_delta_30_z90)
-                              → 44 (iter-v1/034: +basis_zscore_30)
+                              → 44 (iter-v1/034→/040: +basis→+regime_momentum swap)
+                              → 45 (iter-v1/049: +long_short_zscore_30)
         """
         from crypto_trade.features_v1 import V1_FEATURE_COLUMNS_PRUNED
 
         n = len(V1_FEATURE_COLUMNS_PRUNED)
-        assert n == 44, (
-            f"V1_FEATURE_COLUMNS_PRUNED expected 44; got {n}. "
-            "iter-v1/023: 40→42; iter-v1/025: 42→43; iter-v1/034: 43→44 (+basis_zscore_30)."
+        assert n == 45, (
+            f"V1_FEATURE_COLUMNS_PRUNED expected 45; got {n}. "
+            "iter-v1/049: 44→45 (+long_short_zscore_30 top-trader positioning z-score)."
         )
 
     def test_zscore_30_present(self) -> None:

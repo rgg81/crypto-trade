@@ -82,23 +82,22 @@ def test_v1_040_pruned_features_excludes_basis_zscore_30() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Test 10 — V1_FEATURE_COLUMNS_PRUNED count == 44
+# Test 10 — V1_FEATURE_COLUMNS_PRUNED count (updated for iter-v1/049)
 # ---------------------------------------------------------------------------
 
 
 def test_v1_040_pruned_features_count_44() -> None:
-    """len(V1_FEATURE_COLUMNS_PRUNED) must remain 44 after the DROP+ADD swap.
+    """len(V1_FEATURE_COLUMNS_PRUNED) must be 45 after iter-v1/049 ADD.
 
-    iter-v1/040 performs a pure SWAP: DROP basis_zscore_30 (−1) + ADD
-    regime_momentum_signed_5d (+1) → count stays at 44. A count != 44 means
-    the swap was incomplete (only one side applied).
+    iter-v1/040 performed a pure SWAP: DROP basis_zscore_30 (−1) + ADD
+    regime_momentum_signed_5d (+1) → count stayed at 44.
+    iter-v1/049 added long_short_zscore_30 (+1) → count is now 45.
     """
     from crypto_trade.features_v1 import V1_FEATURE_COLUMNS_PRUNED
 
-    assert len(V1_FEATURE_COLUMNS_PRUNED) == 44, (
-        f"V1_FEATURE_COLUMNS_PRUNED has {len(V1_FEATURE_COLUMNS_PRUNED)} features; expected 44. "
-        "iter-v1/040 performs a pure SWAP (DROP 1 + ADD 1): count must stay at 44. "
-        "An incomplete swap would change the count."
+    assert len(V1_FEATURE_COLUMNS_PRUNED) == 45, (
+        f"V1_FEATURE_COLUMNS_PRUNED has {len(V1_FEATURE_COLUMNS_PRUNED)} features; expected 45. "
+        "iter-v1/049 adds long_short_zscore_30 (+1): count advances 44 → 45."
     )
 
 

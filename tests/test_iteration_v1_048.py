@@ -32,7 +32,11 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from crypto_trade.features_v1 import V1_FEATURE_COLUMNS, V1_FEATURE_COLUMNS_PRUNED, microstructure_v1
+from crypto_trade.features_v1 import (
+    V1_FEATURE_COLUMNS,
+    V1_FEATURE_COLUMNS_PRUNED,
+    microstructure_v1,
+)
 from crypto_trade.features_v1.microstructure_v1 import compute_trade_count_zscore_30
 
 # ---------------------------------------------------------------------------
@@ -46,8 +50,9 @@ def test_trade_count_zscore_30_reverted_from_pruned():
         "trade_count_zscore_30 must be REVERTED from V1_FEATURE_COLUMNS_PRUNED "
         "(iter-v1/048 NEG-CLEAN-PRE-EDA: F5 |IC|=0.9063 vs vol_volume_rel_20)"
     )
-    assert len(V1_FEATURE_COLUMNS_PRUNED) == 44, (
-        f"Expected 44 pruned features post-revert, got {len(V1_FEATURE_COLUMNS_PRUNED)}"
+    assert len(V1_FEATURE_COLUMNS_PRUNED) == 45, (
+        f"Expected 45 pruned features (44 post-/048 revert + /049 ADD long_short_zscore_30), "
+        f"got {len(V1_FEATURE_COLUMNS_PRUNED)}"
     )
 
 
@@ -75,8 +80,9 @@ def test_microstructure_v1_not_in_group_registry():
         "microstructure_v1 must be DE-REGISTERED from GROUP_REGISTRY "
         "(iter-v1/048 NEG-CLEAN-PRE-EDA revert)"
     )
-    assert len(GROUP_REGISTRY) == 13, (
-        f"GROUP_REGISTRY must have exactly 13 groups post-revert, got {len(GROUP_REGISTRY)}"
+    # Count is 14 post-/049 (13 post-/048 revert + 1 longshort_v1 added at /049).
+    assert len(GROUP_REGISTRY) == 14, (
+        f"GROUP_REGISTRY must have exactly 14 groups post-/049, got {len(GROUP_REGISTRY)}"
     )
 
 

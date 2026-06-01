@@ -97,6 +97,7 @@ V1_FEATURE_COLUMNS_PRUNED: tuple[str, ...] = (
     "interact_rsi_x_adx",
     "interact_rsi_x_natr",
     "interact_stoch_x_adx",
+    "long_short_zscore_30",  # iter-v1/049: NEW — top-trader long/short ratio z-score (30-bar)
     "mom_macd_hist_12_26_9",
     "mom_macd_line_12_26_9",
     "mom_roc_10",
@@ -151,8 +152,10 @@ V1_FEATURE_COLUMNS_PRUNED: tuple[str, ...] = (
 #              trade_count_zscore_30 REVERTED. Count restored 45 → 44.
 #              microstructure_v1 group de-registered from GROUP_REGISTRY but the
 #              module file kept for future-iter reuse.
-assert len(V1_FEATURE_COLUMNS_PRUNED) == 44, (
-    f"V1_FEATURE_COLUMNS_PRUNED must have exactly 44 features; got {len(V1_FEATURE_COLUMNS_PRUNED)}"
+# iter-v1/049: extended 44 → 45 by adding long_short_zscore_30 (top-trader long/short
+#              account ratio z-score, 30-bar window; non-kline data class from OI cache).
+assert len(V1_FEATURE_COLUMNS_PRUNED) == 45, (
+    f"V1_FEATURE_COLUMNS_PRUNED must have exactly 45 features; got {len(V1_FEATURE_COLUMNS_PRUNED)}"
 )
 
 # Columns explicitly NOT in V1_FEATURE_COLUMNS_PRUNED but which may still appear in
@@ -323,4 +326,6 @@ __all__ = [
     # iter-v1/048: microstructure_v1 group was DE-REGISTERED from GROUP_REGISTRY at
     #              closeout (NEG-CLEAN-PRE-EDA: |IC|=0.9063 vs vol_volume_rel_20).
     #              Module file kept on disk as dead code for future-iter reuse.
+    # iter-v1/049: long/short positioning feature family (add_longshort_v1_features imported
+    #              on demand via features/__init__.py GROUP_REGISTRY longshort_v1 entry).
 ]
