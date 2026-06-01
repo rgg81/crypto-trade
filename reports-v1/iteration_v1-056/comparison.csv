@@ -1,0 +1,9 @@
+metric,in_sample,out_of_sample,ratio
+daily_sharpe,0.629147,-1.376236,-2.187462
+monthly_sharpe,0.11201,-0.17885,-1.596734
+max_drawdown,18.15062,13.55924,0.74704
+win_rate,0.419657,0.371287,0.88474
+profit_factor,1.090709,0.836987,0.767378
+n_trades,641.0,202.0,0.315133
+total_pnl,15.26428,-9.21874,-0.603942
+delta_is_sharpe_vs_baseline,0.346247,-2.015736,N/A

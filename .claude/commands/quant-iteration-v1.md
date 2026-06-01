@@ -53,7 +53,7 @@ Three sibling tracks. The user can run `/quant-iteration-v1` (this skill), `/qua
 | EXPLORATION ENSEMBLE_SIZE | 3 (matches v3) | n/a (no cadence) | 3 |
 | CONFIRMATION ENSEMBLE_SIZE | 10 (matches v3) | n/a | 10 |
 | Outer seed loop | None — single-pass inner ensemble (matches v3 post-/059) | 5 outer seeds (v1-style) | None |
-| Wall-clock targets | EXPLORATION 2h target / CONFIRMATION 8h target — design-time guidance only, NO runtime kill-switch (2026-05-30) | no formal cap | EXPLORATION 2h / CONFIRMATION 6h |
+| Wall-clock targets | EXPLORATION 2h target / CONFIRMATION 9h target — design-time guidance only, NO runtime kill-switch (2026-05-30) | no formal cap | EXPLORATION 2h / CONFIRMATION 9h |
 | Cadence | 10:1 EXPLORATION:CONFIRMATION | none | 10:1 |
 | Auto-trigger | `iter-v1/NNN`, `BASELINE_V1`, `Phase 4.5`, `Phase 6.0`, `Phase 7.4`, `lgbm_advisor`, `LightGBM Master` | `iter-v2/NNN`, `BASELINE_V2.md` | `iter-v3/NNN`, `BASELINE_V3.md` |
 
@@ -419,7 +419,7 @@ A component candidate is evaluated by reference to the current BASELINE_V1 ancho
 
 **Two dimensions FIXED (no QR/QE override):**
 - Seed count: 3 inner seeds EXPLORATION / 10 inner seeds CONFIRMATION
-- Wall-clock cap: 2h EXPLORATION / 6h CONFIRMATION
+- Wall-clock cap: 2h EXPLORATION / 9h CONFIRMATION
 
 **Three dimensions QR-TUNABLE to fit the budget** (compress in this order):
 1. **features**: 40 (PRUNED) → 30 → 20 (if axis isn't feature-family)
@@ -446,7 +446,7 @@ A component candidate is evaluated by reference to the current BASELINE_V1 ancho
 
 5. **Only CONFIRMATION-MERGE updates BASELINE_V1.md.** EXPLORATION-PROMISING is a forward-pointer, not a baseline change. EXPLORATION-NEGATIVE is recorded in the catalog but never affects baseline.
 
-The 10:1 ratio is the only cadence constraint. No daily/weekly limit — if 10 EXPLORATIONs complete in 6h of compute, the CONFIRMATION can launch immediately after.
+The 10:1 ratio is the only cadence constraint. No daily/weekly limit — if 10 EXPLORATIONs complete in 9h of compute, the CONFIRMATION can launch immediately after.
 
 ### `briefs-v1/exploration_catalog.md` — the EXPLORATION ledger
 
@@ -725,7 +725,7 @@ ROTATION_STATUS: VALID  (or BLOCKED — same as last 5)
 HIGH-RISK: NO  (or YES, mitigation = <opted-in multi-seed | none>)
 
 ## Cadence Check
-- Wall-clock budget declared: <2h for EXPLORATION / <6h for CONFIRMATION>: PASS / BLOCK
+- Wall-clock budget declared: <2h for EXPLORATION / <9h for CONFIRMATION>: PASS / BLOCK
 - (CONFIRMATION only) EXPLORATION precedents since last CONFIRMATION: <count, ≥10 required>: PASS / BLOCK
 - (CONFIRMATION only) Section 3 lists imported variations from prior EXPLORATIONs: PASS / BLOCK
 
@@ -1282,7 +1282,7 @@ The brief at `briefs-v1/iteration_v1-NNN/research_brief.md` MUST contain all 11 
 
 ## Section 0.5 — Iteration Type Declaration
 TYPE: EXPLORATION  (or CONFIRMATION)
-- Wall-clock budget: <2h for EXP / 6h for CONF>
+- Wall-clock budget: <2h for EXP / 9h for CONF>
 - (CONF only) EXPLORATION precedents since last CONF: <list iter-v1/NNN ids; must be ≥10>
 - Justification: <1-2 sentences>
 

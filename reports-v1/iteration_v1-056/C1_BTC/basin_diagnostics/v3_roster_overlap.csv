@@ -1,0 +1,3 @@
+symbol,n_main,n_baseline,n_intersection,n_union,jaccard
+BTCUSDT,45,36,3,78,0.038461538461538464
+ALL,45,36,3,78,0.038461538461538464
