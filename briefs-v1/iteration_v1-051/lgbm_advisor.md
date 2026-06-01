@@ -3,97 +3,110 @@
 ## Context Read
 
 - Track: v1; cycle-6 EXP-6 — multi-seed re-validation of iter-v1/050 PROMISING-PARTIAL
-- Cohort: **single-symbol DOT (DOTUSDT)**. /050 IS Sharpe -0.1138 (DOT IS Δ +1.1162 vs -1.23 baseline).
-- Axis: VALIDATION sub-type. No new feature. Drop inert vol-spike gate (0% fire rate).
-- Seeds: --seeds 4 (outer seed offsets 0, 5, 10, 15 from ENSEMBLE_SEEDS roster).
-- Feature stack: V1_FEATURE_COLUMNS_PRUNED unchanged at 46 cols.
-- Same n_trials=18, ENSEMBLE_SIZE=3 as /050.
+- Cohort: single-symbol DOT (DOTUSDT); /050 IS Sharpe Δ +1.1162 vs DOT baseline
+- Axis: VALIDATION sub-type — same feature (`dot_vs_btc_ret_ratio_30`), same cohort, drop
+  vol-spike regime gate (0% fire rate in /050 IS and OOS — mechanically INERT)
+- Seeds: --seeds 4 (outer seed offsets 0/5/10/15 from ENSEMBLE_SEEDS roster)
+- Feature stack: V1_FEATURE_COLUMNS_PRUNED unchanged at 46 cols
+- Same n_trials=18, ENSEMBLE_SIZE=3 as /050 (apples-to-apples comparison)
 
-## Phase 4.5 Assessment
+---
 
-### What Changed vs /050
+## ML Perspective
 
-1. **Vol-spike regime gate DROPPED**: gate never fired (0% IS / 0% OOS) → mechanically INERT.
-   Removing it has no expected effect on IS Sharpe — the +1.1162 IS Δ was 100% feature-attributed.
+Per-seed stability is the load-bearing metric for multi-seed validation, not the mean alone.
 
-2. **Seeds 4 outer seeds (offsets 0, 5, 10, 15)**: each outer seed uses a different 3-seed
-   inner ensemble window from ENSEMBLE_SEEDS. Outer seed 0 (offset=0) = canonical seed_42, which
-   matches /050's single-seed run for sanity validation.
+With DOT's small IS cohort (~125 trades at /050), the n_trials=18 Optuna budget sits near TPE
+warm-up saturation (~15-20 random trials before exploitation starts). This means each outer seed
+run is partially determined by its random warm-up phase — per-seed IS Sharpe could span
+±0.5 to ±1.0 around the mean even with genuine signal.
 
-### ML Perspective on Multi-Seed Validation
+The actionable threshold:
+- **Mean IS Δ ≥ +0.50 with max-min stability ≤ +1.0** → feature is genuine signal
+- Mean IS Δ < +0.50 → LOTTERY-CONFIRMED-NEGATIVE; /050 was a favorable basin at seed=42
+- Max-min > +1.0 even with positive mean → BASIN-LOTTERY; signal not reliable for CONFIRMATION
 
-DOT cohort has ~125 IS trades at /050. With n_trials=18 and ENSEMBLE_SIZE=3 per cell, the
-IS Sharpe at each outer seed is a noisy estimate. The key question: is the +1.1162 IS Δ
-structurally driven by `dot_vs_btc_ret_ratio_30`'s predictive content, or is it a lucky
-arrangement of inner ensemble seeds that happened to vote consistently?
+Outer seed 0 (offset=0) maps to ENSEMBLE_SEEDS starting at index 0 (= canonical seeds
+[42, 123, 456]) — this should closely replicate /050's single-seed result (within Optuna
+stochasticity at n_trials=18). If it diverges by more than ±0.10, there is an implementation
+error.
 
-**Expected per-seed variance**: with DOT's small IS trade count, the seed-to-seed IS Sharpe
-variance could be ±0.5 to ±1.0. A mean IS Δ of +1.1162 with ±0.6 std would still confirm
-PROMISING-PARTIAL (mean in [+0.50, +1.23)). A mean IS Δ < +0.50 confirms LOTTERY-NEGATIVE
-— feature importance at rank 8/45 is consistent with learned signal, but single-seed can
-produce rank artifacts on DOT's small cohort.
+---
 
 ## Top 3 Recommendations
 
-### 1. seed=42 sanity check IS the most important diagnostic
+### Rec 1 — Log per-seed individual IS/OOS Sharpe; variance is more diagnostic than mean
 
-If outer seed 0 (offset=0) produces IS Sharpe materially different from /050's -0.1138 (e.g.
-more than ±0.10), the /051 dispatch implementation has a bug (e.g. regime gate accidentally
-retained). The seed=42 sub-run should reproduce /050 essentially identically (within Optuna
-stochasticity tolerance at n_trials=18).
+The runner already emits per-seed outputs. For brief Section 2, QR must produce a table:
 
-**Pre-register F5 falsifier**: |/051 seed=42 IS Sharpe - /050 IS Sharpe| ≤ 0.10. FAIL =
-implementation error.
+| seed_offset | IS Sharpe | IS Δ | OOS Sharpe | OOS Δ | IS trades |
+|---|---|---|---|---|---|
 
-### 2. Watch for baseline-frozen-IS pattern at offsets 5/10/15
+The coefficient of variation (std / |mean|) across seeds IS the signal-reliability test. Mean
+lift of +0.70 with std of +0.60 is less convincing than mean +0.55 with std of +0.10.
 
-Prior v1 experience (/013 BASIN-LOTTERY, /026 frozen-baseline pattern) showed that
-non-canonical outer seed offsets can land in particularly bad basins on small cohorts.
-DOT with 93 BASELINE IS trades → 125 /050 IS trades has thin per-fold coverage.
+### Rec 2 — Watch for seed=42 outlier (BASIN-LOTTERY fingerprint)
 
-If max(per-seed IS Δ) - min(per-seed IS Δ) > +1.0 (F3 stability falsifier), classify
-BASIN-LOTTERY even if mean is positive.
+If seeds [5, 10, 15 offsets] produce mean IS Δ < +0.50 while seed offset 0 stayed at +1.12,
+that is the BASIN-LOTTERY fingerprint from /013 + /026 history: Optuna at n_trials=18 on a
+small cohort can find a lucky local optimum at the canonical seed that does not generalize.
 
-### 3. No new LightGBM HP tuning needed
+Pre-register F2 falsifier: if max per-seed IS Δ - min per-seed IS Δ > +1.0 → BASIN-LOTTERY
+regardless of mean. The QR should check whether the outlier seed is offset=0.
 
-This is a seed-validation run. HP search space is identical to /050. No colsample, num_leaves,
-min_child_samples changes. The n_trials=18 budget is intentionally consistent with /050 for
-fair comparison.
+### Rec 3 — Trade-rate floor at mean: if any single seed has < 40 IS trades, investigate
 
-## Prior Distribution (4 outcome bands)
+Average IS trade count across the 4 seeds; if any single seed has < 40 IS trades, that seed's
+Optuna run may have found a precision-maximizing solution that simply fires rarely. A Sharpe
+from 38 trades is not the same distribution as one from 125 trades. Flag, do not auto-discard
+— but note in Section 2.
 
-| Band | Prior | Reasoning |
+---
+
+## Prior Distribution (5 outcome bands)
+
+| Band | Prior | Trigger |
 |---|---|---|
-| PROMISING-SPECIALIST-CONFIRMED | 10% | Would require mean IS Δ ≥ +1.23 across all 4 seeds — unlikely given DOT's noise floor |
-| PROMISING-PARTIAL-CONFIRMED | 45% | Feature genuinely learned; partial lift survives seed variation |
-| LOTTERY-CONFIRMED-NEGATIVE | 35% | Single-seed lottery; mean IS Δ < +0.50 |
-| BASIN-LOTTERY | 10% | High per-seed variance (F3 stability fail) even if mean is positive |
+| PROMISING-SPECIALIST-CONFIRMED | 25% | Mean IS Δ ≥ +1.23; all seeds ≥ +0.70 |
+| PROMISING-PARTIAL-CONFIRMED | 30% MODAL | Mean IS Δ ∈ [+0.50, +1.23); stability max-min ≤ +1.0 |
+| LOTTERY-CONFIRMED-NEGATIVE | 25% | Mean IS Δ < +0.50 (seed=42 was favorable basin) |
+| BASIN-LOTTERY | 15% | High stability variance max-min > +1.0; signal unreliable |
+| REGRESSION | 5% | Mean IS Δ < 0; seeds actively harm DOT |
 
-**Modal outcome: PROMISING-PARTIAL-CONFIRMED (45%)**. The /050 feature importance rank 8/45
-is a positive signal — rank 8 in a 46-col model suggests meaningful split budget allocation,
-not a noise-fit artifact. But DOT's small cohort means per-seed variance is high.
+**Modal outcome: PROMISING-PARTIAL-CONFIRMED (30%).** Feature importance rank 8/45 at /050
+suggests real split-budget allocation, not a noise-fit artifact. But single-seed at n_trials=18
+on a small cohort has sufficient noise to place LOTTERY-CONFIRMED-NEGATIVE as the second most
+likely outcome (25%). The BASIN-LOTTERY risk is real: DOT's thin per-fold coverage amplifies
+seed sensitivity.
 
-## Risks
+---
 
-1. **offset=5 inner seeds [2002, 3003, 4004]**: these seeds were never used in a DOT-only
-   single-cohort run. Unknown prior for this cohort + seed combination.
-2. **n_trials=18 is near Optuna's TPE warmup**: 18 trials barely exceeds the expected ~15-20
-   random-search warm-up before TPE starts exploiting. Per-seed IS Sharpe could be largely
-   determined by the random warm-up phase, not the HPO exploitation phase.
+## Risk Flags
 
-## What I Did NOT Recommend
+- Single-seed Optuna at n_trials=18 has high variance; per-seed IS Sharpe Δ from -0.3 to +0.3
+  relative to the mean is normal Monte Carlo noise — not a flag by itself
+- The QUESTION is whether the mean lift > +0.50 clears the noise floor, not whether every
+  individual seed is positive
+- Outer seed offsets [5, 10, 15] use inner ensemble seeds [2002, 3003, 4004], [4004, 5005, 6006],
+  [6006, 7007, 8008] — these have never run on the DOT-only single-cohort setting; treat their
+  outputs as draws from an unknown prior
 
-- No ENSEMBLE_SIZE increase (keep 3; compare apples-to-apples with /050)
-- No n_trials increase (keep 18; this is the EXPLORATION budget; increases would confound comparison)
-- No feature changes (validation run; any change destroys the comparison)
-- No new risk gate (regime gate was INERT; adding a replacement is a /052+ axis)
+---
 
-## Closing Note
+## What I Do NOT Recommend
 
-**Confidence: MEDIUM-HIGH** on correct setup. The only ML-relevant decision here is seed
-count and whether the gate drop is clean. Both are confirmed in tests.
+- No HP changes: this is a seed-validation run, HP search space must be identical to /050
+- No seed-conditional Optuna budget tweaks: adjusting n_trials per seed destroys the
+  apples-to-apples comparison and introduces a confound into the multi-seed mean
+- No feature changes: any addition or removal destroys the comparison baseline
+- No new risk gate: the vol-spike gate was INERT (0% fire rate); adding a replacement is a
+  /052+ axis decision, not part of /051's validation mandate
 
-The genuine question /051 should answer: **is /050's +1.1162 IS Δ basin-dependent at n_trials=18
-with seed=42, or does it survive seed perturbation?**
+---
 
-— Phase 4.5 advisor authored 2026-06-01 (iteration-v1/051 multi-seed re-validation)
+## Closing
+
+The multi-seed mean Δ ≥ +0.50 is the cleanest test of /050's signal validity.
+PROMISING-PARTIAL-CONFIRMED at /051 → DOT enters the /055 CONFIRMATION roster.
+
+— Phase 4.5 advisor authored 2026-06-01 (iteration-v1/051 multi-seed re-validation framing)
