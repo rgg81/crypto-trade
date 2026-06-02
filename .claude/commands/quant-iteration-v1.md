@@ -220,6 +220,35 @@ Three mechanical safeguards against aggregator crash and wall-clock runaway:
 2. **Aggregator validates component report presence BEFORE attempting concatenation.** The final aggregation step MUST `assert all(Path(f).exists() for f in expected_component_files)` before pandas concat. If any component artifact is missing → aggregator emits a clear error ("Component A in_sample/trades.csv not found — check sub-run log") and exits with non-zero status, preserving the partial artifacts for diagnosis.
 3. **Wall-clock cap monitoring.** If any sub-run exceeds 2× the brief Section 3.6 estimated wall-clock for that component, the QE or orchestrator MUST report status before continuing. Format: "Sub-run for Component A exceeded 2× estimate (estimated 45 min, elapsed 92 min). Proceeding — no kill-switch per 2026-05-30 directive. Adjust next-iter estimate." This is a reporting requirement, NOT a kill-switch.
 
+### Architecture Pivot (2026-06-02): Pool+Route Mandatory for Cycle-7
+
+**User directive 2026-06-02** (confirmed after LM Master deep-dive, Option 1): cycle-7 EXPLORATIONs adopt the **Pool+Route** architecture, eliminating the basin-lottery mechanically rather than via vigilance alone.
+
+**Why the pivot is necessary:** 5/5 cycle-6/7 single-symbol PROMISING tags (DOT/050, BTC/054, ETH/055, LTC/057, BTC/058) were BASIN-LOTTERY. LM Master diagnosis: "5/5 lottery isn't an ML problem you can tune away; it's a sample-size problem you can only architect away." Root cause: single-symbol N≈50 OOS trades → σ_SR ≈ 0.14 per path / ≈ 0.35 per seed with Optuna selection noise. Multi-seed spreads structurally exceed the 0.30 BASIN-LOTTERY threshold.
+
+**Mechanism (Pool+Route architecture):**
+
+- Train ONE LightGBM head on the 5-coin pool — same architecture as the /045 baseline: `V1_BASELINE_UNIVERSE = ("BTCUSDT", "ETHUSDT", "DOTUSDT", "LINKUSDT", "LTCUSDT")`.
+- Per-symbol features are kept as **routed inputs**: a new feature is computed for ONE target symbol and NaN-filled for all other rows — the existing pattern established at /050 (`dot_vs_btc_ret_ratio_30`) and /055 (`eth_vs_btc_ret_ratio_30`) in `cross_btc_v1.py`.
+- The runner mirrors the /045 pool architecture (no per-symbol dispatch branches). Each EXPLORATION proposes ONE new routed feature for ONE target symbol.
+
+**Statistical justification:** pool OOS N≈250 trades → σ_SR ≈ 0.06 per path / ≈ 0.12 per seed. Multi-seed spreads fall mechanically below the 0.30 BASIN-LOTTERY threshold. The 3× sample increase is the only reliable fix.
+
+**What is preserved:** feature engineering as the MODAL research axis; per-symbol research direction (each iter proposes one new per-symbol feature); LightGBM head; multi-seed validation discipline.
+
+**What changes:** model HEAD count (N=5 single-symbol heads → N=1 pool head); EXPLORATION compute cost (~0.4× — pool amortizes Optuna across 5 symbols).
+
+**Cycle accounting and catalog treatment:**
+- /059+ are Pool+Route EXPLORATIONs.
+- Single-symbol cohort iters /050–/058 remain in `briefs-v1/exploration_catalog.md` as historical records and form the inventory of per-symbol routed features to test on the pool head.
+- Axis-family rotation discipline RESUMES at cycle-7 (suspended during cycle-6 per-symbol mandate).
+
+**Brief Section 3 requirement for every Pool+Route EXPLORATION:** identify the target symbol, the new routed feature formula, and confirm `cohort = V1_BASELINE_UNIVERSE (5 coins)`. Runner validation: assert no per-symbol dispatch branch exists; assert the new feature column is NaN for all non-target symbols in the training frame.
+
+**Pre-commit escalation checkpoint:** if /059–/068 (10 iters) fail to produce ≥ 2 PROMISING under Pool+Route, escalate to a mandate-refinement conversation before /069. This checkpoint is pre-registered to prevent silent continuation on a structurally unviable architecture.
+
+**Single-symbol cohort EXPLORATIONs are RETIRED for cycle-7 onward.** The user mandate "per-symbol regime-specialist discovery" is reframed as "per-symbol routed feature discovery on a pool head." Regime-specialist CONFIRMATION bundles remain valid; what changes is how each specialist's edge is discovered.
+
 ---
 
 ## Before You Start
