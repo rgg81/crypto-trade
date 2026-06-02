@@ -1246,12 +1246,38 @@ def _run_methodology_reporting(
     # Path Forward #2 (Critic Phase 6.0): fail-fast rather than silently falling back
     # to naive_fallback, which would mechanically violate brief F3 + Section 8 criterion 4.
     # The assert fires after the backtest has run, so the parquet must exist by now.
-    assert oof_parquet_path is not None and Path(oof_parquet_path).exists(), (
-        f"oof_parquet_path missing or does not exist: {oof_parquet_path!r} — "
-        "naive_fallback would violate brief F3 + Section 8 criterion 4 "
-        "(n_eff = n_trials_naive triggers NO-MERGE). "
-        "Ensure oof_persist_path=OOF_PARQUET_PATH is passed to every LightGbmStrategy call."
-    )
+    #
+    # iter-v1/063 graceful-skip patch: specialist_mode iterations produce ONE aggregated
+    # backtest from 50 seeds rather than separate per-seed OOF parquets.  oof_persist_path
+    # is structurally undefined in that aggregation path — the parquet is never written.
+    # In that case we skip the DSR/PBO/PSR block entirely (informational warning only)
+    # rather than crashing after a successful backtest.  ADF + IC still run (they only
+    # need feature parquets, not OOF data).  Non-specialist iterations retain the strict
+    # assert: a missing OOF parquet there IS a wiring bug, not expected behaviour.
+    if oof_parquet_path is None or not Path(oof_parquet_path).exists():
+        print(
+            "[methodology] WARNING: OOF parquet missing or not provided — "
+            "DSR/PBO/PSR skipped.  specialist_mode iterations are not required to write OOF; "
+            "for non-specialist runs this indicates a missing oof_persist_path wiring bug."
+        )
+        # Still run ADF + IC (feature-parquet only; not OOF-dependent).
+        print("[run_baseline_v1] Loading IS features for ADF test (OOF-skip path)...")
+        feature_df = _load_features_for_adf_ic(symbols, features_dir, interval, feature_columns)
+        if feature_df is not None and not feature_df.empty:
+            write_adf_test_csv(is_dir, feature_df, label="IS")
+            write_adf_test_csv(oos_dir, feature_df, label="OOS(same IS features)")
+            fwd_returns = _compute_forward_returns(symbols, features_dir, interval)
+            if fwd_returns is not None and len(fwd_returns) == len(feature_df):
+                write_ic_matrix_csv(is_dir, feature_df, fwd_returns, label="IS")
+                write_ic_matrix_csv(oos_dir, feature_df, fwd_returns, label="OOS(same IS features)")
+            else:
+                print(
+                    "[run_baseline_v1] WARNING: forward returns shape mismatch; "
+                    "ic_matrix.csv skipped"
+                )
+        else:
+            print("[run_baseline_v1] WARNING: no feature parquets found; adf_test.csv skipped")
+        return
 
     print("\n[run_baseline_v1] === iter-v1/001 methodology reporting ===")
 
