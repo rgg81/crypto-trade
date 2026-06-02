@@ -561,6 +561,35 @@ assert len(active_feature_columns) == 48 guard fires in dispatch branch.
 """
 
 
+V1_ITER064_UNIVERSE: tuple[str, ...] = ("ETHUSDT",)
+"""iter-v1/064 cohort: ETH-only SPECIALIST (second under SPECIALIST + BUNDLE methodology).
+
+Cycle-7 SPECIALIST 2/10. Axis family: methodology (continued from /063 — generalization test
+across a second cohort with a different baseline IS profile).
+
+50-seed independent-Optuna bagging on ETHUSDT:
+    V1_SPECIALIST_SEED_COUNT=50, V1_SPECIALIST_OPTUNA_TRIALS=30,
+    max_depth=5 FIXED, num_leaves=31 FIXED, min_child_samples REMOVED,
+    ENSEMBLE_SIZE=1 per study, mean-of-signed-weights aggregator.
+
+Feature set: V1_FEATURE_COLUMNS_PRUNED (48 cols, UNCHANGED).
+Risk config: R1=OFF (Model A baseline — BTC/ETH mean-reverting WR at late streaks),
+             R2=OFF (Model A baseline — R2 is Model E DOT-only disposition),
+             R3=ON-SHARED (cutoff=0.70, 16-feature V1_OOD_FEATURE_COLUMNS),
+             R5=ON (vt_target_vol=0.3, vt_lookback_days=45).
+atr_tp=2.9, atr_sl=1.45 (matched to Model A ETH cell in run_baseline_v1.py:3296-3308).
+
+Baseline ETH IS Sharpe: -0.61 (per-symbol attribution, BASELINE_V1.md:113).
+F-AXIS #1 (load-bearing): mean IS Sharpe >= -0.61 (i.e. delta >= 0 vs baseline).
+F-AXIS #2 (informational): per-candle ensemble dispersion mean sigma_pop <= 0.30.
+NORMAL-RISK: cohort change (DOT->ETH) does NOT alter Optuna training-objective domain.
+
+LOCAL to runner constant. NOT shared; CONFIRMATION-MERGE updates V1_BASELINE_UNIVERSE.
+assert set(symbols) == {"ETHUSDT"} guard fires in dispatch branch.
+assert len(active_feature_columns) == 48 guard fires in dispatch branch.
+"""
+
+
 V1_ITER063_UNIVERSE: tuple[str, ...] = ("DOTUSDT",)
 """iter-v1/063 cohort: DOT-only SPECIALIST (first SPECIALIST under SPECIALIST + BUNDLE methodology).
 
@@ -711,6 +740,7 @@ __all__ = [
     "V1_ITER058_UNIVERSE",
     "V1_ITER061_UNIVERSE",
     "V1_ITER063_UNIVERSE",
+    "V1_ITER064_UNIVERSE",
     # iter-v1/023: funding-rate feature family (add_funding_v1_features imported on demand)
     # iter-v1/025: OI delta feature family (add_oi_delta_v1_features imported on demand)
     # iter-v1/040: composed feature family (add_composed_v1_features imported on demand)
