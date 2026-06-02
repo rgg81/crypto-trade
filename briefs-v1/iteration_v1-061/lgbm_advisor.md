@@ -137,3 +137,145 @@ The single most important thing the QR should NOT ignore: **run the reproducibil
 
 If the user wants to know whether BTC has real edge, the answer requires a 10-seed × 5-HP-grid Monte Carlo sweep (50 reads → empirical CDF of IS Sharpe). One read isn't enough. But one read with a reproducibility certificate IS enough to know the pipeline is honest. That's a worthwhile foundational result.
 
+
+---
+
+# LightGBM Master Advisor — iter-v1/061 — Phase 7.4 (Post-Mortem)
+
+## Context Read
+
+- Iteration outcome (from `reports-v1/iteration_v1-061/comparison.csv`):
+  - **IS Sharpe: −0.8260** (n_trades=224, win_rate=36.2%, MaxDD=55.35%)
+  - **OOS Sharpe: −0.0689** (n_trades=82, win_rate=39.0%, MaxDD=8.73%)
+  - IS/OOS ratio: 0.0834 (IS catastrophically worse than OOS — inverted from typical overfit pattern)
+  - **Bit-exact reproducibility CONFIRMED**: Run-1 IS = Run-2 IS = −0.8260 (basin_diagnostics v1.cross_seed_sharpe_std = 0.0; v3.roster_jaccard FAIL at 0.035 = independent issue, see below)
+- Engineering report claim: pipeline produces bit-identical IS Sharpe across consecutive runs at `n_trials=1, seeds=1, subsample=colsample=1.0, deterministic=True, num_threads=1`.
+- Brief Section 1 hypothesis (H1): pipeline is reproducible AND IS Sharpe lands in central-tendency band.
+
+## Predictions vs Actual — Honest Accounting
+
+| Metric | Predicted | Predicted band | Actual | Verdict |
+|---|---|---|---|---|
+| IS Sharpe | **+0.08** | [−0.10, +0.20] (60% prob); [−0.20, +0.30] (90% prob) | **−0.826** | **MISS BY −0.91; FAR BELOW any pre-registered band** |
+| OOS Sharpe | −0.70 | [−1.20, −0.20] (~85% confidence) | **−0.069** | **MISS BY +0.63; ABOVE the upper band** |
+| Reproducibility | bit-identical | hard prediction | bit-identical Run-1 ≡ Run-2 | **HIT — single correct call** |
+
+**This is a catastrophic prediction miss on the headline IS axis.** I called central-tendency around 0; the model produced −0.826, which is **further from 0 than ANY single BTC-only specialist EXPLORATION in v1 history** (/053 mean −0.04, /054 +0.26, /058 mean −0.28, /059 −0.16). My 60% band [−0.10, +0.20] does not contain the outcome; my 90% band [−0.20, +0.30] does not contain the outcome. The "favorable basin" frame I anchored on was wrong: the basin distribution is wider on the LEFT than the catalog suggested, and the central-tendency HPs I recommended landed in the unfavorable tail.
+
+The OOS miss (predicted −0.70, observed −0.069) is the OPPOSITE direction — I overestimated OOS pain. The model degraded LESS from IS to OOS than the BTC-only catalog pattern predicted; in fact IS was worse than OOS, which is the inverted pattern. Combined, both misses point to the same diagnosis (below).
+
+## Basin-Lottery Diagnosis
+
+Applying the user's pre-committed diagnostic map to (IS=−0.826, reproducible):
+
+- IS ≥ +0.20 + reproducible → OPTUNA-LOTTERY-SOURCE  ❌ (does not apply; IS is far negative)
+- IS ∈ [−0.10, +0.20] + reproducible → SAMPLE-SIZE-NOISE-FLOOR  ❌ (does not apply; IS is far below floor)
+- **IS << −0.10 + reproducible → DEEPER-ARCHITECTURE-OR-DATA-ISSUE  ✅ FIRES**
+- NOT reproducible → HIDDEN-RANDOMNESS-BUG  ❌ (ruled out by bit-identity)
+
+**VERDICT: DEEPER-ARCHITECTURE-OR-DATA-ISSUE.**
+
+What this means concretely: my Phase 4.5 central-tendency HP recipe — `n_estimators=300, max_depth=4, num_leaves=31, learning_rate=0.05, min_child_samples=50, reg_alpha=0.1, reg_lambda=0.1` — when paired with the 48-feature BTC-only training stack at single deterministic fit, does NOT recover any signal. The model is fitting noise plus structural anti-signal. Reproducibility eliminates the hypothesis "the catalog spread was hidden randomness"; it confirms the catalog spread (/053 spread 0.31, /058 spread 0.90) is REAL basin-lottery from Optuna stochastic search, AND my central-tendency HP recipe sits in the unfavorable tail of that lottery distribution rather than its expected value. The Optuna lottery's expected value is NOT central-tendency-HP-Sharpe — those are different statistics.
+
+## Feature Importance Triage
+
+From `reports-v1/iteration_v1-061/in_sample/feature_importance_Model_A_BTC_specialist_061.csv` (48 features, last-month gain):
+
+### Top-3 dominance audit
+
+| Rank | Feature | Gain | % of top-10 gain |
+|---|---|---|---|
+| 1 | `vol_atr_14` | 14,217.66 | 16.4% |
+| 2 | `trend_aroon_osc_50` | 13,205.52 | 15.2% |
+| 3 | `stat_autocorr_lag5` | 8,441.91 | 9.7% |
+
+Top-3 cumulative gain ≈ **41% of top-10** (out of 48 features). For a deterministic single-trial fit at 48 features and ~4,400 training rows per retrain, this is a **narrow basin** — three features carry the model. None of these are the iteration's banner feature (`basis_zscore_30` does not appear in this importance CSV — it was promoted as a 48th feature but the runner's `feature_importance_Model_A_BTC_specialist_061.csv` only shows the cohort the runner trained on; `basis_zscore_30` is missing here entirely, which is itself a finding the Critic should verify).
+
+### Dead-weight (rank 47-48 = zero importance)
+
+| Feature | Mean gain | Rank | Verdict |
+|---|---|---|---|
+| `dot_vs_btc_ret_ratio_30` | 0.0 | 47 | DROP — pure dead weight (LightGBM produced 0 splits) |
+| `eth_vs_btc_ret_ratio_30` | 0.0 | 48 | DROP — pure dead weight (LightGBM produced 0 splits) |
+
+Per `feedback_v3_inert_features_at_higher_budget.md`, INERT features at higher Optuna budget actively HARM OOS by enlarging the search space. Here at `n_trials=1` they cannot harm via Optuna (no search), but they still consume column-fraction budget at `colsample_bytree=1.0` and dilute the gain-attribution audit. **Hard recommendation: drop both for next iteration.**
+
+### Missing-from-importance flag
+
+**`basis_zscore_30`** (the iteration's nominal headline feature, committed in `1be3bd1`) does not appear in `feature_importance_Model_A_BTC_specialist_061.csv`. Two possible reasons:
+1. The runner trained on a different feature roster than the brief specified, OR
+2. The feature was passed but produced 0 splits across all months (importance entry suppressed), OR
+3. The CSV column-set is filtered to BTC-cohort specialist's actual training features and `basis_zscore_30` was excluded by some filter.
+
+This is a **forensic ambiguity** the Critic should resolve in Check 4 / Check 8 (data pipeline integrity).
+
+## Hyperparameter Stability — N/A by Construction
+
+`n_trials=1` means zero Optuna trial-history exists. The trial-history stability table I usually produce is empty: there is exactly ONE fit per `(symbol, month)` cell with hardcoded HPs. The cross-seed-variance basin diagnostic CSV confirms: `std_sharpe = 0.0` (only because `n_outer_seeds=1` — std of one number is zero, not a stability claim). The basin diagnostic v1 PASS verdict is **trivially-PASS by construction**, not evidence the model is stable across seeds.
+
+## Gain Concentration Audit
+
+Top-10 captures ~64,360 gain; top-48 captures ~94,800 gain. Top-10 is **~68% of total**. Bottom-20 features (rank 29-48) contribute < 15% of total gain. This is a **moderate-concentration profile**, consistent with a real ML model that's NOT memorizing — but the IS Sharpe is still −0.826, which means the top-10 features are providing strong-signal-to-WRONG-direction. The model is confidently making BAD predictions, not splitting on noise. This is the worst flavor of deterministic-fit-fail: not "model couldn't learn" but "model learned an anti-edge".
+
+## Suspicious Patterns
+
+1. **IS << OOS (inverted-overfit pattern).** IS Sharpe −0.826 with OOS Sharpe −0.069. Normal overfit produces high IS / low OOS. Inverted-overfit (low IS / higher OOS) typically signals: (a) the IS window contains a regime the model fits poorly while OOS happens to contain a regime closer to the model's bias, OR (b) sample-size effects (IS has 224 trades, OOS has 82 — OOS noise floor is wider, masking small effects). The IS MaxDD 55.35% vs OOS MaxDD 8.73% is the dominant signal here: IS contains a ~6× larger drawdown event the model couldn't avoid. The OOS window happens not to contain that event.
+
+2. **v3 basin-diagnostic roster_jaccard FAIL = 0.035** (between iter-061 OOS trade roster and the baseline's BTC OOS roster). Only 4 of 82 OOS trades overlap with the v0.v1-baseline's BTC OOS trade set (114 trades union). This means **the BTC-only specialist trades a fundamentally different roster** than the pooled Model A in baseline — confirming the BTC-only specialist is NOT a "narrow specialist of Model A" but a **structurally different model**. This is independent confirmation that BTC-only-specialist architecture is not a simple extraction from the pooled-baseline edge; it's a separate experiment with separate edge claims (and at this HP recipe, those claims fail).
+
+3. **Per-regime degenerate output.** `per_regime.csv` shows ONE regime row ("unknown") with all 224 IS trades. Regime tagging produced zero non-unknown rows — either the regime classifier wasn't run, or all trades fell into a single regime bucket. The Critic should flag this for Check 6 (regime-conditional robustness) — without regime stratification, we cannot test whether the model fails uniformly or in a specific regime.
+
+4. **`basis_zscore_30` absence from importance CSV** (per §Feature Importance Triage above). If the headline feature isn't in the model, the iteration didn't test what the brief said it would test.
+
+## What This Iteration Confirms / Refutes About Prior LM Master Advisory
+
+**Confirmed:**
+- ✅ The pipeline IS bit-deterministic at the specified HP/seed/threading recipe. Run-1 IS = Run-2 IS = −0.826 exactly. The "Other Randomness Sources" §11-list I produced was correct in identifying threading + Optuna + class-balance as the surfaces to seal, and the brief sealed them. **The single hit in my Phase 4.5 was the reproducibility prediction (HIGH confidence call, validated).**
+
+**Refuted (HARD):**
+- ❌ My IS prediction +0.08 missed by −0.91. The central-tendency-HP frame was structurally wrong: choosing "modal best across /054 trials" does NOT produce expected-value IS Sharpe. /054 Trial 15 was a basin-favorable DRAW — its HPs (lr=0.27, leaves=57, min_child=89, reg_alpha=0.28) are co-adapted to a favorable basin; picking the "average" of best+second-best is NOT the average of all draws (which is what central-tendency should reflect). I conflated "modal best HPs" with "expected-value HPs" — these are different. The correct anchor for central-tendency would have been the BTC-only catalog MEAN IS Sharpe (/053 −0.04, /054 +0.26, /058 −0.28, /059 −0.16; mean ≈ −0.06) — which actually is closer to where the user's question lives. My prediction was 14 standard errors off (using catalog spread 0.31 from /053 as σ).
+- ❌ My OOS prediction −0.70 missed by +0.63. I anchored to BTC-only specialist OOS pattern [−1.30, −0.40]; observed −0.069 sits ABOVE that band. The OOS window in 2025-04 to 2026-06 happens to be milder for the BTC-only specialist's mistakes than the IS window 2023-03 to 2025-03.
+- ❌ The 60% probability mass I placed on [−0.10, +0.20] IS was incorrect calibration. A better-calibrated prior would have placed ~30% mass on IS << −0.50 (matching /058 multi-seed worst-case spread).
+
+**Track record after Phase 4.5 → 7.4 cycle:** 1 hit (reproducibility), 2 hard misses (IS magnitude, OOS magnitude). My calibration credibility for BTC-only specialist single-deterministic-fit predictions should be discounted accordingly in the next QR-LM exchange.
+
+## Hyperparameter Tuning Recommendations for Next Iteration
+
+Given the DEEPER-ARCHITECTURE-OR-DATA-ISSUE diagnosis, knob-tuning LightGBM HPs is NOT the next correct axis. The recommendations below are conditional on the QR choosing to continue the BTC-only-specialist arc; if the QR pivots away from BTC-only (to pooled-architecture or to multi-symbol-cohort), most of these are moot.
+
+### 1. **Drop 2 INERT features (`dot_vs_btc_ret_ratio_30`, `eth_vs_btc_ret_ratio_30`) — 48 → 46 columns**
+- **What**: literal removal from V1_FEATURE_COLUMNS for BTC specialist cohort
+- **Mechanism**: both have 0.0 gain across the entire training history (LightGBM produced zero splits). Per `feedback_v3_inert_features_at_higher_budget.md`, these add dimensional-curse penalty without contributing signal. At higher Optuna budget they would actively harm.
+- **Risk**: minimal; pure dead weight removal.
+
+### 2. **Replicate /054's exact best HPs (Trial 15)** as a separate diagnostic cell
+- **What**: hardcode `n_estimators=332, lr=0.266, max_depth=4, num_leaves=57, min_child_samples=89, reg_alpha=0.28, subsample=0.985, colsample_bytree=0.888` (which were /054's discovered best per the brief's HP audit)
+- **Mechanism**: this isolates "is the basin actually there at /054's chosen HPs?" — separately from "is the central-tendency HP basin a noise floor?". Together with /061 (central-tendency = −0.826) this gives 2 reads of the basin distribution: one from the catalog's favorable-end and one from the central-tendency-low-tail. The spread between them estimates the basin's mode-vs-mean distance.
+- **Risk**: HARKing concern if reported as a banner result — but reported as a DIAGNOSTIC paired with /061, it's exactly what /061 was supposed to do but didn't (single-draw inference). Frame: "/061 sampled the central-tendency tail; /062 samples the catalog-best tail; together they bracket the basin distribution."
+
+### 3. **Run a 10-seed Monte Carlo sweep at /054's exact best HPs** (proper basin distribution measurement)
+- **What**: 10 independent random_state values (0..9) × hardcoded /054-Trial-15 HPs × single n_trials=1 fit per seed = 10 IS Sharpe reads
+- **Mechanism**: this is the experiment I recommended in my Phase 4.5 closing note. Estimates the 5th/50th/95th percentile of IS Sharpe at the basin-favorable HP region. Tells the user definitively whether /054's +0.26 was a draw from a Sharpe>0 distribution or a tail-sample from a Sharpe≈0 distribution.
+- **Risk**: cost ~10× /061's wall-clock; cycle-7 budget impact ~30 min at single-cell config; acceptable for a clarity-resolving diagnostic.
+
+### 4. **Investigate `basis_zscore_30` absence from importance CSV** (forensic)
+- **What**: read `run.log` or `engineering_report.md` to confirm `basis_zscore_30` was passed to the model
+- **Mechanism**: if the brief's headline feature wasn't actually in the training set, the iteration didn't test what it said it would. Critic should flag this in Check 4 (data pipeline) and Check 8 (claim/code alignment).
+- **Risk**: pure forensic; no model change.
+
+### 5. **Stop trying to extract edge from BTC-only-specialist at this stack** (architectural recommendation)
+- **What**: pivot the next cycle-7 EXPLORATION away from BTC-only single-symbol training
+- **Mechanism**: 6 BTC-only-specialist EXPLORATIONs (/053, /054, /057, /058, /059, /061) span IS Sharpe [−0.83, +0.26] across single-seed reads — a spread of 1.09. The catalog now contains enough data to declare: **BTC-only-specialist edge, if any, is below the single-seed detection floor at 24-month-rolling × 48-feature × LightGBM defaults**. Continuing to tune HPs within this architecture is knob-trap territory (see `feedback_adx_axis_asymmetric_v3.md` for v3 precedent). Per `feedback_v3_structural_over_knob_exploration.md`, the next axis should be structural: pooled-architecture, multi-symbol cohort, or feature-family shift — NOT another BTC-only-specialist HP tweak.
+- **Risk**: closing an axis the user might want to keep open; documented here so the QR can override if the user explicitly extends.
+
+## Closing Note for Critic (Phase 7.5)
+
+Three items deserve Critic attention regardless of axis verdict:
+
+1. **`basis_zscore_30` provenance.** The brief promotes it as the iteration's banner feature; the importance CSV does not list it. Check 8 (claim/code alignment) should resolve whether the feature was actually in the training set. If absent, the iteration's nominal hypothesis was not tested.
+
+2. **Bit-identical reproducibility is the ONLY validated H1 sub-claim.** The user's prediction-map says reproducibility → "pipeline is honest". This was confirmed. But the IS magnitude prediction was off by −0.91. The iteration's PROCEDURAL claim (zero hidden randomness) is supported; the iteration's SUBSTANTIVE claim (central-tendency Sharpe is meaningful) is refuted. The Critic verdict should distinguish these.
+
+3. **Per-regime CSV degenerate ("unknown" row only).** Check 6 (regime-conditional robustness) should flag that regime classification produced zero non-unknown rows — either the classifier wasn't applied, or all 224 IS trades fell in a single regime bucket. Either way, regime-stratified robustness cannot be evaluated for this iteration.
+
+I am NOT recommending a verdict; the Critic 8-check authority is independent. I AM flagging that my Phase 4.5 IS-magnitude prediction missed catastrophically, which the Critic should consider in their review of whether the brief's pre-registered HP recipe was appropriate.
