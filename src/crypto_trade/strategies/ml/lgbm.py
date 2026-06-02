@@ -331,6 +331,14 @@ class LightGbmStrategy:
         # Per-seed specialist state: list of (model, selected_cols, threshold) tuples.
         # Reset every _train_for_month call when specialist_mode=True.
         self._specialist_models: list[tuple[object, list[str], float]] = []
+        # iter-v1/063: per-candle ensemble dispersion diagnostic.
+        # Accumulates population std of signed_weights for every candle that fires a
+        # specialist signal (i.e. abs(final_signed) >= 1e-9).  Informational only —
+        # NOT a gate.  For /064+ briefs, F-AXIS #2 σ_pop SHOULD cite
+        # get_specialist_dispersion_mean() as the σ_pop proxy rather than
+        # cross-seed Sharpe spread (which is structurally undefined under the
+        # 50-seed aggregator producing a single backtest).
+        self._specialist_dispersion_stats: list[float] = []
         # iter-v3/072: labeling mode — "triple_barrier" (default, backward-compat)
         # or "fixed_horizon" (sign of N-candle-forward return; no barriers).
         # iter-v3/105: "trend_scanning" (OLS trend, max-|t| horizon selection
@@ -1455,6 +1463,24 @@ class LightGbmStrategy:
     def skip(self) -> None:
         pass
 
+    def get_specialist_dispersion_mean(self) -> float | None:
+        """Return mean population std of signed_weights across all firing specialist candles.
+
+        This is the σ_pop proxy for /064+ brief F-AXIS #2.  Under the 50-seed
+        specialist aggregator, σ_SR (cross-seed Sharpe spread) is structurally
+        undefined because all seeds produce a single aggregated backtest rather
+        than 50 separate backtests.  This per-candle ensemble_std metric fills
+        that role: it measures how spread the 50 seeds' signed_weights are for
+        each candle that generated a signal.
+
+        Returns None when no signals have fired yet (empty dispersion list).
+        Acceptance threshold should be calibrated empirically in /064+ iterations;
+        this diagnostic is informational, NOT a load-bearing gate.
+        """
+        if not self._specialist_dispersion_stats:
+            return None
+        return float(np.mean(self._specialist_dispersion_stats))
+
     def get_signal(self, symbol: str, open_time: int) -> Signal:
         """Return signal for one candle. Always predicts 1 or -1."""
         # Detect month change → lazy training
@@ -1542,6 +1568,11 @@ class LightGbmStrategy:
                 _signed_weights.append(float(_dir_i) * float(_weight_i))
 
             _final_signed = float(np.mean(_signed_weights)) if _signed_weights else 0.0
+            # iter-v1/063: per-candle ensemble dispersion (population std of signed_weights).
+            # Computed regardless of whether the signal fires — useful for diagnosing
+            # no-consensus candles too.  Appended to dispersion stats only when signal
+            # fires (below) to avoid polluting the diagnostic with skipped candles.
+            _ensemble_std = float(np.std(_signed_weights)) if len(_signed_weights) > 1 else 0.0
 
             if abs(_final_signed) < 1e-9:
                 # All seeds voted 0 (below threshold) or perfectly cancelled.
@@ -1555,10 +1586,14 @@ class LightGbmStrategy:
                         "month": candle_month,
                         "specialist_seeds": len(self._specialist_models),
                         "final_signed": _final_signed,
+                        "ensemble_std": _ensemble_std,
                         "decision": "skipped:specialist_no_consensus",
                     }
                 )
                 return NO_SIGNAL
+
+            # Signal fires — accumulate dispersion diagnostic.
+            self._specialist_dispersion_stats.append(_ensemble_std)
 
             _sp_direction = 1 if _final_signed > 0 else -1
             _sp_weight = int(round(abs(_final_signed)))
@@ -1587,6 +1622,7 @@ class LightGbmStrategy:
                     "month": candle_month,
                     "specialist_seeds": len(self._specialist_models),
                     "final_signed": _final_signed,
+                    "ensemble_std": _ensemble_std,
                     "direction": _sp_direction,
                     "tp_pct": _sp_tp_pct,
                     "sl_pct": _sp_sl_pct,
