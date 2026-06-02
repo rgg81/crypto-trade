@@ -286,31 +286,72 @@ def _objective(
     # leaving them free would confound F-AXIS-MECHANISM attribution for /016.
     # This profile is /016-only; future iterations revert to "v1_pruned".
     _pin_subsampling = bounds_profile == "v1_pruned_axis016"
+    # iter-v1/063: "v1_specialist" profile — SPECIALIST + BUNDLE methodology.
+    #   max_depth = 5   FIXED (not suggested; set by lgbm.py after optimization)
+    #   num_leaves = 31 FIXED (LightGBM default; not suggested)
+    #   min_child_samples REMOVED (uses LGBM default 20; not in search space)
+    #   n_estimators upper bound = specialist_n_estimators_max (wall-clock mitigation)
+    #   subsample, colsample_bytree, learning_rate, reg_alpha, reg_lambda STILL tunable
+    #   confidence_threshold STILL Optuna-tunable per seed (load-bearing)
+    _specialist = bounds_profile == "v1_specialist"
+    _specialist_n_est_max = (
+        int(trial.study.user_attrs.get("specialist_n_estimators_max", 500)) if _specialist else 500
+    )
     fast_mode = trial.study.user_attrs.get("fast_mode", False)
+    # n_estimators upper bound: 500 for specialist (wall-clock mitigation), else original.
+    _n_est_max = _specialist_n_est_max if _specialist else 500
     params = {
-        "n_estimators": trial.suggest_int("n_estimators", 50, 500),
-        "max_depth": trial.suggest_int("max_depth", 3, 5),
-        "num_leaves": trial.suggest_int("num_leaves", 15, 63 if _pruned else 127),
-        "learning_rate": trial.suggest_float("learning_rate", 0.01, 0.3, log=True),
-        "subsample": 1.0 if _pin_subsampling else trial.suggest_float("subsample", 0.5, 1.0),
+        "n_estimators": trial.suggest_int("n_estimators", 50, _n_est_max),
+        # max_depth: FIXED at 5 for specialist (not suggested); tunable otherwise.
+        "max_depth": 5 if _specialist else trial.suggest_int("max_depth", 3, 5),
+        # num_leaves: FIXED at 31 for specialist (not suggested); tunable otherwise.
+        "num_leaves": 31
+        if _specialist
+        else trial.suggest_int("num_leaves", 15, 63 if _pruned else 127),
+        "learning_rate": trial.suggest_float("learning_rate", 0.005, 0.05, log=True)
+        if _specialist
+        else trial.suggest_float("learning_rate", 0.01, 0.3, log=True),
+        "subsample": 1.0
+        if _pin_subsampling
+        else trial.suggest_float(
+            "subsample", 0.4 if _specialist else (0.5 if _pruned else 0.5), 1.0
+        ),
         "colsample_bytree": 1.0
         if (fast_mode or _pin_subsampling)
-        else trial.suggest_float("colsample_bytree", 0.5 if _pruned else 0.3, 1.0),
-        "min_child_samples": trial.suggest_int(
-            "min_child_samples",
-            # iter-v1/041: min_child_samples_lower_bound threads a per-iteration
-            # Optuna lower bound override.  When set, overrides the v1_pruned default
-            # of 20.  None = BIT-IDENTICAL to prior behaviour (20 for pruned, 5 otherwise).
-            min_child_samples_lower_bound
-            if min_child_samples_lower_bound is not None
-            else (20 if _pruned else 5),
-            100,
+        else trial.suggest_float(
+            "colsample_bytree",
+            0.4 if _specialist else (0.5 if _pruned else 0.3),
+            1.0,
         ),
-        "reg_alpha": trial.suggest_float("reg_alpha", 1e-8, 10.0, log=True),
-        "reg_lambda": trial.suggest_float("reg_lambda", 1e-8, 10.0, log=True),
+        # min_child_samples: REMOVED from search space for specialist (uses LGBM default 20).
+        # For non-specialist: honor min_child_samples_lower_bound or profile default.
+        **(
+            {}
+            if _specialist
+            else {
+                "min_child_samples": trial.suggest_int(
+                    "min_child_samples",
+                    # iter-v1/041: min_child_samples_lower_bound threads a per-iteration
+                    # Optuna lower bound override.  When set, overrides the v1_pruned default
+                    # of 20.  None = BIT-IDENTICAL to prior behaviour (20 for pruned, 5 otherwise).
+                    min_child_samples_lower_bound
+                    if min_child_samples_lower_bound is not None
+                    else (20 if _pruned else 5),
+                    100,
+                )
+            }
+        ),
+        "reg_alpha": trial.suggest_float("reg_alpha", 1e-3, 10.0, log=True)
+        if _specialist
+        else trial.suggest_float("reg_alpha", 1e-8, 10.0, log=True),
+        "reg_lambda": trial.suggest_float("reg_lambda", 1e-3, 10.0, log=True)
+        if _specialist
+        else trial.suggest_float("reg_lambda", 1e-8, 10.0, log=True),
         "random_state": seed,
         "verbosity": -1,
     }
+    # For specialist profile, min_child_samples uses LGBM default (20) — not in params dict.
+    # LightGBM will use its internal default when the key is absent.
     if ternary:
         params["objective"] = "multiclass"
         params["num_class"] = 3

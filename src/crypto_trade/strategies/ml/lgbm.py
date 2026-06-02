@@ -16,6 +16,8 @@ from crypto_trade.strategies import NO_SIGNAL
 from crypto_trade.strategies.ml.labeling import compute_sample_uniqueness, label_trades
 from crypto_trade.strategies.ml.optimization import (
     classes_to_labels,
+    labels_to_classes,
+    labels_to_classes_ternary,
     optimize_and_train,
 )
 from crypto_trade.strategies.ml.sample_weighting import (
@@ -94,6 +96,20 @@ def _ms_to_date(ms: int) -> str:
 def _ms_to_datetime(ms: int) -> str:
     """Convert epoch milliseconds to 'YYYY-MM-DD HH:MM' string."""
     return datetime.datetime.fromtimestamp(ms / 1000, tz=datetime.UTC).strftime("%Y-%m-%d %H:%M")
+
+
+# ---------------------------------------------------------------------------
+# iter-v1/063 SPECIALIST + BUNDLE methodology constants
+# ---------------------------------------------------------------------------
+
+#: Number of independent Optuna studies in SPECIALIST mode (one per seed).
+V1_SPECIALIST_SEED_COUNT: int = 50
+
+#: Optuna n_trials per seed/study in SPECIALIST mode.
+V1_SPECIALIST_OPTUNA_TRIALS: int = 30
+
+#: Deterministic 50-seed roster for SPECIALIST mode (42..91 inclusive).
+V1_SPECIALIST_SEEDS: tuple[int, ...] = tuple(range(42, 42 + V1_SPECIALIST_SEED_COUNT))
 
 
 _INTERVAL_MINUTES = {
@@ -191,6 +207,9 @@ class LightGbmStrategy:
         frozen_hp_parquet: Path | None = None,
         optuna_objective: str = "sharpe",
         min_child_samples_lower_bound: int | None = None,
+        specialist_mode: bool = False,
+        specialist_n_startup_trials: int = 10,
+        specialist_n_estimators_max: int = 500,
     ) -> None:
         if not feature_columns:
             raise ValueError(
@@ -297,6 +316,21 @@ class LightGbmStrategy:
         # Set to 50 for iter-v1/041 triple-barrier tighten (denser-label noise mitigation:
         # larger leaf populations average out per-leaf noise from shorter-horizon labels).
         self._min_child_samples_lower_bound: int | None = min_child_samples_lower_bound
+        # iter-v1/063: SPECIALIST + BUNDLE methodology flag.
+        # When True, _train_for_month runs V1_SPECIALIST_SEED_COUNT independent Optuna
+        # studies (one per seed in V1_SPECIALIST_SEEDS) each with
+        # n_trials=V1_SPECIALIST_OPTUNA_TRIALS.
+        # max_depth=5 FIXED, num_leaves=31 FIXED, min_child_samples NOT in search space.
+        # get_signal aggregates via mean-of-signed-weights across 50 seeds.
+        # Default False = old behavior (backward-compatible for v2/v3 and prior v1).
+        self._specialist_mode: bool = bool(specialist_mode)
+        # Wall-clock mitigation: n_startup_trials for TPESampler in specialist mode.
+        self._specialist_n_startup_trials: int = int(specialist_n_startup_trials)
+        # Wall-clock mitigation: upper bound on n_estimators in specialist mode.
+        self._specialist_n_estimators_max: int = int(specialist_n_estimators_max)
+        # Per-seed specialist state: list of (model, selected_cols, threshold) tuples.
+        # Reset every _train_for_month call when specialist_mode=True.
+        self._specialist_models: list[tuple[object, list[str], float]] = []
         # iter-v3/072: labeling mode — "triple_barrier" (default, backward-compat)
         # or "fixed_horizon" (sign of N-candle-forward return; no barriers).
         # iter-v3/105: "trend_scanning" (OLS trend, max-|t| horizon selection
@@ -924,6 +958,263 @@ class LightGbmStrategy:
         # symbols_arr aligns with feat_train rows (after keep_mask filtering)
         train_symbols_arr = self._sym_arr[train_indices][keep_mask]
 
+        # iter-v1/063: SPECIALIST mode — 50 independent Optuna studies, one per seed.
+        # When active, bypass the standard ensemble loop entirely.
+        # Each seed runs its own TPESampler study at n_trials=V1_SPECIALIST_OPTUNA_TRIALS.
+        # HP search space: max_depth=5 FIXED, num_leaves=31 FIXED, min_child_samples REMOVED.
+        # Aggregation in get_signal: mean-of-signed-weights across 50 seeds.
+        if self._specialist_mode:
+            self._specialist_models = []
+            specialist_seeds = V1_SPECIALIST_SEEDS
+            if self.verbose > 0:
+                print(
+                    f"  [SPECIALIST] mode active: "
+                    f"{len(specialist_seeds)} seeds × "
+                    f"{V1_SPECIALIST_OPTUNA_TRIALS} trials each | "
+                    f"max_depth=5 FIXED | num_leaves=31 FIXED | "
+                    f"min_child_samples=REMOVED | "
+                    f"n_startup_trials={self._specialist_n_startup_trials} | "
+                    f"n_estimators_max={self._specialist_n_estimators_max}"
+                )
+            for _sp_idx, _sp_seed in enumerate(specialist_seeds):
+                if self.verbose > 0 and (_sp_idx % 10 == 0 or _sp_idx == len(specialist_seeds) - 1):
+                    print(
+                        f"  [SPECIALIST seed {_sp_idx + 1}/{len(specialist_seeds)}] seed={_sp_seed}"
+                    )
+                try:
+                    import optuna as _optuna
+
+                    _sp_sampler = _optuna.samplers.TPESampler(
+                        seed=_sp_seed,
+                        n_startup_trials=self._specialist_n_startup_trials,
+                    )
+                    _sp_study = _optuna.create_study(direction="maximize", sampler=_sp_sampler)
+                    _sp_study.set_user_attr("fast_mode", False)
+                    _sp_study.set_user_attr("optuna_objective", self._optuna_objective)
+                    _sp_study.set_user_attr("specialist_mode", True)
+                    _sp_study.set_user_attr(
+                        "specialist_n_estimators_max", self._specialist_n_estimators_max
+                    )
+
+                    from crypto_trade.strategies.ml.optimization import (
+                        _objective as _opt_objective,
+                    )
+
+                    _sp_oof_buf: list | None = None
+
+                    # Capture loop variables for closure (avoid late-binding issues).
+                    _sp_feat = feat_train
+                    _sp_lbl = train_labels
+                    _sp_sw = train_weights
+                    _sp_lp = long_pnls
+                    _sp_sp_pnls = short_pnls
+                    _sp_cols = available_feat_cols
+                    _sp_cv = self.cv_splits
+                    _sp_vb = self.verbose
+                    _sp_ot = train_open_times
+                    _sp_ternary = ternary
+                    _sp_cvgap = cv_gap
+                    _sp_month = month_str
+                    _sp_sym = train_symbols_arr
+                    _sp_buf = _sp_oof_buf
+                    _sp_s = _sp_seed
+
+                    def _make_sp_objective(
+                        feat, lbl, sw, lp, sp, cols, cv, seed, vb, ot, trn, cvg, mon, sym, buf
+                    ):
+                        def _sp_obj(_trial):
+                            return _opt_objective(
+                                _trial,
+                                feat,
+                                lbl,
+                                sw,
+                                lp,
+                                sp,
+                                cols,
+                                cv,
+                                seed,
+                                vb,
+                                open_times=ot,
+                                ternary=trn,
+                                cv_gap=cvg,
+                                train_month=mon,
+                                symbols_arr=sym,
+                                oof_buffer=buf,
+                                bounds_profile="v1_specialist",
+                                min_child_samples_lower_bound=None,
+                            )
+
+                        return _sp_obj
+
+                    _sp_study.optimize(
+                        _make_sp_objective(
+                            _sp_feat,
+                            _sp_lbl,
+                            _sp_sw,
+                            _sp_lp,
+                            _sp_sp_pnls,
+                            _sp_cols,
+                            _sp_cv,
+                            _sp_s,
+                            _sp_vb,
+                            _sp_ot,
+                            _sp_ternary,
+                            _sp_cvgap,
+                            _sp_month,
+                            _sp_sym,
+                            _sp_buf,
+                        ),
+                        n_trials=V1_SPECIALIST_OPTUNA_TRIALS,
+                    )
+
+                    _sp_best = _sp_study.best_trial
+                    _sp_params = _sp_best.params
+                    _sp_ct = float(_sp_params["confidence_threshold"])
+
+                    import lightgbm as _lgb_sp
+
+                    _sp_lgbm_params = {
+                        "n_estimators": int(_sp_params["n_estimators"]),
+                        "max_depth": 5,
+                        "num_leaves": 31,
+                        "learning_rate": float(_sp_params["learning_rate"]),
+                        "subsample": float(_sp_params.get("subsample", 1.0)),
+                        "colsample_bytree": float(_sp_params.get("colsample_bytree", 1.0)),
+                        "reg_alpha": float(_sp_params["reg_alpha"]),
+                        "reg_lambda": float(_sp_params["reg_lambda"]),
+                        "random_state": _sp_seed,
+                        "verbosity": -1,
+                        "objective": "multiclass" if ternary else "binary",
+                        "is_unbalance": True,
+                    }
+                    if ternary:
+                        _sp_lgbm_params["num_class"] = 3
+
+                    _sp_y = (
+                        labels_to_classes_ternary(train_labels)
+                        if ternary
+                        else labels_to_classes(train_labels)
+                    )
+                    _sp_clf = _lgb_sp.LGBMClassifier(**_sp_lgbm_params)
+                    _sp_clf.fit(feat_train, _sp_y, sample_weight=train_weights)
+                    self._specialist_models.append((_sp_clf, available_feat_cols, _sp_ct))
+                except Exception as _sp_exc:
+                    if self.verbose > 0:
+                        print(f"  [SPECIALIST seed {_sp_seed}] failed: {_sp_exc!r}")
+
+            if not self._specialist_models:
+                if self.verbose > 0:
+                    print(f"  [SPECIALIST] all seeds failed for {month_str}")
+                return
+
+            # Populate _models/_confidence_thresholds for backward-compat paths
+            # (feature-importance logging, _model, etc. still use first specialist).
+            self._models = [m for m, _, _ in self._specialist_models]
+            self._confidence_thresholds = [ct for _, _, ct in self._specialist_models]
+            self._model = self._specialist_models[0][0]
+            self._selected_cols = self._specialist_models[0][1]
+            self._confidence_threshold = self._specialist_models[0][2]
+
+            # Accumulate per-month feature importance (uses all specialist models).
+            _fi_cols = list(self.feature_columns)
+            if _fi_cols and self._models:
+                _month_gains: dict[str, list[float]] = {c: [] for c in _fi_cols}
+                for _m in self._models:
+                    _fi_arr: np.ndarray | None = None
+                    if hasattr(_m, "booster_"):
+                        _fi_arr = _m.booster_.feature_importance(importance_type="gain")
+                    elif hasattr(_m, "feature_importances_"):
+                        _fi_arr = _m.feature_importances_
+                    if _fi_arr is not None:
+                        for _i, _c in enumerate(_fi_cols):
+                            if _i < len(_fi_arr):
+                                _month_gains[_c].append(float(_fi_arr[_i]))
+                _mean_gain: dict[str, float] = {
+                    c: float(np.mean(v)) if v else 0.0 for c, v in _month_gains.items()
+                }
+                self._per_month_fi_log.append({"train_month": month_str, "mean_gain": _mean_gain})
+
+            # Load test-month features (uses selected_cols from first specialist).
+            _sp_selected_cols = self._specialist_models[0][1]
+            symbols = list(dict.fromkeys(self._sym_arr))
+            self._month_features = load_features_range(
+                symbols,
+                self.features_dir,
+                self._interval,
+                split.test_start_ms,
+                split.test_end_ms,
+                columns=_sp_selected_cols,
+            )
+            # OOD detector (shared per-coin per-month — one set of stats for all seeds).
+            self._ood_mean = None
+            self._ood_inv_cov = None
+            self._ood_cutoff = None
+            self._month_ood_features = {}
+            if self.ood_enabled and self.ood_features:
+                ood_cols_in_train = [c for c in self.ood_features if c in train_feat_df.columns]
+                if len(ood_cols_in_train) == len(self.ood_features) and len(train_feat_df) >= 100:
+                    self._ood_feature_cols = ood_cols_in_train
+                    train_ood_raw = train_feat_df[ood_cols_in_train].to_numpy(dtype=np.float64)
+                    finite_mask = np.isfinite(train_ood_raw).all(axis=1)
+                    train_ood = train_ood_raw[finite_mask]
+                    if len(train_ood) >= 100:
+                        self._ood_mean = train_ood.mean(axis=0)
+                        cov = np.cov(train_ood.T)
+                        if cov.ndim == 0:
+                            cov = np.array([[float(cov)]])
+                        reg = 1e-6 * np.trace(cov) / cov.shape[0] * np.eye(cov.shape[0])
+                        try:
+                            self._ood_inv_cov = np.linalg.pinv(cov + reg)
+                            centered = train_ood - self._ood_mean
+                            distances = np.einsum(
+                                "ij,jk,ik->i", centered, self._ood_inv_cov, centered
+                            )
+                            self._ood_cutoff = float(np.quantile(distances, self.ood_cutoff_pct))
+                            self._month_ood_features = load_features_range(
+                                symbols,
+                                self.features_dir,
+                                self._interval,
+                                split.test_start_ms,
+                                split.test_end_ms,
+                                columns=ood_cols_in_train,
+                            )
+                        except np.linalg.LinAlgError:
+                            self._ood_mean = None
+                            self._ood_inv_cov = None
+                            self._ood_cutoff = None
+            # Load NATR / σ_t cache.
+            self._month_natr = {}
+            if self.atr_tp_multiplier is not None:
+                natr_data = load_features_range(
+                    symbols,
+                    self.features_dir,
+                    self._interval,
+                    split.test_start_ms,
+                    split.test_end_ms,
+                    columns=[self.atr_column],
+                )
+                for _k, _arr in natr_data.items():
+                    self._month_natr[_k] = float(_arr[0])
+            self._month_sigma = {}
+            if self.sigma_source == "ewma14d" and self._label_sigma_values is not None:
+                test_mask = (self._open_time_arr >= split.test_start_ms) & (
+                    self._open_time_arr < split.test_end_ms
+                )
+                test_indices = np.where(test_mask)[0]
+                for _idx in test_indices:
+                    _sym = str(self._sym_arr[_idx])
+                    _ot = int(self._open_time_arr[_idx])
+                    self._month_sigma[(_sym, _ot)] = float(self._label_sigma_values[_idx])
+
+            if self.verbose > 0:
+                print(
+                    f"  [SPECIALIST] {len(self._specialist_models)} seeds trained for "
+                    f"{month_str}: "
+                    f"{len(self._month_features)} test candles with features"
+                )
+            # Early return — skip the standard ensemble loop below.
+            return
+
         # iter-v1/032: lazy-load frozen HP DataFrame on first call.
         if self._frozen_hp_parquet is not None and self._frozen_hp_df is None:
             self._frozen_hp_df = pd.read_parquet(self._frozen_hp_parquet)
@@ -1180,6 +1471,136 @@ class LightGbmStrategy:
         # Look up features from month cache
         key = (symbol, open_time)
         feat_row = self._month_features.get(key)
+
+        # iter-v1/063: SPECIALIST aggregator — mean of signed weights.
+        # Each seed evaluates probability against ITS OWN threshold independently.
+        # Aggregation: final_signed = mean(direction_i × weight_i) across 50 seeds.
+        # R3 OOD is SHARED (applied once below, same as non-specialist path).
+        if self._specialist_mode and self._specialist_models:
+            if feat_row is None:
+                from crypto_trade import decision_log
+
+                decision_log.log(
+                    {
+                        "kind": "lgbm_signal",
+                        "symbol": symbol,
+                        "ot": open_time,
+                        "month": candle_month,
+                        "decision": "skipped:no_features",
+                    }
+                )
+                return NO_SIGNAL
+
+            feat_df_sp = pd.DataFrame(feat_row.reshape(1, -1), columns=self._selected_cols)
+
+            # R3 OOD check (SHARED — evaluated once before aggregating seeds).
+            if (
+                self.ood_enabled
+                and self._ood_mean is not None
+                and self._ood_inv_cov is not None
+                and self._ood_cutoff is not None
+            ):
+                ood_row = self._month_ood_features.get(key)
+                if ood_row is not None and np.isfinite(ood_row).all():
+                    diff = ood_row.astype(np.float64) - self._ood_mean
+                    dist = float(diff @ self._ood_inv_cov @ diff)
+                    if dist > self._ood_cutoff:
+                        from crypto_trade import decision_log
+
+                        decision_log.log(
+                            {
+                                "kind": "lgbm_signal",
+                                "symbol": symbol,
+                                "ot": open_time,
+                                "month": candle_month,
+                                "ood_dist": dist,
+                                "ood_cutoff": float(self._ood_cutoff),
+                                "decision": "skipped:ood",
+                            }
+                        )
+                        return NO_SIGNAL
+
+            ternary_sp = self.neutral_threshold_pct is not None
+            _signed_weights: list[float] = []
+            for _sp_model, _sp_cols, _sp_ct in self._specialist_models:
+                # Re-build feat_df with this seed's selected columns (may differ).
+                if _sp_cols != self._selected_cols:
+                    _feat_df_i = pd.DataFrame(
+                        feat_row.reshape(1, -1)[:, : len(_sp_cols)],
+                        columns=_sp_cols,
+                    )
+                else:
+                    _feat_df_i = feat_df_sp
+                _proba_i = _sp_model.predict_proba(_feat_df_i)[0]
+                if ternary_sp:
+                    _conf_i = max(float(_proba_i[0]), float(_proba_i[2]))
+                    _dir_i = 1 if float(_proba_i[2]) >= float(_proba_i[0]) else -1
+                else:
+                    _conf_i = float(max(_proba_i))
+                    _dir_i = int(classes_to_labels(np.array([int(np.argmax(_proba_i))]))[0])
+                _weight_i = 100 if _conf_i > _sp_ct else 0
+                _signed_weights.append(float(_dir_i) * float(_weight_i))
+
+            _final_signed = float(np.mean(_signed_weights)) if _signed_weights else 0.0
+
+            if abs(_final_signed) < 1e-9:
+                # All seeds voted 0 (below threshold) or perfectly cancelled.
+                from crypto_trade import decision_log
+
+                decision_log.log(
+                    {
+                        "kind": "lgbm_signal",
+                        "symbol": symbol,
+                        "ot": open_time,
+                        "month": candle_month,
+                        "specialist_seeds": len(self._specialist_models),
+                        "final_signed": _final_signed,
+                        "decision": "skipped:specialist_no_consensus",
+                    }
+                )
+                return NO_SIGNAL
+
+            _sp_direction = 1 if _final_signed > 0 else -1
+            _sp_weight = int(round(abs(_final_signed)))
+            _sp_confidence = abs(_final_signed) / 100.0
+
+            # NATR-based dynamic TP/SL (same as non-specialist path).
+            _sp_tp_pct = None
+            _sp_sl_pct = None
+            if self.atr_tp_multiplier is not None:
+                _natr_sp = self._month_natr.get(key)
+                if _natr_sp is not None and _natr_sp > 0:
+                    _sp_tp_pct = _natr_sp * self.atr_tp_multiplier
+                    _sp_sl_pct = _natr_sp * (
+                        self.atr_sl_multiplier
+                        if self.atr_sl_multiplier is not None
+                        else self.atr_tp_multiplier / 2.0
+                    )
+
+            from crypto_trade import decision_log
+
+            decision_log.log(
+                {
+                    "kind": "lgbm_signal",
+                    "symbol": symbol,
+                    "ot": open_time,
+                    "month": candle_month,
+                    "specialist_seeds": len(self._specialist_models),
+                    "final_signed": _final_signed,
+                    "direction": _sp_direction,
+                    "tp_pct": _sp_tp_pct,
+                    "sl_pct": _sp_sl_pct,
+                    "confidence": _sp_confidence,
+                    "decision": "signal",
+                }
+            )
+            return Signal(
+                direction=_sp_direction,
+                weight=_sp_weight,
+                tp_pct=_sp_tp_pct,
+                sl_pct=_sp_sl_pct,
+                confidence=_sp_confidence,
+            )
         if feat_row is None:
             from crypto_trade import decision_log
 
