@@ -87,6 +87,7 @@ from crypto_trade.features_v1 import (
     V1_ITER057_UNIVERSE,
     V1_ITER058_UNIVERSE,
     V1_ITER061_UNIVERSE,
+    V1_ITER063_UNIVERSE,
     V1_OOD_FEATURE_COLUMNS,
     assert_v1_universe,
 )
@@ -95,7 +96,12 @@ from crypto_trade.strategies.ml.basin_diagnostics import (
     derive_basin_trials_from_oof_parquet,
     emit_basin_diagnostics_summary,
 )
-from crypto_trade.strategies.ml.lgbm import LightGbmStrategy
+from crypto_trade.strategies.ml.lgbm import (
+    V1_SPECIALIST_OPTUNA_TRIALS,
+    V1_SPECIALIST_SEED_COUNT,
+    V1_SPECIALIST_SEEDS,
+    LightGbmStrategy,
+)
 from crypto_trade.strategies.ml.metalabeling import MetaLabelingStrategy
 from crypto_trade.strategies.ml.reporting_v1 import (
     _per_cell_n_eff_from_parquet,
@@ -6325,9 +6331,7 @@ def main() -> None:
         # passing all-NaN feature columns to LightGBM for the BTC cohort.
         # V1_FEATURE_COLUMNS_PRUNED is now 49 (post /057); 49 - 2 = 47 BTC-only cols.
         _btc_056_excl = {"eth_vs_btc_ret_ratio_30", "ltc_vs_btc_ret_ratio_30"}
-        _btc_056_feature_columns = [
-            c for c in active_feature_columns if c not in _btc_056_excl
-        ]
+        _btc_056_feature_columns = [c for c in active_feature_columns if c not in _btc_056_excl]
         assert len(_btc_056_feature_columns) == 47, (
             f"iter-v1/056-C1-BTC guard: expected 47 BTC-only feature cols after excluding "
             f"eth_vs_btc_ret_ratio_30 and ltc_vs_btc_ret_ratio_30, "
@@ -6617,10 +6621,10 @@ def main() -> None:
         results_a058, faxm_a058, _strat_a058 = run_model(
             "A_BTC_specialist (R3)",
             ("BTCUSDT",),
-            atr_tp=3.5,   # UNCHANGED — matches BTC specialist convention + BASELINE_V1 Model A
+            atr_tp=3.5,  # UNCHANGED — matches BTC specialist convention + BASELINE_V1 Model A
             atr_sl=1.75,  # UNCHANGED — matches BTC specialist convention + BASELINE_V1 Model A
-            apply_r1=False,   # OFF — same as /052-/054 BTC specialist convention
-            apply_r2=False,   # OFF — same as /052-/054 BTC specialist convention
+            apply_r1=False,  # OFF — same as /052-/054 BTC specialist convention
+            apply_r2=False,  # OFF — same as /052-/054 BTC specialist convention
             n_trials=n_trials,
             ensemble_size=ensemble_size,
             oof_persist_path=OOF_PARQUET_PATH,
@@ -6739,7 +6743,7 @@ def main() -> None:
             vt_lookback_days=45,
             vt_min_scale=0.33,
             vt_max_scale=2.0,
-            risk_consecutive_sl_limit=None,   # R1=OFF
+            risk_consecutive_sl_limit=None,  # R1=OFF
             risk_consecutive_sl_cooldown_candles=0,
             risk_drawdown_scale_enabled=False,  # R2=OFF
             risk_drawdown_trigger_pct=7.0,
@@ -6799,6 +6803,134 @@ def main() -> None:
         all_results = results_a061
         _r5_model_results = [results_a061]
         _post_dispatch_fi_strategies = [("Model_A_BTC_specialist_061", _strat_a061)]
+
+    elif iteration_label == "v1-063" and set(symbols) == set(V1_ITER063_UNIVERSE):
+        # iter-v1/063: DOTUSDT SPECIALIST — first under SPECIALIST + BUNDLE methodology.
+        # Axis family: methodology (cycle-7 SPECIALIST 1/10).
+        #
+        # SPECIALIST + BUNDLE design (skill commit ee5910e):
+        #   - 50 independent Optuna studies, one per seed (V1_SPECIALIST_SEEDS: 42..91)
+        #   - Each study: n_trials=V1_SPECIALIST_OPTUNA_TRIALS=30, ENSEMBLE_SIZE=1
+        #   - LightGBM HP search: max_depth=5 FIXED, num_leaves=31 FIXED,
+        #     min_child_samples REMOVED from search space (uses LGBM default 20)
+        #   - confidence_threshold Optuna-tunable per seed (range [0.50, 0.85])
+        #   - Aggregator at inference: mean-of-signed-weights across 50 seeds
+        #
+        # Wall-clock mitigation (brief Section 3.6):
+        #   - n_estimators upper bound = 500 (capped from 1000)
+        #   - n_startup_trials = 10 (vs Optuna default 30)
+        #
+        # Risk config (matched to baseline DOT cell):
+        #   R1=ON  K=3, C=27 candles (AGGREGATOR-LEVEL)
+        #   R2=ON  trigger=7%, anchor=15%, floor=0.33 (AGGREGATOR-LEVEL)
+        #   R3=ON-SHARED  cutoff=0.70, 16 features (one set of stats per DOT/month)
+        #   R5=ON  vt_target_vol=0.3, vt_lookback_days=45 (AGGREGATOR-LEVEL)
+        #   atr_tp=3.5, atr_sl=1.75 (UNCHANGED from BASELINE_V1 Model E DOT)
+        #
+        # Feature set: V1_FEATURE_COLUMNS_PRUNED (48 cols, UNCHANGED).
+        # NORMAL-RISK: no Optuna training-objective domain change.
+        assert set(symbols) == {"DOTUSDT"}, (
+            f"iter-v1/063 guard: expected {{DOTUSDT}}, got {set(symbols)}"
+        )
+        assert len(active_feature_columns) == 48, (
+            f"iter-v1/063 guard: expected 48 V1_FEATURE_COLUMNS_PRUNED cols (UNCHANGED), "
+            f"got {len(active_feature_columns)}."
+        )
+        print(
+            f"[iter-v1/063] DOT SPECIALIST — SPECIALIST+BUNDLE methodology ACTIVE: "
+            f"V1_SPECIALIST_SEED_COUNT={V1_SPECIALIST_SEED_COUNT} "
+            f"V1_SPECIALIST_OPTUNA_TRIALS={V1_SPECIALIST_OPTUNA_TRIALS} "
+            f"specialist_mode=True "
+            f"max_depth=5 FIXED, num_leaves=31 FIXED, min_child_samples REMOVED. "
+            f"R1=ON K=3/C=27, R2=ON trigger=7%/anchor=15%/floor=0.33, "
+            f"R3=ON-SHARED cutoff=0.70, R5=ON vt_target_vol=0.3. "
+            f"features=V1_FEATURE_COLUMNS_PRUNED (48 cols; UNCHANGED). "
+            f"atr_tp=3.5, atr_sl=1.75. "
+            f"n_estimators_max=500 (wall-clock mitigation). "
+            f"n_startup_trials=10 (wall-clock mitigation). "
+            f"Aggregator: mean-of-signed-weights across {V1_SPECIALIST_SEED_COUNT} seeds."
+        )
+        _config_e063 = BacktestConfig(
+            symbols=("DOTUSDT",),
+            interval="8h",
+            max_amount_usd=1000.0,
+            stop_loss_pct=4.0,
+            take_profit_pct=8.0,
+            timeout_minutes=10080,
+            fee_pct=0.1,
+            data_dir=Path("data"),
+            cooldown_candles=2,
+            vol_targeting=True,
+            vt_target_vol=0.3,
+            vt_lookback_days=45,
+            vt_min_scale=0.33,
+            vt_max_scale=2.0,
+            risk_consecutive_sl_limit=3,  # R1=ON K=3
+            risk_consecutive_sl_cooldown_candles=27,
+            risk_drawdown_scale_enabled=True,  # R2=ON
+            risk_drawdown_trigger_pct=7.0,
+            risk_drawdown_scale_floor=0.33,
+            risk_drawdown_scale_anchor_pct=15.0,
+            risk_r5_vol_target_enabled=_r5_kwargs.get("r5_vol_target_enabled", True),
+            risk_r5_vol_target_pct=_r5_kwargs.get("r5_vol_target_pct", 4.0),
+            risk_r5_kill_low_natr_enabled=_r5_kwargs.get("r5_kill_low_natr_enabled", False),
+            risk_r5_kill_low_natr_min_pct=_r5_kwargs.get("r5_kill_low_natr_min_pct", 2.0),
+        )
+        _strat_e063 = LightGbmStrategy(
+            training_months=24,
+            n_trials=V1_SPECIALIST_OPTUNA_TRIALS,  # informational; specialist loop controls
+            cv_splits=5,
+            label_tp_pct=8.0,
+            label_sl_pct=4.0,
+            label_timeout_minutes=10080,
+            fee_pct=0.1,
+            features_dir="data/features",
+            verbose=1,
+            atr_tp_multiplier=3.5,
+            atr_sl_multiplier=1.75,
+            use_atr_labeling=True,
+            # placeholder seed — specialist_mode uses V1_SPECIALIST_SEEDS internally
+            ensemble_seeds=list(V1_SPECIALIST_SEEDS[:1]),
+            feature_columns=active_feature_columns,
+            ood_enabled=True,  # R3 SHARED
+            ood_features=list(V1_OOD_FEATURE_COLUMNS),
+            ood_cutoff_pct=0.70,
+            oof_persist_path=OOF_PARQUET_PATH,
+            bounds_profile="v1_pruned",  # base profile; specialist_mode overrides via v1_specialist
+            specialist_mode=True,
+            specialist_n_startup_trials=10,
+            specialist_n_estimators_max=500,
+        )
+        import time as _time_063
+
+        _t0_063 = _time_063.time()
+        results_e063 = run_backtest(_config_e063, _strat_e063, yearly_pnl_check=False)
+        _elapsed_063 = _time_063.time() - _t0_063
+        faxm_e063 = _strat_e063._faxm_log
+        print(
+            f"\n[iter-v1/063] Model_E_DOT_specialist complete: "
+            f"{len(results_e063)} trades in {_elapsed_063:.0f}s "
+            f"({_elapsed_063 / 3600:.2f}h)"
+        )
+
+        # Cohort isolation sanity: assert ONLY DOTUSDT trades emitted.
+        _e063_symbols = {r.symbol for r in results_e063}
+        assert _e063_symbols.issubset({"DOTUSDT"}), (
+            f"[iter-v1/063] Model E_DOT produced non-DOT results: "
+            f"{_e063_symbols - {'DOTUSDT'}}. "
+            "Per-cohort isolation failed — iter-v1/063 must trade DOTUSDT ONLY."
+        )
+        print(
+            f"[iter-v1/063] Dispatch verified: "
+            f"DOT-only={len(results_e063)} trades. "
+            f"R1=ON/R2=ON/R3=ON-SHARED. "
+            f"SPECIALIST seeds={len(_strat_e063._specialist_models)} trained."
+        )
+
+        _all_faxm_logs = faxm_e063
+        all_results = results_e063
+        _r5_model_results = [results_e063]
+        _post_dispatch_fi_strategies = [("Model_E_DOT_specialist_063", _strat_e063)]
 
     elif iteration_label == "v1-044":
         # iter-v1/044: CONFIRMATION-MERGE-PORTFOLIO (cycle-5 CONFIRMATION 1/1).

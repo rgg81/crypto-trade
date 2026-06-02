@@ -561,6 +561,30 @@ assert len(active_feature_columns) == 48 guard fires in dispatch branch.
 """
 
 
+V1_ITER063_UNIVERSE: tuple[str, ...] = ("DOTUSDT",)
+"""iter-v1/063 cohort: DOT-only SPECIALIST (first SPECIALIST under SPECIALIST + BUNDLE methodology).
+
+Cycle-7 SPECIALIST 1/10. Axis family: methodology (SPECIALIST + BUNDLE design).
+50-seed independent-Optuna bagging on DOTUSDT:
+    V1_SPECIALIST_SEED_COUNT=50, V1_SPECIALIST_OPTUNA_TRIALS=30,
+    max_depth=5 FIXED, num_leaves=31 FIXED, min_child_samples REMOVED,
+    ENSEMBLE_SIZE=1 per study, mean-of-signed-weights aggregator.
+
+Feature set: V1_FEATURE_COLUMNS_PRUNED (48 cols, UNCHANGED).
+Risk config: R1=ON (K=3, C=27), R2=ON (trigger=7%, anchor=15%, floor=0.33),
+             R3=ON-SHARED (cutoff=0.70, 16-feature V1_OOD_FEATURE_COLUMNS),
+             R5=ON (vt_target_vol=0.3, vt_lookback_days=45).
+atr_tp=3.5, atr_sl=1.75 (UNCHANGED from BASELINE_V1 Model E DOT).
+
+Methodology validates: σ_pop ≤ 0.30 (F-AXIS #2 load-bearing gate).
+NORMAL-RISK: bagging dimensionality change, NOT Optuna training-objective domain change.
+
+LOCAL to runner constant. NOT shared; CONFIRMATION-MERGE updates V1_BASELINE_UNIVERSE.
+assert set(symbols) == {"DOTUSDT"} guard fires in dispatch branch.
+assert len(active_feature_columns) == 48 guard fires in dispatch branch.
+"""
+
+
 V1_ITER061_UNIVERSE: tuple[str, ...] = ("BTCUSDT",)
 """iter-v1/061 cohort: BTC-only zero-randomness diagnostic.
 
@@ -686,6 +710,7 @@ __all__ = [
     "V1_ITER057_UNIVERSE",
     "V1_ITER058_UNIVERSE",
     "V1_ITER061_UNIVERSE",
+    "V1_ITER063_UNIVERSE",
     # iter-v1/023: funding-rate feature family (add_funding_v1_features imported on demand)
     # iter-v1/025: OI delta feature family (add_oi_delta_v1_features imported on demand)
     # iter-v1/040: composed feature family (add_composed_v1_features imported on demand)
