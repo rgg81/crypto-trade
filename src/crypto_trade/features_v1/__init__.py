@@ -561,6 +561,36 @@ assert len(active_feature_columns) == 48 guard fires in dispatch branch.
 """
 
 
+V1_ITER061_UNIVERSE: tuple[str, ...] = ("BTCUSDT",)
+"""iter-v1/061 cohort: BTC-only zero-randomness diagnostic.
+
+Cycle-7 EXPLORATION #4/N. Axis family: methodology (zero-randomness diagnostic; pipeline
+reproducibility test). Tests whether the v1 BTC-only specialist pipeline is bit-exactly
+reproducible when ALL sources of randomness are eliminated:
+    n_trials=1, seeds=1, subsample=1.0, colsample_bytree=1.0, bagging_freq=0,
+    deterministic=True, num_threads=1, is_unbalance=False, force_col_wise=True.
+
+V1_FEATURE_COLUMNS_PRUNED: 48 cols UNCHANGED (no feature add/drop at /061).
+Architecture: Model A_BTC_specialist (BTC only).
+    R1=OFF (same as /052-/054 BTC specialist convention).
+    R2=OFF (same as /052-/054 BTC specialist convention).
+    R3=OFF (LM Master §"Other Randomness Sources" #9 — disabled to eliminate
+            covariance-inversion non-determinism from the experiment).
+    atr_tp=3.5, atr_sl=1.75 (UNCHANGED from BTC specialist convention).
+
+LM Master Phase 4.5 hardcoded HP dict (ADOPTED VERBATIM):
+    n_estimators=300, max_depth=4, num_leaves=31, learning_rate=0.05,
+    min_child_samples=50, reg_alpha=0.1, reg_lambda=0.1, confidence_threshold=0.7,
+    training_days=360 — central-tendency HPs from /054 trial analysis.
+
+NORMAL-RISK: methodology-only axis; no Optuna domain change; no feature change.
+
+LOCAL to runner constant. NOT shared; CONFIRMATION-MERGE updates V1_BASELINE_UNIVERSE.
+assert set(symbols) == {"BTCUSDT"} guard fires in dispatch branch.
+assert len(active_feature_columns) == 48 guard fires in dispatch branch.
+"""
+
+
 V1_ITER058_UNIVERSE: tuple[str, ...] = ("BTCUSDT",)
 """iter-v1/058 cohort: BTC-only specialist head (btc_oi_delta_5_z30 short-window OI feature).
 
@@ -655,6 +685,7 @@ __all__ = [
     "V1_ITER056_C3_UNIVERSE",
     "V1_ITER057_UNIVERSE",
     "V1_ITER058_UNIVERSE",
+    "V1_ITER061_UNIVERSE",
     # iter-v1/023: funding-rate feature family (add_funding_v1_features imported on demand)
     # iter-v1/025: OI delta feature family (add_oi_delta_v1_features imported on demand)
     # iter-v1/040: composed feature family (add_composed_v1_features imported on demand)

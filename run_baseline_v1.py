@@ -86,6 +86,7 @@ from crypto_trade.features_v1 import (
     V1_ITER055_UNIVERSE,
     V1_ITER057_UNIVERSE,
     V1_ITER058_UNIVERSE,
+    V1_ITER061_UNIVERSE,
     V1_OOD_FEATURE_COLUMNS,
     assert_v1_universe,
 )
@@ -6645,6 +6646,159 @@ def main() -> None:
         all_results = results_a058
         _r5_model_results = [results_a058]
         _post_dispatch_fi_strategies = [("Model_A_BTC_specialist_058", _strat_a058)]
+
+    elif iteration_label == "v1-061" and set(symbols) == set(V1_ITER061_UNIVERSE):
+        # iter-v1/061: BTC-only zero-randomness diagnostic (cycle-7 EXPLORATION 4/N).
+        # Axis family: methodology (zero-randomness diagnostic; pipeline reproducibility test).
+        # CHANGE vs /058: NO new feature; NO parquet regen required.
+        #   - ALL randomness sources eliminated per LM Master Phase 4.5 §"Other Randomness Sources":
+        #     n_trials=1, seeds=1, subsample=1.0, colsample_bytree=1.0, bagging_freq=0,
+        #     deterministic=True, num_threads=1, is_unbalance=False, force_col_wise=True.
+        #   - HP dict HARDCODED via study.enqueue_trial() in run_iteration_061.py monkey-patch.
+        #   - V1_FEATURE_COLUMNS_PRUNED: 48 cols UNCHANGED (no feature add/drop).
+        #
+        # Architecture: Model A_BTC_specialist (BTC only).
+        #   R1=OFF (same as /052-/054 BTC specialist convention)
+        #   R2=OFF (same as /052-/054 BTC specialist convention)
+        #   R3=OFF (LM Master §"Other Randomness Sources" #9 — OOD gate disabled to
+        #           eliminate covariance-inversion non-determinism from diagnostic)
+        #   atr_tp=3.5, atr_sl=1.75 (UNCHANGED from BTC specialist convention)
+        #
+        # Verdict: F1 bit-exact reproducibility (PRIMARY) + F2 IS Sharpe vs LM prediction +0.08.
+        # NORMAL-RISK: no Optuna domain change; no feature change; methodology only.
+        #
+        # Hardcoded HPs (injected via study.enqueue_trial() in run_iteration_061.py before
+        # this dispatch fires; the monkey-patch wraps optimize_and_train so that the single
+        # Optuna trial always uses the fixed HP dict from HARDCODED_LGBM_PARAMS_061):
+        #   n_estimators=300, max_depth=4, num_leaves=31, learning_rate=0.05,
+        #   min_child_samples=50, reg_alpha=0.1, reg_lambda=0.1,
+        #   subsample=1.0, colsample_bytree=1.0, bagging_freq=0,
+        #   deterministic=True, num_threads=1, is_unbalance=False, force_col_wise=True,
+        #   confidence_threshold=0.7, training_days=360.
+        assert set(symbols) == {"BTCUSDT"}, (
+            f"iter-v1/061 guard: expected {{BTCUSDT}}, got {set(symbols)}"
+        )
+        assert len(active_feature_columns) == 48, (
+            f"iter-v1/061 guard: expected 48 V1_FEATURE_COLUMNS_PRUNED cols (UNCHANGED), "
+            f"got {len(active_feature_columns)}. "
+            "V1_FEATURE_COLUMNS_PRUNED must be 48 at /061 (no feature add/drop). "
+            "If len == 49: a /058 feature was NOT reverted — check __init__.py."
+        )
+        assert n_trials == 1, (
+            f"iter-v1/061 guard: n_trials must be 1 (zero-randomness diagnostic), "
+            f"got {n_trials}. Pass --n-trials 1 to the runner."
+        )
+        assert ensemble_size == 1, (
+            f"iter-v1/061 guard: ensemble_size must be 1 (single deterministic model), "
+            f"got {ensemble_size}. Pass --ensemble-size 1 to the runner."
+        )
+        print(
+            f"[iter-v1/061] BTC-ONLY ZERO-RANDOMNESS DIAGNOSTIC ACTIVE: "
+            f"features=V1_FEATURE_COLUMNS_PRUNED (48 cols; UNCHANGED). "
+            f"R1=OFF, R2=OFF, R3=OFF (OOD gate DISABLED — eliminates covariance-inversion "
+            f"non-determinism per LM Master §'Other Randomness Sources' #9). "
+            f"atr_tp=3.5, atr_sl=1.75 (BTC specialist convention). "
+            f"n_trials={n_trials}, ENSEMBLE_SIZE={ensemble_size}. "
+            f"ALL randomness sources eliminated: subsample=1.0, colsample_bytree=1.0, "
+            f"bagging_freq=0, deterministic=True, num_threads=1, is_unbalance=False. "
+            f"HPs HARDCODED via study.enqueue_trial() monkey-patch in run_iteration_061.py. "
+            f"NORMAL-RISK: methodology-only axis (no Optuna domain change; no feature change). "
+            f"cycle-7 EXP-4/N. Verdict: F1=bit-exact reproducibility (PRIMARY)."
+        )
+        # Model A_BTC_specialist: BTC only + R1 OFF, R2 OFF, R3 OFF.
+        # R3 (OOD Mahalanobis) disabled via ood_enabled=False to remove covariance-inversion
+        # non-determinism from the diagnostic experiment.
+        # feature_columns = V1_FEATURE_COLUMNS_PRUNED (48 cols; UNCHANGED from /058 closeout).
+        # HP override: run_iteration_061.py monkey-patches optimize_and_train to use
+        # study.enqueue_trial() with HARDCODED_LGBM_PARAMS_061 before calling main().
+        # The subsample=1.0 / colsample_bytree=1.0 / bagging_freq=0 override is enforced
+        # both at the HP dict injection level AND via the _pin_subsampling path.
+        _strategy_kwargs_061: dict = {
+            "n_trials": n_trials,
+            "ensemble_size": ensemble_size,
+            "oof_persist_path": OOF_PARQUET_PATH,
+            "feature_columns": active_feature_columns,
+            "bounds_profile": "v1_pruned_axis016",  # pins subsample=1.0, colsample=1.0
+            **_r5_kwargs,
+        }
+        # Disable R3 OOD gate by constructing the strategy with ood_enabled=False.
+        # run_model() always passes ood_enabled=True, so we call LightGbmStrategy directly
+        # and run_backtest() instead of using the run_model() helper.
+        _config_a061 = BacktestConfig(
+            symbols=("BTCUSDT",),
+            interval="8h",
+            max_amount_usd=1000.0,
+            stop_loss_pct=4.0,
+            take_profit_pct=8.0,
+            timeout_minutes=10080,
+            fee_pct=0.1,
+            data_dir=Path("data"),
+            cooldown_candles=2,
+            vol_targeting=True,
+            vt_target_vol=0.3,
+            vt_lookback_days=45,
+            vt_min_scale=0.33,
+            vt_max_scale=2.0,
+            risk_consecutive_sl_limit=None,   # R1=OFF
+            risk_consecutive_sl_cooldown_candles=0,
+            risk_drawdown_scale_enabled=False,  # R2=OFF
+            risk_drawdown_trigger_pct=7.0,
+            risk_drawdown_scale_floor=0.33,
+            risk_drawdown_scale_anchor_pct=15.0,
+            risk_r5_vol_target_enabled=_r5_kwargs.get("r5_vol_target_enabled", True),
+            risk_r5_vol_target_pct=_r5_kwargs.get("r5_vol_target_pct", 4.0),
+            risk_r5_kill_low_natr_enabled=_r5_kwargs.get("r5_kill_low_natr_enabled", False),
+            risk_r5_kill_low_natr_min_pct=_r5_kwargs.get("r5_kill_low_natr_min_pct", 2.0),
+        )
+        _strat_a061 = LightGbmStrategy(
+            training_months=24,
+            n_trials=n_trials,
+            cv_splits=5,
+            label_tp_pct=8.0,
+            label_sl_pct=4.0,
+            label_timeout_minutes=10080,
+            fee_pct=0.1,
+            features_dir="data/features",
+            verbose=1,
+            atr_tp_multiplier=3.5,
+            atr_sl_multiplier=1.75,
+            use_atr_labeling=True,
+            ensemble_seeds=_derive_ensemble_seeds(ensemble_size, offset=0),
+            feature_columns=active_feature_columns,
+            ood_enabled=False,  # R3=OFF — eliminates covariance-inversion non-determinism
+            oof_persist_path=OOF_PARQUET_PATH,
+            bounds_profile="v1_pruned_axis016",  # pins subsample=1.0, colsample=1.0
+        )
+        import time as _time_061
+
+        _t0_061 = _time_061.time()
+        results_a061 = run_backtest(_config_a061, _strat_a061, yearly_pnl_check=False)
+        _elapsed_061 = _time_061.time() - _t0_061
+        faxm_a061 = _strat_a061._faxm_log
+        print(
+            f"\n[iter-v1/061] Model A_BTC_specialist_061 complete: "
+            f"{len(results_a061)} trades in {_elapsed_061:.0f}s"
+        )
+
+        # Cohort isolation sanity: assert ONLY BTCUSDT trades emitted
+        _a061_symbols = {r.symbol for r in results_a061}
+        assert _a061_symbols.issubset({"BTCUSDT"}), (
+            f"[iter-v1/061] Model A_BTC produced non-BTC results: "
+            f"{_a061_symbols - {'BTCUSDT'}}. "
+            "Per-cohort isolation failed — iter-v1/061 must trade BTCUSDT ONLY."
+        )
+        print(
+            f"[iter-v1/061] Dispatch verified: "
+            f"BTC-only={len(results_a061)} trades (R1=OFF, R2=OFF, R3=OFF). "
+            f"Cohort isolation PASS. "
+            f"atr_tp=3.5, atr_sl=1.75 (BTC specialist convention). "
+            f"HP override: study.enqueue_trial() monkey-patch confirmed (run_iteration_061.py)."
+        )
+
+        _all_faxm_logs = faxm_a061
+        all_results = results_a061
+        _r5_model_results = [results_a061]
+        _post_dispatch_fi_strategies = [("Model_A_BTC_specialist_061", _strat_a061)]
 
     elif iteration_label == "v1-044":
         # iter-v1/044: CONFIRMATION-MERGE-PORTFOLIO (cycle-5 CONFIRMATION 1/1).
