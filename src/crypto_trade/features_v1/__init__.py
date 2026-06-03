@@ -561,31 +561,33 @@ assert len(active_feature_columns) == 48 guard fires in dispatch branch.
 """
 
 
-V1_ITER064_UNIVERSE: tuple[str, ...] = ("ETHUSDT",)
-"""iter-v1/064 cohort: ETH-only SPECIALIST (second under SPECIALIST + BUNDLE methodology).
+V1_ITER065_UNIVERSE: tuple[str, ...] = ("BTCUSDT",)
+"""iter-v1/065 cohort: BTC-only SPECIALIST (third SPECIALIST under SPECIALIST + BUNDLE methodology).
 
-Cycle-7 SPECIALIST 2/10. Axis family: methodology (continued from /063 — generalization test
-across a second cohort with a different baseline IS profile).
-
-50-seed independent-Optuna bagging on ETHUSDT:
-    V1_SPECIALIST_SEED_COUNT=50, V1_SPECIALIST_OPTUNA_TRIALS=30,
-    max_depth=5 FIXED, num_leaves=31 FIXED, min_child_samples REMOVED,
-    ENSEMBLE_SIZE=1 per study, mean-of-signed-weights aggregator.
+Cycle-7 SPECIALIST 3/N. Axis family: methodology (continued from /063 DOT, /064 ETH).
+50-seed independent-Optuna bagging on BTCUSDT — the hardest-cohort generalization test.
 
 Feature set: V1_FEATURE_COLUMNS_PRUNED (48 cols, UNCHANGED).
-Risk config: R1=OFF (Model A baseline — BTC/ETH mean-reverting WR at late streaks),
-             R2=OFF (Model A baseline — R2 is Model E DOT-only disposition),
-             R3=ON-SHARED (cutoff=0.70, 16-feature V1_OOD_FEATURE_COLUMNS),
-             R5=ON (vt_target_vol=0.3, vt_lookback_days=45).
-atr_tp=2.9, atr_sl=1.45 (matched to Model A ETH cell in run_baseline_v1.py:3296-3308).
+Risk config (matched to Model A BTC baseline cell, run_baseline_v1.py:3296-3308):
+    R1=OFF (apply_r1=False — BTC mean-reverting WR at late streaks; R1 cooldown harms),
+    R2=OFF (Model A baseline has no R2; R2 is Model E DOT-only disposition),
+    R3=ON (Mahalanobis OOD gate, cutoff=0.70, 16 scale-invariant features; applied at
+           AGGREGATOR level per SPECIALIST methodology, NOT per-seed),
+    R5=ON (vt_target_vol=0.3, vt_lookback_days=45, vt_min_scale=0.33).
+atr_tp=2.9, atr_sl=1.45 (Model A BTC convention; NOT /055 deviation 3.5/1.75).
 
-Baseline ETH IS Sharpe: -0.61 (per-symbol attribution, BASELINE_V1.md:113).
-F-AXIS #1 (load-bearing): mean IS Sharpe >= -0.61 (i.e. delta >= 0 vs baseline).
-F-AXIS #2 (informational): per-candle ensemble dispersion mean sigma_pop <= 0.30.
-NORMAL-RISK: cohort change (DOT->ETH) does NOT alter Optuna training-objective domain.
+SPECIALIST methodology is load-bearing: specialist_mode=True, V1_SPECIALIST_SEED_COUNT=50,
+V1_SPECIALIST_OPTUNA_TRIALS=30, bounds_profile="v1_specialist" (max_depth=5 FIXED,
+num_leaves=31 FIXED), signed-weight mean aggregator.
 
+LOAD-BEARING PATCH at /065: specialist_dispersion.csv persistence (brief Section 6.5).
+  runner calls strategy.persist_specialist_dispersion_csv(is_dir/specialist_dispersion.csv)
+  AND appends specialist_dispersion_mean scalar to comparison.csv.
+  LM Master Risk 1 declares this MANDATORY; Critic 7.5 BLOCKS if absent.
+
+NORMAL-RISK: methodology axis does NOT change Optuna training-objective domain.
 LOCAL to runner constant. NOT shared; CONFIRMATION-MERGE updates V1_BASELINE_UNIVERSE.
-assert set(symbols) == {"ETHUSDT"} guard fires in dispatch branch.
+assert set(symbols) == {"BTCUSDT"} guard fires in dispatch branch.
 assert len(active_feature_columns) == 48 guard fires in dispatch branch.
 """
 
@@ -740,7 +742,7 @@ __all__ = [
     "V1_ITER058_UNIVERSE",
     "V1_ITER061_UNIVERSE",
     "V1_ITER063_UNIVERSE",
-    "V1_ITER064_UNIVERSE",
+    "V1_ITER065_UNIVERSE",
     # iter-v1/023: funding-rate feature family (add_funding_v1_features imported on demand)
     # iter-v1/025: OI delta feature family (add_oi_delta_v1_features imported on demand)
     # iter-v1/040: composed feature family (add_composed_v1_features imported on demand)

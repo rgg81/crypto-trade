@@ -88,7 +88,7 @@ from crypto_trade.features_v1 import (
     V1_ITER058_UNIVERSE,
     V1_ITER061_UNIVERSE,
     V1_ITER063_UNIVERSE,
-    V1_ITER064_UNIVERSE,
+    V1_ITER065_UNIVERSE,
     V1_OOD_FEATURE_COLUMNS,
     assert_v1_universe,
 )
@@ -6959,59 +6959,61 @@ def main() -> None:
         _r5_model_results = [results_e063]
         _post_dispatch_fi_strategies = [("Model_E_DOT_specialist_063", _strat_e063)]
 
-    elif iteration_label == "v1-064" and set(symbols) == set(V1_ITER064_UNIVERSE):
-        # iter-v1/064: ETHUSDT SPECIALIST — second under SPECIALIST + BUNDLE methodology.
-        # Axis family: methodology (continued from /063 — generalization test on second cohort).
+    elif iteration_label == "v1-065" and set(symbols) == set(V1_ITER065_UNIVERSE):
+        # iter-v1/065: BTCUSDT SPECIALIST — third under SPECIALIST + BUNDLE methodology.
+        # Axis family: methodology (continued from /063 DOT SPECIALIST, /064 ETH SPECIALIST).
+        # Hardest-cohort generalization test: BTC at ≈−1.30 baseline IS Sharpe
+        # is the catalog's deepest deficit AND has the longest basin-lottery history
+        # (5+ cycle-6 monotone-worsening iterations /053-/061).
         #
-        # SPECIALIST + BUNDLE design (skill commit ee5910e):
+        # SPECIALIST + BUNDLE design (same as /063):
         #   - 50 independent Optuna studies, one per seed (V1_SPECIALIST_SEEDS: 42..91)
         #   - Each study: n_trials=V1_SPECIALIST_OPTUNA_TRIALS=30, ENSEMBLE_SIZE=1
-        #   - LightGBM HP search: max_depth=5 FIXED, num_leaves=31 FIXED,
-        #     min_child_samples REMOVED from search space (uses LGBM default 20)
+        #   - LightGBM HP search: max_depth=5 FIXED, num_leaves=31 FIXED
         #   - confidence_threshold Optuna-tunable per seed (range [0.50, 0.85])
         #   - Aggregator at inference: mean-of-signed-weights across 50 seeds
         #
-        # Wall-clock mitigation (brief Section 3.6):
-        #   - n_estimators upper bound = 500 (capped from 1000)
-        #   - n_startup_trials = 10 (vs Optuna default 30)
-        #   - Projected wall-clock ~8-9h (ETH IS has ~5675 rows vs DOT's ~3775)
+        # Risk config (MATCHED to Model A BTC baseline cell, run_baseline_v1.py:3296-3308):
+        #   R1=OFF   apply_r1=False — BTC mean-reverting WR at late streaks (BASELINE_V1.md:43)
+        #   R2=OFF   apply_r2=False — Model A baseline has no R2 (R2 is Model E DOT-only)
+        #   R3=ON    Mahalanobis OOD gate, cutoff=0.70, 16 scale-invariant features;
+        #            applied at AGGREGATOR level (NOT per-seed) per SPECIALIST methodology
+        #   R5=ON    vt_target_vol=0.3, vt_lookback_days=45, vt_min_scale=0.33
+        #   atr_tp=2.9, atr_sl=1.45 (Model A BTC convention; NOT /055 deviation 3.5/1.75)
         #
-        # Risk config (matched to baseline Model A ETH cell — run_baseline_v1.py:3296-3308):
-        #   R1=OFF  (Model A baseline — BTC/ETH mean-reverting WR at late streaks; R1 hurts)
-        #   R2=OFF  (Model A baseline — R2 is Model E DOT-only disposition)
-        #   R3=ON-SHARED  cutoff=0.70, 16 features (one set of stats per ETH/month)
-        #   R5=ON  vt_target_vol=0.3, vt_lookback_days=45 (AGGREGATOR-LEVEL)
-        #   atr_tp=2.9, atr_sl=1.45 (matched to Model A ETH cell)
+        # Feature set: V1_FEATURE_COLUMNS_PRUNED (48 cols, UNCHANGED vs /063, /064).
+        # NORMAL-RISK: no Optuna training-objective domain change.
         #
-        # Feature set: V1_FEATURE_COLUMNS_PRUNED (48 cols, UNCHANGED).
-        # NORMAL-RISK: cohort change (DOT->ETH) does NOT alter Optuna training-objective domain.
-        assert set(symbols) == {"ETHUSDT"}, (
-            f"iter-v1/064 guard: expected {{ETHUSDT}}, got {set(symbols)}"
+        # LOAD-BEARING PATCH (brief Section 6.5, LM Master Risk 1):
+        #   After backtest completes, runner persists:
+        #   1. specialist_dispersion.csv → is_dir/specialist_dispersion.csv
+        #   2. specialist_dispersion_mean scalar → appended to comparison.csv
+        #   Critic 7.5 BLOCKS /065 closeout if either artifact is absent.
+        assert set(symbols) == {"BTCUSDT"}, (
+            f"iter-v1/065 guard: expected {{BTCUSDT}}, got {set(symbols)}"
         )
         assert len(active_feature_columns) == 48, (
-            f"iter-v1/064 guard: expected 48 V1_FEATURE_COLUMNS_PRUNED cols (UNCHANGED), "
+            f"iter-v1/065 guard: expected 48 V1_FEATURE_COLUMNS_PRUNED cols (UNCHANGED), "
             f"got {len(active_feature_columns)}."
         )
         print(
-            f"[iter-v1/064] ETH SPECIALIST — SPECIALIST+BUNDLE methodology ACTIVE: "
+            f"[iter-v1/065] BTC SPECIALIST — SPECIALIST+BUNDLE methodology ACTIVE: "
             f"V1_SPECIALIST_SEED_COUNT={V1_SPECIALIST_SEED_COUNT} "
             f"V1_SPECIALIST_OPTUNA_TRIALS={V1_SPECIALIST_OPTUNA_TRIALS} "
             f"specialist_mode=True "
-            f"max_depth=5 FIXED, num_leaves=31 FIXED, min_child_samples REMOVED. "
-            f"R1=OFF, R2=OFF (Model A baseline), "
-            f"R3=ON-SHARED cutoff=0.70, R5=ON vt_target_vol=0.3. "
+            f"max_depth=5 FIXED, num_leaves=31 FIXED. "
+            f"R1=OFF, R2=OFF, "
+            f"R3=ON-AGGREGATOR-LEVEL cutoff=0.70, R5=ON vt_target_vol=0.3. "
             f"features=V1_FEATURE_COLUMNS_PRUNED (48 cols; UNCHANGED). "
-            f"atr_tp=2.9, atr_sl=1.45 (Model A ETH cell). "
-            f"n_estimators_max=500 (wall-clock mitigation). "
-            f"n_startup_trials=10 (wall-clock mitigation). "
-            f"Aggregator: mean-of-signed-weights across {V1_SPECIALIST_SEED_COUNT} seeds."
+            f"atr_tp=2.9, atr_sl=1.45 (Model A BTC baseline — NOT /055 deviation). "
+            f"LOAD-BEARING: specialist_dispersion.csv will be persisted post-backtest."
         )
-        _config_e064 = BacktestConfig(
-            symbols=("ETHUSDT",),
+        _config_e065 = BacktestConfig(
+            symbols=("BTCUSDT",),
             interval="8h",
             max_amount_usd=1000.0,
-            stop_loss_pct=4.0,
-            take_profit_pct=8.0,
+            stop_loss_pct=2.9,  # ATR-based; overridden by atr_sl_multiplier=1.45
+            take_profit_pct=5.8,  # ATR-based; overridden by atr_tp_multiplier=2.9
             timeout_minutes=10080,
             fee_pct=0.1,
             data_dir=Path("data"),
@@ -7021,19 +7023,20 @@ def main() -> None:
             vt_lookback_days=45,
             vt_min_scale=0.33,
             vt_max_scale=2.0,
-            # R1=OFF: no risk_consecutive_sl_limit / risk_consecutive_sl_cooldown_candles
-            # R2=OFF: no risk_drawdown_scale_enabled
+            risk_consecutive_sl_limit=0,  # R1=OFF: no consecutive-SL cooldown
+            risk_consecutive_sl_cooldown_candles=0,
+            risk_drawdown_scale_enabled=False,  # R2=OFF: no drawdown scaling
             risk_r5_vol_target_enabled=_r5_kwargs.get("r5_vol_target_enabled", True),
             risk_r5_vol_target_pct=_r5_kwargs.get("r5_vol_target_pct", 4.0),
             risk_r5_kill_low_natr_enabled=_r5_kwargs.get("r5_kill_low_natr_enabled", False),
             risk_r5_kill_low_natr_min_pct=_r5_kwargs.get("r5_kill_low_natr_min_pct", 2.0),
         )
-        _strat_e064 = LightGbmStrategy(
+        _strat_e065 = LightGbmStrategy(
             training_months=24,
             n_trials=V1_SPECIALIST_OPTUNA_TRIALS,  # informational; specialist loop controls
             cv_splits=5,
-            label_tp_pct=8.0,
-            label_sl_pct=4.0,
+            label_tp_pct=5.8,
+            label_sl_pct=2.9,
             label_timeout_minutes=10080,
             fee_pct=0.1,
             features_dir="data/features",
@@ -7044,45 +7047,72 @@ def main() -> None:
             # placeholder seed — specialist_mode uses V1_SPECIALIST_SEEDS internally
             ensemble_seeds=list(V1_SPECIALIST_SEEDS[:1]),
             feature_columns=active_feature_columns,
-            ood_enabled=True,  # R3 SHARED
+            ood_enabled=True,  # R3 ON at AGGREGATOR level
             ood_features=list(V1_OOD_FEATURE_COLUMNS),
             ood_cutoff_pct=0.70,
             oof_persist_path=OOF_PARQUET_PATH,
-            bounds_profile="v1_pruned",  # base profile; specialist_mode overrides via v1_specialist
+            bounds_profile="v1_specialist",
             specialist_mode=True,
             specialist_n_startup_trials=10,
             specialist_n_estimators_max=500,
         )
-        import time as _time_064
+        import time as _time_065  # noqa: PLC0415
 
-        _t0_064 = _time_064.time()
-        results_e064 = run_backtest(_config_e064, _strat_e064, yearly_pnl_check=False)
-        _elapsed_064 = _time_064.time() - _t0_064
-        faxm_e064 = _strat_e064._faxm_log
+        _t0_065 = _time_065.time()
+        results_e065 = run_backtest(_config_e065, _strat_e065, yearly_pnl_check=False)
+        _elapsed_065 = _time_065.time() - _t0_065
+        faxm_e065 = _strat_e065._faxm_log
         print(
-            f"\n[iter-v1/064] Model_A_ETH_specialist complete: "
-            f"{len(results_e064)} trades in {_elapsed_064:.0f}s "
-            f"({_elapsed_064 / 3600:.2f}h)"
+            f"\n[iter-v1/065] Model_A_BTC_specialist complete: "
+            f"{len(results_e065)} trades in {_elapsed_065:.0f}s "
+            f"({_elapsed_065 / 3600:.2f}h)"
         )
 
-        # Cohort isolation sanity: assert ONLY ETHUSDT trades emitted.
-        _e064_symbols = {r.symbol for r in results_e064}
-        assert _e064_symbols.issubset({"ETHUSDT"}), (
-            f"[iter-v1/064] Model A_ETH produced non-ETH results: "
-            f"{_e064_symbols - {'ETHUSDT'}}. "
-            "Per-cohort isolation failed — iter-v1/064 must trade ETHUSDT ONLY."
+        # Cohort isolation sanity: assert ONLY BTCUSDT trades emitted.
+        _e065_symbols = {r.symbol for r in results_e065}
+        assert _e065_symbols.issubset({"BTCUSDT"}), (
+            f"[iter-v1/065] Model A_BTC produced non-BTC results: "
+            f"{_e065_symbols - {'BTCUSDT'}}. "
+            "Per-cohort isolation failed — iter-v1/065 must trade BTCUSDT ONLY."
         )
+
+        # -----------------------------------------------------------------
+        # LOAD-BEARING: specialist_dispersion.csv persistence (LM Risk 1,
+        # brief Section 6.5).  Critic 7.5 BLOCKS /065 closeout if absent.
+        # Step 1: persist specialist_dispersion.csv to IS reports directory.
+        # Step 2: append specialist_dispersion_mean scalar to comparison.csv.
+        # -----------------------------------------------------------------
+        _disp_mean_e065 = _strat_e065.get_specialist_dispersion_mean()
+        _disp_is_path_e065 = (
+            Path(reports_dir) / "iteration_v1-065" / "in_sample" / "specialist_dispersion.csv"
+        )
+        # Ensure the IS directory exists (generate_iteration_reports may not
+        # have run yet at this dispatch-branch point; mkdir is idempotent).
+        _disp_is_path_e065.parent.mkdir(parents=True, exist_ok=True)
+        _strat_e065.persist_specialist_dispersion_csv(str(_disp_is_path_e065))
         print(
-            f"[iter-v1/064] Dispatch verified: "
-            f"ETH-only={len(results_e064)} trades. "
-            f"R1=OFF/R2=OFF/R3=ON-SHARED. "
-            f"SPECIALIST seeds={len(_strat_e064._specialist_models)} trained."
+            f"[iter-v1/065] LOAD-BEARING dispersion patch: "
+            f"specialist_dispersion_mean={_disp_mean_e065} "
+            f"specialist_dispersion.csv → {_disp_is_path_e065}"
+        )
+        # specialist_dispersion_mean appended to comparison.csv AFTER
+        # generate_iteration_reports() runs (comparison.csv written there).
+        # We store the value here for the post-report block.
+        _e065_disp_mean = _disp_mean_e065
+        _e065_disp_csv_path = _disp_is_path_e065
+
+        print(
+            f"[iter-v1/065] Dispatch verified: "
+            f"BTC-only={len(results_e065)} trades. "
+            f"R1=OFF/R2=OFF/R3=ON-AGGREGATOR-LEVEL. "
+            f"SPECIALIST seeds={len(_strat_e065._specialist_models)} trained. "
+            f"σ_pop mean={_disp_mean_e065}"
         )
 
-        _all_faxm_logs = faxm_e064
-        all_results = results_e064
-        _r5_model_results = [results_e064]
-        _post_dispatch_fi_strategies = [("Model_A_ETH_specialist_064", _strat_e064)]
+        _all_faxm_logs = faxm_e065
+        all_results = results_e065
+        _r5_model_results = [results_e065]
+        _post_dispatch_fi_strategies = [("Model_A_BTC_specialist_065", _strat_e065)]
 
     elif iteration_label == "v1-044":
         # iter-v1/044: CONFIRMATION-MERGE-PORTFOLIO (cycle-5 CONFIRMATION 1/1).
@@ -8222,6 +8252,34 @@ def main() -> None:
             f"[iter-v1/030] m2_passed column added to trades.csv "
             f"(M2-active keys: {len(_m2_active_keys)}; Model E DOT = NaN)"
         )
+
+    # -------------------------------------------------------------------------
+    # iter-v1/065+: specialist_dispersion_mean → comparison.csv (LOAD-BEARING).
+    # The scalar is persisted AFTER generate_iteration_reports() writes
+    # comparison.csv so we can append the new row reliably.
+    #
+    # Guard: only runs when _e065_disp_mean is defined (v1-065 dispatch sets it).
+    # For all other iterations, _e065_disp_mean is not in scope (no-op).
+    # -------------------------------------------------------------------------
+    if iteration_label == "v1-065" and "_e065_disp_mean" in dir():
+        _disp_mean_val = locals().get("_e065_disp_mean")
+        if _disp_mean_val is not None:
+            import csv as _csv_065  # noqa: PLC0415
+
+            _comp_csv_065 = report_dir / "comparison.csv"
+            if _comp_csv_065.exists():
+                with _comp_csv_065.open("a", newline="") as _fh_065:
+                    _writer_065 = _csv_065.writer(_fh_065)
+                    _writer_065.writerow(["specialist_dispersion_mean", _disp_mean_val, "", ""])
+                print(
+                    f"[iter-v1/065] LOAD-BEARING: specialist_dispersion_mean="
+                    f"{_disp_mean_val:.4f} appended to {_comp_csv_065}"
+                )
+            else:
+                print(
+                    f"[iter-v1/065] WARNING: comparison.csv not found at {_comp_csv_065}; "
+                    f"specialist_dispersion_mean={_disp_mean_val:.4f} NOT appended."
+                )
 
     # -------------------------------------------------------------------------
     # iter-v1/021+: write feature importance CSVs (post-dispatch).
