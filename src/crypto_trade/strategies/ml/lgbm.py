@@ -1481,6 +1481,49 @@ class LightGbmStrategy:
             return None
         return float(np.mean(self._specialist_dispersion_stats))
 
+    def persist_specialist_dispersion_csv(self, path: str) -> None:
+        """Persist the in-memory specialist dispersion stats to a CSV file.
+
+        Writes ``_specialist_dispersion_stats`` to *path* with two columns:
+        - ``observation_idx`` — 0-based index in the accumulator list (NOT
+          candle_idx; the accumulator is append-only at signal-fire events, so
+          the index reflects chronological signal-fire ordering).
+        - ``ensemble_std`` — per-candle population std of signed_weights across
+          all seeds at the specialist aggregator for each firing candle.
+
+        This method is the load-bearing hygiene patch mandated by LM Master
+        Risk 1 (iter-v1/065 lgbm_advisor.md) and brief Section 6.5.  /063 and
+        /064 accumulated ``_specialist_dispersion_stats`` in memory but lost the
+        data at process exit.  /065+ runners MUST call this method after the
+        per-symbol backtest completes.
+
+        If the accumulator is empty (no signals fired), writes a zero-row CSV
+        with the header intact so downstream readers do not crash.
+
+        Args:
+            path: Absolute or relative filesystem path for the output CSV.
+                  Parent directory is created if it does not exist.
+        """
+        import csv as _csv  # noqa: PLC0415
+
+        out_path = Path(path)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        with out_path.open("w", newline="") as _fh:
+            writer = _csv.DictWriter(_fh, fieldnames=["observation_idx", "ensemble_std"])
+            writer.writeheader()
+            for idx, std_val in enumerate(self._specialist_dispersion_stats):
+                writer.writerow({"observation_idx": idx, "ensemble_std": std_val})
+        n_obs = len(self._specialist_dispersion_stats)
+        mean_val = self.get_specialist_dispersion_mean()
+        print(
+            f"[lgbm] specialist_dispersion.csv persisted: "
+            f"{n_obs} observations → {out_path} "
+            f"(mean σ_pop={mean_val:.4f})"
+            if mean_val is not None
+            else f"[lgbm] specialist_dispersion.csv persisted: "
+            f"{n_obs} observations (empty — no signals fired) → {out_path}"
+        )
+
     def get_signal(self, symbol: str, open_time: int) -> Signal:
         """Return signal for one candle. Always predicts 1 or -1."""
         # Detect month change → lazy training
