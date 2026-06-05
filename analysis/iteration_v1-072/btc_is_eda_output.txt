@@ -1,0 +1,209 @@
+Loading BTC /065 IS artifacts from: /home/roberto/crypto-trade/.worktrees/quant-research/reports-v1/iteration_v1-065/in_sample
+Loaded 190 BTC trades from 2022-01-01 07:59:59.999000 to 2025-03-24 00:00:00
+
+================================================================================
+1) PER-MONTH IS LOSS DECOMPOSITION
+================================================================================
+Worst 5 months by net PnL %:
+  month  pnl_pct  trade_count
+2025-02  -8.9070            5
+2024-07  -6.5181            8
+2022-10  -4.5094            9
+2022-06  -4.0393            6
+2022-03  -3.9788            5
+
+Best 5 months by net PnL %:
+  month  pnl_pct  trade_count
+2024-04   9.8883            3
+2022-07   9.0866            7
+2024-01   6.0936            7
+2024-10   5.0361            3
+2022-01   3.3766            3
+
+Negative months: 21 (total -61.05%)
+Positive months: 16 (total 52.72%)
+Net IS PnL: -8.33%  (Sharpe IS = -0.18)
+
+Worst-5 months: trade-by-trade win-rate breakdown
+  2025-02: n= 4  WR= 25.0%  avg_pnl= -1.60%  long=4(WR=25%)  short=0(WR=nan%)
+  2024-07: n= 7  WR= 14.3%  avg_pnl= -2.43%  long=2(WR=50%)  short=5(WR=0%)
+  2022-10: n= 8  WR= 12.5%  avg_pnl= -1.83%  long=7(WR=14%)  short=1(WR=0%)
+  2022-06: n= 5  WR= 40.0%  avg_pnl= -1.67%  long=4(WR=25%)  short=1(WR=100%)
+  2022-03: n= 6  WR= 33.3%  avg_pnl= -1.02%  long=0(WR=nan%)  short=6(WR=33%)
+
+================================================================================
+2) TOP FEATURES — BTC vs ETH vs DOT specialists
+================================================================================
+BTC top-15:
+            feature_name  mean_gain  importance_rank
+      trend_aroon_osc_50 18964.8601                1
+              vol_atr_14 18420.8599                2
+            trend_adx_14 11464.5609                3
+     interact_natr_x_adx 11284.2412                4
+     vol_bb_bandwidth_20 11256.0099                5
+            stat_skew_20 10784.5023                6
+      stat_autocorr_lag5 10237.7010                7
+btc_funding_spread_30_90  9652.2296                8
+         oi_delta_30_z90  9221.3079                9
+    long_short_zscore_30  8136.2179               10
+        stat_kurtosis_20  7691.0877               11
+   mom_macd_line_12_26_9  7574.2884               12
+             vol_natr_14  6097.6131               13
+      mr_pct_from_low_20  5092.2853               14
+              vol_cmf_14  4322.7790               15
+
+BTC BOTTOM-14 (ranks 35-48, low gain — drop candidates):
+           feature_name  mean_gain  importance_rank
+          stat_return_5   718.9519               35
+             mom_roc_10   629.0676               36
+      vol_volume_rel_20   281.0223               37
+   interact_ret1_x_ret3   280.1337               38
+     vol_range_spike_24   274.9254               39
+     vol_range_spike_72   258.8981               40
+    vol_volume_pctchg_5   202.7710               41
+    vol_taker_buy_ratio   200.9661               42
+   interact_ret1_x_natr   164.8066               43
+      stat_log_return_1   132.1024               44
+      mr_rsi_extreme_14    13.3020               45
+          cal_hour_norm     3.1444               46
+dot_vs_btc_ret_ratio_30     0.0000               47
+eth_vs_btc_ret_ratio_30     0.0000               48
+
+Top-10 feature overlap:
+  BTC ∩ ETH: ['btc_funding_spread_30_90', 'interact_natr_x_adx', 'oi_delta_30_z90', 'stat_autocorr_lag5', 'stat_skew_20', 'trend_adx_14', 'trend_aroon_osc_50', 'vol_atr_14']
+  BTC ∩ DOT: ['btc_funding_spread_30_90', 'interact_natr_x_adx', 'oi_delta_30_z90', 'stat_autocorr_lag5', 'stat_skew_20', 'trend_adx_14', 'trend_aroon_osc_50', 'vol_atr_14']
+  BTC unique vs ETH+DOT: ['long_short_zscore_30', 'vol_bb_bandwidth_20']
+  ETH unique vs BTC: ['mom_macd_line_12_26_9', 'stat_kurtosis_20']
+  DOT unique vs BTC: ['mom_macd_line_12_26_9', 'stat_kurtosis_20']
+
+  Features in ETH top10 but NOT DOT, present in BTC top10:
+    NONE
+
+  BTC top10 features containing 'eth' (cross-asset borrowing): set()
+  ETH top10 features containing 'btc': {'btc_funding_spread_30_90'}
+
+BTC rank of features that work for ETH/DOT (cross-check on which BTC under-uses):
+  stat_kurtosis_20: BTC rank=11  gain=7691.1
+  mom_macd_line_12_26_9: BTC rank=12  gain=7574.3
+
+================================================================================
+3) REGIME BREAKDOWN
+================================================================================
+ regime  trades  wins  win_rate  net_pnl_pct  avg_pnl_pct  sharpe
+unknown     190    67      35.3     -43.5629      -0.2293 -0.0542
+
+NOTE: per_regime.csv is DEGENERATE — single 'unknown' row at /065.
+Regime tagging not active for /065 specialist run.
+Falling back to manual regime decomposition by year + BTC-price cycle.
+
+================================================================================
+3b) MANUAL REGIME PROXY — per-year stats (BTC cycle proxy)
+================================================================================
+       n    wr  avg_pnl  net_pnl  sharpe
+year                                    
+2022  69  34.8    -0.14   -10.00  -0.028
+2023  68  32.4    -0.69   -46.87  -0.211
+2024  45  40.0     0.39    17.70   0.093
+2025   8  37.5    -0.55    -4.40  -0.154
+
+Per-year direction breakdown:
+  2022: long n=41(WR=31.7%, PnL=-28.79%)  short n=28(WR=39.3%, PnL=+18.80%)
+  2023: long n=27(WR=37.0%, PnL=-14.64%)  short n=41(WR=29.3%, PnL=-32.23%)
+  2024: long n=19(WR=47.4%, PnL=+24.20%)  short n=26(WR=34.6%, PnL=-6.50%)
+  2025: long n=7(WR=42.9%, PnL=-0.86%)  short n=1(WR=0.0%, PnL=-3.54%)
+
+================================================================================
+4) TRADE-PATTERN FLAWS
+================================================================================
+Total trades: 190
+Wins: 67 (avg = 4.872%)  Losses: 123 (avg = -3.008%)
+Win rate: 35.26%
+Profit factor (win-PnL / |loss-PnL|): 0.882
+Win/Loss ratio: 1.620
+
+Long: n=94  WR=37.2%  avg_pnl=-0.214%  net=-20.10%
+Short: n=96  WR=33.3%  avg_pnl=-0.244%  net=-23.46%
+
+Exit-reason distribution:
+               n     wr  avg_pnl     net
+exit_reason                             
+stop_loss    111    0.0   -3.203 -355.58
+take_profit   44  100.0    6.240  274.54
+timeout       35   65.7    1.071   37.48
+
+Direction × exit-reason joint:
+                        n  avg_pnl     net
+direction exit_reason                     
+-1        stop_loss    58   -3.112 -180.48
+          take_profit  22    6.249  137.47
+          timeout      16    1.222   19.55
+ 1        stop_loss    53   -3.304 -175.09
+          take_profit  22    6.230  137.07
+          timeout      19    0.943   17.92
+
+Holding period (8h candles): mean=10.6, median=9.0, max=21
+
+5 worst single trades:
+           open_time_dt  direction exit_reason      pnl  confidence
+2022-06-17 07:59:59.999          1   stop_loss -10.1116        0.58
+2023-03-16 15:59:59.999         -1   stop_loss  -5.5298        0.20
+2022-06-27 23:59:59.999          1   stop_loss  -5.3510        0.16
+2022-03-17 07:59:59.999         -1   stop_loss  -5.2434        0.22
+2022-03-12 07:59:59.999         -1   stop_loss  -5.1946        0.20
+
+5 best single trades:
+           open_time_dt  direction exit_reason     pnl  confidence
+2022-02-25 07:59:59.999          1 take_profit 12.4511        0.36
+2022-07-01 07:59:59.999          1 take_profit 11.9995        0.06
+2022-07-19 23:59:59.999         -1 take_profit 10.9502        0.18
+2022-07-15 23:59:59.999          1 take_profit  9.1984        0.16
+2022-06-08 15:59:59.999         -1 take_profit  9.0993        0.32
+
+Concentration: top-1 trade = -28.6% of net IS PnL
+               top-5 trades = -123.3% of net IS PnL
+
+================================================================================
+5) ATR-BARRIER / CONFIDENCE DIAGNOSTIC
+================================================================================
+Confidence: mean=0.369  median=0.280
+Confidence quartiles:
+min    0.02
+25%    0.10
+50%    0.28
+75%    0.64
+max    1.00
+
+Confidence-bin × outcome:
+            n    wr  avg_pnl    net
+conf_bin                           
+<0.05      25  32.0   -0.443 -11.07
+0.05-0.10  25  36.0    0.101   2.53
+0.10-0.15  12  41.7    0.311   3.73
+0.15-0.20  21  28.6   -0.543 -11.39
+0.20-0.30  19  26.3   -0.260  -4.94
+0.30+      88  38.6   -0.255 -22.42
+
+Barrier hit rate:  SL=111 (58.4%)  TP=44 (23.2%)  timeout=35 (18.4%)
+
+  Avg SL pnl: -3.203%  (atr_sl=1.45 calibrated)
+  Avg TP pnl: +6.240%  (atr_tp=2.9 calibrated)
+  Avg timeout pnl: +1.071%  WR=65.7%   (timeout proxy: TP too far OR TP arrived but unconfirmed)
+
+================================================================================
+6) CONSECUTIVE-LOSS STREAK AUDIT (R1 candidate)
+================================================================================
+Max consecutive-loss streak: 7
+All loss streaks (sorted desc): [7, 6, 6, 6, 6, 5, 5, 5, 5, 5, 5, 4, 4, 4, 4]
+
+Outcome conditional on prior consecutive-loss streak (R1 design input):
+  Prior streak=0: n= 67  WR= 37.3%  avg_pnl=-0.026%  net= -1.76%
+  Prior streak=1: n= 42  WR= 31.0%  avg_pnl=-0.263%  net=-11.06%
+  Prior streak=2: n= 29  WR= 31.0%  avg_pnl=-0.817%  net=-23.71%
+  Prior streak=3: n= 20  WR= 25.0%  avg_pnl=-1.378%  net=-27.55%
+  Prior streak=4: n= 15  WR= 26.7%  avg_pnl=-0.805%  net=-12.07%
+  Prior streak=5: n= 11  WR= 54.5%  avg_pnl=+2.150%  net=+23.65%
+  Prior streak >=3: n=52  WR=38.5%  net=-7.04%  -- R1=ON would skip these
+
+================================================================================
+DONE
+================================================================================
