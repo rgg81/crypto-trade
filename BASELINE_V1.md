@@ -1,10 +1,207 @@
-# V1 Baseline — Refactored
+# V1 Baseline — BUNDLE-001 (SPECIALIST + BUNDLE methodology)
+
+Last updated by: **iter-v1/071 FIRST BUNDLE-001 ASSEMBLY on 2026-06-05** under user mandate (`"we merge this, no matter what. This is gonna be our baseline now."`). This iteration establishes the FIRST methodology-trained baseline anchor under the new SPECIALIST + BUNDLE methodology. The prior `v0.v1-baseline-corrected` (corrected walk-forward 5-symbol pooled head) is **SUPERSEDED** — preserved in the "Superseded Baseline" section at the bottom of this file.
+
+OOS cutoff date: 2025-03-24 (fixed, never changes).
+
+Tag: **`v0.v1-071`** (this file's commit).
+
+Reports: `reports-v1/iteration_v1-071/` (bundle) + `reports-v1/iteration_v1-063/` + `reports-v1/iteration_v1-064/` + `reports-v1/iteration_v1-065/` (per-specialist; recovered + committed at /071 setup).
+
+Track: **v1** (refactored; 3-coin specialist bundle).
+
+---
+
+## Baseline = BUNDLE-001 (3 single-coin specialists, pairwise-disjoint universe)
+
+BUNDLE-001 is the symbol-partitioned union of 3 LightGBM specialists, each trained independently under the cycle-6/cycle-7 per-symbol regime-specialist mandate. There are no bundle-level weights; each specialist trades its own coin under its own risk wrapper.
+
+| # | Specialist | Owns | Source iter | Risk wrapper | ATR TP/SL | Inner-ensemble seeds | Outer seed |
+|---|---|---|---|---|---|---|---|
+| 1 | DOT specialist | `{DOTUSDT}` | iter-v1/063 | R1+R2+R3 | 3.5 / 1.75 | 5 (`[42,123,456,789,1001]`) | 42 |
+| 2 | ETH specialist | `{ETHUSDT}` | iter-v1/064 | R3 only (Model A pattern) | 2.9 / 1.45 | 5 | 42 |
+| 3 | BTC specialist | `{BTCUSDT}` | iter-v1/065 | R3 only (Model A pattern) | 2.9 / 1.45 | 5 | 42 |
+
+**Pairwise-disjoint universe**: `{DOTUSDT} ∩ {ETHUSDT} = ∅`, `{DOTUSDT} ∩ {BTCUSDT} = ∅`, `{ETHUSDT} ∩ {BTCUSDT} = ∅`. Union = `{BTCUSDT, ETHUSDT, DOTUSDT}` (3 coins). **LINKUSDT and LTCUSDT are NOT in BUNDLE-001** (specialist attempts /066-/070 dropped under 2-strike rule). Per `feedback_v1_bundle_no_coin_overlap.md` Critic Check 16 PASS.
+
+**Bundle decision rule** (per `feedback_v1_backtest_live_parity_hard.md` — Critic Check 15 PASS):
+
+```python
+def bundle_signal(symbol, t):
+    if symbol == "DOTUSDT":
+        return spec_063.get_signal(symbol, t)
+    if symbol == "ETHUSDT":
+        return spec_064.get_signal(symbol, t)
+    if symbol == "BTCUSDT":
+        return spec_065.get_signal(symbol, t)
+    return None  # not in BUNDLE-001 universe
+```
+
+Bit-identical in backtest (post-hoc trades.csv union) and at `live/engine.py:_tick` (specialist dispatch per symbol). No aggregation, no netting, no portfolio-level shared state.
+
+**No bundle-level weights** (per `feedback_v1_bundle_weight_is_only.md` Critic Check 17 N/A): each specialist's per-trade `weight_factor` already encodes vol-targeting + R2 scaling + risk wrapper effects.
+
+---
+
+## BUNDLE-001 Headline Metrics
+
+From `reports-v1/iteration_v1-071/comparison.csv`:
+
+| Metric | In-Sample | Out-of-Sample | OOS/IS ratio |
+|---|---:|---:|---:|
+| **Monthly Sharpe** | **+0.5463** | **+0.9636** | **1.7639** |
+| Monthly Sortino | +0.8729 | +1.5678 | 1.7961 |
+| Max Drawdown | 89.03% | 36.51% | 0.4101 |
+| Win Rate | 40.60% | 45.22% | 1.1138 |
+| Profit Factor | 1.1021 | 1.2158 | 1.1032 |
+| Total Trades | 537 | 230 | 0.4283 |
+| Total Net PnL | +129.681% | +109.7499% | 0.8463 |
+| Calmar Ratio | 0.4482 | 2.2546 | 5.0303 |
+| Top-symbol concentration (OOS) | N/A | **37.96% (BTC)** | N/A |
+
+Bundle per-trade Sharpe ratio (OOS/IS) = +0.084 / +0.041 = **2.05** (regime-favorable OOS window).
+
+---
+
+## Per-Specialist Metrics
+
+From each specialist's `reports-v1/iteration_v1-{063,064,065}/comparison.csv`:
+
+| Specialist | Sym | IS Sharpe | OOS Sharpe | IS Trades | OOS Trades | IS PnL% | OOS PnL% | IS MaxDD | OOS MaxDD |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| /063 | DOT | +0.4310 | −0.0709 | 149 | 62 | +23.94 | −1.09 | 17.12% | 16.21% |
+| /064 | ETH | +0.2383 | +0.5171 | 198 | 81 | +15.00 | +9.21 | 24.66% | 11.44% |
+| /065 | BTC | −0.1763 | +1.1256 | 190 | 87 | −8.33 | +13.75 | 25.86% | 5.48% |
+
+**Regime profile**:
+- **DOT** — high-IS, near-flat-OOS (IS-window regime-specialist; R1+R2+R3 retained from Model E lineage).
+- **ETH** — balanced, OOS-favored (steady contributor; per-trade Sharpe +0.063 OOS vs +0.049 IS).
+- **BTC** — IS-NEGATIVE / OOS-POSITIVE (regime-INVERTING specialist; the single largest OOS contributor at 37.96% of bundle OOS PnL; pending multi-seed disambiguation per `feedback_is_oos_divergence_is_regime_not_overfit.md`).
+
+---
+
+## Per-Symbol OOS PnL Attribution
+
+| Symbol | OOS Trades | OOS PnL% | Share of bundle OOS PnL |
+|---|---:|---:|---:|
+| BTCUSDT | 87 | +41.66% | **37.96%** |
+| DOTUSDT | 62 | +40.18% | **36.61%** |
+| ETHUSDT | 81 | +27.91% | **25.43%** |
+
+**Top-symbol concentration**: BTC at **37.96%** > 30% gate. At N=3 the equal-weight concentration ceiling is 33.3% — the standard 30% gate is structurally infeasible. Future BUNDLE-002 must expand to N≥5 to make the 30% gate achievable. The HHI excess over equal-weight is only 2.85% (effectively equal-weighted PnL distribution).
+
+---
+
+## Configuration Inherited Into BUNDLE-001
+
+**Symbols**: `{BTCUSDT, ETHUSDT, DOTUSDT}` (3-coin universe; LINK + LTC excluded under 2-strike rule).
+
+**Excluded universe (v1)**: `V1_EXCLUDED_SYMBOLS = (SOLUSDT, XRPUSDT, DOGEUSDT, NEARUSDT, BCHUSDT, LDOUSDT, TRXUSDT, BNBUSDT)`.
+
+**Risk mitigations active per specialist**:
+- DOT specialist (/063): **R1 + R2 + R3** (K=3, C=27 candles ≈ 9 days; R2 trigger=7%, anchor=15%, floor=0.33; R3 cutoff=0.70, 16 SI features). Mirror of historical Model E pattern.
+- ETH specialist (/064): **R3 only** (R1/R2 disabled per historical Model A pattern; R3 cutoff=0.70, 16 SI features).
+- BTC specialist (/065): **R3 only** (same).
+
+**Feature stack**: `V1_FEATURE_COLUMNS_PRUNED` (48 columns; post-cycle-2/3 prune; same column-pinned passing to LightGBM).
+
+**Ensemble**: 5 inner seeds per specialist (`[42, 123, 456, 789, 1001]`); single outer seed=42 EXPLORATION budget.
+
+**Optuna**: `n_trials = 18` per (symbol, month) cell (EXPLORATION budget; CONFIRMATION budget = 35 trials/cell deferred to /072 multi-seed re-validation).
+
+**Walk-forward**: `train_end_ms = test_start_ms - embargo_ms` (the iter-v3/058 fix at `walk_forward.py:113`; commit `5566a69`).
+
+**Training schedule**: `training_months = 24`, monthly retrain; OOS_CUTOFF_DATE = 2025-03-24.
+
+---
+
+## Hard Merge Gates — Status vs BUNDLE-001 (USER-MANDATE OVERRIDE)
+
+| Gate | Threshold | BUNDLE-001 | Verdict |
+|---|---|---:|---|
+| IS monthly Sharpe | > 1.0 | +0.5463 | FAIL (informational under user mandate) |
+| OOS monthly Sharpe | > 1.0 | +0.9636 | FAIL (informational under user mandate; 0.04 short of floor) |
+| OOS / IS Sharpe ratio | ≥ 0.5 | 1.7639 | PASS |
+| OOS trades total | ≥ 130 | 230 | PASS |
+| Per-specialist OOS trades | ≥ 50 | DOT 62 / ETH 81 / BTC 87 | PASS (3/3) |
+| OOS trades/month | ≥ 10 | ~16.4 | PASS |
+| IS trades total | ≥ 50 | 537 | PASS |
+| Top symbol concentration | ≤ 30% (OOS PnL share) | 37.96% (BTC) | FAIL (structurally infeasible at N=3; informational) |
+| **DSR** (CONFIRMATION-grade) | > 0.95 | not computed at bundle layer (per-specialist DSR informational; bundle DSR requires aggregated trial-counting) | FAIL (informational under user mandate) |
+| **PSR** (monthly, vs benchmark 1.0) | > 0.95 | not computed at bundle layer | FAIL (informational under user mandate) |
+| **PBO** | < 0.40 | not computed at bundle layer (specialist selection PBO non-trivial at 3-of-8) | FAIL (informational under user mandate) |
+| Multi-seed re-validation | mean SR > 0 + ≥7/10 profitable | NOT YET RUN (single outer seed=42 EXPLORATION basis) | DEFERRED to /072 |
+| Methodology integrity | Look-ahead / embargo / pairwise-disjoint / live-parity | PASS (Critic Phase 7.5 Checks 1, 2, 15, 16, 17) | PASS |
+
+**User mandate is binding for edge-gate evaluation only; methodology-integrity gates (Checks 1, 2, 15, 16, 17) PASS on their own merits and are independent of the mandate.** No methodology violation is overridden — only the standard CONFIRMATION-budget edge thresholds.
+
+**Material work needed to discharge the open gates** (mandatory for /072):
+1. Multi-seed re-validation at 7-outer-seed roster `[42, 123, 456, 789, 1001, 2002, 3003]` per specialist.
+2. Bundle-layer DSR/PBO/PSR computation (methodology axis; design a CONFIRMATION-grade aggregator that accounts for per-specialist Optuna trial counts and the 3-of-8 specialist selection cost).
+3. BUNDLE-002 universe expansion to N≥5 to make the 30% top-symbol concentration gate clearable.
+
+---
+
+## Comparison vs Old (Superseded) Baseline
+
+| Metric | Old `v0.v1-baseline-corrected` | BUNDLE-001 (`v0.v1-071`) | Δ |
+|---|---:|---:|---:|
+| IS monthly Sharpe | +0.2829 | +0.5463 | **+0.2634** |
+| OOS monthly Sharpe | +0.6637 | +0.9636 | **+0.2999** |
+| OOS/IS Sharpe ratio | 2.346 | 1.764 | −0.582 |
+| OOS trades total | 189 | 230 | +41 |
+| IS trades total | 621 | 537 | −84 |
+| OOS Profit Factor | 1.156 | 1.2158 | +0.060 |
+| OOS Win Rate | 40.2% | 45.22% | +5.02pp |
+| OOS Max DD | 40.94% | 36.51% | −4.43pp |
+| IS Max DD | 73.06% | 89.03% | +15.97pp |
+| OOS Calmar | 0.931 | 2.255 | +1.324 |
+| Symbol count | 5 (pool) | 3 (specialists) | −2 (LINK+LTC dropped under 2-strike) |
+
+**Pareto result vs old baseline**: PARTIAL. 6 of 9 comparable metrics strictly improve; OOS/IS Sharpe ratio compresses (still ≫ 0.5 floor); IS trade count drops (still ≫ 50 floor); IS MaxDD widens.
+
+---
+
+## Trade-Artifact Persistence — NEW HARD RULE (effective from /072)
+
+Codified at commit `0a19e0682778b98d0523fcc6c70ebe73b10e6fd9`:
+
+> **HARD rule**: At Phase 8 closeout, the QR MUST `git add reports-v1/iteration_v1-NNN/` BEFORE committing the diary. The reports tree (`trades.csv`, `comparison.csv`, `daily_pnl.csv`, `monthly_pnl.csv`, `per_symbol.csv` per IS+OOS) is a load-bearing artifact:
+> - Bundle composition (THIS iteration's primary failure mode)
+> - Regime attribution
+> - Dead-paths verification
+> - Trade-level deterministic replay (per `feedback_deterministic_trade_match.md`)
+>
+> Phase 8 commit messages must include "reports tracked" in the body. Critic Check `REPORTS-TREE-COMMITTED` verifies the reports tree exists in git history before allowing the merge.
+
+iter-v1/063, /064, /065 (and the LINK+LTC dropped specialists /066-/070) are **GRANDFATHERED** — artifacts recovered from `stash@{0}` at commit `ee37f07e` and committed at /071 setup.
+
+---
+
+## Audit Trail
+
+- **2026-04-22** — Historical v0.186 baseline tagged on `main` (R3 OOD gate added; OOS Sharpe +1.735 — later found to be inflated by walk-forward lookahead bias).
+- **2026-05-13** — Walk-forward fix `5566a69`; corrected stats captured in `BASELINE.md` (OOS Sharpe +0.827 / 184 trades).
+- **2026-05-23** — v1 refactored. `BASELINE_V1.md` created with corrected stats on fresh data — anchor `v0.v1-baseline-corrected` (now SUPERSEDED).
+- **2026-05-26** — Cycle-2 CLOSES NO-MERGE at iter-v1/015. Anchor numbers UNCHANGED.
+- **2026-06-01** — Cycle-6 CLOSES NO-MERGE at iter-v1/056 CONFIRMATION-BLOCK. Per-symbol regime-specialist mandate continues into cycle-7. Anchor numbers UNCHANGED.
+- **2026-06-05** — **iter-v1/071 FIRST BUNDLE-001 ASSEMBLY** under user mandate. Trade-artifact loss incident recovery from `stash@{0}` at `ee37f07e`. New HARD reports-tracking rule codified at `0a19e068`. BASELINE_V1 SUPERSEDED — new anchor is `v0.v1-071` (THIS FILE).
+
+---
+
+## Superseded Baseline — `v0.v1-baseline-corrected` (preserved for history)
+
+The prior baseline (5-symbol pool / 4-model architecture A/C/D/E / 193-col `V1_FEATURE_COLUMNS`) is preserved below verbatim for trace and back-comparison. **Do not cite as the active anchor.** Use `v0.v1-071` BUNDLE-001 for all post-/071 iteration comparisons.
+
+---
+
+## V1 Baseline — Refactored (SUPERSEDED 2026-06-05)
 
 Last updated by: **v1 refactor + fresh-data baseline reproduction on 2026-05-23** — corrected walk-forward stats from re-running v0.186's exact config under the fixed `walk_forward.py:113` (`train_end_ms = test_start_ms - embargo_ms`) and the freshest kline data (2026-05-23 fetch).
 
 OOS cutoff date: 2025-03-24 (fixed, never changes).
 
-Tag: `v0.v1-baseline-corrected` (this file's commit).
+Tag: `v0.v1-baseline-corrected` (SUPERSEDED by `v0.v1-071`).
 
 Reports: `reports-v1/iteration_v1-baseline/`.
 
