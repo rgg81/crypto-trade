@@ -1,0 +1,14 @@
+metric,in_sample,out_of_sample,ratio
+monthly_sharpe,0.5463,0.9636,1.7639
+monthly_sortino,0.8729,1.5678,1.7961
+max_drawdown,89.03%,36.51%,0.4101
+win_rate,40.60%,45.22%,1.1138
+profit_factor,1.1021,1.2158,1.1032
+total_trades,537,230,0.4283
+total_net_pnl,129.681,109.7499,0.8463
+calmar_ratio,0.4482,2.2546,5.0303
+top_symbol_concentration_oos_pct,N/A,37.96,N/A
+--- per_symbol (OOS) ---,,,
+oos_pnl_BTCUSDT,N/A,41.6597,37.96
+oos_pnl_DOTUSDT,N/A,40.1834,36.61
+oos_pnl_ETHUSDT,N/A,27.9068,25.43
