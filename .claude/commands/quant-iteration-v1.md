@@ -1533,6 +1533,20 @@ If a component coin was dropped to satisfy Rule 7: which component, which coin, 
 
 ---
 
+## Phase 8 — Mandatory Artifact Persistence Rule (added 2026-06-05)
+
+At every iteration closeout, the QR MUST run `git add reports-v1/iteration_v1-NNN/` BEFORE the commit, ensuring all CSV reports (trades.csv, daily_pnl.csv, monthly_pnl.csv, per_symbol.csv, feature_importance_*.csv, comparison.csv, specialist_dispersion.csv) enter git history. Parquet files remain gitignored per existing rule. NEVER run `git stash --include-untracked` in any setup or transition workflow — this evacuates report CSVs and breaks future bundle composition. If working-tree cleanliness is required, commit reports first, then stash only tracked changes.
+
+This is a HARD rule. Rationale: the `reports-v1/iteration_v1-NNN/` tree is the only post-hoc reconstruction surface for bundle composition, regime attribution, and dead-paths verification. The /063-/070 stash incident — in which the /063, /064, /065 specialist trades.csv files were nearly lost to `stash@{0}` and only recovered just before /071 BUNDLE-001 assembly — is the documented root cause. Going forward:
+
+- Phase 8 commit MUST include `git add reports-v1/iteration_v1-NNN/` immediately before `git commit`.
+- Phase 8 commit message MUST include the body line `reports tracked`.
+- Critic Phase 7.5 adds Check 18 (`REPORTS-TREE-COMMITTED`) verifying the reports tree exists in git history at the iteration's Phase 8 commit.
+- Setup / transition workflows that need a clean working tree MUST use selective `git stash -- <paths>` over tracked files only; **`git stash --include-untracked` is FORBIDDEN at any phase**. If the setup needs to clear untracked report CSVs, commit them first (under a `docs(iter-v1/NNN): reports tracked` or `feat(iter-v1/NNN): reports tracked` commit) and then operate.
+- Grandfathering: iter-v1/063, /064, /065 are GRANDFATHERED (their reports were recovered at /071 setup). The rule applies prospectively from iter-v1/072 onward.
+
+---
+
 ## Phase 8 Diary Template — v1
 
 QR's `diary-v1/iteration_v1-NNN.md`:
