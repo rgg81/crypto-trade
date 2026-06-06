@@ -43,7 +43,7 @@ Before any code change:
    - (Legacy) `BASELINE.md` for pre-refactor v1 reference
 4. Read the current iteration's research brief at `briefs-vN/iteration_vN-NNN/research_brief.md` (where N ∈ {1, 2, 3}).
 5. **(v1 only)** Read `briefs-v1/iteration_v1-NNN/lgbm_advisor.md` (Phase 4.5 section) — required input for Phase 5.5 gate (verify brief Section 3 addresses LM Master recommendations).
-6. **(v1 only)** Read `briefs-v1/exploration_catalog.md` — required input for Phase 5.5 gate Axis Rotation Discipline check.
+6. **(v1 only)** Read `briefs-v1/specialist_catalog.md` — required input for Phase 5.5 gate Axis Rotation Discipline check.
 7. Read the most recent engineering report in the same track for format reference.
 8. Verify the worktree: `git rev-parse --show-toplevel` should match the expected path.
 9. Verify the branch: `git branch --show-current` should match `iteration-v1/NNN` (or v2/v3 equivalent). If on `main` or `quant-research` (the worktree's base branch), STOP and ask the QR to create the iteration branch first.
@@ -59,8 +59,8 @@ Read `briefs-vN/iteration_vN-NNN/research_brief.md` and verify ALL of the follow
 **Sections common to v1/v3 (v2 omits Sections 0.5, 7, 8, 9 — v2 has lighter brief requirements):**
 
 - **Section 0 — Data Split declaration.** Confirms `OOS_CUTOFF_DATE = 2025-03-24` and `training_months = 24` are unchanged. Names the IS window and OOS window in absolute dates.
-- **Section 0.5 — Iteration Type Declaration (v1/v3 mandatory).** `TYPE: EXPLORATION` or `TYPE: CONFIRMATION`. EXPLORATION = single-axis, 2h cap; CONFIRMATION = bundle of best EXPLORATIONs, 6h cap, requires ≥10 prior EXPLORATION precedents.
-- **Section 0.6 — Architecture-Family Justification (v1-only mandatory).** Declares axis family ∈ {feature-family, model-arch, labeling, universe, risk-primitive} + prior 5 EXPLORATION families + rotation status (VALID or BLOCKED). BLOCK if rotation rule violated (last 5 same-family + this one same again).
+- **Section 0.5 — Iteration Type Declaration (v1/v3 mandatory).** For v1: `TYPE: SPECIALIST` or `TYPE: BUNDLE`. SPECIALIST = single-symbol/single-axis, 2h cap; BUNDLE = assembly of regime-complementary specialists from the running roster, 9h cap, justified by IS regime-coverage of the roster (no formal precedent-count cadence). For v3: `TYPE: EXPLORATION` or `TYPE: CONFIRMATION` (v3 retains the legacy terminology).
+- **Section 0.6 — Architecture-Family Justification (v1-only mandatory).** Declares axis family ∈ {feature-family, model-arch, labeling, universe, risk-primitive} + prior 5 SPECIALIST families + rotation status (VALID or BLOCKED). BLOCK if rotation rule violated (last 5 same-family + this one same again).
 - **Section 1 — Hypothesis.** ONE sentence. What changes and why we expect OOS improvement. Vague hypotheses ("explore funding rate features") are BLOCKs; specific ones ("adding 8h-funding z-score will improve OOS Sharpe by ≥0.15 via positioning-crowding signal") are PASSes.
 - **Section 2 — IS-Only Numerical Evidence.** Tables (CSV or markdown) produced by a committed `analysis/iteration_vN-NNN/*.py` script. The script must run on IS data only, be reproducible, and produce concrete numbers. Category-matching ("this feature is similar to RSI") is NOT evidence — BLOCK.
 - **Section 2.5 — HIGH-RISK Axis Declaration (v1-only mandatory).** Declares whether axis changes Optuna's training-objective domain (HIGH-RISK) or not (NORMAL-RISK). HIGH-RISK declaration is mandatory; multi-seed mitigation is opt-in.
@@ -76,8 +76,8 @@ Read `briefs-vN/iteration_vN-NNN/research_brief.md` and verify ALL of the follow
 
 - **LM Master advisory artifact exists.** `briefs-v1/iteration_v1-NNN/lgbm_advisor.md` must exist with a Phase 4.5 section. If missing, BLOCK with "Phase 4.5 LM Master advisory required before brief authoring".
 - **Brief Section 3 addresses LM Master recommendations.** Each numbered recommendation in `lgbm_advisor.md` Phase 4.5 must appear in brief Section 3 marked adopted / modified / rejected. If any recommendation is unaddressed, BLOCK with "Brief Section 3 missing response to LM Master recommendation #N".
-- **Section 0.6 Rotation Status valid.** Read `briefs-v1/exploration_catalog.md`, count the last 5 EXPLORATION families. If all 5 same as the declared Section 0.6 family, the brief must declare ROTATION_STATUS=BLOCKED — but BLOCKED status itself BLOCKs the gate (QR must propose a different family). If declared VALID but last 5 are all same family, BLOCK with "Rotation Discipline violated: declared family X but last 5 EXPLORATIONs all family X".
-- **(CONFIRMATION only) ≥10 EXPLORATION precedents** since last CONFIRMATION in `briefs-v1/exploration_catalog.md`.
+- **Section 0.6 Rotation Status valid.** Read `briefs-v1/specialist_catalog.md`, count the last 5 SPECIALIST families. If all 5 same as the declared Section 0.6 family, the brief must declare ROTATION_STATUS=BLOCKED — but BLOCKED status itself BLOCKs the gate (QR must propose a different family). If declared VALID but last 5 are all same family, BLOCK with "Rotation Discipline violated: declared family X but last 5 SPECIALISTs all family X".
+- **(BUNDLE only) IS regime-coverage justification** — the brief must demonstrate the running specialist roster in `briefs-v1/specialist_catalog.md` covers the IS regimes the bundle targets. No formal precedent-count cadence; QR judgment based on roster coverage.
 
 ## The Gate Output
 
@@ -89,11 +89,12 @@ Write `briefs-vN/iteration_vN-NNN/phase5p5_gate.md`:
 OVERALL: PASS  (or BLOCK)
 
 ## Iteration Type (from Brief Section 0.5)
-TYPE: EXPLORATION  (or CONFIRMATION)
+TYPE: SPECIALIST  (or BUNDLE)   # v1
+TYPE: EXPLORATION  (or CONFIRMATION)   # v3 only — v3 retains legacy terminology
 
 ## (v1 only) Axis Family + Rotation Status
 FAMILY: <one of 5>
-ROTATION_STATUS: VALID  (or BLOCKED — same as last 5)
+ROTATION_STATUS: VALID  (or BLOCKED — same as last 5 SPECIALISTs)
 
 ## (v1 only) HIGH-RISK Declaration
 HIGH-RISK: NO  (or YES, mitigation = <opted-in multi-seed | none>)
@@ -103,9 +104,13 @@ HIGH-RISK: NO  (or YES, mitigation = <opted-in multi-seed | none>)
 - Brief Section 3 addresses each LM Master recommendation: PASS / BLOCK
 
 ## Cadence Check (v1/v3)
-- Wall-clock budget declared: <2h for EXPLORATION / <6h for CONFIRMATION>: PASS / BLOCK
-- (CONFIRMATION only) EXPLORATION precedents since last CONFIRMATION: <count, ≥10 required>: PASS / BLOCK
-- (CONFIRMATION only) Section 3 lists imported variations from prior EXPLORATIONs: PASS / BLOCK
+- Wall-clock budget declared:
+  - v1: <2h for SPECIALIST / <9h for BUNDLE>: PASS / BLOCK
+  - v3: <2h for EXPLORATION / <6h for CONFIRMATION>: PASS / BLOCK
+- (v1 BUNDLE only) IS regime-coverage justification from specialist roster (no formal precedent-count cadence): PASS / BLOCK
+- (v1 BUNDLE only) Section 3 lists imported variations from selected SPECIALISTs in the roster: PASS / BLOCK
+- (v3 CONFIRMATION only) EXPLORATION precedents since last CONFIRMATION: <count, ≥10 required>: PASS / BLOCK
+- (v3 CONFIRMATION only) Section 3 lists imported variations from prior EXPLORATIONs: PASS / BLOCK
 
 ## Per-Section Status
 - Section 0 (Data Split): PASS / MISSING / INVALID
@@ -315,7 +320,7 @@ Hard prohibitions:
 | Brief has missing or invalid section | BLOCK gate; commit `phase5p5_gate.md`; return to QR; do NOT attempt to fix |
 | (v1) `lgbm_advisor.md` missing | BLOCK Phase 5.5; orchestrator must dispatch LM Master Phase 4.5 BEFORE QR Phase 5; return to QR |
 | (v1) Brief Section 3 missing LM Master responses | BLOCK Phase 5.5; QR must address each Phase 4.5 recommendation; return to QR |
-| (v1) Section 0.6 Rotation Status BLOCKED (last 5 same family + this one same again) | BLOCK Phase 5.5; QR must propose a different axis family; return to QR |
+| (v1) Section 0.6 Rotation Status BLOCKED (last 5 SPECIALISTs same family + this one same again) | BLOCK Phase 5.5; QR must propose a different axis family; return to QR |
 | (v1) Critic Phase 6.0 BLOCK | Do NOT launch backtest. Return to QR for brief revision (one revision allowed); re-run Phase 5.5 → Phase 6.0 |
 | Backtest crashes mid-run | Preserve stack trace in `run.log`; commit a `feat(iter-vN/NNN): WIP — backtest crash <line>` followed by escalation message to QR |
 | Data freshness fails (CSV >16h old) | Re-fetch via `uv run crypto-trade fetch --interval 8h --symbols ...`; document the re-fetch in engineering report; re-run backtest; verify the fetch produced complete data |
