@@ -1,0 +1,3 @@
+side,n_labels,tp_frac,sl_frac,timeout_frac
+LONG,5581,0.2516,0.5995,0.1489
+SHORT,5581,0.25,0.5517,0.1984
