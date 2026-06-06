@@ -91,6 +91,7 @@ from crypto_trade.features_v1 import (
     V1_ITER065_UNIVERSE,
     V1_ITER074_UNIVERSE,
     V1_ITER075_UNIVERSE,
+    V1_ITER076_UNIVERSE,
     V1_OOD_FEATURE_COLUMNS,
     assert_v1_universe,
 )
@@ -7450,6 +7451,178 @@ def main() -> None:
         _r5_model_results = [results_e075]
         _post_dispatch_fi_strategies = [("Model_A_ATOM_specialist_075", _strat_e075)]
 
+    elif iteration_label == "v1-076" and set(symbols) == set(V1_ITER076_UNIVERSE):
+        # iter-v1/076: AAVEUSDT SPECIALIST — second NEW SYMBOL universe-extension.
+        # Cycle-7 SPECIALIST-MINE 2/N. Mine-phase rank 2/N (DeFi-lending narrative first).
+        # Axis family: universe (NEW SYMBOL; cycle-7 per-symbol regime-specialist mandate).
+        #
+        # Single-bit changes vs /063 dispatch:
+        #   (a) SYMBOLS=("AAVEUSDT",) — not DOTUSDT
+        #   (b) ITERATION_LABEL="v1-076"
+        #   (c) ATR cell (2.9, 1.45) — ETH/064 vol-class match for AAVE ~95% IS realized vol
+        #   (d) Model A wrapper (R1=OFF, R2=OFF) — matches /064+/065+/075; NOT /063 DOT's E
+        #
+        # Identical single-bit change family as /075 ATOM (same (a)-(d) pattern):
+        #   /075 changed DOTUSDT→ATOMUSDT; /076 changes ATOMUSDT→AAVEUSDT.
+        #
+        # SPECIALIST + BUNDLE design (same as /075):
+        #   - 50 independent Optuna studies, one per seed (V1_SPECIALIST_SEEDS: 42..91)
+        #   - Each study: n_trials=V1_SPECIALIST_OPTUNA_TRIALS=30, ENSEMBLE_SIZE=1
+        #   - LightGBM HP search: max_depth=5 FIXED, num_leaves=31 FIXED
+        #   - confidence_threshold Optuna-tunable per seed (range [0.50, 0.85])
+        #   - Aggregator at inference: mean-of-signed-weights across 50 seeds
+        #
+        # Wall-clock mitigation (same as /075):
+        #   - n_estimators upper bound = 500 (capped from 1000)
+        #   - n_startup_trials = 10 (vs Optuna default 30)
+        #
+        # Risk config (MATCHED to Model A ETH cell — identical to /064 + /065 + /075):
+        #   R1=OFF   CATALOG-CLOSED for SPECIALIST_mode (f81cafc3)
+        #   R2=OFF   Model A baseline has no R2 (R2 is Model E DOT-only)
+        #   R3=ON    Mahalanobis OOD gate, cutoff=0.70, 16 scale-invariant features;
+        #            applied at AGGREGATOR level (NOT per-seed) per SPECIALIST methodology
+        #   R5=ON    vt_target_vol=0.3, vt_lookback_days=45, vt_min_scale=0.33
+        #   atr_tp=2.9, atr_sl=1.45 (Model A ETH cell; vol-class match for AAVE ~95% IS vol)
+        #
+        # Feature set: V1_FEATURE_COLUMNS_PRUNED (48 cols, UNCHANGED — no parquet regen).
+        # NaN notes: dot_vs_btc_ret_ratio_30 + eth_vs_btc_ret_ratio_30 ALL-NaN for AAVE
+        #   (SYMBOL-conditional features; LightGBM handles NaN natively; 2/48 wasted slots).
+        # HIGH-RISK: universe substitution changes Optuna's training-objective domain.
+        # Mitigation: 50-INNER-seed averaging (sigma_pop <= 0.30 gate).
+        #
+        # KEY RISK: ETH return correlation 0.75 IS (DeFi-cycle leakage to ETH/064).
+        #   F-AXIS-FALSIFIER #2: rolling-90day corr(AAVE_pred, ETH_pred) mandatory at Phase 7.4.
+        # KEY RISK: bull-IS / bear-OOS regime inversion (IS +13x compounded).
+        #   F-AXIS-FALSIFIER #1: per-direction (long/short) Sharpe mandatory in Phase 7.
+        #
+        # LOAD-BEARING: specialist_dispersion.csv persistence (matching /065+/074+/075 pattern).
+        assert set(symbols) == {"AAVEUSDT"}, (
+            f"iter-v1/076 guard: expected {{AAVEUSDT}}, got {set(symbols)}"
+        )
+        assert len(active_feature_columns) == 48, (
+            f"iter-v1/076 guard: expected 48 V1_FEATURE_COLUMNS_PRUNED cols (UNCHANGED), "
+            f"got {len(active_feature_columns)}. "
+            "The 2 ALL-NaN-IS SYMBOL-conditional columns (dot_vs_btc_ret_ratio_30, "
+            "eth_vs_btc_ret_ratio_30) are RETAINED — LightGBM NaN-handles natively. "
+            "If len != 48: check that --pruned-features was passed to the runner."
+        )
+        print(
+            f"[iter-v1/076] AAVE SPECIALIST — NEW SYMBOL mine 2/N: "
+            f"V1_SPECIALIST_SEED_COUNT={V1_SPECIALIST_SEED_COUNT} "
+            f"V1_SPECIALIST_OPTUNA_TRIALS={V1_SPECIALIST_OPTUNA_TRIALS} "
+            f"specialist_mode=True "
+            f"max_depth=5 FIXED, num_leaves=31 FIXED. "
+            f"R1=OFF (CATALOG-CLOSED; f81cafc3), R2=OFF, "
+            f"R3=ON-SHARED cutoff=0.70, R5=ON vt_target_vol=0.3. "
+            f"features=V1_FEATURE_COLUMNS_PRUNED (48 cols; UNCHANGED). "
+            f"atr_tp=2.9, atr_sl=1.45 (Model A ETH cell; vol-class match for AAVE ~95% IS vol). "
+            f"NaN: dot_vs_btc_ret_ratio_30+eth_vs_btc_ret_ratio_30 ALL-NaN (SYMBOL-cond; OK). "
+            f"n_estimators_max=500 (wall-clock). n_startup_trials=10 (wall-clock). "
+            f"Aggregator: mean-of-signed-weights across {V1_SPECIALIST_SEED_COUNT} seeds. "
+            f"KEY RISK: ETH IS corr 0.750 (DeFi-cycle leakage; F-AXIS-FAL #2). "
+            f"KEY RISK: bull-IS/bear-OOS regime inversion (F-AXIS-FAL #1). "
+            f"LOAD-BEARING: specialist_dispersion.csv will be persisted post-backtest."
+        )
+        _config_e076 = BacktestConfig(
+            symbols=("AAVEUSDT",),
+            interval="8h",
+            max_amount_usd=1000.0,
+            stop_loss_pct=2.9,  # ATR-based; overridden by atr_sl_multiplier=1.45
+            take_profit_pct=5.8,  # ATR-based; overridden by atr_tp_multiplier=2.9
+            timeout_minutes=10080,
+            fee_pct=0.1,
+            data_dir=Path("data"),
+            cooldown_candles=2,
+            vol_targeting=True,
+            vt_target_vol=0.3,
+            vt_lookback_days=45,
+            vt_min_scale=0.33,
+            vt_max_scale=2.0,
+            risk_consecutive_sl_limit=0,  # R1=OFF: CATALOG-CLOSED for SPECIALIST_mode
+            risk_consecutive_sl_cooldown_candles=0,
+            risk_drawdown_scale_enabled=False,  # R2=OFF: Model A baseline
+            risk_r5_vol_target_enabled=_r5_kwargs.get("r5_vol_target_enabled", True),
+            risk_r5_vol_target_pct=_r5_kwargs.get("r5_vol_target_pct", 4.0),
+            risk_r5_kill_low_natr_enabled=_r5_kwargs.get("r5_kill_low_natr_enabled", False),
+            risk_r5_kill_low_natr_min_pct=_r5_kwargs.get("r5_kill_low_natr_min_pct", 2.0),
+        )
+        _strat_e076 = LightGbmStrategy(
+            training_months=24,
+            n_trials=V1_SPECIALIST_OPTUNA_TRIALS,  # informational; specialist loop controls
+            cv_splits=5,
+            label_tp_pct=5.8,
+            label_sl_pct=2.9,
+            label_timeout_minutes=10080,
+            fee_pct=0.1,
+            features_dir="data/features",
+            verbose=1,
+            atr_tp_multiplier=2.9,
+            atr_sl_multiplier=1.45,
+            use_atr_labeling=True,
+            # placeholder seed — specialist_mode uses V1_SPECIALIST_SEEDS internally
+            ensemble_seeds=list(V1_SPECIALIST_SEEDS[:1]),
+            feature_columns=active_feature_columns,
+            ood_enabled=True,  # R3 ON at AGGREGATOR level
+            ood_features=list(V1_OOD_FEATURE_COLUMNS),
+            ood_cutoff_pct=0.70,
+            oof_persist_path=OOF_PARQUET_PATH,
+            bounds_profile="v1_specialist",
+            specialist_mode=True,
+            specialist_n_startup_trials=10,
+            specialist_n_estimators_max=500,
+        )
+        import time as _time_076  # noqa: PLC0415
+
+        _t0_076 = _time_076.time()
+        results_e076 = run_backtest(_config_e076, _strat_e076, yearly_pnl_check=False)
+        _elapsed_076 = _time_076.time() - _t0_076
+        faxm_e076 = _strat_e076._faxm_log
+        print(
+            f"\n[iter-v1/076] Model_A_AAVE_specialist_076 complete: "
+            f"{len(results_e076)} trades in {_elapsed_076:.0f}s "
+            f"({_elapsed_076 / 3600:.2f}h)"
+        )
+
+        # Cohort isolation sanity: assert ONLY AAVEUSDT trades emitted.
+        _e076_symbols = {r.symbol for r in results_e076}
+        assert _e076_symbols.issubset({"AAVEUSDT"}), (
+            f"[iter-v1/076] Model A_AAVE produced non-AAVE results: "
+            f"{_e076_symbols - {'AAVEUSDT'}}. "
+            "Per-cohort isolation failed — iter-v1/076 must trade AAVEUSDT ONLY."
+        )
+
+        # -----------------------------------------------------------------
+        # LOAD-BEARING: specialist_dispersion.csv persistence (matching /065+/074+/075 pattern).
+        # -----------------------------------------------------------------
+        _disp_mean_e076 = _strat_e076.get_specialist_dispersion_mean()
+        _disp_is_path_e076 = (
+            Path(reports_dir) / "iteration_v1-076" / "in_sample" / "specialist_dispersion.csv"
+        )
+        _disp_is_path_e076.parent.mkdir(parents=True, exist_ok=True)
+        _strat_e076.persist_specialist_dispersion_csv(str(_disp_is_path_e076))
+        print(
+            f"[iter-v1/076] LOAD-BEARING dispersion patch: "
+            f"specialist_dispersion_mean={_disp_mean_e076} "
+            f"specialist_dispersion.csv → {_disp_is_path_e076}"
+        )
+        # Store for post-report block (specialist_dispersion_mean appended to comparison.csv
+        # AFTER generate_iteration_reports() runs — comparison.csv written there).
+        _e076_disp_mean = _disp_mean_e076
+        _e076_disp_csv_path = _disp_is_path_e076
+
+        print(
+            f"[iter-v1/076] Dispatch verified: "
+            f"AAVE-only={len(results_e076)} trades. "
+            f"R1=OFF/R2=OFF/R3=ON-AGGREGATOR-LEVEL. "
+            f"SPECIALIST seeds={len(_strat_e076._specialist_models)} trained. "
+            f"sigma_pop mean={_disp_mean_e076}"
+        )
+
+        _all_faxm_logs = faxm_e076
+        all_results = results_e076
+        _r5_model_results = [results_e076]
+        _post_dispatch_fi_strategies = [("Model_A_AAVE_specialist_076", _strat_e076)]
+
     elif iteration_label == "v1-044":
         # iter-v1/044: CONFIRMATION-MERGE-PORTFOLIO (cycle-5 CONFIRMATION 1/1).
         # 3-component bundle: BASELINE_V1 (w=0.50) + /036 (w=0.30) + /043 (w=0.20).
@@ -8695,6 +8868,41 @@ def main() -> None:
         if _strat_075_ref is not None:
             _strat_075_ref.persist_specialist_dispersion_csv(str(_oos_disp_path_075))
             print(f"[iter-v1/075] OOS specialist_dispersion.csv persisted → {_oos_disp_path_075}")
+
+    # -------------------------------------------------------------------------
+    # iter-v1/076: specialist_dispersion_mean + OOS specialist_dispersion.csv
+    # → comparison.csv. Mirrors the /065+/074+/075 pattern.
+    # Guard: only runs when _e076_disp_mean is defined (v1-076 dispatch sets it).
+    # -------------------------------------------------------------------------
+    if iteration_label == "v1-076" and "_e076_disp_mean" in dir():
+        _disp_mean_val_076 = locals().get("_e076_disp_mean")
+        if _disp_mean_val_076 is not None:
+            import csv as _csv_076  # noqa: PLC0415
+
+            _comp_csv_076 = report_dir / "comparison.csv"
+            if _comp_csv_076.exists():
+                with _comp_csv_076.open("a", newline="") as _fh_076:
+                    _writer_076 = _csv_076.writer(_fh_076)
+                    _writer_076.writerow(["specialist_dispersion_mean", _disp_mean_val_076, "", ""])
+                print(
+                    f"[iter-v1/076] LOAD-BEARING: specialist_dispersion_mean="
+                    f"{_disp_mean_val_076:.4f} appended to {_comp_csv_076}"
+                )
+            else:
+                print(
+                    f"[iter-v1/076] WARNING: comparison.csv not found at {_comp_csv_076}; "
+                    f"specialist_dispersion_mean={_disp_mean_val_076:.4f} NOT appended."
+                )
+        # Persist OOS specialist_dispersion.csv (F-AXIS #2 audit; matching /065+/074+/075 pattern).
+        _oos_disp_path_076 = report_dir / "out_of_sample" / "specialist_dispersion.csv"
+        _oos_disp_path_076.parent.mkdir(parents=True, exist_ok=True)
+        _strat_076_ref = next(
+            (s for _, s in _post_dispatch_fi_strategies if "AAVE_specialist_076" in _),
+            None,
+        )
+        if _strat_076_ref is not None:
+            _strat_076_ref.persist_specialist_dispersion_csv(str(_oos_disp_path_076))
+            print(f"[iter-v1/076] OOS specialist_dispersion.csv persisted → {_oos_disp_path_076}")
 
     # -------------------------------------------------------------------------
     # iter-v1/021+: write feature importance CSVs (post-dispatch).

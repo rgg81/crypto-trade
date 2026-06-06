@@ -628,6 +628,44 @@ assert len(active_feature_columns) == 48 guard fires in dispatch branch.
 """
 
 
+V1_ITER076_UNIVERSE: tuple[str, ...] = ("AAVEUSDT",)
+"""iter-v1/076 cohort: AAVE-only SPECIALIST — second NEW SYMBOL universe-extension (DeFi-lending).
+
+Autopilot mining directive 2026-06-06. Cycle-7 SPECIALIST-MINE 2/N.
+Mine-phase rank 2/N (DeFi-lending narrative first; rank-1 ATOM/075 is cosmos-interop).
+Axis family: universe (NEW SYMBOL; cycle-7 per-symbol regime-specialist mandate).
+
+Single-bit deviation vs /063 dispatch: SYMBOLS=("AAVEUSDT",), ITERATION_LABEL="v1-076",
+ATR cell /063's (3.5, 1.75) → ETH/064's (2.9, 1.45) [vol-class match for AAVE ~95% IS vol].
+Model A wrapper (R1=OFF, R2=OFF) — matches /064 ETH, /065 BTC, /075 ATOM; NOT /063 DOT's Model E.
+All other methodology constants HELD per user directive 2026-06-06:
+    50 inner seeds × 30 Optuna trials × specialist_mode=True
+    48-col V1_FEATURE_COLUMNS_PRUNED
+    (hash b81176f893826500536ec5cee8ad00e74bf7edb834290e62e835213defe74ca3)
+    R3=ON-SHARED cutoff=0.70, R5=ON vt_target_vol=0.3, mean-of-signed-weights aggregator.
+
+Data extent: 5.64y (2020-10-16 → 2026-06-06; 6178 8h candles).
+IS ETH return corr: 0.750 (LOAD-BEARING DeFi-cycle leakage risk; BUNDLE-002 pair-check hardwired).
+IS realized vol: ~95% annualized (ETH-to-DOT mid-vol; justifies ATR(2.9, 1.45) ETH-class cell).
+NEGATIVE-baseline gate: TS-mom (5,1) IS Sharpe −0.080 — ONLY eligible NEW SYMBOL passing cleanly.
+F-AXIS #1: PROMISING-CLEAN ≥+0.50; PROMISING-TENTATIVE [+0.20, +0.50);
+    NEGATIVE <+0.20 or <50 IS trades (one-attempt-and-eliminate rule).
+Strike rule: one-attempt-and-eliminate (per /066 LINK + /067 LTC precedent for NEW SYMBOL).
+
+NaN notes: dot_vs_btc_ret_ratio_30 + eth_vs_btc_ret_ratio_30 are ALL-NaN-IS for AAVE
+(SYMBOL-conditional; LightGBM NaN-handles natively; 2/48 = 4.2% wasted slot fraction).
+long_short_zscore_30 ~43% NaN-IS + oi_delta_30_z90 ~34% NaN-IS (AAVE data starts mid-window).
+
+HIGH-RISK declaration (brief Section 2.5): universe substitution changes Optuna's
+training-objective domain. Mitigation: 50-INNER-seed averaging (σ_pop ≤ 0.30 gate
+held at /063, /064, /065, /075).
+
+LOCAL to runner constant. NOT shared; CONFIRMATION-MERGE updates V1_BASELINE_UNIVERSE.
+assert set(symbols) == {"AAVEUSDT"} guard fires in dispatch branch.
+assert len(active_feature_columns) == 48 guard fires in dispatch branch.
+"""
+
+
 V1_ITER065_UNIVERSE: tuple[str, ...] = ("BTCUSDT",)
 """iter-v1/065 cohort: BTC-only SPECIALIST (third SPECIALIST under SPECIALIST + BUNDLE methodology).
 
@@ -812,6 +850,7 @@ __all__ = [
     "V1_ITER065_UNIVERSE",
     "V1_ITER074_UNIVERSE",
     "V1_ITER075_UNIVERSE",
+    "V1_ITER076_UNIVERSE",
     # iter-v1/023: funding-rate feature family (add_funding_v1_features imported on demand)
     # iter-v1/025: OI delta feature family (add_oi_delta_v1_features imported on demand)
     # iter-v1/040: composed feature family (add_composed_v1_features imported on demand)
