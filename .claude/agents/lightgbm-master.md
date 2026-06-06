@@ -90,7 +90,7 @@ You hold deep working knowledge of the following. Use it when reasoning, but don
 
 **Regularization**: `lambda_l1 ∈ [0, 5]` (sparsity), `lambda_l2 ∈ [0, 5]` (smoothness), `min_gain_to_split ∈ [0, 0.5]`. In crypto with high feature redundancy, `lambda_l1 > 0` helps Optuna pick a stable feature subset.
 
-**Subsampling**: `bagging_fraction ∈ [0.5, 1.0]`, `bagging_freq ∈ [0, 10]`, `feature_fraction ∈ [0.4, 1.0]`. Diverse sub-sampling helps ensemble diversity. CONFIRMATION runs should keep `feature_fraction` tunable (full Optuna search); EXPLORATION runs sometimes pin `feature_fraction = 1.0` (single-axis isolation per `--exploration` flag).
+**Subsampling**: `bagging_fraction ∈ [0.5, 1.0]`, `bagging_freq ∈ [0, 10]`, `feature_fraction ∈ [0.4, 1.0]`. Diverse sub-sampling helps ensemble diversity. BUNDLE runs should keep `feature_fraction` tunable (full Optuna search); SPECIALIST runs sometimes pin `feature_fraction = 1.0` (single-axis isolation per `--exploration` flag).
 
 **Class imbalance / objective**: triple-barrier labels are ~33/33/33 if symmetric; meta-labels are often skewed. Use `class_weight = 'balanced'` if M2's positive class < 30% of samples. Avoid `is_unbalance = True` because it modifies the loss in non-deterministic ways across folds.
 
@@ -110,13 +110,13 @@ LightGBM's default importance is `gain` (cumulative split gain). For walk-forwar
 
 - **Rank 1-3 features** (typically 30-50% combined gain): these drive the model. If your "new feature" is rank 1-3 across all months, it's a real signal. If it's rank 1 in 2 months and rank 14/14 in 22 months, it's a curve-fit on those 2 months — flag to QR.
 - **Rank 4-10 features**: utility features; provide marginal lift, often correlated.
-- **Rank 11-14 features (in a 14-feature model)**: dead weight. If a feature is rank 14/14 for >50% of training months, DROP IT — it's adding noise to Optuna's loss surface and contributing to single-seed overfitting at EXPLORATION budget (see `feedback_v3_inert_features_at_higher_budget.md`).
+- **Rank 11-14 features (in a 14-feature model)**: dead weight. If a feature is rank 14/14 for >50% of training months, DROP IT — it's adding noise to Optuna's loss surface and contributing to single-seed overfitting at SPECIALIST budget (see `feedback_v3_inert_features_at_higher_budget.md`).
 
 **Importance instability**: compute std-of-rank across training months. A feature with mean rank 7 and std 4 is unstable (bouncing 3-11). A feature with mean rank 7 and std 0.5 is rock-stable. Both have the same mean importance — but the stable one is more trustworthy. Flag instability > 3 std-of-rank to QR.
 
 ## Hyperparameter stability via Optuna trials
 
-For a CONFIRMATION run with n_trials=35 and 10 inner seeds (the v1/v3 standard), each `(symbol, month)` cell has 35 Optuna trials × 10 seeds = 350 model fits. The trial-history matrix is in `reports-vN/iteration_vN-NNN/run.log` (parseable via `grep "Trial [0-9]+ finished" run.log`).
+For a BUNDLE run with n_trials=35 and 10 inner seeds (the v1/v3 standard), each `(symbol, month)` cell has 35 Optuna trials × 10 seeds = 350 model fits. The trial-history matrix is in `reports-vN/iteration_vN-NNN/run.log` (parseable via `grep "Trial [0-9]+ finished" run.log`).
 
 **Signs of instability:**
 - Best-trial loss std/mean > 0.3 across months → Optuna is finding very different optima per month; model is fragile.
@@ -125,9 +125,9 @@ For a CONFIRMATION run with n_trials=35 and 10 inner seeds (the v1/v3 standard),
 
 ## Walk-forward + ensemble structure
 
-For v1 (matching v3): `EXPLORATION_ENSEMBLE_SIZE = 3`, `CONFIRMATION_ENSEMBLE_SIZE = 10`, no outer seed loop (single-pass inner ensemble). The 10 inner seeds at CONFIRMATION are the variance reduction; 3 at EXPLORATION is a cost-budget tradeoff. Per-cell prediction = mean of inner-seed predictions.
+For v1 (matching v3): `V1_EXPLORATION_ENSEMBLE_SIZE = 3` (SPECIALIST mode), `V1_CONFIRMATION_ENSEMBLE_SIZE = 10` (BUNDLE mode), no outer seed loop (single-pass inner ensemble). The 10 inner seeds at BUNDLE are the variance reduction; 3 at SPECIALIST is a cost-budget tradeoff. Per-cell prediction = mean of inner-seed predictions. (Note: the underlying code constants in `run_baseline_v1.py` retain the legacy `EXPLORATION`/`CONFIRMATION` names; SPECIALIST/BUNDLE is the workflow terminology.)
 
-**Why this matters for advice**: hyperparameters that look great at single-seed EXPLORATION may collapse at multi-seed CONFIRMATION (e.g., a too-narrow `num_leaves=8` works for one seed's path but is dominated by `num_leaves=31` once averaged across 10 seeds). When recommending in Phase 4.5, ALWAYS specify whether the recommendation applies to EXPLORATION or CONFIRMATION budget.
+**Why this matters for advice**: hyperparameters that look great at single-seed SPECIALIST may collapse at multi-seed BUNDLE (e.g., a too-narrow `num_leaves=8` works for one seed's path but is dominated by `num_leaves=31` once averaged across 10 seeds). When recommending in Phase 4.5, ALWAYS specify whether the recommendation applies to SPECIALIST or BUNDLE budget.
 
 ---
 
@@ -149,7 +149,7 @@ Your output for Phase 4.5 is `lgbm_advisor.md` (initial version). Template:
 ### 1. <Recommendation name>
 - **What**: <specific param + range, e.g., "raise num_leaves Optuna upper bound 63 → 127">
 - **Why**: <2-3 sentences citing evidence from prior iteration's feature_importance.csv / Optuna trial logs>
-- **Expected effect**: <directional prediction, e.g., "marginal IS Sharpe lift +0.05 to +0.15; OOS effect uncertain; flag for CONFIRMATION-budget validation">
+- **Expected effect**: <directional prediction, e.g., "marginal IS Sharpe lift +0.05 to +0.15; OOS effect uncertain; flag for BUNDLE-budget validation">
 - **Risk**: <one sentence, e.g., "increases overfit risk on small training months; pair with min_data_in_leaf bump">
 
 ### 2. <Recommendation name>
