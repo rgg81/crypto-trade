@@ -136,3 +136,136 @@ This is **near-coin-flip at the merge tier** (PROMISING+). That's not a vote aga
 **Confidence: MEDIUM.** ATOM is the structurally-strongest NEW SYMBOL candidate in the eligible set on 8 of 10 lenses. The two soft FAILs (TS-mom +0.918 nuance + 0.81 DOT corr) are mechanism-explainable, not disqualifying. The most important thing the QR / QE should NOT ignore: **Risk Flag 2 (deep-bear IS + deep-bear OOS short-cohort memorization)**. If Phase 7 reports headline IS Sharpe ≥ +0.30 with ≥ 70% of trades in direction=−1, that is the failure mode to flag at Phase 7.4 triage, NOT a clean PROMISING. The fingerprint to look for in the post-mortem: per-direction Sharpe asymmetry > 1.5σ in favor of shorts, and OOS short-Sharpe collapse if the OOS window's last 30 days transition out of bear.
 
 Single most important thing the QR should hardwire in the brief: **per-direction (long vs short) Sharpe + trade count + WR reporting in Section 4 falsifier table**. The /075 verdict cannot be cleanly interpreted without it given the −62% IS cumulative return.
+
+---
+
+# LightGBM Master Advisor — iter-v1/075 — Phase 7.4 (Post-Mortem)
+
+## Context Read
+- Iteration outcome (`reports-v1/iteration_v1-075/comparison.csv`): **IS Sharpe −0.3043 / OOS Sharpe +0.0478** (verdict **SPECIALIST-NEGATIVE** — IS −0.30 well below the +0.20 PROMISING-TENTATIVE band; 1st strike for ATOM specialist seat). IS 232 trades / OOS 87 trades (both above 50-trade floor). IS WR 37.1% / OOS WR 39.1%. Max DD IS 45.5% / OOS 18.6%. Specialist dispersion mean 36.97 (healthy — see §Feature Importance).
+- Engineering report headline: ATOM single-coin specialist failed to extract IS edge under locked /063 methodology.
+- Brief Section 1 hypothesis: ATOM's Hurst-MR + idiosyncratic 0.61 BTC corr + mid-vol 77% would map to ETH/064-like profile (IS ~+0.24 prior). Phase 4.5 LM Master predicted IS modal +0.30 in [−0.10, +0.65] (90% band) — **observed IS −0.30 is at the lower 5th-percentile tail of the prediction band.** Verdict prior had PROMISING-or-better at 0.48 → outcome is well into the NEGATIVE-NO-EFFECT (0.20) / NEGATIVE-CATASTROPHIC (0.06) tail.
+
+## Failure-Mode Diagnosis
+
+**Primary failure: directional asymmetry collapse — long-side bleed, not prediction-saturation.** The ATOM model is **NOT** trivially saturated. Confidence distribution across 232 IS trades spans 49 unique values (top-1 mode `0.06` at 12 occurrences = 5.2%; nowhere near a >50% identical-prediction trivial regime). Specialist dispersion (50-seed inner-ensemble std on raw logit) median = 40.0, mean = 36.97, only **3.4% of observations have std < 10** — the ensemble produces genuine cross-seed variance, the LightGBM head is learning a non-degenerate signal surface. **Trivial-saturation diagnostic: NEGATIVE (not the failure mode).**
+
+The diagnostic that does fire is **direction-asymmetric Sharpe** — exactly the failure mode I flagged in Phase 4.5 Risk Flag 2, but the **sign is inverted** vs my hypothesis. I predicted bear-bias short-cohort memorization (shorts inflated IS Sharpe, longs would be the bleed cohort under regime shift). Reality:
+
+| Cohort | IS trades | IS WR | IS Sharpe | OOS trades | OOS WR | OOS Sharpe |
+|---|---|---|---|---|---|---|
+| **Shorts (−1)** | 116 | 41.4% | **+0.38** | 40 | 45.0% | **+0.62** |
+| **Longs (+1)** | 116 | 32.8% | **−0.63** | 47 | 36.2% | **−0.35** |
+
+The model **is** finding short-side edge in ATOM's deep-bear regime (IS shorts +30.7% net, OOS shorts +26.2% net). The IS Sharpe collapse is driven by **long-side bleed** — 116 IS longs return −51.9% net at WR 32.8%, with the catastrophe concentrated in 2025 (4 longs / 0% WR / −6.58% mean PnL). The model is **not regime-conditioning entry direction**: it issues 50/50 long/short signals (116/116 IS, 47/40 OOS) in a 5.5y window where ATOM lost 62% cumulative. **A symmetric signal layer in a deeply asymmetric regime IS the failure mode.**
+
+This is mechanism-distinct from the trivial-saturation diagnosis the post-mortem asked me to check. The model learned, but it learned **balanced direction** in a market that punishes balanced direction. The 71% chop regime (which I flagged in Phase 4.5 as a chop-fraction penalty) is the proximate substrate — chop regimes generate symmetric range-trade signals, which during a deep-bear cumulative drift bleed disproportionately on the long side as failed mean-reversion attempts.
+
+**Secondary failure: per-regime CSV reports `regime=unknown` for all 232 trades** (single row in `per_regime.csv`). The regime-tagging pipeline did not emit BULL/BEAR/CHOP labels for /075. This is a **report-generation infrastructure issue, not a model failure** — but it means I cannot triage which-regime-hurt-most from the CSV. I reconstruct year-stratified directional Sharpe instead (below in §3).
+
+## Feature Importance Triage
+
+The ATOM/075 vs DOT/063 top-feature comparison is the most informative artifact of this iteration. Both models use identical 48-col `V1_FEATURE_COLUMNS_PRUNED`. Top-15 ranking diff:
+
+| Rank | DOT/063 | ATOM/075 | Rank-Δ Comment |
+|---|---|---|---|
+| 1 | vol_atr_14 | vol_atr_14 | **IDENTICAL — top primitive stable** |
+| 2 | trend_aroon_osc_50 | trend_aroon_osc_50 | **IDENTICAL** |
+| 3 | stat_autocorr_lag5 | oi_delta_30_z90 (was #4) | OI feature LIFTED for ATOM |
+| 4 | oi_delta_30_z90 | stat_autocorr_lag5 (was #3) | swap with #3 — neutral |
+| 5 | trend_adx_14 | interact_natr_x_adx (was #10) | interaction LIFTED for ATOM (regime-switch proxy) |
+| 6 | stat_skew_20 (was #6 → #12) | trend_adx_14 (was #5) | swap |
+| 7 | stat_kurtosis_20 (was #7 → #11) | btc_funding_spread_30_90 (was #9) | **cross-asset funding feature LIFTED for ATOM** |
+| 8 | mom_macd_line_12_26_9 | long_short_zscore_30 (was #12) | LIFTED — open-interest positioning feature |
+| 9 | btc_funding_spread_30_90 | vol_natr_14 (was #11) | NATR LIFTED — vol-of-vol |
+| 10 | interact_natr_x_adx | mom_macd_line_12_26_9 (was #8) | MACD demoted |
+
+**Top-3 primitives (vol_atr_14, trend_aroon_osc_50, stat_autocorr_lag5/oi_delta_30_z90) are essentially identical between ATOM and DOT.** This is **not a feature-stack-inappropriate failure** — the model is finding the same primitive signal-carriers DOT/063 found (which produced IS +0.43). The differences are in the mid-tier (ranks 5-15) and they are **mechanism-consistent with my Phase 4.5 prediction**:
+- **`btc_funding_spread_30_90` and `long_short_zscore_30` LIFTED at ATOM** (ranks 7-8 vs DOT 9-12). Positioning/funding features carry more signal for the 0.61 BTC-corr lower-idiosyncratic symbol — these proxy "is BTC funding regime stressed?" which leaks ATOM's cross-asset beta. This matches my Phase 4.5 Risk Flag 3 inversion: cross-asset features are NOT diluted at ATOM, they are **re-routed through funding/positioning channels rather than return channels**.
+- **`interact_natr_x_adx` LIFTED (rank 5 vs DOT 10)**. This is the regime-switch interaction — natr×adx fires when "volatility regime is trending." ATOM is chop-heavy 71%, so this feature is doing more work as the model tries to separate trending sub-windows from chop. Mechanism-consistent with high-chop universe.
+- **`dot_vs_btc_ret_ratio_30` and `eth_vs_btc_ret_ratio_30` are rank 47-48 with mean_gain=0.0 at ATOM** (DOT/063 had `dot_vs_btc_ret_ratio_30` at rank 14, gain 6404). The two cross-asset ratio features encode the inter-cohort relative-strength signal that DOT trained on but ATOM's training cannot access (ATOM is not a member of the {dot, eth, btc} cross-feature definition set, so these are **0-gain by construction**). This is an **infrastructure observation, not a signal failure** — but it implies the 48-col stack is effectively **46-col for ATOM**.
+
+**Feature stack is mechanism-appropriate; the failure is signal layer not symbol-feature mismatch.** Drop candidate: none. Adding ATOM-specific cross-asset ratio (e.g. `atom_vs_btc_ret_ratio_30`) would require a feature-stack change which is methodology-locked.
+
+## Per-Regime / Direction Breakdown
+
+`per_regime.csv` is **degenerate at /075** (single row, `regime=unknown`, 232 trades) — the regime-tagger did not partition. Reconstructing from year-stratified direction breakdown on `trades.csv`:
+
+| Year | Shorts n | Shorts WR | Shorts mean PnL% | Longs n | Longs WR | Longs mean PnL% |
+|---|---|---|---|---|---|---|
+| 2022 (deep-bear) | 42 | 38.1% | +0.34 | 32 | 34.4% | **−1.00** |
+| 2023 (chop) | 32 | 37.5% | −0.82 | 40 | 35.0% | +0.00 |
+| 2024 (mid-bull) | 28 | 50.0% | +1.12 | 40 | 32.5% | +0.16 |
+| 2025 (bear-extension, IS tail) | 14 | 42.9% | +0.80 | 4 | 0.0% | **−6.58** |
+| 2025 (OOS) | 19 | 42.1% | +0.03 | 36 | 33.3% | −0.60 |
+| 2026 (OOS) | 21 | 47.6% | +1.22 | 11 | 45.5% | +0.65 |
+
+**Which regime hurt most: 2022 longs (−32% cumulative on 32 trades) and 2025 IS-tail longs (−26% cumulative on 4 trades).** The 2022 long bleed alone is the single biggest contributor to the IS −0.30 Sharpe. 2023 longs net to zero; 2024 longs are mildly positive; 2026 OOS longs are positive (regime transition out of bear). **The model's long-cohort weakness is concentrated in deep-bear years (2022 + 2025 IS tail), exactly where directional asymmetry maximally penalizes balanced signaling.** Shorts were positive Sharpe in **5 of 6 year-cohorts** (only 2023 was negative shorts) — short-side edge is **real but insufficient in size** to overcome long-side bleed at 1:1 ratio.
+
+This is the **structural diagnosis**: the locked /063 methodology is symmetric long/short by design, and ATOM's deep-bear regime gradient penalizes symmetric signaling. The same methodology produced DOT/063 IS +0.43 because DOT had mom-leaning chop with both directions earning their keep; ATOM's chop is **range-trading-on-a-downtrend** which has long-side gravity that the symmetric layer cannot accommodate.
+
+## Hyperparameter Trial Stability (Optuna best-trial inference)
+
+`run.log` is not parsed here (not provisioned in this task scope), but the **specialist_dispersion mean 36.97 ± 13.72** across 3290 observations is the load-bearing stability lens. Reading:
+- **Dispersion is healthy** — 50-seed ensemble produces genuine cross-seed variance in the logit space (`ensemble_std` median 40.0). No collapse to point-prediction. This rules out my Phase 4.5 hypothetical concern about basin-locked best-trial trajectories.
+- **Confidence distribution is broad** (IQR 0.16-0.72, no >30% concentration on any single bin) — Optuna is not collapsing to a degenerate threshold-around-0.5 prediction regime.
+- **232 IS trades / 87 OOS trades** are above the SPECIALIST-mode 50-trade floor — the R3 OOD cutoff=0.70 is firing as designed without collapsing trade volume.
+
+**Stability verdict: model fitting is mechanically clean.** The −0.30 IS Sharpe is **not** an Optuna basin-lottery artifact, **not** a trivial-saturation artifact, **not** an ensemble-collapse artifact. It is a **clean mechanistic failure**: the symmetric signal layer on an asymmetric regime substrate.
+
+## Gain Concentration Audit
+
+Top-3 features (vol_atr_14 + trend_aroon_osc_50 + oi_delta_30_z90) account for **27.2% of cumulative gain** (64,275 / 236,260) at ATOM/075 vs **27.6% at DOT/063** (47,442 / 171,883). Concentration is **identical to DOT and within healthy band** (<70% on top-3 = no narrow-basin risk; >25% = primary-signal anchor present). Top-10 features = 65% of cumulative gain ATOM vs 63% DOT — again essentially identical.
+
+**Concentration audit: clean. No narrow-basin pruning warranted.** The two zero-gain cross-asset ratio features (`dot_vs_btc_ret_ratio_30`, `eth_vs_btc_ret_ratio_30`) at ranks 47-48 are infrastructure-degenerate (ATOM not in their definition set), not LightGBM dead-weight from feature-noise.
+
+## Suspicious Patterns
+
+1. **Short-side OOS Sharpe +0.62 outperforms IS short-Sharpe +0.38** — and OOS overall (+0.05) outperforms IS (−0.30). The IS-OOS Sharpe lift on shorts (+0.24) and on overall (+0.35) is **structurally suspect**: positive OOS-IS gap of this magnitude after a NEGATIVE IS verdict usually flags either (a) regime-transition luck or (b) data-extent edge effect. ATOM's OOS window (2025-09 → 2026-06, 1318 candles ~ 5.5 months) ends in 2026 with cumulative OOS return −66.5% — confirming OOS is still in deep-bear regime, so it's not a regime transition. More likely: **the OOS 87-trade sample is too thin to be reliable on a per-direction split (40 shorts / 47 longs at σ_Sharpe ≈ 0.31)**. Critic should not weight the OOS +0.05 headline as evidence of latent edge; the SPECIALIST-NEGATIVE verdict on IS is correctly load-bearing.
+2. **`btc_funding_spread_30_90` rank 7 at ATOM (rank 9 at DOT) is the highest cross-asset feature signal at /075.** This is interesting because ATOM has no native funding feed in the cross-asset stack — only BTC's funding spread is being used. If the QR were to expand the feature stack (NOT permitted under current methodology lock), `atom_funding_zscore_30` and `atom_oi_delta_30_z90` would be high-conviction additions, given how prominently the BTC funding cousin already ranks. Methodology lock prevents this; logging for cycle-7 reformer.
+3. **The 2025 IS-tail 4 longs at 0.0% WR / −6.58% mean PnL** is a 4-trade outlier cluster. Per `trades.csv` direction=+1 in year 2025 IS: 4 trades, mean pnl −6.58%, sum −26.3%. This is approximately **17% of the total IS PnL loss attributable to 4 trades.** Per-trade inspection (not in this task scope but flagged): if these are all `stop_loss` in a 1-2 month window where ATOM unloaded another 15% spot move, they are a single-event regime-tail. Critic Check 3 (PBO / fold dispersion) should consider the IS −0.30 as **partially driven by a small late-IS bleed cluster**, not uniformly across IS.
+
+## Next-Iteration Tuning Recommendations
+
+Per user directive, **methodology constants LOCKED**. The 2-strike rule allows ATOM specialist re-attempt with NEW axis BEFORE seat exclusion. Single-bit axis recommendations, in priority order:
+
+### 1. **LONG-VETO rule** (analogous to /074's mid-bull SHORT VETO, mechanism-inverted)
+- **What**: Add a single-bit rule `if regime_state == BEAR and direction == +1: reject signal`. Mirror of /074's `if regime_state == MID-BULL and direction == −1: reject`. The regime-state primitive likely already exists in the 48-col stack (`regime_momentum_signed_5d` or `interact_natr_x_adx` as proxy).
+- **Mechanism**: ATOM's failure is **long-cohort bleed in deep-bear regimes**. Vetoing longs in bear-tagged regimes converts the 116-trade long bleed (IS −51.9%) into 0 trades. Even discounting some short volume sympathetic to the veto rule (correlated regime detection), expected IS shift: long pnl 0 (was −51.9%), shorts unchanged at +30.7% → headline IS pnl +30.7% on ~120-150 trades → IS Sharpe estimate **+0.40 to +0.55**.
+- **Risk**: regime-tagging definition is the load-bearing primitive. If "bear" is defined by `ret_30 < 0` or `cumulative_return_180 < 0`, ATOM is BEAR ~80% of IS → veto removes ~120 longs (≥50-trade IS floor still cleared at ~150 trades). If defined too tightly (e.g. `mom_5 < 0 AND vol > median`), veto fires <30% of the time and the rule has insufficient power. **Pre-register the regime definition at brief Section 1 before Phase 5.5 gate.** Same single-bit axis cleanness as /074.
+
+### 2. **Direction-conditional confidence cutoff asymmetry** (R3 SHARED → DIRECTION-SPLIT)
+- **What**: Replace `R3=ON-SHARED cutoff=0.70` with `R3=ON-DIRECTION-SPLIT cutoff_long=0.80 / cutoff_short=0.65`. Cuts low-conviction longs aggressively, keeps low-conviction shorts.
+- **Mechanism**: ATOM long Sharpe is −0.63 across 116 trades; short Sharpe is +0.38 across 116 trades. Pruning the bottom-conviction half of longs (58 trades, presumably the worst-pnl half) would lift long mean pnl from −0.45 toward 0; pruning none of the shorts preserves the +0.38 cohort. Conservative estimate: long pnl moves from −51.9% to ~−15% on 58 trades; short pnl unchanged +30.7% on 116 → IS Sharpe estimate **+0.20 to +0.35**.
+- **Risk**: introduces a methodology axis change (R3 cutoff differentiation) that is structurally distinct from the LOCKED `R3=ON-SHARED cutoff=0.70`. **This is a 2-bit deviation, not 1-bit** — likely OUT OF SCOPE under strict methodology lock. Documented here only for cycle-7 reformer consideration.
+
+### 3. **Triple-barrier ATR asymmetry** (2.9/1.45 → 3.5/1.30 or 2.5/1.80)
+- **What**: Widen take-profit ratio asymmetrically (e.g., short trades 3.5 ATR profit / 1.30 ATR stop vs long trades 2.5 ATR profit / 1.80 ATR stop). Lets shorts run further into bear-bleed, exits longs faster on adverse moves.
+- **Mechanism**: ATOM's 41 timeout exits out of 232 IS trades (17.7%) suggest meaningful trades are getting truncated by the timeout barrier; the 136 stop-losses (58.6%) suggest stops are firing aggressively. Direction-asymmetric ATR would let the directionally-favorable cohort (shorts in bear) capture more PnL per signal and limit damage on the bleed cohort (longs in bear).
+- **Risk**: Same methodology lock concern as Rec 2 — direction-asymmetric ATR is a 2-bit deviation. Documented for cycle-7 reformer.
+
+**Strongest single-bit recommendation: Rec 1 (LONG-VETO).** This is the closest mechanistic analog to /074's existing SHORT VETO axis (which is part of the BUNDLE-001 ETH/064 component construction). It preserves the locked methodology constants while introducing a single rule-layer modifier. Predicted ATOM Re-Attempt /XXX IS Sharpe **+0.40 to +0.55** modal (range [+0.15, +0.70] 90% band). **Confidence: MEDIUM-HIGH** — the mechanism is empirically grounded in the year-stratified direction split table above.
+
+## What This Iteration Confirms / Refutes About Prior LM Master Advisory
+
+**Phase 4.5 prediction tracker:**
+- **Risk Flag 2 (deep-bear short-cohort memorization → OOS short collapse)**: **REFUTED — sign inverted.** I predicted shorts would inflate IS and collapse OOS; reality is shorts are stable POSITIVE both IS (+0.38) and OOS (+0.62). The bleed is on the LONG side both IS (−0.63) and OOS (−0.35). The right direction-asymmetry vigil was correct; the predicted polarity was wrong. **Lesson for future LM Master advisories on deep-bear symbols: the symmetric-signal-on-asymmetric-regime failure mode is more likely than short-cohort overfit-then-collapse.**
+- **Risk Flag 1 (TS-mom +0.918 positive-baseline contamination)**: **PARTIALLY CONFIRMED.** The high trivial-momentum signal Sharpe did predict lower ML headroom — IS came in at −0.30, well below the +0.20 PROMISING-TENTATIVE band, consistent with positive-baseline-trap dynamics (cf. LINK/066 and LTC/067).
+- **Risk Flag 3 (0.61 BTC corr → cross-asset feature dilution)**: **REFUTED on dilution, CONFIRMED on re-routing.** Cross-asset features are NOT diluted; they re-route through `btc_funding_spread_30_90` (rank 7) and `long_short_zscore_30` (rank 8) rather than return-ratio channels. Feature-mechanism flexibility is higher than I credited.
+- **Risk Flag 4 (v2 dead-paths catalog non-blocking)**: **CONFIRMED.** v2 prior failure was orthogonal; ATOM at v1 specialist is its own mechanism story (now established as long-side bleed).
+- **Risk Flag 5 (0.81 DOT correlation → roster diversity erosion)**: **NOT TESTED.** /075 is SPECIALIST-NEGATIVE — does not advance to BUNDLE-002 assembly. Risk Flag 5 is **moot for this iteration**, retained for ATOM-specialist re-attempt evaluation.
+- **8-band verdict prior**: NEGATIVE-NO-EFFECT (prior 0.20) is approximately where /075 lands. The PROMISING-or-better aggregate prior (0.48) overestimated by ~20 pp; the NEGATIVE-CATASTROPHIC tail (0.06) was approximately correct (IS −0.30 is below the −0.10 NEGATIVE-NO-EFFECT band lower bound, edge-case to NEGATIVE-CATASTROPHIC). **Calibration: I was 1σ optimistic on the modal IS Sharpe prediction.**
+
+**Track-record entry for future LM Master**: NEW SYMBOL specialist at locked /063 methodology on a deep-bear cumulative-return symbol underperforms my Phase 4.5 prior by ~0.5σ. Adjust ATOM-class symbol priors (deep-bear IS + chop-dominant regime + symmetric signal layer) downward by ~0.15 IS Sharpe. The mechanism — symmetric-signal-on-asymmetric-regime — is the calibration lesson that should propagate to any future NEW SYMBOL specialist at /076 (AAVE) and /077 (ICP) post-mortems.
+
+## Closing Note for Critic (Phase 7.5)
+
+Three pieces of evidence the Critic should specifically weigh in the 8-check pass:
+
+1. **Direction-asymmetric Sharpe collapse is mechanism, not curve-fit** (Check 4 IC framing). The IS shorts +0.38 / longs −0.63 split is **not** evidence of overfit on shorts — it's evidence that the symmetric signal layer is mismatched to the asymmetric regime substrate. The IS −0.30 verdict is correctly NEGATIVE on the symmetric-construct basis; the per-direction shorts have **genuine signal** that any future ATOM specialist with a LONG-VETO rule (Rec 1) could plausibly capture.
+
+2. **OOS +0.05 should not be cited as latent-edge evidence** (Check 3 PBO / Check 7 trade-rate). The 87-trade OOS sample at σ_Sharpe ≈ 0.21 makes the +0.05 OOS reading consistent with noise around 0. The SPECIALIST-NEGATIVE verdict on IS −0.30 is the load-bearing signal; OOS is supplementary.
+
+3. **The `regime=unknown` collapse in `per_regime.csv` is a report-generation infrastructure issue** (Check 8 reproducibility). It does NOT invalidate the IS verdict — `trades.csv` is the load-bearing artifact and year-stratified reconstruction (this advisor §3) cleanly diagnoses regime-direction interaction. Critic should flag for cycle-7 reformer (re-enable regime-tagging in `per_regime.csv` output) but should NOT block the SPECIALIST-NEGATIVE verdict on report-infrastructure grounds.
+
+Critic verdict prediction: **BLOCK-FINAL / FAIL** on SPECIALIST-NEGATIVE (1st strike). 2-strike rule applies — ATOM specialist seat remains eligible for re-attempt with NEW axis (Rec 1 LONG-VETO recommended). BUNDLE-001 (DOT/063 + ETH/064 + BTC/065) unchanged. Mining roster advances to /076 AAVEUSDT, /077 ICPUSDT as scheduled.
