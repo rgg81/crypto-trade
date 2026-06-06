@@ -210,6 +210,15 @@ class LightGbmStrategy:
         specialist_mode: bool = False,
         specialist_n_startup_trials: int = 10,
         specialist_n_estimators_max: int = 500,
+        # iter-v1/074: AXIS-R — Mid-Bull SHORT VETO post-aggregator rule layer.
+        # When True, direction==-1 signals are vetoed when ret_270b ∈ [lo, hi].
+        # ret_270b = (close[t] / close[t - lookback]) - 1.0 on 8h candles (90-day trailing return).
+        # Pre-registered band edges [0.20, 0.50] frozen at brief authoring.
+        # Default False = BIT-IDENTICAL to all prior runs.
+        enable_mid_bull_short_veto: bool = False,
+        mid_bull_short_veto_lo: float = 0.20,
+        mid_bull_short_veto_hi: float = 0.50,
+        mid_bull_short_veto_lookback: int = 270,
     ) -> None:
         if not feature_columns:
             raise ValueError(
@@ -339,6 +348,19 @@ class LightGbmStrategy:
         # cross-seed Sharpe spread (which is structurally undefined under the
         # 50-seed aggregator producing a single backtest).
         self._specialist_dispersion_stats: list[float] = []
+        # iter-v1/074: AXIS-R — Mid-Bull SHORT VETO post-aggregator rule layer.
+        # Enabled via enable_mid_bull_short_veto=True (SPECIALIST + /074 dispatch only).
+        # Band edges pre-registered [0.20, 0.50]; lookback 270 8h candles = 90 calendar days.
+        # Deterministic post-aggregator filter: does NOT change Optuna training-objective domain.
+        self._enable_mid_bull_short_veto: bool = bool(enable_mid_bull_short_veto)
+        self._mid_bull_short_veto_lo: float = float(mid_bull_short_veto_lo)
+        self._mid_bull_short_veto_hi: float = float(mid_bull_short_veto_hi)
+        self._mid_bull_short_veto_lookback: int = int(mid_bull_short_veto_lookback)
+        # Per-symbol sorted (open_time_ms, close) arrays for O(log n) lookback queries.
+        # Populated in compute_features(); keyed by symbol string.
+        self._close_by_sym: dict[str, tuple[np.ndarray, np.ndarray]] = {}
+        # Veto event log: list of (symbol, open_time_ms, ret_270b) for F-AXIS-COUNTERFACTUAL audit.
+        self._axis_r_veto_log: list[dict] = []
         # iter-v3/072: labeling mode — "triple_barrier" (default, backward-compat)
         # or "fixed_horizon" (sign of N-candle-forward return; no barriers).
         # iter-v3/105: "trend_scanning" (OLS trend, max-|t| horizon selection
@@ -467,6 +489,20 @@ class LightGbmStrategy:
 
         self._current_month = None
         self._model = None
+
+        # iter-v1/074: AXIS-R close-price index — O(log n) lookback queries.
+        # Build a per-symbol (open_time_ms, close) index for ret_270b computation.
+        if self._enable_mid_bull_short_veto:
+            self._close_by_sym = {}
+            for _sym in np.unique(self._sym_arr):
+                _sym_mask = self._sym_arr == _sym
+                _ot_sym = self._open_time_arr[_sym_mask]
+                _cl_sym = master["close"].values[_sym_mask].astype(np.float64)
+                _sort_idx = np.argsort(_ot_sym)
+                self._close_by_sym[str(_sym)] = (
+                    _ot_sym[_sort_idx].astype(np.int64),
+                    _cl_sym[_sort_idx],
+                )
 
         # Load per-row ATR values for dynamic labeling
         if self.use_atr_labeling and self.atr_tp_multiplier is not None:
@@ -1524,6 +1560,86 @@ class LightGbmStrategy:
             f"{n_obs} observations (empty — no signals fired) → {out_path}"
         )
 
+    def _compute_ret_270b(self, symbol: str, open_time: int) -> float | None:
+        """Compute trailing-270-bar return for AXIS-R veto (iter-v1/074).
+
+        Returns (close[t] / close[t - lookback]) - 1.0 where lookback =
+        self._mid_bull_short_veto_lookback (270 by default = 90 calendar days
+        on 8h candles).  Returns None when insufficient history is available.
+
+        Uses the per-symbol sorted (open_time_ms, close) index built in
+        compute_features(); O(log n) binary search per call.
+        """
+        sym_data = self._close_by_sym.get(symbol)
+        if sym_data is None:
+            return None
+        ot_arr, cl_arr = sym_data
+        # Find the position of the current candle.
+        idx_curr = int(np.searchsorted(ot_arr, open_time, side="left"))
+        if idx_curr >= len(ot_arr):
+            return None
+        # Need lookback bars before this candle (not including it).
+        idx_past = idx_curr - self._mid_bull_short_veto_lookback
+        if idx_past < 0:
+            return None
+        close_curr = cl_arr[idx_curr]
+        close_past = cl_arr[idx_past]
+        if close_past <= 0.0 or not np.isfinite(close_curr) or not np.isfinite(close_past):
+            return None
+        return float(close_curr / close_past) - 1.0
+
+    def _apply_mid_bull_short_veto(self, signal: Signal, symbol: str, open_time: int) -> Signal:
+        """Apply AXIS-R Mid-Bull SHORT VETO to an aggregated signal (iter-v1/074).
+
+        Veto fires when:
+          signal.direction == -1
+          AND ret_270b = (close[t] / close[t-270]) - 1.0 ∈ [lo, hi]
+
+        Long signals, flat signals, and candles outside the band are untouched.
+        Logs forensic event kind=axis_r_veto for Phase 7 counterfactual audit.
+
+        Args:
+            signal: Aggregated signal from the 50-seed mean-of-signed-weights.
+            symbol: Trading symbol (e.g. "ETHUSDT").
+            open_time: Candle open_time in epoch milliseconds.
+
+        Returns:
+            Original signal (if veto does not fire) or Signal(direction=0, weight=0).
+        """
+        if not self._enable_mid_bull_short_veto:
+            return signal
+        if signal.direction != -1:
+            return signal
+        ret_270b = self._compute_ret_270b(symbol, open_time)
+        if ret_270b is None:
+            return signal
+        if self._mid_bull_short_veto_lo <= ret_270b <= self._mid_bull_short_veto_hi:
+            from crypto_trade import decision_log
+
+            decision_log.log(
+                {
+                    "kind": "axis_r_veto",
+                    "symbol": symbol,
+                    "ot": open_time,
+                    "ret_270b": ret_270b,
+                    "veto_lo": self._mid_bull_short_veto_lo,
+                    "veto_hi": self._mid_bull_short_veto_hi,
+                    "signal_direction_pre_veto": signal.direction,
+                    "signal_weight_pre_veto": signal.weight,
+                }
+            )
+            self._axis_r_veto_log.append(
+                {
+                    "symbol": symbol,
+                    "open_time": open_time,
+                    "ret_270b": ret_270b,
+                    "direction_pre_veto": signal.direction,
+                    "weight_pre_veto": signal.weight,
+                }
+            )
+            return Signal(direction=0, weight=0)
+        return signal
+
     def get_signal(self, symbol: str, open_time: int) -> Signal:
         """Return signal for one candle. Always predicts 1 or -1."""
         # Detect month change → lazy training
@@ -1657,6 +1773,34 @@ class LightGbmStrategy:
 
             from crypto_trade import decision_log
 
+            # iter-v1/074: AXIS-R Mid-Bull SHORT VETO — post-aggregator rule layer.
+            # Applied AFTER mean-of-signed-weights aggregator emits Signal(direction, weight)
+            # and BEFORE R3 OOD / R5 vol-target call-sites (pre-registered; anti-tuning).
+            _sp_signal_pre_veto = Signal(
+                direction=_sp_direction,
+                weight=_sp_weight,
+                tp_pct=_sp_tp_pct,
+                sl_pct=_sp_sl_pct,
+                confidence=_sp_confidence,
+            )
+            _sp_signal = self._apply_mid_bull_short_veto(_sp_signal_pre_veto, symbol, open_time)
+            if _sp_signal.direction == 0:
+                # Veto fired — log and return NO_SIGNAL (not the vetoed direction).
+                decision_log.log(
+                    {
+                        "kind": "lgbm_signal",
+                        "symbol": symbol,
+                        "ot": open_time,
+                        "month": candle_month,
+                        "specialist_seeds": len(self._specialist_models),
+                        "final_signed": _final_signed,
+                        "ensemble_std": _ensemble_std,
+                        "direction_pre_veto": _sp_direction,
+                        "decision": "vetoed:axis_r_mid_bull_short",
+                    }
+                )
+                return NO_SIGNAL
+
             decision_log.log(
                 {
                     "kind": "lgbm_signal",
@@ -1673,13 +1817,7 @@ class LightGbmStrategy:
                     "decision": "signal",
                 }
             )
-            return Signal(
-                direction=_sp_direction,
-                weight=_sp_weight,
-                tp_pct=_sp_tp_pct,
-                sl_pct=_sp_sl_pct,
-                confidence=_sp_confidence,
-            )
+            return _sp_signal
         if feat_row is None:
             from crypto_trade import decision_log
 

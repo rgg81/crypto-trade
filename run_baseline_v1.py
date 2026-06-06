@@ -89,6 +89,7 @@ from crypto_trade.features_v1 import (
     V1_ITER061_UNIVERSE,
     V1_ITER063_UNIVERSE,
     V1_ITER065_UNIVERSE,
+    V1_ITER074_UNIVERSE,
     V1_OOD_FEATURE_COLUMNS,
     assert_v1_universe,
 )
@@ -7114,6 +7115,178 @@ def main() -> None:
         _r5_model_results = [results_e065]
         _post_dispatch_fi_strategies = [("Model_A_BTC_specialist_065", _strat_e065)]
 
+    elif iteration_label == "v1-074" and set(symbols) == set(V1_ITER074_UNIVERSE):
+        # iter-v1/074: ETH-IMPROVED-V3 — SPECIALIST-IMPROVEMENT (AXIS-R Mid-Bull SHORT VETO).
+        # THIRD improvement attempt for ETH /064 BUNDLE-001 seat.
+        # Anchor: /064 (IS Sharpe +0.2383 / OOS +0.5171 / 198 IS / 81 OOS trades).
+        # /073 is NOT the anchor — /073 was IMPROVEMENT-FAIL (IS Δ −0.25 vs /064; discarded).
+        #
+        # SINGLE-BIT deviation from /064: AXIS-R post-aggregator veto kwargs added.
+        # Everything else inherited UNCHANGED from /064 dispatch (hardwired).
+        #
+        # AXIS-R — Mid-Bull SHORT VETO post-aggregator rule layer:
+        #   When mean-of-signed-weights aggregator emits Signal(direction=−1, weight=W)
+        #   AND ret_270b = (close[t]/close[t−270]) − 1.0 ∈ [0.20, 0.50], the signal is
+        #   replaced with Signal(direction=0, weight=0). Longs/flat untouched.
+        #   Veto is POST-aggregator (NOT per-seed) to preserve F-AXIS #2 dispersion audit.
+        #   Pre-registered band edges [0.20, 0.50] / lookback 270 FROZEN at brief authoring.
+        #
+        # SPECIALIST + BUNDLE design (same as /064):
+        #   - 50 independent Optuna studies, one per seed (V1_SPECIALIST_SEEDS: 42..91)
+        #   - Each study: n_trials=V1_SPECIALIST_OPTUNA_TRIALS=30, ENSEMBLE_SIZE=1
+        #   - LightGBM HP search: max_depth=5 FIXED, num_leaves=31 FIXED
+        #   - confidence_threshold Optuna-tunable per seed (range [0.50, 0.85])
+        #   - Aggregator at inference: mean-of-signed-weights across 50 seeds
+        #
+        # Wall-clock mitigation (same as /064):
+        #   - n_estimators upper bound = 500 (capped from 1000)
+        #   - n_startup_trials = 10 (vs Optuna default 30)
+        #   AXIS-R adds ZERO training-time overhead (post-aggregator filter only).
+        #
+        # Risk config (MATCHED to /064 / Model A ETH cell):
+        #   R1=OFF (CATALOG-CLOSED for SPECIALIST_mode per f81cafc3)
+        #   R2=OFF (Model A baseline)
+        #   R3=ON-SHARED  cutoff=0.70, 16 features
+        #   R5=ON  vt_target_vol=0.3, vt_lookback_days=45
+        #   atr_tp=2.9, atr_sl=1.45 (Model A ETH cell — UNCHANGED from /064)
+        #
+        # Feature set: V1_FEATURE_COLUMNS_PRUNED (48 cols, UNCHANGED — NO parquet regen).
+        # HIGH-RISK: rule-layer inference injection (brief Section 2.5).
+        # Mitigated: mechanism-orthogonal to basin-lottery (H1d).
+        #
+        # LOAD-BEARING: specialist_dispersion.csv persistence (matching /064+/065 pattern).
+        assert set(symbols) == {"ETHUSDT"}, (
+            f"iter-v1/074 guard: expected {{ETHUSDT}}, got {set(symbols)}"
+        )
+        assert len(active_feature_columns) == 48, (
+            f"iter-v1/074 guard: expected 48 V1_FEATURE_COLUMNS_PRUNED cols (UNCHANGED from /064), "
+            f"got {len(active_feature_columns)}. "
+            "AXIS-R is post-aggregator only — it does NOT modify the feature stack. "
+            "If len != 48: check that --pruned-features was passed to the runner."
+        )
+        print(
+            f"[iter-v1/074] ETH-IMPROVED-V3 SPECIALIST — AXIS-R Mid-Bull SHORT VETO ACTIVE: "
+            f"V1_SPECIALIST_SEED_COUNT={V1_SPECIALIST_SEED_COUNT} "
+            f"V1_SPECIALIST_OPTUNA_TRIALS={V1_SPECIALIST_OPTUNA_TRIALS} "
+            f"specialist_mode=True "
+            f"max_depth=5 FIXED, num_leaves=31 FIXED. "
+            f"R1=OFF (CATALOG-CLOSED; f81cafc3), R2=OFF, "
+            f"R3=ON-SHARED cutoff=0.70, R5=ON vt_target_vol=0.3. "
+            f"features=V1_FEATURE_COLUMNS_PRUNED (48 cols; UNCHANGED from /064). "
+            f"atr_tp=2.9, atr_sl=1.45 (Model A ETH cell; UNCHANGED from /064). "
+            f"AXIS-R: enable_mid_bull_short_veto=True lo=0.20 hi=0.50 lookback=270. "
+            f"n_estimators_max=500 (wall-clock mitigation). "
+            f"n_startup_trials=10 (wall-clock mitigation). "
+            f"Aggregator: mean-of-signed-weights across {V1_SPECIALIST_SEED_COUNT} seeds. "
+            f"LOAD-BEARING: specialist_dispersion.csv will be persisted post-backtest."
+        )
+        _config_e074 = BacktestConfig(
+            symbols=("ETHUSDT",),
+            interval="8h",
+            max_amount_usd=1000.0,
+            stop_loss_pct=2.9,  # ATR-based; overridden by atr_sl_multiplier=1.45
+            take_profit_pct=5.8,  # ATR-based; overridden by atr_tp_multiplier=2.9
+            timeout_minutes=10080,
+            fee_pct=0.1,
+            data_dir=Path("data"),
+            cooldown_candles=2,
+            vol_targeting=True,
+            vt_target_vol=0.3,
+            vt_lookback_days=45,
+            vt_min_scale=0.33,
+            vt_max_scale=2.0,
+            risk_consecutive_sl_limit=0,  # R1=OFF: CATALOG-CLOSED for SPECIALIST_mode
+            risk_consecutive_sl_cooldown_candles=0,
+            risk_drawdown_scale_enabled=False,  # R2=OFF: Model A baseline
+            risk_r5_vol_target_enabled=_r5_kwargs.get("r5_vol_target_enabled", True),
+            risk_r5_vol_target_pct=_r5_kwargs.get("r5_vol_target_pct", 4.0),
+            risk_r5_kill_low_natr_enabled=_r5_kwargs.get("r5_kill_low_natr_enabled", False),
+            risk_r5_kill_low_natr_min_pct=_r5_kwargs.get("r5_kill_low_natr_min_pct", 2.0),
+        )
+        _strat_e074 = LightGbmStrategy(
+            training_months=24,
+            n_trials=V1_SPECIALIST_OPTUNA_TRIALS,  # informational; specialist loop controls
+            cv_splits=5,
+            label_tp_pct=5.8,
+            label_sl_pct=2.9,
+            label_timeout_minutes=10080,
+            fee_pct=0.1,
+            features_dir="data/features",
+            verbose=1,
+            atr_tp_multiplier=2.9,
+            atr_sl_multiplier=1.45,
+            use_atr_labeling=True,
+            # placeholder seed — specialist_mode uses V1_SPECIALIST_SEEDS internally
+            ensemble_seeds=list(V1_SPECIALIST_SEEDS[:1]),
+            feature_columns=active_feature_columns,
+            ood_enabled=True,  # R3 ON at AGGREGATOR level (SHARED — UNCHANGED from /064)
+            ood_features=list(V1_OOD_FEATURE_COLUMNS),
+            ood_cutoff_pct=0.70,
+            oof_persist_path=OOF_PARQUET_PATH,
+            bounds_profile="v1_specialist",
+            specialist_mode=True,
+            specialist_n_startup_trials=10,
+            specialist_n_estimators_max=500,
+            # AXIS-R: Mid-Bull SHORT VETO — single-bit add over /064 (pre-registered band)
+            enable_mid_bull_short_veto=True,
+            mid_bull_short_veto_lo=0.20,  # pre-registered band edge LOW (FROZEN)
+            mid_bull_short_veto_hi=0.50,  # pre-registered band edge HIGH (FROZEN)
+            mid_bull_short_veto_lookback=270,  # 270 8h candles = 90 calendar days (FROZEN)
+        )
+        import time as _time_074  # noqa: PLC0415
+
+        _t0_074 = _time_074.time()
+        results_e074 = run_backtest(_config_e074, _strat_e074, yearly_pnl_check=False)
+        _elapsed_074 = _time_074.time() - _t0_074
+        faxm_e074 = _strat_e074._faxm_log
+        print(
+            f"\n[iter-v1/074] Model_A_ETH_specialist_074 complete: "
+            f"{len(results_e074)} trades in {_elapsed_074:.0f}s "
+            f"({_elapsed_074 / 3600:.2f}h)"
+        )
+
+        # Cohort isolation sanity: assert ONLY ETHUSDT trades emitted.
+        _e074_symbols = {r.symbol for r in results_e074}
+        assert _e074_symbols.issubset({"ETHUSDT"}), (
+            f"[iter-v1/074] Model A_ETH produced non-ETH results: "
+            f"{_e074_symbols - {'ETHUSDT'}}. "
+            "Per-cohort isolation failed — iter-v1/074 must trade ETHUSDT ONLY."
+        )
+
+        # -----------------------------------------------------------------
+        # LOAD-BEARING: specialist_dispersion.csv persistence (matching /065 pattern).
+        # -----------------------------------------------------------------
+        _disp_mean_e074 = _strat_e074.get_specialist_dispersion_mean()
+        _disp_is_path_e074 = (
+            Path(reports_dir) / "iteration_v1-074" / "in_sample" / "specialist_dispersion.csv"
+        )
+        _disp_is_path_e074.parent.mkdir(parents=True, exist_ok=True)
+        _strat_e074.persist_specialist_dispersion_csv(str(_disp_is_path_e074))
+        print(
+            f"[iter-v1/074] LOAD-BEARING dispersion patch: "
+            f"specialist_dispersion_mean={_disp_mean_e074} "
+            f"specialist_dispersion.csv → {_disp_is_path_e074}"
+        )
+        # Store for post-report block (specialist_dispersion_mean appended to comparison.csv
+        # AFTER generate_iteration_reports() runs — comparison.csv written there).
+        _e074_disp_mean = _disp_mean_e074
+        _e074_disp_csv_path = _disp_is_path_e074
+
+        print(
+            f"[iter-v1/074] Dispatch verified: "
+            f"ETH-only={len(results_e074)} trades. "
+            f"R1=OFF/R2=OFF/R3=ON-SHARED/AXIS-R=ENABLED. "
+            f"SPECIALIST seeds={len(_strat_e074._specialist_models)} trained. "
+            f"σ_pop mean={_disp_mean_e074} "
+            f"AXIS-R veto count={len(_strat_e074._axis_r_veto_log)} "
+            f"(expected ~32 IS; ~5 OOS)"
+        )
+
+        _all_faxm_logs = faxm_e074
+        all_results = results_e074
+        _r5_model_results = [results_e074]
+        _post_dispatch_fi_strategies = [("Model_A_ETH_specialist_074", _strat_e074)]
+
     elif iteration_label == "v1-044":
         # iter-v1/044: CONFIRMATION-MERGE-PORTFOLIO (cycle-5 CONFIRMATION 1/1).
         # 3-component bundle: BASELINE_V1 (w=0.50) + /036 (w=0.30) + /043 (w=0.20).
@@ -8280,6 +8453,50 @@ def main() -> None:
                     f"[iter-v1/065] WARNING: comparison.csv not found at {_comp_csv_065}; "
                     f"specialist_dispersion_mean={_disp_mean_val:.4f} NOT appended."
                 )
+
+    # -------------------------------------------------------------------------
+    # iter-v1/074: specialist_dispersion_mean + axis_r_veto_count → comparison.csv.
+    # Mirrors the /065 pattern. Persists OOS specialist_dispersion.csv too.
+    # Guard: only runs when _e074_disp_mean is defined (v1-074 dispatch sets it).
+    # -------------------------------------------------------------------------
+    if iteration_label == "v1-074" and "_e074_disp_mean" in dir():
+        _disp_mean_val_074 = locals().get("_e074_disp_mean")
+        if _disp_mean_val_074 is not None:
+            import csv as _csv_074  # noqa: PLC0415
+
+            _comp_csv_074 = report_dir / "comparison.csv"
+            if _comp_csv_074.exists():
+                with _comp_csv_074.open("a", newline="") as _fh_074:
+                    _writer_074 = _csv_074.writer(_fh_074)
+                    _writer_074.writerow(["specialist_dispersion_mean", _disp_mean_val_074, "", ""])
+                    # Persist axis_r_veto_count for F-AXIS-COUNTERFACTUAL audit.
+                    _strat_074_ref = next(
+                        (s for _, s in _post_dispatch_fi_strategies if "ETH_specialist_074" in _),
+                        None,
+                    )
+                    _veto_count = (
+                        len(_strat_074_ref._axis_r_veto_log) if _strat_074_ref is not None else 0
+                    )
+                    _writer_074.writerow(["axis_r_veto_count", _veto_count, "", ""])
+                print(
+                    f"[iter-v1/074] LOAD-BEARING: specialist_dispersion_mean="
+                    f"{_disp_mean_val_074:.4f} appended to {_comp_csv_074}"
+                )
+            else:
+                print(
+                    f"[iter-v1/074] WARNING: comparison.csv not found at {_comp_csv_074}; "
+                    f"specialist_dispersion_mean={_disp_mean_val_074:.4f} NOT appended."
+                )
+        # Persist OOS specialist_dispersion.csv (F-AXIS #2 audit; matching /065+ pattern).
+        _oos_disp_path_074 = report_dir / "out_of_sample" / "specialist_dispersion.csv"
+        _oos_disp_path_074.parent.mkdir(parents=True, exist_ok=True)
+        _strat_074_ref2 = next(
+            (s for _, s in _post_dispatch_fi_strategies if "ETH_specialist_074" in _),
+            None,
+        )
+        if _strat_074_ref2 is not None:
+            _strat_074_ref2.persist_specialist_dispersion_csv(str(_oos_disp_path_074))
+            print(f"[iter-v1/074] OOS specialist_dispersion.csv persisted → {_oos_disp_path_074}")
 
     # -------------------------------------------------------------------------
     # iter-v1/021+: write feature importance CSVs (post-dispatch).

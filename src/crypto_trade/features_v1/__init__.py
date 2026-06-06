@@ -561,6 +561,37 @@ assert len(active_feature_columns) == 48 guard fires in dispatch branch.
 """
 
 
+V1_ITER074_UNIVERSE: tuple[str, ...] = ("ETHUSDT",)
+"""iter-v1/074 cohort: ETH-only SPECIALIST-IMPROVEMENT-V3 (AXIS-R Mid-Bull SHORT VETO).
+
+Cycle-7 SPECIALIST-IMPROVEMENT 3rd attempt for ETH BUNDLE-001 seat. Anchor: /064.
+Axis family: risk-primitive (post-aggregator RULE-form veto).
+
+Single-bit deviation from /064: enables post-aggregator AXIS-R veto in LightGbmStrategy.
+  enable_mid_bull_short_veto=True, mid_bull_short_veto_lo=0.20, mid_bull_short_veto_hi=0.50,
+  mid_bull_short_veto_lookback=270 (270 8h candles = 90 calendar days).
+Pre-registered band edges [0.20, 0.50] frozen at brief authoring commit.
+
+Feature set: V1_FEATURE_COLUMNS_PRUNED (48 cols, UNCHANGED — NO parquet regeneration).
+Risk config: R1=OFF, R2=OFF, R3=ON-SHARED cutoff=0.70, R5=ON vt_target_vol=0.3.
+atr_tp=2.9, atr_sl=1.45 (Model A ETH cell — IDENTICAL to /064).
+
+AXIS-R veto is a post-aggregator rule-layer primitive. Does NOT change:
+  - feature stack (48 cols UNCHANGED)
+  - Optuna training-objective domain (basin identical to /064)
+  - labeling (ATR TP=2.9/SL=1.45 UNCHANGED)
+  - risk wrappers (R1=OFF R2=OFF R3=ON UNCHANGED)
+
+HIGH-RISK declaration (brief Section 2.5): rule-layer inference injection modifies deployed
+trade roster (32 of 198 IS trades skipped). Mitigated by mechanism-orthogonality to
+basin-lottery (H1d): inner-seed Optuna trajectories deterministic on /064 basin.
+
+LOCAL to runner constant. NOT shared; CONFIRMATION-MERGE updates V1_BASELINE_UNIVERSE.
+assert set(symbols) == {"ETHUSDT"} guard fires in dispatch branch.
+assert len(active_feature_columns) == 48 guard fires in dispatch branch.
+"""
+
+
 V1_ITER065_UNIVERSE: tuple[str, ...] = ("BTCUSDT",)
 """iter-v1/065 cohort: BTC-only SPECIALIST (third SPECIALIST under SPECIALIST + BUNDLE methodology).
 
@@ -743,6 +774,7 @@ __all__ = [
     "V1_ITER061_UNIVERSE",
     "V1_ITER063_UNIVERSE",
     "V1_ITER065_UNIVERSE",
+    "V1_ITER074_UNIVERSE",
     # iter-v1/023: funding-rate feature family (add_funding_v1_features imported on demand)
     # iter-v1/025: OI delta feature family (add_oi_delta_v1_features imported on demand)
     # iter-v1/040: composed feature family (add_composed_v1_features imported on demand)
