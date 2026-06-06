@@ -43,7 +43,7 @@ True overfit signature still exists: importance-INERT mechanism + OOS catastroph
 | IS lift via basin lottery, importance INERT, OOS catastrophic, mechanism falsified | **OVERFIT-BY-MECHANISM-FAILURE** — discard |
 | IS lift mechanically attributable to a signal-bearing feature, importance load-bearing, OOS weakness explained by regime mismatch | **REGIME-SPECIALIST-IS** — preserve for /044+ bundle |
 
-### 4.2 Use the 5-band verdict, not binary PROMISING / NEGATIVE
+### 4.2 Use the 5-band verdict, not binary SPECIALIST-PROMISING / SPECIALIST-NEGATIVE
 
 | Band | IS Δ | OOS Δ | Regime attribution | Bundle role |
 |---|---|---|---|---|
@@ -51,16 +51,16 @@ True overfit signature still exists: importance-INERT mechanism + OOS catastroph
 | `REGIME-SPECIALIST-IS` | ≥ +0.10 | ≤ +0.05 (≥ −0.20) | concentrated in IS-only regimes | Bundle candidate for IS-only regimes |
 | `REGIME-SPECIALIST-OOS` | ≤ +0.05 (≥ −0.20) | ≥ +0.10 | concentrated in OOS regimes | Bundle candidate for OOS-recurring regimes |
 | `TAIL-CONTROL` | any | any | DD reduction ≥ 20% | Risk overlay (evaluated on tail, not Sharpe) |
-| `TRUE-NEG` / `EXPLORATION-NEGATIVE` | ≤ 0 | ≤ 0 | no regime gives lift; mechanism falsified | Discard / dead-paths catalog |
+| `TRUE-NEG` / `SPECIALIST-NEGATIVE` | ≤ 0 | ≤ 0 | no regime gives lift; mechanism falsified | Discard / dead-paths catalog |
 | `WALK-FORWARD-LEAKAGE` | n/a | n/a | actual leakage (gap=0, look-ahead) | BLOCK — methodology integrity failure |
 
 ### 4.3 `OOS / IS ≥ 0.5` is a BUNDLE-level gate, not a component gate
 
-This single line in the v1 skill (line 158, 255) was systematically killing regime specialists. It is retained as a gate for **bundle CONFIRMATIONs** only — when claiming a unified regime-free predictor. For **component EXPLORATIONs**, the replacement is **regime-attribution analysis** + within-regime Sharpe.
+This single line in the v1 skill (line 158, 255) was systematically killing regime specialists. It is retained as a gate for **BUNDLE iterations** only — when claiming a unified regime-free predictor. For **component SPECIALIST iterations**, the replacement is **regime-attribution analysis** + within-regime Sharpe.
 
-### 4.4 CONFIRMATION is portfolio composition, not single-model validation
+### 4.4 BUNDLE is portfolio composition, not single-model validation
 
-A CONFIRMATION is the act of combining N component models (each from prior EXPLORATIONs) into a unified prediction — via stacking, regime-conditional dispatch, ensemble averaging, or weighted blend. Components are evaluated for their bundle contribution (regime coverage + composition lift), not as standalone universal predictors.
+A BUNDLE iteration is the act of combining N component models (each from prior SPECIALIST iterations) into a unified prediction — via stacking, regime-conditional dispatch, ensemble averaging, or weighted blend. Components are evaluated for their bundle contribution (regime coverage + composition lift), not as standalone universal predictors.
 
 ## 5. What Each Role Must Do Differently
 
@@ -77,7 +77,7 @@ A CONFIRMATION is the act of combining N component models (each from prior EXPLO
 - Phase 6 runner emits a regime-tagged daily PnL artifact (`reports-v1/iteration_v1-NNN/regime_attribution.csv`) for downstream LM Master + Critic consumption.
 
 **Quant Critic (Phase 6.0, 7.5):**
-- Phase 7.5 Check 3 splits into 3a (DSR/PSR), 3b (PBO), 3c (Regime attribution clarity — component candidate gate), 3d (Bundle-level OOS/IS — BUNDLE-CONFIRMATION only).
+- Phase 7.5 Check 3 splits into 3a (DSR/PSR), 3b (PBO), 3c (Regime attribution clarity — component candidate gate), 3d (Bundle-level OOS/IS — BUNDLE iterations only).
 - New Check 14 (axis family validation) unchanged; existing.
 - Verdict-band map updates to include `REGIME-SPECIALIST-IS`, `REGIME-SPECIALIST-OOS`, `TAIL-CONTROL`, `UNIVERSAL`, `WALK-FORWARD-LEAKAGE`.
 
