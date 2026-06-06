@@ -592,6 +592,42 @@ assert len(active_feature_columns) == 48 guard fires in dispatch branch.
 """
 
 
+V1_ITER075_UNIVERSE: tuple[str, ...] = ("ATOMUSDT",)
+"""iter-v1/075 cohort: ATOM-only SPECIALIST — first NEW SYMBOL universe-extension.
+
+Autopilot mining directive 2026-06-06. Cycle-7 SPECIALIST-MINE 1/N.
+Mine-phase composite rank 1/N (score 0.767).
+Axis family: universe (NEW SYMBOL; cycle-7 per-symbol regime-specialist mandate).
+
+Single-bit deviation vs /063 dispatch: SYMBOLS=("ATOMUSDT",), ITERATION_LABEL="v1-075",
+ATR cell /063's (3.5, 1.75) → ETH/064's (2.9, 1.45) [vol-class match for ATOM 80% IS vol].
+Model A wrapper (R1=OFF, R2=OFF) — matches /064 ETH and /065 BTC; NOT /063 DOT's Model E.
+All other methodology constants HELD per user directive 2026-06-06:
+    50 inner seeds × 30 Optuna trials × specialist_mode=True
+    48-col V1_FEATURE_COLUMNS_PRUNED
+    (hash b81176f893826500536ec5cee8ad00e74bf7edb834290e62e835213defe74ca3)
+    R3=ON-SHARED cutoff=0.70, R5=ON vt_target_vol=0.3, mean-of-signed-weights aggregator.
+
+Data extent: 6.33y (2020-02-07 → 2026-06-06; 6933 8h candles).
+IS BTC return corr: 0.617 (highest idiosyncratic diversity in eligible set).
+IS realized vol: ~80% annualized (ETH-class mid-vol; justifies ATR(2.9, 1.45) cell).
+F-AXIS #1: PROMISING-CLEAN ≥+0.50; PROMISING-TENTATIVE [+0.20, +0.50);
+    NEGATIVE <+0.20 or <50 IS trades.
+Strike rule: one-attempt-and-eliminate (per /066 LINK + /067 LTC precedent for NEW SYMBOL).
+
+NaN notes: dot_vs_btc_ret_ratio_30 + eth_vs_btc_ret_ratio_30 are ALL-NaN-IS for ATOM
+(SYMBOL-conditional; LightGBM NaN-handles natively; 2/48 = 4.2% wasted slot fraction).
+
+HIGH-RISK declaration (brief Section 2.5): universe substitution changes Optuna's
+training-objective domain. Mitigation: 50-INNER-seed averaging (σ_pop ≤ 0.30 gate
+held at /063, /064, /065).
+
+LOCAL to runner constant. NOT shared; CONFIRMATION-MERGE updates V1_BASELINE_UNIVERSE.
+assert set(symbols) == {"ATOMUSDT"} guard fires in dispatch branch.
+assert len(active_feature_columns) == 48 guard fires in dispatch branch.
+"""
+
+
 V1_ITER065_UNIVERSE: tuple[str, ...] = ("BTCUSDT",)
 """iter-v1/065 cohort: BTC-only SPECIALIST (third SPECIALIST under SPECIALIST + BUNDLE methodology).
 
@@ -775,6 +811,7 @@ __all__ = [
     "V1_ITER063_UNIVERSE",
     "V1_ITER065_UNIVERSE",
     "V1_ITER074_UNIVERSE",
+    "V1_ITER075_UNIVERSE",
     # iter-v1/023: funding-rate feature family (add_funding_v1_features imported on demand)
     # iter-v1/025: OI delta feature family (add_oi_delta_v1_features imported on demand)
     # iter-v1/040: composed feature family (add_composed_v1_features imported on demand)
