@@ -105,9 +105,9 @@ From each specialist's `reports-v1/iteration_v1-{063,064,065}/comparison.csv`:
 
 **Feature stack**: `V1_FEATURE_COLUMNS_PRUNED` (48 columns; post-cycle-2/3 prune; same column-pinned passing to LightGBM).
 
-**Ensemble**: 5 inner seeds per specialist (`[42, 123, 456, 789, 1001]`); single outer seed=42 EXPLORATION budget.
+**Ensemble**: 5 inner seeds per specialist (`[42, 123, 456, 789, 1001]`); single outer seed=42 SPECIALIST budget.
 
-**Optuna**: `n_trials = 18` per (symbol, month) cell (EXPLORATION budget; CONFIRMATION budget = 35 trials/cell deferred to /072 multi-seed re-validation).
+**Optuna**: `n_trials = 18` per (symbol, month) cell (SPECIALIST budget; BUNDLE budget = 35 trials/cell deferred to /072 multi-seed re-validation).
 
 **Walk-forward**: `train_end_ms = test_start_ms - embargo_ms` (the iter-v3/058 fix at `walk_forward.py:113`; commit `5566a69`).
 
@@ -127,17 +127,17 @@ From each specialist's `reports-v1/iteration_v1-{063,064,065}/comparison.csv`:
 | OOS trades/month | ≥ 10 | ~16.4 | PASS |
 | IS trades total | ≥ 50 | 537 | PASS |
 | Top symbol concentration | ≤ 30% (OOS PnL share) | 37.96% (BTC) | FAIL (structurally infeasible at N=3; informational) |
-| **DSR** (CONFIRMATION-grade) | > 0.95 | not computed at bundle layer (per-specialist DSR informational; bundle DSR requires aggregated trial-counting) | FAIL (informational under user mandate) |
+| **DSR** (BUNDLE-grade) | > 0.95 | not computed at bundle layer (per-specialist DSR informational; bundle DSR requires aggregated trial-counting) | FAIL (informational under user mandate) |
 | **PSR** (monthly, vs benchmark 1.0) | > 0.95 | not computed at bundle layer | FAIL (informational under user mandate) |
 | **PBO** | < 0.40 | not computed at bundle layer (specialist selection PBO non-trivial at 3-of-8) | FAIL (informational under user mandate) |
-| Multi-seed re-validation | mean SR > 0 + ≥7/10 profitable | NOT YET RUN (single outer seed=42 EXPLORATION basis) | DEFERRED to /072 |
+| Multi-seed re-validation | mean SR > 0 + ≥7/10 profitable | NOT YET RUN (single outer seed=42 SPECIALIST basis) | DEFERRED to /072 |
 | Methodology integrity | Look-ahead / embargo / pairwise-disjoint / live-parity | PASS (Critic Phase 7.5 Checks 1, 2, 15, 16, 17) | PASS |
 
-**User mandate is binding for edge-gate evaluation only; methodology-integrity gates (Checks 1, 2, 15, 16, 17) PASS on their own merits and are independent of the mandate.** No methodology violation is overridden — only the standard CONFIRMATION-budget edge thresholds.
+**User mandate is binding for edge-gate evaluation only; methodology-integrity gates (Checks 1, 2, 15, 16, 17) PASS on their own merits and are independent of the mandate.** No methodology violation is overridden — only the standard BUNDLE-budget edge thresholds.
 
 **Material work needed to discharge the open gates** (mandatory for /072):
 1. Multi-seed re-validation at 7-outer-seed roster `[42, 123, 456, 789, 1001, 2002, 3003]` per specialist.
-2. Bundle-layer DSR/PBO/PSR computation (methodology axis; design a CONFIRMATION-grade aggregator that accounts for per-specialist Optuna trial counts and the 3-of-8 specialist selection cost).
+2. Bundle-layer DSR/PBO/PSR computation (methodology axis; design a BUNDLE-grade aggregator that accounts for per-specialist Optuna trial counts and the 3-of-8 specialist selection cost).
 3. BUNDLE-002 universe expansion to N≥5 to make the 30% top-symbol concentration gate clearable.
 
 ---
@@ -241,7 +241,7 @@ Re-running v0.186 with the fix produces the corrected metrics in this file.
 
 **Ensemble seeds (baseline run, matches historical v186 exactly)**: `[42, 123, 456, 789, 1001]`. 5-seed configuration is preserved for deterministic trade reproduction against the historical anchor.
 
-**Ensemble seeds (for FUTURE iter-v1/NNN per the new skill discipline)**: 3 for EXPLORATION, 10 for CONFIRMATION (selected from the roster `[42, 123, 456, 789, 1001, 2002, 3003, 4004, 5005, 6006]`). The 10-seed CONFIRMATION standard applies to **new iteration work**, NOT to this baseline anchor.
+**Ensemble seeds (for FUTURE iter-v1/NNN per the new skill discipline)**: 3 for SPECIALIST, 10 for BUNDLE (selected from the roster `[42, 123, 456, 789, 1001, 2002, 3003, 4004, 5005, 6006]`). The 10-seed BUNDLE standard applies to **new iteration work**, NOT to this baseline anchor.
 
 **Training schedule**: `training_months = 24`, monthly retrain; OOS_CUTOFF_DATE = 2025-03-24.
 
@@ -426,11 +426,11 @@ New v1 iterations MERGE only if ALL of the following hold against this baseline:
 | Top symbol concentration | ≤ 30% (absolute net_pnl, denominator dependent) | LINK 137.66% of OOS (denominator small) | ⚠ contextual — recompute against per-iteration's OOS PnL |
 | **DSR** | > 0.95 | −35.66 (OOS) | ▲ improve dramatically (DSR is heavily negative at current edge level) |
 | **PSR (monthly, vs benchmark=1.0)** | > 0.95 | 0.0789 (OOS) | ▲ improve materially |
-| 10-seed mean Sharpe (CONF) | > 0 | n/a (baseline is 5-seed; first CONF will produce) | (TBD) |
-| 10-seed profitable count (CONF) | ≥ 7/10 | n/a | (TBD) |
+| 10-seed mean Sharpe (BUNDLE) | > 0 | n/a (baseline is 5-seed; first BUNDLE will produce) | (TBD) |
+| 10-seed profitable count (BUNDLE) | ≥ 7/10 | n/a | (TBD) |
 | **PBO** | < 0.40 | TBD (requires v1 CPCV — see Outstanding Tasks) | (TBD) |
 
-**Material improvements needed for FIRST CONFIRMATION merge**:
+**Material improvements needed for FIRST BUNDLE merge**:
 1. **OOS monthly Sharpe (+0.66 → +1.0+)**: roughly +50% lift needed
 2. **IS monthly Sharpe (+0.28 → +1.0+)**: roughly +250% lift needed — the IS is essentially noise at the baseline
 3. **DSR (−35.66 → +0.95+)**: drastic. The current observed Sharpe is statistically indistinguishable from zero AFTER multi-test correction
@@ -447,11 +447,11 @@ New v1 iterations MERGE only if ALL of the following hold against this baseline:
 
 For new v1 iterations to claim "beats baseline":
 
-1. **Headline comparison**: re-evaluate the iteration's full backtest under fixed `walk_forward.py:113` AND v1's full report layer (CPCV, DSR, PBO, PSR, ADF, IC, Pareto front for CONFIRMATIONs).
+1. **Headline comparison**: re-evaluate the iteration's full backtest under fixed `walk_forward.py:113` AND v1's full report layer (CPCV, DSR, PBO, PSR, ADF, IC, Pareto front for BUNDLEs).
 2. **Trade-level deterministic match**: per `feedback_deterministic_trade_match.md`, the iteration's BASELINE-stack trades (same config, same data extent) must match this baseline's trades bit-exactly. Divergence only on the iteration's actual axis change.
 3. **Brief Section 2 evidence**: prior-iteration's `comparison.csv` row-level comparison with explicit OOS/IS deltas vs THIS baseline.
 4. **Phase 7.5 Critic Check 3**: enforces DSR/PBO/PSR thresholds.
-5. **Phase 7.5 Critic Check 6**: enforces Pareto dominance on 10-seed metric vector (CONFIRMATION only).
+5. **Phase 7.5 Critic Check 6**: enforces Pareto dominance on 10-seed metric vector (BUNDLE only).
 6. **Phase 7.5 Critic Check 14**: enforces Axis Family declaration matches actual src/ diff (v1 only).
 
 Any single threshold failure = NO-MERGE per skill rules.
@@ -460,14 +460,14 @@ Any single threshold failure = NO-MERGE per skill rules.
 
 ## Outstanding Tasks Before First v1 Iteration
 
-The following must be in place before iter-v1/001 can launch and produce a CONFIRMATION-spec output:
+The following must be in place before iter-v1/001 can launch and produce a BUNDLE-spec output:
 
 1. ✅ `src/crypto_trade/run_baseline_v1.py` — v1 runner (DONE 2026-05-23)
 2. ✅ `src/crypto_trade/features_v1/__init__.py` — V1_EXCLUDED_SYMBOLS / V1_FEATURE_COLUMNS (DONE 2026-05-23)
 3. ✅ `src/crypto_trade/strategies/ml/validation_v1.py` — PSR + DSR + CPCV/PBO public API (DONE 2026-05-23)
 4. ✅ Baseline reproduction run committed at `reports-v1/iteration_v1-baseline/` (DONE 2026-05-23 — this file)
 5. ✅ `ITERATION_PLAN_8H_V1.md` at repo root (DONE 2026-05-23)
-6. ✅ `briefs-v1/exploration_catalog.md` — empty initial ledger (TBD: create on iter-v1/001 startup)
+6. ✅ `briefs-v1/specialist_catalog.md` — empty initial ledger (TBD: create on iter-v1/001 startup)
 
 **v1 runner extension work (deferred to iter-v1/001 or a follow-on infra iteration):**
 - Wire `validation_v1.combinatorial_purged_cv` and `validation_v1.pbo_from_cpcv` into `run_baseline_v1.py` to produce `cpcv_paths.csv` + populate `pbo` in `comparison.csv` (45-path CPCV mandatory per skill).
@@ -475,7 +475,7 @@ The following must be in place before iter-v1/001 can launch and produce a CONFI
 - Persist Optuna trial-level returns matrix to disk for DSR/PSR validation.
 - Compute per-feature ADF p-value via `statsmodels.tsa.stattools.adfuller` → `adf_test.csv`.
 - Compute pairwise feature-family IC → `ic_matrix.csv`.
-- 10-seed × 6-metric Pareto front matrix for CONFIRMATION runs → `pareto_front.csv`.
+- 10-seed × 6-metric Pareto front matrix for BUNDLE runs → `pareto_front.csv`.
 - Meta-labeling M1 + M2 architecture wiring + fractional Kelly position sizing.
 
 These additions land iteratively. iter-v1/001's first scope may legitimately be "wire the v3-style reporting layer into run_baseline_v1.py" (a methodology axis, not a research axis). Until those land, iterations can only produce the current report set + the post-hoc PSR/DSR computed in this BASELINE_V1.md.
@@ -511,13 +511,13 @@ The historical headline (v0.186 = OOS Sharpe +1.735) was inflated by leaked labe
 - **2026-05-23** — v1 refactored. `BASELINE_V1.md` created (this file) with corrected stats on fresh data. The legacy `BASELINE.md` is kept for backward compatibility but `BASELINE_V1.md` is the canonical anchor for new v1 iterations.
 - **2026-05-26** — Cycle-2 CLOSES NO-MERGE at iter-v1/015 CONFIRMATION-NEGATIVE catastrophic (tag `v0.v1-015`). 10 iterations, 1 PROMISING-METHODOLOGY (/008 non-compoundable) + 9 NEGATIVE + 0 merges. Anchor numbers UNCHANGED — see Cycle-2 Outcomes section below.
 
-Future v1 iterations update **this** file (`BASELINE_V1.md`) on CONFIRMATION-MERGE per the skill's git workflow.
+Future v1 iterations update **this** file (`BASELINE_V1.md`) on BUNDLE-MERGE per the skill's git workflow.
 
 ---
 
 ## Cycle-2 Outcomes (2026-05-23 → 2026-05-26)
 
-**Cycle-2 CLOSES NO-MERGE.** v1 BASELINE_V1.md anchor numbers UNCHANGED at `v0.v1-baseline-corrected` (`f8bc12c`). Cycle-2 iteration ledger and per-iteration verdicts are in `briefs-v1/exploration_catalog.md` and `diary-v1/iteration_v1-*.md`.
+**Cycle-2 CLOSES NO-MERGE.** v1 BASELINE_V1.md anchor numbers UNCHANGED at `v0.v1-baseline-corrected` (`f8bc12c`). Cycle-2 iteration ledger and per-iteration verdicts are in `briefs-v1/specialist_catalog.md` and `diary-v1/iteration_v1-*.md`.
 
 **Iteration ledger (cycle-2)**:
 
@@ -540,7 +540,7 @@ Future v1 iterations update **this** file (`BASELINE_V1.md`) on CONFIRMATION-MER
 
 1. **iter-v1/008 — n_eff PCA per-cell median** (`PROMISING-METHODOLOGY`, non-compoundable). Measurement substrate; informs all v1 brief Section 7 F-AXIS-MECHANISM falsifiers and Section 8 verdict matrices. Not bundled into any CONFIRMATION as an "edge ingredient" — but the substrate that makes F-AXIS-MECHANISM measurable.
 
-2. **iter-v1/015 — n_eff barrier-magnitude curve** (NEW structural finding, codified at `feedback_v1_n_eff_barrier_magnitude_curve.md`). **n_eff is a CURVE in barrier-magnitude space, not a monotone-increasing function.** /014 at 1.70% labels → n_eff = 19; /015 at 7.82% labels → n_eff = 3 collapsed via timeout-fallback dominance. **Optimum likely in 3-5% middle range.** Forward-binding mandate: before any cycle-3+ labeling sub-axis EXPLORATION, run the n_eff calibration sweep at {1.5%, 2.5%, 3.5%, 5.0%, 7.82%} and establish n_eff ≥ 15 preservation band BEFORE selecting CONFIRMATION magnitude. Critic Phase 6.0 verifies the sweep at brief Section 2/7.
+2. **iter-v1/015 — n_eff barrier-magnitude curve** (NEW structural finding, codified at `feedback_v1_n_eff_barrier_magnitude_curve.md`). **n_eff is a CURVE in barrier-magnitude space, not a monotone-increasing function.** /014 at 1.70% labels → n_eff = 19; /015 at 7.82% labels → n_eff = 3 collapsed via timeout-fallback dominance. **Optimum likely in 3-5% middle range.** Forward-binding mandate: before any cycle-3+ labeling sub-axis SPECIALIST, run the n_eff calibration sweep at {1.5%, 2.5%, 3.5%, 5.0%, 7.82%} and establish n_eff ≥ 15 preservation band BEFORE selecting BUNDLE magnitude. Critic Phase 6.0 verifies the sweep at brief Section 2/7.
 
 ### Cycle-2 Methodology Lessons
 
@@ -555,10 +555,10 @@ Future v1 iterations update **this** file (`BASELINE_V1.md`) on CONFIRMATION-MER
 v1 cycle-2 mirrors v3 cycle-7 saturation pattern (cf. `feedback_v3_cycle7_terminal_finding.md`): bounded by the prevailing architecture's local-optimum basin at single-axis EXPLORATION+CONFIRMATION resolution. The catalog is dispersed (no axis monoculture across 7 families touched) but each single-axis intervention is either INERT or NEGATIVE within v1's basin. **The basin is the binding constraint, NOT the axis selection.**
 
 Cycle-3 considerations:
-1. Multi-axis composition at the CONFIRMATION layer (e.g., universe expansion + sample-weighting bundled)
+1. Multi-axis composition at the BUNDLE layer (e.g., universe expansion + sample-weighting bundled)
 2. Explicit basin-escape mechanisms (universe denominator expansion; XGBoost depth-wise model swap)
 3. NEW UNUSED families (`sample-weighting`) with explicit single-axis isolation first
-4. Wall-clock discipline enforced: 2h EXPLORATION / 6h CONFIRMATION caps per skill `4cb8972` (non-negotiable per user directive 2026-05-25); /015 was the last user-authorized exception
+4. Wall-clock discipline enforced: 2h SPECIALIST / 9h BUNDLE caps per skill (non-negotiable per user directives 2026-05-25 and 2026-06-01); /015 was the last user-authorized exception under the prior cap regime
 
 ### Cycle-2 Dead Paths (do not retry without new evidence)
 
