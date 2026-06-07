@@ -1439,3 +1439,43 @@ def append_vol_ceiling_rows_to_comparison(
         f"vol_ceiling_fire_rate_oos={vol_ceiling_fire_rate_oos:.4f} appended "
         f"[iter-v1/038 F-AXIS#2 wiring proof]."
     )
+
+
+def append_n_seeds_used_to_comparison(
+    comparison_csv_path: Path,
+    n_seeds_used_mean: float,
+) -> None:
+    """Append N_seeds_used row to an existing comparison.csv.
+
+    H2 fix — records the mean number of successfully-trained specialist seeds
+    across walk-forward months so downstream readers can audit ensemble integrity.
+
+    Schema: [metric, in_sample, out_of_sample, ratio].
+    ``in_sample`` receives the scalar; ``out_of_sample`` and ``ratio`` are blank
+    because N_seeds_used is a training diagnostic (not an OOS metric) and has no
+    natural OOS counterpart.  Leaving them blank is consistent with the pattern
+    used for ``specialist_dispersion_mean`` at iter-v1/065.
+
+    Parameters
+    ----------
+    comparison_csv_path
+        Absolute path to the existing comparison.csv (must already exist).
+    n_seeds_used_mean
+        Mean number of successfully-trained seeds across walk-forward months,
+        as returned by ``LightGbmStrategy.get_n_seeds_used_mean()``.
+    """
+    new_row = [
+        "N_seeds_used",
+        f"{n_seeds_used_mean:.4f}",
+        "",
+        "",
+    ]
+
+    with open(comparison_csv_path, "a", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(new_row)
+
+    print(
+        f"[reporting_v1] comparison.csv updated: "
+        f"N_seeds_used={n_seeds_used_mean:.4f} appended [H2 seed-audit row]."
+    )

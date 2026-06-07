@@ -111,6 +111,33 @@ V1_SPECIALIST_OPTUNA_TRIALS: int = 30
 #: Deterministic 50-seed roster for SPECIALIST mode (42..91 inclusive).
 V1_SPECIALIST_SEEDS: tuple[int, ...] = tuple(range(42, 42 + V1_SPECIALIST_SEED_COUNT))
 
+#: H2 fix — maximum number of per-seed failures tolerated before raising.
+#: If more than this many seeds fail in a single _train_for_month call,
+#: SpecialistSeedFailureError is raised rather than silently continuing.
+#: Rationale: 5 of 50 seeds failing is plausible (10%); 6+ is a systematic
+#: data or environment issue that must not produce a quietly-degraded model.
+V1_SPECIALIST_SEED_TOLERANCE: int = 5
+
+
+class SpecialistSeedFailureError(RuntimeError):
+    """Raised when more than V1_SPECIALIST_SEED_TOLERANCE seeds fail in one month.
+
+    H2 fix: converts the previously-silent degradation into a fail-loud signal
+    so callers (runners, tests) can distinguish a healthy partial-failure
+    (≤ tolerance) from a systematic environment or data corruption issue.
+    """
+
+    def __init__(self, failed: int, tolerance: int, month_str: str, seeds: list[str]) -> None:
+        self.failed = failed
+        self.tolerance = tolerance
+        self.month_str = month_str
+        self.seeds = seeds
+        super().__init__(
+            f"[SPECIALIST] {failed} seed(s) failed for {month_str} "
+            f"(tolerance={tolerance}). Failed seeds: {seeds}. "
+            "Investigate data / environment before re-running."
+        )
+
 
 _INTERVAL_MINUTES = {
     "1m": 1,
@@ -340,6 +367,14 @@ class LightGbmStrategy:
         # Per-seed specialist state: list of (model, selected_cols, threshold) tuples.
         # Reset every _train_for_month call when specialist_mode=True.
         self._specialist_models: list[tuple[object, list[str], float]] = []
+        # H2 fix: track per-seed failures across the walk-forward timeline.
+        # Each entry is (seed: int, exc_repr: str) — accumulated globally (not reset
+        # per month) so runners can inspect cumulative failure history.
+        self._failed_seeds_log: list[tuple[int, str]] = []
+        # H2 fix: number of successfully-trained seeds per walk-forward month.
+        # Appended once per _train_for_month call in specialist mode.
+        # Used by get_n_seeds_used_mean() to produce the N_seeds_used comparison.csv row.
+        self._seeds_used_per_month: list[int] = []
         # iter-v1/063: per-candle ensemble dispersion diagnostic.
         # Accumulates population std of signed_weights for every candle that fires a
         # specialist signal (i.e. abs(final_signed) >= 1e-9).  Informational only —
@@ -1009,6 +1044,8 @@ class LightGbmStrategy:
         # Aggregation in get_signal: mean-of-signed-weights across 50 seeds.
         if self._specialist_mode:
             self._specialist_models = []
+            # H2 fix: per-month failure accumulator (reset each call).
+            _sp_failed_this_month: list[tuple[int, str]] = []
             specialist_seeds = V1_SPECIALIST_SEEDS
             if self.verbose > 0:
                 print(
@@ -1161,8 +1198,62 @@ class LightGbmStrategy:
                     _sp_clf.fit(_sp_feat_fit, _sp_y_fit, sample_weight=_sp_sw_fit)
                     self._specialist_models.append((_sp_clf, available_feat_cols, _sp_ct))
                 except Exception as _sp_exc:
+                    # H2 fix: track per-seed failures; raise after tolerance exceeded.
+                    _exc_repr = repr(_sp_exc)
+                    _sp_failed_this_month.append((_sp_seed, _exc_repr))
+                    self._failed_seeds_log.append((_sp_seed, _exc_repr))
                     if self.verbose > 0:
-                        print(f"  [SPECIALIST seed {_sp_seed}] failed: {_sp_exc!r}")
+                        print(
+                            f"  [SPECIALIST seed {_sp_seed}] failed "
+                            f"({len(_sp_failed_this_month)}/{V1_SPECIALIST_SEED_TOLERANCE} "
+                            f"tolerance): {_exc_repr}"
+                        )
+                    if len(_sp_failed_this_month) > V1_SPECIALIST_SEED_TOLERANCE:
+                        # Emit decision_log before raising so the failure is traceable.
+                        try:
+                            from crypto_trade import decision_log as _dl
+
+                            _dl.log(
+                                {
+                                    "kind": "specialist_seed_failures",
+                                    "month": month_str,
+                                    "failed_count": len(_sp_failed_this_month),
+                                    "tolerance": V1_SPECIALIST_SEED_TOLERANCE,
+                                    "failed_seeds": [s for s, _ in _sp_failed_this_month],
+                                    "decision": "raise:tolerance_exceeded",
+                                }
+                            )
+                        except Exception:
+                            pass
+                        raise SpecialistSeedFailureError(
+                            failed=len(_sp_failed_this_month),
+                            tolerance=V1_SPECIALIST_SEED_TOLERANCE,
+                            month_str=month_str,
+                            seeds=[str(s) for s, _ in _sp_failed_this_month],
+                        )
+
+            # H2 fix: emit decision_log summary of per-seed failures (even when 0).
+            try:
+                from crypto_trade import decision_log as _dl_post
+
+                _dl_post.log(
+                    {
+                        "kind": "specialist_seed_failures",
+                        "month": month_str,
+                        "failed_count": len(_sp_failed_this_month),
+                        "tolerance": V1_SPECIALIST_SEED_TOLERANCE,
+                        "failed_seeds": [s for s, _ in _sp_failed_this_month],
+                        "succeeded_count": len(self._specialist_models),
+                        "decision": (
+                            "pass" if len(_sp_failed_this_month) == 0 else "pass:within_tolerance"
+                        ),
+                    }
+                )
+            except Exception:
+                pass
+
+            # H2 fix: record seeds used for this month.
+            self._seeds_used_per_month.append(len(self._specialist_models))
 
             if not self._specialist_models:
                 if self.verbose > 0:
@@ -1534,6 +1625,21 @@ class LightGbmStrategy:
         if not self._specialist_dispersion_stats:
             return None
         return float(np.mean(self._specialist_dispersion_stats))
+
+    def get_n_seeds_used_mean(self) -> float | None:
+        """Return mean number of successfully-trained seeds across walk-forward months.
+
+        H2 fix — provides the N_seeds_used scalar for comparison.csv so downstream
+        readers can audit whether systematic seed failures degraded the specialist
+        ensemble.  Returns None when no months have been trained yet (non-specialist
+        mode, or called before the first _train_for_month).
+
+        Expected value under healthy conditions: close to V1_SPECIALIST_SEED_COUNT (50).
+        A value materially below 45 (= tolerance of 5) should trigger investigation.
+        """
+        if not self._seeds_used_per_month:
+            return None
+        return float(np.mean(self._seeds_used_per_month))
 
     def persist_specialist_dispersion_csv(self, path: str) -> None:
         """Persist the in-memory specialist dispersion stats to a CSV file.
