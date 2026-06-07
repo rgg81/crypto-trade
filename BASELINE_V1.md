@@ -12,6 +12,23 @@ Track: **v1** (refactored; 3-coin specialist bundle).
 
 ---
 
+## POST-CODE-REVIEW (2026-06-07) — Snapshot Validity Disclosure
+
+BUNDLE-001 (`v0.v1-071`) IS/OOS numbers in this file stand as **SNAPSHOTS** from the pre-fix codebase. Code review w692vx7w0 (`analysis/specialist_bundle_code_review_2026-06-07.md`) identified 6 CRITICAL + 10 HIGH findings; their fixes are landing on branch `fix/specialist-bundle-critical-high`.
+
+**Snapshot status**: numbers stand as recorded historical metrics. Reports artifacts at `reports-v1/iteration_v1-071/` are preserved.
+
+**Methodology-affecting fixes** (re-running iter-v1/071 with fixed code MAY produce different per-month metrics):
+- **C2/H1** — Optuna `training_days` HP silently dropped at per-seed retrain (`lgbm.py:1142-1143`). Per-seed inner ensemble was retraining on a stale fixed-window even when Optuna selected a non-default `training_days`. Fix changes the realized training window for some seed/month cells → may shift per-month inner-ensemble outputs.
+- **H5/H10** — OOF parquet structurally unwritable in SPECIALIST mode (`lgbm.py:1047, 1066-1091`). Fix adds OOF persistence under SPECIALIST mode; no change to predicted-signal computation but changes downstream artifact set.
+- **H8/H9** — Specialist dispersion CSV mixed IS+OOS in single accumulator (`lgbm.py:350, 1755`). Fix splits into per-window accumulators; the `specialist_dispersion_mean` value reported in `comparison.csv` may change after the fix even on bit-identical model outputs because the IS/OOS partition is corrected.
+
+**Live deployment gate**: Live deployment of BUNDLE-001 requires a **parity smoke test against fixed code** — a one-month, one-symbol replay under the fixed runner must reconcile (within documented numerical tolerance) against the original `reports-v1/iteration_v1-071/` artifacts for the months and symbols where neither C2/H1, H5/H10, nor H8/H9 are expected to shift outputs (i.e. cells where Optuna selected the default `training_days`, no OOF-write code path is exercised, etc.). Cells with HP-conditional divergence are documented as expected delta; cells without divergence MUST reconcile.
+
+**Operational note for future iter-v1/072+**: when authoring brief Section 11 against the BUNDLE-001 anchor, cite the snapshot numbers in this file AND acknowledge the post-fix delta is open (in-flight). Iteration runners (`run_iteration_063..078`) are NOT touched by these fixes; only the underlying `src/` library is changed.
+
+---
+
 ## Baseline = BUNDLE-001 (3 single-coin specialists, pairwise-disjoint universe)
 
 BUNDLE-001 is the symbol-partitioned union of 3 LightGBM specialists, each trained independently under the cycle-6/cycle-7 per-symbol regime-specialist mandate. There are no bundle-level weights; each specialist trades its own coin under its own risk wrapper.

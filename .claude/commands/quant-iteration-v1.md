@@ -1451,6 +1451,21 @@ TYPE: SPECIALIST  (or BUNDLE)
 - Predicted Sharpe delta: +X.X (CI: [Y.Y, Z.Z])
 - Falsifier: "if OOS Sharpe falls below W, hypothesis is rejected"
 
+### F-AXIS #2 — Cross-seed dispersion (basin-lottery audit; LOAD-BEARING)
+
+> **H11 — Metric rename 2026-06-07 (documentation reconciliation).** The F-AXIS #2 verdict band MUST reference `specialist_dispersion_mean` — the metric the SPECIALIST runner actually emits to `reports-v1/iteration_v1-NNN/specialist_dispersion.csv` and appends to `comparison.csv` per /065 commit `df8e9b1`. The legacy field name `cross_seed_sharpe_std` is RETIRED — code never produced it under SPECIALIST mode (50-inner-seed-averaged signal at single-outer-seed=42 produces no per-outer-seed sharpe std; the dispersion code emits a within-cell predicted-probability dispersion metric instead).
+
+`specialist_dispersion_mean` is the mean across walk-forward cells of the cross-seed standard deviation of the inner-ensemble predicted probability (read from `specialist_dispersion.csv`). Lower = more stable basin; higher = basin-lottery fingerprint at the cohort level.
+
+| Observed `specialist_dispersion_mean` | Interpretation |
+|---|---|
+| ≤ 0.20 | METHODOLOGY-VALIDATED-STRONG (basin convergent across seeds; cohort-level edge stable) |
+| 0.20 < x ≤ 0.30 | METHODOLOGY-VALIDATED (LM modal band; on-par with /063 family) |
+| 0.30 < x ≤ 0.40 | METHODOLOGY-PARTIAL (basin-lottery vigilance triggers; flag for Phase 7.4 diagnostic) |
+| > 0.40 (e.g. ≥ 30 in absolute-scale variants — see roster) | METHODOLOGY-NEGATIVE basin-lottery; per `feedback_v1_basin_lottery_vigilance.md` mandate multi-seed re-validation |
+
+(Brief authors: report the value verbatim from the runner-emitted `specialist_dispersion_mean` column in `comparison.csv`. Do NOT compute a derived "cross_seed_sharpe_std" — that metric was retired with H11.)
+
 ## Section 5 — Risk Mitigation
 <R1/R2/R3 / 7-gate / new-gate changes; IS-calibrated thresholds; simulated effect on prior iterations>
 
@@ -1522,6 +1537,16 @@ component_id,weight,derivation_method,is_window_start,is_window_end
 ```
 
 - **IS-only assertion**: "Every loaded timestamp satisfies `close_time < OOS_CUTOFF_MS`. No reference to `out_of_sample`, `>= OOS_CUTOFF_MS`, or post-2025-03-24 dates used to filter IN appears in `weight_calibration.py`." (Critic Check 17 greps the script for these patterns.)
+
+> **H6 — Aggregator weight semantics under R5=ON (documentation reconciliation 2026-06-07; SPECIALIST-mode BUNDLE methodology note).**
+>
+> Under R5=ON (`vt_target_vol=0.3`), the mean-of-signed-weights aggregator output is **direction-only at runtime**; `vol_targeting` discards `|signal.weight|` magnitude (per H6 code review finding, w692vx7w0). The aggregator is a **CONSENSUS DIRECTIONAL signal** under SPECIALIST mode — individual component magnitudes (Sharpe-proportional weights, inverse-variance weights, etc.) inform DIRECTION CONSENSUS only, never realized position size. Position sizing is owned by `vol_targeting` downstream of the aggregator.
+>
+> Implications for brief authors:
+> - The Section 11.B weight-derivation method (equal / IS-Sharpe-proportional / IS-inverse-variance / IS-risk-parity) determines how components VOTE on direction. It does NOT determine realized exposure.
+> - Pre-registered Section 11.B weights should be interpreted as **directional consensus shaping**, NOT as size allocation across components.
+> - BUNDLE-001 (v0.v1-071) retains `vol_targeting=True` per its baseline risk profile. This is the canonical R5=ON contract; subsequent BUNDLEs that change this MUST justify in brief Section 5 and re-derive parity assumptions with QE.
+> - When R5 is OFF in a future BUNDLE, the aggregator output DOES carry magnitude through to position size, and Section 11.B weights have a direct interpretation. Brief must declare R5 status explicitly.
 
 ### 11.C — Backtest-Live Parity Statement (HARD, Rule 8)
 
