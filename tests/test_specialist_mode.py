@@ -506,8 +506,11 @@ def test_specialist_ensemble_std_logged() -> None:
     ensemble_std = float(np.std(signed_weights))  # ddof=0, population std
 
     # Manually append to dispersion stats as the aggregator would after signal fires.
+    # H8/H9: entries are now dicts with open_time_ms, signed_weight_std, period.
     assert abs(final_signed) >= 1e-9, "Signal should fire with this signed_weights"
-    strat._specialist_dispersion_stats.append(ensemble_std)
+    strat._specialist_dispersion_stats.append(
+        {"open_time_ms": 1700000000000, "signed_weight_std": ensemble_std, "period": "IS"}
+    )
 
     # Verify dispersion mean is computable and numerically correct.
     mean_disp = strat.get_specialist_dispersion_mean()

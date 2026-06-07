@@ -377,12 +377,21 @@ class LightGbmStrategy:
         self._seeds_used_per_month: list[int] = []
         # iter-v1/063: per-candle ensemble dispersion diagnostic.
         # Accumulates population std of signed_weights for every candle that fires a
-        # specialist signal (i.e. abs(final_signed) >= 1e-9).  Informational only —
-        # NOT a gate.  For /064+ briefs, F-AXIS #2 σ_pop SHOULD cite
-        # get_specialist_dispersion_mean() as the σ_pop proxy rather than
+        # specialist signal (i.e. abs(final_signed) >= 1e-9) AND passes the AXIS-R veto.
+        # Informational only — NOT a gate.  For /064+ briefs, F-AXIS #2 σ_pop SHOULD
+        # cite get_specialist_dispersion_mean() as the σ_pop proxy rather than
         # cross-seed Sharpe spread (which is structurally undefined under the
         # 50-seed aggregator producing a single backtest).
-        self._specialist_dispersion_stats: list[float] = []
+        # H8/H9 fix: each entry is a dict with keys:
+        #   open_time_ms: int   — candle open time (epoch ms)
+        #   signed_weight_std: float — population std of signed_weights
+        #   period: str         — "IS" or "OOS" (set by set_period() at IS/OOS boundary)
+        # Append happens AFTER AXIS-R veto so vetoed candles are excluded.
+        self._specialist_dispersion_stats: list[dict] = []
+        # H8/H9 fix: tracks the current evaluation period ("IS" or "OOS").
+        # Callers must call set_period("OOS") at the OOS_CUTOFF_DATE boundary.
+        # Defaults to "IS" so pre-boundary candles are always tagged correctly.
+        self._current_period: str = "IS"
         # iter-v1/074: AXIS-R — Mid-Bull SHORT VETO post-aggregator rule layer.
         # Enabled via enable_mid_bull_short_veto=True (SPECIALIST + /074 dispatch only).
         # Band edges pre-registered [0.20, 0.50]; lookback 270 8h candles = 90 calendar days.
@@ -1670,23 +1679,54 @@ class LightGbmStrategy:
     def skip(self) -> None:
         pass
 
-    def get_specialist_dispersion_mean(self) -> float | None:
-        """Return mean population std of signed_weights across all firing specialist candles.
+    def set_period(self, period: str) -> None:
+        """Set the current evaluation period for dispersion tagging (H8/H9 fix).
+
+        Must be called by the runner at the IS/OOS boundary (i.e. when candle
+        open_time crosses OOS_CUTOFF_MS).  All subsequent dispersion entries will
+        carry ``period`` in their dict.
+
+        Args:
+            period: ``"IS"`` or ``"OOS"``.  Any other value raises ValueError.
+        """
+        if period not in ("IS", "OOS"):
+            raise ValueError(f"period must be 'IS' or 'OOS'; got {period!r}")
+        self._current_period = period
+
+    def get_specialist_dispersion_mean(self, period: str | None = None) -> float | None:
+        """Return mean population std of signed_weights across firing specialist candles.
 
         This is the σ_pop proxy for /064+ brief F-AXIS #2.  Under the 50-seed
         specialist aggregator, σ_SR (cross-seed Sharpe spread) is structurally
         undefined because all seeds produce a single aggregated backtest rather
         than 50 separate backtests.  This per-candle ensemble_std metric fills
         that role: it measures how spread the 50 seeds' signed_weights are for
-        each candle that generated a signal.
+        each candle that generated a signal AND passed the AXIS-R veto.
 
-        Returns None when no signals have fired yet (empty dispersion list).
+        H8/H9 fix: each entry in _specialist_dispersion_stats is a dict; the
+        optional ``period`` arg filters to "IS" or "OOS" rows.
+
+        Args:
+            period: If None (default), compute mean across all periods.
+                    If ``"IS"`` or ``"OOS"``, restrict to that period's rows.
+
+        Returns None when no matching signals have fired yet.
         Acceptance threshold should be calibrated empirically in /064+ iterations;
         this diagnostic is informational, NOT a load-bearing gate.
         """
         if not self._specialist_dispersion_stats:
             return None
-        return float(np.mean(self._specialist_dispersion_stats))
+        if period is None:
+            vals = [e["signed_weight_std"] for e in self._specialist_dispersion_stats]
+        else:
+            vals = [
+                e["signed_weight_std"]
+                for e in self._specialist_dispersion_stats
+                if e["period"] == period
+            ]
+        if not vals:
+            return None
+        return float(np.mean(vals))
 
     def get_n_seeds_used_mean(self) -> float | None:
         """Return mean number of successfully-trained seeds across walk-forward months.
@@ -1703,47 +1743,69 @@ class LightGbmStrategy:
             return None
         return float(np.mean(self._seeds_used_per_month))
 
-    def persist_specialist_dispersion_csv(self, path: str) -> None:
+    def persist_specialist_dispersion_csv(self, path: str, period: str | None = None) -> None:
         """Persist the in-memory specialist dispersion stats to a CSV file.
 
-        Writes ``_specialist_dispersion_stats`` to *path* with two columns:
-        - ``observation_idx`` — 0-based index in the accumulator list (NOT
-          candle_idx; the accumulator is append-only at signal-fire events, so
-          the index reflects chronological signal-fire ordering).
-        - ``ensemble_std`` — per-candle population std of signed_weights across
-          all seeds at the specialist aggregator for each firing candle.
+        H8/H9 fix: each entry in ``_specialist_dispersion_stats`` is now a dict
+        with fields ``open_time_ms``, ``signed_weight_std``, and ``period``.
+        The ``period`` argument filters which rows are written:
+        - ``None`` (default) — writes all rows (backward-compatible legacy callers
+          that pass a single combined path).
+        - ``"IS"`` — writes only IS-period rows (for in_sample/ subdirectory).
+        - ``"OOS"`` — writes only OOS-period rows (for out_of_sample/ subdirectory).
+
+        Writes three columns:
+        - ``observation_idx`` — 0-based index within the filtered row set.
+        - ``open_time_ms`` — candle open time in epoch milliseconds.
+        - ``signed_weight_std`` — per-candle population std of signed_weights.
 
         This method is the load-bearing hygiene patch mandated by LM Master
-        Risk 1 (iter-v1/065 lgbm_advisor.md) and brief Section 6.5.  /063 and
-        /064 accumulated ``_specialist_dispersion_stats`` in memory but lost the
-        data at process exit.  /065+ runners MUST call this method after the
-        per-symbol backtest completes.
+        Risk 1 (iter-v1/065 lgbm_advisor.md) and brief Section 6.5.  /065+
+        runners MUST call this method after the per-symbol backtest completes.
+        Post-H8/H9: runners should call once with period="IS" for IS reports
+        and once with period="OOS" for OOS reports.
 
-        If the accumulator is empty (no signals fired), writes a zero-row CSV
-        with the header intact so downstream readers do not crash.
+        If the filtered accumulator is empty (no signals fired in that period),
+        writes a zero-row CSV with the header intact so downstream readers do
+        not crash.
 
         Args:
             path: Absolute or relative filesystem path for the output CSV.
                   Parent directory is created if it does not exist.
+            period: Optional filter — ``"IS"``, ``"OOS"``, or ``None`` (all).
         """
         import csv as _csv  # noqa: PLC0415
+
+        if period is None:
+            rows_to_write = self._specialist_dispersion_stats
+        else:
+            rows_to_write = [e for e in self._specialist_dispersion_stats if e["period"] == period]
 
         out_path = Path(path)
         out_path.parent.mkdir(parents=True, exist_ok=True)
         with out_path.open("w", newline="") as _fh:
-            writer = _csv.DictWriter(_fh, fieldnames=["observation_idx", "ensemble_std"])
+            writer = _csv.DictWriter(
+                _fh, fieldnames=["observation_idx", "open_time_ms", "signed_weight_std"]
+            )
             writer.writeheader()
-            for idx, std_val in enumerate(self._specialist_dispersion_stats):
-                writer.writerow({"observation_idx": idx, "ensemble_std": std_val})
-        n_obs = len(self._specialist_dispersion_stats)
-        mean_val = self.get_specialist_dispersion_mean()
+            for idx, entry in enumerate(rows_to_write):
+                writer.writerow(
+                    {
+                        "observation_idx": idx,
+                        "open_time_ms": entry["open_time_ms"],
+                        "signed_weight_std": entry["signed_weight_std"],
+                    }
+                )
+        n_obs = len(rows_to_write)
+        mean_val = self.get_specialist_dispersion_mean(period=period)
+        period_label = f"period={period}" if period is not None else "all periods"
         print(
             f"[lgbm] specialist_dispersion.csv persisted: "
-            f"{n_obs} observations → {out_path} "
+            f"{n_obs} observations ({period_label}) → {out_path} "
             f"(mean σ_pop={mean_val:.4f})"
             if mean_val is not None
             else f"[lgbm] specialist_dispersion.csv persisted: "
-            f"{n_obs} observations (empty — no signals fired) → {out_path}"
+            f"{n_obs} observations ({period_label}, empty — no signals fired) → {out_path}"
         )
 
     def _compute_ret_270b(self, symbol: str, open_time: int) -> float | None:
@@ -1937,9 +1999,6 @@ class LightGbmStrategy:
                 )
                 return NO_SIGNAL
 
-            # Signal fires — accumulate dispersion diagnostic.
-            self._specialist_dispersion_stats.append(_ensemble_std)
-
             _sp_direction = 1 if _final_signed > 0 else -1
             _sp_weight = int(round(abs(_final_signed)))
             _sp_confidence = abs(_final_signed) / 100.0
@@ -1986,6 +2045,18 @@ class LightGbmStrategy:
                     }
                 )
                 return NO_SIGNAL
+
+            # H8/H9 fix: accumulate dispersion diagnostic AFTER AXIS-R veto so
+            # vetoed candles are excluded from the dispersion stats.  Tag each
+            # entry with open_time_ms and the current period ("IS"/"OOS") so
+            # persist_specialist_dispersion_csv() can produce separate files.
+            self._specialist_dispersion_stats.append(
+                {
+                    "open_time_ms": int(open_time),
+                    "signed_weight_std": _ensemble_std,
+                    "period": self._current_period,
+                }
+            )
 
             decision_log.log(
                 {

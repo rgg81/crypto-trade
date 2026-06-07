@@ -1479,3 +1479,33 @@ def append_n_seeds_used_to_comparison(
         f"[reporting_v1] comparison.csv updated: "
         f"N_seeds_used={n_seeds_used_mean:.4f} appended [H2 seed-audit row]."
     )
+
+
+def write_specialist_dispersion_csvs(
+    strategy: object,
+    is_path: Path,
+    oos_path: Path,
+) -> None:
+    """Write separate IS and OOS specialist dispersion CSVs (H8/H9 fix).
+
+    Calls ``persist_specialist_dispersion_csv`` on the strategy twice — once
+    with ``period="IS"`` (writing to ``is_path``) and once with ``period="OOS"``
+    (writing to ``oos_path``).  The two files are guaranteed byte-distinct when
+    any IS signals and any OOS signals have fired, because each file contains
+    only the rows tagged with the matching period.
+
+    Callers that previously called ``persist_specialist_dispersion_csv(is_path)``
+    directly should switch to this helper to obtain the H8/H9-correct split.
+    Legacy callers in run_baseline_v1.py and iteration runners that still call
+    the single-path variant will continue to work (``period=None`` writes all
+    rows for backward compatibility).
+
+    Args:
+        strategy: A ``LightGbmStrategy`` instance (typed as object to avoid
+                  circular-import in reporting callers).
+        is_path: Absolute path for the in_sample/specialist_dispersion.csv output.
+        oos_path: Absolute path for the out_of_sample/specialist_dispersion.csv output.
+    """
+    strategy.persist_specialist_dispersion_csv(str(is_path), period="IS")
+    strategy.persist_specialist_dispersion_csv(str(oos_path), period="OOS")
+    print(f"[reporting_v1] H8/H9 specialist_dispersion split: IS → {is_path}  OOS → {oos_path}")
