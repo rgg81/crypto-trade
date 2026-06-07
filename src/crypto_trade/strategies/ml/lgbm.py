@@ -1139,8 +1139,26 @@ class LightGbmStrategy:
                         if ternary
                         else labels_to_classes(train_labels)
                     )
+
+                    # C2/H1 FIX: apply Optuna-chosen training_days window at the
+                    # per-seed final retrain — mirroring optimization.py:738-744.
+                    # Without this slice, every seed trains on the FULL 24-month
+                    # window regardless of what Optuna selected, silently
+                    # discarding the HP that the objective was optimized for.
+                    _sp_feat_fit = feat_train
+                    _sp_y_fit = _sp_y
+                    _sp_sw_fit = train_weights
+                    if _sp_ot is not None and "training_days" in _sp_params:
+                        _sp_td = int(_sp_params["training_days"])
+                        _sp_anchor_ms = int(split.test_start_ms)
+                        _sp_cutoff_ms = _sp_anchor_ms - _sp_td * 86_400_000
+                        _sp_td_mask = _sp_ot >= _sp_cutoff_ms
+                        _sp_feat_fit = feat_train[_sp_td_mask]
+                        _sp_y_fit = _sp_y[_sp_td_mask]
+                        _sp_sw_fit = train_weights[_sp_td_mask]
+
                     _sp_clf = _lgb_sp.LGBMClassifier(**_sp_lgbm_params)
-                    _sp_clf.fit(feat_train, _sp_y, sample_weight=train_weights)
+                    _sp_clf.fit(_sp_feat_fit, _sp_y_fit, sample_weight=_sp_sw_fit)
                     self._specialist_models.append((_sp_clf, available_feat_cols, _sp_ct))
                 except Exception as _sp_exc:
                     if self.verbose > 0:
