@@ -1046,6 +1046,9 @@ class LightGbmStrategy:
             self._specialist_models = []
             # H2 fix: per-month failure accumulator (reset each call).
             _sp_failed_this_month: list[tuple[int, str]] = []
+            # H5/H10 fix: global OOF accumulator across all seeds for this month.
+            # Always a list; we only flush when _oof_persist_path is set.
+            _sp_oof_global_buf: list[dict] = []
             specialist_seeds = V1_SPECIALIST_SEEDS
             if self.verbose > 0:
                 print(
@@ -1081,7 +1084,11 @@ class LightGbmStrategy:
                         _objective as _opt_objective,
                     )
 
-                    _sp_oof_buf: list | None = None
+                    # H5/H10 fix: per-seed buffer — non-None iff _oof_persist_path is set,
+                    # which causes _objective to populate it (oof_buffer is not None check).
+                    _sp_oof_buf: list[dict] | None = (
+                        [] if self._oof_persist_path is not None else None
+                    )
 
                     # Capture loop variables for closure (avoid late-binding issues).
                     _sp_feat = feat_train
@@ -1197,6 +1204,13 @@ class LightGbmStrategy:
                     _sp_clf = _lgb_sp.LGBMClassifier(**_sp_lgbm_params)
                     _sp_clf.fit(_sp_feat_fit, _sp_y_fit, sample_weight=_sp_sw_fit)
                     self._specialist_models.append((_sp_clf, available_feat_cols, _sp_ct))
+                    # H5/H10 fix: tag per-seed OOF rows with seed_id and merge into
+                    # the global accumulator.  _sp_buf is only non-None when
+                    # _oof_persist_path is set; _sp_buf references the same list as
+                    # _sp_oof_buf so it already holds rows the objective appended.
+                    if _sp_buf is not None:
+                        for _row in _sp_buf:
+                            _sp_oof_global_buf.append({**_row, "seed_id": _sp_seed})
                 except Exception as _sp_exc:
                     # H2 fix: track per-seed failures; raise after tolerance exceeded.
                     _exc_repr = repr(_sp_exc)
@@ -1251,6 +1265,54 @@ class LightGbmStrategy:
                 )
             except Exception:
                 pass
+
+            # H5/H10 fix: flush global OOF accumulator to parquet after all seeds complete.
+            # Uses the same atomic write-to-temp + os.replace pattern as optimization.py
+            # Sub-fix 1b.  Schema adds seed_id and specialist_seed_count to the standard
+            # oof_buffer columns so DSR/PBO basin-lottery diagnostics can operate on
+            # SPECIALIST-mode OOF paths identically to ensemble-mode.
+            if self._oof_persist_path is not None and _sp_oof_global_buf:
+                import os
+                import tempfile
+
+                import pandas as pd
+
+                _sp_n_seeds_written = len(self._specialist_models)
+                # Stamp specialist_seed_count into each row before writing.
+                for _r in _sp_oof_global_buf:
+                    _r["specialist_seed_count"] = _sp_n_seeds_written
+                _sp_oof_new_df = pd.DataFrame(
+                    _sp_oof_global_buf,
+                    columns=[
+                        "trial_id",
+                        "symbol",
+                        "train_month",
+                        "fold_idx",
+                        "candle_open_time_ms",
+                        "oof_return",
+                        "seed_id",
+                        "specialist_seed_count",
+                    ],
+                )
+                self._oof_persist_path.parent.mkdir(parents=True, exist_ok=True)
+                if self._oof_persist_path.exists():
+                    _sp_existing = pd.read_parquet(self._oof_persist_path)
+                    _sp_combined = pd.concat([_sp_existing, _sp_oof_new_df], ignore_index=True)
+                else:
+                    _sp_combined = _sp_oof_new_df
+                _sp_tmp_fd, _sp_tmp_name = tempfile.mkstemp(
+                    dir=self._oof_persist_path.parent, suffix=".parquet.tmp"
+                )
+                try:
+                    os.close(_sp_tmp_fd)
+                    _sp_combined.to_parquet(_sp_tmp_name, index=False)
+                    os.replace(_sp_tmp_name, self._oof_persist_path)
+                except Exception:
+                    try:
+                        os.unlink(_sp_tmp_name)
+                    except OSError:
+                        pass
+                    raise
 
             # H2 fix: record seeds used for this month.
             self._seeds_used_per_month.append(len(self._specialist_models))
