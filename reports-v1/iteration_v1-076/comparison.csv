@@ -1,0 +1,11 @@
+metric,in_sample,out_of_sample,ratio
+sharpe,-0.6943,0.6234,-0.8979
+sortino,-0.6199,1.4152,-2.2829
+max_drawdown,55.33%,24.43%,0.4416
+win_rate,35.4%,40.5%,1.1420
+profit_factor,0.8026,1.1797,1.4700
+total_trades,158,84,0.5316
+calmar_ratio,0.7857,0.6654,0.8469
+dsr,-33.0315,-47.0782,1.4253
+total_net_pnl,-43.4782,16.2591,-0.3740
+specialist_dispersion_mean,32.95060021440194,,
