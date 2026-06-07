@@ -57,6 +57,7 @@ from __future__ import annotations
 
 import argparse
 import math
+import re
 import sys
 import time
 from collections.abc import Callable
@@ -2407,13 +2408,19 @@ def bundle_aggregator(
     )
 
 
+# Regex that validates bundle component names: "baseline" or "v1-NNN" (NNN = 001..999).
+# A hardcoded set {"baseline", "v1-036", "v1-043"} previously rejected every
+# SPECIALIST iteration label — fixed 2026-06-07 (C4/H4).
+_BUNDLE_COMPONENT_RE = re.compile(r"^(baseline|v1-\d{3})$")
+
+
 def _parse_bundle_config(bundle_config_str: str) -> dict[str, float]:
     """Parse '--bundle-config' string into {component: weight} dict.
 
     Format: "component:weight,component:weight,..."
-    Example: "baseline:0.50,v1-036:0.30,v1-043:0.20"
+    Example: "baseline:0.50,v1-063:0.33,v1-064:0.33,v1-065:0.34"
 
-    Valid component names: "baseline", "v1-NNN" (e.g. "v1-036", "v1-043").
+    Valid component names: "baseline" or any "v1-NNN" (NNN = 001..999, e.g. "v1-063").
 
     Args:
         bundle_config_str: Raw CLI string.
@@ -2424,7 +2431,9 @@ def _parse_bundle_config(bundle_config_str: str) -> dict[str, float]:
     Raises:
         ValueError: On malformed input or weight sum != 1.0.
     """
-    _valid_components = {"baseline", "v1-036", "v1-043"}
+    # Valid component names: "baseline" OR any "v1-NNN" label (NNN = 001..999).
+    # A hardcoded set previously listed only v1-036 and v1-043, silently rejecting
+    # all SPECIALIST iteration labels (C4/H4 fix 2026-06-07).
     result: dict[str, float] = {}
     for part in bundle_config_str.split(","):
         part = part.strip()
@@ -2433,14 +2442,14 @@ def _parse_bundle_config(bundle_config_str: str) -> dict[str, float]:
         if ":" not in part:
             raise ValueError(
                 f"[bundle_config] Invalid token {part!r}: expected 'component:weight'. "
-                "Example: 'baseline:0.50,v1-036:0.30,v1-043:0.20'"
+                "Example: 'baseline:0.50,v1-063:0.33,v1-064:0.33,v1-065:0.34'"
             )
         comp, weight_str = part.split(":", 1)
         comp = comp.strip()
-        if comp not in _valid_components:
+        if not _BUNDLE_COMPONENT_RE.match(comp):
             raise ValueError(
                 f"[bundle_config] Unknown component {comp!r}. "
-                f"Valid components: {sorted(_valid_components)}"
+                "Valid components: 'baseline' or 'v1-NNN' (e.g. 'v1-063', 'v1-077')."
             )
         try:
             weight = float(weight_str.strip())
