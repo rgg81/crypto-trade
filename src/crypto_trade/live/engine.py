@@ -125,10 +125,35 @@ class ModelRunner:
         if model_config.atr_column is not None:
             atr_column_kwarg["atr_column"] = model_config.atr_column
 
+        # Resolve per-model training-HP overrides; fall back to LiveConfig when None.
+        # (ModelConfig fields training_months / n_trials / cv_splits were added at
+        # iter-v3/132 but were never threaded through here — fix/specialist-bundle C1.)
+        resolved_training_months: int = (
+            model_config.training_months
+            if model_config.training_months is not None
+            else live_config.training_months
+        )
+        # Specialist optuna_trials overrides n_trials when specialist_mode=True and
+        # specialist_optuna_trials > 0; otherwise fall back to per-model or LiveConfig.
+        resolved_n_trials: int = (
+            model_config.specialist_optuna_trials
+            if (model_config.specialist_mode and model_config.specialist_optuna_trials > 0)
+            else (
+                model_config.n_trials
+                if model_config.n_trials is not None
+                else live_config.n_trials
+            )
+        )
+        resolved_cv_splits: int = (
+            model_config.cv_splits
+            if model_config.cv_splits is not None
+            else live_config.cv_splits
+        )
+
         inner = LightGbmStrategy(
-            training_months=live_config.training_months,
-            n_trials=live_config.n_trials,
-            cv_splits=live_config.cv_splits,
+            training_months=resolved_training_months,
+            n_trials=resolved_n_trials,
+            cv_splits=resolved_cv_splits,
             label_tp_pct=live_config.take_profit_pct,
             label_sl_pct=live_config.stop_loss_pct,
             label_timeout_minutes=live_config.timeout_minutes,
@@ -143,6 +168,16 @@ class ModelRunner:
             ood_enabled=model_config.ood_enabled,
             ood_features=(list(model_config.ood_features) if model_config.ood_enabled else None),
             ood_cutoff_pct=model_config.ood_cutoff_pct,
+            # fix/specialist-bundle-critical-high (C1/C3/C5/C6): specialist + AXIS-R fields.
+            # Default values on ModelConfig preserve BIT-IDENTICAL legacy behaviour.
+            specialist_mode=model_config.specialist_mode,
+            specialist_n_startup_trials=model_config.specialist_n_startup_trials,
+            specialist_n_estimators_max=model_config.specialist_n_estimators_max,
+            bounds_profile=model_config.bounds_profile,
+            enable_mid_bull_short_veto=model_config.enable_mid_bull_short_veto,
+            mid_bull_short_veto_lo=model_config.mid_bull_short_veto_lo,
+            mid_bull_short_veto_hi=model_config.mid_bull_short_veto_hi,
+            mid_bull_short_veto_lookback=model_config.mid_bull_short_veto_lookback,
             **atr_column_kwarg,
         )
         # _inner_strategy is the bare LightGbmStrategy regardless of wrapping;

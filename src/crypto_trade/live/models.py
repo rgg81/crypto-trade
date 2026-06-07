@@ -87,6 +87,32 @@ class ModelConfig:
     enable_no_confirm_exit: bool = False
     no_confirm_trigger_atr: float = 0.50
     no_confirm_k_candles: int = 4
+    # fix/specialist-bundle-critical-high (C1/C3/C5/C6): specialist + AXIS-R plumbing.
+    # Default False/0/str values preserve BIT-IDENTICAL behaviour for all legacy
+    # ModelConfig instances (BASELINE_MODELS, V2_BASELINE_MODELS, V3_BASELINE_MODELS).
+    #
+    # specialist_mode: when True, LightGbmStrategy runs V1 SPECIALIST methodology
+    #   (50 independent Optuna studies, mean-of-signed-weights aggregator).
+    # specialist_seed_count: number of specialist seeds (0 → use ensemble_seeds length).
+    # specialist_optuna_trials: per-seed Optuna trial budget (0 → use live_config.n_trials).
+    # specialist_n_startup_trials: TPESampler n_startup_trials in specialist mode.
+    # specialist_n_estimators_max: upper bound on n_estimators in specialist mode.
+    # bounds_profile: Optuna HP bounds profile forwarded to optimization.optimize_and_train.
+    #   "v1_pruned" = tighter bounds for the 40-feature pruned specialist set.
+    # enable_mid_bull_short_veto: AXIS-R Mid-Bull SHORT VETO post-aggregator rule.
+    #   When True, direction==-1 signals are vetoed when trailing return ∈ [lo, hi].
+    # mid_bull_short_veto_lo/hi: pre-registered band edges [0.20, 0.50].
+    # mid_bull_short_veto_lookback: trailing-return lookback in candles (270 = 90 days 8h).
+    specialist_mode: bool = False
+    specialist_seed_count: int = 0
+    specialist_optuna_trials: int = 0
+    specialist_n_startup_trials: int = 10
+    specialist_n_estimators_max: int = 500
+    bounds_profile: str = "v1_pruned"
+    enable_mid_bull_short_veto: bool = False
+    mid_bull_short_veto_lo: float = 0.20
+    mid_bull_short_veto_hi: float = 0.50
+    mid_bull_short_veto_lookback: int = 270
 
 
 # Static feature list for baseline v152: 193 features.
