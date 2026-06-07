@@ -383,10 +383,17 @@ def write_comparison(
             return "nan"
         return f"{v:.2f}%"
 
-    # Top-symbol concentration (OOS)
+    # Top-symbol concentration (OOS) — N-aware (H3 fix).
+    # When sign-mixed PnL is present, total_oos_pnl < sum_of_positives because
+    # losers partially cancel winners.  Dividing top_sym_pnl by the net total
+    # then yields concentration > 100%, which is a meaningless artifact.
+    # Fix: denominator = max(total_oos_pnl, sum_of_positives) so that
+    # concentration is always ≤ 100% even when one specialist is negative.
     total_oos_pnl = sum(r["net_pnl_pct"] for r in per_sym_oos)
+    sum_of_positives = sum(r["net_pnl_pct"] for r in per_sym_oos if r["net_pnl_pct"] > 0)
     top_sym_pnl = max((r["net_pnl_pct"] for r in per_sym_oos), default=0.0)
-    top_sym_conc = top_sym_pnl / total_oos_pnl * 100 if total_oos_pnl != 0 else 0.0
+    _conc_denom = max(total_oos_pnl, sum_of_positives)
+    top_sym_conc = top_sym_pnl / _conc_denom * 100 if _conc_denom != 0 else 0.0
 
     rows = [
         {
@@ -595,10 +602,12 @@ def main() -> None:
         print(f"  spec={spec}  sym={sym:<10}  IS={is_n:>3}  OOS={oos_n:>3}")
     print()
 
-    # Step 10: top-symbol concentration (OOS)
+    # Step 10: top-symbol concentration (OOS) — N-aware (H3 fix).
     total_oos_pnl = sum(r["net_pnl_pct"] for r in oos_per_sym)
+    _sum_pos = sum(r["net_pnl_pct"] for r in oos_per_sym if r["net_pnl_pct"] > 0)
     top = max(oos_per_sym, key=lambda r: r["net_pnl_pct"])
-    top_conc = top["net_pnl_pct"] / total_oos_pnl * 100 if total_oos_pnl != 0 else 0.0
+    _top_denom = max(total_oos_pnl, _sum_pos)
+    top_conc = top["net_pnl_pct"] / _top_denom * 100 if _top_denom != 0 else 0.0
     print(f"[10] Top-symbol OOS concentration: {top['symbol']} = {top_conc:.2f}% of OOS PnL")
     print()
 
