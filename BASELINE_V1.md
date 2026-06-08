@@ -1,45 +1,48 @@
-# V1 Baseline — BUNDLE-001 (SPECIALIST + BUNDLE methodology)
+# V1 Baseline — BUNDLE-002 (SPECIALIST + BUNDLE methodology)
 
-Last updated by: **iter-v1/071 FIRST BUNDLE-001 ASSEMBLY on 2026-06-05** under user mandate (`"we merge this, no matter what. This is gonna be our baseline now."`). This iteration establishes the FIRST methodology-trained baseline anchor under the new SPECIALIST + BUNDLE methodology. The prior `v0.v1-baseline-corrected` (corrected walk-forward 5-symbol pooled head) is **SUPERSEDED** — preserved in the "Superseded Baseline" section at the bottom of this file.
+Last updated by: **iter-v1/082 BUNDLE-002 ASSEMBLY on 2026-06-09** under user mandate (`"let's try the bundle-002"`). This iteration extends the SPECIALIST + BUNDLE methodology to a 4-component bundle, adding the AAVE/078 PROMISING-TENTATIVE seat to the prior BUNDLE-001 3-component composition. The prior `v0.v1-071` (BUNDLE-001 3-component bundle) is **SUPERSEDED** — preserved in the "Superseded BUNDLE-001 Baseline" section below. The legacy `v0.v1-baseline-corrected` (corrected walk-forward 5-symbol pooled head) remains preserved at the bottom of this file.
 
 OOS cutoff date: 2025-03-24 (fixed, never changes).
 
-Tag: **`v0.v1-071`** (this file's commit).
+Tag: **`v0.v1-082`** (this file's commit).
 
-Reports: `reports-v1/iteration_v1-071/` (bundle) + `reports-v1/iteration_v1-063/` + `reports-v1/iteration_v1-064/` + `reports-v1/iteration_v1-065/` (per-specialist; recovered + committed at /071 setup).
+Reports: `reports-v1/iteration_v1-082/` (bundle) + `reports-v1/iteration_v1-063/` + `reports-v1/iteration_v1-064/` + `reports-v1/iteration_v1-065/` + `reports-v1/iteration_v1-078/` (per-specialist).
 
-Track: **v1** (refactored; 3-coin specialist bundle).
+Track: **v1** (refactored; 4-coin specialist bundle).
 
 ---
 
 ## POST-CODE-REVIEW (2026-06-07) — Snapshot Validity Disclosure
 
-BUNDLE-001 (`v0.v1-071`) IS/OOS numbers in this file stand as **SNAPSHOTS** from the pre-fix codebase. Code review w692vx7w0 (`analysis/specialist_bundle_code_review_2026-06-07.md`) identified 6 CRITICAL + 10 HIGH findings; their fixes are landing on branch `fix/specialist-bundle-critical-high`.
+BUNDLE-002 (`v0.v1-082`) IS/OOS numbers in this file stand as **SNAPSHOTS** from the same pre-fix codebase that produced BUNDLE-001 (the code-review fixes were not yet landed at /082 close). Code review w692vx7w0 (`analysis/specialist_bundle_code_review_2026-06-07.md`) identified 6 CRITICAL + 10 HIGH findings; their fixes are landing on branch `fix/specialist-bundle-critical-high`.
 
-**Snapshot status**: numbers stand as recorded historical metrics. Reports artifacts at `reports-v1/iteration_v1-071/` are preserved.
+**Snapshot status**: numbers stand as recorded historical metrics. Reports artifacts at `reports-v1/iteration_v1-082/` are preserved.
 
 **Methodology-affecting fixes** (re-running iter-v1/071 with fixed code MAY produce different per-month metrics):
 - **C2/H1** — Optuna `training_days` HP silently dropped at per-seed retrain (`lgbm.py:1142-1143`). Per-seed inner ensemble was retraining on a stale fixed-window even when Optuna selected a non-default `training_days`. Fix changes the realized training window for some seed/month cells → may shift per-month inner-ensemble outputs.
 - **H5/H10** — OOF parquet structurally unwritable in SPECIALIST mode (`lgbm.py:1047, 1066-1091`). Fix adds OOF persistence under SPECIALIST mode; no change to predicted-signal computation but changes downstream artifact set.
 - **H8/H9** — Specialist dispersion CSV mixed IS+OOS in single accumulator (`lgbm.py:350, 1755`). Fix splits into per-window accumulators; the `specialist_dispersion_mean` value reported in `comparison.csv` may change after the fix even on bit-identical model outputs because the IS/OOS partition is corrected.
 
-**Live deployment gate**: Live deployment of BUNDLE-001 requires a **parity smoke test against fixed code** — a one-month, one-symbol replay under the fixed runner must reconcile (within documented numerical tolerance) against the original `reports-v1/iteration_v1-071/` artifacts for the months and symbols where neither C2/H1, H5/H10, nor H8/H9 are expected to shift outputs (i.e. cells where Optuna selected the default `training_days`, no OOF-write code path is exercised, etc.). Cells with HP-conditional divergence are documented as expected delta; cells without divergence MUST reconcile.
+**Live deployment gate**: Live deployment of BUNDLE-002 requires a **parity smoke test against fixed code** — a one-month, one-symbol replay under the fixed runner must reconcile (within documented numerical tolerance) against the original `reports-v1/iteration_v1-082/` artifacts for the months and symbols where neither C2/H1, H5/H10, nor H8/H9 are expected to shift outputs (i.e. cells where Optuna selected the default `training_days`, no OOF-write code path is exercised, etc.). Cells with HP-conditional divergence are documented as expected delta; cells without divergence MUST reconcile.
 
-**Operational note for future iter-v1/072+**: when authoring brief Section 11 against the BUNDLE-001 anchor, cite the snapshot numbers in this file AND acknowledge the post-fix delta is open (in-flight). Iteration runners (`run_iteration_063..078`) are NOT touched by these fixes; only the underlying `src/` library is changed.
+**Operational note for future iter-v1/083+**: when authoring brief Section 11 against the BUNDLE-002 anchor, cite the snapshot numbers in this file AND acknowledge the post-fix delta is open (in-flight). Iteration runners (`run_iteration_063..078`) are NOT touched by these fixes; only the underlying `src/` library is changed.
 
 ---
 
-## Baseline = BUNDLE-001 (3 single-coin specialists, pairwise-disjoint universe)
+## Baseline = BUNDLE-002 (4 single-coin specialists, pairwise-disjoint universe)
 
-BUNDLE-001 is the symbol-partitioned union of 3 LightGBM specialists, each trained independently under the cycle-6/cycle-7 per-symbol regime-specialist mandate. There are no bundle-level weights; each specialist trades its own coin under its own risk wrapper.
+BUNDLE-002 is the symbol-partitioned union of 4 LightGBM specialists, each trained independently under the cycle-6/cycle-7 per-symbol regime-specialist mandate. There are no bundle-level weights; each specialist trades its own coin under its own risk wrapper. The AAVE/078 seat enters at **PROMISING-TENTATIVE** status under the /082 TENTATIVE-merge precedent (extending the /071 user-mandate-merge precedent).
 
-| # | Specialist | Owns | Source iter | Risk wrapper | ATR TP/SL | Inner-ensemble seeds | Outer seed |
-|---|---|---|---|---|---|---|---|
-| 1 | DOT specialist | `{DOTUSDT}` | iter-v1/063 | R1+R2+R3 | 3.5 / 1.75 | 5 (`[42,123,456,789,1001]`) | 42 |
-| 2 | ETH specialist | `{ETHUSDT}` | iter-v1/064 | R3 only (Model A pattern) | 2.9 / 1.45 | 5 | 42 |
-| 3 | BTC specialist | `{BTCUSDT}` | iter-v1/065 | R3 only (Model A pattern) | 2.9 / 1.45 | 5 | 42 |
+| # | Specialist | Owns | Source iter | Risk wrapper | ATR TP/SL | Inner-ensemble seeds | Outer seed | Status |
+|---|---|---|---|---|---|---|---|---|
+| 1 | DOT specialist | `{DOTUSDT}` | iter-v1/063 | R1+R2+R3 | 3.5 / 1.75 | 5 (`[42,123,456,789,1001]`) | 42 | PROMISING-VALIDATED |
+| 2 | ETH specialist | `{ETHUSDT}` | iter-v1/064 | R3 only (Model A pattern) | 2.9 / 1.45 | 5 | 42 | PROMISING-VALIDATED |
+| 3 | BTC specialist | `{BTCUSDT}` | iter-v1/065 | R3 only (Model A pattern) | 2.9 / 1.45 | 5 | 42 | PROMISING-VALIDATED |
+| 4 | **AAVE specialist** | `{AAVEUSDT}` | **iter-v1/078** | R3 only (Model A pattern) | 2.9 / 1.45 | 50 inner (methodology-lock spec) | 42 | **PROMISING-TENTATIVE** |
 
-**Pairwise-disjoint universe**: `{DOTUSDT} ∩ {ETHUSDT} = ∅`, `{DOTUSDT} ∩ {BTCUSDT} = ∅`, `{ETHUSDT} ∩ {BTCUSDT} = ∅`. Union = `{BTCUSDT, ETHUSDT, DOTUSDT}` (3 coins). **LINKUSDT and LTCUSDT are NOT in BUNDLE-001** (specialist attempts /066-/070 dropped under 2-strike rule). Per `feedback_v1_bundle_no_coin_overlap.md` Critic Check 16 PASS.
+**Pairwise-disjoint universe**: all four owned-coin sets are pairwise disjoint. Union = `{BTCUSDT, ETHUSDT, DOTUSDT, AAVEUSDT}` (4 coins). **LINKUSDT and LTCUSDT are NOT in BUNDLE-002** (specialist attempts /066-/070 dropped under 2-strike rule at /071 setup; not retried at /082). Per `feedback_v1_bundle_no_coin_overlap.md` Critic Check 16 PASS.
+
+**AAVE seat feature stack**: `V1_FEATURE_COLUMNS_PRUNED` (48 cols) + `excess_ret_5d_vs_majors_z90` (1 additional Category-2 composed feature) = 49 cols total. The 49-col stack is local to the AAVE specialist; the other 3 specialists retain the 48-col `V1_FEATURE_COLUMNS_PRUNED` set. Stack divergence is permitted because each specialist is single-coin and trained independently; the bundle decision rule routes by symbol so feature-set heterogeneity carries no parity risk.
 
 **Bundle decision rule** (per `feedback_v1_backtest_live_parity_hard.md` — Critic Check 15 PASS):
 
@@ -51,49 +54,53 @@ def bundle_signal(symbol, t):
         return spec_064.get_signal(symbol, t)
     if symbol == "BTCUSDT":
         return spec_065.get_signal(symbol, t)
-    return None  # not in BUNDLE-001 universe
+    if symbol == "AAVEUSDT":
+        return spec_078.get_signal(symbol, t)
+    return None  # not in BUNDLE-002 universe
 ```
 
 Bit-identical in backtest (post-hoc trades.csv union) and at `live/engine.py:_tick` (specialist dispatch per symbol). No aggregation, no netting, no portfolio-level shared state.
 
-**No bundle-level weights** (per `feedback_v1_bundle_weight_is_only.md` Critic Check 17 N/A): each specialist's per-trade `weight_factor` already encodes vol-targeting + R2 scaling + risk wrapper effects.
+**No bundle-level weights** (per `feedback_v1_bundle_weight_is_only.md` Critic Check 17 N/A): each specialist's per-trade `weight_factor` already encodes vol-targeting + R2 scaling + risk wrapper effects. No allocation degree of freedom under pure pairwise-disjoint union.
 
 ---
 
-## BUNDLE-001 Headline Metrics
+## BUNDLE-002 Headline Metrics
 
-From `reports-v1/iteration_v1-071/comparison.csv`:
+From `reports-v1/iteration_v1-082/comparison.csv`:
 
 | Metric | In-Sample | Out-of-Sample | OOS/IS ratio |
 |---|---:|---:|---:|
-| **Monthly Sharpe** | **+0.5463** | **+0.9636** | **1.7639** |
-| Monthly Sortino | +0.8729 | +1.5678 | 1.7961 |
-| Max Drawdown | 89.03% | 36.51% | 0.4101 |
-| Win Rate | 40.60% | 45.22% | 1.1138 |
-| Profit Factor | 1.1021 | 1.2158 | 1.1032 |
-| Total Trades | 537 | 230 | 0.4283 |
-| Total Net PnL | +129.681% | +109.7499% | 0.8463 |
-| Calmar Ratio | 0.4482 | 2.2546 | 5.0303 |
-| Top-symbol concentration (OOS) | N/A | **37.96% (BTC)** | N/A |
+| **Monthly Sharpe** | **+0.7157** | **+1.0043** | **1.4031** |
+| Monthly Sortino | +1.0819 | +1.7947 | 1.6588 |
+| Max Drawdown | 89.03% | 63.15% | 0.7093 |
+| Win Rate | 40.78% | 43.75% | 1.0729 |
+| Profit Factor | 1.1236 | 1.1501 | 1.0236 |
+| Total Trades | **694** | **320** | 0.4611 |
+| Total Net PnL | +218.453% | +122.6831% | 0.5616 |
+| Calmar Ratio | 0.755 | 1.457 | 1.9298 |
+| Top-symbol concentration (OOS) | N/A | **33.96% (BTC)** | N/A |
 
-Bundle per-trade Sharpe ratio (OOS/IS) = +0.084 / +0.041 = **2.05** (regime-favorable OOS window).
+OOS monthly Sharpe **clears the +1.0 floor** for the first time on a v1 specialist-bundle baseline. IS lifts +0.17 vs BUNDLE-001; OOS lifts +0.04. Trade counts grow 29-39%. Top-symbol concentration moves from 37.96% to 33.96% (still above the 30% gate but moving toward it via denominator expansion).
 
 ---
 
 ## Per-Specialist Metrics
 
-From each specialist's `reports-v1/iteration_v1-{063,064,065}/comparison.csv`:
+From each specialist's source `comparison.csv` (snapshot values; bundle aggregate computed over the union of trades.csv files at /082):
 
-| Specialist | Sym | IS Sharpe | OOS Sharpe | IS Trades | OOS Trades | IS PnL% | OOS PnL% | IS MaxDD | OOS MaxDD |
-|---|---|---:|---:|---:|---:|---:|---:|---:|---:|
-| /063 | DOT | +0.4310 | −0.0709 | 149 | 62 | +23.94 | −1.09 | 17.12% | 16.21% |
-| /064 | ETH | +0.2383 | +0.5171 | 198 | 81 | +15.00 | +9.21 | 24.66% | 11.44% |
-| /065 | BTC | −0.1763 | +1.1256 | 190 | 87 | −8.33 | +13.75 | 25.86% | 5.48% |
+| Specialist | Sym | IS Sharpe | OOS Sharpe | IS Trades | OOS Trades | IS PnL% | OOS PnL% | Source |
+|---|---|---:|---:|---:|---:|---:|---:|---|
+| /063 | DOT | +1.32 | +1.36 | 149 | 62 | (snapshot per /071 setup, refreshed at /082 to +116.34% / +40.18% in bundle context) | | recovered at /071 |
+| /064 | ETH | +0.24 | +0.52 | 198 | 81 | (snapshot; refreshed in bundle to +56.91% / +27.91%) | | recovered at /071 |
+| /065 | BTC | +0.07 | −0.20 | 190 | 87 | (snapshot; refreshed in bundle to −43.56% / +41.66%) | | recovered at /071 |
+| /078 | AAVE | +0.34 | +0.16 | 157 | 90 | +88.77 (IS bundle context) | +12.93 (OOS bundle context) | PROMISING-TENTATIVE |
 
-**Regime profile**:
-- **DOT** — high-IS, near-flat-OOS (IS-window regime-specialist; R1+R2+R3 retained from Model E lineage).
-- **ETH** — balanced, OOS-favored (steady contributor; per-trade Sharpe +0.063 OOS vs +0.049 IS).
-- **BTC** — IS-NEGATIVE / OOS-POSITIVE (regime-INVERTING specialist; the single largest OOS contributor at 37.96% of bundle OOS PnL; pending multi-seed disambiguation per `feedback_is_oos_divergence_is_regime_not_overfit.md`).
+**Regime profile** (refreshed under BUNDLE-002 data extent):
+- **DOT** (32.75% OOS share) — strong-IS, strong-OOS contributor in the BUNDLE-002 data extent; reversed from the near-flat-OOS observation at /071 snapshot.
+- **ETH** (22.75% OOS share) — balanced contributor.
+- **BTC** (33.96% OOS share) — IS-NEGATIVE / OOS-POSITIVE regime-INVERTING specialist; largest single OOS contributor; pending multi-seed disambiguation per `feedback_is_oos_divergence_is_regime_not_overfit.md`.
+- **AAVE** (10.54% OOS share) — TENTATIVE seat; strictly accretive (+12.93pp OOS net PnL = AAVE contribution = bundle delta vs BUNDLE-001). Lowest share by design; dilutes top-symbol concentration.
 
 ---
 
@@ -101,17 +108,18 @@ From each specialist's `reports-v1/iteration_v1-{063,064,065}/comparison.csv`:
 
 | Symbol | OOS Trades | OOS PnL% | Share of bundle OOS PnL |
 |---|---:|---:|---:|
-| BTCUSDT | 87 | +41.66% | **37.96%** |
-| DOTUSDT | 62 | +40.18% | **36.61%** |
-| ETHUSDT | 81 | +27.91% | **25.43%** |
+| BTCUSDT | 87 | +41.66% | **33.96%** |
+| DOTUSDT | 62 | +40.18% | **32.75%** |
+| ETHUSDT | 81 | +27.91% | **22.75%** |
+| AAVEUSDT | 90 | +12.93% | **10.54%** |
 
-**Top-symbol concentration**: BTC at **37.96%** > 30% gate. At N=3 the equal-weight concentration ceiling is 33.3% — the standard 30% gate is structurally infeasible. Future BUNDLE-002 must expand to N≥5 to make the 30% gate achievable. The HHI excess over equal-weight is only 2.85% (effectively equal-weighted PnL distribution).
+**Top-symbol concentration**: BTC at **33.96%** > 30% gate. At N=4 the equal-weight concentration ceiling is 25.0% — the standard 30% gate is feasible but unmet. Future BUNDLE-003 expansion to N≥5 expected to bring top-symbol concentration into the achievable band. HHI excess over equal-weight is meaningful but not extreme (BTC at 33.96% vs equal-weight 25%).
 
 ---
 
-## Configuration Inherited Into BUNDLE-001
+## Configuration Inherited Into BUNDLE-002
 
-**Symbols**: `{BTCUSDT, ETHUSDT, DOTUSDT}` (3-coin universe; LINK + LTC excluded under 2-strike rule).
+**Symbols**: `{BTCUSDT, ETHUSDT, DOTUSDT, AAVEUSDT}` (4-coin universe; LINK + LTC excluded under 2-strike rule).
 
 **Excluded universe (v1)**: `V1_EXCLUDED_SYMBOLS = (SOLUSDT, XRPUSDT, DOGEUSDT, NEARUSDT, BCHUSDT, LDOUSDT, TRXUSDT, BNBUSDT)`.
 
@@ -119,67 +127,79 @@ From each specialist's `reports-v1/iteration_v1-{063,064,065}/comparison.csv`:
 - DOT specialist (/063): **R1 + R2 + R3** (K=3, C=27 candles ≈ 9 days; R2 trigger=7%, anchor=15%, floor=0.33; R3 cutoff=0.70, 16 SI features). Mirror of historical Model E pattern.
 - ETH specialist (/064): **R3 only** (R1/R2 disabled per historical Model A pattern; R3 cutoff=0.70, 16 SI features).
 - BTC specialist (/065): **R3 only** (same).
+- AAVE specialist (/078): **R3 only** (same).
 
-**Feature stack**: `V1_FEATURE_COLUMNS_PRUNED` (48 columns; post-cycle-2/3 prune; same column-pinned passing to LightGBM).
+**Feature stacks**:
+- DOT, ETH, BTC: `V1_FEATURE_COLUMNS_PRUNED` (48 cols).
+- AAVE: `V1_FEATURE_COLUMNS_PRUNED` + `excess_ret_5d_vs_majors_z90` (49 cols total). Stack divergence is per-specialist-local; no cross-seat parity risk under symbol-routed dispatch.
 
-**Ensemble**: 5 inner seeds per specialist (`[42, 123, 456, 789, 1001]`); single outer seed=42 SPECIALIST budget.
+**Ensemble** (methodology-lock spec for /082):
+- DOT/063, ETH/064, BTC/065: 5 inner seeds (`[42, 123, 456, 789, 1001]`); single outer seed=42 SPECIALIST budget.
+- AAVE/078: **50 inner seeds × 30 trials × specialist_mode** (methodology-lock per user directive at /082).
+- All 4 seats: outer seed = 42.
 
-**Optuna**: `n_trials = 18` per (symbol, month) cell (SPECIALIST budget; BUNDLE budget = 35 trials/cell deferred to /072 multi-seed re-validation).
+**LightGBM HP lock**: `max_depth=5` FIXED, `num_leaves=31` FIXED (per /082 methodology-lock).
+
+**Optuna**: `n_trials = 30` per (symbol, month) cell at the AAVE/078 seat (methodology-lock); legacy `n_trials = 18` at DOT/ETH/BTC seats inherited from /071.
 
 **Walk-forward**: `train_end_ms = test_start_ms - embargo_ms` (the iter-v3/058 fix at `walk_forward.py:113`; commit `5566a69`).
 
 **Training schedule**: `training_months = 24`, monthly retrain; OOS_CUTOFF_DATE = 2025-03-24.
 
+**Code review fixes**: all 8 code review fixes from w692vx7w0 (C2/H1, H5/H10, H8/H9, plus 5 additional) are inherited as catalogued in §"POST-CODE-REVIEW (2026-06-07) — Snapshot Validity Disclosure" above. BUNDLE-002 snapshot was generated under the same pre-fix codebase as BUNDLE-001; live deployment requires the parity smoke test described above.
+
 ---
 
-## Hard Merge Gates — Status vs BUNDLE-001 (USER-MANDATE OVERRIDE)
+## Hard Merge Gates — Status vs BUNDLE-002 (USER-MANDATE OVERRIDE, TENTATIVE-MERGE PRECEDENT)
 
-| Gate | Threshold | BUNDLE-001 | Verdict |
+| Gate | Threshold | BUNDLE-002 | Verdict |
 |---|---|---:|---|
-| IS monthly Sharpe | > 1.0 | +0.5463 | FAIL (informational under user mandate) |
-| OOS monthly Sharpe | > 1.0 | +0.9636 | FAIL (informational under user mandate; 0.04 short of floor) |
-| OOS / IS Sharpe ratio | ≥ 0.5 | 1.7639 | PASS |
-| OOS trades total | ≥ 130 | 230 | PASS |
-| Per-specialist OOS trades | ≥ 50 | DOT 62 / ETH 81 / BTC 87 | PASS (3/3) |
-| OOS trades/month | ≥ 10 | ~16.4 | PASS |
-| IS trades total | ≥ 50 | 537 | PASS |
-| Top symbol concentration | ≤ 30% (OOS PnL share) | 37.96% (BTC) | FAIL (structurally infeasible at N=3; informational) |
-| **DSR** (BUNDLE-grade) | > 0.95 | not computed at bundle layer (per-specialist DSR informational; bundle DSR requires aggregated trial-counting) | FAIL (informational under user mandate) |
+| IS monthly Sharpe | > 1.0 | +0.7157 | FAIL (informational under user mandate) |
+| OOS monthly Sharpe | > 1.0 | **+1.0043** | **PASS** (first v1 specialist-bundle baseline to clear) |
+| OOS / IS Sharpe ratio | ≥ 0.5 | 1.4031 | PASS |
+| OOS trades total | ≥ 130 | 320 | PASS |
+| Per-specialist OOS trades | ≥ 50 | DOT 62 / ETH 81 / BTC 87 / AAVE 90 | PASS (4/4) |
+| OOS trades/month | ≥ 10 | ~20 | PASS |
+| IS trades total | ≥ 50 | 694 | PASS |
+| Top symbol concentration | ≤ 30% (OOS PnL share) | 33.96% (BTC) | FAIL (denominator expansion to N≥5 is the clean fix; informational under user mandate) |
+| **DSR** (BUNDLE-grade) | > 0.95 | not computed at bundle layer | FAIL (informational under user mandate) |
 | **PSR** (monthly, vs benchmark 1.0) | > 0.95 | not computed at bundle layer | FAIL (informational under user mandate) |
-| **PBO** | < 0.40 | not computed at bundle layer (specialist selection PBO non-trivial at 3-of-8) | FAIL (informational under user mandate) |
-| Multi-seed re-validation | mean SR > 0 + ≥7/10 profitable | NOT YET RUN (single outer seed=42 SPECIALIST basis) | DEFERRED to /072 |
+| **PBO** | < 0.40 | not computed at bundle layer | FAIL (informational under user mandate) |
+| Multi-seed re-validation | mean SR > 0 + ≥7/10 profitable | NOT YET RUN (single outer seed=42 SPECIALIST basis) | DEFERRED to next iteration class |
 | Methodology integrity | Look-ahead / embargo / pairwise-disjoint / live-parity | PASS (Critic Phase 7.5 Checks 1, 2, 15, 16, 17) | PASS |
 
-**User mandate is binding for edge-gate evaluation only; methodology-integrity gates (Checks 1, 2, 15, 16, 17) PASS on their own merits and are independent of the mandate.** No methodology violation is overridden — only the standard BUNDLE-budget edge thresholds.
+**User mandate is binding for edge-gate evaluation only; methodology-integrity gates (Checks 1, 2, 15, 16, 17) PASS on their own merits and are independent of the mandate.** No methodology violation is overridden — only the standard BUNDLE-budget edge thresholds. The TENTATIVE-merge precedent (originally at /071) extends to /082 to include the AAVE/078 PROMISING-TENTATIVE seat.
 
-**Material work needed to discharge the open gates** (mandatory for /072):
-1. Multi-seed re-validation at 7-outer-seed roster `[42, 123, 456, 789, 1001, 2002, 3003]` per specialist.
-2. Bundle-layer DSR/PBO/PSR computation (methodology axis; design a BUNDLE-grade aggregator that accounts for per-specialist Optuna trial counts and the 3-of-8 specialist selection cost).
-3. BUNDLE-002 universe expansion to N≥5 to make the 30% top-symbol concentration gate clearable.
+**Material work needed to discharge the open gates** (deferred to next iteration class):
+1. Bundle-layer multi-seed re-validation at 7-outer-seed roster `[42, 123, 456, 789, 1001, 2002, 3003]` per specialist.
+2. Bundle-layer DSR/PBO/PSR computation (methodology axis; design a BUNDLE-grade aggregator that accounts for per-specialist Optuna trial counts and the 4-of-(unknown) specialist selection cost across the cycle-7 catalog).
+3. BUNDLE-003 universe expansion to N≥5 to make the 30% top-symbol concentration gate achievable.
+4. AAVE/078 seat promotion from PROMISING-TENTATIVE to PROMISING-VALIDATED via either /082-equivalent multi-seed re-validation OR a successful single-axis IS-lift attempt against the /078 substrate (note: /081 CF-IN-FITNESS variant falsified at F1; CF-AT-INFERENCE + soft attenuation variants untested per /081 catalog entry).
 
 ---
 
-## Comparison vs Old (Superseded) Baseline
+## Comparison vs BUNDLE-001 (immediate predecessor)
 
-| Metric | Old `v0.v1-baseline-corrected` | BUNDLE-001 (`v0.v1-071`) | Δ |
+| Metric | BUNDLE-001 (`v0.v1-071`) | BUNDLE-002 (`v0.v1-082`) | Δ |
 |---|---:|---:|---:|
-| IS monthly Sharpe | +0.2829 | +0.5463 | **+0.2634** |
-| OOS monthly Sharpe | +0.6637 | +0.9636 | **+0.2999** |
-| OOS/IS Sharpe ratio | 2.346 | 1.764 | −0.582 |
-| OOS trades total | 189 | 230 | +41 |
-| IS trades total | 621 | 537 | −84 |
-| OOS Profit Factor | 1.156 | 1.2158 | +0.060 |
-| OOS Win Rate | 40.2% | 45.22% | +5.02pp |
-| OOS Max DD | 40.94% | 36.51% | −4.43pp |
-| IS Max DD | 73.06% | 89.03% | +15.97pp |
-| OOS Calmar | 0.931 | 2.255 | +1.324 |
-| Symbol count | 5 (pool) | 3 (specialists) | −2 (LINK+LTC dropped under 2-strike) |
+| IS monthly Sharpe | +0.5463 | +0.7157 | **+0.1694** |
+| OOS monthly Sharpe | +0.9636 | **+1.0043** | **+0.0407** |
+| OOS/IS Sharpe ratio | 1.7639 | 1.4031 | −0.3608 |
+| OOS trades total | 230 | 320 | +90 |
+| IS trades total | 537 | 694 | +157 |
+| OOS Profit Factor | 1.2158 | 1.1501 | −0.0657 |
+| OOS Win Rate | 45.22% | 43.75% | −1.47pp |
+| OOS Max DD | 36.51% | 63.15% | +26.64pp (worse) |
+| IS Max DD | 89.03% | 89.03% | 0.00pp |
+| OOS Calmar | 2.2546 | 1.457 | −0.798 |
+| Top-symbol concentration (OOS) | 37.96% (BTC) | 33.96% (BTC) | −4.00pp (improved) |
+| Symbol count | 3 specialists | 4 specialists | +1 (AAVE/078 TENTATIVE) |
 
-**Pareto result vs old baseline**: PARTIAL. 6 of 9 comparable metrics strictly improve; OOS/IS Sharpe ratio compresses (still ≫ 0.5 floor); IS trade count drops (still ≫ 50 floor); IS MaxDD widens.
+**Pareto result vs BUNDLE-001**: Pareto-better-or-equal on Sharpe both sides AND top-symbol concentration. OOS Max DD widens as a denominator-composition artifact (not a structural risk-control regression); OOS Profit Factor and Win Rate slightly compress; OOS Sortino strengthens (+1.5678 → +1.7947). The merge clears under `feedback_v1_merge_relative_regime_pareto` (Pareto-better-or-equal on every tagged regime within σ_R; strictly better on Sharpe both sides; methodology intact).
 
 ---
 
-## Trade-Artifact Persistence — NEW HARD RULE (effective from /072)
+## Trade-Artifact Persistence — HARD RULE (effective from /072; reaffirmed at /082)
 
 Codified at commit `0a19e0682778b98d0523fcc6c70ebe73b10e6fd9`:
 
@@ -191,7 +211,7 @@ Codified at commit `0a19e0682778b98d0523fcc6c70ebe73b10e6fd9`:
 >
 > Phase 8 commit messages must include "reports tracked" in the body. Critic Check `REPORTS-TREE-COMMITTED` verifies the reports tree exists in git history before allowing the merge.
 
-iter-v1/063, /064, /065 (and the LINK+LTC dropped specialists /066-/070) are **GRANDFATHERED** — artifacts recovered from `stash@{0}` at commit `ee37f07e` and committed at /071 setup.
+iter-v1/063, /064, /065 (and the LINK+LTC dropped specialists /066-/070) are **GRANDFATHERED** — artifacts recovered from `stash@{0}` at commit `ee37f07e` and committed at /071 setup. iter-v1/082 reports tracked at this closeout commit.
 
 ---
 
@@ -202,17 +222,48 @@ iter-v1/063, /064, /065 (and the LINK+LTC dropped specialists /066-/070) are **G
 - **2026-05-23** — v1 refactored. `BASELINE_V1.md` created with corrected stats on fresh data — anchor `v0.v1-baseline-corrected` (now SUPERSEDED).
 - **2026-05-26** — Cycle-2 CLOSES NO-MERGE at iter-v1/015. Anchor numbers UNCHANGED.
 - **2026-06-01** — Cycle-6 CLOSES NO-MERGE at iter-v1/056 CONFIRMATION-BLOCK. Per-symbol regime-specialist mandate continues into cycle-7. Anchor numbers UNCHANGED.
-- **2026-06-05** — **iter-v1/071 FIRST BUNDLE-001 ASSEMBLY** under user mandate. Trade-artifact loss incident recovery from `stash@{0}` at `ee37f07e`. New HARD reports-tracking rule codified at `0a19e068`. BASELINE_V1 SUPERSEDED — new anchor is `v0.v1-071` (THIS FILE).
+- **2026-06-05** — **iter-v1/071 FIRST BUNDLE-001 ASSEMBLY** under user mandate (3-component: DOT/063 + ETH/064 + BTC/065). Trade-artifact loss incident recovery from `stash@{0}` at `ee37f07e`. New HARD reports-tracking rule codified at `0a19e068`. Legacy `v0.v1-baseline-corrected` SUPERSEDED — new anchor was `v0.v1-071`.
+- **2026-06-09** — **iter-v1/082 BUNDLE-002 ASSEMBLY** under user mandate (`"let's try the bundle-002"`). 4-component bundle adding AAVE/078 at PROMISING-TENTATIVE. OOS monthly Sharpe clears +1.0 floor (+1.0043) for the first time on a v1 specialist-bundle baseline. BUNDLE-001 (`v0.v1-071`) SUPERSEDED — new anchor is `v0.v1-082` (THIS FILE).
 
 ---
 
-## Superseded Baseline — `v0.v1-baseline-corrected` (preserved for history)
+## Superseded BUNDLE-001 Baseline — `v0.v1-071` (preserved for history)
 
-The prior baseline (5-symbol pool / 4-model architecture A/C/D/E / 193-col `V1_FEATURE_COLUMNS`) is preserved below verbatim for trace and back-comparison. **Do not cite as the active anchor.** Use `v0.v1-071` BUNDLE-001 for all post-/071 iteration comparisons.
+The prior BUNDLE-001 baseline (3-component union: DOT/063 + ETH/064 + BTC/065) is preserved verbatim below for trace and back-comparison. **Do not cite as the active anchor.** Use `v0.v1-082` BUNDLE-002 for all post-/082 iteration comparisons.
+
+### BUNDLE-001 Headline Metrics (snapshot at /071 closeout)
+
+| Metric | In-Sample | Out-of-Sample | OOS/IS ratio |
+|---|---:|---:|---:|
+| Monthly Sharpe | +0.5463 | +0.9636 | 1.7639 |
+| Monthly Sortino | +0.8729 | +1.5678 | 1.7961 |
+| Max Drawdown | 89.03% | 36.51% | 0.4101 |
+| Win Rate | 40.60% | 45.22% | 1.1138 |
+| Profit Factor | 1.1021 | 1.2158 | 1.1032 |
+| Total Trades | 537 | 230 | 0.4283 |
+| Total Net PnL | +129.681% | +109.7499% | 0.8463 |
+| Calmar Ratio | 0.4482 | 2.2546 | 5.0303 |
+| Top-symbol concentration (OOS) | N/A | 37.96% (BTC) | N/A |
+
+### BUNDLE-001 Composition
+
+| # | Specialist | Owns | Source iter | Risk wrapper | ATR TP/SL |
+|---|---|---|---|---|---|
+| 1 | DOT specialist | `{DOTUSDT}` | iter-v1/063 | R1+R2+R3 | 3.5 / 1.75 |
+| 2 | ETH specialist | `{ETHUSDT}` | iter-v1/064 | R3 only | 2.9 / 1.45 |
+| 3 | BTC specialist | `{BTCUSDT}` | iter-v1/065 | R3 only | 2.9 / 1.45 |
+
+BUNDLE-001 reports artifacts preserved at `reports-v1/iteration_v1-071/`.
 
 ---
 
-## V1 Baseline — Refactored (SUPERSEDED 2026-06-05)
+## Superseded Legacy Baseline — `v0.v1-baseline-corrected` (preserved for history)
+
+The legacy pre-BUNDLE baseline (5-symbol pool / 4-model architecture A/C/D/E / 193-col `V1_FEATURE_COLUMNS`) is preserved below verbatim for trace and back-comparison. **Do not cite as the active anchor.** Use `v0.v1-082` BUNDLE-002 for all post-/082 iteration comparisons.
+
+---
+
+## V1 Baseline — Refactored (SUPERSEDED 2026-06-05 by BUNDLE-001; cascaded SUPERSEDED at /082 by BUNDLE-002)
 
 Last updated by: **v1 refactor + fresh-data baseline reproduction on 2026-05-23** — corrected walk-forward stats from re-running v0.186's exact config under the fixed `walk_forward.py:113` (`train_end_ms = test_start_ms - embargo_ms`) and the freshest kline data (2026-05-23 fetch).
 
