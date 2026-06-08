@@ -1,0 +1,5 @@
+symbol,trades,wins,win_rate,net_pnl_pct,avg_pnl_pct,pct_of_total_pnl
+AAVEUSDT,90,36,40.0,12.9332,0.1437,10.54
+BTCUSDT,87,40,46.0,41.6597,0.4788,33.96
+DOTUSDT,62,27,43.5,40.1834,0.6481,32.75
+ETHUSDT,81,37,45.7,27.9068,0.3445,22.75
