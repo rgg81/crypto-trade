@@ -202,17 +202,21 @@ from crypto_trade.features_v1.funding_v1 import (  # noqa: E402
 from crypto_trade.features_v1.open_interest_v1 import (  # noqa: E402, I001
     add_oi_delta_5_z30_feature as _add_oi_delta_5_z30_feature,
     add_oi_delta_v1_features as _add_oi_delta_v1_features,
+    add_oi_price_divergence_30_feature as _add_oi_price_divergence_30_feature,
 )
 
 
 def _add_oi_delta_all_v1_features(df: pd.DataFrame) -> pd.DataFrame:
-    """Combined wrapper: add oi_delta_30_z90 + btc_oi_delta_5_z30 in one pass.
+    """Combined wrapper: add oi_delta_30_z90 + btc_oi_delta_5_z30 + oi_price_divergence_30.
 
-    iter-v1/058: both OI features are written when calling
+    iter-v1/058: oi_delta_30_z90 + btc_oi_delta_5_z30.
+    iter-v1/084: oi_price_divergence_30 added (OI-price divergence z-score; CRV specialist).
+    All three OI features are written when calling
     ``uv run crypto-trade features --track v1 --groups open_interest_v1``.
     """
     df = _add_oi_delta_v1_features(df)
     df = _add_oi_delta_5_z30_feature(df)
+    df = _add_oi_price_divergence_30_feature(df)
     return df
 
 

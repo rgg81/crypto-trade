@@ -121,6 +121,7 @@ V1_FEATURE_COLUMNS_PRUNED: tuple[str, ...] = (
     "mr_pct_from_low_20",
     "mr_rsi_extreme_14",
     "oi_delta_30_z90",  # iter-v1/025: NEW — open-interest delta z-score (90-bar window)
+    "oi_price_divergence_30",  # iter-v1/084: NEW — OI-price divergence z-score (CRV specialist)
     "regime_momentum_signed_5d",  # iter-v1/040: composed momentum; replaces basis_zscore_30
     "stat_autocorr_lag5",
     "stat_kurtosis_20",  # LM Master Phase 4.5 swap: drop mom_mom_5, add stat_kurtosis_20
@@ -204,8 +205,13 @@ V1_FEATURE_COLUMNS_PRUNED: tuple[str, ...] = (
 #              [-0.9069, +0.413, -1.303]). Count: 49 → 48. Feature computation code
 #              preserved in open_interest_v1.py for potential future re-use at different
 #              window pair.
-assert len(V1_FEATURE_COLUMNS_PRUNED) == 48, (
-    f"V1_FEATURE_COLUMNS_PRUNED must have exactly 48 features; got {len(V1_FEATURE_COLUMNS_PRUNED)}"
+# iter-v1/084: ADD oi_price_divergence_30 (OI-price direction divergence z-score;
+#              CRV specialist cycle-7 EXPLORATION; re-aimed from /083 rank-7/11 OI family
+#              toward CRVUSDT which has NEGATIVE trivial-momentum IS baseline → ML headroom).
+#              Inserted alphabetically between oi_delta_30_z90 and regime_momentum_signed_5d.
+#              Count: 48 → 49.
+assert len(V1_FEATURE_COLUMNS_PRUNED) == 49, (
+    f"V1_FEATURE_COLUMNS_PRUNED must have exactly 49 features; got {len(V1_FEATURE_COLUMNS_PRUNED)}"
 )
 
 # Columns explicitly NOT in V1_FEATURE_COLUMNS_PRUNED but which may still appear in
@@ -666,6 +672,46 @@ assert len(active_feature_columns) == 48 guard fires in dispatch branch.
 """
 
 
+V1_ITER084_UNIVERSE: tuple[str, ...] = ("CRVUSDT",)
+"""iter-v1/084 cohort: CRV-only SPECIALIST (OI-price divergence + R-FADE gate).
+
+Cycle-7 SPECIALIST-MINE N/N. Symbol selected via REFORMED SELECTION RULE:
+prefer symbols with the MOST NEGATIVE trivial-momentum Sharpe (IS-only).
+CRV trivial-momentum IS Sharpe: negative (ML has room to add edge).
+
+Axis family: feature-family (ADD oi_price_divergence_30; OI-price divergence z-score,
+re-aimed from /083 rank-7/11 OI family toward NEGATIVE-baseline CRVUSDT).
++ risk-primitive (R-FADE: OI-divergence-conditional confidence gate).
+
+NEW feature: oi_price_divergence_30 — OI-price direction divergence z-score (30-bar
+  delta, 90-bar z-score). V1_FEATURE_COLUMNS_PRUNED extended: 48 → 49 cols.
+NEW risk: enable_oi_divergence_fade_gate=True (CRVUSDT specialist only) — post-aggregator
+  stateless confidence gate: VETO entry when sign(signal) opposes sign(oi_price_divergence_30)
+  AND |oi_price_divergence_30| > fade_z (default 2.0, IS-calibrated pre-registered).
+
+Methodology constants HELD per 2026-06-06 directive:
+    50 inner seeds × 30 Optuna trials × specialist_mode=True
+    49-col V1_FEATURE_COLUMNS_PRUNED (NEW 49-col hash after parquet regen)
+    R3=ON-SHARED cutoff=0.70, R5=ON vt_target_vol=0.3, mean-of-signed-weights aggregator.
+    R1=OFF (CATALOG-CLOSED for SPECIALIST_mode; f81cafc3).
+    R2=OFF (Model A wrapper — matches /064 ETH, /065 BTC, /075 ATOM, /076 AAVE).
+    ATR cell: (2.9, 1.45) [vol-class match for CRV ~100-130% IS vol, ETH-class].
+
+Data extent: CRVUSDT 8h klines; OI cache data/open_interest/CRVUSDT/8h.csv (4954 rows).
+NaN notes: dot_vs_btc_ret_ratio_30 + eth_vs_btc_ret_ratio_30 ALL-NaN for CRV
+(SYMBOL-conditional; LightGBM NaN-handles natively).
+long_short_zscore_30 + oi_delta_30_z90: some NaN early in IS window (OI archive start).
+
+HIGH-RISK declaration: universe substitution (new symbol) changes Optuna training-objective
+domain. Mitigation: 50-inner-seed averaging (σ_pop ≤ 0.30 gate).
+
+LOCAL to runner constant. NOT shared; CONFIRMATION-MERGE updates V1_BASELINE_UNIVERSE.
+assert set(symbols) == {"CRVUSDT"} guard fires in dispatch branch.
+assert "oi_price_divergence_30" in active_feature_columns guard fires in dispatch branch.
+assert len(active_feature_columns) == 49 guard fires in dispatch branch.
+"""
+
+
 V1_ITER065_UNIVERSE: tuple[str, ...] = ("BTCUSDT",)
 """iter-v1/065 cohort: BTC-only SPECIALIST (third SPECIALIST under SPECIALIST + BUNDLE methodology).
 
@@ -851,6 +897,7 @@ __all__ = [
     "V1_ITER074_UNIVERSE",
     "V1_ITER075_UNIVERSE",
     "V1_ITER076_UNIVERSE",
+    "V1_ITER084_UNIVERSE",
     # iter-v1/023: funding-rate feature family (add_funding_v1_features imported on demand)
     # iter-v1/025: OI delta feature family (add_oi_delta_v1_features imported on demand)
     # iter-v1/040: composed feature family (add_composed_v1_features imported on demand)

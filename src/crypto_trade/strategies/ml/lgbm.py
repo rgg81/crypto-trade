@@ -246,6 +246,15 @@ class LightGbmStrategy:
         mid_bull_short_veto_lo: float = 0.20,
         mid_bull_short_veto_hi: float = 0.50,
         mid_bull_short_veto_lookback: int = 270,
+        # iter-v1/084: R-FADE — OI-divergence-conditional confidence gate.
+        # When True, entry is VETOED when sign(signal) OPPOSES sign(oi_price_divergence_30[t])
+        # AND |oi_price_divergence_30[t]| > fade_z (IS-calibrated, pre-registered).
+        # Reuses the AXIS-R /074 gate pattern: post-aggregator, stateless, identical in
+        # backtest and live (parity-clean). Default False = BIT-IDENTICAL to all prior runs.
+        # ONLY enabled in the CRV specialist cell (iter-v1/084 dispatch).
+        enable_oi_divergence_fade_gate: bool = False,
+        oi_divergence_fade_z: float = 2.0,  # pre-registered IS-calibrated threshold
+        oi_divergence_fade_column: str = "oi_price_divergence_30",
     ) -> None:
         if not feature_columns:
             raise ValueError(
@@ -405,6 +414,16 @@ class LightGbmStrategy:
         self._close_by_sym: dict[str, tuple[np.ndarray, np.ndarray]] = {}
         # Veto event log: list of (symbol, open_time_ms, ret_270b) for F-AXIS-COUNTERFACTUAL audit.
         self._axis_r_veto_log: list[dict] = []
+        # iter-v1/084: R-FADE — OI-divergence-conditional confidence gate.
+        # Enabled via enable_oi_divergence_fade_gate=True (CRV specialist cell only).
+        # fade_z: |oi_price_divergence_30| threshold (default 2.0; IS-calibrated pre-registered).
+        # fade_column: name of the divergence feature column (default "oi_price_divergence_30").
+        # Stateless post-aggregator gate; does NOT change Optuna training-objective domain.
+        self._enable_oi_divergence_fade_gate: bool = bool(enable_oi_divergence_fade_gate)
+        self._oi_divergence_fade_z: float = float(oi_divergence_fade_z)
+        self._oi_divergence_fade_column: str = str(oi_divergence_fade_column)
+        # R-FADE event log: list of dicts for IS calibration audit.
+        self._oi_divergence_fade_log: list[dict] = []
         # iter-v3/072: labeling mode — "triple_barrier" (default, backward-compat)
         # or "fixed_horizon" (sign of N-candle-forward return; no barriers).
         # iter-v3/105: "trend_scanning" (OLS trend, max-|t| horizon selection
@@ -1888,6 +1907,91 @@ class LightGbmStrategy:
             return Signal(direction=0, weight=0)
         return signal
 
+    def _apply_oi_divergence_fade_gate(
+        self,
+        signal: Signal,
+        feat_row: np.ndarray,
+        symbol: str,
+        open_time: int,
+    ) -> Signal:
+        """Apply R-FADE OI-divergence-conditional confidence gate (iter-v1/084).
+
+        Gate fires when:
+          |oi_price_divergence_30[t]| > fade_z
+          AND sign(signal.direction) OPPOSES sign(oi_price_divergence_30[t])
+
+        When OI divergence contradicts the trade direction with sufficient strength,
+        the entry is VETOED (returns NO_SIGNAL). State-free, post-aggregator.
+
+        Logic:
+          oi_div > 0 means sign(OI_delta) > sign(price_ret) — OI building against price.
+          oi_div < 0 means sign(OI_delta) < sign(price_ret) — OI retreating with price.
+          FADE fires when trade direction AGREES with price direction but OPPOSES OI.
+          Concretely:
+            - signal.direction == +1 (long) AND oi_div < -fade_z (OI retreating, bearish)
+            - signal.direction == -1 (short) AND oi_div > +fade_z (OI building, bullish)
+
+        Args:
+            signal: Aggregated signal from the specialist mean-of-signed-weights.
+            feat_row: Feature vector numpy array (aligned with _selected_cols).
+            symbol: Trading symbol.
+            open_time: Candle open_time in epoch milliseconds.
+
+        Returns:
+            Original signal if gate does not fire, or Signal(direction=0, weight=0).
+        """
+        if not self._enable_oi_divergence_fade_gate:
+            return signal
+        if signal.direction == 0:
+            return signal
+
+        # Look up the OI divergence value from the feature row.
+        col_name = self._oi_divergence_fade_column
+        try:
+            col_idx = self._selected_cols.index(col_name)
+        except ValueError:
+            # Column not in feature set — gate cannot fire (graceful degradation).
+            return signal
+
+        oi_div_val = float(feat_row[col_idx])
+        if not np.isfinite(oi_div_val):
+            # NaN/inf — cannot evaluate gate; pass through (conservative).
+            return signal
+
+        fade_z = self._oi_divergence_fade_z
+        # Gate fires when signal direction OPPOSES OI divergence direction strongly.
+        # oi_div > 0 means OI building vs price (bullish OI signal).
+        # oi_div < 0 means OI retreating vs price (bearish OI signal).
+        # FADE: veto LONG when oi_div < -fade_z (bearish OI signal contradicts long).
+        #       veto SHORT when oi_div > +fade_z (bullish OI signal contradicts short).
+        gate_fires = (signal.direction == 1 and oi_div_val < -fade_z) or (
+            signal.direction == -1 and oi_div_val > fade_z
+        )
+        if gate_fires:
+            from crypto_trade import decision_log
+
+            event = {
+                "kind": "oi_divergence_fade_gate",
+                "symbol": symbol,
+                "ot": open_time,
+                "oi_div_val": oi_div_val,
+                "fade_z": fade_z,
+                "signal_direction_pre_fade": signal.direction,
+                "signal_weight_pre_fade": signal.weight,
+            }
+            decision_log.log(event)
+            self._oi_divergence_fade_log.append(
+                {
+                    "symbol": symbol,
+                    "open_time": open_time,
+                    "oi_div_val": oi_div_val,
+                    "direction_pre_fade": signal.direction,
+                    "weight_pre_fade": signal.weight,
+                }
+            )
+            return Signal(direction=0, weight=0)
+        return signal
+
     def get_signal(self, symbol: str, open_time: int) -> Signal:
         """Return signal for one candle. Always predicts 1 or -1."""
         # Detect month change → lazy training
@@ -2042,6 +2146,30 @@ class LightGbmStrategy:
                         "ensemble_std": _ensemble_std,
                         "direction_pre_veto": _sp_direction,
                         "decision": "vetoed:axis_r_mid_bull_short",
+                    }
+                )
+                return NO_SIGNAL
+
+            # iter-v1/084: R-FADE — OI-divergence-conditional confidence gate.
+            # Applied AFTER AXIS-R veto and BEFORE R3 OOD / R5 vol-target call-sites.
+            # Stateless post-aggregator gate: VETO entry when OI-price divergence
+            # strongly contradicts the trade direction.
+            _sp_signal = self._apply_oi_divergence_fade_gate(
+                _sp_signal, feat_row, symbol, open_time
+            )
+            if _sp_signal.direction == 0:
+                # R-FADE gate fired — log and return NO_SIGNAL.
+                decision_log.log(
+                    {
+                        "kind": "lgbm_signal",
+                        "symbol": symbol,
+                        "ot": open_time,
+                        "month": candle_month,
+                        "specialist_seeds": len(self._specialist_models),
+                        "final_signed": _final_signed,
+                        "ensemble_std": _ensemble_std,
+                        "direction_pre_fade": _sp_direction,
+                        "decision": "vetoed:oi_divergence_fade_gate",
                     }
                 )
                 return NO_SIGNAL

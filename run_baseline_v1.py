@@ -93,6 +93,7 @@ from crypto_trade.features_v1 import (
     V1_ITER074_UNIVERSE,
     V1_ITER075_UNIVERSE,
     V1_ITER076_UNIVERSE,
+    V1_ITER084_UNIVERSE,
     V1_OOD_FEATURE_COLUMNS,
     assert_v1_universe,
 )
@@ -7632,6 +7633,180 @@ def main() -> None:
         _r5_model_results = [results_e076]
         _post_dispatch_fi_strategies = [("Model_A_AAVE_specialist_076", _strat_e076)]
 
+    elif iteration_label == "v1-084" and set(symbols) == set(V1_ITER084_UNIVERSE):
+        # iter-v1/084: CRVUSDT SPECIALIST — OI-price divergence + R-FADE gate.
+        # Cycle-7 SPECIALIST-MINE N/N. Symbol selected via REFORMED SELECTION RULE:
+        # prefer symbols with the MOST NEGATIVE trivial-momentum Sharpe (IS-only).
+        # CRV trivial-momentum IS Sharpe: negative → ML has room to add edge.
+        #
+        # TWO-CHANGE iteration (NEW FEATURE + NEW RISK; brief Section 0.5):
+        #   (a) NEW feature oi_price_divergence_30 added to V1_FEATURE_COLUMNS_PRUNED (48 → 49).
+        #       Re-aimed from /083 rank-7/11 OI family toward NEGATIVE-baseline CRVUSDT.
+        #   (b) NEW risk enable_oi_divergence_fade_gate=True — post-aggregator stateless gate:
+        #       VETO entry when sign(signal) OPPOSES sign(oi_price_divergence_30) AND
+        #       |oi_price_divergence_30| > fade_z=2.0 (IS-calibrated, pre-registered).
+        #
+        # SPECIALIST + BUNDLE design (same as /075+/076):
+        #   - 50 independent Optuna studies, one per seed (V1_SPECIALIST_SEEDS: 42..91)
+        #   - Each study: n_trials=V1_SPECIALIST_OPTUNA_TRIALS=30, ENSEMBLE_SIZE=1
+        #   - LightGBM HP search: max_depth=5 FIXED, num_leaves=31 FIXED
+        #   - confidence_threshold Optuna-tunable per seed (range [0.50, 0.85])
+        #   - Aggregator at inference: mean-of-signed-weights across 50 seeds
+        #
+        # Wall-clock mitigation (same as /075+/076):
+        #   - n_estimators upper bound = 500
+        #   - n_startup_trials = 10
+        #
+        # Risk config (Model A wrapper — R1=OFF, R2=OFF):
+        #   R1=OFF   CATALOG-CLOSED for SPECIALIST_mode (f81cafc3)
+        #   R2=OFF   Model A baseline (matches /064+/065+/075+/076)
+        #   R3=ON    Mahalanobis OOD gate, cutoff=0.70, 16 scale-invariant features;
+        #            applied at AGGREGATOR level (NOT per-seed)
+        #   R5=ON    vt_target_vol=0.3, vt_lookback_days=45, vt_min_scale=0.33
+        #   R-FADE   enable_oi_divergence_fade_gate=True, oi_divergence_fade_z=2.0
+        #            (scoped to CRVUSDT only; pre-registered IS-calibrated threshold)
+        #   atr_tp=2.9, atr_sl=1.45 (Model A ETH cell; vol-class match for CRV ~100-130% IS vol)
+        #
+        # Feature set: V1_FEATURE_COLUMNS_PRUNED (49 cols, with NEW oi_price_divergence_30).
+        # NaN notes: dot_vs_btc_ret_ratio_30 + eth_vs_btc_ret_ratio_30 ALL-NaN for CRV
+        #   (SYMBOL-conditional; LightGBM handles NaN natively; 2/49 wasted slots).
+        # HIGH-RISK: universe substitution changes Optuna training-objective domain.
+        # Mitigation: 50-INNER-seed averaging (σ_pop ≤ 0.30 gate).
+        #
+        # LOAD-BEARING: specialist_dispersion.csv persistence (matching /065+/074+/075+/076).
+        assert set(symbols) == {"CRVUSDT"}, (
+            f"iter-v1/084 guard: expected {{CRVUSDT}}, got {set(symbols)}"
+        )
+        assert len(active_feature_columns) == 49, (
+            f"iter-v1/084 guard: expected 49 cols (48 base + oi_price_divergence_30), "
+            f"got {len(active_feature_columns)}. "
+            "If len != 49: check --pruned-features was passed to the runner."
+        )
+        assert "oi_price_divergence_30" in active_feature_columns, (
+            "iter-v1/084 guard: oi_price_divergence_30 must be in active_feature_columns. "
+            "V1_FEATURE_COLUMNS_PRUNED must include the new OI-price divergence feature."
+        )
+        print(
+            f"[iter-v1/084] CRV SPECIALIST — OI-price divergence + R-FADE gate: "
+            f"V1_SPECIALIST_SEED_COUNT={V1_SPECIALIST_SEED_COUNT} "
+            f"V1_SPECIALIST_OPTUNA_TRIALS={V1_SPECIALIST_OPTUNA_TRIALS} "
+            f"specialist_mode=True "
+            f"max_depth=5 FIXED, num_leaves=31 FIXED. "
+            f"R1=OFF (CATALOG-CLOSED; f81cafc3), R2=OFF, "
+            f"R3=ON-SHARED cutoff=0.70, R5=ON vt_target_vol=0.3. "
+            f"R-FADE=ON oi_divergence_fade_z=2.0 (CRV specialist; IS-calibrated pre-registered). "
+            f"features=V1_FEATURE_COLUMNS_PRUNED (49 cols; NEW oi_price_divergence_30). "
+            f"atr_tp=2.9, atr_sl=1.45 (Model A ETH cell; vol-class match CRV ~100-130% IS vol). "
+            f"NaN: dot_vs_btc_ret_ratio_30+eth_vs_btc_ret_ratio_30 ALL-NaN (SYMBOL-cond; OK). "
+            f"n_estimators_max=500 (wall-clock). n_startup_trials=10 (wall-clock). "
+            f"Aggregator: mean-of-signed-weights across {V1_SPECIALIST_SEED_COUNT} seeds. "
+            f"LOAD-BEARING: specialist_dispersion.csv will be persisted post-backtest."
+        )
+        _config_e084 = BacktestConfig(
+            symbols=("CRVUSDT",),
+            interval="8h",
+            max_amount_usd=1000.0,
+            stop_loss_pct=2.9,  # ATR-based; overridden by atr_sl_multiplier=1.45
+            take_profit_pct=5.8,  # ATR-based; overridden by atr_tp_multiplier=2.9
+            timeout_minutes=10080,
+            fee_pct=0.1,
+            data_dir=Path("data"),
+            cooldown_candles=2,
+            vol_targeting=True,
+            vt_target_vol=0.3,
+            vt_lookback_days=45,
+            vt_min_scale=0.33,
+            vt_max_scale=2.0,
+            risk_consecutive_sl_limit=0,  # R1=OFF: CATALOG-CLOSED for SPECIALIST_mode
+            risk_consecutive_sl_cooldown_candles=0,
+            risk_drawdown_scale_enabled=False,  # R2=OFF: Model A baseline
+            risk_r5_vol_target_enabled=_r5_kwargs.get("r5_vol_target_enabled", True),
+            risk_r5_vol_target_pct=_r5_kwargs.get("r5_vol_target_pct", 4.0),
+            risk_r5_kill_low_natr_enabled=_r5_kwargs.get("r5_kill_low_natr_enabled", False),
+            risk_r5_kill_low_natr_min_pct=_r5_kwargs.get("r5_kill_low_natr_min_pct", 2.0),
+        )
+        _strat_e084 = LightGbmStrategy(
+            training_months=24,
+            n_trials=V1_SPECIALIST_OPTUNA_TRIALS,  # informational; specialist loop controls
+            cv_splits=5,
+            label_tp_pct=5.8,
+            label_sl_pct=2.9,
+            label_timeout_minutes=10080,
+            fee_pct=0.1,
+            features_dir="data/features",
+            verbose=1,
+            atr_tp_multiplier=2.9,
+            atr_sl_multiplier=1.45,
+            use_atr_labeling=True,
+            # placeholder seed — specialist_mode uses V1_SPECIALIST_SEEDS internally
+            ensemble_seeds=list(V1_SPECIALIST_SEEDS[:1]),
+            feature_columns=active_feature_columns,
+            ood_enabled=True,  # R3 ON at AGGREGATOR level (SHARED — UNCHANGED from /076)
+            ood_features=list(V1_OOD_FEATURE_COLUMNS),
+            ood_cutoff_pct=0.70,
+            oof_persist_path=OOF_PARQUET_PATH,
+            bounds_profile="v1_specialist",
+            specialist_mode=True,
+            specialist_n_startup_trials=10,
+            specialist_n_estimators_max=500,
+            # R-FADE: OI-divergence-conditional confidence gate (CRV specialist only)
+            enable_oi_divergence_fade_gate=True,
+            oi_divergence_fade_z=2.0,  # IS-calibrated pre-registered threshold (FROZEN)
+            oi_divergence_fade_column="oi_price_divergence_30",
+        )
+        import time as _time_084  # noqa: PLC0415
+
+        _t0_084 = _time_084.time()
+        results_e084 = run_backtest(_config_e084, _strat_e084, yearly_pnl_check=False)
+        _elapsed_084 = _time_084.time() - _t0_084
+        faxm_e084 = _strat_e084._faxm_log
+        print(
+            f"\n[iter-v1/084] Model_A_CRV_specialist_084 complete: "
+            f"{len(results_e084)} trades in {_elapsed_084:.0f}s "
+            f"({_elapsed_084 / 3600:.2f}h)"
+        )
+
+        # Cohort isolation sanity: assert ONLY CRVUSDT trades emitted.
+        _e084_symbols = {r.symbol for r in results_e084}
+        assert _e084_symbols.issubset({"CRVUSDT"}), (
+            f"[iter-v1/084] Model A_CRV produced non-CRV results: "
+            f"{_e084_symbols - {'CRVUSDT'}}. "
+            "Per-cohort isolation failed — iter-v1/084 must trade CRVUSDT ONLY."
+        )
+
+        # -----------------------------------------------------------------
+        # LOAD-BEARING: specialist_dispersion.csv persistence (matching /065+/074+/075+/076).
+        # -----------------------------------------------------------------
+        _disp_mean_e084 = _strat_e084.get_specialist_dispersion_mean()
+        _disp_is_path_e084 = (
+            Path(reports_dir) / "iteration_v1-084" / "in_sample" / "specialist_dispersion.csv"
+        )
+        _disp_is_path_e084.parent.mkdir(parents=True, exist_ok=True)
+        _strat_e084.persist_specialist_dispersion_csv(str(_disp_is_path_e084))
+        print(
+            f"[iter-v1/084] LOAD-BEARING dispersion patch: "
+            f"specialist_dispersion_mean={_disp_mean_e084} "
+            f"specialist_dispersion.csv → {_disp_is_path_e084}"
+        )
+        # Store for post-report block (specialist_dispersion_mean appended to comparison.csv
+        # AFTER generate_iteration_reports() runs — comparison.csv written there).
+        _e084_disp_mean = _disp_mean_e084
+        _e084_disp_csv_path = _disp_is_path_e084
+
+        print(
+            f"[iter-v1/084] Dispatch verified: "
+            f"CRV-only={len(results_e084)} trades. "
+            f"R1=OFF/R2=OFF/R3=ON-AGGREGATOR-LEVEL/R-FADE=ON(fade_z=2.0). "
+            f"SPECIALIST seeds={len(_strat_e084._specialist_models)} trained. "
+            f"sigma_pop mean={_disp_mean_e084}. "
+            f"R-FADE events={len(_strat_e084._oi_divergence_fade_log)}"
+        )
+
+        _all_faxm_logs = faxm_e084
+        all_results = results_e084
+        _r5_model_results = [results_e084]
+        _post_dispatch_fi_strategies = [("Model_A_CRV_specialist_084", _strat_e084)]
+
     elif iteration_label == "v1-044":
         # iter-v1/044: CONFIRMATION-MERGE-PORTFOLIO (cycle-5 CONFIRMATION 1/1).
         # 3-component bundle: BASELINE_V1 (w=0.50) + /036 (w=0.30) + /043 (w=0.20).
@@ -8912,6 +9087,52 @@ def main() -> None:
         if _strat_076_ref is not None:
             _strat_076_ref.persist_specialist_dispersion_csv(str(_oos_disp_path_076))
             print(f"[iter-v1/076] OOS specialist_dispersion.csv persisted → {_oos_disp_path_076}")
+
+    # -------------------------------------------------------------------------
+    # iter-v1/084: specialist_dispersion_mean + OOS specialist_dispersion.csv + R-FADE count
+    # → comparison.csv. Mirrors the /065+/074+/075+/076 pattern.
+    # Guard: only runs when _e084_disp_mean is defined (v1-084 dispatch sets it).
+    # -------------------------------------------------------------------------
+    if iteration_label == "v1-084" and "_e084_disp_mean" in dir():
+        _disp_mean_val_084 = locals().get("_e084_disp_mean")
+        if _disp_mean_val_084 is not None:
+            import csv as _csv_084  # noqa: PLC0415
+
+            _comp_csv_084 = report_dir / "comparison.csv"
+            if _comp_csv_084.exists():
+                with _comp_csv_084.open("a", newline="") as _fh_084:
+                    _writer_084 = _csv_084.writer(_fh_084)
+                    _writer_084.writerow(["specialist_dispersion_mean", _disp_mean_val_084, "", ""])
+                    # Persist R-FADE gate event count for IS calibration audit.
+                    _strat_084_ref_log = next(
+                        (s for _, s in _post_dispatch_fi_strategies if "CRV_specialist_084" in _),
+                        None,
+                    )
+                    _rfade_count = (
+                        len(_strat_084_ref_log._oi_divergence_fade_log)
+                        if _strat_084_ref_log is not None
+                        else 0
+                    )
+                    _writer_084.writerow(["oi_divergence_fade_gate_count", _rfade_count, "", ""])
+                print(
+                    f"[iter-v1/084] LOAD-BEARING: specialist_dispersion_mean="
+                    f"{_disp_mean_val_084:.4f} appended to {_comp_csv_084}"
+                )
+            else:
+                print(
+                    f"[iter-v1/084] WARNING: comparison.csv not found at {_comp_csv_084}; "
+                    f"specialist_dispersion_mean={_disp_mean_val_084:.4f} NOT appended."
+                )
+        # Persist OOS specialist_dispersion.csv (F-AXIS #2 audit; matching /065+/074+/075+/076).
+        _oos_disp_path_084 = report_dir / "out_of_sample" / "specialist_dispersion.csv"
+        _oos_disp_path_084.parent.mkdir(parents=True, exist_ok=True)
+        _strat_084_ref = next(
+            (s for _, s in _post_dispatch_fi_strategies if "CRV_specialist_084" in _),
+            None,
+        )
+        if _strat_084_ref is not None:
+            _strat_084_ref.persist_specialist_dispersion_csv(str(_oos_disp_path_084))
+            print(f"[iter-v1/084] OOS specialist_dispersion.csv persisted → {_oos_disp_path_084}")
 
     # -------------------------------------------------------------------------
     # iter-v1/021+: write feature importance CSVs (post-dispatch).

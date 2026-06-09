@@ -1,5 +1,6 @@
 """v1 open-interest delta features — iter-v1/025 (feature-family EXPLORATION #10/10 cycle-3).
 iter-v1/058: added ``btc_oi_delta_5_z30`` (5-bar delta, 30-bar z-score; short-window companion).
+iter-v1/084: added ``oi_price_divergence_30`` (OI-price divergence z-score; CRV specialist).
 
 Track-isolated: ZERO imports from crypto_trade.features_v2 or crypto_trade.features_v3.
 The OI compute math is COPIED (not imported) from the v3 derivatives panel logic to
@@ -22,6 +23,19 @@ Features exported:
     Computed for ALL symbols (universal, not BTC-only), but only BTCUSDT is traded
     in /058 cohort. LightGBM handles NaN natively for non-BTC symbols.
     Burn-in: first 5 + 30 = 35 rows NaN (shorter than oi_delta_30_z90's 120 rows).
+  - ``oi_price_divergence_30``: OI-price divergence z-score. iter-v1/084 NEW feature.
+    Captures when OI and price DISAGREE on direction — signals crowding/squeeze risk.
+    Hypothesis: when OI is rising but price is falling (OI-longs getting squeezed) or
+    OI is falling but price rising (deleveraging rally), ML has edge vs trend-follower.
+    Computation (all components past-only via .shift(1)):
+      oi_delta_30 = sum_open_interest.pct_change(30)
+      ret_30 = log(close).diff(30)
+      div_raw = sign(oi_delta_30) - sign(ret_30)   ∈ {-2, 0, +2}
+      oi_price_divergence_30 = z90(div_raw).shift(1)  where z90 = (x - rmean_90) / rstd_90
+    Intermediate columns (oi_delta_30, ret_30, div_raw) NOT added to feature set;
+    registered as NON_FEATURE intermediates.
+    NaN warmup: ~120 bars (30 for delta + 90 for z-score).
+    LightGBM handles NaN natively. Clip: [-10, +10] (same as other OI features).
 
 Data source:
     ``data/open_interest/<SYMBOL>/8h.csv`` — cached CSV from /fapi/v1/openInterest.
@@ -59,14 +73,16 @@ Skip-month NaN policy (LM Master §5(a) ADOPTED):
 Outlier clipping:
     oi_delta_30: clipped to [-1.0, +5.0] (BTC OI floor approx; -100% = full unwind).
     oi_delta_5:  clipped to [-1.0, +5.0] (same clip convention as oi_delta_30).
-    oi_delta_30_z90:     clipped to [-10, +10] to prevent LightGBM training instability.
-    btc_oi_delta_5_z30:  clipped to [-10, +10] (same convention).
+    oi_delta_30_z90:           clipped to [-10, +10] to prevent LightGBM training instability.
+    btc_oi_delta_5_z30:        clipped to [-10, +10] (same convention).
+    oi_price_divergence_30:    clipped to [-10, +10] (same convention).
 
 Burn-in:
     - oi_delta_30: first 30 rows NaN (lookback warm-up)
     - oi_delta_30_z90: first 30 + 90 = 120 rows NaN (delta warm-up + z-score warm-up)
     - oi_delta_5:  first 5 rows NaN (lookback warm-up)  (iter-v1/058)
     - btc_oi_delta_5_z30: first 5 + 30 = 35 rows NaN    (iter-v1/058)
+    - oi_price_divergence_30: first 30 + 90 = 120 rows NaN (same as oi_delta_30_z90)  (iter-v1/084)
 
 Track isolation enforcement:
     Phase 6.0 pre-flight Critic verifies:
@@ -97,6 +113,10 @@ OI_ZSCORE_CLIP: float = 10.0  # z-score clip (same as funding_v1 convention)
 
 # Column name for the iter-v1/058 short-window feature
 OI_DELTA_5_Z30_COLUMN: str = "btc_oi_delta_5_z30"
+
+# iter-v1/084: OI-price divergence z-score constants
+OI_PRICE_DIV_ZSCORE_WINDOW: int = 90  # 30-day z-score window (matches OI_ZSCORE_WINDOW)
+OI_PRICE_DIV_COLUMN: str = "oi_price_divergence_30"
 
 # Default data directory for OI cache
 _DEFAULT_DATA_DIR: Path = Path("data")
@@ -396,6 +416,143 @@ def add_oi_delta_5_z30_feature(
     return df
 
 
+def add_oi_price_divergence_30_feature(
+    df: pd.DataFrame,
+    data_dir: Path | str = _DEFAULT_DATA_DIR,
+    delta_window: int = OI_DELTA_LOOKBACK,
+    zscore_window: int = OI_PRICE_DIV_ZSCORE_WINDOW,
+    zscore_clip: float = OI_ZSCORE_CLIP,
+) -> pd.DataFrame:
+    """Load cached OI data for ``df``'s symbol and add oi_price_divergence_30 column.
+
+    iter-v1/084: OI-price direction divergence z-score.
+    Captures the disagreement between OI delta direction and price return direction
+    over a 30-bar (10-day) horizon, normalized via a 90-bar (30-day) z-score window.
+
+    Parameters
+    ----------
+    df:
+        Kline DataFrame with ``symbol``, ``open_time`` (ms int), and ``close`` columns.
+    data_dir:
+        Root data directory (default ``data/``). Reads from
+        ``data_dir/open_interest/<SYMBOL>/8h.csv``.
+    delta_window:
+        Lookback for OI % change and log-return (default 30 bars = ~10 days at 8h).
+    zscore_window:
+        Rolling window for z-score normalization (default 90 bars = ~30 days).
+    zscore_clip:
+        Absolute clip for the z-score output (default 10.0).
+
+    Returns
+    -------
+    pd.DataFrame
+        Input df (copy) with ``oi_price_divergence_30`` column appended.
+        Intermediate columns (oi_delta_30, ret_30, div_raw) are NOT retained.
+        Rows where OI data is absent get NaN.
+        First (delta_window + zscore_window - 1) rows are NaN by construction.
+
+    Raises
+    ------
+    FileNotFoundError
+        If the OI cache for the symbol does not exist.
+    KeyError
+        If ``df`` does not contain ``symbol`` or ``close`` columns.
+
+    Notes
+    -----
+    Look-ahead discipline (all components past-only):
+    - oi_delta_30[t] uses .pct_change(delta_window) — bar t vs bar t-30, past-only.
+    - ret_30[t] = log(close[t]) - log(close[t-30]) via .diff(delta_window), past-only.
+    - div_raw[t] = sign(oi_delta_30[t]) - sign(ret_30[t])  ∈ {-2, 0, +2}
+    - z-score uses s_shifted = div_raw.shift(1): at bar t, rolling stats see only
+      bars t-zscore_window…t-1 (NOT bar t itself) — additional past-only guard.
+    - Final output = z-scored div_raw with extra .shift(1) so that bar t's feature
+      uses at most bars up to t-1 in both the divergence and the z-score stats.
+
+    NON_FEATURE intermediates (oi_delta_30, ret_30, div_raw): these intermediate
+    values are computed internally and discarded. They must NOT appear as model
+    feature columns per brief Section 3 (registered in NON_FEATURE_COLUMNS contract).
+    """
+    data_dir = Path(data_dir)
+
+    if "symbol" not in df.columns:
+        raise KeyError(
+            "df must contain a 'symbol' column for oi_price_divergence_30 feature. "
+            "Set df['symbol'] = '<SYMBOL>' before calling add_oi_price_divergence_30_feature."
+        )
+    if "close" not in df.columns:
+        raise KeyError("df must contain a 'close' column for oi_price_divergence_30 feature.")
+
+    symbol = df["symbol"].iloc[0]
+    oi_path = data_dir / "open_interest" / symbol / "8h.csv"
+
+    if not oi_path.exists():
+        raise FileNotFoundError(
+            f"OI cache not found: {oi_path}. "
+            f"Run: uv run crypto-trade fetch-oi --symbols {symbol} --intervals 8h"
+        )
+
+    oi_df = pd.read_csv(oi_path)
+
+    if len(oi_df) == 0:
+        df = df.copy()
+        df[OI_PRICE_DIV_COLUMN] = np.nan
+        return df
+
+    # ------------------------------------------------------------------
+    # Align OI to kline frame via left-merge on open_time (ms int).
+    # Same pattern as add_oi_delta_v1_features to avoid index collisions.
+    # ------------------------------------------------------------------
+    df = df.copy()
+    df["_oidiv_merge_key"] = df["open_time"].astype("int64")
+
+    oi_df_keyed = oi_df[["open_time", "sum_open_interest"]].copy()
+    oi_df_keyed["_oidiv_merge_key"] = oi_df_keyed["open_time"].astype("int64")
+
+    merged = df.merge(
+        oi_df_keyed[["_oidiv_merge_key", "sum_open_interest"]],
+        on="_oidiv_merge_key",
+        how="left",
+    ).drop(columns=["_oidiv_merge_key"])
+
+    merged.index = df.index
+    df = df.drop(columns=["_oidiv_merge_key"])
+
+    oi_series = merged["sum_open_interest"].astype(float)
+    close_series = df["close"].astype(float)
+
+    # Step 1: 30-bar OI % change (past-only: close[t] vs close[t-30])
+    denom = oi_series.shift(delta_window).replace(0, np.nan)
+    oi_delta_30 = ((oi_series - oi_series.shift(delta_window)) / denom).clip(
+        OI_DELTA_CLIP_LOW, OI_DELTA_CLIP_HIGH
+    )
+
+    # Step 2: 30-bar log return (past-only: log(close[t]) - log(close[t-30]))
+    log_close = np.log(close_series.replace(0, np.nan))
+    ret_30 = log_close.diff(delta_window)
+
+    # Step 3: direction divergence raw
+    # div_raw ∈ {-2, 0, +2} — nonzero only when OI and price disagree on direction
+    oi_sign = np.sign(oi_delta_30)
+    price_sign = np.sign(ret_30)
+    div_raw = oi_sign - price_sign
+
+    # Step 4: past-only 90-bar z-score of divergence
+    # shift(1): at bar t, rolling stats see only bars t-zscore_window…t-1 (NOT bar t itself)
+    s_shifted = div_raw.shift(1)
+    rmean = s_shifted.rolling(window=zscore_window, min_periods=zscore_window).mean()
+    rstd = s_shifted.rolling(window=zscore_window, min_periods=zscore_window).std(ddof=1)
+
+    zscore_raw = (div_raw - rmean) / rstd.replace(0, np.nan)
+    # Additional shift(1) ensures bar t's feature value uses only bars ≤ t-1
+    zscore_final = zscore_raw.shift(1).clip(-zscore_clip, zscore_clip)
+
+    df = df.copy()
+    df[OI_PRICE_DIV_COLUMN] = zscore_final.values
+
+    return df
+
+
 __all__ = [
     "OI_DELTA_LOOKBACK",
     "OI_ZSCORE_WINDOW",
@@ -405,7 +562,10 @@ __all__ = [
     "OI_DELTA_CLIP_HIGH",
     "OI_ZSCORE_CLIP",
     "OI_DELTA_5_Z30_COLUMN",
+    "OI_PRICE_DIV_ZSCORE_WINDOW",
+    "OI_PRICE_DIV_COLUMN",
     "compute_oi_delta_zscore",
     "add_oi_delta_v1_features",
     "add_oi_delta_5_z30_feature",
+    "add_oi_price_divergence_30_feature",
 ]
