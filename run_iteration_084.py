@@ -5,7 +5,8 @@ prefer symbols with the MOST NEGATIVE trivial-momentum Sharpe (IS-only).
 CRV trivial-momentum IS Sharpe: negative → ML has room to add edge.
 
 TWO-CHANGE iteration (NEW FEATURE + NEW RISK — both scoped to CRVUSDT specialist):
-    (a) NEW feature oi_price_divergence_30 added to V1_FEATURE_COLUMNS_PRUNED (48 → 49).
+    (a) NEW feature oi_price_divergence_30 in V1_ITER084_FEATURE_COLUMNS (LOCAL; 49 cols).
+        Global V1_FEATURE_COLUMNS_PRUNED stays at 48 (one-variable-at-a-time; CRV-local only).
         Re-aimed from /083 rank-7/11 OI family toward NEGATIVE-baseline CRVUSDT.
         Compute (all components past-only via .shift(1)):
             oi_delta_30 = sum_open_interest.pct_change(30)
@@ -31,7 +32,7 @@ SPECIALIST-mode arguments for iter-v1/084:
     - min_child_samples REMOVED from search space (uses LGBM default 20)
     - n_estimators upper bound = 500 (wall-clock mitigation)
     - n_startup_trials = 10 (TPE warmup reduction)
-    - Feature set: V1_FEATURE_COLUMNS_PRUNED (49 cols: 48 base + oi_price_divergence_30)
+    - Feature set: V1_ITER084_FEATURE_COLUMNS (LOCAL; 49 cols = PRUNED 48 + oi_price_divergence_30)
     - Risk config: R1=OFF (CATALOG-CLOSED; f81cafc3), R2=OFF, R3=ON-SHARED cutoff=0.70,
                    R5=ON vt_target_vol=0.3, R-FADE=ON fade_z=2.0
     - atr_tp=2.9, atr_sl=1.45 (Model A ETH cell; vol-class match for CRV ~100-130% IS vol)
@@ -43,10 +44,11 @@ UNCHANGED from /076 methodology (single-bit family per mandate):
     - OOD R3=ON, R5=ON vt_target_vol=0.3
     - mean-of-signed-weights aggregator
 
-PARQUET REGENERATION REQUIRED:
-    V1_FEATURE_COLUMNS_PRUNED extended 48 → 49 (NEW: oi_price_divergence_30).
-    Pre-feature hash (old 48-col parquet): e0292892e28a0f51
-    Post-feature hash (new 49-col parquet): 274348d5eb93f9d6
+PARQUET REGENERATION REQUIRED (CRVUSDT only; other symbols unchanged):
+    V1_ITER084_FEATURE_COLUMNS (LOCAL 49 cols) used for CRVUSDT specialist cell.
+    Global V1_FEATURE_COLUMNS_PRUNED stays 48 — DOT/ETH/BTC/AAVE parquets UNCHANGED.
+    Pre-feature hash (old 48-col CRVUSDT parquet): e0292892e28a0f51
+    Post-feature hash (new 49-col CRVUSDT parquet): 274348d5eb93f9d6
 
 Sacred constants (DO NOT CHANGE):
     OOS_CUTOFF_MS = 1742774400000  (2025-03-24 00:00 UTC)

@@ -3,9 +3,10 @@
 Covers:
 1. V1_ITER084_UNIVERSE constant: importable, correct symbol, in __all__.
 2. run_iteration_084.py: importable, ITERATION_LABEL=="v1-084", ITERATION_NUMBER==84.
-3. Methodology constants: 49-col count (CHANGED from 48), V1_SPECIALIST_SEED_COUNT=50,
-   V1_SPECIALIST_OPTUNA_TRIALS=30, seeds 42..91, OOS_CUTOFF_MS.
-4. oi_price_divergence_30 in V1_FEATURE_COLUMNS_PRUNED at alphabetically correct position.
+3. Methodology constants: V1_ITER084_FEATURE_COLUMNS=49 (LOCAL; global PRUNED stays 48),
+   V1_SPECIALIST_SEED_COUNT=50, V1_SPECIALIST_OPTUNA_TRIALS=30, seeds 42..91, OOS_CUTOFF_MS.
+4. oi_price_divergence_30 in V1_ITER084_FEATURE_COLUMNS (LOCAL) at alphabetically correct
+   position; NOT in global V1_FEATURE_COLUMNS_PRUNED (one-variable-at-a-time discipline).
 5. Dispatch presence: "v1-084" appears in run_baseline_v1.py source,
    references V1_ITER084_UNIVERSE, CRVUSDT, and Model_A_CRV_specialist_084.
 6. R-FADE gate: enable_oi_divergence_fade_gate parameter present in LightGbmStrategy.
@@ -14,7 +15,7 @@ Covers:
 9. R-FADE gate pass-through: does NOT fire when sign agrees.
 10. Feature computation: add_oi_price_divergence_30_feature returns correct column.
 11. Past-only invariant: oi_price_divergence_30 uses only past OI data.
-12. CRVUSDT parquet: has 49 columns from V1_FEATURE_COLUMNS_PRUNED.
+12. CRVUSDT parquet: has 49 columns from V1_ITER084_FEATURE_COLUMNS (LOCAL, not global PRUNED).
 13. Track isolation: no features_v2/features_v3 imports in open_interest_v1.py.
 14. V1_ITER084_UNIVERSE not in V1_EXCLUDED_SYMBOLS.
 """
@@ -91,36 +92,60 @@ def test_runner_import() -> None:
 
 
 def test_v1_feature_columns_pruned_49_cols() -> None:
-    """V1_FEATURE_COLUMNS_PRUNED must be 49 columns (48 base + oi_price_divergence_30)."""
-    from crypto_trade.features_v1 import V1_FEATURE_COLUMNS_PRUNED
+    """V1_ITER084_FEATURE_COLUMNS must be 49 columns (48 global PRUNED + oi_price_divergence_30).
 
-    assert len(V1_FEATURE_COLUMNS_PRUNED) == 49, (
-        f"V1_FEATURE_COLUMNS_PRUNED must have 49 cols at iter-v1/084; "
-        f"got {len(V1_FEATURE_COLUMNS_PRUNED)}. "
+    oi_price_divergence_30 is LOCAL to /084 — it is NOT in the global V1_FEATURE_COLUMNS_PRUNED
+    (which stays at 48 to avoid silently altering DOT/ETH/BTC/AAVE specialists).
+    The runner passes V1_ITER084_FEATURE_COLUMNS (49 cols) for the CRV specialist cell only.
+    """
+    from crypto_trade.features_v1 import V1_FEATURE_COLUMNS_PRUNED, V1_ITER084_FEATURE_COLUMNS
+
+    assert len(V1_FEATURE_COLUMNS_PRUNED) == 48, (
+        f"V1_FEATURE_COLUMNS_PRUNED (global) must stay at 48; got {len(V1_FEATURE_COLUMNS_PRUNED)}."
+        " iter-v1/084 feature is LOCAL-ONLY in V1_ITER084_FEATURE_COLUMNS."
+    )
+    assert len(V1_ITER084_FEATURE_COLUMNS) == 49, (
+        f"V1_ITER084_FEATURE_COLUMNS must have 49 cols at iter-v1/084; "
+        f"got {len(V1_ITER084_FEATURE_COLUMNS)}. "
         "Expected 48 base + oi_price_divergence_30 = 49."
     )
 
 
 def test_oi_price_divergence_30_in_feature_columns() -> None:
-    """oi_price_divergence_30 is in V1_FEATURE_COLUMNS_PRUNED."""
-    from crypto_trade.features_v1 import V1_FEATURE_COLUMNS_PRUNED
+    """oi_price_divergence_30 is in V1_ITER084_FEATURE_COLUMNS (LOCAL) but NOT in global PRUNED.
 
-    assert "oi_price_divergence_30" in V1_FEATURE_COLUMNS_PRUNED, (
-        "oi_price_divergence_30 must be in V1_FEATURE_COLUMNS_PRUNED at iter-v1/084"
+    The feature is LOCAL to the CRV specialist cell — keeping it out of the global PRUNED
+    prevents silently altering DOT/ETH/BTC/AAVE specialists (one-variable-at-a-time discipline).
+    """
+    from crypto_trade.features_v1 import V1_FEATURE_COLUMNS_PRUNED, V1_ITER084_FEATURE_COLUMNS
+
+    assert "oi_price_divergence_30" in V1_ITER084_FEATURE_COLUMNS, (
+        "oi_price_divergence_30 must be in V1_ITER084_FEATURE_COLUMNS at iter-v1/084"
+    )
+    assert "oi_price_divergence_30" not in V1_FEATURE_COLUMNS_PRUNED, (
+        "oi_price_divergence_30 must NOT be in global V1_FEATURE_COLUMNS_PRUNED "
+        "(LOCAL-ONLY per iter-v1/084 one-variable-at-a-time discipline)"
     )
 
 
 def test_oi_price_divergence_30_position_alphabetical() -> None:
-    """oi_price_divergence_30 is between oi_delta_30_z90 and regime_momentum_signed_5d."""
-    from crypto_trade.features_v1 import V1_FEATURE_COLUMNS_PRUNED
+    """oi_price_divergence_30 is the LAST element of V1_ITER084_FEATURE_COLUMNS.
 
-    cols = list(V1_FEATURE_COLUMNS_PRUNED)
-    idx_div = cols.index("oi_price_divergence_30")
-    idx_delta = cols.index("oi_delta_30_z90")
-    idx_regime = cols.index("regime_momentum_signed_5d")
-    assert idx_delta < idx_div < idx_regime, (
-        f"oi_price_divergence_30 (pos {idx_div}) must be between "
-        f"oi_delta_30_z90 (pos {idx_delta}) and regime_momentum_signed_5d (pos {idx_regime})"
+    V1_ITER084_FEATURE_COLUMNS = V1_FEATURE_COLUMNS_PRUNED + ("oi_price_divergence_30",)
+    so the new feature is appended at the end (position 48, 0-indexed), which is also
+    alphabetically correct relative to the global PRUNED tuple order.
+    The feature is NOT present in the global V1_FEATURE_COLUMNS_PRUNED.
+    """
+    from crypto_trade.features_v1 import V1_ITER084_FEATURE_COLUMNS
+
+    cols = list(V1_ITER084_FEATURE_COLUMNS)
+    assert cols[-1] == "oi_price_divergence_30", (
+        f"oi_price_divergence_30 must be the last element of V1_ITER084_FEATURE_COLUMNS; "
+        f"got last={cols[-1]!r}"
+    )
+    assert cols.index("oi_price_divergence_30") == 48, (
+        f"oi_price_divergence_30 must be at position 48 (0-indexed) in V1_ITER084_FEATURE_COLUMNS; "
+        f"got {cols.index('oi_price_divergence_30')}"
     )
 
 
@@ -555,19 +580,23 @@ def test_crvusdt_parquet_has_oi_price_divergence_30() -> None:
 
 
 def test_crvusdt_parquet_has_all_49_v1_feature_columns() -> None:
-    """CRVUSDT parquet contains all 49 V1_FEATURE_COLUMNS_PRUNED columns."""
+    """CRVUSDT parquet contains all 49 V1_ITER084_FEATURE_COLUMNS columns.
+
+    Uses the LOCAL 49-col set (V1_ITER084_FEATURE_COLUMNS = global PRUNED 48 +
+    oi_price_divergence_30) — not the global V1_FEATURE_COLUMNS_PRUNED (48 cols).
+    """
     parquet_path = (
         Path(__file__).parent.parent / "data" / "features" / "CRVUSDT_8h_features.parquet"
     )
     if not parquet_path.exists():
         pytest.skip(f"CRVUSDT parquet not found at {parquet_path}")
 
-    from crypto_trade.features_v1 import V1_FEATURE_COLUMNS_PRUNED
+    from crypto_trade.features_v1 import V1_ITER084_FEATURE_COLUMNS
 
-    df = pd.read_parquet(parquet_path, columns=list(V1_FEATURE_COLUMNS_PRUNED))
-    missing = [c for c in V1_FEATURE_COLUMNS_PRUNED if c not in df.columns]
+    df = pd.read_parquet(parquet_path, columns=list(V1_ITER084_FEATURE_COLUMNS))
+    missing = [c for c in V1_ITER084_FEATURE_COLUMNS if c not in df.columns]
     assert not missing, (
-        f"CRVUSDT parquet is missing {len(missing)} of 49 V1_FEATURE_COLUMNS_PRUNED columns:\n"
+        f"CRVUSDT parquet is missing {len(missing)} of 49 V1_ITER084_FEATURE_COLUMNS columns:\n"
         + "\n".join(f"  {c}" for c in missing)
     )
     assert len(df.columns) == 49
