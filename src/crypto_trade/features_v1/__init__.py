@@ -227,6 +227,23 @@ assert len(V1_ITER084_FEATURE_COLUMNS) == 49, (
     f"got {len(V1_ITER084_FEATURE_COLUMNS)}"
 )
 
+# iter-v1/085 LOCAL feature set: 48-col global PRUNED + 4 UNI-specialist mean-reversion features.
+# These 4 features are LOCAL to the UNI specialist cell — keeping them out of the global PRUNED
+# prevents silently altering DOT/ETH/BTC/AAVE/CRV specialists (one-variable-at-a-time rule).
+# The runner (run_iteration_085.py + run_baseline_v1.py "/v1-085" dispatch) overrides
+# active_feature_columns with this local tuple so that no other specialist sees the new features.
+V1_ITER085_FEATURE_COLUMNS: tuple[str, ...] = V1_FEATURE_COLUMNS_PRUNED + (
+    "rev_extension_z_3",
+    "rev_halflife_50",
+    "rev_vol_gate_signed",
+    "vol_state_z_natr_30",
+)
+
+assert len(V1_ITER085_FEATURE_COLUMNS) == 52, (
+    f"V1_ITER085_FEATURE_COLUMNS must have exactly 52 features "
+    f"(48 base + 4 new UNI-specialist); got {len(V1_ITER085_FEATURE_COLUMNS)}"
+)
+
 # Columns explicitly NOT in V1_FEATURE_COLUMNS_PRUNED but which may still appear in
 # legacy parquet files (from older iterations that included them). The runner must
 # NOT pick these up as training features.
@@ -725,6 +742,44 @@ assert len(active_feature_columns) == 49 guard fires in dispatch branch.
 """
 
 
+V1_ITER085_UNIVERSE: tuple[str, ...] = ("UNIUSDT",)
+"""iter-v1/085 cohort: UNIUSDT-only SPECIALIST — new feature-engineering set #1.
+
+Cycle-7 SPECIALIST-MINE. Symbol selected per user directive 2026-06-09:
+"get one coin and focus on it. start with 4 features, 10. grind a bit."
+
+4-feature set (LOCAL to /085; V1_FEATURE_COLUMNS_PRUNED stays at 48):
+  rev_extension_z_3    — sign-flipped 3-bar return z-score (reversion signal; ac_lag3=-0.0843)
+  vol_state_z_natr_30  — z-normalized 30-bar NATR volatility state conditioner
+  rev_halflife_50      — z-normalized rolling AR(1) mean-reversion half-life (speed axis)
+  rev_vol_gate_signed  — rev_extension_z_3 × soft vol-regime gate (composed capstone)
+
+All 4 features go into V1_ITER085_FEATURE_COLUMNS (LOCAL 52 cols = PRUNED 48 + 4 new).
+V1_FEATURE_COLUMNS_PRUNED (global) stays at 48 — one-variable-at-a-time discipline.
+
+Methodology constants HELD per 2026-06-06 directive:
+    50 inner seeds × 30 Optuna trials × specialist_mode=True
+    52-col V1_ITER085_FEATURE_COLUMNS (LOCAL; new 52-col hash after parquet regen)
+    R3=ON-SHARED cutoff=0.70, R5=ON vt_target_vol=0.3, mean-of-signed-weights aggregator.
+    R1=OFF (CATALOG-CLOSED for SPECIALIST_mode; f81cafc3).
+    R2=OFF (Model A wrapper — matches /064 ETH, /065 BTC, /075 ATOM, /076 AAVE, /084 CRV).
+    ATR cell: (2.9, 1.45) [vol-class match for UNI ~80-100% IS vol, ETH-class].
+
+NaN notes: dot_vs_btc_ret_ratio_30 + eth_vs_btc_ret_ratio_30 ALL-NaN for UNI
+(SYMBOL-conditional; LightGBM NaN-handles natively).
+long_short_zscore_30 + oi_delta_30_z90: some NaN early in IS window (OI archive start).
+rev_vol_gate_signed: depends on rev_extension_z_3 + vol_state_z_natr_30 (both LOCAL).
+    Warmup: max(rev_extension_z_3, vol_state_z_natr_30) warmup ≈ 120 bars.
+
+HIGH-RISK declaration: universe substitution (new symbol + new features) changes
+Optuna training-objective domain. Mitigation: 50-inner-seed averaging.
+
+LOCAL to runner constant. NOT shared; CONFIRMATION-MERGE updates V1_BASELINE_UNIVERSE.
+assert set(symbols) == {"UNIUSDT"} guard fires in dispatch branch.
+assert len(active_feature_columns) == 52 guard fires in dispatch branch.
+assert all 4 new features in active_feature_columns guard fires in dispatch branch.
+"""
+
 V1_ITER065_UNIVERSE: tuple[str, ...] = ("BTCUSDT",)
 """iter-v1/065 cohort: BTC-only SPECIALIST (third SPECIALIST under SPECIALIST + BUNDLE methodology).
 
@@ -912,6 +967,8 @@ __all__ = [
     "V1_ITER075_UNIVERSE",
     "V1_ITER076_UNIVERSE",
     "V1_ITER084_UNIVERSE",
+    "V1_ITER085_UNIVERSE",
+    "V1_ITER085_FEATURE_COLUMNS",
     # iter-v1/023: funding-rate feature family (add_funding_v1_features imported on demand)
     # iter-v1/025: OI delta feature family (add_oi_delta_v1_features imported on demand)
     # iter-v1/040: composed feature family (add_composed_v1_features imported on demand)

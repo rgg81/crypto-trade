@@ -95,6 +95,8 @@ from crypto_trade.features_v1 import (
     V1_ITER076_UNIVERSE,
     V1_ITER084_FEATURE_COLUMNS,
     V1_ITER084_UNIVERSE,
+    V1_ITER085_FEATURE_COLUMNS,
+    V1_ITER085_UNIVERSE,
     V1_OOD_FEATURE_COLUMNS,
     assert_v1_universe,
 )
@@ -7813,6 +7815,188 @@ def main() -> None:
         _r5_model_results = [results_e084]
         _post_dispatch_fi_strategies = [("Model_A_CRV_specialist_084", _strat_e084)]
 
+    elif iteration_label == "v1-085" and set(symbols) == set(V1_ITER085_UNIVERSE):
+        # iter-v1/085: UNIUSDT SPECIALIST — 4-feature mean-reversion set.
+        # Cycle-7 SPECIALIST-MINE. Per user directive 2026-06-09: "get one coin and focus
+        # on it. start with 4 features, 10. grind a bit."
+        #
+        # 4-FEATURE SET (LOCAL; V1_FEATURE_COLUMNS_PRUNED stays at 48):
+        #   (a) rev_extension_z_3     — sign-flipped 3-bar return z-score
+        #                               (UNI ac_lag3=-0.0843 reversion signal)
+        #   (b) vol_state_z_natr_30   — z-normalized 30-bar NATR volatility state
+        #                               (stationarized; |IC|≈0.0386 with label)
+        #   (c) rev_halflife_50       — z-normalized rolling AR(1) half-life
+        #                               (reversion speed axis; depth-5 tree interaction)
+        #   (d) rev_vol_gate_signed   — rev_extension_z_3 × soft vol-regime gate
+        #                               (Category-2 composed; gates reversion in vol-expansion)
+        #
+        # CRITICAL: V1_ITER085_FEATURE_COLUMNS (LOCAL 52 cols) overrides active_feature_columns.
+        # Global V1_FEATURE_COLUMNS_PRUNED stays at 48 (one-variable-at-a-time; /084 lesson).
+        #
+        # SPECIALIST + BUNDLE design (same as /075+/076+/084):
+        #   - 50 independent Optuna studies, one per seed (V1_SPECIALIST_SEEDS: 42..91)
+        #   - Each study: n_trials=V1_SPECIALIST_OPTUNA_TRIALS=30, ENSEMBLE_SIZE=1
+        #   - LightGBM HP search: max_depth=5 FIXED, num_leaves=31 FIXED
+        #   - confidence_threshold Optuna-tunable per seed (range [0.50, 0.85])
+        #   - Aggregator at inference: mean-of-signed-weights across 50 seeds
+        #
+        # Wall-clock mitigation (same as /075+/076+/084):
+        #   - n_estimators upper bound = 500
+        #   - n_startup_trials = 10
+        #
+        # Risk config (Model A wrapper — R1=OFF, R2=OFF):
+        #   R1=OFF   CATALOG-CLOSED for SPECIALIST_mode (f81cafc3)
+        #   R2=OFF   Model A baseline (matches /064+/065+/075+/076+/084)
+        #   R3=ON    Mahalanobis OOD gate, cutoff=0.70, 16 scale-invariant features;
+        #            applied at AGGREGATOR level (NOT per-seed)
+        #   R5=ON    vt_target_vol=0.3, vt_lookback_days=45, vt_min_scale=0.33
+        #   atr_tp=2.9, atr_sl=1.45 (Model A ETH cell; vol-class match for UNI ~80-100% IS vol)
+        #
+        # NaN notes:
+        #   dot_vs_btc_ret_ratio_30 + eth_vs_btc_ret_ratio_30 ALL-NaN for UNI
+        #   (SYMBOL-conditional; LightGBM handles NaN natively; 2/52 wasted slots).
+        #   rev_vol_gate_signed: depends on rev_extension_z_3 + vol_state_z_natr_30 (both LOCAL).
+        #
+        # LOAD-BEARING: specialist_dispersion.csv persistence (matching /065+/074+/075+/076+/084).
+        assert set(symbols) == {"UNIUSDT"}, (
+            f"iter-v1/085 guard: expected {{UNIUSDT}}, got {set(symbols)}"
+        )
+        # /085 LOCAL feature override: 4 new features NOT in the global V1_FEATURE_COLUMNS_PRUNED
+        # (which stays at 48). Override active_feature_columns here so only the UNI specialist
+        # sees the new features (one-variable-at-a-time rule; /084 lesson).
+        active_feature_columns = list(V1_ITER085_FEATURE_COLUMNS)  # 52 cols
+        assert len(active_feature_columns) == 52, (
+            f"iter-v1/085 guard: expected 52 cols (48 base + 4 new UNI features), "
+            f"got {len(active_feature_columns)}. "
+            "V1_ITER085_FEATURE_COLUMNS must be V1_FEATURE_COLUMNS_PRUNED(48) + "
+            "4 new mean-reversion features = 52."
+        )
+        _expected_085_feats = (
+            "rev_extension_z_3",
+            "vol_state_z_natr_30",
+            "rev_halflife_50",
+            "rev_vol_gate_signed",
+        )
+        for _feat_085 in _expected_085_feats:
+            assert _feat_085 in active_feature_columns, (
+                f"iter-v1/085 guard: {_feat_085} must be in active_feature_columns."
+            )
+        print(
+            f"[iter-v1/085] UNI SPECIALIST — 4-feature mean-reversion set: "
+            f"V1_SPECIALIST_SEED_COUNT={V1_SPECIALIST_SEED_COUNT} "
+            f"V1_SPECIALIST_OPTUNA_TRIALS={V1_SPECIALIST_OPTUNA_TRIALS} "
+            f"specialist_mode=True "
+            f"max_depth=5 FIXED, num_leaves=31 FIXED. "
+            f"R1=OFF (CATALOG-CLOSED; f81cafc3), R2=OFF, "
+            f"R3=ON-SHARED cutoff=0.70, R5=ON vt_target_vol=0.3. "
+            f"features=V1_ITER085_FEATURE_COLUMNS (52 cols; NEW rev_extension_z_3, "
+            f"vol_state_z_natr_30, rev_halflife_50, rev_vol_gate_signed). "
+            f"atr_tp=2.9, atr_sl=1.45 (Model A ETH cell; vol-class match UNI ~80-100% IS vol). "
+            f"NaN: dot_vs_btc_ret_ratio_30+eth_vs_btc_ret_ratio_30 ALL-NaN (SYMBOL-cond; OK). "
+            f"n_estimators_max=500 (wall-clock). n_startup_trials=10 (wall-clock). "
+            f"Aggregator: mean-of-signed-weights across {V1_SPECIALIST_SEED_COUNT} seeds. "
+            f"LOAD-BEARING: specialist_dispersion.csv will be persisted post-backtest."
+        )
+        _config_e085 = BacktestConfig(
+            symbols=("UNIUSDT",),
+            interval="8h",
+            max_amount_usd=1000.0,
+            stop_loss_pct=2.9,  # ATR-based; overridden by atr_sl_multiplier=1.45
+            take_profit_pct=5.8,  # ATR-based; overridden by atr_tp_multiplier=2.9
+            timeout_minutes=10080,
+            fee_pct=0.1,
+            data_dir=Path("data"),
+            cooldown_candles=2,
+            vol_targeting=True,
+            vt_target_vol=0.3,
+            vt_lookback_days=45,
+            vt_min_scale=0.33,
+            vt_max_scale=2.0,
+            risk_consecutive_sl_limit=0,  # R1=OFF: CATALOG-CLOSED for SPECIALIST_mode
+            risk_consecutive_sl_cooldown_candles=0,
+            risk_drawdown_scale_enabled=False,  # R2=OFF: Model A baseline
+            risk_r5_vol_target_enabled=_r5_kwargs.get("r5_vol_target_enabled", True),
+            risk_r5_vol_target_pct=_r5_kwargs.get("r5_vol_target_pct", 4.0),
+            risk_r5_kill_low_natr_enabled=_r5_kwargs.get("r5_kill_low_natr_enabled", False),
+            risk_r5_kill_low_natr_min_pct=_r5_kwargs.get("r5_kill_low_natr_min_pct", 2.0),
+        )
+        _strat_e085 = LightGbmStrategy(
+            training_months=24,
+            n_trials=V1_SPECIALIST_OPTUNA_TRIALS,  # informational; specialist loop controls
+            cv_splits=5,
+            label_tp_pct=5.8,
+            label_sl_pct=2.9,
+            label_timeout_minutes=10080,
+            fee_pct=0.1,
+            features_dir="data/features",
+            verbose=1,
+            atr_tp_multiplier=2.9,
+            atr_sl_multiplier=1.45,
+            use_atr_labeling=True,
+            # placeholder seed — specialist_mode uses V1_SPECIALIST_SEEDS internally
+            ensemble_seeds=list(V1_SPECIALIST_SEEDS[:1]),
+            feature_columns=active_feature_columns,
+            ood_enabled=True,  # R3 ON at AGGREGATOR level (SHARED — UNCHANGED from /076)
+            ood_features=list(V1_OOD_FEATURE_COLUMNS),
+            ood_cutoff_pct=0.70,
+            oof_persist_path=OOF_PARQUET_PATH,
+            bounds_profile="v1_specialist",
+            specialist_mode=True,
+            specialist_n_startup_trials=10,
+            specialist_n_estimators_max=500,
+        )
+        import time as _time_085  # noqa: PLC0415
+
+        _t0_085 = _time_085.time()
+        results_e085 = run_backtest(_config_e085, _strat_e085, yearly_pnl_check=False)
+        _elapsed_085 = _time_085.time() - _t0_085
+        faxm_e085 = _strat_e085._faxm_log
+        print(
+            f"\n[iter-v1/085] Model_A_UNI_specialist_085 complete: "
+            f"{len(results_e085)} trades in {_elapsed_085:.0f}s "
+            f"({_elapsed_085 / 3600:.2f}h)"
+        )
+
+        # Cohort isolation sanity: assert ONLY UNIUSDT trades emitted.
+        _e085_symbols = {r.symbol for r in results_e085}
+        assert _e085_symbols.issubset({"UNIUSDT"}), (
+            f"[iter-v1/085] Model A_UNI produced non-UNI results: "
+            f"{_e085_symbols - {'UNIUSDT'}}. "
+            "Per-cohort isolation failed — iter-v1/085 must trade UNIUSDT ONLY."
+        )
+
+        # -----------------------------------------------------------------
+        # LOAD-BEARING: specialist_dispersion.csv persistence (matching /065+/074+/075+/076+/084).
+        # -----------------------------------------------------------------
+        _disp_mean_e085 = _strat_e085.get_specialist_dispersion_mean()
+        _disp_is_path_e085 = (
+            Path(reports_dir) / "iteration_v1-085" / "in_sample" / "specialist_dispersion.csv"
+        )
+        _disp_is_path_e085.parent.mkdir(parents=True, exist_ok=True)
+        _strat_e085.persist_specialist_dispersion_csv(str(_disp_is_path_e085))
+        print(
+            f"[iter-v1/085] LOAD-BEARING dispersion patch: "
+            f"specialist_dispersion_mean={_disp_mean_e085} "
+            f"specialist_dispersion.csv → {_disp_is_path_e085}"
+        )
+        # Store for post-report block (specialist_dispersion_mean appended to comparison.csv
+        # AFTER generate_iteration_reports() runs — comparison.csv written there).
+        _e085_disp_mean = _disp_mean_e085
+        _e085_disp_csv_path = _disp_is_path_e085
+
+        print(
+            f"[iter-v1/085] Dispatch verified: "
+            f"UNI-only={len(results_e085)} trades. "
+            f"R1=OFF/R2=OFF/R3=ON-AGGREGATOR-LEVEL. "
+            f"SPECIALIST seeds={len(_strat_e085._specialist_models)} trained. "
+            f"sigma_pop mean={_disp_mean_e085}"
+        )
+
+        _all_faxm_logs = faxm_e085
+        all_results = results_e085
+        _r5_model_results = [results_e085]
+        _post_dispatch_fi_strategies = [("Model_A_UNI_specialist_085", _strat_e085)]
+
     elif iteration_label == "v1-044":
         # iter-v1/044: CONFIRMATION-MERGE-PORTFOLIO (cycle-5 CONFIRMATION 1/1).
         # 3-component bundle: BASELINE_V1 (w=0.50) + /036 (w=0.30) + /043 (w=0.20).
@@ -9139,6 +9323,41 @@ def main() -> None:
         if _strat_084_ref is not None:
             _strat_084_ref.persist_specialist_dispersion_csv(str(_oos_disp_path_084))
             print(f"[iter-v1/084] OOS specialist_dispersion.csv persisted → {_oos_disp_path_084}")
+
+    # -------------------------------------------------------------------------
+    # iter-v1/085: specialist_dispersion_mean + OOS specialist_dispersion.csv
+    # → comparison.csv. Mirrors the /065+/074+/075+/076+/084 pattern.
+    # Guard: only runs when _e085_disp_mean is defined (v1-085 dispatch sets it).
+    # -------------------------------------------------------------------------
+    if iteration_label == "v1-085" and "_e085_disp_mean" in dir():
+        _disp_mean_val_085 = locals().get("_e085_disp_mean")
+        if _disp_mean_val_085 is not None:
+            import csv as _csv_085  # noqa: PLC0415
+
+            _comp_csv_085 = report_dir / "comparison.csv"
+            if _comp_csv_085.exists():
+                with _comp_csv_085.open("a", newline="") as _fh_085:
+                    _writer_085 = _csv_085.writer(_fh_085)
+                    _writer_085.writerow(["specialist_dispersion_mean", _disp_mean_val_085, "", ""])
+                print(
+                    f"[iter-v1/085] LOAD-BEARING: specialist_dispersion_mean="
+                    f"{_disp_mean_val_085:.4f} appended to {_comp_csv_085}"
+                )
+            else:
+                print(
+                    f"[iter-v1/085] WARNING: comparison.csv not found at {_comp_csv_085}; "
+                    f"specialist_dispersion_mean={_disp_mean_val_085:.4f} NOT appended."
+                )
+        # Persist OOS specialist_dispersion.csv (F-AXIS #2 audit; /065+/074+/075+/076+/084 pattern).
+        _oos_disp_path_085 = report_dir / "out_of_sample" / "specialist_dispersion.csv"
+        _oos_disp_path_085.parent.mkdir(parents=True, exist_ok=True)
+        _strat_085_ref = next(
+            (s for _, s in _post_dispatch_fi_strategies if "UNI_specialist_085" in _),
+            None,
+        )
+        if _strat_085_ref is not None:
+            _strat_085_ref.persist_specialist_dispersion_csv(str(_oos_disp_path_085))
+            print(f"[iter-v1/085] OOS specialist_dispersion.csv persisted → {_oos_disp_path_085}")
 
     # -------------------------------------------------------------------------
     # iter-v1/021+: write feature importance CSVs (post-dispatch).

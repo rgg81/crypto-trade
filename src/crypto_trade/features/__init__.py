@@ -287,6 +287,37 @@ _register("cross_btc_v1", _add_cross_btc_v1_features)  # iter-v1/050
 # families MUST come from NON-kline data sources (long/short ratio, on-chain,
 # funding/OI new transforms, cross-asset macro).
 
+# iter-v1/085: mean-reversion signal feature family (rev_extension_z_3).
+# UNI-specialist reversion signal: sign-flipped 3-bar return z-score targeting ac_lag3=-0.0843.
+# Registered so `uv run crypto-trade features --track v1 --groups mean_reversion_v1` writes
+# rev_extension_z_3 to v1 parquets.
+from crypto_trade.features_v1.mean_reversion_v1 import (  # noqa: E402
+    add_mean_reversion_v1_features as _add_mean_reversion_v1_features,
+)
+
+_register("mean_reversion_v1", _add_mean_reversion_v1_features)  # iter-v1/085
+
+# iter-v1/085: volatility state feature family (vol_state_z_natr_30).
+# UNI-specialist vol state conditioner: z-normalized 30-bar NATR (stationarized).
+# Registered so `uv run crypto-trade features --track v1 --groups volatility_v1` writes
+# vol_state_z_natr_30 to v1 parquets.
+from crypto_trade.features_v1.volatility_v1 import (  # noqa: E402
+    add_volatility_v1_features as _add_volatility_v1_features,
+)
+
+_register("volatility_v1", _add_volatility_v1_features)  # iter-v1/085
+
+# iter-v1/085: composed_v1_085 feature group (rev_halflife_50 + rev_vol_gate_signed).
+# Both depend on rev_extension_z_3 and vol_state_z_natr_30 being present in df first.
+# Registered so `uv run crypto-trade features --track v1 --groups composed_v1_085` writes
+# rev_halflife_50 and rev_vol_gate_signed to v1 parquets (after mean_reversion_v1 +
+# volatility_v1 groups have run).
+from crypto_trade.features_v1.composed_v1 import (  # noqa: E402
+    add_composed_v1_085_features as _add_composed_v1_085_features,
+)
+
+_register("composed_v1_085", _add_composed_v1_085_features)  # iter-v1/085
+
 __all__ = [
     "GROUP_REGISTRY",
     "generate_features",
