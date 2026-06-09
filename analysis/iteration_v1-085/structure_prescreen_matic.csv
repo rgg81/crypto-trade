@@ -1,0 +1,2 @@
+symbol,data_years,n_bars,last_bar,has_oos_coverage,s5,s21,s50,trivial_min,gate1_pass,max_feature_label_ic,max_ic_feature,autocorr_mag,structure_signal,coverage_ok
+MATICUSDT,3.889,4262,2024-09-11,False,0.549,1.189,1.397,0.549,False,0.0517,natr_30,0.0648,MODERATE,False

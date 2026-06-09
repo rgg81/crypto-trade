@@ -1,0 +1,2 @@
+symbol,is_years,n_bars,triv_5d,triv_21d,triv_50d,trivial_baseline_min,gate1_pass,max_feature_label_ic,best_ic_feature,acf_1,acf_3,acf_7,autocorr_mag,structure_signal
+GRTUSDT,4.26,4653,0.0824,1.0002,0.6937,0.0824,True,0.0324,ret_21d,0.0055,-0.0748,0.0132,0.0748,WEAK

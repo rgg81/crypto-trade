@@ -1,0 +1,13 @@
+pattern,feature,ic,n
+modelA_2.9_1.45,ret_5d,-0.0129,5189
+modelA_2.9_1.45,ret_21d,-0.0298,5141
+modelA_2.9_1.45,rsi_14,0.0054,5203
+modelA_2.9_1.45,natr_30,0.0295,5184
+modelA_2.9_1.45,vol_bb_bandwidth,0.0291,5185
+modelA_2.9_1.45,taker_buy_ratio,-0.0102,5204
+dot_3.5_1.75,ret_5d,-0.0284,5189
+dot_3.5_1.75,ret_21d,-0.0203,5141
+dot_3.5_1.75,rsi_14,-0.0042,5203
+dot_3.5_1.75,natr_30,0.0263,5184
+dot_3.5_1.75,vol_bb_bandwidth,0.0369,5185
+dot_3.5_1.75,taker_buy_ratio,-0.0027,5204

@@ -1,0 +1,2 @@
+symbol,is_years,full_years,triv_5d,triv_21d,triv_50d,trivial_baseline_min,gate1_pass,ic_ret_5d,ic_ret_21d,ic_rsi_14,ic_natr_30,ic_vol_bb_bandwidth,max_feature_label_ic,gate2_secondary_pass,ac_lag1,ac_lag3,ac_lag7,autocorr_mag,structure_signal
+UNIUSDT,4.511,4.51,-0.2485,0.389,0.3684,-0.2485,True,-0.0026,0.0092,0.0021,0.0386,0.0393,0.0393,False,-0.026,-0.0843,0.0164,0.0843,WEAK

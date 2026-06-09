@@ -1,0 +1,2 @@
+coin,is_years,n_bars,s5,s21,s50,trivial_baseline_min,gate1_pass,max_feature_label_ic,max_ic_feature,ic_vs_symmetric_label,autocorr_mag,acf_1,acf_3,acf_7,lgbm_probe_is_sharpe,gate2_primary_pass,structure_signal_literal,structure_signal_adjudicated
+XLMUSDT,5.17,5654,0.3685,0.6075,0.6467,0.3685,False,0.0768,vol_natr_14,0.0335,0.0580,0.0580,-0.0531,0.0186,-0.456,False,STRONG,NOISE

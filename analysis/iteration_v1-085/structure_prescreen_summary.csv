@@ -1,0 +1,2 @@
+coin,is_years,n_bars,s5,s21,s50,trivial_baseline_min,gate1_pass,max_feature_label_ic,autocorr_mag,long_frac,structure_signal
+ETCUSDT,5.18,5681,0.865,0.35,0.513,0.35,False,0.0589,0.0616,0.367,MODERATE

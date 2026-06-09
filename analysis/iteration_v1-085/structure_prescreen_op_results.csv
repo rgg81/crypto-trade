@@ -1,0 +1,2 @@
+coin,is_years,is_bars,triv_s5,triv_s21,triv_s50,trivial_baseline_min,gate1_pass,max_feature_label_ic,autocorr_mag,structure_signal
+OPUSDT,2.81,3080,1.079,0.162,0.275,0.162,False,0.0816,0.0365,STRONG
