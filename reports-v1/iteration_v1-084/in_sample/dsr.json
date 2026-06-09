@@ -1,0 +1,20 @@
+{
+  "dsr": 0.0,
+  "pbo": null,
+  "psr": 0.0,
+  "n_trials": 30,
+  "n_eff": 1,
+  "n_eff_pca_method": "eigvalsh_cov_per_cell_median_aggfunc_mean",
+  "min_trl_months": 0.288675,
+  "n_eff_per_cell_median": 1,
+  "n_eff_method_per_cell": "eigvalsh_cov_per_cell_median_aggfunc_mean",
+  "n_eff_per_cell_trimmed_mean": 1,
+  "n_eff_per_cell_p25": 1,
+  "n_eff_per_cell_p75": 1,
+  "n_eff_per_cell_min": 1,
+  "n_eff_per_cell_max": 1,
+  "n_eff_per_cell_by_symbol": {
+    "CRVUSDT": 1
+  },
+  "n_cells": 46
+}
