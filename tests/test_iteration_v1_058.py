@@ -87,26 +87,18 @@ def _compute_features_hash(cols: tuple[str, ...]) -> str:
 
 
 def test_feature_in_pruned() -> None:
-    """btc_oi_delta_5_z30 must be in V1_FEATURE_COLUMNS_PRUNED after iter-v1/058 ADD.
+    """btc_oi_delta_5_z30 was ADDED at /058 then REVERTED at /058 closeout — NOT in global.
 
-    iter-v1/058 adds btc_oi_delta_5_z30 (5-bar OI delta, 30-bar z-score window) as the
-    short-window companion to the existing oi_delta_30_z90 (30-bar delta, 90-bar z-score).
-    The feature should appear at sorted position 1 (after btc_funding_spread_30_90).
+    iter-v1/058 added btc_oi_delta_5_z30 but REVERTED it at closeout (BASIN-LOTTERY:
+    spread 0.8995 > 0.50; mean OOS -0.599). Feature computation code is preserved in
+    open_interest_v1.py for future re-use. Global V1_FEATURE_COLUMNS_PRUNED stays at 48.
+    btc_oi_delta_5_z30 must NOT be in the global pruned set after the /058 REVERT.
     """
     from crypto_trade.features_v1 import V1_FEATURE_COLUMNS_PRUNED
 
-    assert "btc_oi_delta_5_z30" in V1_FEATURE_COLUMNS_PRUNED, (
-        "btc_oi_delta_5_z30 is NOT in V1_FEATURE_COLUMNS_PRUNED. "
-        "iter-v1/058 must ADD it (48 → 49 cols). "
-        "Check src/crypto_trade/features_v1/__init__.py."
-    )
-    # Verify alphabetical position: btc_oi_delta_5_z30 > btc_funding_spread_30_90
-    cols = list(V1_FEATURE_COLUMNS_PRUNED)
-    idx = cols.index("btc_oi_delta_5_z30")
-    assert idx == 1, (
-        f"btc_oi_delta_5_z30 is at index {idx}; expected index 1 (alphabetically after "
-        "btc_funding_spread_30_90 and before cal_dow_norm). "
-        "Check the insertion order in V1_FEATURE_COLUMNS_PRUNED."
+    assert "btc_oi_delta_5_z30" not in V1_FEATURE_COLUMNS_PRUNED, (
+        "btc_oi_delta_5_z30 IS in V1_FEATURE_COLUMNS_PRUNED but was REVERTED at /058 closeout. "
+        "Global should have 48 cols after the BASIN-LOTTERY revert."
     )
 
 
@@ -116,22 +108,23 @@ def test_feature_in_pruned() -> None:
 
 
 def test_pruned_size_49() -> None:
-    """V1_FEATURE_COLUMNS_PRUNED must have exactly 49 features at iter-v1/058.
+    """V1_FEATURE_COLUMNS_PRUNED must have exactly 48 features (post-/058 REVERT).
 
     History:
         40 (baseline /002) → 42 (/023) → 43 (/025) → 44 (/034→/040) → 45 (/049)
         → 46 (/050) → 48 (/052 ADD two features) → 47 (/054 DROP impulse)
         → 48 (/055 ADD eth_vs_btc_ret_ratio_30) → 49 (/057 ADD ltc) → 48 (/057 REVERT)
-        → 49 (/058 ADD btc_oi_delta_5_z30)
+        → 49 (/058 ADD btc_oi_delta_5_z30) → 48 (/058 REVERT — BASIN-LOTTERY spread 0.8995)
+    NOTE: Test function named "test_pruned_size_49" from /057 era; after /058 REVERT count is 48.
+    /084 oi_price_divergence_30 is LOCAL-ONLY (V1_ITER084_FEATURE_COLUMNS). Global stays 48.
     """
     from crypto_trade.features_v1 import V1_FEATURE_COLUMNS_PRUNED
 
     n = len(V1_FEATURE_COLUMNS_PRUNED)
-    assert n == 49, (
-        f"V1_FEATURE_COLUMNS_PRUNED expected 49 features at iter-v1/058; got {n}. "
-        "iter-v1/058 ADDs btc_oi_delta_5_z30 (48 → 49). "
-        "If n == 48: the ADD was NOT applied. "
-        "If n > 49: something was accidentally added beyond /058."
+    assert n == 48, (
+        f"V1_FEATURE_COLUMNS_PRUNED expected 48 features after /058 REVERT; got {n}. "
+        "iter-v1/058 REVERTED btc_oi_delta_5_z30 (BASIN-LOTTERY spread 0.8995). "
+        "/084 oi_price_divergence_30 is LOCAL-ONLY in V1_ITER084_FEATURE_COLUMNS."
     )
 
 
@@ -280,43 +273,44 @@ def test_outer_seed_offsets_patched() -> None:
 
 
 def test_features_base_hash() -> None:
-    """The 49-col hash must match pre-registered value; differ from 48-col ref.
+    """Live hash must match the /058 48-col reference (post-REVERT state).
 
     /057 closeout used 48 cols (ltc_vs_btc_ret_ratio_30 REVERTED).
-    /058 adds btc_oi_delta_5_z30 (48 → 49 cols).
-    The SHA-256 of sorted(V1_FEATURE_COLUMNS_PRUNED) MUST change.
+    /058 added btc_oi_delta_5_z30 (48 → 49 cols) then REVERTED it at closeout
+    (BASIN-LOTTERY spread 0.8995). Global returns to 48 cols = same as post-/057-revert.
+    The live hash must equal FEATURES_BASE_HASH_48COL and differ from FEATURES_BASE_HASH_49COL.
     """
     import run_iteration_058
 
     h49 = run_iteration_058.FEATURES_BASE_HASH_49COL
     h48 = run_iteration_058.FEATURES_BASE_HASH_48COL
 
-    # Hashes must differ
+    # Hashes must differ (ADD vs REVERT are different column sets)
     assert h49 != h48, (
         "FEATURES_BASE_HASH_49COL and FEATURES_BASE_HASH_48COL must differ. "
         "Adding btc_oi_delta_5_z30 (48→49 cols) produces a different SHA-256."
     )
 
-    # Live V1_FEATURE_COLUMNS_PRUNED must match the 49-col hash
+    # Live V1_FEATURE_COLUMNS_PRUNED must match the 48-col hash (REVERT state)
     from crypto_trade.features_v1 import V1_FEATURE_COLUMNS_PRUNED
 
     live_hash = _compute_features_hash(V1_FEATURE_COLUMNS_PRUNED)
-    assert live_hash == h49, (
-        f"Live V1_FEATURE_COLUMNS_PRUNED hash does not match pre-registered 49-col hash.\n"
+    assert live_hash == h48, (
+        f"Live V1_FEATURE_COLUMNS_PRUNED hash does not match pre-registered 48-col hash.\n"
         f"  pre-registered 49-col: {h49}\n"
         f"  pre-registered 48-col: {h48}\n"
         f"  live computed        : {live_hash}\n"
-        "If live == 48-col: btc_oi_delta_5_z30 ADD was not applied."
+        "/058 REVERTED btc_oi_delta_5_z30; live should match 48-col reference."
     )
-    # Must differ from 48-col (revert not in effect)
-    assert live_hash != h48, (
-        f"Live hash matches 48-col reference; btc_oi_delta_5_z30 NOT in pruned set. "
-        f"live = {live_hash}, h48 = {h48}."
+    # Must differ from 49-col (ADD was reverted)
+    assert live_hash != h49, (
+        f"Live hash matches 49-col reference; btc_oi_delta_5_z30 STILL in pruned set — REVERT "
+        f"not applied. live = {live_hash}, h49 = {h49}."
     )
 
     print(f"  [OK] 49-col hash = {h49[:16]}...")
     print(f"  [OK] 48-col hash = {h48[:16]}...")
-    print("  [OK] Hashes differ as expected.")
+    print("  [OK] live == h48: /058 REVERT confirmed.")
 
 
 # ---------------------------------------------------------------------------
@@ -466,7 +460,7 @@ def test_oi_delta_5_z30_clip_range() -> None:
 @pytest.mark.parametrize(
     "feature_name,expected_in_pruned",
     [
-        ("btc_oi_delta_5_z30", True),  # ADDED at /058; must be present
+        ("btc_oi_delta_5_z30", False),  # ADDED at /058 then REVERTED (BASIN-LOTTERY); NOT present
         ("oi_delta_30_z90", True),  # ADDED at /025; still present (sister feature)
         ("btc_funding_spread_30_90", True),  # RETAINED at /054; still present
         ("eth_vs_btc_ret_ratio_30", True),  # ADDED at /055; still present

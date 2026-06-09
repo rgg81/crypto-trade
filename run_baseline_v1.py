@@ -93,6 +93,7 @@ from crypto_trade.features_v1 import (
     V1_ITER074_UNIVERSE,
     V1_ITER075_UNIVERSE,
     V1_ITER076_UNIVERSE,
+    V1_ITER084_FEATURE_COLUMNS,
     V1_ITER084_UNIVERSE,
     V1_OOD_FEATURE_COLUMNS,
     assert_v1_universe,
@@ -7677,14 +7678,19 @@ def main() -> None:
         assert set(symbols) == {"CRVUSDT"}, (
             f"iter-v1/084 guard: expected {{CRVUSDT}}, got {set(symbols)}"
         )
+        # /084 LOCAL feature override: oi_price_divergence_30 is NOT in the global
+        # V1_FEATURE_COLUMNS_PRUNED (which stays at 48). Override active_feature_columns
+        # here so only the CRV specialist sees the new feature (one-variable-at-a-time rule).
+        active_feature_columns = list(V1_ITER084_FEATURE_COLUMNS)  # 49 cols
         assert len(active_feature_columns) == 49, (
             f"iter-v1/084 guard: expected 49 cols (48 base + oi_price_divergence_30), "
             f"got {len(active_feature_columns)}. "
-            "If len != 49: check --pruned-features was passed to the runner."
+            "V1_ITER084_FEATURE_COLUMNS must be V1_FEATURE_COLUMNS_PRUNED(48) + "
+            "('oi_price_divergence_30',) = 49."
         )
         assert "oi_price_divergence_30" in active_feature_columns, (
             "iter-v1/084 guard: oi_price_divergence_30 must be in active_feature_columns. "
-            "V1_FEATURE_COLUMNS_PRUNED must include the new OI-price divergence feature."
+            "V1_ITER084_FEATURE_COLUMNS must contain oi_price_divergence_30."
         )
         print(
             f"[iter-v1/084] CRV SPECIALIST — OI-price divergence + R-FADE gate: "

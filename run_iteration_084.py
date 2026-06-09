@@ -87,7 +87,7 @@ import sys
 # ---------------------------------------------------------------------------
 # features-base-hash guard
 # ---------------------------------------------------------------------------
-from crypto_trade.features_v1 import V1_FEATURE_COLUMNS_PRUNED
+from crypto_trade.features_v1 import V1_FEATURE_COLUMNS_PRUNED, V1_ITER084_FEATURE_COLUMNS
 from crypto_trade.strategies.ml.lgbm import (
     V1_SPECIALIST_OPTUNA_TRIALS,
     V1_SPECIALIST_SEED_COUNT,
@@ -124,26 +124,42 @@ def _compute_features_hash(cols: tuple[str, ...]) -> str:
 
 
 def _verify_features_hash() -> str:
-    """Assert V1_FEATURE_COLUMNS_PRUNED is 49 cols and compute its hash."""
-    if len(V1_FEATURE_COLUMNS_PRUNED) != 49:
+    """Assert V1_ITER084_FEATURE_COLUMNS is 49 cols and compute its hash.
+
+    V1_FEATURE_COLUMNS_PRUNED (global) stays at 48. The /084-local constant
+    V1_ITER084_FEATURE_COLUMNS = PRUNED(48) + ("oi_price_divergence_30",) = 49.
+    """
+    if len(V1_FEATURE_COLUMNS_PRUNED) != 48:
         print(
-            f"[iter-v1/084] FEATURES-COUNT MISMATCH\n"
-            f"  expected : 49 (48 base + oi_price_divergence_30)\n"
+            f"[iter-v1/084] GLOBAL-PRUNED-COUNT MISMATCH\n"
+            f"  expected : 48 (global, unchanged)\n"
             f"  actual   : {len(V1_FEATURE_COLUMNS_PRUNED)}\n"
-            f"  V1_FEATURE_COLUMNS_PRUNED (len={len(V1_FEATURE_COLUMNS_PRUNED)}):\n"
-            + "\n".join(f"    {i:03d}: {c}" for i, c in enumerate(V1_FEATURE_COLUMNS_PRUNED)),
+            "  V1_FEATURE_COLUMNS_PRUNED must stay at 48; oi_price_divergence_30 is LOCAL-ONLY.",
             file=sys.stderr,
         )
         sys.exit(
-            "[iter-v1/084] ABORT: V1_FEATURE_COLUMNS_PRUNED must be 49 at iter-v1/084. "
+            "[iter-v1/084] ABORT: V1_FEATURE_COLUMNS_PRUNED must be 48 (global unchanged). "
+            "oi_price_divergence_30 lives in V1_ITER084_FEATURE_COLUMNS only."
+        )
+    if len(V1_ITER084_FEATURE_COLUMNS) != 49:
+        print(
+            f"[iter-v1/084] ITER084-FEATURE-COUNT MISMATCH\n"
+            f"  expected : 49 (48 base + oi_price_divergence_30)\n"
+            f"  actual   : {len(V1_ITER084_FEATURE_COLUMNS)}\n"
+            f"  V1_ITER084_FEATURE_COLUMNS (len={len(V1_ITER084_FEATURE_COLUMNS)}):\n"
+            + "\n".join(f"    {i:03d}: {c}" for i, c in enumerate(V1_ITER084_FEATURE_COLUMNS)),
+            file=sys.stderr,
+        )
+        sys.exit(
+            "[iter-v1/084] ABORT: V1_ITER084_FEATURE_COLUMNS must be 49 at iter-v1/084. "
             "Expected 48 base + oi_price_divergence_30 = 49."
         )
-    if "oi_price_divergence_30" not in V1_FEATURE_COLUMNS_PRUNED:
+    if "oi_price_divergence_30" not in V1_ITER084_FEATURE_COLUMNS:
         sys.exit(
-            "[iter-v1/084] ABORT: oi_price_divergence_30 not found in V1_FEATURE_COLUMNS_PRUNED. "
-            "This feature must be added before running /084."
+            "[iter-v1/084] ABORT: oi_price_divergence_30 not found in V1_ITER084_FEATURE_COLUMNS. "
+            "This feature must be in the /084 local constant."
         )
-    actual_hash = _compute_features_hash(V1_FEATURE_COLUMNS_PRUNED)
+    actual_hash = _compute_features_hash(V1_ITER084_FEATURE_COLUMNS)
     print(
         f"[iter-v1/084] features-base-hash: {actual_hash[:16]}... "
         f"(49 columns; 48 base + oi_price_divergence_30)"
@@ -181,7 +197,8 @@ def main() -> None:
         print(
             f"[iter-v1/084] --check-hash mode. "
             f"Hash = {actual_hash[:16]}. "
-            f"V1_FEATURE_COLUMNS_PRUNED len = {len(V1_FEATURE_COLUMNS_PRUNED)}. "
+            f"V1_FEATURE_COLUMNS_PRUNED len = {len(V1_FEATURE_COLUMNS_PRUNED)} (global=48). "
+            f"V1_ITER084_FEATURE_COLUMNS len = {len(V1_ITER084_FEATURE_COLUMNS)} (local=49). "
             "No backtest launched."
         )
         print(f"  ITERATION_LABEL          : {ITERATION_LABEL}")
@@ -214,14 +231,19 @@ def main() -> None:
         return
 
     # --- Pre-flight assertions ---
-    assert len(V1_FEATURE_COLUMNS_PRUNED) == 49, (
-        f"[iter-v1/084] PRE-FLIGHT FAIL: expected 49 features, "
+    assert len(V1_FEATURE_COLUMNS_PRUNED) == 48, (
+        f"[iter-v1/084] PRE-FLIGHT FAIL: global V1_FEATURE_COLUMNS_PRUNED expected 48, "
         f"got {len(V1_FEATURE_COLUMNS_PRUNED)}. "
-        "V1_FEATURE_COLUMNS_PRUNED must be 49 at iter-v1/084 "
-        "(48 base + oi_price_divergence_30)."
+        "The global pruned set must stay at 48; oi_price_divergence_30 is LOCAL-ONLY in "
+        "V1_ITER084_FEATURE_COLUMNS."
     )
-    assert "oi_price_divergence_30" in V1_FEATURE_COLUMNS_PRUNED, (
-        "[iter-v1/084] PRE-FLIGHT FAIL: oi_price_divergence_30 not in V1_FEATURE_COLUMNS_PRUNED."
+    assert len(V1_ITER084_FEATURE_COLUMNS) == 49, (
+        f"[iter-v1/084] PRE-FLIGHT FAIL: V1_ITER084_FEATURE_COLUMNS expected 49, "
+        f"got {len(V1_ITER084_FEATURE_COLUMNS)}. "
+        "Must be V1_FEATURE_COLUMNS_PRUNED(48) + ('oi_price_divergence_30',) = 49."
+    )
+    assert "oi_price_divergence_30" in V1_ITER084_FEATURE_COLUMNS, (
+        "[iter-v1/084] PRE-FLIGHT FAIL: oi_price_divergence_30 not in V1_ITER084_FEATURE_COLUMNS."
     )
     assert len(V1_SPECIALIST_SEEDS) == V1_SPECIALIST_SEED_COUNT, (
         f"[iter-v1/084] PRE-FLIGHT FAIL: V1_SPECIALIST_SEEDS length "
@@ -251,8 +273,8 @@ def main() -> None:
         f"  seed roster                : {V1_SPECIALIST_SEEDS[0]}..{V1_SPECIALIST_SEEDS[-1]} "
         f"(50 consecutive seeds)"
     )
-    n_cols = len(V1_FEATURE_COLUMNS_PRUNED)
-    print(f"  feature_columns            : {n_cols} cols (V1_FEATURE_COLUMNS_PRUNED + oi_div_30)")
+    n_cols = len(V1_ITER084_FEATURE_COLUMNS)
+    print(f"  feature_columns            : {n_cols} cols (V1_ITER084_FEATURE_COLUMNS)")
     print("  cohort                     : CRVUSDT only (V1_ITER084_UNIVERSE)")
     print("  model                      : Model_A_CRV_specialist_084")
     print("  max_depth                  : 5 (FIXED — removed from Optuna search)")

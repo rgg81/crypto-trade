@@ -121,7 +121,6 @@ V1_FEATURE_COLUMNS_PRUNED: tuple[str, ...] = (
     "mr_pct_from_low_20",
     "mr_rsi_extreme_14",
     "oi_delta_30_z90",  # iter-v1/025: NEW — open-interest delta z-score (90-bar window)
-    "oi_price_divergence_30",  # iter-v1/084: NEW — OI-price divergence z-score (CRV specialist)
     "regime_momentum_signed_5d",  # iter-v1/040: composed momentum; replaces basis_zscore_30
     "stat_autocorr_lag5",
     "stat_kurtosis_20",  # LM Master Phase 4.5 swap: drop mom_mom_5, add stat_kurtosis_20
@@ -205,13 +204,27 @@ V1_FEATURE_COLUMNS_PRUNED: tuple[str, ...] = (
 #              [-0.9069, +0.413, -1.303]). Count: 49 → 48. Feature computation code
 #              preserved in open_interest_v1.py for potential future re-use at different
 #              window pair.
-# iter-v1/084: ADD oi_price_divergence_30 (OI-price direction divergence z-score;
-#              CRV specialist cycle-7 EXPLORATION; re-aimed from /083 rank-7/11 OI family
-#              toward CRVUSDT which has NEGATIVE trivial-momentum IS baseline → ML headroom).
-#              Inserted alphabetically between oi_delta_30_z90 and regime_momentum_signed_5d.
-#              Count: 48 → 49.
-assert len(V1_FEATURE_COLUMNS_PRUNED) == 49, (
-    f"V1_FEATURE_COLUMNS_PRUNED must have exactly 49 features; got {len(V1_FEATURE_COLUMNS_PRUNED)}"
+# iter-v1/084: LOCAL-ONLY — oi_price_divergence_30 (OI-price direction divergence z-score;
+#              CRV specialist cycle-7 EXPLORATION) is intentionally NOT in the global
+#              V1_FEATURE_COLUMNS_PRUNED. It lives exclusively in V1_ITER084_FEATURE_COLUMNS
+#              below (= PRUNED(48) + (oi_price_divergence_30,) = 49 cols). Keeping the global
+#              at 48 prevents the feature from silently altering DOT/ETH/BTC/AAVE/ATOM
+#              specialists (a methodology violation — one variable at a time).
+assert len(V1_FEATURE_COLUMNS_PRUNED) == 48, (
+    f"V1_FEATURE_COLUMNS_PRUNED must have exactly 48 features; got {len(V1_FEATURE_COLUMNS_PRUNED)}"
+)
+
+# iter-v1/084 LOCAL feature set: 48-col global PRUNED + CRV-specialist oi_price_divergence_30.
+# This is the ONLY constant that should be 49; V1_FEATURE_COLUMNS_PRUNED stays at 48.
+# The runner (run_iteration_084.py + run_baseline_v1.py "/v1-084" dispatch) overrides
+# active_feature_columns with this local tuple so that no other specialist sees the new feature.
+V1_ITER084_FEATURE_COLUMNS: tuple[str, ...] = V1_FEATURE_COLUMNS_PRUNED + (
+    "oi_price_divergence_30",
+)
+
+assert len(V1_ITER084_FEATURE_COLUMNS) == 49, (
+    f"V1_ITER084_FEATURE_COLUMNS must have exactly 49 features; "
+    f"got {len(V1_ITER084_FEATURE_COLUMNS)}"
 )
 
 # Columns explicitly NOT in V1_FEATURE_COLUMNS_PRUNED but which may still appear in
@@ -872,6 +885,7 @@ __all__ = [
     "V1_BASELINE_UNIVERSE",
     "V1_FEATURE_COLUMNS",
     "V1_FEATURE_COLUMNS_PRUNED",
+    "V1_ITER084_FEATURE_COLUMNS",
     "V1_OOD_FEATURE_COLUMNS",
     "V1_RETIRED_FEATURE_COLUMNS",
     "assert_v1_universe",
