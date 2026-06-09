@@ -1,0 +1,12 @@
+{
+  "coin": "GRTUSDT",
+  "probe_is_sharpe": -1.5658,
+  "gate2_pass": false,
+  "n_trades": 148,
+  "pnl_total": -91.07,
+  "elapsed_s": 40.6,
+  "seed": 42,
+  "n_trials": 10,
+  "feature_cols": 48,
+  "note": "single-seed=42, n_trials=10, IS-only, no new features, baseline structure probe"
+}
