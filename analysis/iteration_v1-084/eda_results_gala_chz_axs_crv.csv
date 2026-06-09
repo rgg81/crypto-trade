@@ -1,0 +1,7 @@
+symbol,data_years,IS_years,IS_bars,triv_5d,triv_21d,triv_50d,min_horizon,natr30_p50,bull_S,bear_S,chop_S,verdict
+GALAUSDT,4.66,3.51,3849,+0.854,+0.627,+0.991,+0.627,5.085,+1.645,+0.114,-0.316,LOW
+CHZUSDT,5.11,4.17,4569,+0.939,+0.825,+0.454,+0.454,4.714,+1.381,-0.080,+1.708,LOW
+AXSUSDT,5.49,4.34,4755,+0.906,+1.166,+1.504,+0.906,4.692,+2.084,+0.089,+1.355,NONE
+CRVUSDT,5.71,4.56,4995,+0.352,+0.294,+0.069,+0.069,5.600,+1.283,-0.470,+0.139,MEDIUM
+
+BEST=CRVUSDT min_horizon_sharpe=+0.069 verdict=MEDIUM
