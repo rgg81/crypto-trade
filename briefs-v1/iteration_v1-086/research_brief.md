@@ -159,16 +159,20 @@ TRB clears the full HARD ladder: lowest bundle-correlation (GATE 0) + negative s
 
 ---
 
-## Section 3.5 — LM Master Phase 4.5 Integration (placeholder)
+## Section 3.5 — LM Master Phase 4.5 Integration
 
-The LightGBM Master Phase 4.5 advisory (`briefs-v1/iteration_v1-086/lgbm_advisor.md`) will be authored next, after this brief. This subsection is the placeholder the Phase 5.5 gate expects; it will be filled with adopt/modify/reject responses to each LM Master recommendation before the brief is finalized for Phase 5.5.
+The LightGBM Master Phase 4.5 advisory (`briefs-v1/iteration_v1-086/lgbm_advisor.md`) was authored after this brief; the QR responses to each recommendation are below.
 
-**Anticipated LM Master focus** (given the stock-stack / no-new-features constraint):
-- Hyperparameter recommendations: this iteration FIXES `max_depth=5` / `num_leaves=31` and `n_trials=30` per the methodology-lock; any LM Master HP suggestion outside those locks will be **MODIFIED or REJECTED** with the methodology-lock cited (consistent with the AAVE/078 + UNI/085 spec).
-- Feature-engineering ideas: **any "add a feature" recommendation will be REJECTED** — the entire thesis of /086 is that the edge is present in the stock 48-col stack and that adding features is the /085 crater mechanism. The QR will record the rejection with the /085 inert-feature evidence as the rationale.
-- Saturation risk: LM Master is expected to flag the single-outer-seed basin risk; the QR response will point to the 50-inner-seed variance control + `cross_seed_sharpe_std` adjudicator (Section 2.5).
+| LM rec | QR disposition | Rationale |
+|---|---|---|
+| **Rec 1 — HP landing predictions** (lr ~0.018, reg_alpha 0.8–2.0, colsample 0.65–0.75, training_days 240–320 modal ~300; SHORT <120d landing = red flag) | **NOTED (no action — within-lock prediction)** | These are predicted landings, not bound changes; the `v1_pruned` Optuna search is unchanged. Phase 7.4 will check the realized `training_days` distribution against the predicted MEDIUM-LONG window; a SHORT (<120d) landing is pre-registered as a short-horizon-noise red flag. |
+| **Rec 2 — 50-seed mean IS ≈ +0.48 [+0.38,+0.62]; cross_seed_std predicted [0.05,0.20]** | **ADOPTED as the modal anchor** | Tightens Section 7's modal to ~+0.48. The pre-registered basin-lottery falsifier (cross_seed_std > 0.40 with positive single-seed but mean < +0.20) is folded into F2. |
+| **Rec 3 — feature-importance prediction (vol_atr_14 r1-2; mom_macd_line ≤5 DISCRIMINATING; trend_adx_14 r3-7; oi_delta_30_z90 r2-4)** | **ADOPTED as a Phase 7.4 pre-registered check + NEW F5 below** | The discriminating prediction (MACD/ADX must bind ABOVE the shared vol_atr_14/oi_delta anchors) is load-bearing for the diversification thesis and is hereby promoted to a formal falsifier (F5). |
+| **Rec 4 — R5 cold-start telemetry (isolate 2020-09→2020-10-15 first-45-day IS PnL)** | **ADOPTED as Phase 7.4 telemetry** | Already in Section 6 R5 note; Phase 8 diary must attribute any early-IS magnitude spike to R5 cold-start, not structure (the /085 forensic discipline). |
+| **Rec 5 — diversification is CONDITIONAL; 0.548 is the least-correlated SURVIVOR not a classic low-corr; compute realized PnL-stream corr, not return-corr proxy** | **ADOPTED — promoted to F5 + bundle-assembly precondition** | This is the single most important caveat. The 0.548 is return-correlation; the BUNDLE-003 seat decision must use the realized TRB-specialist-PnL vs bundle-PnL correlation. See F5. |
+| **(implicit) "add a feature" / change the lock** | **REJECTED by design** | The entire /086 thesis is that the edge is in the stock 48-col stack; adding features is the /085 crater mechanism. No HP-bound or lock changes (max_depth=5, num_leaves=31, n_trials=30, 50 seeds all fixed). |
 
-**Pre-registered stance**: HP recommendations adopt-iff-within-lock; feature additions REJECT-by-design; the `cross_seed_sharpe_std` basin check is the agreed adjudication instrument. Final adopt/modify/reject responses land here before Phase 5.5.
+**Net**: no HP-bound or feature changes (all within-lock); the LM's diversification-conditionality (Rec 3 + Rec 5) is promoted to a formal falsifier F5 and a BUNDLE-assembly precondition.
 
 ---
 
@@ -184,7 +188,9 @@ Since there are **no new features**, the falsifiers are framed around realized S
   - **NEGATIVE** iff IS Sharpe **< +0.20**.
 - **F4 — TS-mom-beat**: realized IS Sharpe must **exceed the trivial min-horizon −0.179 AND clear +0.00**. FAIL (IS < 0) → NEGATIVE-MOMENTUM-DOMINATED (worse than not trading IS).
 
-**Pre-registered bundle-fit note**: TRB's value is as a LOW-CORRELATION diversifier (H2). A moderate standalone IS Sharpe in the **[+0.20, +0.50]** band could still be **bundle-accretive** if the 0.548 bundle-correlation holds OOS — i.e., a PROMISING standalone with confirmed low correlation is a legitimate BUNDLE-003 candidate seat, evaluated for accretion at the future BUNDLE assembly, NOT discarded for being sub-+0.50. This pre-registration prevents post-hoc rationalization in either direction: a sub-+0.20 result is NEGATIVE regardless of correlation; a [+0.20,+0.50] result is PROMISING-pending-bundle-fit; a ≥+0.50 result is VALIDATED.
+- **F5 — diversification-conditionality (NEW, promoted from LM Master Rec 3 + Rec 5; load-bearing for the bundle-seat decision)**: TRB's diversification value is CONDITIONAL on its momentum tier binding ABOVE the bundle-shared anchors. Two pre-registered Phase 7.4 checks: (a) **importance-ordering** — `mom_macd_line_12_26_9` AND/OR `trend_adx_14` must rank in the TRB IS top-5, ABOVE the shared `vol_atr_14`/`oi_delta_30_z90` anchors NOT being the *sole* top-2; if `vol_atr_14` + `oi_delta_30_z90` dominate AND MACD/ADX sit rank > 8, TRB is **re-learning the shared bundle basis** → diversification thesis WEAKENED (flag `DIVERSIFIER-DEGENERATE`); (b) **realized PnL-stream correlation** — Phase 7.4 must compute the TRB-specialist daily-PnL vs equal-weight-bundle daily-PnL correlation (IS-only); the BUNDLE-003 seat decision uses THIS realized number, NOT the 0.548 return-correlation proxy. A PROMISING standalone (F3 [+0.20,+0.50]) is bundle-accretive ONLY if realized PnL-corr comes in BELOW ~0.55. **Reframe (LM Rec 5): 0.548 is the least-correlated SURVIVOR of a high-baseline universe (STORJ 0.5505 essentially tied), NOT a classically low-corr diversifier — the benefit is REAL but MODEST and must be earned via differentiated trade-timing, verified in Phase 7.4.**
+
+**Pre-registered bundle-fit note**: TRB's value is as a LOW-CORRELATION diversifier (H2). A moderate standalone IS Sharpe in the **[+0.20, +0.50]** band could still be **bundle-accretive** if the realized PnL-stream correlation (F5b, NOT the 0.548 return-corr proxy) holds low OOS — i.e., a PROMISING standalone with confirmed low PnL-correlation AND F5a importance-ordering pass is a legitimate BUNDLE-003 candidate seat, evaluated for accretion at the future BUNDLE assembly, NOT discarded for being sub-+0.50. This pre-registration prevents post-hoc rationalization in either direction: a sub-+0.20 result is NEGATIVE regardless of correlation; a [+0.20,+0.50] result is PROMISING-pending-bundle-fit (F5a + F5b must pass); a ≥+0.50 result is VALIDATED.
 
 ---
 
