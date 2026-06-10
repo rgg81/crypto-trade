@@ -780,6 +780,37 @@ assert len(active_feature_columns) == 52 guard fires in dispatch branch.
 assert all 4 new features in active_feature_columns guard fires in dispatch branch.
 """
 
+V1_ITER086_UNIVERSE: tuple[str, ...] = ("TRBUSDT",)
+"""iter-v1/086 cohort: TRBUSDT-only SPECIALIST — STOCK 48-col stack, NO new features.
+
+Cycle-7 SPECIALIST-MINE #6; first fresh-mine candidate to clear the full HARD gate ladder:
+  GATE 0: lowest average bundle-correlation (avg 0.548 vs {DOT, ETH, BTC, AAVE})
+  GATE 1: negative short-horizon trivial baseline (min-horizon −0.179 ≤ +0.15)
+  GATE 2 PRIMARY: structure-probe PASS (IS Sharpe +0.4930 ≥ +0.30)
+  GATE 2 SECONDARY: max |IC| 0.3863 (mom_macd_line_12_26_9) — momentum/trend structure
+
+Feature set: V1_FEATURE_COLUMNS_PRUNED (48 cols, STOCK, UNCHANGED — NO new features).
+Global V1_FEATURE_COLUMNS_PRUNED stays at 48. This is the load-bearing one-variable
+discipline: the edge is already in the stock stack (confirmed by probe), so no feature
+engineering surface is exposed for the /085 inert-feature noise-amplification trap.
+
+Methodology constants (methodology-locked, mirrors AAVE/078 + UNI/085 spec):
+    50 inner seeds (42..91) × 30 Optuna trials × specialist_mode=True
+    ENSEMBLE_SIZE=1, single outer seed=42, mean-of-signed-weights aggregator
+    max_depth=5 FIXED, num_leaves=31 FIXED
+    R1=OFF (CATALOG-CLOSED for SPECIALIST_mode; f81cafc3)
+    R2=OFF (Model A wrapper — matches /064 ETH, /065 BTC, /078 AAVE)
+    R3=ON-SHARED cutoff=0.70, R5=ON vt_target_vol=0.3
+    ATR cell: atr_tp=2.9, atr_sl=1.45 (Model A ETH/AAVE/UNI cell)
+
+HIGH-RISK declaration: universe substitution (new symbol) changes Optuna training-objective
+domain. Mitigation: 50-inner-seed ensemble.
+
+LOCAL to runner constant. NOT shared; CONFIRMATION-MERGE updates V1_BASELINE_UNIVERSE.
+assert set(symbols) == {"TRBUSDT"} guard fires in dispatch branch.
+assert len(active_feature_columns) == 48 guard fires in dispatch branch.
+"""
+
 V1_ITER065_UNIVERSE: tuple[str, ...] = ("BTCUSDT",)
 """iter-v1/065 cohort: BTC-only SPECIALIST (third SPECIALIST under SPECIALIST + BUNDLE methodology).
 
@@ -969,6 +1000,7 @@ __all__ = [
     "V1_ITER084_UNIVERSE",
     "V1_ITER085_UNIVERSE",
     "V1_ITER085_FEATURE_COLUMNS",
+    "V1_ITER086_UNIVERSE",
     # iter-v1/023: funding-rate feature family (add_funding_v1_features imported on demand)
     # iter-v1/025: OI delta feature family (add_oi_delta_v1_features imported on demand)
     # iter-v1/040: composed feature family (add_composed_v1_features imported on demand)

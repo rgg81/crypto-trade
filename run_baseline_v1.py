@@ -97,6 +97,7 @@ from crypto_trade.features_v1 import (
     V1_ITER084_UNIVERSE,
     V1_ITER085_FEATURE_COLUMNS,
     V1_ITER085_UNIVERSE,
+    V1_ITER086_UNIVERSE,
     V1_OOD_FEATURE_COLUMNS,
     assert_v1_universe,
 )
@@ -7997,6 +7998,171 @@ def main() -> None:
         _r5_model_results = [results_e085]
         _post_dispatch_fi_strategies = [("Model_A_UNI_specialist_085", _strat_e085)]
 
+    elif iteration_label == "v1-086" and set(symbols) == set(V1_ITER086_UNIVERSE):
+        # iter-v1/086: TRBUSDT SPECIALIST — STOCK 48-col stack, NO new features.
+        # Cycle-7 SPECIALIST-MINE #6; first fresh-mine candidate to clear the full HARD gate
+        # ladder (GATE 0 lowest bundle-correlation 0.548, GATE 1 negative trivial baseline
+        # −0.179, GATE 2 PRIMARY +0.4930, GATE 2 SECONDARY max|IC| 0.3863).
+        #
+        # KEY DIFFERENCE vs /085: NO new features. Feature set = V1_FEATURE_COLUMNS_PRUNED
+        # (STOCK 48 cols, UNCHANGED). Global V1_FEATURE_COLUMNS_PRUNED stays at 48.
+        # active_feature_columns is NOT overridden — uses the global 48-col PRUNED set.
+        # This is the load-bearing one-variable discipline: the edge is already in the stock
+        # stack (confirmed by probe +0.4930), so no feature engineering surface is exposed.
+        #
+        # SPECIALIST + BUNDLE design (same as /075+/076+/084+/085):
+        #   - 50 independent Optuna studies, one per seed (V1_SPECIALIST_SEEDS: 42..91)
+        #   - Each study: n_trials=V1_SPECIALIST_OPTUNA_TRIALS=30, ENSEMBLE_SIZE=1
+        #   - LightGBM HP search: max_depth=5 FIXED, num_leaves=31 FIXED
+        #   - confidence_threshold Optuna-tunable per seed (range [0.50, 0.85])
+        #   - Aggregator at inference: mean-of-signed-weights across 50 seeds
+        #
+        # Wall-clock mitigation (same as /075+/076+/084+/085):
+        #   - n_estimators upper bound = 500
+        #   - n_startup_trials = 10
+        #
+        # Risk config (Model A wrapper — R1=OFF, R2=OFF):
+        #   R1=OFF   CATALOG-CLOSED for SPECIALIST_mode (f81cafc3)
+        #   R2=OFF   Model A baseline
+        #   R3=ON    Mahalanobis OOD gate, cutoff=0.70, 16 scale-invariant features;
+        #            applied at AGGREGATOR level (NOT per-seed)
+        #   R5=ON    vt_target_vol=0.3, vt_lookback_days=45, vt_min_scale=0.33
+        #   atr_tp=2.9, atr_sl=1.45 (Model A ETH cell; matches ATR cell for TRB vol class)
+        #
+        # NaN notes:
+        #   dot_vs_btc_ret_ratio_30 + eth_vs_btc_ret_ratio_30 ALL-NaN for TRB
+        #   (SYMBOL-conditional; LightGBM handles NaN natively; 2/48 wasted slots).
+        #
+        # LOAD-BEARING: specialist_dispersion.csv persistence (matching /065+/074+/075+/076
+        #               +/084+/085).
+        assert set(symbols) == {"TRBUSDT"}, (
+            f"iter-v1/086 guard: expected {{TRBUSDT}}, got {set(symbols)}"
+        )
+        # /086 uses the global V1_FEATURE_COLUMNS_PRUNED (48 cols, STOCK, UNCHANGED).
+        # NO local feature override — active_feature_columns already set to
+        # V1_FEATURE_COLUMNS_PRUNED (48 cols) by the --pruned-features path above.
+        assert len(active_feature_columns) == 48, (
+            f"iter-v1/086 guard: expected 48 cols (V1_FEATURE_COLUMNS_PRUNED, STOCK, "
+            f"NO new features), got {len(active_feature_columns)}. "
+            "Global V1_FEATURE_COLUMNS_PRUNED must stay at 48. "
+            "iter-v1/086 adds ZERO new feature columns by design."
+        )
+        print(
+            f"[iter-v1/086] TRB SPECIALIST — STOCK 48-col stack, NO new features: "
+            f"V1_SPECIALIST_SEED_COUNT={V1_SPECIALIST_SEED_COUNT} "
+            f"V1_SPECIALIST_OPTUNA_TRIALS={V1_SPECIALIST_OPTUNA_TRIALS} "
+            f"specialist_mode=True "
+            f"max_depth=5 FIXED, num_leaves=31 FIXED. "
+            f"R1=OFF (CATALOG-CLOSED; f81cafc3), R2=OFF, "
+            f"R3=ON-SHARED cutoff=0.70, R5=ON vt_target_vol=0.3. "
+            f"features=V1_FEATURE_COLUMNS_PRUNED (48 cols; STOCK; NO new features). "
+            f"atr_tp=2.9, atr_sl=1.45 (Model A ETH cell; vol-class match TRB). "
+            f"NaN: dot_vs_btc_ret_ratio_30+eth_vs_btc_ret_ratio_30 ALL-NaN (SYMBOL-cond; OK). "
+            f"n_estimators_max=500 (wall-clock). n_startup_trials=10 (wall-clock). "
+            f"Aggregator: mean-of-signed-weights across {V1_SPECIALIST_SEED_COUNT} seeds. "
+            f"LOAD-BEARING: specialist_dispersion.csv will be persisted post-backtest."
+        )
+        _config_e086 = BacktestConfig(
+            symbols=("TRBUSDT",),
+            interval="8h",
+            max_amount_usd=1000.0,
+            stop_loss_pct=2.9,  # ATR-based; overridden by atr_sl_multiplier=1.45
+            take_profit_pct=5.8,  # ATR-based; overridden by atr_tp_multiplier=2.9
+            timeout_minutes=10080,
+            fee_pct=0.1,
+            data_dir=Path("data"),
+            cooldown_candles=2,
+            vol_targeting=True,
+            vt_target_vol=0.3,
+            vt_lookback_days=45,
+            vt_min_scale=0.33,
+            vt_max_scale=2.0,
+            risk_consecutive_sl_limit=0,  # R1=OFF: CATALOG-CLOSED for SPECIALIST_mode
+            risk_consecutive_sl_cooldown_candles=0,
+            risk_drawdown_scale_enabled=False,  # R2=OFF: Model A baseline
+            risk_r5_vol_target_enabled=_r5_kwargs.get("r5_vol_target_enabled", True),
+            risk_r5_vol_target_pct=_r5_kwargs.get("r5_vol_target_pct", 4.0),
+            risk_r5_kill_low_natr_enabled=_r5_kwargs.get("r5_kill_low_natr_enabled", False),
+            risk_r5_kill_low_natr_min_pct=_r5_kwargs.get("r5_kill_low_natr_min_pct", 2.0),
+        )
+        _strat_e086 = LightGbmStrategy(
+            training_months=24,
+            n_trials=V1_SPECIALIST_OPTUNA_TRIALS,  # informational; specialist loop controls
+            cv_splits=5,
+            label_tp_pct=5.8,
+            label_sl_pct=2.9,
+            label_timeout_minutes=10080,
+            fee_pct=0.1,
+            features_dir="data/features",
+            verbose=1,
+            atr_tp_multiplier=2.9,
+            atr_sl_multiplier=1.45,
+            use_atr_labeling=True,
+            # placeholder seed — specialist_mode uses V1_SPECIALIST_SEEDS internally
+            ensemble_seeds=list(V1_SPECIALIST_SEEDS[:1]),
+            feature_columns=active_feature_columns,  # 48-col V1_FEATURE_COLUMNS_PRUNED
+            ood_enabled=True,  # R3 ON at AGGREGATOR level (SHARED — UNCHANGED from /085)
+            ood_features=list(V1_OOD_FEATURE_COLUMNS),
+            ood_cutoff_pct=0.70,
+            oof_persist_path=OOF_PARQUET_PATH,
+            bounds_profile="v1_specialist",
+            specialist_mode=True,
+            specialist_n_startup_trials=10,
+            specialist_n_estimators_max=500,
+        )
+        import time as _time_086  # noqa: PLC0415
+
+        _t0_086 = _time_086.time()
+        results_e086 = run_backtest(_config_e086, _strat_e086, yearly_pnl_check=False)
+        _elapsed_086 = _time_086.time() - _t0_086
+        faxm_e086 = _strat_e086._faxm_log
+        print(
+            f"\n[iter-v1/086] Model_A_TRB_specialist_086 complete: "
+            f"{len(results_e086)} trades in {_elapsed_086:.0f}s "
+            f"({_elapsed_086 / 3600:.2f}h)"
+        )
+
+        # Cohort isolation sanity: assert ONLY TRBUSDT trades emitted.
+        _e086_symbols = {r.symbol for r in results_e086}
+        assert _e086_symbols.issubset({"TRBUSDT"}), (
+            f"[iter-v1/086] Model_A_TRB produced non-TRB results: "
+            f"{_e086_symbols - {'TRBUSDT'}}. "
+            "Per-cohort isolation failed — iter-v1/086 must trade TRBUSDT ONLY."
+        )
+
+        # -----------------------------------------------------------------
+        # LOAD-BEARING: specialist_dispersion.csv persistence
+        # (matching /065+/074+/075+/076+/084+/085).
+        # -----------------------------------------------------------------
+        _disp_mean_e086 = _strat_e086.get_specialist_dispersion_mean()
+        _disp_is_path_e086 = (
+            Path(reports_dir) / "iteration_v1-086" / "in_sample" / "specialist_dispersion.csv"
+        )
+        _disp_is_path_e086.parent.mkdir(parents=True, exist_ok=True)
+        _strat_e086.persist_specialist_dispersion_csv(str(_disp_is_path_e086))
+        print(
+            f"[iter-v1/086] LOAD-BEARING dispersion patch: "
+            f"specialist_dispersion_mean={_disp_mean_e086} "
+            f"specialist_dispersion.csv → {_disp_is_path_e086}"
+        )
+        # Store for post-report block (specialist_dispersion_mean appended to comparison.csv
+        # AFTER generate_iteration_reports() runs — comparison.csv written there).
+        _e086_disp_mean = _disp_mean_e086
+        _e086_disp_csv_path = _disp_is_path_e086
+
+        print(
+            f"[iter-v1/086] Dispatch verified: "
+            f"TRB-only={len(results_e086)} trades. "
+            f"R1=OFF/R2=OFF/R3=ON-AGGREGATOR-LEVEL. "
+            f"SPECIALIST seeds={len(_strat_e086._specialist_models)} trained. "
+            f"sigma_pop mean={_disp_mean_e086}"
+        )
+
+        _all_faxm_logs = faxm_e086
+        all_results = results_e086
+        _r5_model_results = [results_e086]
+        _post_dispatch_fi_strategies = [("Model_A_TRB_specialist_086", _strat_e086)]
+
     elif iteration_label == "v1-044":
         # iter-v1/044: CONFIRMATION-MERGE-PORTFOLIO (cycle-5 CONFIRMATION 1/1).
         # 3-component bundle: BASELINE_V1 (w=0.50) + /036 (w=0.30) + /043 (w=0.20).
@@ -9358,6 +9524,41 @@ def main() -> None:
         if _strat_085_ref is not None:
             _strat_085_ref.persist_specialist_dispersion_csv(str(_oos_disp_path_085))
             print(f"[iter-v1/085] OOS specialist_dispersion.csv persisted → {_oos_disp_path_085}")
+
+    # -------------------------------------------------------------------------
+    # iter-v1/086: specialist_dispersion_mean + OOS specialist_dispersion.csv
+    # → comparison.csv. Mirrors the /065+/074+/075+/076+/084+/085 pattern.
+    # Guard: only runs when _e086_disp_mean is defined (v1-086 dispatch sets it).
+    # -------------------------------------------------------------------------
+    if iteration_label == "v1-086" and "_e086_disp_mean" in dir():
+        _disp_mean_val_086 = locals().get("_e086_disp_mean")
+        if _disp_mean_val_086 is not None:
+            import csv as _csv_086  # noqa: PLC0415
+
+            _comp_csv_086 = report_dir / "comparison.csv"
+            if _comp_csv_086.exists():
+                with _comp_csv_086.open("a", newline="") as _fh_086:
+                    _writer_086 = _csv_086.writer(_fh_086)
+                    _writer_086.writerow(["specialist_dispersion_mean", _disp_mean_val_086, "", ""])
+                print(
+                    f"[iter-v1/086] LOAD-BEARING: specialist_dispersion_mean="
+                    f"{_disp_mean_val_086:.4f} appended to {_comp_csv_086}"
+                )
+            else:
+                print(
+                    f"[iter-v1/086] WARNING: comparison.csv not found at {_comp_csv_086}; "
+                    f"specialist_dispersion_mean={_disp_mean_val_086:.4f} NOT appended."
+                )
+        # Persist OOS specialist_dispersion.csv (F-AXIS #2 audit; /065+/074+/075+/076+/084+/085).
+        _oos_disp_path_086 = report_dir / "out_of_sample" / "specialist_dispersion.csv"
+        _oos_disp_path_086.parent.mkdir(parents=True, exist_ok=True)
+        _strat_086_ref = next(
+            (s for _, s in _post_dispatch_fi_strategies if "TRB_specialist_086" in _),
+            None,
+        )
+        if _strat_086_ref is not None:
+            _strat_086_ref.persist_specialist_dispersion_csv(str(_oos_disp_path_086))
+            print(f"[iter-v1/086] OOS specialist_dispersion.csv persisted → {_oos_disp_path_086}")
 
     # -------------------------------------------------------------------------
     # iter-v1/021+: write feature importance CSVs (post-dispatch).
