@@ -32,7 +32,11 @@ from crypto_trade.live.models import BASELINE_FEATURE_COLUMNS, OOD_FEATURE_COLUM
 # ---------------------------------------------------------------------------
 
 # Symbols NOT allowed in v1 (refactored). These are reserved by v2 (live),
-# v3 (live), or kept reserved for historical reasons (BNB).
+# v3 (live), or kept reserved for explicit methodological reasons.
+# iter-v1/087: BNBUSDT UN-RESERVED per user directive 2026-06-10.
+#   "Don't discard BNB — un-reserve it." The real backtest (run_iteration_087.py)
+#   is the proof; the fail-fast gate decides the outcome rather than a pre-hoc
+#   reservation.  XRP/DOGE/NEAR/SOL/BCH/LDO/TRX remain excluded (v2/v3 live).
 V1_EXCLUDED_SYMBOLS: tuple[str, ...] = (
     # v2 traded (live, separate track)
     # iter-v1/017: SOLUSDT removed from exclusion list to enable universe-expansion
@@ -47,8 +51,9 @@ V1_EXCLUDED_SYMBOLS: tuple[str, ...] = (
     "BCHUSDT",
     "LDOUSDT",
     "TRXUSDT",
-    # historical reservation (never traded, kept reserved)
-    "BNBUSDT",
+    # iter-v1/087: BNBUSDT deliberately removed from exclusion list.
+    # The backtest (run_iteration_087.py) with fail_fast_is_years=2.0 is the proof.
+    # "BNBUSDT",  ← un-reserved per user directive 2026-06-10
 )
 
 # Initial baseline universe (corrected walk-forward stats anchored to these 5
@@ -811,6 +816,38 @@ assert set(symbols) == {"TRBUSDT"} guard fires in dispatch branch.
 assert len(active_feature_columns) == 48 guard fires in dispatch branch.
 """
 
+V1_ITER087_UNIVERSE: tuple[str, ...] = ("BNBUSDT",)
+"""iter-v1/087 cohort: BNBUSDT-only SPECIALIST — STOCK 48-col stack, fail-fast gate.
+
+Cycle-7 SPECIALIST-MINE #7. BNBUSDT un-reserved per user directive 2026-06-10
+("Don't discard BNB — un-reserve it. The backtest is the proof.").
+
+Axis: per-cohort-specialization-BNB (universe substitution; NEW symbol in the
+SPECIALIST roster). BNBUSDT is a top-10 perpetual by liquidity and OI; it was
+historically reserved but never tested against the stock 48-col stack.
+
+Fail-fast gate: fail_fast_is_years=2.0 enabled. If cumulative IS weighted_pnl
+over the first 730 days of IS test trades is ≤ 0 → BLOCKED-FAIL-FAST, run aborts
+early (saves remaining IS+OOS months × 50 seeds × 30 trials of compute).
+
+Feature set: V1_FEATURE_COLUMNS_PRUNED (48 cols, STOCK, UNCHANGED).
+Methodology (mirrors AAVE/076, UNI/085, TRB/086):
+    50 inner seeds (42..91) × 30 Optuna trials × specialist_mode=True
+    ENSEMBLE_SIZE=1, single outer seed, mean-of-signed-weights aggregator
+    max_depth=5 FIXED, num_leaves=31 FIXED
+    R1=OFF (CATALOG-CLOSED for SPECIALIST_mode)
+    R2=OFF (Model A baseline)
+    R3=ON-SHARED cutoff=0.70, R5=ON vt_target_vol=0.3
+    ATR cell: atr_tp=2.9, atr_sl=1.45
+
+HIGH-RISK: universe substitution (new symbol) changes Optuna training-objective
+domain. Mitigation: 50-inner-seed ensemble.
+
+LOCAL to runner constant. NOT shared; CONFIRMATION-MERGE updates V1_BASELINE_UNIVERSE.
+assert set(symbols) == {"BNBUSDT"} guard fires in dispatch branch.
+assert len(active_feature_columns) == 48 guard fires in dispatch branch.
+"""
+
 V1_ITER065_UNIVERSE: tuple[str, ...] = ("BTCUSDT",)
 """iter-v1/065 cohort: BTC-only SPECIALIST (third SPECIALIST under SPECIALIST + BUNDLE methodology).
 
@@ -1001,6 +1038,7 @@ __all__ = [
     "V1_ITER085_UNIVERSE",
     "V1_ITER085_FEATURE_COLUMNS",
     "V1_ITER086_UNIVERSE",
+    "V1_ITER087_UNIVERSE",
     # iter-v1/023: funding-rate feature family (add_funding_v1_features imported on demand)
     # iter-v1/025: OI delta feature family (add_oi_delta_v1_features imported on demand)
     # iter-v1/040: composed feature family (add_composed_v1_features imported on demand)

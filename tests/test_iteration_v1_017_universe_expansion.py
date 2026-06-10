@@ -80,10 +80,16 @@ class TestV1ExcludedSymbolsUpdate:
         for sym in ("XRPUSDT", "DOGEUSDT", "NEARUSDT"):
             assert sym in V1_EXCLUDED_SYMBOLS, f"v2 symbol {sym} must remain in V1_EXCLUDED_SYMBOLS"
 
-    def test_bnbusdt_still_excluded(self) -> None:
-        """BNBUSDT historical reservation must remain excluded."""
-        assert "BNBUSDT" in V1_EXCLUDED_SYMBOLS, (
-            "BNBUSDT historical reservation must remain in V1_EXCLUDED_SYMBOLS"
+    def test_bnbusdt_not_excluded(self) -> None:
+        """BNBUSDT was un-reserved per iter-v1/087 user directive 2026-06-10.
+
+        'Don't discard BNB — un-reserve it. The backtest is the proof.'
+        BNBUSDT is no longer in V1_EXCLUDED_SYMBOLS; the real backtest
+        (run_iteration_087.py with fail_fast_is_years=2.0) is the gate.
+        """
+        assert "BNBUSDT" not in V1_EXCLUDED_SYMBOLS, (
+            "iter-v1/087 un-reserved BNBUSDT — it must NOT be in V1_EXCLUDED_SYMBOLS. "
+            f"Current V1_EXCLUDED_SYMBOLS = {V1_EXCLUDED_SYMBOLS}"
         )
 
 
@@ -109,10 +115,11 @@ class TestAssertV1UniverseAcceptsIter017Universe:
         with pytest.raises(AssertionError, match="v1 cannot trade v2/v3 symbols"):
             assert_v1_universe(("BTCUSDT", "ETHUSDT", "XRPUSDT"))
 
-    def test_assert_rejects_bnb(self) -> None:
-        """assert_v1_universe must reject BNBUSDT (historical reservation)."""
-        with pytest.raises(AssertionError, match="v1 cannot trade v2/v3 symbols"):
-            assert_v1_universe(("BTCUSDT", "BNBUSDT"))
+    def test_assert_accepts_bnb(self) -> None:
+        """assert_v1_universe must now accept BNBUSDT (un-reserved at iter-v1/087)."""
+        # iter-v1/087: BNB un-reserved per user directive 2026-06-10.
+        # assert_v1_universe must NOT raise for BNBUSDT.
+        assert_v1_universe(("BTCUSDT", "BNBUSDT"))
 
 
 class TestIter017DispatchBranchDistinction:

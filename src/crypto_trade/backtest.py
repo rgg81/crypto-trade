@@ -142,11 +142,21 @@ def run_backtest(
     *,
     profile_memory: bool = False,
     yearly_pnl_check: bool = False,
+    fail_fast_is_years: float | None = None,
 ) -> BacktestResult:
     """Run a backtest over historical kline data using the given strategy.
 
     If *yearly_pnl_check* is True, checks cumulative PnL at each year
     boundary. Raises EarlyStopError if year-1 PnL is negative.
+
+    If *fail_fast_is_years* is set (e.g. 2.0), monitors IS test trades (those
+    that close before OOS_CUTOFF_MS).  Once the accumulated IS test trades span
+    at least that many years from the first IS test trade's close_time, the
+    cumulative ``weighted_pnl`` of those trades is evaluated.  If it is ≤ 0 the
+    backtest raises ``EarlyStopError`` with reason prefix
+    ``"BLOCKED-FAIL-FAST: ..."``.  Callers that want default behaviour must
+    leave this parameter at its default ``None`` — the backtest is then
+    byte-identical to all pre-/087 runs.
     """
     if profile_memory:
         tracemalloc.start()
@@ -327,6 +337,14 @@ def run_backtest(
     _yearly_trades: dict[int, int] = {}
     _yearly_wins: dict[int, int] = {}
 
+    # iter-v1/087 fail-fast IS tracking (opt-in; default OFF = None).
+    # Accumulates IS test trades (close_time < OOS_CUTOFF_MS) to evaluate
+    # cumulative weighted_pnl once the first `fail_fast_is_years` years of IS
+    # test coverage have elapsed.  Abort fires AT MOST ONCE per backtest run.
+    _ff_is_wpnl: float = 0.0
+    _ff_is_first_close_ms: int | None = None  # first IS test trade close_time
+    _ff_is_fired: bool = False  # True once the checkpoint has been evaluated
+
     for i in range(len(master)):
         sym = str(sym_arr[i])
         ot = int(open_time_arr[i])
@@ -390,6 +408,40 @@ def run_backtest(
                     cum_weighted_pnl += result.weighted_pnl
                     if cum_weighted_pnl > peak_weighted_pnl:
                         peak_weighted_pnl = cum_weighted_pnl
+                # iter-v1/087 fail-fast IS checkpoint (opt-in; default OFF = None).
+                # Only evaluates IS test trades (close_time < OOS_CUTOFF_MS).
+                # Fires AT MOST ONCE: once the accumulated IS trades span
+                # fail_fast_is_years from the first IS trade's close_time,
+                # checks cumulative weighted_pnl. If ≤ 0 → EarlyStopError.
+                if fail_fast_is_years is not None and not _ff_is_fired:
+                    _ct = result.close_time
+                    if _ct < OOS_CUTOFF_MS:
+                        _ff_is_wpnl += result.weighted_pnl
+                        if _ff_is_first_close_ms is None:
+                            _ff_is_first_close_ms = _ct
+                        else:
+                            _ff_span_ms = _ct - _ff_is_first_close_ms
+                            _ff_threshold_ms = fail_fast_is_years * 365.25 * 86_400_000.0
+                            if _ff_span_ms >= _ff_threshold_ms:
+                                _ff_is_fired = True
+                                _ff_n = sum(1 for r in results if r.close_time < OOS_CUTOFF_MS)
+                                _ff_span_days = _ff_span_ms / 86_400_000.0
+                                if _ff_is_wpnl <= 0.0:
+                                    raise EarlyStopError(
+                                        f"BLOCKED-FAIL-FAST: first {_ff_span_days:.0f}d IS "
+                                        f"weighted_pnl={_ff_is_wpnl:+.4f} "
+                                        f"(≤0; {_ff_n} IS trades over "
+                                        f"{fail_fast_is_years:.1f}yr window)",
+                                        results,
+                                        total_signals,
+                                    )
+                                else:
+                                    print(
+                                        f"[fail-fast] IS {fail_fast_is_years:.1f}yr checkpoint "
+                                        f"PASSED: weighted_pnl={_ff_is_wpnl:+.4f} "
+                                        f"({_ff_n} IS trades over {_ff_span_days:.0f}d) — "
+                                        f"continuing to full run"
+                                    )
                 # Yearly fail-fast check — per skill spec:
                 #   Year-1 boundary: check year-1 cumulative PnL ≥ 0
                 #   Year-2 boundary: check cumulative year-1+2 PnL ≥ 0

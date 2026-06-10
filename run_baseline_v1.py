@@ -66,7 +66,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from crypto_trade.backtest import run_backtest
+from crypto_trade.backtest import EarlyStopError, run_backtest
 from crypto_trade.backtest_models import BacktestConfig, BacktestResult, TradeResult
 from crypto_trade.config import OOS_CUTOFF_MS
 from crypto_trade.features_v1 import (
@@ -98,6 +98,7 @@ from crypto_trade.features_v1 import (
     V1_ITER085_FEATURE_COLUMNS,
     V1_ITER085_UNIVERSE,
     V1_ITER086_UNIVERSE,
+    V1_ITER087_UNIVERSE,
     V1_OOD_FEATURE_COLUMNS,
     assert_v1_universe,
 )
@@ -2901,6 +2902,26 @@ def main() -> None:
             "Default: reports-v1/iteration_v1-<label>/. "
             "Used internally by bundle dispatch to route component reports "
             "under reports-v1/iteration_v1-044/{component}/."
+        ),
+    )
+    # iter-v1/087: opt-in fail-fast IS gate.
+    # Default None = OFF (byte-identical to all prior runs).
+    # When set (e.g. 2.0), the backtest monitors cumulative IS weighted_pnl for
+    # the first N years of IS test trades.  If ≤ 0 at the N-year mark, an
+    # EarlyStopError with "BLOCKED-FAIL-FAST" prefix is raised, the runner writes
+    # a minimal fail_fast_report.csv and exits cleanly (not crash).
+    parser.add_argument(
+        "--fail-fast-is-years",
+        type=float,
+        default=None,
+        dest="fail_fast_is_years",
+        metavar="YEARS",
+        help=(
+            "Opt-in fail-fast IS gate (iter-v1/087). Default None=OFF (no change to "
+            "existing behaviour). When set (e.g. 2.0), monitors cumulative IS "
+            "weighted_pnl over the first YEARS of IS test trades. "
+            "If ≤ 0 at the checkpoint → EarlyStopError BLOCKED-FAIL-FAST; minimal "
+            "report written; remaining compute saved. If > 0 → continue to full run."
         ),
     )
 
@@ -8162,6 +8183,200 @@ def main() -> None:
         all_results = results_e086
         _r5_model_results = [results_e086]
         _post_dispatch_fi_strategies = [("Model_A_TRB_specialist_086", _strat_e086)]
+
+    elif set(symbols) == set(V1_ITER087_UNIVERSE):
+        # iter-v1/087: BNBUSDT SPECIALIST — STOCK 48-col stack, fail-fast gate.
+        # BNB un-reserved per user directive 2026-06-10. The real backtest IS the proof;
+        # fail_fast_is_years=2.0 is the structure gate (replaces any pre-hoc reservation logic).
+        #
+        # Architecture (mirrors /076//084//085//086):
+        #   - 50 independent Optuna studies, one per seed (42..91)
+        #   - n_trials=30 per study, max_depth=5 FIXED, num_leaves=31 FIXED
+        #   - mean-of-signed-weights aggregator
+        #   - R1=OFF (CATALOG-CLOSED), R2=OFF, R3=ON-SHARED cutoff=0.70, R5=ON vt=0.3
+        #   - atr_tp=2.9, atr_sl=1.45 (Model A ETH cell; vol-class match BNB)
+        #   - FAIL-FAST: fail_fast_is_years from CLI arg (default 2.0 in run_iteration_087.py)
+        assert set(symbols) == {"BNBUSDT"}, (
+            f"iter-v1/087 pre-flight: expected symbols={{'BNBUSDT'}}, got {set(symbols)}."
+        )
+        # /087 uses the global V1_FEATURE_COLUMNS_PRUNED (48 cols, STOCK, UNCHANGED).
+        assert len(active_feature_columns) == 48, (
+            f"iter-v1/087 guard: expected 48 cols (V1_FEATURE_COLUMNS_PRUNED, STOCK, "
+            f"NO new features), got {len(active_feature_columns)}. "
+            "Global V1_FEATURE_COLUMNS_PRUNED must stay at 48. "
+            "iter-v1/087 adds ZERO new feature columns by design."
+        )
+        _ff_years_087: float | None = getattr(args, "fail_fast_is_years", None)
+        print(
+            f"[iter-v1/087] BNB SPECIALIST — STOCK 48-col stack, fail-fast gate: "
+            f"V1_SPECIALIST_SEED_COUNT={V1_SPECIALIST_SEED_COUNT} "
+            f"V1_SPECIALIST_OPTUNA_TRIALS={V1_SPECIALIST_OPTUNA_TRIALS} "
+            f"specialist_mode=True "
+            f"max_depth=5 FIXED, num_leaves=31 FIXED. "
+            f"R1=OFF (CATALOG-CLOSED), R2=OFF, "
+            f"R3=ON-SHARED cutoff=0.70, R5=ON vt_target_vol=0.3. "
+            f"features=V1_FEATURE_COLUMNS_PRUNED (48 cols; STOCK; NO new features). "
+            f"atr_tp=2.9, atr_sl=1.45 (Model A ETH cell; vol-class match BNB). "
+            f"n_estimators_max=500 (wall-clock). n_startup_trials=10 (wall-clock). "
+            f"Aggregator: mean-of-signed-weights across {V1_SPECIALIST_SEED_COUNT} seeds. "
+            f"fail_fast_is_years={_ff_years_087} "
+            f"(None=OFF; 2.0=enabled; IS weighted_pnl ≤ 0 at 2yr → BLOCKED-FAIL-FAST). "
+            f"LOAD-BEARING: specialist_dispersion.csv will be persisted post-backtest."
+        )
+        _config_e087 = BacktestConfig(
+            symbols=("BNBUSDT",),
+            interval="8h",
+            max_amount_usd=1000.0,
+            stop_loss_pct=2.9,  # ATR-based; overridden by atr_sl_multiplier=1.45
+            take_profit_pct=5.8,  # ATR-based; overridden by atr_tp_multiplier=2.9
+            timeout_minutes=10080,
+            fee_pct=0.1,
+            data_dir=Path("data"),
+            cooldown_candles=2,
+            vol_targeting=True,
+            vt_target_vol=0.3,
+            vt_lookback_days=45,
+            vt_min_scale=0.33,
+            vt_max_scale=2.0,
+            risk_consecutive_sl_limit=0,  # R1=OFF: CATALOG-CLOSED for SPECIALIST_mode
+            risk_consecutive_sl_cooldown_candles=0,
+            risk_drawdown_scale_enabled=False,  # R2=OFF: Model A baseline
+            risk_r5_vol_target_enabled=_r5_kwargs.get("r5_vol_target_enabled", True),
+            risk_r5_vol_target_pct=_r5_kwargs.get("r5_vol_target_pct", 4.0),
+            risk_r5_kill_low_natr_enabled=_r5_kwargs.get("r5_kill_low_natr_enabled", False),
+            risk_r5_kill_low_natr_min_pct=_r5_kwargs.get("r5_kill_low_natr_min_pct", 2.0),
+        )
+        _strat_e087 = LightGbmStrategy(
+            training_months=24,
+            n_trials=V1_SPECIALIST_OPTUNA_TRIALS,  # informational; specialist loop controls
+            cv_splits=5,
+            label_tp_pct=5.8,
+            label_sl_pct=2.9,
+            label_timeout_minutes=10080,
+            fee_pct=0.1,
+            features_dir="data/features",
+            verbose=1,
+            atr_tp_multiplier=2.9,
+            atr_sl_multiplier=1.45,
+            use_atr_labeling=True,
+            # placeholder seed — specialist_mode uses V1_SPECIALIST_SEEDS internally
+            ensemble_seeds=list(V1_SPECIALIST_SEEDS[:1]),
+            feature_columns=active_feature_columns,  # 48-col V1_FEATURE_COLUMNS_PRUNED
+            ood_enabled=True,  # R3 ON at AGGREGATOR level (SHARED — UNCHANGED from /086)
+            ood_features=list(V1_OOD_FEATURE_COLUMNS),
+            ood_cutoff_pct=0.70,
+            oof_persist_path=OOF_PARQUET_PATH,
+            bounds_profile="v1_specialist",
+            specialist_mode=True,
+            specialist_n_startup_trials=10,
+            specialist_n_estimators_max=500,
+        )
+        import csv as _csv_087  # noqa: PLC0415
+        import statistics as _stat_087  # noqa: PLC0415
+        import time as _time_087  # noqa: PLC0415
+
+        _t0_087 = _time_087.time()
+        # iter-v1/087: wrap run_backtest in EarlyStopError handler for fail-fast.
+        # fail_fast_is_years=None (default OFF) = byte-identical to all prior runs.
+        # When BLOCKED-FAIL-FAST fires, we write a minimal report and sys.exit(0).
+        # The try/except is structured so code after the block is only reached on
+        # normal completion (no EarlyStopError raised, or fail_fast_is_years=None).
+        try:
+            results_e087 = run_backtest(
+                _config_e087,
+                _strat_e087,
+                yearly_pnl_check=False,
+                fail_fast_is_years=_ff_years_087,
+            )
+        except EarlyStopError as _ff_exc:
+            _elapsed_087_ff = _time_087.time() - _t0_087
+            _ff_reason = _ff_exc.reason
+            _ff_partial_results = _ff_exc.results
+            # Write minimal fail-fast report so the caller can audit the abort.
+            _ff_report_dir = Path(reports_dir) / f"iteration_v1-{args.iteration:03d}"
+            _ff_report_dir.mkdir(parents=True, exist_ok=True)
+            _ff_is_trades = [r for r in _ff_partial_results if r.close_time < OOS_CUTOFF_MS]
+            _ff_is_wpnl = sum(r.weighted_pnl for r in _ff_is_trades)
+            _ff_is_net = sum(r.net_pnl_pct for r in _ff_is_trades)
+            _ff_n = len(_ff_is_trades)
+            _ff_is_sharpe = 0.0
+            if _ff_n >= 2:
+                _ff_wpnl_arr = [r.weighted_pnl for r in _ff_is_trades]
+                _ff_mean = _stat_087.mean(_ff_wpnl_arr)
+                _ff_std = _stat_087.stdev(_ff_wpnl_arr)
+                if _ff_std > 0:
+                    # Annualised Sharpe approximation: ~3 8h candles/day
+                    _ff_is_sharpe = _ff_mean / _ff_std * (365.25 * 3) ** 0.5
+            _ff_csv_path = _ff_report_dir / "fail_fast_report.csv"
+            with open(_ff_csv_path, "w", newline="") as _ff_f:
+                _writer = _csv_087.writer(_ff_f)
+                _writer.writerow(["metric", "value"])
+                _writer.writerow(["verdict", "BLOCKED-FAIL-FAST"])
+                _writer.writerow(["reason", _ff_reason])
+                _writer.writerow(["fail_fast_is_years", str(_ff_years_087)])
+                _writer.writerow(["is_trades_count", str(_ff_n)])
+                _writer.writerow(["is_cumulative_weighted_pnl", f"{_ff_is_wpnl:.4f}"])
+                _writer.writerow(["is_cumulative_net_pnl_pct", f"{_ff_is_net:.4f}"])
+                _writer.writerow(["is_annualized_sharpe_approx", f"{_ff_is_sharpe:.4f}"])
+                _writer.writerow(["wall_clock_seconds", f"{_elapsed_087_ff:.0f}"])
+                _writer.writerow(["abort_message", _ff_reason])
+            print(
+                f"\n[iter-v1/087] BLOCKED-FAIL-FAST at {_elapsed_087_ff:.0f}s:\n"
+                f"  Reason:                     {_ff_reason}\n"
+                f"  IS trades accumulated:      {_ff_n}\n"
+                f"  IS cumulative weighted_pnl: {_ff_is_wpnl:+.4f}\n"
+                f"  IS cumulative net_pnl_pct:  {_ff_is_net:+.4f}\n"
+                f"  IS Sharpe (approx):         {_ff_is_sharpe:+.4f}\n"
+                f"  fail_fast_report.csv → {_ff_csv_path}"
+            )
+            sys.exit(0)  # clean exit — not a crash
+        _elapsed_087 = _time_087.time() - _t0_087
+        faxm_e087 = _strat_e087._faxm_log
+        print(
+            f"\n[iter-v1/087] Model_A_BNB_specialist_087 complete: "
+            f"{len(results_e087)} trades "
+            f"in {_elapsed_087:.0f}s ({_elapsed_087 / 3600:.2f}h)"
+        )
+
+        # Cohort isolation sanity: assert ONLY BNBUSDT trades emitted.
+        _e087_symbols = {r.symbol for r in results_e087}
+        assert _e087_symbols.issubset({"BNBUSDT"}), (
+            f"[iter-v1/087] Model_A_BNB produced non-BNB results: "
+            f"{_e087_symbols - {'BNBUSDT'}}. "
+            "Per-cohort isolation failed — iter-v1/087 must trade BNBUSDT ONLY."
+        )
+
+        # -----------------------------------------------------------------
+        # LOAD-BEARING: specialist_dispersion.csv persistence
+        # (matching /065+/074+/075+/076+/084+/085+/086).
+        # -----------------------------------------------------------------
+        _disp_mean_e087 = _strat_e087.get_specialist_dispersion_mean()
+        _disp_is_path_e087 = (
+            Path(reports_dir) / "iteration_v1-087" / "in_sample" / "specialist_dispersion.csv"
+        )
+        _disp_is_path_e087.parent.mkdir(parents=True, exist_ok=True)
+        _strat_e087.persist_specialist_dispersion_csv(str(_disp_is_path_e087))
+        print(
+            f"[iter-v1/087] LOAD-BEARING dispersion patch: "
+            f"specialist_dispersion_mean={_disp_mean_e087} "
+            f"specialist_dispersion.csv → {_disp_is_path_e087}"
+        )
+        # Store for post-report block.
+        _e087_disp_mean = _disp_mean_e087
+        _e087_disp_csv_path = _disp_is_path_e087
+
+        print(
+            f"[iter-v1/087] Dispatch verified: "
+            f"BNB-only={len(results_e087)} trades. "
+            f"R1=OFF/R2=OFF/R3=ON-AGGREGATOR-LEVEL. "
+            f"SPECIALIST seeds={len(_strat_e087._specialist_models)} trained. "
+            f"sigma_pop mean={_disp_mean_e087}"
+        )
+
+        _all_faxm_logs = faxm_e087
+        all_results = results_e087
+        _r5_model_results = [results_e087]
+        _post_dispatch_fi_strategies = [("Model_A_BNB_specialist_087", _strat_e087)]
 
     elif iteration_label == "v1-044":
         # iter-v1/044: CONFIRMATION-MERGE-PORTFOLIO (cycle-5 CONFIRMATION 1/1).
