@@ -73,3 +73,37 @@ The 4-feature set is well-constructed and I endorse its SHAPE — it is the diam
 The single most important thing the QR must NOT ignore: **pre-register rev_extension_z_3's importance rank as a HARD falsifier BEFORE the run, and pre-register the expected OOS trade count.** If rev_extension_z_3 lands INERT (rank 14+/52), the 3-bar reversion did not survive the label and the iteration has failed regardless of the headline Sharpe — that is the /084 lesson made concrete. And if the capstone rev_vol_gate_signed dominates while the primitives go quiet, that is the anti-signal pattern, not a win.
 
 **Predicted UNI specialist IS Sharpe: +0.35** (range **+0.10 to +0.65**). Bounded BELOW by the negative probe (−0.243 on the old stack means the new features must add ~+0.6 of IS Sharpe just to reach the gate, which is plausible-but-unproven for 4 targeted reversion coordinates), and bounded ABOVE well short of DOT/063's +1.32 because UNI's structure is WEAK (autocorr_mag 0.0843, |IC| 0.0393 — an order of magnitude thinner than a strong-structure coin). If the 4 features are INERT or near-INERT, the specialist lands at roughly the probe (~−0.10 to −0.25), and the correct verdict is SPECIALIST-NEGATIVE with the diary lesson "feature engineering could not manufacture a structure-gate pass on a sub-probe coin."
+
+---
+
+## Phase 7.4 — LightGBM Master Post-Mortem (iter-v1/085)
+
+**Confidence in this read: HIGH.** 50-seed cross-seed Sharpe std = 0.000 → the negative is structural, not sampling noise. Phase 4.5 modal (+0.35) missed by ~1.05 Sharpe; the miss is owned below.
+
+**Outcome:** IS Sharpe −0.7005 (168 trades, WR 38.1%, PF 0.81, MaxDD 91.36%); OOS +0.1739 (84 trades, PF 1.05, MaxDD 21.42%); ratio −0.2482. Triple-falsified SPECIALIST-NEGATIVE (F2-PRIMARY + F3 + F4).
+
+### 1. Feature-binding triage
+- **Vol-state bound as redundancy, not signal.** vol_state_z_natr_30 (rank 3, gain 5919.8) + rev_halflife_50 (rank 9, 3582.8) paraphrase the incumbent vol stack: vol_atr_14 (rank 1, 13069.9), vol_natr_14 (rank 12, 2857.9). Split-budget redistribution within the vol-state family (feedback_v3_promising_feature_mechanical fingerprint), NOT orthogonal gain.
+- **Direction inert via LABELING-HORIZON MISMATCH (the load-bearing finding).** rev_extension_z_3 (rank 42, gain 203.5) is a 3-bar return-extension; the triple-barrier label fires on 2.9×/1.45× ATR excursions. A 3-bar reversion (sub-1% on an 8h bar) completes INSIDE the 1.45×ATR stop distance → the label never sees a distinct outcome. Corroborated: inherited interact_ret1_x_ret3 (rank 49) — the closest lag-3 proxy — is ALSO near-dead. No lag-3 encoding survives THIS label. rev_vol_gate_signed (rank 39) inherits the primitive's deadness by construction. F2-SUSPICION correctly did NOT fire — clean signal-absence, not the /084 anti-signal pattern.
+
+### 2. Phase 4.5 prediction vs reality — owned
+- **Defensible:** LOW confidence was earned (probe −0.243, no v1-win precedent for rescuing a sub-probe coin); failed in the exact Section-7 modal direction (NEGATIVE-PROBE-FLAT).
+- **Genuine error (key lesson):** conflated autocorr_mag 0.0843 in RAW RETURNS with learnable label causation under the triple-barrier transform. "Real in raw returns" ≠ "extractable through an ATR-barrier directional label." The GATE-2 probe (runs the real label) said −0.243 and was RIGHT; the return-space autocorr argument was the blind one. **Hardwired for /086: screen a raw-return autocorr/IC signal against the actual label horizon + magnitude, not just in return-space.**
+- Predicted −0.05/−0.15 dampening; actual −0.46 below probe (inert features × 30-trial Optuna = amplified overfit surface, feedback_v3_inert_features_at_higher_budget).
+
+### 3. Optuna read (2298 studies parsed)
+best-trial IS-objective mean +0.116 (std 0.108) vs walk-forward IS −0.70 → structural overfit gap. reg_alpha std 2.43 (full-range), training_days std 170 (full-range), n_estimators std 127 — search wandering a flat/noisy loss surface with no informative gradient. best−runnerup gap 0.020 → NOT curve-fit-to-one-trial. cross_seed std 0.000 → all 50 seeds robustly converged to the same bad answer; no profitable basin exists.
+
+### 4. Catastrophe mechanic (under-weighted by the headline)
+monthly_pnl: 15 pos / 15 neg IS months (coin-flip). **2022-09 alone = −43.87% of the −46.63% IS total (94% of all loss).** trades.csv 2022-09: 7/8 stopped out, ~all at weight_factor≈1.0 because R5's 45-day vol-target history hadn't accumulated at IS-start → full-size capital into UNI's listing-shock with no vol damp (all-IS mean weight_factor 0.401). IS-ex-2022-09 ≈ −2.8%. The TRUE signal verdict is "structureless coin-flip"; the −0.70/91%-MaxDD magnitude is an R5 cold-start amplifier. Still clearly NEGATIVE (38% WR across all 168 trades), but the magnitude shouldn't be over-attributed to the features.
+
+### 5. Next-iter implications (advisory)
+- **5a (PRIMARY): make GATE-2 PRIMARY probe (≥+0.30 on the REAL label) a HARD REJECT, not a soft "feature-engineering can flip it" flag.** All v1 wins (DOT +1.32, ETH, BTC, AAVE) cleared structure on the stock label-probe; zero wins ever came from rescuing a probe-reject. CRV + UNI = two consecutive correct GATE-2 predictions. Close the "manufacture a pass via features" hypothesis.
+- **5b (optional, technically-correct confirmation): a short-horizon fixed-bar reversion label** (sign of 3-bar-forward return, or ±k-bp barrier at reversion magnitude not 1.45×ATR) would put the label on the kernel's time-scale. Run as an ISOLATED labeling EXPLORATION on an ALREADY-STRUCTURED coin FIRST (validate the label before applying to a sub-probe coin). Lean 5a primary; 5b only to confirm the kernel is unreachable rather than merely unreached.
+- **5c: do NOT carry the 4 features forward.** Directional pair (rank 39/42) confirmed INERT + IS-harmful; drop both. Vol-state pair (rank 3/9) redundant with vol_atr_14/vol_natr_14; drop for cleanliness unless a future coin's screen flags natr_30 specifically.
+- **5d: R5 cold-start hazard (systemic)** — vol-target runs near 1.0 in the first ~45 IS days exactly when a new/volatile coin is riskiest; systemic NEGATIVE amplifier, not UNI-specific.
+
+### Notes for Critic (7.5)
+1. Check-8: the +0.17 OOS is coin-flip noise on a structureless model (15/15 IS split), NOT a regime-specialist signal — don't let it soften the NEGATIVE.
+2. The −0.70/91%-MaxDD is 94%-driven by 2022-09 R5 cold-start; signal verdict is milder than the magnitude but still NEGATIVE.
+3. If /086 retains these 4 columns, that's a Check-worthy regression (inert-and-harmful).
