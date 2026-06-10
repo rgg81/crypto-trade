@@ -35,3 +35,32 @@ Inert tail: cross-asset ratio features (dot_vs_btc_ret_ratio_30, eth_vs_btc_ret_
 
 ## Closing
 Confidence: MEDIUM-HIGH on standalone IS reproduction (+0.48 modal, tight cross_seed_std); MEDIUM on diversification. TRB is the cleanest fresh-mine setup v1 has produced (single-family momentum = least lottery-prone). **The QR must NOT ignore:** the diversification thesis is CONDITIONAL on the MACD/ADX importance-ordering check (§3, §5) — a PROMISING standalone that re-learns the shared basis is NOT a real diversifier at 0.548.
+
+---
+
+## Phase 7.4 — LightGBM Master Post-Mortem (iter-v1/086)
+
+**Outcome:** IS Sharpe −0.3044 (157 trades, WR 35.7%, PF 0.90, MaxDD 72.95%); OOS −0.5967 (90 trades). SPECIALIST-NEGATIVE; no bundle seat. Probe (n_trials=10, seed=42) +0.4930 → full (n_trials=30, same seed) −0.3044 = **Δ−0.7974**. cross_seed_std=0.000 is a DEGENERATE --seeds 1 artifact, NOT robustness. Seed count constant probe↔full → the only moving variable is n_trials 10→30.
+
+### 1. Probe→full degradation mechanism (load-bearing)
+Parsed 46 walk-forward folds (30 trials × 50 inner seeds = 1500 trial-lines/fold). **Per-fold best in-fold Optuna objective: mean +0.1788 (46/46 folds POSITIVE) vs realized walk-forward IS −0.3044 → ~0.48 Sharpe of pure optimism.** Textbook in-fold-up / walk-forward-down overfit (matches UNI/085's +0.116 vs −0.70). **Smoking gun — training_days collapsed SHORT: median 95d, mean 177d, 26/46 folds <120d** (my Phase 4.5 §1 red flag FIRED). n_trials=30 had budget to discover short-window noise-fit configs; n_trials=10 sampled too sparsely to find them. learning_rate median 0.0079 + reg_alpha median 0.071 (I predicted 0.018 / 0.8–2.0) → search abandoned regularization to chase in-fold fit. Deeper-search-overfits-noisier-surface, fully attributed.
+
+### 2. Phase 4.5 prediction vs reality — owned
+Predicted +0.48 modal MEDIUM-HIGH; actual −0.30 (Δ−0.78 miss). Root cause: treated the n_trials=10 probe as predictive of the n_trials=30 specialist; assumed deeper search IMPROVES walk-forward Sharpe (true on a real basin, FALSE on a noisy surface). The UNI precedent (probe→full Δ−0.46) was in the record; I should have de-rated +0.493 by ~0.5–0.8 → modal ~0.0 coin-flip, LOW confidence.
+
+### 3. GATE-2 reform — KEY DELIVERABLE
+**Recommendation: probe at n_trials=30 (SAME-BUDGET), NOT a threshold haircut.**
+- Threshold-haircut corrects a bias measured only twice (Δ−0.46, Δ−0.80, 0.34-wide spread) — too noisy to set a single threshold; trades false-pass for unquantifiable false-reject.
+- Same-budget probe eliminates the bias BY CONSTRUCTION: n_trials=30 single-seed probe vs n_trials=30 50-seed full differ ONLY in seed averaging (small, symmetric regression-to-basin, not one-sided optimism).
+- Cost: n_trials=30 single-seed probe ≈ single-digit minutes (~0.5–1% of the 6h full run). No compute argument for keeping the mis-calibrated cheap probe.
+- **Reform spec:** (1) GATE-2 PRIMARY probe at n_trials=30 single-seed=42, threshold stays ≥+0.30; (2) keep n_trials=10 probe as an optional seconds-long pre-pre-screen (advisory, never a PASS gate); (3) pre-register the in-fold/walk-forward gap as GATE-2 SECONDARY — if mean per-fold best-objective minus realized walk-forward IS > ~0.3, flag noise-dominated surface (the leading indicator that would have caught UNI + TRB); (4) optionally cap training_days lower bound ~120d for single-symbol stock-stack mines (26/46 folds <120d = the noise-exploitation channel).
+
+### 4. Feature read — DIVERSIFIER-DEGENERATE confirmed
+Top-10: vol_atr_14(1), btc_funding_spread_30_90(2), stat_autocorr_lag5(3), trend_aroon_osc_50(4), mom_macd_line(5), interact_natr_x_adx(6), funding_rate_zscore_30(7)/90(8), trend_adx_14(9), oi_delta_30_z90(10). MACD rank 5 (prediction ≤5 technically MET, boundary). **5 of top-10 = shared vol/funding/OI bundle anchors (entire top-2).** TRB's idiosyncratic momentum tier sits BELOW the shared funding block = F5a DIVERSIFIER-DEGENERATE. Moot for the seat (negative standalone) but confirms the 0.548 return-corr would have understated PnL-corr had TRB printed positive.
+
+### 5. R5 cold-start — FIRED
+TRB earliest kline 2022-09 (not 2020-09). **2022-09 IS PnL −38.43% (5 trades) = 15.7% of |total IS PnL| (clears the >15% trigger).** Dropping 2022-09 flips cumulative IS PnL −25.24% → +13.19% (Δ+38.43). R5 fire rate 0.0000 IS — vol-targeting did NOT damp the listing window (first 45 days ran at full weight before VT history matured). Caveat: flips PnL SIGN but NOT Sharpe to merge-worthy (Sharpe dominated by the §1 short-window overfit across all folds). Confirms R5 needs a hard listing-window guard (skip or 0.5× the first 45 days post-listing) for fresh-listing cohort mines.
+
+### Notes for Critic (7.5)
+1. cross_seed_std=0.000 is degenerate (n_outer_seeds=1), NOT a Check-1 robustness PASS.
+2. Load-bearing artifact is METHODOLOGICAL (n_trials=10 probe systematically optimistic ~0.5–0.8 on 2 symbols), not a code defect. The in-fold/walk-forward gap (+0.179 vs −0.30, 46/46 folds positive in-fold) is the leading indicator. Reform: same-budget n_trials=30 probe.
