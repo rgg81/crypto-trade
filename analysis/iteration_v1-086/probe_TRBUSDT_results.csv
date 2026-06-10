@@ -1,0 +1,2 @@
+symbol,probe_seed,n_trials,max_depth,num_leaves,atr_tp,atr_sl,probe_is_monthly_sharpe,gate2_primary_pass,gate2_secondary_max_ic,gate2_secondary_pass,is_years,last_kline_date,parquet_col_count,feature_col_coverage,note
+TRBUSDT,42,10,5,31,2.9,1.45,0.493,True,0.3863,True,4.55,2026-06-09,235,48/48,48-col V1_FEATURE_COLUMNS_PRUNED; OI/LS cols NaN if not fetched
