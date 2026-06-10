@@ -433,10 +433,15 @@ class TestBNBUnreserved:
         )
 
     def test_v2_v3_symbols_still_excluded(self) -> None:
-        """v2/v3 live symbols must still be excluded even after BNB un-reservation."""
+        """v2/v3 live symbols that have NOT been un-reserved must still be excluded.
+
+        Note: XRPUSDT was un-reserved at iter-v1/088 per user directive 2026-06-10
+        (cross-track double-exposure accepted; Option 3). XRPUSDT is intentionally
+        absent from this assertion — see test_xrp_unreserved in TestXRPUnreserved.
+        """
         from crypto_trade.features_v1 import V1_EXCLUDED_SYMBOLS  # noqa: PLC0415
 
-        for sym in ("XRPUSDT", "DOGEUSDT", "NEARUSDT", "BCHUSDT", "LDOUSDT", "TRXUSDT"):
+        for sym in ("DOGEUSDT", "NEARUSDT", "BCHUSDT", "LDOUSDT", "TRXUSDT"):
             assert sym in V1_EXCLUDED_SYMBOLS, (
                 f"{sym} must remain in V1_EXCLUDED_SYMBOLS (v2/v3 live track)"
             )
@@ -455,3 +460,60 @@ class TestBNBUnreserved:
 
         # Must not raise — BNB is no longer in V1_EXCLUDED_SYMBOLS.
         assert_v1_universe(("BNBUSDT",))
+
+
+# ---------------------------------------------------------------------------
+# (f) V1_EXCLUDED_SYMBOLS — XRP un-reserved (iter-v1/088)
+# ---------------------------------------------------------------------------
+
+
+class TestXRPUnreserved:
+    """Verify XRPUSDT is no longer in V1_EXCLUDED_SYMBOLS (iter-v1/088 directive).
+
+    Cross-track note: XRPUSDT is traded in BOTH v1 (this specialist) AND v2 (live).
+    This is intentional double-exposure per user directive 2026-06-10 (Option 3).
+    Concentration and parity must be checked across tracks at any future bundle/deploy.
+    """
+
+    def test_xrp_not_in_excluded_symbols(self) -> None:
+        """XRPUSDT must NOT be in V1_EXCLUDED_SYMBOLS after iter-v1/088 un-reservation."""
+        from crypto_trade.features_v1 import V1_EXCLUDED_SYMBOLS  # noqa: PLC0415
+
+        assert "XRPUSDT" not in V1_EXCLUDED_SYMBOLS, (
+            "iter-v1/088 un-reserved XRPUSDT per user directive 2026-06-10. "
+            "Cross-track overlap with v2 (live) accepted (Option 3). "
+            f"V1_EXCLUDED_SYMBOLS = {V1_EXCLUDED_SYMBOLS}"
+        )
+
+    def test_v2_v3_symbols_still_excluded_after_xrp_unreserve(self) -> None:
+        """DOGE/NEAR/BCH/LDO/TRX must remain excluded after XRP un-reservation."""
+        from crypto_trade.features_v1 import V1_EXCLUDED_SYMBOLS  # noqa: PLC0415
+
+        for sym in ("DOGEUSDT", "NEARUSDT", "BCHUSDT", "LDOUSDT", "TRXUSDT"):
+            assert sym in V1_EXCLUDED_SYMBOLS, (
+                f"{sym} must remain in V1_EXCLUDED_SYMBOLS (v2/v3 live track). "
+                "Only XRPUSDT was un-reserved at iter-v1/088."
+            )
+
+    def test_v1_iter088_universe_is_xrp(self) -> None:
+        """V1_ITER088_UNIVERSE must be ('XRPUSDT',)."""
+        from crypto_trade.features_v1 import V1_ITER088_UNIVERSE  # noqa: PLC0415
+
+        assert V1_ITER088_UNIVERSE == ("XRPUSDT",), (
+            f"V1_ITER088_UNIVERSE must be ('XRPUSDT',); got {V1_ITER088_UNIVERSE}"
+        )
+
+    def test_assert_v1_universe_accepts_xrp(self) -> None:
+        """assert_v1_universe must no longer reject XRPUSDT (it is now un-reserved)."""
+        from crypto_trade.features_v1 import assert_v1_universe  # noqa: PLC0415
+
+        # Must not raise — XRP is no longer in V1_EXCLUDED_SYMBOLS.
+        assert_v1_universe(("XRPUSDT",))
+
+    def test_v1_iter088_universe_in_all(self) -> None:
+        """V1_ITER088_UNIVERSE is exported in features_v1.__all__."""
+        import crypto_trade.features_v1 as f1  # noqa: PLC0415
+
+        assert "V1_ITER088_UNIVERSE" in f1.__all__, (
+            "V1_ITER088_UNIVERSE must be in features_v1.__all__ (iter-v1/088)"
+        )
