@@ -1,0 +1,10 @@
+metric,value
+verdict,BLOCKED-FAIL-FAST
+reason,BLOCKED-FAIL-FAST: first 732d IS weighted_pnl=-5.8391 (≤0; 132 IS trades over 2.0yr window)
+fail_fast_is_years,2.0
+is_trades_count,132
+is_cumulative_weighted_pnl,-5.8391
+is_cumulative_net_pnl_pct,-2.1431
+is_annualized_sharpe_approx,-0.6998
+wall_clock_seconds,13544
+abort_message,BLOCKED-FAIL-FAST: first 732d IS weighted_pnl=-5.8391 (≤0; 132 IS trades over 2.0yr window)
