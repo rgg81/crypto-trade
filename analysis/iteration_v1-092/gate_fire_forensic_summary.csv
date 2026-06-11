@@ -1,0 +1,3 @@
+label,n_entries,none_count,none_rate,fires_at_thr,fire_rate,btc_ret_min,btc_ret_median,btc_ret_max,btc_ret_p90
+IS (219 XRP entries),219,0,0.0,57,0.2603,-0.330179,-0.002787,0.362388,0.161162
+OOS (84 XRP entries),84,0,0.0,12,0.1429,-0.206377,0.007139,0.148831,0.088126
