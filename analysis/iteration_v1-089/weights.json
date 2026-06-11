@@ -1,0 +1,76 @@
+{
+  "method": "equal_weight_primary (mirror /082) + inverse_vol_secondary",
+  "is_only": true,
+  "oos_cutoff": "2025-03-24",
+  "components": [
+    {
+      "name": "DOT",
+      "source": "iteration_v1-082",
+      "symbol": "DOTUSDT",
+      "is_months": 32,
+      "is_monthly_std": 16.62106860661026,
+      "is_sharpe": 0.7248588641470776,
+      "is_total_pnl": 111.294,
+      "equal_weight": 1.0,
+      "rp_weight": 0.8935368881090466
+    },
+    {
+      "name": "ETH",
+      "source": "iteration_v1-082",
+      "symbol": "ETHUSDT",
+      "is_months": 38,
+      "is_monthly_std": 17.699876570771348,
+      "is_sharpe": 0.31609658385121536,
+      "is_total_pnl": 61.373799999999996,
+      "equal_weight": 1.0,
+      "rp_weight": 0.8390757901850319
+    },
+    {
+      "name": "BTC",
+      "source": "iteration_v1-082",
+      "symbol": "BTCUSDT",
+      "is_months": 36,
+      "is_monthly_std": 9.701969871726918,
+      "is_sharpe": -0.4731575302276262,
+      "is_total_pnl": -47.706500000000005,
+      "equal_weight": 1.0,
+      "rp_weight": 1.5307755142671842
+    },
+    {
+      "name": "AAVE",
+      "source": "iteration_v1-082",
+      "symbol": "AAVEUSDT",
+      "is_months": 28,
+      "is_monthly_std": 19.424130176417428,
+      "is_sharpe": 0.5983724871935167,
+      "is_total_pnl": 93.9465,
+      "equal_weight": 1.0,
+      "rp_weight": 0.7645921740077994
+    },
+    {
+      "name": "XRP",
+      "source": "iteration_v1-088",
+      "symbol": "XRPUSDT",
+      "is_months": 38,
+      "is_monthly_std": 15.279051378186697,
+      "is_sharpe": 0.20751772461138981,
+      "is_total_pnl": 34.781200000000005,
+      "equal_weight": 1.0,
+      "rp_weight": 0.9720196334309381
+    }
+  ],
+  "equal_weights": {
+    "DOT": 1.0,
+    "ETH": 1.0,
+    "BTC": 1.0,
+    "AAVE": 1.0,
+    "XRP": 1.0
+  },
+  "rp_weights": {
+    "DOT": 0.8935368881090466,
+    "ETH": 0.8390757901850319,
+    "BTC": 1.5307755142671842,
+    "AAVE": 0.7645921740077994,
+    "XRP": 0.9720196334309381
+  }
+}

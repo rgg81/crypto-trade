@@ -1,0 +1,69 @@
+{
+  "bundle_002": {
+    "is_sharpe": 0.7170686613797537,
+    "oos_sharpe": 1.000832839323445,
+    "is_trades": 690,
+    "oos_trades": 324,
+    "oos_top_sym": "BTCUSDT",
+    "oos_concentration_pct": 37.47331837225912
+  },
+  "bundle_003": {
+    "is_sharpe": 0.6914239008694218,
+    "oos_sharpe": 1.0577655288953576,
+    "is_dsr": 0.9082571199004748,
+    "oos_dsr": 0.8957446634297324,
+    "is_trades": 908,
+    "oos_trades": 409,
+    "is_total_pnl": 253.689,
+    "oos_total_pnl": 155.4507,
+    "is_maxdd_pct": 77.59906329436086,
+    "oos_maxdd_pct": 92.00812997013597,
+    "oos_top_sym": "BTCUSDT",
+    "oos_concentration_pct": 29.464646990975268,
+    "oos_sharpe_rp_weights": 1.2348460410977538,
+    "is_sharpe_rp_weights": 0.5414681006710284
+  },
+  "per_regime_oos": {
+    "BTC_UP": {
+      "b2_sharpe": 0.3000875055030174,
+      "b3_sharpe": 0.3329121806882313,
+      "b2_n": 83,
+      "b3_n": 103
+    },
+    "BTC_FLAT": {
+      "b2_sharpe": 1.1041933162121393,
+      "b3_sharpe": 1.1073460538994016,
+      "b2_n": 181,
+      "b3_n": 226
+    },
+    "BTC_DOWN": {
+      "b2_sharpe": 0.1937713172908935,
+      "b3_sharpe": 0.6396846798179933,
+      "b2_n": 60,
+      "b3_n": 80
+    }
+  },
+  "falsifier_a_xrp_share": {
+    "notional_share_pct": 20.0,
+    "is_pnl_share_pct": 13.710172691760384,
+    "oos_pnl_share_pct": 21.371663170381346,
+    "note": "XRPUSDT also v2-live; reconcile combined exposure in deploy parity audit"
+  },
+  "falsifier_b_regime_conditionality": {
+    "incr_full": 0.056932689571912665,
+    "incr_ex_postnov": -0.42075500500634744,
+    "xrp_oos_prenov_n": 44,
+    "xrp_oos_postnov_n": 41,
+    "xrp_oos_prenov_pnl": -48.278999999999996,
+    "xrp_oos_postnov_pnl": 81.5014,
+    "regime_contingent": true
+  },
+  "verdict": {
+    "raises_or_holds_oos": true,
+    "concentration_ok": true,
+    "xrp_floor_ok": true,
+    "pareto_better_equal_all_regimes": true,
+    "strictly_better_somewhere": false,
+    "pareto_dominates_bundle_002": false
+  }
+}
