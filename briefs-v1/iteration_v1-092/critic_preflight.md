@@ -202,3 +202,78 @@ trade-count reduction. The Phase 7.5 Critic Check 2 will flag this as BLOCK-PEND
 better to wire it now.
 
 **Backtest may proceed once the decision_log.configure() call is added.**
+
+---
+
+## Phase 6.0 v2 (post dispatch-fix) — 2026-06-12
+
+OVERALL: PASS
+
+This section reviews the QE's dispatch-wiring fix committed at `77947a3d`.
+Diff reviewed: `git show 77947a3d -- run_baseline_v1.py src/crypto_trade/strategies/ml/lgbm.py tests/test_btc_regime_kill.py`.
+
+### (a) Dispatch fix correct, isolated, matches guard pattern
+
+The fix adds `iteration_label == "v1-088" and` to the /088 branch (line 8385) and
+`iteration_label == "v1-087" and` to the /087 branch (line 8191). This matches the
+established pattern used by every other iteration in the dispatcher (e.g. lines
+8026, 8584, 8789, 8990 all carry the same `iteration_label == "v1-NNN" and` prefix).
+
+The /092 branch at line 8990 was always correctly guarded; it is untouched. The fix is
+minimal: 2-character-class additions to 2 elif lines. No other logic changed.
+
+Sibling sweep confirms: the two failing branches (/087, /088) were the ONLY unguarded
+branches in the colliding symbol-set range. All other branches in the /086–/092 stretch
+already carried guards. PASS.
+
+### (b) Zero OOS-tuning
+
+The threshold (0.067 = IS abs-median of btc_ret_42), the lookback (42 bars), and the
+one-sided BTC_UP sign are unchanged in the /092 branch constructor call. These values
+appear in `briefs-v1/iteration_v1-092/rerun_projection.md` (pre-registered before the
+first void run) and remain bit-identical in the fix commit. The fix touched ONLY the
+dispatch guard condition, not any parameter inside the /092 block. PASS.
+
+### (c) PRUNED stays 48
+
+The fix commit contains zero changes to `V1_FEATURE_COLUMNS_PRUNED` or any feature list.
+`test_pruned_48_unchanged` still passes (confirmed by `30 passed` pytest run). PASS.
+
+### (d) Fail-loud assertion is sound
+
+The lgbm.py change replaces the silent `self._btc_regime_kill_idx = None` + warning print
+(when parquet is absent and gate=True) with a `raise FileNotFoundError(...)` containing
+the parquet path and actionable re-fetch commands. A post-build assertion also guards
+against future silent-None regressions after a successful load.
+
+Logic correctness: the `if not _btc_pq.exists(): raise` branch fires ONLY when
+`self._enable_btc_regime_kill is True` (outer `if self._enable_btc_regime_kill:` check).
+Default-OFF path is unchanged — `_btc_regime_kill_idx` is never assigned, stays None.
+Conservative pass-through in `_compute_btc_ret_42` (returns None when idx is None)
+is also unchanged and still correct for the gate-OFF path. PASS.
+
+Three new `TestBtcRegimeKillFailLoud` tests exercise: (1) raises FileNotFoundError with
+"FATAL" when parquet absent, (2) error message mentions BTCUSDT + enable_btc_regime_kill=True,
+(3) success path sets `_btc_regime_kill_idx is not None`. All 30 tests pass. PASS.
+
+### (e) BLOCK-PENDING-FIX-WIRING → single re-run justified
+
+The original Phase 6.0 BLOCK-PENDING-FIX was "WIRING-DEFECT: dispatch routes /092 to
+/088 branch, gate never armed." The fix directly addresses this root cause. The
+hypothesis (BTC-regime kill gate suppresses BTC_UP entries and improves XRP SPECIALIST
+Sharpe) has NEVER been tested — the void run is identical to /088 by construction.
+A single re-run is the correct and sufficient remedy. PASS.
+
+### Summary
+
+| Check | Verdict |
+|---|---|
+| (a) Dispatch fix isolated + matches pattern | PASS |
+| (b) Zero OOS-tuning (thr/lookback/sign unchanged) | PASS |
+| (c) PRUNED stays 48 | PASS |
+| (d) Fail-loud assertion sound | PASS |
+| (e) BLOCK-PENDING-FIX-WIRING single re-run justified | PASS |
+| **OVERALL** | **PASS** |
+
+**Backtest may now proceed.** Data freshness must be verified immediately before launch
+(XRPUSDT + BTCUSDT 8h parquets at ~15.7h at time of fix commit — re-fetch recommended).
