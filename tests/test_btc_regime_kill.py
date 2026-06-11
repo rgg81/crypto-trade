@@ -532,3 +532,269 @@ def test_lgbm_strategy_imports_with_btc_regime_kill_params():
     assert strat_on._btc_regime_kill_lookback == 42
     # BTC index not populated yet (no parquet loaded in unit test context)
     assert strat_on._btc_regime_kill_idx is None
+
+
+# ---------------------------------------------------------------------------
+# Dispatch regression tests (Task 4a/4b/4c from iter-v1/092 fix mandate)
+# These guard against the DISPATCH-WIRING-DEFECT that caused the void run:
+#   run_baseline_v1.py /088 branch lacked iteration_label guard →
+#   V1_ITER088_UNIVERSE == V1_ITER092_UNIVERSE == ("XRPUSDT",) →
+#   /092 branch was dead code (short-circuited to /088 on every XRP run).
+# ---------------------------------------------------------------------------
+
+
+class TestDispatchGuards:
+    """Structural regression tests: verify /087 and /088 carry iteration_label guards.
+
+    These tests parse run_baseline_v1.py source and assert the specific elif lines
+    for /087 and /088 contain 'iteration_label ==' — the minimal structural guard
+    that prevents any future same-symbol iteration from being silently short-circuited
+    to the wrong dispatch branch.
+    """
+
+    def test_runner_source_exists(self):
+        """run_baseline_v1.py exists at repo root (pre-condition)."""
+        runner = Path(__file__).parent.parent / "run_baseline_v1.py"
+        assert runner.exists(), f"run_baseline_v1.py not found at {runner}"
+
+    def test_iter088_branch_has_iteration_label_guard(self):
+        """The /088 dispatch branch contains 'iteration_label == \"v1-088\"'.
+
+        Without this guard, V1_ITER088_UNIVERSE == V1_ITER092_UNIVERSE == ("XRPUSDT",)
+        means ANY XRP iteration (including /092) routes to /088, silently disabling the
+        BTC-regime kill gate. This was the root cause of the /092 void run.
+        """
+        runner = Path(__file__).parent.parent / "run_baseline_v1.py"
+        src = runner.read_text(encoding="utf-8")
+
+        # Find the elif line that references V1_ITER088_UNIVERSE
+        matching_lines = [
+            line.strip()
+            for line in src.splitlines()
+            if "V1_ITER088_UNIVERSE" in line and line.strip().startswith("elif")
+        ]
+        assert len(matching_lines) >= 1, (
+            "No elif branch for V1_ITER088_UNIVERSE found in run_baseline_v1.py. "
+            "Expected at least one 'elif ... V1_ITER088_UNIVERSE ...' line."
+        )
+        for line in matching_lines:
+            assert 'iteration_label == "v1-088"' in line, (
+                f"iter-v1/088 dispatch branch is MISSING iteration_label guard!\n"
+                f"  Found: {line!r}\n"
+                f'  Expected: \'elif iteration_label == "v1-088" and '
+                f"set(symbols) == set(V1_ITER088_UNIVERSE):'\n"
+                f"  Without this guard, any XRP iteration routes to /088 (void-run bug)."
+            )
+
+    def test_iter087_branch_has_iteration_label_guard(self):
+        """The /087 dispatch branch contains 'iteration_label == \"v1-087\"'.
+
+        Without this guard, any future BNBUSDT iteration would be silently routed
+        to the /087 config. BNBUSDT is unique in the catalog today, but the guard
+        prevents silent short-circuits for future BNBUSDT SPECIALISTs.
+        """
+        runner = Path(__file__).parent.parent / "run_baseline_v1.py"
+        src = runner.read_text(encoding="utf-8")
+
+        matching_lines = [
+            line.strip()
+            for line in src.splitlines()
+            if "V1_ITER087_UNIVERSE" in line and line.strip().startswith("elif")
+        ]
+        assert len(matching_lines) >= 1, (
+            "No elif branch for V1_ITER087_UNIVERSE found in run_baseline_v1.py."
+        )
+        for line in matching_lines:
+            assert 'iteration_label == "v1-087"' in line, (
+                f"iter-v1/087 dispatch branch is MISSING iteration_label guard!\n"
+                f"  Found: {line!r}\n"
+                f"  Without this guard, any future BNBUSDT iteration routes to /087."
+            )
+
+    def test_iter092_branch_already_has_iteration_label_guard(self):
+        """/092 branch has always carried the iteration_label guard (regression)."""
+        runner = Path(__file__).parent.parent / "run_baseline_v1.py"
+        src = runner.read_text(encoding="utf-8")
+
+        matching_lines = [
+            line.strip()
+            for line in src.splitlines()
+            if "V1_ITER092_UNIVERSE" in line and line.strip().startswith("elif")
+        ]
+        assert len(matching_lines) >= 1, (
+            "No elif branch for V1_ITER092_UNIVERSE found in run_baseline_v1.py."
+        )
+        for line in matching_lines:
+            assert 'iteration_label == "v1-092"' in line, (
+                f"iter-v1/092 dispatch branch is MISSING iteration_label guard!\n  Found: {line!r}"
+            )
+
+    def test_iter088_universe_equals_iter092_universe(self):
+        """V1_ITER088_UNIVERSE == V1_ITER092_UNIVERSE (the collision condition).
+
+        This test documents the collision: both are ('XRPUSDT',). Without iteration_label
+        guards on BOTH branches, the earlier branch always shadows the later one.
+        """
+        from crypto_trade.features_v1 import V1_ITER088_UNIVERSE, V1_ITER092_UNIVERSE
+
+        assert V1_ITER088_UNIVERSE == V1_ITER092_UNIVERSE, (
+            f"Collision condition changed: V1_ITER088_UNIVERSE={V1_ITER088_UNIVERSE} "
+            f"V1_ITER092_UNIVERSE={V1_ITER092_UNIVERSE}. "
+            "If they differ, the iteration_label guard on /088 is still correct but the "
+            "collision no longer exists. Update this test accordingly."
+        )
+        # Both are XRPUSDT — the original collision
+        assert V1_ITER088_UNIVERSE == ("XRPUSDT",), (
+            f"Expected ('XRPUSDT',), got {V1_ITER088_UNIVERSE}"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Fail-loud assertion test (Task 4c from iter-v1/092 fix mandate)
+# Verifies that compute_features() raises FileNotFoundError when
+# enable_btc_regime_kill=True but the BTC parquet is absent.
+# ---------------------------------------------------------------------------
+
+
+class TestBtcRegimeKillFailLoud:
+    """compute_features() must raise when gate=True and BTC parquet is missing.
+
+    This prevents the class of silent-no-op bugs where an opted-in gate
+    is quietly disabled because its data source is absent.
+    """
+
+    @staticmethod
+    def _make_master_df(n: int = 60, sym: str = "XRPUSDT"):
+        """Build a minimal master DataFrame suitable for compute_features()."""
+        import pandas as pd
+
+        interval_ms = 8 * 3600 * 1000
+        base = 1_700_000_000_000
+        times = [base + i * interval_ms for i in range(n)]
+        return pd.DataFrame(
+            {
+                "symbol": [sym] * n,
+                "open_time": [t - interval_ms for t in times],
+                "close_time": times,
+                "open": [1.0] * n,
+                "high": [1.05] * n,
+                "low": [0.95] * n,
+                "close": [float(1 + i * 0.001) for i in range(n)],
+                "volume": [1000.0] * n,
+                "feat_a": [float(i) * 0.01 for i in range(n)],
+                "feat_b": [float(i) * 0.02 for i in range(n)],
+            }
+        )
+
+    def test_fail_loud_raises_when_parquet_missing(self, tmp_path):
+        """compute_features() raises FileNotFoundError when BTC parquet absent.
+
+        Strategy is built with enable_btc_regime_kill=True and features_dir
+        pointing at a temp directory that has NO BTC parquet.
+        The call to compute_features(master) must raise immediately with a clear message.
+        """
+        from crypto_trade.strategies.ml.lgbm import LightGbmStrategy
+
+        # BTC parquet intentionally absent — no BTCUSDT_8h_features.parquet in tmp_path
+        strat = LightGbmStrategy(
+            training_months=24,
+            n_trials=1,
+            cv_splits=2,
+            feature_columns=["feat_a", "feat_b"],
+            ensemble_seeds=[42],
+            features_dir=str(tmp_path),
+            enable_btc_regime_kill=True,
+            btc_regime_kill_thr=0.067,
+            btc_regime_kill_lookback=42,
+            verbose=0,
+        )
+
+        master = self._make_master_df()
+
+        # compute_features(master) must raise FileNotFoundError — NOT silently disable
+        with pytest.raises(FileNotFoundError, match="FATAL"):
+            strat.compute_features(master)
+
+    def test_fail_loud_error_message_is_actionable(self, tmp_path):
+        """The FileNotFoundError message mentions BTCUSDT and enable_btc_regime_kill."""
+        from crypto_trade.strategies.ml.lgbm import LightGbmStrategy
+
+        strat = LightGbmStrategy(
+            training_months=24,
+            n_trials=1,
+            cv_splits=2,
+            feature_columns=["feat_a", "feat_b"],
+            ensemble_seeds=[42],
+            features_dir=str(tmp_path),
+            enable_btc_regime_kill=True,
+            verbose=0,
+        )
+
+        master = self._make_master_df()
+
+        exc = None
+        try:
+            strat.compute_features(master)
+        except FileNotFoundError as e:
+            exc = e
+
+        assert exc is not None, (
+            "Expected FileNotFoundError when BTC parquet is absent and "
+            "enable_btc_regime_kill=True; no exception was raised."
+        )
+        msg = str(exc)
+        assert "BTCUSDT" in msg, f"Error message should mention BTCUSDT; got: {msg}"
+        assert "enable_btc_regime_kill=True" in msg, (
+            f"Error message should mention enable_btc_regime_kill=True; got: {msg}"
+        )
+
+    def test_gate_on_success_sets_index_not_none(self, tmp_path):
+        """compute_features() with BTC parquet present sets _btc_regime_kill_idx != None.
+
+        This is the positive case: if the parquet exists and is valid, the index
+        is populated and the gate is actually armed.
+        """
+        import pandas as pd
+
+        from crypto_trade.strategies.ml.lgbm import LightGbmStrategy
+
+        # Build a minimal BTC features parquet
+        n = 60
+        interval_ms = 8 * 3600 * 1000
+        base = 1_700_000_000_000
+        times = [base + i * interval_ms for i in range(n)]
+
+        btc_df = pd.DataFrame(
+            {
+                "close_time": times,
+                "open_time": [t - interval_ms for t in times],
+                "close": [float(1 + i * 0.001) for i in range(n)],
+            }
+        )
+        btc_df.to_parquet(tmp_path / "BTCUSDT_8h_features.parquet")
+
+        strat = LightGbmStrategy(
+            training_months=24,
+            n_trials=1,
+            cv_splits=2,
+            feature_columns=["feat_a", "feat_b"],
+            ensemble_seeds=[42],
+            features_dir=str(tmp_path),
+            enable_btc_regime_kill=True,
+            btc_regime_kill_thr=0.067,
+            btc_regime_kill_lookback=42,
+            verbose=0,
+        )
+
+        master = self._make_master_df(n=n)
+
+        try:
+            strat.compute_features(master)
+        except Exception:
+            pass  # Other errors (e.g. insufficient data for training) are OK here
+
+        # The BTC index MUST have been built — gate IS armed
+        assert strat._btc_regime_kill_idx is not None, (
+            "After compute_features() with valid BTC parquet, _btc_regime_kill_idx "
+            "must be non-None. Gate must be ARMED, not silently disabled."
+        )

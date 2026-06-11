@@ -8188,7 +8188,7 @@ def main() -> None:
         _r5_model_results = [results_e086]
         _post_dispatch_fi_strategies = [("Model_A_TRB_specialist_086", _strat_e086)]
 
-    elif set(symbols) == set(V1_ITER087_UNIVERSE):
+    elif iteration_label == "v1-087" and set(symbols) == set(V1_ITER087_UNIVERSE):
         # iter-v1/087: BNBUSDT SPECIALIST — STOCK 48-col stack, fail-fast gate.
         # BNB un-reserved per user directive 2026-06-10. The real backtest IS the proof;
         # fail_fast_is_years=2.0 is the structure gate (replaces any pre-hoc reservation logic).
@@ -8382,7 +8382,7 @@ def main() -> None:
         _r5_model_results = [results_e087]
         _post_dispatch_fi_strategies = [("Model_A_BNB_specialist_087", _strat_e087)]
 
-    elif set(symbols) == set(V1_ITER088_UNIVERSE):
+    elif iteration_label == "v1-088" and set(symbols) == set(V1_ITER088_UNIVERSE):
         # iter-v1/088: XRPUSDT SPECIALIST — STOCK 48-col stack, fail-fast gate.
         # XRP un-reserved per user directive 2026-06-10. The real backtest IS the proof;
         # fail_fast_is_years=2.0 is the structure gate (replaces any pre-hoc reservation logic).

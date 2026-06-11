@@ -641,33 +641,47 @@ class LightGbmStrategy:
             _btc_pq = (
                 Path(self.features_dir) / f"{self._btc_regime_kill_symbol}_8h_features.parquet"
             )
-            if _btc_pq.exists():
-                import pandas as _pd_btc  # noqa: PLC0415
-
-                _btc_df = _pd_btc.read_parquet(_btc_pq, columns=["close_time", "close"])
-                _btc_df = _btc_df.dropna(subset=["close_time", "close"])
-                _btc_ct = _btc_df["close_time"].values.astype(np.int64)
-                _btc_cl = _btc_df["close"].values.astype(np.float64)
-                _btc_sort = np.argsort(_btc_ct)
-                self._btc_regime_kill_idx = (
-                    _btc_ct[_btc_sort],
-                    _btc_cl[_btc_sort],
+            if not _btc_pq.exists():
+                # FAIL LOUD: when enable_btc_regime_kill=True the BTC parquet MUST be
+                # present. Silent pass-through here is the exact bug that caused the
+                # iter-v1/092 void run (DISPATCH-WIRING-DEFECT: the /088 branch fired
+                # without the gate, producing a silent no-op). We never silently disable
+                # a gate that was explicitly opted in. Pre-flight: ensure
+                #   data/features/BTCUSDT_8h_features.parquet exists (fresh).
+                raise FileNotFoundError(
+                    f"[lgbm] BTC-regime kill gate: FATAL — enable_btc_regime_kill=True "
+                    f"but BTC parquet not found at {_btc_pq}. "
+                    "Re-fetch + regen: "
+                    "uv run crypto-trade fetch --symbols BTCUSDT --intervals 8h && "
+                    "uv run crypto-trade features --symbols BTCUSDT --interval 8h "
+                    "--track v1 --format parquet --workers 4"
                 )
-                if self.verbose > 0:
-                    print(
-                        f"[lgbm] BTC-regime kill gate: loaded {len(_btc_ct)} BTC candles "
-                        f"from {_btc_pq} "
-                        f"(thr={self._btc_regime_kill_thr}, "
-                        f"lookback={self._btc_regime_kill_lookback}b)"
-                    )
-            else:
-                # Conservative: gate disabled if parquet missing (no fabricated kills).
-                self._btc_regime_kill_idx = None
-                if self.verbose > 0:
-                    print(
-                        f"[lgbm] BTC-regime kill gate: WARNING — BTC parquet not found at "
-                        f"{_btc_pq}. Gate DISABLED (conservative pass-through)."
-                    )
+            import pandas as _pd_btc  # noqa: PLC0415
+
+            _btc_df = _pd_btc.read_parquet(_btc_pq, columns=["close_time", "close"])
+            _btc_df = _btc_df.dropna(subset=["close_time", "close"])
+            _btc_ct = _btc_df["close_time"].values.astype(np.int64)
+            _btc_cl = _btc_df["close"].values.astype(np.float64)
+            _btc_sort = np.argsort(_btc_ct)
+            self._btc_regime_kill_idx = (
+                _btc_ct[_btc_sort],
+                _btc_cl[_btc_sort],
+            )
+            # Post-build assertion: index MUST be non-None after successful load.
+            # Guards against any future silent-None regression in this code path.
+            if self._btc_regime_kill_idx is None:
+                raise RuntimeError(
+                    "[lgbm] BTC-regime kill gate: FATAL — index is None after build "
+                    f"(parquet={_btc_pq}, rows={len(_btc_ct)}). "
+                    "This is a programming error; please report."
+                )
+            if self.verbose > 0:
+                print(
+                    f"[lgbm] BTC-regime kill gate: loaded {len(_btc_ct)} BTC candles "
+                    f"from {_btc_pq} "
+                    f"(thr={self._btc_regime_kill_thr}, "
+                    f"lookback={self._btc_regime_kill_lookback}b)"
+                )
 
         # Load per-row ATR values for dynamic labeling
         if self.use_atr_labeling and self.atr_tp_multiplier is not None:
