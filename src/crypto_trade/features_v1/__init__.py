@@ -826,6 +826,34 @@ assert set(symbols) == {"TRBUSDT"} guard fires in dispatch branch.
 assert len(active_feature_columns) == 48 guard fires in dispatch branch.
 """
 
+V1_ITER091_UNIVERSE: tuple[str, ...] = ("ETHUSDT",)
+"""iter-v1/091 cohort: ETHUSDT-only SPECIALIST — R-CONV ensemble-conviction trade gate.
+
+Cycle-7 SPECIALIST — second machinery axis (risk-primitive family, post-aggregator RULE layer).
+Single-seat EXPLORATION: ETH/064 seat re-run with enable_r_conv_gate=True, r_conv_tau=0.06.
+R-CONV skips candles with _sp_confidence < tau (net seed-agreement fraction below threshold).
+
+Axis: risk-primitive (post-aggregator RULE, same band as /074 AXIS-R + /084 R-FADE).
+ETHUSDT parquet: standard V1_FEATURE_COLUMNS_PRUNED 48-col set (UNCHANGED).
+Risk config (MATCHED to ETH/064 / Model A ETH cell):
+    R1=OFF (Model A baseline — BTC/ETH mean-reverting WR at late streaks)
+    R2=OFF (Model A baseline)
+    R3=ON-SHARED cutoff=0.70, 16 features (one set of stats per ETH/month)
+    R5=ON vt_target_vol=0.3, vt_lookback_days=45
+    ATR cell: atr_tp=2.9, atr_sl=1.45
+
+Methodology (mirrors ETH/064 / /090):
+    50 inner seeds (42..91) × 30 Optuna trials × specialist_mode=True
+    ENSEMBLE_SIZE=1, single outer seed, mean-of-signed-weights aggregator
+    max_depth=5 FIXED, num_leaves=31 FIXED
+    fail_fast_is_years=2.0 ON
+
+HIGH-RISK: traded-candle population changes (post-aggregator skip). Optuna domain UNCHANGED.
+Mitigation: 50-inner-seed ensemble (specialist_mode).
+Dispatch guard: iteration_label == "v1-091" AND set(symbols) == {"ETHUSDT"}.
+Feature set: V1_FEATURE_COLUMNS_PRUNED (48 cols, UNCHANGED — no feature changes).
+"""
+
 V1_ITER090_UNIVERSE: tuple[str, ...] = ("ETHUSDT",)
 """iter-v1/090 cohort: ETHUSDT-only SPECIALIST — W-DECAY sample-weighting axis.
 
@@ -1115,6 +1143,7 @@ __all__ = [
     "V1_ITER087_UNIVERSE",
     "V1_ITER088_UNIVERSE",
     "V1_ITER090_UNIVERSE",
+    "V1_ITER091_UNIVERSE",
     # iter-v1/023: funding-rate feature family (add_funding_v1_features imported on demand)
     # iter-v1/025: OI delta feature family (add_oi_delta_v1_features imported on demand)
     # iter-v1/040: composed feature family (add_composed_v1_features imported on demand)

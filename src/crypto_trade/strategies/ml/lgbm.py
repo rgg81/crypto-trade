@@ -255,6 +255,15 @@ class LightGbmStrategy:
         enable_oi_divergence_fade_gate: bool = False,
         oi_divergence_fade_z: float = 2.0,  # pre-registered IS-calibrated threshold
         oi_divergence_fade_column: str = "oi_price_divergence_30",
+        # iter-v1/091: R-CONV — ensemble-conviction trade gate.
+        # When True, candles whose net seed-agreement fraction _sp_confidence < r_conv_tau
+        # are SKIPPED (return NO_SIGNAL) in the SPECIALIST path. Stateless post-aggregator
+        # RULE layer (same band as /074 AXIS-R + /084 R-FADE). Does NOT change the model,
+        # seeds, trials, or Optuna objective. Default False = BIT-IDENTICAL to all prior runs.
+        # Pre-registered tau=0.06 (IS-only basis; 67 IS trades in [0,0.06) = net-losing bucket).
+        # ONLY enabled in the ETH specialist cell (iter-v1/091 dispatch).
+        enable_r_conv_gate: bool = False,
+        r_conv_tau: float = 0.06,  # pre-registered IS-calibrated threshold
     ) -> None:
         if not feature_columns:
             raise ValueError(
@@ -424,6 +433,16 @@ class LightGbmStrategy:
         self._oi_divergence_fade_column: str = str(oi_divergence_fade_column)
         # R-FADE event log: list of dicts for IS calibration audit.
         self._oi_divergence_fade_log: list[dict] = []
+        # iter-v1/091: R-CONV — ensemble-conviction trade gate.
+        # Enabled via enable_r_conv_gate=True (ETH specialist cell only; iter-v1/091 dispatch).
+        # r_conv_tau: _sp_confidence threshold (default 0.06; IS-calibrated, pre-registered).
+        # Stateless post-aggregator gate; does NOT change Optuna training-objective domain.
+        # Applied AFTER _sp_confidence is computed and BEFORE the Signal is built (same
+        # post-aggregator RULE-layer band as /074 AXIS-R + /084 R-FADE).
+        # r_conv_skip decision_log entries carry ensemble_std so the dropped set can be
+        # split by abstention vs disagreement in Phase 7.4 (LM §1 REQUIRED deliverable).
+        self._enable_r_conv_gate: bool = bool(enable_r_conv_gate)
+        self._r_conv_tau: float = float(r_conv_tau)
         # iter-v3/072: labeling mode — "triple_barrier" (default, backward-compat)
         # or "fixed_horizon" (sign of N-candle-forward return; no barriers).
         # iter-v3/105: "trend_scanning" (OLS trend, max-|t| horizon selection
@@ -2160,6 +2179,36 @@ class LightGbmStrategy:
             _sp_direction = 1 if _final_signed > 0 else -1
             _sp_weight = int(round(abs(_final_signed)))
             _sp_confidence = abs(_final_signed) / 100.0
+
+            # iter-v1/091: R-CONV — ensemble-conviction trade gate.
+            # Post-aggregator RULE layer (same band as /074 AXIS-R + /084 R-FADE).
+            # Skip candles whose net seed-agreement fraction _sp_confidence < r_conv_tau.
+            # Stateless; does NOT change the model, seeds, trials, or Optuna objective.
+            # Default False = BIT-IDENTICAL to all prior iterations when gate is OFF.
+            # The r_conv_skip decision_log entry carries ensemble_std so Phase 7.4 can
+            # split the dropped set by abstention (low std) vs disagreement (high std)
+            # — LM §1 REQUIRED deliverable.
+            # NOTE: _specialist_dispersion_stats.append() is NOT reached for skipped
+            # candles (gate fires here, before the dispersion append below). Correct:
+            # skipped candles must not pollute the dispersion diagnostic.
+            if self._enable_r_conv_gate and _sp_confidence < self._r_conv_tau:
+                from crypto_trade import decision_log
+
+                decision_log.log(
+                    {
+                        "kind": "r_conv_skip",
+                        "symbol": symbol,
+                        "ot": open_time,
+                        "month": candle_month,
+                        "specialist_seeds": len(self._specialist_models),
+                        "final_signed": _final_signed,
+                        "ensemble_std": _ensemble_std,
+                        "confidence": _sp_confidence,
+                        "r_conv_tau": self._r_conv_tau,
+                        "decision": "skipped:r_conv_low_conviction",
+                    }
+                )
+                return NO_SIGNAL
 
             # NATR-based dynamic TP/SL (same as non-specialist path).
             _sp_tp_pct = None

@@ -101,6 +101,7 @@ from crypto_trade.features_v1 import (
     V1_ITER087_UNIVERSE,
     V1_ITER088_UNIVERSE,
     V1_ITER090_UNIVERSE,
+    V1_ITER091_UNIVERSE,
     V1_OOD_FEATURE_COLUMNS,
     assert_v1_universe,
 )
@@ -8783,6 +8784,207 @@ def main() -> None:
         all_results = results_e090
         _r5_model_results = [results_e090]
         _post_dispatch_fi_strategies = [("Model_A_ETH_specialist_090", _strat_e090)]
+
+    elif iteration_label == "v1-091" and set(symbols) == set(V1_ITER091_UNIVERSE):
+        # iter-v1/091: ETHUSDT SPECIALIST — R-CONV ensemble-conviction trade gate.
+        # Second machinery axis of cycle-7 (risk-primitive family, post-aggregator RULE layer).
+        # Axis: enable_r_conv_gate=True, r_conv_tau=0.06 (pre-registered IS-only; net seed
+        # agreement ≤2/50 skipped). Same RULE-layer band as /074 AXIS-R + /084 R-FADE.
+        # Test seat: ETH/064 config exactly (R1=OFF, R2=OFF, R3=ON-SHARED, R5=ON).
+        # THE SINGLE CHANGE vs ETH/064: enable_r_conv_gate=True, r_conv_tau=0.06 in the
+        # LightGbmStrategy constructor. Default-OFF path is BYTE-IDENTICAL for all others.
+        #
+        # Architecture (mirrors ETH/064 + /090 pattern):
+        #   - 50 independent Optuna studies, one per seed (42..91)
+        #   - n_trials=30 per study, max_depth=5 FIXED, num_leaves=31 FIXED
+        #   - mean-of-signed-weights aggregator
+        #   - R1=OFF (Model A baseline), R2=OFF, R3=ON-SHARED cutoff=0.70, R5=ON vt=0.3
+        #   - atr_tp=2.9, atr_sl=1.45 (Model A ETH cell)
+        #   - fail_fast_is_years from CLI arg (default 2.0 in run_iteration_091.py)
+        assert set(symbols) == {"ETHUSDT"}, (
+            f"iter-v1/091 pre-flight: expected symbols={{'ETHUSDT'}}, got {set(symbols)}."
+        )
+        assert len(active_feature_columns) == 48, (
+            f"iter-v1/091 guard: expected 48 cols (V1_FEATURE_COLUMNS_PRUNED, UNCHANGED), "
+            f"got {len(active_feature_columns)}. "
+            "Global V1_FEATURE_COLUMNS_PRUNED must stay at 48. "
+            "iter-v1/091 adds ZERO new feature columns (risk-primitive/post-aggregator axis)."
+        )
+        _ff_years_091: float | None = getattr(args, "fail_fast_is_years", None)
+        print(
+            f"[iter-v1/091] ETH SPECIALIST R-CONV — enable_r_conv_gate=True, r_conv_tau=0.06: "
+            f"V1_SPECIALIST_SEED_COUNT={V1_SPECIALIST_SEED_COUNT} "
+            f"V1_SPECIALIST_OPTUNA_TRIALS={V1_SPECIALIST_OPTUNA_TRIALS} "
+            f"specialist_mode=True "
+            f"max_depth=5 FIXED, num_leaves=31 FIXED. "
+            f"R1=OFF, R2=OFF, "
+            f"R3=ON-SHARED cutoff=0.70, R5=ON vt_target_vol=0.3. "
+            f"features=V1_FEATURE_COLUMNS_PRUNED (48 cols; UNCHANGED). "
+            f"atr_tp=2.9, atr_sl=1.45 (Model A ETH cell). "
+            f"n_estimators_max=500 (wall-clock). n_startup_trials=10 (wall-clock). "
+            f"Aggregator: mean-of-signed-weights across {V1_SPECIALIST_SEED_COUNT} seeds. "
+            f"AXIS: enable_r_conv_gate=True, r_conv_tau=0.06 (hardwired in constructor; "
+            f"post-aggregator RULE skip _sp_confidence < 0.06 → NO_SIGNAL). "
+            f"fail_fast_is_years={_ff_years_091} "
+            f"(None=OFF; 2.0=enabled; IS weighted_pnl ≤ 0 at 2yr → BLOCKED-FAIL-FAST). "
+            f"specialist_dispersion.csv will be persisted (LM §1 REQUIRED deliverable)."
+        )
+        _config_e091 = BacktestConfig(
+            symbols=("ETHUSDT",),
+            interval="8h",
+            max_amount_usd=1000.0,
+            stop_loss_pct=2.9,  # ATR-based; overridden by atr_sl_multiplier=1.45
+            take_profit_pct=5.8,  # ATR-based; overridden by atr_tp_multiplier=2.9
+            timeout_minutes=10080,
+            fee_pct=0.1,
+            data_dir=Path("data"),
+            cooldown_candles=2,
+            vol_targeting=True,
+            vt_target_vol=0.3,
+            vt_lookback_days=45,
+            vt_min_scale=0.33,
+            vt_max_scale=2.0,
+            risk_consecutive_sl_limit=0,  # R1=OFF: Model A ETH baseline (mirrors /064)
+            risk_consecutive_sl_cooldown_candles=0,
+            risk_drawdown_scale_enabled=False,  # R2=OFF: Model A baseline
+            risk_r5_vol_target_enabled=True,  # R5=ON: 0.3 vt (matches /064 seat config)
+            risk_r5_vol_target_pct=4.0,
+            risk_r5_kill_low_natr_enabled=False,
+            risk_r5_kill_low_natr_min_pct=2.0,
+        )
+        _strat_e091 = LightGbmStrategy(
+            training_months=24,
+            n_trials=V1_SPECIALIST_OPTUNA_TRIALS,  # informational; specialist loop controls
+            cv_splits=5,
+            label_tp_pct=5.8,
+            label_sl_pct=2.9,
+            label_timeout_minutes=10080,
+            fee_pct=0.1,
+            features_dir="data/features",
+            verbose=1,
+            atr_tp_multiplier=2.9,
+            atr_sl_multiplier=1.45,
+            use_atr_labeling=True,
+            # placeholder seed — specialist_mode uses V1_SPECIALIST_SEEDS internally
+            ensemble_seeds=list(V1_SPECIALIST_SEEDS[:1]),
+            feature_columns=active_feature_columns,  # 48-col V1_FEATURE_COLUMNS_PRUNED
+            ood_enabled=True,  # R3 ON at AGGREGATOR level (SHARED — mirrors /064)
+            ood_features=list(V1_OOD_FEATURE_COLUMNS),
+            ood_cutoff_pct=0.70,
+            oof_persist_path=OOF_PARQUET_PATH,
+            bounds_profile="v1_specialist",
+            specialist_mode=True,
+            specialist_n_startup_trials=10,
+            specialist_n_estimators_max=500,
+            # iter-v1/091: R-CONV axis — THE SINGLE CHANGE vs ETH/064.
+            # Post-aggregator conviction skip gate: _sp_confidence < tau → NO_SIGNAL.
+            # tau=0.06 pre-registered IS-only (net seed agreement ≤2/50 = near-coin-flip).
+            # Default enable_r_conv_gate=False path is BYTE-IDENTICAL for all other iterations.
+            enable_r_conv_gate=True,
+            r_conv_tau=0.06,
+        )
+        import csv as _csv_091  # noqa: PLC0415
+        import statistics as _stat_091  # noqa: PLC0415
+        import time as _time_091  # noqa: PLC0415
+
+        _t0_091 = _time_091.time()
+        # iter-v1/091: wrap run_backtest in EarlyStopError handler for fail-fast.
+        # fail_fast_is_years=None (default OFF) = byte-identical to all prior runs.
+        # When BLOCKED-FAIL-FAST fires, we write a minimal report and sys.exit(0).
+        try:
+            results_e091 = run_backtest(
+                _config_e091,
+                _strat_e091,
+                yearly_pnl_check=False,
+                fail_fast_is_years=_ff_years_091,
+            )
+        except EarlyStopError as _ff_exc:
+            _elapsed_091_ff = _time_091.time() - _t0_091
+            _ff_reason = _ff_exc.reason
+            _ff_partial_results = _ff_exc.results
+            _ff_report_dir = Path(reports_dir) / f"iteration_v1-{args.iteration:03d}"
+            _ff_report_dir.mkdir(parents=True, exist_ok=True)
+            _ff_is_trades = [r for r in _ff_partial_results if r.close_time < OOS_CUTOFF_MS]
+            _ff_is_wpnl = sum(r.weighted_pnl for r in _ff_is_trades)
+            _ff_is_net = sum(r.net_pnl_pct for r in _ff_is_trades)
+            _ff_n = len(_ff_is_trades)
+            _ff_is_sharpe = 0.0
+            if _ff_n >= 2:
+                _ff_wpnl_arr = [r.weighted_pnl for r in _ff_is_trades]
+                _ff_mean = _stat_091.mean(_ff_wpnl_arr)
+                _ff_std = _stat_091.stdev(_ff_wpnl_arr)
+                if _ff_std > 0:
+                    _ff_is_sharpe = _ff_mean / _ff_std * (365.25 * 3) ** 0.5
+            _ff_csv_path = _ff_report_dir / "fail_fast_report.csv"
+            with open(_ff_csv_path, "w", newline="") as _ff_f:
+                _writer = _csv_091.writer(_ff_f)
+                _writer.writerow(["metric", "value"])
+                _writer.writerow(["verdict", "BLOCKED-FAIL-FAST"])
+                _writer.writerow(["reason", _ff_reason])
+                _writer.writerow(["fail_fast_is_years", str(_ff_years_091)])
+                _writer.writerow(["is_trades_count", str(_ff_n)])
+                _writer.writerow(["is_cumulative_weighted_pnl", f"{_ff_is_wpnl:.4f}"])
+                _writer.writerow(["is_cumulative_net_pnl_pct", f"{_ff_is_net:.4f}"])
+                _writer.writerow(["is_annualized_sharpe_approx", f"{_ff_is_sharpe:.4f}"])
+                _writer.writerow(["wall_clock_seconds", f"{_elapsed_091_ff:.0f}"])
+                _writer.writerow(["abort_message", _ff_reason])
+            print(
+                f"\n[iter-v1/091] BLOCKED-FAIL-FAST at {_elapsed_091_ff:.0f}s:\n"
+                f"  Reason:                     {_ff_reason}\n"
+                f"  IS trades accumulated:      {_ff_n}\n"
+                f"  IS cumulative weighted_pnl: {_ff_is_wpnl:+.4f}\n"
+                f"  IS cumulative net_pnl_pct:  {_ff_is_net:+.4f}\n"
+                f"  IS Sharpe (approx):         {_ff_is_sharpe:+.4f}\n"
+                f"  fail_fast_report.csv → {_ff_csv_path}"
+            )
+            sys.exit(0)  # clean exit — not a crash
+        _elapsed_091 = _time_091.time() - _t0_091
+        faxm_e091 = _strat_e091._faxm_log
+        print(
+            f"\n[iter-v1/091] Model_A_ETH_specialist_091 R-CONV complete: "
+            f"{len(results_e091)} trades "
+            f"in {_elapsed_091:.0f}s ({_elapsed_091 / 3600:.2f}h)"
+        )
+
+        # Cohort isolation sanity: assert ONLY ETHUSDT trades emitted.
+        _e091_symbols = {r.symbol for r in results_e091}
+        assert _e091_symbols.issubset({"ETHUSDT"}), (
+            f"[iter-v1/091] Model_A_ETH_R-CONV produced non-ETH results: "
+            f"{_e091_symbols - {'ETHUSDT'}}. "
+            "Per-cohort isolation failed — iter-v1/091 must trade ETHUSDT ONLY."
+        )
+
+        # LOAD-BEARING: specialist_dispersion.csv persistence (LM §1 REQUIRED deliverable).
+        # Skipped candles (r_conv_skip) do NOT appear in dispersion stats — correct.
+        # Phase 7.4 will split the SKIPPED set by ensemble_std from the decision_log
+        # (r_conv_skip entries carry ensemble_std per brief §3.5 / LM §1).
+        _disp_mean_e091 = _strat_e091.get_specialist_dispersion_mean()
+        _disp_is_path_e091 = (
+            Path(reports_dir) / "iteration_v1-091" / "in_sample" / "specialist_dispersion.csv"
+        )
+        _disp_is_path_e091.parent.mkdir(parents=True, exist_ok=True)
+        _strat_e091.persist_specialist_dispersion_csv(str(_disp_is_path_e091))
+        print(
+            f"[iter-v1/091] LOAD-BEARING dispersion patch: "
+            f"specialist_dispersion_mean={_disp_mean_e091} "
+            f"specialist_dispersion.csv → {_disp_is_path_e091}"
+        )
+        _e091_disp_mean = _disp_mean_e091
+        _e091_disp_csv_path = _disp_is_path_e091
+
+        print(
+            f"[iter-v1/091] Dispatch verified: "
+            f"ETH-only={len(results_e091)} trades. "
+            f"R1=OFF/R2=OFF/R3=ON-AGGREGATOR-LEVEL/R5=ON. "
+            f"SPECIALIST seeds={len(_strat_e091._specialist_models)} trained. "
+            f"sigma_pop mean={_disp_mean_e091}. "
+            f"enable_r_conv_gate=True, r_conv_tau=0.06 (R-CONV axis)."
+        )
+
+        _all_faxm_logs = faxm_e091
+        all_results = results_e091
+        _r5_model_results = [results_e091]
+        _post_dispatch_fi_strategies = [("Model_A_ETH_specialist_091", _strat_e091)]
 
     elif iteration_label == "v1-044":
         # iter-v1/044: CONFIRMATION-MERGE-PORTFOLIO (cycle-5 CONFIRMATION 1/1).
