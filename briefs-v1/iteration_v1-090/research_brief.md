@@ -126,15 +126,21 @@ The time-decay machinery **already exists** — block `(b3)` at `lgbm.py:891-905
 
 ---
 
-## Section 3.5 — LM Master integration (placeholder)
+## Section 3.5 — LM Master integration
 
-LM Master Phase 4.5 (`lightgbm-master` agent) runs AFTER this brief and emits `briefs-v1/iteration_v1-090/lgbm_advisor.md`. Per the v1 LM-coordination discipline, the Phase 5.5 gate verifies this brief is *amendable* to address each LM Master recommendation. Anticipated LM Master touch-points (to be confirmed/responded after 4.5):
+LM Master Phase 4.5 advisory (`briefs-v1/iteration_v1-090/lgbm_advisor.md`) was authored; QR dispositions below. The advisory materially reframes the mechanism (§0) and the F2 falsifier (now rescaled in Section 4).
 
-- **HP region**: W-DECAY is expected to *interact* with `training_days` — LM Master may recommend monitoring whether the decay makes Optuna's `learning_rate` / `n_estimators` selections shift (a longer effective window may favor lower `learning_rate`). Response placeholder: ADOPT as an F2-adjacent observability note; no HP bound change (HPs stay in `v1_specialist` search, lock intact).
-- **Feature-engineering idea**: if LM Master proposes a composed recency feature as an *alternative* to weight-based decay, response placeholder: DEFER (this iteration isolates the weighting mechanism; a feature-form recency encoder is a distinct future axis, not to be composed here per the "test ONE machinery change alone" discipline).
-- **Saturation risk**: LM Master may flag that the AAVE-seat 50-seed lock already partially de-risks variance; response placeholder: ACKNOWLEDGE — that is precisely why single-seed is acceptable here (Section 2.5).
+| LM finding | QR disposition | Action |
+|---|---|---|
+| **§0 — decay & training_days COMPOSE, not substitute** (code trims-after-decay: optimization.py:392 then :417; decay stacks on whatever window Optuna picks → "removes the truncation incentive" is SECOND-ORDER not first-order) | **ADOPTED — reframes F2** | Section 4 F2 rescaled: expect a SMALL training_days lengthening (~30-60d, NOT cap-ward), and a weak/flat F2 with F1>0 is NO LONGER auto-tagged NEGATIVE-INERT (see revised F2). |
+| **§1c — un-renormalized decay halves weight mass → loosens min_child_weight (absolute units) → stealth regularization-loosening confound; a VALIDATED F1 is unattributable between recency and the reg side-effect** (STRONGEST REC) | **ADOPTED — REQUIRED QE log** | QE MUST add a log line at `(b3)` of `decay.mean()` + `train_weights.sum()` pre/post-decay. Phase 7.4 attributes any F1 lift between recency vs reg-loosening using it. (Renormalize-to-mean-1 would isolate cleanly but the lock pins the impl — the log is the minimum.) |
+| **§1b — abs_pnl×decay compounds dispersion → Kish ratio drops ~0.5→0.35-0.45 (ESS shrink, overfit amplifier; 50-study mean does NOT offset it)** | **ADOPTED — telemetry** | Phase 7.4 reports `_kish_ratio` under W-DECAY vs the abs_pnl read; a Kish <0.4 is recorded as an overfit-amplifier caveat on any F1 lift. |
+| **§1a — decay×is_unbalance shifts effective class balance if recent data is class-skewed → F1 partly reflects class-rebalancing** | **ADOPTED — telemetry** | Phase 7.4 reports long/short WEIGHT share under decay vs the label-balance print. |
+| **§4 — decay shifts the objective NON-uniformly across the 50 TPE seeds; could help some / hurt others → mean-of-signed-weights washes a bimodal effect to ≈0 (F1-INERT masking a real effect)** | **ADOPTED — telemetry** | Phase 7.4 reports per-seed training_days STD (not just median). |
+| **§5.1 — INVERSE-EDGE risk (~25-30%): if ETH's IS edge lives in 2022-23, recency-weighting discards it → F1<0** | **ACKNOWLEDGED (pre-registered downside)** | This is the main F1<0 path; Section 7 modal carries it. If F1<0, Phase 7 attributes to inverse-edge (ETH edge is old-data) NOT a W-DECAY bug. |
+| HP-bound change / multi-seed / renormalize-the-impl | **REJECTED (lock)** | No HP-bound change, no multi-seed (permanently dropped), impl renormalization pinned by lock (log instead). |
 
-**This section will be replaced by explicit Adopted/Modified/Rejected responses to each numbered LM Master recommendation before Phase 5.5.**
+**Net**: no lock change; F2 rescaled to the LM's second-order magnitude; the §1c attribution log is a REQUIRED QE deliverable (without it a VALIDATED F1 is unattributable).
 
 ---
 
@@ -145,10 +151,11 @@ LM Master Phase 4.5 (`lightgbm-master` agent) runs AFTER this brief and emits `b
 - **NEGATIVE** if IS Sharpe Δ < **+0.00** (W-DECAY hurt the seat).
 - **TENTATIVE-INERT** band: 0.00 ≤ Δ < +0.20 (positive but sub-threshold — machinery engaged weakly).
 
-**F2 — MECHANISTIC check (LOAD-BEARING): does the Optuna `training_days` distribution shift LONGER under W-DECAY?**
+**F2 — MECHANISTIC check (DIRECTIONAL, RESCALED per LM §0/§3): does the Optuna `training_days` distribution shift modestly LONGER under W-DECAY?**
 - Measured as: median selected `training_days` across all ETH folds under W-DECAY, vs the abs_pnl cohort prior. Because the ETH/064 baseline run.log is unavailable (§2.2), the comparison is against (a) the W-DECAY run's own abs_pnl control read if fail-fast is ON, and (b) the config-matched positive-seat cohort prior (XRP/088 median 250d, the closest same-family Model-A baseline read).
-- **MECHANISM-ENGAGED** if W-DECAY median `training_days` moves **LONGER** (up) vs the abs_pnl reference (expect median to rise toward / above the 500d cap region, and folds <120d to drop materially below the cohort's collapse rate).
-- **NEGATIVE-INERT (overrides F1 regardless of Sharpe)** if `training_days` does **NOT** lengthen. If the distribution is unchanged or moves shorter, W-DECAY did not engage its mechanism — any Sharpe change is then a confound (basin draw / noise), not the hypothesized effect, and the axis is classified NEGATIVE-INERT. This is the /086-style "mechanism didn't fire" guard: a Sharpe lift WITHOUT the `training_days` shift is NOT evidence for W-DECAY.
+- **RESCALED EXPECTATION (LM §0/§3): decay COMPOSES with `training_days`, it does NOT substitute** (code trims-after-decay) — so the mechanism is SECOND-ORDER. Expect a SMALL lengthening (~+30-60d median, modal ~180d→~220-240d; folds <120d drop ~10-20pp), NOT a move toward the 500d cap. A median jump >150d or to the cap is SUSPICIOUS (more likely the §1c reg-loosening, not pure recency).
+- **MECHANISM-ENGAGED** if W-DECAY median `training_days` moves LONGER by any amount vs the reference.
+- **CRITICAL FALSIFIER-DESIGN RESOLUTION (LM §3):** a weak/flat F2 with **F1 > 0** is **NOT auto-tagged NEGATIVE-INERT** — because a correct W-DECAY can legitimately produce F1>0 with F2 ≈ flat (decay stacks, doesn't substitute). In that case, the **§1c attribution log is the arbiter**: if the `decay.mean()`/weight-sum log confirms decay was applied AND F1>0, the result is SPECIALIST-PROMISING/TENTATIVE (recency or reg-loosening channel — attributed at 7.4), NOT inert. NEGATIVE-INERT is reserved for `training_days` moving SHORTER or unchanged AND F1 ≤ 0 (mechanism truly did nothing). This corrects the /086-style guard for W-DECAY's second-order nature.
 
 **F3 — OOS direction-consistency.**
 - **CONSISTENT** if OOS Sharpe Δ has the **same sign** as IS Sharpe Δ (both up, or both down) — the mechanism generalizes the same direction it shifted IS.
@@ -189,8 +196,9 @@ A clean VALIDATED (F1 ≥ +0.20 AND F2 ✓ AND F3 ✓) is the *upside* outcome a
 |---|---|---|---|---|---|
 | **VALIDATED** | ≥ +0.20 | longer (✓) | consistent | `SPECIALIST-PROMISING` (machinery win) | robustness re-test on DOT/063; W-DECAY'd BUNDLE-002 re-assembly candidate |
 | **TENTATIVE-INERT** (modal) | [0.00, +0.20) | longer (✓) | consistent | `SPECIALIST-TENTATIVE` | tune half_life ONCE (9mo) as a SEPARATE future iteration (NOT this one); or apply to a higher-headroom seat |
-| **MECH-INERT** | any | NOT longer | any | `SPECIALIST-NEGATIVE-INERT` | W-DECAY mechanism did not engage at 12mo — close axis OR debug implementation |
-| **NEGATIVE** | < +0.00 | any | any | `SPECIALIST-NEGATIVE` | W-DECAY hurt; sample-weighting machinery lane de-prioritized for ETH cohort |
+| **F1>0 but F2 weak/flat** (LM §3 case) | ≥ 0.00 | flat/≈unchanged | consistent | `SPECIALIST-TENTATIVE` (attribute via §1c log: recency vs reg-loosening) | NOT inert — decay composes-not-substitutes; 7.4 splits the channel |
+| **MECH-INERT** | ≤ 0.00 | NOT longer (shorter/unchanged) | any | `SPECIALIST-NEGATIVE-INERT` | mechanism truly did nothing (training_days didn't move AND no IS lift) — close axis OR debug |
+| **NEGATIVE** | < +0.00 | any | any | `SPECIALIST-NEGATIVE` | W-DECAY hurt (likely inverse-edge, LM §5.1: ETH edge in old data); sample-weighting lane de-prioritized for ETH |
 | **INCONSISTENT** | ≥ 0.00 | longer | OOS opposite IS | `SPECIALIST-TENTATIVE` (sign caution) | reconcile IS/OOS sign before any BUNDLE use |
 
 **This iteration does NOT update BASELINE_V1.md** regardless of outcome — it is a single-seat machinery EXPLORATION, not a BUNDLE merge. BUNDLE-002 (`v0.v1-082`) remains the live baseline. A VALIDATED W-DECAY would feed a *future* BUNDLE-002 re-assembly (re-running the seats with W-DECAY and re-checking the bundle gates), which is where any baseline change would be adjudicated.
