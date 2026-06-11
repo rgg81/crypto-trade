@@ -235,18 +235,21 @@ consulted ONLY as the F3 mechanical floor verification, never to choose tau.
 
 ---
 
-## Section 3.5 — LightGBM Master Phase 4.5 (placeholder)
+## Section 3.5 — LightGBM Master Phase 4.5 integration
 
-The orchestrator invokes `lightgbm-master` at Phase 4.5; `briefs-v1/iteration_v1-091/lgbm_advisor.md` is
-not yet present at brief-authoring time. This section will be reconciled before Phase 5.5: each LM Master
-recommendation will be tagged Adopted / Modified / Rejected. Expected LM focus areas (pre-empted):
-- R-CONV does NOT change Optuna's hyperparameter domain (post-aggregator RULE), so HP-tuning
-  recommendations are likely N/A — to be confirmed.
-- LM may flag the conviction-vs-vol selection-bias risk (the Critic/LM flagged it earlier); §2.4 + the F4
-  Phase 7 check are the pre-registered response.
-- LM may comment on whether tau=0.06 over- or under-filters; the §2.3 survival table + the F2/F3
-  falsifiers are the pre-registered adjudication, and the brief will not re-grid tau on LM input
-  (anti-tuning — tau stays pre-registered).
+LM advisory (`lgbm_advisor.md`) authored; dispositions below. τ stays pre-registered at 0.06 (the LM's OOS diagnostics are advisory context for the Phase-7 READ, NOT a τ change — retuning on the LM's OOS peek would be OOS-tuning).
+
+| LM finding | Disposition | Action |
+|---|---|---|
+| **§6 DECISIVE: the IS low-conviction→net-losing gradient does NOT replicate OOS** — at τ=0.06 the OOS dropped set is +6.25%/44.4% WR (mirror-opposite of IS −5.43%/37.3%); R-CONV may skip OOS-profitable candles | **ADOPTED — skeptical Phase-7 lens (pre-registered, NOT a design change)** | F4 strengthened: an IS-only F1≥+0.20 with FLAT/NEGATIVE OOS Δ is the IS-overfit-threshold signature → caps the verdict at TENTATIVE (NOT VALIDATED) regardless of IS. The OOS sign-flip is pre-registered HERE so a Phase-7 IS win cannot be over-claimed. |
+| **§1 ensemble_std split** — _sp_confidence conflates abstention (low std, defensible SNR skip) vs disagreement (high std, coin-flips not reliably noise); dropped set = 46 trades \|net\|=1 + 21 \|net\|=2 | **ADOPTED — REQUIRED QE/7.4** | QE persists specialist_dispersion.csv; Phase 7.4 splits the dropped set by ensemble_std (abstention vs disagreement). A VALIDATED verdict requires the lift to come from the abstention (low-std) tail, not a lucky coin-flip partition. |
+| **§4 trend-regime confound** — conviction proxies trend-vs-range regime INDEPENDENT of vol; ρ(conf,NATR)~0 could PASS while the gate is silently a trend-filter | **ADOPTED — F4 third proxy** | F4 adds ρ(conf, \|ret_5d\| / trend-strength) on kept-vs-dropped (OOS), beyond the pre-registered NATR + hold-duration. \|ρ\|>0.30 on ANY proxy → NEGATIVE-REGIME-PROXY. |
+| **§2 modal F1 ≈ +0.10-0.14 (TENTATIVE, sub-+0.20)** — the toxic [0.12,0.20) block is KEPT at τ=0.06; +0.20 needs day-clustering luck (~30%) | **ACKNOWLEDGED** | Section 7 modal aligned to TENTATIVE/NEGATIVE-NO-EFFECT; VALIDATED is the ~15% upside tail. |
+| **§3 R-CONV×R5 mild conflict** (thins R5's vol-estimate sample, slightly noisier scaling) | **ACKNOWLEDGED — no action** | Don't credit R-CONV with exposure-shaping; small effect (R5 = 45-day window). |
+| **§5 F3 floor holds** (OOS keeps 72/81; OVERFILTER ~2-3%) | **ADOPTED** | F3 floor confirmed low-risk. |
+| HP-bound / τ-regrid / multi-seed | **REJECTED (lock)** | Post-aggregator RULE (no Optuna domain change); τ pre-registered; no multi-seed (dropped). |
+
+**Net**: τ unchanged (0.06, IS-only); F4 strengthened with the OOS-sign-flip skeptical lens + the trend-strength proxy; the ensemble_std split is a REQUIRED 7.4 deliverable. The LM's central caution (IS conviction-noise doesn't transfer to ETH OOS) is pre-registered so a Phase-7 IS-only win is read as TENTATIVE, not a primitive.
 
 ---
 
