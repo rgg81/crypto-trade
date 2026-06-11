@@ -452,12 +452,24 @@ class LightGbmStrategy:
         self.sigma_k_sl: float | None = sigma_k_sl
         self.sigma_halflife_candles: int = int(sigma_halflife_candles)
         # iter-v1/016: sample-weighting axis — controls per-row weight assignment.
-        # "abs_pnl"        (default) — BIT-IDENTICAL to baseline; keeps label_trades output.
-        # "uniform"        — replaces train_weights with np.ones(n); Kish n_eff = 1.000.
-        # "uniqueness_only" — replaces train_weights with raw compute_sample_uniqueness output
-        #                     (NOT multiplied by abs_pnl — the prior multiply was a near-no-op
-        #                     per EDA Section 2.5: Spearman 0.997 after multiply).
-        _valid_modes = {"abs_pnl", "uniform", "uniqueness_only", "composite_inv_concurrency"}
+        # "abs_pnl"           (default) — BIT-IDENTICAL to baseline; keeps label_trades output.
+        # "uniform"           — replaces train_weights with np.ones(n); Kish n_eff = 1.000.
+        # "uniqueness_only"   — replaces train_weights with raw compute_sample_uniqueness output
+        #                       (NOT multiplied by abs_pnl — the prior multiply was a near-no-op
+        #                       per EDA Section 2.5: Spearman 0.997 after multiply).
+        # "abs_pnl_timedecay" — iter-v1/090: abs_pnl weights MULTIPLIED by exp(-ln2/12·age_months)
+        #                       (López de Prado AFML Ch.4 exponential time-decay).  half_life=12mo
+        #                       is the pre-registered value (4:1 recent:old emphasis across 24mo
+        #                       window).  OPT-IN / DEFAULT-OFF: abs_pnl path is BYTE-IDENTICAL
+        #                       when this mode is NOT selected.  The decay fires via the existing
+        #                       (b3) block below; the (b1.5) branch just sets _apply_timedecay=True.
+        _valid_modes = {
+            "abs_pnl",
+            "uniform",
+            "uniqueness_only",
+            "composite_inv_concurrency",
+            "abs_pnl_timedecay",  # iter-v1/090
+        }
         if sample_weight_mode not in _valid_modes:
             raise ValueError(
                 f"sample_weight_mode must be one of {_valid_modes}; got {sample_weight_mode!r}"
@@ -820,6 +832,12 @@ class LightGbmStrategy:
         # is "uniform" or "uniqueness_only".  Must execute BEFORE the legacy sample_uniqueness
         # multiplier block (b2) below so that modes are independent, not composed.
         # "abs_pnl" (default) keeps train_weights exactly as returned by label_trades.
+        # "abs_pnl_timedecay" (iter-v1/090): keeps abs_pnl base weights here, sets an
+        # internal flag so (b3) applies the exponential time-decay multiply below.
+        # The decay COMPOSES with Optuna's training_days trim (trim-after-decay is intended:
+        # optimization.py:392 trims train_idx to last training_days, then :417 w_train=w[train_idx]
+        # — decayed weights survive the trim; this is the AFML Ch.4 decay-within-window design).
+        _apply_timedecay: bool = False  # set True only for abs_pnl_timedecay mode
         if self.sample_weight_mode == "uniform":
             train_weights = np.ones(len(train_weights), dtype=np.float64)
             if self.verbose > 0:
@@ -871,6 +889,10 @@ class LightGbmStrategy:
                 f"kish={_kish_conc:.4f}"
             )
             train_weights = _inv_conc_weights
+        elif self.sample_weight_mode == "abs_pnl_timedecay":
+            # iter-v1/090: W-DECAY — keep abs_pnl base weights; signal (b3) to apply
+            # exponential time-decay multiply.  No replacement here — decay is multiplicative.
+            _apply_timedecay = True
         # "abs_pnl" — no change; label_trades output already in train_weights
 
         # (b2) Apply sample uniqueness weighting (AFML Ch. 4)
@@ -888,21 +910,53 @@ class LightGbmStrategy:
                     f"mean={uniq.mean():.3f}, max={uniq.max():.3f}"
                 )
 
-        # (b3) Apply time decay weighting
-        if self.time_decay_half_life is not None:
+        # (b3) Apply time decay weighting.
+        # Fires when:
+        #   (a) time_decay_half_life is set directly (legacy path), OR
+        #   (b) _apply_timedecay=True (abs_pnl_timedecay mode, iter-v1/090).
+        # The pre-registered default for abs_pnl_timedecay is half_life=12mo (365d).
+        # Age is measured relative to the latest training bar (train_times.max()),
+        # which is always <= train_end_ms (past-only — no look-ahead contamination).
+        # The decay SURVIVES the optimization.py:392 training_days trim because
+        # train_idx is trimmed first, then w_train=w[train_idx] reads the already-decayed
+        # weights (trim-after-decay ordering confirmed; AFML Ch.4 decay-within-window).
+        _default_wdecay_half_life_months: float = 12.0  # pre-registered; iter-v1/090
+        if self.time_decay_half_life is not None or _apply_timedecay:
+            _half_life = (
+                self.time_decay_half_life
+                if self.time_decay_half_life is not None
+                else _default_wdecay_half_life_months
+            )
             train_times = self._open_time_arr[train_indices]
             max_time = train_times.max()
             age_ms = max_time - train_times
             age_months = age_ms / (30.44 * 24 * 3600 * 1000)  # approx months
-            lam = np.log(2) / self.time_decay_half_life
+            lam = np.log(2) / _half_life
             decay = np.exp(-lam * age_months)
+            # iter-v1/090 §1c REQUIRED attribution log:
+            # Prints decay.mean(), weight_sum BEFORE and AFTER the decay multiply so
+            # Phase 7.4 can split recency-channel vs regularization-loosening side-effect
+            # (un-renormalized decay halves total weight mass → loosens min_child_weight;
+            # the log is the minimum attribution artifact per LM Master §1c advisory).
+            _w_sum_before = float(train_weights.sum())
             train_weights = train_weights * decay
-            if self.verbose > 0:
-                print(
-                    f"  Time decay (half_life={self.time_decay_half_life}mo): "
-                    f"min={decay.min():.3f}, mean={decay.mean():.3f}, "
-                    f"max={decay.max():.3f}"
-                )
+            _w_sum_after = float(train_weights.sum())
+            _kish_n_eff_decay = (
+                float((train_weights.sum()) ** 2 / (train_weights**2).sum())
+                if train_weights.sum() > 0
+                else 0.0
+            )
+            _kish_ratio_decay = (
+                _kish_n_eff_decay / len(train_weights) if len(train_weights) > 0 else 0.0
+            )
+            print(
+                f"  [W-DECAY §1c] half_life={_half_life}mo "
+                f"decay.mean={decay.mean():.4f} decay.min={decay.min():.3f} "
+                f"weight_sum_before={_w_sum_before:.4f} "
+                f"weight_sum_after={_w_sum_after:.4f} "
+                f"(ratio={_w_sum_after / _w_sum_before:.4f} ≈ decay.mean) "
+                f"kish_ratio_after={_kish_ratio_decay:.4f}"
+            )
 
         # (b4) iter-v1/016: F-AXIS-MECHANISM cell logging.
         # Log Kish n_eff ratio, per-symbol weight share (pooled models), and
