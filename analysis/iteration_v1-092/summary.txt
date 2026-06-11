@@ -1,0 +1,45 @@
+=== iter-v1/092 IS-ONLY EDA SUMMARY (XRP-IMPROVED) ===
+
+IS months: 38 total — 19 positive, 19 negative
+  IS net pnl (sum of monthly): 28.13%
+  IS win-month rate: 50%
+
+--- IS edge by regime (is_regime_edge.csv) ---
+  [adx_state=CHOP] n=115 net=-64.554% WR=36.5% sharpe_proxy=-1.0203
+  [adx_state=TREND] n=104 net=103.296% WR=49.0% sharpe_proxy=1.4416
+  [vol_state=HIVOL] n=75 net=27.546% WR=46.7% sharpe_proxy=0.386
+  [vol_state=LOVOL] n=144 net=11.197% WR=40.3% sharpe_proxy=0.1731
+  [dir_state=DOWN] n=112 net=32.29% WR=43.8% sharpe_proxy=0.4572
+  [dir_state=UP] n=107 net=6.453% WR=41.1% sharpe_proxy=0.0986
+  [btc_state=BTC_DOWN] n=44 net=41.132% WR=45.5% sharpe_proxy=0.8144
+  [btc_state=BTC_FLAT] n=118 net=34.317% WR=44.9% sharpe_proxy=0.508
+  [btc_state=BTC_UP] n=57 net=-36.707% WR=35.1% sharpe_proxy=-0.7937
+  [era=IS_EARLY_22_23] n=149 net=14.993% WR=42.3% sharpe_proxy=0.1923
+  [era=IS_LATE_24_25] n=70 net=23.749% WR=42.9% sharpe_proxy=0.4206
+  [year=2022] n=75 net=-3.703% WR=41.3% sharpe_proxy=-0.0603
+  [year=2023] n=74 net=18.696% WR=43.2% sharpe_proxy=0.3857
+  [year=2024] n=59 net=17.418% WR=44.1% sharpe_proxy=0.367
+  [year=2025] n=11 net=6.331% WR=36.4% sharpe_proxy=0.1982
+
+--- autocorr structure (autocorr_structure.csv) ---
+  ac_lag1_dist: mean=-0.04 std=0.1478 frac_pos=0.387 self_ac1=0.9535
+  ac_lag5_dist: mean=-0.0027 std=0.1309 frac_pos=0.493 self_ac1=0.9526
+  ac_lag10_dist: mean=-0.0427 std=0.1573 frac_pos=0.392 self_ac1=0.9652
+  persistence_half_life: 4.0 lags
+
+--- autocorr-persistence forward edge (autocorr_persistence_edge.csv) ---
+  [AC5_LOW(mean-revert)] n=1881 mom-cont fwd5=0.2463% hit=47.5% spearman=-0.0189
+  [AC5_MID] n=1879 mom-cont fwd5=0.0292% hit=47.1% spearman=-0.0505
+  [AC5_HIGH(persist)] n=1881 mom-cont fwd5=0.4322% hit=48.4% spearman=0.0169
+
+--- candidate orthogonality (max |corr| vs anchors, lower=more orthogonal) ---
+  ac5_signed_mom: max|corr|=0.0383 (vs trend_aroon_osc_50); |corr vs stat_autocorr_lag5|=0.0019
+  ac5_z_90: max|corr|=0.7847 (vs stat_autocorr_lag5); |corr vs stat_autocorr_lag5|=0.7847
+  ac_decay_ratio_1_5: max|corr|=0.0305 (vs trend_adx_14); |corr vs stat_autocorr_lag5|=0.0021
+  ac_persist_score: max|corr|=0.4999 (vs stat_autocorr_lag5); |corr vs stat_autocorr_lag5|=0.4999
+
+=== KNOWN-MOTIVATION CONTEXT (OOS — NOT USED FOR DESIGN) ===
+  OOS pre-Nov-2025 (8mo): net -17.24%, 1/8 positive
+  OOS post-Nov-2025 (8mo): net 26.90%, 7/8 positive
+  (This split is the MOTIVATION; F4 regime-breadth falsifier is pre-registered on it.
+   NO threshold in this script was calibrated on these numbers.)

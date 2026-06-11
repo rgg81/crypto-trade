@@ -1,0 +1,4 @@
+ac5_state,n,ac5_range,mom_continuation_mean_fwd5,mom_continuation_hitrate,spearman_mom5_fwd5
+AC5_LOW(mean-revert),1881,"[-0.456,-0.053]",0.2463,47.5,-0.0189
+AC5_MID,1879,"[-0.053,0.050]",0.0292,47.1,-0.0505
+AC5_HIGH(persist),1881,"[0.050,0.556]",0.4322,48.4,0.0169
