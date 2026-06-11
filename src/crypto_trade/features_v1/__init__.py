@@ -826,6 +826,47 @@ assert set(symbols) == {"TRBUSDT"} guard fires in dispatch branch.
 assert len(active_feature_columns) == 48 guard fires in dispatch branch.
 """
 
+V1_ITER092_UNIVERSE: tuple[str, ...] = ("XRPUSDT",)
+"""iter-v1/092 cohort: XRPUSDT-only SPECIALIST — BTC-regime kill gate.
+
+Cycle-7 SPECIALIST improvement of XRP/088 (IS +0.3783 / OOS +0.4966). Attacks the
+TREND-WRONG-WAY OOS failure mode diagnosed by the Phase 4.5 LM advisory: XRP's edge is
+regime-conditional on BTC's 14d trend direction, not XRP's own trend strength (ADX).
+
+Axis: risk-primitive (post-aggregator BTC-trend-directional kill gate, same band as
+/074 AXIS-R + /084 R-FADE + /091 R-CONV). Opt-in enable_btc_regime_kill=True.
+Gate: suppress ALL XRP entries when btc_ret_42 = BTC_close[t]/BTC_close[t-42] - 1.0
+> btc_regime_kill_thr=0.067 (IS abs-median, pre-registered).
+BTC close index: loaded at init from data/features/BTCUSDT_8h_features.parquet.
+Join key: decision candle's open_time compared to BTC close_time (past-only).
+Conservative pass-through: if BTC parquet absent or <42 history, gate does NOT fire.
+
+CROSS-TRACK-OVERLAP FLAG (inherited from /088): XRPUSDT is traded independently in
+BOTH v1 (this specialist) AND v2 (live). Intentional double-exposure per user directive.
+
+XRPUSDT parquet: standard V1_FEATURE_COLUMNS_PRUNED 48-col set (UNCHANGED).
+Risk config (MATCHED to XRP/088 / Model A XRP cell):
+    R1=OFF (CATALOG-CLOSED for SPECIALIST_mode)
+    R2=OFF (Model A baseline)
+    R3=ON-SHARED cutoff=0.70, 16 features
+    R5=ON vt_target_vol=0.3, vt_lookback_days=45
+    R6 (new, under test)=ON: BTC-trend kill gate thr=0.067 lookback=42 mode=regime
+    ATR cell: atr_tp=2.9, atr_sl=1.45
+
+Methodology (mirrors XRP/088):
+    50 inner seeds (42..91) × 30 Optuna trials × specialist_mode=True
+    ENSEMBLE_SIZE=1, single outer seed, mean-of-signed-weights aggregator
+    max_depth=5 FIXED, num_leaves=31 FIXED
+    fail_fast_is_years=2.0 ON (XRP/088 passed: first-2yr IS +16.88)
+
+HIGH-RISK: NO (NORMAL-RISK). Gate is post-aggregator RULE layer; does NOT change
+Optuna training-objective domain. Default-OFF = byte-identical to /088.
+Dispatch guard: iteration_label == "v1-092" AND set(symbols) == {"XRPUSDT"}.
+Feature set: V1_FEATURE_COLUMNS_PRUNED (48 cols, UNCHANGED — no feature changes).
+Pre-registered threshold: btc_regime_kill_thr=0.067 (IS abs-median of btc_ret_42).
+Pre-registered lookback: btc_regime_kill_lookback=42 bars (~14d @ 8h).
+"""
+
 V1_ITER091_UNIVERSE: tuple[str, ...] = ("ETHUSDT",)
 """iter-v1/091 cohort: ETHUSDT-only SPECIALIST — R-CONV ensemble-conviction trade gate.
 
@@ -1144,6 +1185,7 @@ __all__ = [
     "V1_ITER088_UNIVERSE",
     "V1_ITER090_UNIVERSE",
     "V1_ITER091_UNIVERSE",
+    "V1_ITER092_UNIVERSE",
     # iter-v1/023: funding-rate feature family (add_funding_v1_features imported on demand)
     # iter-v1/025: OI delta feature family (add_oi_delta_v1_features imported on demand)
     # iter-v1/040: composed feature family (add_composed_v1_features imported on demand)

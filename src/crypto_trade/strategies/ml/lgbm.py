@@ -264,6 +264,24 @@ class LightGbmStrategy:
         # ONLY enabled in the ETH specialist cell (iter-v1/091 dispatch).
         enable_r_conv_gate: bool = False,
         r_conv_tau: float = 0.06,  # pre-registered IS-calibrated threshold
+        # iter-v1/092: BTC-regime kill gate.
+        # When True, XRP entries are suppressed when BTC's 42-bar (14d @ 8h) return
+        # exceeds btc_regime_kill_thr (BTC_UP regime — the IS regime where XRP's edge
+        # is net-negative: IS n=57, net -36.71%, sharpe -0.79).
+        # Post-aggregator RULE layer (same band as /074 AXIS-R + /084 R-FADE + /091 R-CONV).
+        # Does NOT change the model, feature columns (PRUNED-48), seeds, trials, or Optuna
+        # objective. Default False = BIT-IDENTICAL to /088 and all prior runs.
+        # btc_regime_kill_thr=0.067 is the IS abs-median of btc_ret_42 (pre-registered;
+        # IS-calibrated; entire 0.05-0.08 band is a clean separator per brief Section 2.2).
+        # btc_regime_kill_lookback=42 bars (~14d @ 8h) mirrors iter-v1/019 BTC-trend gate.
+        # BTC close index built at init from data/features/BTCUSDT_8h_features.parquet;
+        # join is past-only (searchsorted on close_time ≤ decision candle close_time).
+        # Conservative pass-through: if BTC candle absent or <42 history, gate does NOT fire.
+        # ONLY enabled in the XRP specialist cell (iter-v1/092 dispatch).
+        enable_btc_regime_kill: bool = False,
+        btc_regime_kill_thr: float = 0.067,  # IS abs-median of btc_ret_42; pre-registered
+        btc_regime_kill_lookback: int = 42,  # bars (~14d @ 8h); mirrors /019
+        btc_regime_kill_symbol: str = "BTCUSDT",  # cross-asset trend source
     ) -> None:
         if not feature_columns:
             raise ValueError(
@@ -443,6 +461,21 @@ class LightGbmStrategy:
         # split by abstention vs disagreement in Phase 7.4 (LM §1 REQUIRED deliverable).
         self._enable_r_conv_gate: bool = bool(enable_r_conv_gate)
         self._r_conv_tau: float = float(r_conv_tau)
+        # iter-v1/092: BTC-regime kill gate.
+        # Enabled via enable_btc_regime_kill=True (XRP specialist cell only; /092 dispatch).
+        # Suppresses ALL XRP entries when BTC's 42-bar return > btc_regime_kill_thr.
+        # Stateless post-aggregator gate; does NOT change Optuna training-objective domain.
+        # Applied AFTER R-CONV gate (if enabled) and BEFORE NATR/AXIS-R/Signal build.
+        # BTC close index populated in compute_features() when gate is enabled.
+        # btc_regime_kill_skip decision_log entries carry btc_ret_42 + direction_pre_kill
+        # for Phase 7.4 counterfactual (mechanism (ii) directional-disagreement) audit.
+        self._enable_btc_regime_kill: bool = bool(enable_btc_regime_kill)
+        self._btc_regime_kill_thr: float = float(btc_regime_kill_thr)
+        self._btc_regime_kill_lookback: int = int(btc_regime_kill_lookback)
+        self._btc_regime_kill_symbol: str = str(btc_regime_kill_symbol)
+        # Per-BTC sorted (close_time_ms, close) index for O(log n) past-only lookback.
+        # Populated in compute_features() when enable_btc_regime_kill=True.
+        self._btc_regime_kill_idx: tuple[np.ndarray, np.ndarray] | None = None
         # iter-v3/072: labeling mode — "triple_barrier" (default, backward-compat)
         # or "fixed_horizon" (sign of N-candle-forward return; no barriers).
         # iter-v3/105: "trend_scanning" (OLS trend, max-|t| horizon selection
@@ -597,6 +630,44 @@ class LightGbmStrategy:
                     _ot_sym[_sort_idx].astype(np.int64),
                     _cl_sym[_sort_idx],
                 )
+
+        # iter-v1/092: BTC-regime kill gate — build BTC (close_time_ms, close) index.
+        # Mirrors the AXIS-R /074 close-index pattern but for BTC's close_time axis.
+        # Join key: decision candle's close_time (not open_time) — matches the EDA join.
+        # close_time is used because the BTC parquet is indexed by close_time and the
+        # decision candle's close_time corresponds to the BTC candle that closed at or
+        # before the XRP decision candle opens (past-only by construction).
+        if self._enable_btc_regime_kill:
+            _btc_pq = (
+                Path(self.features_dir) / f"{self._btc_regime_kill_symbol}_8h_features.parquet"
+            )
+            if _btc_pq.exists():
+                import pandas as _pd_btc  # noqa: PLC0415
+
+                _btc_df = _pd_btc.read_parquet(_btc_pq, columns=["close_time", "close"])
+                _btc_df = _btc_df.dropna(subset=["close_time", "close"])
+                _btc_ct = _btc_df["close_time"].values.astype(np.int64)
+                _btc_cl = _btc_df["close"].values.astype(np.float64)
+                _btc_sort = np.argsort(_btc_ct)
+                self._btc_regime_kill_idx = (
+                    _btc_ct[_btc_sort],
+                    _btc_cl[_btc_sort],
+                )
+                if self.verbose > 0:
+                    print(
+                        f"[lgbm] BTC-regime kill gate: loaded {len(_btc_ct)} BTC candles "
+                        f"from {_btc_pq} "
+                        f"(thr={self._btc_regime_kill_thr}, "
+                        f"lookback={self._btc_regime_kill_lookback}b)"
+                    )
+            else:
+                # Conservative: gate disabled if parquet missing (no fabricated kills).
+                self._btc_regime_kill_idx = None
+                if self.verbose > 0:
+                    print(
+                        f"[lgbm] BTC-regime kill gate: WARNING — BTC parquet not found at "
+                        f"{_btc_pq}. Gate DISABLED (conservative pass-through)."
+                    )
 
         # Load per-row ATR values for dynamic labeling
         if self.use_atr_labeling and self.atr_tp_multiplier is not None:
@@ -1928,6 +1999,46 @@ class LightGbmStrategy:
             return None
         return float(close_curr / close_past) - 1.0
 
+    def _compute_btc_ret_42(self, candle_open_time: int) -> float | None:
+        """Compute BTC 42-bar return for BTC-regime kill gate (iter-v1/092).
+
+        Returns (btc_close[t] / btc_close[t - 42]) - 1.0 where t is the LAST
+        BTC candle whose close_time <= candle_open_time.  This is strictly
+        past-only: no BTC candle that closed AFTER the XRP decision candle
+        opens is included.
+
+        Uses the BTC sorted (close_time_ms, close) index built in
+        compute_features() when enable_btc_regime_kill=True.
+
+        Join key: close_time (not open_time) — the last BTC candle that
+        FULLY CLOSED before the XRP candle opens (close_time ≤ open_time).
+        This mirrors the EDA join in analysis/iteration_v1-092/eda.py and
+        is the same past-only convention as _compute_ret_270b (AXIS-R /074).
+
+        Returns None when:
+          - BTC index not loaded (gate disabled or parquet missing)
+          - Fewer than 42 BTC candles before decision candle
+          - BTC candle for the decision close_time is missing
+          - Any NaN / zero in the close series
+        """
+        if self._btc_regime_kill_idx is None:
+            return None
+        ct_arr, cl_arr = self._btc_regime_kill_idx
+        # Find last BTC candle whose close_time <= candle_open_time (past-only).
+        # searchsorted with side="right" gives insertion point after all equal values;
+        # subtracting 1 gives the last index with close_time <= candle_open_time.
+        idx_curr = int(np.searchsorted(ct_arr, candle_open_time, side="right")) - 1
+        if idx_curr < 0:
+            return None
+        idx_past = idx_curr - self._btc_regime_kill_lookback
+        if idx_past < 0:
+            return None
+        close_curr = cl_arr[idx_curr]
+        close_past = cl_arr[idx_past]
+        if close_past <= 0.0 or not np.isfinite(close_curr) or not np.isfinite(close_past):
+            return None
+        return float(close_curr / close_past) - 1.0
+
     def _apply_mid_bull_short_veto(self, signal: Signal, symbol: str, open_time: int) -> Signal:
         """Apply AXIS-R Mid-Bull SHORT VETO to an aggregated signal (iter-v1/074).
 
@@ -2209,6 +2320,41 @@ class LightGbmStrategy:
                     }
                 )
                 return NO_SIGNAL
+
+            # iter-v1/092: BTC-regime kill gate.
+            # Post-aggregator RULE layer: suppress ALL XRP entries when BTC's 42-bar
+            # return > btc_regime_kill_thr (BTC_UP regime).
+            # Applied AFTER R-CONV gate (no double-kill issue — R-CONV may already have
+            # returned NO_SIGNAL for low-conviction candles; the BTC gate fires for ALL
+            # directions in BTC_UP regardless of conviction level).
+            # BEFORE NATR TP/SL build and AXIS-R veto (same as /091 R-CONV ordering).
+            # Conservative: if BTC index unavailable or <42 history, gate does NOT fire.
+            # The _sp_direction is logged (not used in kill condition) so Phase 7.4 can
+            # reconstruct the mechanism (ii) directional-disagreement counterfactual.
+            if self._enable_btc_regime_kill:
+                _btc_ret_42 = self._compute_btc_ret_42(open_time)
+                if (
+                    _btc_ret_42 is not None
+                    and np.isfinite(_btc_ret_42)
+                    and _btc_ret_42 > self._btc_regime_kill_thr
+                ):
+                    from crypto_trade import decision_log
+
+                    decision_log.log(
+                        {
+                            "kind": "btc_regime_kill_skip",
+                            "symbol": symbol,
+                            "ot": open_time,
+                            "month": candle_month,
+                            "specialist_seeds": len(self._specialist_models),
+                            "btc_ret_42": _btc_ret_42,
+                            "btc_regime_kill_thr": self._btc_regime_kill_thr,
+                            "final_signed": _final_signed,
+                            "direction_pre_kill": _sp_direction,
+                            "decision": "skipped:btc_up_regime",
+                        }
+                    )
+                    return NO_SIGNAL
 
             # NATR-based dynamic TP/SL (same as non-specialist path).
             _sp_tp_pct = None

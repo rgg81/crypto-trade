@@ -102,6 +102,7 @@ from crypto_trade.features_v1 import (
     V1_ITER088_UNIVERSE,
     V1_ITER090_UNIVERSE,
     V1_ITER091_UNIVERSE,
+    V1_ITER092_UNIVERSE,
     V1_OOD_FEATURE_COLUMNS,
     assert_v1_universe,
 )
@@ -8985,6 +8986,214 @@ def main() -> None:
         all_results = results_e091
         _r5_model_results = [results_e091]
         _post_dispatch_fi_strategies = [("Model_A_ETH_specialist_091", _strat_e091)]
+
+    elif iteration_label == "v1-092" and set(symbols) == set(V1_ITER092_UNIVERSE):
+        # iter-v1/092: XRPUSDT SPECIALIST — BTC-regime kill gate (risk-primitive).
+        # Improvement of XRP/088 (IS +0.3783 / OOS +0.4966). Attacks the TREND-WRONG-WAY
+        # OOS failure mode: XRP loses when BTC is up-trending (BTC_UP regime), not when
+        # XRP is choppy. The LM Phase 4.5 advisory rejected the ADX axis; this iteration
+        # uses the directional/contextual BTC-trend kill gate instead.
+        #
+        # THE SINGLE CHANGE vs /088: enable_btc_regime_kill=True, btc_regime_kill_thr=0.067
+        # in the LightGbmStrategy constructor. All other params bit-identical to /088.
+        # Default-OFF path is BYTE-IDENTICAL for all other iterations.
+        #
+        # Architecture (mirrors /088 exactly except for the kill gate):
+        #   - 50 independent Optuna studies, one per seed (42..91)
+        #   - n_trials=30 per study, max_depth=5 FIXED, num_leaves=31 FIXED
+        #   - mean-of-signed-weights aggregator
+        #   - R1=OFF (CATALOG-CLOSED), R2=OFF, R3=ON-SHARED cutoff=0.70, R5=ON vt=0.3
+        #   - R6 (new): BTC-regime kill gate ON, thr=0.067, lookback=42
+        #   - atr_tp=2.9, atr_sl=1.45 (Model A ETH cell; vol-class match XRP)
+        #   - fail_fast_is_years from CLI arg (default 2.0 in run_iteration_092.py)
+        assert set(symbols) == {"XRPUSDT"}, (
+            f"iter-v1/092 pre-flight: expected symbols={{'XRPUSDT'}}, got {set(symbols)}."
+        )
+        assert len(active_feature_columns) == 48, (
+            f"iter-v1/092 guard: expected 48 cols (V1_FEATURE_COLUMNS_PRUNED, STOCK, "
+            f"NO new features), got {len(active_feature_columns)}. "
+            "Global V1_FEATURE_COLUMNS_PRUNED must stay at 48. "
+            "iter-v1/092 adds ZERO new feature columns (risk-primitive/post-aggregator axis)."
+        )
+        _ff_years_092: float | None = getattr(args, "fail_fast_is_years", None)
+        print(
+            f"[iter-v1/092] XRP SPECIALIST + BTC-regime kill gate: "
+            f"V1_SPECIALIST_SEED_COUNT={V1_SPECIALIST_SEED_COUNT} "
+            f"V1_SPECIALIST_OPTUNA_TRIALS={V1_SPECIALIST_OPTUNA_TRIALS} "
+            f"specialist_mode=True "
+            f"max_depth=5 FIXED, num_leaves=31 FIXED. "
+            f"R1=OFF (CATALOG-CLOSED), R2=OFF, "
+            f"R3=ON-SHARED cutoff=0.70, R5=ON vt_target_vol=0.3. "
+            f"R6=ON BTC-regime kill thr=0.067 lookback=42b. "
+            f"features=V1_FEATURE_COLUMNS_PRUNED (48 cols; STOCK; NO new features). "
+            f"atr_tp=2.9, atr_sl=1.45 (Model A ETH cell; vol-class match XRP). "
+            f"n_estimators_max=500 (wall-clock). n_startup_trials=10 (wall-clock). "
+            f"Aggregator: mean-of-signed-weights across {V1_SPECIALIST_SEED_COUNT} seeds. "
+            f"CROSS-TRACK-OVERLAP: XRPUSDT also traded by v2 live (user-accepted Option 3). "
+            f"fail_fast_is_years={_ff_years_092} "
+            f"(None=OFF; 2.0=enabled; IS weighted_pnl ≤ 0 at 2yr → BLOCKED-FAIL-FAST). "
+            f"LOAD-BEARING: specialist_dispersion.csv will be persisted post-backtest."
+        )
+        _config_e092 = BacktestConfig(
+            symbols=("XRPUSDT",),
+            interval="8h",
+            max_amount_usd=1000.0,
+            stop_loss_pct=2.9,  # ATR-based; overridden by atr_sl_multiplier=1.45
+            take_profit_pct=5.8,  # ATR-based; overridden by atr_tp_multiplier=2.9
+            timeout_minutes=10080,
+            fee_pct=0.1,
+            data_dir=Path("data"),
+            cooldown_candles=2,
+            vol_targeting=True,
+            vt_target_vol=0.3,
+            vt_lookback_days=45,
+            vt_min_scale=0.33,
+            vt_max_scale=2.0,
+            risk_consecutive_sl_limit=0,  # R1=OFF: CATALOG-CLOSED for SPECIALIST_mode
+            risk_consecutive_sl_cooldown_candles=0,
+            risk_drawdown_scale_enabled=False,  # R2=OFF: Model A baseline
+            risk_r5_vol_target_enabled=_r5_kwargs.get("r5_vol_target_enabled", True),
+            risk_r5_vol_target_pct=_r5_kwargs.get("r5_vol_target_pct", 4.0),
+            risk_r5_kill_low_natr_enabled=_r5_kwargs.get("r5_kill_low_natr_enabled", False),
+            risk_r5_kill_low_natr_min_pct=_r5_kwargs.get("r5_kill_low_natr_min_pct", 2.0),
+        )
+        _strat_e092 = LightGbmStrategy(
+            training_months=24,
+            n_trials=V1_SPECIALIST_OPTUNA_TRIALS,  # informational; specialist loop controls
+            cv_splits=5,
+            label_tp_pct=5.8,
+            label_sl_pct=2.9,
+            label_timeout_minutes=10080,
+            fee_pct=0.1,
+            features_dir="data/features",
+            verbose=1,
+            atr_tp_multiplier=2.9,
+            atr_sl_multiplier=1.45,
+            use_atr_labeling=True,
+            # placeholder seed — specialist_mode uses V1_SPECIALIST_SEEDS internally
+            ensemble_seeds=list(V1_SPECIALIST_SEEDS[:1]),
+            feature_columns=active_feature_columns,  # 48-col V1_FEATURE_COLUMNS_PRUNED
+            ood_enabled=True,  # R3 ON at AGGREGATOR level (SHARED — UNCHANGED from /088)
+            ood_features=list(V1_OOD_FEATURE_COLUMNS),
+            ood_cutoff_pct=0.70,
+            oof_persist_path=OOF_PARQUET_PATH,
+            bounds_profile="v1_specialist",
+            specialist_mode=True,
+            specialist_n_startup_trials=10,
+            specialist_n_estimators_max=500,
+            # iter-v1/092: BTC-regime kill gate — THE SINGLE CHANGE vs /088.
+            # Post-aggregator RULE: suppress ALL XRP entries when BTC 42-bar return > thr.
+            # thr=0.067 pre-registered (IS abs-median of btc_ret_42; IS-calibrated).
+            # lookback=42 bars (~14d @ 8h); mirrors iter-v1/019 BTC-trend gate.
+            # Default enable_btc_regime_kill=False path is BYTE-IDENTICAL for all others.
+            enable_btc_regime_kill=True,
+            btc_regime_kill_thr=0.067,
+            btc_regime_kill_lookback=42,
+        )
+        import csv as _csv_092  # noqa: PLC0415
+        import statistics as _stat_092  # noqa: PLC0415
+        import time as _time_092  # noqa: PLC0415
+
+        _t0_092 = _time_092.time()
+        # iter-v1/092: wrap run_backtest in EarlyStopError handler for fail-fast.
+        # fail_fast_is_years=None (default OFF) = byte-identical to all prior runs.
+        # When BLOCKED-FAIL-FAST fires, we write a minimal report and sys.exit(0).
+        try:
+            results_e092 = run_backtest(
+                _config_e092,
+                _strat_e092,
+                yearly_pnl_check=False,
+                fail_fast_is_years=_ff_years_092,
+            )
+        except EarlyStopError as _ff_exc:
+            _elapsed_092_ff = _time_092.time() - _t0_092
+            _ff_reason = _ff_exc.reason
+            _ff_partial_results = _ff_exc.results
+            _ff_report_dir = Path(reports_dir) / f"iteration_v1-{args.iteration:03d}"
+            _ff_report_dir.mkdir(parents=True, exist_ok=True)
+            _ff_is_trades = [r for r in _ff_partial_results if r.close_time < OOS_CUTOFF_MS]
+            _ff_is_wpnl = sum(r.weighted_pnl for r in _ff_is_trades)
+            _ff_is_net = sum(r.net_pnl_pct for r in _ff_is_trades)
+            _ff_n = len(_ff_is_trades)
+            _ff_is_sharpe = 0.0
+            if _ff_n >= 2:
+                _ff_wpnl_arr = [r.weighted_pnl for r in _ff_is_trades]
+                _ff_mean = _stat_092.mean(_ff_wpnl_arr)
+                _ff_std = _stat_092.stdev(_ff_wpnl_arr)
+                if _ff_std > 0:
+                    # Annualised Sharpe approximation: ~3 8h candles/day
+                    _ff_is_sharpe = _ff_mean / _ff_std * (365.25 * 3) ** 0.5
+            _ff_csv_path = _ff_report_dir / "fail_fast_report.csv"
+            with open(_ff_csv_path, "w", newline="") as _ff_f:
+                _writer = _csv_092.writer(_ff_f)
+                _writer.writerow(["metric", "value"])
+                _writer.writerow(["verdict", "BLOCKED-FAIL-FAST"])
+                _writer.writerow(["reason", _ff_reason])
+                _writer.writerow(["fail_fast_is_years", str(_ff_years_092)])
+                _writer.writerow(["is_trades_count", str(_ff_n)])
+                _writer.writerow(["is_cumulative_weighted_pnl", f"{_ff_is_wpnl:.4f}"])
+                _writer.writerow(["is_cumulative_net_pnl_pct", f"{_ff_is_net:.4f}"])
+                _writer.writerow(["is_annualized_sharpe_approx", f"{_ff_is_sharpe:.4f}"])
+                _writer.writerow(["wall_clock_seconds", f"{_elapsed_092_ff:.0f}"])
+                _writer.writerow(["abort_message", _ff_reason])
+            print(
+                f"\n[iter-v1/092] BLOCKED-FAIL-FAST at {_elapsed_092_ff:.0f}s:\n"
+                f"  Reason:                     {_ff_reason}\n"
+                f"  IS trades accumulated:      {_ff_n}\n"
+                f"  IS cumulative weighted_pnl: {_ff_is_wpnl:+.4f}\n"
+                f"  IS cumulative net_pnl_pct:  {_ff_is_net:+.4f}\n"
+                f"  IS Sharpe (approx):         {_ff_is_sharpe:+.4f}\n"
+                f"  fail_fast_report.csv → {_ff_csv_path}"
+            )
+            sys.exit(0)  # clean exit — not a crash
+        _elapsed_092 = _time_092.time() - _t0_092
+        faxm_e092 = _strat_e092._faxm_log
+        print(
+            f"\n[iter-v1/092] Model_A_XRP_specialist_092 + BTC-regime kill gate complete: "
+            f"{len(results_e092)} trades "
+            f"in {_elapsed_092:.0f}s ({_elapsed_092 / 3600:.2f}h)"
+        )
+
+        # Cohort isolation sanity: assert ONLY XRPUSDT trades emitted.
+        _e092_symbols = {r.symbol for r in results_e092}
+        assert _e092_symbols.issubset({"XRPUSDT"}), (
+            f"[iter-v1/092] Model_A_XRP produced non-XRP results: "
+            f"{_e092_symbols - {'XRPUSDT'}}. "
+            "Per-cohort isolation failed — iter-v1/092 must trade XRPUSDT ONLY."
+        )
+
+        # -----------------------------------------------------------------
+        # LOAD-BEARING: specialist_dispersion.csv persistence (matches /088+).
+        # btc_regime_kill_skip entries appear in decision_log NOT dispersion —
+        # suppressed candles correctly excluded from dispersion stats.
+        # -----------------------------------------------------------------
+        _disp_mean_e092 = _strat_e092.get_specialist_dispersion_mean()
+        _disp_is_path_e092 = (
+            Path(reports_dir) / "iteration_v1-092" / "in_sample" / "specialist_dispersion.csv"
+        )
+        _disp_is_path_e092.parent.mkdir(parents=True, exist_ok=True)
+        _strat_e092.persist_specialist_dispersion_csv(str(_disp_is_path_e092))
+        print(
+            f"[iter-v1/092] LOAD-BEARING dispersion patch: "
+            f"specialist_dispersion_mean={_disp_mean_e092} "
+            f"specialist_dispersion.csv → {_disp_is_path_e092}"
+        )
+        _e092_disp_mean = _disp_mean_e092
+        _e092_disp_csv_path = _disp_is_path_e092
+
+        print(
+            f"[iter-v1/092] Dispatch verified: "
+            f"XRP-only={len(results_e092)} trades. "
+            f"R1=OFF/R2=OFF/R3=ON-AGGREGATOR-LEVEL/R5=ON/R6=ON(BTC-kill). "
+            f"SPECIALIST seeds={len(_strat_e092._specialist_models)} trained. "
+            f"sigma_pop mean={_disp_mean_e092}. "
+            f"enable_btc_regime_kill=True thr=0.067 lookback=42b."
+        )
+
+        _all_faxm_logs = faxm_e092
+        all_results = results_e092
+        _r5_model_results = [results_e092]
+        _post_dispatch_fi_strategies = [("Model_A_XRP_specialist_092", _strat_e092)]
 
     elif iteration_label == "v1-044":
         # iter-v1/044: CONFIRMATION-MERGE-PORTFOLIO (cycle-5 CONFIRMATION 1/1).
