@@ -9094,6 +9094,19 @@ def main() -> None:
         import statistics as _stat_092  # noqa: PLC0415
         import time as _time_092  # noqa: PLC0415
 
+        # iter-v1/092: wire backtest-mode decision_log sink so btc_regime_kill_skip
+        # entries are captured (required for F2 attribution — the 20-45% suppression
+        # rate check). Without this, the decision_log.log() calls in lgbm.py are no-ops
+        # (the log module is not configured in backtest mode by default).
+        _dl_092_path = (
+            Path(reports_dir) / f"iteration_v1-{args.iteration:03d}" / "decision_log.jsonl"
+        )
+        _dl_092_path.parent.mkdir(parents=True, exist_ok=True)
+        from crypto_trade import decision_log as _decision_log_092  # noqa: PLC0415
+
+        _decision_log_092.configure(_dl_092_path)
+        print(f"[iter-v1/092] decision_log configured → {_dl_092_path}")
+
         _t0_092 = _time_092.time()
         # iter-v1/092: wrap run_backtest in EarlyStopError handler for fail-fast.
         # fail_fast_is_years=None (default OFF) = byte-identical to all prior runs.
