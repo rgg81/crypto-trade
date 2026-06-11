@@ -38,6 +38,38 @@ IS months: 38 total — 19 positive, 19 negative
   ac_decay_ratio_1_5: max|corr|=0.0305 (vs trend_adx_14); |corr vs stat_autocorr_lag5|=0.0021
   ac_persist_score: max|corr|=0.4999 (vs stat_autocorr_lag5); |corr vs stat_autocorr_lag5|=0.4999
 
+=== REVISED PIVOT — BTC-TREND-DIRECTIONAL GATE (IS CALIBRATION) ===
+--- (i) BTC-regime kill: IS edge by BTC trend regime (btc_regime_sweep.csv) ---
+  thr=0.067 [BTC_UP] n=57 net=-36.707% WR=35.1% sp=-0.7937
+  thr=0.067 [BTC_DOWN] n=44 net=41.132% WR=45.5% sp=0.8144
+  thr=0.067 [BTC_FLAT] n=118 net=34.317% WR=44.9% sp=0.508
+  thr=0.08 [BTC_UP] n=51 net=-29.639% WR=35.3% sp=-0.6655
+  thr=0.08 [BTC_DOWN] n=40 net=27.055% WR=42.5% sp=0.5479
+  thr=0.08 [BTC_FLAT] n=128 net=41.326% WR=45.3% sp=0.5929
+  thr=0.1 [BTC_UP] n=44 net=-25.164% WR=36.4% sp=-0.5911
+  thr=0.1 [BTC_DOWN] n=30 net=-15.56% WR=36.7% sp=-0.3705
+  thr=0.1 [BTC_FLAT] n=145 net=79.466% WR=45.5% sp=1.0536
+
+--- (ii) directional-disagreement: XRP dir vs BTC trend sign (btc_dir_disagreement_sweep.csv) ---
+  thr=0.067 [DISAGREE] n=68 net=-39.072% WR=35.3% sp=-0.7335
+  thr=0.067 [AGREE] n=33 net=43.497% WR=48.5% sp=1.0151
+  thr=0.067 [BTC_FLAT_kept] n=118 net=34.317% WR=44.9% sp=0.508
+  thr=0.08 [DISAGREE] n=62 net=-32.802% WR=35.5% sp=-0.6329
+  thr=0.08 [AGREE] n=29 net=30.219% WR=44.8% sp=0.7277
+  thr=0.08 [BTC_FLAT_kept] n=128 net=41.326% WR=45.3% sp=0.5929
+  thr=0.1 [DISAGREE] n=51 net=-29.475% WR=37.3% sp=-0.6258
+  thr=0.1 [AGREE] n=23 net=-11.249% WR=34.8% sp=-0.305
+  thr=0.1 [BTC_FLAT_kept] n=145 net=79.466% WR=45.5% sp=1.0536
+
+--- OOS-survivor projection (F3 >=50 check; btc_gate_oos_projection.csv) ---
+  thr=0.05 OOS_total=82.0 | mech_i: survivors=64.0 (killed 18.0, killed_net=-9.587%, surv_net=30.386%) | mech_ii: survivors=64.0 (killed 18.0, killed_net=26.851%, surv_net=-6.052%)
+  thr=0.06 OOS_total=82.0 | mech_i: survivors=67.0 (killed 15.0, killed_net=-8.009%, surv_net=28.808%) | mech_ii: survivors=66.0 (killed 16.0, killed_net=21.329%, surv_net=-0.53%)
+  thr=0.067 OOS_total=82.0 | mech_i: survivors=70.0 (killed 12.0, killed_net=-8.427%, surv_net=29.226%) | mech_ii: survivors=67.0 (killed 15.0, killed_net=14.558%, surv_net=6.241%)
+  thr=0.08 OOS_total=82.0 | mech_i: survivors=72.0 (killed 10.0, killed_net=-1.495%, surv_net=22.294%) | mech_ii: survivors=68.0 (killed 14.0, killed_net=11.0%, surv_net=9.799%)
+  thr=0.1 OOS_total=82.0 | mech_i: survivors=78.0 (killed 4.0, killed_net=1.939%, surv_net=18.86%) | mech_ii: survivors=73.0 (killed 9.0, killed_net=14.302%, surv_net=6.497%)
+  thr=0.12 OOS_total=82.0 | mech_i: survivors=80.0 (killed 2.0, killed_net=-1.644%, surv_net=22.443%) | mech_ii: survivors=75.0 (killed 7.0, killed_net=10.719%, surv_net=10.08%)
+  thr=0.15 OOS_total=82.0 | mech_i: survivors=82.0 (killed 0.0, killed_net=0.0%, surv_net=20.799%) | mech_ii: survivors=79.0 (killed 3.0, killed_net=9.192%, surv_net=11.606%)
+
 === KNOWN-MOTIVATION CONTEXT (OOS — NOT USED FOR DESIGN) ===
   OOS pre-Nov-2025 (8mo): net -17.24%, 1/8 positive
   OOS post-Nov-2025 (8mo): net 26.90%, 7/8 positive

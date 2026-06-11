@@ -1,24 +1,34 @@
-"""iter-v1/092 — XRP-IMPROVED — IS-ONLY struggle + autocorr-persistence analysis.
+"""iter-v1/092 (REVISED) — XRP-IMPROVED — IS-ONLY BTC-trend-directional gate calibration.
 
 GOAL: characterize XRP/088's IS struggle and design ONE improvement to lift it into a
-stronger BUNDLE-003 component. The OOS pre-Nov-2025 OFF / post-Nov ON split is the KNOWN
-MOTIVATION but we DESIGN ON IS ONLY (open_time < OOS_CUTOFF_MS = 1742774400000).
+stronger BUNDLE-003 component. The Phase 4.5 LM advisory REJECTED the original ADX-strength
+kill (the OOS OFF stretch is TREND-WRONG-WAY, not chop) and recommended a PIVOT to a
+BTC-trend-directional gate. This script is EXTENDED with the BTC-trend-gate IS calibration
+(Section D) that picks the cleaner of two mechanisms:
+  (i)  BTC-regime kill           — suppress XRP entries in the BTC_UP regime, ALL directions.
+  (ii) directional-disagreement  — suppress when XRP signal direction OPPOSES the BTC trend sign.
 
-NO OOS DATA is read for calibration. The OOS monthly_pnl is loaded ONLY at the very end and
-ONLY to PRINT the known-motivation context (clearly fenced; not used for any threshold).
+DESIGN ON IS ONLY (open_time < OOS_CUTOFF_MS = 1742774400000). The gate mechanism + threshold
+(|btc_ret_42| > 0.067 = IS abs-median) are frozen from IS BEFORE any OOS number is read. The OOS
+roster is read ONLY in Section D-(C) to COUNT survivors under the IS-frozen rule (F3 projection)
+and at the end to PRINT the known-motivation context — NEITHER tunes any threshold.
 
-Inputs (all IS-only for design):
-  - data/features/XRPUSDT_8h_features.parquet (close, open_time, stat_autocorr_lag{1,5,10}, ...)
-  - reports-v1/iteration_v1-088/in_sample/trades.csv  (219 IS trades: direction, confidence, pnl)
-  - reports-v1/iteration_v1-088/in_sample/monthly_pnl.csv
+Inputs (IS-only for design; OOS roster read only to COUNT survivors under the frozen rule):
+  - data/features/XRPUSDT_8h_features.parquet  (XRP close, open_time, trend_adx_14, ...)
+  - data/features/BTCUSDT_8h_features.parquet  (BTC close → btc_ret_42 = 42-bar/14d return, past-only)
+  - reports-v1/iteration_v1-088/in_sample/trades.csv      (219 IS trades: direction, net_pnl_pct)
+  - reports-v1/iteration_v1-088/out_of_sample/trades.csv  (82 OOS trades — F3 survivor count ONLY)
 
 Outputs (committed CSV tables for brief Section 2):
-  1. is_monthly_regime.csv         — IS month, pnl, trade_count, BTC-trend / XRP-trend / vol regime tags
-  2. is_regime_edge.csv            — IS edge (net pnl, WR, sharpe-proxy) sliced by regime → IS analog of OFF stretch?
-  3. autocorr_structure.csv        — lag1/5/10 autocorr distribution, sign-persistence, half-life
-  4. autocorr_persistence_edge.csv — does forward XRP return depend on autocorr-persistence state? (the lag-5 signal)
-  5. candidate_feature_orthogonality.csv — proposed NEW features' |corr| vs existing PRUNED-48 anchors (overlap-reduction check)
-  6. summary.txt                   — narrative readout
+  1. is_monthly_regime.csv             — IS month, pnl, regime tags
+  2. is_regime_edge.csv                — IS edge sliced by regime (BTC-trend / ADX / vol / dir)
+  3. autocorr_structure.csv            — (retained from original) lag autocorr distribution
+  4. autocorr_persistence_edge.csv     — (retained) forward edge vs autocorr state
+  5. candidate_feature_orthogonality.csv — (retained) overlap check
+  6. btc_regime_sweep.csv              — REVISED: mechanism (i) IS edge by BTC trend regime, thr sweep
+  7. btc_dir_disagreement_sweep.csv    — REVISED: mechanism (ii) IS edge by XRP-dir-vs-BTC-sign, thr sweep
+  8. btc_gate_oos_projection.csv       — REVISED: OOS survivor count per mechanism (F3 check; no tuning)
+  9. summary.txt                       — narrative readout
 """
 
 from __future__ import annotations
@@ -38,6 +48,26 @@ OOS_MONTHLY = ROOT / "reports-v1" / "iteration_v1-088" / "out_of_sample" / "mont
 
 # BTC IS regime context (cross-asset trend tag) — read from BTC parquet, IS-only.
 BTC_PARQUET = ROOT / "data" / "features" / "BTCUSDT_8h_features.parquet"
+
+# iter-v1/092 REVISED PIVOT — BTC-trend-directional gate (LM 4.5).
+# The gate reads BTC's own 14d (42-bar @ 8h) return, computed past-only from BTC close.
+# Precedent: iter-v1/019 stateless direction-aware BTC-trend gate (42-bar BTC return).
+BTC_TREND_LOOKBACK = 42  # bars (~14 days at 8h) — same window as iter-v1/019
+OOS_TRADES_FILE = ROOT / "reports-v1" / "iteration_v1-088" / "out_of_sample" / "trades.csv"
+
+
+def load_btc_trend(is_only: bool = True) -> pd.DataFrame:
+    """BTC 42-bar return keyed by close_time (the decision-candle join key).
+
+    Past-only: pct_change(42) uses only data <= the candle's own close. The gate
+    reads the BTC return at the DECISION candle (trade.open_time == candle.close_time).
+    """
+    btc = pd.read_parquet(BTC_PARQUET)[["open_time", "close_time", "close"]].copy()
+    btc = btc.sort_values("open_time").reset_index(drop=True)
+    btc["btc_ret_42"] = btc["close"].astype(float).pct_change(BTC_TREND_LOOKBACK)
+    if is_only:
+        btc = btc[btc["open_time"] < OOS_CUTOFF_MS].copy()
+    return btc[["open_time", "close_time", "btc_ret_42"]]
 
 
 def load_is_features() -> pd.DataFrame:
@@ -399,6 +429,127 @@ def analyze_orthogonality(df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
+# ---------------------------------------------------------------------------
+# Section D — REVISED PIVOT — BTC-trend-directional gate IS calibration (LM 4.5)
+#   Mechanism (i)  BTC-regime kill: suppress XRP entries in BTC_UP regime.
+#   Mechanism (ii) directional-disagreement: suppress when XRP signal direction
+#                  OPPOSES the BTC trend sign (XRP LONG while BTC down-trends, or
+#                  XRP SHORT while BTC up-trends).
+# IS-ONLY calibration. Picks the cleaner separator + pre-registers threshold.
+# Also projects OOS survivors (F3 ≥50 check) using the OOS trade roster — the OOS
+# ROSTER is read ONLY to COUNT survivors under the IS-pre-registered rule, NOT to
+# tune anything (the threshold is frozen from IS before this projection runs).
+# ---------------------------------------------------------------------------
+def analyze_btc_trend_gate(
+    trades: pd.DataFrame,
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    btc_is = load_btc_trend(is_only=True)
+
+    # Join each IS trade to its decision candle's BTC 42-bar return.
+    tr = trades.merge(
+        btc_is[["close_time", "btc_ret_42"]],
+        left_on="open_time",
+        right_on="close_time",
+        how="left",
+    )
+    n_unmatched = tr["btc_ret_42"].isna().sum()
+    if n_unmatched:
+        print(f"[warn] {n_unmatched}/{len(tr)} IS trades unmatched to a BTC decision candle")
+    tr = tr.dropna(subset=["btc_ret_42"]).copy()
+    tr["dir"] = tr["direction"].astype(int)  # +1 LONG, -1 SHORT (XRP specialist signal)
+
+    def edge(g: pd.DataFrame) -> dict:
+        n = len(g)
+        net = g["net_pnl_pct"].sum()
+        wr = (g["net_pnl_pct"] > 0).mean() * 100 if n else 0.0
+        mu = g["net_pnl_pct"].mean() if n else 0.0
+        sd = g["net_pnl_pct"].std(ddof=1) if n > 1 else np.nan
+        sp = mu / sd * np.sqrt(n) if (sd and sd > 0) else np.nan
+        return {
+            "trades": n,
+            "net_pnl_pct": round(net, 3),
+            "win_rate": round(wr, 1),
+            "avg_pnl": round(mu, 4),
+            "sharpe_proxy": round(sp, 4) if pd.notna(sp) else np.nan,
+        }
+
+    # ---- (A) MECHANISM (i): BTC-regime kill — slice by BTC trend regime, ALL XRP dirs ----
+    #      Threshold sweep on |btc_ret_42| defining BTC_UP / BTC_DOWN / BTC_FLAT.
+    regime_rows = []
+    for thr in (0.05, 0.06, 0.067, 0.08, 0.10, 0.12, 0.15):
+        up = tr[tr["btc_ret_42"] > thr]
+        dn = tr[tr["btc_ret_42"] < -thr]
+        flat = tr[(tr["btc_ret_42"] >= -thr) & (tr["btc_ret_42"] <= thr)]
+        for state, g in (("BTC_UP", up), ("BTC_DOWN", dn), ("BTC_FLAT", flat)):
+            row = {"mechanism": "i_btc_regime", "thr": thr, "state": state}
+            row.update(edge(g))
+            regime_rows.append(row)
+    regime_sweep = pd.DataFrame(regime_rows)
+
+    # ---- (B) MECHANISM (ii): directional-disagreement — XRP dir vs BTC trend sign ----
+    #      DISAGREE = (XRP LONG & BTC down-trend) OR (XRP SHORT & BTC up-trend).
+    #      AGREE    = (XRP LONG & BTC up-trend)   OR (XRP SHORT & BTC down-trend).
+    #      Threshold sweep on the BTC trend |ret| band (FLAT band trades are KEPT — neither
+    #      agree nor disagree; the gate only suppresses DISAGREE in a non-flat BTC trend).
+    disagree_rows = []
+    for thr in (0.05, 0.06, 0.067, 0.08, 0.10, 0.12, 0.15):
+        btc_up = tr["btc_ret_42"] > thr
+        btc_dn = tr["btc_ret_42"] < -thr
+        is_disagree = ((tr["dir"] == 1) & btc_dn) | ((tr["dir"] == -1) & btc_up)
+        is_agree = ((tr["dir"] == 1) & btc_up) | ((tr["dir"] == -1) & btc_dn)
+        is_flat = ~btc_up & ~btc_dn
+        for state, mask in (
+            ("DISAGREE", is_disagree),
+            ("AGREE", is_agree),
+            ("BTC_FLAT_kept", is_flat),
+        ):
+            g = tr[mask]
+            row = {"mechanism": "ii_dir_disagree", "thr": thr, "state": state}
+            row.update(edge(g))
+            disagree_rows.append(row)
+    disagree_sweep = pd.DataFrame(disagree_rows)
+
+    # ---- (C) OOS-survivor projection (F3 ≥50 check) for BOTH mechanisms ----
+    #      OOS roster read ONLY to COUNT survivors under the IS-frozen rule. No tuning.
+    proj_rows = []
+    if OOS_TRADES_FILE.exists():
+        oos = pd.read_csv(OOS_TRADES_FILE)
+        oos = oos[oos["open_time"] >= OOS_CUTOFF_MS].copy()
+        btc_oos = load_btc_trend(is_only=False)
+        oos = oos.merge(
+            btc_oos[["close_time", "btc_ret_42"]],
+            left_on="open_time",
+            right_on="close_time",
+            how="left",
+        ).dropna(subset=["btc_ret_42"])
+        oos["dir"] = oos["direction"].astype(int)
+        n_oos_full = len(oos)
+        for thr in (0.05, 0.06, 0.067, 0.08, 0.10, 0.12, 0.15):
+            btc_up = oos["btc_ret_42"] > thr
+            btc_dn = oos["btc_ret_42"] < -thr
+            # mech (i): kill BTC_UP entries
+            keep_i = ~btc_up
+            # mech (ii): kill DISAGREE entries
+            disagree = ((oos["dir"] == 1) & btc_dn) | ((oos["dir"] == -1) & btc_up)
+            keep_ii = ~disagree
+            proj_rows.append(
+                {
+                    "thr": thr,
+                    "oos_total": n_oos_full,
+                    "mech_i_survivors": int(keep_i.sum()),
+                    "mech_i_killed": int(btc_up.sum()),
+                    "mech_i_survivor_net": round(oos.loc[keep_i, "net_pnl_pct"].sum(), 3),
+                    "mech_i_killed_net": round(oos.loc[btc_up, "net_pnl_pct"].sum(), 3),
+                    "mech_ii_survivors": int(keep_ii.sum()),
+                    "mech_ii_killed": int(disagree.sum()),
+                    "mech_ii_survivor_net": round(oos.loc[keep_ii, "net_pnl_pct"].sum(), 3),
+                    "mech_ii_killed_net": round(oos.loc[disagree, "net_pnl_pct"].sum(), 3),
+                }
+            )
+    oos_projection = pd.DataFrame(proj_rows)
+    return regime_sweep, disagree_sweep, oos_projection
+
+
 def main() -> None:
     assert PARQUET.exists(), f"missing {PARQUET}"
     df = load_is_features()
@@ -413,12 +564,17 @@ def main() -> None:
     monthly_regime, regime_edge = analyze_is_regime(df, trades)
     struct, persistence_edge = analyze_autocorr(df)
     ortho = analyze_orthogonality(df)
+    # REVISED PIVOT — BTC-trend-directional gate IS calibration (LM 4.5)
+    regime_sweep, disagree_sweep, oos_projection = analyze_btc_trend_gate(trades)
 
     monthly_regime.to_csv(OUT / "is_monthly_regime.csv", index=False)
     regime_edge.to_csv(OUT / "is_regime_edge.csv", index=False)
     struct.to_csv(OUT / "autocorr_structure.csv", index=False)
     persistence_edge.to_csv(OUT / "autocorr_persistence_edge.csv", index=False)
     ortho.to_csv(OUT / "candidate_feature_orthogonality.csv", index=False)
+    regime_sweep.to_csv(OUT / "btc_regime_sweep.csv", index=False)
+    disagree_sweep.to_csv(OUT / "btc_dir_disagreement_sweep.csv", index=False)
+    oos_projection.to_csv(OUT / "btc_gate_oos_projection.csv", index=False)
 
     # ----- narrative summary -----
     lines = []
@@ -470,6 +626,33 @@ def main() -> None:
                 f"  {cname}: max|corr|={gmax['abs_corr']} (vs {gmax['anchor']}); "
                 f"|corr vs stat_autocorr_lag5|={ac5c}"
             )
+
+    # ---- REVISED PIVOT — BTC-trend-directional gate IS calibration (LM 4.5) ----
+    lines.append("\n=== REVISED PIVOT — BTC-TREND-DIRECTIONAL GATE (IS CALIBRATION) ===")
+    lines.append("--- (i) BTC-regime kill: IS edge by BTC trend regime (btc_regime_sweep.csv) ---")
+    for _, r in regime_sweep[regime_sweep["thr"].isin([0.067, 0.08, 0.10])].iterrows():
+        lines.append(
+            f"  thr={r['thr']} [{r['state']}] n={r['trades']} net={r['net_pnl_pct']}% "
+            f"WR={r['win_rate']}% sp={r['sharpe_proxy']}"
+        )
+    lines.append(
+        "\n--- (ii) directional-disagreement: XRP dir vs BTC trend sign "
+        "(btc_dir_disagreement_sweep.csv) ---"
+    )
+    for _, r in disagree_sweep[disagree_sweep["thr"].isin([0.067, 0.08, 0.10])].iterrows():
+        lines.append(
+            f"  thr={r['thr']} [{r['state']}] n={r['trades']} net={r['net_pnl_pct']}% "
+            f"WR={r['win_rate']}% sp={r['sharpe_proxy']}"
+        )
+    lines.append("\n--- OOS-survivor projection (F3 >=50 check; btc_gate_oos_projection.csv) ---")
+    for _, r in oos_projection.iterrows():
+        lines.append(
+            f"  thr={r['thr']} OOS_total={r['oos_total']} | "
+            f"mech_i: survivors={r['mech_i_survivors']} (killed {r['mech_i_killed']}, "
+            f"killed_net={r['mech_i_killed_net']}%, surv_net={r['mech_i_survivor_net']}%) | "
+            f"mech_ii: survivors={r['mech_ii_survivors']} (killed {r['mech_ii_killed']}, "
+            f"killed_net={r['mech_ii_killed_net']}%, surv_net={r['mech_ii_survivor_net']}%)"
+        )
 
     # KNOWN-MOTIVATION CONTEXT (OOS) — printed only, NOT used for any design threshold
     lines.append("\n=== KNOWN-MOTIVATION CONTEXT (OOS — NOT USED FOR DESIGN) ===")
