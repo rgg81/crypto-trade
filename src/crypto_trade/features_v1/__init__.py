@@ -208,6 +208,19 @@ assert len(V1_FEATURE_COLUMNS_PRUNED) == 48, (
     f"V1_FEATURE_COLUMNS_PRUNED must have exactly 48 features; got {len(V1_FEATURE_COLUMNS_PRUNED)}"
 )
 
+# iter-v1/078: AAVE specialist adds one extra column on top of the 48-col PRUNED set.
+# V1_FEATURE_COLUMNS_PRUNED is intentionally kept at 48 so the other 3 specialists
+# (DOT, ETH, BTC) remain unaffected. AAVE uses this 49-col list instead.
+# The universal cross_btc dispatch writes excess_ret_5d_vs_majors_z90 into every
+# symbol's parquet harmlessly; non-AAVE models simply don't include it in feature_columns.
+V1_ITER078_FEATURE_COLUMNS: tuple[str, ...] = V1_FEATURE_COLUMNS_PRUNED + (
+    "excess_ret_5d_vs_majors_z90",
+)
+assert len(V1_ITER078_FEATURE_COLUMNS) == 49, (
+    f"V1_ITER078_FEATURE_COLUMNS must have exactly 49 features; "
+    f"got {len(V1_ITER078_FEATURE_COLUMNS)}"
+)
+
 # Columns explicitly NOT in V1_FEATURE_COLUMNS_PRUNED but which may still appear in
 # legacy parquet files (from older iterations that included them). The runner must
 # NOT pick these up as training features.
@@ -826,6 +839,7 @@ __all__ = [
     "V1_BASELINE_UNIVERSE",
     "V1_FEATURE_COLUMNS",
     "V1_FEATURE_COLUMNS_PRUNED",
+    "V1_ITER078_FEATURE_COLUMNS",
     "V1_OOD_FEATURE_COLUMNS",
     "V1_RETIRED_FEATURE_COLUMNS",
     "assert_v1_universe",

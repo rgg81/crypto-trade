@@ -73,6 +73,35 @@ def _make_btc_csv(tmpdir: Path, n: int = 300, seed: int = 99) -> Path:
     return csv_path
 
 
+def _make_eth_csv(tmpdir: Path, n: int = 300, seed: int = 77) -> Path:
+    """Write a fake ETHUSDT/8h.csv to tmpdir (iter-v1/078 excess_ret needs ETH).
+
+    Required because add_cross_btc_v1_features now loads ETH for ALL symbols
+    to compute excess_ret_5d_vs_majors_z90 universally.
+    """
+    rng = np.random.default_rng(seed)
+    start_ms = 1_679_616_000_000
+    interval_ms = 8 * 3600 * 1000
+    open_times = [start_ms + i * interval_ms for i in range(n)]
+    log_rets = rng.normal(0, 0.020, n)
+    prices = 2000.0 * np.exp(np.cumsum(log_rets))
+    eth_dir = tmpdir / "ETHUSDT"
+    eth_dir.mkdir(parents=True, exist_ok=True)
+    csv_path = eth_dir / "8h.csv"
+    df = pd.DataFrame(
+        {
+            "open_time": open_times,
+            "open": prices * 0.999,
+            "high": prices * 1.01,
+            "low": prices * 0.99,
+            "close": prices,
+            "volume": rng.uniform(1e5, 1e7, n),
+        }
+    )
+    df.to_csv(csv_path, index=False)
+    return csv_path
+
+
 # ---------------------------------------------------------------------------
 # 1. test_cross_btc_v1_no_lookahead
 # ---------------------------------------------------------------------------
@@ -187,6 +216,7 @@ def test_dot_only_cohort() -> None:
 
     with tempfile.TemporaryDirectory() as tmpdir:
         _make_btc_csv(Path(tmpdir), n=n, seed=99)
+        _make_eth_csv(Path(tmpdir), n=n, seed=77)
 
         out_dot = add_cross_btc_v1_features(df_dot, data_dir=Path(tmpdir))
         out_link = add_cross_btc_v1_features(df_link, data_dir=Path(tmpdir))
@@ -401,6 +431,7 @@ def test_add_cross_btc_missing_column() -> None:
     df = _make_kline_df(n=50, symbol="DOTUSDT").drop(columns=["symbol"])
     with tempfile.TemporaryDirectory() as tmpdir:
         _make_btc_csv(Path(tmpdir), n=50)
+        _make_eth_csv(Path(tmpdir), n=50)
         with pytest.raises(KeyError, match="symbol"):
             add_cross_btc_v1_features(df, data_dir=Path(tmpdir))
 
@@ -429,6 +460,8 @@ def test_add_cross_btc_zscore_clip() -> None:
                 "volume": [1e6] * n,
             }
         ).to_csv(csv_p, index=False)
+        # iter-v1/078: also write ETH CSV (universal excess_ret requires ETH for all symbols)
+        _make_eth_csv(Path(tmpdir), n=n, seed=77)
 
         out = add_cross_btc_v1_features(df_dot, data_dir=Path(tmpdir))
 
