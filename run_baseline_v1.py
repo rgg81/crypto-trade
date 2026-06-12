@@ -93,6 +93,8 @@ from crypto_trade.features_v1 import (
     V1_ITER074_UNIVERSE,
     V1_ITER075_UNIVERSE,
     V1_ITER076_UNIVERSE,
+    V1_ITER078_FEATURE_COLUMNS,
+    V1_ITER078_UNIVERSE,
     V1_OOD_FEATURE_COLUMNS,
     assert_v1_universe,
 )
@@ -7632,6 +7634,172 @@ def main() -> None:
         _r5_model_results = [results_e076]
         _post_dispatch_fi_strategies = [("Model_A_AAVE_specialist_076", _strat_e076)]
 
+    elif iteration_label == "v1-078" and set(symbols) == set(V1_ITER078_UNIVERSE):
+        # iter-v1/078: AAVEUSDT SPECIALIST-IMPROVED-V2 with NEW composed feature axis.
+        # Cycle-7 SPECIALIST-IMPROVEMENT 2nd attempt for AAVE seat.
+        # Axis family: feature-family (ADD excess_ret_5d_vs_majors_z90; NEW composed
+        #   cross-asset primitive — AAVE 5d excess return vs 50/50 BTC+ETH benchmark,
+        #   z-scored 90-bar = 30 calendar days; universal across all symbols).
+        #
+        # Override active_feature_columns to V1_ITER078_FEATURE_COLUMNS (49 cols).
+        # --pruned-features sets active_feature_columns=V1_FEATURE_COLUMNS_PRUNED (48 cols);
+        # /078 adds excess_ret_5d_vs_majors_z90 → 49 cols. The dispatch guards check
+        # active_feature_columns for the 49-col invariant; override here before asserts.
+        active_feature_columns = list(V1_ITER078_FEATURE_COLUMNS)
+        #
+        # Changes vs /076 dispatch:
+        #   (a) ITERATION_LABEL="v1-078" instead of "v1-076"
+        #   (b) feature_columns = V1_ITER078_FEATURE_COLUMNS (49 cols; excess_ret_5d added)
+        #
+        # All methodology constants LOCKED per user directive 2026-06-07:
+        #   50 seeds × 30 trials × specialist_mode=True
+        #   max_depth=5 FIXED, num_leaves=31 FIXED, min_child_samples REMOVED
+        #   ENSEMBLE_SIZE=1, n_estimators<=500, n_startup_trials=10
+        #   atr_tp=2.9, atr_sl=1.45 (UNCHANGED from /076)
+        #   R1=OFF, R2=OFF, R3=ON-SHARED cutoff=0.70, R5=ON vt_target_vol=0.3
+        #   mean-of-signed-weights aggregator, bounds_profile=v1_specialist
+        #
+        # Feature: excess_ret_5d_vs_majors_z90 (CANONICAL DEFINITION):
+        #   ret_5d[t]     = sym_close.pct_change(15)[t]  (15 bars x 8h = 5 calendar days)
+        #   btc_ret_5d[t] = btc_close.pct_change(15)[t]
+        #   eth_ret_5d[t] = eth_close.pct_change(15)[t]
+        #   excess[t]     = ret_5d - 0.5 * btc_ret_5d - 0.5 * eth_ret_5d
+        #   z90[t]        = rolling_zscore_90bar(excess), clipped [-10,+10], NaN->0.0
+        #
+        # F-AXIS bands (absolute IS Sharpe — no delta comparison to /076):
+        #   VALIDATED:               IS >= +0.50 AND OOS > 0 AND IS trades >= 50
+        #   PROMISING-TENTATIVE:     IS in [+0.20, +0.50)
+        #   SPECIALIST-NEGATIVE-2nd-STRIKE: IS < +0.20 (AAVE seat exclusion, 2-strike rule)
+        #
+        # LOAD-BEARING: specialist_dispersion.csv persistence (matching /065+/074+/075+/076).
+        assert set(symbols) == {"AAVEUSDT"}, (
+            f"iter-v1/078 guard: expected {{AAVEUSDT}}, got {set(symbols)}"
+        )
+        assert "excess_ret_5d_vs_majors_z90" in active_feature_columns, (
+            "iter-v1/078 guard: excess_ret_5d_vs_majors_z90 must be in active_feature_columns. "
+            "V1_ITER078_FEATURE_COLUMNS (49 cols) must include this new composed feature."
+        )
+        assert len(active_feature_columns) == 49, (
+            f"iter-v1/078 guard: expected 49 V1_ITER078_FEATURE_COLUMNS cols, "
+            f"got {len(active_feature_columns)}. "
+            "V1_ITER078_FEATURE_COLUMNS = V1_FEATURE_COLUMNS_PRUNED (49 cols; includes "
+            "excess_ret_5d_vs_majors_z90 added at iter-v1/078)."
+        )
+        print(
+            f"[iter-v1/078] AAVE SPECIALIST-IMPROVED-V2 — NEW composed feature axis: "
+            f"excess_ret_5d_vs_majors_z90 (AAVE 5d excess vs 50/50 BTC+ETH, z90-bar). "
+            f"V1_SPECIALIST_SEED_COUNT={V1_SPECIALIST_SEED_COUNT} "
+            f"V1_SPECIALIST_OPTUNA_TRIALS={V1_SPECIALIST_OPTUNA_TRIALS} "
+            f"specialist_mode=True "
+            f"max_depth=5 FIXED, num_leaves=31 FIXED. "
+            f"R1=OFF (CATALOG-CLOSED; f81cafc3), R2=OFF, "
+            f"R3=ON-SHARED cutoff=0.70, R5=ON vt_target_vol=0.3. "
+            f"features=V1_ITER078_FEATURE_COLUMNS (49 cols). "
+            f"atr_tp=2.9, atr_sl=1.45 (UNCHANGED from /076). "
+            f"n_estimators_max=500 (wall-clock). n_startup_trials=10 (wall-clock). "
+            f"Aggregator: mean-of-signed-weights across {V1_SPECIALIST_SEED_COUNT} seeds. "
+            f"F-AXIS: VALIDATED>=+0.50, TENTATIVE[+0.20,+0.50), NEG-2nd-STRIKE<+0.20. "
+            f"LOAD-BEARING: specialist_dispersion.csv will be persisted post-backtest."
+        )
+        _config_e078 = BacktestConfig(
+            symbols=("AAVEUSDT",),
+            interval="8h",
+            max_amount_usd=1000.0,
+            stop_loss_pct=2.9,  # ATR-based; overridden by atr_sl_multiplier=1.45
+            take_profit_pct=5.8,  # ATR-based; overridden by atr_tp_multiplier=2.9
+            timeout_minutes=10080,
+            fee_pct=0.1,
+            data_dir=Path("data"),
+            cooldown_candles=2,
+            vol_targeting=True,
+            vt_target_vol=0.3,
+            vt_lookback_days=45,
+            vt_min_scale=0.33,
+            vt_max_scale=2.0,
+            risk_consecutive_sl_limit=0,  # R1=OFF: CATALOG-CLOSED for SPECIALIST_mode
+            risk_consecutive_sl_cooldown_candles=0,
+            risk_drawdown_scale_enabled=False,  # R2=OFF: Model A baseline
+            risk_r5_vol_target_enabled=_r5_kwargs.get("r5_vol_target_enabled", True),
+            risk_r5_vol_target_pct=_r5_kwargs.get("r5_vol_target_pct", 4.0),
+            risk_r5_kill_low_natr_enabled=_r5_kwargs.get("r5_kill_low_natr_enabled", False),
+            risk_r5_kill_low_natr_min_pct=_r5_kwargs.get("r5_kill_low_natr_min_pct", 2.0),
+        )
+        _strat_e078 = LightGbmStrategy(
+            training_months=24,
+            n_trials=V1_SPECIALIST_OPTUNA_TRIALS,  # informational; specialist loop controls
+            cv_splits=5,
+            label_tp_pct=5.8,
+            label_sl_pct=2.9,
+            label_timeout_minutes=10080,
+            fee_pct=0.1,
+            features_dir="data/features",
+            verbose=1,
+            atr_tp_multiplier=2.9,
+            atr_sl_multiplier=1.45,
+            use_atr_labeling=True,
+            # placeholder seed — specialist_mode uses V1_SPECIALIST_SEEDS internally
+            ensemble_seeds=list(V1_SPECIALIST_SEEDS[:1]),
+            feature_columns=list(V1_ITER078_FEATURE_COLUMNS),  # 49 cols
+            ood_enabled=True,  # R3 ON at AGGREGATOR level
+            ood_features=list(V1_OOD_FEATURE_COLUMNS),
+            ood_cutoff_pct=0.70,
+            oof_persist_path=OOF_PARQUET_PATH,
+            bounds_profile="v1_specialist",
+            specialist_mode=True,
+            specialist_n_startup_trials=10,
+            specialist_n_estimators_max=500,
+        )
+        import time as _time_078  # noqa: PLC0415
+
+        _t0_078 = _time_078.time()
+        results_e078 = run_backtest(_config_e078, _strat_e078, yearly_pnl_check=False)
+        _elapsed_078 = _time_078.time() - _t0_078
+        faxm_e078 = _strat_e078._faxm_log
+        print(
+            f"\n[iter-v1/078] Model_A_AAVE_specialist_078 complete: "
+            f"{len(results_e078)} trades in {_elapsed_078:.0f}s "
+            f"({_elapsed_078 / 3600:.2f}h)"
+        )
+
+        # Cohort isolation sanity: assert ONLY AAVEUSDT trades emitted.
+        _e078_symbols = {r.symbol for r in results_e078}
+        assert _e078_symbols.issubset({"AAVEUSDT"}), (
+            f"[iter-v1/078] Model A_AAVE_078 produced non-AAVE results: "
+            f"{_e078_symbols - {'AAVEUSDT'}}. "
+            "Per-cohort isolation failed — iter-v1/078 must trade AAVEUSDT ONLY."
+        )
+
+        # -----------------------------------------------------------------
+        # LOAD-BEARING: specialist_dispersion.csv persistence (matching /065+/074+/075+/076).
+        # -----------------------------------------------------------------
+        _disp_mean_e078 = _strat_e078.get_specialist_dispersion_mean()
+        _disp_is_path_e078 = (
+            Path(reports_dir) / "iteration_v1-078" / "in_sample" / "specialist_dispersion.csv"
+        )
+        _disp_is_path_e078.parent.mkdir(parents=True, exist_ok=True)
+        _strat_e078.persist_specialist_dispersion_csv(str(_disp_is_path_e078))
+        print(
+            f"[iter-v1/078] LOAD-BEARING dispersion patch: "
+            f"specialist_dispersion_mean={_disp_mean_e078} "
+            f"specialist_dispersion.csv → {_disp_is_path_e078}"
+        )
+        # Store for post-report block (specialist_dispersion_mean appended to comparison.csv).
+        _e078_disp_mean = _disp_mean_e078
+        _e078_disp_csv_path = _disp_is_path_e078
+
+        print(
+            f"[iter-v1/078] Dispatch verified: "
+            f"AAVE-only={len(results_e078)} trades. "
+            f"R1=OFF/R2=OFF/R3=ON-AGGREGATOR-LEVEL. "
+            f"SPECIALIST seeds={len(_strat_e078._specialist_models)} trained. "
+            f"sigma_pop mean={_disp_mean_e078}"
+        )
+
+        _all_faxm_logs = faxm_e078
+        all_results = results_e078
+        _r5_model_results = [results_e078]
+        _post_dispatch_fi_strategies = [("Model_A_AAVE_specialist_078", _strat_e078)]
+
     elif iteration_label == "v1-044":
         # iter-v1/044: CONFIRMATION-MERGE-PORTFOLIO (cycle-5 CONFIRMATION 1/1).
         # 3-component bundle: BASELINE_V1 (w=0.50) + /036 (w=0.30) + /043 (w=0.20).
@@ -8912,6 +9080,41 @@ def main() -> None:
         if _strat_076_ref is not None:
             _strat_076_ref.persist_specialist_dispersion_csv(str(_oos_disp_path_076))
             print(f"[iter-v1/076] OOS specialist_dispersion.csv persisted → {_oos_disp_path_076}")
+
+    # -------------------------------------------------------------------------
+    # iter-v1/078: specialist_dispersion_mean + OOS specialist_dispersion.csv
+    # → comparison.csv. Mirrors the /065+/074+/075+/076 pattern.
+    # Guard: only runs when _e078_disp_mean is defined (v1-078 dispatch sets it).
+    # -------------------------------------------------------------------------
+    if iteration_label == "v1-078" and "_e078_disp_mean" in dir():
+        _disp_mean_val_078 = locals().get("_e078_disp_mean")
+        if _disp_mean_val_078 is not None:
+            import csv as _csv_078  # noqa: PLC0415
+
+            _comp_csv_078 = report_dir / "comparison.csv"
+            if _comp_csv_078.exists():
+                with _comp_csv_078.open("a", newline="") as _fh_078:
+                    _writer_078 = _csv_078.writer(_fh_078)
+                    _writer_078.writerow(["specialist_dispersion_mean", _disp_mean_val_078, "", ""])
+                print(
+                    f"[iter-v1/078] LOAD-BEARING: specialist_dispersion_mean="
+                    f"{_disp_mean_val_078:.4f} appended to {_comp_csv_078}"
+                )
+            else:
+                print(
+                    f"[iter-v1/078] WARNING: comparison.csv not found at {_comp_csv_078}; "
+                    f"specialist_dispersion_mean={_disp_mean_val_078:.4f} NOT appended."
+                )
+        # Persist OOS specialist_dispersion.csv (F-AXIS #2 audit; matching /065+/074+/075+/076).
+        _oos_disp_path_078 = report_dir / "out_of_sample" / "specialist_dispersion.csv"
+        _oos_disp_path_078.parent.mkdir(parents=True, exist_ok=True)
+        _strat_078_ref = next(
+            (s for _, s in _post_dispatch_fi_strategies if "AAVE_specialist_078" in _),
+            None,
+        )
+        if _strat_078_ref is not None:
+            _strat_078_ref.persist_specialist_dispersion_csv(str(_oos_disp_path_078))
+            print(f"[iter-v1/078] OOS specialist_dispersion.csv persisted → {_oos_disp_path_078}")
 
     # -------------------------------------------------------------------------
     # iter-v1/021+: write feature importance CSVs (post-dispatch).

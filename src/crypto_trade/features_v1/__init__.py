@@ -642,6 +642,16 @@ assert len(active_feature_columns) == 48 guard fires in dispatch branch.
 
 
 V1_ITER076_UNIVERSE: tuple[str, ...] = ("AAVEUSDT",)
+
+V1_ITER078_UNIVERSE: tuple[str, ...] = ("AAVEUSDT",)
+"""iter-v1/078 cohort: AAVE-only SPECIALIST-IMPROVED-V2 (same universe as /076).
+
+Axis family: feature-family (ADD excess_ret_5d_vs_majors_z90; NEW composed cross-asset
+primitive — AAVE 5d excess return vs 50/50 BTC+ETH benchmark, z-scored 90 BARS).
+Same AAVEUSDT seat as /076; methodology constants LOCKED per user directive 2026-06-07.
+Feature set: V1_ITER078_FEATURE_COLUMNS (49 cols;
+V1_FEATURE_COLUMNS_PRUNED + excess_ret_5d_vs_majors_z90).
+"""
 """iter-v1/076 cohort: AAVE-only SPECIALIST — second NEW SYMBOL universe-extension (DeFi-lending).
 
 Autopilot mining directive 2026-06-06. Cycle-7 SPECIALIST-MINE 2/N.
@@ -865,6 +875,7 @@ __all__ = [
     "V1_ITER074_UNIVERSE",
     "V1_ITER075_UNIVERSE",
     "V1_ITER076_UNIVERSE",
+    "V1_ITER078_UNIVERSE",
     # iter-v1/023: funding-rate feature family (add_funding_v1_features imported on demand)
     # iter-v1/025: OI delta feature family (add_oi_delta_v1_features imported on demand)
     # iter-v1/040: composed feature family (add_composed_v1_features imported on demand)
