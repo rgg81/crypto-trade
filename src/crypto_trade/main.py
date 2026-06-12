@@ -911,6 +911,7 @@ def _cmd_live(args, settings) -> None:
     from crypto_trade.live.engine import LiveEngine
     from crypto_trade.live.models import (
         BASELINE_MODELS,
+        BUNDLE_002_MODELS,
         COMBINED_MODELS,
         V2_BASELINE_MODELS,
         V3_BASELINE_MODELS,
@@ -923,8 +924,11 @@ def _cmd_live(args, settings) -> None:
     track_map = {
         "v1": BASELINE_MODELS,
         "v2": V2_BASELINE_MODELS,
-        "v3": V3_BASELINE_MODELS,                # iter-v3/121 baseline (BCH/LDO/TRX)
-        "both": COMBINED_MODELS,                  # v1+v2 only (deliberate; v3 deploys alone)
+        "v3": V3_BASELINE_MODELS,  # iter-v3/121 baseline (BCH/LDO/TRX)
+        "both": COMBINED_MODELS,  # v1+v2 only (deliberate; v3 deploys alone)
+        # live/v1-bundle-parity: BUNDLE-002 (iter-v1/082) — 4 single-coin specialists
+        # (DOT/ETH/BTC/AAVE); do NOT repurpose 'v1' (serves legacy v0.186 engine).
+        "v1-bundle": BUNDLE_002_MODELS,
     }
     selected_models = track_map[track]
     print(f"[live] Track: {track} ({len(selected_models)} models)")
@@ -1035,8 +1039,8 @@ def _cmd_seed_live_db(args, settings) -> None:
     track_map = {
         "v1": BASELINE_MODELS,
         "v2": V2_BASELINE_MODELS,
-        "v3": V3_BASELINE_MODELS,                # iter-v3/121 baseline (BCH/LDO/TRX)
-        "both": COMBINED_MODELS,                  # v1+v2 only — v3 deploys alone
+        "v3": V3_BASELINE_MODELS,  # iter-v3/121 baseline (BCH/LDO/TRX)
+        "both": COMBINED_MODELS,  # v1+v2 only — v3 deploys alone
     }
     selected_models = track_map[args.track]
 

@@ -417,6 +417,184 @@ V2_BASELINE_MODELS: tuple[ModelConfig, ...] = _build_v2_baseline_models()
 COMBINED_MODELS: tuple[ModelConfig, ...] = BASELINE_MODELS + V2_BASELINE_MODELS
 
 
+# BUNDLE-002 (iter-v1/082): 4 pairwise-disjoint single-coin LightGBM specialists.
+# Tag: v0.v1-082.  OOS monthly Sharpe +1.0043 (first v1 specialist-bundle to clear +1.0).
+#
+# Each specialist is independent — no bundle-level weights, no cross-symbol shared state.
+# The live engine routes each (symbol, t) to exactly one owning specialist, bit-identical
+# to the backtest post-hoc union of the four single-coin trades.csv files.
+#
+# Specialist methodology (common to all four):
+#   - specialist_mode=True: 50 independent Optuna studies (V1_SPECIALIST_SEEDS: 42..91)
+#   - V1_SPECIALIST_OPTUNA_TRIALS=30 per seed, ENSEMBLE_SIZE=1 per seed
+#   - max_depth=5 FIXED, num_leaves=31 FIXED, n_estimators<=500
+#   - n_startup_trials=10 (wall-clock mitigation)
+#   - Aggregator: mean-of-signed-weights across 50 seeds at get_signal()
+#   - bounds_profile="v1_pruned" (base; specialist_mode upgrades to "v1_specialist" internally)
+#
+# Risk wrappers per specialist (matches run_baseline_v1.py dispatch):
+#   - DOT (/063): R1 (K=3, C=27) + R2 (trigger=7%, anchor=15%, floor=0.33) + R3 (cutoff=0.70)
+#   - ETH (/064): R3 only (Model A pattern — R1/R2 disabled)
+#   - BTC (/065): R3 only (Model A pattern — R1/R2 disabled)
+#   - AAVE (/078): R3 only (Model A pattern — R1/R2 disabled)
+#
+# Feature stacks:
+#   - DOT, ETH, BTC: V1_FEATURE_COLUMNS_PRUNED (48 cols)
+#   - AAVE: V1_ITER078_FEATURE_COLUMNS = PRUNED + excess_ret_5d_vs_majors_z90 (49 cols)
+#
+# R3 OOD gate: ood_enabled=True, ood_features=V1_OOD_FEATURE_COLUMNS (16 scale-invariant),
+#   ood_cutoff_pct=0.70 — same for all 4 specialists (verified against each dispatch branch).
+#
+# ATR labeling:
+#   - DOT: atr_tp=3.5 / atr_sl=1.75 (Model E pattern)
+#   - ETH, BTC, AAVE: atr_tp=2.9 / atr_sl=1.45 (Model A pattern)
+#
+# cooldown_candles=2, vol_targeting=True (LiveConfig default; inherited).
+# features_dir=Path("data/features") (v1 parquet path; matches run_baseline_v1.py).
+# training_months=24 (matches all dispatches).
+def _build_bundle_002_models() -> tuple[ModelConfig, ...]:
+    """Construct BUNDLE_002_MODELS lazily so heavy features_v1 import is deferred.
+
+    Returns 4 ModelConfigs for DOT/ETH/BTC/AAVE specialists as per iter-v1/082
+    BUNDLE-002 composition (tag v0.v1-082, BASELINE_V1.md).
+    """
+    from crypto_trade.features_v1 import (
+        V1_FEATURE_COLUMNS_PRUNED,
+        V1_ITER078_FEATURE_COLUMNS,
+        V1_OOD_FEATURE_COLUMNS,
+    )
+
+    # DOT specialist — iter-v1/063 source.
+    # R1+R2+R3, atr 3.5/1.75, 48-col PRUNED, Model E risk pattern.
+    dot = ModelConfig(
+        name="V1-DOT",
+        symbols=("DOTUSDT",),
+        use_atr_labeling=True,
+        atr_tp_multiplier=3.5,
+        atr_sl_multiplier=1.75,
+        # R1: K=3 consecutive-SL cooldown, C=27 candles (~9 days at 8h)
+        risk_consecutive_sl_limit=3,
+        risk_consecutive_sl_cooldown_candles=27,
+        # R2: drawdown scaling (Model E pattern)
+        risk_drawdown_scale_enabled=True,
+        risk_drawdown_trigger_pct=7.0,
+        risk_drawdown_scale_anchor_pct=15.0,
+        risk_drawdown_scale_floor=0.33,
+        # R3: OOD Mahalanobis gate
+        ood_enabled=True,
+        ood_features=V1_OOD_FEATURE_COLUMNS,
+        ood_cutoff_pct=0.70,
+        # Features and data path
+        feature_columns=V1_FEATURE_COLUMNS_PRUNED,
+        features_dir=Path("data/features"),
+        cooldown_candles=2,
+        # Specialist methodology (iter-v1/063 dispatch — 50 seeds × 30 trials)
+        specialist_mode=True,
+        specialist_seed_count=50,
+        specialist_optuna_trials=30,
+        specialist_n_startup_trials=10,
+        specialist_n_estimators_max=500,
+        bounds_profile="v1_pruned",
+        training_months=24,
+    )
+
+    # ETH specialist — iter-v1/064 source.
+    # R3 only (Model A pattern — R1/R2 disabled), atr 2.9/1.45, 48-col PRUNED.
+    eth = ModelConfig(
+        name="V1-ETH",
+        symbols=("ETHUSDT",),
+        use_atr_labeling=True,
+        atr_tp_multiplier=2.9,
+        atr_sl_multiplier=1.45,
+        # R1=OFF, R2=OFF (Model A baseline)
+        risk_consecutive_sl_limit=None,
+        risk_consecutive_sl_cooldown_candles=0,
+        risk_drawdown_scale_enabled=False,
+        # R3: OOD Mahalanobis gate
+        ood_enabled=True,
+        ood_features=V1_OOD_FEATURE_COLUMNS,
+        ood_cutoff_pct=0.70,
+        # Features and data path
+        feature_columns=V1_FEATURE_COLUMNS_PRUNED,
+        features_dir=Path("data/features"),
+        cooldown_candles=2,
+        # Specialist methodology (iter-v1/064 dispatch — 50 seeds × 30 trials)
+        specialist_mode=True,
+        specialist_seed_count=50,
+        specialist_optuna_trials=30,
+        specialist_n_startup_trials=10,
+        specialist_n_estimators_max=500,
+        bounds_profile="v1_pruned",
+        training_months=24,
+    )
+
+    # BTC specialist — iter-v1/065 source.
+    # R3 only (Model A pattern — R1/R2 disabled), atr 2.9/1.45, 48-col PRUNED.
+    btc = ModelConfig(
+        name="V1-BTC",
+        symbols=("BTCUSDT",),
+        use_atr_labeling=True,
+        atr_tp_multiplier=2.9,
+        atr_sl_multiplier=1.45,
+        # R1=OFF, R2=OFF (Model A baseline)
+        risk_consecutive_sl_limit=None,
+        risk_consecutive_sl_cooldown_candles=0,
+        risk_drawdown_scale_enabled=False,
+        # R3: OOD Mahalanobis gate
+        ood_enabled=True,
+        ood_features=V1_OOD_FEATURE_COLUMNS,
+        ood_cutoff_pct=0.70,
+        # Features and data path
+        feature_columns=V1_FEATURE_COLUMNS_PRUNED,
+        features_dir=Path("data/features"),
+        cooldown_candles=2,
+        # Specialist methodology (iter-v1/065 dispatch — 50 seeds × 30 trials)
+        specialist_mode=True,
+        specialist_seed_count=50,
+        specialist_optuna_trials=30,
+        specialist_n_startup_trials=10,
+        specialist_n_estimators_max=500,
+        bounds_profile="v1_pruned",
+        training_months=24,
+    )
+
+    # AAVE specialist — iter-v1/078 source.
+    # R3 only (Model A pattern — R1/R2 disabled), atr 2.9/1.45.
+    # AAVE-local 49-col feature stack: PRUNED + excess_ret_5d_vs_majors_z90.
+    aave = ModelConfig(
+        name="V1-AAVE",
+        symbols=("AAVEUSDT",),
+        use_atr_labeling=True,
+        atr_tp_multiplier=2.9,
+        atr_sl_multiplier=1.45,
+        # R1=OFF, R2=OFF (Model A baseline; CATALOG-CLOSED for SPECIALIST_mode)
+        risk_consecutive_sl_limit=None,
+        risk_consecutive_sl_cooldown_candles=0,
+        risk_drawdown_scale_enabled=False,
+        # R3: OOD Mahalanobis gate
+        ood_enabled=True,
+        ood_features=V1_OOD_FEATURE_COLUMNS,
+        ood_cutoff_pct=0.70,
+        # AAVE-local 49-col feature stack (PRUNED + excess_ret_5d_vs_majors_z90)
+        feature_columns=V1_ITER078_FEATURE_COLUMNS,
+        features_dir=Path("data/features"),
+        cooldown_candles=2,
+        # Specialist methodology (iter-v1/078 dispatch — 50 seeds × 30 trials)
+        specialist_mode=True,
+        specialist_seed_count=50,
+        specialist_optuna_trials=30,
+        specialist_n_startup_trials=10,
+        specialist_n_estimators_max=500,
+        bounds_profile="v1_pruned",
+        training_months=24,
+    )
+
+    return (dot, eth, btc, aave)
+
+
+BUNDLE_002_MODELS: tuple[ModelConfig, ...] = _build_bundle_002_models()
+
+
 # iter-v3/132: v3 baseline pinned to iter-v3/121 canonical (BCH/LDO/TRX 8h,
 # 14-feature stack, RiskV3Wrapper with /127 brake + /129 scaling DISABLED,
 # /116 no_confirm primitive ENABLED, n_trials=35, ENSEMBLE_SIZE=10).
@@ -437,8 +615,16 @@ def _build_v3_baseline_models() -> tuple[ModelConfig, ...]:
     # iter-v3/121 10-seed unified lineage (outer=42 prefix + outer=123 suffix).
     # Matches run_baseline_v3.py:ENSEMBLE_SEEDS verbatim.
     V3_ENSEMBLE_SEEDS_121: tuple[int, ...] = (
-        191664963, 1662057957, 1405681631, 942484272, 929893137,    # outer=42 lineage
-        33158374, 1465339467, 1273345680, 115579757, 1952249162,    # outer=123 lineage
+        191664963,
+        1662057957,
+        1405681631,
+        942484272,
+        929893137,  # outer=42 lineage
+        33158374,
+        1465339467,
+        1273345680,
+        115579757,
+        1952249162,  # outer=123 lineage
     )
 
     # iter-v3/121 RiskV2Config (consumed by RiskV3Wrapper). Verified against
@@ -458,15 +644,15 @@ def _build_v3_baseline_models() -> tuple[ModelConfig, ...]:
             name=f"V3-{sym.replace('USDT', '')}",
             symbols=(sym,),
             use_atr_labeling=True,
-            atr_tp_multiplier=2.0,   # /121 DEFAULT_ATR_MULTIPLIERS
+            atr_tp_multiplier=2.0,  # /121 DEFAULT_ATR_MULTIPLIERS
             atr_sl_multiplier=1.0,
             atr_column="natr_21_raw",
             feature_columns=V3_FEATURE_COLUMNS_TOP_N,
             features_dir=Path("data/features_v3"),
-            cooldown_candles=4,                       # /121 BacktestConfig cooldown
-            vol_targeting=False,                      # vol_scale lives in RiskV3Wrapper
+            cooldown_candles=4,  # /121 BacktestConfig cooldown
+            vol_targeting=False,  # vol_scale lives in RiskV3Wrapper
             ensemble_seeds=V3_ENSEMBLE_SEEDS_121,
-            ood_enabled=False,                        # z-score OOD lives in RiskV3Wrapper
+            ood_enabled=False,  # z-score OOD lives in RiskV3Wrapper
             risk_wrapper="v3",
             risk_v2_config=v3_risk_cfg,
             # /121 training hyperparams (mismatched from LiveConfig defaults)
