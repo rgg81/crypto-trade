@@ -33,12 +33,12 @@ BUNDLE-002 (`v0.v1-082`) IS/OOS numbers in this file stand as **SNAPSHOTS** from
 
 BUNDLE-002 is the symbol-partitioned union of 4 LightGBM specialists, each trained independently under the cycle-6/cycle-7 per-symbol regime-specialist mandate. There are no bundle-level weights; each specialist trades its own coin under its own risk wrapper. The AAVE/078 seat enters at **PROMISING-TENTATIVE** status under the /082 TENTATIVE-merge precedent (extending the /071 user-mandate-merge precedent).
 
-| # | Specialist | Owns | Source iter | Risk wrapper | ATR TP/SL | Inner-ensemble seeds | Outer seed | Status |
-|---|---|---|---|---|---|---|---|---|
-| 1 | DOT specialist | `{DOTUSDT}` | iter-v1/063 | R1+R2+R3 | 3.5 / 1.75 | 5 (`[42,123,456,789,1001]`) | 42 | PROMISING-VALIDATED |
-| 2 | ETH specialist | `{ETHUSDT}` | iter-v1/064 | R3 only (Model A pattern) | 2.9 / 1.45 | 5 | 42 | PROMISING-VALIDATED |
-| 3 | BTC specialist | `{BTCUSDT}` | iter-v1/065 | R3 only (Model A pattern) | 2.9 / 1.45 | 5 | 42 | PROMISING-VALIDATED |
-| 4 | **AAVE specialist** | `{AAVEUSDT}` | **iter-v1/078** | R3 only (Model A pattern) | 2.9 / 1.45 | 50 inner (methodology-lock spec) | 42 | **PROMISING-TENTATIVE** |
+| # | Specialist | Owns | Source iter | Risk wrapper | ATR TP/SL | Inner-ensemble seeds | ENSEMBLE_SIZE | n_trials | Outer seed | Feature cols | Status |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | DOT specialist | `{DOTUSDT}` | iter-v1/063 | R1+R2+R3 | 3.5 / 1.75 | 50 (seeds 42..91, `V1_SPECIALIST_SEEDS`) | 1 per study | 30 (`V1_SPECIALIST_OPTUNA_TRIALS`) | 42 | 48 (`V1_FEATURE_COLUMNS_PRUNED`) | PROMISING-VALIDATED |
+| 2 | ETH specialist | `{ETHUSDT}` | iter-v1/064 | R3 only (Model A pattern) | 2.9 / 1.45 | 50 (seeds 42..91) | 1 per study | 30 | 42 | 48 (`V1_FEATURE_COLUMNS_PRUNED`) | PROMISING-VALIDATED |
+| 3 | BTC specialist | `{BTCUSDT}` | iter-v1/065 | R3 only (Model A pattern) | 2.9 / 1.45 | 50 (seeds 42..91) | 1 per study | 30 | 42 | 48 (`V1_FEATURE_COLUMNS_PRUNED`) | PROMISING-VALIDATED |
+| 4 | **AAVE specialist** | `{AAVEUSDT}` | **iter-v1/078** | R3 only (Model A pattern) | 2.9 / 1.45 | 50 (seeds 42..91) | 1 per study | 30 | 42 | 49 (`V1_ITER078_FEATURE_COLUMNS` = PRUNED + `excess_ret_5d_vs_majors_z90`) | **PROMISING-TENTATIVE** |
 
 **Pairwise-disjoint universe**: all four owned-coin sets are pairwise disjoint. Union = `{BTCUSDT, ETHUSDT, DOTUSDT, AAVEUSDT}` (4 coins). **LINKUSDT and LTCUSDT are NOT in BUNDLE-002** (specialist attempts /066-/070 dropped under 2-strike rule at /071 setup; not retried at /082). Per `feedback_v1_bundle_no_coin_overlap.md` Critic Check 16 PASS.
 
@@ -131,16 +131,15 @@ From each specialist's source `comparison.csv` (snapshot values; bundle aggregat
 
 **Feature stacks**:
 - DOT, ETH, BTC: `V1_FEATURE_COLUMNS_PRUNED` (48 cols).
-- AAVE: `V1_FEATURE_COLUMNS_PRUNED` + `excess_ret_5d_vs_majors_z90` (49 cols total). Stack divergence is per-specialist-local; no cross-seat parity risk under symbol-routed dispatch.
+- AAVE: `V1_ITER078_FEATURE_COLUMNS` = `V1_FEATURE_COLUMNS_PRUNED` + `excess_ret_5d_vs_majors_z90` (49 cols total). The `excess_ret_5d_vs_majors_z90` feature is defined in `src/crypto_trade/features_v1/cross_btc_v1.py` via `compute_excess_ret_5d_vs_majors_z90()` (ret_5d = `close.pct_change(15)` [15 bars = 5d at 8h], excess = sym_ret_5d − 0.5×btc_ret_5d − 0.5×eth_ret_5d, z-scored over 90 bars, clipped ±10, NaN warm-up filled with 0.0). Stack divergence is per-specialist-local; the universal dispatch in `add_cross_btc_v1_features` writes this column into ALL symbols' parquets harmlessly (non-AAVE parquets carry the column but the PRUNED feature list ignores it). `V1_FEATURE_COLUMNS_PRUNED` remains 48 cols unchanged — only the AAVE-local list `V1_ITER078_FEATURE_COLUMNS` is 49 cols.
 
 **Ensemble** (methodology-lock spec for /082):
-- DOT/063, ETH/064, BTC/065: 5 inner seeds (`[42, 123, 456, 789, 1001]`); single outer seed=42 SPECIALIST budget.
-- AAVE/078: **50 inner seeds × 30 trials × specialist_mode** (methodology-lock per user directive at /082).
-- All 4 seats: outer seed = 42.
+- ALL 4 seats: **50 independent Optuna studies, one per seed** (`V1_SPECIALIST_SEEDS` = seeds 42..91), `ENSEMBLE_SIZE=1` per study, `n_trials=V1_SPECIALIST_OPTUNA_TRIALS=30` per study, `specialist_mode=True`. Aggregator = mean-of-signed-weights across 50 seeds.
+- All 4 seats: outer seed = 42 (placeholder; the specialist loop uses `V1_SPECIALIST_SEEDS` internally).
 
 **LightGBM HP lock**: `max_depth=5` FIXED, `num_leaves=31` FIXED (per /082 methodology-lock).
 
-**Optuna**: `n_trials = 30` per (symbol, month) cell at the AAVE/078 seat (methodology-lock); legacy `n_trials = 18` at DOT/ETH/BTC seats inherited from /071.
+**Optuna**: `n_trials = 30` (`V1_SPECIALIST_OPTUNA_TRIALS`) per (seed, symbol, month) study at **all four seats** (DOT/ETH/BTC/AAVE). The runner sets `specialist_mode=True` which overrides the per-cell n_trials with the specialist loop — each of the 50 seeds runs its own independent 30-trial Optuna study. The `n_trials = 18` figure from the pre-SPECIALIST methodology is obsolete and does not apply to any BUNDLE-002 specialist.
 
 **Walk-forward**: `train_end_ms = test_start_ms - embargo_ms` (the iter-v3/058 fix at `walk_forward.py:113`; commit `5566a69`).
 
