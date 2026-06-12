@@ -592,7 +592,24 @@ def _build_bundle_002_models() -> tuple[ModelConfig, ...]:
     return (dot, eth, btc, aave)
 
 
-BUNDLE_002_MODELS: tuple[ModelConfig, ...] = _build_bundle_002_models()
+# iter-v1 BUNDLE-002 live models are built LAZILY via module __getattr__ below.
+# Eager construction here would trigger a circular import: features_v1/__init__
+# imports from this module (BASELINE_FEATURE_COLUMNS / OOD_FEATURE_COLUMNS), and
+# _build_bundle_002_models() imports back from features_v1 — which is still only
+# partially initialized when live.models is first imported (e.g. via the feature
+# CLI). features_v2/v3 have no such back-import, so their eager builds stay.
+# PEP 562 defers the build until first attribute access, by which point
+# features_v1 is fully loaded. Access `models.BUNDLE_002_MODELS` as usual.
+_BUNDLE_002_MODELS_CACHE: "tuple[ModelConfig, ...] | None" = None
+
+
+def __getattr__(name: str) -> object:
+    if name == "BUNDLE_002_MODELS":
+        global _BUNDLE_002_MODELS_CACHE
+        if _BUNDLE_002_MODELS_CACHE is None:
+            _BUNDLE_002_MODELS_CACHE = _build_bundle_002_models()
+        return _BUNDLE_002_MODELS_CACHE
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 # iter-v3/132: v3 baseline pinned to iter-v3/121 canonical (BCH/LDO/TRX 8h,
