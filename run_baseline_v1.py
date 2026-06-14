@@ -6941,6 +6941,9 @@ def main() -> None:
             specialist_mode=True,
             specialist_n_startup_trials=10,
             specialist_n_estimators_max=500,
+            # FULL-WINDOW-TRAINING design: full 24-month window (no training_days
+            # Optuna search/slice); CV + final fit consistent. Matches live BUNDLE_002.
+            full_window_training=True,
         )
         import time as _time_063
 
@@ -7069,6 +7072,9 @@ def main() -> None:
             specialist_mode=True,
             specialist_n_startup_trials=10,
             specialist_n_estimators_max=500,
+            # FULL-WINDOW-TRAINING design: full 24-month window (no training_days
+            # Optuna search/slice); CV + final fit consistent. Matches live BUNDLE_002.
+            full_window_training=True,
         )
         import time as _time_065  # noqa: PLC0415
 
@@ -7748,6 +7754,9 @@ def main() -> None:
             specialist_mode=True,
             specialist_n_startup_trials=10,
             specialist_n_estimators_max=500,
+            # FULL-WINDOW-TRAINING design: full 24-month window (no training_days
+            # Optuna search/slice); CV + final fit consistent. Matches live BUNDLE_002.
+            full_window_training=True,
         )
         import time as _time_078  # noqa: PLC0415
 

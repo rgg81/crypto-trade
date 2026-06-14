@@ -246,6 +246,15 @@ class LightGbmStrategy:
         mid_bull_short_veto_lo: float = 0.20,
         mid_bull_short_veto_hi: float = 0.50,
         mid_bull_short_veto_lookback: int = 270,
+        # FULL-WINDOW-TRAINING design (v1 BUNDLE-002 specialists):
+        # When True, training_days is REMOVED from the Optuna search space, the CV
+        # objective uses the full training window (no per-fold slice), and the
+        # per-seed final retrain uses the full window (no slice). CV and final fit
+        # then use the SAME full 24-month window — internally consistent.
+        # Default False = EXACTLY current C2/H1-fixed behavior (training_days
+        # searched + sliced in CV + sliced at final fit). v2/v3 and all non-flagged
+        # paths are BYTE-UNCHANGED.
+        full_window_training: bool = False,
     ) -> None:
         if not feature_columns:
             raise ValueError(
@@ -405,6 +414,12 @@ class LightGbmStrategy:
         self._close_by_sym: dict[str, tuple[np.ndarray, np.ndarray]] = {}
         # Veto event log: list of (symbol, open_time_ms, ret_270b) for F-AXIS-COUNTERFACTUAL audit.
         self._axis_r_veto_log: list[dict] = []
+        # FULL-WINDOW-TRAINING design flag (v1 BUNDLE-002 specialists).
+        # When True: training_days NOT suggested by Optuna (passed via study user_attr
+        # to _objective, which then skips trial.suggest_int + leaves training_days=None,
+        # so the CV per-fold slice is also skipped), and the per-seed final retrain
+        # slice is skipped. Default False = current C2/H1-fixed behavior (byte-unchanged).
+        self._full_window_training: bool = bool(full_window_training)
         # iter-v3/072: labeling mode — "triple_barrier" (default, backward-compat)
         # or "fixed_horizon" (sign of N-candle-forward return; no barriers).
         # iter-v3/105: "trend_scanning" (OLS trend, max-|t| horizon selection
@@ -1088,6 +1103,9 @@ class LightGbmStrategy:
                     _sp_study.set_user_attr(
                         "specialist_n_estimators_max", self._specialist_n_estimators_max
                     )
+                    # FULL-WINDOW-TRAINING design: when True, _objective skips the
+                    # training_days suggest (and therefore the CV per-fold slice).
+                    _sp_study.set_user_attr("full_window_training", self._full_window_training)
 
                     from crypto_trade.strategies.ml.optimization import (
                         _objective as _opt_objective,
@@ -1198,10 +1216,20 @@ class LightGbmStrategy:
                     # Without this slice, every seed trains on the FULL 24-month
                     # window regardless of what Optuna selected, silently
                     # discarding the HP that the objective was optimized for.
+                    #
+                    # FULL-WINDOW-TRAINING design: when self._full_window_training is
+                    # True, training_days is never suggested (so "training_days" is
+                    # absent from _sp_params and this slice would already be skipped);
+                    # the explicit `not self._full_window_training` guard documents the
+                    # intent and is defensive against any future stray training_days key.
                     _sp_feat_fit = feat_train
                     _sp_y_fit = _sp_y
                     _sp_sw_fit = train_weights
-                    if _sp_ot is not None and "training_days" in _sp_params:
+                    if (
+                        not self._full_window_training
+                        and _sp_ot is not None
+                        and "training_days" in _sp_params
+                    ):
                         _sp_td = int(_sp_params["training_days"])
                         _sp_anchor_ms = int(split.test_start_ms)
                         _sp_cutoff_ms = _sp_anchor_ms - _sp_td * 86_400_000
@@ -1525,6 +1553,7 @@ class LightGbmStrategy:
                         symbol=self._symbol,
                         optuna_objective=self._optuna_objective,
                         min_child_samples_lower_bound=self._min_child_samples_lower_bound,
+                        full_window_training=self._full_window_training,
                     )
                 self._models.append(model)
                 self._confidence_thresholds.append(confidence_threshold)

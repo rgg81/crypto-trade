@@ -113,6 +113,13 @@ class ModelConfig:
     mid_bull_short_veto_lo: float = 0.20
     mid_bull_short_veto_hi: float = 0.50
     mid_bull_short_veto_lookback: int = 270
+    # FULL-WINDOW-TRAINING design (v1 BUNDLE-002 specialists).
+    #   When True, training_days is REMOVED from the Optuna search space, the CV
+    #   objective uses the full training window (no per-fold slice), and the per-seed
+    #   final retrain uses the full window. training_months=24 stays the fixed window.
+    #   Default False = BIT-IDENTICAL behaviour for all legacy ModelConfig instances
+    #   (v2/v3 baseline models, prior v1 bundles).
+    full_window_training: bool = False
 
 
 # Static feature list for baseline v152: 193 features.
@@ -496,6 +503,9 @@ def _build_bundle_002_models() -> tuple[ModelConfig, ...]:
         specialist_n_estimators_max=500,
         bounds_profile="v1_pruned",
         training_months=24,
+        # FULL-WINDOW-TRAINING design: train on the full 24-month window (no
+        # training_days Optuna search/slice). CV + final fit consistent.
+        full_window_training=True,
     )
 
     # ETH specialist — iter-v1/064 source.
@@ -526,6 +536,9 @@ def _build_bundle_002_models() -> tuple[ModelConfig, ...]:
         specialist_n_estimators_max=500,
         bounds_profile="v1_pruned",
         training_months=24,
+        # FULL-WINDOW-TRAINING design: train on the full 24-month window (no
+        # training_days Optuna search/slice). CV + final fit consistent.
+        full_window_training=True,
     )
 
     # BTC specialist — iter-v1/065 source.
@@ -556,6 +569,9 @@ def _build_bundle_002_models() -> tuple[ModelConfig, ...]:
         specialist_n_estimators_max=500,
         bounds_profile="v1_pruned",
         training_months=24,
+        # FULL-WINDOW-TRAINING design: train on the full 24-month window (no
+        # training_days Optuna search/slice). CV + final fit consistent.
+        full_window_training=True,
     )
 
     # AAVE specialist — iter-v1/078 source.
@@ -587,6 +603,9 @@ def _build_bundle_002_models() -> tuple[ModelConfig, ...]:
         specialist_n_estimators_max=500,
         bounds_profile="v1_pruned",
         training_months=24,
+        # FULL-WINDOW-TRAINING design: train on the full 24-month window (no
+        # training_days Optuna search/slice). CV + final fit consistent.
+        full_window_training=True,
     )
 
     return (dot, eth, btc, aave)

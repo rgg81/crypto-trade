@@ -139,15 +139,11 @@ class ModelRunner:
             model_config.specialist_optuna_trials
             if (model_config.specialist_mode and model_config.specialist_optuna_trials > 0)
             else (
-                model_config.n_trials
-                if model_config.n_trials is not None
-                else live_config.n_trials
+                model_config.n_trials if model_config.n_trials is not None else live_config.n_trials
             )
         )
         resolved_cv_splits: int = (
-            model_config.cv_splits
-            if model_config.cv_splits is not None
-            else live_config.cv_splits
+            model_config.cv_splits if model_config.cv_splits is not None else live_config.cv_splits
         )
 
         inner = LightGbmStrategy(
@@ -178,6 +174,9 @@ class ModelRunner:
             mid_bull_short_veto_lo=model_config.mid_bull_short_veto_lo,
             mid_bull_short_veto_hi=model_config.mid_bull_short_veto_hi,
             mid_bull_short_veto_lookback=model_config.mid_bull_short_veto_lookback,
+            # FULL-WINDOW-TRAINING design (v1 BUNDLE-002 specialists). Default False on
+            # ModelConfig preserves BIT-IDENTICAL legacy behaviour for v2/v3 models.
+            full_window_training=model_config.full_window_training,
             **atr_column_kwarg,
         )
         # _inner_strategy is the bare LightGbmStrategy regardless of wrapping;
@@ -813,13 +812,9 @@ class LiveEngine:
             # Derive arm_time + threshold_price the same way trade_to_order does
             sl_pct = abs(trade.entry_price - trade.stop_loss_price) / trade.entry_price
             if trade.direction == 1:
-                threshold_price = trade.entry_price * (
-                    1.0 + mc.no_confirm_trigger_atr * sl_pct
-                )
+                threshold_price = trade.entry_price * (1.0 + mc.no_confirm_trigger_atr * sl_pct)
             else:
-                threshold_price = trade.entry_price * (
-                    1.0 - mc.no_confirm_trigger_atr * sl_pct
-                )
+                threshold_price = trade.entry_price * (1.0 - mc.no_confirm_trigger_atr * sl_pct)
             # Load symbol klines and scan candles from open_time forward
             kline_path = csv_path(self.config.data_dir, trade.symbol, self.config.interval)
             if not kline_path.exists():

@@ -260,9 +260,16 @@ def _objective(
     # Confidence threshold — only trade when max(proba) >= threshold
     confidence_threshold = trial.suggest_float("confidence_threshold", 0.50, 0.85)
 
-    # Training window size (optimized by Optuna when open_times provided)
+    # Training window size (optimized by Optuna when open_times provided).
+    #
+    # FULL-WINDOW-TRAINING design: when the study user_attr "full_window_training"
+    # is True, training_days is NOT added to the search space — it stays None, which
+    # makes the CV per-fold trim below (`if training_days is not None ...`) a no-op,
+    # so every fold trains on the full available window. Default False (key absent)
+    # is BYTE-IDENTICAL to prior behavior: training_days is suggested + sliced.
+    _full_window_training = trial.study.user_attrs.get("full_window_training", False)
     training_days: int | None = None
-    if open_times is not None:
+    if open_times is not None and not _full_window_training:
         training_days = trial.suggest_int("training_days", 10, 500, step=10)
 
     # LightGBM hyperparameters
@@ -501,6 +508,7 @@ def optimize_and_train(
     symbol: str = "",
     optuna_objective: str = "sharpe",
     min_child_samples_lower_bound: int | None = None,
+    full_window_training: bool = False,
 ) -> tuple[lgb.LGBMClassifier, list[str], float]:
     """Run Optuna optimization and return (model, columns, confidence_threshold).
 
@@ -563,6 +571,10 @@ def optimize_and_train(
             f"optuna_objective must be 'sharpe' or 'sortino'; got {optuna_objective!r}"
         )
     study.set_user_attr("optuna_objective", optuna_objective)
+    # FULL-WINDOW-TRAINING design: propagate to _objective so training_days is not
+    # suggested (and the CV per-fold slice is skipped). Default False is
+    # BYTE-IDENTICAL to all prior callers.
+    study.set_user_attr("full_window_training", full_window_training)
 
     if sample_weights is None:
         sample_weights = np.ones(len(train_labels), dtype=np.float64)
@@ -735,9 +747,13 @@ def optimize_and_train(
 
     import pandas as pd
 
-    # Trim to best training_days for final retrain
+    # Trim to best training_days for final retrain.
+    # FULL-WINDOW-TRAINING design: when full_window_training is True, training_days
+    # was never suggested (so "training_days" is absent from best and this slice would
+    # already be skipped). The explicit `not full_window_training` guard documents the
+    # intent and keeps the final fit on the full window — consistent with the CV folds.
     final_mask = np.ones(len(train_labels), dtype=bool)
-    if open_times is not None and "training_days" in best:
+    if not full_window_training and open_times is not None and "training_days" in best:
         best_training_days = best["training_days"]
         anchor_ms = train_end_ms if train_end_ms is not None else int(open_times[-1])
         cutoff_ms = anchor_ms - best_training_days * 86_400_000
