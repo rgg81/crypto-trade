@@ -237,6 +237,14 @@ class LightGbmStrategy:
         specialist_mode: bool = False,
         specialist_n_startup_trials: int = 10,
         specialist_n_estimators_max: int = 500,
+        # iter-v1/redesign: per-instance bagging count K (number of independent
+        # Optuna studies in SPECIALIST mode). When > 0, the bagging loop uses the
+        # FIRST `specialist_seed_count` seeds of V1_SPECIALIST_SEEDS (sliced roster).
+        # When == 0 (default), behavior is BIT-IDENTICAL to legacy: all
+        # V1_SPECIALIST_SEED_COUNT (=50) seeds are used. This is the ONLY seed
+        # number that varies in the redesigned v1 single-symbol rule:
+        # EXPLORATION → K=3, CONFIRMATION → K=20 (inner ensemble=1, outer seeds=1).
+        specialist_seed_count: int = 0,
         # iter-v1/074: AXIS-R — Mid-Bull SHORT VETO post-aggregator rule layer.
         # When True, direction==-1 signals are vetoed when ret_270b ∈ [lo, hi].
         # ret_270b = (close[t] / close[t - lookback]) - 1.0 on 8h candles (90-day trailing return).
@@ -400,6 +408,9 @@ class LightGbmStrategy:
         self._specialist_n_startup_trials: int = int(specialist_n_startup_trials)
         # Wall-clock mitigation: upper bound on n_estimators in specialist mode.
         self._specialist_n_estimators_max: int = int(specialist_n_estimators_max)
+        # iter-v1/redesign: bagging count K override. When > 0, the bagging loop
+        # uses V1_SPECIALIST_SEEDS[:K]. When == 0, legacy full-roster (50) is used.
+        self._specialist_seed_count: int = int(specialist_seed_count)
         # Per-seed specialist state: list of (model, selected_cols, threshold) tuples.
         # Reset every _train_for_month call when specialist_mode=True.
         self._specialist_models: list[tuple[object, list[str], float]] = []
@@ -1235,12 +1246,36 @@ class LightGbmStrategy:
             # H5/H10 fix: global OOF accumulator across all seeds for this month.
             # Always a list; we only flush when _oof_persist_path is set.
             _sp_oof_global_buf: list[dict] = []
-            specialist_seeds = V1_SPECIALIST_SEEDS
+            # iter-v1/redesign: slice the roster to K seeds when an explicit
+            # bagging count is set; otherwise preserve the legacy full 50-seed
+            # roster BIT-IDENTICALLY (specialist_seed_count == 0).
+            if self._specialist_seed_count > 0:
+                specialist_seeds = V1_SPECIALIST_SEEDS[: self._specialist_seed_count]
+            else:
+                specialist_seeds = V1_SPECIALIST_SEEDS
+            # iter-v1/redesign: per-seed Optuna trial budget. For an explicit bagging
+            # count (K>0 — the single-symbol rule) HONOR self.n_trials so --n-trials is
+            # not silently dropped. Legacy (K==0) keeps V1_SPECIALIST_OPTUNA_TRIALS=30
+            # BIT-IDENTICALLY.
+            _sp_per_seed_trials = (
+                int(self.n_trials)
+                if self._specialist_seed_count > 0
+                else V1_SPECIALIST_OPTUNA_TRIALS
+            )
+            # iter-v1/redesign: K-aware seed-failure tolerance. The absolute legacy
+            # tolerance (5) NEVER fires for K<=5, so a total-failure month would pass
+            # silently as 0 trades. Use a relative floor for explicit K; the post-loop
+            # empty-models check below ALWAYS raises. Legacy (K==0) keeps the absolute 5.
+            _sp_tolerance = (
+                V1_SPECIALIST_SEED_TOLERANCE
+                if self._specialist_seed_count == 0
+                else max(1, self._specialist_seed_count // 10)
+            )
             if self.verbose > 0:
                 print(
                     f"  [SPECIALIST] mode active: "
                     f"{len(specialist_seeds)} seeds × "
-                    f"{V1_SPECIALIST_OPTUNA_TRIALS} trials each | "
+                    f"{_sp_per_seed_trials} trials each | "
                     f"max_depth=5 FIXED | num_leaves=31 FIXED | "
                     f"min_child_samples=REMOVED | "
                     f"n_startup_trials={self._specialist_n_startup_trials} | "
@@ -1314,7 +1349,7 @@ class LightGbmStrategy:
                                 train_month=mon,
                                 symbols_arr=sym,
                                 oof_buffer=buf,
-                                bounds_profile="v1_specialist",
+                                bounds_profile=self._bounds_profile,
                                 min_child_samples_lower_bound=None,
                             )
 
@@ -1338,7 +1373,7 @@ class LightGbmStrategy:
                             _sp_sym,
                             _sp_buf,
                         ),
-                        n_trials=V1_SPECIALIST_OPTUNA_TRIALS,
+                        n_trials=_sp_per_seed_trials,
                     )
 
                     _sp_best = _sp_study.best_trial
@@ -1405,10 +1440,10 @@ class LightGbmStrategy:
                     if self.verbose > 0:
                         print(
                             f"  [SPECIALIST seed {_sp_seed}] failed "
-                            f"({len(_sp_failed_this_month)}/{V1_SPECIALIST_SEED_TOLERANCE} "
+                            f"({len(_sp_failed_this_month)}/{_sp_tolerance} "
                             f"tolerance): {_exc_repr}"
                         )
-                    if len(_sp_failed_this_month) > V1_SPECIALIST_SEED_TOLERANCE:
+                    if len(_sp_failed_this_month) > _sp_tolerance:
                         # Emit decision_log before raising so the failure is traceable.
                         try:
                             from crypto_trade import decision_log as _dl
@@ -1418,7 +1453,7 @@ class LightGbmStrategy:
                                     "kind": "specialist_seed_failures",
                                     "month": month_str,
                                     "failed_count": len(_sp_failed_this_month),
-                                    "tolerance": V1_SPECIALIST_SEED_TOLERANCE,
+                                    "tolerance": _sp_tolerance,
                                     "failed_seeds": [s for s, _ in _sp_failed_this_month],
                                     "decision": "raise:tolerance_exceeded",
                                 }
@@ -1427,7 +1462,7 @@ class LightGbmStrategy:
                             pass
                         raise SpecialistSeedFailureError(
                             failed=len(_sp_failed_this_month),
-                            tolerance=V1_SPECIALIST_SEED_TOLERANCE,
+                            tolerance=_sp_tolerance,
                             month_str=month_str,
                             seeds=[str(s) for s, _ in _sp_failed_this_month],
                         )
@@ -1504,9 +1539,15 @@ class LightGbmStrategy:
             self._seeds_used_per_month.append(len(self._specialist_models))
 
             if not self._specialist_models:
-                if self.verbose > 0:
-                    print(f"  [SPECIALIST] all seeds failed for {month_str}")
-                return
+                # iter-v1/redesign: total failure must NEVER be silent — a 0-model month
+                # would produce a 0-trade backtest month with no error. Raise loud so the
+                # run aborts instead of yielding a silently-degraded baseline.
+                raise SpecialistSeedFailureError(
+                    failed=len(_sp_failed_this_month),
+                    tolerance=_sp_tolerance,
+                    month_str=month_str,
+                    seeds=[str(s) for s, _ in _sp_failed_this_month],
+                )
 
             # Populate _models/_confidence_thresholds for backward-compat paths
             # (feature-importance logging, _model, etc. still use first specialist).
@@ -2260,8 +2301,13 @@ class LightGbmStrategy:
             for _sp_model, _sp_cols, _sp_ct in self._specialist_models:
                 # Re-build feat_df with this seed's selected columns (may differ).
                 if _sp_cols != self._selected_cols:
+                    # Select this seed's columns BY NAME from feat_row (which is aligned
+                    # to self._selected_cols) — a positional slice would silently feed
+                    # WRONG features if a seed's column set ever differs. .index() raises
+                    # loudly if a column is absent (fail-fast over silent garbage).
+                    _sp_col_idx = [self._selected_cols.index(_c) for _c in _sp_cols]
                     _feat_df_i = pd.DataFrame(
-                        feat_row.reshape(1, -1)[:, : len(_sp_cols)],
+                        feat_row.reshape(1, -1)[:, _sp_col_idx],
                         columns=_sp_cols,
                     )
                 else:

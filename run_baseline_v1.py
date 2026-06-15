@@ -155,12 +155,19 @@ ENSEMBLE_SEEDS: tuple[int, ...] = (
     7007, 8008, 9009, 10010, 11011, 12012, 13013, 14014, 15015, 16016,
 )
 
-#: EXPLORATION ensemble size — single-axis, fast cycling (quick iteration, fewer seeds).
-V1_EXPLORATION_ENSEMBLE_SIZE: int = 3
+#: SPECIALIST BAGGING K — the number of independent Optuna studies (each its own
+#: hyperparameter search + seed) combined by mean-of-signed-weights. K is the ONLY
+#: seed number that varies in the redesigned v1 single-symbol rule. The inner
+#: ensemble (ensemble_seeds) is ALWAYS 1 and outer seeds (--seeds) are ALWAYS 1;
+#: lottery robustness comes entirely from bagging K.
+#: NOTE: the OLD `V1_EXPLORATION_ENSEMBLE_SIZE` / `V1_CONFIRMATION_ENSEMBLE_SIZE`
+#: names are RETIRED — they were the (wrong) inner-ensemble knob.
+#: EXPLORATION bagging count — fast cycling.
+V1_EXPLORATION_BAGGING_K: int = 3
 
-#: CONFIRMATION ensemble size — full statistical rigor; isolates lottery bias via
-#: per-seed Sharpe dispersion (mean>0, majority profitable, cross-seed σ within band).
-V1_CONFIRMATION_ENSEMBLE_SIZE: int = 20
+#: CONFIRMATION bagging count — full statistical rigor; isolates lottery bias via
+#: per-seed (per-bag) Sharpe dispersion across the K independent studies.
+V1_CONFIRMATION_BAGGING_K: int = 20
 
 #: Execution slippage in basis points PER SIDE (round-trip drag = 2x). Mirrors
 #: BacktestConfig.slippage_bps_per_side default; overridden at runtime by --slippage-bps
@@ -464,8 +471,26 @@ def run_model(
     vol_ceiling_scale: float = 0.5,
     vol_ceiling_thresholds: dict | None = None,
     min_child_samples_lower_bound: int | None = None,
+    specialist_mode: bool = False,
+    specialist_seed_count: int = 0,
+    specialist_n_startup_trials: int = 10,
+    specialist_n_estimators_max: int = 500,
 ):
     """Run a single v1 sub-model (A/C/D/E) under the corrected walk-forward.
+
+    specialist_mode
+        iter-v1/redesign (2026-06-15) — when True, the LightGbmStrategy runs the
+        SPECIALIST bagging ensemble: `specialist_seed_count` independent Optuna
+        studies (each its own HP search + seed) combined by mean-of-signed-weights.
+        Used by the universal single-symbol routing guard at the top of the model
+        dispatch chain. Default False = legacy inner-ensemble behavior (unchanged).
+    specialist_seed_count
+        Bagging K — the number of independent Optuna studies. Threaded into
+        LightGbmStrategy(specialist_seed_count=...). EXPLORATION → 3, CONFIRMATION
+        → 20 (resolved by the runner mode switch). Only honored when
+        specialist_mode=True; otherwise inert.
+    specialist_n_startup_trials / specialist_n_estimators_max
+        Wall-clock mitigations mirrored from the legacy _strat_e065 template.
 
     Parameters
     ----------
@@ -594,6 +619,10 @@ def run_model(
         frozen_hp_parquet=frozen_hp_parquet,
         optuna_objective=optuna_objective,
         min_child_samples_lower_bound=min_child_samples_lower_bound,
+        specialist_mode=specialist_mode,
+        specialist_seed_count=specialist_seed_count,
+        specialist_n_startup_trials=specialist_n_startup_trials,
+        specialist_n_estimators_max=specialist_n_estimators_max,
     )
     t0 = time.time()
     results = run_backtest(config, strategy, yearly_pnl_check=False)
@@ -2540,6 +2569,18 @@ def main() -> None:
         ),
     )
     parser.add_argument(
+        "--bagging-k",
+        type=int,
+        default=None,
+        help=(
+            "Override the mode-derived SPECIALIST bagging K (number of independent "
+            "Optuna studies combined by mean-of-signed-weights). Default None resolves "
+            "to the mode value (3 for EXPLORATION, 20 for CONFIRMATION). Provided mainly "
+            "for fast smoke tests (e.g. --bagging-k 2). Must be >= 1. The inner ensemble "
+            "stays at 1 and outer seeds stay at 1 regardless of K."
+        ),
+    )
+    parser.add_argument(
         "--symbols",
         type=str,
         default=None,
@@ -2997,7 +3038,11 @@ def main() -> None:
         reports_dir = "reports-v1"
     elif args.exploration:
         mode_label = "EXPLORATION"
-        ensemble_size = V1_EXPLORATION_ENSEMBLE_SIZE
+        # Single-symbol redesign (2026-06-15): the model is the SPECIALIST bagging
+        # ensemble. K is the ONLY seed number that varies; inner ensemble = 1,
+        # outer seeds = 1. EXPLORATION → K=3.
+        bagging_k = V1_EXPLORATION_BAGGING_K
+        ensemble_size = 1
         n_trials = args.n_trials
         if args.iteration is None:
             sys.exit("ERROR: --exploration requires --iteration NNN")
@@ -3005,7 +3050,10 @@ def main() -> None:
         reports_dir = "reports-v1"
     elif args.confirmation:
         mode_label = "CONFIRMATION"
-        ensemble_size = V1_CONFIRMATION_ENSEMBLE_SIZE
+        # Single-symbol redesign (2026-06-15): SPECIALIST bagging ensemble.
+        # CONFIRMATION → K=20. Inner ensemble = 1, outer seeds = 1.
+        bagging_k = V1_CONFIRMATION_BAGGING_K
+        ensemble_size = 1
         n_trials = args.n_trials
         if args.iteration is None:
             sys.exit("ERROR: --confirmation requires --iteration NNN")
@@ -3013,6 +3061,28 @@ def main() -> None:
         reports_dir = "reports-v1"
     else:
         sys.exit("ERROR: must specify --baseline-mode, --exploration, or --confirmation")
+
+    # Single-symbol redesign (2026-06-15): enforce the ratified seed rule.
+    # The ONLY seed number that varies is the SPECIALIST bagging K. Outer seeds
+    # are FIXED at 1; lottery robustness comes from bagging K, NOT outer seeds.
+    if (args.exploration or args.confirmation) and args.seeds != 1:
+        sys.exit(
+            f"ERROR: v1 outer seeds are FIXED at 1 (got --seeds {args.seeds}). "
+            "The redesigned v1 single-symbol rule draws all lottery robustness from "
+            "the SPECIALIST bagging K (3 for EXPLORATION, 20 for CONFIRMATION); the "
+            "inner ensemble is 1 and outer seeds are 1. Do NOT pass --seeds > 1."
+        )
+
+    # --bagging-k override (smoke tests): applies after the mode default.
+    if (args.exploration or args.confirmation) and args.bagging_k is not None:
+        if args.bagging_k < 1:
+            sys.exit(f"ERROR: --bagging-k must be >= 1; got {args.bagging_k}")
+        _bagging_k_default = bagging_k
+        bagging_k = args.bagging_k
+        print(
+            f"[run_baseline_v1] --bagging-k override: {bagging_k} "
+            f"(mode default was {_bagging_k_default})"
+        )
 
     # Single-symbol redesign (2026-06-15): nest every generated report path under the
     # symbol → reports-v1/<SYMBOL>/iteration_v1-NNN/... Every downstream
@@ -3044,24 +3114,17 @@ def main() -> None:
         iteration_label = _override
         print(f"  [iteration-label override] '{iteration_label}' (allowlisted)")
 
-    # --ensemble-size override: applies after mode defaults are set.
-    # Designed for methodology-axis iterations (e.g. iter-v1/001) that need a
-    # specific ensemble size for byte-identity against the baseline anchor without
-    # clobbering the baseline reports directory.  --baseline-mode is intentionally
-    # excluded from the override path (it has its own sacred fixed values).
-    if args.ensemble_size is not None and not args.baseline_mode:
-        if args.ensemble_size < 1 or args.ensemble_size > len(ENSEMBLE_SEEDS):
-            sys.exit(
-                f"ERROR: --ensemble-size must be in [1, {len(ENSEMBLE_SEEDS)}]; "
-                f"got {args.ensemble_size}"
-            )
-        ensemble_size = args.ensemble_size
-        default_size = (
-            V1_EXPLORATION_ENSEMBLE_SIZE if args.exploration else V1_CONFIRMATION_ENSEMBLE_SIZE
-        )
-        print(
-            f"[run_baseline_v1] --ensemble-size override: {ensemble_size} "
-            f"(mode default was {default_size})"
+    # --ensemble-size override: RETIRED for exploration/confirmation under the
+    # single-symbol redesign (2026-06-15). The inner ensemble is FIXED at 1; the
+    # only seed number that varies is the SPECIALIST bagging K (use --bagging-k for
+    # smoke overrides). Passing --ensemble-size with --exploration/--confirmation is
+    # a hard error to prevent silent reintroduction of the wrong (inner-ensemble) knob.
+    if args.ensemble_size is not None and (args.exploration or args.confirmation):
+        sys.exit(
+            f"ERROR: --ensemble-size ({args.ensemble_size}) is not supported with "
+            "--exploration/--confirmation. The v1 single-symbol rule fixes the inner "
+            "ensemble at 1; vary the SPECIALIST bagging K via --bagging-k instead "
+            "(mode defaults: 3 EXPLORATION / 20 CONFIRMATION)."
         )
 
     # Resolve feature columns + Optuna bounds profile.
@@ -3363,7 +3426,95 @@ def main() -> None:
     # Critic Rec #2 CARRY-FORWARD: refactor literal name to generic). Non-feature-importance
     # iterations leave this empty; the post-dispatch call is a no-op.
     _post_dispatch_fi_strategies: list[tuple[str, object]] = []
-    if set(symbols) == set(V1_BASELINE_UNIVERSE) and iteration_label == "v1-023":
+    # iter-v1/redesign (2026-06-15): generic specialist dispersion-mean holder.
+    # Set by the universal single-symbol routing guard below; consumed by the
+    # post-report comparison.csv append block. None for all legacy dispatches.
+    _generic_specialist_disp_mean: float | None = None
+    # -------------------------------------------------------------------------
+    # UNIVERSAL SINGLE-SYMBOL ROUTING GUARD (iter-v1/redesign 2026-06-15).
+    #
+    # Takes PRECEDENCE over ALL legacy `set(symbols) == V1_ITERNNN_UNIVERSE`
+    # branches. Eliminates the /020 collision: any --exploration/--confirmation
+    # run with exactly one symbol routes to ONE generic SPECIALIST bagging
+    # dispatch, regardless of which symbol is chosen. K is the ONLY seed number
+    # that varies (resolved as bagging_k from the mode switch: 3 EXPLORATION /
+    # 20 CONFIRMATION); inner ensemble = 1, outer seeds = 1.
+    #
+    # Mirrors the legacy _config_e065/_strat_e065 BTC-specialist template:
+    #   - specialist_mode=True bagging ensemble (K independent Optuna studies)
+    #   - R1=OFF, R2=OFF, R3=ON-AGGREGATOR cutoff=0.70, R5=ON vt_target_vol=0.3
+    #   - atr_tp=2.9, atr_sl=1.45 (Model A vol-class cell)
+    #   - OOF persistence + specialist_dispersion.csv emission
+    #   - full 193-col V1_FEATURE_COLUMNS unless --pruned-features passed
+    # -------------------------------------------------------------------------
+    if (args.exploration or args.confirmation) and len(set(symbols)) == 1:
+        _spec_sym = symbols[0]
+        print(
+            f"[v1] SPECIALIST BAGGING: K={bagging_k} "
+            f"(inner ensemble=1, outer seeds=1) symbol={_spec_sym} mode={mode_label}"
+        )
+        print(
+            f"[v1] universal single-symbol routing — generic specialist dispatch "
+            f"(features={len(active_feature_columns)} bounds=v1_specialist "
+            f"R1=OFF R2=OFF R3=ON-AGGREGATOR cutoff={BASELINE_OOD_CUTOFF_PCT} "
+            f"R5=ON vt_target_vol=0.3 atr_tp=2.9 atr_sl=1.45)"
+        )
+        _spec_results, _spec_faxm, _spec_strat = run_model(
+            f"Model_A_{_spec_sym}_specialist",
+            (_spec_sym,),
+            atr_tp=2.9,
+            atr_sl=1.45,
+            apply_r1=False,  # R1=OFF: CATALOG-CLOSED for specialist_mode
+            apply_r2=False,  # R2=OFF: Model A baseline
+            n_trials=n_trials,  # honored per-seed in specialist mode (K>0): the --n-trials value
+            ensemble_size=1,  # inner ensemble FIXED at 1 (placeholder seed [42])
+            oof_persist_path=OOF_PARQUET_PATH,
+            feature_columns=active_feature_columns,
+            bounds_profile="v1_specialist",
+            r5_vol_target_enabled=_r5_kwargs.get("r5_vol_target_enabled", True),
+            r5_vol_target_pct=_r5_kwargs.get("r5_vol_target_pct", 4.0),
+            r5_kill_low_natr_enabled=_r5_kwargs.get("r5_kill_low_natr_enabled", False),
+            r5_kill_low_natr_min_pct=_r5_kwargs.get("r5_kill_low_natr_min_pct", 2.0),
+            model_role=f"Model_A_{_spec_sym}_specialist",
+            symbol=_spec_sym,
+            specialist_mode=True,
+            specialist_seed_count=bagging_k,
+            specialist_n_startup_trials=10,
+            specialist_n_estimators_max=500,
+        )
+
+        # Cohort isolation sanity: assert ONLY the target symbol's trades emitted.
+        _spec_emitted = {r.symbol for r in _spec_results}
+        assert _spec_emitted.issubset({_spec_sym}), (
+            f"[v1 specialist] {_spec_sym} dispatch produced non-{_spec_sym} results: "
+            f"{_spec_emitted - {_spec_sym}}. Per-cohort isolation failed."
+        )
+
+        # LOAD-BEARING: persist specialist_dispersion.csv (mirrors /065+ template).
+        _spec_disp_mean = _spec_strat.get_specialist_dispersion_mean()
+        _spec_disp_is_path = (
+            Path(reports_dir)
+            / f"iteration_{iteration_label}"
+            / "in_sample"
+            / "specialist_dispersion.csv"
+        )
+        _spec_disp_is_path.parent.mkdir(parents=True, exist_ok=True)
+        _spec_strat.persist_specialist_dispersion_csv(str(_spec_disp_is_path))
+        _generic_specialist_disp_mean = _spec_disp_mean
+        print(
+            f"[v1 specialist] {_spec_sym} dispatch verified: "
+            f"{len(_spec_results)} trades, "
+            f"SPECIALIST seeds trained={len(_spec_strat._specialist_models)} (K={bagging_k}), "
+            f"sigma_pop mean={_spec_disp_mean}, "
+            f"specialist_dispersion.csv -> {_spec_disp_is_path}"
+        )
+
+        _all_faxm_logs = _spec_faxm
+        all_results = _spec_results
+        _r5_model_results = [_spec_results]
+        _post_dispatch_fi_strategies = [(f"Model_A_{_spec_sym}_specialist", _spec_strat)]
+
+    elif set(symbols) == set(V1_BASELINE_UNIVERSE) and iteration_label == "v1-023":
         # iter-v1/023: funding-rate z-score feature family (cycle-3 #8/10).
         # Feature-family EXPLORATION: adds funding_rate_zscore_30 + funding_rate_zscore_90
         # to V1_FEATURE_COLUMNS_PRUNED (40 → 42). Full 5-symbol universe; 4 models A/C/D/E.
@@ -10420,6 +10571,33 @@ def main() -> None:
             f"[iter-v1/030] m2_passed column added to trades.csv "
             f"(M2-active keys: {len(_m2_active_keys)}; Model E DOT = NaN)"
         )
+
+    # -------------------------------------------------------------------------
+    # iter-v1/redesign (2026-06-15): generic specialist_dispersion_mean →
+    # comparison.csv (LOAD-BEARING) for the universal single-symbol routing guard.
+    # Mirrors the /065+ per-iteration pattern but is keyed on the generic
+    # _generic_specialist_disp_mean holder set by the guard (None for legacy paths).
+    # -------------------------------------------------------------------------
+    if _generic_specialist_disp_mean is not None:
+        import csv as _csv_generic_spec  # noqa: PLC0415
+
+        _comp_csv_generic = report_dir / "comparison.csv"
+        if _comp_csv_generic.exists():
+            with _comp_csv_generic.open("a", newline="") as _fh_generic:
+                _writer_generic = _csv_generic_spec.writer(_fh_generic)
+                _writer_generic.writerow(
+                    ["specialist_dispersion_mean", _generic_specialist_disp_mean, "", ""]
+                )
+            print(
+                f"[v1 specialist] LOAD-BEARING: specialist_dispersion_mean="
+                f"{_generic_specialist_disp_mean:.4f} appended to {_comp_csv_generic}"
+            )
+        else:
+            print(
+                f"[v1 specialist] WARNING: comparison.csv not found at "
+                f"{_comp_csv_generic}; specialist_dispersion_mean="
+                f"{_generic_specialist_disp_mean:.4f} NOT appended."
+            )
 
     # -------------------------------------------------------------------------
     # iter-v1/065+: specialist_dispersion_mean → comparison.csv (LOAD-BEARING).
