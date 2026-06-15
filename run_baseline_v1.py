@@ -2535,8 +2535,8 @@ def main() -> None:
             "iterations that require a specific ensemble size for byte-identity "
             "against the baseline anchor (e.g. --exploration --ensemble-size 5 "
             "--n-trials 50 for iter-v1/001 trade-roster byte-identity).  "
-            "Must be in [1, 10].  Overrides the mode default (3 for EXPLORATION, "
-            "10 for CONFIRMATION) without touching any other mode semantics."
+            "Must be in [1, 20].  Overrides the mode default (3 for EXPLORATION, "
+            "20 for CONFIRMATION) without touching any other mode semantics."
         ),
     )
     parser.add_argument(
@@ -2975,12 +2975,13 @@ def main() -> None:
 
     # MANDATORY runtime audit — fails loudly if a v2/v3 symbol leaks in
     assert_v1_universe(symbols)
-    # Single-symbol redesign (2026-06-15): v1 is now single-symbol parametrized.
-    # Every skill-generated path carries the symbol; assert exactly one resolved symbol.
-    assert len(set(symbols)) == 1, (
-        f"v1 is single-symbol (redesign 2026-06-15); got {symbols}. "
-        "Pass exactly one symbol via --symbols."
-    )
+    # Single-symbol redesign (2026-06-15): exploration/confirmation are single-symbol.
+    # --baseline-mode is the LEGACY multi-symbol v186 reproduction path and is exempt.
+    if not args.baseline_mode:
+        assert len(set(symbols)) == 1, (
+            f"v1 is single-symbol (redesign 2026-06-15); got {symbols}. "
+            "Pass exactly one symbol via --symbols (e.g. --symbols BTCUSDT)."
+        )
     symbol = symbols[0]
 
     # Resolve mode
@@ -3018,8 +3019,10 @@ def main() -> None:
     # Path(reports_dir)/... construction (the generate_iteration_reports batch, per-seed
     # dirs, decision_log, specialist_dispersion, fail-fast) inherits this prefix, so the
     # symbol is attached to ALL skill-generated reports without touching each call site.
-    reports_dir = str(Path(reports_dir) / symbol)
-    print(f"[run_baseline_v1] single-symbol reports_dir = {reports_dir}")
+    # --baseline-mode keeps the legacy flat reports-v1/iteration_v1-baseline/ path.
+    if not args.baseline_mode:
+        reports_dir = str(Path(reports_dir) / symbol)
+        print(f"[run_baseline_v1] single-symbol reports_dir = {reports_dir}")
 
     # --iteration-label override: applies after the auto-formatted iteration_label.
     # Only allowlisted labels are accepted — prevents accidental dispatch misrouting.
@@ -5419,6 +5422,7 @@ def main() -> None:
             take_profit_pct=8.0,
             timeout_minutes=10080,
             fee_pct=0.1,
+            slippage_bps_per_side=SLIPPAGE_BPS_PER_SIDE,
             data_dir=Path("data"),
             cooldown_candles=2,
             vol_targeting=True,
@@ -5468,6 +5472,7 @@ def main() -> None:
             take_profit_pct=8.0,
             timeout_minutes=10080,
             fee_pct=0.1,
+            slippage_bps_per_side=SLIPPAGE_BPS_PER_SIDE,
             data_dir=Path("data"),
             cooldown_candles=2,
             vol_targeting=True,
@@ -5517,6 +5522,7 @@ def main() -> None:
             take_profit_pct=8.0,
             timeout_minutes=10080,
             fee_pct=0.1,
+            slippage_bps_per_side=SLIPPAGE_BPS_PER_SIDE,
             data_dir=Path("data"),
             cooldown_candles=2,
             vol_targeting=True,
@@ -5566,6 +5572,7 @@ def main() -> None:
             take_profit_pct=8.0,
             timeout_minutes=10080,
             fee_pct=0.1,
+            slippage_bps_per_side=SLIPPAGE_BPS_PER_SIDE,
             data_dir=Path("data"),
             cooldown_candles=2,
             vol_targeting=True,
@@ -6858,6 +6865,7 @@ def main() -> None:
             take_profit_pct=8.0,
             timeout_minutes=10080,
             fee_pct=0.1,
+            slippage_bps_per_side=SLIPPAGE_BPS_PER_SIDE,
             data_dir=Path("data"),
             cooldown_candles=2,
             vol_targeting=True,
@@ -6980,6 +6988,7 @@ def main() -> None:
             take_profit_pct=8.0,
             timeout_minutes=10080,
             fee_pct=0.1,
+            slippage_bps_per_side=SLIPPAGE_BPS_PER_SIDE,
             data_dir=Path("data"),
             cooldown_candles=2,
             vol_targeting=True,
@@ -7111,6 +7120,7 @@ def main() -> None:
             take_profit_pct=5.8,  # ATR-based; overridden by atr_tp_multiplier=2.9
             timeout_minutes=10080,
             fee_pct=0.1,
+            slippage_bps_per_side=SLIPPAGE_BPS_PER_SIDE,
             data_dir=Path("data"),
             cooldown_candles=2,
             vol_targeting=True,
@@ -7282,6 +7292,7 @@ def main() -> None:
             take_profit_pct=5.8,  # ATR-based; overridden by atr_tp_multiplier=2.9
             timeout_minutes=10080,
             fee_pct=0.1,
+            slippage_bps_per_side=SLIPPAGE_BPS_PER_SIDE,
             data_dir=Path("data"),
             cooldown_candles=2,
             vol_targeting=True,
@@ -7451,6 +7462,7 @@ def main() -> None:
             take_profit_pct=5.8,  # ATR-based; overridden by atr_tp_multiplier=2.9
             timeout_minutes=10080,
             fee_pct=0.1,
+            slippage_bps_per_side=SLIPPAGE_BPS_PER_SIDE,
             data_dir=Path("data"),
             cooldown_candles=2,
             vol_targeting=True,
@@ -7623,6 +7635,7 @@ def main() -> None:
             take_profit_pct=5.8,  # ATR-based; overridden by atr_tp_multiplier=2.9
             timeout_minutes=10080,
             fee_pct=0.1,
+            slippage_bps_per_side=SLIPPAGE_BPS_PER_SIDE,
             data_dir=Path("data"),
             cooldown_candles=2,
             vol_targeting=True,
@@ -7797,6 +7810,7 @@ def main() -> None:
             take_profit_pct=5.8,  # ATR-based; overridden by atr_tp_multiplier=2.9
             timeout_minutes=10080,
             fee_pct=0.1,
+            slippage_bps_per_side=SLIPPAGE_BPS_PER_SIDE,
             data_dir=Path("data"),
             cooldown_candles=2,
             vol_targeting=True,
@@ -7984,6 +7998,7 @@ def main() -> None:
             take_profit_pct=5.8,  # ATR-based; overridden by atr_tp_multiplier=2.9
             timeout_minutes=10080,
             fee_pct=0.1,
+            slippage_bps_per_side=SLIPPAGE_BPS_PER_SIDE,
             data_dir=Path("data"),
             cooldown_candles=2,
             vol_targeting=True,
@@ -8148,6 +8163,7 @@ def main() -> None:
             take_profit_pct=5.8,  # ATR-based; overridden by atr_tp_multiplier=2.9
             timeout_minutes=10080,
             fee_pct=0.1,
+            slippage_bps_per_side=SLIPPAGE_BPS_PER_SIDE,
             data_dir=Path("data"),
             cooldown_candles=2,
             vol_targeting=True,
@@ -8288,6 +8304,7 @@ def main() -> None:
             take_profit_pct=5.8,  # ATR-based; overridden by atr_tp_multiplier=2.9
             timeout_minutes=10080,
             fee_pct=0.1,
+            slippage_bps_per_side=SLIPPAGE_BPS_PER_SIDE,
             data_dir=Path("data"),
             cooldown_candles=2,
             vol_targeting=True,
@@ -8487,6 +8504,7 @@ def main() -> None:
             take_profit_pct=5.8,  # ATR-based; overridden by atr_tp_multiplier=2.9
             timeout_minutes=10080,
             fee_pct=0.1,
+            slippage_bps_per_side=SLIPPAGE_BPS_PER_SIDE,
             data_dir=Path("data"),
             cooldown_candles=2,
             vol_targeting=True,
@@ -8693,6 +8711,7 @@ def main() -> None:
             take_profit_pct=5.8,  # ATR-based; overridden by atr_tp_multiplier=2.9
             timeout_minutes=10080,
             fee_pct=0.1,
+            slippage_bps_per_side=SLIPPAGE_BPS_PER_SIDE,
             data_dir=Path("data"),
             cooldown_candles=2,
             vol_targeting=True,
@@ -8891,6 +8910,7 @@ def main() -> None:
             take_profit_pct=5.8,  # ATR-based; overridden by atr_tp_multiplier=2.9
             timeout_minutes=10080,
             fee_pct=0.1,
+            slippage_bps_per_side=SLIPPAGE_BPS_PER_SIDE,
             data_dir=Path("data"),
             cooldown_candles=2,
             vol_targeting=True,
@@ -9095,6 +9115,7 @@ def main() -> None:
             take_profit_pct=5.8,  # ATR-based; overridden by atr_tp_multiplier=2.9
             timeout_minutes=10080,
             fee_pct=0.1,
+            slippage_bps_per_side=SLIPPAGE_BPS_PER_SIDE,
             data_dir=Path("data"),
             cooldown_candles=2,
             vol_targeting=True,
