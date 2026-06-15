@@ -32,8 +32,15 @@ _CSV_HEADER = [
 ]
 
 
-def to_trade_result(trade: LiveTrade, fee_pct: float) -> TradeResult | None:
-    """Convert a closed LiveTrade to a backtest TradeResult for reporting."""
+def to_trade_result(
+    trade: LiveTrade, fee_pct: float, slippage_bps_per_side: float = 0.0
+) -> TradeResult | None:
+    """Convert a closed LiveTrade to a backtest TradeResult for reporting.
+
+    ``slippage_bps_per_side`` mirrors the backtest cost (round-trip 2x drag) so
+    live-recorded net PnL matches the backtest by construction. Default 0.0
+    keeps legacy callers unchanged.
+    """
     if trade.exit_price is None or trade.exit_time is None or trade.exit_reason is None:
         return None
 
@@ -48,7 +55,9 @@ def to_trade_result(trade: LiveTrade, fee_pct: float) -> TradeResult | None:
         open_time=trade.open_time,
         timeout_time=trade.timeout_time,
     )
-    return make_result(order, trade.exit_price, trade.exit_time, trade.exit_reason, fee_pct)
+    return make_result(
+        order, trade.exit_price, trade.exit_time, trade.exit_reason, fee_pct, slippage_bps_per_side
+    )
 
 
 def _dir_label(direction: int) -> str:
@@ -58,9 +67,12 @@ def _dir_label(direction: int) -> str:
 class TradeLogger:
     """Appends closed trades to a CSV file for post-hoc analysis."""
 
-    def __init__(self, log_path: Path, fee_pct: float, dry_run: bool) -> None:
+    def __init__(
+        self, log_path: Path, fee_pct: float, dry_run: bool, slippage_bps_per_side: float = 0.0
+    ) -> None:
         self.path = log_path
         self._fee_pct = fee_pct
+        self._slippage_bps_per_side = slippage_bps_per_side
         self._dry_run = dry_run
         self.path.parent.mkdir(parents=True, exist_ok=True)
         if not self.path.exists():
@@ -76,7 +88,7 @@ class TradeLogger:
         )
 
     def log_close(self, trade: LiveTrade) -> None:
-        result = to_trade_result(trade, self._fee_pct)
+        result = to_trade_result(trade, self._fee_pct, self._slippage_bps_per_side)
         if result is None:
             return
 

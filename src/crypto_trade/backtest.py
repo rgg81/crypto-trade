@@ -366,6 +366,7 @@ def run_backtest(
                 float(close_arr[i]),
                 int(close_time_arr[i]),
                 config.fee_pct,
+                config.slippage_bps_per_side,
                 enable_no_confirm=config.enable_no_confirm_exit,
                 no_confirm_state=_no_confirm_confirmed,
                 state_key=id(_order),
@@ -610,7 +611,14 @@ def run_backtest(
         idx = last_per_sym[sym]
         exit_price = float(close_arr[idx])
         exit_time = int(close_time_arr[idx])
-        result = make_result(order, exit_price, exit_time, "end_of_data", config.fee_pct)
+        result = make_result(
+            order,
+            exit_price,
+            exit_time,
+            "end_of_data",
+            config.fee_pct,
+            config.slippage_bps_per_side,
+        )
         results.append(result)
         if verbose > 0:
             month_label = _month_of(result.close_time)
@@ -786,11 +794,12 @@ def check_order(
     low: float,
     close_time: int,
     fee_pct: float,
+    slippage_bps_per_side: float = 0.0,
 ) -> TradeResult | None:
     """Check if an order should be closed on this kline."""
     # 1. Timeout check
     if open_time >= order.timeout_time:
-        return make_result(order, open_price, open_time, "timeout", fee_pct)
+        return make_result(order, open_price, open_time, "timeout", fee_pct, slippage_bps_per_side)
 
     # 2. SL/TP check
     if order.direction == 1:  # Long
@@ -817,8 +826,12 @@ def check_order(
                 tp_hit = False  # SL wins (includes ambiguous case)
 
     if sl_hit:
-        return make_result(order, order.stop_loss_price, close_time, "stop_loss", fee_pct)
-    return make_result(order, order.take_profit_price, close_time, "take_profit", fee_pct)
+        return make_result(
+            order, order.stop_loss_price, close_time, "stop_loss", fee_pct, slippage_bps_per_side
+        )
+    return make_result(
+        order, order.take_profit_price, close_time, "take_profit", fee_pct, slippage_bps_per_side
+    )
 
 
 def evaluate_order_with_no_confirm(
@@ -830,6 +843,7 @@ def evaluate_order_with_no_confirm(
     close_price: float,
     close_time: int,
     fee_pct: float,
+    slippage_bps_per_side: float = 0.0,
     *,
     enable_no_confirm: bool,
     no_confirm_state: dict,
@@ -858,7 +872,9 @@ def evaluate_order_with_no_confirm(
     # No-op fast path: no_confirm disabled OR order doesn't carry an arm_time
     # (orders created before /116 — back-compat).
     if not enable_no_confirm or order.no_confirm_arm_time <= 0:
-        result = check_order(order, open_time, open_price, high, low, close_time, fee_pct)
+        result = check_order(
+            order, open_time, open_price, high, low, close_time, fee_pct, slippage_bps_per_side
+        )
         return result
 
     confirmed = no_confirm_state.get(state_key, False)
@@ -883,15 +899,21 @@ def evaluate_order_with_no_confirm(
             tp_hit = low <= order.take_profit_price
         if sl_hit or tp_hit:
             # TP/SL wins — delegate to check_order for correct price disambiguation
-            result = check_order(order, open_time, open_price, high, low, close_time, fee_pct)
+            result = check_order(
+                order, open_time, open_price, high, low, close_time, fee_pct, slippage_bps_per_side
+            )
         else:
             # No TP/SL: fire no_confirm at candle close
-            result = make_result(order, close_price, close_time, "no_confirm", fee_pct)
+            result = make_result(
+                order, close_price, close_time, "no_confirm", fee_pct, slippage_bps_per_side
+            )
         no_confirm_state.pop(state_key, None)
         return result
 
     # Normal path: delegate TP/SL/timeout to check_order.
-    result = check_order(order, open_time, open_price, high, low, close_time, fee_pct)
+    result = check_order(
+        order, open_time, open_price, high, low, close_time, fee_pct, slippage_bps_per_side
+    )
     if result is not None:
         # Order resolved by TP/SL/timeout — clean up confirmed tracking.
         no_confirm_state.pop(state_key, None)
@@ -1032,14 +1054,21 @@ def make_result(
     close_time: int,
     exit_reason: str,
     fee_pct: float,
+    slippage_bps_per_side: float = 0.0,
 ) -> TradeResult:
-    """Build a TradeResult from a closed order."""
+    """Build a TradeResult from a closed order.
+
+    ``slippage_bps_per_side`` is applied as a round-trip drag of
+    ``2 * slippage_bps_per_side / 100`` percent (entry + exit), deducted from
+    pnl_pct alongside fee_pct. Default 0.0 keeps legacy callers byte-identical.
+    """
     if order.direction == 1:  # Long
         pnl_pct = ((exit_price - order.entry_price) / order.entry_price) * 100.0
     else:  # Short
         pnl_pct = ((order.entry_price - exit_price) / order.entry_price) * 100.0
 
-    net_pnl_pct = pnl_pct - fee_pct
+    slippage_pct = 2.0 * (slippage_bps_per_side / 100.0)
+    net_pnl_pct = pnl_pct - fee_pct - slippage_pct
     weighted_pnl = net_pnl_pct * order.weight_factor
 
     return TradeResult(
@@ -1059,4 +1088,5 @@ def make_result(
         take_profit_price=order.take_profit_price,
         timeout_time=order.timeout_time,
         confidence=order.confidence,
+        slippage_pct=slippage_pct,
     )

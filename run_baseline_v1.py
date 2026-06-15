@@ -147,14 +147,25 @@ from crypto_trade.strategies.regime_gate_v1 import (
 # Ensemble configuration (mirrors v3 post-iter-v3/059 single-pass structure)
 # ---------------------------------------------------------------------------
 
-#: Inner ensemble seeds roster (first 3 used at EXPLORATION; all 10 at CONFIRMATION).
-ENSEMBLE_SEEDS: tuple[int, ...] = (42, 123, 456, 789, 1001, 2002, 3003, 4004, 5005, 6006)
+#: Inner ensemble seeds roster (first 3 used at EXPLORATION; all 20 at CONFIRMATION).
+#: Single-symbol redesign (2026-06-15): extended 10 → 20 so CONFIRMATION can draw 20
+#: deterministic seeds for tighter lottery-bias isolation (per-seed Sharpe dispersion).
+ENSEMBLE_SEEDS: tuple[int, ...] = (
+    42, 123, 456, 789, 1001, 2002, 3003, 4004, 5005, 6006,
+    7007, 8008, 9009, 10010, 11011, 12012, 13013, 14014, 15015, 16016,
+)
 
-#: EXPLORATION ensemble size — single-axis, fast cycling.
+#: EXPLORATION ensemble size — single-axis, fast cycling (quick iteration, fewer seeds).
 V1_EXPLORATION_ENSEMBLE_SIZE: int = 3
 
-#: CONFIRMATION ensemble size — full statistical rigor.
-V1_CONFIRMATION_ENSEMBLE_SIZE: int = 10
+#: CONFIRMATION ensemble size — full statistical rigor; isolates lottery bias via
+#: per-seed Sharpe dispersion (mean>0, majority profitable, cross-seed σ within band).
+V1_CONFIRMATION_ENSEMBLE_SIZE: int = 20
+
+#: Execution slippage in basis points PER SIDE (round-trip drag = 2x). Mirrors
+#: BacktestConfig.slippage_bps_per_side default; overridden at runtime by --slippage-bps
+#: (resolved in main() after parse_args). Read at call-time by the primary config builders.
+SLIPPAGE_BPS_PER_SIDE: float = 2.0
 
 #: iter-v1/017: 6-symbol universe for EXPLORATION.
 #: LOCAL to runner — NOT shared via features_v1/__init__.py (only CONFIRMATION-MERGE
@@ -546,6 +557,7 @@ def run_model(
         vol_ceiling_enabled=vol_ceiling_enabled,
         vol_ceiling_scale=vol_ceiling_scale,
         vol_ceiling_thresholds=vol_ceiling_thresholds or {},
+        slippage_bps_per_side=SLIPPAGE_BPS_PER_SIDE,
     )
     strategy = LightGbmStrategy(
         training_months=24,
@@ -684,6 +696,7 @@ def run_meta_model(
         vol_ceiling_enabled=vol_ceiling_enabled,
         vol_ceiling_scale=vol_ceiling_scale,
         vol_ceiling_thresholds=vol_ceiling_thresholds or {},
+        slippage_bps_per_side=SLIPPAGE_BPS_PER_SIDE,
     )
     strategy = MetaLabelingStrategy(
         training_months=24,
@@ -861,6 +874,7 @@ def build_backtest_config(
         risk_r5_vol_target_pct=r5_vol_target_pct,
         risk_r5_kill_low_natr_enabled=r5_kill_low_natr_enabled,
         risk_r5_kill_low_natr_min_pct=r5_kill_low_natr_min_pct,
+        slippage_bps_per_side=SLIPPAGE_BPS_PER_SIDE,
     )
 
 
@@ -2928,8 +2942,30 @@ def main() -> None:
             "report written; remaining compute saved. If > 0 → continue to full run."
         ),
     )
+    parser.add_argument(
+        "--slippage-bps",
+        type=float,
+        default=2.0,
+        dest="slippage_bps",
+        metavar="BPS",
+        help=(
+            "Execution slippage in basis points PER SIDE (round-trip drag = 2x). "
+            "Default 2.0 (=0.04%% round-trip). Set 0 to disable. Applied at trade-close "
+            "accounting in the backtest and mirrored in the live engine for parity."
+        ),
+    )
 
     args = parser.parse_args()
+
+    # Resolve execution slippage (single-symbol redesign 2026-06-15). Overrides the
+    # module-level SLIPPAGE_BPS_PER_SIDE that the primary config builders read at
+    # call-time, so --slippage-bps controls the backtest cost end-to-end.
+    global SLIPPAGE_BPS_PER_SIDE
+    SLIPPAGE_BPS_PER_SIDE = args.slippage_bps
+    print(
+        f"[run_baseline_v1] slippage_bps_per_side = {SLIPPAGE_BPS_PER_SIDE} "
+        f"(round-trip drag = {2 * SLIPPAGE_BPS_PER_SIDE / 100.0:.4f}%)"
+    )
 
     # Resolve symbols
     if args.symbols:
@@ -2939,6 +2975,13 @@ def main() -> None:
 
     # MANDATORY runtime audit — fails loudly if a v2/v3 symbol leaks in
     assert_v1_universe(symbols)
+    # Single-symbol redesign (2026-06-15): v1 is now single-symbol parametrized.
+    # Every skill-generated path carries the symbol; assert exactly one resolved symbol.
+    assert len(set(symbols)) == 1, (
+        f"v1 is single-symbol (redesign 2026-06-15); got {symbols}. "
+        "Pass exactly one symbol via --symbols."
+    )
+    symbol = symbols[0]
 
     # Resolve mode
     if args.baseline_mode:
@@ -2969,6 +3012,14 @@ def main() -> None:
         reports_dir = "reports-v1"
     else:
         sys.exit("ERROR: must specify --baseline-mode, --exploration, or --confirmation")
+
+    # Single-symbol redesign (2026-06-15): nest every generated report path under the
+    # symbol → reports-v1/<SYMBOL>/iteration_v1-NNN/... Every downstream
+    # Path(reports_dir)/... construction (the generate_iteration_reports batch, per-seed
+    # dirs, decision_log, specialist_dispersion, fail-fast) inherits this prefix, so the
+    # symbol is attached to ALL skill-generated reports without touching each call site.
+    reports_dir = str(Path(reports_dir) / symbol)
+    print(f"[run_baseline_v1] single-symbol reports_dir = {reports_dir}")
 
     # --iteration-label override: applies after the auto-formatted iteration_label.
     # Only allowlisted labels are accepted — prevents accidental dispatch misrouting.
@@ -3118,7 +3169,9 @@ def main() -> None:
     # re-evaluations can reproduce the exact /008 analysis.
     # Pattern mirrors /003 commit 976ce75 (partial-merge infrastructure).
     global OOF_PARQUET_PATH  # noqa: PLW0603
-    OOF_PARQUET_PATH = Path("data") / f"v1_iter_{iteration_label}_trial_oof.parquet"
+    # Single-symbol redesign (2026-06-15): embed symbol so BTC iter-200 and ETH iter-200
+    # OOF parquets don't collide.
+    OOF_PARQUET_PATH = Path("data") / f"v1_iter_{symbol}_{iteration_label}_trial_oof.parquet"
 
     # Resolve ensemble-seeds offset. Default 0 = canonical seed window.
     # iter-v1/012 SUBSTRATE-DISSOLUTION PROBE: offset=3 selects DISJOINT inner

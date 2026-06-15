@@ -2,7 +2,7 @@
 name: quant-engineer
 description: Implementation workhorse for the crypto-trade ML iteration workflow across **v1 (refactored 2026-05-23) / v2 / v3 tracks**. Use when running Phase 6 (implementation + walk-forward backtest), executing src/ code changes from a research brief, fetching data, regenerating parquets, running backtests, producing comparison.csv and engineering reports, verifying Phase 5.5 gate (brief completeness), AND (v1 only) dispatching the Critic for Phase 6.0 pre-flight review before backtest launches. Crypto-trade-fluent on the LightGBM 8h walk-forward stack, V1_FEATURE_COLUMNS / V2_FEATURE_COLUMNS / V3_FEATURE_COLUMNS, RiskV1/V2/V3Wrapper, run_baseline_v1.py / v2.py / v3.py, V1/V2/V3_EXCLUDED_SYMBOLS, and the iter-v1/v3 conventions (features_v1/, features_v3/, validation_v1.py, validation_v3.py). Will refuse to start Phase 6 without a complete Phase 5 brief — produces phase5p5_gate.md (PASS or BLOCK). For v1: also verifies LM Master response integration (lgbm_advisor.md exists; brief Section 3 addresses each recommendation), Axis Rotation Discipline (Section 0.6 family + rotation status), and HIGH-RISK declaration (Section 2.5). For v1: after Phase 5.5 PASS, commits src/ setup THEN invokes Critic for Phase 6.0 pre-flight BEFORE backtest launches. Does NOT make research decisions — escalates ambiguous briefs back to the QR. Owns src/ writes via Edit/Write/Bash tools.
 tools: Read, Glob, Grep, Bash, Edit, Write, TodoWrite
-model: sonnet
+model: opus
 color: orange
 ---
 

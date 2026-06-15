@@ -73,7 +73,7 @@ class ModelConfig:
     vol_targeting: bool | None = None
     ensemble_seeds: tuple[int, ...] | None = None
     risk_wrapper: Literal["none", "v2", "v3"] = "none"
-    risk_v2_config: "RiskV2Config | None" = None
+    risk_v2_config: RiskV2Config | None = None
     # iter-v3/132: per-model training-hyperparam overrides (resolved at runtime
     # by ModelRunner; None ⇒ fall back to LiveConfig). v3 /121 uses n_trials=35,
     # training_months=24 — mismatched from v1/v2 LiveConfig defaults (50, 24).
@@ -437,8 +437,16 @@ def _build_v3_baseline_models() -> tuple[ModelConfig, ...]:
     # iter-v3/121 10-seed unified lineage (outer=42 prefix + outer=123 suffix).
     # Matches run_baseline_v3.py:ENSEMBLE_SEEDS verbatim.
     V3_ENSEMBLE_SEEDS_121: tuple[int, ...] = (
-        191664963, 1662057957, 1405681631, 942484272, 929893137,    # outer=42 lineage
-        33158374, 1465339467, 1273345680, 115579757, 1952249162,    # outer=123 lineage
+        191664963,
+        1662057957,
+        1405681631,
+        942484272,
+        929893137,  # outer=42 lineage
+        33158374,
+        1465339467,
+        1273345680,
+        115579757,
+        1952249162,  # outer=123 lineage
     )
 
     # iter-v3/121 RiskV2Config (consumed by RiskV3Wrapper). Verified against
@@ -458,15 +466,15 @@ def _build_v3_baseline_models() -> tuple[ModelConfig, ...]:
             name=f"V3-{sym.replace('USDT', '')}",
             symbols=(sym,),
             use_atr_labeling=True,
-            atr_tp_multiplier=2.0,   # /121 DEFAULT_ATR_MULTIPLIERS
+            atr_tp_multiplier=2.0,  # /121 DEFAULT_ATR_MULTIPLIERS
             atr_sl_multiplier=1.0,
             atr_column="natr_21_raw",
             feature_columns=V3_FEATURE_COLUMNS_TOP_N,
             features_dir=Path("data/features_v3"),
-            cooldown_candles=4,                       # /121 BacktestConfig cooldown
-            vol_targeting=False,                      # vol_scale lives in RiskV3Wrapper
+            cooldown_candles=4,  # /121 BacktestConfig cooldown
+            vol_targeting=False,  # vol_scale lives in RiskV3Wrapper
             ensemble_seeds=V3_ENSEMBLE_SEEDS_121,
-            ood_enabled=False,                        # z-score OOD lives in RiskV3Wrapper
+            ood_enabled=False,  # z-score OOD lives in RiskV3Wrapper
             risk_wrapper="v3",
             risk_v2_config=v3_risk_cfg,
             # /121 training hyperparams (mismatched from LiveConfig defaults)
@@ -502,6 +510,12 @@ class LiveConfig:
     take_profit_pct: float = 8.0
     timeout_minutes: int = 10080  # 7 days
     fee_pct: float = 0.1
+    # Execution slippage in bps PER SIDE — mirrors BacktestConfig.slippage_bps_per_side
+    # for backtest-live parity. Applied as round-trip drag (2x) at trade-close
+    # accounting on the paper/dry-run + catch-up exit paths.
+    # DEFAULT 0.0 = deployed engine (v1 BUNDLE / v2 / v3) byte-unchanged. A single-symbol
+    # v1 live deployment sets this to 2.0 to match its backtest's --slippage-bps.
+    slippage_bps_per_side: float = 0.0
     cooldown_candles: int = 2
     leverage: int = 1
     # Vol targeting (iter 152)

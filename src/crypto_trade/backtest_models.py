@@ -47,6 +47,14 @@ class BacktestConfig:
     take_profit_pct: float
     timeout_minutes: int
     fee_pct: float = 0.1
+    # Execution slippage in basis points PER SIDE (entry + exit). The backtest
+    # applies a round-trip drag of 2 * slippage_bps_per_side at trade close, on
+    # top of fee_pct (e.g. 2.0 bps/side ⇒ 0.04% round-trip).
+    # DEFAULT 0.0 = byte-identical to all pre-slippage callers (v2/v3 baselines,
+    # tests, ad-hoc). The v1 runner OPTS IN by passing slippage_bps_per_side=2.0
+    # (run_baseline_v1.SLIPPAGE_BPS_PER_SIDE, overridable via --slippage-bps).
+    # Mirrored in LiveConfig.slippage_bps_per_side for backtest-live parity.
+    slippage_bps_per_side: float = 0.0
     data_dir: Path = Path("data")
     start_time: int | None = None  # epoch ms, default=first row
     end_time: int | None = None  # epoch ms, default=last row
@@ -164,6 +172,10 @@ class TradeResult:
     # iter-v3/080: passive metadata — M1 directional confidence scalar.
     # Carried from Order.confidence. No decision path reads this field.
     confidence: float | None = None
+    # Round-trip slippage drag (pct) deducted from pnl_pct alongside fee_pct.
+    # Equals 2 * slippage_bps_per_side / 100. Auditable so net_pnl_pct can be
+    # recomputed as pnl_pct - fee_pct - slippage_pct.
+    slippage_pct: float = 0.0
 
 
 @dataclass(frozen=True)

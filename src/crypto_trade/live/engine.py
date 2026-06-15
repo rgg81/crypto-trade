@@ -23,7 +23,6 @@ from crypto_trade.live.auth_client import AuthenticatedBinanceClient
 from crypto_trade.live.data_pipeline import (
     build_master,
     detect_new_candle,
-    refresh_features,
     refresh_features_by_track,
     refresh_klines,
 )
@@ -139,15 +138,11 @@ class ModelRunner:
             model_config.specialist_optuna_trials
             if (model_config.specialist_mode and model_config.specialist_optuna_trials > 0)
             else (
-                model_config.n_trials
-                if model_config.n_trials is not None
-                else live_config.n_trials
+                model_config.n_trials if model_config.n_trials is not None else live_config.n_trials
             )
         )
         resolved_cv_splits: int = (
-            model_config.cv_splits
-            if model_config.cv_splits is not None
-            else live_config.cv_splits
+            model_config.cv_splits if model_config.cv_splits is not None else live_config.cv_splits
         )
 
         inner = LightGbmStrategy(
@@ -344,7 +339,12 @@ class LiveEngine:
         else:
             log_name = "live_trades.csv"
             decision_log_name = "live_decisions.jsonl"
-        self._logger = TradeLogger(config.data_dir / log_name, config.fee_pct, config.dry_run)
+        self._logger = TradeLogger(
+            config.data_dir / log_name,
+            config.fee_pct,
+            config.dry_run,
+            config.slippage_bps_per_side,
+        )
 
         from crypto_trade import decision_log
 
@@ -695,7 +695,7 @@ class LiveEngine:
         for trade in self._state.get_all_trades():
             if trade.status != "closed" or trade.exit_time is None:
                 continue
-            result = to_trade_result(trade, self.config.fee_pct)
+            result = to_trade_result(trade, self.config.fee_pct, self.config.slippage_bps_per_side)
             if result is None:
                 continue
             close_date = _day_of(result.close_time)
@@ -745,7 +745,7 @@ class LiveEngine:
         for trade in closed:
             sym = trade.symbol
             model_name = trade.model_name
-            result = to_trade_result(trade, self.config.fee_pct)
+            result = to_trade_result(trade, self.config.fee_pct, self.config.slippage_bps_per_side)
             if result is None:
                 continue
             # R1 — update streak and cooldown
@@ -813,13 +813,9 @@ class LiveEngine:
             # Derive arm_time + threshold_price the same way trade_to_order does
             sl_pct = abs(trade.entry_price - trade.stop_loss_price) / trade.entry_price
             if trade.direction == 1:
-                threshold_price = trade.entry_price * (
-                    1.0 + mc.no_confirm_trigger_atr * sl_pct
-                )
+                threshold_price = trade.entry_price * (1.0 + mc.no_confirm_trigger_atr * sl_pct)
             else:
-                threshold_price = trade.entry_price * (
-                    1.0 - mc.no_confirm_trigger_atr * sl_pct
-                )
+                threshold_price = trade.entry_price * (1.0 - mc.no_confirm_trigger_atr * sl_pct)
             # Load symbol klines and scan candles from open_time forward
             kline_path = csv_path(self.config.data_dir, trade.symbol, self.config.interval)
             if not kline_path.exists():
@@ -859,7 +855,7 @@ class LiveEngine:
         """Record a closed trade's PnL into the VT daily accumulator."""
         if not self.config.vol_targeting:
             return
-        result = to_trade_result(trade, self.config.fee_pct)
+        result = to_trade_result(trade, self.config.fee_pct, self.config.slippage_bps_per_side)
         if result is None:
             return
         close_date = _day_of(result.close_time)
@@ -871,7 +867,7 @@ class LiveEngine:
 
         Mirrors backtest.py:263-280 exactly.
         """
-        result = to_trade_result(trade, self.config.fee_pct)
+        result = to_trade_result(trade, self.config.fee_pct, self.config.slippage_bps_per_side)
         if result is None:
             return
 
@@ -1201,6 +1197,7 @@ class LiveEngine:
                         float(close_arr[i]),
                         ct,
                         self.config.fee_pct,
+                        self.config.slippage_bps_per_side,
                         enable_no_confirm=True,
                         no_confirm_state=self._no_confirm_confirmed,
                         state_key=state_key,
@@ -1215,6 +1212,7 @@ class LiveEngine:
                         float(low_arr[i]),
                         ct,
                         self.config.fee_pct,
+                        self.config.slippage_bps_per_side,
                     )
                 if result is not None:
                     trade = open_trades.pop(sym)

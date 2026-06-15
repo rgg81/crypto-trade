@@ -79,13 +79,9 @@ def trade_to_order(
         sl_pct = abs(trade.entry_price - trade.stop_loss_price) / trade.entry_price
         no_confirm_arm_time = trade.open_time + no_confirm_k_candles * interval_ms
         if trade.direction == 1:
-            no_confirm_threshold_price = trade.entry_price * (
-                1.0 + no_confirm_trigger_atr * sl_pct
-            )
+            no_confirm_threshold_price = trade.entry_price * (1.0 + no_confirm_trigger_atr * sl_pct)
         else:
-            no_confirm_threshold_price = trade.entry_price * (
-                1.0 - no_confirm_trigger_atr * sl_pct
-            )
+            no_confirm_threshold_price = trade.entry_price * (1.0 - no_confirm_trigger_atr * sl_pct)
     return Order(
         symbol=trade.symbol,
         direction=trade.direction,
@@ -198,7 +194,9 @@ class OrderManager:
                 log.error(
                     "SL/TP placement failed after entry %s on %s; "
                     "rolling back entry to avoid naked position: %s",
-                    trade.entry_order_id, symbol, exc,
+                    trade.entry_order_id,
+                    symbol,
+                    exc,
                 )
                 # Cancel any SL we did manage to place before TP failed.
                 _try_cancel_algo(self._auth, symbol, trade.sl_order_id)
@@ -209,7 +207,9 @@ class OrderManager:
                     log.critical(
                         "CRITICAL: failed to close naked %s position after SL/TP "
                         "failure (entry order %s): %s — MANUAL INTERVENTION REQUIRED",
-                        symbol, trade.entry_order_id, close_exc,
+                        symbol,
+                        trade.entry_order_id,
+                        close_exc,
                     )
                 raise
         else:
@@ -274,6 +274,7 @@ class OrderManager:
                 candle_close,
                 candle_close_time,
                 self._config.fee_pct,
+                self._config.slippage_bps_per_side,
                 enable_no_confirm=True,
                 no_confirm_state=no_confirm_state,
                 state_key=state_key,
@@ -288,6 +289,7 @@ class OrderManager:
                 candle_low,
                 candle_close_time,
                 self._config.fee_pct,
+                self._config.slippage_bps_per_side,
             )
         if result is not None:
             self._state.close_trade(
@@ -428,9 +430,7 @@ class OrderManager:
             if trade.sl_order_id:
                 sl_status = self._auth.get_algo_order(trade.symbol, trade.sl_order_id)
                 if sl_status.get("algoStatus") in ("TRIGGERED", "FINISHED"):
-                    fill_price = float(
-                        sl_status.get("actualPrice") or trade.stop_loss_price
-                    )
+                    fill_price = float(sl_status.get("actualPrice") or trade.stop_loss_price)
                     fill_time = int(
                         sl_status.get("triggerTime")
                         or sl_status.get("updateTime")
@@ -444,9 +444,7 @@ class OrderManager:
             if trade.tp_order_id:
                 tp_status = self._auth.get_algo_order(trade.symbol, trade.tp_order_id)
                 if tp_status.get("algoStatus") in ("TRIGGERED", "FINISHED"):
-                    fill_price = float(
-                        tp_status.get("actualPrice") or trade.take_profit_price
-                    )
+                    fill_price = float(tp_status.get("actualPrice") or trade.take_profit_price)
                     fill_time = int(
                         tp_status.get("triggerTime")
                         or tp_status.get("updateTime")
@@ -473,11 +471,7 @@ class OrderManager:
             if now_ms < trade.timeout_time:
                 continue
 
-            if (
-                not self._config.dry_run
-                and self._auth is not None
-                and not is_paper_trade(trade)
-            ):
+            if not self._config.dry_run and self._auth is not None and not is_paper_trade(trade):
                 # SL/TP are algo orders; entry was a regular order.
                 _try_cancel_algo(self._auth, trade.symbol, trade.sl_order_id)
                 _try_cancel_algo(self._auth, trade.symbol, trade.tp_order_id)
