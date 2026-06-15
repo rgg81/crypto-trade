@@ -34,10 +34,18 @@ training_months = 24                  # FIXED. NEVER CHANGES.
 walk_forward: train_end_ms = test_start_ms - embargo_ms   # the embargo law; cannot regress
 gap = (timeout_candles + 1) * n_symbols                   # CV label-leak guard (n_symbols = 1)
 
-V1_EXPLORATION_ENSEMBLE_SIZE  = 3     # exploration: fast, few seeds
-V1_CONFIRMATION_ENSEMBLE_SIZE = 20    # confirmation: isolates lottery bias
-ENSEMBLE_SEEDS = (42, 123, 456, 789, 1001, 2002, 3003, 4004, 5005, 6006,
-                  7007, 8008, 9009, 10010, 11011, 12012, 13013, 14014, 15015, 16016)
+# ── THE SEED RULE (ONE knob, no ambiguity) ─────────────────────────────────
+# v1's model = the SPECIALIST BAGGING ensemble: K independent Optuna studies per
+# walk-forward month (each its own seed + hyperparameter search), combined by
+# mean-of-signed-weights. K is the ONLY seed number that ever varies.
+V1_EXPLORATION_BAGGING_K  = 3    # exploration: fast screen
+V1_CONFIRMATION_BAGGING_K = 20   # confirmation: robust; bagging IS the lottery-bias control
+#   inner ensemble (--ensemble-size) = 1, ALWAYS  (placeholder seed [42]; hard error if set)
+#   outer seeds   (--seeds)          = 1, ALWAYS  (hard error if != 1)
+#   K seeds = first K of V1_SPECIALIST_SEEDS=range(42,92): K=3→[42,43,44], K=20→[42..61]
+#   n_trials = the per-seed Optuna budget = --n-trials (default 35), HONORED per seed.
+#   specialist_dispersion.csv reports residual per-candle seed disagreement.
+#   (K==0 in LightGbmStrategy = legacy full-50-seed roster, BIT-IDENTICAL; do not use for v1.)
 
 slippage_bps_per_side = 2.0           # round-trip drag = 2x; v1 runner default (--slippage-bps)
 training_days                          # Optuna-searched (10..500, step 10), applied at CV folds
@@ -113,17 +121,21 @@ blocker (ambiguous brief the QR can't resolve, an error, or a decision needing t
 There are exactly two iteration modes. No axis-rotation rules, no HIGH-RISK declarations, no
 10:1 ratios, no verdict zoo. Just:
 
-- **EXPLORATION** (`--exploration`): quick iteration, **3 seeds**. Goal = screen one focused
+The ONLY thing that changes between modes is the bagging **K** (see THE SEED RULE above).
+inner ensemble = 1 and outer seeds = 1 are FIXED in both modes.
+
+- **EXPLORATION** (`--exploration`): bagging **K=3** (fast screen). Goal = test one focused
   hypothesis (a feature, an HP region, a risk knob) for signal-vs-noise. Fast turnaround. An
   exploration NEVER updates the baseline.
-- **CONFIRMATION** (`--confirmation`): **20 seeds**. Goal = isolate lottery bias and decide the
-  merge. Runs the candidate across 20 independent seeds and reports per-seed Sharpe dispersion
-  (mean, σ, % profitable) plus the `basin_diagnostics` summary. Only a confirmation can update
-  the baseline.
+- **CONFIRMATION** (`--confirmation`): bagging **K=20** (robust). Goal = decide the merge. The
+  20-study bagging IS the lottery-bias control — averaging 20 independent Optuna studies makes the
+  aggregate seed-robust by construction; more K ⇒ lower lottery risk. Only a confirmation can
+  update the baseline.
 
-**Lottery-bias isolation (confirmation):** report cross-seed OOS Sharpe mean > 0, the fraction of
-the 20 seeds that are profitable, and the cross-seed σ against the basin band (PASS < 0.30,
-FAIL > 0.60). A candidate whose edge is a single-seed artifact does not merge.
+**Lottery-bias readout (confirmation):** `specialist_dispersion.csv` reports the residual
+per-candle population std of the K signed-weights (how much the 20 studies still disagree per
+candle). The aggregate prediction is the mean over all K studies; a single study cannot swing it.
+(There is NO outer-`--seeds` re-run loop — robustness comes from K, not from N independent backtests.)
 
 ---
 
@@ -141,7 +153,10 @@ floors** — the old "IS Sharpe > 1.0 AND OOS Sharpe > 1.0" rule is RETIRED for 
 - OOS performance improves over the current baseline (primary: OOS monthly Sharpe; corroborated by
   OOS net PnL / profit factor), AND
 - no material regression on IS, AND
-- the lottery-bias check holds (cross-seed mean > 0, majority of 20 seeds profitable, σ in band).
+- the K=20 bagging dispersion is healthy (`specialist_dispersion.csv`: the 20 studies don't wildly
+  disagree per candle — the aggregate isn't riding a single study). The K=20 bagging is itself the
+  lottery-bias control; there is no separate per-seed-Sharpe panel because confirmation is one
+  aggregated backtest, not 20 independent re-runs.
 
 DSR / PBO / PSR / ADF / IC are **informational context** the Critic weighs — not pass/fail floors.
 Methodology integrity (no look-ahead, embargo intact, IS-only design, single-symbol, honest costs,
@@ -214,10 +229,10 @@ created by the orchestrator. The single-symbol assertion guards the symbol resol
 ## Running a backtest
 
 ```
-# EXPLORATION (3 seeds, fast):
+# EXPLORATION (bagging K=3, fast screen; --n-trials = per-seed Optuna budget):
 uv run python run_baseline_v1.py --exploration --iteration NNN --symbols BTCUSDT --n-trials 35 --slippage-bps 2
 
-# CONFIRMATION (20 seeds, lottery-bias isolation, merge decision):
+# CONFIRMATION (bagging K=20, merge decision):
 uv run python run_baseline_v1.py --confirmation --iteration NNN --symbols BTCUSDT --n-trials 35 --slippage-bps 2
 ```
 
