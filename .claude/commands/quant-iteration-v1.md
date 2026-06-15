@@ -1,1796 +1,235 @@
 ---
 name: quant-iteration-v1
-description: "Quant research/engineering iteration workflow for the crypto-trade LightGBM strategy — v1 TRACK (REFACTORED 2026-05-23: corrected walk-forward baseline + v3 rigor + four QR↔Critic dynamic improvements + new LightGBM Master advisor agent). Use this skill whenever the user mentions: v1 iteration, quant-iteration-v1, iter-v1, iter-v1/NNN, BASELINE_V1, briefs-v1, diary-v1, reports-v1, ITERATION_PLAN_8H_V1, run_baseline_v1, v1 research brief, v1 diary, v1 merge decision, v1 baseline comparison, Phase 4.5, Phase 5.5, Phase 6.0, Phase 7.4, Phase 7.5, Critic agent, Critic review, review.md, lgbm_advisor.md, LightGBM Master, lightgbm-master, Constructive Critic, BLOCK-PENDING-FIX, Axis Rotation Discipline, HIGH-RISK axis declaration, pre-Phase 6 review, V1_EXCLUDED_SYMBOLS, features_v1, validation_v1, run_baseline_v1, Pareto front, Pareto dominance, meta-labeling, primary plus meta model, fractional Kelly, fractional differentiation ADF, ADF stationarity, CPCV mandatory, PBO < 0.4, PSR > 0.95, pre-registered failure mode, pre-registered MERGE/NO-MERGE criteria, library stack declaration. Also trigger when the user says: 'start v1 iteration', 'run v1 phase', 'evaluate v1 reports', 'write v1 diary', 'v1 merge decision', 'invoke Critic for v1', 'invoke LM Master', 'invoke LightGBM Master'."
+description: "Quant research/engineering iteration workflow for the crypto-trade LightGBM strategy — v1 TRACK (REDESIGNED 2026-06-15: SINGLE-SYMBOL parametrized, honest cost model with slippage, 5-role team, exploration/confirmation cadence only, relative merge gate). Use this skill whenever the user mentions: v1 iteration, quant-iteration-v1, iter-v1, iter-v1/NNN, BASELINE_V1, BASELINE_V1_<SYMBOL>, briefs-v1, diary-v1, reports-v1, run_baseline_v1, v1 research brief, v1 diary, v1 merge decision, v1 baseline, single-symbol v1, feature engineer, risk engineer, quant research, quant engineer, Critic, feature_report, risk_report, review.md, slippage, exploration, confirmation, lottery bias, training_days, V1_EXCLUDED_SYMBOLS, features_v1, CPCV, DSR, PBO, PSR, ADF, IC, meta-labeling, fractional Kelly. Also trigger when the user says: 'start v1 iteration', 'run v1 phase', 'evaluate v1 reports', 'write v1 diary', 'v1 merge decision', 'invoke Critic for v1'."
 ---
 
-# Quant Iteration Skill — v1 (Rigor + Creator-Role-Augmented Track)
+# Quant Iteration Skill — v1 (Single-Symbol, Honest-Cost, 5-Role Track)
 
 ## Mission
 
-v1 was the founding strategy track. After 186 iterations on `iteration_NNN/`, it was deployed to live trading on BTC/ETH/LINK/LTC/DOT. Then at iter-v3/058 we discovered a serious walk-forward look-ahead bug: `train_end_ms = test_start_ms` with no embargo, allowing training labels to scan forward into the test window. The fix landed at `walk_forward.py:113` (`train_end_ms = test_start_ms - embargo_ms`). Re-running the v1 stack under the corrected walk-forward produces materially worse OOS numbers than the historical `iteration_186` headline. The old v1 baseline was inflated by leaked labels.
+v1 builds **one per-symbol LightGBM specialist at a time**, under an honest execution-cost model
+(fees + slippage), validated by a walk-forward backtest with embargo, and judged by **relative
+improvement over the symbol's own previous baseline**. We start with **BTCUSDT**, the primary
+asset. Each symbol gets its own baseline, its own reports tree, its own diary.
 
-This refactor restarts v1 from scratch with the **corrected stats as the formal baseline**, bringing v1 up to v3's rigor (CPCV, DSR, PBO, PSR, ADF, IC, meta-labeling, fractional Kelly) AND adding four structural improvements the v3 cycle-7 forensic identified:
+This is a **redesign (2026-06-15)** after a costly train/serve bug: the per-seed final retrain
+once ignored Optuna's `training_days`, and a "full-window-training" patch meant to fix it
+backfired (helped one symbol, collapsed another). The lesson: **train must equal serve**, costs
+must be honest, and the methodology must be simple enough that a defect cannot hide. So v1 is now
+deliberately lean — one symbol, two cadences, five clear roles, and a backtest that is the only
+arbiter of truth.
 
-1. **LightGBM Master agent** — a read-only ML specialist that fires Phase 4.5 (pre-design hyperparameter/feature recommendations) and Phase 7.4 (post-backtest interpretation). Closes the v3 cycle-7 gap where QR + Critic are both evaluators with no "creator" role to inject fresh structural axes.
-2. **Constructive Critic** — every BLOCK verdict (SPECIALIST-NEGATIVE / BUNDLE-BLOCK / BLOCK-PENDING-FIX / BLOCK-FINAL) MUST include a "Path Forward" section proposing 2-3 alternative axes from families NOT used in the prior 5 SPECIALISTs. Rigor unchanged; dead-end-feeling reduced.
-3. **Critic pre-Phase 6 review (Phase 6.0)** — after Phase 5.5 PASS but BEFORE backtest launches, Critic does a SHORT review of (a) the brief for look-ahead / anti-patterns / missing falsifiers, and (b) QE's src/ diff vs baseline for anti-pattern Catalog hits. Catches issues BEFORE compute is spent. Output: `critic_preflight.md` with OVERALL=PASS or OVERALL=BLOCK.
-4. **BLOCK-PENDING-FIX softening** — Phase 7.5 Critic verdict can be `BLOCK-PENDING-FIX` for a specific isolated defect, granting the QR/QE ONE chance to fix and re-run Phase 6 within the SAME iter-v1/NNN. After the fix attempt, next verdict can only be PASS or `BLOCK-FINAL` — no further recursion. Reduces wasted iterations on near-miss briefs without compromising rigor.
-
-Plus a **QR creativity mandate** (Axis Rotation Discipline): if the last 5 SPECIALISTs were from the same axis family, the next SPECIALIST MUST be from a different family. Codifies the v3 cycle-7 lesson — knob-tuning inertia within /121's architecture family produced 9/9 NEGATIVE.
-
-v1 is now the **rigor + creator-role-augmented track**, parallel to v2 (diversification arm) and v3 (rigor-only arm). All three coexist.
-
-**The bundle is the product.** v1's mission is to build a *regime-ensemble bundle* — N complementary models where each is strong in some regime, and the composite is regime-balanced. Individual SPECIALISTs are *component candidates* — a model that crushes bull regimes but flat-lines in chop is a bull specialist, not an overfit reject. BUNDLEs are *assemblies* — combining components (via stacking, ensembling, regime-conditional dispatch) and validating the composite OOS. Edge is measured at the bundle level; rigor is measured per-component (no look-ahead, embargo applied, etc.).
-
-We do not predict the future. We identify moments when the distribution of forward returns is skewed in our favor, and we bet accordingly — sometimes with a bull specialist, sometimes with a chop specialist, sometimes with a tail-control gate. The bundle is regime-free; the components are not, by design.
-
-We do not predict the future. We identify moments when the distribution of forward returns is skewed in our favor, and we bet accordingly, sized by our conviction and disciplined by our risk framework. We build strategies that would survive scrutiny by López de Prado, Bailey, Harvey, Carver. **No p-hacking. No overfitting. No self-deception.** If a strategy cannot withstand combinatorial purged cross-validation, deflated Sharpe ratio tests, probability-of-backtest-overfitting tests, AND adversarial Critic review, it does not trade.
-
-The 186 historical iterations taught us what does not work. That knowledge is as valuable as what does. The corrected v1 baseline is the honest starting point for iteration v1-001+.
+We do not predict the future. We identify moments when the distribution of forward returns is
+skewed in our favor and bet accordingly, sized by conviction and disciplined by risk. No
+p-hacking. No overfitting. No self-deception. The backtest is the proof — no side-script
+projections substitute for a real backtest run.
 
 ---
 
-## Relationship to v2 and v3
+## Sacred Constants (IMMUTABLE)
 
-Three sibling tracks. The user can run `/quant-iteration-v1` (this skill), `/quant-iteration-v2`, or `/quant-iteration-v3` at any time. None is frozen.
+```
+OOS_CUTOFF_DATE = 2025-03-24          # FIXED. NEVER CHANGES.
+training_months = 24                  # FIXED. NEVER CHANGES.
+walk_forward: train_end_ms = test_start_ms - embargo_ms   # the embargo law; cannot regress
+gap = (timeout_candles + 1) * n_symbols                   # CV label-leak guard (n_symbols = 1)
 
-| Aspect | v1 (THIS — refactored 2026-05-23) | v2 | v3 |
+V1_EXPLORATION_ENSEMBLE_SIZE  = 3     # exploration: fast, few seeds
+V1_CONFIRMATION_ENSEMBLE_SIZE = 20    # confirmation: isolates lottery bias
+ENSEMBLE_SEEDS = (42, 123, 456, 789, 1001, 2002, 3003, 4004, 5005, 6006,
+                  7007, 8008, 9009, 10010, 11011, 12012, 13013, 14014, 15015, 16016)
+
+slippage_bps_per_side = 2.0           # round-trip drag = 2x; v1 runner default (--slippage-bps)
+training_days                          # Optuna-searched (10..500, step 10), applied at CV folds
+                                       # AND final per-seed retrain. NO full-window mode. EVER.
+```
+
+**Model invariant — NO SONNET.** Every v1 agent (`feature-engineer`, `risk-engineer`,
+`quant-researcher`, `quant-engineer`, `quant-critic`) runs `model: opus`. A v1 agent may never be
+`sonnet`. Check: `grep -rl 'model: sonnet' .claude/agents/` must not list any v1 agent.
+
+**Single-symbol invariant.** Exactly one symbol per run. The runner asserts `len(set(symbols)) == 1`.
+
+---
+
+## Cost Model (NEW — honest costs)
+
+Every closed trade nets, at the `make_result` accounting site:
+
+```
+net_pnl_pct = pnl_pct - fee_pct - 2 * (slippage_bps_per_side / 100)
+```
+
+- `fee_pct` (round-trip fee, default 0.1%) + round-trip slippage (`2 × slippage_bps_per_side`).
+- v1 backtests run at `slippage_bps_per_side = 2.0` (0.04% round-trip) by default; override with
+  `--slippage-bps`. The Risk Engineer pre-registers a cost-stress sweep ({1×, 2×, 4×}).
+- **Backtest-live parity:** the live engine applies the same slippage via `LiveConfig.slippage_bps_per_side`
+  on the paper/dry-run + catch-up accounting paths (same `make_result`). A single-symbol v1 live
+  deployment sets `LiveConfig.slippage_bps_per_side = 2.0` to match its backtest. The dataclass
+  defaults are 0.0 so v2/v3 and the deployed engine stay byte-unchanged.
+- An edge that only survives at zero cost is not an edge. Judge lift NET of costs.
+
+---
+
+## Five Roles (all `model: opus`)
+
+| Role | Owns phases | Agent file | Produces |
 |---|---|---|---|
-| Symbols (initial baseline) | BTC, ETH, LINK, LTC, DOT (5 — original v1) | SOL, XRP, DOGE, NEAR (4) | BCH, LDO, TRX (3) |
-| Symbol universe (available) | All Binance perpetuals minus `V1_EXCLUDED_SYMBOLS` | Fixed at SOL, XRP, DOGE, NEAR | All minus V3_EXCLUDED_SYMBOLS |
-| Excluded symbols | SOL, XRP, DOGE, NEAR (v2), BCH, LDO, TRX (v3), BNB (reserved) | BTC, ETH, LINK, BNB | v1 + v2 universes + BNB + MKR |
-| Features | `crypto_trade.features_v1` (193 cols, 9 groups — corrected) | `crypto_trade.features_v2` (34 cols) | `crypto_trade.features_v3` (14 cols top-N) |
-| Risk layers | R1+R2+R3 (legacy) — v1 may evolve to v2/v3 patterns | RiskV2Wrapper (7 active gates) | RiskV3Wrapper (subclasses V2) |
-| Validation | **CPCV mandatory + DSR + PBO + PSR (matches v3)** | TimeSeriesSplit + DSR | CPCV + DSR + PBO + PSR |
-| Position sizing | **Meta-labeling (M1+M2) → fractional Kelly (matches v3)** | ATR-percentile vol scaling | M1+M2 + fractional Kelly |
-| Roles | **QR + QE + Critic + LightGBM Master (4 roles)** | QR + QE | QR + QE + Critic |
-| Phases | **12 (1, 2, 3, 4, 4.5, 5, 5.5, 6.0, 6, 7.4, 7.5, 7, 8)** | 8 | 10 (1-8 + 5.5 + 7.5) |
-| Branch | `quant-research` ← `iteration-v1/NNN` | `quant-research` ← `iteration-v2/NNN` | `quant-research` ← `iteration-v3/NNN` |
-| Tag | `v0.v1-NNN` | `v0.v2-NNN` | `v0.v3-NNN` |
-| Reports | `reports-v1/iteration_v1-NNN/` | `reports-v2/iteration_v2-NNN/` | `reports-v3/iteration_v3-NNN/` |
-| Briefs | `briefs-v1/iteration_v1-NNN/` (incl. `lgbm_advisor.md`, `phase5p5_gate.md`, `critic_preflight.md`, `review.md`) | `briefs-v2/iteration_v2-NNN/` | `briefs-v3/iteration_v3-NNN/` |
-| Diaries | `diary-v1/iteration_v1-NNN.md` | `diary-v2/iteration_v2-NNN.md` | `diary-v3/iteration_v3-NNN.md` |
-| SPECIALIST ENSEMBLE_SIZE | 3 (matches v3) | n/a (no cadence) | 3 |
-| BUNDLE ENSEMBLE_SIZE | 10 (matches v3) | n/a | 10 |
-| Outer seed loop | None — single-pass inner ensemble (matches v3 post-/059) | 5 outer seeds (v1-style) | None |
-| Wall-clock targets | SPECIALIST 2h target / BUNDLE 9h target — design-time guidance only, NO runtime kill-switch (2026-05-30) | no formal cap | EXPLORATION 2h / CONFIRMATION 9h |
-| Cadence | No formal cadence — BUNDLE assembly justified by IS regime-coverage of running SPECIALIST roster (per QR judgment) | none | 10:1 |
-| Auto-trigger | `iter-v1/NNN`, `BASELINE_V1`, `Phase 4.5`, `Phase 6.0`, `Phase 7.4`, `lgbm_advisor`, `LightGBM Master` | `iter-v2/NNN`, `BASELINE_V2.md` | `iter-v3/NNN`, `BASELINE_V3.md` |
+| **Feature Engineer (FE)** | 4 (features + selection + ML/HP advisory) | `feature-engineer.md` | `feature_report.md` |
+| **Risk Engineer (RE)** | 4.7 (risk calibration + scenario stress) | `risk-engineer.md` | `risk_report.md` |
+| **Quant Research (QR)** | 1 (EDA), 2 (labeling), 5 (brief), 7 (OOS eval), 8 (diary+merge) | `quant-researcher.md` | brief, eval memo, diary |
+| **Quant Engineer (QE)** | 5.5 (gate), 6 (backtest) | `quant-engineer.md` | `src/` diff, reports, comparison.csv |
+| **Critic** | 7.5 (results-only review) | `quant-critic.md` | `review.md` |
 
-**Shared (sacred across all three tracks):**
-- `OOS_CUTOFF_DATE = 2025-03-24` — immutable
-- `training_months = 24` — immutable
-- 8h candles
-- 10-seed pre-MERGE concentration validation (where applicable)
-- Hard merge floor: IS Sharpe > 1.0 AND OOS Sharpe > 1.0
-- ≥10 trades/month OOS, ≥130 OOS total
-- Top symbol concentration ≤ 30% of OOS PnL (or explicit exception with justification)
-- "QR uses IS data" — every Phase 5 brief must contain numerical tables from a committed `analysis/iteration_v1-NNN/*.py` script
-- Walk-forward backtest runs on full data; reports split at `OOS_CUTOFF_DATE`
-- Forming candles must be dropped (`fetcher.py:if k.close_time < now_ms`)
-- **Walk-forward train_end_ms = test_start_ms - embargo_ms** (the iter-v3/058 fix; cannot regress)
-
-**v1-only (compared to v2/v3):**
-- 4-role workflow with LightGBM Master advisor (v3 has 3 roles)
-- Phase 4.5 (LM Master pre-design)
-- Phase 6.0 (Critic pre-flight review)
-- Phase 7.4 (LM Master post-mortem)
-- BLOCK-PENDING-FIX verdict semantics
-- Axis Rotation Discipline (mandatory family rotation every 5 SPECIALISTs)
-- HIGH-RISK axis declaration (brief Section 2.5 — mitigation = pre-commit to BUNDLE at next iter; NO seed-count bump at SPECIALIST; ENSEMBLE_SIZE=3 is non-negotiable per [[v1-seed-count-non-negotiable]])
-- Path Forward section mandatory on every Critic BLOCK verdict
+FE and RE are the explicit investment priority of this track — feature engineering and risk
+modeling are where edge is found and protected. The former LightGBM Master advisor is **folded
+into the Feature Engineer** (HP regions, training_days range, trial-stability, feature-importance
+interpretation). There is no standalone LM Master, no Phase 4.5 / 6.0 / 7.4.
 
 ---
 
-## EDA Discipline (revised 2026-06-01)
+## Phase Workflow
 
-**EDA is RESEARCH — it exists to INFORM hypothesis design, not to gate iteration progress.**
-
-User directive 2026-06-01: "EDA shouldn't block an iteration. EDA is research, the time we need to spend to find out new ideas. If we stop here, doesn't make sense."
-
-### What changed
-
-The `NEG-CLEAN-PRE-EDA` verdict and pre-launch ABORT semantics on F4/F5 are RETIRED as of 2026-06-01. Two consecutive aborts at iter-v1/047 and iter-v1/048 (skew_zscore_21 |IC|=0.81; trade_count_zscore_30 |IC|=0.91) produced ZERO learning — just blocked compute. Empirical evidence (run the backtest, see what happens) supersedes a-priori theoretical orthogonality gates. High-IC features may still be useful in regime-specialized contexts; aborting forecloses that learning.
-
-iter-v1/047 and iter-v1/048 are RETROACTIVELY-RECLASSIFIED as `PROCEDURAL-ABORT-DEPRECATED` in the specialist catalog. Their verdicts are kept for historical record; the methodology no longer supports this outcome.
-
-### Required EDA outputs (MANDATORY — artifact discipline preserved)
-
-EDA scripts and outputs are still **required** for Phase 5.5 PASS. The artifact must EXIST; its VALUES are informational:
-
-- `analysis/iteration_v1-NNN/eda.py` (or named equivalently) — committed before Phase 5 brief authoring
-- `analysis/iteration_v1-NNN/eda.csv` — produced by the script; contains at minimum: per-feature ADF p-values, pairwise IC orthogonality matrix, distribution stats (mean, std, skew, kurtosis, % NaN)
-- The script MUST run on IS data ONLY (grep clean for OOS patterns — Check 17 IS-only weight provenance is orthogonal to this; the check here is IS-window discipline in the EDA script itself)
-
-Phase 5.5 BLOCKS on: (a) EDA script does not exist on disk, (b) `eda.csv` is missing, (c) EDA script greps positive for OOS-side patterns (loads or filters on post-`OOS_CUTOFF_DATE` data). Phase 5.5 does NOT block on IC values or ADF p-values regardless of magnitude.
-
-### How EDA values are used (informational only)
-
-- **Brief Section 2** reports EDA values verbatim: "new feature `basis_zscore_30` has |IC|=0.62 with `stat_skew_20` — expect partial substitution in trees; hypothesis accounts for this by targeting LTX-regime specifically where stat_skew is less predictive."
-- **Critic Phase 6.0** may REFERENCE EDA values in `critic_preflight.md` commentary but CANNOT BLOCK on them. Phrasing: "NOTE: |IC|=0.62 with stat_skew_20 — trees may redistribute importance without net Sharpe improvement; monitor feature_importance.csv post-run." Not a BLOCK.
-- **Critic Phase 7.5** Check 4 (IC) and Check 5 (ADF) are INFORMATIONAL. Critic reports values, contextualizes them, but does NOT emit FAIL verdicts on F4/F5 values alone. Backtest evidence supersedes pre-hoc theory.
-- **Phase 8 diary** documents EDA predictions vs actual outcomes (e.g., "predicted partial substitution; observed — feature ranked 8/40, sister feature dropped to rank 22/40; net IS Sharpe +0.12 as hypothesized").
-
-### Remaining BLOCK conditions related to EDA
-
-Only three EDA-related conditions still BLOCK the gate:
-
-1. **EDA script does not exist** — artifact discipline failure (Phase 5.5 BLOCK).
-2. **EDA CSV (`eda.csv`) is missing** — artifact discipline failure (Phase 5.5 BLOCK).
-3. **EDA script loads or filters IN OOS-side data** — IS-honesty violation (Phase 5.5 BLOCK; same as Check 17 provenance logic applied to analysis scripts).
-
-Everything else — IC values, ADF p-values, distribution outliers — is INFORMATIONAL. The iteration proceeds to backtest regardless.
-
----
-
-## Basin-Lottery Vigilance (2026-06-02)
-
-**User directive 2026-06-02:** "everytime you see this basin lottery, i want some actions to be taken. don't let our workflow fail. We need to stay vigilant."
-
-The basin-lottery is the failure mode where Optuna's walk-forward hyperparameter search lands in a high-IS local optimum that is narrow, fragile, and non-reproducible across seeds. The IS Sharpe looks PROMISING; OOS degrades catastrophically. Single-seed SPECIALIST at v1's 3-inner-seed budget is structurally susceptible. Four consecutive near-misses (/050 /054 /055 /057) established the empirical 4/4 lottery rate for single-seed PROMISING verdicts.
-
-This section codifies automatic detection thresholds and mandatory phase-specific responses. **Vigilance is not optional — it is a workflow gate.**
-
-### Detection Thresholds (Lottery Flags)
-
-| Diagnostic | Threshold | Flag Label | Source |
+| # | Phase | Owner | Output |
 |---|---|---|---|
-| Per-seed IS Sharpe spread (max − min across inner seeds) | > 0.50 | `SPREAD-HIGH` | /034 BASIN-LOTTERY confirmed at spread 0.77 |
-| Pairwise outer-seed trade-roster Jaccard similarity (median) | < 0.40 | `JACCARD-LOW` | /056 basin diagnostics; AFML Ch. 4 |
-| Cross-seed hyperparameter Spearman ρ (top-3 Optuna params) | < 0.50 | `PARAM-UNSTABLE` | /056 Critic recommendation |
-| n_effective_trials / n_trials | < 60% | `SEARCH-SATURATED` | /056 had ~3–9 of 18–35 effective (Optuna saturated low) |
-| Single-seed PROMISING with n_outer_seeds = 1 | ALWAYS | `TENTATIVE` | /050 /054 /055 /057 — 4/4 lottery rate |
+| 1 | EDA / data analysis (IS-only) | QR | `analysis/<SYMBOL>/iteration_v1-NNN/eda.py` + tables |
+| 2 | Labeling decision | QR | brief §2 |
+| 4 | Feature construction + selection + ML/HP advisory | FE | `feature_report.md` |
+| 4.7 | Risk calibration + scenario stress | RE | `risk_report.md` |
+| 5 | Research brief synthesis | QR | `research_brief.md` |
+| 5.5 | Brief-completeness gate | QE | `phase5p5_gate.md` (PASS/BLOCK) |
+| 6 | Implementation + walk-forward backtest | QE | `src/` diff, IS+OOS reports, `comparison.csv` |
+| 7 | OOS evaluation | QR | evaluation memo |
+| 7.5 | Results-only adversarial review + improvement proposals | Critic | `review.md` |
+| 8 | Diary + merge decision | QR | `diary-v1/<SYMBOL>/iteration_v1-NNN.md` |
 
-
-**`n_effective_trials`** = rank of the trial-return PCA matrix required to explain ≥ 95% cumulative variance. Reported in `dsr.json` as `n_eff`. If `n_eff / n_trials < 0.60`, Optuna has effectively searched a subspace far smaller than declared — lottery risk elevated regardless of headline IS Sharpe.
-
-### Automatic Actions by Phase
-
-**Phase 4.5 (LM Master pre-design advisory):**
-- Any prior SPECIALIST or BUNDLE in the last 5 iterations where IS Sharpe spread exceeded 0.50 OR Jaccard median fell below 0.40 MUST be flagged in the LM advisor's "Saturation risks to flag" section.
-- If the proposed axis is HIGH-RISK (changes Optuna's training-objective domain), the LM advisor MUST specify a multi-seed validation plan: expected per-seed spread band, recommended n_outer_seeds (minimum 3 for SPECIALIST), expected Jaccard range.
-- LM advisor MUST list the expected per-seed IS Sharpe spread as a pre-registered prediction BEFORE the backtest runs. Format: "Expected per-seed IS Sharpe spread: [low, high]." This is compared against actuals in Phase 7.4.
-
-**Phase 5.5 (Engineer gate):**
-- Brief MUST declare `seeds_config` explicitly in Section 0.5: inner-seed count (3 for SPECIALIST, 10 for BUNDLE) AND whether any outer-seed validation is planned.
-- Single-seed SPECIALISTs (n_outer_seeds = 1) are PERMITTED under the existing `[[v1-seed-count-non-negotiable]]` directive BUT require:
-  1. Brief Section 2.5 HIGH-RISK declaration acknowledging basin-lottery risk explicitly (one sentence: "This single-seed SPECIALIST is susceptible to basin-lottery; result is TENTATIVE pending multi-seed re-validation at next iter if PROMISING.").
-  2. Brief Section 4 pre-registers the multi-seed re-validation condition: "IF verdict is SPECIALIST-PROMISING OR PROMISING-TENTATIVE, next iter MUST be HIGH-RISK BUNDLE at ENSEMBLE_SIZE=10 OR a 3-outer-seed SPECIALIST re-validation before BUNDLE inclusion."
-- Phase 5.5 BLOCKS if: (a) Section 2.5 is missing the basin-lottery acknowledgment on a single-seed SPECIALIST, OR (b) Section 4 is missing the multi-seed re-validation pre-registration. This is NOT a new section requirement — it is an additional required sentence inside existing sections.
-
-**Phase 6.0 (Critic pre-flight):**
-- Critic MUST verify that the `_OUTER_SEED_OFFSETS` monkey-patch (or equivalent multi-seed dispatch) produces disjoint outer seeds when n_outer_seeds ≥ 3: `offset + ENSEMBLE_SIZE ≤ len(ENSEMBLE_SEEDS)` for each offset. A misconfigured seed dispatch that silently re-uses the same inner seeds across "outer" runs is a hidden lottery-amplifier.
-- If n_outer_seeds = 1 (single-seed SPECIALIST), Critic MUST explicitly note: "Single-seed SPECIALIST — result is TENTATIVE pending multi-seed re-validation per brief Section 4 pre-registration." This note appears in `critic_preflight.md` under "Cadence + Axis Sanity" even on OVERALL=PASS.
-
-**Phase 7.5 (Critic adversarial review):**
-Critic MUST compute the following lottery diagnostics from `reports-v1/iteration_v1-NNN/` artifacts. These are MANDATORY computations — not optional checks.
-
-1. **Per-seed IS Sharpe spread** — from `pareto_front.csv` (BUNDLE) or inner-seed logs (SPECIALIST). Report max − min across all inner seeds.
-2. **Trade-roster Jaccard (median pairwise)** — from `in_sample/trades.csv` per-seed subsets. Compute for inner seeds if available; note if un-computable from available artifacts.
-3. **Hyperparameter Spearman ρ** — from Optuna study artifacts or `run.log` trial output. Compute rank correlation of best-trial HP values across seeds for top-3 parameters.
-4. **n_effective_trials / n_trials ratio** — from `dsr.json` (`n_eff / n_trials`).
-
-**Automatic downgrade rules (applied BEFORE verdict tier selection):**
-
-| Flag triggered | Automatic downgrade |
-|---|---|
-| `SPREAD-HIGH` (per-seed IS spread > 0.50) | Verdict downgrades ONE tier: `SPECIALIST-PROMISING` → `PROMISING-TENTATIVE`; `REGIME-SPECIALIST-IS` → `MULTI-SEED-WEAK-BASIN-LOTTERY`; `UNIVERSAL` → `PROMISING-TENTATIVE` |
-| `JACCARD-LOW` (Jaccard median < 0.40) | Flag `BASIN-LOTTERY-INSTABILITY` appended to verdict label (e.g., `SPECIALIST-PROMISING-BASIN-LOTTERY-INSTABILITY`); diary MUST include one-paragraph instability explanation |
-| `TENTATIVE` (single-seed PROMISING, n_outer_seeds = 1) | Verdict is `PROMISING-TENTATIVE`; Rec 3 of Critic review is BINDING: "next iter MUST be multi-seed re-validation at ENSEMBLE_SIZE=10 or 3-outer-seed SPECIALIST before BUNDLE inclusion" |
-| `SEARCH-SATURATED` (n_eff / n_trials < 60%) | Flag `SEARCH-SATURATED` appended to verdict label; diary MUST include recommendation: n_trials increase OR HP-space narrowing in next iter |
-
-Downgrades compound: a `SPREAD-HIGH` + `TENTATIVE` PROMISING becomes `PROMISING-TENTATIVE` (not further downgraded — the tiers are already aligned). A `SPREAD-HIGH` + `JACCARD-LOW` on `REGIME-SPECIALIST-IS` becomes `MULTI-SEED-WEAK-BASIN-LOTTERY-BASIN-LOTTERY-INSTABILITY`.
-
-**Phase 8 (Diary + roster):**
-- Diary MUST include a "Basin-Lottery Audit" subsection in the "What Worked / What Failed" block:
-  - Per-seed IS Sharpe spread (reported or "un-computable — single seed")
-  - Jaccard median (reported or "un-computable — insufficient outer seeds")
-  - Hyperparameter Spearman ρ (reported or "un-computable")
-  - n_eff / n_trials ratio (from dsr.json)
-  - Any lottery flags triggered + downgrade applied
-- Specialist catalog row MUST include per-seed-spread and Jaccard columns: `| iter-v1-NNN | date | axis | family | IS Sharpe Δ | OOS Sharpe | verdict | basin_lottery_flags | per_seed_spread | jaccard_median | bundle candidate? |`
-
-### BUNDLE-ASSEMBLY Promotion Rule (Basin-Lottery Tightened)
-
-A component is eligible for BUNDLE-ASSEMBLY inclusion if and only if ALL of the following pass:
-
-1. **Multi-seed mean IS Sharpe Δ ≥ +0.20** (PARTIAL-band or better) vs BASELINE_V1 anchor.
-2. **Max–min seed spread ≤ 0.50** (`SPREAD-HIGH` flag is disqualifying — component must undergo multi-seed re-validation first).
-3. **Per-seed trade-roster Jaccard median ≥ 0.40** (`JACCARD-LOW` flag is disqualifying without multi-seed re-validation).
-4. **OOS n_trades ≥ 50 per single-symbol specialist** (TIGHTENED from legacy ≥ 10; see "Trade-Rate Floor Tightened" below). Specialists with OOS 30–50 trades require 7-outer-seed multi-seed validation OR fall back to BASELINE_V1 anchor.
-5. **Importance rank stable (top-15 across ≥ 2 of 3 inner seeds)** — verifiable from per-seed `feature_importance.csv` artifacts.
-
-A `PROMISING-TENTATIVE` verdict (single-seed, no multi-seed re-validation yet) does NOT qualify for BUNDLE inclusion. The component must first complete a 3-outer-seed or ENSEMBLE_SIZE=10 re-validation and produce a verdict of `SPECIALIST-PROMISING` (no TENTATIVE tag) before bundle eligibility.
-
-### Trade-Rate Floor Tightened (2026-06-02)
-
-Per the /056//057 forensic, OOS trade-count floors for per-single-symbol specialists are tightened:
-
-- **OOS n_trades ≥ 50** per single-symbol specialist (was ≥ 10 per project-level gate, ≥ 130 at bundle level).
-- Specialists with OOS 30–50 trades are PROVISIONAL: eligible only with 7-outer-seed multi-seed validation confirming mean IS Sharpe Δ > +0.20 AND spread ≤ 0.50.
-- Specialists with OOS < 30 trades are INELIGIBLE for bundle inclusion regardless of multi-seed results. Low-trade-count Sharpe is structurally unreliable.
-- The bundle-level trade-rate floor (≥ 130 OOS total across all components) is UNCHANGED.
-
-These tightened floors are EFFECTIVE from 2026-06-02 onward. Prior SPECIALIST verdicts are NOT retroactively re-evaluated — but any component proposed for a BUNDLE after this date is evaluated under the new floors.
-
-### Workflow-Failure Prevention (from /056 lesson)
-
-Three mechanical safeguards against aggregator crash and wall-clock runaway:
-
-1. **Per-iteration-label outputs MUST persist to per-component subdirs BEFORE the next sub-run starts.** In multi-component BUNDLE-ASSEMBLY runs, Component B's sub-run MUST NOT begin until Component A's reports are written to `reports-v1/iteration_v1-NNN/C_A/in_sample/` etc. The QE runner MUST validate artifact presence between sub-runs. An aggregator that reads a per-component subdir before it exists will crash and produce a half-computed `comparison.csv` — exactly the /056 `C1_BTC/in_sample/` missing-dir crash.
-2. **Aggregator validates component report presence BEFORE attempting concatenation.** The final aggregation step MUST `assert all(Path(f).exists() for f in expected_component_files)` before pandas concat. If any component artifact is missing → aggregator emits a clear error ("Component A in_sample/trades.csv not found — check sub-run log") and exits with non-zero status, preserving the partial artifacts for diagnosis.
-3. **Wall-clock cap monitoring.** If any sub-run exceeds 2× the brief Section 3.6 estimated wall-clock for that component, the QE or orchestrator MUST report status before continuing. Format: "Sub-run for Component A exceeded 2× estimate (estimated 45 min, elapsed 92 min). Proceeding — no kill-switch per 2026-05-30 directive. Adjust next-iter estimate." This is a reporting requirement, NOT a kill-switch.
-
-### Architecture Pivot (2026-06-02): Pool+Route Mandatory for Cycle-7
-
-**User directive 2026-06-02** (confirmed after LM Master deep-dive, Option 1): cycle-7 SPECIALISTs adopt the **Pool+Route** architecture, eliminating the basin-lottery mechanically rather than via vigilance alone.
-
-**Why the pivot is necessary:** 5/5 cycle-6/7 single-symbol PROMISING tags (DOT/050, BTC/054, ETH/055, LTC/057, BTC/058) were BASIN-LOTTERY. LM Master diagnosis: "5/5 lottery isn't an ML problem you can tune away; it's a sample-size problem you can only architect away." Root cause: single-symbol N≈50 OOS trades → σ_SR ≈ 0.14 per path / ≈ 0.35 per seed with Optuna selection noise. Multi-seed spreads structurally exceed the 0.30 BASIN-LOTTERY threshold.
-
-**Mechanism (Pool+Route architecture):**
-
-- Train ONE LightGBM head on the 5-coin pool — same architecture as the /045 baseline: `V1_BASELINE_UNIVERSE = ("BTCUSDT", "ETHUSDT", "DOTUSDT", "LINKUSDT", "LTCUSDT")`.
-- Per-symbol features are kept as **routed inputs**: a new feature is computed for ONE target symbol and NaN-filled for all other rows — the existing pattern established at /050 (`dot_vs_btc_ret_ratio_30`) and /055 (`eth_vs_btc_ret_ratio_30`) in `cross_btc_v1.py`.
-- The runner mirrors the /045 pool architecture (no per-symbol dispatch branches). Each SPECIALIST proposes ONE new routed feature for ONE target symbol.
-
-**Statistical justification:** pool OOS N≈250 trades → σ_SR ≈ 0.06 per path / ≈ 0.12 per seed. Multi-seed spreads fall mechanically below the 0.30 BASIN-LOTTERY threshold. The 3× sample increase is the only reliable fix.
-
-**What is preserved:** feature engineering as the MODAL research axis; per-symbol research direction (each iter proposes one new per-symbol feature); LightGBM head; multi-seed validation discipline.
-
-**What changes:** model HEAD count (N=5 single-symbol heads → N=1 pool head); SPECIALIST compute cost (~0.4× — pool amortizes Optuna across 5 symbols).
-
-**Cycle accounting and catalog treatment:**
-- /059+ are Pool+Route SPECIALISTs.
-- Single-symbol cohort iters /050–/058 remain in `briefs-v1/specialist_catalog.md` as historical records and form the inventory of per-symbol routed features to test on the pool head.
-- Axis-family rotation discipline RESUMES at cycle-7 (suspended during cycle-6 per-symbol mandate).
-
-**Brief Section 3 requirement for every Pool+Route SPECIALIST:** identify the target symbol, the new routed feature formula, and confirm `cohort = V1_BASELINE_UNIVERSE (5 coins)`. Runner validation: assert no per-symbol dispatch branch exists; assert the new feature column is NaN for all non-target symbols in the training frame.
-
-**Pre-commit escalation checkpoint:** if /059–/068 (10 iters) fail to produce ≥ 2 PROMISING under Pool+Route, escalate to a mandate-refinement conversation before /069. This checkpoint is pre-registered to prevent silent continuation on a structurally unviable architecture.
-
-**Single-symbol cohort SPECIALISTs are RETIRED for cycle-7 onward.** The user mandate "per-symbol regime-specialist discovery" is reframed as "per-symbol routed feature discovery on a pool head." Regime-specialist BUNDLEs remain valid; what changes is how each specialist's edge is discovered.
+Autopilot: run the full flow end-to-end without pausing between phases. Only stop on a genuine
+blocker (ambiguous brief the QR can't resolve, an error, or a decision needing the user).
 
 ---
 
-## Before You Start
+## Cadence — exploration vs confirmation (and NOTHING else)
 
-Read these files in order, EVERY time this skill is triggered:
+There are exactly two iteration modes. No axis-rotation rules, no HIGH-RISK declarations, no
+10:1 ratios, no verdict zoo. Just:
 
-1. **`ITERATION_PLAN_8H_V1.md`** at the repo root — the v1 workflow doc
-2. **`BASELINE_V1.md`** at the repo root — current v1 baseline metrics (corrected walk-forward), hard constraints, V1_EXCLUDED_SYMBOLS
-3. **The last 3 entries in `diary-v1/`** — what's recently been tried; "Next Iteration Ideas" from the last diary often seeds the next iteration
-4. **This skill file** (`.claude/commands/quant-iteration-v1.md`) — the workflow definition
-5. **`/home/roberto/.claude/projects/-home-roberto-crypto-trade/memory/MEMORY.md`** — active decisions and feedback rules
-6. **`briefs-v1/specialist_catalog.md`** — SPECIALIST ledger (for axis rotation tracking)
+- **EXPLORATION** (`--exploration`): quick iteration, **3 seeds**. Goal = screen one focused
+  hypothesis (a feature, an HP region, a risk knob) for signal-vs-noise. Fast turnaround. An
+  exploration NEVER updates the baseline.
+- **CONFIRMATION** (`--confirmation`): **20 seeds**. Goal = isolate lottery bias and decide the
+  merge. Runs the candidate across 20 independent seeds and reports per-seed Sharpe dispersion
+  (mean, σ, % profitable) plus the `basin_diagnostics` summary. Only a confirmation can update
+  the baseline.
 
-### Default Flow: Full Autopilot
-
-When this skill is triggered, **do NOT ask which role to play or whether to proceed**. Default behavior:
-
-1. Read the last v1 diary's "Next Iteration Ideas" and `BASELINE_V1.md`
-2. Determine the next iteration number (next iter-v1/NNN)
-3. Run the full flow:
-   - QR Phases 1–4 (research design through feature selection) — uses `quant-researcher` agent
-   - **Phase 4.5 — LightGBM Master pre-design advisory** — uses `lightgbm-master` agent (read-only); emits `lgbm_advisor.md`
-   - QR Phase 5 (research brief authoring) — `quant-researcher` agent; integrates LM Master recommendations
-   - **Phase 5.5 Gate** — `quant-engineer` agent verifies brief completeness; PASS or BLOCK
-   - **Phase 6.0 — Critic pre-flight review** — `quant-critic` agent; reviews brief + src/ diff; PASS or BLOCK
-   - QE Phase 6 (implementation + backtest) — `quant-engineer` agent
-   - **Phase 7.4 — LightGBM Master post-mortem** — `lightgbm-master` agent; appends to `lgbm_advisor.md`
-   - **Phase 7.5 Critic Review** — `quant-critic` agent; emits `review.md`; OVERALL=SPECIALIST-PROMISING / SPECIALIST-NEGATIVE / BUNDLE-MERGE / BLOCK-PENDING-FIX / BLOCK-FINAL
-   - If `BLOCK-PENDING-FIX`: QR/QE addresses single defect, re-runs Phase 6, returns to Phase 7.5 ONCE; next verdict must be PASS or BLOCK-FINAL
-   - QR Phase 7 (OOS evaluation) — `quant-researcher` agent
-   - QR Phase 8 (diary + merge decision) — `quant-researcher` agent
-4. Commit/tag per the v1 git workflow
-5. After completing Phase 8, **immediately start the next iteration** — go back to step 1
-6. Keep looping iterations until the user intervenes or context runs out
-7. Only pause if there's an actual blocker (ambiguous brief that the QR can't resolve, unexpected error, decision that genuinely requires user input)
-
-The user can override by specifying a role ("be the QR for iter-v1/003"), a phase ("run Phase 6.0"), or a track ("/quant-iteration-v3 instead"). Otherwise, go.
+**Lottery-bias isolation (confirmation):** report cross-seed OOS Sharpe mean > 0, the fraction of
+the 20 seeds that are profitable, and the cross-seed σ against the basin band (PASS < 0.30,
+FAIL > 0.60). A candidate whose edge is a single-seed artifact does not merge.
 
 ---
 
-## NO CHEATING — ABSOLUTE RULES
+## Baseline bootstrap + Merge Gate (NEW — relative, no absolute floors)
 
-**NEVER** do any of the following to improve metrics artificially:
+**Start from scratch.** There is no inherited v1 baseline for the redesign. The **first run for a
+symbol is a CONFIRMATION** that *establishes* `BASELINE_V1_<SYMBOL>.md` (it has no predecessor to
+beat — it simply sets the bar).
 
-- **NEVER change `start_time`** to skip bad IS months. The backtest MUST run from the earliest available data. Trimming the evaluation window is CHEATING — it hides losses instead of fixing the strategy.
-- **NEVER cherry-pick date ranges** to make IS or OOS look better.
-- **NEVER post-hoc filter trades** from the results to improve metrics.
-- **NEVER tune parameters on OOS data** (the researcher sees OOS only in Phase 7).
-- **NEVER allow labels to leak across CV fold boundaries.** The `gap` parameter MUST be set correctly: `gap = (timeout_candles + 1) × n_symbols`. The QE MUST verify this in EVERY iteration. This is non-negotiable.
-- **NEVER allow labels to leak from live/prediction data to training data.** Each month's model trains ONLY on past klines. Labels for training samples must not scan past the training window boundary. **`train_end_ms = test_start_ms - embargo_ms` is law — anything else is the iter-v3/057-style bug.**
-- **NEVER skip the Phase 5.5 gate.** The Engineer's gate file (`phase5p5_gate.md`) must exist with OVERALL=PASS before Phase 6.0 starts.
-- **NEVER skip the Phase 6.0 pre-flight.** The Critic's pre-flight file (`critic_preflight.md`) must exist with OVERALL=PASS before Phase 6 backtest launches.
-- **NEVER merge without `OVERALL=BUNDLE-MERGE` from the Critic.** Phase 7.5's `review.md` is a hard gate. OVERALL=BLOCK-FINAL means NO-MERGE regardless of headline metrics.
-- **NEVER rerun the Critic on a "let me fix one thing" basis AFTER a BLOCK-FINAL verdict.** The single BLOCK-PENDING-FIX rerun is the ONLY allowed retry; after it produces a verdict, that verdict is final (no further recursion).
-- **NEVER include a v2 or v3 symbol in v1's universe.** `V1_EXCLUDED_SYMBOLS` is enforced at runtime by the runner.
-- **NEVER import from `crypto_trade.features_v2` (v2) or `crypto_trade.features_v3` (v3) in v1 code.** Track isolation is structural.
-- **NEVER bypass the LightGBM Master advisory.** Phase 4.5 must produce `lgbm_advisor.md` before Phase 5 brief authoring; Phase 7.4 must produce the post-mortem before Phase 7.5 Critic review. LM Master's recommendations are advisory (QR can ignore) but the artifact MUST exist.
+**Merge gate (every confirmation after the first):** a candidate MERGES iff it is **better than
+the symbol's current baseline** AND the methodology is intact. There are **no absolute Sharpe
+floors** — the old "IS Sharpe > 1.0 AND OOS Sharpe > 1.0" rule is RETIRED for v1.
 
-To improve IS Sharpe: improve the STRATEGY (features, model, labeling) — not the measurement window. A strategy that only works from 2023 onward is NOT robust.
+"Better than baseline" means, judged net of costs on the confirmation run:
+- OOS performance improves over the current baseline (primary: OOS monthly Sharpe; corroborated by
+  OOS net PnL / profit factor), AND
+- no material regression on IS, AND
+- the lottery-bias check holds (cross-seed mean > 0, majority of 20 seeds profitable, σ in band).
 
----
-
-## Walk-Forward Semantics — CRITICAL READ
-
-```
-OOS_CUTOFF_DATE = 2025-03-24    ← FIXED. NEVER CHANGES. NOT NEGOTIABLE.
-training_months = 24             ← FIXED. NEVER CHANGES.
-```
-
-**This is a WALK-FORWARD framework — not a classical train/test split.**
-
-Every calendar month, for every `(model, symbol)` cell, the system:
-1. Trains a fresh LightGBM on the past `training_months = 24` months of klines + features
-2. Predicts the upcoming month's signals
-3. Trades them through the risk gates
-4. Slides the window forward by one month and repeats
-
-The walk-forward harness (`walk_forward.py:113`) carries the embargo: `train_end_ms = test_start_ms - embargo_ms`. The embargo is applied at EVERY month boundary — IS-internal AND OOS-internal. It is the structural defense against label-horizon leakage.
-
-**Both IS (pre-2025-03-24) and OOS (post-2025-03-24) undergo the SAME monthly train-predict cycle.** OOS is NOT a held-out test set in the classical sense.
-
-### What the IS/OOS split actually means
-
-- **IS = the researcher's research data.** It is what the QR reads, analyzes, EDAs, designs against. It is NOT a single training set — each IS month's prediction comes from a model retrained on the prior 24 months. The walk-forward refits ~60+ times across IS.
-- **OOS = the researcher-honesty window.** QR may NOT look at OOS during Phases 1–5. Purpose: prevent the QR from unconsciously tuning features/labels/params to fit recent patterns the QR has seen.
-- **The walk-forward + embargo prevents MODEL leakage.** The IS/OOS boundary prevents RESEARCHER leakage. Two different defenses, two different failure modes.
-- **Reports split at `OOS_CUTOFF_DATE`** into `in_sample/` and `out_of_sample/` for accounting clarity — the model crosses no wall there.
-- **QR sees OOS results for the FIRST time in Phase 7.**
-
-### The end goal — a regime-ensemble bundle
-
-v1's mission is **NOT to build a single universal model.** It is to build a *bundle* of complementary models, each strong in different market regimes (bull, alt-rotation, chop, bear, vol-spike, liquidation-cascade, ETF-flow, etc.). The bundle's composite OOS — averaged across regime contributors — is what trades live.
-
-Critical verdict implications:
-
-- **An IS-strong / OOS-modest model is NOT inherently overfit.** IS spans ~5 years and ~6 regimes; OOS spans ~7 months and 1–2 regimes. A model that crushed bull-2020 + alt-2021 + chop-2023 (all IS) but only matched the recovery of 2025-Q2-Q3 (OOS) is a **regime specialist** — a bundle candidate.
-- **`OOS/IS Sharpe ≥ 0.5` is a UNIVERSAL-MODEL / BUNDLE-level gate, NOT a component-SPECIALIST gate.** It is retained for full-bundle BUNDLEs (where you ARE claiming a unified regime-free predictor). It is RELAXED for individual SPECIALIST component candidates — replaced by regime-attribution analysis (Phase 7.4 LM Master mandatory Regime Attribution Table; Phase 7.5 Critic Check 3c).
-
-### The IS/OOS gap — what it tells you
-
-| Pattern | Interpretation |
-|---|---|
-| IS strong + OOS strong, both regimes match | UNIVERSAL contributor (rare; anchor candidate) |
-| IS strong + OOS weak, regime mix differs | REGIME-SPECIALIST-IS — bundle candidate if attribution shows clean within-regime edge |
-| IS weak + OOS strong | REGIME-SPECIALIST-OOS — bundle candidate if OOS regime historically recurring |
-| IS weak + OOS weak | TRUE-NEG — dead-paths catalog |
-| Drawdown reduced without Sharpe lift | TAIL-CONTROL — evaluated on regime tail metrics, not Sharpe |
-| Look-ahead bias detected (gap=0, embargo violated) | WALK-FORWARD-LEAKAGE — BLOCK; methodology integrity failure |
-
-The IS-OOS gap is a *regime-mix signal*, not a generalization signal. To distinguish regime mismatch from true researcher overfit, run regime-attributed PnL analysis on both IS and OOS — if within-regime Sharpes match, it's regime mix; if within-regime Sharpes don't match, the QR may have snooped.
-
-**The single most load-bearing sentence in this skill:**
-
-> **The walk-forward is the leakage defense; the IS/OOS split is the researcher-honesty defense; the bundle is the product.**
-
-These constants live in `src/crypto_trade/config.py`.
+DSR / PBO / PSR / ADF / IC are **informational context** the Critic weighs — not pass/fail floors.
+Methodology integrity (no look-ahead, embargo intact, IS-only design, single-symbol, honest costs,
+training_days consistent) is the only HARD gate. A methodology violation is an automatic NO-MERGE
+regardless of headline numbers.
 
 ---
 
-## Merge Principle — Relative Regime Pareto-Dominance (2026-05-31)
+## The Critic — results-only, stage-aware, always-constructive
 
-**MERGE-PRINCIPLE (canonical, one sentence):**
+The Critic reviews **only the backtest RESULTS** (the produced reports: comparison.csv, trades,
+per-seed dispersion, feature importance, regime breakdown). It does NOT pre-review the brief or
+the `src/` diff (no Phase 6.0). Its review is **stage-aware**:
 
-> A candidate bundle becomes the new BASELINE_V1 if and only if, under every tagged regime, the candidate is Pareto-better-or-equal to the current baseline on the bundle metric vector (within one baseline-seed-σ tolerance), AND strictly better in at least one regime, AND methodology integrity is intact.
+- At **EXPLORATION**, the goal is a fast screen. The Critic judges whether the hypothesis showed
+  signal worth confirming (PROMISING) or not (NEGATIVE) — it does NOT apply the merge gate.
+- At **CONFIRMATION**, the Critic applies the merge gate above (better-than-baseline + lottery-bias
+  + methodology) and returns MERGE or NO-MERGE.
 
-Three load-bearing words:
+**Every Critic review — PASS or FAIL, exploration or confirmation — MUST end with a "Proposed
+Backtest Changes" section: 2–3 concrete, runnable backtest modifications** (e.g. "re-run with
+`--slippage-bps 4` to test cost-robustness", "widen training_days lower bound", "add R2 drawdown
+scaling at trigger 8%", "drop INERT feature X and re-screen"). The Critic's job is not only to
+catch problems but to push the next experiment forward.
 
-- **Pareto.** No regime is allowed to regress materially (> 1σ_R below baseline). Cross-regime trade-offs ("we lost chop, but gained bull") are NOT acceptable. The candidate must DOMINATE the baseline on the per-regime surface — not re-shuffle edge.
-- **Regime.** Comparison is always within-regime (bull / alt-rotation / chop / bear / vol-spike / liquidation-cascade / ETF-flow / recovery / …). Aggregated OOS-Sharpe-vs-OOS-Sharpe hides regime-mix effects when IS regime mix differs from OOS regime mix.
-- **Relative.** No absolute Sharpe / DSR / PBO / PSR floors. Every edge metric is compared against the corresponding metric on the current baseline, with tolerance scaled to the baseline's own seed-to-seed noise on that regime. Numbers remain only where they enforce methodology integrity.
-
-Three corollaries:
-
-1. **The bundle is the product.** Components are evaluated as bundle contributors; MERGE evaluation lives at the bundle level.
-2. **OOS is one regime realization, not a generalization oracle.** A candidate that ties baseline on every IS-tagged regime AND ties baseline on the OOS-tagged regime is a MERGE candidate even if headline OOS Sharpe is unchanged.
-3. **Statistical-significance metrics inform; they do not gate.** DSR / PBO / PSR are reported per-regime AND bundle-level. They do NOT auto-trigger BLOCK.
-
-### Methodology Gates (HARD; PRESERVED)
-
-The only absolute pass/fail gates — they enforce INTEGRITY, not EDGE:
-
-- **No look-ahead** (Critic Check 1)
-- **Embargo applied** at every walk-forward fold boundary (Critic Check 2)
-- **CV gap correct** = `(timeout_candles + 1) × n_symbols`
-- **Reproducibility checksum match** — same flags + HEAD → same outputs (Critic Check 7)
-- **No OOS tuning** — researcher discipline (Critic Check 8)
-- **Feature-column pinning** — V1_FEATURE_COLUMNS_PRUNED enforced
-- **Forming-candle drop** — `fetcher.py: if k.close_time < now_ms`
-- **ADF stationarity** — INFORMATIONAL only (Critic Check 5 is now informational per 2026-06-01 revision; see "EDA Discipline" section below). Not a hard methodology gate.
-- **Backtest-Live Parity** — bundle composition method must produce IDENTICAL trade decisions in backtest and at `live/engine.py:_tick`, using only same-time-snapshot per-component signals + each component's own internal sizing weight (Critic Check 15 — BUNDLE-ASSEMBLY only)
-- **No Coin Overlap Across Bundle Components** — in a bundle, each coin is owned by EXACTLY ONE component (universe partition is pairwise-disjoint) (Critic Check 16 — BUNDLE-ASSEMBLY only)
-- **IS-Only Weight Calibration** — bundle weights derived from IS-window data only by a committed `analysis/iteration_v1-NNN/weight_calibration.py`; weights pre-registered in brief Section 11 BEFORE Phase 6 launches; no OOS metric appears in the derivation chain (Critic Check 17 — BUNDLE-ASSEMBLY only)
-
-These are non-negotiable. The "no specific numbers" directive applies to EDGE metrics, NOT INTEGRITY metrics.
-
-### Operational Artifacts (one-time + per-iteration)
-
-- `briefs-v1/_meta/baseline_metric_anchors.csv` — bundle-level DSR/PBO/PSR/Sharpe/MaxDD for current BASELINE_V1.
-- `briefs-v1/_meta/baseline_seed_regime_matrix.csv` — per-regime per-seed Sharpe / max_dd / trade_count for the current baseline (10 seeds × N regimes). Used to compute σ_R and σ_dd_R tolerance bands.
-- `briefs-v1/_meta/regime_catalog.md` — canonical regime tag definitions.
-- `reports-v1/iteration_v1-NNN/regime_attribution.csv` — per-iteration deliverable; schema: `regime_tag, in_sample, candidate_sharpe, candidate_max_dd, candidate_trade_count, baseline_sharpe, baseline_max_dd, baseline_trade_count`.
-
-Each MERGE updates the baseline anchor files; the next candidate must clear the new bar. By design (Pareto monotonicity): the framework has no upper edge ceiling.
-
-Full elaboration in `briefs-v1/_meta/merge_v1_relative_regime_pareto_proposal.md`.
+The Critic still runs the methodology audit on results: look-ahead/embargo evidence, CV gap,
+reproducibility (feature_columns pinned, seeds fixed), hypothesis-implementation alignment, and
+the Anti-Pattern static scan over foundation code (`walk_forward`, labeling, `optimization`,
+`lgbm._train_for_month`). A methodology violation found in results → NO-MERGE.
 
 ---
 
-## Four Roles
+## NO CHEATING — absolute rules
 
-You operate as ONE of four roles for each phase. In autopilot mode (default), you switch roles automatically — no need to ask.
+- NEVER change `start_time` to skip bad IS months. The backtest runs from earliest data.
+- NEVER cherry-pick date ranges, post-hoc filter trades, or tune parameters on OOS.
+- NEVER let labels leak across CV folds: `gap = (timeout_candles + 1) * n_symbols` (n_symbols=1).
+- NEVER let labels leak from the future: `train_end_ms = test_start_ms - embargo_ms` is law.
+- NEVER reintroduce full-window training. `training_days` is searched and applied consistently.
+- NEVER merge without a CONFIRMATION run and a Critic MERGE verdict.
+- NEVER trust an offline trade-subtraction/addition projection to estimate an entry-gate effect —
+  the v1 position model is sequential; suppressing an entry frees the slot and cascades later
+  trades. Only a real backtest with the rule wired in is the verdict.
+- NEVER include a v2/v3 symbol (`V1_EXCLUDED_SYMBOLS`). NEVER import from `features_v2`/`features_v3`.
 
-| Role | Phases | Agent | Tools | Model |
-|---|---|---|---|---|
-| **Quant Researcher (QR)** | 1, 2, 3, 4, 5, 7, 8 | `quant-researcher` | Read, Glob, Grep, Bash, WebFetch, WebSearch, NotebookRead, NotebookEdit, Edit, Write, TodoWrite | opus |
-| **LightGBM Master (LM)** | **4.5, 7.4 (NEW)** | `lightgbm-master` | **Read, Glob, Grep, Bash (read-only)** | opus |
-| **Quant Engineer (QE)** | 5.5 (gate), 6 | `quant-engineer` | Read, Glob, Grep, Bash, Edit, Write, TodoWrite | sonnet |
-| **Quant Critic** | **6.0 (pre-flight, NEW), 7.5 (adversarial)** | `quant-critic` | **Read, Glob, Grep ONLY** (read-only by structural design) | opus |
-
-### Quant Researcher (QR)
-- **Owns:** data analysis (Phase 1), labeling decisions (Phase 2), symbol selection (Phase 3), feature design (Phase 4), research brief authoring (Phase 5), OOS evaluation (Phase 7), diary + merge decision (Phase 8)
-- **Produces:** research briefs, diary entries, evaluation memos
-- **Does NOT:** write production code in `src/`. Uses notebooks (`notebooks/`) and analysis scripts (`analysis/iteration_v1-NNN/*.py`) only.
-- **Data access:** IS data only during Phases 1–5; sees OOS reports only in Phase 7.
-
-### LightGBM Master (LM)
-- **Owns:** Phase 4.5 (pre-design hyperparameter + feature recommendations), Phase 7.4 (post-backtest interpretation: feature-importance triage, hyperparameter instability flags, next-iter tuning ideas)
-- **Produces:** `lgbm_advisor.md` (Phase 4.5 initial; Phase 7.4 appended or new section)
-- **Does NOT:** edit src/ code, BLOCK iterations, make merge decisions, override the QR's hypothesis
-- **Authority:** ADVISORY ONLY — QR can adopt, modify, or explicitly reject recommendations
-- **Data access:** IS data only in Phase 4.5; reports (including OOS) in Phase 7.4
-
-### Quant Engineer (QE)
-- **Owns:** Phase 5.5 gate verification (refuses incomplete briefs), production Python code (`src/`), pipeline architecture, backtest engine, report generation, library installs
-- **Produces:** `src/` implementation, `phase5p5_gate.md`, engineering reports, backtest reports (IS + OOS report batches), `comparison.csv`, companion files
-- **Does NOT:** make research decisions. If the brief is ambiguous, BLOCKs at Phase 5.5 and returns to QR.
-- **Backtest:** runs walk-forward / CPCV on full dataset; reports split at `OOS_CUTOFF_DATE`.
-
-### Quant Critic
-- **Owns:** Phase 6.0 (pre-flight review of brief + src/ diff), Phase 7.5 adversarial review of every iteration before merge
-- **Produces:** `critic_preflight.md` (Phase 6.0: PASS or BLOCK), `review.md` (Phase 7.5: full 8 checks + OVERALL verdict)
-- **Does NOT:** write code, briefs, or diaries. Cannot rerun backtests (read-only tools). Cannot negotiate verdict.
-- **Verdict authority:** BLOCK-FINAL is non-negotiable. BLOCK-PENDING-FIX grants one rerun chance; PASS proceeds. **Path Forward section MANDATORY on every BLOCK verdict.**
-- **Adversarial mindset by structure:** the Critic's job is to find reasons NOT to merge. "When in doubt, FAIL."
-
-The four-role separation is v1's primary defense against the QR-implementing-and-self-reviewing failure mode AND the v3 cycle-7 "no creator role" failure mode. An engineer who just wrote the code is biased toward finding it correct; a separate Critic with fresh context catches errors that destroy strategies. AND a separate LightGBM Master with no role evaluative pressure can propose hyperparameters / features the QR + Critic loop would never generate.
-
-### Critic Scope — What the Critic IS and IS NOT
-
-**Critic's mandate (what the Critic checks):**
-- **Anti-cheating**: no OOS tuning, no IS window trimming, brief Section 2 EDA ran on IS data only
-- **Anti-look-ahead**: `walk_forward.py:113` carries `train_end_ms = test_start_ms - embargo_ms`, labels do not scan past training window boundary, no future data in feature construction
-- **Anti-seed-fragility**: result is reproducible with same seed; Optuna seed sourcing is correct
-- **Anti-methodology-mistake**: correct CV gap, correct training_months, correct atr_column for parquet, correct embargo applied, correct CPCV paths count
-
-**Critic's mandate does NOT include:**
-- Comparing trade-roster overlap between this iteration and the baseline — iterations use different configurations BY DESIGN (different features, labeling, weights, symbols, etc.). Different trades vs baseline is EXPECTED and correct.
-- Demanding that all iterations produce similar trade rosters to the baseline
-- Requiring frozen-HP ablation runs for every PROMISING headline
-- Comparing to baseline via V3-style Jaccard trade-roster metrics
-
-**The comparison metric is always OOS Sharpe / PnL / drawdown vs the BASELINE_V1 anchor**, not trade-roster similarity. Basin migration concern belongs in the LM Master post-mortem as informational context; it is NOT a Critic gate criterion.
+To improve a result: improve the STRATEGY (features, labeling, model, risk) — not the measurement.
 
 ---
 
-## Sacred Constants
+## Filesystem map (per-symbol; symbol attached to EVERYTHING)
 
 ```
-OOS_CUTOFF_DATE = 2025-03-24
-training_months = 24
-V1_EXCLUDED_SYMBOLS = ("SOLUSDT", "XRPUSDT", "DOGEUSDT", "NEARUSDT",
-                       "BCHUSDT", "LDOUSDT", "TRXUSDT", "BNBUSDT")
-V1_EXPLORATION_ENSEMBLE_SIZE = 3  # inner seeds for SPECIALIST (legacy constant name; runtime contract preserved)
-V1_CONFIRMATION_ENSEMBLE_SIZE = 10  # inner seeds for BUNDLE (legacy constant name; runtime contract preserved)
-ENSEMBLE_SEEDS = (42, 123, 456, 789, 1001, 2002, 3003, 4004, 5005, 6006)
-                  # first 3 for SPECIALIST, all 10 for BUNDLE
-V1_OUTER_SEEDS_VALIDATION_ONLY = True
-# LIVE-TRADING CONTRACT (IMMUTABLE, established framework/032+):
-# Multi-outer-seed statistical validation (--seeds N) produces STATISTICAL
-# VALIDATION artifacts only. The live engine ALWAYS runs single-outer-seed=42
-# (inner-ensemble-averaged predictions). Live ONLY reads seed_42/ reports.
-# Multi-outer-seed reports (seed_offset5/, etc.) are NEVER read by the live engine.
-# Any change to this contract REQUIRES explicit user directive + diary entry.
+reports-v1/<SYMBOL>/iteration_v1-NNN/{in_sample,out_of_sample}/...   # runner-generated
+reports-v1/<SYMBOL>/iteration_v1-NNN/comparison.csv
+briefs-v1/<SYMBOL>/iteration_v1-NNN/feature_report.md               # FE
+briefs-v1/<SYMBOL>/iteration_v1-NNN/risk_report.md                  # RE
+briefs-v1/<SYMBOL>/iteration_v1-NNN/research_brief.md               # QR
+briefs-v1/<SYMBOL>/iteration_v1-NNN/phase5p5_gate.md                # QE
+briefs-v1/<SYMBOL>/iteration_v1-NNN/review.md                       # Critic
+diary-v1/<SYMBOL>/iteration_v1-NNN.md                               # QR
+analysis/<SYMBOL>/iteration_v1-NNN/*.py                             # committed IS-only scripts
+BASELINE_V1_<SYMBOL>.md                                             # per-symbol baseline
 ```
 
-Plus the v1 statistical anchors (mirroring v3 — **INFORMATIONAL, NOT auto-BLOCK** per merge-criteria reframe 2026-05-31):
-
-```
-DSR_threshold = 0.95     # Deflated Sharpe Ratio — REFERENCE; below → diary justification required
-PBO_threshold = 0.40     # Probability of Backtest Overfitting (LOWER is better) — REFERENCE
-PSR_threshold = 0.95     # Probabilistic Sharpe Ratio — REFERENCE
-IC_threshold  = 0.70     # |IC_pearson| between feature families (LOWER is better) — INFORMATIONAL (revised 2026-06-01)
-ADF_threshold = 0.05     # ADF p-value (LOWER is better — rejects unit root) — INFORMATIONAL (revised 2026-06-01)
-```
-
-These are **REFERENCE ANCHORS** for diary reporting and significance audit. A candidate bundle that fails any of these thresholds is NOT automatically blocked — the merge gate is per-regime Pareto-dominance vs the current BASELINE_V1 (see "Merge Principle — Relative Regime Pareto-Dominance" below). DSR/PBO/PSR regressions below threshold require diary justification (e.g., "candidate's DSR is 0.92 below 0.95 reference, but candidate Pareto-dominates baseline across all 5 tagged regimes — significance reduction attributable to bundle's lower trade variance from regime-conditional dispatch"). The `ADF_threshold` and `IC_threshold` are now INFORMATIONAL per the 2026-06-01 EDA Discipline revision — see "EDA Discipline" section. EDA values are reported in the diary and brief Section 2 for research traceability, but they do NOT gate Phase 5.5, Phase 6.0, or backtest launch.
-
-Plus inherited project-level merge gates — applied DIFFERENTLY to **component SPECIALISTs** vs **BUNDLEs**:
-
-### Bundle-level (full-stack BUNDLE-MERGE criteria — RELATIVE REGIME PARETO)
-
-The bundle as a whole must clear, by reference to the current BASELINE_V1 anchor:
-
-- **Per-regime Pareto-better-or-equal** vs baseline on every tagged regime R present in IS or OOS: `sharpe_R(candidate) ≥ sharpe_R(baseline) − σ_R` AND `max_dd_R(candidate) ≤ max_dd_R(baseline) + σ_dd_R` AND `trade_count_R(candidate) ≥ 0.5 × trade_count_R(baseline)` (rare-regime carve-out per §B.5 of `briefs-v1/_meta/merge_v1_relative_regime_pareto_proposal.md`).
-- **At least one regime STRICTLY better** (`sharpe_R > baseline_sharpe_R + σ_R` OR `max_dd_R < baseline_max_dd_R − σ_dd_R`).
-- **Methodology integrity intact** (no look-ahead, embargo applied, gap correct, no OOS tuning, reproducibility checksum match) — see "Methodology Gates (HARD; PRESERVED)" rule in Critic checks.
-- **10-seed validation: per-regime mean Sharpe_R(candidate) ≥ per-regime mean Sharpe_R(baseline)** AND seed-distribution dominance ratio ≥ 0.5 (at least 5 of 10 candidate-seed within-regime Sharpes beat the baseline's median seed within-regime Sharpe).
-
-`σ_R` and `σ_dd_R` are baseline-seed-noise tolerances (one σ across the baseline's 10-seed within-regime Sharpe / max_dd distribution) — computed once at baseline commit and stored in `briefs-v1/_meta/baseline_seed_regime_matrix.csv`.
-
-**NO absolute Sharpe / DSR / PBO / PSR floors at the bundle level.** DSR / PBO / PSR are reported per-regime and bundle-level as INFORMATIONAL (see "Statistical-Significance Metrics" section below).
-
-### Component-level (SPECIALIST-PROMISING evaluation — BASELINE-RELATIVE)
-
-A component candidate is evaluated by reference to the current BASELINE_V1 anchor:
-
-- **Within-regime Sharpe Δ vs baseline** — at least one tagged regime where `sharpe_R(candidate) > sharpe_R(baseline) + σ_R` (materially positive vs baseline's own seed noise on that regime).
-- **No regime regression > 1σ_R** — on every other tagged regime, `sharpe_R(candidate) ≥ sharpe_R(baseline) − σ_R`. A regime that materially REGRESSES makes the candidate a TRADED-EDGE candidate, not a clean PROMISING.
-- **Regime-attribution clarity** — the component's PnL concentrates in specific tagged regimes; not scattered noise. LM Master Phase 7.4 Regime Attribution Table is the artifact.
-- **Bundle composition lift (qualitative)** — adding the component to the current bundle (by stacking / dispatch simulation on IS) should improve at least one regime's bundle-attributed Sharpe materially (≥ 1σ_R on that regime).
-- **Methodology floors NOT relaxed** — no look-ahead, embargo applied, gap correct, no OOS tuning. These remain HARD per §C of the proposal.
-
-**A component can be `REGIME-SPECIALIST-IS` with OOS/IS < 0.5 IF regime attribution explains the gap.** The BUNDLE enforces per-regime Pareto-dominance at the bundle level — NOT an OOS/IS ratio.
-
-**Any METHODOLOGY-gate failure = NO-MERGE.** Regime mismatch is NOT a methodology failure; researcher overfit IS. Use the WALK-FORWARD-LEAKAGE verdict cell for actual leakage.
+The runner nests `reports_dir = reports-v1/<SYMBOL>` automatically; briefs/diary/analysis dirs are
+created by the orchestrator. The single-symbol assertion guards the symbol resolution.
 
 ---
 
-## Iteration Cadence Discipline
-
-### Hard rules (inherited from v3 — proven; ENFORCED FROM CYCLE-3 v1 per user directive 2026-05-25)
-
-**NON-NEGOTIABLE from cycle-3 onwards (user directive 2026-05-25):**
-
-> "The QR should choose a combination of symbols, features, candles, Optuna iterations to fit in the specialist (3 seeds) and the bundle (10 seeds). That's non negotiable from now on."
-
-**Two dimensions FIXED (no QR/QE override):**
-- Seed count: 3 inner seeds SPECIALIST / 10 inner seeds BUNDLE
-- Wall-clock cap: 2h SPECIALIST / 9h BUNDLE
-
-**Three dimensions QR-TUNABLE to fit the budget** (compress in this order):
-1. **features**: 40 (PRUNED) → 30 → 20 (if axis isn't feature-family)
-2. **candles**: 8h → 12h → daily (only if axis allows; re-anchor required)
-3. **symbols**: 5 → 4 → 3 (if axis isn't universe)
-
-**MANDATORY brief Section 3.6 (wall-clock estimate)**:
-- Explicit wall-clock prediction from prior-iteration linear scaling
-- Estimate ≤ cap with ≥20% margin
-- Compression decisions documented if not at default
-- Trade-off rationale (what's sacrificed for what)
-
-**Phase 5.5 BLOCK criterion**: if wall-clock estimate is wildly unreasonable (>3× target cap) OR no explicit estimate present, BLOCK. QR must revise brief.
-
-**NO RUNTIME KILL-SWITCHES (locked 2026-05-30 user directive).** Once a backtest is launched, it runs to natural completion or natural failure. Observed wall-clock feeds back into next-iteration estimate calibration. Killing mid-run wastes compute and produces no verdict — the cost of a 12h run that completes is FAR less than the cost of a 9h kill that produces nothing. Use the time as learning.
-
-1. **SPECIALIST wall-clock target: 2h.** Brief MUST design to fit (single-axis variation, single-cohort preferred). If a brief estimates > 2h, Phase 6.0 Critic FLAGS as advisory — but the runtime is NOT auto-killed.
-
-2. **BUNDLE wall-clock target: 9h** (per feedback_v1_confirmation_walltime_9h). Default `--confirmation --n-trials 35` + ENSEMBLE_SIZE=10. Brief Section 3.6 must show 5-step scaling. Critic Phase 6.0 FLAGS if estimate > 9h but no auto-kill. NO "BUNDLE-EXCEPTION" framing needed — design to fit; if it overruns, accept and learn.
-
-3. **BUNDLE assembly is justified by IS regime-coverage of the running SPECIALIST roster.** There is NO formal SPECIALIST:BUNDLE cadence ratio (the legacy 10:1 rule is RETIRED per user directive 2026-06-06). A BUNDLE iteration's brief Section 0.5 MUST justify why the current SPECIALIST roster meets IS regime-coverage criteria sufficient to assemble a bundle (per QR judgment). Phase 5.5 gate verifies the justification is present and references SPECIALIST iter-v1/NNN ids from `briefs-v1/specialist_catalog.md`.
-
-4. **BUNDLE = curated combination of best SPECIALISTs.** The BUNDLE brief Section 3 lists which features/symbols/labels are imported from which prior SPECIALIST iter-v1/NNN ids. Not a fresh hypothesis — a curated combination.
-
-5. **Only BUNDLE-MERGE updates BASELINE_V1.md.** SPECIALIST-PROMISING is a forward-pointer, not a baseline change. SPECIALIST-NEGATIVE is recorded in the catalog but never affects baseline.
-
-There is no formal cadence constraint. SPECIALISTs run as needed; a BUNDLE iteration may be assembled whenever IS regime-coverage of the running roster is justified per QR judgment.
-
-### `briefs-v1/specialist_catalog.md` — the SPECIALIST ledger
-
-Every SPECIALIST's diary appends a one-line entry to `briefs-v1/specialist_catalog.md` after Phase 8 commits. Schema:
+## Running a backtest
 
 ```
-| iter-v1-NNN | YYYY-MM-DD | axis varied | axis family | IS Sharpe Δ | OOS Sharpe (informational) | verdict | bundle candidate? |
-| ----------- | ---------- | ----------- | ----------- | ----------- | -------------------------- | ------- | ----------------- |
-| iter-v1/001 | 2026-MM-DD | example     | feature-family | +0.0500 | +0.0200 | SPECIALIST-PROMISING | YES |
+# EXPLORATION (3 seeds, fast):
+uv run python run_baseline_v1.py --exploration --iteration NNN --symbols BTCUSDT --n-trials 35 --slippage-bps 2
+
+# CONFIRMATION (20 seeds, lottery-bias isolation, merge decision):
+uv run python run_baseline_v1.py --confirmation --iteration NNN --symbols BTCUSDT --n-trials 35 --slippage-bps 2
 ```
 
-The catalog accumulates across iterations. The next BUNDLE QR reads it, picks features/symbols/labels with positive deltas + PROMISING verdict, justifies the bundle in brief Section 3.
-
-**Axis Family column is mandatory in v1** (new vs v3). It enables Axis Rotation Discipline enforcement — see §"QR Axis Rotation Discipline" below.
+The first confirmation for a symbol bootstraps `BASELINE_V1_<SYMBOL>.md`.
 
 ---
 
-## QR Axis Rotation Discipline (NEW vs v3)
+## Before you start (read every time)
 
-### The rule
+1. `BASELINE_V1_<SYMBOL>.md` for the symbol under study (or note none exists → first run = bootstrap CONFIRMATION).
+2. The last 3 `diary-v1/<SYMBOL>/` entries — "Next Iteration Ideas" often seeds the next axis.
+3. This skill file.
+4. `/home/roberto/.claude/projects/-home-roberto-crypto-trade/memory/MEMORY.md`.
 
-Five axis families are catalogued:
-- **feature-family** — adding/removing/modifying feature families (e.g., funding rates, OI, basis, on-chain, composed)
-- **model-arch** — model architecture or family (LightGBM → XGBoost, depth → wide, native vs PyTorch)
-- **labeling** — labeling method (triple-barrier params, meta-labeling architecture, threshold tuning)
-- **universe** — symbol universe (adding/removing/substituting symbols)
-- **risk-primitive** — risk gates, R1/R2/R3/RiskVN wrappers, vol scaling, exposure caps
-
-**If the last 5 SPECIALISTs were all from the same family**, the NEXT SPECIALIST MUST be from a different family. This is enforced in:
-
-1. **Phase 5.5 gate** — QE counts the last 5 SPECIALISTs in `briefs-v1/specialist_catalog.md`. If all 5 are same-family AND the new brief Section 0.6 declares the same family, BLOCK.
-2. **Phase 7.5 Critic Check 14 (new check, v1-only)** — verifies axis family declared in brief Section 0.6 matches actual axis varied in src/ diff + reports.
-
-**Why**: prevents knob-tuning inertia. The v3 cycle-7 lesson — 9/9 NEGATIVE within /121's same architecture family at single-seed budget — is codified here. After 5 same-family attempts produce no breakthrough, the search space within that family is exhausted at SPECIALIST budget; pivot.
-
-### Brief Section 0.6 — Architecture-Family Justification (mandatory)
-
-Every SPECIALIST brief's Section 0.6 declares:
-
-```markdown
-## Section 0.6 — Architecture-Family Justification
-
-- **Axis family**: feature-family | model-arch | labeling | universe | risk-primitive
-- **Prior 5 SPECIALIST families** (from specialist_catalog.md):
-  - iter-v1/NNN-1: <family>
-  - iter-v1/NNN-2: <family>
-  - iter-v1/NNN-3: <family>
-  - iter-v1/NNN-4: <family>
-  - iter-v1/NNN-5: <family>
-- **Rotation status**: VALID (different from majority of prior 5) | BLOCKED (same as last 5 — must rotate)
-- **One-sentence rationale**: <why this family + axis is the right next step given the prior 5>
-```
-
-If the rotation status is BLOCKED, the brief must propose a different family OR explicitly request user override (which is logged in the diary as a deliberate exception).
-
----
-
-## HIGH-RISK Axis Declaration (NEW vs v3 — lighter footing)
-
-Every brief Section 2 must declare:
-
-```markdown
-## Section 2 — IS-Only Numerical Evidence
-
-...
-<existing IS evidence>
-...
-
-### Section 2.5 — HIGH-RISK Axis Declaration
-
-**Does the proposed axis change Optuna's training-objective domain?**
-(Yes if any of: risk-primitive constraint changes, universe substitution, label-mode change, feature-set replacement bar-interval change. No otherwise.)
-
-- **Declaration**: HIGH-RISK | NORMAL-RISK
-- **Reason**: <one sentence>
-- **Mitigation (HIGH-RISK only)**: <if HIGH-RISK, QR MUST pre-commit to running this axis at BUNDLE budget (ENSEMBLE_SIZE=10) at iter-v1/NNN+1 if iter-v1/NNN produces SPECIALIST-PROMISING. No multi-seed validation at THIS iteration — SPECIALIST ALWAYS uses 3 inner seeds; BUNDLE is the ONLY 10-seed path.>
-```
-
-**SEED COUNT — NON-NEGOTIABLE (per user directive 2026-05-23, [[v1-seed-count-non-negotiable]]):**
-- SPECIALIST = 3 inner seeds (`V1_EXPLORATION_ENSEMBLE_SIZE=3`), ALWAYS — even HIGH-RISK
-- BUNDLE = 10 inner seeds (`V1_CONFIRMATION_ENSEMBLE_SIZE=10`), ONLY at BUNDLE
-- NO outer-seed loop in v1 (single-pass inner ensemble, matches v3 post-/059 design)
-- HIGH-RISK declaration is MANDATORY but does NOT permit a seed-count bump
-- The HIGH-RISK mitigation is ONLY "pre-commit to BUNDLE at next iteration if PROMISING"
-- Diary records the HIGH-RISK declaration + the PROMISING-triggers-BUNDLE pre-commit
-
-If the iteration accumulates 3+ HIGH-RISK SPECIALISTs producing >1σ negative deltas, the next HIGH-RISK iteration MUST be deferred to BUNDLE budget — i.e., BUNDLE at iter-v1/NNN+1 becomes mandatory rather than opt-in. This is the lighter-footing tripwire (vs v3's strict pre-emption).
-
----
-
-## Symbol Universe — v1 (Expanded vs Historical)
-
-Old v1 used a fixed 5-symbol universe (BTC, ETH, LINK, LTC, DOT). New v1 KEEPS those as the **initial baseline universe** (so the corrected baseline is comparable to the historical iteration_186 stack), but **expands the pool of available symbols** for SPECIALISTs:
-
-```python
-V1_EXCLUDED_SYMBOLS = (
-    # v2 traded (live, separate track)
-    "SOLUSDT", "XRPUSDT", "DOGEUSDT", "NEARUSDT",
-    # v3 traded (live, separate track)
-    "BCHUSDT", "LDOUSDT", "TRXUSDT",
-    # historical reservation (never traded; kept reserved)
-    "BNBUSDT",
-)
-```
-
-The runner enforces at startup:
-
-```python
-assert set(cfg.symbols).isdisjoint(V1_EXCLUDED_SYMBOLS), \
-    f"v1 cannot trade v2/v3 symbols: {set(cfg.symbols) & set(V1_EXCLUDED_SYMBOLS)}"
-```
-
-### Initial baseline universe (BASELINE_V1.md anchor)
-
-```python
-V1_BASELINE_UNIVERSE = ("BTCUSDT", "ETHUSDT", "LINKUSDT", "LTCUSDT", "DOTUSDT")
-```
-
-### Extended universe (available for SPECIALISTs)
-
-All Binance perpetuals NOT in `V1_EXCLUDED_SYMBOLS`. This includes:
-- The 5 baseline symbols (BTC, ETH, LINK, LTC, DOT)
-- MKR (dropped from v3 at iter-v3/013 — available for v1)
-- AVAX, ADA, ATOM, MATIC, ICP, FIL, RUNE, AAVE, UNI, OP, ARB, LDO, etc.
-- And ~80 other perpetuals
-
-QR's universe-family SPECIALISTs can add/swap symbols. BUNDLE-MERGE updates `V1_BASELINE_UNIVERSE` if the bundle changes universe.
-
----
-
-## First Iteration Hard Rule (iter-v1/001 is the FIRST refactored iteration)
-
-**iter-v1/001 is NOT a BOOTSTRAP.** The corrected v1 stack (5 symbols, models A/C/D/E, 193 features, RiskV1Wrapper) re-evaluated under the fixed walk-forward IS the baseline. `BASELINE_V1.md` is populated by re-running `iteration_186`'s config under the fixed `walk_forward.py:113` BEFORE iter-v1/001 starts.
-
-Steps to populate the baseline (one-time, OUT OF SCOPE for iter-v1/001 but PREREQUISITE):
-
-1. Confirm `walk_forward.py:113` carries `train_end_ms = test_start_ms - embargo_ms`.
-2. Run `uv run python run_baseline_v1.py --baseline-mode` (or whichever script reproduces the historical v1 baseline) on current data.
-3. Capture all metrics: monthly_sharpe, daily_sharpe, max_drawdown, profit_factor, win_rate, n_trades, total_pnl, monthly_calmar, weighted_pnl_total, DSR, PBO, PSR, OOS trade count.
-4. Write into `BASELINE_V1.md` as the "Headline Metrics" + "Corrected Walk-Forward Stats" sections.
-5. Tag as `v0.v1-baseline-corrected`.
-
-**iter-v1/001 ships:**
-- First "real" SPECIALIST or first axis under the new workflow
-- Any axis family is valid (Axis Rotation Discipline kicks in from iter-v1/006+ — needs 5 SPECIALIST history)
-- Single-axis variation (SPECIALIST mode)
-- Phase 4.5 LM Master advisory and Phase 7.4 post-mortem (both mandatory artifacts)
-- Phase 6.0 Critic pre-flight (mandatory)
-- Phase 7.5 Critic adversarial review (mandatory)
-
-If iter-v1/001 produces a SPECIALIST-PROMISING verdict, the candidate is logged to the catalog and the next SPECIALIST begins. If SPECIALIST-NEGATIVE, recorded as dead-end, next SPECIALIST begins from a different axis (or different family per Axis Rotation Discipline once 5 SPECIALISTs accumulate).
-
----
-
-## Phase Quick Reference
-
-| Phase | Role | Inputs | Outputs |
-|---|---|---|---|
-| 1. Data analysis & EDA | QR | IS data, last diary | Notebook scratch, observations |
-| 2. Labeling decisions | QR | EDA findings | Brief Section 2 (params, σ_t source) |
-| 3. Symbol selection | QR | EDA, V1_EXCLUDED_SYMBOLS | Brief Section 3 (universe + Gate 1–2 evidence) |
-| 4. Feature design | QR | EDA, brief Sections 1–3 | Brief Section 4 (feature list with cluster-importance check) |
-| **4.5 LM Master pre-design** | **LM** | QR's Phases 1-4 outputs, prior advisor, prior reports | `briefs-v1/iteration_v1-NNN/lgbm_advisor.md` (Phase 4.5 section) |
-| 5. Research brief | QR | Sections 0–9 + LM advisor | `briefs-v1/iteration_v1-NNN/research_brief.md` (11 sections incl. 0.6, 2.5) |
-| **5.5 Gate** | **QE** | Brief | `briefs-v1/iteration_v1-NNN/phase5p5_gate.md` (PASS or BLOCK) |
-| **6.0 Critic pre-flight** | **Critic** | Brief, QE's src/ diff (after QE Phase 6 setup commit) | `briefs-v1/iteration_v1-NNN/critic_preflight.md` (PASS or BLOCK) |
-| 6. Implementation + backtest | QE | Brief, both gates=PASS | `src/` commits, reports, `comparison.csv`, companion files, engineering report |
-| **7.4 LM Master post-mortem** | **LM** | Engineering report, reports artifacts | `briefs-v1/iteration_v1-NNN/lgbm_advisor.md` (Phase 7.4 appended) |
-| **7.5 Critic Review** | **Critic** | Brief, code, reports, lgbm_advisor | `briefs-v1/iteration_v1-NNN/review.md` (8+1 checks + OVERALL + Path Forward) |
-| 7. OOS evaluation | QR | OOS reports, review.md, lgbm_advisor.md | Evaluation memo (informal; integrates Critic + LM findings) |
-| 8. Diary + merge decision | QR | All above | `diary-v1/iteration_v1-NNN.md` (MERGE or NO-MERGE) |
-
-Four gates are MANDATORY: **Phase 4.5, 5.5, 6.0, 7.5**. Skipping any is a process-integrity violation. Phase 7.4 LM Master post-mortem is mandatory in deliverable but does not BLOCK.
-
----
-
-## Phase 4.5 — LightGBM Master Pre-Design Advisory (NEW)
-
-After QR completes Phases 1–4 (EDA → Labeling → Symbol selection → Feature design) but BEFORE the QR begins Phase 5 (brief authoring), the orchestrator invokes the `lightgbm-master` agent.
-
-### Orchestrator dispatch
-
-```
-Agent({
-  description: "Run Phase 4.5 LM Master pre-design advisory for iter-v1/NNN",
-  subagent_type: "lightgbm-master",
-  prompt: "[Phase 4.5] Run pre-design advisory for iter-v1/NNN. Track: v1. Working dir: /home/roberto/crypto-trade/.worktrees/quant-research. Read: BASELINE_V1.md, last 3 v1 diaries, prior iter-v1/NNN-1 lgbm_advisor.md and engineering_report.md and feature_importance.csv, runner code, lgbm.py + optimization.py. QR's tentative axis: <one-line summary from last diary's 'Next Iteration Ideas' or current EDA notebooks>. Emit lgbm_advisor.md content as final message text per Phase 4.5 template — orchestrator persists at briefs-v1/iteration_v1-NNN/lgbm_advisor.md."
-})
-```
-
-### LM Master's deliverable
-
-`lgbm_advisor.md` (Phase 4.5 section) per the template in the `lightgbm-master` agent file. Approximately 300-500 words covering:
-
-1. **Recommended hyperparameter direction** (2-4 items): specific param + range, expected effect, risk
-2. **Recommended feature-engineering direction** (1-2 items): feature formula, why, expected importance rank
-3. **Saturation risks to flag**: ML-side risks the QR may have missed
-4. **What I did NOT recommend, and why**: prevents the QR from later asking "why didn't LM Master suggest X?"
-5. **Closing note**: HIGH/MEDIUM/LOW confidence on the iteration
-
-### QR's response
-
-The QR reads `lgbm_advisor.md` BEFORE writing the brief. The brief's Section 3 (Proposed Changes) and Section 4 (Expected OOS Impact) must explicitly address each of LM Master's recommendations:
-
-- **Adopted**: "LM Master recommended num_leaves 31→63; brief Section 3 includes this change."
-- **Modified**: "LM Master recommended composed feature `momentum_regime_signed`; brief Section 4 uses a related but different formula because <reason>."
-- **Rejected**: "LM Master recommended adding funding-rate features; brief rejects because v1 universe doesn't include funding endpoints yet (would require data infrastructure first)."
-
-**The QR is NOT bound by LM Master's recommendations**, but the brief must show that LM Master was read and considered. Phase 5.5 gate verifies the brief contains LM Master responses.
-
----
-
-## Phase 5.5 — Pre-Phase 6 Gate (MANDATORY)
-
-This is the skill's first structural defense against rushed iterations. The Engineer refuses to start Phase 6.0 until the brief contains all 11 mandatory sections (10 v3-shared + Section 0.6 v1-only).
-
-### The 11 Mandatory Brief Sections
-
-The Engineer reads `briefs-v1/iteration_v1-NNN/research_brief.md` and verifies:
-
-- **Section 0 — Data Split declaration.** Confirms `OOS_CUTOFF_DATE = 2025-03-24` and `training_months = 24` are unchanged. Names the IS window and OOS window in absolute dates.
-- **Section 0.5 — Iteration Type Declaration.** ONE of:
-  - `TYPE: SPECIALIST` — single-axis variation. **Wall-clock target: 2h** (design-time guidance; NO runtime kill). Uses `--exploration` flag (`V1_EXPLORATION_ENSEMBLE_SIZE=3`, n_trials=18 default). Single-axis variation. Critic scores Checks 1, 2, 4, 5, 6, 8, 14 (methodology + look-ahead + axis-family axes only). Edge thresholds (Check 3 DSR/PSR/Sharpe) are SKIPPED. Critic emits `SPECIALIST-PROMISING` (signal found, candidate for BUNDLE inclusion) or `SPECIALIST-NEGATIVE` (no signal, recorded in catalog).
-  - `TYPE: BUNDLE` — production config. Uses default `V1_CONFIRMATION_ENSEMBLE_SIZE=10`, full Optuna search space. Default `--n-trials 35`. **Wall-clock target: 9h** (design-time guidance; NO runtime kill). Critic scores all 8+1 checks AND optional 9-12 including Check 3 DSR/PSR thresholds. Critic emits `BUNDLE-MERGE`, `BUNDLE-BLOCK`, `BLOCK-PENDING-FIX`, or `BLOCK-FINAL`. **Only BUNDLE-MERGE updates BASELINE_V1.md.**
-  - Brief MUST justify the type choice in 1-2 sentences. BUNDLE iterations require a SPECIALIST roster meeting IS regime-coverage criteria (referenced by iter-v1/NNN ids) per QR judgment — there is NO formal precedent count threshold (legacy 10:1 cadence retired 2026-06-06).
-- **Section 0.6 — Architecture-Family Justification (v1-only).** Per the Axis Rotation Discipline section above. BLOCK if rotation rule violated.
-- **Section 1 — Hypothesis.** ONE sentence. What changes and why we expect OOS improvement. Vague hypotheses BLOCK; specific testable hypotheses PASS.
-- **Section 2 — IS-Only Numerical Evidence.** Tables produced by a committed `analysis/iteration_v1-NNN/*.py` script. Reproducible, IS-data-only, concrete numbers. Category-matching ("similar to RSI") is NOT evidence — BLOCK.
-  - **Section 2.5 — HIGH-RISK Axis Declaration (v1-only)** per the HIGH-RISK section above.
-- **Section 3 — Proposed Changes.** Enumerated: labeling params, symbol set additions/removals (with V1_EXCLUDED_SYMBOLS check), feature additions/removals (with cluster-importance check), risk gate changes. **Must include LM Master responses** (adopted/modified/rejected).
-- **Section 4 — Expected OOS Impact.** Predicted Sharpe delta with confidence interval, plus an explicit falsifier ("if OOS Sharpe falls below X, the hypothesis is rejected").
-- **Section 5 — Risk Mitigation.** R1/R2/R3 / 7-gate / new-gate changes; IS-calibrated thresholds; simulated effect on prior iterations.
-- **Section 6 — Risk Management Design.** 8-primitive table or v1 equivalent; fire-rate predictions; regime coverage analysis.
-- **Section 7 — Pre-Registered Failure-Mode Prediction.** 1–2 paragraphs predicting how this iteration most plausibly fails OOS, what the gates should catch, what the failure looks like in metrics. Phase 8 diary verifies this prediction against actual outcomes.
-- **Section 8 — Pre-Registered Per-Regime Baseline-Comparison Criteria.** Locked per-regime comparison plan vs current BASELINE_V1, BEFORE backtest. Format: "MERGE iff for every tagged regime R, `sharpe_R(candidate) ≥ sharpe_R(baseline) − σ_R` AND `max_dd_R(candidate) ≤ max_dd_R(baseline) + σ_dd_R`; AND on at least one regime R*, `sharpe_R*(candidate) > sharpe_R*(baseline) + σ_R*`." Diary auto-populates the per-regime comparison table from `regime_attribution.csv`. NO absolute Sharpe / DSR / PBO / PSR floors.
-- **Section 9 — Library Stack Declaration.** Versions of mlfinlab/mlfinpy/pypbo/fracdiff used.
-- **Section 10 — Regime Attribution Plan.** Target regime(s) + mechanism + off-regime expectation + bundle role + composition simulation + regime-aware falsifier. MANDATORY for EVERY iteration. (NEW 2026-05-31 regime-ensemble mandate.)
-- **Section 11 — Bundle Composition** (BUNDLE-ASSEMBLY only). Components included + composition method + regime coverage table + pairwise correlation table + component substitution test + bundle-level OOS/IS prediction PLUS the four HARD sub-blocks:
-  - **11.A — Universe Partition** with `Pairwise disjoint: YES` assertion. BLOCK if missing OR if `Pairwise disjoint: NO` is declared (Rule 7).
-  - **11.B — Weight Derivation** with committed `analysis/iteration_v1-NNN/weight_calibration.py` + `analysis/iteration_v1-NNN/bundle_weights.csv` + IS-only assertion. BLOCK if any artifact missing (Rule 1). Phase 5.5 also greps `weight_calibration.py` for the patterns Check 17 enforces (cheap pre-screen; deep semantic check is Phase 7.5).
-  - **11.C — Backtest-Live Parity Statement**. BLOCK if missing (Rule 8).
-  - **11.D — Re-Composition Note**. BLOCK if missing (state "no re-composition required" if none was needed).
-- **Section 4 falsifier must be REGIME-AWARE.** Cites target-regime IS Sharpe, NOT OOS-only.
-
-### Cadence Verification
-
-Phase 5.5 gate ALSO verifies cadence rules:
-
-**For TYPE=SPECIALIST**:
-- Brief Section 0.5 declares wall-clock budget ≤ 2h. BLOCK if missing or > 2h.
-- Brief Section 3.5 changes ONE axis (features OR symbols OR labels — not multiple). BLOCK if cross-axis.
-- Brief Section 0.6 declares axis family + rotation status. BLOCK if rotation violated.
-
-**For TYPE=BUNDLE**:
-- Brief Section 0.5 justifies BUNDLE assembly with reference to SPECIALIST iter-v1/NNN ids in `briefs-v1/specialist_catalog.md` and demonstrates IS regime-coverage of the running roster (per QR judgment). BLOCK if justification missing OR no SPECIALIST ids cited. NO formal precedent-count threshold (legacy 10:1 cadence retired 2026-06-06).
-- Brief Section 3 lists ≥1 imported feature/symbol/label per source SPECIALIST iter-v1/NNN id. BLOCK if Section 3 is a fresh hypothesis (BUNDLE ≠ SPECIALIST).
-- `ENSEMBLE_SIZE=10` (no outer seed loop). BLOCK if config differs.
-
-### Gate Output
-
-The Engineer writes `briefs-v1/iteration_v1-NNN/phase5p5_gate.md`:
-
-```markdown
-# Phase 5.5 Gate — iter-v1/NNN
-
-OVERALL: PASS  (or BLOCK)
-
-## Iteration Type (from Brief Section 0.5)
-TYPE: SPECIALIST  (or BUNDLE)
-
-## Axis Family (from Brief Section 0.6)
-FAMILY: feature-family  (or model-arch / labeling / universe / risk-primitive)
-ROTATION_STATUS: VALID  (or BLOCKED — same as last 5)
-
-## HIGH-RISK Declaration (from Brief Section 2.5)
-HIGH-RISK: NO  (or YES, mitigation = <opted-in multi-seed | none>)
-
-## Cadence Check
-- Wall-clock budget declared: <2h for SPECIALIST / <9h for BUNDLE>: PASS / BLOCK
-- (BUNDLE only) IS regime-coverage justification cites SPECIALIST iter-v1/NNN ids from specialist_catalog.md: PASS / BLOCK
-- (BUNDLE only) Section 3 lists imported variations from prior SPECIALISTs: PASS / BLOCK
-
-## LM Master Response Verification
-- briefs-v1/iteration_v1-NNN/lgbm_advisor.md exists: PASS / BLOCK
-- Brief Section 3 addresses each LM Master recommendation: PASS / BLOCK
-
-## Per-Section Status
-- Section 0 (Data Split): PASS / MISSING / INVALID
-- Section 0.5 (Iteration Type): PASS / MISSING / INVALID
-- Section 0.6 (Architecture-Family Justification): PASS / MISSING / INVALID
-- Section 1 (Hypothesis): PASS / MISSING / INVALID
-- Section 2 (IS-Only Numerical Evidence): PASS / MISSING / INVALID
-- Section 2.5 (HIGH-RISK Axis Declaration): PASS / MISSING / INVALID
-- Section 3 (Proposed Changes): PASS / MISSING / INVALID
-- Section 4 (Expected OOS Impact): PASS / MISSING / INVALID
-- Section 5 (Risk Mitigation): PASS / MISSING / INVALID
-- Section 6 (Risk Management Design): PASS / MISSING / INVALID
-- Section 7 (Pre-Registered Failure-Mode): PASS / MISSING / INVALID
-- Section 8 (Pre-Registered Numerical Criteria): PASS / MISSING / INVALID
-- Section 9 (Library Stack): PASS / MISSING / INVALID
-
-## Reasons (if BLOCK)
-- <Section X>: <specific gap>
-```
-
-**OVERALL=BLOCK → Phase 6.0 terminates immediately.** Engineer commits the gate as `docs(iter-v1/NNN): phase 5.5 gate BLOCK` and returns to QR. The QR addresses gaps and re-submits; the Engineer re-runs the gate.
-
-**OVERALL=PASS → Phase 6.0 (Critic pre-flight) proceeds.** Engineer commits the gate as `docs(iter-v1/NNN): phase 5.5 gate PASS`.
-
----
-
-## Phase 6.0 — Critic Pre-Flight Review (NEW vs v3)
-
-After Phase 5.5 PASS but BEFORE the full backtest launches, the Critic does a SHORT pre-flight review to catch issues that would waste compute.
-
-### What the pre-flight checks
-
-The pre-flight is a **subset** of the Phase 7.5 review, focused on issues catchable WITHOUT the engineering report:
-
-1. **Brief look-ahead audit (mini-Check 1)**: read brief Section 4 (proposed feature changes); check whether any feature description suggests forward data use (e.g., "uses 24-hour rolling close including current bar"). FLAG only obvious cases; no exhaustive trace.
-2. **Anti-Pattern Static Scan (mini-Check 13)**: grep QE's src/ diff vs the parent baseline branch for known anti-pattern signatures (A1-A17 catalog including bundle-discipline A15/A16/A17). Each unexplained match → BLOCK with citation.
-   - **A15 — Cross-Model Symbol Overlap In Bundle**: any BUNDLE-ASSEMBLY brief where Section 11.A enumerates two components that share at least one coin in their universes. Static scan during Phase 5.5 + Phase 6.0 mini-Check 13.
-   - **A16 — Bundle Weight Computed Post-OOS**: any commit to `analysis/iteration_v1-NNN/weight_calibration.py` AFTER the first commit to `reports-v1/iteration_v1-NNN/out_of_sample/`. Static scan during Phase 6.0 + Phase 7.5 Check 17.
-   - **A17 — Bundle Aggregation Requires Post-Trade Information**: any brief Section 11 method description containing "sum of realized PnL", "net position across models", "ex-post correlation-adjusted weight", or equivalent post-trade-information phrasing. Static scan during Phase 6.0 mini-Check 13.
-3. **Foundation regression check (mini-Check 1+Boot Step 9)**: re-verify `walk_forward.py:113` carries `train_end_ms = test_start_ms - embargo_ms` AFTER QE's commits. Catches regressions introduced by the iteration's src/ changes.
-4. **Cadence + axis sanity**: confirm Phase 5.5 gate is PASS; confirm Section 0.6 axis family declared.
-5. **Falsifier presence**: confirm brief Section 4 has an explicit OOS-Sharpe-below-X falsifier.
-
-### Orchestrator dispatch
-
-```
-Agent({
-  description: "Run Phase 6.0 Critic pre-flight review for iter-v1/NNN",
-  subagent_type: "quant-critic",
-  prompt: "[Phase 6.0 PRE-FLIGHT] Run pre-flight review for iter-v1/NNN. Read briefs-v1/iteration_v1-NNN/research_brief.md AND briefs-v1/iteration_v1-NNN/phase5p5_gate.md (confirm OVERALL=PASS). Read QE's src/ diff: `git diff iteration-v1/<prior>..iteration-v1/<NNN> -- src/`. Run mini-checks 1, 13, foundation, cadence, falsifier. Emit critic_preflight.md content as final message text with OVERALL=PASS or OVERALL=BLOCK + Path Forward (if BLOCK). DO NOT run the full Phase 7.5 8-check pass — that is post-backtest only."
-})
-```
-
-### Pre-flight output template
-
-```markdown
-# Phase 6.0 Critic Pre-Flight — iter-v1/NNN
-
-OVERALL: PASS  (or BLOCK — <one-line top concern>)
-
-## Pre-Flight Checks
-
-### Check 1 (mini) — Brief Look-Ahead Audit: PASS
-<one paragraph>
-
-### Check 13 (mini) — Anti-Pattern Static Scan: PASS
-<one paragraph; cite specific files scanned>
-
-### Foundation Regression: PASS
-<one paragraph; confirm walk_forward.py:113 still carries the embargo subtraction>
-
-### Cadence + Axis Sanity: PASS
-<one paragraph>
-
-### Falsifier Presence: PASS
-<one paragraph; quote the falsifier from brief Section 4>
-
-## Path Forward (mandatory on any BLOCK)
-
-(Only present if OVERALL=BLOCK. 2-3 alternative axes the QR should consider for revising the brief OR proposing a different iteration. Each from an axis family the QR has NOT used in the prior 5 SPECIALISTs.)
-
-1. **[Axis name]** — [family] — [one sentence: what's the proposed change, what's the expected mechanism]
-2. **[Axis name]** — [family] — [...]
-3. **[Axis name]** — [family] — [...]
-```
-
-**OVERALL=BLOCK → backtest does NOT launch.** QE returns to QR for brief revision (small fix possible: re-edit brief, re-run Phase 5.5 → Phase 6.0). After 1 brief revision + Phase 6.0 rerun, if still BLOCK, the iteration is abandoned and the next iter-v1/NNN+1 starts fresh.
-
-**OVERALL=PASS → Phase 6 backtest launches.** QE proceeds with the full backtest per the Engineer's Split Dispatch (long backtests) or single dispatch (under 30 min).
-
-### Why this matters
-
-The v3 cycle-7 forensic identified that Critic catches misses POST-backtest, after compute is already spent. Phase 6.0 catches a subset of those misses BEFORE compute is spent. Estimated savings: 1-2 wasted 2h backtests per 10 iterations. Phase 6.0 adds ~10-15 min latency per iteration — clear net win.
-
----
-
-## Phase 6 — Implementation + Backtest (QE)
-
-Standard QE workflow per `quant-engineer` agent. Highlights for v1:
-
-- Runner: `run_baseline_v1.py`
-- Features module: `crypto_trade.features_v1`
-- Validation module: `crypto_trade.validation_v1`
-- `V1_EXCLUDED_SYMBOLS` audit at runtime startup
-- `V1_FEATURE_COLUMNS` explicit list passed to `LightGbmStrategy` (never None / auto-discovered)
-- Per-symbol or pooled models per brief Section 3.5
-- 5-seed ensemble [42, 123, 456, 789, 1001, 2002, 3003, 4004, 5005, 6006] — first 3 for SPECIALIST (`V1_EXPLORATION_ENSEMBLE_SIZE=3`), all 10 for BUNDLE (`V1_CONFIRMATION_ENSEMBLE_SIZE=10`)
-- No outer seed loop (single-pass inner ensemble)
-- All v3 rigor outputs: CPCV 45 paths, DSR/PBO/PSR in dsr.json + comparison.csv, ADF + IC matrix, Pareto front
-
-### Split Dispatch for long backtests (inherited from v3)
-
-Backtests > 30 min wall-clock use the split dispatch pattern (see v3 skill §"Engineer Phase 6 — SPLIT DISPATCH"). Setup-only Engineer dispatch → orchestrator launches detached bash → report-only Engineer dispatch. Saves agent quota.
-
----
-
-## Phase 7.4 — LightGBM Master Post-Mortem (NEW)
-
-After QE commits the engineering report (`OVERALL=READY-FOR-CRITIC`) and BEFORE invoking Critic Phase 7.5, the orchestrator invokes LM Master for post-mortem interpretation.
-
-### Orchestrator dispatch
-
-```
-Agent({
-  description: "Run Phase 7.4 LM Master post-mortem for iter-v1/NNN",
-  subagent_type: "lightgbm-master",
-  prompt: "[Phase 7.4 POST-MORTEM] Run post-mortem interpretation for iter-v1/NNN. Track: v1. Read briefs-v1/iteration_v1-NNN/research_brief.md, briefs-v1/iteration_v1-NNN/engineering_report.md, briefs-v1/iteration_v1-NNN/lgbm_advisor.md (Phase 4.5 section), reports-v1/iteration_v1-NNN/{comparison.csv, in_sample/feature_importance.csv, out_of_sample/feature_importance.csv, pareto_front.csv (if multi-seed), cpcv_paths.csv, ic_matrix.csv}. Run `grep 'Trial [0-9]+ finished' reports-v1/iteration_v1-NNN/run.log` to extract Optuna trial trajectories. Emit Phase 7.4 section of lgbm_advisor.md as final message text per the LM Master template — orchestrator appends to briefs-v1/iteration_v1-NNN/lgbm_advisor.md."
-})
-```
-
-### LM Master's deliverable
-
-Phase 7.4 section appended to `lgbm_advisor.md`. ~600-1200 words covering:
-
-0. **Regime Attribution Table (MANDATORY — NEW 2026-05-31)**: tag IS months and OOS months into regime buckets (bull / alt-rotation / chop / bear / vol-spike / liq-cascade / ETF-flow / other) using a canonical regime tagger (BTC 90-day return + 30-day realized vol quantiles, OR an explicitly documented alternative). For BOTH this iteration AND BASELINE_V1, compute per-regime Sharpe, trade count, max drawdown, weighted PnL. Emit a markdown table:
-
-   | Regime | IS months | OOS months | This iter IS Sharpe | This iter OOS Sharpe | Baseline IS Sharpe | Baseline OOS Sharpe | Bundle role implication |
-   |---|---|---|---|---|---|---|---|
-   | bull | 14 | 3 | +2.10 | +1.45 | +1.20 | +0.80 | UNIVERSAL contributor |
-   | chop | 18 | 4 | +0.30 | −0.20 | +0.85 | +0.40 | Off-regime; do not select for chop bundle role |
-   | ... | ... | ... | ... | ... | ... | ... | ... |
-
-   LM Master proposes the bundle-role implication explicitly for each regime row. The Critic Check 3c reads this table.
-
-1. **Feature importance triage**: top performers, dead weight (rank 14/14 candidates), unstable features
-2. **Hyperparameter trial stability**: best-trial loss std/mean across months, which params jumped wildly, which converged tightly
-3. **Gain concentration audit**: top-3 feature cumulative gain%
-4. **Suspicious patterns**: anything ML-suspicious the Critic might miss in their 8-check pass
-5. **Next-iteration tuning recommendations** (3-5 items): specific changes, mechanisms, risks
-6. **What this iteration confirms / refutes about prior LM Master advisory**: honest accounting of Phase 4.5 predictions vs actual outcomes
-7. **Closing note for Critic**: flags evidence the Critic should look at (NOT directing the verdict)
-
-The Critic reads `lgbm_advisor.md` in Phase 7.5 boot but is NOT bound by LM Master interpretations. Critic's 8-check verdict remains independent.
-
----
-
-## Phase 7.5 — Critic Adversarial Review (UPDATED vs v3)
-
-After Phase 7.4 LM Master post-mortem, the orchestrator invokes the `quant-critic` subagent for the full Phase 7.5 review.
-
-### Updates vs v3
-
-**1. New Check 14 — Axis Family Validation (v1-only).** Critic verifies axis family declared in brief Section 0.6 matches actual axis varied in src/ diff + reports.
-
-**5. New Check 15 — Backtest-Live Parity (v1-only, BUNDLE-ASSEMBLY-only).** Critic verifies that the bundle's per-(symbol, candle) decision rule is a deterministic function of same-time-snapshot per-component signals + each component's frozen internal weight + static bundle config. The Critic traces the runner code's bundle aggregation step and asserts it is implementable at `live/engine.py:_tick`. Forbidden constructs (each → BLOCK-FINAL with reason `BUNDLE-PARITY-VIOLATION`): summing realized PnL across two models holding open positions in the same symbol; netting two-model exposure into a single Binance order requiring intra-tick reconciliation; any rule referencing future bars relative to the decision candle. SPECIALIST single-component iterations are EXEMPT — single component is trivially live-replayable.
-
-**6. New Check 16 — Universe Disjointness (v1-only, BUNDLE-ASSEMBLY-only).** Critic computes pairwise universe intersections across all bundle components declared in brief Section 11.A. Any non-empty intersection → BLOCK-FINAL with reason `BUNDLE-UNIVERSE-OVERLAP`. Phase 5.5 also pre-checks Section 11.A for the `Pairwise disjoint: YES` assertion (cheap structural catch); Phase 7.5 Check 16 verifies the actual symbols match the runner's per-component universe (semantic catch). SPECIALIST single-component iterations EXEMPT.
-
-**7. New Check 17 — Bundle Weight IS-Only Provenance (v1-only, BUNDLE-ASSEMBLY-only).** Critic verifies (a) `analysis/iteration_v1-NNN/weight_calibration.py` exists and is committed before Phase 6.0; (b) the script greps clean for `OOS_CUTOFF`, `>= OOS_CUTOFF_MS`, `oos_window`, `out_of_sample`, or hard-coded post-2025-03-24 dates used for filtering-IN (any forward-pointing reference → BLOCK-FINAL); (c) `bundle_weights.csv` matches brief Section 11.B verbatim; (d) each loaded data source in the script respects the IS-window cutoff. Any failure → BLOCK-FINAL with reason `BUNDLE-WEIGHT-OOS-LEAK`. SPECIALIST single-component iterations EXEMPT.
-- PASS: declared family matches observed change.
-- FAIL: declared "feature-family" but src/ diff shows only risk-gate threshold changes (mis-declared family).
-
-**2. New OVERALL values.** In addition to `SPECIALIST-PROMISING / SPECIALIST-NEGATIVE / BUNDLE-MERGE`, v1 adds:
-- `BLOCK-PENDING-FIX` — One specific defect, QR/QE has ONE chance to fix and re-run Phase 6 within same iter-v1/NNN. After fix, next verdict can only be PASS or BLOCK-FINAL.
-- `BLOCK-FINAL` — Irrecoverable. No rerun. Iteration ends NO-MERGE.
-
-**3. Constructive Path Forward — mandatory on every BLOCK verdict.** Every BLOCK verdict (SPECIALIST-NEGATIVE / BUNDLE-BLOCK / BLOCK-PENDING-FIX / BLOCK-FINAL) MUST include a "Path Forward" section proposing 2-3 alternative axes from families NOT used in the prior 5 SPECIALISTs.
-
-### BLOCK-PENDING-FIX rules
-
-Critic chooses BLOCK-PENDING-FIX only when the defect is:
-- **Specific** — one identifiable issue (not "the whole brief is wrong")
-- **Isolated** — fixable without changing the iteration's hypothesis or axis
-- **Fixable without methodology change** — examples: "comparison.csv missing PSR column", "feature scaling fit on combined train+test (line 142)", "Optuna seeds incorrectly derived from --seeds CLI"
-
-Critic chooses BLOCK-FINAL when:
-- Multi-defect (≥2 distinct failures)
-- Methodology-level issue (e.g., look-ahead in the hypothesis itself, not a code bug)
-- Axis-family mis-declaration (Check 14 FAIL is BLOCK-FINAL — methodology integrity issue)
-- The defect would require a NEW iteration with a NEW brief
-
-### BLOCK-PENDING-FIX flow
-
-1. Critic emits `review.md` with `OVERALL: BLOCK-PENDING-FIX — <defect>` + Path Forward.
-2. QR + QE read the defect. QR may NOT introduce a new hypothesis or change axis. QE makes the specific fix to src/ or comparison.csv.
-3. The fix attempt is committed: `fix(iter-v1/NNN): <defect> — pending Critic re-eval`.
-4. QE re-runs Phase 6 backtest (or just regenerates the specific affected output if a non-code fix).
-5. The fix attempt is logged in `briefs-v1/iteration_v1-NNN/qr_response.md` (re-using existing v3 file convention) with:
-   - Defect quoted from Critic's verdict
-   - Fix made (cite commit SHA)
-   - New reports artifacts
-6. Critic re-runs Phase 7.5 (single pass; no PRELIMINARY round). Possible verdicts: PASS verdict (SPECIALIST-PROMISING / SPECIALIST-NEGATIVE / BUNDLE-MERGE) OR `BLOCK-FINAL`.
-7. After this second verdict, the iteration cannot recurse further.
-
-### Path Forward section template
-
-Mandatory on EVERY BLOCK verdict (SPECIALIST-NEGATIVE / BUNDLE-BLOCK / BLOCK-PENDING-FIX / BLOCK-FINAL):
-
-```markdown
-## Path Forward (mandatory on any BLOCK verdict)
-
-Propose 2-3 alternative axes the QR should consider for the next iteration:
-
-1. **[Axis name]** — [family] — [one sentence: what's the proposed change, what's the expected mechanism]
-2. **[Axis name]** — [family] — [...]
-3. **[Axis name]** — [family] — [...]
-
-Constraints honored: each proposed axis is from a family the QR has NOT used in the prior 5 SPECIALISTs.
-```
-
-The Critic's Path Forward is advisory — QR can adopt, modify, or reject the suggestions. It exists to prevent the QR from feeling "dead-ended" by a BLOCK verdict.
-
-**Constructive Critic Mandate:** A BLOCK verdict without a credible Path Forward is a Critic methodology failure, not a rigor signal. Every blocked verdict MUST propose axes that are:
-- From DIFFERENT families than the last 5 SPECIALISTs (Rotation Discipline enforced in suggestions too)
-- Specific enough to be directly actionable by the QR (not vague "try different features")
-- Ranked by expected signal-to-noise ratio given the iteration history
-
-If the Critic cannot propose 2 credible alternatives, the Critic MUST explicitly state this constraint (e.g., "axis family space is exhausted — recommend user directive to expand search space") rather than offering generic advice.
-
-### Verdict mechanics (round structure inherited from v3, with v1 additions)
-
-**Round 1 — PRELIMINARY review** (same as v3 — preliminary findings + clarifications requested).
-
-**Round 2 — QR Response** (same as v3 — qr_response.md).
-
-**Round 3 — FINAL Verdict** (updated v1 set): one of `SPECIALIST-PROMISING / SPECIALIST-NEGATIVE / BUNDLE-MERGE / BLOCK-PENDING-FIX / BLOCK-FINAL`.
-
-If verdict is `BLOCK-PENDING-FIX`, an additional ROUND 4 (post-fix re-evaluation, single pass) determines the iteration's final status.
-
-**BLOCK-FINAL definition:** A BLOCK-FINAL verdict means the iteration is CLOSED with NO-MERGE status. The following are true:
-- No further re-runs within this iter-v1/NNN are permitted
-- The next iteration (iter-v1/NNN+1) starts fresh with a new brief
-- Diary records the failure mode and the Critic's PATH FORWARD suggestions as the recommended next axes
-- The Critic's Path Forward from a BLOCK-FINAL carries special weight: QR should treat the top suggestion as the default next axis unless there's strong IS evidence against it
-
----
-
-## Regime-Aware Verdict Classification
-
-All verdict cells used in v1. The classification recognizes that under walk-forward semantics, the IS-OOS Sharpe gap is **primarily a regime-mix signal**, not a generalization signal. A 7-band classifier replaces the legacy binary PROMISING/NEGATIVE.
-
-### SPECIALIST verdict cells (REGIME-AWARE)
-
-| Verdict | IS Sharpe Δ | OOS Sharpe Δ | Regime attribution | Bundle role | Next step |
-|---|---|---|---|---|---|
-| `UNIVERSAL` | ≥ +0.05 | ≥ +0.05 | broad across regimes | Anchor candidate | Promote to next BUNDLE |
-| `REGIME-SPECIALIST-IS` | ≥ +0.10 | ≤ +0.05 (and ≥ −0.20) | concentrated in IS-only regimes | Bundle candidate for IS-only regimes | **PRESERVE for /044+ bundle** — log to catalog with regime tag |
-| `REGIME-SPECIALIST-OOS` | ≤ +0.05 (and ≥ −0.20) | ≥ +0.10 | concentrated in OOS regimes | Bundle candidate (OOS-recurring regimes) | **PRESERVE for /044+ bundle** — log with regime tag |
-| `TAIL-CONTROL` | any | any | reduces max_dd / OOS_min_month_pnl by ≥ 20% | Risk overlay | **PRESERVE for /044+ bundle** — evaluated on tail metrics, not Sharpe |
-| `SPECIALIST-PROMISING` | ≥ +0.05 | ≥ +0.05 | lift present, not yet regime-attributed | TBD — pending attribution | Log to catalog; next SPECIALIST or BUNDLE inclusion |
-| `PROMISING-TENTATIVE` | ≥ +0.05 | ≥ +0.05 | single-seed PROMISING; basin-lottery risk unresolved | TBD — TENTATIVE pending multi-seed | MUST run multi-seed re-validation (3-outer-seed or ENSEMBLE_SIZE=10) before BUNDLE inclusion; NOT eligible for bundle as-is |
-| `MULTI-SEED-WEAK-BASIN-LOTTERY` | ≥ +0.10 IS (weak) | negative or near-zero | IS lift concentrated in non-reproducible basin; per-seed spread > 0.50 | None — IS lift is lottery artifact | Dead-paths catalog with BASIN-LOTTERY tag; pivot axis; do NOT retest at higher budget |
-| `TRUE-NEG` / `SPECIALIST-NEGATIVE` | ≤ 0 IS | ≤ 0 OOS | no regime gives lift; mechanism falsified | None | Dead-paths catalog |
-| `NEGATIVE-no-effect` | within ±0.10 baseline | within ±0.10 | axis had no effect; saturated or under-powered | None | Catalog; try higher n_trials or pivot axis |
-| `LEARNED-NEG` | mixed | OOS catastrophic | lost a regime QR expected to capture | None | Dead-paths + regime-tag the failure mechanism |
-| `WALK-FORWARD-LEAKAGE` | n/a | n/a | actual leakage detected (gap=0, look-ahead, embargo violated) | None | **BLOCK** — methodology integrity failure |
-
-**Regime attribution is the load-bearing signal**, not OOS Sharpe Δ alone. The regime-attribution table is a MANDATORY Phase 7.4 LM Master output. The Critic Check 3c reads this table.
-
-**Distinguishing REGIME-SPECIALIST from OVERFIT:**
-
-| Signature | Verdict |
-|---|---|
-| IS lift via importance-INERT basin lottery, OOS catastrophic, mechanism falsified at importance/wiring layer | OVERFIT-BY-MECHANISM-FAILURE — `TRUE-NEG` / `LEARNED-NEG` |
-| IS lift mechanically attributable to a load-bearing feature, OOS weakness explained by regime mismatch | `REGIME-SPECIALIST-IS` — PRESERVE |
-
-Note: iterations CAN and SHOULD produce different configurations from the baseline. Different trades vs baseline is EXPECTED. The comparison metric is regime-attributed component PnL vs the existing bundle's regime coverage — NOT OOS Sharpe vs BASELINE_V1 in isolation.
-
-### BUNDLE verdict cells
-
-A BUNDLE can be EITHER a single-axis validation OR a **multi-component ASSEMBLY**. The /044 substrate is now the canonical bundle-ASSEMBLY pathway.
-
-| Verdict | Condition | Next step |
-|---|---|---|
-| `BUNDLE-MERGE` (single-axis) | One axis validated multi-seed; bundle is Pareto-better-or-equal to current baseline on every tagged regime AND strictly better on ≥1 regime; methodology integrity intact (no look-ahead, embargo, gap, reproducibility) | Update BASELINE_V1.md; tag commit |
-| `BUNDLE-MERGE-ASSEMBLY` (multi-component) | N components combined; the COMPOSITE bundle is Pareto-better-or-equal to current baseline on every tagged regime AND strictly better on ≥1 regime; component substitution test PASS (every component is justified by regime-specialist role OR Pareto-positive marginal within-regime contribution); methodology integrity intact | Update BASELINE_V1.md as new bundle stack; tag commit |
-| `BUNDLE-BLOCK` | ≥1 BUNDLE-level gate fails; Critic verdict non-MERGE | No baseline update; iterate on failed gates |
-| `BLOCK-PENDING-FIX` | One specific isolable defect; NOT multi-defect | QE one-shot fix + re-run; next verdict is PASS or BLOCK-FINAL |
-| `BLOCK-FINAL` | Irrecoverable (multi-defect OR methodology issue OR second BLOCK after BLOCK-PENDING-FIX OR `WALK-FORWARD-LEAKAGE`) | NO-MERGE; next iter fresh brief |
-
-### Portfolio Composition Rules (`BUNDLE-MERGE-ASSEMBLY` only)
-
-1. **Weights (HARD, IS-ONLY):** bundle weights are derived from IS-only data by a committed `analysis/iteration_v1-NNN/weight_calibration.py` and pre-registered in brief Section 11 BEFORE Phase 6 launches. Acceptable derivation methods (QR picks one and documents): EQUAL (`w_i = 1/N`); IS-Sharpe-proportional (`w_i = SR_IS_i / Σ SR_IS_j`, clipped at 0); IS-inverse-variance (`w_i ∝ 1/σ_IS_i`); IS-risk-parity; OR an explicitly-documented QR derivation. The script writes `bundle_weights.csv` with columns `[component_id, weight, derivation_method, is_window_start, is_window_end]`. NO OOS METRIC may appear in the script's data loads or computations. Enforcement: Critic Check 17 (BUNDLE-ASSEMBLY only).
-2. **Regime coverage:** the bundle must cover EVERY tagged regime that the current BASELINE_V1 covers, Pareto-better-or-equal per §B of the proposal. No absolute "≥ 3 regimes" floor. A component that duplicates another's regime coverage stays in the bundle if it contributes a materially positive within-regime lift (≥ 1σ_R) on its target regime; otherwise dropped at the substitution test.
-3. **Correlation diversification:** LOWER pairwise OOS daily-return correlation between components is PREFERRED but NOT BLOCKING. Cite per-pair correlations in brief Section 11; if any pair > 0.70, the diary must include a one-paragraph "correlation justification" explaining why the duplicate-axis exposure is acceptable (e.g., one component is regime-specialist, the other anchor). NO AUTO-BLOCK on correlation.
-4. **Component substitution test:** for every component, predict bundle within-regime metrics WITHOUT that component. A component that fails to Pareto-improve the bundle on at least one tagged regime (vs baseline) AND fails to fill a regime the bundle would otherwise lose (vs baseline coverage) must be justified or dropped.
-5. **At least one anchor:** the bundle must contain ≥ 1 component that, on its own, performs Pareto-better-or-equal to the BASELINE_V1 anchor on the regime the baseline covers best. Pure-specialist bundles (no anchor) require an explicit user-directive exception. NO absolute IS Sharpe > 1.0 / OOS Sharpe > 0.5 floor.
-6. **Bundle MERGE evaluation** lives in the "Bundle-level (full-stack BUNDLE-MERGE criteria — RELATIVE REGIME PARETO)" section above. DSR / PBO / PSR / OOS/IS ratio / trade-count / concentration are reported but INFORMATIONAL; per-regime Pareto-dominance is the gate.
-7. **No Coin Overlap (HARD):** in any bundle, NO single coin may appear in the universe of two or more component models. Each coin is owned by EXACTLY ONE component. Brief Section 11 MUST enumerate per-component universes and assert pairwise disjointness explicitly, plus document any re-composition decision (which coin was dropped from which component to admit the overlapping candidate). Enforcement: Critic Check 16 (BUNDLE-ASSEMBLY only).
-8. **Backtest-Live Parity (HARD):** every bundle composition method MUST produce IDENTICAL trade decisions in backtest and live. The per-(symbol, candle) decision must be a deterministic function of (a) each component's signal at the SAME timestamp t (same-time-snapshot only), (b) each component's INTERNAL position-size weight (frozen pre-Phase 6 per rule 1), (c) static bundle configuration (universe assignment, dispatch rule). Forbidden constructs: summing realized PnL of simultaneously-open positions across two models in the same symbol; "net" exposure of two models in the same symbol netted into one Binance order; ANY rule referencing future bars relative to the decision candle. Enforcement: Critic Check 15 (BUNDLE-ASSEMBLY only).
-9. **Section 11 mandatory sub-blocks:** brief Section 11 MUST contain — Universe Partition (per-component universes + `Pairwise disjoint: YES` assertion + union); Weight Derivation (method + script path + `bundle_weights.csv` quote + IS-only assertion); Backtest-Live Parity Statement (one-paragraph proof the decision rule is replayable at `live/engine.py:_tick`); Re-Composition Note (which coin was dropped from which component, with catalog cross-reference). Phase 5.5 gate BLOCKS on missing sub-block (cheap structural check); Phase 7.5 Critic Checks 15/16/17 BLOCK on substantive violation (semantic check). (BUNDLE-ASSEMBLY only.)
-
----
-
-## Mandatory Statistical-Significance Reporting
-
-Every `comparison.csv` MUST include the following columns and rows (inherited from v3).
-
-### Columns
-```
-metric, in_sample, out_of_sample, ratio
-```
-
-### Required Rows
-- `monthly_sharpe`
-- `daily_sharpe`
-- `max_drawdown`
-- `profit_factor`
-- `win_rate`
-- `n_trades`
-- `total_pnl`
-- `monthly_calmar`
-- `weighted_pnl_total`
-- `dsr` — Deflated Sharpe Ratio
-- `pbo` — Probability of Backtest Overfitting (from CPCV's CSCV)
-- `psr` — Probabilistic Sharpe Ratio
-- `n_trials` — total Optuna trials
-- `n_effective_trials` — PCA on trial-return matrix at 95% cumulative variance threshold
-
-### Reported Statistical-Significance Metrics (INFORMATIONAL, NOT gating)
-
-- **DSR (Deflated Sharpe Ratio)** — reported per-regime AND bundle-level. The diary records `DSR(candidate)` vs `DSR(baseline)`. If `DSR(candidate) < DSR(baseline)` on bundle OR on any tagged regime, the diary includes a "DSR-regression justification" paragraph. NOT a MERGE gate. SPECIALIST-mode DSR/PSR are STRUCTURAL ARTIFACTS of the smaller n_trials search space and are NOT comparable to BUNDLE-mode metrics (see "SPECIALIST-mode DSR/PSR are regime-specific artifacts" memory entry).
-- **PBO (Probability of Backtest Overfitting)** — reported bundle-level. Diary flags any `PBO(candidate) > PBO(baseline) + 0.10`. NOT a MERGE gate.
-- **PSR (Probabilistic Sharpe Ratio)** — reported per-regime. Diary acknowledges `PSR(candidate) < PSR(baseline)` on any regime. NOT a MERGE gate.
-
-**The MERGE gate is per-regime Pareto-dominance vs baseline** (Critic Check 3d). DSR / PBO / PSR are decision-support, not pass/fail predicates. A candidate that ties baseline on every regime but has slightly worse DSR is an Optuna-trajectory noise artifact, NOT an edge regression — the relative-Pareto framework treats it accordingly.
-
-**Methodology-integrity gates remain HARD and BLOCKING** (no look-ahead, embargo applied, gap correct, reproducibility checksum match — see "Methodology Gates (HARD; PRESERVED)" in the Merge Principle section). These are the only absolute gates.
-
----
-
-## CPCV (Mandatory from iter-v1/001 onward)
-
-### Recommended Configuration
-
-```python
-N = 10                  # number of test groups
-k = 2                   # number of test groups in each split
-n_paths = C(N, k) = 45  # total backtest paths
-min_path_count = 10     # required minimum
-```
-
-### Constraints
-
-- `min path_count = C(N, k) ≥ 10` for any reported result
-- Purge gap = `(timeout_candles + 1) × n_symbols` symmetric on both sides of test boundary
-- Embargo δ ≈ 1% of T per López de Prado convention (AFML Ch. 7)
-
-### Walk-Forward as Fallback
-
-Walk-forward (the existing `walk_forward.py` harness, with the iter-v3/058 embargo fix at `walk_forward.py:113`) is NOT removed. It is wrapped and kept for edge cases — specifically when label horizon × n_symbols is so large that purging eats the training window. Document the threshold in the brief's Section 9.
-
-### Path-Level Statistics
-
-The CPCV path matrix (45 paths × 4 metrics) is the input to PBO computation. The matrix is also persisted at `reports-v1/iteration_v1-NNN/cpcv_paths.csv`.
-
----
-
-## Meta-Labeling Architecture
-
-From iter-v1/001 onward, every iteration trains TWO models per symbol:
-
-- **M1 — Primary (direction):** LightGBM classifier. Predicts side ∈ {long, short, no-trade}.
-- **M2 — Meta (size/filter):** LightGBM classifier on M1-positive bars only. Target: "did M1's signal close at TP within the vertical timeout?"
-
-### Position Sizing
-
-Position size = `clip(0.5 · (2 · meta_proba − 1) · vol_target_adjustment, 0, 1)` (half-Kelly + vol targeting).
-
-### Training Schedule
-
-- M1 trained per walk-forward month (existing schedule)
-- M2 trained per walk-forward month, separate Optuna study, same training window as M1
-- Both M1 and M2 serialized per month for reproducibility
-
-### Label Leakage Rule
-
-M2's training labels are M1's binary outcomes. **M2's purge horizon must extend through M1's full label timeout** — otherwise M2 leaks M1's future correctness into M2's training set.
-
----
-
-## Library Dependency Plan
-
-iter-v1/001 verifies the following pinned dependencies in `pyproject.toml`:
-
-- **`mlfinlab==1.4`** (or `mlfinpy` MIT fallback) — CombinatorialPurgedKFold, meta-labeling utilities, fractional differentiation
-- **`pypbo`** — standalone PBO via CSCV
-- **`fracdiff>=0.10`** — Numba-accelerated fractional differentiation with `FracdiffStat`
-- **`statsmodels`** — ADF stationarity testing
-
-Brief Section 9 declares which versions are used.
-
----
-
-## Where v1 Lives (Filesystem Map)
-
-```
-.claude/
-├── commands/
-│   ├── quant-iteration-v1.md      (v1 — THIS FILE — refactored 2026-05-23)
-│   ├── quant-iteration-v2.md      (v2 unchanged)
-│   ├── quant-iteration-v3.md      (v3 unchanged)
-│   └── quant-iteration.md         (legacy stub — points to quant-iteration-v1)
-└── agents/
-    ├── quant-researcher.md        (used for Phases 1-5, 7, 8 of v1/v2/v3)
-    ├── quant-engineer.md          (used for Phases 5.5, 6 of v1/v2/v3)
-    ├── quant-critic.md            (used for Phases 6.0, 7.5 of v1/v3)
-    └── lightgbm-master.md         (used for Phases 4.5, 7.4 of v1)
-
-ITERATION_PLAN_8H_V1.md            (workflow doc at repo root)
-BASELINE_V1.md                     (current v1 baseline at repo root — corrected walk-forward stats)
-
-src/crypto_trade/
-├── features/                      (v1 legacy — superseded by features_v1)
-├── features_v1/                   (v1 — new from refactor; mirrors v2/v3 isolation)
-├── features_v2/                   (v2 — never imported by v1 or v3)
-├── features_v3/                   (v3 — never imported by v1 or v2)
-└── strategies/ml/
-    ├── lgbm.py                    (shared backtest engine; track-aware)
-    ├── walk_forward.py            (canonical; train_end_ms = test_start_ms - embargo_ms at line 113)
-    ├── validation_v1.py           (NEW from refactor — CPCV, PBO, PSR for v1)
-    ├── validation_v2.py           (DSR works; CPCV/PBO stubs)
-    └── validation_v3.py           (v3 — CPCV, PBO, PSR)
-
-run_baseline_v1.py                 (NEW from refactor — v1 runner with CPCV + V1_EXCLUDED_SYMBOLS audit)
-run_baseline_v2.py                 (v2 runner)
-run_baseline_v3.py                 (v3 runner)
-
-reports-v1/
-└── iteration_v1-NNN/
-    ├── in_sample/
-    ├── out_of_sample/
-    ├── comparison.csv             (DSR + PBO + PSR + n_trials columns)
-    ├── pareto_front.csv           (10-seed × 6-metric matrix — BUNDLE only)
-    ├── cpcv_paths.csv             (45 CPCV paths)
-    ├── adf_test.csv               (per-feature ADF p-value)
-    ├── ic_matrix.csv              (pairwise feature-family IC)
-    ├── dsr.json                   (DSR + PBO + PSR + N_eff)
-    └── run.log                    (full stdout/stderr — used by LM Master Phase 7.4)
-
-briefs-v1/
-├── specialist_catalog.md          (SPECIALIST ledger — shared across iterations)
-└── iteration_v1-NNN/
-    ├── research_brief.md          (11 mandatory sections + 0.6 + 2.5)
-    ├── lgbm_advisor.md            (Phase 4.5 + Phase 7.4 sections)
-    ├── phase5p5_gate.md           (Engineer's PASS or BLOCK)
-    ├── critic_preflight.md        (Critic's Phase 6.0 PASS or BLOCK)
-    ├── engineering_report.md      (Engineer's Phase 6 output)
-    ├── qr_response.md             (only if Critic Round 2 clarifications requested OR BLOCK-PENDING-FIX fix)
-    └── review.md                  (Critic's Phase 7.5 output)
-
-diary-v1/
-└── iteration_v1-NNN.md            (QR's Phase 8 output)
-
-analysis/
-└── iteration_v1-NNN/
-    └── *.py                       (committed scripts producing brief Section 2 evidence)
-```
-
-**Track isolation enforced via grep at runtime:**
-- `grep -r "from crypto_trade.features_v2" src/crypto_trade/features_v1/` must be empty
-- `grep -r "from crypto_trade.features_v3" src/crypto_trade/features_v1/` must be empty
-- v1 imports ONLY from stdlib, third-party packages, and `crypto_trade.features_v1`
-
----
-
-## Git Workflow — v1 Refactored
-
-### Starting an iteration
-
-```bash
-git checkout quant-research && git pull
-git checkout -b iteration-v1/NNN
-```
-
-### Commit Discipline
-
-Separate documentation from code. NEVER mix them in the same commit.
-
-1. **Code commits** → prefix `feat(iter-v1/NNN):` or `fix(iter-v1/NNN):`
-2. **Phase 4.5 LM Master advisor** → single commit: `docs(iter-v1/NNN): phase 4.5 LM master advisor`
-3. **Research brief** → single commit: `docs(iter-v1/NNN): research brief`
-4. **Phase 5.5 gate** → single commit: `docs(iter-v1/NNN): phase 5.5 gate PASS` (or BLOCK)
-5. **Phase 6.0 pre-flight** → single commit: `docs(iter-v1/NNN): phase 6.0 pre-flight PASS` (or BLOCK)
-6. **Engineering report + Phase 7.4 post-mortem + Critic review** → single commit: `docs(iter-v1/NNN): engineering report + LM post-mortem + Critic review`
-7. **Diary entry** → LAST commit on branch: `docs(iter-v1/NNN): diary entry`
-
-### Merge Decision — STRICT TRUNK DISCIPLINE
-
-Same as v3's strict-trunk rule. `quant-research` holds only the source of truth for what RUNS today.
-
-What IS allowed on trunk via an iteration merge:
-- `src/` source code (feature modules, runners, risk wrappers)
-- `tests/` test code that covers code now on trunk
-- `BASELINE_V1.md` (when the iteration updates the baseline)
-- Other top-level source files like `run_baseline_v1.py`, `pyproject.toml`, `uv.lock`
-- `CLAUDE.md`, `.claude/`, `.gitignore` if the iteration touches them
-
-What is NEVER allowed on trunk via an iteration merge:
-- `briefs-v1/iteration_v1-NNN/**` (research brief, gates, LM advisor, engineering report, Critic review — stays on the iteration branch)
-- `diary-v1/iteration_v1-NNN.md` (Phase 8 diary — stays on the branch)
-- `analysis/iteration_v1-NNN/**` (per-iteration EDA/diagnostic scripts and their CSV outputs)
-- `reports-v1/iteration_v1-NNN/**` (backtest output artifacts — excluded historically)
-
-`briefs-v1/specialist_catalog.md` IS shared (one-line ledger entry per SPECIALIST) — that file aggregates the dead-paths catalog and is the trunk's index into iteration branches.
-
-**MERGE** (iteration beats baseline AND Critic OVERALL=BUNDLE-MERGE):
-
-```bash
-git checkout quant-research
-git cherry-pick <code-sha-1> <code-sha-2> ... <BASELINE_V1.md-update-sha>
-git tag -a v0.v1-NNN -m "Iteration v1-NNN: OOS Sharpe X.XX, PBO Y.YY, PSR Z.ZZ"
-```
-
-**NO-MERGE** (iteration fails any gate OR Critic OVERALL=BLOCK-FINAL):
-
-```bash
-git tag -a v0.v1-NNN -m "Iteration v1-NNN: NO-MERGE — <one-line reason>"
-git push origin iteration-v1/NNN v0.v1-NNN
-```
-
-Add the catalog ledger entry to `briefs-v1/specialist_catalog.md` via a small `docs(iter-v1/NNN): catalog entry` commit ON `quant-research` directly.
-
----
-
-## Research Brief — Mandatory v1 Sections
-
-The brief at `briefs-v1/iteration_v1-NNN/research_brief.md` MUST contain all 11 sections. The Phase 5.5 gate maps 1:1 onto these sections; any missing section = BLOCK.
-
-### Section Schema
-
-```markdown
-# Iteration v1-NNN — Research Brief
-
-## Section 0 — Data Split Declaration
-- OOS_CUTOFF_DATE: 2025-03-24 (unchanged)
-- training_months: 24 (unchanged)
-- IS window: [start_date, 2025-03-24)
-- OOS window: [2025-03-24, end_date)
-
-## Section 0.5 — Iteration Type Declaration
-TYPE: SPECIALIST  (or BUNDLE)
-- Wall-clock budget: <2h for SPECIALIST / 9h for BUNDLE>
-- (BUNDLE only) IS regime-coverage justification: <list SPECIALIST iter-v1/NNN ids from specialist_catalog.md + one-sentence regime-coverage rationale per QR judgment; NO formal precedent-count threshold>
-- Justification: <1-2 sentences>
-
-## Section 0.6 — Architecture-Family Justification (v1-only)
-- Axis family: feature-family | model-arch | labeling | universe | risk-primitive
-- Prior 5 SPECIALIST families: <list>
-- Rotation status: VALID | BLOCKED
-- One-sentence rationale: <why this family + axis is the right next step>
-
-## Section 1 — Hypothesis
-<one sentence: what changes and why we expect OOS improvement>
-
-## Section 2 — IS-Only Numerical Evidence
-<tables produced by analysis/iteration_v1-NNN/*.py — committed before brief>
-- Path to script: analysis/iteration_v1-NNN/<name>.py
-- Path to output: analysis/iteration_v1-NNN/<name>_output.csv
-<numerical tables inline>
-
-### Section 2.5 — HIGH-RISK Axis Declaration (v1-only)
-- Declaration: HIGH-RISK | NORMAL-RISK
-- Reason: <one sentence>
-- Mitigation (HIGH-RISK only): <pre-commit to running this axis at BUNDLE budget (ENSEMBLE_SIZE=10) at iter-v1/NNN+1 if PROMISING; NO multi-seed at THIS iteration>
-
-## Section 3 — Proposed Changes
-- Symbols: <added / removed / kept; rationale; V1_EXCLUDED_SYMBOLS check>
-- Labeling: <triple-barrier params, σ_t source, timeout>
-- Features: <added / removed; cluster-importance check ran>
-- Risk gates: <new gate? threshold? fire rate prediction>
-- LM Master responses:
-  - <recommendation 1>: adopted | modified | rejected (reason)
-  - <recommendation 2>: ...
-  - <recommendation 3>: ...
-
-## Section 4 — Expected OOS Impact
-- Predicted Sharpe delta: +X.X (CI: [Y.Y, Z.Z])
-- Falsifier: "if OOS Sharpe falls below W, hypothesis is rejected"
-
-### F-AXIS #2 — Cross-seed dispersion (basin-lottery audit; LOAD-BEARING)
-
-> **H11 — Metric rename 2026-06-07 (documentation reconciliation).** The F-AXIS #2 verdict band MUST reference `specialist_dispersion_mean` — the metric the SPECIALIST runner actually emits to `reports-v1/iteration_v1-NNN/specialist_dispersion.csv` and appends to `comparison.csv` per /065 commit `df8e9b1`. The legacy field name `cross_seed_sharpe_std` is RETIRED — code never produced it under SPECIALIST mode (50-inner-seed-averaged signal at single-outer-seed=42 produces no per-outer-seed sharpe std; the dispersion code emits a within-cell predicted-probability dispersion metric instead).
-
-`specialist_dispersion_mean` is the mean across walk-forward cells of the cross-seed standard deviation of the inner-ensemble predicted probability (read from `specialist_dispersion.csv`). Lower = more stable basin; higher = basin-lottery fingerprint at the cohort level.
-
-| Observed `specialist_dispersion_mean` | Interpretation |
-|---|---|
-| ≤ 0.20 | METHODOLOGY-VALIDATED-STRONG (basin convergent across seeds; cohort-level edge stable) |
-| 0.20 < x ≤ 0.30 | METHODOLOGY-VALIDATED (LM modal band; on-par with /063 family) |
-| 0.30 < x ≤ 0.40 | METHODOLOGY-PARTIAL (basin-lottery vigilance triggers; flag for Phase 7.4 diagnostic) |
-| > 0.40 (e.g. ≥ 30 in absolute-scale variants — see roster) | METHODOLOGY-NEGATIVE basin-lottery; per `feedback_v1_basin_lottery_vigilance.md` mandate multi-seed re-validation |
-
-(Brief authors: report the value verbatim from the runner-emitted `specialist_dispersion_mean` column in `comparison.csv`. Do NOT compute a derived "cross_seed_sharpe_std" — that metric was retired with H11.)
-
-## Section 5 — Risk Mitigation
-<R1/R2/R3 / 7-gate / new-gate changes; IS-calibrated thresholds; simulated effect on prior iterations>
-
-## Section 6 — Risk Management Design
-<8-primitive table or v1 equivalent; fire-rate predictions; regime coverage analysis>
-
-## Section 7 — Pre-Registered Failure-Mode Prediction
-<1-2 paragraphs predicting how this iteration most plausibly fails OOS, what the gates should catch, what the failure looks like in metrics>
-
-## Section 8 — Pre-Registered Per-Regime Baseline-Comparison Criteria
-<locked per-regime comparison plan vs current BASELINE_V1, BEFORE backtest.>
-
-- **Regimes to evaluate** (from briefs-v1/_meta/regime_catalog.md): bull, alt-rotation, chop, bear, vol-spike, liquidation-cascade, ETF-flow, recovery (or subset present in IS/OOS).
-- **Per-regime Pareto criteria** (read baseline numbers from briefs-v1/_meta/baseline_seed_regime_matrix.csv):
-  - For every regime R present: `sharpe_R(candidate) ≥ sharpe_R(baseline) − σ_R` AND `max_dd_R(candidate) ≤ max_dd_R(baseline) + σ_dd_R` AND `trade_count_R(candidate) ≥ 0.5 × trade_count_R(baseline)`.
-  - On at least one regime R*: `sharpe_R*(candidate) > sharpe_R*(baseline) + σ_R*` OR `max_dd_R*(candidate) < max_dd_R*(baseline) − σ_dd_R*`.
-- **DSR / PBO / PSR**: reported per-regime + bundle-level; flagged in diary if materially regressed vs baseline anchor, but NOT a MERGE gate.
-- **Methodology integrity gates** (HARD, BLOCKING): no look-ahead, embargo applied, gap correct, reproducibility checksum match.
-
-## Section 9 — Library Stack Declaration
-- mlfinlab: 1.4 (or mlfinpy <version> if fallback)
-- pypbo: <version>
-- fracdiff: <version>
-- statsmodels: <version> (for ADF)
-<note any fallback rationale>
-
-## Section 10 — Regime Attribution Plan (NEW v1, regime-ensemble mandate)
-
-- **Target regime(s):** which regime(s) this iteration is hypothesized to specialize in (bull / alt-rotation / chop / bear / vol-spike / liquidation-cascade / ETF-flow / other)
-- **Why this regime:** 1–2 sentences of mechanism
-- **Off-regime expectation:** what we expect this iter to do in OFF-target regimes (flat? small loss? don't know?)
-- **Bundle role:** candidate for {anchor / bull-specialist / chop-specialist / bear-specialist / tail-control / universal}
-- **Composition simulation:** if PROMISING in target regime, how would this component combine with the existing bundle? (stacking? regime-conditional dispatch? ensemble averaging?)
-- **Falsifier (regime-aware):** "if target-regime IS Sharpe < X, hypothesis is rejected" — NOT "if OOS Sharpe < X" alone (OOS may not contain target regime)
-
-## Section 11 — Bundle Composition (BUNDLE-only)
-
-For BUNDLE iterations of TYPE = `BUNDLE-ASSEMBLY`, declare ALL of the following sub-blocks. Phase 5.5 BLOCKS if any sub-block is missing; Phase 7.5 Critic Checks 15/16/17 BLOCK on substantive violations.
-
-- **Components included** (from prior SPECIALISTs):
-  - iter-v1/NNN-a: <regime role> — <one-sentence summary>
-  - iter-v1/NNN-b: <regime role> — <one-sentence summary>
-- **Composition method:** stacking / ensembling / regime-conditional dispatch / weighted average / other (specify)
-- **Regime coverage table:** every tagged regime; which component(s) cover it; bundle-attributed Sharpe per regime
-- **Pairwise OOS correlation table:** all component pairs; reject bundle if any pair > 0.70 (subject to correlation justification per rule 3)
-- **Component substitution test:** for each component, predict bundle OOS Sharpe WITHOUT that component
-- **Bundle-level OOS/IS prediction:** explicit prediction of the composite OOS/IS ratio (this IS the bundle gate)
-
-### 11.A — Universe Partition (HARD, Rule 7)
-
-- Component A (iter-v1/NNN-a): {SYMBOLS}
-- Component B (iter-v1/NNN-b): {SYMBOLS}
-- Component C (iter-v1/NNN-c): {SYMBOLS}
-- Pairwise disjoint: YES  (A ∩ B = A ∩ C = B ∩ C = {})
-- Union: {ALL SYMBOLS}
-
-If any pair is non-disjoint → BLOCK at Phase 5.5 (cheap) AND Critic Check 16 (deep).
-
-### 11.B — Weight Derivation (HARD, Rule 1)
-
-- **Method**: equal / IS-Sharpe-proportional / IS-inverse-variance / IS-risk-parity / other (specify)
-- **Script**: `analysis/iteration_v1-NNN/weight_calibration.py` (committed before Phase 6.0 Critic pre-flight)
-- **Artifact**: `analysis/iteration_v1-NNN/bundle_weights.csv` (committed before Phase 6.0)
-- **Quote** (verbatim from `bundle_weights.csv`):
-
-```csv
-component_id,weight,derivation_method,is_window_start,is_window_end
-<...>,<...>,<...>,<...>,<...>
-```
-
-- **IS-only assertion**: "Every loaded timestamp satisfies `close_time < OOS_CUTOFF_MS`. No reference to `out_of_sample`, `>= OOS_CUTOFF_MS`, or post-2025-03-24 dates used to filter IN appears in `weight_calibration.py`." (Critic Check 17 greps the script for these patterns.)
-
-> **H6 — Aggregator weight semantics under R5=ON (documentation reconciliation 2026-06-07; SPECIALIST-mode BUNDLE methodology note).**
->
-> Under R5=ON (`vt_target_vol=0.3`), the mean-of-signed-weights aggregator output is **direction-only at runtime**; `vol_targeting` discards `|signal.weight|` magnitude (per H6 code review finding, w692vx7w0). The aggregator is a **CONSENSUS DIRECTIONAL signal** under SPECIALIST mode — individual component magnitudes (Sharpe-proportional weights, inverse-variance weights, etc.) inform DIRECTION CONSENSUS only, never realized position size. Position sizing is owned by `vol_targeting` downstream of the aggregator.
->
-> Implications for brief authors:
-> - The Section 11.B weight-derivation method (equal / IS-Sharpe-proportional / IS-inverse-variance / IS-risk-parity) determines how components VOTE on direction. It does NOT determine realized exposure.
-> - Pre-registered Section 11.B weights should be interpreted as **directional consensus shaping**, NOT as size allocation across components.
-> - BUNDLE-001 (v0.v1-071) retains `vol_targeting=True` per its baseline risk profile. This is the canonical R5=ON contract; subsequent BUNDLEs that change this MUST justify in brief Section 5 and re-derive parity assumptions with QE.
-> - When R5 is OFF in a future BUNDLE, the aggregator output DOES carry magnitude through to position size, and Section 11.B weights have a direct interpretation. Brief must declare R5 status explicitly.
-
-### 11.C — Backtest-Live Parity Statement (HARD, Rule 8)
-
-One paragraph: prove the bundle's per-(symbol, candle) decision is a pure function of `(symbol, t) → owning_component.signal_at(symbol, t)` and is implementable at `live/engine.py:_tick` using only same-time-snapshot signals plus each component's frozen internal weight. State explicitly that no path requires post-trade aggregation, netting, or future-bar reference. (Critic Check 15 reads this statement and traces it through the runner code.)
-
-### 11.D — Re-Composition Note (Rule 7 escape valve)
-
-If a component coin was dropped to satisfy Rule 7: which component, which coin, the resulting per-component metrics under the re-composition (rerun the smaller component without that coin and document IS Sharpe / OOS Sharpe / n_trades), and the catalog row that anchors the re-composed component. If no coin was dropped: state "no re-composition required (candidates were natively disjoint)".
-```
-
----
-
-## Phase 8 — Mandatory Artifact Persistence Rule (added 2026-06-05)
-
-At every iteration closeout, the QR MUST run `git add reports-v1/iteration_v1-NNN/` BEFORE the commit, ensuring all CSV reports (trades.csv, daily_pnl.csv, monthly_pnl.csv, per_symbol.csv, feature_importance_*.csv, comparison.csv, specialist_dispersion.csv) enter git history. Parquet files remain gitignored per existing rule. NEVER run `git stash --include-untracked` in any setup or transition workflow — this evacuates report CSVs and breaks future bundle composition. If working-tree cleanliness is required, commit reports first, then stash only tracked changes.
-
-This is a HARD rule. Rationale: the `reports-v1/iteration_v1-NNN/` tree is the only post-hoc reconstruction surface for bundle composition, regime attribution, and dead-paths verification. The /063-/070 stash incident — in which the /063, /064, /065 specialist trades.csv files were nearly lost to `stash@{0}` and only recovered just before /071 BUNDLE-001 assembly — is the documented root cause. Going forward:
-
-- Phase 8 commit MUST include `git add reports-v1/iteration_v1-NNN/` immediately before `git commit`.
-- Phase 8 commit message MUST include the body line `reports tracked`.
-- Critic Phase 7.5 adds Check 18 (`REPORTS-TREE-COMMITTED`) verifying the reports tree exists in git history at the iteration's Phase 8 commit.
-- Setup / transition workflows that need a clean working tree MUST use selective `git stash -- <paths>` over tracked files only; **`git stash --include-untracked` is FORBIDDEN at any phase**. If the setup needs to clear untracked report CSVs, commit them first (under a `docs(iter-v1/NNN): reports tracked` or `feat(iter-v1/NNN): reports tracked` commit) and then operate.
-- Grandfathering: iter-v1/063, /064, /065 are GRANDFATHERED (their reports were recovered at /071 setup). The rule applies prospectively from iter-v1/072 onward.
-
----
-
-## Phase 8 Diary Template — v1
-
-QR's `diary-v1/iteration_v1-NNN.md`:
-
-```markdown
-# Iteration v1-NNN — Diary
-
-## Decision: MERGE or NO-MERGE
-<single line, no hedging>
-<if NO-MERGE due to Critic BLOCK-FINAL: name the failed Check>
-<if NO-MERGE due to Critic BLOCK-PENDING-FIX then BLOCK-FINAL: name both verdicts and what was attempted>
-
-## What Worked
-<numerical results; OOS metrics; per-symbol attribution; comparison vs baseline>
-
-## What Failed
-<honest accounting; if NO-MERGE, why specifically>
-
-## LM Master Advisory Tracking
-- Phase 4.5 confidence: HIGH / MEDIUM / LOW (from lgbm_advisor.md Phase 4.5 closing note)
-- Phase 4.5 recommendations: <list> — adopted / modified / rejected
-- Phase 7.4 post-mortem highlights: <2-3 bullets>
-
-## Critic Review Summary
-- Check 1 (Look-Ahead): PASS / FAIL  (FAIL → WALK-FORWARD-LEAKAGE → BLOCK-FINAL)
-- Check 2 (Embargo): PASS / FAIL  (FAIL → WALK-FORWARD-LEAKAGE → BLOCK-FINAL)
-- Check 3a (DSR/PSR — methodology gate): PASS / FAIL  (BUNDLE-only; SPECIALIST skips)
-- Check 3b (PBO — selection-bias gate): PASS / FAIL  (BUNDLE-only)
-- Check 3c (Regime attribution clarity — component-candidate gate): PASS / WARN / FAIL  (SPECIALIST + BUNDLE)
-- Check 3d (BUNDLE-level per-regime Pareto-dominance vs BASELINE_V1: candidate ≥ baseline within σ on EVERY tagged regime AND strictly better on ≥1 regime): PASS / FAIL  (BUNDLE-only; component SPECIALISTs EXEMPT — they use within-regime Δ vs baseline per Check 3c)
-- Check 4 (IC): INFORMATIONAL — |IC| values reported; not a gate (revised 2026-06-01)
-- Check 5 (ADF): INFORMATIONAL — ADF p-values reported; not a gate (revised 2026-06-01)
-- Check 6 (Pareto): PASS / WARN
-- Check 7 (Reproducibility): PASS / FAIL
-- Check 8 (Hypothesis-Implementation Alignment): PASS / FAIL
-- Check 14 (Axis Family Validation): PASS / FAIL (v1-only)
-- Check 15 (Backtest-Live Parity): PASS / FAIL / N/A  (v1-only, BUNDLE-ASSEMBLY-only)
-- Check 16 (Universe Disjointness): PASS / FAIL / N/A  (v1-only, BUNDLE-ASSEMBLY-only)
-- Check 17 (Bundle Weight IS-Only Provenance): PASS / FAIL / N/A  (v1-only, BUNDLE-ASSEMBLY-only)
-- OVERALL: UNIVERSAL | REGIME-SPECIALIST-IS | REGIME-SPECIALIST-OOS | TAIL-CONTROL | SPECIALIST-PROMISING | PROMISING-TENTATIVE | MULTI-SEED-WEAK-BASIN-LOTTERY | SPECIALIST-NEGATIVE / TRUE-NEG | LEARNED-NEG | NEGATIVE-no-effect | BUNDLE-MERGE | BUNDLE-MERGE-ASSEMBLY | BLOCK-PENDING-FIX → final | BLOCK-FINAL | WALK-FORWARD-LEAKAGE | BUNDLE-PARITY-VIOLATION | BUNDLE-UNIVERSE-OVERLAP | BUNDLE-WEIGHT-OOS-LEAK
-- Basin-Lottery Audit: per_seed_spread=<value or "un-computable"> | jaccard_median=<value or "un-computable"> | n_eff_ratio=<n_eff/n_trials> | flags=<SPREAD-HIGH / JACCARD-LOW / TENTATIVE / SEARCH-SATURATED / none> | downgrade_applied=<yes/no>
-
-## Path Forward (from Critic, if any BLOCK)
-<copy Critic's Path Forward verbatim — these become candidates for next iter's brief>
-
-## Pareto Position (chosen seed, BUNDLE only)
-<table from pareto_front.csv: chosen seed metrics + dominator (if any)>
-
-## ADF Stationarity Report
-<summary from adf_test.csv: count of features with p<0.05 vs p≥0.05>
-
-## Pre-Registered Failure-Mode vs Reality
-<from brief Section 7: "predicted failure was X via Y mechanism">
-<actual: "iteration failed via PBO threshold, mechanism was Z">
-<match? yes/partial/no — explain>
-
-## Axis Rotation Status (v1-only)
-- This iter's family: <family>
-- Prior 5 families: <list>
-- Rotation honored: YES / NO
-- Cumulative same-family count: <integer> (resets to 0 on family switch)
-
-## Lessons
-<generalizable takeaways; new entries for the dead-paths catalog if applicable>
-
-## Next Iteration Ideas
-<3–5 specific, testable hypotheses for the next QR; ranked by expected impact>
-<include Critic's Path Forward suggestions as candidates>
-```
-
-The "LM Master Advisory Tracking" section is the v1 diary's accountability mechanism — does LM Master's Phase 4.5 prediction match Phase 7.4 / Phase 7.5 outcome? Builds LM Master's track record honestly.
-
----
-
-## Subagent Invocation Protocol
-
-The orchestrating session uses Claude Code's `Agent` tool to delegate phase work.
-
-### QR Phases (1–5, 7, 8)
-
-```
-Agent({
-  description: "Run Phase X for iter-v1/NNN",
-  subagent_type: "quant-researcher",
-  prompt: "[mode: project] [track: v1] Run Phase X for iter-v1/NNN. Brief at briefs-v1/iteration_v1-NNN/research_brief.md (when applicable). Working directory: /home/roberto/crypto-trade/.worktrees/quant-research. Reference BASELINE_V1.md for current baseline."
-})
-```
-
-### LightGBM Master Phase 4.5
-
-```
-Agent({
-  description: "Phase 4.5 LM Master pre-design for iter-v1/NNN",
-  subagent_type: "lightgbm-master",
-  prompt: "[Phase 4.5] [track: v1] Run pre-design advisory for iter-v1/NNN. Working directory: /home/roberto/crypto-trade/.worktrees/quant-research. Read: BASELINE_V1.md, last 3 v1 diaries, prior iter-v1/NNN-1 lgbm_advisor.md and engineering_report.md and feature_importance.csv, runner code, lgbm.py + optimization.py. QR's tentative axis: <one-line summary>. Emit lgbm_advisor.md content as final message text per Phase 4.5 template — orchestrator persists at briefs-v1/iteration_v1-NNN/lgbm_advisor.md."
-})
-```
-
-### Engineer Phase 5.5 Gate
-
-```
-Agent({
-  description: "Verify Phase 5.5 gate for iter-v1/NNN",
-  subagent_type: "quant-engineer",
-  prompt: "[track: v1] Run the Phase 5.5 brief-completeness gate for iter-v1/NNN. Read briefs-v1/iteration_v1-NNN/research_brief.md AND briefs-v1/iteration_v1-NNN/lgbm_advisor.md (verify LM Master responses in brief Section 3). Verify all 11 mandatory sections (incl. 0.6, 2.5). Verify axis rotation. For BUNDLE iterations, verify Section 0.5 references SPECIALIST iter-v1/NNN ids from briefs-v1/specialist_catalog.md and justifies IS regime-coverage of the running roster (per QR judgment; NO formal precedent-count threshold). Write phase5p5_gate.md with OVERALL=PASS or BLOCK + per-section status."
-})
-```
-
-### Critic Phase 6.0 Pre-Flight
-
-```
-Agent({
-  description: "Phase 6.0 Critic pre-flight for iter-v1/NNN",
-  subagent_type: "quant-critic",
-  prompt: "[Phase 6.0 PRE-FLIGHT] [track: v1] Run pre-flight review for iter-v1/NNN. Read briefs-v1/iteration_v1-NNN/research_brief.md AND briefs-v1/iteration_v1-NNN/phase5p5_gate.md (confirm OVERALL=PASS). Read QE's src/ diff: `git diff <parent-baseline>..iteration-v1/NNN -- src/`. Run mini-checks 1, 13, foundation regression, cadence, falsifier. Emit critic_preflight.md content as final message text with OVERALL=PASS or BLOCK + Path Forward (if BLOCK). DO NOT run the full Phase 7.5 8-check pass."
-})
-```
-
-### Engineer Phase 6 — SPLIT DISPATCH (long backtests > 30 min)
-
-Same as v3 (Engineer setup → orchestrator launches detached bash → Engineer report-only). Save agent quota.
-
-### LightGBM Master Phase 7.4
-
-```
-Agent({
-  description: "Phase 7.4 LM Master post-mortem for iter-v1/NNN",
-  subagent_type: "lightgbm-master",
-  prompt: "[Phase 7.4 POST-MORTEM] [track: v1] Run post-mortem interpretation for iter-v1/NNN. Working directory: /home/roberto/crypto-trade/.worktrees/quant-research. Read briefs-v1/iteration_v1-NNN/research_brief.md, briefs-v1/iteration_v1-NNN/engineering_report.md, briefs-v1/iteration_v1-NNN/lgbm_advisor.md (Phase 4.5 section), reports-v1/iteration_v1-NNN/{comparison.csv, in_sample/feature_importance.csv, out_of_sample/feature_importance.csv, pareto_front.csv, cpcv_paths.csv, ic_matrix.csv, run.log}. Emit Phase 7.4 section of lgbm_advisor.md as final message text per LM Master template — orchestrator appends to briefs-v1/iteration_v1-NNN/lgbm_advisor.md."
-})
-```
-
-### Critic Phase 7.5
-
-```
-Agent({
-  description: "Phase 7.5 Critic review for iter-v1/NNN",
-  subagent_type: "quant-critic",
-  prompt: "[Phase 7.5] [track: v1] Run Phase 7.5 adversarial review for iter-v1/NNN. Branch: iteration-v1/NNN. Report dir: reports-v1/iteration_v1-NNN. Brief dir: briefs-v1/iteration_v1-NNN. Read lgbm_advisor.md (both Phase 4.5 and Phase 7.4 sections) as supplemental input. Run all 8 mandatory checks + Check 14 (Axis Family Validation, v1-only) + Check 15 (Backtest-Live Parity, BUNDLE-ASSEMBLY-only) + Check 16 (Universe Disjointness, BUNDLE-ASSEMBLY-only) + Check 17 (Bundle Weight IS-Only Provenance, BUNDLE-ASSEMBLY-only) + optional 9-12. Emit review.md content as final message text with OVERALL ∈ {SPECIALIST-PROMISING, SPECIALIST-NEGATIVE, BUNDLE-MERGE, BUNDLE-MERGE-ASSEMBLY, BLOCK-PENDING-FIX, BLOCK-FINAL}. BLOCK-FINAL reasons include: BUNDLE-PARITY-VIOLATION, BUNDLE-UNIVERSE-OVERLAP, BUNDLE-WEIGHT-OOS-LEAK. **PATH FORWARD section MANDATORY on every BLOCK verdict.**"
-})
-```
-
-### Hand-off Sanity Checks
-
-- LM Master's Phase 4.5 final message starts with `# LightGBM Master Advisor — iter-v1/NNN — Phase 4.5 (Pre-Design)` — orchestrator persists as `lgbm_advisor.md`.
-- Engineer's `OVERALL=PASS` in phase5p5_gate.md is the handshake to Phase 6.0.
-- Critic's `OVERALL=PASS` in critic_preflight.md is the handshake to Phase 6.
-- Engineer's `OVERALL=READY-FOR-CRITIC` in engineering_report.md is the handshake to Phase 7.4.
-- LM Master's Phase 7.4 message starts with `# LightGBM Master Advisor — iter-v1/NNN — Phase 7.4 (Post-Mortem)` — orchestrator appends to `lgbm_advisor.md`.
-- Critic's final message starts with `# Phase 7.5 Critic Review — iter-v1/NNN` and contains `OVERALL: <verdict>` — orchestrator parses.
-- BLOCK-PENDING-FIX → orchestrator routes back through one QE re-fix + Critic single-pass re-review BEFORE Phase 7/8.
-
----
-
-## Quick-Start Command (for the human user)
-
-`/quant-iteration-v1` triggers the autopilot loop:
-
-1. Read `BASELINE_V1.md` + last 3 v1 diaries + specialist_catalog.md
-2. Determine next iteration number (next `iter-v1/NNN`)
-3. `git checkout quant-research && git checkout -b iteration-v1/NNN`
-4. QR Phases 1–4 → tentative axis identified
-5. **LM Master Phase 4.5 → `lgbm_advisor.md`** (pre-design)
-6. QR Phase 5 → research brief at `briefs-v1/iteration_v1-NNN/research_brief.md` (integrates LM Master responses)
-7. Engineer Phase 5.5 gate → `phase5p5_gate.md` (PASS or BLOCK)
-8. If BLOCK → return to QR; loop on QR Phase 5
-9. If PASS → QE Phase 6 setup-only commit
-10. **Critic Phase 6.0 pre-flight → `critic_preflight.md`** (PASS or BLOCK)
-11. If BLOCK → return to QR for brief revision; loop on QR Phase 5
-12. If PASS → QE Phase 6 backtest → engineering report + reports
-13. **LM Master Phase 7.4 → `lgbm_advisor.md` (post-mortem appended)**
-14. Critic Phase 7.5 → `review.md` (OVERALL=SPECIALIST-PROMISING / NEGATIVE / BUNDLE-MERGE / BLOCK-PENDING-FIX / BLOCK-FINAL)
-15. If BLOCK-PENDING-FIX → QR/QE fixes specific defect → re-run Phase 6 → Critic single-pass re-review (Round 4) → final verdict (PASS or BLOCK-FINAL)
-16. QR Phase 7 → OOS evaluation memo
-17. QR Phase 8 → diary + merge decision
-18. Commit/tag per git workflow
-19. Loop back to step 1 with the new diary's "Next Iteration Ideas"
-
----
-
-## Migration Notes (Legacy v1 → Refactored v1)
-
-The historical 186 iterations on `iteration_NNN/` are archived (kept on `main`, never deleted). The **corrected v1 baseline** under the fixed walk-forward IS the iter-v1/001 anchor. Future iterations beat the corrected baseline — never the inflated historical v0.186.
-
-`BASELINE_V1.md` populated by one-time re-run of `iteration_186`'s config under fixed `walk_forward.py:113`. This is a PREREQUISITE to iter-v1/001, NOT iter-v1/001's deliverable.
-
-The legacy `/quant-iteration` skill is **deprecated** — `.claude/commands/quant-iteration.md` becomes a stub pointing to `quant-iteration-v1`. Existing references in MEMORY.md and elsewhere should be updated to `quant-iteration-v1` over time.
-
----
-
-## Key Reminders — v1 (Refactored)
-
-- **The walk-forward is the leakage defense; the IS/OOS split is the researcher-honesty defense; the bundle is the product.** Both IS and OOS undergo the SAME monthly train-predict cycle with embargo. IS/OOS is NOT a classical train/test bisection.
-- **The bundle is the product.** Individual SPECIALISTs identify regime specialists; BUNDLEs assemble them. An IS-strong / OOS-modest model is a `REGIME-SPECIALIST-IS` candidate, NOT an "overfit reject" — pending regime-attribution analysis.
-- **Replace "OVERFIT" with "IS-REGIME-SPECIALIST candidate"** in every Phase 7.5 closeout where: (a) IS Δ ≥ +0.10, (b) OOS Δ ∈ [−0.20, +0.05], (c) regime attribution shows clean within-regime edge, (d) mechanism is NOT importance-INERT (load-bearing feature/risk-primitive). True overfit (importance-INERT basin lottery + OOS catastrophic + mechanism falsified) remains `LEARNED-NEG`.
-- **Regime attribution is the load-bearing signal for component candidates.** OOS Sharpe Δ alone is insufficient. Within-regime Sharpe + regime coverage gap analysis are required, produced by LM Master Phase 7.4 Regime Attribution Table.
-- **`OOS/IS ≥ 0.5` is a BUNDLE-level gate**, NOT a component-SPECIALIST gate. Component SPECIALISTs use regime-attributed within-regime metrics. BUNDLEs use composite OOS/IS.
-- The Critic is read-only by structural design. Tools: `Read, Glob, Grep` ONLY.
-- The LightGBM Master is read-only by structural design. Tools: `Read, Glob, Grep, Bash` (Bash for inspection, NEVER edits).
-- Phase 5.5 gate is the first structural defense. Engineer refuses to start Phase 6.0 without complete brief.
-- Phase 6.0 Critic pre-flight is the second structural defense — catches issues BEFORE compute is spent.
-- BLOCK-PENDING-FIX grants exactly ONE rerun. After it, verdict is final (PASS or BLOCK-FINAL).
-- Path Forward section is MANDATORY on every Critic BLOCK verdict.
-- **MERGE Principle: per-regime Pareto-dominance vs current BASELINE_V1.** Candidate must Pareto-better-or-equal baseline on EVERY tagged regime (within σ_R tolerance) AND strictly better on ≥1 regime. No absolute Sharpe / DSR / PBO / PSR floors — these are reported INFORMATIONAL per-regime and bundle-level, diary-flagged on material regression, but NOT auto-blocking. Methodology-integrity gates (look-ahead, embargo, gap, reproducibility) remain HARD. See "Merge Principle — Relative Regime Pareto-Dominance" section.
-- **Bundle weights are IS-only by HARD gate.** Every BUNDLE-ASSEMBLY pre-registers a deterministic weight derivation in brief Section 11.B, computed by a committed `analysis/iteration_v1-NNN/weight_calibration.py` script that reads ONLY IS-window data. Any OOS reference in the derivation chain → BLOCK-FINAL `BUNDLE-WEIGHT-OOS-LEAK` at Phase 7.5 Critic Check 17.
-- **No coin overlap across bundle components.** In a bundle, every coin is owned by EXACTLY ONE component. Brief Section 11.A enumerates per-component universes and asserts `Pairwise disjoint: YES`. Overlap → BLOCK-FINAL `BUNDLE-UNIVERSE-OVERLAP` at Phase 7.5 Critic Check 16 (or earlier at Phase 5.5 structural pre-check).
-- **Backtest-live parity is HARD for bundles.** Every BUNDLE-ASSEMBLY's composition method MUST produce IDENTICAL trade decisions in backtest and at `live/engine.py:_tick`. Section 11.C states the parity proof; aggregation rules referring to post-trade information (summed realized PnL across two models on the same symbol, etc.) → BLOCK-FINAL `BUNDLE-PARITY-VIOLATION` at Phase 7.5 Critic Check 15.
-- v1 universe must exclude all v2+v3 symbols (V1_EXCLUDED_SYMBOLS enforced at runtime).
-- Track isolation: v1 NEVER imports from `crypto_trade.features_v2` (v2) or `crypto_trade.features_v3` (v3).
-- Axis Rotation Discipline: every 5 same-family SPECIALISTs triggers mandatory family rotation.
-- HIGH-RISK declaration is mandatory in every brief Section 2.5. Mitigation is pre-commit to BUNDLE at next iter — NOT a seed-count bump. SPECIALIST ALWAYS uses 3 inner seeds, even HIGH-RISK ([[v1-seed-count-non-negotiable]]).
-- "QR uses IS data" — Phase 5 brief must contain numerical tables from a committed `analysis/iteration_v1-NNN/*.py` script.
-- Pre-registered failure-mode prediction (Section 7) and MERGE/NO-MERGE criteria (Section 8) are MANDATORY in every v1 brief.
-- BLOCK-FINAL from the Critic is FINAL. Re-running after a fix is selection bias (BLOCK-PENDING-FIX is the only sanctioned single-rerun mechanism).
-- Sacred constants are sacred. `OOS_CUTOFF_DATE = 2025-03-24` and `training_months = 24` never change.
-- `walk_forward.py:113` carries `train_end_ms = test_start_ms - embargo_ms`. The iter-v3/058 fix is law — anything else is the iter-v3/057-style bug.
-- LM Master is the missing "creator" role from v3 cycle-7's diagnosis. QR + LM Master + QE + Critic = the four-role v1 workflow.
-
-- **Basin-Lottery Vigilance is a workflow gate, not an advisory.** Per-seed IS Sharpe spread > 0.50 → `SPREAD-HIGH` → automatic verdict downgrade. Jaccard median < 0.40 → `JACCARD-LOW` → `BASIN-LOTTERY-INSTABILITY` tag. Single-seed PROMISING → `PROMISING-TENTATIVE` → MUST complete multi-seed re-validation before BUNDLE inclusion. n_eff / n_trials < 60% → `SEARCH-SATURATED` → recommend n_trials increase or HP-space narrowing. All lottery diagnostics are MANDATORY computations in Phase 7.5 — not optional checks. LM Master Phase 4.5 MUST pre-register expected per-seed spread. Phase 8 diary MUST include a "Basin-Lottery Audit" subsection. Promotion to BUNDLE is BLOCKED for any component carrying unresolved `SPREAD-HIGH` or `JACCARD-LOW` flags.
-
-The v1 refactor turns informal best-practices into structural gates AND adds a creator role to prevent the QR↔Critic loop from running out of ideas. The structure makes it harder to fool yourself, and harder to fool yourself is the entire game.
+Then determine the next iteration number and run the flow. Start with BTCUSDT.
