@@ -335,6 +335,19 @@ V1_BTC_PRUNED_ITER002: tuple[str, ...] = (
 V1_BTC_ORTHO_ITER005_ADDS: tuple[str, ...] = ("btc_funding_spread_30_90",)
 V1_BTC_ORTHO_ITER005: tuple[str, ...] = V1_BTC_PRUNED_ITER002 + V1_BTC_ORTHO_ITER005_ADDS
 
+#: iter-v1/006 EXPLORATION (BTCUSDT): the 41-col OHLCV prune + the funding-LEVEL z-score
+#: funding_rate_zscore_90 (NOT the spread). FE Phase 4 (iter-006 feature_report.md) found this
+#: is the only orthogonal candidate clearing every IS-only diagnostic at once: |IS-IC|=0.043
+#: (monotone-decreasing quintiles, ABOVE the entire 41-col price band whose max |IC|=0.028),
+#: orthogonal (max |corr| 0.37 vs the prune), top-quartile gain-importance (rank 8/42), and the
+#: best dual purged-CV OOF lift (+0.0105 dir_acc, +0.0102 R²). iter-005 tested the funding SPREAD
+#: (rank 16/42, the weakest funding member) and went NEGATIVE; the funding LEVEL z-score is a
+#: materially stronger, never-screened signal. funding_rate_zscore_90 is in the parquet but NOT
+#: in V1_FEATURE_COLUMNS — same override discipline as /005 (PRUNE ⊆ V1_FEATURE_COLUMNS; the
+#: orthogonal add listed explicitly + verified present in the BTC parquet pre-launch).
+V1_BTC_ORTHO_ITER006_ADDS: tuple[str, ...] = ("funding_rate_zscore_90",)
+V1_BTC_ORTHO_ITER006: tuple[str, ...] = V1_BTC_PRUNED_ITER002 + V1_BTC_ORTHO_ITER006_ADDS
+
 #: iter-v1/023: full V1_BASELINE_UNIVERSE (5-sym) with funding-rate z-score feature family.
 #: Feature-family EXPLORATION cycle-3 #8/10. V1_FEATURE_COLUMNS_PRUNED 40 → 42.
 #: Dispatch is handled by the iteration_label == "v1-023" elif branch.
@@ -3585,6 +3598,30 @@ def main() -> None:
             f"(41-col prune + orthogonal {list(V1_BTC_ORTHO_ITER005_ADDS)}) "
             f"| R2 OFF | R1=OFF R3=ON({BASELINE_OOD_CUTOFF_PCT}) R5/vt=ON atr_tp=2.9 atr_sl=1.45"
         )
+    elif iteration_label == "v1-006":
+        # iter-v1/006 EXPLORATION (BTCUSDT, K=5). ORTHOGONAL-FEATURE axis: the 41-col OHLCV
+        # prune + the funding-LEVEL z-score funding_rate_zscore_90 (NOT the /005 spread). FE
+        # Phase 4 recommendation (A): the only orthogonal candidate clearing every IS-only
+        # diagnostic at once (|IC|=0.043 above the price band, orthogonal max|corr|=0.37,
+        # importance rank 8/42, best dual purged-CV OOF lift). R2 OFF (baseline risk).
+        # PRUNE part MUST be ⊆ V1_FEATURE_COLUMNS; the orthogonal add lives in the parquet
+        # OUTSIDE the 193 (presence verified pre-launch; importance now visible via the /006
+        # active_feature_columns sync fix above).
+        _full_set = set(V1_FEATURE_COLUMNS)
+        _missing = [c for c in V1_BTC_PRUNED_ITER002 if c not in _full_set]
+        assert not _missing, (
+            f"iter-v1/006: prune base not a subset of V1_FEATURE_COLUMNS — {_missing}"
+        )
+        assert len(set(V1_BTC_ORTHO_ITER006)) == len(V1_BTC_ORTHO_ITER006), (
+            "iter-v1/006: V1_BTC_ORTHO_ITER006 has duplicate columns"
+        )
+        _spec_feature_columns = list(V1_BTC_ORTHO_ITER006)
+        _spec_apply_r2 = False  # R2 OFF — baseline risk
+        print(
+            f"[iter-v1/006] OVERRIDE ACTIVE: features={len(V1_BTC_ORTHO_ITER006)} "
+            f"(41-col prune + orthogonal {list(V1_BTC_ORTHO_ITER006_ADDS)}) "
+            f"| R2 OFF | R1=OFF R3=ON({BASELINE_OOD_CUTOFF_PCT}) R5/vt=ON atr_tp=2.9 atr_sl=1.45"
+        )
 
     # -------------------------------------------------------------------------
     # UNIVERSAL SINGLE-SYMBOL ROUTING GUARD (iter-v1/redesign 2026-06-15).
@@ -3605,6 +3642,16 @@ def main() -> None:
     # -------------------------------------------------------------------------
     if (args.exploration or args.confirmation) and len(set(symbols)) == 1:
         _spec_sym = symbols[0]
+        # iter-v1/006 verifiability fix (task #130): sync the report-layer feature list to
+        # the ACTUAL trained columns. Override branches (e.g. /005, /006) reassign
+        # _spec_feature_columns to a narrowed/orthogonal set, but active_feature_columns
+        # stayed at the 193-col V1_FEATURE_COLUMNS — so _write_feature_importance and
+        # _run_methodology_reporting (ADF/IC) reported on columns the model never used and
+        # OMITTED any orthogonal feature outside the 193 (the iter-005 funding-feature
+        # invisibility). For single-symbol specialist runs the legacy multi-symbol run_model
+        # branches never execute, so narrowing here is safe and strictly more correct:
+        # every downstream artifact now reflects exactly what the specialist trained on.
+        active_feature_columns = list(_spec_feature_columns)
         print(
             f"[v1] SPECIALIST BAGGING: K={bagging_k} "
             f"(inner ensemble=1, outer seeds=1) symbol={_spec_sym} mode={mode_label}"
