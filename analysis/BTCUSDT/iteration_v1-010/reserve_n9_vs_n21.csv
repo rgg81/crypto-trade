@@ -1,0 +1,3 @@
+horizon,n,trades_per_mo,wr,payoff,be_payoff,clears_be,sharpe_pt,sharpe_ann,LONG_sharpe_ann
+N=21 (7d),4552,72.6,0.3425,2.041,1.92,True,0.0222,0.6563,1.4384
+N=9 (3d),4560,72.7,0.445,1.371,1.247,True,0.0362,1.0685,0.8075
