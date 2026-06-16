@@ -269,6 +269,60 @@ shows +10.79% IS / +12.45% OOS lift (both halves positive).
 LOCAL to runner. assert set(symbols) == {"LTCUSDT"} guard fires for this branch.
 """
 
+#: iter-v1/002 (redesigned single-symbol track, BTCUSDT EXPLORATION K=3).
+#: PRUNED feature set — 41-col STRICT SUBSET of the 193-col V1_FEATURE_COLUMNS
+#: (NO feature-generation change; only the feature_columns argument changes).
+#: Derived IS-only (close_time < 2025-03-24) from BTC-specific iter-001 importance
+#: + BTC IS IC (1-bar + 21-bar) + hierarchical clustering on |Spearman| distance
+#: (cut at |rho|>=0.70 -> 52 clusters; keep 1 representative/cluster; drop the 12
+#: jointly-inert reps -> 41). Source: feature_report.md §1-§3 + the committed
+#: analysis/BTCUSDT/iteration_v1-002/{ic_pruning_audit,build_pruned_set}.py.
+#: Activated ONLY by the iteration_label == "v1-002" keyed override below; every
+#: other single-symbol run stays on the 193-col default.
+V1_BTC_PRUNED_ITER002: tuple[str, ...] = (
+    "cal_dow_norm",
+    "mom_macd_hist_12_26_9",
+    "mom_macd_hist_5_13_3",
+    "mr_bb_pctb_10",
+    "mr_pct_from_high_10",
+    "mr_pct_from_high_100",
+    "mr_pct_from_low_100",
+    "mr_pct_from_low_20",
+    "mr_rsi_extreme_14",
+    "stat_autocorr_lag1",
+    "stat_autocorr_lag10",
+    "stat_autocorr_lag5",
+    "stat_kurtosis_10",
+    "stat_kurtosis_30",
+    "stat_kurtosis_50",
+    "stat_skew_10",
+    "stat_skew_20",
+    "stat_skew_50",
+    "trend_adx_14",
+    "trend_adx_7",
+    "trend_aroon_down_25",
+    "trend_aroon_down_50",
+    "trend_aroon_osc_14",
+    "trend_aroon_osc_25",
+    "trend_aroon_osc_50",
+    "trend_plus_di_21",
+    "trend_psar_af",
+    "trend_sma_50",
+    "trend_supertrend_10_2",
+    "trend_supertrend_7_3",
+    "vol_ad",
+    "vol_cmf_20",
+    "vol_garman_klass_50",
+    "vol_hist_10",
+    "vol_hist_5",
+    "vol_obv",
+    "vol_taker_buy_ratio",
+    "vol_taker_buy_ratio_sma_10",
+    "vol_taker_buy_ratio_sma_50",
+    "vol_volume_pctchg_15",
+    "vol_volume_pctchg_20",
+)
+
 #: iter-v1/023: full V1_BASELINE_UNIVERSE (5-sym) with funding-rate z-score feature family.
 #: Feature-family EXPLORATION cycle-3 #8/10. V1_FEATURE_COLUMNS_PRUNED 40 → 42.
 #: Dispatch is handled by the iteration_label == "v1-023" elif branch.
@@ -443,6 +497,9 @@ def run_model(
     *,
     apply_r1: bool,
     apply_r2: bool = False,
+    risk_drawdown_trigger_pct: float = 7.0,
+    risk_drawdown_scale_floor: float = 0.33,
+    risk_drawdown_scale_anchor_pct: float = 15.0,
     n_trials: int,
     ensemble_size: int,
     oof_persist_path: Path | None = None,
@@ -572,9 +629,9 @@ def run_model(
         risk_consecutive_sl_limit=3 if apply_r1 else None,
         risk_consecutive_sl_cooldown_candles=27 if apply_r1 else 0,
         risk_drawdown_scale_enabled=apply_r2,
-        risk_drawdown_trigger_pct=7.0,
-        risk_drawdown_scale_floor=0.33,
-        risk_drawdown_scale_anchor_pct=15.0,
+        risk_drawdown_trigger_pct=risk_drawdown_trigger_pct,
+        risk_drawdown_scale_floor=risk_drawdown_scale_floor,
+        risk_drawdown_scale_anchor_pct=risk_drawdown_scale_anchor_pct,
         risk_r5_vol_target_enabled=r5_vol_target_enabled,
         risk_r5_vol_target_pct=r5_vol_target_pct,
         risk_r5_kill_low_natr_enabled=r5_kill_low_natr_enabled,
@@ -3430,6 +3487,51 @@ def main() -> None:
     # Set by the universal single-symbol routing guard below; consumed by the
     # post-report comparison.csv append block. None for all legacy dispatches.
     _generic_specialist_disp_mean: float | None = None
+
+    # -------------------------------------------------------------------------
+    # PER-ITERATION SINGLE-SYMBOL OVERRIDES (iter-v1/redesign 2026-06-15).
+    #
+    # Keyed on iteration_label. The universal single-symbol routing guard below
+    # reads `_spec_feature_columns` + `_spec_r2_kwargs` from here. The DEFAULT
+    # (no keyed override) is the BASELINE_V1 rule: 193-col V1_FEATURE_COLUMNS
+    # (unless --pruned-features) + R2 OFF (apply_r2=False, baseline 7/0.33/15
+    # trigger/floor/anchor — inert because disabled). Each future single-symbol
+    # iteration registers its own block here; keep them minimal and IS-justified.
+    # -------------------------------------------------------------------------
+    _spec_feature_columns: list[str] = active_feature_columns
+    _spec_apply_r2: bool = False
+    # run_model R2 trigger/floor/anchor — only consumed when _spec_apply_r2=True.
+    _spec_r2_trigger_pct: float = 7.0
+    _spec_r2_scale_floor: float = 0.33
+    _spec_r2_scale_anchor_pct: float = 15.0
+
+    if iteration_label == "v1-002":
+        # iter-v1/002 EXPLORATION (BTCUSDT, K=3). PRIMARY axis = 41-col feature
+        # prune (V1_BTC_PRUNED_ITER002). SUPPORTING = R2 drawdown-scaling brake
+        # (8/0.5/18) per risk_report.md §6 — size-only, does NOT suppress entries.
+        # Fail-loud: the pruned set MUST be a strict subset of V1_FEATURE_COLUMNS.
+        _full_set = set(V1_FEATURE_COLUMNS)
+        _missing = [c for c in V1_BTC_PRUNED_ITER002 if c not in _full_set]
+        assert not _missing, (
+            f"iter-v1/002: V1_BTC_PRUNED_ITER002 not a strict subset of "
+            f"V1_FEATURE_COLUMNS — {len(_missing)} unknown cols: {_missing}"
+        )
+        assert len(set(V1_BTC_PRUNED_ITER002)) == len(V1_BTC_PRUNED_ITER002), (
+            "iter-v1/002: V1_BTC_PRUNED_ITER002 contains duplicate columns"
+        )
+        _spec_feature_columns = list(V1_BTC_PRUNED_ITER002)
+        _spec_apply_r2 = True
+        _spec_r2_trigger_pct = 8.0
+        _spec_r2_scale_floor = 0.5
+        _spec_r2_scale_anchor_pct = 18.0
+        print(
+            f"[iter-v1/002] OVERRIDE ACTIVE: features=41 (V1_BTC_PRUNED_ITER002, "
+            f"strict subset of {len(V1_FEATURE_COLUMNS)}-col V1_FEATURE_COLUMNS) "
+            f"| R2 drawdown-scaling ON (trigger={_spec_r2_trigger_pct} "
+            f"floor={_spec_r2_scale_floor} anchor={_spec_r2_scale_anchor_pct}) "
+            f"| R1=OFF R3=ON({BASELINE_OOD_CUTOFF_PCT}) R5/vt=ON atr_tp=2.9 atr_sl=1.45"
+        )
+
     # -------------------------------------------------------------------------
     # UNIVERSAL SINGLE-SYMBOL ROUTING GUARD (iter-v1/redesign 2026-06-15).
     #
@@ -3455,8 +3557,9 @@ def main() -> None:
         )
         print(
             f"[v1] universal single-symbol routing — generic specialist dispatch "
-            f"(features={len(active_feature_columns)} bounds=v1_specialist "
-            f"R1=OFF R2=OFF R3=ON-AGGREGATOR cutoff={BASELINE_OOD_CUTOFF_PCT} "
+            f"(features={len(_spec_feature_columns)} bounds=v1_specialist "
+            f"R1=OFF R2={'ON' if _spec_apply_r2 else 'OFF'} "
+            f"R3=ON-AGGREGATOR cutoff={BASELINE_OOD_CUTOFF_PCT} "
             f"R5=ON vt_target_vol=0.3 atr_tp=2.9 atr_sl=1.45)"
         )
         _spec_results, _spec_faxm, _spec_strat = run_model(
@@ -3465,11 +3568,14 @@ def main() -> None:
             atr_tp=2.9,
             atr_sl=1.45,
             apply_r1=False,  # R1=OFF: CATALOG-CLOSED for specialist_mode
-            apply_r2=False,  # R2=OFF: Model A baseline
+            apply_r2=_spec_apply_r2,  # default OFF; per-iteration override may enable (e.g. /002)
+            risk_drawdown_trigger_pct=_spec_r2_trigger_pct,
+            risk_drawdown_scale_floor=_spec_r2_scale_floor,
+            risk_drawdown_scale_anchor_pct=_spec_r2_scale_anchor_pct,
             n_trials=n_trials,  # honored per-seed in specialist mode (K>0): the --n-trials value
             ensemble_size=1,  # inner ensemble FIXED at 1 (placeholder seed [42])
             oof_persist_path=OOF_PARQUET_PATH,
-            feature_columns=active_feature_columns,
+            feature_columns=_spec_feature_columns,
             bounds_profile="v1_specialist",
             r5_vol_target_enabled=_r5_kwargs.get("r5_vol_target_enabled", True),
             r5_vol_target_pct=_r5_kwargs.get("r5_vol_target_pct", 4.0),
