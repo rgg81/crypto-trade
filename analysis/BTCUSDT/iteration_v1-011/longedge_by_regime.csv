@@ -1,0 +1,8 @@
+regime,long_n,trades_per_mo,long_sharpe_ann,long_wr,always_long_sharpe,model_beats_long
+ALL (ungated LONG),2549,40.6,1.957,0.47,0.915,True
+TREND bull (200SMA up),1425,22.7,2.474,0.489,1.489,True
+TREND bear (200SMA dn),1124,17.9,0.113,0.447,-0.335,True
+VOL high (natr>p67),887,14.1,0.916,0.528,0.177,True
+VOL low (natr<p33),921,14.7,1.363,0.428,0.635,True
+BULL & VOL-low,515,8.2,1.055,0.433,0.389,True
+BEAR & VOL-high,412,6.6,-0.348,0.5,-0.662,True

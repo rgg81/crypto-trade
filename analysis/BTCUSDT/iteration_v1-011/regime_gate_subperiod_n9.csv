@@ -1,0 +1,5 @@
+book,overall_sharpe,n,frac_pos,dispersion,worst_subperiod,most_recent_subperiod
+ungated full (iter-010 N9),1.87,4611,0.667,0.984,-0.655,-0.126
+BULL-restricted full,2.096,2576,0.667,1.008,-0.974,-0.974
+LONG-only in BULL,2.474,1425,0.667,1.64,-2.914,-0.54
+ungated LONG-only,1.957,2549,0.667,1.212,-0.952,-0.757

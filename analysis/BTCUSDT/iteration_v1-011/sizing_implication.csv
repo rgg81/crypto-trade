@@ -1,0 +1,4 @@
+variant,n,sharpe_ann,wr,trades_per_mo
+"full model book (both sides, ungated)",4611,1.87,0.458,73.5
+model book restricted to BULL regime,2576,2.096,0.471,41.1
+LONG-only restricted to BULL regime,1425,2.474,0.489,22.7

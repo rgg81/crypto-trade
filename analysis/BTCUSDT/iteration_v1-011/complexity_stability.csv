@@ -1,0 +1,5 @@
+config,full_n,full_sharpe_ann,long_n,long_sharpe_ann,long_wr,sp_n,sp_frac_pos,sp_mean,sp_dispersion,sp_worst
+19col_base,4611,1.87,2549,1.957,0.47,9,0.667,0.603,1.212,-0.952
+16col_lean,4611,1.822,2488,1.886,0.466,9,0.667,0.616,1.183,-1.037
+8col_top,4611,1.156,2575,1.39,0.456,9,0.667,0.451,1.147,-1.293
+19col_strongreg,4611,1.8,2771,1.537,0.463,9,0.667,0.507,1.232,-1.467
