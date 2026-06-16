@@ -4045,6 +4045,59 @@ def main() -> None:
             f"atr_sl={_spec_atr_sl}('cut losers') timeout={_spec_execution_timeout_minutes}min(14d) "
             f"| R2 OFF R1=OFF R3=ON({BASELINE_OOD_CUTOFF_PCT}) R5/vt=ON | TREND-SCALE=OFF"
         )
+    elif iteration_label == "v1-015":
+        # iter-v1/015 EXPLORATION (BTCUSDT). RISK-METHOD axis — add the R2 DRAWDOWN BRAKE to the
+        # iter-013 N=42 base (the campaign's strongest IS, +0.88, with a 31.85-pt OOS max-DD).
+        #
+        # WHY R2 (RE iter-015 rec, commit 69ea3e99): regime-label-AGNOSTIC equity-drawdown de-lever
+        # — structurally immune to the iter-012 mistake (which mis-read the regime and de-levered
+        # up-trends where the OOS losses actually were). R2 cuts size DURING drawdowns, restores it
+        # during recoveries (path-dependent; the RE proved a flat de-lever gives +0.00, so the lift
+        # is genuinely from the timing). IS proxy: pooled Sharpe +0.71, max-DD −61%. Goal: BOUND the
+        # iter-013 OOS −1.18 bleed toward 0 while keeping/lifting the strong IS → the clearest
+        # both-positive shot.
+        #
+        # UNITS (the RE's flagged reconciliation, resolved): the backtest R2 dd_pct is in additive
+        # cum_weighted_pnl POINTS (backtest.py:648 `peak_weighted_pnl - cum_weighted_pnl`), NOT
+        # %-of-peak (that's the LIVE field's unit — irrelevant to this backtest). The RE's absolute
+        # 20/80 was its POOLED-proxy scale; I apply its pre-registered RELATIVE shape on iter-013's
+        # ACTUAL scale: iter-013 IS max-DD = 31.85 pts → trigger = 6.5% = 2.07, anchor = 26% = 8.28,
+        # floor = 0.20. (Verified from iter-013 in_sample/trades.csv cum-weighted_pnl curve.)
+        #
+        # CHANGE vs /013: ONLY R2 (single-axis). Same 19-col HYBRID, fixed_horizon N=42 (14d),
+        # let-winners-run execution (atr_tp=100 / atr_sl=1.45 / 14d timeout).
+        import pyarrow.parquet as pq  # noqa: PLC0415
+
+        _iter015_parquet = Path("data/features") / "BTCUSDT_8h_features.parquet"
+        assert _iter015_parquet.exists(), (
+            f"iter-v1/015: feature parquet not found at {_iter015_parquet}."
+        )
+        _parquet_cols = set(pq.ParquetFile(_iter015_parquet).schema.names)
+        _missing = [c for c in V1_BTC_ITER009_FEATURES if c not in _parquet_cols]
+        assert not _missing, (
+            f"iter-v1/015: {len(_missing)} of the 19 feature columns are NOT present — {_missing}."
+        )
+        _spec_feature_columns = list(V1_BTC_ITER009_FEATURES)  # SAME 19-col set as /009-/013
+        _spec_label_mode = "fixed_horizon"
+        _spec_use_atr_labeling = False
+        _spec_label_timeout_minutes = 20160  # 42 candles = 14d (== /013)
+        _spec_atr_tp = 100.0  # TP NON-BINDING (let winners run) — == /013
+        _spec_atr_sl = 1.45  # protective stop (cut losers) — == /013
+        _spec_execution_timeout_minutes = 20160  # 14d (== label horizon) — == /013
+        # --- NEW (the ONLY change vs /013): R2 drawdown brake, RE relative shape on /013's scale ---
+        _spec_apply_r2 = True
+        _spec_r2_trigger_pct = 2.07  # 6.5% of iter-013 IS max-DD (31.85 pts)
+        _spec_r2_scale_anchor_pct = 8.28  # 26% of iter-013 IS max-DD
+        _spec_r2_scale_floor = 0.20
+        print(
+            f"[iter-v1/015] OVERRIDE ACTIVE: features={len(V1_BTC_ITER009_FEATURES)} "
+            f"(SAME 19-col HYBRID as /013) | LABEL=fixed_horizon N=42(14d) use_atr_labeling=False "
+            f"| EXEC atr_tp={_spec_atr_tp}(TP NON-BINDING) atr_sl={_spec_atr_sl} "
+            f"timeout={_spec_execution_timeout_minutes}min(14d) "
+            f"| R2 DRAWDOWN BRAKE ON (trigger={_spec_r2_trigger_pct} anchor={_spec_r2_scale_anchor_pct} "
+            f"floor={_spec_r2_scale_floor}; RE relative shape on /013 scale) "
+            f"| R1=OFF R3=ON({BASELINE_OOD_CUTOFF_PCT}) R5/vt=ON | TREND-SCALE=OFF"
+        )
 
     # -------------------------------------------------------------------------
     # UNIVERSAL SINGLE-SYMBOL ROUTING GUARD (iter-v1/redesign 2026-06-15).
