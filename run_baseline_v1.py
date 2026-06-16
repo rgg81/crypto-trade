@@ -348,6 +348,18 @@ V1_BTC_ORTHO_ITER005: tuple[str, ...] = V1_BTC_PRUNED_ITER002 + V1_BTC_ORTHO_ITE
 V1_BTC_ORTHO_ITER006_ADDS: tuple[str, ...] = ("funding_rate_zscore_90",)
 V1_BTC_ORTHO_ITER006: tuple[str, ...] = V1_BTC_PRUNED_ITER002 + V1_BTC_ORTHO_ITER006_ADDS
 
+#: iter-v1/007 EXPLORATION (BTCUSDT): the 41-col OHLCV prune + the Open-Interest impulse
+#: btc_oi_delta_5_z30 (fast 5-bar OI delta, 30-bar z). NEW family (OI) after the funding family
+#: closed at 2 NEGATIVE (spread /005, level z90 /006). Per FE Phase 4 (iter-006 feature_report.md)
+#: this is the best NON-funding candidate by raw purged-CV dir_acc OOF lift (+0.0118) — note its
+#: univariate IС is near-zero (+0.0046): the hypothesis is a NON-LINEAR positioning signal that a
+#: depth-4 tree may exploit where the linear funding signal failed. IS coverage 84.8% (OI data
+#: starts later; LightGBM tolerates the early NaN). Same override discipline as /005-/006 (PRUNE ⊆
+#: V1_FEATURE_COLUMNS; the OI add lives in the parquet OUTSIDE the 193, verified present pre-launch;
+#: importance visible via the active_feature_columns sync fix).
+V1_BTC_ORTHO_ITER007_ADDS: tuple[str, ...] = ("btc_oi_delta_5_z30",)
+V1_BTC_ORTHO_ITER007: tuple[str, ...] = V1_BTC_PRUNED_ITER002 + V1_BTC_ORTHO_ITER007_ADDS
+
 #: iter-v1/023: full V1_BASELINE_UNIVERSE (5-sym) with funding-rate z-score feature family.
 #: Feature-family EXPLORATION cycle-3 #8/10. V1_FEATURE_COLUMNS_PRUNED 40 → 42.
 #: Dispatch is handled by the iteration_label == "v1-023" elif branch.
@@ -3620,6 +3632,28 @@ def main() -> None:
         print(
             f"[iter-v1/006] OVERRIDE ACTIVE: features={len(V1_BTC_ORTHO_ITER006)} "
             f"(41-col prune + orthogonal {list(V1_BTC_ORTHO_ITER006_ADDS)}) "
+            f"| R2 OFF | R1=OFF R3=ON({BASELINE_OOD_CUTOFF_PCT}) R5/vt=ON atr_tp=2.9 atr_sl=1.45"
+        )
+    elif iteration_label == "v1-007":
+        # iter-v1/007 EXPLORATION (BTCUSDT, K=5). ORTHOGONAL-FEATURE axis, NEW family (Open
+        # Interest) after funding closed at 2 NEGATIVE: the 41-col prune + btc_oi_delta_5_z30
+        # (fast 5-bar OI delta, 30-bar z). FE: best non-funding raw dir_acc OOF lift; near-zero
+        # univariate IC → tests a NON-LINEAR positioning signal. R2 OFF. PRUNE ⊆ V1_FEATURE_COLUMNS;
+        # the OI add lives in the parquet OUTSIDE the 193 (presence verified pre-launch; importance
+        # visible via the active_feature_columns sync fix). If NEGATIVE → orthogonal axis closed.
+        _full_set = set(V1_FEATURE_COLUMNS)
+        _missing = [c for c in V1_BTC_PRUNED_ITER002 if c not in _full_set]
+        assert not _missing, (
+            f"iter-v1/007: prune base not a subset of V1_FEATURE_COLUMNS — {_missing}"
+        )
+        assert len(set(V1_BTC_ORTHO_ITER007)) == len(V1_BTC_ORTHO_ITER007), (
+            "iter-v1/007: V1_BTC_ORTHO_ITER007 has duplicate columns"
+        )
+        _spec_feature_columns = list(V1_BTC_ORTHO_ITER007)
+        _spec_apply_r2 = False  # R2 OFF — baseline risk
+        print(
+            f"[iter-v1/007] OVERRIDE ACTIVE: features={len(V1_BTC_ORTHO_ITER007)} "
+            f"(41-col prune + orthogonal {list(V1_BTC_ORTHO_ITER007_ADDS)}) "
             f"| R2 OFF | R1=OFF R3=ON({BASELINE_OOD_CUTOFF_PCT}) R5/vt=ON atr_tp=2.9 atr_sl=1.45"
         )
 
