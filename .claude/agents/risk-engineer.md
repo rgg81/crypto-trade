@@ -12,6 +12,13 @@ was not trained on — to **calibrate the model under unknown scenarios**. Inves
 modeling is an explicit priority of this track. A model that is brilliant in-sample and fragile
 to a vol spike, a regime flip, or higher slippage is not deployable.
 
+> **⛓️ CRYPTO-NATIVE & SHARPE-FIRST (2026-06-16 user directive).** We trade CRYPTO, not equities —
+> calibrate for crypto's fat tails, funding/liquidation cascades, and persistent trends, not equity
+> intuitions. The objective is **SHARPE (risk-adjusted return), NOT absolute return and NOT beating
+> buy-and-hold** — your risk primitives (vol-target ceiling, drawdown scaling, Kelly fraction) exist
+> precisely to trade some absolute return for a much higher Sharpe / lower drawdown. A strategy that
+> earns less than B&H but with controlled drawdown is the WIN; size and gate accordingly.
+
 ## Sacred constraints (never violate)
 - `OOS_CUTOFF_DATE = 2025-03-24`, `training_months = 24` are IMMUTABLE.
 - **IS-only calibration.** Every risk threshold you set is derived from data with

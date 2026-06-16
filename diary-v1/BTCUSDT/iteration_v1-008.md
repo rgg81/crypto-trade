@@ -1,4 +1,28 @@
-# Diary — iter-v1/008 (BTCUSDT) — AXIS PIVOT (research-only, no backtest) — ESCALATE
+# Diary — iter-v1/008 (BTCUSDT) — AXIS PIVOT (research-only, no backtest) — ESCALATE → OVERRIDDEN
+
+> **2026-06-16 USER OVERRIDE — escalation REJECTED, stay on BTC.** The user overrode the symbol-pivot
+> recommendation below. Verbatim: *"you can emulate other frequencies by expanding the timeout and
+> using higher frequencies for the features. we want Sharpe not absolute return. doesn't matter to
+> have less return than buy and hold, the key is sharpe. you ran only a few runs and already give up.
+> no. we will stay on this symbol. the agents must understand we are handling crypto so their nature
+> is different than normal equity."*
+>
+> **What this corrects in the analysis below:** the regime forensic dismissed every BTC regime as
+> "beta, not alpha" because always-LONG out-RETURNED the model — but the objective is **SHARPE, not
+> absolute return / not beating buy-and-hold**. always-LONG has brutal crypto drawdowns and poor
+> Sharpe; the model taking less return with controlled drawdown can have a HIGHER Sharpe = the win.
+> The forensic used the wrong yardstick. The agents also reasoned equity-brained ("BTC too efficient
+> for directional edge") — crypto is different (retail flow, funding, trend persistence,
+> microstructure). Recorded as durable rules: [[feedback_v1_sharpe_not_buyhold]],
+> [[feedback_crypto_native_not_equity]]; QR/FE/RE/Critic agent defs updated with a CRYPTO-NATIVE &
+> SHARPE-FIRST framing block.
+>
+> **New mandated axis (iter-009):** STAY ON BTC. Emulate a different trading frequency *within* the
+> 8h sacred constant by (a) **expanding the label timeout** (longer hold horizon) and (b) using
+> **higher-frequency (short-window) features**. Re-examine the "positive-econ" regimes (VOL-high,
+> TREND-up, ADX≥25) through a **Sharpe** lens — they may be tradeable gates after all. The IS-only
+> label/regime analysis below remains valid evidence; only its absolute-return verdict is overruled.
+
 
 **Axis:** the two untouched non-feature levers, analyzed IS-only by the QR after the
 orthogonal-feature axis closed at iter-007: (1) label horizon/mode learnability, (2)
