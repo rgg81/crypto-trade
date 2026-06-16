@@ -629,6 +629,9 @@ def run_model(
     specialist_seed_count: int = 0,
     specialist_n_startup_trials: int = 10,
     specialist_n_estimators_max: int = 500,
+    enable_trend_state_dir: bool = False,
+    trend_state_sma_window: int = 200,
+    trend_state_symbol: str = "BTCUSDT",
 ):
     """Run a single v1 sub-model (A/C/D/E) under the corrected walk-forward.
 
@@ -799,6 +802,11 @@ def run_model(
         specialist_seed_count=specialist_seed_count,
         specialist_n_startup_trials=specialist_n_startup_trials,
         specialist_n_estimators_max=specialist_n_estimators_max,
+        # iter-v1/016: TREND-STATE direction override. Default False = BIT-IDENTICAL
+        # to all prior single-symbol dispatches and v2/v3.
+        enable_trend_state_dir=enable_trend_state_dir,
+        trend_state_sma_window=trend_state_sma_window,
+        trend_state_symbol=trend_state_symbol,
     )
     t0 = time.time()
     results = run_backtest(config, strategy, yearly_pnl_check=False)
@@ -1763,9 +1771,7 @@ def _run_methodology_reporting(
             trend_scale_fires_oos / trend_scale_signals_oos if trend_scale_signals_oos > 0 else 0.0
         )
         ts_avg_mult_is = (
-            trend_scale_mult_sum_is / trend_scale_signals_is
-            if trend_scale_signals_is > 0
-            else 1.0
+            trend_scale_mult_sum_is / trend_scale_signals_is if trend_scale_signals_is > 0 else 1.0
         )
         ts_avg_mult_oos = (
             trend_scale_mult_sum_oos / trend_scale_signals_oos
@@ -2804,6 +2810,30 @@ def main() -> None:
         ),
     )
     parser.add_argument(
+        "--enable-trend-state-dir",
+        action="store_true",
+        help=(
+            "Enable the iter-v1/016 TREND-STATE direction override (V-A RULE layer). "
+            "Overrides the EXECUTED entry direction with the stateless past-only "
+            "200-SMA trend-state sign: +1 if close[t-1] > SMA_window(close)[t-1] else "
+            "-1. The model still decides WHETHER to trade and supplies sizing; only the "
+            "sign is replaced. NORMAL-RISK (no change to the Optuna training objective). "
+            "The `--iteration 16` keyed override sets this automatically; this flag lets "
+            "ad-hoc control runs toggle it. Default: off (BIT-IDENTICAL to all prior runs)."
+        ),
+    )
+    parser.add_argument(
+        "--trend-state-sma-window",
+        type=int,
+        default=200,
+        help=(
+            "SMA window (candles) for the iter-v1/016 trend-state direction override "
+            "(default 200; crypto-canonical, flat plateau 100-300 per brief §1). "
+            "Only evaluated when --enable-trend-state-dir is set or the v1-016 keyed "
+            "override is active."
+        ),
+    )
+    parser.add_argument(
         "--r5-binary-kill-enabled",
         action="store_true",
         help=(
@@ -3679,6 +3709,13 @@ def main() -> None:
     _spec_trend_scale_z_hi: float = 0.0
     _spec_trend_scale_slope_lb: int = 20
     _spec_trend_scale_std_lb: int = 250
+    # iter-v1/016 TREND-STATE direction override defaults. Strict NO-OP
+    # (enable=False) so EVERY prior single-symbol iteration (/002-/015) routes
+    # byte-identically through the universal dispatch — same discipline as the
+    # trend-scale block above. The v1-016 keyed block below flips enable=True.
+    _spec_enable_trend_state_dir: bool = False
+    _spec_trend_state_sma_window: int = 200
+    _spec_trend_state_symbol: str = "BTCUSDT"
 
     if iteration_label == "v1-002":
         # iter-v1/002 EXPLORATION (BTCUSDT, K=3). PRIMARY axis = 41-col feature
@@ -4099,6 +4136,84 @@ def main() -> None:
             f"| R1=OFF R3=ON({BASELINE_OOD_CUTOFF_PCT}) R5/vt=ON | TREND-SCALE=OFF"
         )
 
+    elif iteration_label == "v1-016":
+        # iter-v1/016 EXPLORATION (BTCUSDT). TARGET REDESIGN — TREND-STATE direction
+        # override (V-A, RULE layer). SINGLE AXIS vs /015: keep the ENTIRE iter-015 stack
+        # (19-col HYBRID, fixed_horizon N=42, let-winners-run exec, R2 drawdown brake,
+        # R3 OOD, R5 vol-target) and ADD ONLY enable_trend_state_dir=True.
+        #
+        # WHY (brief §0/§1): the LightGBM-LEARNED direction sign overfits IS-bull
+        # microstructure and INVERTS in OOS-bull (diary-012: IS-bull longs +31% → OOS-bull
+        # -22%, WR 24%). The stateless 200-SMA trend-state sign has ZERO parameters fit to
+        # IS so it CANNOT overfit; it is the ONLY direction source in the campaign whose
+        # most-recent IS sub-period (the OOS-fragility fingerprint) is POSITIVE at EVERY
+        # horizon (+1.45..+2.6). The model is DEMOTED from sign-picker to timing/size
+        # filter: its confidence/conviction gate still decides WHETHER to trade and supplies
+        # sizing; only the EXECUTED sign is replaced with trend_state(t).
+        #
+        # LOOK-AHEAD SAFETY (load-bearing): trend_state(t) = sign(close[t-1] -
+        # SMA200(close)[t-1]) computed PAST-ONLY (only candles with close_time < open_time(t)).
+        # See lgbm._compute_trend_state + tests/test_trend_state_lookahead.py.
+        #
+        # RISK (brief §2.5): V-A is NORMAL-RISK — the override is a stateless RULE on top
+        # of the UNCHANGED training objective (the model still trains the same direction
+        # labels; only the executed direction is overridden at signal time).
+        #
+        # CHANGE vs /015: ONLY enable_trend_state_dir=True (single-axis). Everything else
+        # (features, label, exec barriers, R2/R3/R5) is BIT-IDENTICAL to /015.
+        import pyarrow.parquet as pq  # noqa: PLC0415
+
+        _iter016_parquet = Path("data/features") / "BTCUSDT_8h_features.parquet"
+        assert _iter016_parquet.exists(), (
+            f"iter-v1/016: feature parquet not found at {_iter016_parquet}. "
+            "Re-fetch + regen BTCUSDT 8h v1 features before running."
+        )
+        _parquet_cols = set(pq.ParquetFile(_iter016_parquet).schema.names)
+        _missing = [c for c in V1_BTC_ITER009_FEATURES if c not in _parquet_cols]
+        assert not _missing, (
+            f"iter-v1/016: {len(_missing)} of the 19 feature columns are NOT present — {_missing}."
+        )
+        _spec_feature_columns = list(V1_BTC_ITER009_FEATURES)  # SAME 19-col set as /009-/015
+        _spec_label_mode = "fixed_horizon"
+        _spec_use_atr_labeling = False
+        _spec_label_timeout_minutes = 20160  # 42 candles = 14d (== /013-/015)
+        _spec_atr_tp = 100.0  # TP NON-BINDING (let winners run) — == /015
+        _spec_atr_sl = 1.45  # protective stop (cut losers) — == /015
+        _spec_execution_timeout_minutes = 20160  # 14d (== label horizon) — == /015
+        # R2 drawdown brake — the iter-015 keeper (BIT-IDENTICAL shape).
+        _spec_apply_r2 = True
+        _spec_r2_trigger_pct = 2.07
+        _spec_r2_scale_anchor_pct = 8.28
+        _spec_r2_scale_floor = 0.20
+        # --- NEW (the ONLY change vs /015): TREND-STATE direction override ---
+        _spec_enable_trend_state_dir = True
+        _spec_trend_state_sma_window = 200
+        _spec_trend_state_symbol = "BTCUSDT"
+        print(
+            f"[iter-v1/016] OVERRIDE ACTIVE: features={len(V1_BTC_ITER009_FEATURES)} "
+            f"(SAME 19-col HYBRID as /015) | LABEL=fixed_horizon N=42(14d) use_atr_labeling=False "
+            f"| EXEC atr_tp={_spec_atr_tp}(TP NON-BINDING) atr_sl={_spec_atr_sl} "
+            f"timeout={_spec_execution_timeout_minutes}min(14d) "
+            f"| R2 DRAWDOWN BRAKE ON (trigger={_spec_r2_trigger_pct} "
+            f"anchor={_spec_r2_scale_anchor_pct} floor={_spec_r2_scale_floor}; == /015) "
+            f"| TREND-STATE DIR OVERRIDE ON (sma_window={_spec_trend_state_sma_window} "
+            f"symbol={_spec_trend_state_symbol}; NORMAL-RISK V-A; past-only) "
+            f"| R1=OFF R3=ON({BASELINE_OOD_CUTOFF_PCT}) R5/vt=ON | TREND-SCALE=OFF"
+        )
+
+    # CLI precedence hook for the trend-state override (ad-hoc control runs).
+    # The v1-016 keyed branch above is the CANONICAL activation; this lets a manual
+    # `--enable-trend-state-dir` toggle it on a different iteration_label (e.g. a
+    # control run reusing the /015 stack). The keyed branch already sets these for
+    # v1-016, so re-asserting from args is idempotent there.
+    if getattr(args, "enable_trend_state_dir", False):
+        _spec_enable_trend_state_dir = True
+        _spec_trend_state_sma_window = int(args.trend_state_sma_window)
+        print(
+            f"[run_baseline_v1] --enable-trend-state-dir: trend-state direction override "
+            f"ON (sma_window={_spec_trend_state_sma_window} symbol={_spec_trend_state_symbol})."
+        )
+
     # -------------------------------------------------------------------------
     # UNIVERSAL SINGLE-SYMBOL ROUTING GUARD (iter-v1/redesign 2026-06-15).
     #
@@ -4180,6 +4295,12 @@ def main() -> None:
             specialist_seed_count=bagging_k,
             specialist_n_startup_trials=10,
             specialist_n_estimators_max=500,
+            # iter-v1/016: TREND-STATE direction override. Defaults (False) keep ALL
+            # other single-symbol iterations BIT-IDENTICAL; the v1-016 keyed block sets
+            # _spec_enable_trend_state_dir=True.
+            enable_trend_state_dir=_spec_enable_trend_state_dir,
+            trend_state_sma_window=_spec_trend_state_sma_window,
+            trend_state_symbol=_spec_trend_state_symbol,
         )
 
         # Cohort isolation sanity: assert ONLY the target symbol's trades emitted.
@@ -11226,9 +11347,7 @@ def main() -> None:
     agg_ts_fires_is = sum(getattr(r, "trend_scale_fires_is", 0) for r in _r5_model_results)
     agg_ts_signals_oos = sum(getattr(r, "trend_scale_signals_oos", 0) for r in _r5_model_results)
     agg_ts_fires_oos = sum(getattr(r, "trend_scale_fires_oos", 0) for r in _r5_model_results)
-    agg_ts_mult_sum_is = sum(
-        getattr(r, "trend_scale_mult_sum_is", 0.0) for r in _r5_model_results
-    )
+    agg_ts_mult_sum_is = sum(getattr(r, "trend_scale_mult_sum_is", 0.0) for r in _r5_model_results)
     agg_ts_mult_sum_oos = sum(
         getattr(r, "trend_scale_mult_sum_oos", 0.0) for r in _r5_model_results
     )

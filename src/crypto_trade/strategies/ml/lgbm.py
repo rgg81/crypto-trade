@@ -290,6 +290,26 @@ class LightGbmStrategy:
         btc_regime_kill_thr: float = 0.067,  # IS abs-median of btc_ret_42; pre-registered
         btc_regime_kill_lookback: int = 42,  # bars (~14d @ 8h); mirrors /019
         btc_regime_kill_symbol: str = "BTCUSDT",  # cross-asset trend source
+        # iter-v1/016: TREND-STATE direction override (V-A, RULE-layer).
+        # When True, the EXECUTED entry direction is overridden with the stateless
+        # 200-SMA trend-state sign: +1 if close[t-1] > SMA200(close)[t-1] else -1,
+        # computed PAST-ONLY (only candles with close_time < open_time(t)). The
+        # LightGBM specialist still decides WHETHER the trade fires (its
+        # confidence/conviction gate) and supplies sizing/confidence; only the
+        # sign is replaced. On warmup (< sma_window history) the override is
+        # CONSERVATIVE: fall back to the model sign. Diagnosis (diary-012): the
+        # LightGBM-LEARNED sign overfits IS-bull microstructure and inverts in
+        # OOS-bull; the stateless trend-state sign has NO parameters fit to IS so
+        # it cannot overfit. Post-aggregator RULE layer (same band as /074 AXIS-R,
+        # /084 R-FADE, /091 R-CONV, /092 BTC-regime-kill); does NOT change the
+        # model, feature columns, seeds, trials, or Optuna training-objective domain
+        # (NORMAL-RISK per brief §2.5). Default False = BIT-IDENTICAL to all prior
+        # runs and v2/v3. Close index built at init (same machinery as the /092
+        # BTC-regime-kill gate); FAIL LOUD if the trend-state parquet is missing.
+        # ONLY enabled in the iter-v1/016 BTC specialist cell.
+        enable_trend_state_dir: bool = False,
+        trend_state_sma_window: int = 200,  # crypto-canonical; flat plateau 100-300 (brief §1)
+        trend_state_symbol: str = "BTCUSDT",  # symbol whose own close drives the trend-state
     ) -> None:
         if not feature_columns:
             raise ValueError(
@@ -487,6 +507,22 @@ class LightGbmStrategy:
         # Per-BTC sorted (close_time_ms, close) index for O(log n) past-only lookback.
         # Populated in compute_features() when enable_btc_regime_kill=True.
         self._btc_regime_kill_idx: tuple[np.ndarray, np.ndarray] | None = None
+        # iter-v1/016: TREND-STATE direction override (V-A RULE layer).
+        # Enabled via enable_trend_state_dir=True (BTC specialist cell only; /016 dispatch).
+        # Overrides the EXECUTED direction with sign(close[t-1] - SMA200(close)[t-1]),
+        # computed past-only. Does NOT change the Optuna training-objective domain
+        # (NORMAL-RISK). Applied AFTER the abstention gates (R-CONV / BTC-regime-kill)
+        # decide the trade FIRES, BEFORE the Signal(direction=...) build — so the
+        # model's confidence/sizing is preserved and only the sign is replaced.
+        # trend_state_skip / trend_state_override decision_log entries carry the
+        # model sign (final_signed) + the trend-state sign for Phase 7.4 attribution.
+        self._enable_trend_state_dir: bool = bool(enable_trend_state_dir)
+        self._trend_state_sma_window: int = int(trend_state_sma_window)
+        self._trend_state_symbol: str = str(trend_state_symbol)
+        # Sorted (close_time_ms, close) index for the trend-state symbol; built in
+        # compute_features() when enable_trend_state_dir=True. Same machinery as the
+        # /092 BTC-regime-kill close index (past-only searchsorted lookback).
+        self._trend_state_idx: tuple[np.ndarray, np.ndarray] | None = None
         # iter-v3/072: labeling mode — "triple_barrier" (default, backward-compat)
         # or "fixed_horizon" (sign of N-candle-forward return; no barriers).
         # iter-v3/105: "trend_scanning" (OLS trend, max-|t| horizon selection
@@ -692,6 +728,50 @@ class LightGbmStrategy:
                     f"from {_btc_pq} "
                     f"(thr={self._btc_regime_kill_thr}, "
                     f"lookback={self._btc_regime_kill_lookback}b)"
+                )
+
+        # iter-v1/016: TREND-STATE direction override — build the (close_time_ms, close)
+        # index for the trend-state symbol. Mirrors the /092 BTC-regime-kill close-index
+        # build exactly (same past-only searchsorted convention). Join key: the decision
+        # candle's open_time vs the trend-state symbol's close_time (the last candle that
+        # FULLY closed before the decision candle opens — close_time < open_time, since
+        # the Binance 8h candle close_time = open_time(next) - 1ms). The SMA200 + close[t-1]
+        # are both taken from that candle and its 199 predecessors → strictly past-only.
+        if self._enable_trend_state_dir:
+            _ts_pq = Path(self.features_dir) / f"{self._trend_state_symbol}_8h_features.parquet"
+            if not _ts_pq.exists():
+                # FAIL LOUD (same discipline as the /092 BTC-regime-kill gate): when
+                # enable_trend_state_dir=True the trend-state parquet MUST be present.
+                # A silent pass-through here would leave the override inert and the
+                # whole iteration void (the /092 DISPATCH-WIRING-DEFECT lesson).
+                raise FileNotFoundError(
+                    f"[lgbm] trend-state direction override: FATAL — "
+                    f"enable_trend_state_dir=True but parquet not found at {_ts_pq}. "
+                    "Re-fetch + regen: "
+                    f"uv run crypto-trade fetch --symbols {self._trend_state_symbol} "
+                    "--intervals 8h && "
+                    f"uv run crypto-trade features --symbols {self._trend_state_symbol} "
+                    "--interval 8h --track v1 --format parquet --workers 4"
+                )
+            import pandas as _pd_ts  # noqa: PLC0415
+
+            _ts_df = _pd_ts.read_parquet(_ts_pq, columns=["close_time", "close"])
+            _ts_df = _ts_df.dropna(subset=["close_time", "close"])
+            _ts_ct = _ts_df["close_time"].values.astype(np.int64)
+            _ts_cl = _ts_df["close"].values.astype(np.float64)
+            _ts_sort = np.argsort(_ts_ct)
+            self._trend_state_idx = (_ts_ct[_ts_sort], _ts_cl[_ts_sort])
+            # Post-build assertion: index MUST be non-None after a successful load.
+            if self._trend_state_idx is None:
+                raise RuntimeError(
+                    "[lgbm] trend-state direction override: FATAL — index is None after "
+                    f"build (parquet={_ts_pq}, rows={len(_ts_ct)}). Programming error."
+                )
+            if self.verbose > 0:
+                print(
+                    f"[lgbm] trend-state direction override: loaded {len(_ts_ct)} "
+                    f"{self._trend_state_symbol} candles from {_ts_pq} "
+                    f"(sma_window={self._trend_state_sma_window})"
                 )
 
         # Load per-row ATR values for dynamic labeling
@@ -2094,6 +2174,57 @@ class LightGbmStrategy:
             return None
         return float(close_curr / close_past) - 1.0
 
+    def _compute_trend_state(self, candle_open_time: int) -> int | None:
+        """Compute the stateless 200-SMA trend-state sign (iter-v1/016).
+
+        Returns +1 if close[t-1] > SMA_window(close)[t-1] else -1, where t-1 is the
+        LAST trend-state-symbol candle whose close_time < candle_open_time (strictly
+        past-only) and SMA_window(close)[t-1] is the simple mean of the *window*
+        closes ENDING at that candle (closes of candles t-window .. t-1 inclusive).
+
+        This is the EXACT IS-only proxy from
+        analysis/BTCUSDT/iteration_v1-016/design_decision_trendstate_metalabel.py:
+            cp  = pd.Series(close).shift(1)                       # close[t-1]
+            sma = pd.Series(close).rolling(W).mean().shift(1)     # SMA_W(close)[t-1]
+            ts  = where(cp > sma, +1, -1)                         # NaN on warmup
+        reproduced here with a searchsorted past-only lookup so the backtest and the
+        live engine compute an IDENTICAL value with NO look-ahead.
+
+        LOOK-AHEAD SAFETY (load-bearing): the join uses
+            idx_curr = searchsorted(close_time, candle_open_time, side="right") - 1
+        which selects the last candle with close_time <= candle_open_time. Because the
+        8h candle close_time = open_time(next) - 1ms, the candle that closes EXACTLY at
+        the decision candle's open is candle t-1 (close_time = open_time(t) - 1ms <
+        open_time(t)). No candle with close_time >= open_time(t) (the decision candle
+        itself or any later candle) is ever read.
+
+        Returns None when (CONSERVATIVE → caller falls back to the model sign):
+          - index not loaded (override disabled or parquet missing),
+          - fewer than `sma_window` closes available before the decision candle,
+          - the decision close_time is before any candle (idx_curr < 0),
+          - any NaN / non-positive close in the SMA window or at t-1.
+        """
+        if self._trend_state_idx is None:
+            return None
+        ct_arr, cl_arr = self._trend_state_idx
+        # Last candle whose close_time <= candle_open_time (== candle t-1, past-only).
+        idx_curr = int(np.searchsorted(ct_arr, candle_open_time, side="right")) - 1
+        if idx_curr < 0:
+            return None
+        w = self._trend_state_sma_window
+        idx_lo = idx_curr - w + 1  # first index of the window of `w` closes ending at idx_curr
+        if idx_lo < 0:
+            # Warmup: fewer than `w` closes before the decision candle.
+            return None
+        close_prev = cl_arr[idx_curr]  # close[t-1]
+        window = cl_arr[idx_lo : idx_curr + 1]  # w closes: t-window .. t-1
+        if not np.isfinite(close_prev) or close_prev <= 0.0:
+            return None
+        if not np.isfinite(window).all() or (window <= 0.0).any():
+            return None
+        sma_prev = float(np.mean(window))  # SMA_window(close)[t-1]
+        return 1 if close_prev > sma_prev else -1
+
     def _apply_mid_bull_short_veto(self, signal: Signal, symbol: str, open_time: int) -> Signal:
         """Apply AXIS-R Mid-Bull SHORT VETO to an aggregated signal (iter-v1/074).
 
@@ -2430,6 +2561,53 @@ class LightGbmStrategy:
                     )
 
             from crypto_trade import decision_log
+
+            # iter-v1/016: TREND-STATE direction override (V-A RULE layer).
+            # The abstention gates above (specialist consensus, R-CONV, BTC-regime-kill,
+            # R3 OOD) have already decided the trade FIRES. Now OVERRIDE the executed
+            # direction with the stateless past-only 200-SMA trend-state sign, keeping
+            # the model's weight/confidence/TP/SL (sizing + timing stay with the model;
+            # only the sign is replaced). On warmup (_compute_trend_state returns None)
+            # the override is CONSERVATIVE: keep the model sign (_sp_direction unchanged).
+            # Logged with the model sign (final_signed) + the override so Phase 7.4 can
+            # attribute every executed trade's direction source.
+            if self._enable_trend_state_dir:
+                _ts_dir = self._compute_trend_state(open_time)
+                if _ts_dir is not None:
+                    _sp_dir_model = _sp_direction
+                    _sp_direction = int(_ts_dir)
+                    decision_log.log(
+                        {
+                            "kind": "trend_state_override",
+                            "symbol": symbol,
+                            "ot": open_time,
+                            "month": candle_month,
+                            "specialist_seeds": len(self._specialist_models),
+                            "final_signed": _final_signed,
+                            "direction_model": _sp_dir_model,
+                            "direction_trend_state": _sp_direction,
+                            "trend_state_sma_window": self._trend_state_sma_window,
+                            "agreed": bool(_sp_dir_model == _sp_direction),
+                            "decision": "direction_overridden:trend_state",
+                        }
+                    )
+                else:
+                    # Warmup: insufficient history for the SMA — keep the model sign.
+                    decision_log.log(
+                        {
+                            "kind": "trend_state_override",
+                            "symbol": symbol,
+                            "ot": open_time,
+                            "month": candle_month,
+                            "specialist_seeds": len(self._specialist_models),
+                            "final_signed": _final_signed,
+                            "direction_model": _sp_direction,
+                            "direction_trend_state": None,
+                            "trend_state_sma_window": self._trend_state_sma_window,
+                            "agreed": None,
+                            "decision": "trend_state_warmup:kept_model_sign",
+                        }
+                    )
 
             # iter-v1/074: AXIS-R Mid-Bull SHORT VETO — post-aggregator rule layer.
             # Applied AFTER mean-of-signed-weights aggregator emits Signal(direction, weight)
