@@ -4200,6 +4200,47 @@ def main() -> None:
             f"symbol={_spec_trend_state_symbol}; NORMAL-RISK V-A; past-only) "
             f"| R1=OFF R3=ON({BASELINE_OOD_CUTOFF_PCT}) R5/vt=ON | TREND-SCALE=OFF"
         )
+    elif iteration_label == "v1-017":
+        # iter-v1/017 CONFIRMATION (BTCUSDT) — K=20 validation of the iter-016 both-positive
+        # breakthrough (IS +0.63 / OOS +0.11, the campaign's FIRST coherent both-positive).
+        # CONFIG IS BIT-IDENTICAL to iter-016 (19-col HYBRID, fixed_horizon N=42 let-winners-run,
+        # R2 brake, R3 OOD, R5 vol-target, stateless 200-SMA trend-state direction override). The
+        # ONLY difference vs /016 is the bagging K (5 EXPLORATION -> 20 CONFIRMATION, resolved by
+        # --confirmation in the routing guard) — isolates the K=5 lottery risk. If the both-positive
+        # holds across 20 seeds AND beats the baseline on the generalization-coherence gate -> MERGE
+        # (update BASELINE_V1_BTCUSDT; first merge of the single-symbol redesign).
+        import pyarrow.parquet as pq  # noqa: PLC0415
+
+        _iter017_parquet = Path("data/features") / "BTCUSDT_8h_features.parquet"
+        assert _iter017_parquet.exists(), (
+            f"iter-v1/017: feature parquet not found at {_iter017_parquet}."
+        )
+        _parquet_cols = set(pq.ParquetFile(_iter017_parquet).schema.names)
+        _missing = [c for c in V1_BTC_ITER009_FEATURES if c not in _parquet_cols]
+        assert not _missing, (
+            f"iter-v1/017: {len(_missing)} of the 19 feature columns are NOT present — {_missing}."
+        )
+        _spec_feature_columns = list(V1_BTC_ITER009_FEATURES)  # == /016
+        _spec_label_mode = "fixed_horizon"
+        _spec_use_atr_labeling = False
+        _spec_label_timeout_minutes = 20160  # 14d == /016
+        _spec_atr_tp = 100.0  # == /016
+        _spec_atr_sl = 1.45  # == /016
+        _spec_execution_timeout_minutes = 20160  # == /016
+        _spec_apply_r2 = True  # == /016
+        _spec_r2_trigger_pct = 2.07
+        _spec_r2_scale_anchor_pct = 8.28
+        _spec_r2_scale_floor = 0.20
+        _spec_enable_trend_state_dir = True  # == /016
+        _spec_trend_state_sma_window = 200
+        _spec_trend_state_symbol = "BTCUSDT"
+        print(
+            f"[iter-v1/017] CONFIRMATION (K=20) — config BIT-IDENTICAL to /016 "
+            f"(19-col HYBRID, fixed_horizon N=42(14d) let-winners-run, R2 brake "
+            f"trigger={_spec_r2_trigger_pct}/anchor={_spec_r2_scale_anchor_pct}/floor={_spec_r2_scale_floor}, "
+            f"TREND-STATE DIR sma={_spec_trend_state_sma_window}, R3=ON({BASELINE_OOD_CUTOFF_PCT}) R5/vt=ON). "
+            f"Validates iter-016 both-positive (IS +0.63/OOS +0.11) across 20 seeds -> MERGE if it holds."
+        )
 
     # CLI precedence hook for the trend-state override (ad-hoc control runs).
     # The v1-016 keyed branch above is the CANONICAL activation; this lets a manual
