@@ -3531,23 +3531,25 @@ def main() -> None:
             f"floor={_spec_r2_scale_floor} anchor={_spec_r2_scale_anchor_pct}) "
             f"| R1=OFF R3=ON({BASELINE_OOD_CUTOFF_PCT}) R5/vt=ON atr_tp=2.9 atr_sl=1.45"
         )
-    elif iteration_label == "v1-003":
-        # iter-v1/003 EXPLORATION (BTCUSDT, K=3). FEATURE-ONLY ablation of /002:
-        # SAME 41-col prune, but R2 drawdown-scaling OFF (baseline risk). Isolates
-        # the prune from the R2 brake — /002 Critic showed R2 throttled OOS recovery
-        # winners (weight_factor decayed 0.33→0.18 OOS). Tests whether the prune
-        # alone keeps the both-positive coherence with OOS recovered toward +0.64.
+    elif iteration_label in ("v1-003", "v1-004"):
+        # iter-v1/003 EXPLORATION (K=3) + iter-v1/004 CONFIRMATION (K=20) — SAME config:
+        # 41-col prune (V1_BTC_PRUNED_ITER002), R2 drawdown-scaling OFF (baseline risk).
+        # /003 (K=3) was the feature-only ablation of /002 — isolated the prune from the
+        # R2 brake (/002 Critic showed R2 throttled OOS recovery winners) and screened
+        # PROMISING (IS +0.17 / OOS +0.40, both positive). /004 is its K=20 CONFIRMATION —
+        # the merge-deciding run, matched-K + matched-data vs the iter-001 baseline. If it
+        # holds both-positive (generalization-coherence gate), it MERGES as BASELINE_V1_BTCUSDT.
         _full_set = set(V1_FEATURE_COLUMNS)
         _missing = [c for c in V1_BTC_PRUNED_ITER002 if c not in _full_set]
         assert not _missing, (
-            f"iter-v1/003: V1_BTC_PRUNED_ITER002 not a strict subset of "
+            f"{iteration_label}: V1_BTC_PRUNED_ITER002 not a strict subset of "
             f"V1_FEATURE_COLUMNS — {len(_missing)} unknown cols: {_missing}"
         )
         _spec_feature_columns = list(V1_BTC_PRUNED_ITER002)
-        _spec_apply_r2 = False  # R2 OFF — the isolation variable
+        _spec_apply_r2 = False  # R2 OFF — confirmed (R2 was the OOS killer in /002)
         print(
-            f"[iter-v1/003] OVERRIDE ACTIVE: features=41 (V1_BTC_PRUNED_ITER002) "
-            f"| R2 drawdown-scaling OFF (feature-only ablation of /002) "
+            f"[{iteration_label}] OVERRIDE ACTIVE: features=41 (V1_BTC_PRUNED_ITER002) "
+            f"| R2 drawdown-scaling OFF (prune-only; /004=K=20 confirmation of /003) "
             f"| R1=OFF R3=ON({BASELINE_OOD_CUTOFF_PCT}) R5/vt=ON atr_tp=2.9 atr_sl=1.45"
         )
 
