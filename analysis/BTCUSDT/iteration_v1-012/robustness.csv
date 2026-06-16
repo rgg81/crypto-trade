@@ -1,0 +1,8 @@
+variant,overall_long_ON,worst_neg_ON,mean_bull_ON_or_worstoff
+slope-z (CHOSEN),2.315,-1.309,1.261
+price-vs-SMA-z,2.292,-1.51,1.282
+seed 42 (neg-sub worst),,-0.952,-1.309
+seed 123 (neg-sub worst),,-1.002,-1.23
+seed 456 (neg-sub worst),,-1.376,-1.358
+seed 789 (neg-sub worst),,-0.834,-1.117
+seed 1001 (neg-sub worst),,-0.814,-1.068

@@ -1,0 +1,4 @@
+slippage_bps_per_side,roundtrip_drag_pct,long_sharpe_OFF,long_sharpe_ON,long_delta,full_sharpe_OFF,full_sharpe_ON,full_delta
+0.0,0.0,1.957,2.326,0.37,1.87,2.04,0.17
+2.0,0.04,1.788,2.178,0.39,1.626,1.807,0.181
+4.0,0.08,1.619,2.03,0.411,1.381,1.573,0.192
