@@ -1,0 +1,5 @@
+set,n_feats,n_label,full_n,full_sharpe,full_wr,sp_n,sp_frac_pos,sp_mean,sp_dispersion,sp_worst,sp_recent
+iter009_19col,19,9,4611,1.857,0.461,9,0.667,0.556,0.834,-0.302,-0.17
+stable_selected,16,9,4611,1.108,0.457,9,0.556,0.384,1.358,-1.281,-0.855
+iter009_19col,19,21,4587,1.137,0.351,9,0.444,0.138,1.39,-2.156,-0.806
+stable_selected,16,21,4587,1.033,0.359,9,0.556,-0.073,1.975,-3.804,-3.804

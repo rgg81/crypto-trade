@@ -1,0 +1,17 @@
+feature
+interact_natr_x_adx
+trend_adx_14
+vol_taker_buy_ratio_sma_50
+btc_funding_spread_30_90
+trend_adx_7
+mr_pct_from_high_50
+ent_volume_20
+mr_pct_from_low_50
+trend_aroon_up_14
+vol_cmf_14
+vol_state_z_natr_30
+stat_skew_30
+basis_zscore_30
+vol_taker_buy_ratio
+vol_range_spike_24
+mr_pct_from_low_5
