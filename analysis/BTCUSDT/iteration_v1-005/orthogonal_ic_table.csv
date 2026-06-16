@@ -1,0 +1,10 @@
+feature,family,is_nonnan,is_cover_pct,ic_1bar,ic_21bar,abs_ic_21bar,max_base_corr,max_base_col,mean_base_corr,orthogonality,screen_score,adf_pass,adf_p,lineage
+btc_funding_spread_30_90,funding,5575,97.3,-0.026,-0.1053,0.1053,0.3389,trend_aroon_osc_50,0.093,0.6611,0.06961,True,0.0,iter-052: funding term-structure slope (z30 - z90); STRONGLY LEARNED at /053 rank 4-10/48
+funding_rate_zscore_30,funding,5635,98.4,-0.0567,-0.0531,0.0531,0.2583,trend_plus_di_21,0.1046,0.7417,0.0394,True,0.0,iter-023 pooled-track: funding z-score 30-bar (10d)
+basis_zscore_30,basis,5697,99.5,-0.025,-0.0347,0.0347,0.2889,trend_plus_di_21,0.1102,0.7111,0.02468,True,0.0,iter-034 pooled-track: perp-spot basis z-score; RETIRED at /040 (3-consec INERT pooled)
+oi_price_divergence_30,open_interest,4563,79.7,0.0103,0.0257,0.0257,0.3301,trend_plus_di_21,0.1268,0.6699,0.01721,True,0.0,iter-084: OI-price direction divergence z-score (CRV specialist; LOCAL-only there)
+btc_oi_delta_5_z30,open_interest,4854,84.8,0.0046,-0.0156,0.0156,0.1713,mr_pct_from_high_10,0.0401,0.8287,0.01289,True,0.0,iter-058: OI 5-bar delta z-scored 30-bar; BASIN-LOTTERY at /058 multi-seed (spread 0.90)
+oi_delta_30_z90,open_interest,4564,79.7,0.0015,0.0149,0.0149,0.1927,mr_pct_from_high_10,0.0698,0.8073,0.012,True,0.0,iter-025 pooled-track: OI delta z-score 90-bar
+long_short_zscore_30,long_short,4195,73.2,-0.0003,0.0094,0.0094,0.2255,trend_plus_di_21,0.0895,0.7745,0.00728,True,0.0,iter-049 pooled-track: top-trader long/short account ratio z-score 30-bar
+btc_funding_rate_8h_impulse,funding,5637,98.4,-0.0312,-0.0065,0.0065,0.0798,mom_macd_hist_5_13_3,0.0159,0.9202,0.00595,True,0.0,iter-052: funding shock detector (normalized 1st-diff); INERT at /053 rank>30/48 — DROPPED at /054
+funding_rate_zscore_90,funding,5637,98.4,-0.0426,0.0052,0.0052,0.3792,trend_plus_di_21,0.1411,0.6208,0.00324,True,0.0,iter-023 pooled-track: funding z-score 90-bar (30d)

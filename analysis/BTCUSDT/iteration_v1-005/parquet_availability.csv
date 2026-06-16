@@ -1,0 +1,10 @@
+feature,family,available,lineage
+funding_rate_zscore_30,funding,True,iter-023 pooled-track: funding z-score 30-bar (10d)
+funding_rate_zscore_90,funding,True,iter-023 pooled-track: funding z-score 90-bar (30d)
+btc_funding_spread_30_90,funding,True,iter-052: funding term-structure slope (z30 - z90); STRONGLY LEARNED at /053 rank 4-10/48
+btc_funding_rate_8h_impulse,funding,True,iter-052: funding shock detector (normalized 1st-diff); INERT at /053 rank>30/48 — DROPPED at /054
+oi_delta_30_z90,open_interest,True,iter-025 pooled-track: OI delta z-score 90-bar
+btc_oi_delta_5_z30,open_interest,True,iter-058: OI 5-bar delta z-scored 30-bar; BASIN-LOTTERY at /058 multi-seed (spread 0.90)
+oi_price_divergence_30,open_interest,True,iter-084: OI-price direction divergence z-score (CRV specialist; LOCAL-only there)
+long_short_zscore_30,long_short,True,iter-049 pooled-track: top-trader long/short account ratio z-score 30-bar
+basis_zscore_30,basis,True,iter-034 pooled-track: perp-spot basis z-score; RETIRED at /040 (3-consec INERT pooled)

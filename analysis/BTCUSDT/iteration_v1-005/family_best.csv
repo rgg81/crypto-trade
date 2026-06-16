@@ -1,0 +1,5 @@
+feature,family,is_nonnan,is_cover_pct,ic_1bar,ic_21bar,abs_ic_21bar,max_base_corr,max_base_col,mean_base_corr,orthogonality,screen_score,adf_pass,adf_p,lineage
+btc_funding_spread_30_90,funding,5575,97.3,-0.026,-0.1053,0.1053,0.3389,trend_aroon_osc_50,0.093,0.6611,0.06961,True,0.0,iter-052: funding term-structure slope (z30 - z90); STRONGLY LEARNED at /053 rank 4-10/48
+basis_zscore_30,basis,5697,99.5,-0.025,-0.0347,0.0347,0.2889,trend_plus_di_21,0.1102,0.7111,0.02468,True,0.0,iter-034 pooled-track: perp-spot basis z-score; RETIRED at /040 (3-consec INERT pooled)
+oi_price_divergence_30,open_interest,4563,79.7,0.0103,0.0257,0.0257,0.3301,trend_plus_di_21,0.1268,0.6699,0.01721,True,0.0,iter-084: OI-price direction divergence z-score (CRV specialist; LOCAL-only there)
+long_short_zscore_30,long_short,4195,73.2,-0.0003,0.0094,0.0094,0.2255,trend_plus_di_21,0.0895,0.7745,0.00728,True,0.0,iter-049 pooled-track: top-trader long/short account ratio z-score 30-bar
