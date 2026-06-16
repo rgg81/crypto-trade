@@ -1,0 +1,2 @@
+model,month,inner_seed,mean_sharpe,std_sharpe,n_outer_seeds
+v1-001,BTCUSDT,0,2.1106258844000445,0.0,1
