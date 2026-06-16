@@ -3832,6 +3832,60 @@ def main() -> None:
             f"atr_sl={_spec_atr_sl}('cut losers') timeout={_spec_execution_timeout_minutes}min(7d) "
             f"| R2 OFF R1=OFF R3=ON({BASELINE_OOD_CUTOFF_PCT}) R5/vt=ON"
         )
+    elif iteration_label == "v1-010":
+        # iter-v1/010 EXPLORATION (BTCUSDT). LABEL-HORIZON axis — SHORTEN /009's horizon 21→9.
+        #
+        # THESIS (QR Phase 1/2, iter-010 research_brief.md): iter-009 found the RIGHT mechanism
+        # (fixed_horizon label + "let winners run, cut losers" execution; payoff 2.08 real) but
+        # was NEGATIVE because the BLIND hit-rate (~33%) sat exactly at the 2.0 breakeven payoff,
+        # so OOS slipped below. The QR re-examined regime gates on a SHARPE basis (per user
+        # directive) and RULED THEM OUT: every Sharpe-lifting regime is out-Sharpe'd by
+        # always-LONG-in-regime (beta, not alpha) AND inverts in the IS third nearest OOS (T3) —
+        # a gate would LOCK IN the T3 inversion that caused /009 OOS −0.74. Instead, SHORTENING
+        # the horizon 21→9 (3d) lifts the blind hit-rate 34.3%→44.5% (breakeven payoff drops
+        # 2.0→~1.25, so the ~2.0 let-run payoff now has comfortable margin), lifts the ungated
+        # model IS Sharpe proxy +0.66→+1.17, BEATS always-LONG ungated (genuine timing alpha, no
+        # fragile regime state), is 3/3 IS-thirds positive (no T3 inversion), and is seed-robust
+        # (6-seed spread 0.25 ≪ 0.50 basin threshold). NO REGIME GATE.
+        #
+        # CHANGE vs /009: ONLY the horizon. Same 19-col HYBRID set, same let-winners-run
+        # execution (TP non-binding 100×, SL 1.45×). label_timeout AND execution_timeout both
+        # 10080→4320 min (9 candles = 3d). The label↔execution consistency (exec horizon ==
+        # label horizon) is preserved at N=9. Proxy magnitude is DIRECTION-ONLY (iter-009's +1.28
+        # proxy collapsed to −0.09 in backtest); the robust signals are WR 44.5% ≫ breakeven,
+        # beats-always-LONG-ungated, and 3/3 thirds — not the +1.17 number.
+        import pyarrow.parquet as pq  # noqa: PLC0415
+
+        _iter010_parquet = Path("data/features") / "BTCUSDT_8h_features.parquet"
+        assert _iter010_parquet.exists(), (
+            f"iter-v1/010: feature parquet not found at {_iter010_parquet}."
+        )
+        _parquet_cols = set(pq.ParquetFile(_iter010_parquet).schema.names)
+        _missing = [c for c in V1_BTC_ITER009_FEATURES if c not in _parquet_cols]
+        assert not _missing, (
+            f"iter-v1/010: {len(_missing)} of the 19 feature columns are NOT present — {_missing}."
+        )
+        _full_193 = set(V1_FEATURE_COLUMNS)
+        for _fcol in ("btc_funding_spread_30_90", "funding_rate_zscore_30"):
+            assert _fcol not in _full_193, (
+                f"iter-v1/010: funding col {_fcol} unexpectedly inside V1_FEATURE_COLUMNS."
+            )
+        _spec_feature_columns = list(V1_BTC_ITER009_FEATURES)  # SAME 19-col set as /009
+        _spec_apply_r2 = False
+        _spec_label_mode = "fixed_horizon"
+        _spec_use_atr_labeling = False
+        _spec_label_timeout_minutes = 4320  # 9 candles = 3d (SHORTENED from /009's 10080=7d)
+        _spec_atr_tp = 100.0  # TP NON-BINDING (let winners run to the 3d horizon)
+        _spec_atr_sl = 1.45  # protective stop (cut losers)
+        _spec_execution_timeout_minutes = 4320  # 9 candles = 3d (== label horizon)
+        print(
+            f"[iter-v1/010] OVERRIDE ACTIVE: features={len(V1_BTC_ITER009_FEATURES)} "
+            f"(SAME 19-col HYBRID as /009) "
+            f"| LABEL=fixed_horizon N=9(3d) use_atr_labeling=False "
+            f"| EXEC atr_tp={_spec_atr_tp}(TP NON-BINDING → 3d timeout binds, 'let winners run') "
+            f"atr_sl={_spec_atr_sl}('cut losers') timeout={_spec_execution_timeout_minutes}min(3d) "
+            f"| R2 OFF R1=OFF R3=ON({BASELINE_OOD_CUTOFF_PCT}) R5/vt=ON"
+        )
 
     # -------------------------------------------------------------------------
     # UNIVERSAL SINGLE-SYMBOL ROUTING GUARD (iter-v1/redesign 2026-06-15).
