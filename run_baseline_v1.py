@@ -4001,6 +4001,50 @@ def main() -> None:
             f"z_lo={_spec_trend_scale_z_lo} z_hi={_spec_trend_scale_z_hi} "
             f"slope_lb={_spec_trend_scale_slope_lb} std_lb={_spec_trend_scale_std_lb}"
         )
+    elif iteration_label == "v1-013":
+        # iter-v1/013 EXPLORATION (BTCUSDT). LABEL-HORIZON axis — LENGTHEN /010's horizon 9→42
+        # (3d→14d). The user's original "expand the timeout" instinct + the gap evidence: the
+        # fixed_horizon let-winners-run IS/OOS gap SHRINKS sharply with horizon (N9 gap 1.87 /
+        # OOS -1.48 → N21 gap 0.65 / OOS -0.74). A LONGER horizon = fewer trades = less overfit =
+        # smaller gap, re-orienting toward the baseline's actual strength (OOS generalization;
+        # iter-001 baseline OOS +0.64). Merge bar is RELATIVE (beat the baseline) — not perfect
+        # coherence. Same 19-col HYBRID + let-winners-run execution as /010; NO trend_scale (/012
+        # de-lever FAILED — it de-levered up-trends where the OOS losses actually were). Single-axis
+        # vs /010 = ONLY the horizon (label + exec timeout 4320→20160 min). Watch the OOS trade-rate
+        # (longer hold → fewer trades; flag if OOS << ~10/mo).
+        import pyarrow.parquet as pq  # noqa: PLC0415
+
+        _iter013_parquet = Path("data/features") / "BTCUSDT_8h_features.parquet"
+        assert _iter013_parquet.exists(), (
+            f"iter-v1/013: feature parquet not found at {_iter013_parquet}."
+        )
+        _parquet_cols = set(pq.ParquetFile(_iter013_parquet).schema.names)
+        _missing = [c for c in V1_BTC_ITER009_FEATURES if c not in _parquet_cols]
+        assert not _missing, (
+            f"iter-v1/013: {len(_missing)} of the 19 feature columns are NOT present — {_missing}."
+        )
+        _full_193 = set(V1_FEATURE_COLUMNS)
+        for _fcol in ("btc_funding_spread_30_90", "funding_rate_zscore_30"):
+            assert _fcol not in _full_193, (
+                f"iter-v1/013: funding col {_fcol} unexpectedly inside V1_FEATURE_COLUMNS."
+            )
+        _spec_feature_columns = list(V1_BTC_ITER009_FEATURES)  # SAME 19-col set as /009-/012
+        _spec_apply_r2 = False
+        _spec_label_mode = "fixed_horizon"
+        _spec_use_atr_labeling = False
+        _spec_label_timeout_minutes = 20160  # 42 candles = 14d (LENGTHENED from /010's 4320=3d)
+        _spec_atr_tp = 100.0  # TP NON-BINDING (let winners run) — == /010
+        _spec_atr_sl = 1.45  # protective stop (cut losers) — == /010
+        _spec_execution_timeout_minutes = 20160  # 42 candles = 14d (== label horizon)
+        # NO trend_scale (/012 de-lever failed — isolate the horizon axis cleanly).
+        print(
+            f"[iter-v1/013] OVERRIDE ACTIVE: features={len(V1_BTC_ITER009_FEATURES)} "
+            f"(SAME 19-col HYBRID as /009-/012) "
+            f"| LABEL=fixed_horizon N=42(14d) use_atr_labeling=False "
+            f"| EXEC atr_tp={_spec_atr_tp}(TP NON-BINDING → 14d timeout binds, 'let winners run') "
+            f"atr_sl={_spec_atr_sl}('cut losers') timeout={_spec_execution_timeout_minutes}min(14d) "
+            f"| R2 OFF R1=OFF R3=ON({BASELINE_OOD_CUTOFF_PCT}) R5/vt=ON | TREND-SCALE=OFF"
+        )
 
     # -------------------------------------------------------------------------
     # UNIVERSAL SINGLE-SYMBOL ROUTING GUARD (iter-v1/redesign 2026-06-15).
