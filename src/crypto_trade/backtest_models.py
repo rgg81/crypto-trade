@@ -121,6 +121,27 @@ class BacktestConfig:
     vol_ceiling_enabled: bool = False
     vol_ceiling_scale: float = 0.5
     vol_ceiling_thresholds: dict = None  # type: ignore[assignment]  # symbol -> threshold float
+    # iter-v1/012: LONG-bias trend-scaled de-lever position-SIZING primitive.
+    # When enabled, multiplies vt_scale (LONG entries only, signal.direction > 0)
+    # by a smooth piecewise-linear trend_scale in [trend_scale_floor, 1.0], driven
+    # by a STATELESS past-only 200-SMA-slope z-score computed from `close`:
+    #   slope_t   = (SMA200_{t-1} - SMA200_{t-1-slope_lb}) / SMA200_{t-1-slope_lb}
+    #   trend_z_t = slope_t / rolling_std_{std_lb}(slope)_{t-1}
+    # trend_scale = floor at trend_z <= z_lo, 1.0 at trend_z >= z_hi, linear between;
+    # NaN -> 1.0 (FAIL-OPEN, never silently de-levers). SHORT trades are NEVER scaled.
+    # The multiplier scales SIZE only — floor > 0 means trade COUNT is unchanged.
+    # Applied AFTER R5 vol-target AND AFTER vol_ceiling in the vt_scale pipeline
+    # (composes multiplicatively, conservative-stacking, all factors <= 1.0).
+    # Default disabled — restoring trend_scale_enabled=False preserves byte-identical
+    # behavior for ALL prior iterations (v1 /002-/011, v2, v3) and deployed paths
+    # (same discipline as the slippage_bps_per_side field). The trend_z lookup is
+    # built ONCE at backtest init from past-only `close` prices.
+    trend_scale_enabled: bool = False
+    trend_scale_floor: float = 0.25
+    trend_scale_z_lo: float = -0.5
+    trend_scale_z_hi: float = 0.0
+    trend_scale_slope_lb: int = 20
+    trend_scale_std_lb: int = 250
 
 
 @dataclass(frozen=True)
@@ -215,6 +236,20 @@ class BacktestResult(list):
                                                      fire count for IS half.
     vol_ceiling_signals_oos, vol_ceiling_fires_oos : same for OOS half.
     All four default to 0 when vol_ceiling_enabled is False.
+
+    iter-v1/012 trend-scale (LONG-bias de-lever) IS/OOS split counters
+    ------------------------------------------------------------------
+    trend_scale_signals_is, trend_scale_fires_is   : LONG-entry count and count
+                                                     of LONG entries where
+                                                     trend_scale < 1.0 (de-levered)
+                                                     for the IS half.
+    trend_scale_signals_oos, trend_scale_fires_oos : same for OOS half.
+    trend_scale_mult_sum_is, trend_scale_mult_sum_oos : sum of the applied LONG
+                                                     trend_scale multipliers (so
+                                                     avg LONG multiplier = sum /
+                                                     signals). All default to 0 /
+                                                     0.0 when trend_scale_enabled
+                                                     is False.
     """
 
     def __init__(
@@ -234,6 +269,12 @@ class BacktestResult(list):
         vol_ceiling_fires_is: int = 0,
         vol_ceiling_signals_oos: int = 0,
         vol_ceiling_fires_oos: int = 0,
+        trend_scale_signals_is: int = 0,
+        trend_scale_fires_is: int = 0,
+        trend_scale_signals_oos: int = 0,
+        trend_scale_fires_oos: int = 0,
+        trend_scale_mult_sum_is: float = 0.0,
+        trend_scale_mult_sum_oos: float = 0.0,
     ):
         super().__init__(trades)
         self.total_signals = total_signals
@@ -249,3 +290,9 @@ class BacktestResult(list):
         self.vol_ceiling_fires_is = vol_ceiling_fires_is
         self.vol_ceiling_signals_oos = vol_ceiling_signals_oos
         self.vol_ceiling_fires_oos = vol_ceiling_fires_oos
+        self.trend_scale_signals_is = trend_scale_signals_is
+        self.trend_scale_fires_is = trend_scale_fires_is
+        self.trend_scale_signals_oos = trend_scale_signals_oos
+        self.trend_scale_fires_oos = trend_scale_fires_oos
+        self.trend_scale_mult_sum_is = trend_scale_mult_sum_is
+        self.trend_scale_mult_sum_oos = trend_scale_mult_sum_oos

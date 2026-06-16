@@ -123,6 +123,7 @@ from crypto_trade.strategies.ml.reporting_v1 import (
     append_psr_rows_to_comparison,
     append_r5_binary_kill_rows_to_comparison,
     append_r5_rows_to_comparison,
+    append_trend_scale_rows_to_comparison,
     append_vol_ceiling_rows_to_comparison,
     compute_n_eff_and_dsr,
     compute_psr_columns,
@@ -617,6 +618,12 @@ def run_model(
     vol_ceiling_enabled: bool = False,
     vol_ceiling_scale: float = 0.5,
     vol_ceiling_thresholds: dict | None = None,
+    trend_scale_enabled: bool = False,
+    trend_scale_floor: float = 0.25,
+    trend_scale_z_lo: float = -0.5,
+    trend_scale_z_hi: float = 0.0,
+    trend_scale_slope_lb: int = 20,
+    trend_scale_std_lb: int = 250,
     min_child_samples_lower_bound: int | None = None,
     specialist_mode: bool = False,
     specialist_seed_count: int = 0,
@@ -745,6 +752,12 @@ def run_model(
         vol_ceiling_enabled=vol_ceiling_enabled,
         vol_ceiling_scale=vol_ceiling_scale,
         vol_ceiling_thresholds=vol_ceiling_thresholds or {},
+        trend_scale_enabled=trend_scale_enabled,
+        trend_scale_floor=trend_scale_floor,
+        trend_scale_z_lo=trend_scale_z_lo,
+        trend_scale_z_hi=trend_scale_z_hi,
+        trend_scale_slope_lb=trend_scale_slope_lb,
+        trend_scale_std_lb=trend_scale_std_lb,
         slippage_bps_per_side=SLIPPAGE_BPS_PER_SIDE,
     )
     strategy = LightGbmStrategy(
@@ -1424,6 +1437,12 @@ def _run_methodology_reporting(
     vol_ceiling_fires_is: int = 0,
     vol_ceiling_signals_oos: int = 0,
     vol_ceiling_fires_oos: int = 0,
+    trend_scale_signals_is: int = 0,
+    trend_scale_fires_is: int = 0,
+    trend_scale_signals_oos: int = 0,
+    trend_scale_fires_oos: int = 0,
+    trend_scale_mult_sum_is: float = 0.0,
+    trend_scale_mult_sum_oos: float = 0.0,
 ) -> None:
     """Run all iter-v1/001 methodology reporting passes AFTER generate_iteration_reports().
 
@@ -1734,6 +1753,32 @@ def _run_methodology_reporting(
             vol_ceiling_fires_oos / vol_ceiling_signals_oos if vol_ceiling_signals_oos > 0 else 0.0
         )
         append_vol_ceiling_rows_to_comparison(comparison_path, vol_ceil_rate_is, vol_ceil_rate_oos)
+        # ---------------------------------------------------------------------------
+        # 4e. comparison.csv trend-scale fire-rate + avg-mult rows (iter-v1/012)
+        # ---------------------------------------------------------------------------
+        ts_fire_rate_is = (
+            trend_scale_fires_is / trend_scale_signals_is if trend_scale_signals_is > 0 else 0.0
+        )
+        ts_fire_rate_oos = (
+            trend_scale_fires_oos / trend_scale_signals_oos if trend_scale_signals_oos > 0 else 0.0
+        )
+        ts_avg_mult_is = (
+            trend_scale_mult_sum_is / trend_scale_signals_is
+            if trend_scale_signals_is > 0
+            else 1.0
+        )
+        ts_avg_mult_oos = (
+            trend_scale_mult_sum_oos / trend_scale_signals_oos
+            if trend_scale_signals_oos > 0
+            else 1.0
+        )
+        append_trend_scale_rows_to_comparison(
+            comparison_path,
+            ts_fire_rate_is,
+            ts_fire_rate_oos,
+            ts_avg_mult_is,
+            ts_avg_mult_oos,
+        )
     else:
         print(
             "[run_baseline_v1] WARNING: comparison.csv not found at "
@@ -3623,6 +3668,17 @@ def main() -> None:
     _spec_atr_tp: float = 2.9  # EXECUTION take-profit ATR multiplier
     _spec_atr_sl: float = 1.45  # EXECUTION stop-loss ATR multiplier (protective)
     _spec_execution_timeout_minutes: int = 10080  # EXECUTION horizon (binding exit)
+    # iter-v1/012 LONG-bias trend-scale de-lever overrides. Defaults are a strict
+    # NO-OP (trend_scale_enabled=False) so EVERY prior single-symbol iteration
+    # (/002-/011) routes byte-identically through the universal dispatch — same
+    # discipline as the slippage field. The v1-012 keyed block below flips
+    # enabled=True and pins the IS-calibrated FLOOR/band; nothing else touches them.
+    _spec_trend_scale_enabled: bool = False
+    _spec_trend_scale_floor: float = 0.25
+    _spec_trend_scale_z_lo: float = -0.5
+    _spec_trend_scale_z_hi: float = 0.0
+    _spec_trend_scale_slope_lb: int = 20
+    _spec_trend_scale_std_lb: int = 250
 
     if iteration_label == "v1-002":
         # iter-v1/002 EXPLORATION (BTCUSDT, K=3). PRIMARY axis = 41-col feature
@@ -3887,6 +3943,65 @@ def main() -> None:
             f"| R2 OFF R1=OFF R3=ON({BASELINE_OOD_CUTOFF_PCT}) R5/vt=ON"
         )
 
+    elif iteration_label == "v1-012":
+        # iter-v1/012 EXPLORATION (BTCUSDT). RISK-PRIMITIVE axis — ADD a LONG-bias,
+        # vol-scaled, stateless trend-scale DE-LEVER on top of the /010 let-run book.
+        #
+        # SINGLE AXIS vs /010: this branch is BIT-IDENTICAL to the /010 override
+        # (same 19-col HYBRID set, fixed_horizon N=9, let-winners-run execution
+        # atr_tp=100 / atr_sl=1.45 / 3d label==exec horizon, R2 OFF, R5/vt ON) PLUS
+        # the NEW trend_scale primitive (the ONLY change). So iter-012 = iter-010 +
+        # trend-scale — clean single-variable attribution against the /010 anchor.
+        #
+        # PRIMITIVE (RE risk_report.md §6-§7, pre-registered): a smooth piecewise-
+        # linear LONG-only size multiplier in [FLOOR, 1.0] driven by a past-only
+        # 200-SMA-slope z-score (slope over SLOPE_LB=20 candles, normalized by a
+        # STD_LB=250 rolling std; every rolling stat .shift(1) → strictly t-1 info).
+        # FLOOR=0.25 at trend_z <= Z_LO=-0.5, 1.0 at trend_z >= Z_HI=0.0, linear
+        # between; NaN -> 1.0 (FAIL-OPEN). LONG entries only — SHORT trades unscaled.
+        # FLOOR 0.25 > 0 ⇒ trade COUNT is unchanged vs /010 (size scaled, not gated).
+        # IS-calibrated (IS-ONLY) lift: FULL-book pooled Sharpe +1.87→~+2.04, max-DD
+        # −30%, all 5 seeds positive; cost-robust (lift grows at 4 bps/side). The
+        # primitive composes with (does not replace) R5 vol-target.
+        import pyarrow.parquet as pq  # noqa: PLC0415
+
+        _iter012_parquet = Path("data/features") / "BTCUSDT_8h_features.parquet"
+        assert _iter012_parquet.exists(), (
+            f"iter-v1/012: feature parquet not found at {_iter012_parquet}."
+        )
+        _parquet_cols = set(pq.ParquetFile(_iter012_parquet).schema.names)
+        _missing = [c for c in V1_BTC_ITER009_FEATURES if c not in _parquet_cols]
+        assert not _missing, (
+            f"iter-v1/012: {len(_missing)} of the 19 feature columns are NOT present — {_missing}."
+        )
+        # --- /010-IDENTICAL config (the de-lever is the ONLY axis change) ---
+        _spec_feature_columns = list(V1_BTC_ITER009_FEATURES)  # SAME 19-col set as /009-/010
+        _spec_apply_r2 = False
+        _spec_label_mode = "fixed_horizon"
+        _spec_use_atr_labeling = False
+        _spec_label_timeout_minutes = 4320  # 9 candles = 3d (== /010)
+        _spec_atr_tp = 100.0  # TP NON-BINDING (let winners run) — == /010
+        _spec_atr_sl = 1.45  # protective stop (cut losers) — == /010
+        _spec_execution_timeout_minutes = 4320  # 9 candles = 3d (== label horizon) — == /010
+        # --- NEW: LONG-bias trend-scale de-lever (pre-registered IS-calibrated values) ---
+        _spec_trend_scale_enabled = True
+        _spec_trend_scale_floor = 0.25
+        _spec_trend_scale_z_lo = -0.5
+        _spec_trend_scale_z_hi = 0.0
+        _spec_trend_scale_slope_lb = 20
+        _spec_trend_scale_std_lb = 250
+        print(
+            f"[iter-v1/012] OVERRIDE ACTIVE: features={len(V1_BTC_ITER009_FEATURES)} "
+            f"(SAME 19-col HYBRID as /009-/010) "
+            f"| LABEL=fixed_horizon N=9(3d) use_atr_labeling=False "
+            f"| EXEC atr_tp={_spec_atr_tp}(TP NON-BINDING → 3d timeout binds, 'let winners run') "
+            f"atr_sl={_spec_atr_sl}('cut losers') timeout={_spec_execution_timeout_minutes}min(3d) "
+            f"| R2 OFF R1=OFF R3=ON({BASELINE_OOD_CUTOFF_PCT}) R5/vt=ON "
+            f"| TREND-SCALE=ON (LONG-only de-lever) floor={_spec_trend_scale_floor} "
+            f"z_lo={_spec_trend_scale_z_lo} z_hi={_spec_trend_scale_z_hi} "
+            f"slope_lb={_spec_trend_scale_slope_lb} std_lb={_spec_trend_scale_std_lb}"
+        )
+
     # -------------------------------------------------------------------------
     # UNIVERSAL SINGLE-SYMBOL ROUTING GUARD (iter-v1/redesign 2026-06-15).
     #
@@ -3954,6 +4069,14 @@ def main() -> None:
             r5_vol_target_pct=_r5_kwargs.get("r5_vol_target_pct", 4.0),
             r5_kill_low_natr_enabled=_r5_kwargs.get("r5_kill_low_natr_enabled", False),
             r5_kill_low_natr_min_pct=_r5_kwargs.get("r5_kill_low_natr_min_pct", 2.0),
+            # iter-v1/012: LONG-bias trend-scale de-lever (defaults = NO-OP for
+            # /002-/011 → byte-identical; v1-012 keyed block flips enabled=True).
+            trend_scale_enabled=_spec_trend_scale_enabled,
+            trend_scale_floor=_spec_trend_scale_floor,
+            trend_scale_z_lo=_spec_trend_scale_z_lo,
+            trend_scale_z_hi=_spec_trend_scale_z_hi,
+            trend_scale_slope_lb=_spec_trend_scale_slope_lb,
+            trend_scale_std_lb=_spec_trend_scale_std_lb,
             model_role=f"Model_A_{_spec_sym}_specialist",
             symbol=_spec_sym,
             specialist_mode=True,
@@ -11001,6 +11124,17 @@ def main() -> None:
         getattr(r, "vol_ceiling_signals_oos", 0) for r in _r5_model_results
     )
     agg_vol_ceil_fires_oos = sum(getattr(r, "vol_ceiling_fires_oos", 0) for r in _r5_model_results)
+    # Aggregate trend-scale IS/OOS split counters (iter-v1/012).
+    agg_ts_signals_is = sum(getattr(r, "trend_scale_signals_is", 0) for r in _r5_model_results)
+    agg_ts_fires_is = sum(getattr(r, "trend_scale_fires_is", 0) for r in _r5_model_results)
+    agg_ts_signals_oos = sum(getattr(r, "trend_scale_signals_oos", 0) for r in _r5_model_results)
+    agg_ts_fires_oos = sum(getattr(r, "trend_scale_fires_oos", 0) for r in _r5_model_results)
+    agg_ts_mult_sum_is = sum(
+        getattr(r, "trend_scale_mult_sum_is", 0.0) for r in _r5_model_results
+    )
+    agg_ts_mult_sum_oos = sum(
+        getattr(r, "trend_scale_mult_sum_oos", 0.0) for r in _r5_model_results
+    )
 
     all_results.sort(key=lambda t: t.close_time)
     print(f"\nCombined: {len(all_results)} trades")
@@ -11427,6 +11561,12 @@ def main() -> None:
             vol_ceiling_fires_is=agg_vol_ceil_fires_is,
             vol_ceiling_signals_oos=agg_vol_ceil_signals_oos,
             vol_ceiling_fires_oos=agg_vol_ceil_fires_oos,
+            trend_scale_signals_is=agg_ts_signals_is,
+            trend_scale_fires_is=agg_ts_fires_is,
+            trend_scale_signals_oos=agg_ts_signals_oos,
+            trend_scale_fires_oos=agg_ts_fires_oos,
+            trend_scale_mult_sum_is=agg_ts_mult_sum_is,
+            trend_scale_mult_sum_oos=agg_ts_mult_sum_oos,
         )
     else:
         print(

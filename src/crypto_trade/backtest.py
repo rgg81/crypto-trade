@@ -44,6 +44,79 @@ def _sync_label_params(strategy: Strategy, config: BacktestConfig) -> None:
             setattr(target, attr, config_val)
 
 
+def trend_scale_from_z(
+    trend_z: float,
+    floor: float,
+    z_lo: float,
+    z_hi: float,
+) -> float:
+    """iter-v1/012 — piecewise-linear LONG-bias de-lever size multiplier.
+
+    Maps a past-only 200-SMA-slope z-score to a SIZE multiplier in
+    ``[floor, 1.0]``:
+
+      * ``floor``                       when ``trend_z <= z_lo``  (confirmed down-trend)
+      * ``1.0``                         when ``trend_z >= z_hi``  (confirmed up-trend)
+      * linear interpolation between    otherwise                (smooth transition)
+      * ``1.0`` (FAIL-OPEN)             when ``trend_z`` is NaN   (never silently de-lever)
+
+    The mapping NEVER returns < ``floor`` and ``floor`` is required > 0 by the
+    iter-v1/012 spec, so the multiplier can only shrink position SIZE — it can
+    never gate (zero out) a trade. Shared by the backtest pipeline and the live
+    engine (backtest-live parity).
+    """
+    if math.isnan(trend_z):
+        return 1.0
+    if trend_z <= z_lo:
+        return floor
+    if trend_z >= z_hi:
+        return 1.0
+    # z_hi > z_lo guaranteed by the iter-v1/012 calibration (0.0 > -0.5).
+    span = (trend_z - z_lo) / (z_hi - z_lo)
+    return floor + (1.0 - floor) * span
+
+
+def build_trend_z_lookup(
+    closes: np.ndarray,
+    open_times: np.ndarray,
+    symbol: str,
+    slope_lb: int,
+    std_lb: int,
+) -> dict[tuple[str, int], float]:
+    """iter-v1/012 — build the STATELESS past-only trend-z lookup for one symbol.
+
+    For a chronologically-sorted ``closes`` / ``open_times`` pair (one symbol),
+    computes per-bar ``trend_z`` keyed ``(symbol, open_time)``:
+
+        sma200_t   = mean(close over the 200 bars ending at t-1)       # .shift(1)
+        slope_t    = (sma200_t - sma200_{t-slope_lb}) / sma200_{t-slope_lb}
+        slope_std_t= std(slope over the std_lb bars ending at t-1)     # .shift(1)
+        trend_z_t  = slope_t / slope_std_t
+
+    Every rolling statistic is computed on closes STRICTLY at or before bar
+    ``t-1`` (the SMA-200 itself is ``.shift(1)``, and the slope/std use already
+    shifted SMA / slope series), so the value at bar ``t`` uses no data after
+    ``t-1`` — no look-ahead. Warmup bars (insufficient history, or a zero/NaN
+    normalizer) produce ``NaN`` (the caller fail-opens to multiplier 1.0).
+    """
+    s = pd.Series(closes, dtype=float)
+    # SMA-200 from `close`, then shift(1) so bar t uses closes up to t-1 only.
+    sma200 = s.rolling(window=200, min_periods=200).mean().shift(1)
+    # Fractional 200-SMA slope over `slope_lb` bars (both endpoints already past-only).
+    sma200_lagged = sma200.shift(slope_lb)
+    slope = (sma200 - sma200_lagged) / sma200_lagged
+    # Past-only normalizer: rolling std of slope over std_lb bars, shifted by 1.
+    slope_std = slope.rolling(window=std_lb, min_periods=std_lb).std().shift(1)
+    trend_z = slope / slope_std
+    # Guard: a zero normalizer would yield inf — coerce to NaN (fail-open).
+    trend_z = trend_z.replace([np.inf, -np.inf], np.nan)
+    tz_arr = trend_z.to_numpy(dtype=float)
+    lookup: dict[tuple[str, int], float] = {}
+    for _ot, _tz in zip(open_times, tz_arr, strict=True):
+        lookup[(symbol, int(_ot))] = float(_tz)
+    return lookup
+
+
 def _mem_report(label: str) -> None:
     current, peak = tracemalloc.get_traced_memory()
     print(f"[memory] {label}: current={current / 1e9:.2f} GB, peak={peak / 1e9:.2f} GB")
@@ -228,6 +301,38 @@ def run_backtest(
     vol_ceiling_fires_is: int = 0
     vol_ceiling_signals_oos: int = 0
     vol_ceiling_fires_oos: int = 0
+    # iter-v1/012: LONG-bias trend-scale de-lever lookup + IS/OOS counters.
+    # (symbol, open_time_ms) -> trend_z (past-only 200-SMA-slope z-score from close).
+    # Built ONCE at init from the master df's closes when trend_scale_enabled.
+    trend_z_lookup: dict[tuple[str, int], float] = {}
+    trend_scale_signals_is: int = 0  # LONG entries (IS half)
+    trend_scale_fires_is: int = 0  # LONG entries where trend_scale < 1.0 (IS half)
+    trend_scale_signals_oos: int = 0
+    trend_scale_fires_oos: int = 0
+    trend_scale_mult_sum_is: float = 0.0  # sum of applied LONG multipliers (IS half)
+    trend_scale_mult_sum_oos: float = 0.0
+    if config.trend_scale_enabled:
+        for _ts_sym in config.symbols:
+            _ts_sym_df = master[master["symbol"] == _ts_sym].sort_values("open_time")
+            _ts_closes = _ts_sym_df["close"].to_numpy(dtype=float)
+            _ts_ots = _ts_sym_df["open_time"].to_numpy(dtype=int)
+            trend_z_lookup.update(
+                build_trend_z_lookup(
+                    _ts_closes,
+                    _ts_ots,
+                    _ts_sym,
+                    int(config.trend_scale_slope_lb),
+                    int(config.trend_scale_std_lb),
+                )
+            )
+        _ts_nonnan = sum(1 for v in trend_z_lookup.values() if not math.isnan(v))
+        print(
+            f"[TREND-SCALE/012] trend_z lookup built: {len(trend_z_lookup)} entries "
+            f"({_ts_nonnan} non-NaN) across {len(config.symbols)} symbols "
+            f"| floor={config.trend_scale_floor} z_lo={config.trend_scale_z_lo} "
+            f"z_hi={config.trend_scale_z_hi} slope_lb={config.trend_scale_slope_lb} "
+            f"std_lb={config.trend_scale_std_lb} (LONG-only; NaN -> 1.0 fail-open)"
+        )
     if config.vol_ceiling_enabled:
         from crypto_trade.risk.vol_ceiling import compute_rv_30d_ann_at_bar  # noqa: PLC0415
 
@@ -585,6 +690,30 @@ def run_backtest(
                             else:
                                 vol_ceiling_fires_oos += 1
                             vt_scale = vt_scale * float(config.vol_ceiling_scale)
+                # iter-v1/012: LONG-bias trend-scaled de-lever. Composes with
+                # (never replaces) R5/vol_ceiling — one more multiplicative
+                # factor in [floor, 1.0]. LONG entries ONLY (signal.direction > 0);
+                # SHORT trades are NEVER scaled. NaN trend_z -> 1.0 (fail-open).
+                # Applied LAST so it stacks on R5 NATR-ceiling + vol_ceiling.
+                if config.trend_scale_enabled and signal.direction > 0:
+                    _tz = trend_z_lookup.get((sym, ot), float("nan"))
+                    _ts_mult = trend_scale_from_z(
+                        _tz,
+                        float(config.trend_scale_floor),
+                        float(config.trend_scale_z_lo),
+                        float(config.trend_scale_z_hi),
+                    )
+                    if ot < OOS_CUTOFF_MS:
+                        trend_scale_signals_is += 1
+                        trend_scale_mult_sum_is += _ts_mult
+                        if _ts_mult < 1.0:
+                            trend_scale_fires_is += 1
+                    else:
+                        trend_scale_signals_oos += 1
+                        trend_scale_mult_sum_oos += _ts_mult
+                        if _ts_mult < 1.0:
+                            trend_scale_fires_oos += 1
+                    vt_scale = vt_scale * _ts_mult
                 order = create_order(
                     sym,
                     signal,
@@ -720,6 +849,49 @@ def run_backtest(
             f"{_vc_total} signals ({_vc_all_rate:.2f}%) [scale={config.vol_ceiling_scale:.2f}x]"
         )
 
+    # iter-v1/012: trend-scale LONG-bias de-lever fire-rate / avg-multiplier report.
+    if config.trend_scale_enabled:
+        _ts_total_sig = trend_scale_signals_is + trend_scale_signals_oos
+        _ts_total_fire = trend_scale_fires_is + trend_scale_fires_oos
+        _ts_total_sum = trend_scale_mult_sum_is + trend_scale_mult_sum_oos
+        _ts_is_rate = (
+            100.0 * trend_scale_fires_is / trend_scale_signals_is
+            if trend_scale_signals_is > 0
+            else 0.0
+        )
+        _ts_oos_rate = (
+            100.0 * trend_scale_fires_oos / trend_scale_signals_oos
+            if trend_scale_signals_oos > 0
+            else 0.0
+        )
+        _ts_all_rate = 100.0 * _ts_total_fire / _ts_total_sig if _ts_total_sig > 0 else 0.0
+        _ts_is_avg = (
+            trend_scale_mult_sum_is / trend_scale_signals_is
+            if trend_scale_signals_is > 0
+            else 1.0
+        )
+        _ts_oos_avg = (
+            trend_scale_mult_sum_oos / trend_scale_signals_oos
+            if trend_scale_signals_oos > 0
+            else 1.0
+        )
+        _ts_all_avg = _ts_total_sum / _ts_total_sig if _ts_total_sig > 0 else 1.0
+        print(
+            f"[TREND-SCALE/012] IS:  de-levered {trend_scale_fires_is} of "
+            f"{trend_scale_signals_is} LONG entries ({_ts_is_rate:.2f}%) "
+            f"avg_long_mult={_ts_is_avg:.4f}"
+        )
+        print(
+            f"[TREND-SCALE/012] OOS: de-levered {trend_scale_fires_oos} of "
+            f"{trend_scale_signals_oos} LONG entries ({_ts_oos_rate:.2f}%) "
+            f"avg_long_mult={_ts_oos_avg:.4f}"
+        )
+        print(
+            f"[TREND-SCALE/012] ALL: de-levered {_ts_total_fire} of "
+            f"{_ts_total_sig} LONG entries ({_ts_all_rate:.2f}%) "
+            f"avg_long_mult={_ts_all_avg:.4f} [floor={config.trend_scale_floor:.2f}]"
+        )
+
     if profile_memory:
         _mem_report("after backtest loop")
         tracemalloc.stop()
@@ -739,6 +911,12 @@ def run_backtest(
         vol_ceiling_fires_is=vol_ceiling_fires_is,
         vol_ceiling_signals_oos=vol_ceiling_signals_oos,
         vol_ceiling_fires_oos=vol_ceiling_fires_oos,
+        trend_scale_signals_is=trend_scale_signals_is,
+        trend_scale_fires_is=trend_scale_fires_is,
+        trend_scale_signals_oos=trend_scale_signals_oos,
+        trend_scale_fires_oos=trend_scale_fires_oos,
+        trend_scale_mult_sum_is=trend_scale_mult_sum_is,
+        trend_scale_mult_sum_oos=trend_scale_mult_sum_oos,
     )
 
 

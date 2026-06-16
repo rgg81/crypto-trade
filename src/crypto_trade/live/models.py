@@ -549,6 +549,26 @@ class LiveConfig:
     # trade ships. Pass None to keep the legacy previous-calendar-month
     # behavior (used by old scripts that relied on _previous_month_start_ms).
     catch_up_lookback_days: int | None = 90
+    # iter-v1/012: LONG-bias trend-scale de-lever position-SIZING primitive —
+    # mirrors BacktestConfig.{trend_scale_enabled, trend_scale_floor,
+    # trend_scale_z_lo, trend_scale_z_hi, trend_scale_slope_lb, trend_scale_std_lb}
+    # for backtest-live parity. A future single-symbol v1 live deployment that
+    # runs the iter-v1/012 trend-scale specialist sets trend_scale_enabled=True
+    # (+ the calibrated band) so the live engine computes the SAME stateless,
+    # past-only 200-SMA-slope trend-z at decision time and applies the SAME
+    # LONG-only [floor, 1.0] multiplier to vt_scale that the backtest applied
+    # (see crypto_trade.backtest.trend_scale_from_z + build_trend_z_lookup, the
+    # shared helpers). DEFAULT False = NO-OP: the deployed engine (v1 BUNDLE /
+    # v2 / v3) runtime path is byte-unchanged — same discipline as
+    # slippage_bps_per_side. No deployed runtime code reads these fields while
+    # the flag is False; enabling parity wiring in the engine tick is a separate
+    # deployment step (not performed here).
+    trend_scale_enabled: bool = False
+    trend_scale_floor: float = 0.25
+    trend_scale_z_lo: float = -0.5
+    trend_scale_z_hi: float = 0.0
+    trend_scale_slope_lb: int = 20
+    trend_scale_std_lb: int = 250
 
     @functools.cached_property
     def all_symbols(self) -> tuple[str, ...]:
