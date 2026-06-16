@@ -326,6 +326,15 @@ V1_BTC_PRUNED_ITER002: tuple[str, ...] = (
     "vol_volume_pctchg_20",
 )
 
+#: iter-v1/005 EXPLORATION (BTCUSDT): the 41-col OHLCV prune + ONE orthogonal NON-OHLCV
+#: addition — btc_funding_spread_30_90 (funding term-structure slope, |IS-IC|=0.105,
+#: orthogonal to the price base). The funding col is in the parquet but NOT in
+#: V1_FEATURE_COLUMNS (the 193 OHLCV set) — so the iter-005 override asserts the PRUNE part
+#: ⊆ V1_FEATURE_COLUMNS and the orthogonal additions are listed explicitly (verified present
+#: in the BTC parquet pre-launch). FIRST of the orthogonal-feature batch (006=basis, 007=OI).
+V1_BTC_ORTHO_ITER005_ADDS: tuple[str, ...] = ("btc_funding_spread_30_90",)
+V1_BTC_ORTHO_ITER005: tuple[str, ...] = V1_BTC_PRUNED_ITER002 + V1_BTC_ORTHO_ITER005_ADDS
+
 #: iter-v1/023: full V1_BASELINE_UNIVERSE (5-sym) with funding-rate z-score feature family.
 #: Feature-family EXPLORATION cycle-3 #8/10. V1_FEATURE_COLUMNS_PRUNED 40 → 42.
 #: Dispatch is handled by the iteration_label == "v1-023" elif branch.
@@ -3554,6 +3563,27 @@ def main() -> None:
             f"[{iteration_label}] OVERRIDE ACTIVE: features=41 (V1_BTC_PRUNED_ITER002) "
             f"| R2 drawdown-scaling OFF (prune-only; /004=K=20 confirmation of /003) "
             f"| R1=OFF R3=ON({BASELINE_OOD_CUTOFF_PCT}) R5/vt=ON atr_tp=2.9 atr_sl=1.45"
+        )
+    elif iteration_label == "v1-005":
+        # iter-v1/005 EXPLORATION (BTCUSDT, K=5). ORTHOGONAL-FEATURE axis: the 41-col OHLCV
+        # prune + ONE non-OHLCV addition (btc_funding_spread_30_90). FIRST of the orthogonal
+        # batch (006=basis, 007=OI). R2 OFF (baseline risk; confirmed OOS killer). The prune
+        # part MUST be ⊆ V1_FEATURE_COLUMNS; the orthogonal adds live in the parquet but
+        # OUTSIDE the 193 (presence verified pre-launch + by post-run non-zero-importance count).
+        _full_set = set(V1_FEATURE_COLUMNS)
+        _missing = [c for c in V1_BTC_PRUNED_ITER002 if c not in _full_set]
+        assert not _missing, (
+            f"iter-v1/005: prune base not a subset of V1_FEATURE_COLUMNS — {_missing}"
+        )
+        assert len(set(V1_BTC_ORTHO_ITER005)) == len(V1_BTC_ORTHO_ITER005), (
+            "iter-v1/005: V1_BTC_ORTHO_ITER005 has duplicate columns"
+        )
+        _spec_feature_columns = list(V1_BTC_ORTHO_ITER005)
+        _spec_apply_r2 = False  # R2 OFF — baseline risk
+        print(
+            f"[iter-v1/005] OVERRIDE ACTIVE: features={len(V1_BTC_ORTHO_ITER005)} "
+            f"(41-col prune + orthogonal {list(V1_BTC_ORTHO_ITER005_ADDS)}) "
+            f"| R2 OFF | R1=OFF R3=ON({BASELINE_OOD_CUTOFF_PCT}) R5/vt=ON atr_tp=2.9 atr_sl=1.45"
         )
 
     # -------------------------------------------------------------------------
