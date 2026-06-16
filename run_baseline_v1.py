@@ -151,8 +151,26 @@ from crypto_trade.strategies.regime_gate_v1 import (
 #: Single-symbol redesign (2026-06-15): extended 10 → 20 so CONFIRMATION can draw 20
 #: deterministic seeds for tighter lottery-bias isolation (per-seed Sharpe dispersion).
 ENSEMBLE_SEEDS: tuple[int, ...] = (
-    42, 123, 456, 789, 1001, 2002, 3003, 4004, 5005, 6006,
-    7007, 8008, 9009, 10010, 11011, 12012, 13013, 14014, 15015, 16016,
+    42,
+    123,
+    456,
+    789,
+    1001,
+    2002,
+    3003,
+    4004,
+    5005,
+    6006,
+    7007,
+    8008,
+    9009,
+    10010,
+    11011,
+    12012,
+    13013,
+    14014,
+    15015,
+    16016,
 )
 
 #: SPECIALIST BAGGING K — the number of independent Optuna studies (each its own
@@ -360,6 +378,38 @@ V1_BTC_ORTHO_ITER006: tuple[str, ...] = V1_BTC_PRUNED_ITER002 + V1_BTC_ORTHO_ITE
 V1_BTC_ORTHO_ITER007_ADDS: tuple[str, ...] = ("btc_oi_delta_5_z30",)
 V1_BTC_ORTHO_ITER007: tuple[str, ...] = V1_BTC_PRUNED_ITER002 + V1_BTC_ORTHO_ITER007_ADDS
 
+#: iter-v1/009 EXPLORATION (BTCUSDT). LABEL-HORIZON axis (FE Phase 4 PRIMARY): the BTC
+#: directional null is a LABEL artifact — the ATR triple-barrier (2.9/1.45, 7d) truncates
+#: winners early. Switching the TRAINING label to fixed_horizon N=21 (7d, NO barrier
+#: truncation) lifts the IS Sharpe proxy +0.03 (SIGN-MIXED) → +1.28 (8/8 seeds, SIGN-ROBUST).
+#: 19-col cluster-pruned HYBRID short+regime feature set (FE recommended set; 4 cols pruned
+#: from a 23-col probe — see feature_report.md §3). NOT a strict subset of V1_FEATURE_COLUMNS:
+#: 16/19 are inside the 193, 3 live in the parquet OUTSIDE it (ent_shannon_10,
+#: btc_funding_spread_30_90, funding_rate_zscore_30). Presence verified pre-launch; importance
+#: stays auditable via the active_feature_columns sync fix (the funding/entropy cols would
+#: otherwise be invisible to _write_feature_importance, the /005 funding-invisibility bug).
+V1_BTC_ITER009_FEATURES: tuple[str, ...] = (
+    "trend_adx_7",
+    "vol_garman_klass_10",
+    "vol_atr_5",
+    "vol_taker_buy_ratio",
+    "vol_taker_buy_ratio_sma_5",
+    "vol_mfi_7",
+    "mom_rsi_9",
+    "stat_autocorr_lag1",
+    "mr_pct_from_high_5",
+    "vol_cmf_10",
+    "ent_shannon_10",
+    "trend_adx_14",
+    "trend_supertrend_14_3",
+    "btc_funding_spread_30_90",
+    "funding_rate_zscore_30",
+    "stat_autocorr_lag5",
+    "vol_range_spike_72",
+    "mr_rsi_extreme_14",
+    "stat_kurtosis_20",
+)
+
 #: iter-v1/023: full V1_BASELINE_UNIVERSE (5-sym) with funding-rate z-score feature family.
 #: Feature-family EXPLORATION cycle-3 #8/10. V1_FEATURE_COLUMNS_PRUNED 40 → 42.
 #: Dispatch is handled by the iteration_label == "v1-023" elif branch.
@@ -553,6 +603,9 @@ def run_model(
     sigma_halflife_days: int = 14,
     sample_weight_mode: str = "abs_pnl",
     label_mode: str = "triple_barrier",
+    use_atr_labeling: bool = True,
+    label_timeout_minutes: int = 10080,
+    execution_timeout_minutes: int = 10080,
     params_persist_path: Path | None = None,
     model_role: str = "",
     symbol: str = "",
@@ -635,6 +688,22 @@ def run_model(
         Callable[[pd.DataFrame], np.ndarray] returning a boolean mask.
         Applied to train_indices BEFORE labeling in _train_for_month().
         Default None = no filter (backward-compatible).
+    use_atr_labeling
+        iter-v1/009 — whether the TRAINING LABEL uses ATR triple-barrier scanning.
+        Default True (BIT-IDENTICAL to /002-/007). Set False for fixed_horizon
+        runs (the label becomes sign-of-N-candle-forward-return; the ATR
+        multipliers are then irrelevant to labeling and only drive execution).
+    label_timeout_minutes
+        iter-v1/009 — TRAINING-LABEL horizon in minutes (forward scan deadline /
+        fixed_horizon N). Default 10080 (= 21 candles = 7d at 8h; BIT-IDENTICAL to
+        /002-/007). Threaded into LightGbmStrategy.label_timeout_minutes.
+    execution_timeout_minutes
+        iter-v1/009 — BACKTEST-EXECUTION timeout (the binding horizon exit for
+        winners when the TP is made non-binding). Default 10080 (BIT-IDENTICAL).
+        Threaded into BacktestConfig.timeout_minutes. Kept SEPARATE from
+        label_timeout_minutes so the two can be reasoned about independently
+        (they coincide at 10080 for /009, by design — label horizon == execution
+        horizon, the core label↔execution consistency requirement).
     """
     effective_feature_columns = (
         feature_columns if feature_columns is not None else list(V1_FEATURE_COLUMNS)
@@ -654,7 +723,7 @@ def run_model(
         max_amount_usd=1000.0,
         stop_loss_pct=4.0,
         take_profit_pct=8.0,
-        timeout_minutes=10080,
+        timeout_minutes=execution_timeout_minutes,
         fee_pct=0.1,
         data_dir=Path("data"),
         cooldown_candles=2,
@@ -684,13 +753,13 @@ def run_model(
         cv_splits=5,
         label_tp_pct=8.0,
         label_sl_pct=4.0,
-        label_timeout_minutes=10080,
+        label_timeout_minutes=label_timeout_minutes,
         fee_pct=0.1,
         features_dir="data/features",
         verbose=1,
         atr_tp_multiplier=atr_tp,
         atr_sl_multiplier=atr_sl,
-        use_atr_labeling=True,
+        use_atr_labeling=use_atr_labeling,
         ensemble_seeds=_derive_ensemble_seeds(ensemble_size, offset=ensemble_seeds_offset),
         feature_columns=effective_feature_columns,
         ood_enabled=True,
@@ -3541,6 +3610,19 @@ def main() -> None:
     _spec_r2_trigger_pct: float = 7.0
     _spec_r2_scale_floor: float = 0.33
     _spec_r2_scale_anchor_pct: float = 15.0
+    # iter-v1/009 (label↔execution consistency) overrides. Defaults reproduce the
+    # /002-/007 BTC-specialist behavior BIT-IDENTICALLY: ATR triple-barrier TRAINING
+    # label (use_atr_labeling=True), 7d label horizon, and ATR execution barriers
+    # 2.9/1.45 with a 7d execution timeout. A per-iteration block (e.g. v1-009) may
+    # override these to switch the training label to fixed_horizon AND re-shape the
+    # execution barrier so winners run to the horizon instead of truncating at the
+    # 2.9-ATR TP. These thread through the universal single-symbol run_model dispatch.
+    _spec_label_mode: str = "triple_barrier"
+    _spec_use_atr_labeling: bool = True
+    _spec_label_timeout_minutes: int = 10080  # 21 candles = 7d at 8h (TRAINING label)
+    _spec_atr_tp: float = 2.9  # EXECUTION take-profit ATR multiplier
+    _spec_atr_sl: float = 1.45  # EXECUTION stop-loss ATR multiplier (protective)
+    _spec_execution_timeout_minutes: int = 10080  # EXECUTION horizon (binding exit)
 
     if iteration_label == "v1-002":
         # iter-v1/002 EXPLORATION (BTCUSDT, K=3). PRIMARY axis = 41-col feature
@@ -3656,6 +3738,100 @@ def main() -> None:
             f"(41-col prune + orthogonal {list(V1_BTC_ORTHO_ITER007_ADDS)}) "
             f"| R2 OFF | R1=OFF R3=ON({BASELINE_OOD_CUTOFF_PCT}) R5/vt=ON atr_tp=2.9 atr_sl=1.45"
         )
+    elif iteration_label == "v1-009":
+        # iter-v1/009 EXPLORATION (BTCUSDT). LABEL-HORIZON axis (FE Phase 4 PRIMARY).
+        #
+        # THESIS: the BTC directional null is a LABEL artifact. The ATR triple-barrier
+        # TRAINING label (2.9/1.45 ATR, 7d) truncates winners early; switching the label
+        # to fixed_horizon N=21 (7d, no barrier truncation) lifts the IS Sharpe proxy
+        # +0.03 (SIGN-MIXED) → +1.28 (8/8 seeds). Objective = SHARPE, not absolute return
+        # ("let winners run" → crypto trend-persistence capture).
+        #
+        # ── LABEL↔EXECUTION CONSISTENCY (the load-bearing QE decision) ──────────────
+        # `label_mode` ONLY changes the TRAINING label. Backtest EXECUTION still exits
+        # via the ATR TP/SL barriers (Signal.tp_pct/sl_pct = NATR × atr_tp/sl_multiplier,
+        # lgbm.py:2658-2666) + the BacktestConfig timeout. With the incumbent 2.9-ATR TP
+        # (≈ 6.7% at median NATR 2.31%) a fixed_horizon-trained model's trades TP within a
+        # few candles and NEVER realize the 21-candle thesis — the backtest would be a
+        # MISMATCHED, INVALID test of the FE hypothesis.
+        #
+        # RESOLUTION (cleanest engine-supported mechanism; ZERO new backtest.py code):
+        #   - atr_tp_multiplier = 100.0 → TP price = NATR × 100. Even in the lowest
+        #     monthly-median-NATR month (1.17%) the TP sits at ≈ 117%, far above the
+        #     max observed 21-candle BTC move (47.4%; p99 = 28.5%). The TP is therefore
+        #     NON-BINDING across the entire IS+OOS window → the 7d EXECUTION timeout is
+        #     the binding exit for winners ("let winners run to the horizon").
+        #   - atr_sl_multiplier = 1.45 (UNCHANGED) → protective stop ≈ 3.3% at median
+        #     NATR. Losers are still cut ("cut losers"). The label↔execution thesis is
+        #     asymmetric: cut losers (SL retained), let winners run (TP disabled).
+        #   - execution_timeout_minutes = label_timeout_minutes = 10080 (21 candles = 7d):
+        #     the EXECUTION horizon EQUALS the TRAINING-label horizon — this is exactly
+        #     the consistency the FE Sharpe proxy assumes (full ~21-candle forward move).
+        #
+        # Why 100× (not None / not config fallback): setting atr_tp_multiplier=None makes
+        # the signal emit tp_pct=None, which create_order (backtest.py:990) then falls back
+        # to BacktestConfig.take_profit_pct=8.0% — a TIGHTER fixed TP, the opposite of
+        # intended. A large multiplier is the engine-native way to make TP non-binding
+        # while keeping the exact existing code path (no new flags, byte-identical for
+        # every other iteration).
+        #
+        # FEATURES: 19-col cluster-pruned HYBRID short+regime set (FE recommended).
+        # NOT a strict subset of V1_FEATURE_COLUMNS (3/19 are OUTSIDE the 193:
+        # ent_shannon_10 + the two funding cols), so the /002-/007 strict-subset assertion
+        # is INTENTIONALLY replaced by a parquet-presence assertion + a funding-outside-193
+        # assertion (per QE task #4). Importance stays auditable via the
+        # active_feature_columns sync fix in the universal routing guard below.
+        import pyarrow.parquet as pq  # noqa: PLC0415
+
+        _iter009_parquet = Path("data/features") / "BTCUSDT_8h_features.parquet"
+        assert _iter009_parquet.exists(), (
+            f"iter-v1/009: feature parquet not found at {_iter009_parquet}. "
+            "Run `uv run crypto-trade features --symbols BTCUSDT --interval 8h --track v1 "
+            "--format parquet` before launch."
+        )
+        _parquet_cols = set(pq.ParquetFile(_iter009_parquet).schema.names)
+        _missing = [c for c in V1_BTC_ITER009_FEATURES if c not in _parquet_cols]
+        assert not _missing, (
+            f"iter-v1/009: {len(_missing)} of the 19 feature columns are NOT present in "
+            f"the BTCUSDT feature parquet — {_missing}. Regenerate features before launch."
+        )
+        assert len(set(V1_BTC_ITER009_FEATURES)) == len(V1_BTC_ITER009_FEATURES), (
+            "iter-v1/009: V1_BTC_ITER009_FEATURES contains duplicate columns"
+        )
+        # Prune-subset discipline is NOT applicable here (this is a hybrid short+regime set,
+        # not a prune of the 193). Assert the funding cols live OUTSIDE V1_FEATURE_COLUMNS
+        # (so the active_feature_columns sync fix is the thing keeping them auditable).
+        _full_193 = set(V1_FEATURE_COLUMNS)
+        for _fcol in ("btc_funding_spread_30_90", "funding_rate_zscore_30"):
+            assert _fcol in V1_BTC_ITER009_FEATURES, (
+                f"iter-v1/009: expected funding col {_fcol} in the 19-col set"
+            )
+            assert _fcol not in _full_193, (
+                f"iter-v1/009: funding col {_fcol} unexpectedly inside V1_FEATURE_COLUMNS "
+                f"({len(_full_193)} cols) — the funding-outside-193 invariant is violated; "
+                "verify the active_feature_columns sync fix still covers it."
+            )
+        _spec_feature_columns = list(V1_BTC_ITER009_FEATURES)
+        _spec_apply_r2 = False  # R2 OFF — baseline risk (mirrors /005-/007 BTC specialist)
+        # LABEL: fixed_horizon N=21 (7d). use_atr_labeling=False — the ATR multipliers are
+        # irrelevant to the fixed_horizon label (labeling.py:426 guards barrier scanning),
+        # so the label is purely sign-of-7d-forward-return.
+        _spec_label_mode = "fixed_horizon"
+        _spec_use_atr_labeling = False
+        _spec_label_timeout_minutes = 10080  # 21 candles = 7d (training label horizon)
+        # EXECUTION: TP non-binding (100× ATR), SL protective (1.45× ATR), 7d horizon binds.
+        _spec_atr_tp = 100.0
+        _spec_atr_sl = 1.45
+        _spec_execution_timeout_minutes = 10080  # 21 candles = 7d (== label horizon)
+        print(
+            f"[iter-v1/009] OVERRIDE ACTIVE: features={len(V1_BTC_ITER009_FEATURES)} "
+            f"(19-col HYBRID short+regime; 16⊆V1_FEATURE_COLUMNS + 3 outside: "
+            f"ent_shannon_10/btc_funding_spread_30_90/funding_rate_zscore_30) "
+            f"| LABEL=fixed_horizon N=21(7d) use_atr_labeling=False "
+            f"| EXEC atr_tp={_spec_atr_tp}(TP NON-BINDING → 7d timeout binds, 'let winners run') "
+            f"atr_sl={_spec_atr_sl}('cut losers') timeout={_spec_execution_timeout_minutes}min(7d) "
+            f"| R2 OFF R1=OFF R3=ON({BASELINE_OOD_CUTOFF_PCT}) R5/vt=ON"
+        )
 
     # -------------------------------------------------------------------------
     # UNIVERSAL SINGLE-SYMBOL ROUTING GUARD (iter-v1/redesign 2026-06-15).
@@ -3695,13 +3871,17 @@ def main() -> None:
             f"(features={len(_spec_feature_columns)} bounds=v1_specialist "
             f"R1=OFF R2={'ON' if _spec_apply_r2 else 'OFF'} "
             f"R3=ON-AGGREGATOR cutoff={BASELINE_OOD_CUTOFF_PCT} "
-            f"R5=ON vt_target_vol=0.3 atr_tp=2.9 atr_sl=1.45)"
+            f"R5=ON vt_target_vol=0.3 label_mode={_spec_label_mode} "
+            f"use_atr_labeling={_spec_use_atr_labeling} "
+            f"label_timeout={_spec_label_timeout_minutes}min "
+            f"atr_tp={_spec_atr_tp} atr_sl={_spec_atr_sl} "
+            f"exec_timeout={_spec_execution_timeout_minutes}min)"
         )
         _spec_results, _spec_faxm, _spec_strat = run_model(
             f"Model_A_{_spec_sym}_specialist",
             (_spec_sym,),
-            atr_tp=2.9,
-            atr_sl=1.45,
+            atr_tp=_spec_atr_tp,  # /009: 100.0 (TP non-binding); default 2.9 for /002-/007
+            atr_sl=_spec_atr_sl,  # /009: 1.45 (protective); default 1.45 (unchanged)
             apply_r1=False,  # R1=OFF: CATALOG-CLOSED for specialist_mode
             apply_r2=_spec_apply_r2,  # default OFF; per-iteration override may enable (e.g. /002)
             risk_drawdown_trigger_pct=_spec_r2_trigger_pct,
@@ -3712,6 +3892,10 @@ def main() -> None:
             oof_persist_path=OOF_PARQUET_PATH,
             feature_columns=_spec_feature_columns,
             bounds_profile="v1_specialist",
+            label_mode=_spec_label_mode,  # /009: fixed_horizon; default triple_barrier
+            use_atr_labeling=_spec_use_atr_labeling,  # /009: False; default True
+            label_timeout_minutes=_spec_label_timeout_minutes,  # training-label horizon
+            execution_timeout_minutes=_spec_execution_timeout_minutes,  # backtest exit horizon
             r5_vol_target_enabled=_r5_kwargs.get("r5_vol_target_enabled", True),
             r5_vol_target_pct=_r5_kwargs.get("r5_vol_target_pct", 4.0),
             r5_kill_low_natr_enabled=_r5_kwargs.get("r5_kill_low_natr_enabled", False),
