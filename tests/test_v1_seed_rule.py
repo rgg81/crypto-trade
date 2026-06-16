@@ -6,11 +6,11 @@ THE RULE (ratified by the user):
     K is the ONLY seed number that varies.
       - Inner ensemble (--ensemble-size / ensemble_seeds) = 1, ALWAYS.
       - Outer seeds (--seeds)                            = 1, ALWAYS.
-      - EXPLORATION  -> K = 3.   CONFIRMATION -> K = 20.
+      - EXPLORATION  -> K = 5.   CONFIRMATION -> K = 20.
       - Single-symbol only.
 
 These tests assert the rule WITHOUT running a full backtest:
-  (a) EXPLORATION resolves bagging_k=3, CONFIRMATION resolves bagging_k=20.
+  (a) EXPLORATION resolves bagging_k=5, CONFIRMATION resolves bagging_k=20.
   (b) the single-symbol specialist dispatch builds a LightGbmStrategy with
       specialist_mode=True, specialist_seed_count==bagging_k, and inner
       ensemble_seeds length == 1.
@@ -107,7 +107,7 @@ class TestBaggingKConstants:
     def test_exploration_bagging_k_is_3(self) -> None:
         from run_baseline_v1 import V1_EXPLORATION_BAGGING_K
 
-        assert V1_EXPLORATION_BAGGING_K == 3
+        assert V1_EXPLORATION_BAGGING_K == 5
 
     def test_confirmation_bagging_k_is_20(self) -> None:
         from run_baseline_v1 import V1_CONFIRMATION_BAGGING_K
@@ -131,7 +131,7 @@ class TestModeResolvesBaggingK:
 
     def test_exploration_resolves_bagging_k_3(self) -> None:
         result = _resolve_mode(["--exploration", "--iteration", "900"])
-        assert result["bagging_k"] == 3
+        assert result["bagging_k"] == 5
         assert result["ensemble_size"] == 1, "inner ensemble must be FIXED at 1"
         assert result["seeds"] == 1, "outer seeds must be FIXED at 1"
 

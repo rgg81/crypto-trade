@@ -163,7 +163,10 @@ ENSEMBLE_SEEDS: tuple[int, ...] = (
 #: NOTE: the OLD `V1_EXPLORATION_ENSEMBLE_SIZE` / `V1_CONFIRMATION_ENSEMBLE_SIZE`
 #: names are RETIRED — they were the (wrong) inner-ensemble knob.
 #: EXPLORATION bagging count — fast cycling.
-V1_EXPLORATION_BAGGING_K: int = 3
+V1_EXPLORATION_BAGGING_K: int = 5  # raised 3->5 (2026-06-16): K=3 was lottery-prone
+#   (iter-003 K=3 screened IS +0.17 but iter-004 K=20 confirmed IS -0.17 — a 3-seed fluke).
+#   K=5 cuts screen variance ~1.3x. A K=5 screen is still TENTATIVE — the K=20 CONFIRMATION
+#   is the only arbiter; do not merge on a screen.
 
 #: CONFIRMATION bagging count — full statistical rigor; isolates lottery bias via
 #: per-seed (per-bag) Sharpe dispersion across the K independent studies.

@@ -38,7 +38,8 @@ gap = (timeout_candles + 1) * n_symbols                   # CV label-leak guard 
 # v1's model = the SPECIALIST BAGGING ensemble: K independent Optuna studies per
 # walk-forward month (each its own seed + hyperparameter search), combined by
 # mean-of-signed-weights. K is the ONLY seed number that ever varies.
-V1_EXPLORATION_BAGGING_K  = 3    # exploration: fast screen
+V1_EXPLORATION_BAGGING_K  = 5    # exploration: fast screen (raised 3->5 2026-06-16; K=3 was
+                                 # lottery-prone — a K screen is TENTATIVE, the K=20 confirm is truth)
 V1_CONFIRMATION_BAGGING_K = 20   # confirmation: robust; bagging IS the lottery-bias control
 #   inner ensemble (--ensemble-size) = 1, ALWAYS  (placeholder seed [42]; hard error if set)
 #   outer seeds   (--seeds)          = 1, ALWAYS  (hard error if != 1)
@@ -124,9 +125,12 @@ There are exactly two iteration modes. No axis-rotation rules, no HIGH-RISK decl
 The ONLY thing that changes between modes is the bagging **K** (see THE SEED RULE above).
 inner ensemble = 1 and outer seeds = 1 are FIXED in both modes.
 
-- **EXPLORATION** (`--exploration`): bagging **K=3** (fast screen). Goal = test one focused
+- **EXPLORATION** (`--exploration`): bagging **K=5** (fast screen). Goal = test one focused
   hypothesis (a feature, an HP region, a risk knob) for signal-vs-noise. Fast turnaround. An
-  exploration NEVER updates the baseline.
+  exploration NEVER updates the baseline. **A screen result is TENTATIVE** — small-K bagging is
+  noisy (iter-003 K=3 screened IS +0.17 but iter-004 K=20 confirmed IS −0.17, a 3-seed fluke; K
+  raised 3→5 in response). Treat a marginal both-positive screen with skepticism; the K=20
+  CONFIRMATION is the only arbiter.
 - **CONFIRMATION** (`--confirmation`): bagging **K=20** (robust). Goal = decide the merge. The
   20-study bagging IS the lottery-bias control — averaging 20 independent Optuna studies makes the
   aggregate seed-robust by construction; more K ⇒ lower lottery risk. Only a confirmation can
@@ -236,7 +240,7 @@ created by the orchestrator. The single-symbol assertion guards the symbol resol
 ## Running a backtest
 
 ```
-# EXPLORATION (bagging K=3, fast screen; --n-trials = per-seed Optuna budget):
+# EXPLORATION (bagging K=5, fast screen — TENTATIVE; --n-trials = per-seed Optuna budget):
 uv run python run_baseline_v1.py --exploration --iteration NNN --symbols BTCUSDT --n-trials 35 --slippage-bps 2
 
 # CONFIRMATION (bagging K=20, merge decision):
