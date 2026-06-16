@@ -3531,6 +3531,25 @@ def main() -> None:
             f"floor={_spec_r2_scale_floor} anchor={_spec_r2_scale_anchor_pct}) "
             f"| R1=OFF R3=ON({BASELINE_OOD_CUTOFF_PCT}) R5/vt=ON atr_tp=2.9 atr_sl=1.45"
         )
+    elif iteration_label == "v1-003":
+        # iter-v1/003 EXPLORATION (BTCUSDT, K=3). FEATURE-ONLY ablation of /002:
+        # SAME 41-col prune, but R2 drawdown-scaling OFF (baseline risk). Isolates
+        # the prune from the R2 brake — /002 Critic showed R2 throttled OOS recovery
+        # winners (weight_factor decayed 0.33→0.18 OOS). Tests whether the prune
+        # alone keeps the both-positive coherence with OOS recovered toward +0.64.
+        _full_set = set(V1_FEATURE_COLUMNS)
+        _missing = [c for c in V1_BTC_PRUNED_ITER002 if c not in _full_set]
+        assert not _missing, (
+            f"iter-v1/003: V1_BTC_PRUNED_ITER002 not a strict subset of "
+            f"V1_FEATURE_COLUMNS — {len(_missing)} unknown cols: {_missing}"
+        )
+        _spec_feature_columns = list(V1_BTC_PRUNED_ITER002)
+        _spec_apply_r2 = False  # R2 OFF — the isolation variable
+        print(
+            f"[iter-v1/003] OVERRIDE ACTIVE: features=41 (V1_BTC_PRUNED_ITER002) "
+            f"| R2 drawdown-scaling OFF (feature-only ablation of /002) "
+            f"| R1=OFF R3=ON({BASELINE_OOD_CUTOFF_PCT}) R5/vt=ON atr_tp=2.9 atr_sl=1.45"
+        )
 
     # -------------------------------------------------------------------------
     # UNIVERSAL SINGLE-SYMBOL ROUTING GUARD (iter-v1/redesign 2026-06-15).

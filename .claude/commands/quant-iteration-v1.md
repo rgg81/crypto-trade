@@ -150,8 +150,15 @@ the symbol's current baseline** AND the methodology is intact. There are **no ab
 floors** — the old "IS Sharpe > 1.0 AND OOS Sharpe > 1.0" rule is RETIRED for v1.
 
 "Better than baseline" means, judged net of costs on the confirmation run:
-- OOS performance improves over the current baseline (primary: OOS monthly Sharpe; corroborated by
-  OOS net PnL / profit factor), AND
+- **Generalization-coherence FIRST (the primary lens).** Prefer a candidate whose **IS and OOS are
+  BOTH positive with a healthy OOS/IS ratio (~0.5–1.0)** over a profile where IS and OOS disagree in
+  sign. An OOS Sharpe that is positive *only while IS is negative* (an **inversion**, ratio < 0) is a
+  regime artifact, NOT a generalizing edge — do **not** treat such a baseline's high OOS number as the
+  bar to beat. A coherent both-positive candidate with a lower raw OOS Sharpe can still be **better**
+  than an inverted baseline with a higher OOS Sharpe. Judge on coherent both-window performance + the
+  ratio, not the OOS number in isolation. (Codified 2026-06-16 — the iter-001 BTC baseline was exactly
+  such an inversion: IS −0.28 / OOS +0.64, ratio −2.29.)
+- corroborated by OOS net PnL / profit factor moving the same direction, AND
 - no material regression on IS, AND
 - the K=20 bagging dispersion is healthy (`specialist_dispersion.csv`: the 20 studies don't wildly
   disagree per candle — the aggregate isn't riding a single study). The K=20 bagging is itself the
