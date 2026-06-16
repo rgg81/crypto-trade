@@ -1,0 +1,5 @@
+config,pooled_sharpe,maxDD,total_ret
+baseline,1.87,306.0,1409.8
+R2 only,2.581,118.6,1211.7
+conviction only (floor .35),1.941,223.3,1108.5
+R2 + conviction,2.47,100.2,956.5

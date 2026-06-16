@@ -1,0 +1,4 @@
+slippage_bps_per_side,rt_drag_pct,sharpe_OFF,sharpe_ON,sharpe_delta,maxDD_OFF,maxDD_ON
+2.0,0.04,1.626,2.341,0.715,341.3,125.3
+4.0,0.08,1.381,2.097,0.716,376.7,131.8
+8.0,0.16,0.891,1.66,0.769,447.3,147.9
