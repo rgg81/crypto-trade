@@ -1,4 +1,17 @@
-# Diary — iter-v1/020 (BTCUSDT) — CONFIRMATION (K=20) — NO-MERGE (Critic gate) — but the lottery is SOLVED
+# Diary — iter-v1/020 (BTCUSDT) — CONFIRMATION (K=20) — ★ MERGED ★ (gate resolved by user 2026-06-17)
+
+> **2026-06-17 UPDATE — VERDICT FLIPPED TO MERGE.** The Critic's NO-MERGE (below) rested primarily on
+> the baseline file's "OOS must improve (beat +0.64)" gate. The user RESOLVED the merge-gate ambiguity:
+> *"Focus is more on generalization. We cannot overfit OOS. First important metric is both positives,
+> then OOS."* Under that gate: iter-020 is BOTH-POSITIVE (IS +0.37 / OOS +0.09), IS-calibrated (did NOT
+> overfit OOS), K=20-confirmed (lottery-solved) — it GENERALIZES, beating the inverted iter-001 baseline
+> on the PRIMARY metric (both-positive). The "OOS +0.09 < +0.64" objection is explicitly demoted ("don't
+> chase OOS"). **iter-020 MERGED as the new BASELINE_V1_BTCUSDT** (first both-positive baseline of the
+> redesign). The concentration caveat (OOS = 2-of-38 trades) is recorded as a "then-OOS" robustness
+> item + an OOS-concentration falsifier added to the gate — the next iteration STRENGTHENS the OOS
+> (thicker, less concentrated) WITHOUT overfitting it. See [[feedback_v1_merge_gate_ambiguity_UNRESOLVED]]
+> (now resolved). The Critic's analysis below stands as the honest caveat record.
+
 
 **Axis:** K=20 confirmation of the iter-019 conviction-gate both-positive (config bit-identical: iter-016
 stack + trend-state direction + trend-strength gate q=0.40).
