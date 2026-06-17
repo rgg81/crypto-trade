@@ -323,6 +323,18 @@ class LightGbmStrategy:
         enable_trend_strength_gate: bool = False,
         trend_strength_atr_window: int = 14,  # ATR window (candles) for the ATR-normalizer
         trend_strength_quantile: float = 0.50,  # past-only |dist_atr| q-quantile threshold
+        # iter-v1/021: FUNDING-CONTRA-CROWD re-admission (RULE-layer, NORMAL-RISK).
+        # RE-ADMITS a row the trend-strength gate would SKIP (weak trend) IFF funding
+        # OPPOSES the trend-state direction AND |funding_z30[t-1]| >= a past-only per-month
+        # quantile threshold (crowded positioning against the trend = squeeze fuel). The
+        # direction is NEVER changed — a skipped row is un-skipped at the unchanged
+        # trend-state direction. Past-only: funding at bar t uses funding_z30[t-1]
+        # (`.shift(1)` over the parquet column — the QR leak-probe found 478/2382 (20.07%)
+        # of decisions FLIP without it). Default False = BIT-IDENTICAL to all prior runs
+        # and v2/v3. ONLY enabled in the iter-v1/021 BTC specialist cell.
+        enable_funding_contra_readmit: bool = False,
+        funding_contra_col: str = "funding_rate_zscore_30",  # the parquet funding feature col
+        funding_contra_quantile: float = 0.50,  # past-only |funding| q-quantile threshold
     ) -> None:
         if not feature_columns:
             raise ValueError(
@@ -562,6 +574,28 @@ class LightGbmStrategy:
         # the training window (mirrors the R3 OOD training-window-stat pattern). None
         # until the first month with >= 50 finite training-window |dist_atr| rows.
         self._trend_strength_thr: float | None = None
+        # iter-v1/021: FUNDING-CONTRA-CROWD re-admission (RULE layer).
+        # Enabled via enable_funding_contra_readmit=True (BTC specialist cell only; /021).
+        # RE-ADMITS a trend-strength-gate-skipped row IFF funding OPPOSES the trend-state
+        # direction AND |funding_z30[t-1]| >= the past-only per-month threshold. Does NOT
+        # change the Optuna training-objective domain (NORMAL-RISK) and NEVER changes
+        # direction. Mirrors the EXACT IS-only construction in
+        # analysis/BTCUSDT/iteration_v1-021/r2_funding_contra_robustness.py:
+        #   f_z30   = df["funding_rate_zscore_30"].shift(1)         # funding_z30[t-1] past-only
+        #   opposes = sign(f_z30) == -sign(direction)               # funding leans against trend
+        #   thr     = quantile(|f_z30| over training-window rows, q) # past-only threshold
+        #   readmit = isfinite(f_z30) & isfinite(thr) & (|f_z30| >= thr) & opposes
+        self._enable_funding_contra_readmit: bool = bool(enable_funding_contra_readmit)
+        self._funding_contra_col: str = str(funding_contra_col)
+        self._funding_contra_quantile: float = float(funding_contra_quantile)
+        # Sorted (open_time_ms, funding_z30[t-1]) index — built in compute_features() when
+        # enable_funding_contra_readmit=True from the trend_state_symbol parquet's
+        # funding_contra_col, lagged ONE bar (`.shift(1)`) so row t reads funding_z30[t-1].
+        self._funding_contra_idx: tuple[np.ndarray, np.ndarray] | None = None
+        # Per-month past-only threshold; recomputed at each _train_for_month from the
+        # training-window |funding_z30[t-1]| rows (mirrors the trend-strength threshold).
+        # None until the first month with >= 50 finite training-window rows.
+        self._funding_contra_thr: float | None = None
         # iter-v3/072: labeling mode — "triple_barrier" (default, backward-compat)
         # or "fixed_horizon" (sign of N-candle-forward return; no barriers).
         # iter-v3/105: "trend_scanning" (OLS trend, max-|t| horizon selection
@@ -872,6 +906,54 @@ class LightGbmStrategy:
                     f"{self._trend_state_symbol} candles from {_str_pq} "
                     f"(sma_window={_w} atr_window={_aw} quantile={self._trend_strength_quantile}; "
                     f"{_n_finite} finite |dist_atr| rows)"
+                )
+
+        # iter-v1/021: FUNDING-CONTRA-CROWD re-admission — build the past-only
+        # (open_time_ms, funding_z30[t-1]) index from the trend_state_symbol parquet.
+        # For decision candle t (open_time == open_time(t)):
+        #   funding_z30(t) = funding_contra_col[t-1]            # `.shift(1)`, past-only
+        # The QR's IS-only script reads f_z30 = df[col].shift(1) — an ADDITIONAL `.shift(1)`
+        # over the parquet column (the parquet's funding_rate_zscore_30[t] numerator uses
+        # rate[t] which settles at candle t's open; the brief's rule wants the value at
+        # bar t-1). The leak-probe confirmed this `.shift(1)` is LOAD-BEARING (478/2382 =
+        # 20.07% of re-admission decisions FLIP without it). The index is keyed on
+        # OPEN_TIME so the signal-time lookup returns funding_z30 at the SAME row index t
+        # the QR aligns to dir_ts[t]. FAIL LOUD if the parquet or the column is missing.
+        if self._enable_funding_contra_readmit:
+            _fc_pq = Path(self.features_dir) / f"{self._trend_state_symbol}_8h_features.parquet"
+            if not _fc_pq.exists():
+                # FAIL LOUD (same discipline as the /016 trend-state + /018 strength gates).
+                raise FileNotFoundError(
+                    f"[lgbm] funding-contra readmit: FATAL — enable_funding_contra_readmit=True "
+                    f"but parquet not found at {_fc_pq}. Re-fetch + regen: "
+                    f"uv run crypto-trade fetch --symbols {self._trend_state_symbol} "
+                    "--intervals 8h && "
+                    f"uv run crypto-trade features --symbols {self._trend_state_symbol} "
+                    "--interval 8h --track v1 --format parquet --workers 4"
+                )
+            import pandas as _pd_fc  # noqa: PLC0415
+
+            _fc_df = _pd_fc.read_parquet(_fc_pq, columns=["open_time", self._funding_contra_col])
+            _fc_df = _fc_df.dropna(subset=["open_time"])
+            _fc_df = _fc_df.sort_values("open_time").reset_index(drop=True)
+            _fc_ot = _fc_df["open_time"].to_numpy(dtype=np.int64)
+            # `.shift(1)` so row t reads funding_z30[t-1] — EXACTLY the QR IS-only script's
+            #   f_z30 = df["funding_rate_zscore_30"].shift(1).to_numpy(float)
+            _fc_z = _pd_fc.Series(_fc_df[self._funding_contra_col].to_numpy(dtype=np.float64))
+            _fc_z_lag = _fc_z.shift(1).to_numpy(dtype=np.float64)  # funding_z30[t-1], past-only
+            self._funding_contra_idx = (_fc_ot, _fc_z_lag.astype(np.float64))
+            if self._funding_contra_idx is None:
+                raise RuntimeError(
+                    "[lgbm] funding-contra readmit: FATAL — index is None after build "
+                    f"(parquet={_fc_pq}, rows={len(_fc_ot)}). Programming error."
+                )
+            if self.verbose > 0:
+                _n_fin_fc = int(np.isfinite(_fc_z_lag).sum())
+                print(
+                    f"[lgbm] funding-contra readmit: loaded {len(_fc_ot)} "
+                    f"{self._trend_state_symbol} candles from {_fc_pq} "
+                    f"(col={self._funding_contra_col} quantile={self._funding_contra_quantile}; "
+                    f"{_n_fin_fc} finite funding_z30[t-1] rows)"
                 )
 
         # Load per-row ATR values for dynamic labeling
@@ -1835,6 +1917,31 @@ class LightGbmStrategy:
                         f"={self._trend_strength_thr} from {len(_tw_absd)} training-window "
                         f"|dist_atr| rows (month={month_str})"
                     )
+            # iter-v1/021: FUNDING-CONTRA-CROWD re-admission — per-month PAST-ONLY threshold.
+            # thr = quantile(|funding_z30[t-1]| over candles in the TRAINING window, q_f).
+            # The index is keyed on open_time, so "in the training window" is exactly
+            # train_start_ms <= open_time < train_end_ms — the SAME mask the trend-strength
+            # threshold uses. Each row's funding_z30[t-1] is past-only (`.shift(1)`), so the
+            # whole window is past-only relative to the test month. Conservative: < 50 finite
+            # training-window rows → leave thr None (no re-admission this month).
+            self._funding_contra_thr = None
+            if self._enable_funding_contra_readmit and self._funding_contra_idx is not None:
+                _fc_ot, _fc_z = self._funding_contra_idx
+                _fc_tw_mask = (_fc_ot >= int(split.train_start_ms)) & (
+                    _fc_ot < int(split.train_end_ms)
+                )
+                _fc_tw_absz = np.abs(_fc_z[_fc_tw_mask])
+                _fc_tw_absz = _fc_tw_absz[np.isfinite(_fc_tw_absz)]
+                if len(_fc_tw_absz) >= 50:
+                    self._funding_contra_thr = float(
+                        np.quantile(_fc_tw_absz, self._funding_contra_quantile)
+                    )
+                if self.verbose > 0:
+                    print(
+                        f"[lgbm] funding-contra readmit: thr({self._funding_contra_quantile})"
+                        f"={self._funding_contra_thr} from {len(_fc_tw_absz)} training-window "
+                        f"|funding_z30[t-1]| rows (month={month_str})"
+                    )
             # Load NATR / σ_t cache.
             self._month_natr = {}
             if self.atr_tp_multiplier is not None:
@@ -2402,6 +2509,41 @@ class LightGbmStrategy:
             return None
         return val
 
+    def _compute_funding_contra(self, candle_open_time: int) -> float | None:
+        """Compute the past-only funding z-score funding_z30[t-1] at decision candle (iter-v1/021).
+
+        Returns ``funding_contra_col[t-1]`` for decision candle t (the candle whose
+        open_time == candle_open_time), read from the ``_funding_contra_idx``
+        (open_time_ms, funding_z30[t-1]) index built in compute_features() — row t's value
+        ALREADY uses only the parquet funding column at candle t-1 (the index applied an
+        extra ``.shift(1)`` at build time, EXACTLY the QR's IS-only script
+        ``f_z30 = df["funding_rate_zscore_30"].shift(1)``).
+
+        LOOK-AHEAD SAFETY (load-bearing): the index is keyed on open_time and we select the
+        row whose open_time == candle_open_time EXACTLY (searchsorted left + equality
+        check). funding_z30[t-1] at that row was built `.shift(1)`-lagged, so it reads NO
+        funding data at or after the decision candle's own bar. Appending future candles
+        (open_time > candle_open_time) cannot change it. The QR leak-probe found the
+        `.shift(1)` is LOAD-BEARING (478/2382 = 20.07% of re-admission decisions flip
+        without it).
+
+        Returns None when (CONSERVATIVE → caller does NOT re-admit, i.e. the row stays
+        skipped):
+          - index not loaded (re-admission disabled or parquet missing),
+          - no candle with open_time == candle_open_time (decision candle not in parquet),
+          - the funding_z30[t-1] at row t is NaN (warmup or missing funding record).
+        """
+        if self._funding_contra_idx is None:
+            return None
+        ot_arr, fz_arr = self._funding_contra_idx
+        idx_t = int(np.searchsorted(ot_arr, candle_open_time, side="left"))
+        if idx_t < 0 or idx_t >= len(ot_arr) or int(ot_arr[idx_t]) != int(candle_open_time):
+            return None
+        val = float(fz_arr[idx_t])
+        if not np.isfinite(val):
+            return None
+        return val
+
     def _apply_mid_bull_short_veto(self, signal: Signal, symbol: str, open_time: int) -> Signal:
         """Apply AXIS-R Mid-Bull SHORT VETO to an aggregated signal (iter-v1/074).
 
@@ -2801,24 +2943,65 @@ class LightGbmStrategy:
                     and self._trend_strength_thr is not None
                     and _ts_strength < self._trend_strength_thr
                 ):
-                    decision_log.log(
-                        {
-                            "kind": "trend_strength_gate_skip",
-                            "symbol": symbol,
-                            "ot": open_time,
-                            "month": candle_month,
-                            "specialist_seeds": len(self._specialist_models),
-                            "final_signed": _final_signed,
-                            "direction_pre_gate": _sp_direction,
-                            "trend_strength": _ts_strength,
-                            "trend_strength_thr": self._trend_strength_thr,
-                            "trend_strength_quantile": self._trend_strength_quantile,
-                            "trend_strength_atr_window": self._trend_strength_atr_window,
-                            "sma_window": self._trend_state_sma_window,
-                            "decision": "skipped:weak_trend_chop",
-                        }
-                    )
-                    return NO_SIGNAL
+                    # iter-v1/021: FUNDING-CONTRA-CROWD re-admission. The trend-strength
+                    # gate WOULD skip this weak-trend row. RE-ADMIT it (do NOT skip) IFF
+                    # funding OPPOSES the trend-state direction AND crowding is at-least-q_f:
+                    #   f_z30   = funding_z30[t-1]                    (past-only `.shift(1)`)
+                    #   opposes = sign(f_z30) == -sign(_sp_direction) (funding leans vs trend)
+                    #   crowded = |f_z30| >= self._funding_contra_thr (past-only q_f threshold)
+                    # The direction is NEVER changed — the row is un-skipped at the unchanged
+                    # trend-state direction (_sp_direction). CONSERVATIVE: if the gate is OFF,
+                    # the month threshold is None (< 50 training rows), or f_z30 is None
+                    # (warmup / missing record) → do NOT re-admit (the row stays skipped).
+                    _fc_readmit = False
+                    _fc_f = None
+                    if self._enable_funding_contra_readmit and self._funding_contra_thr is not None:
+                        _fc_f = self._compute_funding_contra(open_time)
+                        if _fc_f is not None and _sp_direction != 0:
+                            _fc_opposes = int(np.sign(_fc_f)) == -int(np.sign(_sp_direction))
+                            _fc_crowded = abs(_fc_f) >= self._funding_contra_thr
+                            _fc_readmit = bool(_fc_opposes and _fc_crowded)
+                    if _fc_readmit:
+                        decision_log.log(
+                            {
+                                "kind": "funding_contra_readmit",
+                                "symbol": symbol,
+                                "ot": open_time,
+                                "month": candle_month,
+                                "specialist_seeds": len(self._specialist_models),
+                                "final_signed": _final_signed,
+                                "direction_pre_gate": _sp_direction,
+                                "dir_sign": int(np.sign(_sp_direction)),
+                                "trend_strength": _ts_strength,
+                                "trend_strength_thr": self._trend_strength_thr,
+                                "funding_z30": _fc_f,
+                                "funding_contra_thr": self._funding_contra_thr,
+                                "funding_contra_quantile": self._funding_contra_quantile,
+                                "funding_contra_col": self._funding_contra_col,
+                                "decision": "readmitted:funding_contra_crowd",
+                            }
+                        )
+                        # Fall through — do NOT return NO_SIGNAL. The trend-state-direction
+                        # trade fires at the UNCHANGED direction (_sp_direction).
+                    else:
+                        decision_log.log(
+                            {
+                                "kind": "trend_strength_gate_skip",
+                                "symbol": symbol,
+                                "ot": open_time,
+                                "month": candle_month,
+                                "specialist_seeds": len(self._specialist_models),
+                                "final_signed": _final_signed,
+                                "direction_pre_gate": _sp_direction,
+                                "trend_strength": _ts_strength,
+                                "trend_strength_thr": self._trend_strength_thr,
+                                "trend_strength_quantile": self._trend_strength_quantile,
+                                "trend_strength_atr_window": self._trend_strength_atr_window,
+                                "sma_window": self._trend_state_sma_window,
+                                "decision": "skipped:weak_trend_chop",
+                            }
+                        )
+                        return NO_SIGNAL
 
             # iter-v1/074: AXIS-R Mid-Bull SHORT VETO — post-aggregator rule layer.
             # Applied AFTER mean-of-signed-weights aggregator emits Signal(direction, weight)

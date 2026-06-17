@@ -635,6 +635,9 @@ def run_model(
     enable_trend_strength_gate: bool = False,
     trend_strength_atr_window: int = 14,
     trend_strength_quantile: float = 0.50,
+    enable_funding_contra_readmit: bool = False,
+    funding_contra_col: str = "funding_rate_zscore_30",
+    funding_contra_quantile: float = 0.50,
 ):
     """Run a single v1 sub-model (A/C/D/E) under the corrected walk-forward.
 
@@ -815,6 +818,11 @@ def run_model(
         enable_trend_strength_gate=enable_trend_strength_gate,
         trend_strength_atr_window=trend_strength_atr_window,
         trend_strength_quantile=trend_strength_quantile,
+        # iter-v1/021: FUNDING-CONTRA-CROWD re-admission. Default False = BIT-IDENTICAL
+        # to all prior single-symbol dispatches and v2/v3.
+        enable_funding_contra_readmit=enable_funding_contra_readmit,
+        funding_contra_col=funding_contra_col,
+        funding_contra_quantile=funding_contra_quantile,
     )
     t0 = time.time()
     results = run_backtest(config, strategy, yearly_pnl_check=False)
@@ -2876,6 +2884,44 @@ def main() -> None:
         ),
     )
     parser.add_argument(
+        "--enable-funding-contra-readmit",
+        action="store_true",
+        help=(
+            "Enable the iter-v1/021 FUNDING-CONTRA-CROWD re-admission (RULE layer). "
+            "RE-ADMITS a row the iter-v1/018 trend-strength gate would SKIP (weak trend) "
+            "IFF funding OPPOSES the trend-state direction (sign(funding_z30[t-1]) == "
+            "-sign(direction)) AND |funding_z30[t-1]| >= the past-only per-month q-quantile "
+            "threshold (crowded positioning against the trend = squeeze fuel). The "
+            "direction is NEVER changed — only a skipped row is un-skipped at the unchanged "
+            "trend-state direction. NORMAL-RISK (no change to the Optuna training "
+            "objective). The `--iteration 21` keyed override sets this automatically. "
+            "Default: off (BIT-IDENTICAL to all prior runs)."
+        ),
+    )
+    parser.add_argument(
+        "--funding-contra-col",
+        type=str,
+        default="funding_rate_zscore_30",
+        help=(
+            "Parquet funding-feature column for the iter-v1/021 funding-contra re-admission "
+            "(default funding_rate_zscore_30; already in the 19-col HYBRID set). Read "
+            "past-only as `.shift(1)` so bar t uses funding_z30[t-1]. Only evaluated when "
+            "--enable-funding-contra-readmit is set or the v1-021 keyed override is active."
+        ),
+    )
+    parser.add_argument(
+        "--funding-contra-quantile",
+        type=float,
+        default=0.50,
+        help=(
+            "Past-only |funding_z30[t-1]| quantile that defines the iter-v1/021 "
+            "funding-contra crowding threshold (default 0.50 = median; mid-plateau, brief "
+            "§0.3). Pre-registered fallback 0.30 (thicker) per brief §4. Only evaluated "
+            "when --enable-funding-contra-readmit is set or the v1-021 keyed override is "
+            "active."
+        ),
+    )
+    parser.add_argument(
         "--r5-binary-kill-enabled",
         action="store_true",
         help=(
@@ -3763,6 +3809,11 @@ def main() -> None:
     _spec_enable_trend_strength_gate: bool = False
     _spec_trend_strength_atr_window: int = 14
     _spec_trend_strength_quantile: float = 0.50
+    # iter-v1/021 FUNDING-CONTRA-CROWD re-admission defaults. Strict NO-OP for /002-/020
+    # (byte-identical); the v1-021 keyed block below flips enable=True.
+    _spec_enable_funding_contra_readmit: bool = False
+    _spec_funding_contra_col: str = "funding_rate_zscore_30"
+    _spec_funding_contra_quantile: float = 0.50
 
     if iteration_label == "v1-002":
         # iter-v1/002 EXPLORATION (BTCUSDT, K=3). PRIMARY axis = 41-col feature
@@ -4453,6 +4504,69 @@ def main() -> None:
             f"trend-state DIR sma=200 + trend-strength GATE q=0.40). Validates iter-019 both-positive "
             f"(IS +0.54/OOS +0.06) across 20 seeds -> MERGE if it holds (else conviction-gate OOS = noise)."
         )
+    elif iteration_label == "v1-021":
+        # iter-v1/021 EXPLORATION — FUNDING-CONTRA-CROWD re-admission of gate-skipped chop.
+        # CONFIG = the iter-020 MERGED stack (= iter-016 stack + trend-state DIR sma=200 +
+        # trend-strength GATE q=0.40), PLUS the single new axis: re-admit a row the
+        # trend-strength gate would SKIP IFF funding OPPOSES the trend-state direction AND
+        # |funding_z30[t-1]| >= the past-only per-month q_f quantile. The direction is NEVER
+        # changed — only a skipped row is un-skipped at the unchanged trend-state direction.
+        # NORMAL-RISK (RULE-layer entry primitive; no change to the Optuna training
+        # objective; funding_rate_zscore_30 is already in the 19-col HYBRID set — no feature
+        # change). Single-axis vs /020: ONLY the 3 funding-contra readmit params are added.
+        # q_f=0.50 mid-plateau (brief §0.3); pre-registered fallback 0.30 (brief §4) if OOS
+        # trades < 50.
+        import pyarrow.parquet as pq  # noqa: PLC0415
+
+        _iter021_parquet = Path("data/features") / "BTCUSDT_8h_features.parquet"
+        assert _iter021_parquet.exists(), (
+            f"iter-v1/021: feature parquet not found at {_iter021_parquet}."
+        )
+        _parquet_cols = set(pq.ParquetFile(_iter021_parquet).schema.names)
+        _missing = [c for c in V1_BTC_ITER009_FEATURES if c not in _parquet_cols]
+        assert not _missing, (
+            f"iter-v1/021: {len(_missing)} of the 19 feature columns are NOT present — {_missing}."
+        )
+        # The funding-contra readmit reads funding_rate_zscore_30 past-only from the same
+        # parquet; assert it is present (it IS in the 19-col HYBRID set, but fail loud).
+        assert "funding_rate_zscore_30" in _parquet_cols, (
+            "iter-v1/021: funding_rate_zscore_30 NOT in the BTCUSDT parquet — the "
+            "funding-contra re-admission cannot read its past-only signal. Regen features."
+        )
+        _spec_feature_columns = list(V1_BTC_ITER009_FEATURES)  # == /020
+        _spec_label_mode = "fixed_horizon"
+        _spec_use_atr_labeling = False
+        _spec_label_timeout_minutes = 20160  # == /020
+        _spec_atr_tp = 100.0  # == /020
+        _spec_atr_sl = 1.45  # == /020
+        _spec_execution_timeout_minutes = 20160  # == /020
+        _spec_apply_r2 = True  # == /020
+        _spec_r2_trigger_pct = 2.07
+        _spec_r2_scale_anchor_pct = 8.28
+        _spec_r2_scale_floor = 0.20
+        _spec_enable_trend_state_dir = True  # == /020
+        _spec_trend_state_sma_window = 200
+        _spec_trend_state_symbol = "BTCUSDT"
+        _spec_enable_trend_strength_gate = True  # == /020
+        _spec_trend_strength_atr_window = 14
+        _spec_trend_strength_quantile = 0.40  # == /020 (the MERGED conviction-gate knob)
+        # NEW (the single axis vs /020): funding-contra-crowd re-admission.
+        _spec_enable_funding_contra_readmit = True
+        _spec_funding_contra_col = "funding_rate_zscore_30"
+        _spec_funding_contra_quantile = 0.50  # q_f mid-plateau; fallback 0.30 per brief §4
+        _r2_desc = (
+            f"trig={_spec_r2_trigger_pct}/anch={_spec_r2_scale_anchor_pct}"
+            f"/floor={_spec_r2_scale_floor}"
+        )
+        print(
+            f"[iter-v1/021] OVERRIDE ACTIVE: features={len(V1_BTC_ITER009_FEATURES)} "
+            f"(== /020) | fixed_horizon N=42(14d) let-winners-run | R2 brake ({_r2_desc}) "
+            f"| TREND-STATE DIR sma={_spec_trend_state_sma_window} "
+            f"| TREND-STRENGTH GATE q={_spec_trend_strength_quantile} "
+            f"| FUNDING-CONTRA READMIT ON (col={_spec_funding_contra_col} "
+            f"q_f={_spec_funding_contra_quantile}; NORMAL-RISK; funding OPPOSES trend; .shift(1)) "
+            f"| R3=ON({BASELINE_OOD_CUTOFF_PCT}) R5/vt=ON"
+        )
 
     # CLI precedence hook for the trend-state override (ad-hoc control runs).
     # The v1-016 keyed branch above is the CANONICAL activation; this lets a manual
@@ -4479,6 +4593,20 @@ def main() -> None:
             f"[run_baseline_v1] --enable-trend-strength-gate: trend-strength conviction "
             f"gate ON (atr_window={_spec_trend_strength_atr_window} "
             f"quantile={_spec_trend_strength_quantile} sma={_spec_trend_state_sma_window})."
+        )
+
+    # CLI precedence hook for the iter-v1/021 funding-contra-crowd re-admission (ad-hoc
+    # control runs). The v1-021 keyed branch above is the CANONICAL activation; this lets
+    # a manual `--enable-funding-contra-readmit` toggle it on a different iteration_label.
+    # Re-asserting from args is idempotent for v1-021.
+    if getattr(args, "enable_funding_contra_readmit", False):
+        _spec_enable_funding_contra_readmit = True
+        _spec_funding_contra_col = str(args.funding_contra_col)
+        _spec_funding_contra_quantile = float(args.funding_contra_quantile)
+        print(
+            f"[run_baseline_v1] --enable-funding-contra-readmit: funding-contra-crowd "
+            f"re-admission ON (col={_spec_funding_contra_col} "
+            f"q_f={_spec_funding_contra_quantile})."
         )
 
     # -------------------------------------------------------------------------
@@ -4519,7 +4647,13 @@ def main() -> None:
         # and the gate-fire audit. Without configure() the decision_log.log() calls in
         # lgbm.py are no-ops in backtest mode. Only configured when a RULE-layer gate is
         # active on the generic single-symbol dispatch — byte-identical for ungated runs.
-        if _spec_enable_trend_strength_gate or _spec_enable_trend_state_dir:
+        # iter-v1/021: also fire when the funding-contra re-admission is active so the
+        # funding_contra_readmit events persist for the gate-fire audit.
+        if (
+            _spec_enable_trend_strength_gate
+            or _spec_enable_trend_state_dir
+            or _spec_enable_funding_contra_readmit
+        ):
             _dl_spec_path = (
                 Path(reports_dir) / f"iteration_{iteration_label}" / "decision_log.jsonl"
             )
@@ -4588,6 +4722,12 @@ def main() -> None:
             enable_trend_strength_gate=_spec_enable_trend_strength_gate,
             trend_strength_atr_window=_spec_trend_strength_atr_window,
             trend_strength_quantile=_spec_trend_strength_quantile,
+            # iter-v1/021: FUNDING-CONTRA-CROWD re-admission. Defaults (False) keep ALL
+            # other single-symbol iterations BIT-IDENTICAL; the v1-021 keyed block sets
+            # _spec_enable_funding_contra_readmit=True.
+            enable_funding_contra_readmit=_spec_enable_funding_contra_readmit,
+            funding_contra_col=_spec_funding_contra_col,
+            funding_contra_quantile=_spec_funding_contra_quantile,
         )
 
         # Cohort isolation sanity: assert ONLY the target symbol's trades emitted.
