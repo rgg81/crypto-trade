@@ -1,0 +1,2 @@
+book,mean_chosen_thr,n_kept,win_rate,per_trade_sharpe_ann,top2_share_of_net
+M2_nested_train_threshold,0.45,710,0.5788732394366197,0.5647891418704921,0.07787079755130386
