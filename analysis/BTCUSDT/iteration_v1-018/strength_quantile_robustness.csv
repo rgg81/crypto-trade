@@ -1,0 +1,3 @@
+full,frac_pos,dispersion,worst,recent3,n_pos,n_scored,n_trades,win_rate,mean_ret_pct,design,est_oos_trades
+1.2126,0.7,2.3272,-4.4108,2.094,7,10,2328,0.5636,2.9034,Cd_strong_BOTH_q050,571
+1.2132,0.8,2.7164,-6.2262,1.605,8,10,2523,0.5561,2.8747,E1_qL030_qS070,619
