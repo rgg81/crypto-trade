@@ -4368,6 +4368,50 @@ def main() -> None:
             f"skips weak-trend chop) "
             f"| R1=OFF R3=ON({BASELINE_OOD_CUTOFF_PCT}) R5/vt=ON | TREND-SCALE=OFF"
         )
+    elif iteration_label == "v1-019":
+        # iter-v1/019 EXPLORATION (BTCUSDT). TREND-STRENGTH gate q=0.50 -> 0.40 (QR pre-registered
+        # trade-rate fallback). iter-018 (q=0.50) gave IS +0.86 / OOS -0.16 but only 36 OOS trades
+        # (~2.4/mo) — below the v1 OOS floor and within noise of zero. q=0.40 is a LESS aggressive
+        # gate (skip only the weakest ~40% of trend rows) -> thicker, more robust trade count for a
+        # trustworthy OOS read. QR confirmed q=0.40 is IS-sub-period-stable (on the broad plateau).
+        # CHANGE vs /018: ONLY trend_strength_quantile 0.50 -> 0.40 (single knob, pre-registered).
+        # Everything else BIT-IDENTICAL to /018 (= /016 stack + conviction gate).
+        import pyarrow.parquet as pq  # noqa: PLC0415
+
+        _iter019_parquet = Path("data/features") / "BTCUSDT_8h_features.parquet"
+        assert _iter019_parquet.exists(), (
+            f"iter-v1/019: feature parquet not found at {_iter019_parquet}."
+        )
+        _parquet_cols = set(pq.ParquetFile(_iter019_parquet).schema.names)
+        _missing = [c for c in V1_BTC_ITER009_FEATURES if c not in _parquet_cols]
+        assert not _missing, (
+            f"iter-v1/019: {len(_missing)} of the 19 feature columns are NOT present — {_missing}."
+        )
+        _spec_feature_columns = list(V1_BTC_ITER009_FEATURES)  # == /018
+        _spec_label_mode = "fixed_horizon"
+        _spec_use_atr_labeling = False
+        _spec_label_timeout_minutes = 20160  # 14d == /018
+        _spec_atr_tp = 100.0  # == /018
+        _spec_atr_sl = 1.45  # == /018
+        _spec_execution_timeout_minutes = 20160  # == /018
+        _spec_apply_r2 = True  # == /018
+        _spec_r2_trigger_pct = 2.07
+        _spec_r2_scale_anchor_pct = 8.28
+        _spec_r2_scale_floor = 0.20
+        _spec_enable_trend_state_dir = True  # == /018
+        _spec_trend_state_sma_window = 200
+        _spec_trend_state_symbol = "BTCUSDT"
+        _spec_enable_trend_strength_gate = True  # == /018
+        _spec_trend_strength_atr_window = 14
+        _spec_trend_strength_quantile = 0.40  # <-- ONLY change vs /018 (0.50 -> 0.40, thicker)
+        print(
+            f"[iter-v1/019] OVERRIDE ACTIVE: features={len(V1_BTC_ITER009_FEATURES)} "
+            f"(== /018) | fixed_horizon N=42(14d) let-winners-run | R2 brake "
+            f"(trigger={_spec_r2_trigger_pct}/anchor={_spec_r2_scale_anchor_pct}/floor={_spec_r2_scale_floor}) "
+            f"| TREND-STATE DIR sma={_spec_trend_state_sma_window} "
+            f"| TREND-STRENGTH GATE q={_spec_trend_strength_quantile} (FALLBACK 0.50->0.40, thicker trades) "
+            f"| R3=ON({BASELINE_OOD_CUTOFF_PCT}) R5/vt=ON"
+        )
 
     # CLI precedence hook for the trend-state override (ad-hoc control runs).
     # The v1-016 keyed branch above is the CANONICAL activation; this lets a manual
