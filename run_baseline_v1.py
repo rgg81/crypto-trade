@@ -411,6 +411,29 @@ V1_BTC_ITER009_FEATURES: tuple[str, ...] = (
     "stat_kurtosis_20",
 )
 
+#: iter-v1/028: M2 (meta-labeling) feature set — the 15-col crypto-native
+#: positioning/leverage/regime set (brief §3.2 / §2.6).  DISTINCT from M1's 19-col
+#: V1_BTC_ITER009_FEATURES.  The M2 classifier reads these to predict P(M1 trend
+#: trade wins); open-interest + vol-regime carry the most signal (brief §2.6).
+#: All 15 verified present in the ETHUSDT feature parquet (QR + QE pre-flight).
+V1_ITER028_M2_FEATURES: tuple[str, ...] = (
+    "funding_rate_zscore_30",
+    "funding_rate_zscore_90",
+    "btc_funding_spread_30_90",
+    "oi_delta_30_z90",
+    "oi_price_divergence_30",
+    "basis_zscore_30",
+    "long_short_zscore_30",
+    "vol_taker_buy_ratio",
+    "hurst_100",
+    "trend_adx_14",
+    "vol_natr_21",
+    "mom_rsi_9",
+    "regime_momentum_signed_5d",
+    "stat_autocorr_lag1",
+    "mr_pct_from_high_5",
+)
+
 #: iter-v1/023: full V1_BASELINE_UNIVERSE (5-sym) with funding-rate z-score feature family.
 #: Feature-family EXPLORATION cycle-3 #8/10. V1_FEATURE_COLUMNS_PRUNED 40 → 42.
 #: Dispatch is handled by the iteration_label == "v1-023" elif branch.
@@ -864,20 +887,58 @@ def run_meta_model(
     vol_ceiling_enabled: bool = False,
     vol_ceiling_scale: float = 0.5,
     vol_ceiling_thresholds: dict | None = None,
+    # iter-v1/028: R2 brake calibration (threaded; default = /030 baseline 7/0.33/15).
+    risk_drawdown_trigger_pct: float = 7.0,
+    risk_drawdown_scale_floor: float = 0.33,
+    risk_drawdown_scale_anchor_pct: float = 15.0,
+    # iter-v1/028: M1 label↔execution consistency (let-winners-run fixed_horizon).
+    # Defaults reproduce the /030 baseline (ATR triple_barrier, 14d label/exec).
+    use_atr_labeling: bool = True,
+    label_timeout_minutes: int = 10080,
+    execution_timeout_minutes: int = 10080,
+    # iter-v1/028: model-role + symbol descriptors threaded into M1 (params parquet).
+    model_role: str = "Model_meta",
+    symbol: str = "",
+    # iter-v1/028: M1 specialist bagging stack (K independent Optuna studies).
+    specialist_mode: bool = False,
+    specialist_seed_count: int = 0,
+    specialist_n_startup_trials: int = 10,
+    specialist_n_estimators_max: int = 500,
+    # iter-v1/028: M1 trend-state DIRECTION + conviction (trend-strength) gate.
+    enable_trend_state_dir: bool = False,
+    trend_state_sma_window: int = 200,
+    trend_state_symbol: str = "BTCUSDT",
+    enable_trend_strength_gate: bool = False,
+    trend_strength_atr_window: int = 14,
+    trend_strength_quantile: float = 0.50,
+    # iter-v1/028: M2 distinct feature set + configurable veto threshold.
+    m2_feature_columns: list[str] | None = None,
+    m2_veto_threshold: float = 0.5,
 ):
-    """Run a single v1 sub-model with M2 meta-labeling (iter-v1/030).
+    """Run a single v1 sub-model with M2 meta-labeling (iter-v1/030 + iter-v1/028).
 
     Mirrors run_model() but creates MetaLabelingStrategy instead of
     LightGbmStrategy.  M2 is a binary LGBMClassifier trained on M1-positive
-    bars per training window; it vetoes M1 signals where M2 confidence < 0.5.
+    bars per training window; it vetoes M1 signals where M2 P(win) <
+    ``m2_veto_threshold`` (0.5 default; iter-028 passes 0.45).
 
-    label_mode, frozen_hp_parquet, optuna_objective: accepted for _r5_kwargs
-    compatibility but ignored by MetaLabelingStrategy (M1 in /030 uses baseline
-    triple_barrier labels and Sharpe objective; meta-labeling axis is orthogonal
-    to label-mode and loss-function axes).
+    iter-v1/028 additions (threaded through to MetaLabelingStrategy → inner M1):
+      - M1 is the iter-027 TREND-STATE specialist stack (deterministic 200-SMA
+        direction + conviction gate + fixed_horizon let-winners-run + R2), via
+        ``enable_trend_state_dir`` / ``enable_trend_strength_gate`` /
+        ``use_atr_labeling=False`` / ``label_mode=fixed_horizon`` /
+        ``label_timeout_minutes`` / ``execution_timeout_minutes`` /
+        ``specialist_mode`` + ``specialist_seed_count=K``.  This guarantees M2
+        filters the SAME merged primary, not the LightGbm-learned direction.
+      - M2 reads a DISTINCT 15-col positioning/regime feature set
+        (``m2_feature_columns``), separate from M1's 19-col HYBRID.
 
-    M2 input: feature_columns (43 V1_FEATURE_COLUMNS_PRUNED) + m1_confidence
-    + m1_direction = 45-dim (include_m1_direction=True, per brief §3.3).
+    frozen_hp_parquet, optuna_objective: accepted for _r5_kwargs compatibility
+    but ignored by MetaLabelingStrategy (Sharpe objective; meta-labeling axis is
+    orthogonal to the loss-function axis).
+
+    M2 input (iter-028): m2_feature_columns (15) + m1_confidence + m1_direction
+    = 17-dim (include_m1_direction=True).
 
     Model E (DOT) MUST NOT be dispatched through this function — use run_model()
     directly for DOT (sample-size floor mandate, LM Master §3).
@@ -903,7 +964,9 @@ def run_meta_model(
         max_amount_usd=1000.0,
         stop_loss_pct=4.0,
         take_profit_pct=8.0,
-        timeout_minutes=10080,
+        # iter-v1/028: EXECUTION horizon (binding exit). /030 default 10080 (7d);
+        # iter-028 passes 20160 (14d let-winners-run).
+        timeout_minutes=execution_timeout_minutes,
         fee_pct=0.1,
         data_dir=Path("data"),
         cooldown_candles=2,
@@ -915,9 +978,11 @@ def run_meta_model(
         risk_consecutive_sl_limit=3 if apply_r1 else None,
         risk_consecutive_sl_cooldown_candles=27 if apply_r1 else 0,
         risk_drawdown_scale_enabled=apply_r2,
-        risk_drawdown_trigger_pct=7.0,
-        risk_drawdown_scale_floor=0.33,
-        risk_drawdown_scale_anchor_pct=15.0,
+        # iter-v1/028: R2 brake calibration threaded (ETH-calibrated 4.07/0.20/16.27);
+        # /030 default 7.0/0.33/15.0.
+        risk_drawdown_trigger_pct=risk_drawdown_trigger_pct,
+        risk_drawdown_scale_floor=risk_drawdown_scale_floor,
+        risk_drawdown_scale_anchor_pct=risk_drawdown_scale_anchor_pct,
         risk_r5_vol_target_enabled=r5_vol_target_enabled,
         risk_r5_vol_target_pct=r5_vol_target_pct,
         risk_r5_kill_low_natr_enabled=r5_kill_low_natr_enabled,
@@ -933,14 +998,19 @@ def run_meta_model(
         cv_splits=5,
         label_tp_pct=8.0,
         label_sl_pct=4.0,
-        label_timeout_minutes=10080,
+        # iter-v1/028: M1 TRAINING-label horizon (fixed_horizon N=42 = 14d = 20160min);
+        # /030 default 10080 (7d).
+        label_timeout_minutes=label_timeout_minutes,
         fee_pct=0.1,
         features_dir="data/features",
         verbose=1,
         atr_tp_multiplier=atr_tp,
         atr_sl_multiplier=atr_sl,
         atr_column="vol_natr_21",  # v1 parquet schema (v3 default is natr_21_raw)
-        use_atr_labeling=True,
+        # iter-v1/028: M1 label mode. /030 = ATR triple_barrier (use_atr_labeling=True);
+        # iter-028 = fixed_horizon let-winners-run (use_atr_labeling=False).
+        use_atr_labeling=use_atr_labeling,
+        label_mode=label_mode,
         ensemble_seeds=_derive_ensemble_seeds(ensemble_size, offset=ensemble_seeds_offset),
         feature_columns=effective_feature_columns,
         ood_enabled=True,
@@ -957,6 +1027,23 @@ def run_meta_model(
         sigma_k_sl=sigma_k_sl,
         sigma_halflife_candles=sigma_halflife_candles,
         sample_weight_mode=sample_weight_mode,
+        # iter-v1/028: M2 distinct feature set + configurable veto threshold.
+        m2_feature_columns=m2_feature_columns,
+        m2_veto_threshold=m2_veto_threshold,
+        # iter-v1/028: M1 trend-state DIRECTION + conviction gate (the iter-027 primary).
+        enable_trend_state_dir=enable_trend_state_dir,
+        trend_state_sma_window=trend_state_sma_window,
+        trend_state_symbol=trend_state_symbol,
+        enable_trend_strength_gate=enable_trend_strength_gate,
+        trend_strength_atr_window=trend_strength_atr_window,
+        trend_strength_quantile=trend_strength_quantile,
+        # iter-v1/028: M1 specialist bagging stack (K independent Optuna studies).
+        specialist_mode=specialist_mode,
+        specialist_seed_count=specialist_seed_count,
+        specialist_n_startup_trials=specialist_n_startup_trials,
+        specialist_n_estimators_max=specialist_n_estimators_max,
+        model_role=model_role,
+        symbol=symbol,
     )
     t0 = time.time()
     results = run_backtest(config, strategy, yearly_pnl_check=False)
@@ -3814,6 +3901,17 @@ def main() -> None:
     _spec_enable_funding_contra_readmit: bool = False
     _spec_funding_contra_col: str = "funding_rate_zscore_30"
     _spec_funding_contra_quantile: float = 0.50
+    # iter-v1/028 META-LABELING (M2 precision filter) defaults. Strict NO-OP for
+    # /002-/027 (byte-identical): when _spec_enable_metalabel=False the universal
+    # routing guard dispatches via run_model() exactly as before.  The v1-028 keyed
+    # block flips enable=True and pins the M2 feature set + veto threshold.  When
+    # enabled, the guard routes to run_meta_model() (M1 = trend-state stack, M2 =
+    # LGBMClassifier veto on the 15-col positioning set).
+    _spec_enable_metalabel: bool = False
+    _spec_m2_feature_columns: list[str] = list(V1_ITER028_M2_FEATURES)
+    _spec_m2_veto_threshold: float = 0.45
+    _spec_m2_n_trials: int = V1_ITER030_N_TRIALS_M2
+    _spec_m2_bounds_profile: str = V1_ITER030_BOUNDS_PROFILE_M2
 
     if iteration_label == "v1-002":
         # iter-v1/002 EXPLORATION (BTCUSDT, K=3). PRIMARY axis = 41-col feature
@@ -4640,7 +4738,9 @@ def main() -> None:
             f"iter-v1/026: {len(_missing)} of the 19 feature columns NOT in {_spec_sym_026} parquet — {_missing}."
         )
         _spec_feature_columns = list(V1_BTC_ITER009_FEATURES)
-        _spec_apply_r2 = False  # R2 OFF for the first ETH screen (add ETH-calibrated R2 in confirmation)
+        _spec_apply_r2 = (
+            False  # R2 OFF for the first ETH screen (add ETH-calibrated R2 in confirmation)
+        )
         _spec_label_mode = "fixed_horizon"
         _spec_use_atr_labeling = False
         _spec_label_timeout_minutes = 20160  # 14d (== iter-020)
@@ -4708,6 +4808,82 @@ def main() -> None:
             f"(trig={_spec_r2_trigger_pct}/anch={_spec_r2_scale_anchor_pct}/floor={_spec_r2_scale_floor}) "
             f"+ R3=ON({BASELINE_OOD_CUTOFF_PCT}) R5/vt=ON. Validates iter-026 (IS +0.58/OOS +0.97) across "
             f"20 seeds -> MERGE BASELINE_V1_ETHUSDT if both-positive holds."
+        )
+
+    elif iteration_label == "v1-028":
+        # iter-v1/028 META-LABELING (López de Prado AFML Ch.3) on ETH. The MERGED
+        # iter-027 stack is the PRIMARY (M1) UNCHANGED; a SECONDARY (M2) LGBMClassifier
+        # vetoes M1 entries where P(M1 trade wins) < 0.45, de-concentrating the OOS book.
+        #
+        # M1 (primary, side) — EXACTLY the iter-027 proven stack:
+        #   19-col HYBRID (V1_BTC_ITER009_FEATURES) + fixed_horizon N=42 (14d)
+        #   let-winners-run (atr_tp=100/sl=1.45) + stateless 200-SMA trend-state
+        #   DIRECTION on ETH's own close + conviction gate q=0.40 + ETH-calibrated R2
+        #   (trig 4.07/anch 16.27/floor 0.20) + R3/R5.
+        # M2 (meta, size/filter) — NEW: LGBMClassifier on the DISTINCT 15-col
+        #   crypto-native positioning/leverage/regime set (V1_ITER028_M2_FEATURES),
+        #   trained per walk-forward month on M1-positive bars only; veto < 0.45.
+        #
+        # Routing: the universal single-symbol guard dispatches via run_meta_model()
+        # (NOT run_model()) because _spec_enable_metalabel=True.  The legacy
+        # multi-symbol v1-028 (LTCUSDT) branch is NEVER reached for a single ETH symbol.
+        import pyarrow.parquet as pq  # noqa: PLC0415
+
+        _spec_sym_028 = symbols[0]
+        _iter028_parquet = Path("data/features") / f"{_spec_sym_028}_8h_features.parquet"
+        assert _iter028_parquet.exists(), (
+            f"iter-v1/028: feature parquet not found at {_iter028_parquet}."
+        )
+        _parquet_cols = set(pq.ParquetFile(_iter028_parquet).schema.names)
+        # M1 19-col HYBRID must be present.
+        _missing_m1 = [c for c in V1_BTC_ITER009_FEATURES if c not in _parquet_cols]
+        assert not _missing_m1, (
+            f"iter-v1/028: {len(_missing_m1)} of the 19 M1 feature columns NOT in "
+            f"{_spec_sym_028} parquet — {_missing_m1}."
+        )
+        # M2 15-col positioning set must be present (brief §3.2 wiring-flag #3).
+        _missing_m2 = [c for c in V1_ITER028_M2_FEATURES if c not in _parquet_cols]
+        assert not _missing_m2, (
+            f"iter-v1/028: {len(_missing_m2)} of the 15 M2 feature columns NOT in "
+            f"{_spec_sym_028} parquet — {_missing_m2}."
+        )
+        assert len(set(V1_ITER028_M2_FEATURES)) == 15, (
+            "iter-v1/028: V1_ITER028_M2_FEATURES must be 15 distinct columns."
+        )
+        # M1 stack — IDENTICAL to the v1-027 keyed block above.
+        _spec_feature_columns = list(V1_BTC_ITER009_FEATURES)
+        _spec_label_mode = "fixed_horizon"
+        _spec_use_atr_labeling = False
+        _spec_label_timeout_minutes = 20160  # 14d == /027
+        _spec_atr_tp = 100.0  # == /027
+        _spec_atr_sl = 1.45  # == /027
+        _spec_execution_timeout_minutes = 20160  # == /027
+        _spec_enable_trend_state_dir = True  # == /027
+        _spec_trend_state_sma_window = 200
+        _spec_trend_state_symbol = _spec_sym_028  # ETH's own trend
+        _spec_enable_trend_strength_gate = True  # conviction gate == /027
+        _spec_trend_strength_atr_window = 14
+        _spec_trend_strength_quantile = 0.40
+        # ETH-calibrated R2 drawdown brake (== /027).
+        _spec_apply_r2 = True
+        _spec_r2_trigger_pct = 4.07
+        _spec_r2_scale_anchor_pct = 16.27
+        _spec_r2_scale_floor = 0.20
+        # M2 meta-labeling layer ON.
+        _spec_enable_metalabel = True
+        _spec_m2_feature_columns = list(V1_ITER028_M2_FEATURES)
+        _spec_m2_veto_threshold = 0.45
+        _spec_m2_n_trials = V1_ITER030_N_TRIALS_M2  # 18 (LM Master §2.3)
+        _spec_m2_bounds_profile = V1_ITER030_BOUNDS_PROFILE_M2  # "v1_030"
+        _n_m2 = len(_spec_m2_feature_columns)
+        print(
+            f"[iter-v1/028] META-LABELING ({_spec_sym_028}) — M1 = iter-027 proven stack "
+            f"(19-col HYBRID + fixed_horizon N=42(14d) let-winners-run + TREND-STATE DIR "
+            f"sma=200 symbol={_spec_trend_state_symbol} + conviction gate q=0.40 + R2 trig="
+            f"{_spec_r2_trigger_pct}/anch={_spec_r2_scale_anchor_pct}/floor={_spec_r2_scale_floor}). "
+            f"M2 = LGBMClassifier veto<{_spec_m2_veto_threshold} on {_n_m2}-col positioning set "
+            f"(n_trials_m2={_spec_m2_n_trials} bounds={_spec_m2_bounds_profile}). "
+            f"De-concentrates the OOS book; targets the iter-027 OOS-concentration falsifier."
         )
 
     # CLI precedence hook for the trend-state override (ad-hoc control runs).
@@ -4804,73 +4980,137 @@ def main() -> None:
 
             _decision_log_spec.configure(_dl_spec_path)
             print(f"[v1 specialist] decision_log configured → {_dl_spec_path}")
-        print(
-            f"[v1] universal single-symbol routing — generic specialist dispatch "
-            f"(features={len(_spec_feature_columns)} bounds=v1_specialist "
-            f"R1=OFF R2={'ON' if _spec_apply_r2 else 'OFF'} "
-            f"R3=ON-AGGREGATOR cutoff={BASELINE_OOD_CUTOFF_PCT} "
-            f"R5=ON vt_target_vol=0.3 label_mode={_spec_label_mode} "
-            f"use_atr_labeling={_spec_use_atr_labeling} "
-            f"label_timeout={_spec_label_timeout_minutes}min "
-            f"atr_tp={_spec_atr_tp} atr_sl={_spec_atr_sl} "
-            f"exec_timeout={_spec_execution_timeout_minutes}min)"
-        )
-        _spec_results, _spec_faxm, _spec_strat = run_model(
-            f"Model_A_{_spec_sym}_specialist",
-            (_spec_sym,),
-            atr_tp=_spec_atr_tp,  # /009: 100.0 (TP non-binding); default 2.9 for /002-/007
-            atr_sl=_spec_atr_sl,  # /009: 1.45 (protective); default 1.45 (unchanged)
-            apply_r1=False,  # R1=OFF: CATALOG-CLOSED for specialist_mode
-            apply_r2=_spec_apply_r2,  # default OFF; per-iteration override may enable (e.g. /002)
-            risk_drawdown_trigger_pct=_spec_r2_trigger_pct,
-            risk_drawdown_scale_floor=_spec_r2_scale_floor,
-            risk_drawdown_scale_anchor_pct=_spec_r2_scale_anchor_pct,
-            n_trials=n_trials,  # honored per-seed in specialist mode (K>0): the --n-trials value
-            ensemble_size=1,  # inner ensemble FIXED at 1 (placeholder seed [42])
-            oof_persist_path=OOF_PARQUET_PATH,
-            feature_columns=_spec_feature_columns,
-            bounds_profile="v1_specialist",
-            label_mode=_spec_label_mode,  # /009: fixed_horizon; default triple_barrier
-            use_atr_labeling=_spec_use_atr_labeling,  # /009: False; default True
-            label_timeout_minutes=_spec_label_timeout_minutes,  # training-label horizon
-            execution_timeout_minutes=_spec_execution_timeout_minutes,  # backtest exit horizon
-            r5_vol_target_enabled=_r5_kwargs.get("r5_vol_target_enabled", True),
-            r5_vol_target_pct=_r5_kwargs.get("r5_vol_target_pct", 4.0),
-            r5_kill_low_natr_enabled=_r5_kwargs.get("r5_kill_low_natr_enabled", False),
-            r5_kill_low_natr_min_pct=_r5_kwargs.get("r5_kill_low_natr_min_pct", 2.0),
-            # iter-v1/012: LONG-bias trend-scale de-lever (defaults = NO-OP for
-            # /002-/011 → byte-identical; v1-012 keyed block flips enabled=True).
-            trend_scale_enabled=_spec_trend_scale_enabled,
-            trend_scale_floor=_spec_trend_scale_floor,
-            trend_scale_z_lo=_spec_trend_scale_z_lo,
-            trend_scale_z_hi=_spec_trend_scale_z_hi,
-            trend_scale_slope_lb=_spec_trend_scale_slope_lb,
-            trend_scale_std_lb=_spec_trend_scale_std_lb,
-            model_role=f"Model_A_{_spec_sym}_specialist",
-            symbol=_spec_sym,
-            specialist_mode=True,
-            specialist_seed_count=bagging_k,
-            specialist_n_startup_trials=10,
-            specialist_n_estimators_max=500,
-            # iter-v1/016: TREND-STATE direction override. Defaults (False) keep ALL
-            # other single-symbol iterations BIT-IDENTICAL; the v1-016 keyed block sets
-            # _spec_enable_trend_state_dir=True.
-            enable_trend_state_dir=_spec_enable_trend_state_dir,
-            trend_state_sma_window=_spec_trend_state_sma_window,
-            trend_state_symbol=_spec_trend_state_symbol,
-            # iter-v1/018: TREND-STRENGTH CONVICTION entry gate. Defaults (False) keep ALL
-            # other single-symbol iterations BIT-IDENTICAL; the v1-018 keyed block sets
-            # _spec_enable_trend_strength_gate=True.
-            enable_trend_strength_gate=_spec_enable_trend_strength_gate,
-            trend_strength_atr_window=_spec_trend_strength_atr_window,
-            trend_strength_quantile=_spec_trend_strength_quantile,
-            # iter-v1/021: FUNDING-CONTRA-CROWD re-admission. Defaults (False) keep ALL
-            # other single-symbol iterations BIT-IDENTICAL; the v1-021 keyed block sets
-            # _spec_enable_funding_contra_readmit=True.
-            enable_funding_contra_readmit=_spec_enable_funding_contra_readmit,
-            funding_contra_col=_spec_funding_contra_col,
-            funding_contra_quantile=_spec_funding_contra_quantile,
-        )
+        if _spec_enable_metalabel:
+            # iter-v1/028 META-LABELING dispatch. M1 = the iter-027 trend-state
+            # specialist stack (threaded into MetaLabelingStrategy's inner
+            # LightGbmStrategy); M2 = LGBMClassifier veto on the 15-col positioning
+            # set.  run_meta_model() builds MetaLabelingStrategy with specialist
+            # bagging K=bagging_k on M1 (same as run_model's specialist dispatch)
+            # plus the M2 layer.  Routes here ONLY when the v1-028 keyed block set
+            # _spec_enable_metalabel=True — every other single-symbol iteration
+            # stays on run_model() (byte-identical).
+            print(
+                f"[v1] universal single-symbol routing — META-LABELING dispatch "
+                f"(M1: features={len(_spec_feature_columns)} trend_state="
+                f"{_spec_enable_trend_state_dir} conviction_gate="
+                f"{_spec_enable_trend_strength_gate} q={_spec_trend_strength_quantile} "
+                f"label_mode={_spec_label_mode} use_atr_labeling={_spec_use_atr_labeling} "
+                f"atr_tp={_spec_atr_tp} atr_sl={_spec_atr_sl} "
+                f"exec_timeout={_spec_execution_timeout_minutes}min R2="
+                f"{'ON' if _spec_apply_r2 else 'OFF'}) "
+                f"(M2: veto<{_spec_m2_veto_threshold} features={len(_spec_m2_feature_columns)} "
+                f"n_trials_m2={_spec_m2_n_trials} bounds_m2={_spec_m2_bounds_profile})"
+            )
+            _spec_results, _spec_faxm, _spec_strat = run_meta_model(
+                f"Model_A_{_spec_sym}_metalabel",
+                (_spec_sym,),
+                atr_tp=_spec_atr_tp,
+                atr_sl=_spec_atr_sl,
+                apply_r1=False,  # R1=OFF: CATALOG-CLOSED for specialist_mode
+                apply_r2=_spec_apply_r2,
+                risk_drawdown_trigger_pct=_spec_r2_trigger_pct,
+                risk_drawdown_scale_floor=_spec_r2_scale_floor,
+                risk_drawdown_scale_anchor_pct=_spec_r2_scale_anchor_pct,
+                n_trials=n_trials,  # M1 per-seed Optuna budget
+                ensemble_size=1,  # placeholder; specialist bagging governs M1
+                n_trials_m2=_spec_m2_n_trials,
+                bounds_profile_m2=_spec_m2_bounds_profile,
+                oof_persist_path=OOF_PARQUET_PATH,
+                feature_columns=_spec_feature_columns,  # M1 19-col HYBRID
+                bounds_profile="v1_specialist",
+                label_mode=_spec_label_mode,
+                use_atr_labeling=_spec_use_atr_labeling,
+                label_timeout_minutes=_spec_label_timeout_minutes,
+                execution_timeout_minutes=_spec_execution_timeout_minutes,
+                r5_vol_target_enabled=_r5_kwargs.get("r5_vol_target_enabled", True),
+                r5_vol_target_pct=_r5_kwargs.get("r5_vol_target_pct", 4.0),
+                r5_kill_low_natr_enabled=_r5_kwargs.get("r5_kill_low_natr_enabled", False),
+                r5_kill_low_natr_min_pct=_r5_kwargs.get("r5_kill_low_natr_min_pct", 2.0),
+                model_role=f"Model_A_{_spec_sym}_metalabel",
+                symbol=_spec_sym,
+                specialist_mode=True,
+                specialist_seed_count=bagging_k,
+                specialist_n_startup_trials=10,
+                specialist_n_estimators_max=500,
+                # M1 trend-state direction + conviction gate (the iter-027 primary).
+                enable_trend_state_dir=_spec_enable_trend_state_dir,
+                trend_state_sma_window=_spec_trend_state_sma_window,
+                trend_state_symbol=_spec_trend_state_symbol,
+                enable_trend_strength_gate=_spec_enable_trend_strength_gate,
+                trend_strength_atr_window=_spec_trend_strength_atr_window,
+                trend_strength_quantile=_spec_trend_strength_quantile,
+                # M2 layer: distinct positioning feature set + configurable veto.
+                m2_feature_columns=_spec_m2_feature_columns,
+                m2_veto_threshold=_spec_m2_veto_threshold,
+            )
+        else:
+            print(
+                f"[v1] universal single-symbol routing — generic specialist dispatch "
+                f"(features={len(_spec_feature_columns)} bounds=v1_specialist "
+                f"R1=OFF R2={'ON' if _spec_apply_r2 else 'OFF'} "
+                f"R3=ON-AGGREGATOR cutoff={BASELINE_OOD_CUTOFF_PCT} "
+                f"R5=ON vt_target_vol=0.3 label_mode={_spec_label_mode} "
+                f"use_atr_labeling={_spec_use_atr_labeling} "
+                f"label_timeout={_spec_label_timeout_minutes}min "
+                f"atr_tp={_spec_atr_tp} atr_sl={_spec_atr_sl} "
+                f"exec_timeout={_spec_execution_timeout_minutes}min)"
+            )
+            _spec_results, _spec_faxm, _spec_strat = run_model(
+                f"Model_A_{_spec_sym}_specialist",
+                (_spec_sym,),
+                atr_tp=_spec_atr_tp,  # /009: 100.0 (TP non-binding); default 2.9 for /002-/007
+                atr_sl=_spec_atr_sl,  # /009: 1.45 (protective); default 1.45 (unchanged)
+                apply_r1=False,  # R1=OFF: CATALOG-CLOSED for specialist_mode
+                apply_r2=_spec_apply_r2,  # default OFF; per-iteration override may enable
+                risk_drawdown_trigger_pct=_spec_r2_trigger_pct,
+                risk_drawdown_scale_floor=_spec_r2_scale_floor,
+                risk_drawdown_scale_anchor_pct=_spec_r2_scale_anchor_pct,
+                n_trials=n_trials,  # honored per-seed in specialist mode (K>0)
+                ensemble_size=1,  # inner ensemble FIXED at 1 (placeholder seed [42])
+                oof_persist_path=OOF_PARQUET_PATH,
+                feature_columns=_spec_feature_columns,
+                bounds_profile="v1_specialist",
+                label_mode=_spec_label_mode,  # /009: fixed_horizon; default triple_barrier
+                use_atr_labeling=_spec_use_atr_labeling,  # /009: False; default True
+                label_timeout_minutes=_spec_label_timeout_minutes,  # training-label horizon
+                execution_timeout_minutes=_spec_execution_timeout_minutes,  # backtest exit horizon
+                r5_vol_target_enabled=_r5_kwargs.get("r5_vol_target_enabled", True),
+                r5_vol_target_pct=_r5_kwargs.get("r5_vol_target_pct", 4.0),
+                r5_kill_low_natr_enabled=_r5_kwargs.get("r5_kill_low_natr_enabled", False),
+                r5_kill_low_natr_min_pct=_r5_kwargs.get("r5_kill_low_natr_min_pct", 2.0),
+                # iter-v1/012: LONG-bias trend-scale de-lever (defaults = NO-OP for
+                # /002-/011 → byte-identical; v1-012 keyed block flips enabled=True).
+                trend_scale_enabled=_spec_trend_scale_enabled,
+                trend_scale_floor=_spec_trend_scale_floor,
+                trend_scale_z_lo=_spec_trend_scale_z_lo,
+                trend_scale_z_hi=_spec_trend_scale_z_hi,
+                trend_scale_slope_lb=_spec_trend_scale_slope_lb,
+                trend_scale_std_lb=_spec_trend_scale_std_lb,
+                model_role=f"Model_A_{_spec_sym}_specialist",
+                symbol=_spec_sym,
+                specialist_mode=True,
+                specialist_seed_count=bagging_k,
+                specialist_n_startup_trials=10,
+                specialist_n_estimators_max=500,
+                # iter-v1/016: TREND-STATE direction override. Defaults (False) keep ALL
+                # other single-symbol iterations BIT-IDENTICAL; the v1-016 keyed block sets
+                # _spec_enable_trend_state_dir=True.
+                enable_trend_state_dir=_spec_enable_trend_state_dir,
+                trend_state_sma_window=_spec_trend_state_sma_window,
+                trend_state_symbol=_spec_trend_state_symbol,
+                # iter-v1/018: TREND-STRENGTH CONVICTION entry gate. Defaults (False) keep ALL
+                # other single-symbol iterations BIT-IDENTICAL; the v1-018 keyed block sets
+                # _spec_enable_trend_strength_gate=True.
+                enable_trend_strength_gate=_spec_enable_trend_strength_gate,
+                trend_strength_atr_window=_spec_trend_strength_atr_window,
+                trend_strength_quantile=_spec_trend_strength_quantile,
+                # iter-v1/021: FUNDING-CONTRA-CROWD re-admission. Defaults (False) keep ALL
+                # other single-symbol iterations BIT-IDENTICAL; the v1-021 keyed block sets
+                # _spec_enable_funding_contra_readmit=True.
+                enable_funding_contra_readmit=_spec_enable_funding_contra_readmit,
+                funding_contra_col=_spec_funding_contra_col,
+                funding_contra_quantile=_spec_funding_contra_quantile,
+            )
 
         # Cohort isolation sanity: assert ONLY the target symbol's trades emitted.
         _spec_emitted = {r.symbol for r in _spec_results}

@@ -308,6 +308,39 @@ class MetaLabelingStrategy:
         sigma_k_sl: float | None = None,
         sigma_halflife_candles: int = 42,
         sample_weight_mode: str = "abs_pnl",
+        # iter-v1/028: separate M2 feature set + configurable veto threshold.
+        # m2_feature_columns: distinct positioning/leverage/regime feature set for
+        #   the M2 classifier (M1 keeps its own ``feature_columns``). When None the
+        #   M2 reuses ``feature_columns`` (iter-v3/017 / iter-v1/030 behaviour —
+        #   backwards-compatible).  When provided, the M2 base feature vector is
+        #   built from THESE columns (plus m1_confidence [+ m1_direction]); M1 is
+        #   unaffected.  This is the brief §4 wiring-flag #3 clean path (a).
+        # m2_veto_threshold: M2 P(win) below which the M1 signal is vetoed.
+        #   Default 0.5 (Bayes-optimal, iter-v3/017 / iter-v1/030).  iter-v1/028
+        #   sets 0.45 — the de-concentrating sweet spot (brief §2.1, wiring-flag #2).
+        m2_feature_columns: list[str] | None = None,
+        m2_veto_threshold: float = 0.5,
+        # iter-v1/028: trend-state direction + conviction (trend-strength) gate
+        # threaded into the INNER M1 LightGbmStrategy so M2 filters the SAME
+        # deterministic trend-state primary that merged at iter-027 — NOT the
+        # LightGbm-learned direction.  Defaults are a strict NO-OP so iter-v1/030
+        # (Models A/C/D) stay bit-identical (brief §4 wiring-flag #1, the #1 risk).
+        enable_trend_state_dir: bool = False,
+        trend_state_sma_window: int = 200,
+        trend_state_symbol: str = "BTCUSDT",
+        enable_trend_strength_gate: bool = False,
+        trend_strength_atr_window: int = 14,
+        trend_strength_quantile: float = 0.50,
+        # iter-v1/028: M1 must run the SAME specialist bagging stack as the merged
+        # iter-027 baseline (K independent Optuna studies via specialist_mode).
+        # Defaults (specialist_mode=False) keep /030 bit-identical.
+        specialist_mode: bool = False,
+        specialist_seed_count: int = 0,
+        specialist_n_startup_trials: int = 10,
+        specialist_n_estimators_max: int = 500,
+        # iter-v1/028: model-role + symbol descriptors threaded into M1 (params parquet).
+        model_role: str = "",
+        symbol: str = "",
     ) -> None:
         """Initialise MetaLabelingStrategy (M1 + M2 binary classifier).
 
@@ -379,11 +412,34 @@ class MetaLabelingStrategy:
             sigma_k_sl=sigma_k_sl,
             sigma_halflife_candles=sigma_halflife_candles,
             sample_weight_mode=sample_weight_mode,
+            # iter-v1/028: trend-state DIRECTION + conviction (trend-strength) gate
+            # threaded into M1 so M2 filters the deterministic iter-027 primary.
+            enable_trend_state_dir=enable_trend_state_dir,
+            trend_state_sma_window=trend_state_sma_window,
+            trend_state_symbol=trend_state_symbol,
+            enable_trend_strength_gate=enable_trend_strength_gate,
+            trend_strength_atr_window=trend_strength_atr_window,
+            trend_strength_quantile=trend_strength_quantile,
+            # iter-v1/028: M1 runs the SAME specialist bagging stack as iter-027.
+            specialist_mode=specialist_mode,
+            specialist_seed_count=specialist_seed_count,
+            specialist_n_startup_trials=specialist_n_startup_trials,
+            specialist_n_estimators_max=specialist_n_estimators_max,
+            model_role=model_role,
+            symbol=symbol,
         )
 
         # M1 training-window derived params (read after M1 trains)
         self._fee_pct = fee_pct
         self._atr_tp_multiplier = atr_tp_multiplier
+
+        # iter-v1/028: M2 veto threshold + separate M2 feature set.
+        self._m2_veto_threshold: float = float(m2_veto_threshold)
+        # M2 base feature columns: the distinct positioning/regime set when given,
+        # else M1's own columns (iter-v3/017 / iter-v1/030 backwards-compat).
+        self._m2_base_cols: list[str] = (
+            list(m2_feature_columns) if m2_feature_columns else list(feature_columns)
+        )
 
         # M2 state per calendar month
         self._m2_model: lgb.LGBMClassifier | None = None
@@ -391,9 +447,12 @@ class MetaLabelingStrategy:
         _m2_extra_cols = ["m1_confidence"]
         if include_m1_direction:
             _m2_extra_cols.append("m1_direction")
-        self._m2_feature_cols: list[str] = list(feature_columns) + _m2_extra_cols
+        self._m2_feature_cols: list[str] = list(self._m2_base_cols) + _m2_extra_cols
         # Dict {(symbol, open_time): np.ndarray[14]} — populated per training month
         self._m2_month_features: dict[tuple[str, int], np.ndarray] = {}
+        # iter-v1/028: M2 base-feature cache for the test month (M2 base cols only),
+        # keyed (symbol, open_time).  Populated in _train_m2_for_month Step 7.
+        self._m2_test_month_features: dict[tuple[str, int], np.ndarray] = {}
         # Track current month for lazy M2 training
         self._m2_current_month: str | None = None
         # Last M1 confidence used (for M2 input construction at predict time)
@@ -420,8 +479,9 @@ class MetaLabelingStrategy:
           1. Get M1 signal (triggers M1 lazy training if month changed).
           2. After M1 trains for a new month, train M2 on the same window.
           3. If M1 returns NO_SIGNAL, return NO_SIGNAL (no M2 query needed).
-          4. If M1 fires: build M2 input (13 features + M1 confidence);
-             if M2 confidence >= 0.5, pass signal through; else veto.
+          4. If M1 fires: build M2 input (M2 base features + M1 confidence
+             [+ M1 direction]); if M2 confidence >= ``self._m2_veto_threshold``,
+             pass signal through; else veto.
         """
         candle_month = _epoch_ms_to_month(open_time)
 
@@ -454,14 +514,17 @@ class MetaLabelingStrategy:
         m2_proba = self._m2_model.predict_proba(feat_df)[0]
         m2_confidence = float(m2_proba[1])  # P(TP-hit)
 
-        if m2_confidence < 0.5:
+        thr = self._m2_veto_threshold
+        if m2_confidence < thr:
             if self._verbose > 0:
                 import datetime as _dt  # noqa: PLC0415
 
                 ts_str = _dt.datetime.fromtimestamp(open_time / 1000, tz=_dt.UTC).strftime(
                     "%Y-%m-%d %H:%M"
                 )
-                print(f"  [M2] {ts_str} {symbol} → VETOED (M2 conf={m2_confidence:.3f} < 0.5)")
+                print(
+                    f"  [M2] {ts_str} {symbol} → VETOED (M2 conf={m2_confidence:.3f} < {thr:.2f})"
+                )
             return NO_SIGNAL
 
         if self._verbose > 0:
@@ -470,7 +533,7 @@ class MetaLabelingStrategy:
             ts_str = _dt.datetime.fromtimestamp(open_time / 1000, tz=_dt.UTC).strftime(
                 "%Y-%m-%d %H:%M"
             )
-            print(f"  [M2] {ts_str} {symbol} → PASSED (M2 conf={m2_confidence:.3f} >= 0.5)")
+            print(f"  [M2] {ts_str} {symbol} → PASSED (M2 conf={m2_confidence:.3f} >= {thr:.2f})")
         return m1_signal
 
     # ------------------------------------------------------------------
@@ -496,6 +559,7 @@ class MetaLabelingStrategy:
         self._m2_model = None
         self._m2_active = False
         self._m2_month_features = {}
+        self._m2_test_month_features = {}
 
         if not self._m1._models:
             if self._verbose > 0:
@@ -554,6 +618,18 @@ class MetaLabelingStrategy:
                 c for c in self._m1._all_feature_cols if c in train_feat_df.columns
             ]
         feat_train = train_feat_df[available_feat_cols].values
+
+        # iter-v1/028: build the M2 base-feature matrix from the DISTINCT M2 column
+        # set (positioning/leverage/regime).  Same train_feat_df rows (identical
+        # look-ahead discipline — bounded by split.train_end_ms) but different
+        # columns from M1.  When _m2_base_cols == M1 cols this is bit-identical to
+        # the iter-v3/017 / iter-v1/030 path.
+        _m2_missing = [c for c in self._m2_base_cols if c not in train_feat_df.columns]
+        if _m2_missing:
+            if self._verbose > 0:
+                print(f"  [M2] M2 feature columns missing from parquet {_m2_missing} — M2 skipped")
+            return
+        m2_feat_train = train_feat_df[self._m2_base_cols].values
 
         # Step 3: M1 inference on training window to get M1-positive mask
         # Use first M1 ensemble model + mean confidence_threshold
@@ -617,9 +693,11 @@ class MetaLabelingStrategy:
             m2_labels_full[flat_i] = 1 if pnl > 0.0 else 0
 
         # Step 5: build M2 features for positive subset
-        # Dim = len(feature_columns) + 1 (m1_confidence) [+ 1 (m1_direction) if enabled]
+        # Dim = len(_m2_base_cols) + 1 (m1_confidence) [+ 1 (m1_direction) if enabled]
+        # iter-v1/028: M2 base features come from the DISTINCT M2 column matrix
+        # (m2_feat_train), NOT M1's feature matrix (feat_train).
         m2_pos_idx = np.where(m1_positive_mask)[0]
-        feat_train_m1_pos = feat_train[m2_pos_idx]  # [n_m1_pos, n_features]
+        feat_train_m1_pos = m2_feat_train[m2_pos_idx]  # [n_m1_pos, n_m2_base_features]
         m1_conf_m1_pos = m1_confidence_arr[m2_pos_idx]  # [n_m1_pos]
         extra_cols = [m1_conf_m1_pos.reshape(-1, 1)]
         if self._include_m1_direction:
@@ -661,13 +739,27 @@ class MetaLabelingStrategy:
         self._m2_model = m2_model
         self._m2_active = True
 
-        # Step 7: populate M2 test-month feature cache (N-dim)
-        # We need M1 confidence for test-month candles — compute lazily at
-        # predict time from M1's _month_features and _models.
-        # Pre-populate an (symbol, open_time) → base-feature row cache for the
-        # test month; the extra features (M1 confidence [+ M1 direction]) are
-        # added at predict time.
-        self._m2_month_features = {}  # will be filled per-candle in get_signal
+        # Step 7: populate M2 test-month base-feature cache.
+        # iter-v1/028: M2 reads a DISTINCT base-feature set (_m2_base_cols) from
+        # M1, so we load the M2 base columns for the TEST window from the parquet
+        # keyed (symbol, open_time) — the same rows the engine sees at decision
+        # time.  Look-ahead-safe: the test window (split.test_start_ms ..
+        # split.test_end_ms) is disjoint from the M2 TRAINING window, and the
+        # parquet feature columns are past-only by construction.  The extra
+        # features (M1 confidence [+ M1 direction]) are appended at predict time
+        # in _get_m2_features.
+        from crypto_trade.feature_store import load_features_range  # noqa: PLC0415
+
+        test_symbols = list(dict.fromkeys(self._m1._sym_arr))
+        self._m2_test_month_features = load_features_range(
+            test_symbols,
+            self._m1.features_dir,
+            self._m1._interval,
+            split.test_start_ms,
+            split.test_end_ms,
+            columns=list(self._m2_base_cols),
+        )
+        self._m2_month_features = {}  # legacy field retained (unused for /028 path)
 
         # Per LM Master §9 Q8 item 6: log M2_TRAINED status with month_str.
         print(
@@ -679,24 +771,27 @@ class MetaLabelingStrategy:
     def _get_m2_features(self, symbol: str, open_time: int) -> np.ndarray | None:
         """Build N-dim M2 input for the given candle.
 
-        Reads M1's cached base-feature row, appends:
+        iter-v1/028: the M2 BASE feature row comes from ``_m2_test_month_features``
+        (the DISTINCT M2 positioning/regime column set loaded for the test month),
+        NOT M1's feature row.  Appended:
           - M1's prediction probability (m1_confidence) — always present.
           - M1's predicted direction as float (m1_direction) — only when
-            ``include_m1_direction=True`` (iter-v1/030: 45-dim total).
+            ``include_m1_direction=True``.
 
-        We re-run M1 proba computation on the cached feature row to get a fresh
-        M1 confidence value for M2's input.  This is safe: M1._month_features
-        and M1._models are already set for this month.
+        M1 confidence/direction are computed from M1's OWN cached feature row
+        (M1._month_features + M1._models) — unchanged.  This is look-ahead-safe:
+        both rows are the test-month parquet values the engine reads at decision
+        time, and the M2 model was trained only on the disjoint training window.
 
-        Returns None if the candle is not in M1's feature cache.
+        Returns None if the candle is not in either feature cache.
         """
         key = (symbol, open_time)
-        feat_row = self._m1._month_features.get(key)
-        if feat_row is None:
-            return None
 
-        # Re-compute M1 confidence + direction (identical to what M1.get_signal computed)
-        feat_df = pd.DataFrame(feat_row.reshape(1, -1), columns=self._m1._selected_cols)
+        # M1 confidence/direction from M1's cached row (M1 columns).
+        m1_feat_row = self._m1._month_features.get(key)
+        if m1_feat_row is None:
+            return None
+        feat_df = pd.DataFrame(m1_feat_row.reshape(1, -1), columns=self._m1._selected_cols)
         all_proba = [m.predict_proba(feat_df)[0] for m in self._m1._models]
         m1_proba = np.mean(all_proba, axis=0)
         m1_confidence = float(m1_proba.max())
@@ -704,9 +799,50 @@ class MetaLabelingStrategy:
         m1_pred_cls = int(np.argmax(m1_proba))
         m1_direction = 1.0 if m1_pred_cls == 1 else -1.0
 
+        # M2 base feature row from the DISTINCT M2 column cache.
+        m2_base_row = self._m2_test_month_features.get(key)
+        if m2_base_row is None:
+            return None
+
         extra = [m1_confidence]
         if self._include_m1_direction:
             extra.append(m1_direction)
 
-        m2_input = np.concatenate([feat_row, extra])
+        m2_input = np.concatenate([m2_base_row, extra])
         return m2_input
+
+    # ------------------------------------------------------------------
+    # M1 delegation (iter-v1/028): the universal single-symbol routing guard
+    # and the post-dispatch feature-importance / specialist-dispersion writers
+    # read these attributes/methods directly off the strategy object.  When the
+    # strategy is a MetaLabelingStrategy they must transparently forward to the
+    # inner M1 LightGbmStrategy (which IS the specialist bagging model + the
+    # feature-importance source).  M2 importance is tracked separately by the
+    # design analysis scripts (m2_feature_importance.csv), not by this writer.
+    # ------------------------------------------------------------------
+
+    @property
+    def _specialist_models(self) -> list:
+        return self._m1._specialist_models
+
+    @property
+    def _models(self) -> list:
+        return self._m1._models
+
+    @property
+    def _selected_cols(self) -> list[str]:
+        return self._m1._selected_cols
+
+    @property
+    def _per_month_fi_log(self) -> list:
+        return getattr(self._m1, "_per_month_fi_log", [])
+
+    @property
+    def _nan_skip_log(self) -> list:
+        return getattr(self._m1, "_nan_skip_log", [])
+
+    def get_specialist_dispersion_mean(self) -> float | None:
+        return self._m1.get_specialist_dispersion_mean()
+
+    def persist_specialist_dispersion_csv(self, path: str) -> None:
+        self._m1.persist_specialist_dispersion_csv(path)
