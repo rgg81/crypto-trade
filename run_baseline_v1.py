@@ -4661,6 +4661,54 @@ def main() -> None:
             f"| TREND-STRENGTH GATE q=0.40 (self-calibrating per-coin) "
             f"| R2 OFF (DD-control; add ETH-calibrated in confirmation) R1=OFF R3=ON({BASELINE_OOD_CUTOFF_PCT}) R5/vt=ON"
         )
+    elif iteration_label == "v1-027":
+        # iter-v1/027 CONFIRMATION (K=20, ETHUSDT) — validates the iter-026 strong both-positive
+        # (K=5 IS +0.58 / OOS +0.97) AND adds ETH-calibrated R2 for DD control (iter-026 IS maxDD was
+        # 62.6%, R2 OFF). = the FULL proven iter-020-equivalent stack on ETH. R2 trigger/anchor are the
+        # RE relative shape (6.5%/26%) on iter-026's IS maxDD 62.60 -> 4.07/16.27, floor 0.20. R2 is
+        # DD-control (doesn't flip the Sharpe SIGN, proven BTC iter-015), so the both-positive is
+        # preserved. The trend-state DIRECTION is deterministic -> the big OOS winners are taken every
+        # seed -> the K=20 should HOLD the both-positive (like BTC iter-020, unlike the iter-016 timing
+        # lottery). If IS>0 AND OOS>0 across 20 seeds -> MERGE as BASELINE_V1_ETHUSDT (first ETH merge;
+        # validates the BTC deterministic stack as a portable template).
+        import pyarrow.parquet as pq  # noqa: PLC0415
+
+        _spec_sym_027 = symbols[0]
+        _iter027_parquet = Path("data/features") / f"{_spec_sym_027}_8h_features.parquet"
+        assert _iter027_parquet.exists(), (
+            f"iter-v1/027: feature parquet not found at {_iter027_parquet}."
+        )
+        _parquet_cols = set(pq.ParquetFile(_iter027_parquet).schema.names)
+        _missing = [c for c in V1_BTC_ITER009_FEATURES if c not in _parquet_cols]
+        assert not _missing, (
+            f"iter-v1/027: {len(_missing)} of the 19 feature columns NOT in {_spec_sym_027} parquet — {_missing}."
+        )
+        _spec_feature_columns = list(V1_BTC_ITER009_FEATURES)
+        _spec_label_mode = "fixed_horizon"
+        _spec_use_atr_labeling = False
+        _spec_label_timeout_minutes = 20160  # 14d == /026
+        _spec_atr_tp = 100.0  # == /026
+        _spec_atr_sl = 1.45  # == /026
+        _spec_execution_timeout_minutes = 20160  # == /026
+        _spec_enable_trend_state_dir = True  # == /026
+        _spec_trend_state_sma_window = 200
+        _spec_trend_state_symbol = _spec_sym_027  # ETH's own trend
+        _spec_enable_trend_strength_gate = True  # == /026
+        _spec_trend_strength_atr_window = 14
+        _spec_trend_strength_quantile = 0.40
+        # NEW vs /026: ETH-calibrated R2 drawdown brake (RE relative shape on iter-026 IS maxDD 62.60)
+        _spec_apply_r2 = True
+        _spec_r2_trigger_pct = 4.07  # 6.5% of 62.60
+        _spec_r2_scale_anchor_pct = 16.27  # 26% of 62.60
+        _spec_r2_scale_floor = 0.20
+        print(
+            f"[iter-v1/027] CONFIRMATION (K=20, {_spec_sym_027}) — FULL proven stack on ETH (iter-026 "
+            f"+ ETH-calibrated R2). 19-col HYBRID + fixed_horizon N=42(14d) let-winners-run + TREND-STATE "
+            f"DIR sma=200 symbol={_spec_trend_state_symbol} + conviction gate q=0.40 + R2 brake "
+            f"(trig={_spec_r2_trigger_pct}/anch={_spec_r2_scale_anchor_pct}/floor={_spec_r2_scale_floor}) "
+            f"+ R3=ON({BASELINE_OOD_CUTOFF_PCT}) R5/vt=ON. Validates iter-026 (IS +0.58/OOS +0.97) across "
+            f"20 seeds -> MERGE BASELINE_V1_ETHUSDT if both-positive holds."
+        )
 
     # CLI precedence hook for the trend-state override (ad-hoc control runs).
     # The v1-016 keyed branch above is the CANONICAL activation; this lets a manual
