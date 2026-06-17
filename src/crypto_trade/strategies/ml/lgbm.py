@@ -310,6 +310,19 @@ class LightGbmStrategy:
         enable_trend_state_dir: bool = False,
         trend_state_sma_window: int = 200,  # crypto-canonical; flat plateau 100-300 (brief §1)
         trend_state_symbol: str = "BTCUSDT",  # symbol whose own close drives the trend-state
+        # iter-v1/018: TREND-STRENGTH CONVICTION entry gate (RULE-layer, NORMAL-RISK).
+        # When True, AFTER the abstention gates + trend-state direction override decide
+        # the trade FIRES, ADDITIONALLY require the past-only trend strength
+        #   trend_strength(t) = |close[t-1] - SMA_W(close)[t-1]| / ATR_atrwin[t-1]
+        # to be >= a PAST-ONLY threshold (per-month q-quantile of |trend_strength| over
+        # the training window). If below threshold → ABSTAIN (skip the weak-trend chop).
+        # On warmup (strength None) → CONSERVATIVE fire (do NOT gate on missing data).
+        # The SMA window REUSES trend_state_sma_window (= 200; the gate measures distance
+        # from the SAME SMA200 that drives the direction). Default False = BIT-IDENTICAL
+        # to all prior runs and v2/v3. ONLY enabled in the iter-v1/018 BTC specialist cell.
+        enable_trend_strength_gate: bool = False,
+        trend_strength_atr_window: int = 14,  # ATR window (candles) for the ATR-normalizer
+        trend_strength_quantile: float = 0.50,  # past-only |dist_atr| q-quantile threshold
     ) -> None:
         if not feature_columns:
             raise ValueError(
@@ -523,6 +536,32 @@ class LightGbmStrategy:
         # compute_features() when enable_trend_state_dir=True. Same machinery as the
         # /092 BTC-regime-kill close index (past-only searchsorted lookback).
         self._trend_state_idx: tuple[np.ndarray, np.ndarray] | None = None
+        # iter-v1/018: TREND-STRENGTH CONVICTION entry gate (RULE layer).
+        # Enabled via enable_trend_strength_gate=True (BTC specialist cell only; /018).
+        # ABSTAINS when |close[t-1] - SMA_W[t-1]| / ATR_atrwin[t-1] is below the past-only
+        # q-quantile threshold (weak-trend chop). Does NOT change the Optuna
+        # training-objective domain (NORMAL-RISK). Mirrors the EXACT IS-only construction
+        # in analysis/BTCUSDT/iteration_v1-018/strength_gate_by_side.py:
+        #   cp   = close.shift(1)                                  # close[t-1]
+        #   sma  = close.rolling(W).mean().shift(1)                # SMA_W(close)[t-1]
+        #   tr   = max(high-low, |high-cp|, |low-cp|)              # true range
+        #   atr  = tr.rolling(atr_win).mean().shift(1)             # ATR_atrwin[t-1]
+        #   dist = (cp - sma) / atr                                # signed trend strength
+        #   absd = |dist|
+        #   q_thr= quantile(absd over training-window rows, q)     # past-only threshold
+        #   fire = absd[t] >= q_thr
+        self._enable_trend_strength_gate: bool = bool(enable_trend_strength_gate)
+        self._trend_strength_atr_window: int = int(trend_strength_atr_window)
+        self._trend_strength_quantile: float = float(trend_strength_quantile)
+        # Sorted (close_time_ms, abs_dist_atr) index — built in compute_features() when
+        # enable_trend_strength_gate=True from the trend_state_symbol parquet's
+        # close/high/low (the gate measures distance from the SAME SMA200 used for
+        # direction, so it reuses trend_state_sma_window + trend_state_symbol).
+        self._trend_strength_idx: tuple[np.ndarray, np.ndarray] | None = None
+        # Per-month past-only threshold q_thr; recomputed at each _train_for_month from
+        # the training window (mirrors the R3 OOD training-window-stat pattern). None
+        # until the first month with >= 50 finite training-window |dist_atr| rows.
+        self._trend_strength_thr: float | None = None
         # iter-v3/072: labeling mode — "triple_barrier" (default, backward-compat)
         # or "fixed_horizon" (sign of N-candle-forward return; no barriers).
         # iter-v3/105: "trend_scanning" (OLS trend, max-|t| horizon selection
@@ -772,6 +811,67 @@ class LightGbmStrategy:
                     f"[lgbm] trend-state direction override: loaded {len(_ts_ct)} "
                     f"{self._trend_state_symbol} candles from {_ts_pq} "
                     f"(sma_window={self._trend_state_sma_window})"
+                )
+
+        # iter-v1/018: TREND-STRENGTH CONVICTION gate — build the sorted past-only
+        # (open_time_ms, |dist_atr|) index from the trend_state_symbol parquet.
+        # For decision candle t (the candle whose open_time == open_time(t)):
+        #   |dist_atr|(t) = |close[t-1] - SMA_W(close)[t-1]| / ATR_atrwin[t-1]
+        # where every primitive is built `.shift(1)` so row t's value uses NO data at or
+        # after candle t-1's close (the EXACT past-only construction the QR's IS-only
+        # script validated as load-bearing — 143/5527 rows flip sign without `.shift(1)`).
+        # ATR is the simple rolling-mean of true range (NOT Wilder), matching the QR
+        # script EXACTLY. The index is keyed on OPEN_TIME (not close_time) so the signal-
+        # time lookup picks |dist_atr| at the SAME row index t the QR script aligns to
+        # `y[t]`/`dir_ts[t]` — and the SAME close[t-1] the trend-state DIRECTION override
+        # reads (no double-lag). compute_features() builds this exactly once.
+        if self._enable_trend_strength_gate:
+            _str_pq = Path(self.features_dir) / f"{self._trend_state_symbol}_8h_features.parquet"
+            if not _str_pq.exists():
+                # FAIL LOUD (same discipline as the /016 trend-state + /092 BTC gates):
+                # a silent pass-through would leave the gate inert and the iteration void.
+                raise FileNotFoundError(
+                    f"[lgbm] trend-strength gate: FATAL — enable_trend_strength_gate=True "
+                    f"but parquet not found at {_str_pq}. Re-fetch + regen: "
+                    f"uv run crypto-trade fetch --symbols {self._trend_state_symbol} "
+                    "--intervals 8h && "
+                    f"uv run crypto-trade features --symbols {self._trend_state_symbol} "
+                    "--interval 8h --track v1 --format parquet --workers 4"
+                )
+            import pandas as _pd_str  # noqa: PLC0415
+
+            _str_df = _pd_str.read_parquet(_str_pq, columns=["open_time", "close", "high", "low"])
+            _str_df = _str_df.dropna(subset=["open_time", "close", "high", "low"])
+            _str_df = _str_df.sort_values("open_time").reset_index(drop=True)
+            _str_ot = _str_df["open_time"].to_numpy(dtype=np.int64)
+            _str_close = _str_df["close"].to_numpy(dtype=np.float64)
+            _str_high = _str_df["high"].to_numpy(dtype=np.float64)
+            _str_low = _str_df["low"].to_numpy(dtype=np.float64)
+            _w = self._trend_state_sma_window
+            _aw = self._trend_strength_atr_window
+            _cp = _pd_str.Series(_str_close).shift(1).to_numpy()  # close[t-1]
+            _sma = _pd_str.Series(_str_close).rolling(_w).mean().shift(1).to_numpy()  # SMA_W[t-1]
+            _tr = np.maximum(
+                _str_high - _str_low,
+                np.maximum(np.abs(_str_high - _cp), np.abs(_str_low - _cp)),
+            )
+            _atr = _pd_str.Series(_tr).rolling(_aw).mean().shift(1).to_numpy()  # ATR_aw[t-1]
+            _atr_safe = np.where(_atr > 0, _atr, np.nan)
+            _dist_atr = (_cp - _sma) / _atr_safe  # signed trend strength, past-only
+            _abs_dist = np.abs(_dist_atr)
+            self._trend_strength_idx = (_str_ot, _abs_dist.astype(np.float64))
+            if self._trend_strength_idx is None:
+                raise RuntimeError(
+                    "[lgbm] trend-strength gate: FATAL — index is None after build "
+                    f"(parquet={_str_pq}, rows={len(_str_ot)}). Programming error."
+                )
+            if self.verbose > 0:
+                _n_finite = int(np.isfinite(_abs_dist).sum())
+                print(
+                    f"[lgbm] trend-strength gate: loaded {len(_str_ot)} "
+                    f"{self._trend_state_symbol} candles from {_str_pq} "
+                    f"(sma_window={_w} atr_window={_aw} quantile={self._trend_strength_quantile}; "
+                    f"{_n_finite} finite |dist_atr| rows)"
                 )
 
         # Load per-row ATR values for dynamic labeling
@@ -1704,6 +1804,37 @@ class LightGbmStrategy:
                             self._ood_mean = None
                             self._ood_inv_cov = None
                             self._ood_cutoff = None
+            # iter-v1/018: TREND-STRENGTH gate — per-month PAST-ONLY threshold.
+            # q_thr = quantile(|dist_atr| over candles in the TRAINING window, q).
+            # The training window (train_start_ms..train_end_ms) is strictly past-only
+            # relative to the test month, so this mirrors the R3 OOD training-window-stat
+            # pattern (the brief §7.3 reference): the threshold is fit on PAST rows only,
+            # never recomputed on test rows. Conservative: < 50 finite training-window
+            # rows → leave thr None (gate disabled this month → CONSERVATIVE fire).
+            self._trend_strength_thr = None
+            if self._enable_trend_strength_gate and self._trend_strength_idx is not None:
+                _str_ot, _str_absd = self._trend_strength_idx
+                # The index is keyed on open_time, so "in the training window" is exactly
+                # train_start_ms <= open_time < train_end_ms — the SAME mask the model's
+                # train_indices use (line ~915). Each row's |dist_atr| is past-only
+                # (built from close[t-1]), so the whole window is past-only relative to
+                # the test month. Threshold fit on PAST rows only; never recomputed on
+                # test rows (mirrors the R3 OOD training-window-stat pattern).
+                _tw_mask = (_str_ot >= int(split.train_start_ms)) & (
+                    _str_ot < int(split.train_end_ms)
+                )
+                _tw_absd = _str_absd[_tw_mask]
+                _tw_absd = _tw_absd[np.isfinite(_tw_absd)]
+                if len(_tw_absd) >= 50:
+                    self._trend_strength_thr = float(
+                        np.quantile(_tw_absd, self._trend_strength_quantile)
+                    )
+                if self.verbose > 0:
+                    print(
+                        f"[lgbm] trend-strength gate: q_thr({self._trend_strength_quantile})"
+                        f"={self._trend_strength_thr} from {len(_tw_absd)} training-window "
+                        f"|dist_atr| rows (month={month_str})"
+                    )
             # Load NATR / σ_t cache.
             self._month_natr = {}
             if self.atr_tp_multiplier is not None:
@@ -2225,6 +2356,52 @@ class LightGbmStrategy:
         sma_prev = float(np.mean(window))  # SMA_window(close)[t-1]
         return 1 if close_prev > sma_prev else -1
 
+    def _compute_trend_strength(self, candle_open_time: int) -> float | None:
+        """Compute the past-only trend STRENGTH |dist_atr| at the decision candle (iter-v1/018).
+
+        Returns |close[t-1] - SMA_W(close)[t-1]| / ATR_atrwin[t-1] for decision candle t
+        (the candle whose open_time == candle_open_time), every primitive `.shift(1)`-
+        lagged. The value is read from the `_trend_strength_idx` (open_time_ms, |dist_atr|)
+        index built in compute_features(); row t's |dist_atr| ALREADY uses only data at or
+        before candle t-1's close (close[t-1], SMA over close[t-W..t-1], ATR over TR of
+        close[t-aw..t-1]).
+
+        This is the EXACT IS-only quantity the QR's script
+        analysis/BTCUSDT/iteration_v1-018/strength_gate_by_side.py computes as `absd[t]`
+        and aligns to `y[t]` / `dir_ts[t]`:
+            cp   = close.shift(1); sma = close.rolling(W).mean().shift(1)
+            tr   = max(high-low, |high-cp|, |low-cp|); atr = tr.rolling(aw).mean().shift(1)
+            absd = |(cp - sma) / atr|
+        Keying on OPEN_TIME (not close_time) makes the lookup return absd at the SAME row
+        index t the QR aligns to — and the SAME close[t-1] the trend-state DIRECTION
+        override reads (no double-lag; the two RULE layers see identical history).
+
+        LOOK-AHEAD SAFETY (load-bearing): the index is keyed on open_time and we select the
+        row whose open_time == candle_open_time EXACTLY (searchsorted left + equality
+        check). The |dist_atr| at that row was built from close.shift(1)/SMA.shift(1)/
+        ATR.shift(1), so it reads NO data at or after candle t-1's close — i.e. nothing at
+        or after the decision candle. Appending future candles (open_time > candle_open_time)
+        cannot change it, nor can mutating the decision candle's own close/high/low.
+
+        Returns None when (CONSERVATIVE → caller does NOT gate, i.e. fires):
+          - index not loaded (gate disabled or parquet missing),
+          - no candle with open_time == candle_open_time (decision candle not in the
+            trend-state parquet),
+          - the |dist_atr| at row t is NaN (SMA/ATR warmup or non-positive ATR).
+        """
+        if self._trend_strength_idx is None:
+            return None
+        ot_arr, absd_arr = self._trend_strength_idx
+        # Row whose open_time == candle_open_time (the decision candle t). The trend-state
+        # symbol == the traded symbol, so the row always exists; if not, return None.
+        idx_t = int(np.searchsorted(ot_arr, candle_open_time, side="left"))
+        if idx_t < 0 or idx_t >= len(ot_arr) or int(ot_arr[idx_t]) != int(candle_open_time):
+            return None
+        val = float(absd_arr[idx_t])
+        if not np.isfinite(val):
+            return None
+        return val
+
     def _apply_mid_bull_short_veto(self, signal: Signal, symbol: str, open_time: int) -> Signal:
         """Apply AXIS-R Mid-Bull SHORT VETO to an aggregated signal (iter-v1/074).
 
@@ -2608,6 +2785,40 @@ class LightGbmStrategy:
                             "decision": "trend_state_warmup:kept_model_sign",
                         }
                     )
+
+            # iter-v1/018: TREND-STRENGTH CONVICTION entry gate (RULE layer).
+            # The abstention gates above (specialist consensus, R-CONV, BTC-regime-kill,
+            # R3 OOD) AND the trend-state direction override have already decided the
+            # trade FIRES with a direction. Now ABSTAIN if the trend is NOT convincing:
+            # require |close[t-1] - SMA200[t-1]| / ATR14[t-1] >= the past-only per-month
+            # q-threshold. Below threshold = weak-trend chop (IS-net-negative) → skip.
+            # CONSERVATIVE: if strength is None (warmup / index missing) OR the month's
+            # threshold is None (< 50 training-window rows) → do NOT gate (fire).
+            if self._enable_trend_strength_gate:
+                _ts_strength = self._compute_trend_strength(open_time)
+                if (
+                    _ts_strength is not None
+                    and self._trend_strength_thr is not None
+                    and _ts_strength < self._trend_strength_thr
+                ):
+                    decision_log.log(
+                        {
+                            "kind": "trend_strength_gate_skip",
+                            "symbol": symbol,
+                            "ot": open_time,
+                            "month": candle_month,
+                            "specialist_seeds": len(self._specialist_models),
+                            "final_signed": _final_signed,
+                            "direction_pre_gate": _sp_direction,
+                            "trend_strength": _ts_strength,
+                            "trend_strength_thr": self._trend_strength_thr,
+                            "trend_strength_quantile": self._trend_strength_quantile,
+                            "trend_strength_atr_window": self._trend_strength_atr_window,
+                            "sma_window": self._trend_state_sma_window,
+                            "decision": "skipped:weak_trend_chop",
+                        }
+                    )
+                    return NO_SIGNAL
 
             # iter-v1/074: AXIS-R Mid-Bull SHORT VETO — post-aggregator rule layer.
             # Applied AFTER mean-of-signed-weights aggregator emits Signal(direction, weight)

@@ -632,6 +632,9 @@ def run_model(
     enable_trend_state_dir: bool = False,
     trend_state_sma_window: int = 200,
     trend_state_symbol: str = "BTCUSDT",
+    enable_trend_strength_gate: bool = False,
+    trend_strength_atr_window: int = 14,
+    trend_strength_quantile: float = 0.50,
 ):
     """Run a single v1 sub-model (A/C/D/E) under the corrected walk-forward.
 
@@ -807,6 +810,11 @@ def run_model(
         enable_trend_state_dir=enable_trend_state_dir,
         trend_state_sma_window=trend_state_sma_window,
         trend_state_symbol=trend_state_symbol,
+        # iter-v1/018: TREND-STRENGTH CONVICTION entry gate. Default False = BIT-IDENTICAL
+        # to all prior single-symbol dispatches and v2/v3.
+        enable_trend_strength_gate=enable_trend_strength_gate,
+        trend_strength_atr_window=trend_strength_atr_window,
+        trend_strength_quantile=trend_strength_quantile,
     )
     t0 = time.time()
     results = run_backtest(config, strategy, yearly_pnl_check=False)
@@ -2834,6 +2842,40 @@ def main() -> None:
         ),
     )
     parser.add_argument(
+        "--enable-trend-strength-gate",
+        action="store_true",
+        help=(
+            "Enable the iter-v1/018 TREND-STRENGTH CONVICTION entry gate (RULE layer). "
+            "AFTER the gates + trend-state direction override decide the trade fires, "
+            "ABSTAIN unless |close[t-1] - SMA200[t-1]| / ATR14[t-1] (past-only) >= the "
+            "per-month q-quantile threshold of |dist_atr| over the training window — "
+            "i.e. trade only convincing trends; skip weak-trend chop. NORMAL-RISK (no "
+            "change to the Optuna training objective). The `--iteration 18` keyed override "
+            "sets this automatically. Default: off (BIT-IDENTICAL to all prior runs)."
+        ),
+    )
+    parser.add_argument(
+        "--trend-strength-atr-window",
+        type=int,
+        default=14,
+        help=(
+            "ATR window (candles) for the iter-v1/018 trend-strength gate's ATR "
+            "normalizer (default 14; matches the QR IS-only script). Only evaluated when "
+            "--enable-trend-strength-gate is set or the v1-018 keyed override is active."
+        ),
+    )
+    parser.add_argument(
+        "--trend-strength-quantile",
+        type=float,
+        default=0.50,
+        help=(
+            "Past-only |dist_atr| quantile that defines the iter-v1/018 trend-strength "
+            "threshold (default 0.50 = median; mid-plateau, brief §0.4). Only evaluated "
+            "when --enable-trend-strength-gate is set or the v1-018 keyed override is "
+            "active."
+        ),
+    )
+    parser.add_argument(
         "--r5-binary-kill-enabled",
         action="store_true",
         help=(
@@ -3716,6 +3758,11 @@ def main() -> None:
     _spec_enable_trend_state_dir: bool = False
     _spec_trend_state_sma_window: int = 200
     _spec_trend_state_symbol: str = "BTCUSDT"
+    # iter-v1/018 TREND-STRENGTH CONVICTION gate defaults. Strict NO-OP for /002-/017
+    # (byte-identical); the v1-018 keyed block below flips enable=True.
+    _spec_enable_trend_strength_gate: bool = False
+    _spec_trend_strength_atr_window: int = 14
+    _spec_trend_strength_quantile: float = 0.50
 
     if iteration_label == "v1-002":
         # iter-v1/002 EXPLORATION (BTCUSDT, K=3). PRIMARY axis = 41-col feature
@@ -4241,6 +4288,86 @@ def main() -> None:
             f"TREND-STATE DIR sma={_spec_trend_state_sma_window}, R3=ON({BASELINE_OOD_CUTOFF_PCT}) R5/vt=ON). "
             f"Validates iter-016 both-positive (IS +0.63/OOS +0.11) across 20 seeds -> MERGE if it holds."
         )
+    elif iteration_label == "v1-018":
+        # iter-v1/018 EXPLORATION (BTCUSDT). TREND-STRENGTH CONVICTION entry gate.
+        # SINGLE AXIS vs /016: keep the ENTIRE iter-016 stack (19-col HYBRID,
+        # fixed_horizon N=42(14d), let-winners-run exec, R2 drawdown brake, R3 OOD,
+        # R5 vol-target, stateless 200-SMA trend-state DIRECTION override) and ADD ONLY
+        # enable_trend_strength_gate=True.
+        #
+        # WHY (brief §0.3/§0.4): the iter-016 trend-state book trades the SMA200 sign in
+        # ALL regimes — including weak-trend chop (price hugging the SMA200) where the 14d
+        # directional bet is a coin-flip net of cost. The IS sub-period decomposition shows
+        # those weak-trend rows are net-negative (IS full -0.22, -0.54%/trade) while the
+        # strong-trend rows (|close-SMA200| in ATR units >= past-only median) carry the
+        # edge (IS full +1.21, frac_pos 0.70, recent3 +2.09, WR 56%, +2.90%/trade). The
+        # gate trades the trend-state direction ONLY when the trend is convincing; it
+        # SKIPS the chop. The benefit is the most IS-sub-period-stable design in the
+        # campaign (frac_pos 0.70 AND recent3 +2.09 AND strong full Sharpe simultaneously).
+        #
+        # LOOK-AHEAD SAFETY (load-bearing): trend_strength(t) = |close[t-1] -
+        # SMA200(close)[t-1]| / ATR14[t-1], every primitive `.shift(1)` past-only; the
+        # per-month threshold is the q=0.50 quantile of |dist_atr| over the TRAINING
+        # window ONLY (mirrors R3 OOD training-window-stat). See
+        # lgbm._compute_trend_strength + tests/test_trend_strength_lookahead.py.
+        #
+        # RISK (brief §2.5): NORMAL-RISK — a stateless RULE-layer ENTRY FILTER on top of
+        # the UNCHANGED training objective and UNCHANGED direction rule. It can only
+        # REMOVE trades (the weak-trend chop); it cannot add a position the baseline
+        # would not take. Worst case it thins the book — caught by the trade-rate floor.
+        #
+        # CHANGE vs /016: ONLY enable_trend_strength_gate=True (single-axis). Everything
+        # else (features, label, exec barriers, R2/R3/R5, trend-state DIRECTION) is
+        # BIT-IDENTICAL to /016.
+        import pyarrow.parquet as pq  # noqa: PLC0415
+
+        _iter018_parquet = Path("data/features") / "BTCUSDT_8h_features.parquet"
+        assert _iter018_parquet.exists(), (
+            f"iter-v1/018: feature parquet not found at {_iter018_parquet}. "
+            "Re-fetch + regen BTCUSDT 8h v1 features before running."
+        )
+        _parquet_cols = set(pq.ParquetFile(_iter018_parquet).schema.names)
+        _missing = [c for c in V1_BTC_ITER009_FEATURES if c not in _parquet_cols]
+        assert not _missing, (
+            f"iter-v1/018: {len(_missing)} of the 19 feature columns are NOT present — {_missing}."
+        )
+        # The gate also needs close/high/low on the trend-state symbol parquet.
+        _str_needed = {"close", "high", "low", "close_time"}
+        _str_missing = [c for c in _str_needed if c not in _parquet_cols]
+        assert not _str_missing, (
+            f"iter-v1/018: trend-strength gate needs {_str_missing} on the parquet."
+        )
+        _spec_feature_columns = list(V1_BTC_ITER009_FEATURES)  # == /016 (19-col HYBRID)
+        _spec_label_mode = "fixed_horizon"  # == /016
+        _spec_use_atr_labeling = False  # == /016
+        _spec_label_timeout_minutes = 20160  # 42 candles = 14d == /016
+        _spec_atr_tp = 100.0  # TP NON-BINDING == /016
+        _spec_atr_sl = 1.45  # protective == /016
+        _spec_execution_timeout_minutes = 20160  # 14d == /016
+        _spec_apply_r2 = True  # == /016
+        _spec_r2_trigger_pct = 2.07
+        _spec_r2_scale_anchor_pct = 8.28
+        _spec_r2_scale_floor = 0.20
+        _spec_enable_trend_state_dir = True  # == /016 (DIRECTION override KEEPER)
+        _spec_trend_state_sma_window = 200
+        _spec_trend_state_symbol = "BTCUSDT"
+        # --- NEW (the ONLY change vs /016): TREND-STRENGTH CONVICTION entry gate ---
+        _spec_enable_trend_strength_gate = True
+        _spec_trend_strength_atr_window = 14
+        _spec_trend_strength_quantile = 0.50
+        print(
+            f"[iter-v1/018] OVERRIDE ACTIVE: features={len(V1_BTC_ITER009_FEATURES)} "
+            f"(SAME 19-col HYBRID as /016) | LABEL=fixed_horizon N=42(14d) use_atr_labeling=False "
+            f"| EXEC atr_tp={_spec_atr_tp}(TP NON-BINDING) atr_sl={_spec_atr_sl} "
+            f"timeout={_spec_execution_timeout_minutes}min(14d) "
+            f"| R2 DRAWDOWN BRAKE ON (trigger={_spec_r2_trigger_pct} "
+            f"anchor={_spec_r2_scale_anchor_pct} floor={_spec_r2_scale_floor}; == /016) "
+            f"| TREND-STATE DIR OVERRIDE ON (sma={_spec_trend_state_sma_window}; == /016) "
+            f"| TREND-STRENGTH GATE ON (atr_window={_spec_trend_strength_atr_window} "
+            f"quantile={_spec_trend_strength_quantile}; NORMAL-RISK; past-only median; "
+            f"skips weak-trend chop) "
+            f"| R1=OFF R3=ON({BASELINE_OOD_CUTOFF_PCT}) R5/vt=ON | TREND-SCALE=OFF"
+        )
 
     # CLI precedence hook for the trend-state override (ad-hoc control runs).
     # The v1-016 keyed branch above is the CANONICAL activation; this lets a manual
@@ -4253,6 +4380,20 @@ def main() -> None:
         print(
             f"[run_baseline_v1] --enable-trend-state-dir: trend-state direction override "
             f"ON (sma_window={_spec_trend_state_sma_window} symbol={_spec_trend_state_symbol})."
+        )
+
+    # CLI precedence hook for the iter-v1/018 trend-strength conviction gate (ad-hoc
+    # control runs). The v1-018 keyed branch above is the CANONICAL activation; this lets
+    # a manual `--enable-trend-strength-gate` toggle it on a different iteration_label
+    # (e.g. an iter-016 control). Re-asserting from args is idempotent for v1-018.
+    if getattr(args, "enable_trend_strength_gate", False):
+        _spec_enable_trend_strength_gate = True
+        _spec_trend_strength_atr_window = int(args.trend_strength_atr_window)
+        _spec_trend_strength_quantile = float(args.trend_strength_quantile)
+        print(
+            f"[run_baseline_v1] --enable-trend-strength-gate: trend-strength conviction "
+            f"gate ON (atr_window={_spec_trend_strength_atr_window} "
+            f"quantile={_spec_trend_strength_quantile} sma={_spec_trend_state_sma_window})."
         )
 
     # -------------------------------------------------------------------------
@@ -4288,6 +4429,20 @@ def main() -> None:
             f"[v1] SPECIALIST BAGGING: K={bagging_k} "
             f"(inner ensemble=1, outer seeds=1) symbol={_spec_sym} mode={mode_label}"
         )
+        # iter-v1/018: wire backtest-mode decision_log sink so the RULE-layer skip events
+        # (trend_strength_gate_skip + trend_state_override) persist for Phase 7 attribution
+        # and the gate-fire audit. Without configure() the decision_log.log() calls in
+        # lgbm.py are no-ops in backtest mode. Only configured when a RULE-layer gate is
+        # active on the generic single-symbol dispatch — byte-identical for ungated runs.
+        if _spec_enable_trend_strength_gate or _spec_enable_trend_state_dir:
+            _dl_spec_path = (
+                Path(reports_dir) / f"iteration_{iteration_label}" / "decision_log.jsonl"
+            )
+            _dl_spec_path.parent.mkdir(parents=True, exist_ok=True)
+            from crypto_trade import decision_log as _decision_log_spec  # noqa: PLC0415
+
+            _decision_log_spec.configure(_dl_spec_path)
+            print(f"[v1 specialist] decision_log configured → {_dl_spec_path}")
         print(
             f"[v1] universal single-symbol routing — generic specialist dispatch "
             f"(features={len(_spec_feature_columns)} bounds=v1_specialist "
@@ -4342,6 +4497,12 @@ def main() -> None:
             enable_trend_state_dir=_spec_enable_trend_state_dir,
             trend_state_sma_window=_spec_trend_state_sma_window,
             trend_state_symbol=_spec_trend_state_symbol,
+            # iter-v1/018: TREND-STRENGTH CONVICTION entry gate. Defaults (False) keep ALL
+            # other single-symbol iterations BIT-IDENTICAL; the v1-018 keyed block sets
+            # _spec_enable_trend_strength_gate=True.
+            enable_trend_strength_gate=_spec_enable_trend_strength_gate,
+            trend_strength_atr_window=_spec_trend_strength_atr_window,
+            trend_strength_quantile=_spec_trend_strength_quantile,
         )
 
         # Cohort isolation sanity: assert ONLY the target symbol's trades emitted.
