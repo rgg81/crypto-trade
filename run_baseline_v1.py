@@ -4567,6 +4567,54 @@ def main() -> None:
             f"q_f={_spec_funding_contra_quantile}; NORMAL-RISK; funding OPPOSES trend; .shift(1)) "
             f"| R3=ON({BASELINE_OOD_CUTOFF_PCT}) R5/vt=ON"
         )
+    elif iteration_label == "v1-022":
+        # iter-v1/022 CONFIRMATION (K=20) — validates the iter-021 funding-contra-readmit (K=5: IS
+        # +0.52 / OOS +0.22, improves the MERGED iter-020 baseline +0.37/+0.09). CONFIG BIT-IDENTICAL
+        # to iter-021 (= iter-020 stack + funding-contra-crowd re-admission q_f=0.50). ONLY difference
+        # vs /021 is K (5->20, via --confirmation). The OOS is 1-trade concentrated (top-1=98% of net),
+        # but the trend-state DIRECTION is deterministic so the big winner is taken at every seed —
+        # this K=20 tests whether the OOS MAGNITUDE (+0.22) survives the bagged sizing or regresses to
+        # iter-020's +0.09. If both-positive holds AND OOS > +0.09 -> candidate improved-baseline MERGE
+        # (with the honest concentration caveat); else iter-020 stays.
+        import pyarrow.parquet as pq  # noqa: PLC0415
+
+        _iter022_parquet = Path("data/features") / "BTCUSDT_8h_features.parquet"
+        assert _iter022_parquet.exists(), (
+            f"iter-v1/022: feature parquet not found at {_iter022_parquet}."
+        )
+        _parquet_cols = set(pq.ParquetFile(_iter022_parquet).schema.names)
+        _missing = [c for c in V1_BTC_ITER009_FEATURES if c not in _parquet_cols]
+        assert not _missing, (
+            f"iter-v1/022: {len(_missing)} of the 19 feature columns are NOT present — {_missing}."
+        )
+        assert "funding_rate_zscore_30" in _parquet_cols, (
+            "iter-v1/022: funding_rate_zscore_30 NOT in the BTCUSDT parquet."
+        )
+        _spec_feature_columns = list(V1_BTC_ITER009_FEATURES)  # == /021
+        _spec_label_mode = "fixed_horizon"
+        _spec_use_atr_labeling = False
+        _spec_label_timeout_minutes = 20160  # == /021
+        _spec_atr_tp = 100.0  # == /021
+        _spec_atr_sl = 1.45  # == /021
+        _spec_execution_timeout_minutes = 20160  # == /021
+        _spec_apply_r2 = True  # == /021
+        _spec_r2_trigger_pct = 2.07
+        _spec_r2_scale_anchor_pct = 8.28
+        _spec_r2_scale_floor = 0.20
+        _spec_enable_trend_state_dir = True  # == /021
+        _spec_trend_state_sma_window = 200
+        _spec_trend_state_symbol = "BTCUSDT"
+        _spec_enable_trend_strength_gate = True  # == /021
+        _spec_trend_strength_atr_window = 14
+        _spec_trend_strength_quantile = 0.40  # == /021
+        _spec_enable_funding_contra_readmit = True  # == /021
+        _spec_funding_contra_col = "funding_rate_zscore_30"
+        _spec_funding_contra_quantile = 0.50  # == /021
+        print(
+            f"[iter-v1/022] CONFIRMATION (K=20) — config BIT-IDENTICAL to /021 (iter-020 stack + "
+            f"funding-contra-readmit q_f=0.50). Validates iter-021 (IS +0.52/OOS +0.22) across 20 seeds "
+            f"-> improved-baseline MERGE if both-positive holds AND OOS > iter-020's +0.09 (else /020 stays)."
+        )
 
     # CLI precedence hook for the trend-state override (ad-hoc control runs).
     # The v1-016 keyed branch above is the CANONICAL activation; this lets a manual
