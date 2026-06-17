@@ -4412,6 +4412,47 @@ def main() -> None:
             f"| TREND-STRENGTH GATE q={_spec_trend_strength_quantile} (FALLBACK 0.50->0.40, thicker trades) "
             f"| R3=ON({BASELINE_OOD_CUTOFF_PCT}) R5/vt=ON"
         )
+    elif iteration_label == "v1-020":
+        # iter-v1/020 CONFIRMATION (K=20) — validates the iter-019 conviction-gate q=0.40 BOTH-POSITIVE
+        # (K=5: IS +0.54 / OOS +0.06). CONFIG BIT-IDENTICAL to iter-019 (= iter-016 stack + trend-state
+        # direction + trend-strength gate q=0.40). ONLY difference vs /019 is K (5->20, via --confirmation)
+        # — isolates the basin-lottery (iter-016 K=5 +0.11 collapsed to K=20 -1.15). The iter-019 OOS is
+        # marginal/knob-sensitive (q=0.50->0.40 flipped -0.16->+0.06), so this K=20 is the decisive test of
+        # whether the conviction-gate OOS is a robust positive or noise-around-zero. If IS>0 AND OOS>=0 hold
+        # across 20 seeds + beats baseline on the coherence gate -> MERGE (first both-positive of the redesign).
+        import pyarrow.parquet as pq  # noqa: PLC0415
+
+        _iter020_parquet = Path("data/features") / "BTCUSDT_8h_features.parquet"
+        assert _iter020_parquet.exists(), (
+            f"iter-v1/020: feature parquet not found at {_iter020_parquet}."
+        )
+        _parquet_cols = set(pq.ParquetFile(_iter020_parquet).schema.names)
+        _missing = [c for c in V1_BTC_ITER009_FEATURES if c not in _parquet_cols]
+        assert not _missing, (
+            f"iter-v1/020: {len(_missing)} of the 19 feature columns are NOT present — {_missing}."
+        )
+        _spec_feature_columns = list(V1_BTC_ITER009_FEATURES)  # == /019
+        _spec_label_mode = "fixed_horizon"
+        _spec_use_atr_labeling = False
+        _spec_label_timeout_minutes = 20160  # == /019
+        _spec_atr_tp = 100.0  # == /019
+        _spec_atr_sl = 1.45  # == /019
+        _spec_execution_timeout_minutes = 20160  # == /019
+        _spec_apply_r2 = True  # == /019
+        _spec_r2_trigger_pct = 2.07
+        _spec_r2_scale_anchor_pct = 8.28
+        _spec_r2_scale_floor = 0.20
+        _spec_enable_trend_state_dir = True  # == /019
+        _spec_trend_state_sma_window = 200
+        _spec_trend_state_symbol = "BTCUSDT"
+        _spec_enable_trend_strength_gate = True  # == /019
+        _spec_trend_strength_atr_window = 14
+        _spec_trend_strength_quantile = 0.40  # == /019 (the both-positive K=5 knob)
+        print(
+            f"[iter-v1/020] CONFIRMATION (K=20) — config BIT-IDENTICAL to /019 (iter-016 stack + "
+            f"trend-state DIR sma=200 + trend-strength GATE q=0.40). Validates iter-019 both-positive "
+            f"(IS +0.54/OOS +0.06) across 20 seeds -> MERGE if it holds (else conviction-gate OOS = noise)."
+        )
 
     # CLI precedence hook for the trend-state override (ad-hoc control runs).
     # The v1-016 keyed branch above is the CANONICAL activation; this lets a manual
