@@ -4615,6 +4615,52 @@ def main() -> None:
             f"funding-contra-readmit q_f=0.50). Validates iter-021 (IS +0.52/OOS +0.22) across 20 seeds "
             f"-> improved-baseline MERGE if both-positive holds AND OOS > iter-020's +0.09 (else /020 stays)."
         )
+    elif iteration_label == "v1-026":
+        # iter-v1/026 EXPLORATION (ETHUSDT) — FIRST ETH improvement: apply the PROVEN BTC iter-020
+        # CORE stack to ETH. The vanilla ETH bootstrap (iter-025) was IS -0.48 / OOS -0.96 (both
+        # negative). The iter-020 deterministic stack produced BTC's both-positive; this tests whether
+        # it transfers to ETH (whose 2025-26 OOS is less correction-dominated than BTC's).
+        # STACK: 19-col HYBRID + fixed_horizon N=42 (14d) let-winners-run (atr_tp=100 non-binding /
+        # atr_sl=1.45) + stateless 200-SMA trend-state DIRECTION on ETH's OWN close + conviction gate
+        # (q=0.40, self-calibrating per-coin from ETH's training-window |dist_atr|) + R3 + R5.
+        # R2 DRAWDOWN BRAKE OFF for this FIRST screen: R2 is DD-control (it does NOT flip the Sharpe
+        # SIGN — proven on BTC iter-015), and its trigger/anchor are BTC-PnL-scaled; ETH-calibrated R2
+        # is added in the CONFIRMATION once iter-026 gives ETH's maxDD (mirrors BTC iter-013->015).
+        # trend_state_symbol = the TARGET symbol (ETH trades on its OWN trend).
+        import pyarrow.parquet as pq  # noqa: PLC0415
+
+        _spec_sym_026 = symbols[0]
+        _iter026_parquet = Path("data/features") / f"{_spec_sym_026}_8h_features.parquet"
+        assert _iter026_parquet.exists(), (
+            f"iter-v1/026: feature parquet not found at {_iter026_parquet}. Fetch + regen v1 features."
+        )
+        _parquet_cols = set(pq.ParquetFile(_iter026_parquet).schema.names)
+        _missing = [c for c in V1_BTC_ITER009_FEATURES if c not in _parquet_cols]
+        assert not _missing, (
+            f"iter-v1/026: {len(_missing)} of the 19 feature columns NOT in {_spec_sym_026} parquet — {_missing}."
+        )
+        _spec_feature_columns = list(V1_BTC_ITER009_FEATURES)
+        _spec_apply_r2 = False  # R2 OFF for the first ETH screen (add ETH-calibrated R2 in confirmation)
+        _spec_label_mode = "fixed_horizon"
+        _spec_use_atr_labeling = False
+        _spec_label_timeout_minutes = 20160  # 14d (== iter-020)
+        _spec_atr_tp = 100.0  # TP NON-BINDING (let winners run)
+        _spec_atr_sl = 1.45  # protective stop
+        _spec_execution_timeout_minutes = 20160  # 14d
+        _spec_enable_trend_state_dir = True
+        _spec_trend_state_sma_window = 200
+        _spec_trend_state_symbol = _spec_sym_026  # ETH's OWN 200-SMA trend
+        _spec_enable_trend_strength_gate = True
+        _spec_trend_strength_atr_window = 14
+        _spec_trend_strength_quantile = 0.40
+        print(
+            f"[iter-v1/026] OVERRIDE ACTIVE ({_spec_sym_026}): PROVEN BTC iter-020 CORE stack on ETH "
+            f"| features=19 HYBRID | LABEL=fixed_horizon N=42(14d) use_atr_labeling=False "
+            f"| EXEC atr_tp=100(NON-BINDING) atr_sl=1.45 timeout=20160min(14d) "
+            f"| TREND-STATE DIR sma=200 symbol={_spec_trend_state_symbol} (ETH's own trend) "
+            f"| TREND-STRENGTH GATE q=0.40 (self-calibrating per-coin) "
+            f"| R2 OFF (DD-control; add ETH-calibrated in confirmation) R1=OFF R3=ON({BASELINE_OOD_CUTOFF_PCT}) R5/vt=ON"
+        )
 
     # CLI precedence hook for the trend-state override (ad-hoc control runs).
     # The v1-016 keyed branch above is the CANONICAL activation; this lets a manual
