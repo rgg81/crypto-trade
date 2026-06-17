@@ -1,0 +1,11 @@
+candidate,column,lift_cuts_of_6,best_cut,best_d_recent3,best_worst,best_frac_pos,verdict
+RVOL: high realized-vol NATR z-state,vol_state_z_natr_30,6,0.8,0.785,-3.8381,0.7,PLATEAU
+RVOL: high NATR-7,vol_natr_7,6,0.8,0.192,-3.8065,0.6,PLATEAU
+RVOL: high range-spike-24,vol_range_spike_24,0,0.95,-0.188,-3.8508,0.7,NO-LIFT
+RVOL: high range-spike-72,vol_range_spike_72,4,0.75,0.197,-3.7759,0.7,PLATEAU
+FUND: extreme |funding z30| (crowding),funding_rate_zscore_30,2,0.7,0.497,-3.6305,0.8,PARTIAL
+FUND: extreme |funding z90| (crowding),funding_rate_zscore_90,0,0.8,-0.045,-3.6392,0.7,NO-LIFT
+FUND: large |funding impulse| (flip),btc_funding_rate_8h_impulse,1,0.8,0.225,-3.7087,0.8,KNIFE-EDGE
+OI: extreme |OI-delta z90| (build/unwind),oi_delta_30_z90,0,0.95,-0.278,-3.9183,0.7,NO-LIFT
+OI: extreme |OI-delta-5 z30| (fast unwind),btc_oi_delta_5_z30,1,0.85,0.123,-3.9151,0.7,KNIFE-EDGE
+OI: extreme |OI-price divergence|,oi_price_divergence_30,4,0.85,0.371,-3.975,0.7,PLATEAU
