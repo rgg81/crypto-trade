@@ -4953,6 +4953,46 @@ def main() -> None:
             f"SELECTS trend-direction entries (vs /044 all-entries). Can the model filter ZEC's "
             f"losing entries to a both-positive subset? trend-state dir sma=200 + gate q=0.40, R2-OFF, K=5."
         )
+    elif iteration_label == "v1-048" and len(symbols) == 1 and symbols[0] == "THETAUSDT":
+        # iter-v1/048 — THETA deterministic core + THETA-CALIBRATED R2 (baseline finalization).
+        # iter-047 (R2-OFF) was both-positive (IS +0.1465 / OOS +0.5626) but 82% uncontrolled IS
+        # MaxDD. R2 = 6.5%/26% on IS maxDD 82.04 -> trig 5.33 / anch 21.33 / floor 0.20. THETA IS is
+        # POSITIVE (unlike DOT/ZEC) so R2 may control the DD without over-braking. If both-positive
+        # HOLDS -> MERGE BASELINE_V1_THETAUSDT (1st low-corr portfolio coin). Else merge R2-OFF /047. K-inv.
+        import pyarrow.parquet as pq  # noqa: PLC0415
+
+        _spec_sym_048 = symbols[0]
+        _t48p = Path("data/features") / f"{_spec_sym_048}_8h_features.parquet"
+        assert _t48p.exists(), f"iter-v1/048: parquet not found at {_t48p}."
+        _parquet_cols = set(pq.ParquetFile(_t48p).schema.names)
+        _missing = [c for c in V1_BTC_ITER009_FEATURES if c not in _parquet_cols]
+        assert not _missing, f"iter-v1/048: {len(_missing)} feature cols missing."
+        _str_missing = [c for c in ("close", "high", "low", "close_time") if c not in _parquet_cols]
+        assert not _str_missing, f"iter-v1/048: gate needs {_str_missing}."
+        _spec_feature_columns = list(V1_BTC_ITER009_FEATURES)
+        _spec_label_mode = "fixed_horizon"
+        _spec_use_atr_labeling = False
+        _spec_label_timeout_minutes = 20160
+        _spec_atr_tp = 100.0
+        _spec_atr_sl = 1.45
+        _spec_execution_timeout_minutes = 20160
+        _spec_apply_r2 = True
+        _spec_r2_trigger_pct = 5.33  # THETA-calibrated (6.5% of IS maxDD 82.04)
+        _spec_r2_scale_anchor_pct = 21.33  # 26% of 82.04
+        _spec_r2_scale_floor = 0.20
+        _spec_enable_trend_state_dir = True
+        _spec_trend_state_sma_window = 200
+        _spec_trend_state_symbol = _spec_sym_048
+        _spec_enable_trend_strength_gate = True
+        _spec_trend_strength_atr_window = 14
+        _spec_trend_strength_quantile = 0.40
+        _spec_enable_metalabel = False
+        _spec_deterministic_entry_only = True
+        print(
+            f"[iter-v1/048] THETA deterministic core + THETA-calibrated R2 (trig=5.33/anch=21.33/"
+            f"floor=0.20). Does R2 control the 82% IS DD while keeping /047 both-positive "
+            f"(IS+0.15/OOS+0.56)? Both-positive -> BASELINE_V1_THETAUSDT. K-invariant."
+        )
     elif iteration_label == "v1-021":
         # iter-v1/021 EXPLORATION — FUNDING-CONTRA-CROWD re-admission of gate-skipped chop.
         # CONFIG = the iter-020 MERGED stack (= iter-016 stack + trend-state DIR sma=200 +
