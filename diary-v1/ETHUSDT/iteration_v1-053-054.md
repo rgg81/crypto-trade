@@ -58,6 +58,19 @@ RAW = equal-weight `net_pnl_pct`, isolates signal from the R5 overlay.)
    −0.32 raw, from the 2022 W=400 lag), but the plateau grid (054) fixes most of it (IS +0.04 raw /
    +0.24 official) AND the OOS is strong regardless. So the selection is honest AND strong-OOS.
 
+## GENERALITY CHECK — THETA (official R5-weighted metric) confirms it, even stronger
+| THETA | IS | OOS | OOS MaxDD | trades |
+|---|---|---|---|---|
+| fixed-200 (BIASED, iter-047) | +0.15 | +0.56 | 45.9% | 35 |
+| honest wf-select 100..300 | **+0.63** | **+1.43** | 45.1% | 37 |
+
+On THETA the honest walk-forward beats the biased fixed-200 on **BOTH** IS (4×) and OOS (2.5×) at
+equal drawdown. It selected a median window of **125** (dist: 100×12, 125×27, 150×6, 175×4, 300×1) —
+forcing SMA=200 on THETA (just because 200 was the BTC/ETH-canonical number) was itself a cross-coin
+hindsight bias. So the finding generalizes: on BOTH coins the honest walk-forward ≥ biased fixed-200
+on OOS (ETH +0.99 vs +0.49; THETA +1.43 vs +0.56), and on THETA it wins IS too. The ETH weak-IS was
+ETH-specific, not a property of the method.
+
 ## Verdict & baseline implication
 - **The walk-forward is adopted as the HONEST methodology** (per the user's directive). It is not a
   performance sacrifice — under the official metric the honest selection OOS (+0.99) beats the biased
