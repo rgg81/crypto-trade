@@ -52,3 +52,16 @@ stack) → assemble a regime-complementary BUNDLE → portfolio-level breadth + 
 redesign's original goal; the genuine answer to the breadth mandate. (2) **DOT near-miss:** a proper
 R2-calibrated DOT test (IS +0.39 is a real positive edge; OOS −0.03 might tip). (3) **Deepen ETH:** a new
 edge class on the strong ETH core. Recommendation: (1) — it both serves breadth AND builds the track.
+
+## ADDENDUM — iter-040 (DOT + R2-calibrated) RESULT: DOT fails (R2 over-brakes) → strip-model DEFINITIVELY ETH-specific
+The DOT near-miss (option 2) was tested: DOT deterministic core + R2 calibrated 6.5%/26% on DOT's IS
+maxDD 55.31 (trigger 3.60 / anchor 14.38 / floor 0.20). Result: **IS −0.4464 / OOS −0.0572 — WORSE than
+R2-off** (IS +0.3946 → −0.4464). The ETH/BTC R2 calibration shape OVER-BRAKES DOT (cuts exposure during
+its productive periods → destroys the IS edge; MaxDD did drop 55%→23% but Sharpe collapsed). So **DOT is
+NOT a strip-model both-positive coin under EITHER config** (R2-off OOS-negative; R2-on both-negative).
+SECONDARY FINDING: the R2 calibration shape (6.5%/26%) is itself COIN-SPECIFIC — not portable.
+**FINAL: strip-model is ETH-special (clean win, merged) + BTC-modest; DOT/LINK/LTC all FAIL. The
+portfolio-via-strip-model path is NOT viable (only ETH qualifies strongly; a 2-coin ETH+BTC bundle is too
+thin for breadth).** To pursue the portfolio, the weak coins would need MODEL-GATED bootstraps (iter-027
+stack — an uncertain, bigger effort on hard coins). The ETH breakthrough (iter-034, OOS +0.41) stands as
+the v1 track's strong asset + the session's headline win.
