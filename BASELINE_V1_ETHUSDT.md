@@ -82,8 +82,12 @@ than iter-027). Critic OVERALL=CONFIRMATION-MERGE (look-ahead audit PASS, determ
    complementary DETERMINISTIC 2nd let-winners band / partial-take to raise OOS trade count + trim the
    top-trade dominance, holding the both-positive sign. (De-concentration via within-trend mechanisms
    was intractable on the WEAK iter-027 OOS; retry on the STRONG core.)
-2. **Direction-robustness K-invariant screen:** swap `trend_state_symbol`→BTC (cross-asset regime) or
-   SMA 100/300 — stress the single deterministic primitive the edge rests on (all K-invariant, fast).
+2. ~~**Direction-robustness K-invariant screen.**~~ DONE (iter-041-043) — **PASS, robust.** Both-positive
+   in 3 of 4 neighborhood variants: SMA100/ETH (IS +0.20/OOS +0.72 ✓), SMA200/ETH (merged ✓), SMA200 on
+   BTC-regime (IS +0.29/OOS +0.77 ✓); only SMA300/ETH breaks (IS −0.11, too slow). SMA-200 is the IS PEAK
+   (IS 100→200→300 = +0.20→+0.65→−0.11) → the merged window is correctly chosen (balanced, not a
+   knife-edge). The higher-OOS variants ride weaker IS (regime-luck) → not better baselines. Confidence in
+   the +0.41 baseline is RAISED. See diary-v1/ETHUSDT/iteration_v1-041-043_robustness.md.
 3. **Portability:** apply the model-stripped deterministic core to BTC (does removing the model lift
    BTC's iter-020 OOS too?) + the next coins — corroborate the "deterministic core generalizes, learned
    layer overfits" thesis beyond ETH. This may be the single highest-EV change across the WHOLE v1 track.
