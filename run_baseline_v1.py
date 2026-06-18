@@ -4728,7 +4728,7 @@ def main() -> None:
             f"stack + R2 2.07/8.28/0.20. Does removing the model lift BTC OOS (iter-020 +0.09)? "
             f"K-invariant (model bypassed)."
         )
-    elif iteration_label in ("v1-037", "v1-038", "v1-039", "v1-044") and len(symbols) == 1:
+    elif iteration_label in ("v1-037", "v1-038", "v1-039", "v1-044", "v1-047") and len(symbols) == 1:
         # iter-v1/037 (LINK) / 038 (LTC) / 039 (DOT) — PORTABILITY SWEEP of the strip-the-model
         # finding across the remaining v1 coins. Generic deterministic-core directional screen on
         # symbols[0]: the proven trend-state DIRECTION (sma=200) + conviction gate q=0.40 +
