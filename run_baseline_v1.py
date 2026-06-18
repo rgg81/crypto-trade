@@ -4821,6 +4821,58 @@ def main() -> None:
             f"floor=0.20). Does the DD brake tip DOT's OOS (-0.03 R2-off, IS +0.39) both-positive? "
             f"K-invariant (model bypassed)."
         )
+    elif (
+        iteration_label in ("v1-041", "v1-042", "v1-043")
+        and len(symbols) == 1
+        and symbols[0] == "ETHUSDT"
+    ):
+        # iter-v1/041-043 — DIRECTION-ROBUSTNESS validation of the MERGED ETH crown jewel
+        # (iter-034 pure-deterministic trend, OOS +0.41). The edge rests on ONE primitive: the
+        # 200-SMA trend-state direction on ETH's own close. Stress it: 041=SMA100 (faster),
+        # 042=SMA300 (slower), 043=SMA200 on BTC's regime (cross-asset). If the both-positive
+        # holds across these -> robust neighborhood (not a knife-edge); if it collapses ->
+        # the +0.41 is SMA-200-on-ETH-specific (temper baseline confidence). K-invariant.
+        import pyarrow.parquet as pq  # noqa: PLC0415
+
+        _robust_cfg = {
+            "v1-041": (100, "ETHUSDT"),
+            "v1-042": (300, "ETHUSDT"),
+            "v1-043": (200, "BTCUSDT"),
+        }
+        _rob_window, _rob_sym = _robust_cfg[iteration_label]
+        _spec_sym_rob = symbols[0]
+        _rob_parquet = Path("data/features") / f"{_spec_sym_rob}_8h_features.parquet"
+        _rob_ts_parquet = Path("data/features") / f"{_rob_sym}_8h_features.parquet"
+        assert _rob_parquet.exists() and _rob_ts_parquet.exists(), (
+            f"{iteration_label}: parquet missing ({_rob_parquet} or {_rob_ts_parquet})."
+        )
+        _parquet_cols = set(pq.ParquetFile(_rob_parquet).schema.names)
+        _missing = [c for c in V1_BTC_ITER009_FEATURES if c not in _parquet_cols]
+        assert not _missing, f"{iteration_label}: {len(_missing)} feature cols missing."
+        _spec_feature_columns = list(V1_BTC_ITER009_FEATURES)
+        _spec_label_mode = "fixed_horizon"
+        _spec_use_atr_labeling = False
+        _spec_label_timeout_minutes = 20160
+        _spec_atr_tp = 100.0
+        _spec_atr_sl = 1.45
+        _spec_execution_timeout_minutes = 20160
+        _spec_apply_r2 = True
+        _spec_r2_trigger_pct = 4.07
+        _spec_r2_scale_anchor_pct = 16.27
+        _spec_r2_scale_floor = 0.20
+        _spec_enable_trend_state_dir = True
+        _spec_trend_state_sma_window = _rob_window
+        _spec_trend_state_symbol = _rob_sym
+        _spec_enable_trend_strength_gate = True
+        _spec_trend_strength_atr_window = 14
+        _spec_trend_strength_quantile = 0.40
+        _spec_enable_metalabel = False
+        _spec_deterministic_entry_only = True
+        print(
+            f"[{iteration_label}] ETH crown-jewel DIRECTION-ROBUSTNESS: deterministic core with "
+            f"trend-state SMA={_rob_window} on {_rob_sym} (vs merged SMA=200 on ETH). Does iter-034 "
+            f"OOS +0.41 hold in the neighborhood? K-invariant (model bypassed)."
+        )
     elif iteration_label == "v1-021":
         # iter-v1/021 EXPLORATION — FUNDING-CONTRA-CROWD re-admission of gate-skipped chop.
         # CONFIG = the iter-020 MERGED stack (= iter-016 stack + trend-state DIR sma=200 +
