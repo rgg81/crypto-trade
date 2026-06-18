@@ -345,6 +345,10 @@ class MetaLabelingStrategy:
         reversion_z_threshold: float = 1.5,
         reversion_natr_quantile: float = 0.40,
         reversion_natr_col: str = "vol_natr_14",
+        # iter-v1/034: PURE-DETERMINISTIC entry, forwarded to M1's LightGbmStrategy for
+        # symmetry. Default False = strict NO-OP (iter-034 EXPLORATION keeps M2 OFF, so this
+        # M2 path is not exercised; threaded only so the param surface matches run_model).
+        deterministic_entry_only: bool = False,
         # iter-v1/028: M1 must run the SAME specialist bagging stack as the merged
         # iter-027 baseline (K independent Optuna studies via specialist_mode).
         # Defaults (specialist_mode=False) keep /030 bit-identical.
@@ -443,6 +447,8 @@ class MetaLabelingStrategy:
             reversion_z_threshold=reversion_z_threshold,
             reversion_natr_quantile=reversion_natr_quantile,
             reversion_natr_col=reversion_natr_col,
+            # iter-v1/034: PURE-DETERMINISTIC entry (default OFF; symmetry only).
+            deterministic_entry_only=deterministic_entry_only,
             # iter-v1/028: M1 runs the SAME specialist bagging stack as iter-027.
             specialist_mode=specialist_mode,
             specialist_seed_count=specialist_seed_count,

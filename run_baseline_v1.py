@@ -683,6 +683,7 @@ def run_model(
     reversion_z_threshold: float = 1.5,
     reversion_natr_quantile: float = 0.40,
     reversion_natr_col: str = "vol_natr_14",
+    deterministic_entry_only: bool = False,
 ):
     """Run a single v1 sub-model (A/C/D/E) under the corrected walk-forward.
 
@@ -879,6 +880,9 @@ def run_model(
         reversion_z_threshold=reversion_z_threshold,
         reversion_natr_quantile=reversion_natr_quantile,
         reversion_natr_col=reversion_natr_col,
+        # iter-v1/034: PURE-DETERMINISTIC entry — bypass the LightGBM entry decision.
+        # Default False = BIT-IDENTICAL to all prior single-symbol dispatches and v2/v3.
+        deterministic_entry_only=deterministic_entry_only,
     )
     t0 = time.time()
     results = run_backtest(config, strategy, yearly_pnl_check=False)
@@ -956,6 +960,9 @@ def run_meta_model(
     reversion_z_threshold: float = 1.5,
     reversion_natr_quantile: float = 0.40,
     reversion_natr_col: str = "vol_natr_14",
+    # iter-v1/034: PURE-DETERMINISTIC entry (threaded for symmetry; default OFF — iter-034
+    # EXPLORATION keeps M2 OFF so it takes the generic run_model path, not this one).
+    deterministic_entry_only: bool = False,
     # iter-v1/028: M2 distinct feature set + configurable veto threshold.
     m2_feature_columns: list[str] | None = None,
     m2_veto_threshold: float = 0.5,
@@ -1084,6 +1091,8 @@ def run_meta_model(
         trend_strength_quantile=trend_strength_quantile,
         # iter-v1/030: AGREE_SCALE conviction modulator (default OFF; symmetry only).
         enable_agreement_scale=enable_agreement_scale,
+        # iter-v1/034: PURE-DETERMINISTIC entry (default OFF; symmetry only).
+        deterministic_entry_only=deterministic_entry_only,
         # iter-v1/028: M1 specialist bagging stack (K independent Optuna studies).
         specialist_mode=specialist_mode,
         specialist_seed_count=specialist_seed_count,
@@ -3964,6 +3973,12 @@ def main() -> None:
     _spec_reversion_z_threshold: float = 1.5
     _spec_reversion_natr_quantile: float = 0.40
     _spec_reversion_natr_col: str = "vol_natr_14"
+    # iter-v1/034 PURE-DETERMINISTIC entry default. Strict NO-OP for /002-/033
+    # (byte-identical); the v1-034 ETH keyed block below flips it True. When True, the
+    # LightGBM specialist entry decision is BYPASSED — the conviction gate + trend-state
+    # direction alone decide entry/direction (model output unused → result is independent
+    # of K / n_trials). Threads through the generic run_model dispatch.
+    _spec_deterministic_entry_only: bool = False
     # iter-v1/028 META-LABELING (M2 precision filter) defaults. Strict NO-OP for
     # /002-/027 (byte-identical): when _spec_enable_metalabel=False the universal
     # routing guard dispatches via run_model() exactly as before.  The v1-028 keyed
@@ -5060,6 +5075,99 @@ def main() -> None:
             f"HIGH-RISK axis (new label + new direction primitive); single-seed EXPLORATION."
         )
 
+    elif iteration_label == "v1-034" and len(symbols) == 1 and symbols[0] == "ETHUSDT":
+        # iter-v1/034 EXPLORATION (ETHUSDT, single-symbol) — PURE-DETERMINISTIC trend:
+        # STRIP the overfit LightGBM ENTRY layer. The deepest campaign finding (iter-030
+        # forensic, briefs-v1/ETHUSDT/iteration_v1-030/review.md): the LightGBM
+        # ENTRY-TIMING/selection layer is OVERFIT — de-correlating from it LIFTED OOS. The
+        # deterministic core (200-SMA trend-state DIRECTION + conviction gate q=0.40) is what
+        # GENERALIZES (it is what merged at iter-020/027).
+        #
+        # THE ONE CHANGE vs the merged iter-027 stack: the ENTRY DECISION source changes
+        # from "LightGBM prediction" to "deterministic: enter whenever the conviction gate
+        # passes and we are flat, in the trend-state direction." Everything else is the
+        # iter-027 ETH stack EXACTLY. _spec_deterministic_entry_only=True bypasses the
+        # specialist predict_proba aggregation + the no-consensus skip in get_signal — the
+        # entry fires with a fixed unit signal and the trend-state override sets the SIGN.
+        #
+        # MODEL-INDEPENDENCE (load-bearing): with the entry decision bypassed, the model's
+        # output is UNUSED. The model still trains per month (so the specialist path is
+        # entered and R3 OOD stats are fit from training-window FEATURES) but the entry +
+        # direction are fully deterministic → the backtest result is INDEPENDENT of
+        # K (bagging) and n_trials. The orchestrator MAY launch with --bagging-k 1
+        # --n-trials 1 for speed without changing the result (only requirement: training
+        # succeeds so _specialist_models is non-empty).
+        #
+        # LOOK-AHEAD SAFETY: NO new data access. The conviction gate
+        # (|close[t-1]-SMA200[t-1]|/ATR14[t-1] >= per-month q40) and the trend-state
+        # direction (sign(close[t-1]-SMA200[t-1])) are ALREADY past-only look-ahead-tested
+        # (tests/test_trend_strength_lookahead.py + tests/test_trend_state_lookahead.py).
+        # iter-034 only changes WHETHER the model prediction is consulted for entry.
+        #
+        # RISK (brief §2.5): NORMAL-RISK — post-aggregator RULE-layer bypass; no new trained
+        # model, no new feature column, no label/universe/bar change; does NOT change
+        # Optuna's training-objective domain.
+        import pyarrow.parquet as pq  # noqa: PLC0415
+
+        _spec_sym_034 = symbols[0]
+        _iter034_parquet = Path("data/features") / f"{_spec_sym_034}_8h_features.parquet"
+        assert _iter034_parquet.exists(), (
+            f"iter-v1/034: feature parquet not found at {_iter034_parquet}. "
+            f"Re-fetch + regen {_spec_sym_034} 8h v1 features before running."
+        )
+        _parquet_cols = set(pq.ParquetFile(_iter034_parquet).schema.names)
+        _missing = [c for c in V1_BTC_ITER009_FEATURES if c not in _parquet_cols]
+        assert not _missing, (
+            f"iter-v1/034: {len(_missing)} of the 19 feature columns NOT in "
+            f"{_spec_sym_034} parquet — {_missing}."
+        )
+        assert len(V1_BTC_ITER009_FEATURES) == 19, (
+            "iter-v1/034: V1_BTC_ITER009_FEATURES must be the 19-col HYBRID stack."
+        )
+        # The trend-state direction + conviction gate need close/high/low on the trend-state
+        # symbol parquet (ETH's own).
+        _str_needed = {"close", "high", "low", "close_time"}
+        _str_missing = [c for c in _str_needed if c not in _parquet_cols]
+        assert not _str_missing, (
+            f"iter-v1/034: trend-state/conviction gate needs {_str_missing} on the "
+            f"{_spec_sym_034} parquet."
+        )
+        # M1 stack — BYTE-IDENTICAL to the v1-027 keyed block (M2 OFF).
+        _spec_feature_columns = list(V1_BTC_ITER009_FEATURES)  # == /027 (19-col HYBRID)
+        _spec_label_mode = "fixed_horizon"  # == /027
+        _spec_use_atr_labeling = False  # == /027
+        _spec_label_timeout_minutes = 20160  # 42 candles = 14d == /027
+        _spec_atr_tp = 100.0  # TP NON-BINDING (let winners run) == /027
+        _spec_atr_sl = 1.45  # protective stop == /027
+        _spec_execution_timeout_minutes = 20160  # 14d == /027
+        _spec_enable_trend_state_dir = True  # == /027 (DIRECTION override KEEPER; UNCHANGED)
+        _spec_trend_state_sma_window = 200  # == /027
+        _spec_trend_state_symbol = _spec_sym_034  # ETH's own trend == /027
+        _spec_enable_trend_strength_gate = True  # == /027 (conviction gate KEEPER)
+        _spec_trend_strength_atr_window = 14  # == /027
+        _spec_trend_strength_quantile = 0.40  # == /027
+        _spec_apply_r2 = True  # ETH-calibrated R2 == /027
+        _spec_r2_trigger_pct = 4.07  # == /027 (6.5% of 62.60)
+        _spec_r2_scale_anchor_pct = 16.27  # == /027 (26% of 62.60)
+        _spec_r2_scale_floor = 0.20  # == /027
+        _spec_enable_metalabel = False  # M2 OFF (generic run_model path; single-axis)
+        # --- NEW (the ONLY change vs /027): bypass the LightGBM entry decision ---
+        _spec_deterministic_entry_only = True
+        print(
+            f"[iter-v1/034] EXPLORATION ({_spec_sym_034}) — PURE-DETERMINISTIC trend (STRIP "
+            f"the overfit LightGBM ENTRY layer). SINGLE AXIS vs /027: the ENTRY DECISION "
+            f"source changes from LightGBM-prediction to DETERMINISTIC (enter on EVERY "
+            f"conviction-gated candle when flat, in the trend-state direction; model output "
+            f"IGNORED). Full iter-027 M1 stack (19-col HYBRID + fixed_horizon N=42(14d) "
+            f"let-winners-run atr_tp={_spec_atr_tp}/sl={_spec_atr_sl} + TREND-STATE DIR "
+            f"sma=200 symbol={_spec_trend_state_symbol} + conviction gate "
+            f"q={_spec_trend_strength_quantile} + ETH R2 brake (trig={_spec_r2_trigger_pct}/"
+            f"anch={_spec_r2_scale_anchor_pct}/floor={_spec_r2_scale_floor}) + R3=ON"
+            f"({BASELINE_OOD_CUTOFF_PCT}) R5/vt=0.3) PLUS deterministic_entry_only=ON "
+            f"(bypass predict_proba aggregation + no-consensus skip; model is UNUSED → result "
+            f"INDEPENDENT of K/n_trials). M2=OFF (single-axis). NORMAL-RISK; past-only."
+        )
+
     elif iteration_label == "v1-028":
         # iter-v1/028 META-LABELING (López de Prado AFML Ch.3) on ETH. The MERGED
         # iter-027 stack is the PRIMARY (M1) UNCHANGED; a SECONDARY (M2) LGBMClassifier
@@ -5375,6 +5483,9 @@ def main() -> None:
                 reversion_z_threshold=_spec_reversion_z_threshold,
                 reversion_natr_quantile=_spec_reversion_natr_quantile,
                 reversion_natr_col=_spec_reversion_natr_col,
+                # iter-v1/034: PURE-DETERMINISTIC entry (default OFF; symmetry only —
+                # iter-034 EXPLORATION keeps M2 OFF so this path is not exercised).
+                deterministic_entry_only=_spec_deterministic_entry_only,
                 # M2 layer: distinct positioning feature set + configurable veto.
                 m2_feature_columns=_spec_m2_feature_columns,
                 m2_veto_threshold=_spec_m2_veto_threshold,
@@ -5460,6 +5571,11 @@ def main() -> None:
                 reversion_z_threshold=_spec_reversion_z_threshold,
                 reversion_natr_quantile=_spec_reversion_natr_quantile,
                 reversion_natr_col=_spec_reversion_natr_col,
+                # iter-v1/034: PURE-DETERMINISTIC entry. Default (False) keeps ALL other
+                # single-symbol iterations (iter-002→033) BIT-IDENTICAL; the v1-034 ETH
+                # keyed block sets _spec_deterministic_entry_only=True (bypass the model
+                # entry decision; conviction gate + trend-state direction decide entry).
+                deterministic_entry_only=_spec_deterministic_entry_only,
             )
 
         # Cohort isolation sanity: assert ONLY the target symbol's trades emitted.

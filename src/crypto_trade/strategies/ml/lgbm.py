@@ -392,6 +392,26 @@ class LightGbmStrategy:
         reversion_z_threshold: float = 1.5,  # |price_z[t-1]| overextension trigger
         reversion_natr_quantile: float = 0.40,  # past-only natr q-quantile (high-vol gate)
         reversion_natr_col: str = "vol_natr_14",  # parquet natr feature column (ATR14/close)
+        # iter-v1/034: PURE-DETERMINISTIC entry (RULE-layer, NORMAL-RISK). When True, the
+        # LightGBM specialist's ENTRY DECISION is BYPASSED in the SPECIALIST path: instead of
+        # aggregating per-seed predict_proba into _final_signed (and skipping on
+        # no-consensus), the entry fires with a FIXED unit signal (_final_signed = +100,
+        # _ensemble_std = 0). The PROVISIONAL +1 sign is then OVERRIDDEN by the deterministic
+        # past-only trend-state direction (enable_trend_state_dir; conservative-fire +1 on
+        # warmup) and the entry is GATED by the past-only conviction gate
+        # (enable_trend_strength_gate). Net effect: enter on EVERY conviction-gated candle
+        # (when flat) in the trend-state direction, with the model's prediction IGNORED.
+        # The model still trains per month (its output is just unused) — so the entry
+        # decision is INDEPENDENT of K / n_trials / model quality, provided training
+        # succeeds (non-empty _specialist_models). Adds NO new data access: the conviction
+        # gate + trend-state direction are ALREADY past-only look-ahead-tested. R3 OOD is
+        # unaffected (it is fit from training-window FEATURES, not model output). Default
+        # False = BIT-IDENTICAL to all prior single-symbol dispatches (iter-002→033) and
+        # v2/v3. ONLY enabled in the iter-v1/034 ETH specialist cell (deepest-finding test:
+        # the LightGBM entry-timing/selection layer is OVERFIT — iter-030 forensic — and the
+        # deterministic core 200-SMA trend-state DIRECTION + conviction gate q=0.40 is what
+        # generalizes; this iteration strips the model entry layer entirely).
+        deterministic_entry_only: bool = False,
     ) -> None:
         if not feature_columns:
             raise ValueError(
@@ -689,6 +709,10 @@ class LightGbmStrategy:
         # None until the first month with >= 50 finite training-window rows → gate ABSTAINS
         # this month (CONSERVATIVE: a reversion edge with no calibrated vol floor is undefined).
         self._reversion_natr_thr: float | None = None
+        # iter-v1/034: PURE-DETERMINISTIC entry — bypass the LightGBM specialist entry
+        # decision. Enabled via deterministic_entry_only=True (ETH specialist cell only;
+        # /034 dispatch). Default-off keeps every existing run BYTE-IDENTICAL.
+        self._deterministic_entry_only: bool = bool(deterministic_entry_only)
         # iter-v3/072: labeling mode — "triple_barrier" (default, backward-compat)
         # or "fixed_horizon" (sign of N-candle-forward return; no barriers).
         # iter-v3/105: "trend_scanning" (OLS trend, max-|t| horizon selection
@@ -3116,56 +3140,71 @@ class LightGbmStrategy:
                         )
                         return NO_SIGNAL
 
-            ternary_sp = self.neutral_threshold_pct is not None
-            _signed_weights: list[float] = []
-            for _sp_model, _sp_cols, _sp_ct in self._specialist_models:
-                # Re-build feat_df with this seed's selected columns (may differ).
-                if _sp_cols != self._selected_cols:
-                    # Select this seed's columns BY NAME from feat_row (which is aligned
-                    # to self._selected_cols) — a positional slice would silently feed
-                    # WRONG features if a seed's column set ever differs. .index() raises
-                    # loudly if a column is absent (fail-fast over silent garbage).
-                    _sp_col_idx = [self._selected_cols.index(_c) for _c in _sp_cols]
-                    _feat_df_i = pd.DataFrame(
-                        feat_row.reshape(1, -1)[:, _sp_col_idx],
-                        columns=_sp_cols,
+            if self._deterministic_entry_only:
+                # iter-v1/034: PURE-DETERMINISTIC entry — the LightGBM specialist ENTRY
+                # DECISION is BYPASSED. We do NOT call predict_proba / aggregate seeds /
+                # apply the no-consensus skip. Instead the entry fires with a FIXED unit
+                # signal: _final_signed = +100 (provisional +1 sign; OVERRIDDEN below by the
+                # deterministic trend-state direction), _ensemble_std = 0. The conviction
+                # gate (enable_trend_strength_gate) downstream decides WHETHER the trade
+                # fires; the trend-state override (enable_trend_state_dir) sets the SIGN. The
+                # model still trained this month (the _specialist_models guard above ensured
+                # the specialist path is entered) but its prediction is UNUSED — so the
+                # entry decision is INDEPENDENT of K / n_trials / model quality. R3 OOD
+                # (above) is unaffected (fit from training-window FEATURES, not predictions).
+                _final_signed = 100.0
+                _ensemble_std = 0.0
+            else:
+                ternary_sp = self.neutral_threshold_pct is not None
+                _signed_weights: list[float] = []
+                for _sp_model, _sp_cols, _sp_ct in self._specialist_models:
+                    # Re-build feat_df with this seed's selected columns (may differ).
+                    if _sp_cols != self._selected_cols:
+                        # Select this seed's columns BY NAME from feat_row (which is aligned
+                        # to self._selected_cols) — a positional slice would silently feed
+                        # WRONG features if a seed's column set ever differs. .index() raises
+                        # loudly if a column is absent (fail-fast over silent garbage).
+                        _sp_col_idx = [self._selected_cols.index(_c) for _c in _sp_cols]
+                        _feat_df_i = pd.DataFrame(
+                            feat_row.reshape(1, -1)[:, _sp_col_idx],
+                            columns=_sp_cols,
+                        )
+                    else:
+                        _feat_df_i = feat_df_sp
+                    _proba_i = _sp_model.predict_proba(_feat_df_i)[0]
+                    if ternary_sp:
+                        _conf_i = max(float(_proba_i[0]), float(_proba_i[2]))
+                        _dir_i = 1 if float(_proba_i[2]) >= float(_proba_i[0]) else -1
+                    else:
+                        _conf_i = float(max(_proba_i))
+                        _dir_i = int(classes_to_labels(np.array([int(np.argmax(_proba_i))]))[0])
+                    _weight_i = 100 if _conf_i > _sp_ct else 0
+                    _signed_weights.append(float(_dir_i) * float(_weight_i))
+
+                _final_signed = float(np.mean(_signed_weights)) if _signed_weights else 0.0
+                # iter-v1/063: per-candle ensemble dispersion (population std of signed_weights).
+                # Computed regardless of whether the signal fires — useful for diagnosing
+                # no-consensus candles too.  Appended to dispersion stats only when signal
+                # fires (below) to avoid polluting the diagnostic with skipped candles.
+                _ensemble_std = float(np.std(_signed_weights)) if len(_signed_weights) > 1 else 0.0
+
+                if abs(_final_signed) < 1e-9:
+                    # All seeds voted 0 (below threshold) or perfectly cancelled.
+                    from crypto_trade import decision_log
+
+                    decision_log.log(
+                        {
+                            "kind": "lgbm_signal",
+                            "symbol": symbol,
+                            "ot": open_time,
+                            "month": candle_month,
+                            "specialist_seeds": len(self._specialist_models),
+                            "final_signed": _final_signed,
+                            "ensemble_std": _ensemble_std,
+                            "decision": "skipped:specialist_no_consensus",
+                        }
                     )
-                else:
-                    _feat_df_i = feat_df_sp
-                _proba_i = _sp_model.predict_proba(_feat_df_i)[0]
-                if ternary_sp:
-                    _conf_i = max(float(_proba_i[0]), float(_proba_i[2]))
-                    _dir_i = 1 if float(_proba_i[2]) >= float(_proba_i[0]) else -1
-                else:
-                    _conf_i = float(max(_proba_i))
-                    _dir_i = int(classes_to_labels(np.array([int(np.argmax(_proba_i))]))[0])
-                _weight_i = 100 if _conf_i > _sp_ct else 0
-                _signed_weights.append(float(_dir_i) * float(_weight_i))
-
-            _final_signed = float(np.mean(_signed_weights)) if _signed_weights else 0.0
-            # iter-v1/063: per-candle ensemble dispersion (population std of signed_weights).
-            # Computed regardless of whether the signal fires — useful for diagnosing
-            # no-consensus candles too.  Appended to dispersion stats only when signal
-            # fires (below) to avoid polluting the diagnostic with skipped candles.
-            _ensemble_std = float(np.std(_signed_weights)) if len(_signed_weights) > 1 else 0.0
-
-            if abs(_final_signed) < 1e-9:
-                # All seeds voted 0 (below threshold) or perfectly cancelled.
-                from crypto_trade import decision_log
-
-                decision_log.log(
-                    {
-                        "kind": "lgbm_signal",
-                        "symbol": symbol,
-                        "ot": open_time,
-                        "month": candle_month,
-                        "specialist_seeds": len(self._specialist_models),
-                        "final_signed": _final_signed,
-                        "ensemble_std": _ensemble_std,
-                        "decision": "skipped:specialist_no_consensus",
-                    }
-                )
-                return NO_SIGNAL
+                    return NO_SIGNAL
 
             _sp_direction = 1 if _final_signed > 0 else -1
             _sp_weight = int(round(abs(_final_signed)))
