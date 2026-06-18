@@ -107,7 +107,7 @@ def score(name: str, trades_by_coin: dict[str, pd.DataFrame], coins: list[str]) 
         else "FAILS gauntlet (indistinguishable from luck / coin-flip)"
     )
     print(f"\n================ ANTI-HYPE SCORECARD: {name} ================")
-    print(f"1. BREADTH  : {n_pos}/{n} coins OOS-positive  (binomial p vs coin-flip {p_breadth:.3f})")
+    print(f"1. BREADTH  : {n_pos}/{n} coins OOS+  (binomial p vs coin-flip {p_breadth:.3f})")
     print(f"2. POOLED   : N={npool} trades  mean={mu*100:+.3f}%  t-stat={tstat:+.2f}  "
           f"trade-Sharpe={trade_sharpe:+.3f}")
     print(f"3. NULL     : real trade-Sharpe={real_sh:+.3f}  vs direction-shuffle null "
