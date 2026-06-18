@@ -1,0 +1,62 @@
+================================================================================================
+iter-v1/032 ETHUSDT — WINNER ROBUSTNESS + crypto-mechanism probes
+================================================================================================
+
+[1] Sub-period robustness — trendSMA100, N=6 (the breadth winner)
+  FULL IS: events=818 win=0.490 sharpe=+0.6299 net=+239.9% raw_dir_acc=0.520
+  year | events | sharpe | net% 
+   2020  |   157  | +0.796 | +66.9
+   2021  |   157  | +1.639 | +159.3
+   2022  |   156  | +0.611 | +42.5
+   2023  |   157  | +0.202 | +8.3
+   2024  |   156  | -1.371 | -83.2
+   2025  |    35  | +3.363 | +46.1
+
+[2] Hold-horizon plateau — trendSMA100, N in 3..12
+   N | events | win | sharpe | net% | mean_pct
+   3 |  1431 | 0.461 | +0.0917 | +33.3 | +0.023
+   4 |  1145 | 0.450 | -0.4740 | -182.3 | -0.159
+   5 |   954 | 0.472 | +0.1691 | +66.2 | +0.069
+   6 |   818 | 0.490 | +0.6299 | +239.9 | +0.293
+   7 |   715 | 0.471 | +0.1045 | +40.7 | +0.057
+   8 |   636 | 0.481 | +0.0718 | +30.2 | +0.047
+   9 |   572 | 0.472 | +0.2425 | +98.9 | +0.173
+  10 |   520 | 0.483 | +0.0792 | +30.0 | +0.058
+  12 |   440 | 0.482 | +0.3695 | +146.2 | +0.332
+
+[2b] SMA-window sweep at N=6 (50,75,100,150,200)
+   W | events | win | sharpe | net%
+   50 |   818 | 0.468 | +0.1094 | +41.8
+   75 |   818 | 0.469 | +0.1977 | +75.5
+  100 |   818 | 0.490 | +0.6299 | +239.9
+  150 |   818 | 0.482 | +0.1222 | +46.7
+  200 |   818 | 0.476 | -0.0648 | -24.8
+
+[3] Conviction-gate transplant — trendSMA100_N6, gate |dist|/ATR14 >= q-quantile
+   q | thresh | events | win | sharpe | net%
+  0.00 |   -inf |   803 | 0.492 | +0.4331 | +165.5
+  0.20 |   1.18 |   707 | 0.494 | +0.7996 | +300.2
+  0.40 |   2.24 |   570 | 0.488 | +0.2158 | +72.9
+  0.50 |   2.74 |   488 | 0.500 | +0.3429 | +103.9
+  0.60 |   3.37 |   396 | 0.513 | +0.3624 | +102.8
+
+[4] FUNDING direction test — FOLLOW (+sign) vs FADE (-sign), N=6, |fz30|>=k
+   mode | k | events | win | sharpe | net% | raw_dir_acc
+  FOLLOW | 0.5 |   656 | 0.463 | -0.6073 | -214.1 | 0.494
+  FADE   | 0.5 |   656 | 0.479 | -0.2860 | -100.8 | 0.506
+  FOLLOW | 1.0 |   467 | 0.458 | -0.4691 | -135.1 | 0.490
+  FADE   | 1.0 |   467 | 0.484 | -0.3095 | -89.1 | 0.510
+  FOLLOW | 1.5 |   321 | 0.514 | +0.0039 | +0.9 | 0.536
+  FADE   | 1.5 |   321 | 0.430 | -0.6324 | -155.0 | 0.464
+
+[5] FUNDING-CONFIRMED faster-trend — trendSMA100_N6 traded ONLY when funding agrees
+    (direction = trend-state; entry only if sign(fz30) == trend-state sign)
+   k | events | win | sharpe | net% | (vs unfiltered sharpe +0.63)
+  0.0 |   594 | 0.466 | -0.4919 | -171.3
+  0.5 |   493 | 0.473 | -0.3103 | -94.3
+  1.0 |   350 | 0.480 | -0.0843 | -21.9
+
+[6] Event spread of winner (trendSMA100_N6) — monthly distribution
+   active months: 63/63  events/mo mean=13.0 max=14 min=9
+   monthly net: 30/63 positive  best=+68.8% worst=-43.9%
+   top-2 trade share (gross) = 0.0196 (iter-027 IS ~0.073 / OOS ~0.44 — winner is FAR more diffuse)

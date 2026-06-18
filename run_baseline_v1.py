@@ -677,6 +677,12 @@ def run_model(
     funding_contra_col: str = "funding_rate_zscore_30",
     funding_contra_quantile: float = 0.50,
     enable_agreement_scale: bool = False,
+    enable_reversion_dir: bool = False,
+    reversion_z_window: int = 10,
+    enable_reversion_trigger_gate: bool = False,
+    reversion_z_threshold: float = 1.5,
+    reversion_natr_quantile: float = 0.40,
+    reversion_natr_col: str = "vol_natr_14",
 ):
     """Run a single v1 sub-model (A/C/D/E) under the corrected walk-forward.
 
@@ -865,6 +871,14 @@ def run_model(
         # iter-v1/030: AGREE_SCALE multi-speed agreement conviction modulator. Default
         # False = BIT-IDENTICAL to all prior single-symbol dispatches (iter-016→029) and v2/v3.
         enable_agreement_scale=enable_agreement_scale,
+        # iter-v1/032: SHORT-HORIZON MEAN-REVERSION direction override + vol-regime gate.
+        # Default False = BIT-IDENTICAL to all prior single-symbol dispatches and v2/v3.
+        enable_reversion_dir=enable_reversion_dir,
+        reversion_z_window=reversion_z_window,
+        enable_reversion_trigger_gate=enable_reversion_trigger_gate,
+        reversion_z_threshold=reversion_z_threshold,
+        reversion_natr_quantile=reversion_natr_quantile,
+        reversion_natr_col=reversion_natr_col,
     )
     t0 = time.time()
     results = run_backtest(config, strategy, yearly_pnl_check=False)
@@ -933,6 +947,15 @@ def run_meta_model(
     # iter-v1/030: AGREE_SCALE conviction modulator (threaded for symmetry; default OFF —
     # iter-030 EXPLORATION keeps M2 OFF so it takes the generic run_model path, not this one).
     enable_agreement_scale: bool = False,
+    # iter-v1/032: SHORT-HORIZON MEAN-REVERSION direction override + vol-regime gate (threaded
+    # for symmetry; default OFF — iter-032 EXPLORATION keeps M2 OFF so it takes the generic
+    # run_model path, not this one).
+    enable_reversion_dir: bool = False,
+    reversion_z_window: int = 10,
+    enable_reversion_trigger_gate: bool = False,
+    reversion_z_threshold: float = 1.5,
+    reversion_natr_quantile: float = 0.40,
+    reversion_natr_col: str = "vol_natr_14",
     # iter-v1/028: M2 distinct feature set + configurable veto threshold.
     m2_feature_columns: list[str] | None = None,
     m2_veto_threshold: float = 0.5,
@@ -3930,6 +3953,17 @@ def main() -> None:
     # PINNED single-axis P3 panel (windows hardcoded in lgbm.compute_features); the panel
     # name is documentation-only (V1_ITER030_AGREE_PANEL).
     _spec_enable_agreement_scale: bool = False
+    # iter-v1/032 SHORT-HORIZON MEAN-REVERSION direction override + vol-regime gate defaults.
+    # Strict NO-OP for /002-/031 (byte-identical); the v1-032 ETH keyed block below flips
+    # enable_reversion_dir + enable_reversion_trigger_gate True. The reversion DIRECTION
+    # (-sign(price_z)) reuses the trend_state_symbol parquet's close; the vol gate uses the
+    # natr column (vol_natr_14). These thread through the generic run_model dispatch.
+    _spec_enable_reversion_dir: bool = False
+    _spec_reversion_z_window: int = 10
+    _spec_enable_reversion_trigger_gate: bool = False
+    _spec_reversion_z_threshold: float = 1.5
+    _spec_reversion_natr_quantile: float = 0.40
+    _spec_reversion_natr_col: str = "vol_natr_14"
     # iter-v1/028 META-LABELING (M2 precision filter) defaults. Strict NO-OP for
     # /002-/027 (byte-identical): when _spec_enable_metalabel=False the universal
     # routing guard dispatches via run_model() exactly as before.  The v1-028 keyed
@@ -4931,6 +4965,101 @@ def main() -> None:
             f"past-only; DIRECTION sign UNCHANGED). M2=OFF (single-axis)."
         )
 
+    elif iteration_label == "v1-032" and len(symbols) == 1 and symbols[0] == "ETHUSDT":
+        # iter-v1/032 EXPLORATION (ETHUSDT, single-symbol) — a genuinely NEW deterministic
+        # SHORT-HORIZON MEAN-REVERSION edge. This REPLACES the iter-027 trend-state direction
+        # with a REVERSION fade direction and uses a SHORT (16h = N=2 candle) hold, reusing
+        # the proven architecture (deterministic direction override + LightGBM head for
+        # timing/sizing/abstention), analogous to the iter-026/027 trend-state wiring.
+        #
+        # THE EDGE (brief §1):
+        #   price_z[t-1] = (close[t-1] - SMA10[t-1]) / std10[t-1]   (past-only, ETH's own close)
+        #   DIRECTION    = -sign(price_z[t-1])                      (FADE the overextension)
+        #   ENTRY GATE   = |price_z[t-1]| >= 1.5  AND  natr[t-1] >= q40  (high-vol exhaustion)
+        #   CONSERVATIVE = ABSTAIN (skip) when undefined — OPPOSITE of the trend-strength gate.
+        # The LightGBM head does abstention/sizing ONLY; the SIGN is rule-replaced (cannot be
+        # overfit by a freely-learned entry). The trend-state DIRECTION + the trend-strength
+        # CONVICTION gate are BOTH OFF (mutually exclusive with the reversion edge this iter).
+        #
+        # LABEL (NEW): fixed_horizon N=2 candles = 16h. atr_tp=100 NON-BINDING → the 16h
+        # timeout binds (a reversion edge exits on TIME, not on a profit target);
+        # atr_sl=1.45 keeps the ETH-calibrated protective stop (a reversion trade against a
+        # continuing move must be cut). Short hold caps cost-bleed + prevents drift into trend.
+        #
+        # LOOK-AHEAD SAFETY (load-bearing): _compute_reversion_state mirrors _compute_trend_state
+        # EXACTLY (searchsorted past-only close[t-1]); the vol gate uses an open_time-keyed
+        # natr[t-1] (`.shift(1)`) index + a past-only per-month q40 threshold (same machinery as
+        # the iter-018 trend-strength gate). See tests/test_reversion_state_lookahead.py.
+        #
+        # RISK (brief §2.5): HIGH-RISK axis (new label + new direction primitive). Single-seed
+        # EXPLORATION first (v1 OPT-IN rule); if both-positive survives, the CONFIRMATION does
+        # the K=20 bagging validation. Sacred constants intact (OOS_CUTOFF / training_months /
+        # 5-seed inner — bagging governs single-symbol). R2 ETH-calibrated ON, R3=0.70, R5 vt=0.3.
+        import pyarrow.parquet as pq  # noqa: PLC0415
+
+        _spec_sym_032 = symbols[0]
+        _iter032_parquet = Path("data/features") / f"{_spec_sym_032}_8h_features.parquet"
+        assert _iter032_parquet.exists(), (
+            f"iter-v1/032: feature parquet not found at {_iter032_parquet}. "
+            f"Re-fetch + regen {_spec_sym_032} 8h v1 features before running."
+        )
+        _parquet_cols = set(pq.ParquetFile(_iter032_parquet).schema.names)
+        _missing = [c for c in V1_BTC_ITER009_FEATURES if c not in _parquet_cols]
+        assert not _missing, (
+            f"iter-v1/032: {len(_missing)} of the 19 feature columns NOT in "
+            f"{_spec_sym_032} parquet — {_missing}."
+        )
+        assert len(V1_BTC_ITER009_FEATURES) == 19, (
+            "iter-v1/032: V1_BTC_ITER009_FEATURES must be the 19-col HYBRID stack."
+        )
+        # The reversion DIRECTION needs close/close_time and the vol gate needs the natr
+        # column on the reversion (== traded) symbol parquet.
+        _rev_needed = {"close", "close_time", "open_time", "vol_natr_14"}
+        _rev_missing = [c for c in _rev_needed if c not in _parquet_cols]
+        assert not _rev_missing, (
+            f"iter-v1/032: reversion edge needs {_rev_missing} on the {_spec_sym_032} parquet."
+        )
+        _spec_feature_columns = list(V1_BTC_ITER009_FEATURES)  # 19-col HYBRID (head sizing only)
+        # NEW label: fixed_horizon N=2 candles = 16h.
+        _spec_label_mode = "fixed_horizon"
+        _spec_use_atr_labeling = False
+        _spec_label_timeout_minutes = 960  # N=2 candles × 8h = 16h (TRAINING label)
+        _spec_execution_timeout_minutes = 960  # 16h (binding exit — reversion exits on time)
+        _spec_atr_tp = 100.0  # NON-BINDING → the 16h timeout binds
+        _spec_atr_sl = 1.45  # ETH-calibrated protective stop (== /027)
+        # NEW direction: reversion fade. Trend-state direction + conviction gate OFF.
+        _spec_enable_trend_state_dir = False  # this edge does NOT use the trend direction
+        _spec_enable_trend_strength_gate = False  # replaced by the reversion trigger gate
+        _spec_trend_state_symbol = _spec_sym_032  # reuse for the parquet path (ETH's own close)
+        _spec_enable_reversion_dir = True
+        _spec_reversion_z_window = 10
+        _spec_enable_reversion_trigger_gate = True  # ON when enable_reversion_dir=True
+        _spec_reversion_z_threshold = 1.5
+        _spec_reversion_natr_quantile = 0.40
+        _spec_reversion_natr_col = "vol_natr_14"
+        # Risk: R2 ETH-calibrated ON (== /027), R3=0.70 + R5 vt=0.3 (universal dispatch
+        # defaults), R1 OFF, M2 OFF (generic run_model path; single-axis).
+        _spec_apply_r2 = True
+        _spec_r2_trigger_pct = 4.07  # == /027 (6.5% of iter-026 IS maxDD 62.60)
+        _spec_r2_scale_anchor_pct = 16.27  # == /027 (26% of 62.60)
+        _spec_r2_scale_floor = 0.20  # == /027
+        _spec_enable_metalabel = False  # M2 OFF (generic run_model path; single-axis)
+        print(
+            f"[iter-v1/032] EXPLORATION ({_spec_sym_032}) — NEW deterministic SHORT-HORIZON "
+            f"MEAN-REVERSION edge. REPLACES the trend-state direction with a REVERSION FADE: "
+            f"dir = -sign(price_z[t-1]) where price_z = (close[t-1]-SMA{_spec_reversion_z_window}"
+            f"[t-1])/std{_spec_reversion_z_window}[t-1] (past-only, ETH's own close). ENTRY GATE: "
+            f"|price_z| >= {_spec_reversion_z_threshold} AND natr[t-1] >= q"
+            f"{int(_spec_reversion_natr_quantile * 100)} (past-only per-month; high-vol "
+            f"exhaustion regime); CONSERVATIVE = ABSTAIN. SHORT hold: fixed_horizon N=2 (16h), "
+            f"atr_tp={_spec_atr_tp} NON-BINDING (16h timeout binds) / atr_sl={_spec_atr_sl}. "
+            f"19-col HYBRID head (abstention/sizing ONLY). TREND-STATE DIR + conviction gate OFF. "
+            f"R2 ETH-calibrated brake (trig={_spec_r2_trigger_pct}/anch="
+            f"{_spec_r2_scale_anchor_pct}/floor={_spec_r2_scale_floor}) + R3=ON"
+            f"({BASELINE_OOD_CUTOFF_PCT}) R5/vt=0.3. M2=OFF (single-axis; generic run_model). "
+            f"HIGH-RISK axis (new label + new direction primitive); single-seed EXPLORATION."
+        )
+
     elif iteration_label == "v1-028":
         # iter-v1/028 META-LABELING (López de Prado AFML Ch.3) on ETH. The MERGED
         # iter-027 stack is the PRIMARY (M1) UNCHANGED; a SECONDARY (M2) LGBMClassifier
@@ -5165,6 +5294,8 @@ def main() -> None:
             or _spec_enable_trend_state_dir
             or _spec_enable_funding_contra_readmit
             or _spec_enable_agreement_scale  # iter-v1/030: persist AGREE_SCALE skip attribution
+            or _spec_enable_reversion_dir  # iter-v1/032: persist reversion override attribution
+            or _spec_enable_reversion_trigger_gate  # iter-v1/032: persist reversion gate skips
         ):
             _dl_spec_path = (
                 Path(reports_dir) / f"iteration_{iteration_label}" / "decision_log.jsonl"
@@ -5236,6 +5367,14 @@ def main() -> None:
                 # iter-v1/030: AGREE_SCALE conviction modulator (default OFF; symmetry only —
                 # iter-030 EXPLORATION keeps M2 OFF so this path is not exercised).
                 enable_agreement_scale=_spec_enable_agreement_scale,
+                # iter-v1/032: SHORT-HORIZON MEAN-REVERSION override + gate (default OFF;
+                # symmetry only — iter-032 EXPLORATION keeps M2 OFF so this path is not exercised).
+                enable_reversion_dir=_spec_enable_reversion_dir,
+                reversion_z_window=_spec_reversion_z_window,
+                enable_reversion_trigger_gate=_spec_enable_reversion_trigger_gate,
+                reversion_z_threshold=_spec_reversion_z_threshold,
+                reversion_natr_quantile=_spec_reversion_natr_quantile,
+                reversion_natr_col=_spec_reversion_natr_col,
                 # M2 layer: distinct positioning feature set + configurable veto.
                 m2_feature_columns=_spec_m2_feature_columns,
                 m2_veto_threshold=_spec_m2_veto_threshold,
@@ -5311,6 +5450,16 @@ def main() -> None:
                 # other single-symbol iterations (iter-016→029) BIT-IDENTICAL; the v1-030 ETH
                 # keyed block sets _spec_enable_agreement_scale=True.
                 enable_agreement_scale=_spec_enable_agreement_scale,
+                # iter-v1/032: SHORT-HORIZON MEAN-REVERSION direction override + vol-regime
+                # gate. Defaults (False) keep ALL other single-symbol iterations
+                # (iter-002→031) BIT-IDENTICAL; the v1-032 ETH keyed block sets
+                # _spec_enable_reversion_dir + _spec_enable_reversion_trigger_gate=True.
+                enable_reversion_dir=_spec_enable_reversion_dir,
+                reversion_z_window=_spec_reversion_z_window,
+                enable_reversion_trigger_gate=_spec_enable_reversion_trigger_gate,
+                reversion_z_threshold=_spec_reversion_z_threshold,
+                reversion_natr_quantile=_spec_reversion_natr_quantile,
+                reversion_natr_col=_spec_reversion_natr_col,
             )
 
         # Cohort isolation sanity: assert ONLY the target symbol's trades emitted.

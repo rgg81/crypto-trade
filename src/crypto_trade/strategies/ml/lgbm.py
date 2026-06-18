@@ -359,6 +359,39 @@ class LightGbmStrategy:
         enable_funding_contra_readmit: bool = False,
         funding_contra_col: str = "funding_rate_zscore_30",  # the parquet funding feature col
         funding_contra_quantile: float = 0.50,  # past-only |funding| q-quantile threshold
+        # iter-v1/032: SHORT-HORIZON MEAN-REVERSION direction primitive (RULE-layer,
+        # HIGH-RISK axis at the brief level but a post-aggregator deterministic override at
+        # the code level — does NOT change the Optuna training-objective domain). Mirrors
+        # the iter-016 trend-state direction override EXACTLY (same searchsorted past-only
+        # close[t-1] lookup) but the SIGN is the REVERSION fade:
+        #   price_z[t-1] = (close[t-1] - SMA_W(close)[t-1]) / rolling_std_W(close)[t-1]
+        #   dir          = -sign(price_z[t-1])   # short the up-stretch, long the down-stretch
+        # SMA_W / std_W are the simple mean / sample-std (ddof=1, matching pandas
+        # rolling(W).std()) of the W closes ENDING at t-1 (closes of candles t-W .. t-1),
+        # every primitive `.shift(1)`-lagged so NO data at or after the decision candle is
+        # read. Returns None on warmup (< W closes) or std==0 → CONSERVATIVE fall-back to
+        # the model sign (same contract as the trend-state override). Default False =
+        # BIT-IDENTICAL to all prior runs (iter-016→031) and v2/v3. ONLY enabled in the
+        # iter-v1/032 ETH specialist cell. The reversion DIRECTION reuses the same
+        # trend_state_symbol parquet's close (trend_state_symbol must be the traded symbol).
+        enable_reversion_dir: bool = False,
+        reversion_z_window: int = 10,  # SMA/std window for price_z (10 candles ~ 3.3d)
+        # iter-v1/032: REVERSION TRIGGER + VOL-REGIME entry gate (RULE-layer). When True
+        # (paired with enable_reversion_dir), ABSTAIN (skip the entry) unless BOTH:
+        #   |price_z[t-1]| >= reversion_z_threshold        (overextension trigger)
+        #   natr[t-1]      >= past-only per-month q-quantile (high-vol exhaustion regime)
+        # where natr[t-1] = reversion_natr_col[t-1] (`.shift(1)` over the parquet column;
+        # default vol_natr_14 = ATR14/close). The per-month natr threshold mirrors the
+        # iter-018 trend-strength gate's per-month np.quantile(_tw, q) machinery EXACTLY
+        # but on the natr series. CRITICAL — the CONSERVATIVE behavior is ABSTAIN (skip),
+        # the OPPOSITE of the trend-strength gate's conservative-FIRE: a reversion trade
+        # with no valid price_z (warmup/std==0) or NaN/missing natr (warmup) or a None
+        # month-threshold is UNDEFINED, so it must NOT enter. Default False = BIT-IDENTICAL
+        # to all prior runs and v2/v3. ONLY enabled in the iter-v1/032 ETH specialist cell.
+        enable_reversion_trigger_gate: bool = False,
+        reversion_z_threshold: float = 1.5,  # |price_z[t-1]| overextension trigger
+        reversion_natr_quantile: float = 0.40,  # past-only natr q-quantile (high-vol gate)
+        reversion_natr_col: str = "vol_natr_14",  # parquet natr feature column (ATR14/close)
     ) -> None:
         if not feature_columns:
             raise ValueError(
@@ -627,6 +660,35 @@ class LightGbmStrategy:
         # training-window |funding_z30[t-1]| rows (mirrors the trend-strength threshold).
         # None until the first month with >= 50 finite training-window rows.
         self._funding_contra_thr: float | None = None
+        # iter-v1/032: SHORT-HORIZON MEAN-REVERSION direction override + entry gate.
+        # Enabled via enable_reversion_dir=True (ETH specialist cell only; /032 dispatch).
+        # The reversion DIRECTION (= -sign(price_z[t-1])) reuses the trend_state_symbol
+        # parquet's close (the searchsorted past-only close index, same machinery as the
+        # /016 trend-state override + /092 BTC-regime-kill close index). The TRIGGER + vol
+        # gate (|price_z| >= z_threshold AND natr[t-1] >= per-month q-quantile) reuse the
+        # SAME reversion close index (for price_z) plus a separate (open_time, natr[t-1])
+        # index (for the vol gate). Default-off keeps every existing run BYTE-IDENTICAL.
+        self._enable_reversion_dir: bool = bool(enable_reversion_dir)
+        self._reversion_z_window: int = int(reversion_z_window)
+        self._enable_reversion_trigger_gate: bool = bool(enable_reversion_trigger_gate)
+        self._reversion_z_threshold: float = float(reversion_z_threshold)
+        self._reversion_natr_quantile: float = float(reversion_natr_quantile)
+        self._reversion_natr_col: str = str(reversion_natr_col)
+        # Sorted (close_time_ms, close) index for the reversion symbol; built in
+        # compute_features() when enable_reversion_dir=True. Same structure as the
+        # trend-state close index — used for BOTH the direction (-sign(price_z)) AND the
+        # trigger magnitude (|price_z|). None when the override is disabled / not loaded.
+        self._reversion_close_idx: tuple[np.ndarray, np.ndarray] | None = None
+        # Sorted (open_time_ms, natr[t-1]) index for the vol-regime gate; built in
+        # compute_features() when enable_reversion_trigger_gate=True from the
+        # trend_state_symbol parquet's reversion_natr_col, lagged ONE bar (`.shift(1)`)
+        # so row t reads natr[t-1] (past-only). None until built / when the gate is off.
+        self._reversion_natr_idx: tuple[np.ndarray, np.ndarray] | None = None
+        # Per-month past-only natr threshold; recomputed at each _train_for_month from the
+        # training-window natr[t-1] rows (mirrors the trend-strength / funding thresholds).
+        # None until the first month with >= 50 finite training-window rows → gate ABSTAINS
+        # this month (CONSERVATIVE: a reversion edge with no calibrated vol floor is undefined).
+        self._reversion_natr_thr: float | None = None
         # iter-v3/072: labeling mode — "triple_barrier" (default, backward-compat)
         # or "fixed_horizon" (sign of N-candle-forward return; no barriers).
         # iter-v3/105: "trend_scanning" (OLS trend, max-|t| horizon selection
@@ -876,6 +938,106 @@ class LightGbmStrategy:
                     f"[lgbm] trend-state direction override: loaded {len(_ts_ct)} "
                     f"{self._trend_state_symbol} candles from {_ts_pq} "
                     f"(sma_window={self._trend_state_sma_window})"
+                )
+
+        # iter-v1/032: SHORT-HORIZON MEAN-REVERSION direction override — build the sorted
+        # past-only (close_time_ms, close) index from the trend_state_symbol parquet (the
+        # traded symbol's own close). STRUCTURALLY IDENTICAL to the /016 trend-state close
+        # index above: the searchsorted lookup in _compute_reversion_state selects candle
+        # t-1 (the last candle whose close_time <= decision open_time, < open_time under the
+        # 8h close_time = next_open - 1ms convention), then computes price_z over the W
+        # closes ENDING at t-1. The index serves BOTH the direction (-sign(price_z)) AND the
+        # trigger magnitude (|price_z|), so it is built once here. FAIL LOUD if the parquet
+        # is missing (same discipline as the /016 + /092 close gates — a silent pass-through
+        # would leave the override inert and the iteration void).
+        if self._enable_reversion_dir:
+            _rv_pq = Path(self.features_dir) / f"{self._trend_state_symbol}_8h_features.parquet"
+            if not _rv_pq.exists():
+                raise FileNotFoundError(
+                    f"[lgbm] reversion direction override: FATAL — "
+                    f"enable_reversion_dir=True but parquet not found at {_rv_pq}. "
+                    "Re-fetch + regen: "
+                    f"uv run crypto-trade fetch --symbols {self._trend_state_symbol} "
+                    "--intervals 8h && "
+                    f"uv run crypto-trade features --symbols {self._trend_state_symbol} "
+                    "--interval 8h --track v1 --format parquet --workers 4"
+                )
+            import pandas as _pd_rv  # noqa: PLC0415
+
+            _rv_df = _pd_rv.read_parquet(_rv_pq, columns=["close_time", "close"])
+            _rv_df = _rv_df.dropna(subset=["close_time", "close"])
+            _rv_ct = _rv_df["close_time"].values.astype(np.int64)
+            _rv_cl = _rv_df["close"].values.astype(np.float64)
+            _rv_sort = np.argsort(_rv_ct)
+            self._reversion_close_idx = (_rv_ct[_rv_sort], _rv_cl[_rv_sort])
+            if self._reversion_close_idx is None:
+                raise RuntimeError(
+                    "[lgbm] reversion direction override: FATAL — index is None after "
+                    f"build (parquet={_rv_pq}, rows={len(_rv_ct)}). Programming error."
+                )
+            if self.verbose > 0:
+                print(
+                    f"[lgbm] reversion direction override: loaded {len(_rv_ct)} "
+                    f"{self._trend_state_symbol} candles from {_rv_pq} "
+                    f"(z_window={self._reversion_z_window})"
+                )
+
+        # iter-v1/032: REVERSION VOL-REGIME gate — build the sorted past-only
+        # (open_time_ms, natr[t-1]) index from the trend_state_symbol parquet's natr column,
+        # lagged ONE bar (`.shift(1)`) so row t reads natr[t-1]. STRUCTURALLY IDENTICAL to
+        # the /018 trend-strength gate index (keyed on open_time so the signal-time lookup
+        # returns the value at the SAME row index t aligned to the decision candle). The
+        # parquet natr column (vol_natr_14 = ATR14/close) is computed PER-CANDLE using OHLC
+        # through candle t's close, so the `.shift(1)` makes row t's value past-only
+        # (natr[t-1], data through candle t-1's close — nothing at or after the decision
+        # candle). FAIL LOUD if the parquet or the natr column is missing.
+        if self._enable_reversion_trigger_gate:
+            _rvn_pq = Path(self.features_dir) / f"{self._trend_state_symbol}_8h_features.parquet"
+            if not _rvn_pq.exists():
+                raise FileNotFoundError(
+                    f"[lgbm] reversion vol-regime gate: FATAL — "
+                    f"enable_reversion_trigger_gate=True but parquet not found at {_rvn_pq}. "
+                    "Re-fetch + regen: "
+                    f"uv run crypto-trade fetch --symbols {self._trend_state_symbol} "
+                    "--intervals 8h && "
+                    f"uv run crypto-trade features --symbols {self._trend_state_symbol} "
+                    "--interval 8h --track v1 --format parquet --workers 4"
+                )
+            import pandas as _pd_rvn  # noqa: PLC0415
+
+            _rvn_pf_cols = set(pq.ParquetFile(_rvn_pq).schema.names)
+            if self._reversion_natr_col not in _rvn_pf_cols:
+                raise KeyError(
+                    f"[lgbm] reversion vol-regime gate: FATAL — natr column "
+                    f"{self._reversion_natr_col!r} not found in {_rvn_pq}. "
+                    f"Available atr/natr cols: "
+                    f"{sorted(c for c in _rvn_pf_cols if 'atr' in c.lower())}"
+                )
+            _rvn_df = _pd_rvn.read_parquet(_rvn_pq, columns=["open_time", self._reversion_natr_col])
+            _rvn_df = _rvn_df.dropna(subset=["open_time"])
+            _rvn_df = _rvn_df.sort_values("open_time").reset_index(drop=True)
+            _rvn_ot = _rvn_df["open_time"].to_numpy(dtype=np.int64)
+            # `.shift(1)` so row t holds natr[t-1] (past-only); warmup → NaN → gate abstains.
+            _rvn_natr = (
+                _pd_rvn.Series(_rvn_df[self._reversion_natr_col].to_numpy(dtype=np.float64))
+                .shift(1)
+                .to_numpy()
+            )
+            self._reversion_natr_idx = (_rvn_ot, _rvn_natr.astype(np.float64))
+            if self._reversion_natr_idx is None:
+                raise RuntimeError(
+                    "[lgbm] reversion vol-regime gate: FATAL — index is None after build "
+                    f"(parquet={_rvn_pq}, rows={len(_rvn_ot)}). Programming error."
+                )
+            if self.verbose > 0:
+                _rvn_n_finite = int(np.isfinite(_rvn_natr).sum())
+                print(
+                    f"[lgbm] reversion vol-regime gate: loaded {len(_rvn_ot)} "
+                    f"{self._trend_state_symbol} candles from {_rvn_pq} "
+                    f"(natr_col={self._reversion_natr_col} "
+                    f"quantile={self._reversion_natr_quantile} "
+                    f"z_thr={self._reversion_z_threshold}; "
+                    f"{_rvn_n_finite} finite natr[t-1] rows)"
                 )
 
         # iter-v1/018: TREND-STRENGTH CONVICTION gate — build the sorted past-only
@@ -2020,6 +2182,35 @@ class LightGbmStrategy:
                         f"={self._funding_contra_thr} from {len(_fc_tw_absz)} training-window "
                         f"|funding_z30[t-1]| rows (month={month_str})"
                     )
+            # iter-v1/032: REVERSION VOL-REGIME gate — per-month PAST-ONLY natr threshold.
+            # q_thr = quantile(natr[t-1] over candles in the TRAINING window, q). The index
+            # is keyed on open_time, so "in the training window" is exactly
+            # train_start_ms <= open_time < train_end_ms — the SAME mask the model's train
+            # rows + the trend-strength / funding thresholds use. Each row's natr[t-1] is
+            # past-only (`.shift(1)` at build time), so the whole window is past-only relative
+            # to the test month (mirrors the R3 OOD training-window-stat pattern). Threshold
+            # fit on PAST rows only; never recomputed on test rows. CONSERVATIVE: < 50 finite
+            # training-window rows → leave thr None → the gate ABSTAINS this month (a reversion
+            # edge with no calibrated vol floor is undefined — OPPOSITE of the trend-strength
+            # gate's None→fire fallback).
+            self._reversion_natr_thr = None
+            if self._enable_reversion_trigger_gate and self._reversion_natr_idx is not None:
+                _rvn_ot, _rvn_natr = self._reversion_natr_idx
+                _rvn_tw_mask = (_rvn_ot >= int(split.train_start_ms)) & (
+                    _rvn_ot < int(split.train_end_ms)
+                )
+                _rvn_tw = _rvn_natr[_rvn_tw_mask]
+                _rvn_tw = _rvn_tw[np.isfinite(_rvn_tw)]
+                if len(_rvn_tw) >= 50:
+                    self._reversion_natr_thr = float(
+                        np.quantile(_rvn_tw, self._reversion_natr_quantile)
+                    )
+                if self.verbose > 0:
+                    print(
+                        f"[lgbm] reversion vol-regime gate: q_thr({self._reversion_natr_quantile})"
+                        f"={self._reversion_natr_thr} from {len(_rvn_tw)} training-window "
+                        f"natr[t-1] rows (month={month_str})"
+                    )
             # Load NATR / σ_t cache.
             self._month_natr = {}
             if self.atr_tp_multiplier is not None:
@@ -2541,6 +2732,107 @@ class LightGbmStrategy:
         sma_prev = float(np.mean(window))  # SMA_window(close)[t-1]
         return 1 if close_prev > sma_prev else -1
 
+    def _reversion_price_z(self, candle_open_time: int) -> float | None:
+        """Compute the past-only short-horizon price z-score at the decision candle (iter-v1/032).
+
+        Returns ``price_z[t-1] = (close[t-1] - SMA_W(close)[t-1]) / std_W(close)[t-1]`` for
+        decision candle t (the candle whose open_time == candle_open_time), where t-1 is the
+        LAST reversion-symbol candle whose close_time <= candle_open_time (strictly past-only
+        under the 8h close_time = next_open - 1ms convention), and SMA_W / std_W are the
+        simple mean / SAMPLE std (ddof=1, matching pandas ``rolling(W).std()``) of the W
+        closes ENDING at that candle (closes of candles t-W .. t-1 inclusive).
+
+        This is the EXACT past-only proxy the QR's IS-only design uses:
+            cp   = close.shift(1)                                  # close[t-1]
+            sma  = close.rolling(W).mean().shift(1)                # SMA_W(close)[t-1]
+            std  = close.rolling(W).std().shift(1)                 # std_W(close)[t-1]  (ddof=1)
+            z    = (cp - sma) / std                                # NaN on warmup / std==0
+        reproduced here with a searchsorted past-only lookup IDENTICAL to
+        ``_compute_trend_state`` so the backtest and live engine compute the same value with
+        NO look-ahead. Shared by BOTH the reversion DIRECTION (``-sign(z)``) and the
+        TRIGGER magnitude (``|z| >= reversion_z_threshold``).
+
+        Returns None (CONSERVATIVE → direction falls back to model sign; gate ABSTAINS) when:
+          - the reversion close index is not loaded (override disabled / parquet missing),
+          - fewer than ``reversion_z_window`` closes available before the decision candle,
+          - the decision close_time is before any candle (idx_curr < 0),
+          - any NaN / non-positive close in the z window or at t-1,
+          - the window std is zero / non-finite (degenerate, undefined z).
+        """
+        if self._reversion_close_idx is None:
+            return None
+        ct_arr, cl_arr = self._reversion_close_idx
+        # Last candle whose close_time <= candle_open_time (== candle t-1, past-only).
+        idx_curr = int(np.searchsorted(ct_arr, candle_open_time, side="right")) - 1
+        if idx_curr < 0:
+            return None
+        w = self._reversion_z_window
+        idx_lo = idx_curr - w + 1  # first index of the window of `w` closes ending at idx_curr
+        if idx_lo < 0:
+            # Warmup: fewer than `w` closes before the decision candle.
+            return None
+        close_prev = cl_arr[idx_curr]  # close[t-1]
+        window = cl_arr[idx_lo : idx_curr + 1]  # w closes: t-window .. t-1
+        if not np.isfinite(close_prev) or close_prev <= 0.0:
+            return None
+        if not np.isfinite(window).all() or (window <= 0.0).any():
+            return None
+        sma_prev = float(np.mean(window))  # SMA_W(close)[t-1]
+        std_prev = float(np.std(window, ddof=1))  # std_W(close)[t-1] (pandas rolling .std default)
+        if not np.isfinite(std_prev) or std_prev <= 0.0:
+            return None  # degenerate window → z undefined → CONSERVATIVE None
+        return (close_prev - sma_prev) / std_prev
+
+    def _compute_reversion_state(self, candle_open_time: int) -> int | None:
+        """Compute the short-horizon MEAN-REVERSION fade direction (iter-v1/032).
+
+        Returns ``-sign(price_z[t-1])`` — i.e. ``-1`` when ``price_z > 0`` (overextended
+        UP → fade SHORT) and ``+1`` when ``price_z < 0`` (overextended DOWN → fade LONG),
+        where ``price_z[t-1]`` is the past-only z-score from ``_reversion_price_z``.
+
+        Mirrors ``_compute_trend_state`` EXACTLY in its look-ahead contract (searchsorted
+        past-only ``close[t-1]`` lookup) but the SIGN is REVERSED (fade, not follow).
+        Returns None (CONSERVATIVE → caller falls back to the model sign) on warmup
+        (< ``reversion_z_window`` closes), degenerate std (std==0), or NaN/non-positive
+        close — exactly the cases where ``_reversion_price_z`` returns None.
+
+        On the exact-zero z boundary (close[t-1] == SMA_W[t-1]) the fade direction is +1
+        (``-sign(0)`` is undefined; we follow the convention ``price_z > 0 → -1 else +1``,
+        identical to the trend-state ``close_prev > sma_prev`` boundary handling).
+        """
+        z = self._reversion_price_z(candle_open_time)
+        if z is None:
+            return None
+        return -1 if z > 0.0 else 1
+
+    def _compute_reversion_natr(self, candle_open_time: int) -> float | None:
+        """Compute the past-only natr[t-1] for the reversion vol-regime gate (iter-v1/032).
+
+        Returns ``reversion_natr_col[t-1]`` for decision candle t (open_time ==
+        candle_open_time), read from the ``_reversion_natr_idx`` (open_time_ms, natr[t-1])
+        index built in compute_features() — row t's value ALREADY uses only the parquet
+        natr column at candle t-1 (the index applied an extra ``.shift(1)`` at build time),
+        so it reads NO data at or after the decision candle's own bar.
+
+        LOOK-AHEAD SAFETY: the index is keyed on open_time and we select the row whose
+        open_time == candle_open_time EXACTLY (searchsorted left + equality check). Appending
+        future candles (open_time > candle_open_time) cannot change it, nor can mutating the
+        decision candle's own natr.
+
+        Returns None (CONSERVATIVE → gate ABSTAINS) when: index not loaded, no candle with
+        open_time == candle_open_time, or natr[t-1] is NaN (warmup / missing record).
+        """
+        if self._reversion_natr_idx is None:
+            return None
+        ot_arr, natr_arr = self._reversion_natr_idx
+        idx_t = int(np.searchsorted(ot_arr, candle_open_time, side="left"))
+        if idx_t < 0 or idx_t >= len(ot_arr) or int(ot_arr[idx_t]) != int(candle_open_time):
+            return None
+        val = float(natr_arr[idx_t])
+        if not np.isfinite(val):
+            return None
+        return val
+
     def _compute_trend_strength(self, candle_open_time: int) -> float | None:
         """Compute the past-only trend STRENGTH |dist_atr| at the decision candle (iter-v1/018).
 
@@ -3006,6 +3298,58 @@ class LightGbmStrategy:
                         }
                     )
 
+            # iter-v1/032: SHORT-HORIZON MEAN-REVERSION direction override (RULE layer).
+            # The abstention gates above have decided the trade FIRES. OVERRIDE the executed
+            # direction with the deterministic past-only reversion fade sign
+            #   dir = -sign(price_z[t-1])   (price_z over SMA10/std10 of close ending at t-1),
+            # keeping the model's weight/confidence/TP/SL (sizing + timing stay with the
+            # model; only the SIGN is replaced — same contract as the /016 trend-state
+            # override). On warmup / degenerate std (_compute_reversion_state returns None)
+            # the override is CONSERVATIVE: keep the model sign (_sp_direction unchanged).
+            # Mutually exclusive with the trend-state override for this iteration (the v1-032
+            # dispatch sets enable_trend_state_dir=False, so the block above is inert). Logged
+            # with the model sign + the override for Phase 7.4 direction-source attribution.
+            if self._enable_reversion_dir:
+                _rv_dir = self._compute_reversion_state(open_time)
+                if _rv_dir is not None:
+                    _rv_z_log = self._reversion_price_z(open_time)
+                    _sp_dir_model = _sp_direction
+                    _sp_direction = int(_rv_dir)
+                    decision_log.log(
+                        {
+                            "kind": "reversion_state_override",
+                            "symbol": symbol,
+                            "ot": open_time,
+                            "month": candle_month,
+                            "specialist_seeds": len(self._specialist_models),
+                            "final_signed": _final_signed,
+                            "direction_model": _sp_dir_model,
+                            "direction_reversion": _sp_direction,
+                            "price_z": _rv_z_log,
+                            "reversion_z_window": self._reversion_z_window,
+                            "agreed": bool(_sp_dir_model == _sp_direction),
+                            "decision": "direction_overridden:reversion_state",
+                        }
+                    )
+                else:
+                    # Warmup / degenerate std — keep the model sign.
+                    decision_log.log(
+                        {
+                            "kind": "reversion_state_override",
+                            "symbol": symbol,
+                            "ot": open_time,
+                            "month": candle_month,
+                            "specialist_seeds": len(self._specialist_models),
+                            "final_signed": _final_signed,
+                            "direction_model": _sp_direction,
+                            "direction_reversion": None,
+                            "price_z": None,
+                            "reversion_z_window": self._reversion_z_window,
+                            "agreed": None,
+                            "decision": "reversion_warmup:kept_model_sign",
+                        }
+                    )
+
             # iter-v1/018: TREND-STRENGTH CONVICTION entry gate (RULE layer).
             # The abstention gates above (specialist consensus, R-CONV, BTC-regime-kill,
             # R3 OOD) AND the trend-state direction override have already decided the
@@ -3081,6 +3425,56 @@ class LightGbmStrategy:
                             }
                         )
                         return NO_SIGNAL
+
+            # iter-v1/032: REVERSION TRIGGER + VOL-REGIME entry gate (RULE layer).
+            # The reversion direction override above has set _sp_direction = -sign(price_z).
+            # ENTER ONLY when the move is overextended AND in a high-vol exhaustion regime:
+            #   |price_z[t-1]| >= self._reversion_z_threshold    (overextension trigger)
+            #   natr[t-1]      >= self._reversion_natr_thr        (past-only per-month q-gate)
+            # CRITICAL — the CONSERVATIVE behavior is ABSTAIN (return NO_SIGNAL), the OPPOSITE
+            # of the trend-strength gate's conservative-FIRE. A reversion trade with no valid
+            # z (warmup / degenerate std → price_z None) OR NaN/missing natr (warmup → natr
+            # None) OR an uncalibrated month threshold (< 50 training rows → thr None) is
+            # UNDEFINED, so it must NOT enter. Only when BOTH conditions are satisfied with
+            # finite, calibrated values does the trade fire.
+            if self._enable_reversion_trigger_gate:
+                _rv_z = self._reversion_price_z(open_time)
+                _rv_natr = self._compute_reversion_natr(open_time)
+                _rv_trigger_ok = _rv_z is not None and abs(_rv_z) >= self._reversion_z_threshold
+                _rv_vol_ok = (
+                    _rv_natr is not None
+                    and self._reversion_natr_thr is not None
+                    and _rv_natr >= self._reversion_natr_thr
+                )
+                if not (_rv_trigger_ok and _rv_vol_ok):
+                    # ABSTAIN — undefined / out-of-regime reversion entry.
+                    if _rv_z is None or self._reversion_natr_thr is None or _rv_natr is None:
+                        _rv_reason = "skipped:reversion_undefined"
+                    elif not _rv_trigger_ok:
+                        _rv_reason = "skipped:reversion_no_overextension"
+                    else:
+                        _rv_reason = "skipped:reversion_low_vol_regime"
+                    decision_log.log(
+                        {
+                            "kind": "reversion_trigger_gate_skip",
+                            "symbol": symbol,
+                            "ot": open_time,
+                            "month": candle_month,
+                            "specialist_seeds": len(self._specialist_models),
+                            "final_signed": _final_signed,
+                            "direction_pre_gate": _sp_direction,
+                            "price_z": _rv_z,
+                            "reversion_z_threshold": self._reversion_z_threshold,
+                            "natr": _rv_natr,
+                            "reversion_natr_thr": self._reversion_natr_thr,
+                            "reversion_natr_quantile": self._reversion_natr_quantile,
+                            "reversion_natr_col": self._reversion_natr_col,
+                            "trigger_ok": bool(_rv_trigger_ok),
+                            "vol_ok": bool(_rv_vol_ok),
+                            "decision": _rv_reason,
+                        }
+                    )
+                    return NO_SIGNAL
 
             # iter-v1/074: AXIS-R Mid-Bull SHORT VETO — post-aggregator rule layer.
             # Applied AFTER mean-of-signed-weights aggregator emits Signal(direction, weight)

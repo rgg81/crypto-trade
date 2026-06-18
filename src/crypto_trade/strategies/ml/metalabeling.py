@@ -335,6 +335,16 @@ class MetaLabelingStrategy:
         # for symmetry. Default False = strict NO-OP (iter-030 EXPLORATION keeps M2 OFF, so
         # this M2 path is not exercised; threaded only so the param surface matches run_model).
         enable_agreement_scale: bool = False,
+        # iter-v1/032: SHORT-HORIZON MEAN-REVERSION direction override + vol-regime gate,
+        # forwarded to M1's LightGbmStrategy for symmetry. Default False = strict NO-OP
+        # (iter-032 EXPLORATION keeps M2 OFF, so this M2 path is not exercised; threaded only
+        # so the param surface matches run_model).
+        enable_reversion_dir: bool = False,
+        reversion_z_window: int = 10,
+        enable_reversion_trigger_gate: bool = False,
+        reversion_z_threshold: float = 1.5,
+        reversion_natr_quantile: float = 0.40,
+        reversion_natr_col: str = "vol_natr_14",
         # iter-v1/028: M1 must run the SAME specialist bagging stack as the merged
         # iter-027 baseline (K independent Optuna studies via specialist_mode).
         # Defaults (specialist_mode=False) keep /030 bit-identical.
@@ -426,6 +436,13 @@ class MetaLabelingStrategy:
             trend_strength_quantile=trend_strength_quantile,
             # iter-v1/030: AGREE_SCALE conviction modulator (default OFF; symmetry only).
             enable_agreement_scale=enable_agreement_scale,
+            # iter-v1/032: SHORT-HORIZON MEAN-REVERSION override + gate (default OFF; symmetry).
+            enable_reversion_dir=enable_reversion_dir,
+            reversion_z_window=reversion_z_window,
+            enable_reversion_trigger_gate=enable_reversion_trigger_gate,
+            reversion_z_threshold=reversion_z_threshold,
+            reversion_natr_quantile=reversion_natr_quantile,
+            reversion_natr_col=reversion_natr_col,
             # iter-v1/028: M1 runs the SAME specialist bagging stack as iter-027.
             specialist_mode=specialist_mode,
             specialist_seed_count=specialist_seed_count,
