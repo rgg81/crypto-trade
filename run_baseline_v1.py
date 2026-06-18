@@ -4892,6 +4892,55 @@ def main() -> None:
                 f"{_spec_trend_optuna_sma_step}, {_spec_trend_optuna_n_trials} trials/mo; q=0.40, "
                 f"R2 OFF, R3/R5 ON). The legitimate, non-OOS-cheating way to 'tune the 200'."
             )
+    elif iteration_label in ("v1-056", "v1-057", "v1-058") and len(symbols) == 1:
+        # iter-v1/056 — BACK TO LIGHTGBM (user directive 2026-06-18). After the top-20 breadth
+        # test falsified the hand-picked SMA-trend rule as a broad edge (coin-flip OOS; IS can't
+        # predict OOS), return to the LightGBM that LEARNS linear+nonlinear feature structure and
+        # adapts per-month — NO magic numbers, everything earned in the honest walk-forward.
+        # PURE MODEL: the LightGBM specialist decides BOTH direction and timing via predict_proba
+        # vs its Optuna-tuned confidence threshold. ALL deterministic/trend/conviction overrides
+        # are OFF (no 200-SMA, no q-gate, no deterministic_entry_only). Same 19-feature HYBRID +
+        # fixed_horizon N=42 + R3/R5 as the deterministic baselines, so this is a clean
+        # apples-to-apples "LightGBM-decides vs hand-rule-decides" comparison on the SAME inputs.
+        # Honest walk-forward: train_end = test_start - embargo; per-month past-only training;
+        # Optuna tunes HP + training_days on past data each month (no hindsight constants).
+        # NOT K-invariant (the model is USED) → run K>=5 (EXPLORATION) for a real ensemble read.
+        import pyarrow.parquet as pq  # noqa: PLC0415
+
+        _spec_sym_056 = symbols[0]
+        _iter056_parquet = Path("data/features") / f"{_spec_sym_056}_8h_features.parquet"
+        assert _iter056_parquet.exists(), (
+            f"{iteration_label}: feature parquet not found at {_iter056_parquet}."
+        )
+        _parquet_cols = set(pq.ParquetFile(_iter056_parquet).schema.names)
+        _missing = [c for c in V1_BTC_ITER009_FEATURES if c not in _parquet_cols]
+        assert not _missing, (
+            f"{iteration_label}: {len(_missing)} of 19 feature cols missing in "
+            f"{_spec_sym_056} parquet: {_missing}."
+        )
+        _spec_feature_columns = list(V1_BTC_ITER009_FEATURES)
+        _spec_label_mode = "fixed_horizon"
+        _spec_use_atr_labeling = False
+        _spec_label_timeout_minutes = 20160  # 42 candles = 14d (== the deterministic baselines)
+        _spec_atr_tp = 100.0  # non-binding (let winners run to the horizon)
+        _spec_atr_sl = 1.45  # protective SL (== baselines)
+        _spec_execution_timeout_minutes = 20160
+        _spec_apply_r2 = False  # R2 OFF (matches the deterministic read; R3/R5 ON)
+        # PURE MODEL — every deterministic/trend/conviction override OFF.
+        _spec_enable_trend_state_dir = False
+        _spec_enable_trend_strength_gate = False
+        _spec_deterministic_entry_only = False
+        _spec_enable_trend_optuna_sma = False
+        _spec_enable_trend_sma_ensemble = False
+        _spec_enable_metalabel = False
+        print(
+            f"[{iteration_label}] BACK TO LIGHTGBM ({_spec_sym_056}) — PURE MODEL decides "
+            f"direction + timing (predict_proba vs Optuna-tuned confidence threshold). NO "
+            f"deterministic/trend/conviction overrides, NO magic numbers. 19-feature HYBRID + "
+            f"fixed_horizon N=42, R2 OFF / R3/R5 ON. Honest walk-forward (per-month past-only "
+            f"training, embargo intact, Optuna-tuned HP+training_days). Does the LightGBM that "
+            f"LEARNS features generalize where the hand-picked trend rule did not?"
+        )
     elif iteration_label == "v1-040" and len(symbols) == 1 and symbols[0] == "DOTUSDT":
         # iter-v1/040 (DOT) — strip-model deterministic core WITH DOT-calibrated R2 (the
         # sweep's R2-OFF DOT was IS +0.39 / OOS -0.03 — a real positive IS edge, OOS near-zero).
