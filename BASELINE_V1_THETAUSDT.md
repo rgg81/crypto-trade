@@ -50,6 +50,12 @@ basin-lottery). The strip-model deterministic core (the merged-ETH architecture)
    IDENTICAL code path + the standard v1 feature pipeline + the same OOS split — no new leak surface. The
    result is deterministic (K-invariant). A THETA-specific Critic review is a recommended (non-blocking)
    follow-up.
+4. **50-SEED CONFIRMATION (iter-049, 2026-06-18): seed-invariance EMPIRICALLY CONFIRMED.** Re-ran the
+   exact config at K=50 (50 bagging seeds trained): comparison.csv + in_sample/trades.csv +
+   out_of_sample/trades.csv are ALL byte-identical to the K=1 merge (iter-047), and
+   specialist_dispersion = 0.0000 across all 50 seeds. The deterministic core has ZERO seed variance —
+   the K=1 baseline IS the 50-seed result. (The merge ran K=1 legitimately because the model is bypassed;
+   this confirms it empirically rather than inheriting it from ETH.)
 
 ## Merge gate (generalization-first, all coins)
 (1) PRIMARY both-positive (IS +0.15>0 AND OOS +0.56>0) ✓; (2) OOS strong, not chased (deterministic) ✓;
