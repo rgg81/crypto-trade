@@ -5168,6 +5168,60 @@ def main() -> None:
             f"INDEPENDENT of K/n_trials). M2=OFF (single-axis). NORMAL-RISK; past-only."
         )
 
+    elif iteration_label == "v1-035" and len(symbols) == 1 and symbols[0] == "ETHUSDT":
+        # iter-v1/035 CONFIRMATION (K=20) of iter-034 PURE-DETERMINISTIC trend.
+        # Config BYTE-IDENTICAL to v1-034 (deterministic_entry_only=True). Because the LightGBM
+        # entry decision is bypassed, the strategy is a pure deterministic function of
+        # (data, conviction gate, trend-state direction) -> K-INVARIANT. This K=20 run MUST be
+        # byte-identical to the iter-034 K=1 result (IS +0.6481 / OOS +0.4148) — empirically
+        # confirming dispersion=0 / no hidden seed-dependence + satisfying the CONFIRMATION gate
+        # before MERGE. If identical -> MERGE BASELINE_V1_ETHUSDT.
+        import pyarrow.parquet as pq  # noqa: PLC0415
+
+        _spec_sym_035 = symbols[0]
+        _iter035_parquet = Path("data/features") / f"{_spec_sym_035}_8h_features.parquet"
+        assert _iter035_parquet.exists(), (
+            f"iter-v1/035: feature parquet not found at {_iter035_parquet}."
+        )
+        _parquet_cols = set(pq.ParquetFile(_iter035_parquet).schema.names)
+        _missing = [c for c in V1_BTC_ITER009_FEATURES if c not in _parquet_cols]
+        assert not _missing, (
+            f"iter-v1/035: {len(_missing)} of the 19 feature columns NOT in "
+            f"{_spec_sym_035} parquet — {_missing}."
+        )
+        _str_needed = {"close", "high", "low", "close_time"}
+        _str_missing = [c for c in _str_needed if c not in _parquet_cols]
+        assert not _str_missing, (
+            f"iter-v1/035: trend-state/conviction gate needs {_str_missing} on the "
+            f"{_spec_sym_035} parquet."
+        )
+        # Config BYTE-IDENTICAL to v1-034 (= iter-027 stack + deterministic_entry_only=True).
+        _spec_feature_columns = list(V1_BTC_ITER009_FEATURES)
+        _spec_label_mode = "fixed_horizon"
+        _spec_use_atr_labeling = False
+        _spec_label_timeout_minutes = 20160
+        _spec_atr_tp = 100.0
+        _spec_atr_sl = 1.45
+        _spec_execution_timeout_minutes = 20160
+        _spec_enable_trend_state_dir = True
+        _spec_trend_state_sma_window = 200
+        _spec_trend_state_symbol = _spec_sym_035
+        _spec_enable_trend_strength_gate = True
+        _spec_trend_strength_atr_window = 14
+        _spec_trend_strength_quantile = 0.40
+        _spec_apply_r2 = True
+        _spec_r2_trigger_pct = 4.07
+        _spec_r2_scale_anchor_pct = 16.27
+        _spec_r2_scale_floor = 0.20
+        _spec_enable_metalabel = False
+        _spec_deterministic_entry_only = True
+        print(
+            f"[iter-v1/035] CONFIRMATION (K=20, {_spec_sym_035}) — verify iter-034 "
+            f"PURE-DETERMINISTIC trend is K-INVARIANT (model bypassed -> must match K=1 "
+            f"IS +0.6481/OOS +0.4148). deterministic_entry_only=ON. MERGE BASELINE_V1_ETHUSDT "
+            f"if byte-identical + Critic PASS."
+        )
+
     elif iteration_label == "v1-028":
         # iter-v1/028 META-LABELING (López de Prado AFML Ch.3) on ETH. The MERGED
         # iter-027 stack is the PRIMARY (M1) UNCHANGED; a SECONDARY (M2) LGBMClassifier
