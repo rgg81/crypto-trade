@@ -4735,7 +4735,7 @@ def main() -> None:
         # deterministic_entry_only=True (model bypassed), R2 OFF (per-coin R2 not calibrated; R2 is
         # DD-control, does NOT flip the Sharpe sign — fine for a both-positive directional read),
         # R3=ON / R5=ON. Tests: does the pure deterministic core generalize (both-positive) on this
-        # coin too? K-invariant (model bypassed) -> K=1 fast. NOT a final baseline (R2 off); a screen.
+        # coin too? K-invariant (model bypassed) -> K=1 fast. Directional screen, not a baseline.
         import pyarrow.parquet as pq  # noqa: PLC0415
 
         _spec_sym_sweep = symbols[0]
@@ -4772,7 +4772,7 @@ def main() -> None:
             f"[{iteration_label}] PORTABILITY SWEEP ({_spec_sym_sweep}) — deterministic core "
             f"(trend-state sma=200 + conviction gate q=0.40 + deterministic_entry_only, R2 OFF, "
             f"R3/R5 ON). Does the strip-model deterministic core generalize both-positive on "
-            f"{_spec_sym_sweep}? K-invariant (model bypassed). Directional screen, not a final baseline."
+            f"{_spec_sym_sweep}? K-invariant; directional screen, not a baseline."
         )
     elif iteration_label == "v1-021":
         # iter-v1/021 EXPLORATION — FUNDING-CONTRA-CROWD re-admission of gate-skipped chop.
