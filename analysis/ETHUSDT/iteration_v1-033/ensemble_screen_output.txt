@@ -1,0 +1,39 @@
+================================================================================================
+iter-v1/033 — TREND x REVERSION regime-complementary ENSEMBLE (IS-only screen)
+  TREND : SMA200 state-dir + conv>=q0.4 (thr=3.337) hold=42 (14d)
+  REV   : SMA10 z-fade |z|>=1.5 + natr>=q0.4 (thr=2.81739) hold=2 (16h)
+  cost/trip=0.0024  OOS_CUTOFF_MS=1742774400000
+================================================================================================
+
+[1] STANDALONE BOOKS (non-overlap re-entry, IS-only):
+  TREND : ev= 104 shrp=+0.402 win=0.510 net= +166.9% top1=+0.359 top2=+0.710 | 20:+0.42 21:+1.42 22:-0.29 23:-0.41 24:-0.17
+  REVERS: ev= 452 shrp=-0.039 win=0.524 net=   -7.8% top1=+nan top2=+nan | 20:-0.05 21:+0.06 22:-0.42 23:+1.84 24:-1.33
+
+[2] REGIME OCCUPANCY (median regime feature at each book's events):
+  TREND  events: ADX14 med= 24.1  natr med=3.2531  convATR med=5.01
+  REVERS events: ADX14 med= 26.6  natr med=3.8207  convATR med=4.66
+  (IS ADX14 tertile cuts: low<21.0  high>29.4)
+  TREND : frac in LOW-ADX(chop)=0.36  frac in HIGH-ADX(trend)=0.34
+  REVERS: frac in LOW-ADX(chop)=0.29  frac in HIGH-ADX(trend)=0.39
+
+[3] EVENT-TIMING OVERLAP:
+  candle-level Jaccard(open_trend, open_rev) = 0.0393  (inter=21 union=535)
+  reversion opens FALLING INSIDE a 14d trend hold = 366 of 452 (81.0%) <- the single-position CROWDING surface
+
+[4] REGIME-ROUTER COMBINED BOOK (single-position, mutually-exclusive, priority-by-walk):
+  trend-alone reference: ev=104 shrp=+0.402 top2=+0.710
+  R-ADX : ev= 230 (T=85 R=145) shrp=-0.086 win=0.478 net=  -32.5% top1=+nan top2=+nan
+          yearly 20:+0.50 21:+0.11 22:+0.03 23:-1.39 24:-0.58
+          CONTROL trend-only-under-router: ev=85 shrp=+0.256 top2=+1.125  ||  reversion marginal: Δev=+145 Δshrp=-0.342  (DILUTIVE)
+  R-CONV: ev= 199 (T=109 R=90) shrp=+0.464 win=0.543 net= +197.0% top1=+0.279 top2=+0.541
+          yearly 20:+0.31 21:+1.95 22:-0.63 23:-0.04 24:-0.11
+          CONTROL trend-only-under-router: ev=109 shrp=+0.428 top2=+0.615  ||  reversion marginal: Δev=+90 Δshrp=+0.036  (ADDITIVE)
+
+[5] PRE-REGISTERED VERDICT (per the brief's combined-book criteria):
+  PASS requires (vs trend-alone), for the recommended router:
+    (a) MORE independent events than trend-alone
+    (b) LOWER top-2 share than trend-alone (de-concentration)
+    (c) IS Sharpe >= trend-alone (net-additive, NOT dilutive — the iter-031-B failure mode)
+    (d) recent sub-period (2022,2023,2024) all non-negative (the OOS-adjacent stability gate)
+  R-ADX : NEGATIVE  (a)more-events=True(230v104)  (b)lower-top2=False(+nanv+0.710)  (c)sharpe>=trend=False(-0.086v+0.402)  (d)recent-nonneg=False
+  R-CONV: NEGATIVE  (a)more-events=True(199v104)  (b)lower-top2=True(+0.541v+0.710)  (c)sharpe>=trend=True(+0.464v+0.402)  (d)recent-nonneg=False
