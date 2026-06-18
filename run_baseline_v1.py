@@ -4680,6 +4680,54 @@ def main() -> None:
             f"trend-state DIR sma=200 + trend-strength GATE q=0.40). Validates iter-019 both-positive "
             f"(IS +0.54/OOS +0.06) across 20 seeds -> MERGE if it holds (else conviction-gate OOS = noise)."
         )
+    elif iteration_label == "v1-036" and len(symbols) == 1 and symbols[0] == "BTCUSDT":
+        # iter-v1/036 EXPLORATION (BTCUSDT) — PORTABILITY of the iter-034/035 breakthrough:
+        # STRIP the overfit LightGBM ENTRY layer on BTC. Does removing it lift BTC's thin OOS
+        # (iter-020 +0.09) the way it lifted ETH's (+0.056 -> +0.41)? Config = the iter-020 BTC
+        # baseline stack (BTC-calibrated R2 2.07/8.28/0.20) + deterministic_entry_only=True.
+        # K-invariant (model bypassed) -> run K=1. THE ONE CHANGE vs iter-020: entry bypass.
+        import pyarrow.parquet as pq  # noqa: PLC0415
+
+        _spec_sym_036 = symbols[0]
+        _iter036_parquet = Path("data/features") / f"{_spec_sym_036}_8h_features.parquet"
+        assert _iter036_parquet.exists(), (
+            f"iter-v1/036: feature parquet not found at {_iter036_parquet}."
+        )
+        _parquet_cols = set(pq.ParquetFile(_iter036_parquet).schema.names)
+        _missing = [c for c in V1_BTC_ITER009_FEATURES if c not in _parquet_cols]
+        assert not _missing, (
+            f"iter-v1/036: {len(_missing)} feature cols missing in {_spec_sym_036} parquet."
+        )
+        _str_needed = {"close", "high", "low", "close_time"}
+        _str_missing = [c for c in _str_needed if c not in _parquet_cols]
+        assert not _str_missing, (
+            f"iter-v1/036: gate needs {_str_missing} on {_spec_sym_036} parquet."
+        )
+        _spec_feature_columns = list(V1_BTC_ITER009_FEATURES)  # == /020
+        _spec_label_mode = "fixed_horizon"
+        _spec_use_atr_labeling = False
+        _spec_label_timeout_minutes = 20160
+        _spec_atr_tp = 100.0
+        _spec_atr_sl = 1.45
+        _spec_execution_timeout_minutes = 20160
+        _spec_apply_r2 = True
+        _spec_r2_trigger_pct = 2.07  # BTC-calibrated == /020
+        _spec_r2_scale_anchor_pct = 8.28
+        _spec_r2_scale_floor = 0.20
+        _spec_enable_trend_state_dir = True
+        _spec_trend_state_sma_window = 200
+        _spec_trend_state_symbol = _spec_sym_036  # BTC's own trend
+        _spec_enable_trend_strength_gate = True
+        _spec_trend_strength_atr_window = 14
+        _spec_trend_strength_quantile = 0.40
+        _spec_enable_metalabel = False
+        _spec_deterministic_entry_only = True  # THE ONE CHANGE vs /020 (portability of /034)
+        print(
+            f"[iter-v1/036] EXPLORATION ({_spec_sym_036}) — PORTABILITY of iter-034/035: STRIP "
+            f"the overfit LightGBM ENTRY layer on BTC (deterministic_entry_only=ON). iter-020 BTC "
+            f"stack + R2 2.07/8.28/0.20. Does removing the model lift BTC OOS (iter-020 +0.09)? "
+            f"K-invariant (model bypassed)."
+        )
     elif iteration_label == "v1-021":
         # iter-v1/021 EXPLORATION — FUNDING-CONTRA-CROWD re-admission of gate-skipped chop.
         # CONFIG = the iter-020 MERGED stack (= iter-016 stack + trend-state DIR sma=200 +
