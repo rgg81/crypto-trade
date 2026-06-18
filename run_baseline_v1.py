@@ -4774,6 +4774,53 @@ def main() -> None:
             f"R3/R5 ON). Does the strip-model deterministic core generalize both-positive on "
             f"{_spec_sym_sweep}? K-invariant; directional screen, not a baseline."
         )
+    elif iteration_label == "v1-040" and len(symbols) == 1 and symbols[0] == "DOTUSDT":
+        # iter-v1/040 (DOT) — strip-model deterministic core WITH DOT-calibrated R2 (the
+        # sweep's R2-OFF DOT was IS +0.39 / OOS -0.03 — a real positive IS edge, OOS near-zero).
+        # R2 (DD brake) cuts tail losses -> may tip OOS positive. R2 = RE relative shape
+        # (6.5%/26%) on DOT's R2-off IS maxDD 55.31 -> trigger 3.60 / anchor 14.38 / floor 0.20.
+        # Tests: is DOT a genuine 3rd strip-model both-positive coin (a bundle candidate)?
+        # K-invariant (model bypassed) -> K=1.
+        import pyarrow.parquet as pq  # noqa: PLC0415
+
+        _spec_sym_040 = symbols[0]
+        _iter040_parquet = Path("data/features") / f"{_spec_sym_040}_8h_features.parquet"
+        assert _iter040_parquet.exists(), (
+            f"iter-v1/040: feature parquet not found at {_iter040_parquet}."
+        )
+        _parquet_cols = set(pq.ParquetFile(_iter040_parquet).schema.names)
+        _missing = [c for c in V1_BTC_ITER009_FEATURES if c not in _parquet_cols]
+        assert not _missing, (
+            f"iter-v1/040: {len(_missing)} feature cols missing in {_spec_sym_040} parquet."
+        )
+        _str_missing = [c for c in ("close", "high", "low", "close_time") if c not in _parquet_cols]
+        assert not _str_missing, (
+            f"iter-v1/040: gate needs {_str_missing} on {_spec_sym_040} parquet."
+        )
+        _spec_feature_columns = list(V1_BTC_ITER009_FEATURES)
+        _spec_label_mode = "fixed_horizon"
+        _spec_use_atr_labeling = False
+        _spec_label_timeout_minutes = 20160
+        _spec_atr_tp = 100.0
+        _spec_atr_sl = 1.45
+        _spec_execution_timeout_minutes = 20160
+        _spec_apply_r2 = True  # DOT-calibrated R2 (vs R2-OFF sweep)
+        _spec_r2_trigger_pct = 3.60
+        _spec_r2_scale_anchor_pct = 14.38
+        _spec_r2_scale_floor = 0.20
+        _spec_enable_trend_state_dir = True
+        _spec_trend_state_sma_window = 200
+        _spec_trend_state_symbol = _spec_sym_040
+        _spec_enable_trend_strength_gate = True
+        _spec_trend_strength_atr_window = 14
+        _spec_trend_strength_quantile = 0.40
+        _spec_enable_metalabel = False
+        _spec_deterministic_entry_only = True
+        print(
+            f"[iter-v1/040] DOT strip-model core + DOT-calibrated R2 (trig=3.60/anch=14.38/"
+            f"floor=0.20). Does the DD brake tip DOT's OOS (-0.03 R2-off, IS +0.39) both-positive? "
+            f"K-invariant (model bypassed)."
+        )
     elif iteration_label == "v1-021":
         # iter-v1/021 EXPLORATION — FUNDING-CONTRA-CROWD re-admission of gate-skipped chop.
         # CONFIG = the iter-020 MERGED stack (= iter-016 stack + trend-state DIR sma=200 +
