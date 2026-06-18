@@ -1,0 +1,62 @@
+[guard] LEAK GUARD PASS: all 82 trades IS (max open_time 1742716799999 < OOS_CUTOFF 1742774400000).
+[guard] entry==close check PASS (max diff 0.00e+00); SL/NATR21 ratio mean=1.4500 (expect 1.45).
+
+====================================================================================================
+COMPARISON — iter-027 single-exit IS baseline vs partial-profit ladder variants (IS-ONLY)
+====================================================================================================
+                               n_rows  n_legs_extra total_net_pct monthly_sharpe win_rate top1_share_net top2_share_net top1_share_gross top2_share_gross hhi_abs
+name                                                                                                                                                             
+iter-027 single-exit (IS)          82             0      +100.82%        +0.5690    34.1%        +38.88%        +71.40%           +6.85%          +12.58%  0.0240
+3-leg raw  (1/3@1.5, 1/3@3.0)     148            66       +37.83%        +0.3827    63.5%        +34.60%        +63.55%           +2.81%           +5.23%  0.0098
+3-leg natr (1/3@1.5, 1/3@3.0)     151            69       +44.44%        +0.4513    64.2%        +29.45%        +54.10%           +2.80%           +5.22%  0.0097
+2-leg raw  (1/2@2.0)              119            37       +63.66%        +0.5627    54.6%        +30.84%        +56.65%           +3.99%           +7.33%  0.0126
+2-leg natr (1/2@2.0)              119            37       +58.76%        +0.5216    54.6%        +33.41%        +61.37%           +4.02%           +7.38%  0.0126
+
+====================================================================================================
+PRE-REGISTERED PASS CRITERION (Critic):
+  (a) ladder REDUCES top-2 share vs iter-027 IS, AND
+  (b) IS net monthly Sharpe bleed <= 0.05 (ladder Sharpe >= baseline - 0.05).
+  baseline: top2_share_gross=+12.58% top2_share_net=+71.40% monthly_sharpe=+0.5690 net_sum=+100.82%
+====================================================================================================
+
+  3-leg raw  (1/3@1.5, 1/3@3.0)
+     d_top2_share_gross = -0.0735 (+12.58% -> +5.23%)  [decon by gross: True]
+     d_top2_share_net   = -0.0785 (+71.40% -> +63.55%)  [decon by net: True]
+     d_monthly_sharpe   = -0.1863 (+0.5690 -> +0.3827)  [bleed<=0.05: False]
+     d_net_sum_pct      = -62.99% (+100.82% -> +37.83%)
+     >>> NEGATIVE
+
+  3-leg natr (1/3@1.5, 1/3@3.0)
+     d_top2_share_gross = -0.0737 (+12.58% -> +5.22%)  [decon by gross: True]
+     d_top2_share_net   = -0.1730 (+71.40% -> +54.10%)  [decon by net: True]
+     d_monthly_sharpe   = -0.1176 (+0.5690 -> +0.4513)  [bleed<=0.05: False]
+     d_net_sum_pct      = -56.38% (+100.82% -> +44.44%)
+     >>> NEGATIVE
+
+  2-leg raw  (1/2@2.0)
+     d_top2_share_gross = -0.0525 (+12.58% -> +7.33%)  [decon by gross: True]
+     d_top2_share_net   = -0.1475 (+71.40% -> +56.65%)  [decon by net: True]
+     d_monthly_sharpe   = -0.0063 (+0.5690 -> +0.5627)  [bleed<=0.05: True]
+     d_net_sum_pct      = -37.16% (+100.82% -> +63.66%)
+     >>> PASS
+
+  2-leg natr (1/2@2.0)
+     d_top2_share_gross = -0.0520 (+12.58% -> +7.38%)  [decon by gross: True]
+     d_top2_share_net   = -0.1003 (+71.40% -> +61.37%)  [decon by net: True]
+     d_monthly_sharpe   = -0.0473 (+0.5690 -> +0.5216)  [bleed<=0.05: True]
+     d_net_sum_pct      = -42.05% (+100.82% -> +58.76%)
+     >>> PASS
+
+====================================================================================================
+OVERALL SCREEN VERDICT: PASS (>=1 variant)
+====================================================================================================
+
+Runner diagnostic (3-leg raw): how many trades realized >=1 partial leg
+  trades with >=1 partial fill: 40/82 (49%)
+  trades with both partials (>=2): 26/82 (32%)
+  non-runners (0 partials, behave as single-exit): 42/82
+
+Top-3 baseline winners and their 3-leg-raw realized fate:
+  trade 12: baseline net +39.20%  ->  ladder legs: partial(0.33):+1.48%, partial(0.33):+3.13%, actual_exit(0.33):+13.09% (sum +17.70%)
+  trade 55: baseline net +32.79%  ->  ladder legs: partial(0.33):+1.22%, partial(0.33):+2.61%, actual_exit(0.33):+10.95% (sum +14.78%)
+  trade 10: baseline net +24.94%  ->  ladder legs: partial(0.33):+1.44%, partial(0.33):+3.05%, actual_exit(0.33):+8.34% (sum +12.83%)
