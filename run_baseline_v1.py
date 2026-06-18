@@ -554,6 +554,21 @@ V1_ITER030_OOS_TRADES_FLOOR: int = 90  # F-AXIS #2 critical threshold (OOS < 90 
 V1_ITER030_OOS_TP_FLOOR: int = 15  # F-AXIS #5 overall OOS TP-exit floor
 V1_ITER030_MODEL_D_OOS_TP_FLOOR: int = 3  # F-AXIS #5 Model D LOAD-BEARING floor
 
+#: iter-v1/030 (ETHUSDT, AGREE_SCALE — the ACTIVE design per the QR research brief).
+#: Multi-speed AGREEMENT conviction modulator on the UNCHANGED iter-027 SMA200 direction.
+#: The conviction-gate quantity |close[t-1]-SMA200[t-1]|/ATR14[t-1] is multiplied by a
+#: deterministic, past-only AGREEMENT fraction over a PINNED 3-signal panel (P3):
+#:   {ema_cross(50,200), donchian(55), tsmom(42)} vs the SMA200 anchor.
+#: Single-axis: DIRECTION sign is byte-identical to iter-027; only the gated QUANTITY
+#: changes. Documentation-only — the panel windows are HARDCODED (single PINNED axis,
+#: NOT tunable) inside lgbm.compute_features() per the QR's committed
+#: analysis/ETHUSDT/iteration_v1-030/{multispeed_breadth,blend_agreement,agree_scale_robustness}.py.
+#: NOTE: the V1_ITER030_*_M2_* constants above belong to a SEPARATE, REJECTED iter-030
+#: M2-meta-labeling concept; iter-030 EXPLORATION keeps M2 OFF (single-symbol ETH → generic
+#: run_model path). Those constants stay as inert run_meta_model defaults (consumed only when
+#: _spec_enable_metalabel=True, which the v1-030 branch leaves False) — do NOT delete them.
+V1_ITER030_AGREE_PANEL: str = "P3_family3_macross50-200_donch55_tsmom42"  # PINNED, single-axis
+
 #: iter-v1/021: stable path for Optuna best-params parquet (H1 diagnostic substrate).
 #: Written by optimize_and_train when params_persist_path is set.
 #: Cleared at runner start (same pattern as OOF_PARQUET_PATH) to prevent accumulation.
@@ -661,6 +676,7 @@ def run_model(
     enable_funding_contra_readmit: bool = False,
     funding_contra_col: str = "funding_rate_zscore_30",
     funding_contra_quantile: float = 0.50,
+    enable_agreement_scale: bool = False,
 ):
     """Run a single v1 sub-model (A/C/D/E) under the corrected walk-forward.
 
@@ -846,6 +862,9 @@ def run_model(
         enable_funding_contra_readmit=enable_funding_contra_readmit,
         funding_contra_col=funding_contra_col,
         funding_contra_quantile=funding_contra_quantile,
+        # iter-v1/030: AGREE_SCALE multi-speed agreement conviction modulator. Default
+        # False = BIT-IDENTICAL to all prior single-symbol dispatches (iter-016→029) and v2/v3.
+        enable_agreement_scale=enable_agreement_scale,
     )
     t0 = time.time()
     results = run_backtest(config, strategy, yearly_pnl_check=False)
@@ -911,6 +930,9 @@ def run_meta_model(
     enable_trend_strength_gate: bool = False,
     trend_strength_atr_window: int = 14,
     trend_strength_quantile: float = 0.50,
+    # iter-v1/030: AGREE_SCALE conviction modulator (threaded for symmetry; default OFF —
+    # iter-030 EXPLORATION keeps M2 OFF so it takes the generic run_model path, not this one).
+    enable_agreement_scale: bool = False,
     # iter-v1/028: M2 distinct feature set + configurable veto threshold.
     m2_feature_columns: list[str] | None = None,
     m2_veto_threshold: float = 0.5,
@@ -1037,6 +1059,8 @@ def run_meta_model(
         enable_trend_strength_gate=enable_trend_strength_gate,
         trend_strength_atr_window=trend_strength_atr_window,
         trend_strength_quantile=trend_strength_quantile,
+        # iter-v1/030: AGREE_SCALE conviction modulator (default OFF; symmetry only).
+        enable_agreement_scale=enable_agreement_scale,
         # iter-v1/028: M1 specialist bagging stack (K independent Optuna studies).
         specialist_mode=specialist_mode,
         specialist_seed_count=specialist_seed_count,
@@ -3901,6 +3925,11 @@ def main() -> None:
     _spec_enable_funding_contra_readmit: bool = False
     _spec_funding_contra_col: str = "funding_rate_zscore_30"
     _spec_funding_contra_quantile: float = 0.50
+    # iter-v1/030 AGREE_SCALE multi-speed agreement conviction modulator default. Strict
+    # NO-OP for /002-/029 (byte-identical); the v1-030 keyed block below flips enable=True.
+    # PINNED single-axis P3 panel (windows hardcoded in lgbm.compute_features); the panel
+    # name is documentation-only (V1_ITER030_AGREE_PANEL).
+    _spec_enable_agreement_scale: bool = False
     # iter-v1/028 META-LABELING (M2 precision filter) defaults. Strict NO-OP for
     # /002-/027 (byte-identical): when _spec_enable_metalabel=False the universal
     # routing guard dispatches via run_model() exactly as before.  The v1-028 keyed
@@ -4810,6 +4839,98 @@ def main() -> None:
             f"20 seeds -> MERGE BASELINE_V1_ETHUSDT if both-positive holds."
         )
 
+    elif iteration_label == "v1-030" and len(symbols) == 1 and symbols[0] == "ETHUSDT":
+        # iter-v1/030 EXPLORATION (ETHUSDT, single-symbol) — AGREE_SCALE multi-speed
+        # AGREEMENT conviction modulator. SINGLE AXIS vs the merged iter-027 stack: keep
+        # the ENTIRE iter-027 M1 stack (19-col HYBRID, fixed_horizon N=42(14d),
+        # let-winners-run exec atr_tp=100/sl=1.45, stateless 200-SMA trend-state DIRECTION
+        # on ETH's own close, conviction gate q=0.40, ETH-calibrated R2 trig 4.07/anch
+        # 16.27/floor 0.20, R3/R5) and ADD ONLY _spec_enable_agreement_scale=True. M2
+        # meta-labeling is OFF (_spec_enable_metalabel stays False → generic run_model path).
+        #
+        # THE ONE CHANGE (QR brief §3.2): the conviction-gate quantity
+        #   conv = |close[t-1]-SMA200[t-1]|/ATR14[t-1]   (UNCHANGED iter-027 quantity)
+        # is multiplied by a deterministic, past-only AGREEMENT fraction over a PINNED
+        # 3-signal panel (P3 = {ema_cross(50,200), donchian(55), tsmom(42)}) that points the
+        # SAME way as the UNCHANGED SMA200 anchor direction. Low-agreement (chop) rows shrink
+        # below the q=0.40 gate and stand aside; high-agreement rows keep full conviction.
+        # The executed DIRECTION sign is BYTE-IDENTICAL to iter-027 — only the gated QUANTITY
+        # changes. IS-only design shown to de-concentrate (top-2 0.043→0.033) and lift Sharpe
+        # (+0.44→+0.56) across 6/6 panels (brief §1.5) WITHOUT giving up the recent-regime edge.
+        #
+        # LOOK-AHEAD SAFETY (load-bearing): every panel member is `.shift(1)` past-only and
+        # the agreement multiplier is applied to the |dist_atr| SERIES at build time in
+        # lgbm.compute_features() — so BOTH the per-month q-quantile threshold AND the
+        # per-candle gated value are built from the modulated series (the whole trick).
+        # Where |dist_atr| is NaN (SMA200/ATR warmup) the product stays NaN → conservative
+        # fire exactly as iter-027. See tests/test_agreement_scale_lookahead.py.
+        #
+        # RISK (brief §2.6): NORMAL-RISK — deterministic past-only multiplier on the existing
+        # conviction quantity; no new trained model, no new LightGBM feature column, no
+        # label/universe/bar change; does NOT change Optuna's training-objective domain.
+        #
+        # NOTE: the multi-symbol v1-030 M2-meta-labeling branch (set(symbols) ==
+        # V1_BASELINE_UNIVERSE) is a SEPARATE, REJECTED design and is NEVER reached for a
+        # single ETH symbol (its guard requires the 5-symbol baseline universe).
+        import pyarrow.parquet as pq  # noqa: PLC0415
+
+        _spec_sym_030 = symbols[0]
+        _iter030_parquet = Path("data/features") / f"{_spec_sym_030}_8h_features.parquet"
+        assert _iter030_parquet.exists(), (
+            f"iter-v1/030: feature parquet not found at {_iter030_parquet}. "
+            f"Re-fetch + regen {_spec_sym_030} 8h v1 features before running."
+        )
+        _parquet_cols = set(pq.ParquetFile(_iter030_parquet).schema.names)
+        _missing = [c for c in V1_BTC_ITER009_FEATURES if c not in _parquet_cols]
+        assert not _missing, (
+            f"iter-v1/030: {len(_missing)} of the 19 feature columns NOT in "
+            f"{_spec_sym_030} parquet — {_missing}."
+        )
+        assert len(V1_BTC_ITER009_FEATURES) == 19, (
+            "iter-v1/030: V1_BTC_ITER009_FEATURES must be the 19-col HYBRID stack."
+        )
+        # The AGREE_SCALE panel + trend-strength gate also need close/high/low on the
+        # trend-state symbol parquet (ETH's own).
+        _str_needed = {"close", "high", "low", "close_time"}
+        _str_missing = [c for c in _str_needed if c not in _parquet_cols]
+        assert not _str_missing, (
+            f"iter-v1/030: AGREE_SCALE panel needs {_str_missing} on the {_spec_sym_030} parquet."
+        )
+        # M1 stack — BYTE-IDENTICAL to the v1-027 keyed block above (M2 OFF).
+        _spec_feature_columns = list(V1_BTC_ITER009_FEATURES)  # == /027 (19-col HYBRID)
+        _spec_label_mode = "fixed_horizon"  # == /027
+        _spec_use_atr_labeling = False  # == /027
+        _spec_label_timeout_minutes = 20160  # 42 candles = 14d == /027
+        _spec_atr_tp = 100.0  # TP NON-BINDING (let winners run) == /027
+        _spec_atr_sl = 1.45  # protective stop == /027
+        _spec_execution_timeout_minutes = 20160  # 14d == /027
+        _spec_enable_trend_state_dir = True  # == /027 (DIRECTION override KEEPER; UNCHANGED)
+        _spec_trend_state_sma_window = 200
+        _spec_trend_state_symbol = _spec_sym_030  # ETH's own trend == /027
+        _spec_enable_trend_strength_gate = True  # == /027 (conviction gate KEEPER)
+        _spec_trend_strength_atr_window = 14
+        _spec_trend_strength_quantile = 0.40  # == /027
+        _spec_apply_r2 = True  # ETH-calibrated R2 == /027
+        _spec_r2_trigger_pct = 4.07  # == /027 (6.5% of 62.60)
+        _spec_r2_scale_anchor_pct = 16.27  # == /027 (26% of 62.60)
+        _spec_r2_scale_floor = 0.20  # == /027
+        _spec_enable_metalabel = False  # M2 OFF (generic run_model path; single-axis)
+        # --- NEW (the ONLY change vs /027): AGREE_SCALE conviction modulator ---
+        _spec_enable_agreement_scale = True
+        print(
+            f"[iter-v1/030] EXPLORATION ({_spec_sym_030}) — AGREE_SCALE multi-speed AGREEMENT "
+            f"conviction modulator. SINGLE AXIS vs /027: full iter-027 M1 stack "
+            f"(19-col HYBRID + fixed_horizon N=42(14d) let-winners-run atr_tp={_spec_atr_tp}/"
+            f"sl={_spec_atr_sl} + TREND-STATE DIR sma=200 symbol={_spec_trend_state_symbol} "
+            f"+ conviction gate q={_spec_trend_strength_quantile} + ETH R2 brake "
+            f"(trig={_spec_r2_trigger_pct}/anch={_spec_r2_scale_anchor_pct}/"
+            f"floor={_spec_r2_scale_floor}) "
+            f"+ R3=ON({BASELINE_OOD_CUTOFF_PCT}) R5/vt=ON) PLUS AGREE_SCALE ON "
+            f"(panel={V1_ITER030_AGREE_PANEL}; PINNED P3 = {{ema_cross(50,200),donchian(55),"
+            f"tsmom(42)}} vs SMA200 anchor; conv *= agreement∈{{0,1/3,2/3,1}}; NORMAL-RISK; "
+            f"past-only; DIRECTION sign UNCHANGED). M2=OFF (single-axis)."
+        )
+
     elif iteration_label == "v1-028":
         # iter-v1/028 META-LABELING (López de Prado AFML Ch.3) on ETH. The MERGED
         # iter-027 stack is the PRIMARY (M1) UNCHANGED; a SECONDARY (M2) LGBMClassifier
@@ -4884,6 +5005,78 @@ def main() -> None:
             f"M2 = LGBMClassifier veto<{_spec_m2_veto_threshold} on {_n_m2}-col positioning set "
             f"(n_trials_m2={_spec_m2_n_trials} bounds={_spec_m2_bounds_profile}). "
             f"De-concentrates the OOS book; targets the iter-027 OOS-concentration falsifier."
+        )
+
+    elif iteration_label == "v1-029":
+        # iter-v1/029 CONFIRMATION (K=20, ETHUSDT) — META-LABELING ARBITER of /028.
+        # Validates the iter-028 K=5 EXPLORATION (IS +0.2705 / OOS +0.2097, ratio +0.78 —
+        # the most coherent both-positive of the ETH campaign) across K=20 bagging studies.
+        # Config is BYTE-IDENTICAL to the v1-028 keyed block (M1 = iter-027 proven trend-state
+        # stack; M2 = LGBMClassifier veto<0.45 on the 15-col positioning set). The ONLY
+        # difference vs /028 is K (5 -> 20, via --confirmation). M2 is a LEARNED layer
+        # (per-seed which trades it keeps varies) so it adds seed-variance — the K=20 tests
+        # whether the coherent both-positive HOLDS (like the deterministic iter-020/027
+        # trend-state direction) or REGRESSES (like the iter-026 sizing lottery +0.97->+0.06).
+        # If IS>0 AND OOS>0 across 20 seeds -> MERGE as a more-coherent BASELINE_V1_ETHUSDT
+        # (replaces iter-027); else the meta-labeling K=5 OOS was seed-variance -> pursue
+        # BREADTH (SMA-ensemble M1) instead.
+        import pyarrow.parquet as pq  # noqa: PLC0415
+
+        _spec_sym_029 = symbols[0]
+        _iter029_parquet = Path("data/features") / f"{_spec_sym_029}_8h_features.parquet"
+        assert _iter029_parquet.exists(), (
+            f"iter-v1/029: feature parquet not found at {_iter029_parquet}."
+        )
+        _parquet_cols = set(pq.ParquetFile(_iter029_parquet).schema.names)
+        _missing_m1 = [c for c in V1_BTC_ITER009_FEATURES if c not in _parquet_cols]
+        assert not _missing_m1, (
+            f"iter-v1/029: {len(_missing_m1)} of the 19 M1 feature columns NOT in "
+            f"{_spec_sym_029} parquet — {_missing_m1}."
+        )
+        _missing_m2 = [c for c in V1_ITER028_M2_FEATURES if c not in _parquet_cols]
+        assert not _missing_m2, (
+            f"iter-v1/029: {len(_missing_m2)} of the 15 M2 feature columns NOT in "
+            f"{_spec_sym_029} parquet — {_missing_m2}."
+        )
+        assert len(set(V1_ITER028_M2_FEATURES)) == 15, (
+            "iter-v1/029: V1_ITER028_M2_FEATURES must be 15 distinct columns."
+        )
+        # M1 stack — IDENTICAL to the v1-027 + v1-028 keyed blocks.
+        _spec_feature_columns = list(V1_BTC_ITER009_FEATURES)
+        _spec_label_mode = "fixed_horizon"
+        _spec_use_atr_labeling = False
+        _spec_label_timeout_minutes = 20160  # 14d == /027 + /028
+        _spec_atr_tp = 100.0  # == /028
+        _spec_atr_sl = 1.45  # == /028
+        _spec_execution_timeout_minutes = 20160  # == /028
+        _spec_enable_trend_state_dir = True  # == /028
+        _spec_trend_state_sma_window = 200
+        _spec_trend_state_symbol = _spec_sym_029  # ETH's own trend
+        _spec_enable_trend_strength_gate = True  # conviction gate == /028
+        _spec_trend_strength_atr_window = 14
+        _spec_trend_strength_quantile = 0.40
+        # ETH-calibrated R2 drawdown brake (== /027 + /028).
+        _spec_apply_r2 = True
+        _spec_r2_trigger_pct = 4.07
+        _spec_r2_scale_anchor_pct = 16.27
+        _spec_r2_scale_floor = 0.20
+        # M2 meta-labeling layer ON (== /028).
+        _spec_enable_metalabel = True
+        _spec_m2_feature_columns = list(V1_ITER028_M2_FEATURES)
+        _spec_m2_veto_threshold = 0.45
+        _spec_m2_n_trials = V1_ITER030_N_TRIALS_M2  # 18 (LM Master §2.3)
+        _spec_m2_bounds_profile = V1_ITER030_BOUNDS_PROFILE_M2  # "v1_030"
+        _n_m2 = len(_spec_m2_feature_columns)
+        print(
+            f"[iter-v1/029] CONFIRMATION (K=20, {_spec_sym_029}) — META-LABELING ARBITER of /028. "
+            f"M1 = iter-027 proven stack (19-col HYBRID + fixed_horizon N=42(14d) let-winners-run "
+            f"+ TREND-STATE DIR sma=200 symbol={_spec_trend_state_symbol} + conviction gate q=0.40 "
+            f"+ R2 trig={_spec_r2_trigger_pct}/anch={_spec_r2_scale_anchor_pct}"
+            f"/floor={_spec_r2_scale_floor}). "
+            f"M2 = LGBMClassifier veto<{_spec_m2_veto_threshold} on {_n_m2}-col positioning set "
+            f"(n_trials_m2={_spec_m2_n_trials} bounds={_spec_m2_bounds_profile}). "
+            f"Validates iter-028 (IS +0.27/OOS +0.21, ratio +0.78) across 20 seeds -> MERGE "
+            f"more-coherent BASELINE_V1_ETHUSDT if both-positive holds."
         )
 
     # CLI precedence hook for the trend-state override (ad-hoc control runs).
@@ -4971,6 +5164,7 @@ def main() -> None:
             _spec_enable_trend_strength_gate
             or _spec_enable_trend_state_dir
             or _spec_enable_funding_contra_readmit
+            or _spec_enable_agreement_scale  # iter-v1/030: persist AGREE_SCALE skip attribution
         ):
             _dl_spec_path = (
                 Path(reports_dir) / f"iteration_{iteration_label}" / "decision_log.jsonl"
@@ -5039,6 +5233,9 @@ def main() -> None:
                 enable_trend_strength_gate=_spec_enable_trend_strength_gate,
                 trend_strength_atr_window=_spec_trend_strength_atr_window,
                 trend_strength_quantile=_spec_trend_strength_quantile,
+                # iter-v1/030: AGREE_SCALE conviction modulator (default OFF; symmetry only —
+                # iter-030 EXPLORATION keeps M2 OFF so this path is not exercised).
+                enable_agreement_scale=_spec_enable_agreement_scale,
                 # M2 layer: distinct positioning feature set + configurable veto.
                 m2_feature_columns=_spec_m2_feature_columns,
                 m2_veto_threshold=_spec_m2_veto_threshold,
@@ -5110,6 +5307,10 @@ def main() -> None:
                 enable_funding_contra_readmit=_spec_enable_funding_contra_readmit,
                 funding_contra_col=_spec_funding_contra_col,
                 funding_contra_quantile=_spec_funding_contra_quantile,
+                # iter-v1/030: AGREE_SCALE conviction modulator. Default (False) keeps ALL
+                # other single-symbol iterations (iter-016→029) BIT-IDENTICAL; the v1-030 ETH
+                # keyed block sets _spec_enable_agreement_scale=True.
+                enable_agreement_scale=_spec_enable_agreement_scale,
             )
 
         # Cohort isolation sanity: assert ONLY the target symbol's trades emitted.

@@ -1,0 +1,94 @@
+====================================================================================================
+iter-v1/030 BREADTH EDA — Multi-speed trend-state ENSEMBLE vs single SMA-200 (ETHUSDT, IS-ONLY)
+====================================================================================================
+IS rows (open_time < 1742774400000): 5727
+IS date span: 2020-01-01 00:00:00 .. 2025-03-23 16:00:00
+Forward-return horizon: 42 candles (= 14d @ 8h)
+
+Embargo-safe scorable candles (t+42 still inside IS): 5685 (dropped last 42 IS candles whose fwd window crosses cutoff)
+
+----------------------------------------------------------------------------------------------------
+WARMUP COVERAGE (fraction of IS candles with a defined direction; ensemble needs ALL members warm)
+----------------------------------------------------------------------------------------------------
+rule                                 defined  cov_frac  active(!=0)
+single_sma200                           5527     0.965         5527
+ens_sma_majority                        5427     0.948         5427
+ens_sma_signed_avg(0.20)                5427     0.948         5427
+ens_sma+tsmom_majority                  5427     0.948         5073
+ens_sma+tsmom_signed_avg(0.25)          5427     0.948         5073
+
+----------------------------------------------------------------------------------------------------
+AGREEMENT vs single_sma200 + DISAGREEMENT directional accuracy (proxy: sign(fwd 14d return))
+  acc = P(direction sign == sign(fwd_return)); computed on EMBARGO-SAFE candles only
+----------------------------------------------------------------------------------------------------
+rule                                 agree%  disagree_n  rule_acc_dis  sma200_acc_dis
+single_sma200                         --             --            --              --
+ens_sma_majority                      92.2%         422         0.500           0.500
+ens_sma_signed_avg(0.20)              92.2%         422         0.500           0.500
+ens_sma+tsmom_majority                89.8%         518         0.494           0.506
+ens_sma+tsmom_signed_avg(0.25)        89.8%         518         0.494           0.506
+
+----------------------------------------------------------------------------------------------------
+OVERALL directional accuracy (embargo-safe, active candles only): P(dir == sign(fwd14d))
+  + mean signed fwd return per active candle (dir * fwd) — a raw 'edge per signal' proxy (NO costs)
+----------------------------------------------------------------------------------------------------
+rule                               n_active_emb   dir_acc   mean_dir*fwd  sharpe_like
+single_sma200                              5485     0.531        0.02058       0.1223
+ens_sma_majority                           5385     0.539        0.02002       0.1195
+ens_sma_signed_avg(0.20)                   5385     0.539        0.02002       0.1195
+ens_sma+tsmom_majority                     5031     0.539        0.02214       0.1315
+ens_sma+tsmom_signed_avg(0.25)             5031     0.539        0.02214       0.1315
+
+----------------------------------------------------------------------------------------------------
+CONCENTRATION of the per-candle direction*fwd14d book (embargo-safe, active candles, NO costs)
+  Lower top1/top2/HHI = MORE DIVERSIFIED. This is the iter-030 hypothesis test.
+----------------------------------------------------------------------------------------------------
+rule                                    n  top1_share  top2_share       HHI       1/N
+single_sma200                        5485      0.0017      0.0032    0.0003    0.0002
+ens_sma_majority                     5385      0.0017      0.0033    0.0004    0.0002
+ens_sma_signed_avg(0.20)             5385      0.0017      0.0033    0.0004    0.0002
+ens_sma+tsmom_majority               5031      0.0018      0.0035    0.0004    0.0002
+ens_sma+tsmom_signed_avg(0.25)       5031      0.0018      0.0035    0.0004    0.0002
+
+----------------------------------------------------------------------------------------------------
+BREADTH / TEMPORAL SPREAD (full IS, all defined candles)
+  More sign_changes = more entries; smaller max_run = less single-regime concentration
+----------------------------------------------------------------------------------------------------
+rule                                n_active  sign_changes  flip_rate  max_run
+single_sma200                           5527           151     0.0273      409
+ens_sma_majority                        5427           178     0.0328      343
+ens_sma_signed_avg(0.20)                5427           178     0.0328      343
+ens_sma+tsmom_majority                  5073           145     0.0286      339
+ens_sma+tsmom_signed_avg(0.25)          5073           145     0.0286      339
+
+====================================================================================================
+IS-ONLY VERDICT (relative to single_sma200): does the ensemble DE-CONCENTRATE while preserving accuracy?
+====================================================================================================
+BASELINE single_sma200: dir_acc=0.531  top1=0.0017  top2=0.0032  HHI=0.0003  sharpe_like=0.1223
+
+rule                                  d_acc    d_top1    d_top2     d_HHI   d_sharpe                   verdict
+ens_sma_majority                     +0.007   +0.0000   +0.0001   +0.0000    -0.0028       no de-concentration
+ens_sma_signed_avg(0.20)             +0.007   +0.0000   +0.0001   +0.0000    -0.0028       no de-concentration
+ens_sma+tsmom_majority               +0.008   +0.0002   +0.0003   +0.0000    +0.0092       no de-concentration
+ens_sma+tsmom_signed_avg(0.25)       +0.008   +0.0002   +0.0003   +0.0000    +0.0092       no de-concentration
+
+NOTE: dir*fwd 'sharpe_like' is a RAW per-candle directional-edge proxy with NO costs and
+      NO trade construction (every active candle scored, overlapping 14d windows). It is
+      NOT the backtest Sharpe. Concentration/HHI are the load-bearing iter-030 signals;
+      accuracy is the 'preserves direction-correctness' guardrail.
+
+====================================================================================================
+TRADE-LEVEL CONCENTRATION (consecutive same-direction runs collapsed to 1 trade; IS-only, NO costs)
+  This proxies the REAL trade roster (one trade per direction-regime). LOWER top1/top2/HHI =
+  more diversified roster = the iter-030 de-concentration objective.
+====================================================================================================
+rule                               n_trades     top1     top2      HHI   net_sum   win%
+single_sma200                           151    0.221    0.293   0.0656     3.523  27.8%
+ens_sma_majority                        178    0.215    0.263   0.0589     3.463  29.8%
+ens_sma_signed_avg(0.20)                178    0.215    0.263   0.0589     3.463  29.8%
+ens_sma+tsmom_majority                  145    0.213    0.265   0.0617     5.260  35.2%
+ens_sma+tsmom_signed_avg(0.25)          145    0.213    0.265   0.0617     5.260  35.2%
+
+READING: single_sma200 parks in ONE 409-candle regime -> its largest trades dominate the
+  roster (top1 ~0.22). The SMA-majority ensemble cuts the max regime run to 343, raises the
+  trade count, and lowers top1/top2/HHI -> a more diversified roster at preserved net & win%.

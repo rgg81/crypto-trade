@@ -331,6 +331,10 @@ class MetaLabelingStrategy:
         enable_trend_strength_gate: bool = False,
         trend_strength_atr_window: int = 14,
         trend_strength_quantile: float = 0.50,
+        # iter-v1/030: AGREE_SCALE conviction modulator, forwarded to M1's LightGbmStrategy
+        # for symmetry. Default False = strict NO-OP (iter-030 EXPLORATION keeps M2 OFF, so
+        # this M2 path is not exercised; threaded only so the param surface matches run_model).
+        enable_agreement_scale: bool = False,
         # iter-v1/028: M1 must run the SAME specialist bagging stack as the merged
         # iter-027 baseline (K independent Optuna studies via specialist_mode).
         # Defaults (specialist_mode=False) keep /030 bit-identical.
@@ -420,6 +424,8 @@ class MetaLabelingStrategy:
             enable_trend_strength_gate=enable_trend_strength_gate,
             trend_strength_atr_window=trend_strength_atr_window,
             trend_strength_quantile=trend_strength_quantile,
+            # iter-v1/030: AGREE_SCALE conviction modulator (default OFF; symmetry only).
+            enable_agreement_scale=enable_agreement_scale,
             # iter-v1/028: M1 runs the SAME specialist bagging stack as iter-027.
             specialist_mode=specialist_mode,
             specialist_seed_count=specialist_seed_count,

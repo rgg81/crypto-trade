@@ -323,6 +323,30 @@ class LightGbmStrategy:
         enable_trend_strength_gate: bool = False,
         trend_strength_atr_window: int = 14,  # ATR window (candles) for the ATR-normalizer
         trend_strength_quantile: float = 0.50,  # past-only |dist_atr| q-quantile threshold
+        # iter-v1/030: multi-speed AGREEMENT conviction modulator (AGREE_SCALE, RULE-layer,
+        # NORMAL-RISK). When True (AND enable_trend_strength_gate=True), the trend-strength
+        # conviction quantity |close[t-1]-SMA200[t-1]|/ATR14[t-1] is MULTIPLIED by a
+        # deterministic, past-only AGREEMENT score = fraction of a PINNED 3-signal panel P3
+        # that points the SAME way as the UNCHANGED SMA200 trend-state direction:
+        #   s1 = ema_cross_sign(close, 50, 200)   # +1 if EMA50[t-1] > EMA200[t-1] else -1
+        #   s2 = donchian_breakout_sign(55)       # +1 if close[t-1] >= midline(H/L,55)[t-1] else -1
+        #   s3 = tsmom_sign(42)                    # +1 if close[t-1]/close[t-43]-1 > 0 else -1
+        #   anchor = +1 if close[t-1] > SMA200[t-1] else -1   (the iter-027 direction; UNCHANGED)
+        #   agreement = mean({s1,s2,s3} == anchor) in {0, 1/3, 2/3, 1}
+        #   conv_modulated = |dist_atr| * agreement
+        # Modulating the SERIES at build time makes BOTH the per-month q-quantile threshold
+        # AND the per-candle gated value consistent (the whole trick). Low-agreement (chop)
+        # rows shrink below the q-gate and stand aside; high-agreement rows keep full
+        # conviction. The executed DIRECTION sign is byte-identical to iter-027 — only the
+        # conviction-gate QUANTITY changes. Where |dist_atr| is NaN (SMA200/ATR warmup) the
+        # product stays NaN → the gate falls back to a conservative fire exactly as today;
+        # the panel's warmup signs are irrelevant there. The panel is a SINGLE PINNED axis
+        # (windows hardcoded in compute_features per the QR's committed P3_family_3 in
+        # analysis/ETHUSDT/iteration_v1-030/agree_scale_robustness.py) — NOT tunable.
+        # Mirrors blend_agreement.py `conv_agree_scale = conv * agree_with_anchor`.
+        # Default False = BIT-IDENTICAL to all prior runs (iter-016→029) and v2/v3.
+        # ONLY enabled in the iter-v1/030 ETH specialist cell.
+        enable_agreement_scale: bool = False,
         # iter-v1/021: FUNDING-CONTRA-CROWD re-admission (RULE-layer, NORMAL-RISK).
         # RE-ADMITS a row the trend-strength gate would SKIP (weak trend) IFF funding
         # OPPOSES the trend-state direction AND |funding_z30[t-1]| >= a past-only per-month
@@ -565,6 +589,13 @@ class LightGbmStrategy:
         self._enable_trend_strength_gate: bool = bool(enable_trend_strength_gate)
         self._trend_strength_atr_window: int = int(trend_strength_atr_window)
         self._trend_strength_quantile: float = float(trend_strength_quantile)
+        # iter-v1/030: AGREE_SCALE multi-speed agreement conviction modulator (RULE layer).
+        # When True (with the trend-strength gate), compute_features() multiplies the
+        # |dist_atr| series by a deterministic past-only PINNED-P3 agreement score before
+        # it is stored in _trend_strength_idx[1] — so the per-month threshold and the
+        # per-candle gated value are both built from the modulated series. Default False =
+        # BIT-IDENTICAL to iter-016→029 (the raw |dist_atr| is stored unchanged).
+        self._enable_agreement_scale: bool = bool(enable_agreement_scale)
         # Sorted (close_time_ms, abs_dist_atr) index — built in compute_features() when
         # enable_trend_strength_gate=True from the trend_state_symbol parquet's
         # close/high/low (the gate measures distance from the SAME SMA200 used for
@@ -893,6 +924,53 @@ class LightGbmStrategy:
             _atr_safe = np.where(_atr > 0, _atr, np.nan)
             _dist_atr = (_cp - _sma) / _atr_safe  # signed trend strength, past-only
             _abs_dist = np.abs(_dist_atr)
+            # iter-v1/030: AGREE_SCALE — modulate the conviction quantity by a deterministic,
+            # past-only multi-speed AGREEMENT score (PINNED panel P3). The executed DIRECTION
+            # (the SMA200 trend-state sign) is UNCHANGED; only the gated QUANTITY shrinks in
+            # low-agreement (chop) regimes. Every panel member is `.shift(1)`-lagged in the
+            # SAME _cp/_sma style as the existing build, so NO data at or after candle t-1's
+            # close enters row t. Mirrors EXACTLY the QR's committed primitives:
+            #   analysis/ETHUSDT/iteration_v1-030/multispeed_breadth.py
+            #     ema_cross_sign / donchian_breakout_sign / tsmom_sign / sma_sign (anchor)
+            #   analysis/ETHUSDT/iteration_v1-030/agree_scale_robustness.py
+            #     P3_family_3 = [ma_cross_sign(50,200), donchian_breakout_sign(55), tsmom_sign(42)]
+            #   analysis/ETHUSDT/iteration_v1-030/blend_agreement.py
+            #     agree = mean(panel == anchor, axis=0);  conv_agree_scale = conv * agree
+            # Because _abs_dist is NaN during SMA200/ATR warmup, _abs_dist*agreement stays NaN
+            # there → the gate falls back exactly as today; the panel's warmup −1.0 signs are
+            # irrelevant where _abs_dist is NaN (replicates blend_agreement.py gating only on
+            # finite conv). Default-off (_enable_agreement_scale=False) leaves _abs_dist the
+            # raw byte-identical iter-016→029 series.
+            if self._enable_agreement_scale:
+                _str_close_s = _pd_str.Series(_str_close)
+                _str_high_s = _pd_str.Series(_str_high)
+                _str_low_s = _pd_str.Series(_str_low)
+                # anchor: +1 if close[t-1] > SMA_W[t-1] else -1 (the UNCHANGED iter-027 sign;
+                # uses the same _cp/_sma already computed above — byte-identical to direction).
+                _anchor_sign = np.where(_cp > _sma, 1.0, -1.0)
+                # s1 = ema_cross_sign(50, 200): +1 if EMA50[t-1] > EMA200[t-1] else -1
+                _ema_f = _str_close_s.ewm(span=50, adjust=False).mean().shift(1).to_numpy()
+                _ema_s = _str_close_s.ewm(span=200, adjust=False).mean().shift(1).to_numpy()
+                _s1 = np.where(_ema_f > _ema_s, 1.0, -1.0)
+                # s2 = donchian_breakout_sign(55): +1 if close[t-1] >= midline(H/L,55)[t-1]
+                _donch_hi = _str_high_s.shift(1).rolling(55).max().to_numpy()
+                _donch_lo = _str_low_s.shift(1).rolling(55).min().to_numpy()
+                _donch_mid = (_donch_hi + _donch_lo) / 2.0
+                _s2 = np.where(_cp >= _donch_mid, 1.0, -1.0)
+                # s3 = tsmom_sign(42): +1 if close[t-1]/close[t-43]-1 > 0 else -1
+                _tsmom_ret = _cp / _pd_str.Series(_cp).shift(42).to_numpy() - 1.0
+                _s3 = np.where(_tsmom_ret > 0, 1.0, -1.0)
+                # agreement = fraction of {s1,s2,s3} pointing the SAME way as the anchor.
+                _panel = np.vstack([_s1, _s2, _s3])  # (3, N) PINNED P3 panel
+                _agreement = np.mean(_panel == _anchor_sign, axis=0)  # in {0, 1/3, 2/3, 1}
+                _abs_dist = _abs_dist * _agreement  # NaN stays NaN at warmup → gate fallback
+                if self.verbose > 0:
+                    print(
+                        "[lgbm][iter-v1/030] AGREE_SCALE active: conviction quantity "
+                        "|dist_atr| * agreement(P3) where P3 = {ema_cross(50,200), "
+                        "donchian(55), tsmom(42)} vs SMA200 anchor; modulated at build time "
+                        "so BOTH the per-month threshold and per-candle value are consistent."
+                    )
             self._trend_strength_idx = (_str_ot, _abs_dist.astype(np.float64))
             if self._trend_strength_idx is None:
                 raise RuntimeError(
@@ -2998,6 +3076,7 @@ class LightGbmStrategy:
                                 "trend_strength_quantile": self._trend_strength_quantile,
                                 "trend_strength_atr_window": self._trend_strength_atr_window,
                                 "sma_window": self._trend_state_sma_window,
+                                "agreement_scale": self._enable_agreement_scale,
                                 "decision": "skipped:weak_trend_chop",
                             }
                         )

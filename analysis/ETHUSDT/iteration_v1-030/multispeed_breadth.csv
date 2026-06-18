@@ -1,0 +1,8 @@
+name,n_gated_trades,signal_hit_rate_all_rows,gated_win_rate,gated_n_winners,per_trade_sharpe_ann,net_sum,top1_share_of_net,top2_share_of_net,herfindahl_abs_pnl
+ANCHOR_sma200,3291,0.5256,0.5242,1725,0.4363,49.3522,0.0217,0.0433,0.00057
+A_sma_majority_100_150_200_300,3291,0.5186,0.5245,1726,0.44,49.7656,0.0215,0.0429,0.00057
+Aprime_sma_signed_avg,3291,0.5186,0.5245,1726,0.44,49.7656,0.0215,0.0429,0.00057
+Aprime2_signed_avg_agree50,3026,0.5186,0.5202,1574,0.3784,39.0113,0.0274,0.0548,0.00061
+B_tsmom_majority_21_42_84,3291,0.5347,0.5293,1742,0.5541,62.5159,0.0171,0.0342,0.00057
+C_family_macross_donchian_tsmom,3291,0.5395,0.5333,1755,0.617,69.5061,0.0154,0.0308,0.00057
+D_grand_signed_avg,3291,0.5265,0.529,1741,0.5359,60.4866,0.0177,0.0353,0.00057
