@@ -4958,7 +4958,7 @@ def main() -> None:
         # iter-047 (R2-OFF) was both-positive (IS +0.1465 / OOS +0.5626) but 82% uncontrolled IS
         # MaxDD. R2 = 6.5%/26% on IS maxDD 82.04 -> trig 5.33 / anch 21.33 / floor 0.20. THETA IS is
         # POSITIVE (unlike DOT/ZEC) so R2 may control the DD without over-braking. If both-positive
-        # HOLDS -> MERGE BASELINE_V1_THETAUSDT (1st low-corr portfolio coin). Else merge R2-OFF /047. K-inv.
+        # HOLDS -> MERGE BASELINE_V1_THETAUSDT. Else merge R2-OFF /047. K-invariant.
         import pyarrow.parquet as pq  # noqa: PLC0415
 
         _spec_sym_048 = symbols[0]
