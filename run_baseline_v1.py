@@ -12385,9 +12385,14 @@ def main() -> None:
     # TradeResult is frozen — annotation is applied via CSV post-processing on
     # the already-written trades.csv files from generate_iteration_reports().
     # -------------------------------------------------------------------------
-    if iteration_label == "v1-030":
+    if iteration_label == "v1-030" and set(symbols) == set(V1_BASELINE_UNIVERSE):
         # Build a set of (open_time, symbol) keys for M2-active trades (A/C/D).
         # Model E trades have m2_passed=NaN (absent = inactive).
+        # GUARD (iter-v1/030 single-symbol fix): this m2_passed annotation belongs to
+        # the LEGACY 5-symbol M2 path (results_a030/c030/d030, defined only in the
+        # `set(symbols)==V1_BASELINE_UNIVERSE` config branch at ~L12139). The single-symbol
+        # ETH AGREE_SCALE v1-030 path never assigns those vars, so this block must be
+        # universe-gated to match — otherwise UnboundLocalError. AGREE_SCALE has no M2 layer.
         _m2_active_keys: set[tuple[int, str]] = {
             (t.open_time, t.symbol) for t in (results_a030 + results_c030 + results_d030)
         }
