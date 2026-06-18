@@ -684,6 +684,13 @@ def run_model(
     reversion_natr_quantile: float = 0.40,
     reversion_natr_col: str = "vol_natr_14",
     deterministic_entry_only: bool = False,
+    enable_trend_optuna_sma: bool = False,
+    trend_optuna_sma_min: int = 50,
+    trend_optuna_sma_max: int = 400,
+    trend_optuna_sma_step: int = 25,
+    trend_optuna_n_trials: int = 30,
+    trend_optuna_min_trades: int = 10,
+    trend_optuna_cost_pct: float = 0.14,
 ):
     """Run a single v1 sub-model (A/C/D/E) under the corrected walk-forward.
 
@@ -883,6 +890,15 @@ def run_model(
         # iter-v1/034: PURE-DETERMINISTIC entry — bypass the LightGBM entry decision.
         # Default False = BIT-IDENTICAL to all prior single-symbol dispatches and v2/v3.
         deterministic_entry_only=deterministic_entry_only,
+        # iter-v1/053: WALK-FORWARD OPTUNA SMA SELECTION — Optuna-select the trend SMA
+        # window per-month on the PAST training window. Default False = BIT-IDENTICAL.
+        enable_trend_optuna_sma=enable_trend_optuna_sma,
+        trend_optuna_sma_min=trend_optuna_sma_min,
+        trend_optuna_sma_max=trend_optuna_sma_max,
+        trend_optuna_sma_step=trend_optuna_sma_step,
+        trend_optuna_n_trials=trend_optuna_n_trials,
+        trend_optuna_min_trades=trend_optuna_min_trades,
+        trend_optuna_cost_pct=trend_optuna_cost_pct,
     )
     t0 = time.time()
     results = run_backtest(config, strategy, yearly_pnl_check=False)
@@ -3979,6 +3995,18 @@ def main() -> None:
     # direction alone decide entry/direction (model output unused → result is independent
     # of K / n_trials). Threads through the generic run_model dispatch.
     _spec_deterministic_entry_only: bool = False
+    # iter-v1/053 WALK-FORWARD OPTUNA SMA SELECTION defaults. Strict NO-OP for /002-/052
+    # (byte-identical); the v1-053 keyed block below flips it True. When True (with
+    # deterministic_entry_only + the trend-state/strength gates), the SMA window is
+    # Optuna-selected PER MONTH on the PAST training window — the legitimate way to "tune
+    # the 200" without OOS leak. Threads through the generic run_model dispatch.
+    _spec_enable_trend_optuna_sma: bool = False
+    _spec_trend_optuna_sma_min: int = 50
+    _spec_trend_optuna_sma_max: int = 400
+    _spec_trend_optuna_sma_step: int = 25
+    _spec_trend_optuna_n_trials: int = 30
+    _spec_trend_optuna_min_trades: int = 10
+    _spec_trend_optuna_cost_pct: float = 0.14
     # iter-v1/028 META-LABELING (M2 precision filter) defaults. Strict NO-OP for
     # /002-/027 (byte-identical): when _spec_enable_metalabel=False the universal
     # routing guard dispatches via run_model() exactly as before.  The v1-028 keyed
@@ -4773,6 +4801,74 @@ def main() -> None:
             f"(trend-state sma=200 + conviction gate q=0.40 + deterministic_entry_only, R2 OFF, "
             f"R3/R5 ON). Does the strip-model deterministic core generalize both-positive on "
             f"{_spec_sym_sweep}? K-invariant; directional screen, not a baseline."
+        )
+    elif iteration_label in ("v1-053", "v1-054", "v1-055") and len(symbols) == 1:
+        # iter-v1/053 — WALK-FORWARD OPTUNA SMA SELECTION (the long-trend strategy that
+        # REPLACES LightGBM in the decision). Same deterministic core as the merged ETH
+        # iter-034 baseline (trend-state DIRECTION + conviction gate q=0.40 +
+        # deterministic_entry_only → model bypassed, R2 OFF, R3/R5 ON), with ONE change:
+        # the trend SMA window is no longer hardcoded at 200 — it is Optuna-selected PER
+        # MONTH on the PAST training window only (walk-forward, embargo-respected). This is
+        # the user's directive: the legitimate, NON-OOS-CHEATING way to "tune the 200". The
+        # window adapts to each month's past regime; never reads OOS. The LightGBM scaffold
+        # still trains (K=1, bypassed) but plays NO role. Compared head-to-head against the
+        # fixed-200 deterministic baseline (iter-034 ETH) — does adaptive walk-forward window
+        # selection match or beat the fixed window WITHOUT OOS leak?
+        import pyarrow.parquet as pq  # noqa: PLC0415
+
+        _spec_sym_053 = symbols[0]
+        _iter053_parquet = Path("data/features") / f"{_spec_sym_053}_8h_features.parquet"
+        assert _iter053_parquet.exists(), (
+            f"{iteration_label}: feature parquet not found at {_iter053_parquet}."
+        )
+        _parquet_cols = set(pq.ParquetFile(_iter053_parquet).schema.names)
+        _missing = [c for c in V1_BTC_ITER009_FEATURES if c not in _parquet_cols]
+        assert not _missing, (
+            f"{iteration_label}: {len(_missing)} feature cols missing in {_spec_sym_053} parquet."
+        )
+        _str_missing = [c for c in ("close", "high", "low", "close_time") if c not in _parquet_cols]
+        assert not _str_missing, (
+            f"{iteration_label}: gate needs {_str_missing} on {_spec_sym_053} parquet."
+        )
+        _spec_feature_columns = list(V1_BTC_ITER009_FEATURES)
+        _spec_label_mode = "fixed_horizon"
+        _spec_use_atr_labeling = False
+        _spec_label_timeout_minutes = 20160  # 42 candles = 14d (== /034)
+        _spec_atr_tp = 100.0
+        _spec_atr_sl = 1.45
+        _spec_execution_timeout_minutes = 20160
+        _spec_apply_r2 = False  # R2 OFF — matches the deterministic sweep/ETH-034 read
+        _spec_enable_trend_state_dir = True
+        _spec_trend_state_sma_window = 200  # FALLBACK only (used if no window clears floor)
+        _spec_trend_state_symbol = _spec_sym_053
+        _spec_enable_trend_strength_gate = True
+        _spec_trend_strength_atr_window = 14
+        _spec_trend_strength_quantile = 0.40
+        _spec_enable_metalabel = False
+        _spec_deterministic_entry_only = True
+        # THE iter-053 change: walk-forward Optuna SMA selection ON.
+        _spec_enable_trend_optuna_sma = True
+        # iter-053 = WIDE neutral grid 50..400. iter-054 = restricted to the documented
+        # robust plateau 100..300 (the code's own `trend_state_sma_window` comment: "flat
+        # plateau 100-300") — removes the damaging extremes (50/400) that overfit the
+        # trailing regime. Pre-justified band, NOT OOS-tuned.
+        if iteration_label == "v1-054":
+            _spec_trend_optuna_sma_min = 100
+            _spec_trend_optuna_sma_max = 300
+        else:
+            _spec_trend_optuna_sma_min = 50
+            _spec_trend_optuna_sma_max = 400
+        _spec_trend_optuna_sma_step = 25
+        _spec_trend_optuna_n_trials = 30
+        _spec_trend_optuna_min_trades = 10
+        _spec_trend_optuna_cost_pct = 0.14
+        print(
+            f"[{iteration_label}] WALK-FORWARD OPTUNA SMA ({_spec_sym_053}) — deterministic "
+            f"core with the trend SMA window Optuna-SELECTED per-month on past-only training "
+            f"data (grid {_spec_trend_optuna_sma_min}..{_spec_trend_optuna_sma_max} step "
+            f"{_spec_trend_optuna_sma_step}, {_spec_trend_optuna_n_trials} trials/mo; q=0.40, "
+            f"R2 OFF, R3/R5 ON). The legitimate, non-OOS-cheating way to 'tune the 200'. "
+            f"Head-to-head vs the fixed-200 deterministic baseline."
         )
     elif iteration_label == "v1-040" and len(symbols) == 1 and symbols[0] == "DOTUSDT":
         # iter-v1/040 (DOT) — strip-model deterministic core WITH DOT-calibrated R2 (the
@@ -5943,6 +6039,16 @@ def main() -> None:
                 # keyed block sets _spec_deterministic_entry_only=True (bypass the model
                 # entry decision; conviction gate + trend-state direction decide entry).
                 deterministic_entry_only=_spec_deterministic_entry_only,
+                # iter-v1/053: WALK-FORWARD OPTUNA SMA SELECTION. Default (False) keeps ALL
+                # other single-symbol iterations BIT-IDENTICAL; the v1-053 keyed block sets
+                # _spec_enable_trend_optuna_sma=True (per-month past-only SMA selection).
+                enable_trend_optuna_sma=_spec_enable_trend_optuna_sma,
+                trend_optuna_sma_min=_spec_trend_optuna_sma_min,
+                trend_optuna_sma_max=_spec_trend_optuna_sma_max,
+                trend_optuna_sma_step=_spec_trend_optuna_sma_step,
+                trend_optuna_n_trials=_spec_trend_optuna_n_trials,
+                trend_optuna_min_trades=_spec_trend_optuna_min_trades,
+                trend_optuna_cost_pct=_spec_trend_optuna_cost_pct,
             )
 
         # Cohort isolation sanity: assert ONLY the target symbol's trades emitted.
@@ -5962,6 +6068,13 @@ def main() -> None:
         )
         _spec_disp_is_path.parent.mkdir(parents=True, exist_ok=True)
         _spec_strat.persist_specialist_dispersion_csv(str(_spec_disp_is_path))
+        # iter-v1/053: persist the per-month walk-forward SMA-window selection audit log.
+        if _spec_enable_trend_optuna_sma:
+            _spec_sma_path = (
+                Path(reports_dir) / f"iteration_{iteration_label}" / "sma_selection.csv"
+            )
+            _spec_strat.persist_sma_selection_csv(str(_spec_sma_path))
+            print(f"[v1 specialist] {_spec_sym} walk-forward SMA selection -> {_spec_sma_path}")
         _generic_specialist_disp_mean = _spec_disp_mean
         print(
             f"[v1 specialist] {_spec_sym} dispatch verified: "

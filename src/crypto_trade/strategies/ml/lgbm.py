@@ -412,6 +412,26 @@ class LightGbmStrategy:
         # deterministic core 200-SMA trend-state DIRECTION + conviction gate q=0.40 is what
         # generalizes; this iteration strips the model entry layer entirely).
         deterministic_entry_only: bool = False,
+        # iter-v1/053: WALK-FORWARD OPTUNA SMA SELECTION (the long-trend strategy that
+        # REPLACES LightGBM in the decision). When True (composes with
+        # deterministic_entry_only + enable_trend_state_dir + enable_trend_strength_gate),
+        # _train_for_month() runs an Optuna study over the trend-state SMA WINDOW on the
+        # PAST training window ONLY (train_start_ms..train_end_ms, embargo-respected),
+        # selecting the window W* that maximizes the in-sample deterministic-trend Sharpe.
+        # W* then drives BOTH the direction (_compute_trend_state) AND the conviction gate
+        # (_compute_trend_strength + the per-month q-threshold) for that test month. This
+        # is the legitimate, NON-OOS-CHEATING way to "tune the 200": the window is chosen
+        # each month from past data only — never from OOS, never hardcoded. The LightGBM
+        # model still trains (inert scaffold; bypassed by deterministic_entry_only) but
+        # plays NO role in the decision. Default False = BIT-IDENTICAL to all prior runs
+        # (the fixed trend_state_sma_window is used unchanged).
+        enable_trend_optuna_sma: bool = False,
+        trend_optuna_sma_min: int = 50,  # candidate window grid lower bound
+        trend_optuna_sma_max: int = 400,  # candidate window grid upper bound
+        trend_optuna_sma_step: int = 25,  # candidate window grid step (→ 15 windows)
+        trend_optuna_n_trials: int = 30,  # Optuna trials per month (TPE over the grid)
+        trend_optuna_min_trades: int = 10,  # min in-sample trades for a valid window score
+        trend_optuna_cost_pct: float = 0.14,  # round-trip cost (%) subtracted per sim trade
     ) -> None:
         if not feature_columns:
             raise ValueError(
@@ -713,6 +733,32 @@ class LightGbmStrategy:
         # decision. Enabled via deterministic_entry_only=True (ETH specialist cell only;
         # /034 dispatch). Default-off keeps every existing run BYTE-IDENTICAL.
         self._deterministic_entry_only: bool = bool(deterministic_entry_only)
+        # iter-v1/053: WALK-FORWARD OPTUNA SMA SELECTION. Enabled via
+        # enable_trend_optuna_sma=True (single-symbol cell only; /053 dispatch). Selects the
+        # trend-state SMA window per-month by Optuna on the PAST training window only.
+        # Default-off keeps every existing run BYTE-IDENTICAL (fixed window unchanged).
+        self._enable_trend_optuna_sma: bool = bool(enable_trend_optuna_sma)
+        self._trend_optuna_sma_min: int = int(trend_optuna_sma_min)
+        self._trend_optuna_sma_max: int = int(trend_optuna_sma_max)
+        self._trend_optuna_sma_step: int = int(trend_optuna_sma_step)
+        self._trend_optuna_n_trials: int = int(trend_optuna_n_trials)
+        self._trend_optuna_min_trades: int = int(trend_optuna_min_trades)
+        self._trend_optuna_cost_pct: float = float(trend_optuna_cost_pct)
+        # Per-candidate-window SIGNED past-only dist_atr series (open_time-aligned),
+        # built once in compute_features() when enable_trend_optuna_sma=True:
+        #   dist_atr_W[t] = (close[t-1] - SMA_W(close)[t-1]) / ATR_aw[t-1]   (signed)
+        # The SIGN is the trend-state direction; |dist_atr_W| is the conviction quantity.
+        # Keyed by SMA window int. None until built / when the mode is off.
+        self._trend_dist_by_window: dict[int, np.ndarray] | None = None
+        # open_time-aligned (sorted) open_time + close arrays of the trend_state_symbol,
+        # used by the per-month window-selection objective (built alongside the grid).
+        self._trend_optuna_ot: np.ndarray | None = None
+        self._trend_optuna_close: np.ndarray | None = None
+        # Per-month Optuna-SELECTED SMA window (set each _train_for_month when the mode is
+        # on). None → fall back to the fixed trend_state_sma_window (warmup / mode off).
+        self._selected_sma_window: int | None = None
+        # Audit log: one dict per month — {month, selected_window, train_sharpe, n_windows}.
+        self._sma_selection_log: list[dict] = []
         # iter-v3/072: labeling mode — "triple_barrier" (default, backward-compat)
         # or "fixed_horizon" (sign of N-candle-forward return; no barriers).
         # iter-v3/105: "trend_scanning" (OLS trend, max-|t| horizon selection
@@ -1170,6 +1216,56 @@ class LightGbmStrategy:
                     f"{self._trend_state_symbol} candles from {_str_pq} "
                     f"(sma_window={_w} atr_window={_aw} quantile={self._trend_strength_quantile}; "
                     f"{_n_finite} finite |dist_atr| rows)"
+                )
+
+        # iter-v1/053: WALK-FORWARD OPTUNA SMA grid — build the per-candidate-window SIGNED
+        # past-only dist_atr series (open_time-aligned) once, so the per-month objective can
+        # score any window without re-reading the parquet. Mirrors the /018 trend-strength
+        # build EXACTLY (close[t-1], SMA_W[t-1], ATR_aw[t-1], all `.shift(1)`-lagged) but
+        # keeps the SIGN (the trend direction) and computes it for every grid window.
+        # dist_atr_W[t] = (close[t-1] - SMA_W[t-1]) / ATR_aw[t-1]. NaN during warmup.
+        if self._enable_trend_optuna_sma:
+            _tos_pq = Path(self.features_dir) / f"{self._trend_state_symbol}_8h_features.parquet"
+            if not _tos_pq.exists():
+                raise FileNotFoundError(
+                    f"[lgbm] trend-optuna SMA: FATAL — enable_trend_optuna_sma=True but "
+                    f"parquet not found at {_tos_pq}. Re-fetch + regen: "
+                    f"uv run crypto-trade fetch --symbols {self._trend_state_symbol} "
+                    "--intervals 8h && "
+                    f"uv run crypto-trade features --symbols {self._trend_state_symbol} "
+                    "--interval 8h --track v1 --format parquet --workers 4"
+                )
+            import pandas as _pd_tos  # noqa: PLC0415
+
+            _tos_df = _pd_tos.read_parquet(_tos_pq, columns=["open_time", "close", "high", "low"])
+            _tos_df = _tos_df.dropna(subset=["open_time", "close", "high", "low"])
+            _tos_df = _tos_df.sort_values("open_time").reset_index(drop=True)
+            _tos_ot = _tos_df["open_time"].to_numpy(dtype=np.int64)
+            _tos_close = _tos_df["close"].to_numpy(dtype=np.float64)
+            _tos_high = _tos_df["high"].to_numpy(dtype=np.float64)
+            _tos_low = _tos_df["low"].to_numpy(dtype=np.float64)
+            _tos_cp = _pd_tos.Series(_tos_close).shift(1).to_numpy()  # close[t-1]
+            _tos_aw = self._trend_strength_atr_window
+            _tos_tr = np.maximum(
+                _tos_high - _tos_low,
+                np.maximum(np.abs(_tos_high - _tos_cp), np.abs(_tos_low - _tos_cp)),
+            )
+            _tos_atr = _pd_tos.Series(_tos_tr).rolling(_tos_aw).mean().shift(1).to_numpy()
+            _tos_atr_safe = np.where(_tos_atr > 0, _tos_atr, np.nan)
+            _grid: dict[int, np.ndarray] = {}
+            for _win in self._candidate_sma_windows():
+                _sma_win = _pd_tos.Series(_tos_close).rolling(_win).mean().shift(1).to_numpy()
+                _grid[_win] = ((_tos_cp - _sma_win) / _tos_atr_safe).astype(np.float64)
+            self._trend_dist_by_window = _grid
+            self._trend_optuna_ot = _tos_ot
+            self._trend_optuna_close = _tos_close
+            if self.verbose > 0:
+                print(
+                    f"[lgbm][iter-v1/053] trend-optuna SMA grid built: "
+                    f"{len(_grid)} windows {self._candidate_sma_windows()[0]}..."
+                    f"{self._candidate_sma_windows()[-1]} step {self._trend_optuna_sma_step} "
+                    f"over {len(_tos_ot)} {self._trend_state_symbol} candles "
+                    f"(atr_window={_tos_aw}, q={self._trend_strength_quantile})"
                 )
 
         # iter-v1/021: FUNDING-CONTRA-CROWD re-admission — build the past-only
@@ -1767,6 +1863,22 @@ class LightGbmStrategy:
         # Aggregation in get_signal: mean-of-signed-weights across 50 seeds.
         if self._specialist_mode:
             self._specialist_models = []
+            # iter-v1/053: WALK-FORWARD OPTUNA SMA SELECTION — choose the trend SMA window
+            # for THIS test month from the PAST training window only (leak-safe). The
+            # selected window drives direction (_compute_trend_state) + the conviction gate
+            # (_compute_trend_strength + the threshold below) for this month. Runs BEFORE
+            # the LightGBM scaffold trains; the scaffold's prediction is bypassed by
+            # deterministic_entry_only, so the decision is now a pure walk-forward-tuned
+            # long-trend rule. The window is selected on past data each month — never OOS,
+            # never hardcoded — which is the legitimate way to "tune the 200".
+            if self._enable_trend_optuna_sma:
+                self._selected_sma_window = self._select_sma_window(split, month_str)
+                if self.verbose > 0:
+                    print(
+                        f"  [TREND-OPTUNA] {month_str}: SMA window = "
+                        f"{self._selected_sma_window} (from {len(self._candidate_sma_windows())} "
+                        f"candidates on past-only training window)"
+                    )
             # H2 fix: per-month failure accumulator (reset each call).
             _sp_failed_this_month: list[tuple[int, str]] = []
             # H5/H10 fix: global OOF accumulator across all seeds for this month.
@@ -2158,7 +2270,29 @@ class LightGbmStrategy:
             # never recomputed on test rows. Conservative: < 50 finite training-window
             # rows → leave thr None (gate disabled this month → CONSERVATIVE fire).
             self._trend_strength_thr = None
-            if self._enable_trend_strength_gate and self._trend_strength_idx is not None:
+            # iter-v1/053: in trend-optuna mode the conviction threshold tracks the
+            # per-month Optuna-SELECTED window (|dist_atr_W*|), recomputed here from the
+            # SAME grid + SAME training window + SAME q as the selection objective — so the
+            # live gate is consistent with the window that won the in-sample search.
+            if (
+                self._enable_trend_optuna_sma
+                and self._selected_sma_window is not None
+                and self._trend_dist_by_window is not None
+                and self._trend_optuna_ot is not None
+            ):
+                _opt_dist = self._trend_dist_by_window.get(int(self._selected_sma_window))
+                if _opt_dist is not None:
+                    _opt_ot = self._trend_optuna_ot
+                    _opt_mask = (_opt_ot >= int(split.train_start_ms)) & (
+                        _opt_ot < int(split.train_end_ms)
+                    )
+                    _opt_absd = np.abs(_opt_dist[_opt_mask])
+                    _opt_absd = _opt_absd[np.isfinite(_opt_absd)]
+                    if len(_opt_absd) >= 50:
+                        self._trend_strength_thr = float(
+                            np.quantile(_opt_absd, self._trend_strength_quantile)
+                        )
+            elif self._enable_trend_strength_gate and self._trend_strength_idx is not None:
                 _str_ot, _str_absd = self._trend_strength_idx
                 # The index is keyed on open_time, so "in the training window" is exactly
                 # train_start_ms <= open_time < train_end_ms — the SAME mask the model's
@@ -2742,7 +2876,7 @@ class LightGbmStrategy:
         idx_curr = int(np.searchsorted(ct_arr, candle_open_time, side="right")) - 1
         if idx_curr < 0:
             return None
-        w = self._trend_state_sma_window
+        w = self._effective_sma_window  # iter-v1/053: per-month Optuna-selected window (or fixed)
         idx_lo = idx_curr - w + 1  # first index of the window of `w` closes ending at idx_curr
         if idx_lo < 0:
             # Warmup: fewer than `w` closes before the decision candle.
@@ -2755,6 +2889,182 @@ class LightGbmStrategy:
             return None
         sma_prev = float(np.mean(window))  # SMA_window(close)[t-1]
         return 1 if close_prev > sma_prev else -1
+
+    # ------------------------------------------------------------------
+    # iter-v1/053: WALK-FORWARD OPTUNA SMA SELECTION (long-trend strategy)
+    # ------------------------------------------------------------------
+    @property
+    def _effective_sma_window(self) -> int:
+        """The SMA window in force RIGHT NOW for direction + conviction.
+
+        In trend-optuna mode this is the per-month Optuna-SELECTED window
+        (``_selected_sma_window``); otherwise the fixed ``trend_state_sma_window``.
+        Falls back to the fixed window during warmup (before the first selection).
+        """
+        if self._enable_trend_optuna_sma and self._selected_sma_window is not None:
+            return int(self._selected_sma_window)
+        return int(self._trend_state_sma_window)
+
+    def _candidate_sma_windows(self) -> list[int]:
+        """The discrete SMA-window search grid (min..max inclusive, by step)."""
+        return list(
+            range(
+                self._trend_optuna_sma_min,
+                self._trend_optuna_sma_max + 1,
+                self._trend_optuna_sma_step,
+            )
+        )
+
+    def _label_horizon_candles(self) -> int:
+        """Fixed-horizon hold length N in candles (= label_timeout / interval)."""
+        _im = _interval_to_minutes(self._interval)
+        return max(1, int(self.label_timeout_minutes // _im))
+
+    def _simulate_trend_window(
+        self, window: int, train_start_ms: int, train_end_ms: int
+    ) -> np.ndarray:
+        """In-sample (past-only) trade returns of the deterministic trend rule at ``window``.
+
+        The rule is IDENTICAL to the live decision:
+          dir[t]  = sign(close[t-1] - SMA_window[t-1])                       (trend-state)
+          gate[t] = |close[t-1]-SMA_window[t-1]|/ATR_aw[t-1] >= q_thr        (conviction)
+        with q_thr = quantile(training-window |dist_atr_window|, trend_strength_quantile)
+        — the SAME per-month past-only threshold the real run computes for ``window``.
+
+        Trades are NON-OVERLAPPING fixed-horizon holds of N candles (N = label horizon),
+        entered when flat, in the trend direction; PnL = dir·(close[t+N]/close[t]-1) - cost.
+
+        LEAK SAFETY (load-bearing, Critic Check 1): a trade is counted ONLY if BOTH its
+        entry candle t AND its exit candle t+N have open_time < train_end_ms. Since
+        train_end_ms = test_start_ms - embargo_ms, the ENTIRE simulated trade lies strictly
+        inside the training window — no candle at or after the test month is ever read.
+        This is STRICTER than the embargo (we additionally require the exit to land before
+        train_end), so the objective is unambiguously past-only. dist_atr_window[t] itself
+        is built from close[t-1]/SMA[t-1]/ATR[t-1] (`.shift(1)`-lagged) — past-only by
+        construction. The selection therefore uses ZERO out-of-sample information.
+        """
+        if (
+            self._trend_dist_by_window is None
+            or self._trend_optuna_ot is None
+            or self._trend_optuna_close is None
+            or window not in self._trend_dist_by_window
+        ):
+            return np.array([], dtype=np.float64)
+        ot = self._trend_optuna_ot
+        close = self._trend_optuna_close
+        dist = self._trend_dist_by_window[window]  # SIGNED dist_atr, open_time-aligned
+        n = len(ot)
+        horizon = self._label_horizon_candles()
+        cost = self._trend_optuna_cost_pct / 100.0  # percent → fraction round-trip
+
+        # Per-month past-only conviction threshold over the training window for THIS window.
+        tw_mask = (ot >= int(train_start_ms)) & (ot < int(train_end_ms))
+        tw_abs = np.abs(dist[tw_mask])
+        tw_abs = tw_abs[np.isfinite(tw_abs)]
+        if len(tw_abs) < 50:
+            return np.array([], dtype=np.float64)
+        q_thr = float(np.quantile(tw_abs, self._trend_strength_quantile))
+
+        i_start = int(np.searchsorted(ot, int(train_start_ms), side="left"))
+        i_end = int(np.searchsorted(ot, int(train_end_ms), side="left"))  # ot[i_end] >= end
+        rets: list[float] = []
+        i = max(i_start, window)  # need `window` prior closes for the SMA (NaN before)
+        while i < i_end:
+            d = dist[i]
+            if not np.isfinite(d) or abs(d) < q_thr:
+                i += 1
+                continue
+            j = i + horizon  # exit candle index (fixed-horizon hold)
+            # LEAK GUARD: exit must also lie strictly inside the training window.
+            if j >= n or ot[j] >= int(train_end_ms):
+                break  # no later entry can close in-window either → stop
+            entry_px = close[i]
+            exit_px = close[j]
+            if not (np.isfinite(entry_px) and np.isfinite(exit_px) and entry_px > 0.0):
+                i += 1
+                continue
+            direction = 1.0 if d > 0.0 else -1.0
+            rets.append(direction * (exit_px / entry_px - 1.0) - cost)
+            i = j + 1  # non-overlapping: next entry only after this trade has closed
+        return np.array(rets, dtype=np.float64)
+
+    def _select_sma_window(self, split, month_str: str) -> int:
+        """Optuna-select the best trend SMA window on the PAST training window only.
+
+        Walk-forward parameter selection: for the given test month's training window
+        [train_start_ms, train_end_ms), run a TPE study over the candidate SMA grid,
+        scoring each window by the annualized in-sample Sharpe of its deterministic-trend
+        trades (``_simulate_trend_window`` — leak-safe, past-only). Returns W* = argmax.
+        Falls back to the fixed window if no candidate clears the min-trades floor.
+        """
+        import optuna  # noqa: PLC0415
+
+        optuna.logging.set_verbosity(optuna.logging.WARNING)
+        train_start = int(split.train_start_ms)
+        train_end = int(split.train_end_ms)
+        windows = self._candidate_sma_windows()
+        # Trades are ~N candles apart → annualization is a constant (no effect on argmax);
+        # kept only so the logged Sharpe is on a familiar scale.
+        _im = _interval_to_minutes(self._interval)
+        _trades_per_year = (365.25 * 24 * 60.0) / (self._label_horizon_candles() * _im)
+        _ann = np.sqrt(_trades_per_year) if _trades_per_year > 0 else 1.0
+        cache: dict[int, float] = {}
+
+        def _score(w: int) -> float:
+            if w in cache:
+                return cache[w]
+            rets = self._simulate_trend_window(w, train_start, train_end)
+            if len(rets) < self._trend_optuna_min_trades:
+                s = -10.0
+            else:
+                mu = float(np.mean(rets))
+                sd = float(np.std(rets, ddof=1))
+                s = (mu / sd * _ann) if sd > 0.0 else -10.0
+            cache[w] = s
+            return s
+
+        def _objective(trial) -> float:
+            w = trial.suggest_int(
+                "trend_sma_window",
+                self._trend_optuna_sma_min,
+                self._trend_optuna_sma_max,
+                step=self._trend_optuna_sma_step,
+            )
+            return _score(w)
+
+        sampler = optuna.samplers.TPESampler(
+            seed=42, n_startup_trials=min(10, len(windows))
+        )
+        study = optuna.create_study(direction="maximize", sampler=sampler)
+        study.optimize(_objective, n_trials=self._trend_optuna_n_trials)
+        best_w = int(study.best_params["trend_sma_window"])
+        best_s = cache.get(best_w, float("nan"))
+        if best_s <= -10.0:
+            # No candidate cleared the min-trades floor → fall back to the fixed window.
+            best_w = int(self._trend_state_sma_window)
+        self._sma_selection_log.append(
+            {
+                "month": month_str,
+                "selected_window": best_w,
+                "train_sharpe": float(best_s),
+                "n_windows_evaluated": len(cache),
+            }
+        )
+        return best_w
+
+    def persist_sma_selection_csv(self, path: str) -> None:
+        """Write the per-month SMA-window selection audit log to CSV (iter-v1/053)."""
+        import csv  # noqa: PLC0415
+
+        Path(path).parent.mkdir(parents=True, exist_ok=True)
+        with open(path, "w", newline="") as _f:
+            _w = csv.DictWriter(
+                _f,
+                fieldnames=["month", "selected_window", "train_sharpe", "n_windows_evaluated"],
+            )
+            _w.writeheader()
+            for _row in self._sma_selection_log:
+                _w.writerow(_row)
 
     def _reversion_price_z(self, candle_open_time: int) -> float | None:
         """Compute the past-only short-horizon price z-score at the decision candle (iter-v1/032).
@@ -2890,6 +3200,24 @@ class LightGbmStrategy:
             trend-state parquet),
           - the |dist_atr| at row t is NaN (SMA/ATR warmup or non-positive ATR).
         """
+        # iter-v1/053: in trend-optuna mode the conviction quantity tracks the per-month
+        # Optuna-SELECTED window (|dist_atr_W*|), read from the precomputed grid — keeping
+        # the gate consistent with the SAME window that drives the direction this month.
+        if self._enable_trend_optuna_sma and self._selected_sma_window is not None:
+            if self._trend_dist_by_window is None or self._trend_optuna_ot is None:
+                return None
+            _w = int(self._selected_sma_window)
+            _dist_w = self._trend_dist_by_window.get(_w)
+            if _dist_w is None:
+                return None
+            ot_arr = self._trend_optuna_ot
+            idx_t = int(np.searchsorted(ot_arr, candle_open_time, side="left"))
+            if idx_t < 0 or idx_t >= len(ot_arr) or int(ot_arr[idx_t]) != int(candle_open_time):
+                return None
+            val = float(abs(_dist_w[idx_t]))
+            if not np.isfinite(val):
+                return None
+            return val
         if self._trend_strength_idx is None:
             return None
         ot_arr, absd_arr = self._trend_strength_idx
@@ -3314,7 +3642,7 @@ class LightGbmStrategy:
                             "final_signed": _final_signed,
                             "direction_model": _sp_dir_model,
                             "direction_trend_state": _sp_direction,
-                            "trend_state_sma_window": self._trend_state_sma_window,
+                            "trend_state_sma_window": self._effective_sma_window,
                             "agreed": bool(_sp_dir_model == _sp_direction),
                             "decision": "direction_overridden:trend_state",
                         }
@@ -3331,7 +3659,7 @@ class LightGbmStrategy:
                             "final_signed": _final_signed,
                             "direction_model": _sp_direction,
                             "direction_trend_state": None,
-                            "trend_state_sma_window": self._trend_state_sma_window,
+                            "trend_state_sma_window": self._effective_sma_window,
                             "agreed": None,
                             "decision": "trend_state_warmup:kept_model_sign",
                         }
