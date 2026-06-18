@@ -4915,6 +4915,44 @@ def main() -> None:
             f"floor=0.20). Does R2 flip iter-044's DD-driven IS (-0.18, 116% MaxDD) positive while "
             f"keeping OOS (+0.85)? Both-positive -> ZEC baseline. K-invariant."
         )
+    elif iteration_label == "v1-046" and len(symbols) == 1 and symbols[0] == "ZECUSDT":
+        # iter-v1/046 — ZEC MODEL-GATED stack (iter-027 form): the deterministic-ALL core
+        # (iter-044/045) had a NEGATIVE IS trend-direction edge (loses across 2020-2025). The
+        # model-gated form lets the LightGBM SELECT which trend-direction entries to take
+        # (deterministic_entry_only=False) — it may filter ZEC's losing entries to a profitable
+        # subset. Trend-state dir + conviction gate + R2-OFF (R2 hurt ZEC in /045). K=5 (model
+        # used; lottery-prone → K=20 confirm if both-positive). The standard v1 baseline bootstrap.
+        import pyarrow.parquet as pq  # noqa: PLC0415
+
+        _spec_sym_046 = symbols[0]
+        _z46_parquet = Path("data/features") / f"{_spec_sym_046}_8h_features.parquet"
+        assert _z46_parquet.exists(), f"iter-v1/046: parquet not found at {_z46_parquet}."
+        _parquet_cols = set(pq.ParquetFile(_z46_parquet).schema.names)
+        _missing = [c for c in V1_BTC_ITER009_FEATURES if c not in _parquet_cols]
+        assert not _missing, f"iter-v1/046: {len(_missing)} feature cols missing."
+        _str_missing = [c for c in ("close", "high", "low", "close_time") if c not in _parquet_cols]
+        assert not _str_missing, f"iter-v1/046: gate needs {_str_missing}."
+        _spec_feature_columns = list(V1_BTC_ITER009_FEATURES)
+        _spec_label_mode = "fixed_horizon"
+        _spec_use_atr_labeling = False
+        _spec_label_timeout_minutes = 20160
+        _spec_atr_tp = 100.0
+        _spec_atr_sl = 1.45
+        _spec_execution_timeout_minutes = 20160
+        _spec_apply_r2 = False  # R2-OFF (R2 hurt ZEC in /045)
+        _spec_enable_trend_state_dir = True
+        _spec_trend_state_sma_window = 200
+        _spec_trend_state_symbol = _spec_sym_046
+        _spec_enable_trend_strength_gate = True
+        _spec_trend_strength_atr_window = 14
+        _spec_trend_strength_quantile = 0.40
+        _spec_enable_metalabel = False
+        _spec_deterministic_entry_only = False  # MODEL-GATED (the key difference vs /044)
+        print(
+            f"[iter-v1/046] ZEC MODEL-GATED (deterministic_entry_only=False): LightGBM "
+            f"SELECTS trend-direction entries (vs /044 all-entries). Can the model filter ZEC's "
+            f"losing entries to a both-positive subset? trend-state dir sma=200 + gate q=0.40, R2-OFF, K=5."
+        )
     elif iteration_label == "v1-021":
         # iter-v1/021 EXPLORATION — FUNDING-CONTRA-CROWD re-admission of gate-skipped chop.
         # CONFIG = the iter-020 MERGED stack (= iter-016 stack + trend-state DIR sma=200 +
