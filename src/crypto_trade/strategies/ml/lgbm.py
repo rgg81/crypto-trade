@@ -432,6 +432,17 @@ class LightGbmStrategy:
         trend_optuna_n_trials: int = 30,  # Optuna trials per month (TPE over the grid)
         trend_optuna_min_trades: int = 10,  # min in-sample trades for a valid window score
         trend_optuna_cost_pct: float = 0.14,  # round-trip cost (%) subtracted per sim trade
+        # iter-v1/055: MULTI-SMA ENSEMBLE (the "no magic number" honest answer). When True
+        # (composes with deterministic_entry_only + the trend-state/strength gates), there
+        # is NO per-month window selection at all — the trend DIRECTION is the MAJORITY VOTE
+        # of sign(close[t-1]-SMA_W[t-1]) across EVERY window W in the grid, and the
+        # conviction quantity is the MEAN |dist_atr_W[t]| across the grid. Each window is
+        # past-only, so the ensemble is honest every month; and because no single window is
+        # ever "chosen", there is no hindsight-optimal constant to peek at — it directly
+        # dissolves the fixed-200 selection bias. Reuses the same per-window grid built for
+        # the Optuna path. Mutually exclusive with enable_trend_optuna_sma. Default False =
+        # BIT-IDENTICAL to all prior runs.
+        enable_trend_sma_ensemble: bool = False,
     ) -> None:
         if not feature_columns:
             raise ValueError(
@@ -759,6 +770,20 @@ class LightGbmStrategy:
         self._selected_sma_window: int | None = None
         # Audit log: one dict per month — {month, selected_window, train_sharpe, n_windows}.
         self._sma_selection_log: list[dict] = []
+        # iter-v1/055: MULTI-SMA ENSEMBLE — no per-month selection; direction = majority vote
+        # of sign(close[t-1]-SMA_W[t-1]) across the grid, conviction = mean |dist_atr_W[t]|.
+        self._enable_trend_sma_ensemble: bool = bool(enable_trend_sma_ensemble)
+        # Precomputed (open_time-aligned) ensemble series, built alongside the grid:
+        #   _ensemble_conv[t] = nanmean_W |dist_atr_W[t]|        (per-row mean conviction)
+        #   _ensemble_dir[t]  = sign(nansum_W sign(dist_atr_W[t]))  (+1/-1 majority; 0 = tie)
+        self._ensemble_conv: np.ndarray | None = None
+        self._ensemble_dir: np.ndarray | None = None
+        if self._enable_trend_optuna_sma and self._enable_trend_sma_ensemble:
+            raise ValueError(
+                "enable_trend_optuna_sma and enable_trend_sma_ensemble are mutually "
+                "exclusive (one SELECTS a window per month, the other ENSEMBLES all "
+                "windows with no selection). Enable at most one."
+            )
         # iter-v3/072: labeling mode — "triple_barrier" (default, backward-compat)
         # or "fixed_horizon" (sign of N-candle-forward return; no barriers).
         # iter-v3/105: "trend_scanning" (OLS trend, max-|t| horizon selection
@@ -1224,7 +1249,7 @@ class LightGbmStrategy:
         # build EXACTLY (close[t-1], SMA_W[t-1], ATR_aw[t-1], all `.shift(1)`-lagged) but
         # keeps the SIGN (the trend direction) and computes it for every grid window.
         # dist_atr_W[t] = (close[t-1] - SMA_W[t-1]) / ATR_aw[t-1]. NaN during warmup.
-        if self._enable_trend_optuna_sma:
+        if self._enable_trend_optuna_sma or self._enable_trend_sma_ensemble:
             _tos_pq = Path(self.features_dir) / f"{self._trend_state_symbol}_8h_features.parquet"
             if not _tos_pq.exists():
                 raise FileNotFoundError(
@@ -1259,6 +1284,14 @@ class LightGbmStrategy:
             self._trend_dist_by_window = _grid
             self._trend_optuna_ot = _tos_ot
             self._trend_optuna_close = _tos_close
+            # iter-055: ensemble precompute — per-row mean conviction + majority-vote dir
+            # over ALL grid windows. NaN-aware: warmup windows are ignored row-wise; a row
+            # where every window is still in warmup → conv NaN + dir 0 (→ None at lookup).
+            _stack = np.vstack([_grid[_w0] for _w0 in self._candidate_sma_windows()])  # (W, N)
+            with np.errstate(invalid="ignore"):
+                self._ensemble_conv = np.nanmean(np.abs(_stack), axis=0).astype(np.float64)
+                _signsum = np.nansum(np.sign(_stack), axis=0)
+            self._ensemble_dir = np.sign(_signsum).astype(np.int64)  # +1 / -1 / 0(tie/all-NaN)
             if self.verbose > 0:
                 print(
                     f"[lgbm][iter-v1/053] trend-optuna SMA grid built: "
@@ -2270,11 +2303,29 @@ class LightGbmStrategy:
             # never recomputed on test rows. Conservative: < 50 finite training-window
             # rows → leave thr None (gate disabled this month → CONSERVATIVE fire).
             self._trend_strength_thr = None
+            # iter-v1/055: ENSEMBLE mode — threshold = q-quantile of the per-row mean
+            # conviction (_ensemble_conv) over the training window (past-only, mirrors the
+            # /018 pattern). Consistent with the per-candle conviction the gate reads.
+            if (
+                self._enable_trend_sma_ensemble
+                and self._ensemble_conv is not None
+                and self._trend_optuna_ot is not None
+            ):
+                _ens_ot = self._trend_optuna_ot
+                _ens_mask = (_ens_ot >= int(split.train_start_ms)) & (
+                    _ens_ot < int(split.train_end_ms)
+                )
+                _ens_tw = self._ensemble_conv[_ens_mask]
+                _ens_tw = _ens_tw[np.isfinite(_ens_tw)]
+                if len(_ens_tw) >= 50:
+                    self._trend_strength_thr = float(
+                        np.quantile(_ens_tw, self._trend_strength_quantile)
+                    )
             # iter-v1/053: in trend-optuna mode the conviction threshold tracks the
             # per-month Optuna-SELECTED window (|dist_atr_W*|), recomputed here from the
             # SAME grid + SAME training window + SAME q as the selection objective — so the
             # live gate is consistent with the window that won the in-sample search.
-            if (
+            elif (
                 self._enable_trend_optuna_sma
                 and self._selected_sma_window is not None
                 and self._trend_dist_by_window is not None
@@ -2869,6 +2920,18 @@ class LightGbmStrategy:
           - the decision close_time is before any candle (idx_curr < 0),
           - any NaN / non-positive close in the SMA window or at t-1.
         """
+        # iter-v1/055: MULTI-SMA ENSEMBLE direction — majority vote across the grid (no
+        # single window). _ensemble_dir[t] is +1/-1 (majority) or 0 (tie / all-warmup);
+        # 0 → None (CONSERVATIVE: caller keeps the model/provisional sign, same as warmup).
+        if self._enable_trend_sma_ensemble:
+            if self._ensemble_dir is None or self._trend_optuna_ot is None:
+                return None
+            ot_e = self._trend_optuna_ot
+            idx_e = int(np.searchsorted(ot_e, candle_open_time, side="left"))
+            if idx_e < 0 or idx_e >= len(ot_e) or int(ot_e[idx_e]) != int(candle_open_time):
+                return None
+            d_e = int(self._ensemble_dir[idx_e])
+            return d_e if d_e != 0 else None
         if self._trend_state_idx is None:
             return None
         ct_arr, cl_arr = self._trend_state_idx
@@ -3200,6 +3263,17 @@ class LightGbmStrategy:
             trend-state parquet),
           - the |dist_atr| at row t is NaN (SMA/ATR warmup or non-positive ATR).
         """
+        # iter-v1/055: MULTI-SMA ENSEMBLE conviction — per-row mean |dist_atr_W| across the
+        # grid (the SAME quantity the per-month threshold is fit on). None on all-warmup.
+        if self._enable_trend_sma_ensemble:
+            if self._ensemble_conv is None or self._trend_optuna_ot is None:
+                return None
+            ot_e = self._trend_optuna_ot
+            idx_e = int(np.searchsorted(ot_e, candle_open_time, side="left"))
+            if idx_e < 0 or idx_e >= len(ot_e) or int(ot_e[idx_e]) != int(candle_open_time):
+                return None
+            val_e = float(self._ensemble_conv[idx_e])
+            return val_e if np.isfinite(val_e) else None
         # iter-v1/053: in trend-optuna mode the conviction quantity tracks the per-month
         # Optuna-SELECTED window (|dist_atr_W*|), read from the precomputed grid — keeping
         # the gate consistent with the SAME window that drives the direction this month.

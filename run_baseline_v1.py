@@ -691,6 +691,7 @@ def run_model(
     trend_optuna_n_trials: int = 30,
     trend_optuna_min_trades: int = 10,
     trend_optuna_cost_pct: float = 0.14,
+    enable_trend_sma_ensemble: bool = False,
 ):
     """Run a single v1 sub-model (A/C/D/E) under the corrected walk-forward.
 
@@ -899,6 +900,9 @@ def run_model(
         trend_optuna_n_trials=trend_optuna_n_trials,
         trend_optuna_min_trades=trend_optuna_min_trades,
         trend_optuna_cost_pct=trend_optuna_cost_pct,
+        # iter-v1/055: MULTI-SMA ENSEMBLE — majority-vote direction + mean conviction
+        # across the grid (no per-month selection). Default False = BIT-IDENTICAL.
+        enable_trend_sma_ensemble=enable_trend_sma_ensemble,
     )
     t0 = time.time()
     results = run_backtest(config, strategy, yearly_pnl_check=False)
@@ -4007,6 +4011,9 @@ def main() -> None:
     _spec_trend_optuna_n_trials: int = 30
     _spec_trend_optuna_min_trades: int = 10
     _spec_trend_optuna_cost_pct: float = 0.14
+    # iter-v1/055 MULTI-SMA ENSEMBLE default. Strict NO-OP for all prior iterations; the
+    # v1-055 keyed block flips it True (and turns optuna-selection OFF — mutually exclusive).
+    _spec_enable_trend_sma_ensemble: bool = False
     # iter-v1/028 META-LABELING (M2 precision filter) defaults. Strict NO-OP for
     # /002-/027 (byte-identical): when _spec_enable_metalabel=False the universal
     # routing guard dispatches via run_model() exactly as before.  The v1-028 keyed
@@ -4846,30 +4853,45 @@ def main() -> None:
         _spec_trend_strength_quantile = 0.40
         _spec_enable_metalabel = False
         _spec_deterministic_entry_only = True
-        # THE iter-053 change: walk-forward Optuna SMA selection ON.
-        _spec_enable_trend_optuna_sma = True
-        # iter-053 = WIDE neutral grid 50..400. iter-054 = restricted to the documented
-        # robust plateau 100..300 (the code's own `trend_state_sma_window` comment: "flat
-        # plateau 100-300") — removes the damaging extremes (50/400) that overfit the
-        # trailing regime. Pre-justified band, NOT OOS-tuned.
-        if iteration_label == "v1-054":
-            _spec_trend_optuna_sma_min = 100
-            _spec_trend_optuna_sma_max = 300
-        else:
-            _spec_trend_optuna_sma_min = 50
-            _spec_trend_optuna_sma_max = 400
+        # The iter-053+ change: HONEST walk-forward SMA, no hindsight-fixed 200.
+        #   v1-053 = per-month Optuna SELECTION, WIDE neutral grid 50..400.
+        #   v1-054 = per-month Optuna SELECTION, robust plateau 100..300 (the code's own
+        #            `trend_state_sma_window` comment) — removes the 50/400 extremes.
+        #   v1-055 = MULTI-SMA ENSEMBLE (no selection): majority-vote direction + mean
+        #            conviction across the WHOLE 50..400 grid → NO magic number to peek at.
+        #            This is the most direct answer to the fixed-200 selection bias.
         _spec_trend_optuna_sma_step = 25
         _spec_trend_optuna_n_trials = 30
         _spec_trend_optuna_min_trades = 10
         _spec_trend_optuna_cost_pct = 0.14
-        print(
-            f"[{iteration_label}] WALK-FORWARD OPTUNA SMA ({_spec_sym_053}) — deterministic "
-            f"core with the trend SMA window Optuna-SELECTED per-month on past-only training "
-            f"data (grid {_spec_trend_optuna_sma_min}..{_spec_trend_optuna_sma_max} step "
-            f"{_spec_trend_optuna_sma_step}, {_spec_trend_optuna_n_trials} trials/mo; q=0.40, "
-            f"R2 OFF, R3/R5 ON). The legitimate, non-OOS-cheating way to 'tune the 200'. "
-            f"Head-to-head vs the fixed-200 deterministic baseline."
-        )
+        if iteration_label == "v1-055":
+            _spec_enable_trend_optuna_sma = False
+            _spec_enable_trend_sma_ensemble = True
+            _spec_trend_optuna_sma_min = 50
+            _spec_trend_optuna_sma_max = 400
+            print(
+                f"[{iteration_label}] MULTI-SMA ENSEMBLE ({_spec_sym_053}) — deterministic "
+                f"core, trend direction = MAJORITY VOTE of sign(close-SMA_W) across the whole "
+                f"{_spec_trend_optuna_sma_min}..{_spec_trend_optuna_sma_max} grid, conviction "
+                f"= mean |dist_atr_W|. NO single window is ever chosen → no hindsight-optimal "
+                f"constant to peek at. Honest every month. q=0.40, R2 OFF, R3/R5 ON."
+            )
+        else:
+            _spec_enable_trend_optuna_sma = True
+            _spec_enable_trend_sma_ensemble = False
+            if iteration_label == "v1-054":
+                _spec_trend_optuna_sma_min = 100
+                _spec_trend_optuna_sma_max = 300
+            else:
+                _spec_trend_optuna_sma_min = 50
+                _spec_trend_optuna_sma_max = 400
+            print(
+                f"[{iteration_label}] WALK-FORWARD OPTUNA SMA ({_spec_sym_053}) — deterministic "
+                f"core with the trend SMA window Optuna-SELECTED per-month on past-only training "
+                f"data (grid {_spec_trend_optuna_sma_min}..{_spec_trend_optuna_sma_max} step "
+                f"{_spec_trend_optuna_sma_step}, {_spec_trend_optuna_n_trials} trials/mo; q=0.40, "
+                f"R2 OFF, R3/R5 ON). The legitimate, non-OOS-cheating way to 'tune the 200'."
+            )
     elif iteration_label == "v1-040" and len(symbols) == 1 and symbols[0] == "DOTUSDT":
         # iter-v1/040 (DOT) — strip-model deterministic core WITH DOT-calibrated R2 (the
         # sweep's R2-OFF DOT was IS +0.39 / OOS -0.03 — a real positive IS edge, OOS near-zero).
@@ -6049,6 +6071,9 @@ def main() -> None:
                 trend_optuna_n_trials=_spec_trend_optuna_n_trials,
                 trend_optuna_min_trades=_spec_trend_optuna_min_trades,
                 trend_optuna_cost_pct=_spec_trend_optuna_cost_pct,
+                # iter-v1/055: MULTI-SMA ENSEMBLE. Default (False) keeps all other
+                # single-symbol iterations BIT-IDENTICAL; the v1-055 keyed block sets True.
+                enable_trend_sma_ensemble=_spec_enable_trend_sma_ensemble,
             )
 
         # Cohort isolation sanity: assert ONLY the target symbol's trades emitted.

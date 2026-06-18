@@ -11,20 +11,33 @@ WHAT IT SHOWS (consistent apples-to-apples monthly-sum aggregation across all it
 per-iter comparison.csv uses each iter's own vol-targeted/weighted series, so absolute
 Sharpes differ — the RELATIVE finding is the robust claim):
 
-  iter-034  fixed SMA=200             IS +0.75 / OOS +0.82 / FULL +0.78   (the merged baseline)
-  iter-053  walk-forward SMA 50..400  IS -0.32 / OOS +0.60 / FULL -0.07   (worse every seg + yr)
-  iter-054  walk-forward SMA 100..300 IS +0.04 / OOS +0.60 / FULL +0.22   (plateau recovers IS
-              from -0.32 but still far below fixed-200; finding holds regardless of grid width)
+  This script prints BOTH bases. Headline numbers (RAW net_pnl_pct | OFFICIAL R5-weighted):
+  iter-034  fixed SMA=200    (BIASED)   RAW IS +0.75/OOS +0.82 | OFFICIAL IS +0.70/OOS +0.49
+  iter-053  wf-SELECT 50..400           RAW IS -0.32/OOS +0.60 | OFFICIAL IS +0.06/OOS +0.99
+  iter-054  wf-SELECT 100..300          RAW IS +0.04/OOS +0.60 | OFFICIAL IS +0.24/OOS +0.99
+  iter-055  ENSEMBLE 50..400            RAW IS +0.42/OOS +0.61 | OFFICIAL IS +0.42/OOS -0.53
 
-FINDING: naive walk-forward Optuna selection of the trend SMA window UNDERPERFORMS the fixed
-200. The window that maximizes the TRAILING 24-month Sharpe overfits the trailing regime and
-fails on regime shifts: in 2022-01 it picked a LONG window (400) because the 2020-21 bull
-rewarded slow trend-following, then that slow SMA LAGGED into the 2022 bear and stayed long
-through the crash (-41.5% vs the fixed-200's +50.9%); in 2023-24 chop it picked SHORT windows
-(50-125) that whipsawed. The fixed 200 generalizes better precisely because it is a
-non-overfit prior. => This is the direct answer to the "is the 200 cheated / how do we tune
-it?" worry: 200 is a robust crypto-canonical prior; legitimately re-tuning it per-month on a
-rolling basis makes it WORSE, not better. Keep it fixed.
+  OFFICIAL = monthly Sharpe of weighted_pnl (R5 vol-targeted; matches each iter's comparison.csv).
+  RAW = monthly Sharpe of net_pnl_pct (equal-weight; isolates signal from the R5 overlay).
+
+CRITICAL FRAMING (user correction, 2026-06-18): the fixed SMA=200 is NOT a fair target — it is
+HINDSIGHT BIAS. We only "know" 200 is good because we already saw 2020-2026; a trader at the
+start of the backtest (2022) had no way to know that, so baking SMA=200 into the WHOLE backtest
+injects look-ahead (every 2022 trade uses a window optimized over data that, relative to 2022,
+is the future). Comparing an honest walk-forward (past-only every month) against that hindsight
+constant and concluding "the constant wins" is CIRCULAR — the constant is the cheater. The
+fixed-200 row is kept ONLY as the biased reference; the HONEST numbers are the walk-forward /
+ensemble rows. The honest ETH OOS is ~+0.60 (selection) — NOT the fixed-200's +0.82.
+
+FINDING (corrected): under the OFFICIAL R5-weighted metric the honest walk-forward SELECTION
+GENERALIZES BETTER than the biased fixed 200 — OOS +0.99 (both grids) vs fixed-200's +0.49 — with a
+weak-IS/strong-OOS profile (the opposite of overfitting). The ENSEMBLE has the best RAW signal
+(IS +0.42/OOS +0.61, both positive) but R5 vol-targeting (calibrated for the fixed-200 distribution)
+upscales its OOS losers and flips its weighted OOS to -0.53 → R5 recalibration is the follow-up. The
+single-window selection's only weakness is a weak/negative RAW IS (2022 W=400 lag), largely fixed by
+the 100..300 plateau (054) and irrelevant to its strong OOS. Net: the walk-forward is both the only
+non-cheating method AND competitive-to-better than the hindsight constant — adopt it; iter-054 is the
+best honest re-baseline candidate (official IS +0.24 / OOS +0.99).
 """
 
 from __future__ import annotations
@@ -36,9 +49,10 @@ import pandas as pd
 
 OOS_CUTOFF = pd.Timestamp("2025-03-24")
 ITERS = {
-    "iter-034 fixed-200": "reports-v1/ETHUSDT/iteration_v1-034",
-    "iter-053 wf-SMA 50..400": "reports-v1/ETHUSDT/iteration_v1-053",
-    "iter-054 wf-SMA 100..300": "reports-v1/ETHUSDT/iteration_v1-054",
+    "iter-034 fixed-200 (BIASED ref)": "reports-v1/ETHUSDT/iteration_v1-034",
+    "iter-053 wf-select 50..400": "reports-v1/ETHUSDT/iteration_v1-053",
+    "iter-054 wf-select 100..300": "reports-v1/ETHUSDT/iteration_v1-054",
+    "iter-055 ENSEMBLE 50..400": "reports-v1/ETHUSDT/iteration_v1-055",
 }
 
 
