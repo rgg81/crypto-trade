@@ -4873,6 +4873,48 @@ def main() -> None:
             f"trend-state SMA={_rob_window} on {_rob_sym} (vs merged SMA=200 on ETH). Does iter-034 "
             f"OOS +0.41 hold in the neighborhood? K-invariant (model bypassed)."
         )
+    elif iteration_label == "v1-045" and len(symbols) == 1 and symbols[0] == "ZECUSDT":
+        # iter-v1/045 — ZEC deterministic core + ZEC-CALIBRATED R2 (the baseline candidate).
+        # iter-044 (R2-OFF) was IS -0.18 / OOS +0.85 — IS negative but dominated by a
+        # catastrophic 116% uncontrolled IS MaxDD. R2 (DD brake) may cut those IS losses and
+        # flip the IS positive (unlike DOT, where R2 over-braked a POSITIVE IS — here the IS
+        # is DD-driven-negative, so R2 should HELP). R2 = RE relative shape 6.5%/26% on
+        # iter-044's IS maxDD 116.43 -> trigger 7.57 / anchor 30.27 / floor 0.20. If both-positive
+        # -> calibrated ZEC baseline (low-corr independent edge for the portfolio). K-invariant.
+        import pyarrow.parquet as pq  # noqa: PLC0415
+
+        _spec_sym_045 = symbols[0]
+        _z45_parquet = Path("data/features") / f"{_spec_sym_045}_8h_features.parquet"
+        assert _z45_parquet.exists(), f"iter-v1/045: parquet not found at {_z45_parquet}."
+        _parquet_cols = set(pq.ParquetFile(_z45_parquet).schema.names)
+        _missing = [c for c in V1_BTC_ITER009_FEATURES if c not in _parquet_cols]
+        assert not _missing, f"iter-v1/045: {len(_missing)} feature cols missing."
+        _str_missing = [c for c in ("close", "high", "low", "close_time") if c not in _parquet_cols]
+        assert not _str_missing, f"iter-v1/045: gate needs {_str_missing}."
+        _spec_feature_columns = list(V1_BTC_ITER009_FEATURES)
+        _spec_label_mode = "fixed_horizon"
+        _spec_use_atr_labeling = False
+        _spec_label_timeout_minutes = 20160
+        _spec_atr_tp = 100.0
+        _spec_atr_sl = 1.45
+        _spec_execution_timeout_minutes = 20160
+        _spec_apply_r2 = True
+        _spec_r2_trigger_pct = 7.57  # ZEC-calibrated (6.5% of IS maxDD 116.43)
+        _spec_r2_scale_anchor_pct = 30.27  # 26% of 116.43
+        _spec_r2_scale_floor = 0.20
+        _spec_enable_trend_state_dir = True
+        _spec_trend_state_sma_window = 200
+        _spec_trend_state_symbol = _spec_sym_045
+        _spec_enable_trend_strength_gate = True
+        _spec_trend_strength_atr_window = 14
+        _spec_trend_strength_quantile = 0.40
+        _spec_enable_metalabel = False
+        _spec_deterministic_entry_only = True
+        print(
+            f"[iter-v1/045] ZEC deterministic core + ZEC-calibrated R2 (trig=7.57/anch=30.27/"
+            f"floor=0.20). Does R2 flip iter-044's DD-driven IS (-0.18, 116% MaxDD) positive while "
+            f"keeping OOS (+0.85)? Both-positive -> ZEC baseline. K-invariant."
+        )
     elif iteration_label == "v1-021":
         # iter-v1/021 EXPLORATION — FUNDING-CONTRA-CROWD re-admission of gate-skipped chop.
         # CONFIG = the iter-020 MERGED stack (= iter-016 stack + trend-state DIR sma=200 +
