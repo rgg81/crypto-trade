@@ -4728,6 +4728,52 @@ def main() -> None:
             f"stack + R2 2.07/8.28/0.20. Does removing the model lift BTC OOS (iter-020 +0.09)? "
             f"K-invariant (model bypassed)."
         )
+    elif iteration_label in ("v1-037", "v1-038", "v1-039") and len(symbols) == 1:
+        # iter-v1/037 (LINK) / 038 (LTC) / 039 (DOT) — PORTABILITY SWEEP of the strip-the-model
+        # finding across the remaining v1 coins. Generic deterministic-core directional screen on
+        # symbols[0]: the proven trend-state DIRECTION (sma=200) + conviction gate q=0.40 +
+        # deterministic_entry_only=True (model bypassed), R2 OFF (per-coin R2 not calibrated; R2 is
+        # DD-control, does NOT flip the Sharpe sign — fine for a both-positive directional read),
+        # R3=ON / R5=ON. Tests: does the pure deterministic core generalize (both-positive) on this
+        # coin too? K-invariant (model bypassed) -> K=1 fast. NOT a final baseline (R2 off); a screen.
+        import pyarrow.parquet as pq  # noqa: PLC0415
+
+        _spec_sym_sweep = symbols[0]
+        _sweep_parquet = Path("data/features") / f"{_spec_sym_sweep}_8h_features.parquet"
+        assert _sweep_parquet.exists(), (
+            f"{iteration_label}: feature parquet not found at {_sweep_parquet}."
+        )
+        _parquet_cols = set(pq.ParquetFile(_sweep_parquet).schema.names)
+        _missing = [c for c in V1_BTC_ITER009_FEATURES if c not in _parquet_cols]
+        assert not _missing, (
+            f"{iteration_label}: {len(_missing)} feature cols missing in {_spec_sym_sweep} parquet."
+        )
+        _str_missing = [c for c in ("close", "high", "low", "close_time") if c not in _parquet_cols]
+        assert not _str_missing, (
+            f"{iteration_label}: gate needs {_str_missing} on {_spec_sym_sweep} parquet."
+        )
+        _spec_feature_columns = list(V1_BTC_ITER009_FEATURES)
+        _spec_label_mode = "fixed_horizon"
+        _spec_use_atr_labeling = False
+        _spec_label_timeout_minutes = 20160
+        _spec_atr_tp = 100.0
+        _spec_atr_sl = 1.45
+        _spec_execution_timeout_minutes = 20160
+        _spec_apply_r2 = False  # R2 OFF — directional screen (per-coin R2 not calibrated)
+        _spec_enable_trend_state_dir = True
+        _spec_trend_state_sma_window = 200
+        _spec_trend_state_symbol = _spec_sym_sweep
+        _spec_enable_trend_strength_gate = True
+        _spec_trend_strength_atr_window = 14
+        _spec_trend_strength_quantile = 0.40
+        _spec_enable_metalabel = False
+        _spec_deterministic_entry_only = True
+        print(
+            f"[{iteration_label}] PORTABILITY SWEEP ({_spec_sym_sweep}) — deterministic core "
+            f"(trend-state sma=200 + conviction gate q=0.40 + deterministic_entry_only, R2 OFF, "
+            f"R3/R5 ON). Does the strip-model deterministic core generalize both-positive on "
+            f"{_spec_sym_sweep}? K-invariant (model bypassed). Directional screen, not a final baseline."
+        )
     elif iteration_label == "v1-021":
         # iter-v1/021 EXPLORATION — FUNDING-CONTRA-CROWD re-admission of gate-skipped chop.
         # CONFIG = the iter-020 MERGED stack (= iter-016 stack + trend-state DIR sma=200 +
