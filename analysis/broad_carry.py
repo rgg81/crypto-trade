@@ -44,14 +44,17 @@ def load_universe() -> dict:
 def build_book(coins: dict, m_fund: int = M_FUND, frac: float = FRAC,
                cost_side: float = pe.COST_SIDE,
                exclude_top_pctl: float | None = None,
-               min_liquidity: float | None = None) -> tuple[pd.DataFrame, pd.DataFrame]:
+               min_liquidity: float | None = None,
+               min_history: int | None = None) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Realistic broad cross-sectional carry. Returns (book[net,price,funding,cost], weights).
 
     exclude_top_pctl: if set (e.g. 0.90), drop coins whose trailing funding is above that per-row
         percentile BEFORE ranking — i.e. don't short the most extreme-funding 'squeeze magnets'.
     min_liquidity: if set (e.g. 5e6), a coin is eligible only when its trailing-30d mean 8h
-        quote-volume (past-only) >= this floor — the CAPACITY filter (the headline number is
-        optimistic without it; ~$5M roughly halves OOS Sharpe but is realizable-at-size).
+        quote-volume (past-only) >= this floor — the CAPACITY filter.
+    min_history: if set (e.g. 1095 = ~1y of 8h candles), a coin is eligible at t only after it has
+        that many candles of history (POINT-IN-TIME listing-age filter). Brand-new listings are the
+        squeeze magnets that wreck the short leg on the full universe — this excludes them honestly.
     """
     opens = pd.DataFrame({s: d["open"] for s, d in coins.items()}).sort_index()
     funds = pd.DataFrame({s: d["funding_rate"] for s, d in coins.items()}).reindex(opens.index)
@@ -63,6 +66,9 @@ def build_book(coins: dict, m_fund: int = M_FUND, frac: float = FRAC,
         qv = pd.DataFrame({s: d["quote_volume"] for s, d in coins.items()}).reindex(opens.index)
         liq = qv.rolling(LIQ_WIN).mean().shift(1)
         elig = elig & (liq >= min_liquidity)
+    if min_history is not None:                            # point-in-time listing-age filter
+        hist = opens.notna().cumsum().shift(1)            # valid candles before t, per coin
+        elig = elig & (hist >= min_history)
     ft_np, elig_np = ftrail.to_numpy(), elig.to_numpy()
     wvals = np.zeros_like(ft_np)
     for i in range(len(opens.index)):
