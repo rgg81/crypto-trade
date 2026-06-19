@@ -110,8 +110,8 @@ def report(name: str, net: pd.Series) -> None:
     by_year = {int(k): round(v, 0) for k, v in yr.items()}
     eq = (1 + net).cumprod()
     dd = float((eq / eq.cummax() - 1).min())
-    print(f"  {name:26} IS={sharpe(net, lo0, OOS_CUTOFF):+.2f} OOS={sharpe(net, OOS_CUTOFF, hi1):+.2f} "
-          f"maxDD={dd*100:5.0f}%  net%/yr={by_year}")
+    is_s, oos_s = sharpe(net, lo0, OOS_CUTOFF), sharpe(net, OOS_CUTOFF, hi1)
+    print(f"  {name:26} IS={is_s:+.2f} OOS={oos_s:+.2f} maxDD={dd*100:5.0f}%  net%/yr={by_year}")
 
 
 def main() -> None:
