@@ -40,8 +40,10 @@ def load_basis_coin(sym: str):
     sp = pd.read_csv(spath)
     if len(sp) < 1000:
         return None
-    sp = sp.set_index("open_time")
+    # dedup open_time (defends against a partial/duplicate write) before reindexing
+    sp = sp.drop_duplicates(subset="open_time", keep="last").set_index("open_time").sort_index()
     df = pd.DataFrame({"perp_open": perp["open"].astype(float), "funding": perp["funding_rate"]})
+    df = df[~df.index.duplicated(keep="last")].sort_index()
     df["spot_open"] = sp["open"].astype(float).reindex(df.index)
     df["spot_qv"] = sp["quote_volume"].astype(float).reindex(df.index)   # spot $ volume (capacity)
     df = df.dropna(subset=["spot_open", "perp_open"])
@@ -53,7 +55,10 @@ def load_basis_universe() -> dict:
                   if os.path.exists(f"{p}/8h.csv"))
     out = {}
     for s in syms:
-        d = load_basis_coin(s)
+        try:
+            d = load_basis_coin(s)
+        except Exception:
+            continue                       # skip a coin whose CSV is unreadable / mid-write
         if d is not None:
             out[s] = d
     return out
