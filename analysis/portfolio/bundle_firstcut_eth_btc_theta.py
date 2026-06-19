@@ -9,7 +9,7 @@ Method (parity-clean: each coin's single-symbol strategy runs INDEPENDENTLY; the
 capital-weighted SUM of the independent coins' PnL — no post-trade netting):
   - per-coin MONTHLY net PnL (sum of trade net_pnl_pct by close-month)
   - weights: EQUAL and INVERSE-VOL (IS-only: w ∝ 1/std(IS monthly PnL))   [IS-only, no OOS leak]
-  - portfolio monthly PnL = Σ_coin w_coin · coin_monthly ; Sharpe = mean/std·√12, split at OOS_CUTOFF
+  - portfolio monthly PnL = Σ_coin w_coin · coin_monthly ; Sharpe = mean/std·√12 at OOS_CUTOFF
 
 RESULT (official merged baselines):
   single OOS monthly Sharpe: ETH +0.82, BTC +0.45, THETA +0.74
@@ -20,7 +20,7 @@ RESULT (official merged baselines):
      correlation to ETH is the key driver. The 3-coin portfolio crosses OOS Sharpe 1.0.
 
 CAVEATS (load-bearing):
-  - This is a SIMPLE monthly-sum aggregation of net_pnl_pct (NOT the baselines' weighted/vol-targeted
+  - This is a SIMPLE monthly-sum aggregation of net_pnl_pct (NOT the baselines' weighted/vol-tgt
     series), so the absolute monthly Sharpes differ from the baseline-doc headline numbers; the
     RELATIVE finding (portfolio > single coins) is the robust point.
   - OOS is ~15 months (15 data points) -> the +1.04 has WIDE error bars; the durable claim is the
