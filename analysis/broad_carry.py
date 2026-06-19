@@ -41,8 +41,13 @@ def load_universe() -> dict:
 
 
 def build_book(coins: dict, m_fund: int = M_FUND, frac: float = FRAC,
-               cost_side: float = pe.COST_SIDE) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Realistic broad cross-sectional carry. Returns (book[net,price,funding,cost], weights)."""
+               cost_side: float = pe.COST_SIDE,
+               exclude_top_pctl: float | None = None) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Realistic broad cross-sectional carry. Returns (book[net,price,funding,cost], weights).
+
+    exclude_top_pctl: if set (e.g. 0.90), drop coins whose trailing funding is above that per-row
+    percentile BEFORE ranking — i.e. don't short the most extreme-funding 'squeeze magnets'.
+    """
     opens = pd.DataFrame({s: d["open"] for s, d in coins.items()}).sort_index()
     funds = pd.DataFrame({s: d["funding_rate"] for s, d in coins.items()}).reindex(opens.index)
     ftrail = funds.rolling(m_fund).mean()                 # signal <= t
@@ -53,6 +58,9 @@ def build_book(coins: dict, m_fund: int = M_FUND, frac: float = FRAC,
     wvals = np.zeros_like(ft_np)
     for i in range(len(opens.index)):
         ecols = np.where(elig_np[i])[0]
+        if exclude_top_pctl is not None and len(ecols) >= 4:
+            thr = np.quantile(ft_np[i, ecols], exclude_top_pctl)
+            ecols = ecols[ft_np[i, ecols] <= thr]         # drop the extreme-high-funding magnets
         k = int(len(ecols) * frac)
         if len(ecols) < 4 or k < 1:
             continue
