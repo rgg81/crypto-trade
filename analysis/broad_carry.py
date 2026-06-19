@@ -30,6 +30,7 @@ import pair_engine as pe  # noqa: E402
 
 M_FUND = 9
 FRAC = 0.25
+LIQ_WIN = 90        # trailing-liquidity window (30d of 8h candles) for the capacity floor
 LO0 = pd.Timestamp("2000-01-01")
 HI1 = pd.Timestamp("2100-01-01")
 
@@ -42,11 +43,15 @@ def load_universe() -> dict:
 
 def build_book(coins: dict, m_fund: int = M_FUND, frac: float = FRAC,
                cost_side: float = pe.COST_SIDE,
-               exclude_top_pctl: float | None = None) -> tuple[pd.DataFrame, pd.DataFrame]:
+               exclude_top_pctl: float | None = None,
+               min_liquidity: float | None = None) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Realistic broad cross-sectional carry. Returns (book[net,price,funding,cost], weights).
 
     exclude_top_pctl: if set (e.g. 0.90), drop coins whose trailing funding is above that per-row
-    percentile BEFORE ranking — i.e. don't short the most extreme-funding 'squeeze magnets'.
+        percentile BEFORE ranking — i.e. don't short the most extreme-funding 'squeeze magnets'.
+    min_liquidity: if set (e.g. 5e6), a coin is eligible only when its trailing-30d mean 8h
+        quote-volume (past-only) >= this floor — the CAPACITY filter (the headline number is
+        optimistic without it; ~$5M roughly halves OOS Sharpe but is realizable-at-size).
     """
     opens = pd.DataFrame({s: d["open"] for s, d in coins.items()}).sort_index()
     funds = pd.DataFrame({s: d["funding_rate"] for s, d in coins.items()}).reindex(opens.index)
@@ -54,6 +59,10 @@ def build_book(coins: dict, m_fund: int = M_FUND, frac: float = FRAC,
     ret = opens.shift(-2) / opens.shift(-1) - 1.0         # hold candle t+1
     fund_earn = funds.shift(-1)                            # funding settled over candle t+1
     elig = ftrail.notna() & ret.notna() & fund_earn.notna()
+    if min_liquidity is not None:                          # past-only capacity floor
+        qv = pd.DataFrame({s: d["quote_volume"] for s, d in coins.items()}).reindex(opens.index)
+        liq = qv.rolling(LIQ_WIN).mean().shift(1)
+        elig = elig & (liq >= min_liquidity)
     ft_np, elig_np = ftrail.to_numpy(), elig.to_numpy()
     wvals = np.zeros_like(ft_np)
     for i in range(len(opens.index)):
@@ -100,16 +109,20 @@ def evaluate(book: pd.DataFrame, w: pd.DataFrame) -> dict:
 
 def main() -> None:
     coins = load_universe()
-    book, w = build_book(coins)
-    r = evaluate(book, w)
     print(f"BROAD CROSS-SECTIONAL CARRY (realistic engine; {len(coins)} coins, "
           f"M={M_FUND}, FRAC={FRAC})")
-    print(f"  net   : IS Sharpe={r['is_sh']:+.2f}  OOS Sharpe={r['oos_sh']:+.2f}  "
-          f"maxDD={r['max_dd']*100:.0f}%")
-    print(f"  funding-only: IS Sharpe={r['fund_is_sh']:+.2f}  OOS Sharpe={r['fund_oos_sh']:+.2f}  "
-          f"(IS monthly t={r['fund_is_t']:+.2f})")
-    print(f"  avg per-candle turnover (gross w change) = {r['avg_turnover']:.2f}")
-    print(f"  net%/yr = {r['net_by_year']}")
+    for label, min_liq in [("research (NO capacity floor)", None),
+                           ("realizable ($5M liquidity floor)", 5e6)]:
+        book, w = build_book(coins, min_liquidity=min_liq)
+        r = evaluate(book, w)
+        print(f"\n  [{label}]")
+        print(f"    net   : IS Sharpe={r['is_sh']:+.2f}  OOS Sharpe={r['oos_sh']:+.2f}  "
+              f"maxDD={r['max_dd']*100:.0f}%")
+        print(f"    funding-only: IS={r['fund_is_sh']:+.2f} OOS={r['fund_oos_sh']:+.2f} "
+              f"(IS monthly t={r['fund_is_t']:+.2f})")
+        print(f"    turnover={r['avg_turnover']:.2f} | net%/yr={r['net_by_year']}")
+    print("\n  NOTE: the $5M-floor row is the capacity-respecting headline; the no-floor row is "
+          "research-only (leans on illiquid coins).")
 
 
 if __name__ == "__main__":
