@@ -38,6 +38,71 @@ def msharpe(net: pd.Series) -> float:
     return g.mean() / g.std() * np.sqrt(12) if len(g) > 1 and g.std() > 0 else float("nan")
 
 
+def walkforward_book(coins: dict) -> tuple[pd.Series, dict[str, pd.DataFrame]]:
+    """THE BASELINE as a reusable function (EXPLORATION-002 hook).
+
+    Per calendar month, pick the (M_FUND, FRAC, min_history) combo with the best PAST-window monthly
+    Sharpe (train = trailing TRAIN_MONTHS, gap = GAP_CANDLES), then apply that combo to the test
+    month. Coin selection is already point-in-time, so NOTHING uses future info (true OOS).
+
+    Returns:
+      wf_net : the stitched per-candle net (== carry_walkforward.main's "walk-forward" baseline).
+      parts  : {"price","funding","cost","weights"} stitched the SAME way -> each test month's rows
+               come from the combo chosen for that month. `weights` is the per-coin weight matrix
+               (index = candle open_time, columns = coins) needed by weight-level risk overlays
+               (per-coin caps, beta-hedge). Rows outside any selected test month are absent.
+
+    Efficient: each combo's full (book, weights) is built once; the walk-forward just slices the
+    chosen combo's precomputed rows per month.
+    """
+    combos = list(product(M_GRID, FRAC_GRID, HIST_GRID))
+    books: dict[tuple, pd.DataFrame] = {}
+    wmats: dict[tuple, pd.DataFrame] = {}
+    for combo in combos:
+        m, f, h = combo
+        bk, wm = bc.build_book(coins, m_fund=m, frac=f, min_history=h)
+        books[combo] = bk
+        wmats[combo] = wm
+    panel = pd.DataFrame({c: books[c]["net"] for c in combos}).sort_index()
+
+    months = pd.PeriodIndex(panel.index, freq="M").unique().sort_values()
+    step = 8 * 60 * 60 * 1000
+    net_parts, price_parts, fund_parts, cost_parts, w_parts = [], [], [], [], []
+    for ms in months:
+        m_start = ms.to_timestamp()
+        train_lo = m_start - pd.DateOffset(months=TRAIN_MONTHS)
+        train_hi = m_start - pd.Timedelta(milliseconds=GAP_CANDLES * step)
+        test_hi = (ms + 1).to_timestamp()
+        train = panel[(panel.index >= train_lo) & (panel.index < train_hi)]
+        test_mask = (panel.index >= m_start) & (panel.index < test_hi)
+        if len(train) < 200 or not test_mask.any():
+            continue
+        train_sh = train.apply(msharpe)
+        if not np.isfinite(train_sh.max()):
+            continue
+        best = train_sh.idxmax()
+        bk = books[best]
+        idx = bk.index[(bk.index >= m_start) & (bk.index < test_hi)]
+        net_parts.append(bk["net"].loc[idx])
+        price_parts.append(bk["price"].loc[idx])
+        fund_parts.append(bk["funding"].loc[idx])
+        cost_parts.append(bk["cost"].loc[idx])
+        w_parts.append(wmats[best].loc[idx])
+    wf_net = pd.concat(net_parts).sort_index().rename("net")
+    parts = {
+        "price": pd.concat(price_parts).sort_index().rename("price"),
+        "funding": pd.concat(fund_parts).sort_index().rename("funding"),
+        "cost": pd.concat(cost_parts).sort_index().rename("cost"),
+        "weights": pd.concat(w_parts).sort_index(),
+    }
+    return wf_net, parts
+
+
+def walkforward_net(coins: dict) -> pd.Series:
+    """Convenience: just the baseline net series (walkforward_book has the full decomposition)."""
+    return walkforward_book(coins)[0]
+
+
 def report(label: str, net: pd.Series) -> None:
     eq = (1 + net).cumprod()
     dd = float((eq / eq.cummax() - 1).min())
