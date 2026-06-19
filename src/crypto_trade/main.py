@@ -1375,7 +1375,13 @@ def _cmd_fetch_spot(args, settings) -> None:
                 last_ms = (
                     max(int(r[0]) for r in (existing + new_rows)) if (existing or new_rows) else 0
                 )
-                api_rows = _fetch_current_month_api(api_http, sym, iv, last_ms + 1)
+                try:
+                    api_rows = _fetch_current_month_api(api_http, sym, iv, last_ms + 1)
+                except httpx.HTTPStatusError as exc:
+                    # Perp-only symbol (no Binance spot listing) returns 4xx — skip, don't crash.
+                    print(f"  {sym}/{iv}: no spot listing / API error "
+                          f"({exc.response.status_code}) — skipping current-month")
+                    api_rows = []
                 fresh_api = [r for r in api_rows if int(r[0]) not in seen]
                 if fresh_api:
                     new_rows.extend(fresh_api)
