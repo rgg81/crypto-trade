@@ -51,9 +51,16 @@ Every iteration uses the agent team; the orchestrator coordinates + synthesizes,
 - **quant-researcher** — designs the EXPLORATION (which one change, why, crypto-native rationale).
 - **quant-engineer / risk-engineer** — implements the change + runs the backtest (risk-engineer for
   any risk/sizing/DD primitive).
-- **quant-critic** (read-only) — adversarially reviews EVERY result before it's kept: leak, selection
-  bias, survivorship, walk-forward correctness, cost realism. A change is NOT promoted without a
-  critic PASS. (The critic already caught a funding-alignment bug that inflated OOS ~28% — this is why.)
+- **quant-critic** (read-only) — reviews EVERY result before it's kept, and is **CONSTRUCTIVE, not just
+  a gate** (user directive 2026-06-20). Every review delivers BOTH:
+  (a) **adversarial findings** — incl. a MANDATORY data-leak check (future→past corruption test: corrupt
+      all inputs from a cutoff forward, confirm past values are bit-identical) + selection bias,
+      survivorship, walk-forward/stitch correctness, cost realism, statistical significance (n);
+  (b) **constructive suggestions** — concrete fixes for what it flags AND ideas for the next iteration.
+  The critic and the builders WORK TOGETHER: the critic's suggestions feed the next EXPLORATION; a
+  change is NOT promoted without a critic PASS, but a BLOCK always comes with a path forward.
+  (This caught a funding-bug ~28% inflation, a de-lever stitch artifact, and a broken ERC solver — and
+  proposed the fixes each time.)
 
 ## Cadence
 - **EXPLORATION** — one change, scored on the backtest + the rigor checks that don't need OOS.
