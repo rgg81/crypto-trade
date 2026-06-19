@@ -154,8 +154,8 @@ def main() -> None:
     # OOS matches iter_005 exactly (+1.22); IS/DD differ ~0.07/1pt because we stitch the raw
     # per-month net then vol-target once (vs iter_005's per-λ vol-target before stitch) — the
     # vol-target operator is non-linear across stitch boundaries. Faithful for DD-control probing.
-    # NOTE: this raw-stitch+single-vol-target path differs from iter_005's canonical per-λ vol-target;
-    # the critic showed it INFLATES the de-lever lift (stitch-order artifact). Sanity-bound only.
+    # NOTE: this raw-stitch+single-vol-target path differs from iter_005's canonical per-λ
+    # vol-target; the critic showed it INFLATES the de-lever lift (stitch artifact). Sanity-bound.
     assert b["oos"] > 0.8 and b["is"] > 0.8, "baseline sanity"
     print(f"  [probe] raw-stitch baseline IS={b['is']:+.2f} OOS={b['oos']:+.2f} "
           "(NON-canonical; see iter_005 for the deployable definition)\n")
