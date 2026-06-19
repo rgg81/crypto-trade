@@ -174,3 +174,22 @@ with a critic PASS — promotion is the orchestrator's call after that review.
   aggressive-flow scaling the book — a second, orthogonal lever on the −23% DD), and the roadmap's
   **OI / perp-spot-basis** structural families — now with three confirmed factors (trend, carry, flow)
   cleanly combined, the cross-section is demonstrably not exhausted.
+
+## CRITIC REVIEW (2026-06-20) — CONCERNS: do NOT promote as-is (baseline stays +1.37)
+The flow factor is REAL + leak-free + additive (verified: corruption test bit-identical; flow standalone
++1.59 independently reproduced; flow marginal +0.92, every pair with flow beats trend+carry). BUT the
+promotion case was OVERSTATED:
+- **ERC "+2.55 corroboration" is a BROKEN solver** — does not converge to equal risk; corners toward
+  flow on 43% of OOS dates (the same iter-013 corner pathology). NOT independent evidence. Fix or drop.
+- **"2× cost +2.34" is hollow** — only doubled the trivial meta-layer turnover (~0.044bps), NOT the
+  coin-level taker cost. Need a real coin-level 2× stress (flow 2×-coin-cost is actually +1.39 — fine —
+  but the gate didn't measure it).
+- **The +2.40 vs +1.37 lift is WITHIN NOISE at n=16** (paired monthly t=+1.68, p≈0.11). Point estimate
+  nearly doubles, but the GAP is not statistically significant. RP-3's own Sharpe IS significant vs 0.
+- GOOD NEWS: the "−29% DD" caveat DISSOLVES on OOS — the −29% trough is IN-SAMPLE (2020-05); OOS-only
+  DD = −23%, same as baseline. The agent under-sold the candidate here.
+- Carry gets a full 1/3 inverse-vol weight despite IS −0.03 (by-design, not OOS-tuning; flag carry's
+  single-regime nature — main DD contributor).
+**Status: FLOW FACTOR CONFIRMED real; 3-factor risk-parity combiner is a PROMISING candidate but NOT a
+clean significant promotion. Baseline UNCHANGED (+1.37). Route to a proper held-OOS / significance
+validation (fix ERC, real coin-level cost stress) before promotion.**
