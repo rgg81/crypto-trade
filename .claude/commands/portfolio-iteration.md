@@ -46,8 +46,9 @@ the top-20 (deep, liquid) are the cost model.
 - Data already on disk: `data/<SYM>/8h.csv` (726 coins) + `data/funding_rates/<SYM>.csv` (572). 8h
   candles (the project's sacred interval). No re-fetch.
 
-## Roles — AGENT-DRIVEN (user directive 2026-06-19: do NOT work solo)
-Every iteration uses the agent team; the orchestrator coordinates + synthesizes, does not do it all alone:
+## Roles — AGENT-DRIVEN (user: do NOT work solo; ALWAYS use ALL agents, EVERY iteration 2026-06-20)
+EVERY iteration uses the FULL team — never a single agent, never a solo-orchestrator pass, including
+for rejects. The orchestrator only coordinates + synthesizes + commits:
 - **quant-researcher** — designs the EXPLORATION (which one change, why, crypto-native rationale).
 - **quant-engineer / risk-engineer** — implements the change + runs the backtest (risk-engineer for
   any risk/sizing/DD primitive).
