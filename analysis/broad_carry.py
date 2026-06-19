@@ -134,7 +134,7 @@ def main() -> None:
         print(f"    turnover={r['avg_turnover']:.2f} | net%/yr={r['net_by_year']}")
     print("\n  NOTE: full-universe collapses OOS (the 40-coin +2.61 was survivorship); the funding")
     print("  edge is real everywhere (OOS Sharpe ~+6), but the price/short leg is wrecked by NEW")
-    print("  listings -> the >=2y min-history filter (point-in-time) is the honest deployable carry.")
+    print("  listings -> the >=2y min-history filter (point-in-time) is the deployable carry.")
 
 
 if __name__ == "__main__":
