@@ -1,7 +1,7 @@
 """portfolio-iteration EXPLORATION-005 — WALK-FORWARD carry-tilt weight λ (no OOS peek).
 
 iter-004 found a carry tilt λ=0.25 lifts OOS (+0.50 -> +1.31), but on IS λ=0 and λ=0.25 tie, so
-0.25 was effectively OOS-picked. This selects λ per calendar month on the PAST window only (best past
+0.25 was effectively OOS-picked. This selects λ per month on the PAST window only (best past
 monthly Sharpe), applies it to the test month, and stitches — a true walk-forward. If the OOS lift
 survives honest λ-selection it is real and trend+carry-tilt becomes baseline; if not, reject.
 
