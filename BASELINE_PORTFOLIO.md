@@ -10,7 +10,7 @@ Living baseline for the `portfolio-iteration` track. Updated only by a confirmed
     - **λ selected WALK-FORWARD** each month on the past 24mo (best past Sharpe); converges ~0.25.
   Gross-normalized long/short, portfolio vol-targeted (1%/candle, max 3x). Real funding P&L booked.
   Realistic: decide close[t] → fill open[t+1] → hold; taker 0.05%/side. Leak-safe.
-- **Performance (walk-forward λ, honest):** net **IS +1.30 / OOS +1.08 / maxDD −24%**, positive every
+- **Performance (walk-forward λ, honest):** net **IS +1.30 / OOS +1.37 / maxDD −23%**, positive every
   year. (Fixed-λ=0.25: IS +1.72 / OOS +1.07.) Trend-only was OOS +0.49 — the carry tilt
   is a walk-forward-VALIDATED lift (not OOS-selection bias: walk-forward independently picks λ≈0.25 in
   14/18 OOS months). Beats buy-and-hold BTC (IS +0.98 / OOS −0.36 / −77% DD) on every axis.
@@ -43,3 +43,14 @@ walk-forward any param · universe PIT top-20 ex-stables · report net (cost+fun
   (incl. stale tail) is the conservative +1.08. FIX = refresh full-universe data + min-eligible guard.
   (3) only λ is walk-forward; honest path per risk-engineer = walk-forward λ + PROVE robustness of the
   structural params (NOT per-month-tune all 12, which overfits the 24mo window = a hidden cheat).
+
+## UPDATE — iter-007 (agent-driven: risk-engineer built, quant-critic reviewed), 2026-06-19
+- **Data refresh (blocker #2 FIXED):** the stale-universe degenerate OOS tail is gone (critic-verified:
+  0 OOS candles guarded, no new leak — legitimate de-biasing). Honest baseline OOS **+1.08 → +1.37**.
+- **min-eligible guard:** KEPT as a free, leak-safe safety net (neutral on current data — only guards
+  the early-2020 warmup; insurance against future universe degeneracy).
+- **vol-spike de-lever: REJECTED by critic.** Its apparent +0.16 OOS lift was a STITCH-ORDER ARTIFACT
+  (iter_007 vol-targets once vs iter_005's per-λ); under canonical accounting it adds +0.01 OOS (noise).
+  NOT promoted. (The agent review caught a measurement artifact before it entered the baseline.)
+- **Current honest baseline = canonical iter_005 walk-forward λ: IS +1.30 / OOS +1.37 / DD −23%**,
+  positive every year, funding-fixed, fresh PIT universe, taker fees, no HFT/MM/VIP.
