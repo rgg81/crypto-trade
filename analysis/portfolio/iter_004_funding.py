@@ -31,8 +31,10 @@ def load_funding(index_ms, syms) -> pd.DataFrame:
             cols[s] = pd.Series(0.0, index=index_ms)
             continue
         f = pd.read_csv(p).drop_duplicates(subset="funding_time", keep="last")
-        f = f.set_index("funding_time")["funding_rate"].astype(float)
-        cols[s] = f.reindex(index_ms).fillna(0.0)
+        f = f.set_index("funding_time")["funding_rate"].astype(float).sort_index()
+        # FIX (critic blocker #1): Binance funding_time has ms jitter; exact reindex silently zeroed
+        # ~65% of cells. Map each 8h candle to the NEAREST funding event within 4h.
+        cols[s] = f.reindex(index_ms, method="nearest", tolerance=14_400_000).fillna(0.0)
     return pd.DataFrame(cols)
 
 
