@@ -115,11 +115,16 @@ def evaluate(book: pd.DataFrame, w: pd.DataFrame) -> dict:
 
 def main() -> None:
     coins = load_universe()
-    print(f"BROAD CROSS-SECTIONAL CARRY (realistic engine; {len(coins)} coins, "
+    print(f"BROAD CROSS-SECTIONAL CARRY (realistic engine; {len(coins)}-coin universe, "
           f"M={M_FUND}, FRAC={FRAC})")
-    for label, min_liq in [("research (NO capacity floor)", None),
-                           ("realizable ($5M liquidity floor)", 5e6)]:
-        book, w = build_book(coins, min_liquidity=min_liq)
+    # full universe (no history filter) = research/diagnostic — collapses OOS (new-listing squeezes,
+    # the survivorship lesson). 2y min-history = the honest, survivorship-clean DEPLOYABLE config.
+    configs = [
+        ("research: full universe (no min-history)", {}),
+        ("DEPLOYABLE: >=2y min-history", {"min_history": 2190}),
+    ]
+    for label, kw in configs:
+        book, w = build_book(coins, **kw)
         r = evaluate(book, w)
         print(f"\n  [{label}]")
         print(f"    net   : IS Sharpe={r['is_sh']:+.2f}  OOS Sharpe={r['oos_sh']:+.2f}  "
@@ -127,8 +132,9 @@ def main() -> None:
         print(f"    funding-only: IS={r['fund_is_sh']:+.2f} OOS={r['fund_oos_sh']:+.2f} "
               f"(IS monthly t={r['fund_is_t']:+.2f})")
         print(f"    turnover={r['avg_turnover']:.2f} | net%/yr={r['net_by_year']}")
-    print("\n  NOTE: the $5M-floor row is the capacity-respecting headline; the no-floor row is "
-          "research-only (leans on illiquid coins).")
+    print("\n  NOTE: full-universe collapses OOS (the 40-coin +2.61 was survivorship); the funding")
+    print("  edge is real everywhere (OOS Sharpe ~+6), but the price/short leg is wrecked by NEW")
+    print("  listings -> the >=2y min-history filter (point-in-time) is the honest deployable carry.")
 
 
 if __name__ == "__main__":
