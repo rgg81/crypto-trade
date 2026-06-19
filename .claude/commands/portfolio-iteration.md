@@ -46,12 +46,28 @@ the top-20 (deep, liquid) are the cost model.
 - Data already on disk: `data/<SYM>/8h.csv` (726 coins) + `data/funding_rates/<SYM>.csv` (572). 8h
   candles (the project's sacred interval). No re-fetch.
 
+## Roles — AGENT-DRIVEN (user directive 2026-06-19: do NOT work solo)
+Every iteration uses the agent team; the orchestrator coordinates + synthesizes, does not do it all alone:
+- **quant-researcher** — designs the EXPLORATION (which one change, why, crypto-native rationale).
+- **quant-engineer / risk-engineer** — implements the change + runs the backtest (risk-engineer for
+  any risk/sizing/DD primitive).
+- **quant-critic** (read-only) — adversarially reviews EVERY result before it's kept: leak, selection
+  bias, survivorship, walk-forward correctness, cost realism. A change is NOT promoted without a
+  critic PASS. (The critic already caught a funding-alignment bug that inflated OOS ~28% — this is why.)
+
 ## Cadence
-- **EXPLORATION** — one change (a new factor, a signal/lookback refinement, portfolio-construction
-  improvement, a regime filter), scored on the backtest with the rigor checks that don't need OOS.
-  Cheap, frequent. Logged to `diary-portfolio/EXPLORATION-NNN.md` with the numbers + verdict.
-- **CONFIRMATION** — reveal OOS + full gauntlet; only this promotes a change into the baseline
-  (`BASELINE_PORTFOLIO.md` + the engine defaults). Commit every step with the honest result.
+- **EXPLORATION** — one change, scored on the backtest + the rigor checks that don't need OOS.
+  Logged to `diary-portfolio/EXPLORATION-NNN.md` with numbers + verdict + the critic's note.
+- **CONFIRMATION** — reveal OOS + full gauntlet; only this (with a critic PASS) promotes a change into
+  the baseline. Commit every step with the honest result — including downward corrections.
+
+## NO CHEATING (hard — user-critical)
+- A param earns per-month walk-forward tuning ONLY if proven non-stationary (λ qualifies). Tuning ALL
+  params per-month on the 24mo window OVERFITS the training window — that is itself a hidden cheat.
+  For structural params, PROVE robustness (iter-006-style sweep: all configs positive IS+OOS) instead.
+- Never exact-match-join jittery timestamps (the funding bug). Never report a number a critic hasn't
+  cleared. Refresh stale data rather than silently trading a degenerate universe. Report DOWN-corrections
+  openly. If a result looks too good, assume a bug until the critic clears it.
 
 ## Roadmap (build BTC-first, then widen — little by little)
 1. **iter-001** — BTC time-series momentum (trend) standalone: validate the single-asset trend signal
