@@ -114,4 +114,7 @@ not persist long enough to harvest at this cadence.
 ## INDEPENDENT CRITIC REVIEW (2026-06-20) — PASS (reject is sound)
 Leak test bit-identical (accel slope past-only; only forward op is the correct fund.shift(-1) accrual).
 Reject correctly discards a non-edge: fade IS -0.066 (clearly fails gate); OOS +0.47 is cost-fragile
-(2x -> +0.14), window-sign-flipping (no cell IS>0 AND OOS>0), year-concentrated (all 2025; 2026 -19
+(2x -> +0.14), window-sign-flipping (no cell IS>0 AND OOS>0), year-concentrated (all 2025; 2026 -19%); residual vs trend+carry+flow -0.13. Sanity gate meaningful (carry reproduced byte-for-byte; the
+bug would have tripped it). NOT a false reject. CONSTRUCTIVE NEXT FACTOR = perp-spot BASIS (a different
+price series, not a funding transform so not pre-doomed to collapse into carry; have spot plumbing from
+cash-and-carry; pre-register carry-orthogonalization + 2x-cost gate). Baseline iter_005 +1.37 untouched.
