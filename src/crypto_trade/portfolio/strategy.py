@@ -8,10 +8,10 @@ the validated backtest modules (analysis/portfolio/iter_002,004,005,020) and exp
   the latest candle close (un-lagged signal).
 
 Deployed config (baseline-v2, tag portfolio-baseline-v2): trend+carry (walk-forward lambda),
-inverse-vol sized, gross-normalized L/S, vol-targeted (1%/candle, max 3x), HYSTERESIS SNAP delta=0.010.
+inverse-vol sized, gross-normalized L/S, vol-targeted (1%/candle, max 3x), hysteresis SNAP delta 0.010.
 
 The iter_* modules use CWD-relative data paths and bare sibling imports, so we put analysis/portfolio
-on sys.path and run data ops with CWD = repo root.
+on the path and run data ops with CWD = repo root.
 """
 
 from __future__ import annotations
