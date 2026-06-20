@@ -115,13 +115,13 @@ class PortfolioEngine:
         }
 
     def refresh_data(self) -> None:
-        """Refresh klines AND funding for the full candidate universe (PIT top-20 + carry parity)."""
+        """Refresh klines + funding for the full candidate universe (PIT + carry parity)."""
         syms = strategy.candidate_symbols()
         data_pipeline.refresh_klines(self.kline_client, syms, self.cfg.interval, self.cfg.data_dir)
         funding.refresh_funding(syms, self.cfg.data_dir)
 
     def run_once(self, refresh: bool = True) -> dict:
-        """One evaluation: optionally refresh data, compute the plan, log it. No orders in dry-run."""
+        """One evaluation: optionally refresh data, compute + log the plan. No orders in dry-run."""
         if refresh:
             self.refresh_data()
         plan = self.compute_plan()
