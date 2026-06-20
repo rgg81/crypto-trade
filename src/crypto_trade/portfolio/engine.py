@@ -135,10 +135,22 @@ class PortfolioEngine:
         }
 
     def refresh_data(self) -> None:
-        """Refresh klines + funding for the full candidate universe (PIT + carry parity)."""
+        """Refresh klines + funding for the full candidate universe (PIT + carry parity).
+
+        Per-symbol tolerant: a coin delisted from production fapi (400 on /klines) keeps its on-disk
+        CSV (parity with the backtest's view) and is skipped — one dead symbol must not abort the run.
+        """
+        from crypto_trade.fetcher import fetch_symbol_interval
+        data_dir = Path(self.cfg.data_dir)
         syms = strategy.candidate_symbols()
-        data_pipeline.refresh_klines(
-            self.kline_client, syms, self.cfg.interval, Path(self.cfg.data_dir))
+        ok = skipped = 0
+        for s in syms:
+            try:
+                fetch_symbol_interval(self.kline_client, data_dir, s, self.cfg.interval)
+                ok += 1
+            except Exception:
+                skipped += 1                   # delisted / unavailable on production fapi
+        print(f"[portfolio] klines refreshed: {ok} ok, {skipped} skipped (delisted)")
         funding.refresh_funding(syms, self.cfg.data_dir)
 
     # ---- live execution plumbing (reuses the proven AuthenticatedBinanceClient) ----
