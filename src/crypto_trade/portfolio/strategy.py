@@ -94,41 +94,27 @@ def position_weight_book(coins: dict, delta: float = DELTA, mode: str = MODE) ->
 
 
 def next_target_weights(coins: dict, delta: float = DELTA, mode: str = MODE) -> dict:
-    """Position weights to HOLD for the UPCOMING candle, decided at the latest candle close.
+    """Deployed position weights to HOLD during the LATEST candle in `coins` — the live target.
 
-    The backtest lags weights by one candle (`w = raw.shift(1)`), so the live "next" weight is the
-    un-lagged signal at the latest close. We band it against the latest deployed held weights and
-    apply the latest vol-target scale — the row the backtest WOULD place at the next candle.
+    BIT-EXACT DEFINITION (verified by reconcile_live): the deployed weight for the candle being held
+    = the LAST ROW of the full deployed book (banded -> renorm -> x vol-target). The vol scale
+    for candle H depends on open[H] (via raw_net[H-1] = w[H-1]*(open[H]/open[H-1]-1)), so the CALLER
+    must feed `coins` ending at the HOLD candle — i.e. include the just-opened candle's open. Live:
+    when candle H-1 closes, candle H has opened; fetch through H's open, compute, rebalance.
 
-    Returns {symbol: signed_weight} for non-trivial targets, plus metadata under "_meta".
+    Because the book is recomputed from FULL history, the month's walk-forward lambda and the
+    path-dependent band chain are reproduced from data — so a mid-month start is handled
+    automatically. Returns {symbol: signed_weight} for non-trivial holds, plus "_meta".
     """
     book = _hy.canonical_book(coins, _hy.build_books(coins))
-    target_w = book["target_w"]                  # lagged target weights (held during each candle)
-    held = _hy.apply_band(target_w, delta, mode)  # the backtest's banded held chain
-    raw_next = target_w.shift(-1).iloc[-1]            # raw[T] = next-candle target (un-lagged)
-    held_last = held.iloc[-1]
-    move = raw_next - held_last
-    nxt = held_last.copy()
-    if delta > 0:
-        trig = move.abs() > delta
-        if mode == "edge":
-            nxt[trig] = held_last[trig] + np.sign(move[trig]) * (move[trig].abs() - delta)
-        else:
-            nxt[trig] = raw_next[trig]
-    else:
-        nxt = raw_next.copy()
-    gross = nxt.abs().sum()
-    base_gross = float(target_w.iloc[-1].abs().sum())
-    if gross > 0:
-        nxt = nxt * (base_gross / gross)
-    scale = float(book["scale"].iloc[-1])
-    pos = (nxt * scale).dropna()
-    out = {s: float(v) for s, v in pos.items() if abs(v) > 1e-9}
+    deployed = _deployed_weights(book, delta, mode)        # full per-candle deployed book
+    last = deployed.iloc[-1]                                # weight held during the latest candle
+    pos = last[last.abs() > 1e-9]
+    out = {s: float(v) for s, v in pos.items()}
     out["_meta"] = {
-        "as_of": str(target_w.index[-1]),
+        "as_of": str(deployed.index[-1]),
         "lambda_pick": book["picks"][-1] if book["picks"] else None,
-        "vol_target_scale": scale,
-        "gross": float(pos.abs().sum()),
-        "n_positions": int((pos.abs() > 1e-9).sum()),
+        "gross": float(last.abs().sum()),
+        "n_positions": int(len(pos)),
     }
     return out

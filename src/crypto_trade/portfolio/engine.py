@@ -64,45 +64,45 @@ class PortfolioEngine:
     def compute_plan(self, current_weights: dict | None = None) -> dict:
         """Return the rebalance plan: per-coin target weight, current weight, delta-notional, side.
 
-        current_weights: actual held weights (from positions live; persisted held_w in dry-run).
-        Applies the hysteresis band vs the ACTUAL current weight (skip if |move| <= delta).
+        PARITY: target = strategy.next_target_weights = the backtest's deployed book for the held
+        candle (the hysteresis band is ALREADY baked in there, on the pre-vol-target weights). The
+        engine does NOT re-band — it TRACKS that book: trade = target - actual_held. The only
+        execution filter is min_notional (skip dust legs Binance rejects). Because the target is
+        recomputed from FULL history every tick, a mid-month start is handled automatically: the
+        month's walk-forward lambda and the path-dependent band chain are reproduced from data, not
+        from when we started. current_weights = actual positions (live) / persisted paper (dry-run);
+        an empty book => cold-start full entry falls out naturally.
         """
         coins = strategy.load_universe()
         tgt = strategy.next_target_weights(coins, delta=self.cfg.delta)
         meta = tgt.pop("_meta")
         cur = dict(current_weights if current_weights is not None else self._load_held())
         gross_dollar = self.cfg.equity_usd * self.cfg.leverage
-        # COLD START (no held book yet): enter the FULL current target book un-banded. The band only
-        # suppresses CHANGES once a book exists; from flat it would wrongly drop sub-delta positions
-        # the backtest holds (it banded incrementally, never from flat). Day-1 full entry.
-        cold_start = len(cur) == 0
 
         all_syms = set(tgt) | set(cur)
         legs = []
         new_held = {}
         for s in sorted(all_syms):
-            t = float(tgt.get(s, 0.0))
-            c = float(cur.get(s, 0.0))
-            move = t - c
-            if cold_start or abs(move) > self.cfg.delta:
-                held_w = t                                  # full entry (cold) / SNAP to target
-            else:
-                held_w = c                                  # inside band: hold
-            if abs(held_w) > 1e-9:
-                new_held[s] = held_w
-            trade_w = held_w - c
+            t = float(tgt.get(s, 0.0))            # backtest deployed weight for the upcoming candle
+            c = float(cur.get(s, 0.0))            # what we actually hold now
+            trade_w = t - c
             delta_notional = trade_w * gross_dollar
             if abs(delta_notional) >= self.cfg.min_notional_usd:
                 legs.append({
                     "symbol": s,
                     "side": "BUY" if trade_w > 0 else "SELL",
-                    "target_w": round(held_w, 5),
-                    "current_w": round(c, 5),
+                    "target_w": round(t, 6),
+                    "current_w": round(c, 6),
                     "delta_notional_usd": round(delta_notional, 2),
                 })
+                held_w = t                        # traded to target
+            else:
+                held_w = c                        # below min-notional: can't trade, keep current
+            if abs(held_w) > 1e-9:
+                new_held[s] = held_w
         return {
             "as_of": meta["as_of"],
-            "cold_start": cold_start,
+            "cold_start": len(cur) == 0,
             "lambda_pick": meta["lambda_pick"],
             "vol_target_scale": round(meta["vol_target_scale"], 4),
             "target_gross": round(meta["gross"], 4),
