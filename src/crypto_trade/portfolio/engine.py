@@ -50,8 +50,10 @@ class PortfolioEngine:
     def __init__(self, config: PortfolioConfig, settings):
         self.cfg = config
         self.settings = settings
-        # klines always from production (parity with backtest data source)
+        # klines always from production (parity with backtest data source). kline_client (bulk
+        # incremental refresh) vs read_client (limit=2 for candle-detect + forming-open polls).
         self.kline_client = BinanceClient(base_url=settings.base_url)
+        self.read_client = BinanceClient(base_url=settings.base_url, limit=2)
         self.store = StateStore(Path(config.db_path))
         # signed client (orders/positions/leverage) — testnet routing via auth_base_url; only when
         # we will actually trade. klines stay on production base_url for full history (parity).
@@ -135,7 +137,8 @@ class PortfolioEngine:
     def refresh_data(self) -> None:
         """Refresh klines + funding for the full candidate universe (PIT + carry parity)."""
         syms = strategy.candidate_symbols()
-        data_pipeline.refresh_klines(self.kline_client, syms, self.cfg.interval, self.cfg.data_dir)
+        data_pipeline.refresh_klines(
+            self.kline_client, syms, self.cfg.interval, Path(self.cfg.data_dir))
         funding.refresh_funding(syms, self.cfg.data_dir)
 
     # ---- live execution plumbing (reuses the proven AuthenticatedBinanceClient) ----
@@ -144,7 +147,7 @@ class PortfolioEngine:
         out: dict = {}
         for s in symbols:
             try:
-                kl = self.kline_client.fetch_klines(s, self.cfg.interval)
+                kl = self.read_client.fetch_klines(s, self.cfg.interval)
                 if kl:
                     last = kl[-1]
                     out[s] = (int(last.open_time), float(last.open))
@@ -247,7 +250,7 @@ class PortfolioEngine:
             last = self.store.get_state(last_key)
             last_ms = int(last) if last else None
             candle = data_pipeline.detect_new_candle(
-                self.kline_client, self.cfg.ref_symbol, self.cfg.interval, last_ms)
+                self.read_client, self.cfg.ref_symbol, self.cfg.interval, last_ms)
             if candle is not None:
                 self.run_once(refresh=True)
                 self.store.set_state(last_key, str(candle.open_time))
