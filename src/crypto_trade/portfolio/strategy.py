@@ -46,6 +46,25 @@ def _in_root():
         os.chdir(cwd)
 
 
+def candidate_symbols() -> list[str]:
+    """Candidate-universe symbols (ex-stable, ascii) WITHOUT loading every CSV — for kline refresh.
+
+    Mirrors iter_002.load_universe's symbol filter (the >=2y-history cut is applied later by
+    load_universe). Used to know which symbols' klines+funding the live tick must keep fresh, so the
+    PIT top-20 selection matches the backtest (which scans the full candidate set).
+    """
+    import glob
+    import os.path
+
+    syms = []
+    for p in sorted(glob.glob(os.path.join(_ROOT, "data", "*USDT", "8h.csv"))):
+        sym = os.path.basename(os.path.dirname(p))
+        if not sym.endswith("USDT") or _base.STABLE.search(sym) or not sym.isascii():
+            continue
+        syms.append(sym)
+    return syms
+
+
 def load_universe() -> dict:
     """PIT candidate universe (data/<SYM>/8h.csv, ex-stable, >=2y history). CWD-independent."""
     with _in_root():
