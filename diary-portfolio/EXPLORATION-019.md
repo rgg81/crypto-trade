@@ -64,3 +64,17 @@ The lever for this DD is not a univariate market-state scalar. Candidates worth 
 (1) a CORRELATION/cross-sectional-rank overlay that de-levers only when the book's effective breadth
 collapses AND positions are crowded one-way (must beat the constant-de-lever control + show negative
 corr(mult,|net|)); (2) accept the DD as the price of the +1.37 OOS and pivot back to signal/alpha axes.
+
+## INDEPENDENT CRITIC REVIEW (2026-06-20) — PASS (reject sound, DD intrinsic)
+Leak CLEAN (overlay-off bit-exact +1.37; corruption test past bit-identical; lag=2 conservative; pure
+scalar on canonical net, NO stitch trap). Control VALID: constant 0.816× reproduces 89% of breadth's
+DD relief w/ zero regime info (Sharpe scale-invariant), corr(mult,|net|)=+0.03 (doesn't de-lever into
+danger), re-vol-targeted residual within noise (phase-randomization null p=0.244). The -23% DD is
+INTRINSIC correlated portfolio-wide reversals — no market-state signal anticipates it. Honest reject,
+baseline +1.37 untouched.
+CONSTRUCTIVE: portfolio exploration LARGELY CONCLUDED (7 directional rejects + flow-only + combiner HELD
+@ DSR-N=14 + DD overlay rejected). Ship +1.37 baseline to testnet + shadow combiner (task #184). ONE
+genuinely un-mined lever = TURNOVER/holding-period: every iter modulated gross-exposure or factor-weight,
+none touched REBALANCING CADENCE. A hysteresis-banded slower-turnover version of the same trend+carry
+book (rebalance only on meaningful signal change) attacks the DD AT ITS SOURCE (whipsaw into reversals)
++ is deployment-relevant (lower cost/slippage). The honest one-more iteration (iter-020); else ship+shadow.
