@@ -121,3 +121,16 @@ window**. The combiner **stays a candidate**; promotion is the critic's call on 
   −0.03, −67% standalone DD at a ~1/3 risk share) — pre-register a falsifier: if carry's OOS contribution
   flips negative, the candidate is a 2-factor (trend+flow) story. Keep the baseline frozen at +1.37 until a
   power-aware reveal on a forward window clears DSR > 0.95.
+
+## CRITIC DECISION (2026-06-20) — CONFIRM HOLD (robust, not knife-edge)
+Leak clean (cutoff frozen, combiner reused not recomputed, bootstrap seed-stable). DSR correct; N=14
+fair — HOLD robust across N=2..50 (promote boundary only N=2..4; combiner needs ~3.47 own-Sharpe vs
+2.40 observed). Bootstrap honest (block>=3 correct; t-vs-bootstrap "disagreement" is a one-sided/two-
+sided artifact — they largely agree; script slightly over-conservative). HOLD SOUND: promotion needs
+beating the incumbent; the lift is real-but-unproven at n=16; conjunctive rule correct. NOT a false
+HOLD, no missed leak. The obstacle is n, not effect size — only FORWARD months can clear DSR.
+DEPLOY PLAN (critic): deploy iter_005 baseline (+1.37) live on testnet; run RP-3 combiner in
+SHADOW/PAPER to accumulate forward OOS; pre-register the forward window + DSR/t recompute cadence NOW;
+when forward data clears the pre-registered rule, promotion is a clean leak-free confirmation.
+BASELINE = iter_005 WF-λ trend+carry, OOS +1.37 (the deployable strategy). Combiner = strong candidate
+in shadow.
