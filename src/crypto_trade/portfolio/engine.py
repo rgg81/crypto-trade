@@ -138,7 +138,7 @@ class PortfolioEngine:
         """Refresh klines + funding for the full candidate universe (PIT + carry parity).
 
         Per-symbol tolerant: a coin delisted from production fapi (400 on /klines) keeps its on-disk
-        CSV (parity with the backtest's view) and is skipped — one dead symbol must not abort the run.
+        CSV (parity with the backtest view) and is skipped — one dead symbol must not abort the run.
         """
         from crypto_trade.fetcher import fetch_symbol_interval
         data_dir = Path(self.cfg.data_dir)
