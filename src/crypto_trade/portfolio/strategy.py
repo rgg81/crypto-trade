@@ -7,10 +7,10 @@ the validated backtest modules (analysis/portfolio/iter_002,004,005,020) and exp
 - next_target_weights(coins) -> dict : position weights to HOLD for the UPCOMING candle, decided at
   the latest candle close (un-lagged signal).
 
-Deployed config (baseline-v2, tag portfolio-baseline-v2): trend+carry (walk-forward lambda),
-inverse-vol sized, gross-normalized L/S, vol-targeted (1%/candle, max 3x), hysteresis SNAP delta 0.010.
+Deployed config (baseline-v2): trend+carry (walk-forward lambda), inverse-vol sized,
+gross-normalized L/S, vol-targeted (1%/candle, max 3x), hysteresis SNAP delta 0.010.
 
-The iter_* modules use CWD-relative data paths and bare sibling imports, so we put analysis/portfolio
+The iter_* modules use CWD-relative data paths + bare sibling imports, so we put analysis/portfolio
 on the path and run data ops with CWD = repo root.
 """
 
