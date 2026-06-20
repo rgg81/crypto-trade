@@ -110,3 +110,8 @@ not persist long enough to harvest at this cadence.
   directional per-coin tilt, use market-wide funding acceleration to scale the *book's* leverage
   (de-risk when aggregate funding is spiking = crowding building). Attacks the −23% DD lever, not the
   Sharpe — a different use of the same (orthogonal) signal that a directional standalone could not bank.
+
+## INDEPENDENT CRITIC REVIEW (2026-06-20) — PASS (reject is sound)
+Leak test bit-identical (accel slope past-only; only forward op is the correct fund.shift(-1) accrual).
+Reject correctly discards a non-edge: fade IS -0.066 (clearly fails gate); OOS +0.47 is cost-fragile
+(2x -> +0.14), window-sign-flipping (no cell IS>0 AND OOS>0), year-concentrated (all 2025; 2026 -19
