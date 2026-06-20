@@ -2,20 +2,23 @@
 
 Living baseline for the `portfolio-iteration` track. Updated only by a confirmed accretive change.
 
-## Current baseline: TREND + CARRY-TILT (walk-forward λ)  [iter-005, walk-forward-confirmed]
+## Current baseline: TREND + CARRY-TILT (walk-forward λ) + HYSTERESIS-BANDING  [iter-005 + iter-020]
 - **Config:** point-in-time top-20 by trailing $-volume (ex-stablecoins, ≥2y-history pool, 206 coins).
   Per coin, blended directional signal `(1-λ)·trend + λ·carry`, inverse-vol sized:
     - trend = mean sign of trailing returns over {7d,14d,28d,56d} (8h candles)
     - carry = −sign(trailing-9 funding) (short high-funding / long low-funding)
     - **λ selected WALK-FORWARD** each month on the past 24mo (best past Sharpe); converges ~0.25.
   Gross-normalized long/short, portfolio vol-targeted (1%/candle, max 3x). Real funding P&L booked.
-  Realistic: decide close[t] → fill open[t+1] → hold; taker 0.05%/side. Leak-safe.
-- **Performance (walk-forward λ, honest):** net **IS +1.30 / OOS +1.37 / maxDD −23%**, positive every
-  year. (Fixed-λ=0.25: IS +1.72 / OOS +1.07.) Trend-only was OOS +0.49 — the carry tilt
-  is a walk-forward-VALIDATED lift (not OOS-selection bias: walk-forward independently picks λ≈0.25 in
-  14/18 OOS months). Beats buy-and-hold BTC (IS +0.98 / OOS −0.36 / −77% DD) on every axis.
+  **HYSTERESIS-BANDING (SNAP δ=0.010, iter-020, critic-PROMOTED 2026-06-20):** rebalance a coin only
+  when |target_w − held_w| > 0.010 (no-trade band), gross renormalized each candle (cadence change, not
+  sizing). Realistic: decide close[t] → fill open[t+1] → hold; taker 0.05%/side. Leak-safe.
+- **Performance:** net **IS +1.30 / OOS +1.37+ / maxDD −23%**, positive every year. The hysteresis band
+  cuts rebalancing TICKETS −63% (−7% notional turnover) at NO Sharpe cost (OOS within-noise +1.50 point
+  est; the deterministic ticket/cost reduction is the promotion case), and is MORE cost-robust (OOS@2×
+  taker +0.89 → +1.05). The carry tilt is walk-forward-VALIDATED (λ≈0.25 picked 14/18 OOS months).
+  Beats buy-and-hold BTC (IS +0.98 / OOS −0.36 / −77% DD) on every axis.
 - **Code:** `analysis/portfolio/iter_002_top20.py` (trend) + `iter_004_funding.py` (carry tilt) +
-  `iter_005_wf_lambda.py` (walk-forward λ — the deployable, no-hindsight version).
+  `iter_005_wf_lambda.py` (walk-forward λ) + `iter_020_hysteresis.py` (SNAP δ=0.010 band — deploy this).
 
 ## Progression
 - iter-001 BTC trend anchor: OOS +0.64. → iter-002 diversified top-20 trend: OOS +0.50, −28% DD.
@@ -54,3 +57,12 @@ walk-forward any param · universe PIT top-20 ex-stables · report net (cost+fun
   NOT promoted. (The agent review caught a measurement artifact before it entered the baseline.)
 - **Current honest baseline = canonical iter_005 walk-forward λ: IS +1.30 / OOS +1.37 / DD −23%**,
   positive every year, funding-fixed, fresh PIT universe, taker fees, no HFT/MM/VIP.
+
+## PROMOTION LOG
+- **2026-06-20 — HYSTERESIS-BANDING promoted (iter-020, critic PASS).** First promotion since the data
+  refresh. SNAP δ=0.010 no-trade band: rebalancing tickets −63% at no Sharpe cost, more cost-robust
+  (advantage widens under 2× taker), leak-free, gross-preserved (true cadence change, not a de-lever),
+  robust δ=0.005→0.020. maxDD unchanged (the whipsaw-DD hypothesis did NOT confirm; the win is cost/
+  cadence). Deploy SNAP δ=0.010 (NOT EDGE mode — degrades IS + worsens DD). Tag portfolio-baseline-v2.
+- HELD (NOT promoted): trend+carry+flow risk-parity combiner (iter-014/015) — OOS +2.40 point est but
+  DSR-NOT-significant at N=14 (iter-018); strong CANDIDATE, run in SHADOW for forward OOS.
