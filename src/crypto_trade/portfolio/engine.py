@@ -9,7 +9,8 @@ so we can verify live decisions track the backtest before any order is placed.
 Parity contract:
 - target weights come from strategy.next_target_weights (machine-precision parity with iter_020).
 - act on candle CLOSE[t] (detect_new_candle on a reference symbol) -> rebalance at next open.
-- gross dollar = sum |target_w| * equity * leverage; the weights already carry the vol-target scale.
+- notional = weight * equity (the weights already carry the vol-target scale ~0.70 gross). LEVERAGE
+  only reduces required MARGIN (notional/leverage); it does NOT scale the notional.
 """
 
 from __future__ import annotations
@@ -56,6 +57,7 @@ class PortfolioEngine:
         # we will actually trade. klines stay on production base_url for full history (parity).
         self.auth: AuthenticatedBinanceClient | None = None
         self.qty_prec: dict[str, int] = {}
+        self._lev_set: set[str] = set()           # symbols whose leverage we've already set
         if not config.dry_run and settings.binance_api_key:
             auth_url = settings.auth_base_url or settings.base_url
             self.auth = AuthenticatedBinanceClient(
@@ -94,7 +96,7 @@ class PortfolioEngine:
         tgt = strategy.next_target_weights(coins, delta=self.cfg.delta)
         meta = tgt.pop("_meta")
         cur = dict(current_weights if current_weights is not None else self._load_held())
-        gross_dollar = self.cfg.equity_usd * self.cfg.leverage
+        gross_dollar = self.cfg.equity_usd        # notional base; leverage only affects margin
 
         all_syms = set(tgt) | set(cur)
         legs = []
@@ -159,21 +161,21 @@ class PortfolioEngine:
             self.qty_prec[si["symbol"]] = int(si["quantityPrecision"])
         print(f"[portfolio] loaded quantityPrecision for {len(self.qty_prec)} symbols")
 
-    def _set_leverage(self, symbols: list[str]) -> None:
-        if self.auth is None:
+    def _ensure_leverage(self, symbol: str) -> None:
+        """Set leverage on a symbol once (lazily, before its first order)."""
+        if self.auth is None or symbol in self._lev_set:
             return
-        lev = max(1, int(round(self.cfg.leverage)))
-        for s in symbols:
-            try:
-                self.auth.set_leverage(s, lev)
-            except Exception as exc:
-                print(f"[portfolio] set_leverage {s} failed: {exc}")
+        try:
+            self.auth.set_leverage(symbol, max(1, int(round(self.cfg.leverage))))
+        except Exception as exc:
+            print(f"[portfolio] set_leverage {symbol} failed: {exc}")
+        self._lev_set.add(symbol)
 
     def _actual_weights(self) -> dict:
         """Current per-coin weight from positions: positionAmt*markPrice / (equity*leverage)."""
         if self.auth is None:
             return self._load_held()
-        gross_dollar = self.cfg.equity_usd * self.cfg.leverage
+        gross_dollar = self.cfg.equity_usd        # notional base (matches compute_plan)
         cur: dict = {}
         for p in self.auth.get_positions():
             amt = float(p.get("positionAmt", 0) or 0)
@@ -202,6 +204,7 @@ class PortfolioEngine:
             if qty <= 0:
                 continue
             try:
+                self._ensure_leverage(s)
                 self.auth.place_market_order(s, leg["side"], qty)
                 placed += 1
             except Exception as exc:
@@ -238,8 +241,7 @@ class PortfolioEngine:
         print(f"[portfolio:{mode}] entering poll loop (every {self.cfg.poll_interval_seconds}s); "
               f"equity=${self.cfg.equity_usd} lev={self.cfg.leverage}x band={self.cfg.delta}")
         if not self.cfg.dry_run:
-            self.setup_exchange()
-            self._set_leverage(strategy.candidate_symbols())
+            self.setup_exchange()             # load quantityPrecision; leverage set lazily per leg
         last_key = f"portfolio_last_candle_{self.cfg.ref_symbol}"
         while True:
             last = self.store.get_state(last_key)
