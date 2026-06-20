@@ -71,6 +71,27 @@ def load_universe() -> dict:
         return _base.load_universe()
 
 
+def append_forming(coins: dict, forming_opens: dict) -> dict:
+    """Append the just-opened (forming) candle's OPEN per coin so the deployed book covers the HOLD
+    candle. Bit-exact parity needs open[H] (the vol-target scale[H] uses it); close[H]/qv[H] do NOT
+    affect deployed[H], so we placeholder them. forming_opens = {sym: (open_time_ms, open_px)}.
+    """
+    out = {}
+    for s, d in coins.items():
+        fo = forming_opens.get(s)
+        if fo is None:
+            out[s] = d
+            continue
+        ot, px = int(fo[0]), float(fo[1])
+        if len(d) and ot <= int(d.index[-1]):
+            out[s] = d                      # forming candle already closed/in data
+            continue
+        last_qv = float(d["quote_volume"].iloc[-1]) if len(d) else 0.0
+        row = pd.DataFrame({"open": [px], "close": [px], "quote_volume": [last_qv]}, index=[ot])
+        out[s] = pd.concat([d, row])
+    return out
+
+
 def _deployed_weights(book: dict, delta: float, mode: str) -> pd.DataFrame:
     """Deployed position weights = banded held -> renorm to baseline gross -> x vol-target scale.
 

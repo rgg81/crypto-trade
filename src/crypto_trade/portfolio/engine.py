@@ -21,6 +21,7 @@ from pathlib import Path
 
 from crypto_trade.client import BinanceClient
 from crypto_trade.live import data_pipeline
+from crypto_trade.live.auth_client import AuthenticatedBinanceClient
 from crypto_trade.live.state_store import StateStore
 from crypto_trade.portfolio import funding, strategy
 
@@ -51,6 +52,19 @@ class PortfolioEngine:
         # klines always from production (parity with backtest data source)
         self.kline_client = BinanceClient(base_url=settings.base_url)
         self.store = StateStore(Path(config.db_path))
+        # signed client (orders/positions/leverage) — testnet routing via auth_base_url; only when
+        # we will actually trade. klines stay on production base_url for full history (parity).
+        self.auth: AuthenticatedBinanceClient | None = None
+        self.qty_prec: dict[str, int] = {}
+        if not config.dry_run and settings.binance_api_key:
+            auth_url = settings.auth_base_url or settings.base_url
+            self.auth = AuthenticatedBinanceClient(
+                api_key=settings.binance_api_key,
+                api_secret=settings.binance_api_secret,
+                base_url=auth_url,
+            )
+            mode = "TESTNET" if config.testnet else "LIVE"
+            print(f"[portfolio:{mode}] AUTH endpoint: {auth_url}")
 
     # ---- held-weight persistence (the hysteresis band's path-dependent state) ----
     def _load_held(self) -> dict:
@@ -61,7 +75,8 @@ class PortfolioEngine:
         self.store.set_state(_held_key(self.cfg), json.dumps(held))
 
     # ---- the core: compute the rebalance plan for the upcoming candle ----
-    def compute_plan(self, current_weights: dict | None = None) -> dict:
+    def compute_plan(self, current_weights: dict | None = None,
+                     forming_opens: dict | None = None) -> dict:
         """Return the rebalance plan: per-coin target weight, current weight, delta-notional, side.
 
         PARITY: target = strategy.next_target_weights = the backtest's deployed book for the held
@@ -74,6 +89,8 @@ class PortfolioEngine:
         an empty book => cold-start full entry falls out naturally.
         """
         coins = strategy.load_universe()
+        if forming_opens:                     # inject the just-opened candle's open (HOLD)
+            coins = strategy.append_forming(coins, forming_opens)
         tgt = strategy.next_target_weights(coins, delta=self.cfg.delta)
         meta = tgt.pop("_meta")
         cur = dict(current_weights if current_weights is not None else self._load_held())
@@ -104,7 +121,6 @@ class PortfolioEngine:
             "as_of": meta["as_of"],
             "cold_start": len(cur) == 0,
             "lambda_pick": meta["lambda_pick"],
-            "vol_target_scale": round(meta["vol_target_scale"], 4),
             "target_gross": round(meta["gross"], 4),
             "n_target_positions": meta["n_positions"],
             "gross_dollar": round(gross_dollar, 2),
@@ -120,11 +136,86 @@ class PortfolioEngine:
         data_pipeline.refresh_klines(self.kline_client, syms, self.cfg.interval, self.cfg.data_dir)
         funding.refresh_funding(syms, self.cfg.data_dir)
 
+    # ---- live execution plumbing (reuses the proven AuthenticatedBinanceClient) ----
+    def _forming_opens(self, symbols: list[str]) -> dict:
+        """Fetch the just-opened (forming) candle open per symbol — bit-exact vol-target needs."""
+        out: dict = {}
+        for s in symbols:
+            try:
+                kl = self.kline_client.fetch_klines(s, self.cfg.interval)
+                if kl:
+                    last = kl[-1]
+                    out[s] = (int(last.open_time), float(last.open))
+            except Exception:
+                continue
+        return out
+
+    def setup_exchange(self) -> None:
+        """Load quantityPrecision (exchangeInfo) + set leverage per held-universe symbol."""
+        if self.auth is None:
+            return
+        info = self.auth.get_exchange_info()
+        for si in info.get("symbols", []):
+            self.qty_prec[si["symbol"]] = int(si["quantityPrecision"])
+        print(f"[portfolio] loaded quantityPrecision for {len(self.qty_prec)} symbols")
+
+    def _set_leverage(self, symbols: list[str]) -> None:
+        if self.auth is None:
+            return
+        lev = max(1, int(round(self.cfg.leverage)))
+        for s in symbols:
+            try:
+                self.auth.set_leverage(s, lev)
+            except Exception as exc:
+                print(f"[portfolio] set_leverage {s} failed: {exc}")
+
+    def _actual_weights(self) -> dict:
+        """Current per-coin weight from positions: positionAmt*markPrice / (equity*leverage)."""
+        if self.auth is None:
+            return self._load_held()
+        gross_dollar = self.cfg.equity_usd * self.cfg.leverage
+        cur: dict = {}
+        for p in self.auth.get_positions():
+            amt = float(p.get("positionAmt", 0) or 0)
+            if amt == 0:
+                continue
+            mark = float(p.get("markPrice", 0) or 0)
+            cur[p["symbol"]] = amt * mark / gross_dollar
+        return cur
+
+    def _round_qty(self, symbol: str, qty: float) -> float:
+        return round(qty, self.qty_prec.get(symbol, 3))
+
+    def execute(self, plan: dict, forming_opens: dict) -> dict:
+        """Place a MARKET order per rebalance leg on the (testnet) exchange. Returns summary."""
+        if self.auth is None:
+            return {"placed": 0, "skipped": len(plan["legs"]), "errors": 0}
+        placed = errors = 0
+        for leg in plan["legs"]:
+            s = leg["symbol"]
+            fo = forming_opens.get(s)
+            if fo is None:
+                errors += 1
+                continue
+            px = float(fo[1])
+            qty = self._round_qty(s, abs(leg["delta_notional_usd"]) / px)
+            if qty <= 0:
+                continue
+            try:
+                self.auth.place_market_order(s, leg["side"], qty)
+                placed += 1
+            except Exception as exc:
+                errors += 1
+                print(f"[portfolio] order {leg['side']} {s} x{qty} failed: {exc}")
+        return {"placed": placed, "skipped": 0, "errors": errors}
+
     def run_once(self, refresh: bool = True) -> dict:
-        """One evaluation: optionally refresh data, compute + log the plan. No orders in dry-run."""
+        """One evaluation: refresh data, compute the plan, log it; place orders unless dry-run."""
         if refresh:
             self.refresh_data()
-        plan = self.compute_plan()
+        forming = self._forming_opens(strategy.candidate_symbols()) if not self.cfg.dry_run else {}
+        current = None if self.cfg.dry_run else self._actual_weights()
+        plan = self.compute_plan(current_weights=current, forming_opens=forming)
         mode = "DRY-RUN" if self.cfg.dry_run else ("TESTNET" if self.cfg.testnet else "LIVE")
         print(f"[portfolio:{mode}] rebalance plan as_of={plan['as_of']} "
               f"gross=${plan['gross_dollar']} target_gross={plan['target_gross']} "
@@ -135,6 +226,10 @@ class PortfolioEngine:
                   f"${leg['delta_notional_usd']:+.2f}")
         if self.cfg.dry_run:
             self._save_held(plan["_new_held"])   # treat plan as filled (paper book)
+        else:
+            res = self.execute(plan, forming)
+            print(f"[portfolio:{mode}] orders placed={res['placed']} errors={res['errors']}")
+            self._save_held(plan["_new_held"])
         return plan
 
     def run(self) -> None:
@@ -142,6 +237,9 @@ class PortfolioEngine:
         mode = "DRY-RUN" if self.cfg.dry_run else ("TESTNET" if self.cfg.testnet else "LIVE")
         print(f"[portfolio:{mode}] entering poll loop (every {self.cfg.poll_interval_seconds}s); "
               f"equity=${self.cfg.equity_usd} lev={self.cfg.leverage}x band={self.cfg.delta}")
+        if not self.cfg.dry_run:
+            self.setup_exchange()
+            self._set_leverage(strategy.candidate_symbols())
         last_key = f"portfolio_last_candle_{self.cfg.ref_symbol}"
         while True:
             last = self.store.get_state(last_key)
