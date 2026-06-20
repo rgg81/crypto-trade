@@ -144,3 +144,15 @@ IS+OOS-positive cell in either direction or any window, 2×-cost fragile, residu
 concentrated in 2020-2021 then monotone decay. Orthogonality-to-carry (the brief's primary reject
 trigger) PASSES — so the reject is correctly attributed to NO-EDGE / REGIME-DECAY, not redundancy.
 Baseline iter_005 +1.37 untouched.
+
+## INDEPENDENT CRITIC REVIEW (2026-06-20) — PASS (reject sound, leak-free, guard correct)
+Leak test: time-only truncation -> past basis-net bit-identical (the 6e-3 first-glance diff was
+cross-sectional universe membership, not time leak); lag chain = 1 (correct). Data-guard leak-safe
+(full-history provenance, symmetric IS+OOS; drops the 4 wrong-asset coins GLMR/RAY/RAD/SC; kept coins
+p90 |basis| 0.099%, clean separation, no threshold-gaming). Reject honest (FADE regime-decayed +
+cost-fragile + residual -1.87; +0.65 momentum is mirror noise). Cosmetic: a docstring states a tighter
+band than the executed (looser, correct) gate constants.
+DECISIVE RECOMMENDATION: directional search EXHAUSTED (7 rejects, only taker-flow survived). Next =
+the POWER-AWARE CONFIRMATION of trend+carry+flow (block-bootstrap CI + DSR deflating for ~14 factors
+tried + directional/sign-stability gate + PBO) -> prices in the rejects, decides promotion. DD overlay
+comes AFTER confirming the core book. Baseline iter_005 +1.37 untouched.
