@@ -145,3 +145,16 @@ the orchestrator's call after that reveal.
   the 012→015 search, with pre-registered Sharpe floor (≥ +1.93 at real 2× cost) and DD target
   (combined OOS ≤ −23%), the carry-regime falsifier, and the equal-weight-basket + baseline benchmarks
   on Sharpe/DD. If the direction survives the held window → PROMOTE to baseline.
+
+## INDEPENDENT CRITIC REVIEW (2026-06-20) — PASS
+Leak test ALL PASS (corruption bit-identical; ERC cov + carry-ceiling past-only; cov block-shift = no
+look-ahead). All 4 fixes verified genuine: ERC SLSQP converges RC=[1/3,1/3,1/3] (old solver cornered
+68% of OOS dates); real coin-level 2× cost +1.93 (coin turnover 0.104 vs hollow meta 0.009); t=+1.68
+p≈0.11 within-noise honestly stated; carry-cap demoted to diagnostic. Headline = KNOB-FREE inverse-vol
+RP-3 (no OOS-tuned knob). CAVEAT: lift is concentration-fragile (top-3 months = 71% of the diff).
+CONSTRUCTIVE SUGGESTION for the held-OOS CONFIRMATION (n-not-effect-size is the real obstacle; t>2.1
+unreachable at n=16): pre-register a POWER-AWARE plan — (a) DSR/multiple-testing-corrected critical
+value for the ~5+ combiner variants searched; (b) stationary BLOCK-BOOTSTRAP on monthly diffs (block~3
+for the 71%-in-3-months autocorr), report bootstrap CI on mean monthly lift; (c) PRIMARY gate =
+directional (bootstrap CI lower bound > 0 AND held-OOS sign matches), parametric t secondary.
+STATUS: combiner = clean within-noise candidate; baseline stays +1.37 until the power-aware CONFIRM.
