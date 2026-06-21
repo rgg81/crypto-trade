@@ -59,6 +59,7 @@ class PortfolioEngine:
         # we will actually trade. klines stay on production base_url for full history (parity).
         self.auth: AuthenticatedBinanceClient | None = None
         self.qty_prec: dict[str, int] = {}
+        self.step_size: dict[str, float] = {}     # LOT_SIZE stepSize per symbol (qty multiple)
         self._lev_set: set[str] = set()           # symbols whose leverage we've already set
         if not config.dry_run and settings.binance_api_key:
             auth_url = settings.auth_base_url or settings.base_url
@@ -161,13 +162,18 @@ class PortfolioEngine:
 
     # ---- live execution plumbing (reuses the proven AuthenticatedBinanceClient) ----
     def setup_exchange(self) -> None:
-        """Load quantityPrecision (exchangeInfo) + set leverage per held-universe symbol."""
+        """Load quantityPrecision + LOT_SIZE stepSize (exchangeInfo) for valid order qtys."""
         if self.auth is None:
             return
         info = self.auth.get_exchange_info()
         for si in info.get("symbols", []):
-            self.qty_prec[si["symbol"]] = int(si["quantityPrecision"])
-        print(f"[portfolio] loaded quantityPrecision for {len(self.qty_prec)} symbols")
+            sym = si["symbol"]
+            self.qty_prec[sym] = int(si["quantityPrecision"])
+            for f in si.get("filters", []):
+                if f.get("filterType") in ("LOT_SIZE", "MARKET_LOT_SIZE"):
+                    self.step_size[sym] = float(f["stepSize"])    # qty must be a multiple of this
+                    break
+        print(f"[portfolio] loaded quantityPrecision + stepSize for {len(self.qty_prec)} symbols")
 
     def _ensure_leverage(self, symbol: str) -> None:
         """Set leverage on a symbol once (lazily, before its first order)."""
@@ -194,7 +200,16 @@ class PortfolioEngine:
         return cur
 
     def _round_qty(self, symbol: str, qty: float) -> float:
-        return round(qty, self.qty_prec.get(symbol, 3))
+        """Snap qty DOWN to the LOT_SIZE stepSize multiple, then to precision (Binance-valid).
+
+        is coarser than 10^-precision (e.g. ONDO step=1, prec=1). floor-to-step is the rule.
+        is coarser than 10^-precision (e.g. ONDO). floor-to-step is the correct Binance rule.
+        """
+        prec = self.qty_prec.get(symbol, 3)
+        step = self.step_size.get(symbol)
+        if step and step > 0:
+            qty = (qty // step) * step            # floor to a stepSize multiple
+        return round(qty, prec)                    # clean float artifacts to the allowed precision
 
     def execute(self, plan: dict) -> dict:
         """Place a MARKET order per rebalance leg on the (testnet) exchange. Returns summary."""
