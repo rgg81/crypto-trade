@@ -1,5 +1,15 @@
 # Portfolio Monitor — live watch on the deployed L/S portfolio bot
 
+## Operating principle (read first)
+**This skill is the canonical home for ALL monitoring + assistant intelligence on the trade bot.**
+Every improvement we make — a new health signal, a smarter alert, a reconciliation check, a report,
+an auto-recovery playbook — lands HERE (in this file + its helper scripts under `scripts/`), gets
+committed, and is logged in the Changelog below. Intelligence compounds in one place instead of
+scattering across sessions. When the user asks to "improve the monitoring/assistant," extend this
+skill. Keep helper logic in committed scripts (testable, reusable) and keep this file the index +
+playbook over them. The roadmap below is the living backlog; promote items into the workflow as we
+build them and tick them off in the Changelog.
+
 ## Mission
 Keep a continuous, self-paced watch on the **live portfolio trading engine** (currently the
 baseline-v3 long/short top-20 book on Binance **testnet**) and alert the user on **any unexpected
@@ -90,3 +100,27 @@ task #189 done. Keep the cadence at 2700s unless the user asks for tighter/loose
   tag `portfolio-baseline-v3`. Parity is bit-exact vs the backtest (reconcile_live + parity test).
 - Going to **real money**: swap `--testnet`/keys for production, seed `data/live.db`; same recipe.
   Tighten the watch cadence and re-confirm the ALERT thresholds before that step.
+
+## Intelligence roadmap (the living backlog — build these into the skill over time)
+Prioritized; each becomes a committed helper script + a section here when built.
+1. **Parity / drift check (HIGH).** Each tick, compare the LIVE exchange book to the v3 strategy's
+   intended target weights (`strategy.next_target_weights` on current data). Alert if any name
+   diverges beyond the band+dust tolerance — the real correctness check: *is the bot actually
+   holding what the strategy says?* This is the safety net the threshold checks don't give.
+2. **PnL attribution + daily digest (HIGH).** Realized vs unrealized, funding accrued, taker cost
+   paid, per-name contribution; once-a-day summary via PushNotification. Persist equity snapshots.
+3. **Drawdown / equity-curve tracking.** Log equity each tick to a CSV; track live maxDD vs the
+   backtest −23%; alert if live DD breaches an IS-calibrated band.
+4. **Fill-quality / slippage tracking.** Compare actual fills (from order history) vs the
+   close-proxy reference price the leg was sized at — measures real slippage vs the 5bps assumption.
+5. **Trend-aware alerts.** Not just thresholds: margin steadily declining, gross drifting, uPnL
+   trend, "what changed since last tick" deltas. Reduce both misses and false alarms.
+6. **Turnover / cost ledger.** Track tickets/candle + notional turnover live; confirm the −63%
+   ticket win (and the eligibility-exit ticket reduction) actually holds in production.
+7. **Live-money pre-flight + kill-switch.** A checklist before the production cutover (keys, balance,
+   leverage caps, max-gross guard) and a one-command flatten/halt.
+
+## Changelog (tick off as we build)
+- **2026-06-21 v0** — initial skill: live-API health check (`scripts/portfolio_healthcheck.py`),
+  STATUS OK|ALERT, threshold alerts, benign list, engine-down relaunch, self-paced ScheduleWakeup
+  loop. Deployed against baseline-v3 on testnet ($10k/3x). Task #189.
