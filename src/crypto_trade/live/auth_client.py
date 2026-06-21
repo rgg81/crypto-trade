@@ -230,7 +230,7 @@ class AuthenticatedBinanceClient:
 
     def get_user_trades(self, symbol: str, start_time: int | None = None,
                         limit: int = 500) -> list:
-        """Account trade fills for a symbol (/fapi/v1/userTrades) — actual executed price + commission.
+        """Account trade fills for a symbol (/fapi/v1/userTrades) — executed price + commission.
 
         Read-only. Used by the fill-quality / slippage check. Futures requires a per-symbol query.
         """
