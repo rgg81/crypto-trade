@@ -20,15 +20,18 @@ def _have_data() -> bool:
 
 
 @pytest.mark.skipif(not _have_data(), reason="needs local kline data (data/<SYM>/8h.csv)")
-def test_strategy_reproduces_iter020_baseline_v2():
+def test_strategy_reproduces_iter021_baseline_v3():
+    """The live strategy reproduces iter_021 eligibility-exit (baseline-v3 K=2) to machine eps."""
     from crypto_trade.portfolio import strategy
 
     sys.path.insert(0, "analysis/portfolio")
     import iter_020_hysteresis as hy
+    import iter_021_eligexit as ee
 
     coins = strategy.load_universe()
     book = hy.canonical_book(coins, hy.build_books(coins))
-    ref = hy.banded_net(book, strategy.DELTA, strategy.MODE)          # iter_020 reference net
+    elig = ee.eligibility_mask(coins, book["target_w"])
+    pos = strategy.position_weight_book(coins)                   # strategy deployed weights
 
     pos = strategy.position_weight_book(coins)                        # strategy deployed weights
     scale = book["scale"]

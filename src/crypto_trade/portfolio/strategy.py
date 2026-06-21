@@ -30,9 +30,11 @@ if _AP not in sys.path:
 
 import iter_002_top20 as _base  # noqa: E402
 import iter_020_hysteresis as _hy  # noqa: E402
+import iter_021_eligexit as _ee  # noqa: E402
 
-DELTA = 0.010   # baseline-v2 hysteresis band (SNAP)
+DELTA = 0.010   # baseline-v3 hysteresis band (SNAP)
 MODE = "snap"
+K_EXIT = 2      # baseline-v3 eligibility-exit: force-close after K candles out of top-20
 
 
 @contextlib.contextmanager
@@ -111,16 +113,20 @@ def append_forming(coins: dict, forming_opens: dict) -> dict:
     return out
 
 
-def _deployed_weights(book: dict, delta: float, mode: str) -> pd.DataFrame:
-    """Deployed position weights = banded held -> renorm to baseline gross -> x vol-target scale.
+def _deployed_weights(book: dict, coins: dict, delta: float, mode: str,
+                      k_exit: float = K_EXIT) -> pd.DataFrame:
+    """Deployed position weights = band + ELIGIBILITY-EXIT held -> renorm -> x vol-target scale.
 
-    Identical construction to iter_020.banded_net (which books P&L from exactly this `w * scale`).
+    baseline-v3: iter_020's no-trade band PLUS iter_021's eligibility-exit (force-close coins out of
+    the top-20 for >= k_exit candles, clearing the zombie/delisted tail). k_exit=inf reproduces v2.
+    Books P&L from exactly this `w * scale` (mirrors iter_021.eligexit_net).
     """
     target_w = book["target_w"]
-    held = _hy.apply_band(target_w, delta, mode)
+    elig = _ee.eligibility_mask(coins, target_w)
+    held = _ee.apply_band_eligexit(target_w, elig, delta, k_exit, mode)
     base_gross = target_w.abs().sum(axis=1)
     held_gross = held.abs().sum(axis=1).replace(0, np.nan)
-    w = held.mul((base_gross / held_gross).fillna(0.0), axis=0)          # banded, renormed
+    w = held.mul((base_gross / held_gross).fillna(0.0), axis=0)          # banded+exited, renormed
     return w.mul(book["scale"], axis=0)                                  # x per-candle vol-target
 
 
@@ -130,7 +136,7 @@ def position_weight_book(coins: dict, delta: float = DELTA, mode: str = MODE) ->
     Row t is the weight HELD during candle t (decided at close[t-1]) — the backtest's traded book.
     """
     book = _hy.canonical_book(coins, _hy.build_books(coins))
-    return _deployed_weights(book, delta, mode)
+    return _deployed_weights(book, coins, delta, mode)
 
 
 def next_target_weights(coins: dict, delta: float = DELTA, mode: str = MODE) -> dict:
@@ -147,7 +153,7 @@ def next_target_weights(coins: dict, delta: float = DELTA, mode: str = MODE) -> 
     automatically. Returns {symbol: signed_weight} for non-trivial holds, plus "_meta".
     """
     book = _hy.canonical_book(coins, _hy.build_books(coins))
-    deployed = _deployed_weights(book, delta, mode)        # full per-candle deployed book
+    deployed = _deployed_weights(book, coins, delta, mode)  # full per-candle deployed book
     last = deployed.iloc[-1]                                # weight held during the latest candle
     pos = last[last.abs() > 1e-9]
     out = {s: float(v) for s, v in pos.items()}
