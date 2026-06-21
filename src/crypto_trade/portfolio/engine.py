@@ -215,12 +215,15 @@ class PortfolioEngine:
         """Place a MARKET order per rebalance leg on the (testnet) exchange. Returns summary."""
         if self.auth is None:
             return {"placed": 0, "skipped": len(plan["legs"]), "errors": 0}
-        placed = errors = 0
+        placed = errors = skipped = 0
         for leg in plan["legs"]:
             s = leg["symbol"]
             px = float(leg["price"])             # forming-open (close-proxy) the leg sized at
             qty = self._round_qty(s, abs(leg["delta_notional_usd"]) / px)
-            if qty <= 0:
+            # POST-FLOOR min-notional guard: flooring qty to stepSize can drop the order below
+            # Binance's $5 min-notional (-4164). Skip these dust legs (position stays <$5 off target).
+            if qty <= 0 or qty * px < self.cfg.min_notional_usd:
+                skipped += 1
                 continue
             try:
                 self._ensure_leverage(s)
@@ -229,7 +232,7 @@ class PortfolioEngine:
             except Exception as exc:
                 errors += 1
                 print(f"[portfolio] order {leg['side']} {s} x{qty} failed: {exc}")
-        return {"placed": placed, "skipped": 0, "errors": errors}
+        return {"placed": placed, "skipped": skipped, "errors": errors}
 
     def run_once(self, refresh: bool = True) -> dict:
         """One evaluation: refresh data, compute the plan, log it; place orders unless dry-run."""
@@ -250,7 +253,8 @@ class PortfolioEngine:
             self._save_held(plan["_new_held"])   # treat plan as filled (paper book)
         else:
             res = self.execute(plan)
-            print(f"[portfolio:{mode}] orders placed={res['placed']} errors={res['errors']}")
+            print(f"[portfolio:{mode}] orders placed={res['placed']} "
+                  f"skipped={res['skipped']} errors={res['errors']}")
             self._save_held(plan["_new_held"])
         return plan
 
