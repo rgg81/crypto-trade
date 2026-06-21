@@ -47,8 +47,15 @@ cd /home/roberto/crypto-trade/.worktrees/quant-research \
   && uv run python scripts/portfolio_parity_check.py \
   && uv run python scripts/portfolio_digest.py \
   && uv run python scripts/portfolio_drawdown_check.py \
-  && uv run python scripts/portfolio_fill_quality.py
+  && uv run python scripts/portfolio_fill_quality.py \
+  && uv run python scripts/portfolio_trend_alerts.py \
+  && uv run python scripts/portfolio_turnover_ledger.py
 ```
+All checks are READ-ONLY and DON'T COMPETE with the trade loop: they read CSVs / the log / the
+testnet-signed endpoints, while the engine's heavy 8h refresh hits PRODUCTION klines+funding (a
+different host/rate-limit pool), and nothing here touches the engine's SQLite DB. Avoid running the
+heavy parity check in the ~5min right at an 8h boundary (engine mid-refresh) — the 45min cadence
+naturally does.
 - `portfolio_healthcheck.py` → `STATUS: OK|ALERT` + positions summary + `FLAG:` lines (fast, API-only).
 - `portfolio_candle_check.py` → `CANDLE: OK|BAD` (fast, CSV-only). BAD = a forming (incomplete) candle
   leaked into the signal data, or the data is stale (missed refresh). Guards the "close must be a
@@ -66,8 +73,24 @@ cd /home/roberto/crypto-trade/.worktrees/quant-research \
   rate (real in every mode; ~5bps expected) + adverse slippage vs the close-proxy reference. On
   TESTNET slippage is flagged NON-REPRESENTATIVE (INFO, never an alert); on PAPER it's n/a (simulated
   fills); on LIVE large adverse slippage or a fee-rate far above ~5bps IS an alert.
+- `portfolio_trend_alerts.py` → `TREND: OK|WATCH` from the equity curve — slow bleeds the per-tick
+  thresholds miss (equity down >5%/2h, margin down >30%/2h) + "what changed since last tick". CSV-only.
+- `portfolio_turnover_ledger.py` → `TURNOVER: OK|SPIKE`. Parses the log into a per-rebalance ledger
+  (`data/portfolio_turnover.csv`); confirms low live turnover (~1-4 legs/rebal steady-state, under the
+  backtest's ~18 since live skips sub-$5 dust); SPIKE = a non-cold-start rebalance with many legs.
 Filter stderr noise with `| grep -vE "UserWarning|warn"`. Treat **any** of `STATUS=ALERT`,
-`CANDLE=BAD`, `PARITY=DRIFT` (not flagged near-boundary-transient), or `DD=BREACH` as an alert.
+`CANDLE=BAD`, `PARITY=DRIFT` (not flagged near-boundary-transient), `DD=BREACH`, or `TURNOVER=SPIKE`
+as an alert; `TREND=WATCH` is a soft heads-up (notify if it's developing, not a hard alarm);
+`FILLQUAL` is INFO on testnet/paper (alert only on LIVE).
+
+## Emergency & cutover tools (on-demand, NOT per-tick)
+- **Pre-flight** (`scripts/portfolio_preflight.py`) → `PREFLIGHT: GO|NO-GO`. Run before the live-money
+  cutover: checks creds/mode, balance ≥ 1.5× est. margin, baseline-v3 tag, fresh data, sane ~top-20
+  target. Read-only.
+- **Kill-switch** (`scripts/portfolio_killswitch.py`) → emergency halt. DRY-RUN by default (shows what
+  it would do); `--confirm` STOPS the engine FIRST (so it can't re-enter), THEN flattens every
+  position with reduceOnly orders. MANUAL only — the monitor may *recommend* it via PushNotification on
+  a catastrophic alert, but does NOT auto-fire it (auto-flattening real money is too dangerous).
 
 ## Daily digest (PnL attribution)
 `portfolio_digest.py` runs every tick to log the equity snapshot (cheap). When its output shows
@@ -167,12 +190,12 @@ Prioritized; each becomes a committed helper script + a section here when built.
    (account DD + strategy-equiv DD vs backtest −23%; BREACH alert).
 4. **Fill-quality / slippage tracking.** ✅ DONE 2026-06-21 — `scripts/portfolio_fill_quality.py`
    (MODE-AWARE: paper=n/a, testnet=INFO non-representative, live=real; fee rate + adverse slippage).
-5. **Trend-aware alerts.** Not just thresholds: margin steadily declining, gross drifting, uPnL
-   trend, "what changed since last tick" deltas. Reduce both misses and false alarms.
-6. **Turnover / cost ledger.** Track tickets/candle + notional turnover live; confirm the −63%
-   ticket win (and the eligibility-exit ticket reduction) actually holds in production.
-7. **Live-money pre-flight + kill-switch.** A checklist before the production cutover (keys, balance,
-   leverage caps, max-gross guard) and a one-command flatten/halt.
+5. **Trend-aware alerts.** ✅ DONE 2026-06-21 — `scripts/portfolio_trend_alerts.py`.
+6. **Turnover / cost ledger.** ✅ DONE 2026-06-21 — `scripts/portfolio_turnover_ledger.py`.
+7. **Live-money pre-flight + kill-switch.** ✅ DONE 2026-06-21 — `scripts/portfolio_preflight.py`
+   + `scripts/portfolio_killswitch.py` (stop-engine-first, reduceOnly flatten, --confirm).
+ROADMAP #1–#7 COMPLETE. Future ideas: per-name funding-carry attribution, regime/vol dashboard,
+auto-recovery escalation ladder, a live-vs-backtest tracking-error report.
 
 ## Changelog (tick off as we build)
 - **2026-06-21 v0** — initial skill: live-API health check (`scripts/portfolio_healthcheck.py`),
@@ -182,6 +205,12 @@ Prioritized; each becomes a committed helper script + a section here when built.
   Recomputes the v3 strategy target (same code + close-proxy forming) and compares per-name to the
   LIVE book; flags MISSING / EXTRA / WRONGSIDE / MISSIZED, tolerates price-drift + dust, notes 8h
   boundary transients. Monitor now runs health + parity each tick; either ALERT or DRIFT pings.
+- **2026-06-21 v6** — roadmap #5 **trend-aware alerts** (`portfolio_trend_alerts.py`), #6 **turnover
+  ledger** (`portfolio_turnover_ledger.py`), #7 **pre-flight + kill-switch** (`portfolio_preflight.py`
+  + `portfolio_killswitch.py`, stop-engine-first reduceOnly flatten). User constraint baked in: all
+  checks read-only + non-competing with the trade loop (CSV/log/testnet-signed; engine uses production
+  klines pool + its own DB). Monitor now runs 8 checks/tick; preflight+killswitch are on-demand.
+  ROADMAP #1–#7 COMPLETE.
 - **2026-06-21 v5** — roadmap #4: **fill-quality / slippage** (`scripts/portfolio_fill_quality.py`
   + read-only `auth_client.get_user_trades`), MODE-AWARE per the user's paper-vs-testnet-vs-live
   distinction. Reports effective fee rate (real everywhere, ~5bps expected) + adverse slippage vs the

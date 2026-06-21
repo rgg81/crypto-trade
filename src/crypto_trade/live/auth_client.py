@@ -86,16 +86,17 @@ class AuthenticatedBinanceClient:
         _raise_with_body(resp)
         return resp.json()
 
-    def place_market_order(self, symbol: str, side: str, quantity: float) -> dict:
-        return self._signed_post(
-            "/fapi/v1/order",
-            {
-                "symbol": symbol,
-                "side": side,
-                "type": "MARKET",
-                "quantity": f"{quantity}",
-            },
-        )
+    def place_market_order(self, symbol: str, side: str, quantity: float,
+                           reduce_only: bool = False) -> dict:
+        params = {
+            "symbol": symbol,
+            "side": side,
+            "type": "MARKET",
+            "quantity": f"{quantity}",
+        }
+        if reduce_only:
+            params["reduceOnly"] = "true"      # only reduces an existing position
+        return self._signed_post("/fapi/v1/order", params)
 
     # --- Algo (conditional) orders -----------------------------------------
     # As of 2025-12-09 Binance USDⓈ-M Futures conditional order types

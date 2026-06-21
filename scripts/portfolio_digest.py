@@ -81,6 +81,7 @@ def main() -> None:
     acct = a.get_account()
     wallet = float(acct.get("totalWalletBalance", 0) or 0)
     upnl = float(acct.get("totalUnrealizedProfit", 0) or 0)
+    avail = float(acct.get("availableBalance", 0) or 0)
     equity = wallet + upnl
     pos = [p for p in a.get_positions() if float(p.get("positionAmt", 0) or 0) != 0]
 
@@ -93,7 +94,7 @@ def main() -> None:
         "datetime": time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime()),
         "wallet_balance": round(wallet, 4), "unrealized_pnl": round(upnl, 4),
         "equity": round(equity, 4), "gross": round(gross, 2), "net": round(net, 2),
-        "n_positions": len(pos),
+        "n_positions": len(pos), "avail_balance": round(avail, 4),
     })
 
     # income attribution over the trailing window
