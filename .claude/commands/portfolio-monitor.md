@@ -29,13 +29,17 @@ cd /home/roberto/crypto-trade/.worktrees/quant-research \
   && set -a; source ~/.binance_testnet_env; set +a \
   && export BINANCE_AUTH_BASE_URL="https://testnet.binancefuture.com" \
   && uv run python scripts/portfolio_healthcheck.py \
+  && uv run python scripts/portfolio_candle_check.py \
   && uv run python scripts/portfolio_parity_check.py
 ```
 - `portfolio_healthcheck.py` → `STATUS: OK|ALERT` + positions summary + `FLAG:` lines (fast, API-only).
+- `portfolio_candle_check.py` → `CANDLE: OK|BAD` (fast, CSV-only). BAD = a forming (incomplete) candle
+  leaked into the signal data, or the data is stale (missed refresh). Guards the "close must be a
+  COMPLETE candle, never the forming one" invariant.
 - `portfolio_parity_check.py` → `PARITY: OK|DRIFT` (loads the universe + recomputes the strategy
   target; ~20s). DRIFT = the live book no longer matches what the strategy says it should hold.
-Filter stderr noise with `| grep -vE "UserWarning|warn"`. Treat **either** `STATUS=ALERT` **or**
-`PARITY=DRIFT` (not flagged near-boundary-transient) as an alert.
+Filter stderr noise with `| grep -vE "UserWarning|warn"`. Treat **any** of `STATUS=ALERT`,
+`CANDLE=BAD`, or `PARITY=DRIFT` (not flagged near-boundary-transient) as an alert.
 
 ## What the health check verifies (`scripts/portfolio_healthcheck.py`)
 - **engine alive** — the `run_portfolio_testnet.py` process is running (`ps`).
@@ -61,6 +65,10 @@ Filter stderr noise with `| grep -vE "UserWarning|warn"`. Treat **either** `STAT
   entry), `EXTRA` (failed close), `WRONGSIDE`, or `MISSIZED` leg. The real correctness alarm —
   means the bot is NOT holding what v3 says. (If the line says "NEAR 8h boundary, likely transient,"
   the engine is mid-rebalance — re-check next tick before alerting.)
+- **CANDLE=BAD** — `FORMING-CANDLE LEAK` (an incomplete candle is in the signal data — a look-ahead
+  bug; the fetcher should have dropped it) or `STALE data` (freshest complete candle >9h old → the
+  engine missed a refresh). Either breaks backtest parity at the data layer — investigate the
+  fetcher / refresh immediately.
 
 ## BENIGN — do NOT alert
 - `skipped > 0` dust legs (sub-$5 after stepSize floor — correctly skipped).
@@ -113,6 +121,8 @@ task #189 done. Keep the cadence at 2700s unless the user asks for tighter/loose
 ## Intelligence roadmap (the living backlog — build these into the skill over time)
 Prioritized; each becomes a committed helper script + a section here when built.
 1. **Parity / drift check (HIGH).** ✅ DONE 2026-06-21 — `scripts/portfolio_parity_check.py`.
+1b. **Candle-integrity check (HIGH).** ✅ DONE 2026-06-21 — `scripts/portfolio_candle_check.py`
+   (signal close must be a COMPLETE candle, never the forming one; + staleness).
 2. **PnL attribution + daily digest (HIGH).** Realized vs unrealized, funding accrued, taker cost
    paid, per-name contribution; once-a-day summary via PushNotification. Persist equity snapshots.
 3. **Drawdown / equity-curve tracking.** Log equity each tick to a CSV; track live maxDD vs the
@@ -134,3 +144,9 @@ Prioritized; each becomes a committed helper script + a section here when built.
   Recomputes the v3 strategy target (same code + close-proxy forming) and compares per-name to the
   LIVE book; flags MISSING / EXTRA / WRONGSIDE / MISSIZED, tolerates price-drift + dust, notes 8h
   boundary transients. Monitor now runs health + parity each tick; either ALERT or DRIFT pings.
+- **2026-06-21 v2** — roadmap #1b: **candle-integrity check** (`scripts/portfolio_candle_check.py`),
+  per the user: the signal close must always be a COMPLETE candle, never the forming one. Verifies no
+  forming candle leaked into any coin CSV (close_time > now) + data isn't stale (missed refresh).
+  Confirmed clean live (667 coins, 0 leaks). Monitor now runs health + candle + parity each tick.
+  GUIDING MANDATE (user): make the bot run as close as possible to the backtest, solve any unexpected
+  issue, be the user's eyes when away — contribute proactively, every improvement lands in this skill.
