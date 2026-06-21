@@ -72,6 +72,27 @@ def main() -> None:
     verdict = "PARITY HOLDS — bit-exact" if worst < 1e-9 else "DIVERGENCE — BUG"
     print(f"\n  WORST maxdiff across join points = {worst:.2e}  ({verdict})")
 
+    # --- LIVE close-proxy forming path: the engine injects forming via close[last] (non-ragged).
+    #     Assert it reproduces deployed[H] with relative weights bit-exact + gross within the proxy
+    #     tolerance. This guards the XLM-0.40 ragged-panel bug class. ---
+    print("\nLIVE close-proxy forming path (the engine's actual path) vs backtest deployed book:")
+    worst_rel = worst_gross = 0.0
+    for label, h in tests.items():
+        if h is None:
+            continue
+        trunc = _truncate(coins, int(open_ms[h - 1]))        # data through H-1 (last closed)
+        forming = strategy.forming_from_close(trunc)         # close-proxy forming for candle H
+        nt = strategy.next_target_weights(strategy.append_forming(trunc, forming))
+        gp = nt.pop("_meta")["gross"]
+        bt = full.iloc[h]
+        gr = float(bt.abs().sum())
+        syms = set(nt) | set(bt[bt.abs() > 1e-9].index)
+        rel = max(abs(nt.get(s, 0.0) / gp - float(bt.get(s, 0.0)) / gr) for s in syms)
+        worst_rel = max(worst_rel, rel)
+        worst_gross = max(worst_gross, abs(gr - gp) / gr)
+    print(f"  worst RELATIVE weight diff = {worst_rel:.2e} (bit-exact? {worst_rel < 1e-9}) | "
+          f"worst gross diff = {worst_gross * 100:.3f}%")
+
     if midmonth_hold is None:
         return
     print("\nMID-MONTH ENGINE REPLAY (track backtest book; dust = min_notional/equity):")

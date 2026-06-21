@@ -71,6 +71,25 @@ def load_universe() -> dict:
         return _base.load_universe()
 
 
+def forming_from_close(coins: dict) -> dict:
+    """Build the forming (hold) candle's open per ACTIVE coin from its last close — non-ragged.
+
+    The next candle's open ~= the prior close (measured gap < 0.01%), so close[last] is a near-exact
+    proxy for open[H]. Using it for EVERY active coin (last candle == the global latest) avoids the
+    ragged-panel bug a partial fetch caused, with relative weights BIT-EXACT and the vol-target
+    gross scalar off by < 0.1%. Returns {sym: (next_open_time_ms, close[last])}. 8h candle assumed.
+    """
+    if not coins:
+        return {}
+    step = 8 * 60 * 60 * 1000
+    global_last = max(int(d.index[-1]) for d in coins.values() if len(d))
+    out = {}
+    for s, d in coins.items():
+        if len(d) and int(d.index[-1]) == global_last:
+            out[s] = (global_last + step, float(d["close"].iloc[-1]))
+    return out
+
+
 def append_forming(coins: dict, forming_opens: dict) -> dict:
     """Append the just-opened (forming) candle's OPEN per coin so the deployed book covers the HOLD
     candle. Bit-exact parity needs open[H] (the vol-target scale[H] uses it); close[H]/qv[H] do NOT

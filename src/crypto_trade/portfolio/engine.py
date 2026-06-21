@@ -93,8 +93,13 @@ class PortfolioEngine:
         an empty book => cold-start full entry falls out naturally.
         """
         coins = strategy.load_universe()
-        if forming_opens:                     # inject the just-opened candle's open (HOLD)
-            coins = strategy.append_forming(coins, forming_opens)
+        # forming (hold) candle via NON-RAGGED close-proxy (every active coin) unless an override is
+        # given. A partial network fetch ragged-collapses the book (the XLM-0.40 bug); close[last]
+        # is a < 0.01% proxy for open[H] -> relative weights bit-exact, gross off < 0.1%.
+        if forming_opens is None:
+            forming_opens = strategy.forming_from_close(coins)
+        prices = {s: float(px) for s, (_, px) in forming_opens.items()}
+        coins = strategy.append_forming(coins, forming_opens)
         tgt = strategy.next_target_weights(coins, delta=self.cfg.delta)
         meta = tgt.pop("_meta")
         cur = dict(current_weights if current_weights is not None else self._load_held())
@@ -108,13 +113,14 @@ class PortfolioEngine:
             c = float(cur.get(s, 0.0))            # what we actually hold now
             trade_w = t - c
             delta_notional = trade_w * gross_dollar
-            if abs(delta_notional) >= self.cfg.min_notional_usd:
+            if abs(delta_notional) >= self.cfg.min_notional_usd and s in prices:
                 legs.append({
                     "symbol": s,
                     "side": "BUY" if trade_w > 0 else "SELL",
                     "target_w": round(t, 6),
                     "current_w": round(c, 6),
                     "delta_notional_usd": round(delta_notional, 2),
+                    "price": prices[s],
                 })
                 held_w = t                        # traded to target
             else:
@@ -154,19 +160,6 @@ class PortfolioEngine:
         funding.refresh_funding(syms, self.cfg.data_dir)
 
     # ---- live execution plumbing (reuses the proven AuthenticatedBinanceClient) ----
-    def _forming_opens(self, symbols: list[str]) -> dict:
-        """Fetch the just-opened (forming) candle open per symbol — bit-exact vol-target needs."""
-        out: dict = {}
-        for s in symbols:
-            try:
-                kl = self.read_client.fetch_klines(s, self.cfg.interval)
-                if kl:
-                    last = kl[-1]
-                    out[s] = (int(last.open_time), float(last.open))
-            except Exception:
-                continue
-        return out
-
     def setup_exchange(self) -> None:
         """Load quantityPrecision (exchangeInfo) + set leverage per held-universe symbol."""
         if self.auth is None:
@@ -203,18 +196,14 @@ class PortfolioEngine:
     def _round_qty(self, symbol: str, qty: float) -> float:
         return round(qty, self.qty_prec.get(symbol, 3))
 
-    def execute(self, plan: dict, forming_opens: dict) -> dict:
+    def execute(self, plan: dict) -> dict:
         """Place a MARKET order per rebalance leg on the (testnet) exchange. Returns summary."""
         if self.auth is None:
             return {"placed": 0, "skipped": len(plan["legs"]), "errors": 0}
         placed = errors = 0
         for leg in plan["legs"]:
             s = leg["symbol"]
-            fo = forming_opens.get(s)
-            if fo is None:
-                errors += 1
-                continue
-            px = float(fo[1])
+            px = float(leg["price"])             # forming-open (close-proxy) the leg sized at
             qty = self._round_qty(s, abs(leg["delta_notional_usd"]) / px)
             if qty <= 0:
                 continue
@@ -231,9 +220,9 @@ class PortfolioEngine:
         """One evaluation: refresh data, compute the plan, log it; place orders unless dry-run."""
         if refresh:
             self.refresh_data()
-        forming = self._forming_opens(strategy.candidate_symbols()) if not self.cfg.dry_run else {}
+        # forming candle via close-proxy (built in compute_plan); current book from positions
         current = None if self.cfg.dry_run else self._actual_weights()
-        plan = self.compute_plan(current_weights=current, forming_opens=forming)
+        plan = self.compute_plan(current_weights=current)
         mode = "DRY-RUN" if self.cfg.dry_run else ("TESTNET" if self.cfg.testnet else "LIVE")
         print(f"[portfolio:{mode}] rebalance plan as_of={plan['as_of']} "
               f"gross=${plan['gross_dollar']} target_gross={plan['target_gross']} "
@@ -245,7 +234,7 @@ class PortfolioEngine:
         if self.cfg.dry_run:
             self._save_held(plan["_new_held"])   # treat plan as filled (paper book)
         else:
-            res = self.execute(plan, forming)
+            res = self.execute(plan)
             print(f"[portfolio:{mode}] orders placed={res['placed']} errors={res['errors']}")
             self._save_held(plan["_new_held"])
         return plan
