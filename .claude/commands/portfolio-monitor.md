@@ -22,15 +22,20 @@ Positions, unrealized PnL, balance, margin, liquidation come from `/fapi/v3/posi
 from the engine log) are local — and correctly so, since they describe the *bot*, not the money.
 
 ## How to run a check
+Each tick runs BOTH the fast health check and the deeper parity/drift check:
 ```
 cd /home/roberto/crypto-trade/.worktrees/quant-research \
   && export PATH="$HOME/.local/bin:$PATH" \
   && set -a; source ~/.binance_testnet_env; set +a \
   && export BINANCE_AUTH_BASE_URL="https://testnet.binancefuture.com" \
-  && uv run python scripts/portfolio_healthcheck.py
+  && uv run python scripts/portfolio_healthcheck.py \
+  && uv run python scripts/portfolio_parity_check.py
 ```
-It prints one line: `STATUS: OK` or `STATUS: ALERT` plus a positions summary and any `FLAG:` lines.
-Filter stderr noise with `| grep -vE "UserWarning|warn"`.
+- `portfolio_healthcheck.py` → `STATUS: OK|ALERT` + positions summary + `FLAG:` lines (fast, API-only).
+- `portfolio_parity_check.py` → `PARITY: OK|DRIFT` (loads the universe + recomputes the strategy
+  target; ~20s). DRIFT = the live book no longer matches what the strategy says it should hold.
+Filter stderr noise with `| grep -vE "UserWarning|warn"`. Treat **either** `STATUS=ALERT` **or**
+`PARITY=DRIFT` (not flagged near-boundary-transient) as an alert.
 
 ## What the health check verifies (`scripts/portfolio_healthcheck.py`)
 - **engine alive** — the `run_portfolio_testnet.py` process is running (`ps`).
@@ -52,6 +57,10 @@ Filter stderr noise with `| grep -vE "UserWarning|warn"`.
 - **Margin avail < $200** — liquidation risk.
 - **MISSED rebalance** — UTC time is well past an 8h boundary (00/08/16 UTC) but `last_rebal`
   hasn't advanced to it. Check the log tail for a stuck refresh / traceback.
+- **PARITY=DRIFT** — the live book diverges from the strategy target: a `MISSING` name (failed
+  entry), `EXTRA` (failed close), `WRONGSIDE`, or `MISSIZED` leg. The real correctness alarm —
+  means the bot is NOT holding what v3 says. (If the line says "NEAR 8h boundary, likely transient,"
+  the engine is mid-rebalance — re-check next tick before alerting.)
 
 ## BENIGN — do NOT alert
 - `skipped > 0` dust legs (sub-$5 after stepSize floor — correctly skipped).
@@ -103,10 +112,7 @@ task #189 done. Keep the cadence at 2700s unless the user asks for tighter/loose
 
 ## Intelligence roadmap (the living backlog — build these into the skill over time)
 Prioritized; each becomes a committed helper script + a section here when built.
-1. **Parity / drift check (HIGH).** Each tick, compare the LIVE exchange book to the v3 strategy's
-   intended target weights (`strategy.next_target_weights` on current data). Alert if any name
-   diverges beyond the band+dust tolerance — the real correctness check: *is the bot actually
-   holding what the strategy says?* This is the safety net the threshold checks don't give.
+1. **Parity / drift check (HIGH).** ✅ DONE 2026-06-21 — `scripts/portfolio_parity_check.py`.
 2. **PnL attribution + daily digest (HIGH).** Realized vs unrealized, funding accrued, taker cost
    paid, per-name contribution; once-a-day summary via PushNotification. Persist equity snapshots.
 3. **Drawdown / equity-curve tracking.** Log equity each tick to a CSV; track live maxDD vs the
@@ -124,3 +130,7 @@ Prioritized; each becomes a committed helper script + a section here when built.
 - **2026-06-21 v0** — initial skill: live-API health check (`scripts/portfolio_healthcheck.py`),
   STATUS OK|ALERT, threshold alerts, benign list, engine-down relaunch, self-paced ScheduleWakeup
   loop. Deployed against baseline-v3 on testnet ($10k/3x). Task #189.
+- **2026-06-21 v1** — roadmap #1: **parity/drift check** (`scripts/portfolio_parity_check.py`).
+  Recomputes the v3 strategy target (same code + close-proxy forming) and compares per-name to the
+  LIVE book; flags MISSING / EXTRA / WRONGSIDE / MISSIZED, tolerates price-drift + dust, notes 8h
+  boundary transients. Monitor now runs health + parity each tick; either ALERT or DRIFT pings.
