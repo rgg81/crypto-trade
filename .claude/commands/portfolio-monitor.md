@@ -31,7 +31,8 @@ cd /home/roberto/crypto-trade/.worktrees/quant-research \
   && uv run python scripts/portfolio_healthcheck.py \
   && uv run python scripts/portfolio_candle_check.py \
   && uv run python scripts/portfolio_parity_check.py \
-  && uv run python scripts/portfolio_digest.py
+  && uv run python scripts/portfolio_digest.py \
+  && uv run python scripts/portfolio_drawdown_check.py
 ```
 - `portfolio_healthcheck.py` → `STATUS: OK|ALERT` + positions summary + `FLAG:` lines (fast, API-only).
 - `portfolio_candle_check.py` → `CANDLE: OK|BAD` (fast, CSV-only). BAD = a forming (incomplete) candle
@@ -42,8 +43,12 @@ cd /home/roberto/crypto-trade/.worktrees/quant-research \
 - `portfolio_digest.py` → appends an equity snapshot to `data/portfolio_equity.csv` (the equity
   curve) and prints a 24h PnL digest (realized / funding / commission / unrealized, per-name) +
   `DIGEST_DUE: yes|no`. Not an alert source — it's the periodic report (see Daily digest below).
+  RUN IT BEFORE the drawdown check so the latest equity snapshot is logged first.
+- `portfolio_drawdown_check.py` → `DD: OK|BREACH` from the equity curve. Reports ACCOUNT DD (vs peak,
+  liquidation-relevant) AND STRATEGY-EQUIV DD (cumPnL/notional, comparable to the backtest −23%).
+  BREACH = account DD >20% or strat-equiv DD worse than backtest×1.5.
 Filter stderr noise with `| grep -vE "UserWarning|warn"`. Treat **any** of `STATUS=ALERT`,
-`CANDLE=BAD`, or `PARITY=DRIFT` (not flagged near-boundary-transient) as an alert.
+`CANDLE=BAD`, `PARITY=DRIFT` (not flagged near-boundary-transient), or `DD=BREACH` as an alert.
 
 ## Daily digest (PnL attribution)
 `portfolio_digest.py` runs every tick to log the equity snapshot (cheap). When its output shows
@@ -139,8 +144,8 @@ Prioritized; each becomes a committed helper script + a section here when built.
    (signal close must be a COMPLETE candle, never the forming one; + staleness).
 2. **PnL attribution + daily digest (HIGH).** ✅ DONE 2026-06-21 — `scripts/portfolio_digest.py`
    (realized/funding/commission/unrealized, per-name, equity snapshots, once-a-day digest).
-3. **Drawdown / equity-curve tracking.** Equity snapshots now logged (#2) to
-   `data/portfolio_equity.csv`; NEXT: track live maxDD vs the backtest −23% + alert on breach.
+3. **Drawdown / equity-curve tracking.** ✅ DONE 2026-06-21 — `scripts/portfolio_drawdown_check.py`
+   (account DD + strategy-equiv DD vs backtest −23%; BREACH alert).
 4. **Fill-quality / slippage tracking.** Compare actual fills (from order history) vs the
    close-proxy reference price the leg was sized at — measures real slippage vs the 5bps assumption.
 5. **Trend-aware alerts.** Not just thresholds: margin steadily declining, gross drifting, uPnL
@@ -158,6 +163,11 @@ Prioritized; each becomes a committed helper script + a section here when built.
   Recomputes the v3 strategy target (same code + close-proxy forming) and compares per-name to the
   LIVE book; flags MISSING / EXTRA / WRONGSIDE / MISSIZED, tolerates price-drift + dust, notes 8h
   boundary transients. Monitor now runs health + parity each tick; either ALERT or DRIFT pings.
+- **2026-06-21 v4** — roadmap #3: **drawdown / equity-curve tracking**
+  (`scripts/portfolio_drawdown_check.py`). Reads the logged equity curve; reports account DD (vs peak)
+  + strategy-equiv DD (cumPnL/notional, comparable to backtest −23%); BREACH alert on account DD >20%
+  or strat-equiv worse than backtest×1.5. Monitor now runs 5 checks/tick. Account DD is
+  leverage-amplified vs the backtest DD (testnet account < $10k notional) — both reported.
 - **2026-06-21 v3** — roadmap #2: **PnL attribution + daily digest** (`scripts/portfolio_digest.py`
   + read-only `auth_client.get_income`). Logs an equity snapshot each tick to
   `data/portfolio_equity.csv`; reports 24h realized/funding/commission/unrealized PnL attributed
