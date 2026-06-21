@@ -228,6 +228,17 @@ class AuthenticatedBinanceClient:
             params["startTime"] = start_time
         return self._signed_get("/fapi/v1/income", params)
 
+    def get_user_trades(self, symbol: str, start_time: int | None = None,
+                        limit: int = 500) -> list:
+        """Account trade fills for a symbol (/fapi/v1/userTrades) — actual executed price + commission.
+
+        Read-only. Used by the fill-quality / slippage check. Futures requires a per-symbol query.
+        """
+        params: dict = {"symbol": symbol, "limit": limit}
+        if start_time is not None:
+            params["startTime"] = start_time
+        return self._signed_get("/fapi/v1/userTrades", params)
+
     def set_leverage(self, symbol: str, leverage: int) -> dict:
         return self._signed_post(
             "/fapi/v1/leverage",

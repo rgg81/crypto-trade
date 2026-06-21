@@ -10,6 +10,20 @@ skill. Keep helper logic in committed scripts (testable, reusable) and keep this
 playbook over them. The roadmap below is the living backlog; promote items into the workflow as we
 build them and tick them off in the Changelog.
 
+## Run modes — PAPER vs TEST BINANCE vs LIVE (keep these distinct)
+The bot can run in three modes; metrics mean different things in each, and the monitor must label
+which one it's watching. NEVER conflate them.
+- **PAPER (dry-run)** — no exchange. Fills are SIMULATED at the engine's reference price (close-proxy),
+  so PnL is idealized and slippage is zero by construction. Good for decision-parity, not for cost.
+- **TEST BINANCE (testnet, current deploy)** — REAL orders on Binance's testnet matching engine with
+  FAKE money. Decisions, positions, balance, funding, rebalances are real-shaped — but testnet
+  LIQUIDITY is thin/artificial, so FILL PRICES and SLIPPAGE are NOT representative of production.
+  The effective fee rate IS real. This is a full smoke test of the integration, not a cost study.
+- **LIVE** — real money + real liquidity. The only mode where slippage / fill-quality is the true
+  number to trust. Tighten thresholds + run the pre-flight before this.
+The monitor scripts auto-detect mode (creds + auth_base_url) and label output (e.g. `MODE=TESTNET`).
+Treat testnet fill/slippage as INFO, never as an alert; on LIVE they become real alert sources.
+
 ## Mission
 Keep a continuous, self-paced watch on the **live portfolio trading engine** (currently the
 baseline-v3 long/short top-20 book on Binance **testnet**) and alert the user on **any unexpected
@@ -32,7 +46,8 @@ cd /home/roberto/crypto-trade/.worktrees/quant-research \
   && uv run python scripts/portfolio_candle_check.py \
   && uv run python scripts/portfolio_parity_check.py \
   && uv run python scripts/portfolio_digest.py \
-  && uv run python scripts/portfolio_drawdown_check.py
+  && uv run python scripts/portfolio_drawdown_check.py \
+  && uv run python scripts/portfolio_fill_quality.py
 ```
 - `portfolio_healthcheck.py` → `STATUS: OK|ALERT` + positions summary + `FLAG:` lines (fast, API-only).
 - `portfolio_candle_check.py` → `CANDLE: OK|BAD` (fast, CSV-only). BAD = a forming (incomplete) candle
@@ -47,6 +62,10 @@ cd /home/roberto/crypto-trade/.worktrees/quant-research \
 - `portfolio_drawdown_check.py` → `DD: OK|BREACH` from the equity curve. Reports ACCOUNT DD (vs peak,
   liquidation-relevant) AND STRATEGY-EQUIV DD (cumPnL/notional, comparable to the backtest −23%).
   BREACH = account DD >20% or strat-equiv DD worse than backtest×1.5.
+- `portfolio_fill_quality.py` → `FILLQUAL: OK|INFO|n/a` + `MODE=PAPER|TESTNET|LIVE`. Effective fee
+  rate (real in every mode; ~5bps expected) + adverse slippage vs the close-proxy reference. On
+  TESTNET slippage is flagged NON-REPRESENTATIVE (INFO, never an alert); on PAPER it's n/a (simulated
+  fills); on LIVE large adverse slippage or a fee-rate far above ~5bps IS an alert.
 Filter stderr noise with `| grep -vE "UserWarning|warn"`. Treat **any** of `STATUS=ALERT`,
 `CANDLE=BAD`, `PARITY=DRIFT` (not flagged near-boundary-transient), or `DD=BREACH` as an alert.
 
@@ -146,8 +165,8 @@ Prioritized; each becomes a committed helper script + a section here when built.
    (realized/funding/commission/unrealized, per-name, equity snapshots, once-a-day digest).
 3. **Drawdown / equity-curve tracking.** ✅ DONE 2026-06-21 — `scripts/portfolio_drawdown_check.py`
    (account DD + strategy-equiv DD vs backtest −23%; BREACH alert).
-4. **Fill-quality / slippage tracking.** Compare actual fills (from order history) vs the
-   close-proxy reference price the leg was sized at — measures real slippage vs the 5bps assumption.
+4. **Fill-quality / slippage tracking.** ✅ DONE 2026-06-21 — `scripts/portfolio_fill_quality.py`
+   (MODE-AWARE: paper=n/a, testnet=INFO non-representative, live=real; fee rate + adverse slippage).
 5. **Trend-aware alerts.** Not just thresholds: margin steadily declining, gross drifting, uPnL
    trend, "what changed since last tick" deltas. Reduce both misses and false alarms.
 6. **Turnover / cost ledger.** Track tickets/candle + notional turnover live; confirm the −63%
@@ -163,6 +182,12 @@ Prioritized; each becomes a committed helper script + a section here when built.
   Recomputes the v3 strategy target (same code + close-proxy forming) and compares per-name to the
   LIVE book; flags MISSING / EXTRA / WRONGSIDE / MISSIZED, tolerates price-drift + dust, notes 8h
   boundary transients. Monitor now runs health + parity each tick; either ALERT or DRIFT pings.
+- **2026-06-21 v5** — roadmap #4: **fill-quality / slippage** (`scripts/portfolio_fill_quality.py`
+  + read-only `auth_client.get_user_trades`), MODE-AWARE per the user's paper-vs-testnet-vs-live
+  distinction. Reports effective fee rate (real everywhere, ~5bps expected) + adverse slippage vs the
+  close-proxy reference; testnet slippage flagged NON-REPRESENTATIVE (INFO, not an alert); paper=n/a;
+  live=real alert source. Verified live: MODE=TESTNET, fee 3.9bps (vs 5bps assumed), slippage +28.5bps
+  correctly flagged testnet-noise. Added the "Run modes" section. Monitor now runs 6 checks/tick.
 - **2026-06-21 v4** — roadmap #3: **drawdown / equity-curve tracking**
   (`scripts/portfolio_drawdown_check.py`). Reads the logged equity curve; reports account DD (vs peak)
   + strategy-equiv DD (cumPnL/notional, comparable to backtest −23%); BREACH alert on account DD >20%
