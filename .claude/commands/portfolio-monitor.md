@@ -30,7 +30,8 @@ cd /home/roberto/crypto-trade/.worktrees/quant-research \
   && export BINANCE_AUTH_BASE_URL="https://testnet.binancefuture.com" \
   && uv run python scripts/portfolio_healthcheck.py \
   && uv run python scripts/portfolio_candle_check.py \
-  && uv run python scripts/portfolio_parity_check.py
+  && uv run python scripts/portfolio_parity_check.py \
+  && uv run python scripts/portfolio_digest.py
 ```
 - `portfolio_healthcheck.py` → `STATUS: OK|ALERT` + positions summary + `FLAG:` lines (fast, API-only).
 - `portfolio_candle_check.py` → `CANDLE: OK|BAD` (fast, CSV-only). BAD = a forming (incomplete) candle
@@ -38,8 +39,21 @@ cd /home/roberto/crypto-trade/.worktrees/quant-research \
   COMPLETE candle, never the forming one" invariant.
 - `portfolio_parity_check.py` → `PARITY: OK|DRIFT` (loads the universe + recomputes the strategy
   target; ~20s). DRIFT = the live book no longer matches what the strategy says it should hold.
+- `portfolio_digest.py` → appends an equity snapshot to `data/portfolio_equity.csv` (the equity
+  curve) and prints a 24h PnL digest (realized / funding / commission / unrealized, per-name) +
+  `DIGEST_DUE: yes|no`. Not an alert source — it's the periodic report (see Daily digest below).
 Filter stderr noise with `| grep -vE "UserWarning|warn"`. Treat **any** of `STATUS=ALERT`,
 `CANDLE=BAD`, or `PARITY=DRIFT` (not flagged near-boundary-transient) as an alert.
+
+## Daily digest (PnL attribution)
+`portfolio_digest.py` runs every tick to log the equity snapshot (cheap). When its output shows
+`DIGEST_DUE: yes` (first tick of a new UTC day), **PushNotification the digest block** to the user
+(equity + 24h Δ, realized/funding/commission/net, top winners/losers), then run
+`uv run python scripts/portfolio_digest.py --mark-pushed` so it only fires once per day. On
+`DIGEST_DUE: no`, do nothing with it (the snapshot was already logged). The equity CSV builds the
+curve; after 24h of snapshots the "24h Δ" populates. NOTE early realized/commission numbers are
+inflated by deploy/debug churn (flatten + re-enter); steady-state commission is near-zero (the band +
+eligibility-exit keep turnover low).
 
 ## What the health check verifies (`scripts/portfolio_healthcheck.py`)
 - **engine alive** — the `run_portfolio_testnet.py` process is running (`ps`).
@@ -123,10 +137,10 @@ Prioritized; each becomes a committed helper script + a section here when built.
 1. **Parity / drift check (HIGH).** ✅ DONE 2026-06-21 — `scripts/portfolio_parity_check.py`.
 1b. **Candle-integrity check (HIGH).** ✅ DONE 2026-06-21 — `scripts/portfolio_candle_check.py`
    (signal close must be a COMPLETE candle, never the forming one; + staleness).
-2. **PnL attribution + daily digest (HIGH).** Realized vs unrealized, funding accrued, taker cost
-   paid, per-name contribution; once-a-day summary via PushNotification. Persist equity snapshots.
-3. **Drawdown / equity-curve tracking.** Log equity each tick to a CSV; track live maxDD vs the
-   backtest −23%; alert if live DD breaches an IS-calibrated band.
+2. **PnL attribution + daily digest (HIGH).** ✅ DONE 2026-06-21 — `scripts/portfolio_digest.py`
+   (realized/funding/commission/unrealized, per-name, equity snapshots, once-a-day digest).
+3. **Drawdown / equity-curve tracking.** Equity snapshots now logged (#2) to
+   `data/portfolio_equity.csv`; NEXT: track live maxDD vs the backtest −23% + alert on breach.
 4. **Fill-quality / slippage tracking.** Compare actual fills (from order history) vs the
    close-proxy reference price the leg was sized at — measures real slippage vs the 5bps assumption.
 5. **Trend-aware alerts.** Not just thresholds: margin steadily declining, gross drifting, uPnL
@@ -144,6 +158,10 @@ Prioritized; each becomes a committed helper script + a section here when built.
   Recomputes the v3 strategy target (same code + close-proxy forming) and compares per-name to the
   LIVE book; flags MISSING / EXTRA / WRONGSIDE / MISSIZED, tolerates price-drift + dust, notes 8h
   boundary transients. Monitor now runs health + parity each tick; either ALERT or DRIFT pings.
+- **2026-06-21 v3** — roadmap #2: **PnL attribution + daily digest** (`scripts/portfolio_digest.py`
+  + read-only `auth_client.get_income`). Logs an equity snapshot each tick to
+  `data/portfolio_equity.csv`; reports 24h realized/funding/commission/unrealized PnL attributed
+  per-name from `/fapi/v1/income`; pushes a digest once per UTC day (DIGEST_DUE flag + --mark-pushed).
 - **2026-06-21 v2** — roadmap #1b: **candle-integrity check** (`scripts/portfolio_candle_check.py`),
   per the user: the signal close must always be a COMPLETE candle, never the forming one. Verifies no
   forming candle leaked into any coin CSV (close_time > now) + data isn't stale (missed refresh).

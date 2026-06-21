@@ -215,6 +215,19 @@ class AuthenticatedBinanceClient:
     def get_account(self) -> dict:
         return self._signed_get("/fapi/v3/account")
 
+    def get_income(self, income_type: str | None = None, start_time: int | None = None,
+                   limit: int = 1000) -> list:
+        """Account income history (/fapi/v1/income) — REALIZED_PNL, FUNDING_FEE, COMMISSION, etc.
+
+        Read-only. Used by the PnL-attribution digest. Empty income_type returns all types.
+        """
+        params: dict = {"limit": limit}
+        if income_type:
+            params["incomeType"] = income_type
+        if start_time is not None:
+            params["startTime"] = start_time
+        return self._signed_get("/fapi/v1/income", params)
+
     def set_leverage(self, symbol: str, leverage: int) -> dict:
         return self._signed_post(
             "/fapi/v1/leverage",
