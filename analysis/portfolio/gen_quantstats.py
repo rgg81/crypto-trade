@@ -32,12 +32,15 @@ def to_daily(net: pd.Series) -> pd.Series:
 
 
 def main() -> None:
+    import iter_021_eligexit as ee
     os.makedirs(OUT, exist_ok=True)
     coins = base.load_universe()
     book = hy.canonical_book(coins, hy.build_books(coins))
+    elig = ee.eligibility_mask(coins, book["target_w"])
     nets = {
         "baseline_v1_trend_carry": hy.banded_net(book, 0.0, "snap"),
         "baseline_v2_trend_carry_hysteresis": hy.banded_net(book, 0.010, "snap"),
+        "baseline_v3_eligibility_exit": ee.eligexit_net(book, elig, 2, 0.010, "snap"),  # K=2
     }
     for name, net in nets.items():
         d = to_daily(net)
