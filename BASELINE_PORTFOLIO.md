@@ -66,3 +66,17 @@ walk-forward any param · universe PIT top-20 ex-stables · report net (cost+fun
   cadence). Deploy SNAP δ=0.010 (NOT EDGE mode — degrades IS + worsens DD). Tag portfolio-baseline-v2.
 - HELD (NOT promoted): trend+carry+flow risk-parity combiner (iter-014/015) — OOS +2.40 point est but
   DSR-NOT-significant at N=14 (iter-018); strong CANDIDATE, run in SHADOW for forward OOS.
+
+## PROMOTION — baseline-v3: ELIGIBILITY-EXIT (iter-021, K=2, critic PASS 2026-06-21)
+User-found flaw: the δ=0.010 band held ~18 ZOMBIE positions (exited coins never closed, incl. delisted
+TOMO/BLZ) -> book = 38 for a "top-20" strategy. FIX (iter_021_eligexit.py): force-close any coin
+ineligible (liquidity rank > 20) for >= K=2 consecutive candles, overriding the band; renorm + vol-target
+as before. RESULT (current data): book 38 -> 20 (true top-20, all zombies + delisted GONE), IS +1.22 /
+OOS +1.63 (baseline K=inf +1.25/+1.66 same data), maxDD -23%. NOT alpha — book-hygiene + deployment
+robustness: order-TICKETS/candle FALL 23.8 -> 18.3 (zombies generated a phantom renorm ticket every bar)
+-> lower live cost/slippage; OOS RETURN actually HIGHER (+53.9% vs +51.7%), the -0.03 Sharpe is just
+slightly higher vol from a less-diluted book. Critic PASS: leak-free (corruption bit-identical; K=inf
+reproduces iter_020 bit-exact), K robust on mechanism (not OOS-tuned), concentration healthy (ETH 18.9%).
+DEPLOYABLE BASELINE = trend+carry (wf λ) + hysteresis (δ=0.010) + eligibility-exit (K=2). Tag
+portfolio-baseline-v3. Critic suggestion (future): add a liquidity-floor exit for coins that stay rank<=20
+but go untradeable (TOMO-style pre-delist decay), IS-calibrated, as standing insurance.
