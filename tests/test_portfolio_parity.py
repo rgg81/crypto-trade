@@ -31,7 +31,7 @@ def test_strategy_reproduces_iter021_baseline_v3():
     coins = strategy.load_universe()
     book = hy.canonical_book(coins, hy.build_books(coins))
     elig = ee.eligibility_mask(coins, book["target_w"])
-    pos = strategy.position_weight_book(coins)                   # strategy deployed weights
+    ref = ee.eligexit_net(book, elig, strategy.K_EXIT, strategy.DELTA, strategy.MODE)  # v3 ref net
 
     pos = strategy.position_weight_book(coins)                        # strategy deployed weights
     scale = book["scale"]
