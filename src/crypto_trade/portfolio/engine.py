@@ -221,7 +221,7 @@ class PortfolioEngine:
             px = float(leg["price"])             # forming-open (close-proxy) the leg sized at
             qty = self._round_qty(s, abs(leg["delta_notional_usd"]) / px)
             # POST-FLOOR min-notional guard: flooring qty to stepSize can drop the order below
-            # Binance's $5 min-notional (-4164). Skip these dust legs (position stays <$5 off target).
+            # Binance's $5 min-notional (-4164). Skip these dust legs (<$5 off target = negligible).
             if qty <= 0 or qty * px < self.cfg.min_notional_usd:
                 skipped += 1
                 continue
