@@ -16,7 +16,7 @@ import sys
 
 sys.path.insert(0, "src")
 
-EQUITY = 10_000.0
+EQUITY = 4_000.0           # notional base, sized to fit the ~5k testnet faucet at 1x
 LEVERAGE = 1.0              # 1x — account PnL ~= strategy PnL (no DD amplification)
 GROSS_TARGET = 0.85          # upper end of the vol-target band
 MARGIN_SAFETY = 1.2         # require this multiple of the estimated margin as headroom

@@ -21,7 +21,7 @@ import os
 import time
 
 EQUITY_CSV = "data/portfolio_equity.csv"
-NOTIONAL = 10_000.0            # strategy notional base (matches run_portfolio_testnet.py)
+NOTIONAL = 4_000.0            # strategy notional base (matches run_portfolio_testnet.py)
 BACKTEST_MAXDD = 0.23         # baseline-v3 backtest maxDD (reference)
 LEVERAGE = 1.0               # 1x — at 1x account DD ~= strategy DD (no amplification)
 ALERT_ACCOUNT_DD = 0.20      # account DD from peak (informational under HANDS-OFF; never act)
