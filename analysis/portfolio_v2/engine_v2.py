@@ -205,6 +205,59 @@ def _signals(panel: dict) -> dict:
     }
 
 
+# ---- iter-v2-002: cross-sectional momentum (XS-mom) -----------------------------------------
+XS_GAMMA = 0.0
+XS_LOOKBACK = 84
+XS_NMIN = 8
+
+
+def _xsmom(
+    close: pd.DataFrame, elig: pd.DataFrame, lookback: int
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Centered within-band return-rank XS-mom signal + its past-only L-return panel `mom`.
+
+    Bit-identical to v1's iter_002_top20.build('xsec_mom') lines 85-89 (lookback L=84), revived on
+    the rank-21-40 band here:
+
+        mom = close / close.shift(L) - 1.0                # trailing L-return, past-only
+        rk  = mom.where(elig).rank(axis=1)                # cross-sectional rank in the band, asc
+        n   = elig.sum(axis=1)                            # number of names in the band at t
+        xs  = (rk - (n+1)/2) / n , masked .where(elig)    # CENTERED, dollar-neutral in [-0.5, +0.5]
+
+    `xs` is `0.0`-filled where ineligible (never NaN) so it can be blended into `combined` without
+    injecting NaN: at γ=0 the engine early-returns to `tc` and never touches `xs`; at γ>0 the
+    0.0-fill contributes exactly 0.0 outside the band (masked off by `.where(elig)` downstream).
+    Returns (xs, mom) — `mom` is reused for the dispersion gate.
+    """
+    mom = close / close.shift(lookback) - 1.0
+    rk = mom.where(elig).rank(axis=1)
+    n = elig.sum(axis=1)
+    xs = rk.sub(n.add(1) / 2.0, axis=0).div(n, axis=0).where(elig).fillna(0.0)
+    return xs, mom
+
+
+def _xs_gate_mask(
+    mom: pd.DataFrame,
+    elig: pd.DataFrame,
+    n_min: int,
+    disp_min: float | None,
+) -> pd.Series:
+    """Past-only dispersion / min-names gate. Returns a per-candle bool Series: True => the XS-mom
+    term is GATED OFF for that candle (blend reverts to pure trend+carry `tc`, fail-safe to anchor).
+
+    Both conditions are computed on the band's eligible members as of the PRIOR close (`.shift(1)`):
+        n[t]    = elig.sum(axis=1)                          # band size at t
+        disp[t] = cross-sectional std of mom over the eligible band at t   (L-return spread)
+    GATE OFF iff  (n[t] < n_min)  OR  (disp[t] < disp_min).  disp_min=None disables dispersion leg.
+    """
+    n_prev = elig.sum(axis=1).shift(1)
+    disp_prev = mom.where(elig).std(axis=1).shift(1)
+    gate = (n_prev < n_min).fillna(True)
+    if disp_min is not None:
+        gate = gate | (disp_prev < disp_min).fillna(True)
+    return gate
+
+
 # ---- per-λ book (the small-panel-safe building block) --------------------------------------
 def fixed_lambda_book(
     coins: dict,
@@ -217,6 +270,10 @@ def fixed_lambda_book(
     cost_mult: float = 1.0,
     slip_mult: float = 1.0,
     liq_win: int = LIQ_WIN,
+    xs_gamma: float = XS_GAMMA,
+    xs_lookback: int = XS_LOOKBACK,
+    xs_nmin: int = XS_NMIN,
+    xs_disp_min: float | None = None,
 ) -> dict:
     """One λ's canonical pre-band book: lagged gross-normalized weights `w` + the vol-targeted net.
 
@@ -224,6 +281,16 @@ def fixed_lambda_book(
     eligibility and the slippage cost term. Returns w / pnl / fpnl / cost / raw_net / scale / net.
     With slip=0 + v1-compat eligibility (lo=0, hi=20, season=None) the cost and net are the v1 ones
     bit-for-bit. Small-panel safe (no walk-forward) — the leak/cost unit tests call this directly.
+
+    iter-v2-002 — XS-mom blend (parity-preserving at γ=0):
+        tc       = (1 - lam) * trend + lam * carry                  # unchanged anchor combo
+        combined = (1 - xs_gamma) * tc + xs_gamma * xs              # γ-tilt to XS-mom
+        raw      = (combined / rvol).where(elig)
+    HARD γ=0 parity guard: `xs_gamma == 0.0` early-returns `combined = tc` — the `xs` panel is
+    never even built/multiplied, so the numerator is `tc` bit-for-bit (no NaN/dtype perturb). §2.3
+    dispersion/min-names gate forces the xs-term to 0 on gated candles (combined reverts to `tc`,
+    fail-safe to the anchor). The XS term flows through the SAME /rvol, gross-norm, lag, slippage,
+    band, eligexit, vol-target pipeline — its higher-turnover cost is charged honestly.
     """
     panel = build_panel(coins, liq_win=liq_win)
     sig = _signals(panel)
@@ -233,7 +300,18 @@ def fixed_lambda_book(
         .fillna(False)
     )
 
-    raw = (((1 - lam) * sig["trend"] + lam * sig["carry"]) / sig["rvol"]).where(elig)
+    tc = (1 - lam) * sig["trend"] + lam * sig["carry"]
+    if xs_gamma == 0.0:
+        # HARD γ=0 parity guard: never touch `xs`; combined IS tc, bit-for-bit with the anchor line.
+        combined = tc
+    else:
+        xs, mom = _xsmom(panel["close"], elig, xs_lookback)
+        gate = _xs_gate_mask(mom, elig, xs_nmin, xs_disp_min)
+        # gate OFF (True) => force the xs-term to 0 that candle (combined reverts to tc).
+        gamma_t = pd.Series(xs_gamma, index=tc.index).where(~gate, 0.0)
+        combined = tc.mul(1.0 - gamma_t, axis=0) + xs.mul(gamma_t, axis=0)
+
+    raw = (combined / sig["rvol"]).where(elig)
     w = raw.div(raw.abs().sum(axis=1).replace(0, np.nan), axis=0).fillna(0.0).shift(1)
 
     slip_fn = make_slip_fn(slip_bps_fn, slip_mult)
@@ -387,12 +465,22 @@ def run_book(
     cost_mult: float = 1.0,
     slip_mult: float = 1.0,
     liq_win: int = LIQ_WIN,
+    xs_gamma: float = XS_GAMMA,
+    xs_lookback: int = XS_LOOKBACK,
+    xs_nmin: int = XS_NMIN,
+    xs_disp_min: float | None = None,
 ) -> dict:
     """Full v2 pipeline -> dict(net, target_w, picks, turnover, avg_positions, tickets, ...).
 
     v1-compat (rank_lo=0, rank_hi=20, season=None, slip_bps_fn=None/zero, delta=0.010, k_exit=2)
     reproduces iter_021 K=2 bit-for-bit. The slippage + (rank band, season) parametrizations enter
     BOTH the per-λ book (so λ-selection is slippage-aware) and the final banded net.
+
+    iter-v2-002: the XS-mom params (xs_gamma/xs_lookback/xs_nmin/xs_disp_min) enter the per-λ books
+    ONLY — they reshape the signal numerator inside each `fixed_lambda_book`, so the walk-forward
+    λ-selection sees the XS-augmented nets AND the final banded net is stitched from those books'
+    weights. The canonical-book stitch / band / eligexit / renorm / vol-target are UNCHANGED. At
+    xs_gamma=0.0 every book early-returns to `tc`, so the whole pipeline is bit-for-bit the anchor.
     """
     books = {
         lam: fixed_lambda_book(
@@ -405,6 +493,10 @@ def run_book(
             cost_mult=cost_mult,
             slip_mult=slip_mult,
             liq_win=liq_win,
+            xs_gamma=xs_gamma,
+            xs_lookback=xs_lookback,
+            xs_nmin=xs_nmin,
+            xs_disp_min=xs_disp_min,
         )
         for lam in LAM_GRID
     }

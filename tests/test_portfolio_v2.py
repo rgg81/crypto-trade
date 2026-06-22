@@ -405,3 +405,84 @@ def test_leak_safety_run_book_walkforward():
     safe = nc.index < (cutoff_dt - pd.Timedelta(milliseconds=2 * STEP_MS))
     assert float((nc[safe] - nd[safe]).abs().max()) == 0.0
     assert bool((nc[safe].abs() > 0).any()), "net is trivially zero — vol-target not warmed"
+
+
+# ---------------------------------------------------------------------------------------------
+# 10. iter-v2-002 XS-mom: γ=0 reproduces the anchor net BIT-FOR-BIT (max|Δ| == 0.0)
+# ---------------------------------------------------------------------------------------------
+def test_xsmom_gamma_zero_parity():
+    """The hard parity contract: run_book(..., xs_gamma=0.0) net == the anchor run_book(...) net
+    bit-for-bit (max|Δ| == 0.0, NOT just < 1e-9). The γ=0 early-return guard must make the XS-mom
+    extension a pure no-op. Panel spans > TRAIN_MONTHS so the walk-forward + band overlay run."""
+    n = 2400
+    idx = _ms_index(n)
+    streams = {k: np.random.default_rng(300 + k) for k in range(8)}
+    coins = {}
+    for k in range(8):
+        px = 100.0 * np.cumprod(1.0 + streams[k].normal(0, 0.02, n))
+        coins[f"C{k}USDT"] = _coin(
+            idx, opens=px, closes=px, qv=float(8 - k) * 1_000_000.0, fund=0.0001
+        )
+
+    # anchor: no XS-mom params at all (defaults => xs_gamma=0.0 => early-return guard).
+    anchor = engine_v2.run_book(coins, rank_lo=0, rank_hi=5, season=None)
+    # explicit γ=0 with the OTHER XS knobs set to non-defaults — must STILL be a pure no-op.
+    zero = engine_v2.run_book(
+        coins,
+        rank_lo=0,
+        rank_hi=5,
+        season=None,
+        xs_gamma=0.0,
+        xs_lookback=42,
+        xs_nmin=3,
+        xs_disp_min=0.01,
+    )
+    a, b = anchor["net"], zero["net"].reindex(anchor["net"].index)
+    assert len(anchor["net"]) == len(zero["net"])
+    assert float((a - b).abs().max()) == 0.0  # bit-for-bit, not < 1e-9
+    # decisions identical too (target_w + held_w)
+    for key in ("target_w", "held_w"):
+        x = anchor[key]
+        y = zero[key].reindex(index=x.index, columns=x.columns)
+        assert float((x - y).abs().to_numpy().max()) == 0.0
+    assert bool((a.abs() > 0).any()), "net trivially zero — panel not warmed; test vacuous"
+
+
+# ---------------------------------------------------------------------------------------------
+# 11. iter-v2-002 XS-mom: the centered within-band rank is dollar-neutral (Σ over band ≈ 0)
+# ---------------------------------------------------------------------------------------------
+def test_xsmom_dollar_neutral():
+    """At γ=1 with NO gating, the pre-size centered-rank `xs` panel sums to ≈ 0 across the eligible
+    band at every warmed candle (Σ_c xs ≈ 0). This is the dollar-neutral construction: ranks
+    1..n centered by (n+1)/2 and divided by n sum to exactly 0 over the n eligible names."""
+    n = 120
+    idx = _ms_index(n)
+    rng = np.random.default_rng(7)
+    # 10 coins with distinct, dispersed trailing returns so the within-band rank is non-degenerate.
+    coins = {}
+    for k in range(10):
+        px = 100.0 * np.cumprod(1.0 + rng.normal(0.001 * (k - 5), 0.02, n))
+        coins[f"C{k:02d}USDT"] = _coin(
+            idx, opens=px, closes=px, qv=float(10 - k) * 1_000_000.0, fund=0.0
+        )
+
+    panel = engine_v2.build_panel(coins, liq_win=3)
+    elig = (
+        universe_v2.eligibility(coins, rank_lo=0, rank_hi=10, season=None, liq_win=3)
+        .reindex(index=panel["opens"].index, columns=panel["cols"])
+        .fillna(False)
+    )
+    xs, _mom = engine_v2._xsmom(panel["close"], elig, lookback=21)
+
+    # warmed candles only (need >= lookback trailing closes for `mom` to be defined on the band).
+    warm = elig.index[30:]
+    band_sum = xs.reindex(index=warm).where(elig.reindex(index=warm)).sum(axis=1)
+    n_band = elig.reindex(index=warm).sum(axis=1)
+    band_sum = band_sum[n_band > 0]
+    assert len(band_sum) > 0, "no eligible warmed candles — test vacuous"
+    assert float(band_sum.abs().max()) < 1e-9  # dollar-neutral within the band
+
+    # and outside the band `xs` is exactly 0.0-filled (never NaN) so the blend can't inject NaN.
+    assert not xs.isna().any().any()
+    masked_off = xs.where(~elig)
+    assert float(masked_off.abs().max().max()) == 0.0
