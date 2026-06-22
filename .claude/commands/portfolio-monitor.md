@@ -10,6 +10,22 @@ skill. Keep helper logic in committed scripts (testable, reusable) and keep this
 playbook over them. The roadmap below is the living backlog; promote items into the workflow as we
 build them and tick them off in the Changelog.
 
+## HANDS-OFF MANDATE — NEVER interfere with the strategy (user directive 2026-06-22)
+We are TESTING the strategy. It must run UNTOUCHED through wins AND losses. The monitor OBSERVES and
+INFORMS; it NEVER intervenes in the trading.
+- **NEVER** flatten, reduce, hedge, or otherwise alter positions in response to performance.
+- **NEVER** run or recommend the kill-switch because of drawdown / a losing streak / an offside tilt.
+  Overriding the strategy on a loss corrupts the test (the −23% drawdown budget exists to sit through
+  exactly these). The kill-switch stays a MANUAL, user-only tool — the monitor never invokes or
+  suggests it for performance reasons.
+- **DRAWDOWN / PnL / tilt / turnover are TEST RESULTS, not alerts.** Report them in the daily digest
+  and on request; do NOT treat them as something to act on. (A genuine DD=BREACH at the catastrophic
+  20%-account band is still surfaced as INFORMATION, not a call to intervene.)
+- The ONLY things that warrant an alert are TEST-INTEGRITY failures — the test isn't running correctly
+  or the strategy isn't faithfully following the backtest: engine DOWN, traceback, order ERRORS,
+  PARITY=DRIFT, CANDLE=BAD, a MISSED rebalance. Relaunching a crashed engine is PRO-test (it resumes
+  the run and reconciles to the strategy's own target), so it's allowed — it is not interference.
+
 ## Run modes — PAPER vs TEST BINANCE vs LIVE (keep these distinct)
 The bot can run in three modes; metrics mean different things in each, and the monitor must label
 which one it's watching. NEVER conflate them.
@@ -78,19 +94,23 @@ naturally does.
 - `portfolio_turnover_ledger.py` → `TURNOVER: OK|SPIKE`. Parses the log into a per-rebalance ledger
   (`data/portfolio_turnover.csv`); confirms low live turnover (~1-4 legs/rebal steady-state, under the
   backtest's ~18 since live skips sub-$5 dust); SPIKE = a non-cold-start rebalance with many legs.
-Filter stderr noise with `| grep -vE "UserWarning|warn"`. Treat **any** of `STATUS=ALERT`,
-`CANDLE=BAD`, `PARITY=DRIFT` (not flagged near-boundary-transient), `DD=BREACH`, or `TURNOVER=SPIKE`
-as an alert; `TREND=WATCH` is a soft heads-up (notify if it's developing, not a hard alarm);
-`FILLQUAL` is INFO on testnet/paper (alert only on LIVE).
+Filter stderr noise with `| grep -vE "UserWarning|warn"`. Per the HANDS-OFF mandate, the ALERT set is
+TEST-INTEGRITY only: `STATUS=ALERT` (engine down / traceback / order ERRORS / missed rebalance / zombie
+reappear), `CANDLE=BAD`, `PARITY=DRIFT` (not near-boundary-transient). These mean the test isn't running
+right or the strategy isn't tracking the backtest → investigate/fix (fixes that resume the run, never
+position changes) + PushNotification. `DD=BREACH`, `TURNOVER=SPIKE`, `TREND=WATCH`, `FILLQUAL` are
+OBSERVATIONAL test-results — report in the digest / on request, do NOT act on them and do NOT push a
+"consider flattening" alert. (Concentration/gross/margin: surface only as info; never act.)
 
 ## Emergency & cutover tools (on-demand, NOT per-tick)
 - **Pre-flight** (`scripts/portfolio_preflight.py`) → `PREFLIGHT: GO|NO-GO`. Run before the live-money
   cutover: checks creds/mode, balance ≥ 1.5× est. margin, baseline-v3 tag, fresh data, sane ~top-20
   target. Read-only.
-- **Kill-switch** (`scripts/portfolio_killswitch.py`) → emergency halt. DRY-RUN by default (shows what
-  it would do); `--confirm` STOPS the engine FIRST (so it can't re-enter), THEN flattens every
-  position with reduceOnly orders. MANUAL only — the monitor may *recommend* it via PushNotification on
-  a catastrophic alert, but does NOT auto-fire it (auto-flattening real money is too dangerous).
+- **Kill-switch** (`scripts/portfolio_killswitch.py`) → emergency halt. DRY-RUN by default; `--confirm`
+  STOPS the engine FIRST then flattens every position (reduceOnly). **USER-ONLY.** Per the HANDS-OFF
+  mandate the monitor NEVER runs it and NEVER recommends it for performance/drawdown — the strategy is
+  being tested and must run untouched. It exists solely for the user to invoke manually if they choose,
+  or for a genuine operational emergency the user directs.
 
 ## Daily digest (PnL attribution)
 `portfolio_digest.py` runs every tick to log the equity snapshot (cheap). When its output shows
@@ -198,6 +218,10 @@ ROADMAP #1–#7 COMPLETE. Future ideas: per-name funding-carry attribution, regi
 auto-recovery escalation ladder, a live-vs-backtest tracking-error report.
 
 ## Changelog (tick off as we build)
+- **2026-06-22 v8** — HANDS-OFF mandate (user: "never interfere, we need to test this"). The
+  monitor now OBSERVES + INFORMS only; never flattens/recommends the kill-switch on drawdown.
+  Alert set narrowed to TEST-INTEGRITY (engine/parity/candle/errors); DD/PnL/tilt/turnover are
+  observational test-results (digest only). Kill-switch is user-only. Drawdown is expected.
 - **2026-06-22 v7** — calibration fix: turnover SPIKE threshold 15 -> 30 + cold-start = first row
   only. The 15 threshold false-fired on normal ~16-18-leg active rebalances (backtest averages
   ~18 tickets/candle; live steady-state confirmed ~18). No real issue — a monitor false positive
