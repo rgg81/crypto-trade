@@ -63,6 +63,15 @@ def _equity_24h_ago(now_ms: int) -> float | None:
     return best
 
 
+def _curve_start_ms() -> int | None:
+    """First equity-snapshot ts — the (re)launch time. Income before this belongs to a prior
+    account incarnation (e.g. pre-faucet-reset churn) and must NOT be attributed to this run."""
+    if not os.path.exists(EQUITY_CSV):
+        return None
+    rows = list(csv.DictReader(open(EQUITY_CSV)))
+    return int(rows[0]["ts_ms"]) if rows else None
+
+
 def main() -> None:
     if "--mark-pushed" in sys.argv:
         _mark_pushed()
@@ -97,8 +106,14 @@ def main() -> None:
         "n_positions": len(pos), "avail_balance": round(avail, 4),
     })
 
-    # income attribution over the trailing window
+    # income attribution over the trailing window, but never before this run's (re)launch
+    # (the equity-curve start) — so a faucet reset / relaunch doesn't pull a prior account's
+    # realized/commission churn into this run's digest.
     start = now_ms - WINDOW_H * 3600_000
+    cstart = _curve_start_ms()
+    if cstart is not None:
+        start = max(start, cstart)
+    win_h = (now_ms - start) / 3600_000
     realized = funding = commission = 0.0
     by_coin: dict[str, float] = {}
     try:
@@ -123,7 +138,8 @@ def main() -> None:
     winners = sorted(by_coin.items(), key=lambda kv: -kv[1])[:3]
     losers = sorted(by_coin.items(), key=lambda kv: kv[1])[:3]
 
-    print(f"DIGEST ({WINDOW_H}h, testnet) — {time.strftime('%Y-%m-%d %H:%M UTC', time.gmtime())}")
+    print(f"DIGEST ({win_h:.0f}h since launch, testnet) — "
+          f"{time.strftime('%Y-%m-%d %H:%M UTC', time.gmtime())}")
     print(f"  equity ${equity:,.2f}  (wallet ${wallet:,.2f} + uPnL ${upnl:+,.2f})  24h delta {chg}")
     print(f"  realized PnL ${realized:+,.2f} | funding ${funding:+,.2f} | "
           f"commission ${commission:+,.2f} | net realized ${realized_net:+,.2f}")
