@@ -60,6 +60,7 @@ class PortfolioEngine:
         self.auth: AuthenticatedBinanceClient | None = None
         self.qty_prec: dict[str, int] = {}
         self.step_size: dict[str, float] = {}     # LOT_SIZE stepSize per symbol (qty multiple)
+        self.min_notl: dict[str, float] = {}      # MIN_NOTIONAL filter per symbol ($ floor; -4164)
         self._lev_set: set[str] = set()           # symbols whose leverage we've already set
         if not config.dry_run and settings.binance_api_key:
             auth_url = settings.auth_base_url or settings.base_url
@@ -114,7 +115,7 @@ class PortfolioEngine:
             c = float(cur.get(s, 0.0))            # what we actually hold now
             trade_w = t - c
             delta_notional = trade_w * gross_dollar
-            if abs(delta_notional) >= self.cfg.min_notional_usd and s in prices:
+            if abs(delta_notional) >= self._min_notional(s) and s in prices:
                 legs.append({
                     "symbol": s,
                     "side": "BUY" if trade_w > 0 else "SELL",
@@ -162,7 +163,7 @@ class PortfolioEngine:
 
     # ---- live execution plumbing (reuses the proven AuthenticatedBinanceClient) ----
     def setup_exchange(self) -> None:
-        """Load quantityPrecision + LOT_SIZE stepSize (exchangeInfo) for valid order qtys."""
+        """Load quantityPrecision + stepSize + MIN_NOTIONAL (exchangeInfo) for valid orders."""
         if self.auth is None:
             return
         info = self.auth.get_exchange_info()
@@ -170,10 +171,19 @@ class PortfolioEngine:
             sym = si["symbol"]
             self.qty_prec[sym] = int(si["quantityPrecision"])
             for f in si.get("filters", []):
-                if f.get("filterType") in ("LOT_SIZE", "MARKET_LOT_SIZE"):
+                ft = f.get("filterType")
+                if ft in ("LOT_SIZE", "MARKET_LOT_SIZE") and sym not in self.step_size:
                     self.step_size[sym] = float(f["stepSize"])    # qty must be a multiple of this
-                    break
-        print(f"[portfolio] loaded quantityPrecision + stepSize for {len(self.qty_prec)} symbols")
+                elif ft == "MIN_NOTIONAL":
+                    self.min_notl[sym] = float(f.get("notional") or f.get("minNotional") or 0.0)
+        print(f"[portfolio] loaded quantityPrecision + stepSize + MIN_NOTIONAL "
+              f"for {len(self.qty_prec)} symbols")
+
+    def _min_notional(self, symbol: str) -> float:
+        """Largest of the configured floor and the symbol's Binance MIN_NOTIONAL filter. Legs below
+        this can't be placed (-4164 BTC=$50 etc.), so they're skipped (held at current — bounded by
+        one filter-notional off target, inside parity tolerance, self-corrects next rebalance)."""
+        return max(self.cfg.min_notional_usd, self.min_notl.get(symbol, 0.0))
 
     def _ensure_leverage(self, symbol: str) -> None:
         """Set leverage on a symbol once (lazily, before its first order)."""
@@ -220,9 +230,9 @@ class PortfolioEngine:
             s = leg["symbol"]
             px = float(leg["price"])             # forming-open (close-proxy) the leg sized at
             qty = self._round_qty(s, abs(leg["delta_notional_usd"]) / px)
-            # POST-FLOOR min-notional guard: flooring qty to stepSize can drop the order below
-            # Binance's $5 min-notional (-4164). Skip these dust legs (<$5 off target = negligible).
-            if qty <= 0 or qty * px < self.cfg.min_notional_usd:
+            # POST-FLOOR min-notional guard: flooring qty to stepSize can drop the order below the
+            # symbol's MIN_NOTIONAL filter (-4164; BTC=$50). Skip these dust legs (held at current).
+            if qty <= 0 or qty * px < self._min_notional(s):
                 skipped += 1
                 continue
             try:

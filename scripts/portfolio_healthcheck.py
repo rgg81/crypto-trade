@@ -44,11 +44,13 @@ def _log_scan() -> tuple[list[str], str | None, int]:
     if "Traceback" in txt:
         flags.append(f"TRACEBACK x{txt.count('Traceback')}")
     rebals = re.findall(r"rebalance plan as_of=([\d :-]+) .*?legs=(\d+)", txt)
-    errs = re.findall(r"orders placed=(\d+) errors=(\d+)", txt)
+    # NOTE: the real log line is "orders placed=N skipped=M errors=K" — the regex MUST include
+    # skipped= or it silently never matches and last_errs stays 0 (was blind to order errors).
+    errs = re.findall(r"orders placed=(\d+) skipped=(\d+) errors=(\d+)", txt)
     if rebals:
         last_rebal = rebals[-1][0].strip()
     if errs:
-        last_errs = int(errs[-1][1])
+        last_errs = int(errs[-1][2])
     return flags, last_rebal, last_errs
 
 
