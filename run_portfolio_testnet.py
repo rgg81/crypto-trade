@@ -1,6 +1,6 @@
 """Launch the baseline-v2 portfolio executor on Binance TESTNET (full 8h poll loop).
 
-Sizing: equity $4k, leverage 1x => gross notional ~$3.3k (vol-target ~0.83) needs ~$3.3k margin at 1x,
+Sizing: equity $4k, leverage 1x => gross notional ~$3.3k (vol-target ~0.83), ~$3.3k margin at 1x,
 fitting the ~5k testnet faucet balance with headroom. At 1x the account PnL ~= the strategy PnL
 (no leverage amplification), so account DD ~= strategy DD — clean 1:1 reads.
 Signed calls route to the testnet host (BINANCE_AUTH_BASE_URL); klines stay on production (parity).
