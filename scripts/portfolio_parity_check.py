@@ -22,7 +22,7 @@ import time
 
 sys.path.insert(0, "src")
 
-EQUITY = 10_000.0          # notional base — must match run_portfolio_testnet.py PortfolioConfig
+EQUITY = 4_000.0           # notional base — MUST match run_portfolio_testnet.py PortfolioConfig
 MIN_NOTIONAL = 5.0        # Binance min order; names below this in $ are untradeable dust
 DUST_W = MIN_NOTIONAL / EQUITY                 # ~0.0005 weight; |w| below this == effectively flat
 ABS_TOL = 0.015                                # absolute weight tolerance (price drift headroom)

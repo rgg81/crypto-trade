@@ -22,7 +22,7 @@ import time
 sys.path.insert(0, "src")
 
 LOG = "logs/portfolio_testnet_v3.log"
-EXPECT_GROSS = (5_000, 12_000)     # $ gross band ($10k equity x 0.70-0.85 vol-target +/- slack)
+EXPECT_GROSS = (2_000, 6_000)      # $ gross band ($4k equity x ~0.83 vol-target ~$3.3k, +/- slack)
 MAX_CONC = 0.30                    # single-name share of gross alarm threshold
 CANDLE_MS = 8 * 60 * 60 * 1000
 DELISTED = {"TOMOUSDT", "BLZUSDT"}  # must NOT reappear in the book
