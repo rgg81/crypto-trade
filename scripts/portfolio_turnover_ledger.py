@@ -20,8 +20,12 @@ import time
 
 LOG = "logs/portfolio_testnet_v3.log"
 LEDGER = "data/portfolio_turnover.csv"
-COLDSTART_LEGS = 15       # >= this on the FIRST rebalance(s) = cold-start full entry (expected)
-SPIKE_LEGS = 15           # a non-cold-start rebalance with this many legs = turnover spike
+# Calibration note (2026-06-22): a NORMAL active rebalance touches up to ~the full book (~20 names),
+# and the backtest averages ~18 tickets/candle — so 16-18-leg rebalances are EXPECTED, not spikes
+# (quiet band-gated candles are ~1 leg; the average is what the band lowers). Only flag genuinely
+# anomalous churn: clearly above a full re-entry. The first ledger row is the launch cold-start.
+COLDSTART_IDX = 0         # the first rebalance after (re)launch = cold-start full entry (expected)
+SPIKE_LEGS = 30           # >30 legs on a non-cold-start rebalance = anomalous churn (band off?)
 
 PLAN_RE = re.compile(r"rebalance plan as_of=([\d-]+ [\d:]+).*?legs=(\d+) rebal=\$([\d.]+)")
 ORD_RE = re.compile(r"orders placed=(\d+)(?: skipped=(\d+))? errors=(\d+)")
@@ -68,13 +72,13 @@ def main() -> None:
         return
     _persist(recs)
 
-    # tag cold-starts: leading rebalances with >=COLDSTART_LEGS legs (full entry on (re)launch)
+    # first rebalance = launch cold-start (full entry); SPIKE only on anomalous churn (>SPIKE_LEGS)
+    # at a later rebalance — normal active rebalances are ~16-18 legs (backtest ~18 tickets/candle)
     flags = []
     for i, r in enumerate(recs):
-        cold = r["legs"] >= COLDSTART_LEGS and i <= 2
-        if not cold and r["legs"] >= SPIKE_LEGS:
-            flags.append(f"turnover SPIKE at {r['as_of']}: {r['legs']} legs (band off?)")
-    steady = [r for i, r in enumerate(recs) if not (r["legs"] >= COLDSTART_LEGS and i <= 2)]
+        if i != COLDSTART_IDX and r["legs"] > SPIKE_LEGS:
+            flags.append(f"turnover SPIKE at {r['as_of']}: {r['legs']} legs (>{SPIKE_LEGS})")
+    steady = [r for i, r in enumerate(recs) if i != COLDSTART_IDX]
     avg_legs = sum(r["legs"] for r in steady) / len(steady) if steady else 0.0
     last = recs[-1]
     tot_err = sum(r["errors"] for r in recs)

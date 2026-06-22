@@ -198,6 +198,10 @@ ROADMAP #1–#7 COMPLETE. Future ideas: per-name funding-carry attribution, regi
 auto-recovery escalation ladder, a live-vs-backtest tracking-error report.
 
 ## Changelog (tick off as we build)
+- **2026-06-22 v7** — calibration fix: turnover SPIKE threshold 15 -> 30 + cold-start = first row
+  only. The 15 threshold false-fired on normal ~16-18-leg active rebalances (backtest averages
+  ~18 tickets/candle; live steady-state confirmed ~18). No real issue — a monitor false positive
+  caught + fixed live. Turnover parity is GOOD (live ~18 ≈ backtest ~18).
 - **2026-06-21 v0** — initial skill: live-API health check (`scripts/portfolio_healthcheck.py`),
   STATUS OK|ALERT, threshold alerts, benign list, engine-down relaunch, self-paced ScheduleWakeup
   loop. Deployed against baseline-v3 on testnet ($10k/3x). Task #189.
