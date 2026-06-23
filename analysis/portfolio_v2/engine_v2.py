@@ -57,6 +57,11 @@ SLIP_B = 20.0
 SLIP_FLOOR = 1.0
 SLIP_CAP = 10.0
 
+# ---- funding-rate data dir (module-overridable; default unchanged for parity) ---------------
+# The live process flips this to the fresh fetched `data/funding_rates` dir at import (strategy_v2);
+# the default `pf_data/funding_rates` is the frozen backtest snapshot the parity gates read.
+FUNDING_DIR = "pf_data/funding_rates"
+
 SlipFn = Callable[[float | np.ndarray | pd.Series], float | np.ndarray | pd.Series]
 
 
@@ -113,12 +118,16 @@ def vol_target(net: pd.Series) -> pd.Series:
 
 
 def _load_funding(index_ms, syms) -> pd.DataFrame:
-    """Funding panel, nearest-match within 4h (iter_004.load_funding fix), reading from pf_data/."""
+    """Funding panel, nearest-match within 4h (iter_004.load_funding fix), reading from FUNDING_DIR.
+
+    FUNDING_DIR defaults to `pf_data/funding_rates` (the frozen backtest snapshot — parity-safe).
+    The live process overrides the module global to the fresh `data/funding_rates` dir first.
+    """
     import os
 
     cols = {}
     for s in syms:
-        p = f"pf_data/funding_rates/{s}.csv"
+        p = f"{FUNDING_DIR}/{s}.csv"
         if not os.path.exists(p):
             cols[s] = pd.Series(0.0, index=index_ms)
             continue

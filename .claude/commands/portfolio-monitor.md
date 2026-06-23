@@ -199,6 +199,35 @@ task #189 done. Keep the cadence at 2700s unless the user asks for tighter/loose
 - Going to **real money**: swap `--testnet`/keys for production, seed `data/live.db`; same recipe.
   Tighten the watch cadence and re-confirm the ALERT thresholds before that step.
 
+## v2 PARALLEL TRACK — rank-21–40 dollar-neutral XS-mom (added 2026-06-23)
+A SECOND book runs ALONGSIDE v1, fully isolated, on a SEPARATE testnet account. Monitor BOTH.
+- **Worktree:** `/home/roberto/crypto-trade/.worktrees/quant-portfolio` · **Runner:**
+  `run_portfolio_v2_testnet.py` (equity $4k, lev 1x, `--live-testnet` to trade) ·
+  **Log:** `logs/portfolio_v2_testnet.log` · **DB:** `data/portfolio_v2_testnet.db` ·
+  **Creds:** `~/.binance_testnet_v2_env` (DIFFERENT account, $5k faucet) · **proc:** `run_portfolio_v2_testnet`.
+- **Strategy** = BASELINE_PORTFOLIO_V2 (crypto-only rank-21–40 XS-mom 5-way ensemble {42,63,84,126,168} +
+  risk layer TARGET_VOL=0.006/MAX_LEV=2.0). Dollar-neutral-ISH (small inverse-vol net tilt is expected,
+  certified). Gross ≈ 0.3–0.6×equity (lower than v1 — the de-lever). Backtest OOS +1.16 (2× taker +0.90).
+- **v2 health check:** `scripts/portfolio_v2_healthcheck.py` (v2 paths/creds/account; STATUS OK|ALERT).
+  Run it with `source ~/.binance_testnet_v2_env` (NOT v1's). The full v2 parity/candle/digest suite is
+  a roadmap item — for now the healthcheck + a manual log scan cover the TEST-INTEGRITY essentials.
+- **v2 TESTNET-ARTIFACT errors are INFO, never alerts** (key difference from v1): the rank-21–40 universe
+  includes COIN names that testnet can't fill — `-1121 Invalid symbol` (listed on production, not testnet)
+  and `-4131 PERCENT_PRICE` (testnet's thin book). The healthcheck classifies `-1121/-4131/-4411` as INFO.
+  A REAL order error (any OTHER code) on v2 IS an alert. These testnet legs cause a small, expected parity
+  drift on testnet ONLY — they fill on production.
+- **Universe hygiene (load-bearing, real-money-critical):** v2 trades ONLY Binance `underlyingType==COIN`
+  perps. Tokenized stocks (INTC/CRCL/NVDA/…), commodities (XAU/XAG), index baskets (BTCDOM/DEFI), and
+  pre-market tokens are EXCLUDED via `universe_v2.NON_COIN_PERPS`. Before the production cutover, REGENERATE
+  that set from production exchangeInfo (testnet ≠ production listings). If a stock-perp ever appears in the
+  v2 book → ALERT (universe filter stale). See `diary-portfolio-v2/LIVE_DEPLOY.md`.
+- **Relaunch v2** (same self-reconcile pattern as v1): stop the v2 proc, `rm data/portfolio_v2_testnet.db`,
+  `set -a; source ~/.binance_testnet_v2_env; set +a`, `export BINANCE_AUTH_BASE_URL=https://testnet.binancefuture.com`,
+  `PYTHONUNBUFFERED=1 uv run python run_portfolio_v2_testnet.py --live-testnet > logs/portfolio_v2_testnet.log 2>&1 &`.
+  ⚠️ Do NOT `pkill -f run_portfolio_v2` (self-matches the shell) — kill by PID. NEVER touch the v1
+  quant-research worktree/proc.
+- The HANDS-OFF mandate applies to v2 identically: observe + inform, never intervene on performance.
+
 ## Intelligence roadmap (the living backlog — build these into the skill over time)
 Prioritized; each becomes a committed helper script + a section here when built.
 1. **Parity / drift check (HIGH).** ✅ DONE 2026-06-21 — `scripts/portfolio_parity_check.py`.

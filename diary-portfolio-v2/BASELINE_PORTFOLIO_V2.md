@@ -3,6 +3,12 @@
 **Established:** 2026-06-23 (iter-v2-001 → 009). **Branch:** `quant-portfolio`. **Status:** baseline
 candidate, MERGE-WITH-RISK-LAYER confirmed by quant-critic; record items R1/R3 closed below.
 
+> **⚠️ CORRECTION (2026-06-23, live deploy) — numbers below are the pre-correction figures.** The live
+> testnet deploy revealed the universe was contaminated with NON-COIN perps (tokenized stocks INTC/CRCL/…,
+> BTCDOM/DEFI indices). Fixed via `universe_v2.NON_COIN_PERPS` (exclude `underlyingType != COIN`). The
+> **crypto-only ensemble baseline is OOS +1.16 (2× taker +0.90)** — down from the contaminated +1.37 but
+> still real + cost-robust. Treat **OOS +1.16** as the authoritative number. See `LIVE_DEPLOY.md`.
+
 ## The strategy (fixed-parameter — NO monthly tuning, NO OOS tuning)
 **Dollar-neutral cross-sectional momentum on the rank-21–40 mid-cap perp cohort, 8h rebalance.**
 - **Signal:** equal-weight ensemble of the centered within-band return-rank at lookbacks

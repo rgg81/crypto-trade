@@ -31,6 +31,22 @@ MIN_HISTORY = 2190  # ~2y of 8h candles — v1's established-coin lifetime filte
 TOP_N = 20
 STABLE = re.compile(r"(USDC|BUSD|FDUSD|TUSD|USD1|DAI|USDP|EUR|USTC|FRAX|PAXG|XUSD|USDE)")
 
+# Non-COIN perps to EXCLUDE from the crypto universe (Binance `underlyingType != COIN`:
+# tokenized stocks/EQUITY, COMMODITY, INDEX baskets, PREMARKET/pre-IPO). A crypto cross-sectional
+# momentum strategy must not trade these — different dynamics, TradFi agreements, and they polluted
+# the rank-21-40 pool (INTC/CRCL were top OOS positions; BTCDOM/DEFI indices throughout). Applied to
+# load_pool_pit ONLY (load_pool_v1compat keeps the iter_002 universe for the v1 parity gate).
+# Regenerate from exchangeInfo (underlyingType) when the listing set changes — see scripts note.
+NON_COIN_PERPS = frozenset({
+    "0GUSDT", "ALLUSDT", "AMZNUSDT", "AZTECUSDT", "BLUEBIRDUSDT", "BMNRUSDT", "BREVUSDT",
+    "BTCDOMUSDT", "CCUSDT", "COINUSDT", "COPPERUSDT", "CRCLUSDT", "DEFIUSDT", "EDGEUSDT",
+    "EPICUSDT", "ESPUSDT", "EWJUSDT", "FAKEKR000660USDT", "FOGOUSDT", "GOOGLUSDT", "HOODUSDT",
+    "INTCUSDT", "KATUSDT", "KITEUSDT", "MEGAUSDT", "METAUSDT", "METUSDT", "MONUSDT",
+    "MSTRUSDT", "NVDAUSDT", "OPENAIUSDT", "PAYPUSDT", "PLTRUSDT", "QNTXUSDT", "QQQUSDT",
+    "SENTUSDT", "SPACEFUSDT", "SPCXUSDT", "SPYUSDT", "STABLEUSDT", "TSLAUSDT", "XAGUSDT",
+    "XAUUSDT", "XPDUSDT", "XPTUSDT", "YBUSDT", "ZAMAUSDT",
+})
+
 # Data root for this worktree: pf_data/ (data/ is sparse here).
 DATA_GLOB = "pf_data/*USDT/8h.csv"
 
@@ -73,7 +89,12 @@ def load_pool_pit() -> dict:
     coins: dict = {}
     for p in sorted(glob.glob(DATA_GLOB)):
         sym = _sym_from_path(p)
-        if not sym.endswith("USDT") or STABLE.search(sym) or not sym.isascii():
+        if (
+            not sym.endswith("USDT")
+            or STABLE.search(sym)
+            or not sym.isascii()
+            or sym in NON_COIN_PERPS  # exclude tokenized stocks / commodities / indices / pre-market
+        ):
             continue
         try:
             k = pd.read_csv(p, usecols=["open_time", "open", "close", "quote_volume"])
