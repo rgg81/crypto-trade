@@ -694,3 +694,65 @@ def test_ml_walkforward_future_perturbation_invariance():
         assert np.nanmax(dpost) > 0.0, (
             "future perturbation had NO effect — test not exercising leak"
         )
+
+
+# ---------------------------------------------------------------------------------------------
+# 16. leak safety of the run_book_from_signal PIPELINE directly (critic R1 — the deployed path).
+#     A FIXED data-independent signal isolates the engine: corrupting future price/qv/funding must
+#     NOT move any pre-cutoff weight or booked net (the /rvol, elig, vol-target, cost, band are all
+#     past-only). test #9 covers run_book (λ path); this covers the signal-driven entry point.
+# ---------------------------------------------------------------------------------------------
+def test_run_book_from_signal_future_perturbation():
+    n = 300
+    idx = _ms_index(n)
+    cutoff_i = 250
+    streams = {k: np.random.default_rng(700 + k) for k in range(6)}
+
+    def _make(shift, cut):
+        coins = {}
+        for k in range(6):
+            base = 100.0 * np.cumprod(1.0 + streams[k].normal(0, 0.02, n))
+            opens, closes = base.copy(), base.copy()
+            qv = np.full(n, float(6 - k) * 1e6)
+            fund = np.full(n, 0.0001)
+            if cut is not None:
+                opens[cut:] = base[cut:] * (1.0 + shift)
+                closes[cut:] = base[cut:] * (1.0 - shift)
+                qv[cut:] *= 1000.0
+                fund[cut:] = -0.05
+            coins[f"C{k}USDT"] = _coin(idx, opens=opens, closes=closes, qv=qv, fund=fund)
+        return coins
+
+    # FIXED, data-independent, dollar-neutral signal (constant centered pattern across the 6 coins),
+    # identical for both runs — so the ONLY between-run difference is the (corrupted) coin data.
+    cols = [f"C{k}USDT" for k in range(6)]
+    dt = pd.to_datetime(idx, unit="ms")
+    sig_row = np.array([(k - 2.5) / 2.5 for k in range(6)])
+    signal = pd.DataFrame(np.tile(sig_row, (n, 1)), index=dt, columns=cols)
+
+    streams = {k: np.random.default_rng(700 + k) for k in range(6)}
+    clean = engine_v2.run_book_from_signal(
+        _make(0.0, None), signal, rank_lo=0, rank_hi=4, liq_win=3
+    )
+    streams = {k: np.random.default_rng(700 + k) for k in range(6)}
+    dirty = engine_v2.run_book_from_signal(
+        _make(0.3, cutoff_i), signal, rank_lo=0, rank_hi=4, liq_win=3
+    )
+
+    cutoff_dt = pd.to_datetime(idx[cutoff_i], unit="ms")
+    pre = clean["target_w"].index[clean["target_w"].index < cutoff_dt]
+    assert len(pre) > 100, "too few pre-cutoff candles — test vacuous"
+
+    # DECISIONS: target_w + held_w bit-identical for every pre-cutoff candle.
+    for key in ("target_w", "held_w"):
+        a = clean[key]
+        b = dirty[key].reindex(index=a.index, columns=a.columns)
+        m = a.index < cutoff_dt
+        assert np.nanmax((a[m] - b[m]).abs().to_numpy()) == 0.0, f"{key} leaked future info"
+
+    # BOOKED net: identical up to the 2 boundary candles whose forward-return legitimately reads
+    # the corrupted open.
+    nc, nd = clean["net"], dirty["net"].reindex(clean["net"].index)
+    safe = nc.index < (cutoff_dt - pd.Timedelta(milliseconds=2 * STEP_MS))
+    assert float((nc[safe] - nd[safe]).abs().max()) == 0.0
+    assert bool((nc[safe].abs() > 0).any()), "net trivially zero — vol-target not warmed"
