@@ -61,7 +61,7 @@ def build_books(coins: dict) -> dict:
     for df in (opens, close, qv, fund):
         df.index = dt
     ret_fwd = opens.shift(-1) / opens - 1.0
-    elig = qv.rolling(base.LIQ_WIN).mean().shift(1).rank(axis=1, ascending=False) <= base.TOP_N
+    elig = base.top_n_eligibility(close, qv)  # PIT-seasoned top-N (survivorship-safe)
     rvol = close.pct_change().rolling(base.VOL_WIN).std()
     trend = sum(np.sign(close / close.shift(h) - 1.0) for h in base.HORIZONS) / len(base.HORIZONS)
     carry = -np.sign(fund.rolling(f4.M_FUND).mean())

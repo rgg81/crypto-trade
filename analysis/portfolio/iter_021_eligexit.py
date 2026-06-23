@@ -62,10 +62,11 @@ def eligibility_mask(coins: dict, target_w: pd.DataFrame) -> pd.DataFrame:
     it is the mask whose `<= TOP_N` band-free book has exactly TOP_N positions. Past-only by shift.
     """
     opens = pd.DataFrame({s: d["open"] for s, d in coins.items()}).astype(float).sort_index()
+    close = pd.DataFrame({s: d["close"] for s, d in coins.items()}).astype(float)
     qv = pd.DataFrame({s: d["quote_volume"] for s, d in coins.items()}).astype(float)
-    qv = qv.reindex(opens.index)
-    qv.index = pd.to_datetime(opens.index, unit="ms")
-    elig = qv.rolling(base.LIQ_WIN).mean().shift(1).rank(axis=1, ascending=False) <= base.TOP_N
+    close, qv = close.reindex(opens.index), qv.reindex(opens.index)
+    close.index = qv.index = pd.to_datetime(opens.index, unit="ms")
+    elig = base.top_n_eligibility(close, qv)  # PIT-seasoned top-N (survivorship-safe)
     return elig.reindex(index=target_w.index, columns=target_w.columns).fillna(False)
 
 

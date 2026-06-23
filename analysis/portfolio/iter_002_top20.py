@@ -25,27 +25,71 @@ HI1 = pd.Timestamp("2100-01-01")
 COST_SIDE = 0.0005
 HORIZONS = [21, 42, 84, 168]
 VOL_WIN = 84
-MIN_HISTORY = 2190            # ~2y of 8h candles — established-coin candidate pool
+MIN_HISTORY = 2190           # LEGACY ~2y lifetime filter (survivorship-biased; see SEASON)
 TOP_N = 20                   # point-in-time universe size
 LIQ_WIN = 90                 # trailing-30d volume window for the liquidity rank
+# PIT seasoning: a coin needs >= SEASON trailing non-NaN closes to be eligible — survivorship-safe;
+# replaces the MIN_HISTORY lifetime filter so a young listing can't steal a top-N slot pre-signal.
+SEASON = 168
 PORT_VOL_WIN = 84            # portfolio vol-target window
 TARGET_VOL = 0.01            # per-candle portfolio vol target
 MAX_LEV = 3.0
 STABLE = re.compile(r"(USDC|BUSD|FDUSD|TUSD|USD1|DAI|USDP|EUR|USTC|FRAX|PAXG|XUSD|USDE)")
 
+# Non-COIN perps to EXCLUDE (Binance `underlyingType != COIN`: tokenized stocks/EQUITY, COMMODITY,
+# INDEX baskets, PREMARKET/pre-IPO). A crypto strategy must not trade these — different dynamics,
+# TradFi agreements, special filters. In v1's top-20 only BTCDOM/DEFI ever entered the pool (ranks
+# ~88/179, never traded), so this is defensive enforcement. Mirrors universe_v2.NON_COIN_PERPS;
+# duplicated so the v1 modules stay self-contained. Regenerate from exchangeInfo on listing change.
+NON_COIN_PERPS = frozenset({
+    "0GUSDT", "ALLUSDT", "AMZNUSDT", "AZTECUSDT", "BLUEBIRDUSDT", "BMNRUSDT", "BREVUSDT",
+    "BTCDOMUSDT", "CCUSDT", "COINUSDT", "COPPERUSDT", "CRCLUSDT", "DEFIUSDT", "EDGEUSDT",
+    "EPICUSDT", "ESPUSDT", "EWJUSDT", "FAKEKR000660USDT", "FOGOUSDT", "GOOGLUSDT", "HOODUSDT",
+    "INTCUSDT", "KATUSDT", "KITEUSDT", "MEGAUSDT", "METAUSDT", "METUSDT", "MONUSDT",
+    "MSTRUSDT", "NVDAUSDT", "OPENAIUSDT", "PAYPUSDT", "PLTRUSDT", "QNTXUSDT", "QQQUSDT",
+    "SENTUSDT", "SPACEFUSDT", "SPCXUSDT", "SPYUSDT", "STABLEUSDT", "TSLAUSDT", "XAGUSDT",
+    "XAUUSDT", "XPDUSDT", "XPTUSDT", "YBUSDT", "ZAMAUSDT",
+})
+
+
+def top_n_eligibility(close: pd.DataFrame, qv: pd.DataFrame) -> pd.DataFrame:
+    """Past-only top-TOP_N liquidity eligibility with PIT seasoning (survivorship-safe).
+
+    A coin must have >= SEASON trailing non-NaN closes STRICTLY before t (`.shift(1)`) to enter the
+    rank denominator at all — so a young high-volume listing can't steal a top-N slot before it has
+    signal history, and a delisted coin (NaN closes) drops out. `close`/`qv` are the aligned panels
+    the callers already build. Mirrors universe_v2.eligibility (rank_lo=0, rank_hi=TOP_N) exactly.
+    With SEASON=0 this degenerates to the old `rank <= TOP_N` (no seasoning).
+    """
+    liq = qv.rolling(LIQ_WIN).mean().shift(1)
+    if not SEASON:
+        return (liq.rank(axis=1, ascending=False) <= TOP_N).fillna(False)
+    seasoned = (close.notna().shift(1).rolling(SEASON).sum() == SEASON).fillna(False)
+    rank = liq.where(seasoned).rank(axis=1, ascending=False)
+    return (seasoned & (rank <= TOP_N)).fillna(False)
+
 
 def load_universe() -> dict:
+    """Survivorship-safe PIT candidate pool: every ex-stable ascii crypto (COIN) USDT perp incl.
+    delisted, NO lifetime filter. A young coin simply never seasons until it has SEASON trailing
+    candles (handled in top_n_eligibility); a delisted coin keeps its on-disk history through its
+    terminal candle then drops out via NaN. Non-COIN perps (tokenized stocks/indices) excluded.
+    """
     coins = {}
     for p in sorted(glob.glob("data/*USDT/8h.csv")):
         sym = p.split("/")[1]
-        if not sym.endswith("USDT") or STABLE.search(sym) or not sym.isascii():
+        if (
+            not sym.endswith("USDT")
+            or STABLE.search(sym)
+            or not sym.isascii()
+            or sym in NON_COIN_PERPS
+        ):
             continue
         try:
             k = pd.read_csv(p, usecols=["open_time", "open", "close", "quote_volume"])
         except Exception:
             continue
-        if len(k) < MIN_HISTORY:
-            continue
+        # NO MIN_HISTORY filter — survivorship fix; seasoning gates young coins per-bar instead.
         k = k.drop_duplicates(subset="open_time", keep="last").set_index("open_time").sort_index()
         coins[sym] = k
     return coins
@@ -73,10 +117,8 @@ def build(coins: dict, mode: str) -> tuple[pd.Series, pd.DataFrame]:
     close.index = opens.index
     qv.index = opens.index
     ret_fwd = opens.shift(-1) / opens - 1.0
-    # point-in-time top-N by trailing $-volume (past-only)
-    liq = qv.rolling(LIQ_WIN).mean().shift(1)
-    rank_liq = liq.rank(axis=1, ascending=False)
-    elig = rank_liq <= TOP_N
+    # point-in-time top-N by trailing $-volume, PIT-seasoned (past-only, survivorship-safe)
+    elig = top_n_eligibility(close, qv)
     # per-coin signals (past-only)
     rvol = close.pct_change().rolling(VOL_WIN).std()
     if mode == "ts_trend":

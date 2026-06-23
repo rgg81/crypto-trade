@@ -61,14 +61,20 @@ def candidate_symbols() -> list[str]:
     syms = []
     for p in sorted(glob.glob(os.path.join(_ROOT, "data", "*USDT", "8h.csv"))):
         sym = os.path.basename(os.path.dirname(p))
-        if not sym.endswith("USDT") or _base.STABLE.search(sym) or not sym.isascii():
+        if (
+            not sym.endswith("USDT")
+            or _base.STABLE.search(sym)
+            or not sym.isascii()
+            or sym in _base.NON_COIN_PERPS  # exclude tokenized stocks / commodities / indices
+        ):
             continue
         syms.append(sym)
     return syms
 
 
 def load_universe() -> dict:
-    """PIT candidate universe (data/<SYM>/8h.csv, ex-stable, >=2y history). CWD-independent."""
+    """Survivorship-safe PIT candidate universe (data/<SYM>/8h.csv, ex-stable, crypto-COIN only;
+    NO lifetime filter — young coins seasoned per-bar by SEASON). CWD-independent."""
     with _in_root():
         return _base.load_universe()
 
