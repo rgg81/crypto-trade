@@ -115,7 +115,7 @@ class PortfolioEngine:
             c = float(cur.get(s, 0.0))            # what we actually hold now
             trade_w = t - c
             delta_notional = trade_w * gross_dollar
-            if abs(delta_notional) >= self._min_notional(s) and s in prices:
+            if abs(delta_notional) >= self._min_notional(s) and s in prices and self._tradable(s):
                 legs.append({
                     "symbol": s,
                     "side": "BUY" if trade_w > 0 else "SELL",
@@ -163,11 +163,19 @@ class PortfolioEngine:
 
     # ---- live execution plumbing (reuses the proven AuthenticatedBinanceClient) ----
     def setup_exchange(self) -> None:
-        """Load quantityPrecision + stepSize + MIN_NOTIONAL (exchangeInfo) for valid orders."""
+        """Load quantityPrecision + stepSize + MIN_NOTIONAL (exchangeInfo) for valid orders.
+        ONLY status=='TRADING' symbols are registered — a listed-but-not-yet-trading symbol
+        (PENDING_TRADING / SETTLING / PRE_TRADING / BREAK) is rejected by the order endpoint with
+        -1121 'Invalid symbol'. The production universe can include such a coin while this venue
+        (testnet) hasn't opened it yet; it's skipped at plan + execution time via _tradable()."""
         if self.auth is None:
             return
+        skipped = 0
         info = self.auth.get_exchange_info()
         for si in info.get("symbols", []):
+            if si.get("status") != "TRADING":
+                skipped += 1
+                continue
             sym = si["symbol"]
             self.qty_prec[sym] = int(si["quantityPrecision"])
             for f in si.get("filters", []):
@@ -176,8 +184,13 @@ class PortfolioEngine:
                     self.step_size[sym] = float(f["stepSize"])    # qty must be a multiple of this
                 elif ft == "MIN_NOTIONAL":
                     self.min_notl[sym] = float(f.get("notional") or f.get("minNotional") or 0.0)
-        print(f"[portfolio] loaded quantityPrecision + stepSize + MIN_NOTIONAL "
-              f"for {len(self.qty_prec)} symbols")
+        print(f"[portfolio] loaded {len(self.qty_prec)} TRADING symbols "
+              f"(precision/stepSize/MIN_NOTIONAL); {skipped} non-TRADING skipped")
+
+    def _tradable(self, symbol: str) -> bool:
+        """True if the symbol is in TRADING status on the venue (registered in setup_exchange).
+        With no exchange info loaded (paper / backtest), everything is tradable."""
+        return (not self.qty_prec) or (symbol in self.qty_prec)
 
     def _min_notional(self, symbol: str) -> float:
         """Largest of the configured floor and the symbol's Binance MIN_NOTIONAL filter. Legs below
@@ -228,6 +241,9 @@ class PortfolioEngine:
         placed = errors = skipped = 0
         for leg in plan["legs"]:
             s = leg["symbol"]
+            if not self._tradable(s):            # not TRADING on this venue (-1121) — skip cleanly
+                skipped += 1
+                continue
             px = float(leg["price"])             # forming-open (close-proxy) the leg sized at
             qty = self._round_qty(s, abs(leg["delta_notional_usd"]) / px)
             # POST-FLOOR min-notional guard: flooring qty to stepSize can drop the order below the

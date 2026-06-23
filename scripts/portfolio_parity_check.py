@@ -47,6 +47,14 @@ def main() -> None:
     a = AuthenticatedBinanceClient(
         api_key=s.binance_api_key, api_secret=s.binance_api_secret, base_url=s.auth_base_url)
 
+    # venue-tradable set: a target coin that isn't TRADING on this venue (e.g. PENDING_TRADING on
+    # testnet while live on production) CAN'T be held here — expected-absent, not a drift.
+    try:
+        trading = {si["symbol"] for si in a.get_exchange_info().get("symbols", [])
+                   if si.get("status") == "TRADING"}
+    except Exception:
+        trading = set()
+
     # LIVE book -> per-coin weight (positionAmt * markPrice / equity)
     live_w: dict[str, float] = {}
     for p in a.get_positions():
@@ -68,6 +76,8 @@ def main() -> None:
         tw, lw = tgt_w.get(sym, 0.0), live_w.get(sym, 0.0)
         if abs(tw) < DUST_W and abs(lw) < DUST_W:
             continue                                            # both ~flat (incl. TNSR-style dust)
+        if trading and sym not in trading and abs(lw) < DUST_W:
+            continue                            # venue-excluded (non-TRADING) target coin
         if abs(tw) >= DUST_W and abs(lw) < DUST_W:
             flags.append(f"MISSING {sym}: target {tw:+.4f} but live ~0 (failed entry?)")
         elif abs(lw) >= DUST_W and abs(tw) < DUST_W:
