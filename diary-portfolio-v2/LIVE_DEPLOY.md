@@ -44,10 +44,20 @@ a valid baseline — honestly de-inflated. (Live-parity re-verified at 0.0 on th
 clean cold-start plan is stock-perp-free: BCH/ASTER/PUMP/JTO/SYN/UNI…, gross 0.457.)
 
 ## Testnet-specific execution notes (NOT strategy faults; expected to vanish on production)
-- A few COIN names per rebalance may error on testnet only: `-1121 Invalid symbol` (listed on production
-  but not testnet) and `-4131 PERCENT_PRICE` (testnet's thin book can't fill a market order in-band).
-  The engine logs + continues; those legs are skipped → a small, testnet-only parity drift. On production
-  (real liquidity, full symbol set) these fill. The monitor treats testnet fill/symbol issues as INFO.
+- A few COIN names per rebalance can't fill on testnet only: `-1121 Invalid symbol` (listed on production
+  but not testnet), `-4140 invalid status for opening`, `-4131 PERCENT_PRICE` (testnet's thin book).
+
+## PAPER-FALLBACK (added 2026-06-23) — keeps the testnet book faithful to the strategy
+`PortfolioConfig.paper_untradeable=True` (v2 runner; OFF for v1 + production). When a real order fails
+with a testnet-untradeable code (`-1121/-4131/-4140/-4411/-4061/-4046`), the engine adds that symbol to
+a persisted PAPER set (`engine_state["portfolio_paper"]`) and tracks its target weight there instead of
+dropping the leg. Mechanism: `run_once` merges the paper-held weights into the `current` book, so the
+strategy holds its FULL intended 20-name book — no MISSING drift, no net tilt from un-placed legs — while
+the venue holds only the real legs. Each untradeable symbol errors at most ONCE (then it's papered, never
+retried). `errors` drops to ~0; the log shows `papered=N` + `PAPER-FALLBACK <sym>` lines. The paper
+positions are simulated (not on the exchange), so the healthcheck's EXCHANGE position count stays at the
+real legs; the STRATEGY's book (real + paper) matches the target. **Turn it OFF for the production cutover**
+— there, every COIN fills, so a MISSING leg would be a REAL alert, not something to paper over.
 
 ## Real-money readiness follow-ups (before swapping testnet→production)
 1. Refresh `NON_COIN_PERPS` from production exchangeInfo (testnet ≠ production listing set).

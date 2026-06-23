@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import dataclasses
 import json
+import re
 import time
 from pathlib import Path
 
@@ -40,10 +41,27 @@ class PortfolioConfig:
     db_path: str = "data/portfolio_dry_run.db"
     dry_run: bool = True
     testnet: bool = False
+    # PAPER-FALLBACK: when a real order fails with a testnet-untradeable code (symbol not listed /
+    # not openable / thin-book PERCENT_PRICE on testnet), track that symbol as a PAPER position
+    # instead of dropping the leg — so the live book stays faithful to the strategy target (no MISSING
+    # drift, no net tilt from un-placed legs). TESTNET-ONLY convenience; OFF by default (v1 + production
+    # place real orders only). On production the strategy should hold real positions, not paper.
+    paper_untradeable: bool = False
+
+
+# Binance error codes meaning "can't trade this symbol on THIS venue right now" — papered when the
+# paper-fallback is on: -1121 invalid symbol, -4131 PERCENT_PRICE, -4140 invalid status for opening,
+# -4411 TradFi agreement, -4061/-4046 position-side/leverage quirks.
+_TESTNET_UNTRADEABLE = {"-1121", "-4131", "-4140", "-4411", "-4061", "-4046"}
 
 
 def _held_key(cfg: PortfolioConfig) -> str:
     return "portfolio_held_w"
+
+
+def _err_code(exc: Exception) -> str | None:
+    m = re.search(r'"code":(-?\d+)', str(exc))
+    return m.group(1) if m else None
 
 
 class PortfolioEngine:
@@ -75,6 +93,13 @@ class PortfolioEngine:
             )
             mode = "TESTNET" if config.testnet else "LIVE"
             print(f"[portfolio:{mode}] AUTH endpoint: {auth_url}")
+            if config.paper_untradeable and not config.testnet:
+                print(
+                    "[portfolio] SAFETY: paper_untradeable=True ignored on PRODUCTION (real money) — "
+                    "the paper-fallback is testnet-only; every leg trades for real here."
+                )
+            elif config.paper_untradeable:
+                print("[portfolio] paper-fallback ON (testnet): untradeable symbols tracked as paper")
 
     # ---- held-weight persistence (the hysteresis band's path-dependent state) ----
     def _load_held(self) -> dict:
@@ -83,6 +108,23 @@ class PortfolioEngine:
 
     def _save_held(self, held: dict) -> None:
         self.store.set_state(_held_key(self.cfg), json.dumps(held))
+
+    # ---- paper-fallback state (testnet-untradeable symbols tracked as paper, not on the exchange) --
+    def _load_paper(self) -> tuple[set, dict]:
+        """(paper_symbols, paper_held_weights). Symbols that failed to trade on testnet → papered, so
+        the strategy holds its full intended book; their weights are tracked here, not on the venue."""
+        raw = self.store.get_state("portfolio_paper")
+        d = json.loads(raw) if raw else {}
+        return set(d.get("syms", [])), d.get("held", {})
+
+    def _save_paper(self, syms: set, held: dict) -> None:
+        self.store.set_state("portfolio_paper", json.dumps({"syms": sorted(syms), "held": held}))
+
+    def _paper_enabled(self) -> bool:
+        """The paper-fallback is allowed ONLY on TESTNET (and only when explicitly opted in, live mode).
+        HARD SAFETY: never on production (real money) — papering a position you don't actually hold
+        would fabricate P&L. `testnet` is the load-bearing guard; `paper_untradeable` is the opt-in."""
+        return self.cfg.paper_untradeable and self.cfg.testnet and not self.cfg.dry_run
 
     # ---- the core: compute the rebalance plan for the upcoming candle ----
     def compute_plan(
@@ -231,13 +273,30 @@ class PortfolioEngine:
             qty = (qty // step) * step  # floor to a stepSize multiple
         return round(qty, prec)  # clean float artifacts to the allowed precision
 
-    def execute(self, plan: dict) -> dict:
-        """Place a MARKET order per rebalance leg on the (testnet) exchange. Returns summary."""
+    def execute(self, plan: dict, paper_syms: set | None = None) -> dict:
+        """Place a MARKET order per rebalance leg on the (testnet) exchange. Returns summary.
+
+        Legs whose symbol is already a known paper symbol are NOT sent (papered). When the
+        paper-fallback is on, a leg that FAILS with a testnet-untradeable code is added to `new_paper`
+        (papered, not counted as an error) so it never spams again — the strategy keeps the position
+        on its books as paper while the venue can't trade it.
+        """
         if self.auth is None:
-            return {"placed": 0, "skipped": len(plan["legs"]), "errors": 0}
-        placed = errors = skipped = 0
+            return {
+                "placed": 0,
+                "skipped": len(plan["legs"]),
+                "errors": 0,
+                "papered": 0,
+                "new_paper": set(),
+            }
+        paper_syms = paper_syms or set()
+        placed = errors = skipped = papered = 0
+        new_paper: set = set()
         for leg in plan["legs"]:
             s = leg["symbol"]
+            if s in paper_syms:  # already a paper symbol — track, don't send
+                papered += 1
+                continue
             px = float(leg["price"])  # forming-open (close-proxy) the leg sized at
             qty = self._round_qty(s, abs(leg["delta_notional_usd"]) / px)
             # POST-FLOOR min-notional guard: flooring qty to stepSize can drop the order below the
@@ -250,16 +309,39 @@ class PortfolioEngine:
                 self.auth.place_market_order(s, leg["side"], qty)
                 placed += 1
             except Exception as exc:
-                errors += 1
-                print(f"[portfolio] order {leg['side']} {s} x{qty} failed: {exc}")
-        return {"placed": placed, "skipped": skipped, "errors": errors}
+                code = _err_code(exc)
+                if self._paper_enabled() and code in _TESTNET_UNTRADEABLE:
+                    new_paper.add(s)
+                    papered += 1
+                    print(
+                        f"[portfolio] PAPER-FALLBACK {s} (testnet code {code}) — tracking as paper"
+                    )
+                else:
+                    errors += 1
+                    print(f"[portfolio] order {leg['side']} {s} x{qty} failed: {exc}")
+        return {
+            "placed": placed,
+            "skipped": skipped,
+            "errors": errors,
+            "papered": papered,
+            "new_paper": new_paper,
+        }
 
     def run_once(self, refresh: bool = True) -> dict:
         """One evaluation: refresh data, compute the plan, log it; place orders unless dry-run."""
         if refresh:
             self.refresh_data()
-        # forming candle via close-proxy (built in compute_plan); current book from positions
-        current = None if self.cfg.dry_run else self._actual_weights()
+        # paper-fallback state (testnet-untradeable symbols we track as paper, not on the venue)
+        paper_on = self._paper_enabled()
+        paper_syms, paper_held = self._load_paper() if paper_on else (set(), {})
+        # forming candle via close-proxy (built in compute_plan); current book from positions, with
+        # the paper symbols merged in at their tracked weight so the strategy holds its FULL book.
+        if self.cfg.dry_run:
+            current = None
+        else:
+            current = self._actual_weights()
+            if paper_on:
+                current = {**current, **paper_held}
         plan = self.compute_plan(current_weights=current)
         mode = "DRY-RUN" if self.cfg.dry_run else ("TESTNET" if self.cfg.testnet else "LIVE")
         print(
@@ -276,12 +358,22 @@ class PortfolioEngine:
         if self.cfg.dry_run:
             self._save_held(plan["_new_held"])  # treat plan as filled (paper book)
         else:
-            res = self.execute(plan)
+            res = self.execute(plan, paper_syms=paper_syms)
+            extra = f" papered={res['papered']}" if paper_on else ""
             print(
                 f"[portfolio:{mode}] orders placed={res['placed']} "
-                f"skipped={res['skipped']} errors={res['errors']}"
+                f"skipped={res['skipped']} errors={res['errors']}{extra}"
             )
             self._save_held(plan["_new_held"])
+            if paper_on:
+                paper_syms = paper_syms | res["new_paper"]
+                # the paper symbols' intended (target) weights, from the plan's would-be held book
+                paper_held = {
+                    s: plan["_new_held"].get(s, 0.0)
+                    for s in paper_syms
+                    if abs(plan["_new_held"].get(s, 0.0)) > 1e-9
+                }
+                self._save_paper(paper_syms, paper_held)
         return plan
 
     def run(self) -> None:

@@ -67,6 +67,8 @@ def main() -> None:
         testnet=True,
         db_path="data/portfolio_v2_testnet.db",  # isolated from the v1 portfolio DB
         poll_interval_seconds=60,
+        paper_untradeable=True,  # testnet: names testnet can't fill (OPN/PUMP/...) -> paper, keeping
+        # the live book faithful to the strategy target. (Set False for the production cutover.)
     )
     engine = PortfolioEngine(cfg, settings, strategy_module=strategy_v2)
     mode = "DRY-RUN" if dry_run else "TESTNET (REAL ORDERS)"
