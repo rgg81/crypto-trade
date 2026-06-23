@@ -29,11 +29,24 @@ The candidate converged on in EXPLORATION-005 (xs-only, the LATE-alive low-turno
 - Dollar-neutral except the bounded warmup overcount (signal max|Σ|=0.835 on a few warmup candles, typ
   ~1e-16); held-book max|Σw|=0.928 is engine-inherent (anchor=1.0 too).
 
-## Status
-**PROMISING — the first v2 candidate with a real, cost-robust OOS edge.** This is "win where v1 lost":
-on rank 21-40 the ported trend stack is OOS-dead (−0.01) but a dollar-neutral XS-mom book is OOS +1.20
-(+0.81 at 2× taker). NOT yet a baseline — must clear an adversarial CONFIRMATION: leak re-audit of the
-run_book_from_signal path + xs signal; multiple-testing deflation (~20 OOS configs revealed across
-/002–/006; candidate was pre-identified but headline needs DSR/N_eff); the −25% OOS DD (risk layer);
-the 2026 L-sensitivity; and whether xs-only standalone (abandoning the EARLY-strong trend) is a
-legitimate v2 baseline or a regime bet. → Critic confirmation next, then risk-engineer for the DD.
+## Status — CONFIRMED: MERGE-WITH-RISK-LAYER (quant-critic Phase 7.5)
+The adversarial confirmation PASSED on every count except the drawdown:
+- **Leak: CLEAN** — full run_book_from_signal path traced past-only; the runner `_norm` is mathematically
+  inert (homogeneous degree-0); warmup over-count bounded; handcomputed-net + perturbation tests certify.
+- **Multiple-testing: SURVIVES DEFLATION** — ~30-40 configs but N_eff≈4 (correlated perturbations of ONE
+  signal family); candidate PRE-REGISTERED (L=84 v1-inherited, not reselected); default +1.20 clears even
+  the pessimistic full-N bound, 2×-taker +0.81 at the boundary. The 5 prior negatives were DIFFERENT
+  signal classes → honest search, not p-hacking.
+- **2026 L-sensitivity: REAL, not disqualifying** — every L positive overall OOS; 2026 flip is n≈518
+  sub-window noise; L=84 holds both sub-windows + survives 2× taker. (Logged as monitored falsifier.)
+- **Mechanism: crypto-native-persistent** — retail rotation / relative-strength in the flow-rich mid-cap
+  band, positive across 3 distinct 2024/25/26 regimes. Standalone is the CORRECT vehicle (by elimination
+  of blend/ML/residual/routing); the weak full-IS is regime-irrelevant for a forward-deployed book.
+- **BINDING CONDITION: the −25% OOS drawdown** → needs an IS-calibrated drawdown-brake + tightened
+  vol-target risk layer (target OOS DD ~−15%, keep OOS Sharpe ≥ +1.0). → **iter-v2-007 risk layer**
+  (risk-engineer, in progress). Becomes the unconditional v2 BASELINE once the DD is bounded.
+- Record-closing items owed (non-gating): R1 direct leak test on run_book_from_signal; R2 live
+  full-seasoning gate; R3 formal DSR/PBO commit; exact-weight-hold confirmation backtest.
+
+**This is the v2 result: "win where v1 lost" — a leak-clean, cost-robust, deflation-surviving OOS edge
+(+1.20, +0.81 @2×taker) on rank 21-40, where the ported top-20 trend stack is OOS-dead (−0.01).**

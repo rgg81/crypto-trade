@@ -541,6 +541,7 @@ def run_book_from_signal(
 
     return {
         "net": net,
+        "raw_net": raw_net,
         "target_w": target_w,
         "held_w": w,
         "picks": [],
