@@ -28,7 +28,7 @@ COLDSTART_IDX = 0         # the first rebalance after (re)launch = cold-start fu
 SPIKE_LEGS = 30           # >30 legs on a non-cold-start rebalance = anomalous churn (band off?)
 
 PLAN_RE = re.compile(r"rebalance plan as_of=([\d-]+ [\d:]+).*?legs=(\d+) rebal=\$([\d.]+)")
-ORD_RE = re.compile(r"orders placed=(\d+)(?: skipped=(\d+))? errors=(\d+)")
+ORD_RE = re.compile(r"orders placed=(\d+)(?: papered=\d+)?(?: skipped=(\d+))? errors=(\d+)")
 
 
 def _parse() -> list[dict]:

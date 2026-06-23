@@ -115,7 +115,9 @@ class PortfolioEngine:
             c = float(cur.get(s, 0.0))            # what we actually hold now
             trade_w = t - c
             delta_notional = trade_w * gross_dollar
-            if abs(delta_notional) >= self._min_notional(s) and s in prices and self._tradable(s):
+            # include EVERY target coin in the book (held_w) — even ones this venue can't trade yet;
+            # those are PAPERED at execution (testnet) so the book stays the full strategy target.
+            if abs(delta_notional) >= self._min_notional(s) and s in prices:
                 legs.append({
                     "symbol": s,
                     "side": "BUY" if trade_w > 0 else "SELL",
@@ -237,12 +239,18 @@ class PortfolioEngine:
     def execute(self, plan: dict) -> dict:
         """Place a MARKET order per rebalance leg on the (testnet) exchange. Returns summary."""
         if self.auth is None:
-            return {"placed": 0, "skipped": len(plan["legs"]), "errors": 0}
-        placed = errors = skipped = 0
+            return {"placed": 0, "papered": 0, "skipped": len(plan["legs"]), "errors": 0}
+        placed = errors = skipped = papered = 0
         for leg in plan["legs"]:
             s = leg["symbol"]
-            if not self._tradable(s):            # not TRADING on this venue (-1121) — skip cleanly
-                skipped += 1
+            if not self._tradable(s):
+                # untradable on this venue (PENDING_TRADING etc. -> -1121). TESTNET: PAPER it — keep
+                # in the book (held_w), place no order, so the book stays the full strategy target.
+                # LIVE: production lists every target coin, so this is unexpected; skip defensively.
+                if self.cfg.testnet:
+                    papered += 1
+                else:
+                    skipped += 1
                 continue
             px = float(leg["price"])             # forming-open (close-proxy) the leg sized at
             qty = self._round_qty(s, abs(leg["delta_notional_usd"]) / px)
@@ -258,7 +266,7 @@ class PortfolioEngine:
             except Exception as exc:
                 errors += 1
                 print(f"[portfolio] order {leg['side']} {s} x{qty} failed: {exc}")
-        return {"placed": placed, "skipped": skipped, "errors": errors}
+        return {"placed": placed, "papered": papered, "skipped": skipped, "errors": errors}
 
     def run_once(self, refresh: bool = True) -> dict:
         """One evaluation: refresh data, compute the plan, log it; place orders unless dry-run."""
@@ -280,7 +288,8 @@ class PortfolioEngine:
         else:
             res = self.execute(plan)
             print(f"[portfolio:{mode}] orders placed={res['placed']} "
-                  f"skipped={res['skipped']} errors={res['errors']}")
+                  f"papered={res.get('papered', 0)} skipped={res['skipped']} "
+                  f"errors={res['errors']}")
             self._save_held(plan["_new_held"])
         return plan
 
