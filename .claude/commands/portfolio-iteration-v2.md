@@ -86,15 +86,26 @@ A change is "real" when it survives:
   robustness sweep. Never exact-match-join jittery funding timestamps. Refresh stale data. Report
   DOWN-corrections openly. If a result looks too good, assume a bug until the critic clears it.
 
-## Roadmap (anchor first, then the cohort's edge)
-1. **iter-v2-001 — ANCHOR.** Port the v1 trend+carry+band+eligexit stack to rank 21–40 on the corrected
-   PIT universe with slippage. Establish the v2 baseline + the de-inflated v1 benchmark + the
-   parity/leak/survivorship gates. (Foundation iteration — no new factor.)
-2. **iter-v2-002 — CROSS-SECTIONAL MOMENTUM (the lead "win-where-v1-lost" axis).** Add the XS-momentum
-   factor v1 rejected on the top-20; expect it to work on the dispersed mid-caps. One change.
-3. then layer one at a time, each its own EXPLORATION kept only if it lifts net (slippage-inclusive)
-   Sharpe: short-term reversal (mid-caps reverse harder), carry refinements, trend-strength/regime
-   filter, vol-scaling, dispersion-conditional gross. CONFIRMATION → baseline → repeat.
+## CURRENT BASELINE (2026-06-23, iter-v2-001…009) — see `diary-portfolio-v2/BASELINE_PORTFOLIO_V2.md`
+**Dollar-neutral cross-sectional momentum, rank 21–40, 8h: XS-mom 5-way ensemble {42,63,84,126,168} via
+`run_book_from_signal` + risk layer (TARGET_VOL=0.006, MAX_LEV=2.0).** OOS **+1.37** (2× taker +1.03),
+OOS maxDD −16%, turn 0.157, fixed-parameter, leak-safe. The ported top-20 trend stack (the anchor) is
+OOS-dead (−0.01) on this cohort — this is "win where v1 lost." PSR(>0)=0.94, DSR≈0.83 (XS-family) /
+0.37 (all-classes) → real but MODERATE deflated significance; strong candidate, not a certainty.
+
+**Dead paths (closed):** fixed-γ trend+XS blend (/002), L2 cross-sectional ML (/003), BTC-beta-residual
+momentum (/004), factor-momentum routing (/005), weekly/monthly rebalance (/006), funding-fade sleeve
+(/009). "Combine trend+XS-mom" axis family closed; carry regime-faded.
+
+## Roadmap
+1. **iter-v2-001…009 — DONE.** Anchor (OOS-dead) → XS-mom edge found (/006) → risk layer (/007) →
+   ensemble robustness (/008) → funding rejected (/009). Baseline established (above).
+2. **Open items before real capital:** exact-weight-hold confirmation backtest; R2 live full-seasoning
+   gate (warmup non-neutrality); monitor the 2026 sub-window + the DSR (carry-style fade risk).
+3. **Next EXPLORATIONs** (each one change, kept only if it lifts slippage-inclusive net Sharpe vs the
+   ensemble baseline, judged on IS+LATE then ONE OOS reveal, deflation tracked): short-term cross-
+   sectional reversal (different signal class); dispersion-conditional gross; vol-scaled ranks;
+   universe-band sensitivity (21–50 vs 16–40). CONFIRMATION → baseline → repeat.
 
 ## Sacred constants
 - `OOS_CUTOFF = 2025-03-24` (immutable). 8h candles. Signals past-only; fills at open[t+1].
