@@ -211,11 +211,14 @@ A SECOND book runs ALONGSIDE v1, fully isolated, on a SEPARATE testnet account. 
 - **v2 health check:** `scripts/portfolio_v2_healthcheck.py` (v2 paths/creds/account; STATUS OK|ALERT).
   Run it with `source ~/.binance_testnet_v2_env` (NOT v1's). The full v2 parity/candle/digest suite is
   a roadmap item — for now the healthcheck + a manual log scan cover the TEST-INTEGRITY essentials.
-- **v2 TESTNET-ARTIFACT errors are INFO, never alerts** (key difference from v1): the rank-21–40 universe
-  includes COIN names that testnet can't fill — `-1121 Invalid symbol` (listed on production, not testnet)
-  and `-4131 PERCENT_PRICE` (testnet's thin book). The healthcheck classifies `-1121/-4131/-4411` as INFO.
-  A REAL order error (any OTHER code) on v2 IS an alert. These testnet legs cause a small, expected parity
-  drift on testnet ONLY — they fill on production.
+- **v2 PAPER-FALLBACK (testnet-only, hard-gated):** `paper_untradeable=True` in the v2 runner →
+  symbols testnet can't fill (`-1121/-4131/-4140/-4411`) are tracked as PAPER (not dropped), so the
+  strategy holds its full intended book. Each errors at most ONCE, then is papered: the log shows
+  `PAPER-FALLBACK <sym>` + `orders ... errors=0 papered=N`, and `engine_state["portfolio_paper"]` holds
+  the papered symbols+weights. So on v2, **`errors=0` is the healthy steady state** (was the testnet-
+  artifact errors). A REAL order error (any code NOT in the testnet set) IS still an alert. The
+  fallback is `_paper_enabled() = paper_untradeable AND testnet AND not dry_run` → IMPOSSIBLE on
+  production (real money); turn the flag OFF for the production cutover (there a MISSING leg = real alert).
 - **Universe hygiene (load-bearing, real-money-critical):** v2 trades ONLY Binance `underlyingType==COIN`
   perps. Tokenized stocks (INTC/CRCL/NVDA/…), commodities (XAU/XAG), index baskets (BTCDOM/DEFI), and
   pre-market tokens are EXCLUDED via `universe_v2.NON_COIN_PERPS`. Before the production cutover, REGENERATE
