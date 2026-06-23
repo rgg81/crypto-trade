@@ -5,9 +5,14 @@ candidate, MERGE-WITH-RISK-LAYER confirmed by quant-critic; record items R1/R3 c
 
 > **⚠️ CORRECTION (2026-06-23, live deploy) — numbers below are the pre-correction figures.** The live
 > testnet deploy revealed the universe was contaminated with NON-COIN perps (tokenized stocks INTC/CRCL/…,
-> BTCDOM/DEFI indices). Fixed via `universe_v2.NON_COIN_PERPS` (exclude `underlyingType != COIN`). The
-> **crypto-only ensemble baseline is OOS +1.16 (2× taker +0.90)** — down from the contaminated +1.37 but
-> still real + cost-robust. Treat **OOS +1.16** as the authoritative number. See `LIVE_DEPLOY.md`.
+> BTCDOM/DEFI indices). Fixed via `universe_v2.NON_COIN_PERPS` (exclude `underlyingType != COIN`).
+> **Authoritative CRYPTO-ONLY figures (re-run):**
+> - v2 ensemble baseline **OOS +1.16** (2025 +1.58, 2026 +0.62), 2× taker **+0.90**, pessimistic +1.10.
+> - risk layer (tv=0.006/ml=2.0): **OOS DD ~−24% → ~−15% at zero Sharpe cost** (signal-agnostic de-lever).
+> - statistics: **PSR(SR>0) = 0.90**, **DSR (XS-family N=9) = 0.765** (all-classes over-conservative 0.34) —
+>   real, corroborated, MODERATE deflated significance (was 0.94/0.83 contaminated).
+> - **combined v1+v2 (50/50) OOS +1.89** (corr +0.22, DD −18%) — diversification lift survives.
+> The stock-perps were padding ~+0.21 OOS (mostly 2026, when they listed). See `LIVE_DEPLOY.md`.
 
 ## The strategy (fixed-parameter — NO monthly tuning, NO OOS tuning)
 **Dollar-neutral cross-sectional momentum on the rank-21–40 mid-cap perp cohort, 8h rebalance.**
