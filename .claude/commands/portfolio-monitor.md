@@ -230,6 +230,15 @@ A SECOND book runs ALONGSIDE v1, fully isolated, on a SEPARATE testnet account. 
   ⚠️ Do NOT `pkill -f run_portfolio_v2` (self-matches the shell) — kill by PID. NEVER touch the v1
   quant-research worktree/proc.
 - The HANDS-OFF mandate applies to v2 identically: observe + inform, never intervene on performance.
+- **Network resilience (2026-06-23):** the engine poll loop (`engine.py:run()`) now wraps each tick in
+  try/except → a transient `ConnectError`/network/API failure logs a ONE-LINER `tick error #N (...);
+  retrying` and the loop CONTINUES (no crash). So a genuine `Traceback` in the v2 log now means a REAL
+  bug (still an ALERT); recurring `tick error` one-liners = a network/outage condition (watch, but the
+  engine self-heals when connectivity returns). `last_candle` only advances after a SUCCESSFUL tick, so
+  no rebalance is lost to a blip. **For a CRASH-RESUME relaunch, KEEP the DB** (preserves the paper
+  state + held + `last_candle` → resumes mid-cycle, no spurious rebalance); only `rm` the DB for a
+  deliberate clean reset (e.g. universe change). The crash on 2026-06-23 (2× `ConnectError [Errno 104]
+  Connection reset by peer` during a kline fetch) is what this hardening prevents from recurring.
 
 ## Intelligence roadmap (the living backlog — build these into the skill over time)
 Prioritized; each becomes a committed helper script + a section here when built.
@@ -250,6 +259,15 @@ ROADMAP #1–#7 COMPLETE. Future ideas: per-name funding-carry attribution, regi
 auto-recovery escalation ladder, a live-vs-backtest tracking-error report.
 
 ## Changelog (tick off as we build)
+- **2026-06-23 v10** — INCIDENT + FIX: the v2 engine CRASHED on 2× `httpx.ConnectError [Errno 104]
+  Connection reset by peer` during a candle-check kline fetch — the `run()` poll loop had no exception
+  handling, so a transient network blip propagated out and killed the process (book left unmanaged).
+  Fix: wrapped each tick in try/except (`engine.py:run()`) → log a one-liner `tick error #N` + retry
+  next poll, never crash. Relaunched on the hardened code KEEPING the DB (paper state + held + last
+  candle preserved → resumed mid-cycle, no spurious rebalance). Book intact (20 positions), STATUS OK.
+  Benefits v1 + v2 (shared engine). See the v2-section "Network resilience" note.
+- **2026-06-23 v9** — v2 PARALLEL TRACK added (rank-21–40 XS-mom on a separate testnet account) +
+  PAPER-FALLBACK (testnet-untradeable symbols tracked as paper) + universe hygiene (NON_COIN_PERPS).
 - **2026-06-22 v8** — HANDS-OFF mandate (user: "never interfere, we need to test this"). The
   monitor now OBSERVES + INFORMS only; never flattens/recommends the kill-switch on drawdown.
   Alert set narrowed to TEST-INTEGRITY (engine/parity/candle/errors); DD/PnL/tilt/turnover are

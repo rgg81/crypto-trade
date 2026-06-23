@@ -386,13 +386,27 @@ class PortfolioEngine:
         if not self.cfg.dry_run:
             self.setup_exchange()  # load quantityPrecision; leverage set lazily per leg
         last_key = f"portfolio_last_candle_{self.cfg.ref_symbol}"
+        consecutive_errors = 0
         while True:
-            last = self.store.get_state(last_key)
-            last_ms = int(last) if last else None
-            candle = data_pipeline.detect_new_candle(
-                self.read_client, self.cfg.ref_symbol, self.cfg.interval, last_ms
-            )
-            if candle is not None:
-                self.run_once(refresh=True)
-                self.store.set_state(last_key, str(candle.open_time))
+            try:
+                last = self.store.get_state(last_key)
+                last_ms = int(last) if last else None
+                candle = data_pipeline.detect_new_candle(
+                    self.read_client, self.cfg.ref_symbol, self.cfg.interval, last_ms
+                )
+                if candle is not None:
+                    self.run_once(refresh=True)
+                    self.store.set_state(last_key, str(candle.open_time))
+                consecutive_errors = 0
+            except Exception as exc:
+                # RESILIENCE: a transient error (network reset, API hiccup, kline fetch failure)
+                # must NOT kill the long-running engine. Log a ONE-LINER (no stack trace, so the
+                # monitor's `Traceback` alarm stays reserved for genuine bugs) and retry next poll.
+                # last_key only advances after a SUCCESSFUL run_once, so a missed candle is simply
+                # re-detected and the rebalance retried on the next tick — no rebalance is lost.
+                consecutive_errors += 1
+                print(
+                    f"[portfolio:{mode}] tick error #{consecutive_errors} "
+                    f"({type(exc).__name__}: {exc}); retrying in {self.cfg.poll_interval_seconds}s"
+                )
             time.sleep(self.cfg.poll_interval_seconds)
