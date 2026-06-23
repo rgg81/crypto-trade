@@ -452,6 +452,110 @@ def _renorm(target_w: pd.DataFrame, held: pd.DataFrame) -> pd.DataFrame:
 
 
 # ---- top-level driver ----------------------------------------------------------------------
+def run_book_from_signal(
+    coins: dict,
+    signal_panel: pd.DataFrame,
+    *,
+    rank_lo: float = 0,
+    rank_hi: float = TOP_N,
+    season: int | None = None,
+    slip_bps_fn: SlipFn | None = None,
+    delta: float = DELTA,
+    k_exit: float = K_EXIT,
+    mode: str = MODE,
+    cost_mult: float = 1.0,
+    slip_mult: float = 1.0,
+    liq_win: int = LIQ_WIN,
+) -> dict:
+    """Full v2 pipeline driven by a PRECOMPUTED per-(coin, candle) `signal_panel` — the ML path.
+
+    `signal_panel` is a candle-indexed, coin-columned DataFrame holding the (already centered /
+    dollar-neutral, on the same scale as the other signals) target signal at each candle. It plays
+    the role the trend+carry blend plays inside `fixed_lambda_book`: the engine runs the EXACT SAME
+    downstream pipeline on it, with NO walk-forward λ selection (the signal IS the target, λ is a
+    trend+carry concept):
+
+        raw = (signal_panel / rvol).where(elig)              # inverse-vol size, band-masked
+          -> gross-norm (Σ|raw| = 1 per candle)
+          -> .shift(1) lag (decisions act on the next candle)            == target_w
+          -> _apply_band_eligexit (δ SNAP/EDGE band + K-exit force-close)
+          -> _renorm (back to the pre-band gross)
+          -> net = pnl + funding - cost (taker + liquidity slippage)
+          -> vol-target (84-candle, target 0.01, max-lev 3).
+
+    Reuses build_panel / _signals (for rvol/ret_fwd/fund_next) / eligibility / _slip_side_panel /
+    _apply_band_eligexit / _renorm — the IDENTICAL code paths `run_book` uses, so it cannot perturb
+    `run_book` (this is a brand-new entry point; parity_check stays green). Returns the SAME dict
+    shape as `run_book` (net, target_w, held_w, turnover, avg_positions, tickets, scale, IS, OOS).
+
+    `signal_panel` is reindexed onto the opens grid + coin columns and NaN-filled to 0.0 before the
+    /rvol step, so a missing-coin / missing-candle cell contributes exactly 0.0 (the `.where(elig)`
+    masks it off anyway). A constant or all-zero signal yields a degenerate (zero-gross) book
+    without error (the gross-norm divides by NaN where the gross is 0 and `.fillna(0.0)` flattens).
+    """
+    panel = build_panel(coins, liq_win=liq_win)
+    sig = _signals(panel)
+    elig = (
+        uv.eligibility(coins, rank_lo, rank_hi, season, liq_win=liq_win)
+        .reindex(index=panel["opens"].index, columns=panel["cols"])
+        .fillna(False)
+    )
+
+    # Align the supplied signal onto the engine grid; missing cells -> 0.0 (masked off by elig).
+    signal = (
+        signal_panel.reindex(index=panel["opens"].index, columns=panel["cols"])
+        .astype(float)
+        .fillna(0.0)
+    )
+
+    # raw -> gross-norm -> lag : SAME construction as fixed_lambda_book, signal in place of `tc`.
+    raw = (signal / sig["rvol"]).where(elig)
+    target_w = raw.div(raw.abs().sum(axis=1).replace(0, np.nan), axis=0).fillna(0.0).shift(1)
+
+    # band + eligibility-exit overlay + renorm (UNCHANGED helpers).
+    held = _apply_band_eligexit(target_w, elig, delta, k_exit, mode)
+    w = _renorm(target_w, held)
+
+    slip_fn = make_slip_fn(slip_bps_fn, slip_mult)
+    slip_side = (
+        _slip_side_panel(panel["liq"], slip_fn)
+        .reindex(index=w.index, columns=w.columns)
+        .fillna(0.0)
+    )
+    ret_fwd = sig["ret_fwd"].reindex(columns=w.columns)
+    fund_next = sig["fund_next"].reindex(columns=w.columns)
+
+    dw = (w - w.shift(1)).abs()
+    pnl = (w * ret_fwd).sum(axis=1)
+    fpnl = -(w * fund_next).sum(axis=1)
+    cost = (dw * (COST_SIDE * cost_mult + slip_side)).sum(axis=1)
+    raw_net = (pnl + fpnl - cost).dropna()
+
+    rv = raw_net.rolling(PORT_VOL_WIN).std().shift(1)
+    scale = (TARGET_VOL / rv).clip(upper=MAX_LEV).fillna(0.0)
+    net = (raw_net * scale.reindex(raw_net.index)).dropna()
+
+    turnover = float(dw.sum(axis=1).iloc[1:].mean()) if len(dw) > 1 else float("nan")
+    tickets = float((dw > 1e-6).sum(axis=1).iloc[1:].mean()) if len(dw) > 1 else float("nan")
+    avg_positions = float((w.abs() > 1e-9).sum(axis=1).mean())
+
+    return {
+        "net": net,
+        "target_w": target_w,
+        "held_w": w,
+        "picks": [],
+        "turnover": turnover,
+        "avg_positions": avg_positions,
+        "tickets": tickets,
+        "scale": scale,
+        "ret_fwd": ret_fwd,
+        "fund_next": fund_next,
+        "elig": elig,
+        "IS": msharpe(net, LO0, OOS_CUTOFF),
+        "OOS": msharpe(net, OOS_CUTOFF, HI1),
+    }
+
+
 def run_book(
     coins: dict,
     *,

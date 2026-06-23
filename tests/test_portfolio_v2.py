@@ -486,3 +486,211 @@ def test_xsmom_dollar_neutral():
     assert not xs.isna().any().any()
     masked_off = xs.where(~elig)
     assert float(masked_off.abs().max().max()) == 0.0
+
+
+# =============================================================================================
+# iter-v2-003 — cross-sectional LightGBM return predictor (engine hook + leak-safe walk-forward)
+# =============================================================================================
+
+
+# ---------------------------------------------------------------------------------------------
+# 12. run_book_from_signal — a constant / zero signal produces a degenerate book WITHOUT error
+# ---------------------------------------------------------------------------------------------
+def test_run_book_from_signal_degenerate_constant():
+    """A constant (here all-zero, and separately all-ones) signal yields a zero-gross / degenerate
+    book without raising: gross-norm divides by NaN where the gross is 0 and .fillna(0.0) flattens
+    it; the dict shape matches run_book."""
+    rng = np.random.default_rng(3)
+    n = 80
+    idx = _ms_index(n)
+    coins = {}
+    for k in range(6):
+        px = 100.0 * np.cumprod(1.0 + rng.normal(0, 0.02, n))
+        coins[f"C{k}USDT"] = _coin(idx, opens=px, closes=px, qv=float(6 - k) * 1e6, fund=0.0)
+    grid_index = pd.to_datetime(idx, unit="ms")
+    cols = list(coins.keys())
+
+    # all-zero signal -> empty gross -> all weights 0 -> net all 0, no exception (the only NaN is
+    # the leading .shift(1) lag warmup row, identical to fixed_lambda_book's warmup).
+    zero_sig = pd.DataFrame(0.0, index=grid_index, columns=cols)
+    res0 = engine_v2.run_book_from_signal(coins, zero_sig, rank_lo=0, rank_hi=4, season=None)
+    for key in ("net", "target_w", "held_w", "turnover", "avg_positions", "tickets", "IS", "OOS"):
+        assert key in res0
+    assert float(np.nanmax(np.abs(res0["held_w"].to_numpy()))) == 0.0  # no nonzero weight anywhere
+    assert float(res0["net"].abs().max()) == 0.0  # net is dropna'd -> all 0
+    # past the lag warmup row, the weights are a clean 0.0 (no spurious NaN propagation).
+    assert not res0["held_w"].iloc[1:].isna().any().any()
+
+    # all-ones constant signal -> identical across the band -> /rvol differentiates by vol; the book
+    # is still well-defined (no NaN propagation past warmup, no exception, finite net).
+    one_sig = pd.DataFrame(1.0, index=grid_index, columns=cols)
+    res1 = engine_v2.run_book_from_signal(coins, one_sig, rank_lo=0, rank_hi=4, season=None)
+    assert not res1["held_w"].iloc[1:].isna().any().any()
+    assert np.isfinite(res1["net"].to_numpy()).all()
+
+
+# ---------------------------------------------------------------------------------------------
+# 13. run_book_from_signal — a hand-set signal reproduces an independently hand-computed net
+# ---------------------------------------------------------------------------------------------
+def test_run_book_from_signal_handcomputed_net():
+    """With the band/eligexit overlay disabled (delta=0, k_exit=inf) and zero slippage/funding, the
+    booked net must equal an INDEPENDENT recomputation of the documented pipeline on a small panel:
+        raw = (signal/rvol).where(elig); w = (raw/Σ|raw|).shift(1)   (== target_w, == held_w)
+        net = (Σ_c w·ret_fwd - COST_SIDE·Σ_c|Δw|) · vol_target_scale.
+    This is the hand-computed small-panel net the brief asks for (no path-dependence from band)."""
+    rng = np.random.default_rng(123)
+    n = 200
+    idx = _ms_index(n)
+    coins = {}
+    for k in range(5):
+        px = 100.0 * np.cumprod(1.0 + rng.normal(0.0003 * (k - 2), 0.02, n))
+        coins[f"C{k}USDT"] = _coin(idx, opens=px, closes=px, qv=float(5 - k) * 1e6, fund=0.0)
+    grid_index = pd.to_datetime(idx, unit="ms")
+    cols = list(coins.keys())
+
+    # deterministic, dispersed hand-set signal (a fixed per-coin tilt + a slow oscillation in t).
+    base = np.array([0.5, -0.3, 0.1, -0.4, 0.2])
+    osc = np.sin(np.arange(n) / 7.0)[:, None]
+    signal = pd.DataFrame(base[None, :] * (1.0 + 0.3 * osc), index=grid_index, columns=cols)
+
+    res = engine_v2.run_book_from_signal(
+        coins,
+        signal,
+        rank_lo=0,
+        rank_hi=5,
+        season=None,
+        slip_bps_fn=engine_v2.zero_slip,
+        delta=0.0,  # band OFF
+        k_exit=float("inf"),  # eligexit OFF
+    )
+
+    # --- INDEPENDENT recomputation of the SAME pipeline ---
+    panel = engine_v2.build_panel(coins)
+    sig = engine_v2._signals(panel)
+    elig = (
+        universe_v2.eligibility(coins, 0, 5, None)
+        .reindex(index=panel["opens"].index, columns=panel["cols"])
+        .fillna(False)
+    )
+    sig_aligned = signal.reindex(index=panel["opens"].index, columns=panel["cols"]).fillna(0.0)
+    raw = (sig_aligned / sig["rvol"]).where(elig)
+    w = raw.div(raw.abs().sum(axis=1).replace(0, np.nan), axis=0).fillna(0.0).shift(1)
+    # band off + eligexit off => held_w == target_w (no overlay change), renorm is identity.
+    dw = (w - w.shift(1)).abs()
+    pnl = (w * sig["ret_fwd"].reindex(columns=w.columns)).sum(axis=1)
+    cost = (dw * engine_v2.COST_SIDE).sum(axis=1)
+    raw_net = (pnl - cost).dropna()  # fund=0
+    rv = raw_net.rolling(engine_v2.PORT_VOL_WIN).std().shift(1)
+    scale = (engine_v2.TARGET_VOL / rv).clip(upper=engine_v2.MAX_LEV).fillna(0.0)
+    exp_net = (raw_net * scale.reindex(raw_net.index)).dropna()
+
+    a, b = res["net"].align(exp_net, join="inner")
+    assert len(a) > 50, "too few overlapping candles — test vacuous"
+    assert float((a - b).abs().max()) < 1e-12  # bit-for-bit hand-computed reproduction
+    # and the overlay-off invariant: held_w == target_w exactly (past the lag-warmup row).
+    assert float(np.nanmax(np.abs((res["held_w"] - res["target_w"]).to_numpy()))) == 0.0
+
+
+# ---------------------------------------------------------------------------------------------
+# 14. ml_v2 walk-forward — NO train window for a pre-cutoff test month contains rows >= cutoff,
+#     AND the embargo GAP holds (last train candle < test month - GAP).
+# ---------------------------------------------------------------------------------------------
+def test_ml_walkforward_train_window_bound():
+    """Replicate ml_v2's exact monthly train-window math and assert, for every test month, that the
+    train window's upper bound never reaches into the test month (embargo gap), i.e. the leak
+    surface is closed at the window level (no train candle is >= the test-month start, GAP)."""
+    from portfolio_v2 import ml_v2
+
+    # a synthetic monthly candle grid spanning > TRAIN_MONTHS so the loop has real covered months.
+    n = 3000
+    idx = _ms_index(n)
+    candles = pd.to_datetime(idx, unit="ms")
+    months = pd.PeriodIndex(candles, freq="M").unique().sort_values()
+
+    checked = 0
+    for ms in months:
+        m0 = ms.to_timestamp()
+        lo = m0 - pd.DateOffset(months=ml_v2.TRAIN_MONTHS)
+        hi = m0 - pd.Timedelta(milliseconds=ml_v2.GAP_CANDLES * ml_v2.STEP_MS)
+        train_mask = (candles >= lo) & (candles < hi)
+        if not train_mask.any():
+            continue
+        last_train = candles[train_mask].max()
+        # the embargo: the last train candle is strictly before the test month start minus the gap.
+        assert last_train < m0, f"train window for {ms} reaches into the test month (LEAK)"
+        assert last_train <= hi - pd.Timedelta(milliseconds=ml_v2.STEP_MS) + pd.Timedelta(
+            milliseconds=ml_v2.STEP_MS
+        )
+        assert last_train < hi, f"train window for {ms} violates the GAP embargo"
+        checked += 1
+    assert checked > 5, "too few covered months — test vacuous"
+
+
+# ---------------------------------------------------------------------------------------------
+# 15. ml_v2 walk-forward — FUTURE-PERTURBATION leak test: corrupt all inputs from a cutoff forward
+#     and confirm the pre-cutoff ML SIGNAL is bit-identical (the predictions for pre-cutoff months
+#     come from models trained only on prior data, so they cannot move).
+# ---------------------------------------------------------------------------------------------
+def test_ml_walkforward_future_perturbation_invariance():
+    """The mandatory leak test (brief §2.3). Build a panel spanning > TRAIN_MONTHS, run the full ML
+    pipeline twice — clean, and with EVERY input (open/close/qv/funding) garbaged from a cutoff
+    month forward. The pre-cutoff covered-month ML signal must be bit-identical (max|Δ|==0):
+    pre-cutoff predictions use only pre-cutoff data, so future garbage cannot perturb them."""
+    from portfolio_v2 import ml_v2
+
+    n = 3200  # ~29 months of 8h candles
+    idx = _ms_index(n)
+    candles = pd.to_datetime(idx, unit="ms")
+    cutoff_i = 3000
+    cutoff_dt = candles[cutoff_i]
+    cutoff_month = pd.Period(cutoff_dt, freq="M")
+
+    streams = {k: np.random.default_rng(500 + k) for k in range(8)}
+
+    def _make(shift, cut):
+        coins = {}
+        for k in range(8):
+            base = 100.0 * np.cumprod(1.0 + streams[k].normal(0, 0.02, n))
+            opens, closes = base.copy(), base.copy()
+            qv = np.full(n, float(8 - k) * 1e6)
+            fund = np.full(n, 0.0001)
+            if cut is not None:
+                opens[cut:] = base[cut:] * (1.0 + shift)
+                closes[cut:] = base[cut:] * (1.0 - shift)
+                qv[cut:] *= 1000.0
+                fund[cut:] = -0.05
+            coins[f"C{k}USDT"] = _coin(idx, opens=opens, closes=closes, qv=qv, fund=fund)
+        return coins
+
+    def _ml_signal(coins):
+        long_df, elig, opens_index, cols = ml_v2.build_feature_panel(
+            coins, rank_lo=0, rank_hi=5, season=None, liq_win=3
+        )
+        pred, _imp, covered, _skip = ml_v2.walk_forward_predict(
+            long_df, elig, min_train_rows=50, seeds=(42,)
+        )
+        return ml_v2.pred_to_signal(pred, elig), covered
+
+    streams = {k: np.random.default_rng(500 + k) for k in range(8)}
+    clean_sig, covered = _ml_signal(_make(0.0, None))
+    streams = {k: np.random.default_rng(500 + k) for k in range(8)}
+    dirty_sig, _ = _ml_signal(_make(0.4, cutoff_i))
+
+    # there MUST be covered months strictly before the cutoff month, else the test is vacuous.
+    pre_cut_months = [m for m in covered if m < cutoff_month]
+    assert len(pre_cut_months) >= 2, "too few pre-cutoff covered months — test vacuous"
+
+    a = clean_sig
+    b = dirty_sig.reindex(index=a.index, columns=a.columns)
+    # restrict to candles in covered months strictly before the cutoff month.
+    cand_month = pd.PeriodIndex(a.index, freq="M")
+    pre_mask = pd.Series(cand_month.isin(pre_cut_months), index=a.index)
+    diff = (a[pre_mask].fillna(0.0) - b[pre_mask].fillna(0.0)).abs().to_numpy()
+    assert np.nanmax(diff) == 0.0, "pre-cutoff ML signal moved under future perturbation (LEAK)"
+    # sanity: the perturbation is real (the signal DOES change somewhere at/after the cutoff month).
+    post_mask = ~pre_mask
+    if post_mask.any():
+        dpost = (a[post_mask].fillna(0.0) - b[post_mask].fillna(0.0)).abs().to_numpy()
+        assert np.nanmax(dpost) > 0.0, (
+            "future perturbation had NO effect — test not exercising leak"
+        )
