@@ -218,6 +218,14 @@ ROADMAP #1–#7 COMPLETE. Future ideas: per-name funding-carry attribution, regi
 auto-recovery escalation ladder, a live-vs-backtest tracking-error report.
 
 ## Changelog (tick off as we build)
+- **2026-06-23 v10** — TESTNET HYBRID (user: 'real trades on testnet, only the ones we can't
+  trade should be paper; testnet only mode'). Reverted full-paper; back on testnet ($4k/1x) but
+  the engine now holds the FULL strategy book and PAPERS venue-untradable coins instead of
+  skipping them: 19 real orders + ALLO papered (log 'orders placed=N papered=P skipped=M
+  errors=K'; papered=1 is NORMAL, not an error). held_w=20 names; exchange=19 real; parity OK
+  (live 19 vs target 20 = ALLO venue-excluded). Monitor = the 8 testnet checks again (the paper
+  run_portfolio_paper mode + portfolio_paper_status stay available for full-paper). LIVE mode
+  papers nothing (production lists all coins).
 - **2026-06-23 v9** — PAPER mode (user: 'do paper trading, keep the same positions as the
   strategy'). Switched the v1 portfolio off testnet onto dry-run: `run_portfolio_paper.py`
   (dry_run, \$10k canonical, db=data/portfolio_paper.db, log=logs/portfolio_paper.log). The
