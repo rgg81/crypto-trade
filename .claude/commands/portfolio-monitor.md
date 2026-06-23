@@ -218,6 +218,14 @@ ROADMAP #1–#7 COMPLETE. Future ideas: per-name funding-carry attribution, regi
 auto-recovery escalation ladder, a live-vs-backtest tracking-error report.
 
 ## Changelog (tick off as we build)
+- **2026-06-23 v9** — PAPER mode (user: 'do paper trading, keep the same positions as the
+  strategy'). Switched the v1 portfolio off testnet onto dry-run: `run_portfolio_paper.py`
+  (dry_run, \$10k canonical, db=data/portfolio_paper.db, log=logs/portfolio_paper.log). The
+  paper book == the strategy's deployed book by construction (all 20 names incl venue-untradable
+  ALLO; zero slippage; no -1121/-4164). PAPER monitor = `scripts/portfolio_paper_status.py`
+  (engine alive + held_w==strategy target parity + paper PnL = eligexit_net compounded from
+  launch x equity) + `portfolio_candle_check.py`. The 8 testnet/exchange checks DON'T apply in
+  paper (no account). Earlier survivorship/TradFi/-1121 fixes (747a22ce/a3eda65a) still apply.
 - **2026-06-22 v8** — HANDS-OFF mandate (user: "never interfere, we need to test this"). The
   monitor now OBSERVES + INFORMS only; never flattens/recommends the kill-switch on drawdown.
   Alert set narrowed to TEST-INTEGRITY (engine/parity/candle/errors); DD/PnL/tilt/turnover are
