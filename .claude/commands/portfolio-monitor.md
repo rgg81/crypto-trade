@@ -259,6 +259,20 @@ ROADMAP #1–#7 COMPLETE. Future ideas: per-name funding-carry attribution, regi
 auto-recovery escalation ladder, a live-vs-backtest tracking-error report.
 
 ## Changelog (tick off as we build)
+- **2026-06-24 v12** — INCIDENT (recurrence) + STRONGER FIX: the 08:00 UTC rebalance degenerated AGAIN
+  (net −$1,612) and the v11 guard did NOT fire (`collapse-aborts: 0`). The 418 contention recurred at
+  the boundary (`klines refreshed: 171 ok` vs 540), but the v11 `min_active_universe=100` guard was the
+  WRONG metric — the active count stayed > 100 while the *seasoned-eligible* rank set collapsed (the
+  partial fetch leaves GAPS in trailing candles → coins lose per-bar seasoning → the rank-21-40 denom
+  shrinks → a few oversized non-neutral names). ROOT: `refresh_data` catches a 418 fetch failure as
+  `skipped += 1` "delisted", so a 418-storm silently truncates the panel. STRONGER FIX:
+  `PortfolioConfig.min_refresh_fraction` (v2 runner sets **0.80**) — `run_once` now records the refresh
+  ok-count and RAISES if `ok/total < 0.80` (caught by the poll loop → retries next tick when contention
+  clears). This catches the partial refresh DIRECTLY (171/542 ≈ 31% → abort), the root signal the
+  active-count guard couldn't see. Reconciled the book the same way (clear last_candle → relaunch →
+  `540 ok` → 20 names, net +$232/+15%). The v11 `min_active_universe` guard is kept as a backstop.
+  Open follow-up still stands: stagger the engines' kline refreshes / share a cache so the 418
+  contention stops happening at the boundary.
 - **2026-06-24 v11** — INCIDENT + FIX: the 00:00 UTC rebalance traded a DEGENERATE book (gross $1.6k→
   $2.9k, net +$240→**−$1,495**, 4 oversized shorts at w −0.13/−0.15). Root cause: a Binance **`418`
   rate-limit ban** (concurrent engines all refreshing klines at the 8h boundary) hit the refresh

@@ -69,6 +69,8 @@ def main() -> None:
         poll_interval_seconds=60,
         paper_untradeable=True,  # testnet: names testnet can't fill (OPN/PUMP/...) -> paper, keeping
         # the live book faithful to the strategy target. (Set False for the production cutover.)
+        min_refresh_fraction=0.80,  # refuse to rebalance if a 418 rate-limit ban left <80% of the
+        # universe refreshed (partial fetch -> broken seasoning -> degenerate book); retries next tick.
     )
     engine = PortfolioEngine(cfg, settings, strategy_module=strategy_v2)
     mode = "DRY-RUN" if dry_run else "TESTNET (REAL ORDERS)"

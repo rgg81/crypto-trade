@@ -53,6 +53,13 @@ class PortfolioConfig:
     # this floor the engine REFUSES to rebalance (raises -> poll loop logs + retries) rather than
     # trade a corrupted book. Normal is hundreds; a collapse is tens. 0 disables.
     min_active_universe: int = 100
+    # PRIMARY data-integrity guard (load-bearing): min FRACTION of the candidate universe that must
+    # refresh OK to rebalance. A 418 ban mid-refresh drops most coins (logged "skipped"); even when
+    # the active count stays > min_active_universe, the partial fetch leaves GAPS in trailing candles
+    # that break per-bar SEASONING -> the eligible rank set collapses -> degenerate book. If ok/total
+    # is below this fraction the engine REFUSES to rebalance (raises -> retries). Normal ~99% ok.
+    # 0 disables; the v2 runner sets 0.80. Real/testnet only.
+    min_refresh_fraction: float = 0.0
 
 
 # Binance error codes meaning "can't trade this symbol on THIS venue right now" — papered when the
@@ -228,6 +235,11 @@ class PortfolioEngine:
             except Exception:
                 skipped += 1  # delisted / unavailable on production fapi
         print(f"[portfolio] klines refreshed: {ok} ok, {skipped} skipped (delisted)")
+        # expose refresh completeness for the run_once data-integrity guard. NOTE: a transient fetch
+        # failure (Binance 418 rate-limit ban) is caught above as "skipped" too, so a low ok-count is
+        # the direct signal of a PARTIAL refresh (not just genuine delistings).
+        self._last_refresh_ok = ok
+        self._last_refresh_total = len(syms)
         funding.refresh_funding(syms, self.cfg.data_dir)
 
     # ---- live execution plumbing (reuses the proven AuthenticatedBinanceClient) ----
@@ -350,6 +362,21 @@ class PortfolioEngine:
         """One evaluation: refresh data, compute the plan, log it; place orders unless dry-run."""
         if refresh:
             self.refresh_data()
+            # GUARD: refuse to rebalance on a PARTIAL refresh (a 418 rate-limit ban dropped most coins
+            # -> ragged panel -> broken seasoning -> degenerate book). The raise is caught by the poll
+            # loop (last_candle NOT advanced) so it retries next tick once the contention clears.
+            ok, total = self._last_refresh_ok, self._last_refresh_total
+            if (
+                not self.cfg.dry_run
+                and self.cfg.min_refresh_fraction
+                and total
+                and ok < self.cfg.min_refresh_fraction * total
+            ):
+                raise RuntimeError(
+                    f"refresh incomplete: {ok}/{total} coins ok "
+                    f"(< {self.cfg.min_refresh_fraction:.0%}); rate-limit/partial fetch — "
+                    f"refusing to rebalance on a ragged panel"
+                )
         # paper-fallback state (testnet-untradeable symbols we track as paper, not on the venue)
         paper_on = self._paper_enabled()
         paper_syms, paper_held = self._load_paper() if paper_on else (set(), {})
