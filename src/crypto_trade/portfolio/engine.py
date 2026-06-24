@@ -47,6 +47,12 @@ class PortfolioConfig:
     # drift, no net tilt from un-placed legs). TESTNET-ONLY convenience; OFF by default (v1 + production
     # place real orders only). On production the strategy should hold real positions, not paper.
     paper_untradeable: bool = False
+    # DATA-INTEGRITY GUARD: min ACTIVE coins (at the latest candle) required to rebalance. A partial
+    # or stale kline refresh (a Binance 418 rate-limit ban mid-refresh) collapses the universe
+    # to a handful -> the rank book degenerates into a few oversized, non-neutral positions. Below
+    # this floor the engine REFUSES to rebalance (raises -> poll loop logs + retries) rather than
+    # trade a corrupted book. Normal is hundreds; a collapse is tens. 0 disables.
+    min_active_universe: int = 100
 
 
 # Binance error codes meaning "can't trade this symbol on THIS venue right now" — papered when the
@@ -147,6 +153,19 @@ class PortfolioEngine:
         # is a < 0.01% proxy for open[H] -> relative weights bit-exact, gross off < 0.1%.
         if forming_opens is None:
             forming_opens = self.strat.forming_from_close(coins)
+        # GUARD: refuse to rebalance on a collapsed active universe (partial/stale refresh -> ragged
+        # panel -> degenerate book). The raise is caught by the poll loop (logged as a tick error,
+        # last_candle NOT advanced) so the rebalance retries next tick on complete data.
+        n_active = len(forming_opens)
+        if (
+            not self.cfg.dry_run
+            and self.cfg.min_active_universe
+            and n_active < self.cfg.min_active_universe
+        ):
+            raise RuntimeError(
+                f"active universe collapsed to {n_active} coins "
+                f"(< {self.cfg.min_active_universe}); refusing to rebalance on a ragged panel"
+            )
         prices = {s: float(px) for s, (_, px) in forming_opens.items()}
         coins = self.strat.append_forming(coins, forming_opens)
         tgt = self.strat.next_target_weights(coins, delta=self.cfg.delta)

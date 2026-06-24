@@ -259,6 +259,23 @@ ROADMAP #1–#7 COMPLETE. Future ideas: per-name funding-carry attribution, regi
 auto-recovery escalation ladder, a live-vs-backtest tracking-error report.
 
 ## Changelog (tick off as we build)
+- **2026-06-24 v11** — INCIDENT + FIX: the 00:00 UTC rebalance traded a DEGENERATE book (gross $1.6k→
+  $2.9k, net +$240→**−$1,495**, 4 oversized shorts at w −0.13/−0.15). Root cause: a Binance **`418`
+  rate-limit ban** (concurrent engines all refreshing klines at the 8h boundary) hit the refresh
+  MID-FETCH — only 236/540 coins updated; the missing ones were silently logged as "skipped
+  (delisted)". `forming_from_close` then saw a collapsed active universe → the rank-21-40 book
+  degenerated. Diagnosis: data freshness showed most coins stuck 1-2 candles stale + `538 skipped`;
+  a fresh recompute gave the proper 20-name dollar-neutral book (net −0.004). FIX (2 parts):
+  (1) **GUARD** `PortfolioConfig.min_active_universe=100` — `compute_plan` raises if the active
+  universe collapses below the floor (caught by the poll loop → retries on complete data, never trades
+  a ragged panel). (2) **RECONCILE** — stopped v2, cleared the `portfolio_last_candle_BTCUSDT`
+  engine_state key to force ONE corrective rebalance, relaunched on the guarded code; the refresh came
+  back `540 ok` and the book reconciled to 20 names / net +$180 (+11%), errors=0. Procedure to force a
+  corrective rebalance: stop engine → `sqlite3 …delete from engine_state where key='portfolio_last_candle_BTCUSDT'`
+  (KEEP the rest of the DB) → relaunch. **FOLLOW-UPS:** the 418 is from kline-refresh CONTENTION across
+  concurrent engines — consider staggering refreshes / a shared kline cache. The v1 engine
+  (quant-research) has the ORIGINAL engine.py — it lacks BOTH this guard AND the v10 network-resilience
+  fix; port them before v1 real-money.
 - **2026-06-23 v10** — INCIDENT + FIX: the v2 engine CRASHED on 2× `httpx.ConnectError [Errno 104]
   Connection reset by peer` during a candle-check kline fetch — the `run()` poll loop had no exception
   handling, so a transient network blip propagated out and killed the process (book left unmanaged).
