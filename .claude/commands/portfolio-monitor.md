@@ -259,6 +259,15 @@ ROADMAP #1–#7 COMPLETE. Future ideas: per-name funding-carry attribution, regi
 auto-recovery escalation ladder, a live-vs-backtest tracking-error report.
 
 ## Changelog (tick off as we build)
+- **2026-06-24 v13** — ROOT-CAUSE FIX (the standing v11/v12 follow-up): the 418 contention happened
+  because all the engines hammer production klines at the SAME 8h boundary. `PortfolioConfig.rebalance_lag_seconds`
+  (v2 runner = **900 / 15 min**) staggers v2's rebalance 15 min PAST the candle close — non-blocking
+  (the run loop keeps polling; `last_candle` only advances after the rebalance fires; `due = candle
+  open_time + interval + lag`). Parity-safe: still the just-closed candle's signal, same target, just
+  executed later. So **v2 now rebalances at ~HH:15, not HH:00** (00:15 / 08:15 / 16:15) — clear of the
+  v1/paper engines' boundary refresh, so the 418 contention stops at the source. The guards (v11/v12)
+  remain the safety net if it ever recurs. Log shows `staggering rebalance ~Nmin` when a candle closes.
+  REMAINING follow-up: port the guards + resilience + this stagger to the v1 engine before v1 real money.
 - **2026-06-24 v12** — INCIDENT (recurrence) + STRONGER FIX: the 08:00 UTC rebalance degenerated AGAIN
   (net −$1,612) and the v11 guard did NOT fire (`collapse-aborts: 0`). The 418 contention recurred at
   the boundary (`klines refreshed: 171 ok` vs 540), but the v11 `min_active_universe=100` guard was the

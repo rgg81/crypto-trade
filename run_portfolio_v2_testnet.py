@@ -71,6 +71,8 @@ def main() -> None:
         # the live book faithful to the strategy target. (Set False for the production cutover.)
         min_refresh_fraction=0.80,  # refuse to rebalance if a 418 rate-limit ban left <80% of the
         # universe refreshed (partial fetch -> broken seasoning -> degenerate book); retries next tick.
+        rebalance_lag_seconds=900,  # stagger the rebalance 15min PAST the 8h boundary so v2's kline
+        # refresh doesn't collide with the other engines at the boundary (avoids the 418 contention).
     )
     engine = PortfolioEngine(cfg, settings, strategy_module=strategy_v2)
     mode = "DRY-RUN" if dry_run else "TESTNET (REAL ORDERS)"

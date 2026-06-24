@@ -60,6 +60,11 @@ class PortfolioConfig:
     # is below this fraction the engine REFUSES to rebalance (raises -> retries). Normal ~99% ok.
     # 0 disables; the v2 runner sets 0.80. Real/testnet only.
     min_refresh_fraction: float = 0.0
+    # STAGGER: seconds to delay the rebalance PAST the candle close, so this engine's kline refresh
+    # doesn't collide with the other engines all refreshing at the 8h boundary (the cause of the 418
+    # rate-limit contention). Parity-safe (same just-closed-candle signal, executed later). 0 = fire
+    # at the boundary (default). The v2 runner sets 900 (15 min).
+    rebalance_lag_seconds: int = 0
 
 
 # Binance error codes meaning "can't trade this symbol on THIS venue right now" — papered when the
@@ -422,6 +427,11 @@ class PortfolioEngine:
                 self._save_paper(paper_syms, paper_held)
         return plan
 
+    def _interval_ms(self) -> int:
+        """Candle interval in ms, parsed from cfg.interval (e.g. '8h' -> 28_800_000)."""
+        s = self.cfg.interval
+        return int(s[:-1]) * {"m": 60, "h": 3600, "d": 86400}[s[-1]] * 1000
+
     def run(self) -> None:
         """Poll loop: act once per new 8h candle close on the reference symbol."""
         mode = "DRY-RUN" if self.cfg.dry_run else ("TESTNET" if self.cfg.testnet else "LIVE")
@@ -433,6 +443,7 @@ class PortfolioEngine:
             self.setup_exchange()  # load quantityPrecision; leverage set lazily per leg
         last_key = f"portfolio_last_candle_{self.cfg.ref_symbol}"
         consecutive_errors = 0
+        announced_lag_for = None  # candle open_time we've already logged a "staggered" notice for
         while True:
             try:
                 last = self.store.get_state(last_key)
@@ -441,8 +452,24 @@ class PortfolioEngine:
                     self.read_client, self.cfg.ref_symbol, self.cfg.interval, last_ms
                 )
                 if candle is not None:
-                    self.run_once(refresh=True)
-                    self.store.set_state(last_key, str(candle.open_time))
+                    # STAGGER: hold the rebalance until `rebalance_lag_seconds` PAST the candle close,
+                    # so the kline refresh doesn't collide with the other engines all refreshing at the
+                    # 8h boundary (the Binance 418 rate-limit contention). Parity-safe: the rebalance
+                    # still uses THIS just-closed candle's signal — same target, just executed later.
+                    # Non-blocking: keep polling; last_candle only advances after the rebalance fires.
+                    due_ms = candle.open_time + self._interval_ms() + self.cfg.rebalance_lag_seconds * 1000
+                    if int(time.time() * 1000) >= due_ms:
+                        self.run_once(refresh=True)
+                        self.store.set_state(last_key, str(candle.open_time))
+                        announced_lag_for = None
+                    elif announced_lag_for != candle.open_time:
+                        wait_min = (due_ms - int(time.time() * 1000)) / 60000
+                        print(
+                            f"[portfolio:{mode}] new candle closed; staggering rebalance "
+                            f"~{wait_min:.0f}min (lag={self.cfg.rebalance_lag_seconds}s) to avoid "
+                            f"boundary kline-refresh contention"
+                        )
+                        announced_lag_for = candle.open_time
                 consecutive_errors = 0
             except Exception as exc:
                 # RESILIENCE: a transient error (network reset, API hiccup, kline fetch failure)
