@@ -26,6 +26,10 @@ from crypto_trade.live.auth_client import AuthenticatedBinanceClient
 from crypto_trade.live.state_store import StateStore
 from crypto_trade.portfolio import funding, strategy
 
+# On a Binance rate-limit ban (418 / -1003) the poll loop waits this long before retrying — hitting a
+# banned IP again ESCALATES the ban, so we must back off well past a typical ban (minutes) not retry/60s.
+RATE_LIMIT_BACKOFF = 900  # 15 min
+
 
 @dataclasses.dataclass(frozen=True)
 class PortfolioConfig:
@@ -303,9 +307,12 @@ class PortfolioEngine:
         last_key = f"portfolio_last_candle_{self.cfg.ref_symbol}"
         while True:
             # RESILIENT poll: a transient API error (418 rate-limit ban / 429 / network / 5xx) must
-            # NOT crash the engine — log it and retry next tick. The candle key only advances after
-            # a CLEAN run_once, so a failed poll re-attempts the same candle next tick (Binance IP
-            # bans lift on their own; the next poll then succeeds and rebalances).
+            # NOT crash the engine. The candle key only advances after a CLEAN run_once, so a failed
+            # poll re-attempts the same candle. CRITICAL: on a RATE-LIMIT error (418/429/-1003) back
+            # off HARD (RATE_LIMIT_BACKOFF) instead of re-hitting every poll — pounding a banned IP
+            # ESCALATES the ban (Binance extends it on each request), so a 60s retry would perpetuate
+            # it. Backing off lets the ban lapse, then the next poll rebalances.
+            sleep_s = self.cfg.poll_interval_seconds
             try:
                 last = self.store.get_state(last_key)
                 last_ms = int(last) if last else None
@@ -315,5 +322,8 @@ class PortfolioEngine:
                     self.run_once(refresh=True)
                     self.store.set_state(last_key, str(candle.open_time))
             except Exception as exc:
-                print(f"[portfolio] poll error (retry next tick): {repr(exc)[:200]}")
-            time.sleep(self.cfg.poll_interval_seconds)
+                msg = repr(exc)
+                rate_limited = any(t in msg for t in ("418", "429", "-1003", "too many requests"))
+                sleep_s = RATE_LIMIT_BACKOFF if rate_limited else max(120, sleep_s)
+                print(f"[portfolio] poll error (backoff {sleep_s}s, retry): {msg[:180]}")
+            time.sleep(sleep_s)
