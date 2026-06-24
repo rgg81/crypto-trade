@@ -303,9 +303,9 @@ class PortfolioEngine:
         last_key = f"portfolio_last_candle_{self.cfg.ref_symbol}"
         while True:
             # RESILIENT poll: a transient API error (418 rate-limit ban / 429 / network / 5xx) must
-            # NOT crash the engine — log it and retry next tick. The candle key only advances after a
-            # CLEAN run_once, so a failed poll re-attempts the same candle on the next tick (Binance
-            # IP bans lift on their own; the next poll then succeeds and rebalances).
+            # NOT crash the engine — log it and retry next tick. The candle key only advances after
+            # a CLEAN run_once, so a failed poll re-attempts the same candle next tick (Binance IP
+            # bans lift on their own; the next poll then succeeds and rebalances).
             try:
                 last = self.store.get_state(last_key)
                 last_ms = int(last) if last else None
