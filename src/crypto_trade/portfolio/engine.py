@@ -26,8 +26,8 @@ from crypto_trade.live.auth_client import AuthenticatedBinanceClient
 from crypto_trade.live.state_store import StateStore
 from crypto_trade.portfolio import funding, strategy
 
-# On a Binance rate-limit ban (418 / -1003) the poll loop waits this long before retrying — hitting a
-# banned IP again ESCALATES the ban, so we must back off well past a typical ban (minutes) not retry/60s.
+# On a Binance rate-limit ban (418 / -1003) the poll loop waits this long before retrying — re-hitting
+# a banned IP ESCALATES the ban, so back off well past a typical ban (minutes), not the 60s poll.
 RATE_LIMIT_BACKOFF = 900  # 15 min
 
 
@@ -310,8 +310,8 @@ class PortfolioEngine:
             # NOT crash the engine. The candle key only advances after a CLEAN run_once, so a failed
             # poll re-attempts the same candle. CRITICAL: on a RATE-LIMIT error (418/429/-1003) back
             # off HARD (RATE_LIMIT_BACKOFF) instead of re-hitting every poll — pounding a banned IP
-            # ESCALATES the ban (Binance extends it on each request), so a 60s retry would perpetuate
-            # it. Backing off lets the ban lapse, then the next poll rebalances.
+            # ESCALATES the ban (extended on each request), so a 60s retry would perpetuate it.
+            # Backing off lets the ban lapse, then the next poll rebalances.
             sleep_s = self.cfg.poll_interval_seconds
             try:
                 last = self.store.get_state(last_key)
