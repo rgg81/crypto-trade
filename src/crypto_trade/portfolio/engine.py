@@ -26,8 +26,8 @@ from crypto_trade.live.auth_client import AuthenticatedBinanceClient
 from crypto_trade.live.state_store import StateStore
 from crypto_trade.portfolio import funding, strategy
 
-# On a Binance rate-limit ban (418 / -1003) the poll loop waits this long before retrying — re-hitting
-# a banned IP ESCALATES the ban, so back off well past a typical ban (minutes), not the 60s poll.
+# On a Binance rate-limit ban (418 / -1003) the poll waits this long before retrying — re-hitting a
+# banned IP ESCALATES the ban, so back off well past a typical ban (minutes), not the 60s poll.
 RATE_LIMIT_BACKOFF = 900  # 15 min
 
 
