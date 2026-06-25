@@ -62,8 +62,9 @@ def _legs_deployed(coins: dict[str, pd.DataFrame]):
     d_raw = ov.mn_dispersion_raw(pan["close"])
     net_d, dep_d = um.deployed_from_raw(d_raw, ret_fwd)
 
-    # ── per-bar regime weight on the dispersion sleeve ──
-    d_w = CHAMP["dw_bull"] + (CHAMP["dw_bear"] - CHAMP["dw_bull"]) * b
+    # ── per-bar regime weight on the dispersion sleeve (LAGGED — uses b[t-1], leak-free; matches
+    #    the iter_008.regime_book fix so live == backtest) ──
+    d_w = CHAMP["dw_bull"] + (CHAMP["dw_bear"] - CHAMP["dw_bull"]) * b.shift(1).fillna(0.0)
     return dep_a_braked, net_a_braked, dep_d, net_d, d_w, b
 
 

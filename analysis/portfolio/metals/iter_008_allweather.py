@@ -294,7 +294,10 @@ def regime_book(
     """
     net_a, b = anchor_leg_braked(coins, kind, win, thresh, confirm_k, apply_brake=brake_anchor)
     net_d = dispersion_leg(coins)
-    d_w = dw_bull + (dw_bear - dw_bull) * b  # per-bar dispersion weight (regime-scaled)
+    # LAGGED regime weight: the dispersion size for candle t is set from the PRIOR candle's regime
+    # b[t-1] (known at the close[t-1] decision) — NOT b[t] (the candle's own close, a look-ahead the
+    # live engine cannot reproduce). The anchor leg is already lagged inside net_from_raw .shift(1).
+    d_w = dw_bull + (dw_bear - dw_bull) * b.shift(1).fillna(0.0)
     net = a_w * net_a + d_w * net_d
     if brake_whole:  # head-to-head control: brake the whole book (anchor passed un-braked above)
         net = _brake(net)
