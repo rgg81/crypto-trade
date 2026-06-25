@@ -21,7 +21,21 @@ sys.path.insert(0, str(_METALS))
 import ingest_dukascopy as ing  # noqa: E402
 import iter_001_trend as it  # noqa: E402
 import iter_002_mn_overlay as ov  # noqa: E402
+import iter_004_cot as i4  # noqa: E402
 import universe_metals as um  # noqa: E402
+
+
+def _synth_cot(net_ois, *, ticker="XAUUSDT", oi=100.0, tuesdays=None):
+    """Tidy COT frame for one ticker with prescribed mm_net/OI values on given Tuesday snapshots."""
+    tuesdays = tuesdays or ["2023-01-03", "2023-01-10", "2023-01-17"]
+    rows = []
+    for d, noi in zip(tuesdays, net_ois):
+        rows.append({
+            "ticker": ticker, "date": pd.Timestamp(d), "Open_Interest_All": oi,
+            "M_Money_Positions_Long_All": oi / 2 + noi * oi / 2,
+            "M_Money_Positions_Short_All": oi / 2 - noi * oi / 2,  # long-short = noi*oi
+        })
+    return pd.DataFrame(rows)
 
 
 def _make_coins(n: int = 800, k: int = 4, seed: int = 0) -> dict[str, pd.DataFrame]:
@@ -142,6 +156,32 @@ def test_mn_overlay_is_dollar_neutral():
     raw = ov.mn_dispersion_raw(pan["close"])
     assert raw.sum(axis=1).abs().max() < 1e-9
     assert ov.gross_norm(raw).sum(axis=1).abs().max() < 1e-9
+
+
+def test_cot_alignment_value_correctness():
+    """align_cot_to_grid maps each 8h candle to the report whose snapshot+lag is the latest known —
+    the exact VALUE, not merely 'some eligible report exists'. Pre-history candles are NaN."""
+    lag = i4.RELEASE_LAG_DAYS  # 6 → Tuesday+6d = next Monday
+    cot = _synth_cot([0.10, 0.20, -0.10])
+    grid = pd.date_range("2023-01-01", "2023-01-26", freq="8h")
+    aligned = i4.align_cot_to_grid(cot, grid, lag_days=lag)["XAUUSDT"]
+    k1, k2, k3 = (pd.Timestamp(d) + pd.Timedelta(days=lag) for d in
+                  ("2023-01-03", "2023-01-10", "2023-01-17"))
+    assert aligned[grid < k1].isna().all()                       # nothing knowable yet
+    assert (aligned[(grid >= k1) & (grid < k2)] == 0.10).all()   # report 1
+    assert (aligned[(grid >= k2) & (grid < k3)] == 0.20).all()   # report 2
+    assert (aligned[grid >= k3] == -0.10).all()                  # report 3
+
+
+def test_cot_alignment_future_report_is_past_only():
+    """Corrupting the LAST COT report leaves every candle before its knowable-stamp bit-identical —
+    a unit-scale version of the orchestrator's future-COT corruption test."""
+    lag = i4.RELEASE_LAG_DAYS
+    grid = pd.date_range("2023-01-01", "2023-01-26", freq="8h")
+    base = i4.align_cot_to_grid(_synth_cot([0.10, 0.20, -0.10]), grid, lag_days=lag)["XAUUSDT"]
+    pert = i4.align_cot_to_grid(_synth_cot([0.10, 0.20, +9.90]), grid, lag_days=lag)["XAUUSDT"]
+    k3 = pd.Timestamp("2023-01-17") + pd.Timedelta(days=lag)
+    pd.testing.assert_series_equal(base[grid < k3], pert[grid < k3])
 
 
 def test_combined_book_is_past_only():
