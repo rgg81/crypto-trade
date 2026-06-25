@@ -19,7 +19,25 @@ _METALS = _ROOT / "analysis" / "portfolio" / "metals"
 sys.path.insert(0, str(_METALS))
 
 import ingest_dukascopy as ing  # noqa: E402
+import iter_001_trend as it  # noqa: E402
 import universe_metals as um  # noqa: E402
+
+
+def _make_coins(n: int = 800, k: int = 4, seed: int = 0) -> dict[str, pd.DataFrame]:
+    """Synthetic {ticker: OHLCV DataFrame indexed by open_time ms} — the shape build() consumes."""
+    rng = np.random.default_rng(seed)
+    start = int(pd.Timestamp("2019-01-01").value // 1_000_000)
+    ot = start + np.arange(n) * (8 * 3600 * 1000)
+    coins: dict[str, pd.DataFrame] = {}
+    for i in range(k):
+        close = 100 * np.exp(np.cumsum(rng.normal(0, 0.012, n)))
+        opn = np.concatenate([[close[0]], close[:-1]])
+        coins[f"M{i}"] = pd.DataFrame(
+            {"open": opn, "high": np.maximum(opn, close) * 1.001,
+             "low": np.minimum(opn, close) * 0.999, "close": close, "volume": 1.0},
+            index=pd.Index(ot, name="open_time"),
+        )
+    return coins
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────────────
@@ -71,6 +89,34 @@ def test_net_from_raw_is_past_only():
     pd.testing.assert_series_equal(a.loc[common], b.loc[common])
     # deployed weights before the cutoff are bit-identical too
     pd.testing.assert_frame_equal(w0[w0.index < cut], w1[w1.index < cut])
+
+
+def test_build_ema_path_is_past_only():
+    """iter-001 build() (EMA recursion incl.) is past-only: corrupting close after a cutoff must
+    not change any deployed weight or net before it. Guards the ewm(adjust=False) causal path
+    that the foundation's net_from_raw test does not exercise."""
+    coins = _make_coins(seed=7)
+    net0, w0 = it.build(coins)
+    cut_ms = int(pd.Timestamp("2019-09-01").value // 1_000_000)
+    rng = np.random.default_rng(1)
+    corrupt = {}
+    for s, d in coins.items():
+        d2 = d.copy()
+        m = d2.index >= cut_ms
+        for col in ("open", "high", "low", "close"):
+            d2.loc[m, col] = d2.loc[m, col].to_numpy() * rng.uniform(0.2, 5.0, int(m.sum()))
+        corrupt[s] = d2
+    net1, w1 = it.build(corrupt)
+    bound = pd.Timestamp("2019-08-25")  # buffer clears the open[t+1] dependence
+    a = net0[net0.index < bound]
+    pd.testing.assert_series_equal(a, net1.reindex(a.index))
+    pd.testing.assert_frame_equal(w0[w0.index < bound], w1.reindex(w0[w0.index < bound].index))
+
+
+def test_iter001_is_long_only():
+    """The anchor never shorts: every deployed weight is >= 0 (raw = expo/rvol, expo>=floor>0)."""
+    _, w = it.build(_make_coins(seed=8))
+    assert (w.fillna(0.0) >= -1e-12).all().all()
 
 
 def test_vol_target_is_past_only():
