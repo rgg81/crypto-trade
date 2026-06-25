@@ -91,15 +91,20 @@ def panels(coins: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
     return out
 
 
-def vol_target(net: pd.Series) -> pd.Series:
-    """Scale a per-candle net-return series to ~ANNUAL_TARGET_VOL, capped at MAX_LEV.
+def vol_target_scale(net: pd.Series) -> pd.Series:
+    """The per-candle vol-target SCALAR (past-only): TARGET_VOL / trailing-vol, capped at MAX_LEV.
 
-    Past-only: realized vol uses a trailing window `.shift(1)` so candle t's scale is known
-    at the close of t-1.
+    Factored out so the live layer can reconstruct DEPLOYED weights = gross-normed-lagged-weight ×
+    this scalar (the position the desk actually holds). `.shift(1)` keeps candle t's scale known at
+    the close of t-1.
     """
     rv = net.rolling(PORT_VOL_WIN).std().shift(1)
-    scale = (TARGET_VOL / rv).clip(upper=MAX_LEV).fillna(0.0)
-    return net * scale
+    return (TARGET_VOL / rv).clip(upper=MAX_LEV).fillna(0.0)
+
+
+def vol_target(net: pd.Series) -> pd.Series:
+    """Scale a per-candle net-return series to ~ANNUAL_TARGET_VOL, capped at MAX_LEV."""
+    return net * vol_target_scale(net)
 
 
 def net_from_raw(raw: pd.DataFrame, ret_fwd: pd.DataFrame) -> tuple[pd.Series, pd.DataFrame]:
@@ -114,6 +119,25 @@ def net_from_raw(raw: pd.DataFrame, ret_fwd: pd.DataFrame) -> tuple[pd.Series, p
     cost = COST_SIDE * (w - w.shift(1)).abs().sum(axis=1)
     net = (pnl - cost).dropna()
     return vol_target(net), w
+
+
+def deployed_from_raw(raw: pd.DataFrame, ret_fwd: pd.DataFrame) -> tuple[pd.Series, pd.DataFrame]:
+    """Single-source DEPLOYED-position decomposition of a leg — mirrors `net_from_raw` EXACTLY but
+    also returns the post-vol-target weight book the desk actually holds.
+
+    `net_from_raw` returns the gross-normed *lagged* weight `w` (pre-vol-target). The position the
+    desk HOLDS during candle t is `w[t] × vol_target_scale[t]`. Returns `(net, deployed_w)` with
+    `net` bit-identical to `net_from_raw`'s first return, so the live layer reconstructs positions
+    from the same arithmetic — no drift. (For the anchor leg the brake scalar is applied on top.)
+    """
+    gross = raw.abs().sum(axis=1).replace(0, np.nan)
+    w = raw.div(gross, axis=0).fillna(0.0).shift(1)
+    pnl = (w * ret_fwd.reindex(columns=w.columns)).sum(axis=1)
+    cost = COST_SIDE * (w - w.shift(1)).abs().sum(axis=1)
+    net0 = (pnl - cost).dropna()
+    scale = vol_target_scale(net0)
+    deployed = w.mul(scale.reindex(w.index).fillna(0.0), axis=0)
+    return net0 * scale, deployed
 
 
 def msharpe(net: pd.Series, lo=LO0, hi=HI1) -> float:
