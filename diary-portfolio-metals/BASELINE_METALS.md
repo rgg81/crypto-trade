@@ -49,10 +49,16 @@ overlay kept in the baseline.
   non-promotable sleeve** → not baselined.
 
 ## Outstanding constraints (must clear before a FULL CONFIRMATION-PASS / multi-regime alpha claim)
-1. **A metals-BEAR OOS window.** The binding open question: does a long-biased anchor + dollar-neutral
-   dispersion survive a metals DOWNTURN? The anchor's long-bias is the obvious vulnerability (IS bad
-   years 2015/2018/2021/2023). Until a post-2026 bear (or a pre-registered bear sub-window stress),
-   the OOS Sharpe is regime-conditional.
+1. **A metals-BEAR OOS window — ✅ RUN 2026-06-25, result = FAIL.** Backward OOS on the never-seen
+   2011–2015 bear (frozen params, gold/silver core; `BEAR-TEST-2011.md`): the long-biased anchor is
+   **crushed — maxDD ≈ −46%, net −42%, Sharpe −0.75** in the pure bear. So the book's regime profile is
+   now bracketed by both tails: **benign bull → OOS +1.71; severe bear → −46% maxDD.** It is a
+   LONG-BIASED metals strategy, Sharpe conditional on a friendly regime — NOT regime-robust. The
+   dispersion overlay is a genuine diversifier (standalone **+0.25 to +0.53 Sharpe through the bear**,
+   long-gold/short-silver) but at α=0.5 only shaves ~1pp off the −46% drawdown. **FIX (future
+   pre-registered exploration, NOT a retune):** rebalance the directional-vs-neutral mix and/or add a
+   regime brake cutting the anchor floor toward FLAT (never short) in confirmed downtrends — trading
+   bull upside for bear survival.
 2. **A second non-overlapping OOS regime** confirming the overlays' lift.
 3. **`L2 + GS-only-COT` run as an explicit headline OOS layer** (not an inferred cell).
 4. **Live-parity reconcile harness** before any capital (reproduce the COT weekly-release alignment +
