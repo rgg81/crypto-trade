@@ -20,19 +20,24 @@ sys.path.insert(0, str(_METALS))
 
 import ingest_dukascopy as ing  # noqa: E402
 import iter_001_trend as it  # noqa: E402
+import iter_002_mn_overlay as ov  # noqa: E402
 import universe_metals as um  # noqa: E402
 
 
 def _make_coins(n: int = 800, k: int = 4, seed: int = 0) -> dict[str, pd.DataFrame]:
-    """Synthetic {ticker: OHLCV DataFrame indexed by open_time ms} — the shape build() consumes."""
+    """Synthetic {ticker: OHLCV DataFrame indexed by open_time ms} — the shape build() consumes.
+
+    Uses the real metal tickers (XAUUSDT first) so iter-002's gold-keyed dispersion works.
+    """
     rng = np.random.default_rng(seed)
     start = int(pd.Timestamp("2019-01-01").value // 1_000_000)
     ot = start + np.arange(n) * (8 * 3600 * 1000)
+    tickers = list(um.UNIVERSE[:k]) + [f"M{i}" for i in range(k - len(um.UNIVERSE))]
     coins: dict[str, pd.DataFrame] = {}
     for i in range(k):
         close = 100 * np.exp(np.cumsum(rng.normal(0, 0.012, n)))
         opn = np.concatenate([[close[0]], close[:-1]])
-        coins[f"M{i}"] = pd.DataFrame(
+        coins[tickers[i]] = pd.DataFrame(
             {"open": opn, "high": np.maximum(opn, close) * 1.001,
              "low": np.minimum(opn, close) * 0.999, "close": close, "volume": 1.0},
             index=pd.Index(ot, name="open_time"),
@@ -117,6 +122,47 @@ def test_iter001_is_long_only():
     """The anchor never shorts: every deployed weight is >= 0 (raw = expo/rvol, expo>=floor>0)."""
     _, w = it.build(_make_coins(seed=8))
     assert (w.fillna(0.0) >= -1e-12).all().all()
+
+
+# ── iter-002 regression (Critic Caveat A) ─────────────────────────────────────────────
+def test_build_raw_refactor_is_bit_identical():
+    """iter-001's build() must equal net_from_raw(build_raw(coins), ret_fwd) — pins the refactor
+    that exposed build_raw for the overlay composition, so the anchor can never silently drift."""
+    coins = _make_coins(seed=9)
+    net0, w0 = it.build(coins)
+    pan = um.panels(coins)
+    net1, w1 = um.net_from_raw(it.build_raw(coins), pan["ret_fwd"])
+    pd.testing.assert_series_equal(net0, net1)
+    pd.testing.assert_frame_equal(w0, w1)
+
+
+def test_mn_overlay_is_dollar_neutral():
+    """The MN dispersion book is exactly dollar-neutral, and gross-norm preserves neutrality."""
+    pan = um.panels(_make_coins(seed=10))
+    raw = ov.mn_dispersion_raw(pan["close"])
+    assert raw.sum(axis=1).abs().max() < 1e-9
+    assert ov.gross_norm(raw).sum(axis=1).abs().max() < 1e-9
+
+
+def test_combined_book_is_past_only():
+    """The anchor+overlay COMBINED book is leak-safe: corrupting close after a cutoff leaves every
+    pre-cutoff net + deployed weight bit-identical (guards the demean + double gross-norm path)."""
+    coins = _make_coins(seed=11)
+    net0, w0 = ov.build_combined(coins)
+    cut_ms = int(pd.Timestamp("2019-09-01").value // 1_000_000)
+    rng = np.random.default_rng(2)
+    corrupt = {}
+    for s, d in coins.items():
+        d2 = d.copy()
+        m = d2.index >= cut_ms
+        for col in ("open", "high", "low", "close"):
+            d2.loc[m, col] = d2.loc[m, col].to_numpy() * rng.uniform(0.2, 5.0, int(m.sum()))
+        corrupt[s] = d2
+    net1, w1 = ov.build_combined(corrupt)
+    bound = pd.Timestamp("2019-08-25")
+    a = net0[net0.index < bound]
+    pd.testing.assert_series_equal(a, net1.reindex(a.index))
+    pd.testing.assert_frame_equal(w0[w0.index < bound], w1.reindex(w0[w0.index < bound].index))
 
 
 def test_vol_target_is_past_only():

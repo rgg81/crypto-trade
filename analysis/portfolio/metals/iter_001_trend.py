@@ -44,6 +44,37 @@ SWEEP_SLOW = (168, 189, 210)
 SWEEP_FLOOR = (0.25, 0.5, 0.75)
 
 
+def build_raw(
+    coins: dict[str, pd.DataFrame],
+    ema_fast: int = EMA_FAST,
+    ema_slow: int = EMA_SLOW,
+    floor: float = FLOOR,
+) -> pd.DataFrame:
+    """Pre-`net_from_raw` SIGNED RAW weight book for the long-biased trend anchor.
+
+    Returns the inverse-vol-sized `(expo / rvol).where(elig, 0.0)` panel — the exact input the
+    anchor hands to `net_from_raw`. Exposed so an overlay (iter-002) can combine at the RAW-weight
+    level (parity-correct: ONE `net_from_raw` over the summed book, no post-trade netting).
+
+    Per metal: exposure ∈ {floor, 1.0} — `floor` always, stepped up to 1.0 while fast EMA > slow
+    EMA (confirmed uptrend). NEVER shorts: `expo` and therefore `raw` are non-negative everywhere.
+
+    Look-ahead audit: `ewm(...).mean()` is causal (only past+present closes). `up`/`expo` at t use
+    close[t]; the downstream `net_from_raw` lags `raw` by one candle, so expo[t] is filled at
+    open[t+1] (decided at close[t], traded next open) — no future information enters the decision.
+    `rvol` and `elig` are likewise past/present-only.
+    """
+    pan = panels(coins)
+    close = pan["close"]
+    elig = close.notna()  # PIT eligibility — a metal carries weight only once it has price history
+    rvol = close.pct_change().rolling(VOL_WIN).std()  # 28d realized vol for inverse-vol sizing
+    ef = close.ewm(span=ema_fast, adjust=False).mean()
+    es = close.ewm(span=ema_slow, adjust=False).mean()
+    up = (ef > es).astype(float)  # 1.0 in a confirmed uptrend, else 0.0
+    expo = floor + (1.0 - floor) * up  # in {floor, 1.0}, long-only — never negative
+    return (expo / rvol).where(elig, 0.0)  # inverse-vol sized; 0 where the metal has no history
+
+
 def build(
     coins: dict[str, pd.DataFrame],
     ema_fast: int = EMA_FAST,
@@ -52,25 +83,12 @@ def build(
 ) -> tuple[pd.Series, pd.DataFrame]:
     """Long-biased trend anchor → (vol-targeted net return, deployed weight book).
 
-    Per metal: exposure ∈ {floor, 1.0} — `floor` always, stepped up to 1.0 while fast EMA > slow
-    EMA (confirmed uptrend). Inverse-vol sized, then handed to the leak-safe `net_from_raw` core
-    (gross-norm → .shift(1) lag → cost → vol-target). NEVER shorts: `expo` and therefore `raw` are
-    non-negative everywhere.
-
-    Look-ahead audit: `ewm(...).mean()` is causal (only past+present closes). `up`/`expo` at t use
-    close[t]; `net_from_raw` lags `raw` by one candle, so expo[t] is filled at open[t+1] (decided at
-    close[t], traded next open) — no future information enters the decision. `rvol` and `elig` are
-    likewise past/present-only.
+    Thin wrapper: `build_raw` produces the signed raw book; the leak-safe `net_from_raw` core
+    (gross-norm → .shift(1) lag → cost → vol-target) turns it into a vol-targeted net return and
+    the deployed weight book. Bit-identical to the pre-refactor inline path.
     """
-    pan = panels(coins)
-    close, ret_fwd = pan["close"], pan["ret_fwd"]
-    elig = close.notna()  # PIT eligibility — a metal carries weight only once it has price history
-    rvol = close.pct_change().rolling(VOL_WIN).std()  # 28d realized vol for inverse-vol sizing
-    ef = close.ewm(span=ema_fast, adjust=False).mean()
-    es = close.ewm(span=ema_slow, adjust=False).mean()
-    up = (ef > es).astype(float)  # 1.0 in a confirmed uptrend, else 0.0
-    expo = floor + (1.0 - floor) * up  # in {floor, 1.0}, long-only — never negative
-    raw = (expo / rvol).where(elig, 0.0)  # inverse-vol sized; 0 where the metal has no history
+    ret_fwd = panels(coins)["ret_fwd"]
+    raw = build_raw(coins, ema_fast, ema_slow, floor)
     return net_from_raw(raw, ret_fwd)
 
 
