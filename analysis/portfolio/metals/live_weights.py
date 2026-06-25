@@ -36,7 +36,7 @@ import iter_007_calibrate as cal  # noqa: E402
 import iter_008_allweather as r8  # noqa: E402
 import universe_metals as um  # noqa: E402
 
-CHAMP = r8.CHAMP  # frozen champion: {win, thresh, a_w, dw_bull, dw_bear}
+CHAMP = r8.CHAMP9  # iter-009 champion: {win, thresh, a_w, dw_bull, dw_bear, gate="continuous"}
 BRAKE_FLOOR = 0.25  # iter-007 _brake default (floor=0; floor=0 self-locks)
 
 
@@ -62,9 +62,12 @@ def _legs_deployed(coins: dict[str, pd.DataFrame]):
     d_raw = ov.mn_dispersion_raw(pan["close"])
     net_d, dep_d = um.deployed_from_raw(d_raw, ret_fwd)
 
-    # ── per-bar regime weight on the dispersion sleeve (LAGGED — uses b[t-1], leak-free; matches
-    #    the iter_008.regime_book fix so live == backtest) ──
-    d_w = CHAMP["dw_bull"] + (CHAMP["dw_bear"] - CHAMP["dw_bull"]) * b.shift(1).fillna(0.0)
+    # ── per-bar regime weight on the dispersion sleeve — the SHARED single-source helper, so the
+    #    live d_w is bit-identical to regime_book's (iter-009 continuous-breadth gate, leak-free) ──
+    d_w = r8.regime_dw(
+        coins, b, gate=CHAMP["gate"], kind="ma", win=CHAMP["win"],
+        dw_bull=CHAMP["dw_bull"], dw_bear=CHAMP["dw_bear"],
+    )
     return dep_a_braked, net_a_braked, dep_d, net_d, d_w, b
 
 
@@ -84,7 +87,7 @@ def deployed_weight_book(coins: dict[str, pd.DataFrame]) -> tuple[pd.DataFrame, 
 
 def regime_net(coins: dict[str, pd.DataFrame]) -> pd.Series:
     """The desk NET return series (paper-PnL source of truth) — `regime_book` net, bit-exact."""
-    net, _ = r8.regime_book(coins)
+    net, _ = r8.regime_book(coins, **CHAMP)
     return net
 
 

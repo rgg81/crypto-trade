@@ -104,7 +104,12 @@ BULL_LO, BULL_HI = aw.BULL_LO, aw.BULL_HI  # bull (OOS_CUTOFF → now)
 
 # ── anchor / champion defaults ────────────────────────────────────────────────────────────────
 EMA_FAST, EMA_SLOW, FLOOR = it.EMA_FAST, it.EMA_SLOW, it.FLOOR  # 84 / 189 / 0.5
-CHAMP = dict(win=450, thresh=0.6, a_w=0.5, dw_bull=0.25, dw_bear=1.5)  # pre-registered, frozen
+CHAMP = dict(win=450, thresh=0.6, a_w=0.5, dw_bull=0.25, dw_bear=1.5)  # iter-008 binary (historic)
+# iter-009 CHAMPION — CONTINUOUS-breadth dispersion gate (leak-free bear recovery). Scales the
+# dispersion sleeve by the DEPTH of the bear (the breadth fraction), not a noisy binary 0.6 gate: a
+# smooth signal the one-bar de-leak lag barely perturbs, so the bear edge survives. dw_bear capped
+# at 1.0 keeps the tail TIGHTER than the L2+brake baseline. IS-only tuned; bear/2008 = stress.
+CHAMP9 = dict(win=450, thresh=0.6, a_w=0.5, dw_bull=0.25, dw_bear=1.0, gate="continuous")
 
 
 # ══════════════════════════════════════════════════════════════════════════════════════════════
@@ -268,6 +273,28 @@ def dispersion_leg(coins: dict[str, pd.DataFrame]) -> pd.Series:
 # ══════════════════════════════════════════════════════════════════════════════════════════════
 #  THE COMBINE — sum the two NET streams (portfolio of two sub-strategies)
 # ══════════════════════════════════════════════════════════════════════════════════════════════
+def regime_dw(
+    coins: dict[str, pd.DataFrame],
+    b: pd.Series,
+    *,
+    gate: str,
+    kind: str,
+    win: int,
+    dw_bull: float,
+    dw_bear: float,
+) -> pd.Series:
+    """The LAGGED per-bar dispersion regime weight d_w[t] (single source for backtest + live).
+
+    gate='binary'     → d_w from the bear flag b[t-1] ∈ {0,1}              (iter-008)
+    gate='continuous' → d_w from the breadth FRACTION[t-1] ∈ [0,1]         (iter-009 — depth-scaled)
+    Both use `.shift(1)` so d_w[t] is known at the close[t-1] decision (leak-free; the live engine
+    reproduces it exactly). The continuous fraction is a smooth signal, so the one-bar lag barely
+    perturbs it — recovering the bear edge the binary gate lost once the same-bar leak is cut.
+    """
+    sig = breadth_down(um.panels(coins)["close"], kind, win) if gate == "continuous" else b
+    return dw_bull + (dw_bear - dw_bull) * sig.shift(1).fillna(0.0)
+
+
 def regime_book(
     coins: dict[str, pd.DataFrame],
     win: int = CHAMP["win"],
@@ -278,6 +305,7 @@ def regime_book(
     *,
     kind: str = "ma",
     confirm_k: int = 0,
+    gate: str = "binary",
     brake_anchor: bool = True,
     brake_whole: bool = False,
 ) -> tuple[pd.Series, pd.Series]:
@@ -294,10 +322,7 @@ def regime_book(
     """
     net_a, b = anchor_leg_braked(coins, kind, win, thresh, confirm_k, apply_brake=brake_anchor)
     net_d = dispersion_leg(coins)
-    # LAGGED regime weight: the dispersion size for candle t is set from the PRIOR candle's regime
-    # b[t-1] (known at the close[t-1] decision) — NOT b[t] (the candle's own close, a look-ahead the
-    # live engine cannot reproduce). The anchor leg is already lagged inside net_from_raw .shift(1).
-    d_w = dw_bull + (dw_bear - dw_bull) * b.shift(1).fillna(0.0)
+    d_w = regime_dw(coins, b, gate=gate, kind=kind, win=win, dw_bull=dw_bull, dw_bear=dw_bear)
     net = a_w * net_a + d_w * net_d
     if brake_whole:  # head-to-head control: brake the whole book (anchor passed un-braked above)
         net = _brake(net)

@@ -65,9 +65,9 @@ def test_live_legs_recombine_to_regime_book_net():
     This is THE parity guarantee: the positions the live engine deploys ARE the backtest book.
     """
     coins = _make_coins(seed=2)
-    net_book, _ = r8.regime_book(coins)
+    net_book, _ = r8.regime_book(coins, **r8.CHAMP9)  # iter-009 continuous champ (what live deploys)
     _, net_a_braked, _, net_d, d_w, _ = lw._legs_deployed(coins)
-    recon = r8.CHAMP["a_w"] * net_a_braked + d_w * net_d
+    recon = r8.CHAMP9["a_w"] * net_a_braked + d_w * net_d
     common = net_book.index.intersection(recon.index)
     pd.testing.assert_series_equal(net_book.loc[common], recon.loc[common], check_names=False)
 
@@ -107,8 +107,8 @@ def test_real_data_target_weights_sane(_):
     tgt = lw.next_target_weights_metals(coins)
     assert tgt["_meta"]["gross"] >= 0.0 and np.isfinite(tgt["_meta"]["gross"])
     # the live legs still recombine to the book on REAL data (the deployment is parity-exact)
-    net_book, _ = r8.regime_book(coins)
+    net_book, _ = r8.regime_book(coins, **r8.CHAMP9)
     _, net_a_braked, _, net_d, d_w, _ = lw._legs_deployed(coins)
-    recon = r8.CHAMP["a_w"] * net_a_braked + d_w * net_d
+    recon = r8.CHAMP9["a_w"] * net_a_braked + d_w * net_d
     common = net_book.index.intersection(recon.index)
     assert float((net_book.loc[common] - recon.loc[common]).abs().max()) < 1e-12
