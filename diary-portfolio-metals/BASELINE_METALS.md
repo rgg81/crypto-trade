@@ -1,10 +1,11 @@
 # BASELINE_METALS — metals portfolio baseline
 
-**Current baseline (iter-010 PROMOTE-WITH-CAVEAT, 2026-06-26): BREADTH-ACCELERATION gate + POSITION-LEVEL
-honest net** (Critic PASS on blockers 1–4). The first LEAK-FREE, COST-HONEST metals book Sharpe-positive
-in bear + in-sample + bull. **Branch:** `portfolio-metals`. **DEPLOYED PAPER** (`run_metals_paper.py`).
-Predecessors: L2 → L2+brake (iter-007) → sleeve-aware regime book (iter-008, **WITHDRAWN, see below**) →
-de-leaked level gate (iter-009) → **iter-010**.
+**Current baseline (iter-012 PROMOTE-WITH-CAVEAT, 2026-06-26): breadth-ACCEL gate + deadband + COT
+ensemble, POSITION-LEVEL honest net** (Critic PASS — COT release-timing leak genuinely closed). A
+LEAK-FREE, COST-HONEST, all-weather metals book. **Branch:** `portfolio-metals`. **DEPLOYED PAPER**
+(`run_metals_paper.py`). Chain: L2 → L2+brake (iter-007) → sleeve-aware regime book (iter-008,
+**WITHDRAWN**) → de-leaked level gate (iter-009) → breadth-ACCEL + position-level net (iter-010) →
++ hysteresis deadband (iter-011) → + gold/silver COT positioning ensemble (**iter-012**).
 
 > ## ⚠️ WITHDRAWN NUMBERS — DO NOT CITE
 > The iter-008 "sleeve-aware regime book" headline (**BEAR +0.75 / IS +0.76 / BULL +2.13 / worst-DD
@@ -15,45 +16,62 @@ de-leaked level gate (iter-009) → **iter-010**.
 > de-leaked (gate → `b[t-1]`); iter-010 supersedes with the acceleration gate under honest
 > position-level accounting. **None of the withdrawn numbers may be cited anywhere.**
 
-## The baseline book — iter-010 (long braked anchor + breadth-ACCEL-gated dispersion; POSITION-LEVEL net)
+## The baseline book — iter-012 (anchor + breadth-ACCEL dispersion + COT, deadband, POSITION-LEVEL net)
 ```
-sig[t]   = w_blend·breadth_ACCEL[t] + (1−w_blend)·breadth_LEVEL[t]          # w_blend=0.65
-           breadth_LEVEL = frac(metals close < SMA(450));  breadth_ACCEL = logistic(z-scored RATE of
-           breadth deterioration: chg=level−level[t−42], z=clip(chg/std_252(chg).shift(1), ±4))
-W[t]     = (0.25 + (1.0−0.25)·sig).shift(1)                                 # LAGGED → leak-free + live-exact
-desk[t,i]= 0.5·dep_anchor_braked[t,i] + W[t]·dep_dispersion[t,i]            # per-metal DEPLOYED positions
-net[t]   = Σ_i desk[t,i]·ret_fwd[t,i] − COST·Σ_i |desk[t,i]−desk[t-1,i]|    # POSITION-LEVEL honest net
+sig[t]   = w_blend·breadth_ACCEL[t] + (1−w_blend)·breadth_LEVEL[t]          # w_blend=0.65; ACCEL =
+           logistic(z-scored RATE of breadth deterioration, chg=level−level[t−42] / std_252.shift(1))
+W[t]     = (0.25 + 0.75·sig).shift(1)                                       # LAGGED → leak-free
+tgt[t,i] = 0.5·dep_anchor_braked[t,i] + W[t]·dep_dispersion[t,i] + 0.3·dep_COT[t,i]   # +COT sleeve
+held[t,i]= hysteresis_band(tgt, δ=0.02)[t,i]                                # iter-011 deadband (fewer trades)
+net[t]   = Σ_i held[t,i]·ret_fwd[t,i] − COST·Σ_i |held[t,i]−held[t-1,i]|    # POSITION-LEVEL honest net
 ```
-`CHAMP10 = {win:450, a_w:0.5, dw_bull:0.25, dw_bear:1.0, sm:42, zwin:252, w_blend:0.65}`.
-`iter_010_breadth_accel.py` (desk_book/desk_net); deployed live via `live_weights` → `live_metals`.
-- **The mechanism (iter-010):** the bear-PAYER is the dollar-neutral **dispersion sleeve** (silver/
-  industrials crash ~2× gold in a metals bear). The iter-009 gate keyed off the breadth LEVEL — a
-  *lagging, confirming* signal that ramped the sleeve up only after the complex was already broadly down.
-  The **ACCELERATION** (rate of breadth deterioration) is a **LEADING** signal → it captures the
-  high-payoff front of the plunge. IS is **monotone in the accel weight w** (`iter_010_robustness.py`),
-  so the bear protection is a BYPRODUCT of selecting the highest-IS book — it was **NOT tuned to the bear**.
+`CHAMP12 = {win:450, a_w:0.5, dw_bull:0.25, dw_bear:1.0, sm:42, zwin:252, w_blend:0.65, deadband:0.02,
+cot_w:0.3, cot_lag:6}`; COT_COLS=(gold, silver). `iter_010_breadth_accel.py` + `iter_011_deadband.py` +
+`iter_012_cot_ensemble.py`; deployed live via `live_weights` → `live_metals` (refreshes COT each tick).
+- **iter-010 mechanism:** the bear-PAYER is the dollar-neutral dispersion sleeve (silver/industrials
+  crash ~2× gold). The **breadth ACCELERATION** (a LEADING signal) ramps it up at the front of the plunge,
+  vs the lagging level. **iter-011:** a hysteresis deadband cuts turnover ~19% (cost 1.49→1.20%/yr), and
+  the saving lifts the Sharpe. **iter-012:** the bad months are the transitional-chop regime (long-gold
+  anchor whipsaw); de-risking the anchor FAILS (kills the bull) — so ENSEMBLE a small dose of the
+  **uncorrelated, NON-PRICE CFTC COT managed-money CONTRARIAN positioning tilt (gold/silver only)**, which
+  fades crowd extremes independent of price → the chop bad-bucket is NEUTRALIZED.
+- IS is monotone/peaked in every knob (`iter_012_robustness.py`: cot_w peaks at 0.3, δ/w_blend smooth
+  basins) → the all-weather lift is a BYPRODUCT of IS-only selection, **NOT tuned to the bear**.
 
 ## All-weather scorecard — LEAK-FREE, POSITION-LEVEL (BEAR 2011-09→2015-03 · IS →2025-03 · BULL 2025-06)
-Canonical data: BEAR = `data_bear` (gold/silver), IS+BULL = `data/` (4 metals). Same accounting for all rows.
-| book | BEAR | IS | BULL | all-3-+ |
-|---|---|---|---|---|
-| anchor-only braked | −0.31 | −0.04 | +1.79 | ✗ |
-| iter-009 LEVEL gate | +0.12 | +0.08 | +1.95 | ✓ |
-| **iter-010 ACCEL gate (baseline)** | **+0.36 / −8.7%** | **+0.16** | **+1.60** | **✓** |
-- iter-010 **triples the bear edge and doubles the IS** vs the level gate, with a tighter bear-DD. Robust:
-  **18/18** committed `w×sm×zwin` cells all-3-positive, BEAR range [+0.20,+0.51] — a basin (`iter_010_robustness.py`).
-- **Pristine 2008 GFC** (frozen champion, never selected on): **pure crash +2.24**; crash+recovery **≈ flat
-  (−0.02)** — the leading accel correctly captures the crash and de-escalates into the V-snapback (it trades
-  V-recovery-capture for crash-capture; a disclosed property, decomposed in `iter_010_robustness.py`).
+Canonical data: BEAR = `data_bear` (gold/silver), IS+BULL = `data/` (4 metals). Same honest accounting all rows.
+| book | BEAR | IS | BULL | worst-DD | all-3-+ |
+|---|---|---|---|---|---|
+| anchor-only braked | −0.31 | −0.04 | +1.79 | — | ✗ |
+| iter-010 ACCEL gate | +0.36 | +0.16 | +1.60 | −13.6% | ✓ |
+| iter-011 + deadband (−19% trades) | +0.36 | +0.21 | +1.66 | −13.6% | ✓ |
+| **iter-012 + COT ensemble (baseline)** | **+0.58** | **+0.38** | **+1.72** | **−12.5%** | **✓** |
+- The chain lifts the leak-free IS +0.16→+0.38 and BEAR +0.36→+0.58 while TIGHTENING the worst-DD and CUTTING
+  turnover. The COT ensemble **NEUTRALIZES the chop bad-bucket** (transitional breadth 0.3-0.5: mean
+  −0.38%→−0.04%/month). Committed basins: `iter_012_robustness.py` (cot_w peaks 0.3; δ/w_blend smooth).
+- **COT LEAK-SAFETY** (the highest-risk component; Critic-verified PASS): each weekly report is applied only
+  at its Tuesday-snapshot **+ 6 days** (≈next Monday — ≥3d after the Friday public release; the downstream
+  one-candle lag absorbs holiday-week edges); the z-score/rvol are causal; `align_cot_to_grid` is
+  grid-restricted so price-truncated recompute sees no future report (reconcile bit-exact WITH the COT).
+  CI: 2 alignment tests + a future-price-corruption test + a **peek-earlier falsifier** (peeking a week
+  early gives no edge). GOLD/SILVER-ONLY (full-4 COT was OOS-FALSIFIED −0.137 — a dead-path; selected on
+  OOS-robustness, NOT the higher full-4 IS).
+- **Pristine 2008 GFC** (frozen champion, never selected on): **pure crash +2.24**; crash+recovery ≈ flat
+  (the leading accel trades V-recovery-capture for crash-capture — a disclosed property).
 
 ## Caveats (load-bearing — record honestly, per Critic)
 - **Bear Sharpe is NOT individually significant** (N≈42 monthly buckets, SE≈±0.5). The claim rests on the
   SIGN vs the −0.31 anchor / −0.79 L2+brake baselines under *identical* accounting (the A/B), the
   independent 2008 **pure-crash +2.24**, and the mechanism — NOT the bear t-stat.
-- **IS is thin (+0.16) and carries 3 accel knobs** (w_blend, sm, zwin) → selection haircut applies; treat
-  IS as drawdown-year DIVERSIFICATION + leading-bear protection, not a trustworthy Sharpe level.
+- **IS (+0.38) carries 5+ free knobs** (sm, zwin, w_blend, δ, cot_w) → a real + growing cumulative selection
+  haircut; treat IS as drawdown-year DIVERSIFICATION + chop-repair, not a trustworthy Sharpe LEVEL. The
+  durable, mechanism-grounded headline is the **chop bad-bucket neutralization** (−0.38%→−0.04%/month) + the
+  bear sign vs baselines. (Outstanding: a paired-bootstrap N_eff haircut to firm the thin IS.)
 - **2008 crash+recovery ≈ flat** (leading signal un-fires on the V-rebound); **bull window ≈15 months** —
   do not over-claim bull preservation.
+- **COT +6d lag is conservative on normal weeks, within one candle-lag on holiday-delayed weeks** (consider
+  +7d for full airtightness — verified not to change IS materially). The live engine MUST `clear_cot_cache()`
+  on each COT refresh (wired in `live_metals._refresh_cot`) or it deploys a frozen COT tilt.
 - **PARITY is now STRUCTURAL** — `net` is computed FROM the deployed `desk` matrix, so the live positions
   and the booked PnL are the same object. `reconcile_metals.py` bit-exact (recompute==book 0.0; forming
   gap 6.3e-4 < 5e-3). The position-level net models a **cost-netted single desk** (one net order/metal) —
