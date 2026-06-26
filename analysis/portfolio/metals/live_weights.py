@@ -22,9 +22,9 @@ _HERE = Path(__file__).resolve().parent
 if str(_HERE) not in sys.path:
     sys.path.insert(0, str(_HERE))
 
-import iter_010_breadth_accel as champ  # noqa: E402  — the current metals champion
+import iter_011_deadband as champ  # noqa: E402  — the current metals champion
 
-CHAMP = champ.CHAMP10
+CHAMP = champ.CHAMP11
 
 
 def deployed_weight_book(coins: dict[str, pd.DataFrame]) -> tuple[pd.DataFrame, pd.Series]:
