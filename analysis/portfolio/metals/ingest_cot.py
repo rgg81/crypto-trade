@@ -102,6 +102,28 @@ def ingest(path: Path = CACHE_PATH, years: range = YEARS) -> pd.DataFrame:
     return df
 
 
+def refresh_recent(path: Path = CACHE_PATH, n_years: int = 2) -> pd.DataFrame:
+    """Incremental live refresh: re-fetch the last `n_years` calendar years (one CFTC call each) and
+    MERGE into the cached panel (dedup on (ticker, date), keep latest) so the deep history is kept
+    and only recent weekly releases are appended. Used by the live engine."""
+    import datetime as _dt
+
+    yr = _dt.datetime.now(_dt.UTC).year
+    new = fetch_cot(range(yr - n_years + 1, yr + 1))
+    if path.exists():
+        new = (
+            pd.concat([pd.read_parquet(path), new])
+            .drop_duplicates(["ticker", "date"], keep="last")
+            .sort_values(["ticker", "date"])
+            .reset_index(drop=True)
+        )
+    path.parent.mkdir(parents=True, exist_ok=True)
+    new.to_parquet(path)
+    with contextlib.suppress(FileNotFoundError):
+        Path("f_year.txt").unlink()
+    return new
+
+
 def main() -> None:
     df = ingest()
     print(f"\nCACHED {df.shape[0]} rows × {df.shape[1]} cols → {CACHE_PATH}")

@@ -28,7 +28,7 @@ if str(_HERE) not in sys.path:
 
 import ingest_dukascopy as ing  # noqa: E402
 import iter_007_allweather as aw  # noqa: E402
-import iter_010_breadth_accel as i10  # noqa: E402
+import iter_012_cot_ensemble as i12  # noqa: E402
 import universe_metals as um  # noqa: E402
 
 DIR_2008 = _HERE.parents[2] / "data_bear2008"
@@ -81,12 +81,12 @@ def main() -> None:
         f"\n  universe {tuple(coins)}  span {next(iter(coins.values())).shape}  (gold/silver only)"
     )
 
-    # FROZEN books: baseline L2+brake vs the CURRENT champion (iter-010, position-level honest net).
-    # NOTE: the iter-008 BINARY regime_book is look-ahead-corrected but SUPERSEDED
-    # — its bear figure was inflated; do NOT cite it). The live champion is iter_010.desk_net.
+    # FROZEN books: baseline L2+brake vs the CURRENT champion (iter-012, position-level honest net).
+    # The iter-008 BINARY regime_book is SUPERSEDED + look-ahead-inflated (do NOT cite +1.25/+3.15);
+    # the live champion is iter_012.desk_net (breadth-accel + deadband + gold/silver COT ensemble).
     net0_l2 = aw.book_l2(coins)
     net_base = aw.apply_brake(net0_l2, aw.dd_brake_scalar(net0_l2))  # iter-007 baseline
-    net_champ = i10.desk_net(coins)  # iter-010 breadth-accel + position-level (what live deploys)
+    net_champ = i12.desk_net(coins)  # iter-012 (what live deploys)
 
     print(f"\n  {'window':42} {'book':16} {'Sharpe':>7} {'maxDD':>8} {'net%':>7}")
     print("  " + "-" * 84)

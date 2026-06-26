@@ -11,7 +11,7 @@ desk[t,i] = iter-010 desk[t,i] + cot_w · dep_cot[t,i]   (then the iter-011 dead
 Effect (position-level honest, canonical data): the chop bad-bucket is NEUTRALIZED (mean
 −0.38%→−0.04%/month) and every regime lifts — IS +0.21→+0.38, BEAR +0.36→+0.58, BULL +1.66→+1.72.
 cot_w is a smooth IS-basin peaking at 0.3 (0.1-0.4 all all-weather-improving). GOLD/SILVER-ONLY COT
-(the iter-004 robust subset — full-4-metal COT was OOS-FALSIFIED, a recorded dead-path). IS-only tuned.
+(the iter-004 robust subset — full-4 COT was OOS-FALSIFIED, a dead-path). IS-only tuned.
 
 LEAK-SAFETY (the COT is the highest-risk component): align_cot_to_grid applies each weekly report
 only at snapshot+RELEASE_LAG_DAYS(6) (Tuesday snapshot → Friday public → +6d safety); the z-score +
@@ -38,7 +38,8 @@ import iter_010_breadth_accel as i10  # noqa: E402
 import iter_011_deadband as i11  # noqa: E402
 import universe_metals as um  # noqa: E402
 
-CHAMP12 = {**i11.CHAMP11, "cot_w": 0.3}  # iter-011 + gold/silver COT positioning sleeve @ 0.3
+# iter-011 + gold/silver COT positioning sleeve @ 0.3, applied at the +6d release lag (leak-safe)
+CHAMP12 = {**i11.CHAMP11, "cot_w": 0.3, "cot_lag": cot.RELEASE_LAG_DAYS}
 COT_COLS = ("XAUUSDT", "XAGUSDT")  # gold/silver only (full-4 COT was OOS-FALSIFIED; dead-path)
 _COT_CACHE: pd.DataFrame | None = None
 
@@ -59,11 +60,11 @@ def clear_cot_cache() -> None:
 def desk_book(coins: dict[str, pd.DataFrame], **over) -> tuple[pd.DataFrame, pd.Series]:
     """iter-010 desk + cot_w·(gold/silver COT positioning sleeve), then the iter-011 deadband."""
     cfg = {**CHAMP12, **over}
-    base_keys = {k: v for k, v in cfg.items() if k not in ("deadband", "cot_w")}
+    base_keys = {k: v for k, v in cfg.items() if k not in ("deadband", "cot_w", "cot_lag")}
     raw_desk, b = i10.desk_book(coins, **base_keys)
     if cfg["cot_w"] > 0:
         rf = um.panels(coins)["ret_fwd"]
-        craw = cot.cot_mm_contrarian_raw(coins, _cot_df(), cols=COT_COLS)
+        craw = cot.cot_mm_contrarian_raw(coins, _cot_df(), cols=COT_COLS, lag_days=cfg["cot_lag"])
         _, dep_cot = um.deployed_from_raw(craw, rf)
         raw_desk = raw_desk.add(
             dep_cot.reindex(columns=raw_desk.columns, fill_value=0.0) * cfg["cot_w"], fill_value=0.0
