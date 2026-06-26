@@ -81,7 +81,15 @@ class MetalsPaperEngine:
         with tempfile.TemporaryDirectory(prefix="mlive_") as tmp:
             h1 = ing.fetch_h1(instrument, start, end, tmp)
         eight = ing.resample_8h(h1)
-        klines = [k for k in ing.to_klines(eight) if last is None or k.open_time > last]
+        # DROP the FORMING (incomplete) 8h candle — its bucket end (open + 8h) is still in the
+        # future, so it holds only partial h1 data. Appending it would leak an incomplete candle into
+        # signal (a look-ahead). Keep only COMPLETE candles whose 8h window has fully closed.
+        now_ms = int(time.time() * 1000)
+        klines = [
+            k
+            for k in ing.to_klines(eight)
+            if (last is None or k.open_time > last) and k.open_time + STEP_MS <= now_ms
+        ]
         return write_klines(out, klines, append=(last is not None))
 
     def refresh_data(self) -> None:
