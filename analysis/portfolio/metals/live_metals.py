@@ -167,7 +167,7 @@ class MetalsPaperEngine:
 
         as_of = pd.Timestamp(latest, unit="ms")
         print(
-            f"  [rebal] as_of={as_of}  regime={'BEAR' if meta['bear_flag'] else 'bull'}  "
+            f"  [rebal] as_of={as_of}  breadth={meta['breadth']:.2f}  "
             f"gross={meta['gross']:.3f}  n_pos={meta['n_positions']}  legs={n_legs}  "
             f"equity=${equity:,.0f}  positions={ {s: round(w, 4) for s, w in held.items()} }",
             flush=True,
@@ -205,8 +205,8 @@ class MetalsPaperEngine:
         new = not path.exists()
         with open(path, "a") as f:
             if new:
-                f.write("ts_utc,candle_open_ms,equity_usd,gross,bear_flag,n_positions\n")
+                f.write("ts_utc,candle_open_ms,equity_usd,gross,breadth,n_positions\n")
             f.write(
                 f"{dt.datetime.now(dt.UTC).isoformat()},{candle_ms},{equity:.2f},"
-                f"{meta['gross']:.4f},{int(meta['bear_flag'])},{meta['n_positions']}\n"
+                f"{meta['gross']:.4f},{meta['breadth']:.4f},{meta['n_positions']}\n"
             )
