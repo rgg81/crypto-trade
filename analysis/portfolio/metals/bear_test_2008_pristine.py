@@ -82,7 +82,7 @@ def main() -> None:
     )
 
     # FROZEN books: baseline L2+brake vs the CURRENT champion (iter-010, position-level honest net).
-    # NOTE: r8.regime_book defaults are the iter-008 BINARY book (look-ahead-corrected but SUPERSEDED
+    # NOTE: the iter-008 BINARY regime_book is look-ahead-corrected but SUPERSEDED
     # — its bear figure was inflated; do NOT cite it). The live champion is iter_010.desk_net.
     net0_l2 = aw.book_l2(coins)
     net_base = aw.apply_brake(net0_l2, aw.dd_brake_scalar(net0_l2))  # iter-007 baseline
