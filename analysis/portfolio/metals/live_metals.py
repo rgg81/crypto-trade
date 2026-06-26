@@ -92,14 +92,13 @@ class MetalsPaperEngine:
                     print(f"  [data] {ticker}: +{n} 8h candle(s)", flush=True)
             except Exception as e:  # noqa: BLE001 — tolerate a transient source hiccup
                 print(f"  [data] {ticker}: refresh failed ({e})", flush=True)
-        self._refresh_cot()
 
     def _refresh_cot(self) -> None:
         """Incremental CFTC COT refresh for the iter-012 ensemble sleeve (tolerant; weekly cadence).
 
         The COT only changes on Friday releases; refreshing each tick is harmless (idempotent).
         A failed fetch is non-fatal — the engine keeps the cached COT (the sleeve uses release-
-        lagged warmup-clean values, so a few-day-stale COT just defers the newest week, never leaks)."""
+        lagged warmup-clean values, so a few-day-stale COT just defers the newest week)."""
         try:
             import ingest_cot
             import iter_012_cot_ensemble as champ
@@ -156,6 +155,10 @@ class MetalsPaperEngine:
 
         if self.store.get_state("metals_launch_candle") is None:
             self.store.set_state("metals_launch_candle", str(latest))
+
+        # Refresh the COT ONLY here — at an actual rebalance — so the persisted held_w and the COT
+        # it was computed on stay in sync (a per-tick refresh desyncs them → spurious PARITY=DRIFT).
+        self._refresh_cot()
 
         # target positions for the just-opened (forming) candle — the parity bridge
         tgt = lw.next_target_weights_metals(self._append_forming(coins))
