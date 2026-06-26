@@ -1,8 +1,9 @@
-"""Full quantstats tearsheet for the metals baseline (iter-008 sleeve-aware regime book).
+"""Full quantstats tearsheet for the metals baseline (the current deployed champion).
 
 Builds the MAXIMAL continuous series: gold/silver re-ingested gap-free from 2005 (Dukascopy depth) +
 platinum/palladium from 2022 (their data start), runs the FROZEN regime-book baseline, compounds the
-8h net to daily, and emits a full quantstats HTML report.
+8h net to daily, emits a full quantstats HTML report. Always reflects the live-deployed champion
+(via the live_weights adapter — currently iter-012: breadth-accel + deadband + COT ensemble).
 
 HONEST SCOPE: this is the strategy's full HISTORICAL SIMULATION across every available month — it
 mixes in-sample (2015→2025-03), the selection-period bear (2011-2015), the pristine validation bear
@@ -27,7 +28,7 @@ if str(_HERE) not in sys.path:
     sys.path.insert(0, str(_HERE))
 
 import ingest_dukascopy as ing  # noqa: E402
-import live_weights as lw  # noqa: E402  — the deployed champion (iter-010), via the live adapter
+import live_weights as lw  # noqa: E402  — the deployed champion, via the live adapter
 import universe_metals as um  # noqa: E402
 
 FULL_DIR = _HERE.parents[2] / "data_full"  # continuous gold/silver 2005+ ∪ pt/pd 2022+
@@ -36,7 +37,7 @@ GS = {"XAUUSDT": "xauusd", "XAGUSDT": "xagusd"}
 PTPD = ("XPTUSDT", "XPDUSDT")
 START = "2005-06-01"  # warmup before the first reportable month (~2006); through to now
 REPORT_FROM = pd.Timestamp("2006-06-01")  # trim signal warmup
-OUT = _HERE.parents[2] / "reports" / "portfolio-metals" / "quantstats_iter010_all_months.html"
+OUT = _HERE.parents[2] / "reports" / "portfolio-metals" / "quantstats_iter012_all_months.html"
 
 
 def _build_full_dataset() -> None:
@@ -80,8 +81,7 @@ def main() -> None:
     }
     print(f"  universe {tuple(coins)}  spans {spans}")
 
-    # iter-010 champion (breadth-accel gate + POSITION-LEVEL honest net), via the live adapter so
-    # the tearsheet always reflects the CURRENTLY DEPLOYED book — leak-free, cost-honest.
+    # The CURRENTLY DEPLOYED champion (iter-012), via the live adapter — leak-free, cost-honest.
     net = lw.regime_net(coins)
     net = net[net.index >= REPORT_FROM]
     daily = to_daily(net)
@@ -95,7 +95,7 @@ def main() -> None:
         daily,
         benchmark=None,
         output=str(OUT),
-        title="Metals iter-010 (breadth-accel, leak-free) — full historical sim (all months)",
+        title="Metals iter-012 (accel+deadband+COT, leak-free) — full historical sim",
         periods_per_year=252,
     )
     print(f"\n  ✅ tearsheet → {OUT}")
