@@ -1,60 +1,68 @@
 # BASELINE_METALS — metals portfolio baseline
 
-**Current baseline (iter-008 PROMOTE-BOOTSTRAP, 2026-06-25): the SLEEVE-AWARE REGIME BOOK** — the first
-metals book Sharpe-POSITIVE in bear + in-sample + bull simultaneously. **Branch:** `portfolio-metals`.
-Predecessors: L2 (CONFIRMATION-BOOTSTRAP) → L2+drawdown-brake (iter-007) → this. NOT deployed.
+**Current baseline (iter-010 PROMOTE-WITH-CAVEAT, 2026-06-26): BREADTH-ACCELERATION gate + POSITION-LEVEL
+honest net** (Critic PASS on blockers 1–4). The first LEAK-FREE, COST-HONEST metals book Sharpe-positive
+in bear + in-sample + bull. **Branch:** `portfolio-metals`. **DEPLOYED PAPER** (`run_metals_paper.py`).
+Predecessors: L2 → L2+brake (iter-007) → sleeve-aware regime book (iter-008, **WITHDRAWN, see below**) →
+de-leaked level gate (iter-009) → **iter-010**.
 
-## The baseline book — SLEEVE-AWARE REGIME BOOK (portfolio of two sub-strategies)
+> ## ⚠️ WITHDRAWN NUMBERS — DO NOT CITE
+> The iter-008 "sleeve-aware regime book" headline (**BEAR +0.75 / IS +0.76 / BULL +2.13 / worst-DD
+> −18.7%**, pristine 2008 **+1.25 / +3.15**) was **look-ahead-inflated** by a SAME-BAR leak in the
+> dispersion regime gate (`d_w[t]` used the candle's *own* close), caught by the live-parity reconcile
+> (the standard future-corruption leak test missed it — it was same-bar, not future-bar). A second
+> inflation came from two-stream accounting that under-charged the regime re-sizing turnover. iter-009
+> de-leaked (gate → `b[t-1]`); iter-010 supersedes with the acceleration gate under honest
+> position-level accounting. **None of the withdrawn numbers may be cited anywhere.**
+
+## The baseline book — iter-010 (long braked anchor + breadth-ACCEL-gated dispersion; POSITION-LEVEL net)
 ```
-b[t] = 1 if frac(metals with close < SMA(450 candles)) >= 0.6  else 0       # IS-calibrated broad-bear regime
-leg1 = LONG anchor (FLOOR=0.5, FLAT in confirmed bear, NEVER short), BRAKED:
-       net_a_braked = dd_brake_scalar(net_anchor)·net_anchor                # iter-007 bear-blind brake, ANCHOR LEG ONLY
-leg2 = DISPERSION (long-gold/short-industrials, $-neutral), UNBRAKED, gate dW: 0.25 bull → 1.5 confirmed-bear
-delivered[t] = 0.5·net_a_braked[t] + dW[t]·net_dispersion[t]                # two independently vol-targeted legs, summed
+sig[t]   = w_blend·breadth_ACCEL[t] + (1−w_blend)·breadth_LEVEL[t]          # w_blend=0.65
+           breadth_LEVEL = frac(metals close < SMA(450));  breadth_ACCEL = logistic(z-scored RATE of
+           breadth deterioration: chg=level−level[t−42], z=clip(chg/std_252(chg).shift(1), ±4))
+W[t]     = (0.25 + (1.0−0.25)·sig).shift(1)                                 # LAGGED → leak-free + live-exact
+desk[t,i]= 0.5·dep_anchor_braked[t,i] + W[t]·dep_dispersion[t,i]            # per-metal DEPLOYED positions
+net[t]   = Σ_i desk[t,i]·ret_fwd[t,i] − COST·Σ_i |desk[t,i]−desk[t-1,i]|    # POSITION-LEVEL honest net
 ```
-- **The insight (iter-008):** directional SHORTING metals is DEAD (price can't separate a persistent bear
-  from a deep dip that recovers — 2022 was the deepest IS drawdown yet fully recovered). The bear-PAYER is
-  the dollar-neutral **dispersion sleeve** (standalone bear **+0.53**) because silver/industrials crash
-  harder than gold in a metals bear. The unlock is a **SLEEVE-AWARE brake**: brake the long anchor leg
-  (handles the plunge), let the dispersion ride UNbraked and scaled UP in the bear (the long-book brake was
-  dampening it: brake-anchor-only IS +0.76 vs brake-whole-book +0.42).
-- **The gate is asymmetric on purpose:** a false "dispersion-on in a non-bear" costs only mild $-neutral
-  drag (bounded) — so the regime gate can be aggressive, unlike a directional short where a false signal is
-  catastrophic.
+`CHAMP10 = {win:450, a_w:0.5, dw_bull:0.25, dw_bear:1.0, sm:42, zwin:252, w_blend:0.65}`.
+`iter_010_breadth_accel.py` (desk_book/desk_net); deployed live via `live_weights` → `live_metals`.
+- **The mechanism (iter-010):** the bear-PAYER is the dollar-neutral **dispersion sleeve** (silver/
+  industrials crash ~2× gold in a metals bear). The iter-009 gate keyed off the breadth LEVEL — a
+  *lagging, confirming* signal that ramped the sleeve up only after the complex was already broadly down.
+  The **ACCELERATION** (rate of breadth deterioration) is a **LEADING** signal → it captures the
+  high-payoff front of the plunge. IS is **monotone in the accel weight w** (`iter_010_robustness.py`),
+  so the bear protection is a BYPRODUCT of selecting the highest-IS book — it was **NOT tuned to the bear**.
 
-## All-weather scorecard (BEAR 2011-09→2015-03 · IS →2025-03 · BULL 2025-03→2026-06)
-| book | BEAR Sharpe / DD | IS Sharpe / DD | BULL Sharpe / DD | worst-DD | all-3-+ |
-|---|---|---|---|---|---|
-| L2 + DD-brake (predecessor) | −0.79 / −22.9% | +0.31 / −18.2% | +1.87 / −15.9% | −22.9% | ✗ |
-| **REGIME BOOK (baseline)** | **+0.75 / −18.3%** | +0.76 / −18.7% | **+2.13 / −5.0%** | **−18.7%** | **✓** |
-- The bear now **PAYS +0.75 Sharpe (+68% over the bear window)** — a +1.54 swing — while the bull *improves*
-  (+1.87 → +2.13) and worst-DD *tightens* (−22.9% → −18.7%). Robust: **11/11** committed neighborhood cells
-  all-3-positive (win{390,450,510}×thr{0.6,0.8}×weight-schemes), BEAR range [+0.71,+1.03] — not a basin.
+## All-weather scorecard — LEAK-FREE, POSITION-LEVEL (BEAR 2011-09→2015-03 · IS →2025-03 · BULL 2025-06)
+Canonical data: BEAR = `data_bear` (gold/silver), IS+BULL = `data/` (4 metals). Same accounting for all rows.
+| book | BEAR | IS | BULL | all-3-+ |
+|---|---|---|---|---|
+| anchor-only braked | −0.31 | −0.04 | +1.79 | ✗ |
+| iter-009 LEVEL gate | +0.12 | +0.08 | +1.95 | ✓ |
+| **iter-010 ACCEL gate (baseline)** | **+0.36 / −8.7%** | **+0.16** | **+1.60** | **✓** |
+- iter-010 **triples the bear edge and doubles the IS** vs the level gate, with a tighter bear-DD. Robust:
+  **18/18** committed `w×sm×zwin` cells all-3-positive, BEAR range [+0.20,+0.51] — a basin (`iter_010_robustness.py`).
+- **Pristine 2008 GFC** (frozen champion, never selected on): **pure crash +2.24**; crash+recovery **≈ flat
+  (−0.02)** — the leading accel correctly captures the crash and de-escalates into the V-snapback (it trades
+  V-recovery-capture for crash-capture; a disclosed property, decomposed in `iter_010_robustness.py`).
 
-## ✅ PRISTINE BEAR VALIDATION (the Critic's #1 caveat, directly answered)
-The frozen champion (zero param changes) run ONCE on the **2008 GFC crash** — a bear NEVER touched during
-iter-008 selection, and a V-shape (vs the 2011-15 grind) — `bear_test_2008_pristine.py`:
-| 2008 window | baseline L2+brake | **REGIME BOOK** |
-|---|---|---|
-| crash+recovery (2008-03→2009-06) | −0.76 / −16.5% / −9% | **+1.25 / −9.6% / +33%** |
-| pure crash (2008-07→2008-12) | −1.81 / −13.7% / −10% | **+3.15 / −7.1% / +39%** |
-The bear PAYS on an independent, pristine bear too — the architecture GENERALIZES (silver crashed ~2× gold
-in 2008 → the dispersion bear-edge fired). This upgrades the bootstrap toward a clean confirmation.
+## Caveats (load-bearing — record honestly, per Critic)
+- **Bear Sharpe is NOT individually significant** (N≈42 monthly buckets, SE≈±0.5). The claim rests on the
+  SIGN vs the −0.31 anchor / −0.79 L2+brake baselines under *identical* accounting (the A/B), the
+  independent 2008 **pure-crash +2.24**, and the mechanism — NOT the bear t-stat.
+- **IS is thin (+0.16) and carries 3 accel knobs** (w_blend, sm, zwin) → selection haircut applies; treat
+  IS as drawdown-year DIVERSIFICATION + leading-bear protection, not a trustworthy Sharpe level.
+- **2008 crash+recovery ≈ flat** (leading signal un-fires on the V-rebound); **bull window ≈15 months** —
+  do not over-claim bull preservation.
+- **PARITY is now STRUCTURAL** — `net` is computed FROM the deployed `desk` matrix, so the live positions
+  and the booked PnL are the same object. `reconcile_metals.py` bit-exact (recompute==book 0.0; forming
+  gap 6.3e-4 < 5e-3). The position-level net models a **cost-netted single desk** (one net order/metal) —
+  *accurate*, and mildly less conservative than the withdrawn two-stream (which double-charged the gold
+  overlap). Combined realised vol **floats** with cross-sleeve correlation — budget live.
+- **Dead-paths (recorded):** directional metals SHORT (price can't separate persistent-bear from
+  deep-recovering-dip); same-bar regime gate (the iter-008 leak); two-stream net (under-costs re-sizing).
 
-## Caveats + parity (load-bearing — record honestly)
-- **PARITY = two-instance multi-strategy desk** (NOT one vol-targeted book): the desk runs two sub-strategy
-  instances (braked anchor + dispersion), each vol-targets its OWN net to ~15%, and holds the SUM of their
-  per-metal positions. The two-stream cost sum is **conservative** (over-states a gold-netted desk). The
-  combined realised vol **floats with cross-sleeve correlation** (not pinned to 15%) — live risk sizing must
-  budget for this.
-- **IS edge = drawdown-year DIVERSIFICATION, not a trustworthy Sharpe-doubling.** The IS +0.31→+0.76 is SOFT
-  (selection haircut borderline, N_eff≈6-8, t≈2.5); the durable IS content is that it improves the IS
-  drawdown years (2015/2018/2021/2023) and gives back in strong bulls — real diversification.
-- **The durable claims** (independent of the soft IS): the BEAR sign-flip (−0.79→+0.75, confirmed pristine on
-  2008 at +1.25/+3.15), the bounded worst-DD (−18.7%), the all-3-positive, the mechanism. Directional short
-  is a recorded dead-path; recovery-brakes don't mix with a losing short (keep the brake on the long leg).
-
-## Predecessor: L2 + DRAWDOWN-BRAKE (iter-007; the regime book reduces to this at b=0)
+## Predecessor: L2 + DRAWDOWN-BRAKE (iter-007)
 ```
 net0 = net_from_raw( gn(iter_001_trend.build_raw(coins))                   # long-biased trend anchor
                    + 0.5·gn(iter_002_mn_overlay.mn_dispersion_raw(close)) )  # $-neutral dispersion
@@ -127,20 +135,17 @@ overlay kept in the baseline.
   non-promotable sleeve** → not baselined.
 
 ## Outstanding constraints
-1. **A metals-BEAR window — ✅ SOLVED (iter-008).** The bare L2 took −45% on the 2011-2015 bear; iter-007's
-   brake bounded it to −23% (BOUNDED, not profitable); **iter-008's regime book makes it PAY (+0.75 Sharpe,
-   −18.3% DD), and the pristine 2008 bear independently confirms (+1.25 / +3.15).** Remaining: a third bear
-   (forward post-2026) for a fully-clean multi-regime claim — non-blocking.
-2. **Two-instance LIVE-PARITY reconcile (the hard pre-capital gate).** The book is two independently
-   vol-targeted sub-strategy instances + the stateful per-candle brake scalar on the anchor instance. Before
-   capital, a reconcile harness must reproduce bit-identically in `engine._tick`: each instance's own
-   `vol_target.shift(1)` scalar, the brake recursion on the anchor instance only, and the per-metal position
-   SUM across the two instances. (Inherits the iter-007 brake-scalar parity item + adds the two-instance netting.)
-3. **Commit the 15/15 robustness neighborhood as runnable code** (currently 11 cells committed + a narrated
-   15/15) and a paired-bootstrap N_eff haircut to firm the IS claim — for a clean (non-bootstrap) confirmation.
-4. **`L2 + GS-only-COT` run as an explicit headline OOS layer** (not an inferred cell).
-4. **Live-parity reconcile harness** before any capital (reproduce the COT weekly-release alignment +
-   `vol_target` `.shift(1)` scalar bit-identically live; analogous to `scripts/reconcile_full_oos.py`).
+1. **A metals-BEAR window — ✅ SOLVED LEAK-FREE (iter-010).** Bare L2 took −45%; iter-007's brake bounded
+   it to −23%; **iter-010 makes it PAY +0.36 Sharpe leak-free** (pristine 2008 pure-crash +2.24 confirms).
+   Remaining (non-blocking): a third, forward post-2026 bear for a fully-clean multi-regime claim.
+2. **LIVE-PARITY reconcile — ✅ DONE.** `analysis/portfolio/metals/reconcile_metals.py` proves the paper
+   engine reproduces the backtest bit-for-bit (recompute==book 0.0; forming gap 6.3e-4). Parity is now
+   STRUCTURAL (net computed from the deployed `desk`). It is what CAUGHT the iter-008 same-bar leak.
+3. **Robustness committed — ✅ DONE** (`iter_010_robustness.py`: 18/18 cells + the monotone-IS curve).
+   Remaining (non-blocking): a paired-bootstrap N_eff haircut on the thin IS (3 accel knobs).
+4. **Pre-CAPITAL** (paper is live now): a Binance metals-perp vs Dukascopy BASIS reconcile (the paper
+   engine trades on Dukascopy for signal parity; real execution would be on Binance perps) + a forward
+   bear. `L2 + GS-only-COT` remains an unexplored headline-OOS layer (orthogonal to iter-010).
 
 ## Provenance
 Foundation + iter-001..006 + CONFIRMATION, all Critic-reviewed, on branch `portfolio-metals`.
