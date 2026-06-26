@@ -71,4 +71,4 @@ notebooks/.ipynb_checkpoints/
 .claude/*
 !.claude/commands/
 !.claude/skills/
-!.claude/agents/
+!.claude/agents/.dukascopy-cache/

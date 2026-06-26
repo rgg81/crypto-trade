@@ -31,12 +31,16 @@ import os
 import subprocess
 import sys
 import tempfile
+import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pandas as pd
 
 _ROOT = Path(__file__).resolve().parents[3]
+# Persistent dukascopy-node artifact cache — re-fetches of overlapping windows (the live engine's
+# per-tick incremental refresh) reuse cached artifacts instead of re-downloading. Gitignored.
+_DUKA_CACHE = str(_ROOT / ".dukascopy-cache")
 if str(_ROOT / "src") not in sys.path:
     sys.path.insert(0, str(_ROOT / "src"))
 
@@ -60,40 +64,38 @@ def _price_str(x: float) -> str:
 
 
 def _run_duka(
-    instrument: str, start: str, end: str, outdir: str, retries: int = 3
+    instrument: str, start: str, end: str, outdir: str, retries: int = 3, timeout: int = 300
 ) -> pd.DataFrame | None:
     """Run dukascopy-node for one [start, end) window; return its h1 frame (or None if empty).
 
-    Retries transient "fetch failed" errors. A genuinely empty window (e.g. a pre-listing
-    year) returns None rather than raising — the caller skips it.
+    Uses dukascopy-node's own CACHE (`-ch`) so re-fetches of overlapping windows reuse downloaded
+    artifacts (the live engine re-pulls the last ~10 days every rebalance — caching makes that fast)
+    and its internal RETRIES (`-r`/`-rp`) so a transient artifact failure is recovered inside one
+    call. `timeout` bounds a hung call (default 300s, vs the old 1800s) so the engine fails fast and
+    falls back to cached data. Retries transient "fetch failed"; an empty window returns None.
     """
     os.makedirs(outdir, exist_ok=True)
+    os.makedirs(_DUKA_CACHE, exist_ok=True)
     cmd = [
-        "npx",
-        "--yes",
-        "dukascopy-node",
-        "-i",
-        instrument,
-        "-from",
-        start,
-        "-to",
-        end,
-        "-t",
-        "h1",
-        "-f",
-        "csv",
-        "-v",
-        "true",
-        "-dir",
-        outdir,
-    ]
+        "npx", "--yes", "dukascopy-node",
+        "-i", instrument, "-from", start, "-to", end,
+        "-t", "h1", "-f", "csv", "-v", "true", "-dir", outdir,
+        "-ch", "-chpath", _DUKA_CACHE,  # cache artifacts → overlapping re-fetches are near-instant
+        "-r", "3", "-rp", "2000", "-re",  # 3 internal retries, 2s pause, retry-on-empty
+    ]  # fmt: skip
     last_err = ""
-    for attempt in range(retries):
-        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=1800)
+    for _attempt in range(retries):
+        try:
+            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+        except subprocess.TimeoutExpired:
+            last_err = f"timeout after {timeout}s"
+            time.sleep(3)
+            continue
         out = (proc.stderr or "") + (proc.stdout or "")
         if proc.returncode == 0 and "went wrong" not in out and "fetch failed" not in out:
             break
         last_err = out.strip().splitlines()[-1] if out.strip() else "unknown error"
+        time.sleep(3)  # backoff before retrying a transient failure
     else:
         raise RuntimeError(f"dukascopy-node failed for {instrument} {start}..{end}: {last_err}")
 

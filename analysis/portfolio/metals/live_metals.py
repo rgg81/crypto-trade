@@ -53,7 +53,7 @@ class MetalsPaperConfig:
     db_path: str = str(_ROOT / "data" / "metals_paper.db")
     equity_csv: str = str(_ROOT / "data" / "metals_equity.csv")
     poll_interval_seconds: int = 60
-    refresh_lookback_days: int = 21  # incremental Dukascopy pull window each tick
+    refresh_lookback_days: int = 10  # incremental Dukascopy pull window each tick (cache → fast)
     seed_start: str = "2005-06-01"  # first-run deep history (warmup for SMA450)
 
 
@@ -82,7 +82,7 @@ class MetalsPaperEngine:
             h1 = ing.fetch_h1(instrument, start, end, tmp)
         eight = ing.resample_8h(h1)
         # DROP the FORMING (incomplete) 8h candle — its bucket end (open + 8h) is still in the
-        # future, so it holds only partial h1 data. Appending it would leak an incomplete candle into
+        # future, so it holds only partial h1 data. Appending it leaks an incomplete candle into
         # signal (a look-ahead). Keep only COMPLETE candles whose 8h window has fully closed.
         now_ms = int(time.time() * 1000)
         klines = [
