@@ -32,6 +32,7 @@ from crypto_trade.live.state_store import StateStore  # noqa: E402
 
 DB = _ROOT / "data" / "metals_paper.db"
 EQ = _ROOT / "data" / "metals_equity.csv"
+DATA = _ROOT / "data_live_metals"  # Dukascopy store — for marking the held book (unrealized PnL)
 
 
 def main() -> int:
@@ -61,10 +62,30 @@ def main() -> int:
 
     gross = sum(abs(w) for w in held.values())
     net = sum(held.values())
+    e0 = float(eq_df["equity_usd"].iloc[0]) if len(eq_df) else 10_000.0
+    realized = equity - e0  # booked PnL = compounded completed-candle returns since launch
+
+    # UNREALIZED PnL — mark-to-market of the held book over the LATEST 8h candle (open→close). The
+    # desk books open-to-open at each rebalance, so the in-progress candle's move isn't yet realized.
+    # Per-metal $ unrealized = held_w · equity · (close/open − 1). Falls back to 0 if data absent.
+    mtm: dict[str, float] = {}
+    try:
+        coins = um.load_metals(DATA)
+        for s in held:
+            d = coins.get(s)
+            if d is not None and len(d):
+                o, c = float(d["open"].iloc[-1]), float(d["close"].iloc[-1])
+                mtm[s] = held[s] * equity * (c / o - 1.0) if o else 0.0
+    except Exception:  # noqa: BLE001 — MTM is best-effort; never block the digest
+        mtm = {}
+    unreal = sum(mtm.values())
+
     print(
         f"METALS BOOK + STATS  (as_of {asof}, {lw.LEVERAGE:.0f}x leverage)\n"
         f"  equity ${equity:,.0f}   since-launch {ret_since:+.1f}%   24h {d24:+.1f}%   "
         f"regime {regime} (breadth {breadth:.2f})\n"
+        f"  REALIZED ${realized:+,.0f} ({realized / e0 * 100:+.2f}%)   "
+        f"UNREALIZED ${unreal:+,.0f}   TOTAL ${realized + unreal:+,.0f}\n"
         f"  gross {gross:.2f}x (${gross * equity:,.0f})   net {net:+.2f}x (${net * equity:,.0f})"
     )
     if held:
@@ -72,7 +93,8 @@ def main() -> int:
         for s, w in sorted(held.items(), key=lambda kv: -abs(kv[1])):
             name = um.NAMES.get(s, s)
             side = "LONG " if w > 0 else "SHORT"
-            print(f"    {side} {name:10} {s:8} {w:+.4f}   ${w * equity:>+9,.0f}")
+            ur = f"  unreal ${mtm[s]:+,.1f}" if s in mtm else ""
+            print(f"    {side} {name:10} {s:8} {w:+.4f}   ${w * equity:>+9,.0f}{ur}")
 
     # push trigger: a new rebalance (book changed) OR a new UTC day since the last report
     today = dt.datetime.now(dt.UTC).date().isoformat()
