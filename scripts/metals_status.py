@@ -42,8 +42,15 @@ PARITY_TOL = 1e-4  # held vs recomputed target (paper = exact fill, so this shou
 
 
 def _engine_up() -> bool:
+    """True iff the engine PROCESS is running — match the actual `python … run_metals_paper.py`,
+    not a shell/grep/monitor command that merely MENTIONS the string (which naive substring matching
+    false-positives on; e.g. a `bash -c '… grep run_metals_paper.py …'` wrapper)."""
     out = subprocess.run(["ps", "-eo", "args"], capture_output=True, text=True).stdout
-    return "run_metals_paper.py" in out
+    bad = ("grep", "pgrep", "bash -c", "/bin/sh", "metals_status", "metals_digest")
+    return any(
+        "run_metals_paper.py" in ln and "python" in ln and not any(b in ln for b in bad)
+        for ln in out.splitlines()
+    )
 
 
 def _log_scan() -> tuple[bool, str]:
