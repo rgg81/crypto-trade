@@ -28,27 +28,80 @@ if str(_ROOT / "src") not in sys.path:
     sys.path.insert(0, str(_ROOT / "src"))
 
 # Binance live ticker -> (dukascopy instrument id, earliest sensible start).
-# Dukascopy US single-stock ids are lowercase "<ticker>ususd" (e.g. aaplususd). ADRs use the
-# US-listed line. Verify per-name depth on first ingest; recent IPOs start at listing.
+#
+# IDs are NOT a clean pattern — each was resolved AUTHORITATIVELY against dukascopy-node's
+# shipped instrument metadata (`require('dukascopy-node').instrumentMetaData`, v1.46.4 =
+# the latest published version as of 2026-06-30) by matching the company description, NOT by
+# guessing "<ticker>ususd". Most US lines ARE "<ticker>ususd", but real exceptions exist:
+#   - META  -> fbususd   (Dukascopy keeps the legacy Facebook ticker; desc "FACEBOOK INC-A / META")
+#   - PAYP   -> pyplususd (Binance labels PayPal "PAYP"; the stock symbol is PYPL)
+#   - BRKB   -> brkbususd (Berkshire Hathaway-B; "BRK-B.US/USD")
+# Two ids that were in the prior hand-written map were WRONG and are fixed here:
+#   - "tslususd" does NOT exist (Tesla is tslaususd); "metususd" is METLIFE INC, not Meta.
+# `start` = max(2018-01-01, dukascopy startYearForDailyCandles) so recent listings begin where
+# Dukascopy actually has daily depth (avoids fetching empty pre-listing ranges). Probed live
+# 2026-06-30 (1-week d1): fbususd/tslaususd/babaususd/brkbususd/pyplususd all return rows at the
+# right price level (META ~470, TSLA ~178, BABA ~79, BRK.B ~414, PYPL ~63 in Jun-2024).
+#
+# DROPPED (27 of 69) — absent from dukascopy-node v1.46.4 instrument metadata, so dukascopy-node
+# rejects them at validateConfig (cannot be fetched). Better to omit than map a wrong/empty id.
+#   No US line at all: ARM, KLAC, CRWD, COIN, HOOD, MSTR, DKNG, GME, RIVN, HIMS, NOK, CRCL,
+#     CRWV, NBIS, IREN, RKLB, ASTS, SMCI, SNDK, CIEN, CRDO, ALAB, LITE, FLNC (recent IPOs /
+#     names Dukascopy never carried a US-USD line for).
+#   Only a non-USD foreign-listing line exists (currency mismatch -> dropped, not remapped):
+#     ASML (ASML.NL/EUR), NVO (NOVOB.DK/DKK), SONY (6758.JP/JPY).
+# These re-enter the universe automatically once a US-USD line appears in a future
+# dukascopy-node release; the universe is data-availability-gated by design.
 INSTRUMENTS: dict[str, tuple[str, str]] = {
-    # Dukascopy US stock data available from ~2018 onwards for most names.
-    # Verified earliest start: aaplususd starts ~2017-01-26 per smoke test 2026-06-30.
+    # --- Tech / Comm mega-caps ---
     "AAPLUSDT": ("aaplususd", "2018-01-01"),
     "MSFTUSDT": ("msftususd", "2018-01-01"),
-    "AMZNUSDT": ("amznususd", "2018-01-01"),
-    "NVDAUSDT": ("nvdaususd", "2018-01-01"),
     "GOOGLUSDT": ("googlususd", "2018-01-01"),
-    "METAUSDT": ("metususd", "2018-01-01"),
-    "TSLAUSDT": ("tslususd", "2018-01-01"),
+    "METAUSDT": ("fbususd", "2018-01-01"),
+    "AMZNUSDT": ("amznususd", "2018-01-01"),
+    "TSLAUSDT": ("tslaususd", "2018-01-01"),
+    # --- Semis ---
+    "NVDAUSDT": ("nvdaususd", "2018-01-01"),
+    "AMDUSDT": ("amdususd", "2018-01-01"),
+    "AVGOUSDT": ("avgoususd", "2018-01-01"),
+    "MRVLUSDT": ("mrvlususd", "2022-05-13"),
+    "QCOMUSDT": ("qcomususd", "2018-01-01"),
+    "TSMUSDT": ("tsmususd", "2018-02-01"),
+    "LRCXUSDT": ("lrcxususd", "2018-01-01"),
+    "AMATUSDT": ("amatususd", "2018-01-01"),
+    "MUUSDT": ("muususd", "2018-01-01"),
+    "INTCUSDT": ("intcususd", "2018-01-01"),
+    "WDCUSDT": ("wdcususd", "2018-01-01"),
+    "COHRUSDT": ("cohrususd", "2022-05-13"),
+    "GLWUSDT": ("glwususd", "2018-01-01"),
+    # --- Software / IT ---
+    "ORCLUSDT": ("orclususd", "2018-01-01"),
+    "CRMUSDT": ("crmususd", "2018-01-01"),
+    "ADBEUSDT": ("adbeususd", "2018-01-01"),
+    "NOWUSDT": ("nowususd", "2022-05-13"),
+    "IBMUSDT": ("ibmususd", "2018-01-01"),
+    "CSCOUSDT": ("cscoususd", "2018-01-01"),
+    "PLTRUSDT": ("pltrususd", "2020-10-01"),
+    "DELLUSDT": ("dellususd", "2022-05-12"),
+    "HPEUSDT": ("hpeususd", "2022-05-12"),
+    "UBERUSDT": ("uberususd", "2020-10-01"),
+    "ZMUSDT": ("zmususd", "2020-09-30"),
+    # --- Comm / Media ---
+    "NFLXUSDT": ("nflxususd", "2018-01-01"),
+    "DISUSDT": ("disususd", "2018-01-01"),
+    # --- Financials ---
     "JPMUSDT": ("jpmususd", "2018-01-01"),
     "VUSDT": ("vususd", "2018-01-01"),
+    "BRKBUSDT": ("brkbususd", "2018-01-01"),
+    "PAYPUSDT": ("pyplususd", "2018-01-01"),
+    # --- Consumer ---
     "WMTUSDT": ("wmtususd", "2018-01-01"),
     "COSTUSDT": ("costususd", "2018-01-01"),
-    "NFLXUSDT": ("nflxususd", "2018-01-01"),
-    "AMDUSDT": ("amdususd", "2018-01-01"),
-    "INTCUSDT": ("intcususd", "2018-01-01"),
-    # NOTE: extend to the full SECTOR_MAP roster on first full ingest; recent IPOs:
-    # COINUSDT coinususd 2021-04-14, HOODUSDT hoodususd 2021-07-29, PLTRUSDT pltrususd 2020-09-30
+    "HDUSDT": ("hdususd", "2018-01-01"),
+    "EBAYUSDT": ("ebayususd", "2018-01-01"),
+    "BABAUSDT": ("babaususd", "2018-01-01"),
+    # --- Health ---
+    "LLYUSDT": ("llyususd", "2018-01-01"),
 }
 
 
