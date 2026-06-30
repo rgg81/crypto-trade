@@ -294,6 +294,83 @@ def test_production_xsmom_same_bar_close_no_leak():
     pd.testing.assert_series_equal(net0.loc[upto_t], net2.loc[upto_t])
 
 
+import iter_002_sector_rel as i2  # noqa: E402
+
+
+def test_iter002_build_is_dollar_and_sector_neutral_and_leak_safe():
+    """iter-002 build() must produce a lagged weight book that is BOTH dollar-neutral AND
+    per-sector-neutral (each sector's active weights sum ~0) — sector-neutrality is the whole
+    point of the one change, and it implies dollar-neutrality by construction (no extra
+    dollar_neutralize call). Uses real SECTOR_MAP tickers spanning a multi-name sector (Semi),
+    a second multi-name sector (Tech) and a SINGLETON sector (Health=LLY -> forced to 0)."""
+    syms = [
+        "NVDAUSDT",
+        "AMDUSDT",
+        "MUUSDT",  # Semi (multi-name)
+        "AAPLUSDT",
+        "MSFTUSDT",
+        "ORCLUSDT",  # Tech (multi-name)  (ORCL absent on disk but valid in SECTOR_MAP)
+        "LLYUSDT",  # Health (singleton -> 0 weight)
+    ]
+    rng = np.random.default_rng(13)
+    start = int(pd.Timestamp("2018-01-01").value // 1_000_000)
+    ot = start + np.arange(500) * 86_400_000
+    coins = {}
+    for s in syms:
+        close = 100 * np.exp(np.cumsum(rng.normal(0, 0.02, 500)))
+        opn = np.concatenate([[close[0]], close[:-1]])
+        coins[s] = pd.DataFrame(
+            {
+                "open": opn,
+                "high": np.maximum(opn, close),
+                "low": np.minimum(opn, close),
+                "close": close,
+                "volume": 1.0,
+            },
+            index=pd.Index(ot, name="open_time"),
+        )
+    net, w = i2.build(coins)
+    assert isinstance(net, pd.Series) and len(net) > 200
+    active = w[w.abs().sum(axis=1) > 0]
+    assert len(active) > 100
+    # (1) whole book is dollar-neutral on every active row
+    assert np.allclose(active.sum(axis=1).to_numpy(), 0.0, atol=1e-9)
+    # (2) EACH multi-name sector's weights sum ~0 on active rows (the load-bearing property)
+    sectors: dict[str, list[str]] = {}
+    for c in w.columns:
+        sectors.setdefault(ut.SECTOR_MAP[c], []).append(c)
+    for sec, cols in sectors.items():
+        block_sum = active[cols].sum(axis=1)
+        assert np.allclose(block_sum.to_numpy(), 0.0, atol=1e-9), f"{sec} not sector-neutral"
+    # (3) singleton sector (Health=LLY) takes ZERO weight on every active bar (forced to 0
+    # by demeaning against itself; the lone leading NaN is the net_from_raw .shift(1) warm-up)
+    assert np.allclose(active["LLYUSDT"].to_numpy(), 0.0, atol=1e-12)
+
+
+def test_iter002_sector_rel_raw_future_bar_no_leak():
+    """The production iter-002 signal (sector_neutralize(mom/rvol)) must be future-bar leak-safe:
+    corrupting raw + forward returns AFTER a cutoff must not change net/weights before it."""
+    pn = _make_panel(seed=24)
+    # Give the synthetic columns a real multi-name sector map (S0..S5 -> A/A/A/B/B/B).
+    smap = {c: ("A" if i < 3 else "B") for i, c in enumerate(pn["close"].columns)}
+    orig = ut.SECTOR_MAP
+    try:
+        ut.SECTOR_MAP = smap
+        raw = i2.sector_rel_raw(pn)
+        net0, w0 = ct.net_from_raw(raw, pn["ret_fwd"])
+        cut = net0.index[len(net0) // 2]
+        raw_c, ret_c = raw.copy(), pn["ret_fwd"].copy()
+        raw_c.loc[raw_c.index >= cut] *= -7.0
+        ret_c.loc[ret_c.index >= cut] += 5.0
+        net1, w1 = ct.net_from_raw(raw_c, ret_c)
+        common = net0.index.intersection(net1.index)
+        common = common[common < cut]
+        pd.testing.assert_series_equal(net0.loc[common], net1.loc[common])
+        pd.testing.assert_frame_equal(w0[w0.index < cut], w1[w1.index < cut])
+    finally:
+        ut.SECTOR_MAP = orig
+
+
 def test_perf_line_hides_oos_by_default():
     """perf_line without reveal_oos must leak NO OOS info: no OOS_Sharpe, and maxDD/netTot
     computed over IS-only (not the full series that extends past OOS_CUTOFF)."""
