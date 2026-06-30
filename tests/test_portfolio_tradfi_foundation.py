@@ -5,6 +5,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import pytest
 
 _ROOT = Path(__file__).resolve().parents[1]
 _TRADFI = _ROOT / "analysis" / "portfolio" / "tradfi"
@@ -744,3 +745,80 @@ def test_iter006_gated_book_stays_sector_neutral():
             assert np.allclose(raw[bucket].sum(axis=1).to_numpy(), 0.0, atol=1e-9)
     finally:
         ut.SECTOR_MAP = orig
+
+
+# =====================================================================================
+# C1 — SPLIT-UNADJUSTMENT REGRESSION GUARD (the data-hardening test that would have caught
+# the Dukascopy bug that BLOCK-PENDING-FIX'd iter-006). Runs against the ON-DISK Yahoo data;
+# skips if the data dir is absent (CI). Split-adjusted total-return data must be CONTINUOUS
+# across split ex-dates: an unadjusted N:1 split prints a single-day open-to-open DOWN gap of
+# -(1 - 1/N) (4:1 -> -0.75, 10:1 -> -0.90, 20:1 -> -0.95). A symmetric |ret|<0.40 floor is
+# NOT usable here because the meme-heavy universe has REAL >40% single-day moves (GME +3.01 /
+# -0.555 on 2021-01-26 / 2021-02-01; COIN +0.54; ASTS +0.55) — those are genuine, not split
+# artifacts. So the guard is two-pronged: (a) a DOWNSIDE split-artifact floor that the worst
+# real single-day collapse (GME -0.555) clears but every named split (>=4:1) trips, and
+# (b) exact continuity at the known split ex-dates.
+# =====================================================================================
+
+# Known split ex-dates the Dukascopy split-unadjustment corrupted (Yahoo total-return fixes them).
+_KNOWN_SPLITS = {
+    "AAPLUSDT": "2020-08-31",  # 4-for-1
+    "AMZNUSDT": "2022-06-06",  # 20-for-1
+    "NVDAUSDT": "2021-07-20",  # 4-for-1
+}
+# Split-down signature floor: catches every named split (>=4:1 -> <=-0.75) while clearing the
+# worst REAL single-day move in 8y of 69 meme-heavy names (GME -0.555). A >~3:1 single-bar
+# collapse on adjusted data is a split-unadjustment artifact, not a tradable price move.
+_SPLIT_FLOOR = -0.65
+
+
+def _disk_ret_fwd():
+    """On-disk Yahoo open-to-open ret_fwd panel (SECTOR_MAP names), or None if data absent (CI)."""
+    base = ct._ROOT / "data"
+    syms = sorted(p.parent.name for p in base.glob("*/1d.csv") if p.parent.name in ut.SECTOR_MAP)
+    if not syms:
+        return None
+    return ct.panels(ct.load_tradfi(syms, None))["ret_fwd"]
+
+
+def test_no_split_unadjustment_down_gaps_on_disk():
+    """No on-disk name may have a single-day open-to-open DOWN gap below the split-artifact floor.
+
+    This is the guard that would have caught the Dukascopy split-unadjustment bug: on unadjusted
+    data AAPL/NVDA print -0.75 and AMZN -0.95 on their split ex-dates — all below -0.65. The
+    worst REAL collapse on clean Yahoo data is GME -0.555 (a genuine meme unwind), which clears
+    the floor. UP-spikes (GME +3.01) are never split artifacts (splits divide price), so the
+    guard is downside-only.
+    """
+    rf = _disk_ret_fwd()
+    if rf is None:
+        pytest.skip("no on-disk tradfi data (CI)")
+    worst = rf.min()  # most-negative open-to-open return per name
+    offenders = {s: round(float(v), 3) for s, v in worst.items() if v < _SPLIT_FLOOR}
+    assert not offenders, (
+        f"split-unadjustment DOWN-gap(s) below floor {_SPLIT_FLOOR}: {offenders} — "
+        "split-adjusted total-return data should never single-bar collapse this hard"
+    )
+
+
+def test_known_split_dates_are_continuous_on_disk():
+    """At each known split ex-date the adjusted series must be CONTINUOUS (|open-to-open ret|<0.40).
+
+    Exact, name-and-date-targeted version of the guard: the Dukascopy bug manifested as a
+    -0.75/-0.95 jump precisely here; on Yahoo total-return data the ±4-calendar-day window around
+    each split clears 0.40 with a wide margin (~0.08), confirming the split is fully adjusted out.
+    """
+    rf = _disk_ret_fwd()
+    if rf is None:
+        pytest.skip("no on-disk tradfi data (CI)")
+    for sym, sd in _KNOWN_SPLITS.items():
+        assert sym in rf.columns, f"{sym} missing from on-disk panel"
+        col = rf[sym].dropna()
+        d = pd.Timestamp(sd)
+        win = col[(col.index >= d - pd.Timedelta(days=4)) & (col.index <= d + pd.Timedelta(days=4))]
+        assert not win.empty, f"{sym}: no bars near split {sd}"
+        mx = float(win.abs().max())
+        assert mx < 0.40, (
+            f"{sym} split {sd}: adjusted series must be continuous (|ret|<0.40) but "
+            f"max|open-to-open ret|={mx:.3f} — split-unadjustment artifact (the Dukascopy bug)"
+        )

@@ -330,6 +330,37 @@ def main():
         "fires near the bottom); this brake targets the SUSTAINED momentum crash, not V-crashes."
     )
 
+    # --- CRASH-WATCH (the iter-001 brief mandated this single-day-outlier diagnostic but it was
+    # never produced): IS-only worst single MONTH + worst single DAY portfolio return of the
+    # iter-006 stack. Surfaces tail single-bar outliers a regime Sharpe can mask. OOS HIDDEN. ---
+    net6_is = ct.is_only(net6)
+    monthly6 = net6_is.groupby(net6_is.index.to_period("M")).sum()
+    wm_period, wm_val = monthly6.idxmin(), float(monthly6.min())
+    wd_date, wd_val = net6_is.idxmin(), float(net6_is.min())
+    print("\n  CRASH-WATCH (iter-006 stack, IS-only, vol-targeted portfolio return):")
+    print(f"    worst MONTH: {wm_period}  {wm_val * 100:+.2f}%")
+    print(f"    worst DAY  : {wd_date.date()}  {wd_val * 100:+.2f}%")
+
+    # --- COST STRESS (Critic I1): iter-006 net IS Sharpe at 1x (6 bps, default) and 2x (12 bps)
+    # COST_SIDE, plus the turnover-implied annual cost drag (mean daily turnover x cost x 252).
+    # The book is cost-fragile; this reports whether the +net survives a 2x cost regime. IS-only;
+    # the gate/signal/band are UNCHANGED — only the per-side cost constant is stressed. ---
+    print("\n  COST STRESS (iter-006 stack, IS-only; signal/band UNCHANGED):")
+    turn6 = ct.turnover(w6, ct.LO0, ct.OOS_CUTOFF)  # band/weights are cost-independent
+    orig_cost = ct.COST_SIDE
+    try:
+        for mult, bps in ((1.0, 6.0), (2.0, 12.0)):
+            ct.COST_SIDE = orig_cost * mult
+            net_c, _ = i3.banded_net(crash_braked_raw(pn), ret_fwd, d)
+            sh_c = ct.msharpe(net_c, ct.LO0, ct.OOS_CUTOFF)
+            ann = ct.COST_SIDE * turn6 * ct.CANDLES_PER_YEAR * 100.0
+            print(
+                f"    {bps:4.0f} bps/side ({mult:.0f}x): net IS_Sharpe={sh_c:+.2f}  "
+                f"turnover-implied annual cost={ann:.1f}%"
+            )
+    finally:
+        ct.COST_SIDE = orig_cost
+
 
 if __name__ == "__main__":
     main()
