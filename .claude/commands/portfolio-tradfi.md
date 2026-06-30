@@ -100,7 +100,7 @@ The orchestrator coordinates + synthesizes + commits. Every iteration uses the F
 - OOS stats require `--confirm` — the engine is the enforcer, not convention.
 
 ## Neutrality roadmap (little by little)
-1. **iter-001** — dollar-neutral XS-momentum anchor (IS scored, leak-safe, regime-survivable). DONE.
+1. **iter-001** — dollar-neutral XS-momentum anchor (foundation code built; IS run + leak-check + critic review PENDING real-data ingest).
 2. **iter-002** — beta-neutral overlay (neutralize net market-beta exposure).
 3. **iter-003** — sector-neutral overlay (dollar/beta within hard-coded sector buckets).
 4. Then layer factors one at a time: short-term reversal, low-vol, quality, vol gross-scaling, regime
@@ -111,7 +111,7 @@ The orchestrator coordinates + synthesizes + commits. Every iteration uses the F
 - `OOS_CUTOFF = 2025-03-24` (immutable). **Daily** bars. Signals past-only; fills at next-open.
 - Universe = Binance `TRADIFI_PERPETUAL` single-company stocks, point-in-time, no survivorship cherry-pick.
   No ETFs/indices, no commodities, no metals, no pre-IPO synthetics.
-- IS window = 2010+ (all-weather tested from iter-001).
+- IS window = 2010+ (all-weather scoring required at iter-001 and every subsequent EXPLORATION).
 - OOS HIDDEN until CONFIRMATION (`--confirm`).
 
 ## Run
