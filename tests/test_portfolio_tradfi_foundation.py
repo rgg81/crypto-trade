@@ -371,6 +371,80 @@ def test_iter002_sector_rel_raw_future_bar_no_leak():
         ut.SECTOR_MAP = orig
 
 
+import iter_003_hysteresis as i3  # noqa: E402
+
+
+def test_iter003_delta0_reproduces_iter002_bit_identical():
+    """delta=0 must reproduce iter-002 net_from_raw EXACTLY (band identity, renorm no-op).
+
+    The pre-registered identity check: with no band, held==target, the per-bar gross renorm is a
+    multiply-by-1.0 no-op, and the .shift(1) lag is the same — so net AND the lagged weight book are
+    bit-for-bit identical to ct.net_from_raw. This anchors every non-zero-delta number as a pure
+    one-change delta off the iter-002 baseline.
+    """
+    pn = _make_panel(seed=31)
+    smap = {c: ("A" if i < 3 else "B") for i, c in enumerate(pn["close"].columns)}
+    orig = ut.SECTOR_MAP
+    try:
+        ut.SECTOR_MAP = smap
+        raw = i2.sector_rel_raw(pn)
+        net_b, w_b = i3.banded_net(raw, pn["ret_fwd"], 0.0)
+        net_i2, w_i2 = ct.net_from_raw(raw, pn["ret_fwd"])
+        pd.testing.assert_series_equal(net_b, net_i2)
+        pd.testing.assert_frame_equal(w_b, w_i2)
+    finally:
+        ut.SECTOR_MAP = orig
+
+
+def test_iter003_banded_future_bar_no_leak():
+    """The BANDED build must be future-bar leak-safe despite the path-dependent recursion.
+
+    The hysteresis recursion held[t]=f(w_tgt[t], held[t-1]) is strictly causal: corrupting the raw
+    signal + forward returns AFTER a cutoff must not change the banded net OR the lagged held book
+    before it. This is the load-bearing guarantee — a path-dependent band that peeked forward would
+    silently inflate IS. Tested at the CHOSEN delta (band active, not the identity).
+    """
+    pn = _make_panel(seed=32)
+    smap = {c: ("A" if i < 3 else "B") for i, c in enumerate(pn["close"].columns)}
+    orig = ut.SECTOR_MAP
+    try:
+        ut.SECTOR_MAP = smap
+        raw = i2.sector_rel_raw(pn)
+        net0, w0 = i3.banded_net(raw, pn["ret_fwd"], i3.CHOSEN_DELTA)
+        cut = net0.index[len(net0) // 2]
+        raw_c, ret_c = raw.copy(), pn["ret_fwd"].copy()
+        raw_c.loc[raw_c.index >= cut] *= -7.0
+        ret_c.loc[ret_c.index >= cut] += 5.0
+        net1, w1 = i3.banded_net(raw_c, ret_c, i3.CHOSEN_DELTA)
+        common = net0.index.intersection(net1.index)
+        common = common[common < cut]
+        pd.testing.assert_series_equal(net0.loc[common], net1.loc[common])
+        pd.testing.assert_frame_equal(w0[w0.index < cut], w1[w1.index < cut])
+    finally:
+        ut.SECTOR_MAP = orig
+
+
+def test_iter003_band_reduces_turnover_monotone():
+    """A larger no-trade band must NOT increase turnover (SNAP band trades strictly less often).
+
+    Mechanical sanity that the band does what it claims — turnover is non-increasing in delta and
+    strictly lower than the delta=0 baseline once the band is active.
+    """
+    pn = _make_panel(seed=33)
+    smap = {c: ("A" if i < 3 else "B") for i, c in enumerate(pn["close"].columns)}
+    orig = ut.SECTOR_MAP
+    try:
+        ut.SECTOR_MAP = smap
+        raw = i2.sector_rel_raw(pn)
+        turns = []
+        for delta in (0.0, 0.01, 0.03):
+            _, w = i3.banded_net(raw, pn["ret_fwd"], delta)
+            turns.append(ct.turnover(w, ct.LO0, ct.HI1))
+        assert turns[1] < turns[0] and turns[2] <= turns[1]  # monotone non-increasing, band active
+    finally:
+        ut.SECTOR_MAP = orig
+
+
 def test_perf_line_hides_oos_by_default():
     """perf_line without reveal_oos must leak NO OOS info: no OOS_Sharpe, and maxDD/netTot
     computed over IS-only (not the full series that extends past OOS_CUTOFF)."""
