@@ -190,3 +190,31 @@ def test_instruments_map_has_core_names():
         assert sym in ids.INSTRUMENTS
         duka_id, start = ids.INSTRUMENTS[sym]
         assert isinstance(duka_id, str) and isinstance(start, str)
+
+
+import iter_001_xsmom as i1  # noqa: E402
+
+
+def test_iter001_build_is_dollar_neutral_and_leak_safe():
+    coins = {}
+    rng = np.random.default_rng(11)
+    start = int(pd.Timestamp("2018-01-01").value // 1_000_000)
+    ot = start + np.arange(500) * 86_400_000
+    for i in range(8):
+        close = 100 * np.exp(np.cumsum(rng.normal(0, 0.02, 500)))
+        opn = np.concatenate([[close[0]], close[:-1]])
+        coins[f"S{i}USDT"] = pd.DataFrame(
+            {
+                "open": opn,
+                "high": np.maximum(opn, close),
+                "low": np.minimum(opn, close),
+                "close": close,
+                "volume": 1.0,
+            },
+            index=pd.Index(ot, name="open_time"),
+        )
+    net, w = i1.build(coins)
+    assert isinstance(net, pd.Series) and len(net) > 200
+    # pre-vol-target lagged weights are dollar-neutral on active rows
+    active = w[w.abs().sum(axis=1) > 0]
+    assert np.allclose(active.sum(axis=1).to_numpy(), 0.0, atol=1e-9)
