@@ -664,3 +664,83 @@ def test_iter005_sleeve_is_past_only():
         pd.testing.assert_frame_equal(s0.loc[early], s1.loc[early])
     finally:
         ut.SECTOR_MAP = orig
+
+
+import iter_006_crashbrake as i6  # noqa: E402
+
+
+def test_iter006_gate_off_reproduces_iter005():
+    """Pre-registered IDENTITY: a forced all-zero crash gate must reproduce iter-005's banded net
+    bit-for-bit. With g=0 the convex blend (1-g)*mh + g*sleeve(252) collapses to mh exactly, so the
+    banded build is byte-identical to iter-005 — anchoring iter-006 as a pure one-change delta."""
+    pn = _make_panel(seed=60)
+    smap = _i4_smap(pn)
+    orig = ut.SECTOR_MAP
+    try:
+        ut.SECTOR_MAP = smap
+        zeros = pd.Series(0.0, index=pn["close"].index)
+        net6, w6 = i3.banded_net(
+            i6.crash_braked_raw(pn, gate=zeros), pn["ret_fwd"], i3.CHOSEN_DELTA
+        )
+        net5, w5 = i3.banded_net(i5.mh_raw(pn), pn["ret_fwd"], i3.CHOSEN_DELTA)
+        pd.testing.assert_series_equal(net6, net5)
+        pd.testing.assert_frame_equal(w6, w5)
+    finally:
+        ut.SECTOR_MAP = orig
+
+
+def test_iter006_gate_on_collapses_to_12_1m_sleeve():
+    """With a forced all-ONE gate, the book collapses to the 12-1m sleeve (the crash book) — the
+    banded build must equal iter-005's one-sleeve sleeve(252) build (the bear-robust fallback)."""
+    pn = _make_panel(seed=61)
+    smap = _i4_smap(pn)
+    orig = ut.SECTOR_MAP
+    try:
+        ut.SECTOR_MAP = smap
+        ones = pd.Series(1.0, index=pn["close"].index)
+        net_on, w_on = i3.banded_net(
+            i6.crash_braked_raw(pn, gate=ones), pn["ret_fwd"], i3.CHOSEN_DELTA
+        )
+        net_s, w_s = i3.banded_net(i5.sleeve(pn, 252), pn["ret_fwd"], i3.CHOSEN_DELTA)
+        pd.testing.assert_series_equal(net_on, net_s)
+        pd.testing.assert_frame_equal(w_on, w_s)
+    finally:
+        ut.SECTOR_MAP = orig
+
+
+def test_iter006_crashbraked_future_bar_no_leak():
+    """The gated build must be future-bar leak-safe: the bear-state gate is a past-only function of
+    the EW-universe trailing return, and the convex blend feeds the strictly-causal iter-003 band.
+    Corrupting the panel + forward returns AFTER a cutoff must not change the braked net OR the
+    lagged held book before it. Reuses the iter-004 combined-build leak harness on the gated raw."""
+    _i4_leak_check(lambda pn: i6.crash_braked_raw(pn))
+
+
+def test_iter006_bear_state_is_past_only():
+    """The crash gate g[t] must be past-only: corrupting the tail of the close panel must not change
+    any gate value before the cutoff (market_index uses close[t]/close[t-1]; the trailing-252 return
+    never reads forward)."""
+    pn = _make_panel(seed=62)
+    g0 = i6.bear_state(pn["close"])
+    cut = g0.index[len(g0) // 2]
+    pn_c = {k: v.copy() for k, v in pn.items()}
+    pn_c["close"].loc[pn_c["close"].index >= cut] *= 3.0
+    g1 = i6.bear_state(pn_c["close"])
+    early = g0.index[g0.index < cut]
+    pd.testing.assert_series_equal(g0.loc[early], g1.loc[early])
+
+
+def test_iter006_gated_book_stays_sector_neutral():
+    """The gated convex blend must stay per-sector net-zero pre-band (a row-wise convex combination
+    of two per-sector-zero books is per-sector-zero) for any gate path — tested with the real
+    data-driven gate."""
+    pn = _make_panel(seed=63)
+    smap = _i4_smap(pn)
+    orig = ut.SECTOR_MAP
+    try:
+        ut.SECTOR_MAP = smap
+        raw = i6.crash_braked_raw(pn).dropna(how="all")
+        for bucket in (["S0", "S1", "S2"], ["S3", "S4", "S5"]):
+            assert np.allclose(raw[bucket].sum(axis=1).to_numpy(), 0.0, atol=1e-9)
+    finally:
+        ut.SECTOR_MAP = orig
