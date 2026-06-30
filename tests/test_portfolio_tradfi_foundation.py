@@ -218,3 +218,18 @@ def test_iter001_build_is_dollar_neutral_and_leak_safe():
     # pre-vol-target lagged weights are dollar-neutral on active rows
     active = w[w.abs().sum(axis=1) > 0]
     assert np.allclose(active.sum(axis=1).to_numpy(), 0.0, atol=1e-9)
+
+
+def test_perf_line_hides_oos_by_default():
+    """perf_line without reveal_oos must leak NO OOS info: no OOS_Sharpe, and maxDD/netTot
+    computed over IS-only (not the full series that extends past OOS_CUTOFF)."""
+    idx = pd.date_range("2024-06-01", periods=500, freq="B")  # crosses 2025-03-24
+    net = pd.Series(0.001, index=idx)  # steady positive so IS total < full total
+    line = ct.perf_line("x", net)
+    assert "OOS_Sharpe" not in line
+    is_net = net[net.index < ct.OOS_CUTOFF]
+    is_tot = ((1 + is_net).cumprod().iloc[-1] - 1) * 100
+    full_tot = ((1 + net).cumprod().iloc[-1] - 1) * 100
+    assert is_tot < full_tot  # proves OOS rows are excluded from the IS total
+    assert f"netTot={is_tot:+.0f}%" in line
+    assert "OOS_Sharpe" in ct.perf_line("x", net, reveal_oos=True)

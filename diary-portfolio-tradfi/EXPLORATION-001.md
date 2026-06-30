@@ -11,7 +11,8 @@
 Cross-sectional price momentum (rank long winners / short losers on a 12-1 month lookback) is the
 most-documented equity factor and a natural starting point for the TradFi perp universe. A simple
 dollar-neutral long/short implementation, vol-targeted at ~10–15%, should net a positive IS Sharpe
-across 2010–2025-03 (covering 2020 COVID + 2022 bear) without requiring beta or sector neutralization.
+across ~2018-01 to 2025-03-23 (covering 2020 COVID + 2022 bear; Dukascopy US-stock depth starts ~2018)
+without requiring beta or sector neutralization.
 This establishes the anchor that every subsequent EXPLORATION beats or improves upon.
 
 ---
@@ -36,7 +37,7 @@ This establishes the anchor that every subsequent EXPLORATION beats or improves 
 
 **PENDING** — ingest pipeline not yet run against real Dukascopy data.
 
-| Metric | IS (2010–2025-03-23) |
+| Metric | IS (~2018-01 to 2025-03-23) |
 |--------|----------------------|
 | Net Sharpe | PENDING |
 | Ann. Return (net) | PENDING |
@@ -49,7 +50,7 @@ This establishes the anchor that every subsequent EXPLORATION beats or improves 
 
 | Regime | Period | Net Sharpe | Max DD |
 |--------|---------|------------|--------|
-| Bull (2010–2019) | 2010-01 → 2019-12 | PENDING | PENDING |
+| Bull (2018–2019) | 2018-01 → 2019-12 | PENDING | PENDING |
 | COVID crash | 2020-01 → 2020-06 | PENDING | PENDING |
 | Recovery bull | 2020-07 → 2021-12 | PENDING | PENDING |
 | 2022 bear | 2022-01 → 2022-12 | PENDING | PENDING |

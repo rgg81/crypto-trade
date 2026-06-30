@@ -150,11 +150,16 @@ def regime_sharpe(net: pd.Series) -> dict[str, float]:
 
 
 def perf_line(label: str, net: pd.Series, *, reveal_oos: bool = False) -> str:
-    """One-line IS performance summary. OOS hidden unless reveal_oos=True (CONFIRMATION)."""
-    eq = (1 + net).cumprod()
+    """One-line IS performance summary. OOS hidden unless reveal_oos=True (CONFIRMATION).
+
+    When reveal_oos is False, maxDD and netTot are computed over the IS-only slice too —
+    not just IS_Sharpe — so an EXPLORATION run leaks NO OOS information.
+    """
+    src = net if reveal_oos else is_only(net)
+    eq = (1 + src).cumprod()
     parts = [
         f"  {label:18} IS_Sharpe={msharpe(net, LO0, OOS_CUTOFF):+.2f}",
-        f"maxDD={maxdd(net) * 100:5.1f}%",
+        f"maxDD={maxdd(src) * 100:5.1f}%",
         f"netTot={(eq.iloc[-1] - 1) * 100:+.0f}%",
     ]
     if reveal_oos:

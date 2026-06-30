@@ -28,8 +28,9 @@ A change is "real" when it survives:
    hindsight-picked. Per-month tuning of ALL params is itself a hidden cheat.
 4. **OOS HIDDEN** — `OOS_CUTOFF = 2025-03-24`. EXPLORATIONs scored IS-only. OOS revealed ONLY at a
    CONFIRMATION, via `--confirm`. Mechanically enforced: engine refuses OOS stats without `--confirm`.
-5. **All-weather** — IS spans 2010+, including 2020 COVID and 2022 bear. Every iteration scored
-   bull / bear / chop; survivable (bounded drawdown) is required, not merely peak-Sharpe.
+5. **All-weather** — IS spans ~2018+ (Dukascopy US-stock depth starts ~2018), including 2020 COVID
+   and 2022 bear. Every iteration scored bull / bear / chop; survivable (bounded drawdown) is
+   required, not merely peak-Sharpe.
 6. **Benchmarks (at CONFIRMATION)** — beat an equal-weight stock basket and market proxy on
    risk-adjusted terms; report turnover + Sharpe at 1×/2× cost. Net Sharpe is what counts.
 
@@ -53,11 +54,12 @@ clears a trailing $-volume / data-availability gate. Recent IPOs enter via ragge
 back-fabricated. Survivorship-safe by construction.
 
 ## Data strategy
-Binance TradFi perps onboarded 2026 → only months of native history. The 2010+ IS therefore comes from
+Binance TradFi perps onboarded 2026 → only months of native history. The ~2018+ IS therefore comes from
 **Dukascopy daily underlying** OHLC via `dukascopy-node` (free, no key), the proven metals pattern.
 
-- **Backtest (2010+):** `analysis/portfolio/tradfi/ingest_dukascopy_stocks.py` writes
-  `data/<TICKER>/1d.csv` in Binance Kline CSV format. Mega-caps from 2010; recent IPOs from listing.
+- **Backtest (~2018+):** `analysis/portfolio/tradfi/ingest_dukascopy_stocks.py` writes
+  `data/<TICKER>/1d.csv` in Binance Kline CSV format. Instruments start ~2018 (Dukascopy US-stock
+  depth); recent IPOs from their listing date.
 - **Recent / live:** Binance daily-resampled `TRADIFI_PERPETUAL` klines; live venue is the 24/7 perp,
   rebalanced once daily at a fixed UTC time.
 - **Known deployment caveat (not a research blocker):** backtest uses underlying-stock prices; live
@@ -111,7 +113,8 @@ The orchestrator coordinates + synthesizes + commits. Every iteration uses the F
 - `OOS_CUTOFF = 2025-03-24` (immutable). **Daily** bars. Signals past-only; fills at next-open.
 - Universe = Binance `TRADIFI_PERPETUAL` single-company stocks, point-in-time, no survivorship cherry-pick.
   No ETFs/indices, no commodities, no metals, no pre-IPO synthetics.
-- IS window = 2010+ (all-weather scoring required at iter-001 and every subsequent EXPLORATION).
+- IS window = ~2018+ (Dukascopy US-stock depth; covers 2020 COVID + 2022 bear; all-weather scoring
+  required at iter-001 and every subsequent EXPLORATION).
 - OOS HIDDEN until CONFIRMATION (`--confirm`).
 
 ## Run

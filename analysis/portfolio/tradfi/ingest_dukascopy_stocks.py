@@ -68,7 +68,10 @@ def resample_daily(h1: pd.DataFrame) -> pd.DataFrame:
         h1 = h1.copy()
         h1.index = idx
     g = h1.resample("1D")
-    vol_series = g["volume"].sum() if "volume" in h1.columns else pd.Series(0.0, index=g["open"].first().index)
+    if "volume" in h1.columns:
+        vol_series = g["volume"].sum()
+    else:
+        vol_series = pd.Series(0.0, index=g["open"].first().index)
     daily = pd.DataFrame(
         {
             "open": g["open"].first(),
