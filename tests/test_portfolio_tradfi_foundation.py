@@ -185,6 +185,44 @@ def test_resample_daily_aggregates_intraday_ohlc():
     assert d0["open_time"] == int(pd.Timestamp("2021-03-01", tz="UTC").value // 1_000_000)
 
 
+def test_resample_daily_drops_weekend_and_flat_holiday_bars():
+    """TRADING-DAY filter: weekends AND flat (high==low) holiday carries are DROPPED.
+
+    Equities trade ~252 days/yr; the Dukascopy stock-CFD feed pads closed days with a flat
+    carried quote. resample_daily must drop them so shift(252)==12 trading months stays valid.
+    Each clause is exercised independently: Sat/Sun carry a NON-flat range (only the weekday
+    clause can drop them) and a weekday holiday is FLAT (only the high==low clause can drop it).
+    """
+    spec = [
+        ("2021-03-05", "trading"),  # Fri -> kept
+        ("2021-03-06", "weekend"),  # Sat, NON-flat -> dropped by weekday clause
+        ("2021-03-07", "weekend"),  # Sun, NON-flat -> dropped by weekday clause
+        ("2021-03-08", "trading"),  # Mon -> kept
+        ("2021-03-09", "holiday"),  # Tue, FLAT carry -> dropped by high==low clause
+        ("2021-03-10", "trading"),  # Wed -> kept
+    ]
+    frames = []
+    for date, kind in spec:
+        hrs = pd.date_range(f"{date} 14:00", periods=4, freq="h", tz="UTC")
+        if kind == "holiday":  # flat carried quote: open==high==low==close
+            op = hi = lo = cl = np.full(4, 50.0)
+        else:  # trading + weekend both get a real intraday range (high != low)
+            base = 10.0 if kind == "trading" else 20.0
+            op = base + np.arange(4, dtype=float)
+            hi, lo, cl = op + 0.5, op - 0.5, op + 0.1
+        frames.append(
+            pd.DataFrame({"open": op, "high": hi, "low": lo, "close": cl, "volume": 1.0}, index=hrs)
+        )
+    daily = ids.resample_daily(pd.concat(frames))
+    kept = [str(d.date()) for d in pd.to_datetime(daily["open_time"], unit="ms")]
+    assert kept == [
+        "2021-03-05",
+        "2021-03-08",
+        "2021-03-10",
+    ]  # 3 trading days; 2 weekend + 1 holiday dropped
+    assert len(daily) == 3
+
+
 def test_instruments_map_has_core_names():
     for sym in ("AAPLUSDT", "MSFTUSDT", "TSLAUSDT", "JPMUSDT"):
         assert sym in ids.INSTRUMENTS

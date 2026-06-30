@@ -110,10 +110,19 @@ def _price(x: float) -> str:
 
 
 def resample_daily(h1: pd.DataFrame) -> pd.DataFrame:
-    """Intraday OHLC (tz-aware UTC index) → daily OHLC with open_time(ms)+OHLCV columns.
+    """Intraday OHLC (tz-aware UTC index) → daily TRADING-DAY OHLC with open_time(ms)+OHLCV cols.
 
     open = first open of the UTC calendar day, high = max, low = min, close = last close,
     volume = sum. Empty days are dropped (no fabrication of non-trading days).
+
+    TRADING-DAY filter: equities trade ~252 days/yr, but the Dukascopy stock-CFD feed carries
+    FLAT weekend/holiday quotes (open==high==low==close, zero intraday range) for every closed
+    calendar day. Left in, a calendar-daily panel mis-scales every rolling window — shift(252)
+    spans ~8.3 trading months not 12, realized-vol is diluted by ~28.7% flat rows, and
+    CANDLES_PER_YEAR=252 annualises ~365-bar/yr data. We drop non-trading bars two ways:
+      • weekday >= 5 (Sat/Sun) — calendar weekend, robust even to a non-flat weekend CFD quote;
+      • high == low (zero intraday range) — flat carried quote = weekday market holiday.
+    The union yields ~252 bars/yr (empirically 251.7 on AAPL: 250–253 across full years).
     """
     idx = h1.index
     if idx.tz is None:
@@ -134,6 +143,11 @@ def resample_daily(h1: pd.DataFrame) -> pd.DataFrame:
             "volume": vol_series,
         }
     ).dropna(subset=["open", "close"])
+    # Trading-day filter (after OHLC aggregation, before open_time): drop weekends + flat
+    # holiday carries. high>=low always (max>=min), so `high == low` flags zero-range bars.
+    is_weekend = pd.Series(daily.index.weekday >= 5, index=daily.index)
+    is_flat = daily["high"] <= daily["low"]
+    daily = daily[~(is_weekend | is_flat)]
     # pandas 3.0 removed DatetimeIndex.view("int64") and uses datetime64[us] by default,
     # so .asi8 returns microseconds (not nanoseconds), making a naive // 1_000_000 yield
     # seconds instead of milliseconds.  Fix: normalise to ms precision first via .as_unit("ms"),
