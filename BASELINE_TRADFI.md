@@ -15,17 +15,19 @@ signals past-only, fills next-open. Universe = Binance `TRADIFI_PERPETUAL` singl
 | Field | Value |
 |-------|-------|
 | Current baseline iteration | None |
-| Last EXPLORATION | iter-001 — NEGATIVE-CONFIRMED (IS −0.18, leak-free, real) |
+| Working best | iter-006 — net **+0.31** IS (clears +0.30 bar; PROMOTE-CANDIDATE, pending Critic + iter-007) |
 | IS Sharpe | — (no baseline) |
 | OOS Sharpe | — (hidden until a CONFIRMATION) |
 | Universe size | 39 (Dukascopy-sourceable of 42 TradFi single-stock perps) |
-| Neutrality | dollar-neutral tested (NEGATIVE); next = sector-RELATIVE signal (iter-002) |
-| Last updated | 2026-06-30 (iter-001 closeout) |
+| Construction | sector-relative multi-horizon momentum + hysteresis band + bear-state crash gate |
+| Last updated | 2026-06-30 (iter-006; iter-007 optimizer in flight) |
 
 ## EXPLORATION log
 
-- **iter-001** (2026-06-30) — dollar-neutral 12-1m cross-sectional momentum. **NEGATIVE-CONFIRMED**
-  IS −0.18 (gross −0.04, signal-driven), maxDD −45.2%, regimes bull −0.20 / bear +0.36 / chop −0.62,
-  negate −0.10 (no reversal edge), β≈0. Leak PASS (future + same-bar + trading-day filter). Surfaced +
-  fixed a calendar→trading-day data-grain bug (`eef9b524`). Critic BLOCK-PENDING-FIX → NEGATIVE-CONFIRMED.
-  Path forward: sector-RELATIVE momentum at the signal layer (β/sector *weight* overlays demoted — inert).
+- **iter-001** dollar-neutral 12-1m momentum → **NEGATIVE-CONFIRMED** −0.18 (leak-free; surfaced+fixed the
+  calendar→trading-day data bug `eef9b524`). Path: sector-relative at the signal layer.
+- **iter-002** sector-relative momentum → +0.08 (sign flip, gross +0.26). PROMISING.
+- **iter-003** + hysteresis band δ=0.005 → +0.16 (cost-capture, gross +0.29). Working best.
+- **iter-004** + 1m reversal sleeve → NEGATIVE (reversal gross-negative; universe momentum-persistent). Rejected.
+- **iter-005** multi-horizon {3-1,6-1,12-1}m blend → +0.20 (gross +0.40, all-weather 1/3→2/3; deeper bear −0.90). KEPT.
+- **iter-006** momentum-crash brake (bear-state→slow sleeve) → **+0.31 (CLEARS +0.30 bar)**, bull +0.42/bear −0.54/chop +0.26, maxDD −29.9%. PROMOTE-CANDIDATE (pending Critic + iter-007 optimizer comparison). 2022 crash fixed; COVID V-crash residual.
