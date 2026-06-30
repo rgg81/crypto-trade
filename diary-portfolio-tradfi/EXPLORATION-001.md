@@ -8,9 +8,10 @@
 
 ## Hypothesis
 
-Cross-sectional price momentum (rank long winners / short losers on a 12-1 month lookback) is the
-most-documented equity factor and a natural starting point for the TradFi perp universe. A simple
-dollar-neutral long/short implementation, vol-targeted at ~10–15%, should net a positive IS Sharpe
+Cross-sectional price momentum (continuously weight each name by its risk-adjusted 12-1 month
+return — long the above-average names, short the below-average ones) is the most-documented equity
+factor and a natural starting point for the TradFi perp universe. A simple dollar-neutral long/short
+implementation, vol-targeted at ~10–15%, should net a positive IS Sharpe
 across ~2018-01 to 2025-03-23 (covering 2020 COVID + 2022 bear; Dukascopy US-stock depth starts ~2018)
 without requiring beta or sector neutralization.
 This establishes the anchor that every subsequent EXPLORATION beats or improves upon.
@@ -24,9 +25,13 @@ This establishes the anchor that every subsequent EXPLORATION beats or improves 
 
 - Universe: `universe_tradfi.py` — Binance `TRADIFI_PERPETUAL` single-company stocks, PIT, exclude sets
   applied.
-- Signal: XS-momentum = 12-1 month return rank (exclude most-recent month, classic Jegadeesh-Titman).
-- Weights: long top-tercile, short bottom-tercile; dollar-neutral (net weight = 0); vol-targeted at ~12%
-  annualized ex-ante (clip at 2× leverage).
+- Signal: XS-momentum = 12-1 month return (exclude most-recent month, classic Jegadeesh-Titman),
+  inverse-vol scaled (`mom / 63d realized vol`).
+- Weights: CONTINUOUS, not tercile/discrete buckets. Each name's weight = its inverse-vol-scaled
+  momentum minus the cross-sectional mean (`dollar_neutralize(mom/rvol)`), so the book is
+  dollar-neutral (Σ weight = 0) by construction. Names with above-average risk-adjusted momentum
+  are long, below-average short, sized by magnitude across the full cross-section. Gross-normalized
+  → lagged → vol-targeted at ~12% annualized ex-ante (clip at MAX_LEV).
 - Execution: signal on CLOSE[t], rebalance at next-open OPEN[t+1]; taker cost ≈ 6 bps/side on weight
   delta; no funding.
 - Implementation: `analysis/portfolio/tradfi/iter_001_xsmom.py`.

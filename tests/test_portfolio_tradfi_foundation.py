@@ -220,6 +220,42 @@ def test_iter001_build_is_dollar_neutral_and_leak_safe():
     assert np.allclose(active.sum(axis=1).to_numpy(), 0.0, atol=1e-9)
 
 
+def test_production_xsmom_future_bar_no_leak():
+    """The REAL production signal (dollar_neutralize(mom/rvol)) must be future-bar leak-safe.
+
+    Corrupting the raw signal + forward returns AFTER a cutoff must not change net/weights
+    before it. Mirrors test_future_bar_corruption_does_not_change_past_net but against the
+    production i1.xsmom_raw operation order, not the local _xsmom_raw proxy.
+    """
+    pn = _make_panel(seed=22)
+    raw = i1.xsmom_raw(pn)
+    net0, w0 = ct.net_from_raw(raw, pn["ret_fwd"])
+    cut = net0.index[len(net0) // 2]
+    raw_c, ret_c = raw.copy(), pn["ret_fwd"].copy()
+    raw_c.loc[raw_c.index >= cut] *= -7.0
+    ret_c.loc[ret_c.index >= cut] += 5.0
+    net1, w1 = ct.net_from_raw(raw_c, ret_c)
+    common = net0.index.intersection(net1.index)
+    common = common[common < cut]
+    pd.testing.assert_series_equal(net0.loc[common], net1.loc[common])
+    pd.testing.assert_frame_equal(w0[w0.index < cut], w1[w1.index < cut])
+
+
+def test_production_xsmom_same_bar_close_no_leak():
+    """The REAL production signal (dollar_neutralize(mom/rvol)) must be same-bar leak-safe too."""
+    pn = _make_panel(seed=21)
+    raw = i1.xsmom_raw(pn)
+    net0, _ = ct.net_from_raw(raw, pn["ret_fwd"])
+    t = pn["close"].index[300]
+    pn2 = {k: v.copy() for k, v in pn.items()}
+    pn2["close"].loc[t] *= 1.5
+    raw2 = i1.xsmom_raw(pn2)
+    net2, _ = ct.net_from_raw(raw2, pn2["ret_fwd"])
+    common = net0.index.intersection(net2.index)
+    upto_t = common[common <= t]
+    pd.testing.assert_series_equal(net0.loc[upto_t], net2.loc[upto_t])
+
+
 def test_perf_line_hides_oos_by_default():
     """perf_line without reveal_oos must leak NO OOS info: no OOS_Sharpe, and maxDD/netTot
     computed over IS-only (not the full series that extends past OOS_CUTOFF)."""
