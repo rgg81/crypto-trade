@@ -31,20 +31,22 @@ if str(_ROOT / "src") not in sys.path:
 # Dukascopy US single-stock ids are lowercase "<ticker>ususd" (e.g. aaplususd). ADRs use the
 # US-listed line. Verify per-name depth on first ingest; recent IPOs start at listing.
 INSTRUMENTS: dict[str, tuple[str, str]] = {
-    "AAPLUSDT": ("aaplususd", "2010-01-01"),
-    "MSFTUSDT": ("msftususd", "2010-01-01"),
-    "AMZNUSDT": ("amznususd", "2010-01-01"),
-    "NVDAUSDT": ("nvdaususd", "2010-01-01"),
-    "GOOGLUSDT": ("googlususd", "2010-01-01"),
-    "METAUSDT": ("metususd", "2012-05-18"),
-    "TSLAUSDT": ("tslususd", "2010-06-29"),
-    "JPMUSDT": ("jpmususd", "2010-01-01"),
-    "VUSDT": ("vususd", "2010-01-01"),
-    "WMTUSDT": ("wmtususd", "2010-01-01"),
-    "COSTUSDT": ("costususd", "2010-01-01"),
-    "NFLXUSDT": ("nflxususd", "2010-01-01"),
-    "AMDUSDT": ("amdususd", "2010-01-01"),
-    "INTCUSDT": ("intcususd", "2010-01-01"),
+    # Dukascopy US stock data available from ~2018 onwards for most names.
+    # Verified earliest start: aaplususd starts ~2017-01-26 per smoke test 2026-06-30.
+    "AAPLUSDT": ("aaplususd", "2018-01-01"),
+    "MSFTUSDT": ("msftususd", "2018-01-01"),
+    "AMZNUSDT": ("amznususd", "2018-01-01"),
+    "NVDAUSDT": ("nvdaususd", "2018-01-01"),
+    "GOOGLUSDT": ("googlususd", "2018-01-01"),
+    "METAUSDT": ("metususd", "2018-01-01"),
+    "TSLAUSDT": ("tslususd", "2018-01-01"),
+    "JPMUSDT": ("jpmususd", "2018-01-01"),
+    "VUSDT": ("vususd", "2018-01-01"),
+    "WMTUSDT": ("wmtususd", "2018-01-01"),
+    "COSTUSDT": ("costususd", "2018-01-01"),
+    "NFLXUSDT": ("nflxususd", "2018-01-01"),
+    "AMDUSDT": ("amdususd", "2018-01-01"),
+    "INTCUSDT": ("intcususd", "2018-01-01"),
     # NOTE: extend to the full SECTOR_MAP roster on first full ingest; recent IPOs:
     # COINUSDT coinususd 2021-04-14, HOODUSDT hoodususd 2021-07-29, PLTRUSDT pltrususd 2020-09-30
 }
@@ -66,13 +68,14 @@ def resample_daily(h1: pd.DataFrame) -> pd.DataFrame:
         h1 = h1.copy()
         h1.index = idx
     g = h1.resample("1D")
+    vol_series = g["volume"].sum() if "volume" in h1.columns else pd.Series(0.0, index=g["open"].first().index)
     daily = pd.DataFrame(
         {
             "open": g["open"].first(),
             "high": g["high"].max(),
             "low": g["low"].min(),
             "close": g["close"].last(),
-            "volume": g["volume"].sum(),
+            "volume": vol_series,
         }
     ).dropna(subset=["open", "close"])
     # pandas 3.0 removed DatetimeIndex.view("int64") and uses datetime64[us] by default,
@@ -139,7 +142,9 @@ def _run_duka(instrument: str, start: str, end: str, outdir: str, timeout: int =
         return None
     df = pd.read_csv(max(files, key=os.path.getmtime))
     tcol = "timestamp" if "timestamp" in df.columns else df.columns[0]
-    df[tcol] = pd.to_datetime(df[tcol], utc=True, errors="coerce")
+    # dukascopy-node CSV timestamps are Unix-epoch milliseconds; specify unit='ms' so
+    # pandas does not silently interpret them as nanoseconds (collapsing all rows to 1970).
+    df[tcol] = pd.to_datetime(df[tcol], unit="ms", utc=True, errors="coerce")
     df = df.dropna(subset=[tcol]).set_index(tcol)
     df.columns = [c.lower() for c in df.columns]
     keep = [c for c in ("open", "high", "low", "close", "volume") if c in df.columns]
