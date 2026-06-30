@@ -1,7 +1,12 @@
 # EXPLORATION-001 — Dollar-neutral XS-momentum anchor (iter-001)
 
+> ⚠️ **VERDICT OVERTURNED ON CLEAN DATA (2026-06-30).** The NEGATIVE-CONFIRMED below was computed on
+> Dukascopy **split-UNADJUSTED** prices — split-down gaps manufactured a spurious negative. On the corrected
+> Yahoo total-return data the anchor is **+0.23 (POSITIVE)**. This entry is preserved as the historical
+> record of the (contaminated) Dukascopy-era run; see `BASELINE_TRADFI.md` → CLEAN-DATA RE-BASELINE.
+
 **Date:** 2026-06-30
-**Status:** COMPLETE — **NEGATIVE-CONFIRMED** (real, leak-free reject of the bare-momentum anchor). OOS HIDDEN.
+**Status:** SUPERSEDED — was "NEGATIVE-CONFIRMED" on Dukascopy; **+0.23 POSITIVE on clean Yahoo data**. OOS HIDDEN.
 **Cadence:** EXPLORATION (IS-only — `--confirm` NOT passed; OOS never revealed)
 
 ---
