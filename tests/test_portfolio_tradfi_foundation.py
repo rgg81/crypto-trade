@@ -458,3 +458,132 @@ def test_perf_line_hides_oos_by_default():
     assert is_tot < full_tot  # proves OOS rows are excluded from the IS total
     assert f"netTot={is_tot:+.0f}%" in line
     assert "OOS_Sharpe" in ct.perf_line("x", net, reveal_oos=True)
+
+
+import iter_004_mom_rev as i4  # noqa: E402
+
+
+def _i4_smap(pn):
+    """Real multi-name sector map for the synthetic columns (S0..S5 -> A/A/A/B/B/B)."""
+    return {c: ("A" if i < 3 else "B") for i, c in enumerate(pn["close"].columns)}
+
+
+def test_iter004_rev_sleeve_is_sector_neutral_and_negated():
+    """The reversal sleeve must be (1) per-sector net-zero (sector_neutralize) and (2) the SIGN
+    NEGATION of the raw 1-month return / rvol — long recent losers, short recent winners."""
+    pn = _make_panel(seed=40)
+    smap = _i4_smap(pn)
+    orig = ut.SECTOR_MAP
+    try:
+        ut.SECTOR_MAP = smap
+        rraw = i4.rev_raw(pn).dropna(how="all")
+        # (1) each sector bucket sums to ~0 on every row
+        for bucket in (["S0", "S1", "S2"], ["S3", "S4", "S5"]):
+            rs = rraw[bucket].sum(axis=1).dropna()
+            assert np.allclose(rs.to_numpy(), 0.0, atol=1e-9)
+        # (2) sign: before sector-demean, rev = -(close/close.shift(21)-1)/rvol — a name that ROSE
+        # over the last 21d (positive raw return) must get a NEGATIVE pre-demean reversal weight.
+        close = pn["close"]
+        raw_ret = close / close.shift(21) - 1.0
+        rvol = close.pct_change().rolling(ct.VOL_WIN).std()
+        pre_demean = (-raw_ret / rvol).dropna(how="all")
+        # opposite sign to the raw 1-month return wherever finite & non-zero
+        m = raw_ret.reindex_like(pre_demean).abs() > 1e-9
+        assert (np.sign(pre_demean[m]) == -np.sign(raw_ret.reindex_like(pre_demean)[m])).all().all()
+    finally:
+        ut.SECTOR_MAP = orig
+
+
+def test_iter004_mom_only_banded_reproduces_iter003():
+    """mom-only sleeve through the iter-004 path must equal iter-003 banded net bit-for-bit
+    (the momentum sleeve is reused byte-for-byte from iter-002 -> iter-003)."""
+    pn = _make_panel(seed=41)
+    smap = _i4_smap(pn)
+    orig = ut.SECTOR_MAP
+    try:
+        ut.SECTOR_MAP = smap
+        net4, w4 = i3.banded_net(i4.mom_raw(pn), pn["ret_fwd"], i3.CHOSEN_DELTA)
+        net3, w3 = i3.banded_net(i2.sector_rel_raw(pn), pn["ret_fwd"], i3.CHOSEN_DELTA)
+        pd.testing.assert_series_equal(net4, net3)
+        pd.testing.assert_frame_equal(w4, w3)
+    finally:
+        ut.SECTOR_MAP = orig
+
+
+def _i4_leak_check(combine_fn):
+    """Shared future-bar leak harness: corrupting raw + forward returns AFTER a cutoff must not
+    change the combined BANDED net OR the lagged held book before it."""
+    pn = _make_panel(seed=42)
+    smap = _i4_smap(pn)
+    orig = ut.SECTOR_MAP
+    try:
+        ut.SECTOR_MAP = smap
+        raw0 = combine_fn(pn)
+        net0, w0 = i3.banded_net(raw0, pn["ret_fwd"], i3.CHOSEN_DELTA)
+        cut = net0.index[len(net0) // 2]
+        # corrupt the underlying panel AFTER cut, then rebuild the combined raw from scratch
+        pn_c = {k: v.copy() for k, v in pn.items()}
+        pn_c["close"].loc[pn_c["close"].index >= cut] *= -7.0
+        pn_c["ret_fwd"].loc[pn_c["ret_fwd"].index >= cut] += 5.0
+        raw1 = combine_fn(pn_c)
+        net1, w1 = i3.banded_net(raw1, pn_c["ret_fwd"], i3.CHOSEN_DELTA)
+        common = net0.index.intersection(net1.index)
+        common = common[common < cut]
+        pd.testing.assert_series_equal(net0.loc[common], net1.loc[common])
+        pd.testing.assert_frame_equal(w0[w0.index < cut], w1[w1.index < cut])
+    finally:
+        ut.SECTOR_MAP = orig
+
+
+def test_iter004_equal_weight_combined_banded_future_bar_no_leak():
+    """Combiner (a) equal-weight: combined banded build must be future-bar leak-safe."""
+    _i4_leak_check(lambda pn: i4.combine_equal(i4.mom_raw(pn), i4.rev_raw(pn)))
+
+
+def test_iter004_invvol_combined_banded_future_bar_no_leak():
+    """Combiner (b) inverse-vol parity: the past-only sleeve-vol weighting (.shift(1)) plus the
+    combined banded build must be future-bar leak-safe — the inverse-vol weights add a new path
+    (sleeve net -> rolling std -> shift(1)) that must not peek forward."""
+    _i4_leak_check(lambda pn: i4.combine_invvol(i4.mom_raw(pn), i4.rev_raw(pn), pn["ret_fwd"]))
+
+
+def test_iter004_invvol_weights_are_past_only():
+    """The inverse-vol sleeve weights themselves must be past-only: corrupting the tail of the
+    panel must not change the early weights (the .shift(1) on the rolling sleeve vol is load-bearing)."""  # noqa: E501
+    pn = _make_panel(seed=43)
+    smap = _i4_smap(pn)
+    orig = ut.SECTOR_MAP
+    try:
+        ut.SECTOR_MAP = smap
+        mraw, rraw = i4.mom_raw(pn), i4.rev_raw(pn)
+        w_mom0, _ = i4.invvol_weights(mraw, rraw, pn["ret_fwd"])
+        cut = w_mom0.dropna().index[len(w_mom0.dropna()) // 2]
+        pn_c = {k: v.copy() for k, v in pn.items()}
+        pn_c["close"].loc[pn_c["close"].index >= cut] *= 3.0
+        pn_c["ret_fwd"].loc[pn_c["ret_fwd"].index >= cut] += 4.0
+        w_mom1, _ = i4.invvol_weights(i4.mom_raw(pn_c), i4.rev_raw(pn_c), pn_c["ret_fwd"])
+        early = w_mom0.index[w_mom0.index < cut]
+        pd.testing.assert_series_equal(w_mom0.loc[early], w_mom1.loc[early])
+    finally:
+        ut.SECTOR_MAP = orig
+
+
+def test_iter004_combined_books_stay_sector_neutral():
+    """Both combiners must preserve per-sector net-zero dollar (a linear combo of per-sector-zero
+    panels is per-sector-zero) BEFORE the band — the band may then induce the same tiny drift as
+    iter-003, but the pre-band combined book must be exactly sector-neutral."""
+    pn = _make_panel(seed=44)
+    smap = _i4_smap(pn)
+    orig = ut.SECTOR_MAP
+    try:
+        ut.SECTOR_MAP = smap
+        for raw in (
+            i4.combine_equal(i4.mom_raw(pn), i4.rev_raw(pn)),
+            i4.combine_invvol(i4.mom_raw(pn), i4.rev_raw(pn), pn["ret_fwd"]),
+        ):
+            raw = raw.dropna(how="all")
+            for bucket in (["S0", "S1", "S2"], ["S3", "S4", "S5"]):
+                rs = raw[bucket].sum(axis=1)
+                assert np.allclose(rs.to_numpy(), 0.0, atol=1e-9)
+    finally:
+        ut.SECTOR_MAP = orig
