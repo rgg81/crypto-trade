@@ -156,3 +156,37 @@ def test_rolling_beta_is_past_only():
     betas_c = nz.rolling_beta(ret_c, mkt, win=63)
     early = betas.index[betas.index < cut]
     pd.testing.assert_frame_equal(betas.loc[early], betas_c.loc[early])
+
+
+import ingest_dukascopy_stocks as ids  # noqa: E402
+
+
+def test_resample_daily_aggregates_intraday_ohlc():
+    # two UTC days of hourly bars; daily OHLC = first open / max high / min low / last close.
+    idx = pd.date_range("2021-03-01 14:00", periods=13, freq="h", tz="UTC")  # spans 2 sessions
+    h1 = pd.DataFrame(
+        {
+            "open": np.arange(1, 14, dtype=float),
+            "high": np.arange(1, 14, dtype=float) + 0.5,
+            "low": np.arange(1, 14, dtype=float) - 0.5,
+            "close": np.arange(1, 14, dtype=float) + 0.1,
+            "volume": 1.0,
+        },
+        index=idx,
+    )
+    daily = ids.resample_daily(h1)
+    assert list(daily.columns) == ["open_time", "open", "high", "low", "close", "volume"]
+    # day 1 (2021-03-01): bars 14:00..23:00 -> open=row0.open, high=max, low=min, close=last
+    d0 = daily.iloc[0]
+    assert d0["open"] == 1.0
+    assert d0["high"] == h1.loc["2021-03-01"]["high"].max()
+    assert d0["low"] == h1.loc["2021-03-01"]["low"].min()
+    # open_time is midnight-UTC epoch ms of that calendar day
+    assert d0["open_time"] == int(pd.Timestamp("2021-03-01", tz="UTC").value // 1_000_000)
+
+
+def test_instruments_map_has_core_names():
+    for sym in ("AAPLUSDT", "MSFTUSDT", "TSLAUSDT", "JPMUSDT"):
+        assert sym in ids.INSTRUMENTS
+        duka_id, start = ids.INSTRUMENTS[sym]
+        assert isinstance(duka_id, str) and isinstance(start, str)
