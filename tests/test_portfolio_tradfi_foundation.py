@@ -587,3 +587,80 @@ def test_iter004_combined_books_stay_sector_neutral():
                 assert np.allclose(rs.to_numpy(), 0.0, atol=1e-9)
     finally:
         ut.SECTOR_MAP = orig
+
+
+import iter_005_multihorizon as i5  # noqa: E402
+
+
+def test_iter005_single_sleeve_banded_reproduces_iter003():
+    """Pre-registered IDENTITY: a one-sleeve blend `sleeve(252)` through the iter-003 band must
+    reproduce iter-003's banded net. The blend's per-sleeve gross-norm + the band's own gross-norm
+    is idempotent up to MACHINE EPSILON (the extra division re-rounds), so the match is allclose
+    ~1e-16, not bit-exact — the IS Sharpe is identical. This anchors the multi-horizon blend as a
+    pure one-change delta off the iter-002 -> iter-003 12-1m baseline."""
+    pn = _make_panel(seed=50)
+    smap = {c: ("A" if i < 3 else "B") for i, c in enumerate(pn["close"].columns)}
+    orig = ut.SECTOR_MAP
+    try:
+        ut.SECTOR_MAP = smap
+        net5, w5 = i3.banded_net(i5.sleeve(pn, 252), pn["ret_fwd"], i3.CHOSEN_DELTA)
+        net3, w3 = i3.banded_net(i2.sector_rel_raw(pn), pn["ret_fwd"], i3.CHOSEN_DELTA)
+        pd.testing.assert_series_equal(net5, net3, atol=1e-12, rtol=0.0)
+        pd.testing.assert_frame_equal(w5.fillna(0.0), w3.fillna(0.0), atol=1e-12, rtol=0.0)
+        # the IS Sharpe (the reported headline number) matches to machine epsilon — the only
+        # divergence is the extra gross-norm division re-rounding, not a signal-level difference
+        sh5 = ct.msharpe(net5, ct.LO0, ct.OOS_CUTOFF)
+        sh3 = ct.msharpe(net3, ct.LO0, ct.OOS_CUTOFF)
+        assert abs(sh5 - sh3) < 1e-9
+    finally:
+        ut.SECTOR_MAP = orig
+
+
+def test_iter005_multihorizon_banded_future_bar_no_leak():
+    """The multi-horizon BANDED build must be future-bar leak-safe: the blend is a row-wise linear
+    combination of past-only gross-normed sleeves, fed into the strictly-causal iter-003 band.
+    Corrupting the panel + forward returns AFTER a cutoff must not change the banded net OR the
+    lagged held book before it. Reuses the iter-004 combined-build leak harness on mh_raw."""
+    _i4_leak_check(lambda pn: i5.mh_raw(pn))
+
+
+def test_iter005_each_sleeve_is_unit_gross_and_sector_neutral():
+    """Each gross-normed sleeve must (1) be per-sector net-zero (linear combo of sector_neutralize)
+    and (2) have unit gross (sum|w|=1) on every active row — so the equal-weight blend gives each
+    horizon equal scale. The blend itself stays per-sector net-zero (linear combo of zero-sum)."""
+    pn = _make_panel(seed=51)
+    smap = _i4_smap(pn)
+    orig = ut.SECTOR_MAP
+    try:
+        ut.SECTOR_MAP = smap
+        for lookback in i5.HORIZONS_MH:
+            s = i5.sleeve(pn, lookback).dropna(how="all")
+            for bucket in (["S0", "S1", "S2"], ["S3", "S4", "S5"]):
+                assert np.allclose(s[bucket].sum(axis=1).to_numpy(), 0.0, atol=1e-9)
+            gross = s.abs().sum(axis=1)
+            active = gross > 1e-9
+            assert np.allclose(gross[active].to_numpy(), 1.0, atol=1e-9)
+        blend = i5.mh_raw(pn).dropna(how="all")
+        for bucket in (["S0", "S1", "S2"], ["S3", "S4", "S5"]):
+            assert np.allclose(blend[bucket].sum(axis=1).to_numpy(), 0.0, atol=1e-9)
+    finally:
+        ut.SECTOR_MAP = orig
+
+
+def test_iter005_sleeve_is_past_only():
+    """Each momentum sleeve is past-only: corrupting the tail of the close panel must not change any
+    sleeve weight before the cutoff (close.shift(>=21) + trailing-63 rvol never read forward)."""
+    pn = _make_panel(seed=52)
+    smap = _i4_smap(pn)
+    orig = ut.SECTOR_MAP
+    try:
+        ut.SECTOR_MAP = smap
+        s0 = i5.mh_raw(pn)
+        cut = s0.dropna(how="all").index[len(s0.dropna(how="all")) // 2]
+        pn_c = {k: v.copy() for k, v in pn.items()}
+        pn_c["close"].loc[pn_c["close"].index >= cut] *= 3.0
+        s1 = i5.mh_raw(pn_c)
+        early = s0.index[s0.index < cut]
+        pd.testing.assert_frame_equal(s0.loc[early], s1.loc[early])
+    finally:
+        ut.SECTOR_MAP = orig
