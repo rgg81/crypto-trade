@@ -11,6 +11,7 @@ _TRADFI = _ROOT / "analysis" / "portfolio" / "tradfi"
 sys.path.insert(0, str(_TRADFI))
 
 import core_tradfi as ct  # noqa: E402
+import neutralize as nz  # noqa: E402
 import universe_tradfi as ut  # noqa: E402
 
 
@@ -123,3 +124,35 @@ def test_same_bar_close_cannot_affect_its_own_return():
     common = net0.index.intersection(net2.index)
     upto_t = common[common <= t]
     pd.testing.assert_series_equal(net0.loc[upto_t], net2.loc[upto_t])
+
+
+def test_dollar_neutral_rows_sum_to_zero():
+    pn = _make_panel(seed=5)
+    raw = _xsmom_raw(pn).dropna(how="all")
+    dn = nz.dollar_neutralize(raw)
+    rs = dn.sum(axis=1).dropna()
+    assert np.allclose(rs.to_numpy(), 0.0, atol=1e-9)
+
+
+def test_sector_neutral_each_bucket_sums_to_zero():
+    pn = _make_panel(seed=6, k=6)
+    raw = _xsmom_raw(pn).dropna(how="all")
+    smap = {"S0": "A", "S1": "A", "S2": "A", "S3": "B", "S4": "B", "S5": "B"}
+    sn = nz.sector_neutralize(raw, smap)
+    for bucket in (["S0", "S1", "S2"], ["S3", "S4", "S5"]):
+        rs = sn[bucket].sum(axis=1).dropna()
+        assert np.allclose(rs.to_numpy(), 0.0, atol=1e-9)
+
+
+def test_rolling_beta_is_past_only():
+    pn = _make_panel(seed=7)
+    ret = pn["close"].pct_change()
+    mkt = ret.mean(axis=1)
+    betas = nz.rolling_beta(ret, mkt, win=63)
+    # corrupting the tail of returns must not change early betas
+    ret_c = ret.copy()
+    cut = ret.index[250]
+    ret_c.loc[ret_c.index >= cut] *= 9.0
+    betas_c = nz.rolling_beta(ret_c, mkt, win=63)
+    early = betas.index[betas.index < cut]
+    pd.testing.assert_frame_equal(betas.loc[early], betas_c.loc[early])
