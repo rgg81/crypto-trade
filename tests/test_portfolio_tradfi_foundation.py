@@ -85,3 +85,41 @@ def test_net_from_raw_dollar_accounting_and_shape():
     gsum = w.abs().sum(axis=1)
     active = gsum[gsum > 0]
     assert np.allclose(active.to_numpy(), 1.0, atol=1e-9)
+
+
+def test_future_bar_corruption_does_not_change_past_net():
+    """Corrupting raw signal + forward returns AFTER a cutoff must not change net before it."""
+    pn = _make_panel(seed=3)
+    raw = _xsmom_raw(pn)
+    net0, w0 = ct.net_from_raw(raw, pn["ret_fwd"])
+    cut = net0.index[len(net0) // 2]
+    raw_c, ret_c = raw.copy(), pn["ret_fwd"].copy()
+    raw_c.loc[raw_c.index >= cut] *= -7.0
+    ret_c.loc[ret_c.index >= cut] += 5.0
+    net1, w1 = ct.net_from_raw(raw_c, ret_c)
+    common = net0.index.intersection(net1.index)
+    common = common[common < cut]
+    pd.testing.assert_series_equal(net0.loc[common], net1.loc[common])
+    pd.testing.assert_frame_equal(w0[w0.index < cut], w1[w1.index < cut])
+
+
+def test_same_bar_close_cannot_affect_its_own_return():
+    """SAME-BAR leak guard: corrupting close[t] (and only t) must not change net[t] or net[<t].
+
+    This is the leak class the standard future-only test misses (it cost the metals track a
+    withdrawn iteration). A leak-safe signal decided at close[t] is applied via .shift(1) to
+    ret_fwd[t]=open[t+1]/open[t]; the realized return on bar t must not depend on close[t].
+    """
+    pn = _make_panel(seed=4)
+    raw = _xsmom_raw(pn)
+    net0, _ = ct.net_from_raw(raw, pn["ret_fwd"])
+    # Corrupt a single bar's CLOSE deep in the middle, rebuild the signal from it.
+    t = pn["close"].index[300]
+    pn2 = {k: v.copy() for k, v in pn.items()}
+    pn2["close"].loc[t] *= 1.5  # only close[t] perturbed; open/ret_fwd untouched
+    raw2 = _xsmom_raw(pn2)
+    net2, _ = ct.net_from_raw(raw2, pn2["ret_fwd"])
+    # net on bar t (return open[t]->open[t+1], position from close[t-1]) is independent of close[t].
+    common = net0.index.intersection(net2.index)
+    upto_t = common[common <= t]
+    pd.testing.assert_series_equal(net0.loc[upto_t], net2.loc[upto_t])
