@@ -747,6 +747,124 @@ def test_iter006_gated_book_stays_sector_neutral():
         ut.SECTOR_MAP = orig
 
 
+import iter_008_vix_stop as i8  # noqa: E402
+
+
+def _synth_vix(index: pd.DatetimeIndex, seed: int = 70) -> pd.Series:
+    """A VIX-like positive series on `index`: ~15 baseline with fat upside spikes (some > 20/40)."""
+    rng = np.random.default_rng(seed)
+    return pd.Series(12.0 + 8.0 * np.abs(rng.normal(0, 1.0, len(index))), index=index)
+
+
+def _i8_net6(pn):
+    """iter-006 vol-targeted net on a synthetic panel (the series the iter-008 overlays scale)."""
+    return i3.banded_net(i6.crash_braked_raw(pn), pn["ret_fwd"], i6.CHOSEN_DELTA)[0]
+
+
+def test_iter008_vix_brake_inert_below_base_is_identity():
+    """Pre-registered IDENTITY: when VIX never exceeds the baseline (base huge), the VIX scalar is
+    1.0 everywhere and net*scale reproduces the iter-006 net bit-for-bit — the brake is a no-op in
+    calm tape, so every non-trivial number is a pure de-lever delta off iter-006."""
+    pn = _make_panel(seed=64)
+    smap = _i4_smap(pn)
+    orig = ut.SECTOR_MAP
+    try:
+        ut.SECTOR_MAP = smap
+        net6 = _i8_net6(pn)
+        vix = _synth_vix(net6.index)
+        s = i8.vix_scale(vix, base=1e9).reindex(net6.index).fillna(1.0)
+        assert np.allclose(s.to_numpy(), 1.0, atol=1e-12)  # fully inert
+        pd.testing.assert_series_equal(net6 * s, net6)
+    finally:
+        ut.SECTOR_MAP = orig
+
+
+def test_iter008_dd_stop_never_trips_is_identity():
+    """Pre-registered IDENTITY: with D_trip = +inf the drawdown stop never trips, scale==1, and the
+    stopped net equals the iter-006 net bit-for-bit."""
+    pn = _make_panel(seed=65)
+    smap = _i4_smap(pn)
+    orig = ut.SECTOR_MAP
+    try:
+        ut.SECTOR_MAP = smap
+        net6 = _i8_net6(pn)
+        pd.testing.assert_series_equal(i8.dd_brake(net6, d_trip=1e9), net6)
+    finally:
+        ut.SECTOR_MAP = orig
+
+
+def test_iter008_vix_scale_is_past_only():
+    """The VIX brake scalar must be past-only: corrupting the VIX tail after a cutoff must not
+    change any scale value before it (reindex+ffill+`.shift(1)` never reads forward)."""
+    idx = pd.date_range("2020-01-01", periods=300, freq="B")
+    vix = _synth_vix(idx, seed=71)
+    s0 = i8.vix_scale(vix)
+    cut = idx[150]
+    vix_c = vix.copy()
+    vix_c.loc[vix_c.index >= cut] = 999.0
+    s1 = i8.vix_scale(vix_c)
+    early = idx[idx < cut]
+    pd.testing.assert_series_equal(s0.loc[early], s1.loc[early])
+
+
+def test_iter008_dd_brake_is_past_only():
+    """The drawdown stop scalar must be strictly causal: scale[t] depends only on returns before t,
+    so corrupting the net tail after a cutoff must not change any scale value before it."""
+    rng = np.random.default_rng(72)
+    idx = pd.date_range("2020-01-01", periods=300, freq="B")
+    net = pd.Series(rng.normal(0.0003, 0.01, len(idx)), index=idx)
+    s0 = i8.dd_brake_scale(net, d_trip=0.05, floor=0.5, rearm=0.025)
+    cut = idx[150]
+    net_c = net.copy()
+    net_c.loc[net_c.index >= cut] -= 0.5  # huge corruption after the cutoff
+    s1 = i8.dd_brake_scale(net_c, d_trip=0.05, floor=0.5, rearm=0.025)
+    early = idx[idx < cut]
+    pd.testing.assert_series_equal(s0.loc[early], s1.loc[early])
+
+
+def test_iter008_dd_floor_no_self_lock_and_rearms():
+    """floor>0 keeps the de-levered book moving so it can RECOVER and re-arm (no self-lock):
+    on a path that crashes then rallies, the scalar must (1) never drop below the floor and
+    (2) trip to the floor in the crash AND return to 1.0 after the rally re-arms it."""
+    idx = pd.date_range("2020-01-01", periods=120, freq="B")
+    # 40 days of -2%/day crash (>> D_trip) then 80 days of +2%/day recovery
+    path = np.concatenate([np.full(40, -0.02), np.full(80, 0.02)])
+    net = pd.Series(path, index=idx)
+    s = i8.dd_brake_scale(net, d_trip=0.15, floor=0.5, rearm=0.075)
+    assert float(s.min()) >= 0.5 - 1e-12  # never below the floor (no self-lock)
+    assert np.isclose(float(s.min()), 0.5)  # actually tripped to the floor in the crash
+    assert np.isclose(float(s.iloc[-1]), 1.0)  # re-armed to full after the recovery
+
+
+def test_iter008_combined_future_bar_no_leak():
+    """LOAD-BEARING: the COMBINED VIX+stop build must be future-bar leak-safe. Corrupting the panel,
+    the forward returns AND the VIX series after a cutoff must not change the combined net before it
+    — the VIX brake reads only VIX[<t], the stop reads only returns[<t], and both multiply the
+    future-bar-leak-safe iter-006 net."""
+    pn = _make_panel(seed=66)
+    smap = _i4_smap(pn)
+    orig = ut.SECTOR_MAP
+    try:
+        ut.SECTOR_MAP = smap
+        net6 = _i8_net6(pn)
+        vix = _synth_vix(net6.index)
+        d_trip = i8.dd_trip_level(net6)
+        comb0 = i8.dd_brake(net6 * i8.vix_scale(vix).reindex(net6.index).fillna(1.0), d_trip)
+        cut = comb0.index[len(comb0) // 2]
+        pn_c = {k: v.copy() for k, v in pn.items()}
+        pn_c["close"].loc[pn_c["close"].index >= cut] *= -7.0
+        pn_c["ret_fwd"].loc[pn_c["ret_fwd"].index >= cut] += 5.0
+        vix_c = vix.copy()
+        vix_c.loc[vix_c.index >= cut] = 999.0
+        net6_c = _i8_net6(pn_c)
+        comb1 = i8.dd_brake(net6_c * i8.vix_scale(vix_c).reindex(net6_c.index).fillna(1.0), d_trip)
+        common = comb0.index.intersection(comb1.index)
+        common = common[common < cut]
+        pd.testing.assert_series_equal(comb0.loc[common], comb1.loc[common])
+    finally:
+        ut.SECTOR_MAP = orig
+
+
 # =====================================================================================
 # C1 — SPLIT-UNADJUSTMENT REGRESSION GUARD (the data-hardening test that would have caught
 # the Dukascopy bug that BLOCK-PENDING-FIX'd iter-006). Runs against the ON-DISK Yahoo data;
