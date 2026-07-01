@@ -86,7 +86,8 @@ LIVE_EXCLUDED = frozenset({"PAYPUSDT"})
 
 @dataclasses.dataclass(frozen=True)
 class TradfiPaperConfig:
-    equity_usd: float = 100_000.0
+    equity_usd: float = 10_000.0  # real starting budget; $10k trades the book cleanly
+    # (~1% lot-quant shortfall, 66/68 legs clear the $5 min-notional) — see sizing_min_notional.py.
     data_dir: str = str(_ROOT / "data")  # Yahoo underlying bars (backtest source of truth)
     live_data_dir: str = str(_ROOT / "data_live_tradfi")  # Binance perp daily klines
     funding_dir: str = str(_ROOT / "data")  # funding under <funding_dir>/funding_rates/<SYM>.csv
