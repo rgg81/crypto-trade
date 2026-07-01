@@ -66,5 +66,11 @@ an era-strong momentum window). N=2-bear overfitting concern RESOLVED; numbers c
   LTR orthogonal (corr +0.01), fixed the 3 momentum-crash years; misses 2017/2019 (low-dispersion). maxDD −49%.
 - **SEC-EDGAR PIT fundamentals** BUILT (filing-date-clean, 56/69) but VALUE −0.34 / QUALITY −0.09 = negative-EV
   on the mega-cap-GROWTH 69 (2010-25 value drought); orthogonal but don't rescue the bad years. Need breadth.
-- **NEXT = iter-012 broad-universe test** (pivotal): do factors work with real cross-sectional diversity + can
-  a multi-factor book hit 0.5 + positive-all-years on broad US, and how much is realizable within the 69?
+- **iter-012 broad-universe test (525 names) — FALSIFIED the multi-factor premise.** Ceiling = FACTOR problem
+  NOT universe: BAB −0.42 / low-vol −0.95 / reversal −0.94 / value −0.34 / quality −0.09 = ALL dead on broad
+  (2010-25 momentum+growth decade; value/low-vol had a brutal run). SIZE +1.30 = pure SURVIVORSHIP artifact.
+  MOM is STRONGER on the 69 (+0.32) than broad (+0.17). Only MOM + LTR are honest edges. **Net 0.5 +
+  positive-EVERY-year is NOT achievable for a PURE market-neutral book on this data.**
+- **REMAINING LEVER = controlled DIRECTIONAL sleeve** (user-approved): the unwinnable years (2013/17/19) are
+  BULL melt-ups → a bounded trend/TSMOM sleeve (net-long in uptrends, VIX-managed) earns there → the honest
+  path to positive-all-years + higher Sharpe, at the cost of controlled market-beta. = iter-013.
