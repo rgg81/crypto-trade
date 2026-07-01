@@ -74,3 +74,11 @@ an era-strong momentum window). N=2-bear overfitting concern RESOLVED; numbers c
 - **iter-013 controlled directional TSMOM sleeve (λ=0.25) → net +0.63 (CLEARS ≥0.5), 13/16 yrs, β +0.12.**
   Fixed 2013/2017 melt-ups + 2020; controlled tilt (85% neutral). Sharpe bar MET, 16/16 MISSED (3 residual:
   2010 warm-up, 2018 net-long bear, 2019 TSMOM whipsaw). Next iter-014 = multi-horizon trend for 2019.
+- **iter-014 multi-horizon TSMOM → REJECT** (fast 3/6m speeds whipsaw on the 2018 crash+V-recovery; net
+  +0.63→+0.51, 13→12/16). Multi-horizon does NOT generalize to the trend sleeve. **CEILING REACHED.**
+- **HONEST CEILING = iter-013: net +0.63 (clears ≥0.5), 13/16 years, β +0.12 (85% neutral), 15-yr validated,
+  leak-free.** 16/16 is NOT honestly achievable: the 3 misses are structural — 2010 (data warm-up), 2018
+  (net-long bear cost), 2019 (bull year the neutral book misses + TSMOM whipsaw). Positive-EVERY-year would
+  require perfect market timing (long every bull, flat/short every bear, no turning-point whipsaw) AND the
+  factor diversifiers that would smooth years (value/quality/BAB/low-vol) are dead 2010-25. Exhausted:
+  momentum✓ LTR✓ TSMOM✓ VIX✓ | value✗ quality✗ BAB✗ low-vol✗ reversal✗ MVO✗ multi-horizon-trend✗.
