@@ -29,9 +29,29 @@ HORIZONS = (21, 63, 126, 252)  # ~1m / 3m / 6m / 12m in trading days
 VOL_WIN = 63  # 3m realized-vol window for inverse-vol sizing
 PORT_VOL_WIN = 63  # portfolio vol-target lookback
 
-# Fixed IS regime tags (US equity regimes; IS-only, used for all-weather scoring).
+# Fixed IS regime tags (US-equity regimes; IS-only, used for all-weather scoring).
+# 2026-07-01: IS history extended 2018 -> 2010 (iter-009). The 2020+ COVID/2022/chop/bull tags are
+# kept BYTE-IDENTICAL for comparability; the three documented pre-2020 bears below are ADDED so the
+# VIX bear-control can be validated on 5 bears instead of 2. Every boundary is anchored to a MACRO
+# event (S&P 500 peak/trough + the named catalyst), PRE-REGISTERED, and NOT tuned to strategy P&L.
+#   Bear windows (S&P 500 peak -> trough):
+#     2011    US debt-ceiling downgrade / EU sovereign crisis : 2011-07-22 -> 2011-10-03 (~-19%)
+#     2015-16 China deval (Aug 11) / oil crash / growth scare : 2015-08-17 -> 2016-02-11 (~-14%)
+#     2018-Q4 Fed tightening / QT selloff                     : 2018-10-01 -> 2018-12-24 (~-20%)
+#   Chop = documented transitional/range-bound recoveries off each bear trough, anchored to the next
+#   macro pivot (2012 spring low / 2016 US election / 2019 post-trade-war low) — NOT strategy-tuned.
 _REGIMES = [
-    ("bull", "2012-01-01", "2020-02-19"),
+    ("bull", "2010-01-01", "2011-07-22"),  # post-GFC / QE2 recovery rally
+    ("bear", "2011-07-22", "2011-10-03"),  # 2011 debt-ceiling downgrade + EU sovereign crisis
+    ("chop", "2011-10-03", "2012-06-04"),  # choppy EU-tail-risk recovery into the 2012 spring low
+    ("bull", "2012-06-04", "2015-08-17"),  # 2012-2015 QE3 bull
+    ("bear", "2015-08-17", "2016-02-11"),  # 2015-16 China deval / oil crash / global growth scare
+    ("chop", "2016-02-11", "2016-11-04"),  # 2016 V-recovery + Brexit range into the US election
+    ("bull", "2016-11-04", "2018-10-01"),  # 2016-2018 reflation / tax-cut bull
+    ("bear", "2018-10-01", "2018-12-24"),  # 2018-Q4 Fed-tightening / QT selloff
+    ("chop", "2018-12-24", "2019-06-03"),  # early-2019 V-recovery into the May trade-war pullback
+    ("bull", "2019-06-03", "2020-02-19"),  # late-2019 bull into the COVID top
+    # --- existing 2020+ tags, UNCHANGED for comparability ---
     ("bear", "2020-02-19", "2020-04-01"),  # COVID crash
     ("bull", "2020-04-01", "2022-01-03"),
     ("bear", "2022-01-03", "2022-10-13"),  # 2022 bear

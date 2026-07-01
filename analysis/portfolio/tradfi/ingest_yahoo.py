@@ -119,7 +119,11 @@ def download_daily(yticker: str, start: str, end: str, retries: int = 3) -> pd.D
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--symbols", default=",".join(sorted(ut.SECTOR_MAP)))
-    ap.add_argument("--start", default="2018-01-01")
+    # 2026-07-01: start pushed 2018 -> 2010 to extend IS history back to the post-GFC era, bringing
+    # 3 more documented bears (2011 debt-ceiling, 2015-16 China/oil, 2018-Q4 Fed) into the test.
+    # Established names get full 2010+ history; recent IPOs stay ragged (point-in-time, NaN before
+    # listing). OOS cutoff (2025-03-24) is UNCHANGED — extending BACKWARD only grows IS.
+    ap.add_argument("--start", default="2010-01-01")
     # yfinance `end` is EXCLUSIVE -> +1 day to include today's settled bar.
     ap.add_argument("--end", default=str((pd.Timestamp.now("UTC") + pd.Timedelta(days=1)).date()))
     ap.add_argument("--data-dir", default=str(_ROOT / "data"))
