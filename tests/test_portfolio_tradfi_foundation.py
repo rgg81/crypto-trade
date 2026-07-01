@@ -1380,3 +1380,59 @@ def test_iter016_bear_gated_future_bar_no_leak():
         pd.testing.assert_frame_equal(w0[w0.index < cut], w1[w1.index < cut])
     finally:
         ut.SECTOR_MAP = orig
+
+
+import iter_017_rvbrake as i17  # noqa: E402
+
+
+def test_iter017_brake_off_reproduces_iter016():
+    """Pre-registered IDENTITY: brake OFF (TARGET=+inf -> s==1 everywhere) makes the rv-braked net
+    equal the iter-016 deployed net BIT-FOR-BIT. Anchors iter-017 as a pure one-change delta off
+    iter-016 — with s==1 there is nothing to de-lever and the two books coincide."""
+    pn = _make_panel(n=1000, seed=170)
+    smap = _i4_smap(pn)
+    orig = ut.SECTOR_MAP
+    d, f = i15.CHOSEN_DELTA, i15.CHOSEN_FREQ
+    try:
+        ut.SECTOR_MAP = smap
+        net16, _ = i15.banded_net_freq(
+            i16.bear_gated_combined_raw(pn), pn["ret_fwd"], d, f, ct.COST_SIDE
+        )
+        s_off = i17.rv_brake_scale(net16, i17.CHOSEN_WINDOW, 1e18, i17.CHOSEN_FLOOR)
+        # s==1 everywhere (de-lever-only clip; +inf target never binds), so net*s == net exactly
+        assert float(s_off.min()) == 1.0 and float(s_off.max()) == 1.0
+        pd.testing.assert_series_equal(i17._apply(net16, s_off), net16, atol=1e-15, rtol=0.0)
+    finally:
+        ut.SECTOR_MAP = orig
+
+
+def test_iter017_rvbrake_future_bar_no_leak():
+    """LOAD-BEARING: the short-window rv-brake must be future-bar leak-safe. rv_short =
+    net16.rolling(W).std().shift(1) reads ONLY past net (same lag as ct.vol_target_scale) and TARGET
+    is a data-independent constant, so corrupting close + forward returns AFTER a cutoff must leave
+    the rv-braked deployed net before the cutoff bit-identical."""
+    pn = _make_panel(n=1000, seed=171)
+    smap = _i4_smap(pn)
+    orig = ut.SECTOR_MAP
+    d, f = i15.CHOSEN_DELTA, i15.CHOSEN_FREQ
+    try:
+        ut.SECTOR_MAP = smap
+        net0, _ = i15.banded_net_freq(
+            i16.bear_gated_combined_raw(pn), pn["ret_fwd"], d, f, ct.COST_SIDE
+        )
+        s0 = i17.rv_brake_scale(net0, i17.CHOSEN_WINDOW, i17.TARGET, i17.CHOSEN_FLOOR)
+        b0 = i17._apply(net0, s0)
+        cut = b0.index[len(b0) // 2]
+        pn_c = {k: v.copy() for k, v in pn.items()}
+        pn_c["close"].loc[pn_c["close"].index >= cut] *= -7.0
+        pn_c["ret_fwd"].loc[pn_c["ret_fwd"].index >= cut] += 5.0
+        net1, _ = i15.banded_net_freq(
+            i16.bear_gated_combined_raw(pn_c), pn_c["ret_fwd"], d, f, ct.COST_SIDE
+        )
+        s1 = i17.rv_brake_scale(net1, i17.CHOSEN_WINDOW, i17.TARGET, i17.CHOSEN_FLOOR)
+        b1 = i17._apply(net1, s1)
+        common = b0.index.intersection(b1.index)
+        common = common[common < cut]
+        pd.testing.assert_series_equal(b0.loc[common], b1.loc[common])
+    finally:
+        ut.SECTOR_MAP = orig
