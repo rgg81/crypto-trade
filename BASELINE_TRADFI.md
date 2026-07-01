@@ -10,7 +10,7 @@ a baseline. A baseline is promoted only at the first CONFIRMATION (critic PASS, 
 **Track:** portfolio-tradfi (market-neutral L/S Binance TradFi single-company stock perps)
 **Sacred constants:** `OOS_CUTOFF = 2025-03-24`, **trading-day** bars (weekend/holiday padding dropped),
 signals past-only, fills next-open. Universe = Binance `TRADIFI_PERPETUAL` single stocks, 39 sourceable.
-**Promotion criterion:** clears IS bar (≥+0.30, all-weather) → CONFIRMATION with critic PASS; OOS revealed.
+**Promotion criterion (USER-RAISED 2026-07-01):** net IS Sharpe **≥ +0.50 AND POSITIVE EVERY CALENDAR YEAR** → CONFIRMATION with critic PASS; OOS revealed. (~0.28 single-factor momentum is TOO WEAK — need multi-factor diversification. A single momentum book cannot be positive every year.)
 
 | Field | Value |
 |-------|-------|
