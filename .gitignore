@@ -33,6 +33,10 @@ htmlcov/
 # Data
 data/
 
+# Broad-universe TradFi probe data (iter-012; ~500 S&P names, regenerable via
+# analysis/portfolio/tradfi/ingest_yahoo_broad.py — never commit the CSVs).
+data_broad/
+
 # Worktrees
 .worktrees/
 
