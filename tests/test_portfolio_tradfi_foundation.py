@@ -1436,3 +1436,68 @@ def test_iter017_rvbrake_future_bar_no_leak():
         pd.testing.assert_series_equal(b0.loc[common], b1.loc[common])
     finally:
         ut.SECTOR_MAP = orig
+
+
+# ==================================================================================================
+# iter-016 LIVE-DEPLOY parity bridge (Phase 1) — deployed weight book + reconcile bit-exactness
+# ==================================================================================================
+def test_iter016_deployed_weights_matches_backtest_net():
+    """The Task-1 deployed-weights extractor's net reproduces the iter-016 deployed d1x bit-for-bit,
+    and the deployed book runs at vol-target-scaled gross (NOT unit gross), bear-gate tilt."""
+    import iter_008_vix_stop as i8
+    import iter_013_directional as i13
+    import iter_016_bear_gated_tsmom as i16
+
+    base = ct._ROOT / "data"
+    syms = sorted(p.parent.name for p in base.glob("*/1d.csv") if p.parent.name in ut.SECTOR_MAP)
+    if not syms:
+        pytest.skip("no on-disk tradfi data (CI)")
+    pn = ct.panels(ct.load_tradfi(syms, None))
+    s_vix = i8.vix_scale(i8.load_vix_close(pn["ret_fwd"].index))
+    ref = i16.deployed_metrics(
+        i16.bear_gated_combined_raw(pn), pn["ret_fwd"], s_vix, i13.market_return(pn)
+    )
+    net, deployed = i16.deployed_weights(pn, s_vix=s_vix)
+    a, b = ref["d1x"].align(net, join="inner")
+    assert len(a) > 3000
+    assert float((a - b).abs().max()) < 1e-12  # net == backtest d1x, bit-for-bit
+    # DEPLOYED gross is vol-target-scaled (mean > 1 = leverage), not the pre-scale unit gross.
+    gross = deployed.abs().sum(axis=1)
+    live = gross > 1e-9
+    assert float(gross[live].mean()) > 1.0
+    # bit-consistency: net[t] == Σ deployed·ret_fwd − scaled cost (machine eps).
+    w = i16.i15.banded_book_freq(i16.bear_gated_combined_raw(pn), i16.DELTA, i16.FREQ)
+    scale = ct.vol_target_scale(
+        (w * pn["ret_fwd"]).sum(axis=1) - ct.COST_SIDE * (w - w.shift(1)).abs().sum(axis=1)
+    )
+    svix = s_vix.reindex(deployed.index).fillna(1.0)
+    cost = ct.COST_SIDE * (w - w.shift(1)).abs().sum(axis=1)
+    recon = (
+        (deployed * pn["ret_fwd"].reindex(columns=deployed.columns)).sum(axis=1)
+        - scale.reindex(deployed.index).fillna(0.0) * svix * cost
+    ).dropna()
+    ra, rb = net.align(recon, join="inner")
+    assert float((ra - rb).abs().max()) < 1e-14
+
+
+def test_iter016_live_bridge_reconciles_bit_exact():
+    """The live bridge deployed_target_weights(as_of) == the full-backtest deployed book row at
+    as_of, BIT-EXACT (allclose 1e-10), at phase-diverse dates incl. bear-gate-fire + latest bar."""
+    import iter_016_bear_gated_tsmom as i16
+    import live_weights_tradfi as lw
+
+    base = ct._ROOT / "data"
+    syms = sorted(p.parent.name for p in base.glob("*/1d.csv") if p.parent.name in ut.SECTOR_MAP)
+    if not syms:
+        pytest.skip("no on-disk tradfi data (CI)")
+    coins = ct.load_tradfi(syms, None)
+    _, full = i16.deployed_weights(ct.panels(coins))
+    cols, idx = full.columns, full.index
+    gross = full.abs().sum(axis=1)
+    live = idx[gross.values > 1e-9]
+    for ts in (live[len(live) // 2], live[-1]):  # a mid-history bar + the latest bar
+        api = lw.deployed_target_weights(ts, None)
+        api.pop("_meta")
+        ref = full.loc[ts].reindex(cols).fillna(0.0)
+        worst = max((abs(api.get(c, 0.0) - float(ref[c])) for c in cols), default=0.0)
+        assert worst < 1e-10, f"{ts.date()}: live bridge diverges from backtest by {worst:.2e}"

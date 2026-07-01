@@ -97,6 +97,54 @@ def bear_gated_combined_raw(
     return neu.mul(1.0 - lam_eff, axis=0).add(ts.mul(lam_eff, axis=0), fill_value=0.0)
 
 
+# ---------------------------------------------------------------- DEPLOYED position book --------
+def deployed_weights(
+    pn: dict[str, pd.DataFrame],
+    s_vix: pd.Series | None = None,
+    data_dir: str | None = None,
+) -> tuple[pd.Series, pd.DataFrame]:
+    """The iter-016 DEPLOYED weight book — the actual positions the desk HOLDS (Task-1 extractor).
+
+    Mirrors metals `universe_metals.deployed_from_raw`: returns ``(net, deployed_w)`` where
+    ``deployed_w[t]`` is the signed per-name weight book held during bar t, decomposed from the SAME
+    arithmetic as the backtest net so it is bit-consistent (no two-stream reconstruction to drift):
+
+        raw    = bear_gated_combined_raw(pn)                 # (1-lam_eff)*neutral + lam_eff*tsmom
+        w      = i15.banded_book_freq(raw, 0.010, 1)         # band d=0.010, daily, unit-gross+shift
+        net0   = Σ w·ret_fwd − COST_SIDE·Σ|Δw|               # pre-scale leak-safe net
+        scale  = ct.vol_target_scale(net0)                   # 15%/yr vol-target scalar (past-only)
+        s_vix  = clip(20/VIX[t-1], 0.50, 1)                  # iter-008 VIX brake (past-only)
+        deployed_w[t] = w[t] · scale[t] · s_vix[t]           # POST band+vol-target+VIX, bear-gated
+        net[t]        = net0[t] · scale[t] · s_vix[t]        # == deployed_metrics d1x, bit-for-bit
+
+    So ``Σ|deployed_w[t]|`` ≈ ``scale[t]·s_vix[t]`` (the vol-target-scaled gross the desk actually
+    runs — NOT the pre-scale unit gross), and ``Σ deployed_w[t]`` carries the small bear-gated
+    net-long TSMOM tilt (β-tilted, ~sector/dollar-neutral otherwise).
+
+    RAGGED-PANEL / FORMING-BAR SAFETY: the vol-target scale is computed on the NON-``dropna``
+    ``net0`` so the LAST (latest-as-of / forming-adjacent) bar still carries a VALID, causal weight
+    — ``scale[t]`` reads ``net0`` only through ``t-1`` via its own ``.shift(1)``, so the forming
+    bar's NaN ``ret_fwd`` never leaks in. Dropping the tail first (the metals `deployed_from_raw`
+    default) would zero the last row and break live parity for "the book to hold now". ``net`` is
+    ``.dropna``-ed so it matches the backtest ``deployed_metrics`` d1x on the valid bars exactly.
+    Leak-safe: every input is past-only, so slicing ``pn`` to ``≤ as_of`` reproduces this book's
+    ``as_of`` row bit-for-bit (proven in reconcile_tradfi.py).
+    """
+    ret_fwd = pn["ret_fwd"]
+    if s_vix is None:
+        s_vix = i8.vix_scale(i8.load_vix_close(ret_fwd.index, data_dir))
+    raw = bear_gated_combined_raw(pn)
+    w = i15.banded_book_freq(raw, DELTA, FREQ)  # banded, unit-gross, .shift(1)-lagged
+    pnl = (w * ret_fwd.reindex(columns=w.columns)).sum(axis=1)
+    cost = ct.COST_SIDE * (w - w.shift(1)).abs().sum(axis=1)
+    net0 = pnl - cost  # KEEP the forming tail (NO dropna) so scale[as_of] stays valid
+    scale = ct.vol_target_scale(net0)  # .shift(1) inside -> causal; defined on the last bar too
+    svix = s_vix.reindex(w.index).fillna(1.0)
+    deployed = w.mul(scale, axis=0).mul(svix, axis=0)
+    net = (net0 * scale * svix).dropna()
+    return net, deployed
+
+
 # ---------------------------------------------------------------- IS-only deployed metrics ------
 def deployed_metrics(raw, ret_fwd, s_vix, mkt) -> dict:
     """Deployed (band d=0.010, freq=1, VIX-ON) IS metric bundle for a raw book — mirrors i15._cell.
