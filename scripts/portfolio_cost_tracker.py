@@ -156,19 +156,43 @@ def main() -> None:
     def utc(ms):
         return time.strftime("%Y-%m-%d %H:%M", time.gmtime(ms / 1000))
 
-    # one-line summary (monitor greps "COSTS:")
+    # PRODUCTION funding run-rate: current live positions x current PRODUCTION funding rate.
+    # Testnet funding is a synthetic-book artifact (e.g. ESPORTS pinned at the -3.75% cap); the
+    # real cost is what production rates would charge. premiumIndex is a public production
+    # endpoint on a DIFFERENT host, so it never touches the testnet trading IP's rate budget.
+    prod_rate_day = None
+    try:
+        import httpx
+
+        pos = [p for p in a.get_positions() if float(p.get("positionAmt", 0) or 0) != 0]
+        prem = httpx.get("https://fapi.binance.com/fapi/v1/premiumIndex", timeout=15).json()
+        fr = {x["symbol"]: float(x["lastFundingRate"]) for x in prem}
+        per_settle = sum(
+            -(float(p["positionAmt"]) * float(p.get("markPrice", 0) or 0)) * fr[p["symbol"]]
+            for p in pos
+            if p["symbol"] in fr
+        )
+        prod_rate_day = per_settle * 3  # 8h cadence -> 3/day
+    except Exception:  # noqa: BLE001
+        pass
+
+    # one-line summary (monitor greps "COSTS:"). funding is shown BOTH testnet-charged (ledger
+    # ground truth — reconciles to wallet, but a synthetic-book ARTIFACT) and the production
+    # run-rate (the REAL funding cost). testnet_net reconciles to the testnet wallet; the
+    # production-realistic net comes from portfolio_funding_real.py (re-prices funding).
+    prod_str = f"${prod_rate_day:+.2f}/day" if prod_rate_day is not None else "n/a"
     print(
-        f"COSTS: funding ${funding:+,.2f} | commission ${commission:+,.2f} | "
-        f"realized ${realized:+,.2f} | strat_net ${strat_net:+,.2f} | "
-        f"funding_rate ${funding / span_d:+.2f}/day  (+{len(fresh)} new rows, {span_d:.1f}d ledger)"
+        f"COSTS: funding(PROD run-rate) {prod_str} [REAL] | funding(testnet) ${funding:+,.2f} "
+        f"[artifact] | commission ${commission:+,.2f} | realized ${realized:+,.2f} | "
+        f"testnet_net ${strat_net:+,.2f}  (+{len(fresh)} new, {span_d:.1f}d)"
     )
     # detail block
     top_f = sorted(funding_by_coin, key=lambda k: -abs(funding_by_coin[k]))[:5]
     worst = min(funding_by_coin.values()) if funding_by_coin else 0.0
     print(
-        "  funding by coin: "
+        "  testnet funding by coin: "
         + ", ".join(f"{k.replace('USDT', '')}={funding_by_coin[k]:+.1f}" for k in top_f)
-        + f"   (ex-worst: {funding - worst:+.2f})"
+        + f"   (ex-worst {funding - worst:+.2f}; run portfolio_funding_real.py for prod re-price)"
     )
     if transfer:
         print(f"  (excl TRANSFER ${transfer:+,.2f} faucet)  ledger {utc(t_min)}->{utc(t_max)} UTC")
