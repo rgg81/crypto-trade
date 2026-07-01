@@ -37,6 +37,10 @@ data/
 # analysis/portfolio/tradfi/ingest_yahoo_broad.py — never commit the CSVs).
 data_broad/
 
+# Live TradFi single-stock perp klines (Phase-2 deploy reconcile; regenerable via
+# analysis/portfolio/tradfi/ingest_perp_tradfi.py — never commit the CSVs).
+data_live_tradfi/
+
 # Worktrees
 .worktrees/
 
