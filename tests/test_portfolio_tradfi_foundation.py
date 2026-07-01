@@ -865,6 +865,108 @@ def test_iter008_combined_future_bar_no_leak():
         ut.SECTOR_MAP = orig
 
 
+import iter_010_betaneutral as i10  # noqa: E402
+
+
+def _i10_uncond(pn):
+    """The UNCONDITIONAL beta-neutral iter-006 book (raw6 + past-only betas -> beta_neutralize)."""
+    raw6 = i6.crash_braked_raw(pn)
+    return i10.unconditional_raw(raw6, i10.book_betas(pn))
+
+
+def _i10_cond(pn):
+    """The CONDITIONAL beta-neutral book: iter-006 in the bear state, beta-neutral in bull+chop."""
+    raw6 = i6.crash_braked_raw(pn)
+    raw_bn = i10.unconditional_raw(raw6, i10.book_betas(pn))
+    return i10.conditional_raw(raw6, raw_bn, i6.bear_state(pn["close"]))
+
+
+def test_iter010_beta_zero_reproduces_iter006():
+    """Pre-registered IDENTITY: beta_neutralize with all-zero betas leaves the iter-006 book
+    unchanged (a beta-0 name is UN-hedged), so the banded net reproduces iter-006 bit-for-bit.
+    This anchors every non-trivial iter-010 number as a pure one-change delta off iter-006."""
+    pn = _make_panel(seed=80)
+    smap = _i4_smap(pn)
+    orig = ut.SECTOR_MAP
+    try:
+        ut.SECTOR_MAP = smap
+        raw6 = i6.crash_braked_raw(pn)
+        betas0 = i10.book_betas(pn) * 0.0
+        net10, w10 = i3.banded_net(nz.beta_neutralize(raw6, betas0), pn["ret_fwd"], i3.CHOSEN_DELTA)
+        net6, w6 = i3.banded_net(raw6, pn["ret_fwd"], i3.CHOSEN_DELTA)
+        pd.testing.assert_series_equal(net10, net6)
+        pd.testing.assert_frame_equal(w10, w6)
+    finally:
+        ut.SECTOR_MAP = orig
+
+
+def test_iter010_conditional_gate_identities():
+    """CONDITIONAL(g=all-ones) == iter-006 (never neutralize) and CONDITIONAL(g=all-zeros) ==
+    UNCONDITIONAL (always neutralize) — the pre-registered gate-endpoint identities."""
+    pn = _make_panel(seed=81)
+    smap = _i4_smap(pn)
+    orig = ut.SECTOR_MAP
+    try:
+        ut.SECTOR_MAP = smap
+        raw6 = i6.crash_braked_raw(pn)
+        raw_bn = i10.unconditional_raw(raw6, i10.book_betas(pn))
+        ones = pd.Series(1.0, index=pn["close"].index)
+        zeros = pd.Series(0.0, index=pn["close"].index)
+        pd.testing.assert_frame_equal(
+            i10.conditional_raw(raw6, raw_bn, ones).fillna(0.0), raw6.fillna(0.0)
+        )
+        pd.testing.assert_frame_equal(
+            i10.conditional_raw(raw6, raw_bn, zeros).fillna(0.0), raw_bn.fillna(0.0)
+        )
+    finally:
+        ut.SECTOR_MAP = orig
+
+
+def test_iter010_unconditional_removes_net_beta():
+    """The UNCONDITIONAL beta-neutral book must carry ~0 net market beta on active rows — the
+    projection zeroes Σ w·β by construction (the load-bearing property of the one change)."""
+    pn = _make_panel(seed=82)
+    smap = _i4_smap(pn)
+    orig = ut.SECTOR_MAP
+    try:
+        ut.SECTOR_MAP = smap
+        raw6 = i6.crash_braked_raw(pn)
+        betas = i10.book_betas(pn)
+        nb = i10.net_beta_series(i10.unconditional_raw(raw6, betas), betas)
+        active = nb[raw6.abs().sum(axis=1) > 1e-9]
+        assert np.allclose(active.to_numpy(), 0.0, atol=1e-9)
+    finally:
+        ut.SECTOR_MAP = orig
+
+
+def test_iter010_betas_are_past_only():
+    """book_betas must be past-only: corrupting the tail of the close panel must not change any beta
+    before the cutoff (rolling_beta's trailing window + the .shift(1) never read forward)."""
+    pn = _make_panel(seed=83)
+    b0 = i10.book_betas(pn)
+    cut = b0.index[len(b0) // 2]
+    pn_c = {k: v.copy() for k, v in pn.items()}
+    pn_c["close"].loc[pn_c["close"].index >= cut] *= 3.0
+    b1 = i10.book_betas(pn_c)
+    early = b0.index[b0.index < cut]
+    pd.testing.assert_frame_equal(b0.loc[early], b1.loc[early])
+
+
+def test_iter010_betaneutral_future_bar_no_leak():
+    """LOAD-BEARING: the UNCONDITIONAL beta-neutral banded build must be future-bar leak-safe. The
+    betas (rolling_beta + .shift(1)) and the iter-006 book are both past-only, and the transformed
+    book feeds the strictly-causal iter-003 band. Corrupting the panel + forward returns AFTER a
+    cutoff must not change the banded net OR the lagged held book before it. Reuses the iter-004
+    combined-build leak harness on the beta-neutral raw."""
+    _i4_leak_check(_i10_uncond)
+
+
+def test_iter010_conditional_future_bar_no_leak():
+    """The CONDITIONAL beta-neutral build must also be future-bar leak-safe: it composes two
+    past-only books (iter-006 crash-gated + beta-neutral) via the past-only bear-state gate g."""
+    _i4_leak_check(_i10_cond)
+
+
 # =====================================================================================
 # C1 — SPLIT-UNADJUSTMENT REGRESSION GUARD (the data-hardening test that would have caught
 # the Dukascopy bug that BLOCK-PENDING-FIX'd iter-006). Runs against the ON-DISK Yahoo data;
