@@ -65,8 +65,13 @@ def _price(sym: str) -> float | None:
     return None
 
 
-def _quantize(w: float, price: float, filt: dict, equity: float) -> tuple[float, bool]:
-    """Round a target weight to a tradeable (realized_weight, tradeable?) under the perp filters."""
+def quantize_weight(w: float, price: float, filt: dict, equity: float) -> tuple[float, bool]:
+    """Round a target weight to a tradeable ``(realized_weight, tradeable?)`` under perp filters.
+
+    Single source of truth for the lot/min-notional quantization rule, importable by the live paper
+    engine (which quantizes the LIVE track day-by-day) so backtest-feasibility and live-execution
+    share one implementation. Behavior is unchanged from the original private ``_quantize``.
+    """
     target_notional = abs(w) * equity
     step, min_qty, min_notional = filt["step"], filt["min_qty"], filt["min_notional"]
     qty = round(target_notional / price / step) * step  # nearest whole lot
@@ -108,7 +113,7 @@ def main() -> None:
         gross_r = net_r = te = 0.0
         max_rel = ("", 0.0)
         for s, w in book.items():
-            rw, ok = _quantize(w, prices[s], filt[s], eq)
+            rw, ok = quantize_weight(w, prices[s], filt[s], eq)
             if ok:
                 n_tr += 1
             else:
@@ -140,7 +145,9 @@ def main() -> None:
             f"  (binder {b} w={mat[b]:+.4f})"
         )
     # gross share of the legs DROPPED at $10k (the economic cost of the min-notional floor)
-    dropped = [(s, w) for s, w in book.items() if not _quantize(w, prices[s], filt[s], 10_000.0)[1]]
+    dropped = [
+        (s, w) for s, w in book.items() if not quantize_weight(w, prices[s], filt[s], 10_000.0)[1]
+    ]
     dg = sum(abs(w) for _, w in dropped)
     print(
         f"\n  at $10k: {len(dropped)} legs drop {sorted(s for s, _ in dropped)} "
@@ -148,14 +155,16 @@ def main() -> None:
     )
     # smallest legs (the ones that drop first at low equity)
     small = sorted(book.items(), key=lambda kv: abs(kv[1]))[:6]
-    print("  smallest legs (drop first):  " + "  ".join(
-        f"{s} |w|={abs(w):.4f}=${abs(w) * 10_000:,.0f}@10k" for s, w in small
-    ))
+    print(
+        "  smallest legs (drop first):  "
+        + "  ".join(f"{s} |w|={abs(w):.4f}=${abs(w) * 10_000:,.0f}@10k" for s, w in small)
+    )
     # highest-priced legs (worst quantization granularity)
     hi = sorted(book.items(), key=lambda kv: -prices[kv[0]])[:6]
-    print("  highest-priced (coarsest step): " + "  ".join(
-        f"{s} ${prices[s]:,.0f}(step ${0.01 * prices[s]:.2f})" for s, w in hi
-    ))
+    print(
+        "  highest-priced (coarsest step): "
+        + "  ".join(f"{s} ${prices[s]:,.0f}(step ${0.01 * prices[s]:.2f})" for s, w in hi)
+    )
 
 
 if __name__ == "__main__":

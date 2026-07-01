@@ -102,6 +102,12 @@ def _parity_drift(
 
     The exclusion is the load-bearing bit: the LIVE held book never carries PAYP, so a raw target
     that still contains PAYP must have it dropped before the compare or PAYP false-DRIFTs.
+
+    PARITY IS A SIGNAL-FIDELITY CHECK — deliberately PRE-QUANTIZATION. Both `held` (`tradfi_held_w`)
+    and the recomputed `target` are the CONTINUOUS ideal weights, so lot-quantization / sub-min-
+    notional drops (a LIVE-execution effect that lives only in the eq_live track, never in the held
+    book) can NEVER make this drift. A DRIFT here means the SIGNAL itself diverged from the
+    backtest, which is a real correctness bug; quantization is not, by construction.
     """
     tgt = {k: v for k, v in target.items() if k != "_meta" and k not in excluded}
     out = []

@@ -9,16 +9,26 @@ trading-day bars and with a two-track P&L. Each new SETTLED daily bar:
   equity tracks (PARITY = the Yahoo-TR backtest net; LIVE = perp-return − funding − turnover on the
   actual tradeable perps)  →  persist state + snapshot equity  →  log. No real orders.
 
-TWO EQUITY TRACKS
------------------
-  * PARITY (backtest book of record): ``net`` from ``live_weights_tradfi.deployed_book`` compounded
-    since launch. All 69 names, Yahoo total-return. This is the anchor the desk is validated on.
-  * LIVE (the real paper P&L): the SAME deployed weight panel ``deployed_w`` (PAYP dropped), scored
-    on Binance single-stock TradFi-perp returns MINUS funding MINUS turnover cost. Coverage-aware —
-    a name with no perp bar / no funding on a day contributes 0 (ragged onboarding, 34→100 % cover).
+TWO EQUITY TRACKS — SIGNAL vs EXECUTED
+--------------------------------------
+  * PARITY = THE SIGNAL (backtest book of record): ``net`` from
+    ``live_weights_tradfi.deployed_book`` compounded since launch, on the CONTINUOUS ideal weights.
+    All 69 names, Yahoo total-return, realistic cost (``ct.COST_SIDE`` = taker + slippage). This is
+    the reference that must match the backtest bit-for-bit — quantization is NOT a signal error and
+    must NEVER drift it. ``tradfi_held_w`` stays the continuous ideal book for the same reason (the
+    monitor's PARITY check compares to it).
+  * LIVE = THE REAL TRADE (executed paper P&L): the deployed weight panel QUANTIZED to the official
+    Binance perp filters (lot-step rounding + sub-min-notional drops) at each day's perp price,
+    scored on Binance TradFi-perp returns MINUS funding (on the quantized legs) MINUS turnover cost
+    at the SAME ``ct.COST_SIDE`` the backtest owns (slippage is already in it — NOT double-counted;
+    an optional ``live_extra_slippage_side`` stress knob defaults to 0). Coverage-aware — a name
+    with no perp bar / no funding on a day contributes 0 (ragged onboarding, 34→100 % cover).
 
-  ``basis_gap = equity_live − equity_parity`` is the perp-vs-(underlying+funding) residual the
-  Phase-2b reconcile measured at ≈ −85 bps at the whole-book level (100 % perp coverage).
+  ``basis_gap = equity_live − equity_parity`` bundles the full REAL-vs-SIGNAL gap:
+  perp-vs-underlying basis + funding + quantization (lot rounding + dropped sub-min-notional legs).
+  Slippage is in BOTH tracks via ``ct.COST_SIDE`` so it does NOT appear in the gap. Expected
+  non-zero and growing — that is the desk's honesty. Phase-2b measured the basis+funding part at
+  ≈ −85 bps at the whole-book level.
 
 PAYP EXCLUSION
 --------------
@@ -62,6 +72,7 @@ import sys
 import time
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 _HERE = Path(__file__).resolve().parent
@@ -75,6 +86,7 @@ import iter_016_bear_gated_tsmom as champ  # noqa: E402  — the confirmed tradf
 import live_weights_tradfi as lw  # noqa: E402  — parity bridge (deployed_book / deployed_target_weights)
 import perp_map_tradfi as pm  # noqa: E402
 import reconcile_basis_tradfi as rc  # noqa: E402  — REUSE funding-binning + perp fwd-return helpers
+import sizing_min_notional as sizing  # noqa: E402  — REUSE its filter fetch + quantize_weight rule
 import universe_tradfi as ut  # noqa: E402
 
 from crypto_trade.storage import csv_path, read_last_open_time  # noqa: E402
@@ -82,6 +94,11 @@ from crypto_trade.storage import csv_path, read_last_open_time  # noqa: E402
 # The broken PayPal perp (Phase-2b): perp ~$14 vs PayPal ~$43, corr 0.19. Excluded from the LIVE
 # tradeable book; NOT re-normalized (every other name keeps its exact backtest weight).
 LIVE_EXCLUDED = frozenset({"PAYPUSDT"})
+
+# Uniform Binance TradFi-perp filter fallback (verified 2026-07-01: all 69 perps share these). Used
+# only when the live exchangeInfo fetch fails at engine init, so a brief outage never kills the desk
+# (the quantizer keeps running on the uniform default).
+_DEFAULT_FILT = {"min_notional": 5.0, "step": 0.01, "min_qty": 0.01}
 
 
 @dataclasses.dataclass(frozen=True)
@@ -94,6 +111,20 @@ class TradfiPaperConfig:
     db_path: str = str(_ROOT / "data" / "tradfi_paper.db")
     equity_csv: str = str(_ROOT / "data" / "tradfi_equity.csv")
     poll_interval_seconds: int = 60
+    # ── LIVE-track execution realism (PARITY track is untouched — it stays the ideal signal) ──
+    # quantize_live: quantize the LIVE deployed weights to the official Binance perp filters
+    #   (lot-step rounding + sub-min-notional drops) at each day's perp price. Quantization is a
+    #   REAL execution effect, NOT a signal error — it must NEVER touch parity / ``tradfi_held_w``.
+    quantize_live: bool = True
+    # LIVE-track cost = ``ct.COST_SIDE`` (the SAME taker+slippage the backtest/parity already own:
+    #   core_tradfi.COST_SIDE = 0.0006 = 6 bps/side taker + slippage) charged on the QUANTIZED
+    #   turnover. Slippage is a real cost OWNED BY THE BACKTEST and lives in BOTH parity and live,
+    #   so it is NOT re-added here (that would double-count it). The only cost difference vs parity
+    #   is that quantized turnover ≠ continuous turnover — a small, correct quantization effect.
+    #   ``live_extra_slippage_side`` is a STARTING-ASSUMPTION stress knob: extra slippage ABOVE the
+    #   backtest's built-in assumption (to be refined from observed fills). Default 0.0 ⇒ live and
+    #   parity are cost-consistent, so basis_gap = perp basis + funding + quantization ONLY.
+    live_extra_slippage_side: float = 0.0
 
 
 class TradfiPaperEngine:
@@ -106,6 +137,23 @@ class TradfiPaperEngine:
 
         Path(cfg.db_path).parent.mkdir(parents=True, exist_ok=True)
         self.store = StateStore(Path(cfg.db_path))
+        # Official Binance perp filters, fetched ONCE at init and cached for the LIVE quantizer.
+        self._perp_filters = self._load_perp_filters()
+
+    @staticmethod
+    def _load_perp_filters() -> dict[str, dict]:
+        """``{perp_symbol: {min_notional, step, min_qty}}`` from LIVE exchangeInfo (reuses sizing's
+        ``_filters``), fetched once. On ANY fetch failure return ``{}`` — every lookup then resolves
+        to the verified-uniform ``_DEFAULT_FILT`` — so a brief exchangeInfo outage never kills the
+        desk (the quantizer keeps running on the uniform default)."""
+        try:
+            return sizing._filters()
+        except Exception as e:  # noqa: BLE001 — exchangeInfo hiccup must not kill the engine
+            print(
+                f"  [filters] live exchangeInfo fetch failed ({e}); using uniform default filter",
+                flush=True,
+            )
+            return {}
 
     # ── data refresh (Yahoo inputs + perp klines/funding; tolerant like the metals engine) ──
     def refresh_data(self) -> None:
@@ -209,6 +257,71 @@ class TradfiPaperEngine:
         live_ret = perp_pnl + funding_ret - cost
         return live_ret, funding_ret
 
+    # ── quantize a CONTINUOUS weight panel to the per-perp lot/min-notional filters (LIVE only) ──
+    def _quantize_book(self, w: pd.DataFrame, opens: pd.DataFrame) -> pd.DataFrame:
+        """Quantize each continuous deployed weight to its official Binance perp filter at that
+        day's perp OPEN price. Returns a ``q_w`` panel (same index/columns as ``w``): sub-min-
+        notional or sub-lot legs drop to 0 (their gross is simply not deployable live), the rest
+        round to the lot step. Reuses the scalar ``sizing.quantize_weight`` (ONE rule, shared with
+        the backtest-feasibility script) on the perp-available cells only — a cell with no perp open
+        (NaN / ≤ 0) or zero weight stays 0. Quantization is a LIVE-execution effect ONLY; it never
+        touches the parity track or ``tradfi_held_w`` (those stay the continuous ideal signal)."""
+        equity = self.cfg.equity_usd
+        q = pd.DataFrame(0.0, index=w.index, columns=w.columns)
+        for name in w.columns:
+            filt = self._perp_filters.get(name, _DEFAULT_FILT)
+            prices = opens[name].to_numpy(dtype=float)
+            weights = w[name].to_numpy(dtype=float)
+            out = np.zeros(len(weights))
+            live_cells = np.flatnonzero(np.isfinite(prices) & (prices > 0.0) & (weights != 0.0))
+            for r in live_cells:
+                rw, ok = sizing.quantize_weight(float(weights[r]), float(prices[r]), filt, equity)
+                if ok:
+                    out[r] = rw
+            q[name] = out
+        return q
+
+    # ── live-perp track, EXECUTED: quantized fills + funding on the quantized legs + COST_SIDE ──
+    def _live_returns_quantized(self, deployed_w: pd.DataFrame) -> tuple[pd.Series, pd.Series]:
+        """``(live_ret, funding_ret)`` for the REAL executed book — same coverage-aware perp+funding
+        netting as ``_live_returns`` but on the QUANTIZED weight panel.
+
+            q_w[t]         = quantize(deployed_w[t], perp_open[t], filter)   (drop sub-min-notional)
+            live_ret[t]    = Σ q_w·perp_rf − Σ q_w·f_daily − COST·Σ|Δq_w|
+            funding_ret[t] = −Σ q_w·f_daily                       (funding on the quantized legs)
+
+        Cost per side = ``ct.COST_SIDE + live_extra_slippage_side``. With the default stress knob
+        0.0 this is EXACTLY the backtest/parity cost (``ct.COST_SIDE`` = taker + slippage) — so
+        slippage is NOT double-counted; the only cost difference vs parity is quantized vs
+        continuous turnover. Parity + ``tradfi_held_w`` are computed elsewhere and stay CONTINUOUS
+        (the ideal signal)."""
+        perp_map = {
+            k: v for k, v in pm.perp_symbol_map(live=False).items() if k in deployed_w.columns
+        }
+        idx = deployed_w.index
+        perp_opens = rc.load_perp_opens(perp_map, idx, live_dir=Path(self.cfg.live_data_dir))
+        perp_rf = rc.fwd_ret(perp_opens)
+        fdaily = rc.daily_funding(
+            perp_map, idx, funding_dir=Path(self.cfg.funding_dir) / "funding_rates"
+        )
+
+        names = [c for c in deployed_w.columns if c in perp_rf.columns]
+        w = deployed_w[names]
+        prf = perp_rf.reindex(columns=names)
+        fd = fdaily.reindex(columns=names)
+        opens = perp_opens.reindex(columns=names)
+
+        q_w = self._quantize_book(w, opens) if self.cfg.quantize_live else w
+        avail = prf.notna() & fd.notna()  # tradeable-live mask per (day, name)
+        q_live = q_w.where(avail, 0.0)  # coverage-aware: absent leg → 0 (no NaN poison)
+
+        perp_pnl = (q_live * prf.fillna(0.0)).sum(axis=1)
+        funding_ret = -(q_live * fd.fillna(0.0)).sum(axis=1)  # −Σ q_w·f on the quantized legs
+        cost_side = ct.COST_SIDE + self.cfg.live_extra_slippage_side
+        cost = cost_side * (q_live - q_live.shift(1)).abs().sum(axis=1)
+        live_ret = perp_pnl + funding_ret - cost
+        return live_ret, funding_ret
+
     # ── one tick: refresh → detect new settled bar → recompute book → book dual P&L → persist ──
     def run_once(self, *, refresh: bool = True) -> dict | None:
         if refresh:
@@ -253,9 +366,12 @@ class TradfiPaperEngine:
             else self.cfg.equity_usd
         )
 
-        # 3. LIVE track — perp+funding on the SAME lagged weights, PAYP dropped, coverage-aware
+        # 3. LIVE track — the REAL executed book: perp+funding on the QUANTIZED lagged weights (lot
+        #    rounding + sub-min-notional drops at each day's perp price), PAYP dropped, coverage
+        #    aware. Cost = ct.COST_SIDE (same taker+slippage as parity) on quantized turnover — no
+        #    double-count. Parity + held (below) stay CONTINUOUS: quantization is execution.
         dw_live = deployed_w.drop(columns=list(LIVE_EXCLUDED & set(deployed_w.columns)))
-        live_ret, funding_ret = self._live_returns(dw_live)
+        live_ret, funding_ret = self._live_returns_quantized(dw_live)
         live_ret = live_ret.reindex(realized).fillna(
             0.0
         )  # realized bars only (drops warmup+frontier)
@@ -294,7 +410,7 @@ class TradfiPaperEngine:
         print(
             f"  [rebal] as_of={as_of.date()}  gross={gross:.3f}  n_pos={len(held)}  legs={n_legs}  "
             f"eq_parity=${equity_parity:,.0f}  eq_live=${equity_live:,.0f}  "
-            f"basis_gap=${basis_gap:,.0f} ({bps:+.0f}bps)  "
+            f"basis_gap=${basis_gap:,.0f} ({bps:+.0f}bps, incl quant+basis+funding)  "
             f"day_fund=${day_funding:,.2f}  cum_fund=${funding_cum:,.2f}  "
             f"(meta gross={meta['gross']:.3f})",
             flush=True,

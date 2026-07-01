@@ -35,8 +35,14 @@ for _p in (str(_ROOT / "src"), str(_ROOT / "analysis" / "portfolio" / "tradfi"))
 import core_tradfi as ct  # noqa: E402
 import iter_006_crashbrake as i6  # noqa: E402  — the EW-252d bear-state gate (regime read)
 import live_weights_tradfi as lw  # noqa: E402  — for the settled universe resolution
+import sizing_min_notional as sizing  # noqa: E402  — REUSE quantize_weight + _price for leg counts
 import universe_tradfi as ut  # noqa: E402
-from live_tradfi import LIVE_EXCLUDED, TradfiPaperConfig, TradfiPaperEngine  # noqa: E402
+from live_tradfi import (  # noqa: E402
+    _DEFAULT_FILT,
+    LIVE_EXCLUDED,
+    TradfiPaperConfig,
+    TradfiPaperEngine,
+)
 
 from crypto_trade.live.state_store import StateStore  # noqa: E402
 
@@ -67,6 +73,29 @@ def _bear_gate_state(data_dir: str, today_ms: int) -> tuple[int | None, float]:
         return g, r
     except Exception:  # noqa: BLE001 — the regime read is best-effort; never block the digest
         return None, float("nan")
+
+
+def _quant_leg_counts(held: dict[str, float], equity: float) -> tuple[int, int, int, float]:
+    """(n_quantized, n_dropped, n_no_price, gross_dropped) for the CONTINUOUS held book at ``eq``.
+
+    Read-only feasibility snapshot: quantize each ideal leg to the uniform TradFi-perp filter (all
+    69 share ``_DEFAULT_FILT``) at its latest local perp price (``sizing._price`` — no network) to
+    show how many legs the LIVE track places vs drops at the sub-$5 min-notional floor. This is
+    display-only; it never touches the ideal held book (parity stays continuous)."""
+    n_quant = n_drop = n_noprice = 0
+    gross_dropped = 0.0
+    for sym, w in held.items():
+        price = sizing._price(sym)
+        if not price:
+            n_noprice += 1
+            continue
+        _rw, ok = sizing.quantize_weight(w, price, _DEFAULT_FILT, equity)
+        if ok:
+            n_quant += 1
+        else:
+            n_drop += 1
+            gross_dropped += abs(w)
+    return n_quant, n_drop, n_noprice, gross_dropped
 
 
 def main() -> int:
@@ -126,13 +155,23 @@ def main() -> int:
     n_long = sum(1 for w in held.values() if w > 0)
     n_short = sum(1 for w in held.values() if w < 0)
 
+    n_quant, n_drop, n_noprice, gross_drop = _quant_leg_counts(held, equity0)
     print(
         f"TRADFI BOOK + DUAL P&L  (as_of {as_of}, iter-016 bear-gated TSMOM, PAPER)\n"
+        f"  PARITY = signal (ideal book, must match backtest — the correctness check)\n"
         f"  PARITY  ${eq_parity:,.0f}   since-launch {ret_p:+.2f}%   since-last {_pct(prev_p)}\n"
+        f"  LIVE = executed (quantized fills + funding + basis on real perps, "
+        f"same realistic cost)\n"
         f"  LIVE    ${eq_live:,.0f}   since-launch {ret_l:+.2f}%   since-last {_pct(prev_l)}   "
-        f"(perp − funding − cost)\n"
-        f"  basis_gap ${basis_gap:,.0f} ({bps:+.0f}bps)   "
-        f"funding_cum ${fund_cum:,.2f} ({fund_pct:+.3f}% ≈ {fund_ann:+.2f}%/yr carry)\n"
+        f"(quantized perp − funding − cost)\n"
+        f"  basis_gap ${basis_gap:,.0f} ({bps:+.0f}bps) = real execution gap "
+        f"(perp basis + funding + quantization; slippage is in BOTH tracks, not here)\n"
+        f"  funding_cum ${fund_cum:,.2f} ({fund_pct:+.3f}% ≈ {fund_ann:+.2f}%/yr carry, "
+        f"on quant legs)\n"
+        f"  exec @ ${equity0:,.0f}: {n_quant} legs quantized / {n_drop} dropped "
+        f"(sub-$5 min-notional, {gross_drop:.4f} gross)"
+        + (f" / {n_noprice} no-price" if n_noprice else "")
+        + "\n"
         f"  regime {regime}\n"
         f"  book: {len(held)} names (ex-PAYP)   {n_long} long / {n_short} short\n"
         f"  gross Σ|w| {gross:.3f} (${gross * eq_parity:,.0f})   "
