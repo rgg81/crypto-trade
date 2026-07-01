@@ -15,13 +15,13 @@ signals past-only, fills next-open. Universe = Binance `TRADIFI_PERPETUAL` singl
 | Field | Value |
 |-------|-------|
 | Current baseline iteration | None |
-| Working best | iter-006 on **Yahoo** — net **+0.43** IS (bull +0.60/chop +0.56 but **bear −1.23**); NOT promotable until bear fixed (VIX brake + stop-loss in flight); survives 2× cost (+0.27) |
+| Working best | iter-006 on **Yahoo 2010-25** — net **+0.28** IS (bull +0.30/bear −0.24/chop +0.51); with VIX-brake insurance +0.23, bear −0.09 (~flat) = all-weather-ish; ~0.25 Sharpe robust across 5 bears |
 | IS Sharpe | — (no baseline) |
 | OOS Sharpe | — (hidden until a CONFIRMATION) |
 | Universe size | 39 (Dukascopy-sourceable of 42 TradFi single-stock perps) |
 | Construction | sector-relative multi-horizon momentum + hysteresis band + bear-state crash gate |
 | Data source | **Yahoo Finance** (split+dividend-adjusted total-return, 69 names + ^VIX); Dukascopy DEPRECATED (split-unadjusted bug) |
-| Last updated | 2026-06-30 (Yahoo migration + clean-data re-baseline; iter-008 VIX/stop in flight) |
+| Last updated | 2026-07-01 (iter-009 15-yr/5-bear validation; iter-010 beta-neutral in flight) |
 
 ## EXPLORATION log
 
@@ -51,3 +51,12 @@ The momentum edge was **understated** by bad data; the qualitative arc holds and
 problem on clean data = the −1.23 bear** (high-beta recent IPOs whipsaw) → iter-008 = VIX brake + stop-loss.
 iter-006's Dukascopy-calibrated KEEP thresholds need re-calibration (don't trust the in-script REJECT).
 Guard added: split-artifact regression test (no single-day |ret_fwd| beyond known-split continuity).
+
+### 15-YEAR VALIDATION (iter-009, 2010-2025, N≈5 bears)
+Extended IS to 2010 (42 names full history) to fix the N=2-bear gap. **Momentum edge HOLDS: iter-006 +0.28**
+(bull +0.30/bear −0.24/chop +0.51); VIX-alone +0.23 (bear **−0.09 ~flat**). Momentum WON 2 of 5 bears
+(2011 +0.85, 2015-16 +1.39); the real tail is sharp REVERSAL crashes (COVID, 2018-Q4), not bears. VIX brake
+generalizes (fired 5/5, helped 4/5; whiffed moderate-VIX 2018-Q4). Honest downgrade +0.43→+0.28 (2018-25 was
+an era-strong momentum window). N=2-bear overfitting concern RESOLVED; numbers came DOWN on more data.
+- **iter-008** VIX brake + stop-loss → WASH for promote (de-risk trades strong regimes for bear); VIX-alone =
+  near-free crash insurance (bear −1.23→−0.88 @2018 / −0.24→−0.09 @15yr). Ship VIX-alone, don't stack stop.
