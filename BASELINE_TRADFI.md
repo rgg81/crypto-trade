@@ -14,12 +14,12 @@ signals past-only, fills next-open. Universe = Binance `TRADIFI_PERPETUAL` singl
 
 | Field | Value |
 |-------|-------|
-| Current baseline iteration | **iter-015 — CONFIRMED** (cost-robust revision of iter-013; CONFIRMATION-001 + cost cycle) |
+| Current baseline iteration | **iter-016 — CONFIRMED** (bear-gated TSMOM; iter-015 cost-robust + worst-month fix) |
 | Working best | **iter-013** (mom+LTR+0.25·TSMOM, **VIX brake ON = DEPLOYED config**, Yahoo 2010-25) — net **+0.61** / maxDD **−28%** / bear **−0.20** / **13/16 years** / net-β **+0.12** (85% neutral). ONE pinned config → the VIX-ON IS anchor (the earlier +0.63/−32% figures were the VIX-OFF row mislabeled "+VIX" — corrected). Misses 2010(warm-up)/2018(bear)/2019(whipsaw); not 16/16 (structurally unreachable). **2× cost (12 bps/side) stress: net +0.42 (< +0.50 — the ≥0.5 bar breaks under DOUBLED taker cost; robust only at the 6 bps/side base cost).** |
-| IS Sharpe | **+0.67 @1× / +0.52 @2× (2×-cost-ROBUST)** — iter-013 was +0.61/+0.42-fragile; gross +0.81 held, β +0.129 |
-| OOS Sharpe | +3.06 @1× (held-out, frozen; small-N favorable-regime — do NOT extrapolate; through-cycle anchor ~+0.6) |
+| IS Sharpe | **+0.73 @1× / +0.58 @2× (2×-cost-ROBUST)** — gross +0.87, β +0.148; worst yr 2019 −11.1%→**−7.6%**, worst mo Jan-19 −10.8%→**−7.6%** |
+| OOS Sharpe | +3.02 @1× (held-out; do-no-harm ≡ iter-015 — bear-gate fired 0/319 all-bull days, so bear-protection OOS-UNTESTED; small-N, do NOT extrapolate; anchor ~+0.7) |
 | Universe size | 39 (Dukascopy-sourceable of 42 TradFi single-stock perps) |
-| Construction | XS-momentum + LT-reversal + controlled TSMOM tilt + VIX brake; band δ=0.010 (cost-robust); daily |
+| Construction | XS-momentum + LT-reversal + bear-GATED TSMOM tilt (off in EW-252d bear) + VIX brake; band δ=0.010; daily |
 | Data source | **Yahoo Finance** (split+dividend-adjusted total-return, 69 names + ^VIX); Dukascopy DEPRECATED (split-unadjusted bug) |
 | Last updated | 2026-07-01 (iter-009 15-yr/5-bear validation; iter-010 beta-neutral in flight) |
 
