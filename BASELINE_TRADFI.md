@@ -60,3 +60,11 @@ generalizes (fired 5/5, helped 4/5; whiffed moderate-VIX 2018-Q4). Honest downgr
 an era-strong momentum window). N=2-bear overfitting concern RESOLVED; numbers came DOWN on more data.
 - **iter-008** VIX brake + stop-loss → WASH for promote (de-risk trades strong regimes for bear); VIX-alone =
   near-free crash insurance (bear −1.23→−0.88 @2018 / −0.24→−0.09 @15yr). Ship VIX-alone, don't stack stop.
+
+### MULTI-FACTOR PIVOT (iter-011+, bar ≥0.5 + positive every year)
+- **iter-011** mom + 0.5·LTR (3y-1y long-term-reversal value-proxy) → **KEPT net +0.33** (11/16 yrs, 12 w/VIX);
+  LTR orthogonal (corr +0.01), fixed the 3 momentum-crash years; misses 2017/2019 (low-dispersion). maxDD −49%.
+- **SEC-EDGAR PIT fundamentals** BUILT (filing-date-clean, 56/69) but VALUE −0.34 / QUALITY −0.09 = negative-EV
+  on the mega-cap-GROWTH 69 (2010-25 value drought); orthogonal but don't rescue the bad years. Need breadth.
+- **NEXT = iter-012 broad-universe test** (pivotal): do factors work with real cross-sectional diversity + can
+  a multi-factor book hit 0.5 + positive-all-years on broad US, and how much is realizable within the 69?
