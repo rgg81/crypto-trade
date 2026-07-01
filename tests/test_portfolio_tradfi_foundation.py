@@ -1247,13 +1247,42 @@ def test_iter015_freq1_reproduces_iter003_band_bit_identical():
         ut.SECTOR_MAP = orig
 
 
-def test_iter015_two_lever_future_bar_no_leak():
-    """The BAND+FREQ build must be future-bar leak-safe (the load-bearing guarantee).
+def test_iter015_deployed_cell_future_bar_no_leak():
+    """The DEPLOYED cost cell build must be future-bar leak-safe (the load-bearing guarantee).
 
-    stride_hold ffills only STRICTLY-PAST rebalance rows (by integer position), the band recursion
-    is causal, and the .shift(1) lag is standard — so corrupting the raw signal + forward returns
-    AFTER a cutoff must not move the net OR the lagged weight book before it. Tested with BOTH
-    levers active (delta=0.020 band on, freq=5 stride on) — the deployed cost-robust mechanic.
+    Pinned to the CHOSEN deployed cell (i15.CHOSEN_DELTA / i15.CHOSEN_FREQ = 0.010 band, freq=1
+    daily — the least-aggressive robust pick) so the committed leak guard tracks exactly what ships.
+    The band recursion is causal and the .shift(1) lag is standard — so corrupting the raw signal +
+    forward returns AFTER a cutoff must not move the net OR the lagged weight book before it.
+    """
+    pn = _make_panel(seed=42)
+    smap = {c: ("A" if i < 3 else "B") for i, c in enumerate(pn["close"].columns)}
+    orig = ut.SECTOR_MAP
+    d, f = i15.CHOSEN_DELTA, i15.CHOSEN_FREQ
+    try:
+        ut.SECTOR_MAP = smap
+        raw = i2.sector_rel_raw(pn)
+        net0, w0 = i15.banded_net_freq(raw, pn["ret_fwd"], d, f, ct.COST_SIDE)
+        cut = net0.index[len(net0) // 2]
+        raw_c, ret_c = raw.copy(), pn["ret_fwd"].copy()
+        raw_c.loc[raw_c.index >= cut] *= -7.0
+        ret_c.loc[ret_c.index >= cut] += 5.0
+        net1, w1 = i15.banded_net_freq(raw_c, ret_c, d, f, ct.COST_SIDE)
+        common = net0.index.intersection(net1.index)
+        common = common[common < cut]
+        pd.testing.assert_series_equal(net0.loc[common], net1.loc[common])
+        pd.testing.assert_frame_equal(w0[w0.index < cut], w1[w1.index < cut])
+    finally:
+        ut.SECTOR_MAP = orig
+
+
+def test_iter015_stride_path_future_bar_no_leak():
+    """The freq>1 STRIDE path stays leak-guarded even though the deployed cell is freq=1.
+
+    stride_hold ffills only STRICTLY-PAST rebalance rows (by integer position), so corrupting the
+    raw signal + forward returns AFTER a cutoff must not move the pre-cut net/weights. Tested with
+    BOTH levers active (delta=0.020 band on, freq=5 stride on) — keeps the stride machinery covered
+    for any future micro-search that re-enables freq>1.
     """
     pn = _make_panel(seed=42)
     smap = {c: ("A" if i < 3 else "B") for i, c in enumerate(pn["close"].columns)}
