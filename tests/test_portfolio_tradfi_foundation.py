@@ -1323,3 +1323,60 @@ def test_iter015_lower_frequency_reduces_turnover_monotone():
         assert turns[2] <= turns[1] and turns[3] <= turns[2]  # monotone non-increasing
     finally:
         ut.SECTOR_MAP = orig
+
+
+import iter_016_bear_gated_tsmom as i16  # noqa: E402
+
+
+def test_iter016_gate_zero_reproduces_iter015():
+    """Pre-registered IDENTITY: an all-ZERO bear-gate makes lam_eff == LAM everywhere, so
+    bear_gated_combined_raw(pn, LAM, zeros) must equal i13.combined_raw(pn, LAM) BIT-FOR-BIT (the
+    per-bar row scalar 0.25 == the constant 0.25 blend). Anchors iter-016 as a pure one-change
+    delta off iter-015 — with g=0 there is NOTHING to gate and the two books coincide."""
+    pn = _make_panel(n=1000, seed=160)
+    smap = _i4_smap(pn)
+    orig = ut.SECTOR_MAP
+    try:
+        ut.SECTOR_MAP = smap
+        zeros = pd.Series(0.0, index=pn["close"].index)
+        raw_id = i16.bear_gated_combined_raw(pn, i16.LAM, zeros)
+        raw_ref = i13.combined_raw(pn, i16.LAM)
+        pd.testing.assert_frame_equal(raw_id.fillna(0.0), raw_ref.fillna(0.0), atol=1e-15, rtol=0.0)
+        # and the deployed banded net coincides too (identity survives the band + vol-target)
+        net0, _ = i15.banded_net_freq(
+            raw_id, pn["ret_fwd"], i15.CHOSEN_DELTA, i15.CHOSEN_FREQ, ct.COST_SIDE
+        )
+        net1, _ = i15.banded_net_freq(
+            raw_ref, pn["ret_fwd"], i15.CHOSEN_DELTA, i15.CHOSEN_FREQ, ct.COST_SIDE
+        )
+        pd.testing.assert_series_equal(net0, net1, atol=1e-12, rtol=0.0)
+    finally:
+        ut.SECTOR_MAP = orig
+
+
+def test_iter016_bear_gated_future_bar_no_leak():
+    """LOAD-BEARING: the bear-gated combined build must be future-bar leak-safe at the DEPLOYED cell
+    (band d=0.010, freq=1). The gate g reuses the past-only i6.bear_state (reads close.shift(252)),
+    the neutral + TSMOM sleeves read pure past, and the per-bar lam_eff scalar feeds the causal
+    band. Corrupting close + forward returns AFTER a cutoff (on a >756-day panel so LTR + TSMOM are
+    active) must leave the deployed banded net AND the lagged held book before it unchanged."""
+    pn = _make_panel(n=1000, seed=161)
+    smap = _i4_smap(pn)
+    orig = ut.SECTOR_MAP
+    d, f = i15.CHOSEN_DELTA, i15.CHOSEN_FREQ
+    try:
+        ut.SECTOR_MAP = smap
+        raw0 = i16.bear_gated_combined_raw(pn)
+        net0, w0 = i15.banded_net_freq(raw0, pn["ret_fwd"], d, f, ct.COST_SIDE)
+        cut = net0.index[len(net0) // 2]
+        pn_c = {k: v.copy() for k, v in pn.items()}
+        pn_c["close"].loc[pn_c["close"].index >= cut] *= -7.0
+        pn_c["ret_fwd"].loc[pn_c["ret_fwd"].index >= cut] += 5.0
+        raw1 = i16.bear_gated_combined_raw(pn_c)
+        net1, w1 = i15.banded_net_freq(raw1, pn_c["ret_fwd"], d, f, ct.COST_SIDE)
+        common = net0.index.intersection(net1.index)
+        common = common[common < cut]
+        pd.testing.assert_series_equal(net0.loc[common], net1.loc[common])
+        pd.testing.assert_frame_equal(w0[w0.index < cut], w1[w1.index < cut])
+    finally:
+        ut.SECTOR_MAP = orig
