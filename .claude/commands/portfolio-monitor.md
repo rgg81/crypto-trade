@@ -211,6 +211,16 @@ A SECOND book runs ALONGSIDE v1, fully isolated, on a SEPARATE testnet account. 
 - **v2 health check:** `scripts/portfolio_v2_healthcheck.py` (v2 paths/creds/account; STATUS OK|ALERT).
   Run it with `source ~/.binance_testnet_v2_env` (NOT v1's). The full v2 parity/candle/digest suite is
   a roadmap item — for now the healthcheck + a manual log scan cover the TEST-INTEGRITY essentials.
+  NOTE its one-line `uPnL` is MARK-ONLY (open-position mark-to-market); it does NOT include funding/fees.
+- **v2 all-in cost accounting (REALISTIC bottom line):** `scripts/portfolio_v2_pnl.py` (v15). Since these
+  are REAL exchange trades, it reconciles to Binance's own ledger: `seed + realized + funding + commission
+  == wallet balance` (ties to the cent → nothing missing by construction), `+ unrealized == margin balance
+  (true equity)`, `− seed == ALL-IN P/L`. Reports equity, all-in P/L vs seed, the trading-attributable
+  breakdown (realized / funding / commission / unrealized), per-symbol funding drag, and a reconcile line
+  whose `opening` residual should stay small+stable (a GROWING gap = a cost bucket we're not capturing →
+  investigate). Funding on TESTNET is flagged NON-representative (rates are artificial — e.g. the SIREN
+  short bled ~−$79/8d, an unreal rate). Run each tick alongside the healthcheck. Slippage is already baked
+  into realized/unrealized (it lands in the fill price); `portfolio_fill_quality.py` isolates it explicitly.
 - **v2 PAPER-FALLBACK (testnet-only, hard-gated):** `paper_untradeable=True` in the v2 runner →
   symbols testnet can't fill (`-1121/-4131/-4140/-4411`) are tracked as PAPER (not dropped), so the
   strategy holds its full intended book. Each errors at most ONCE, then is papered: the log shows
@@ -259,6 +269,43 @@ ROADMAP #1–#7 COMPLETE. Future ideas: per-name funding-carry attribution, regi
 auto-recovery escalation ladder, a live-vs-backtest tracking-error report.
 
 ## Changelog (tick off as we build)
+- **2026-07-01 v15** — ALL-IN COST ACCOUNTING (`scripts/portfolio_v2_pnl.py`), on user request to make PnL
+  "as realistic as possible / consider all costs." The healthcheck `uPnL` was MARK-ONLY (open-position
+  mark-to-market) — it omitted funding, commission, and realized. New report reconciles to Binance's OWN
+  ledger: `seed + realized + funding + commission == wallet balance` (ties to the cent → by construction
+  every cost is captured), `+ unrealized == margin balance = true equity`, `− seed == ALL-IN P/L`. Prints
+  equity, all-in P/L vs seed, trading-attributable breakdown, per-symbol funding, and a reconcile verdict.
+  Findings on the live v2 account: all-in P/L ~+$16 (+0.32% vs $5k seed); the headline mark uPnL (+$64) is
+  ~2/3 offset by funding (−$76.94, almost ALL from the SIREN short) — funding is the dominant cost. Gotchas
+  fixed while building: (a) a fill emits REALIZED_PNL + COMMISSION under the SAME `tranId`, so income
+  de-dupe MUST key on incomeType+symbol+time (tranId alone dropped realized rows → false −$35 gap); (b) the
+  reconcile residual is a fixed ~$1.11 pre-existing OPENING balance (income ledger sums to $4950.98 vs
+  wallet $4952.09) — labeled "opening dust", only warns if it GROWS (= a missing bucket). TESTNET funding
+  rates flagged NON-representative. Now run each tick beside the healthcheck. v1 has no equivalent yet —
+  port for the real-money cutover (where funding/fees are the true costs).
+  **PRODUCTION FUNDING OVERLAY** (added same day, user request "use the REAL binance funding endpoint not
+  testnet"): the report also queries PRODUCTION `fapi.binance.com/premiumIndex` (public, no auth — same
+  host the engine uses for klines) for the CURRENT book and prints the real-rate funding run-rate. Finding:
+  testnet funding is a pure artifact — SIREN settles at the testnet cap −3.75%/8h (cost −$78.94, 25/25
+  intervals PAID as a short) whereas its REAL rate is +0.0190%/8h (opposite sign; our short would EARN a
+  cent/day). Across the whole ~dollar-neutral book, REAL funding runs ~−$0.08/day (~−$29/yr, negligible)
+  vs testnet's ~−$9.4/day. So the strategy's true edge (~+$92 ex-funding price/execution) is masked on
+  testnet by artificial funding; on production funding is near-neutral. Sign convention verified against
+  live data (short + negative rate = we pay; long + positive rate = we pay).
+- **2026-06-30 v14** — MONITORING BLIND-SPOT FIX (first non-zero `errors=` of the v2 run): the 00:00
+  UTC Jun 30 rebalance logged `orders placed=6 errors=2` — both were **502 Bad Gateway** HTML responses
+  from the testnet edge on the `SELL INJUSDT` + `SELL XPLUSDT` POSTs (transient infra, `Powered by
+  tengine`, NO JSON `"code"`). The engine handled it correctly: logged the 2 failures, placed the other
+  6, papered 2, advanced `last_rebal`, no traceback; the 2 off-target legs (a sub-$50 INJ flip + a $5 XPL
+  trim) self-heal at the next rebalance (engine trades to target off ACTUAL exchange positions each
+  cycle). NOT a strategy/code fault, NOT an alert. BUT `portfolio_v2_healthcheck.py` only classified JSON
+  `"code":` rejections, so a 502 (no code) made `errors=2` pass as **silent STATUS=OK** — a real gap.
+  FIX: `_log_scan` now counts engine `order ... failed: 5\d\d` lines as `gateway_errs` → surfaced as an
+  INFO line (`testnet gateway 5xx order errors xN … self-heal at next rebalance`), AND any `last_errs`
+  not matched by code/gateway is surfaced as `unclassified order errors xN (review log)` so errors>0 is
+  NEVER swallowed. STATUS stays OK for transient 5xx (correct — observational), still ALERTs on real
+  `"code"` rejections. Verified against the live log (shows the x2 INFO). Note for v1 cutover: the v1
+  `portfolio_healthcheck.py` likely has the same blind spot — port this when porting the guards/stagger.
 - **2026-06-24 v13** — ROOT-CAUSE FIX (the standing v11/v12 follow-up): the 418 contention happened
   because all the engines hammer production klines at the SAME 8h boundary. `PortfolioConfig.rebalance_lag_seconds`
   (v2 runner = **900 / 15 min**) staggers v2's rebalance 15 min PAST the candle close — non-blocking

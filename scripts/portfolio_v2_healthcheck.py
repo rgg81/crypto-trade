@@ -59,10 +59,24 @@ def _log_scan():
                     testnet_errs += 1
                 else:
                     real_errs += 1
+            # HTTP 5xx / gateway failures (e.g. 502 Bad Gateway) are testnet INFRA
+            # transients — the exchange's edge returned an HTML error page with NO JSON
+            # "code", so they slip past the code-classifier above. Count the engine's own
+            # per-order failure lines (one per failed POST) so errors>0 is never silent.
+            gateway_errs = len(re.findall(r"order .* failed: 5\d\d", tail))
             if testnet_errs:
                 info.append(
                     f"testnet-artifact order errors x{testnet_errs} (INFO: -1121/-4131/-4411)"
                 )
+            if gateway_errs:
+                info.append(
+                    f"testnet gateway 5xx order errors x{gateway_errs} "
+                    f"(INFO: transient infra; off-target legs self-heal at next rebalance)"
+                )
+            # never swallow errors silently: surface any last_errs not classified above
+            unclassified = last_errs - testnet_errs - real_errs - gateway_errs
+            if unclassified > 0:
+                info.append(f"unclassified order errors x{unclassified} (review log)")
             if real_errs:
                 flags.append(f"REAL order errors x{real_errs}")
     return flags, info, last_rebal, real_errs, testnet_errs
