@@ -1218,3 +1218,79 @@ def test_known_split_dates_are_continuous_on_disk():
             f"{sym} split {sd}: adjusted series must be continuous (|ret|<0.40) but "
             f"max|open-to-open ret|={mx:.3f} — split-unadjustment artifact (the Dukascopy bug)"
         )
+
+
+# --------------------------------------------------------------------------------------------------
+# iter-015 — COST DISCIPLINE: band + rebalance-frequency levers (parametrized two-lever build)
+# --------------------------------------------------------------------------------------------------
+import iter_015_cost as i15  # noqa: E402
+
+
+def test_iter015_freq1_reproduces_iter003_band_bit_identical():
+    """freq=1 must reduce the two-lever build to the plain iter-003 band, bit-for-bit.
+
+    stride_hold is the identity at freq=1, so banded_book_freq(raw, delta, 1) must equal
+    i3.banded_book(raw, delta) exactly — the pre-registered identity that anchors every freq>1 /
+    delta>0.005 number as a pure lever delta off the deployed iter-013 band pipeline.
+    """
+    pn = _make_panel(seed=41)
+    smap = {c: ("A" if i < 3 else "B") for i, c in enumerate(pn["close"].columns)}
+    orig = ut.SECTOR_MAP
+    try:
+        ut.SECTOR_MAP = smap
+        raw = i2.sector_rel_raw(pn)
+        for delta in (0.005, 0.020):
+            w_freq = i15.banded_book_freq(raw, delta, 1)
+            w_band = i3.banded_book(raw, delta)
+            pd.testing.assert_frame_equal(w_freq, w_band)
+    finally:
+        ut.SECTOR_MAP = orig
+
+
+def test_iter015_two_lever_future_bar_no_leak():
+    """The BAND+FREQ build must be future-bar leak-safe (the load-bearing guarantee).
+
+    stride_hold ffills only STRICTLY-PAST rebalance rows (by integer position), the band recursion
+    is causal, and the .shift(1) lag is standard — so corrupting the raw signal + forward returns
+    AFTER a cutoff must not move the net OR the lagged weight book before it. Tested with BOTH
+    levers active (delta=0.020 band on, freq=5 stride on) — the deployed cost-robust mechanic.
+    """
+    pn = _make_panel(seed=42)
+    smap = {c: ("A" if i < 3 else "B") for i, c in enumerate(pn["close"].columns)}
+    orig = ut.SECTOR_MAP
+    try:
+        ut.SECTOR_MAP = smap
+        raw = i2.sector_rel_raw(pn)
+        net0, w0 = i15.banded_net_freq(raw, pn["ret_fwd"], 0.020, 5, ct.COST_SIDE)
+        cut = net0.index[len(net0) // 2]
+        raw_c, ret_c = raw.copy(), pn["ret_fwd"].copy()
+        raw_c.loc[raw_c.index >= cut] *= -7.0
+        ret_c.loc[ret_c.index >= cut] += 5.0
+        net1, w1 = i15.banded_net_freq(raw_c, ret_c, 0.020, 5, ct.COST_SIDE)
+        common = net0.index.intersection(net1.index)
+        common = common[common < cut]
+        pd.testing.assert_series_equal(net0.loc[common], net1.loc[common])
+        pd.testing.assert_frame_equal(w0[w0.index < cut], w1[w1.index < cut])
+    finally:
+        ut.SECTOR_MAP = orig
+
+
+def test_iter015_lower_frequency_reduces_turnover_monotone():
+    """A lower rebalance frequency must NOT increase turnover (holds the target longer -> fewer
+
+    trades). Mechanical sanity that LEVER B does what it claims — turnover is non-increasing as freq
+    goes 1 -> 2 -> 5 -> 10 at the fixed baseline band, and strictly lower once freq>1.
+    """
+    pn = _make_panel(seed=43)
+    smap = {c: ("A" if i < 3 else "B") for i, c in enumerate(pn["close"].columns)}
+    orig = ut.SECTOR_MAP
+    try:
+        ut.SECTOR_MAP = smap
+        raw = i2.sector_rel_raw(pn)
+        turns = [
+            ct.turnover(i15.banded_book_freq(raw, 0.005, f), ct.LO0, ct.HI1) for f in (1, 2, 5, 10)
+        ]
+        assert turns[1] < turns[0]  # freq=2 strictly reduces vs daily
+        assert turns[2] <= turns[1] and turns[3] <= turns[2]  # monotone non-increasing
+    finally:
+        ut.SECTOR_MAP = orig
