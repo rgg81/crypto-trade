@@ -43,6 +43,7 @@ def main() -> int:
     st = StateStore(DB)
     held = json.loads(st.get_state("metals_held_w") or "{}")
     equity = float(st.get_state("metals_equity") or 0.0)
+    funding_pnl = float(st.get_state("metals_funding_pnl") or 0.0)  # $ funding leg since launch
     last_candle = st.get_state("metals_last_candle")
 
     eq_df = pd.read_csv(EQ) if EQ.exists() else pd.DataFrame()
@@ -66,7 +67,7 @@ def main() -> int:
     realized = equity - e0  # booked PnL = compounded completed-candle returns since launch
 
     # UNREALIZED PnL — mark-to-market of the held book over the LATEST 8h candle (open→close). The
-    # desk books open-to-open at each rebalance, so the in-progress candle's move isn't yet realized.
+    # desk books open-to-open, so the in-progress candle's move isn't yet realized.
     # Per-metal $ unrealized = held_w · equity · (close/open − 1). Falls back to 0 if data absent.
     mtm: dict[str, float] = {}
     try:
@@ -84,7 +85,7 @@ def main() -> int:
         f"METALS BOOK + STATS  (as_of {asof}, {lw.LEVERAGE:.0f}x leverage)\n"
         f"  equity ${equity:,.0f}   since-launch {ret_since:+.1f}%   24h {d24:+.1f}%   "
         f"regime {regime} (breadth {breadth:.2f})\n"
-        f"  REALIZED ${realized:+,.0f} ({realized / e0 * 100:+.2f}%)   "
+        f"  REALIZED ${realized:+,.0f} ({realized / e0 * 100:+.2f}%) [fund ${funding_pnl:+.1f}]  "
         f"UNREALIZED ${unreal:+,.0f}   TOTAL ${realized + unreal:+,.0f}\n"
         f"  gross {gross:.2f}x (${gross * equity:,.0f})   net {net:+.2f}x (${net * equity:,.0f})"
     )

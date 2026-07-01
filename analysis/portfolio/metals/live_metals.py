@@ -38,6 +38,7 @@ for p in (str(_HERE), str(_ROOT / "src")):
 
 import ingest_dukascopy as ing  # noqa: E402
 import live_weights as lw  # noqa: E402
+import metals_funding as mf  # noqa: E402
 import universe_metals as um  # noqa: E402
 
 from crypto_trade.live.state_store import StateStore  # noqa: E402
@@ -117,6 +118,21 @@ class MetalsPaperEngine:
         except Exception as e:  # noqa: BLE001 — tolerate CFTC network hiccups; keep cached COT
             print(f"  [data] COT refresh skipped ({e})", flush=True)
 
+    def _refresh_funding(self) -> None:
+        """Incremental Binance funding refresh for realistic paper PnL (real 4h metal-perp rates).
+
+        Refreshed ONLY here — at an actual rebalance — so the equity we persist and the funding it
+        was computed on stay in sync. Funding NEVER touches the strategy signals (held book is
+        identical with/without it); it is a post-decision paper-accounting leg only. Tolerant: a
+        failed fetch keeps cached rates (funding is tiny; a stale tail just defers new rows)."""
+        try:
+            from crypto_trade.portfolio.funding import refresh_funding
+
+            refresh_funding(list(self._instr), data_dir=self.cfg.data_dir)
+            print("  [data] funding refreshed", flush=True)
+        except Exception as e:  # noqa: BLE001 — tolerate Binance hiccups; keep cached funding
+            print(f"  [data] funding refresh skipped ({e})", flush=True)
+
     # ── forming-candle proxy (open ≈ last close; the live target is for the just-opened candle) ──
     @staticmethod
     def _append_forming(coins: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
@@ -164,24 +180,41 @@ class MetalsPaperEngine:
         if self.store.get_state("metals_launch_candle") is None:
             self.store.set_state("metals_launch_candle", str(latest))
 
-        # Refresh the COT ONLY here — at an actual rebalance — so the persisted held_w and the COT
-        # it was computed on stay in sync (a per-tick refresh desyncs them → spurious PARITY=DRIFT).
+        # Refresh COT + funding ONLY here — at an actual rebalance — so the persisted held_w/equity
+        # and the data they were computed on stay in sync (a per-tick refresh desyncs them).
         self._refresh_cot()
+        self._refresh_funding()
 
         # target positions for the just-opened (forming) candle — the parity bridge
         tgt = lw.next_target_weights_metals(self._append_forming(coins))
         meta = tgt.pop("_meta")
         held = {s: float(w) for s, w in tgt.items()}
 
-        # realised paper equity = equity0 × Π(1+net) since launch (regime_net = the backtest net)
-        net = lw.regime_net(coins)
+        # realised paper equity since launch = equity0 × Π(1 + price_net + funding_net).
+        #   PRICE leg  = regime_net (the backtest net, ×leverage) — the strategy edge.
+        #   FUNDING leg = real Binance 4h funding on the DEPLOYED book — paper-only realism.
+        #     Causal: only COMPLETE candles are loaded, so candle t's {t, t+4h} funding is settled;
+        #     it rides the same price_net.index as the cost leg (lockstep) and NEVER touches the
+        #     held book, so backtest↔live parity is preserved.
+        price_net = lw.regime_net(coins)
+        deployed, _ = lw.deployed_weight_book(coins)
+        funding = mf.load_funding(self.cfg.data_dir, list(self._instr))
+        fnet = mf.funding_net_8h(deployed, funding).reindex(price_net.index).fillna(0.0)
         launch = pd.Timestamp(int(self.store.get_state("metals_launch_candle")), unit="ms")
-        live_net = net[net.index >= launch]
+        live = price_net.index >= launch
+        live_net = (price_net + fnet)[live]
+        live_price = price_net[live]
         equity = (
             self.cfg.equity_usd * float((1.0 + live_net).prod())
             if len(live_net)
-            else (self.cfg.equity_usd)
+            else self.cfg.equity_usd
         )
+        equity_price_only = (
+            self.cfg.equity_usd * float((1.0 + live_price).prod())
+            if len(live_price)
+            else self.cfg.equity_usd
+        )
+        funding_pnl = equity - equity_price_only  # $ funding contribution since launch
 
         prev = self._load_held()
         n_legs = sum(
@@ -191,13 +224,15 @@ class MetalsPaperEngine:
         self._save_held(held)
         self.store.set_state("metals_last_candle", str(latest))
         self.store.set_state("metals_equity", f"{equity:.2f}")
+        self.store.set_state("metals_funding_pnl", f"{funding_pnl:.4f}")
         self._snapshot_equity(latest, equity, meta)
 
         as_of = pd.Timestamp(latest, unit="ms")
         print(
             f"  [rebal] as_of={as_of}  breadth={meta['breadth']:.2f}  "
             f"gross={meta['gross']:.3f}  n_pos={meta['n_positions']}  legs={n_legs}  "
-            f"equity=${equity:,.0f}  positions={ {s: round(w, 4) for s, w in held.items()} }",
+            f"equity=${equity:,.0f} (funding ${funding_pnl:+.2f})  "
+            f"positions={ {s: round(w, 4) for s, w in held.items()} }",
             flush=True,
         )
         return {"as_of": str(as_of), "held": held, "equity": equity, "meta": meta, "legs": n_legs}
