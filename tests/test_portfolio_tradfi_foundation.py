@@ -967,6 +967,129 @@ def test_iter010_conditional_future_bar_no_leak():
     _i4_leak_check(_i10_cond)
 
 
+import iter_011_mom_ltr as i11  # noqa: E402
+
+
+def _i11_leak_check(combine_fn, *, n=1000, seed=110):
+    """iter-011 future-bar leak harness on a LONG panel (n>=756) so the 3y-1y LTR sleeve is actually
+    active around the cutoff: corrupting the panel + forward returns AFTER a cutoff must not change
+    the combined BANDED net OR the lagged held book before it."""
+    pn = _make_panel(n=n, seed=seed)
+    smap = _i4_smap(pn)
+    orig = ut.SECTOR_MAP
+    try:
+        ut.SECTOR_MAP = smap
+        raw0 = combine_fn(pn)
+        net0, w0 = i3.banded_net(raw0, pn["ret_fwd"], i3.CHOSEN_DELTA)
+        cut = net0.index[len(net0) // 2]
+        pn_c = {k: v.copy() for k, v in pn.items()}
+        pn_c["close"].loc[pn_c["close"].index >= cut] *= -7.0
+        pn_c["ret_fwd"].loc[pn_c["ret_fwd"].index >= cut] += 5.0
+        raw1 = combine_fn(pn_c)
+        net1, w1 = i3.banded_net(raw1, pn_c["ret_fwd"], i3.CHOSEN_DELTA)
+        common = net0.index.intersection(net1.index)
+        common = common[common < cut]
+        pd.testing.assert_series_equal(net0.loc[common], net1.loc[common])
+        pd.testing.assert_frame_equal(w0[w0.index < cut], w1[w1.index < cut])
+    finally:
+        ut.SECTOR_MAP = orig
+
+
+def test_iter011_mom_ltr_future_bar_no_leak():
+    """LOAD-BEARING: the mom+LTR banded build must be future-bar leak-safe. The LTR sleeve reads
+    only close.shift(252)/close.shift(756) + a trailing-63 rvol (pure past), the mom sleeve is the
+    past-only iter-006 book, and the equal-weight blend feeds the strictly-causal iter-003 band.
+    Corrupting the panel + forward returns AFTER a cutoff (on a >756-day panel so LTR is active)
+    must leave the banded net AND the lagged held book before it unchanged."""
+    _i11_leak_check(lambda pn: i11.mom_ltr_raw(pn))
+
+
+def test_iter011_w0_reproduces_iter006():
+    """Pre-registered IDENTITY: w=0 -> raw == gross_norm(iter006 book); through the band's own
+    gross-norm this is idempotent up to MACHINE EPSILON (the extra division re-rounds), so the
+    mom+LTR banded net reproduces the iter-006 banded net to allclose ~1e-12 (IS Sharpe identical).
+    Anchors iter-011 as a pure one-change delta off iter-006."""
+    pn = _make_panel(n=1000, seed=111)
+    smap = _i4_smap(pn)
+    orig = ut.SECTOR_MAP
+    try:
+        ut.SECTOR_MAP = smap
+        net0, w0 = i3.banded_net(i11.mom_ltr_raw(pn, 0.0), pn["ret_fwd"], i3.CHOSEN_DELTA)
+        net6, w6 = i3.banded_net(i6.crash_braked_raw(pn), pn["ret_fwd"], i3.CHOSEN_DELTA)
+        pd.testing.assert_series_equal(net0, net6, atol=1e-12, rtol=0.0)
+        pd.testing.assert_frame_equal(w0.fillna(0.0), w6.fillna(0.0), atol=1e-12, rtol=0.0)
+        assert (
+            abs(ct.msharpe(net0, ct.LO0, ct.OOS_CUTOFF) - ct.msharpe(net6, ct.LO0, ct.OOS_CUTOFF))
+            < 1e-9
+        )
+    finally:
+        ut.SECTOR_MAP = orig
+
+
+def test_iter011_ltr_sleeve_is_sector_neutral_unit_gross_and_reversal_signed():
+    """The LTR sleeve must be (1) per-sector net-zero, (2) unit-gross on active rows, and (3) the
+    SIGN NEGATION of the 3y-1y return / rvol — LONG multi-year losers, SHORT multi-year winners."""
+    pn = _make_panel(n=1000, seed=112)
+    smap = _i4_smap(pn)
+    orig = ut.SECTOR_MAP
+    try:
+        ut.SECTOR_MAP = smap
+        s = i11.ltr_sleeve(pn).dropna(how="all")
+        for bucket in (["S0", "S1", "S2"], ["S3", "S4", "S5"]):
+            assert np.allclose(s[bucket].sum(axis=1).to_numpy(), 0.0, atol=1e-9)
+        gross = s.abs().sum(axis=1)
+        active = gross > 1e-9
+        assert np.allclose(gross[active].to_numpy(), 1.0, atol=1e-9)
+        # sign: a name UP over the 3y-1y window (positive raw reversal base) gets a NEGATIVE
+        # pre-neutralize LTR weight (long the losers)
+        close = pn["close"]
+        base = close.shift(i11.LTR_SKIP) / close.shift(i11.LTR_LONG) - 1.0
+        rvol = close.pct_change().rolling(ct.VOL_WIN).std()
+        pre = (-base / rvol).dropna(how="all")
+        m = base.reindex_like(pre).abs() > 1e-9
+        assert (np.sign(pre[m]) == -np.sign(base.reindex_like(pre)[m])).all().all()
+    finally:
+        ut.SECTOR_MAP = orig
+
+
+def test_iter011_ltr_sleeve_is_past_only():
+    """The LTR sleeve is past-only: corrupting the tail of the close panel must not change any LTR
+    weight before the cutoff (close.shift(252)/close.shift(756) + trailing-63 rvol never read
+    forward)."""
+    pn = _make_panel(n=1000, seed=113)
+    smap = _i4_smap(pn)
+    orig = ut.SECTOR_MAP
+    try:
+        ut.SECTOR_MAP = smap
+        s0 = i11.ltr_sleeve(pn)
+        active = s0.dropna(how="all")
+        cut = active.index[len(active) // 2]
+        pn_c = {k: v.copy() for k, v in pn.items()}
+        pn_c["close"].loc[pn_c["close"].index >= cut] *= 3.0
+        s1 = i11.ltr_sleeve(pn_c)
+        early = s0.index[s0.index < cut]
+        pd.testing.assert_frame_equal(s0.loc[early], s1.loc[early])
+    finally:
+        ut.SECTOR_MAP = orig
+
+
+def test_iter011_unseasoned_names_get_zero_ltr_weight():
+    """PIT / ragged handling: a name with fewer than LTR_LONG (756) days of history has a NaN LTR
+    signal and must take EXACTLY ZERO LTR weight until it seasons (NaN -> 0 through gross_norm) —
+    the leak-safe, point-in-time-clean guarantee that early-history names never inflate breadth."""
+    pn = _make_panel(n=1000, seed=114)
+    smap = _i4_smap(pn)
+    orig = ut.SECTOR_MAP
+    try:
+        ut.SECTOR_MAP = smap
+        ltr = i11.ltr_sleeve(pn)
+        unseasoned = pn["close"].shift(i11.LTR_LONG).isna()  # <756d history OR missing bar
+        assert unseasoned.to_numpy().any()  # the first 756 rows are unseasoned by construction
+        assert np.allclose(ltr.to_numpy()[unseasoned.to_numpy()], 0.0, atol=1e-15)
+    finally:
+        ut.SECTOR_MAP = orig
+
+
 # =====================================================================================
 # C1 — SPLIT-UNADJUSTMENT REGRESSION GUARD (the data-hardening test that would have caught
 # the Dukascopy bug that BLOCK-PENDING-FIX'd iter-006). Runs against the ON-DISK Yahoo data;
