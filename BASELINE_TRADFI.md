@@ -15,7 +15,7 @@ signals past-only, fills next-open. Universe = Binance `TRADIFI_PERPETUAL` singl
 | Field | Value |
 |-------|-------|
 | Current baseline iteration | None |
-| Working best | iter-006 on **Yahoo 2010-25** — net **+0.28** IS (bull +0.30/bear −0.24/chop +0.51); with VIX-brake insurance +0.23, bear −0.09 (~flat) = all-weather-ish; ~0.25 Sharpe robust across 5 bears |
+| Working best | **iter-013** (mom+LTR+0.25·TSMOM+VIX, Yahoo 2010-25) — net **+0.63** (CLEARS ≥0.5 bar), **13/16 years**, net-β +0.12 (85% neutral), maxDD −32%. Misses 2010(warm-up)/2018(bear)/2019(whipsaw). Not yet 16/16. |
 | IS Sharpe | — (no baseline) |
 | OOS Sharpe | — (hidden until a CONFIRMATION) |
 | Universe size | 39 (Dukascopy-sourceable of 42 TradFi single-stock perps) |
@@ -71,6 +71,6 @@ an era-strong momentum window). N=2-bear overfitting concern RESOLVED; numbers c
   (2010-25 momentum+growth decade; value/low-vol had a brutal run). SIZE +1.30 = pure SURVIVORSHIP artifact.
   MOM is STRONGER on the 69 (+0.32) than broad (+0.17). Only MOM + LTR are honest edges. **Net 0.5 +
   positive-EVERY-year is NOT achievable for a PURE market-neutral book on this data.**
-- **REMAINING LEVER = controlled DIRECTIONAL sleeve** (user-approved): the unwinnable years (2013/17/19) are
-  BULL melt-ups → a bounded trend/TSMOM sleeve (net-long in uptrends, VIX-managed) earns there → the honest
-  path to positive-all-years + higher Sharpe, at the cost of controlled market-beta. = iter-013.
+- **iter-013 controlled directional TSMOM sleeve (λ=0.25) → net +0.63 (CLEARS ≥0.5), 13/16 yrs, β +0.12.**
+  Fixed 2013/2017 melt-ups + 2020; controlled tilt (85% neutral). Sharpe bar MET, 16/16 MISSED (3 residual:
+  2010 warm-up, 2018 net-long bear, 2019 TSMOM whipsaw). Next iter-014 = multi-horizon trend for 2019.
