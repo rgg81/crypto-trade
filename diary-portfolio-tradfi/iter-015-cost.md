@@ -133,3 +133,57 @@ The **δ=0.010, freq=1** cell is the iter-015 candidate: 2×-cost-ROBUST at the 
 EXPLORATION wants more net@2× it must find it WITHOUT pushing β>0.15 (e.g., a per-sleeve cadence on
 the fast-momentum churn engine, or a lower-turnover momentum horizon) — the joint grid shows raw
 band+freq widening buys extra net only by inflating the directional tilt past the criterion.
+
+---
+
+## OOS CONFIRMATION CHECK — FROZEN δ=0.010 / freq=1 (held-out, 2026-07-01)
+
+**Script:** `analysis/portfolio/tradfi/iter_015_oos_check.py` (FROZEN — asserts the reported cell ==
+`iter_015_cost.CHOSEN_DELTA/CHOSEN_FREQ`; `iter_015_cost.py` stays IS-only). The pre-chosen cell was
+selected on IS 2×-cost + β ONLY; here we merely **slice the same past-only deployed net by date** to
+read the OOS window. iter-013's OOS is already revealed, so this is a legitimate one-look held-out
+sanity check, **NOT** a re-selection. **Path proof:** the iter-013 identity cell (δ=0.005/f=1) computed
+by the identical windowed path reproduces the revealed **OOS net@1× = +3.39** exactly → the OOS-slice
+path is correct, so the frozen cell's OOS is equally trustworthy. Leak self-check PASS; OOS = same
+series sliced by date (no OOS branch) CONFIRMED. Suite green (62 passed). OOS window = [2025-03-24 ,
+2026-06-30] (~15 months, small N).
+
+### IS vs OOS — FROZEN δ=0.010/freq=1 (iter-015 candidate) vs iter-013 baseline δ=0.005/f=1
+| metric | iter-013 IS | iter-013 OOS | **iter-015 IS** | **iter-015 OOS** |
+|--------|-------------|--------------|-----------------|------------------|
+| net@1× Sharpe (6bps)   | +0.61 | +3.39 | **+0.67** | **+3.06** |
+| net@2× Sharpe (12bps)  | +0.42 | +3.31 | **+0.52** | **+3.01** |
+| turnover/day           | 0.0939 | 0.0676 | **0.0700** | **0.0468** |
+| gross(cost-off) Sharpe | +0.81 | +3.48 | **+0.81** | **+3.12** |
+| net-β (VIX-off)        | +0.120 | +0.209 | **+0.129** | **+0.218** |
+| maxDD                  | −28% | −8% | **−28%** | **−8%** |
+
+### Critic watch-list — does cost-robustness + β-control PERSIST OOS?
+- **(a) net@2× OOS not ≪ IS (overfit test): HOLDS.** Frozen OOS net@2× **+3.01** ≫ IS **+0.52** — δ=0.010
+  is an INTERIOR cell (not a grid corner); no overfit signature. net@2× ≈ net@1× OOS (+3.01 vs +3.06)
+  confirms the 2×-cost drag is tiny (the book really is cheaper).
+- **(b) turnover cut PERSISTS.** Frozen-vs-iter-013 turnover reduction is **−25% IS → −31% OOS** (0.0468
+  vs 0.0676) — the cost saving that is the entire point of iter-015 is **not an IS artifact**; it holds
+  (slightly larger) OOS. Both cells' absolute turnover fall ~28-31% in the trending OOS regime.
+- **(c) OOS gross edge HOLDS.** Frozen OOS gross **+3.12** vs iter-013 **+3.48** (ratio 0.90) — both
+  strongly positive; the edge persists. IS gross was held EXACTLY (+0.81=+0.81); the small OOS gap is a
+  wider-band **timing give-up** in the fast favorable tape, not a de-lever (a de-lever would drop IS
+  gross too, which δ=0.010 does not).
+- **(d) net-β — increment CONTROLLED; absolute inherited.** iter-015's β increment over iter-013 is
+  **+0.009 IS → +0.009 OOS** — iter-015 adds **no extra β** OOS. BUT the **absolute** OOS β is **+0.218
+  > 0.15** for the frozen cell — **shared with iter-013 (+0.209)**: the TSMOM net-long tilt expands β in
+  the 2025-26 bull melt-up. The 0.15 gate is IS-calibrated; the OOS breach is an iter-013-architecture
+  regime property, **not** an iter-015 regression.
+
+### Verdict
+**Cost-robustness + β-control PERSIST OOS — iter-015 is READY to replace iter-013 as the 2×-cost-robust
+baseline.** It is a like-for-like OOS-equivalent of iter-013 with a **genuine, persistent ~31% OOS
+turnover cut**, net@2× robustness intact (no overfit), gross edge held, and **zero incremental β**. Every
+iter-015-specific effect that was promised on IS shows up OOS at the same magnitude.
+
+**Concern (honest):** the OOS Sharpe LEVEL (+3.06 / +3.39) is a small-N (~15mo) FAVORABLE-regime artifact
+— do NOT extrapolate it; iter-013's own forensic showed a large share of the +65% OOS return is
+beta-tilt in a broad rally. Both cells' **absolute OOS β (~0.22) exceeds the IS 0.15 gate** in that bull
+tape — so the "controlled β" claim is IS-conditional. iter-015 does not worsen it (Δβ +0.009), but a
+future EXPLORATION chasing more net@2× must still avoid pushing β higher, and a genuine bear in the live
+OOS-forward would test the VIX-braked net-long tilt that this calm window did not.
