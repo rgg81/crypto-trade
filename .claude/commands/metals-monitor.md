@@ -108,6 +108,15 @@ the live engine reproduces the backtest bit-for-bit. Run before trusting a long 
   basis reconcile + a forward bear; tighten the watch cadence first. Paper is the current scope.
 
 ## Changelog
+- **2026-07-01 v2** — REALISTIC FUNDING (user: "account those trades realistically"). Paper equity now
+  = price leg + FUNDING leg from REAL Binance metal-perp 4h `fundingRate` (`metals_funding.py`;
+  refreshed at each rebalance in `live_metals`; shown as `[fund $X]` in the digest, `metals_funding_pnl`
+  in the DB). Funding is post-decision on the deployed book → held book bit-identical, parity preserved
+  (19-test suite green). Causal (complete-candle gate; no look-ahead — quant-critic PASS). Live funding
+  leg ≈ +$13 (net-short book earns). Push block's REALIZED line carries the funding automatically.
+- **2026-06-30 v1** — realized/unrealized/total PnL + per-metal MTM in the digest; `_engine_up` hardened
+  (positional match, not naive `ps` substring — a computer restart had it false-report engine=up); push
+  gated on genuine book change (`legs>0`), not day-flips; deployment leverage 3× (`live_weights.LEVERAGE`).
 - **2026-06-26 v0** — initial skill: `metals_status.py` (STATUS/PARITY/CANDLE, the test-integrity alert
   set) + `metals_digest.py` (equity/regime/positions, observational, once-a-day push). HANDS-OFF
   mandate, engine-down relaunch, self-paced ScheduleWakeup loop. Watches the iter-010 metals paper desk.
