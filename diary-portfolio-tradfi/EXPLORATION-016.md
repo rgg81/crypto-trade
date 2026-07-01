@@ -71,3 +71,51 @@ but with little headroom); the risk win is drawdown/worst-month, not beta. (2) *
 12m-trend gate cannot catch the fast-from-bull crash; that residual would need the forensic's SECONDARY
 realized-vol brake (PROBE C), which could STACK on this. Recommend CONFIRMATION of iter-016 as the new
 baseline; if the near-ceiling β is a concern, QR may pair it with the rv-brake to reclaim beta headroom.
+
+---
+
+## HELD-OUT OOS CHECK (FROZEN config — `iter_016_oos_check.py`, 2026-07-01)
+One-look held-out confirmation of the Critic-CLEARED iter-016. **Config FROZEN** — no re-selection on OOS
+(λ=0.25, g=EW-252d bear-state, band δ=0.010/freq=1, VIX-ON; all constants pre-exist). OOS window =
+**2025-03-24 → 2026-06-30** (319 trading days, ~15 months). β = **EW-69, VIX-OFF** convention (same as iter-015).
+
+### iter-016 (frozen) — IS vs OOS
+| metric | IS | OOS |
+|--|--|--|
+| Sharpe net@1× (6bps) | +0.73 | **+3.02** |
+| net@2× Sharpe (12bps) | +0.58 | +2.97 |
+| gross (cost-off) | +0.87 | +3.08 |
+| turnover/day | 0.0698 | 0.0467 |
+| net-β (EW-69, VIX-off) | +0.15 | +0.22 |
+| maxDD % | −25% | −8% |
+
+*(iter-015 baseline OOS for reference: net@1× +3.06, net@2× +3.01, gross +3.12, turn 0.0468, β +0.218,
+maxDD −8%.)* **The ~+3.0 OOS Sharpe LEVEL is small-N (~15 months) in a FAVORABLE bull — NOT a forward estimate.**
+
+### Critic watch-items
+1. **OOS g=1 fire count: `0 / 319` days (0.0%)** — the EW-252d bear-state **never fired OOS** (IS: 11.2%). OOS
+   is **ALL-BULL**. By the g=0 identity (forced-g=0 → iter-016 OOS net == iter-015 OOS net **PASS**), iter-016
+   ≡ iter-015 OOS. **The OOS can only confirm "NO HARM in the bull"; it CANNOT validate the bear-protection
+   thesis — there are NO OOS bears.** Not spun as confirmation of the Jan-2019 worst-month edge.
+2. **iter-016 OOS β +0.215 vs iter-015 OOS β +0.218 (Δ −0.002)** — essentially EQUAL (not hotter). The "iter-016
+   hotter" effect is **IS-only** (IS β +0.148 vs +0.129); in an all-bull OOS the gate is inert so the two books
+   carry the same beta. Both ~+0.22 is the known **beta-runs-hot-in-bull** regime effect, NOT a failure by itself.
+3. **Divergence Σ(iter016 − iter015) OOS = −0.257%**, of which **+0.000% on g=1 days / −0.257% on g=0 days**.
+   Since g never fired OOS, the divergence is **pure vol-target 63d-trailing-vol carryover** off the (changed)
+   pre-OOS IS tail bridging the IS→OOS boundary — **immaterial, NOT a bear-protection effect**.
+4. **Lift decomposition** (iter-013-forensic β-attribution on the DIFF): of the −0.257% lift, −0.156% (61%) is
+   extra-captured-β, −0.101% (39%) is market-neutral residual — but the lift itself is **immaterial noise**, so
+   the split carries no signal.
+
+### Integrity + do-no-harm read
+- **Do-no-harm:** net@1× OOS +3.02 vs +3.06 (**NO HARM**), gross +3.08 vs +3.12 (**NO HARM**), 2×-cost robustness
+  holds (net@2× +2.97 not << net@1× +3.02). Turnover/β/maxDD all ≈ iter-015 OOS.
+- **Integrity:** OOS-path identity **PASS**, future-bar leak self-check **PASS**, OOS = same past-only net sliced
+  by date **CONFIRMED**, frozen-config guard **PASS**. Suite green (87 tradfi tests). `data/` untouched.
+
+### HONEST verdict
+**OOS does NO HARM** — iter-016 tracks iter-015 to within vol-target rounding in the all-bull OOS, so on the
+do-no-harm promotion gate it is **ready to replace iter-015**. **BUT the bear-protection thesis is UNTESTED
+OOS**: the gate fired 0 OOS days, so the held-out window supplies **zero evidence** for (or against) the
+Jan-2019/crash worst-month edge that motivated iter-016. The merge case rests **entirely on the IS gate**; the
+OOS is a clean "no-harm-in-the-bull" confirmation and nothing more.
