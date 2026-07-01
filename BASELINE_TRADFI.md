@@ -10,12 +10,12 @@ a baseline. A baseline is promoted only at the first CONFIRMATION (critic PASS, 
 **Track:** portfolio-tradfi (market-neutral L/S Binance TradFi single-company stock perps)
 **Sacred constants:** `OOS_CUTOFF = 2025-03-24`, **trading-day** bars (weekend/holiday padding dropped),
 signals past-only, fills next-open. Universe = Binance `TRADIFI_PERPETUAL` single stocks, 39 sourceable.
-**Promotion criterion (USER-RAISED 2026-07-01):** net IS Sharpe **≥ +0.50 AND POSITIVE EVERY CALENDAR YEAR** → CONFIRMATION with critic PASS; OOS revealed. (~0.28 single-factor momentum is TOO WEAK — need multi-factor diversification. A single momentum book cannot be positive every year.)
+**Promotion criterion OF RECORD (USER-RATIFIED 2026-07-01, revised bar):** net IS Sharpe **≥ +0.50 AND controlled net-beta (≤~0.15) AND positive in ≥13/16 years / no catastrophic year** → CONFIRMATION with critic PASS; OOS revealed. **16/16 (positive EVERY calendar year) is documented as STRUCTURALLY UNREACHABLE** on this data: the diversifier factors (value/quality/BAB/low-vol) are dead 2010-25, and positive-every-year would need perfect market timing (long every bull, flat/short every bear, no turning-point whipsaw). The user explicitly approved **13/16 as the working-best target** plus the directional (controlled-beta) relaxation of pure market-neutrality. (The earlier "positive EVERY year / 16-of-16" wording is SUPERSEDED by this ratified bar.)
 
 | Field | Value |
 |-------|-------|
 | Current baseline iteration | None |
-| Working best | **iter-013** (mom+LTR+0.25·TSMOM+VIX, Yahoo 2010-25) — net **+0.63** (CLEARS ≥0.5 bar), **13/16 years**, net-β +0.12 (85% neutral), maxDD −32%. Misses 2010(warm-up)/2018(bear)/2019(whipsaw). Not yet 16/16. |
+| Working best | **iter-013** (mom+LTR+0.25·TSMOM, **VIX brake ON = DEPLOYED config**, Yahoo 2010-25) — net **+0.61** / maxDD **−28%** / bear **−0.20** / **13/16 years** / net-β **+0.12** (85% neutral). ONE pinned config → the VIX-ON IS anchor (the earlier +0.63/−32% figures were the VIX-OFF row mislabeled "+VIX" — corrected). Misses 2010(warm-up)/2018(bear)/2019(whipsaw); not 16/16 (structurally unreachable). **2× cost (12 bps/side) stress: net +0.42 (< +0.50 — the ≥0.5 bar breaks under DOUBLED taker cost; robust only at the 6 bps/side base cost).** |
 | IS Sharpe | — (no baseline) |
 | OOS Sharpe | — (hidden until a CONFIRMATION) |
 | Universe size | 39 (Dukascopy-sourceable of 42 TradFi single-stock perps) |
@@ -71,13 +71,16 @@ an era-strong momentum window). N=2-bear overfitting concern RESOLVED; numbers c
   (2010-25 momentum+growth decade; value/low-vol had a brutal run). SIZE +1.30 = pure SURVIVORSHIP artifact.
   MOM is STRONGER on the 69 (+0.32) than broad (+0.17). Only MOM + LTR are honest edges. **Net 0.5 +
   positive-EVERY-year is NOT achievable for a PURE market-neutral book on this data.**
-- **iter-013 controlled directional TSMOM sleeve (λ=0.25) → net +0.63 (CLEARS ≥0.5), 13/16 yrs, β +0.12.**
-  Fixed 2013/2017 melt-ups + 2020; controlled tilt (85% neutral). Sharpe bar MET, 16/16 MISSED (3 residual:
-  2010 warm-up, 2018 net-long bear, 2019 TSMOM whipsaw). Next iter-014 = multi-horizon trend for 2019.
+- **iter-013 controlled directional TSMOM sleeve (λ=0.25, VIX brake ON = DEPLOYED) → net +0.61 (CLEARS ≥0.5),
+  maxDD −28%, bear −0.20, 13/16 yrs, β +0.12.** (VIX-ON anchor; the +0.63/−32% VIX-OFF row was mislabeled
+  "+VIX" — corrected.) Fixed 2013/2017 melt-ups + 2020; controlled tilt (85% neutral). Sharpe bar MET at 1×
+  cost; 2× cost (12 bps/side) → net +0.42 (bar breaks). 16/16 MISSED (3 residual: 2010 warm-up, 2018 net-long
+  bear, 2019 TSMOM whipsaw). Next iter-014 = multi-horizon trend for 2019.
 - **iter-014 multi-horizon TSMOM → REJECT** (fast 3/6m speeds whipsaw on the 2018 crash+V-recovery; net
   +0.63→+0.51, 13→12/16). Multi-horizon does NOT generalize to the trend sleeve. **CEILING REACHED.**
-- **HONEST CEILING = iter-013: net +0.63 (clears ≥0.5), 13/16 years, β +0.12 (85% neutral), 15-yr validated,
-  leak-free.** 16/16 is NOT honestly achievable: the 3 misses are structural — 2010 (data warm-up), 2018
+- **HONEST CEILING = iter-013 (VIX-ON DEPLOYED): net +0.61 (clears ≥0.5), maxDD −28%, bear −0.20, 13/16 years,
+  β +0.12 (85% neutral), 15-yr validated, leak-free. 2× cost (12 bps/side) → net +0.42 (< +0.50 bar).** 16/16
+  is NOT honestly achievable: the 3 misses are structural — 2010 (data warm-up), 2018
   (net-long bear cost), 2019 (bull year the neutral book misses + TSMOM whipsaw). Positive-EVERY-year would
   require perfect market timing (long every bull, flat/short every bear, no turning-point whipsaw) AND the
   factor diversifiers that would smooth years (value/quality/BAB/low-vol) are dead 2010-25. Exhausted:

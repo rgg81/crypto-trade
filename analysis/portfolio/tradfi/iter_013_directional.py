@@ -97,6 +97,7 @@ import universe_tradfi as ut  # noqa: E402
 TSMOM_LOOKBACK = 252  # 12-month trailing total-return trend (Moskowitz-Ooi-Pedersen), FIXED
 W_LTR_NEUTRAL = i11.W_LTR  # 0.5 — the FROZEN iter-011 neutral engine (unchanged)
 LAMBDAS = (0.15, 0.25, 0.35)  # SMALL directional mixing fractions — pre-registered, NOT max-fit
+DEPLOYED_LAM = 0.25  # PINNED deployed config (VIX brake ON) — the ONE unambiguous config of record
 CHOSEN_DELTA = i11.CHOSEN_DELTA  # 0.005 band, inherited unchanged
 
 # Melt-up years the neutral (cross-sectional) book structurally misses; TSMOM should FLIP them +.
@@ -138,6 +139,16 @@ def combined_raw(pn: dict[str, pd.DataFrame], lam: float) -> pd.DataFrame:
 # ---------------------------------------------------------------- IS-only metrics ---------------
 def _banded(raw, ret_fwd):
     return i3.banded_net(raw, ret_fwd, CHOSEN_DELTA)  # (net, w)
+
+
+def _banded_cost(raw, ret_fwd, cost_side):
+    """banded_net at a CUSTOM taker cost/side (for the 2x-cost stress) — mirrors i3.banded_net
+    exactly (same band, same PnL, same vol-target) but scales the |Δw| turnover cost term."""
+    w = i3.banded_book(raw, CHOSEN_DELTA)
+    pnl = (w * ret_fwd.reindex(columns=w.columns)).sum(axis=1)
+    cost = cost_side * (w - w.shift(1)).abs().sum(axis=1)
+    net = (pnl - cost).dropna()
+    return ct.vol_target(net), w
 
 
 def market_return(pn: dict[str, pd.DataFrame]) -> pd.Series:
@@ -248,10 +259,7 @@ def main():
         f"{r_ts['reg']['chop']:+.2f}"
     )
     yts = i11.year_table(net_ts)
-    print(
-        "      per-year Sharpe: "
-        + " ".join(f"{y}:{yts[y][0]:+.2f}" for y in sorted(yts))
-    )
+    print("      per-year Sharpe: " + " ".join(f"{y}:{yts[y][0]:+.2f}" for y in sorted(yts)))
 
     # --- (2) BOUNDED COMBINED book per pre-registered lam ---
     lams = (args.lam,) if args.lam is not None else LAMBDAS
@@ -281,8 +289,10 @@ def main():
     # --- (3) PER-YEAR table 2010-2025: neutral -> each combined lam (melt-up FIX markers) ---
     yneu = i11.year_table(net_neu)
     ytabs = {lam: i11.year_table(rows[lam][0]) for lam in lams}
-    print("\n  (3) PER-YEAR net Sharpe (IS 2010-2025): neutral(lam=0) -> combined per lam "
-          "(* = melt-up year the neutral book structurally misses):")
+    print(
+        "\n  (3) PER-YEAR net Sharpe (IS 2010-2025): neutral(lam=0) -> combined per lam "
+        "(* = melt-up year the neutral book structurally misses):"
+    )
     hdr = f"      {'year':>5} {'neutral':>8}"
     for lam in lams:
         hdr += f" {'lam=' + format(lam, '.2f'):>9}"
@@ -296,8 +306,10 @@ def main():
 
     # --- (4) VIX brake ON TOP per lam — bear WITH/WITHOUT (honest cost of the added beta) ---
     print("\n  (4) VIX brake ON TOP (iter-008 s=clip(20/VIX[t-1],0.5,1)) — added-bear management:")
-    print(f"      {'lam':>5} {'net':>6} {'netVIX':>7} {'bear':>6} {'bearVIX':>8} "
-          f"{'maxDD':>7} {'mddVIX':>8} {'+yrs':>7} {'+yrsVIX':>8}")
+    print(
+        f"      {'lam':>5} {'net':>6} {'netVIX':>7} {'bear':>6} {'bearVIX':>8} "
+        f"{'maxDD':>7} {'mddVIX':>8} {'+yrs':>7} {'+yrsVIX':>8}"
+    )
     for lam in lams:
         net_c = rows[lam][0]
         net_cv = net_c * s_vix.reindex(net_c.index).fillna(1.0)
@@ -336,6 +348,48 @@ def main():
         f"+yrs={rb['npos']}/{rb['nyr']}  "
         f"net-beta={rb['beta']:+.2f} (controlled)  net-long={rb['nlong']:+.2f}"
     )
+
+    # --- (7) DEPLOYED config (lam=0.25, VIX ON) — 2x-cost robustness + the CONFIRMATION reveal ---
+    # ONE pinned config of record. gross(cost-off) vs net(1x=6bps) vs net(2x=12bps), all IS-only and
+    # all with the iter-008 VIX brake ON (the deployed config). This is the SUBSTANTIVE robustness
+    # check: does the candidate clear the >=+0.50 bar even when taker cost DOUBLES?
+    raw_dep = combined_raw(pn, DEPLOYED_LAM)
+
+    def _vixed(net):  # apply the deployed iter-008 VIX brake (outer past-only scalar)
+        return net * s_vix.reindex(net.index).fillna(1.0)
+
+    net_g, _ = i3.banded_net(raw_dep, ret_fwd, CHOSEN_DELTA, cost_on=False)  # gross (cost-off)
+    net_1x, _ = i3.banded_net(raw_dep, ret_fwd, CHOSEN_DELTA)  # net 1x (6 bps/side, deployed)
+    net_2x, _ = _banded_cost(raw_dep, ret_fwd, 2.0 * ct.COST_SIDE)  # net 2x (12 bps/side stress)
+    dep_g, dep_1x, dep_2x = _vixed(net_g), _vixed(net_1x), _vixed(net_2x)
+    sh_g = ct.msharpe(dep_g, ct.LO0, ct.OOS_CUTOFF)
+    sh_1x = ct.msharpe(dep_1x, ct.LO0, ct.OOS_CUTOFF)
+    sh_2x = ct.msharpe(dep_2x, ct.LO0, ct.OOS_CUTOFF)
+    turn_dep = ct.turnover(i3.banded_book(raw_dep, CHOSEN_DELTA), ct.LO0, ct.OOS_CUTOFF)
+    print("\n  (7) DEPLOYED config lam=0.25 + VIX ON — cost robustness (IS-only):")
+    print(
+        f"      gross(cost-off)={sh_g:+.2f}  net(1x 6bps)={sh_1x:+.2f}  net(2x 12bps)={sh_2x:+.2f}"
+        f"  (turn/day={turn_dep:.4f};  1x drag {sh_g - sh_1x:+.2f} / 2x drag {sh_g - sh_2x:+.2f})"
+    )
+    print(
+        f"      net(2x 12bps) >= +0.50 bar: "
+        f"{'PASS — ROBUST to 2x cost' if sh_2x >= 0.50 else 'FAIL — bar breaks under 2x cost'}  "
+        f"(got {sh_2x:+.2f})"
+    )
+
+    # --- (8) CONFIRMATION reveal path for the PINNED deployed config (lam=0.25, VIX ON) ---
+    # DEFAULT (no --confirm): reveal_oos=False -> perf_line computes IS-only (NO OOS number).
+    # --confirm (CONFIRMATION only): reveals OOS_Sharpe + OOS-window maxDD/netTot. DO NOT run here.
+    print(f"\n  (8) DEPLOYED perf line (lam={DEPLOYED_LAM:.2f} + VIX; OOS hidden w/o --confirm):")
+    print("  " + ct.perf_line("iter-013 DEPLOYED", dep_1x, reveal_oos=args.confirm))
+    if args.confirm:  # CONFIRMATION ONLY — this block never executes without the flag
+        oos = dep_1x[dep_1x.index >= ct.OOS_CUTOFF]
+        print(
+            f"      [CONFIRM] OOS reveal: OOS_Sharpe="
+            f"{ct.msharpe(dep_1x, ct.OOS_CUTOFF, ct.HI1):+.2f}  "
+            f"OOS_maxDD={ct.maxdd(oos) * 100:.0f}%  "
+            f"OOS_netTot={((1 + oos).cumprod().iloc[-1] - 1) * 100:+.0f}%"
+        )
 
 
 if __name__ == "__main__":

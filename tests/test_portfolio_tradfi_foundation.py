@@ -1090,6 +1090,59 @@ def test_iter011_unseasoned_names_get_zero_ltr_weight():
         ut.SECTOR_MAP = orig
 
 
+import iter_013_directional as i13  # noqa: E402
+
+
+def test_iter013_lambda0_reproduces_iter011():
+    """Pre-registered IDENTITY: lam=0 -> combined_raw == gross_norm(iter-011 mom+LTR book); through
+    the band's own gross-norm this reproduces the iter-011 banded net to MACHINE EPSILON (the extra
+    gross-norm division re-rounds — the same idempotency iter-005/iter-011 document). Anchors
+    iter-013 as a pure one-change (directional TSMOM sleeve) delta off iter-011 at lam=0."""
+    pn = _make_panel(n=1000, seed=130)
+    smap = _i4_smap(pn)
+    orig = ut.SECTOR_MAP
+    try:
+        ut.SECTOR_MAP = smap
+        net0, w0 = i3.banded_net(i13.combined_raw(pn, 0.0), pn["ret_fwd"], i3.CHOSEN_DELTA)
+        net11, w11 = i3.banded_net(
+            i11.mom_ltr_raw(pn, i13.W_LTR_NEUTRAL), pn["ret_fwd"], i3.CHOSEN_DELTA
+        )
+        pd.testing.assert_series_equal(net0, net11, atol=1e-12, rtol=0.0)
+        pd.testing.assert_frame_equal(w0.fillna(0.0), w11.fillna(0.0), atol=1e-12, rtol=0.0)
+        # the IS Sharpe (the reported headline number) matches to machine epsilon
+        assert (
+            abs(ct.msharpe(net0, ct.LO0, ct.OOS_CUTOFF) - ct.msharpe(net11, ct.LO0, ct.OOS_CUTOFF))
+            < 1e-9
+        )
+    finally:
+        ut.SECTOR_MAP = orig
+
+
+def test_iter013_tsmom_sleeve_is_past_only():
+    """The directional TSMOM sleeve is PAST-ONLY: corrupting the tail of the close panel must not
+    change any sleeve weight before the cutoff. sign(close/close.shift(252)-1)/rvol reads only
+    close.shift(252) + a trailing-63 rvol and gross-norms row-wise — it never reads forward."""
+    pn = _make_panel(n=1000, seed=131)
+    s0 = i13.tsmom_sleeve(pn)
+    active = s0.dropna(how="all")
+    cut = active.index[len(active) // 2]
+    pn_c = {k: v.copy() for k, v in pn.items()}
+    pn_c["close"].loc[pn_c["close"].index >= cut] *= 3.0
+    s1 = i13.tsmom_sleeve(pn_c)
+    early = s0.index[s0.index < cut]
+    pd.testing.assert_frame_equal(s0.loc[early], s1.loc[early])
+
+
+def test_iter013_combined_future_bar_no_leak():
+    """LOAD-BEARING: the combined (1-lam)*neutral + lam*TSMOM banded build must be future-bar
+    leak-safe at the DEPLOYED lam=0.25. The neutral sleeve is the past-only iter-011 book, the TSMOM
+    sleeve reads pure past (close.shift(252) + trailing-63 rvol), and the row-wise blend feeds the
+    strictly-causal iter-003 band. Corrupting the panel + forward returns AFTER a cutoff (on a
+    >756-day panel so both the LTR and TSMOM sleeves are active) must leave the banded net AND the
+    lagged held book before it unchanged. Reuses the iter-011 future-bar-corruption leak harness."""
+    _i11_leak_check(lambda pn: i13.combined_raw(pn, i13.DEPLOYED_LAM))
+
+
 # =====================================================================================
 # C1 — SPLIT-UNADJUSTMENT REGRESSION GUARD (the data-hardening test that would have caught
 # the Dukascopy bug that BLOCK-PENDING-FIX'd iter-006). Runs against the ON-DISK Yahoo data;
