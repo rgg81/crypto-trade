@@ -35,15 +35,23 @@ RATE_LIMIT_BACKOFF = 900  # 15 min
 class PortfolioConfig:
     equity_usd: float = 10_000.0
     leverage: float = 1.0
-    delta: float = strategy.DELTA          # hysteresis band (SNAP)
+    delta: float = strategy.DELTA  # hysteresis band (SNAP)
     interval: str = "8h"
-    ref_symbol: str = "BTCUSDT"            # candle-close trigger reference
-    min_notional_usd: float = 5.0          # skip dust legs (Binance min-notional is ~5 USDT)
+    ref_symbol: str = "BTCUSDT"  # candle-close trigger reference
+    min_notional_usd: float = 5.0  # skip dust legs (Binance min-notional is ~5 USDT)
     poll_interval_seconds: int = 60
     data_dir: str = "data"
     db_path: str = "data/portfolio_dry_run.db"
     dry_run: bool = True
     testnet: bool = False
+    # Panel-completeness guard: at an 8h boundary some symbols' new candle can lag / their fetch
+    # can transiently error (production API load at 00/08/16:00). Rebalancing on that incomplete
+    # cross-section ranks marginal names differently and carries a slightly-off book until the next
+    # 8h rebalance. So require >= this fraction of the universe to fetch OK before rebalancing;
+    # otherwise wait panel_retry_wait_s and re-fetch, up to panel_max_retries, then proceed anyway.
+    min_panel_ok_fraction: float = 0.95  # steady-state is ~2/513 skipped (0.4%); 40 skipped = 7.8%
+    panel_retry_wait_s: int = 20
+    panel_max_retries: int = 6  # ~2min max wait — bounded so the loop never hangs
 
 
 def _held_key(cfg: PortfolioConfig) -> str:
@@ -63,9 +71,9 @@ class PortfolioEngine:
         # we will actually trade. klines stay on production base_url for full history (parity).
         self.auth: AuthenticatedBinanceClient | None = None
         self.qty_prec: dict[str, int] = {}
-        self.step_size: dict[str, float] = {}     # LOT_SIZE stepSize per symbol (qty multiple)
-        self.min_notl: dict[str, float] = {}      # MIN_NOTIONAL filter per symbol ($ floor; -4164)
-        self._lev_set: set[str] = set()           # symbols whose leverage we've already set
+        self.step_size: dict[str, float] = {}  # LOT_SIZE stepSize per symbol (qty multiple)
+        self.min_notl: dict[str, float] = {}  # MIN_NOTIONAL filter per symbol ($ floor; -4164)
+        self._lev_set: set[str] = set()  # symbols whose leverage we've already set
         if not config.dry_run and settings.binance_api_key:
             auth_url = settings.auth_base_url or settings.base_url
             self.auth = AuthenticatedBinanceClient(
@@ -85,8 +93,9 @@ class PortfolioEngine:
         self.store.set_state(_held_key(self.cfg), json.dumps(held))
 
     # ---- the core: compute the rebalance plan for the upcoming candle ----
-    def compute_plan(self, current_weights: dict | None = None,
-                     forming_opens: dict | None = None) -> dict:
+    def compute_plan(
+        self, current_weights: dict | None = None, forming_opens: dict | None = None
+    ) -> dict:
         """Return the rebalance plan: per-coin target weight, current weight, delta-notional, side.
 
         PARITY: target = strategy.next_target_weights = the backtest's deployed book for the held
@@ -109,30 +118,32 @@ class PortfolioEngine:
         tgt = strategy.next_target_weights(coins, delta=self.cfg.delta)
         meta = tgt.pop("_meta")
         cur = dict(current_weights if current_weights is not None else self._load_held())
-        gross_dollar = self.cfg.equity_usd        # notional base; leverage only affects margin
+        gross_dollar = self.cfg.equity_usd  # notional base; leverage only affects margin
 
         all_syms = set(tgt) | set(cur)
         legs = []
         new_held = {}
         for s in sorted(all_syms):
-            t = float(tgt.get(s, 0.0))            # backtest deployed weight for the upcoming candle
-            c = float(cur.get(s, 0.0))            # what we actually hold now
+            t = float(tgt.get(s, 0.0))  # backtest deployed weight for the upcoming candle
+            c = float(cur.get(s, 0.0))  # what we actually hold now
             trade_w = t - c
             delta_notional = trade_w * gross_dollar
             # include EVERY target coin in the book (held_w) — even ones this venue can't trade yet;
             # those are PAPERED at execution (testnet) so the book stays the full strategy target.
             if abs(delta_notional) >= self._min_notional(s) and s in prices:
-                legs.append({
-                    "symbol": s,
-                    "side": "BUY" if trade_w > 0 else "SELL",
-                    "target_w": round(t, 6),
-                    "current_w": round(c, 6),
-                    "delta_notional_usd": round(delta_notional, 2),
-                    "price": prices[s],
-                })
-                held_w = t                        # traded to target
+                legs.append(
+                    {
+                        "symbol": s,
+                        "side": "BUY" if trade_w > 0 else "SELL",
+                        "target_w": round(t, 6),
+                        "current_w": round(c, 6),
+                        "delta_notional_usd": round(delta_notional, 2),
+                        "price": prices[s],
+                    }
+                )
+                held_w = t  # traded to target
             else:
-                held_w = c                        # below min-notional: can't trade, keep current
+                held_w = c  # below min-notional: can't trade, keep current
             if abs(held_w) > 1e-9:
                 new_held[s] = held_w
         return {
@@ -148,13 +159,15 @@ class PortfolioEngine:
             "_new_held": new_held,
         }
 
-    def refresh_data(self) -> None:
+    def refresh_data(self) -> tuple[int, int]:
         """Refresh klines + funding for the full candidate universe (PIT + carry parity).
 
         Per-symbol tolerant: a coin delisted from production fapi (400 on /klines) keeps its on-disk
         CSV (parity with the backtest view) and is skipped — one dead symbol must not abort the run.
+        Returns (ok, skipped) so the caller can gate rebalancing on panel completeness.
         """
         from crypto_trade.fetcher import fetch_symbol_interval
+
         data_dir = Path(self.cfg.data_dir)
         syms = strategy.candidate_symbols()
         ok = skipped = 0
@@ -163,9 +176,38 @@ class PortfolioEngine:
                 fetch_symbol_interval(self.kline_client, data_dir, s, self.cfg.interval)
                 ok += 1
             except Exception:
-                skipped += 1                   # delisted / unavailable on production fapi
+                skipped += 1  # delisted / unavailable on production fapi
         print(f"[portfolio] klines refreshed: {ok} ok, {skipped} skipped (delisted)")
         funding.refresh_funding(syms, self.cfg.data_dir)
+        return ok, skipped
+
+    def refresh_data_complete(self) -> tuple[int, int]:
+        """refresh_data + panel-completeness guard: retry the refresh while too many symbols fail,
+        so lagging boundary candles / transient fetch errors have time to clear before we rebalance
+        on a degraded cross-section. Bounded by panel_max_retries so the poll loop never hangs; on
+        exhaustion it proceeds on the best panel obtained (logged) — next 8h rebalance corrects."""
+        ok, skipped = self.refresh_data()
+        total = ok + skipped
+        if total == 0:
+            return ok, skipped
+        for attempt in range(1, self.cfg.panel_max_retries + 1):
+            if ok >= self.cfg.min_panel_ok_fraction * total:
+                return ok, skipped
+            print(
+                f"[portfolio] DEGRADED PANEL: {ok}/{total} ok ({skipped} skipped, "
+                f">{(1 - self.cfg.min_panel_ok_fraction) * 100:.0f}% missing) — waiting "
+                f"{self.cfg.panel_retry_wait_s}s for candles to post (retry {attempt}/"
+                f"{self.cfg.panel_max_retries}) before rebalancing"
+            )
+            time.sleep(self.cfg.panel_retry_wait_s)
+            ok, skipped = self.refresh_data()
+            total = ok + skipped
+        if ok < self.cfg.min_panel_ok_fraction * total:
+            print(
+                f"[portfolio] WARNING: panel still degraded after {self.cfg.panel_max_retries} "
+                f"retries ({ok}/{total} ok) — rebalancing on best available; next 8h corrects"
+            )
+        return ok, skipped
 
     # ---- live execution plumbing (reuses the proven AuthenticatedBinanceClient) ----
     def setup_exchange(self) -> None:
@@ -187,11 +229,13 @@ class PortfolioEngine:
             for f in si.get("filters", []):
                 ft = f.get("filterType")
                 if ft in ("LOT_SIZE", "MARKET_LOT_SIZE") and sym not in self.step_size:
-                    self.step_size[sym] = float(f["stepSize"])    # qty must be a multiple of this
+                    self.step_size[sym] = float(f["stepSize"])  # qty must be a multiple of this
                 elif ft == "MIN_NOTIONAL":
                     self.min_notl[sym] = float(f.get("notional") or f.get("minNotional") or 0.0)
-        print(f"[portfolio] loaded {len(self.qty_prec)} TRADING symbols "
-              f"(precision/stepSize/MIN_NOTIONAL); {skipped} non-TRADING skipped")
+        print(
+            f"[portfolio] loaded {len(self.qty_prec)} TRADING symbols "
+            f"(precision/stepSize/MIN_NOTIONAL); {skipped} non-TRADING skipped"
+        )
 
     def _tradable(self, symbol: str) -> bool:
         """True if the symbol is in TRADING status on the venue (registered in setup_exchange).
@@ -218,7 +262,7 @@ class PortfolioEngine:
         """Current per-coin weight from positions: positionAmt*markPrice / (equity*leverage)."""
         if self.auth is None:
             return self._load_held()
-        gross_dollar = self.cfg.equity_usd        # notional base (matches compute_plan)
+        gross_dollar = self.cfg.equity_usd  # notional base (matches compute_plan)
         cur: dict = {}
         for p in self.auth.get_positions():
             amt = float(p.get("positionAmt", 0) or 0)
@@ -237,8 +281,8 @@ class PortfolioEngine:
         prec = self.qty_prec.get(symbol, 3)
         step = self.step_size.get(symbol)
         if step and step > 0:
-            qty = (qty // step) * step            # floor to a stepSize multiple
-        return round(qty, prec)                    # clean float artifacts to the allowed precision
+            qty = (qty // step) * step  # floor to a stepSize multiple
+        return round(qty, prec)  # clean float artifacts to the allowed precision
 
     def execute(self, plan: dict) -> dict:
         """Place a MARKET order per rebalance leg on the (testnet) exchange. Returns summary."""
@@ -256,7 +300,7 @@ class PortfolioEngine:
                 else:
                     skipped += 1
                 continue
-            px = float(leg["price"])             # forming-open (close-proxy) the leg sized at
+            px = float(leg["price"])  # forming-open (close-proxy) the leg sized at
             qty = self._round_qty(s, abs(leg["delta_notional_usd"]) / px)
             # POST-FLOOR min-notional guard: flooring qty to stepSize can drop the order below the
             # symbol's MIN_NOTIONAL filter (-4164; BTC=$50). Skip these dust legs (held at current).
@@ -275,35 +319,43 @@ class PortfolioEngine:
     def run_once(self, refresh: bool = True) -> dict:
         """One evaluation: refresh data, compute the plan, log it; place orders unless dry-run."""
         if refresh:
-            self.refresh_data()
+            self.refresh_data_complete()   # guard: no rebalance on a partial/degraded kline fetch
         # forming candle via close-proxy (built in compute_plan); current book from positions
         current = None if self.cfg.dry_run else self._actual_weights()
         plan = self.compute_plan(current_weights=current)
         mode = "DRY-RUN" if self.cfg.dry_run else ("TESTNET" if self.cfg.testnet else "LIVE")
-        print(f"[portfolio:{mode}] rebalance plan as_of={plan['as_of']} "
-              f"gross=${plan['gross_dollar']} target_gross={plan['target_gross']} "
-              f"legs={plan['n_rebalance_legs']} rebal=${plan['rebalance_notional_usd']}")
+        print(
+            f"[portfolio:{mode}] rebalance plan as_of={plan['as_of']} "
+            f"gross=${plan['gross_dollar']} target_gross={plan['target_gross']} "
+            f"legs={plan['n_rebalance_legs']} rebal=${plan['rebalance_notional_usd']}"
+        )
         for leg in plan["legs"]:
-            print(f"    {leg['side']:4} {leg['symbol']:14} "
-                  f"w {leg['current_w']:+.4f}->{leg['target_w']:+.4f} "
-                  f"${leg['delta_notional_usd']:+.2f}")
+            print(
+                f"    {leg['side']:4} {leg['symbol']:14} "
+                f"w {leg['current_w']:+.4f}->{leg['target_w']:+.4f} "
+                f"${leg['delta_notional_usd']:+.2f}"
+            )
         if self.cfg.dry_run:
-            self._save_held(plan["_new_held"])   # treat plan as filled (paper book)
+            self._save_held(plan["_new_held"])  # treat plan as filled (paper book)
         else:
             res = self.execute(plan)
-            print(f"[portfolio:{mode}] orders placed={res['placed']} "
-                  f"papered={res.get('papered', 0)} skipped={res['skipped']} "
-                  f"errors={res['errors']}")
+            print(
+                f"[portfolio:{mode}] orders placed={res['placed']} "
+                f"papered={res.get('papered', 0)} skipped={res['skipped']} "
+                f"errors={res['errors']}"
+            )
             self._save_held(plan["_new_held"])
         return plan
 
     def run(self) -> None:
         """Poll loop: act once per new 8h candle close on the reference symbol."""
         mode = "DRY-RUN" if self.cfg.dry_run else ("TESTNET" if self.cfg.testnet else "LIVE")
-        print(f"[portfolio:{mode}] entering poll loop (every {self.cfg.poll_interval_seconds}s); "
-              f"equity=${self.cfg.equity_usd} lev={self.cfg.leverage}x band={self.cfg.delta}")
+        print(
+            f"[portfolio:{mode}] entering poll loop (every {self.cfg.poll_interval_seconds}s); "
+            f"equity=${self.cfg.equity_usd} lev={self.cfg.leverage}x band={self.cfg.delta}"
+        )
         if not self.cfg.dry_run:
-            self.setup_exchange()             # load quantityPrecision; leverage set lazily per leg
+            self.setup_exchange()  # load quantityPrecision; leverage set lazily per leg
         last_key = f"portfolio_last_candle_{self.cfg.ref_symbol}"
         while True:
             # RESILIENT poll: a transient API error (418 rate-limit ban / 429 / network / 5xx) must
@@ -317,7 +369,8 @@ class PortfolioEngine:
                 last = self.store.get_state(last_key)
                 last_ms = int(last) if last else None
                 candle = data_pipeline.detect_new_candle(
-                    self.read_client, self.cfg.ref_symbol, self.cfg.interval, last_ms)
+                    self.read_client, self.cfg.ref_symbol, self.cfg.interval, last_ms
+                )
                 if candle is not None:
                     self.run_once(refresh=True)
                     self.store.set_state(last_key, str(candle.open_time))
