@@ -11,12 +11,15 @@ trading-day bars and with a two-track P&L. Each new SETTLED daily bar:
 
 TWO EQUITY TRACKS — SIGNAL vs EXECUTED
 --------------------------------------
-  * PARITY = THE SIGNAL (backtest book of record): ``net`` from
-    ``live_weights_tradfi.deployed_book`` compounded since launch, on the CONTINUOUS ideal weights.
-    All 69 names, Yahoo total-return, realistic cost (``ct.COST_SIDE`` = taker + slippage). This is
-    the reference that must match the backtest bit-for-bit — quantization is NOT a signal error and
-    must NEVER drift it. ``tradfi_held_w`` stays the continuous ideal book for the same reason (the
-    monitor's PARITY check compares to it).
+  * PARITY = THE SIGNAL (backtest book of record): ``net`` from the SPLICED deployed book
+    (``splice_loader.load_tradfi_spliced`` → ``champ.deployed_weights``, the SAME mechanism as
+    ``live_weights_tradfi.deployed_book``) compounded since launch, on the CONTINUOUS ideal weights.
+    All 69 names, SPLICED total-return (Yahoo deep history return-chain-spliced to each name's
+    traded perp from PIT inception; the recent 2026 tail rides the perp the desk trades), realistic
+    cost (``ct.COST_SIDE`` = taker + slippage). This is the reference that must match the SPLICED
+    backtest bit-for-bit — quantization is NOT a signal error and must NEVER drift it. IS is
+    bit-identical to pure Yahoo (entire IS < earliest perp inception). ``tradfi_held_w`` stays the
+    continuous ideal SPLICED book (the monitor's PARITY check compares to it).
   * LIVE = THE REAL TRADE (executed paper P&L): the deployed weight panel QUANTIZED to the official
     Binance perp filters (lot-step rounding + sub-min-notional drops) at each day's perp price,
     scored on Binance TradFi-perp returns MINUS funding (on the quantized legs) MINUS turnover cost
@@ -24,11 +27,13 @@ TWO EQUITY TRACKS — SIGNAL vs EXECUTED
     an optional ``live_extra_slippage_side`` stress knob defaults to 0). Coverage-aware — a name
     with no perp bar / no funding on a day contributes 0 (ragged onboarding, 34→100 % cover).
 
-  ``basis_gap = equity_live − equity_parity`` bundles the full REAL-vs-SIGNAL gap:
-  perp-vs-underlying basis + funding + quantization (lot rounding + dropped sub-min-notional legs).
-  Slippage is in BOTH tracks via ``ct.COST_SIDE`` so it does NOT appear in the gap. Expected
-  non-zero and growing — that is the desk's honesty. Phase-2b measured the basis+funding part at
-  ≈ −85 bps at the whole-book level.
+  ``basis_gap = equity_live − equity_parity`` bundles the REAL-vs-SIGNAL gap. Because the PARITY
+  book now rides the SAME spliced (perp-recent) instrument the LIVE track marks, the perp-vs-
+  underlying BASIS has collapsed out of the gap — what remains is FUNDING + QUANTIZATION (lot
+  rounding + dropped sub-min-notional legs). Slippage is in BOTH tracks via ``ct.COST_SIDE`` so it
+  does NOT appear in the gap. Pre-splice (Phase-2b) the whole-book basis+funding gap was ≈ −85 bps
+  (basis ~−55 bps + funding ~−30 bps); the splice removes the basis, leaving the funding carry
+  (~−0.7%/yr net) plus quantization as the honest residual.
 
 PAYP EXCLUSION
 --------------
@@ -87,6 +92,7 @@ import live_weights_tradfi as lw  # noqa: E402  — parity bridge (deployed_book
 import perp_map_tradfi as pm  # noqa: E402
 import reconcile_basis_tradfi as rc  # noqa: E402  — REUSE funding-binning + perp fwd-return helpers
 import sizing_min_notional as sizing  # noqa: E402  — REUSE its filter fetch + quantize_weight rule
+import splice_loader as sl  # noqa: E402  — SPLICED book of record (parity on the EXECUTED instrument)
 import universe_tradfi as ut  # noqa: E402
 
 from crypto_trade.storage import csv_path, read_last_open_time  # noqa: E402
@@ -201,8 +207,19 @@ class TradfiPaperEngine:
         parity by construction — but the panel is first truncated to bars whose date < today UTC, so
         today's not-yet-settled bar never enters. ``as_of`` = the newest settled bar (the book to
         hold now). Returns ``(None, None, None)`` if there is no settled data yet.
+
+        SPLICED book of record (splice step 2): loads via ``splice_loader.load_tradfi_spliced`` (the
+        SAME loader the ``lw`` bridge uses), so the PARITY net + traded ``deployed_w`` are computed
+        on the instrument the desk executes — the recent-2026 tail rides the perp, matching the LIVE
+        track's perp+funding marks and the spliced ``held`` book from the ``lw`` bridge. This
+        collapses the parity↔live BASIS to funding + quantization. IS is bit-identical to pure
+        Yahoo by construction (entire IS < earliest perp inception). The perp-return math in
+        ``_live_returns_quantized`` is UNCHANGED — its perp opens ride the same trading-day grid as
+        the spliced parity, so no extra calendar alignment is needed.
         """
-        coins = ct.load_tradfi(lw._universe(self.cfg.data_dir), self.cfg.data_dir)
+        coins = sl.load_tradfi_spliced(
+            lw._universe(self.cfg.data_dir), self.cfg.data_dir, self.cfg.live_data_dir
+        )
         today_ms = self._today_ms()
         coins = {s: d[d.index < today_ms] for s, d in coins.items() if len(d[d.index < today_ms])}
         if not coins:

@@ -13,12 +13,15 @@ and VIX scalars), the truncated recompute's ``as_of`` row equals the full-histor
 Recompute-from-full-history (the metals pattern): each call rebuilds the whole book from scratch and
 returns the last row. There is no stored position state to diverge from the backtest.
 
-DEPLOYMENT TODO (Phase 2, documented — NOT solved here): PERP-VS-UNDERLYING BASIS. The backtest is
-priced on Yahoo UNDERLYING total-return daily bars (``data/<SYM>/1d.csv``); the live desk fills on
-Binance single-stock TradFi PERPS. The target WEIGHTS are identical (same signal, same book), but
-the fill-price basis differs (perp mark vs underlying close, funding, overnight/weekend gaps).
-Phase 2 must map each ``<STEM>`` weight to its ``<STEM>USDT`` perp, size in perp notional, and
-account for the basis + funding drag. This bridge emits the underlying-derived target weights only.
+PERP-VS-UNDERLYING BASIS — SOLVED (splice step 2). This bridge now loads the SPLICED book of record
+(``splice_loader.load_tradfi_spliced``): Yahoo deep history return-chain-spliced to each name's
+Binance perp from its point-in-time inception, resampled onto the Yahoo trading-day calendar. So the
+signal + parity book are computed on the SAME instrument the desk executes (perp for the recent
+2026 tail, Yahoo for the pre-inception history). IS is BIT-IDENTICAL to pure Yahoo by construction
+(the entire in-sample window precedes every perp inception, so ``spliced == Yahoo`` for all IS bars;
+proven in ``splice_verify.py`` / ``tests/test_tradfi_splice.py``) — the confirmed iter-016 IS cannot
+move. Only the recent tail switches to the traded perp, collapsing the parity-vs-live BASIS to just
+funding + quantization. Residual funding carry (~−0.7%/yr net on the L/S book) stays a budget item.
 
 Run:  uv run python analysis/portfolio/tradfi/live_weights_tradfi.py [--as-of YYYY-MM-DD]
 """
@@ -37,6 +40,7 @@ if str(_HERE) not in sys.path:
 
 import core_tradfi as ct  # noqa: E402
 import iter_016_bear_gated_tsmom as champ  # noqa: E402  — the confirmed tradfi baseline
+import splice_loader as sl  # noqa: E402  — Yahoo->perp SPLICED loader (the EXECUTED instrument)
 import universe_tradfi as ut  # noqa: E402
 
 
@@ -54,9 +58,17 @@ def _truncate(coins: dict[str, pd.DataFrame], cutoff_ms: int) -> dict[str, pd.Da
     return {s: d[d.index <= cutoff_ms] for s, d in coins.items() if len(d[d.index <= cutoff_ms])}
 
 
-def deployed_book(data_dir: str | None = None) -> tuple[pd.Series, pd.DataFrame]:
-    """Full-history ``(net, deployed_w)`` of the iter-016 baseline (the backtest book of record)."""
-    coins = ct.load_tradfi(_universe(data_dir), data_dir)
+def deployed_book(
+    data_dir: str | None = None, live_data_dir: str | None = None
+) -> tuple[pd.Series, pd.DataFrame]:
+    """Full-history ``(net, deployed_w)`` of the iter-016 baseline on the SPLICED book of record.
+
+    Loads via ``splice_loader.load_tradfi_spliced`` (Yahoo deep history return-chain-spliced to each
+    name's Binance perp from PIT inception), so the parity net + weight book are computed on the
+    instrument the desk executes. IS bit-identical to pure Yahoo by construction (entire IS <
+    earliest inception); only the recent 2026 tail switches to the traded perp. ``live_data_dir``
+    overrides the perp store (default ``data_live_tradfi``)."""
+    coins = sl.load_tradfi_spliced(_universe(data_dir), data_dir, live_data_dir)
     pn = ct.panels(coins)
     return champ.deployed_weights(pn, data_dir=data_dir)
 
@@ -65,6 +77,7 @@ def deployed_target_weights(
     as_of: str | pd.Timestamp,
     data_dir: str | None = None,
     tol: float = 1e-12,
+    live_data_dir: str | None = None,
 ) -> dict[str, float]:
     """The iter-016 DEPLOYED target weight book the desk should hold as of ``as_of``.
 
@@ -79,7 +92,9 @@ def deployed_target_weights(
     """
     as_of_ts = pd.Timestamp(as_of)
     as_of_ms = int(as_of_ts.value // 1_000_000)  # ns -> ms
-    coins = _truncate(ct.load_tradfi(_universe(data_dir), data_dir), as_of_ms)
+    coins = _truncate(
+        sl.load_tradfi_spliced(_universe(data_dir), data_dir, live_data_dir), as_of_ms
+    )
     if not coins:
         raise ValueError(f"no tradfi data ≤ {as_of_ts.date()}")
     pn = ct.panels(coins)
@@ -112,7 +127,7 @@ def main() -> None:
     meta = tgt.pop("_meta")
     top = sorted(tgt.items(), key=lambda kv: -abs(kv[1]))[:12]
     print(
-        f"iter-016 DEPLOYED target weights  as_of={meta['as_of'].date()}  (underlying-weight space)"
+        f"iter-016 DEPLOYED target weights  as_of={meta['as_of'].date()}  (SPLICED book of record)"
     )
     print(
         f"  gross Σ|w| = {meta['gross']:.3f} (vol-target-scaled)   "
@@ -121,7 +136,7 @@ def main() -> None:
     print("  top |w|:")
     for t, w in top:
         print(f"    {t:12} {w:+.4f}")
-    print("  NOTE: weights are underlying (Yahoo TR) — perp-vs-underlying basis is a Phase-2 TODO.")
+    print("  NOTE: SPLICED book — recent tail on the traded perp; IS bit-identical to Yahoo.")
 
 
 if __name__ == "__main__":

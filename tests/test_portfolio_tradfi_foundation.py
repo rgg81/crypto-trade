@@ -1482,15 +1482,20 @@ def test_iter016_deployed_weights_matches_backtest_net():
 
 def test_iter016_live_bridge_reconciles_bit_exact():
     """The live bridge deployed_target_weights(as_of) == the full-backtest deployed book row at
-    as_of, BIT-EXACT (allclose 1e-10), at phase-diverse dates incl. bear-gate-fire + latest bar."""
+    as_of, BIT-EXACT (allclose 1e-10), at phase-diverse dates incl. bear-gate-fire + latest bar.
+
+    Parity of record is the SPLICED backtest (splice step 2): the bridge loads via
+    ``splice_loader.load_tradfi_spliced``, so the bit-exact reference here is the SPLICED
+    full-history book (IS bit-identical to pure Yahoo; recent 2026 tail rides the traded perp)."""
     import iter_016_bear_gated_tsmom as i16
     import live_weights_tradfi as lw
+    import splice_loader as sl
 
     base = ct._ROOT / "data"
     syms = sorted(p.parent.name for p in base.glob("*/1d.csv") if p.parent.name in ut.SECTOR_MAP)
     if not syms:
         pytest.skip("no on-disk tradfi data (CI)")
-    coins = ct.load_tradfi(syms, None)
+    coins = sl.load_tradfi_spliced(syms, None)
     _, full = i16.deployed_weights(ct.panels(coins))
     cols, idx = full.columns, full.index
     gross = full.abs().sum(axis=1)

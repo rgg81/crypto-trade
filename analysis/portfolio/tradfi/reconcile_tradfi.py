@@ -1,5 +1,11 @@
 """Live-parity RECONCILE — prove the tradfi paper bridge reproduces the backtest BIT-FOR-BIT.
 
+PARITY OF RECORD = the SPLICED backtest (splice step 2). The live bridge now loads via
+``splice_loader.load_tradfi_spliced`` (Yahoo deep history return-chain-spliced to each name's
+Binance perp from PIT inception), so this reconcile's bit-exact reference is the SPLICED
+full-history book — NOT pure Yahoo. IS is bit-identical either way (the entire in-sample window
+precedes every perp inception, so ``spliced == Yahoo`` for IS bars); only the 2026 tail rides perp.
+
 The live bridge (`live_weights_tradfi.deployed_target_weights`) recomputes the iter-016 deployed
 weight book from FULL history each call. This harness replays that at chosen ``as_of`` dates: at
 each ``as_of`` it truncates the history to ``≤ as_of`` (what the desk sees when ``as_of`` has just
@@ -37,6 +43,7 @@ import iter_006_crashbrake as i6  # noqa: E402
 import iter_015_cost as i15  # noqa: E402
 import iter_016_bear_gated_tsmom as champ  # noqa: E402
 import live_weights_tradfi as lw  # noqa: E402
+import splice_loader as sl  # noqa: E402  — parity of record is now the SPLICED backtest recompute
 
 BIT_TOL = 1e-10  # bit-exact (truncated recompute == full-history book)
 PROXY_TOL = 5e-2  # live forming-bar proxy gap (open ≈ prior close on the vol-target scale term)
@@ -104,7 +111,10 @@ def _pick_as_of_dates(
 
 
 def reconcile(data_dir: str | None, n: int) -> int:
-    coins = ct.load_tradfi(lw._universe(data_dir), data_dir)
+    # Parity of record is now the SPLICED backtest (the live bridge recomputes from the SAME spliced
+    # loader), so the bit-exact reference is the spliced full-history book. IS is bit-identical to
+    # pure Yahoo (entire IS < perp inception); only the recent 2026 tail rides the traded perp.
+    coins = sl.load_tradfi_spliced(lw._universe(data_dir), data_dir)
     full_net, full = champ.deployed_weights(ct.panels(coins), data_dir=data_dir)
     cols = full.columns
     idx = full.index
