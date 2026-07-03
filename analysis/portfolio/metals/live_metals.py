@@ -24,7 +24,6 @@ import dataclasses
 import datetime as dt
 import json
 import sys
-import tempfile
 import time
 from pathlib import Path
 
@@ -36,13 +35,13 @@ for p in (str(_HERE), str(_ROOT / "src")):
     if p not in sys.path:
         sys.path.insert(0, p)
 
-import ingest_dukascopy as ing  # noqa: E402
 import live_weights as lw  # noqa: E402
 import metals_funding as mf  # noqa: E402
 import universe_metals as um  # noqa: E402
 
+from crypto_trade.client import BinanceClient  # noqa: E402
+from crypto_trade.fetcher import fetch_symbol_interval  # noqa: E402
 from crypto_trade.live.state_store import StateStore  # noqa: E402
-from crypto_trade.storage import csv_path, read_last_open_time, write_klines  # noqa: E402
 
 STEP_MS = 8 * 60 * 60 * 1000
 
@@ -50,12 +49,12 @@ STEP_MS = 8 * 60 * 60 * 1000
 @dataclasses.dataclass(frozen=True)
 class MetalsPaperConfig:
     equity_usd: float = 10_000.0
-    data_dir: str = str(_ROOT / "data_live_metals")  # dedicated live Dukascopy store
+    # Merged 8h store: Dukascopy deep-history backfill (frozen) + Binance live tail. Built once by
+    # build_merged_data.py; the engine only ever APPENDS the Binance tail (fetch_symbol_interval).
+    data_dir: str = str(_ROOT / "data_live_metals")
     db_path: str = str(_ROOT / "data" / "metals_paper.db")
     equity_csv: str = str(_ROOT / "data" / "metals_equity.csv")
     poll_interval_seconds: int = 60
-    refresh_lookback_days: int = 10  # incremental Dukascopy pull window each tick (cache → fast)
-    seed_start: str = "2005-06-01"  # first-run deep history (warmup for SMA450)
 
 
 class MetalsPaperEngine:
@@ -65,38 +64,21 @@ class MetalsPaperEngine:
         self.cfg = cfg
         Path(cfg.db_path).parent.mkdir(parents=True, exist_ok=True)
         self.store = StateStore(Path(cfg.db_path))
-        self._instr = dict(ing.INSTRUMENTS)  # {ticker: (dukascopy_id, start)}
+        self._instr = list(um.UNIVERSE)  # the 4 Binance metal-perp tickers
+        self._client = BinanceClient()  # production fapi klines — the reliable live source
 
-    # ── data refresh (incremental Dukascopy — the backtest's source, for exact signal parity) ──
-    def _refresh_one(self, ticker: str, instrument: str) -> int:
-        out = csv_path(Path(self.cfg.data_dir), ticker, "8h")
-        last = read_last_open_time(out)
-        start = (
-            self.cfg.seed_start
-            if last is None
-            else (
-                pd.Timestamp(last, unit="ms") - pd.Timedelta(days=self.cfg.refresh_lookback_days)
-            ).strftime("%Y-%m-%d")
-        )
-        end = (dt.datetime.now(dt.UTC).date() + dt.timedelta(days=1)).isoformat()
-        with tempfile.TemporaryDirectory(prefix="mlive_") as tmp:
-            h1 = ing.fetch_h1(instrument, start, end, tmp)
-        eight = ing.resample_8h(h1)
-        # DROP the FORMING (incomplete) 8h candle — its bucket end (open + 8h) is still in the
-        # future, so it holds only partial h1 data. Appending it leaks an incomplete candle into
-        # signal (a look-ahead). Keep only COMPLETE candles whose 8h window has fully closed.
-        now_ms = int(time.time() * 1000)
-        klines = [
-            k
-            for k in ing.to_klines(eight)
-            if (last is None or k.open_time > last) and k.open_time + STEP_MS <= now_ms
-        ]
-        return write_klines(out, klines, append=(last is not None))
+    # ── data refresh (incremental BINANCE klines — reliable live source; Dukascopy is a one-time
+    #    historical backfill merged in by build_merged_data.py, never re-fetched live) ──
+    def _refresh_one(self, ticker: str) -> int:
+        # fetch_symbol_interval resumes from the CSV's last open_time, drops the still-forming
+        # candle (close_time > now — a look-ahead guard), and appends to data_dir/<SYM>/8h.csv —
+        # the same store the Dukascopy backfill wrote, so signals stay bit-parity with the backtest.
+        return fetch_symbol_interval(self._client, Path(self.cfg.data_dir), ticker, "8h")
 
     def refresh_data(self) -> None:
-        for ticker, (instrument, _start) in self._instr.items():
+        for ticker in self._instr:
             try:
-                n = self._refresh_one(ticker, instrument)
+                n = self._refresh_one(ticker)
                 if n:
                     print(f"  [data] {ticker}: +{n} 8h candle(s)", flush=True)
             except Exception as e:  # noqa: BLE001 — tolerate a transient source hiccup
