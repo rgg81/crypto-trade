@@ -1,7 +1,9 @@
 import time
+from collections.abc import Callable
 from pathlib import Path
 
 from crypto_trade.client import BinanceClient
+from crypto_trade.models import Kline
 from crypto_trade.storage import csv_path, read_last_open_time, write_klines
 
 
@@ -11,6 +13,7 @@ def fetch_symbol_interval(
     symbol: str,
     interval: str,
     start_time: int | None = None,
+    keep: Callable[[Kline], bool] | None = None,
 ) -> int:
     """Fetch klines for one symbol/interval pair and append to CSV.
 
@@ -18,6 +21,9 @@ def fetch_symbol_interval(
     incrementally. Only CLOSED klines are written — the currently
     forming candle (close_time > now) is dropped so it never
     contaminates the CSV with stale mid-candle values.
+
+    ``keep`` is an optional per-kline predicate applied after the forming-candle drop (e.g. to
+    restrict a 24/7 market to trading-hours candles); ``None`` keeps every closed candle.
 
     Returns the number of new klines written.
     """
@@ -36,6 +42,8 @@ def fetch_symbol_interval(
 
     now_ms = int(time.time() * 1000)
     closed = [k for k in klines if k.close_time < now_ms]
+    if keep is not None:
+        closed = [k for k in closed if keep(k)]
     if not closed:
         return 0
 

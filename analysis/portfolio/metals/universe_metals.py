@@ -32,6 +32,20 @@ _ROOT = Path(__file__).resolve().parents[3]
 UNIVERSE: tuple[str, ...] = ("XAUUSDT", "XAGUSDT", "XPTUSDT", "XPDUSDT")
 NAMES = {"XAUUSDT": "gold", "XAGUSDT": "silver", "XPTUSDT": "platinum", "XPDUSDT": "palladium"}
 
+
+def metals_market_open(open_time_ms: int) -> bool:
+    """True iff the 8h candle opening at ``open_time_ms`` is a metals MARKET-HOURS (24/5) candle.
+
+    The strategy is 24/5 (Dukascopy has no weekend candles; CANDLES_PER_YEAR=825 and the vol target
+    depend on it). Binance metal perps trade 24/7, so its live/backfill klines are filtered to the
+    24/5 schedule the strategy was validated on: KEEP Mon-Fri (all 00/08/16 UTC slots) + the
+    Sun-16:00 reopen candle (metals reopen ~Sun 22:00 UTC); DROP Sat (all) and Sun 00:00/08:00.
+    (Derived from the Dukascopy 2024 pattern.) Epoch 1970-01-01 was a Thu, so dow = (days+3) % 7.
+    """
+    dow = (open_time_ms // 86_400_000 + 3) % 7  # Mon=0 .. Sun=6
+    hour = (open_time_ms // 3_600_000) % 24
+    return dow <= 4 or (dow == 6 and hour == 16)
+
 # ── Sacred constants (inherited from the project) ─────────────────────────────────────
 OOS_CUTOFF = pd.Timestamp("2025-03-24")  # immutable; IS < cutoff, OOS >= cutoff
 LO0 = pd.Timestamp("2000-01-01")

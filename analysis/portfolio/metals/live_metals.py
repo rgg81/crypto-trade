@@ -73,7 +73,15 @@ class MetalsPaperEngine:
         # fetch_symbol_interval resumes from the CSV's last open_time, drops the still-forming
         # candle (close_time > now — a look-ahead guard), and appends to data_dir/<SYM>/8h.csv —
         # the same store the Dukascopy backfill wrote, so signals stay bit-parity with the backtest.
-        return fetch_symbol_interval(self._client, Path(self.cfg.data_dir), ticker, "8h")
+        # keep=metals_market_open filters Binance's 24/7 stream to the 24/5 schedule the strategy
+        # (CANDLES_PER_YEAR=825) and the Dukascopy backfill use — no weekend candles.
+        return fetch_symbol_interval(
+            self._client,
+            Path(self.cfg.data_dir),
+            ticker,
+            "8h",
+            keep=lambda k: um.metals_market_open(k.open_time),
+        )
 
     def refresh_data(self) -> None:
         for ticker in self._instr:
