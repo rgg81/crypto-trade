@@ -172,10 +172,20 @@ class MetalsPaperEngine:
         if not coins:
             print("  [tick] no data yet", flush=True)
             return None
-        latest = max(int(d.index[-1]) for d in coins.values() if len(d))
+        # Rebalance only on the latest candle EVERY coin has — never max-of-coins. Dukascopy can
+        # recover unevenly (one metal's candle lands before another's); rebalancing on that
+        # misaligned data feeds the strategy stale/NaN legs → a book that diverges from the backtest
+        # (which always sees aligned data). Using MIN makes a lagging coin defer the whole rebalance
+        # until all four align — matches the backtest, so parity is preserved.
+        latests = {s: int(d.index[-1]) for s, d in coins.items() if len(d)}
+        latest = min(latests.values())
         last_seen = self.store.get_state("metals_last_candle")
         if last_seen is not None and latest <= int(last_seen):
-            return None  # no new COMPLETE candle since last rebalance
+            if len(set(latests.values())) > 1:  # some coin(s) ahead — defer for the laggard(s)
+                lag = pd.Timestamp(latest, unit="ms")
+                print(f"  [tick] coins misaligned (aligned-latest={lag}); deferring rebalance",
+                      flush=True)
+            return None  # no new COMPLETE candle that ALL coins have
 
         if self.store.get_state("metals_launch_candle") is None:
             self.store.set_state("metals_launch_candle", str(latest))
