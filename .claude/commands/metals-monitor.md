@@ -108,6 +108,17 @@ the live engine reproduces the backtest bit-for-bit. Run before trusting a long 
   basis reconcile + a forward bear; tighten the watch cadence first. Paper is the current scope.
 
 ## Changelog
+- **2026-07-03 v3** — DATA SOURCING: Binance live (24/5) + Dukascopy one-time backfill (user: "stop
+  relying on Dukascopy live"). Recurring Dukascopy live fetch-failures (twice in ~8h + an uneven-
+  recovery incident that briefly corrupted the book) → swapped `live_metals._refresh_one` to
+  `fetcher.fetch_symbol_interval` (Binance incremental, reliable). Per metal: Dukascopy[deep..
+  perp_launch) + Binance[perp_launch..now], built once by `build_merged_data.py` into data/ +
+  data_live_metals/. Binance is 24/7 but the strategy is 24/5 → `um.metals_market_open` filters to
+  Mon-Fri + Sun-16:00. Also added: MIN-ALIGNMENT guard (`live_metals` run_once uses min-of-coins
+  latest — never rebalance on partially-refreshed data; commit 04552538); hardened `_engine_up`;
+  "exactly-ONE-engine" check (kill extras by PID, NEVER `pkill -f run_metals_paper.py` — self-matches
+  the monitor shell). Parity bit-exact on the merged store; 36 metals tests pass. Weekend gap still
+  applies (24/5): Fri-16:00 candle → Sun-16:00 reopen; STALE/MISSED benign Sat/Sun.
 - **2026-07-01 v2** — REALISTIC FUNDING (user: "account those trades realistically"). Paper equity now
   = price leg + FUNDING leg from REAL Binance metal-perp 4h `fundingRate` (`metals_funding.py`;
   refreshed at each rebalance in `live_metals`; shown as `[fund $X]` in the digest, `metals_funding_pnl`
