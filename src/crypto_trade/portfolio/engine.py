@@ -30,6 +30,38 @@ from crypto_trade.portfolio import funding, strategy
 # banned IP ESCALATES the ban, so back off well past a typical ban (minutes), not the 60s poll.
 RATE_LIMIT_BACKOFF = 900  # 15 min
 
+# Binance business-logic order errors a retry cannot fix (bad request, not a transient outage) —
+# never resend on these. All are NEGATIVE codes, so a "-NNNN" substring can't collide with a digit
+# run inside a URL/timestamp/quantity that a 5xx error body may echo.
+TERMINAL_ORDER_CODES = ("-1121", "-4164", "-2019", "-1111", "-1013", "-4003", "-1102", "-4061")
+# Rate-limit business codes (also negative) — do NOT retry inside a rebalance (hammering a banned IP
+# escalates the ban); the poll loop's RATE_LIMIT_BACKOFF handles these higher up. HTTP 418/429 are
+# detected via status code, not substring (a bare "429" could match a timestamp in a 5xx body).
+RATE_LIMIT_CODES = ("-1003", "-1015")
+
+
+def _order_error_kind(exc: Exception) -> str:
+    """Classify a place_market_order failure: 'terminal' (don't retry), 'ratelimit' (don't retry),
+    or 'transient' (retry with position reconcile). Prefers the HTTP status code (httpx) so a bare
+    418/429 in a 5xx error body's echoed URL can't cause a misclassification. Unknown / network
+    errors default to transient — safe because the retry reconciles to the live position and trades
+    only the remaining gap (never double-fills)."""
+    status = getattr(getattr(exc, "response", None), "status_code", None)
+    if status in (418, 429):
+        return "ratelimit"
+    if status is not None and status >= 500:
+        return "transient"  # 5xx gateway/server outage — ambiguous, reconcile makes the retry safe
+    if status is not None and 400 <= status < 500:
+        # any other 4xx is a Binance business reject (bad param/precision/notional) — a retry can't
+        # fix it. Covers codes beyond TERMINAL_ORDER_CODES (e.g. -1100/-4011/-4001) without a list.
+        return "terminal"
+    msg = repr(exc).lower()
+    if any(c in msg for c in RATE_LIMIT_CODES) or "too many requests" in msg:
+        return "ratelimit"
+    if any(c in msg for c in TERMINAL_ORDER_CODES):  # 4xx Binance reject with a negative code
+        return "terminal"
+    return "transient"
+
 
 @dataclasses.dataclass(frozen=True)
 class PortfolioConfig:
@@ -52,6 +84,13 @@ class PortfolioConfig:
     min_panel_ok_fraction: float = 0.95  # steady-state is ~2/513 skipped (0.4%); 40 skipped = 7.8%
     panel_retry_wait_s: int = 20
     panel_max_retries: int = 6  # ~2min max wait — bounded so the loop never hangs
+    # Order-retry guard: a MARKET leg can fail on a transient venue error (502 / timeout / 5xx) the
+    # matching engine may or may not have received. Rather than blindly resend (which double-fills
+    # if the failed order actually landed), the retry RECONCILES against the live position, trading
+    # only the remaining gap to target — idempotent by construction. Terminal errors
+    # (-1121/-4164/-2019/-1111/-1013) and rate-limits (418/429/-1003) are NOT retried.
+    order_max_retries: int = 3
+    order_retry_wait_s: int = 2
 
 
 def _held_key(cfg: PortfolioConfig) -> str:
@@ -254,9 +293,9 @@ class PortfolioEngine:
             return
         try:
             self.auth.set_leverage(symbol, max(1, int(round(self.cfg.leverage))))
+            self._lev_set.add(symbol)  # only cache on success — a failed set stays retryable
         except Exception as exc:
             print(f"[portfolio] set_leverage {symbol} failed: {exc}")
-        self._lev_set.add(symbol)
 
     def _actual_weights(self) -> dict:
         """Current per-coin weight from positions: positionAmt*markPrice / (equity*leverage)."""
@@ -284,11 +323,83 @@ class PortfolioEngine:
             qty = (qty // step) * step  # floor to a stepSize multiple
         return round(qty, prec)  # clean float artifacts to the allowed precision
 
+    def _live_notional(self, symbol: str) -> float:
+        """Signed USD notional currently held for symbol (positionAmt * markPrice), 0 if flat.
+        Used by the order-retry reconcile to measure what actually filled after a failed leg."""
+        for p in self.auth.get_positions(symbol):
+            if p.get("symbol") != symbol:
+                continue
+            amt = float(p.get("positionAmt", 0) or 0)
+            return amt * float(p.get("markPrice", 0) or 0)
+        return 0.0
+
+    def _place_leg_with_retry(self, leg: dict, gross_dollar: float) -> str:
+        """Place one MARKET leg with a RECONCILE-based retry. Returns 'placed' | 'retried' |
+        'reconciled' | 'error'.
+
+        Idempotency: a transient venue failure (502 / timeout / 5xx) is ambiguous — the matching
+        engine may or may not have received the order. So we NEVER blindly resend; on each retry we
+        re-read the LIVE position and trade only the remaining gap to this symbol's target notional
+        (target_w * gross_dollar). If the failed order actually landed, the gap is ~0 and we place
+        nothing — no double-fill. Terminal errors + rate-limits are not retried (won't clear)."""
+        s = leg["symbol"]
+        px = float(leg["price"])  # forming-open (close-proxy) the leg was sized at
+        target_notional = float(leg["target_w"]) * gross_dollar
+        side = leg["side"]
+        qty = self._round_qty(s, abs(leg["delta_notional_usd"]) / px)
+        self._ensure_leverage(s)
+        for attempt in range(self.cfg.order_max_retries + 1):  # 1 initial + N retries
+            try:
+                self.auth.place_market_order(s, side, qty)
+                return "placed" if attempt == 0 else "retried"
+            except Exception as exc:  # noqa: BLE001
+                kind = _order_error_kind(exc)
+                print(
+                    f"[portfolio] order {side} {s} x{qty} failed (attempt "
+                    f"{attempt + 1}/{self.cfg.order_max_retries + 1}, {kind}): {repr(exc)[:120]}"
+                )
+                if kind != "transient" or attempt >= self.cfg.order_max_retries:
+                    return "error"
+                time.sleep(self.cfg.order_retry_wait_s)
+                # RECONCILE: recompute the remaining gap from the LIVE position (idempotent).
+                try:
+                    remaining = target_notional - self._live_notional(s)
+                except Exception as rexc:  # noqa: BLE001 — can't verify fill; do NOT resend (double-fill risk)
+                    print(
+                        f"[portfolio] reconcile query for {s} failed ({repr(rexc)[:80]}) — "
+                        "not resending; next 8h rebalance heals"
+                    )
+                    return "error"
+                if abs(remaining) < self._min_notional(s):
+                    print(
+                        f"[portfolio] {s} reconciled to target (gap ${remaining:+.2f} "
+                        f"< min-notional) after transient error — no resend"
+                    )
+                    return "reconciled"
+                side = "BUY" if remaining > 0 else "SELL"
+                qty = self._round_qty(s, abs(remaining) / px)
+                if qty <= 0:
+                    # gap >= min-notional but below stepSize resolution — can't place it; surface as
+                    # error (not a false "reconciled" success). Sub-step residue heals if the target
+                    # later moves enough to clear one stepSize.
+                    print(f"[portfolio] {s} gap ${remaining:+.2f} below stepSize — cannot resize")
+                    return "error"
+        return "error"
+
     def execute(self, plan: dict) -> dict:
-        """Place a MARKET order per rebalance leg on the (testnet) exchange. Returns summary."""
+        """Place a MARKET order per rebalance leg on the (testnet) exchange. Returns summary.
+        Transient per-leg failures are retried with a live-position reconcile (see
+        _place_leg_with_retry) so a 502/timeout re-sends only the UNFILLED gap, no double-fill."""
         if self.auth is None:
-            return {"placed": 0, "papered": 0, "skipped": len(plan["legs"]), "errors": 0}
-        placed = errors = skipped = papered = 0
+            return {
+                "placed": 0,
+                "papered": 0,
+                "skipped": len(plan["legs"]),
+                "errors": 0,
+                "retried": 0,
+            }
+        gross_dollar = float(plan.get("gross_dollar", self.cfg.equity_usd))
+        placed = errors = skipped = papered = retried = 0
         for leg in plan["legs"]:
             s = leg["symbol"]
             if not self._tradable(s):
@@ -307,19 +418,26 @@ class PortfolioEngine:
             if qty <= 0 or qty * px < self._min_notional(s):
                 skipped += 1
                 continue
-            try:
-                self._ensure_leverage(s)
-                self.auth.place_market_order(s, leg["side"], qty)
+            outcome = self._place_leg_with_retry(leg, gross_dollar)
+            if outcome == "placed":
                 placed += 1
-            except Exception as exc:
+            elif outcome in ("retried", "reconciled"):
+                placed += 1
+                retried += 1  # recovered after a transient failure (retry or reconcile-to-target)
+            else:
                 errors += 1
-                print(f"[portfolio] order {leg['side']} {s} x{qty} failed: {exc}")
-        return {"placed": placed, "papered": papered, "skipped": skipped, "errors": errors}
+        return {
+            "placed": placed,
+            "papered": papered,
+            "skipped": skipped,
+            "errors": errors,
+            "retried": retried,
+        }
 
     def run_once(self, refresh: bool = True) -> dict:
         """One evaluation: refresh data, compute the plan, log it; place orders unless dry-run."""
         if refresh:
-            self.refresh_data_complete()   # guard: no rebalance on a partial/degraded kline fetch
+            self.refresh_data_complete()  # guard: no rebalance on a partial/degraded kline fetch
         # forming candle via close-proxy (built in compute_plan); current book from positions
         current = None if self.cfg.dry_run else self._actual_weights()
         plan = self.compute_plan(current_weights=current)
@@ -342,7 +460,7 @@ class PortfolioEngine:
             print(
                 f"[portfolio:{mode}] orders placed={res['placed']} "
                 f"papered={res.get('papered', 0)} skipped={res['skipped']} "
-                f"errors={res['errors']}"
+                f"errors={res['errors']} retried={res.get('retried', 0)}"
             )
             self._save_held(plan["_new_held"])
         return plan
