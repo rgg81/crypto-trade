@@ -5,7 +5,8 @@ READ-ONLY. Three test-integrity checks for the metals paper desk (iter-010 bread
             unprocessed). ALERT on engine down / traceback / missed rebalance.
   PARITY  : recompute the champion target from data_live_metals and compare per-metal to the held
             book in the DB. DRIFT = the paper book no longer matches what the strategy says to hold.
-  CANDLE  : no forming (incomplete) candle leaked into the signal data; data not stale (>9h).
+  CANDLE  : no forming (incomplete) candle leaked into the signal data; data not stale (24/5-aware —
+            freshest data candle not >=1 trading candle behind um.expected_trading_candle).
 
 Per the HANDS-OFF mandate these are the ONLY alert sources (test-integrity). PnL / drawdown / regime
 are observational — see metals_digest.py. Exit 0 = all OK; exit 1 = an alert fired.
@@ -106,13 +107,22 @@ def main() -> int:
         now_ms = int(time.time() * 1000)
         leaks = [s for s, d in coins.items() if len(d) and int(d.index[-1]) + STEP_MS > now_ms]
         freshest = max((int(d.index[-1]) for d in coins.values() if len(d)), default=0)
-        stale_h = (now_ms - (freshest + STEP_MS)) / 3_600_000
+        # 24/5-aware staleness: how far the freshest DATA candle is behind the most recent CLOSED
+        # trading candle (um.expected_trading_candle). Comparing to wall-clock `now` false-flags all
+        # weekend (Fri-16:00 data reads 10-48h "stale"); against the expected trading candle the
+        # weekend gap reads 0 while a genuine trading-day data-stall (missed Binance refresh) flags.
+        expected = um.expected_trading_candle(now_ms)
+        behind_h = (expected - freshest) / 3_600_000
         if leaks:
             alerts.append(f"CANDLE=BAD forming-candle leak in {leaks}")
             candle = "BAD"
-        elif stale_h > 9:
-            flags.append(f"data stale: freshest complete candle {stale_h:.0f}h old (>9h)")
-            candle = f"STALE {stale_h:.0f}h"
+        elif behind_h >= 8:  # >=1 trading candle behind
+            flags.append(
+                f"data stale: freshest complete candle {pd.Timestamp(freshest, unit='ms')} is "
+                f"{behind_h:.0f}h behind the expected trading candle "
+                f"{pd.Timestamp(int(expected), unit='ms')}"
+            )
+            candle = f"STALE {behind_h:.0f}h"
         else:
             candle = "OK"
 
