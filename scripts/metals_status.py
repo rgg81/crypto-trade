@@ -84,15 +84,18 @@ def main() -> int:
     else:
         flags.append("no DB yet (engine not seeded)")
 
-    # MISSED rebalance: a new COMPLETE 8h candle is clock-due but last_candle hasn't advanced.
+    # MISSED rebalance: a new COMPLETE 24/5 TRADING candle is clock-due but last_candle hasn't
+    # advanced. 24/5-aware (um.expected_trading_candle walks back over weekend slots) so the
+    # Fri-16:00 → Sun-16:00 gap is NOT read as a miss — a naive +8h clock grid false-alerts every
+    # Sat/Sun. A genuine trading-day miss (≥1 unprocessed market-open candle) still fires.
     if last_candle is not None:
-        now_ms = int(time.time() * 1000)
-        latest_complete = (now_ms // STEP_MS) * STEP_MS - STEP_MS
-        behind_h = (latest_complete - int(last_candle)) / 3_600_000
-        if behind_h >= 8:  # a full candle overdue (weekend gaps are < 8h of trading candles)
+        expected = um.expected_trading_candle(int(time.time() * 1000))
+        behind_h = (expected - int(last_candle)) / 3_600_000
+        if behind_h >= 8:
             alerts.append(
                 f"MISSED rebalance: last_candle {pd.Timestamp(int(last_candle), unit='ms')} is "
-                f"{behind_h:.0f}h behind the clock-due candle"
+                f"{behind_h:.0f}h behind the clock-due trading candle "
+                f"{pd.Timestamp(int(expected), unit='ms')}"
             )
 
     # CANDLE integrity + PARITY (only when data present)

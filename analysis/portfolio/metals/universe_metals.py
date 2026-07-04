@@ -46,6 +46,24 @@ def metals_market_open(open_time_ms: int) -> bool:
     hour = (open_time_ms // 3_600_000) % 24
     return dow <= 4 or (dow == 6 and hour == 16)
 
+
+def expected_trading_candle(now_ms: int) -> int:
+    """The open_time (ms) of the most recent 8h candle that has CLOSED *and* is a 24/5 trading
+    candle (``metals_market_open``). Walks back over the weekend 8h slots that don't exist in the
+    schedule (Sat 00/08/16 + Sun 00/08) from the naive most-recent-closed grid slot.
+
+    This is what an overdue/MISSED-rebalance check must compare ``metals_last_candle`` against: a
+    naive ``(now // 8h) * 8h - 8h`` clock grid would read the Fri-16:00 → Sun-16:00 weekend gap
+    (48h, no trading candles) as an 8h+ miss and false-alert every Sat/Sun. Walking to the nearest
+    market-open slot keeps the weekend benign while a genuine trading-day miss still shows behind.
+    """
+    step = 8 * 3_600_000
+    slot = (now_ms // step) * step - step  # most recent CLOSED 8h grid slot (naive)
+    while not metals_market_open(slot):
+        slot -= step
+    return slot
+
+
 # ── Sacred constants (inherited from the project) ─────────────────────────────────────
 OOS_CUTOFF = pd.Timestamp("2025-03-24")  # immutable; IS < cutoff, OOS >= cutoff
 LO0 = pd.Timestamp("2000-01-01")

@@ -51,6 +51,52 @@ def test_metals_market_open_24x5_schedule():
     assert um.metals_market_open(_ms(2026, 7, sun, 16)), "Sun 16 reopen must keep"
 
 
+def test_expected_trading_candle_weekend_is_benign():
+    """Over the whole Fri-16:00 → Sun-16:00 weekend gap the most-recent EXPECTED trading candle
+    stays pinned at Fri 16:00 — so an overdue check comparing last_candle=Fri-16:00 reads 0h
+    behind (no false MISSED), instead of the naive +8h grid that would show 8h+ every Sat/Sun."""
+    days = {d: _ms(2026, 7, d, 0) for d in range(1, 8)}
+    fri = next(d for d in days if _dow(days[d]) == 4)
+    fri_1600 = _ms(2026, 7, fri, 16)
+    # every hour from Fri 16:00 (close Sat 00:00) up to the Sun-16:00 reopen closing (Mon 00:00)
+    for hours_after in range(8, 56):  # Sat 00:00 .. Sun 23:00-ish
+        now = fri_1600 + hours_after * 3_600_000
+        exp = um.expected_trading_candle(now)
+        # until the Sun-16:00 candle CLOSES (Mon 00:00), the last closed trading candle is Fri 16:00
+        if now < fri_1600 + 56 * 3_600_000:  # before Mon 00:00
+            assert exp <= _ms(2026, 7, fri + 2, 16), (hours_after, exp)  # never past Sun 16:00
+        assert um.metals_market_open(exp), (hours_after, exp)
+
+
+def test_expected_trading_candle_steady_state_and_miss():
+    """On a trading day the expected candle is the last CLOSED market-open slot; a stuck engine
+    reads as >=8h behind (genuine MISSED), a caught-up engine reads 0h."""
+    days = {d: _ms(2026, 7, d, 0) for d in range(1, 8)}
+    tue = next(d for d in days if _dow(days[d]) == 1)
+    # Tue 17:00: the Tue 08:00 candle closed at Tue 16:00; Tue 16:00 candle still forming
+    now = _ms(2026, 7, tue, 17)
+    exp = um.expected_trading_candle(now)
+    assert exp == _ms(2026, 7, tue, 8), exp
+    # caught up (last_candle == expected) -> 0h behind
+    assert (exp - _ms(2026, 7, tue, 8)) == 0
+    # stuck since Mon 16:00 -> 16h behind -> fires the >=8h MISSED gate
+    assert (exp - _ms(2026, 7, tue - 1, 16)) / 3_600_000 >= 8
+
+
+def test_expected_trading_candle_monday_reopen():
+    """After the Sun-16:00 reopen candle closes (Mon 00:00), the expected candle is Sun 16:00 —
+    so a Monday engine still parked at Fri 16:00 correctly reads as a MISSED reopen."""
+    days = {d: _ms(2026, 7, d, 0) for d in range(1, 15)}
+    sun = next(d for d in days if _dow(days[d]) == 6)
+    mon_0030 = _ms(2026, 7, sun + 1, 0) + 30 * 60_000
+    exp = um.expected_trading_candle(mon_0030)
+    assert exp == _ms(2026, 7, sun, 16), exp
+    # parked at Fri 16:00 -> 48h behind -> MISSED fires; caught up at Sun 16:00 -> 0h
+    fri_1600 = _ms(2026, 7, sun - 2, 16)
+    assert (exp - fri_1600) / 3_600_000 >= 8
+    assert (exp - _ms(2026, 7, sun, 16)) == 0
+
+
 def test_merged_store_is_24x5_and_grid_aligned_in_binance_era():
     """On the live store: the Binance era (>= 2025-12-11) carries NO Saturday candle and no
     Sunday-00/08 candle, and every open_time lands on the 00/08/16 UTC grid — i.e. the 24/5 filter

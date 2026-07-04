@@ -108,6 +108,14 @@ the live engine reproduces the backtest bit-for-bit. Run before trusting a long 
   basis reconcile + a forward bear; tighten the watch cadence first. Paper is the current scope.
 
 ## Changelog
+- **2026-07-04 v4** — WEEKEND MISSED false-positive fix. `metals_status.py`'s overdue check used a
+  naive `(now // 8h) * 8h - 8h` clock grid (comment wrongly assumed "weekend gaps are < 8h") so it
+  fired `STATUS: ALERT MISSED rebalance` on EVERY Sat/Sun tick (the Fri-16:00 → Sun-16:00 gap is 48h
+  with no trading candles). New pure helper `universe_metals.expected_trading_candle(now_ms)` walks
+  back over non-trading weekend slots (Sat 00/08/16 + Sun 00/08) to the most recent CLOSED
+  market-open candle; the MISSED check compares last_candle to that. Weekend stays OK; a genuine
+  trading-day miss (incl. a Monday-reopen miss parked at Fri-16:00 → 48h behind) still fires. 3 new
+  tests in `test_metals_data_sourcing.py` (10 total pass). Caught live on Sat 2026-07-04 08:54 UTC.
 - **2026-07-03 v3** — DATA SOURCING: Binance live (24/5) + Dukascopy one-time backfill (user: "stop
   relying on Dukascopy live"). Recurring Dukascopy live fetch-failures (twice in ~8h + an uneven-
   recovery incident that briefly corrupted the book) → swapped `live_metals._refresh_one` to
