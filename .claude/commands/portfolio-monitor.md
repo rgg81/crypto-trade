@@ -234,11 +234,30 @@ A SECOND book runs ALONGSIDE v1, fully isolated, on a SEPARATE testnet account. 
   pre-market tokens are EXCLUDED via `universe_v2.NON_COIN_PERPS`. Before the production cutover, REGENERATE
   that set from production exchangeInfo (testnet ≠ production listings). If a stock-perp ever appears in the
   v2 book → ALERT (universe filter stale). See `diary-portfolio-v2/LIVE_DEPLOY.md`.
-- **Relaunch v2** (same self-reconcile pattern as v1): stop the v2 proc, `rm data/portfolio_v2_testnet.db`,
+- **Relaunch v2** (same self-reconcile pattern as v1) — for a CRASH-RESUME or HUNG restart, **KEEP the DB**
+  (preserves paper state + held + `last_candle` → resumes mid-cycle, no spurious rebalance) and **append**
+  (`>>`) to the log so the incident history survives. Only `rm data/portfolio_v2_testnet.db` + truncate
+  (`>`) for a deliberate CLEAN RESET (e.g. universe change). Recipe:
   `set -a; source ~/.binance_testnet_v2_env; set +a`, `export BINANCE_AUTH_BASE_URL=https://testnet.binancefuture.com`,
-  `PYTHONUNBUFFERED=1 uv run python run_portfolio_v2_testnet.py --live-testnet > logs/portfolio_v2_testnet.log 2>&1 &`.
-  ⚠️ Do NOT `pkill -f run_portfolio_v2` (self-matches the shell) — kill by PID. NEVER touch the v1
-  quant-research worktree/proc.
+  `PYTHONUNBUFFERED=1 nohup uv run python run_portfolio_v2_testnet.py --live-testnet >> logs/portfolio_v2_testnet.log 2>&1 &`.
+  ⚠️ **Killing the old proc:** NEVER `pkill -f run_portfolio_v2` / `pgrep -f run_portfolio_v2` — the pattern
+  self-matches your own shell command (a false "STILL ALIVE"). Kill by **process-group**: `ps -eo pid,pgid,cmd`
+  to get the pgid of the `uv run` leader, then `kill -TERM -- -<pgid>` (TERMs the `uv` wrapper AND its python
+  child together), escalate to `-KILL` if it survives ~4s. Verify dead with `ps -eo cmd | grep run_portfolio_v2`
+  (NOT pgrep). NEVER touch the v1 quant-research worktree/proc.
+- **HUNG engine (proc up, but frozen) — a distinct failure mode from a crash (2026-07-05).** A crash removes
+  the proc (`STATUS: ENGINE DOWN`); a HANG leaves `proc=up` but the poll loop stops advancing. The tell: the
+  engine was in an **actively-logging** state (a `tick error #N … retrying in 60s` storm writes a line every
+  60s) and then the **log mtime freezes** mid-storm. A healthy engine BETWEEN 8h boundaries is also log-silent
+  (no-op ticks don't log), so log-silence alone is NOT a hang — silence is only suspicious while the engine
+  should be logging (mid-storm, or mid-refresh). The current healthcheck won't flag a between-boundary hang
+  until it's `>25min` past the next boundary (`MISSED rebalance`); to catch it sooner, when the log has been
+  frozen through what should be active logging, (1) confirm the IP is NOT the cause with a direct
+  `curl -s -o /dev/null -w '%{http_code}' 'https://fapi.binance.com/fapi/v1/klines?symbol=BTCUSDT&interval=8h&limit=2'`
+  — a `200` means the IP is clear and the freeze is a genuine process hang — then (2) PGID-kill + relaunch
+  (KEEP the DB). A restart of a stuck engine is PRO-test recovery (it reconciles to its own target), not
+  interference. Backlog: add a lightweight engine heartbeat / poll-tick timestamp so a hang is detectable
+  without the log-activity heuristic.
 - The HANDS-OFF mandate applies to v2 identically: observe + inform, never intervene on performance.
 - **Network resilience (2026-06-23):** the engine poll loop (`engine.py:run()`) now wraps each tick in
   try/except → a transient `ConnectError`/network/API failure logs a ONE-LINER `tick error #N (...);
@@ -269,6 +288,17 @@ ROADMAP #1–#7 COMPLETE. Future ideas: per-name funding-carry attribution, regi
 auto-recovery escalation ladder, a live-vs-backtest tracking-error report.
 
 ## Changelog (tick off as we build)
+- **2026-07-05 v16** — HUNG-ENGINE failure mode + PGID-kill recovery documented (v2 section). After a WSL
+  reboot, a ~3h DNS outage spanned the 08:00 boundary and an IP-level 418 storm followed on relaunch (v1+v2
+  both cold-started 540-symbol production refreshes → shared IP → 418). The v2 engine then HUNG: `proc=up`
+  but the log froze at 11:24 UTC mid-418-storm (2.5h). Diagnosed as a genuine process hang (direct curl to
+  the engine's exact klines URL returned 200 → IP clear), killed the hung proc by PROCESS-GROUP
+  (`kill -TERM -- -<pgid>`; `pgrep -f`/`pkill -f` self-match the shell — a false "STILL ALIVE"), relaunched
+  KEEPING the DB (append log). Came back clean: 0 errors since restart, 21 positions intact, reconciles to
+  the cent. Documented: (a) hung ≠ crashed (proc stays up), (b) log-silence is only suspicious while the
+  engine SHOULD be logging, (c) the crash-resume relaunch must KEEP the DB + append the log (the old recipe
+  wrongly said `rm` DB + truncate). Backlog: engine heartbeat to detect a hang without the log heuristic;
+  stagger v1+v2 COLD-START refreshes (the stagger only covers steady-state 8h rebalances, not restart-time).
 - **2026-07-01 v15** — ALL-IN COST ACCOUNTING (`scripts/portfolio_v2_pnl.py`), on user request to make PnL
   "as realistic as possible / consider all costs." The healthcheck `uPnL` was MARK-ONLY (open-position
   mark-to-market) — it omitted funding, commission, and realized. New report reconciles to Binance's OWN
