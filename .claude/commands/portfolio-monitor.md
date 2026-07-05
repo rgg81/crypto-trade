@@ -212,15 +212,25 @@ A SECOND book runs ALONGSIDE v1, fully isolated, on a SEPARATE testnet account. 
   Run it with `source ~/.binance_testnet_v2_env` (NOT v1's). The full v2 parity/candle/digest suite is
   a roadmap item — for now the healthcheck + a manual log scan cover the TEST-INTEGRITY essentials.
   NOTE its one-line `uPnL` is MARK-ONLY (open-position mark-to-market); it does NOT include funding/fees.
-- **v2 all-in cost accounting (REALISTIC bottom line):** `scripts/portfolio_v2_pnl.py` (v15). Since these
+- **v2 all-in cost accounting (REALISTIC bottom line):** `scripts/portfolio_v2_pnl.py` (v17). Since these
   are REAL exchange trades, it reconciles to Binance's own ledger: `seed + realized + funding + commission
   == wallet balance` (ties to the cent → nothing missing by construction), `+ unrealized == margin balance
-  (true equity)`, `− seed == ALL-IN P/L`. Reports equity, all-in P/L vs seed, the trading-attributable
-  breakdown (realized / funding / commission / unrealized), per-symbol funding drag, and a reconcile line
-  whose `opening` residual should stay small+stable (a GROWING gap = a cost bucket we're not capturing →
-  investigate). Funding on TESTNET is flagged NON-representative (rates are artificial — e.g. the SIREN
-  short bled ~−$79/8d, an unreal rate). Run each tick alongside the healthcheck. Slippage is already baked
-  into realized/unrealized (it lands in the fill price); `portfolio_fill_quality.py` isolates it explicitly.
+  (true equity)`, `− seed == ALL-IN P/L`. **HEADLINE P/L is stated on a PRODUCTION-funding basis** (user
+  directive — testnet funding is a garbage artifact): every real funding settlement is repriced to what it
+  WOULD have cost at production rates via `prod_income = testnet_income × (prod_rate / testnet_rate)` per
+  (symbol, funding_time) — funding is linear in the rate and the notional is identical, so notional cancels;
+  prod_rate/testnet_rate come from the public historical `fapi/v1/fundingRate` endpoints (prod =
+  fapi.binance.com, testnet host). So `funding(PROD)` replaces the testnet funding in `all-in P/L`, and the
+  raw testnet funding is used ONLY for the reconcile-to-wallet integrity check (the wallet physically holds
+  testnet funding). Testnet slams the ±3.75%/8h cap flat (SIREN settled −3.75% every 8h ≈ −$113 total; real
+  prod rate is +0.0001–0.0003 → repriced to ~+$1.6 since we're SHORT and a positive rate PAYS the short).
+  Net effect: the ~−$109 testnet funding drag is a pure artifact; on prod funding is ~neutral, so the true
+  strategy P/L is ~+3.5% not the ~+1.3% the raw testnet ledger shows. Reports equity(prod-adj), all-in P/L,
+  the breakdown (realized / funding(PROD) / commission / unrealized / dust), the testnet→prod funding
+  repricing detail + top artifact swings, a forward run-rate on the current book, and a reconcile line whose
+  `opening` residual must stay small+stable (a GROWING gap = a cost bucket we're not capturing → investigate).
+  Run each tick alongside the healthcheck. Slippage is already baked into realized/unrealized (it lands in
+  the fill price); `portfolio_fill_quality.py` isolates it explicitly.
 - **v2 PAPER-FALLBACK (testnet-only, hard-gated):** `paper_untradeable=True` in the v2 runner →
   symbols testnet can't fill (`-1121/-4131/-4140/-4411`) are tracked as PAPER (not dropped), so the
   strategy holds its full intended book. Each errors at most ONCE, then is papered: the log shows
@@ -288,6 +298,17 @@ ROADMAP #1–#7 COMPLETE. Future ideas: per-name funding-carry attribution, regi
 auto-recovery escalation ladder, a live-vs-backtest tracking-error report.
 
 ## Changelog (tick off as we build)
+- **2026-07-05 v17** — FUNDING NOW REPRICED TO PRODUCTION RATES (`scripts/portfolio_v2_pnl.py`), on user
+  directive: "do not account the funding from testnet, it must be the funding from prod binance." The v15
+  report summed the raw testnet FUNDING_FEE (−$108.82, dominated by SIREN's −$113 cap-slam) into the
+  headline all-in P/L and only showed prod as a forward run-rate footnote — so the P/L read +1.34% when the
+  real number is +3.56%. Now every real funding settlement is repriced per (symbol, funding_time) via
+  `prod_income = testnet_income × (prod_rate / testnet_rate)` (notional cancels; rates from the public
+  historical `fapi/v1/fundingRate` on both hosts). `funding(PROD)` (+$0.73 over 12d, ~neutral) replaces
+  testnet funding in the headline; raw testnet funding is retained ONLY for the reconcile-to-wallet check.
+  Verified: all-in flips +1.34% → +3.56%, SIREN testnet −112.83 → prod +1.64, reconcile still ties to the
+  cent ($1.11 dust). 887/925 settlements repriced (38 unmatched = testnet fundingRate gaps, assumed 0 prod
+  → immaterial at tiny prod rates). This is the number that carries to real money.
 - **2026-07-05 v16** — HUNG-ENGINE failure mode + PGID-kill recovery documented (v2 section). After a WSL
   reboot, a ~3h DNS outage spanned the 08:00 boundary and an IP-level 418 storm followed on relaunch (v1+v2
   both cold-started 540-symbol production refreshes → shared IP → 418). The v2 engine then HUNG: `proc=up`
