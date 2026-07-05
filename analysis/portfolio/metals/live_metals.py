@@ -143,16 +143,22 @@ class MetalsPaperEngine:
         return out
 
     def _new_candle_due(self) -> bool:
-        """Clock gate: has a new COMPLETE 8h candle (00/08/16 UTC) opened since the last rebalance?
+        """Clock gate: has a new COMPLETE 24/5 TRADING candle opened since the last rebalance?
 
-        Keeps the expensive Dukascopy refresh to ~once per 8h instead of every 60s poll. The latest
-        complete candle's open = (now floored to the 8h grid) − 8h (forming candle is the floor).
+        Gates the Binance kline refresh to ~once per new 8h candle instead of every 60s poll. The
+        "latest complete candle" is ``um.expected_trading_candle`` — the most recent CLOSED 00/08/16
+        UTC slot that is a metals MARKET-OPEN candle — NOT a naive ``(now // 8h) * 8h - 8h`` clock
+        grid. The naive grid marches through the WEEKEND slots (Sat 00/08/16 + Sun 00/08) that don't
+        exist in the 24/5 schedule, so it returned True on every weekend tick → ``run_once`` → a
+        Binance refresh every 60s; on a rate-limit that self-inflicts an HTTP-418 IP ban (observed
+        2026-07-05). Walking to the real trading candle keeps the engine QUIET all weekend (no
+        refresh until the Sun-16:00 reopen closes ~Mon 00:00); same as the old grid on a weekday.
         """
         last = self.store.get_state("metals_last_candle")
         if last is None:
             return True  # first run — seed + rebalance
         now_ms = int(time.time() * 1000)
-        latest_complete_open = (now_ms // STEP_MS) * STEP_MS - STEP_MS
+        latest_complete_open = um.expected_trading_candle(now_ms)  # 24/5-aware (was naive grid)
         return latest_complete_open > int(last)
 
     # ── one tick: refresh → detect new candle → recompute target → paper-fill → persist ──
@@ -173,8 +179,10 @@ class MetalsPaperEngine:
         if last_seen is not None and latest <= int(last_seen):
             if len(set(latests.values())) > 1:  # some coin(s) ahead — defer for the laggard(s)
                 lag = pd.Timestamp(latest, unit="ms")
-                print(f"  [tick] coins misaligned (aligned-latest={lag}); deferring rebalance",
-                      flush=True)
+                print(
+                    f"  [tick] coins misaligned (aligned-latest={lag}); deferring rebalance",
+                    flush=True,
+                )
             return None  # no new COMPLETE candle that ALL coins have
 
         if self.store.get_state("metals_launch_candle") is None:

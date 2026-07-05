@@ -108,6 +108,18 @@ the live engine reproduces the backtest bit-for-bit. Run before trusting a long 
   basis reconcile + a forward bear; tighten the watch cadence first. Paper is the current scope.
 
 ## Changelog
+- **2026-07-05 v5** — ENGINE 418-SPIRAL ROOT-CAUSE FIX (same 24/5 bug class as v4, but in the
+  engine). After a computer restart Binance began returning HTTP 418 (IP rate-limit ban) on the
+  kline refresh; the count reached ~416 because `live_metals._new_candle_due()` — the gate meant to
+  keep refreshes to "~once per 8h" — used a naive `(now//8h)*8h-8h` clock grid that marches through
+  the non-existent weekend slots, so it returned True EVERY 60s weekend tick → `run_once` → a
+  Binance refresh every minute, which continued-requests-during-a-418 EXTENDS. Interim: stopped the
+  engine (kill by PID) to let the ban decay (weekend gap, next data event = Sun-16:00 reopen closing
+  ~Mon 00:00). Fix: `_new_candle_due` now uses `um.expected_trading_candle` (24/5-aware) → engine
+  stays QUIET all weekend (0 Binance calls until the reopen), byte-identical on weekdays. Relaunched
+  ~Sun 20:54 UTC with the fix; log confirmed 0×418. Parity-safe: on the weekend the old path also
+  deferred (run_once's min-align returned None), so only the pointless refresh calls are removed. 1
+  new test (`test_new_candle_due_is_24x5_aware`); 15 metals-sourcing+parity tests pass.
 - **2026-07-04 v4** — WEEKEND false-positive fix (both time checks made 24/5-aware). `metals_status.py`
   compared against a naive `(now // 8h)*8h - 8h` clock grid / wall-clock `now`, so over the Fri-16:00
   → Sun-16:00 weekend gap (48h, no trading candles) it (a) fired `STATUS: ALERT MISSED rebalance` on

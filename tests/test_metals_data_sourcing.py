@@ -97,6 +97,44 @@ def test_expected_trading_candle_monday_reopen():
     assert (exp - _ms(2026, 7, sun, 16)) == 0
 
 
+def test_new_candle_due_is_24x5_aware(tmp_path, monkeypatch):
+    """The engine's Binance-refresh clock gate must be 24/5-aware: with last_candle=Fri-16:00 it
+    stays False all weekend (no refresh → no HTTP-418 spiral) and flips True only once the Sun-16:00
+    reopen candle has CLOSED (~Mon 00:00). On a weekday a freshly-closed candle still trips True."""
+    import live_metals as lm
+
+    cfg = lm.MetalsPaperConfig(
+        data_dir=str(tmp_path / "d"),
+        db_path=str(tmp_path / "m.db"),
+        equity_csv=str(tmp_path / "e.csv"),
+    )
+    eng = lm.MetalsPaperEngine(cfg)
+
+    def at(ms: int) -> None:
+        monkeypatch.setattr(lm.time, "time", lambda: ms / 1000)
+
+    # last processed = Fri 16:00 (2026-07-03 is a Friday)
+    eng.store.set_state("metals_last_candle", str(_ms(2026, 7, 3, 16)))
+    for h in (0, 8, 12, 16, 23):  # all Saturday
+        at(_ms(2026, 7, 4, h))
+        assert eng._new_candle_due() is False, ("Sat", h)
+    for h in (0, 8, 12, 20, 23):  # Sunday — the 16:00 reopen is still FORMING until Mon 00:00
+        at(_ms(2026, 7, 5, h))
+        assert eng._new_candle_due() is False, ("Sun", h)
+    # Sun-16:00 reopen candle has now CLOSED (Mon 00:00) → a new trading candle is due
+    at(_ms(2026, 7, 6, 0) + 5 * 60_000)  # Mon 00:05
+    assert eng._new_candle_due() is True
+
+    # weekday steady state: last=Tue 00:00; the Tue 08:00 candle closed at Tue 16:00 → due
+    eng.store.set_state("metals_last_candle", str(_ms(2026, 7, 7, 0)))
+    at(_ms(2026, 7, 7, 17))
+    assert eng._new_candle_due() is True
+    # ...and NOT due mid-candle before any new one closes (last=Tue 08:00, now Tue 12:00)
+    eng.store.set_state("metals_last_candle", str(_ms(2026, 7, 7, 8)))
+    at(_ms(2026, 7, 7, 12))
+    assert eng._new_candle_due() is False
+
+
 def test_merged_store_is_24x5_and_grid_aligned_in_binance_era():
     """On the live store: the Binance era (>= 2025-12-11) carries NO Saturday candle and no
     Sunday-00/08 candle, and every open_time lands on the 00/08/16 UTC grid — i.e. the 24/5 filter
