@@ -298,6 +298,23 @@ ROADMAP #1–#7 COMPLETE. Future ideas: per-name funding-carry attribution, regi
 auto-recovery escalation ladder, a live-vs-backtest tracking-error report.
 
 ## Changelog (tick off as we build)
+- **2026-07-06 v18** — `-4141 "Symbol is closed"` classified as testnet artifact + per-symbol error
+  grouping (`scripts/portfolio_v2_healthcheck.py`). The 00:00 Jul 6 rebalance targeted a BUY TLMUSDT leg;
+  testnet has **NO TLM listing** (prod: status=TRADING qtyPrec=0 stepSize=1; testnet: NOT LISTED), so
+  `set_leverage` returned `-4141 "Symbol is closed"` and the order returned `-1111 "Precision over maximum"`
+  (the engine loads precision from testnet, which lacks TLM → default precision → non-integer qty). The
+  healthcheck counted BOTH codes as REAL (neither was in TESTNET_ERR) → false `STATUS: ALERT REAL order
+  errors x2`. Fix: (a) added `-4141` to TESTNET_ERR (same family as -1121/-4140 — a prod-listed name absent
+  from testnet, trades fine on production); (b) rewrote the classifier to group codes PER SYMBOL (one failing
+  leg emits 2 codes; occurrence-counting double-flagged it) and treat `-1111` as a benign CASCADE when the
+  same symbol also threw a listing artifact. Verified: STATUS flips ALERT→OK, TLM → INFO x1. **KNOWN
+  testnet-fidelity gap (NOT a production bug):** the engine's paper-fallback trigger set (`-1121/-4131/
+  -4140/-4411`) does NOT include `-4141`, so a prod-listed/testnet-unlisted symbol hard-errors + leaves a
+  MISSING leg (TLM ~$93, benign) instead of being papered. On real money TLM (and any halted name) is
+  handled correctly — the symbol simply can't be traded, a missing leg is unavoidable, and papering a REAL
+  position would be wrong. OPTIONAL testnet-only improvement: add `-4141` to the engine paper-fallback set so
+  the smoke-test book holds the intended weight as paper (keeps parity clean). Deferred — needs a restart and
+  only affects testnet fidelity, not production. See universe-hygiene bullet.
 - **2026-07-05 v17** — FUNDING NOW REPRICED TO PRODUCTION RATES (`scripts/portfolio_v2_pnl.py`), on user
   directive: "do not account the funding from testnet, it must be the funding from prod binance." The v15
   report summed the raw testnet FUNDING_FEE (−$108.82, dominated by SIREN's −$113 cap-slam) into the

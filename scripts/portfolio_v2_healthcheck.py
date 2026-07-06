@@ -3,10 +3,11 @@
 One-shot; prints STATUS: OK|ALERT + positions/balance + FLAG: lines. Mirrors the v1
 portfolio_healthcheck but for the ISOLATED v2 deploy (separate runner / log / DB / account).
 
-Per the monitor HANDS-OFF mandate: alerts are TEST-INTEGRITY only (engine down, traceback, REAL order
-errors, missed rebalance). Testnet-artifact order errors (-1121 invalid-symbol, -4131 PERCENT_PRICE,
--4411 TradFi-agreement) are INFO, not alerts — they're testnet liquidity/listing quirks that vanish on
-production. DD/PnL/tilt are observational (not acted on).
+Per the monitor HANDS-OFF mandate: alerts are TEST-INTEGRITY only (engine down, traceback, REAL
+order errors, missed rebalance). Testnet-artifact order errors (-1121 invalid-symbol, -4131
+PERCENT_PRICE, -4411 TradFi-agreement, -4141 symbol-closed/not-on-testnet + its -1111 precision
+cascade) are INFO, not alerts — testnet liquidity/listing quirks that vanish on production.
+DD/PnL/tilt are observational (not acted on).
 
 Run:  cd .worktrees/quant-portfolio && export PATH="$HOME/.local/bin:$PATH" \
       && set -a; source ~/.binance_testnet_v2_env; set +a \
@@ -29,7 +30,9 @@ EXPECT_GROSS = (700, 3_500)  # $ gross band ($4k equity x vol-target ~0.3-0.6 af
 MAX_CONC = 0.40  # single-name share of gross (mid-caps run a touch more concentrated than top-20)
 CANDLE_MS = 8 * 60 * 60 * 1000
 # testnet-only execution quirks (INFO, never a strategy alert):
-TESTNET_ERR = {"-1121", "-4131", "-4411", "-4061", "-4046", "-4140"}
+# -4141 "Symbol is closed" = a prod-listed name absent from testnet (e.g. TLM: TRADING on prod,
+# NOT LISTED on testnet) — same family as -1121 invalid-symbol / -4140. Trades fine on production.
+TESTNET_ERR = {"-1121", "-4131", "-4411", "-4061", "-4046", "-4140", "-4141"}
 
 
 def _proc_alive() -> bool:
@@ -53,20 +56,36 @@ def _log_scan():
         if last_errs:
             # the failure lines after the last 'rebalance plan'
             tail = txt[txt.rfind("rebalance plan") :]
-            codes = re.findall(r'"code":(-?\d+)', tail)
-            for c in codes:
-                if c in TESTNET_ERR:
+            # Group failure codes by SYMBOL, not by raw "code" occurrence: one failing leg can
+            # emit TWO codes (e.g. set_leverage -4141 THEN order -1111 for the same symbol), so
+            # counting occurrences double-flags a single benign leg. Classify per symbol.
+            sym_codes: dict[str, set[str]] = {}
+            fail_pat = (
+                r"(?:order \w+ (\w+) x[\d.]+ failed|set_leverage (\w+) failed)"
+                r'[^\n]*?"code":(-?\d+)'
+            )
+            for m in re.finditer(fail_pat, tail):
+                sym_codes.setdefault(m.group(1) or m.group(2), set()).add(m.group(3))
+            # A symbol whose codes are ALL testnet artifacts is INFO. -1111 "precision" is a
+            # CASCADE (INFO) when the same symbol also threw a listing artifact: a prod-listed
+            # symbol absent from testnet (e.g. TLM) gets default precision -> -1111.
+            listing = {"-4141", "-1121", "-4140"}  # symbol closed / invalid / not tradeable
+            for cset in sym_codes.values():
+                has_listing = bool(cset & listing)
+                benign = all(c in TESTNET_ERR or (c == "-1111" and has_listing) for c in cset)
+                if benign:
                     testnet_errs += 1
                 else:
                     real_errs += 1
             # HTTP 5xx / gateway failures (e.g. 502 Bad Gateway) are testnet INFRA
             # transients — the exchange's edge returned an HTML error page with NO JSON
-            # "code", so they slip past the code-classifier above. Count the engine's own
+            # "code", so they slip past the per-symbol classifier above. Count the engine's own
             # per-order failure lines (one per failed POST) so errors>0 is never silent.
             gateway_errs = len(re.findall(r"order .* failed: 5\d\d", tail))
             if testnet_errs:
                 info.append(
-                    f"testnet-artifact order errors x{testnet_errs} (INFO: -1121/-4131/-4411)"
+                    f"testnet-artifact order errors x{testnet_errs} "
+                    f"(INFO: symbol closed/invalid on testnet incl -4141/-1121, +cascade -1111)"
                 )
             if gateway_errs:
                 info.append(
@@ -152,9 +171,8 @@ def main() -> None:
         info.append(f"account query failed: {type(e).__name__}")
 
     status = "ALERT" if flags else "OK"
-    print(
-        f"STATUS: {status}  MODE=TESTNET-v2  proc={'up' if alive else 'DOWN'}  last_rebal={last_rebal}"
-    )
+    proc_s = "up" if alive else "DOWN"
+    print(f"STATUS: {status}  MODE=TESTNET-v2  proc={proc_s}  last_rebal={last_rebal}")
     print(f"  {pos_line}")
     for f in flags:
         print(f"  ALERT: {f}")
