@@ -232,8 +232,10 @@ A SECOND book runs ALONGSIDE v1, fully isolated, on a SEPARATE testnet account. 
   Run each tick alongside the healthcheck. Slippage is already baked into realized/unrealized (it lands in
   the fill price); `portfolio_fill_quality.py` isolates it explicitly.
 - **v2 PAPER-FALLBACK (testnet-only, hard-gated):** `paper_untradeable=True` in the v2 runner →
-  symbols testnet can't fill (`-1121/-4131/-4140/-4411`) are tracked as PAPER (not dropped), so the
-  strategy holds its full intended book. Each errors at most ONCE, then is papered: the log shows
+  symbols testnet can't fill (`-1121/-4131/-4140/-4411/-4061/-4046` at the ORDER step, and
+  `-4141/-1121/-4140` at the SET_LEVERAGE step per v19 — the latter for prod-listed names absent from
+  testnet like TLM, caught before the order so no `-1111` cascade) are tracked as PAPER (not dropped),
+  so the strategy holds its full intended book. Each errors at most ONCE, then is papered: the log shows
   `PAPER-FALLBACK <sym>` + `orders ... errors=0 papered=N`, and `engine_state["portfolio_paper"]` holds
   the papered symbols+weights. So on v2, **`errors=0` is the healthy steady state** (was the testnet-
   artifact errors). A REAL order error (any code NOT in the testnet set) IS still an alert. The
@@ -298,6 +300,22 @@ ROADMAP #1–#7 COMPLETE. Future ideas: per-name funding-carry attribution, regi
 auto-recovery escalation ladder, a live-vs-backtest tracking-error report.
 
 ## Changelog (tick off as we build)
+- **2026-07-06 v19** — ENGINE paper-fallback now covers the set_leverage step (`src/crypto_trade/
+  portfolio/engine.py`) — the v18 "deferred" gap, done after the user pushed "why not restart?". Root
+  cause on inspection: `-4141` surfaces from `set_leverage`, which `_ensure_leverage` CATCHES AND
+  SWALLOWS, so the order was still attempted and failed with a `-1111` precision cascade — meaning
+  adding `-4141` to `_TESTNET_UNTRADEABLE` alone did NOTHING (my first assumption was wrong; verified by
+  reading the code). Fix: `_ensure_leverage` now returns `bool` — `False` when set_leverage returns a
+  code in the new `_LEVERAGE_UNTRADEABLE={-4141,-1121,-4140}` subset (deliberately EXCLUDES the benign
+  `-4046/-4061` "leverage already set" quirks, which must fall through to the order). `execute()` papers
+  it on testnet / skips it as an error leg on production (papering a REAL position would fabricate P&L —
+  production behavior unchanged: an untradeable symbol is still a missing leg, which is correct). Added
+  `tests/test_portfolio_engine_execute.py` (3 tests: testnet-paper, production-skip, benign-quirk-still-
+  places) — the FIRST coverage of the live-engine execute() path. Full suite 252 passed / 0 failed; my
+  edits lint-clean. Restarted the engine (v16 playbook: PGID-kill, KEEP DB, append log) to put it live;
+  TLM will PAPER (not error) at the next rebalance that targets it. NOTE restart risk was low (v1
+  steady-state, IP clear, single refresh proven fine at 16:00+00:00); a restart alone would NOT have
+  fixed it — the code change is what matters, and it only takes effect at the next rebalance anyway.
 - **2026-07-06 v18** — `-4141 "Symbol is closed"` classified as testnet artifact + per-symbol error
   grouping (`scripts/portfolio_v2_healthcheck.py`). The 00:00 Jul 6 rebalance targeted a BUY TLMUSDT leg;
   testnet has **NO TLM listing** (prod: status=TRADING qtyPrec=0 stepSize=1; testnet: NOT LISTED), so

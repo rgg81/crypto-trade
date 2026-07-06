@@ -69,8 +69,13 @@ class PortfolioConfig:
 
 # Binance error codes meaning "can't trade this symbol on THIS venue right now" — papered when the
 # paper-fallback is on: -1121 invalid symbol, -4131 PERCENT_PRICE, -4140 invalid status for opening,
-# -4411 TradFi agreement, -4061/-4046 position-side/leverage quirks.
-_TESTNET_UNTRADEABLE = {"-1121", "-4131", "-4140", "-4411", "-4061", "-4046"}
+# -4411 TradFi agreement, -4061/-4046 position-side/leverage quirks, -4141 symbol closed (a
+# prod-listed name absent from testnet, e.g. TLM: TRADING on prod, NOT LISTED on testnet).
+_TESTNET_UNTRADEABLE = {"-1121", "-4131", "-4140", "-4411", "-4061", "-4046", "-4141"}
+# Subset surfacing at the set_leverage step that means the SYMBOL genuinely can't be traded (paper /
+# skip it). Deliberately EXCLUDES -4046/-4061, which from set_leverage are benign "leverage already
+# set" quirks — those must fall through to the order, not paper a perfectly tradeable symbol.
+_LEVERAGE_UNTRADEABLE = {"-4141", "-1121", "-4140"}
 
 
 def _held_key(cfg: PortfolioConfig) -> str:
@@ -117,7 +122,9 @@ class PortfolioEngine:
                     "the paper-fallback is testnet-only; every leg trades for real here."
                 )
             elif config.paper_untradeable:
-                print("[portfolio] paper-fallback ON (testnet): untradeable symbols tracked as paper")
+                print(
+                    "[portfolio] paper-fallback ON (testnet): untradeable symbols tracked as paper"
+                )
 
     # ---- held-weight persistence (the hysteresis band's path-dependent state) ----
     def _load_held(self) -> dict:
@@ -273,15 +280,24 @@ class PortfolioEngine:
         one filter-notional off target, inside parity tolerance, self-corrects next rebalance)."""
         return max(self.cfg.min_notional_usd, self.min_notl.get(symbol, 0.0))
 
-    def _ensure_leverage(self, symbol: str) -> None:
-        """Set leverage on a symbol once (lazily, before its first order)."""
+    def _ensure_leverage(self, symbol: str) -> bool:
+        """Set leverage on a symbol once (lazily, before its first order). Returns False if the
+        symbol is UNTRADEABLE on the venue — set_leverage returned a code in _LEVERAGE_UNTRADEABLE
+        (e.g. -4141 'Symbol is closed' for a prod-listed name absent from testnet). The caller then
+        papers/skips it, rather than proceeding to an order that fails downstream with a -1111
+        precision cascade. Benign leverage quirks (already-set, etc.) still return True."""
         if self.auth is None or symbol in self._lev_set:
-            return
+            return True
         try:
             self.auth.set_leverage(symbol, max(1, int(round(self.cfg.leverage))))
         except Exception as exc:
             print(f"[portfolio] set_leverage {symbol} failed: {exc}")
+            if _err_code(exc) in _LEVERAGE_UNTRADEABLE:
+                return (
+                    False  # symbol can't be traded here — do NOT mark _lev_set; caller handles it
+                )
         self._lev_set.add(symbol)
+        return True
 
     def _actual_weights(self) -> dict:
         """Current per-coin weight from positions: positionAmt*markPrice / (equity*leverage)."""
@@ -341,7 +357,21 @@ class PortfolioEngine:
                 skipped += 1
                 continue
             try:
-                self._ensure_leverage(s)
+                if not self._ensure_leverage(s):
+                    # symbol untradeable here (set_leverage said so, e.g. testnet-unlisted). On
+                    # testnet, paper it so the book keeps its intended weight; on production paper
+                    # is off, so skip as an error leg (a halted symbol can't trade, and papering a
+                    # real-money position would fabricate P&L).
+                    if self._paper_enabled():
+                        new_paper.add(s)
+                        papered += 1
+                        print(
+                            f"[portfolio] PAPER-FALLBACK {s} (untradeable at set_leverage) — paper"
+                        )
+                    else:
+                        errors += 1
+                        print(f"[portfolio] {s} untradeable on venue (set_leverage) — leg skipped")
+                    continue
                 self.auth.place_market_order(s, leg["side"], qty)
                 placed += 1
             except Exception as exc:
@@ -457,7 +487,11 @@ class PortfolioEngine:
                     # 8h boundary (the Binance 418 rate-limit contention). Parity-safe: the rebalance
                     # still uses THIS just-closed candle's signal — same target, just executed later.
                     # Non-blocking: keep polling; last_candle only advances after the rebalance fires.
-                    due_ms = candle.open_time + self._interval_ms() + self.cfg.rebalance_lag_seconds * 1000
+                    due_ms = (
+                        candle.open_time
+                        + self._interval_ms()
+                        + self.cfg.rebalance_lag_seconds * 1000
+                    )
                     if int(time.time() * 1000) >= due_ms:
                         self.run_once(refresh=True)
                         self.store.set_state(last_key, str(candle.open_time))
