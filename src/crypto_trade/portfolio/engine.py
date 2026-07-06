@@ -67,14 +67,19 @@ class PortfolioConfig:
     rebalance_lag_seconds: int = 0
 
 
-# Binance error codes meaning "can't trade this symbol on THIS venue right now" — papered when the
-# paper-fallback is on: -1121 invalid symbol, -4131 PERCENT_PRICE, -4140 invalid status for opening,
-# -4411 TradFi agreement, -4061/-4046 position-side/leverage quirks, -4141 symbol closed (a
-# prod-listed name absent from testnet, e.g. TLM: TRADING on prod, NOT LISTED on testnet).
-_TESTNET_UNTRADEABLE = {"-1121", "-4131", "-4140", "-4411", "-4061", "-4046", "-4141"}
-# Subset surfacing at the set_leverage step that means the SYMBOL genuinely can't be traded (paper /
-# skip it). Deliberately EXCLUDES -4046/-4061, which from set_leverage are benign "leverage already
-# set" quirks — those must fall through to the order, not paper a perfectly tradeable symbol.
+# PERMANENT untradeability — paper on the FIRST failure (retrying can't help here): -1121 invalid
+# symbol, -4141 symbol closed/not-listed (e.g. TLM: prod-listed, absent on testnet), -4140 invalid
+# status for opening, -4411 TradFi agreement, -4061/-4046 position-side/leverage quirks.
+_PERMANENT_UNTRADEABLE = {"-1121", "-4140", "-4411", "-4061", "-4046", "-4141"}
+# TRANSIENT — a MOMENTARY thin-book rejection, NOT permanent: -4131 PERCENT_PRICE (implied price
+# exceeded the band because the book was thin THAT tick). Retried; papered only after PAPER_STRIKE_N
+# consecutive failures, so a one-off doesn't permanently freeze a liquid symbol (LINK/HEI were
+# wrongly papered forever on a single -4131 before v20).
+_TRANSIENT_UNTRADEABLE = {"-4131"}
+PAPER_STRIKE_N = 3
+# Subset surfacing at set_leverage that means the SYMBOL genuinely can't be traded (all PERMANENT).
+# EXCLUDES -4046/-4061 (from set_leverage they're benign "leverage already set" quirks — must fall
+# through to the order, not paper a tradeable symbol).
 _LEVERAGE_UNTRADEABLE = {"-4141", "-1121", "-4140"}
 
 
@@ -107,6 +112,9 @@ class PortfolioEngine:
         self.step_size: dict[str, float] = {}  # LOT_SIZE stepSize per symbol (qty multiple)
         self.min_notl: dict[str, float] = {}  # MIN_NOTIONAL filter per symbol ($ floor; -4164)
         self._lev_set: set[str] = set()  # symbols whose leverage we've already set
+        self._paper_strikes: dict[
+            str, int
+        ] = {}  # per-symbol consecutive transient (-4131) failures
         if not config.dry_run and settings.binance_api_key:
             auth_url = settings.auth_base_url or settings.base_url
             self.auth = AuthenticatedBinanceClient(
@@ -144,6 +152,35 @@ class PortfolioEngine:
 
     def _save_paper(self, syms: set, held: dict) -> None:
         self.store.set_state("portfolio_paper", json.dumps({"syms": sorted(syms), "held": held}))
+
+    def _reconcile_paper_vs_positions(self) -> None:
+        """Startup reconcile: a symbol must NOT be both papered AND holding a real position. If a
+        papered symbol has a live position on the venue it IS tradeable (e.g. wrongly papered on a
+        transient -4131 before v20 — LINK/HEI/SIREN were frozen this way), so UN-STICK it: drop it
+        from the paper set so the next rebalance manages that real position back toward target.
+        Genuinely-untradeable papered symbols (no real position, e.g. TLM) are left papered."""
+        if not self._paper_enabled() or self.auth is None:
+            return
+        syms, held = self._load_paper()
+        if not syms:
+            return
+        real = {
+            p["symbol"]
+            for p in self.auth.get_positions()
+            if float(p.get("positionAmt", 0) or 0) != 0
+        }
+        stuck = syms & real
+        if not stuck:
+            return
+        syms -= stuck
+        held = {s: w for s, w in held.items() if s not in stuck}
+        for s in stuck:
+            self._paper_strikes.pop(s, None)
+        self._save_paper(syms, held)
+        print(
+            f"[portfolio] paper reconcile: un-stuck {len(stuck)} papered sym(s) holding a live "
+            f"position (now strategy-managed again): {', '.join(sorted(stuck))}"
+        )
 
     def _paper_enabled(self) -> bool:
         """The paper-fallback is allowed ONLY on TESTNET (and only when explicitly opted in, live mode).
@@ -325,13 +362,16 @@ class PortfolioEngine:
             qty = (qty // step) * step  # floor to a stepSize multiple
         return round(qty, prec)  # clean float artifacts to the allowed precision
 
-    def execute(self, plan: dict, paper_syms: set | None = None) -> dict:
+    def execute(
+        self, plan: dict, paper_syms: set | None = None, strikes: dict | None = None
+    ) -> dict:
         """Place a MARKET order per rebalance leg on the (testnet) exchange. Returns summary.
 
         Legs whose symbol is already a known paper symbol are NOT sent (papered). When the
-        paper-fallback is on, a leg that FAILS with a testnet-untradeable code is added to `new_paper`
-        (papered, not counted as an error) so it never spams again — the strategy keeps the position
-        on its books as paper while the venue can't trade it.
+        paper-fallback is on, a leg that FAILS with a PERMANENT untradeable code is papered
+        immediately; a TRANSIENT code (-4131 thin-book) is RETRIED and papered only after
+        PAPER_STRIKE_N consecutive failures, so a one-off doesn't freeze a liquid symbol.
+        `strikes` (per-symbol transient-failure counts) is mutated in place; a fill clears it.
         """
         if self.auth is None:
             return {
@@ -339,10 +379,12 @@ class PortfolioEngine:
                 "skipped": len(plan["legs"]),
                 "errors": 0,
                 "papered": 0,
+                "retrying": 0,
                 "new_paper": set(),
             }
         paper_syms = paper_syms or set()
-        placed = errors = skipped = papered = 0
+        strikes = strikes if strikes is not None else {}
+        placed = errors = skipped = papered = retrying = 0
         new_paper: set = set()
         for leg in plan["legs"]:
             s = leg["symbol"]
@@ -358,13 +400,13 @@ class PortfolioEngine:
                 continue
             try:
                 if not self._ensure_leverage(s):
-                    # symbol untradeable here (set_leverage said so, e.g. testnet-unlisted). On
-                    # testnet, paper it so the book keeps its intended weight; on production paper
-                    # is off, so skip as an error leg (a halted symbol can't trade, and papering a
-                    # real-money position would fabricate P&L).
+                    # untradeable at set_leverage (PERMANENT, e.g. -4141 not-listed). Paper it on
+                    # testnet so the book keeps its weight; on production skip as an error leg
+                    # (papering a real position would fabricate P&L).
                     if self._paper_enabled():
                         new_paper.add(s)
                         papered += 1
+                        strikes.pop(s, None)
                         print(
                             f"[portfolio] PAPER-FALLBACK {s} (untradeable at set_leverage) — paper"
                         )
@@ -374,14 +416,30 @@ class PortfolioEngine:
                     continue
                 self.auth.place_market_order(s, leg["side"], qty)
                 placed += 1
+                strikes.pop(s, None)  # a fill clears any transient strike streak
             except Exception as exc:
                 code = _err_code(exc)
-                if self._paper_enabled() and code in _TESTNET_UNTRADEABLE:
+                if self._paper_enabled() and code in _PERMANENT_UNTRADEABLE:
                     new_paper.add(s)
                     papered += 1
-                    print(
-                        f"[portfolio] PAPER-FALLBACK {s} (testnet code {code}) — tracking as paper"
-                    )
+                    strikes.pop(s, None)
+                    print(f"[portfolio] PAPER-FALLBACK {s} (permanent {code}) — paper")
+                elif self._paper_enabled() and code in _TRANSIENT_UNTRADEABLE:
+                    strikes[s] = strikes.get(s, 0) + 1
+                    if strikes[s] >= PAPER_STRIKE_N:
+                        new_paper.add(s)
+                        papered += 1
+                        strikes.pop(s, None)
+                        print(
+                            f"[portfolio] PAPER-FALLBACK {s} (transient {code} x{PAPER_STRIKE_N} "
+                            f"consecutive) — tracking as paper"
+                        )
+                    else:
+                        retrying += 1
+                        print(
+                            f"[portfolio] {leg['side']} {s} transient {code} "
+                            f"(strike {strikes[s]}/{PAPER_STRIKE_N}) — retry next rebalance"
+                        )
                 else:
                     errors += 1
                     print(f"[portfolio] order {leg['side']} {s} x{qty} failed: {exc}")
@@ -390,6 +448,7 @@ class PortfolioEngine:
             "skipped": skipped,
             "errors": errors,
             "papered": papered,
+            "retrying": retrying,
             "new_paper": new_paper,
         }
 
@@ -439,8 +498,8 @@ class PortfolioEngine:
         if self.cfg.dry_run:
             self._save_held(plan["_new_held"])  # treat plan as filled (paper book)
         else:
-            res = self.execute(plan, paper_syms=paper_syms)
-            extra = f" papered={res['papered']}" if paper_on else ""
+            res = self.execute(plan, paper_syms=paper_syms, strikes=self._paper_strikes)
+            extra = f" retrying={res['retrying']} papered={res['papered']}" if paper_on else ""
             print(
                 f"[portfolio:{mode}] orders placed={res['placed']} "
                 f"skipped={res['skipped']} errors={res['errors']}{extra}"
@@ -471,6 +530,10 @@ class PortfolioEngine:
         )
         if not self.cfg.dry_run:
             self.setup_exchange()  # load quantityPrecision; leverage set lazily per leg
+            try:
+                self._reconcile_paper_vs_positions()  # un-stick papered symbols that hold real legs
+            except Exception as exc:  # never let a reconcile hiccup block startup
+                print(f"[portfolio] paper reconcile skipped: {type(exc).__name__}: {exc}")
         last_key = f"portfolio_last_candle_{self.cfg.ref_symbol}"
         consecutive_errors = 0
         announced_lag_for = None  # candle open_time we've already logged a "staggered" notice for

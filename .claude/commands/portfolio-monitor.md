@@ -232,10 +232,13 @@ A SECOND book runs ALONGSIDE v1, fully isolated, on a SEPARATE testnet account. 
   Run each tick alongside the healthcheck. Slippage is already baked into realized/unrealized (it lands in
   the fill price); `portfolio_fill_quality.py` isolates it explicitly.
 - **v2 PAPER-FALLBACK (testnet-only, hard-gated):** `paper_untradeable=True` in the v2 runner →
-  symbols testnet can't fill (`-1121/-4131/-4140/-4411/-4061/-4046` at the ORDER step, and
-  `-4141/-1121/-4140` at the SET_LEVERAGE step per v19 — the latter for prod-listed names absent from
-  testnet like TLM, caught before the order so no `-1111` cascade) are tracked as PAPER (not dropped),
-  so the strategy holds its full intended book. Each errors at most ONCE, then is papered: the log shows
+  symbols testnet can't fill are tracked as PAPER (not dropped), so the strategy holds its full intended
+  book. Two failure classes (v20): PERMANENT codes (`-1121/-4140/-4411/-4061/-4046` at the ORDER step,
+  `-4141/-1121/-4140` at SET_LEVERAGE per v19 — prod-listed names absent from testnet like TLM, caught
+  before the order so no `-1111` cascade) paper on the FIRST failure; TRANSIENT `-4131` PERCENT_PRICE
+  (thin-book) is RETRIED and papers only after 3 consecutive strikes (a liquid name like LINK retries +
+  fills instead of freezing). A `_reconcile_paper_vs_positions()` startup step un-sticks any papered
+  symbol that holds a live position (they're tradeable). The papered symbol's log shows
   `PAPER-FALLBACK <sym>` + `orders ... errors=0 papered=N`, and `engine_state["portfolio_paper"]` holds
   the papered symbols+weights. So on v2, **`errors=0` is the healthy steady state** (was the testnet-
   artifact errors). A REAL order error (any code NOT in the testnet set) IS still an alert. The
@@ -300,6 +303,21 @@ ROADMAP #1–#7 COMPLETE. Future ideas: per-name funding-carry attribution, regi
 auto-recovery escalation ladder, a live-vs-backtest tracking-error report.
 
 ## Changelog (tick off as we build)
+- **2026-07-06 v20** — PAPER-FALLBACK OVER-ACCUMULATION FIXED — transient errors no longer permanently
+  freeze liquid symbols (`src/crypto_trade/portfolio/engine.py`), on user directive after a `book?`
+  query surfaced it. FINDING: the paper set only ever GREW and papered on the FIRST failure of ANY
+  code — so LINK/HEI (liquid, tradeable) hit a one-off `-4131 PERCENT_PRICE` (a *transient* thin-testnet-
+  book rejection) and got frozen as paper FOREVER, while their real positions sat on the venue diverging
+  from the strategy (LINK: real LONG +$64 vs paper SHORT −0.020 — opposite sign; SIREN's frozen short is
+  what bled the −$114 funding artifact). Fix: (1) split codes — only `-4131` is now TRANSIENT (strike-
+  based: retried, papered only after `PAPER_STRIKE_N=3` consecutive fails); all others keep paper-on-
+  first-failure. (2) `retrying` counter added to `execute()` + the `orders …` log line (a transient retry
+  is INFO, not an error). (3) startup `_reconcile_paper_vs_positions()` — a symbol must never be BOTH
+  papered AND holding a real position; if it is (LINK/HEI/SIREN/PUMP) it's un-stuck so the next rebalance
+  manages the real position toward target again (TLM/EVAA, no real position, stay papered). Strike state
+  is in-memory (resets on restart — acceptable). Added 5 tests (transient-retry, paper-after-N, reset-on-
+  fill, reconcile-unstick, reconcile-noop); full portfolio+live scope 257 passed / 0 failed; ruff clean.
+  Healthcheck v20: surfaces `retrying=` as INFO. On real money none of this triggers (prod symbols trade).
 - **2026-07-06 v19** — ENGINE paper-fallback now covers the set_leverage step (`src/crypto_trade/
   portfolio/engine.py`) — the v18 "deferred" gap, done after the user pushed "why not restart?". Root
   cause on inspection: `-4141` surfaces from `set_leverage`, which `_ensure_leverage` CATCHES AND

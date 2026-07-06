@@ -99,3 +99,105 @@ def test_benign_leverage_error_still_places_the_order():
     assert res["placed"] == 1
     assert res["papered"] == 0 and res["errors"] == 0
     assert ("ETHUSDT", "BUY", 100.0) in eng.auth.orders
+
+
+# ---- v20: transient -4131 is strike-based (retry), not paper-on-first-failure ----
+
+_PCT_PRICE = '400 Bad Request: {"code":-4131,"msg":"Filter failure: PERCENT_PRICE"}'
+_XYZ_PLAN = {
+    "legs": [{"symbol": "XYZUSDT", "side": "BUY", "price": "1.0", "delta_notional_usd": 100.0}]
+}
+
+
+def _engine_thin(thin_sym: str) -> PortfolioEngine:
+    """Engine whose ORDER for thin_sym raises -4131 (a transient thin-book rejection)."""
+    eng = _engine(paper_untradeable=True, testnet=True)
+
+    def place(symbol, side, qty):
+        if symbol == thin_sym:
+            raise Exception(_PCT_PRICE)  # noqa: TRY002
+        eng.auth.orders.append((symbol, side, qty))
+
+    eng.auth.place_market_order = place
+    return eng
+
+
+def test_transient_4131_retries_not_papered_on_first_failure():
+    eng = _engine_thin("XYZUSDT")
+    strikes: dict = {}
+    res = eng.execute(_XYZ_PLAN, paper_syms=set(), strikes=strikes)
+
+    assert res["papered"] == 0
+    assert res["retrying"] == 1
+    assert res["errors"] == 0
+    assert "XYZUSDT" not in res["new_paper"]  # NOT frozen on a one-off
+    assert strikes["XYZUSDT"] == 1
+
+
+def test_transient_4131_papers_only_after_n_consecutive_strikes():
+    eng = _engine_thin("XYZUSDT")
+    strikes: dict = {}
+    # strikes 1 and 2 → retry, not papered
+    for _ in range(2):
+        res = eng.execute(_XYZ_PLAN, paper_syms=set(), strikes=strikes)
+        assert res["papered"] == 0 and res["retrying"] == 1
+    # 3rd consecutive strike → now papered (persistent, not transient)
+    res = eng.execute(_XYZ_PLAN, paper_syms=set(), strikes=strikes)
+    assert res["papered"] == 1
+    assert "XYZUSDT" in res["new_paper"]
+    assert "XYZUSDT" not in strikes  # cleared once papered
+
+
+def test_transient_strike_resets_on_fill():
+    eng = _engine(paper_untradeable=True, testnet=True)
+    n = {"calls": 0}
+
+    def place(symbol, side, qty):
+        n["calls"] += 1
+        if n["calls"] == 1:
+            raise Exception(_PCT_PRICE)  # noqa: TRY002 — fail once, then fill
+        eng.auth.orders.append((symbol, side, qty))
+
+    eng.auth.place_market_order = place
+    strikes: dict = {}
+    r1 = eng.execute(_XYZ_PLAN, paper_syms=set(), strikes=strikes)
+    assert r1["retrying"] == 1 and strikes.get("XYZUSDT") == 1
+    r2 = eng.execute(_XYZ_PLAN, paper_syms=set(), strikes=strikes)  # now fills
+    assert r2["placed"] == 1
+    assert "XYZUSDT" not in strikes  # a fill clears the streak
+
+
+# ---- v20: startup reconcile un-sticks papered symbols that hold a real position ----
+
+
+def test_reconcile_unsticks_papered_symbol_with_live_position():
+    eng = _engine(paper_untradeable=True, testnet=True)
+    saved: dict = {}
+    # LINK is papered AND holds a real position (wrongly frozen); TLM papered, no real position.
+    eng._load_paper = lambda: ({"LINKUSDT", "TLMUSDT"}, {"LINKUSDT": -0.02, "TLMUSDT": 0.024})
+    eng._save_paper = lambda syms, held: saved.update({"syms": set(syms), "held": dict(held)})
+    eng.auth.get_positions = lambda: [
+        {"symbol": "LINKUSDT", "positionAmt": "5.0"},  # live position → un-stick
+        {"symbol": "BTCUSDT", "positionAmt": "0.1"},
+        {"symbol": "TLMUSDT", "positionAmt": "0"},  # no live position → stays papered
+    ]
+    eng._paper_strikes = {"LINKUSDT": 2}
+
+    eng._reconcile_paper_vs_positions()
+
+    assert saved["syms"] == {"TLMUSDT"}  # LINK dropped, TLM retained
+    assert "LINKUSDT" not in saved["held"]
+    assert "TLMUSDT" in saved["held"]
+    assert "LINKUSDT" not in eng._paper_strikes  # strike streak cleared for the un-stuck symbol
+
+
+def test_reconcile_noop_when_no_overlap():
+    eng = _engine(paper_untradeable=True, testnet=True)
+    saved: dict = {}
+    eng._load_paper = lambda: ({"TLMUSDT"}, {"TLMUSDT": 0.024})
+    eng._save_paper = lambda syms, held: saved.update({"syms": set(syms), "held": dict(held)})
+    eng.auth.get_positions = lambda: [{"symbol": "BTCUSDT", "positionAmt": "0.1"}]
+
+    eng._reconcile_paper_vs_positions()
+
+    assert saved == {}  # nothing un-stuck → no save

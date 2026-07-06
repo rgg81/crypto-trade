@@ -50,6 +50,14 @@ def _log_scan():
     rebals = re.findall(r"rebalance plan as_of=([\d :-]+) ", txt)
     last_rebal = rebals[-1].strip() if rebals else None
     res = re.findall(r"orders placed=(\d+) skipped=(\d+) errors=(\d+)", txt)
+    # transient -4131 (thin-book PERCENT_PRICE) retries — INFO, not an error: v20 retries a liquid
+    # symbol instead of permanently papering it, and only papers after N consecutive strikes.
+    retries = re.findall(r"errors=\d+ retrying=(\d+)", txt)
+    if retries and int(retries[-1]) > 0:
+        info.append(
+            f"transient -4131 retries x{retries[-1]} (INFO: thin-book PERCENT_PRICE; retried, "
+            f"papers only after consecutive strikes — liquid names retry+fill)"
+        )
     # classify the order-error lines of the LAST rebalance block
     if res:
         last_errs = int(res[-1][2])
