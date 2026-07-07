@@ -117,6 +117,15 @@ class TradfiPaperConfig:
     db_path: str = str(_ROOT / "data" / "tradfi_paper.db")
     equity_csv: str = str(_ROOT / "data" / "tradfi_equity.csv")
     poll_interval_seconds: int = 60
+    # Data refresh runs on a TIME cadence, DECOUPLED from the rebalance gate. ``refresh_data()``
+    # does a heavy 69-name Yahoo + perp + funding pull, so it MUST NOT run every 60s poll (that
+    # would hammer / rate-limit yfinance). 30 min catches the ~00:00-UTC daily settlement fast
+    # enough for a daily-rebalance desk. CRITICAL: the refresh must NEVER be gated by
+    # ``_new_candle_due()`` — that gate reads the LAST on-disk bar, which only advances via
+    # ``refresh_data()``; gating the refresh on it deadlocks the desk once caught up (it never
+    # pulls the next settled bar). ``run()`` / ``_tick()`` refresh on THIS cadence first, then
+    # gate only the REBALANCE.
+    refresh_interval_seconds: int = 1800
     # ── LIVE-track execution realism (PARITY track is untouched — it stays the ideal signal) ──
     # quantize_live: quantize the LIVE deployed weights to the official Binance perp filters
     #   (lot-step rounding + sub-min-notional drops) at each day's perp price. Quantization is a
@@ -145,6 +154,9 @@ class TradfiPaperEngine:
         self.store = StateStore(Path(cfg.db_path))
         # Official Binance perp filters, fetched ONCE at init and cached for the LIVE quantizer.
         self._perp_filters = self._load_perp_filters()
+        # Monotonic timestamp of the last data refresh (None = never refreshed). Drives the
+        # cadenced refresh in ``_maybe_refresh``; ``time.monotonic()`` avoids wall-clock jumps.
+        self._last_refresh_monotonic: float | None = None
 
     @staticmethod
     def _load_perp_filters() -> dict[str, dict]:
@@ -443,16 +455,69 @@ class TradfiPaperEngine:
             "legs": n_legs,
         }
 
+    # ── cadenced data refresh (DECOUPLED from the rebalance gate — the deadlock fix) ──
+    def _maybe_refresh(self, *, force: bool = False) -> bool:
+        """Refresh the on-disk data on a TIME cadence, INDEPENDENT of the rebalance gate.
+
+        Returns ``True`` iff a refresh ran this call. The cadence uses ``time.monotonic()`` (immune
+        to wall-clock jumps / NTP steps). A refresh runs when: ``force`` is set (startup pull), OR
+        no refresh has ever run, OR at least ``cfg.refresh_interval_seconds`` have elapsed since the
+        last one. A refresh exception is caught + logged so a transient yfinance/perp hiccup never
+        kills the desk; the monotonic stamp still advances so a persistently failing source is not
+        hammered on every 60s poll.
+
+        This is the load-bearing fix: the OLD loop gated the refresh behind ``_new_candle_due()``,
+        which reads the LAST on-disk bar — but that bar only advances via ``refresh_data()``. Once
+        caught up, the gate stayed False forever, ``refresh_data()`` never ran, and the desk froze.
+        Refreshing on a time cadence breaks that cycle; the gate then only decides the rebalance.
+        """
+        now = time.monotonic()
+        if not force and self._last_refresh_monotonic is not None:
+            if now - self._last_refresh_monotonic < self.cfg.refresh_interval_seconds:
+                return False
+        try:
+            self.refresh_data()
+        except Exception as e:  # noqa: BLE001 — a refresh error must not kill the desk
+            print(f"[tradfi-paper] refresh error: {e}", flush=True)
+        self._last_refresh_monotonic = now
+        return True
+
+    def _tick(self, *, force_refresh: bool = False) -> dict | None:
+        """One poll-loop step, extracted from ``run()`` so the refresh→gate→rebalance path is
+        unit-testable without the sleep loop.
+
+        (1) Refresh the on-disk data on the TIME cadence (``force_refresh`` on the startup tick).
+        (2) THEN gate only the REBALANCE on the now-fresh on-disk bars.
+        When a new settled bar is due, ``run_once(refresh=not refreshed)`` processes it: if this
+        tick already refreshed, ``refresh=False`` avoids a double pull; otherwise ``run_once`` keeps
+        its default ``refresh=True`` so nothing else that relies on that default breaks.
+        """
+        refreshed = self._maybe_refresh(force=force_refresh)
+        if self._new_candle_due():  # gate on the (now-fresh) on-disk data — only the REBALANCE
+            return self.run_once(refresh=not refreshed)
+        return None
+
     def run(self) -> None:
         print(
             f"[tradfi-paper] start  equity=${self.cfg.equity_usd:,.0f}  "
             f"data={self.cfg.data_dir}  live={self.cfg.live_data_dir}  db={self.cfg.db_path}",
             flush=True,
         )
+        # Startup: refresh ONCE (force) BEFORE the first gate check so a RESUMED engine caught up at
+        # bar N immediately pulls bar N+1 and rebalances — the fix for the resume-deadlock case. The
+        # cadenced ticks below then keep the on-disk data current on a TIME schedule, independent of
+        # the rebalance gate. ``_maybe_refresh(force=True)`` stamps the monotonic clock, so the
+        # first loop tick will NOT double-pull.
+        try:
+            self._tick(force_refresh=True)
+        except KeyboardInterrupt:
+            print("[tradfi-paper] stopped", flush=True)
+            return
+        except Exception as e:  # noqa: BLE001 — a startup error must not stop the desk launching
+            print(f"[tradfi-paper] startup tick error: {e}", flush=True)
         while True:
             try:
-                if self._new_candle_due():  # cheap gate — only work on a new settled daily bar
-                    self.run_once()
+                self._tick()  # cadenced refresh + rebalance gate — see _tick / _maybe_refresh
             except KeyboardInterrupt:
                 print("[tradfi-paper] stopped", flush=True)
                 return
