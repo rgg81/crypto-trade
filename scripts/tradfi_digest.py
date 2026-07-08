@@ -9,6 +9,9 @@ TradFi perps ex-PAYP, DAILY rebalance):
   * basis_gap (bps) = equity_live − equity_parity — the perp-vs-underlying tracking residual;
   * funding_cum ($ + a rough annualized carry note) — the net long-premium CARRY (a drag, ≈−0.7%/yr
     at book level per Phase-2b), NOT a dividend bridge;
+  * funding AUDIT split — gross long-leg / short-leg / NET drag (annualized), direction −w·f (f>0 ⇒
+    long pays / short earns), from the PRODUCTION public fapi funding (never testnet). Confirms the
+    ~net-zero-but-not-quite value is the net-long tilt + asymmetric retail-long-premium funding;
   * the bear-gate regime state g = 1{EW-universe trailing-252d return < 0} (TSMOM sleeve gated OFF).
 
 Per the HANDS-OFF mandate these are TEST RESULTS — report them, never act. `REPORT_DUE: yes` fires
@@ -98,6 +101,29 @@ def _quant_leg_counts(held: dict[str, float], equity: float) -> tuple[int, int, 
     return n_quant, n_drop, n_noprice, gross_dropped
 
 
+def _funding_split(data_dir: str) -> dict | None:
+    """Gross long-leg / short-leg / net funding drag (annualized %/yr) — best-effort AUDIT line.
+
+    Reuses ``reconcile_basis_tradfi.funding_drag`` (per-leg P&L = −w·f, so f>0 ⇒ long pays / short
+    earns — the verified direction). Loads the deployed weight panel + perp fwd-returns + daily
+    funding over the live perp window; returns None on any failure (never blocks the digest).
+    Funding data is the PRODUCTION public fapi (``data/funding_rates/`` via
+    ``portfolio.funding.refresh_funding`` @ https://fapi.binance.com), NOT testnet."""
+    try:
+        import perp_map_tradfi as pm
+        import reconcile_basis_tradfi as rc
+
+        _net, dw = lw.deployed_book(data_dir)
+        dw = dw.drop(columns=list(LIVE_EXCLUDED), errors="ignore")
+        pmap = {k: v for k, v in pm.perp_symbol_map(live=False).items() if k in dw.columns}
+        idx = dw.index
+        perp_rf = rc.fwd_ret(rc.load_perp_opens(pmap, idx))
+        fd = rc.daily_funding(pmap, idx, funding_dir=_ROOT / "data" / "funding_rates")
+        return rc.funding_drag(dw, perp_rf, fd)
+    except Exception:  # noqa: BLE001 — audit line is best-effort; never block the digest
+        return None
+
+
 def main() -> int:
     mark = "--mark-pushed" in sys.argv
     if not DB.exists():
@@ -139,6 +165,16 @@ def main() -> int:
     fund_pct = fund_cum / equity0 * 100
     fund_ann = fund_pct * 365.0 / days if days and days > 0 else float("nan")
 
+    # funding AUDIT split — gross long-leg / short-leg / net drag (dir −w·f, prod-fapi source)
+    fs = _funding_split(DATA_DIR)
+    fund_split_str = ""
+    if fs:
+        fund_split_str = (
+            f"  funding split (dir −w·f, f>0 ⇒ long pays/short earns; src prod fapi): "
+            f"long-leg {fs['long_leg_ann_%']:+.2f}%/yr, "
+            f"short-leg {fs['short_leg_ann_%']:+.2f}%/yr, NET {fs['net_ann_%']:+.2f}%/yr\n"
+        )
+
     # regime gate
     today_ms = TradfiPaperEngine._today_ms()
     g, r252 = _bear_gate_state(DATA_DIR, today_ms)
@@ -168,6 +204,7 @@ def main() -> int:
         f"(perp basis + funding + quantization; slippage is in BOTH tracks, not here)\n"
         f"  funding_cum ${fund_cum:,.2f} ({fund_pct:+.3f}% ≈ {fund_ann:+.2f}%/yr carry, "
         f"on quant legs)\n"
+        f"{fund_split_str}"
         f"  exec @ ${equity0:,.0f}: {n_quant} legs quantized / {n_drop} dropped "
         f"(sub-$5 min-notional, {gross_drop:.4f} gross)"
         + (f" / {n_noprice} no-price" if n_noprice else "")

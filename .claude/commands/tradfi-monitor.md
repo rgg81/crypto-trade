@@ -37,6 +37,21 @@ State: `data/tradfi_paper.db` (SQLite `StateStore`), equity curve `data/tradfi_e
 - **Funding is a CARRY, not a dividend bridge**: net long-premium drag **≈ −0.7%/yr** at book level
   (per-leg funding P&L = `−w·f`; Binance `f>0` ⇒ longs pay). It is a modeled cost of the perp book,
   not a corporate-action reconciliation.
+- **Funding AUDIT (verified 2026-07-08; the digest now shows the split each report):**
+  1. **Source = PRODUCTION public fapi** — `data/funding_rates/<PERP>.csv` via
+     `crypto_trade.portfolio.funding.refresh_funding` @ `https://fapi.binance.com/fapi/v1/fundingRate`.
+     NEVER testnet (no testnet ref anywhere in the funding path). Same helper the engine reuses.
+  2. **Direction = `−w·f`, correct** — `f>0` ⇒ long pays / short earns; `f<0` ⇒ long earns / short
+     pays (Binance convention). Verified in code (`reconcile_basis_tradfi` lines 11/127/192/238, and
+     `live_tradfi._live_returns` reuses `rc.daily_funding`) and by per-leg example.
+  3. **NOT net-zero, and that's EXPECTED** — measured gross **long-leg ≈ −1.5%/yr** (pay) vs
+     **short-leg ≈ +0.8%/yr** (earn) ⇒ **NET ≈ −0.76%/yr**. Two real reasons it doesn't cancel: the
+     book is **net-long ~10–13%** (bear-gated TSMOM tilt, not perfectly dollar-neutral), and the perps'
+     retail-long-premium funding is **asymmetric** (longs pay more than shorts earn). A small negative
+     NET is correct, **not a bug**. This carry is **NOT in the backtest** (Yahoo TR) — the LIVE track
+     models it. **Re-check** the gross-long/short/NET split (in the digest, or
+     `reconcile_basis_tradfi.funding_drag`) after any big regime/net-long-tilt shift; a NET that swings
+     large-positive or large-negative (beyond ±~2%/yr) would be worth investigating.
 - **PAYP is EXCLUDED** (`LIVE_EXCLUDED = {PAYPUSDT}`) — a broken PayPal perp (perp ~$14 vs PayPal
   ~$43, corr 0.19: a perp-venue decoupling / ticker mismap). Dropped from the LIVE book and **NOT
   re-normalized** (every other name keeps its exact backtest weight; the tiny gross drift is the
@@ -69,7 +84,8 @@ it never touches the trade/rebalance path. Filter matplotlib noise with `| grep 
   `candle=OK|BAD` (no look-ahead) + a FUNDING/BASIS observational line. **The only alert source.**
   Exit 1 if any alert.
 - `tradfi_digest.py` → both equity tracks (since-launch + since-last-rebalance), basis_gap (bps),
-  funding carry, bear-gate regime, held book (per-name weight + $ exposure, long/short, top legs).
+  funding carry + the **gross long-leg/short-leg/NET funding split** (direction + source audit),
+  bear-gate regime, held book (per-name weight + $ exposure, long/short, top legs).
   `REPORT_DUE: yes` on a new rebalance OR the first report of a new UTC day. **Observational.**
 
 ## ALERT conditions (investigate → fix if safe → notify)
@@ -162,3 +178,15 @@ uv run python analysis/portfolio/tradfi/reconcile_basis_tradfi.py  # perp/fundin
   MISSED-rebalance rule (weekend-benign, reuses the engine's settled-bar helpers), PAYP exclusion in
   the parity recompute, engine-down relaunch + flat-start caveat, self-paced ScheduleWakeup loop.
   Watches the iter-016 bear-gated TSMOM tradfi paper desk (68 perps ex-PAYP, DAILY, PAPER).
+- **2026-07-07 — refresh-deadlock fix** (`9403db90`): the engine gated its data refresh on the on-disk
+  bar the refresh advances → a long-running engine went deaf to new bars (only advanced on restart).
+  Decoupled: `_maybe_refresh` (30-min cadence + startup force-refresh) then `_new_candle_due` gates
+  only the rebalance. Validated in production (07-06→07-07 auto-advanced). Regression test
+  `tests/test_tradfi_refresh_gate.py`. If the engine is up but stuck ≥1h past a settled bar, this is
+  the class of bug to suspect — check `tail logs/tradfi_paper.log` for a stale refresh.
+- **2026-07-08 — funding audit + digest split**: audited the LIVE-only funding (not in the backtest).
+  Source = production public fapi (never testnet); direction `−w·f` verified (f>0 ⇒ long pays/short
+  earns); NET drag ≈ −0.76%/yr (net-long tilt + asymmetric retail-long-premium funding — expected, not
+  a bug, does not net to zero). `tradfi_digest.py` now prints the gross long-leg/short-leg/NET split
+  each report (best-effort `_funding_split` → `reconcile_basis_tradfi.funding_drag`). See Strategy
+  facts → Funding AUDIT.
