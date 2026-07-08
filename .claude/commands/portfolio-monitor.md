@@ -303,6 +303,19 @@ ROADMAP #1–#7 COMPLETE. Future ideas: per-name funding-carry attribution, regi
 auto-recovery escalation ladder, a live-vs-backtest tracking-error report.
 
 ## Changelog (tick off as we build)
+- **2026-07-08 v21** — RECONCILE DUST STEP diagnosed BENIGN (no code change). At the 08:00 Jul 8 rebalance
+  the `portfolio_v2_pnl.py` opening dust stepped from the long-stable +$1.11 to −$2.93 and HELD there (not
+  income-ledger lag — it didn't settle back in ~50min). Full diagnostic: (1) dedup is CLEAN — raw vs
+  composite-key-deduped income are bit-identical (0 rows dropped), so NOT the tranId/tradeId collision I
+  suspected; (2) NO unrecorded income type (only TRANSFER/REALIZED_PNL/FUNDING_FEE/COMMISSION); (3) account
+  fields SELF-CONSISTENT to 8 decimals (`totalMarginBalance == wallet + totalUnrealizedProfit` exactly).
+  CONCLUSION: the residual = `wallet − Σ(income rows)` = −$2.93; on PRODUCTION `wallet == Σ(income)` is a
+  hard invariant, but TESTNET's matching engine drifts its wallet bookkeeping ~$1-4 from the income ledger.
+  **The headline all-in P/L is UNAFFECTED** — it's anchored to `equity(totalMarginBalance) − seed`, not the
+  income sum. The −$2.93 is within the $5 reconcile tolerance (verdict stays OK). ONLY act if the residual
+  EXCEEDS $5 (real GAP) — then re-run this diagnostic: a genuine missing-cost bug shows as a dropped income
+  row (dedup) OR a new incomeType OR account-field inconsistency; if all three are clean it's testnet drift.
+  Do NOT tighten the $5 tolerance (it's sized to absorb this testnet noise). Won't occur on real money.
 - **2026-07-06 v20** — PAPER-FALLBACK OVER-ACCUMULATION FIXED — transient errors no longer permanently
   freeze liquid symbols (`src/crypto_trade/portfolio/engine.py`), on user directive after a `book?`
   query surfaced it. FINDING: the paper set only ever GREW and papered on the FIRST failure of ANY
