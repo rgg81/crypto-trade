@@ -37,7 +37,11 @@ def _engine(*, paper_untradeable: bool, testnet: bool) -> PortfolioEngine:
     """A PortfolioEngine with __init__ bypassed — only the attrs execute() touches are wired up."""
     eng = PortfolioEngine.__new__(PortfolioEngine)
     eng.cfg = SimpleNamespace(
-        paper_untradeable=paper_untradeable, testnet=testnet, dry_run=False, leverage=1.0
+        paper_untradeable=paper_untradeable,
+        testnet=testnet,
+        dry_run=False,
+        leverage=1.0,
+        min_notional_buffer=1.20,
     )
     eng.auth = _FakeAuth()
     eng._lev_set = set()
@@ -201,3 +205,30 @@ def test_reconcile_noop_when_no_overlap():
     eng._reconcile_paper_vs_positions()
 
     assert saved == {}  # nothing un-stuck → no save
+
+
+# ---- min-notional buffer: skip boundary dust legs so they can't be rejected -4164 ----
+
+
+def test_min_notional_buffer_skips_boundary_dust_leg():
+    """A leg sized just ABOVE the $5 floor but WITHIN the 1.20 buffer ($5-$6) is SKIPPED, not sent —
+    so a price drift down before the staggered execution can't get it rejected -4164 (the 2026-07-09
+    SKYAI $5.31 case). A leg above the buffer ($6+) still places normally."""
+    eng = _engine(paper_untradeable=True, testnet=True)
+    eng._min_notional = lambda s: 5.0  # $5 floor → buffered skip threshold = $6.00
+    eng._round_qty = lambda s, q: (
+        q
+    )  # identity: qty == notional/price, so we control notional directly
+    plan = {
+        "legs": [
+            {"symbol": "SKYAIUSDT", "side": "SELL", "price": "1.0", "delta_notional_usd": 5.31},
+            {"symbol": "BTCUSDT", "side": "BUY", "price": "1.0", "delta_notional_usd": 7.00},
+        ]
+    }
+    res = eng.execute(plan, paper_syms=set())
+
+    assert res["skipped"] == 1  # SKYAI dust leg ($5.31, within buffer) skipped
+    assert res["placed"] == 1  # BTC ($7, above buffer) placed
+    assert res["errors"] == 0
+    assert all(o[0] != "SKYAIUSDT" for o in eng.auth.orders)  # never sent → no -4164 possible
+    assert ("BTCUSDT", "BUY", 7.00) in eng.auth.orders

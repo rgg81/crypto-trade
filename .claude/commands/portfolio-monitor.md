@@ -303,6 +303,18 @@ ROADMAP #1–#7 COMPLETE. Future ideas: per-name funding-carry attribution, regi
 auto-recovery escalation ladder, a live-vs-backtest tracking-error report.
 
 ## Changelog (tick off as we build)
+- **2026-07-09 v22** — MIN-NOTIONAL BUFFER + -4164 classified benign. The 00:00 Jul 9 rebalance sent a
+  SELL SKYAIUSDT leg sized $5.31 at the close-proxy price (just above Binance's $5 MIN_NOTIONAL floor);
+  by the staggered execution (~00:15) SKYAI's price had drifted down and Binance re-evaluated the notional
+  BELOW $5 → rejected `-4164`. The healthcheck flagged it `REAL order errors x1` (false alarm — it's a
+  benign ~$5 dust leg; impact: SKYAI position off ~$5 on a $1491 book, self-corrects next rebalance). Fixes:
+  (1) ENGINE (`engine.py`) — new `PortfolioConfig.min_notional_buffer=1.20`; the post-floor guard now skips
+  legs sized below `MIN_NOTIONAL × buffer` ($6 for a $5 floor), so a normal ~15-min price move can't push a
+  just-above-floor leg below it at execution. Live-execution-only — does NOT touch target-weight parity
+  (skipped dust legs are held at current, bounded by one filter-notional off target, self-correct next
+  rebalance, per the guard docstring). (2) MONITOR — `-4164` now classifies as `min-notional dust legs`
+  INFO (not REAL); it's a benign <$5 dust boundary that applies on production too, not a strategy break.
+  Added `test_min_notional_buffer_skips_boundary_dust_leg`; full portfolio+live scope 258 passed / 0 failed.
 - **2026-07-08 v21** — RECONCILE DUST STEP diagnosed BENIGN (no code change). At the 08:00 Jul 8 rebalance
   the `portfolio_v2_pnl.py` opening dust stepped from the long-stable +$1.11 to −$2.93 and HELD there (not
   income-ledger lag — it didn't settle back in ~50min). Full diagnostic: (1) dedup is CLEAN — raw vs

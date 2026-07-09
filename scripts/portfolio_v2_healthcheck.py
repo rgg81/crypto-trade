@@ -76,12 +76,19 @@ def _log_scan():
                 sym_codes.setdefault(m.group(1) or m.group(2), set()).add(m.group(3))
             # A symbol whose codes are ALL testnet artifacts is INFO. -1111 "precision" is a
             # CASCADE (INFO) when the same symbol also threw a listing artifact: a prod-listed
-            # symbol absent from testnet (e.g. TLM) gets default precision -> -1111.
+            # symbol absent from testnet (e.g. TLM) gets default precision -> -1111. -4164
+            # "notional < min" is a benign DUST-boundary leg (< $5), held at current — self-corrects
+            # next rebalance; the v22 min-notional buffer skips these before send.
             listing = {"-4141", "-1121", "-4140"}  # symbol closed / invalid / not tradeable
+            dust_errs = 0
             for cset in sym_codes.values():
                 has_listing = bool(cset & listing)
-                benign = all(c in TESTNET_ERR or (c == "-1111" and has_listing) for c in cset)
-                if benign:
+                benign = all(
+                    c in TESTNET_ERR or c == "-4164" or (c == "-1111" and has_listing) for c in cset
+                )
+                if benign and "-4164" in cset:
+                    dust_errs += 1
+                elif benign:
                     testnet_errs += 1
                 else:
                     real_errs += 1
@@ -95,13 +102,18 @@ def _log_scan():
                     f"testnet-artifact order errors x{testnet_errs} "
                     f"(INFO: symbol closed/invalid on testnet incl -4141/-1121, +cascade -1111)"
                 )
+            if dust_errs:
+                info.append(
+                    f"min-notional dust legs x{dust_errs} (INFO: -4164 <$5 notional; held at "
+                    f"current, self-corrects next rebalance; v22 buffer skips these pre-send)"
+                )
             if gateway_errs:
                 info.append(
                     f"testnet gateway 5xx order errors x{gateway_errs} "
                     f"(INFO: transient infra; off-target legs self-heal at next rebalance)"
                 )
             # never swallow errors silently: surface any last_errs not classified above
-            unclassified = last_errs - testnet_errs - real_errs - gateway_errs
+            unclassified = last_errs - testnet_errs - dust_errs - real_errs - gateway_errs
             if unclassified > 0:
                 info.append(f"unclassified order errors x{unclassified} (review log)")
             if real_errs:

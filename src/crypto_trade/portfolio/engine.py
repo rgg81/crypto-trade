@@ -36,6 +36,11 @@ class PortfolioConfig:
     interval: str = "8h"
     ref_symbol: str = "BTCUSDT"  # candle-close trigger reference
     min_notional_usd: float = 5.0  # skip dust legs (Binance min-notional is ~5 USDT)
+    # BUFFER on the post-floor min-notional guard: a leg sized at the close-proxy price just ABOVE
+    # the MIN_NOTIONAL floor can still be REJECTED (-4164) if the price drifts down before the
+    # staggered order executes (the notional is re-evaluated at execution). Skip legs within this
+    # multiple of the floor so a normal ~15-min price move can't push them below it. 1.0 = off.
+    min_notional_buffer: float = 1.20
     poll_interval_seconds: int = 60
     data_dir: str = "data"
     db_path: str = "data/portfolio_dry_run.db"
@@ -395,7 +400,11 @@ class PortfolioEngine:
             qty = self._round_qty(s, abs(leg["delta_notional_usd"]) / px)
             # POST-FLOOR min-notional guard: flooring qty to stepSize can drop the order below the
             # symbol's MIN_NOTIONAL filter (-4164; BTC=$50). Skip these dust legs (held at current).
-            if qty <= 0 or qty * px < self._min_notional(s):
+            # The BUFFER absorbs price drift between the close-proxy sizing and the staggered
+            # execution (a leg just above the floor at plan time can be re-evaluated below it and
+            # rejected -4164). Skipped legs are bounded by one filter-notional off target — inside
+            # parity tolerance, self-correct next rebalance.
+            if qty <= 0 or qty * px < self._min_notional(s) * self.cfg.min_notional_buffer:
                 skipped += 1
                 continue
             try:
