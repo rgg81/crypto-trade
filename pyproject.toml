@@ -60,3 +60,11 @@ line-length = 100
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W", "UP"]
+
+[tool.ruff.lint.per-file-ignores]
+# Test and analysis scripts use ALL-CAPS / A/B-suffix scalar and result
+# variables by long-standing numpy/scipy convention (T, C, E, sigA, resB, etc).
+# Tolerating N802/N803/N806 here keeps the existing blind_* tests consistent
+# without forcing a wide rename that would obscure the diff under REVIEW-001.
+"tests/test_blind_engine.py" = ["N802", "N803", "N806"]
+"analysis/portfolio/blind_*.py" = ["N802", "N803", "N806"]
