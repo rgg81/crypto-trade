@@ -1,0 +1,46 @@
+====================================================================================================
+BURNED-WINDOW REVEAL (user-authorized 2026-07-10) — INFORMATIONAL ONLY, NOT VALIDATION
+====================================================================================================
+[panel] 7147 candles | 747 coins | .. 2026-07-10 00:00:00
+[run] 21 L1 tranches on the FULL panel ...
+[run] 21 V0 tranches on the FULL panel ...
+
+[ANCHOR vs CONFIRMATION-005 (Sharpe +0.219, maxDD -73.0%)]
+  V0 single-phase [C5 window] Sharpe +0.136 | ann -0.6% | maxDD -27.6% | worst-mo -20.7% @2025-04 | mo-win 47% | n=1413 | per-yr 2025:+0.35  2026:-0.10
+  -> anchor MISMATCH — INVESTIGATE BEFORE TRUSTING ANYTHING BELOW
+
+[BURNED WINDOW] 2025-03-24 00:00:00 .. 2026-07-09 16:00:00  (1419 candles)
+
+  ENSEMBLE-L1  (fwd book)    Sharpe -0.205 | ann -5.6% | maxDD -25.5% | worst-mo -9.3% @2026-05 | mo-win 53% | n=1419 | per-yr 2025:+0.62  2026:-1.52
+  V0-ENSEMBLE  (reference)   Sharpe -0.230 | ann -7.4% | maxDD -26.2% | worst-mo -10.1% @2026-05 | mo-win 47% | n=1419 | per-yr 2025:+0.35  2026:-1.16
+  L1 single-phase Wed@00h    Sharpe +0.404 | ann +7.7% | maxDD -24.4% | worst-mo -11.0% @2025-04 | mo-win 53% | n=1419 | per-yr 2025:+1.14  2026:-0.21
+  V0 single-phase (=/005)    Sharpe +0.139 | ann -0.5% | maxDD -27.6% | worst-mo -20.7% @2025-04 | mo-win 47% | n=1419 | per-yr 2025:+0.35  2026:-0.09
+
+  overlay delta (ENS-L1 − V0-ENS) Sharpe: +0.025
+  burned-window rho_bar: +0.457 (IS was +0.5245)
+
+  crash months in window (frozen rule): ['2025-11', '2025-12', '2026-01', '2026-02', '2026-03', '2026-04', '2026-06', '2026-07']
+  mania months in window (frozen rule): ['2025-05']
+  ENS-L1 CRASH bucket: mean -1.35%/mo | short_px +0.312 | long_px -0.325
+  ENS-L1 MANIA bucket: mean +3.61%/mo | short_px -0.024 | long_px +0.062
+
+  ENSEMBLE-L1 monthly returns over the burned window:
+    2025-03   +1.03%
+    2025-04   -7.78%
+    2025-05   +3.61%
+    2025-06   +4.57%
+    2025-07   +2.44%
+    2025-08   +2.29%
+    2025-09   -1.27%
+    2025-10   +9.74%
+    2025-11   -5.94%
+    2025-12   +0.37%
+    2026-01   +4.66%
+    2026-02   -2.40%
+    2026-03   -2.94%
+    2026-04   +0.60%
+    2026-05   -9.28%
+    2026-06   -5.05%
+    2026-07   -0.09%
+
+[done] REMINDER: informational only; window is now design-contaminated for this track.
