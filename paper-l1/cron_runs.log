@@ -32,3 +32,39 @@
 [done] 2026-07-10T04:34:19Z extent=2026-07-09T16:00:00Z panel=7146x712 forward_panel=7146x712 anchor=Wed@00h(trim0) parity_l1_sharpe=+1.1638 parity_hash=0396f2b9c84d62fa append_invariance=OK appended(eq=0,dec=0,phase_fwd=0) DEGRADED=1 data=(klines_ok=False funding_ok=True; DEGRADED: 30 of BTC+top40 stale vs expected latest 2026-07-09T16:00:00Z; e.g. ['LUNAUSDT', 'BTCUSDC', 'ETHUSDC', 'XAGUSDT', 'XAUUSDT', 'POWERUSDT']) wall=676.9s
 ==============================================================================
 runner exit code: 0
+logs committed: e5550b3469da80d0082dd7d8628f00ccefc895c0
+==== end 2026-07-10T04:34:19Z ====
+==== run_weekly 2026-07-10T04:49:37Z ====
+##############################################################################
+# blind_paper_l1 — FROZEN L1 (C1+C2) forward-validation PAPER runner
+# run 2026-07-10T04:49:37Z   PAPER-ONLY (no exchange orders)   dir /home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/paper-l1
+##############################################################################
+[data] fetching 8h klines for 695 ACTIVE perps (exchange-info; PENDING_TRADING excluded; per-symbol tolerant) ...
+  [fetch] attempt 1/2 rc=1: ['For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/429']
+[data] fetching funding rates for 791 panel symbols ...
+[data] klines_ok=True funding_ok=True
+[data] complete: BTC+top40-live current to 2026-07-09T16:00:00Z
+[panel] full 7146 candles, 747 coins, 2020-01-01 .. 2026-07-09
+==============================================================================
+[PARITY] IS slice of the native Wed@00h panel (= forward phase) — IS-ONLY
+==============================================================================
+  IS window 2020-01-01 .. 2025-03-23  (5727 candles, 747 coins, < OOS_CUTOFF 2025-03-24)
+    V0 Sharpe    +0.9134   target +0.913 +/-0.005   -> PASS
+    L1 Sharpe    +1.1638   target +1.164 +/-0.005   -> PASS
+    L1 maxDD     -0.2858   target -0.286 +/-0.01   -> PASS
+    L1 turn/yr   +50.1426   target +50.100 +/-2.0   -> PASS
+  -> PARITY OK: runner reproduces the frozen candidate (IS L1 Sharpe +1.164).
+[phase] PHASE_TRIM=0 | rebals=340 | last pre-T0 2026-07-08T00:00:00Z | first post-T0 2026-07-15T00:00:00Z [projected(T0)]
+==============================================================================
+[REPORT] FORWARD (post-T0) READOUT — paper trade; NO verdicts
+==============================================================================
+  T0 = 2026-07-15T00:00:00Z (Wednesday)   data latest candle open = 2026-07-09T16:00:00Z
+  phase: last pre-T0 rebal 2026-07-08T00:00:00Z | first post-T0 rebal 2026-07-15T00:00:00Z [projected(T0)]
+  candles elapsed post-T0: 0  (T0 is +4.8 days from now — awaiting first Wednesday-00:00 rebal at/after T0)
+  no forward metric to report; burned window [OOS_CUTOFF, T0) is sealed.
+==============================================================================
+[done] 2026-07-10T04:58:09Z extent=2026-07-09T16:00:00Z panel=7146x747 forward_panel=7146x747 anchor=Wed@00h(trim0) parity_l1_sharpe=+1.1638 parity_hash=835a8d46fa5b127e append_invariance=OK appended(eq=0,dec=0,phase_fwd=0) DEGRADED=0 data=(klines_ok=True funding_ok=True; complete: BTC+top40-live current to 2026-07-09T16:00:00Z) wall=511.6s
+==============================================================================
+runner exit code: 0
+logs committed: f8cc028ab1c08f414079fc1beec68ccf5ddce7db
+==== end 2026-07-10T04:58:09Z ====

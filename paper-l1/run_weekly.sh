@@ -31,6 +31,10 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>") \
         && git update-ref refs/heads/quant-portfolio-blind "$COMMIT" \
         && echo "logs committed: $COMMIT"
       rm -f "$TMPIDX"
+      # Realign the REAL index for paper-l1/ with the new HEAD — a temp-index
+      # commit moves the branch ref without updating the index, and a later
+      # normal `git commit` would otherwise sweep in stale paper-l1 snapshots.
+      git reset -q -- paper-l1/ || true
     else
       echo "no log changes to commit"
     fi
