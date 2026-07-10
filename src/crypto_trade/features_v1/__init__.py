@@ -229,10 +229,24 @@ assert len(V1_FEATURE_COLUMNS_PRUNED) == 48, (
     f"V1_FEATURE_COLUMNS_PRUNED must have exactly 48 features; got {len(V1_FEATURE_COLUMNS_PRUNED)}"
 )
 
+# iter-v1/078: AAVE specialist adds one extra column on top of the 48-col PRUNED set.
+# V1_FEATURE_COLUMNS_PRUNED is intentionally kept at 48 so the other 3 specialists
+# (DOT, ETH, BTC) remain unaffected. AAVE uses this 49-col list instead.
+# The universal cross_btc dispatch writes excess_ret_5d_vs_majors_z90 into every
+# symbol's parquet harmlessly; non-AAVE models simply don't include it in feature_columns.
+V1_ITER078_FEATURE_COLUMNS: tuple[str, ...] = V1_FEATURE_COLUMNS_PRUNED + (
+    "excess_ret_5d_vs_majors_z90",
+)
+assert len(V1_ITER078_FEATURE_COLUMNS) == 49, (
+    f"V1_ITER078_FEATURE_COLUMNS must have exactly 49 features; "
+    f"got {len(V1_ITER078_FEATURE_COLUMNS)}"
+)
+
 # iter-v1/084 LOCAL feature set: 48-col global PRUNED + CRV-specialist oi_price_divergence_30.
 # This is the ONLY constant that should be 49; V1_FEATURE_COLUMNS_PRUNED stays at 48.
 # The runner (run_iteration_084.py + run_baseline_v1.py "/v1-084" dispatch) overrides
 # active_feature_columns with this local tuple so that no other specialist sees the new feature.
+# (NOTE: /078 above is also 49 cols — both are LOCAL specialist sets, never global.)
 V1_ITER084_FEATURE_COLUMNS: tuple[str, ...] = V1_FEATURE_COLUMNS_PRUNED + (
     "oi_price_divergence_30",
 )
@@ -1151,6 +1165,7 @@ __all__ = [
     "V1_BASELINE_UNIVERSE",
     "V1_FEATURE_COLUMNS",
     "V1_FEATURE_COLUMNS_PRUNED",
+    "V1_ITER078_FEATURE_COLUMNS",
     "V1_ITER084_FEATURE_COLUMNS",
     "V1_OOD_FEATURE_COLUMNS",
     "V1_RETIRED_FEATURE_COLUMNS",

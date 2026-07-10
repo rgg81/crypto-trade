@@ -73,6 +73,35 @@ def _make_btc_csv(tmpdir: Path, n: int = 300, seed: int = 99) -> Path:
     return csv_path
 
 
+def _make_eth_csv(tmpdir: Path, n: int = 300, seed: int = 77) -> Path:
+    """Write a fake ETHUSDT/8h.csv to tmpdir (iter-v1/078 excess_ret needs ETH).
+
+    Required because add_cross_btc_v1_features now loads ETH for ALL symbols
+    to compute excess_ret_5d_vs_majors_z90 universally.
+    """
+    rng = np.random.default_rng(seed)
+    start_ms = 1_679_616_000_000
+    interval_ms = 8 * 3600 * 1000
+    open_times = [start_ms + i * interval_ms for i in range(n)]
+    log_rets = rng.normal(0, 0.020, n)
+    prices = 2000.0 * np.exp(np.cumsum(log_rets))
+    eth_dir = tmpdir / "ETHUSDT"
+    eth_dir.mkdir(parents=True, exist_ok=True)
+    csv_path = eth_dir / "8h.csv"
+    df = pd.DataFrame(
+        {
+            "open_time": open_times,
+            "open": prices * 0.999,
+            "high": prices * 1.01,
+            "low": prices * 0.99,
+            "close": prices,
+            "volume": rng.uniform(1e5, 1e7, n),
+        }
+    )
+    df.to_csv(csv_path, index=False)
+    return csv_path
+
+
 # ---------------------------------------------------------------------------
 # 1. test_cross_btc_v1_no_lookahead
 # ---------------------------------------------------------------------------
@@ -187,6 +216,7 @@ def test_dot_only_cohort() -> None:
 
     with tempfile.TemporaryDirectory() as tmpdir:
         _make_btc_csv(Path(tmpdir), n=n, seed=99)
+        _make_eth_csv(Path(tmpdir), n=n, seed=77)
 
         out_dot = add_cross_btc_v1_features(df_dot, data_dir=Path(tmpdir))
         out_link = add_cross_btc_v1_features(df_link, data_dir=Path(tmpdir))
@@ -273,22 +303,26 @@ def test_synthetic_btc_ratio() -> None:
 
 
 def test_pruned_size_46() -> None:
-    """V1_FEATURE_COLUMNS_PRUNED must have exactly 48 features (post iter-v1/052 ADD).
+    """V1_FEATURE_COLUMNS_PRUNED must have exactly 48 features (post /057-CLOSEOUT REVERT).
 
     iter-v1/050 ADD extended 45→46 (dot_vs_btc_ret_ratio_30).
     iter-v1/052: 46→48 (+btc_funding_rate_8h_impulse +btc_funding_spread_30_90).
-    The live constant reflects the post-/057 state (49 cols).
+    iter-v1/057 CLOSEOUT reverted ltc_vs_btc_ret_ratio_30 (49→48, multi-seed falsified);
+    iter-v1/084 fix 960da644 restored the global PRUNED to 48 (specialist adds are LOCAL).
     """
     from crypto_trade.features_v1 import V1_FEATURE_COLUMNS_PRUNED
 
     n = len(V1_FEATURE_COLUMNS_PRUNED)
-    assert n == 49, (
-        f"V1_FEATURE_COLUMNS_PRUNED expected 49 features (post iter-v1/057 ADD); got {n}. "
+    assert n == 48, (
+        f"V1_FEATURE_COLUMNS_PRUNED expected 48 features (post /057-CLOSEOUT REVERT + "
+        f"/084 fix 960da644); got {n}. "
         "History: ...→ 45 (/049) → 46 (/050 ADD dot_vs_btc_ret_ratio_30) "
         "→ 48 (/052 ADD btc_funding_rate_8h_impulse + btc_funding_spread_30_90) "
         "→ 47 (/054 DROP btc_funding_rate_8h_impulse) "
         "→ 48 (/055 ADD eth_vs_btc_ret_ratio_30) "
-        "→ 49 (/057 ADD ltc_vs_btc_ret_ratio_30)."
+        "→ 49 (/057 ADD ltc_vs_btc_ret_ratio_30) "
+        "→ 48 (/057 CLOSEOUT REVERT ltc_vs_btc_ret_ratio_30; /084 960da644 keeps 48 — "
+        "specialist extras like /078/084/085 are LOCAL tuples, never global)."
     )
 
 
@@ -401,6 +435,7 @@ def test_add_cross_btc_missing_column() -> None:
     df = _make_kline_df(n=50, symbol="DOTUSDT").drop(columns=["symbol"])
     with tempfile.TemporaryDirectory() as tmpdir:
         _make_btc_csv(Path(tmpdir), n=50)
+        _make_eth_csv(Path(tmpdir), n=50)
         with pytest.raises(KeyError, match="symbol"):
             add_cross_btc_v1_features(df, data_dir=Path(tmpdir))
 
@@ -429,6 +464,8 @@ def test_add_cross_btc_zscore_clip() -> None:
                 "volume": [1e6] * n,
             }
         ).to_csv(csv_p, index=False)
+        # iter-v1/078: also write ETH CSV (universal excess_ret requires ETH for all symbols)
+        _make_eth_csv(Path(tmpdir), n=n, seed=77)
 
         out = add_cross_btc_v1_features(df_dot, data_dir=Path(tmpdir))
 

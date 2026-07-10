@@ -73,6 +73,38 @@ def _make_btc_csv(tmpdir: Path, n: int = 300, seed: int = 99) -> Path:
     return csv_path
 
 
+def _make_eth_csv(tmpdir: Path, n: int = 300, seed: int = 77) -> Path:
+    """Write a fake ETHUSDT/8h.csv to tmpdir (iter-v1/078 excess_ret needs ETH).
+
+    Required because add_cross_btc_v1_features now loads ETH for ALL symbols
+    to compute excess_ret_5d_vs_majors_z90 universally. For ETHUSDT tests, this
+    provides a separate fake ETH reference price series (note: when df_sym IS
+    ETHUSDT, the cross_btc dispatch also loads it for the ratio computation, so
+    having both BTCUSDT and ETHUSDT CSVs in tmpdir is required).
+    """
+    rng = np.random.default_rng(seed)
+    start_ms = 1_679_616_000_000
+    interval_ms = 8 * 3600 * 1000
+    open_times = [start_ms + i * interval_ms for i in range(n)]
+    log_rets = rng.normal(0, 0.020, n)
+    prices = 2000.0 * np.exp(np.cumsum(log_rets))
+    eth_dir = tmpdir / "ETHUSDT"
+    eth_dir.mkdir(parents=True, exist_ok=True)
+    csv_path = eth_dir / "8h.csv"
+    df = pd.DataFrame(
+        {
+            "open_time": open_times,
+            "open": prices * 0.999,
+            "high": prices * 1.01,
+            "low": prices * 0.99,
+            "close": prices,
+            "volume": rng.uniform(1e5, 1e7, n),
+        }
+    )
+    df.to_csv(csv_path, index=False)
+    return csv_path
+
+
 def _compute_features_hash(cols: tuple[str, ...]) -> str:
     """Compute SHA-256 of sorted feature-column tuple (deterministic)."""
     payload = "\n".join(sorted(cols)).encode("utf-8")
@@ -331,6 +363,7 @@ def test_eth_feature_computed_non_nan() -> None:
 
     with tempfile.TemporaryDirectory() as tmpdir:
         _make_btc_csv(Path(tmpdir), n=n, seed=99)
+        _make_eth_csv(Path(tmpdir), n=n, seed=77)
         out = add_cross_btc_v1_features(df_eth, data_dir=Path(tmpdir))
 
     # ETH feature: non-NaN after warmup
@@ -372,6 +405,7 @@ def test_dot_feature_nan_for_eth_symbol() -> None:
 
     with tempfile.TemporaryDirectory() as tmpdir:
         _make_btc_csv(Path(tmpdir), n=n, seed=99)
+        _make_eth_csv(Path(tmpdir), n=n, seed=77)
         out = add_cross_btc_v1_features(df_eth, data_dir=Path(tmpdir))
 
     # dot_vs_btc_ret_ratio_30 must exist but be all-NaN for ETHUSDT

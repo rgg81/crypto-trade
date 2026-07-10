@@ -1,6 +1,6 @@
 {
-  "written_utc": "2026-07-10T00:00:00Z",
-  "note": "PRE-T0 re-pin (2026-07-10, before T0=2026-07-15): blind_paper_l1.py hash refreshed after the two operational fixes to the data-refresh step ONLY (Defect 1: fetch discovers ACTIVE perps + per-symbol tolerance so PENDING_TRADING BTCSTUSDT/GAIBUSDT klines-400 no longer aborts --all; Defect 2: DEGRADED guard set restricted to LIVE feeds via GUARD_RECENCY_CANDLES=90 so delisted feeds LUNAUSDT/BTCUSDC/... can't pin DEGRADED). NO change to the frozen L1 construction or any other pinned module. Pre-T0 pin refreshes are allowed; any hash change AFTER T0 must be flagged in the weekly report.",
+  "written_utc": "2026-07-10T03:16:28Z",
+  "note": "T0-init pinned hashes",
   "sha256": {
     "blind_engine.py": "8e63aeef01a79b390d89d5cbf438543a70b41791c1c39cb68a9a8d8c1ba17953",
     "blind_risk_calib_006.py": "27f9250fb4f1bf213aa27224378912b4c522824fc06287791cf971db27efbc05",
@@ -8,6 +8,6 @@
     "blind_universe.py": "7cf8a4401fcaee80a41cb9b9ae8ee1f8e93fcb68604850e79ee69630dbd1f335",
     "blind_funding.py": "859cac8b526ff5404675415615c49c9c2fd66bb90283e2534c77b685f731a0d5",
     "blind_sanity_lowvol.py": "6c785f1baa7700227354737f9e74b6c8a095261092cc453db7712b3cf946c7b4",
-    "blind_paper_l1.py": "6e272cde6eaf29b4d1f749be5ad572dce6e8e4852508d784f7ad9d435e7accd7"
+    "blind_paper_l1.py": "c8ae8f25f5c17e51592edc6b0b078f526f3a98ded23e77643ef3e21398f9d6ce"
   }
 }
