@@ -1,1 +1,1 @@
-decision_close_utc,fill_open_utc,n_long,n_short,turnover,cost_bps,funding_8h_bps,c1_gate_fired,c1_short_scalar,c2_excluded_names,weights_sha256,DEGRADED
+protocol,row_type,decision_close_utc,fill_open_utc,rebal_tranche_id,ens_turnover,ens_cost_bps,ens_funding_8h_bps,c1_fired_tranche,c2_excluded_names,n_long_ens,n_short_ens,DEGRADED
