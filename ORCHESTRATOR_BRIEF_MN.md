@@ -73,3 +73,29 @@ QE extends it for beta-hedged weights (new leak tests required).
 **STARTING POINT:** QR writes `diary-portfolio-mn/PLAN.md` — sketch 3–5 constructions from the
 menu (+ any genuinely new angle), pick the cheapest-to-falsify diagnostic for each, propose the
 diagnostic order. Then run DIAGNOSTIC-001.
+
+---
+
+## ADDENDUM 2026-07-10 — ENSEMBLE CAPSTONE (user-directed, pre-registered NOW)
+
+**User directive:** "combine solutions, build an ensemble — this generalizes even more."
+
+**The capstone construction, registered before any member field exists:** when ≥2 families hold
+BANKED candidates (currently: A3-1; C/E2 surveying), register **EXPLORATION-ENSEMBLE** — the
+cross-family combination book. Frozen principles, committed in advance:
+1. **Weights chosen a-priori, never IS-optimized:** equal-risk (inverse trailing-vol) or plain
+   equal-weight — pick ONE at registration from member vol statistics only; an IS-Sharpe-
+   optimized weighting is mining and is banned.
+2. **Members enter byte-frozen** as banked; no member re-tuning inside the ensemble.
+3. **Gates:** the same frozen charter set (all 11 HARD incl. beta/bucket neutrality on the
+   COMBINED book — member-level neutrality does not automatically compose if members share
+   exposures; measured, not assumed).
+4. **The falsifiable claim:** combined Sharpe ≥ best member's AND combined maxDD shallower than
+   every member's, via measured member decorrelation. If members are too correlated to add
+   anything, that is a FINDING (mechanism overlap), not a failure to tune away.
+5. **Holdout governance (pre-registered to prevent budget gaming):** evaluating the ENSEMBLE on
+   the sealed holdout consumes the one-forever reveal of EVERY member family simultaneously.
+   The efficient use of the reveal budget is therefore likely ONE ensemble reveal instead of
+   per-family reveals — but that decision remains the USER's, made after the field survey.
+6. **Intra-family ensembling** (21-phase tranche staggering) remains mandatory at member level —
+   the cross-family ensemble stacks ON TOP of it.
