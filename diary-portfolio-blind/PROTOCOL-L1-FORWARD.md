@@ -1,5 +1,11 @@
 # PROTOCOL-L1-FORWARD — Pre-registered forward-validation contract for the frozen L1 (C1+C2)
 
+> **RETIRED 2026-07-10, PRE-T0 — SUPERSEDED by PROTOCOL-ENSEMBLE-L1-FORWARD.md (v2).**
+> Zero forward candles ever accrued under this contract (verified in
+> REVIEW-PROTOCOL-V2-preflight.md); no in-flight test was abandoned. The user accepted the
+> PHASE7-007 §5(c) recommendation to switch the single forward book to ENSEMBLE-L1.
+> This document is preserved as the historical v1 contract; nothing below is active.
+
 **Status: FROZEN 2026-07-10, before the first forward candle.** **Pre-T0 amendment (same day,
 REVIEW-006 ADDENDUM 2):** rebal-phase anchor re-pinned Mon@00h → **Wed@00h** (the a-priori frozen
 construction), new **T0 = 2026-07-15**, revised expectation band **+0.55–0.80**, new **M-phase** gate +
