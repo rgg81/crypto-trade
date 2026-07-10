@@ -296,3 +296,30 @@ T0 panel extent         : <max grid_ms at T0 build>
 **FROZEN 2026-07-10.** Gates, thresholds, horizon dates, the interpretation map, and the extension rule
 are locked before the first forward candle. No OOS was read; the burned window is INPUT-history only; no
 backtest was run to author this contract. Any deviation is a new protocol version with a new T0.
+
+---
+
+## §7 ACTIVATION RECORD (2026-07-10)
+
+**Scheduler:** systemd user timer `blind-paper-l1.timer` (`~/.config/systemd/user/`), enabled +
+started, `OnCalendar=Wed *-*-* 00:10:00 UTC`, **Persistent=true** (a run missed while the host is
+down fires on next boot — harmless: the runner recomputes decisions from recorded klines, so a
+late run reconstructs the Wednesday decision exactly). `loginctl` linger enabled for the user.
+Verified: next fire Wed 2026-07-15 00:10 UTC = the first forward decision day.
+
+**Job:** `/bin/bash paper-l1/run_weekly.sh` → cd worktree, `PYTHONUNBUFFERED=1 uv run python
+analysis/portfolio/blind_paper_l1.py`, output appended to `paper-l1/cron_runs.log`; on runner
+exit 0 with log changes, commits `paper-l1/` to `quant-portfolio-blind` via a temporary git
+index (tolerates the worktree's pre-existing unmerged path). Runner failure (e.g.
+append-invariance ABORT) ⇒ NO commit + FAILED line in cron_runs.log.
+
+**End-to-end proof run (2026-07-10 04:23–04:34 UTC, via the exact scheduled path):** parity
+PASS (V0 +0.9134 / L1 +1.1638 direct), append-invariance OK, 0 forward rows (pre-T0, correct),
+burned window sealed, auto-commit fired. Known issues found and fixed before T0: the `fetch
+--all` kline refresh returned HTTP 400 (diagnosed + fixed, see cron_runs.log for the re-proof)
+and the staleness guard counted permanently-dead feeds (LUNAUSDT) in "top-40" — guard re-scoped
+to feeds alive in the panel's recent rows so DEGRADED can clear.
+
+**Paper only.** The runner contains no exchange-order code; nothing in this protocol places real
+orders. Monitoring cadence: weekly commit diffs on `paper-l1/` are the audit trail; gate
+evaluation per §4/§5 only.
