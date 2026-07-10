@@ -1,0 +1,177 @@
+==============================================================================
+DIAG-E STAGE 2 — 1h residualized short-horizon cross-section (pre-registered)
+==============================================================================
+[mn-datacheck] DEGRADED: BTC grid OK: T=7147, contiguous, [2020-01-01T00:00:00Z .. 2026-07-10T00:00:00Z]; 40 of BTC+top40-live stale vs expected latest 2026-07-10T08:00:00Z; e.g. ['BTCUSDT', 'ETHUSDT', 'BTCUSDC', 'SOLUSDT', 'ETHUSDC', 'LABUSDT']
+  NOTE: DEGRADED verdict is live-feed staleness — irrelevant for an IS-only probe (IS ends 2025-12-31); proceeding.
+
+[1] 8h IS panel (universe/regime machinery) + sealed-holdout guard
+  8h panel: T=6576 [2020-01-01 .. 2025-12-31], C=747 syms
+  top-40 (8h): mean members/candle = 36.6; ever-members = 361
+
+[2] 1h panel load (361-symbol §4.3 scope) + 1h coverage check
+  1h grid: T=52608 [2020-01-01 .. 2025-12-31] (IS-only, guard passed)
+  coverage: 303/361 syms gap-free; 58 syms with interior gaps, 7970 missing hours total (0.0869% of finite panel)
+  gaps beyond the 96h ffill limit (stay NaN past the limit): [('BNXUSDT', 518), ('ICPUSDT', 626), ('TLMUSDT', 708)]
+  hole policy (DIAG-B precedent): interior ffill <= 96h, FLAGGED; 6406 candle-values fabricated (0.0698%); decisions EXCLUDED on hole-filled hours; positions hold through
+
+[3] 8h->1h mapping (universe + regime labels at the last CLOSED 8h candle)
+  CRASH: n=5976 (11.5%)  MANIA: n=8168 (15.7%)  CHOP: n=37737 (72.7%)  warmup=727
+  top-40 on 1h grid: mean members/candle = 36.6; decision-excluded member-hours on holes = 1782
+
+[4] Funding (1h bucket-sum on the 1h grid) + coverage check
+[funding] load: mapped=0 direct=361 missing=0 (of 361 panel syms); 361 cols with >=1 in-grid settlement
+  funding coverage complete for all top-40 ever-members
+
+[5] Rolling betas (frozen 270/135/0.33/[0,3] on the NATIVE 1h grid) + residuals
+  beta valid from candle 135 (2020-01-06); 135 all-NaN warmup rows excluded; median prior-filled/candle = 201  (2s)
+  residual coverage over member-candles = 100.0% (NaN rows excluded)
+
+[6] Signals: trailing L-candle mean residual return, L in {4,12,24,48} (1h)
+  L=4   signal coverage over member-candles = 99.9%
+  L=12  signal coverage over member-candles = 99.9%
+  L=24  signal coverage over member-candles = 99.9%
+  L=48  signal coverage over member-candles = 99.9%
+
+[7] THE MAP — IC + IC-oriented tail spread + cost coverage per cell (top-40)
+  (spread bps per h candles; natural cadence rebal=h, phase-agnostic; net incl.
+   funding - 7.5bps/side on turnover; net2x doubles costs; the DIAG-D/E1 columns)
+  cell          mean IC       t  t_adj sign  sp mean   sp med   %pos   t(sp)
+  L=4   h=1     -0.0433  -42.16 -42.16 REV     +1.03    +5.23  52.4%   +1.50
+  L=4   h=4     -0.0350  -34.21 -17.10 REV     -1.17    +6.33  51.4%   -0.89
+  L=4   h=12    -0.0209  -20.78  -6.00 REV     -8.06    +5.91  50.8%   -3.90
+  L=4   h=24    -0.0110  -10.93  -2.23 REV    -11.12    +0.64  50.1%   -3.93
+  L=12  h=1     -0.0343  -33.24 -33.24 REV     -0.91    +2.04  50.9%   -1.30
+  L=12  h=4     -0.0312  -30.05 -15.03 REV     -6.45    +1.56  50.4%   -4.88
+  L=12  h=12    -0.0229  -22.11  -6.38 REV    -20.32    -2.82  49.6%   -9.61
+  L=12  h=24    -0.0150  -14.40  -2.94 REV    -20.74    -0.80  49.9%   -7.08
+  L=24  h=1     -0.0301  -28.76 -28.76 REV     -0.38    +2.47  51.1%   -0.56
+  L=24  h=4     -0.0291  -27.17 -13.58 REV     -5.15    +1.95  50.4%   -3.91
+  L=24  h=12    -0.0229  -21.50  -6.21 REV    -16.15    -0.70  49.9%   -7.34
+  L=24  h=24    -0.0156  -14.71  -3.00 REV    -24.14    -5.67  49.5%   -7.92
+  L=48  h=1     -0.0211  -20.21 -20.21 REV     -1.61    +1.03  50.4%   -2.28
+  L=48  h=4     -0.0227  -21.24 -10.62 REV     -7.31    -0.79  49.8%   -5.28
+  L=48  h=12    -0.0238  -22.11  -6.38 REV    -16.27    -0.98  49.9%   -7.08
+  L=48  h=24    -0.0231  -21.55  -4.40 REV    -23.57    -9.52  49.2%   -7.46
+
+  per-cell cost coverage at natural cadence (phase-agnostic):
+  cell         rebal  gross_ann  fund_ann   NET_ann  net2x_ann   to_ann  Sharpe   ph+   exW NET
+  L=4   h=1        1     +90.6%    -18.3%  -1133.1%   -2338.5%   16072x   -7.90   0/1   -1089.0%
+  L=4   h=4        4     -25.4%    -11.6%   -579.7%   -1122.4%    7236x   -4.22   0/4    -563.7%
+  L=4   h=12      12     -59.8%     -5.8%   -248.1%    -430.7%    2434x   -1.90   0/12   -241.3%
+  L=4   h=24      24     -40.0%     -5.5%   -137.5%    -229.6%    1228x   -1.10   1/24   -120.0%
+  L=12  h=1        1     -79.4%    -17.1%   -839.5%   -1582.4%    9906x   -5.79   0/1    -803.5%
+  L=12  h=4        4    -141.0%    -13.8%   -493.2%    -831.7%    4513x   -3.54   0/4    -497.5%
+  L=12  h=12      12    -149.3%    -11.4%   -341.8%    -523.0%    2416x   -2.57   0/12   -331.7%
+  L=12  h=24      24     -76.6%    -10.7%   -178.5%    -269.8%    1217x   -1.39   0/24   -160.2%
+  L=24  h=1        1     -33.4%    -24.1%   -604.0%   -1150.5%    7287x   -4.21   0/1    -530.3%
+  L=24  h=4        4    -113.0%    -23.0%   -385.9%    -635.7%    3332x   -2.77   0/4    -329.9%
+  L=24  h=12      12    -118.9%    -18.9%   -273.4%    -409.1%    1808x   -2.02   0/12   -234.0%
+  L=24  h=24      24     -89.3%    -15.6%   -195.6%    -286.3%    1209x   -1.47   0/24   -173.8%
+  L=48  h=1        1    -140.7%    -35.9%   -569.9%    -963.2%    5244x   -3.88   0/1    -562.5%
+  L=48  h=4        4    -160.0%    -32.7%   -375.8%    -559.0%    2442x   -2.62   0/4    -379.4%
+  L=48  h=12      12    -120.5%    -28.7%   -250.5%    -351.7%    1350x   -1.79   0/12   -257.1%
+  L=48  h=24      24     -85.8%    -24.7%   -179.6%    -248.7%     921x   -1.32   0/24   -192.2%
+  [check] vectorized Spearman vs scipy, 300 random candles: max|diff|=1.11e-16
+
+[8] SIGN MAP — IS halves (2020-22 / 2023-25, decision candle) + IC ex-2025-03+
+  cell                         half1 IC                   half2 IC  stable?     IC exW
+  L=4   h=1    -0.0585 (t=-38.93, n=23033) -0.0299 (t=-21.38, n=26302)  SAME-SIGN  -0.0467
+  L=4   h=4    -0.0466 (t=-30.98, n=23033) -0.0249 (t=-17.85, n=26300)  SAME-SIGN  -0.0373
+  L=4   h=12   -0.0292 (t=-19.67, n=23033) -0.0137 (t= -9.99, n=26292)  SAME-SIGN  -0.0207
+  L=4   h=24   -0.0176 (t=-11.85, n=23033) -0.0052 (t= -3.81, n=26280)  SAME-SIGN  -0.0118
+  L=12  h=1    -0.0476 (t=-31.30, n=23033) -0.0226 (t=-16.16, n=26302)  SAME-SIGN  -0.0366
+  L=12  h=4    -0.0424 (t=-27.41, n=23033) -0.0214 (t=-15.33, n=26300)  SAME-SIGN  -0.0317
+  L=12  h=12   -0.0267 (t=-17.15, n=23033) -0.0197 (t=-14.15, n=26292)  SAME-SIGN  -0.0220
+  L=12  h=24   -0.0213 (t=-13.70, n=23033) -0.0094 (t= -6.76, n=26280)  SAME-SIGN  -0.0161
+  L=24  h=1    -0.0416 (t=-26.86, n=23033) -0.0200 (t=-14.15, n=26302)  SAME-SIGN  -0.0329
+  L=24  h=4    -0.0409 (t=-25.66, n=23033) -0.0187 (t=-13.00, n=26300)  SAME-SIGN  -0.0314
+  L=24  h=12   -0.0307 (t=-19.02, n=23033) -0.0161 (t=-11.40, n=26292)  SAME-SIGN  -0.0245
+  L=24  h=24   -0.0239 (t=-15.06, n=23033) -0.0083 (t= -5.86, n=26280)  SAME-SIGN  -0.0168
+  L=48  h=1    -0.0281 (t=-18.06, n=23033) -0.0150 (t=-10.67, n=26302)  SAME-SIGN  -0.0223
+  L=48  h=4    -0.0282 (t=-17.57, n=23033) -0.0178 (t=-12.50, n=26300)  SAME-SIGN  -0.0230
+  L=48  h=12   -0.0243 (t=-14.92, n=23033) -0.0233 (t=-16.35, n=26292)  SAME-SIGN  -0.0230
+  L=48  h=24   -0.0198 (t=-12.42, n=23033) -0.0259 (t=-17.98, n=26280)  SAME-SIGN  -0.0199
+
+  cell                              CRASH                      MANIA                       CHOP
+  L=4   h=1    -0.0473 (t=-15.54, n=5264)  -0.0591 (t=-21.84, n=7432)  -0.0395 (t=-33.19, n=36639)
+  L=4   h=4    -0.0402 (t=-13.11, n=5264)  -0.0473 (t=-17.40, n=7432)  -0.0318 (t=-26.85, n=36637)
+  L=4   h=12   -0.0202 (t= -6.59, n=5264)  -0.0238 (t= -8.98, n=7432)  -0.0205 (t=-17.56, n=36629)
+  L=4   h=24   -0.0059 (t= -2.01, n=5264)  -0.0209 (t= -7.86, n=7432)  -0.0097 (t= -8.32, n=36617)
+  L=12  h=1    -0.0364 (t=-11.72, n=5264)  -0.0466 (t=-17.13, n=7432)  -0.0315 (t=-26.38, n=36639)
+  L=12  h=4    -0.0345 (t=-10.93, n=5264)  -0.0376 (t=-13.85, n=7432)  -0.0294 (t=-24.48, n=36637)
+  L=12  h=12   -0.0171 (t= -5.43, n=5264)  -0.0226 (t= -8.33, n=7432)  -0.0238 (t=-19.84, n=36629)
+  L=12  h=24   -0.0042 (t= -1.34, n=5264)  -0.0259 (t= -9.30, n=7432)  -0.0143 (t=-11.92, n=36617)
+  L=24  h=1    -0.0301 (t= -9.62, n=5264)  -0.0414 (t=-14.82, n=7432)  -0.0278 (t=-23.00, n=36639)
+  L=24  h=4    -0.0294 (t= -9.25, n=5264)  -0.0421 (t=-14.85, n=7432)  -0.0264 (t=-21.29, n=36637)
+  L=24  h=12   -0.0135 (t= -4.20, n=5264)  -0.0354 (t=-12.40, n=7432)  -0.0217 (t=-17.69, n=36629)
+  L=24  h=24   -0.0037 (t= -1.15, n=5264)  -0.0330 (t=-11.78, n=7432)  -0.0138 (t=-11.26, n=36617)
+  L=48  h=1    -0.0217 (t= -6.85, n=5264)  -0.0291 (t=-10.47, n=7432)  -0.0194 (t=-16.11, n=36639)
+  L=48  h=4    -0.0224 (t= -6.95, n=5264)  -0.0304 (t=-10.82, n=7432)  -0.0212 (t=-17.11, n=36637)
+  L=48  h=12   -0.0160 (t= -4.87, n=5264)  -0.0321 (t=-11.62, n=7432)  -0.0232 (t=-18.59, n=36629)
+  L=48  h=24   -0.0149 (t= -4.58, n=5264)  -0.0305 (t=-11.33, n=7432)  -0.0227 (t=-18.20, n=36617)
+
+[9] KILL-ELIGIBLE CELLS (|IC| >= 0.02 AND same-sign halves) + champions
+  eligible: ['L=4,h=1', 'L=4,h=4', 'L=4,h=12', 'L=12,h=1', 'L=12,h=4', 'L=12,h=12', 'L=24,h=1', 'L=24,h=4', 'L=24,h=12', 'L=48,h=1', 'L=48,h=4', 'L=48,h=12', 'L=48,h=24']
+  best momentum: NONE
+  best reversal: L=4, h=1  mean IC=-0.0433
+  champion MOM (kill-eligible): NONE
+  champion REV (kill-eligible): L=4, h=1  mean IC=-0.0433
+
+------------------------------------------------------------------------------
+[10] DEEP DIVE — cell L=4, h=1  (REV (long D1 lo-past-resid / short D10))
+  capture candles: 49336 (effective start 2020-05-16); median names used = 40
+  per-decile mean forward-1-candle residual return (bps, D1=lowest past-resid):
+    D1:+1.10  D2:+0.36  D3:+0.31  D4:-0.19  D5:-0.21  D6:-0.52  D7:-0.76  D8:-0.50  D9:-0.65  D10:+0.11
+  oriented spread: mean=+1.03 bps/1c med=+5.23 %pos=52.4% t=+1.50 (t_adj=+1.50) ann~+90.6% gross
+
+  regime buckets (decision-candle label, 8h rules mapped):
+    bucket       n  spread(bps)       t       IC
+    CRASH     5264         1.98    0.62  -0.0473
+    MANIA     7432         5.67    3.39  -0.0591
+    CHOP     36640        -0.04   -0.06  -0.0395
+
+  per-year stability (year of first return candle):
+    year        n  spread(bps)       t       IC
+    2020     5512         7.05    4.87  -0.0671
+    2021     8760         4.58    2.57  -0.0612
+    2022     8760        -0.80   -0.36  -0.0504
+    2023     8760         0.29    0.27  -0.0394
+    2024     8784        -0.47   -0.36  -0.0278
+    2025     8760        -2.21   -1.21  -0.0226
+
+  contamination twin (forward window fully before 2025-03):
+    spread mean=+1.59 bps (t=+2.20); IC mean=-0.0467 (n=41992)
+
+  spread-stream beta before/after residualization (measured, not assumed):
+    RAW   (before): beta_BTC=+0.0903 (se 0.0110)  beta_ETH=+0.0859 (se 0.0084)  n=49336
+    RESID (after) : beta_BTC=+0.0702 (se 0.0109)  beta_ETH=+0.0720 (se 0.0083)  n=49336
+    RESID bucket-conditional beta_BTC [CRASH]: +0.3402 (se 0.0359, n=5264)
+    RESID bucket-conditional beta_BTC [MANIA]: +0.0009 (se 0.0222, n=7432)
+
+  COST COVERAGE at natural cadence rebal=1 (phase-agnostic over 1 phases):
+    gross_ann= +90.6%  fund_ann=-18.3%  NET_ann=-1133.1%  net2x_ann=-2338.5%  turnover_ann=16072.3x  Sharpe_net=-7.90
+    ex-2025-03+ NET=-1089.0%
+
+  TOP-20 robustness: IC=-0.0437 (t=-32.62); spread mean=+0.32 bps med=+6.37 (t=+0.35, n=49912); natural-cadence NET_ann=-1239.1%
+
+==============================================================================
+[11] VERDICT — pre-registered kill criterion (PLAN §2 Sketch E', Stage 2)
+  max |IC| over the 16-cell grid = 0.0433 (cell L=4,h=1; floor 0.02)
+  eligible L=4,h=1: |IC|=0.0433 (>=0.02 OK), halves same-sign OK, net2x_ann at rebal=1 = -2338.5% -> COVERAGE FAIL
+  eligible L=4,h=4: |IC|=0.0350 (>=0.02 OK), halves same-sign OK, net2x_ann at rebal=4 = -1122.4% -> COVERAGE FAIL
+  eligible L=4,h=12: |IC|=0.0209 (>=0.02 OK), halves same-sign OK, net2x_ann at rebal=12 = -430.7% -> COVERAGE FAIL
+  eligible L=12,h=1: |IC|=0.0343 (>=0.02 OK), halves same-sign OK, net2x_ann at rebal=1 = -1582.4% -> COVERAGE FAIL
+  eligible L=12,h=4: |IC|=0.0312 (>=0.02 OK), halves same-sign OK, net2x_ann at rebal=4 = -831.7% -> COVERAGE FAIL
+  eligible L=12,h=12: |IC|=0.0229 (>=0.02 OK), halves same-sign OK, net2x_ann at rebal=12 = -523.0% -> COVERAGE FAIL
+  eligible L=24,h=1: |IC|=0.0301 (>=0.02 OK), halves same-sign OK, net2x_ann at rebal=1 = -1150.5% -> COVERAGE FAIL
+  eligible L=24,h=4: |IC|=0.0291 (>=0.02 OK), halves same-sign OK, net2x_ann at rebal=4 = -635.7% -> COVERAGE FAIL
+  eligible L=24,h=12: |IC|=0.0229 (>=0.02 OK), halves same-sign OK, net2x_ann at rebal=12 = -409.1% -> COVERAGE FAIL
+  eligible L=48,h=1: |IC|=0.0211 (>=0.02 OK), halves same-sign OK, net2x_ann at rebal=1 = -963.2% -> COVERAGE FAIL
+  eligible L=48,h=4: |IC|=0.0227 (>=0.02 OK), halves same-sign OK, net2x_ann at rebal=4 = -559.0% -> COVERAGE FAIL
+  eligible L=48,h=12: |IC|=0.0238 (>=0.02 OK), halves same-sign OK, net2x_ann at rebal=12 = -351.7% -> COVERAGE FAIL
+  eligible L=48,h=24: |IC|=0.0231 (>=0.02 OK), halves same-sign OK, net2x_ann at rebal=24 = -248.7% -> COVERAGE FAIL
+
+  STAGE 2: KILLED
+  (Stage 1 died 2026-07-10 -> both stages dead => Sketch E' dead, PLAN §2 E'.)
+  wall time: 3.0 min
+==============================================================================
