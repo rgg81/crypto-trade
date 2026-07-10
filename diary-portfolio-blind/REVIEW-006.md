@@ -108,10 +108,77 @@ sub-regime split.
 
 ## Caveats PHASE7-006 MUST carry
 1. IS design-validation only; NO deployability claim; forward-validation mandatory.
-2. Deflate +1.164 → honest ~+0.75–0.95 forward expectation (wide band).
+2. Deflate +1.164 → honest ~+0.75–0.95 forward expectation (wide band). [SUPERSEDED by the
+   phase addendum below: re-anchored band +0.55–0.80.]
 3. G-mania = mechanism-efficacy, not regime alpha; 2020-12-only clip-hurts framing.
 4. G-crash thin (+0.20pp); F2 bear-rally/capitulation C1-firing is a named OOS crash risk.
 5. C2 = the fragile contribution; stress on non-2024-11 squeezes; no post-hoc Q scan.
 6. Mania fix rests on C1/C2; C3/C4 correctly dropped; C4 stickiness lesson recorded.
 7. C5 falsification NEGATIVE on all axes + C1 anchor validated — record both §5.4 paragraphs.
 8. Correct the Rule-1 formula sign error before any future reuse of the decision tree.
+
+---
+
+# ADDENDUM 2 — Rebal-phase fragility ruling (same date, pre-T0 of the forward protocol)
+
+**Trigger:** while building the forward paper-trade runner, the QE discovered the weekly rebal=21
+construction has 21 possible 8h phase offsets; all /005 and /006 evidence was generated at the
+phase inherited from the panel's 2020-01-01 (Wednesday) start — never chosen, never scanned. A
+committed IS-only sweep (`blind_phase_sweep_006.py` → `paper-l1/phase_sweep_is.csv`) evaluated
+all 21 phases.
+
+## Addendum verdict
+**SUCCESS-WITH-CAVEATS SURVIVES on the DESIGN/MECHANISM axis — strengthened there — but is
+DOWNGRADED on the LEVEL axis.** The +1.164 Sharpe / −28.58% maxDD are a favorable, never-chosen
+phase draw; L1 maxDD breaches the −35% floor at 7/21 phases (to −70.4%; phase-agnostic mean
+≈ −37.3%). Had the panel started Monday, /006 would have FAILED its own gates.
+
+## Key numbers (all IS, frozen params, warmup=63)
+- V0: phase mean +0.334, median +0.502, std 0.509, min −0.795 (Mon@00h), max +1.109; the /005
+  headline +0.913 ranks **3/21** (top ~14% of its own phase distribution).
+- L1: phase mean +0.947, median +1.008, std 0.443, min +0.085, max +1.589; **21/21 positive**;
+  frozen Wed@00h +1.164 ranks 8/21.
+- Overlay delta (L1−V0): **positive at ALL 21 phases**, mean +0.614, min +0.250 (at the frozen
+  phase itself — the frozen evidence UNDERSTATED the control benefit), max +0.919 (at the worst
+  base phase). C1+C2 convert a phase-fragile base (4/21 negative) into a phase-robust Sharpe
+  book (0/21 negative). Robustness claim is Sharpe/overlay-scoped, NOT maxDD-scoped.
+- Dispersion mechanism: concentrated in violent squeeze months (2024-11 swings 35.3pp across
+  phases) — a 1-2 day rebal-boundary shift decides whether the short leg holds through a squeeze.
+
+## Rulings
+1. **Sweep ADMISSIBLE** as falsification-directed robustness analysis (analogous to /005's
+   cadence table): selection-free, IS-clean (front-trim only; OOS seal asserted), fully
+   disclosed, drift-proof (reuses the runner's frozen run functions). Condition: the
+   phase-selection ban is mandatory — adopting Wed@08h (the max) would convert it to best-of-21
+   search and void the accounting.
+2. **Forward anchor = Wed@00h** (the a-priori panel-start phase; the phase all frozen evidence
+   was generated at). The Mon@00h pin (orchestrator operational choice, worst-of-21, ~zero IS
+   edge, near-guaranteed FF-1 breach) is REJECTED and corrected pre-T0 — a pre-registration
+   correction, NOT a clock reset (no forward data contaminated). Wed@08h FORBIDDEN (selection).
+   All-21 equal-weight ensemble = a genuinely more robust NEW construction — recommended as a
+   future design iteration, not this test.
+3. **Phase-ensemble forward diagnostics BELONG in the protocol:** 21-phase distribution logged
+   weekly, INFORMATIONAL; gates bind only to the Wed@00h book; phase-selection ban pre-registered.
+   A one-sided mechanism-contradiction gate is LEGITIMATE (tests direction, aggregates across
+   phases, selects nothing): forward overlay delta < 0 at ≥11/21 phases (trailing window,
+   evaluated at the 12-month primary, minimum-N) → CONTRADICTION. Positive overlay grants
+   nothing. FF-1 stays at −35% (do not widen to accommodate fragility); log the overlay delta at
+   any FF-1 breach for attribution (breach+positive overlay = base phase-tail; breach+negative
+   overlay = mechanism failure; either way FF-1 fails).
+4. **Ledger:** zero best-of-k inflation (nothing selected) + 1 researcher-DOF bump → cumulative
+   n_eff ≈ 16–22. The material move is a LEVEL RE-ANCHOR: expectation base +1.164 → phase-
+   agnostic +0.947, then standard deflation → **revised honest forward band ≈ +0.55–0.80**;
+   forward maxDD honest expectation −35%…−50% plausible (FF-1 breach risk elevated, phase-driven).
+5. **Retroactive /005 note:** a substantial fraction of /005's +0.91 was phase luck
+   (phase-agnostic base ≈ +0.33–0.50; maxDD mean ≈ −49%, worst −82.9%; 4/21 phases negative) —
+   a deflation vector REVIEW-005 did not capture, and a plausible IS-side mechanism for the
+   /005 forward underperformance. Track lesson: **rebal phase is a first-order robustness axis
+   for any cadence > 1 candle; sweep it before believing a headline.**
+
+## New findings (ranked)
+- **F7 [HIGH]** L1 maxDD phase-fragile; the passing G-dd-floor reading was a favorable draw
+  (breaches −35% at 7/21 phases). Forward FF-1 at elevated phase-driven breach risk.
+- **F8 [HIGH]** The Mon@00h forward pin was the single worst of 21 phases — corrected pre-T0.
+- **F9 [MED]** /005's +0.91/−33% headline substantially phase luck (rank 3/21).
+- **F10 [POSITIVE/MED]** C1+C2 overlay phase-robust on Sharpe (21/21 positive; frozen phase
+  understates it). Strongest orthogonal design-validation evidence the track has.

@@ -1,0 +1,13 @@
+{
+  "written_utc": "2026-07-10T03:16:28Z",
+  "note": "T0-init pinned hashes",
+  "sha256": {
+    "blind_engine.py": "8e63aeef01a79b390d89d5cbf438543a70b41791c1c39cb68a9a8d8c1ba17953",
+    "blind_risk_calib_006.py": "27f9250fb4f1bf213aa27224378912b4c522824fc06287791cf971db27efbc05",
+    "blind_mania_rule.py": "590dab217f0d6c4a4b2ebb02f0b84a811ba078f90be437120fcaa18d9e73511b",
+    "blind_universe.py": "7cf8a4401fcaee80a41cb9b9ae8ee1f8e93fcb68604850e79ee69630dbd1f335",
+    "blind_funding.py": "859cac8b526ff5404675415615c49c9c2fd66bb90283e2534c77b685f731a0d5",
+    "blind_sanity_lowvol.py": "6c785f1baa7700227354737f9e74b6c8a095261092cc453db7712b3cf946c7b4",
+    "blind_paper_l1.py": "c8ae8f25f5c17e51592edc6b0b078f526f3a98ded23e77643ef3e21398f9d6ce"
+  }
+}

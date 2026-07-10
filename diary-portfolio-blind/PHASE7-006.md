@@ -171,7 +171,8 @@ is exactly the cushion the deflation consumes.
 /005 base is spent (CONFIRMATION-005), so IS-window OOS cannot re-validate L1 — validation must come
 from **genuinely unseen forward data** (e.g., paper-trading the byte-frozen L1 construction on
 post-cutoff live candles, or a fresh held-out window that never informed C1/C2/the mania rule). The
-protocol must, per the caveats: (a) treat +0.75–0.95 as the expectation band, not +1.164; (b) stress
+protocol must, per the caveats: (a) treat the deflated band as the expectation, not +1.164 (revised to
+**+0.55–0.80** post phase-sweep — see the ADDENDUM below); (b) stress
 C2 on **non-2024-11** squeezes; (c) watch the thin crash margin on any capitulation-with-bear-rally
 (the 2022-08-type C1 mis-fire); (d) keep C3/C4 OUT unless C4 is first recalibrated on braked-path
 feedback. **This is named as the follow-on only — it is NOT designed or run in this phase.** No OOS was
@@ -185,3 +186,29 @@ validated — but the result is an **IS design-validation, not a deployable book
 deflates to a ~+0.75–0.95 honest forward expectation, G-mania is mechanism-efficacy (not regime alpha),
 the crash margin is thin, and C2 is the fragile, 2024-11-concentrated contribution that a mandatory
 forward-validation must stress before any deployment.
+
+---
+
+## ADDENDUM — rebal-phase fragility (REVIEW-006 ADDENDUM 2; pre-T0 of the forward protocol)
+
+A committed IS-only 21-phase sweep (`paper-l1/phase_sweep_is.csv`) found that the weekly `rebal=21`
+construction has 21 8h phase offsets, and **all /005 and /006 evidence was generated at the single
+a-priori panel-start phase (Wed@00h), never scanned.** The finding SPLITS the verdict:
+- **DESIGN/MECHANISM axis — STRENGTHENED.** The C1+C2 overlay (L1−V0) is **positive at 21/21 phases**
+  (mean +0.614; the frozen Wed@00h phase shows the SMALLEST overlay, +0.250, so /006 *understated* the
+  control benefit); L1 Sharpe is positive at 21/21 phases (mean +0.947). This is the strongest
+  orthogonal design-validation the track has.
+- **LEVEL axis — DEMOTED.** The frozen +1.164 Sharpe / −28.6% maxDD are a **favorable, never-chosen
+  phase draw** (Sharpe rank 8/21; maxDD phase mean −37.3%, **7/21 phases breach −35%**, worst −70.4%).
+  The honest **forward Sharpe band is re-anchored off the phase-agnostic mean +0.947 → ≈ +0.55–0.80**
+  (superseding +0.75–0.95), and forward maxDD −35%…−50% is within the phase-neutral distribution even if
+  the mechanism holds.
+- **Retroactive /005 note.** A substantial fraction of /005's headline +0.913 was **phase luck** — it
+  ranks **3/21** of its own phase distribution (V0 phase mean only +0.334, maxDD mean ≈ −49%, 4/21 phases
+  negative). This is a deflation vector REVIEW-005 did not capture and a plausible IS-side mechanism for
+  the /005 forward underperformance. **Track lesson: rebal phase is a first-order robustness axis for any
+  cadence > 1 candle — sweep it before believing a headline.**
+
+Full ruling + numbers: `diary-portfolio-blind/REVIEW-006.md` (ADDENDUM 2) and `paper-l1/phase_sweep_is.csv`.
+The forward protocol (`PROTOCOL-L1-FORWARD.md`) is amended accordingly pre-T0 (anchor → Wed@00h, band →
++0.55–0.80, new M-phase gate); this is a pre-registration correction, not a clock reset.
