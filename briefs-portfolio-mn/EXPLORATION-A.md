@@ -413,3 +413,119 @@ G2-CRASH contingency (§4.5), the decision map + reveal protocol (§5), and the 
 locked as of 2026-07-10, pre-run. Any deviation is a new EXPLORATION.
 
 *— QR, MN track, 2026-07-10.*
+
+---
+
+## PRE-RUN AMENDMENT 001 — Critic pre-flight conditions C1–C6 (2026-07-10, pre-launch)
+
+Applies the six conditions of `diary-portfolio-mn/REVIEW-A-preflight.md` (verdict
+PASS-WITH-CONDITIONS). **This amendment SUPERSEDES the frozen sections above WHERE THEY CONFLICT**;
+the frozen sections are otherwise unchanged. No gate threshold, signal parameter, or decision tier
+changes (only the C4 A2-trigger disambiguation, frozen here because it was two-readable). Applied
+BEFORE any run; the QE builds against the amended contract.
+
+### C1 — 2×-cost twin is GROUND-TRUTH re-runs (supersedes §1.6, §7 "2×-cost twin (analytic…)")
+**Owned error:** §1.6/§7 asserted the analytic twin is exact "per the /007 identity" — /007 is the
+document that DISPROVED that identity (fixed-share drift divides by cost-bearing equity, so the
+identity is exact ONLY at rebal candles; ~7e-5 elementwise drift was measured). The frozen ≤1e-12
+assert was guaranteed-false.
+**Amendment:** G-2xcost is scored on **GROUND-TRUTH re-runs** — every cell's 21 tranches re-run
+through the UNCHANGED engine at `CostModel(10.0, 5.0, funding_enable=True)` (4 cells × 21 = **+84
+backtests**; matrix now **168 tranche runs** + N20). The analytic stream `rets_1x − turnover·cost_side`
+is **demoted to a cross-check only**: report its max elementwise drift vs the re-run (sanity
+**≤1e-3**), **never assert 1e-12**. The 2× ensemble is the equal-weight mean of the 21 re-run 2×
+tranche streams on the common slice.
+
+### C2 — sanctioned `weight_cap` engine extension + frozen infeasibility rule (supersedes §1.3 impl)
+The per-name cap is NOT reachable through the fully-unchanged engine (no hook between the weighting
+builder and the hedge overlay), and it genuinely binds (post-floor membership ≤18 ⇒ rank-neutral max
+weight >10%). **Sanctioned:** an opt-in `weight_cap: float | None = None` extension to
+`blind_engine` — inert default (`None`) is **byte-identical** to the current engine for every
+weighting mode (required test); when set, after `target_weights` and BEFORE the hedge overlay, clip
+`|w_i| ≤ weight_cap·gross` and redistribute the excess **iteratively, pro-rata, within the SAME leg
+to a fixed point** (clip → redistribute → re-clip until no name exceeds the cap or the leg is
+uniform), preserving `Σw=0` and `Σ|w|=gross`. QE tests: (a) inert-default byte-identity on one Cell-3
+tranche; (b) semantics — a hand-constructed row with one over-cap name reaches the fixed point with
+`Σw=0`, `Σ|w|=gross`, `max|w|≤cap+1e-12`; (c) leg-preservation — no long weight leaks to the short
+leg or vice-versa.
+
+**FROZEN INFEASIBILITY / MIN-MEMBERS RULE (frozen text, adopted from the Critic's suggestion):**
+> At a rebal, let `m` = the number of universe members (post-liquidity-floor) with a finite signal.
+> If `m < N/2` (N the cell's top-N: 20 at N=40, 10 at N=20), the rebal is INFEASIBLE: **skip it —
+> hold the previous candle's weights unchanged (no new target, no forced flatten)** — and increment
+> `n_infeasible_rebal`. The count and the fraction of rebals skipped are REPORTED per cell. A cell
+> whose `n_infeasible_rebal` exceeds 10% of its rebals is flagged in the report (does not auto-fail;
+> informs G-sample and the QR's read). This rule is identical across all cells and both N.
+
+### C3 — ensemble warmup = 273 tranche-local (supersedes §1.4, §7 "warmup = the beta warmup…")
+The residualized-ETH beta (`rolling_residual_beta`, ~2×min_periods) is first all-finite at
+tranche-local index **269**; betas are consumed at `[k−1]`, so the first **fully-hedged** rebal is
+`k = 273` (13×21). Using /007's warmup=63 would put ~200 effectively-unhedged candles per tranche
+inside the G1/G2 windows — invalidating the neutrality gates.
+**Amendment:** ensemble warmup = **273 tranche-local, derived PROGRAMMATICALLY** (the first `k` with
+`k % 21 == 0` AND `k−1 ≥` the first all-finite row of `beta_eth_resid` on the untrimmed IS panel) and
+**asserted `== 273`**; the common-metric-mask first-True index on the original grid is **asserted
+`== 293`**. The **IDENTICAL mask is used for all 4 cells** (so cells are apples-to-apples). The
+trim-invariance assert (§1.5) is **scoped to the common slice only** (betas need only match on
+`[293, T)`, not on the front-trimmed warmup). **Ensemble turnover is computed from the per-tranche
+`turnover` series** (mapped + averaged), not from an aggregate re-derivation.
+**Disclosure (charter §5.4 spirit):** the metric window begins at original index 293 (≈ early-April
+2020), so the **March-2020 COVID crash falls OUTSIDE the metric window** — as it largely did in
+DIAG-A too (capture effective-start 2020-05-17). The CRASH bucket therefore draws on 2021→2025
+crash regimes (LUNA, FTX, the 2025 crash-heavy window); DIAG-A's CRASH n=658 was already
+COVID-light, so the C5 n≥30 floor is not threatened. This is disclosed, not fixed.
+
+### C4 — ONE frozen A2 joint-failure trigger (supersedes §4.5 item 2's "otherwise intact")
+The §4.5 "mechanism otherwise intact" phrasing was two-readable on joint failures. Frozen to exactly
+one rule (adopted from the Critic's suggestion):
+
+**FROZEN A2-TRIGGER RULE (frozen text):**
+> EXPLORATION-A2 (the ONE bounded hedge retry) is triggered **iff ALL of:**
+> (i) **G2-CRASH FAILS** (crash `|β_BTC| > 0.15`); AND
+> (ii) **{G1a, G1b, G2-MANIA, G3} ALL PASS** (every other neutrality gate holds); AND
+> (iii) **{G-sharpe-floor, G-durable, G-2xcost} ALL PASS** (the mechanism is real and durable).
+> A **concurrent G4 failure is permitted ONLY when the worst bucket is CRASH** (i.e., G4 fails
+> because the crash bucket — the very bucket A2 targets — loses; consistent with an unhedged crash
+> beta). **Any broader failure set** (G1a/G1b/G2-MANIA/G3 fails, or a mechanism gate fails, or G4
+> fails on a NON-crash worst bucket) ⇒ **plain FAIL, NO A2.** A2 changes ONLY the risk-primitive
+> (crash-conditional / downside beta); signal, universe, cap, floor, cadence stay byte-frozen; +1
+> family-A n_eff. If A2 also fails G2-CRASH ⇒ family shelved, holdout NOT spent (§4.5 item 3).
+
+### C5 — pinned neutrality-measurement mechanics (supersedes the §4 measurement wording)
+All HARD neutrality gates use these pinned mechanics (frozen):
+- **Regressor = BTC/ETH HOLD returns** — `open[t+1]/open[t] − 1` on the same grid, matching the
+  engine's realized book hold-returns AND the engine's internal `eth_hold` (NOT close-to-close;
+  this differs from DIAG-A's committed close-to-close probe convention, and that difference is
+  intentional — the EXPLORATION regresses the engine's actual return stream).
+- **Rolling betas (G1a/G1b) `min_periods = 135`** on the 270-candle window.
+- **Bucket labels (G2/G4) = `mn_regime_labels(pis)[t]` at the RETURN candle t** (trailing,
+  live-computable; supersedes the "decision-candle label" note in §4/§5 for the EXPLORATION gates —
+  DIAG-A's committed convention is unchanged).
+- **Sample guard:** any G2 or G4 bucket with **< 30 common-slice candles → loud `N/A-FAIL`** of that
+  gate line (never a silent pass on a thin bucket).
+- **Liquidity-floor array pin:** the floor is applied to the SAME `270-candle-history-masked trailing
+  $-vol mean (lookback=30, min_periods=10)` array the universe ranks on (i.e., `build_universe`'s own
+  trailing-$-vol) — **no backfill of rank-41+ names** into the floor test; a name below the top-N
+  rank is never resurrected by the floor.
+
+### C6 — funding-only income sign + cost treatment (supersedes §2/§4 G-durable wording)
+Engine `funding_rets` sign is **+ = drag**, so the funding INCOME stream is **`−funding_rets`**.
+- **G-durable is evaluated on the frozen UNCOSTED income stream** `−funding_rets` (Sharpe ≥ +0.25
+  AND ≥5/6 IS years > 0) — the durability of the carry itself.
+- **ALSO report, as an honesty line, the COSTED funding-only Sharpe** `mean(−funding_rets −
+  turnover·cost_side) / std(...) · √PPY` — funding income net of the turnover cost required to hold
+  the positions (does not gate; informs the QR's read of whether the carry survives its own cost).
+
+### Optional (adopted) — G3-margin prediction band
+Added to §3: **G3 max |Σw|/gross point 0.05, band [0.02, 0.12]** (post-hedge net exposure sits just
+above zero — the residual of an imperfect but small book beta; straddles well inside the 0.10 bound).
+
+### Ledger + footprint updates
+- Compute footprint (§2): **168 tranche backtests** (84 at 1× + 84 ground-truth 2× per C1) + N20
+  cell, all IS-only; no long-run flag.
+- n_eff (§6) unchanged (the 2× re-runs are the SAME constructions at a different cost model — not new
+  cells). **On the record (Critic check 9):** promoting the N=20 robustness column to PRIMARY would
+  be a selection event requiring re-ledgering — N=20 stays a robustness read, not promotable without
+  a new EXPLORATION.
+
+**AMENDED-FROZEN 2026-07-10, pre-launch.** — QR, MN track.
