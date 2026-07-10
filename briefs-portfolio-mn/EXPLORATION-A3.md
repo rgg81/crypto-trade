@@ -315,3 +315,86 @@ release — §1.1/§1.2), the variant (§2, one run, no ablation), predictions +
 locked as of 2026-07-10, pre-run. **Shelve-on-fail; no A4.** Any deviation is a process violation.
 
 *— QR, MN track, 2026-07-10.*
+
+---
+
+## PRE-RUN AMENDMENT 001 — Critic pre-flight conditions C1–C4 (2026-07-10, pre-launch)
+
+Applies the four additive pins of `diary-portfolio-mn/REVIEW-A3-preflight.md` (verdict
+PASS-WITH-CONDITIONS; none re-opens the frozen construction, gates, predictions, or decision map).
+**This amendment SUPERSEDES the frozen sections above WHERE THEY CONFLICT**; frozen sections are
+otherwise untouched. Applied BEFORE any run; the QE builds against the amended contract.
+
+### C1 — per-parameter provenance disclosure (supplements §1.1/§1.2)
+
+Each throttle parameter's anchor, on the record, with an honest weakest-link flag:
+
+| Param | Value | Provenance (pre-established anchor) |
+|---|---|---|
+| `h` (trailing-return window) | 9 candles (3d) | DIAG-A `Z_MEAN_WINDOW = 9` — the funding-sort signal's own 3-day timescale; the squeeze detector reads the same horizon the book trades on. |
+| `W` (z-score window) | 90 candles (30d) | `mn_regimes.MN_REGIME_WINDOW = 90` — the track's frozen regime-classification horizon; SCUD-z is standardized on the same 30d window the CRASH/MANIA rules use. |
+| `q_short` (short cohort fraction) | 0.33 | **Weakest-anchored, disclosed:** a structural "short third" motivated by the rank book's short-side geometry (the squeeze-exposed leg), NOT a tuned value and NOT chosen from any return/DD outcome. Bottom-third is the round structural cohort; no scan over q_short. |
+| `φ` (floor scalar) | 0.50 | Halve-gross principle — a meaningful de-risk that keeps the carry engine ON (φ=0 flatten would surrender the funding harvest the book exists to collect). Round, non-fitted. |
+| `m_min` (min cohort members) | 5 | Percentile-stability floor — a 75th-percentile statistic on <5 members is unstable; 5 is the minimum for a meaningful upper-tail. |
+
+**Affirmation (binding):** the four revealed A2 drawdown EPISODES were used ONLY to locate their
+calendar DATES for the §7 alignment forensic. **Episode SHAPES (depths, paths, which names, intra-
+episode timing) were NEVER inspected to select ANY throttle parameter.** No parameter above was
+scored against a return or drawdown outcome; τ/φ are coverage/principle anchors, h/W are pre-
+established track constants, q_short/m_min are structural. RISK-006 (no-Sharpe-scan) holds.
+
+### C2 — m<5 forward-fill target pinned (supersedes §1.1 step 1 "forward-fill")
+
+When the short cohort has `< m_min = 5` members at candle t, SCUD-z's forward-fill holds **the final
+computed SCALAR** (the throttle multiplier at its last computed value), backward-looking — NOT the
+raw SCUD-z, and never any forward value. Rationale: pinning the scalar (the consumed quantity) is
+reproducibility-exact and past-only under any reading; over the pre-live warmup where the cohort is
+never ≥5 the scalar is its initialized 1.0 (book flat). No scored-window effect (live rebals always
+have ≥5 short-cohort members).
+
+### C3 — MARGINAL disposition pinned (supersedes §3.1 MARGINAL + §5 SUCCESS row)
+
+**FROZEN MARGINAL disposition (frozen text):**
+> If **maxDD ∈ (−25%, −22%] AND net Sharpe ≥ +1.30**: the frozen G-maxdd gate PASSES, so **TIER =
+> SUCCESS** per the §5 map, and family A becomes **THE reveal CANDIDATE** — NOT auto-reveal, NOT
+> shelve. It is presented to the USER **WITH an explicit <3pp-fragility warning** (the drawdown
+> cleared the −25% floor by less than 3pp, so the pass is fragile to the window choice, inheriting
+> Cell-1's 0.32pp-fragility lesson) **AND the QR note that a fragile re-pass is a WEAK basis for
+> spending the one-per-family-FOREVER holdout reveal.** The holdout-reveal decision remains the
+> USER's alone; the QR's standing recommendation on a MARGINAL result is caution, not enthusiasm.
+
+This pins the pre-run stance so the disposition is not tailored to the observed number: a marginal
+gate-pass is a SUCCESS tier and a reveal candidate, but a QR-flagged WEAK one — never silently
+promoted, never silently shelved.
+
+### C4 — episode-alignment forensic pinned (supersedes §7 "EPISODE ALIGNMENT")
+
+**(a) FROZEN per-episode window (frozen text):**
+> The alignment window for each of the four episodes is the **calendar month of that episode's
+> worst-10 trough: 2023-12, 2020-11, 2025-06, 2025-09.** The throttle **"FIRED"** in an episode iff
+> **scalar < 1.0 on ≥1 rebal-consumed candle within that calendar month** (a rebal-consumed candle =
+> one where the engine reads `gross_scalar_series[k−1]` at a rebal step k whose decision candle
+> k−1 falls in the month). Binary per episode; no flexing of the window.
+
+**(b) FROZEN per-episode TIMING annotation (frozen text):**
+> For each episode, annotate the throttle's timing as **LEAD / COINCIDENT / LAG** relative to the
+> episode's peak→trough span, where the span is defined on the A2-1 (revealed) equity path: `peak` =
+> the equity high of the calendar month (or the last high in the prior month if the descent began
+> there), `trough` = the equity low within the calendar month, and `t_first_fire` = the first
+> rebal-consumed candle in the window with scalar < 1.0. Then:
+> - **LEAD** = `t_first_fire` is at or before the **midpoint candle of the peak→trough span**
+>   (the throttle engaged during the FIRST half of the descent — the maxDD-reducing early fire);
+> - **COINCIDENT** = `t_first_fire` is after the midpoint but at or before the trough candle
+>   (engaged during the second half of the descent — partial benefit);
+> - **LAG** = `t_first_fire` is after the trough candle, or the throttle never fired in the window
+>   (too late / missed — no maxDD benefit, "fired at the trough, too late").
+>
+> Report per episode: FIRED (y/n), timing bin (LEAD/COINCIDENT/LAG), `t_first_fire` date, the
+> peak/trough/midpoint dates, and the mean scalar over the peak→trough span. **A2's revealed equity
+> path is used ONLY to locate peak/trough/midpoint for this timing annotation (episode dates were
+> already revealed); it is NEVER used to select any throttle parameter (C1 affirmation).** The
+> mechanism-diagnostic reading: a throttle that scores FIRED but LAG on the episodes is "aligned but
+> useless for maxDD" and, combined with a −25%-ish maxDD, is the FALSIFIER signature — distinguished
+> here from the LEAD firing that actually clips the tail.
+
+**AMENDED-FROZEN 2026-07-10, pre-launch.** — QR, MN track.
