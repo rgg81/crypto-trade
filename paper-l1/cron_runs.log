@@ -141,3 +141,40 @@ fatal: Unable to process path paper-l1/decisions.csv
 [done] 2026-07-10T08:03:54Z protocol=ENSEMBLE-L1-v2 extent=2026-07-09T16:00:00Z panel=7146x747 anchor=Wed@00h T0=2026-07-15T00:00:00Z parity_ens_sharpe=+1.2826 parity_l1_sharpe=+1.1638 parity_hash=fecb27eb417eb939 append_invariance=OK appended(eq=0,dec=0,phase_fwd=0) DEGRADED=1 data=(klines_ok=True funding_ok=True; DEGRADED: 40 of BTC+top40-live stale vs expected latest 2026-07-10T00:00:00Z; e.g. ['BTCUSDT', 'ETHUSDT', 'BTCUSDC', 'SOLUSDT', 'ETHUSDC', 'LABUSDT']) wall=600.2s
 ==============================================================================
 runner exit code: 0
+logs committed: a6a375342ef2f6504924c1fca5c9515e7e6fc8c0
+==== end 2026-07-10T08:03:54Z ====
+==== run_weekly 2026-07-10T08:05:57Z ====
+##############################################################################
+# blind_paper_l1 — ENSEMBLE-L1-v2 (ENSEMBLE-L1) forward-validation PAPER runner
+# run 2026-07-10T08:05:58Z   PAPER-ONLY (no exchange orders)   dir /home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/paper-l1
+##############################################################################
+[data] fetching 8h klines for 695 ACTIVE perps (exchange-info; PENDING_TRADING excluded; per-symbol tolerant) ...
+[data] fetching funding rates for 791 panel symbols ...
+[data] klines_ok=True funding_ok=True
+[data] complete: BTC+top40-live current to 2026-07-10T00:00:00Z
+[panel] full 7147 candles, 747 coins, 2020-01-01 .. 2026-07-10
+==============================================================================
+[PARITY] ENSEMBLE-L1 dual guard — IS slice (common [83:]) — IS-ONLY
+==============================================================================
+  IS window 2020-01-01 .. 2025-03-23  (5727 candles, 747 coins, < OOS_CUTOFF 2025-03-24)
+    common firstTrue +83.0000   target +83.0000 +/-0.0   -> PASS
+    ENSEMBLE Sharpe  +1.2826   target +1.2826 +/-0.005   -> PASS
+    ENSEMBLE maxDD   -0.1859   target -0.1859 +/-0.01   -> PASS
+    ENSEMBLE turn/yr +50.3428   target +50.3000 +/-2.0   -> PASS
+    tranche0 L1 Sh   +1.1638   target +1.1638 +/-0.005   -> PASS
+    tranche0 V0 Sh   +0.9134   target +0.9134 +/-0.005   -> PASS
+    21-row sweep repro  max err 1.28e-15  (<=1e-6) -> PASS
+    per-tranche leg recon max 2.78e-17  (<=1e-12) -> PASS
+  -> PARITY OK: ENSEMBLE-L1 +1.2826 AND tranche-0 +1.1638 reproduced.
+[phase] anchor=Wed@00h | rebals=340 | last pre-T0 2026-07-08T00:00:00Z | first post-T0 2026-07-15T00:00:00Z [projected(T0)]
+==============================================================================
+[REPORT] FORWARD (post-T0) ENSEMBLE-L1 READOUT — paper trade; NO verdicts
+==============================================================================
+  T0 = 2026-07-15T00:00:00Z (Wednesday)   data latest candle open = 2026-07-10T00:00:00Z
+  phase: last pre-T0 rebal 2026-07-08T00:00:00Z | first post-T0 rebal 2026-07-15T00:00:00Z [projected(T0)]
+  candles elapsed post-T0: 0  (T0 is +4.7 days from now — awaiting first Wednesday-00:00 rebal at/after T0)
+  no forward metric to report; burned window [OOS_CUTOFF, T0) is sealed.
+==============================================================================
+[done] 2026-07-10T08:15:58Z protocol=ENSEMBLE-L1-v2 extent=2026-07-10T00:00:00Z panel=7147x747 anchor=Wed@00h T0=2026-07-15T00:00:00Z parity_ens_sharpe=+1.2826 parity_l1_sharpe=+1.1638 parity_hash=fecb27eb417eb939 append_invariance=OK appended(eq=0,dec=0,phase_fwd=0) DEGRADED=0 data=(klines_ok=True funding_ok=True; complete: BTC+top40-live current to 2026-07-10T00:00:00Z) wall=600.6s
+==============================================================================
+runner exit code: 0

@@ -1,11 +1,13 @@
 {
-  "written_utc": "2026-07-10T08:02:22Z",
-  "note": "T0-init pinned hashes",
+  "written_utc": "2026-07-10T08:14:23Z",
+  "note": "protocol-v2 retarget pre-T0 (ENSEMBLE-L1)",
+  "protocol": "ENSEMBLE-L1-v2",
+  "T0": "2026-07-15T00:00:00Z",
   "sha256": {
     "blind_engine.py": "8e63aeef01a79b390d89d5cbf438543a70b41791c1c39cb68a9a8d8c1ba17953",
     "blind_risk_calib_006.py": "27f9250fb4f1bf213aa27224378912b4c522824fc06287791cf971db27efbc05",
     "blind_mania_rule.py": "590dab217f0d6c4a4b2ebb02f0b84a811ba078f90be437120fcaa18d9e73511b",
-    "blind_paper_l1.py": "069f45c0fde585c3f713a09aaaad74e4d3ec74c95178f62ea3f9c019926c2139",
+    "blind_paper_l1.py": "dc053737862f1693819d38f54d56e847aba92dbbb87ef4fd34d27afc7056a633",
     "blind_exploration_007.py": "3075152948f3b46bb6d9edcc27f94b1ddb506d65a522142aa0d156de91e2d60e",
     "blind_universe.py": "7cf8a4401fcaee80a41cb9b9ae8ee1f8e93fcb68604850e79ee69630dbd1f335",
     "blind_funding.py": "859cac8b526ff5404675415615c49c9c2fd66bb90283e2534c77b685f731a0d5",
