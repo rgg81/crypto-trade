@@ -764,3 +764,186 @@ the same rigor as survivals.
 *— QR, MN3 track, 2026-07-11. This document is the pre-registration record; amendments only
 via dated PLAN-AMENDMENT sections, never in-place edits. Nothing has been run; no code exists;
 the holdout has never been touched.*
+
+---
+
+# PLAN-AMENDMENT-001 — the ONE crisis-machine re-registration (2026-07-11)
+
+**Trigger:** `CRISIS-FALSIFY-001.md` (commit 9672d8ff) — the frozen §2 machine FAILED IS
+falsification: primary episodes 3/4 (COVID unscoreable), secondary 3/3 PASS, calm budgets 0/4
+(STRESS+CRISIS occupancy 85.25% vs ≤15%). Read in full.
+
+**Scope & authority:** this is the SINGLE anchor-family-constrained re-registration §2.4 permits,
+authored BEFORE any book-level backtest consumes the machine, honoring my own frozen constraints:
+changes stay within the pre-registered anchor families (normal-coverage-z / round-number-abs on
+bounded quantities / fat-tail magnitude), the same five indicator concepts, and the same
+three-state fast-in/slow-out grammar. It supersedes ONLY the named items in §2.1–§2.2; everything
+else in §2 (blue-chip core §2.3, FLAT fallback + carve-out §2.3, the falsification protocol
+targets §2.4, leak-safety §2.5) stands unchanged. **The four calm budgets and the episode pass
+bars in §2.4 are NOT touched — they are the falsifier (see §D below).**
+
+**This is the last re-registration.** If the machine below FAILS falsification, the crisis-machine
+spec is FROZEN AS FAILED and the track proceeds with GAP-only (the sole component that passed) or
+I escalate to the user. There is no second amendment.
+
+**Root-cause summary (from CRISIS-FALSIFY-001 §2–§3, adopted):** two independent defects.
+(1) COVID: at T0 only 24 perps existed, none with ≥270c history, so the four cross-sectional
+indicators were in warmup; GAP was DEFINED and voted crisis-grade at T0 but §2.2 rule-4 global
+warmup forced NORMAL and suppressed it. Not reachable by any threshold — a semantics defect.
+(2) Calm blowout: robust-z with standard-normal anchors on regime-PERSISTENT series (median-RV,
+mean-|funding|) and abs-level on chronically-high crypto correlation / bear-market breadth measure
+regime MEMBERSHIP, not event ARRIVAL — each fires 8–9% of candles; a lone crisis vote trips STRESS
+and the 21c-clean de-escalation multiplies every hit into ≥7 days. GAP alone was well-behaved
+(1.9%/0.7%, near its anchors) — the only event-arrival construction in the suite.
+
+## A. Warmup semantics + scoring-ambiguity resolution (fixes COVID; adopts guidance (a))
+
+**A1 — per-indicator abstention replaces global-warmup NORMAL forcing.** §2.2 rule 4 is superseded:
+an indicator in warmup/undefined at t ABSTAINS — it contributes NO vote and is excluded from the
+confluence counts (it is NOT counted as a calm 0-vote). The state is decided from the DEFINED
+indicators' votes via the §C grammar. Because GAP defines from ~candle 30 (BTC exists at candle 0;
+GAP needs only its EWMA-σ warmup) and GAP-at-crisis-grade is a single-sufficient CRISIS-trigger,
+the machine can reach CRISIS on GAP alone before any cross-sectional indicator warms — exactly the
+COVID case. A candle where ALL indicators abstain (the first ~30 candles of 2020-01, or a full data
+outage) HOLDS state (DEGRADED, initialized NORMAL) — never a forced NORMAL, never a silent
+de-escalation on missing data (the §2.5 DEGRADED-hold rule, now the ONLY warmup rule).
+
+**A2 — the §2.2/§2.4 ambiguity is resolved explicitly (adopting the QE's suggested reading).**
+An episode is SCOREABLE iff ≥1 indicator is defined within its pass window. Under A1 every primary
+is now scoreable (COVID on GAP). The pass bar is therefore the STRICT, unchanged **4/4 primary at
+CRISIS with 0 LAG** — I am not lowering the bar to a lenient 3/3; I am fixing the machine so COVID
+is genuinely scoreable and must pass on its own merits. Secondary bar unchanged: **3/3 at ≥STRESS**.
+"WARMUP excluded from scoring" (old §2.2) is retired; abstention (A1) is the sole mechanism.
+
+## B. Indicator transforms — LEVEL → EVENT-ARRIVAL (adopts guidance (b))
+
+The four regime-persistent indicators are converted from level reads to onset reads of the SAME
+underlying quantity, keeping each within a pre-registered anchor family. GAP (the one that worked)
+keeps its construction; only its crisis floor is nudged for entry-budget margin. All past-only;
+consumed at [k−1]; robust-z convention unchanged (median/MAD, trailing 270c, min_periods 135,
+clip ±8); indicator universe unchanged (PIT top-40; CORR on PIT top-20; ≥15-member floor).
+
+**B1 — XVOL: cross-sectional realized-vol ONSET (was: median-RV level-z).**
+RV_i,short = std of 8h log returns over trailing 9c (min 6 finite); RV_i,long = over trailing 90c
+(min 45). V_short = cross-sectional MEDIAN of RV_i,short; V_long = MEDIAN of RV_i,long.
+R_XVOL = ln(V_short / V_long) (guard V_long>0). **z_XVOL = robust z of R_XVOL.** Votes: stress z≥2.0,
+crisis z≥3.0 (normal-coverage family, unchanged anchors). Property: after a vol jump, V_long catches
+up within ~90c so the ratio decays toward 0 — the indicator fires on ACCELERATION, and a multi-month
+high-vol regime no longer pins it (the §3.1 pathology).
+
+**B2 — FUND: aggregate |funding| ONSET (was: mean-|funding| level-z).**
+fund_short_i = 9c mean |funding_i|; fund_long_i = 90c mean |funding_i|. F_short = EW cross-sectional
+mean of fund_short_i; F_long = EW mean of fund_long_i. R_FUND = ln(F_short / F_long) (guard F_long>0).
+**z_FUND = robust z of R_FUND.** Votes: stress z≥2.0, crisis z≥3.0. Fires when funding suddenly
+dislocates in EITHER direction (a mania leverage-ramp OR a crash funding-plunge both spike |funding|
+short-term); a slow leverage grind (F_long tracks F_short) no longer chronically fires. Clamp
+limitation (§2.1) still disclosed — confirming indicator, never sole trigger.
+
+**B3 — CORR: median-pairwise-correlation ONSET (was: abs level 0.75/0.85).**
+ρ̄[t] unchanged (median pairwise Pearson of 8h returns, trailing 90c, PIT top-20, 190 pairs).
+**z_CORR = robust z of ρ̄** over trailing 270c. Votes: stress z≥2.0, crisis z≥3.0 (moves CORR into
+the normal-coverage-z family already used by XVOL/FUND — a pre-registered family in the suite, and
+exactly the LEVEL→onset conversion guidance (b) names). Rationale: crypto majors are CHRONICALLY
+correlated (median pairwise 0.6–0.8 in calm), so the abs 0.75 anchor was a normal-market level
+(9.5% chronic stress, 0% crisis — useless as a crisis signal). The systemic event is correlation
+SPIKING ABOVE its already-high baseline; z detects that. My original "z goes numb in an extended
+systemic regime" objection is retired: the §C slow de-escalation HOLDS the state up after CORR's
+onset spike fades, so CORR is now a confluence CONFIRMER, not a persistence-carrier.
+
+**B4 — BREADTH: coincident-sharp-decline (was: fraction down over 3d, abs 0.85/0.95).**
+Per name, standardize the CURRENT 8h return by the name's own trailing-90c return σ (past-only,
+min 45 finite): s_i[t] = r_i[t] / σ_i[t]. breadth_tail[t] = fraction of universe members (finite
+s_i) with s_i ≤ −2.0. Votes: **stress ≥ 0.40, crisis ≥ 0.60** (round-number-fraction family on a
+[0,1]-bounded quantity — same family, new anchors). Fires when a large fraction of the universe
+SIMULTANEOUSLY prints a ≥2σ-down 8h candle = a synchronized liquidation event; a slow bear grind
+(individual 8h moves within normal σ) no longer chronically fires (the §3.1 pathology). The per-name
+σ denominator self-normalizes across regimes (a −2σ move requires a bigger absolute move in
+sustained high vol).
+
+**B5 — GAP: unchanged construction; crisis floor raised for entry-budget margin.**
+σ[t] = EWMA std of BTC 8h log returns (HL 30c, through t−1); g[t] = |r_BTC[t]| / σ[t].
+Stress-grade UNCHANGED: g ≥ 3 OR |r_BTC| ≥ 7%. **Crisis-grade RAISED: g ≥ 5 OR |r_BTC| ≥ 12%**
+(was g≥4 OR 10%) — within the fat-tail "impossible-under-calm magnitude" family. Rationale: GAP is
+the single-sufficient CRISIS-trigger (COVID's fast path) and the direct driver of distinct-CRISIS
+entries; tightening its crisis floor to the most extreme moves buys margin under the ≤10-entry
+budget (§D) while every IS primary still clears it (COVID −27%/8h; May-2021/LUNA/FTX all had ≥12%
+8h candles), and the ≥2-crisis-confluence path (§C) is the redundant safety net for any primary
+whose peak candle were sub-12%.
+
+## C. State grammar — kill the multiplication (adopts guidance (c); keeps fast-in/slow-out)
+
+Votes are ordinal per DEFINED indicator (crisis-grade v=2 implies ≥ stress-grade); abstaining
+indicators are excluded from all counts (A1).
+
+- **CRISIS-trigger:** (≥2 defined indicators at crisis-grade) OR (GAP at crisis-grade). *[unchanged;
+  GAP fast path preserved — COVID-critical]*
+- **STRESS-trigger:** (≥2 defined indicators at ≥ stress-grade) OR (≥1 defined indicator at
+  crisis-grade). *[the ≥2-CONFLUENCE clause is the change: a lone stress-grade vote no longer
+  triggers anything. A lone CRISIS-grade vote still triggers STRESS — justified because the B1–B4
+  onset transforms collapse per-indicator crisis-vote occupancy from 8–9% to ~1%, so this path is
+  no longer chronic; the §3.1 "single crisis vote is a STRESS-trigger" pathology was a symptom of
+  the LEVEL construction, now fixed at the source.]*
+- **Escalation:** immediate, may jump states (NORMAL→CRISIS direct), decided at close[t], consumed
+  at the open[t+1] fill ([k−1] convention). *[unchanged]*
+- **Dwell:** CRISIS ≥ 9c (3d), STRESS ≥ 6c (2d). *[unchanged — CRISIS is now rare, its dwell costs
+  negligible occupancy, and 3-day-flat in a genuine "model is lost" event is prudent]*
+- **De-escalation:** CRISIS→STRESS after 9c with no CRISIS-trigger (unchanged); **STRESS→NORMAL
+  after 12c (4d) with no STRESS- and no CRISIS-trigger** *[REDUCED from 21c/7d — the §3.3-identified
+  primary occupancy multiplier]*. Fast-in/slow-out is preserved: same-candle escalation vs up-to-6-day
+  full exit (9c crisis tail + 12c stress tail), still ≥12× slower out than in; median cascade 2–6h
+  with aftershocks over days is amply covered by a 4-day stress tail.
+
+## D. Budgets FROZEN — the falsifier is untouched (guidance (d))
+
+The four §2.4 calm budgets — CRISIS ≤ 4%, STRESS+CRISIS ≤ 15%, distinct CRISIS entries ≤ 10,
+off-episode CRISIS ≤ 1.5% — and the episode pass bars (4/4 primary CRISIS 0-LAG, 3/3 secondary
+≥STRESS, per-episode windows [T0−5d, T0+1d], T0 dates unchanged) are **unchanged**. Moving them
+would be tuning-to-pass and would void the entire point of the exercise: the budget is the OTHER
+jaw of the vise that the episode test cannot supply. The re-registration changes only the
+indicator constructions and the state grammar — the pass/fail bars stay exactly where they were
+frozen before any number existed.
+
+## E. Pre-registered expectations for CRISIS-FALSIFY-002 (predictions, honest ranges, residual risks)
+
+Committed BEFORE the re-run. I cannot run this; these are falsifiable predictions, not results.
+
+**Episodes (expect strict 4/4 primary + 3/3 secondary):**
+- COVID: GAP defined by ~candle 30; COVID's ≫12% 8h candles → GAP crisis-grade → NORMAL→CRISIS at
+  or before T0. Expect PASS (LEAD/COINCIDENT). This is the whole COVID fix.
+- May-2021 / LUNA / FTX: genuine sharp onsets; expect onset transforms (B1–B4) to fire crisis-grade
+  in confluence AND GAP crisis-grade — timing 0-LAG PRESERVED. FTX's textbook 4-indicator confluence
+  should survive (onset forms fire harder at true onsets than level forms).
+- Secondaries: expect ≥STRESS via ≥2-confluence. Possible timing shift: Celsius's prior 5-day LEAD
+  came from a lone CORR=1 vote (now insufficient under §C ≥2-confluence) — expect it to re-hit
+  COINCIDENT on genuine mid-June confluence, still PASS. 2021-12-04 (GAP+coincident-BREADTH) and
+  2023-08-17 (GAP stress + BREADTH) expected PASS.
+
+**Per-indicator vote occupancy (the load-bearing fix):** expect crisis-grade occupancy to fall from
+8–9% (XVOL/FUND) and 8.6% (BREADTH) to ≈ 0.5–2% each under the onset/coincident transforms; CORR
+crisis-grade to rise from 0% to a small non-zero (~0.5–1.5%) and its chronic stress to fall from
+9.5% to ≈ 2–4%; GAP essentially unchanged (crisis-grade slightly lower under the 5σ/12% floor).
+
+**Calm budgets:**
+- CRISIS occupancy: expect ≤ 4% (rare confluence + rare GAP-crisis, × 9c dwell).
+- STRESS+CRISIS occupancy: expect ≤ 15%, honest range 6–15%. **Primary residual risk** — if onset
+  transforms retain more persistence than expected or confluence co-fires broadly across minor
+  wobbles, the 12c de-escalation multiplier could still push this over 15%.
+- Distinct CRISIS entries: expect 6–9. **TIGHTEST budget / second residual risk** — genuine
+  ≥12%-BTC-8h events plus ≥2-crisis-confluence events over 4.5y could plausibly reach 10–11; the
+  5σ/12% GAP floor is the margin lever. If entries > 10, that is a FAIL.
+- Off-episode CRISIS ≤ 1.5%: expect PASS (≥12% BTC 8h moves outside the pre-registered episode
+  windows are rare).
+
+**Disclosed residual limitation (acceptable):** onset transforms could miss a hypothetical
+SLOW-BUILDING crisis with no sharp onset; no IS primary is of that type (all four are sharp onsets),
+and GAP + confluence provide redundancy, so this is an acceptable, disclosed hole rather than a
+falsification risk on the pre-registered episodes.
+
+**Terminal commitment (restated):** CRISIS-FALSIFY-002 is scored against the UNCHANGED §2.4 bars.
+If it PASSES, the machine is frozen as the shared infrastructure and the field proceeds (DIAG-J
+first, §4). If it FAILS on ANY arm, the crisis-machine spec is FROZEN AS FAILED; the track either
+runs GAP-only (the proven event-arrival component — a degraded but honest one-indicator machine) or
+I escalate the design question to the user. No third machine, no budget move, no rescue.
+
+*— QR, MN3 track, 2026-07-11. PLAN-AMENDMENT-001. This is the one permitted re-registration;
+appended, not edited; frozen before CRISIS-FALSIFY-002 runs; the holdout remains untouched.*
