@@ -1121,3 +1121,64 @@ positive control on the COMPOSED scalar (corrupt rows ≥ t ⇒ composed scalar 
 *— QR, MN3 track, 2026-07-11. PLAN-AMENDMENT-002. User-ruled (auth A ratified, auth B authorized);
 appended, not edited; all budgets derived and frozen pre-run with documented arithmetic; nothing
 run, nothing committed; the holdout remains untouched.*
+
+# PLAN-AMENDMENT-003 — DIAG-H sleeve-distinctness ratification (Critic pre-flight, 2026-07-11)
+
+Registered BEFORE DIAG-H's scored run, per §3.2's mandate. Full ruling persisted verbatim at
+`diary-portfolio-mn3/PREFLIGHT-DIAG-H.md`; the conditions below are BINDING and must be
+reproduced in the DIAG-H script header.
+
+## §A — S3 (RV9/RV90 vol term-structure): RATIFIED-WITH-CONDITIONS (4 HARD)
+
+- **S3-C1 level-control (kill-only falsification arm):** rank-regression of rank(RV9/RV90) on
+  rank(RV12 level — the closed vol_low signal verbatim: std of trailing 12 8h log returns,
+  min_periods 6); raw + level-controlled IC vs forward-21c residual total return, full IS +
+  halves (H1 2020-01→2022-03 / H2 2022-04→2024-06). PASS requires ALL of: (i) the §3.2 kill-(a)
+  raw sleeve gate unchanged; (ii) retention = mean(lc IC)/mean(raw IC) ≥ 0.50 with matching
+  sign; (iii) lc IC sign-stable across halves. Fallback if |raw IC| < 0.005: retention
+  UNDEFINED; sleeve passes only if mean per-candle |ρ(rank ratio, rank RV12)| < 0.50.
+  FAIL ⇒ S3 = vol_low-in-disguise ⇒ sleeve DROPPED pre-composite; the vol-structure axis stays
+  CLOSED forever (no re-registration / re-parameterization / spin-out).
+- **S3-C2:** direction frozen LONG low-ratio / SHORT high-ratio; measured opposite sign = FAIL,
+  never re-orientation.
+- **S3-C3:** mechanism-overlap disclosure in every family-H document (payer story overlaps
+  closed vol_low's registered rationale; distinctness rests on the OBJECT + S3-C1, not payer).
+- **S3-C4:** if S3-C1 fails, the level-domination finding carries into DIAG-G's read
+  (rvratio_xz / rv_ownpctl partially reconstruct the closed family inside G) — informational
+  duty, not a G kill.
+- Informational (non-gating): report mean cross-sectional Spearman ρ(rank ratio, rank RV12),
+  full IS + per half, vs the Critic's +0.3/+0.6 expectation.
+
+## §B — S2 (Δlog OI 90c continuation): RATIFIED-WITH-CONDITIONS
+
+- Family-distinct from closed OI-FADE (opposite trade; DIAG-C §7.2 pre-adjudicated the
+  taxonomy). The guarded side-door is closed RESID-MOM-STANDALONE:
+- **S2-C1 momentum-control (kill-only falsification arm):** rank-regression of
+  rank(z ΔlogOI 90c) on rank(trailing 90c cumulative residual return, mn_beta residuals);
+  same bar as S3-C1 (retention ≥ 0.50 sign-matched; half-stable — halves disclosed asymmetric,
+  OI coverage from ~2021-12; same |raw IC| < 0.005 fallback with |ρ| < 0.50).
+  FAIL ⇒ S2 = resid-mom-in-disguise ⇒ sleeve DROPPED; no standalone OI-continuation family
+  registrable on this evidence.
+- **S2-C2:** direction frozen LONG high-ΔOI / SHORT low; opposite measured sign = FAIL (a
+  re-orientation would literally reopen the closed fade — banned).
+- **S2 sign-provenance discount (pre-registered, binding at any family-H Stage-2 reveal):**
+  the continuation sign was selected on MN-v2 DIAG-C's window, overlapping W1+W2 = 75% of the
+  MN3 holdout. The family-H decision map MUST pre-commit: (1) per-sleeve attribution, full
+  holdout AND split at 2025-12-31; (2) dual reads — READ-1 = full composite full holdout;
+  READ-2 = composite ex-S2 over 2024-07→2025-12 (survivors re-weighted by the same a-priori
+  inverse-trailing-vol rule) chained with full composite over 2026-01→2026-06; FULL PASS needs
+  BOTH; READ-1 pass + READ-2 fail caps the verdict at PARTIAL; (3) S2's W1+W2 attribution =
+  ZERO evidential weight for the sign claim, forever; (4) the discount is structural (dual
+  read + cap), never a numeric Sharpe haircut.
+
+## §C — Ledger + carried flag
+
+- S3-C1/S2-C1 are falsification arms: kill-only, ledger-neutral (family H stays 4 registered
+  trials). Any design choice conditioned on them converts them to registered trials
+  retroactively.
+- CARRIED FLAG (not ruled): S1's W3 problem is the mirror image (W3 fully revealed for the
+  funding-carry family). The family-H decision map must treat S1/W3 symmetrically (READ-2
+  dual-read template) or it fails its reveal pre-flight.
+
+*— Orchestrator, MN3 track, 2026-07-11. Appended, not edited; Critic ruling persisted verbatim;
+nothing run against these conditions yet; the holdout remains untouched.*
