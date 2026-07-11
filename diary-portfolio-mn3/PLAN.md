@@ -1233,3 +1233,34 @@ BEFORE any candidate status.** No diagnostic edge banks unconfirmed again.
 *— Orchestrator, MN3 track, 2026-07-11 (Opus 4.8, Fable suspended, user-directed). Appended not
 edited; DIAG-I closed on evidence, no run; DIAG-K reconciled + S4-lesson-armed; nothing revealed;
 holdout sealed; MN3-I retired unused, MN3-K unspent.*
+
+# PLAN-AMENDMENT-005 — family-G revision round invoked (slow-label reformulation, 2026-07-11)
+
+User-directed 2026-07-11 ("Slow-G reformulation") after the MN3 field closed with zero
+candidates. This INVOKES the §3.1 pre-registered ONE revision round for family G ("If DIAG-G
+fails on a specific diagnosable defect, at most ONE pre-registered revision round is permitted
+(PLAN-AMENDMENT before rerun; ledger 8→16)"). Appended not edited; no token spent.
+
+- **Diagnosable defect (the §3.1 trigger):** DIAG-G kill (d) is a HORIZON-MISMATCH, not a signal
+  defect. The model forecasts a 3-candle (24h) return but the book HOLDS 21 candles (weekly), so
+  each rebal re-ranks on a fresh near-independent forecast → >full-flip weekly (156×/yr, net-2×
+  −5.3%). Specific, diagnosable, and orthogonal to the signal (which was IC +0.037, crash-robust,
+  all years/seeds positive). Qualifies for the one revision round.
+- **The revision = EXPLORATION-G** (briefs-portfolio-mn3/EXPLORATION-G.md): retrain the SAME 24
+  features + SAME config c1 (PINNED, not re-selected) + SAME 5 seeds on a horizon-matched 21-candle
+  label (purge 3→21, winsor 0.20→0.53 by √-horizon vol-scaling), continuous IC-proportional
+  weights, BTC-only projection, weekly rebal, engine-level (blind_engine) with the S4 honest-engine
+  methodology from birth. The ONE suppression constant (label horizon H=21) is anchored on the
+  horizon-matching principle (forecast horizon = holding period), NOT fitted to G's economics.
+- **Ledger: cap 8→16** (the §3.1 expansion). EXPLORATION-G opens family-G at 10 (8 DIAG-G grid + 1
+  slow-label retrain [c1 pinned, N=1; the other 7 configs reported ledger-neutral as an
+  HP-insensitivity cross-check] + 1 G-LCDD-z throttle [inherited constants]). Headroom 6. Kill-only
+  falsification arms spend 0.
+- **Governance:** EXPLORATION-G is a re-parameterization of family G → shares the MN3-G one-forever
+  holdout token (§6.1); spends NO token (Stage-1, reveal_token=None; REVEAL-LEDGER zero spends). G
+  is now the ONLY live MN3 family (I/J/K dead, H+S4 dead) — a Stage-2 pass = G standalone reveal, no
+  ensemble. This is the LAST revision round for family G; a further failure closes G.
+
+*— Orchestrator, MN3 track, 2026-07-11 (Opus 4.8, Fable suspended, user-directed). Appended not
+edited; revision round invoked on a diagnosable defect; ledger expanded per the pre-registered
+mechanism; nothing revealed; holdout sealed.*
