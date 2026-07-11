@@ -1182,3 +1182,54 @@ reproduced in the DIAG-H script header.
 
 *— Orchestrator, MN3 track, 2026-07-11. Appended, not edited; Critic ruling persisted verbatim;
 nothing run against these conditions yet; the holdout remains untouched.*
+
+# PLAN-AMENDMENT-004 — DIAG-K reconciliation + DIAG-I closure (2026-07-11)
+
+User-directed 2026-07-11 ("Run DIAG-K only") after EXPLORATION-S4 FAIL. Two rulings, appended
+not edited; both close pre-registration gaps opened by intervening findings (the crisis-machine
+death and the S4 diagnostic-artifact lesson). No token spent.
+
+## §A — DIAG-I CLOSED at the mechanism level (no run)
+Family I (funding-carry v2) is closed WITHOUT running DIAG-I. Evidence chain (4 independent
+reads, all IS-honest): DIAG-A (funding crash residual-β flagged) → CONFIRMATION-A (crash-bucket
+edge NEUTRAL-to-negative, mania-free window −0.53) → DIAG-H S1 (funding-carry sleeve gate FAIL:
+CRASH −92.9%, H2-dead −9.3%, half-unstable) — funding carry is a CHOP/MANIA harvester,
+crash-toxic, the OPPOSITE of the all-weather mandate. Compounding: family I's registered
+construction put a "crisis machine on top with blue-chip-core carve-out," and BOTH shared crisis
+floors are DEAD (CRISIS-FALSIFY-003) — the construction's own premise no longer exists. The PLAN
+itself rated DIAG-I "LOW information gain, structurally weak" (§4 order, row 5). Re-running a
+4×-confirmed-crash-toxic mechanism is not disciplined completion, it is cargo-cult. Family I is
+closed like the other mechanism-closed families (vol_low, pairs-coint, taker-standalone,
+resid-mom, OI-fade). No I token exists to spend; the MN3-I holdout budget is retired unused.
+
+## §B — DIAG-K kill (c) reconciled for the dead crisis machine
+DIAG-K (§3.5) kill (c) as frozen reads ">50% of aggregate event P&L falls inside machine-CRISIS
+candles (doctrine-incompatible: the edge lives exactly where the book must be flat)." The shared
+crisis machine is DEAD — there is no machine-CRISIS state series, and no construction is ever
+forced flat (worst-case Layer-2 throttle is φ=0.50 gross). The FRAGILITY SPIRIT of kill (c) holds
+and is preserved with a MARKET-ONLY proxy:
+- **Kill (c) [reconciled]:** K dies if >50% of aggregate event P&L falls inside **CRASH-bucket
+  candles** (the frozen `mn3_regimes` market-only rule: trailing-90c BTC ≤ −15%). An event edge
+  >50%-concentrated in acute market stress is regime-fragile and fails the all-weather mandate —
+  the same disqualification, machine-independent. Report the GAP-candle (≥4σ/10% BTC single-move)
+  concentration as a SECONDARY informational read (the one crisis primitive that scored 4/4 at
+  0-lag), non-gating.
+Kills (a), (b), (d) UNCHANGED. Sample floor ≥150 events UNCHANGED. 1h completeness gate PASSED
+(219 verified-complete symbols; DIAG-K universe restricted to that list, per the QE's
+`data/mn3_diag/mn3_1h_verified_complete.json`).
+
+## §C — S4 diagnostic-artifact lesson baked into DIAG-K (methodology, binding)
+EXPLORATION-S4 proved diagnostic residual-return scoring OVERSTATES tradable edge (close-to-close
+bid-ask bounce + un-fillable delisting names + gross 2.0 → a real +17%/yr diagnostic number
+collapsed to −2.75%/yr under honest engine execution). DIAG-K's kill (b) net-2×-cost per-event
+spread MUST be computed with the S4 corrections AT THE DIAGNOSTIC LEVEL where feasible:
+next-bar (open-to-open) fills not close-to-close; un-fillable/delisting names excluded or
+force-exited at honest fill; honest per-side 1h cost (15 bps round-trip/turnover unit). AND —
+pre-registered per the user's explicit instruction — **a DIAG-K that survives all four kills does
+NOT bank as a candidate directly; it triggers an EXPLORATION-K engine-level honest-execution
+confirmation (the S4 reality check: `blind_engine.run_backtest`, weight projection, honest fills)
+BEFORE any candidate status.** No diagnostic edge banks unconfirmed again.
+
+*— Orchestrator, MN3 track, 2026-07-11 (Opus 4.8, Fable suspended, user-directed). Appended not
+edited; DIAG-I closed on evidence, no run; DIAG-K reconciled + S4-lesson-armed; nothing revealed;
+holdout sealed; MN3-I retired unused, MN3-K unspent.*
