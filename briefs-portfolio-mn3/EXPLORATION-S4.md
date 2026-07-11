@@ -490,3 +490,63 @@ already IS-validated).
 *— Quant Researcher (Opus 4.8, Fable-limit deviation disclosed), MN3 track, 2026-07-11.
 EXPLORATION-S4 pre-registration. Everything frozen before the run; holdout sealed; `MN3-H` token
 unspent; nothing committed. Next: Critic pre-flight, then QE/QR scored run.*
+
+---
+
+# EXPLORATION-S4-AMENDMENT-001 — Critic pre-flight conditions (2026-07-11)
+
+Registered BEFORE the scored run, per the Critic PASS-WITH-CONDITIONS ruling
+(`diary-portfolio-mn3/REVIEW-S4-preflight.md`). Appended, not edited — this block
+SUPERSEDES the referenced clauses. C1+C2 are MUST (decision-map MECE); C3+C4 SHOULD
+(applied); C5+C6 recommendations (carried into the run instructions, reported not gated).
+
+## C1 (MUST) — §6 SUCCESS row exclusivity
+The §6 **SUCCESS** tier is amended to require, IN ADDITION to all 13 HARD gates + all
+controls passing: **AND the §2.2 throttle disposition ∈ {THROTTLE-HELPS, THROTTLE-NEUTRAL}
+(i.e. NOT THROTTLE-HURTS).** A THROTTLE-HURTS result caps at MARGINAL even if its throttle-off
+book passes all 13 HARD — so no result can satisfy two tiers.
+
+## C2 (MUST) — §2.2 throttle-disposition bins replaced with a MECE priority partition
+Sign convention (stated to remove ambiguity): **Δmaxdd = (un-throttled maxDD depth) −
+(throttled maxDD depth)**, i.e. Δmaxdd > 0 means the throttle made the drawdown SHALLOWER
+(helped); Δmaxdd < 0 means it made it DEEPER (hurt). **s = Sharpe(throttled) / Sharpe(un-throttled).**
+Evaluate in this exact priority order (first match wins — exhaustive, non-overlapping):
+1. **THROTTLE-HURTS** if `Δmaxdd < 0` **OR** `s < 0.90` → ship throttle-OFF; tier caps at MARGINAL;
+   next-iteration target = "a different throttle primitive for the long-thin tail."
+2. else **THROTTLE-HELPS** if `Δmaxdd ≥ +2pp` **AND** `s ≥ 0.90` → ship THROTTLED; load-bearing.
+3. else **THROTTLE-NEUTRAL** (the residual: `Δmaxdd ∈ [0, +2pp)` AND `s ≥ 0.90`) → ship THROTTLED.
+The only tier-load-bearing boundary is HURTS at s<0.90 (HELPS↔NEUTRAL both → SUCCESS). This
+closes the [0.85,0.90) dead-zone (→ HURTS, the honest call for a crash-positive book whose
+carry a throttle shaves), the s>1.10/Δmaxdd∈[0,2pp) hole (→ NEUTRAL), and the small-worsening
+overlap (any Δmaxdd<0 → HURTS by priority-1).
+
+## C3 (SHOULD, applied) — G-sample "≥12 names/rebal" re-anchored
+The G-sample sub-clause "≥12 names/rebal mean" is REPLACED by the structural quintile minimum:
+**≥8 names/rebal mean** = 2·⌊MIN_MEMBERS/5⌋ = 2·⌊20/5⌋ at the frozen quintile geometry. This
+is the sample floor implied by the construction's own MIN_MEMBERS=20 admission rule, not a
+value read off DIAG-H's realized ~14 breadth.
+
+## C4 (SHOULD, applied) — §5.2 placebo null made two-sided
+The shuffled-signal placebo FALSIFIER is now TWO-SIDED: the placebo PASSES iff its Sharpe 95%
+CI (over the ≥20 pre-registered shuffle seeds) INCLUDES 0, and FAILS on a Sharpe reliably ≠ 0
+in EITHER sign (a reliably-negative placebo signals a directional projection/cost plumbing
+asymmetry, not just a positive one). No new compute — reuses the existing ≥20-shuffle distribution.
+
+## C5 (RECOMMENDATION, carried) — ETH crash-bucket β reported (no gate)
+The run REPORTS bucket-conditional β_ETH for CRASH and MANIA alongside the gated β_BTC buckets
+(charter G2 is BTC-only, so this is informational, not a HARD gate) — an ETH crash-beta leak
+under the BTC-only projection must be visible ahead of a crash-heavy holdout.
+
+## C6 (RECOMMENDATION, carried) — ensemble-orthogonality flag + CS-A sourcing
+(i) §7 now flags that Amihud also appears as `amihud30_xz` in family G's 24-feature list
+(PLAN §3.1); a FUTURE S4+G ensemble must measure + disclose S4↔G residual correlation net of
+the shared Amihud input before any a-priori-decorrelation claim. Irrelevant to S4's IS validation.
+(ii) The CS-A 3× long-leg multiplier is anchored to the trailing spread/depth ratio of the thin
+vs liquid half of the top-40 (microstructure basis, reported), not a convenience constant.
+
+**Ledger unchanged:** C1–C6 are pre-registration corrections (decision-map + falsifier form +
+anchor provenance), NOT new signal/construction DOF. Family-H ledger stays 4→5 (cap 8). No token
+spent (Stage-1, reveal_token=None; REVEAL-LEDGER zero spends).
+
+*— Orchestrator, MN3 track, 2026-07-11. Critic ruling persisted verbatim in REVIEW-S4-preflight.md;
+conditions applied by append; run may proceed. Authored on Opus 4.8 (Fable suspended, user-directed).*
