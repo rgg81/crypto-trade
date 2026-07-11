@@ -90,3 +90,51 @@ Holdout remains sealed for a future family that clears a fresh IS gate; nothing 
 
 *— Orchestrator, MN3 track, 2026-07-11. Field complete; five families scored/closed; zero
 candidates; all holdout tokens unspent; pre-registration intact end-to-end.*
+
+---
+
+# ADDENDUM — the G revision round + holdout reveal (2026-07-11): MN3 DEFINITIVELY CONCLUDED
+
+The closeout above was written when the field's menu was exhausted. The user then authorized
+family G's one revision round (slow-label reformulation, EXPLORATION-G), which FAILED its
+registered mechanism but whose falsification arm REVEALED that DIAG-G's economics death was a
+weighting artifact — the continuous-IC-weighted flagship book cleared the cost wall on IS
+(net-2× Sharpe +0.70, crash edge *strengthened* to t+11.03). That momentarily overturned the
+"no cost-surviving edge" conclusion. The user then spent family G's one-forever holdout token
+(MN3-G) to test it on the sealed 2 years.
+
+**REVEAL-G TIER = FAIL (terminal). The overturning did not survive contact with unseen data.**
+- **Crash-robustness INVERTED:** IS CRASH was the book's BEST regime (quintile-spread t **+11.03**);
+  holdout CRASH is its WORST (**t −2.87**, net −9.86 bps/cd). A clean sign flip. The
+  crowding-syndrome crash edge — the single strongest signal the entire MN/MN3 effort ever
+  measured — is an **in-sample artifact**.
+- **Neutrality was the only pillar that generalized** (holdout β_BTC +0.016, crash-bucket +0.050):
+  the BTC-only minimal-L2 weight projection transferred cleanly, a 3rd independent confirmation
+  and the track's most reusable engineering result.
+- The holdout was CHOP-dominated with CRASH slightly OVER-sampled vs IS — conditions that should
+  *help* a genuinely crash-robust book — so the inversion is a **high-power falsification**, not a
+  regime-mismatch excuse.
+
+**The pre-registration discipline was vindicated on unseen data.** EXPLORATION-G's §5.1
+mechanism-provenance falsifier — the arm that condemned the book to a mechanical FAIL — was
+*predictive*: it warned the win did not come from the registered mechanism, and the part that was
+not mechanism-grounded (the crash edge) is exactly what failed to generalize. Honoring the
+falsifier would have preserved the token; the user's informed override instead converted a
+design-contaminated IS story into a **clean out-of-sample refutation** — which is itself worth
+more than an unresolved "maybe." A FAIL on genuinely-unseen data is the methodology working.
+
+## Final MN3 verdict
+Five families + one spinout + one revision round + one holdout reveal → **ZERO deployable
+candidates.** The two-year-holdout methodology ran end-to-end to a clean null. Combined with the
+old L/S track and MN v2, this is now a **four-line structural finding**: the OHLCV + funding + OI
+dataset available in this repo does not contain a cost-surviving all-weather market-neutral edge
+via cross-sectional mechanisms at 8h/1h — and every "crash-robust" signal it surfaces is an
+in-sample artifact that inverts or vanishes out-of-sample. The productive next directions remain
+those in the closeout's "Open decision": genuinely new DATA (spot / CEX-basis / liquidations /
+order-book / options-DVOL — none currently in the repo), a fundamentally different object, or
+accepting the structural conclusion. `MN3-G` is spent; `MN3-H/I/J/K` are unspent but their
+families are dead (no construction survives to reveal). The 2020→2024-06 IS and the neutrality
+machinery remain; the crash-alpha well, on this dataset, is dry.
+
+*— Orchestrator, MN3 track, 2026-07-11. Track concluded; one holdout reveal spent and FAILED;
+pre-registration intact and vindicated end-to-end.*
