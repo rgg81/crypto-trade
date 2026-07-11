@@ -1,0 +1,395 @@
+====================================================================================================
+CONFIRMATION-A — ONE-PER-FAMILY-FOREVER holdout reveal of A3-1 (family A, MN track)
+map: briefs-portfolio-mn/CONFIRMATION-A.md (FROZEN 2026-07-11). USER-AUTHORIZED.
+====================================================================================================
+run start: 2026-07-11T07:50:02Z
+
+[1] mn_panel_health() on the FULL panel through present (§7 step 1)
+[mn-datacheck] OK: BTC grid OK: T=7149, contiguous, [2020-01-01T00:00:00Z .. 2026-07-10T16:00:00Z]; BTC+top40-live current to 2026-07-10T16:00:00Z
+
+[2] FULL panel load [2020-01-01, present] + boundary pins (NO IS slice)
+  panel: T=7149 [2020-01-01 .. 2026-07-10T16:00Z], C=747 syms; IS rows 6576 (== frozen 6576); holdout rows 573
+  holdout window for the reveal: [2026-01-01T00:00Z, 2026-07-11T00:00Z)
+  NOTE: scored-candle convention is [293, T-2] (frozen); the single candle opening 2025-12-31T16:00Z (last IS row) sits outside BOTH the frozen IS mask [293, 6574] AND the holdout slice (grid >= cutoff) — disclosed.
+
+[3] Untrimmed builders + frozen pins + leak controls (construction integrity)
+[funding] load: mapped=0 direct=745 missing=2 (of 747 panel syms); 745 cols with >=1 in-grid settlement
+  funding coverage: complete for all floored top-40 ever-members
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/analysis/portfolio/mn_diag_a_funding.py:131: RuntimeWarning: Mean of empty slice
+  mu = np.nanmean(fu, axis=1, keepdims=True)
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/.venv/lib/python3.13/site-packages/numpy/lib/_nanfunctions_impl.py:2019: RuntimeWarning: Degrees of freedom <= 0 for slice.
+  var = nanvar(a, axis=axis, dtype=dtype, out=out, ddof=ddof,
+  funding-sort leak positive control PASS (corrupt fund[3574:,:] -> signal[:3574] bit-identical, future changed)
+  SCUD ramp gate (1e-12) + monotonicity + corrupt-future positive control PASS
+  IS regime-occupancy pin: CRASH 11.5% / MANIA 15.7% / CHOP 72.7%   [frozen DIAG-A/A2/A3: CRASH 11.5% / MANIA 15.7% / CHOP 72.7%]
+
+[4] Warmup derivation asserts + scored-mask pins
+  beta all-finite row 135; first feasible 585 -> first live rebal 588 (A2/A3-identical physics)
+  scored mask [293, T-2]: n=6855; holdout scored candles n=572 [2026-01-01T00:00Z .. 2026-07-10T08:00Z]
+
+[5] Matrix pass 1: 21 tranches x (A3-1 @1x+2x GT, A2-REPRO @1x)
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/analysis/portfolio/mn_diag_a_funding.py:131: RuntimeWarning: Mean of empty slice
+  mu = np.nanmean(fu, axis=1, keepdims=True)
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/.venv/lib/python3.13/site-packages/numpy/lib/_nanfunctions_impl.py:2019: RuntimeWarning: Degrees of freedom <= 0 for slice.
+  var = nanvar(a, axis=axis, dtype=dtype, out=out, ddof=ddof,
+  [pass1] p= 0 a3_1:ok a2_repro:ok
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/analysis/portfolio/mn_diag_a_funding.py:131: RuntimeWarning: Mean of empty slice
+  mu = np.nanmean(fu, axis=1, keepdims=True)
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/.venv/lib/python3.13/site-packages/numpy/lib/_nanfunctions_impl.py:2019: RuntimeWarning: Degrees of freedom <= 0 for slice.
+  var = nanvar(a, axis=axis, dtype=dtype, out=out, ddof=ddof,
+  [pass1] p= 1 a3_1:ok a2_repro:ok
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/analysis/portfolio/mn_diag_a_funding.py:131: RuntimeWarning: Mean of empty slice
+  mu = np.nanmean(fu, axis=1, keepdims=True)
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/.venv/lib/python3.13/site-packages/numpy/lib/_nanfunctions_impl.py:2019: RuntimeWarning: Degrees of freedom <= 0 for slice.
+  var = nanvar(a, axis=axis, dtype=dtype, out=out, ddof=ddof,
+  [pass1] p= 2 a3_1:ok a2_repro:ok
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/analysis/portfolio/mn_diag_a_funding.py:131: RuntimeWarning: Mean of empty slice
+  mu = np.nanmean(fu, axis=1, keepdims=True)
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/.venv/lib/python3.13/site-packages/numpy/lib/_nanfunctions_impl.py:2019: RuntimeWarning: Degrees of freedom <= 0 for slice.
+  var = nanvar(a, axis=axis, dtype=dtype, out=out, ddof=ddof,
+  [pass1] p= 3 a3_1:ok a2_repro:ok
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/analysis/portfolio/mn_diag_a_funding.py:131: RuntimeWarning: Mean of empty slice
+  mu = np.nanmean(fu, axis=1, keepdims=True)
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/.venv/lib/python3.13/site-packages/numpy/lib/_nanfunctions_impl.py:2019: RuntimeWarning: Degrees of freedom <= 0 for slice.
+  var = nanvar(a, axis=axis, dtype=dtype, out=out, ddof=ddof,
+  [pass1] p= 4 a3_1:ok a2_repro:ok
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/analysis/portfolio/mn_diag_a_funding.py:131: RuntimeWarning: Mean of empty slice
+  mu = np.nanmean(fu, axis=1, keepdims=True)
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/.venv/lib/python3.13/site-packages/numpy/lib/_nanfunctions_impl.py:2019: RuntimeWarning: Degrees of freedom <= 0 for slice.
+  var = nanvar(a, axis=axis, dtype=dtype, out=out, ddof=ddof,
+  [pass1] p= 5 a3_1:ok a2_repro:ok
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/analysis/portfolio/mn_diag_a_funding.py:131: RuntimeWarning: Mean of empty slice
+  mu = np.nanmean(fu, axis=1, keepdims=True)
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/.venv/lib/python3.13/site-packages/numpy/lib/_nanfunctions_impl.py:2019: RuntimeWarning: Degrees of freedom <= 0 for slice.
+  var = nanvar(a, axis=axis, dtype=dtype, out=out, ddof=ddof,
+  [pass1] p= 6 a3_1:ok a2_repro:ok
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/analysis/portfolio/mn_diag_a_funding.py:131: RuntimeWarning: Mean of empty slice
+  mu = np.nanmean(fu, axis=1, keepdims=True)
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/.venv/lib/python3.13/site-packages/numpy/lib/_nanfunctions_impl.py:2019: RuntimeWarning: Degrees of freedom <= 0 for slice.
+  var = nanvar(a, axis=axis, dtype=dtype, out=out, ddof=ddof,
+  [pass1] p= 7 a3_1:ok a2_repro:ok
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/analysis/portfolio/mn_diag_a_funding.py:131: RuntimeWarning: Mean of empty slice
+  mu = np.nanmean(fu, axis=1, keepdims=True)
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/.venv/lib/python3.13/site-packages/numpy/lib/_nanfunctions_impl.py:2019: RuntimeWarning: Degrees of freedom <= 0 for slice.
+  var = nanvar(a, axis=axis, dtype=dtype, out=out, ddof=ddof,
+  [pass1] p= 8 a3_1:ok a2_repro:ok
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/analysis/portfolio/mn_diag_a_funding.py:131: RuntimeWarning: Mean of empty slice
+  mu = np.nanmean(fu, axis=1, keepdims=True)
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/.venv/lib/python3.13/site-packages/numpy/lib/_nanfunctions_impl.py:2019: RuntimeWarning: Degrees of freedom <= 0 for slice.
+  var = nanvar(a, axis=axis, dtype=dtype, out=out, ddof=ddof,
+  [pass1] p= 9 a3_1:ok a2_repro:ok
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/analysis/portfolio/mn_diag_a_funding.py:131: RuntimeWarning: Mean of empty slice
+  mu = np.nanmean(fu, axis=1, keepdims=True)
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/.venv/lib/python3.13/site-packages/numpy/lib/_nanfunctions_impl.py:2019: RuntimeWarning: Degrees of freedom <= 0 for slice.
+  var = nanvar(a, axis=axis, dtype=dtype, out=out, ddof=ddof,
+  [pass1] p=10 a3_1:ok a2_repro:ok
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/analysis/portfolio/mn_diag_a_funding.py:131: RuntimeWarning: Mean of empty slice
+  mu = np.nanmean(fu, axis=1, keepdims=True)
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/.venv/lib/python3.13/site-packages/numpy/lib/_nanfunctions_impl.py:2019: RuntimeWarning: Degrees of freedom <= 0 for slice.
+  var = nanvar(a, axis=axis, dtype=dtype, out=out, ddof=ddof,
+  [pass1] p=11 a3_1:ok a2_repro:ok
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/analysis/portfolio/mn_diag_a_funding.py:131: RuntimeWarning: Mean of empty slice
+  mu = np.nanmean(fu, axis=1, keepdims=True)
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/.venv/lib/python3.13/site-packages/numpy/lib/_nanfunctions_impl.py:2019: RuntimeWarning: Degrees of freedom <= 0 for slice.
+  var = nanvar(a, axis=axis, dtype=dtype, out=out, ddof=ddof,
+  [pass1] p=12 a3_1:ok a2_repro:ok
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/analysis/portfolio/mn_diag_a_funding.py:131: RuntimeWarning: Mean of empty slice
+  mu = np.nanmean(fu, axis=1, keepdims=True)
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/.venv/lib/python3.13/site-packages/numpy/lib/_nanfunctions_impl.py:2019: RuntimeWarning: Degrees of freedom <= 0 for slice.
+  var = nanvar(a, axis=axis, dtype=dtype, out=out, ddof=ddof,
+  [pass1] p=13 a3_1:ok a2_repro:ok
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/analysis/portfolio/mn_diag_a_funding.py:131: RuntimeWarning: Mean of empty slice
+  mu = np.nanmean(fu, axis=1, keepdims=True)
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/.venv/lib/python3.13/site-packages/numpy/lib/_nanfunctions_impl.py:2019: RuntimeWarning: Degrees of freedom <= 0 for slice.
+  var = nanvar(a, axis=axis, dtype=dtype, out=out, ddof=ddof,
+  [pass1] p=14 a3_1:ok a2_repro:ok
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/analysis/portfolio/mn_diag_a_funding.py:131: RuntimeWarning: Mean of empty slice
+  mu = np.nanmean(fu, axis=1, keepdims=True)
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/.venv/lib/python3.13/site-packages/numpy/lib/_nanfunctions_impl.py:2019: RuntimeWarning: Degrees of freedom <= 0 for slice.
+  var = nanvar(a, axis=axis, dtype=dtype, out=out, ddof=ddof,
+  [pass1] p=15 a3_1:ok a2_repro:ok
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/analysis/portfolio/mn_diag_a_funding.py:131: RuntimeWarning: Mean of empty slice
+  mu = np.nanmean(fu, axis=1, keepdims=True)
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/.venv/lib/python3.13/site-packages/numpy/lib/_nanfunctions_impl.py:2019: RuntimeWarning: Degrees of freedom <= 0 for slice.
+  var = nanvar(a, axis=axis, dtype=dtype, out=out, ddof=ddof,
+  [pass1] p=16 a3_1:ok a2_repro:ok
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/analysis/portfolio/mn_diag_a_funding.py:131: RuntimeWarning: Mean of empty slice
+  mu = np.nanmean(fu, axis=1, keepdims=True)
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/.venv/lib/python3.13/site-packages/numpy/lib/_nanfunctions_impl.py:2019: RuntimeWarning: Degrees of freedom <= 0 for slice.
+  var = nanvar(a, axis=axis, dtype=dtype, out=out, ddof=ddof,
+  [pass1] p=17 a3_1:ok a2_repro:ok
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/analysis/portfolio/mn_diag_a_funding.py:131: RuntimeWarning: Mean of empty slice
+  mu = np.nanmean(fu, axis=1, keepdims=True)
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/.venv/lib/python3.13/site-packages/numpy/lib/_nanfunctions_impl.py:2019: RuntimeWarning: Degrees of freedom <= 0 for slice.
+  var = nanvar(a, axis=axis, dtype=dtype, out=out, ddof=ddof,
+  [pass1] p=18 a3_1:ok a2_repro:ok
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/analysis/portfolio/mn_diag_a_funding.py:131: RuntimeWarning: Mean of empty slice
+  mu = np.nanmean(fu, axis=1, keepdims=True)
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/.venv/lib/python3.13/site-packages/numpy/lib/_nanfunctions_impl.py:2019: RuntimeWarning: Degrees of freedom <= 0 for slice.
+  var = nanvar(a, axis=axis, dtype=dtype, out=out, ddof=ddof,
+  [pass1] p=19 a3_1:ok a2_repro:ok
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/analysis/portfolio/mn_diag_a_funding.py:131: RuntimeWarning: Mean of empty slice
+  mu = np.nanmean(fu, axis=1, keepdims=True)
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/.venv/lib/python3.13/site-packages/numpy/lib/_nanfunctions_impl.py:2019: RuntimeWarning: Degrees of freedom <= 0 for slice.
+  var = nanvar(a, axis=axis, dtype=dtype, out=out, ddof=ddof,
+  [pass1] p=20 a3_1:ok a2_repro:ok
+
+[5b] Matrix pass 2 (bit-identical re-run, full recompute)
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/analysis/portfolio/mn_diag_a_funding.py:131: RuntimeWarning: Mean of empty slice
+  mu = np.nanmean(fu, axis=1, keepdims=True)
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/.venv/lib/python3.13/site-packages/numpy/lib/_nanfunctions_impl.py:2019: RuntimeWarning: Degrees of freedom <= 0 for slice.
+  var = nanvar(a, axis=axis, dtype=dtype, out=out, ddof=ddof,
+  [pass2] p= 0 a3_1:ok a2_repro:ok
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/analysis/portfolio/mn_diag_a_funding.py:131: RuntimeWarning: Mean of empty slice
+  mu = np.nanmean(fu, axis=1, keepdims=True)
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/.venv/lib/python3.13/site-packages/numpy/lib/_nanfunctions_impl.py:2019: RuntimeWarning: Degrees of freedom <= 0 for slice.
+  var = nanvar(a, axis=axis, dtype=dtype, out=out, ddof=ddof,
+  [pass2] p= 1 a3_1:ok a2_repro:ok
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/analysis/portfolio/mn_diag_a_funding.py:131: RuntimeWarning: Mean of empty slice
+  mu = np.nanmean(fu, axis=1, keepdims=True)
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/.venv/lib/python3.13/site-packages/numpy/lib/_nanfunctions_impl.py:2019: RuntimeWarning: Degrees of freedom <= 0 for slice.
+  var = nanvar(a, axis=axis, dtype=dtype, out=out, ddof=ddof,
+  [pass2] p= 2 a3_1:ok a2_repro:ok
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/analysis/portfolio/mn_diag_a_funding.py:131: RuntimeWarning: Mean of empty slice
+  mu = np.nanmean(fu, axis=1, keepdims=True)
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/.venv/lib/python3.13/site-packages/numpy/lib/_nanfunctions_impl.py:2019: RuntimeWarning: Degrees of freedom <= 0 for slice.
+  var = nanvar(a, axis=axis, dtype=dtype, out=out, ddof=ddof,
+  [pass2] p= 3 a3_1:ok a2_repro:ok
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/analysis/portfolio/mn_diag_a_funding.py:131: RuntimeWarning: Mean of empty slice
+  mu = np.nanmean(fu, axis=1, keepdims=True)
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/.venv/lib/python3.13/site-packages/numpy/lib/_nanfunctions_impl.py:2019: RuntimeWarning: Degrees of freedom <= 0 for slice.
+  var = nanvar(a, axis=axis, dtype=dtype, out=out, ddof=ddof,
+  [pass2] p= 4 a3_1:ok a2_repro:ok
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/analysis/portfolio/mn_diag_a_funding.py:131: RuntimeWarning: Mean of empty slice
+  mu = np.nanmean(fu, axis=1, keepdims=True)
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/.venv/lib/python3.13/site-packages/numpy/lib/_nanfunctions_impl.py:2019: RuntimeWarning: Degrees of freedom <= 0 for slice.
+  var = nanvar(a, axis=axis, dtype=dtype, out=out, ddof=ddof,
+  [pass2] p= 5 a3_1:ok a2_repro:ok
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/analysis/portfolio/mn_diag_a_funding.py:131: RuntimeWarning: Mean of empty slice
+  mu = np.nanmean(fu, axis=1, keepdims=True)
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/.venv/lib/python3.13/site-packages/numpy/lib/_nanfunctions_impl.py:2019: RuntimeWarning: Degrees of freedom <= 0 for slice.
+  var = nanvar(a, axis=axis, dtype=dtype, out=out, ddof=ddof,
+  [pass2] p= 6 a3_1:ok a2_repro:ok
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/analysis/portfolio/mn_diag_a_funding.py:131: RuntimeWarning: Mean of empty slice
+  mu = np.nanmean(fu, axis=1, keepdims=True)
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/.venv/lib/python3.13/site-packages/numpy/lib/_nanfunctions_impl.py:2019: RuntimeWarning: Degrees of freedom <= 0 for slice.
+  var = nanvar(a, axis=axis, dtype=dtype, out=out, ddof=ddof,
+  [pass2] p= 7 a3_1:ok a2_repro:ok
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/analysis/portfolio/mn_diag_a_funding.py:131: RuntimeWarning: Mean of empty slice
+  mu = np.nanmean(fu, axis=1, keepdims=True)
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/.venv/lib/python3.13/site-packages/numpy/lib/_nanfunctions_impl.py:2019: RuntimeWarning: Degrees of freedom <= 0 for slice.
+  var = nanvar(a, axis=axis, dtype=dtype, out=out, ddof=ddof,
+  [pass2] p= 8 a3_1:ok a2_repro:ok
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/analysis/portfolio/mn_diag_a_funding.py:131: RuntimeWarning: Mean of empty slice
+  mu = np.nanmean(fu, axis=1, keepdims=True)
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/.venv/lib/python3.13/site-packages/numpy/lib/_nanfunctions_impl.py:2019: RuntimeWarning: Degrees of freedom <= 0 for slice.
+  var = nanvar(a, axis=axis, dtype=dtype, out=out, ddof=ddof,
+  [pass2] p= 9 a3_1:ok a2_repro:ok
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/analysis/portfolio/mn_diag_a_funding.py:131: RuntimeWarning: Mean of empty slice
+  mu = np.nanmean(fu, axis=1, keepdims=True)
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/.venv/lib/python3.13/site-packages/numpy/lib/_nanfunctions_impl.py:2019: RuntimeWarning: Degrees of freedom <= 0 for slice.
+  var = nanvar(a, axis=axis, dtype=dtype, out=out, ddof=ddof,
+  [pass2] p=10 a3_1:ok a2_repro:ok
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/analysis/portfolio/mn_diag_a_funding.py:131: RuntimeWarning: Mean of empty slice
+  mu = np.nanmean(fu, axis=1, keepdims=True)
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/.venv/lib/python3.13/site-packages/numpy/lib/_nanfunctions_impl.py:2019: RuntimeWarning: Degrees of freedom <= 0 for slice.
+  var = nanvar(a, axis=axis, dtype=dtype, out=out, ddof=ddof,
+  [pass2] p=11 a3_1:ok a2_repro:ok
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/analysis/portfolio/mn_diag_a_funding.py:131: RuntimeWarning: Mean of empty slice
+  mu = np.nanmean(fu, axis=1, keepdims=True)
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/.venv/lib/python3.13/site-packages/numpy/lib/_nanfunctions_impl.py:2019: RuntimeWarning: Degrees of freedom <= 0 for slice.
+  var = nanvar(a, axis=axis, dtype=dtype, out=out, ddof=ddof,
+  [pass2] p=12 a3_1:ok a2_repro:ok
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/analysis/portfolio/mn_diag_a_funding.py:131: RuntimeWarning: Mean of empty slice
+  mu = np.nanmean(fu, axis=1, keepdims=True)
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/.venv/lib/python3.13/site-packages/numpy/lib/_nanfunctions_impl.py:2019: RuntimeWarning: Degrees of freedom <= 0 for slice.
+  var = nanvar(a, axis=axis, dtype=dtype, out=out, ddof=ddof,
+  [pass2] p=13 a3_1:ok a2_repro:ok
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/analysis/portfolio/mn_diag_a_funding.py:131: RuntimeWarning: Mean of empty slice
+  mu = np.nanmean(fu, axis=1, keepdims=True)
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/.venv/lib/python3.13/site-packages/numpy/lib/_nanfunctions_impl.py:2019: RuntimeWarning: Degrees of freedom <= 0 for slice.
+  var = nanvar(a, axis=axis, dtype=dtype, out=out, ddof=ddof,
+  [pass2] p=14 a3_1:ok a2_repro:ok
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/analysis/portfolio/mn_diag_a_funding.py:131: RuntimeWarning: Mean of empty slice
+  mu = np.nanmean(fu, axis=1, keepdims=True)
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/.venv/lib/python3.13/site-packages/numpy/lib/_nanfunctions_impl.py:2019: RuntimeWarning: Degrees of freedom <= 0 for slice.
+  var = nanvar(a, axis=axis, dtype=dtype, out=out, ddof=ddof,
+  [pass2] p=15 a3_1:ok a2_repro:ok
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/analysis/portfolio/mn_diag_a_funding.py:131: RuntimeWarning: Mean of empty slice
+  mu = np.nanmean(fu, axis=1, keepdims=True)
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/.venv/lib/python3.13/site-packages/numpy/lib/_nanfunctions_impl.py:2019: RuntimeWarning: Degrees of freedom <= 0 for slice.
+  var = nanvar(a, axis=axis, dtype=dtype, out=out, ddof=ddof,
+  [pass2] p=16 a3_1:ok a2_repro:ok
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/analysis/portfolio/mn_diag_a_funding.py:131: RuntimeWarning: Mean of empty slice
+  mu = np.nanmean(fu, axis=1, keepdims=True)
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/.venv/lib/python3.13/site-packages/numpy/lib/_nanfunctions_impl.py:2019: RuntimeWarning: Degrees of freedom <= 0 for slice.
+  var = nanvar(a, axis=axis, dtype=dtype, out=out, ddof=ddof,
+  [pass2] p=17 a3_1:ok a2_repro:ok
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/analysis/portfolio/mn_diag_a_funding.py:131: RuntimeWarning: Mean of empty slice
+  mu = np.nanmean(fu, axis=1, keepdims=True)
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/.venv/lib/python3.13/site-packages/numpy/lib/_nanfunctions_impl.py:2019: RuntimeWarning: Degrees of freedom <= 0 for slice.
+  var = nanvar(a, axis=axis, dtype=dtype, out=out, ddof=ddof,
+  [pass2] p=18 a3_1:ok a2_repro:ok
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/analysis/portfolio/mn_diag_a_funding.py:131: RuntimeWarning: Mean of empty slice
+  mu = np.nanmean(fu, axis=1, keepdims=True)
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/.venv/lib/python3.13/site-packages/numpy/lib/_nanfunctions_impl.py:2019: RuntimeWarning: Degrees of freedom <= 0 for slice.
+  var = nanvar(a, axis=axis, dtype=dtype, out=out, ddof=ddof,
+  [pass2] p=19 a3_1:ok a2_repro:ok
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/analysis/portfolio/mn_diag_a_funding.py:131: RuntimeWarning: Mean of empty slice
+  mu = np.nanmean(fu, axis=1, keepdims=True)
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/.venv/lib/python3.13/site-packages/numpy/lib/_nanfunctions_impl.py:2019: RuntimeWarning: Degrees of freedom <= 0 for slice.
+  var = nanvar(a, axis=axis, dtype=dtype, out=out, ddof=ddof,
+  [pass2] p=20 a3_1:ok a2_repro:ok
+  bit-identical re-run PASS (all mapped streams + throttle records + counters,
+  IS AND holdout rows included in the array compare)
+  execution-pattern identity PASS; per-tranche leg recon (63 runs x 2 passes): max 8.33e-17 (<=1e-12)
+  A3-1 full-window counters: capDrop 0 / degenerate 0 / collapse 0
+
+====================================================================================================
+[GATE] p=0 STRUCTURAL FORENSIC — inert control + throttle proportionality
+       (map §7 step 2; ABORT on fail; run-time re-assertion of the unit suite)
+====================================================================================================
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/analysis/portfolio/mn_diag_a_funding.py:131: RuntimeWarning: Mean of empty slice
+  mu = np.nanmean(fu, axis=1, keepdims=True)
+/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind/.venv/lib/python3.13/site-packages/numpy/lib/_nanfunctions_impl.py:2019: RuntimeWarning: Degrees of freedom <= 0 for slice.
+  var = nanvar(a, axis=axis, dtype=dtype, out=out, ddof=ddof,
+  (i) INERT CONTROL PASS: gross_scalar_series=ones BYTE-IDENTICAL to the A2-1
+      construction (rets/turnover/weights/funding_rets/book_scalar_series)
+  (ii) PROPORTIONALITY PASS: 313 executed rebals; max |w_A3 - s*w_A2| = 8.33e-17 (<=1e-12); identical executed set; max |Sum w_A3| = 2.03e-15; throttled rebals 61 (s<1 branch non-vacuous)
+
+====================================================================================================
+[6] IS-PARITY GATE — the full-panel build's IS slice [293, 6574] must reproduce the
+    revealed A3-1 IS numbers (map §7 step 2). ABORT pre-reveal on failure.
+====================================================================================================
+  A3-1 IS Sharpe (1x)        obs +1.734131  revealed +1.7341  delta +3.08e-05  PASS (exact at printed precision)
+  A3-1 IS maxDD              obs -0.231103  revealed -0.2311  delta -3.07e-06  PASS (exact at printed precision)
+  A3-1 IS CRASH beta         obs +0.009391  revealed +0.0094  delta -8.73e-06  PASS (exact at printed precision)
+  A3-1 IS G3 rebal-row max   obs +0.069919  revealed +0.0699  delta +1.85e-05  PASS (exact at printed precision)
+  A3-1 IS Sharpe (2x GT)     obs +1.510703  revealed +1.5107  delta +2.77e-06  PASS (exact at printed precision)
+  A2-REPRO IS Sharpe         obs +1.678442  revealed +1.6784  delta +4.16e-05  PASS (exact at printed precision)
+  A2-REPRO IS maxDD          obs -0.255700  revealed -0.2557  delta -2.66e-07  PASS (exact at printed precision)
+  IS crash-bucket n=658 (se 0.0083); IS candles n=6282 (== frozen 6282)
+  IS-PARITY GATE PASS — the full-panel build did not perturb the frozen book.
+
+[7] Characterization DRY-RUN on an IS stand-in slice (post-reveal code path is
+    exercised end-to-end BEFORE the one-shot reveal; output captured, IS-only)
+  dry-run OK: 86 lines, 0 section exceptions
+
+[8] THE SINGLE REVEAL — mn_guard_holdout(2026-01-01, window_end,
+    confirmation_reveal="funding-carry") — the banner below is the PERMANENT record.
+========================================================================
+MN HOLDOUT REVEAL — SANCTIONED CONFIRMATION
+  family : funding-carry
+  window : [2026-01-01T00:00:00Z, 2026-07-11T00:00:00Z)
+  at     : 2026-07-11T07:53:06Z
+  ONE reveal per candidate FAMILY, EVER (PLAN §5.2). This banner is
+  the audit record — a second reveal for this family is a violation.
+========================================================================
+
+====================================================================================================
+[HOLDOUT 1] WINDOW COMPOSITION FIRST — regime fractions (frozen mn_regimes)
+====================================================================================================
+  window: 2026-01-01T00:00Z .. 2026-07-10T08:00Z (scored candles n=572; ~0.52 yr); SE(ann Sharpe) ~ 1.38
+  CRASH : n= 163  frac=28.5%
+  MANIA : n=   0  frac=0.0%
+  CHOP  : n= 409  frac=71.5%
+
+====================================================================================================
+[HOLDOUT 2] NEUTRALITY PANEL (C5 pins) — the N read (HIGHEST power)
+====================================================================================================
+  full-window OLS: beta_BTC = -0.0587 (se 0.0343, n=572)   [N bound: |b| <= 0.15]
+                   beta_ETH = -0.0611 (se 0.0255, n=572)   [N bound: |b| <= 0.20]
+  rolling-270/135 beta_BTC (window-local): n_defined=438 of 572; within |b|<=0.10 on 59.4%; max|b|=0.1724; mean=-0.0676   (supporting context, not the gate)
+  CRASH  n= 163  beta_BTC=-0.0519 (se 0.0555)  mean=+1.50 bps/cd  t=+0.16   [N crash bound: |b| <= 0.25]
+  MANIA  n=   0 < 30 -> N/A (C5 sample guard; bucket beta WAIVED)
+  CHOP   n= 409  beta_BTC=-0.0627 (se 0.0447)  mean=-3.06 bps/cd  t=-0.59
+
+  N read (mechanical): |b_BTC|=0.0587 vs 0.15; |b_ETH|=0.0611 vs 0.20; crash-bucket |b|=0.0519 (n=163)
+  ==> N HOLDS
+
+====================================================================================================
+[HOLDOUT 3] HEADLINE (honest cost 1x; 2x = GROUND-TRUTH re-runs)
+====================================================================================================
+  net Sharpe (1x)   : -0.5327   [S read: positive-edge >= +0.30; weak [-1.0,+0.30); clear-negative < -1.0]
+  net Sharpe (2x GT): -0.6622
+  ann return (comp) : -22.72%
+  ann vol           : 36.14%
+  maxDD             : -25.26%   [D read: controlled >= -33%; elevated (-45%,-33%); catastrophic < -45%]
+  turnover (1-way)  : 62.5x/yr
+  monthly win rate  : 57.1% (4/7)
+  worst month       : -11.57%
+
+====================================================================================================
+[HOLDOUT 4] REGIME-BUCKET P&L + FUNDING-vs-PRICE ATTRIBUTION — the F read
+====================================================================================================
+  CRASH  n= 163  mean +1.50 bps/cd  t=+0.16  P&L share -24.4%
+  MANIA  n=   0 -> no candles
+  CHOP   n= 409  mean -3.06 bps/cd  t=-0.59  P&L share +124.4%
+
+  cum (arith): total -0.1006 = price -0.5767 + funding +0.5006 - tcost 0.0245
+  per-candle: funding +8.75 bps/cd; price -10.08 bps/cd; funding Sharpe (uncosted, drip artifact) +21.05
+  F read (mechanical): funding income sum = +0.5006 ==> POSITIVE   [F: positive > 0]
+  top-5 |per-name P&L share| (window records): LABUSDT +135.3%, SIRENUSDT +101.6%, PIPPINUSDT +77.9%, RIVERUSDT -68.0%, HUSDT -67.1%
+
+====================================================================================================
+[HOLDOUT 5] SCUD THROTTLE BEHAVIOR — coverage + C4 episode timing (mechanism)
+====================================================================================================
+  rebal-consumed coverage (572 executed rebals x 21 tranches): scalar<1 on 20.1%; scalar=phi on 9.8%; mean 0.9267; min 0.5000   [IS anchors: 19.4% / 7.0% / 0.9385]
+  SCUD-z realized quantiles (pooled tranche-candles, n=12012): z>tau_lo(+0.85) 20.1% (anchor ~20%); z>tau_hi(+1.65) 9.8% (anchor ~5%)
+  ensemble activity: >=1/21 tranches held-throttled on 71.9% of candles; all-21 on 0.0%; mean held scalar 0.9263   [IS: 69.3% / 0.2% / 0.9413]
+  throttle-effect (A3 - A2): total +0.0330 (+0.58 bps/cd); active +0.0330 (411 cd); inactive +0.0000
+    on A2-LOSING candles: +0.1982 (209 cd, loss averted if +); on A2-WINNING: -0.1651 (202 cd, carry foregone if -)
+  A2-REPRO (un-throttled) window context: Sharpe -0.6500; maxDD -28.55%; vol 39.35%
+  C4 episode timing on the window's own negative months (peak/mid/trough from the A2-REPRO path; C4(b) pinned rules; peak window clipped at the window start where the prior month precedes it):
+    2026-02: FIRED=Y timing=COINCIDENT  t_first=2026-02-08  peak=2026-01-26 mid=2026-02-05 trough=2026-02-16
+             mean consumed scalar peak->trough = 0.9012 (65 cons); month A3 -5.26% vs A2 -5.93% (delta +0.68%)
+    2026-04: FIRED=Y timing=COINCIDENT  t_first=2026-04-07  peak=2026-04-02 mid=2026-04-06 trough=2026-04-11
+             mean consumed scalar peak->trough = 0.9418 (30 cons); month A3 -7.56% vs A2 -7.70% (delta +0.14%)
+    2026-05: FIRED=Y timing=COINCIDENT  t_first=2026-05-01  peak=2026-04-02 mid=2026-04-22 trough=2026-05-13
+             mean consumed scalar peak->trough = 0.8988 (126 cons); month A3 -11.57% vs A2 -14.71% (delta +3.14%)
+  episode summary: FIRED in 3/3 negative months
+  projection health (572 projected rebals): Sum|w_proj|/g_eff med 0.9720 min 0.8017; amp>2x 0; rho(w_proj,w_raw) mean +0.9756 min +0.8588; post-cap target-beta max|.| 0.0020
+
+====================================================================================================
+[HOLDOUT 6] maxDD PATH + MONTHLY TABLE (compounded ret; legs summed)
+====================================================================================================
+  maxDD -25.26%: peak 2026-01-26 -> trough 2026-06-01 (trough regime CHOP; trough month 2026-06)
+
+month       n      ret   long_px  short_px  net_fund    tcost    A2ret
+----------------------------------------------------------------------
+2026-01    93   +2.33%   -0.1659   +0.1191   +0.0759   0.0037   +2.62%
+2026-02    84   -5.26%   -0.0811   -0.0260   +0.0590   0.0035   -5.93%
+2026-03    93   +5.47%   -0.0487   +0.0279   +0.0819   0.0041   +6.16%
+2026-04    90   -7.56%   -0.0890   -0.0746   +0.1008   0.0039   -7.70%
+2026-05    93  -11.57%   -0.0562   -0.0743   +0.0146   0.0042  -14.71%
+2026-06    90   +4.56%   -0.0666   -0.0061   +0.1303   0.0037   +3.89%
+2026-07    29   +0.00%   -0.0780   +0.0428   +0.0381   0.0013   +0.24%
+
+====================================================================================================
+[HOLDOUT 7] PER-TRANCHE DISPERSION (21 window-slice Sharpes) + integrity
+====================================================================================================
+  A3-1 : min -1.941  p25 -1.263  med -0.595  p75 +0.579  max +1.022  positive 9/21
+  ensemble leg reconciliation on this window: max 1.39e-17 (<=1e-12)
+  analytic 2x twin vs GROUND-TRUTH: max elementwise drift 2.70e-04 (stateless expectation ~2.6e-4); analytic ens 2x Sharpe -0.6624 vs GT -0.6622
+
+====================================================================================================
+[REPRO] Holdout characterization recomputed from the independent PASS-2 matrix
+====================================================================================================
+  pass-2 holdout: Sharpe -0.5327 maxDD -25.26% funding +0.5006; stream bit-identical to pass-1: PASS; Sharpe exact-equal: PASS
+
+====================================================================================================
+[TIER] THE FOUR §4 READS + MECHANICAL BIN (arithmetic only — NOT a verdict; the
+       QR renders the formal CONFIRMATION verdict)
+====================================================================================================
+  N (neutrality) : |b_BTC| 0.0587 vs 0.15; |b_ETH| 0.0611 vs 0.20; crash |b| 0.0519 vs 0.25 (n=163) ==> HOLDS
+  D (drawdown)   : maxDD -25.26%  [controlled >= -33%; elevated (-45%,-33%); catastrophic < -45%]
+  S (edge)       : net Sharpe -0.5327  [positive-edge >= +0.30; weak [-1.0,+0.30); clear-negative < -1.0]
+  F (funding)    : income +0.5006  [positive > 0]
+
+  MECHANICAL §4 BIN: AMBIGUOUS / PARTIAL — mechanism HELD, edge UNPROVEN: S in [-1.0,+0.30) (Sharpe -0.5327)
+
+====================================================================================================
+[done] CONFIRMATION-A reveal executed EXACTLY ONCE. Family A's holdout budget is
+       SPENT FOREVER. Hand the record to the QR for the CONFIRMATION verdict.
+====================================================================================================
+run end: 2026-07-11T07:53:06Z
