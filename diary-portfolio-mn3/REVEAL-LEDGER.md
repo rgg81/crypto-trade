@@ -7,3 +7,4 @@ records the ensemble token plus every member family's token. NEVER edit or
 delete existing lines — this file is the audit record.
 
 ## Spends
+- SPENT token=MN3-G at=2026-07-11T19:35:24Z window=[2020-01-01T00:00:00Z,2026-07-01T00:00:00Z) note=family-reveal
