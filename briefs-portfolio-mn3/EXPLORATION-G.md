@@ -519,3 +519,65 @@ EXPLORATION-G pre-registration — the turnover-suppressed, horizon-matched refo
 family-G flagship. Everything frozen before the run; holdout sealed; `MN3-G` token unspent; nothing
 committed to git. Next: Critic pre-flight, then the QE slow-label retrain (§9.1) + the scored engine
 run (§9.2).*
+
+---
+
+# EXPLORATION-G-AMENDMENT-001 — Critic pre-flight conditions (2026-07-11)
+
+Registered BEFORE the retrain + scored run per the Critic PASS-WITH-CONDITIONS ruling
+(`diary-portfolio-mn3/REVIEW-G-preflight.md`). Appended, not edited — SUPERSEDES the referenced
+clauses. MUST-1/MUST-2 are binding; SHOULD-3..7 applied; FLAG-8 recorded. Ledger unchanged (these
+are safety/disclosure/governance corrections, 0 new DOF).
+
+## MUST-1 (leak-safety, the one foundation landmine) — purge changed at BOTH sites + abort-assert
+The slow retrain MUST change the 3-candle purge to 21 at BOTH sites (the QR named both in §9.1
+step 3; the runner IGNORES `oof_month_slices.train_mask` and uses the duplicated inline):
+1. module constant `mn3_features.MN3_G_PURGE_CANDLES` 3→21;
+2. hardcoded inline `mn3_g_oof.py:143` `t_idx_arr <= b_idx - 3 - 1` → `b_idx - 21 - 1`.
+A single-site change silently leaves the effective purge at 3 → 21c-forward training labels overlap
+the OOF window by up to 18 candles → look-ahead inflating the slow IC and EVERY downstream metric.
+BEFORE persisting `data/mn3_g_slow/oof_predictions.parquet`, add an **ABORT-ON-FAIL assert** that
+re-runs DIAG-G §3's "Purge PASS" check at horizon 21: for every walk-forward month, the last
+permitted training candle's forward-21 label window must end at index < `b_idx` (the OOF month's
+first candle). Preferred equivalent: refactor the runner to consume `oof_month_slices.train_mask`
+as the single source of truth, eliminating the duplication. The run does NOT proceed if this assert
+fails.
+
+## MUST-2 (c1-pin no-selection lock)
+The §6 TIER is computed on the **c1-slow as-shipped book ONLY**. The other 7 slow-label configs are
+reported SOLELY as the HP-insensitivity cross-check; no tier, gate, or design choice may key off
+them. A c1-slow HARD-gate FAIL coincident with any other slow-config passing is disclosed as a
+finding for a POSSIBLE FUTURE iteration (which would spend additional ledger under the cap-16 /
+last-round constraint), NEVER a within-iteration config re-selection.
+
+## SHOULD-3 (crash-strong disclosure)
+If G-crash-preserve passes but SOFT G-crash-strong (CRASH quintile-spread t>1.5) fails, the diary
+flags the SUCCESS as "crash-edge-preserved-but-weakened" (disclosure, not a re-gate).
+
+## SHOULD-4 (§5.4 mechanism restatement)
+§5.4's "un-throttled book independently gates the alpha floors" is REPLACED by the correct reason:
+a gross-reduction throttle (scalar ∈ [φ=0.50, 1.0]) is structurally INCAPABLE of manufacturing
+positive alpha; a HELPS disposition is legitimate risk-shaping; §5.2 (placebo) + §5.3 (direction)
+gate the underlying signal regardless of throttle state.
+
+## SHOULD-5 (placebo gross-object)
+The §5.2 GROSS placebo return stream is defined IDENTICALLY to the real book's gross (residual
+price + funding, pre-cost) — no funding-in-one-not-the-other asymmetry.
+
+## SHOULD-6 (§5.1 Δnet decomposition)
+§5.1 reports the explicit Δnet = Δgross − Δcost so the cost-driven FRACTION of the net win is
+auditable, not resting solely on the 1.25× gross threshold.
+
+## SHOULD-7 (winsor clip-fraction verification)
+Report the realized clip-fraction at ±0.53 on the 21c label vs ±0.20 on the 3c label — the
+falsifiable claim behind the √-horizon anchor.
+
+## FLAG-8 (§3.1-body reconciliation, governance record)
+AMENDMENT-005's label change (3c→21c) overrides §3.1's body clause "no post-diagnostic label
+changes" via the SANCTIONED dated-amendment + one-revision-round mechanism — NOT an in-place edit.
+The distinction that makes it non-mining: a SINGLE principle-anchored horizon-match (H=hold) through
+the pre-provisioned revision round, vs open-ended label iteration. This is family G's LAST round;
+G closes on the next failure; cap-16 is hard.
+
+*— Orchestrator, MN3 track, 2026-07-11 (Opus 4.8, Fable suspended, user-directed). Critic ruling
+verbatim in REVIEW-G-preflight.md; conditions applied by append; retrain + run may proceed.*
