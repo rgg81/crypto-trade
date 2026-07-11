@@ -947,3 +947,177 @@ I escalate the design question to the user. No third machine, no budget move, no
 
 *— QR, MN3 track, 2026-07-11. PLAN-AMENDMENT-001. This is the one permitted re-registration;
 appended, not edited; frozen before CRISIS-FALSIFY-002 runs; the holdout remains untouched.*
+
+---
+
+# PLAN-AMENDMENT-002 — post-terminal risk architecture (USER-RULED, 2026-07-11)
+
+**Trigger:** `CRISIS-FALSIFY-002.md` (commit e2cad09e) — the amended 5-indicator machine FAILED
+terminally; `CRISIS-MACHINE-DISPOSITION.md` — QR escalated with two auth asks. **USER RULING
+(2026-07-11):** **auth A RATIFIED** (GAP-only Layer-1 at the original 4σ/10% floor — the post-hoc
+selection residue flagged in DISPOSITION §2 is **cleansed by user ratification**, recorded here as
+authorized track doctrine, no longer a researcher post-hoc pick) AND **auth B AUTHORIZED** (a
+drawdown-from-peak detector registered as a NEW indicator family with its own falsification,
+terminal no-retry). The 5-indicator machine remains FROZEN AS FAILED. This amendment freezes the
+replacement risk architecture: a Layer-1 GAP-only interrupt (§A), a NEW drawdown-from-peak family
+(§B), a Layer-2 per-construction throttle invariant (§C), their composition (§D), and the unblock
+sequencing (§E). All falsification is IS-only (2020-01→2024-06); none of this touches the holdout
+or consumes any alpha-family token — this is risk infrastructure, not an alpha family.
+
+## §A — Layer-1 GAP-only machine (RATIFIED; exact spec, FROZEN)
+
+**Indicator (unchanged from AMENDMENT-001 §B5 construction; RATIFIED 4σ/10% floor):**
+σ[t] = EWMA std of BTC 8h log returns, half-life 30c, on returns through t−1; g[t] = |r_BTC[t]|/σ[t].
+Crisis-grade: **g ≥ 4 OR |r_BTC[t]| ≥ 10%** (the originally-registered §2.1 floor; user-ratified —
+DISPOSITION §2 reversion argument accepted, residue cleansed by ratification).
+
+**States: NORMAL / CRISIS only (2-state).** No STRESS (a single fat-tail-magnitude indicator cannot
+grade sustained regimes; that is Layer 2's job, §C). **CRISIS action = FLAT (gross → 0).** The §2.3
+blue-chip carve-out stays a per-construction option for observable-print payers only (unchanged).
+**Timing:** escalation immediate at close[t], consumed at open[t+1] ([k−1]); CRISIS dwell ≥ 9c;
+de-escalate CRISIS→NORMAL after 9c clean (no crisis-trigger). **Warmup:** per-indicator abstention
+carried from AMENDMENT-001 §A — GAP defines from ~candle 11 (2020-01-11, per 002 §3); before that
+DEGRADED-hold at NORMAL. §2.5 leak suite applies (GAP's corrupt-future control already passed).
+
+**Mini-falsification — MANDATORY hard bar (UNCHANGED, the real test):**
+**4/4 primary episodes at CRISIS with 0 LAG** (COVID, May-2021, LUNA, FTX). **HAZARD, stated per my
+own DISPOSITION §3:** COVID (GAP=2 alone) and FTX (GAP=2 via the σ-leg, 4.35σ ≥ 4) are CONFIRMED
+GAP-catchable from the 001/002 attributions; **May-2021 and LUNA were CONFLUENCE catches in 001
+(attributed "multi-indicator" / "XVOL=2", NOT GAP) — GAP-only coverage of them is UNCONFIRMED and
+genuinely uncertain.** Pre-committed consequence, frozen: **if GAP-only misses ANY primary at
+CRISIS, Layer 1 is DEAD and the track proceeds Layer-2-only** (§C) for crisis coverage. Secondary
+episodes (2021-12-04, Celsius, 2023-08-17) are REPORTED for information; GAP-only is EXPECTED to
+miss grinding secondaries (Celsius had no 4σ candle) — these misses are the documented
+slow-bleed-blindness cost, NOT a bar and NOT a tuning target.
+
+**Mini-falsification — calm budgets, RE-DERIVED for a single-indicator 2-state machine and FROZEN
+PRE-RUN (deriving-not-tuning: forward-computed from GAP's OWN observed physics + a stated margin,
+before the run, with the arithmetic shown; the bars would be identical whether or not GAP passes).**
+
+*Frozen inputs (observed):* GAP raw crisis-grade vote occupancy at 4σ/10% = **0.7%** (001 §3,
+"well-behaved, near its coverage anchor"); IS live extent = **4,898 candles** (002 §3); ⇒ raw
+crisis-grade candles ≈ 0.007 × 4,898 ≈ **34**. Frozen mechanics: dwell 9c + de-escalate 9c ⇒ an
+isolated event occupies ≈ 18c; candles clustering inside one event overlap the dwell.
+
+| Metric | Derivation (forward, pre-run) | FROZEN BAR |
+|---|---|---|
+| Distinct CRISIS entries | 34 raw candles ÷ (~2–4 crisis candles per genuine violent event, crypto cascade clustering) ≈ **~11 events** (range 8–14) | **≤ 16** (expected ~11 + margin; each entry is a genuine ≥4σ/10% BTC candle, not chatter, so this is a sanity ceiling — a gross excess signals σ-leg mis-calibration) |
+| CRISIS occupancy | ~11 events × ~18c per event ÷ 4,898 ≈ **~4.0%** (tight-clustering ~3%; pathological all-isolated worst case 34×18/4898 = 12.5%) | **≤ 6%** (expected ~4% + ~2pp clustering-uncertainty margin; NOT the 5-indicator ≤4% — derived from GAP's own 0.7% raw × the frozen 18c hysteresis extension; >6% ⇒ interrupt materially broader than GAP's physics ⇒ FAIL) |
+| Off-episode CRISIS occupancy | of ~11 events, ~4–6 fall outside the 7 labeled episode windows (±15d); ~5 × 18c / 4,898 ≈ **~1.8%** | **≤ 3%** (expected ~1.8% + margin; a violent-candle interrupt legitimately fires on real ≥4σ/10% candles the episode list does not enumerate — true positives; the old ≤1.5% was a confluence-machine number) |
+| STRESS+CRISIS occupancy | — | **INAPPLICABLE / REMOVED** — the 2-state machine has no STRESS state (documented as inapplicable, not deleted-to-pass) |
+
+**Terminal for Layer 1:** pass ⇒ Layer 1 is the shared fast interrupt. Fail on the primary bar ⇒
+Layer 1 DEAD, Layer-2-only. Fail a derived calm budget ⇒ same (a violent-candle interrupt that is
+not sparse is not worth its turnover). No re-registration of Layer 1 (RATIFIED as-is).
+
+## §B — Drawdown-from-peak detector (NEW family, USER-AUTHORIZED auth B; FROZEN; terminal no-retry)
+
+**Purpose:** cover the sustained-regime and slow-bleed crises single-candle GAP structurally cannot
+see (FTX = the canonical multi-candle bleed with no 4σ candle). **LEVEL-based by design** — that is
+its job; onset transforms provably cannot see a crash inside a sustained regime (002 §4).
+
+**Construction (my call, frozen):**
+- Trailing-peak window **W = 90 candles (30d)** — deliberately a RECENT-peak, not all-time-peak,
+  window: this is the first line of defense against the level-persistence trap (a 30d-trailing peak
+  DECAYS in a prolonged decline, so drawdown-from-it measures the FRESH decline and self-heals on
+  stabilization, rather than pinning to a 2021 all-time high for years).
+- Per name i: DD_i[t] = close_i[t] / max(close_i over trailing W) − 1 (≤ 0), past-only.
+- **Signal = blue-chip-median drawdown with BTC fallback:** BCDD[t] = median of DD_i over the §2.3
+  blue-chip core (top-5 by trailing 270c dollar-volume, ≥540d listed) when ≥3 core names are
+  defined; else DD[t] = BTC-DD[t] (BTC defined once it has W history, ~2020-04 — this is why COVID,
+  where the core is under-defined, is still scoreable for this detector via BTC-DD). Blue-chip
+  median (not BTC alone) because alt-carnage events (FTX, LUNA) draw the majors down FAR more than
+  BTC, and a MN book's systemic danger is the broad blue-chip drawdown, not BTC's alone.
+- **Graded thresholds (coverage-anchored, round-number principle anchors on the natural DD scale;
+  NOT z-scored — a z of a persistent level IS the trap):** STRESS-grade DD ≤ **−20%**; CRISIS-grade
+  DD ≤ **−30%**.
+- **Recovery-based de-escalation (the explicit anti-persistence design, per the coordinator's
+  guidance — de-escalation driven by a MARKET recovery event, NOT a clean-candle timer, so it cannot
+  suffer the clean-streak multiplication that killed the confluence machine):** hysteresis bands —
+  CRISIS→STRESS only when DD RECOVERS above **−22%**; STRESS→NORMAL only when DD recovers above
+  **−12%**. Minimum dwell CRISIS ≥ 9c / STRESS ≥ 6c (a 1-candle wick above a band cannot de-escalate).
+- Escalation immediate, consumed [k−1]. **STRESS action = gross 0.5 + universe contraction to the
+  blue-chip core; CRISIS action = FLAT (blue-chip carve-out per-construction as §2.3).**
+
+**Explicit confrontation of the known trap (level-persistence, the XVOL/FUND killer):** the 30d
+self-resetting window + recovery-based bands are the two defenses. The RESIDUAL risk is honest and
+stated: in a prolonged steady grind-down (the 2022 bear, ~12 months of majors below their 30d
+peaks), DD-from-30d-peak may remain in STRESS for extended stretches → high occupancy. **This
+detector's single most likely failure mode is its calm/occupancy budget** (below), and its secondary
+risk is FTX sitting borderline at the −30% CRISIS line (BCDD at the FTX trough may be ~−27 to −33% —
+if shallower than −30%, FTX MISSES and the detector is dead). Both are genuine, pre-stated
+falsification risks. This is the trap in plain view, as authorized.
+
+**OWN falsification bars (FROZEN pre-run; TERMINAL no-retry — fail = dead, no rescue, Layer-2
+remains the fallback for its coverage):**
+- **Episodes (UNCHANGED shape): 4/4 primary at CRISIS 0-LAG** (COVID via BTC-DD fallback; May-2021 /
+  LUNA / FTX via BCDD) **AND 3/3 secondary at ≥ STRESS** (this detector HAS a STRESS state, so —
+  unlike GAP-only — the secondary ≥STRESS bar applies and is mandatory: covering grinding
+  deleveraging is exactly this detector's purpose).
+- **Calm budgets — DERIVED pre-run for a LEVEL detector and FROZEN** (derivation: a
+  drawdown-regime detector should be roughly co-extensive with genuine drawdown regimes; IS regime
+  occupancy is CRASH 13.16% / MANIA 18.85% / CHOP 67.99%, so a −20%/−30% DD detector's elevated
+  time should track the ~13% CRASH scale, with deeper CRISIS rarer):
+
+| Metric | Derivation | FROZEN BAR |
+|---|---|---|
+| CRISIS occupancy (DD ≤ −30%, w/ hysteresis) | the deepest sub-part of the 13% CRASH bucket | **≤ 8%** (level detector; deliberately higher than Layer-1's derived ≤6% because a sustained-regime detector legitimately occupies its deep state longer) |
+| STRESS+CRISIS occupancy (DD ≤ −20%) | ~ CRASH-bucket scale, elevated through genuine drawdown regimes | **≤ 25%** (deliberately HIGHER than the onset machine's 15% — a sustained-regime detector's JOB is sustained elevation; but ≤25% is a REAL falsifier: exceeding it means the detector is elevated through ordinary chop/bear, i.e., the level-persistence trap WON and the 30d self-reset failed) |
+| Distinct CRISIS entries | ~2/yr genuine systemic-DD events over 4.5y | **≤ 10** |
+| Off-episode CRISIS occupancy | genuine deep-DD outside the 7 labeled windows | **≤ 3%** |
+
+- Leak suite: same §2.5 battery (corrupt-future on the DD level and the composed state;
+  append-invariance; decision-lag [k−1]; no-book-input). Runner reuses `mn3_crisis_falsify.py`
+  harness against these 4-primary + 3-secondary + calm bars, frozen here.
+
+## §C — Layer-2 per-construction throttle (TRACK INVARIANT, restated as BINDING)
+
+Regardless of the outcomes of §A and §B, **every MN3 construction ships a pre-registered
+per-construction gross throttle** (the A3/SCUD precedent: a gross scalar on the book's OWN signal
+state — e.g., its short-cohort upside-dispersion z — which IS sustained-regime-aware because it
+z-scores the book's own cohort, not the market). Each EXPLORATION brief pre-registers the throttle's
+construction, its coverage-anchored thresholds, and its own falsification arm (past-only leak test +
+IS behavior), sized to the construction's frequency. This is now a binding invariant replacing PLAN
+§2.3/§3's "the shared crisis machine handles risk" assumption. Layers 1/B are floors UNDER this, not
+substitutes for it.
+
+## §D — Composition (how the layers combine; leak tests required)
+
+Each active layer emits a **past-only gross scalar in [0,1]** (1.0 full, 0.5 stress/half, 0.0 flat)
+and a state label, consumed at the [k−1] decision lag:
+- s_gap[k−1] ∈ {1.0, 0.0} (Layer 1: NORMAL/CRISIS).
+- s_dd[k−1] ∈ {1.0, 0.5, 0.0} (§B detector, IF it passes its falsification; otherwise absent /
+  ≡ 1.0).
+- s_con[k−1] ∈ [0,1] (Layer-2 per-construction throttle, always present).
+
+**Effective gross scalar at rebal k = min(s_gap[k−1], s_dd[k−1], s_con[k−1])** — the most
+conservative layer wins; multiplicative stacking is banned (it double-counts and can over-de-risk).
+**Universe:** apply the TIGHTEST contraction any layer requests — if any layer is at a
+STRESS/CRISIS-grade contraction, restrict to the blue-chip-core intersection; a CRISIS/flat from any
+layer (scalar 0) forces flat (or the per-construction §2.3 blue-chip carve-out, whichever the
+construction registered). **Precedence** is moot for the scalar (min is order-free) but FROZEN for
+forensics/state reporting as GAP > DD > construction (report the binding layer). **Leak tests
+(mandatory, extend the suite, house style):** (1) inert-default byte-identity — all layers off ⇒
+existing engine behavior bit-for-bit; (2) min-composition determinism + order-independence;
+(3) decision-lag — every layer's scalar at fill k uses only data ≤ close[k−1]; (4) corrupt-future
+positive control on the COMPOSED scalar (corrupt rows ≥ t ⇒ composed scalar < t bit-identical);
+(5) the composed `book_scalar_series` is charged through turnover/funding like any weight change.
+
+## §E — What unblocks when
+
+- **The diagnostic field (DIAG-J first, per PLAN §4) unblocks once the Layer-1 GAP-only
+  mini-falsification (§A) is SCORED — pass OR fail.** The field does NOT wait for the §B detector.
+  Rationale: Layer 2 (§C) is a binding invariant regardless, so every construction carries its own
+  risk primitive from birth; the shared Layer-1 result (and the §B result) only determine which
+  shared floors compose UNDER the constructions, which is a plumbing decision resolvable at
+  EXPLORATION time, not a diagnostic-stage blocker.
+- **The §B drawdown-from-peak falsification runs IN PARALLEL** with the diagnostic field (same
+  harness, IS-only, no book, no token). Its pass/fail determines only whether s_dd participates in
+  §D composition; a §B failure leaves the architecture at Layer-1 (if it passed) + Layer-2, with
+  slow-bleed coverage carried by per-construction throttles.
+- No holdout, no alpha-family token, and no post-2026-06 data is touched by any of §A/§B/§C/§D —
+  all falsification is IS-only 2020-01→2024-06.
+
+*— QR, MN3 track, 2026-07-11. PLAN-AMENDMENT-002. User-ruled (auth A ratified, auth B authorized);
+appended, not edited; all budgets derived and frozen pre-run with documented arithmetic; nothing
+run, nothing committed; the holdout remains untouched.*
