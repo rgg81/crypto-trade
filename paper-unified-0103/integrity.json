@@ -1,0 +1,31 @@
+{
+  "written_utc": "2026-07-12T16:52:12Z",
+  "note": "mn4 UNIFIED-01-03 live paper-trade (forward / Stage-3)",
+  "forward_start": "2026-07-01T00:00:00Z",
+  "frozen_modules": [
+    "blind_engine.py",
+    "blind_funding.py",
+    "blind_universe.py",
+    "mn4_unified_0103.py",
+    "mn4_idea01_tsmom.py",
+    "mn4_idea03_alpha.py",
+    "mn4_idea03_regime.py",
+    "mn4_idea03_run.py",
+    "mn_beta.py",
+    "mn3_regimes.py",
+    "mn3_split.py"
+  ],
+  "sha256": {
+    "blind_engine.py": "32c2263c155c8959a80299bd6c9af38d0c0a220738cff3632e6e34328699fc37",
+    "blind_funding.py": "859cac8b526ff5404675415615c49c9c2fd66bb90283e2534c77b685f731a0d5",
+    "blind_universe.py": "7cf8a4401fcaee80a41cb9b9ae8ee1f8e93fcb68604850e79ee69630dbd1f335",
+    "mn4_unified_0103.py": "25cb8f7f7de16fc43620f8c65b620ed7a9741240910489a9ea8041426eec14df",
+    "mn4_idea01_tsmom.py": "7ddedcb98fb50ad5494e9c21cd90fdb525372cf59113652d9ccbf65ecfcff68e",
+    "mn4_idea03_alpha.py": "766bef9fb3c862aa4e268dee58fa207f22cac5968070c989727f7e28e8231f73",
+    "mn4_idea03_regime.py": "47aa6c1696b70a3bf0ca5f1bcedb7b0522378116c80ceb34e407a6a4f7f5cf35",
+    "mn4_idea03_run.py": "38da9d14f67fb502a5527f9e86bfc5df2483032002f2f0e4cd84b016bce891af",
+    "mn_beta.py": "ef7c6a72e06e1e8817ca43a5a75bfe6c73504b0f4d8e7631ee63d699905de0b3",
+    "mn3_regimes.py": "0dc7c1fd308e45eb1270f709e105fd95c3accd833d8daea16b2ee1fb2abb930b",
+    "mn3_split.py": "1b37170d542e866d7c2369f0ba44b9b504e29d7cd6ddd992d7078fea12596d25"
+  }
+}
