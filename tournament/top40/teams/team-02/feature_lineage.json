@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "candidate_id": "t02-dldn-c01",
+  "oos_rows_inspected": false,
+  "features": [
+    {"field":"transaction_close","source":"data/top40/snapshot-v1/bars.parquet; Binance USD-M 8h klines","event_time":"close_time","available_time":"open_time+8h","lag":"closed by decision","transform":"log close return","missing":"asset unavailable","fitted":false},
+    {"field":"weekly_membership","source":"membership.parquet; prior-30-complete-day median quote volume","event_time":"Monday 00:00 UTC","available_time":"same boundary","lag":"past-only","transform":"eligible-symbol filter","missing":"not tradable","fitted":false},
+    {"field":"market_residual_z","source":"transaction_close","event_time":"bar end","available_time":"bar end","lag":"0 after close","transform":"median-market OLS residual, rolling median/MAD, clip +/-4","missing":"predictor=0; response dropped","fitted":true},
+    {"field":"directed_edges","source":"market_residual_z","event_time":"weekly refit","available_time":"after labels ending by refit","lag":"one 8h lead","transform":"ridge, split-half sign stability, soft threshold, top-K","missing":"edge rejected","fitted":true},
+    {"field":"community_beta_neutral_score","source":"directed_edges, market_residual_z","event_time":"decision","available_time":"decision","lag":"current completed bar","transform":"diffusion gap, spectral communities, inverse residual-vol projection","missing":"flat if <12 linked","fitted":true},
+    {"field":"funding_cashflow","source":"funding.parquet; Binance funding history","event_time":"funding_time","available_time":"strictly before strategy context; evaluator at event","lag":"not a signal","transform":"-signed_notional*rate","missing":"snapshot failure, never imputed","fitted":false},
+    {"field":"execution_inputs","source":"bars.parquet, mark_prices.parquet","event_time":"fill/risk boundary","available_time":"central evaluator only","lag":"next-open","transform":"fees, slippage, participation, mark risk","missing":"unfilled/forced-exit rules","fitted":false}
+  ]
+}

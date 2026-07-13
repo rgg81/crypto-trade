@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "candidate_id": "t03-idtail-v1",
+  "fixed_feature_order": ["tail_rank", "beta_rank", "momentum_rank", "log_idio_vol_rank"],
+  "fields": [
+    {"field":"bars.close","endpoint_archive":"Binance USD-M 8h transaction klines -> bars.parquet","event_timestamp":"open_time+8h","available_timestamp":"event timestamp","lag":"closed rows with timestamp<=decision","transformation":"adjacent log return; robust factor residual and tail score","missing_data":"never bridge; rolling minima in brief","fitted":true},
+    {"field":"membership.symbol","endpoint_archive":"PIT membership.parquet from prior 30 complete days","event_timestamp":"Monday 00:00 UTC","available_timestamp":"same Monday","lag":"prior dates only","transformation":"eligibility gate","missing_data":"not tradable","fitted":false},
+    {"field":"calendar","endpoint_archive":"deterministic UTC","event_timestamp":"decision_time","available_timestamp":"decision_time","lag":"none","transformation":"Monday rebalance gate","missing_data":"none","fitted":false},
+    {"field":"funding_rate","endpoint_archive":"Binance funding archives/manifested REST gaps -> funding.parquet","event_timestamp":"actual funding_time","available_timestamp":"strictly before strategy context; evaluator cashflow at event","lag":"not a signal","transformation":"-signed_notional*rate","missing_data":"snapshot fails coverage","fitted":false},
+    {"field":"bars.open/quote_volume","endpoint_archive":"Binance transaction klines","event_timestamp":"bar open / bar close","available_timestamp":"open hidden from decision; volume after close","lag":"evaluator only","transformation":"fill and participation only; prohibited from alpha","missing_data":"central no-fill/exit rules","fitted":false},
+    {"field":"mark_price","endpoint_archive":"Binance 1h mark archives/manifested fallbacks","event_timestamp":"hour boundary","available_timestamp":"boundary","lag":"evaluator only","transformation":"risk and funding accounting","missing_data":"snapshot fails required coverage","fitted":false}
+  ]
+}

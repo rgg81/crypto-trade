@@ -1,0 +1,134 @@
+{
+  "schema_version": 1,
+  "team_id": "team-10",
+  "mechanism": "print_fragmentation_attention_premium",
+  "status": "terminated_no_go",
+  "phase0_record_commit": "012727865acecad6ea0c3327745359820b8e45c6",
+  "common_freeze_commit": "48df09341f02eba7a3469abd1ccda6649a4ef0ba",
+  "window": {
+    "name": "in_sample_only",
+    "start": "2020-02-03",
+    "end_inclusive": "2024-06-30"
+  },
+  "public_oos_accesses": 0,
+  "material_configurations_consumed": 21,
+  "remaining_configuration_budget": 99,
+  "notes": [
+    "Proxy screens use open-to-open returns, 7.5 bp per executed turnover, and approximate membership removals; they omit exact funding, fill caps, and delist accounting and are not canonical evidence.",
+    "C01 is the only exact common-evaluator candidate. Its 2x-cost replay is a stress setting, not an additional configuration.",
+    "The 24h primary appears twice conservatively because A01 and G02 used different feasibility coverage gates."
+  ],
+  "direction_and_component_controls": [
+    {
+      "id": "A01",
+      "feature": "120d robust log(trade_count/quote_volume), liquidity-vol-beta residual",
+      "hold_days": 1,
+      "names_per_sleeve": 5,
+      "mean_spearman_ic": 0.0245,
+      "proxy_net_sharpe": -0.467,
+      "disposition": "daily primary fails costs"
+    },
+    {
+      "id": "A02",
+      "feature": "same fragmentation shock without nuisance residualization",
+      "hold_days": 1,
+      "names_per_sleeve": 5,
+      "mean_spearman_ic": 0.0474,
+      "proxy_net_sharpe": -0.365,
+      "disposition": "nuisance removal is not source of failure"
+    },
+    {
+      "id": "A03",
+      "feature": "quote-volume shock only with identical nuisance residualization",
+      "hold_days": 1,
+      "names_per_sleeve": 5,
+      "mean_spearman_ic": -0.0372,
+      "proxy_net_sharpe": -0.898,
+      "disposition": "does not replicate primary tail relation"
+    },
+    {
+      "id": "A04",
+      "feature": "raw trade-count shock only with identical nuisance residualization",
+      "hold_days": 1,
+      "names_per_sleeve": 5,
+      "mean_spearman_ic": -0.0393,
+      "proxy_net_sharpe": -0.394,
+      "disposition": "does not replicate primary tail relation"
+    },
+    {
+      "id": "A05",
+      "feature": "reversed fragmentation direction",
+      "hold_days": 1,
+      "names_per_sleeve": 5,
+      "mean_spearman_ic": -0.0245,
+      "proxy_net_sharpe": -0.857,
+      "disposition": "sign reversal is worse"
+    }
+  ],
+  "bounded_cadence_tail_grid": [
+    {"id": "G01", "hold_days": 1, "names_per_sleeve": 4, "proxy_net_sharpe": -0.151},
+    {"id": "G02", "hold_days": 1, "names_per_sleeve": 5, "proxy_net_sharpe": -0.471},
+    {"id": "G03", "hold_days": 1, "names_per_sleeve": 6, "proxy_net_sharpe": -0.303},
+    {"id": "G04", "hold_days": 2, "names_per_sleeve": 4, "proxy_net_sharpe": 0.356},
+    {"id": "G05", "hold_days": 2, "names_per_sleeve": 5, "proxy_net_sharpe": 0.087},
+    {"id": "G06", "hold_days": 2, "names_per_sleeve": 6, "proxy_net_sharpe": 0.144},
+    {"id": "G07", "hold_days": 3, "names_per_sleeve": 4, "proxy_net_sharpe": 0.747},
+    {"id": "G08", "hold_days": 3, "names_per_sleeve": 5, "proxy_net_sharpe": 0.866},
+    {"id": "G09", "hold_days": 3, "names_per_sleeve": 6, "proxy_net_sharpe": 0.764},
+    {"id": "G10", "hold_days": 5, "names_per_sleeve": 4, "proxy_net_sharpe": 0.196},
+    {"id": "G11", "hold_days": 5, "names_per_sleeve": 5, "proxy_net_sharpe": 0.293},
+    {"id": "G12", "hold_days": 5, "names_per_sleeve": 6, "proxy_net_sharpe": 0.358},
+    {"id": "G13", "hold_days": 7, "names_per_sleeve": 4, "proxy_net_sharpe": -0.204},
+    {"id": "G14", "hold_days": 7, "names_per_sleeve": 5, "proxy_net_sharpe": -0.136},
+    {"id": "G15", "hold_days": 7, "names_per_sleeve": 6, "proxy_net_sharpe": -0.018}
+  ],
+  "exact_common_evaluator": {
+    "id": "C01",
+    "parameters": {
+      "baseline_days": 120,
+      "minimum_baseline_days": 60,
+      "mad_floor": 0.05,
+      "hold_hours": 72,
+      "names_per_sleeve": 5,
+      "weight_per_name": 0.08,
+      "anchor_utc": "2020-02-03T00:00:00Z",
+      "seed": 20260713
+    },
+    "base_cost": {
+      "net_sharpe": -0.25129873202783354,
+      "annualized_return": -0.08179106168208838,
+      "max_drawdown": 0.6174130309199718,
+      "positive_quarter_fraction": 0.2777777777777778,
+      "long_price_pnl_sum": 1.0556019791504072,
+      "short_price_pnl_sum": -1.1818923588099393,
+      "funding_pnl_sum": 0.16919505296919662,
+      "fees_sum": 0.2073821200927695,
+      "slippage_sum": 0.10369106004638474,
+      "turnover_sum": 414.76424018553894,
+      "mean_long_exposure": 0.36777013928662866,
+      "mean_short_exposure": 0.3659347514599726,
+      "both_sleeves_fraction_above_1pct": 0.9329192546583851,
+      "buy_notional_usdt": 21485400.04416464,
+      "sell_notional_usdt": 21471286.36928934,
+      "unfilled_notional_usdt": 237218.2457483228,
+      "conservative_settlement_loss_sum": 0.0,
+      "risk_cap_breach_bars": 53,
+      "regime_sharpe": {"bear": -0.22, "bull": -0.124, "chop": -0.666, "stress": -0.237}
+    },
+    "double_cost": {
+      "net_sharpe": -0.5549140843556593,
+      "annualized_return": -0.1444531408771017,
+      "max_drawdown": 0.6990917681839615,
+      "positive_quarter_fraction": 0.2777777777777778
+    },
+    "falsifier_triggered": true,
+    "disposition": "terminate mechanism; no nested validation and no public OOS"
+  },
+  "failed_diagnostic_attempts": [
+    {
+      "description": "non-overlapping forward-spread horizon printout",
+      "result": "no metric produced because timestamp arithmetic raised before the first horizon evaluation",
+      "material_configuration_count": 0
+    }
+  ]
+}

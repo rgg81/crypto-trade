@@ -1,0 +1,93 @@
+{
+  "schema_version": 1,
+  "team_id": "team-10",
+  "mechanism": "print_fragmentation_attention_premium",
+  "status": "terminated_no_go",
+  "phase0_record_commit": "012727865acecad6ea0c3327745359820b8e45c6",
+  "common_freeze_commit": "48df09341f02eba7a3469abd1ccda6649a4ef0ba",
+  "data_manifest_sha256": "077eb036d262befec80f7013084fe6906859f7c3bbe2f8c193c9d9ec68e367c3",
+  "research_cutoff_exclusive_utc": "2024-07-01T00:00:00Z",
+  "public_oos_accesses": 0,
+  "features": [
+    {
+      "name": "daily_trade_count",
+      "field": "trade_count (Binance kline number_of_trades)",
+      "endpoint_or_archive": "Binance public USD-M monthly klines archive; frozen bars.parquet",
+      "event_timestamp": "8h kline close_time",
+      "available_timestamp": "close_time",
+      "lag": "three bars opened t-24h, t-16h, t-8h; all closed by 00:00 decision t",
+      "transformation": "N_it=sum of three bars; enters ln(N_it)-ln(Q_it)",
+      "missing_data_behavior": "missing unless exactly three bars and N_it>=10; no pseudocount",
+      "fitted": false
+    },
+    {
+      "name": "daily_quote_volume",
+      "field": "quote_volume (Binance kline quote_asset_volume)",
+      "endpoint_or_archive": "Binance public USD-M monthly klines archive; frozen bars.parquet",
+      "event_timestamp": "8h kline close_time",
+      "available_timestamp": "close_time",
+      "lag": "same three completed bars through decision t",
+      "transformation": "Q_it=sum; ln(N_it)-ln(Q_it); prior/current 30-day median supplies liquidity nuisance",
+      "missing_data_behavior": "missing unless exactly three bars and Q_it>=100000 USDT",
+      "fitted": false
+    },
+    {
+      "name": "fragmentation_shock",
+      "field": "derived from daily_trade_count and daily_quote_volume",
+      "endpoint_or_archive": "derived only from frozen bars.parquet",
+      "event_timestamp": "00:00 UTC after all three source bars close",
+      "available_timestamp": "decision time t",
+      "lag": "current x uses data through t; baseline uses 120 prior valid days excluding t",
+      "transformation": "x=ln(N)-ln(Q); f=clip((x-median_120)/max(1.4826*MAD_120,0.05),-5,5), min 60",
+      "missing_data_behavior": "exclude symbol for the decision when current or baseline rule fails; never impute",
+      "fitted": false
+    },
+    {
+      "name": "close_return_volatility",
+      "field": "close",
+      "endpoint_or_archive": "Binance public USD-M monthly klines archive; frozen bars.parquet",
+      "event_timestamp": "last daily 8h kline close_time",
+      "available_timestamp": "00:00 UTC decision t",
+      "lag": "daily close return through t; 30-day trailing window including t",
+      "transformation": "sqrt(365)*sample_sd(log(C_t/C_t-1),30), min 20; cross-sectional average rank nuisance",
+      "missing_data_behavior": "exclude symbol when fewer than 20 returns",
+      "fitted": false
+    },
+    {
+      "name": "btc_beta",
+      "field": "BTCUSDT and symbol transaction close",
+      "endpoint_or_archive": "Binance public USD-M monthly klines archive; frozen bars.parquet",
+      "event_timestamp": "last daily 8h kline close_time",
+      "available_timestamp": "00:00 UTC decision t",
+      "lag": "90 trailing daily returns through t, minimum 60 paired",
+      "transformation": "past-only covariance/variance beta; cross-sectional average rank nuisance",
+      "missing_data_behavior": "exclude symbol if BTC is unavailable, pairs<60, or BTC variance<=0",
+      "fitted": false
+    },
+    {
+      "name": "pit_eligible_symbols",
+      "field": "reconstitution_time, symbol, liquidity_rank",
+      "endpoint_or_archive": "frozen membership.parquet built from prior-30-complete-day Binance quote volume",
+      "event_timestamp": "Monday 00:00 UTC reconstitution",
+      "available_timestamp": "reconstitution_time",
+      "lag": "most recent reconstitution at or before t, intersected with decision-time fillability",
+      "transformation": "eligibility gate only; liquidity rank is not alpha",
+      "missing_data_behavior": "no earlier membership means ineligible; absent decision-time open means ineligible",
+      "fitted": false
+    }
+  ],
+  "execution_only_inputs": [
+    {
+      "field": "transaction open, close, quote_volume",
+      "use": "next-open fills, participation cap, and forced exits in common evaluator; open price is hidden from strategy"
+    },
+    {
+      "field": "actual funding_rate and funding mark_price",
+      "use": "common cashflow -signed_position_notional*funding_rate; never an alpha feature"
+    },
+    {
+      "field": "hourly boundary mark_price",
+      "use": "common exposure/risk accounting only; never an alpha feature"
+    }
+  ]
+}

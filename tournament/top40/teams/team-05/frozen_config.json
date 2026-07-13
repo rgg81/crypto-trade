@@ -1,0 +1,142 @@
+{
+  "schema_version": 1,
+  "candidate_id": "T05-AER12-H80-R72-v1",
+  "strategy_name": "auction-excursion rejection",
+  "strategy_seed": 20260713,
+  "trial_namespace_seed": 2026071305,
+  "common_freeze_commit": "48df09341f02eba7a3469abd1ccda6649a4ef0ba",
+  "phase0_record_commit": "012727865acecad6ea0c3327745359820b8e45c6",
+  "data_manifest_sha256": "077eb036d262befec80f7013084fe6906859f7c3bbe2f8c193c9d9ec68e367c3",
+  "common_config_sha256": "030a065f75f9c4adb7484065908f4379435929609d446be0de0a831d9e28ee0a",
+  "strategy_sha256": "30e8159fddf388d42750def7f32c9a122c1a589611b820765c4e0aaaf441cd37",
+  "dependency_lock_sha256": "869cd3380346a9c9a219fc762868e23cd494a18e22dd9b314ba18621d991faa5",
+  "coverage": {
+    "warmup_start": "2020-01-01T00:00:00Z",
+    "in_sample_start": "2020-02-03T00:00:00Z",
+    "in_sample_end_exclusive": "2024-07-01T00:00:00Z",
+    "public_oos_views": 0,
+    "public_oos_read": false
+  },
+  "cadence": {
+    "bar_interval_hours": 8,
+    "evaluate_every_hours": 8,
+    "fill": "hidden transaction open at decision boundary",
+    "refresh_hours": 72
+  },
+  "auction_feature": {
+    "lookback_slots": 12,
+    "minimum_valid": 9,
+    "predecessor_adjacency_hours": 8,
+    "minimum_true_range_over_previous_close": 1e-08,
+    "body_confirmation": 0.5,
+    "aggregate": "median(q)*abs(mean(sign(q)))",
+    "gap_rule": "gaps enlarge true range but are neither wick nor body; missing predecessors invalidate q"
+  },
+  "nuisances": {
+    "adjacent_return": "log(C_k/C_k-1), exact 8h adjacency",
+    "return_24h_slots": 3,
+    "return_7d_slots": 21,
+    "return_horizons_require_contiguous": true,
+    "volatility_slots": 21,
+    "volatility_minimum": 18,
+    "volatility_annualization": 1095.0,
+    "quote_volume_slots": 21,
+    "quote_volume_minimum": 18,
+    "quote_volume_transform": "log(median(quote_volume))",
+    "beta_slots": 63,
+    "beta_minimum_aligned": 50,
+    "beta_estimator": "demeaned covariance numerator / demeaned BTC sum of squares",
+    "beta_minimum_btc_mean_squared_deviation": 1e-12,
+    "funding_maximum_age_hours": 16,
+    "funding_strictly_before_decision": true,
+    "funding_missing_rate": 0.0,
+    "funding_missing_indicator": 1.0
+  },
+  "cross_section": {
+    "minimum_fully_valid_names": 10,
+    "symbol_order": "ascending",
+    "robust_z": "clip((x-median)/(1.4826*MAD),-3,3)",
+    "zero_mad_nuisance": 0.0,
+    "zero_mad_alpha": "explicit flat",
+    "design_order": [
+      "intercept",
+      "z_r24",
+      "z_r7d",
+      "z_volatility",
+      "z_log_quote_volume",
+      "z_beta",
+      "z_funding",
+      "funding_missing"
+    ],
+    "pseudoinverse_rcond": 1e-10,
+    "rank": "ascending residual with symbol tie-break",
+    "percentile": "(rank-1)/(N-1)"
+  },
+  "selection": {
+    "long_entry_percentile": 0.8,
+    "short_entry_percentile": 0.2,
+    "long_retention_percentile": 0.55,
+    "short_retention_percentile": 0.45,
+    "maximum_per_side": "min(6,max(2,ceil(0.15*N)))",
+    "minimum_per_side": 2
+  },
+  "stress": {
+    "estimator": "sqrt(1095/(4*log(2))*mean(log(H/L)^2))",
+    "slots": 90,
+    "minimum_valid": 75,
+    "enter_above": 0.8,
+    "exit_below": 0.65,
+    "equality": "retain prior state",
+    "unavailable": "stress",
+    "normal_gross_ceiling": 0.72,
+    "stress_gross_ceiling": 0.36
+  },
+  "optimizer": {
+    "method": "SLSQP",
+    "objective": "sum((w-d)^2)+4*sum((w-w_prev)^2)",
+    "ftol": 1e-12,
+    "maxiter": 500,
+    "initial_point": "desired",
+    "equality_residual_tolerance": 1e-08,
+    "per_symbol_bound": 0.08,
+    "gross_per_side": "min(G/2,0.06*min(nLong,nShort))",
+    "fallback_levels": {
+      "1": "beta and funding neutrality, omitting only zero-MAD factors",
+      "2": "drop funding neutrality",
+      "3": "drop beta neutrality",
+      "4": "explicit flat because no accepted solution or required inputs/dispersion/sides are unavailable"
+    }
+  },
+  "emission": {
+    "mapping_on": [
+      "selected set change",
+      "point-in-time membership change",
+      "stress state change",
+      "72h since last mapping"
+    ],
+    "otherwise": "None (hold quantities)",
+    "membership_loss": "immediate mapping without lost symbol"
+  },
+  "validation": {
+    "training_start": "2020-02-03T00:00:00Z",
+    "validation_folds": [
+      ["2021-01-01T00:00:00Z", "2021-07-01T00:00:00Z"],
+      ["2021-07-01T00:00:00Z", "2022-01-01T00:00:00Z"],
+      ["2022-01-01T00:00:00Z", "2022-07-01T00:00:00Z"],
+      ["2022-07-01T00:00:00Z", "2023-01-01T00:00:00Z"],
+      ["2023-01-01T00:00:00Z", "2023-07-01T00:00:00Z"],
+      ["2023-07-01T00:00:00Z", "2024-01-01T00:00:00Z"],
+      ["2024-01-01T00:00:00Z", "2024-07-01T00:00:00Z"]
+    ],
+    "purge_hours": 8,
+    "later_training_exclusion_after_each_validation_hours": 24,
+    "reset_state_per_fold": true,
+    "predeclared_grid_configurations": 96
+  },
+  "runtime_versions": {
+    "python": "3.13.12",
+    "numpy": "2.2.6",
+    "pandas": "3.0.0",
+    "scipy": "1.17.0"
+  }
+}

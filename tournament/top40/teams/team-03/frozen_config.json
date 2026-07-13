@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "candidate_id": "t03-idtail-v1",
+  "seed": 20260713,
+  "parameters": {
+    "a": 2.0,
+    "blend": 0.75,
+    "windows": [84, 168, 336],
+    "K": 6,
+    "annualized_volatility_target": 0.3
+  }
+}

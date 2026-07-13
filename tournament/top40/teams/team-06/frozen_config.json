@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "candidate_id": "T06-HWDS-001",
+  "strategy_name": "hierarchical_weekday_differential_seasonality",
+  "strategy_seed": 20260713,
+  "trial_seed": 2026071306,
+  "phase0_record_commit": "012727865acecad6ea0c3327745359820b8e45c6",
+  "common_freeze_commit": "48df09341f02eba7a3469abd1ccda6649a4ef0ba",
+  "data_manifest_path": "tournament/top40/data_manifest.json",
+  "data_manifest_sha256": "077eb036d262befec80f7013084fe6906859f7c3bbe2f8c193c9d9ec68e367c3",
+  "decision_clock": {
+    "rebalance": "daily-00:00-UTC",
+    "hold": [
+      "08:00-UTC",
+      "16:00-UTC"
+    ],
+    "fill": "central-evaluator-next-unseen-open"
+  },
+  "parameters": {
+    "weekday_lookback_weeks": 52,
+    "weekday_half_life_observations": 13,
+    "minimum_weekday_observations": 26,
+    "beta_lookback_days": 60,
+    "minimum_beta_observations": 45,
+    "beta_estimator": "paired-centered-ols-slope-with-intercept",
+    "covariate_lookback_days": 20,
+    "minimum_covariate_observations": 18,
+    "cross_sectional_feature_order": [
+      "beta",
+      "momentum_20d",
+      "sample_volatility_20d",
+      "log_median_quote_volume_20d"
+    ],
+    "ridge_slope_penalty": 1.0,
+    "ridge_intercept_penalty": 0.0,
+    "minimum_valid_names": 10,
+    "selection_fraction": 0.2,
+    "selection_minimum_per_sleeve": 5,
+    "selection_maximum_per_sleeve": 8,
+    "gross_cap": 0.8,
+    "symbol_cap": 0.09,
+    "inverse_volatility_floor": 0.01,
+    "volatility_throttle": 0.04,
+    "spread_ramp_start": 0.003,
+    "spread_ramp_end": 0.006
+  },
+  "missing_data": {
+    "daily_return": "pairwise-omit-nonadjacent-or-invalid-boundaries",
+    "beta": "exclude-below-45-pairs-or-zero-btc-variance",
+    "weekday": "exclude-below-26-pairs",
+    "covariates": "exclude-below-18-returns-or-18-complete-positive-volume-dates",
+    "cross_section": "flat-below-10-valid-names"
+  },
+  "dependency_lock": "uv.lock",
+  "dependency_lock_source": "repository-root-uv.lock-byte-identical"
+}

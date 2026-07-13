@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "team_id": "team-07",
+  "status": "T07-SRMB-118_organizer_advanced_despite_QR_falsifier",
+  "is_only": true,
+  "public_oos_views": 0,
+  "material_configuration_count": 120,
+  "history": [
+    {
+      "family": "PES",
+      "trials": 72,
+      "result": "no proxy survivor; fixed point Sharpe -1.917, MDD .960, exact insolvency 2022-05-13T00:00:00Z"
+    },
+    {
+      "family": "PEES",
+      "trials": 1,
+      "result": "sign inversion at gross .60; exact insolvency 2022-05-13T00:00:00Z"
+    },
+    {
+      "family": "SRM-B",
+      "trials": 47,
+      "result": "nested OOF Sharpe .798, 2x .621, MDD .132, 4/6 positive, fill .967; final trial 118 full-IS Sharpe .400, 2x .270, MDD .124, fill .669",
+      "falsifier": "full-IS fill fraction below fixed .90 floor"
+    }
+  ],
+  "srm_grid": {
+    "coefficient_formation_pairs": [[126, 42], [126, 63], [189, 42], [189, 63], [189, 126], [252, 63], [252, 126]],
+    "fixed_skip_bars": 21,
+    "standardize": [false, true],
+    "names_per_sleeve": [4, 6, 8],
+    "core_trials": 42,
+    "anchor_ablations": ["gross=.40", "gross=.80", "outside_breadth_multiplier=0", "breadth_bounds=.25/.75", "no_breadth_brake"]
+  },
+  "organizer_advanced_submission_nominee": {
+    "candidate": "T07-SRMB-118",
+    "qr_accepted": false,
+    "mechanically_valid": true,
+    "trial": 118,
+    "W_F_S": [189, 63, 21],
+    "rms_standardized": true,
+    "names_per_sleeve": 6,
+    "gross": 0.6,
+    "breadth_bounds": [0.2, 0.8],
+    "outside_multiplier": 0.0
+  },
+  "disposition": "QE handoff unchanged trial 118; failed .90 QR fill gate is a warning, not a DQ; budget exhausted, no rescue/tuning/OOS"
+}

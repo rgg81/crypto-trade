@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "candidate_id": "t04-fps-001",
+  "is_cutoff_exclusive": "2024-07-01T00:00:00Z",
+  "features": [
+    {
+      "field": "funding_rate",
+      "source": "https://data.binance.vision/data/futures/um/monthly/fundingRate/{SYMBOL}/{SYMBOL}-fundingRate-{YYYY-MM}.zip; frozen gap fallback GET https://fapi.binance.com/fapi/v1/fundingRate?symbol={SYMBOL}&startTime={MONTH_START_MS}&endTime={MONTH_END_MS}&limit=1000, deterministically paged",
+      "event_time": "funding_time; settlement s=floor_hour(funding_time), subsecond jitter <1s",
+      "available_time": "strictly after funding_time; context requires funding_time < decision t",
+      "lag": "latest row tau<t; b=ceil_8h_UTC(s); require b+8h=t",
+      "transformation": "180d same-settlement-hour median/MAD z-score (min 20); all-hour fallback min 60; scale floor 1e-5; clip +/-6; subtract contemporaneous cross-sectional median (min 8)",
+      "missing": "zero signal; never forward-fill",
+      "fitted": true
+    },
+    {
+      "field": "open,close",
+      "source": "https://data.binance.vision/data/futures/um/monthly/klines/{SYMBOL}/8h/{SYMBOL}-8h-{YYYY-MM}.zip",
+      "event_time": "bar [open_time,open_time+8h]",
+      "available_time": "at close; runner exposes only bars closed by t",
+      "lag": "response bar must end at t; fill open t is hidden",
+      "transformation": "log(close/open), 180d UTC-slot median (min 30; all-hour min 90), BTC beta on 270 prior bars min 120, residual MAD on 90 prior bars min 60, cross-sectional median min 8",
+      "missing": "BTC fallback is per-bar median of >=10 current PIT names with >=120 pairs; otherwise zero signal",
+      "fitted": true
+    },
+    {
+      "field": "eligible_symbols",
+      "source": "canonical membership.parquet derived from completed Binance quote_volume bars: Monday 00 UTC, prior 30 complete days, median daily quote volume, min 30 dates plus prior date, top 40",
+      "event_time": "reconstitution_time",
+      "available_time": "at Monday reconstitution; intersected with executable open at t",
+      "lag": "prior complete days only",
+      "transformation": "membership/risk boundary only; quote volume is not alpha",
+      "missing": "exclude symbol; central participation/delist logic remains active",
+      "fitted": false
+    },
+    {
+      "field": "UTC hour",
+      "source": "deterministic calendar",
+      "event_time": "funding settlement or bar open",
+      "available_time": "immediate",
+      "lag": "none",
+      "transformation": "time-of-day grouping and 8h event alignment",
+      "missing": "impossible",
+      "fitted": false
+    }
+  ],
+  "explicitly_unused": ["mark_price_as_signal", "taker_flow", "volume_alpha", "impact", "replenishment", "liquidations"]
+}

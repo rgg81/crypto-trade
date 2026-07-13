@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "team_id": "team-01",
+  "candidate_id": "t01-alr-002",
+  "predecessor": {"id":"t01-alr-001","status":"falsified_is_feasibility","evidence":"26/26 organizer-sampled Mondays flat from unscaled denominator gate","public_oos_views":0},
+  "baseline": {"H":6,"W":189,"theta":1.0,"lambda_f":0.25,"flow_floor":0.0,"side_scale":"weighted_rms","gross":0.8,"seed":20260713},
+  "common_contract":"Same IS folds/purge/embargo, PIT universe, funding, next-open fills, base/2x costs, regimes, sleeve attribution; no public OOS.",
+  "budget":{"c001":1,"c002":1,"retired_unevaluated_c001_grid":53,"ablations_max":8,"total_max":10,"limit":120,"authorized_oos":{"candidate":"t01-alr-002","views":1}},
+  "ablations": [
+    {"id":"unsigned-volume","delta":"replace signed x with max(v-theta,0)","expect":"spread <90% baseline","falsifier":true},
+    {"id":"permuted-sign","delta":"permute q signs within symbol-month, seed 2026071301","expect":"absolute spread <=25% baseline","falsifier":true},
+    {"id":"buy-only","delta":"a=R(b_plus), eligibility unchanged","expect":"lower robust utility","falsifier":false},
+    {"id":"sell-only","delta":"a=-R(b_minus), eligibility unchanged","expect":"lower robust utility","falsifier":false},
+    {"id":"immediate-impact","delta":"y=event-bar e instead of forward response","expect":"lower spread/2x utility","falsifier":false},
+    {"id":"no-neutralization","delta":"u=a","expect":"worse fold IQR, beta, drawdown or worst regime","falsifier":false},
+    {"id":"no-carry-rank","delta":"lambda_f=0; exact cashflows remain","expect":"no better net utility","falsifier":false},
+    {"id":"equal-risk","delta":"eight +.05 and eight -.05","expect":"worse stress/drawdown/risk reductions","falsifier":false}
+  ],
+  "required_outputs":["fold base/2x Sharpe","spread","drawdown/turnover/unfilled","four regimes","long/short price/funding/exposure"]
+}

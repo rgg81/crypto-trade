@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "candidate_id": "t02-dldn-c01",
+  "strategy_name": "Directed Lagged Diffusion Network",
+  "entrypoint": "strategy.py:build_strategy",
+  "seed": 20260713,
+  "parameters": {
+    "L": 540,
+    "lambda": 20,
+    "K": 3,
+    "kappa": 0.5,
+    "tau": 0.015,
+    "H": 0.3
+  }
+}

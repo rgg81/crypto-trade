@@ -1,0 +1,13 @@
+{
+  "candidate_id": "T05-AER12-H80-R72-v1",
+  "common_evaluation": "Identical seven IS folds, 8h label, PIT universe, actual funding/fills, base and 2x costs; each variant counts inside the 96-configuration ceiling.",
+  "ablations": [
+    {"id": "A1_NO_PERSISTENCE", "change": "A=median(q), omitting abs(mean(sign(q)))", "test": "persistence should improve median fold net return"},
+    {"id": "A2_NO_BODY_CONFIRM", "change": "set body multiplier 0 instead of 0.5", "test": "body-confirmed rejection should improve IC"},
+    {"id": "A3_BODY_ONLY", "change": "replace q by b", "test": "wick geometry must add OOF net Sharpe beyond candle direction"},
+    {"id": "A4_NO_NUISANCE", "change": "rank z(A) without X residualization", "test": "alpha must not reduce to momentum, beta, volatility, liquidity, or funding"},
+    {"id": "A5_NO_HYSTERESIS", "change": "enter/retain at 0.50 and refresh every 8h", "test": "expected to fail turnover and 2x-cost gates"},
+    {"id": "A6_NO_STRESS_SCALE", "change": "G=0.72 in all states", "test": "stress scaling should reduce drawdown without reversing median return"}
+  ],
+  "mechanism_falsifier": "Reject if baseline fails any QE gate or fails to beat A3 on median fold net return and A5 on 2x-cost Sharpe."
+}

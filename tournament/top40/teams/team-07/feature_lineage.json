@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "team_id": "team-07",
+  "research_access_end_exclusive": "2024-07-01T00:00:00Z",
+  "status": "T07-SRMB-118_organizer_advanced_despite_QR_falsifier",
+  "rows": [
+    {
+      "field": "asset and BTC transaction close",
+      "source": "Binance USD-M monthly 8h klines; canonical bars.parquet",
+      "event_time": "open_time+8h",
+      "available_time": "open_time+8h after closure",
+      "lag": "open_time+8h<=Monday decision; 21 most-recent returns skipped from coefficient/formation window",
+      "transform": "adjacent log returns; 189-return OLS with intercept on contemporaneous BTC; last-63 residual sum divided by residual RMS*sqrt(63)",
+      "missing": "any gap, nonpositive/missing close, missing BTC row, OLS denominator<=1e-12, or residual RMS<=1e-8 makes asset unscorable",
+      "fitted": true,
+      "fit_scope": "decision-local past-only OLS; no persisted coefficients"
+    },
+    {
+      "field": "PIT symbol membership and executable-open flag",
+      "source": "canonical membership.parquet and Binance transaction-bar availability",
+      "event_time": "Monday 00:00 UTC reconstitution/open boundary",
+      "available_time": "decision boundary; open price hidden",
+      "lag": "latest reconstitution_time<=t",
+      "transform": "ranking universe only; BTC factor-only; liquidity rank not alpha",
+      "missing": "absent means ineligible; fewer than 12 scorable non-BTC names means flat",
+      "fitted": false
+    },
+    {
+      "field": "actual funding rate and funding mark",
+      "source": "Binance funding archives/official gap REST; canonical funding.parquet",
+      "event_time": "published funding_time",
+      "available_time": "strictly past to strategy; exact event to evaluator",
+      "lag": "never an alpha input",
+      "transform": "cashflow=-signed_position_notional*funding_rate",
+      "missing": "snapshot/evaluator fails closed; never impute or assume 8h",
+      "fitted": false
+    },
+    {
+      "field": "UTC clock",
+      "source": "deterministic calendar",
+      "event_time": "decision_time",
+      "available_time": "decision_time",
+      "lag": "none",
+      "transform": "explicit rebalance Monday 00:00; otherwise hold",
+      "missing": "not applicable",
+      "fitted": false
+    }
+  ]
+}

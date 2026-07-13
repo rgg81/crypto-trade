@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "candidate_id": "t02-dldn-c01",
+  "status": "preregistered",
+  "identical_settings": "same PIT universe, folds, costs, funding, fills, seed and selected hyperparameters; one named change only",
+  "primary_metric": "aggregate outer-OOF net Sharpe delta versus full mechanism",
+  "ablations": [
+    {"id":"A01","change":"set all directed edges to zero","purpose":"core network necessity","expected_delta":"<=-0.10"},
+    {"id":"A02","change":"transpose edge matrix","purpose":"direction necessity","expected_delta":"negative"},
+    {"id":"A03","change":"remove split-half stability","purpose":"edge uncertainty control","expected_delta":"lower worst-fold Sharpe"},
+    {"id":"A04","change":"set kappa=0","purpose":"unrealized response gap","expected_delta":"negative unless selected kappa is 0"},
+    {"id":"A05","change":"set edge reliability q=1","purpose":"uncertainty scaling","expected_delta":"higher drawdown"},
+    {"id":"A06","change":"remove community projection","purpose":"graph-cluster neutrality","expected_delta":"higher beta/cluster concentration"},
+    {"id":"A07","change":"set H=0","purpose":"turnover hysteresis","expected_delta":"lower net and 2x-cost Sharpe"},
+    {"id":"A08","change":"replace inverse residual-vol with equal risk scalar","purpose":"risk allocation","expected_delta":"higher volatility concentration"}
+  ]
+}

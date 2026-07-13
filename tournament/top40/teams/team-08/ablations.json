@@ -1,0 +1,27 @@
+{
+  "accounting": {
+    "hard_configuration_ceiling": 40,
+    "offline_is_diagnostics_consumed": 12,
+    "public_oos_views": 0
+  },
+  "constant_evaluation": "identical PIT universe, next-open fills, actual funding, base costs, 2x costs, participation and delist rules",
+  "is_only_feasibility": {
+    "candidate_floor_available_fraction": 0.912,
+    "first_20_candidate_anchor": "2020-05-09T00:00:00Z",
+    "median_carry_ic": 0.553,
+    "median_future_72h_extreme_spread_bp": 17.25,
+    "positive_ic_fraction": 0.992,
+    "usable_ic_anchors": 507
+  },
+  "items": [
+    {"delta": "7d carry only; remove 28d agreement/sign shrink", "id": "A1", "purpose": "test slow persistence; observed IS IC 0.611 but greater transience risk"},
+    {"delta": "reverse long/short carry ranks", "id": "A2", "purpose": "mechanism falsifier; must underperform"},
+    {"delta": "remove both price quarantines", "id": "A3", "purpose": "measure adverse-selection protection"},
+    {"delta": "remove beta equality, retain dollar neutrality", "id": "A4", "purpose": "measure market-factor contamination"},
+    {"delta": "rank buffer=0", "id": "A5", "purpose": "measure churn; preliminary IS screen was worse after cost"},
+    {"delta": "equal weights instead of inverse-vol/QP", "id": "A6", "purpose": "measure sizing contribution"}
+  ],
+  "negative_evidence": "Tighter displacement/acceleration vetoes 2.0/1.75 reduced the simple IS carry proxy and increased turnover; they are not the frozen baseline.",
+  "schema_version": 1,
+  "team_id": "team-08"
+}

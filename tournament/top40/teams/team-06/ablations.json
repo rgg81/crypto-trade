@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "candidate_id": "T06-HWDS-001",
+  "common_evaluation": "Identical four IS folds, PIT membership, actual funding, fills, base costs, and 2x costs; each is one registered material configuration.",
+  "ablations": [
+    {
+      "id": "A1_wrong_weekday_placebo",
+      "change": "Use weekday(t+1d) samples while forecasting t.",
+      "test": "Pooled net Sharpe must be below champion; otherwise weekday mechanism is not identified."
+    },
+    {
+      "id": "A2_no_partial_pooling",
+      "change": "Set lambda_i=1.",
+      "test": "Compare turnover, fold dispersion, and net Sharpe."
+    },
+    {
+      "id": "A3_no_neutralization",
+      "change": "Set z_i=p_i-mu; omit beta and cross-sectional ridge residualization.",
+      "test": "Attribute any gain to beta, momentum, volatility, or size leakage."
+    },
+    {
+      "id": "A4_no_dispersion_haircut",
+      "change": "Set h=1 whenever N>=10.",
+      "test": "Champion should improve 2x-cost Sharpe and turnover efficiency."
+    },
+    {
+      "id": "A5_equal_weight_no_throttle",
+      "change": "Equal-weight selected names and set v=1, retaining G and 9% cap.",
+      "test": "Measure whether risk scaling, not weekday alpha, drives regime behavior."
+    }
+  ]
+}

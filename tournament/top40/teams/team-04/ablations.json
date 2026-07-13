@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "candidate_id": "t04-fps-001",
+  "common": "Same PIT universe, folds, purge/embargo, seed 20260713, pairing/risk, evaluator funding/fills, base and 2x costs; each is one material configuration.",
+  "ablations": [
+    {"id": "A1_no_confirmation", "change": "Drop F*R<0 and |R| gate; keep receiver direction -sign(f).", "tests": "post-payment price confirmation"},
+    {"id": "A2_no_funding_surprise", "change": "Drop |F| and sign(F)=sign(f) gates; retain nonzero f and response confirmation.", "tests": "discrete payment-shock magnitude"},
+    {"id": "A3_reverse_direction", "change": "Use +sign(f) with all gates unchanged.", "tests": "receiver-side sign algebra"},
+    {"id": "A4_event_placebo", "change": "Add 8h to each funding timestamp before causal matching; unmatched rows remain zero.", "tests": "settlement alignment"},
+    {"id": "A5_no_beta_pair", "change": "Pair by strength only; retain dollar neutrality and all caps.", "tests": "BTC-beta matching"}
+  ]
+}

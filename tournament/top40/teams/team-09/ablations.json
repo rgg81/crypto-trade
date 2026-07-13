@@ -1,0 +1,38 @@
+{
+  "ablations": [
+    {
+      "id": "price_only",
+      "change": "Replace alpha=-e with alpha=b_t*zP; preserve selection, state, sizing, cadence and evaluator.",
+      "falsifier": "Joint outer-OOF Sharpe must exceed this by at least 0.10."
+    },
+    {
+      "id": "funding_only",
+      "change": "Replace alpha=-e with alpha=-zF; preserve all other settings.",
+      "falsifier": "Joint outer-OOF Sharpe must exceed this by at least 0.10 and joint price PnL net of execution costs must be positive."
+    },
+    {
+      "id": "no_price_scaling",
+      "change": "Use raw 72h log displacement before prior-day robust normalization.",
+      "falsifier": "Tests whether volatility scaling, rather than funding-price mismatch, creates ranks."
+    },
+    {
+      "id": "no_demean",
+      "change": "Use raw cumulative funding and raw scaled displacement in Theil-Sen.",
+      "falsifier": "Tests whether slow funding levels masquerade as fast innovation."
+    },
+    {
+      "id": "no_dispersion_throttle",
+      "change": "Fix gross at Gmax.",
+      "falsifier": "Throttle must improve double-cost drawdown or Sharpe without making a sleeve immaterial."
+    },
+    {
+      "id": "equal_weight",
+      "change": "Equal-weight each selected sleeve subject to the same 8% cap.",
+      "falsifier": "Tests whether inverse-volatility allocation is the apparent edge."
+    }
+  ],
+  "common_settings": "Identical PIT universe, folds, 24h labels, purge/embargo, actual funding, costs, next-open fills, participation, delists and seeds.",
+  "material_configuration_count": 6,
+  "schema_version": 1,
+  "team_id": "team-09"
+}

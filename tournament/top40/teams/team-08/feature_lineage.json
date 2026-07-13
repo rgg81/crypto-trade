@@ -1,0 +1,63 @@
+{
+  "features": [
+    {
+      "available_timestamp": "open_time+8h <= t; newest usable bar ends t",
+      "event_timestamp": "bar close",
+      "field": "transaction_close",
+      "fitted": false,
+      "historical_coverage": "canonical IS through 2024-06-30",
+      "lag": "execution open at t hidden",
+      "missing_data": "bad row/gap excludes that non-BTC symbol at t; no interpolation",
+      "source": "manifest-frozen Binance USD-M 8h archives; bars.parquet",
+      "transformation": "C(u)=close [u-8h,u]; r(u)=log(C(u)/C(u-8h)); last L spans t-(L-1)8h through t. Sample sd ddof=1, floor 1e-12; L=21,42,84,168"
+    },
+    {
+      "available_timestamp": "funding_time < t; equality excluded",
+      "event_timestamp": "funding_time",
+      "field": "funding_rate,funding_interval_hours",
+      "fitted": false,
+      "historical_coverage": "member events through 2024-06-30",
+      "lag": "strictly past",
+      "missing_data": "bad event/coverage excludes that symbol; never zero-fill",
+      "source": "manifest-frozen Binance USD-M archives/API gaps; funding.parquet",
+      "transformation": "E_x is [t-xd,t). EWMs use E_84; persistence E_28. d_j is hours since immediate prior actual source event, derived before membership/window filters; predecessor may precede E_84"
+    },
+    {
+      "available_timestamp": "same closed-bar boundary",
+      "event_timestamp": "BTCUSDT bar close",
+      "field": "rolling_beta",
+      "fitted": true,
+      "historical_coverage": "canonical IS bars",
+      "lag": "all finite aligned pairs in 252 endpoints through t; minimum 189",
+      "missing_data": "symbol failure is local; BTC failure flattens scheduled book",
+      "source": "canonical BTCUSDT and symbol transaction closes",
+      "transformation": "sample Cov/Var ddof=1; BTC Var>1e-16; ratio clipped [-0.5,3]; refit each rebalance"
+    },
+    {
+      "available_timestamp": "reconstitution_time <= decision_time",
+      "event_timestamp": "Monday 00:00 UTC reconstitution",
+      "field": "eligible_symbols",
+      "fitted": false,
+      "historical_coverage": "weekly PIT from 2020-02-03",
+      "lag": "current PIT set with executable open",
+      "missing_data": "absent is ineligible; no survivor substitution",
+      "source": "membership.parquet / eligible_symbols",
+      "transformation": "membership filter only"
+    },
+    {
+      "available_timestamp": "deterministic",
+      "event_timestamp": "UTC decision boundary",
+      "field": "rebalance_clock",
+      "fitted": false,
+      "historical_coverage": "all decisions",
+      "lag": "none",
+      "missing_data": "not applicable",
+      "source": "calendar arithmetic only",
+      "transformation": "2020-02-03T00:00Z + 72h*k; no weekday feature"
+    }
+  ],
+  "fault_policy": "At scheduled t, malformed/duplicate/nonmonotone/gapped input removes only that non-BTC symbol; no imputation. Recompute N; flatten only on BTC failure, N<20, or construction failure",
+  "is_cutoff_exclusive": "2024-07-01T00:00:00Z",
+  "schema_version": 1,
+  "team_id": "team-08"
+}

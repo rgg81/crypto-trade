@@ -1,0 +1,53 @@
+{
+  "candidate_id": "T05-AER12-H80-R72-v1",
+  "coverage": "Frozen snapshot warmup [2020-01-01,2020-02-03) and IS [2020-02-03,2024-07-01); no later row read.",
+  "is_end_exclusive": "2024-07-01T00:00:00Z",
+  "features": [
+    {
+      "field": "open, high, low, close",
+      "source": "https://data.binance.vision/data/futures/um/monthly/klines/<symbol>/8h/<symbol>-8h-YYYY-MM.zip (daily path substitutes daily and YYYY-MM-DD); snapshot bars.parquet",
+      "event_timestamp": "bar open_time; economic interval [open_time, close_time]",
+      "available_timestamp": "close_time, required <= decision t",
+      "lag": "latest input bar opens t-8h; order fills at hidden open t",
+      "transformation": "scale-free true-range wick/body q; 12-slot median and sign persistence. Adjacent returns are log(C_k/C_{k-1}); r24/r7d sum 3/21 contiguous returns. Beta is sum((r_i-mean_i)*(r_BTC-mean_BTC))/sum((r_BTC-mean_BTC)^2), with both means on aligned pairs in the last 63 scheduled slots.",
+      "minimum": "9/12 q; all 3 r24 and 21 r7d returns; 18/21 volatility; 50 aligned beta pairs and BTC mean squared deviation >1e-12; exact 8h adjacency",
+      "missing": "invalidate affected observation; flat if BTC unavailable or fewer than 10 valid names",
+      "fitted": false
+    },
+    {
+      "field": "quote_volume",
+      "source": "same Binance transaction-kline archive and bars.parquet",
+      "event_timestamp": "bar close_time",
+      "available_timestamp": "close_time <= t",
+      "lag": "one execution bar",
+      "transformation": "log of 21-slot median; also central prior-24h participation capacity",
+      "minimum": "18/21 feature slots; central cap always authoritative",
+      "missing": "symbol invalid for signal; never imputed",
+      "fitted": false
+    },
+    {
+      "field": "funding_rate, funding_time, mark_price",
+      "source": "https://data.binance.vision/data/futures/um/monthly/fundingRate/<symbol>/<symbol>-fundingRate-YYYY-MM.zip; manifest-frozen gap fallback https://fapi.binance.com/fapi/v1/fundingRate; mark fallback https://fapi.binance.com/fapi/v1/markPriceKlines; funding.parquet",
+      "event_timestamp": "actual funding_time",
+      "available_timestamp": "strictly before decision t",
+      "lag": "last event < t, maximum age 16h",
+      "transformation": "raw rate robust-z nuisance and neutralization constraint; actual evaluator cashflow uses frozen mark_price",
+      "minimum": "one event within 16h",
+      "missing": "rate=0 plus missing indicator; cashflows never synthesized",
+      "fitted": false
+    },
+    {
+      "field": "eligible_symbols, liquidity_rank",
+      "source": "membership.parquet derived PIT from Binance quote volume and https://fapi.binance.com/fapi/v1/exchangeInfo",
+      "event_timestamp": "Monday 00:00 UTC reconstitution",
+      "available_timestamp": "decision t at or after reconstitution",
+      "lag": "30 complete prior UTC days",
+      "transformation": "PIT Top-40 eligibility only",
+      "minimum": "30 days and immediately preceding day",
+      "missing": "not tradable; central capped exit if previously held",
+      "fitted": false
+    }
+  ],
+  "cross_sectional_fit": "Contemporaneous median/MAD and pseudoinverse use only rows available at t; no state is prefit across time.",
+  "label": "log transaction open(t+8h)/open(t), used only after its end in IS validation"
+}

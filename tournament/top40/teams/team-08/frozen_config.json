@@ -1,0 +1,57 @@
+{
+  "beta": {
+    "clip": [-0.5, 3.0],
+    "minimum_pairs": 189,
+    "return_endpoints": 252,
+    "variance_floor": 1e-16
+  },
+  "common_freeze_commit": "48df09341f02eba7a3469abd1ccda6649a4ef0ba",
+  "decision_anchor_utc": "2020-02-03T00:00:00Z",
+  "decision_interval_hours": 72,
+  "funding": {
+    "coverage_max_interval_hours": 24.0,
+    "coverage_max_latest_age_hours": 24.0,
+    "coverage_min_age_days": 21.0,
+    "coverage_min_events": 42,
+    "coverage_min_interval_hours": 504.0,
+    "coverage_window_days": 28.0,
+    "half_lives_days": [7.0, 28.0],
+    "persistence_floor": 0.25,
+    "score_window_days": 84.0,
+    "strictly_before_decision": true
+  },
+  "phase0_record": "012727865acecad6ea0c3327745359820b8e45c6",
+  "portfolio": {
+    "buffer": 4,
+    "gross": 0.8,
+    "initial_names_per_sleeve": 10,
+    "maximum_names_per_sleeve": 15,
+    "maximum_symbol_weight": 0.075,
+    "projection_bound": 0.1875,
+    "sleeve_gross": 0.4
+  },
+  "price": {
+    "acceleration_limit": 2.0,
+    "acceleration_long_returns": 84,
+    "acceleration_short_returns": 21,
+    "contiguous_returns": 168,
+    "ddof": 1,
+    "displacement_limit": 2.5,
+    "displacement_returns": 42,
+    "return_interval_hours": 8,
+    "standard_deviation_floor": 1e-12,
+    "volatility_returns": 84
+  },
+  "projection": {
+    "bound_tolerance": 1e-10,
+    "equality_tolerance": 1e-9,
+    "ftol": 1e-12,
+    "maxiter": 500,
+    "method": "SLSQP",
+    "paired_tail_expansion": true
+  },
+  "schema_version": 1,
+  "seed": 20260713,
+  "strategy_name": "Persistent Carry Dispersion Harvest",
+  "team_id": "team-08"
+}

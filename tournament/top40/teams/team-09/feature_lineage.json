@@ -1,0 +1,60 @@
+{
+  "bindings": {
+    "common_freeze_commit": "48df09341f02eba7a3469abd1ccda6649a4ef0ba",
+    "phase0_record": "012727865acecad6ea0c3327745359820b8e45c6"
+  },
+  "features": [
+    {
+      "available_timestamp": "bar open_time + 8h; included only when <= decision_time",
+      "endpoint_archive": "data.binance.vision USD-M monthly klines, 8h; frozen bars.parquet",
+      "event_timestamp": "open_time (bar interval starts); close event is open_time + 8h",
+      "field": "bars.close",
+      "fitted": false,
+      "lag": "latest input is the bar ending at t; fill open stamped t is hidden",
+      "missing_behavior": "no forward fill or interpolation; current 72h exact grid failure excludes symbol; prior pair is skipped and fewer than 48/60 excludes symbol",
+      "transformation": "adjacent log returns, 72h displacement divided by realized-root-sum-square; prior-60-day median/MAD z-score"
+    },
+    {
+      "available_timestamp": "funding_time, admitted only when funding_time < decision_time",
+      "endpoint_archive": "data.binance.vision USD-M monthly fundingRate; official /fapi/v1/fundingRate only for frozen archive gaps",
+      "event_timestamp": "funding_time (actual event schedule)",
+      "field": "funding.funding_rate",
+      "fitted": true,
+      "lag": "strictly earlier than t",
+      "missing_behavior": "sum actual events; no-event window is zero only after first observed event; pre-first-event is missing; snapshot coverage failure is not repaired",
+      "transformation": "72h cumulative rate; prior-60-day median/MAD z-score; cross-sectional Theil-Sen residual"
+    },
+    {
+      "available_timestamp": "Monday 00:00 UTC reconstitution, then current decision intersection with executable opens",
+      "endpoint_archive": "frozen membership.parquet derived from prior 30 complete days of Binance 8h quote volume and contract metadata",
+      "event_timestamp": "reconstitution_time",
+      "field": "eligible_symbols",
+      "fitted": false,
+      "lag": "ranking uses only completed dates before reconstitution",
+      "missing_behavior": "never substitute a survivor or ineligible symbol; insufficient executable cross-section requests flat",
+      "transformation": "PIT execution mask only"
+    },
+    {
+      "available_timestamp": "ex post at its timestamp; never passed as a feature",
+      "endpoint_archive": "data.binance.vision USD-M monthly klines, 8h",
+      "event_timestamp": "open_time",
+      "field": "bars.open",
+      "fitted": false,
+      "lag": "future relative to decision feature set",
+      "missing_behavior": "label invalid; evaluator handles disappearance/delist",
+      "transformation": "next-open fill and 24h forward research label only"
+    },
+    {
+      "available_timestamp": "prior completed 24h for participation; funding event for cashflow",
+      "endpoint_archive": "frozen bars.quote_volume, funding.mark_price, and boundary mark_prices",
+      "event_timestamp": "source bar/event/boundary timestamp",
+      "field": "central_execution_inputs",
+      "fitted": false,
+      "lag": "central evaluator contract",
+      "missing_behavior": "fail closed; never imputed by strategy",
+      "transformation": "participation cap, risk marks, actual funding, fees and slippage; not signal inputs"
+    }
+  ],
+  "schema_version": 1,
+  "team_id": "team-09"
+}

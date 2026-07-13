@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "candidate_id": "t03-idtail-v1",
+  "common_settings": "Identical PIT universe, folds, next-open fills, funding, base/2x costs, seed and risk limits; each counts as one material configuration.",
+  "ablations": [
+    {"id":"A1_invert","change":"multiply final score by -1","test":"directional falsifier"},
+    {"id":"A2_raw_tail","change":"tail shape on raw rather than factor-residual returns","test":"idiosyncratic mechanism"},
+    {"id":"A3_positive_only","change":"set negative-tail terms to zero","test":"asymmetry contribution"},
+    {"id":"A4_no_neutralization","change":"omit beta/momentum/vol ridge projection","test":"nuisance independence"},
+    {"id":"A5_single_window","change":"use 168-return window only","test":"multiscale stability"},
+    {"id":"A6_no_hysteresis","change":"replace sleeves with current top/bottom K weekly","test":"turnover benefit"},
+    {"id":"A7_equal_weight","change":"equal weights within sleeves","test":"idio-risk weighting"},
+    {"id":"A8_no_vol_scale","change":"retain beta hedge but omit covariance volatility scaling","test":"risk-control contribution"}
+  ]
+}

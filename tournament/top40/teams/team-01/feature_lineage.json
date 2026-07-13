@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "team_id": "team-01",
+  "candidate_id": "t01-alr-002",
+  "predecessor": {"candidate_id":"t01-alr-001","status":"IS feasibility falsified; 26/26 organizer-sampled Mondays flat; zero OOS views","delta_to_c002":"Remove |q|>=0.05 and normalize x separately per side by past weighted RMS before slope fitting."},
+  "features": [
+    {"field":"close","source":"bars.parquet; official Binance USD-M 8h transaction klines","event_time":"close_time","available_time":"open_time+8h","lag":"available_time<=decision","transform":"adjacent log return; 126-prior-return BTC residual, min84","missing":"break segment/exclude","fitted":"online beta"},
+    {"field":"quote_volume","source":"bars.parquet; official Binance klines","event_time":"close_time","available_time":"open_time+8h","lag":"63-bar baseline excludes event","transform":"past median/MAD abnormal volume; liquidity/control/capacity","missing":"break segment/exclude","fitted":"online robust scale"},
+    {"field":"taker_buy_quote_volume","source":"bars.parquet; official Binance klines","event_time":"close_time","available_time":"open_time+8h","lag":"available_time<=decision","transform":"q=clip(2*TBQV/QV-1,-1,1); x=q*max(v-theta,0); no magnitude cutoff; exact zero ignored","missing":"exclude bar","fitted":false},
+    {"field":"funding_rate","source":"funding.parquet; official archive plus frozen official REST gap pages","event_time":"funding_time","available_time":"funding_time","lag":"strictly < decision","transform":"sum actual 21d events then rank; min14 spanning14d","missing":"exclude; no schedule assumption","fitted":false},
+    {"field":"eligible_symbols","source":"membership.parquet; PIT prior-30-day Binance QV","event_time":"Monday reconstitution_time","available_time":"reconstitution_time","lag":"latest <= decision and centrally fillable","transform":"hard gate only","missing":"flat","fitted":false},
+    {"field":"event_response","source":"derived transaction returns","event_time":"event close","available_time":"event close+8h*H","lag":"label end<=decision","transform":"split x by sign; within each side z=x/sqrt(sum(omega*x^2)/sum(omega)); EW ridge y on z over W; min6/side and sum(omega*z^2)>.25","missing":"nonpositive/nonfinite sums or RMS exclude symbol","fitted":"online"},
+    {"field":"neutralized_alpha","source":"derived above","event_time":"decision","available_time":"decision","lag":"past-only","transform":"cross-sectional ranks; ridge beta/momentum/vol/liquidity; funding-rank penalty","missing":"fewer than16 valid => flat","fitted":"same-time cross-section"},
+    {"field":"tail_risk","source":"derived idiosyncratic returns","event_time":"decision","available_time":"decision","lag":"126 completed returns, min84","transform":"side-specific 5% expected shortfall","missing":"exclude","fitted":"online"}
+  ],
+  "execution_only": {"transaction_open":"hidden next-open fill","mark_price":"central exposure and funding only"},
+  "state_policy":"Rebuild all fitted state chronologically; no model blob or timestamp-target table."
+}

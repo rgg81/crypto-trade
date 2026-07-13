@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "candidate_id": "t04-fps-001",
+  "strategy_name": "Funding Receiver Aftershock",
+  "entrypoint": "strategy.py:build_strategy",
+  "phase0_record_commit": "012727865acecad6ea0c3327745359820b8e45c6",
+  "common_freeze_commit": "48df09341f02eba7a3469abd1ccda6649a4ef0ba",
+  "data_manifest_sha256": "077eb036d262befec80f7013084fe6906859f7c3bbe2f8c193c9d9ec68e367c3",
+  "strategy_seed": 20260713,
+  "trial_seed_namespace": "2026071304",
+  "feature_order": [
+    "funding_rate",
+    "transaction_open",
+    "transaction_close",
+    "eligible_symbols",
+    "utc_hour"
+  ],
+  "decision": {
+    "cadence_hours": 8,
+    "funding_availability": "funding_time_strictly_less_than_decision_time",
+    "bar_availability": "open_time_plus_8h_less_than_or_equal_to_decision_time",
+    "event_settlement": "floor_hour",
+    "response_bar_open": "ceil_8h_utc_of_settlement_hour",
+    "response_bar_rule": "response_open_plus_8h_equals_decision_time",
+    "newer_unfinished_event_supersedes": true,
+    "emit_explicit_mapping_every_decision": true
+  },
+  "funding_feature": {
+    "lookback_days": 180,
+    "same_settlement_hour_minimum": 20,
+    "all_hour_fallback_minimum": 60,
+    "mad_multiplier": 1.4826,
+    "scale_floor": 0.00001,
+    "raw_z_clip": 6.0,
+    "cross_section_minimum": 8,
+    "cross_section_center": "median",
+    "absolute_score_threshold": 1.5
+  },
+  "price_feature": {
+    "return": "log_close_over_open",
+    "lookback_days": 180,
+    "same_bar_open_utc_hour_minimum": 30,
+    "all_hour_fallback_minimum": 90,
+    "primary_market": "BTCUSDT",
+    "fallback_market": "per_bar_median_of_current_eligible_symbols",
+    "fallback_market_minimum_names_per_bar": 10,
+    "beta_last_paired_bars": 270,
+    "beta_minimum_pairs": 120,
+    "market_variance_floor": 1e-08,
+    "beta_clip": 3.0,
+    "residual_last_paired_bars": 90,
+    "residual_minimum_pairs": 60,
+    "residual_mad_multiplier": 1.4826,
+    "residual_scale_floor": 0.0005,
+    "response_cross_section_minimum": 8,
+    "response_cross_section_center": "median",
+    "response_score_clip": 6.0,
+    "absolute_response_threshold": 0.25
+  },
+  "activation": {
+    "funding_score_sign_equals_raw_funding_sign": true,
+    "funding_score_times_response_score": "strictly_negative",
+    "direction": "negative_sign_of_raw_funding_rate",
+    "strength": "sqrt_abs_funding_score_times_response_score"
+  },
+  "portfolio": {
+    "pairing": "all_opposite_direction_then_greedy_disjoint",
+    "maximum_beta_gap": 0.25,
+    "pair_sort": [
+      "descending_minimum_strength_over_one_plus_beta_gap",
+      "ascending_beta_gap",
+      "ascending_long_symbol",
+      "ascending_short_symbol"
+    ],
+    "minimum_pairs": 2,
+    "maximum_pairs": 5,
+    "symbol_weight": "min_0.08_or_0.40_divided_by_pair_count",
+    "maximum_symbol_weight": 0.08,
+    "maximum_gross_weight": 0.8,
+    "target_net_weight": 0.0
+  },
+  "dependencies": {
+    "lock_file": "uv.lock",
+    "uv_lock_sha256": "869cd3380346a9c9a219fc762868e23cd494a18e22dd9b314ba18621d991faa5"
+  },
+  "qe_scope": {
+    "public_oos_evaluated": false,
+    "official_evaluator_outputs_generated": false,
+    "tests": "synthetic_and_in_sample_safe_targeted_checks_only"
+  }
+}

@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "candidate_id": "T06-HWDS-001",
+  "features": [
+    {
+      "field": "open, close",
+      "endpoint_archive": "https://data.binance.vision/data/futures/um/monthly/klines/{SYMBOL}/8h/{SYMBOL}-8h-{YYYY}-{MM}.zip",
+      "event_timestamp": "open_time; close boundary=open_time+8h",
+      "available_timestamp": "close boundary",
+      "lag": "daily label endpoint <= decision_time",
+      "transformation": "24h close-to-close log return; weekday EW idiosyncratic mean; beta/momentum/volatility",
+      "missing": "pairwise omit; beta 45/60, weekday 26/52, covariate 18/20; otherwise zero reliability and no rank",
+      "fitted": "daily, past-only"
+    },
+    {
+      "field": "quote_volume",
+      "endpoint_archive": "https://data.binance.vision/data/futures/um/monthly/klines/{SYMBOL}/8h/{SYMBOL}-8h-{YYYY}-{MM}.zip",
+      "event_timestamp": "candle interval",
+      "available_timestamp": "candle close",
+      "lag": "last completed UTC date before decision",
+      "transformation": "daily sum; log median over 20 dates",
+      "missing": "require 18 positive dates or exclude",
+      "fitted": false
+    },
+    {
+      "field": "PIT membership",
+      "endpoint_archive": "derived from lagged transaction quote_volume plus https://fapi.binance.com/fapi/v1/exchangeInfo",
+      "event_timestamp": "Monday 00:00 UTC",
+      "available_timestamp": "same boundary from 30 prior complete dates",
+      "lag": "weekly supplied membership only",
+      "transformation": "eligible Top-40 intersection with executable open",
+      "missing": "never target absent/ineligible symbol",
+      "fitted": false
+    },
+    {
+      "field": "actual funding_rate and mark_price",
+      "endpoint_archive": "https://data.binance.vision/data/futures/um/monthly/fundingRate/{SYMBOL}/{SYMBOL}-fundingRate-{YYYY}-{MM}.zip; fallback https://fapi.binance.com/fapi/v1/fundingRate",
+      "event_timestamp": "actual funding_time",
+      "available_timestamp": "strictly before strategy context; evaluator settlement uses actual event",
+      "lag": "not a signal",
+      "transformation": "cashflow=-signed_notional*rate",
+      "missing": "snapshot fails closed",
+      "fitted": false
+    },
+    {
+      "field": "boundary mark_price",
+      "endpoint_archive": "https://data.binance.vision/data/futures/um/monthly/markPriceKlines/{SYMBOL}/1h/{SYMBOL}-1h-{YYYY}-{MM}.zip; daily archive then https://fapi.binance.com/fapi/v1/markPriceKlines fallback",
+      "event_timestamp": "exact 8h boundary hour",
+      "available_timestamp": "evaluator boundary",
+      "lag": "not exposed as predictive input",
+      "transformation": "risk notional and funding accounting only",
+      "missing": "snapshot/evaluator fails closed",
+      "fitted": false
+    },
+    {
+      "field": "UTC weekday",
+      "endpoint_archive": "deterministic calendar",
+      "event_timestamp": "decision_time",
+      "available_timestamp": "decision_time",
+      "lag": "none",
+      "transformation": "weekday 0..6",
+      "missing": "impossible",
+      "fitted": false
+    }
+  ]
+}
