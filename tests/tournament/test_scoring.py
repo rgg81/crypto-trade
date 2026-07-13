@@ -518,10 +518,40 @@ def _write(root: Path, relative: str, content: str) -> Path:
     return path
 
 
+def test_canonical_manifest_fast_verifier_hashes_every_frozen_file(tmp_path: Path):
+    import crypto_trade.tournament.top40 as top40
+
+    canonical = _write(tmp_path, "data/top40/snapshot-v1/bars.parquet", "frozen bytes")
+    manifest_path = _write(
+        tmp_path,
+        "tournament/top40/data_manifest.json",
+        json.dumps(
+            {
+                "files": [
+                    {
+                        "name": "bars",
+                        "path": "data/top40/snapshot-v1/bars.parquet",
+                        "sha256": hashlib.sha256(canonical.read_bytes()).hexdigest(),
+                        "size": canonical.stat().st_size,
+                    }
+                ]
+            },
+            sort_keys=True,
+        )
+        + "\n",
+    )
+
+    parsed = top40._verify_canonical_manifest_files(manifest_path, tmp_path)
+    assert parsed["files"][0]["name"] == "bars"
+    canonical.write_text("mutated bytes", encoding="utf-8")
+    with pytest.raises(ValueError, match="size differs|SHA-256 differs"):
+        top40._verify_canonical_manifest_files(manifest_path, tmp_path)
+
+
 def test_phase0_verifier_pins_common_bytes_and_frozen_git_commit(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
-    import crypto_trade.tournament.snapshot as snapshot
+    import crypto_trade.tournament.top40 as top40
 
     _git(tmp_path, "init", "-q")
     _git(tmp_path, "config", "user.email", "test@example.com")
@@ -570,7 +600,11 @@ def test_phase0_verifier_pins_common_bytes_and_frozen_git_commit(
             "builder_sha256": hashlib.sha256(builder.read_bytes()).hexdigest(),
         },
     }
-    monkeypatch.setattr(snapshot, "verify_snapshot_manifest", lambda _path: manifest)
+    monkeypatch.setattr(
+        top40,
+        "_verify_canonical_manifest_files",
+        lambda _path, _root: manifest,
+    )
     freeze = {
         "frozen_at_utc": "2026-07-13T00:00:00+00:00",
         "branch": TOURNAMENT_BRANCH,

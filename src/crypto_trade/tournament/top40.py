@@ -536,6 +536,62 @@ def validate_submission(submission: Submission) -> tuple[ValidationIssue, ...]:
     return tuple(issues)
 
 
+def _verify_canonical_manifest_files(manifest_path: Path, root: Path) -> dict[str, Any]:
+    """Recheck every frozen canonical file without replaying raw-source provenance.
+
+    ``freeze-phase0`` performs the expensive archive/REST provenance audit before its unique Git
+    record is created.  Later lifecycle commands prove that record and its common commit, then
+    hash every canonical file listed in the immutable manifest.  Replaying tens of thousands of
+    raw archives on every review or run adds no new integrity property.
+    """
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise ValueError(f"cannot read canonical snapshot manifest: {exc}") from exc
+    if not isinstance(manifest, dict):
+        raise ValueError("canonical snapshot manifest must be a JSON object")
+    files = manifest.get("files")
+    if not isinstance(files, list) or not files:
+        raise ValueError("canonical snapshot manifest requires a non-empty files list")
+
+    seen_names: set[str] = set()
+    seen_paths: set[str] = set()
+    for index, entry in enumerate(files):
+        if not isinstance(entry, dict):
+            raise ValueError(f"canonical snapshot file entry {index} must be an object")
+        name = entry.get("name")
+        relative = entry.get("path")
+        expected_sha256 = entry.get("sha256")
+        if not isinstance(name, str) or not name or name in seen_names:
+            raise ValueError(f"canonical snapshot file entry {index} has an invalid name")
+        if (
+            not isinstance(relative, str)
+            or not _safe_relative_path(relative)
+            or relative in seen_paths
+        ):
+            raise ValueError(f"canonical snapshot file entry {index} has an unsafe path")
+        if not isinstance(expected_sha256, str) or not re.fullmatch(
+            r"[0-9a-f]{64}", expected_sha256
+        ):
+            raise ValueError(f"canonical snapshot file entry {index} has an invalid SHA-256")
+        seen_names.add(name)
+        seen_paths.add(relative)
+        path = root / relative
+        if not path.is_file() or path.is_symlink():
+            raise ValueError(f"canonical snapshot file is missing or unsafe: {relative}")
+        expected_size = entry.get("size")
+        if expected_size is not None and (
+            isinstance(expected_size, bool)
+            or not isinstance(expected_size, int)
+            or expected_size < 0
+            or path.stat().st_size != expected_size
+        ):
+            raise ValueError(f"canonical snapshot file size differs: {relative}")
+        if _sha256_file(path) != expected_sha256:
+            raise ValueError(f"canonical snapshot file SHA-256 differs: {relative}")
+    return manifest
+
+
 def verify_phase0_freeze(*, root: str | Path) -> tuple[ValidationIssue, ...]:
     """Verify the live common evaluator/data bytes against the Phase-0 freeze.
 
@@ -543,8 +599,6 @@ def verify_phase0_freeze(*, root: str | Path) -> tuple[ValidationIssue, ...]:
     treat any returned issue as a tournament-level abort, never as ten team disqualifications.
     """
     from crypto_trade.tournament.data import sha256_manifest
-    from crypto_trade.tournament.snapshot import verify_snapshot_manifest
-
     root_path = Path(root).resolve()
     issues: list[ValidationIssue] = []
     freeze = _read_json_object(root_path / PHASE0_FREEZE_PATH, "phase0_freeze", issues)
@@ -604,7 +658,7 @@ def verify_phase0_freeze(*, root: str | Path) -> tuple[ValidationIssue, ...]:
     orchestrator_path = root_path / ORCHESTRATOR_SCRIPT_PATH
     manifest: dict[str, Any] | None = None
     try:
-        manifest = verify_snapshot_manifest(manifest_path)
+        manifest = _verify_canonical_manifest_files(manifest_path, root_path)
     except (OSError, TypeError, ValueError) as exc:
         issues.append(ValidationIssue("snapshot_manifest", str(exc)))
 
