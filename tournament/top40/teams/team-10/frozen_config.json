@@ -1,0 +1,22 @@
+{
+  "advancement": "organizer_advanced_after_nested_gate_failure",
+  "anchor_utc": "2020-02-03T00:00:00Z",
+  "cadence_days": 14,
+  "candidate_id": "T10-PLMP-270-540-C14",
+  "common_freeze_commit": "48df09341f02eba7a3469abd1ccda6649a4ef0ba",
+  "data_manifest_sha256": "077eb036d262befec80f7013084fe6906859f7c3bbe2f8c193c9d9ec68e367c3",
+  "evaluator_sha256": "508f56af0b4fe2636933909977cdbcfbb38e4ff821072dbf12b35bfb04d3af66",
+  "left_censor_rule": "first_open_equals_snapshot_start",
+  "material_configuration_count": 37,
+  "mature_min_days": 540,
+  "mechanism": "perpetual_listing_maturation",
+  "names_per_sleeve": 5,
+  "phase0_record_commit": "012727865acecad6ea0c3327745359820b8e45c6",
+  "qr_accepted": false,
+  "schema_version": 1,
+  "seed": 20260713,
+  "snapshot_start_utc": "2020-01-01T00:00:00Z",
+  "weight_per_name": 0.08,
+  "young_max_days": 270,
+  "young_min_days": 30
+}
