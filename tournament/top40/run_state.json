@@ -8,9 +8,9 @@
   "phase": "research",
   "research_journal": {
     "genesis_sha256": "7db83e660d43c4c9420a534f3b96532cd2062bda4addafbf0a34613045e0638d",
-    "head_sha256": "7db83e660d43c4c9420a534f3b96532cd2062bda4addafbf0a34613045e0638d",
+    "head_sha256": "b547eb19ea69a5e59b3ee711826059d1fd4045bc46e51307516d0fa81998cc02",
     "path": "tournament/top40/organizer_research_journal.jsonl",
-    "record_count": 1,
+    "record_count": 21,
     "schema_version": 1
   },
   "schema_version": 1,
@@ -19,7 +19,21 @@
       "canonical_run": "pending",
       "champion": null,
       "freeze_commit": null,
-      "oos_accesses": [],
+      "oos_accesses": [
+        {
+          "candidate_id": "t01-alr-002",
+          "failure_type": "OrganizerInterruptedRun",
+          "finished_at_utc": "2026-07-13T17:57:56.969636+00:00",
+          "registration_sha256": "c0812355788f761fa0aa6ff000ff753da8a8aff84f0759540181db0bb7ecff19",
+          "reservation_record_sha256": "3a69a5175411b91ff1541ff04bd171b675149ded4713002dfa4523c487824bb2",
+          "reserved_at_utc": "2026-07-13T17:33:17.428358+00:00",
+          "result_record_sha256": "65da70a101f8b8462cdb2e93e8bb7da7ed9aac36dc802b4d1178da0597cd7ebd",
+          "run_id": "ca54effa2eb312ec16727481066826deb64a6f1e9ce7eb99cd23654700e37903",
+          "source_bundle_sha256": "d550753f062bfd70a5fb2666f56ef09a5b99a98396842869fcba40ac20cdeb90",
+          "status": "failed",
+          "team_ledger_sha256": "21af46822772fee868ffd1fb7eab9e32315f03f24a6ff50173fe070223233937"
+        }
+      ],
       "qe": "pending",
       "qr": "pending",
       "reviews": {}
@@ -28,7 +42,21 @@
       "canonical_run": "pending",
       "champion": null,
       "freeze_commit": null,
-      "oos_accesses": [],
+      "oos_accesses": [
+        {
+          "candidate_id": "t02-dldn-c01",
+          "failure_type": "OrganizerInterruptedRun",
+          "finished_at_utc": "2026-07-13T17:58:04.669349+00:00",
+          "registration_sha256": "7ba6e0fedbd4d4006eeb102bd3868cfb4e50bb18802f5b6e76472731590c5535",
+          "reservation_record_sha256": "a3c50e3ce02d8d42cdea5dff8774193bbbe6fdccdca46d4addb0cb1a4e3dfd29",
+          "reserved_at_utc": "2026-07-13T17:33:17.404997+00:00",
+          "result_record_sha256": "39d81984b5eb42cc3f188cf468295694c9b2dbe9600ecc8ff8d3772b2c84b543",
+          "run_id": "57fa0676292bdfcae6a64d3e15f16cc7ce6d5b6be1007b64d4618b982ffc93ce",
+          "source_bundle_sha256": "fd4a0811cacd750bba051c167eecea6bf27d7a88a9089c74e5c8b3e4336caafc",
+          "status": "failed",
+          "team_ledger_sha256": "7ba6e0fedbd4d4006eeb102bd3868cfb4e50bb18802f5b6e76472731590c5535"
+        }
+      ],
       "qe": "pending",
       "qr": "pending",
       "reviews": {}
@@ -37,7 +65,21 @@
       "canonical_run": "pending",
       "champion": null,
       "freeze_commit": null,
-      "oos_accesses": [],
+      "oos_accesses": [
+        {
+          "candidate_id": "t03-idtail-v1",
+          "failure_type": "OrganizerInterruptedRun",
+          "finished_at_utc": "2026-07-13T17:58:05.194603+00:00",
+          "registration_sha256": "4077c4a837c65ef9ebb0ea13c1674ad82c76ea7a9e48ce9609da6175a63bd7a4",
+          "reservation_record_sha256": "5832749c8a88e738103a94015cad02a42eed9bd659fa735b374a47b1a834ca99",
+          "reserved_at_utc": "2026-07-13T17:33:17.524024+00:00",
+          "result_record_sha256": "ec13a00d95bacad88dc339371fbee171989717e75fece3d520090da0fd77d9ce",
+          "run_id": "b3a138b90a22e3e797328a3bfbaf6bf917fddbace4660975b58edfcd0e6b106f",
+          "source_bundle_sha256": "37ae4377667a228785053d135b460e87d79033c22c7563a96dd904d11de7a51c",
+          "status": "failed",
+          "team_ledger_sha256": "4077c4a837c65ef9ebb0ea13c1674ad82c76ea7a9e48ce9609da6175a63bd7a4"
+        }
+      ],
       "qe": "pending",
       "qr": "pending",
       "reviews": {}
@@ -46,7 +88,21 @@
       "canonical_run": "pending",
       "champion": null,
       "freeze_commit": null,
-      "oos_accesses": [],
+      "oos_accesses": [
+        {
+          "candidate_id": "t04-fps-001",
+          "failure_type": "OrganizerInterruptedRun",
+          "finished_at_utc": "2026-07-13T17:58:05.707403+00:00",
+          "registration_sha256": "b86b4e0fce6e9e4fc67a86aea6234ec55a053a2aa6a2919d7c56855735bebe9a",
+          "reservation_record_sha256": "67ea92d9800223a77540833ca638f029f304a1305008f57fc6aa852b152f213c",
+          "reserved_at_utc": "2026-07-13T17:33:17.294354+00:00",
+          "result_record_sha256": "c30e18acf870e1a979b08cd7fb640846a31258450c0c90382779a49a1422f11f",
+          "run_id": "73ab3335a0c54a8eb318b4c66c72e6d79b32e6ad34ccd7746a7d3a001571e39d",
+          "source_bundle_sha256": "767ba1a87a96d2179e164dd7bc3eb6e2f5365c32e8f95c0d222704740d294b79",
+          "status": "failed",
+          "team_ledger_sha256": "b86b4e0fce6e9e4fc67a86aea6234ec55a053a2aa6a2919d7c56855735bebe9a"
+        }
+      ],
       "qe": "pending",
       "qr": "pending",
       "reviews": {}
@@ -55,7 +111,21 @@
       "canonical_run": "pending",
       "champion": null,
       "freeze_commit": null,
-      "oos_accesses": [],
+      "oos_accesses": [
+        {
+          "candidate_id": "T05-AER12-H80-R72-v1",
+          "failure_type": "OrganizerInterruptedRun",
+          "finished_at_utc": "2026-07-13T17:58:06.259278+00:00",
+          "registration_sha256": "1412fe213f708b84f132131bc60f486335ec9919fbccbe699d3e11ea5a01c289",
+          "reservation_record_sha256": "46d18bb5aace9c8ef38af6808f32f02d87ab044fe09de9e4d9bd4ad17bf97efa",
+          "reserved_at_utc": "2026-07-13T17:33:35.692374+00:00",
+          "result_record_sha256": "849b2a60f6a9460009bca6538a1cf61019f5328bfe948af15088ce931db974f5",
+          "run_id": "d006ee66fd7b558ee48d9e21c1293fd650517b26154355be27fe620411a2d68b",
+          "source_bundle_sha256": "583940c69375f40303db80803751261051068dae158308385218e1411c9b452c",
+          "status": "failed",
+          "team_ledger_sha256": "1412fe213f708b84f132131bc60f486335ec9919fbccbe699d3e11ea5a01c289"
+        }
+      ],
       "qe": "pending",
       "qr": "pending",
       "reviews": {}
@@ -64,7 +134,21 @@
       "canonical_run": "pending",
       "champion": null,
       "freeze_commit": null,
-      "oos_accesses": [],
+      "oos_accesses": [
+        {
+          "candidate_id": "T06-HWDS-001",
+          "failure_type": "OrganizerInterruptedRun",
+          "finished_at_utc": "2026-07-13T17:58:06.781481+00:00",
+          "registration_sha256": "526ee8664b975c13b8ec70016e4282990412c5f0f887315a40a96099bac0993a",
+          "reservation_record_sha256": "de66ada9dd9d7396500ad76ee6bd513db6af0508f46c844ffda215097df6ada9",
+          "reserved_at_utc": "2026-07-13T17:33:56.255507+00:00",
+          "result_record_sha256": "6b1852e038e26b49bf2691ce4b20b870d1d475c38867a4b2339793a4f47707fd",
+          "run_id": "589fe42020ff754205337094e1a0f5b423c425442e290a61849b28aa150db820",
+          "source_bundle_sha256": "8ed4c9d92c1921a8540e52a59c8ba5f05008cb13c3a0df88d565226a707ea012",
+          "status": "failed",
+          "team_ledger_sha256": "526ee8664b975c13b8ec70016e4282990412c5f0f887315a40a96099bac0993a"
+        }
+      ],
       "qe": "pending",
       "qr": "pending",
       "reviews": {}
@@ -73,7 +157,21 @@
       "canonical_run": "pending",
       "champion": null,
       "freeze_commit": null,
-      "oos_accesses": [],
+      "oos_accesses": [
+        {
+          "candidate_id": "T07-SRMB-118",
+          "failure_type": "OrganizerInterruptedRun",
+          "finished_at_utc": "2026-07-13T17:58:07.299644+00:00",
+          "registration_sha256": "92061ed7e8d0d707c487d654c65db4575b338c84514babfdd391af24dd194ee2",
+          "reservation_record_sha256": "6cdb5a28fbb6dcc081c3d292d97926b0630cfc5044e30b3fe65b2075951f4338",
+          "reserved_at_utc": "2026-07-13T17:34:12.426604+00:00",
+          "result_record_sha256": "8e33f36421bb732a3e0d928a5487aa9a5958f372f3976099481ae19c534e1686",
+          "run_id": "19cc89394a5a47da4f96e6b6a7ce57ea1ec9fc52a0c8c96d71fdf7a7b4ef4eb3",
+          "source_bundle_sha256": "75f899cf99b5f4ca29057228a842b5abc8d0ffec2d6999662f36837ef481b4f8",
+          "status": "failed",
+          "team_ledger_sha256": "92061ed7e8d0d707c487d654c65db4575b338c84514babfdd391af24dd194ee2"
+        }
+      ],
       "qe": "pending",
       "qr": "pending",
       "reviews": {}
@@ -82,7 +180,21 @@
       "canonical_run": "pending",
       "champion": null,
       "freeze_commit": null,
-      "oos_accesses": [],
+      "oos_accesses": [
+        {
+          "candidate_id": "T08-PCDH-001",
+          "failure_type": "OrganizerInterruptedRun",
+          "finished_at_utc": "2026-07-13T17:58:07.813183+00:00",
+          "registration_sha256": "ad38ae1dce7d22bc74905f14aecdc55247025463d83d29243e549d8752fa6ebe",
+          "reservation_record_sha256": "adc0ed743d6777d9a0a82463bba50a8448ac84d341378a8516cc2cd7ed3b5990",
+          "reserved_at_utc": "2026-07-13T17:33:17.698528+00:00",
+          "result_record_sha256": "6e1d89d4668825e2832bbb17a73abb2d41f14bd404cfabbdbeb683dacf2a1ada",
+          "run_id": "06fd725865ae997e7a30588af25fe47286174456edcbc1821ef69d4c0b9272be",
+          "source_bundle_sha256": "c9190646b14f2c3f5c745ff45174fa4786011240d39a984ccead9ccd387b778a",
+          "status": "failed",
+          "team_ledger_sha256": "ad38ae1dce7d22bc74905f14aecdc55247025463d83d29243e549d8752fa6ebe"
+        }
+      ],
       "qe": "pending",
       "qr": "pending",
       "reviews": {}
@@ -91,7 +203,21 @@
       "canonical_run": "pending",
       "champion": null,
       "freeze_commit": null,
-      "oos_accesses": [],
+      "oos_accesses": [
+        {
+          "candidate_id": "T09-FPEG-306045180",
+          "failure_type": "OrganizerInterruptedRun",
+          "finished_at_utc": "2026-07-13T17:58:08.357267+00:00",
+          "registration_sha256": "6816a6dee9b6dfa1710540f4aeb313de1ebc575789d200ed9382f87e82d3d2d9",
+          "reservation_record_sha256": "78b33eec094178daa3e0e44f54e2eefc2517a5e6cbc00ffa54a3c42ea1594130",
+          "reserved_at_utc": "2026-07-13T17:33:17.645557+00:00",
+          "result_record_sha256": "67ad3d3962b04efd512d9fd02675098e13e34d4a3b79bad7db00cdd1e89e01f7",
+          "run_id": "a62c1c03cd660a452049059cd44fba2381949f7b50d2a23df457e4031db9d43c",
+          "source_bundle_sha256": "41ce5c74192b12a8039f9e47379c2d198a294892399d24c46d1662665cd53294",
+          "status": "failed",
+          "team_ledger_sha256": "6816a6dee9b6dfa1710540f4aeb313de1ebc575789d200ed9382f87e82d3d2d9"
+        }
+      ],
       "qe": "pending",
       "qr": "pending",
       "reviews": {}
@@ -100,7 +226,21 @@
       "canonical_run": "pending",
       "champion": null,
       "freeze_commit": null,
-      "oos_accesses": [],
+      "oos_accesses": [
+        {
+          "candidate_id": "T10-PLMP-270-540-C14",
+          "failure_type": "OrganizerInterruptedRun",
+          "finished_at_utc": "2026-07-13T17:58:08.890817+00:00",
+          "registration_sha256": "c0b9d63defdd30785983f57dafb47b0b31cc12b093bb6d56d13450c3de9f8cf4",
+          "reservation_record_sha256": "7d7cb4f27474c618fa468cf0a4e6c8ec2cfe9ccfb4400b2e40fa132073ea8a87",
+          "reserved_at_utc": "2026-07-13T17:33:17.941770+00:00",
+          "result_record_sha256": "b547eb19ea69a5e59b3ee711826059d1fd4045bc46e51307516d0fa81998cc02",
+          "run_id": "5355794eee4db81a0f8fd8b12ba85280fe89ad2b33cd72e1be34bf976b639dee",
+          "source_bundle_sha256": "85ba73405d835b7cd9eb393738982d2d8e6d34eb1b1af80042a0d582ca1b34e6",
+          "status": "failed",
+          "team_ledger_sha256": "c0b9d63defdd30785983f57dafb47b0b31cc12b093bb6d56d13450c3de9f8cf4"
+        }
+      ],
       "qe": "pending",
       "qr": "pending",
       "reviews": {}
