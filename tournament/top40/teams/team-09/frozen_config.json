@@ -1,0 +1,94 @@
+{
+  "bindings": {
+    "common_freeze_commit": "48df09341f02eba7a3469abd1ccda6649a4ef0ba",
+    "common_tournament_config_sha256": "030a065f75f9c4adb7484065908f4379435929609d446be0de0a831d9e28ee0a",
+    "data_manifest_sha256": "077eb036d262befec80f7013084fe6906859f7c3bbe2f8c193c9d9ec68e367c3",
+    "evaluator_sha256": "508f56af0b4fe2636933909977cdbcfbb38e4ff821072dbf12b35bfb04d3af66",
+    "phase0_record": "012727865acecad6ea0c3327745359820b8e45c6",
+    "qr_evidence_commit": "a21413a53fade5061fcc065cdad604564046f1a1",
+    "root_dependency_lock_sha256": "869cd3380346a9c9a219fc762868e23cd494a18e22dd9b314ba18621d991faa5",
+    "strategy_source_sha256": "07a5fabe781e44421faf3825c496568327fb1c3297794b1fe3a305f0fe621e7b"
+  },
+  "candidate_id": "T09-FPEG-306045180",
+  "disposition": {
+    "advancement": "organizer_advanced_after_QR_rejection",
+    "all_preregistered_cells_failed_final_selector": true,
+    "performance_is_not_a_charter_disqualification": true,
+    "qr_accepted": false
+  },
+  "entrypoint": "tournament/top40/teams/team-09/strategy.py",
+  "fixed_parameters": {
+    "bar_interval_hours": 8,
+    "decision_hours_utc": [
+      0,
+      8,
+      16
+    ],
+    "dispersion_history_minimum": 60,
+    "funding_scale_floor": 1e-07,
+    "gross_schedule_fractions": [
+      0.5,
+      0.75,
+      1.0
+    ],
+    "minimum_cross_section": 20,
+    "minimum_distinct_price_z": 5,
+    "minimum_pairwise_slopes": 20,
+    "minimum_valid_prior_pairs": 48,
+    "normalisation_history_days": 60,
+    "price_denominator_floor": 1e-06,
+    "price_scale_floor": 0.1,
+    "signal_horizon_hours": 72,
+    "slope_denominator_floor": 1e-12,
+    "symbol_weight_cap": 0.08,
+    "volatility_floor": 1e-06,
+    "volatility_minimum_exact_return_fraction": 0.8,
+    "zscore_clip": 4.0
+  },
+  "research_accounting": {
+    "ablation_configurations": 6,
+    "grid_configurations": 36,
+    "implementation_or_robustness_configurations": 0,
+    "public_oos_views": 0,
+    "total_material_configurations": 42
+  },
+  "research_evidence": {
+    "exact_finalist_summary_sha256": "37864beb7ea12802a114d0b0ebb78100788aca7d41cd106ef3be000125e1b8bc",
+    "exact_nested_oof_summary_sha256": "f5e573a4792f563adce1a470feaaefb3ee27c47d95ab7c8b100172ed1cfc7dcb",
+    "reference_target_csv_sha256": "84fe97c9854cc407c2cba3aadb4b9dd138b53c273214fa8ce2b881c0bf189af2"
+  },
+  "research_grid": {
+    "dispersion_lookback": [
+      90,
+      180,
+      270
+    ],
+    "gross_max": [
+      0.6,
+      0.8
+    ],
+    "q": [
+      0.25,
+      0.3
+    ],
+    "volatility_days": [
+      15,
+      30,
+      45
+    ]
+  },
+  "schema_version": 1,
+  "seeds": {
+    "strategy": 20260713,
+    "trial_namespace": 2026071309
+  },
+  "selected_parameters": {
+    "dispersion_history_includes_current": false,
+    "dispersion_lookback": 180,
+    "gross_max": 0.6,
+    "q": 0.3,
+    "volatility_days": 45
+  },
+  "strategy_name": "Funding-Price Elasticity Gap",
+  "team_id": "team-09"
+}

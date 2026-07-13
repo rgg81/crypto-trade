@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import math
 import sys
 from collections.abc import Mapping
@@ -360,6 +361,28 @@ def test_daily_cadence_holds_at_eight_and_sixteen_and_seed_is_bound():
         assert STRATEGY.FPEGStrategy(_config()).target_weights(held, seed=EXPECTED_SEED) is None
     with pytest.raises(ValueError, match="seed"):
         STRATEGY.FPEGStrategy(_config()).target_weights(context, seed=EXPECTED_SEED + 1)
+
+
+def test_factory_binds_the_disclosed_organizer_advanced_cell():
+    payload = json.loads(Path(__file__).with_name("frozen_config.json").read_text())
+    assert payload["candidate_id"] == "T09-FPEG-306045180"
+    assert payload["disposition"] == {
+        "advancement": "organizer_advanced_after_QR_rejection",
+        "all_preregistered_cells_failed_final_selector": True,
+        "performance_is_not_a_charter_disqualification": True,
+        "qr_accepted": False,
+    }
+    assert payload["research_accounting"]["total_material_configurations"] == 42
+    assert payload["research_accounting"]["public_oos_views"] == 0
+    built = STRATEGY.build_strategy()
+    assert built.config == STRATEGY.FPEGConfig(
+        q=0.30,
+        gross_max=0.60,
+        volatility_days=45,
+        dispersion_lookback=180,
+        dispersion_history_includes_current=False,
+        seed=EXPECTED_SEED,
+    )
 
 
 class _FixedTargets:
