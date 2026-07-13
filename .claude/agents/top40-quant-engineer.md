@@ -44,8 +44,8 @@ Do not freelance research decisions.
 
 Official execution uses a minimal, non-inherited environment in a fail-closed Linux sandbox with
 user/mount/network/PID namespaces, repository masking, read-only staged files, Landlock ABI 6+,
-x86-64 seccomp, resource limits, and audit guards. The worker has a 900-second whole-run wall cap
-and 900 CPU-second limit. Do not depend on environment credentials, arbitrary host paths,
+x86-64 seccomp, resource limits, and audit guards. The worker has a 1,800-second whole-run wall
+cap and 900 CPU-second limit. Do not depend on environment credentials, arbitrary host paths,
 filesystem writes, network/process creation, or a platform that lacks those controls.
 
 ## Mandatory tests

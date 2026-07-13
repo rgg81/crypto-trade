@@ -249,8 +249,8 @@ Canonical strategy execution fails closed unless the host supplies the implement
 sandbox: user/mount/network/PID namespaces, a masked repository, read-only staged source/runtime,
 Landlock ABI 6+ restrictions, the x86-64 seccomp policy, cleared capabilities, `no_new_privs`,
 resource limits, and Python audit guards. The environment is built from a minimal allowlist rather
-than inherited organizer variables. Each worker has a 900-second whole-run wall deadline and 900
-CPU-second limit, plus bounded address space, files, descriptors, and processes/threads. These are
+than inherited organizer variables. Each worker has a 1,800-second whole-run wall deadline and
+900 CPU-second limit, plus bounded address space, files, descriptors, and processes/threads. These are
 defense-in-depth controls around the trusted parent evaluator, not a separate physical host.
 
 Every team entrypoint exposes `build_strategy()` and returns one fresh object implementing

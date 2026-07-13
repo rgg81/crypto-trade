@@ -124,8 +124,8 @@ The whole allowed UTF-8 team text tree is Git-bound and fingerprinted (2 MiB per
 total), but the worker stages only `.py` plus the fixed small `frozen_config.json`/
 `strategy_config.{json,toml,yaml,yml}` names. Opaque prefit state and timestamp→target lookups are
 forbidden. Canonical execution requires the implemented Linux namespace/Landlock/seccomp sandbox,
-a minimal non-inherited environment, resource limits, and both 900-second CPU and whole-run wall
-caps; it fails closed if those host controls are unavailable.
+a minimal non-inherited environment, resource limits, a 900-second CPU cap, and a 1,800-second wall
+cap; it fails closed if those host controls are unavailable.
 
 ## Phase 3 — canonical rerun
 
