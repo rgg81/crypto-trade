@@ -1,8 +1,9 @@
 {
   "schema_version": 1,
   "team_id": "team-10",
-  "mechanism": "print_fragmentation_attention_premium",
-  "status": "terminated_no_go",
+  "status": "organizer_advance_qr_not_accepted",
+  "qr_accepted": false,
+  "candidate_id": "T10-PLMP-270-540-C14",
   "phase0_record_commit": "012727865acecad6ea0c3327745359820b8e45c6",
   "common_freeze_commit": "48df09341f02eba7a3469abd1ccda6649a4ef0ba",
   "window": {
@@ -11,124 +12,382 @@
     "end_inclusive": "2024-06-30"
   },
   "public_oos_accesses": 0,
-  "material_configurations_consumed": 21,
-  "remaining_configuration_budget": 99,
-  "notes": [
-    "Proxy screens use open-to-open returns, 7.5 bp per executed turnover, and approximate membership removals; they omit exact funding, fill caps, and delist accounting and are not canonical evidence.",
-    "C01 is the only exact common-evaluator candidate. Its 2x-cost replay is a stress setting, not an additional configuration.",
-    "The 24h primary appears twice conservatively because A01 and G02 used different feasibility coverage gates."
-  ],
-  "direction_and_component_controls": [
-    {
-      "id": "A01",
-      "feature": "120d robust log(trade_count/quote_volume), liquidity-vol-beta residual",
-      "hold_days": 1,
-      "names_per_sleeve": 5,
-      "mean_spearman_ic": 0.0245,
-      "proxy_net_sharpe": -0.467,
-      "disposition": "daily primary fails costs"
-    },
-    {
-      "id": "A02",
-      "feature": "same fragmentation shock without nuisance residualization",
-      "hold_days": 1,
-      "names_per_sleeve": 5,
-      "mean_spearman_ic": 0.0474,
-      "proxy_net_sharpe": -0.365,
-      "disposition": "nuisance removal is not source of failure"
-    },
-    {
-      "id": "A03",
-      "feature": "quote-volume shock only with identical nuisance residualization",
-      "hold_days": 1,
-      "names_per_sleeve": 5,
-      "mean_spearman_ic": -0.0372,
-      "proxy_net_sharpe": -0.898,
-      "disposition": "does not replicate primary tail relation"
-    },
-    {
-      "id": "A04",
-      "feature": "raw trade-count shock only with identical nuisance residualization",
-      "hold_days": 1,
-      "names_per_sleeve": 5,
-      "mean_spearman_ic": -0.0393,
-      "proxy_net_sharpe": -0.394,
-      "disposition": "does not replicate primary tail relation"
-    },
-    {
-      "id": "A05",
-      "feature": "reversed fragmentation direction",
-      "hold_days": 1,
-      "names_per_sleeve": 5,
-      "mean_spearman_ic": -0.0245,
-      "proxy_net_sharpe": -0.857,
-      "disposition": "sign reversal is worse"
-    }
-  ],
-  "bounded_cadence_tail_grid": [
-    {"id": "G01", "hold_days": 1, "names_per_sleeve": 4, "proxy_net_sharpe": -0.151},
-    {"id": "G02", "hold_days": 1, "names_per_sleeve": 5, "proxy_net_sharpe": -0.471},
-    {"id": "G03", "hold_days": 1, "names_per_sleeve": 6, "proxy_net_sharpe": -0.303},
-    {"id": "G04", "hold_days": 2, "names_per_sleeve": 4, "proxy_net_sharpe": 0.356},
-    {"id": "G05", "hold_days": 2, "names_per_sleeve": 5, "proxy_net_sharpe": 0.087},
-    {"id": "G06", "hold_days": 2, "names_per_sleeve": 6, "proxy_net_sharpe": 0.144},
-    {"id": "G07", "hold_days": 3, "names_per_sleeve": 4, "proxy_net_sharpe": 0.747},
-    {"id": "G08", "hold_days": 3, "names_per_sleeve": 5, "proxy_net_sharpe": 0.866},
-    {"id": "G09", "hold_days": 3, "names_per_sleeve": 6, "proxy_net_sharpe": 0.764},
-    {"id": "G10", "hold_days": 5, "names_per_sleeve": 4, "proxy_net_sharpe": 0.196},
-    {"id": "G11", "hold_days": 5, "names_per_sleeve": 5, "proxy_net_sharpe": 0.293},
-    {"id": "G12", "hold_days": 5, "names_per_sleeve": 6, "proxy_net_sharpe": 0.358},
-    {"id": "G13", "hold_days": 7, "names_per_sleeve": 4, "proxy_net_sharpe": -0.204},
-    {"id": "G14", "hold_days": 7, "names_per_sleeve": 5, "proxy_net_sharpe": -0.136},
-    {"id": "G15", "hold_days": 7, "names_per_sleeve": 6, "proxy_net_sharpe": -0.018}
-  ],
-  "exact_common_evaluator": {
-    "id": "C01",
-    "parameters": {
-      "baseline_days": 120,
-      "minimum_baseline_days": 60,
-      "mad_floor": 0.05,
+  "configuration_accounting": {
+    "print_fragmentation_consumed": 21,
+    "cost_basis_dislocation_consumed": 5,
+    "listing_maturation_consumed": 11,
+    "total_consumed": 37,
+    "remaining": 83,
+    "maximum": 120
+  },
+  "print_fragmentation_no_go": {
+    "mechanism": "robust log(trade_count/quote_volume) attention shock, long low and short high",
+    "component_controls": [
+      {"id": "A01", "variant": "residualized primary", "proxy_net_sharpe": -0.467},
+      {"id": "A02", "variant": "no nuisance residualization", "proxy_net_sharpe": -0.365},
+      {"id": "A03", "variant": "quote-volume shock only", "proxy_net_sharpe": -0.898},
+      {"id": "A04", "variant": "raw trade-count shock only", "proxy_net_sharpe": -0.394},
+      {"id": "A05", "variant": "reversed sign", "proxy_net_sharpe": -0.857}
+    ],
+    "cadence_tail_cells": [
+      {"id": "G01", "hold_days": 1, "names": 4, "proxy_net_sharpe": -0.151},
+      {"id": "G02", "hold_days": 1, "names": 5, "proxy_net_sharpe": -0.471},
+      {"id": "G03", "hold_days": 1, "names": 6, "proxy_net_sharpe": -0.303},
+      {"id": "G04", "hold_days": 2, "names": 4, "proxy_net_sharpe": 0.356},
+      {"id": "G05", "hold_days": 2, "names": 5, "proxy_net_sharpe": 0.087},
+      {"id": "G06", "hold_days": 2, "names": 6, "proxy_net_sharpe": 0.144},
+      {"id": "G07", "hold_days": 3, "names": 4, "proxy_net_sharpe": 0.747},
+      {"id": "G08", "hold_days": 3, "names": 5, "proxy_net_sharpe": 0.866},
+      {"id": "G09", "hold_days": 3, "names": 6, "proxy_net_sharpe": 0.764},
+      {"id": "G10", "hold_days": 5, "names": 4, "proxy_net_sharpe": 0.196},
+      {"id": "G11", "hold_days": 5, "names": 5, "proxy_net_sharpe": 0.293},
+      {"id": "G12", "hold_days": 5, "names": 6, "proxy_net_sharpe": 0.358},
+      {"id": "G13", "hold_days": 7, "names": 4, "proxy_net_sharpe": -0.204},
+      {"id": "G14", "hold_days": 7, "names": 5, "proxy_net_sharpe": -0.136},
+      {"id": "G15", "hold_days": 7, "names": 6, "proxy_net_sharpe": -0.018}
+    ],
+    "exact_candidate": {
+      "id": "C01",
       "hold_hours": 72,
       "names_per_sleeve": 5,
       "weight_per_name": 0.08,
-      "anchor_utc": "2020-02-03T00:00:00Z",
-      "seed": 20260713
-    },
-    "base_cost": {
       "net_sharpe": -0.25129873202783354,
       "annualized_return": -0.08179106168208838,
       "max_drawdown": 0.6174130309199718,
-      "positive_quarter_fraction": 0.2777777777777778,
+      "double_cost_sharpe": -0.5549140843556593,
       "long_price_pnl_sum": 1.0556019791504072,
       "short_price_pnl_sum": -1.1818923588099393,
-      "funding_pnl_sum": 0.16919505296919662,
-      "fees_sum": 0.2073821200927695,
-      "slippage_sum": 0.10369106004638474,
-      "turnover_sum": 414.76424018553894,
-      "mean_long_exposure": 0.36777013928662866,
-      "mean_short_exposure": 0.3659347514599726,
-      "both_sleeves_fraction_above_1pct": 0.9329192546583851,
-      "buy_notional_usdt": 21485400.04416464,
-      "sell_notional_usdt": 21471286.36928934,
-      "unfilled_notional_usdt": 237218.2457483228,
-      "conservative_settlement_loss_sum": 0.0,
-      "risk_cap_breach_bars": 53,
-      "regime_sharpe": {"bear": -0.22, "bull": -0.124, "chop": -0.666, "stress": -0.237}
-    },
-    "double_cost": {
-      "net_sharpe": -0.5549140843556593,
-      "annualized_return": -0.1444531408771017,
-      "max_drawdown": 0.6990917681839615,
-      "positive_quarter_fraction": 0.2777777777777778
-    },
-    "falsifier_triggered": true,
-    "disposition": "terminate mechanism; no nested validation and no public OOS"
-  },
-  "failed_diagnostic_attempts": [
-    {
-      "description": "non-overlapping forward-spread horizon printout",
-      "result": "no metric produced because timestamp arithmetic raised before the first horizon evaluation",
-      "material_configuration_count": 0
+      "disposition": "terminated before nested validation"
     }
-  ]
+  },
+  "cost_basis_dislocation_no_go": {
+    "frozen_parameters": {
+      "source_bars": 3,
+      "source_hours": [-24, -16, -8],
+      "baseline_valid_days": 90,
+      "minimum_baseline_days": 45,
+      "mad_floor": 0.001,
+      "clip": 5.0,
+      "rebalance": "daily 00:00 UTC",
+      "names_per_sleeve": 5,
+      "weight_per_name": 0.08,
+      "seed": 20260713
+    },
+    "coverage": {
+      "feature_rows": 219063,
+      "decision_days": 1610,
+      "mean_valid_names": 34.009937888198756,
+      "warmup_days_below_10": 78,
+      "loaded_maxima": {
+        "bars": "2024-06-30T16:00:00Z",
+        "funding": "2024-06-30T20:00:00.004Z",
+        "marks": "2024-06-30T16:00:00Z",
+        "membership": "2024-06-24T00:00:00Z"
+      }
+    },
+    "exact_configurations": [
+      {
+        "id": "V01",
+        "variant": "paid-price displacement residualized against endpoint return, log quote volume, and volatility",
+        "net_sharpe": -1.514975543116843,
+        "annualized_return": -0.34865631754149917,
+        "max_drawdown": 0.8647434287820519,
+        "positive_quarter_fraction": 0.2222222222222222,
+        "double_cost_sharpe": -2.8115700866366145,
+        "double_cost_annualized_return": -0.5356812981007536,
+        "double_cost_max_drawdown": 0.9678876730556663,
+        "disposition": "primary hard falsifier fired"
+      },
+      {
+        "id": "V02",
+        "variant": "raw robust paid-price displacement without nuisance regression",
+        "net_sharpe": -1.664404466356515,
+        "double_cost_sharpe": -2.833579069214379,
+        "disposition": "negative control"
+      },
+      {
+        "id": "V03",
+        "variant": "endpoint-return-only ordinary 24h reversal",
+        "net_sharpe": -1.7392907881306658,
+        "double_cost_sharpe": -2.84099243883223,
+        "disposition": "negative control"
+      },
+      {
+        "id": "V04",
+        "variant": "equal-bar-price displacement with identical nuisance regression",
+        "net_sharpe": -1.8164217090141799,
+        "double_cost_sharpe": -3.0887612247808907,
+        "disposition": "negative paid-anchor control"
+      },
+      {
+        "id": "V05",
+        "variant": "predeclared reversed primary sign",
+        "net_sharpe": -1.0628421129150236,
+        "double_cost_sharpe": -2.3764694895929765,
+        "disposition": "negative sign control; not selected"
+      }
+    ],
+    "primary_attribution": {
+      "long_price_pnl_sum": 0.6917654131710351,
+      "short_price_pnl_sum": -0.8527361078780034,
+      "funding_pnl_sum": -0.09041398550364993,
+      "fees_sum": 0.9993394182325321,
+      "slippage_sum": 0.49966970911626607,
+      "turnover_sum": 1998.6788364650645,
+      "mean_long_exposure": 0.3782163994016218,
+      "mean_short_exposure": 0.37763369943948966,
+      "long_active_fraction": 0.9515527950310559,
+      "short_active_fraction": 0.9515527950310559,
+      "buy_notional_usdt": 39030143.148840986,
+      "sell_notional_usdt": 39006247.12996039,
+      "unfilled_notional_usdt": 1416590.4322112675,
+      "risk_cap_breach_bars": 13,
+      "conservative_settlement_loss_sum": 0.0,
+      "terminal_unresolved_notional": 0.0,
+      "regime_sharpe": {
+        "bear": -2.4596845944079253,
+        "bull": -1.0725055392259883,
+        "chop": -1.7574516500748643,
+        "stress": -1.6623923311450293
+      }
+    },
+    "half_year_stability_diagnostics": [
+      {"window": "2021H2", "base_sharpe": -2.2655387852829763, "double_cost_sharpe": -3.479930394990852},
+      {"window": "2022H1", "base_sharpe": -1.6629682931564573, "double_cost_sharpe": -3.1300817486069024},
+      {"window": "2022H2", "base_sharpe": -2.9553053019650433, "double_cost_sharpe": -4.748762230355705},
+      {"window": "2023H1", "base_sharpe": -1.4303436910687102, "double_cost_sharpe": -3.3320317345206587},
+      {"window": "2023H2", "base_sharpe": 0.33262238659386856, "double_cost_sharpe": -1.2426301027661257},
+      {"window": "2024H1", "base_sharpe": -2.0316965661702953, "double_cost_sharpe": -3.6003634592768563}
+    ],
+    "nested_gate": {
+      "stage_1": "require positive exact base and 2x IS Sharpe, both sleeves material, and primary better than endpoint/equal-price controls",
+      "stage_1_result": "failed exact Sharpe positivity",
+      "stage_2_if_passed": "expanding inner walk-forward with 24h label purge and 48h embargo, then six 6-month outer folds; require positive median outer Sharpe, at least four positive folds, and positive median 2x Sharpe",
+      "stage_2_result": "not opened; half-year values above are stability diagnostics only",
+      "rescue_search": false,
+      "public_oos_opened": false
+    }
+  },
+  "listing_maturation_organizer_advance": {
+    "candidate_id": "T10-PLMP-270-540-C14",
+    "qr_accepted": false,
+    "frozen_parameters": {
+      "snapshot_start_utc": "2020-01-01T00:00:00Z",
+      "anchor_utc": "2020-02-03T00:00:00Z",
+      "left_censor_rule": "first transaction open equals snapshot start exactly",
+      "young_min_days_inclusive": 30,
+      "young_max_days_inclusive": 270,
+      "mature_min_days_inclusive": 540,
+      "cadence_days": 14,
+      "decision_time_utc": "00:00",
+      "names_per_sleeve": 5,
+      "weight_per_name": 0.08,
+      "target_gross": 0.8,
+      "target_net": 0.0,
+      "seed": 20260713,
+      "alpha_input": "past-visible transaction open_time only"
+    },
+    "coverage": {
+      "scheduled_decisions": 115,
+      "active_decisions": 58,
+      "active_fraction": 0.5043478260869565,
+      "first_active_decision": "2021-07-05T00:00:00Z",
+      "last_active_decision": "2024-06-17T00:00:00Z",
+      "mean_young_count": 11.556521739130435,
+      "mean_mature_count": 17.721739130434784,
+      "snapshot_start_left_censored_symbols": 3,
+      "after_snapshot_first_open_symbols": 295,
+      "loaded_maxima": {
+        "bars": "2024-06-30T16:00:00Z",
+        "funding": "2024-06-30T20:00:00.004Z",
+        "marks": "2024-06-30T16:00:00Z",
+        "membership": "2024-06-24T00:00:00Z"
+      }
+    },
+    "exact_configurations": [
+      {
+        "id": "PL01",
+        "variant": "young maximum 180 days, cadence 7 days",
+        "young_max_days": 180,
+        "cadence_days": 7,
+        "active_decisions": 62,
+        "net_sharpe": 0.27071756595000157,
+        "annualized_return": 0.029962508811187227,
+        "max_drawdown": 0.2885056308429227,
+        "double_cost_sharpe": 0.2386907509585306
+      },
+      {
+        "id": "PL02",
+        "variant": "young maximum 180 days, cadence 14 days",
+        "young_max_days": 180,
+        "cadence_days": 14,
+        "active_decisions": 31,
+        "net_sharpe": 0.07458522246131129,
+        "annualized_return": 0.0006906354012008453,
+        "max_drawdown": 0.2907258543345176,
+        "double_cost_sharpe": 0.04627609209562743
+      },
+      {
+        "id": "PL03",
+        "variant": "young maximum 180 days, cadence 28 days",
+        "young_max_days": 180,
+        "cadence_days": 28,
+        "active_decisions": 17,
+        "net_sharpe": -0.1313537335076202,
+        "annualized_return": -0.02431772984606939,
+        "max_drawdown": 0.2974692144227139,
+        "double_cost_sharpe": -0.15545997844192716
+      },
+      {
+        "id": "PL04",
+        "variant": "young maximum 270 days, cadence 7 days",
+        "young_max_days": 270,
+        "cadence_days": 7,
+        "active_decisions": 117,
+        "net_sharpe": 0.1689329378378785,
+        "annualized_return": 0.013906080122611408,
+        "max_drawdown": 0.3329196883834463,
+        "double_cost_sharpe": 0.12337732073383795
+      },
+      {
+        "id": "PL05",
+        "candidate_id": "T10-PLMP-270-540-C14",
+        "variant": "fixed primary: young maximum 270 days, mature minimum 540 days, cadence 14 days",
+        "young_max_days": 270,
+        "cadence_days": 14,
+        "active_decisions": 58,
+        "net_sharpe": 0.3670250557210546,
+        "annualized_return": 0.05034061362206321,
+        "max_drawdown": 0.30892179623110727,
+        "positive_quarter_fraction": 0.4444444444444444,
+        "double_cost_sharpe": 0.3262076300110734,
+        "double_cost_annualized_return": 0.04284372929776947,
+        "double_cost_max_drawdown": 0.31586117345775033,
+        "disposition": "organizer-advance after nested gate failure; qr_accepted=false"
+      },
+      {
+        "id": "PL06",
+        "variant": "young maximum 270 days, cadence 28 days",
+        "young_max_days": 270,
+        "cadence_days": 28,
+        "active_decisions": 32,
+        "net_sharpe": 0.25622553907966694,
+        "annualized_return": 0.02889428004842509,
+        "max_drawdown": 0.32091461521639164,
+        "double_cost_sharpe": 0.22460421454472632
+      },
+      {
+        "id": "PL07",
+        "variant": "young maximum 360 days, cadence 7 days",
+        "young_max_days": 360,
+        "cadence_days": 7,
+        "active_decisions": 153,
+        "net_sharpe": -0.02700630735097032,
+        "annualized_return": -0.029673615077274618,
+        "max_drawdown": 0.3314135883772582,
+        "double_cost_sharpe": -0.06972603653449352
+      },
+      {
+        "id": "PL08",
+        "variant": "young maximum 360 days, cadence 14 days",
+        "young_max_days": 360,
+        "cadence_days": 14,
+        "active_decisions": 77,
+        "net_sharpe": 0.09363771680698618,
+        "annualized_return": -0.0015422856013006525,
+        "max_drawdown": 0.3110297665095675,
+        "double_cost_sharpe": 0.05824974064444678
+      },
+      {
+        "id": "PL09",
+        "variant": "young maximum 360 days, cadence 28 days",
+        "young_max_days": 360,
+        "cadence_days": 28,
+        "active_decisions": 39,
+        "net_sharpe": -0.04206774508780912,
+        "annualized_return": -0.024554906974624147,
+        "max_drawdown": 0.31757839105669505,
+        "double_cost_sharpe": -0.07071173601466439
+      },
+      {
+        "id": "PL10",
+        "variant": "reverse fixed primary: long young and short mature",
+        "net_sharpe": -0.579751990942842,
+        "annualized_return": -0.11349918647555113,
+        "max_drawdown": 0.5440126566048691,
+        "double_cost_sharpe": -0.6172718861491654,
+        "disposition": "sign control; not selected"
+      },
+      {
+        "id": "PL11",
+        "variant": "all-age rank control at 14-day cadence without 30/270/540 maturity bands",
+        "net_sharpe": -0.047060963299179775,
+        "annualized_return": -0.047653614738086714,
+        "max_drawdown": 0.46626087722787357,
+        "double_cost_sharpe": -0.08591997558944514,
+        "disposition": "threshold control; not selected"
+      }
+    ],
+    "basin_summary": {
+      "grid": "young_max_days in {180,270,360} x cadence_days in {7,14,28}; mature_min_days=540 and 5+5 names at +/-0.08 fixed",
+      "positive_base_cells": 6,
+      "positive_double_cost_cells": 6,
+      "median_base_sharpe": 0.09363771680698618,
+      "median_double_cost_sharpe": 0.05824974064444678,
+      "selection_use": "diagnostic only; fixed primary retained regardless of neighboring result"
+    },
+    "primary_attribution": {
+      "price_pnl_sum": 0.2925876307352797,
+      "long_price_pnl_sum": -0.06583710542211084,
+      "short_price_pnl_sum": 0.35842473615739046,
+      "funding_pnl_sum": 0.021623941400166005,
+      "long_funding_pnl_sum": -0.07360449383989506,
+      "short_funding_pnl_sum": 0.09522843524006108,
+      "fees_sum": 0.020038145088847846,
+      "slippage_sum": 0.010019072544423923,
+      "turnover_sum": 40.07629017769569,
+      "mean_long_exposure": 0.1826336698968688,
+      "mean_short_exposure": 0.1892021360257787,
+      "long_active_fraction": 0.5043478260869565,
+      "short_active_fraction": 0.5217391304347826,
+      "buy_notional_usdt": 2237025.5907,
+      "sell_notional_usdt": 2279472.8688,
+      "unfilled_notional_usdt": 9733217.5955,
+      "risk_cap_breach_bars": 21,
+      "conservative_settlement_loss_sum": 0.0739968782484507,
+      "terminal_unresolved_notional": 0.0,
+      "both_sleeves_material": true,
+      "regime_sharpe": {
+        "bear": 0.641814,
+        "bull": 0.036552,
+        "chop": 1.372977,
+        "stress": -0.829794
+      }
+    },
+    "calendar_bucket_diagnostics": [
+      {"window": "2020", "base_sharpe": 0.0, "annualized_return": 0.0, "double_cost_sharpe": 0.0},
+      {"window": "2021", "base_sharpe": -0.307578, "annualized_return": -0.071535, "double_cost_sharpe": -0.34027},
+      {"window": "2022", "base_sharpe": 0.7764, "annualized_return": 0.118024, "double_cost_sharpe": 0.721003},
+      {"window": "2023", "base_sharpe": 1.370813, "annualized_return": 0.285498, "double_cost_sharpe": 1.323433},
+      {"window": "2024H1", "base_sharpe": -0.380653, "annualized_return": -0.134184, "double_cost_sharpe": -0.43338}
+    ],
+    "nested_fixed_primary": {
+      "protocol": "six half-year outer folds, fixed primary throughout, past-only first-open state, 14-day label purge, 28-day embargo; completed inner evidence ends no later than outer start minus 42 days",
+      "outer_folds": [
+        {"window": "2021H2", "inner_evidence_cutoff": "2021-05-20T00:00:00Z", "completed_inner_blocks": 0, "base_sharpe": -0.4326740603043237, "double_cost_sharpe": -0.4786766611233992},
+        {"window": "2022H1", "inner_evidence_cutoff": "2021-11-20T00:00:00Z", "completed_inner_blocks": 1, "base_sharpe": 0.06614963008857641, "double_cost_sharpe": 0.004812857449568546},
+        {"window": "2022H2", "inner_evidence_cutoff": "2022-05-20T00:00:00Z", "completed_inner_blocks": 2, "base_sharpe": 1.8039371680954932, "double_cost_sharpe": 1.7536965016148525},
+        {"window": "2023H1", "inner_evidence_cutoff": "2022-11-20T00:00:00Z", "completed_inner_blocks": 3, "base_sharpe": 3.1246058627044766, "double_cost_sharpe": 3.094699239864642},
+        {"window": "2023H2", "inner_evidence_cutoff": "2023-05-20T00:00:00Z", "completed_inner_blocks": 4, "base_sharpe": -0.1949444030899493, "double_cost_sharpe": -0.2557437717835168},
+        {"window": "2024H1", "inner_evidence_cutoff": "2023-11-20T00:00:00Z", "completed_inner_blocks": 5, "base_sharpe": -0.3806526514552719, "double_cost_sharpe": -0.43338001314774555}
+      ],
+      "positive_outer_base_folds": 3,
+      "median_outer_base_sharpe": -0.06439738650068644,
+      "median_outer_double_cost_sharpe": -0.12546545716697413,
+      "gate": "median base > 0, at least 4/6 base folds > 0, and median 2x > 0",
+      "gate_pass": false,
+      "public_oos_opened": false
+    },
+    "final_disposition": "organizer-advance exact fixed PL05/T10-PLMP-270-540-C14 with qr_accepted=false; no rescue or neighbor switch"
+  }
 }
