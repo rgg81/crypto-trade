@@ -1,38 +1,175 @@
 {
   "ablations": [
     {
+      "change": "Replace alpha=-e with alpha=b_t*zP; preserve main residual dispersion state, sizing, cadence, and proxy execution.",
+      "evidence": {
+        "base_sharpe": -1.6476993841871108,
+        "double_cost_sharpe": -2.940295557178184,
+        "joint_minus_ablation_sharpe": 2.77455471699999,
+        "sum_return": -0.6817897754656845,
+        "turnover": 720.0570987664573
+      },
+      "falsifier": "Joint outer-OOF Sharpe must exceed this by at least 0.10.",
       "id": "price_only",
-      "change": "Replace alpha=-e with alpha=b_t*zP; preserve selection, state, sizing, cadence and evaluator.",
-      "falsifier": "Joint outer-OOF Sharpe must exceed this by at least 0.10."
+      "result": "proxy differential passes, but the joint strategy fails aggregate OOF acceptance"
     },
     {
+      "change": "Replace alpha=-e with alpha=-zF; preserve main residual dispersion state and all other settings.",
+      "evidence": {
+        "base_sharpe": 1.0803874547867893,
+        "double_cost_sharpe": 0.2974141950072982,
+        "joint_minus_ablation_sharpe": 0.04646787802608967,
+        "sum_return": 0.38643785396447167,
+        "turnover": 373.2998992481765
+      },
+      "falsifier": "Joint Sharpe must exceed this by at least 0.10 and joint price PnL net of execution costs must be positive.",
       "id": "funding_only",
-      "change": "Replace alpha=-e with alpha=-zF; preserve all other settings.",
-      "falsifier": "Joint outer-OOF Sharpe must exceed this by at least 0.10 and joint price PnL net of execution costs must be positive."
+      "result": "fails: incremental joint Sharpe is only 0.046468; exact OOF joint price less execution costs is -0.111019"
     },
     {
+      "change": "Use raw 72h log displacement before the same prior-day robust normalization.",
+      "evidence": {
+        "base_sharpe": 1.1426721386538712,
+        "double_cost_sharpe": 0.28285038128339,
+        "sum_return": 0.4057094434069135,
+        "turnover": 407.01012485024387
+      },
+      "falsifier": "Tests whether volatility scaling, rather than funding-price mismatch, creates ranks.",
       "id": "no_price_scaling",
-      "change": "Use raw 72h log displacement before prior-day robust normalization.",
-      "falsifier": "Tests whether volatility scaling, rather than funding-price mismatch, creates ranks."
+      "result": "negative mechanism evidence: proxy Sharpe exceeds the joint baseline"
     },
     {
+      "change": "Use raw cumulative funding and raw scaled displacement in the Theil-Sen fit.",
+      "evidence": {
+        "base_sharpe": 1.463309453026546,
+        "double_cost_sharpe": 0.7798336159132149,
+        "sum_return": 0.5916670930024827,
+        "turnover": 368.8192613151992
+      },
+      "falsifier": "Tests whether slow funding levels masquerade as fast innovation.",
       "id": "no_demean",
-      "change": "Use raw cumulative funding and raw scaled displacement in Theil-Sen.",
-      "falsifier": "Tests whether slow funding levels masquerade as fast innovation."
+      "result": "strong negative mechanism evidence: proxy base and stressed Sharpes exceed the joint baseline"
     },
     {
+      "change": "Fix gross at Gmax instead of applying the prior-only dispersion throttle.",
+      "evidence": {
+        "base_sharpe": 1.1864582563837978,
+        "double_cost_sharpe": 0.33701476789166596,
+        "sum_return": 0.5374432436086639,
+        "turnover": 513.0440573125065
+      },
+      "falsifier": "Throttle must improve double-cost drawdown or Sharpe without making a sleeve immaterial.",
       "id": "no_dispersion_throttle",
-      "change": "Fix gross at Gmax.",
-      "falsifier": "Throttle must improve double-cost drawdown or Sharpe without making a sleeve immaterial."
+      "result": "negative: removing the throttle raises proxy base and stressed Sharpe, although turnover rises"
     },
     {
-      "id": "equal_weight",
       "change": "Equal-weight each selected sleeve subject to the same 8% cap.",
-      "falsifier": "Tests whether inverse-volatility allocation is the apparent edge."
+      "evidence": {
+        "base_sharpe": 1.3288021984937066,
+        "double_cost_sharpe": 0.5575097064309301,
+        "sum_return": 0.5104348932907226,
+        "turnover": 395.12768398268366
+      },
+      "falsifier": "Tests whether inverse-volatility allocation is the apparent edge.",
+      "id": "equal_weight",
+      "result": "negative: equal weighting materially outperforms the joint inverse-volatility baseline in the proxy"
     }
   ],
-  "common_settings": "Identical PIT universe, folds, 24h labels, purge/embargo, actual funding, costs, next-open fills, participation, delists and seeds.",
-  "material_configuration_count": 6,
+  "accounting": {
+    "ablation_configurations": 6,
+    "grid_configurations": 36,
+    "implementation_or_robustness_configurations": 0,
+    "public_oos_views": 0,
+    "total_material_configurations": 42
+  },
+  "common_settings": "Identical PIT universe, 24h next-open label, prior-only transforms, D_t excluded from its current thresholds, folds, purge/embargo, actual funding, next-open timing, and seeds. Ablation numbers are deterministic ideal-daily proxy diagnostics with 7.5 bp executed-notional cost (15 bp stressed); they do not model participation, mark/open basis, forced delists, or central risk reductions and are not substituted for the finalist's exact engine validation.",
+  "evidence_hashes": {
+    "exact_finalist_summary_sha256": "37864beb7ea12802a114d0b0ebb78100788aca7d41cd106ef3be000125e1b8bc",
+    "exact_nested_oof_summary_sha256": "f5e573a4792f563adce1a470feaaefb3ee27c47d95ab7c8b100172ed1cfc7dcb",
+    "reference_target_csv_sha256": "84fe97c9854cc407c2cba3aadb4b9dd138b53c273214fa8ce2b881c0bf189af2"
+  },
+  "final_anchor_grid": [
+    {"Gmax": 0.6, "L": 90, "V": 15, "gate": false, "median_proxy_sharpe": -0.46291148186797004, "positive_blocks": 1, "proxy_double_cost_sharpe": -1.4594817773372497, "q": 0.25},
+    {"Gmax": 0.6, "L": 180, "V": 15, "gate": false, "median_proxy_sharpe": -0.3830331706619238, "positive_blocks": 1, "proxy_double_cost_sharpe": -1.3280242408823328, "q": 0.25},
+    {"Gmax": 0.6, "L": 270, "V": 15, "gate": false, "median_proxy_sharpe": -0.16949014422841915, "positive_blocks": 1, "proxy_double_cost_sharpe": -1.310461136552565, "q": 0.25},
+    {"Gmax": 0.6, "L": 90, "V": 30, "gate": false, "median_proxy_sharpe": -0.6921778538847873, "positive_blocks": 1, "proxy_double_cost_sharpe": -1.4396069149338155, "q": 0.25},
+    {"Gmax": 0.6, "L": 180, "V": 30, "gate": false, "median_proxy_sharpe": -0.6230770667027955, "positive_blocks": 1, "proxy_double_cost_sharpe": -1.3154952005228822, "q": 0.25},
+    {"Gmax": 0.6, "L": 270, "V": 30, "gate": false, "median_proxy_sharpe": -0.6243458859865604, "positive_blocks": 1, "proxy_double_cost_sharpe": -1.3223305460583201, "q": 0.25},
+    {"Gmax": 0.6, "L": 90, "V": 45, "gate": false, "median_proxy_sharpe": -0.7127250243253512, "positive_blocks": 1, "proxy_double_cost_sharpe": -1.4361924338278211, "q": 0.25},
+    {"Gmax": 0.6, "L": 180, "V": 45, "gate": false, "median_proxy_sharpe": -0.6433531099274715, "positive_blocks": 1, "proxy_double_cost_sharpe": -1.312897155671197, "q": 0.25},
+    {"Gmax": 0.6, "L": 270, "V": 45, "gate": false, "median_proxy_sharpe": -0.6379054942743441, "positive_blocks": 1, "proxy_double_cost_sharpe": -1.3172727385628806, "q": 0.25},
+    {"Gmax": 0.8, "L": 90, "V": 15, "gate": false, "median_proxy_sharpe": -0.44220943879812175, "positive_blocks": 1, "proxy_double_cost_sharpe": -1.4626169027916713, "q": 0.25},
+    {"Gmax": 0.8, "L": 180, "V": 15, "gate": false, "median_proxy_sharpe": -0.3369853078687045, "positive_blocks": 1, "proxy_double_cost_sharpe": -1.3303472252827209, "q": 0.25},
+    {"Gmax": 0.8, "L": 270, "V": 15, "gate": false, "median_proxy_sharpe": -0.14846826010621947, "positive_blocks": 1, "proxy_double_cost_sharpe": -1.326273010080098, "q": 0.25},
+    {"Gmax": 0.8, "L": 90, "V": 30, "gate": false, "median_proxy_sharpe": -0.6808098012641409, "positive_blocks": 1, "proxy_double_cost_sharpe": -1.4316488161831198, "q": 0.25},
+    {"Gmax": 0.8, "L": 180, "V": 30, "gate": false, "median_proxy_sharpe": -0.5984743456959387, "positive_blocks": 1, "proxy_double_cost_sharpe": -1.3210746110776896, "q": 0.25},
+    {"Gmax": 0.8, "L": 270, "V": 30, "gate": false, "median_proxy_sharpe": -0.5873505164405028, "positive_blocks": 1, "proxy_double_cost_sharpe": -1.3328564015336875, "q": 0.25},
+    {"Gmax": 0.8, "L": 90, "V": 45, "gate": false, "median_proxy_sharpe": -0.7180260675650215, "positive_blocks": 1, "proxy_double_cost_sharpe": -1.463872565736497, "q": 0.25},
+    {"Gmax": 0.8, "L": 180, "V": 45, "gate": false, "median_proxy_sharpe": -0.63299768808081, "positive_blocks": 1, "proxy_double_cost_sharpe": -1.3398587495542191, "q": 0.25},
+    {"Gmax": 0.8, "L": 270, "V": 45, "gate": false, "median_proxy_sharpe": -0.6204094688149119, "positive_blocks": 1, "proxy_double_cost_sharpe": -1.3534333714647944, "q": 0.25},
+    {"Gmax": 0.6, "L": 90, "V": 15, "gate": false, "median_proxy_sharpe": 0.011836182269042879, "positive_blocks": 2, "proxy_double_cost_sharpe": -0.9601663962329211, "q": 0.3},
+    {"Gmax": 0.6, "L": 180, "V": 15, "gate": false, "median_proxy_sharpe": 0.08067571442852381, "positive_blocks": 2, "proxy_double_cost_sharpe": -0.8005687082345171, "q": 0.3},
+    {"Gmax": 0.6, "L": 270, "V": 15, "gate": false, "median_proxy_sharpe": 0.24694836622499422, "positive_blocks": 2, "proxy_double_cost_sharpe": -0.7654450655537772, "q": 0.3},
+    {"Gmax": 0.6, "L": 90, "V": 30, "gate": false, "median_proxy_sharpe": 0.29616365987568277, "positive_blocks": 2, "proxy_double_cost_sharpe": -0.857866486839106, "q": 0.3},
+    {"Gmax": 0.6, "L": 180, "V": 30, "gate": false, "median_proxy_sharpe": 0.4848971242673141, "positive_blocks": 2, "proxy_double_cost_sharpe": -0.7029380862294835, "q": 0.3},
+    {"Gmax": 0.6, "L": 270, "V": 30, "gate": false, "median_proxy_sharpe": 0.4382565985687005, "positive_blocks": 2, "proxy_double_cost_sharpe": -0.6998324709214498, "q": 0.3},
+    {"Gmax": 0.6, "L": 90, "V": 45, "gate": false, "median_proxy_sharpe": 0.27988430950075344, "positive_blocks": 2, "proxy_double_cost_sharpe": -0.9031858876805268, "q": 0.3},
+    {"Gmax": 0.6, "L": 180, "V": 45, "gate": false, "median_proxy_sharpe": 0.4898916252223857, "positive_blocks": 2, "proxy_double_cost_sharpe": -0.751806661847092, "q": 0.3},
+    {"Gmax": 0.6, "L": 270, "V": 45, "gate": false, "median_proxy_sharpe": 0.4448964506638222, "positive_blocks": 2, "proxy_double_cost_sharpe": -0.738513580193554, "q": 0.3},
+    {"Gmax": 0.8, "L": 90, "V": 15, "gate": false, "median_proxy_sharpe": 0.01343767540038602, "positive_blocks": 2, "proxy_double_cost_sharpe": -0.9539229565237786, "q": 0.3},
+    {"Gmax": 0.8, "L": 180, "V": 15, "gate": false, "median_proxy_sharpe": 0.08230499378559263, "positive_blocks": 2, "proxy_double_cost_sharpe": -0.7937966936509071, "q": 0.3},
+    {"Gmax": 0.8, "L": 270, "V": 15, "gate": false, "median_proxy_sharpe": 0.2508666853423567, "positive_blocks": 2, "proxy_double_cost_sharpe": -0.7586598155919151, "q": 0.3},
+    {"Gmax": 0.8, "L": 90, "V": 30, "gate": false, "median_proxy_sharpe": 0.297611825971192, "positive_blocks": 2, "proxy_double_cost_sharpe": -0.8521580480635809, "q": 0.3},
+    {"Gmax": 0.8, "L": 180, "V": 30, "gate": false, "median_proxy_sharpe": 0.486201739282335, "positive_blocks": 2, "proxy_double_cost_sharpe": -0.6966407212871696, "q": 0.3},
+    {"Gmax": 0.8, "L": 270, "V": 30, "gate": false, "median_proxy_sharpe": 0.4397041108711518, "positive_blocks": 2, "proxy_double_cost_sharpe": -0.6944622954915437, "q": 0.3},
+    {"Gmax": 0.8, "L": 90, "V": 45, "gate": false, "median_proxy_sharpe": 0.27602617965013193, "positive_blocks": 2, "proxy_double_cost_sharpe": -0.9032342755763985, "q": 0.3},
+    {"Gmax": 0.8, "L": 180, "V": 45, "gate": false, "median_proxy_sharpe": 0.48061718498476075, "positive_blocks": 2, "proxy_double_cost_sharpe": -0.7506834255059953, "q": 0.3},
+    {"Gmax": 0.8, "L": 270, "V": 45, "gate": false, "median_proxy_sharpe": 0.4357039797847029, "positive_blocks": 2, "proxy_double_cost_sharpe": -0.7413000897886705, "q": 0.3}
+  ],
+  "final_selection": {
+    "exact_validation": {
+      "aggregate_double_cost_sharpe": -0.6787934146034984,
+      "block_base_sharpes": [
+        0.6271868110598882,
+        0.7475798107355037,
+        -0.2979953937454866
+      ],
+      "median_base_sharpe": 0.6271868110598882,
+      "positive_blocks": 2,
+      "selector_gate_passed": false
+    },
+    "parameters": {
+      "dispersion_history_includes_current": false,
+      "dispersion_lookback": 180,
+      "gross_max": 0.6,
+      "q": 0.3,
+      "volatility_days": 45
+    },
+    "proxy_validation": {
+      "aggregate_double_cost_sharpe": -0.751806661847092,
+      "block_base_sharpes": [0.4898916252223857, 0.6033147828591975, -0.21721488245895929],
+      "material_sleeves": true,
+      "median_base_sharpe": 0.4898916252223857,
+      "passed_cells": 0,
+      "positive_blocks": 2
+    },
+    "status": "organizer_advanced_after_all_36_cells_failed; not_qr_accepted"
+  },
+  "nested_oof_exact": {
+    "aggregate_base_sharpe": -0.03234148006888468,
+    "aggregate_double_cost_sharpe": -1.0947363801517922,
+    "negative_spearman_folds": 5,
+    "positive_folds": 3,
+    "positive_regimes": 2,
+    "worst_regime_sharpe": -0.9134713584168651
+  },
+  "proxy_baseline": {
+    "base_sharpe": 1.126855332812879,
+    "double_cost_sharpe": 0.2255570354335276,
+    "id": "joint",
+    "sum_return": 0.38816951185142634,
+    "turnover": 413.9792807763886
+  },
   "schema_version": 1,
   "team_id": "team-09"
 }

@@ -1,7 +1,31 @@
 {
   "bindings": {
     "common_freeze_commit": "48df09341f02eba7a3469abd1ccda6649a4ef0ba",
-    "phase0_record": "012727865acecad6ea0c3327745359820b8e45c6"
+    "config_sha256": "030a065f75f9c4adb7484065908f4379435929609d446be0de0a831d9e28ee0a",
+    "data_manifest_sha256": "077eb036d262befec80f7013084fe6906859f7c3bbe2f8c193c9d9ec68e367c3",
+    "phase0_record": "012727865acecad6ea0c3327745359820b8e45c6",
+    "snapshot_files": {
+      "bars": "f6f6364c34d23725d96a41c5cec216a83ca8cb05145e70b56aa239508b1cb99b",
+      "funding": "90f0e4702752cadc314b1aaac58175357dca14617c2a4243bdad51c366dbbeb9",
+      "mark_prices": "8bf341f358cda3d2fa41f2a4d1290c1851114416f04b137386d0cf13e49ec4b0",
+      "membership": "f51c9eb207c1da51cc4b9ff6045bb5e914828015b5c9c214f0e2673cd868eb14"
+    }
+  },
+  "cutoff_audit": {
+    "cutoff_exclusive": "2024-07-01T00:00:00+00:00",
+    "loaded_rows": {
+      "bars": 680320,
+      "funding": 502901,
+      "mark_prices": 481084,
+      "membership": 8666
+    },
+    "maximum_loaded_event_timestamp": {
+      "bars.open_time": "2024-06-30T16:00:00+00:00",
+      "funding.funding_time": "2024-06-30T20:00:00.004000+00:00",
+      "mark_prices.mark_time": "2024-06-30T16:00:00+00:00",
+      "membership.reconstitution_time": "2024-06-24T00:00:00+00:00"
+    },
+    "scan_rule": "Each Parquet scan applied its own event-time predicate < 2024-07-01T00:00:00Z before conversion to pandas, projected only required columns, then asserted max(event_time) < cutoff. The canonical full-window runner was not invoked."
   },
   "features": [
     {
@@ -11,8 +35,8 @@
       "field": "bars.close",
       "fitted": false,
       "lag": "latest input is the bar ending at t; fill open stamped t is hidden",
-      "missing_behavior": "no forward fill or interpolation; current 72h exact grid failure excludes symbol; prior pair is skipped and fewer than 48/60 excludes symbol",
-      "transformation": "adjacent log returns, 72h displacement divided by realized-root-sum-square; prior-60-day median/MAD z-score"
+      "missing_behavior": "no forward fill or interpolation; current 72h exact-grid failure excludes symbol; a prior pair is skipped and fewer than 48 valid values among the prior 60 excludes the symbol",
+      "transformation": "nine adjacent log returns on an exact ten-close 72h grid; displacement divided by realized root-sum-square; prior-60-day median/MAD z-score using observations strictly before t"
     },
     {
       "available_timestamp": "funding_time, admitted only when funding_time < decision_time",
@@ -20,9 +44,19 @@
       "event_timestamp": "funding_time (actual event schedule)",
       "field": "funding.funding_rate",
       "fitted": true,
-      "lag": "strictly earlier than t",
-      "missing_behavior": "sum actual events; no-event window is zero only after first observed event; pre-first-event is missing; snapshot coverage failure is not repaired",
-      "transformation": "72h cumulative rate; prior-60-day median/MAD z-score; cross-sectional Theil-Sen residual"
+      "lag": "strictly earlier than t; a boundary event at t is excluded from the signal",
+      "missing_behavior": "sum actual events; no-event window is zero only after the first observed event; pre-first-event is missing; snapshot coverage failure is not repaired",
+      "transformation": "72h cumulative rate on [t-72h,t); prior-60-day past-only median/MAD z-score; daily cross-sectional Theil-Sen residual"
+    },
+    {
+      "available_timestamp": "after the valid cross-sectional fit at daily decision t",
+      "endpoint_archive": "derived only from the contemporaneous past-only FPEG residual cross-section",
+      "event_timestamp": "decision_time t",
+      "field": "derived.D_t",
+      "fitted": true,
+      "lag": "Q33/Q67 are computed from valid D_s with s<t only; D_t is appended after sizing",
+      "missing_behavior": "invalid cross-sectional fit requests flat and appends no D; valid D is appended even if a later allocation-feasibility gate requests flat",
+      "transformation": "1.4826 times cross-sectional MAD of residuals; most recent L=180 prior values; nearest-rank 33rd/67th percentiles; current-in-history flag is binding false"
     },
     {
       "available_timestamp": "Monday 00:00 UTC reconstitution, then current decision intersection with executable opens",
@@ -40,12 +74,12 @@
       "event_timestamp": "open_time",
       "field": "bars.open",
       "fitted": false,
-      "lag": "future relative to decision feature set",
+      "lag": "future relative to the decision feature set",
       "missing_behavior": "label invalid; evaluator handles disappearance/delist",
-      "transformation": "next-open fill and 24h forward research label only"
+      "transformation": "next-open fill and 24h forward research label log(O[t+24h]/O[t]) only; label interval [t,t+24h]"
     },
     {
-      "available_timestamp": "prior completed 24h for participation; funding event for cashflow",
+      "available_timestamp": "prior completed 24h for participation; funding event for cashflow; exact boundary for mark risk",
       "endpoint_archive": "frozen bars.quote_volume, funding.mark_price, and boundary mark_prices",
       "event_timestamp": "source bar/event/boundary timestamp",
       "field": "central_execution_inputs",
@@ -55,6 +89,14 @@
       "transformation": "participation cap, risk marks, actual funding, fees and slippage; not signal inputs"
     }
   ],
+  "selected_parameters": {
+    "dispersion_history_includes_current": false,
+    "dispersion_lookback": 180,
+    "gross_max": 0.6,
+    "q": 0.3,
+    "status": "organizer_advanced_after_qr_rejection",
+    "volatility_days": 45
+  },
   "schema_version": 1,
   "team_id": "team-09"
 }
