@@ -128,7 +128,12 @@ def generate_targets(
         else:
             if not isinstance(weights, Mapping):
                 raise TypeError("target_weights() must return a weight mapping or None")
-            row_values = {str(symbol): float(weight) for symbol, weight in weights.items()}
+            row_values = {}
+            for symbol, raw_weight in weights.items():
+                weight = float(raw_weight)
+                if not math.isfinite(weight):
+                    raise ValueError("target_weights() returned a non-finite target weight")
+                row_values[str(symbol)] = weight
             if REBALANCE_INSTRUCTION_COLUMN in row_values:
                 raise ValueError("target_weights() returned the reserved instruction column")
             row_values[REBALANCE_INSTRUCTION_COLUMN] = True
@@ -188,6 +193,9 @@ def evaluate_targets(
     else:
         # Focused evaluator callers predating sparse instructions remain explicit-rebalance rows.
         rebalance_instructions = pd.Series(True, index=target_frame.index, dtype=bool)
+    target_frame = target_frame.apply(pd.to_numeric, errors="raise").astype(float)
+    if not np.isfinite(target_frame.to_numpy()).all():
+        raise ValueError("target frame contains non-finite target weights")
     if frame["symbol"].astype(str).eq(REBALANCE_INSTRUCTION_COLUMN).any():
         raise ValueError("market data contains the reserved rebalance instruction symbol")
     symbols = sorted(set(frame["symbol"]) | set(target_frame.columns))

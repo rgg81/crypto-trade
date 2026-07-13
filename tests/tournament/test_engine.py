@@ -160,8 +160,8 @@ def test_delisting_boundary_funding_charges_only_forced_quantity_once(
     targets = pd.DataFrame(
         [
             {"AAAUSDT": target_weight, "BBBUSDT": 0.1},
-            {"BBBUSDT": 0.1},
-            {"BBBUSDT": 0.1},
+            {"AAAUSDT": 0.0, "BBBUSDT": 0.1},
+            {"AAAUSDT": 0.0, "BBBUSDT": 0.1},
         ],
         index=times[1:],
     )
@@ -718,5 +718,37 @@ def test_nonfinite_market_or_funding_inputs_fail_loudly():
             membership,
             targets,
             mark_prices=missing_mark,
+            config=_config(),
+        )
+
+
+def test_nonfinite_strategy_and_target_frame_weights_fail_loudly():
+    bars, funding, membership, times = _market()
+
+    class NonFiniteStrategy:
+        def target_weights(self, context, *, seed):
+            return {context.eligible_symbols[0]: float("nan")}
+
+    with pytest.raises(ValueError, match="non-finite target weight"):
+        generate_targets(
+            NonFiniteStrategy(),
+            bars,
+            funding,
+            membership,
+            [times[1], times[2]],
+            seed=7,
+        )
+
+    targets = pd.DataFrame(
+        [{"AAAUSDT": float("nan")}, {"AAAUSDT": 0.0}],
+        index=[times[1], times[2]],
+    )
+    with pytest.raises(ValueError, match="non-finite target weight"):
+        evaluate_targets(
+            bars,
+            funding,
+            membership,
+            targets,
+            mark_prices=_marks(bars),
             config=_config(),
         )
