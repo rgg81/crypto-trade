@@ -1,0 +1,93 @@
+schema_version = 1
+name = "quant-portfolio-blind-top40"
+teams = [
+  "team-01", "team-02", "team-03", "team-04", "team-05",
+  "team-06", "team-07", "team-08", "team-09", "team-10",
+]
+
+[data]
+source = "binance-public-usdm"
+archive_base_url = "https://data.binance.vision"
+archive_s3_url = "https://s3-ap-northeast-1.amazonaws.com/data.binance.vision"
+exchange_info_url = "https://fapi.binance.com/fapi/v1/exchangeInfo"
+funding_rate_url = "https://fapi.binance.com/fapi/v1/fundingRate"
+mark_price_klines_url = "https://fapi.binance.com/fapi/v1/markPriceKlines"
+warmup_start = "2020-01-01"
+hard_end_exclusive = "2026-07-01"
+transaction_interval = "8h"
+mark_price_interval = "1h"
+snapshot_dir = "data/top40/snapshot-v1"
+manifest_path = "tournament/top40/data_manifest.json"
+common_report_dir = "reports-top40/common"
+checksum_policy = "require-binance-sha256-sidecar"
+parser_version = "top40-snapshot-v1"
+
+[splits]
+in_sample_start = "2020-02-03"
+in_sample_end_inclusive = "2024-06-30"
+public_oos_start = "2024-07-01"
+public_oos_end_inclusive = "2026-06-30"
+public_oos_visible_to_teams = true
+quarantined_gap_start = "2026-07-01"
+forward_paper_start = "winner-freeze-next-8h-boundary"
+
+[universe]
+venue = "binance-usdm"
+instrument = "linear-usdt-perpetual"
+size = 40
+reconstitution = "weekly-monday-00:00-utc"
+liquidity_measure = "median-daily-quote-volume"
+trailing_days = 30
+minimum_history_days = 30
+
+[execution]
+base_interval = "8h"
+initial_equity_usdt = 100000.0
+taker_fee_bps_per_side = 5.0
+slippage_bps_per_side = 2.5
+max_gross_exposure = 1.0
+max_abs_net_exposure = 0.25
+max_symbol_exposure = 0.10
+max_bar_participation = 0.001
+double_cost_multiplier = 2.0
+annualization_days = 365
+funding_at_rebalance_order = "funding-on-carried-position-then-rebalance"
+
+[regimes]
+stress_trailing_days = 30
+stress_annualized_btc_vol = 0.80
+direction_trailing_days = 60
+bull_btc_return = 0.10
+bear_btc_return = -0.10
+lag_days = 1
+
+[statistics]
+bootstrap_samples = 2000
+bootstrap_block_days = 10
+bootstrap_seed = 20260713
+
+[scoring]
+automatic_weight = 70.0
+critic_weight = 15.0
+user_weight = 15.0
+winner_required_when_any_submission_is_valid = true
+performance_can_be_disqualified = false
+
+[paper_eligibility]
+minimum_is_net_sharpe = 0.75
+minimum_public_oos_net_sharpe = 1.0
+minimum_double_cost_oos_sharpe = 0.5
+maximum_public_oos_drawdown = 0.30
+minimum_positive_quarter_fraction = 0.625
+minimum_worst_regime_sharpe = -0.25
+minimum_positive_regimes = 3
+
+[research_budget]
+maximum_material_configurations_per_team = 120
+maximum_public_oos_views_per_team = 3
+maximum_cpu_hours_per_team = 12.0
+maximum_wall_clock_hours_per_team = 18.0
+deadline_utc = "2026-07-16T18:00:00Z"
+strategy_seed = 20260713
+trial_seed_namespace = "20260713NN"
+public_oos_access_log_required = true

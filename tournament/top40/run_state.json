@@ -1,0 +1,109 @@
+{
+  "common_freeze_commit": null,
+  "config_sha256": null,
+  "data_manifest_sha256": null,
+  "evaluator_sha256": null,
+  "methodology_sha256": null,
+  "orchestrator_sha256": null,
+  "phase": "phase0",
+  "research_journal": {
+    "genesis_sha256": "7db83e660d43c4c9420a534f3b96532cd2062bda4addafbf0a34613045e0638d",
+    "head_sha256": "7db83e660d43c4c9420a534f3b96532cd2062bda4addafbf0a34613045e0638d",
+    "path": "tournament/top40/organizer_research_journal.jsonl",
+    "record_count": 1,
+    "schema_version": 1
+  },
+  "schema_version": 1,
+  "teams": {
+    "team-01": {
+      "canonical_run": "pending",
+      "champion": null,
+      "freeze_commit": null,
+      "oos_accesses": [],
+      "qe": "pending",
+      "qr": "pending",
+      "reviews": {}
+    },
+    "team-02": {
+      "canonical_run": "pending",
+      "champion": null,
+      "freeze_commit": null,
+      "oos_accesses": [],
+      "qe": "pending",
+      "qr": "pending",
+      "reviews": {}
+    },
+    "team-03": {
+      "canonical_run": "pending",
+      "champion": null,
+      "freeze_commit": null,
+      "oos_accesses": [],
+      "qe": "pending",
+      "qr": "pending",
+      "reviews": {}
+    },
+    "team-04": {
+      "canonical_run": "pending",
+      "champion": null,
+      "freeze_commit": null,
+      "oos_accesses": [],
+      "qe": "pending",
+      "qr": "pending",
+      "reviews": {}
+    },
+    "team-05": {
+      "canonical_run": "pending",
+      "champion": null,
+      "freeze_commit": null,
+      "oos_accesses": [],
+      "qe": "pending",
+      "qr": "pending",
+      "reviews": {}
+    },
+    "team-06": {
+      "canonical_run": "pending",
+      "champion": null,
+      "freeze_commit": null,
+      "oos_accesses": [],
+      "qe": "pending",
+      "qr": "pending",
+      "reviews": {}
+    },
+    "team-07": {
+      "canonical_run": "pending",
+      "champion": null,
+      "freeze_commit": null,
+      "oos_accesses": [],
+      "qe": "pending",
+      "qr": "pending",
+      "reviews": {}
+    },
+    "team-08": {
+      "canonical_run": "pending",
+      "champion": null,
+      "freeze_commit": null,
+      "oos_accesses": [],
+      "qe": "pending",
+      "qr": "pending",
+      "reviews": {}
+    },
+    "team-09": {
+      "canonical_run": "pending",
+      "champion": null,
+      "freeze_commit": null,
+      "oos_accesses": [],
+      "qe": "pending",
+      "qr": "pending",
+      "reviews": {}
+    },
+    "team-10": {
+      "canonical_run": "pending",
+      "champion": null,
+      "freeze_commit": null,
+      "oos_accesses": [],
+      "qe": "pending",
+      "qr": "pending",
+      "reviews": {}
+    }
+  }
+}

@@ -1,0 +1,125 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "quant-portfolio-blind-top40/experiment-event.schema.json",
+  "title": "Top-40 append-only experiment event",
+  "type": "object",
+  "oneOf": [
+    {
+      "additionalProperties": false,
+      "properties": {
+        "candidate_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "delta": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "event_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "event_type": {
+          "const": "registered"
+        },
+        "parameters": {
+          "type": "object"
+        },
+        "parent_candidate_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "public_oos_requested": {
+          "type": "boolean"
+        },
+        "seed": {
+          "type": "integer"
+        },
+        "timestamp_utc": {
+          "format": "date-time",
+          "type": "string"
+        }
+      },
+      "required": [
+        "event_id",
+        "candidate_id",
+        "event_type",
+        "timestamp_utc",
+        "parent_candidate_id",
+        "delta",
+        "seed",
+        "parameters",
+        "public_oos_requested"
+      ]
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_hashes": {
+          "additionalProperties": {
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "candidate_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "cpu_hours": {
+          "minimum": 0,
+          "type": "number"
+        },
+        "disposition": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "event_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "event_type": {
+          "const": "result"
+        },
+        "is_metrics": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "public_oos_accessed": {
+          "type": "boolean"
+        },
+        "public_oos_metrics": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "timestamp_utc": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "wall_clock_hours": {
+          "minimum": 0,
+          "type": "number"
+        }
+      },
+      "required": [
+        "event_id",
+        "candidate_id",
+        "event_type",
+        "timestamp_utc",
+        "cpu_hours",
+        "wall_clock_hours",
+        "is_metrics",
+        "public_oos_accessed",
+        "public_oos_metrics",
+        "disposition",
+        "artifact_hashes"
+      ]
+    }
+  ]
+}

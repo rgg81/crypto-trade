@@ -1,0 +1,99 @@
+{
+  "artifact_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "artifacts": {
+    "ablations": "tournament/top40/teams/team-05/ablations.json",
+    "artifact_manifest": "tournament/top40/teams/team-05/artifact_manifest.json",
+    "audit_report": "tournament/top40/teams/team-05/qe_report.md",
+    "btc_daily_returns": "reports-top40/common/btc_daily_returns.csv",
+    "compliance_evidence": "tournament/top40/teams/team-05/compliance.json",
+    "daily_returns": "reports-top40/team-05/daily_returns.csv",
+    "data_manifest": "tournament/top40/data_manifest.json",
+    "dependency_lock": "tournament/top40/teams/team-05/uv.lock",
+    "double_cost_daily_returns": "reports-top40/team-05/double_cost_daily_returns.csv",
+    "double_cost_evaluator_returns": "reports-top40/team-05/double_cost_bar_returns.csv",
+    "evaluator_returns": "reports-top40/team-05/bar_returns.csv",
+    "events": "reports-top40/team-05/events.parquet",
+    "feature_lineage": "tournament/top40/teams/team-05/feature_lineage.json",
+    "frozen_config": "tournament/top40/teams/team-05/frozen_config.json",
+    "positions": "reports-top40/team-05/positions.parquet",
+    "provenance": "tournament/top40/teams/team-05/provenance.md",
+    "reproduce_command": "uv run python scripts/top40_tournament.py validate tournament/top40/teams/team-05/submission.json",
+    "research_brief": "tournament/top40/teams/team-05/research_brief.md",
+    "strategy_source": "tournament/top40/teams/team-05/strategy.py",
+    "targets": "reports-top40/team-05/targets.parquet",
+    "team_source_manifest": "tournament/top40/teams/team-05/team_source_manifest.json",
+    "trades": "reports-top40/team-05/trades.csv",
+    "trial_ledger": "tournament/top40/teams/team-05/experiments.jsonl"
+  },
+  "compliance": {
+    "append_invariance_test": false,
+    "closed_data_only": false,
+    "corrupt_future_test": false,
+    "deterministic_rerun": false,
+    "double_cost_rerun": false,
+    "fees_and_slippage_charged": false,
+    "funding_cashflows_charged": false,
+    "long_and_short_enabled": false,
+    "next_bar_execution": false,
+    "point_in_time_top40": false,
+    "public_binance_only": false
+  },
+  "confidence_intervals": {
+    "double_cost_oos_net_sharpe_95": [
+      0.0,
+      0.0
+    ],
+    "is_net_sharpe_95": [
+      0.0,
+      0.0
+    ],
+    "public_oos_net_sharpe_95": [
+      0.0,
+      0.0
+    ]
+  },
+  "config_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "data_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "dependency_lock_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "double_cost_oos_sharpe": 0.0,
+  "entrypoint": "tournament/top40/teams/team-05/strategy.py",
+  "evaluator_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "freeze_commit": "0000000",
+  "in_sample": {
+    "end": "2024-06-30",
+    "metrics": {
+      "annualized_return": 0.0,
+      "calmar": 0.0,
+      "max_drawdown": 0.0,
+      "net_sharpe": 0.0,
+      "net_sortino": 0.0,
+      "positive_quarter_fraction": 0.0
+    },
+    "start": "2020-02-03"
+  },
+  "public_oos": {
+    "end": "2026-06-30",
+    "metrics": {
+      "annualized_return": 0.0,
+      "calmar": 0.0,
+      "max_drawdown": 0.0,
+      "net_sharpe": 0.0,
+      "net_sortino": 0.0,
+      "positive_quarter_fraction": 0.0
+    },
+    "start": "2024-07-01"
+  },
+  "regime_sharpe": {
+    "bear": 0.0,
+    "bull": 0.0,
+    "chop": 0.0,
+    "stress": 0.0
+  },
+  "seeds": [
+    20260713
+  ],
+  "strategy_name": "REPLACE_WITH_FRESH_STRATEGY_NAME",
+  "strategy_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "team_id": "team-05",
+  "trial_count": 1
+}

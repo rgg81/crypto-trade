@@ -1,0 +1,131 @@
+{
+  "files": [
+    {
+      "name": "archive_provenance",
+      "path": "data/top40/snapshot-v1/archive_provenance.jsonl",
+      "rows": 44977,
+      "sha256": "17bf454098cc68fbfb4e9eff10f85d88d23709a7535f0f6fbdbf21d5700b1584",
+      "size": 30374069
+    },
+    {
+      "name": "bars",
+      "path": "data/top40/snapshot-v1/bars.parquet",
+      "rows": 1719896,
+      "sha256": "f6f6364c34d23725d96a41c5cec216a83ca8cb05145e70b56aa239508b1cb99b",
+      "size": 79899406
+    },
+    {
+      "name": "contract_metadata",
+      "path": "data/top40/snapshot-v1/contract_metadata.parquet",
+      "rows": 667,
+      "sha256": "0995d50011e73de880358b994031fdf8bb58e75ab8901de2c5601e7abed05243",
+      "size": 15984
+    },
+    {
+      "name": "coverage",
+      "path": "data/top40/snapshot-v1/coverage.json",
+      "rows": 667,
+      "sha256": "acc4ef69fab9c8ab6892b9a43a8b8992caf0c6296ccbac06e1f3ede9c24d672e",
+      "size": 621254
+    },
+    {
+      "name": "exchange_info",
+      "path": "data/top40/snapshot-v1/exchange_info.json",
+      "rows": 832,
+      "sha256": "aab4219452e61cfa5e135518ed182c98fd7e527d13bc240e891bb6b550deeb64",
+      "size": 1682464
+    },
+    {
+      "name": "funding",
+      "path": "data/top40/snapshot-v1/funding.parquet",
+      "rows": 1245933,
+      "sha256": "90f0e4702752cadc314b1aaac58175357dca14617c2a4243bdad51c366dbbeb9",
+      "size": 13131096
+    },
+    {
+      "name": "mark_prices",
+      "path": "data/top40/snapshot-v1/mark_prices.parquet",
+      "rows": 1005267,
+      "sha256": "8bf341f358cda3d2fa41f2a4d1290c1851114416f04b137386d0cf13e49ec4b0",
+      "size": 7280385
+    },
+    {
+      "name": "mark_rest_provenance",
+      "path": "data/top40/snapshot-v1/mark_rest_provenance.jsonl",
+      "rows": 1440,
+      "sha256": "6d7f3d88d26b296025bcadbd5b54b5ebbbcb9a2132053c4a22be027570ae6b41",
+      "size": 1105653
+    },
+    {
+      "name": "membership",
+      "path": "data/top40/snapshot-v1/membership.parquet",
+      "rows": 12866,
+      "sha256": "f51c9eb207c1da51cc4b9ff6045bb5e914828015b5c9c214f0e2673cd868eb14",
+      "size": 134866
+    },
+    {
+      "name": "rest_provenance",
+      "path": "data/top40/snapshot-v1/rest_provenance.jsonl",
+      "rows": 10,
+      "sha256": "4a334881917ad9f87418617d71db324fe7dfa313ad31390a72c6ffd4ace95935",
+      "size": 4860
+    },
+    {
+      "name": "btc_daily_returns",
+      "path": "reports-top40/common/btc_daily_returns.csv",
+      "rows": 2340,
+      "sha256": "6b797c9c331f73c121a717bb29bb93f6ec460622b4eb137c794b2032bc888142",
+      "size": 110725
+    },
+    {
+      "name": "btc_regimes",
+      "path": "reports-top40/common/btc_regimes.csv",
+      "rows": 2340,
+      "sha256": "8d740ad552115d7defb3f9253db5cb41daa43fa5d0e293b44700964d0f50f09c",
+      "size": 73020
+    }
+  ],
+  "limitations": [
+    "Binance does not publish complete point-in-time exchangeInfo/filter history.",
+    "Archive-only plain USDT symbols are inferred to be crypto perpetuals; known historical composite/index symbols BLUEBIRDUSDT, BTCDOMUSDT, DEFIUSDT, DOTECOUSDT, and FOOTBALLUSDT are explicitly excluded.",
+    "Archive-only onboard/delivery bounds are inferred from first/last executable 8h bars.",
+    "Funding mark price is the exact floor-hour 1h mark open (a boundary-open proxy); actual funding timestamps are preserved and must have less than one second of boundary jitter.",
+    "Risk exposure uses exact 8h boundary opens from Binance 1h mark-price archives; transaction klines remain the execution and participation source.",
+    "Exact required marks absent from a checksummed monthly markPriceKlines archive use the checksummed Binance daily markPriceKlines archive first, then exact-hour REST only when the daily object is absent or lacks that hour; no mark is interpolated.",
+    "Monthly archive gaps are treated as non-executable intervals, not silently interpolated; funding coverage is required for every month in which a weekly member has executable bars.",
+    "Official fundingRate REST responses used only for required archive gaps have no upstream SHA-256 sidecar and Binance may revise that API history; exact parameters, retrieval time, canonical response bytes, and a local SHA-256 are frozen for every request.",
+    "Official markPriceKlines REST responses used only for exact required hourly marks absent from checksummed monthly and daily archives have no upstream SHA-256 sidecar and Binance may revise that API history; exact parameters, retrieval time, canonical response bytes, fallback reason, archive SHA-256, and a local response SHA-256 are frozen for every request.",
+    "Transaction bars before a symbol's first Top-40 admission remain available as research history but are non-executable; no risk mark is required or synthesized for those bars."
+  ],
+  "parser_version": "top40-snapshot-v1",
+  "schema_version": 1,
+  "sources": {
+    "archive_base_url": "https://data.binance.vision",
+    "archive_count": 44977,
+    "archive_provenance_path": "data/top40/snapshot-v1/archive_provenance.jsonl",
+    "archive_provenance_sha256": "17bf454098cc68fbfb4e9eff10f85d88d23709a7535f0f6fbdbf21d5700b1584",
+    "archive_s3_url": "https://s3-ap-northeast-1.amazonaws.com/data.binance.vision",
+    "builder_path": "src/crypto_trade/tournament/snapshot.py",
+    "builder_sha256": "a686c2388c6943340de8bfd4b5e565873f1342540f8c63674b82ce151b5a7e95",
+    "checksum_policy": "require-binance-sha256-sidecar",
+    "config_path": "tournament/top40/config.toml",
+    "config_sha256": "030a065f75f9c4adb7484065908f4379435929609d446be0de0a831d9e28ee0a",
+    "exchange_info_retrieved_at_utc": "2026-07-13T11:50:58.268641+00:00",
+    "exchange_info_server_time": 1783936816491,
+    "exchange_info_url": "https://fapi.binance.com/fapi/v1/exchangeInfo",
+    "funding_rate_url": "https://fapi.binance.com/fapi/v1/fundingRate",
+    "mark_price_klines_url": "https://fapi.binance.com/fapi/v1/markPriceKlines",
+    "mark_rest_provenance_path": "data/top40/snapshot-v1/mark_rest_provenance.jsonl",
+    "mark_rest_provenance_sha256": "6d7f3d88d26b296025bcadbd5b54b5ebbbcb9a2132053c4a22be027570ae6b41",
+    "mark_rest_request_count": 1440,
+    "rest_provenance_path": "data/top40/snapshot-v1/rest_provenance.jsonl",
+    "rest_provenance_sha256": "4a334881917ad9f87418617d71db324fe7dfa313ad31390a72c6ffd4ace95935",
+    "rest_request_count": 10,
+    "source": "binance-public-usdm"
+  },
+  "window": {
+    "evaluation_start": "2020-02-03T00:00:00+00:00",
+    "hard_end_exclusive": "2026-07-01T00:00:00+00:00",
+    "warmup_start": "2020-01-01T00:00:00+00:00"
+  }
+}

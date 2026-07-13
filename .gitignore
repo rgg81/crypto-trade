@@ -63,6 +63,10 @@ reports-v1/**/*.parquet
 # (data/features_v3/, etc.) already covered by the data/ rule above.
 reports-v3/**/*.parquet
 
+# Top-40 canonical team reruns are reproducible local artifacts. Keep the small common BTC
+# benchmark under version control, but not per-team Parquet/CSV output directories.
+reports-top40/team-*/
+
 # Notebook outputs and checkpoints
 notebooks/output/
 notebooks/.ipynb_checkpoints/

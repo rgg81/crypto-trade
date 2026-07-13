@@ -1,0 +1,88 @@
+{
+  "team_id": "team-01",
+  "strategy_name": "REPLACE_WITH_FRESH_STRATEGY_NAME",
+  "freeze_commit": "0000000",
+  "data_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "evaluator_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "config_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "strategy_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "dependency_lock_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "artifact_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "entrypoint": "tournament/top40/teams/team-01/strategy.py",
+  "seeds": [20260713],
+  "trial_count": 1,
+  "in_sample": {
+    "start": "2020-02-03",
+    "end": "2024-06-30",
+    "metrics": {
+      "net_sharpe": 0.0,
+      "net_sortino": 0.0,
+      "calmar": 0.0,
+      "annualized_return": 0.0,
+      "max_drawdown": 0.0,
+      "positive_quarter_fraction": 0.0
+    }
+  },
+  "public_oos": {
+    "start": "2024-07-01",
+    "end": "2026-06-30",
+    "metrics": {
+      "net_sharpe": 0.0,
+      "net_sortino": 0.0,
+      "calmar": 0.0,
+      "annualized_return": 0.0,
+      "max_drawdown": 0.0,
+      "positive_quarter_fraction": 0.0
+    }
+  },
+  "double_cost_oos_sharpe": 0.0,
+  "regime_sharpe": {
+    "bull": 0.0,
+    "bear": 0.0,
+    "chop": 0.0,
+    "stress": 0.0
+  },
+  "confidence_intervals": {
+    "is_net_sharpe_95": [0.0, 0.0],
+    "public_oos_net_sharpe_95": [0.0, 0.0],
+    "double_cost_oos_net_sharpe_95": [0.0, 0.0]
+  },
+  "compliance": {
+    "public_binance_only": false,
+    "point_in_time_top40": false,
+    "closed_data_only": false,
+    "next_bar_execution": false,
+    "fees_and_slippage_charged": false,
+    "funding_cashflows_charged": false,
+    "long_and_short_enabled": false,
+    "double_cost_rerun": false,
+    "corrupt_future_test": false,
+    "append_invariance_test": false,
+    "deterministic_rerun": false
+  },
+  "artifacts": {
+    "artifact_manifest": "tournament/top40/teams/team-01/artifact_manifest.json",
+    "data_manifest": "tournament/top40/data_manifest.json",
+    "dependency_lock": "tournament/top40/teams/team-01/uv.lock",
+    "frozen_config": "tournament/top40/teams/team-01/frozen_config.json",
+    "trial_ledger": "tournament/top40/teams/team-01/experiments.jsonl",
+    "compliance_evidence": "tournament/top40/teams/team-01/compliance.json",
+    "research_brief": "tournament/top40/teams/team-01/research_brief.md",
+    "provenance": "tournament/top40/teams/team-01/provenance.md",
+    "feature_lineage": "tournament/top40/teams/team-01/feature_lineage.json",
+    "ablations": "tournament/top40/teams/team-01/ablations.json",
+    "daily_returns": "reports-top40/team-01/daily_returns.csv",
+    "double_cost_daily_returns": "reports-top40/team-01/double_cost_daily_returns.csv",
+    "btc_daily_returns": "reports-top40/common/btc_daily_returns.csv",
+    "strategy_source": "tournament/top40/teams/team-01/strategy.py",
+    "team_source_manifest": "tournament/top40/teams/team-01/team_source_manifest.json",
+    "targets": "reports-top40/team-01/targets.parquet",
+    "events": "reports-top40/team-01/events.parquet",
+    "evaluator_returns": "reports-top40/team-01/bar_returns.csv",
+    "double_cost_evaluator_returns": "reports-top40/team-01/double_cost_bar_returns.csv",
+    "trades": "reports-top40/team-01/trades.csv",
+    "positions": "reports-top40/team-01/positions.parquet",
+    "audit_report": "tournament/top40/teams/team-01/qe_report.md",
+    "reproduce_command": "uv run python scripts/top40_tournament.py validate tournament/top40/teams/team-01/submission.json"
+  }
+}
