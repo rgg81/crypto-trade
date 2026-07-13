@@ -1380,16 +1380,18 @@ _LITERAL_DATE_TARGET = re.compile(
     r"(?is)(?:20\d{2}-\d{2}-\d{2}.{0,200}(?:target|weight|position|signal)|"
     r"(?:target|weight|position|signal).{0,200}20\d{2}-\d{2}-\d{2})"
 )
+_TARGET_FIELD = re.compile(
+    r"(?:^|_)(?:targets?|weights?|positions?|signals?)(?:$|_)", re.IGNORECASE
+)
 
 
 def _timestamp_target_structure(value: object) -> bool:
     if isinstance(value, dict):
         lowered = {str(key).lower() for key in value}
         has_time = any(key in lowered for key in {"timestamp", "timestamp_utc", "date", "time"})
-        has_target = any(
-            any(token in key for token in ("target", "weight", "position", "signal"))
-            for key in lowered
-        )
+        # Treat target concepts as field-name tokens; ``disposition`` is required experiment
+        # metadata, not a position vector.
+        has_target = any(_TARGET_FIELD.search(key) is not None for key in lowered)
         if has_time and has_target:
             return True
         for key, nested in value.items():

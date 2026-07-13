@@ -330,6 +330,12 @@ def test_timestamp_keyed_target_tables_are_rejected_as_prefit_state():
         {"timestamp": "2025-01-01T00:00:00Z", "target_weights": {"BTCUSDT": 0.1}}
     )
     assert not _timestamp_target_structure({"lookback": 30, "gross_target": 0.8})
+    assert not _timestamp_target_structure(
+        {
+            "timestamp_utc": "2025-01-01T00:00:00Z",
+            "disposition": "IS-falsified",
+        }
+    )
 
 
 def test_canonical_artifacts_are_hashed_and_scalar_metrics_are_recomputed(tmp_path):
