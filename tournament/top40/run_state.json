@@ -20,10 +20,23 @@
       "champion": null,
       "freeze_commit": null,
       "oos_accesses": [],
-      "qe": "pending",
+      "qe": "complete",
+      "qe_completed_at_utc": "2026-07-13T16:36:16.725712+00:00",
       "qr": "complete",
       "qr_completed_at_utc": "2026-07-13T16:35:38.815428+00:00",
       "reviews": {
+        "qe": {
+          "commit": "5ccb5517f66c90f3fe1739aa7fbee9a821354335",
+          "completed_at_utc": "2026-07-13T16:36:16.725712+00:00",
+          "evidence_sha256": {
+            "tournament/top40/teams/team-01/compliance.json": "9f15ae9d9c4ad1bd4ffd65af07c293b7c1f63682dc214d9c156f02e7b6c6990d",
+            "tournament/top40/teams/team-01/frozen_config.json": "cf2380fb498a53c8c6ce7bebf9bb1b3e65a1de806368a662d6001c749b3889d5",
+            "tournament/top40/teams/team-01/qe_report.md": "29d609fd0d64dc4408953430e48bcf2f0ab57613b8b6626f21a0b0c0f5ad01b1",
+            "tournament/top40/teams/team-01/strategy.py": "2325e379b732c85a4518305986b4016f4ac37d0f9f9bc1b177c33925a982876d",
+            "tournament/top40/teams/team-01/team_source_manifest.json": "91a0dcaf06155e002eb8e771dd7bbbc27009635f1442f5fb023ca5d7bbacde72",
+            "tournament/top40/teams/team-01/uv.lock": "869cd3380346a9c9a219fc762868e23cd494a18e22dd9b314ba18621d991faa5"
+          }
+        },
         "qr": {
           "commit": "8ad6c0a424bcec27e6cb96adabe96a26e870ba21",
           "completed_at_utc": "2026-07-13T16:35:38.815428+00:00",
@@ -42,10 +55,23 @@
       "champion": null,
       "freeze_commit": null,
       "oos_accesses": [],
-      "qe": "pending",
+      "qe": "complete",
+      "qe_completed_at_utc": "2026-07-13T16:36:17.307856+00:00",
       "qr": "complete",
       "qr_completed_at_utc": "2026-07-13T16:35:39.391213+00:00",
       "reviews": {
+        "qe": {
+          "commit": "5ccb5517f66c90f3fe1739aa7fbee9a821354335",
+          "completed_at_utc": "2026-07-13T16:36:17.307856+00:00",
+          "evidence_sha256": {
+            "tournament/top40/teams/team-02/compliance.json": "9f15ae9d9c4ad1bd4ffd65af07c293b7c1f63682dc214d9c156f02e7b6c6990d",
+            "tournament/top40/teams/team-02/frozen_config.json": "eb107387695398746f7f58de1a50f31c914259783af2e88899c25d41d246bb4d",
+            "tournament/top40/teams/team-02/qe_report.md": "b77aa02be8395d82474619ab53208705f440e2f0e53226e8d5ec3c2e4f5d056b",
+            "tournament/top40/teams/team-02/strategy.py": "22bb19d7e20d9a1c07a9c00af1436914e3239c9ed9e98d521a9f4605d4671e4e",
+            "tournament/top40/teams/team-02/team_source_manifest.json": "456b5b2d6d652b461ab5ea2830a71629275000b4945f7b9f94116032cbf704f8",
+            "tournament/top40/teams/team-02/uv.lock": "869cd3380346a9c9a219fc762868e23cd494a18e22dd9b314ba18621d991faa5"
+          }
+        },
         "qr": {
           "commit": "8ad6c0a424bcec27e6cb96adabe96a26e870ba21",
           "completed_at_utc": "2026-07-13T16:35:39.391213+00:00",
@@ -64,10 +90,23 @@
       "champion": null,
       "freeze_commit": null,
       "oos_accesses": [],
-      "qe": "pending",
+      "qe": "complete",
+      "qe_completed_at_utc": "2026-07-13T16:36:17.906116+00:00",
       "qr": "complete",
       "qr_completed_at_utc": "2026-07-13T16:35:39.978146+00:00",
       "reviews": {
+        "qe": {
+          "commit": "5ccb5517f66c90f3fe1739aa7fbee9a821354335",
+          "completed_at_utc": "2026-07-13T16:36:17.906116+00:00",
+          "evidence_sha256": {
+            "tournament/top40/teams/team-03/compliance.json": "c4f9fe8d7a1234fcf1691aa0e814b93a787881779bb428ca2c22dab888225d1c",
+            "tournament/top40/teams/team-03/frozen_config.json": "26ab6e4c7624dcabacab0a347037680b13b9a3099708866cd8c3ce75a95fd980",
+            "tournament/top40/teams/team-03/qe_report.md": "162056a1c47c08699dd3b067544e27089ab3d58a317404076cf8c6e80caa7ae4",
+            "tournament/top40/teams/team-03/strategy.py": "3b6816adf956c7911d09918a02cc65ac5260d39e36433ced75665a16d1dd4309",
+            "tournament/top40/teams/team-03/team_source_manifest.json": "7573942ab95cc3bc249c6ec4a1f282d355eb779e9c12c5a1f7de6b8a75ba5ce8",
+            "tournament/top40/teams/team-03/uv.lock": "869cd3380346a9c9a219fc762868e23cd494a18e22dd9b314ba18621d991faa5"
+          }
+        },
         "qr": {
           "commit": "8ad6c0a424bcec27e6cb96adabe96a26e870ba21",
           "completed_at_utc": "2026-07-13T16:35:39.978146+00:00",
@@ -86,10 +125,23 @@
       "champion": null,
       "freeze_commit": null,
       "oos_accesses": [],
-      "qe": "pending",
+      "qe": "complete",
+      "qe_completed_at_utc": "2026-07-13T16:36:18.489470+00:00",
       "qr": "complete",
       "qr_completed_at_utc": "2026-07-13T16:35:40.586741+00:00",
       "reviews": {
+        "qe": {
+          "commit": "5ccb5517f66c90f3fe1739aa7fbee9a821354335",
+          "completed_at_utc": "2026-07-13T16:36:18.489470+00:00",
+          "evidence_sha256": {
+            "tournament/top40/teams/team-04/compliance.json": "9f15ae9d9c4ad1bd4ffd65af07c293b7c1f63682dc214d9c156f02e7b6c6990d",
+            "tournament/top40/teams/team-04/frozen_config.json": "ecb6fdcd3932224b89fdd339319359dde77f5815358a95fe9608f61988dc4472",
+            "tournament/top40/teams/team-04/qe_report.md": "f76e4797d1596faccc8b778dfe6e2458bd37f43fb59d7f3e15709e172c6f6e6d",
+            "tournament/top40/teams/team-04/strategy.py": "97f89203a116cfe674a34ed1d26d43d62909e34999e199332195d1e3e26cead8",
+            "tournament/top40/teams/team-04/team_source_manifest.json": "9d73266f5c88484cd7c111f64ca1600541d4e83c6a160803f083a06217c8b2ea",
+            "tournament/top40/teams/team-04/uv.lock": "869cd3380346a9c9a219fc762868e23cd494a18e22dd9b314ba18621d991faa5"
+          }
+        },
         "qr": {
           "commit": "8ad6c0a424bcec27e6cb96adabe96a26e870ba21",
           "completed_at_utc": "2026-07-13T16:35:40.586741+00:00",
@@ -108,10 +160,23 @@
       "champion": null,
       "freeze_commit": null,
       "oos_accesses": [],
-      "qe": "pending",
+      "qe": "complete",
+      "qe_completed_at_utc": "2026-07-13T16:36:19.065868+00:00",
       "qr": "complete",
       "qr_completed_at_utc": "2026-07-13T16:35:41.181288+00:00",
       "reviews": {
+        "qe": {
+          "commit": "5ccb5517f66c90f3fe1739aa7fbee9a821354335",
+          "completed_at_utc": "2026-07-13T16:36:19.065868+00:00",
+          "evidence_sha256": {
+            "tournament/top40/teams/team-05/compliance.json": "9f15ae9d9c4ad1bd4ffd65af07c293b7c1f63682dc214d9c156f02e7b6c6990d",
+            "tournament/top40/teams/team-05/frozen_config.json": "8b7b74a3d304b0036d1a4a7becc5fcf536c3daf0c97687f4dfede20bced939ae",
+            "tournament/top40/teams/team-05/qe_report.md": "0ffd6bbffebef5b84b9628bf5b055481f3ab81e3773beb8d81797320d35d1029",
+            "tournament/top40/teams/team-05/strategy.py": "30e8159fddf388d42750def7f32c9a122c1a589611b820765c4e0aaaf441cd37",
+            "tournament/top40/teams/team-05/team_source_manifest.json": "b0a5ead7903c3897adfb5707ddb1d2c4d84bc3bf867f50dee052e775ed1466f6",
+            "tournament/top40/teams/team-05/uv.lock": "869cd3380346a9c9a219fc762868e23cd494a18e22dd9b314ba18621d991faa5"
+          }
+        },
         "qr": {
           "commit": "8ad6c0a424bcec27e6cb96adabe96a26e870ba21",
           "completed_at_utc": "2026-07-13T16:35:41.181288+00:00",
@@ -130,10 +195,23 @@
       "champion": null,
       "freeze_commit": null,
       "oos_accesses": [],
-      "qe": "pending",
+      "qe": "complete",
+      "qe_completed_at_utc": "2026-07-13T16:36:19.678515+00:00",
       "qr": "complete",
       "qr_completed_at_utc": "2026-07-13T16:35:41.767961+00:00",
       "reviews": {
+        "qe": {
+          "commit": "5ccb5517f66c90f3fe1739aa7fbee9a821354335",
+          "completed_at_utc": "2026-07-13T16:36:19.678515+00:00",
+          "evidence_sha256": {
+            "tournament/top40/teams/team-06/compliance.json": "9f15ae9d9c4ad1bd4ffd65af07c293b7c1f63682dc214d9c156f02e7b6c6990d",
+            "tournament/top40/teams/team-06/frozen_config.json": "57c074f309cc6441da5630f3e15827afc53d2c6ef15b0b7b2938bbbdb1015472",
+            "tournament/top40/teams/team-06/qe_report.md": "a643cfb53a628c8d1d409a7fd56d7675812d2893ebc0b2c112f78b72c30d6a16",
+            "tournament/top40/teams/team-06/strategy.py": "971a7e841c3fb07f1b1fc712068fced78352a4373c82907b4e4c4968cbeaf3ec",
+            "tournament/top40/teams/team-06/team_source_manifest.json": "aef6b99fa1244c420b2630c2f9c06afa92e8241a826d9013b0692aefaa9fa5b2",
+            "tournament/top40/teams/team-06/uv.lock": "869cd3380346a9c9a219fc762868e23cd494a18e22dd9b314ba18621d991faa5"
+          }
+        },
         "qr": {
           "commit": "8ad6c0a424bcec27e6cb96adabe96a26e870ba21",
           "completed_at_utc": "2026-07-13T16:35:41.767961+00:00",
@@ -152,10 +230,23 @@
       "champion": null,
       "freeze_commit": null,
       "oos_accesses": [],
-      "qe": "pending",
+      "qe": "complete",
+      "qe_completed_at_utc": "2026-07-13T16:36:20.300310+00:00",
       "qr": "complete",
       "qr_completed_at_utc": "2026-07-13T16:35:42.332485+00:00",
       "reviews": {
+        "qe": {
+          "commit": "5ccb5517f66c90f3fe1739aa7fbee9a821354335",
+          "completed_at_utc": "2026-07-13T16:36:20.300310+00:00",
+          "evidence_sha256": {
+            "tournament/top40/teams/team-07/compliance.json": "9f15ae9d9c4ad1bd4ffd65af07c293b7c1f63682dc214d9c156f02e7b6c6990d",
+            "tournament/top40/teams/team-07/frozen_config.json": "09fd205786ba51935ef6585d579f6ad8f52c1cc2bd19bab0f0efacd4b6964849",
+            "tournament/top40/teams/team-07/qe_report.md": "2e3d278d8a12fff5d4fdedd6f54ebede89b189af30789e2c57dc01f830a997b0",
+            "tournament/top40/teams/team-07/strategy.py": "d1161852adc9fbf525686705f30b9353eddaf072edf490a7a3270450751eeb73",
+            "tournament/top40/teams/team-07/team_source_manifest.json": "4793d201d21e86612cb5da0ba3713563f9f8666d5820b2631b3b323358293d0d",
+            "tournament/top40/teams/team-07/uv.lock": "869cd3380346a9c9a219fc762868e23cd494a18e22dd9b314ba18621d991faa5"
+          }
+        },
         "qr": {
           "commit": "8ad6c0a424bcec27e6cb96adabe96a26e870ba21",
           "completed_at_utc": "2026-07-13T16:35:42.332485+00:00",
@@ -174,10 +265,23 @@
       "champion": null,
       "freeze_commit": null,
       "oos_accesses": [],
-      "qe": "pending",
+      "qe": "complete",
+      "qe_completed_at_utc": "2026-07-13T16:36:20.950838+00:00",
       "qr": "complete",
       "qr_completed_at_utc": "2026-07-13T16:35:42.909966+00:00",
       "reviews": {
+        "qe": {
+          "commit": "5ccb5517f66c90f3fe1739aa7fbee9a821354335",
+          "completed_at_utc": "2026-07-13T16:36:20.950838+00:00",
+          "evidence_sha256": {
+            "tournament/top40/teams/team-08/compliance.json": "9f15ae9d9c4ad1bd4ffd65af07c293b7c1f63682dc214d9c156f02e7b6c6990d",
+            "tournament/top40/teams/team-08/frozen_config.json": "9bcfd210a53e8c41d93b6dd7f1c8f713666e62e56b9336cf3eefa3bfa68384ab",
+            "tournament/top40/teams/team-08/qe_report.md": "e7ba046a0935fae45bc58f0a6b44499662f10ed34657a49984dd30acf39f3fb9",
+            "tournament/top40/teams/team-08/strategy.py": "0e6cf2ffff246c18e3e1055d2e6882248958fd30f956a01b0ed53e8457132dbe",
+            "tournament/top40/teams/team-08/team_source_manifest.json": "a8f22858e41f5749ce93a28df56bd377862ff7d5653df78a56306f5f2e0e7379",
+            "tournament/top40/teams/team-08/uv.lock": "869cd3380346a9c9a219fc762868e23cd494a18e22dd9b314ba18621d991faa5"
+          }
+        },
         "qr": {
           "commit": "8ad6c0a424bcec27e6cb96adabe96a26e870ba21",
           "completed_at_utc": "2026-07-13T16:35:42.909966+00:00",
