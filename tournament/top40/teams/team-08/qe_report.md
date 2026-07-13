@@ -22,7 +22,7 @@ float64 SLSQP projection uses the frozen analytic constraints and symmetric pair
 - Common config SHA-256: `030a065f75f9c4adb7484065908f4379435929609d446be0de0a831d9e28ee0a`
 - Phase-0 evaluator SHA-256: `508f56af0b4fe2636933909977cdbcfbb38e4ff821072dbf12b35bfb04d3af66`
 - Strategy SHA-256: `0e6cf2ffff246c18e3e1055d2e6882248958fd30f956a01b0ed53e8457132dbe`
-- Frozen config SHA-256: `9bcfd210a53e8c41d93b6dd7f1c8f713666e62e56b9336cf3eefa3bfa68384ab`
+- Frozen config SHA-256: `dbceee82553c5e5ee68fbf98be9e8b7fda2a882bce8247235c96e21870343b98`
 - QE test SHA-256: `ffd17178a1f4997eabd1b2be65caf8841988bc58fae6c63c26eda4f0904aec29`
 - Team/root dependency-lock SHA-256: `869cd3380346a9c9a219fc762868e23cd494a18e22dd9b314ba18621d991faa5`
 - Compliance SHA-256: `9f15ae9d9c4ad1bd4ffd65af07c293b7c1f63682dc214d9c156f02e7b6c6990d`

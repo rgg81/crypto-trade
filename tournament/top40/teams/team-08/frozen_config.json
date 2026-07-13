@@ -5,6 +5,7 @@
     "return_endpoints": 252,
     "variance_floor": 1e-16
   },
+  "candidate_id": "T08-PCDH-001",
   "common_freeze_commit": "48df09341f02eba7a3469abd1ccda6649a4ef0ba",
   "decision_anchor_utc": "2020-02-03T00:00:00Z",
   "decision_interval_hours": 72,
