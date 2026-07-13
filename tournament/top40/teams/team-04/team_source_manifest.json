@@ -1,0 +1,91 @@
+{
+  "entries": [
+    {
+      "git_blob_oid": "ab1dd45576524467faf511457763949f9f88f504",
+      "git_mode": "100644",
+      "path": "tournament/top40/teams/team-04/BOOTSTRAP.md",
+      "sha256": "1f44b2bd7de11e78f89920cb2dc2effd7e478918a0d668121ab5234742634a44",
+      "size": 244
+    },
+    {
+      "git_blob_oid": "d5b1892169c0c66855c63b7a3042719d8c28b5a2",
+      "git_mode": "100644",
+      "path": "tournament/top40/teams/team-04/ablations.json",
+      "sha256": "1b542d9f021128cfe739a33d1e8ce8e167507655041e706fb3808fa4ff8eb6a4",
+      "size": 997
+    },
+    {
+      "git_blob_oid": "6c7a26823fc90a646763faa6a205480c044b00c1",
+      "git_mode": "100644",
+      "path": "tournament/top40/teams/team-04/compliance.json",
+      "sha256": "9f15ae9d9c4ad1bd4ffd65af07c293b7c1f63682dc214d9c156f02e7b6c6990d",
+      "size": 356
+    },
+    {
+      "git_blob_oid": "c91473c0ba89a5cf88256fb996d2da031ffcb12f",
+      "git_mode": "100644",
+      "path": "tournament/top40/teams/team-04/experiments.jsonl",
+      "sha256": "b86b4e0fce6e9e4fc67a86aea6234ec55a053a2aa6a2919d7c56855735bebe9a",
+      "size": 511
+    },
+    {
+      "git_blob_oid": "f5931b43765f5979441f7b64df2c2012488afe63",
+      "git_mode": "100644",
+      "path": "tournament/top40/teams/team-04/feature_lineage.json",
+      "sha256": "9b5fc6013f0c307a0e483dacac85868ab03c782e34d2b6995e2a52d7fa920bee",
+      "size": 2739
+    },
+    {
+      "git_blob_oid": "409786c0599b1828ee608505521224835ee44292",
+      "git_mode": "100644",
+      "path": "tournament/top40/teams/team-04/frozen_config.json",
+      "sha256": "ecb6fdcd3932224b89fdd339319359dde77f5815358a95fe9608f61988dc4472",
+      "size": 3195
+    },
+    {
+      "git_blob_oid": "bb829e5208481df9420c5c2989b7bfc42f0fd688",
+      "git_mode": "100644",
+      "path": "tournament/top40/teams/team-04/provenance.md",
+      "sha256": "4ac0599a846e086a3ed7a621abfb1d455115dc954b7a0743a6f712c88707fc48",
+      "size": 774
+    },
+    {
+      "git_blob_oid": "e74136e8c6cbff74326b6eb29901d68a52c11bf7",
+      "git_mode": "100644",
+      "path": "tournament/top40/teams/team-04/qe_report.md",
+      "sha256": "f76e4797d1596faccc8b778dfe6e2458bd37f43fb59d7f3e15709e172c6f6e6d",
+      "size": 8002
+    },
+    {
+      "git_blob_oid": "2762cb9dfe4adccef0d378617b169582a169a636",
+      "git_mode": "100644",
+      "path": "tournament/top40/teams/team-04/research_brief.md",
+      "sha256": "1c923ad9c8eab5e6669a7f4139c0a562ce86fcd5a0d83885880d83dcb0dad961",
+      "size": 5285
+    },
+    {
+      "git_blob_oid": "7fedf051a57ecd5594387dce7ca1fb225fae1b71",
+      "git_mode": "100644",
+      "path": "tournament/top40/teams/team-04/strategy.py",
+      "sha256": "97f89203a116cfe674a34ed1d26d43d62909e34999e199332195d1e3e26cead8",
+      "size": 21893
+    },
+    {
+      "git_blob_oid": "b75bdcd0fd5c44cce60d93d3fb3ed7dda72769f6",
+      "git_mode": "100644",
+      "path": "tournament/top40/teams/team-04/test_team_04_strategy.py",
+      "sha256": "56517ab7a204763cecf6400effaaf92d77d80568d6cc44f30da9f98e4cdaa418",
+      "size": 30614
+    },
+    {
+      "git_blob_oid": "ba279d0a26a142830888ccadeca65b892139edff",
+      "git_mode": "100644",
+      "path": "tournament/top40/teams/team-04/uv.lock",
+      "sha256": "869cd3380346a9c9a219fc762868e23cd494a18e22dd9b314ba18621d991faa5",
+      "size": 374244
+    }
+  ],
+  "prefit_state_policy": "source-text-config-only-no-timestamp-target-lookups",
+  "schema_version": 1,
+  "team_id": "team-04"
+}

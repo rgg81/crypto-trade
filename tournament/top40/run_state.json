@@ -21,8 +21,21 @@
       "freeze_commit": null,
       "oos_accesses": [],
       "qe": "pending",
-      "qr": "pending",
-      "reviews": {}
+      "qr": "complete",
+      "qr_completed_at_utc": "2026-07-13T16:35:38.815428+00:00",
+      "reviews": {
+        "qr": {
+          "commit": "8ad6c0a424bcec27e6cb96adabe96a26e870ba21",
+          "completed_at_utc": "2026-07-13T16:35:38.815428+00:00",
+          "evidence_sha256": {
+            "tournament/top40/teams/team-01/ablations.json": "78e9fe36efa1c980730375adcb3fd21cb977a88b79f5cd9795ef85e540cebd21",
+            "tournament/top40/teams/team-01/experiments.jsonl": "21af46822772fee868ffd1fb7eab9e32315f03f24a6ff50173fe070223233937",
+            "tournament/top40/teams/team-01/feature_lineage.json": "74c557ca318a45487df30133d7930e29ccec4cad21234534f022d09d25eca56a",
+            "tournament/top40/teams/team-01/provenance.md": "07c56b1d26a3ab36fd4a5d269a269347f83ede031655072f3181bb32c7e12fa8",
+            "tournament/top40/teams/team-01/research_brief.md": "ea2a1ed32028a015036aababf5d79fee39449befb91704137cc73b81c82f3ca7"
+          }
+        }
+      }
     },
     "team-02": {
       "canonical_run": "pending",
@@ -30,8 +43,21 @@
       "freeze_commit": null,
       "oos_accesses": [],
       "qe": "pending",
-      "qr": "pending",
-      "reviews": {}
+      "qr": "complete",
+      "qr_completed_at_utc": "2026-07-13T16:35:39.391213+00:00",
+      "reviews": {
+        "qr": {
+          "commit": "8ad6c0a424bcec27e6cb96adabe96a26e870ba21",
+          "completed_at_utc": "2026-07-13T16:35:39.391213+00:00",
+          "evidence_sha256": {
+            "tournament/top40/teams/team-02/ablations.json": "d10543b358430ffff36a5ca9e57dcb6e8918daf4102c2d09859c64a0ba810b47",
+            "tournament/top40/teams/team-02/experiments.jsonl": "7ba6e0fedbd4d4006eeb102bd3868cfb4e50bb18802f5b6e76472731590c5535",
+            "tournament/top40/teams/team-02/feature_lineage.json": "a6e1c043223ee1d2e56d4125a2f8cdbe70ac9f83b85e9c3e55e89cf0cd65b5bd",
+            "tournament/top40/teams/team-02/provenance.md": "658d6e671eb12cf59885e123c209912cc0bb07c5444add88158b1932463d6a75",
+            "tournament/top40/teams/team-02/research_brief.md": "856311dd700cdc1f64a59061121fb81f52c258bb59b40f2a7b45a1e857227c2d"
+          }
+        }
+      }
     },
     "team-03": {
       "canonical_run": "pending",
@@ -39,8 +65,21 @@
       "freeze_commit": null,
       "oos_accesses": [],
       "qe": "pending",
-      "qr": "pending",
-      "reviews": {}
+      "qr": "complete",
+      "qr_completed_at_utc": "2026-07-13T16:35:39.978146+00:00",
+      "reviews": {
+        "qr": {
+          "commit": "8ad6c0a424bcec27e6cb96adabe96a26e870ba21",
+          "completed_at_utc": "2026-07-13T16:35:39.978146+00:00",
+          "evidence_sha256": {
+            "tournament/top40/teams/team-03/ablations.json": "ba32b982d1f24c5412c3e36d14cbc6172619da3d724d4a143b6d63ba1a928472",
+            "tournament/top40/teams/team-03/experiments.jsonl": "4077c4a837c65ef9ebb0ea13c1674ad82c76ea7a9e48ce9609da6175a63bd7a4",
+            "tournament/top40/teams/team-03/feature_lineage.json": "1686d4ec11147dd1ee3b683777ddf1e4535f2a229d34e4d54663ef28cb41cd70",
+            "tournament/top40/teams/team-03/provenance.md": "30c64827fea5656c42b22e56ca0b1657f9edb1791cf0f4ac795c24ace34405d3",
+            "tournament/top40/teams/team-03/research_brief.md": "81bf293bdf81b1964f894d802adc7fbda4c98224ca6982011d338654b5764a9b"
+          }
+        }
+      }
     },
     "team-04": {
       "canonical_run": "pending",
@@ -48,8 +87,21 @@
       "freeze_commit": null,
       "oos_accesses": [],
       "qe": "pending",
-      "qr": "pending",
-      "reviews": {}
+      "qr": "complete",
+      "qr_completed_at_utc": "2026-07-13T16:35:40.586741+00:00",
+      "reviews": {
+        "qr": {
+          "commit": "8ad6c0a424bcec27e6cb96adabe96a26e870ba21",
+          "completed_at_utc": "2026-07-13T16:35:40.586741+00:00",
+          "evidence_sha256": {
+            "tournament/top40/teams/team-04/ablations.json": "1b542d9f021128cfe739a33d1e8ce8e167507655041e706fb3808fa4ff8eb6a4",
+            "tournament/top40/teams/team-04/experiments.jsonl": "b86b4e0fce6e9e4fc67a86aea6234ec55a053a2aa6a2919d7c56855735bebe9a",
+            "tournament/top40/teams/team-04/feature_lineage.json": "9b5fc6013f0c307a0e483dacac85868ab03c782e34d2b6995e2a52d7fa920bee",
+            "tournament/top40/teams/team-04/provenance.md": "4ac0599a846e086a3ed7a621abfb1d455115dc954b7a0743a6f712c88707fc48",
+            "tournament/top40/teams/team-04/research_brief.md": "1c923ad9c8eab5e6669a7f4139c0a562ce86fcd5a0d83885880d83dcb0dad961"
+          }
+        }
+      }
     },
     "team-05": {
       "canonical_run": "pending",
@@ -57,8 +109,21 @@
       "freeze_commit": null,
       "oos_accesses": [],
       "qe": "pending",
-      "qr": "pending",
-      "reviews": {}
+      "qr": "complete",
+      "qr_completed_at_utc": "2026-07-13T16:35:41.181288+00:00",
+      "reviews": {
+        "qr": {
+          "commit": "8ad6c0a424bcec27e6cb96adabe96a26e870ba21",
+          "completed_at_utc": "2026-07-13T16:35:41.181288+00:00",
+          "evidence_sha256": {
+            "tournament/top40/teams/team-05/ablations.json": "2d2d85fbb170408a64f09a26858221ea8bea4d031ff92c9fe179f2b142fa342c",
+            "tournament/top40/teams/team-05/experiments.jsonl": "1412fe213f708b84f132131bc60f486335ec9919fbccbe699d3e11ea5a01c289",
+            "tournament/top40/teams/team-05/feature_lineage.json": "63f8700a926e4523358ea7d017d5e79ecbedc81857b15a943773e3770d8ddf92",
+            "tournament/top40/teams/team-05/provenance.md": "24cbdf0b692d2692e796ead98417a99e4a1e75cc16df4b5db95435edfee19c19",
+            "tournament/top40/teams/team-05/research_brief.md": "3d9c75794c75b502f2a6b7fff7ed01cbd4575c56788b51531e8ca83ed635e900"
+          }
+        }
+      }
     },
     "team-06": {
       "canonical_run": "pending",
@@ -66,8 +131,21 @@
       "freeze_commit": null,
       "oos_accesses": [],
       "qe": "pending",
-      "qr": "pending",
-      "reviews": {}
+      "qr": "complete",
+      "qr_completed_at_utc": "2026-07-13T16:35:41.767961+00:00",
+      "reviews": {
+        "qr": {
+          "commit": "8ad6c0a424bcec27e6cb96adabe96a26e870ba21",
+          "completed_at_utc": "2026-07-13T16:35:41.767961+00:00",
+          "evidence_sha256": {
+            "tournament/top40/teams/team-06/ablations.json": "ce0b049a217b3747236851022951e53fae40904d18ef1eed7770bbf830e38408",
+            "tournament/top40/teams/team-06/experiments.jsonl": "526ee8664b975c13b8ec70016e4282990412c5f0f887315a40a96099bac0993a",
+            "tournament/top40/teams/team-06/feature_lineage.json": "cff89ed854d9230d52cd8d8de0cc72e9c2fb62b8e4c0ee73893e409c8a50f481",
+            "tournament/top40/teams/team-06/provenance.md": "40ac2d94b18cebb9c4a80ebee44881ef8ea6bc2be143e4e2ae08c56e31153b89",
+            "tournament/top40/teams/team-06/research_brief.md": "9a7a0a144a487d98ac83ae6557adb609842266eaed8b8a8a9ad15501edbd4d3a"
+          }
+        }
+      }
     },
     "team-07": {
       "canonical_run": "pending",
@@ -75,8 +153,21 @@
       "freeze_commit": null,
       "oos_accesses": [],
       "qe": "pending",
-      "qr": "pending",
-      "reviews": {}
+      "qr": "complete",
+      "qr_completed_at_utc": "2026-07-13T16:35:42.332485+00:00",
+      "reviews": {
+        "qr": {
+          "commit": "8ad6c0a424bcec27e6cb96adabe96a26e870ba21",
+          "completed_at_utc": "2026-07-13T16:35:42.332485+00:00",
+          "evidence_sha256": {
+            "tournament/top40/teams/team-07/ablations.json": "f457d77a18b6cd74828a8276dd86b0f8e137b48b23ce7b9fcabf173933049d96",
+            "tournament/top40/teams/team-07/experiments.jsonl": "92061ed7e8d0d707c487d654c65db4575b338c84514babfdd391af24dd194ee2",
+            "tournament/top40/teams/team-07/feature_lineage.json": "cdf7676bdf2f8514e1b2f3b0f37e3ada66a9c25cbe53af00b4fb4b061fc6d433",
+            "tournament/top40/teams/team-07/provenance.md": "ab6144882d3aae36829505528a1586ba545e5bc56d6894f1f6d53f5b40c5e469",
+            "tournament/top40/teams/team-07/research_brief.md": "cc40d21521530c3b83b6a89ae19228ed3bc9b47a3c5c8f5ee40259a2f586393c"
+          }
+        }
+      }
     },
     "team-08": {
       "canonical_run": "pending",
@@ -84,8 +175,21 @@
       "freeze_commit": null,
       "oos_accesses": [],
       "qe": "pending",
-      "qr": "pending",
-      "reviews": {}
+      "qr": "complete",
+      "qr_completed_at_utc": "2026-07-13T16:35:42.909966+00:00",
+      "reviews": {
+        "qr": {
+          "commit": "8ad6c0a424bcec27e6cb96adabe96a26e870ba21",
+          "completed_at_utc": "2026-07-13T16:35:42.909966+00:00",
+          "evidence_sha256": {
+            "tournament/top40/teams/team-08/ablations.json": "b9bb04ed53de309a3ba272a00ed02e27b4a9f13e68a12ad71e8dde63cfd3a73f",
+            "tournament/top40/teams/team-08/experiments.jsonl": "ad38ae1dce7d22bc74905f14aecdc55247025463d83d29243e549d8752fa6ebe",
+            "tournament/top40/teams/team-08/feature_lineage.json": "3bbefd6b39414a2e5245137e2891fb85186f966c32e79e9ecbe901c8401b6042",
+            "tournament/top40/teams/team-08/provenance.md": "8a21b1b41137b4ae6603ec1027b20c0b2ac256882922c25776f843792c0c2839",
+            "tournament/top40/teams/team-08/research_brief.md": "a496205469ba41c79288bc956cd54c6954eb2965d78689876e223ead63c290c3"
+          }
+        }
+      }
     },
     "team-09": {
       "canonical_run": "pending",
