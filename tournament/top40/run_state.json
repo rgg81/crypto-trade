@@ -85,8 +85,14 @@
     },
     "team-02": {
       "canonical_run": "pending",
-      "champion": null,
-      "freeze_commit": null,
+      "champion": {
+        "freeze_commit": "f5666db02274e69abcda62f7a9d2d44aa624a14e",
+        "frozen_at_utc": "2026-07-14T07:56:08.523194+00:00",
+        "strategy_name": "Directed Lagged Diffusion Network",
+        "strategy_sha256": "22bb19d7e20d9a1c07a9c00af1436914e3239c9ed9e98d521a9f4605d4671e4e",
+        "trial_count": 2
+      },
+      "freeze_commit": "f5666db02274e69abcda62f7a9d2d44aa624a14e",
       "oos_accesses": [
         {
           "candidate_id": "t02-dldn-c01",
