@@ -153,8 +153,14 @@
     },
     "team-03": {
       "canonical_run": "pending",
-      "champion": null,
-      "freeze_commit": null,
+      "champion": {
+        "freeze_commit": "9e0c0e3a37291d76e6361a7e65b5a33645bc624a",
+        "frozen_at_utc": "2026-07-14T22:28:12.239520+00:00",
+        "strategy_name": "Residual Tail Asymmetry",
+        "strategy_sha256": "3b6816adf956c7911d09918a02cc65ac5260d39e36433ced75665a16d1dd4309",
+        "trial_count": 2
+      },
+      "freeze_commit": "9e0c0e3a37291d76e6361a7e65b5a33645bc624a",
       "oos_accesses": [
         {
           "candidate_id": "t03-idtail-v1",
