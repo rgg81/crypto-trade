@@ -207,6 +207,37 @@ def _utc_series(values: pd.Series) -> pd.Series | None:
         return None
 
 
+def _is_canonical_history_view(
+    frame: pd.DataFrame,
+    time_column: str,
+    value_columns: tuple[str, ...],
+) -> bool:
+    """Recognize the canonical worker's normalized, read-only history views.
+
+    The isolated worker exposes append-only UTC histories through a zero-based ``RangeIndex``
+    and read-only NumPy value storage.  Pandas materializes timezone-aware timestamps into its
+    own writable extension array, so the immutable numeric columns are the worker signature.
+    Those properties let the strategy use binary time slicing without rescanning an immutable
+    multi-year prefix at every decision.  Directly constructed or mutable frames retain the
+    defensive validation and masking paths below.
+    """
+
+    index = frame.index
+    if not (
+        isinstance(index, pd.RangeIndex)
+        and index.start == 0
+        and index.step == 1
+        and str(getattr(frame[time_column].dtype, "tz", None)) == "UTC"
+    ):
+        return False
+    try:
+        return all(
+            not frame[column].to_numpy(copy=False).flags.writeable for column in value_columns
+        )
+    except (AttributeError, KeyError, TypeError, ValueError):
+        return False
+
+
 def _sign(value: float) -> int:
     if value > 0.0:
         return 1
@@ -247,11 +278,22 @@ def _has_usable_response_bar(
     open_times = _utc_series(frame["open_time"])
     if open_times is None:
         return False
-    matches = (open_times == response_open) & (open_times + BAR_INTERVAL <= decision_time)
-    locations = np.flatnonzero(matches.to_numpy(dtype=bool))
-    if len(locations) != 1:
-        return False
-    row = frame.iloc[int(locations[0])]
+    if _is_canonical_history_view(frame, "open_time", ("open", "close")):
+        left = int(open_times.searchsorted(response_open, side="left"))
+        right = int(open_times.searchsorted(response_open, side="right"))
+        if (
+            right - left != 1
+            or pd.Timestamp(open_times.iloc[left]) + BAR_INTERVAL > decision_time
+        ):
+            return False
+        location = left
+    else:
+        matches = (open_times == response_open) & (open_times + BAR_INTERVAL <= decision_time)
+        locations = np.flatnonzero(matches.to_numpy(dtype=bool))
+        if len(locations) != 1:
+            return False
+        location = int(locations[0])
+    row = frame.iloc[location]
     try:
         open_price = float(row["open"])
         close_price = float(row["close"])
@@ -277,7 +319,10 @@ def _transform_symbol_bars(
         return None
     window_start = response_open - PRICE_LOOKBACK
     # Reapply the information boundary even though the canonical context is already truncated.
-    if open_times.notna().all() and open_times.is_monotonic_increasing:
+    ordered = _is_canonical_history_view(frame, "open_time", ("open", "close")) or (
+        open_times.notna().all() and open_times.is_monotonic_increasing
+    )
+    if ordered:
         left = int(open_times.searchsorted(window_start, side="left"))
         right = int(open_times.searchsorted(response_open, side="right"))
         selected_frame = frame.iloc[left:right]
@@ -301,9 +346,10 @@ def _transform_symbol_bars(
     finite = np.isfinite(opens) & np.isfinite(closes) & (opens > 0.0) & (closes > 0.0)
     value_times = selected_times[finite]
     log_returns = np.log(closes[finite] / opens[finite])
-    order = np.argsort(value_times.asi8, kind="stable")
-    value_times = value_times[order]
-    log_returns = log_returns[order]
+    if not ordered:
+        order = np.argsort(value_times.asi8, kind="stable")
+        value_times = value_times[order]
+        log_returns = log_returns[order]
     response_locations = np.flatnonzero(value_times == response_open)
     if len(response_locations) != 1:
         return None
@@ -358,7 +404,10 @@ def _past_funding(
     # A matching tau is no more than 16h before t, so this slice still fully contains
     # [tau-180d, tau) while avoiding repeated scans over multi-year context history.
     search_start = decision_time - FUNDING_LOOKBACK - 2 * BAR_INTERVAL
-    if funding_times.notna().all() and funding_times.is_monotonic_increasing:
+    ordered = _is_canonical_history_view(funding, "funding_time", ("funding_rate",)) or (
+        funding_times.notna().all() and funding_times.is_monotonic_increasing
+    )
+    if ordered:
         left = int(funding_times.searchsorted(search_start, side="left"))
         right = int(funding_times.searchsorted(decision_time, side="left"))
         selected = funding.iloc[left:right]
@@ -396,7 +445,6 @@ def _matched_funding_groups(
         return {}
     matched: dict[str, pd.DataFrame] = {}
     for symbol, group in past.groupby("symbol", sort=True, observed=True):
-        group = group.sort_values("funding_time", kind="mergesort")
         latest = group.iloc[-1]
         tau = pd.Timestamp(latest["funding_time"])
         settlement = tau.floor("h")

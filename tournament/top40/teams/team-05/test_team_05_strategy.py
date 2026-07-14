@@ -273,6 +273,74 @@ def test_factory_is_fresh_and_seed_is_pinned() -> None:
         first.target_weights(_context_from_market(market, DECISION_TIME), seed=1)
 
 
+def test_canonical_utc_datetimes_use_identity_fast_path() -> None:
+    values = pd.Series(pd.date_range(DECISION_TIME, periods=3, freq=INTERVAL))
+
+    assert STRATEGY._datetime_series(values) is values
+
+
+def test_history_is_tailed_before_column_projection() -> None:
+    calls: list[tuple[str, int]] = []
+
+    class TailFirstFrame:
+        def __init__(self, label: str, frame: pd.DataFrame) -> None:
+            self.label = label
+            self.frame = frame
+            self.columns = frame.columns
+
+        @property
+        def empty(self) -> bool:
+            return self.frame.empty
+
+        @property
+        def loc(self) -> object:
+            raise AssertionError("full-history column projection happened before tail")
+
+        def tail(self, rows: int) -> pd.DataFrame:
+            calls.append((self.label, rows))
+            return self.frame.tail(rows)
+
+    open_times = pd.date_range(
+        end=DECISION_TIME - INTERVAL,
+        periods=129,
+        freq=INTERVAL,
+        tz="UTC",
+    )
+    bars = pd.DataFrame(
+        {
+            "open_time": open_times,
+            "open": np.full(len(open_times), 100.0),
+            "high": np.full(len(open_times), 101.0),
+            "low": np.full(len(open_times), 99.0),
+            "close": np.full(len(open_times), 100.5),
+            "quote_volume": np.full(len(open_times), 1_000_000.0),
+        }
+    )
+    normalised = STRATEGY._normalise_symbol_bars(
+        TailFirstFrame("bars", bars), DECISION_TIME
+    )
+    assert len(normalised) == 128
+
+    funding_times = pd.date_range(
+        end=DECISION_TIME - INTERVAL,
+        periods=4097,
+        freq=INTERVAL,
+        tz="UTC",
+    )
+    funding = pd.DataFrame(
+        {
+            "symbol": "AAAUSDT",
+            "funding_time": funding_times,
+            "funding_rate": np.full(len(funding_times), 0.001),
+        }
+    )
+    features = STRATEGY._funding_features(
+        TailFirstFrame("funding", funding), ("AAAUSDT",), DECISION_TIME
+    )
+    assert features["AAAUSDT"] == (0.001, 0.0)
+    assert calls == [("bars", 128), ("funding", 4096)]
+
+
 def test_auction_geometry_body_confirmation_and_gap_rules() -> None:
     index = pd.date_range(_utc_date(2023, 1, 1), periods=13, freq=INTERVAL)
     rows = pd.DataFrame(

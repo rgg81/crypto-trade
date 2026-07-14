@@ -157,11 +157,18 @@ def _funding_series(
     *,
     symbol: str,
     decision_time: pd.Timestamp,
+    row_positions: Sequence[int] | np.ndarray | None = None,
 ) -> pd.Series | None:
     required = {"funding_time", "symbol", "funding_rate"}
     if not required.issubset(funding.columns):
         return None
-    rows = funding.loc[funding["symbol"].astype(str).eq(symbol), ["funding_time", "funding_rate"]]
+    if row_positions is None:
+        rows = funding.loc[
+            funding["symbol"].astype(str).eq(symbol),
+            ["funding_time", "funding_rate"],
+        ]
+    else:
+        rows = funding.iloc[row_positions][["funding_time", "funding_rate"]]
     try:
         times = pd.to_datetime(rows["funding_time"], utc=True, errors="coerce")
     except (TypeError, ValueError):
@@ -179,6 +186,20 @@ def _funding_series(
     if not np.isfinite(rates.to_numpy(dtype=float)).all():
         return None
     return rates.sort_index()
+
+
+def _funding_row_groups(funding: pd.DataFrame) -> dict[str, np.ndarray]:
+    """Index funding rows by normalized symbol with one full-table pass."""
+
+    required = {"funding_time", "symbol", "funding_rate"}
+    if not required.issubset(funding.columns):
+        return {}
+    normalized_symbols = funding["symbol"].astype(str)
+    grouped = funding.groupby(normalized_symbols, sort=False, dropna=False)
+    return {
+        str(symbol): np.asarray(positions, dtype=np.intp)
+        for symbol, positions in grouped.indices.items()
+    }
 
 
 def _funding_feature(rates: pd.Series, decision_time: pd.Timestamp) -> float | None:
@@ -323,7 +344,9 @@ class FPEGStrategy:
     def __init__(self, config: FPEGConfig):
         config.validate()
         self.config = config
-        self._pair_cache: dict[tuple[str, pd.Timestamp], tuple[float, float]] = {}
+        self._pair_cache: dict[
+            tuple[str, pd.Timestamp], tuple[float, float] | None
+        ] = {}
         self._dispersion_history: list[tuple[pd.Timestamp, float]] = []
         self._last_daily_decision: pd.Timestamp | None = None
 
@@ -335,12 +358,15 @@ class FPEGStrategy:
         rates: pd.Series,
     ) -> tuple[float, float] | None:
         key = (symbol, decision_time)
-        cached = self._pair_cache.get(key)
-        if cached is not None:
-            return cached
+        if key in self._pair_cache:
+            return self._pair_cache[key]
         price = _exact_price_feature(close, decision_time)
+        if price is None:
+            self._pair_cache[key] = None
+            return None
         funding = _funding_feature(rates, decision_time)
-        if price is None or funding is None:
+        if funding is None:
+            self._pair_cache[key] = None
             return None
         pair = (price, funding)
         self._pair_cache[key] = pair
@@ -422,6 +448,7 @@ class FPEGStrategy:
         if len(eligible) < MINIMUM_CROSS_SECTION:
             return {}
         earliest_needed = decision_time - pd.Timedelta(days=max(63, self.config.volatility_days))
+        funding_row_groups = _funding_row_groups(context.funding)
         observations: list[_SymbolObservation] = []
         for symbol in eligible:
             frame = context.bars.get(symbol)
@@ -434,10 +461,14 @@ class FPEGStrategy:
             )
             if close is None:
                 continue
+            row_positions = funding_row_groups.get(symbol)
+            if row_positions is None:
+                continue
             rates = _funding_series(
                 context.funding,
                 symbol=symbol,
                 decision_time=decision_time,
+                row_positions=row_positions,
             )
             if rates is None:
                 continue

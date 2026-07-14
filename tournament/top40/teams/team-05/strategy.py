@@ -42,6 +42,11 @@ def _as_utc(value: object) -> pd.Timestamp:
 def _datetime_series(values: pd.Series) -> pd.Series:
     """Parse timestamp columns while also accepting canonical epoch-millisecond rows."""
 
+    timezone = getattr(values.dtype, "tz", None)
+    if timezone is not None:
+        return values if str(timezone) == "UTC" else values.dt.tz_convert("UTC")
+    if pd.api.types.is_datetime64_dtype(values.dtype):
+        return values.dt.tz_localize("UTC")
     if pd.api.types.is_numeric_dtype(values.dtype):
         finite = pd.to_numeric(values, errors="coerce")
         magnitude = float(finite.abs().median()) if finite.notna().any() else 0.0
@@ -64,7 +69,7 @@ def _normalise_symbol_bars(frame: pd.DataFrame, decision_time: pd.Timestamp) -> 
     columns = ["open_time", "open", "high", "low", "close", "quote_volume"]
     if "close_time" in frame.columns:
         columns.append("close_time")
-    work = frame.loc[:, columns].tail(128).copy()
+    work = frame.tail(128).loc[:, columns].copy()
     work["open_time"] = _datetime_series(work["open_time"])
     if work["open_time"].isna().any():
         raise ValueError("strategy bars contain invalid open_time")
@@ -83,7 +88,8 @@ def _normalise_symbol_bars(frame: pd.DataFrame, decision_time: pd.Timestamp) -> 
     if not work["open_time"].is_monotonic_increasing:
         work = work.sort_values("open_time", kind="mergesort")
     for column in ("open", "high", "low", "close", "quote_volume"):
-        work[column] = pd.to_numeric(work[column], errors="coerce")
+        if not pd.api.types.is_numeric_dtype(work[column].dtype):
+            work[column] = pd.to_numeric(work[column], errors="coerce")
     work = work.set_index("open_time", drop=True)
     work["_present"] = True
     return work
@@ -253,12 +259,13 @@ def _funding_features(
         raise ValueError(f"strategy funding missing columns: {sorted(missing)}")
     # The last 4,096 actual events exceed the theoretical 16h requirement for forty names even
     # at hourly funding, yet keep canonical runtime bounded as history grows.
-    frame = funding.loc[:, ["symbol", "funding_time", "funding_rate"]].tail(4096).copy()
+    frame = funding.tail(4096).loc[:, ["symbol", "funding_time", "funding_rate"]].copy()
     frame["symbol"] = frame["symbol"].astype(str)
     frame["funding_time"] = _datetime_series(frame["funding_time"])
     if frame["funding_time"].isna().any():
         raise ValueError("strategy funding contains invalid funding_time")
-    frame["funding_rate"] = pd.to_numeric(frame["funding_rate"], errors="coerce")
+    if not pd.api.types.is_numeric_dtype(frame["funding_rate"].dtype):
+        frame["funding_rate"] = pd.to_numeric(frame["funding_rate"], errors="coerce")
     frame = frame[frame["symbol"].isin(symbols) & (frame["funding_time"] < decision_time)]
     if frame.duplicated(["symbol", "funding_time"]).any():
         raise ValueError("strategy funding contains duplicate symbol/timestamp rows")

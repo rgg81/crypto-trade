@@ -15,6 +15,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from crypto_trade.tournament._strategy_worker import _HistoryBuffer
 from crypto_trade.tournament.data import point_in_time_top40
 from crypto_trade.tournament.engine import (
     EvaluatorConfig,
@@ -144,6 +145,23 @@ def _mechanism_inputs(
 
 def _empty_funding() -> pd.DataFrame:
     return pd.DataFrame(columns=["funding_time", "symbol", "funding_rate", "mark_price"])
+
+
+def test_canonical_worker_history_is_recognized_for_bounded_slicing() -> None:
+    bars = _HistoryBuffer(
+        ("open_time", "open", "close"),
+        ("datetime64[ns, UTC]", "float64", "float64"),
+        frozenset({"open_time"}),
+    )
+    bars.append(
+        (
+            (_utc_date(2023, 1, 1), 100.0, 101.0),
+            (_utc_date(2023, 1, 1) + pd.Timedelta(hours=8), 101.0, 102.0),
+        )
+    )
+    frame = bars.frame()
+
+    assert t04._is_canonical_history_view(frame, "open_time", ("open", "close"))
 
 
 def _evaluation_inputs() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
