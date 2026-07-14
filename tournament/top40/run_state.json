@@ -383,8 +383,14 @@
     },
     "team-06": {
       "canonical_run": "pending",
-      "champion": null,
-      "freeze_commit": null,
+      "champion": {
+        "freeze_commit": "6db6997a1f84c8285211edd9a6da80df956d301d",
+        "frozen_at_utc": "2026-07-14T22:29:00.723112+00:00",
+        "strategy_name": "Hierarchical Weekday Differential Seasonality",
+        "strategy_sha256": "971a7e841c3fb07f1b1fc712068fced78352a4373c82907b4e4c4968cbeaf3ec",
+        "trial_count": 2
+      },
+      "freeze_commit": "6db6997a1f84c8285211edd9a6da80df956d301d",
       "oos_accesses": [
         {
           "candidate_id": "T06-HWDS-001",
