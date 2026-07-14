@@ -451,8 +451,14 @@
     },
     "team-07": {
       "canonical_run": "pending",
-      "champion": null,
-      "freeze_commit": null,
+      "champion": {
+        "freeze_commit": "d4d0acca95029f74a7d0c43f1f3e283dbf6ae21d",
+        "frozen_at_utc": "2026-07-14T22:29:13.418282+00:00",
+        "strategy_name": "Slow Residual Momentum with Breadth Brake",
+        "strategy_sha256": "d1161852adc9fbf525686705f30b9353eddaf072edf490a7a3270450751eeb73",
+        "trial_count": 2
+      },
+      "freeze_commit": "d4d0acca95029f74a7d0c43f1f3e283dbf6ae21d",
       "oos_accesses": [
         {
           "candidate_id": "T07-SRMB-118",
