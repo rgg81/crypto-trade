@@ -8,9 +8,9 @@
   "phase": "research",
   "research_journal": {
     "genesis_sha256": "7db83e660d43c4c9420a534f3b96532cd2062bda4addafbf0a34613045e0638d",
-    "head_sha256": "e53fd48662c8d3b861a34203a5d01fa4e37db073262cd6e26b5985f5f7cf501f",
+    "head_sha256": "c01673a6ae22e14211839624b1f225165ce5cad9f4d5f67c1a37c82d2d561508",
     "path": "tournament/top40/organizer_research_journal.jsonl",
-    "record_count": 41,
+    "record_count": 43,
     "schema_version": 1
   },
   "schema_version": 1,
@@ -153,6 +153,19 @@
           "source_bundle_sha256": "565e7cbd529645f758b067c8c8ad320595c4bff8814ace5914e50267366a87ca",
           "status": "failed",
           "team_ledger_sha256": "aaa62ea082cfe868964b862b0b606231757cdfb506b53bd18c6099475700ecb9"
+        },
+        {
+          "candidate_id": "t04-fps-001-r2",
+          "failure_type": null,
+          "finished_at_utc": "2026-07-14T03:52:58.959949+00:00",
+          "registration_sha256": "8b601aae60cdc1792ae48f84f37b68815a467e97f077f1701bb13457120aa1e7",
+          "reservation_record_sha256": "13c5390bcf09e1779ad88809cb12b28aa54a36198092f1dd1db32184cf247012",
+          "reserved_at_utc": "2026-07-14T03:20:37.415161+00:00",
+          "result_record_sha256": "c01673a6ae22e14211839624b1f225165ce5cad9f4d5f67c1a37c82d2d561508",
+          "run_id": "450d2031c8ae7cf4df11b3baac6b79aad31bd385d6f360a307adabaf9a6b9b1c",
+          "source_bundle_sha256": "59d8825bdfd6646a9b880b82c7a95b1c9e7f97a39350211721bd576a95e0813a",
+          "status": "completed",
+          "team_ledger_sha256": "1ce63ec0b72c364943d853589535e19eb9b8cd087676ab5170747eddd640ae45"
         }
       ],
       "qe": "pending",
