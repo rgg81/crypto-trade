@@ -42,44 +42,66 @@ uv run ruff format --check tournament/top40/teams/team-03/strategy.py tournament
 
 uv run pytest -q tournament/top40/teams/team-03/test_team_03_strategy.py
 ...... [100%]
-6 passed in 0.63s
+6 passed in 0.62s
+
+uv run pytest -q tests/tournament/test_engine.py
+......................... [100%]
+25 passed in 1.60s
+
+uv run pytest -q tests/tournament/test_runner.py
+....................................... [100%]
+39 passed in 8.83s
+
+uv run pytest -q tests/tournament/test_data.py
+... [100%]
+3 passed in 0.35s
 
 cmp -s uv.lock tournament/top40/teams/team-03/uv.lock
 exit 0
 ```
 
-The synthetic causal tests cover exact 8h adjacency and gap rejection, exact 84-return momentum
+The team causal tests cover exact 8h adjacency and gap rejection, exact 84-return momentum
 completeness, closed/future truncation, corrupt-future and append invariance, deterministic fresh
 instances, average-tie ranks, capped water-filling, Monday mapping versus non-Monday hold, both
 factor paths, fallback-hedge sleeve exclusion, finite eligible-only signed targets, gross/net/name
-caps, and algebraic factor-beta neutrality. The canonical source-bundle validator also accepted
-the complete team tree after generated Python caches were removed.
+caps, and algebraic factor-beta neutrality. The common engine, runner, and data suites cover
+closed-context construction, point-in-time membership, next-open execution, fees and slippage,
+actual-timestamp funding, two-sided accounting, independent 2x-cost evaluation, and exact fresh-run
+artifact determinism. The canonical source-bundle validator also accepted the complete team tree
+after generated Python caches were removed.
 
-`compliance.json` marks only closed-data, append-invariance, and corrupt-future checks true. All
-evaluator-owned or realized-result checks remain false pending an organizer run.
+`compliance.json` now records all hard checks as true against that direct test evidence, the frozen
+public-Binance snapshot/manifest, the restricted strategy source surface, and the completed official
+research attempt described below. The official returns contain nonzero exposure in both sleeves
+(maximum long exposure `0.541966585`, maximum short exposure `0.565320848`) and the trade ledger
+contains both positive- and negative-quantity executions.
 
 ## Reproduction and result locations
 
-The preregistered organizer-gated command is:
+The first organizer process was interrupted by the host restart and was closed as a counted failed
+attempt. The unchanged retry `t03-idtail-v1-r1` completed at
+`2026-07-13T19:20:13.738586+00:00`; its registration, reservation, result, resource use, metrics,
+artifact hashes, and source-bundle hash are append-only in `experiments.jsonl` and the organizer
+research journal. The successful attempt used `0.4164631597` CPU hours and `0.4164260791` wall-clock
+hours. No strategy or parameter changed after the public-OOS observation.
 
-```bash
-uv run python scripts/top40_tournament.py run-team team-03 --candidate-id t03-idtail-v1
-```
+The produced base artifacts are `reports-top40/team-03/bar_returns.csv` and
+`reports-top40/team-03/daily_returns.csv`; the independent cost-stress artifacts are
+`reports-top40/team-03/double_cost_bar_returns.csv` and
+`reports-top40/team-03/double_cost_daily_returns.csv`. The remaining target, position, event, and
+trade locations and their SHA-256 hashes are recorded in the successful result event and
+`reports-top40/team-03/research-attempt-2.json`.
 
-The organizer has not run it yet. Consequently no base or 2x-cost files exist under
-`reports-top40/team-03/`, and this QE did not inspect public OOS. The organizer must append the
-canonical result event to `experiments.jsonl`; the team ledger intentionally contains only its one
-registered event.
-
-Local deterministic target comparisons require exact equality. No tolerance is claimed yet for
-canonical positions, returns, or manifests because the two independent clean evaluator reruns have
-not occurred.
+Target and common-runner deterministic comparisons require exact byte equality. The later cohort
+finalization still must perform its charter-required two independent clean evaluator reruns; this
+QE repair does not claim that finalization has already occurred.
 
 ## Known limitations
 
-- Synthetic contexts do not establish realized long/short exposure or execution-notional floors.
+- Realized exposure and execution floors can vary by period even though the completed research
+  attempt exercised both sleeves.
 - Fees, slippage, actual funding, delisting, participation, base/2x reconciliation, and next-open
-  fills are evaluator-owned and were not re-evaluated locally.
-- Full-history runtime under the official 900-second sandbox remains to be measured by the
-  organizer. The focused synthetic suite completed well inside that limit.
+  fills remain evaluator-owned; the strategy does not reproduce accounting logic.
+- The completed research run establishes full-history feasibility under the current official
+  worker limits, but it does not guarantee identical timing on a more heavily loaded host.
 - The local WSL environment is not the official fail-closed worker sandbox.

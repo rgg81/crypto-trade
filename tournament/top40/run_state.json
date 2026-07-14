@@ -183,23 +183,10 @@
           "team_ledger_sha256": "c0f7a8cbe3f2289ab2b6fa019157355b536f25d76da9bd66b1f9ef070f4c475e"
         }
       ],
-      "qe": "complete",
-      "qe_completed_at_utc": "2026-07-14T07:52:44.510342+00:00",
+      "qe": "pending",
       "qr": "complete",
       "qr_completed_at_utc": "2026-07-14T07:52:29.786622+00:00",
       "reviews": {
-        "qe": {
-          "commit": "b8ad32183476d7a2235efa6a738f5a096b211b2c",
-          "completed_at_utc": "2026-07-14T07:52:44.510342+00:00",
-          "evidence_sha256": {
-            "tournament/top40/teams/team-03/compliance.json": "c4f9fe8d7a1234fcf1691aa0e814b93a787881779bb428ca2c22dab888225d1c",
-            "tournament/top40/teams/team-03/frozen_config.json": "26ab6e4c7624dcabacab0a347037680b13b9a3099708866cd8c3ce75a95fd980",
-            "tournament/top40/teams/team-03/qe_report.md": "162056a1c47c08699dd3b067544e27089ab3d58a317404076cf8c6e80caa7ae4",
-            "tournament/top40/teams/team-03/strategy.py": "3b6816adf956c7911d09918a02cc65ac5260d39e36433ced75665a16d1dd4309",
-            "tournament/top40/teams/team-03/team_source_manifest.json": "d42b0eafec70cec105fdf782b21dfbe821cfe9922e089ed1ce8c7e26d02b1fe1",
-            "tournament/top40/teams/team-03/uv.lock": "869cd3380346a9c9a219fc762868e23cd494a18e22dd9b314ba18621d991faa5"
-          }
-        },
         "qr": {
           "commit": "b8ad32183476d7a2235efa6a738f5a096b211b2c",
           "completed_at_utc": "2026-07-14T07:52:29.786622+00:00",
