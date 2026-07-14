@@ -35,6 +35,29 @@ ZSCORE_LIMIT = 4.0
 SLOPE_DENOMINATOR_FLOOR = 1e-12
 SYMBOL_WEIGHT_CAP = 0.08
 EXPECTED_SEED = 20260713
+CANONICAL_BAR_COLUMNS = (
+    "open_time",
+    "symbol",
+    "open",
+    "high",
+    "low",
+    "close",
+    "volume",
+    "close_time",
+    "quote_volume",
+    "trade_count",
+    "taker_buy_volume",
+    "taker_buy_quote_volume",
+)
+CANONICAL_FUNDING_COLUMNS = (
+    "funding_rate",
+    "funding_time",
+    "mark_price",
+    "symbol",
+    "settlement_time",
+)
+PRICE_HISTORY_ROWS = 256
+FUNDING_HISTORY_ROWS_PER_SYMBOL = 2048
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -85,6 +108,37 @@ def _utc_timestamp(value: object) -> pd.Timestamp:
     return timestamp.tz_convert("UTC")
 
 
+def _utc_datetime_series(values: pd.Series) -> pd.Series:
+    timezone = getattr(values.dtype, "tz", None)
+    if timezone is not None:
+        return values if str(timezone) == "UTC" else values.dt.tz_convert("UTC")
+    if pd.api.types.is_datetime64_dtype(values.dtype):
+        return values.dt.tz_localize("UTC")
+    return pd.to_datetime(values, utc=True, errors="coerce")
+
+
+def _is_canonical_history(
+    frame: pd.DataFrame,
+    columns: tuple[str, ...],
+    time_column: str,
+    value_column: str,
+) -> bool:
+    """Recognize a trusted worker history without weakening defensive inputs."""
+
+    try:
+        index = frame.index
+        return (
+            tuple(str(column) for column in frame.columns) == columns
+            and isinstance(index, pd.RangeIndex)
+            and index.start == 0
+            and index.step == 1
+            and str(getattr(frame[time_column].dtype, "tz", None)) == "UTC"
+            and not frame[value_column].to_numpy(copy=False).flags.writeable
+        )
+    except (AttributeError, KeyError, TypeError, ValueError):
+        return False
+
+
 def _closed_price_series(
     frame: pd.DataFrame,
     *,
@@ -95,13 +149,25 @@ def _closed_price_series(
 
     if not {"open_time", "close"}.issubset(frame.columns):
         return None
+    canonical = _is_canonical_history(frame, CANONICAL_BAR_COLUMNS, "open_time", "close")
+    source = frame.tail(PRICE_HISTORY_ROWS) if canonical else frame
     try:
-        open_times = pd.to_datetime(frame["open_time"], utc=True, errors="coerce")
+        open_times = _utc_datetime_series(source["open_time"])
     except (TypeError, ValueError):
         return None
     end_times = open_times + BAR_INTERVAL
+    if canonical:
+        left = int(end_times.searchsorted(earliest_needed, side="left"))
+        right = int(end_times.searchsorted(decision_time, side="right"))
+        index = pd.DatetimeIndex(end_times.iloc[left:right])
+        values = source["close"].iloc[left:right].to_numpy(dtype=float, copy=False)
+        if index.hasnans or index.duplicated().any():
+            return None
+        if not np.isfinite(values).all() or (values <= 0.0).any():
+            return None
+        return pd.Series(values, index=index, dtype=float, copy=False)
     relevant = (end_times <= decision_time) & (end_times >= earliest_needed)
-    selected = frame.loc[relevant, ["close"]].copy()
+    selected = source.loc[relevant, ["close"]].copy()
     selected.index = pd.DatetimeIndex(end_times[relevant])
     if selected.index.hasnans or selected.index.duplicated().any():
         return None
@@ -158,6 +224,7 @@ def _funding_series(
     symbol: str,
     decision_time: pd.Timestamp,
     row_positions: Sequence[int] | np.ndarray | None = None,
+    bounded_history: bool = False,
 ) -> pd.Series | None:
     required = {"funding_time", "symbol", "funding_rate"}
     if not required.issubset(funding.columns):
@@ -168,9 +235,24 @@ def _funding_series(
             ["funding_time", "funding_rate"],
         ]
     else:
+        if bounded_history and len(row_positions) > FUNDING_HISTORY_ROWS_PER_SYMBOL:
+            row_positions = row_positions[-FUNDING_HISTORY_ROWS_PER_SYMBOL:]
+        if bounded_history:
+            times = pd.DatetimeIndex(funding["funding_time"].iloc[row_positions])
+            if times.hasnans or not times.is_monotonic_increasing:
+                return None
+            right = int(times.searchsorted(decision_time, side="left"))
+            times = times[:right]
+            rates = funding["funding_rate"].iloc[row_positions[:right]].to_numpy(
+                dtype=float,
+                copy=False,
+            )
+            if times.duplicated().any() or not np.isfinite(rates).all():
+                return None
+            return pd.Series(rates, index=times, dtype=float, copy=False)
         rows = funding.iloc[row_positions][["funding_time", "funding_rate"]]
     try:
-        times = pd.to_datetime(rows["funding_time"], utc=True, errors="coerce")
+        times = _utc_datetime_series(rows["funding_time"])
     except (TypeError, ValueError):
         return None
     # Future rows are outside the feature's information set and cannot affect validation.
@@ -449,6 +531,12 @@ class FPEGStrategy:
             return {}
         earliest_needed = decision_time - pd.Timedelta(days=max(63, self.config.volatility_days))
         funding_row_groups = _funding_row_groups(context.funding)
+        bounded_funding = _is_canonical_history(
+            context.funding,
+            CANONICAL_FUNDING_COLUMNS,
+            "funding_time",
+            "funding_rate",
+        )
         observations: list[_SymbolObservation] = []
         for symbol in eligible:
             frame = context.bars.get(symbol)
@@ -469,6 +557,7 @@ class FPEGStrategy:
                 symbol=symbol,
                 decision_time=decision_time,
                 row_positions=row_positions,
+                bounded_history=bounded_funding,
             )
             if rates is None:
                 continue

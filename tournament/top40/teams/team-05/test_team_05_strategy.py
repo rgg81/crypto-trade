@@ -21,6 +21,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from crypto_trade.tournament._strategy_worker import _HistoryBuffer
 from crypto_trade.tournament.data import point_in_time_top40
 from crypto_trade.tournament.engine import (
     EvaluatorConfig,
@@ -277,6 +278,63 @@ def test_canonical_utc_datetimes_use_identity_fast_path() -> None:
     values = pd.Series(pd.date_range(DECISION_TIME, periods=3, freq=INTERVAL))
 
     assert STRATEGY._datetime_series(values) is values
+
+
+def test_canonical_bar_fast_path_matches_defensive_normalisation() -> None:
+    columns = STRATEGY.CANONICAL_BAR_COLUMNS
+    buffer = _HistoryBuffer(
+        columns,
+        (
+            "datetime64[ns, UTC]",
+            "object",
+            "float64",
+            "float64",
+            "float64",
+            "float64",
+            "float64",
+            "datetime64[ns, UTC]",
+            "float64",
+            "int64",
+            "float64",
+            "float64",
+        ),
+        frozenset({"open_time", "close_time"}),
+    )
+    open_times = pd.date_range(
+        end=DECISION_TIME - INTERVAL,
+        periods=129,
+        freq=INTERVAL,
+        tz="UTC",
+    )
+    buffer.append(
+        tuple(
+            (
+                timestamp,
+                "AAAUSDT",
+                100.0,
+                101.0,
+                99.0,
+                100.5,
+                500.0,
+                timestamp + INTERVAL,
+                1_000_000.0,
+                10,
+                250.0,
+                500_000.0,
+            )
+            for timestamp in open_times
+        )
+    )
+    canonical = buffer.frame()
+    mutable = canonical.copy()
+    mutable.index = pd.RangeIndex(1, len(mutable) + 1)
+
+    assert STRATEGY._is_canonical_bar_history(canonical)
+    assert not STRATEGY._is_canonical_bar_history(mutable)
+    pd.testing.assert_frame_equal(
+        STRATEGY._normalise_symbol_bars(canonical, DECISION_TIME),
+        STRATEGY._normalise_symbol_bars(mutable, DECISION_TIME),
+    )
 
 
 def test_history_is_tailed_before_column_projection() -> None:

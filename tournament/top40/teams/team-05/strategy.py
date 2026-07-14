@@ -21,6 +21,21 @@ STRATEGY_NAME = "T05-AER12-H80-R72-v1"
 STRATEGY_SEED = 20260713
 INTERVAL = pd.Timedelta(hours=8)
 BTC_SYMBOL = "BTCUSDT"
+BAR_VALUE_COLUMNS = ("open", "high", "low", "close", "quote_volume")
+CANONICAL_BAR_COLUMNS = (
+    "open_time",
+    "symbol",
+    "open",
+    "high",
+    "low",
+    "close",
+    "volume",
+    "close_time",
+    "quote_volume",
+    "trade_count",
+    "taker_buy_volume",
+    "taker_buy_quote_volume",
+)
 
 
 @dataclass(frozen=True)
@@ -55,6 +70,26 @@ def _datetime_series(values: pd.Series) -> pd.Series:
     return pd.to_datetime(values, utc=True, errors="coerce")
 
 
+def _is_canonical_bar_history(frame: pd.DataFrame) -> bool:
+    """Recognize the trusted worker's sorted, append-only bar history view."""
+
+    try:
+        index = frame.index
+        return (
+            tuple(str(column) for column in frame.columns) == CANONICAL_BAR_COLUMNS
+            and isinstance(index, pd.RangeIndex)
+            and index.start == 0
+            and index.step == 1
+            and str(getattr(frame["open_time"].dtype, "tz", None)) == "UTC"
+            and all(
+            not frame[column].to_numpy(copy=False).flags.writeable
+            for column in BAR_VALUE_COLUMNS
+            )
+        )
+    except (AttributeError, KeyError, TypeError, ValueError):
+        return False
+
+
 def _normalise_symbol_bars(frame: pd.DataFrame, decision_time: pd.Timestamp) -> pd.DataFrame:
     """Return at most the required trailing history, without changing ``frame``."""
 
@@ -62,6 +97,24 @@ def _normalise_symbol_bars(frame: pd.DataFrame, decision_time: pd.Timestamp) -> 
     missing = required - set(frame.columns)
     if missing:
         raise ValueError(f"strategy bars missing columns: {sorted(missing)}")
+
+    if _is_canonical_bar_history(frame):
+        # The trusted context is already sorted and truncated to completed bars.  Construct the
+        # small feature view directly from its immutable arrays instead of repeatedly copying,
+        # parsing, filtering, validating, and reindexing a multi-year prefix.
+        tail = frame.tail(128)
+        return pd.DataFrame(
+            {
+                **{
+                    column: tail[column].to_numpy(copy=False)
+                    for column in BAR_VALUE_COLUMNS
+                },
+                "close_time": tail["close_time"].array,
+                "_present": np.ones(len(tail), dtype=bool),
+            },
+            index=pd.DatetimeIndex(tail["open_time"]),
+            copy=False,
+        )
 
     # The protocol supplies sorted, already-truncated frames.  A 128-row defensive tail is
     # enough for the 90-slot risk window plus every predecessor, while avoiding a quadratic
@@ -102,6 +155,10 @@ def _scheduled_rows(frame: pd.DataFrame, decision_time: pd.Timestamp, slots: int
         freq=INTERVAL,
         tz="UTC",
     )
+    if len(frame) >= slots:
+        tail = frame.tail(slots)
+        if tail.index.equals(expected):
+            return tail
     rows = frame.reindex(expected)
     rows["_present"] = rows["_present"].fillna(False).astype(bool)
     return rows
