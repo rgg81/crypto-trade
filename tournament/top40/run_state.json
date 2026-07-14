@@ -221,8 +221,14 @@
     },
     "team-04": {
       "canonical_run": "pending",
-      "champion": null,
-      "freeze_commit": null,
+      "champion": {
+        "freeze_commit": "1e444fccf37e77114f159feee635c932b87a20b0",
+        "frozen_at_utc": "2026-07-14T22:28:27.740655+00:00",
+        "strategy_name": "Funding Receiver Aftershock",
+        "strategy_sha256": "cd6cad1636128a7d36a0b69a9f821b45c071223d37d025f3269e713aba8ee80d",
+        "trial_count": 3
+      },
+      "freeze_commit": "1e444fccf37e77114f159feee635c932b87a20b0",
       "oos_accesses": [
         {
           "candidate_id": "t04-fps-001",
