@@ -519,8 +519,14 @@
     },
     "team-08": {
       "canonical_run": "pending",
-      "champion": null,
-      "freeze_commit": null,
+      "champion": {
+        "freeze_commit": "fee68bf25c66125f7d309c495a896dce2f5f1f5c",
+        "frozen_at_utc": "2026-07-14T22:29:31.606061+00:00",
+        "strategy_name": "Persistent Carry Dispersion Harvest",
+        "strategy_sha256": "0e6cf2ffff246c18e3e1055d2e6882248958fd30f956a01b0ed53e8457132dbe",
+        "trial_count": 2
+      },
+      "freeze_commit": "fee68bf25c66125f7d309c495a896dce2f5f1f5c",
       "oos_accesses": [
         {
           "candidate_id": "T08-PCDH-001",
