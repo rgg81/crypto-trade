@@ -302,8 +302,14 @@
     },
     "team-05": {
       "canonical_run": "pending",
-      "champion": null,
-      "freeze_commit": null,
+      "champion": {
+        "freeze_commit": "10c0f197b11fe35040689163b79a68560db1315f",
+        "frozen_at_utc": "2026-07-14T22:28:41.593763+00:00",
+        "strategy_name": "Auction-Excursion Rejection",
+        "strategy_sha256": "ef3f7bc58b1f825c0a13f024bbd584ff523d96654b0fec152071c88619318d2f",
+        "trial_count": 3
+      },
+      "freeze_commit": "10c0f197b11fe35040689163b79a68560db1315f",
       "oos_accesses": [
         {
           "candidate_id": "T05-AER12-H80-R72-v1",
