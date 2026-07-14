@@ -16,7 +16,10 @@
   "schema_version": 1,
   "teams": {
     "team-01": {
-      "canonical_run": "pending",
+      "canonical_finished_at_utc": "2026-07-14T23:21:57.977761+00:00",
+      "canonical_output_sha256": "6cf0bfb782069775551ae2f55fcbbdae5f4277ee49bea9b03466434eefbb3c65",
+      "canonical_run": "complete",
+      "canonical_started_at_utc": "2026-07-14T22:30:35.242272+00:00",
       "champion": {
         "freeze_commit": "85af71210719004ed530c26d44e77afb81b56475",
         "frozen_at_utc": "2026-07-14T07:55:35.979743+00:00",
