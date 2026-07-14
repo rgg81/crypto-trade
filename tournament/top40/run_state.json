@@ -5,7 +5,7 @@
   "evaluator_sha256": "508f56af0b4fe2636933909977cdbcfbb38e4ff821072dbf12b35bfb04d3af66",
   "methodology_sha256": "29cf7ed048ce49e9865eb5018554d8680e4eefad061725da73dded19da277cce",
   "orchestrator_sha256": "205c6da1ce77654aefcf11770721d06d9e8a766b9f339b3ecd78afc10bc6f58c",
-  "phase": "research",
+  "phase": "cohort_frozen",
   "research_journal": {
     "genesis_sha256": "7db83e660d43c4c9420a534f3b96532cd2062bda4addafbf0a34613045e0638d",
     "head_sha256": "149ed194ce33bea691ad89accbde794e96f4e044eb079c012ee1311849898cc2",
@@ -668,8 +668,14 @@
     },
     "team-10": {
       "canonical_run": "pending",
-      "champion": null,
-      "freeze_commit": null,
+      "champion": {
+        "freeze_commit": "963fcc95e85e1d1e6f806b89a02045efd6785997",
+        "frozen_at_utc": "2026-07-14T22:30:00.170605+00:00",
+        "strategy_name": "Perpetual Listing-Maturation Premium",
+        "strategy_sha256": "212c1bda50ac7a3884792554da1bba8b85c51bc7f9535c5950466a1c007ae837",
+        "trial_count": 2
+      },
+      "freeze_commit": "963fcc95e85e1d1e6f806b89a02045efd6785997",
       "oos_accesses": [
         {
           "candidate_id": "T10-PLMP-270-540-C14",
