@@ -17,8 +17,14 @@
   "teams": {
     "team-01": {
       "canonical_run": "pending",
-      "champion": null,
-      "freeze_commit": null,
+      "champion": {
+        "freeze_commit": "85af71210719004ed530c26d44e77afb81b56475",
+        "frozen_at_utc": "2026-07-14T07:55:35.979743+00:00",
+        "strategy_name": "Asymmetric Liquidity Replenishment",
+        "strategy_sha256": "2325e379b732c85a4518305986b4016f4ac37d0f9f9bc1b177c33925a982876d",
+        "trial_count": 3
+      },
+      "freeze_commit": "85af71210719004ed530c26d44e77afb81b56475",
       "oos_accesses": [
         {
           "candidate_id": "t01-alr-002",
