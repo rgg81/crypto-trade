@@ -186,7 +186,19 @@ def _private_evidence(root: Path, config, development: dict, *, passing: bool = 
     }
 
 
+def _register_initial_family(cli, root: Path) -> None:
+    registration = root / "family-1.json"
+    _write_json(registration, _family("team-01", "family-1", None))
+    assert (
+        cli._register_family(
+            _args(team_id="team-01", registration=str(registration)), pivot=False
+        )
+        == 0
+    )
+
+
 def _qualify_team_one(cli, root: Path) -> None:
+    _register_initial_family(cli, root)
     config = load_config(root / CONFIG)
     development = _development_evidence(root, config, trial_count=2)
     development_path = root / "development.json"
@@ -253,6 +265,7 @@ def test_failed_development_is_research_not_submission_then_passing_candidate_fr
 ):
     _initialize(cli, tmp_path, monkeypatch)
     _open_research(tmp_path)
+    _register_initial_family(cli, tmp_path)
     config = load_config(tmp_path / CONFIG)
     failed = _development_evidence(tmp_path, config, trial_count=1, passing=False)
     failed_path = tmp_path / "failed.json"
@@ -280,11 +293,26 @@ def test_failed_development_is_research_not_submission_then_passing_candidate_fr
     assert team["qualifier_candidate"]["candidate_id"] == "candidate-1"
 
 
+def test_development_assessment_requires_a_preregistered_family(cli, tmp_path, monkeypatch):
+    _initialize(cli, tmp_path, monkeypatch)
+    _open_research(tmp_path)
+    config = load_config(tmp_path / CONFIG)
+    evidence = _development_evidence(tmp_path, config)
+    path = tmp_path / "development.json"
+    _write_json(path, evidence)
+
+    with pytest.raises(ValueError, match="preregistered mechanism family"):
+        cli._record_development_assessment(
+            _args(team_id="team-01", evidence=str(path))
+        )
+
+
 def test_private_ticket_is_single_shot_and_public_state_contains_no_observations(
     cli, tmp_path, monkeypatch
 ):
     _initialize(cli, tmp_path, monkeypatch)
     _open_research(tmp_path)
+    _register_initial_family(cli, tmp_path)
     config = load_config(tmp_path / CONFIG)
     development = _development_evidence(tmp_path, config, trial_count=2)
     development_path = tmp_path / "development.json"

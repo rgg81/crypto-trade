@@ -90,6 +90,28 @@ def _atomic_write_json(path: Path, payload: object) -> None:
 def _first_add_json(path: Path, payload: object) -> str:
     if path.exists() or path.is_symlink():
         raise ValueError(f"refusing to replace immutable lock: {path}")
+    root = Path.cwd().resolve()
+    try:
+        relative = path.resolve().relative_to(root).as_posix()
+    except ValueError as exc:
+        raise ValueError("immutable locks must remain inside the tournament repository") from exc
+    repository = subprocess.run(
+        ["git", "rev-parse", "--is-inside-work-tree"],
+        cwd=root,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if repository.returncode == 0 and repository.stdout.strip() == "true":
+        history = subprocess.run(
+            ["git", "log", "--all", "--format=%H", "--", relative],
+            cwd=root,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if history.returncode or history.stdout.strip():
+            raise ValueError(f"immutable lock path already exists in Git history: {relative}")
     encoded = _json_bytes(payload)
     _atomic_write_bytes(path, encoded)
     return _sha256_bytes(encoded)
@@ -387,6 +409,8 @@ def _record_development_assessment(args: argparse.Namespace) -> int:
         team = _team(state, args.team_id)
         if team["status"] not in {"pending_phase0", "researching"}:
             raise ValueError(f"development assessment is closed for {args.team_id}")
+        if team["family_count"] < 1 or team["active_family_id"] is None:
+            raise ValueError("development assessment requires a preregistered mechanism family")
         previous = team["development_assessment"]
         if (
             isinstance(previous, Mapping)
