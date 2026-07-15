@@ -15,9 +15,9 @@
   "qualification_lock": null,
   "research_journal": {
     "genesis_sha256": "a11eee0475d514a1f022deda4e62014536f12bfb074556546645c5f8255a48ed",
-    "head_sha256": "f60b37aee9a6bbb40d3be1c2b28be7ddf1aa2d090597cadf9862029d41f70786",
+    "head_sha256": "357ac065477daf9b3b0eccddd3352f1cbeb017eab6cea1d13e2528a9cfcde303",
     "path": "tournament/top40-v2/organizer_research_journal.jsonl",
-    "record_count": 9
+    "record_count": 10
   },
   "schema_version": 2,
   "selection_lock": null,
@@ -48,7 +48,7 @@
       "private_result": null,
       "qualifier_candidate": null,
       "status": "researching",
-      "trial_count": 2
+      "trial_count": 3
     },
     "team-03": {
       "active_family_id": null,

@@ -1,0 +1,29 @@
+{
+  "candidate_id": "team-02-daa-reference-001",
+  "config_sha256": "bd0e4f70bcf335b2ac4e44ec049b89b8e8eaf4c6ac6502574d0accf12d9d9947",
+  "falsifier": "Stop DAA before any parameter or risk study if this exact no-control reference is insolvent or incomplete; has nonpositive annualized return, net Sharpe, or doubled-cost Sharpe; has fewer than four profitable chronological folds; has nonpositive bull, bear, or chop return; fails the long-bull or short-bear sleeve role; or fails positive pooled and four-of-six-fold absorption-uplift and composite-rank-IC signs. Controls cannot rescue a failed core.",
+  "family_id": "team-02-directional-auction-absorption-v1",
+  "parameters": {
+    "absorption_half_life_bars": 2,
+    "absorption_weight": 0.4,
+    "absorption_window_bars": 3,
+    "feature_lag_bars": 1,
+    "gross_target": 0.8,
+    "minimum_cross_section": 24,
+    "minimum_names_per_sleeve": 6,
+    "rebalance_bars": 3,
+    "risk_policy_id": "team-02-daa-reference-no-control",
+    "selected_fraction_per_side": "1/4",
+    "side_budget": 0.4,
+    "symbol_cap": 0.06,
+    "trend_efficiency_days": 12,
+    "trend_weight": 0.6
+  },
+  "risk_config_sha256": "0c90e21388df81f4a4a045c8d8a86ac61d178f14779987cc53883f5531556a52",
+  "seed": 20260801,
+  "source_bundle_sha256": "810ce22a8ac80cfece9c55b987cb2446c2121ecb573f458e70203589523e3f3a",
+  "strategy_sha256": "d1d031e717031455ef93decbc990f1f55e0703abee26dd885763a2ec4191ffd4",
+  "team_id": "team-02",
+  "thesis": "A fixed cross-sectional blend of each contract's signed path efficiency and the gap between closing location and aggressive taker-buy share identifies durable relative leaders and laggards across bull, bear, and chop without residualization, funding, a state switch, inverse-volatility sizing, or a directional sleeve tilt.",
+  "timestamp_utc": "2026-07-15T22:46:41Z"
+}
