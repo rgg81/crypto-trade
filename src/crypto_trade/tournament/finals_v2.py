@@ -45,11 +45,17 @@ _RUNNER_KEYS = {
     "strategy_sha256",
     "risk_policy_sha256",
     "source_bundle_sha256",
+    "output_dir",
     "scored_window",
     "double_cost_sharpe",
     "regime_sharpe",
     "confidence_intervals",
     "artifacts",
+    "artifact_sha256",
+    "artifact_sizes",
+    "decision_count",
+    "event_count",
+    "trade_count",
 }
 _WINDOW_METRIC_KEYS = {
     "net_sharpe",
@@ -70,6 +76,17 @@ _ARTIFACT_FILENAMES = {
     "trades": "trades.csv",
 }
 _OBJECTIVE_STATUS = Literal["scored", "no-qualified-model"]
+_FINAL_STATUS = Literal["scored", "no-qualified-model", "integrity-review-required"]
+ALLOWED_INTEGRITY_DQ_CODES = frozenset(
+    {
+        "data-boundary-violation",
+        "execution-contract-violation",
+        "provenance-failure",
+        "evaluator-tampering",
+        "reproducibility-failure",
+        "source-freeze-mismatch",
+    }
+)
 
 
 def _sha256_bytes(payload: bytes) -> str:
@@ -374,6 +391,22 @@ def _runner_window(
     artifacts = _exact_object(record["artifacts"], set(_ARTIFACT_FILENAMES), "runner artifacts")
     if dict(artifacts) != _expected_runner_artifacts(binding.team_id, stage):
         raise ValueError(f"{stage} runner artifact paths are noncanonical")
+    expected_output = str(next(iter(artifacts.values()))).rsplit("/", maxsplit=1)[0]
+    if record["output_dir"] != expected_output:
+        raise ValueError(f"{stage} runner output directory is noncanonical")
+    hashes = _exact_object(
+        record["artifact_sha256"], set(_ARTIFACT_FILENAMES), "runner artifact hashes"
+    )
+    sizes = _exact_object(
+        record["artifact_sizes"], set(_ARTIFACT_FILENAMES), "runner artifact sizes"
+    )
+    for name in _ARTIFACT_FILENAMES:
+        _sha256(hashes[name], f"runner artifact_sha256.{name}")
+        _integer(sizes[name], f"runner artifact_sizes.{name}")
+    for field in ("decision_count", "event_count", "trade_count"):
+        _integer(record[field], f"runner {field}")
+    if record["trade_count"] > record["event_count"]:
+        raise ValueError("runner trade_count cannot exceed event_count")
     return performance, double_cost, regime_sharpes
 
 
@@ -417,12 +450,35 @@ def build_finalist_performance(
 
     sealed = _exact_object(
         private_sealed_record.object("private sealed record"),
-        {"schema_version", "sealed_at_utc", "evidence", "assessment"},
+        {
+            "schema_version",
+            "sealed_at_utc",
+            "evidence",
+            "provenance",
+            "assessment",
+            "runner_record_path",
+            "runner_record_sha256",
+            "organizer_journal_head_sha256",
+            "registration_sha256",
+        },
         "private sealed record",
     )
     if sealed["schema_version"] != 1:
         raise ValueError("private sealed record schema_version must be 1")
     _utc_timestamp(sealed["sealed_at_utc"], "sealed_at_utc")
+    expected_private_runner_path = (
+        f"{TOP40_V2_LAYOUT.tournament_root}/private/artifacts/"
+        f"{binding.team_id}/runner_record.json"
+    )
+    if (
+        sealed["runner_record_path"] != expected_private_runner_path
+        or sealed["runner_record_sha256"] != binding.private_runner_record_sha256
+    ):
+        raise ValueError("private sealed record runner binding is noncanonical")
+    _sha256(sealed["organizer_journal_head_sha256"], "organizer journal head")
+    _sha256(sealed["registration_sha256"], "registration_sha256")
+    if not isinstance(sealed["provenance"], Mapping):
+        raise ValueError("private sealed provenance must be a JSON object")
     private_evidence = sealed["evidence"]
     if not isinstance(private_evidence, Mapping):
         raise ValueError("private sealed evidence must be a JSON object")
@@ -819,6 +875,9 @@ def validate_integrity_disqualifications(
             raise ValueError("integrity DQ reasons must be trimmed nonempty strings <= 256 chars")
         if len(reasons) != len(set(reasons)):
             raise ValueError("integrity DQ reasons must be unique per finalist")
+        invalid = set(reasons) - ALLOWED_INTEGRITY_DQ_CODES
+        if invalid:
+            raise ValueError(f"integrity DQ contains noncanonical reason codes: {sorted(invalid)}")
         result.append((team_id, reasons))
     return IntegrityDisqualifications(tuple(result))
 
@@ -859,7 +918,7 @@ class FinalScoreRecord:
 
 @dataclasses.dataclass(frozen=True)
 class FinalScoreLock:
-    status: _OBJECTIVE_STATUS
+    status: _FINAL_STATUS
     winner_team_id: str | None
     objective_lock_sha256: str
     ballots: FinalistBallots
@@ -937,8 +996,11 @@ def combine_locked_scores(
             key=lambda score: (score.objective_rank, score.team_id),
         )
     )
+    status: _FINAL_STATUS = objective_lock.status
+    if objective_lock.finalist_team_ids and not ranked:
+        status = "integrity-review-required"
     return FinalScoreLock(
-        status=objective_lock.status,
+        status=status,
         winner_team_id=ranked[0].team_id if ranked else None,
         objective_lock_sha256=objective_lock.sha256,
         ballots=ballots,

@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$defs": {
+    "category_scores": {
+      "additionalProperties": false,
+      "properties": {
+        "data_integrity": {"maximum": 3, "minimum": 0, "type": "number"},
+        "execution_realism": {"maximum": 3, "minimum": 0, "type": "number"},
+        "reproducibility_provenance": {"maximum": 3, "minimum": 0, "type": "number"},
+        "research_discipline": {"maximum": 3, "minimum": 0, "type": "number"},
+        "risk_disclosure": {"maximum": 3, "minimum": 0, "type": "number"}
+      },
+      "required": [
+        "data_integrity",
+        "execution_realism",
+        "reproducibility_provenance",
+        "research_discipline",
+        "risk_disclosure"
+      ],
+      "type": "object"
+    },
+    "finding": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "enum": [
+            "data-boundary-violation",
+            "execution-contract-violation",
+            "provenance-failure",
+            "evaluator-tampering",
+            "reproducibility-failure",
+            "source-freeze-mismatch"
+          ]
+        },
+        "evidence_path": {"minLength": 1, "type": "string"},
+        "evidence_sha256": {"pattern": "^[0-9a-f]{64}$", "type": "string"}
+      },
+      "required": ["code", "evidence_path", "evidence_sha256"],
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "dq_findings": {
+      "additionalProperties": false,
+      "maxProperties": 10,
+      "patternProperties": {
+        "^team-(0[1-9]|10)$": {
+          "items": {"$ref": "#/$defs/finding"},
+          "minItems": 1,
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "reviews": {
+      "additionalProperties": false,
+      "maxProperties": 10,
+      "minProperties": 1,
+      "patternProperties": {
+        "^team-(0[1-9]|10)$": {"minLength": 1, "type": "string"}
+      },
+      "type": "object"
+    },
+    "schema_version": {"const": 1},
+    "scores": {
+      "additionalProperties": false,
+      "maxProperties": 10,
+      "minProperties": 1,
+      "patternProperties": {
+        "^team-(0[1-9]|10)$": {"$ref": "#/$defs/category_scores"}
+      },
+      "type": "object"
+    }
+  },
+  "required": ["schema_version", "scores", "reviews", "dq_findings"],
+  "title": "Top40 V2 complete Critic ballot",
+  "type": "object"
+}

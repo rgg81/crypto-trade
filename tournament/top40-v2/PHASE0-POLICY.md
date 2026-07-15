@@ -26,7 +26,9 @@ Before finalist-cohort lock, only pass/fail and failed gate names may leave the 
 sealed record; numerical private metrics remain sealed.
 
 Final OOS is unavailable until every team is terminal and the exact qualified/DNF cohort is
-first-added and committed. Every finalist is then evaluated once from the same frozen bytes.
+first-added and committed. Every finalist then consumes one organizer reveal from the same frozen
+bytes. Two clean-process internal replays must produce identical records and artifact hashes;
+neither replay is a team research view.
 
 ## Research accounting
 
@@ -37,6 +39,9 @@ falsifier, and parent family when applicable.
 
 The cumulative limits are 80 material configurations, two mechanism pivots, 12 CPU hours, and 18
 wall-clock hours per team. The private qualifier has one ticket. Final OOS has no research views.
+The organizer hash-chain journal is authoritative; `experiments.jsonl` is a derived exact
+projection. Registration precedes result, failed/interrupted work consumes its trial and resource
+budget, and only a whole-record journal prefix may be repaired after interruption.
 
 ## Risk controls
 

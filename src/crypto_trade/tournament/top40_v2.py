@@ -25,7 +25,9 @@ RUN_PHASES = (
     "objective_locked",
     "critic_locked",
     "dq_confirmed",
+    "integrity_review_required",
     "user_locked",
+    "selection_locked",
     "paper_frozen",
     "no_qualified_model",
 )
@@ -38,6 +40,7 @@ TEAM_STATUSES = (
     "finalist_frozen",
     "canonical_running",
     "canonical_complete",
+    "canonical_failed",
 )
 TERMINAL_QUALIFICATION_STATUSES = frozenset({"qualified", "dnf"})
 _SHA256 = re.compile(r"[0-9a-f]{64}")
@@ -50,16 +53,32 @@ PHASE0_FROZEN_FILES = (
     f"{TOP40_V2_LAYOUT.tournament_root}/README.md",
     f"{TOP40_V2_LAYOUT.tournament_root}/PHASE0-POLICY.md",
     f"{TOP40_V2_LAYOUT.tournament_root}/METHODOLOGY-DISTILLATION.md",
+    f"{TOP40_V2_LAYOUT.tournament_root}/TEAM-PLAYBOOK.md",
     f"{TOP40_V2_LAYOUT.tournament_root}/templates/development-qualification-evidence.schema.json",
     f"{TOP40_V2_LAYOUT.tournament_root}/templates/family-registration.schema.json",
     f"{TOP40_V2_LAYOUT.tournament_root}/templates/private-qualification-evidence.schema.json",
     f"{TOP40_V2_LAYOUT.tournament_root}/templates/risk-policy.json",
     f"{TOP40_V2_LAYOUT.tournament_root}/templates/risk-policy.schema.json",
+    f"{TOP40_V2_LAYOUT.tournament_root}/templates/trial-registration-input.schema.json",
+    f"{TOP40_V2_LAYOUT.tournament_root}/templates/trial-result-input.schema.json",
+    f"{TOP40_V2_LAYOUT.tournament_root}/templates/walk-forward-manifest.schema.json",
+    f"{TOP40_V2_LAYOUT.tournament_root}/templates/parameter-neighborhood-manifest.schema.json",
+    f"{TOP40_V2_LAYOUT.tournament_root}/templates/critic-ballot.schema.json",
+    f"{TOP40_V2_LAYOUT.tournament_root}/templates/critic-confirmation.schema.json",
+    f"{TOP40_V2_LAYOUT.tournament_root}/templates/user-ballot.schema.json",
     TOP40_V2_LAYOUT.orchestrator_script,
     TOP40_V2_LAYOUT.contract_source,
+    ".claude/agents/top40-v2-quant-researcher.md",
+    ".claude/agents/top40-v2-quant-engineer.md",
+    ".claude/agents/top40-v2-tournament-critic.md",
+    ".claude/commands/top40-v2-tournament.md",
     "src/crypto_trade/tournament/layout.py",
     "src/crypto_trade/tournament/qualification.py",
     "src/crypto_trade/tournament/risk_policy.py",
+    "src/crypto_trade/tournament/research_v2.py",
+    "src/crypto_trade/tournament/evidence_v2.py",
+    "src/crypto_trade/tournament/finals_v2.py",
+    "src/crypto_trade/tournament/scoring_v2.py",
     "src/crypto_trade/tournament/data.py",
     "src/crypto_trade/tournament/metrics.py",
     "src/crypto_trade/tournament/protocol.py",
@@ -187,6 +206,9 @@ def _validate_config(raw: Mapping[str, Any], layout: TournamentLayout) -> None:
             "statistics",
             "qualification",
             "research_budget",
+            "final_oos",
+            "critic",
+            "integrity",
             "scoring",
             "paper_eligibility",
         ),
@@ -608,6 +630,48 @@ def _validate_config(raw: Mapping[str, Any], layout: TournamentLayout) -> None:
     ):
         raise ValueError("trial seeds and append-only accounting must remain canonical")
 
+    final_oos = raw["final_oos"]
+    expected_final_oos = {
+        "team_views_before_selection_lock": 0,
+        "organizer_reveals_per_finalist": 1,
+        "deterministic_internal_replays": 2,
+        "replay_outputs_must_match": True,
+    }
+    if not isinstance(final_oos, Mapping) or dict(final_oos) != expected_final_oos:
+        raise ValueError("config.final_oos differs from the one-reveal reproducibility contract")
+
+    critic = raw["critic"]
+    expected_critic = {
+        "category_order": [
+            "data_integrity",
+            "execution_realism",
+            "reproducibility_provenance",
+            "research_discipline",
+            "risk_disclosure",
+        ],
+        "points_per_category": 3.0,
+        "complete_finalist_ballot_required": True,
+        "independent_confirmation_required_for_dq": True,
+    }
+    if not isinstance(critic, Mapping) or dict(critic) != expected_critic:
+        raise ValueError("config.critic differs from the complete 15-point ballot contract")
+
+    integrity = raw["integrity"]
+    expected_integrity = {
+        "allowed_dq_codes": [
+            "data-boundary-violation",
+            "execution-contract-violation",
+            "provenance-failure",
+            "evaluator-tampering",
+            "reproducibility-failure",
+            "source-freeze-mismatch",
+        ],
+        "all_finalists_dq_result": "integrity-review-required",
+        "performance_failure_is_not_dq": True,
+    }
+    if not isinstance(integrity, Mapping) or dict(integrity) != expected_integrity:
+        raise ValueError("config.integrity differs from the frozen DQ-code contract")
+
     scoring = raw["scoring"]
     if not isinstance(scoring, Mapping):
         raise ValueError("config.scoring must be a table")
@@ -622,7 +686,15 @@ def _validate_config(raw: Mapping[str, Any], layout: TournamentLayout) -> None:
             "require_is_qualification",
             "zero_finalists_result",
             "dnf_is_not_a_submission",
+            "rounding_decimals",
+            "relative_tie_method",
+            "sole_finalist_relative_percentile",
+            "positive_role_threshold",
+            "objective_lock_survives_integrity_dq",
+            "absolute_weights",
+            "relative_weights",
             "absolute_anchors",
+            "absolute_subweights",
         ),
         "config.scoring",
     )
@@ -642,8 +714,42 @@ def _validate_config(raw: Mapping[str, Any], layout: TournamentLayout) -> None:
         scoring.get("require_is_qualification") is not True
         or scoring.get("dnf_is_not_a_submission") is not True
         or scoring.get("zero_finalists_result") != "no-qualified-model"
+        or scoring.get("relative_tie_method") != "average-rank"
+        or _integer(scoring.get("rounding_decimals"), "rounding_decimals") != 6
+        or _finite(
+            scoring.get("sole_finalist_relative_percentile"),
+            "sole_finalist_relative_percentile",
+        )
+        != 0.5
+        or _finite(scoring.get("positive_role_threshold"), "positive_role_threshold")
+        != 0.0
+        or scoring.get("objective_lock_survives_integrity_dq") is not True
     ):
         raise ValueError("scoring cannot bypass qualification or fabricate DNF submissions")
+    absolute_weights = {
+        "final_oos_sharpe": 15.0,
+        "final_oos_drawdown": 10.0,
+        "double_cost_oos_sharpe": 8.0,
+        "final_oos_annualized_return": 5.0,
+        "final_oos_positive_quarters": 3.0,
+        "regime_robustness": 4.0,
+        "generalization_role_stability": 5.0,
+    }
+    relative_weights = {
+        "final_oos_sharpe": 7.0,
+        "final_oos_drawdown": 4.0,
+        "double_cost_oos_sharpe": 3.0,
+        "final_oos_annualized_return": 2.0,
+        "worst_regime_sharpe": 2.0,
+        "generalization_role_stability": 2.0,
+    }
+    if (
+        not isinstance(scoring["absolute_weights"], Mapping)
+        or dict(scoring["absolute_weights"]) != absolute_weights
+        or not isinstance(scoring["relative_weights"], Mapping)
+        or dict(scoring["relative_weights"]) != relative_weights
+    ):
+        raise ValueError("hybrid automatic component weights differ from the V2 charter")
     anchors = scoring["absolute_anchors"]
     expected_anchors = {
         "oos_sharpe_zero": 0.0,
@@ -652,9 +758,30 @@ def _validate_config(raw: Mapping[str, Any], layout: TournamentLayout) -> None:
         "oos_drawdown_zero": 0.40,
         "double_cost_sharpe_zero": 0.0,
         "double_cost_sharpe_full": 0.75,
+        "oos_annualized_return_zero": 0.0,
+        "oos_annualized_return_full": 0.30,
+        "positive_quarter_fraction_zero": 0.50,
+        "positive_quarter_fraction_full": 0.75,
+        "worst_regime_sharpe_zero": -0.25,
+        "worst_regime_sharpe_full": 0.75,
+        "cross_window_sharpe_zero": 0.0,
+        "cross_window_sharpe_full": 0.75,
     }
     if not isinstance(anchors, Mapping) or dict(anchors) != expected_anchors:
         raise ValueError("absolute scoring anchors differ from the V2 charter")
+    expected_subweights = {
+        "regime_worst_sharpe": 2.5,
+        "regime_positive_fraction": 1.5,
+        "cross_window_sharpe": 2.0,
+        "parameter_stability": 1.0,
+        "positive_fold_fraction": 1.0,
+        "positive_role_fraction": 1.0,
+    }
+    if (
+        not isinstance(scoring["absolute_subweights"], Mapping)
+        or dict(scoring["absolute_subweights"]) != expected_subweights
+    ):
+        raise ValueError("absolute scoring subweights differ from the V2 charter")
 
     paper = raw["paper_eligibility"]
     if not isinstance(paper, Mapping):
@@ -779,9 +906,11 @@ def new_run_state(
         "qualification_lock": None,
         "finalist_cohort_lock": None,
         "objective_lock": None,
+        "final_oos_lock": None,
         "critic_lock": None,
         "critic_confirmation_lock": None,
         "user_ballot_lock": None,
+        "selection_lock": None,
         "winner_freeze": None,
         "teams": teams,
     }
@@ -800,9 +929,11 @@ def validate_run_state(state: Mapping[str, Any], config: LoadedV2Config) -> None
         "qualification_lock",
         "finalist_cohort_lock",
         "objective_lock",
+        "final_oos_lock",
         "critic_lock",
         "critic_confirmation_lock",
         "user_ballot_lock",
+        "selection_lock",
         "winner_freeze",
         "teams",
     }
@@ -831,6 +962,54 @@ def validate_run_state(state: Mapping[str, Any], config: LoadedV2Config) -> None
             if not isinstance(journal[field], str) or _SHA256.fullmatch(journal[field]) is None:
                 raise ValueError(f"run state research journal {field} is invalid")
         _integer(journal["record_count"], "research_journal.record_count", minimum=1)
+    phase = str(state["phase"])
+    if phase != "phase0_pending" and journal is None:
+        raise ValueError("every active or terminal V2 phase requires the organizer journal")
+
+    def require_binding(field: str, *, required: bool) -> None:
+        value = state.get(field)
+        if required:
+            if (
+                not isinstance(value, Mapping)
+                or not isinstance(value.get("path"), str)
+                or not value["path"]
+                or not isinstance(value.get("sha256"), str)
+                or _SHA256.fullmatch(value["sha256"]) is None
+            ):
+                raise ValueError(f"run state {field} binding is required and malformed")
+        elif value is not None:
+            raise ValueError(f"run state {field} is populated before its lifecycle phase")
+
+    phase_order = {
+        "phase0_pending": 0,
+        "research": 1,
+        "qualification_closed": 2,
+        "finalist_cohort_frozen": 3,
+        "oos_revealed": 4,
+        "objective_locked": 5,
+        "critic_locked": 6,
+        "dq_confirmed": 7,
+        "integrity_review_required": 7,
+        "user_locked": 8,
+        "selection_locked": 9,
+        "paper_frozen": 10,
+        "no_qualified_model": 3,
+    }
+    order = phase_order[phase]
+    require_binding("phase0", required=order >= 1)
+    require_binding("qualification_lock", required=order >= 2)
+    require_binding("finalist_cohort_lock", required=order >= 3)
+    terminal_without_final = phase == "no_qualified_model"
+    require_binding("final_oos_lock", required=order >= 4 and not terminal_without_final)
+    require_binding("objective_lock", required=order >= 5 and phase != "no_qualified_model")
+    require_binding("critic_lock", required=order >= 6 and phase != "no_qualified_model")
+    require_binding(
+        "critic_confirmation_lock",
+        required=order >= 7 and phase != "no_qualified_model",
+    )
+    require_binding("user_ballot_lock", required=order >= 8)
+    require_binding("selection_lock", required=order >= 9)
+    require_binding("winner_freeze", required=order >= 10)
     teams = state.get("teams")
     if not isinstance(teams, Mapping) or set(teams) != set(TEAM_IDS):
         raise ValueError("run state must contain all ten teams exactly once")
@@ -867,8 +1046,77 @@ def validate_run_state(state: Mapping[str, Any], config: LoadedV2Config) -> None
             raise ValueError(f"private qualifier attempts exceed the budget for {team_id}")
         if team["status"] == "dnf" and not isinstance(team["dnf"], Mapping):
             raise ValueError(f"DNF team {team_id} requires a DNF record")
-        if team["status"] == "qualified" and not isinstance(team["private_result"], Mapping):
-            raise ValueError(f"qualified team {team_id} requires a private result")
+        active_family = team["active_family_id"]
+        if (family_count == 0 and active_family is not None) or (
+            family_count > 0 and (not isinstance(active_family, str) or not active_family)
+        ):
+            raise ValueError(f"active family accounting is inconsistent for {team_id}")
+        candidate_statuses = {
+            "qualifier_candidate_frozen",
+            "qualified",
+            "finalist_frozen",
+            "canonical_running",
+            "canonical_complete",
+            "canonical_failed",
+        }
+        if team["status"] in candidate_statuses:
+            assessment = team["development_assessment"]
+            if (
+                not isinstance(assessment, Mapping)
+                or assessment.get("passed") is not True
+                or not isinstance(team["qualifier_candidate"], Mapping)
+            ):
+                raise ValueError(f"frozen candidate prerequisites are missing for {team_id}")
+        private_statuses = candidate_statuses - {"qualifier_candidate_frozen"}
+        if team["status"] in private_statuses:
+            private_result = team["private_result"]
+            if (
+                private_attempts != 1
+                or not isinstance(private_result, Mapping)
+                or private_result.get("passed") is not True
+            ):
+                raise ValueError(f"qualified private result is missing for {team_id}")
+        finalist_statuses = {
+            "finalist_frozen",
+            "canonical_running",
+            "canonical_complete",
+            "canonical_failed",
+        }
+        if team["status"] in finalist_statuses and not isinstance(
+            team["finalist_freeze"], Mapping
+        ):
+            raise ValueError(f"finalist freeze is missing for {team_id}")
+        if team["status"] == "canonical_complete" and (
+            not isinstance(team["canonical_result"], Mapping)
+            or team["canonical_result"].get("status") != "complete"
+        ):
+            raise ValueError(f"canonical result is incomplete for {team_id}")
+        if team["status"] == "canonical_failed" and (
+            not isinstance(team["canonical_result"], Mapping)
+            or team["canonical_result"].get("status") != "failed"
+        ):
+            raise ValueError(f"canonical failure record is missing for {team_id}")
+
+    cohort = state.get("finalist_cohort_lock")
+    if isinstance(cohort, Mapping) and "finalist_team_ids" in cohort:
+        finalist_ids = cohort["finalist_team_ids"]
+        if (
+            not isinstance(finalist_ids, list)
+            or len(finalist_ids) != len(set(finalist_ids))
+            or any(team_id not in TEAM_IDS for team_id in finalist_ids)
+        ):
+            raise ValueError("run-state finalist cohort ids are malformed")
+        if phase == "no_qualified_model" and finalist_ids:
+            raise ValueError("no-qualified-model phase cannot contain finalists")
+        if order >= 3 and phase != "no_qualified_model":
+            for team_id in finalist_ids:
+                if teams[team_id]["status"] not in {
+                    "finalist_frozen",
+                    "canonical_running",
+                    "canonical_complete",
+                    "canonical_failed",
+                }:
+                    raise ValueError(f"locked finalist status is inconsistent for {team_id}")
 
 
 def read_run_state(root: str | Path, config: LoadedV2Config) -> dict[str, Any]:

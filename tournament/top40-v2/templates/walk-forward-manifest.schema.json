@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "candidate_id": {"pattern": "^[a-z0-9][a-z0-9._-]{0,127}$", "type": "string"},
+    "evidence_class": {"const": "declared-retrained-out-of-fold"},
+    "folds": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "fold_id": {"pattern": "^fold-[1-6]$", "type": "string"},
+          "model_artifact_path": {"minLength": 1, "type": "string"},
+          "model_artifact_sha256": {"pattern": "^[0-9a-f]{64}$", "type": "string"},
+          "test_end_inclusive": {"format": "date", "type": "string"},
+          "test_start": {"format": "date", "type": "string"},
+          "training_end_inclusive": {"format": "date", "type": "string"}
+        },
+        "required": [
+          "fold_id", "training_end_inclusive", "test_start", "test_end_inclusive",
+          "model_artifact_path", "model_artifact_sha256"
+        ],
+        "type": "object"
+      },
+      "maxItems": 6,
+      "minItems": 6,
+      "type": "array"
+    },
+    "schema_version": {"const": 1},
+    "stitched_daily_returns_sha256": {"pattern": "^[0-9a-f]{64}$", "type": "string"},
+    "team_id": {"pattern": "^team-(0[1-9]|10)$", "type": "string"}
+  },
+  "required": [
+    "schema_version", "team_id", "candidate_id", "evidence_class",
+    "stitched_daily_returns_sha256", "folds"
+  ],
+  "title": "Top40 V2 declared walk-forward manifest",
+  "type": "object"
+}

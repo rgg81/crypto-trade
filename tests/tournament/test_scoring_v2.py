@@ -228,6 +228,8 @@ def test_critic_and_user_scores_are_bounded_and_unknown_teams_are_rejected() -> 
 
 
 def test_performance_inputs_validate_finite_domains_regimes_and_are_immutable() -> None:
+    with pytest.raises(ValueError, match="team-01 through team-10"):
+        _performance("team-11")
     with pytest.raises(ValueError, match="finite"):
         _window(sharpe=math.nan)
     with pytest.raises(ValueError, match=r"\[0, 1\]"):

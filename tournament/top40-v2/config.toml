@@ -124,6 +124,36 @@ strategy_seed = 20260801
 trial_seed_namespace = "20260801NN"
 append_only_trial_log_required = true
 
+[final_oos]
+team_views_before_selection_lock = 0
+organizer_reveals_per_finalist = 1
+deterministic_internal_replays = 2
+replay_outputs_must_match = true
+
+[critic]
+category_order = [
+  "data_integrity",
+  "execution_realism",
+  "reproducibility_provenance",
+  "research_discipline",
+  "risk_disclosure",
+]
+points_per_category = 3.0
+complete_finalist_ballot_required = true
+independent_confirmation_required_for_dq = true
+
+[integrity]
+allowed_dq_codes = [
+  "data-boundary-violation",
+  "execution-contract-violation",
+  "provenance-failure",
+  "evaluator-tampering",
+  "reproducibility-failure",
+  "source-freeze-mismatch",
+]
+all_finalists_dq_result = "integrity-review-required"
+performance_failure_is_not_dq = true
+
 [scoring]
 automatic_weight = 70.0
 critic_weight = 15.0
@@ -133,6 +163,28 @@ automatic_relative_points = 20.0
 require_is_qualification = true
 zero_finalists_result = "no-qualified-model"
 dnf_is_not_a_submission = true
+rounding_decimals = 6
+relative_tie_method = "average-rank"
+sole_finalist_relative_percentile = 0.5
+positive_role_threshold = 0.0
+objective_lock_survives_integrity_dq = true
+
+[scoring.absolute_weights]
+final_oos_sharpe = 15.0
+final_oos_drawdown = 10.0
+double_cost_oos_sharpe = 8.0
+final_oos_annualized_return = 5.0
+final_oos_positive_quarters = 3.0
+regime_robustness = 4.0
+generalization_role_stability = 5.0
+
+[scoring.relative_weights]
+final_oos_sharpe = 7.0
+final_oos_drawdown = 4.0
+double_cost_oos_sharpe = 3.0
+final_oos_annualized_return = 2.0
+worst_regime_sharpe = 2.0
+generalization_role_stability = 2.0
 
 [scoring.absolute_anchors]
 oos_sharpe_zero = 0.0
@@ -141,6 +193,22 @@ oos_drawdown_full = 0.15
 oos_drawdown_zero = 0.40
 double_cost_sharpe_zero = 0.0
 double_cost_sharpe_full = 0.75
+oos_annualized_return_zero = 0.0
+oos_annualized_return_full = 0.30
+positive_quarter_fraction_zero = 0.50
+positive_quarter_fraction_full = 0.75
+worst_regime_sharpe_zero = -0.25
+worst_regime_sharpe_full = 0.75
+cross_window_sharpe_zero = 0.0
+cross_window_sharpe_full = 0.75
+
+[scoring.absolute_subweights]
+regime_worst_sharpe = 2.5
+regime_positive_fraction = 1.5
+cross_window_sharpe = 2.0
+parameter_stability = 1.0
+positive_fold_fraction = 1.0
+positive_role_fraction = 1.0
 
 [paper_eligibility]
 minimum_development_net_sharpe = 0.75

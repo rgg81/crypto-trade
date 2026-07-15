@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "candidate_id": {"pattern": "^[a-z0-9][a-z0-9._-]{0,127}$", "type": "string"},
+    "neighbors": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "daily_returns_path": {"minLength": 1, "type": "string"},
+          "daily_returns_sha256": {"pattern": "^[0-9a-f]{64}$", "type": "string"},
+          "neighbor_id": {"minLength": 1, "type": "string"},
+          "parameter_artifact_path": {"minLength": 1, "type": "string"},
+          "parameter_artifact_sha256": {"pattern": "^[0-9a-f]{64}$", "type": "string"}
+        },
+        "required": [
+          "neighbor_id", "parameter_artifact_path", "parameter_artifact_sha256",
+          "daily_returns_path", "daily_returns_sha256"
+        ],
+        "type": "object"
+      },
+      "minItems": 3,
+      "type": "array"
+    },
+    "schema_version": {"const": 1},
+    "team_id": {"pattern": "^team-(0[1-9]|10)$", "type": "string"}
+  },
+  "required": ["schema_version", "team_id", "candidate_id", "neighbors"],
+  "title": "Top40 V2 parameter-neighborhood manifest",
+  "type": "object"
+}

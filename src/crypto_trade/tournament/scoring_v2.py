@@ -16,10 +16,12 @@ from __future__ import annotations
 
 import dataclasses
 import math
+import re
 from collections.abc import Iterable, Mapping, Sequence
 from typing import Literal
 
 REQUIRED_REGIMES = ("bear", "bull", "chop", "stress")
+_TEAM_ID = re.compile(r"team-(?:0[1-9]|10)")
 
 # Each tuple is (component name, maximum points). Keeping these as ordered immutable tuples makes
 # the published formula and component serialization deterministic.
@@ -141,10 +143,9 @@ class FinalistPerformance:
     def __post_init__(self) -> None:
         if (
             not isinstance(self.team_id, str)
-            or not self.team_id
-            or self.team_id.strip() != self.team_id
+            or _TEAM_ID.fullmatch(self.team_id) is None
         ):
-            raise ValueError("team_id must be a nonempty trimmed string")
+            raise ValueError("team_id must be team-01 through team-10")
         for field in ("development", "private", "final_oos"):
             if not isinstance(getattr(self, field), WindowPerformance):
                 raise ValueError(f"{field} must be WindowPerformance")

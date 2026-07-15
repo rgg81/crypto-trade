@@ -379,6 +379,12 @@ def test_phase0_fast_path_requires_committed_exact_frozen_bytes(tmp_path: Path):
         "path": "tournament/top40-v2/phase0_freeze.json",
         "sha256": hashlib.sha256(freeze_path.read_bytes()).hexdigest(),
     }
+    state["research_journal"] = {
+        "path": "tournament/top40-v2/organizer_research_journal.jsonl",
+        "genesis_sha256": "0" * 64,
+        "head_sha256": "0" * 64,
+        "record_count": 1,
+    }
     for team in state["teams"].values():
         team["status"] = "researching"
     state_path.write_text(json.dumps(state, indent=2, sort_keys=True) + "\n", encoding="utf-8")

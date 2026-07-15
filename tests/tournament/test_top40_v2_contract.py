@@ -90,6 +90,10 @@ def test_finalist_cohort_uses_only_qualified_teams_and_dnfs_remain_unscored():
     for team_id in TEAM_IDS:
         team = state["teams"][team_id]
         if team_id in {"team-01", "team-07"}:
+            team["active_family_id"] = "family-1"
+            team["family_count"] = 1
+            team["development_assessment"] = {"passed": True}
+            team["qualifier_candidate"] = {"candidate_id": "candidate-1"}
             team["status"] = "qualified"
             team["private_attempts"] = 1
             team["private_result"] = {"passed": True}

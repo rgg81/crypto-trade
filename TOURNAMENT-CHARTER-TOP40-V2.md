@@ -128,27 +128,51 @@ positive.
 
 ## 10. Final OOS and scoring
 
-Every finalist is rerun from frozen bytes against final OOS exactly once. A disappointing OOS
-result is not an integrity DQ; it is the experiment's answer and receives low automatic points.
+Every finalist consumes exactly one organizer final-OOS reveal. Inside that sealed reveal, the
+organizer performs two independent clean-process replays and requires identical metric records
+and artifact hashes before promoting one canonical result. Teams receive zero final-OOS views
+before the selection lock. A disappointing OOS result is not an integrity DQ; it is the
+experiment's answer and receives low automatic points.
 
 Final score remains 70 automatic, 15 Critic, and 15 user. Of the automatic score, 50 points use
 fixed absolute bands and 20 use cohort-relative ranks. Negative OOS Sharpe and nonpositive
 doubled-cost Sharpe receive no absolute points for those components. Absolute scoring prevents a
 weak cohort from appearing economically strong merely through percentile ranks.
 
+The frozen 50-point absolute score is: 15 final-OOS Sharpe, 10 drawdown, 8 doubled-cost Sharpe,
+5 annualized return, 3 positive-quarter fraction, 4 regime robustness, and 5 cross-window/
+role/parameter stability. The 20 relative points are: 7 final-OOS Sharpe, 4 drawdown, 3
+doubled-cost Sharpe, 2 annualized return, 2 worst-regime Sharpe, and 2 cross-window/role/stability.
+All bands, subweights, average-rank tie handling, sole-finalist treatment, and six-decimal rounding
+are frozen in `config.toml` before research.
+
 DNF teams appear in the final report with their research disposition and failed gates but receive
 no fabricated OOS, Critic, user, or total score.
 
 ## 11. Integrity review and paper eligibility
 
-The V1 Critic, independent-confirmation, user-ballot, winner-freeze, and prospective paper chain is
-retained conceptually and rebound to the finalist cohort. Integrity DQs remain restricted to
-demonstrated data, execution, provenance, evaluator, or reproducibility failures. Performance is
-not an integrity DQ.
+The Critic scores every finalist from 0–3 in each frozen category: `data_integrity`,
+`execution_realism`, `reproducibility_provenance`, `research_discipline`, and `risk_disclosure`.
+The complete 0–15 Critic ballot locks before the user ballot.
+
+Integrity DQs remain restricted to demonstrated failures using one of six codes:
+`data-boundary-violation`, `execution-contract-violation`, `provenance-failure`,
+`evaluator-tampering`, `reproducibility-failure`, or `source-freeze-mismatch`. Every allegation
+cites exact artifact bytes and has no effect until independently confirmed. Performance is not an
+integrity DQ. If all finalists would be DQed, selection stops at `integrity_review_required`.
+
+The user ballot assigns an explicit 0–15 score to every original finalist, including one later
+DQed. `lock-selection` combines the already-locked automatic score, complete ballots, and confirmed
+DQ codes without recomputing objective scores. Automatic scores and objective ranks survive a
+later integrity DQ; the DQed entry has no final total or final rank.
 
 Paper eligibility is separately mechanical and uses the higher frozen development, private,
 final-OOS, cost, drawdown, quarter, and regime thresholds. At least one qualified finalist may win
 the tournament while nobody is ready for paper trading.
+
+Winner freeze creates a prospective paper-journal genesis at the next 8h boundary, records a
+three-boundary quarantine, and keeps `live_orders_enabled=false`. Paper evidence is the first
+globally untouched validation for V2.
 
 ## 12. V2 immutability
 

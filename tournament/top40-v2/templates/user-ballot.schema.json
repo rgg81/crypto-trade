@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "rationales": {
+      "additionalProperties": false,
+      "maxProperties": 10,
+      "minProperties": 1,
+      "patternProperties": {
+        "^team-(0[1-9]|10)$": {
+          "maxLength": 20000,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "schema_version": {"const": 1},
+    "scores": {
+      "additionalProperties": false,
+      "maxProperties": 10,
+      "minProperties": 1,
+      "patternProperties": {
+        "^team-(0[1-9]|10)$": {"maximum": 15, "minimum": 0, "type": "number"}
+      },
+      "type": "object"
+    }
+  },
+  "required": ["schema_version", "scores", "rationales"],
+  "title": "Top40 V2 complete user ballot",
+  "type": "object"
+}

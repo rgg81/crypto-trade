@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "artifact_hashes": {
+      "additionalProperties": {"pattern": "^[0-9a-f]{64}$", "type": "string"},
+      "type": "object"
+    },
+    "candidate_id": {"pattern": "^[a-z0-9][a-z0-9._-]{0,127}$", "type": "string"},
+    "cpu_hours": {"minimum": 0, "type": "number"},
+    "failure_reason": {"type": ["string", "null"]},
+    "family_id": {"pattern": "^[a-z0-9][a-z0-9._-]{0,127}$", "type": "string"},
+    "metrics_summary": {"type": "object"},
+    "registration_sha256": {"pattern": "^[0-9a-f]{64}$", "type": "string"},
+    "status": {"enum": ["completed", "failed", "interrupted"]},
+    "team_id": {"pattern": "^team-(0[1-9]|10)$", "type": "string"},
+    "timestamp_utc": {"pattern": "Z$", "type": "string"},
+    "wall_clock_hours": {"minimum": 0, "type": "number"}
+  },
+  "required": [
+    "timestamp_utc", "team_id", "family_id", "candidate_id", "registration_sha256", "status",
+    "failure_reason", "artifact_hashes", "metrics_summary", "cpu_hours", "wall_clock_hours"
+  ],
+  "title": "Top40 V2 material-trial result input",
+  "type": "object"
+}

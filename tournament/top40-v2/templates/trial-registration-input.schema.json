@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "candidate_id": {"pattern": "^[a-z0-9][a-z0-9._-]{0,127}$", "type": "string"},
+    "config_sha256": {"pattern": "^[0-9a-f]{64}$", "type": "string"},
+    "falsifier": {"minLength": 1, "type": "string"},
+    "family_id": {"pattern": "^[a-z0-9][a-z0-9._-]{0,127}$", "type": "string"},
+    "parameters": {"type": "object"},
+    "risk_config_sha256": {"pattern": "^[0-9a-f]{64}$", "type": "string"},
+    "seed": {"minimum": 0, "type": "integer"},
+    "source_bundle_sha256": {"pattern": "^[0-9a-f]{64}$", "type": "string"},
+    "strategy_sha256": {"pattern": "^[0-9a-f]{64}$", "type": "string"},
+    "team_id": {"pattern": "^team-(0[1-9]|10)$", "type": "string"},
+    "thesis": {"minLength": 1, "type": "string"},
+    "timestamp_utc": {"pattern": "Z$", "type": "string"}
+  },
+  "required": [
+    "timestamp_utc", "team_id", "family_id", "candidate_id", "strategy_sha256",
+    "source_bundle_sha256", "risk_config_sha256", "config_sha256", "parameters", "seed",
+    "thesis", "falsifier"
+  ],
+  "title": "Top40 V2 material-trial preregistration input",
+  "type": "object"
+}

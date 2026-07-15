@@ -24,6 +24,7 @@ from crypto_trade.tournament.metrics import (
 )
 from crypto_trade.tournament.protocol import REBALANCE_INSTRUCTION_COLUMN
 from crypto_trade.tournament.qualification import assess_development, assess_private
+from crypto_trade.tournament.runner_v2 import source_bundle_fingerprint
 from crypto_trade.tournament.top40_v2 import load_config
 
 REPOSITORY = Path(__file__).parents[2]
@@ -241,6 +242,7 @@ def _fixture(root: Path, stage: str = "development") -> dict[str, object]:
         "double_cost_daily_returns": f"{output_relative}/double_cost_daily_returns.csv",
         "trades": f"{output_relative}/trades.csv",
     }
+    artifact_paths = {name: root / relative for name, relative in artifacts.items()}
     scored = base_daily.loc[score_start:score_end]
     scored_double = double_daily.loc[score_start:score_end]
     metrics = compute_window_metrics(scored)
@@ -253,6 +255,9 @@ def _fixture(root: Path, stage: str = "development") -> dict[str, object]:
         "data_manifest_sha256": _sha256(manifest_path),
         "config_sha256": config.sha256,
         "strategy_sha256": _sha256(strategy),
+        "risk_policy_sha256": _sha256(team_root / "risk_policy.json"),
+        "source_bundle_sha256": "0" * 64,
+        "output_dir": output_relative,
         "scored_window": {
             "start": score_start.date().isoformat(),
             "end": score_end.date().isoformat(),
@@ -265,6 +270,13 @@ def _fixture(root: Path, stage: str = "development") -> dict[str, object]:
             "double_cost_sharpe_95": [-1.0, 1.0],
         },
         "artifacts": artifacts,
+        "artifact_sha256": {
+            name: _sha256(path) for name, path in artifact_paths.items()
+        },
+        "artifact_sizes": {name: path.stat().st_size for name, path in artifact_paths.items()},
+        "decision_count": len(bar_index),
+        "event_count": len(event_frame),
+        "trade_count": len(event_frame),
     }
     result: dict[str, object] = {
         "config": config,
@@ -306,8 +318,8 @@ def _fixture(root: Path, stage: str = "development") -> dict[str, object]:
         folds = []
         for index, indices in enumerate(scored_indices, start=1):
             fold_id = f"fold-{index}"
-            model = team_root / f"{fold_id}.model"
-            model.write_bytes(f"model {index}".encode())
+            model = team_root / f"{fold_id}.model.json"
+            _write_json(model, {"fold": index})
             values = scored.iloc[indices]
             folds.append(
                 {
@@ -335,6 +347,11 @@ def _fixture(root: Path, stage: str = "development") -> dict[str, object]:
         )
         result["neighborhood"] = neighborhood_path
         result["walk"] = walk_path
+    record["source_bundle_sha256"] = source_bundle_fingerprint(
+        root,
+        TEAM_ID,
+        f"{TOP40_V2_LAYOUT.team_root(TEAM_ID)}/strategy.py",
+    )[0]
     return result
 
 
@@ -431,7 +448,7 @@ def test_tampered_daily_return_is_rejected_by_bar_reconciliation(tmp_path):
     frame.loc[100, "net_return"] += 0.01
     frame.to_csv(path, index=False)
 
-    with pytest.raises(ValueError, match="do not reconcile"):
+    with pytest.raises(ValueError, match="artifact manifest differs"):
         _build(tmp_path, fixture)
 
 
@@ -459,7 +476,7 @@ def test_noncanonical_bar_columns_fail_closed(tmp_path):
     frame = pd.read_csv(path).drop(columns="long_exposure")
     frame.to_csv(path, index=False)
 
-    with pytest.raises(ValueError, match="noncanonical return columns"):
+    with pytest.raises(ValueError, match="artifact manifest differs"):
         _build(tmp_path, fixture)
 
 

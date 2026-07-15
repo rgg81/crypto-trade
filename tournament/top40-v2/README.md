@@ -18,9 +18,12 @@ phase0
   -> oos_revealed
   -> objective_locked
   -> critic_locked
-  -> dq_confirmed
+  -> dq_confirmed | integrity_review_required
   -> user_locked
-  -> paper_frozen | no_qualified_model
+  -> selection_locked
+  -> paper_frozen
+
+phase0 -> research -> qualification_closed -> no_qualified_model
 ```
 
 Team lifecycle:
@@ -31,7 +34,7 @@ researching
   -> qualified | dnf
   -> finalist_frozen
   -> canonical_running
-  -> canonical_complete
+  -> canonical_complete | canonical_failed
 ```
 
 The intended organizer CLI is `scripts/top40_v2_tournament.py`. Phase 0 must not be frozen until

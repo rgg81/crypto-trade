@@ -125,7 +125,11 @@ def _private_evidence(
 
 
 def _sealed_private(
-    config: LoadedV2Config, team_id: str, *, candidate_id: str = "candidate-a"
+    config: LoadedV2Config,
+    team_id: str,
+    *,
+    private_runner_sha256: str,
+    candidate_id: str = "candidate-a",
 ) -> dict[str, Any]:
     evidence = _private_evidence(config, team_id, candidate_id=candidate_id)
     evidence_sha = "5" * 64
@@ -138,7 +142,14 @@ def _sealed_private(
         "schema_version": 1,
         "sealed_at_utc": "2026-08-02T12:00:00+00:00",
         "evidence": evidence,
+        "provenance": {"builder": "top40-v2-evidence-v1"},
         "assessment": assessment.to_dict(include_observations=True),
+        "runner_record_path": (
+            f"tournament/top40-v2/private/artifacts/{team_id}/runner_record.json"
+        ),
+        "runner_record_sha256": private_runner_sha256,
+        "organizer_journal_head_sha256": "6" * 64,
+        "registration_sha256": "7" * 64,
     }
 
 
@@ -195,6 +206,7 @@ def _runner_record(
         "strategy_sha256": STRATEGY_SHA,
         "risk_policy_sha256": RISK_SHA,
         "source_bundle_sha256": SOURCE_SHA,
+        "output_dir": output,
         "scored_window": {"start": start, "end": end, "metrics": metrics},
         "double_cost_sharpe": double_cost,
         "regime_sharpe": {"bull": 1.1, "bear": 0.7, "chop": 0.5, "stress": 0.2},
@@ -203,6 +215,11 @@ def _runner_record(
             "double_cost_sharpe_95": [0.1, 1.0],
         },
         "artifacts": {name: f"{output}/{filename}" for name, filename in filenames.items()},
+        "artifact_sha256": {name: "8" * 64 for name in filenames},
+        "artifact_sizes": {name: 100 for name in filenames},
+        "decision_count": 100,
+        "event_count": 20,
+        "trade_count": 10,
     }
 
 
@@ -236,21 +253,24 @@ def _fixture(
     final_runner_transform: Callable[[dict[str, Any]], None] | None = None,
 ) -> _FinalistFixture:
     development_raw = _development_evidence(config, team_id)
-    sealed_raw = _sealed_private(config, team_id)
     private_raw = _runner_record(config, team_id, "private")
     final_raw = _runner_record(config, team_id, "final_oos")
     for transform, raw in (
         (development_transform, development_raw),
-        (sealed_transform, sealed_raw),
         (private_runner_transform, private_raw),
         (final_runner_transform, final_raw),
     ):
         if transform is not None:
             transform(raw)
     development = _bound_json(development_raw)
-    sealed = _bound_json(sealed_raw)
     private = _bound_json(private_raw)
     final = _bound_json(final_raw)
+    sealed_raw = _sealed_private(
+        config, team_id, private_runner_sha256=private.sha256
+    )
+    if sealed_transform is not None:
+        sealed_transform(sealed_raw)
+    sealed = _bound_json(sealed_raw)
     binding = FinalistSourceBinding(
         team_id=team_id,
         candidate_id="candidate-a",
@@ -474,6 +494,8 @@ def test_ballots_are_exact_bounded_finalist_maps_and_dq_is_finalist_only(
         validate_integrity_disqualifications(
             locked, {"team-01": ["data-leak", "data-leak"]}
         )
+    with pytest.raises(ValueError, match="noncanonical reason codes"):
+        validate_integrity_disqualifications(locked, {"team-01": ["data-leak"]})
 
 
 def test_combination_uses_locked_objective_scores_without_recomputation(
@@ -506,6 +528,26 @@ def test_combination_uses_locked_objective_scores_without_recomputation(
         score.team_id: (score.objective_rank, score.automatic_score)
         for score in combined.scores
     } == objective_values
+
+
+def test_all_finalists_disqualified_requires_integrity_review(
+    config: LoadedV2Config,
+) -> None:
+    locked = _objective_lock(config)
+    ballot = {team_id: 10.0 for team_id in TEAM_IDS[:3]}
+    combined = combine_locked_scores(
+        locked,
+        critic_ballot=ballot,
+        user_ballot=ballot,
+        integrity_disqualifications={
+            team_id: ["reproducibility-failure"] for team_id in TEAM_IDS[:3]
+        },
+    )
+
+    assert combined.status == "integrity-review-required"
+    assert combined.winner_team_id is None
+    assert all(score.rank is None for score in combined.scores)
+    assert all(score.total_score is None for score in combined.scores)
 
 
 def test_zero_cohort_requires_empty_ballots_and_combines_to_no_qualified_model(

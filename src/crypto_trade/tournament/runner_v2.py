@@ -98,7 +98,12 @@ _MAX_WORKER_RESPONSE_BYTES = 1_048_576
 _TEAM_TREE_MAX_FILE_BYTES = 2 * 1024 * 1024
 _TEAM_TREE_MAX_TOTAL_BYTES = 10 * 1024 * 1024
 _STAGED_CONFIG_MAX_BYTES = 64 * 1024
-_MUTABLE_TEAM_OUTPUTS = frozenset({"artifact_manifest.json", "submission.json"})
+# Organizer-owned projections change as research is journaled; they are not executable candidate
+# inputs.  Keeping them out of the bundle lets one preregistered executable tree retain the same
+# identity when its registration/result rows are appended.
+_MUTABLE_TEAM_OUTPUTS = frozenset(
+    {"artifact_manifest.json", "submission.json", "experiments.jsonl"}
+)
 _TEAM_TEXT_SUFFIXES = frozenset(
     {".py", ".md", ".json", ".jsonl", ".toml", ".lock", ".txt", ".yaml", ".yml"}
 )
@@ -176,6 +181,8 @@ class TeamWindowRunResult:
     source_bundle_sha256: str
     output_dir: str
     artifacts: Mapping[str, str]
+    artifact_sha256: Mapping[str, str]
+    artifact_sizes: Mapping[str, int]
     scored_window: EvaluationWindow
     double_cost_sharpe: float
     regime_sharpe: Mapping[str, float]
@@ -196,6 +203,8 @@ class TeamWindowRunResult:
             "config_sha256": self.config_sha256,
             "strategy_sha256": self.strategy_sha256,
             "risk_policy_sha256": self.risk_policy_sha256,
+            "source_bundle_sha256": self.source_bundle_sha256,
+            "output_dir": self.output_dir,
             "scored_window": dataclasses.asdict(self.scored_window),
             "double_cost_sharpe": self.double_cost_sharpe,
             "regime_sharpe": dict(self.regime_sharpe),
@@ -206,6 +215,11 @@ class TeamWindowRunResult:
                 ),
             },
             "artifacts": dict(self.artifacts),
+            "artifact_sha256": dict(self.artifact_sha256),
+            "artifact_sizes": dict(self.artifact_sizes),
+            "decision_count": self.decision_count,
+            "event_count": self.event_count,
+            "trade_count": self.trade_count,
         }
 
 
@@ -230,6 +244,7 @@ def run_team(
     *,
     stage: str,
     _authorization: object | None = None,
+    _output_relative: str | None = None,
 ) -> TeamWindowRunResult:
     """Run one team against a verified frozen snapshot and publish canonical artifacts.
 
@@ -269,6 +284,7 @@ def run_team(
     initial_manifest_sha256 = _sha256_file(canonical_manifest_path)
     config = _load_config(canonical_config_path, team_id)
     authorized = _authorized_window(config, stage)
+    output_relative = _validated_output_relative(team_id, stage, _output_relative)
     evaluator_config = _evaluator_config(config)
     risk_policy = load_risk_policy(risk_policy_path)
     decision_times = _decision_grid(authorized)
@@ -345,6 +361,7 @@ def run_team(
         root_path,
         team_id,
         stage=stage,
+        output_relative=output_relative,
         targets=targets,
         base=base,
         stressed=stressed,
@@ -352,6 +369,9 @@ def run_team(
         stressed_daily=stressed_daily,
     )
     trades = _trade_events(base.events)
+    artifact_files = {
+        name: root_path / relative for name, relative in artifact_paths.items()
+    }
     return TeamWindowRunResult(
         stage=stage,
         team_id=team_id,
@@ -362,8 +382,12 @@ def run_team(
         strategy_sha256=initial_strategy_sha256,
         risk_policy_sha256=initial_risk_policy_sha256,
         source_bundle_sha256=initial_source_bundle_sha256,
-        output_dir=_stage_output_relative(team_id, stage),
+        output_dir=output_relative,
         artifacts=artifact_paths,
+        artifact_sha256={
+            name: _sha256_file(path) for name, path in artifact_files.items()
+        },
+        artifact_sizes={name: path.stat().st_size for name, path in artifact_files.items()},
         scored_window=metrics["scored_window"],
         double_cost_sharpe=metrics["double_cost_sharpe"],
         regime_sharpe=metrics["regime_sharpe"],
@@ -1574,12 +1598,11 @@ def _v2_phase0_allows_fast_snapshot_verification(
         freeze["shared_snapshot_manifest_sha256"]
     ):
         raise ValueError("V2 shared snapshot manifest differs from the common commit")
-    additions = subprocess.run(
+    history = subprocess.run(
         [
             "git",
             "log",
             "--format=%H",
-            "--diff-filter=A",
             "--",
             TOP40_V2_LAYOUT.phase0_freeze_path,
         ],
@@ -1588,10 +1611,10 @@ def _v2_phase0_allows_fast_snapshot_verification(
         capture_output=True,
         text=True,
     )
-    add_commits = additions.stdout.splitlines() if additions.returncode == 0 else []
-    if len(add_commits) != 1:
-        raise ValueError("V2 Phase-0 freeze must have exactly one first-add commit")
-    record_commit = add_commits[0]
+    record_commits = history.stdout.splitlines() if history.returncode == 0 else []
+    if len(record_commits) != 1:
+        raise ValueError("V2 Phase-0 freeze must be first-added once and never modified")
+    record_commit = record_commits[0]
     parents = subprocess.run(
         ["git", "rev-list", "--parents", "-n", "1", record_commit],
         cwd=root,
@@ -1923,13 +1946,13 @@ def _publish_artifacts(
     team_id: str,
     *,
     stage: str,
+    output_relative: str,
     targets: pd.DataFrame,
     base: EvaluationResult,
     stressed: EvaluationResult,
     base_daily: pd.Series,
     stressed_daily: pd.Series,
 ) -> dict[str, str]:
-    output_relative = _stage_output_relative(team_id, stage)
     output_dir = (root / output_relative).resolve()
     report_parent = output_dir.parent
     if not report_parent.is_relative_to(root):
@@ -1972,7 +1995,9 @@ def _publish_artifacts(
             staging / files["double_cost_daily_returns"],
         )
         _write_csv(_trade_events(events), staging / files["trades"])
-        _promote_report_directory(staging, output_dir)
+        _promote_report_directory(
+            staging, output_dir, allow_replace=stage == "development"
+        )
     except BaseException:
         shutil.rmtree(staging, ignore_errors=True)
         raise
@@ -1990,6 +2015,24 @@ def _stage_output_relative(team_id: str, stage: str) -> str:
     if stage == "final_oos":
         return f"{TOP40_V2_LAYOUT.reports_root}/{team_id}/final-oos"
     raise ValueError("runner stage must be development, private, or final_oos")
+
+
+def _validated_output_relative(
+    team_id: str, stage: str, override: str | None
+) -> str:
+    if override is None:
+        return _stage_output_relative(team_id, stage)
+    if stage != "final_oos" or not isinstance(override, str):
+        raise ValueError("only final-OOS internal replays may override the output directory")
+    pure = PurePosixPath(override)
+    prefix = f"{TOP40_V2_LAYOUT.tournament_root}/private/final-replays/{team_id}/"
+    if (
+        pure.is_absolute()
+        or any(part in {"", ".", ".."} for part in pure.parts)
+        or not pure.as_posix().startswith(prefix)
+    ):
+        raise ValueError("final-OOS replay output must remain in its organizer-private namespace")
+    return pure.as_posix()
 
 
 def _indexed_frame(frame: pd.DataFrame, index_name: str) -> pd.DataFrame:
@@ -2038,10 +2081,14 @@ def _write_csv(frame: pd.DataFrame, path: Path) -> None:
     output.to_csv(path, index=False, lineterminator="\n", float_format="%.17g")
 
 
-def _promote_report_directory(staging: Path, output_dir: Path) -> None:
+def _promote_report_directory(
+    staging: Path, output_dir: Path, *, allow_replace: bool
+) -> None:
     if not output_dir.exists():
         os.replace(staging, output_dir)
         return
+    if not allow_replace:
+        raise FileExistsError(f"immutable tournament output already exists: {output_dir}")
     backup = output_dir.parent / f".{output_dir.name}-backup"
     if backup.exists():
         raise FileExistsError(f"stale report backup exists: {backup}")

@@ -51,11 +51,19 @@ _RUNNER_RECORD_KEYS = {
     "data_manifest_sha256",
     "config_sha256",
     "strategy_sha256",
+    "risk_policy_sha256",
+    "source_bundle_sha256",
+    "output_dir",
     "scored_window",
     "double_cost_sharpe",
     "regime_sharpe",
     "confidence_intervals",
     "artifacts",
+    "artifact_sha256",
+    "artifact_sizes",
+    "decision_count",
+    "event_count",
+    "trade_count",
 }
 _BAR_RETURN_COLUMNS = (
     "timestamp",
@@ -261,6 +269,24 @@ def _artifact_paths(
         path = _safe_file(root, expected, f"runner artifact {name}")
         paths[name] = path
         hashes[name] = _sha256_bytes(path.read_bytes())
+    if record.get("output_dir") != output:
+        raise ValueError("runner output directory is noncanonical")
+    recorded_hashes = _exact_object(
+        record.get("artifact_sha256"), set(_ARTIFACT_FILENAMES), "runner artifact hashes"
+    )
+    recorded_sizes = _exact_object(
+        record.get("artifact_sizes"), set(_ARTIFACT_FILENAMES), "runner artifact sizes"
+    )
+    for name, path in paths.items():
+        size = recorded_sizes[name]
+        if (
+            recorded_hashes[name] != hashes[name]
+            or isinstance(size, bool)
+            or not isinstance(size, int)
+            or size < 0
+            or size != path.stat().st_size
+        ):
+            raise ValueError(f"runner artifact manifest differs for {name}")
     return paths, hashes
 
 
@@ -920,7 +946,12 @@ def _verify_runner_record(
     double_cost_sharpe: float,
     regime_metrics: Mapping[str, Mapping[str, float]],
     strategy_sha256: str,
+    risk_policy_sha256: str,
+    source_bundle_sha256: str,
     manifest_sha256: str,
+    decision_count: int,
+    event_count: int,
+    trade_count: int,
 ) -> None:
     _exact_object(record, _RUNNER_RECORD_KEYS, "runner record")
     expected_entrypoint = f"{TOP40_V2_LAYOUT.team_root(team_id)}/strategy.py"
@@ -931,9 +962,17 @@ def _verify_runner_record(
         or record["seeds"] != [config.raw["research_budget"]["strategy_seed"]]
         or record["config_sha256"] != config.sha256
         or record["strategy_sha256"] != strategy_sha256
+        or record["risk_policy_sha256"] != risk_policy_sha256
+        or record["source_bundle_sha256"] != source_bundle_sha256
         or record["data_manifest_sha256"] != manifest_sha256
     ):
         raise ValueError("runner record candidate identity or input hashes differ")
+    if (
+        record["decision_count"] != decision_count
+        or record["event_count"] != event_count
+        or record["trade_count"] != trade_count
+    ):
+        raise ValueError("runner record decision/event/trade counts differ from artifacts")
     scored_window = _exact_object(record["scored_window"], {"start", "end", "metrics"}, "window")
     if scored_window["start"] != window.score_start.date().isoformat() or scored_window[
         "end"
@@ -1030,6 +1069,11 @@ def build_qualification_evidence(
         raise ValueError("risk policy path must be the canonical team risk_policy.json")
     risk_policy = load_risk_policy(risk_path)
     risk_sha256 = _sha256_bytes(risk_path.read_bytes())
+    from crypto_trade.tournament.runner_v2 import source_bundle_fingerprint
+
+    source_bundle_sha256, _source_entries = source_bundle_fingerprint(
+        root_path, str(team_id), strategy_relative
+    )
 
     manifest_relative = str(config.raw["paths"]["shared_snapshot_manifest"])
     manifest_path = _safe_file(root_path, manifest_relative, "shared snapshot manifest")
@@ -1091,7 +1135,12 @@ def build_qualification_evidence(
         double_cost_sharpe=double_cost_sharpe,
         regime_metrics=regimes,
         strategy_sha256=strategy_sha256,
+        risk_policy_sha256=risk_sha256,
+        source_bundle_sha256=source_bundle_sha256,
         manifest_sha256=manifest_sha256,
+        decision_count=len(expected_bars),
+        event_count=len(events),
+        trade_count=int(events["event_type"].isin(_TRADE_TYPES).sum()),
     )
 
     identity = {
@@ -1108,6 +1157,7 @@ def build_qualification_evidence(
         "config": {"path": TOP40_V2_LAYOUT.config_path, "sha256": config.sha256},
         "strategy": {"path": strategy_relative, "sha256": strategy_sha256},
         "risk_policy": {"path": risk_relative, "sha256": risk_sha256},
+        "source_bundle_sha256": source_bundle_sha256,
         "shared_snapshot_manifest": {
             "path": manifest_relative,
             "sha256": manifest_sha256,

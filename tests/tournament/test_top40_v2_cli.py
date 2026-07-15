@@ -12,6 +12,7 @@ from types import SimpleNamespace
 import pytest
 
 from crypto_trade.tournament.layout import TOP40_V2_LAYOUT
+from crypto_trade.tournament.runner_v2 import source_bundle_fingerprint
 from crypto_trade.tournament.top40_v2 import TEAM_IDS, load_config, validate_run_state
 
 REPOSITORY = Path(__file__).parents[2]
@@ -57,6 +58,10 @@ def _read_state(root: Path) -> dict:
 def _open_research(root: Path) -> None:
     state = _read_state(root)
     state["phase"] = "research"
+    state["phase0"] = {
+        "path": TOP40_V2_LAYOUT.phase0_freeze_path,
+        "sha256": "0" * 64,
+    }
     for team in state["teams"].values():
         team["status"] = "researching"
     (root / TOP40_V2_LAYOUT.state_path).write_text(
@@ -93,13 +98,18 @@ def _write_json(path: Path, payload: object) -> None:
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
-def _candidate_bindings(root: Path, config, team_id: str) -> tuple[str, str]:
+def _candidate_bindings(root: Path, config, team_id: str) -> tuple[str, str, str]:
     strategy = root / TOP40_V2_LAYOUT.team_root(team_id) / "strategy.py"
     strategy.write_text("def decide(context):\n    return {}\n", encoding="utf-8")
     risk = root / TOP40_V2_LAYOUT.team_root(team_id) / "risk_policy.json"
     return (
         hashlib.sha256(strategy.read_bytes()).hexdigest(),
         hashlib.sha256(risk.read_bytes()).hexdigest(),
+        source_bundle_fingerprint(
+            root,
+            team_id,
+            f"{TOP40_V2_LAYOUT.team_root(team_id)}/strategy.py",
+        )[0],
     )
 
 
@@ -112,7 +122,7 @@ def _development_evidence(
     trial_count: int = 1,
     passing: bool = True,
 ) -> dict:
-    strategy_sha, risk_sha = _candidate_bindings(root, config, team_id)
+    strategy_sha, risk_sha, _source_sha = _candidate_bindings(root, config, team_id)
     return {
         "schema_version": 1,
         "stage": "development",
@@ -197,23 +207,140 @@ def _register_initial_family(cli, root: Path) -> None:
     )
 
 
-def _qualify_team_one(cli, root: Path) -> None:
+def _register_completed_candidate(
+    cli,
+    root: Path,
+    config,
+    *,
+    candidate_id: str,
+    family_id: str = "family-1",
+) -> None:
+    strategy_sha, risk_sha, source_sha = _candidate_bindings(root, config, "team-01")
+    number = int(candidate_id.rsplit("-", maxsplit=1)[-1])
+    day = 16 + number
+    registration = {
+        "timestamp_utc": f"2026-07-{day:02d}T10:00:00Z",
+        "team_id": "team-01",
+        "family_id": family_id,
+        "candidate_id": candidate_id,
+        "strategy_sha256": strategy_sha,
+        "source_bundle_sha256": source_sha,
+        "risk_config_sha256": risk_sha,
+        "config_sha256": config.sha256,
+        "parameters": {"lookback": 20 + number},
+        "seed": 20260801 + number,
+        "thesis": "A causal cross-sectional spread should survive conservative costs.",
+        "falsifier": "Reject when stitched development Sharpe is non-positive.",
+    }
+    registration_path = root / f"{candidate_id}.registration.json"
+    _write_json(registration_path, registration)
+    assert cli._register_trial(
+        _args(team_id="team-01", registration=str(registration_path))
+    ) == 0
+
+    artifact = root / f"reports-top40-v2/team-01/{candidate_id}.trial.json"
+    _write_json(artifact, {"candidate_id": candidate_id})
+    result = {
+        "timestamp_utc": f"2026-07-{day:02d}T11:00:00Z",
+        "team_id": "team-01",
+        "family_id": family_id,
+        "candidate_id": candidate_id,
+        "registration_sha256": hashlib.sha256(
+            cli._registration_input(registration)
+        ).hexdigest(),
+        "status": "completed",
+        "failure_reason": None,
+        "artifact_hashes": {
+            artifact.relative_to(root).as_posix(): hashlib.sha256(
+                artifact.read_bytes()
+            ).hexdigest()
+        },
+        "metrics_summary": {"development": {"net_sharpe": 0.8}},
+        "cpu_hours": 0.1,
+        "wall_clock_hours": 0.2,
+    }
+    result_path = root / f"{candidate_id}.result.json"
+    _write_json(result_path, result)
+    assert cli._record_trial_result(
+        _args(team_id="team-01", result=str(result_path))
+    ) == 0
+
+
+def _runner_record(root: Path, *, stage: str, candidate_id: str) -> Path:
+    path = root / f"{candidate_id}.{stage}.runner.json"
+    _write_json(path, {"stage": stage, "team_id": "team-01"})
+    return path
+
+
+def _stub_evidence(cli, monkeypatch, root: Path, config, outcomes: dict[str, bool]) -> None:
+    def derive(
+        _root,
+        runner_record,
+        *,
+        team_id,
+        stage,
+        candidate_id,
+        trial_count,
+        parameter_neighborhood_manifest=None,
+        walk_forward_manifest=None,
+    ):
+        development = _development_evidence(
+            root,
+            config,
+            team_id=team_id,
+            candidate_id=candidate_id,
+            trial_count=trial_count,
+            passing=outcomes.get(candidate_id, True),
+        )
+        evidence = (
+            development
+            if stage == "development"
+            else _private_evidence(
+                root,
+                config,
+                development,
+                passing=outcomes.get(f"{candidate_id}:private", True),
+            )
+        )
+        return SimpleNamespace(
+            evidence=evidence,
+            provenance={
+                "schema_version": 1,
+                "builder": "synthetic-focused-test",
+                "stage": stage,
+                "team_id": team_id,
+                "candidate_id": candidate_id,
+            },
+        )
+
+    monkeypatch.setattr(cli, "_derive_qualification_evidence", derive)
+
+
+def _qualify_team_one(cli, root: Path, monkeypatch) -> None:
     _register_initial_family(cli, root)
     config = load_config(root / CONFIG)
-    development = _development_evidence(root, config, trial_count=2)
-    development_path = root / "development.json"
-    _write_json(development_path, development)
+    _register_completed_candidate(cli, root, config, candidate_id="candidate-1")
+    _stub_evidence(cli, monkeypatch, root, config, {"candidate-1": True})
+    development_path = _runner_record(
+        root, stage="development", candidate_id="candidate-1"
+    )
     assert (
         cli._record_development_assessment(
-            _args(team_id="team-01", evidence=str(development_path))
+            _args(
+                team_id="team-01",
+                runner_record=str(development_path),
+                candidate_id="candidate-1",
+                parameter_neighborhood_manifest="neighbors.json",
+                walk_forward_manifest="walk.json",
+            )
         )
         == 0
     )
-    private = _private_evidence(root, config, development)
-    private_path = root / "private.json"
-    _write_json(private_path, private)
+    private_path = _runner_record(root, stage="private", candidate_id="candidate-1")
     assert (
-        cli._record_private_assessment(_args(team_id="team-01", evidence=str(private_path)))
+        cli._record_private_assessment(
+            _args(team_id="team-01", runner_record=str(private_path))
+        )
         == 0
     )
 
@@ -267,44 +394,68 @@ def test_failed_development_is_research_not_submission_then_passing_candidate_fr
     _open_research(tmp_path)
     _register_initial_family(cli, tmp_path)
     config = load_config(tmp_path / CONFIG)
-    failed = _development_evidence(tmp_path, config, trial_count=1, passing=False)
-    failed_path = tmp_path / "failed.json"
-    _write_json(failed_path, failed)
+    _register_completed_candidate(cli, tmp_path, config, candidate_id="candidate-1")
+    _stub_evidence(
+        cli,
+        monkeypatch,
+        tmp_path,
+        config,
+        {"candidate-1": False, "candidate-2": True},
+    )
+    failed_path = _runner_record(
+        tmp_path, stage="development", candidate_id="candidate-1"
+    )
     assert (
         cli._record_development_assessment(
-            _args(team_id="team-01", evidence=str(failed_path))
+            _args(
+                team_id="team-01",
+                runner_record=str(failed_path),
+                candidate_id="candidate-1",
+                parameter_neighborhood_manifest="neighbors.json",
+                walk_forward_manifest="walk.json",
+            )
         )
         == 1
     )
     assert _read_state(tmp_path)["teams"]["team-01"]["status"] == "researching"
 
-    passed = _development_evidence(tmp_path, config, trial_count=2)
-    passed_path = tmp_path / "passed.json"
-    _write_json(passed_path, passed)
+    _register_completed_candidate(cli, tmp_path, config, candidate_id="candidate-2")
+    passed_path = _runner_record(
+        tmp_path, stage="development", candidate_id="candidate-2"
+    )
     assert (
         cli._record_development_assessment(
-            _args(team_id="team-01", evidence=str(passed_path))
+            _args(
+                team_id="team-01",
+                runner_record=str(passed_path),
+                candidate_id="candidate-2",
+                parameter_neighborhood_manifest="neighbors.json",
+                walk_forward_manifest="walk.json",
+            )
         )
         == 0
     )
     team = _read_state(tmp_path)["teams"]["team-01"]
     assert team["status"] == "qualifier_candidate_frozen"
     assert team["trial_count"] == 2
-    assert team["qualifier_candidate"]["candidate_id"] == "candidate-1"
+    assert team["qualifier_candidate"]["candidate_id"] == "candidate-2"
     assert len(team["qualifier_candidate"]["source_bundle_sha256"]) == 64
 
 
 def test_development_assessment_requires_a_preregistered_family(cli, tmp_path, monkeypatch):
     _initialize(cli, tmp_path, monkeypatch)
     _open_research(tmp_path)
-    config = load_config(tmp_path / CONFIG)
-    evidence = _development_evidence(tmp_path, config)
-    path = tmp_path / "development.json"
-    _write_json(path, evidence)
+    path = _runner_record(tmp_path, stage="development", candidate_id="candidate-1")
 
     with pytest.raises(ValueError, match="preregistered mechanism family"):
         cli._record_development_assessment(
-            _args(team_id="team-01", evidence=str(path))
+            _args(
+                team_id="team-01",
+                runner_record=str(path),
+                candidate_id="candidate-1",
+                parameter_neighborhood_manifest="neighbors.json",
+                walk_forward_manifest="walk.json",
+            )
         )
 
 
@@ -315,17 +466,25 @@ def test_private_ticket_is_single_shot_and_public_state_contains_no_observations
     _open_research(tmp_path)
     _register_initial_family(cli, tmp_path)
     config = load_config(tmp_path / CONFIG)
-    development = _development_evidence(tmp_path, config, trial_count=2)
-    development_path = tmp_path / "development.json"
-    _write_json(development_path, development)
-    cli._record_development_assessment(
-        _args(team_id="team-01", evidence=str(development_path))
+    _register_completed_candidate(cli, tmp_path, config, candidate_id="candidate-1")
+    _stub_evidence(cli, monkeypatch, tmp_path, config, {"candidate-1": True})
+    development_path = _runner_record(
+        tmp_path, stage="development", candidate_id="candidate-1"
     )
-    private = _private_evidence(tmp_path, config, development)
-    private_path = tmp_path / "private.json"
-    _write_json(private_path, private)
+    cli._record_development_assessment(
+        _args(
+            team_id="team-01",
+            runner_record=str(development_path),
+            candidate_id="candidate-1",
+            parameter_neighborhood_manifest="neighbors.json",
+            walk_forward_manifest="walk.json",
+        )
+    )
+    private_path = _runner_record(tmp_path, stage="private", candidate_id="candidate-1")
     assert (
-        cli._record_private_assessment(_args(team_id="team-01", evidence=str(private_path)))
+        cli._record_private_assessment(
+            _args(team_id="team-01", runner_record=str(private_path))
+        )
         == 0
     )
 
@@ -339,7 +498,7 @@ def test_private_ticket_is_single_shot_and_public_state_contains_no_observations
     assert sealed["assessment"]["gates"][0]["observed"] == 0.6
     with pytest.raises(ValueError, match="private assessment requires|already consumed"):
         cli._record_private_assessment(
-            _args(team_id="team-01", evidence=str(private_path))
+            _args(team_id="team-01", runner_record=str(private_path))
         )
 
 
@@ -375,28 +534,35 @@ def test_private_ticket_rejects_any_post_development_source_bundle_change(
     _open_research(tmp_path)
     _register_initial_family(cli, tmp_path)
     config = load_config(tmp_path / CONFIG)
-    development = _development_evidence(tmp_path, config, trial_count=2)
-    development_path = tmp_path / "development.json"
-    _write_json(development_path, development)
+    _register_completed_candidate(cli, tmp_path, config, candidate_id="candidate-1")
+    _stub_evidence(cli, monkeypatch, tmp_path, config, {"candidate-1": True})
+    development_path = _runner_record(
+        tmp_path, stage="development", candidate_id="candidate-1"
+    )
     assert cli._record_development_assessment(
-        _args(team_id="team-01", evidence=str(development_path))
+        _args(
+            team_id="team-01",
+            runner_record=str(development_path),
+            candidate_id="candidate-1",
+            parameter_neighborhood_manifest="neighbors.json",
+            walk_forward_manifest="walk.json",
+        )
     ) == 0
 
     bootstrap = tmp_path / TOP40_V2_LAYOUT.team_root("team-01") / "BOOTSTRAP.md"
     bootstrap.write_text(bootstrap.read_text(encoding="utf-8") + "changed\n", encoding="utf-8")
-    private_path = tmp_path / "private.json"
-    _write_json(private_path, _private_evidence(tmp_path, config, development))
+    private_path = _runner_record(tmp_path, stage="private", candidate_id="candidate-1")
 
-    with pytest.raises(ValueError, match="frozen development candidate"):
+    with pytest.raises(ValueError, match="exact preregistration"):
         cli._record_private_assessment(
-            _args(team_id="team-01", evidence=str(private_path))
+            _args(team_id="team-01", runner_record=str(private_path))
         )
 
 
 def test_close_and_finalist_lock_advance_only_qualified_teams(cli, tmp_path, monkeypatch):
     _initialize(cli, tmp_path, monkeypatch)
     _open_research(tmp_path)
-    _qualify_team_one(cli, tmp_path)
+    _qualify_team_one(cli, tmp_path, monkeypatch)
 
     assert cli._close_qualification(_args()) == 0
     closed = _read_state(tmp_path)
