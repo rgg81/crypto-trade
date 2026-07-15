@@ -1,0 +1,9 @@
+{
+  "cohort_sha256": "2d6d3efa9ec6276513481959d83df7fefe782a42b977cc937cd5597d372fc01d",
+  "confirmations_path": "tournament/top40/critic_confirmations.json",
+  "confirmations_sha256": "bd3e8298fe40f8758ef150f13eb8002964f285d7348cc35faa61a541b9451220",
+  "critic_lock_sha256": "d9800a0bb9e9ec59a5923c0f4bcf70ccdcbbd136fb92c54bdb7a30f582df9181",
+  "locked_at_utc": "2026-07-15T13:03:10.065425+00:00",
+  "parent_critic_lock_commit": "3c0b4e42a3c8c23286511f634f1d609c98d25ae7",
+  "schema_version": 1
+}

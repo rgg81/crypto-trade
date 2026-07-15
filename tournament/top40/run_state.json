@@ -1,6 +1,12 @@
 {
   "common_freeze_commit": "48df09341f02eba7a3469abd1ccda6649a4ef0ba",
   "config_sha256": "030a065f75f9c4adb7484065908f4379435929609d446be0de0a831d9e28ee0a",
+  "critic_confirmation_lock": {
+    "cohort_sha256": "2d6d3efa9ec6276513481959d83df7fefe782a42b977cc937cd5597d372fc01d",
+    "locked_at_utc": "2026-07-15T13:03:10.065425+00:00",
+    "path": "tournament/top40/critic_confirmation_lock.json",
+    "sha256": "9ed39def48f04eea55e79df789ba0be0e342d5f7d2095dc5015527b6f3ea0f2c"
+  },
   "critic_lock": {
     "cohort_sha256": "2d6d3efa9ec6276513481959d83df7fefe782a42b977cc937cd5597d372fc01d",
     "locked_at_utc": "2026-07-15T13:02:00.823639+00:00",
@@ -17,7 +23,7 @@
     "sha256": "966970749e4cbbccbeb851050ce31409a88b1ab05a99073f6b75eedf78d8f8e9"
   },
   "orchestrator_sha256": "205c6da1ce77654aefcf11770721d06d9e8a766b9f339b3ecd78afc10bc6f58c",
-  "phase": "critic_locked",
+  "phase": "dq_confirmed",
   "research_journal": {
     "genesis_sha256": "7db83e660d43c4c9420a534f3b96532cd2062bda4addafbf0a34613045e0638d",
     "head_sha256": "149ed194ce33bea691ad89accbde794e96f4e044eb079c012ee1311849898cc2",
