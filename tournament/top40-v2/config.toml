@@ -1,0 +1,153 @@
+schema_version = 2
+name = "quant-portfolio-blind-top40-v2"
+branch = "quant-portfolio-blind-top40-v2"
+teams = [
+  "team-01", "team-02", "team-03", "team-04", "team-05",
+  "team-06", "team-07", "team-08", "team-09", "team-10",
+]
+
+[paths]
+tournament_root = "tournament/top40-v2"
+reports_root = "reports-top40-v2"
+shared_snapshot_manifest = "tournament/top40/data_manifest.json"
+snapshot_dir = "data/top40/snapshot-v1"
+
+[data]
+source = "binance-public-usdm"
+venue = "binance-usdm"
+instrument = "linear-usdt-perpetual"
+transaction_interval = "8h"
+mark_price_interval = "1h"
+warmup_start = "2020-01-01"
+hard_end_exclusive = "2026-07-01"
+snapshot_binding = "shared-immutable-v1-by-sha256"
+
+[splits]
+visible_development_start = "2020-02-03"
+visible_development_end_inclusive = "2023-06-30"
+private_qualifier_start = "2023-07-01"
+private_qualifier_end_inclusive = "2024-06-30"
+final_oos_start = "2024-07-01"
+final_oos_end_inclusive = "2026-06-30"
+private_qualifier_feedback = "pass-fail-only"
+team_oos_visibility_before_finalist_lock = false
+
+[universe]
+size = 40
+reconstitution = "weekly-monday-00:00-utc"
+liquidity_measure = "median-daily-quote-volume"
+trailing_days = 30
+minimum_history_days = 30
+
+[execution]
+base_interval = "8h"
+initial_equity_usdt = 100000.0
+taker_fee_bps_per_side = 5.0
+slippage_bps_per_side = 2.5
+max_gross_exposure = 1.0
+max_abs_net_exposure = 0.25
+max_symbol_exposure = 0.10
+max_bar_participation = 0.001
+double_cost_multiplier = 2.0
+annualization_days = 365
+funding_at_rebalance_order = "funding-on-carried-position-then-risk-then-rebalance"
+
+[risk_policy]
+schema_version = 1
+organizer_owned_execution = true
+intrabar_stop_fills_allowed = false
+close_confirmed_stop_execution = "next-open"
+same_boundary_reentry_default = false
+risk_actions_pay_normal_costs = true
+risk_actions_share_participation_capacity = true
+
+[regimes]
+stress_trailing_days = 30
+stress_annualized_btc_vol = 0.80
+direction_trailing_days = 60
+bull_btc_return = 0.10
+bear_btc_return = -0.10
+lag_days = 1
+
+[statistics]
+bootstrap_samples = 2000
+bootstrap_block_days = 10
+bootstrap_seed = 20260801
+walk_forward_folds = 6
+
+[qualification.development]
+minimum_net_sharpe = 0.75
+minimum_annualized_return = 0.0
+minimum_calmar = 0.40
+maximum_drawdown = 0.30
+minimum_double_cost_sharpe = 0.35
+minimum_positive_folds = 4
+minimum_positive_quarter_fraction = 0.55
+minimum_trial_adjusted_probability_positive = 0.90
+
+[qualification.private]
+minimum_net_sharpe = 0.50
+minimum_annualized_return = 0.0
+maximum_drawdown = 0.30
+minimum_double_cost_sharpe = 0.0
+minimum_positive_quarter_fraction = 0.50
+maximum_attempts = 1
+
+[qualification.regimes]
+required_positive_return_regimes = ["bull", "bear", "chop"]
+minimum_positive_sharpe_regimes = 3
+minimum_worst_regime_sharpe = -0.25
+require_long_bull_positive = true
+require_short_bear_positive = true
+require_combined_chop_positive = true
+
+[qualification.sleeves]
+minimum_side_exposure = 0.01
+minimum_side_active_bar_fraction = 0.10
+minimum_mean_side_exposure = 0.01
+minimum_side_executed_notional_usdt = 1000.0
+
+[qualification.stability]
+minimum_profitable_neighbor_fraction = 0.70
+minimum_neighbor_median_sharpe = 0.50
+maximum_positive_pnl_concentration = 0.40
+
+[research_budget]
+maximum_material_configurations_per_team = 80
+maximum_mechanism_pivots_per_team = 2
+maximum_private_qualifier_attempts_per_team = 1
+maximum_final_oos_views_per_team = 0
+maximum_cpu_hours_per_team = 12.0
+maximum_wall_clock_hours_per_team = 18.0
+deadline_utc = "2026-08-01T18:00:00Z"
+strategy_seed = 20260801
+trial_seed_namespace = "20260801NN"
+append_only_trial_log_required = true
+
+[scoring]
+automatic_weight = 70.0
+critic_weight = 15.0
+user_weight = 15.0
+automatic_absolute_points = 50.0
+automatic_relative_points = 20.0
+require_is_qualification = true
+zero_finalists_result = "no-qualified-model"
+dnf_is_not_a_submission = true
+
+[scoring.absolute_anchors]
+oos_sharpe_zero = 0.0
+oos_sharpe_full = 1.5
+oos_drawdown_full = 0.15
+oos_drawdown_zero = 0.40
+double_cost_sharpe_zero = 0.0
+double_cost_sharpe_full = 0.75
+
+[paper_eligibility]
+minimum_development_net_sharpe = 0.75
+minimum_private_net_sharpe = 0.50
+minimum_final_oos_net_sharpe = 1.0
+minimum_double_cost_oos_sharpe = 0.5
+maximum_final_oos_drawdown = 0.30
+minimum_positive_quarter_fraction = 0.625
+minimum_worst_regime_sharpe = -0.25
+minimum_positive_regimes = 3
