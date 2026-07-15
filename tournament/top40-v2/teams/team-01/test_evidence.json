@@ -1,32 +1,49 @@
 {
   "artifact": "qe_test_evidence",
-  "candidate_id": "rdf-core-h21-k1-g05",
+  "baseline_comparison": {
+    "baseline_candidate_id": "rdf-ref-001",
+    "only_material_core_coordinate_delta": {
+      "path_efficiency_exponent": {
+        "from": 0.5,
+        "to": 1.0
+      }
+    }
+  },
+  "candidate_id": "rdf-core-h21-k3-g10",
   "central_evaluator_invoked": false,
   "clean_process_replays": {
-    "canonical_synthetic_target_sha256": "89013d78cea4a81462a17528a7c48d4d6c7857b2a9825d9d8bb66032d934bc12",
+    "canonical_synthetic_target_sha256": "7a08069e083289a37204b6be93f2916b2219c35272c1ba4e0a2617137a3c2f03",
     "identical": true,
     "process_count": 2,
     "runtime_seed": 20260801
   },
-  "created_at_utc": "2026-07-15T21:37:23Z",
+  "created_at_utc": "2026-07-15T23:10:32Z",
   "dependencies_tested": {
-    "numpy": "2.4.3",
-    "pandas": "3.0.3",
-    "python": "3.11.15"
+    "numpy": "2.2.6",
+    "pandas": "3.0.0",
+    "python": "3.13.12"
   },
   "files_sha256": {
-    "frozen_config.json": "082b52dc817f728b8eb0308a33bc9c4015a81a69d7b3dc5c1e7a939005070af0",
+    "frozen_config.json": "22097466ca921816f61f337c69b5f6e6439655a3e29ad91ed8ecd292d4713247",
     "risk_policy.json": "9efd1401ffec46a7767fe625d70538b1aa5a9281a46fdb1bc06e90c264dc7e5b",
-    "strategy.py": "d70827ffbe7532f1dcc3be207b3e3479a281e14d9d4cff8a362573559b6c5f8f",
-    "test_strategy.py": "2b7c46ff06b130b62fc2d67a61725b80b590be12dfa24d7d350a02be27c07f0a"
+    "strategy.py": "127449e75cdd3ec17f63bf7c36e3639568829501e16fe5e362203e53e1b6b773",
+    "test_strategy.py": "ed6115a059176a5d8199d558a5655b19d04cdd3fd568803662a4426baf3a07f8"
   },
   "family_id": "t01-residual-drift-funding-v1",
+  "official_worker_smoke": {
+    "direct_targets_matched": true,
+    "namespaced_worker": true,
+    "process_count_per_suite": 2,
+    "suite_replay_count": 2,
+    "synthetic_only": true,
+    "total_process_count": 4
+  },
   "result": {
     "failed": 0,
-    "passed": 12
+    "passed": 14
   },
   "schema_version": 1,
-  "suite_command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src python -m pytest tournament/top40-v2/teams/team-01/test_strategy.py -q",
+  "suite_command": "PYTHONDONTWRITEBYTECODE=1 uv run pytest tournament/top40-v2/teams/team-01/test_strategy.py -q",
   "synthetic_checks": [
     "fresh factory instances and repeated deterministic targets",
     "canonical runtime seed and daily hold/rebalance semantics",
@@ -35,9 +52,12 @@
     "point-in-time eligible membership removal",
     "positive funding lowers the score and negative funding raises it",
     "ascending-symbol score tie break",
+    "exact E^1.0 path-efficiency effect versus the otherwise identical E^0.5 baseline",
+    "all non-gamma frozen coordinates equal the solvent baseline binding",
+    "two independent official namespaced-worker synthetic runs equal direct targets",
     "duplicate, NaN, Inf, sparse-history, missing-BTC, and one-sided-flat behavior",
     "eligible-only finite outputs with gross, net, per-symbol, and two-sleeve bounds",
-    "frozen rdf-core-h21-k1-g05 parameters and declarative no-control risk policy"
+    "frozen rdf-core-h21-k3-g10 parameters and byte-identical no-control risk policy"
   ],
   "team_id": "team-01"
 }

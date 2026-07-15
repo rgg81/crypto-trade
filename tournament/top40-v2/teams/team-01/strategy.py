@@ -80,8 +80,8 @@ class StrategyParameters:
 
 REFERENCE_PARAMETERS = StrategyParameters(
     residual_lookback_days=21,
-    skip_days=1,
-    path_efficiency_exponent=0.5,
+    skip_days=3,
+    path_efficiency_exponent=1.0,
     rank_tail_fraction=0.25,
     direction_tilt_delta=0.075,
 )
@@ -555,6 +555,6 @@ def _valid_targets(
 
 
 def build_strategy() -> ResidualDriftFundingStrategy:
-    """Return a fresh rdf-core-h21-k1-g05 strategy instance for the canonical worker."""
+    """Return a fresh rdf-core-h21-k3-g10 strategy instance for the canonical worker."""
 
     return ResidualDriftFundingStrategy(REFERENCE_PARAMETERS)

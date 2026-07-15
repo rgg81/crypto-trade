@@ -1,11 +1,11 @@
 {
   "artifact": "frozen_reference_config",
-  "candidate_id": "rdf-core-h21-k1-g05",
+  "candidate_id": "rdf-core-h21-k3-g10",
   "candidate_status": "deterministic_core_candidate_not_yet_registered_or_evaluated",
   "dependencies": {
-    "numpy": "2.4.3",
-    "pandas": "3.0.3",
-    "python": "3.11.15"
+    "numpy": "2.2.6",
+    "pandas": "3.0.0",
+    "python": "3.13.12"
   },
   "execution_contract": {
     "bar_interval": "8h",
@@ -49,12 +49,12 @@
     "minimum_names_per_side": 6,
     "minimum_paired_returns": 72,
     "minimum_valid_symbols": 24,
-    "path_efficiency_exponent": 0.5,
+    "path_efficiency_exponent": 1.0,
     "per_symbol_target_cap": 0.09,
     "rank_tail_fraction": 0.25,
     "residual_denominator_floor": 1e-08,
     "residual_lookback_days": 21,
-    "skip_days": 1,
+    "skip_days": 3,
     "total_gross": 0.8
   },
   "risk_policy": {

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+import dataclasses
 import hashlib
 import importlib.util
 import json
@@ -14,11 +15,34 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from crypto_trade.tournament.protocol import DecisionContext
+from crypto_trade.tournament import runner_v2
+from crypto_trade.tournament.protocol import REBALANCE_INSTRUCTION_COLUMN, DecisionContext
 
 _TEAM_DIR = Path(__file__).resolve().parent
 _DECISION_TIME = pd.Timestamp(year=2023, month=6, day=30, tz="UTC")
 _RUNTIME_SEED = 20260801
+_BASELINE_FROZEN_PARAMETERS = {
+    "beta_clip": [-1.0, 3.0],
+    "beta_lookback_days": 30,
+    "btc_symbol": "BTCUSDT",
+    "btc_variance_floor": 1e-12,
+    "direction_lookback_days": 60,
+    "direction_return_scale": 0.2,
+    "direction_tilt_delta": 0.075,
+    "funding_lookback_days": 7,
+    "funding_penalty": 0.35,
+    "minimum_funding_events": 14,
+    "minimum_names_per_side": 6,
+    "minimum_paired_returns": 72,
+    "minimum_valid_symbols": 24,
+    "path_efficiency_exponent": 0.5,
+    "per_symbol_target_cap": 0.09,
+    "rank_tail_fraction": 0.25,
+    "residual_denominator_floor": 1e-8,
+    "residual_lookback_days": 21,
+    "skip_days": 3,
+    "total_gross": 0.8,
+}
 
 
 def _load_strategy_module():
@@ -130,7 +154,54 @@ def _target_hash(targets: dict[str, float]) -> str:
     return hashlib.sha256(encoded).hexdigest()
 
 
-def test_reference_factory_is_fresh_deterministic_and_bounded() -> None:
+def _official_worker_targets(context: DecisionContext) -> dict[str, float]:
+    root = _TEAM_DIR.parents[3]
+    entrypoint = _TEAM_DIR / "strategy.py"
+    source_fingerprint, _ = runner_v2.source_bundle_fingerprint(
+        root,
+        "team-01",
+        entrypoint.relative_to(root),
+    )
+
+    bar_frames: list[pd.DataFrame] = []
+    for frame in context.bars.values():
+        future_open = frame.iloc[[-1]].copy(deep=True)
+        future_open.loc[:, "open_time"] = context.decision_time
+        bar_frames.append(pd.concat([frame, future_open], ignore_index=True))
+    bars = pd.concat(bar_frames, ignore_index=True)
+    membership = pd.DataFrame(
+        [
+            {
+                "reconstitution_time": context.decision_time - pd.Timedelta(days=4),
+                "symbol": symbol,
+                "liquidity_rank": rank,
+                "trailing_quote_volume": 10_000_000.0 - rank,
+            }
+            for rank, symbol in enumerate(context.eligible_symbols, start=1)
+        ]
+    )
+    target_frame = runner_v2._generate_targets_in_worker(
+        root,
+        "team-01",
+        entrypoint,
+        bars,
+        context.funding,
+        membership,
+        [context.decision_time],
+        seed=_RUNTIME_SEED,
+        interval_hours=8,
+        expected_source_bundle_sha256=source_fingerprint,
+    )
+    row = target_frame.loc[context.decision_time]
+    assert bool(row[REBALANCE_INSTRUCTION_COLUMN])
+    return {
+        str(symbol): float(weight)
+        for symbol, weight in row.items()
+        if symbol != REBALANCE_INSTRUCTION_COLUMN and float(weight) != 0.0
+    }
+
+
+def test_candidate_factory_is_fresh_deterministic_and_bounded() -> None:
     first_strategy = strategy_module.build_strategy()
     second_strategy = strategy_module.build_strategy()
     assert first_strategy is not second_strategy
@@ -263,6 +334,83 @@ def test_equal_scores_use_ascending_symbol_tie_break() -> None:
     assert [symbol for symbol, _, _ in long_tail] == ["G", "H"]
 
 
+def test_gamma_one_applies_the_exact_registered_path_efficiency_exponent() -> None:
+    context = _synthetic_context()
+    symbol = "A14USDT"
+    btc_history = strategy_module._closed_history(
+        context.bars["BTCUSDT"], context.decision_time
+    )
+    symbol_history = strategy_module._closed_history(
+        context.bars[symbol], context.decision_time
+    )
+    assert btc_history is not None and symbol_history is not None
+    _, btc_returns = btc_history
+    _, symbol_returns = symbol_history
+    funding = strategy_module._funding_pressures(
+        context.funding,
+        eligible=context.eligible_symbols,
+        decision_time=context.decision_time,
+        lookback_days=7,
+        minimum_events=14,
+    )
+    assert funding is not None and symbol in funding
+
+    gamma_one = strategy_module.build_strategy()
+    baseline_parameters = dataclasses.replace(
+        strategy_module.REFERENCE_PARAMETERS,
+        path_efficiency_exponent=0.5,
+    )
+    gamma_half = strategy_module.ResidualDriftFundingStrategy(baseline_parameters)
+    signal_one = gamma_one._symbol_signal(
+        symbol,
+        symbol_returns=symbol_returns,
+        btc_returns=btc_returns,
+        funding_pressure=funding[symbol],
+        decision_time=context.decision_time,
+    )
+    signal_half = gamma_half._symbol_signal(
+        symbol,
+        symbol_returns=symbol_returns,
+        btc_returns=btc_returns,
+        funding_pressure=funding[symbol],
+        decision_time=context.decision_time,
+    )
+    assert signal_one is not None and signal_half is not None
+
+    parameters = strategy_module.REFERENCE_PARAMETERS
+    beta_times = pd.date_range(
+        end=context.decision_time,
+        periods=3 * parameters.beta_lookback_days,
+        freq="8h",
+    )
+    y_beta = symbol_returns.reindex(beta_times).to_numpy(dtype=float)
+    x_beta = btc_returns.reindex(beta_times).to_numpy(dtype=float)
+    paired = np.isfinite(y_beta) & np.isfinite(x_beta)
+    centered_x = x_beta[paired] - float(np.mean(x_beta[paired]))
+    centered_y = y_beta[paired] - float(np.mean(y_beta[paired]))
+    beta = float(np.mean(centered_x * centered_y) / np.mean(centered_x * centered_x))
+    beta = float(np.clip(beta, -1.0, 3.0))
+    drift_times = pd.date_range(
+        end=context.decision_time - pd.Timedelta(days=3),
+        periods=63,
+        freq="8h",
+    )
+    residuals = (
+        symbol_returns.reindex(drift_times).to_numpy(dtype=float)
+        - beta * btc_returns.reindex(drift_times).to_numpy(dtype=float)
+    )
+    residual_sum = float(np.sum(residuals))
+    residual_volatility = float(np.std(residuals, ddof=1))
+    trend = residual_sum / max(residual_volatility * math.sqrt(63.0), 1e-8)
+    efficiency = abs(residual_sum) / max(float(np.sum(np.abs(residuals))), 1e-8)
+    assert 0.0 < efficiency < 1.0
+    assert signal_one.drift == pytest.approx(trend * efficiency, rel=1e-13, abs=1e-13)
+    assert signal_half.drift == pytest.approx(
+        trend * math.sqrt(efficiency), rel=1e-13, abs=1e-13
+    )
+    assert abs(signal_one.drift) < abs(signal_half.drift)
+
+
 @pytest.mark.parametrize("defect", ["duplicate", "nonfinite_close", "nonfinite_funding"])
 def test_invalid_past_data_with_inadequate_remaining_coverage_requests_flat(defect: str) -> None:
     context = _synthetic_context(asset_count=24)
@@ -323,19 +471,79 @@ def test_canonical_target_hash_is_clean_process_stable() -> None:
     first = _target_hash(_targets(_synthetic_context()))
     second = _target_hash(_targets(_synthetic_context()))
     assert first == second
-    assert first == "89013d78cea4a81462a17528a7c48d4d6c7857b2a9825d9d8bb66032d934bc12"
+    assert first == "7a08069e083289a37204b6be93f2916b2219c35272c1ba4e0a2617137a3c2f03"
+
+
+def test_official_namespaced_worker_matches_direct_synthetic_targets_twice() -> None:
+    context = _synthetic_context()
+    direct = _targets(context)
+    first_worker = _official_worker_targets(context)
+    second_worker = _official_worker_targets(context)
+    assert first_worker == direct
+    assert second_worker == direct
+    assert _target_hash(first_worker) == _target_hash(second_worker)
 
 
 def test_frozen_current_candidate_and_no_control_policy_match_qr_decision() -> None:
     frozen = json.loads((_TEAM_DIR / "frozen_config.json").read_text(encoding="utf-8"))
-    policy = json.loads((_TEAM_DIR / "risk_policy.json").read_text(encoding="utf-8"))
-    assert frozen["candidate_id"] == "rdf-core-h21-k1-g05"
-    assert frozen["parameters"]["residual_lookback_days"] == 21
-    assert frozen["parameters"]["skip_days"] == 1
-    assert frozen["parameters"]["path_efficiency_exponent"] == 0.5
-    assert frozen["parameters"]["rank_tail_fraction"] == 0.25
-    assert frozen["parameters"]["direction_tilt_delta"] == 0.075
-    assert frozen["seeds"]["canonical_runtime"] == _RUNTIME_SEED
+    risk_policy_bytes = (_TEAM_DIR / "risk_policy.json").read_bytes()
+    policy = json.loads(risk_policy_bytes)
+    assert frozen["candidate_id"] == "rdf-core-h21-k3-g10"
+    assert (
+        frozen["candidate_status"]
+        == "deterministic_core_candidate_not_yet_registered_or_evaluated"
+    )
+    expected_candidate = dict(_BASELINE_FROZEN_PARAMETERS)
+    expected_candidate["path_efficiency_exponent"] = 1.0
+    assert frozen["parameters"] == expected_candidate
+    assert {
+        key: value
+        for key, value in frozen["parameters"].items()
+        if key != "path_efficiency_exponent"
+    } == {
+        key: value
+        for key, value in _BASELINE_FROZEN_PARAMETERS.items()
+        if key != "path_efficiency_exponent"
+    }
+    assert dataclasses.asdict(strategy_module.REFERENCE_PARAMETERS) == {
+        "residual_lookback_days": 21,
+        "skip_days": 3,
+        "path_efficiency_exponent": 1.0,
+        "rank_tail_fraction": 0.25,
+        "direction_tilt_delta": 0.075,
+        "beta_lookback_days": 30,
+        "minimum_paired_returns": 72,
+        "funding_lookback_days": 7,
+        "minimum_funding_events": 14,
+        "funding_penalty": 0.35,
+        "direction_lookback_days": 60,
+        "direction_return_scale": 0.2,
+        "total_gross": 0.8,
+        "per_symbol_cap": 0.09,
+        "minimum_valid_symbols": 24,
+        "minimum_names_per_side": 6,
+    }
+    assert frozen["execution_contract"] == {
+        "bar_interval": "8h",
+        "funding_availability": "funding_time < decision_time",
+        "invalid_scheduled_request": "flat_empty_mapping",
+        "non_rebalance_request": "hold_none",
+        "rebalance_boundary_utc": "00:00",
+        "target_execution": "organizer_owned_next_executable_open",
+    }
+    assert frozen["risk_policy"] == {
+        "cost_multiplier": 1.0,
+        "enabled_controls": [],
+        "path": "risk_policy.json",
+        "policy_id": "team-01-base",
+    }
+    assert frozen["seeds"] == {
+        "canonical_runtime": _RUNTIME_SEED,
+        "team_trial_search_placebo_namespace_not_used_for_targets": 2026080101,
+    }
+    assert hashlib.sha256(risk_policy_bytes).hexdigest() == (
+        "9efd1401ffec46a7767fe625d70538b1aa5a9281a46fdb1bc06e90c264dc7e5b"
+    )
     assert policy["drawdown_brakes"] == []
     assert policy["volatility_target"]["enabled"] is False
     assert policy["position_stop"]["enabled"] is False
