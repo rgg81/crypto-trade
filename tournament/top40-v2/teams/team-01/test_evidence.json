@@ -1,0 +1,43 @@
+{
+  "artifact": "qe_test_evidence",
+  "candidate_id": "RDF-REF-001",
+  "central_evaluator_invoked": false,
+  "clean_process_replays": {
+    "canonical_synthetic_target_sha256": "7a08069e083289a37204b6be93f2916b2219c35272c1ba4e0a2617137a3c2f03",
+    "identical": true,
+    "process_count": 2,
+    "runtime_seed": 20260801
+  },
+  "created_at_utc": "2026-07-15T20:04:21Z",
+  "dependencies_tested": {
+    "numpy": "2.4.3",
+    "pandas": "3.0.3",
+    "python": "3.11.15"
+  },
+  "files_sha256": {
+    "frozen_config.json": "8cc4ce332259e49bcdac1cde03517cbf11cdc537715c18310b15a79af4257821",
+    "risk_policy.json": "9efd1401ffec46a7767fe625d70538b1aa5a9281a46fdb1bc06e90c264dc7e5b",
+    "strategy.py": "800d26540ceb433fd4c3f73490038b9f9511bebd5e7a383eb61fabcbbc0dce72",
+    "test_strategy.py": "c8fd0eabbe3aaaaddccf0f310bc2d918d4a95a5d0350144851288e2bffea0109"
+  },
+  "family_id": "t01-residual-drift-funding-v1",
+  "result": {
+    "failed": 0,
+    "passed": 12
+  },
+  "schema_version": 1,
+  "suite_command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src python -m pytest tournament/top40-v2/teams/team-01/test_strategy.py -q",
+  "synthetic_checks": [
+    "fresh factory instances and repeated deterministic targets",
+    "canonical runtime seed and daily hold/rebalance semantics",
+    "future append, future corruption, and unexposed-open invariance",
+    "strict exclusion of funding_time equal to or after the decision",
+    "point-in-time eligible membership removal",
+    "positive funding lowers the score and negative funding raises it",
+    "ascending-symbol score tie break",
+    "duplicate, NaN, Inf, sparse-history, missing-BTC, and one-sided-flat behavior",
+    "eligible-only finite outputs with gross, net, per-symbol, and two-sleeve bounds",
+    "frozen RDF-REF-001 parameters and declarative no-control risk policy"
+  ],
+  "team_id": "team-01"
+}

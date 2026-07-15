@@ -22,10 +22,10 @@
     "maximum_one_way_turnover": 1.0
   },
   "volatility_target": {
-    "annualized_target": 0.4,
+    "annualized_target": 0.35,
     "enabled": false,
     "lookback_days": 30,
     "maximum_scale": 1.0,
-    "minimum_scale": 0.0
+    "minimum_scale": 0.25
   }
 }

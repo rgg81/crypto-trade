@@ -184,6 +184,42 @@ rule. If no candidate clears every gate, there is no champion.
 | Canonical runtime strategy seed | `20260801`, frozen by `config.toml`; this is the only worker/production target seed |
 | Team trial/search/placebo namespace | `2026080101`; never passed as the worker seed and never used to alter a production target |
 
+### 6.1 Normative initial reference/test cell
+
+The exact first implementation and test reference is `RDF-REF-001`. This is a pre-data
+clarification using only already-registered values; it neither narrows the registered search domain
+nor preselects a champion.
+
+| Reference field | Normative value |
+|---|---|
+| Cost/control cell | frozen base costs (`1.0x`); no organizer risk controls enabled |
+| Runtime seed | `20260801` |
+| BTC beta | 30 days, minimum 72 paired 8h returns, no intercept removal, clip `[-1,3]`, BTC variance floor `1e-12` |
+| Drift horizon `H` | **21 days** |
+| Skip `K` | **3 days** |
+| Path exponent `gamma` | **0.5** |
+| Residual statistic | sample standard deviation; denominator floor `1e-8` |
+| Funding | 7-day actual-event sum, minimum 14 events, `lambda_funding=0.35`, strictly `funding_time < t` |
+| Cross-sectional scale | median / `1.4826*MAD`, clipped `[-3,3]`; flat when MAD `<=1e-12` |
+| Tail fraction `q` | **0.25** |
+| Direction | BTC 60-day log return divided by `0.20`, clipped `[-1,1]`; neutral `m=0` during direction warmup |
+| Direction tilt `delta` | **0.075** |
+| Sleeve gross | long `0.40 + 0.075m`; short magnitude `0.40 - 0.075m`; total gross `0.80` |
+| Sleeve weights | inverse residual volatility, contemporaneously winsorized at 20th/80th percentiles, deterministic capped-simplex projection |
+| Capacity/coverage | symbol target cap `0.09`; minimum 24 valid symbols and six signed names per side |
+| Asset treatment | BTC is the factor and is excluded from ranked assets; no substitute factor |
+| Rebalance/output | `00:00 UTC` target; `None` at `08:00/16:00`; `{}` at a scheduled boundary on invalid or infeasible two-sided input |
+| Tie break | ascending symbol after score ordering |
+| No-control policy | volatility target disabled; drawdown brakes empty; position/time stops and turnover limit disabled; side scales `1.0/1.0`; same-boundary reentry false |
+
+`H=21` and `q=0.25` are the central registered values, while `delta=0.075` is the registered core
+reference. `K=3` is chosen before data to keep the defining continuation window clearly separated
+from the latest liquidation/bounce interval and from any prohibited short-horizon reversal switch.
+`gamma=0.5` is chosen before data as a concave path-efficiency weight: it rewards coherent paths
+without allowing a noisy estimate near zero to eliminate too much cross-sectional breadth. These
+choices are scientific defaults, not evidence-based preferences. Any material alternative remains
+a separately preregistered trial under the original domain.
+
 The parameter neighborhood is a nine-cell Cartesian cross around the selected `(H, q)`:
 `H + {-7,0,+7}` days by `q + {-0.05,0,+0.05}`, clipped only to the preregistered bounds. The
 center may reuse its already registered result; the eight distinct neighbors are separately

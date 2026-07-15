@@ -70,6 +70,21 @@ writing this package.
 - The private qualifier receives one frozen ticket only after a complete development pass. Final
   OOS remains inaccessible as a research view.
 
+## Pre-data reference-cell clarification
+
+At `2026-07-15T19:53:41Z`, before any team-01 trial, data view, evaluator call, or result, the QR
+resolved the registered-domain tie for the initial implementation/test cell as `RDF-REF-001`:
+`H=21d`, `K=3d`, `gamma=0.5`, `q=0.25`, and `delta=0.075`, with every other baseline constant
+listed normatively in section 6.1 of `research_brief.md`. The cell uses frozen base costs, no
+enabled organizer risk controls, and runtime seed `20260801`.
+
+The choice is structural rather than empirical. `H=21` and `q=0.25` are registered central values;
+`delta=0.075` was already the registered core reference; `K=3` separates medium-horizon
+continuation from recent bounce/liquidation noise; and concave `gamma=0.5` rewards path coherence
+without aggressively collapsing breadth. This clarification changes neither the family thesis nor
+its registered parameter domain, registration input, or organizer family ledger. It does not make
+the reference cell a champion and does not authorize an unregistered trial.
+
 ## Organizer collision-control guardrail
 
 Family identity is frozen as **BTC-factor residual, path-efficient, medium-horizon continuation**.
