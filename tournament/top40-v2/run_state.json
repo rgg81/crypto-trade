@@ -7,8 +7,11 @@
   "final_oos_lock": null,
   "finalist_cohort_lock": null,
   "objective_lock": null,
-  "phase": "phase0_pending",
-  "phase0": null,
+  "phase": "research",
+  "phase0": {
+    "path": "tournament/top40-v2/phase0_freeze.json",
+    "sha256": "cc7484d0be2fe6b64b34b6f4c7ce76647af750b02c3df065c4b81e10f1396259"
+  },
   "qualification_lock": null,
   "research_journal": {
     "genesis_sha256": "a11eee0475d514a1f022deda4e62014536f12bfb074556546645c5f8255a48ed",
@@ -30,7 +33,7 @@
       "private_attempts": 0,
       "private_result": null,
       "qualifier_candidate": null,
-      "status": "pending_phase0",
+      "status": "researching",
       "trial_count": 0
     },
     "team-02": {
@@ -44,7 +47,7 @@
       "private_attempts": 0,
       "private_result": null,
       "qualifier_candidate": null,
-      "status": "pending_phase0",
+      "status": "researching",
       "trial_count": 0
     },
     "team-03": {
@@ -58,7 +61,7 @@
       "private_attempts": 0,
       "private_result": null,
       "qualifier_candidate": null,
-      "status": "pending_phase0",
+      "status": "researching",
       "trial_count": 0
     },
     "team-04": {
@@ -72,7 +75,7 @@
       "private_attempts": 0,
       "private_result": null,
       "qualifier_candidate": null,
-      "status": "pending_phase0",
+      "status": "researching",
       "trial_count": 0
     },
     "team-05": {
@@ -86,7 +89,7 @@
       "private_attempts": 0,
       "private_result": null,
       "qualifier_candidate": null,
-      "status": "pending_phase0",
+      "status": "researching",
       "trial_count": 0
     },
     "team-06": {
@@ -100,7 +103,7 @@
       "private_attempts": 0,
       "private_result": null,
       "qualifier_candidate": null,
-      "status": "pending_phase0",
+      "status": "researching",
       "trial_count": 0
     },
     "team-07": {
@@ -114,7 +117,7 @@
       "private_attempts": 0,
       "private_result": null,
       "qualifier_candidate": null,
-      "status": "pending_phase0",
+      "status": "researching",
       "trial_count": 0
     },
     "team-08": {
@@ -128,7 +131,7 @@
       "private_attempts": 0,
       "private_result": null,
       "qualifier_candidate": null,
-      "status": "pending_phase0",
+      "status": "researching",
       "trial_count": 0
     },
     "team-09": {
@@ -142,7 +145,7 @@
       "private_attempts": 0,
       "private_result": null,
       "qualifier_candidate": null,
-      "status": "pending_phase0",
+      "status": "researching",
       "trial_count": 0
     },
     "team-10": {
@@ -156,7 +159,7 @@
       "private_attempts": 0,
       "private_result": null,
       "qualifier_candidate": null,
-      "status": "pending_phase0",
+      "status": "researching",
       "trial_count": 0
     }
   },
