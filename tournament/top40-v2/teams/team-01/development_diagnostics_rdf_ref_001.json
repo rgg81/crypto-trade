@@ -1,0 +1,354 @@
+{
+  "aggregate": {
+    "base": {
+      "annualized_return": 0.279696436453,
+      "annualized_volatility": 0.246314068075,
+      "calmar": 0.613845169475,
+      "expected_shortfall_1pct": -0.041898858215,
+      "max_drawdown": 0.455646554475,
+      "net_sharpe": 1.123931345681,
+      "sharpe_95": [
+        -0.003884019639,
+        2.193983210088
+      ],
+      "total_return": 1.317629430578,
+      "var_1pct": -0.03295505475,
+      "worst_day": -0.060949993345
+    },
+    "double_cost": {
+      "annualized_return": 0.172030720173,
+      "annualized_volatility": 0.246402887305,
+      "calmar": 0.319279767626,
+      "expected_shortfall_1pct": -0.042178804981,
+      "max_drawdown": 0.538808711409,
+      "net_sharpe": 0.766778680809,
+      "sharpe_95": [
+        -0.377006586995,
+        1.85319967293
+      ],
+      "total_return": 0.717747026364,
+      "var_1pct": -0.033205764301,
+      "worst_day": -0.061087216962
+    },
+    "scored_days": 1244
+  },
+  "candidate_id": "rdf-ref-001",
+  "causal_assessment": {
+    "family_status": "not_yet_falsified_but_reference_rejected",
+    "funding_sign_premise": "supported_accountingly_but_no_zero_funding_ablation",
+    "overall_short_sleeve": "negative_before_shared_costs",
+    "pooled_next_day_score_ic": null,
+    "positive_ic_fold_count": null,
+    "raw_momentum_comparison": null,
+    "reference_causal_minima": {
+      "aggregate_no_control_sharpe_positive": true,
+      "at_least_four_positive_folds": false,
+      "pooled_score_ic_positive": null,
+      "positive_ic_in_at_least_four_folds": null
+    },
+    "risk_overlay_rescue_allowed": false
+  },
+  "concentration_diagnostics": {
+    "formal_organizer_field_available": false,
+    "largest_positive_fold_pnl_fraction": 0.564020165251,
+    "largest_positive_quarter_pnl_fraction": 0.450734785525,
+    "threshold": 0.4
+  },
+  "decision": {
+    "action": "continue_declared_12_cell_core_grid",
+    "next_cell": {
+      "candidate_id": "rdf-core-h21-k1-g05",
+      "changed_parameter_only": {
+        "skip_days": {
+          "from": 3,
+          "to": 1
+        }
+      },
+      "direction_tilt_delta": 0.075,
+      "path_efficiency_exponent": 0.5,
+      "rank_tail_fraction": 0.25,
+      "residual_lookback_days": 21,
+      "risk_policy_id": "team-01-base",
+      "seed": 20260801,
+      "status": "planned_not_registered_not_run"
+    },
+    "rationale": "Test whether reducing the registered skip makes medium-horizon continuation responsive enough to repair the negative bear, late-fold, short-sleeve, drawdown, and quarter evidence without changing mechanism identity.",
+    "stop_rules": [
+      "No core cell receives construction or risk overlays if aggregate no-control Sharpe is nonpositive, positive folds are fewer than four, pooled next-day score IC is nonpositive, or positive-IC folds are fewer than four once IC evidence exists.",
+      "Failure of rdf-core-h21-k1-g05 on a causal minimum kills that exact branch without a risk overlay; other registered core cells remain available.",
+      "If none of all 12 registered core cells clears all four causal minima, stop the family and pivot or record DNF without expanding its parameter domain.",
+      "No cell advances as champion before every V2 gate, six manifests, trial adjustment, component checks, and parameter neighbors are complete."
+    ]
+  },
+  "next_decision": {
+    "action": "continue_declared_12_cell_core_grid",
+    "baseline_candidate_id": "rdf-ref-001",
+    "candidate_id": "rdf-core-h21-k1-g05",
+    "causal_stop_rules": [
+      "Kill this cell without construction or risk overlays if aggregate no-control Sharpe is nonpositive, fewer than four folds are positive, pooled next-day score IC is nonpositive, or fewer than four folds have positive score IC once IC evidence exists.",
+      "Failure kills only this exact branch; other already-declared core cells remain available.",
+      "Stop the family and pivot or record DNF if none of all 12 core cells clears all four causal minima."
+    ],
+    "cost_multiplier": 1.0,
+    "only_parameter_delta": {
+      "skip_days": {
+        "from": 3,
+        "to": 1
+      }
+    },
+    "parameters": {
+      "beta_clip": [
+        -1,
+        3
+      ],
+      "beta_lookback_days": 30,
+      "btc_symbol": "BTCUSDT",
+      "btc_variance_floor": 1e-12,
+      "direction_lookback_days": 60,
+      "direction_return_scale": 0.2,
+      "direction_tilt_delta": 0.075,
+      "funding_lookback_days": 7,
+      "funding_penalty": 0.35,
+      "minimum_funding_events": 14,
+      "minimum_names_per_side": 6,
+      "minimum_paired_returns": 72,
+      "minimum_valid_symbols": 24,
+      "path_efficiency_exponent": 0.5,
+      "per_symbol_target_cap": 0.09,
+      "rank_tail_fraction": 0.25,
+      "rebalance_boundary_utc": "00:00",
+      "residual_denominator_floor": 1e-08,
+      "residual_lookback_days": 21,
+      "risk_policy_id": "team-01-base",
+      "skip_days": 1,
+      "total_gross": 0.8
+    },
+    "risk_controls": "none",
+    "seed": 20260801,
+    "status": "planned_not_registered_not_run"
+  },
+  "drawdown_path": {
+    "end_drawdown": 0.454086774684,
+    "peak_date": "2021-11-22",
+    "recovered_by_development_end": false,
+    "trough_date": "2023-05-11"
+  },
+  "evidence_files": [
+    "tournament/top40-v2/teams/team-01/experiments.jsonl",
+    "reports-top40-v2/team-01/qualification-attempts/rdf-ref-001.runner-record.json",
+    "reports-top40-v2/team-01/development-runs/rdf-ref-001/daily_returns.csv",
+    "reports-top40-v2/team-01/development-runs/rdf-ref-001/double_cost_daily_returns.csv",
+    "reports-top40-v2/team-01/development-runs/rdf-ref-001/bar_returns.csv",
+    "reports-top40-v2/team-01/development-runs/rdf-ref-001/double_cost_bar_returns.csv",
+    "reports-top40-v2/team-01/development-runs/rdf-ref-001/events.parquet",
+    "reports-top40-v2/team-01/development-runs/rdf-ref-001/positions.parquet",
+    "reports-top40-v2/team-01/development-runs/rdf-ref-001/targets.parquet",
+    "reports-top40-v2/team-01/development-runs/rdf-ref-001/trades.csv"
+  ],
+  "execution_and_risk": {
+    "active_bar_fraction": 0.869774919614,
+    "base_fee_usd": 56176.224693862285,
+    "base_slippage_usd": 28088.112346931142,
+    "common_exposure_cap_reduction_events": 54,
+    "declarative_risk_overlay_enabled": false,
+    "executed_trade_rows": 22733,
+    "fill_fraction": 0.99886245245,
+    "first_nonzero_target": "2020-07-04T00:00:00Z",
+    "max_abs_net_exposure": 0.231047707288,
+    "max_gross_exposure": 1.000000000001,
+    "mean_gross_exposure_active": 0.800663346671,
+    "membership_exit_events": 171,
+    "requested_notional_usd": 112480401.1925,
+    "risk_cap_breach_count": 2,
+    "scheduled_flat_rebalances": 162,
+    "scheduled_nonzero_rebalances": 1082,
+    "scheduled_rebalances": 1244,
+    "turnover_annualized_one_way": 117.041960511088,
+    "turnover_sum": 398.904654454228,
+    "unfilled_notional_usd": 127951.804775,
+    "worst_bar_return": -0.044119345329,
+    "zero_day_fraction": 0.12459807074
+  },
+  "family_id": "t01-residual-drift-funding-v1",
+  "folds": [
+    {
+      "base_max_drawdown": 0.094803075289,
+      "base_return": 0.018375244174,
+      "base_sharpe": 0.300775188702,
+      "double_return": 0.003371638487,
+      "double_sharpe": 0.109789104053,
+      "end_exclusive": "2020-09-01",
+      "fold": "F1",
+      "start": "2020-02-03"
+    },
+    {
+      "base_max_drawdown": 0.118647812356,
+      "base_return": 1.676600037005,
+      "base_sharpe": 4.889053285193,
+      "double_return": 1.541924023502,
+      "double_sharpe": 4.640834648853,
+      "end_exclusive": "2021-04-01",
+      "fold": "F2",
+      "start": "2020-09-01"
+    },
+    {
+      "base_max_drawdown": 0.108114598348,
+      "base_return": 0.47745089945,
+      "base_sharpe": 2.3925574373,
+      "double_return": 0.393312322438,
+      "double_sharpe": 2.053681769555,
+      "end_exclusive": "2021-11-01",
+      "fold": "F3",
+      "start": "2021-04-01"
+    },
+    {
+      "base_max_drawdown": 0.231349471951,
+      "base_return": -0.189701674345,
+      "base_sharpe": -1.487000737246,
+      "double_return": -0.237408424905,
+      "double_sharpe": -1.946784244789,
+      "end_exclusive": "2022-06-01",
+      "fold": "F4",
+      "start": "2021-11-01"
+    },
+    {
+      "base_max_drawdown": 0.212205750927,
+      "base_return": -0.132558560581,
+      "base_sharpe": -1.215703764902,
+      "double_return": -0.18410755309,
+      "double_sharpe": -1.779423017215,
+      "end_exclusive": "2023-01-01",
+      "fold": "F5",
+      "start": "2022-06-01"
+    },
+    {
+      "base_max_drawdown": 0.224070132036,
+      "base_return": -0.181243953307,
+      "base_sharpe": -2.263506064207,
+      "double_return": -0.223106612363,
+      "double_sharpe": -2.876333953332,
+      "end_exclusive": "2023-07-01",
+      "fold": "F6",
+      "start": "2023-01-01"
+    }
+  ],
+  "formal_qualification_claimed": false,
+  "gate_summary": {
+    "diagnostic_fail": [
+      "positive_pnl_concentration"
+    ],
+    "diagnostic_pass": [
+      "minimum_side_exposure",
+      "minimum_side_active_fraction",
+      "minimum_mean_side_exposure",
+      "minimum_side_executed_notional"
+    ],
+    "fail": [
+      "maximum_drawdown",
+      "minimum_positive_folds",
+      "minimum_positive_quarter_fraction",
+      "bull_bear_chop_positive_return_due_to_bear",
+      "minimum_worst_regime_sharpe"
+    ],
+    "pass": [
+      "minimum_net_sharpe",
+      "positive_annualized_return",
+      "minimum_calmar",
+      "minimum_double_cost_sharpe",
+      "minimum_positive_sharpe_regimes"
+    ],
+    "unavailable": [
+      "minimum_trial_adjusted_probability_positive",
+      "long_bull_attribution",
+      "short_bear_attribution",
+      "combined_chop_return",
+      "profitable_neighbor_fraction",
+      "neighbor_median_sharpe",
+      "canonical_positive_pnl_concentration",
+      "six_fold_model_manifests",
+      "pooled_and_fold_score_ic",
+      "raw_momentum_ablation"
+    ]
+  },
+  "methods": {
+    "cost_allocation": "Diagnostic shared return-cost allocation by reconstructed side-specific USD fees and slippage at each timestamp.",
+    "folds": "Compounded daily returns sliced at the six preregistered end-exclusive boundaries; not a substitute for six manifests.",
+    "notional": "Carry prior quantity through each executed trade and split sign crossings between closing and opening sleeves.",
+    "quarter_and_tail": "Read-only derivation from canonical daily returns.",
+    "scope": "team-01 visible-development evidence only"
+  },
+  "positive_fold_count": {
+    "base": 3,
+    "double_cost": 3,
+    "required": 4
+  },
+  "quarters": {
+    "base_returns": {
+      "2020Q1": 0.0,
+      "2020Q2": 0.0,
+      "2020Q3": 0.049163941497,
+      "2020Q4": 0.366800229709,
+      "2021Q1": 0.900828408259,
+      "2021Q2": 0.256301919093,
+      "2021Q3": -0.012357065169,
+      "2021Q4": 0.13055488456,
+      "2022Q1": -0.021622249487,
+      "2022Q2": -0.119811234287,
+      "2022Q3": -0.114834367624,
+      "2022Q4": -0.02880688262,
+      "2023Q1": -0.116508968426,
+      "2023Q2": -0.073271807599
+    },
+    "count": 14,
+    "positive_count": 5,
+    "positive_fraction": 0.357142857143,
+    "required_fraction": 0.55
+  },
+  "regimes": {
+    "bear": {
+      "gate_implication": "fails worst-regime floor and required positive bear return",
+      "sharpe": -1.264130967803
+    },
+    "bull": {
+      "exact_compounded_return_available": false,
+      "sharpe": 1.072263435257
+    },
+    "chop": {
+      "exact_compounded_return_available": false,
+      "sharpe": 2.214132079003
+    },
+    "positive_sharpe_count": 3,
+    "stress": {
+      "stress_tail_available": false,
+      "sharpe": 2.462946047062
+    }
+  },
+  "review_artifact": "development_review_rdf_ref_001.md",
+  "schema_version": 1,
+  "sleeves": {
+    "long": {
+      "active_bar_fraction_at_1pct": 0.869774919614,
+      "allocated_shared_cost_return_sum_diagnostic": 0.12698550473,
+      "executed_notional_usd": 45494888.670525,
+      "funding_return_contribution_sum": -0.080239540461,
+      "gross_return_contribution_before_shared_cost": 1.464285460029,
+      "mean_exposure_active": 0.409989306897,
+      "mean_exposure_all": 0.356598416449,
+      "net_return_contribution_diagnostic": 1.337299955299,
+      "price_return_contribution_sum": 1.54452500049
+    },
+    "per_regime_attribution_available": false,
+    "short": {
+      "active_bar_fraction_at_1pct": 0.869774919614,
+      "allocated_shared_cost_return_sum_diagnostic": 0.172192986111,
+      "executed_notional_usd": 64477912.609437,
+      "funding_return_contribution_sum": 0.211012464413,
+      "gross_return_contribution_before_shared_cost": -0.230646385583,
+      "mean_exposure_active": 0.390674039774,
+      "mean_exposure_all": 0.33979848154,
+      "net_return_contribution_diagnostic": -0.402839371693,
+      "price_return_contribution_sum": -0.441658849995
+    }
+  },
+  "team_id": "team-01"
+}

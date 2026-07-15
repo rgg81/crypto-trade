@@ -1,0 +1,100 @@
+{
+  "decision": {
+    "dnf_now": false,
+    "mechanism_pivot_now": false,
+    "next_action": "continue_one_preregistered_within_family_diagnostic",
+    "reason": "The failed baseline produced no mechanism or performance artifact. The predeclared no-direction-tilt arm preserves gross, no-control execution, both sleeves, and the mandatory variable persistence-versus-reversal core while isolating the ancillary directional budget overlay.",
+    "risk_rescue_forbidden": true
+  },
+  "family_id": "team-02-causal-crowding-residual-persistence-v1",
+  "integrity": {
+    "data_accessed": false,
+    "evaluator_invoked_by_review": false,
+    "experiment_ledger_edited": false,
+    "lifecycle_command_invoked": false,
+    "performance_artifacts_available": false,
+    "strategy_or_config_edited": false
+  },
+  "next_reference_cell": {
+    "candidate_id": "team-02-c3rp-no-direction-tilt-002",
+    "delta_from_failed_baseline": {
+      "maximum_side_tilt": {
+        "from": 0.075,
+        "to": 0.0
+      }
+    },
+    "no_control_first": true,
+    "parameters": {
+      "beta_lookback_days": 20,
+      "direction_scale": 1.5,
+      "fast_residual_days": 10,
+      "fast_trend_weight": 0.35,
+      "feature_lag_bars": 1,
+      "funding_lookback_days": 7,
+      "funding_statistic": "cumulative-fsum-funding-rate",
+      "funding_weight": 0.2,
+      "gross_target": 0.9,
+      "maximum_side_tilt": 0.0,
+      "minimum_cross_section": 12,
+      "minimum_funding_symbols_for_rank": 4,
+      "minimum_names_per_sleeve": 4,
+      "minimum_unique_funding_events": 2,
+      "minimum_valid_history_fraction": "4/5",
+      "moment_ddof": 0,
+      "persistence_breadth_threshold": 0.3,
+      "persistence_efficiency_threshold": 0.3,
+      "rebalance_bars": 3,
+      "residual_reversal_days": 2,
+      "selected_fraction_per_side": "1/4",
+      "slow_residual_days": 20,
+      "slow_trend_weight": 0.65,
+      "symbol_cap": 0.095,
+      "transition_width": 0.15,
+      "volatility_lookback_days": 20,
+      "volatility_quantile_method": "hyndman-fan-type-7",
+      "volatility_quantiles": [
+        0.1,
+        0.9
+      ],
+      "weight_tolerance": 1e-12
+    },
+    "preregistered_arm": "component-no-direction-tilt",
+    "risk_policy_id": "team-02-c3rp-baseline-no-control",
+    "runtime_seed": 20260801,
+    "status": "planned_not_registered_not_run"
+  },
+  "observed_failure": {
+    "artifact_hashes": {},
+    "candidate_id": "team-02-c3rp-baseline-001",
+    "cpu_hours": 0.24398177153694442,
+    "failure_reason": "ValueError: portfolio insolvent at 2022-05-13 00:00:00+00:00",
+    "metrics_summary": {},
+    "registration_sha256": "163f134d130545f6d2d1de1c9821ba958e173a7eafe106749fe8c7075a703e7a",
+    "result_status": "failed",
+    "result_timestamp_utc": "2026-07-15T21:17:18.859175Z",
+    "wall_clock_hours": 0.24383154066916582
+  },
+  "preregistered_falsifier_unchanged": true,
+  "schema_version": 1,
+  "stop_rules": [
+    "If the reference cell is insolvent or produces no complete artifacts, stop the initial C3RP family.",
+    "If it completes but fails the causal interaction or any non-compensatory gate, do not lower gross or add risk controls as rescue.",
+    "Risk-control factorial work requires a complete no-control record and a frozen signal first.",
+    "Any later continuation requires a new evidence review; any different causal thesis requires a formal pivot."
+  ],
+  "team_id": "team-02",
+  "trial_allocation": {
+    "additional_cells_authorized_by_review": 1,
+    "material_configurations_observed_consumed": 1,
+    "mechanism_pivots_consumed": 0,
+    "private_tickets_consumed_in_own_records": 0
+  },
+  "what_is_not_inferable": [
+    "returns, Sharpe, Calmar, drawdown, tail loss, or recovery path",
+    "fold, quarter, regime, or sleeve attribution",
+    "state-interaction IC or funding-carry efficacy",
+    "cost sensitivity, turnover, participation, fills, funding cashflows, or symbol contribution",
+    "cause of insolvency among signal, execution, costs, funding, data handling, or path interactions",
+    "parameter-neighbor stability or trial-adjusted probability"
+  ]
+}
