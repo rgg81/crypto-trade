@@ -52,9 +52,11 @@ At an 8-hour decision boundary `t`, define the conservative feature cutoff `c(t)
 - The organizer-supplied `eligible_symbols` at `t` is the only universe. It is the point-in-time
   weekly Top-40 set intersected with executable symbols; no current or future execution open is
   exposed to the strategy.
-- Target weights are recomputed every third boundary (daily, at 00:00 UTC). The strategy returns
-  `None` at the other two boundaries to hold. A scheduled decision with insufficient valid state
-  returns `{}` and requests flat.
+- Give every exact 8-hour UTC boundary an integer index
+  `j = (t - 1970-01-01T00:00:00Z) / 8h`. Target weights are recomputed iff
+  `j mod rebalance_bars == 0`; the baseline `rebalance_bars=3` is therefore daily at 00:00 UTC.
+  The strategy returns `None` at other valid boundaries to hold. A scheduled decision with
+  insufficient valid state, or a timestamp off the exact grid, returns `{}` and requests flat.
 - Every order is a target request. The central evaluator alone performs next-open fills, funding,
   fee/slippage, participation, delisting, exposure, risk actions, and PnL accounting.
 
@@ -78,18 +80,35 @@ For a horizon `h`, define risk-adjusted residual displacement:
 `z[i,h] = (sum_h(r[i]) - beta[i] * sum_h(m)) / (sigma[i] * sqrt(3h) + epsilon)`,
 
 where `sigma[i]` is trailing per-bar volatility estimated over `L_vol` days. Cross-sectional ranks
-use deterministic average ranks, mapped to `[-1, 1]`; alphabetical symbol is the final exact-tie
-key. There is no fitted cross-time scaler or winsorizer.
+use deterministic average ranks, mapped to `[-1, 1]`; symbol order resolves only membership ties
+after equal numeric ranks. There is no fitted cross-time scaler or winsorizer.
 
 The three score legs are:
 
 - Residual persistence: `T[i] = rank(0.65*z[i,L_slow] + 0.35*z[i,L_fast])`.
 - Residual reversal: `R[i] = rank(-z[i,L_rev])`.
 - Funding carry: for rows in the trailing `L_funding` days, calculate
-  `daily_funding[i] = 24 * sum(funding_rate) / sum(funding_interval_hours)`, then
-  `F[i] = rank(-daily_funding[i])`. Thus low funding raises a long rank and high funding lowers a
-  rank, making it a better short. A symbol without enough funding observations receives neutral
-  `F=0`, never a cross-sectional extreme.
+  `cumulative_funding[i] = fsum(funding_rate)`, then
+  `F[i] = rank(-cumulative_funding[i])`. Thus low/negative cumulative realized funding raises a
+  long rank and high positive cumulative realized funding lowers a rank, making it a better short.
+  A symbol without enough funding observations receives neutral `F=0`, never a cross-sectional
+  extreme.
+
+### Pre-trial funding-interface correction
+
+The neutral V2 worker supplies normalized realized funding rows with `funding_time`, `symbol`,
+`funding_rate`, and `mark_price`; it does not supply interval metadata. Therefore the executable
+funding statistic is the raw cumulative actual funding rate above, using only `funding_time`,
+`symbol`, and `funding_rate`. The fixed wall-time window already makes observations comparable and
+the event-rate sum represents the per-notional funding actually accrued across supplied events.
+Dividing by `L_funding`, 24 hours, or any other fixed positive constant would not change the
+cross-sectional rank, so no scaling is applied. `mark_price` is intentionally unused: it neither
+enters validity nor rescales the signal, and the central evaluator remains solely responsible for
+funding cashflows.
+
+This clarification corrects a pre-trial interface mismatch inside the already-registered realized-
+funding carry mechanism. It was made without data, performance, evaluator output, or a trial; it is
+not a thesis change, new domain, or mechanism pivot.
 
 The market persistence state is known at `c(t)`:
 
@@ -116,11 +135,126 @@ Let
 - long gross `G_long = G/2 + d*D`;
 - short gross `G_short = G/2 - d*D` (submitted as negative weights).
 
-At the baseline `G=0.90` and `d=0.075`, gross stays 0.90, absolute net stays below 0.15, and both
-sleeves retain at least 0.375 gross even at an extreme state. A deterministic iterative 0.095
-per-symbol precap redistributes excess within a sleeve; if insufficient names remain, the sleeve
-budget is reduced rather than violating the cap. The central evaluator's stricter limits remain
-authoritative.
+At the baseline `G=0.90` and `d=0.075`, pre-cap requested gross is 0.90, absolute requested net is
+below 0.15, and each pre-cap sleeve budget is at least 0.375 even at an extreme state. A
+deterministic iterative 0.095 per-symbol precap redistributes excess within a sleeve; if too few
+selected names make the requested sleeve budget infeasible, the unallocatable amount remains cash
+rather than violating the cap. The central evaluator's stricter limits remain authoritative.
+
+## Frozen executable numerical conventions
+
+These conventions remove implementation discretion. Changing any one after a result is observed is
+a material parameter change; the mechanism-identity guardrail still governs every deployable arm.
+
+### Arithmetic, epsilon, and moments
+
+- All calculations use finite IEEE-754 binary64 values. Symbols are traversed in ascending ASCII
+  symbol order and time rows in ascending `open_time`/event-time order. Scalar sums use an
+  accurate deterministic float64 sum (`math.fsum` semantics). `log` is the natural logarithm.
+- The single return-scale constant is `epsilon = 1e-12`. It is added only to the three explicitly
+  shown denominators: residual `z` (`sigma_i*sqrt(W_h)+epsilon`), `ER`
+  (`sum(abs(m))+epsilon`), and market-direction `Z_m`
+  (`sigma_m*sqrt(W_slow)+epsilon`). It is not added to prices, returns, covariance, beta variance,
+  ranks, quantiles, funding, or budget normalization.
+- Beta uses paired valid observations, arithmetic means, and population moments:
+  `Cov_0(x,m)=sum((x-mean(x))*(m-mean(m)))/n` and
+  `Var_0(m)=sum((m-mean(m))^2)/n` (`ddof=0`). If `Var_0(m) <= epsilon`, beta is invalid rather
+  than regularized. A valid beta is clipped exactly to `[-1, 3]`.
+- Symbol volatility `sigma_i` is the population standard deviation (`ddof=0`) of valid 8-hour log
+  returns in the fixed `L_vol` window. The same `sigma_i` is used in residual `z`, the cross-section
+  quantiles, and inverse-volatility weights. `sigma_i <= epsilon` is invalid.
+- Residual displacement uses complete horizon returns and
+  `W_h=3*h`: `(fsum(r_i)-beta_i*fsum(m))/(sigma_i*sqrt(W_h)+epsilon)`. It does not estimate a
+  second residual standard deviation.
+- Market-direction volatility `sigma_m` is the population standard deviation (`ddof=0`) of the
+  complete `W_slow` common-return window. `ER` uses no variance. Thus every beta, residual-z,
+  volatility-weight, ER, and direction convention is explicitly population-based where a moment
+  is present.
+
+### Bar, return, and funding windows
+
+- At scheduled `t`, `c=t-8h`. The anchor is the bar with `open_time=c-8h` and
+  `close_time<=c`; a different or missing anchor is not silently replaced with an older row.
+- For a `W=3*h` return window, expected return-end bars have `open_time` in the exact grid
+  `{c-8h, c-16h, ..., c-W*8h}`. Each return is
+  `log(close_later/close_prior)` and additionally requires the immediately preceding bar at an
+  `open_time` exactly 8 hours earlier. Therefore the rightmost usable end bar is included, the
+  price at the left boundary is denominator-only, and `W+1` consecutive price bars are needed for
+  a complete horizon. Duplicates, non-grid gaps, non-finite closes, and closes `<=0` make the
+  affected return slot invalid; there is no forward fill.
+- A fixed beta or volatility estimation window always contains exactly its `W` expected slots.
+  With `f_min` represented as the exact rational `4/5` or `9/10`, validity requires
+  `n_valid >= ceil(f_min*W)`; beta counts paired `(r_i,m)` slots and volatility counts symbol-return
+  slots. At least two observations are also required. The numerator is not rescaled for missing
+  slots. Fast, slow, and reversal cumulative-displacement horizons require all of their expected
+  slots, so their economic horizon never shortens.
+- A common return exists at a slot only with at least 12 valid current-constituent returns. It is
+  their exact median: the central ordered value for odd `n`, or the arithmetic mean of the two
+  central values for even `n`. `ER`, `D`, and each cumulative common displacement require a complete
+  common-return horizon. Breadth uses only symbols with a complete slow horizon, requires at least
+  12, and counts a zero cumulative return as non-positive.
+- A trailing funding window is left-open/right-closed:
+  `c-L_funding*24h < funding_time <= c`. Rows are ordered by `(funding_time,symbol)`, must have a
+  finite `funding_rate`, and are never filled or interpolated. The event key is
+  `(symbol,funding_time)`. Any repeated key in the window invalidates that symbol's entire funding
+  statistic for the decision, regardless of whether the repeated values agree, preventing silent
+  double counting or an arbitrary first/last choice. A symbol needs at least two unique valid
+  events for `cumulative_funding`; this already-frozen minimum prevents a single event from defining
+  a multi-day carry rank. A non-finite in-window rate or duplicate key makes that symbol neutral.
+  Funding ranks are computed only if at least four symbols have valid `cumulative_funding`; all
+  other symbols receive `F=0`. If fewer than four are valid, every symbol receives `F=0` for that
+  decision.
+
+### Ranks, state transforms, and startup
+
+- For `n>=2` finite values, numeric ties are exact-equality groups, assigned the average of their
+  one-based ascending positions. Map average rank `r` to `2*(r-1)/(n-1)-1`. No tolerance or symbol
+  key breaks a numeric rank tie. A one-element rank cross-section is invalid.
+- The persistence input is
+  `x=(ER-theta_ER)/width+(BR-theta_BR)/width`; freeze
+  `sigmoid(x)=1/(1+exp(-clip(x,-40,40)))`. The clipping prevents overflow but leaves both trend and
+  reversal weights strictly nonzero. Direction is
+  `D=tanh(clip(Z_m/k_direction,-20,20))`.
+- The funding rank applies the same average-rank map to `-cumulative_funding`; exact equal funding
+  maps to the same value. Missing, invalid, duplicate, or insufficient funding is assigned neutral
+  zero only after ranking valid symbols, never inserted into the rank distribution.
+- A symbol is scoreable only when beta, `sigma_i`, every required complete displacement, trend,
+  reversal, and composite alpha are finite. Funding may be neutral. No shorter startup window or
+  padded history is allowed. A scheduled decision needs at least `N=12` scoreable symbols and a
+  feasible allocation on both sides; otherwise the whole portfolio requests flat `{}` rather than
+  running one-sided.
+
+### Sleeve count, quantiles, and deterministic capped allocation
+
+- `N` is the number of scoreable current constituents before sleeve selection. Interpret the three
+  allowed `q` values as exact rationals: `0.20=1/5`, `0.25=1/4`, and `0.30=3/10`. Set
+  `K=max(4,floor(q*N))` for each sleeve. If `2*K>N`, request flat. Sort once by
+  `(A_i ascending, symbol ASCII ascending)`; the first `K` are shorts and the last `K` are longs,
+  guaranteeing disjoint sets even when all alphas tie.
+- Compute volatility quantiles from all `N` finite positive `sigma_i` values before selecting a
+  sleeve. Freeze Hyndman-Fan type 7 linear interpolation: sort `s[0..N-1]`, let
+  `u=(N-1)*p`, `j=floor(u)`, `g=u-j`, and
+  `Q_p=(1-g)*s[j]+g*s[min(j+1,N-1)]`, for `p=0.10` and `0.90`. Each selected volatility becomes
+  `v_i=min(max(sigma_i,Q_0.10),Q_0.90)` and raw allocation score is `a_i=1/v_i`.
+- Freeze symbol cap `C=0.095` and absolute weight tolerance `tau_w=1e-12`. For requested side
+  budget `B`, first set `B_eff=min(B,K*C)`; `B-B_eff` remains cash and no extra symbol is added.
+  Initialize all selected symbols active, all weights zero, and remaining budget `b=B_eff`.
+  Repeatedly sum active `a_i` in ASCII order, propose `u_i=b*a_i/sum(a)`, simultaneously set every
+  symbol with `u_i>=C-tau_w` to `C`, subtract those caps from `b`, remove them, and repeat. When no
+  symbol meets that condition, assign every active symbol its proposed `u_i` and stop. If a cap
+  round leaves `b<=tau_w`, leave all still-active weights at zero and stop to reconcile. If it
+  removes the final active symbol, also stop and reconcile; an empty active set is not itself a
+  failure. A nonempty active set with `b>tau_w` and a non-finite or non-positive score sum makes the
+  side infeasible.
+- Before reconciliation, fail if a weight is outside `[-tau_w,C+tau_w]`; otherwise project only
+  boundary roundoff with `w_i=min(C,max(0,w_i))`. Then let `delta=B_eff-fsum(w)`. If `delta>0`, add
+  up to available
+  headroom in descending-headroom then ASCII-symbol order; if `delta<0`, subtract in
+  descending-weight then ASCII-symbol order, never subtracting more than the current weight. Stop
+  when `abs(delta)<=tau_w`. If reconciliation is
+  impossible, any final weight lies outside `[0,C]`, or the final magnitude sum differs from
+  `B_eff` by more than `tau_w`, the whole scheduled target is `{}`. Otherwise apply positive signs
+  to longs and negative signs to shorts and do not renormalize away deliberately unallocated cash.
 
 Expected roles are preregistered as follows:
 

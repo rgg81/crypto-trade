@@ -32,7 +32,7 @@
     "feature_cutoff": "c(t) = decision_time t - 8h",
     "insufficient_state_action": "return an empty mapping to request flat",
     "non_rebalance_action": "return None to hold",
-    "rebalance_schedule": "every third boundary at 00:00 UTC",
+    "rebalance_schedule": "integer boundary index j=(t-1970-01-01T00:00:00Z)/8h; rebalance iff j modulo rebalance_bars is zero; baseline rebalance_bars=3",
     "timezone": "UTC"
   },
   "derived_features": [
@@ -59,31 +59,31 @@
     },
     {
       "availability_lag": "all observations end at c(t)",
-      "formula": "clip(cov(symbol return, common return)/var(common return), -1, 3)",
-      "fitting_rule": "rolling OLS slope over L_beta_days; no intercept is exported and no state is fitted across decisions",
+      "formula": "clip(population_covariance(symbol return, common return)/population_variance(common return), -1, 3)",
+      "fitting_rule": "paired causal observations, ddof=0, exact fixed window; no intercept is exported and no state is fitted across decisions",
       "id": "rolling_beta",
       "inputs": [
         "symbol_log_return_8h",
         "common_market_return"
       ],
-      "missing_rule": "missing unless at least minimum_valid_history_fraction of the requested window is paired and common variance is positive"
+      "missing_rule": "missing unless paired count is at least ceil(f_min*W) and two, and population common variance is greater than 1e-12"
     },
     {
       "availability_lag": "all observations end at c(t)",
-      "formula": "(sum_h(symbol returns)-rolling_beta*sum_h(common returns))/(trailing_symbol_sigma*sqrt(3h)+epsilon)",
-      "fitting_rule": "causal rolling moments only",
+      "formula": "(fsum_h(symbol returns)-rolling_beta*fsum_h(common returns))/(population_symbol_sigma*sqrt(3h)+1e-12)",
+      "fitting_rule": "complete exact-grid horizon returns plus causal ddof=0 trailing volatility",
       "id": "risk_adjusted_residual_displacement",
       "inputs": [
         "symbol_log_return_8h",
         "common_market_return",
         "rolling_beta"
       ],
-      "missing_rule": "missing if beta, volatility, or minimum history is unavailable"
+      "missing_rule": "missing if beta is invalid, population volatility is <=1e-12, or any expected horizon return slot is invalid"
     },
     {
       "availability_lag": "same as residual displacement",
       "formula": "rank_to_minus_one_plus_one(0.65*z_L_slow + 0.35*z_L_fast)",
-      "fitting_rule": "contemporaneous average cross-sectional rank; alphabetical symbol resolves exact ties",
+      "fitting_rule": "exact-equality average rank mapped by 2*(rank-1)/(n-1)-1; symbol order does not break numeric rank ties",
       "id": "residual_trend_rank",
       "inputs": [
         "risk_adjusted_residual_displacement"
@@ -102,18 +102,17 @@
     },
     {
       "availability_lag": "funding_time <= c(t)",
-      "formula": "24*sum(funding_rate)/sum(funding_interval_hours) over L_funding_days, then cross-sectional rank of its negative",
-      "fitting_rule": "realized trailing events only; no predicted funding and no forward fill",
+      "formula": "cumulative_funding=fsum(funding_rate) for unique event keys satisfying c-L_funding*24h < funding_time <= c, then exact average rank of -cumulative_funding",
+      "fitting_rule": "realized trailing event rates only; at least two unique events per ranked symbol and four ranked symbols cross-sectionally; no cadence normalization, predicted funding, scaling, or forward fill",
       "id": "funding_carry_rank",
       "inputs": [
-        "realized_funding_rate",
-        "funding_interval"
+        "realized_funding_rate"
       ],
-      "missing_rule": "fewer than two in-window events maps to neutral rank 0 and sets a missing indicator"
+      "missing_rule": "any duplicate (symbol,funding_time), any non-finite in-window rate, or fewer than two unique valid events maps that symbol to neutral 0 after valid-only ranking; fewer than four valid symbols maps every funding score to 0"
     },
     {
       "availability_lag": "all return inputs end at c(t)",
-      "formula": "ER=abs(sum(common))/(sum(abs(common))+epsilon); BR=abs(2*fraction(symbol cumulative return > 0)-1); P=sigmoid((ER-theta_ER)/width+(BR-theta_BR)/width)",
+      "formula": "ER=abs(fsum(common))/(fsum(abs(common))+1e-12); BR=abs(2*fraction(symbol complete cumulative return > 0)-1); x=(ER-theta_ER)/width+(BR-theta_BR)/width; P=1/(1+exp(-clip(x,-40,40)))",
       "fitting_rule": "fixed formula and thresholds; recomputed at every scheduled decision",
       "id": "causal_persistence_state",
       "inputs": [
@@ -137,18 +136,18 @@
     },
     {
       "availability_lag": "common returns end at c(t)",
-      "formula": "D=tanh(sum_L_slow(common)/(sd(common)*sqrt(3*L_slow)+epsilon)/k_direction)",
+      "formula": "Z_m=fsum_L_slow(common)/(population_sd(common)*sqrt(3*L_slow)+1e-12); D=tanh(clip(Z_m/k_direction,-20,20))",
       "fitting_rule": "fixed bounded transform",
       "id": "market_direction_tilt",
       "inputs": [
         "common_market_return"
       ],
-      "missing_rule": "zero tilt when the denominator is invalid but the rest of the signal is valid"
+      "missing_rule": "missing if the exact common horizon is incomplete; a complete all-zero common window produces D=0"
     },
     {
       "availability_lag": "uses only composite ranks, volatility, and direction known at c(t)",
-      "formula": "top/bottom q selection; inverse-volatility sleeve normalization; G_long=G/2+dD and G_short=G/2-dD; iterative 0.095 symbol precap",
-      "fitting_rule": "deterministic portfolio mapping; organizer limits remain authoritative",
+      "formula": "K=max(4,floor(q*N)); first/last K of (A,symbol) ascending; type-7 clipped inverse population volatility; G_long=G/2+dD and G_short=G/2-dD; deterministic 0.095-cap water filling",
+      "fitting_rule": "exact rational q, deterministic ordering, and 1e-12 weight tolerance; organizer limits remain authoritative",
       "id": "target_weights",
       "inputs": [
         "composite_alpha_rank",
@@ -174,6 +173,88 @@
     ],
     "statement": "Diagnostic ablations cannot become this family's champion regardless of performance."
   },
+  "numerical_conventions": {
+    "allocation": {
+      "cap": 0.095,
+      "failure_behavior": "If either side is infeasible or reconciliation fails tolerance, request the whole scheduled portfolio flat; never emit one side alone.",
+      "feasible_budget": "B_eff=min(B,K*0.095); any difference B-B_eff remains cash and is not redistributed to unselected names.",
+      "raw_score": "inverse of population symbol volatility after type-7 10th/90th percentile clipping",
+      "reconciliation": "First reject values outside [-1e-12,0.095+1e-12], project boundary roundoff to [0,0.095], then correct only the float residual in descending headroom (positive) or descending weight (negative), then ASCII symbol order, bounded by headroom/current weight. Require final [0,0.095] bounds and sum tolerance; never renormalize deliberate cash.",
+      "water_filling": "In each simultaneous round propose remaining_budget*a_i/fsum(active a); cap every proposal >=0.095-1e-12, remove it, and repeat. Assign all proposals when no cap binds. If a cap round leaves remaining budget <=1e-12, leave still-active weights at zero and reconcile; likewise stop if active empties. Only a nonempty set with budget >1e-12 and nonpositive/nonfinite score sum is infeasible.",
+      "weight_tolerance": 1e-12
+    },
+    "arithmetic": {
+      "epsilon": 1e-12,
+      "epsilon_applied_only_to": [
+        "residual z denominator",
+        "ER absolute-return denominator",
+        "market-direction Z_m denominator"
+      ],
+      "float_type": "IEEE-754 binary64 finite values",
+      "logarithm": "natural",
+      "reduction_order": "time ascending; symbols ASCII ascending; accurate deterministic float64 sum semantics"
+    },
+    "funding": {
+      "duplicate_behavior": "Any repeated (symbol,funding_time) key inside the window invalidates that symbol's whole funding statistic for that decision, even when repeated values agree; the symbol receives neutral zero after valid-only ranking.",
+      "formula": "cumulative_funding=fsum(funding_rate) in ascending funding_time order; F is the exact average rank of its negative",
+      "interface_correction": "The worker exposes normalized realized funding_time, symbol, funding_rate, and mark_price, but no interval metadata. Cumulative actual event rates preserve the registered realized-funding mechanism and need no fixed positive scaling for ranks.",
+      "mark_price_usage": "intentionally unused for signal calculation, validity, and ranking; central evaluation owns funding cashflows",
+      "minimum_events_per_symbol": 2,
+      "minimum_symbols_for_rank": 4,
+      "neutral_rule": "A duplicate key, non-finite in-window rate, or fewer than two unique valid events invalidates the symbol. Rank only valid symbols, then assign zero to invalid symbols; if fewer than four valid symbols, assign zero to all.",
+      "scaling": "none; any fixed positive scaling would leave cross-sectional ranks unchanged",
+      "window": "left-open/right-closed: c-L_funding*24h < funding_time <= c"
+    },
+    "history_and_startup": {
+      "breadth_minimum_symbols": 12,
+      "complete_horizons": "fast, slow, reversal, common ER/D, and breadth cumulative-return horizons require every expected slot",
+      "estimation_fraction": "f_min is exact 4/5 or 9/10; beta/volatility requires n_valid >= ceil(f_min*W) and at least two",
+      "flat_condition": "Fewer than 12 scoreable symbols, 2*K>N, or either infeasible side requests flat at a scheduled decision.",
+      "no_padding": true
+    },
+    "moments": {
+      "beta": "paired population covariance divided by population common variance, ddof=0; variance <=1e-12 is invalid; clip result to [-1,3]",
+      "direction_volatility": "population standard deviation, ddof=0",
+      "residual_z": "uses population symbol volatility and sqrt(number of complete horizon slots); no residual-series standard deviation",
+      "symbol_volatility": "population standard deviation, ddof=0, shared by z, quantiles, and weights; <=1e-12 is invalid"
+    },
+    "quantile": {
+      "definition": "Hyndman-Fan type 7: u=(N-1)*p, j=floor(u), g=u-j, Q=(1-g)*s[j]+g*s[min(j+1,N-1)]",
+      "population": "all N finite positive scoreable-symbol population volatilities before sleeve selection",
+      "probabilities": [
+        0.1,
+        0.9
+      ]
+    },
+    "ranking_and_state": {
+      "direction": "tanh(clip(Z_m/k_direction,-20,20))",
+      "rank": "Exact-equality average one-based ascending rank mapped to 2*(r-1)/(n-1)-1; no tolerance tie break; n<2 invalid.",
+      "selection_tie_order": "single (composite alpha ascending, symbol ASCII ascending) ordering; first K short and last K long",
+      "sigmoid": "1/(1+exp(-clip(x,-40,40)))"
+    },
+    "rebalance": {
+      "boundary_index": "j=(t-1970-01-01T00:00:00Z)/8h must be an integer",
+      "condition": "j modulo rebalance_bars equals zero",
+      "default": "rebalance_bars=3, hence 00:00 UTC daily",
+      "off_grid": "request flat",
+      "unscheduled": "return None to hold"
+    },
+    "return_windows": {
+      "anchor": "bar open_time=c-8h with close_time<=c",
+      "expected_slots": "For W=3h returns, return-end bar open_time values are c-8h through c-W*8h on the exact 8h grid; W+1 closes are needed.",
+      "invalid_slot": "missing/non-grid/duplicate adjacency or a non-finite/non-positive close; no fill or interpolation",
+      "window_sides": "rightmost return end included; left boundary close is denominator-only"
+    },
+    "sleeve_count": {
+      "minimum_each_side": 4,
+      "q_rationals": {
+        "0.20": "1/5",
+        "0.25": "1/4",
+        "0.30": "3/10"
+      },
+      "rule": "K=max(4,floor(q*N)); require 2*K<=N"
+    }
+  },
   "forbidden_inputs": [
     "future or same-cutoff-plus-one bars",
     "current/future execution open",
@@ -191,37 +272,27 @@
       "event_timestamp": "close_time",
       "fields": [
         "close",
-        "close_time"
+        "close_time",
+        "open_time"
       ],
       "id": "transaction_close",
-      "missing_data_rule": "no backfill; reject non-finite/non-positive close and require the configured fraction of the trailing window",
+      "missing_data_rule": "no backfill; require exact 8h open_time adjacency, reject duplicate/gapped/non-finite/non-positive closes, require the frozen count rule",
       "source": "organizer-streamed canonical Binance USD-M transaction klines",
       "strategy_lag": "use only close_time <= decision_time - 8h"
     },
     {
       "availability_timestamp_rule": "funding_time; neutral worker supplies only rows strictly earlier than decision_time",
-      "coverage_statement": "Actual historical funding events for currently eligible symbols; cadence may vary and is normalized with funding_interval_hours.",
+      "coverage_statement": "Normalized actual historical funding events for currently eligible symbols. Event cadence is preserved and cumulative funding_rate measures actual per-notional rates accrued over the fixed wall-time window.",
       "event_timestamp": "funding_time",
       "fields": [
         "funding_rate",
-        "funding_time"
+        "funding_time",
+        "symbol"
       ],
       "id": "realized_funding_rate",
-      "missing_data_rule": "no interpolation or forward fill; fewer than two trailing events yields neutral carry score",
+      "missing_data_rule": "no interpolation or forward fill; duplicate event key, non-finite rate, or fewer than two unique trailing events yields neutral carry score",
       "source": "organizer-streamed canonical Binance USD-M realized funding rows",
       "strategy_lag": "use only funding_time <= decision_time - 8h"
-    },
-    {
-      "availability_timestamp_rule": "same row as realized funding_rate",
-      "coverage_statement": "Positive interval metadata attached to each supplied funding event.",
-      "event_timestamp": "funding_time",
-      "fields": [
-        "funding_interval_hours"
-      ],
-      "id": "funding_interval",
-      "missing_data_rule": "row is unusable if interval is absent, non-finite, or non-positive",
-      "source": "organizer-streamed canonical Binance USD-M funding rows",
-      "strategy_lag": "use only rows with funding_time <= decision_time - 8h"
     },
     {
       "availability_timestamp_rule": "organizer supplies membership at decision_time after causal weekly reconstitution",

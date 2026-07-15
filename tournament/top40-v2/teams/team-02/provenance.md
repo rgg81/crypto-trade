@@ -78,6 +78,45 @@ as this family's champion. An unconditional continuation strategy, a fixed `P`, 
 reversal interaction requires a formal mechanism pivot before execution. This organizer
 collision-control condition adds no information about any other mechanism.
 
+## Pre-data numerical clarification
+
+Before code, data access, or any trial, the QE completeness review identified executable degrees of
+freedom that the qualitative preregistration did not numerically bind. They are now frozen without
+changing the registered thesis or domain:
+
+- binary64 arithmetic, natural log, deterministic ordered reductions, and `epsilon=1e-12` only in
+  residual-z, ER, and direction denominators;
+- population (`ddof=0`) covariance, variance, and standard deviation throughout;
+- exact-grid count windows, complete displacement horizons, rational valid-history thresholds, and
+  left-open/right-closed funding windows;
+- exact average-rank mapping, clipped sigmoid/tanh inputs, neutral funding after valid-only ranking,
+  and epoch-anchored rebalance boundaries;
+- exact rational `q`, `K=max(4,floor(q*N))`, type-7 10th/90th volatility quantiles, and
+  deterministic 9.5%-cap water filling with `1e-12` absolute weight tolerance.
+
+These choices resolve implementation ambiguity only. Any later change is material for research
+accounting. No market observation, evaluator result, other mechanism, or lifecycle command informed
+the clarification.
+
+## Pre-trial neutral-interface correction
+
+Before code or any trial, organizer preflight established that the neutral worker's normalized
+realized-funding context exposes `funding_time`, `symbol`, `funding_rate`, and `mark_price`, but not
+interval metadata. The earlier prose formula's interval denominator was therefore non-executable.
+It has been replaced with the exact interface-compatible statistic
+`cumulative_funding = fsum(funding_rate)` over the already-frozen left-open/right-closed window,
+ranked on its negative. `mark_price` is intentionally unused because the signal ranks per-notional
+realized rates and the evaluator owns cashflow calculation. No fixed positive scale is applied
+because it cannot change a cross-sectional rank.
+
+The pre-existing minimum of two unique events is retained. A duplicate `(symbol,funding_time)` key
+or any non-finite in-window rate makes that symbol's funding statistic invalid and neutral; valid
+symbols are ranked only when at least four exist, otherwise all funding scores are neutral. This is
+a neutral-interface correction within the registered realized-funding mechanism, not a
+performance-driven choice, thesis/domain change, or pivot. `ablations.json` required no change: its
+funding-removal diagnostic refers only to `w_funding` and contains no interval-dependent input or
+formula.
+
 ## Mechanism fingerprint
 
 The mechanism fingerprint is the SHA-256 digest of the exact bytes of

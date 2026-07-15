@@ -1,0 +1,87 @@
+{
+  "canonical_runtime_seed": 20260801,
+  "configuration_id": "team-02-c3rp-baseline-001",
+  "dependencies": {
+    "pandas": "3.0.3",
+    "python": "3.11.15"
+  },
+  "entrypoint": "strategy.py",
+  "factory": "build_strategy",
+  "family_id": "team-02-causal-crowding-residual-persistence-v1",
+  "information_contract": {
+    "bar_interval_hours": 8,
+    "feature_lag_bars": 1,
+    "funding_duplicate_action": "neutralize-symbol",
+    "funding_fields_used": [
+      "funding_time",
+      "symbol",
+      "funding_rate"
+    ],
+    "funding_mark_price_used": false,
+    "funding_statistic": "cumulative-fsum-funding-rate",
+    "funding_window_sides": "left-open-right-closed",
+    "off_grid_action": "flat",
+    "unscheduled_action": "hold"
+  },
+  "mechanism_guardrail": {
+    "deployable": true,
+    "fixed_state_forbidden": true,
+    "persistence_leg_enabled": true,
+    "reversal_leg_enabled": true,
+    "variable_state_interaction_enabled": true
+  },
+  "numerical_conventions": {
+    "allocation_tolerance": 1e-12,
+    "beta_clip": [
+      -1.0,
+      3.0
+    ],
+    "direction_input_clip": [
+      -20.0,
+      20.0
+    ],
+    "epsilon": 1e-12,
+    "moment_ddof": 0,
+    "quantile_method": "hyndman-fan-type-7",
+    "rank_ties": "exact-average",
+    "sigmoid_input_clip": [
+      -40.0,
+      40.0
+    ],
+    "symbol_cap": 0.095
+  },
+  "parameters": {
+    "beta_lookback_days": 20,
+    "direction_scale": 1.5,
+    "fast_residual_days": 10,
+    "fast_trend_weight": 0.35,
+    "funding_lookback_days": 7,
+    "funding_weight": 0.2,
+    "gross_target": 0.9,
+    "maximum_side_tilt": 0.075,
+    "minimum_cross_section": 12,
+    "minimum_unique_funding_events": 2,
+    "minimum_funding_symbols_for_rank": 4,
+    "minimum_names_per_sleeve": 4,
+    "minimum_valid_history_fraction": "4/5",
+    "persistence_breadth_threshold": 0.3,
+    "persistence_efficiency_threshold": 0.3,
+    "rebalance_bars": 3,
+    "residual_reversal_days": 2,
+    "selected_fraction_per_side": "1/4",
+    "slow_residual_days": 20,
+    "slow_trend_weight": 0.65,
+    "transition_width": 0.15,
+    "volatility_lookback_days": 20,
+    "volatility_quantiles": [
+      0.1,
+      0.9
+    ]
+  },
+  "risk_policy_id": "team-02-c3rp-baseline-no-control",
+  "runtime_seed_policy": "require-exact-canonical",
+  "schema_version": 1,
+  "status": "pre-data-explicit-baseline",
+  "team_id": "team-02",
+  "trial_search_tie_namespace": 2026080102
+}

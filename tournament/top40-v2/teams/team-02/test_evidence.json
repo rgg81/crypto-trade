@@ -1,0 +1,55 @@
+{
+  "canonical_runtime_seed": 20260801,
+  "clean_process_replays": [
+    {
+      "gross": 0.8514132319270987,
+      "long_count": 5,
+      "net": 0.09858676807290127,
+      "replay": 1,
+      "short_count": 5,
+      "source_sha256": "d8f577a8c9cedc63a2b743b3ca5ecea2e24f30e93c5a667eff01582ea3b09d0f",
+      "target_sha256": "b9a3cb9751e3265030a8ef710661765b35f595141fc86f476636c720e0a12599"
+    },
+    {
+      "gross": 0.8514132319270987,
+      "long_count": 5,
+      "net": 0.09858676807290127,
+      "replay": 2,
+      "short_count": 5,
+      "source_sha256": "d8f577a8c9cedc63a2b743b3ca5ecea2e24f30e93c5a667eff01582ea3b09d0f",
+      "target_sha256": "b9a3cb9751e3265030a8ef710661765b35f595141fc86f476636c720e0a12599"
+    }
+  ],
+  "coverage": [
+    "future append invariance",
+    "future finite-value corruption invariance",
+    "future truncation invariance",
+    "strict extra feature-lag boundary",
+    "left-open/right-closed cumulative realized funding availability on the official worker schema",
+    "funding carry sign plus duplicate, non-finite, insufficient, and missing-neutral behavior",
+    "point-in-time eligible membership",
+    "variable persistence-versus-reversal state interaction",
+    "exact average ranks and ASCII set-tie handling",
+    "input-order and fresh-instance target determinism",
+    "both sleeves, finite weights, symbol cap, gross, and net bounds",
+    "duplicate history, insufficient coverage, off-grid flat, and unscheduled hold",
+    "strict canonical runtime-seed enforcement",
+    "read-only context behavior",
+    "frozen JSON and disabled risk-policy validation"
+  ],
+  "files": {
+    "frozen_config.json": "8b7d4f1381b29aa8201f75a3c878337ed80bd4036fa449717cd3919624b3ab09",
+    "risk_policy.json": "0d893457d00453e2bdd16c0a192fbec482aff679158d3589123791498c68a310",
+    "strategy.py": "d8f577a8c9cedc63a2b743b3ca5ecea2e24f30e93c5a667eff01582ea3b09d0f",
+    "test_strategy.py": "60ad1f4badfb3877864101c1c1b3c08cb70ea27daa6fc816e39899ff90951966"
+  },
+  "market_data_accessed": false,
+  "material_trial_run": false,
+  "pytest": {
+    "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src python -m pytest tournament/top40-v2/teams/team-02/test_strategy.py -q",
+    "passed": 11,
+    "status": "passed"
+  },
+  "schema_version": 1,
+  "team_id": "team-02"
+}
