@@ -1,0 +1,402 @@
+{
+  "aggregate": {
+    "base": {
+      "annualized_return": 0.217472399891,
+      "annualized_volatility": 0.242519053258,
+      "calmar": 0.470263613673,
+      "expected_shortfall_1pct": -0.042638061234,
+      "max_drawdown": 0.462447855985,
+      "net_sharpe": 0.932417148589,
+      "sharpe_95": [
+        -0.206273115904,
+        2.049109048011
+      ],
+      "total_return": 0.955525246412,
+      "var_1pct": -0.033860547415,
+      "worst_day": -0.057975857166
+    },
+    "double_cost": {
+      "annualized_return": 0.113071661153,
+      "annualized_volatility": 0.242644144338,
+      "calmar": 0.204492793134,
+      "expected_shortfall_1pct": -0.042951702908,
+      "max_drawdown": 0.552937144728,
+      "net_sharpe": 0.562459055934,
+      "sharpe_95": [
+        -0.589675788906,
+        1.704867575834
+      ],
+      "total_return": 0.440658378641,
+      "var_1pct": -0.034130896596,
+      "worst_day": -0.058218724493
+    },
+    "scored_days": 1244
+  },
+  "ambiguities_and_unavailable_evidence": [
+    "Pooled and fold next-day score IC cannot be reconstructed without a pre-construction score and full eligible-symbol forward-return panel.",
+    "Exact bull, bear, chop, and stress compounded returns are not emitted in the runner record.",
+    "Long-bull, short-bear, and combined-chop attribution cannot be reconstructed because committed artifacts do not join common regime labels to sleeve contributions.",
+    "Positive-PnL concentration values here are transparent diagnostics, not an emitted organizer gate field.",
+    "Trial-adjusted probability, six fold/model manifests, raw-momentum ablation, and parameter-neighbor evidence remain unavailable."
+  ],
+  "artifact": "post_result_diagnostics",
+  "candidate_id": "rdf-core-h21-k3-g10",
+  "candidate_parameters": {
+    "beta_clip": [
+      -1,
+      3
+    ],
+    "beta_lookback_days": 30,
+    "btc_symbol": "BTCUSDT",
+    "btc_variance_floor": 1e-12,
+    "direction_lookback_days": 60,
+    "direction_return_scale": 0.2,
+    "direction_tilt_delta": 0.075,
+    "funding_lookback_days": 7,
+    "funding_penalty": 0.35,
+    "minimum_funding_events": 14,
+    "minimum_names_per_side": 6,
+    "minimum_paired_returns": 72,
+    "minimum_valid_symbols": 24,
+    "path_efficiency_exponent": 1.0,
+    "per_symbol_target_cap": 0.09,
+    "rank_tail_fraction": 0.25,
+    "rebalance_boundary_utc": "00:00",
+    "residual_denominator_floor": 1e-08,
+    "residual_lookback_days": 21,
+    "risk_policy_id": "team-01-base",
+    "skip_days": 3,
+    "total_gross": 0.8
+  },
+  "concentration_diagnostics": {
+    "formal_organizer_field_available": false,
+    "largest_positive_fold_pnl_fraction": 0.670075702715,
+    "largest_positive_quarter_pnl_fraction": 0.447624621279,
+    "threshold": 0.4
+  },
+  "created_at_utc": "2026-07-15T23:34:48Z",
+  "decision": {
+    "candidate_disposition": "rejected_no_risk_rescue",
+    "failed_causal_minima": [
+      "positive net-return folds < 4 of 6",
+      "pooled next-day score IC unavailable",
+      "positive score-IC fold count unavailable"
+    ],
+    "family_action": "authorize_at_most_one_final_diagnostic_core_cell_then_stop_or_pivot_on_any_causal_failure",
+    "risk_rescue_allowed": false
+  },
+  "drawdown_path": {
+    "end_drawdown": 0.460737129061,
+    "peak_date": "2021-11-22",
+    "recovered_by_development_end": false,
+    "trough_date": "2023-05-11"
+  },
+  "evidence_binding": {
+    "artifact_sha256": {
+      "bar_returns": "c6f315d64f911ffb66fe55fb8a3205b4fd671faf2eb5459690fc2d96bbb61b85",
+      "daily_returns": "ac389c3a8c740c34d6ffc22b8e53e2a63f8e2bc6cbfe8611c83f0c878a502b20",
+      "double_cost_bar_returns": "3fa07b4522021c0d4c7f6065febc9f709079edcfa1a65b752603fbf68eb4809a",
+      "double_cost_daily_returns": "7a24782ae3d48e9ca151d9384d596b475cb3e2d94e36a89cf06368b0d8ee7b90",
+      "events": "74736579a543bb105ec9bcc88d5f3e019e9a36f17970c7aaa96f01cd5c3e5c8c",
+      "positions": "8da52afa861074c41fc309f626d1135eebe8dfb6db40236465c7e1a380e82179",
+      "targets": "3239063d092955ddb732068aba5a5558d80b30f2d0e41bc2f7dd006ab27319b7",
+      "trades": "95412a3c9d09f9d42a98e98f85ea6b8dfa05b3a93b2996275bff0f4b816ab591"
+    },
+    "commit": "f763818e6f5f382644bca7779981c8fe9e34ee96",
+    "candidate_artifacts_differ_from_commit": false,
+    "runner_record": "reports-top40-v2/team-01/qualification-attempts/rdf-core-h21-k3-g10.runner-record.json"
+  },
+  "execution_and_costs": {
+    "active_bar_fraction": 0.869774919614,
+    "base_fee_return_contribution_sum": 0.203827992122,
+    "base_fee_usd": 50757.501689853336,
+    "base_slippage_return_contribution_sum": 0.101913996061,
+    "base_slippage_usd": 25378.750844926668,
+    "executed_trade_rows": 22803,
+    "fill_fraction": 0.998763188029,
+    "first_nonzero_target": "2020-07-04T00:00:00Z",
+    "max_abs_net_exposure": 0.229839636868,
+    "max_gross_exposure": 1.000000000001,
+    "mean_gross_exposure_active": 0.800945904204,
+    "requested_notional_usd": 101640713.831289,
+    "risk_cap_breach_count": 2,
+    "risk_policy_reason_bar_count": 0,
+    "turnover_annualized_one_way": 119.609673833473,
+    "turnover_sum": 407.655984243399,
+    "unfilled_notional_usd": 125710.451583,
+    "worst_bar_return": -0.041751446132,
+    "zero_day_fraction": 0.12459807074
+  },
+  "folds": [
+    {
+      "base_max_drawdown": 0.089974379003,
+      "base_return": 0.025560967349,
+      "base_sharpe": 0.386073441445,
+      "double_return": 0.009697482538,
+      "double_sharpe": 0.189649165898,
+      "end_exclusive": "2020-09-01",
+      "fold": "F1",
+      "start": "2020-02-03"
+    },
+    {
+      "base_max_drawdown": 0.122922008798,
+      "base_return": 1.58028364977,
+      "base_sharpe": 4.962295428203,
+      "double_return": 1.446418078041,
+      "double_sharpe": 4.691495345982,
+      "end_exclusive": "2021-04-01",
+      "fold": "F2",
+      "start": "2020-09-01"
+    },
+    {
+      "base_max_drawdown": 0.165051636463,
+      "base_return": 0.291889732761,
+      "base_sharpe": 1.643382656686,
+      "double_return": 0.215723910539,
+      "double_sharpe": 1.287197909387,
+      "end_exclusive": "2021-11-01",
+      "fold": "F3",
+      "start": "2021-04-01"
+    },
+    {
+      "base_max_drawdown": 0.250390126995,
+      "base_return": -0.204859590395,
+      "base_sharpe": -1.565678812318,
+      "double_return": -0.252984501959,
+      "double_sharpe": -2.021027678693,
+      "end_exclusive": "2022-06-01",
+      "fold": "F4",
+      "start": "2021-11-01"
+    },
+    {
+      "base_max_drawdown": 0.209251861833,
+      "base_return": -0.132614622546,
+      "base_sharpe": -1.198645747998,
+      "double_return": -0.184975073713,
+      "double_sharpe": -1.763203164902,
+      "end_exclusive": "2023-01-01",
+      "fold": "F5",
+      "start": "2022-06-01"
+    },
+    {
+      "base_max_drawdown": 0.205967951623,
+      "base_return": -0.170620827519,
+      "base_sharpe": -2.056954048312,
+      "double_return": -0.212041042409,
+      "double_sharpe": -2.641148975442,
+      "end_exclusive": "2023-07-01",
+      "fold": "F6",
+      "start": "2023-01-01"
+    }
+  ],
+  "formal_qualification_claimed": false,
+  "gate_summary": {
+    "diagnostic_fail": [
+      "positive_pnl_concentration"
+    ],
+    "diagnostic_pass": [
+      "minimum_side_exposure",
+      "minimum_side_active_fraction",
+      "minimum_mean_side_exposure",
+      "minimum_side_executed_notional"
+    ],
+    "fail": [
+      "maximum_drawdown",
+      "minimum_positive_folds",
+      "minimum_positive_quarter_fraction",
+      "required_positive_bear_return",
+      "minimum_worst_regime_sharpe",
+      "pooled_next_day_score_ic_causal_minimum",
+      "positive_score_ic_fold_count_causal_minimum"
+    ],
+    "pass": [
+      "minimum_net_sharpe_point_estimate",
+      "positive_annualized_return",
+      "minimum_calmar",
+      "minimum_double_cost_sharpe_point_estimate",
+      "minimum_positive_sharpe_regimes"
+    ],
+    "unavailable": [
+      "minimum_trial_adjusted_probability_positive",
+      "long_bull_attribution",
+      "short_bear_attribution",
+      "combined_chop_return",
+      "canonical_positive_pnl_concentration",
+      "six_fold_model_manifests",
+      "raw_momentum_ablation",
+      "parameter_neighbors"
+    ]
+  },
+  "ic_audit": {
+    "bar_returns_are_portfolio_or_sleeve_aggregate": true,
+    "event_forward_return_field_present": false,
+    "fold_positive_score_ic_count": null,
+    "pooled_next_day_score_ic": null,
+    "positions_are_quantities_without_return_panel": true,
+    "preregistered_interpretation": "unavailable_is_failure",
+    "reason": "Targets contain post-construction weights, not scores; event rows are selected executions/funding with no full cross-sectional forward returns; positions lack prices/returns; portfolio returns cannot substitute for score IC.",
+    "target_score_field_present": false,
+    "validly_reconstructable": false
+  },
+  "next_decision": {
+    "action": "authorize_at_most_one_next_no_control_core_cell",
+    "baseline_candidate_id": "rdf-ref-001",
+    "candidate_id": "rdf-core-h14-k3-g05",
+    "cost_multiplier": 1.0,
+    "only_parameter_delta_from_baseline": {
+      "residual_lookback_days": {
+        "from": 21,
+        "to": 14
+      }
+    },
+    "parameters": {
+      "beta_clip": [
+        -1,
+        3
+      ],
+      "beta_lookback_days": 30,
+      "btc_symbol": "BTCUSDT",
+      "btc_variance_floor": 1e-12,
+      "direction_lookback_days": 60,
+      "direction_return_scale": 0.2,
+      "direction_tilt_delta": 0.075,
+      "funding_lookback_days": 7,
+      "funding_penalty": 0.35,
+      "minimum_funding_events": 14,
+      "minimum_names_per_side": 6,
+      "minimum_paired_returns": 72,
+      "minimum_valid_symbols": 24,
+      "path_efficiency_exponent": 0.5,
+      "per_symbol_target_cap": 0.09,
+      "rank_tail_fraction": 0.25,
+      "rebalance_boundary_utc": "00:00",
+      "residual_denominator_floor": 1e-08,
+      "residual_lookback_days": 14,
+      "risk_policy_id": "team-01-base",
+      "skip_days": 3,
+      "total_gross": 0.8
+    },
+    "rationale": "Test the remaining orthogonal response-horizon coordinate while retaining the solvent reference's K3 and gamma0.5. H14 is preregistered and tests faster medium-horizon adaptation without admitting the latest three-day interval that accompanied K1 insolvency.",
+    "risk_controls": "none",
+    "seed": 20260801,
+    "status": "planned_not_registered_not_run",
+    "stop_rule": {
+      "reject_no_rescue_if_any": [
+        "terminal, insolvent, interrupted, or incomplete canonical development record",
+        "aggregate no-control net Sharpe <= 0",
+        "positive net-return folds < 4 of 6",
+        "pooled next-day score IC <= 0 or unavailable",
+        "positive score-IC folds < 4 of 6 or unavailable"
+      ],
+      "on_failure": "Stop this family and formally pivot or record DNF; no further core cell is automatically authorized.",
+      "on_pass": "Require a fresh QR review before any construction, risk, private, or additional trial decision."
+    }
+  },
+  "positive_fold_count": {
+    "base": 3,
+    "double_cost": 3,
+    "required": 4
+  },
+  "quarters": {
+    "base_returns": {
+      "2020Q1": 0.0,
+      "2020Q2": 0.0,
+      "2020Q3": 0.07921300929,
+      "2020Q4": 0.394662635999,
+      "2021Q1": 0.758136522901,
+      "2021Q2": 0.211266927246,
+      "2021Q3": -0.087605127771,
+      "2021Q4": 0.117604276599,
+      "2022Q1": -0.016212524173,
+      "2022Q2": -0.132091280263,
+      "2022Q3": -0.10855658766,
+      "2022Q4": -0.052233187389,
+      "2023Q1": -0.109306578009,
+      "2023Q2": -0.068838781108
+    },
+    "count": 14,
+    "positive_count": 5,
+    "positive_fraction": 0.357142857143,
+    "required_fraction": 0.55
+  },
+  "reference_comparison": {
+    "baseline_candidate_id": "rdf-ref-001",
+    "candidate_minus_reference": {
+      "annualized_return": -0.062224036562,
+      "bear_sharpe": -0.26295118294,
+      "bull_sharpe": -0.023606077592,
+      "chop_sharpe": -0.714681268495,
+      "double_cost_sharpe": -0.204319624875,
+      "max_drawdown": 0.00680130151,
+      "net_sharpe": -0.191514197092,
+      "positive_fold_count": 0,
+      "positive_quarter_fraction": 0.0,
+      "short_gross_return_contribution": -0.079883208915,
+      "stress_sharpe": -0.077602195573
+    },
+    "only_strategy_delta": {
+      "path_efficiency_exponent": {
+        "from": 0.5,
+        "to": 1.0
+      }
+    },
+    "summary": "Gamma1 is unchanged or worse on every listed aggregate, chronology, regime, and short-sleeve comparison."
+  },
+  "regime_sharpe": {
+    "bear": -1.527082150743,
+    "bull": 1.048657357665,
+    "chop": 1.499450810508,
+    "positive_count": 3,
+    "stress": 2.385343851489,
+    "worst": -1.527082150743
+  },
+  "review_artifact": "post_result_review_rdf_core_h21_k3_g10.md",
+  "schema_version": 1,
+  "sleeves": {
+    "long": {
+      "active_bar_fraction_at_1pct": 0.869774919614,
+      "allocated_shared_cost_return_sum_diagnostic": 0.132912283536,
+      "executed_notional_usd": 42377147.517066,
+      "funding_return_contribution_sum": -0.087064731879,
+      "gross_return_contribution_before_shared_cost": 1.380559702868,
+      "mean_exposure_active": 0.410139896964,
+      "mean_exposure_all": 0.356729395912,
+      "net_return_contribution_diagnostic": 1.247647419332,
+      "price_return_contribution_sum": 1.467624434747
+    },
+    "per_regime_attribution_available": false,
+    "short": {
+      "active_bar_fraction_at_1pct": 0.869774919614,
+      "allocated_shared_cost_return_sum_diagnostic": 0.172829704647,
+      "executed_notional_usd": 57121186.239477,
+      "funding_return_contribution_sum": 0.205410111985,
+      "gross_return_contribution_before_shared_cost": -0.310529594497,
+      "mean_exposure_active": 0.39080600724,
+      "mean_exposure_all": 0.339913263532,
+      "net_return_contribution_diagnostic": -0.483359299144,
+      "price_return_contribution_sum": -0.515939706482
+    }
+  },
+  "team_id": "team-01",
+  "trial_accounting": {
+    "core_cells_consumed_now": 3,
+    "core_cells_remaining_now": 9,
+    "cpu_hours_consumed_now": 0.589317222448,
+    "cpu_hours_remaining_now": 11.410682777552,
+    "family_cells_consumed_now": 3,
+    "family_cells_remaining_now": 36,
+    "material_configurations_consumed_now": 3,
+    "material_configurations_remaining_now": 77,
+    "mechanism_pivots_consumed": 0,
+    "proposed_cell_if_later_run": {
+      "core_cells_consumed": 4,
+      "core_cells_remaining": 8,
+      "family_cells_consumed": 4,
+      "family_cells_remaining": 35,
+      "material_configurations_consumed": 4,
+      "material_configurations_remaining": 76
+    },
+    "wall_hours_consumed_now": 0.588817153894,
+    "wall_hours_remaining_now": 17.411182846106
+  }
+}
