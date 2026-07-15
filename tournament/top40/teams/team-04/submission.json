@@ -33,7 +33,7 @@
     "double_cost_rerun": true,
     "fees_and_slippage_charged": true,
     "funding_cashflows_charged": true,
-    "long_and_short_enabled": true,
+    "long_and_short_enabled": false,
     "next_bar_execution": true,
     "point_in_time_top40": true,
     "public_binance_only": true

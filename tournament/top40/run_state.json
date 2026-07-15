@@ -241,6 +241,27 @@
         "trial_count": 3
       },
       "freeze_commit": "1e444fccf37e77114f159feee635c932b87a20b0",
+      "mechanical_validity": {
+        "amendment_id": "organizer-amendment-01-invalid-team-04",
+        "amendment_path": "tournament/top40/organizer_amendment_01.json",
+        "canonical_output_sha256": "7dc8ec6d275e6b27b4e0b2a47c66c717e1d1c1dc7ce95af8cf630c56cab79636",
+        "recorded_at_utc": "2026-07-15T12:49:24.132898+00:00",
+        "status": "invalid",
+        "validation_issues": [
+          {
+            "code": "long_and_short_enabled",
+            "message": "hard compliance check failed: long_and_short_enabled"
+          },
+          {
+            "code": "long_and_short_enabled",
+            "message": "public_oos long realized exposure is immaterial: active_fraction=0.038813, mean=0.007052"
+          },
+          {
+            "code": "long_and_short_enabled",
+            "message": "public_oos short realized exposure is immaterial: active_fraction=0.038813, mean=0.007052"
+          }
+        ]
+      },
       "oos_accesses": [
         {
           "candidate_id": "t04-fps-001",

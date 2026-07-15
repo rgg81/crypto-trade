@@ -1,0 +1,77 @@
+{
+  "amended_submission_sha256": "8b049081aa5c36c4af4bea56ad40a522744bb29167cd9e8da1f6ff6f08c218b0",
+  "amendment_id": "organizer-amendment-01-invalid-team-04",
+  "amendment_tool_path": "scripts/top40_invalid_team_amendment.py",
+  "amendment_tool_sha256": "3b5bc89921b961604c8fc1fdd1b6a81b75eeb336b4cbfb2b94870ee899271ea6",
+  "artifact_manifest_file_sha256": "a275e6a633d72ff1b3b153fe5210f91f032840b84cdf76a6297d676d7b9db30a",
+  "artifact_manifest_path": "tournament/top40/teams/team-04/artifact_manifest.json",
+  "artifact_manifest_sha256": "708b65dc436af2f7a4b800283c14750fc5d30cc9fed59b7e4de14edaae5a6bd7",
+  "authorization_text": "yes, go ahead",
+  "authorized_by": "organizer-user",
+  "authorized_scope": "Keep every frozen strategy, threshold, evaluator, scorer, charter, and original orchestrator unchanged; retain Team 04 as an invalid audited entrant and rank the remaining mechanically valid teams.",
+  "canonical_output_sha256": "7dc8ec6d275e6b27b4e0b2a47c66c717e1d1c1dc7ce95af8cf630c56cab79636",
+  "changed_paths": [
+    "tournament/top40/organizer_amendment_01.json",
+    "tournament/top40/teams/team-04/submission.json",
+    "tournament/top40/run_state.json"
+  ],
+  "invalid_team_id": "team-04",
+  "mechanical_validity_state": {
+    "amendment_id": "organizer-amendment-01-invalid-team-04",
+    "amendment_path": "tournament/top40/organizer_amendment_01.json",
+    "canonical_output_sha256": "7dc8ec6d275e6b27b4e0b2a47c66c717e1d1c1dc7ce95af8cf630c56cab79636",
+    "recorded_at_utc": "2026-07-15T12:49:24.132898+00:00",
+    "status": "invalid",
+    "validation_issues": [
+      {
+        "code": "long_and_short_enabled",
+        "message": "hard compliance check failed: long_and_short_enabled"
+      },
+      {
+        "code": "long_and_short_enabled",
+        "message": "public_oos long realized exposure is immaterial: active_fraction=0.038813, mean=0.007052"
+      },
+      {
+        "code": "long_and_short_enabled",
+        "message": "public_oos short realized exposure is immaterial: active_fraction=0.038813, mean=0.007052"
+      }
+    ]
+  },
+  "original_orchestrator_sha256": "205c6da1ce77654aefcf11770721d06d9e8a766b9f339b3ecd78afc10bc6f58c",
+  "original_submission_sha256": "c4b93c549841ea9165f37632ded54e6fede5e44cec6857e6df6be32374b0c392",
+  "phase0_freeze_sha256": "50a62133904ab70ef401dcf656b16d35451d0582f848d8de6bdd54d4c9279716",
+  "pre_amendment_head_commit": "7069db5f76900ae0c5d6b5836fa55fca19fca31e",
+  "recorded_at_utc": "2026-07-15T12:49:24.132898+00:00",
+  "schema_version": 1,
+  "unchanged_thresholds": {
+    "minimum_mean_side_exposure": 0.005,
+    "minimum_side_active_bar_fraction": 0.05,
+    "minimum_side_executed_notional_usdt": 1000.0,
+    "minimum_side_exposure": 0.01
+  },
+  "valid_team_ids": [
+    "team-01",
+    "team-02",
+    "team-03",
+    "team-05",
+    "team-06",
+    "team-07",
+    "team-08",
+    "team-09",
+    "team-10"
+  ],
+  "validation_issues": [
+    {
+      "code": "long_and_short_enabled",
+      "message": "hard compliance check failed: long_and_short_enabled"
+    },
+    {
+      "code": "long_and_short_enabled",
+      "message": "public_oos long realized exposure is immaterial: active_fraction=0.038813, mean=0.007052"
+    },
+    {
+      "code": "long_and_short_enabled",
+      "message": "public_oos short realized exposure is immaterial: active_fraction=0.038813, mean=0.007052"
+    }
+  ]
+}
