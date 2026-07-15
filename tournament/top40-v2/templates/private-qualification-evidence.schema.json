@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "top40-v2-private-qualification-evidence.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "stage", "team_id", "candidate_id", "strategy_sha256", "risk_policy_sha256", "config_sha256", "trial_count", "aggregate"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "stage": {"const": "private"},
+    "team_id": {"type": "string", "pattern": "^team-(0[1-9]|10)$"},
+    "candidate_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "strategy_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "risk_policy_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "config_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "trial_count": {"type": "integer", "minimum": 1},
+    "aggregate": {
+      "type": "object", "additionalProperties": false,
+      "required": ["net_sharpe", "annualized_return", "max_drawdown", "double_cost_sharpe", "positive_quarter_fraction"],
+      "properties": {
+        "net_sharpe": {"type": "number"}, "annualized_return": {"type": "number"},
+        "max_drawdown": {"type": "number", "minimum": 0, "maximum": 1},
+        "double_cost_sharpe": {"type": "number"},
+        "positive_quarter_fraction": {"type": "number", "minimum": 0, "maximum": 1}
+      }
+    }
+  }
+}

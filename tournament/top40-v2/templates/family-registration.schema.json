@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "top40-v2-family-registration.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "team_id",
+    "family_id",
+    "parent_family_id",
+    "registered_at_utc",
+    "mechanism",
+    "economic_thesis",
+    "expected_regime_roles",
+    "falsifier",
+    "parameter_ranges",
+    "selection_metric",
+    "risk_policy_plan"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "team_id": {"type": "string", "pattern": "^team-(0[1-9]|10)$"},
+    "family_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "parent_family_id": {"type": ["string", "null"], "maxLength": 128},
+    "registered_at_utc": {"type": "string", "format": "date-time"},
+    "mechanism": {"type": "string", "minLength": 1},
+    "economic_thesis": {"type": "string", "minLength": 1},
+    "expected_regime_roles": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["bull", "bear", "chop", "stress", "long_sleeve", "short_sleeve"],
+      "properties": {
+        "bull": {"type": "string", "minLength": 1},
+        "bear": {"type": "string", "minLength": 1},
+        "chop": {"type": "string", "minLength": 1},
+        "stress": {"type": "string", "minLength": 1},
+        "long_sleeve": {"type": "string", "minLength": 1},
+        "short_sleeve": {"type": "string", "minLength": 1}
+      }
+    },
+    "falsifier": {"type": "string", "minLength": 1},
+    "parameter_ranges": {"type": "object", "minProperties": 1},
+    "selection_metric": {"type": "string", "minLength": 1},
+    "risk_policy_plan": {"type": "string", "minLength": 1}
+  }
+}

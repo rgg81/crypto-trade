@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "top40-v2-development-qualification-evidence.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "stage", "team_id", "candidate_id", "strategy_sha256",
+    "risk_policy_sha256", "config_sha256", "trial_count", "aggregate", "folds",
+    "regimes", "roles", "sleeves", "stability"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "stage": {"const": "development"},
+    "team_id": {"type": "string", "pattern": "^team-(0[1-9]|10)$"},
+    "candidate_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "strategy_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "risk_policy_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "config_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "trial_count": {"type": "integer", "minimum": 1},
+    "aggregate": {
+      "type": "object", "additionalProperties": false,
+      "required": ["net_sharpe", "annualized_return", "calmar", "max_drawdown", "double_cost_sharpe", "positive_quarter_fraction", "trial_adjusted_probability_positive"],
+      "properties": {
+        "net_sharpe": {"type": "number"}, "annualized_return": {"type": "number"},
+        "calmar": {"type": "number"}, "max_drawdown": {"type": "number", "minimum": 0, "maximum": 1},
+        "double_cost_sharpe": {"type": "number"},
+        "positive_quarter_fraction": {"type": "number", "minimum": 0, "maximum": 1},
+        "trial_adjusted_probability_positive": {"type": "number", "minimum": 0, "maximum": 1}
+      }
+    },
+    "folds": {
+      "type": "array", "minItems": 6, "maxItems": 6,
+      "items": {"type": "object", "additionalProperties": false, "required": ["fold_id", "net_return"], "properties": {"fold_id": {"type": "string", "minLength": 1}, "net_return": {"type": "number"}}}
+    },
+    "regimes": {"$ref": "#/$defs/regimes"},
+    "roles": {
+      "type": "object", "additionalProperties": false,
+      "required": ["long_bull_net_return", "short_bear_net_return", "combined_chop_net_return"],
+      "properties": {"long_bull_net_return": {"type": "number"}, "short_bear_net_return": {"type": "number"}, "combined_chop_net_return": {"type": "number"}}
+    },
+    "sleeves": {
+      "type": "object", "additionalProperties": false, "required": ["long", "short"],
+      "properties": {"long": {"$ref": "#/$defs/sleeve"}, "short": {"$ref": "#/$defs/sleeve"}}
+    },
+    "stability": {
+      "type": "object", "additionalProperties": false,
+      "required": ["profitable_neighbor_fraction", "neighbor_median_sharpe", "maximum_positive_pnl_concentration"],
+      "properties": {
+        "profitable_neighbor_fraction": {"type": "number", "minimum": 0, "maximum": 1},
+        "neighbor_median_sharpe": {"type": "number"},
+        "maximum_positive_pnl_concentration": {"type": "number", "minimum": 0, "maximum": 1}
+      }
+    }
+  },
+  "$defs": {
+    "regimeMetric": {"type": "object", "additionalProperties": false, "required": ["net_return", "net_sharpe"], "properties": {"net_return": {"type": "number"}, "net_sharpe": {"type": "number"}}},
+    "regimes": {"type": "object", "additionalProperties": false, "required": ["bull", "bear", "chop", "stress"], "properties": {"bull": {"$ref": "#/$defs/regimeMetric"}, "bear": {"$ref": "#/$defs/regimeMetric"}, "chop": {"$ref": "#/$defs/regimeMetric"}, "stress": {"$ref": "#/$defs/regimeMetric"}}},
+    "sleeve": {"type": "object", "additionalProperties": false, "required": ["active_bar_fraction", "mean_gross_exposure", "executed_notional_usdt"], "properties": {"active_bar_fraction": {"type": "number", "minimum": 0, "maximum": 1}, "mean_gross_exposure": {"type": "number", "minimum": 0, "maximum": 1}, "executed_notional_usdt": {"type": "number", "minimum": 0}}}
+  }
+}

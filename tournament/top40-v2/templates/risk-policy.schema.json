@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "top40-v2-risk-policy.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "policy_id",
+    "same_boundary_reentry",
+    "volatility_target",
+    "drawdown_brakes",
+    "position_stop",
+    "time_stop",
+    "turnover_limit",
+    "side_scaling"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "policy_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"},
+    "same_boundary_reentry": {"type": "boolean"},
+    "volatility_target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "lookback_days", "annualized_target", "minimum_scale", "maximum_scale"],
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "lookback_days": {"type": "integer", "minimum": 2},
+        "annualized_target": {"type": "number", "exclusiveMinimum": 0},
+        "minimum_scale": {"type": "number", "minimum": 0, "maximum": 1},
+        "maximum_scale": {"type": "number", "minimum": 0, "maximum": 1}
+      }
+    },
+    "drawdown_brakes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["drawdown", "gross_scale"],
+        "properties": {
+          "drawdown": {"type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 1},
+          "gross_scale": {"type": "number", "minimum": 0, "maximum": 1}
+        }
+      }
+    },
+    "position_stop": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "loss_fraction", "cooldown_bars"],
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "loss_fraction": {"type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 1},
+        "cooldown_bars": {"type": "integer", "minimum": 0}
+      }
+    },
+    "time_stop": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "maximum_holding_bars", "cooldown_bars"],
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "maximum_holding_bars": {"type": "integer", "minimum": 1},
+        "cooldown_bars": {"type": "integer", "minimum": 0}
+      }
+    },
+    "turnover_limit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "maximum_one_way_turnover"],
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "maximum_one_way_turnover": {"type": "number", "exclusiveMinimum": 0, "maximum": 2}
+      }
+    },
+    "side_scaling": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["long_scale", "short_scale"],
+      "properties": {
+        "long_scale": {"type": "number", "minimum": 0, "maximum": 1},
+        "short_scale": {"type": "number", "minimum": 0, "maximum": 1}
+      }
+    }
+  }
+}
