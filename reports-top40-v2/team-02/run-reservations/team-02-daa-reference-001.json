@@ -1,0 +1,15 @@
+{
+  "candidate_id": "team-02-daa-reference-001",
+  "config_sha256": "bd0e4f70bcf335b2ac4e44ec049b89b8e8eaf4c6ac6502574d0accf12d9d9947",
+  "organizer_journal_head_sha256": "357ac065477daf9b3b0eccddd3352f1cbeb017eab6cea1d13e2528a9cfcde303",
+  "private_attempt_number": null,
+  "registration_sha256": "a7e1794af874196e57da281781acb78e79bca38fe902438130b215b29fa1fd9a",
+  "reserved_at_utc": "2026-07-15T22:47:38.322026+00:00",
+  "risk_policy_sha256": "0c90e21388df81f4a4a045c8d8a86ac61d178f14779987cc53883f5531556a52",
+  "schema_version": 1,
+  "source_bundle_sha256": "810ce22a8ac80cfece9c55b987cb2446c2121ecb573f458e70203589523e3f3a",
+  "stage": "development",
+  "strategy_sha256": "d1d031e717031455ef93decbc990f1f55e0703abee26dd885763a2ec4191ffd4",
+  "team_id": "team-02",
+  "tournament": "quant-portfolio-blind-top40-v2"
+}
