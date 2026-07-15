@@ -9,12 +9,14 @@ orchestrator with amendment-aware cohort verification.
 
 from __future__ import annotations
 
+import dataclasses
 import hashlib
 import importlib.util
 import json
 import subprocess
 import sys
 from collections.abc import Mapping, Sequence
+from copy import deepcopy
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -51,6 +53,31 @@ AMENDMENT_CHANGED_PATHS = (
     TEAM_SUBMISSION_PATH,
     RUN_STATE_PATH,
 )
+AUTHORIZED_SCOPE = (
+    "Keep every frozen strategy, threshold, evaluator, scorer, charter, and original "
+    "orchestrator unchanged; retain Team 04 as an invalid audited entrant and rank the "
+    "remaining mechanically valid teams."
+)
+UNCHANGED_THRESHOLDS = {
+    "minimum_side_exposure": 0.01,
+    "minimum_side_active_bar_fraction": 0.05,
+    "minimum_mean_side_exposure": 0.005,
+    "minimum_side_executed_notional_usdt": 1000.0,
+}
+AUTHORIZED_HARD_FAILURE = "hard compliance check failed: long_and_short_enabled"
+AUTHORIZED_EXPOSURE_FAILURES = {
+    "public_oos long realized exposure is immaterial: active_fraction=0.038813, mean=0.007052",
+    "public_oos short realized exposure is immaterial: active_fraction=0.038813, mean=0.007052",
+}
+DELEGATED_COMMANDS = {
+    "validate",
+    "lock-critic",
+    "lock-critic-confirmations",
+    "lock-user-ballot",
+    "score",
+    "freeze-winner",
+    "verify-winner-freeze",
+}
 
 
 def _sha256(path: Path) -> str:
@@ -67,6 +94,16 @@ def _json_object(path: Path, label: str) -> dict[str, object]:
     return value
 
 
+def _json_bytes_object(payload: bytes, label: str) -> dict[str, object]:
+    try:
+        value = json.loads(payload)
+    except (UnicodeError, json.JSONDecodeError) as exc:
+        raise ValueError(f"invalid {label}: {exc}") from exc
+    if not isinstance(value, dict):
+        raise ValueError(f"{label} must be a JSON object")
+    return value
+
+
 def _issue_payload(issues: Sequence[ValidationIssue]) -> list[dict[str, str]]:
     return [{"code": issue.code, "message": issue.message} for issue in issues]
 
@@ -75,12 +112,7 @@ def _validate_exposure_failure(issues: Sequence[ValidationIssue]) -> None:
     payload = _issue_payload(issues)
     if len(payload) != 2 or any(item["code"] != "long_and_short_enabled" for item in payload):
         raise ValueError(f"Team 04 has unexpected canonical issues: {payload}")
-    messages = {item["message"] for item in payload}
-    required_fragments = {
-        "public_oos long realized exposure is immaterial",
-        "public_oos short realized exposure is immaterial",
-    }
-    if not all(any(fragment in message for message in messages) for fragment in required_fragments):
+    if {item["message"] for item in payload} != AUTHORIZED_EXPOSURE_FAILURES:
         raise ValueError(f"Team 04 exposure failure differs from the authorized case: {payload}")
 
 
@@ -88,14 +120,82 @@ def _validate_authorized_issue_set(issues: Sequence[ValidationIssue]) -> None:
     payload = _issue_payload(issues)
     if len(payload) != 3 or any(item["code"] != "long_and_short_enabled" for item in payload):
         raise ValueError(f"Team 04 amendment has unexpected issues: {payload}")
-    messages = {item["message"] for item in payload}
-    required_fragments = {
-        "hard compliance check failed: long_and_short_enabled",
-        "public_oos long realized exposure is immaterial",
-        "public_oos short realized exposure is immaterial",
-    }
-    if not all(any(fragment in message for message in messages) for fragment in required_fragments):
+    expected = AUTHORIZED_EXPOSURE_FAILURES | {AUTHORIZED_HARD_FAILURE}
+    if {item["message"] for item in payload} != expected:
         raise ValueError(f"Team 04 amendment issue set is incomplete: {payload}")
+
+
+def _normalized_json_bytes(value: object) -> bytes:
+    return (json.dumps(value, indent=2, sort_keys=True) + "\n").encode()
+
+
+def _authorized_submission_payload(original: Mapping[str, object]) -> dict[str, object]:
+    amended = deepcopy(dict(original))
+    compliance = amended.get("compliance")
+    if not isinstance(compliance, dict) or compliance.get("long_and_short_enabled") is not True:
+        raise ValueError("pre-amendment submission lacks the stale true exposure assertion")
+    compliance["long_and_short_enabled"] = False
+    return amended
+
+
+def _prepared_state_payload(
+    original: Mapping[str, object], mechanical_record: Mapping[str, object]
+) -> dict[str, object]:
+    prepared = deepcopy(dict(original))
+    teams = prepared.get("teams")
+    team_state = teams.get(INVALID_TEAM_ID) if isinstance(teams, dict) else None
+    valid_complete = isinstance(teams, dict) and all(
+        isinstance(teams.get(team_id), dict) and teams[team_id].get("canonical_run") == "complete"
+        for team_id in VALID_TEAM_IDS
+    )
+    if (
+        prepared.get("phase") != "cohort_frozen"
+        or not valid_complete
+        or not isinstance(team_state, dict)
+        or team_state.get("canonical_run") != "failed"
+        or team_state.get("canonical_failure_type") != "ValueError"
+        or "mechanical_validity" in team_state
+    ):
+        raise ValueError("Team 04 run state is not eligible for one-shot amendment preparation")
+    team_state["mechanical_validity"] = deepcopy(dict(mechanical_record))
+    return prepared
+
+
+def _objective_state_payload(
+    prelock: Mapping[str, object], objective: Mapping[str, object], output_sha256: str
+) -> dict[str, object]:
+    expected = deepcopy(dict(prelock))
+    teams = expected.get("teams")
+    team_state = teams.get(INVALID_TEAM_ID) if isinstance(teams, dict) else None
+    valid_complete = isinstance(teams, dict) and all(
+        isinstance(teams.get(team_id), dict) and teams[team_id].get("canonical_run") == "complete"
+        for team_id in VALID_TEAM_IDS
+    )
+    if (
+        expected.get("phase") != "cohort_frozen"
+        or not valid_complete
+        or not isinstance(team_state, dict)
+        or team_state.get("canonical_run") != "failed"
+        or "mechanical_validity" not in team_state
+        or "objective_lock" in expected
+    ):
+        raise ValueError("Team 04 is not in the amendment's pre-lock failed state")
+    locked_at = objective.get("locked_at_utc")
+    cohort_sha256 = objective.get("cohort_sha256")
+    if not isinstance(locked_at, str) or not isinstance(cohort_sha256, str):
+        raise ValueError("objective payload lacks its timestamp or cohort binding")
+    team_state["canonical_run"] = "complete"
+    team_state["canonical_output_sha256"] = output_sha256
+    team_state["canonical_completed_via_amendment_at_utc"] = locked_at
+    team_state.pop("canonical_failure_type", None)
+    expected["phase"] = "objective_locked"
+    expected["objective_lock"] = {
+        "path": OBJECTIVE_LOCK_PATH,
+        "sha256": hashlib.sha256(_normalized_json_bytes(objective)).hexdigest(),
+        "cohort_sha256": cohort_sha256,
+        "locked_at_utc": locked_at,
+    }
+    return expected
 
 
 def _mechanical_issues(submission: Submission, root: Path) -> tuple[ValidationIssue, ...]:
@@ -156,7 +256,11 @@ def _prepare_amendment() -> int:
         raise ValueError("Team 04 failure type differs from the canonical validation failure")
 
     submission_path = root / TEAM_SUBMISSION_PATH
-    original_submission_sha256 = _sha256(submission_path)
+    state_path = root / RUN_STATE_PATH
+    amendment_path = root / AMENDMENT_PATH
+    original_submission_bytes = submission_path.read_bytes()
+    original_state_bytes = state_path.read_bytes()
+    original_submission_sha256 = hashlib.sha256(original_submission_bytes).hexdigest()
     original = load_submission(submission_path)
     if original.team_id != INVALID_TEAM_ID or validate_submission(original):
         raise ValueError("Team 04 pre-amendment submission is structurally malformed")
@@ -165,12 +269,11 @@ def _prepare_amendment() -> int:
     canonical_output_sha256 = base._canonical_output_sha256(root, original)
 
     raw = _json_object(submission_path, "Team 04 submission")
-    compliance = raw.get("compliance")
-    if not isinstance(compliance, dict) or compliance.get("long_and_short_enabled") is not True:
-        raise ValueError("Team 04 submission does not contain the stale true exposure assertion")
-    compliance["long_and_short_enabled"] = False
-    base._atomic_write_json(submission_path, raw)
-    amended = load_submission(submission_path)
+    amended_raw = _authorized_submission_payload(raw)
+    amended_bytes = _normalized_json_bytes(amended_raw)
+    amended_compliance = dict(original.compliance)
+    amended_compliance["long_and_short_enabled"] = False
+    amended = dataclasses.replace(original, compliance=amended_compliance)
     amendment_issues = _mechanical_issues(amended, root)
     _validate_authorized_issue_set(amendment_issues)
 
@@ -193,11 +296,7 @@ def _prepare_amendment() -> int:
         "amendment_id": AMENDMENT_ID,
         "authorized_by": "organizer-user",
         "authorization_text": "yes, go ahead",
-        "authorized_scope": (
-            "Keep every frozen strategy, threshold, evaluator, scorer, charter, and original "
-            "orchestrator unchanged; retain Team 04 as an invalid audited entrant and rank the "
-            "remaining mechanically valid teams."
-        ),
+        "authorized_scope": AUTHORIZED_SCOPE,
         "recorded_at_utc": timestamp,
         "pre_amendment_head_commit": pre_head,
         "phase0_freeze_sha256": _sha256(phase0_path),
@@ -206,14 +305,9 @@ def _prepare_amendment() -> int:
         "amendment_tool_sha256": _sha256(tool_path),
         "invalid_team_id": INVALID_TEAM_ID,
         "valid_team_ids": list(VALID_TEAM_IDS),
-        "unchanged_thresholds": {
-            "minimum_side_exposure": 0.01,
-            "minimum_side_active_bar_fraction": 0.05,
-            "minimum_mean_side_exposure": 0.005,
-            "minimum_side_executed_notional_usdt": 1000.0,
-        },
+        "unchanged_thresholds": UNCHANGED_THRESHOLDS,
         "original_submission_sha256": original_submission_sha256,
-        "amended_submission_sha256": _sha256(submission_path),
+        "amended_submission_sha256": hashlib.sha256(amended_bytes).hexdigest(),
         "artifact_manifest_path": amended.artifacts["artifact_manifest"],
         "artifact_manifest_file_sha256": _sha256(root / amended.artifacts["artifact_manifest"]),
         "artifact_manifest_sha256": amended.artifact_manifest_sha256,
@@ -222,16 +316,30 @@ def _prepare_amendment() -> int:
         "changed_paths": list(AMENDMENT_CHANGED_PATHS),
         "mechanical_validity_state": mechanical_record,
     }
-    base._atomic_write_json(root / AMENDMENT_PATH, amendment)
-    with base._edit_run_state(root) as locked:
-        current = locked.get("teams", {}).get(INVALID_TEAM_ID)
-        if (
-            locked.get("phase") != "cohort_frozen"
-            or not isinstance(current, dict)
-            or current != invalid_state
+    amendment_bytes = _normalized_json_bytes(amendment)
+    prepared_state = _prepared_state_payload(state, mechanical_record)
+    try:
+        with base._edit_run_state(root) as locked:
+            if locked != state:
+                raise ValueError("tournament state changed during amendment preparation")
+            if amendment_path.exists() or amendment_path.is_symlink():
+                raise ValueError("organizer amendment path appeared during preparation")
+            if submission_path.read_bytes() != original_submission_bytes:
+                raise ValueError("Team 04 submission changed during amendment preparation")
+            base._atomic_write_bytes(submission_path, amended_bytes)
+            base._atomic_write_bytes(amendment_path, amendment_bytes)
+            locked.clear()
+            locked.update(prepared_state)
+    except BaseException:
+        if submission_path.is_file() and submission_path.read_bytes() == amended_bytes:
+            base._atomic_write_bytes(submission_path, original_submission_bytes)
+        if amendment_path.is_file() and amendment_path.read_bytes() == amendment_bytes:
+            amendment_path.unlink()
+        if state_path.is_file() and state_path.read_bytes() == _normalized_json_bytes(
+            prepared_state
         ):
-            raise ValueError("tournament state changed during amendment preparation")
-        current["mechanical_validity"] = mechanical_record
+            base._atomic_write_bytes(state_path, original_state_bytes)
+        raise
     print(f"prepared {AMENDMENT_ID}; commit exactly {', '.join(AMENDMENT_CHANGED_PATHS)}")
     return 0
 
@@ -292,8 +400,10 @@ def _verify_amendment(root: Path) -> tuple[dict[str, object], str]:
         or amendment["amendment_id"] != AMENDMENT_ID
         or amendment["authorized_by"] != "organizer-user"
         or amendment["authorization_text"] != "yes, go ahead"
+        or amendment["authorized_scope"] != AUTHORIZED_SCOPE
         or amendment["invalid_team_id"] != INVALID_TEAM_ID
         or amendment["valid_team_ids"] != list(VALID_TEAM_IDS)
+        or amendment["unchanged_thresholds"] != UNCHANGED_THRESHOLDS
         or amendment["changed_paths"] != list(AMENDMENT_CHANGED_PATHS)
     ):
         raise ValueError("organizer amendment schema or authorization binding is invalid")
@@ -325,6 +435,12 @@ def _verify_amendment(root: Path) -> tuple[dict[str, object], str]:
         != submission_path.read_bytes()
     ):
         raise ValueError("Team 04 amended submission changed after the amendment commit")
+    original_raw = _json_bytes_object(original_submission, "pre-amendment Team 04 submission")
+    amended_raw = _json_object(submission_path, "amended Team 04 submission")
+    if amended_raw != _authorized_submission_payload(original_raw):
+        raise ValueError(
+            "Team 04 amendment changed more than compliance.long_and_short_enabled true -> false"
+        )
     submission = load_submission(submission_path)
     if (
         amendment["amended_submission_sha256"] != _sha256(submission_path)
@@ -339,6 +455,26 @@ def _verify_amendment(root: Path) -> tuple[dict[str, object], str]:
     _validate_authorized_issue_set(issues)
     if amendment["validation_issues"] != _issue_payload(issues):
         raise ValueError("amendment issue binding differs from live Team 04 evidence")
+    expected_mechanical_state = {
+        "status": "invalid",
+        "amendment_id": AMENDMENT_ID,
+        "amendment_path": AMENDMENT_PATH,
+        "recorded_at_utc": amendment["recorded_at_utc"],
+        "canonical_output_sha256": amendment["canonical_output_sha256"],
+        "validation_issues": amendment["validation_issues"],
+    }
+    if amendment["mechanical_validity_state"] != expected_mechanical_state:
+        raise ValueError("amendment mechanical-validity fields are not internally consistent")
+    pre_state = _json_bytes_object(
+        base._git_file_bytes(root, pre_head, RUN_STATE_PATH),
+        "pre-amendment run state",
+    )
+    recorded_state = _json_bytes_object(
+        base._git_file_bytes(root, record_commit, RUN_STATE_PATH),
+        "amendment-commit run state",
+    )
+    if recorded_state != _prepared_state_payload(pre_state, expected_mechanical_state):
+        raise ValueError("amendment commit changed run_state beyond Team 04 validity metadata")
     state = base._read_state(root)
     team_state = state.get("teams", {}).get(INVALID_TEAM_ID)
     if (
@@ -511,30 +647,34 @@ def _lock_objective() -> int:
         "amendment_record_commit": amendment_record_commit,
         "amendment_tool_path": AMENDMENT_TOOL_PATH,
         "amendment_tool_sha256": _sha256(root / AMENDMENT_TOOL_PATH),
+        "authorized_scope": AUTHORIZED_SCOPE,
+        "unchanged_thresholds": UNCHANGED_THRESHOLDS,
         "mechanically_valid_team_ids": list(VALID_TEAM_IDS),
         "cohort_sha256": base._cohort_sha256(submissions),
         "teams": bindings,
     }
-    with base._edit_run_state(root) as locked:
-        if locked != state or locked.get("phase") != "cohort_frozen":
-            raise ValueError("tournament state changed before amended objective locking")
-        current = locked["teams"][INVALID_TEAM_ID]
-        current["canonical_run"] = "complete"
-        current["canonical_output_sha256"] = invalid_output_sha
-        current["canonical_completed_via_amendment_at_utc"] = locked_at
-        current.pop("canonical_failure_type", None)
-        if not all(
-            locked["teams"][team_id].get("canonical_run") == "complete" for team_id in base.TEAM_IDS
+    lock_path = root / OBJECTIVE_LOCK_PATH
+    state_path = root / RUN_STATE_PATH
+    original_state_bytes = state_path.read_bytes()
+    lock_bytes = _normalized_json_bytes(payload)
+    objective_state = _objective_state_payload(state, payload, invalid_output_sha)
+    try:
+        with base._edit_run_state(root) as locked:
+            if locked != state or locked.get("phase") != "cohort_frozen":
+                raise ValueError("tournament state changed before amended objective locking")
+            if lock_path.exists() or lock_path.is_symlink():
+                raise ValueError("objective lock path appeared during amended locking")
+            base._atomic_write_bytes(lock_path, lock_bytes)
+            locked.clear()
+            locked.update(objective_state)
+    except BaseException:
+        if lock_path.is_file() and lock_path.read_bytes() == lock_bytes:
+            lock_path.unlink()
+        if state_path.is_file() and state_path.read_bytes() == _normalized_json_bytes(
+            objective_state
         ):
-            raise ValueError("amended objective lock still lacks a completed canonical cohort")
-        base._atomic_write_json(root / OBJECTIVE_LOCK_PATH, payload)
-        locked["phase"] = "objective_locked"
-        locked["objective_lock"] = {
-            "path": OBJECTIVE_LOCK_PATH,
-            "sha256": _sha256(root / OBJECTIVE_LOCK_PATH),
-            "cohort_sha256": payload["cohort_sha256"],
-            "locked_at_utc": locked_at,
-        }
+            base._atomic_write_bytes(state_path, original_state_bytes)
+        raise
     print(json.dumps(payload, indent=2, sort_keys=True))
     return 0
 
@@ -573,6 +713,8 @@ def _amended_verify_objective_lock(
         "amendment_record_commit",
         "amendment_tool_path",
         "amendment_tool_sha256",
+        "authorized_scope",
+        "unchanged_thresholds",
         "mechanically_valid_team_ids",
         "cohort_sha256",
         "teams",
@@ -625,13 +767,30 @@ def _amended_verify_objective_lock(
         or lock["amendment_record_commit"] != amendment_record_commit
         or lock["amendment_tool_path"] != AMENDMENT_TOOL_PATH
         or lock["amendment_tool_sha256"] != _sha256(root / AMENDMENT_TOOL_PATH)
+        or lock["authorized_scope"] != AUTHORIZED_SCOPE
+        or lock["unchanged_thresholds"] != UNCHANGED_THRESHOLDS
         or lock["mechanically_valid_team_ids"] != list(VALID_TEAM_IDS)
     ):
         raise ValueError("objective lock differs from its organizer amendment")
-    if amendment["canonical_output_sha256"] != state["teams"][INVALID_TEAM_ID].get(
-        "canonical_output_sha256"
+    state_teams = state.get("teams")
+    state_invalid = state_teams.get(INVALID_TEAM_ID) if isinstance(state_teams, dict) else None
+    if not isinstance(state_invalid, dict) or amendment["canonical_output_sha256"] != (
+        state_invalid.get("canonical_output_sha256")
     ):
         raise ValueError("Team 04 state differs from the amendment output binding")
+    prelock_state = _json_bytes_object(
+        base._git_file_bytes(root, prelock_head, RUN_STATE_PATH),
+        "pre-objective-lock run state",
+    )
+    objective_state = _json_bytes_object(
+        base._git_file_bytes(root, objective_record_commit, RUN_STATE_PATH),
+        "objective-lock-commit run state",
+    )
+    invalid_output_sha = amendment["canonical_output_sha256"]
+    if not isinstance(invalid_output_sha, str) or objective_state != _objective_state_payload(
+        prelock_state, lock, invalid_output_sha
+    ):
+        raise ValueError("objective-lock commit changed run_state beyond the authorized transition")
 
     phase0_path = root / PHASE0_FREEZE_PATH
     phase0 = _json_object(phase0_path, "Phase-0 freeze")
@@ -707,6 +866,9 @@ def main() -> int:
         if len(sys.argv) != 2:
             raise ValueError("lock-objective accepts no additional arguments")
         return _lock_objective()
+    if command not in DELEGATED_COMMANDS:
+        allowed = ", ".join(sorted(DELEGATED_COMMANDS))
+        raise ValueError(f"amendment wrapper delegates only later commands: {allowed}")
     _patch_frozen_orchestrator()
     return base.main()
 
