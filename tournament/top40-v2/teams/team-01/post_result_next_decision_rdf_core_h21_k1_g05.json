@@ -1,0 +1,126 @@
+{
+  "artifact": "post_result_next_decision",
+  "candidate_outcomes_used": [
+    {
+      "candidate_id": "rdf-ref-001",
+      "parameters": {
+        "path_efficiency_exponent": 0.5,
+        "residual_lookback_days": 21,
+        "skip_days": 3
+      },
+      "recorded_evidence": {
+        "double_cost_sharpe": 0.766778680809,
+        "late_fold_disposition": "last_three_folds_negative",
+        "max_drawdown": 0.455646554475,
+        "net_sharpe": 1.123931345681,
+        "positive_fold_count": 3,
+        "positive_quarter_fraction": 0.357142857143,
+        "regime_sharpe_bear": -1.264130967803
+      },
+      "status": "completed_rejected"
+    },
+    {
+      "candidate_id": "rdf-core-h21-k1-g05",
+      "failure_reason": "ValueError: portfolio insolvent at 2022-05-13 00:00:00+00:00",
+      "parameters": {
+        "path_efficiency_exponent": 0.5,
+        "residual_lookback_days": 21,
+        "skip_days": 1
+      },
+      "risk_rescue_allowed": false,
+      "status": "terminally_insolvent_rejected"
+    }
+  ],
+  "created_at_utc": "2026-07-15T23:01:11Z",
+  "decision": "authorize_at_most_one_next_no_control_core_cell",
+  "evidence_scope": "Team 01 frozen family/preregistration documents and its two recorded development outcomes only; no raw market or run artifacts.",
+  "family_id": "t01-residual-drift-funding-v1",
+  "k1_disposition": {
+    "further_k1_cell_authorized": false,
+    "reason": "The observed H21/K1/gamma0.5 cell is terminally insolvent and has no complete aggregate, fold, doubled-cost, regime, role, or IC record. It cannot clear the preregistered no-control causal minima.",
+    "risk_rescue_allowed": false,
+    "tested_candidate_id": "rdf-core-h21-k1-g05"
+  },
+  "next_candidate": {
+    "baseline_candidate_id": "rdf-ref-001",
+    "candidate_id": "rdf-core-h21-k3-g10",
+    "cost_multiplier": 1.0,
+    "only_parameter_delta_from_baseline": {
+      "path_efficiency_exponent": {
+        "from": 0.5,
+        "to": 1.0
+      }
+    },
+    "parameters": {
+      "beta_clip": [
+        -1,
+        3
+      ],
+      "beta_lookback_days": 30,
+      "btc_symbol": "BTCUSDT",
+      "btc_variance_floor": 1e-12,
+      "direction_lookback_days": 60,
+      "direction_return_scale": 0.2,
+      "direction_tilt_delta": 0.075,
+      "funding_lookback_days": 7,
+      "funding_penalty": 0.35,
+      "minimum_funding_events": 14,
+      "minimum_names_per_side": 6,
+      "minimum_paired_returns": 72,
+      "minimum_valid_symbols": 24,
+      "path_efficiency_exponent": 1.0,
+      "per_symbol_target_cap": 0.09,
+      "rank_tail_fraction": 0.25,
+      "rebalance_boundary_utc": "00:00",
+      "residual_denominator_floor": 1e-08,
+      "residual_lookback_days": 21,
+      "risk_policy_id": "team-01-base",
+      "skip_days": 3,
+      "total_gross": 0.8
+    },
+    "risk_controls": "none",
+    "seed": 20260801,
+    "status": "planned_not_registered_not_run"
+  },
+  "rationale": [
+    "Anchor the contrast to rdf-ref-001, the only completed solvent cell.",
+    "Retain H21 and K3 after the K1 terminal failure.",
+    "Change only the preregistered path-efficiency exponent to test whether stronger path coherence, rather than terminal displacement alone, identifies persistent residual drift.",
+    "Do not change horizon, funding, construction, gross, cost, risk, or seed in the same trial."
+  ],
+  "schema_version": 1,
+  "stop_rule": {
+    "branch_reject_no_rescue_if_any": [
+      "terminal, insolvent, interrupted, or incomplete canonical development record",
+      "aggregate no-control net Sharpe <= 0",
+      "positive net-return folds < 4 of 6",
+      "pooled next-day score IC <= 0 or unavailable at decision",
+      "positive score-IC folds < 4 of 6 or unavailable at decision"
+    ],
+    "on_causal_minimum_pass": "Require a fresh QR review; do not automatically authorize risk, construction, private qualification, or another trial.",
+    "on_failure": "Authorize no automatic successor; risk controls cannot rescue the cell."
+  },
+  "supersedes_next_decision_in": "development_diagnostics_rdf_ref_001.json",
+  "team_id": "team-01",
+  "trial_accounting": {
+    "core_cells_consumed_now": 2,
+    "core_cells_remaining_now": 10,
+    "cpu_hours_consumed_now": 0.381261207977,
+    "cpu_hours_remaining_now": 11.618738792023,
+    "family_cells_consumed_now": 2,
+    "family_cells_remaining_now": 37,
+    "material_configurations_consumed_now": 2,
+    "material_configurations_remaining_now": 78,
+    "mechanism_pivots_consumed": 0,
+    "proposed_cell_if_later_run": {
+      "core_cells_consumed": 3,
+      "core_cells_remaining": 9,
+      "family_cells_consumed": 3,
+      "family_cells_remaining": 36,
+      "material_configurations_consumed": 3,
+      "material_configurations_remaining": 77
+    },
+    "wall_hours_consumed_now": 0.380972502043,
+    "wall_hours_remaining_now": 17.619027497957
+  }
+}
