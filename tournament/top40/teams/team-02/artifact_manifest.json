@@ -1,0 +1,107 @@
+[
+  {
+    "path": "reports-top40/common/btc_daily_returns.csv",
+    "sha256": "6b797c9c331f73c121a717bb29bb93f6ec460622b4eb137c794b2032bc888142",
+    "size": 110725
+  },
+  {
+    "path": "reports-top40/team-02/bar_returns.csv",
+    "sha256": "72e9a01965dc6f5c7e9d0a01feaec99094f2c3bce4245c1d78beaf1e179678a6",
+    "size": 2684125
+  },
+  {
+    "path": "reports-top40/team-02/daily_returns.csv",
+    "sha256": "8de65e4fe5e7148f98cac1e956a2c80f3835d4bee5af78e36fd12849ef71f407",
+    "size": 76321
+  },
+  {
+    "path": "reports-top40/team-02/double_cost_bar_returns.csv",
+    "sha256": "712ca53b095085ada8825468c8024cffba852d3addd0bc10f25ea52f05d570fc",
+    "size": 2693157
+  },
+  {
+    "path": "reports-top40/team-02/double_cost_daily_returns.csv",
+    "sha256": "749531fab00e680a99c80da4ef784f1faca2e44b067b7ddb454c07deaf77f2d5",
+    "size": 76463
+  },
+  {
+    "path": "reports-top40/team-02/events.parquet",
+    "sha256": "f25b3078d0161128f7bfc631647a9f00ccc8bf702701c3fd07eceaeda90b33c7",
+    "size": 23982098
+  },
+  {
+    "path": "reports-top40/team-02/positions.parquet",
+    "sha256": "563426419cce6674681fdb43ea193d29f0019623bb44c32cc6170de5482a3340",
+    "size": 2651859
+  },
+  {
+    "path": "reports-top40/team-02/targets.parquet",
+    "sha256": "d2feabb72b17ff518a594cfe7b67fced04051de669e31fd1ea7114c3d6149e01",
+    "size": 2597184
+  },
+  {
+    "path": "reports-top40/team-02/trades.csv",
+    "sha256": "b3e419c501e28d7ce810bd3750c7397c8a6c8b27aecebd4330388385c8155741",
+    "size": 34904840
+  },
+  {
+    "path": "tournament/top40/data_manifest.json",
+    "sha256": "077eb036d262befec80f7013084fe6906859f7c3bbe2f8c193c9d9ec68e367c3",
+    "size": 6541
+  },
+  {
+    "path": "tournament/top40/teams/team-02/ablations.json",
+    "sha256": "d10543b358430ffff36a5ca9e57dcb6e8918daf4102c2d09859c64a0ba810b47",
+    "size": 1372
+  },
+  {
+    "path": "tournament/top40/teams/team-02/compliance.json",
+    "sha256": "9f15ae9d9c4ad1bd4ffd65af07c293b7c1f63682dc214d9c156f02e7b6c6990d",
+    "size": 356
+  },
+  {
+    "path": "tournament/top40/teams/team-02/experiments.jsonl",
+    "sha256": "bcf7a1f9ca20e0717bece79df4cc554996f5a163a040ebe1a93f79c60c09f671",
+    "size": 2912
+  },
+  {
+    "path": "tournament/top40/teams/team-02/feature_lineage.json",
+    "sha256": "a6e1c043223ee1d2e56d4125a2f8cdbe70ac9f83b85e9c3e55e89cf0cd65b5bd",
+    "size": 2063
+  },
+  {
+    "path": "tournament/top40/teams/team-02/frozen_config.json",
+    "sha256": "eb107387695398746f7f58de1a50f31c914259783af2e88899c25d41d246bb4d",
+    "size": 298
+  },
+  {
+    "path": "tournament/top40/teams/team-02/provenance.md",
+    "sha256": "658d6e671eb12cf59885e123c209912cc0bb07c5444add88158b1932463d6a75",
+    "size": 735
+  },
+  {
+    "path": "tournament/top40/teams/team-02/qe_report.md",
+    "sha256": "b77aa02be8395d82474619ab53208705f440e2f0e53226e8d5ec3c2e4f5d056b",
+    "size": 5092
+  },
+  {
+    "path": "tournament/top40/teams/team-02/research_brief.md",
+    "sha256": "856311dd700cdc1f64a59061121fb81f52c258bb59b40f2a7b45a1e857227c2d",
+    "size": 7917
+  },
+  {
+    "path": "tournament/top40/teams/team-02/strategy.py",
+    "sha256": "22bb19d7e20d9a1c07a9c00af1436914e3239c9ed9e98d521a9f4605d4671e4e",
+    "size": 23688
+  },
+  {
+    "path": "tournament/top40/teams/team-02/team_source_manifest.json",
+    "sha256": "4cea62d618f7b942603c90f76d45ebd595a9e3149f64740ad1c1207b4bef8d3d",
+    "size": 3437
+  },
+  {
+    "path": "tournament/top40/teams/team-02/uv.lock",
+    "sha256": "869cd3380346a9c9a219fc762868e23cd494a18e22dd9b314ba18621d991faa5",
+    "size": 374244
+  }
+]
