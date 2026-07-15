@@ -1,0 +1,257 @@
+{
+  "causality_tests": [
+    {
+      "failure_condition": "Any target at or before the prefix boundary changes.",
+      "name": "future_truncation",
+      "procedure": "Delete all later bars and compare prefix feature and target bytes."
+    },
+    {
+      "failure_condition": "Any earlier feature or target changes.",
+      "name": "future_corruption",
+      "procedure": "Replace every post-boundary OHLC/volume field with extreme finite sentinels."
+    },
+    {
+      "failure_condition": "An appended suffix changes any prefix target.",
+      "name": "append_invariance",
+      "procedure": "Compare prefix-only and extended clean replays at identical decision boundaries."
+    },
+    {
+      "failure_condition": "A bar later than c(t), an ineligible symbol, or a non-grid substitute changes the target at t.",
+      "name": "availability_and_membership",
+      "procedure": "Inject boundary-adjacent and ineligible rows and assert exact cutoff/grid/current-universe masks."
+    },
+    {
+      "failure_condition": "Clean processes differ in feature hashes, membership, or target bytes.",
+      "name": "deterministic_rerun",
+      "procedure": "Replay identical inputs twice using canonical runtime seed 20260801; namespace 2026080102 labels tests only."
+    }
+  ],
+  "decision_contract": {
+    "boundary_index": "j=(t-1970-01-01T00:00:00Z)/8h must be integer",
+    "feature_cutoff": "c(t)=t-8h",
+    "insufficient_or_off_grid": "return empty mapping to request flat",
+    "non_rebalance": "return None to hold",
+    "rebalance_rule": "j modulo rebalance_bars equals zero; reference rebalance_bars=3",
+    "runtime_seed": 20260801,
+    "timezone": "UTC"
+  },
+  "derived_features": [
+    {
+      "availability": "both adjacent closes belong to exact bars with close_time<=c(t)",
+      "formula": "natural_log(close_s/close_previous)",
+      "id": "symbol_log_return_8h",
+      "inputs": [
+        "transaction_ohlc"
+      ],
+      "missing_rule": "invalid if either close is missing, non-finite, non-positive, duplicated, or not exactly 8h adjacent"
+    },
+    {
+      "availability": "complete W=3*L_trend return slots ending at the exact anchor",
+      "formula": "E=fsum(r)/(fsum(abs(r))+1e-12)",
+      "id": "directional_path_efficiency",
+      "inputs": [
+        "symbol_log_return_8h"
+      ],
+      "missing_rule": "all W returns and W+1 closes are required; no partial horizon or imputation"
+    },
+    {
+      "availability": "same completed bar through c(t)",
+      "formula": "flow=2*taker_buy_quote_volume/quote_volume-1",
+      "id": "aggressive_flow_imbalance",
+      "inputs": [
+        "transaction_taker_flow"
+      ],
+      "missing_rule": "invalid unless quote_volume>1e-12 and 0<=taker_buy_quote_volume<=quote_volume, all finite"
+    },
+    {
+      "availability": "same completed bar through c(t)",
+      "formula": "clv=clip((2*close-high-low)/(high-low),-1,1)",
+      "id": "closing_location",
+      "inputs": [
+        "transaction_ohlc"
+      ],
+      "missing_rule": "invalid unless positive finite OHLC obey low<=open,close<=high and high-low>1e-12*max(1,abs(high),abs(low))"
+    },
+    {
+      "availability": "inherits the common completed-bar cutoff of both inputs",
+      "formula": "gap=(closing_location-aggressive_flow_imbalance)/2",
+      "id": "bar_absorption_gap",
+      "inputs": [
+        "closing_location",
+        "aggressive_flow_imbalance"
+      ],
+      "missing_rule": "invalid if either component is invalid"
+    },
+    {
+      "availability": "exact latest L_abs completed bars through c(t)",
+      "formula": "G=fsum(normalized_weight_age*gap_age), raw_weight_age=2^(-age/2), age zero newest",
+      "id": "smoothed_auction_absorption",
+      "inputs": [
+        "bar_absorption_gap"
+      ],
+      "missing_rule": "every expected bar is required; no replacement, fill, or shorter window"
+    },
+    {
+      "availability": "all inputs known at c(t) for the current point-in-time universe",
+      "formula": "D=average_rank_map(E); A=average_rank_map(G); S=0.60*D+0.40*A for the reference",
+      "id": "directional_auction_score",
+      "inputs": [
+        "directional_path_efficiency",
+        "smoothed_auction_absorption",
+        "point_in_time_eligibility"
+      ],
+      "missing_rule": "symbol excluded unless both components are finite; entire request flat if fewer than 24 symbols remain"
+    },
+    {
+      "availability": "uses only finite scores at c(t)",
+      "formula": "sort (S,symbol) ascending; K=max(6,floor(N/4)); first K short, last K long; equal magnitude with B_eff=min(0.40,K*0.06)",
+      "id": "target_weights",
+      "inputs": [
+        "directional_auction_score",
+        "point_in_time_eligibility"
+      ],
+      "missing_rule": "flat if N<24, 2K>N, either sleeve is infeasible, or final weight invariants fail"
+    }
+  ],
+  "family_id": "team-02-directional-auction-absorption-v1",
+  "forbidden_inputs": [
+    "common-market median or factor return",
+    "rolling beta or residual return",
+    "persistence/reversal state or regime switch",
+    "funding rate or mark price",
+    "future or unlagged bar",
+    "execution open",
+    "organizer regime label",
+    "evaluator position, fill, cost, equity, drawdown, or PnL",
+    "private/final observations or artifacts"
+  ],
+  "forward_diagnostics": {
+    "availability": "computed after a registered run from outcomes strictly after each decision; never passed to the strategy",
+    "embargo": "30 calendar days for any outcome-based fold-local choice",
+    "label": "next scheduled 24h symbol return",
+    "purge": "daily reference labels are non-overlapping; reject malformed overlap",
+    "uplift": {
+      "U": "(U_long+U_short)/2",
+      "U_long": "mean(y|E_top,G_top)-mean(y|E_top,G_bottom)",
+      "U_short": "mean(y|E_bottom,G_top)-mean(y|E_bottom,G_bottom)",
+      "required": "pooled U>0 and fold U>0 in at least four of six folds; composite rank IC>0 in at least four folds"
+    }
+  },
+  "mechanism_identity_guardrail": {
+    "deployable_requires": [
+      "nonzero directional path-efficiency component",
+      "nonzero auction absorption component containing both taker flow and closing location",
+      "fixed weights independent of market/regime state"
+    ],
+    "formal_pivot_required_for": [
+      "common-factor residual or persistence/reversal blend",
+      "trend-only deployment",
+      "absorption-only deployment",
+      "removing taker flow or closing location from deployable absorption",
+      "adding funding or a market-state sleeve switch"
+    ],
+    "nondeployable_diagnostics": [
+      "trend-only",
+      "absorption-only",
+      "no-flow",
+      "no-close-location",
+      "sign-flipped absorption"
+    ]
+  },
+  "numerical_conventions": {
+    "allocation": {
+      "cap": 0.06,
+      "effective_side_budget": "min(0.40,K*0.06); excess remains cash",
+      "equal_weight_rule": "initialize each of K magnitudes to B_eff/K; reconcile B_eff-fsum(weights) in ASCII order within headroom/current weight",
+      "failure": "flat whole portfolio if either sleeve or final invariant fails",
+      "final_invariants": "each magnitude in [0,0.06], each side sum within 1e-12 of B_eff, disjoint K-name sleeves",
+      "gross_target": 0.8,
+      "side_budget": 0.4
+    },
+    "arithmetic": {
+      "epsilon": 1e-12,
+      "float": "finite IEEE-754 binary64",
+      "log": "natural",
+      "sum": "accurate deterministic float64 sum; time ascending and symbols ASCII ascending",
+      "tolerance": 1e-12
+    },
+    "auction_fields": {
+      "close_location_clip": [
+        -1.0,
+        1.0
+      ],
+      "flow_validity": "finite Q>1e-12 and finite 0<=TBQ<=Q",
+      "ohlc_validity": "positive finite OHLC, low<=open,close<=high, range>1e-12*max(1,abs(high),abs(low))",
+      "smoothing": "raw age weight 2^(-age/2), normalized by fsum, newest age zero"
+    },
+    "rank": {
+      "definition": "exact-equality average of one-based ascending positions, mapped to 2*(r-1)/(N-1)-1",
+      "numeric_tie": "symbol does not break the tie",
+      "selection_tie": "single ascending (S,ASCII symbol) order"
+    },
+    "selection": {
+      "minimum_cross_section": 24,
+      "minimum_names_per_side": 6,
+      "q": "exact rational 1/4 for reference; allowed 1/5,1/4,3/10",
+      "rule": "K=max(6,floor(q*N)); require 2K<=N"
+    },
+    "windows": {
+      "anchor": "bar open_time=c(t)-8h and close_time<=c(t)",
+      "absorption": "last L_abs exact bars, right endpoint included",
+      "return": "W=3*L_trend exact return-end bars through anchor; W+1 closes",
+      "startup": "no partial window, fill, interpolation, or older substitute"
+    }
+  },
+  "raw_inputs": [
+    {
+      "availability_timestamp": "close_time",
+      "coverage": "authorized organizer-streamed 8h transaction bars for current eligible symbols",
+      "event_timestamp": "close_time",
+      "fields": [
+        "open_time",
+        "close_time",
+        "open",
+        "high",
+        "low",
+        "close"
+      ],
+      "id": "transaction_ohlc",
+      "lag": "use only exact bars with close_time<=decision_time-8h",
+      "missing_rule": "no fill or interpolation; invalid/gapped/duplicate bar invalidates affected windows"
+    },
+    {
+      "availability_timestamp": "close_time",
+      "coverage": "quote-denominated total and taker-buy transaction volume on the same completed 8h bar",
+      "event_timestamp": "close_time",
+      "fields": [
+        "quote_volume",
+        "taker_buy_quote_volume"
+      ],
+      "id": "transaction_taker_flow",
+      "lag": "use only exact bars with close_time<=decision_time-8h",
+      "missing_rule": "no fill; non-finite, non-positive total, or taker amount outside [0,total] invalidates the bar"
+    },
+    {
+      "availability_timestamp": "decision_time after causal weekly reconstitution",
+      "coverage": "current point-in-time Top-40 intersected with executable symbols",
+      "event_timestamp": "reconstitution_time and decision_time",
+      "fields": [
+        "eligible_symbols"
+      ],
+      "id": "point_in_time_eligibility",
+      "lag": "available at decision; membership construction uses completed prior UTC days",
+      "missing_rule": "never synthesize membership; insufficient scoreable set requests flat"
+    }
+  ],
+  "reference_candidate_id": "team-02-daa-reference-001",
+  "schema_version": 1,
+  "scored_folds": [
+    "[2020-02-03,2020-09-01)",
+    "[2020-09-01,2021-04-01)",
+    "[2021-04-01,2021-11-01)",
+    "[2021-11-01,2022-06-01)",
+    "[2022-06-01,2023-01-01)",
+    "[2023-01-01,2023-07-01)"
+  ],
+  "team_id": "team-02"
+}

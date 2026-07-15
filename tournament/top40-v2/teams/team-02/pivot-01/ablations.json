@@ -1,0 +1,286 @@
+{
+  "budget": {
+    "causal_diagnostics": 5,
+    "coarse_grid_additional": 11,
+    "configurations_consumed_before_pivot": 2,
+    "cumulative_team_limit": 80,
+    "local_neighbors_additional": 8,
+    "pivot_01_maximum": 37,
+    "portfolio_schedule_cells": 4,
+    "reference": 1,
+    "remaining_before_pivot": 78,
+    "reserved_after_pivot_01_plan": 41,
+    "risk_cost_observations": 8
+  },
+  "causal_diagnostics": [
+    {
+      "change": "set trend weight to 1 and absorption weight to 0",
+      "deployable": false,
+      "id": "daa-trend-only",
+      "question": "Does absorption add information beyond per-symbol path efficiency?"
+    },
+    {
+      "change": "set trend weight to 0 and absorption weight to 1",
+      "deployable": false,
+      "id": "daa-absorption-only",
+      "question": "Does path efficiency stabilize the raw auction response gap?"
+    },
+    {
+      "change": "replace gap=(clv-flow)/2 with gap=clv/2",
+      "deployable": false,
+      "id": "daa-no-flow",
+      "question": "Does taker aggression contribute beyond closing location?"
+    },
+    {
+      "change": "replace gap=(clv-flow)/2 with gap=-flow/2",
+      "deployable": false,
+      "id": "daa-no-close-location",
+      "question": "Does price response contribute beyond taker aggression?"
+    },
+    {
+      "change": "replace gap=(clv-flow)/2 with its negative",
+      "deployable": false,
+      "id": "daa-sign-flipped-negative-control",
+      "question": "Does the preregistered absorption sign outperform its exact negative control?"
+    }
+  ],
+  "coarse_grid": {
+    "absorption_window_bars": [
+      3,
+      6
+    ],
+    "count_including_reference": 12,
+    "reference_is_in_grid": true,
+    "trend_efficiency_days": [
+      8,
+      12,
+      18
+    ],
+    "trend_weight": [
+      0.5,
+      0.6
+    ]
+  },
+  "cost_contract": {
+    "base": 1.0,
+    "doubled": 2.0,
+    "execution": "central next-open fills, ordinary funding/cost ordering, participation constraints, and no intrabar fills remain authoritative"
+  },
+  "family_id": "team-02-directional-auction-absorption-v1",
+  "global_stop_and_selection": {
+    "full_selection_order": [
+      "all non-compensatory gates and causal uplift pass",
+      "positive fold count",
+      "worst regime Sharpe",
+      "worst fold Sharpe",
+      "doubled-cost Sharpe",
+      "median fold Sharpe",
+      "aggregate Sharpe",
+      "Calmar",
+      "lower drawdown",
+      "lower turnover",
+      "bytewise candidate_id"
+    ],
+    "reference_stop": "Stop DAA before any parameter or risk study if the exact reference is insolvent/incomplete; has nonpositive annualized return, net Sharpe, or doubled-cost Sharpe; has fewer than four profitable folds; fails positive bull/bear/chop return or long-bull/short-bear roles; or fails pooled/fold uplift and IC signs.",
+    "risk_non_rescue": "No risk subset may be run unless a complete no-control core passes the reference stop. Controls cannot rescue nonpositive alpha, failed regimes, failed sleeves, or failed causal diagnostics."
+  },
+  "local_neighborhood": {
+    "center": "lexicographic no-control winner after coarse and portfolio stages; center already counted",
+    "edge_rule": "Use previous/next values in the frozen ordered list. At an endpoint, use the nearest and second-nearest inward values so the two neighbors remain distinct; a center lacking two distinct alternatives on an axis is ineligible. Never create a post-result value.",
+    "minimum_median_sharpe": 0.5,
+    "minimum_profitable_count": 7,
+    "neighbors": [
+      {
+        "axis": "trend_efficiency_days",
+        "direction": "previous",
+        "ordered_values": [
+          8,
+          12,
+          16,
+          18
+        ]
+      },
+      {
+        "axis": "trend_efficiency_days",
+        "direction": "next",
+        "ordered_values": [
+          8,
+          12,
+          16,
+          18
+        ]
+      },
+      {
+        "axis": "absorption_window_bars",
+        "direction": "previous",
+        "ordered_values": [
+          2,
+          3,
+          6
+        ]
+      },
+      {
+        "axis": "absorption_window_bars",
+        "direction": "next",
+        "ordered_values": [
+          2,
+          3,
+          6
+        ]
+      },
+      {
+        "axis": "trend_weight",
+        "direction": "previous",
+        "ordered_values": [
+          0.5,
+          0.6,
+          0.7
+        ]
+      },
+      {
+        "axis": "trend_weight",
+        "direction": "next",
+        "ordered_values": [
+          0.5,
+          0.6,
+          0.7
+        ]
+      },
+      {
+        "axis": "selected_fraction_per_side",
+        "direction": "previous",
+        "ordered_values": [
+          "1/5",
+          "1/4",
+          "3/10"
+        ]
+      },
+      {
+        "axis": "selected_fraction_per_side",
+        "direction": "next",
+        "ordered_values": [
+          "1/5",
+          "1/4",
+          "3/10"
+        ]
+      }
+    ],
+    "size_including_center": 9
+  },
+  "portfolio_schedule_cells": {
+    "count": 4,
+    "fixed": {
+      "gross_target": 0.8,
+      "symbol_cap": 0.06
+    },
+    "grid": {
+      "rebalance_bars": [
+        3,
+        6
+      ],
+      "selected_fraction_per_side": [
+        "1/5",
+        "3/10"
+      ]
+    }
+  },
+  "reference": {
+    "candidate_id": "team-02-daa-reference-001",
+    "no_control_first": true,
+    "status": "planned_not_registered_not_run"
+  },
+  "risk_factorial": {
+    "allowed_only_after_positive_no_control_core": true,
+    "controls": {
+      "drawdown_brake": {
+        "levels": [
+          {
+            "drawdown": 0.1,
+            "gross_scale": 0.75
+          },
+          {
+            "drawdown": 0.2,
+            "gross_scale": 0.4
+          },
+          {
+            "drawdown": 0.275,
+            "gross_scale": 0.0
+          }
+        ]
+      },
+      "volatility_target": {
+        "annualized_target": 0.35,
+        "lookback_days": 20,
+        "maximum_scale": 1.0,
+        "minimum_scale": 0.25
+      }
+    },
+    "disabled_in_every_arm": [
+      "position_stop",
+      "time_stop",
+      "turnover_limit",
+      "side_scaling",
+      "same_boundary_reentry"
+    ],
+    "observations": [
+      {
+        "controls": [],
+        "cost": "base",
+        "id": "daa-risk-none-base"
+      },
+      {
+        "controls": [],
+        "cost": "doubled",
+        "id": "daa-risk-none-double"
+      },
+      {
+        "controls": [
+          "volatility_target"
+        ],
+        "cost": "base",
+        "id": "daa-risk-v-base"
+      },
+      {
+        "controls": [
+          "volatility_target"
+        ],
+        "cost": "doubled",
+        "id": "daa-risk-v-double"
+      },
+      {
+        "controls": [
+          "drawdown_brake"
+        ],
+        "cost": "base",
+        "id": "daa-risk-d-base"
+      },
+      {
+        "controls": [
+          "drawdown_brake"
+        ],
+        "cost": "doubled",
+        "id": "daa-risk-d-double"
+      },
+      {
+        "controls": [
+          "volatility_target",
+          "drawdown_brake"
+        ],
+        "cost": "base",
+        "id": "daa-risk-vd-base"
+      },
+      {
+        "controls": [
+          "volatility_target",
+          "drawdown_brake"
+        ],
+        "cost": "doubled",
+        "id": "daa-risk-vd-double"
+      }
+    ]
+  },
+  "schema_version": 1,
+  "status": "planned_not_run",
+  "team_id": "team-02",
+  "trial_accounting": "Every reference, diagnostic, grid, schedule, neighborhood, risk, cost, manual, failed, or interrupted configuration is registered before execution and consumes cumulative budget. Unused stage allocation is not automatically reassigned."
+}

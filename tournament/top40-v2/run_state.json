@@ -37,13 +37,13 @@
       "trial_count": 2
     },
     "team-02": {
-      "active_family_id": "team-02-causal-crowding-residual-persistence-v1",
+      "active_family_id": "team-02-directional-auction-absorption-v1",
       "canonical_result": null,
       "development_assessment": null,
       "dnf": null,
-      "family_count": 1,
+      "family_count": 2,
       "finalist_freeze": null,
-      "pivot_count": 0,
+      "pivot_count": 1,
       "private_attempts": 0,
       "private_result": null,
       "qualifier_candidate": null,

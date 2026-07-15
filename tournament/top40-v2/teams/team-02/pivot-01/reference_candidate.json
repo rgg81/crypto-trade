@@ -1,0 +1,92 @@
+{
+  "candidate_id": "team-02-daa-reference-001",
+  "causal_diagnostic": {
+    "absorption_uplift": "U=(U_long+U_short)/2 must be positive pooled and in at least four of six folds",
+    "composite_rank_ic": "positive in at least four of six folds",
+    "forward_label": "next scheduled 24h symbol return beginning strictly after the decision; diagnostic only"
+  },
+  "family_id": "team-02-directional-auction-absorption-v1",
+  "information_contract": {
+    "bar_interval_hours": 8,
+    "feature_cutoff": "decision_time minus 8h",
+    "feature_lag_bars": 1,
+    "fields_used": [
+      "open_time",
+      "close_time",
+      "open",
+      "high",
+      "low",
+      "close",
+      "quote_volume",
+      "taker_buy_quote_volume"
+    ],
+    "funding_used": false,
+    "off_grid_action": "flat",
+    "unscheduled_action": "hold"
+  },
+  "mechanism_guardrail": {
+    "absorption_component_enabled": true,
+    "common_market_or_residual_features_forbidden": true,
+    "deployable": true,
+    "funding_forbidden": true,
+    "regime_or_state_switch_forbidden": true,
+    "trend_component_enabled": true
+  },
+  "numerical_conventions": {
+    "arithmetic": "finite IEEE-754 binary64; math.fsum semantics; natural log",
+    "epsilon": 1e-12,
+    "field_and_weight_tolerance": 1e-12,
+    "rank": "exact-equality average one-based ascending rank mapped to 2*(r-1)/(N-1)-1",
+    "selection_tie_order": "composite score ascending then ASCII symbol ascending"
+  },
+  "parameters": {
+    "absorption_half_life_bars": 2.0,
+    "absorption_weight": 0.4,
+    "absorption_window_bars": 3,
+    "feature_lag_bars": 1,
+    "gross_target": 0.8,
+    "minimum_cross_section": 24,
+    "minimum_names_per_sleeve": 6,
+    "rebalance_bars": 3,
+    "selected_fraction_per_side": "1/4",
+    "side_budget": 0.4,
+    "symbol_cap": 0.06,
+    "trend_efficiency_days": 12,
+    "trend_weight": 0.6
+  },
+  "portfolio": {
+    "capacity_rule": "B_eff=min(0.40,K*0.06); excess remains cash",
+    "long_budget": 0.4,
+    "name_count_rule": "K=max(6,floor(N/4)); require N>=24 and 2K<=N",
+    "name_weighting": "equal within each side with deterministic residual reconciliation",
+    "short_budget": 0.4
+  },
+  "reference_gate": {
+    "annualized_return_strictly_positive": true,
+    "bull_bear_chop_returns_strictly_positive": true,
+    "complete_and_solvent": true,
+    "doubled_cost_sharpe_strictly_positive": true,
+    "long_bull_and_short_bear_positive": true,
+    "minimum_profitable_folds": 4,
+    "net_sharpe_strictly_positive": true,
+    "uplift_and_ic_signs_pass": true
+  },
+  "risk_policy": {
+    "drawdown_brakes": [],
+    "policy_id": "team-02-daa-reference-no-control",
+    "position_stop_enabled": false,
+    "same_boundary_reentry": false,
+    "side_scales": [
+      1.0,
+      1.0
+    ],
+    "time_stop_enabled": false,
+    "turnover_limit_enabled": false,
+    "volatility_target_enabled": false
+  },
+  "runtime_seed": 20260801,
+  "schema_version": 1,
+  "status": "planned_not_registered_not_run",
+  "team_id": "team-02",
+  "trial_search_tie_namespace": 2026080102
+}
