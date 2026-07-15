@@ -15,9 +15,9 @@
   "qualification_lock": null,
   "research_journal": {
     "genesis_sha256": "a11eee0475d514a1f022deda4e62014536f12bfb074556546645c5f8255a48ed",
-    "head_sha256": "862c79b9b8e0cd16af33113a88eb41ca0b79fa424139dba0e41b7cae348097b0",
+    "head_sha256": "801a82aa739ee2c27406348c7886d7a331fd3928ba3812985c5f7111c4c5edf3",
     "path": "tournament/top40-v2/organizer_research_journal.jsonl",
-    "record_count": 5
+    "record_count": 7
   },
   "schema_version": 2,
   "selection_lock": null,
@@ -34,7 +34,7 @@
       "private_result": null,
       "qualifier_candidate": null,
       "status": "researching",
-      "trial_count": 1
+      "trial_count": 2
     },
     "team-02": {
       "active_family_id": "team-02-causal-crowding-residual-persistence-v1",
@@ -48,7 +48,7 @@
       "private_result": null,
       "qualifier_candidate": null,
       "status": "researching",
-      "trial_count": 1
+      "trial_count": 2
     },
     "team-03": {
       "active_family_id": null,
