@@ -1,64 +1,67 @@
 {
   "canonical_runtime_seed": 20260801,
-  "candidate_id": "team-02-c3rp-no-direction-tilt-002",
+  "candidate_id": "team-02-daa-reference-001",
   "clean_process_replays": [
     {
-      "gross": 0.8999999999999999,
-      "long_count": 5,
-      "net": 1.3877787807814457e-17,
+      "gross": 0.8,
+      "long_count": 7,
+      "net": 0.0,
       "replay": 1,
-      "short_count": 5,
-      "source_sha256": "0417353f04c6b42c101ad252d2510abb5d8703f91d8d95d93299d905736e3e5e",
-      "target_sha256": "69e2685f2180e15446c07104108444e5490971c43bf1706ca61383a29f113c85"
+      "short_count": 7,
+      "source_sha256": "d1d031e717031455ef93decbc990f1f55e0703abee26dd885763a2ec4191ffd4",
+      "target_sha256": "8f3f92958586e57d96019abee2c65a36e88d5996bb428feb82fe0a689ea9ac89"
     },
     {
-      "gross": 0.8999999999999999,
-      "long_count": 5,
-      "net": 1.3877787807814457e-17,
+      "gross": 0.8,
+      "long_count": 7,
+      "net": 0.0,
       "replay": 2,
-      "short_count": 5,
-      "source_sha256": "0417353f04c6b42c101ad252d2510abb5d8703f91d8d95d93299d905736e3e5e",
-      "target_sha256": "69e2685f2180e15446c07104108444e5490971c43bf1706ca61383a29f113c85"
+      "short_count": 7,
+      "source_sha256": "d1d031e717031455ef93decbc990f1f55e0703abee26dd885763a2ec4191ffd4",
+      "target_sha256": "8f3f92958586e57d96019abee2c65a36e88d5996bb428feb82fe0a689ea9ac89"
     }
   ],
   "coverage": [
-    "future append invariance",
-    "future finite-value corruption invariance",
-    "future truncation invariance",
-    "strict extra feature-lag boundary",
-    "left-open/right-closed cumulative realized funding availability on the official worker schema",
-    "funding carry sign plus duplicate, non-finite, insufficient, and missing-neutral behavior",
-    "point-in-time eligible membership",
-    "variable persistence-versus-reversal state interaction",
-    "exact average ranks and ASCII set-tie handling",
-    "input-order and fresh-instance target determinism",
-    "both sleeves, finite weights, symbol cap, gross, and net bounds",
-    "diagnostic equal 0.45 long/short budgets with zero direction tilt",
-    "duplicate history, insufficient coverage, off-grid flat, and unscheduled hold",
-    "strict canonical runtime-seed enforcement",
-    "read-only context behavior",
-    "frozen JSON and disabled risk-policy validation"
+    "exact signed log-return path-efficiency formula",
+    "OHLC closing-location and taker-flow absorption-gap formula",
+    "three-bar half-life-two normalized smoothing",
+    "positive finite OHLC, range, quote-volume, and taker-share validation",
+    "future append, finite corruption, and truncation invariance",
+    "strict t-8h cutoff, exact anchor, and no non-grid substitution",
+    "point-in-time eligible membership and funding independence",
+    "exact average ranks and ASCII selection ties",
+    "quarter selection, minimum six names, equal allocation, capacity cash, and cap",
+    "both sleeves, gross, net, finite target, and minimum-universe behavior",
+    "duplicate, missing, non-finite, invalid OHLC, and invalid flow failure behavior",
+    "input-order, fresh-instance, and clean-process determinism",
+    "off-grid flat, non-rebalance hold, and canonical-seed enforcement",
+    "read-only DecisionContext behavior",
+    "frozen reference config and exact no-control risk-policy validation"
   ],
+  "family_id": "team-02-directional-auction-absorption-v1",
   "files": {
-    "frozen_config.json": "1ce64d582b879257bf6de38dc6e8f6401d4abf4ed7f3de88a8a28f899770febb",
-    "risk_policy.json": "0d893457d00453e2bdd16c0a192fbec482aff679158d3589123791498c68a310",
-    "strategy.py": "0417353f04c6b42c101ad252d2510abb5d8703f91d8d95d93299d905736e3e5e",
-    "test_strategy.py": "7a4745d3e70db69276d18e149b4ffd3f8ac0e4ca012a33aa0528615a891d89f6"
+    "frozen_config.json": "f5b2a316b74c43323a6d38cf674c05422f6161e150bb3d624095267baa224e5b",
+    "risk_policy.json": "0c90e21388df81f4a4a045c8d8a86ac61d178f14779987cc53883f5531556a52",
+    "strategy.py": "d1d031e717031455ef93decbc990f1f55e0703abee26dd885763a2ec4191ffd4",
+    "test_strategy.py": "549db52e818be4489e8600ada593621f003e108ed5f7765d4de67556ef470a5c"
   },
-  "diagnostic_arm": "component-no-direction-tilt",
-  "diagnostic_only": true,
   "market_data_accessed": false,
   "material_trial_run": false,
-  "one_parameter_scope": {
-    "change": "_BASELINE.maximum_side_tilt: 0.075 -> 0.0",
-    "diagnostic_source_with_parameter_reverted_sha256": "d8f577a8c9cedc63a2b743b3ca5ecea2e24f30e93c5a667eff01582ea3b09d0f",
-    "previous_baseline_source_sha256": "d8f577a8c9cedc63a2b743b3ca5ecea2e24f30e93c5a667eff01582ea3b09d0f"
+  "official_worker_smoke": {
+    "decision_count": 1,
+    "input": "synthetic-bars-only",
+    "long_count": 7,
+    "short_count": 7,
+    "status": "passed",
+    "target_sha256": "8f3f92958586e57d96019abee2c65a36e88d5996bb428feb82fe0a689ea9ac89"
   },
   "pytest": {
-    "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src python -m pytest tournament/top40-v2/teams/team-02/test_strategy.py -q",
-    "passed": 11,
+    "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src .venv/bin/python -m pytest tournament/top40-v2/teams/team-02/test_strategy.py -q",
+    "passed": 19,
     "status": "passed"
   },
   "schema_version": 1,
+  "source_spec_commit": "e563a80a",
+  "spec_ambiguities": [],
   "team_id": "team-02"
 }

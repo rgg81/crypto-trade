@@ -1,6 +1,6 @@
 {
   "drawdown_brakes": [],
-  "policy_id": "team-02-c3rp-baseline-no-control",
+  "policy_id": "team-02-daa-reference-no-control",
   "position_stop": {
     "cooldown_bars": 3,
     "enabled": false,

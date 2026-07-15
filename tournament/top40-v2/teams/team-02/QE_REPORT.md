@@ -1,67 +1,58 @@
-# team-02 no-direction-tilt diagnostic engineering report
+# team-02 Directional Auction Absorption engineering report
 
 ## Outcome
 
-Candidate `team-02-c3rp-no-direction-tilt-002` implements preregistered arm
-`component-no-direction-tilt`. The sole executable mechanism change from the baseline is
-`maximum_side_tilt: 0.075 -> 0.0`; gross remains `0.90`. This is a within-family diagnostic and is
-not automatically deployable or eligible for champion selection.
+Exact reference candidate `team-02-daa-reference-001` is implemented for active family
+`team-02-directional-auction-absorption-v1`. Commit `e563a80a` and the frozen files under
+`pivot-01/` were treated as authoritative and were not edited. No specification ambiguity remains.
 
-As a static scope check, replacing only that `0.0` literal with `0.075` in the diagnostic source
-reconstructs the prior baseline source SHA-256 exactly:
-`d8f577a8c9cedc63a2b743b3ca5ecea2e24f30e93c5a667eff01582ea3b09d0f`.
+The strategy applies the mandatory `t-8h` feature cutoff and exact 8-hour grid. It computes the
+complete 36-return signed path-efficiency statistic and the complete three-bar, half-life-two
+auction-absorption statistic from validated OHLC, quote volume, and taker-buy quote volume. It
+independently average-ranks both features, blends them at fixed `0.60/0.40`, and resolves final set
+ties by ASCII symbol.
 
-`build_strategy()` returns a fresh deterministic strategy and rejects every runtime seed except
-canonical `20260801`. The mandatory causal variable-`P` interaction between residual persistence
-and residual reversal remains active, as do realized funding carry, all horizons, beta/volatility
-estimation, ranks, caps, rebalance timing, and two-sided inverse-volatility construction.
+The portfolio requires 24 scoreable names, selects `K=max(6,floor(N/4))` on both sides, requests
+equal `0.40/0.40` budgets, leaves cap-constrained capacity in cash, and uses equal name magnitudes
+under the 6% cap. There is no common-market factor, beta, residual, funding feature, market state,
+directional side tilt, inverse-volatility weighting, fill logic, or risk-state logic.
 
-The implementation applies the deliberate `t-8h` feature cutoff, exact 8-hour grids, current
-eligibility only, population moments, complete displacement horizons, exact average ranks,
-valid-only ranks of negative cumulative realized `funding_rate`, type-7 volatility quantiles, and
-the frozen 9.5% cap water-filling algorithm. Funding uses the official worker fields without cadence
-scaling, ignores `mark_price`, and neutralizes duplicates, non-finite rates, and insufficient
-history exactly as frozen. It returns `None` only at valid unscheduled boundaries and `{}` for
-invalid or insufficient scheduled construction. It contains no fill, position, PnL, cost,
-risk-state, or execution logic.
-
-With the direction tilt removed, the requested pre-cap long and short budgets are fixed at `0.45`
-each. Both sleeves remain mandatory and independently normalized.
-
-The initial `risk_policy.json` is a valid no-control policy. Preregistered future control values
-are present but disabled; position/time stops and side scaling remain disabled, and
-same-boundary reentry remains false.
+`build_strategy()` returns a fresh object and accepts only canonical runtime seed `20260801`.
+Off-grid or insufficient scheduled inputs request flat `{}`; valid non-rebalance boundaries return
+`None` to hold. `risk_policy.json` is the exact disabled no-control policy identified as
+`team-02-daa-reference-no-control`.
 
 ## Verification
 
-The narrow synthetic suite passes `11/11` tests. It covers append/corrupt/truncate invariance,
-the exact extra-lag boundary, strict cumulative-funding availability, sign, duplicate/non-finite
-neutralization, point-in-time membership, canonical-seed rejection, the state-interaction sign,
-deterministic ranks and set ties, fresh-instance/input-order determinism, both sleeves, exact
-`0.45/0.45` diagnostic budgets, exposure bounds, invalid data, scheduling actions, read-only
-context, and risk/config validation.
+The synthetic suite passes `19/19` cases under the official `.venv`. Coverage includes causal
+append/corrupt/truncate invariance, exact timing, closed-bar availability, feature formulas,
+field validation, smoothing, ranks, numeric and membership ties, selection, capacity cash, equal
+allocation, cap/gross/net invariants, invalid and duplicate rows, membership, seed enforcement,
+context immutability, and clean-process determinism.
 
-Two separate clean Python processes produced identical target bytes:
+An isolated official V2 worker smoke also passed using only synthetic transaction bars, empty
+funding, synthetic point-in-time membership, and one scheduled decision. Its target bytes exactly
+matched the direct clean-process target.
 
-- strategy source SHA-256:
-  `0417353f04c6b42c101ad252d2510abb5d8703f91d8d95d93299d905736e3e5e`
+- strategy SHA-256:
+  `d1d031e717031455ef93decbc990f1f55e0703abee26dd885763a2ec4191ffd4`
+- frozen config SHA-256:
+  `f5b2a316b74c43323a6d38cf674c05422f6161e150bb3d624095267baa224e5b`
+- no-control risk policy SHA-256:
+  `0c90e21388df81f4a4a045c8d8a86ac61d178f14779987cc53883f5531556a52`
 - synthetic target SHA-256:
-  `69e2685f2180e15446c07104108444e5490971c43bf1706ca61383a29f113c85`
-- synthetic target: five longs, five shorts, gross `0.8999999999999999`, net
-  `1.3877787807814457e-17`
+  `8f3f92958586e57d96019abee2c65a36e88d5996bb428feb82fe0a689ea9ac89`
+- synthetic target: seven longs, seven shorts, gross `0.8`, net `0.0`
 
-Ruff lint and format checks pass. JSON parsing and the neutral declarative risk-policy parser pass.
-The detailed hashes and coverage record are in `test_evidence.json`.
+Ruff lint/format, JSON parsing, neutral risk-policy parsing, source-tree validation, and diff checks
+pass. Detailed test coverage and file hashes are recorded in `test_evidence.json`.
 
-## Scope and remaining evidence
+## Scope
 
-QE-authored files are `strategy.py`, `frozen_config.json`, `risk_policy.json`,
-`test_strategy.py`, `test_evidence.json`, and this report. The QR's pre-data numerical
-clarification resolved every implementation ambiguity before code or results; no ambiguity
-remains.
+Changed executable/test artifacts are `strategy.py`, `frozen_config.json`, `risk_policy.json`,
+`test_strategy.py`, `test_evidence.json`, and this report. Reviews, ledgers, experiment history,
+family records, top-level research artifacts, and every `pivot-01/` file were preserved.
 
-No snapshot byte, market observation, evaluator, trial registration, lifecycle mutation, private
-window, or final window was accessed. Accordingly, next-open fills, actual central funding
-cashflows, base/doubled costs, fold and regime results, long/short realized attribution, and future
-risk-control action semantics remain organizer-evaluator evidence. This report makes no performance
-claim and does not register a candidate.
+No market snapshot, development result, private/final data, evaluator, trial registration,
+lifecycle mutation, another team, or external research artifact was accessed. No performance claim
+is made and the candidate has not been run or registered by QE.
