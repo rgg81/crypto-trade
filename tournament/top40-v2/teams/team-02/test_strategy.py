@@ -1,4 +1,4 @@
-"""Synthetic, market-data-free tests for the team-02 C3RP baseline."""
+"""Synthetic tests for team-02 diagnostic C3RP-no-direction-tilt-002."""
 
 from __future__ import annotations
 
@@ -92,7 +92,7 @@ def _context(
     )
 
 
-def _canonical_weights() -> dict[str, float]:
+def _diagnostic_weights() -> dict[str, float]:
     result = c3rp.build_strategy().target_weights(_context(), seed=20260801)
     assert isinstance(result, dict) and result
     return result
@@ -307,8 +307,8 @@ def test_deterministic_targets_under_input_reordering() -> None:
     assert _target_bytes(first) == _target_bytes(second)
 
 
-def test_two_sleeves_and_frozen_exposure_bounds() -> None:
-    weights = _canonical_weights()
+def test_no_direction_tilt_preserves_two_sleeves_and_exposure_bounds() -> None:
+    weights = _diagnostic_weights()
     positives = [weight for weight in weights.values() if weight > 0.0]
     negatives = [weight for weight in weights.values() if weight < 0.0]
     assert len(positives) >= 4
@@ -317,8 +317,12 @@ def test_two_sleeves_and_frozen_exposure_bounds() -> None:
     assert max(abs(weight) for weight in weights.values()) <= 0.095
     gross = math.fsum(abs(weight) for weight in weights.values())
     net = math.fsum(weights.values())
-    assert gross <= 0.90 + 1e-12
-    assert abs(net) <= 0.15 + 1e-12
+    long_gross = math.fsum(weight for weight in weights.values() if weight > 0.0)
+    short_gross = math.fsum(-weight for weight in weights.values() if weight < 0.0)
+    assert abs(long_gross - 0.45) <= 1e-12
+    assert abs(short_gross - 0.45) <= 1e-12
+    assert abs(gross - 0.90) <= 1e-12
+    assert abs(net) <= 1e-12
 
 
 def test_invalid_data_and_clock_actions_are_conservative() -> None:
@@ -354,11 +358,17 @@ def test_context_is_read_only_and_missing_funding_is_neutral() -> None:
     pd.testing.assert_frame_equal(base.funding, before_funding)
 
 
-def test_frozen_json_and_no_control_policy_validate() -> None:
+def test_diagnostic_frozen_json_and_no_control_policy_validate() -> None:
     frozen = json.loads((TEAM_DIR / "frozen_config.json").read_text(encoding="utf-8"))
     assert frozen["canonical_runtime_seed"] == 20260801
+    assert frozen["candidate_id"] == "team-02-c3rp-no-direction-tilt-002"
+    assert frozen["parameters"]["maximum_side_tilt"] == 0.0
     assert frozen["mechanism_guardrail"] == {
-        "deployable": True,
+        "automatically_deployable": False,
+        "deployable": False,
+        "diagnostic_arm": "component-no-direction-tilt",
+        "diagnostic_only": True,
+        "eligible_for_automatic_champion_selection": False,
         "fixed_state_forbidden": True,
         "persistence_leg_enabled": True,
         "reversal_leg_enabled": True,
@@ -372,10 +382,11 @@ def test_frozen_json_and_no_control_policy_validate() -> None:
 
 
 def synthetic_evidence() -> dict[str, object]:
-    target = _canonical_weights()
+    target = _diagnostic_weights()
     target_payload = _target_bytes(target)
     source_bytes = (TEAM_DIR / "strategy.py").read_bytes()
     return {
+        "candidate_id": "team-02-c3rp-no-direction-tilt-002",
         "gross": math.fsum(abs(weight) for weight in target.values()),
         "long_count": sum(weight > 0.0 for weight in target.values()),
         "net": math.fsum(target.values()),

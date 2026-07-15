@@ -1,23 +1,24 @@
 {
   "canonical_runtime_seed": 20260801,
+  "candidate_id": "team-02-c3rp-no-direction-tilt-002",
   "clean_process_replays": [
     {
-      "gross": 0.8514132319270987,
+      "gross": 0.8999999999999999,
       "long_count": 5,
-      "net": 0.09858676807290127,
+      "net": 1.3877787807814457e-17,
       "replay": 1,
       "short_count": 5,
-      "source_sha256": "d8f577a8c9cedc63a2b743b3ca5ecea2e24f30e93c5a667eff01582ea3b09d0f",
-      "target_sha256": "b9a3cb9751e3265030a8ef710661765b35f595141fc86f476636c720e0a12599"
+      "source_sha256": "0417353f04c6b42c101ad252d2510abb5d8703f91d8d95d93299d905736e3e5e",
+      "target_sha256": "69e2685f2180e15446c07104108444e5490971c43bf1706ca61383a29f113c85"
     },
     {
-      "gross": 0.8514132319270987,
+      "gross": 0.8999999999999999,
       "long_count": 5,
-      "net": 0.09858676807290127,
+      "net": 1.3877787807814457e-17,
       "replay": 2,
       "short_count": 5,
-      "source_sha256": "d8f577a8c9cedc63a2b743b3ca5ecea2e24f30e93c5a667eff01582ea3b09d0f",
-      "target_sha256": "b9a3cb9751e3265030a8ef710661765b35f595141fc86f476636c720e0a12599"
+      "source_sha256": "0417353f04c6b42c101ad252d2510abb5d8703f91d8d95d93299d905736e3e5e",
+      "target_sha256": "69e2685f2180e15446c07104108444e5490971c43bf1706ca61383a29f113c85"
     }
   ],
   "coverage": [
@@ -32,19 +33,27 @@
     "exact average ranks and ASCII set-tie handling",
     "input-order and fresh-instance target determinism",
     "both sleeves, finite weights, symbol cap, gross, and net bounds",
+    "diagnostic equal 0.45 long/short budgets with zero direction tilt",
     "duplicate history, insufficient coverage, off-grid flat, and unscheduled hold",
     "strict canonical runtime-seed enforcement",
     "read-only context behavior",
     "frozen JSON and disabled risk-policy validation"
   ],
   "files": {
-    "frozen_config.json": "8b7d4f1381b29aa8201f75a3c878337ed80bd4036fa449717cd3919624b3ab09",
+    "frozen_config.json": "1ce64d582b879257bf6de38dc6e8f6401d4abf4ed7f3de88a8a28f899770febb",
     "risk_policy.json": "0d893457d00453e2bdd16c0a192fbec482aff679158d3589123791498c68a310",
-    "strategy.py": "d8f577a8c9cedc63a2b743b3ca5ecea2e24f30e93c5a667eff01582ea3b09d0f",
-    "test_strategy.py": "60ad1f4badfb3877864101c1c1b3c08cb70ea27daa6fc816e39899ff90951966"
+    "strategy.py": "0417353f04c6b42c101ad252d2510abb5d8703f91d8d95d93299d905736e3e5e",
+    "test_strategy.py": "7a4745d3e70db69276d18e149b4ffd3f8ac0e4ca012a33aa0528615a891d89f6"
   },
+  "diagnostic_arm": "component-no-direction-tilt",
+  "diagnostic_only": true,
   "market_data_accessed": false,
   "material_trial_run": false,
+  "one_parameter_scope": {
+    "change": "_BASELINE.maximum_side_tilt: 0.075 -> 0.0",
+    "diagnostic_source_with_parameter_reverted_sha256": "d8f577a8c9cedc63a2b743b3ca5ecea2e24f30e93c5a667eff01582ea3b09d0f",
+    "previous_baseline_source_sha256": "d8f577a8c9cedc63a2b743b3ca5ecea2e24f30e93c5a667eff01582ea3b09d0f"
+  },
   "pytest": {
     "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src python -m pytest tournament/top40-v2/teams/team-02/test_strategy.py -q",
     "passed": 11,

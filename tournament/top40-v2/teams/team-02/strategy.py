@@ -37,7 +37,7 @@ class _Config:
     selection_numerator: int = 1
     selection_denominator: int = 4
     gross: float = 0.90
-    maximum_side_tilt: float = 0.075
+    maximum_side_tilt: float = 0.0
     direction_scale: float = 1.5
     rebalance_bars: int = 3
     valid_history_numerator: int = 4

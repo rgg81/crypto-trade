@@ -1,6 +1,7 @@
 {
   "canonical_runtime_seed": 20260801,
-  "configuration_id": "team-02-c3rp-baseline-001",
+  "candidate_id": "team-02-c3rp-no-direction-tilt-002",
+  "configuration_id": "team-02-c3rp-no-direction-tilt-002",
   "dependencies": {
     "pandas": "3.0.3",
     "python": "3.11.15"
@@ -24,7 +25,11 @@
     "unscheduled_action": "hold"
   },
   "mechanism_guardrail": {
-    "deployable": true,
+    "automatically_deployable": false,
+    "deployable": false,
+    "diagnostic_arm": "component-no-direction-tilt",
+    "diagnostic_only": true,
+    "eligible_for_automatic_champion_selection": false,
     "fixed_state_forbidden": true,
     "persistence_leg_enabled": true,
     "reversal_leg_enabled": true,
@@ -58,7 +63,7 @@
     "funding_lookback_days": 7,
     "funding_weight": 0.2,
     "gross_target": 0.9,
-    "maximum_side_tilt": 0.075,
+    "maximum_side_tilt": 0.0,
     "minimum_cross_section": 12,
     "minimum_unique_funding_events": 2,
     "minimum_funding_symbols_for_rank": 4,
@@ -81,7 +86,7 @@
   "risk_policy_id": "team-02-c3rp-baseline-no-control",
   "runtime_seed_policy": "require-exact-canonical",
   "schema_version": 1,
-  "status": "pre-data-explicit-baseline",
+  "status": "preregistered-within-family-diagnostic",
   "team_id": "team-02",
   "trial_search_tie_namespace": 2026080102
 }
