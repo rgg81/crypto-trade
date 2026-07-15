@@ -1,5 +1,5 @@
 {
-  "artifact_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "artifact_manifest_sha256": "cc51a77c7f3ebbb647e6f4e782f5eacc9500a02a436ae1917fc849557c283748",
   "artifacts": {
     "ablations": "tournament/top40/teams/team-09/ablations.json",
     "artifact_manifest": "tournament/top40/teams/team-09/artifact_manifest.json",
@@ -26,74 +26,74 @@
     "trial_ledger": "tournament/top40/teams/team-09/experiments.jsonl"
   },
   "compliance": {
-    "append_invariance_test": false,
-    "closed_data_only": false,
-    "corrupt_future_test": false,
-    "deterministic_rerun": false,
-    "double_cost_rerun": false,
-    "fees_and_slippage_charged": false,
-    "funding_cashflows_charged": false,
-    "long_and_short_enabled": false,
-    "next_bar_execution": false,
-    "point_in_time_top40": false,
-    "public_binance_only": false
+    "append_invariance_test": true,
+    "closed_data_only": true,
+    "corrupt_future_test": true,
+    "deterministic_rerun": true,
+    "double_cost_rerun": true,
+    "fees_and_slippage_charged": true,
+    "funding_cashflows_charged": true,
+    "long_and_short_enabled": true,
+    "next_bar_execution": true,
+    "point_in_time_top40": true,
+    "public_binance_only": true
   },
   "confidence_intervals": {
     "double_cost_oos_net_sharpe_95": [
-      0.0,
-      0.0
+      -3.374757095110829,
+      -0.7018334747660111
     ],
     "is_net_sharpe_95": [
-      0.0,
-      0.0
+      0.18229903318005025,
+      2.198654789804442
     ],
     "public_oos_net_sharpe_95": [
-      0.0,
-      0.0
+      -2.243768312417094,
+      0.4077024321919249
     ]
   },
-  "config_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-  "data_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-  "dependency_lock_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-  "double_cost_oos_sharpe": 0.0,
+  "config_sha256": "030a065f75f9c4adb7484065908f4379435929609d446be0de0a831d9e28ee0a",
+  "data_manifest_sha256": "077eb036d262befec80f7013084fe6906859f7c3bbe2f8c193c9d9ec68e367c3",
+  "dependency_lock_sha256": "869cd3380346a9c9a219fc762868e23cd494a18e22dd9b314ba18621d991faa5",
+  "double_cost_oos_sharpe": -2.0307206541952714,
   "entrypoint": "tournament/top40/teams/team-09/strategy.py",
-  "evaluator_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-  "freeze_commit": "0000000",
+  "evaluator_sha256": "508f56af0b4fe2636933909977cdbcfbb38e4ff821072dbf12b35bfb04d3af66",
+  "freeze_commit": "ff78fd816354adbd670ebc6ff42abc9342931016",
   "in_sample": {
     "end": "2024-06-30",
     "metrics": {
-      "annualized_return": 0.0,
-      "calmar": 0.0,
-      "max_drawdown": 0.0,
-      "net_sharpe": 0.0,
-      "net_sortino": 0.0,
-      "positive_quarter_fraction": 0.0
+      "annualized_return": 0.09381923850197338,
+      "calmar": 0.755360685834784,
+      "max_drawdown": 0.12420455586497647,
+      "net_sharpe": 1.1845646547933042,
+      "net_sortino": 1.772628950472402,
+      "positive_quarter_fraction": 0.6666666666666666
     },
     "start": "2020-02-03"
   },
   "public_oos": {
     "end": "2026-06-30",
     "metrics": {
-      "annualized_return": 0.0,
-      "calmar": 0.0,
-      "max_drawdown": 0.0,
-      "net_sharpe": 0.0,
-      "net_sortino": 0.0,
-      "positive_quarter_fraction": 0.0
+      "annualized_return": -0.07719702206544665,
+      "calmar": -0.40337210969200293,
+      "max_drawdown": 0.19137917622611755,
+      "net_sharpe": -0.921747869675917,
+      "net_sortino": -1.2335895275232236,
+      "positive_quarter_fraction": 0.125
     },
     "start": "2024-07-01"
   },
   "regime_sharpe": {
-    "bear": 0.0,
-    "bull": 0.0,
-    "chop": 0.0,
-    "stress": 0.0
+    "bear": -1.3890343028261158,
+    "bull": -2.7355682617190693,
+    "chop": 0.21402308920042162,
+    "stress": 1.101342136523797
   },
   "seeds": [
     20260713
   ],
-  "strategy_name": "REPLACE_WITH_FRESH_STRATEGY_NAME",
-  "strategy_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "strategy_name": "Funding-Price Elasticity Gap",
+  "strategy_sha256": "cfde04f23ea9eeca5d8bc0bdf952e8460f18f78c58a460fc6c2b862b3c86e58a",
   "team_id": "team-09",
-  "trial_count": 1
+  "trial_count": 3
 }
