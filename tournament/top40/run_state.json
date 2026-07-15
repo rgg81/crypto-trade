@@ -397,7 +397,10 @@
       }
     },
     "team-06": {
-      "canonical_run": "pending",
+      "canonical_finished_at_utc": "2026-07-15T09:16:34.987475+00:00",
+      "canonical_output_sha256": "4dc4fb980d70842779fe1ff8886181117536a72f4a56f5f067386e72fd47589f",
+      "canonical_run": "complete",
+      "canonical_started_at_utc": "2026-07-15T08:13:49.665939+00:00",
       "champion": {
         "freeze_commit": "6db6997a1f84c8285211edd9a6da80df956d301d",
         "frozen_at_utc": "2026-07-14T22:29:00.723112+00:00",
