@@ -1,0 +1,191 @@
+{
+  "amendment_id": "organizer-amendment-01-invalid-team-04",
+  "amendment_path": "tournament/top40/organizer_amendment_01.json",
+  "amendment_record_commit": "e1d8c0f93a740c34638c3de3e61c3c00fe80bb09",
+  "amendment_sha256": "428bb22e0a2562edf78b3cd6d63d15475aa1d45ebb94114f98837b0be40adaec",
+  "amendment_tool_path": "scripts/top40_invalid_team_amendment.py",
+  "amendment_tool_sha256": "3b5bc89921b961604c8fc1fdd1b6a81b75eeb336b4cbfb2b94870ee899271ea6",
+  "authorized_scope": "Keep every frozen strategy, threshold, evaluator, scorer, charter, and original orchestrator unchanged; retain Team 04 as an invalid audited entrant and rank the remaining mechanically valid teams.",
+  "cohort_sha256": "2d6d3efa9ec6276513481959d83df7fefe782a42b977cc937cd5597d372fc01d",
+  "common_freeze_commit": "48df09341f02eba7a3469abd1ccda6649a4ef0ba",
+  "config_sha256": "030a065f75f9c4adb7484065908f4379435929609d446be0de0a831d9e28ee0a",
+  "data_manifest_sha256": "077eb036d262befec80f7013084fe6906859f7c3bbe2f8c193c9d9ec68e367c3",
+  "evaluator_sha256": "508f56af0b4fe2636933909977cdbcfbb38e4ff821072dbf12b35bfb04d3af66",
+  "locked_at_utc": "2026-07-15T12:50:36.383900+00:00",
+  "mechanically_valid_team_ids": [
+    "team-01",
+    "team-02",
+    "team-03",
+    "team-05",
+    "team-06",
+    "team-07",
+    "team-08",
+    "team-09",
+    "team-10"
+  ],
+  "phase0_freeze_sha256": "50a62133904ab70ef401dcf656b16d35451d0582f848d8de6bdd54d4c9279716",
+  "phase0_record_commit": "012727865acecad6ea0c3327745359820b8e45c6",
+  "prelock_head_commit": "e1d8c0f93a740c34638c3de3e61c3c00fe80bb09",
+  "schema_version": 2,
+  "teams": [
+    {
+      "artifact_manifest_file_sha256": "fccdf599d7e6535fbc8ad9ed41be209d39fedf563cdef8654471b035231bc455",
+      "artifact_manifest_path": "tournament/top40/teams/team-01/artifact_manifest.json",
+      "artifact_manifest_sha256": "dd61b34f93d4393bf1e5859a554e9e35793da74ab0db00ca35ff2c28bfbc4043",
+      "automatic_score": 36.8125,
+      "canonical_output_sha256": "6cf0bfb782069775551ae2f55fcbbdae5f4277ee49bea9b03466434eefbb3c65",
+      "freeze_commit": "85af71210719004ed530c26d44e77afb81b56475",
+      "mechanically_valid": true,
+      "objective_rank": 5,
+      "submission_path": "tournament/top40/teams/team-01/submission.json",
+      "submission_sha256": "97c26eef863a6507b110ba0833e6de652903bb10767464bf451eebfc0fd0c0d1",
+      "team_id": "team-01",
+      "validation_issues": []
+    },
+    {
+      "artifact_manifest_file_sha256": "eff2716d73f48d2a28b13d5e00e5afb06ae8edef36d28d9c1217a8d89c004c70",
+      "artifact_manifest_path": "tournament/top40/teams/team-02/artifact_manifest.json",
+      "artifact_manifest_sha256": "f7d008acda477082b5a0f444b86ebf1d26124c425aec51a119b931c325413744",
+      "automatic_score": 0.375,
+      "canonical_output_sha256": "5f5c31157e21a61208204927ce3244164d5fc692be9929fa809c866eee48b3d2",
+      "freeze_commit": "f5666db02274e69abcda62f7a9d2d44aa624a14e",
+      "mechanically_valid": true,
+      "objective_rank": 9,
+      "submission_path": "tournament/top40/teams/team-02/submission.json",
+      "submission_sha256": "9d9dffd0e66744da4463ce5a2b2bc232f74a89652650823e9f2d793e17766483",
+      "team_id": "team-02",
+      "validation_issues": []
+    },
+    {
+      "artifact_manifest_file_sha256": "fe6ddaef6691092c89c557876ac1506c0d5eb3073e4b9fec742805662ee59d02",
+      "artifact_manifest_path": "tournament/top40/teams/team-03/artifact_manifest.json",
+      "artifact_manifest_sha256": "8176c646e7bd3de97430b69e2275b050351d4b3647194906ea408649ee9c20df",
+      "automatic_score": 56.4375,
+      "canonical_output_sha256": "1b087cabe23a0e99706d7b9c1ba442b3ed922c78b747248926b10aae7fb62f30",
+      "freeze_commit": "9e0c0e3a37291d76e6361a7e65b5a33645bc624a",
+      "mechanically_valid": true,
+      "objective_rank": 1,
+      "submission_path": "tournament/top40/teams/team-03/submission.json",
+      "submission_sha256": "b0b16a5a031731a6ceffd3fe6c743782b591327a67a4d861d54bbd4493dda1b7",
+      "team_id": "team-03",
+      "validation_issues": []
+    },
+    {
+      "artifact_manifest_file_sha256": "a275e6a633d72ff1b3b153fe5210f91f032840b84cdf76a6297d676d7b9db30a",
+      "artifact_manifest_path": "tournament/top40/teams/team-04/artifact_manifest.json",
+      "artifact_manifest_sha256": "708b65dc436af2f7a4b800283c14750fc5d30cc9fed59b7e4de14edaae5a6bd7",
+      "automatic_score": null,
+      "canonical_output_sha256": "7dc8ec6d275e6b27b4e0b2a47c66c717e1d1c1dc7ce95af8cf630c56cab79636",
+      "freeze_commit": "1e444fccf37e77114f159feee635c932b87a20b0",
+      "mechanically_valid": false,
+      "objective_rank": null,
+      "submission_path": "tournament/top40/teams/team-04/submission.json",
+      "submission_sha256": "8b049081aa5c36c4af4bea56ad40a522744bb29167cd9e8da1f6ff6f08c218b0",
+      "team_id": "team-04",
+      "validation_issues": [
+        {
+          "code": "long_and_short_enabled",
+          "message": "hard compliance check failed: long_and_short_enabled"
+        },
+        {
+          "code": "long_and_short_enabled",
+          "message": "public_oos long realized exposure is immaterial: active_fraction=0.038813, mean=0.007052"
+        },
+        {
+          "code": "long_and_short_enabled",
+          "message": "public_oos short realized exposure is immaterial: active_fraction=0.038813, mean=0.007052"
+        }
+      ]
+    },
+    {
+      "artifact_manifest_file_sha256": "2b1b2d8668d33d53b5d8b40441f4b694276d315ebf061b6dce87e3a804d7527b",
+      "artifact_manifest_path": "tournament/top40/teams/team-05/artifact_manifest.json",
+      "artifact_manifest_sha256": "bcb7542ab2e3de9255ba435b49a3f4205865eb1ff85ae7a7da30274fb2f9e005",
+      "automatic_score": 23.1875,
+      "canonical_output_sha256": "a3387cc02786b49538a3c0caca80c9e416da7c96213d35e1d864e1f6fc0d5776",
+      "freeze_commit": "10c0f197b11fe35040689163b79a68560db1315f",
+      "mechanically_valid": true,
+      "objective_rank": 7,
+      "submission_path": "tournament/top40/teams/team-05/submission.json",
+      "submission_sha256": "181a84812785a61077d2b35e738d0ae67ad2c742d2e9ce0dc72c892bb54fa67b",
+      "team_id": "team-05",
+      "validation_issues": []
+    },
+    {
+      "artifact_manifest_file_sha256": "c52365cc01b5877bf9c27b2c54476c3bd63f570f8712efed418a0f85494d5426",
+      "artifact_manifest_path": "tournament/top40/teams/team-06/artifact_manifest.json",
+      "artifact_manifest_sha256": "ddf1fa814107b2e4f3d139dce97b71d6c0dec0a94bca7767941e9fd37eba291e",
+      "automatic_score": 18.1875,
+      "canonical_output_sha256": "4dc4fb980d70842779fe1ff8886181117536a72f4a56f5f067386e72fd47589f",
+      "freeze_commit": "6db6997a1f84c8285211edd9a6da80df956d301d",
+      "mechanically_valid": true,
+      "objective_rank": 8,
+      "submission_path": "tournament/top40/teams/team-06/submission.json",
+      "submission_sha256": "23952bb9e2140da45c64bb3d8d1469aac82ebd17702f87abcad0f507287ecd68",
+      "team_id": "team-06",
+      "validation_issues": []
+    },
+    {
+      "artifact_manifest_file_sha256": "659ae83769dbcc72b2267ef22044fc9f7dd8a844b1107820ee695e6538ff16ee",
+      "artifact_manifest_path": "tournament/top40/teams/team-07/artifact_manifest.json",
+      "artifact_manifest_sha256": "fb6203363908e980a3ac25a1e46a3f3f3363e6221daadfdca87da756470f04e3",
+      "automatic_score": 50.875,
+      "canonical_output_sha256": "5d2a97419c1fec5593aed13a8b9a7c5a81e823272c2b02141870c7518d3fb4ff",
+      "freeze_commit": "d4d0acca95029f74a7d0c43f1f3e283dbf6ae21d",
+      "mechanically_valid": true,
+      "objective_rank": 3,
+      "submission_path": "tournament/top40/teams/team-07/submission.json",
+      "submission_sha256": "550e5baccdaa4b0eb83822453e1d6d3e9fbc94912794b4033f32616b021c0e0b",
+      "team_id": "team-07",
+      "validation_issues": []
+    },
+    {
+      "artifact_manifest_file_sha256": "04223695dff582386ae797d791725e028024d74e78be661956e3337f75a4e7a7",
+      "artifact_manifest_path": "tournament/top40/teams/team-08/artifact_manifest.json",
+      "artifact_manifest_sha256": "89487ee617285d438668e04bc669db792dd94f883724a3d155a2416b14b8fb56",
+      "automatic_score": 42.3125,
+      "canonical_output_sha256": "cad71171b90c3b7aeaa0a12b421bc3260eaa66206adea7438760e34ffcc212e8",
+      "freeze_commit": "fee68bf25c66125f7d309c495a896dce2f5f1f5c",
+      "mechanically_valid": true,
+      "objective_rank": 4,
+      "submission_path": "tournament/top40/teams/team-08/submission.json",
+      "submission_sha256": "1b5828f68c6168c4cae37926a43ee024c77ca6ae3f3acf42a019374ebe33bfc7",
+      "team_id": "team-08",
+      "validation_issues": []
+    },
+    {
+      "artifact_manifest_file_sha256": "57eb8943fe7e917afec7546811ae98ae9ddc4ef6659c2de076fbb44bf3898e92",
+      "artifact_manifest_path": "tournament/top40/teams/team-09/artifact_manifest.json",
+      "artifact_manifest_sha256": "cc51a77c7f3ebbb647e6f4e782f5eacc9500a02a436ae1917fc849557c283748",
+      "automatic_score": 32.6875,
+      "canonical_output_sha256": "43c57fa8253a667cb3cf8ea04039362878d5124c2b52d845ff1cb5d8839c6326",
+      "freeze_commit": "ff78fd816354adbd670ebc6ff42abc9342931016",
+      "mechanically_valid": true,
+      "objective_rank": 6,
+      "submission_path": "tournament/top40/teams/team-09/submission.json",
+      "submission_sha256": "f72bc62a8007c642b5399d46b84b9f2258a204e97452923e9f63d41e4f7f3c43",
+      "team_id": "team-09",
+      "validation_issues": []
+    },
+    {
+      "artifact_manifest_file_sha256": "ff4a186ae794105dc2f7bd6fd8b4e8dee7bdf98f9cba0c80de7fe7dca6d98c6e",
+      "artifact_manifest_path": "tournament/top40/teams/team-10/artifact_manifest.json",
+      "artifact_manifest_sha256": "3436dedb9a4692a824a987fdae407f1db037c2223747e376e60f8c271bc40a27",
+      "automatic_score": 54.125,
+      "canonical_output_sha256": "e4b30cbd71606d131389db7ff44ab660547d541954929b60c3f854de87ae353d",
+      "freeze_commit": "963fcc95e85e1d1e6f806b89a02045efd6785997",
+      "mechanically_valid": true,
+      "objective_rank": 2,
+      "submission_path": "tournament/top40/teams/team-10/submission.json",
+      "submission_sha256": "7996f13870372cc4a85db0a05a8be2fe76cfa833245857fdecf83eee792b8881",
+      "team_id": "team-10",
+      "validation_issues": []
+    }
+  ],
+  "unchanged_thresholds": {
+    "minimum_mean_side_exposure": 0.005,
+    "minimum_side_active_bar_fraction": 0.05,
+    "minimum_side_executed_notional_usdt": 1000.0,
+    "minimum_side_exposure": 0.01
+  }
+}
