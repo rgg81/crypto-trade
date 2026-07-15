@@ -49,7 +49,27 @@ def _args(**values):
 def _copy_contract(root: Path) -> None:
     destination = root / TOP40_V2_LAYOUT.tournament_root
     destination.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copytree(REPOSITORY / TOP40_V2_LAYOUT.tournament_root, destination)
+    shutil.copytree(
+        REPOSITORY / TOP40_V2_LAYOUT.tournament_root,
+        destination,
+        ignore=shutil.ignore_patterns(
+            "teams",
+            "private",
+            "run_state.json",
+            "phase0_freeze.json",
+            "organizer_research_journal.jsonl",
+            "qualification_lock.json",
+            "finalist_cohort_lock.json",
+            "final_oos_lock.json",
+            "objective_lock.json",
+            "critic_lock.json",
+            "critic_confirmation_lock.json",
+            "user_ballot_lock.json",
+            "selection_lock.json",
+            "winner_freeze.json",
+            "paper_journal_genesis.json",
+        ),
+    )
 
 
 def _initialize(cli, root: Path, monkeypatch) -> None:
