@@ -1,0 +1,233 @@
+{
+  "artifact": "feature_lineage",
+  "created_at_utc": "2026-07-15T19:33:29Z",
+  "decision_contract": {
+    "decision_timezone": "UTC",
+    "execution": "A target formed at boundary t uses only closed rows available at t and is filled by the central evaluator at the next executable open with ordinary costs and capacity limits.",
+    "hold_boundaries_utc": [
+      "08:00",
+      "16:00"
+    ],
+    "rebalance_boundary_utc": "00:00",
+    "strategy_outputs": {
+      "flat": "{} at a scheduled boundary when required inputs or two-sided allocation are invalid",
+      "hold": "None outside the daily scheduled boundary",
+      "targets": "finite signed unlevered weights for current eligible symbols only"
+    }
+  },
+  "family_id": "t01-residual-drift-funding-v1",
+  "mechanism_identity_guardrail": {
+    "forbidden_without_formal_pivot": [
+      "a persistence/reversal state switch",
+      "routing observations into a reversal state",
+      "selection of a short-horizon reversal signal"
+    ],
+    "identity": "BTC-factor residual, path-efficient, medium-horizon continuation",
+    "reason": "Organizer collision control; it does not reveal or depend on another mechanism."
+  },
+  "forward_diagnostics": [
+    {
+      "availability": "Outcome only; never an input to the target at t.",
+      "embargo": "One 24-hour holding interval for any training-prefix diagnostic.",
+      "label_id": "next_daily_open_to_open_return",
+      "label_window": "Executable open following the decision at t through the following daily executable open.",
+      "overlap_rule": "Daily decision labels are non-overlapping; a label whose endpoint reaches a fold boundary is purged.",
+      "purpose": "Cross-sectional Spearman information coefficient and falsifier only; no supervised fitting."
+    },
+    {
+      "availability": "Outcome only; calculated centrally from canonical fills and costs.",
+      "embargo": "Not applicable to canonical accounting; chronological folds are separate cutoff-safe replays.",
+      "label_id": "portfolio_net_return",
+      "label_window": "Central evaluator return interval after the next-open target fill.",
+      "overlap_rule": "Assigned to the canonical chronological fold by evaluator timestamp.",
+      "purpose": "Qualification, selection metric, and risk-control comparisons."
+    }
+  ],
+  "invariance_tests": [
+    {
+      "expected": "All targets at or before cutoff are byte-identical.",
+      "test": "truncate every raw stream strictly after cutoff"
+    },
+    {
+      "expected": "All targets at or before cutoff are byte-identical.",
+      "test": "append valid future bars, funding rows, and memberships"
+    },
+    {
+      "expected": "All targets at or before cutoff are byte-identical and no exception exposes future values.",
+      "test": "replace future closes, opens, volumes, funding values, and symbols with corrupt sentinels"
+    },
+    {
+      "expected": "Target mapping and canonical serialization are identical across clean processes.",
+      "test": "repeat with canonical runtime strategy seed 20260801"
+    },
+    {
+      "expected": "The row is rejected and cannot affect a target.",
+      "test": "inject a bar whose close time is after decision_time or funding_time equal to decision_time"
+    },
+    {
+      "expected": "No target includes the removed symbol; historical rankings before the membership change are unchanged.",
+      "test": "point-in-time membership removal"
+    }
+  ],
+  "missing_data_policy": {
+    "bars": "No forward fill and no full-sample imputation. A symbol failing finite-positive close, consecutive-return, or paired-BTC coverage is excluded at that boundary.",
+    "cross_section": "Require at least 24 valid symbols before ranking and six valid names on each signed tail. Otherwise request flat; never transfer unused gross to the other sleeve.",
+    "funding": "Require at least 14 finite actual events in [t-7d,t). No row at or after t and no imputation.",
+    "market_factor": "If BTCUSDT, its variance, or required coverage is unavailable, request flat. Do not choose a substitute factor after observing performance.",
+    "robust_scale": "If MAD is non-finite or <=1e-12, request flat. No fallback to a full-period standard deviation."
+  },
+  "raw_inputs": [
+    {
+      "availability_timestamp": "The bar is delivered only when open_time + 8h <= decision_time.",
+      "coverage": "Per-symbol closed 8h rows supplied for current eligible symbols; at least 72 paired returns in 30 days and the complete H+K drift slice are required.",
+      "event_timestamp": "open_time + 8h",
+      "field": "bars.close",
+      "lag": "Zero after the bar close for computation; execution remains next-open, so the just-closed price is not a fill.",
+      "missing_rule": "Exclude non-finite, non-positive, duplicate, non-monotone, or insufficient-history symbols; do not forward fill.",
+      "source": "Frozen public Binance USD-M 8h transaction-bar snapshot through the authorized stage cutoff."
+    },
+    {
+      "availability_timestamp": "The containing bar row is delivered only after that bar closes.",
+      "coverage": "Same rows as bars.close.",
+      "event_timestamp": "open_time",
+      "field": "bars.open_time",
+      "lag": "The timestamp is used for ordering and close-time derivation only; the row's open price is not used as the contemporaneous fill input.",
+      "missing_rule": "Reject a non-UTC, duplicate, or non-monotone sequence.",
+      "source": "Frozen public Binance USD-M 8h transaction-bar snapshot."
+    },
+    {
+      "availability_timestamp": "Strictly after the completed event; worker contract admits only funding_time < decision_time.",
+      "coverage": "Actual event rows for current eligible symbols; at least 14 finite events in the trailing seven calendar days.",
+      "event_timestamp": "funding_time",
+      "field": "funding.funding_rate",
+      "lag": "Strictly positive event-time lag; a row timestamped at t is unavailable at t.",
+      "missing_rule": "Exclude the symbol when event count or finiteness fails; do not assume a scheduled rate or impute zero.",
+      "source": "Frozen public Binance USD-M actual funding rows through the authorized stage cutoff."
+    },
+    {
+      "availability_timestamp": "Effective at the current decision boundary and delivered authoritatively by the organizer.",
+      "coverage": "Weekly Monday 00:00 UTC point-in-time Top-40, intersected with instruments having an executable next open.",
+      "event_timestamp": "Universe effective boundary",
+      "field": "context.eligible_symbols",
+      "lag": "Universe construction uses the frozen trailing 30-day median daily quote-volume rule; strategy consumes only the already-authorized current set.",
+      "missing_rule": "Never synthesize membership. Return targets only inside the delivered set.",
+      "source": "Organizer-owned point-in-time universe derived from the frozen public Binance snapshot."
+    }
+  ],
+  "schema_version": 1,
+  "seed_contract": {
+    "canonical_runtime_strategy_seed": 20260801,
+    "family_registration_erratum": "The parameter label strategy_seed: 2026080101 in the already-registered family input means the team trial/search/placebo namespace. It does not override config.toml, is never the worker seed, and never changes a production target.",
+    "team_trial_search_placebo_namespace": 2026080101
+  },
+  "team_id": "team-01",
+  "transforms": [
+    {
+      "availability": "At t after both adjacent closes are closed and delivered.",
+      "fit_scope": "None; deterministic point transform.",
+      "formula": "r_i,u = log(C_i,u / C_i,u-1)",
+      "inputs": [
+        "bars.close",
+        "bars.open_time"
+      ],
+      "lag": "Latest return ends at t.",
+      "missing_rule": "No return across a gap or non-positive close.",
+      "transform_id": "log_return_8h"
+    },
+    {
+      "availability": "Recomputed at every t from paired returns ending no later than t.",
+      "fit_scope": "Past-only rolling 30 days; no fold-spanning fitted object.",
+      "formula": "clip(cov(r_i,r_BTC)/var(r_BTC),-1,3)",
+      "inputs": [
+        "log_return_8h for symbol",
+        "log_return_8h for BTCUSDT"
+      ],
+      "lag": "Window [t-30d,t], with at least 72 paired returns.",
+      "missing_rule": "Invalid if BTC missing, paired count <72, or BTC variance <=1e-12.",
+      "transform_id": "rolling_btc_beta"
+    },
+    {
+      "availability": "Recomputed at t from closed past returns and beta_t.",
+      "fit_scope": "No learned cross-period state.",
+      "formula": "e_i,u = r_i,u - beta_i(t)*r_BTC,u",
+      "inputs": [
+        "log_return_8h",
+        "rolling_btc_beta"
+      ],
+      "lag": "Only returns in the selected historical slice are used.",
+      "missing_rule": "Invalid when either paired return or beta is invalid.",
+      "transform_id": "btc_residual_return"
+    },
+    {
+      "availability": "At t from 3H residuals ending 3K bars before t.",
+      "fit_scope": "H in {14,21,28} days, K in {1,3} days, gamma in {0.5,1.0}; fixed per registered trial.",
+      "formula": "U_i = [sum(e)/(sd(e)*sqrt(3H))] * [abs(sum(e))/sum(abs(e))]^gamma",
+      "inputs": [
+        "btc_residual_return"
+      ],
+      "lag": "Explicit K-day skip; no residual after t-K enters.",
+      "missing_rule": "Invalid on incomplete slice, non-finite values, or denominator <=1e-8.",
+      "transform_id": "path_efficient_residual_drift"
+    },
+    {
+      "availability": "At t using funding events strictly before t.",
+      "fit_scope": "Fixed trailing seven calendar days; no learned schedule.",
+      "formula": "F_i = sum(funding_rate where t-7d <= funding_time < t)",
+      "inputs": [
+        "funding.funding_rate"
+      ],
+      "lag": "Strictly excludes funding_time >=t.",
+      "missing_rule": "Invalid with fewer than 14 finite events.",
+      "transform_id": "funding_pressure_7d"
+    },
+    {
+      "availability": "At t over the valid current eligible cross-section only.",
+      "fit_scope": "Contemporaneous median and MAD; never full-window fitted.",
+      "formula": "clip((x_i-median(x))/(1.4826*MAD(x)),-3,3)",
+      "inputs": [
+        "path_efficient_residual_drift or funding_pressure_7d",
+        "context.eligible_symbols"
+      ],
+      "lag": "No temporal look-ahead; current cross-section is known at t.",
+      "missing_rule": "Flat request when MAD <=1e-12 or valid cross-section <24.",
+      "transform_id": "causal_cross_sectional_robust_z"
+    },
+    {
+      "availability": "At t after both robust z-scores are available.",
+      "fit_scope": "lambda_funding fixed at 0.35 for the mechanism; zero only in a registered ablation.",
+      "formula": "S_i = robust_z(U_i) - 0.35*robust_z(F_i)",
+      "inputs": [
+        "causal robust z of path_efficient_residual_drift",
+        "causal robust z of funding_pressure_7d"
+      ],
+      "lag": "Inherits price skip and strictly past funding lag.",
+      "missing_rule": "Invalid if either component is invalid.",
+      "transform_id": "residual_drift_funding_score"
+    },
+    {
+      "availability": "At t from BTC closes ending at t; neutral value until 60 days are available.",
+      "fit_scope": "Fixed 60-day rule and fixed 0.20 scaling constant.",
+      "formula": "m_t = clip(log(C_BTC,t/C_BTC,t-60d)/0.20,-1,1)",
+      "inputs": [
+        "bars.close for BTCUSDT"
+      ],
+      "lag": "Latest close is t; target still fills next-open.",
+      "missing_rule": "Use m_t=0 for fewer than 60 days only when the residual factor itself remains valid; missing BTC makes the whole request flat.",
+      "transform_id": "bounded_btc_direction"
+    },
+    {
+      "availability": "At scheduled daily t after ranking and coverage checks.",
+      "fit_scope": "Trial-fixed q and delta; contemporaneous inverse-vol winsorization and deterministic capped-simplex projection.",
+      "formula": "rank tails by score; long gross=0.40+delta*m_t, short magnitude=0.40-delta*m_t, total gross=0.80, symbol cap=0.09",
+      "inputs": [
+        "residual_drift_funding_score",
+        "bounded_btc_direction",
+        "btc residual volatility",
+        "context.eligible_symbols"
+      ],
+      "lag": "Formed at t and filled only at the next executable open.",
+      "missing_rule": "Flat if either side has fewer than six signed names or cap projection is infeasible; never redistribute across sleeves.",
+      "transform_id": "two_sleeve_target_weights"
+    }
+  ]
+}

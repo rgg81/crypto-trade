@@ -1,0 +1,212 @@
+{
+  "artifact": "planned_ablations",
+  "component_ablations": [
+    {
+      "ablation_id": "F01-raw-common-momentum",
+      "change": "Replace BTC residual returns with raw symbol returns; keep all other transforms, construction, and no-control base costs identical.",
+      "causal_claim_tested": "Removing common BTC beta should make the cross-sectional continuation effect less regime-dependent.",
+      "decision": "The registered family cannot advance if this ablation has a higher declared J than the selected residual signal; removal of residualization requires a formal pivot.",
+      "status": "planned"
+    },
+    {
+      "ablation_id": "F02-no-funding-term",
+      "change": "Set lambda_funding=0 while keeping residual drift, construction, and no-control base costs identical.",
+      "causal_claim_tested": "Funding de-crowding reduces paid funding and squeeze exposure rather than merely perturbing ranks.",
+      "decision": "Retain the funding term only if it reduces net funding drag and does not lower doubled-cost Sharpe by more than 0.05; otherwise reject or pivot, never silently tune it away.",
+      "status": "planned"
+    },
+    {
+      "ablation_id": "F03-no-path-efficiency",
+      "change": "Set gamma=0, leaving the standardized cumulative residual and funding term unchanged.",
+      "causal_claim_tested": "A coherent residual path is more persistent than an equally large but alternating displacement.",
+      "decision": "Report J, turnover, worst-fold Sharpe, and tail loss versus the selected gamma; gamma remains subject to the registered core grid.",
+      "status": "planned"
+    },
+    {
+      "ablation_id": "F04-no-direction-tilt",
+      "change": "Set delta=0 so both sleeve gross magnitudes remain 0.40.",
+      "causal_claim_tested": "A bounded past BTC direction tilt improves bull-long and bear-short roles without sacrificing chop.",
+      "decision": "The tilt is retained only if all common role gates pass and declared J is higher; zero tilt as a champion would require a registered material configuration.",
+      "status": "planned"
+    },
+    {
+      "ablation_id": "F05-sign-inversion-placebo",
+      "change": "Multiply the complete pre-construction score by -1 with deterministic ordering and identical targets otherwise.",
+      "causal_claim_tested": "The predicted continuation direction, rather than generic trading or risk scaling, carries the effect.",
+      "decision": "The placebo is expected to have negative pooled next-day IC and materially lower no-control J; contrary evidence falsifies the directional thesis.",
+      "status": "planned"
+    }
+  ],
+  "created_at_utc": "2026-07-15T19:33:29Z",
+  "family_id": "t01-residual-drift-funding-v1",
+  "metrics_required_for_every_risk_cell": [
+    "net annualized return",
+    "net Sharpe",
+    "maximum drawdown",
+    "Calmar",
+    "1% daily expected shortfall",
+    "worst daily return",
+    "annualized one-way turnover",
+    "funding cashflow",
+    "bull/bear/chop/stress return and Sharpe",
+    "long and short sleeve attribution and exposure",
+    "positive fold and quarter fractions",
+    "risk action counts",
+    "time under each volatility or drawdown scale",
+    "requested and filled risk notional",
+    "same-boundary reentry preventions"
+  ],
+  "risk_control_definitions": {
+    "brakes_only": {
+      "drawdown_brakes": [
+        {
+          "drawdown": 0.1,
+          "gross_scale": 0.75
+        },
+        {
+          "drawdown": 0.18,
+          "gross_scale": 0.4
+        },
+        {
+          "drawdown": 0.25,
+          "gross_scale": 0.0
+        }
+      ],
+      "position_stop_enabled": false,
+      "same_boundary_reentry": false,
+      "side_scaling": {
+        "long_scale": 1.0,
+        "short_scale": 1.0
+      },
+      "time_stop_enabled": false,
+      "turnover_limit_enabled": false,
+      "volatility_target_enabled": false
+    },
+    "combined": {
+      "drawdown_brakes": [
+        {
+          "drawdown": 0.1,
+          "gross_scale": 0.75
+        },
+        {
+          "drawdown": 0.18,
+          "gross_scale": 0.4
+        },
+        {
+          "drawdown": 0.25,
+          "gross_scale": 0.0
+        }
+      ],
+      "position_stop_enabled": false,
+      "same_boundary_reentry": false,
+      "side_scaling": {
+        "long_scale": 1.0,
+        "short_scale": 1.0
+      },
+      "time_stop_enabled": false,
+      "turnover_limit_enabled": false,
+      "volatility_target": {
+        "annualized_target": 0.35,
+        "enabled": true,
+        "lookback_days": 30,
+        "maximum_scale": 1.0,
+        "minimum_scale": 0.25
+      }
+    },
+    "none": {
+      "drawdown_brakes": [],
+      "position_stop_enabled": false,
+      "same_boundary_reentry": false,
+      "side_scaling": {
+        "long_scale": 1.0,
+        "short_scale": 1.0
+      },
+      "time_stop_enabled": false,
+      "turnover_limit_enabled": false,
+      "volatility_target_enabled": false
+    },
+    "volatility_only": {
+      "drawdown_brakes": [],
+      "position_stop_enabled": false,
+      "same_boundary_reentry": false,
+      "side_scaling": {
+        "long_scale": 1.0,
+        "short_scale": 1.0
+      },
+      "time_stop_enabled": false,
+      "turnover_limit_enabled": false,
+      "volatility_target": {
+        "annualized_target": 0.35,
+        "enabled": true,
+        "lookback_days": 30,
+        "maximum_scale": 1.0,
+        "minimum_scale": 0.25
+      }
+    }
+  },
+  "risk_decision_rule": {
+    "admissibility": "Risk overlays are evaluated only after the no-control core has positive aggregate net Sharpe, at least four positive folds, positive pooled next-day IC, and at least four positive-IC folds.",
+    "combined_policy_minimum_effect": "Versus no control at the same costs, maximum drawdown and 1% daily expected shortfall must both improve; expected shortfall must improve by at least 10%; annualized return retention must be at least 70%; neither base- nor doubled-cost Sharpe may fall by more than 0.05; every mandatory regime and sleeve gate must remain satisfied.",
+    "fallback": "If combined fails, choose the least complex admissible individual control, otherwise no control. Tie breaks are lower maximum drawdown, lower turnover, then canonical policy ID.",
+    "non_rescue": "No control variant may turn a falsified core mechanism into an admissible family."
+  },
+  "risk_matrix": [
+    {
+      "ablation_id": "R01-none-base",
+      "control_definition": "none",
+      "cost_multiplier": 1.0,
+      "status": "planned"
+    },
+    {
+      "ablation_id": "R02-volatility-base",
+      "control_definition": "volatility_only",
+      "cost_multiplier": 1.0,
+      "status": "planned"
+    },
+    {
+      "ablation_id": "R03-brakes-base",
+      "control_definition": "brakes_only",
+      "cost_multiplier": 1.0,
+      "status": "planned"
+    },
+    {
+      "ablation_id": "R04-combined-base",
+      "control_definition": "combined",
+      "cost_multiplier": 1.0,
+      "status": "planned"
+    },
+    {
+      "ablation_id": "R05-none-double",
+      "control_definition": "none",
+      "cost_multiplier": 2.0,
+      "status": "planned"
+    },
+    {
+      "ablation_id": "R06-volatility-double",
+      "control_definition": "volatility_only",
+      "cost_multiplier": 2.0,
+      "status": "planned"
+    },
+    {
+      "ablation_id": "R07-brakes-double",
+      "control_definition": "brakes_only",
+      "cost_multiplier": 2.0,
+      "status": "planned"
+    },
+    {
+      "ablation_id": "R08-combined-double",
+      "control_definition": "combined",
+      "cost_multiplier": 2.0,
+      "status": "planned"
+    }
+  ],
+  "schema_version": 1,
+  "team_id": "team-01",
+  "trial_accounting": {
+    "component_or_placebo_cells": 5,
+    "initial_family_hard_cap": 39,
+    "risk_cost_cells": 8,
+    "rule": "Every material cell is registered before execution; an exact already-registered cell may be reused but never omitted from the organizer accounting.",
+    "tournament_budget_reserved_after_family_cap": 41
+  }
+}

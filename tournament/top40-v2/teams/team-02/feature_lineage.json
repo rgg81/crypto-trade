@@ -1,0 +1,256 @@
+{
+  "causality_tests": [
+    {
+      "failure_condition": "Any target at or before the original cutoff changes.",
+      "name": "future_truncation",
+      "procedure": "Recompute after deleting every bar and funding row later than each decision cutoff."
+    },
+    {
+      "failure_condition": "Any target at or before the corruption boundary changes.",
+      "name": "future_corruption",
+      "procedure": "Replace all post-boundary numeric values with extreme finite sentinels."
+    },
+    {
+      "failure_condition": "Appending later observations changes the prefix targets or internal prefix feature hashes.",
+      "name": "append_invariance",
+      "procedure": "Compare a prefix-only replay with the identical prefix of an extended replay."
+    },
+    {
+      "failure_condition": "Two clean processes differ in target bytes, feature hashes, or tie resolution.",
+      "name": "deterministic_rerun",
+      "procedure": "Replay identical frozen inputs in two clean processes with canonical worker/runtime seed 20260801. Namespace 2026080102 may identify the team-scoped tie-test case but is never passed to target_weights."
+    },
+    {
+      "failure_condition": "A row with close_time or funding_time after c(t) affects a target at t.",
+      "name": "availability_boundary",
+      "procedure": "Inject boundary-adjacent rows on both sides of c(t)=t-8h and assert the strict masks."
+    }
+  ],
+  "decision_contract": {
+    "decision_interval": "8h",
+    "execution_lag": "central next-open fill after the decision; the execution open is not visible",
+    "feature_cutoff": "c(t) = decision_time t - 8h",
+    "insufficient_state_action": "return an empty mapping to request flat",
+    "non_rebalance_action": "return None to hold",
+    "rebalance_schedule": "every third boundary at 00:00 UTC",
+    "timezone": "UTC"
+  },
+  "derived_features": [
+    {
+      "availability_lag": "inherits close_time <= c(t)",
+      "formula": "log(close_s / close_{s-1})",
+      "fitting_rule": "none",
+      "id": "symbol_log_return_8h",
+      "inputs": [
+        "transaction_close"
+      ],
+      "missing_rule": "pair is missing if either close is absent, non-finite, or non-positive"
+    },
+    {
+      "availability_lag": "inherits the latest included symbol return",
+      "formula": "cross-sectional median of valid symbol_log_return_8h among the current point-in-time eligible set",
+      "fitting_rule": "recomputed independently at each historical bar using only symbols and rows known at t",
+      "id": "common_market_return",
+      "inputs": [
+        "symbol_log_return_8h",
+        "point_in_time_eligibility"
+      ],
+      "missing_rule": "historical bar is missing if fewer than 12 eligible symbols have valid returns"
+    },
+    {
+      "availability_lag": "all observations end at c(t)",
+      "formula": "clip(cov(symbol return, common return)/var(common return), -1, 3)",
+      "fitting_rule": "rolling OLS slope over L_beta_days; no intercept is exported and no state is fitted across decisions",
+      "id": "rolling_beta",
+      "inputs": [
+        "symbol_log_return_8h",
+        "common_market_return"
+      ],
+      "missing_rule": "missing unless at least minimum_valid_history_fraction of the requested window is paired and common variance is positive"
+    },
+    {
+      "availability_lag": "all observations end at c(t)",
+      "formula": "(sum_h(symbol returns)-rolling_beta*sum_h(common returns))/(trailing_symbol_sigma*sqrt(3h)+epsilon)",
+      "fitting_rule": "causal rolling moments only",
+      "id": "risk_adjusted_residual_displacement",
+      "inputs": [
+        "symbol_log_return_8h",
+        "common_market_return",
+        "rolling_beta"
+      ],
+      "missing_rule": "missing if beta, volatility, or minimum history is unavailable"
+    },
+    {
+      "availability_lag": "same as residual displacement",
+      "formula": "rank_to_minus_one_plus_one(0.65*z_L_slow + 0.35*z_L_fast)",
+      "fitting_rule": "contemporaneous average cross-sectional rank; alphabetical symbol resolves exact ties",
+      "id": "residual_trend_rank",
+      "inputs": [
+        "risk_adjusted_residual_displacement"
+      ],
+      "missing_rule": "symbol excluded from this leg when either horizon is invalid"
+    },
+    {
+      "availability_lag": "same as residual displacement",
+      "formula": "rank_to_minus_one_plus_one(-z_L_rev)",
+      "fitting_rule": "contemporaneous average cross-sectional rank",
+      "id": "residual_reversal_rank",
+      "inputs": [
+        "risk_adjusted_residual_displacement"
+      ],
+      "missing_rule": "symbol excluded from this leg when the reversal horizon is invalid"
+    },
+    {
+      "availability_lag": "funding_time <= c(t)",
+      "formula": "24*sum(funding_rate)/sum(funding_interval_hours) over L_funding_days, then cross-sectional rank of its negative",
+      "fitting_rule": "realized trailing events only; no predicted funding and no forward fill",
+      "id": "funding_carry_rank",
+      "inputs": [
+        "realized_funding_rate",
+        "funding_interval"
+      ],
+      "missing_rule": "fewer than two in-window events maps to neutral rank 0 and sets a missing indicator"
+    },
+    {
+      "availability_lag": "all return inputs end at c(t)",
+      "formula": "ER=abs(sum(common))/(sum(abs(common))+epsilon); BR=abs(2*fraction(symbol cumulative return > 0)-1); P=sigmoid((ER-theta_ER)/width+(BR-theta_BR)/width)",
+      "fitting_rule": "fixed formula and thresholds; recomputed at every scheduled decision",
+      "id": "causal_persistence_state",
+      "inputs": [
+        "common_market_return",
+        "symbol_log_return_8h"
+      ],
+      "missing_rule": "invalid if the common series lacks minimum history or fewer than 12 symbols have a valid horizon return"
+    },
+    {
+      "availability_lag": "maximum lag of all component inputs",
+      "formula": "rank((1-w_funding)*(P*trend+(1-P)*reversal)+w_funding*funding)",
+      "fitting_rule": "fixed convex blend followed by contemporaneous rank",
+      "id": "composite_alpha_rank",
+      "inputs": [
+        "residual_trend_rank",
+        "residual_reversal_rank",
+        "funding_carry_rank",
+        "causal_persistence_state"
+      ],
+      "missing_rule": "requires valid trend and reversal; missing funding is neutral rather than imputed cross-time"
+    },
+    {
+      "availability_lag": "common returns end at c(t)",
+      "formula": "D=tanh(sum_L_slow(common)/(sd(common)*sqrt(3*L_slow)+epsilon)/k_direction)",
+      "fitting_rule": "fixed bounded transform",
+      "id": "market_direction_tilt",
+      "inputs": [
+        "common_market_return"
+      ],
+      "missing_rule": "zero tilt when the denominator is invalid but the rest of the signal is valid"
+    },
+    {
+      "availability_lag": "uses only composite ranks, volatility, and direction known at c(t)",
+      "formula": "top/bottom q selection; inverse-volatility sleeve normalization; G_long=G/2+dD and G_short=G/2-dD; iterative 0.095 symbol precap",
+      "fitting_rule": "deterministic portfolio mapping; organizer limits remain authoritative",
+      "id": "target_weights",
+      "inputs": [
+        "composite_alpha_rank",
+        "market_direction_tilt",
+        "symbol_log_return_8h",
+        "point_in_time_eligibility"
+      ],
+      "missing_rule": "request flat if fewer than 12 total valid symbols or fewer than four names can populate either sleeve"
+    }
+  ],
+  "family_id": "team-02-causal-crowding-residual-persistence-v1",
+  "mechanism_identity_guardrail": {
+    "formal_pivot_required_for": [
+      "fixing the persistence state P to a constant",
+      "unconditional residual continuation",
+      "removing the residual-reversal leg or its causal interaction"
+    ],
+    "mandatory_identity": "Every deployable family candidate retains residual persistence, residual reversal, and their causal variable-P interaction.",
+    "non_deployable_diagnostics": [
+      "trend-only",
+      "reversal-only",
+      "fixed-blend"
+    ],
+    "statement": "Diagnostic ablations cannot become this family's champion regardless of performance."
+  },
+  "forbidden_inputs": [
+    "future or same-cutoff-plus-one bars",
+    "current/future execution open",
+    "mark prices",
+    "predicted funding",
+    "full-period scaling or coefficients",
+    "organizer regime labels as strategy features",
+    "private/final observations or artifacts",
+    "evaluator positions, fills, equity, or PnL"
+  ],
+  "raw_inputs": [
+    {
+      "availability_timestamp_rule": "bar close_time",
+      "coverage_statement": "Authorized public Binance USD-M 8h transaction-bar history streamed only for the current organizer-eligible symbols; empirical coverage is not assumed before evaluation.",
+      "event_timestamp": "close_time",
+      "fields": [
+        "close",
+        "close_time"
+      ],
+      "id": "transaction_close",
+      "missing_data_rule": "no backfill; reject non-finite/non-positive close and require the configured fraction of the trailing window",
+      "source": "organizer-streamed canonical Binance USD-M transaction klines",
+      "strategy_lag": "use only close_time <= decision_time - 8h"
+    },
+    {
+      "availability_timestamp_rule": "funding_time; neutral worker supplies only rows strictly earlier than decision_time",
+      "coverage_statement": "Actual historical funding events for currently eligible symbols; cadence may vary and is normalized with funding_interval_hours.",
+      "event_timestamp": "funding_time",
+      "fields": [
+        "funding_rate",
+        "funding_time"
+      ],
+      "id": "realized_funding_rate",
+      "missing_data_rule": "no interpolation or forward fill; fewer than two trailing events yields neutral carry score",
+      "source": "organizer-streamed canonical Binance USD-M realized funding rows",
+      "strategy_lag": "use only funding_time <= decision_time - 8h"
+    },
+    {
+      "availability_timestamp_rule": "same row as realized funding_rate",
+      "coverage_statement": "Positive interval metadata attached to each supplied funding event.",
+      "event_timestamp": "funding_time",
+      "fields": [
+        "funding_interval_hours"
+      ],
+      "id": "funding_interval",
+      "missing_data_rule": "row is unusable if interval is absent, non-finite, or non-positive",
+      "source": "organizer-streamed canonical Binance USD-M funding rows",
+      "strategy_lag": "use only rows with funding_time <= decision_time - 8h"
+    },
+    {
+      "availability_timestamp_rule": "organizer supplies membership at decision_time after causal weekly reconstitution",
+      "coverage_statement": "Weekly Monday 00:00 UTC point-in-time Top-40 liquidity membership intersected with symbols having an executable next open.",
+      "event_timestamp": "reconstitution_time and current decision_time",
+      "fields": [
+        "eligible_symbols"
+      ],
+      "id": "point_in_time_eligibility",
+      "missing_data_rule": "never synthesize membership; an empty/insufficient set requests flat",
+      "source": "central tournament universe contract",
+      "strategy_lag": "available at decision_time; underlying membership uses completed prior UTC days"
+    }
+  ],
+  "schema_version": 1,
+  "supervised_target": {
+    "embargo": "Outcome-based fold-local selection must end strictly before fold_start minus 30 calendar days. Embargoed raw observations may initialize causal feature state after parameters freeze, and no canonical visible-development date is omitted from scoring.",
+    "forward_label": null,
+    "label_overlap_purge": "not applicable because the strategy has no supervised forward-return label",
+    "scored_fold_coverage": [
+      "[2020-02-03, 2020-09-01)",
+      "[2020-09-01, 2021-04-01)",
+      "[2021-04-01, 2021-11-01)",
+      "[2021-11-01, 2022-06-01)",
+      "[2022-06-01, 2023-01-01)",
+      "[2023-01-01, 2023-07-01)"
+    ],
+    "selection_outcome": "central next-open, net-of-cost portfolio returns are used only after the corresponding candidate was registered",
+    "statement": "No forward target is used to train a model. Rolling estimates are past-only features. The six contiguous folds score the complete canonical [2020-02-03, 2023-07-01) window exactly once; [2020-01-01, 2020-02-03) is state-only warmup."
+  },
+  "team_id": "team-02"
+}

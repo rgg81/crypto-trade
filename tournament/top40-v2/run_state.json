@@ -23,11 +23,11 @@
   "selection_lock": null,
   "teams": {
     "team-01": {
-      "active_family_id": null,
+      "active_family_id": "t01-residual-drift-funding-v1",
       "canonical_result": null,
       "development_assessment": null,
       "dnf": null,
-      "family_count": 0,
+      "family_count": 1,
       "finalist_freeze": null,
       "pivot_count": 0,
       "private_attempts": 0,
@@ -37,11 +37,11 @@
       "trial_count": 0
     },
     "team-02": {
-      "active_family_id": null,
+      "active_family_id": "team-02-causal-crowding-residual-persistence-v1",
       "canonical_result": null,
       "development_assessment": null,
       "dnf": null,
-      "family_count": 0,
+      "family_count": 1,
       "finalist_freeze": null,
       "pivot_count": 0,
       "private_attempts": 0,

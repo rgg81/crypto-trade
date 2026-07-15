@@ -1,0 +1,297 @@
+{
+  "budget": {
+    "allocated_initial_family": 52,
+    "coarse_horizon_state": 12,
+    "component_identification": 8,
+    "cumulative_team_limit": 80,
+    "local_neighbors_additional": 8,
+    "portfolio_refinement": 8,
+    "reserved_for_documented_pivots": 28,
+    "risk_factorial_including_cost_levels": 16
+  },
+  "cost_contract": {
+    "base_multiplier": 1.0,
+    "doubled_multiplier": 2.0,
+    "statement": "Every one of the eight risk subsets is observed under both central base and doubled costs; all fills remain next-open and participation-constrained."
+  },
+  "family_id": "team-02-causal-crowding-residual-persistence-v1",
+  "global_decision_rules": {
+    "component_retention": "A component is supported only if its inclusion improves its preregistered causal diagnostic in at least four of six folds and does not create a tournament-gate failure. Statistical significance alone cannot rescue failed economics.",
+    "family_rejection": "Reject or pivot if the state-interaction sign fails in at least three folds, funding does not reduce net carry paid in at least four folds, fewer than four folds are profitable after base costs, or the 70% profitable-neighbor rule fails.",
+    "risk_policy_retention": "Retain a control subset only if maximum drawdown or 5% tail loss improves by at least 10% versus no-control, net Sharpe falls by no more than 0.10, and every regime/sleeve gate still passes. Prefer fewer controls on an exact tie.",
+    "selection_order": [
+      "all non-compensatory gates pass",
+      "positive fold count",
+      "worst fold net Sharpe",
+      "median fold net Sharpe",
+      "doubled-cost Sharpe",
+      "Calmar",
+      "lower maximum drawdown",
+      "lower turnover",
+      "bytewise candidate_id"
+    ]
+  },
+  "local_neighborhood": {
+    "center_rule": "The provisional center is the lexicographic winner after the coarse and refinement stages; it was already counted in those stages.",
+    "edge_rule": "If the center is at a declared boundary, use the closest distinct inward value; never invent an outward value after seeing performance.",
+    "minimum_median_neighbor_sharpe": 0.5,
+    "minimum_profitable_fraction": 0.7,
+    "neighbors": [
+      {
+        "axis": "L_slow_days",
+        "direction": "lower",
+        "step": -5
+      },
+      {
+        "axis": "L_slow_days",
+        "direction": "higher",
+        "step": 5
+      },
+      {
+        "axis": "L_rev_days",
+        "direction": "lower",
+        "step": -1
+      },
+      {
+        "axis": "L_rev_days",
+        "direction": "higher",
+        "step": 1
+      },
+      {
+        "axis": "w_funding",
+        "direction": "lower",
+        "step": -0.1
+      },
+      {
+        "axis": "w_funding",
+        "direction": "higher",
+        "step": 0.1
+      },
+      {
+        "axis": "selection_fraction",
+        "direction": "lower",
+        "step": -0.05
+      },
+      {
+        "axis": "selection_fraction",
+        "direction": "higher",
+        "step": 0.05
+      }
+    ],
+    "size_including_center": 9
+  },
+  "risk_controls": {
+    "drawdown_brake": {
+      "levels": [
+        {
+          "drawdown": 0.1,
+          "gross_scale": 0.7
+        },
+        {
+          "drawdown": 0.2,
+          "gross_scale": 0.35
+        },
+        {
+          "drawdown": 0.275,
+          "gross_scale": 0.0
+        }
+      ],
+      "same_boundary_reentry": false,
+      "stated_failure_mode": "portfolio loss cascade after persistent common or crowding shock"
+    },
+    "position_stop": {
+      "enabled": false,
+      "reason": "A position-level stop would confound the preregistered persistence/reversal horizon."
+    },
+    "side_scaling": {
+      "long_scale": 1.0,
+      "short_scale": 1.0
+    },
+    "time_stop": {
+      "enabled": false,
+      "reason": "The daily score refresh already defines holding intent; an extra holding clock is not causally motivated."
+    },
+    "turnover_limit": {
+      "maximum_one_way_turnover": 0.25,
+      "stated_failure_mode": "rank churn causing cost and participation drag"
+    },
+    "volatility_target": {
+      "annualized_target": 0.35,
+      "lookback_days": 20,
+      "maximum_scale": 1.0,
+      "minimum_scale": 0.25,
+      "stated_failure_mode": "volatility clustering and tail amplification without adding leverage"
+    }
+  },
+  "risk_factorial": [
+    {
+      "controls": [],
+      "id": "risk-none"
+    },
+    {
+      "controls": [
+        "volatility_target"
+      ],
+      "id": "risk-v"
+    },
+    {
+      "controls": [
+        "drawdown_brake"
+      ],
+      "id": "risk-d"
+    },
+    {
+      "controls": [
+        "turnover_limit"
+      ],
+      "id": "risk-t"
+    },
+    {
+      "controls": [
+        "volatility_target",
+        "drawdown_brake"
+      ],
+      "id": "risk-vd"
+    },
+    {
+      "controls": [
+        "volatility_target",
+        "turnover_limit"
+      ],
+      "id": "risk-vt"
+    },
+    {
+      "controls": [
+        "drawdown_brake",
+        "turnover_limit"
+      ],
+      "id": "risk-dt"
+    },
+    {
+      "controls": [
+        "volatility_target",
+        "drawdown_brake",
+        "turnover_limit"
+      ],
+      "id": "risk-vdt"
+    }
+  ],
+  "schema_version": 1,
+  "signal_stages": [
+    {
+      "arms": [
+        {
+          "change": "none",
+          "diagnostic": "reference for every paired causal comparison",
+          "id": "component-baseline"
+        },
+        {
+          "change": "set w_funding=0",
+          "diagnostic": "funding inclusion should reduce realized net funding paid in at least four folds",
+          "id": "component-no-funding"
+        },
+        {
+          "change": "set P=1",
+          "diagnostic": "isolates unconditional residual persistence",
+          "id": "component-trend-only"
+        },
+        {
+          "change": "set P=0",
+          "diagnostic": "isolates unconditional residual reversal",
+          "id": "component-reversal-only"
+        },
+        {
+          "change": "set P=0.5",
+          "diagnostic": "tests whether causal state conditioning adds value beyond a static blend",
+          "id": "component-static-blend"
+        },
+        {
+          "change": "set maximum side tilt d=0",
+          "diagnostic": "tests whether directional sleeve budgets, rather than ranks alone, deliver bull/bear roles",
+          "id": "component-no-direction-tilt"
+        },
+        {
+          "change": "replace inverse-volatility sleeve weights with equal weights",
+          "diagnostic": "tests whether risk normalization reduces concentration and tails without manufacturing alpha",
+          "id": "component-equal-weight"
+        },
+        {
+          "change": "rebalance every 6 bars rather than 3",
+          "diagnostic": "tests persistence after lower turnover and an additional day of staleness",
+          "id": "component-two-day-rebalance"
+        }
+      ],
+      "count": 8,
+      "name": "causal_component_identification"
+    },
+    {
+      "count": 12,
+      "grid": {
+        "horizon_bundles": [
+          {
+            "L_beta_days": 15,
+            "L_fast_days": 7,
+            "L_slow_days": 15,
+            "L_vol_days": 15,
+            "id": "short"
+          },
+          {
+            "L_beta_days": 20,
+            "L_fast_days": 10,
+            "L_slow_days": 20,
+            "L_vol_days": 20,
+            "id": "medium"
+          },
+          {
+            "L_beta_days": 25,
+            "L_fast_days": 10,
+            "L_slow_days": 25,
+            "L_vol_days": 25,
+            "id": "long"
+          }
+        ],
+        "persistence_threshold_pairs": [
+          {
+            "theta_BR": 0.2,
+            "theta_ER": 0.2
+          },
+          {
+            "theta_BR": 0.4,
+            "theta_ER": 0.4
+          }
+        ],
+        "reversal_days": [
+          1,
+          2
+        ]
+      },
+      "name": "coarse_horizon_and_state"
+    },
+    {
+      "count": 8,
+      "grid": {
+        "funding_weights": [
+          0.1,
+          0.3
+        ],
+        "rebalance_bars": [
+          3,
+          6
+        ],
+        "selection_fractions": [
+          0.2,
+          0.3
+        ]
+      },
+      "name": "carry_and_portfolio_refinement"
+    },
+    {
+      "count": 8,
+      "name": "one_coordinate_local_neighbors",
+      "statement": "Eight new neighbors are tested around the already-counted provisional center."
+    }
+  ],
+  "status": "planned_not_run",
+  "team_id": "team-02",
+  "trial_accounting": "Every listed arm, manual alternative, changed constant, interrupted run, and base/doubled risk observation must be registered before execution."
+}
