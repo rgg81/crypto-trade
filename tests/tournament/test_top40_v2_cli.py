@@ -11,9 +11,16 @@ from types import SimpleNamespace
 
 import pytest
 
+from crypto_trade.tournament import runner_v2
 from crypto_trade.tournament.layout import TOP40_V2_LAYOUT
 from crypto_trade.tournament.runner_v2 import source_bundle_fingerprint
-from crypto_trade.tournament.top40_v2 import TEAM_IDS, load_config, validate_run_state
+from crypto_trade.tournament.top40_v2 import (
+    TEAM_IDS,
+    EvaluationWindow,
+    WindowMetrics,
+    load_config,
+    validate_run_state,
+)
 
 REPOSITORY = Path(__file__).parents[2]
 CONFIG = TOP40_V2_LAYOUT.config_path
@@ -266,6 +273,83 @@ def _register_completed_candidate(
     ) == 0
 
 
+def _register_pending_candidate(cli, root: Path, config, *, candidate_id: str) -> None:
+    strategy_sha, risk_sha, source_sha = _candidate_bindings(root, config, "team-01")
+    registration = {
+        "timestamp_utc": "2026-07-20T10:00:00Z",
+        "team_id": "team-01",
+        "family_id": "family-1",
+        "candidate_id": candidate_id,
+        "strategy_sha256": strategy_sha,
+        "source_bundle_sha256": source_sha,
+        "risk_config_sha256": risk_sha,
+        "config_sha256": config.sha256,
+        "parameters": {"lookback": 24},
+        "seed": 20260801,
+        "thesis": "A causal spread should survive conservative execution costs.",
+        "falsifier": "Reject when stitched development Sharpe is non-positive.",
+    }
+    registration_path = root / f"{candidate_id}.registration.json"
+    _write_json(registration_path, registration)
+    assert (
+        cli._register_trial(
+            _args(team_id="team-01", registration=str(registration_path))
+        )
+        == 0
+    )
+
+
+def _mock_window_result(root: Path, config, *, stage: str) -> runner_v2.TeamWindowRunResult:
+    strategy_sha, risk_sha, source_sha = _candidate_bindings(root, config, "team-01")
+    if stage == "development":
+        output = "reports-top40-v2/team-01/development"
+        start = str(config.raw["splits"]["visible_development_start"])
+        end = str(config.raw["splits"]["visible_development_end_inclusive"])
+    else:
+        output = "tournament/top40-v2/private/artifacts/team-01"
+        start = str(config.raw["splits"]["private_qualifier_start"])
+        end = str(config.raw["splits"]["private_qualifier_end_inclusive"])
+    artifact = root / output / "daily_returns.csv"
+    artifact.parent.mkdir(parents=True, exist_ok=True)
+    artifact.write_text("date,net_return\n2023-01-01,0.01\n", encoding="utf-8")
+    relative = artifact.relative_to(root).as_posix()
+    digest = hashlib.sha256(artifact.read_bytes()).hexdigest()
+    return runner_v2.TeamWindowRunResult(
+        stage=stage,
+        team_id="team-01",
+        entrypoint="tournament/top40-v2/teams/team-01/strategy.py",
+        seed=int(config.raw["research_budget"]["strategy_seed"]),
+        data_manifest_sha256="d" * 64,
+        config_sha256=config.sha256,
+        strategy_sha256=strategy_sha,
+        risk_policy_sha256=risk_sha,
+        source_bundle_sha256=source_sha,
+        output_dir=output,
+        artifacts={"daily_returns": relative},
+        artifact_sha256={"daily_returns": digest},
+        artifact_sizes={"daily_returns": artifact.stat().st_size},
+        scored_window=EvaluationWindow(
+            start=start,
+            end=end,
+            metrics=WindowMetrics(
+                net_sharpe=0.9,
+                net_sortino=1.1,
+                calmar=0.6,
+                annualized_return=0.1,
+                max_drawdown=0.2,
+                positive_quarter_fraction=0.75,
+            ),
+        ),
+        double_cost_sharpe=0.5,
+        regime_sharpe={"bull": 0.9, "bear": 0.5, "chop": 0.4, "stress": 0.1},
+        net_sharpe_confidence_interval=(0.2, 1.4),
+        double_cost_sharpe_confidence_interval=(0.1, 0.9),
+        decision_count=100,
+        event_count=20,
+        trade_count=10,
+    )
+
+
 def _runner_record(root: Path, *, stage: str, candidate_id: str) -> Path:
     path = root / f"{candidate_id}.{stage}.runner.json"
     _write_json(path, {"stage": stage, "team_id": "team-01"})
@@ -385,6 +469,120 @@ def test_family_registration_and_two_pivots_preserve_cumulative_budget(
         )
     team = _read_state(tmp_path)["teams"]["team-01"]
     assert (team["family_count"], team["pivot_count"], team["trial_count"]) == (3, 2, 0)
+
+
+def test_run_window_development_closes_journal_and_archives_artifacts(
+    cli, tmp_path, monkeypatch
+):
+    _initialize(cli, tmp_path, monkeypatch)
+    _open_research(tmp_path)
+    _register_initial_family(cli, tmp_path)
+    config = load_config(tmp_path / CONFIG)
+    _register_pending_candidate(
+        cli, tmp_path, config, candidate_id="candidate-window"
+    )
+    calls: list[str] = []
+
+    def fake_run_team(*_args, stage, **_kwargs):
+        calls.append(stage)
+        return _mock_window_result(tmp_path, config, stage=stage)
+
+    monkeypatch.setattr(runner_v2, "run_team", fake_run_team)
+    assert (
+        cli._run_window(
+            _args(
+                stage="development",
+                team_id="team-01",
+                candidate_id="candidate-window",
+            )
+        )
+        == 0
+    )
+
+    assert calls == ["development"]
+    state = _read_state(tmp_path)
+    assert state["teams"]["team-01"]["trial_count"] == 1
+    ledger = [
+        json.loads(line)
+        for line in (
+            tmp_path / TOP40_V2_LAYOUT.team_root("team-01") / "experiments.jsonl"
+        )
+        .read_text(encoding="utf-8")
+        .splitlines()
+    ]
+    assert [row["event_type"] for row in ledger] == [
+        "trial_registration",
+        "trial_result",
+    ]
+    assert ledger[-1]["status"] == "completed"
+    assert (
+        tmp_path
+        / "reports-top40-v2/team-01/development-runs/candidate-window/daily_returns.csv"
+    ).is_file()
+    assert (
+        tmp_path
+        / "reports-top40-v2/team-01/qualification-attempts/"
+        "candidate-window.runner-record.json"
+    ).is_file()
+    with pytest.raises(ValueError, match="terminal trial result"):
+        cli._run_window(
+            _args(
+                stage="development",
+                team_id="team-01",
+                candidate_id="candidate-window",
+            )
+        )
+
+
+def test_run_window_private_consumes_ticket_and_emits_only_gate_feedback(
+    cli, tmp_path, monkeypatch
+):
+    _initialize(cli, tmp_path, monkeypatch)
+    _open_research(tmp_path)
+    _register_initial_family(cli, tmp_path)
+    config = load_config(tmp_path / CONFIG)
+    _register_completed_candidate(cli, tmp_path, config, candidate_id="candidate-1")
+    _stub_evidence(cli, monkeypatch, tmp_path, config, {"candidate-1": True})
+    development_path = _runner_record(
+        tmp_path, stage="development", candidate_id="candidate-1"
+    )
+    assert (
+        cli._record_development_assessment(
+            _args(
+                team_id="team-01",
+                runner_record=str(development_path),
+                candidate_id="candidate-1",
+                parameter_neighborhood_manifest="neighbors.json",
+                walk_forward_manifest="walk.json",
+            )
+        )
+        == 0
+    )
+    output = tmp_path / "private-feedback.json"
+
+    def fake_run_team(*_args, stage, **_kwargs):
+        return _mock_window_result(tmp_path, config, stage=stage)
+
+    monkeypatch.setattr(runner_v2, "run_team", fake_run_team)
+    assert (
+        cli._run_window(
+            _args(
+                stage="private",
+                team_id="team-01",
+                candidate_id="candidate-1",
+                json_out=str(output),
+            )
+        )
+        == 0
+    )
+
+    team = _read_state(tmp_path)["teams"]["team-01"]
+    feedback = json.loads(output.read_text(encoding="utf-8"))
+    assert team["status"] == "qualified"
+    assert team["private_attempts"] == 1
+    assert feedback["passed"] is True
+    assert feedback["feedback_mode"] == "pass-fail-only"
+    assert all("observed" not in gate for gate in feedback["gates"])
 
 
 def test_failed_development_is_research_not_submission_then_passing_candidate_freezes(
