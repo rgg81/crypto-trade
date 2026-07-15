@@ -323,15 +323,15 @@ def test_canonical_target_hash_is_clean_process_stable() -> None:
     first = _target_hash(_targets(_synthetic_context()))
     second = _target_hash(_targets(_synthetic_context()))
     assert first == second
-    assert first == "7a08069e083289a37204b6be93f2916b2219c35272c1ba4e0a2617137a3c2f03"
+    assert first == "89013d78cea4a81462a17528a7c48d4d6c7857b2a9825d9d8bb66032d934bc12"
 
 
-def test_frozen_reference_and_no_control_policy_match_qr_clarification() -> None:
+def test_frozen_current_candidate_and_no_control_policy_match_qr_decision() -> None:
     frozen = json.loads((_TEAM_DIR / "frozen_config.json").read_text(encoding="utf-8"))
     policy = json.loads((_TEAM_DIR / "risk_policy.json").read_text(encoding="utf-8"))
-    assert frozen["candidate_id"] == "rdf-ref-001"
+    assert frozen["candidate_id"] == "rdf-core-h21-k1-g05"
     assert frozen["parameters"]["residual_lookback_days"] == 21
-    assert frozen["parameters"]["skip_days"] == 3
+    assert frozen["parameters"]["skip_days"] == 1
     assert frozen["parameters"]["path_efficiency_exponent"] == 0.5
     assert frozen["parameters"]["rank_tail_fraction"] == 0.25
     assert frozen["parameters"]["direction_tilt_delta"] == 0.075

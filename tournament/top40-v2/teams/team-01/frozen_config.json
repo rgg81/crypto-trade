@@ -1,7 +1,7 @@
 {
   "artifact": "frozen_reference_config",
-  "candidate_id": "rdf-ref-001",
-  "candidate_status": "deterministic_reference_not_yet_registered_or_evaluated",
+  "candidate_id": "rdf-core-h21-k1-g05",
+  "candidate_status": "deterministic_core_candidate_not_yet_registered_or_evaluated",
   "dependencies": {
     "numpy": "2.4.3",
     "pandas": "3.0.3",
@@ -54,7 +54,7 @@
     "rank_tail_fraction": 0.25,
     "residual_denominator_floor": 1e-08,
     "residual_lookback_days": 21,
-    "skip_days": 3,
+    "skip_days": 1,
     "total_gross": 0.8
   },
   "risk_policy": {
