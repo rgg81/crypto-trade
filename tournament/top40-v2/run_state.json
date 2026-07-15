@@ -15,9 +15,9 @@
   "qualification_lock": null,
   "research_journal": {
     "genesis_sha256": "a11eee0475d514a1f022deda4e62014536f12bfb074556546645c5f8255a48ed",
-    "head_sha256": "d36d35bf352df2abff19fc5b4c16b79a0a277e20309d1859bc5d3a52d0934791",
+    "head_sha256": "371d4caf6f831cb2676f34b2b1ac52d319a37ba4909f1f12b7e9f11e5b89a548",
     "path": "tournament/top40-v2/organizer_research_journal.jsonl",
-    "record_count": 3
+    "record_count": 4
   },
   "schema_version": 2,
   "selection_lock": null,
