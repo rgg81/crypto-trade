@@ -1,6 +1,6 @@
 # team-01 QE implementation report
 
-Status: **RDF-REF-001 implemented and synthetically verified; not registered or evaluated**
+Status: **rdf-ref-001 implemented and synthetically verified; not registered or evaluated**
 
 The implementation is a faithful, stateless translation of the preregistered
 `t01-residual-drift-funding-v1` mechanism. `build_strategy()` returns a fresh strategy fixed to

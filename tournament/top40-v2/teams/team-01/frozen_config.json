@@ -1,6 +1,6 @@
 {
   "artifact": "frozen_reference_config",
-  "candidate_id": "RDF-REF-001",
+  "candidate_id": "rdf-ref-001",
   "candidate_status": "deterministic_reference_not_yet_registered_or_evaluated",
   "dependencies": {
     "numpy": "2.4.3",

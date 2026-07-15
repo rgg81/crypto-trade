@@ -1,6 +1,6 @@
 {
   "artifact": "qe_test_evidence",
-  "candidate_id": "RDF-REF-001",
+  "candidate_id": "rdf-ref-001",
   "central_evaluator_invoked": false,
   "clean_process_replays": {
     "canonical_synthetic_target_sha256": "7a08069e083289a37204b6be93f2916b2219c35272c1ba4e0a2617137a3c2f03",
@@ -15,10 +15,10 @@
     "python": "3.11.15"
   },
   "files_sha256": {
-    "frozen_config.json": "8cc4ce332259e49bcdac1cde03517cbf11cdc537715c18310b15a79af4257821",
+    "frozen_config.json": "32b0dad56b5e9a5b89054049ba646bdaf61e4bd9ba70d46e41351bcfa15b87dd",
     "risk_policy.json": "9efd1401ffec46a7767fe625d70538b1aa5a9281a46fdb1bc06e90c264dc7e5b",
-    "strategy.py": "800d26540ceb433fd4c3f73490038b9f9511bebd5e7a383eb61fabcbbc0dce72",
-    "test_strategy.py": "c8fd0eabbe3aaaaddccf0f310bc2d918d4a95a5d0350144851288e2bffea0109"
+    "strategy.py": "622b016cff6af36390fc3b05ca04b974345281e408718673c3cfc91b895c8813",
+    "test_strategy.py": "9ab136ea1616799a8530553b4ca73606ecc0334858865f0ae08828c0bd5e94b8"
   },
   "family_id": "t01-residual-drift-funding-v1",
   "result": {
@@ -37,7 +37,7 @@
     "ascending-symbol score tie break",
     "duplicate, NaN, Inf, sparse-history, missing-BTC, and one-sided-flat behavior",
     "eligible-only finite outputs with gross, net, per-symbol, and two-sleeve bounds",
-    "frozen RDF-REF-001 parameters and declarative no-control risk policy"
+    "frozen rdf-ref-001 parameters and declarative no-control risk policy"
   ],
   "team_id": "team-01"
 }

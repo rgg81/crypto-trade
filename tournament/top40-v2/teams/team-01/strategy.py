@@ -555,6 +555,6 @@ def _valid_targets(
 
 
 def build_strategy() -> ResidualDriftFundingStrategy:
-    """Return a fresh RDF-REF-001 strategy instance for the canonical worker."""
+    """Return a fresh rdf-ref-001 strategy instance for the canonical worker."""
 
     return ResidualDriftFundingStrategy(REFERENCE_PARAMETERS)

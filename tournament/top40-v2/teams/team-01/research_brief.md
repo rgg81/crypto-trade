@@ -186,7 +186,7 @@ rule. If no candidate clears every gate, there is no champion.
 
 ### 6.1 Normative initial reference/test cell
 
-The exact first implementation and test reference is `RDF-REF-001`. This is a pre-data
+The exact first implementation and test reference is `rdf-ref-001`. This is a pre-data
 clarification using only already-registered values; it neither narrows the registered search domain
 nor preselects a champion.
 

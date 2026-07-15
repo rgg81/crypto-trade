@@ -73,7 +73,7 @@ writing this package.
 ## Pre-data reference-cell clarification
 
 At `2026-07-15T19:53:41Z`, before any team-01 trial, data view, evaluator call, or result, the QR
-resolved the registered-domain tie for the initial implementation/test cell as `RDF-REF-001`:
+resolved the registered-domain tie for the initial implementation/test cell as `rdf-ref-001`:
 `H=21d`, `K=3d`, `gamma=0.5`, `q=0.25`, and `delta=0.075`, with every other baseline constant
 listed normatively in section 6.1 of `research_brief.md`. The cell uses frozen base costs, no
 enabled organizer risk controls, and runtime seed `20260801`.

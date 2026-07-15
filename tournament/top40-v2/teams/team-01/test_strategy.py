@@ -329,7 +329,7 @@ def test_canonical_target_hash_is_clean_process_stable() -> None:
 def test_frozen_reference_and_no_control_policy_match_qr_clarification() -> None:
     frozen = json.loads((_TEAM_DIR / "frozen_config.json").read_text(encoding="utf-8"))
     policy = json.loads((_TEAM_DIR / "risk_policy.json").read_text(encoding="utf-8"))
-    assert frozen["candidate_id"] == "RDF-REF-001"
+    assert frozen["candidate_id"] == "rdf-ref-001"
     assert frozen["parameters"]["residual_lookback_days"] == 21
     assert frozen["parameters"]["skip_days"] == 3
     assert frozen["parameters"]["path_efficiency_exponent"] == 0.5
