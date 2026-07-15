@@ -1,0 +1,56 @@
+{
+  "cohort_sha256": "2d6d3efa9ec6276513481959d83df7fefe782a42b977cc937cd5597d372fc01d",
+  "schema_version": 1,
+  "teams": {
+    "team-01": {
+      "artifact_manifest_sha256": "dd61b34f93d4393bf1e5859a554e9e35793da74ab0db00ca35ff2c28bfbc4043",
+      "findings": [],
+      "freeze_commit": "85af71210719004ed530c26d44e77afb81b56475"
+    },
+    "team-02": {
+      "artifact_manifest_sha256": "f7d008acda477082b5a0f444b86ebf1d26124c425aec51a119b931c325413744",
+      "findings": [],
+      "freeze_commit": "f5666db02274e69abcda62f7a9d2d44aa624a14e"
+    },
+    "team-03": {
+      "artifact_manifest_sha256": "8176c646e7bd3de97430b69e2275b050351d4b3647194906ea408649ee9c20df",
+      "findings": [],
+      "freeze_commit": "9e0c0e3a37291d76e6361a7e65b5a33645bc624a"
+    },
+    "team-04": {
+      "artifact_manifest_sha256": "708b65dc436af2f7a4b800283c14750fc5d30cc9fed59b7e4de14edaae5a6bd7",
+      "findings": [],
+      "freeze_commit": "1e444fccf37e77114f159feee635c932b87a20b0"
+    },
+    "team-05": {
+      "artifact_manifest_sha256": "bcb7542ab2e3de9255ba435b49a3f4205865eb1ff85ae7a7da30274fb2f9e005",
+      "findings": [],
+      "freeze_commit": "10c0f197b11fe35040689163b79a68560db1315f"
+    },
+    "team-06": {
+      "artifact_manifest_sha256": "ddf1fa814107b2e4f3d139dce97b71d6c0dec0a94bca7767941e9fd37eba291e",
+      "findings": [],
+      "freeze_commit": "6db6997a1f84c8285211edd9a6da80df956d301d"
+    },
+    "team-07": {
+      "artifact_manifest_sha256": "fb6203363908e980a3ac25a1e46a3f3f3363e6221daadfdca87da756470f04e3",
+      "findings": [],
+      "freeze_commit": "d4d0acca95029f74a7d0c43f1f3e283dbf6ae21d"
+    },
+    "team-08": {
+      "artifact_manifest_sha256": "89487ee617285d438668e04bc669db792dd94f883724a3d155a2416b14b8fb56",
+      "findings": [],
+      "freeze_commit": "fee68bf25c66125f7d309c495a896dce2f5f1f5c"
+    },
+    "team-09": {
+      "artifact_manifest_sha256": "cc51a77c7f3ebbb647e6f4e782f5eacc9500a02a436ae1917fc849557c283748",
+      "findings": [],
+      "freeze_commit": "ff78fd816354adbd670ebc6ff42abc9342931016"
+    },
+    "team-10": {
+      "artifact_manifest_sha256": "3436dedb9a4692a824a987fdae407f1db037c2223747e376e60f8c271bc40a27",
+      "findings": [],
+      "freeze_commit": "963fcc95e85e1d1e6f806b89a02045efd6785997"
+    }
+  }
+}

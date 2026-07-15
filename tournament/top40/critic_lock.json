@@ -1,0 +1,23 @@
+{
+  "cohort_sha256": "2d6d3efa9ec6276513481959d83df7fefe782a42b977cc937cd5597d372fc01d",
+  "critic_adjudications_path": "tournament/top40/critic_adjudications.json",
+  "critic_adjudications_sha256": "f32f4a3b117676cc5084ec0f0f22408455c82d176c009a2a1221b6d3302a2870",
+  "critic_scores_path": "tournament/top40/critic_scores.json",
+  "critic_scores_sha256": "43975e9f75d0867eddea382353afa9f302235871a9ff9f46d9a7aa0f0c1ca320",
+  "locked_at_utc": "2026-07-15T13:02:00.823639+00:00",
+  "objective_lock_sha256": "966970749e4cbbccbeb851050ce31409a88b1ab05a99073f6b75eedf78d8f8e9",
+  "parent_objective_lock_commit": "e9e74fa9af80c271414caf5fbe2a754494e2ed37",
+  "schema_version": 1,
+  "team_ids": [
+    "team-01",
+    "team-02",
+    "team-03",
+    "team-04",
+    "team-05",
+    "team-06",
+    "team-07",
+    "team-08",
+    "team-09",
+    "team-10"
+  ]
+}
