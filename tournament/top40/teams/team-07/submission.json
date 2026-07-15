@@ -1,5 +1,5 @@
 {
-  "artifact_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "artifact_manifest_sha256": "fb6203363908e980a3ac25a1e46a3f3f3363e6221daadfdca87da756470f04e3",
   "artifacts": {
     "ablations": "tournament/top40/teams/team-07/ablations.json",
     "artifact_manifest": "tournament/top40/teams/team-07/artifact_manifest.json",
@@ -26,74 +26,74 @@
     "trial_ledger": "tournament/top40/teams/team-07/experiments.jsonl"
   },
   "compliance": {
-    "append_invariance_test": false,
-    "closed_data_only": false,
-    "corrupt_future_test": false,
-    "deterministic_rerun": false,
-    "double_cost_rerun": false,
-    "fees_and_slippage_charged": false,
-    "funding_cashflows_charged": false,
-    "long_and_short_enabled": false,
-    "next_bar_execution": false,
-    "point_in_time_top40": false,
-    "public_binance_only": false
+    "append_invariance_test": true,
+    "closed_data_only": true,
+    "corrupt_future_test": true,
+    "deterministic_rerun": true,
+    "double_cost_rerun": true,
+    "fees_and_slippage_charged": true,
+    "funding_cashflows_charged": true,
+    "long_and_short_enabled": true,
+    "next_bar_execution": true,
+    "point_in_time_top40": true,
+    "public_binance_only": true
   },
   "confidence_intervals": {
     "double_cost_oos_net_sharpe_95": [
-      0.0,
-      0.0
+      -1.037458050864522,
+      1.345540863630892
     ],
     "is_net_sharpe_95": [
-      0.0,
-      0.0
+      -0.33124701003639123,
+      1.3648603591551471
     ],
     "public_oos_net_sharpe_95": [
-      0.0,
-      0.0
+      -0.9633446602151154,
+      1.4403932446851757
     ]
   },
-  "config_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-  "data_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-  "dependency_lock_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-  "double_cost_oos_sharpe": 0.0,
+  "config_sha256": "030a065f75f9c4adb7484065908f4379435929609d446be0de0a831d9e28ee0a",
+  "data_manifest_sha256": "077eb036d262befec80f7013084fe6906859f7c3bbe2f8c193c9d9ec68e367c3",
+  "dependency_lock_sha256": "869cd3380346a9c9a219fc762868e23cd494a18e22dd9b314ba18621d991faa5",
+  "double_cost_oos_sharpe": 0.004151153551614452,
   "entrypoint": "tournament/top40/teams/team-07/strategy.py",
-  "evaluator_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-  "freeze_commit": "0000000",
+  "evaluator_sha256": "508f56af0b4fe2636933909977cdbcfbb38e4ff821072dbf12b35bfb04d3af66",
+  "freeze_commit": "d4d0acca95029f74a7d0c43f1f3e283dbf6ae21d",
   "in_sample": {
     "end": "2024-06-30",
     "metrics": {
-      "annualized_return": 0.0,
-      "calmar": 0.0,
-      "max_drawdown": 0.0,
-      "net_sharpe": 0.0,
-      "net_sortino": 0.0,
-      "positive_quarter_fraction": 0.0
+      "annualized_return": 0.058096538792898667,
+      "calmar": 0.468714518023981,
+      "max_drawdown": 0.12394866503777946,
+      "net_sharpe": 0.48992894779325435,
+      "net_sortino": 0.7268363723544494,
+      "positive_quarter_fraction": 0.6111111111111112
     },
     "start": "2020-02-03"
   },
   "public_oos": {
     "end": "2026-06-30",
     "metrics": {
-      "annualized_return": 0.0,
-      "calmar": 0.0,
-      "max_drawdown": 0.0,
-      "net_sharpe": 0.0,
-      "net_sortino": 0.0,
-      "positive_quarter_fraction": 0.0
+      "annualized_return": -0.003976519674031342,
+      "calmar": -0.021005519205283152,
+      "max_drawdown": 0.18930832583425017,
+      "net_sharpe": 0.0853949471119124,
+      "net_sortino": 0.1057931764338935,
+      "positive_quarter_fraction": 0.625
     },
     "start": "2024-07-01"
   },
   "regime_sharpe": {
-    "bear": 0.0,
-    "bull": 0.0,
-    "chop": 0.0,
-    "stress": 0.0
+    "bear": 0.037659167103278976,
+    "bull": 0.7720232074144094,
+    "chop": 0.11217551575777744,
+    "stress": -4.089332622382871
   },
   "seeds": [
     20260713
   ],
-  "strategy_name": "REPLACE_WITH_FRESH_STRATEGY_NAME",
-  "strategy_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "strategy_name": "Slow Residual Momentum with Breadth Brake",
+  "strategy_sha256": "d1161852adc9fbf525686705f30b9353eddaf072edf490a7a3270450751eeb73",
   "team_id": "team-07",
-  "trial_count": 1
+  "trial_count": 2
 }
