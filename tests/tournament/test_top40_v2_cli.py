@@ -291,6 +291,7 @@ def test_failed_development_is_research_not_submission_then_passing_candidate_fr
     assert team["status"] == "qualifier_candidate_frozen"
     assert team["trial_count"] == 2
     assert team["qualifier_candidate"]["candidate_id"] == "candidate-1"
+    assert len(team["qualifier_candidate"]["source_bundle_sha256"]) == 64
 
 
 def test_development_assessment_requires_a_preregistered_family(cli, tmp_path, monkeypatch):
@@ -365,6 +366,31 @@ def test_private_assessment_cli_hides_numeric_feedback_by_default(
     assert feedback["feedback_mode"] == "pass-fail-only"
     assert feedback["passed"] is True
     assert all("observed" not in gate for gate in feedback["gates"])
+
+
+def test_private_ticket_rejects_any_post_development_source_bundle_change(
+    cli, tmp_path, monkeypatch
+):
+    _initialize(cli, tmp_path, monkeypatch)
+    _open_research(tmp_path)
+    _register_initial_family(cli, tmp_path)
+    config = load_config(tmp_path / CONFIG)
+    development = _development_evidence(tmp_path, config, trial_count=2)
+    development_path = tmp_path / "development.json"
+    _write_json(development_path, development)
+    assert cli._record_development_assessment(
+        _args(team_id="team-01", evidence=str(development_path))
+    ) == 0
+
+    bootstrap = tmp_path / TOP40_V2_LAYOUT.team_root("team-01") / "BOOTSTRAP.md"
+    bootstrap.write_text(bootstrap.read_text(encoding="utf-8") + "changed\n", encoding="utf-8")
+    private_path = tmp_path / "private.json"
+    _write_json(private_path, _private_evidence(tmp_path, config, development))
+
+    with pytest.raises(ValueError, match="frozen development candidate"):
+        cli._record_private_assessment(
+            _args(team_id="team-01", evidence=str(private_path))
+        )
 
 
 def test_close_and_finalist_lock_advance_only_qualified_teams(cli, tmp_path, monkeypatch):

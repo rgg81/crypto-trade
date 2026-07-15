@@ -346,6 +346,8 @@ def _identity_bindings(
     team_id: str,
     raw: Mapping[str, Any],
 ) -> dict[str, Any]:
+    from crypto_trade.tournament.runner_v2 import source_bundle_fingerprint
+
     if raw.get("team_id") != team_id:
         raise ValueError("qualification evidence team_id differs from the command")
     candidate_id = _nonempty_text(raw.get("candidate_id"), "candidate_id", maximum=128)
@@ -369,10 +371,16 @@ def _identity_bindings(
         raise ValueError("qualification evidence strategy_sha256 differs from strategy.py")
     if raw.get("risk_policy_sha256") != risk_sha256:
         raise ValueError("qualification evidence risk_policy_sha256 differs from risk_policy.json")
+    source_bundle_sha256, _source_entries = source_bundle_fingerprint(
+        root,
+        team_id,
+        f"{TOP40_V2_LAYOUT.team_root(team_id)}/strategy.py",
+    )
     return {
         "candidate_id": candidate_id,
         "strategy_sha256": strategy_sha256,
         "risk_policy_sha256": risk_sha256,
+        "source_bundle_sha256": source_bundle_sha256,
         "config_sha256": config.sha256,
         "trial_count": trial_count,
     }
@@ -392,7 +400,7 @@ def _assess_qualification(args: argparse.Namespace) -> int:
     config = _config(root, args.config)
     raw, payload = _read_json(args.evidence, "qualification evidence")
     assessment = _assessment(raw, payload, config, args.stage)
-    include = args.stage == "development" or args.include_private_observations
+    include = args.stage == "development"
     _emit(_assessment_output(assessment, include_observations=include), args.json_out)
     return 0 if assessment.passed else 1
 
@@ -468,6 +476,7 @@ def _record_private_assessment(args: argparse.Namespace) -> int:
                     "candidate_id",
                     "strategy_sha256",
                     "risk_policy_sha256",
+                    "source_bundle_sha256",
                     "config_sha256",
                     "trial_count",
                 )
@@ -980,11 +989,6 @@ def build_parser() -> argparse.ArgumentParser:
     assess = commands.add_parser("assess-qualification", help="apply non-compensatory gates")
     assess.add_argument("stage", choices=("development", "private"))
     assess.add_argument("evidence")
-    assess.add_argument(
-        "--include-private-observations",
-        action="store_true",
-        help="organizer-only: include sealed private metrics and thresholds",
-    )
     _common_config(assess)
 
     register = commands.add_parser("register-family", help="register the initial mechanism family")
