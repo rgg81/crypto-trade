@@ -42,6 +42,33 @@ TEAM_STATUSES = (
 TERMINAL_QUALIFICATION_STATUSES = frozenset({"qualified", "dnf"})
 _SHA256 = re.compile(r"[0-9a-f]{64}")
 
+PHASE0_FROZEN_FILES = (
+    "TOURNAMENT-CHARTER-TOP40-V2.md",
+    "pyproject.toml",
+    "uv.lock",
+    TOP40_V2_LAYOUT.config_path,
+    f"{TOP40_V2_LAYOUT.tournament_root}/README.md",
+    f"{TOP40_V2_LAYOUT.tournament_root}/PHASE0-POLICY.md",
+    f"{TOP40_V2_LAYOUT.tournament_root}/METHODOLOGY-DISTILLATION.md",
+    f"{TOP40_V2_LAYOUT.tournament_root}/templates/development-qualification-evidence.schema.json",
+    f"{TOP40_V2_LAYOUT.tournament_root}/templates/family-registration.schema.json",
+    f"{TOP40_V2_LAYOUT.tournament_root}/templates/private-qualification-evidence.schema.json",
+    f"{TOP40_V2_LAYOUT.tournament_root}/templates/risk-policy.json",
+    f"{TOP40_V2_LAYOUT.tournament_root}/templates/risk-policy.schema.json",
+    TOP40_V2_LAYOUT.orchestrator_script,
+    TOP40_V2_LAYOUT.contract_source,
+    "src/crypto_trade/tournament/layout.py",
+    "src/crypto_trade/tournament/qualification.py",
+    "src/crypto_trade/tournament/risk_policy.py",
+    "src/crypto_trade/tournament/data.py",
+    "src/crypto_trade/tournament/metrics.py",
+    "src/crypto_trade/tournament/protocol.py",
+    "src/crypto_trade/tournament/snapshot.py",
+    "src/crypto_trade/tournament/engine_v2.py",
+    "src/crypto_trade/tournament/runner_v2.py",
+    "src/crypto_trade/tournament/_strategy_worker_v2.py",
+)
+
 
 @dataclasses.dataclass(frozen=True)
 class LoadedV2Config:
@@ -60,6 +87,23 @@ class LoadedV2Config:
             "stability": qualification["stability"],
             "walk_forward_folds": self.raw["statistics"]["walk_forward_folds"],
         }
+
+
+@dataclasses.dataclass(frozen=True)
+class WindowMetrics:
+    net_sharpe: float
+    net_sortino: float
+    calmar: float
+    annualized_return: float
+    max_drawdown: float
+    positive_quarter_fraction: float
+
+
+@dataclasses.dataclass(frozen=True)
+class EvaluationWindow:
+    start: str
+    end: str
+    metrics: WindowMetrics
 
 
 def _safe_relative(value: Any, label: str) -> str:
@@ -118,9 +162,11 @@ def _date(value: Any, label: str) -> datetime:
 
 
 def _require_keys(raw: Mapping[str, Any], keys: Sequence[str], label: str) -> None:
-    missing = [key for key in keys if key not in raw]
-    if missing:
-        raise ValueError(f"{label} missing keys: {missing}")
+    expected = set(keys)
+    if set(raw) != expected:
+        missing = sorted(expected - set(raw))
+        extra = sorted(set(raw) - expected)
+        raise ValueError(f"{label} has invalid keys; missing={missing}, extra={extra}")
 
 
 def _validate_config(raw: Mapping[str, Any], layout: TournamentLayout) -> None:
@@ -134,6 +180,7 @@ def _validate_config(raw: Mapping[str, Any], layout: TournamentLayout) -> None:
             "paths",
             "data",
             "splits",
+            "universe",
             "execution",
             "risk_policy",
             "regimes",
@@ -153,6 +200,11 @@ def _validate_config(raw: Mapping[str, Any], layout: TournamentLayout) -> None:
     paths = raw["paths"]
     if not isinstance(paths, Mapping):
         raise ValueError("config.paths must be a table")
+    _require_keys(
+        paths,
+        ("tournament_root", "reports_root", "shared_snapshot_manifest", "snapshot_dir"),
+        "config.paths",
+    )
     if (
         _safe_relative(paths.get("tournament_root"), "paths.tournament_root")
         != layout.tournament_root
@@ -160,21 +212,45 @@ def _validate_config(raw: Mapping[str, Any], layout: TournamentLayout) -> None:
         raise ValueError("paths.tournament_root differs from the V2 layout")
     if _safe_relative(paths.get("reports_root"), "paths.reports_root") != layout.reports_root:
         raise ValueError("paths.reports_root differs from the V2 layout")
-    _safe_relative(paths.get("shared_snapshot_manifest"), "paths.shared_snapshot_manifest")
-    _safe_relative(paths.get("snapshot_dir"), "paths.snapshot_dir")
+    if (
+        _safe_relative(paths.get("shared_snapshot_manifest"), "paths.shared_snapshot_manifest")
+        != "tournament/top40/data_manifest.json"
+        or _safe_relative(paths.get("snapshot_dir"), "paths.snapshot_dir")
+        != "data/top40/snapshot-v1"
+    ):
+        raise ValueError("config.paths must bind the shared immutable V1 snapshot")
 
     data = raw["data"]
-    if not isinstance(data, Mapping) or (
-        data.get("source") != "binance-public-usdm"
-        or data.get("transaction_interval") != "8h"
-        or data.get("hard_end_exclusive") != "2026-07-01"
-        or data.get("snapshot_binding") != "shared-immutable-v1-by-sha256"
-    ):
+    expected_data = {
+        "source": "binance-public-usdm",
+        "venue": "binance-usdm",
+        "instrument": "linear-usdt-perpetual",
+        "transaction_interval": "8h",
+        "mark_price_interval": "1h",
+        "warmup_start": "2020-01-01",
+        "hard_end_exclusive": "2026-07-01",
+        "snapshot_binding": "shared-immutable-v1-by-sha256",
+    }
+    if not isinstance(data, Mapping) or dict(data) != expected_data:
         raise ValueError("config.data differs from the V2 common-data contract")
 
     splits = raw["splits"]
     if not isinstance(splits, Mapping):
         raise ValueError("config.splits must be a table")
+    _require_keys(
+        splits,
+        (
+            "visible_development_start",
+            "visible_development_end_inclusive",
+            "private_qualifier_start",
+            "private_qualifier_end_inclusive",
+            "final_oos_start",
+            "final_oos_end_inclusive",
+            "private_qualifier_feedback",
+            "team_oos_visibility_before_finalist_lock",
+        ),
+        "config.splits",
+    )
     development_start = _date(splits.get("visible_development_start"), "development start")
     development_end = _date(
         splits.get("visible_development_end_inclusive"), "development end"
@@ -200,15 +276,43 @@ def _validate_config(raw: Mapping[str, Any], layout: TournamentLayout) -> None:
     if (
         splits.get("private_qualifier_feedback") != "pass-fail-only"
         or splits.get("team_oos_visibility_before_finalist_lock") is not False
+        or splits.get("visible_development_start") != "2020-02-03"
+        or splits.get("visible_development_end_inclusive") != "2023-06-30"
+        or splits.get("private_qualifier_start") != "2023-07-01"
+        or splits.get("private_qualifier_end_inclusive") != "2024-06-30"
+        or splits.get("final_oos_start") != "2024-07-01"
+        or splits.get("final_oos_end_inclusive") != "2026-06-30"
     ):
         raise ValueError("private/OOS visibility controls cannot be weakened")
 
+    universe = raw["universe"]
+    expected_universe = {
+        "size": 40,
+        "reconstitution": "weekly-monday-00:00-utc",
+        "liquidity_measure": "median-daily-quote-volume",
+        "trailing_days": 30,
+        "minimum_history_days": 30,
+    }
+    if not isinstance(universe, Mapping) or dict(universe) != expected_universe:
+        raise ValueError("config.universe differs from the shared Top-40 contract")
+
     execution = raw["execution"]
+    expected_execution = {
+        "base_interval": "8h",
+        "initial_equity_usdt": 100000.0,
+        "taker_fee_bps_per_side": 5.0,
+        "slippage_bps_per_side": 2.5,
+        "max_gross_exposure": 1.0,
+        "max_abs_net_exposure": 0.25,
+        "max_symbol_exposure": 0.10,
+        "max_bar_participation": 0.001,
+        "double_cost_multiplier": 2.0,
+        "annualization_days": 365,
+        "funding_at_rebalance_order": "funding-on-carried-position-then-risk-then-rebalance",
+    }
     if not isinstance(execution, Mapping) or (
-        execution.get("base_interval") != "8h"
-        or _finite(execution.get("double_cost_multiplier"), "double_cost_multiplier") != 2
-        or execution.get("funding_at_rebalance_order")
-        != "funding-on-carried-position-then-risk-then-rebalance"
+        set(execution) != set(expected_execution)
+        or any(execution.get(key) != value for key, value in expected_execution.items())
     ):
         raise ValueError("config.execution differs from the V2 execution contract")
     for name in (
@@ -226,19 +330,41 @@ def _validate_config(raw: Mapping[str, Any], layout: TournamentLayout) -> None:
         raise ValueError("annualization_days must be 365")
 
     risk = raw["risk_policy"]
+    expected_risk = {
+        "schema_version": 1,
+        "organizer_owned_execution": True,
+        "intrabar_stop_fills_allowed": False,
+        "close_confirmed_stop_execution": "next-open",
+        "same_boundary_reentry_default": False,
+        "risk_actions_pay_normal_costs": True,
+        "risk_actions_share_participation_capacity": True,
+    }
     if not isinstance(risk, Mapping) or (
-        risk.get("schema_version") != 1
-        or risk.get("organizer_owned_execution") is not True
-        or risk.get("intrabar_stop_fills_allowed") is not False
-        or risk.get("close_confirmed_stop_execution") != "next-open"
-        or risk.get("risk_actions_pay_normal_costs") is not True
-        or risk.get("risk_actions_share_participation_capacity") is not True
+        set(risk) != set(expected_risk)
+        or any(risk.get(key) != value for key, value in expected_risk.items())
     ):
         raise ValueError("config.risk_policy weakens the V2 risk contract")
+
+    regimes = raw["regimes"]
+    expected_regimes = {
+        "stress_trailing_days": 30,
+        "stress_annualized_btc_vol": 0.80,
+        "direction_trailing_days": 60,
+        "bull_btc_return": 0.10,
+        "bear_btc_return": -0.10,
+        "lag_days": 1,
+    }
+    if not isinstance(regimes, Mapping) or dict(regimes) != expected_regimes:
+        raise ValueError("config.regimes differs from the canonical lagged regime map")
 
     statistics = raw["statistics"]
     if not isinstance(statistics, Mapping):
         raise ValueError("config.statistics must be a table")
+    _require_keys(
+        statistics,
+        ("bootstrap_samples", "bootstrap_block_days", "bootstrap_seed", "walk_forward_folds"),
+        "config.statistics",
+    )
     _integer(statistics.get("bootstrap_samples"), "bootstrap_samples", minimum=100)
     _integer(statistics.get("bootstrap_block_days"), "bootstrap_block_days", minimum=1)
     _integer(statistics.get("walk_forward_folds"), "walk_forward_folds", minimum=2)
@@ -246,16 +372,43 @@ def _validate_config(raw: Mapping[str, Any], layout: TournamentLayout) -> None:
     qualification = raw["qualification"]
     if not isinstance(qualification, Mapping):
         raise ValueError("config.qualification must be a table")
+    _require_keys(
+        qualification,
+        ("development", "private", "regimes", "sleeves", "stability"),
+        "config.qualification",
+    )
     for section in ("development", "private", "regimes", "sleeves", "stability"):
         if not isinstance(qualification.get(section), Mapping):
             raise ValueError(f"qualification.{section} must be a table")
     development = qualification["development"]
+    _require_keys(
+        development,
+        (
+            "minimum_net_sharpe",
+            "minimum_annualized_return",
+            "minimum_calmar",
+            "maximum_drawdown",
+            "minimum_double_cost_sharpe",
+            "minimum_positive_folds",
+            "minimum_positive_quarter_fraction",
+            "minimum_trial_adjusted_probability_positive",
+        ),
+        "qualification.development",
+    )
     if (
         _finite(development.get("minimum_net_sharpe"), "minimum_net_sharpe") < 0.75
+        or _finite(development.get("minimum_annualized_return"), "minimum_annualized_return")
+        < 0.0
         or _finite(development.get("minimum_calmar"), "minimum_calmar") < 0.4
         or _fraction(development.get("maximum_drawdown"), "maximum_drawdown") > 0.30
         or _finite(development.get("minimum_double_cost_sharpe"), "minimum_double_cost_sharpe")
         < 0.35
+        or _integer(development.get("minimum_positive_folds"), "minimum_positive_folds") < 4
+        or _fraction(
+            development.get("minimum_positive_quarter_fraction"),
+            "minimum_positive_quarter_fraction",
+        )
+        < 0.55
         or _fraction(
             development.get("minimum_trial_adjusted_probability_positive"),
             "minimum_trial_adjusted_probability_positive",
@@ -264,16 +417,153 @@ def _validate_config(raw: Mapping[str, Any], layout: TournamentLayout) -> None:
     ):
         raise ValueError("development qualification thresholds cannot be weaker than the charter")
     private = qualification["private"]
+    _require_keys(
+        private,
+        (
+            "minimum_net_sharpe",
+            "minimum_annualized_return",
+            "maximum_drawdown",
+            "minimum_double_cost_sharpe",
+            "minimum_positive_quarter_fraction",
+            "maximum_attempts",
+        ),
+        "qualification.private",
+    )
     if (
         _finite(private.get("minimum_net_sharpe"), "private minimum_net_sharpe") < 0.50
+        or _finite(
+            private.get("minimum_annualized_return"), "private minimum_annualized_return"
+        )
+        < 0.0
         or _fraction(private.get("maximum_drawdown"), "private maximum_drawdown") > 0.30
+        or _finite(
+            private.get("minimum_double_cost_sharpe"), "private minimum_double_cost_sharpe"
+        )
+        < 0.0
+        or _fraction(
+            private.get("minimum_positive_quarter_fraction"),
+            "private minimum_positive_quarter_fraction",
+        )
+        < 0.50
         or _integer(private.get("maximum_attempts"), "private maximum_attempts", minimum=1) != 1
     ):
         raise ValueError("private qualification thresholds cannot be weaker than the charter")
 
+    regime_gates = qualification["regimes"]
+    _require_keys(
+        regime_gates,
+        (
+            "required_positive_return_regimes",
+            "minimum_positive_sharpe_regimes",
+            "minimum_worst_regime_sharpe",
+            "require_long_bull_positive",
+            "require_short_bear_positive",
+            "require_combined_chop_positive",
+        ),
+        "qualification.regimes",
+    )
+    if (
+        regime_gates.get("required_positive_return_regimes") != ["bull", "bear", "chop"]
+        or _integer(
+            regime_gates.get("minimum_positive_sharpe_regimes"),
+            "minimum_positive_sharpe_regimes",
+        )
+        < 3
+        or _finite(
+            regime_gates.get("minimum_worst_regime_sharpe"),
+            "minimum_worst_regime_sharpe",
+        )
+        < -0.25
+        or any(
+            regime_gates.get(name) is not True
+            for name in (
+                "require_long_bull_positive",
+                "require_short_bear_positive",
+                "require_combined_chop_positive",
+            )
+        )
+    ):
+        raise ValueError("regime and sleeve-role gates cannot be weaker than the charter")
+
+    sleeve_gates = qualification["sleeves"]
+    _require_keys(
+        sleeve_gates,
+        (
+            "minimum_side_exposure",
+            "minimum_side_active_bar_fraction",
+            "minimum_mean_side_exposure",
+            "minimum_side_executed_notional_usdt",
+        ),
+        "qualification.sleeves",
+    )
+    if (
+        _fraction(sleeve_gates.get("minimum_side_exposure"), "minimum_side_exposure") < 0.01
+        or _fraction(
+            sleeve_gates.get("minimum_side_active_bar_fraction"),
+            "minimum_side_active_bar_fraction",
+        )
+        < 0.10
+        or _fraction(
+            sleeve_gates.get("minimum_mean_side_exposure"),
+            "minimum_mean_side_exposure",
+        )
+        < 0.01
+        or _finite(
+            sleeve_gates.get("minimum_side_executed_notional_usdt"),
+            "minimum_side_executed_notional_usdt",
+        )
+        < 1000.0
+    ):
+        raise ValueError("sleeve materiality gates cannot be weaker than the charter")
+
+    stability_gates = qualification["stability"]
+    _require_keys(
+        stability_gates,
+        (
+            "minimum_profitable_neighbor_fraction",
+            "minimum_neighbor_median_sharpe",
+            "maximum_positive_pnl_concentration",
+        ),
+        "qualification.stability",
+    )
+    if (
+        _fraction(
+            stability_gates.get("minimum_profitable_neighbor_fraction"),
+            "minimum_profitable_neighbor_fraction",
+        )
+        < 0.70
+        or _finite(
+            stability_gates.get("minimum_neighbor_median_sharpe"),
+            "minimum_neighbor_median_sharpe",
+        )
+        < 0.50
+        or _fraction(
+            stability_gates.get("maximum_positive_pnl_concentration"),
+            "maximum_positive_pnl_concentration",
+        )
+        > 0.40
+    ):
+        raise ValueError("parameter stability gates cannot be weaker than the charter")
+
     research = raw["research_budget"]
     if not isinstance(research, Mapping):
         raise ValueError("config.research_budget must be a table")
+    _require_keys(
+        research,
+        (
+            "maximum_material_configurations_per_team",
+            "maximum_mechanism_pivots_per_team",
+            "maximum_private_qualifier_attempts_per_team",
+            "maximum_final_oos_views_per_team",
+            "maximum_cpu_hours_per_team",
+            "maximum_wall_clock_hours_per_team",
+            "deadline_utc",
+            "strategy_seed",
+            "trial_seed_namespace",
+            "append_only_trial_log_required",
+        ),
+        "config.research_budget",
+    )
     if (
         _integer(
             research.get("maximum_material_configurations_per_team"),
@@ -297,13 +587,45 @@ def _validate_config(raw: Mapping[str, Any], layout: TournamentLayout) -> None:
             "maximum_final_oos_views_per_team",
         )
         != 0
+        or not 0 < _finite(
+            research.get("maximum_cpu_hours_per_team"), "maximum_cpu_hours_per_team"
+        )
+        <= 12.0
+        or not 0 < _finite(
+            research.get("maximum_wall_clock_hours_per_team"),
+            "maximum_wall_clock_hours_per_team",
+        )
+        <= 18.0
     ):
         raise ValueError("research budgets exceed the V2 charter")
     _utc_timestamp(research.get("deadline_utc"), "research deadline")
+    strategy_seed = _integer(research.get("strategy_seed"), "strategy_seed")
+    if strategy_seed > 2**32 - 1:
+        raise ValueError("strategy_seed must fit PYTHONHASHSEED")
+    if (
+        research.get("trial_seed_namespace") != "20260801NN"
+        or research.get("append_only_trial_log_required") is not True
+    ):
+        raise ValueError("trial seeds and append-only accounting must remain canonical")
 
     scoring = raw["scoring"]
     if not isinstance(scoring, Mapping):
         raise ValueError("config.scoring must be a table")
+    _require_keys(
+        scoring,
+        (
+            "automatic_weight",
+            "critic_weight",
+            "user_weight",
+            "automatic_absolute_points",
+            "automatic_relative_points",
+            "require_is_qualification",
+            "zero_finalists_result",
+            "dnf_is_not_a_submission",
+            "absolute_anchors",
+        ),
+        "config.scoring",
+    )
     weights = tuple(
         _finite(scoring.get(name), f"scoring.{name}")
         for name in ("automatic_weight", "critic_weight", "user_weight")
@@ -322,6 +644,68 @@ def _validate_config(raw: Mapping[str, Any], layout: TournamentLayout) -> None:
         or scoring.get("zero_finalists_result") != "no-qualified-model"
     ):
         raise ValueError("scoring cannot bypass qualification or fabricate DNF submissions")
+    anchors = scoring["absolute_anchors"]
+    expected_anchors = {
+        "oos_sharpe_zero": 0.0,
+        "oos_sharpe_full": 1.5,
+        "oos_drawdown_full": 0.15,
+        "oos_drawdown_zero": 0.40,
+        "double_cost_sharpe_zero": 0.0,
+        "double_cost_sharpe_full": 0.75,
+    }
+    if not isinstance(anchors, Mapping) or dict(anchors) != expected_anchors:
+        raise ValueError("absolute scoring anchors differ from the V2 charter")
+
+    paper = raw["paper_eligibility"]
+    if not isinstance(paper, Mapping):
+        raise ValueError("config.paper_eligibility must be a table")
+    _require_keys(
+        paper,
+        (
+            "minimum_development_net_sharpe",
+            "minimum_private_net_sharpe",
+            "minimum_final_oos_net_sharpe",
+            "minimum_double_cost_oos_sharpe",
+            "maximum_final_oos_drawdown",
+            "minimum_positive_quarter_fraction",
+            "minimum_worst_regime_sharpe",
+            "minimum_positive_regimes",
+        ),
+        "config.paper_eligibility",
+    )
+    if (
+        _finite(
+            paper.get("minimum_development_net_sharpe"),
+            "minimum_development_net_sharpe",
+        )
+        < 0.75
+        or _finite(paper.get("minimum_private_net_sharpe"), "minimum_private_net_sharpe")
+        < 0.50
+        or _finite(
+            paper.get("minimum_final_oos_net_sharpe"), "minimum_final_oos_net_sharpe"
+        )
+        < 1.0
+        or _finite(
+            paper.get("minimum_double_cost_oos_sharpe"),
+            "minimum_double_cost_oos_sharpe",
+        )
+        < 0.50
+        or _fraction(
+            paper.get("maximum_final_oos_drawdown"), "maximum_final_oos_drawdown"
+        )
+        > 0.30
+        or _fraction(
+            paper.get("minimum_positive_quarter_fraction"),
+            "minimum_positive_quarter_fraction",
+        )
+        < 0.625
+        or _finite(
+            paper.get("minimum_worst_regime_sharpe"), "minimum_worst_regime_sharpe"
+        )
+        < -0.25
+        or _integer(paper.get("minimum_positive_regimes"), "minimum_positive_regimes") < 3
+    ):
+        raise ValueError("paper eligibility thresholds cannot be weaker than the charter")
 
 
 def load_config(
@@ -390,6 +774,7 @@ def new_run_state(
         "created_at_utc": created,
         "config_path": TOP40_V2_LAYOUT.config_path,
         "config_sha256": config.sha256,
+        "research_journal": None,
         "phase0": None,
         "qualification_lock": None,
         "finalist_cohort_lock": None,
@@ -410,6 +795,7 @@ def validate_run_state(state: Mapping[str, Any], config: LoadedV2Config) -> None
         "created_at_utc",
         "config_path",
         "config_sha256",
+        "research_journal",
         "phase0",
         "qualification_lock",
         "finalist_cohort_lock",
@@ -430,6 +816,21 @@ def validate_run_state(state: Mapping[str, Any], config: LoadedV2Config) -> None
         or state.get("config_sha256") != config.sha256
     ):
         raise ValueError("run state is not bound to the current V2 config")
+    journal = state.get("research_journal")
+    if journal is not None:
+        if not isinstance(journal, Mapping) or set(journal) != {
+            "path",
+            "genesis_sha256",
+            "head_sha256",
+            "record_count",
+        }:
+            raise ValueError("run state research journal binding is malformed")
+        if journal["path"] != TOP40_V2_LAYOUT.organizer_journal_path:
+            raise ValueError("run state research journal path is noncanonical")
+        for field in ("genesis_sha256", "head_sha256"):
+            if not isinstance(journal[field], str) or _SHA256.fullmatch(journal[field]) is None:
+                raise ValueError(f"run state research journal {field} is invalid")
+        _integer(journal["record_count"], "research_journal.record_count", minimum=1)
     teams = state.get("teams")
     if not isinstance(teams, Mapping) or set(teams) != set(TEAM_IDS):
         raise ValueError("run state must contain all ten teams exactly once")

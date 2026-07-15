@@ -108,7 +108,7 @@ variable-size finalist cohort. Zero finalists ends as `no_qualified_model`.
 V2 supports organizer-owned declarative risk controls using authoritative portfolio state.
 Permitted controls initially include volatility targeting, portfolio drawdown brakes,
 close-confirmed position stops, time stops, loss cooldowns, side scaling, turnover limits, and
-liquidity/breadth gates.
+centrally enforced exposure limits.
 
 With 8h bars, no policy receives an intrabar fill. Funding is charged to the carried position,
 risk is evaluated from known boundary state, and any reduction fills at the next open with ordinary

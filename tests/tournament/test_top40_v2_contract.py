@@ -56,6 +56,23 @@ def test_config_enforces_zero_oos_views_and_hard_qualification():
         _validate_config(weakened, TOP40_V2_LAYOUT)
 
 
+@pytest.mark.parametrize(
+    ("section", "field", "value", "message"),
+    (
+        ("paths", "shared_snapshot_manifest", "tournament/top40-v2/fake.json", "snapshot"),
+        ("execution", "taker_fee_bps_per_side", 0.0, "execution contract"),
+        ("regimes", "lag_days", 0, "regime map"),
+        ("qualification", "unexpected", {}, "invalid keys"),
+    ),
+)
+def test_config_rejects_contract_drift(section, field, value, message):
+    config = _config()
+    changed = deepcopy(config.raw)
+    changed[section][field] = value
+    with pytest.raises(ValueError, match=message):
+        _validate_config(changed, TOP40_V2_LAYOUT)
+
+
 def test_new_state_tracks_ten_entrants_without_fabricating_finalists():
     config = _config()
     state = new_run_state(config, created_at_utc="2026-07-15T12:00:00+00:00")
