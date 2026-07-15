@@ -1,0 +1,15 @@
+{
+  "candidate_id": "rdf-core-h21-k3-g10",
+  "config_sha256": "bd0e4f70bcf335b2ac4e44ec049b89b8e8eaf4c6ac6502574d0accf12d9d9947",
+  "organizer_journal_head_sha256": "77f5e844c597bfa40496815c3fb9575b073d57ebe964f42c5881ce08b1bcff3f",
+  "private_attempt_number": null,
+  "registration_sha256": "22894f66d8589cb4d5c3bbd2feaf2a853b166f533efc3b98e32c5d09511cd336",
+  "reserved_at_utc": "2026-07-15T23:15:19.086614+00:00",
+  "risk_policy_sha256": "9efd1401ffec46a7767fe625d70538b1aa5a9281a46fdb1bc06e90c264dc7e5b",
+  "schema_version": 1,
+  "source_bundle_sha256": "c2bb2ebe06b80ac7cf0a1c41c31838fd6153c06bfb1bb540ae9d27e8b129ec89",
+  "stage": "development",
+  "strategy_sha256": "127449e75cdd3ec17f63bf7c36e3639568829501e16fe5e362203e53e1b6b773",
+  "team_id": "team-01",
+  "tournament": "quant-portfolio-blind-top40-v2"
+}
