@@ -1,0 +1,39 @@
+{
+  "economic_thesis": "After subtracting the contemporaneous eligible-crypto median return, medium/slow relative leaders and laggards should persist when the common crypto path is directional, while six-bar relative overshoots should revert when that path is inefficient. A causal efficiency mixture and balanced rank sleeves should express both effects without market direction or funding carry.",
+  "expected_regime_roles": {
+    "bear": "Directional mixing emphasizes continuation; persistent residual losers populate the short sleeve, which must contribute positively in bear observations.",
+    "bull": "Directional mixing emphasizes continuation; residual leaders populate the long sleeve, which must contribute positively in bull observations.",
+    "chop": "Low path efficiency emphasizes six-bar residual reversal; the combined balanced book must contribute positively.",
+    "long_sleeve": "Own the five highest causal ensemble ranks at 0.08 each and satisfy all frozen long-side activity, notional, and bull-attribution gates.",
+    "short_sleeve": "Short the five lowest causal ensemble ranks at -0.08 each and satisfy all frozen short-side activity, notional, and bear-attribution gates.",
+    "stress": "Maintain balanced raw targets while organizer-owned next-open volatility, drawdown, position-stop, and turnover controls are evaluated prospectively."
+  },
+  "family_id": "t10-residual-trend-reversion-ensemble-v1",
+  "falsifier": "Reject or pivot if any development, regime, sleeve, fold, quarter, doubled-cost, concentration, or neighborhood gate fails; if adaptive mixing is not robust relative to pure-mode controls; or if removing cross-sectional residualization does not weaken the proposed mechanism. DNF rather than submit a negative model.",
+  "mechanism": "At each 8h close, subtract the eligible-crypto cross-sectional median return, compute studentized residual sums over 6/18/63 bars, robustly standardize them, and mix medium/slow continuation with fast reversal using a causal 63-bar common-market path-efficiency share. Rank deterministically into equal-gross five-coin long and short sleeves.",
+  "parameter_ranges": {
+    "efficiency_lower": [0.1, 0.12, 0.14],
+    "efficiency_upper": [0.28, 0.32, 0.36],
+    "ensemble_mode": ["adaptive", "equal_blend", "reversion_only", "trend_only"],
+    "fast_horizon_bars": [4, 6, 8],
+    "gross_exposure": [0.8],
+    "interval_hours": [8],
+    "maximum_symbol_weight": [0.1],
+    "medium_horizon_bars": [15, 18, 21],
+    "minimum_cross_section": [10, 12, 14],
+    "minimum_score_spread": [0.4, 0.5, 0.6],
+    "minimum_scored_symbols": [14, 16, 18],
+    "regime_horizon_bars": [54, 63, 72],
+    "residualize": [false, true],
+    "robust_z_clip": [3.5, 4.0, 4.5],
+    "selection_count_per_side": [4, 5, 6],
+    "slow_horizon_bars": [54, 63, 72],
+    "trend_medium_weight": [0.0, 0.35, 0.4, 0.45, 1.0]
+  },
+  "parent_family_id": null,
+  "registered_at_utc": "1970-01-01T00:00:00Z",
+  "risk_policy_plan": "Evaluate six material policies: no control, volatility only, drawdown only, position-stop only, turnover only, and combined. Each organizer run emits base and doubled-cost outputs together; the cost pair is one policy choice, not two trials. Controls act centrally no earlier than next open with ordinary costs, shared participation, and same-boundary reentry disabled.",
+  "schema_version": 1,
+  "selection_metric": "Non-compensatory development qualification first; among passers only, prefer trial-adjusted probability positive, doubled-cost Sharpe, worst-regime Sharpe, neighborhood median Sharpe, and lower positive-PnL concentration in that order. No failing or negative candidate may be selected.",
+  "team_id": "team-10"
+}

@@ -1,0 +1,49 @@
+{
+  "accounting": {
+    "reference_configurations": 1,
+    "signal_ablation_configurations": 7,
+    "status": "prospective_unregistered",
+    "total_material_configurations": 8
+  },
+  "ablations": [
+    {
+      "ablation_id": "trend-only",
+      "expected_diagnostic": "Should retain continuation behavior but lose chop robustness if the reversal sleeve is causal.",
+      "overrides": {"ensemble_mode": "trend_only"}
+    },
+    {
+      "ablation_id": "reversion-only",
+      "expected_diagnostic": "Should retain chop reversal behavior but lose directional bull/bear sleeve robustness if continuation is causal.",
+      "overrides": {"ensemble_mode": "reversion_only"}
+    },
+    {
+      "ablation_id": "fixed-equal-blend",
+      "expected_diagnostic": "Tests whether the causal path-efficiency switch improves regime robustness beyond a fixed mixture.",
+      "overrides": {"ensemble_mode": "equal_blend"}
+    },
+    {
+      "ablation_id": "no-market-residualization",
+      "expected_diagnostic": "Tests the core relative-value claim by replacing residual returns with raw coin returns.",
+      "overrides": {"residualize": false}
+    },
+    {
+      "ablation_id": "medium-trend-only",
+      "expected_diagnostic": "Tests whether the 63-bar continuation component adds stability beyond the 18-bar horizon.",
+      "overrides": {"trend_medium_weight": 1.0}
+    },
+    {
+      "ablation_id": "slow-trend-only",
+      "expected_diagnostic": "Tests whether the 18-bar continuation component adds responsiveness beyond the 63-bar horizon.",
+      "overrides": {"trend_medium_weight": 0.0}
+    },
+    {
+      "ablation_id": "narrow-four-per-side",
+      "expected_diagnostic": "Tests whether the apparent edge depends on the fifth-ranked coin or excessive rank breadth.",
+      "overrides": {"selection_count_per_side": 4}
+    }
+  ],
+  "family_id": "t10-residual-trend-reversion-ensemble-v1",
+  "reference_candidate_id": "t10-rtre-core-v1",
+  "schema_version": 1,
+  "team_id": "team-10"
+}

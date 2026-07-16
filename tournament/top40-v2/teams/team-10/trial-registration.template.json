@@ -1,0 +1,32 @@
+{
+  "candidate_id": "t10-rtre-core-v1",
+  "config_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "falsifier": "Fail the candidate if any non-compensatory development, regime, sleeve, walk-forward, doubled-cost, concentration, or neighborhood gate fails. A failing result cannot be submitted.",
+  "family_id": "t10-residual-trend-reversion-ensemble-v1",
+  "parameters": {
+    "efficiency_lower": 0.12,
+    "efficiency_upper": 0.32,
+    "ensemble_mode": "adaptive",
+    "fast_horizon_bars": 6,
+    "gross_exposure": 0.8,
+    "interval_hours": 8,
+    "maximum_symbol_weight": 0.1,
+    "medium_horizon_bars": 18,
+    "minimum_cross_section": 12,
+    "minimum_score_spread": 0.5,
+    "minimum_scored_symbols": 16,
+    "regime_horizon_bars": 63,
+    "residualize": true,
+    "robust_z_clip": 4.0,
+    "selection_count_per_side": 5,
+    "slow_horizon_bars": 63,
+    "trend_medium_weight": 0.4
+  },
+  "risk_config_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "seed": 20260801,
+  "source_bundle_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "strategy_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "team_id": "team-10",
+  "thesis": "A balanced adaptive mixture of causal crypto residual continuation and reversal can produce positive, stable visible-development evidence across bull, bear, and chop after realistic and doubled costs.",
+  "timestamp_utc": "1970-01-01T00:00:00Z"
+}

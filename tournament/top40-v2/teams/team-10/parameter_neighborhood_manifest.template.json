@@ -1,0 +1,91 @@
+{
+  "candidate_id": "t10-rtre-core-v1",
+  "neighbors": [
+    {
+      "daily_returns_path": "PENDING/n01-fast-4.daily-returns.json",
+      "daily_returns_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "neighbor_id": "n01-fast-4",
+      "parameter_artifact_path": "tournament/top40-v2/teams/team-10/PENDING/n01-fast-4.parameters.json",
+      "parameter_artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "daily_returns_path": "PENDING/n02-fast-8.daily-returns.json",
+      "daily_returns_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "neighbor_id": "n02-fast-8",
+      "parameter_artifact_path": "tournament/top40-v2/teams/team-10/PENDING/n02-fast-8.parameters.json",
+      "parameter_artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "daily_returns_path": "PENDING/n03-medium-15.daily-returns.json",
+      "daily_returns_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "neighbor_id": "n03-medium-15",
+      "parameter_artifact_path": "tournament/top40-v2/teams/team-10/PENDING/n03-medium-15.parameters.json",
+      "parameter_artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "daily_returns_path": "PENDING/n04-medium-21.daily-returns.json",
+      "daily_returns_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "neighbor_id": "n04-medium-21",
+      "parameter_artifact_path": "tournament/top40-v2/teams/team-10/PENDING/n04-medium-21.parameters.json",
+      "parameter_artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "daily_returns_path": "PENDING/n05-slow-54.daily-returns.json",
+      "daily_returns_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "neighbor_id": "n05-slow-54",
+      "parameter_artifact_path": "tournament/top40-v2/teams/team-10/PENDING/n05-slow-54.parameters.json",
+      "parameter_artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "daily_returns_path": "PENDING/n06-slow-72.daily-returns.json",
+      "daily_returns_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "neighbor_id": "n06-slow-72",
+      "parameter_artifact_path": "tournament/top40-v2/teams/team-10/PENDING/n06-slow-72.parameters.json",
+      "parameter_artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "daily_returns_path": "PENDING/n07-regime-54.daily-returns.json",
+      "daily_returns_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "neighbor_id": "n07-regime-54",
+      "parameter_artifact_path": "tournament/top40-v2/teams/team-10/PENDING/n07-regime-54.parameters.json",
+      "parameter_artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "daily_returns_path": "PENDING/n08-regime-72.daily-returns.json",
+      "daily_returns_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "neighbor_id": "n08-regime-72",
+      "parameter_artifact_path": "tournament/top40-v2/teams/team-10/PENDING/n08-regime-72.parameters.json",
+      "parameter_artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "daily_returns_path": "PENDING/n09-count-4.daily-returns.json",
+      "daily_returns_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "neighbor_id": "n09-count-4",
+      "parameter_artifact_path": "tournament/top40-v2/teams/team-10/PENDING/n09-count-4.parameters.json",
+      "parameter_artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "daily_returns_path": "PENDING/n10-count-6.daily-returns.json",
+      "daily_returns_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "neighbor_id": "n10-count-6",
+      "parameter_artifact_path": "tournament/top40-v2/teams/team-10/PENDING/n10-count-6.parameters.json",
+      "parameter_artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "daily_returns_path": "PENDING/n11-medium-weight-035.daily-returns.json",
+      "daily_returns_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "neighbor_id": "n11-medium-weight-035",
+      "parameter_artifact_path": "tournament/top40-v2/teams/team-10/PENDING/n11-medium-weight-035.parameters.json",
+      "parameter_artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "daily_returns_path": "PENDING/n12-medium-weight-045.daily-returns.json",
+      "daily_returns_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "neighbor_id": "n12-medium-weight-045",
+      "parameter_artifact_path": "tournament/top40-v2/teams/team-10/PENDING/n12-medium-weight-045.parameters.json",
+      "parameter_artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    }
+  ],
+  "schema_version": 1,
+  "team_id": "team-10"
+}

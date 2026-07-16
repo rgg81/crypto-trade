@@ -1,0 +1,65 @@
+{
+  "candidate_id": "t10-rtre-core-v1",
+  "evidence_status": "prospective_plan_only",
+  "folds": [
+    {
+      "embargo_days": 7,
+      "fold_id": "fold-1",
+      "test_end_inclusive": "2020-12-31",
+      "test_start": "2020-07-08",
+      "training_end_inclusive": "2020-06-30",
+      "training_start": "2020-02-03"
+    },
+    {
+      "embargo_days": 7,
+      "fold_id": "fold-2",
+      "test_end_inclusive": "2021-06-30",
+      "test_start": "2021-01-08",
+      "training_end_inclusive": "2020-12-31",
+      "training_start": "2020-02-03"
+    },
+    {
+      "embargo_days": 7,
+      "fold_id": "fold-3",
+      "test_end_inclusive": "2021-12-31",
+      "test_start": "2021-07-08",
+      "training_end_inclusive": "2021-06-30",
+      "training_start": "2020-02-03"
+    },
+    {
+      "embargo_days": 7,
+      "fold_id": "fold-4",
+      "test_end_inclusive": "2022-06-30",
+      "test_start": "2022-01-08",
+      "training_end_inclusive": "2021-12-31",
+      "training_start": "2020-02-03"
+    },
+    {
+      "embargo_days": 7,
+      "fold_id": "fold-5",
+      "test_end_inclusive": "2022-12-31",
+      "test_start": "2022-07-08",
+      "training_end_inclusive": "2022-06-30",
+      "training_start": "2020-02-03"
+    },
+    {
+      "embargo_days": 7,
+      "fold_id": "fold-6",
+      "test_end_inclusive": "2023-06-30",
+      "test_start": "2023-01-08",
+      "training_end_inclusive": "2022-12-31",
+      "training_start": "2020-02-03"
+    }
+  ],
+  "fold_model_rule": "Instantiate a clean strategy in every fold. This rule has no learned coefficients; each byte-distinct fold artifact binds the exact source/config/seed, fold dates, empty learned-state declaration, and fresh-state proof.",
+  "label_rule": "No forward label enters strategy fitting. Organizer performance labels begin strictly after each decision and are used only for fold scoring.",
+  "minimum_requirements": {
+    "positive_folds": 4,
+    "positive_quarter_fraction": 0.55,
+    "trial_adjusted_probability_positive": 0.9
+  },
+  "purge_rule": "The seven-day gap between each expanding training end and test start is a conservative embargo exceeding the 8h execution horizon; no test observation is used for a parameter or preprocessing choice.",
+  "schema_version": 1,
+  "selection_rule": "Register the exact family and candidate before producing any fold result. Stitched out-of-fold evidence is evaluated only by the organizer and may not be replaced with slices from one fitted backtest.",
+  "team_id": "team-10"
+}

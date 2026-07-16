@@ -1,0 +1,46 @@
+{
+  "candidate_id": "t10-rtre-core-v1",
+  "center_parameters": {
+    "efficiency_lower": 0.12,
+    "efficiency_upper": 0.32,
+    "ensemble_mode": "adaptive",
+    "fast_horizon_bars": 6,
+    "gross_exposure": 0.8,
+    "interval_hours": 8,
+    "maximum_symbol_weight": 0.1,
+    "medium_horizon_bars": 18,
+    "minimum_cross_section": 12,
+    "minimum_score_spread": 0.5,
+    "minimum_scored_symbols": 16,
+    "regime_horizon_bars": 63,
+    "residualize": true,
+    "robust_z_clip": 4.0,
+    "selection_count_per_side": 5,
+    "slow_horizon_bars": 63,
+    "trend_medium_weight": 0.4
+  },
+  "neighbors": [
+    {"axis": "fast_horizon_bars", "neighbor_id": "n01-fast-4", "value": 4},
+    {"axis": "fast_horizon_bars", "neighbor_id": "n02-fast-8", "value": 8},
+    {"axis": "medium_horizon_bars", "neighbor_id": "n03-medium-15", "value": 15},
+    {"axis": "medium_horizon_bars", "neighbor_id": "n04-medium-21", "value": 21},
+    {"axis": "slow_horizon_bars", "neighbor_id": "n05-slow-54", "value": 54},
+    {"axis": "slow_horizon_bars", "neighbor_id": "n06-slow-72", "value": 72},
+    {"axis": "regime_horizon_bars", "neighbor_id": "n07-regime-54", "value": 54},
+    {"axis": "regime_horizon_bars", "neighbor_id": "n08-regime-72", "value": 72},
+    {"axis": "selection_count_per_side", "neighbor_id": "n09-count-4", "value": 4},
+    {"axis": "selection_count_per_side", "neighbor_id": "n10-count-6", "value": 6},
+    {"axis": "trend_medium_weight", "neighbor_id": "n11-medium-weight-035", "value": 0.35},
+    {"axis": "trend_medium_weight", "neighbor_id": "n12-medium-weight-045", "value": 0.45}
+  ],
+  "rules": {
+    "all_other_parameters": "identical to center_parameters",
+    "evaluation": "Each neighbor is a separate preregistered material configuration evaluated chronologically with the same six-fold plan and paired base/doubled costs.",
+    "minimum_neighbor_median_sharpe": 0.5,
+    "minimum_profitable_fraction": 0.7,
+    "selection": "The neighborhood is diagnostic only and may not be searched after seeing its results."
+  },
+  "schema_version": 1,
+  "status": "prospective_unregistered",
+  "team_id": "team-10"
+}

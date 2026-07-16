@@ -1,0 +1,38 @@
+{
+  "cost_accounting": {
+    "cost_multipliers_per_policy": [1.0, 2.0],
+    "material_configuration_count": 6,
+    "paired_outputs_in_one_organizer_evaluation": true,
+    "prohibited_interpretation": "Do not count base and doubled costs as two policy configurations."
+  },
+  "execution_contract": {
+    "intrabar_fills": false,
+    "ordinary_costs": true,
+    "same_boundary_reentry": false,
+    "shared_participation_capacity": true,
+    "stop_confirmation": "closed boundary mark",
+    "stop_execution": "next executable open"
+  },
+  "policies": [
+    {"path": "risk_policies/no-control.json", "policy_id": "team-10-no-control"},
+    {"path": "risk_policies/volatility-only.json", "policy_id": "team-10-volatility-only"},
+    {"path": "risk_policies/drawdown-only.json", "policy_id": "team-10-drawdown-only"},
+    {"path": "risk_policies/position-stop-only.json", "policy_id": "team-10-position-stop-only"},
+    {"path": "risk_policies/turnover-only.json", "policy_id": "team-10-turnover-only"},
+    {"path": "risk_policy.json", "policy_id": "team-10-combined"}
+  ],
+  "required_comparisons": [
+    "net return and Sharpe",
+    "maximum drawdown and tail loss",
+    "turnover and base/doubled costs",
+    "bull, bear, chop, and stress effects",
+    "long and short sleeve attribution",
+    "stop and brake counts",
+    "cooldown time",
+    "requested versus filled risk notional",
+    "same-boundary reentry prevention"
+  ],
+  "schema_version": 1,
+  "status": "prospective_unregistered",
+  "team_id": "team-10"
+}

@@ -1,0 +1,35 @@
+{
+  "amendment_0006": {
+    "active_entrypoint": "scripts/top40_v2_tournament_pure_crypto_v6.py",
+    "active_entrypoint_sha256": "a9197dc2f83d4415f1aa4c098546e21e010cb99e754580de96c3e339cc927641",
+    "freeze_sha256": "e8cc34251ba0eb558015a02b96f15e884eee05006f41ea0b32ce6510376a76db",
+    "integration_freeze_sha256": "3e93bdfe031e2589888c3bbcaae583437bbd074fa9d86c6dc0a54187bc0f1e34",
+    "policy_sha256": "2c7fb0ff593d06c323517e60df4b28ab9387a2df580b83f82f65ef71c91fc350"
+  },
+  "candidate_id": "t10-rtre-core-v1",
+  "family_id": "t10-residual-trend-reversion-ensemble-v1",
+  "risk_policy_path": "tournament/top40-v2/teams/team-10/risk_policy.json",
+  "schema_version": 1,
+  "seed": 20260801,
+  "status": "prospective_unregistered_draft",
+  "strategy": {
+    "efficiency_lower": 0.12,
+    "efficiency_upper": 0.32,
+    "ensemble_mode": "adaptive",
+    "fast_horizon_bars": 6,
+    "gross_exposure": 0.8,
+    "interval_hours": 8,
+    "maximum_symbol_weight": 0.1,
+    "medium_horizon_bars": 18,
+    "minimum_cross_section": 12,
+    "minimum_score_spread": 0.5,
+    "minimum_scored_symbols": 16,
+    "regime_horizon_bars": 63,
+    "residualize": true,
+    "robust_z_clip": 4.0,
+    "selection_count_per_side": 5,
+    "slow_horizon_bars": 63,
+    "trend_medium_weight": 0.4
+  },
+  "team_id": "team-10"
+}

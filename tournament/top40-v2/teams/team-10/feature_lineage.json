@@ -1,0 +1,70 @@
+{
+  "features": [
+    {
+      "availability_rule": "The 8h candle is available only when open_time + 8h is at or before decision_time.",
+      "event_timestamp": "open_time + 8h",
+      "field": "close",
+      "lag": "zero additional bars after the candle close",
+      "missing_rule": "Require exact 8h adjacency; do not bridge or impute a missing candle.",
+      "source": "DecisionContext.bars for Amendment-0006-authorized eligible symbols",
+      "transform": "log(close_t / close_t-1)"
+    },
+    {
+      "availability_rule": "Computed at each closed 8h timestamp from at least 12 eligible-symbol returns available at that timestamp.",
+      "event_timestamp": "constituent candle close times",
+      "field": "cross_sectional_market_return",
+      "lag": "past-closed constituents only",
+      "missing_rule": "Market return is missing when fewer than 12 eligible returns exist; dependent signals then fail closed.",
+      "source": "cross-sectional median of causal close-to-close returns",
+      "transform": "median(return_i,t)"
+    },
+    {
+      "availability_rule": "Same timestamp as the coin and market returns after both are available.",
+      "event_timestamp": "candle close time",
+      "field": "coin_market_residual",
+      "lag": "past-closed rows only",
+      "missing_rule": "Missing when either input is missing; no interpolation or cross-gap compression.",
+      "source": "derived from close return and cross-sectional market return",
+      "transform": "return_i,t - median(return_j,t)"
+    },
+    {
+      "availability_rule": "All 6/18/63 exact adjacent residual observations must end at decision_time.",
+      "event_timestamp": "decision_time",
+      "field": "multi_horizon_residual_scores",
+      "lag": "windows end on the just-closed candle",
+      "missing_rule": "Exclude the coin if any required residual is missing.",
+      "source": "coin_market_residual",
+      "transform": "window sum divided by root sum of squared residuals, then robust cross-sectional z score clipped to +/-4"
+    },
+    {
+      "availability_rule": "All 63 common-market returns must be exactly adjacent and end at decision_time.",
+      "event_timestamp": "decision_time",
+      "field": "market_path_efficiency",
+      "lag": "63 past-closed 8h bars",
+      "missing_rule": "Request flat if any required common-market observation is missing.",
+      "source": "cross_sectional_market_return",
+      "transform": "abs(sum returns) / sum(abs(returns)); linearly mapped from [0.12, 0.32] into trend share [0, 1]"
+    },
+    {
+      "availability_rule": "Ranking occurs only after every component is causal at decision_time.",
+      "event_timestamp": "decision_time",
+      "field": "ensemble_rank",
+      "lag": "inherits all upstream windows",
+      "missing_rule": "Request flat below 16 scored coins or score spread below 0.50.",
+      "source": "multi-horizon scores and market_path_efficiency",
+      "transform": "trend_share * (0.40 * z18 + 0.60 * z63) + (1 - trend_share) * (-z6)"
+    }
+  ],
+  "forbidden_inputs": [
+    "future or still-open candles",
+    "funding",
+    "auxiliary datasets",
+    "transaction opens",
+    "mark prices",
+    "positions, fills, equity, PnL, or evaluator results",
+    "team-owned symbol eligibility heuristics",
+    "private qualifier or final-OOS observations"
+  ],
+  "schema_version": 1,
+  "team_id": "team-10"
+}

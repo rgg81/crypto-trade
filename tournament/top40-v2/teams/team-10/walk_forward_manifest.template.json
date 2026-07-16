@@ -1,0 +1,57 @@
+{
+  "candidate_id": "t10-rtre-core-v1",
+  "evidence_class": "declared-retrained-out-of-fold",
+  "folds": [
+    {
+      "fold_id": "fold-1",
+      "model_artifact_path": "tournament/top40-v2/teams/team-10/PENDING/fold-1-model.json",
+      "model_artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "test_end_inclusive": "2020-12-31",
+      "test_start": "2020-07-08",
+      "training_end_inclusive": "2020-06-30"
+    },
+    {
+      "fold_id": "fold-2",
+      "model_artifact_path": "tournament/top40-v2/teams/team-10/PENDING/fold-2-model.json",
+      "model_artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "test_end_inclusive": "2021-06-30",
+      "test_start": "2021-01-08",
+      "training_end_inclusive": "2020-12-31"
+    },
+    {
+      "fold_id": "fold-3",
+      "model_artifact_path": "tournament/top40-v2/teams/team-10/PENDING/fold-3-model.json",
+      "model_artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "test_end_inclusive": "2021-12-31",
+      "test_start": "2021-07-08",
+      "training_end_inclusive": "2021-06-30"
+    },
+    {
+      "fold_id": "fold-4",
+      "model_artifact_path": "tournament/top40-v2/teams/team-10/PENDING/fold-4-model.json",
+      "model_artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "test_end_inclusive": "2022-06-30",
+      "test_start": "2022-01-08",
+      "training_end_inclusive": "2021-12-31"
+    },
+    {
+      "fold_id": "fold-5",
+      "model_artifact_path": "tournament/top40-v2/teams/team-10/PENDING/fold-5-model.json",
+      "model_artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "test_end_inclusive": "2022-12-31",
+      "test_start": "2022-07-08",
+      "training_end_inclusive": "2022-06-30"
+    },
+    {
+      "fold_id": "fold-6",
+      "model_artifact_path": "tournament/top40-v2/teams/team-10/PENDING/fold-6-model.json",
+      "model_artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "test_end_inclusive": "2023-06-30",
+      "test_start": "2023-01-08",
+      "training_end_inclusive": "2022-12-31"
+    }
+  ],
+  "schema_version": 1,
+  "stitched_daily_returns_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "team_id": "team-10"
+}
