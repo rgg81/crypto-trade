@@ -1,0 +1,39 @@
+{
+  "candidate_id": "t08-volatility-scaled-rank-persistence-v1-base",
+  "family_id": "t08-volatility-scaled-rank-persistence-v1",
+  "files": [
+    {
+      "path": "candidate_variant.py",
+      "sha256": "a4122f22bb26ffe317da3f7780f9b9000f0da89212ccbf1cc24aa642d58e1704",
+      "size": 203
+    },
+    {
+      "path": "frozen_config.json",
+      "sha256": "169738c60f0a11d6256b20137c42f850d68dbeb7a3bd4e5bcbe7bcc258a1af6f",
+      "size": 5657
+    },
+    {
+      "path": "risk_policy.json",
+      "sha256": "8db76eb8d59fbef6473d2a2cd98bbba68c8e53d8d78284284ec06db54b8fa5d6",
+      "size": 580
+    },
+    {
+      "path": "strategy.py",
+      "sha256": "3c7a36d1f9c868d330fb5f445ea7ca5dce213099a66190b88d43ea8e16db9800",
+      "size": 19606
+    },
+    {
+      "path": "test_risk_policy_contract.py",
+      "sha256": "264da2c48b4c5eab433980db60f6a7d6ce5e72e0516af355f706951f225932e1",
+      "size": 7175
+    },
+    {
+      "path": "test_strategy.py",
+      "sha256": "82ba176c92a5d05322191315a709c9534c56755554570f4b4ee928e48a1b34a1",
+      "size": 16834
+    }
+  ],
+  "manifest_kind": "top40-v2-executable-source-manifest-v1",
+  "schema_version": 1,
+  "team_id": "team-08"
+}
