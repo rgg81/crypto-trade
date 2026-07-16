@@ -292,6 +292,12 @@ def test_wrapper_prioritizes_post_integrity_failure(monkeypatch) -> None:
     assert isinstance(exc_info.value.__cause__, RuntimeError)
 
 
+def test_loaded_authority_paths_are_bound_to_the_repository(monkeypatch) -> None:
+    monkeypatch.setattr(amendment._PURE_MODULE, "__file__", "/tmp/alternate-a6.py")
+    with pytest.raises(amendment.Amendment0006Error, match="authority path"):
+        amendment.verify_parent_authorities(ROOT)
+
+
 def test_candidate_entrypoint_is_additive_and_old_active_path_is_not_edited() -> None:
     assert "scripts/top40_v2_tournament_pure_crypto_v6.py" in amendment.IMPLEMENTATION_FILE_PATHS
     assert "scripts/top40_v2_tournament_active.py" not in amendment.IMPLEMENTATION_FILE_PATHS

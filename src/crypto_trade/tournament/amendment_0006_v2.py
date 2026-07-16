@@ -77,6 +77,17 @@ def verify_parent_authorities(root: str | Path) -> None:
     """Verify the exact frozen runner delegated to by this additive draft."""
 
     root_path = Path(root).resolve()
+    expected_a4_path = (
+        root_path / "src/crypto_trade/tournament/runner_schema3_compat_v4.py"
+    ).resolve()
+    expected_pure_path = (
+        root_path / "src/crypto_trade/tournament/pure_crypto_universe_v6.py"
+    ).resolve()
+    if (
+        Path(_A4_MODULE.__file__).resolve() != expected_a4_path
+        or Path(_PURE_MODULE.__file__).resolve() != expected_pure_path
+    ):
+        raise Amendment0006Error("loaded amendment authority path differs from repository")
     _bound_repo_bytes(
         root_path,
         "src/crypto_trade/tournament/runner_schema3_compat_v4.py",
