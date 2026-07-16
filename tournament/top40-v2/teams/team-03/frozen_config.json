@@ -1,0 +1,36 @@
+{
+  "candidate_id": "t03-rlsa-base-h3-b30-v21-f25",
+  "entrypoint": "tournament/top40-v2/teams/team-03/strategy.py",
+  "family_id": "t03-residual-liquidity-shock-absorption-v1",
+  "parameters": {
+    "beta_lookback_days": 30,
+    "directional_gross_tilt": 0.05,
+    "funding_lookback_days": 30,
+    "funding_recent_days": 3,
+    "funding_weight": 0.25,
+    "minimum_funding_events": 12,
+    "minimum_names_per_side": 5,
+    "minimum_valid_symbols": 20,
+    "per_symbol_target_cap": 0.08,
+    "rank_tail_fraction": 0.25,
+    "rebalance_hour_utc": 0,
+    "residual_variance_floor": 1e-8,
+    "residual_volatility_lookback_days": 21,
+    "shock_horizon_bars": 3,
+    "total_gross": 0.8,
+    "trend_lookback_days": 60,
+    "trend_threshold": 0.1,
+    "volume_amplifier": 0.35,
+    "volume_lookback_days": 30
+  },
+  "risk_policy_binding": {
+    "hash_field_at_registration": "risk_config_sha256",
+    "path": "tournament/top40-v2/teams/team-03/risk_policy.json",
+    "policy_id": "team-03-base"
+  },
+  "schema_version": 1,
+  "seed": 20260801,
+  "status": "preregistration_candidate_not_registered",
+  "strategy_builder": "build_strategy",
+  "team_id": "team-03"
+}

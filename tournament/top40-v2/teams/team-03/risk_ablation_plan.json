@@ -1,0 +1,73 @@
+{
+  "activation_condition": "Run only after the no-control base passes the preregistered minimal mechanism screen.",
+  "candidate_id": "t03-rlsa-base-h3-b30-v21-f25",
+  "common_rules": {
+    "base_and_doubled_cost_required": true,
+    "same_boundary_reentry": false,
+    "unchanged_strategy_parameters": true
+  },
+  "material_configuration_limit": 5,
+  "schema_version": 1,
+  "team_id": "team-03",
+  "variants": [
+    {
+      "changes_from_base": {},
+      "policy_id": "team-03-base",
+      "role": "no-control baseline"
+    },
+    {
+      "changes_from_base": {
+        "volatility_target": {
+          "annualized_target": 0.35,
+          "enabled": true,
+          "lookback_days": 30,
+          "maximum_scale": 1.0,
+          "minimum_scale": 0.25
+        }
+      },
+      "policy_id": "team-03-rlsa-vol35",
+      "role": "individual volatility-target ablation"
+    },
+    {
+      "changes_from_base": {
+        "drawdown_brakes": [
+          {"drawdown": 0.1, "gross_scale": 0.65},
+          {"drawdown": 0.2, "gross_scale": 0.25}
+        ]
+      },
+      "policy_id": "team-03-rlsa-dd10-20",
+      "role": "individual portfolio-drawdown ablation"
+    },
+    {
+      "changes_from_base": {
+        "turnover_limit": {
+          "enabled": true,
+          "maximum_one_way_turnover": 0.35
+        }
+      },
+      "policy_id": "team-03-rlsa-turn35",
+      "role": "individual turnover-control ablation"
+    },
+    {
+      "changes_from_base": {
+        "drawdown_brakes": [
+          {"drawdown": 0.1, "gross_scale": 0.65},
+          {"drawdown": 0.2, "gross_scale": 0.25}
+        ],
+        "turnover_limit": {
+          "enabled": true,
+          "maximum_one_way_turnover": 0.35
+        },
+        "volatility_target": {
+          "annualized_target": 0.35,
+          "enabled": true,
+          "lookback_days": 30,
+          "maximum_scale": 1.0,
+          "minimum_scale": 0.25
+        }
+      },
+      "policy_id": "team-03-rlsa-combined",
+      "role": "combined-control ablation"
+    }
+  ]
+}

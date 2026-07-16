@@ -1,0 +1,80 @@
+{
+  "activation_condition": "The no-control base must first pass the minimal mechanism screen.",
+  "base_parameters": {
+    "beta_lookback_days": 30,
+    "directional_gross_tilt": 0.05,
+    "funding_lookback_days": 30,
+    "funding_recent_days": 3,
+    "funding_weight": 0.25,
+    "minimum_funding_events": 12,
+    "minimum_names_per_side": 5,
+    "minimum_valid_symbols": 20,
+    "per_symbol_target_cap": 0.08,
+    "rank_tail_fraction": 0.25,
+    "rebalance_hour_utc": 0,
+    "residual_variance_floor": 1e-8,
+    "residual_volatility_lookback_days": 21,
+    "shock_horizon_bars": 3,
+    "total_gross": 0.8,
+    "trend_lookback_days": 60,
+    "trend_threshold": 0.1,
+    "volume_amplifier": 0.35,
+    "volume_lookback_days": 30
+  },
+  "candidate_id": "t03-rlsa-base-h3-b30-v21-f25",
+  "parameter_neighbors": [
+    {
+      "neighbor_id": "shock-h1",
+      "overrides": {
+        "shock_horizon_bars": 1
+      }
+    },
+    {
+      "neighbor_id": "shock-h6",
+      "overrides": {
+        "shock_horizon_bars": 6
+      }
+    },
+    {
+      "neighbor_id": "beta-b21",
+      "overrides": {
+        "beta_lookback_days": 21
+      }
+    },
+    {
+      "neighbor_id": "beta-b45",
+      "overrides": {
+        "beta_lookback_days": 45
+      }
+    },
+    {
+      "neighbor_id": "resvol-v14",
+      "overrides": {
+        "residual_volatility_lookback_days": 14
+      }
+    },
+    {
+      "neighbor_id": "resvol-v28",
+      "overrides": {
+        "residual_volatility_lookback_days": 28
+      }
+    },
+    {
+      "neighbor_id": "tail-t20",
+      "overrides": {
+        "rank_tail_fraction": 0.2
+      }
+    },
+    {
+      "neighbor_id": "tail-t30",
+      "overrides": {
+        "rank_tail_fraction": 0.3
+      }
+    }
+  ],
+  "required_evidence_binding": "Each evaluated neighbor must receive immutable config, source-bundle, risk-policy, model/config-artifact, and daily-return hashes after activation.",
+  "schema_version": 1,
+  "seed": 20260801,
+  "status": "preregistered_not_run",
+  "team_id": "team-03"
+}

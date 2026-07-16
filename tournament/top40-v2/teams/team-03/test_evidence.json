@@ -1,0 +1,43 @@
+{
+  "candidate_id": "t03-rlsa-base-h3-b30-v21-f25",
+  "commands_run": [
+    "uv run ruff check tournament/top40-v2/teams/team-03/strategy.py tournament/top40-v2/teams/team-03/test_strategy.py tournament/top40-v2/teams/team-03/prepare_preregistration.py",
+    "uv run ruff format tournament/top40-v2/teams/team-03/strategy.py tournament/top40-v2/teams/team-03/test_strategy.py",
+    "PYTHONDONTWRITEBYTECODE=1 uv run pytest -q tournament/top40-v2/teams/team-03/test_strategy.py",
+    "uv run python scripts/top40_v2_amended_tournament.py validate-risk-policy tournament/top40-v2/teams/team-03/risk_policy.json"
+  ],
+  "created_at_utc": "2026-07-16T10:27:17Z",
+  "files_sha256": {
+    "frozen_config.json": "3d00a5c9493aaa1356d1cc9df53b3e1068e81246ac22b9cd88285fa5cbaf0752",
+    "risk_policy.json": "5d862a75a08b6ffbb4683789efbb1b7338b30f024ddf381d1a95736148702bbc",
+    "strategy.py": "1d867c254b6456560dbd55a63f470e300cd901929ca5aee26cd360891635cd57",
+    "test_strategy.py": "2eff8561dbc6175d6d299d010f699df5e6082883ee45d919c64927e7fc4f9dad"
+  },
+  "material_trial_run": false,
+  "prior_revision_failure": {
+    "diagnosis": "Shock bars entered their own beta and residual-volatility baselines, while final score clipping collapsed distinct extreme shocks into symbol-name ties.",
+    "failed": 1,
+    "passed": 4,
+    "scientific_result": false
+  },
+  "risk_policy_validation": {
+    "enabled": false,
+    "policy_id": "team-03-base",
+    "valid": true
+  },
+  "schema_version": 1,
+  "status": "synthetic-tests-passed",
+  "synthetic_coverage": [
+    "beta and residual-volatility baselines exclude the traded three-bar shock",
+    "exact six most-negative shock longs and six most-positive shock shorts",
+    "raw finite score ordering without saturation ties",
+    "future and not-yet-closed bar invariance",
+    "deterministic replay and canonical seed enforcement"
+  ],
+  "team_id": "team-03",
+  "test_result": {
+    "duration_seconds": 0.77,
+    "failed": 0,
+    "passed": 5
+  }
+}

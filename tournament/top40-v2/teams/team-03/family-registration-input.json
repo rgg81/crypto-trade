@@ -1,0 +1,31 @@
+{
+  "economic_thesis": "High-volume price moves unexplained by rolling BTC beta and reinforced by same-side perpetual funding partly reflect temporary forced-flow impact. Diversified long and short exhaustion tails should earn subsequent liquidity-provision reversal.",
+  "expected_regime_roles": {
+    "bear": "Shift five percentage points of gross from long to short; crowded positive residual relief rallies should feed the short sleeve.",
+    "bull": "Shift five percentage points of gross from short to long; forced-sale pullbacks should feed the long sleeve.",
+    "chop": "Use symmetric sleeves; repeated idiosyncratic overshoots are the primary expected return source.",
+    "long_sleeve": "Buy negative beta-residual, high-volume exhaustion, strengthened by negative funding crowding.",
+    "short_sleeve": "Short positive beta-residual, high-volume exhaustion, strengthened by positive funding crowding.",
+    "stress": "Diversification and unlevered gross limit exposure, but falling-knife risk is explicit and must be tested with separate controls."
+  },
+  "falsifier": "Reject for causal or deterministic failure. Reject this iteration without risk rescue if the base has nonpositive OOF Sharpe, fewer than four positive folds, nonpositive bull/bear/chop return, failed long-bull or short-bear roles, nonpositive doubled-cost Sharpe, or drawdown above 40%.",
+  "mechanism": "Daily cross-sectional reversal of high-volume idiosyncratic shocks after removing rolling BTC beta, with funding crowding confirmation and a slow BTC trend gross tilt.",
+  "parameter_ranges": {
+    "beta_lookback_days": [21, 30, 45],
+    "directional_gross_tilt": [0.0, 0.05, 0.1],
+    "funding_weight": [0.0, 0.25, 0.5],
+    "rank_tail_fraction": [0.2, 0.25, 0.3],
+    "residual_volatility_lookback_days": [14, 21, 28],
+    "shock_horizon_bars": [1, 3, 6],
+    "total_gross": [0.6, 0.8],
+    "trend_lookback_days": [30, 60, 90],
+    "trend_threshold": [0.05, 0.1, 0.15],
+    "volume_amplifier": [0.15, 0.35, 0.55]
+  },
+  "parent_family_id": null,
+  "registered_at_utc": "2026-07-16T10:34:37Z",
+  "risk_policy_plan": "Start with no control. Only after a positive base screen, separately register volatility-target, drawdown-brake, turnover-limit, and combined ablations; run each at base and doubled costs.",
+  "schema_version": 1,
+  "selection_metric": "Noncompensatory causal/regime/sleeve/cost/stability gates, then median fold Sharpe; drawdown and turnover are tie-breakers.",
+  "team_id": "team-03"
+}

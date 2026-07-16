@@ -1,0 +1,109 @@
+{
+  "authorized_inputs": [
+    "bars.open_time",
+    "bars.close",
+    "bars.quote_volume",
+    "funding.funding_time",
+    "funding.symbol",
+    "funding.funding_rate",
+    "eligible_symbols"
+  ],
+  "candidate_id": "t03-rlsa-base-h3-b30-v21-f25",
+  "decision_boundary": {
+    "bar_rule": "An 8-hour bar is usable only when open_time plus 8 hours is no later than the decision boundary.",
+    "fill_rule": "The executable open at the decision boundary is not an input to the strategy.",
+    "funding_rule": "DecisionContext funding is required to contain only events strictly before the decision boundary."
+  },
+  "family_id": "t03-residual-liquidity-shock-absorption-v1",
+  "ranking_rule": "Rank the raw finite long-desirability score without clipping; buy the highest tail and short the lowest tail, breaking only exact numerical ties by symbol.",
+  "features": [
+    {
+      "availability_rule": "Both adjacent closes are from fully closed 8-hour bars.",
+      "feature_id": "close_log_return",
+      "lag": "one fully closed 8-hour candle",
+      "lookback": "one adjacent close pair",
+      "missing_rule": "Omit the symbol if closes are insufficient, non-finite, or nonpositive.",
+      "raw_inputs": [
+        "bars.open_time",
+        "bars.close"
+      ],
+      "transformation": "natural_log(close_current) minus natural_log(close_previous)"
+    },
+    {
+      "availability_rule": "The 90 aligned return bars end immediately before the three-bar shock horizon.",
+      "feature_id": "rolling_btc_beta",
+      "lag": "three fully closed 8-hour bars relative to the decision boundary",
+      "lookback": "30 days (90 aligned 8-hour returns)",
+      "missing_rule": "Omit the symbol if aligned history is insufficient or BTC variance is at or below 1e-8.",
+      "raw_inputs": [
+        "close_log_return.symbol",
+        "close_log_return.BTCUSDT"
+      ],
+      "transformation": "covariance(symbol_return, btc_return) divided by variance(btc_return), clipped to [-1, 3]"
+    },
+    {
+      "availability_rule": "Uses exactly the latest three fully closed aligned returns and a beta estimated without those rows.",
+      "feature_id": "beta_residual_shock",
+      "lag": "available after the third shock-horizon bar closes",
+      "lookback": "3 bars (24 hours)",
+      "missing_rule": "Omit the symbol when beta or aligned returns are unavailable.",
+      "raw_inputs": [
+        "close_log_return.symbol",
+        "close_log_return.BTCUSDT",
+        "rolling_btc_beta"
+      ],
+      "transformation": "sum over three bars of symbol_return minus rolling_btc_beta times btc_return"
+    },
+    {
+      "availability_rule": "The 63 residual bars end immediately before the three-bar shock horizon.",
+      "feature_id": "residual_volatility",
+      "lag": "three fully closed 8-hour bars relative to the decision boundary",
+      "lookback": "21 days (63 residual returns)",
+      "missing_rule": "Omit the symbol if sample volatility is non-finite or at or below 1e-8.",
+      "raw_inputs": [
+        "close_log_return.symbol",
+        "close_log_return.BTCUSDT",
+        "rolling_btc_beta"
+      ],
+      "transformation": "sample standard deviation of beta residuals; the shock is divided by this value times square_root(3)"
+    },
+    {
+      "availability_rule": "All volume observations belong to fully closed bars; the numerator is the latest completed three-bar sum.",
+      "feature_id": "quote_volume_surprise",
+      "lag": "available after the latest 8-hour bar closes",
+      "lookback": "latest three-bar sum against the median of up to 90 completed three-bar sums",
+      "missing_rule": "Omit the symbol for invalid volume, fewer than 30 rolling sums, or a nonpositive baseline median.",
+      "raw_inputs": [
+        "bars.open_time",
+        "bars.quote_volume"
+      ],
+      "transformation": "log(latest_three_bar_volume / median_history), clipped to [0, 2], then multiplied by 0.35 and added to one"
+    },
+    {
+      "availability_rule": "Only funding events supplied before the decision boundary are eligible.",
+      "feature_id": "funding_crowding",
+      "lag": "strictly before the decision boundary",
+      "lookback": "3-day mean scaled by sample volatility from up to 30 days",
+      "missing_rule": "Use zero until at least 12 valid events exist or when the historical scale is degenerate.",
+      "raw_inputs": [
+        "funding.funding_time",
+        "funding.symbol",
+        "funding.funding_rate"
+      ],
+      "transformation": "recent mean divided by historical sample standard deviation, clipped to [-3, 3], with weight -0.25 in long desirability"
+    },
+    {
+      "availability_rule": "Uses BTC returns from fully closed bars only.",
+      "feature_id": "btc_trend_tilt",
+      "lag": "one fully closed 8-hour candle",
+      "lookback": "60 days (180 BTC returns)",
+      "missing_rule": "Use symmetric sleeve gross when history is insufficient or the aggregate return is non-finite.",
+      "raw_inputs": [
+        "close_log_return.BTCUSDT"
+      ],
+      "transformation": "compound the 180 log returns; move 0.05 gross toward long above +0.10 or toward short below -0.10"
+    }
+  ],
+  "schema_version": 1,
+  "team_id": "team-03"
+}

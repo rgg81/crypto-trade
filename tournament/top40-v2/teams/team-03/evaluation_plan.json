@@ -1,0 +1,55 @@
+{
+  "candidate_id": "t03-rlsa-base-h3-b30-v21-f25",
+  "folds": [
+    {
+      "fold_id": "fold-1",
+      "test_end_inclusive": "2020-08-31",
+      "test_start": "2020-02-03",
+      "training_end_inclusive": "2020-02-02"
+    },
+    {
+      "fold_id": "fold-2",
+      "test_end_inclusive": "2021-03-31",
+      "test_start": "2020-09-01",
+      "training_end_inclusive": "2020-08-31"
+    },
+    {
+      "fold_id": "fold-3",
+      "test_end_inclusive": "2021-10-31",
+      "test_start": "2021-04-01",
+      "training_end_inclusive": "2021-03-31"
+    },
+    {
+      "fold_id": "fold-4",
+      "test_end_inclusive": "2022-05-31",
+      "test_start": "2021-11-01",
+      "training_end_inclusive": "2021-10-31"
+    },
+    {
+      "fold_id": "fold-5",
+      "test_end_inclusive": "2022-12-31",
+      "test_start": "2022-06-01",
+      "training_end_inclusive": "2022-05-31"
+    },
+    {
+      "fold_id": "fold-6",
+      "test_end_inclusive": "2023-06-30",
+      "test_start": "2023-01-01",
+      "training_end_inclusive": "2022-12-31"
+    }
+  ],
+  "neighbor_activation_condition": "The no-control base must first pass the minimal mechanism screen.",
+  "parameter_neighbors": [
+    {"neighbor_id": "shock-h1", "overrides": {"shock_horizon_bars": 1}},
+    {"neighbor_id": "shock-h6", "overrides": {"shock_horizon_bars": 6}},
+    {"neighbor_id": "beta-b21", "overrides": {"beta_lookback_days": 21}},
+    {"neighbor_id": "beta-b45", "overrides": {"beta_lookback_days": 45}},
+    {"neighbor_id": "resvol-v14", "overrides": {"residual_volatility_lookback_days": 14}},
+    {"neighbor_id": "resvol-v28", "overrides": {"residual_volatility_lookback_days": 28}},
+    {"neighbor_id": "tail-t20", "overrides": {"rank_tail_fraction": 0.2}},
+    {"neighbor_id": "tail-t30", "overrides": {"rank_tail_fraction": 0.3}}
+  ],
+  "schema_version": 1,
+  "stitched_evidence": "Each clean fold may replay earlier public history for rolling state; only declared test dates enter the stitched OOF return series.",
+  "team_id": "team-03"
+}

@@ -1,0 +1,32 @@
+{
+  "candidate_id": "t03-rlsa-base-h3-b30-v21-f25",
+  "family_id": "t03-residual-liquidity-shock-absorption-v1",
+  "falsifier": "Reject immediately for causal-test failure, nondeterminism, invalid execution, insolvency, nonpositive no-control OOF Sharpe, fewer than four positive folds, nonpositive bull/bear/chop return, nonpositive long-bull or short-bear attribution, nonpositive doubled-cost Sharpe, or drawdown above 40%. Risk controls cannot rescue a failed base mechanism.",
+  "parameters": {
+    "beta_lookback_days": 30,
+    "candidate_seed": 20260801,
+    "directional_gross_tilt": 0.05,
+    "funding_lookback_days": 30,
+    "funding_recent_days": 3,
+    "funding_weight": 0.25,
+    "minimum_funding_events": 12,
+    "minimum_names_per_side": 5,
+    "minimum_valid_symbols": 20,
+    "per_symbol_target_cap": 0.08,
+    "rank_tail_fraction": 0.25,
+    "rebalance_hour_utc": 0,
+    "residual_variance_floor": 1e-08,
+    "residual_volatility_lookback_days": 21,
+    "shock_horizon_bars": 3,
+    "total_gross": 0.8,
+    "trend_lookback_days": 60,
+    "trend_threshold": 0.1,
+    "volume_amplifier": 0.35,
+    "volume_lookback_days": 30
+  },
+  "risk_policy_id": "team-03-base",
+  "schema_version": 1,
+  "selection_rule": "Pass all causal, regime, sleeve, doubled-cost, drawdown, fold and stability gates; among survivors maximize median fold Sharpe, then minimize drawdown and turnover.",
+  "team_id": "team-03",
+  "thesis": "High-volume price moves unexplained by rolling BTC beta and reinforced by same-side funding partly reflect temporary forced-flow impact. A diversified long/short tail portfolio should earn the subsequent liquidity-provision reversal."
+}
