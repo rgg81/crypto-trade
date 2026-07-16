@@ -1,0 +1,15 @@
+{
+  "candidate_id": "vdr-core-candidate-001",
+  "config_sha256": "bd0e4f70bcf335b2ac4e44ec049b89b8e8eaf4c6ac6502574d0accf12d9d9947",
+  "organizer_journal_head_sha256": "e1aa228e8c517b514134350b4c14466d0b06a9332e332c19354234bd47b34732",
+  "private_attempt_number": null,
+  "registration_sha256": "bf351ebfdc382017b28fe9943a3ea6b7929453d3fee57173548e686283c8230c",
+  "reserved_at_utc": "2026-07-16T21:34:11.289657+00:00",
+  "risk_policy_sha256": "8db76eb8d59fbef6473d2a2cd98bbba68c8e53d8d78284284ec06db54b8fa5d6",
+  "schema_version": 1,
+  "source_bundle_sha256": "f0654eccbf72b5393bdabedda49c1d4c07cb27abe189a5e315ea72fb039d2f7e",
+  "stage": "development",
+  "strategy_sha256": "42dc347a18466187d262aeaf251785cfeb27759ed15a6490a42e0be97e405ef6",
+  "team_id": "team-08",
+  "tournament": "quant-portfolio-blind-top40-v2"
+}
