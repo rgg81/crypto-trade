@@ -1,0 +1,28 @@
+{
+  "cost_multipliers": [1.0, 2.0],
+  "metrics_required": [
+    "annualized_return",
+    "net_sharpe",
+    "maximum_drawdown",
+    "tail_loss",
+    "turnover",
+    "regime_metrics",
+    "long_short_attribution",
+    "stop_and_brake_counts",
+    "cooldown_time",
+    "requested_risk_notional",
+    "filled_risk_notional",
+    "same_boundary_reentry_preventions"
+  ],
+  "policies": [
+    "risk_policies/no-control.json",
+    "risk_policies/volatility-only.json",
+    "risk_policies/drawdown-only.json",
+    "risk_policies/position-stop-only.json",
+    "risk_policies/turnover-only.json",
+    "risk_policy.json"
+  ],
+  "registration_rule": "Each of the six policies is one material preregistration; the frozen runner emits ordinary and doubled-cost results together for that policy.",
+  "schema_version": 1,
+  "team_id": "team-07"
+}

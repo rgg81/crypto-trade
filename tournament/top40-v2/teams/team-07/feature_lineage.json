@@ -1,0 +1,48 @@
+{
+  "features": [
+    {
+      "availability": "open_time + 8h <= decision_time",
+      "event_timestamp": "open_time + 8h",
+      "field": "bars.close",
+      "lag": "latest completed 8h candle",
+      "missing_rule": "exclude symbol; flat if fewer than 16 valid symbols",
+      "source": "organizer-authorized Binance USD-M snapshot",
+      "transforms": [
+        "log close-to-close return",
+        "liquid-leader equal-weight return",
+        "contemporaneous beta residual",
+        "one-bar lag response",
+        "idiosyncratic reversal",
+        "126-bar leader trend"
+      ]
+    },
+    {
+      "availability": "same completed candle boundary",
+      "event_timestamp": "open_time + 8h",
+      "field": "bars.quote_volume",
+      "lag": "90 completed 8h candles",
+      "missing_rule": "exclude nonfinite/nonpositive-liquidity symbol",
+      "source": "organizer-authorized Binance USD-M snapshot",
+      "transforms": ["trailing median", "descending leader selection"]
+    },
+    {
+      "availability": "funding_time < decision_time",
+      "event_timestamp": "funding_time",
+      "field": "funding.funding_rate",
+      "lag": "21 most recent published events",
+      "missing_rule": "zero carry conditioner when no past row exists",
+      "source": "organizer-authorized actual Binance funding rows",
+      "transforms": ["per-symbol trailing mean", "negative carry forecast"]
+    }
+  ],
+  "forbidden_or_unused_fields": [
+    "bar high/low for signal or stop fills",
+    "current executable open",
+    "future membership",
+    "positions, fills, equity, PnL, drawdown, or evaluator actions",
+    "private qualifier or final OOS data"
+  ],
+  "model_refit": "all moments, leaders, ranks, and trend are recomputed at each daily decision from past-only rolling rows",
+  "schema_version": 1,
+  "team_id": "team-07"
+}

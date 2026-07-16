@@ -1,0 +1,31 @@
+{
+  "candidate_id": "team07-shock-diffusion-center-v1",
+  "family_id": "shock-diffusion-v1",
+  "parameters": {
+    "diffusion_multiplier": 1.0,
+    "funding_carry_multiplier": 6.0,
+    "funding_lookback_events": 21,
+    "gross_target": 0.8,
+    "idiosyncratic_reversion": 0.12,
+    "interval_hours": 8,
+    "leader_fraction": 0.2,
+    "liquidity_lookback_bars": 90,
+    "lookback_bars": 189,
+    "maximum_directional_net": 0.16,
+    "maximum_symbol_weight": 0.09,
+    "minimum_leaders": 4,
+    "minimum_names_per_side": 6,
+    "minimum_observations": 126,
+    "minimum_universe": 16,
+    "rebalance_every_bars": 3,
+    "shock_winsor_sigma": 2.5,
+    "trend_bars": 126,
+    "trend_z_scale": 2.0
+  },
+  "risk_policy_path": "tournament/top40-v2/teams/team-07/risk_policy.json",
+  "schema_version": 1,
+  "seed": 20260801,
+  "status": "prospective-unregistered",
+  "strategy_entrypoint": "strategy.py"
+}
+
