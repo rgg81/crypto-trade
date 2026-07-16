@@ -52,7 +52,7 @@
   "critic_lock": null,
   "final_oos_lock": null,
   "finalist_cohort_lock": null,
-  "legacy_projection_sha256": "5d2fa13666ae4cdf6dbb3f293369f3b76df07e576ce82f0a8701db21a7246494",
+  "legacy_projection_sha256": "b2780e5e391575b144ea302ac7e9630588be3c79bf6b762219f91469d3e27be8",
   "legacy_state_sha256": "8c858495fde6ddde203124a055e40ebad5d8d5a684cd20f0e55f6c88f7360b07",
   "objective_lock": null,
   "organizer_audit": {
@@ -139,13 +139,13 @@
       "trial_count": 2
     },
     "team-04": {
-      "active_family_id": "team-04-broad-exhaustion-reversal-v1",
+      "active_family_id": "team-04-path-adaptive-relative-dynamics-v1",
       "canonical_result": null,
       "development_assessment": null,
       "dnf": null,
-      "family_count": 2,
+      "family_count": 3,
       "finalist_freeze": null,
-      "pivot_count": 1,
+      "pivot_count": 2,
       "private_attempts": 0,
       "private_result": null,
       "qualifier_candidate": null,
