@@ -22,7 +22,7 @@ does not mutate `pivot-01/submission.json`.
 
 ```bash
 uv run python tournament/top40-v2/teams/team-03/pivot-01/prepare_preregistration.py family --timestamp-utc YYYY-MM-DDTHH:MM:SS.ffffffZ > /tmp/team03-pivot01-family-registration.json
-uv run python scripts/top40_v2_tournament_active.py register-family team-03 /tmp/team03-pivot01-family-registration.json
+uv run python scripts/top40_v2_tournament_active.py pivot-team team-03 /tmp/team03-pivot01-family-registration.json
 uv run python scripts/top40_v2_tournament_active.py research-status
 ```
 

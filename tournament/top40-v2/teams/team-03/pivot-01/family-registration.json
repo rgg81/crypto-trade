@@ -1,0 +1,59 @@
+{
+  "economic_thesis": "A high-volume BTC-beta-residual impulse is tradable only after the next fully closed 8-hour residual reverses sign, evidencing absorption rather than assuming immediate mean reversion.",
+  "expected_regime_roles": {
+    "bear": "The confirmed positive-impulse reversal should support the short sleeve; the frozen BTC trend tilt moves five gross percentage points toward short.",
+    "bull": "The confirmed negative-impulse reversal should support the long sleeve; the frozen BTC trend tilt moves five gross percentage points toward long.",
+    "chop": "Symmetric confirmed overshoots should provide the primary combined return source.",
+    "long_sleeve": "Buy negative three-bar beta-residual impulses only after the next closed residual is positive.",
+    "short_sleeve": "Short positive three-bar beta-residual impulses only after the next closed residual is negative.",
+    "stress": "Sign confirmation is hypothesized to reject continuing shocks, but insolvency and drawdown remain immediate falsifiers rather than control triggers."
+  },
+  "falsifier": "Reject immediately for causal failure, nondeterminism, invalid execution, missing terminal evidence, or insolvency. Reject the no-control base for failure of any frozen development, fold, cost, regime, sleeve, activity or concentration gate. Only a complete base pass activates four fixed one-axis neighbors; any base or neighborhood failure makes Team 03 DNF without controls or a second pivot.",
+  "family_id": "t03-confirmed-residual-shock-absorption-v1",
+  "mechanism": "Daily cross-sectional reversal of high-volume BTC-beta-residual impulses only after one subsequent fully closed 8-hour residual reverses sign, with past funding crowding used for ranking and a frozen slow BTC trend gross tilt.",
+  "parameter_ranges": {
+    "beta_lookback_days": [
+      21,
+      30,
+      45
+    ],
+    "confirmation_horizon_bars": [
+      1
+    ],
+    "directional_gross_tilt": [
+      0.05
+    ],
+    "funding_weight": [
+      0.25
+    ],
+    "rank_tail_fraction": [
+      0.25
+    ],
+    "residual_volatility_lookback_days": [
+      21
+    ],
+    "shock_horizon_bars": [
+      1,
+      3,
+      6
+    ],
+    "total_gross": [
+      0.8
+    ],
+    "trend_lookback_days": [
+      60
+    ],
+    "trend_threshold": [
+      0.1
+    ],
+    "volume_amplifier": [
+      0.35
+    ]
+  },
+  "parent_family_id": "t03-residual-liquidity-shock-absorption-v1",
+  "registered_at_utc": "2026-07-16T12:11:47.667717Z",
+  "risk_policy_plan": "Use only the unchanged no-control policy. No risk-control variant is authorized; a failed base or fixed neighborhood makes Team 03 DNF.",
+  "schema_version": 1,
+  "selection_metric": "Noncompensatory hard/development/fold/regime/sleeve/cost/activity gates first, then the fixed four-neighbor stability gate. Any failure ends Team 03 as DNF.",
+  "team_id": "team-03"
+}
