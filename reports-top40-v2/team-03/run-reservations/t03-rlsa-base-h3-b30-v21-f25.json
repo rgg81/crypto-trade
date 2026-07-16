@@ -1,0 +1,15 @@
+{
+  "candidate_id": "t03-rlsa-base-h3-b30-v21-f25",
+  "config_sha256": "bd0e4f70bcf335b2ac4e44ec049b89b8e8eaf4c6ac6502574d0accf12d9d9947",
+  "organizer_journal_head_sha256": "00adeeec2776262218e5a3937d8d9bc0581581924e366ffe0b2eaa9d08081fca",
+  "private_attempt_number": null,
+  "registration_sha256": "f295e81e2cb443659de88d41370a97cba69cb21beaa4e031a9d3c3a62c05428e",
+  "reserved_at_utc": "2026-07-16T11:08:23.534264+00:00",
+  "risk_policy_sha256": "5d862a75a08b6ffbb4683789efbb1b7338b30f024ddf381d1a95736148702bbc",
+  "schema_version": 1,
+  "source_bundle_sha256": "50de628803f4ff714f3e36c3a4ec11c8b017a69ad0993c02bd92891a3086e73a",
+  "stage": "development",
+  "strategy_sha256": "1d867c254b6456560dbd55a63f470e300cd901929ca5aee26cd360891635cd57",
+  "team_id": "team-03",
+  "tournament": "quant-portfolio-blind-top40-v2"
+}
