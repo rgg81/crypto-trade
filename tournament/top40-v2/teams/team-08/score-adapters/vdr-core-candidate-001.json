@@ -1,0 +1,26 @@
+{
+  "adapter_id": "top40-v2-declared-score-boundary-v1",
+  "candidate_id": "vdr-core-candidate-001",
+  "capture_boundary": "candidate-declared-post-transform-pre-selection-weight-cap-risk",
+  "family_id": "volatility-dispersion-release-v1",
+  "hook": "strategy.score_boundary",
+  "label": {
+    "executable_price_column": "open",
+    "holding_horizon_hours": 24,
+    "label_id": "manifest-horizon-simple-executable-open-to-open-return-v1",
+    "minimum_pairs": 240,
+    "purge_cross_fold_endpoints": true,
+    "return_definition": "simple-executable-open-to-open",
+    "score_direction": "higher-score-higher-return",
+    "statistic_id": "globally-pooled-pearson-v1"
+  },
+  "schedule_utc": {
+    "anchor_timestamp_utc": "1970-01-01T00:00:00Z",
+    "interval_hours": 24
+  },
+  "schema_version": 1,
+  "score_description": "Higher final VDR scores identify pure-crypto contracts selected for continuation after compression and broad dispersion, or for convergence after failed low-dispersion releases; they predict higher executable open-to-open returns over the exact 24-hour holding interval before selection, sizing, caps, or risk.",
+  "semantic_coupling_review_sha256": "d22731ac00e8ff9c1cfb71acf44e39b5d896fa909d6a1653bb941cf28257a451",
+  "stage": "development",
+  "team_id": "team-08"
+}
