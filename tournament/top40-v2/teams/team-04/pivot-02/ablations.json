@@ -1,0 +1,52 @@
+{
+  "budget": {
+    "causal_diagnostics": 4,
+    "cumulative_team_limit": 80,
+    "family_maximum": 21,
+    "neighbors_additional": 8,
+    "reference": 1,
+    "risk_cost_observations": 8
+  },
+  "causal_diagnostics": [
+    {
+      "change": "minimum_trend_blend=1 and coherence contribution disabled",
+      "deployable": false,
+      "id": "pard-trend-only",
+      "question": "Does displacement reversal improve the established continuation mechanism?"
+    },
+    {
+      "change": "minimum_trend_blend=0 and coherence fixed at zero",
+      "deployable": false,
+      "id": "pard-displacement-reversal-only",
+      "question": "Does established continuation improve pure recent reversal?"
+    },
+    {
+      "change": "coherence fixed at zero with minimum_trend_blend=0.35",
+      "deployable": false,
+      "id": "pard-no-path-adaptation",
+      "question": "Does path coherence add causal value beyond a fixed trend/reversal mixture?"
+    },
+    {
+      "change": "invert the displacement sign to continuation",
+      "deployable": false,
+      "id": "pard-displacement-sign-flip",
+      "question": "Does low-coherence displacement reverse rather than continue?"
+    }
+  ],
+  "family_id": "team-04-path-adaptive-relative-dynamics-v1",
+  "global_stop": "Observe only the exact no-control reference first. Stop before every neighbor, ablation, or risk arm unless it clears net Sharpe 0.75, annualized return strictly above zero, Calmar 0.40, maximum drawdown 0.30, doubled-cost Sharpe 0.35, four of six profitable folds, positive-quarter fraction 0.55, trial-adjusted positive probability 0.90, every declared regime/role/sleeve/activity/concentration gate, pooled and four-of-six positive score IC, complete scheduled A5 evidence, and independent semantic review. Unavailable evidence fails. After that center gate, require at least seven of nine profitable neighborhood cells (fraction at least 0.70) and median neighborhood Sharpe 0.50 before observing any risk factorial.",
+  "reference": {
+    "candidate_id": "team-04-pard-reference-001",
+    "no_control_first": true,
+    "status": "promoted-static-package-not-validated-not-registered-not-run"
+  },
+  "risk_factorial": {
+    "allowed_only_after_complete_no_control_core_and_neighborhood_qualification": true,
+    "arms": ["none", "volatility-target-only", "drawdown-brake-only", "combined"],
+    "cost_multipliers": [1.0, 2.0],
+    "disabled": ["position-stop", "time-stop", "turnover-limit", "side-scaling", "same-boundary-reentry"]
+  },
+  "schema_version": 1,
+  "selection_order": ["all non-compensatory gates", "positive folds", "worst regime Sharpe", "worst fold Sharpe", "doubled-cost Sharpe", "median fold Sharpe", "aggregate Sharpe", "Calmar", "lower drawdown", "lower turnover", "candidate_id"],
+  "team_id": "team-04"
+}

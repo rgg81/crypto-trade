@@ -1,0 +1,37 @@
+{
+  "commands": [
+    {
+      "command": "uv run ruff check tournament/top40-v2/teams/team-04/pivot-02/strategy.py tournament/top40-v2/teams/team-04/pivot-02/test_strategy.py",
+      "purpose": "static lint",
+      "status": "PASSED"
+    },
+    {
+      "command": "uv run ruff format --check tournament/top40-v2/teams/team-04/pivot-02/strategy.py tournament/top40-v2/teams/team-04/pivot-02/test_strategy.py",
+      "purpose": "format verification without mutation",
+      "status": "PASSED"
+    },
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 uv run pytest -q tournament/top40-v2/teams/team-04/pivot-02/test_strategy.py",
+      "purpose": "synthetic market-data-free behavior tests",
+      "status": "PASSED_14_TESTS"
+    },
+    {
+      "command": "uv run python scripts/top40_v2_tournament_runtime_preload_v7.py validate-risk-policy tournament/top40-v2/teams/team-04/pivot-02/risk_policy.json",
+      "purpose": "active-authority no-control policy validation",
+      "status": "PASSED_VALID_DISABLED_POLICY"
+    },
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 uv run pytest -q tournament/top40-v2/teams/team-04/test_strategy.py",
+      "purpose": "byte-identical promoted-root behavior and governance tests",
+      "status": "PASSED_14_TESTS"
+    },
+    {
+      "command": "uv run python scripts/top40_v2_tournament_runtime_preload_v7.py validate-risk-policy tournament/top40-v2/teams/team-04/risk_policy.json",
+      "purpose": "byte-identical promoted-root no-control policy validation",
+      "status": "PASSED_VALID_DISABLED_POLICY"
+    }
+  ],
+  "execution_precondition": "All validation is organizer-owned and serial. Registration and execution remain blocked until independent A5 review/materialization is complete, the second/final pivot family is explicitly registered, and the final post-pivot source hash is computed.",
+  "schema_version": 1,
+  "team_id": "team-04"
+}

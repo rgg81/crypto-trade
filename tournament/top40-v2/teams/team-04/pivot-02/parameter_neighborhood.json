@@ -1,0 +1,26 @@
+{
+  "candidate_center": "team-04-pard-reference-001",
+  "evaluation_sequence": [
+    "observe-exact-no-control-center-only",
+    "require-every-core-and-a5-pre-neighbor-gate",
+    "observe-eight-frozen-one-axis-neighbors-only-if-center-qualified",
+    "require-neighborhood-stability-before-any-risk-factorial"
+  ],
+  "family_id": "team-04-path-adaptive-relative-dynamics-v1",
+  "minimum_median_sharpe": 0.5,
+  "minimum_profitable_count": 7,
+  "minimum_profitable_fraction": 0.7,
+  "neighbors": [
+    {"axis": "established_bars", "value": 45},
+    {"axis": "established_bars", "value": 81},
+    {"axis": "displacement_bars", "value": 3},
+    {"axis": "displacement_bars", "value": 9},
+    {"axis": "minimum_trend_blend", "value": 0.2},
+    {"axis": "minimum_trend_blend", "value": 0.5},
+    {"axis": "selected_fraction_per_side", "value": "1/5"},
+    {"axis": "selected_fraction_per_side", "value": "3/10"}
+  ],
+  "size_including_center": 9,
+  "status": "preregistered-unobserved-noncircular-core-and-a5-gates-must-pass-first",
+  "team_id": "team-04"
+}

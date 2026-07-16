@@ -1,0 +1,114 @@
+{
+  "causality_tests": [
+    {
+      "failure_condition": "Any prefix score or target changes.",
+      "name": "future_append_corruption_truncation",
+      "procedure": "Append, corrupt, and remove rows strictly after decision time minus 8h and compare exact scores and targets."
+    },
+    {
+      "failure_condition": "Organizer-equivalent UTC encodings produce different observations.",
+      "name": "timestamp_storage_equivalence",
+      "procedure": "Compare aware, timezone-naive UTC, and integer epoch close-time representations."
+    },
+    {
+      "failure_condition": "Input order changes score bytes, membership, or targets.",
+      "name": "deterministic_order",
+      "procedure": "Reverse symbol order and price-row order under seed 20260801."
+    },
+    {
+      "failure_condition": "A score reads or serializes an outcome label.",
+      "name": "label_free_a5_boundary",
+      "procedure": "Inject opaque outcome-like auxiliary values and require identical exact score dictionaries."
+    }
+  ],
+  "decision_contract": {
+    "bar_cutoff": "decision_time minus 8h",
+    "insufficient_scheduled": "empty mapping after exactly one score_boundary({}) call",
+    "non_rebalance": "None holds",
+    "off_grid": "empty mapping with no score_boundary call",
+    "rebalance_rule": "nonnegative integer 8h epoch index modulo 6 equals zero",
+    "runtime_seed": 20260801
+  },
+  "derived_features": [
+    {
+      "availability": "69 contiguous eight-hour returns from 70 unique positive closes through the lagged cutoff",
+      "formula": "L=sum(first 63)/(sigma*sqrt(63)); M=sum(last 21 of first 63)/(sigma*sqrt(21)); D=sum(final 6)/(sigma*sqrt(6))",
+      "id": "standardized_established_confirmation_displacement",
+      "inputs": ["completed_transaction_closes"],
+      "missing_rule": "Exclude symbol for insufficient history, duplicate valid close time, nonpositive or nonfinite close, gap, sigma below 1e-6, or latest close more than 16h stale."
+    },
+    {
+      "availability": "seven three-day blocks from the established path",
+      "formula": "C=clip(2*fraction(block sign agrees with established sign)-1,0,1)",
+      "id": "path_coherence",
+      "inputs": ["standardized_established_confirmation_displacement"],
+      "missing_rule": "C=0 when the absolute established-path sum is at most 1e-12; otherwise inherit feature exclusion."
+    },
+    {
+      "availability": "at least 20 complete current pure-crypto symbols",
+      "formula": "trend=.60*rank(L)+.40*rank(M); blend=.35+.65*C; raw=blend*trend-(1-blend)*rank(D); score=rank(raw)",
+      "id": "pard_ranked_path_adaptive_relative_dynamics",
+      "inputs": ["standardized_established_confirmation_displacement", "path_coherence", "point_in_time_eligibility"],
+      "missing_rule": "Flat if fewer than 20 complete symbols or any rank is invalid."
+    },
+    {
+      "availability": "finite final scores at a scheduled boundary",
+      "formula": "K=max(6,floor(N/4)); top K long, bottom K short; equal 0.25 side budgets and 0.03 cap",
+      "id": "target_weights",
+      "inputs": ["pard_ranked_path_adaptive_relative_dynamics"],
+      "missing_rule": "Flat if every selected long is not strictly positive, every selected short is not strictly negative, or any sleeve, cap, gross, or net invariant fails."
+    }
+  ],
+  "family_id": "team-04-path-adaptive-relative-dynamics-v1",
+  "forbidden_inputs": [
+    "future or unclosed price rows",
+    "stablecoins, metals, commodities, indexes, equities, or other TradFi proxies",
+    "funding, mark price, OHLC shape, volume, order flow, or order book",
+    "organizer regime, common-market direction, position, fill, fee, equity, drawdown, or PnL",
+    "forward label or outcome passed through context auxiliary",
+    "private/final observations, V1 results, other teams, ballots, or leaderboards"
+  ],
+  "parent_family_id": "team-04-broad-exhaustion-reversal-v1",
+  "raw_inputs": [
+    {
+      "availability_timestamp": "close_time<=decision_time-8h",
+      "coverage": "organizer-streamed eight-hour transaction bars for current A6-certified eligible symbols",
+      "event_timestamp": "close_time normalized to UTC",
+      "fields": ["close_time", "close"],
+      "id": "completed_transaction_closes",
+      "lag": "one complete eight-hour bar",
+      "missing_rule": "No fill or interpolation; use only the latest contiguous causal suffix."
+    },
+    {
+      "availability_timestamp": "current decision after organizer pure-crypto reconstitution",
+      "coverage": "A6-certified native-crypto universe intersected with executable symbols",
+      "event_timestamp": "reconstitution_time",
+      "fields": ["eligible_symbols"],
+      "id": "point_in_time_eligibility",
+      "lag": "available at decision",
+      "missing_rule": "Never synthesize membership or add Binance-listed non-crypto proxies."
+    }
+  ],
+  "score_evidence_contract": {
+    "aggregate": "one ordinary Pearson correlation across the union of six disjoint retained fold pools",
+    "aggregate_minimum_pairs": 1440,
+    "endpoint_offset_hours": 48,
+    "endpoint_rule": "Require exactly one finite positive organizer executable open for each emitted symbol at t and t+48h.",
+    "fold_assignment": "Assign a pair only when t and t+48h both lie inside the same development fold; purge boundary crossings.",
+    "fold_count": 6,
+    "fold_minimum_pairs": 240,
+    "fold_minimum_scheduled_decisions": 10,
+    "fold_statistic": "ordinary Pearson across every retained decision-symbol pair without label ranking, timestamp demeaning, timestamp-level averaging, weighting, or Fisher transform",
+    "label": "simple executable-open(t)-to-executable-open(t+48h) return",
+    "neighbor_staging": "Do not observe any neighbor, ablation, or risk arm until the exact no-control reference clears every core and A5 pre-neighbor gate.",
+    "required": "pooled IC>0, at least four of six fold ICs>0, every pair and decision minimum, complete scheduled score-row coverage after warmup, and independent semantic-coupling approval",
+    "schedule_utc": {
+      "anchor_timestamp_utc": "1970-01-01T00:00:00Z",
+      "interval_hours": 48
+    },
+    "unavailable_evidence_action": "fail-reference"
+  },
+  "reference_candidate_id": "team-04-pard-reference-001",
+  "schema_version": 1,
+  "team_id": "team-04"
+}

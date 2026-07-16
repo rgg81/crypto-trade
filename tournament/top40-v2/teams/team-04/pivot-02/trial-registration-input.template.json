@@ -1,0 +1,37 @@
+{
+  "candidate_id": "team-04-pard-reference-001",
+  "config_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "falsifier": "Stop PARD before every later family observation, including every neighbor, ablation, and risk-control arm, unless the exact no-control reference has trades and a nonempty A5 score row at every manifest-scheduled timestamp after warmup; is complete and solvent; has annualized return strictly above 0.00, net Sharpe at least 0.75, Calmar at least 0.40, maximum drawdown at most 0.30, doubled-cost Sharpe at least 0.35, at least four of six profitable folds, positive-quarter fraction at least 0.55, and trial-adjusted positive probability at least 0.90; has bull, bear, and chop returns each strictly above zero, at least three strictly positive Sharpe values across bull, bear, chop, and stress, worst-regime Sharpe at least -0.25, and long-bull, short-bear, and combined-chop returns each strictly above zero; has for each sleeve exposure at least 0.01, active-bar fraction at least 0.10, mean exposure at least 0.01, and executed notional at least 1000 USDT; has maximum positive-PnL concentration at most 0.40; and has pooled 48-hour score IC strictly above zero, at least four of six fold score ICs strictly above zero, at least 240 pairs and ten scheduled decisions per fold, at least 1440 aggregate pairs, complete causal score evidence, and independent semantic-coupling approval. Unavailable evidence is failure. Controls cannot rescue a failed core. Only after every core and A5 pre-neighbor gate passes may the frozen nine-cell neighborhood be observed; at least seven of nine cells, and therefore at least 0.70, must be profitable and neighborhood median Sharpe must be at least 0.50.",
+  "family_id": "team-04-path-adaptive-relative-dynamics-v1",
+  "parameters": {
+    "_top40_v2_score_adapter": {
+      "adapter_id": "top40-v2-declared-score-boundary-v1",
+      "manifest_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "schema_version": 1
+    },
+    "coherence_block_bars": 9,
+    "displacement_bars": 6,
+    "established_bars": 63,
+    "gross_target": 0.5,
+    "long_trend_weight": 0.6,
+    "maximum_staleness_bars": 2,
+    "medium_bars": 21,
+    "medium_trend_weight": 0.4,
+    "minimum_cross_section": 20,
+    "minimum_sleeve_names": 6,
+    "minimum_trend_blend": 0.35,
+    "minimum_volatility": 1e-6,
+    "rebalance_bars": 6,
+    "risk_policy_id": "team-04-pard-reference-no-control",
+    "selected_fraction_per_side": "1/4",
+    "side_budget": 0.25,
+    "symbol_cap": 0.03
+  },
+  "risk_config_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "seed": 20260801,
+  "source_bundle_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "strategy_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "team_id": "team-04",
+  "thesis": "A fixed coherence blend of established relative continuation and independent recent displacement reversal should sustain broad market-neutral alpha across bull, bear, and chop while avoiding BER's structural empty-score failure.",
+  "timestamp_utc": "1970-01-01T00:00:00Z"
+}

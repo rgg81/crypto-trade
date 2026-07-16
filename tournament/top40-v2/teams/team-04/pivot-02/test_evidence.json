@@ -1,0 +1,18 @@
+{
+  "candidate_id": "team-04-pard-reference-001",
+  "commands_run": [
+    "ruff-check-root-and-pivot",
+    "ruff-format-check-root-and-pivot",
+    "pytest-pivot-02-14-passed",
+    "pytest-root-14-passed",
+    "a7-validate-risk-policy-pivot-02-valid-disabled",
+    "a7-validate-risk-policy-root-valid-disabled",
+    "a7-research-status-team-04-valid"
+  ],
+  "family_id": "team-04-path-adaptive-relative-dynamics-v1",
+  "market_data_accessed": false,
+  "material_trial_run": false,
+  "schema_version": 1,
+  "status": "organizer-serial-validation-passed",
+  "team_id": "team-04"
+}
