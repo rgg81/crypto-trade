@@ -1,0 +1,26 @@
+{
+  "adapter_id": "top40-v2-declared-score-boundary-v1",
+  "candidate_id": "t07-two-tape-rank-durability-v1-base",
+  "capture_boundary": "candidate-declared-post-transform-pre-selection-weight-cap-risk",
+  "family_id": "t07-two-tape-rank-durability-v1",
+  "hook": "strategy.score_boundary",
+  "label": {
+    "executable_price_column": "open",
+    "holding_horizon_hours": 168,
+    "label_id": "manifest-horizon-simple-executable-open-to-open-return-v1",
+    "minimum_pairs": 240,
+    "purge_cross_fold_endpoints": true,
+    "return_definition": "simple-executable-open-to-open",
+    "score_direction": "higher-score-higher-return",
+    "statistic_id": "globally-pooled-pearson-v1"
+  },
+  "schedule_utc": {
+    "anchor_timestamp_utc": "1970-01-01T00:00:00Z",
+    "interval_hours": 168
+  },
+  "schema_version": 1,
+  "score_description": "Higher final scores identify native-crypto coins whose same-bar relative-return ranks persist across common-market up and down bars and three non-overlapping time blocks; they predict higher executable open-to-open returns over 168 hours before selection, sizing, caps, or risk.",
+  "semantic_coupling_review_sha256": "9163d514ddd2bd8d8d48fec06ec48416e5b8ee2a371d4bf72608f942f185b35f",
+  "stage": "development",
+  "team_id": "team-07"
+}
