@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "team_id": "team-05",
+  "candidate_id": "team05-crtr-base-v1",
+  "neighbors": [
+    {
+      "neighbor_id": "team05-crtr-n01-slow-50d",
+      "parameter_artifact_path": "neighbors/team05-crtr-n01-slow-50d.json",
+      "parameter_artifact_sha256": "49b56a6c4b504320646afa2a45053287b672fbf0554af19c1267e2ae2f8b4375",
+      "daily_returns_path": "REPLACE_WITH_ORGANIZER_ARTIFACT_PATH_N01",
+      "daily_returns_sha256": "REPLACE_WITH_64_LOWERCASE_HEX"
+    },
+    {
+      "neighbor_id": "team05-crtr-n02-slow-70d",
+      "parameter_artifact_path": "neighbors/team05-crtr-n02-slow-70d.json",
+      "parameter_artifact_sha256": "843485e7df68e33c4d8e90d8c2338762029b6de03c444421cc8a07cebda7a286",
+      "daily_returns_path": "REPLACE_WITH_ORGANIZER_ARTIFACT_PATH_N02",
+      "daily_returns_sha256": "REPLACE_WITH_64_LOWERCASE_HEX"
+    },
+    {
+      "neighbor_id": "team05-crtr-n03-selection-020",
+      "parameter_artifact_path": "neighbors/team05-crtr-n03-selection-020.json",
+      "parameter_artifact_sha256": "33842c8d81f70b60fef2407e09809156ad9d1b4767a80a84bca8eb0af93d642a",
+      "daily_returns_path": "REPLACE_WITH_ORGANIZER_ARTIFACT_PATH_N03",
+      "daily_returns_sha256": "REPLACE_WITH_64_LOWERCASE_HEX"
+    },
+    {
+      "neighbor_id": "team05-crtr-n04-selection-030",
+      "parameter_artifact_path": "neighbors/team05-crtr-n04-selection-030.json",
+      "parameter_artifact_sha256": "1ff533fbe525e3f177ee428dcc18cd11b069046d007f19ff5a7517ef87260556",
+      "daily_returns_path": "REPLACE_WITH_ORGANIZER_ARTIFACT_PATH_N04",
+      "daily_returns_sha256": "REPLACE_WITH_64_LOWERCASE_HEX"
+    },
+    {
+      "neighbor_id": "team05-crtr-n05-gross-050",
+      "parameter_artifact_path": "neighbors/team05-crtr-n05-gross-050.json",
+      "parameter_artifact_sha256": "b0700084645da0c00df4f731bc47b3ed19f785f796d20a648c9d2ac590168ff5",
+      "daily_returns_path": "REPLACE_WITH_ORGANIZER_ARTIFACT_PATH_N05",
+      "daily_returns_sha256": "REPLACE_WITH_64_LOWERCASE_HEX"
+    },
+    {
+      "neighbor_id": "team05-crtr-n06-gross-070",
+      "parameter_artifact_path": "neighbors/team05-crtr-n06-gross-070.json",
+      "parameter_artifact_sha256": "597c0aac494303ddc955ca97268233d1acbc9ab6c436076c02dee3f80812b745",
+      "daily_returns_path": "REPLACE_WITH_ORGANIZER_ARTIFACT_PATH_N06",
+      "daily_returns_sha256": "REPLACE_WITH_64_LOWERCASE_HEX"
+    },
+    {
+      "neighbor_id": "team05-crtr-n07-chop-reversal-015",
+      "parameter_artifact_path": "neighbors/team05-crtr-n07-chop-reversal-015.json",
+      "parameter_artifact_sha256": "a0d5036386c4bab5939fd2cf4d312e251bb06fe4313c2c6ba47bc53befaccb71",
+      "daily_returns_path": "REPLACE_WITH_ORGANIZER_ARTIFACT_PATH_N07",
+      "daily_returns_sha256": "REPLACE_WITH_64_LOWERCASE_HEX"
+    },
+    {
+      "neighbor_id": "team05-crtr-n08-chop-reversal-025",
+      "parameter_artifact_path": "neighbors/team05-crtr-n08-chop-reversal-025.json",
+      "parameter_artifact_sha256": "f829b028bb39802310d90eb0c7c9469a3b3f7a5b04ab3142cb02a381e09a36b0",
+      "daily_returns_path": "REPLACE_WITH_ORGANIZER_ARTIFACT_PATH_N08",
+      "daily_returns_sha256": "REPLACE_WITH_64_LOWERCASE_HEX"
+    }
+  ]
+}

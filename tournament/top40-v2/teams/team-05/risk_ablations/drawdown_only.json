@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "policy_id": "team-05-crtr-conservative-v1",
+  "policy_id": "team-05-crtr-drawdown-only-v1",
   "same_boundary_reentry": false,
   "volatility_target": {
-    "enabled": true,
+    "enabled": false,
     "lookback_days": 30,
     "annualized_target": 0.18,
     "minimum_scale": 0.35,
@@ -28,7 +28,7 @@
     }
   ],
   "position_stop": {
-    "enabled": true,
+    "enabled": false,
     "loss_fraction": 0.12,
     "cooldown_bars": 6
   },
@@ -38,7 +38,7 @@
     "cooldown_bars": 3
   },
   "turnover_limit": {
-    "enabled": true,
+    "enabled": false,
     "maximum_one_way_turnover": 0.18
   },
   "side_scaling": {

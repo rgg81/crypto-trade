@@ -1,0 +1,142 @@
+{
+  "schema_version": 1,
+  "team_id": "team-05",
+  "family_id": "team05-causal-residual-trend-reversal-v1",
+  "base_candidate_id": "team05-crtr-base-v1",
+  "predeclared_before_results": true,
+  "organizer_registration_pending": true,
+  "selection_after_results_forbidden": true,
+  "signal_parameters": "frozen_config.json",
+  "combined_policy": "risk_policy.json",
+  "policy_artifacts": {
+    "none": "risk_ablations/none.json",
+    "volatility_only": "risk_ablations/volatility_only.json",
+    "drawdown_only": "risk_ablations/drawdown_only.json",
+    "position_stop_only": "risk_ablations/position_stop_only.json",
+    "turnover_only": "risk_ablations/turnover_only.json",
+    "combined": "risk_policy.json"
+  },
+  "policy_sha256": {
+    "none": "6d26816cb61be1267084acbf689161baa39d4bbbcb3bb62fe686ec0c8ee5d9b4",
+    "volatility_only": "134e1b7edd66ff0926f671b888a0e5e7d8de6cd88b56a8643a41762a66a11b29",
+    "drawdown_only": "bec52447fa9d60fb32a0a4fca19c4a7b8367514d9abc898c1d65c0c9f91c9c95",
+    "position_stop_only": "9bf0261ef77d915c3644a58ca744a4c00fac038da2a4b981f8a465813bbb6005",
+    "turnover_only": "b0f58fd66420bc38c4ce0838fbbd785cbec1476faad97bfdb151f55d2c3ce0ca",
+    "combined": "9af084c44d5082fb4cd5ab320ba76241d330b601567cdd6a3667f1fcdf523355"
+  },
+  "control_definitions": {
+    "none": [],
+    "volatility_only": ["volatility_target"],
+    "drawdown_only": ["drawdown_brakes"],
+    "position_stop_only": ["position_stop"],
+    "turnover_only": ["turnover_limit"],
+    "combined": ["volatility_target", "drawdown_brakes", "position_stop", "turnover_limit"]
+  },
+  "cells": [
+    {
+      "trial_suffix": "risk-none-cost-base",
+      "candidate_id": "team05-crtr-ab-none-base",
+      "controls": "none",
+      "cost_multiplier": 1.0,
+      "purpose": "uncontrolled economic signal and execution-cost baseline"
+    },
+    {
+      "trial_suffix": "risk-vol-cost-base",
+      "candidate_id": "team05-crtr-ab-vol-base",
+      "controls": "volatility_only",
+      "cost_multiplier": 1.0,
+      "purpose": "isolate exposure scaling during high realized portfolio volatility"
+    },
+    {
+      "trial_suffix": "risk-dd-cost-base",
+      "candidate_id": "team05-crtr-ab-dd-base",
+      "controls": "drawdown_only",
+      "cost_multiplier": 1.0,
+      "purpose": "isolate path-dependent loss containment"
+    },
+    {
+      "trial_suffix": "risk-stop-cost-base",
+      "candidate_id": "team05-crtr-ab-stop-base",
+      "controls": "position_stop_only",
+      "cost_multiplier": 1.0,
+      "purpose": "isolate idiosyncratic persistent-position crash containment"
+    },
+    {
+      "trial_suffix": "risk-turnover-cost-base",
+      "candidate_id": "team05-crtr-ab-turnover-base",
+      "controls": "turnover_only",
+      "cost_multiplier": 1.0,
+      "purpose": "isolate capacity and churn restraint"
+    },
+    {
+      "trial_suffix": "risk-combined-cost-base",
+      "candidate_id": "team05-crtr-base-v1",
+      "controls": "combined",
+      "cost_multiplier": 1.0,
+      "purpose": "canonical candidate policy"
+    },
+    {
+      "trial_suffix": "risk-none-cost-double",
+      "candidate_id": "team05-crtr-ab-none-double",
+      "controls": "none",
+      "cost_multiplier": 2.0,
+      "purpose": "uncontrolled signal cost stress"
+    },
+    {
+      "trial_suffix": "risk-vol-cost-double",
+      "candidate_id": "team05-crtr-ab-vol-double",
+      "controls": "volatility_only",
+      "cost_multiplier": 2.0,
+      "purpose": "volatility-control cost stress"
+    },
+    {
+      "trial_suffix": "risk-dd-cost-double",
+      "candidate_id": "team05-crtr-ab-dd-double",
+      "controls": "drawdown_only",
+      "cost_multiplier": 2.0,
+      "purpose": "drawdown-control cost stress"
+    },
+    {
+      "trial_suffix": "risk-stop-cost-double",
+      "candidate_id": "team05-crtr-ab-stop-double",
+      "controls": "position_stop_only",
+      "cost_multiplier": 2.0,
+      "purpose": "position-stop cost stress"
+    },
+    {
+      "trial_suffix": "risk-turnover-cost-double",
+      "candidate_id": "team05-crtr-ab-turnover-double",
+      "controls": "turnover_only",
+      "cost_multiplier": 2.0,
+      "purpose": "turnover-control cost stress"
+    },
+    {
+      "trial_suffix": "risk-combined-cost-double",
+      "candidate_id": "team05-crtr-ab-combined-double",
+      "controls": "combined",
+      "cost_multiplier": 2.0,
+      "purpose": "canonical candidate doubled-cost gate"
+    }
+  ],
+  "required_central_outputs": [
+    "net_return",
+    "net_sharpe",
+    "maximum_drawdown",
+    "tail_loss",
+    "turnover",
+    "bull_return_and_sharpe",
+    "bear_return_and_sharpe",
+    "chop_return_and_sharpe",
+    "stress_return_and_sharpe",
+    "long_bull_attribution",
+    "short_bear_attribution",
+    "combined_chop_attribution",
+    "stop_count",
+    "brake_count",
+    "cooldown_time",
+    "requested_risk_notional",
+    "filled_risk_notional",
+    "same_boundary_reentry_prevention"
+  ],
+  "interpretation_rule": "The combined policy is fixed ex ante. Individual cells diagnose mechanisms only and cannot be substituted after results. Every cell is a material trial and must be registered first."
+}

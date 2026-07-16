@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "team_id": "team-05",
+  "candidate_id": "team05-crtr-base-v1",
+  "evidence_class": "declared-retrained-out-of-fold",
+  "construction": "Six independent expanding-history replays. The model is a frozen deterministic rule with no learned parameters; each fold artifact binds source, parameters, seed, training cutoff, past-only replay state, and test target hash.",
+  "label_policy": "No forward label is constructed, so label-overlap purge and embargo are not applicable. Every target still executes no earlier than the next transaction open.",
+  "stitching_rule": "Use each fold's test returns exactly once in fold order; no training return enters the stitched series and no gap or overlap is allowed.",
+  "folds": [
+    {
+      "fold_id": "fold-1",
+      "training_start": "2020-01-01",
+      "training_end_inclusive": "2020-02-02",
+      "test_start": "2020-02-03",
+      "test_end_inclusive": "2020-08-31",
+      "model_artifact_path": "folds/fold-1-model.json"
+    },
+    {
+      "fold_id": "fold-2",
+      "training_start": "2020-01-01",
+      "training_end_inclusive": "2020-08-31",
+      "test_start": "2020-09-01",
+      "test_end_inclusive": "2021-02-28",
+      "model_artifact_path": "folds/fold-2-model.json"
+    },
+    {
+      "fold_id": "fold-3",
+      "training_start": "2020-01-01",
+      "training_end_inclusive": "2021-02-28",
+      "test_start": "2021-03-01",
+      "test_end_inclusive": "2021-08-31",
+      "model_artifact_path": "folds/fold-3-model.json"
+    },
+    {
+      "fold_id": "fold-4",
+      "training_start": "2020-01-01",
+      "training_end_inclusive": "2021-08-31",
+      "test_start": "2021-09-01",
+      "test_end_inclusive": "2022-02-28",
+      "model_artifact_path": "folds/fold-4-model.json"
+    },
+    {
+      "fold_id": "fold-5",
+      "training_start": "2020-01-01",
+      "training_end_inclusive": "2022-02-28",
+      "test_start": "2022-03-01",
+      "test_end_inclusive": "2022-08-31",
+      "model_artifact_path": "folds/fold-5-model.json"
+    },
+    {
+      "fold_id": "fold-6",
+      "training_start": "2020-01-01",
+      "training_end_inclusive": "2022-08-31",
+      "test_start": "2022-09-01",
+      "test_end_inclusive": "2023-06-30",
+      "model_artifact_path": "folds/fold-6-model.json"
+    }
+  ],
+  "fold_hard_gates": {
+    "official_minimum_positive_folds": 4,
+    "team05_minimum_positive_folds": 5,
+    "maximum_single_positive_pnl_concentration": 0.35,
+    "failure_is_noncompensatory": true
+  },
+  "status": "PLAN_ONLY_HASHES_PENDING_ORGANIZER_RUN"
+}

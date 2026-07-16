@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "team_id": "team-05",
+  "neighbor_id": "team05-crtr-n05-gross-050",
+  "base_candidate_id": "team05-crtr-base-v1",
+  "one_axis": "target_gross",
+  "overrides": {
+    "target_gross": 0.50
+  },
+  "all_other_parameters": "identical to frozen_config.json",
+  "risk_policy": "identical to risk_policy.json",
+  "activation": "only after base hard-gate pass"
+}

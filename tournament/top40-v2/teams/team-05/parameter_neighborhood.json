@@ -1,0 +1,84 @@
+{
+  "schema_version": 1,
+  "team_id": "team-05",
+  "family_id": "team05-causal-residual-trend-reversal-v1",
+  "base_candidate_id": "team05-crtr-base-v1",
+  "base_parameters_path": "frozen_config.json",
+  "activation_gate": "Do not register or execute any neighbor until the combined-policy base passes every official and Team-05 hard development gate except the neighborhood gates themselves.",
+  "replacement_rule": "A failed, interrupted, or unprofitable neighbor remains in the denominator and cannot be replaced.",
+  "selection_rule": "Neighbors are nonselectable stability probes; only the unchanged base can be frozen.",
+  "common_fixed_inputs": {
+    "strategy_seed": 20260801,
+    "risk_policy_path": "risk_policy.json",
+    "cost_multiplier": 1.0,
+    "fold_plan": "walk_forward_plan.json"
+  },
+  "neighbors": [
+    {
+      "neighbor_id": "team05-crtr-n01-slow-50d",
+      "one_axis": "slow_horizon_days",
+      "base_value": 60,
+      "neighbor_value": 50,
+      "parameter_artifact_path": "neighbors/team05-crtr-n01-slow-50d.json"
+    },
+    {
+      "neighbor_id": "team05-crtr-n02-slow-70d",
+      "one_axis": "slow_horizon_days",
+      "base_value": 60,
+      "neighbor_value": 70,
+      "parameter_artifact_path": "neighbors/team05-crtr-n02-slow-70d.json"
+    },
+    {
+      "neighbor_id": "team05-crtr-n03-selection-020",
+      "one_axis": "selection_fraction",
+      "base_value": 0.25,
+      "neighbor_value": 0.20,
+      "parameter_artifact_path": "neighbors/team05-crtr-n03-selection-020.json"
+    },
+    {
+      "neighbor_id": "team05-crtr-n04-selection-030",
+      "one_axis": "selection_fraction",
+      "base_value": 0.25,
+      "neighbor_value": 0.30,
+      "parameter_artifact_path": "neighbors/team05-crtr-n04-selection-030.json"
+    },
+    {
+      "neighbor_id": "team05-crtr-n05-gross-050",
+      "one_axis": "target_gross",
+      "base_value": 0.60,
+      "neighbor_value": 0.50,
+      "parameter_artifact_path": "neighbors/team05-crtr-n05-gross-050.json"
+    },
+    {
+      "neighbor_id": "team05-crtr-n06-gross-070",
+      "one_axis": "target_gross",
+      "base_value": 0.60,
+      "neighbor_value": 0.70,
+      "parameter_artifact_path": "neighbors/team05-crtr-n06-gross-070.json"
+    },
+    {
+      "neighbor_id": "team05-crtr-n07-chop-reversal-015",
+      "one_axis": "chop_reversal_weight",
+      "base_value": 0.20,
+      "neighbor_value": 0.15,
+      "parameter_artifact_path": "neighbors/team05-crtr-n07-chop-reversal-015.json"
+    },
+    {
+      "neighbor_id": "team05-crtr-n08-chop-reversal-025",
+      "one_axis": "chop_reversal_weight",
+      "base_value": 0.20,
+      "neighbor_value": 0.25,
+      "parameter_artifact_path": "neighbors/team05-crtr-n08-chop-reversal-025.json"
+    }
+  ],
+  "hard_stability_gate": {
+    "official_minimum_profitable_fraction": 0.70,
+    "team05_minimum_profitable_count": 6,
+    "team05_total_neighbor_count": 8,
+    "team05_minimum_profitable_fraction": 0.75,
+    "official_minimum_neighbor_median_sharpe": 0.50,
+    "team05_minimum_neighbor_median_sharpe": 0.55,
+    "all_return_series_must_be_byte_distinct": true
+  },
+  "status": "DRAFT_PREDECLARED_NOT_REGISTERED_OR_ACTIVATED"
+}

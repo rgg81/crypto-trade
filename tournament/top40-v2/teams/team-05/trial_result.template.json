@@ -1,0 +1,21 @@
+{
+  "timestamp_utc": "REPLACE_WITH_RESULT_TIMESTAMP_Z",
+  "team_id": "team-05",
+  "family_id": "team05-causal-residual-trend-reversal-v1",
+  "candidate_id": "REPLACE_WITH_EXACT_REGISTERED_CANDIDATE_ID",
+  "registration_sha256": "REPLACE_WITH_64_LOWERCASE_HEX",
+  "status": "REPLACE_WITH_completed_failed_OR_interrupted",
+  "failure_reason": null,
+  "artifact_hashes": {
+    "development_evidence": "REPLACE_WITH_64_LOWERCASE_HEX",
+    "walk_forward_manifest": "REPLACE_WITH_64_LOWERCASE_HEX",
+    "daily_returns": "REPLACE_WITH_64_LOWERCASE_HEX"
+  },
+  "metrics_summary": {
+    "report_only_central_gate_names_and_permitted_development_metrics": true,
+    "all_hard_gates_pass": "REPLACE_WITH_BOOLEAN",
+    "failed_gate_names": []
+  },
+  "cpu_hours": "REPLACE_WITH_NONNEGATIVE_NUMBER",
+  "wall_clock_hours": "REPLACE_WITH_NONNEGATIVE_NUMBER"
+}

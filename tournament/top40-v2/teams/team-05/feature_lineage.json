@@ -1,0 +1,116 @@
+{
+  "schema_version": 1,
+  "team_id": "team-05",
+  "algorithm_id": "team05-crtr-v1",
+  "decision_boundary": "8h transaction boundary; all feature rows have close timestamp <= decision_time",
+  "raw_inputs": [
+    {
+      "name": "close",
+      "source": "DecisionContext.bars[symbol]['close'] from the frozen Binance USD-M perpetual snapshot",
+      "event_timestamp": "bar close timestamp in the DatetimeIndex",
+      "availability_timestamp": "the same closed-bar timestamp as exposed by DecisionContext",
+      "lag": "zero closed bars; transaction open is not exposed and execution is at the next eligible open",
+      "coverage": "eligible symbols with positive finite closes, a recent close, valid 3d/20d/60d anchors, and >=85% nominal 60d observations",
+      "missing_rule": "omit the symbol; never fill, backfill, cross-fill, or extrapolate"
+    },
+    {
+      "name": "eligible_symbols",
+      "source": "DecisionContext.eligible_symbols",
+      "event_timestamp": "organizer weekly point-in-time membership state intersected with executable-open eligibility",
+      "availability_timestamp": "decision_time",
+      "lag": "organizer-owned point-in-time state",
+      "coverage": "exact supplied membership only",
+      "missing_rule": "empty or fewer than 12 valid symbols requests flat"
+    }
+  ],
+  "derived_features": [
+    {
+      "name": "log_return_3d",
+      "parents": ["close"],
+      "formula": "ln(latest closed price / last price at or before decision_time - 3d)",
+      "availability": "decision_time after both endpoints are closed",
+      "lookback": "3 calendar days",
+      "missing_rule": "omit symbol when anchor gap exceeds 16h"
+    },
+    {
+      "name": "log_return_20d",
+      "parents": ["close"],
+      "formula": "ln(latest closed price / last price at or before decision_time - 20d)",
+      "availability": "decision_time after both endpoints are closed",
+      "lookback": "20 calendar days",
+      "missing_rule": "omit symbol when anchor gap exceeds 16h"
+    },
+    {
+      "name": "log_return_60d",
+      "parents": ["close"],
+      "formula": "ln(latest closed price / last price at or before decision_time - 60d)",
+      "availability": "decision_time after both endpoints are closed",
+      "lookback": "60 calendar days",
+      "missing_rule": "omit symbol when anchor gap exceeds 16h"
+    },
+    {
+      "name": "realized_bar_volatility_20d",
+      "parents": ["close"],
+      "formula": "population standard deviation of consecutive 8h log close changes in trailing 20d",
+      "availability": "decision_time",
+      "lookback": "20 calendar days",
+      "missing_rule": "omit symbol if fewer than 85% nominal observations or volatility <= 1e-8"
+    },
+    {
+      "name": "normalized_horizon_returns",
+      "parents": ["log_return_3d", "log_return_20d", "log_return_60d", "realized_bar_volatility_20d"],
+      "formula": "horizon log return / (8h volatility * sqrt(3 * horizon_days))",
+      "availability": "decision_time",
+      "lookback": "up to 60 days",
+      "missing_rule": "inherit parent omission"
+    },
+    {
+      "name": "cross_sectional_fractional_ranks",
+      "parents": ["normalized_horizon_returns", "eligible_symbols"],
+      "formula": "average-rank ties across valid eligible members, linearly mapped to [-1,1]",
+      "availability": "decision_time after all member features are formed",
+      "lookback": "boundary cross-section only",
+      "missing_rule": "no rank imputation; request flat below 12 valid members"
+    },
+    {
+      "name": "broad_market_direction",
+      "parents": ["log_return_20d", "log_return_60d", "eligible_symbols"],
+      "formula": "0.40 * cross-sectional median 20d return + 0.60 * median 60d return",
+      "availability": "decision_time",
+      "lookback": "60 days",
+      "missing_rule": "computed only on the valid score universe"
+    },
+    {
+      "name": "preconstruction_score",
+      "parents": ["cross_sectional_fractional_ranks", "broad_market_direction", "realized_bar_volatility_20d", "log_return_20d", "log_return_60d"],
+      "formula": "direction-continuous slow/medium/reversal composite times alignment and volatility-reliability discounts, clipped to [-1,1]",
+      "availability": "decision_time",
+      "lookback": "60 days",
+      "missing_rule": "inherit parent omission; invalid map requests flat"
+    }
+  ],
+  "explicit_non_features": [
+    "transaction open",
+    "future close",
+    "funding",
+    "auxiliary data",
+    "positions",
+    "entry basis",
+    "fills",
+    "PnL",
+    "equity",
+    "drawdown",
+    "private or final timestamps",
+    "full-window scalers",
+    "learned coefficients"
+  ],
+  "causality_tests": [
+    "future append invariance",
+    "future corruption invariance",
+    "future truncation invariance",
+    "non-close-column invariance",
+    "point-in-time membership exclusion",
+    "mapping-order invariance",
+    "fresh-instance and seed invariance"
+  ]
+}

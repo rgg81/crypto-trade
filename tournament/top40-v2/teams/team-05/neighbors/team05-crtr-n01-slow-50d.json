@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "team_id": "team-05",
+  "neighbor_id": "team05-crtr-n01-slow-50d",
+  "base_candidate_id": "team05-crtr-base-v1",
+  "one_axis": "slow_horizon_days",
+  "overrides": {
+    "slow_horizon_days": 50
+  },
+  "all_other_parameters": "identical to frozen_config.json",
+  "risk_policy": "identical to risk_policy.json",
+  "activation": "only after base hard-gate pass"
+}
