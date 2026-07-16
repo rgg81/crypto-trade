@@ -1,0 +1,33 @@
+{
+  "amendment_id": "top40-v2-amendment-0003-read-only-status-compatibility",
+  "decision": "approved",
+  "final_implementation_commit": "959e9c21f68c80a5a0f96bd4c32e647223efa614",
+  "implementation_files": {
+    "scripts/top40_v2_tournament_current.py": "fa7c84e3e6338603b79ff3f101bdd93dc77d2833ffcdf1f799ac3e55056f8cc0",
+    "src/crypto_trade/tournament/amended_orchestrator_compat_v3.py": "b7c9be94aca5b4ef7a66a5f59f0a47d0cd52235474eafb576cf0dc37281c066d",
+    "tests/tournament/test_top40_v2_amended_orchestrator_compat.py": "7a915ff99aff5401b68c1e07610d3b971aad4bfdd2ce80746be852f45ed8a6e4",
+    "tournament/top40-v2/amendments/0003/AMENDMENT.md": "76c8f8cd0d6ece396ce1240b67013d6796d64db6907275f7bcfd680b280ab140"
+  },
+  "parent_authority": {
+    "amendment_0001_freeze_sha256": "a897850a205e720002ef9d7c17862a60d60b809da27f998244b64943deaeb439",
+    "amendment_0001_integration_sha256": "a63aa51dd0a83fd19106512dfb519764c655f69a4240757c3561ad3b7ea76e71",
+    "amendment_0002_freeze_sha256": "d95cebdb17ef76ec815f2561e502aa076f9370d29eaa8f2d1ed01c75cf2a76c9",
+    "amendment_0002_integration_sha256": "d3f02cf82672d85108c881ccf94350b0c7a3b05fa73bf7ae65e04baa25ac58e7",
+    "reviewed_run_state_sha256": "f4c706ce0983306b86b17bb59137b4f193d466dd27358970e8306be6a5981921"
+  },
+  "reviewed_at_utc": "2026-07-16T10:03:00Z",
+  "reviewer": "v2_design_review",
+  "scope": {
+    "non_status_delegation_unchanged": true,
+    "projection_recovery_disabled": true,
+    "research_status_only": true,
+    "shared_result_transition_lock": true,
+    "writes_or_rollbacks_added": false
+  },
+  "tests": {
+    "combined_adapter_tests": "11 passed",
+    "production_tree_bytes_and_modes_preserved": true,
+    "real_lock_blocking_exercised": true,
+    "ruff": "passed"
+  }
+}
