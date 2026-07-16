@@ -1,0 +1,23 @@
+{
+  "candidate_id": "t08-volatility-scaled-rank-persistence-v1-base",
+  "decision": "approve",
+  "declared_capture_boundary": "candidate-declared-post-transform-pre-selection-weight-cap-risk",
+  "executable_source_manifest_path": "tournament/top40-v2/teams/team-08/score-adapters/t08-volatility-scaled-rank-persistence-v1-base.executable-source-manifest.json",
+  "executable_source_manifest_sha256": "9a88e64aefc0a14261171f500f276c48837cf1a36cea383390a3b7f80dc897e5",
+  "family_id": "t08-volatility-scaled-rank-persistence-v1",
+  "findings": {
+    "direct_hook_call_found": true,
+    "hook_after_declared_score_transform": true,
+    "hook_before_selection_weight_caps_and_risk": true,
+    "no_decoy_or_transient_score_path_found": true,
+    "score_object_is_declared_model_ranking_signal": true
+  },
+  "hook": "strategy.score_boundary",
+  "review_kind": "top40-v2-score-semantic-coupling-static-review-v1",
+  "reviewed_at_utc": "2026-07-16T22:56:54Z",
+  "reviewer_id": "team08-pivot2-static-reviewer",
+  "runtime_proof_limit": "static-review-attestation-not-runtime-semantic-proof",
+  "schema_version": 1,
+  "strategy_sha256": "3c7a36d1f9c868d330fb5f445ea7ca5dce213099a66190b88d43ea8e16db9800",
+  "team_id": "team-08"
+}
