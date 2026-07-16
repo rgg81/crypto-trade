@@ -9,12 +9,14 @@
   "artifact_hashes": {
     "development_evidence": "REPLACE_WITH_64_LOWERCASE_HEX",
     "walk_forward_manifest": "REPLACE_WITH_64_LOWERCASE_HEX",
-    "daily_returns": "REPLACE_WITH_64_LOWERCASE_HEX"
+    "base_cost_daily_returns": "REPLACE_WITH_64_LOWERCASE_HEX",
+    "doubled_cost_daily_returns": "REPLACE_WITH_64_LOWERCASE_HEX"
   },
   "metrics_summary": {
     "report_only_central_gate_names_and_permitted_development_metrics": true,
     "all_hard_gates_pass": "REPLACE_WITH_BOOLEAN",
-    "failed_gate_names": []
+    "failed_gate_names": [],
+    "both_cost_outputs_present": "REPLACE_WITH_BOOLEAN"
   },
   "cpu_hours": "REPLACE_WITH_NONNEGATIVE_NUMBER",
   "wall_clock_hours": "REPLACE_WITH_NONNEGATIVE_NUMBER"

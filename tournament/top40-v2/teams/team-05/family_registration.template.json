@@ -10,7 +10,7 @@
     "bull": "Long persistent relative winners contribute positively; smooth net tilt modestly favors the long sleeve while shorts remain active.",
     "bear": "Short persistent relative losers contribute positively; smooth net tilt modestly favors the short sleeve while longs remain active in resilient names.",
     "chop": "The reversal component rises toward 20% and balanced sleeves express cross-sectional mean reversion; combined return must be positive.",
-    "stress": "Signal dispersion may persist, but frozen volatility targeting, drawdown brakes, stops, and turnover limits must contain exposure; official worst-regime floor remains mandatory.",
+    "stress": "Signal dispersion may persist; controls can be considered only after broad positive no-control alpha, and the fixed combined policy must contain exposure while clearing the official worst-regime floor.",
     "long_sleeve": "Top quartile causal scores, diversified and capped; required to be positive in bull.",
     "short_sleeve": "Bottom quartile causal scores, diversified and capped; required to be positive in bear."
   },
@@ -28,5 +28,5 @@
     "neighborhood_design": "Base plus exactly eight preregistered one-axis moves listed in parameter_neighborhood.json; no Cartesian grid and no replacement neighbors."
   },
   "selection_metric": "Binary noncompensatory rule: freeze team05-crtr-base-v1 only if every official and Team-05 hard gate, including the full predeclared neighborhood, passes. Neighbors are stability probes and cannot replace the base.",
-  "risk_policy_plan": "Fixed combined policy: 18% 30d volatility target with [0.35,1] scale; drawdown scales 0.75/0.50/0.25/0 at 10%/16%/22%/28%; close-confirmed 12% position stop with six-bar cooldown; 0.18 one-way turnover cap; no time stop or side scaling; no same-boundary reentry. Evaluate no-control, each active control alone, and combined at base and doubled costs."
+  "risk_policy_plan": "Run the top-level no-control policy first. Only after every preregistered broad positive core-alpha minimum passes may four single controls and the fixed combined policy activate. Each of six policy runs emits base and doubled costs. The combined policy in risk_ablations/combined.json must pass all full non-neighborhood gates before any neighbor."
 }

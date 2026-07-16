@@ -1,43 +1,39 @@
 {
   "schema_version": 1,
   "team_id": "team-05",
-  "binding_scope": "local Team-05-authored bytes only; organizer source bundle and dependencies pending",
-  "strategy": {
-    "path": "strategy.py",
-    "sha256": "4e0b455d19958b76b823ae12d16dba95acf24ec593d3439e5afb8f340cf94efe"
-  },
-  "frozen_config": {
-    "path": "frozen_config.json",
-    "sha256": "f5192a09bdee49955be10f6bf9d83ca15b6de6caf88e96cb404dabef4dffc061"
-  },
-  "combined_risk_policy": {
-    "path": "risk_policy.json",
-    "sha256": "9af084c44d5082fb4cd5ab320ba76241d330b601567cdd6a3667f1fcdf523355"
-  },
+  "binding_scope": "Draft paths only; every byte hash was invalidated by remediation and must be recomputed by the organizer.",
+  "strategy": {"path": "strategy.py", "sha256": "RECOMPUTE_AFTER_REMEDIATION"},
+  "frozen_config": {"path": "frozen_config.json", "sha256": "RECOMPUTE_AFTER_REMEDIATION"},
+  "initial_no_control_policy": {"path": "risk_policy.json", "sha256": "RECOMPUTE_AFTER_REMEDIATION"},
   "risk_ablation_policies": {
-    "none": "6d26816cb61be1267084acbf689161baa39d4bbbcb3bb62fe686ec0c8ee5d9b4",
-    "volatility_only": "134e1b7edd66ff0926f671b888a0e5e7d8de6cd88b56a8643a41762a66a11b29",
-    "drawdown_only": "bec52447fa9d60fb32a0a4fca19c4a7b8367514d9abc898c1d65c0c9f91c9c95",
-    "position_stop_only": "9bf0261ef77d915c3644a58ca744a4c00fac038da2a4b981f8a465813bbb6005",
-    "turnover_only": "b0f58fd66420bc38c4ce0838fbbd785cbec1476faad97bfdb151f55d2c3ce0ca"
+    "none": "RECOMPUTE_AFTER_REMEDIATION",
+    "volatility_only": "RECOMPUTE_AFTER_REMEDIATION",
+    "drawdown_only": "RECOMPUTE_AFTER_REMEDIATION",
+    "position_stop_only": "RECOMPUTE_AFTER_REMEDIATION",
+    "turnover_only": "RECOMPUTE_AFTER_REMEDIATION",
+    "combined": "RECOMPUTE_AFTER_REMEDIATION"
   },
+  "candidate_score_contract": {"path": "candidate_score_contract.json", "sha256": "RECOMPUTE_AFTER_REMEDIATION"},
   "neighbor_parameter_artifacts": {
-    "team05-crtr-n01-slow-50d": "49b56a6c4b504320646afa2a45053287b672fbf0554af19c1267e2ae2f8b4375",
-    "team05-crtr-n02-slow-70d": "843485e7df68e33c4d8e90d8c2338762029b6de03c444421cc8a07cebda7a286",
-    "team05-crtr-n03-selection-020": "33842c8d81f70b60fef2407e09809156ad9d1b4767a80a84bca8eb0af93d642a",
-    "team05-crtr-n04-selection-030": "1ff533fbe525e3f177ee428dcc18cd11b069046d007f19ff5a7517ef87260556",
-    "team05-crtr-n05-gross-050": "b0700084645da0c00df4f731bc47b3ed19f785f796d20a648c9d2ac590168ff5",
-    "team05-crtr-n06-gross-070": "597c0aac494303ddc955ca97268233d1acbc9ab6c436076c02dee3f80812b745",
-    "team05-crtr-n07-chop-reversal-015": "a0d5036386c4bab5939fd2cf4d312e251bb06fe4313c2c6ba47bc53befaccb71",
-    "team05-crtr-n08-chop-reversal-025": "f829b028bb39802310d90eb0c7c9469a3b3f7a5b04ab3142cb02a381e09a36b0"
+    "team05-crtr-n01-slow-50d": "RECOMPUTE_AFTER_REMEDIATION",
+    "team05-crtr-n02-slow-70d": "RECOMPUTE_AFTER_REMEDIATION",
+    "team05-crtr-n03-selection-020": "RECOMPUTE_AFTER_REMEDIATION",
+    "team05-crtr-n04-selection-030": "RECOMPUTE_AFTER_REMEDIATION",
+    "team05-crtr-n05-gross-050": "RECOMPUTE_AFTER_REMEDIATION",
+    "team05-crtr-n06-gross-070": "RECOMPUTE_AFTER_REMEDIATION",
+    "team05-crtr-n07-chop-reversal-015": "RECOMPUTE_AFTER_REMEDIATION",
+    "team05-crtr-n08-chop-reversal-025": "RECOMPUTE_AFTER_REMEDIATION"
   },
   "pending": [
+    "amendment_0005_freeze_and_score_adapter_protocol_sha256",
     "organizer_source_bundle_sha256",
     "dependency_lock_sha256",
-    "fold_target_sha256_values",
-    "fold_model_artifact_sha256_values",
+    "all_remediated_team05_file_sha256_values",
+    "organizer_equal_fold_derivation_sha256",
+    "fold_target_and_model_sha256_values",
     "stitched_daily_returns_sha256",
+    "candidate_score_label_and_ic_sha256_values",
     "neighbor_daily_returns_sha256_values"
   ],
-  "status": "DRAFT_RECOMPUTE_AFTER_ANY_EDIT"
+  "status": "DRAFT_ALL_PRIOR_HASHES_INVALID_RECOMPUTE_BEFORE_REGISTRATION"
 }

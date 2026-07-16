@@ -9,8 +9,8 @@
   "selection_rule": "Neighbors are nonselectable stability probes; only the unchanged base can be frozen.",
   "common_fixed_inputs": {
     "strategy_seed": 20260801,
-    "risk_policy_path": "risk_policy.json",
-    "cost_multiplier": 1.0,
+    "risk_policy_path": "risk_ablations/combined.json",
+    "evaluator_cost_outputs": [1.0, 2.0],
     "fold_plan": "walk_forward_plan.json"
   },
   "neighbors": [

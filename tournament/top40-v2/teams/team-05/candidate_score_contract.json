@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "team_id": "team-05",
+  "family_id": "team05-causal-residual-trend-reversal-v1",
+  "first_candidate_id": "team05-crtr-core-v1",
+  "signal_definition_id": "team05-crtr-base-v1",
+  "applies_to": "the unchanged CRTR score producer across all declared risk policies and one-axis neighbors",
+  "status": "PROSPECTIVE_BLOCKED_UNTIL_AMENDMENT_0005_FREEZE",
+  "candidate_ordinal_within_family": 1,
+  "score_boundary": {
+    "producer": "strategy.preconstruction_scores",
+    "hook_import": "crypto_trade.tournament.score_adapter_protocol_v5.score_boundary",
+    "hook_input": "built-in dict[str,float] with sorted symbol insertion order and finite scores",
+    "timing": "after every declared score transform and before score-span checks, asset selection, sleeve construction, or weighting",
+    "identity_requirement": "Amendment 0005 hook must return the same keys and finite float values; strategy construction consumes the returned mapping",
+    "score_direction": "higher score predicts higher simple executable-open-to-open return"
+  },
+  "label": {
+    "name": "forward_3d_simple_executable_open_to_open_return",
+    "score_time": "decision_time",
+    "entry": "organizer-authoritative executable transaction open used for a target produced at decision_time; the price is never exposed to the strategy",
+    "exit": "first organizer-authoritative executable transaction open at or after entry_time + 3 calendar days",
+    "formula": "exit_open / entry_open - 1",
+    "price_requirements": "both opens must be finite and strictly positive",
+    "membership_requirements": "symbol must be in the score map and executable at both endpoints",
+    "missing_rule": "omit the symbol-boundary observation; never substitute, carry, fill, or shorten the horizon",
+    "overlap_rule": "labels are diagnostic only; compute each scheduled score boundary independently and do not use labels as strategy inputs"
+  },
+  "information_coefficient": {
+    "unit": "scheduled score boundary",
+    "paired_universe": "intersection of score-map symbols and valid labels under the label rule",
+    "minimum_pairs": 12,
+    "statistic": "Spearman rank correlation, implemented as Pearson correlation of average ranks",
+    "ties": "exact average ranks for both score and label; symbol text is only a deterministic serialization tie-breaker",
+    "undefined_rule": "omit boundary IC when fewer than 12 pairs or either ranked vector has zero variance",
+    "aggregation": "report the count, arithmetic mean, median, positive fraction, and complete ordered boundary-IC series; no value is a qualification gate unless Amendment 0005 says so"
+  },
+  "canonical_score_payload": {
+    "function": "strategy.candidate_score_payload_bytes",
+    "encoding": "UTF-8 JSON plus one LF",
+    "json_options": "allow_nan=false, ensure_ascii=true, separators=(',', ':'), sort_keys=true",
+    "shape": "{schema_version:1,scores:[{score:<float>,symbol:<string>}]} with rows sorted by symbol",
+    "byte_invariance": "same causal input must be identical under future append/corruption/truncation, bar-map insertion order, and fresh construction"
+  },
+  "registration_rule": "Do not register or execute any Team-05 candidate until Amendment 0005 and score_adapter_protocol_v5 are frozen and this contract and its manifest are organizer hash-bound."
+}

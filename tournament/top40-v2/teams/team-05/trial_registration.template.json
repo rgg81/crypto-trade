@@ -10,10 +10,10 @@
   "parameters": {
     "base_candidate_id": "team05-crtr-base-v1",
     "strategy_parameters": "frozen_config.json or exactly one declared neighbor override",
-    "risk_ablation_cell": "REPLACE_WITH_EXACT_ABLATIONS_JSON_TRIAL_SUFFIX_OR_NEIGHBOR_COMBINED",
-    "cost_multiplier": "REPLACE_WITH_1.0_OR_2.0",
+    "risk_policy_cell": "REPLACE_WITH_EXACT_ABLATIONS_JSON_TRIAL_SUFFIX_OR_NEIGHBOR_COMBINED",
+    "evaluator_cost_outputs": [1.0, 2.0],
     "fold_plan": "walk_forward_plan.json",
-    "activation_precondition": "base for risk grid; documented base hard-gate pass for neighbors"
+    "activation_precondition": "no-control core first; broad positive core-alpha gate for controls; full combined-policy non-neighborhood gate for neighbors"
   },
   "seed": 20260801,
   "thesis": "CRTR intermediate relative continuation plus direction-conditioned short reversal should support bull-long, bear-short, and combined-chop roles at conservative exposure.",

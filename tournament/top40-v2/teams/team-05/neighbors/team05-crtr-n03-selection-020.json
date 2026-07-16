@@ -8,6 +8,6 @@
     "selection_fraction": 0.20
   },
   "all_other_parameters": "identical to frozen_config.json",
-  "risk_policy": "identical to risk_policy.json",
+  "risk_policy": "identical to risk_ablations/combined.json",
   "activation": "only after base hard-gate pass"
 }

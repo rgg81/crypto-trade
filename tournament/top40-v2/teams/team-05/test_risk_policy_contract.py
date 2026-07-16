@@ -9,12 +9,13 @@ from crypto_trade.tournament.risk_policy import boundary_risk_decision, load_ris
 
 POLICY_PATH = Path(__file__).with_name("risk_policy.json")
 ABLATION_ROOT = Path(__file__).with_name("risk_ablations")
+COMBINED_PATH = ABLATION_ROOT / "combined.json"
 
 
-def test_frozen_policy_parses_and_is_enabled() -> None:
+def test_initial_top_level_policy_parses_and_has_no_controls() -> None:
     policy = load_risk_policy(POLICY_PATH)
-    assert policy.policy_id == "team-05-crtr-conservative-v1"
-    assert policy.enabled
+    assert policy.policy_id == "team-05-crtr-none-v1"
+    assert not policy.enabled
     assert not policy.same_boundary_reentry
 
 
@@ -24,16 +25,22 @@ def test_every_exact_ablation_policy_parses_with_only_declared_controls() -> Non
     drawdown = load_risk_policy(ABLATION_ROOT / "drawdown_only.json")
     position = load_risk_policy(ABLATION_ROOT / "position_stop_only.json")
     turnover = load_risk_policy(ABLATION_ROOT / "turnover_only.json")
+    combined = load_risk_policy(COMBINED_PATH)
 
     assert not none.enabled
     assert volatility.volatility_target.enabled and not volatility.drawdown_brakes
     assert drawdown.drawdown_brakes and not drawdown.volatility_target.enabled
     assert position.position_stop.enabled and not position.turnover_limit.enabled
     assert turnover.turnover_limit.enabled and not turnover.position_stop.enabled
+    assert combined.enabled
+    assert combined.volatility_target.enabled
+    assert combined.drawdown_brakes
+    assert combined.position_stop.enabled
+    assert combined.turnover_limit.enabled
 
 
 def test_drawdown_and_volatility_take_the_more_conservative_scale() -> None:
-    policy = load_risk_policy(POLICY_PATH)
+    policy = load_risk_policy(COMBINED_PATH)
     decision = boundary_risk_decision(
         policy,
         current_drawdown=0.17,
@@ -49,7 +56,7 @@ def test_drawdown_and_volatility_take_the_more_conservative_scale() -> None:
 
 
 def test_close_confirmed_stop_blocks_same_boundary_reentry() -> None:
-    policy = load_risk_policy(POLICY_PATH)
+    policy = load_risk_policy(COMBINED_PATH)
     decision = boundary_risk_decision(
         policy,
         current_drawdown=0.0,
@@ -66,7 +73,7 @@ def test_close_confirmed_stop_blocks_same_boundary_reentry() -> None:
 
 
 def test_existing_cooldown_is_deterministically_sorted_and_blocked() -> None:
-    policy = load_risk_policy(POLICY_PATH)
+    policy = load_risk_policy(COMBINED_PATH)
     decision = boundary_risk_decision(
         policy,
         current_drawdown=0.0,
@@ -79,7 +86,7 @@ def test_existing_cooldown_is_deterministically_sorted_and_blocked() -> None:
 
 
 def test_full_drawdown_brake_requests_zero_gross_without_manufacturing_fill() -> None:
-    policy = load_risk_policy(POLICY_PATH)
+    policy = load_risk_policy(COMBINED_PATH)
     decision = boundary_risk_decision(
         policy,
         current_drawdown=0.28,

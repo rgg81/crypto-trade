@@ -8,6 +8,6 @@
     "slow_horizon_days": 70
   },
   "all_other_parameters": "identical to frozen_config.json",
-  "risk_policy": "identical to risk_policy.json",
+  "risk_policy": "identical to risk_ablations/combined.json",
   "activation": "only after base hard-gate pass"
 }

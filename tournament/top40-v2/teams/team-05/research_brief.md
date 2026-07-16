@@ -24,7 +24,8 @@ one-axis neighbors are profitable. A failure is not eligible to become a submiss
 ## Causal signal and preconstruction score
 
 At a scheduled boundary, the strategy takes only symbols in the supplied point-in-time eligible
-set. It reads only positive finite `close` values timestamped no later than the decision. It does
+set. It reads canonical RangeIndex frames and only positive finite `close` values whose
+`open_time + 8h` is no later than the decision; it never interprets the index as time. It does
 not use funding, auxiliary data, an exposed transaction open, positions, fills, equity, or risk
 state. Histories that are stale, sparse, invalid, or lack a time-valid 60-day anchor are omitted;
 there is no imputation. Fewer than 12 valid symbols requests flat.
@@ -72,13 +73,14 @@ levered or reassigned across sleeves. The target is therefore below organizer li
 
 ## Six chronological folds
 
-The six test windows are contiguous, disjoint, and cover the complete visible development window.
-Each fold is independently replayed from canonical history through its training cutoff, then emits
-only that fold's test targets. The rule has no fitted coefficients, global scaler, feature
-selection, or learned ensemble weight; a fold artifact therefore binds the frozen rule and the
-past-only state established by that replay. Purge and embargo are not applicable because CRTR has
-no forward labels, but a decision-close-to-next-open execution separation is mandatory. Exact
-dates and artifact requirements are in `walk_forward_plan.json`.
+The organizer derives six equal chronological test slices from its canonical complete visible
+development index. Team 05 declares no dates. The slices must be contiguous, disjoint, ordered,
+and exhaustive; every fold is independently replayed from past-only history and emits only that
+fold's test targets. The rule has no fitted coefficients, global scaler, feature selection, or
+learned ensemble weight, but each fold still requires an exact evaluator-derived boundary and
+hash-bound replay declaration before qualification evidence is admissible. The prospective A5
+open-to-open label is diagnostic-only and cannot enter state or targets. Exact materialization
+requirements are in `walk_forward_plan.json`.
 
 ## Hard noncompensatory development gates
 
@@ -107,7 +109,8 @@ least-bad cell.
 
 ## Fixed risk-control plan
 
-The canonical combined policy is frozen in `risk_policy.json`:
+The initial top-level `risk_policy.json` is the no-control policy. The immutable combined policy is
+declared separately in `risk_ablations/combined.json`:
 
 - 30-day realized-volatility target of 18%, scale clamped to `[0.35, 1.00]`;
 - drawdown scales 0.75/0.50/0.25/0.00 at 10%/16%/22%/28% drawdown;
@@ -115,21 +118,27 @@ The canonical combined policy is frozen in `risk_policy.json`:
 - maximum one-way turnover 0.18 per boundary;
 - no time stop, no side scaling, and no same-boundary reentry.
 
-All actions remain evaluator-owned, next-open, costed, and capacity constrained. The complete
-no-control, single-control, combined-control, base-cost, and doubled-cost grid is preregistered in
-`ablations.json`; controls will not be selected opportunistically after seeing results.
+All actions remain evaluator-owned, next-open, costed, and capacity constrained. Exactly six
+policy runs are preregistered in `ablations.json`: no control, four single controls, and combined.
+Every evaluator run emits both base- and doubled-cost evidence, so cost levels are not separately
+registered trials.
 
 ## Research sequence and stopping rule
 
-1. Organizer registers this family and the no-control base-cost signal trial.
-2. Run the fixed risk/cost ablation grid, registering each cell before its result.
-3. The combined-policy base earns a **provisional base pass** only after every non-neighborhood
+1. After the external A5 freeze and family registration, register and run only the no-control core.
+2. Activate no risk control unless the core has strictly positive base- and doubled-cost net return
+   and Sharpe, at least four positive equal chronological folds, positive bull/bear/chop returns,
+   positive long-bull/short-bear/combined-chop roles, and both sleeves meet official activity
+   floors. A negative or one-regime core is falsified; controls cannot rescue it.
+3. After that gate only, run the four single-control diagnostics and immutable combined policy,
+   registering each policy once before its result. Each run yields both cost levels.
+4. The combined-policy base earns a **provisional base pass** only after every non-neighborhood
    official and Team-05 gate above is known and passes.
-4. Only after that provisional pass activate the eight already defined one-axis neighbors.
+5. Only after that provisional pass activate the eight already defined one-axis neighbors.
    Register every activated neighbor before reading it; do not replace a failed neighbor.
-5. A final family pass exists only if the neighborhood gates also pass. Otherwise falsify this
+6. A final family pass exists only if the neighborhood gates also pass. Otherwise falsify this
    family or document a mechanism pivot; never submit the least-bad cell.
 
-Planned maximum for this family is 20 material configurations (12 risk/cost cells and 8
+Planned maximum for this family is 14 material configurations (6 risk-policy cells and 8
 neighbors), leaving budget for honest interruption or a separately registered pivot. No private
 ticket is authorized by this draft.

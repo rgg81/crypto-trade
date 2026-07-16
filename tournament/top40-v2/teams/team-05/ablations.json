@@ -7,23 +7,28 @@
   "organizer_registration_pending": true,
   "selection_after_results_forbidden": true,
   "signal_parameters": "frozen_config.json",
-  "combined_policy": "risk_policy.json",
+  "initial_policy": "risk_policy.json",
+  "combined_policy": "risk_ablations/combined.json",
   "policy_artifacts": {
-    "none": "risk_ablations/none.json",
+    "none": "risk_policy.json",
     "volatility_only": "risk_ablations/volatility_only.json",
     "drawdown_only": "risk_ablations/drawdown_only.json",
     "position_stop_only": "risk_ablations/position_stop_only.json",
     "turnover_only": "risk_ablations/turnover_only.json",
-    "combined": "risk_policy.json"
+    "combined": "risk_ablations/combined.json"
   },
   "policy_sha256": {
-    "none": "6d26816cb61be1267084acbf689161baa39d4bbbcb3bb62fe686ec0c8ee5d9b4",
-    "volatility_only": "134e1b7edd66ff0926f671b888a0e5e7d8de6cd88b56a8643a41762a66a11b29",
-    "drawdown_only": "bec52447fa9d60fb32a0a4fca19c4a7b8367514d9abc898c1d65c0c9f91c9c95",
-    "position_stop_only": "9bf0261ef77d915c3644a58ca744a4c00fac038da2a4b981f8a465813bbb6005",
-    "turnover_only": "b0f58fd66420bc38c4ce0838fbbd785cbec1476faad97bfdb151f55d2c3ce0ca",
-    "combined": "9af084c44d5082fb4cd5ab320ba76241d330b601567cdd6a3667f1fcdf523355"
+    "none": "RECOMPUTE_AFTER_REMEDIATION",
+    "volatility_only": "RECOMPUTE_AFTER_REMEDIATION",
+    "drawdown_only": "RECOMPUTE_AFTER_REMEDIATION",
+    "position_stop_only": "RECOMPUTE_AFTER_REMEDIATION",
+    "turnover_only": "RECOMPUTE_AFTER_REMEDIATION",
+    "combined": "RECOMPUTE_AFTER_REMEDIATION"
   },
+  "evaluator_cost_evidence_per_policy_run": [
+    {"cost_class": "base", "cost_multiplier": 1.0},
+    {"cost_class": "doubled", "cost_multiplier": 2.0}
+  ],
   "control_definitions": {
     "none": [],
     "volatility_only": ["volatility_target"],
@@ -32,93 +37,74 @@
     "turnover_only": ["turnover_limit"],
     "combined": ["volatility_target", "drawdown_brakes", "position_stop", "turnover_limit"]
   },
+  "core_alpha_activation_gate": {
+    "applies_to": "team05-crtr-core-v1 under the no-control policy",
+    "base_cost_net_return_strictly_positive": true,
+    "base_cost_net_sharpe_strictly_positive": true,
+    "doubled_cost_net_return_strictly_positive": true,
+    "doubled_cost_net_sharpe_strictly_positive": true,
+    "minimum_positive_equal_chronological_folds": 4,
+    "required_positive_return_regimes": ["bull", "bear", "chop"],
+    "required_positive_roles": [
+      "long_bull_positive",
+      "short_bear_positive",
+      "combined_chop_positive"
+    ],
+    "both_sleeves_meet_official_activity_floors": true,
+    "activation_rule": "All minima must pass on the no-control core before any controlled policy is registered or executed; a negative or one-regime core is falsified and controls cannot rescue it."
+  },
   "cells": [
     {
-      "trial_suffix": "risk-none-cost-base",
-      "candidate_id": "team05-crtr-ab-none-base",
+      "order": 1,
+      "trial_suffix": "risk-none",
+      "candidate_id": "team05-crtr-core-v1",
       "controls": "none",
-      "cost_multiplier": 1.0,
-      "purpose": "uncontrolled economic signal and execution-cost baseline"
+      "purpose": "uncontrolled core-alpha test and activation gate",
+      "activation": "first and unconditional after family/A5 registration"
     },
     {
-      "trial_suffix": "risk-vol-cost-base",
-      "candidate_id": "team05-crtr-ab-vol-base",
+      "order": 2,
+      "trial_suffix": "risk-vol",
+      "candidate_id": "team05-crtr-ab-vol",
       "controls": "volatility_only",
-      "cost_multiplier": 1.0,
-      "purpose": "isolate exposure scaling during high realized portfolio volatility"
+      "purpose": "isolate exposure scaling during high realized portfolio volatility",
+      "activation": "only after the no-control core-alpha gate passes"
     },
     {
-      "trial_suffix": "risk-dd-cost-base",
-      "candidate_id": "team05-crtr-ab-dd-base",
+      "order": 3,
+      "trial_suffix": "risk-dd",
+      "candidate_id": "team05-crtr-ab-dd",
       "controls": "drawdown_only",
-      "cost_multiplier": 1.0,
-      "purpose": "isolate path-dependent loss containment"
+      "purpose": "isolate path-dependent loss containment",
+      "activation": "only after the no-control core-alpha gate passes"
     },
     {
-      "trial_suffix": "risk-stop-cost-base",
-      "candidate_id": "team05-crtr-ab-stop-base",
+      "order": 4,
+      "trial_suffix": "risk-stop",
+      "candidate_id": "team05-crtr-ab-stop",
       "controls": "position_stop_only",
-      "cost_multiplier": 1.0,
-      "purpose": "isolate idiosyncratic persistent-position crash containment"
+      "purpose": "isolate idiosyncratic persistent-position crash containment",
+      "activation": "only after the no-control core-alpha gate passes"
     },
     {
-      "trial_suffix": "risk-turnover-cost-base",
-      "candidate_id": "team05-crtr-ab-turnover-base",
+      "order": 5,
+      "trial_suffix": "risk-turnover",
+      "candidate_id": "team05-crtr-ab-turnover",
       "controls": "turnover_only",
-      "cost_multiplier": 1.0,
-      "purpose": "isolate capacity and churn restraint"
+      "purpose": "isolate capacity and churn restraint",
+      "activation": "only after the no-control core-alpha gate passes"
     },
     {
-      "trial_suffix": "risk-combined-cost-base",
+      "order": 6,
+      "trial_suffix": "risk-combined",
       "candidate_id": "team05-crtr-base-v1",
       "controls": "combined",
-      "cost_multiplier": 1.0,
-      "purpose": "canonical candidate policy"
-    },
-    {
-      "trial_suffix": "risk-none-cost-double",
-      "candidate_id": "team05-crtr-ab-none-double",
-      "controls": "none",
-      "cost_multiplier": 2.0,
-      "purpose": "uncontrolled signal cost stress"
-    },
-    {
-      "trial_suffix": "risk-vol-cost-double",
-      "candidate_id": "team05-crtr-ab-vol-double",
-      "controls": "volatility_only",
-      "cost_multiplier": 2.0,
-      "purpose": "volatility-control cost stress"
-    },
-    {
-      "trial_suffix": "risk-dd-cost-double",
-      "candidate_id": "team05-crtr-ab-dd-double",
-      "controls": "drawdown_only",
-      "cost_multiplier": 2.0,
-      "purpose": "drawdown-control cost stress"
-    },
-    {
-      "trial_suffix": "risk-stop-cost-double",
-      "candidate_id": "team05-crtr-ab-stop-double",
-      "controls": "position_stop_only",
-      "cost_multiplier": 2.0,
-      "purpose": "position-stop cost stress"
-    },
-    {
-      "trial_suffix": "risk-turnover-cost-double",
-      "candidate_id": "team05-crtr-ab-turnover-double",
-      "controls": "turnover_only",
-      "cost_multiplier": 2.0,
-      "purpose": "turnover-control cost stress"
-    },
-    {
-      "trial_suffix": "risk-combined-cost-double",
-      "candidate_id": "team05-crtr-ab-combined-double",
-      "controls": "combined",
-      "cost_multiplier": 2.0,
-      "purpose": "canonical candidate doubled-cost gate"
+      "purpose": "canonical controlled candidate; must pass every official and Team-05 non-neighborhood gate",
+      "activation": "only after the no-control core-alpha gate passes"
     }
   ],
   "required_central_outputs": [
+    "base_and_doubled_cost_metrics_from_each_policy_run",
     "net_return",
     "net_sharpe",
     "maximum_drawdown",
@@ -138,5 +124,5 @@
     "filled_risk_notional",
     "same_boundary_reentry_prevention"
   ],
-  "interpretation_rule": "The combined policy is fixed ex ante. Individual cells diagnose mechanisms only and cannot be substituted after results. Every cell is a material trial and must be registered first."
+  "interpretation_rule": "The no-control core is first. Controlled cells are diagnostics only until the fixed combined policy passes every full non-neighborhood gate; no single control or neighbor can replace the combined base."
 }

@@ -5,10 +5,12 @@
   "candidate_id": "team05-crtr-base-v1",
   "algorithm_id": "team05-crtr-v1",
   "strategy_seed": 20260801,
+  "seed_rule": "Runtime seed must equal 20260801 exactly or strategy construction fails closed.",
   "data_contract": {
     "transaction_interval": "8h",
-    "decision_input": "past-closed DecisionContext bars only",
-    "required_bar_field": "close",
+    "decision_input": "canonical RangeIndex DecisionContext bar frames only",
+    "required_bar_fields": ["open_time", "close"],
+    "bar_availability_rule": "admit a row only when open_time + 8h <= decision_time; frame index is never a timestamp",
     "funding_used_as_feature": false,
     "auxiliary_used_as_feature": false,
     "membership_source": "DecisionContext.eligible_symbols",
@@ -57,6 +59,14 @@
     "funding_action_order": "funding on carried position, then risk, then strategy rebalance",
     "risk_and_strategy_actions_execute": "next available transaction open"
   },
+  "score_adapter": {
+    "protocol_import": "crypto_trade.tournament.score_adapter_protocol_v5.score_boundary",
+    "boundary": "built-in finite dict[str,float] after all score transforms and before score-span checks or selection",
+    "construction_consumes_returned_values": true,
+    "candidate_score_contract": "candidate_score_contract.json",
+    "candidate_score_manifest": "candidate_score_manifest.template.json",
+    "registration_blocked_until_amendment_0005_frozen": true
+  },
   "noncompensatory_development_gates": {
     "official_minimum_net_sharpe": 0.75,
     "official_minimum_annualized_return": 0.0,
@@ -79,7 +89,11 @@
     "official_maximum_positive_pnl_concentration": 0.40,
     "team05_maximum_positive_pnl_concentration": 0.35
   },
-  "risk_policy_path": "risk_policy.json",
+  "initial_risk_policy_path": "risk_policy.json",
+  "initial_risk_policy_controls": "none",
+  "combined_risk_policy_path": "risk_ablations/combined.json",
+  "control_activation_gate": "all preregistered broad positive no-control core-alpha minima in ablations.json",
+  "neighbor_activation_gate": "combined policy passes every official and Team-05 non-neighborhood gate",
   "selection_rule": "Binary: freeze team05-crtr-base-v1 only if every official and Team-05 gate, including the complete neighborhood, passes. Neighbors are nonselectable stability probes.",
   "status": "DRAFT_UNREGISTERED_DO_NOT_EVALUATE"
 }

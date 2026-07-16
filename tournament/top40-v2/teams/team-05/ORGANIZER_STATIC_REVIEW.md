@@ -37,3 +37,28 @@ Disposition: **NO-GO for registration or execution; mechanism concept retained f
 After remediation, run lint, formatting, synthetic strategy tests, risk-contract tests, and each
 policy validator serially. Do not register the family until every blocker is closed and all draft
 hashes are recomputed.
+
+## Team-05 remediation response
+
+Status: **all team-local corrections authored; registration remains blocked on the external A5
+freeze and all organizer verification/hash-binding steps.** No test, Python, lifecycle, evaluator,
+or Git command was run during remediation.
+
+1. `strategy.py` now requires canonical RangeIndex frames with `open_time` and `close`, ignores the
+   index as time, and admits only rows satisfying `open_time + 8h <= decision_time`.
+2. Synthetic frames use that schema and distinguish an opened-but-unclosed row from the last
+   exactly closed row; future append/corrupt/truncate checks include canonical score bytes.
+3. Every runtime seed other than `20260801` is rejected.
+4. The prospective direct v5 `score_boundary` call is post-transform/pre-selection and its return
+   drives construction. The first-candidate manifest, executable-open-to-open label/IC contract,
+   and byte tests are declared. This item remains externally blocked until Amendment 0005 freezes.
+5. `ablations.json` and `trial_plan.json` declare six policy runs, each with evaluator-produced base
+   and doubled-cost evidence, followed by eight possible neighbors.
+6. The sequence is no-control core, broad positive-alpha activation gate, single/combined controls,
+   full combined-policy gates, then neighbors. Controls cannot rescue a failed core.
+7. Top-level `risk_policy.json` is no-control; the immutable combined declaration is
+   `risk_ablations/combined.json`.
+8. Hand-dated fold declarations were removed. The plan consumes the organizer's exact equal
+   chronological six-fold derivation before any fold evidence becomes admissible.
+
+All earlier exact-looking draft hashes were removed or marked for recomputation.

@@ -2,14 +2,23 @@
   "schema_version": 1,
   "team_id": "team-05",
   "algorithm_id": "team05-crtr-v1",
-  "decision_boundary": "8h transaction boundary; all feature rows have close timestamp <= decision_time",
+  "decision_boundary": "8h transaction boundary; canonical frames have a RangeIndex and a row is admitted only when open_time + 8h <= decision_time",
   "raw_inputs": [
+    {
+      "name": "open_time",
+      "source": "DecisionContext.bars[symbol]['open_time'] from the canonical worker frame",
+      "event_timestamp": "bar open timestamp; the RangeIndex is ignored",
+      "availability_timestamp": "open_time + 8h",
+      "lag": "the row is inadmissible until its fixed 8h close time is no later than decision_time",
+      "coverage": "canonical parseable UTC timestamps only",
+      "missing_rule": "omit the row; omit the symbol if the remaining history fails any coverage or anchor rule"
+    },
     {
       "name": "close",
       "source": "DecisionContext.bars[symbol]['close'] from the frozen Binance USD-M perpetual snapshot",
-      "event_timestamp": "bar close timestamp in the DatetimeIndex",
-      "availability_timestamp": "the same closed-bar timestamp as exposed by DecisionContext",
-      "lag": "zero closed bars; transaction open is not exposed and execution is at the next eligible open",
+      "event_timestamp": "parent open_time plus the fixed 8h bar duration; the frame index has no time meaning",
+      "availability_timestamp": "open_time + 8h",
+      "lag": "admit only when open_time + 8h <= decision_time; transaction open is not exposed and execution is at the next eligible open",
       "coverage": "eligible symbols with positive finite closes, a recent close, valid 3d/20d/60d anchors, and >=85% nominal 60d observations",
       "missing_rule": "omit the symbol; never fill, backfill, cross-fill, or extrapolate"
     },
@@ -26,7 +35,7 @@
   "derived_features": [
     {
       "name": "log_return_3d",
-      "parents": ["close"],
+      "parents": ["open_time", "close"],
       "formula": "ln(latest closed price / last price at or before decision_time - 3d)",
       "availability": "decision_time after both endpoints are closed",
       "lookback": "3 calendar days",
@@ -34,7 +43,7 @@
     },
     {
       "name": "log_return_20d",
-      "parents": ["close"],
+      "parents": ["open_time", "close"],
       "formula": "ln(latest closed price / last price at or before decision_time - 20d)",
       "availability": "decision_time after both endpoints are closed",
       "lookback": "20 calendar days",
@@ -42,7 +51,7 @@
     },
     {
       "name": "log_return_60d",
-      "parents": ["close"],
+      "parents": ["open_time", "close"],
       "formula": "ln(latest closed price / last price at or before decision_time - 60d)",
       "availability": "decision_time after both endpoints are closed",
       "lookback": "60 calendar days",
@@ -50,7 +59,7 @@
     },
     {
       "name": "realized_bar_volatility_20d",
-      "parents": ["close"],
+      "parents": ["open_time", "close"],
       "formula": "population standard deviation of consecutive 8h log close changes in trailing 20d",
       "availability": "decision_time",
       "lookback": "20 calendar days",
@@ -111,6 +120,8 @@
     "non-close-column invariance",
     "point-in-time membership exclusion",
     "mapping-order invariance",
-    "fresh-instance and seed invariance"
+    "fresh-instance invariance",
+    "byte-level candidate-score invariance",
+    "exact canonical-seed rejection"
   ]
 }

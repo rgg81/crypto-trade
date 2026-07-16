@@ -35,28 +35,31 @@ code, or Git command was run. Consequently, all synthetic tests and JSON/schema 
 **authored but unexecuted**, and every result-dependent SHA-256 field is an explicit invalid
 `REPLACE_WITH...` placeholder.
 
-A local `sha256sum` read of Team-05-authored bytes bound the current `strategy.py`,
-`frozen_config.json`, combined/ablation risk policies, and eight neighbor parameter artifacts into
-the fold, ablation, neighborhood, and source-binding drafts. It did not read or hash data, results,
-journals, or external artifacts. The organizer must recompute these hashes after any review edit
-and before registration.
+Earlier local draft hashes were invalidated and removed or marked `RECOMPUTE_AFTER_REMEDIATION`.
+No replacement evidence hashes were fabricated. The organizer must recompute all source, config,
+risk, neighbor, fold, score-contract, and manifest hashes after Amendment 0005 is frozen and before
+registration.
 
 ## Runtime provenance contract
 
-- Runtime dependencies: Python standard library and organizer-provided pandas; the neutral
-  `DecisionContext`/`TargetStrategy` interface is the only tournament import in strategy code.
+- Runtime dependencies: Python standard library, organizer-provided pandas, the neutral
+  `DecisionContext`/`TargetStrategy` interface, and the prospective organizer-owned
+  `score_adapter_protocol_v5.score_boundary` identity hook.
 - Strategy entrypoint: `strategy.build_strategy()`.
-- Frozen seed: `20260801`; randomness is absent and all valid seeds produce the same signal.
+- Frozen seed: `20260801`; every other runtime seed is rejected.
 - No filesystem, network, environment, credentials, reports, staged models, or subprocess access
   exists in the strategy.
 - All algorithm constants are compiled into `StrategyParameters`; `frozen_config.json` is the
   human/machine audit mirror and must be drift-checked before registration.
-- Risk execution is exclusively organizer-owned under `risk_policy.json`.
+- Risk execution is exclusively organizer-owned. `risk_policy.json` is initially no-control;
+  `risk_ablations/combined.json` may activate only after the core-alpha gate.
 
 ## Freeze obligations
 
-Before the first material run, the organizer must verify strategy/config parity, execute the
-synthetic and central integration tests, replace placeholders with exact hashes/paths/timestamps,
-register the family and trial, and bind dependency/source/config/risk bytes in its authoritative
-journal. Later fold, neighbor, private, and final artifacts must be derived only through the
-authorized lifecycle. A mismatch or reproducibility failure falsifies eligibility.
+Before registration or a material run, the organizer must freeze Amendment 0005 and its v5 module,
+verify strategy/config parity, execute the synthetic and central integration tests, replace
+placeholders with exact hashes/paths/timestamps, and bind dependency/source/config/risk/score bytes
+in its authoritative journal. Exact equal chronological fold boundaries must be evaluator-derived
+before fold evidence is recorded. Later fold, neighbor, private, and final artifacts must be
+derived only through the authorized lifecycle. A mismatch or reproducibility failure falsifies
+eligibility.

@@ -2,115 +2,96 @@
   "schema_version": 1,
   "team_id": "team-05",
   "family_id": "team05-causal-residual-trend-reversal-v1",
-  "maximum_planned_material_configurations": 20,
+  "maximum_planned_material_configurations": 14,
   "common_seed": 20260801,
-  "registration_rule": "Every listed cell requires a separate organizer registration before its result is read; failed and interrupted cells consume budget.",
-  "base_stage": [
-    {
+  "cost_accounting": "Each evaluator policy run emits both base-cost and doubled-cost evidence; doubled costs are not separate material configurations.",
+  "registration_rule": "Every activated policy or neighbor requires a separate organizer registration before its result is read; failed and interrupted configurations consume budget.",
+  "core_stage": {
+    "activation": "first policy run after family registration and A5 freeze",
+    "cell": {
       "order": 1,
-      "candidate_id": "team05-crtr-ab-none-base",
-      "definition": "ablations.json:risk-none-cost-base"
+      "candidate_id": "team05-crtr-core-v1",
+      "definition": "ablations.json:risk-none",
+      "risk_policy_path": "risk_policy.json"
     },
-    {
-      "order": 2,
-      "candidate_id": "team05-crtr-ab-vol-base",
-      "definition": "ablations.json:risk-vol-cost-base"
-    },
-    {
-      "order": 3,
-      "candidate_id": "team05-crtr-ab-dd-base",
-      "definition": "ablations.json:risk-dd-cost-base"
-    },
-    {
-      "order": 4,
-      "candidate_id": "team05-crtr-ab-stop-base",
-      "definition": "ablations.json:risk-stop-cost-base"
-    },
-    {
-      "order": 5,
-      "candidate_id": "team05-crtr-ab-turnover-base",
-      "definition": "ablations.json:risk-turnover-cost-base"
-    },
-    {
-      "order": 6,
-      "candidate_id": "team05-crtr-base-v1",
-      "definition": "ablations.json:risk-combined-cost-base"
-    },
-    {
-      "order": 7,
-      "candidate_id": "team05-crtr-ab-none-double",
-      "definition": "ablations.json:risk-none-cost-double"
-    },
-    {
-      "order": 8,
-      "candidate_id": "team05-crtr-ab-vol-double",
-      "definition": "ablations.json:risk-vol-cost-double"
-    },
-    {
-      "order": 9,
-      "candidate_id": "team05-crtr-ab-dd-double",
-      "definition": "ablations.json:risk-dd-cost-double"
-    },
-    {
-      "order": 10,
-      "candidate_id": "team05-crtr-ab-stop-double",
-      "definition": "ablations.json:risk-stop-cost-double"
-    },
-    {
-      "order": 11,
-      "candidate_id": "team05-crtr-ab-turnover-double",
-      "definition": "ablations.json:risk-turnover-cost-double"
-    },
-    {
-      "order": 12,
-      "candidate_id": "team05-crtr-ab-combined-double",
-      "definition": "ablations.json:risk-combined-cost-double"
-    }
-  ],
-  "neighbor_stage": {
-    "activation": "only after provisional base pass on all non-neighborhood hard gates",
+    "pass_gate": "Every preregistered positive and broad core-alpha minimum in ablations.json must pass before any control activates.",
+    "failure_action": "Falsify the mechanism; do not register a single-control, combined-control, or neighbor configuration."
+  },
+  "controlled_stage": {
+    "activation": "only after the no-control core-alpha gate passes",
     "cells": [
       {
-        "order": 13,
+        "order": 2,
+        "candidate_id": "team05-crtr-ab-vol",
+        "definition": "ablations.json:risk-vol"
+      },
+      {
+        "order": 3,
+        "candidate_id": "team05-crtr-ab-dd",
+        "definition": "ablations.json:risk-dd"
+      },
+      {
+        "order": 4,
+        "candidate_id": "team05-crtr-ab-stop",
+        "definition": "ablations.json:risk-stop"
+      },
+      {
+        "order": 5,
+        "candidate_id": "team05-crtr-ab-turnover",
+        "definition": "ablations.json:risk-turnover"
+      },
+      {
+        "order": 6,
+        "candidate_id": "team05-crtr-base-v1",
+        "definition": "ablations.json:risk-combined"
+      }
+    ],
+    "promotion_rule": "Only the fixed combined-policy team05-crtr-base-v1 may be promoted, and only after every official and Team-05 non-neighborhood gate passes."
+  },
+  "neighbor_stage": {
+    "activation": "only after the combined-policy base passes every official and Team-05 gate except the neighborhood gates",
+    "cells": [
+      {
+        "order": 7,
         "candidate_id": "team05-crtr-n01-slow-50d",
         "definition": "neighbors/team05-crtr-n01-slow-50d.json"
       },
       {
-        "order": 14,
+        "order": 8,
         "candidate_id": "team05-crtr-n02-slow-70d",
         "definition": "neighbors/team05-crtr-n02-slow-70d.json"
       },
       {
-        "order": 15,
+        "order": 9,
         "candidate_id": "team05-crtr-n03-selection-020",
         "definition": "neighbors/team05-crtr-n03-selection-020.json"
       },
       {
-        "order": 16,
+        "order": 10,
         "candidate_id": "team05-crtr-n04-selection-030",
         "definition": "neighbors/team05-crtr-n04-selection-030.json"
       },
       {
-        "order": 17,
+        "order": 11,
         "candidate_id": "team05-crtr-n05-gross-050",
         "definition": "neighbors/team05-crtr-n05-gross-050.json"
       },
       {
-        "order": 18,
+        "order": 12,
         "candidate_id": "team05-crtr-n06-gross-070",
         "definition": "neighbors/team05-crtr-n06-gross-070.json"
       },
       {
-        "order": 19,
+        "order": 13,
         "candidate_id": "team05-crtr-n07-chop-reversal-015",
         "definition": "neighbors/team05-crtr-n07-chop-reversal-015.json"
       },
       {
-        "order": 20,
+        "order": 14,
         "candidate_id": "team05-crtr-n08-chop-reversal-025",
         "definition": "neighbors/team05-crtr-n08-chop-reversal-025.json"
       }
     ]
   },
-  "stop_rule": "No neighbor stage after provisional base failure. No private submission after any final hard-gate failure."
+  "stop_rule": "No controls after core failure, no neighbors after combined-policy failure, and no private submission after any final hard-gate failure."
 }

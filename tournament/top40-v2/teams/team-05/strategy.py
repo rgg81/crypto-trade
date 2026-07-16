@@ -7,6 +7,7 @@ only converts past-closed bars and point-in-time eligibility into signed target 
 from __future__ import annotations
 
 import dataclasses
+import json
 import math
 import statistics
 from collections.abc import Mapping
@@ -14,6 +15,11 @@ from collections.abc import Mapping
 import pandas as pd
 
 from crypto_trade.tournament.protocol import DecisionContext, TargetStrategy
+from crypto_trade.tournament.score_adapter_protocol_v5 import score_boundary
+
+
+CANONICAL_SEED = 20260801
+BAR_DURATION = pd.Timedelta(hours=8)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -133,17 +139,34 @@ def _closed_price_series(
     decision_time: pd.Timestamp,
     parameters: StrategyParameters,
 ) -> pd.Series | None:
-    if not isinstance(frame, pd.DataFrame) or "close" not in frame.columns:
+    if (
+        not isinstance(frame, pd.DataFrame)
+        or not isinstance(frame.index, pd.RangeIndex)
+        or not {"open_time", "close"}.issubset(frame.columns)
+    ):
         return None
-    if not isinstance(frame.index, pd.DatetimeIndex):
+    try:
+        raw_open_times = frame["open_time"]
+        if pd.api.types.is_bool_dtype(raw_open_times.dtype):
+            return None
+        if pd.api.types.is_numeric_dtype(raw_open_times.dtype):
+            open_times = pd.to_datetime(
+                raw_open_times,
+                unit="ms",
+                utc=True,
+                errors="coerce",
+            )
+        else:
+            open_times = pd.to_datetime(raw_open_times, utc=True, errors="coerce")
+    except (TypeError, ValueError, OverflowError):
         return None
-    index = frame.index
-    if index.tz is None:
-        index = index.tz_localize("UTC")
-    else:
-        index = index.tz_convert("UTC")
+    close_times = open_times + BAR_DURATION
     numeric_values: list[float] = []
-    for value in frame["close"].tolist():
+    admitted_close_times: list[pd.Timestamp] = []
+    for close_time, value in zip(close_times.tolist(), frame["close"].tolist(), strict=True):
+        if pd.isna(close_time) or close_time > decision_time:
+            continue
+        admitted_close_times.append(_as_utc(close_time))
         if isinstance(value, bool):
             numeric_values.append(math.nan)
             continue
@@ -151,8 +174,11 @@ def _closed_price_series(
             numeric_values.append(float(value))
         except (TypeError, ValueError, OverflowError):
             numeric_values.append(math.nan)
-    series = pd.Series(numeric_values, index=index, dtype="float64")
-    series = series.loc[series.index <= decision_time]
+    series = pd.Series(
+        numeric_values,
+        index=pd.DatetimeIndex(admitted_close_times),
+        dtype="float64",
+    )
     series = series[~series.index.duplicated(keep="last")].sort_index(kind="mergesort")
     finite_positive = series.map(lambda value: math.isfinite(float(value)) and float(value) > 0)
     series = series.loc[finite_positive]
@@ -376,6 +402,84 @@ def preconstruction_scores(
     return scores
 
 
+def candidate_score_values(
+    scores: Mapping[str, PreconstructionScore],
+) -> dict[str, float]:
+    """Expose the exact A5 identity boundary and return its construction inputs.
+
+    The hook receives only a built-in ``dict[str, float]`` after all score transforms and before
+    score-span checks, sleeve selection, or weighting.  The returned values are validated and are
+    the values used by portfolio construction.  The hook is prospective until Amendment 0005 and
+    ``score_adapter_protocol_v5`` are frozen by the organizer.
+    """
+    if any(not isinstance(symbol, str) or not symbol for symbol in scores):
+        return {}
+    ordered_symbols = sorted(scores)
+    if any(
+        not isinstance(row, PreconstructionScore)
+        or symbol != row.symbol
+        or not -1.0 <= row.score <= 1.0
+        or row.realized_bar_volatility <= 0
+        or not all(
+            math.isfinite(value)
+            for value in (
+                row.score,
+                row.short_log_return,
+                row.medium_log_return,
+                row.slow_log_return,
+                row.realized_bar_volatility,
+                row.market_direction_log_return,
+            )
+        )
+        for symbol, row in scores.items()
+    ):
+        return {}
+
+    boundary_input = {
+        symbol: float(scores[symbol].score) for symbol in ordered_symbols
+    }
+    boundary_output = score_boundary(boundary_input)
+    if not isinstance(boundary_output, Mapping) or set(boundary_output) != set(boundary_input):
+        return {}
+
+    result: dict[str, float] = {}
+    for symbol in ordered_symbols:
+        value = boundary_output[symbol]
+        if isinstance(value, bool):
+            return {}
+        try:
+            built_in_value = float(value)
+        except (TypeError, ValueError, OverflowError):
+            return {}
+        if not math.isfinite(built_in_value) or not -1.0 <= built_in_value <= 1.0:
+            return {}
+        result[symbol] = built_in_value
+    return result
+
+
+def candidate_score_payload_bytes(
+    scores: Mapping[str, PreconstructionScore],
+) -> bytes:
+    """Canonical bytes for the score-map portion of the prospective A5 artifact."""
+    values = candidate_score_values(scores)
+    payload = {
+        "schema_version": 1,
+        "scores": [
+            {"score": values[symbol], "symbol": symbol} for symbol in sorted(values)
+        ],
+    }
+    return (
+        json.dumps(
+            payload,
+            allow_nan=False,
+            ensure_ascii=True,
+            separators=(",", ":"),
+            sort_keys=True,
+        )
+        + "\n"
+    ).encode("utf-8")
+
+
 def _bounded_side_weights(
     symbols: list[str],
     scores: Mapping[str, PreconstructionScore],
@@ -437,35 +541,22 @@ def scores_to_target_weights(
     """Pure, deterministic adapter from preconstruction scores to signed targets."""
     if len(scores) < parameters.minimum_symbols:
         return {}
-    if any(not isinstance(symbol, str) or not symbol for symbol in scores):
+    adapted_score_values = candidate_score_values(scores)
+    if len(adapted_score_values) != len(scores):
         return {}
-    ordered_symbols = sorted(scores)
-    if any(
-        not isinstance(row, PreconstructionScore)
-        or symbol != row.symbol
-        or not -1.0 <= row.score <= 1.0
-        or row.realized_bar_volatility <= 0
-        or not all(
-            math.isfinite(value)
-            for value in (
-                row.score,
-                row.short_log_return,
-                row.medium_log_return,
-                row.slow_log_return,
-                row.realized_bar_volatility,
-                row.market_direction_log_return,
-            )
-        )
-        for symbol, row in scores.items()
-    ):
-        return {}
+    construction_scores = {
+        symbol: dataclasses.replace(scores[symbol], score=adapted_score_values[symbol])
+        for symbol in sorted(scores)
+    }
+    ordered_symbols = sorted(construction_scores)
     market_values = [
-        scores[symbol].market_direction_log_return for symbol in ordered_symbols
+        construction_scores[symbol].market_direction_log_return
+        for symbol in ordered_symbols
     ]
     if max(market_values) - min(market_values) > 1e-15:
         return {}
-    score_span = max(scores[symbol].score for symbol in ordered_symbols) - min(
-        scores[symbol].score for symbol in ordered_symbols
+    score_span = max(construction_scores[symbol].score for symbol in ordered_symbols) - min(
+        construction_scores[symbol].score for symbol in ordered_symbols
     )
     if score_span < parameters.minimum_score_span:
         return {}
@@ -479,11 +570,15 @@ def scores_to_target_weights(
     if side_count < 1:
         return {}
 
-    long_order = sorted(ordered_symbols, key=lambda symbol: (-scores[symbol].score, symbol))
+    long_order = sorted(
+        ordered_symbols,
+        key=lambda symbol: (-construction_scores[symbol].score, symbol),
+    )
     long_preferred = [
         symbol
         for symbol in long_order
-        if scores[symbol].medium_log_return >= -parameters.trend_gate_log_return
+        if construction_scores[symbol].medium_log_return
+        >= -parameters.trend_gate_log_return
     ]
     long_symbols = (long_preferred + [
         symbol for symbol in long_order if symbol not in set(long_preferred)
@@ -492,12 +587,13 @@ def scores_to_target_weights(
     long_set = set(long_symbols)
     short_order = sorted(
         (symbol for symbol in ordered_symbols if symbol not in long_set),
-        key=lambda symbol: (scores[symbol].score, symbol),
+        key=lambda symbol: (construction_scores[symbol].score, symbol),
     )
     short_preferred = [
         symbol
         for symbol in short_order
-        if scores[symbol].medium_log_return <= parameters.trend_gate_log_return
+        if construction_scores[symbol].medium_log_return
+        <= parameters.trend_gate_log_return
     ]
     short_symbols = (short_preferred + [
         symbol for symbol in short_order if symbol not in set(short_preferred)
@@ -513,14 +609,14 @@ def scores_to_target_weights(
     short_budget = (parameters.target_gross - net_tilt) / 2.0
     long_weights = _bounded_side_weights(
         long_symbols,
-        scores,
+        construction_scores,
         budget=long_budget,
         maximum_symbol_weight=parameters.maximum_symbol_weight,
         equal_weight_fraction=parameters.equal_weight_fraction,
     )
     short_weights = _bounded_side_weights(
         short_symbols,
-        scores,
+        construction_scores,
         budget=short_budget,
         maximum_symbol_weight=parameters.maximum_symbol_weight,
         equal_weight_fraction=parameters.equal_weight_fraction,
@@ -542,8 +638,8 @@ class CausalResidualTrendReversalStrategy(TargetStrategy):
         *,
         seed: int,
     ) -> Mapping[str, float] | None:
-        if isinstance(seed, bool) or not isinstance(seed, int) or seed < 0:
-            raise ValueError("seed must be a non-negative integer")
+        if isinstance(seed, bool) or not isinstance(seed, int) or seed != CANONICAL_SEED:
+            raise ValueError(f"seed must equal canonical seed {CANONICAL_SEED}")
         decision_time = _as_utc(context.decision_time)
         if (
             decision_time.hour != 0
