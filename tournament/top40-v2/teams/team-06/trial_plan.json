@@ -4,44 +4,100 @@
     "mechanism_pivots_consumed": 0,
     "private_tickets_consumed": 0
   },
+  "cost_view_rule": "Every material run emits both 1x and 2x central-cost views from the same frozen target/fill path; the 2x view is never a trial or material configuration.",
   "family_id": "t06-balanced-trend-reversal-v1",
-  "read_discipline": "within each activated batch, register every trial before running any; read results only after the full batch is terminal",
-  "schema_version": 1,
+  "read_discipline": "Within each activated batch, register every material trial before running any and read results only after the full batch is terminal.",
+  "registration_prerequisite": {
+    "condition": "Organizer completes the A5 candidate-manifest and candidate-contract freeze, replaces every A5 placeholder from authoritative bytes, and confirms byte invariance.",
+    "status": "blocked-pending-a5-freeze"
+  },
+  "schema_version": 2,
   "stages": [
     {
-      "activation": "initial",
+      "activation": "initial, but only after A5 freeze",
       "candidate_ids": [
         "t06-balanced-trend-reversal-v1-base"
       ],
+      "cost_views": [
+        1.0,
+        2.0
+      ],
+      "hard_alpha_minima": {
+        "combined_chop_net_return": "> 0",
+        "doubled_cost_net_return": "> 0",
+        "doubled_cost_net_sharpe": "> 0",
+        "long_bull_net_return": "> 0",
+        "maximum_positive_pnl_concentration": "<= 0.40",
+        "minimum_mean_side_exposure": ">= 0.01",
+        "minimum_positive_fold_count": ">= 4 of 6 organizer-derived equal chronological slices",
+        "minimum_positive_quarter_fraction": ">= 0.55",
+        "minimum_side_active_bar_fraction": ">= 0.10",
+        "minimum_side_executed_notional_usdt": ">= 1000",
+        "minimum_side_exposure_when_active": ">= 0.01",
+        "net_return": "> 0",
+        "net_sharpe": "> 0",
+        "required_positive_regime_returns": [
+          "bull",
+          "bear",
+          "chop"
+        ],
+        "short_bear_net_return": "> 0"
+      },
       "material_configurations": 1,
-      "required_outcome": "all base-core hard gates pass",
-      "stage_id": "base"
+      "policy_path": "risk_policy.json",
+      "policy_variant": "no-control",
+      "required_outcome": "Every broad no-control alpha minimum passes; any failure is terminal for this family because controls may not create or rescue negative core alpha.",
+      "stage_id": "no-control-core"
     },
     {
-      "activation": "only after base-core pass",
+      "activation": "only after every no-control core alpha minimum passes",
+      "candidate_ids": [
+        "t06-balanced-trend-reversal-v1-ablation-volatility-only",
+        "t06-balanced-trend-reversal-v1-ablation-drawdown-only",
+        "t06-balanced-trend-reversal-v1-ablation-turnover-only",
+        "t06-balanced-trend-reversal-v1-combined"
+      ],
+      "cost_views_per_run": [
+        1.0,
+        2.0
+      ],
+      "material_configurations": 4,
+      "policy_paths": [
+        "risk_policies/volatility-only.json",
+        "risk_policies/drawdown-only.json",
+        "risk_policies/turnover-only.json",
+        "risk_policies/combined.json"
+      ],
+      "required_outcome": "Read all four together for fixed attribution only; do not select a policy and do not use any controlled result to cure a failed no-control core gate.",
+      "stage_id": "fixed-control-batch"
+    },
+    {
+      "activation": "after the fixed-control batch is terminal",
+      "candidate_ids": [
+        "t06-balanced-trend-reversal-v1-combined"
+      ],
+      "material_configurations": 0,
+      "required_outcome": "The already-run combined policy passes every aggregate, doubled-cost, fold, quarter, trial-adjusted, regime, role, sleeve, drawdown, Calmar, and concentration qualification gate, plus the frozen risk-attribution falsifier.",
+      "stage_id": "combined-full-gates"
+    },
+    {
+      "activation": "only after combined full-gate pass",
       "candidate_ids": [
         "t06-balanced-trend-reversal-v1-n01-slow84",
         "t06-balanced-trend-reversal-v1-n02-slow96",
         "t06-balanced-trend-reversal-v1-n03-select20",
         "t06-balanced-trend-reversal-v1-n04-select30"
       ],
-      "material_configurations": 4,
-      "required_outcome": "at least 3/4 profitable and median Sharpe >= 0.50; base remains candidate",
-      "stage_id": "neighborhood"
-    },
-    {
-      "activation": "only after neighborhood pass",
-      "candidate_ids": [
-        "t06-balanced-trend-reversal-v1-ablation-no-control",
-        "t06-balanced-trend-reversal-v1-ablation-volatility-only",
-        "t06-balanced-trend-reversal-v1-ablation-drawdown-only",
-        "t06-balanced-trend-reversal-v1-ablation-turnover-only"
+      "cost_views_per_run": [
+        1.0,
+        2.0
       ],
       "material_configurations": 4,
-      "required_outcome": "risk falsifier in ablations.json does not trigger; no policy switching",
-      "stage_id": "risk-ablations"
+      "policy_path": "risk_policies/combined.json",
+      "required_outcome": "At least 3/4 neighbors are profitable and median Sharpe is >= 0.50; the combined base remains the only qualification candidate.",
+      "stage_id": "combined-policy-neighborhood"
     }
   ],
   "team_id": "team-06",
-  "terminal_rule": "any failed noncompensatory gate rejects the base; record negative result, then documented pivot-or-DNF decision"
+  "terminal_rule": "A failed no-control alpha minimum or combined full gate rejects the family; record the negative result and make a documented pivot-or-DNF decision. Controls and neighbors cannot compensate."
 }

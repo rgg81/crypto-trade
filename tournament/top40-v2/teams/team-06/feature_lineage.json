@@ -26,53 +26,53 @@
       "use": "preconstruction candidate set only"
     },
     {
-      "availability": "only rows with close timestamp <= decision_time; most recent close must be no more than 16 hours old",
-      "event_timestamp": "bar close_time or normalized datetime index",
+      "availability": "canonical RangeIndex rows only; open_time + 8h <= decision_time; most recent completed close must be no more than 16 hours old",
+      "event_timestamp": "bars.open_time + 8h",
       "feature_id": "lagged_slow_return",
       "lag": "3 bars between decision-side latest close and momentum endpoint",
       "missing_rule": "exclude symbol if fewer than 94 valid positive closes, any nonfinite/nonpositive retained close, or stale close",
       "raw_fields": [
         "bars.close",
-        "bars.close_time"
+        "bars.open_time"
       ],
       "source": "organizer-supplied past-closed 8h bars",
       "transform": "log(close[t-3]/close[t-93]) / max(20% annualized volatility, trailing 60-bar annualized volatility)"
     },
     {
       "availability": "same past-closed rule as lagged_slow_return",
-      "event_timestamp": "bar close_time or normalized datetime index",
+      "event_timestamp": "bars.open_time + 8h",
       "feature_id": "lagged_fast_return",
       "lag": "3 bars between decision-side latest close and momentum endpoint",
       "missing_rule": "same exclusion rule as lagged_slow_return",
       "raw_fields": [
         "bars.close",
-        "bars.close_time"
+        "bars.open_time"
       ],
       "source": "organizer-supplied past-closed 8h bars",
       "transform": "log(close[t-3]/close[t-24]) / max(20% annualized volatility, trailing 60-bar annualized volatility)"
     },
     {
       "availability": "same past-closed rule as lagged_slow_return",
-      "event_timestamp": "bar close_time or normalized datetime index",
+      "event_timestamp": "bars.open_time + 8h",
       "feature_id": "short_reversal",
       "lag": "current decision-side close is closed and available; no forward value",
       "missing_rule": "same exclusion rule as lagged_slow_return",
       "raw_fields": [
         "bars.close",
-        "bars.close_time"
+        "bars.open_time"
       ],
       "source": "organizer-supplied past-closed 8h bars",
       "transform": "-log(close[t]/close[t-6]) / max(20% annualized volatility, trailing 60-bar annualized volatility)"
     },
     {
       "availability": "same past-closed rule as lagged_slow_return",
-      "event_timestamp": "bar close_time or normalized datetime index",
+      "event_timestamp": "bars.open_time + 8h",
       "feature_id": "realized_volatility",
       "lag": "60 past 8h close-to-close returns ending at decision-side close",
       "missing_rule": "exclude symbol when fewer than 61 closes or result is nonfinite",
       "raw_fields": [
         "bars.close",
-        "bars.close_time"
+        "bars.open_time"
       ],
       "source": "organizer-supplied past-closed 8h bars",
       "transform": "sample standard deviation of 60 log returns * sqrt(1095)"
@@ -102,7 +102,7 @@
         "cross_sectional_centered_ranks"
       ],
       "source": "fixed deterministic transform",
-      "transform": "continuous market-direction mix of 65/35 slow/fast trend and reversal, less 0.10 volatility rank"
+      "transform": "continuous market-direction mix of 65/35 slow/fast trend and reversal, less 0.10 volatility rank; all finite built-in scores then pass once through strategy.score_boundary and its returned values are used for construction"
     }
   ],
   "forbidden_inputs": [

@@ -1,0 +1,44 @@
+{
+  "a5_freeze": {
+    "frozen_at_utc": "<organizer-fill-a5-freeze-timestamp-Z>",
+    "organizer_freeze_record_sha256": "<organizer-fill-a5-freeze-record-64-hex-sha256>",
+    "status": "blocked-pending-organizer-freeze"
+  },
+  "artifacts": [
+    {
+      "path": "strategy.py",
+      "sha256": "<organizer-fill-final-strategy-64-hex-sha256>"
+    },
+    {
+      "path": "frozen_config.json",
+      "sha256": "<organizer-fill-final-config-64-hex-sha256>"
+    },
+    {
+      "path": "risk_policy.json",
+      "role": "initial-no-control-policy",
+      "sha256": "<organizer-fill-final-no-control-policy-64-hex-sha256>"
+    },
+    {
+      "path": "risk_policies/combined.json",
+      "role": "conditional-combined-policy",
+      "sha256": "<organizer-fill-final-combined-policy-64-hex-sha256>"
+    },
+    {
+      "path": "feature_lineage.json",
+      "sha256": "<organizer-fill-final-feature-lineage-64-hex-sha256>"
+    },
+    {
+      "path": "candidate_contract.template.json",
+      "sha256": "<organizer-fill-frozen-candidate-contract-64-hex-sha256>"
+    }
+  ],
+  "candidate_id": "t06-balanced-trend-reversal-v1-base",
+  "entrypoint": "strategy.py:build_strategy",
+  "family_id": "t06-balanced-trend-reversal-v1",
+  "initial_risk_policy": "risk_policy.json",
+  "registration_allowed": false,
+  "schema_version": 1,
+  "seed": 20260801,
+  "source_bundle_sha256": "<organizer-fill-after-a5-freeze-64-hex-sha256>",
+  "team_id": "team-06"
+}

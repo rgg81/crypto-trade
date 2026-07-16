@@ -1,59 +1,63 @@
 {
   "candidate_id": "<organizer-fill-registered-candidate-id>",
+  "derivation": {
+    "boundary_source": "organizer canonical visible-development observation boundaries from tournament/top40-v2/config.toml",
+    "fold_count": 6,
+    "method": "Enumerate the organizer-owned visible-development observation boundaries in strictly increasing order; let q,r = divmod(count,6); assign q+1 consecutive boundaries to each of the first r folds and q to each remaining fold.",
+    "requirements": [
+      "folds are chronological, contiguous, nonoverlapping, and exhaustive",
+      "fold lengths differ by at most one organizer observation boundary",
+      "each fold test start is the boundary immediately after its training end",
+      "no Team06-authored calendar boundary overrides organizer derivation"
+    ]
+  },
   "evidence_class": "organizer-derived-equal-chronological-slices",
-  "fold_declaration_path": "folds/fold_declaration.template.json",
-  "fold_declaration_sha256": "<organizer-fill-after-equal-slice-derivation-64-hex-sha256>",
   "folds": [
     {
       "fold_id": "fold-1",
-      "model_artifact_path": "<organizer-fill-produced-fold-artifact-path>",
-      "model_artifact_sha256": "<organizer-fill-produced-fold-artifact-64-hex-sha256>",
       "test_end_inclusive": "<organizer-derive-from-equal-slice-rule>",
       "test_start": "<organizer-derive-from-equal-slice-rule>",
       "training_end_inclusive": "<organizer-derive-from-causal-history-before-test-start>"
     },
     {
       "fold_id": "fold-2",
-      "model_artifact_path": "<organizer-fill-produced-fold-artifact-path>",
-      "model_artifact_sha256": "<organizer-fill-produced-fold-artifact-64-hex-sha256>",
       "test_end_inclusive": "<organizer-derive-from-equal-slice-rule>",
       "test_start": "<organizer-derive-from-equal-slice-rule>",
       "training_end_inclusive": "<organizer-derive-from-causal-history-before-test-start>"
     },
     {
       "fold_id": "fold-3",
-      "model_artifact_path": "<organizer-fill-produced-fold-artifact-path>",
-      "model_artifact_sha256": "<organizer-fill-produced-fold-artifact-64-hex-sha256>",
       "test_end_inclusive": "<organizer-derive-from-equal-slice-rule>",
       "test_start": "<organizer-derive-from-equal-slice-rule>",
       "training_end_inclusive": "<organizer-derive-from-causal-history-before-test-start>"
     },
     {
       "fold_id": "fold-4",
-      "model_artifact_path": "<organizer-fill-produced-fold-artifact-path>",
-      "model_artifact_sha256": "<organizer-fill-produced-fold-artifact-64-hex-sha256>",
       "test_end_inclusive": "<organizer-derive-from-equal-slice-rule>",
       "test_start": "<organizer-derive-from-equal-slice-rule>",
       "training_end_inclusive": "<organizer-derive-from-causal-history-before-test-start>"
     },
     {
       "fold_id": "fold-5",
-      "model_artifact_path": "<organizer-fill-produced-fold-artifact-path>",
-      "model_artifact_sha256": "<organizer-fill-produced-fold-artifact-64-hex-sha256>",
       "test_end_inclusive": "<organizer-derive-from-equal-slice-rule>",
       "test_start": "<organizer-derive-from-equal-slice-rule>",
       "training_end_inclusive": "<organizer-derive-from-causal-history-before-test-start>"
     },
     {
       "fold_id": "fold-6",
-      "model_artifact_path": "<organizer-fill-produced-fold-artifact-path>",
-      "model_artifact_sha256": "<organizer-fill-produced-fold-artifact-64-hex-sha256>",
       "test_end_inclusive": "<organizer-derive-from-equal-slice-rule>",
       "test_start": "<organizer-derive-from-equal-slice-rule>",
       "training_end_inclusive": "<organizer-derive-from-causal-history-before-test-start>"
     }
   ],
-  "schema_version": 2,
-  "stitched_daily_returns_sha256": "<organizer-fill-after-development-run-64-hex-sha256>",
+  "fit": {
+    "forward_labels": false,
+    "learned_preprocessing": false,
+    "learned_state": false,
+    "procedure": "fresh strategy instance with frozen source, exact material parameters, policy, and seed",
+    "purge_or_embargo": "not applicable because no forward label exists"
+  },
+  "schema_version": 1,
+  "seed": 20260801,
   "team_id": "team-06"
 }

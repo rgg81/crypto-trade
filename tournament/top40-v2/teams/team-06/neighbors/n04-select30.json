@@ -1,6 +1,6 @@
 {
-  "activation": "only-after-base-core-pass",
-  "base_candidate_id": "t06-balanced-trend-reversal-v1-base",
+  "activation": "only-after-combined-full-gate-pass",
+  "base_candidate_id": "t06-balanced-trend-reversal-v1-combined",
   "candidate_id": "t06-balanced-trend-reversal-v1-n04-select30",
   "changed_parameter": "selection_fraction",
   "entrypoint": "neighbors/n04_select30_strategy.py:build_strategy",
@@ -10,6 +10,7 @@
     "selection_fraction": 0.3,
     "slow_lookback_bars": 90
   },
+  "risk_policy_path": "risk_policies/combined.json",
   "schema_version": 1,
   "team_id": "team-06"
 }

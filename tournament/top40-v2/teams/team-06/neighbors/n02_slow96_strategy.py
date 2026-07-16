@@ -1,4 +1,4 @@
-"""Dormant one-axis neighbor; activate only after the base-core gate passes."""
+"""Dormant one-axis neighbor; activate only after the combined full gates pass."""
 
 from strategy import build_parameterized_strategy
 

@@ -22,29 +22,29 @@ preregistered hypothesis rather than evidence.
   credential, report, snapshot, or evaluator access.
 - State: only immutable constants and a new strategy instance; no learned or persisted state.
 - Randomness: none. The seed is nevertheless checked exactly to prevent accidental drift.
-- Input fields used: decision time, eligible-symbol identity, and past-closed bar time/close.
+- Input fields used: decision time, eligible-symbol identity, and canonical RangeIndex bar
+  `open_time` / `close`.
   Funding, auxiliary fields, prices other than close, positions, fills, costs, and risk state are
   ignored.
-- Timestamp rule: explicitly truncate to close timestamp <= decision time, sort stably, resolve
-  duplicate timestamps deterministically, and reject stale/invalid histories.
-- Construction rule: all valid members cross the public preconstruction score boundary before
-  selection or sizing. The optional local identity hook must echo keys and values exactly and is
-  absent from the canonical build. No nonexistent shared hook is imported.
-- Risk: `risk_policy.json` is declarative; only the central evaluator may act on authoritative
-  state, at the next open, with ordinary costs and shared participation capacity.
+- Timestamp rule: admit a close only when `open_time + 8h <= decision_time`, sort stably by
+  `open_time`, resolve duplicates deterministically, and reject noncanonical/stale/invalid data.
+- Construction rule: every valid finite built-in score crosses the directly imported public
+  `score_boundary` exactly once after transforms and before selection/weight caps/risk. Its
+  returned values drive construction.
+- Risk: top-level `risk_policy.json` is the initial no-control policy; combined controls are
+  separate in `risk_policies/combined.json`. Only the evaluator may act on state.
 
-`frozen_config.json`, `feature_lineage.json`, `risk_policy.json`, `strategy.py`, and the six fold
-declarations form the intended base source/config bundle. The four neighbor parameter artifacts
-and wrappers are dormant and byte-distinct; they must not enter a trial bundle until base-core
-pass. Risk-only policy files are likewise dormant attribution artifacts.
+`frozen_config.json`, `feature_lineage.json`, `risk_policy.json`, `strategy.py`, and the organizer-
+derived fold declaration form the initial bundle. Controls and neighbors remain dormant until
+their noncompensatory activation conditions pass.
 
 ## Hash and registration status
 
 No hash in a `*.template.json` file is evidence. Angle-bracket values are deliberate invalid
 sentinels so an unproduced artifact cannot masquerade as a valid SHA-256 or timestamp. The
-organizer must compute hashes from final bytes, replace sentinels in a copy, validate it against
-the public schema, and register it through the authoritative lifecycle. Do not edit the templates
-after registration to simulate a journal record.
+organizer must first complete the A5 candidate-manifest/contract freeze and byte-invariance replay,
+then compute hashes from final bytes, replace sentinels in a copy, validate it, and register it
+through the authoritative lifecycle. Do not edit templates to simulate a journal record.
 
 `families.jsonl` and `experiments.jsonl` were left untouched because they are derived organizer
 projections. Resource usage remains zero only as an unevaluated design statement; the organizer

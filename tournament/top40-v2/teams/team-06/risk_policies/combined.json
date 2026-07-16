@@ -1,6 +1,19 @@
 {
-  "drawdown_brakes": [],
-  "policy_id": "team-06-no-control-v1",
+  "drawdown_brakes": [
+    {
+      "drawdown": 0.1,
+      "gross_scale": 0.75
+    },
+    {
+      "drawdown": 0.18,
+      "gross_scale": 0.45
+    },
+    {
+      "drawdown": 0.25,
+      "gross_scale": 0.25
+    }
+  ],
+  "policy_id": "team-06-combined-v1",
   "position_stop": {
     "cooldown_bars": 3,
     "enabled": false,
@@ -18,12 +31,12 @@
     "maximum_holding_bars": 21
   },
   "turnover_limit": {
-    "enabled": false,
+    "enabled": true,
     "maximum_one_way_turnover": 0.18
   },
   "volatility_target": {
     "annualized_target": 0.18,
-    "enabled": false,
+    "enabled": true,
     "lookback_days": 30,
     "maximum_scale": 1.0,
     "minimum_scale": 0.3

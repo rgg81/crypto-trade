@@ -1,5 +1,5 @@
 {
-  "candidate_id": "t06-balanced-trend-reversal-v1-base",
+  "candidate_id": "t06-balanced-trend-reversal-v1-combined",
   "neighbors": [
     {
       "daily_returns_path": "organizer-artifacts/n01-slow84/daily_returns.json",

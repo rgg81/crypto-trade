@@ -1,0 +1,38 @@
+{
+  "a5_freeze": {
+    "candidate_manifest_path": "candidate_manifest.template.json",
+    "capture_replay_record_sha256": "<organizer-fill-a5-capture-replay-record-64-hex-sha256>",
+    "status": "blocked-pending-organizer-freeze"
+  },
+  "bar_contract": {
+    "availability_rule": "open_time + 8h <= decision_time",
+    "index": "RangeIndex",
+    "interval_hours": 8,
+    "required_columns": [
+      "open_time",
+      "close"
+    ]
+  },
+  "byte_invariance": {
+    "candidate_bundle_sha256_after_capture": "<organizer-fill-64-hex-sha256>",
+    "candidate_bundle_sha256_before_capture": "<organizer-fill-64-hex-sha256>",
+    "required_relation": "before == after",
+    "strategy_sha256_after_capture": "<organizer-fill-64-hex-sha256>",
+    "strategy_sha256_before_capture": "<organizer-fill-64-hex-sha256>"
+  },
+  "candidate_id": "t06-balanced-trend-reversal-v1-base",
+  "registration_allowed": false,
+  "schema_version": 1,
+  "score_adapter": {
+    "adapter_id": "top40-v2-preconstruction-score-boundary-v1",
+    "call_count_per_construction": 1,
+    "capture_boundary": "post-transform-pre-selection-weight-cap-risk",
+    "direct_import": "from crypto_trade.tournament.score_adapter_protocol_v5 import score_boundary",
+    "input": "finite built-in dict[str, float] containing every valid candidate score",
+    "local_binding": "strategy.score_boundary",
+    "returned_values_drive_construction": true,
+    "selection_or_sizing_before_call": false
+  },
+  "seed": 20260801,
+  "team_id": "team-06"
+}

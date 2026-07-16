@@ -2,7 +2,12 @@
   "candidate_id": "t06-balanced-trend-reversal-v1-base",
   "data_contract": {
     "bar_interval": "8h",
-    "close_availability": "close_time_lte_decision_time",
+    "bar_frame_index": "RangeIndex",
+    "bar_required_columns": [
+      "open_time",
+      "close"
+    ],
+    "close_availability": "open_time_plus_8h_lte_decision_time",
     "funding_used_by_strategy": false,
     "membership": "context.eligible_symbols_at_decision",
     "maximum_staleness_hours": 16,
@@ -12,6 +17,7 @@
   "family_id": "t06-balanced-trend-reversal-v1",
   "parameters": {
     "annualization_bars": 1095,
+    "bar_interval_hours": 8,
     "base_gross_exposure": 0.48,
     "chop_trend_mix": 0.35,
     "direction_full_scale_return": 0.15,
@@ -19,7 +25,10 @@
     "fast_lookback_bars": 21,
     "fast_trend_weight": 0.35,
     "maximum_abs_net_exposure": 0.04,
+    "maximum_staleness_hours": 16,
     "maximum_symbol_exposure": 0.07,
+    "minimum_positions_per_side": 4,
+    "minimum_valid_symbols": 12,
     "minimum_positions_per_side": 4,
     "momentum_lag_bars": 3,
     "rebalance_hour_utc": 0,
@@ -39,17 +48,24 @@
     "sizing": "equal_weight_per_side_subject_to_0.07_symbol_cap"
   },
   "preconstruction_boundary": {
-    "hook_behavior": "optional_observer_must_return_byte-for-value-identical_score_mapping",
+    "adapter_id": "top40-v2-preconstruction-score-boundary-v1",
+    "call_count_per_construction": 1,
+    "capture_boundary": "post-transform-pre-selection-weight-cap-risk",
+    "input_contract": "finite_builtin_dict_str_float",
+    "local_binding": "strategy.score_boundary",
     "public_methods": [
       "preconstruction_snapshot",
       "preconstruction_scores"
     ],
-    "selection_or_sizing_before_boundary": false,
-    "shared_hook_import": null
+    "returned_values_drive_construction": true,
+    "selection_weight_cap_or_risk_before_boundary": false,
+    "shared_hook_import": "crypto_trade.tournament.score_adapter_protocol_v5.score_boundary"
   },
+  "registration_blocker": "A5 organizer candidate-manifest and contract freeze is incomplete",
+  "combined_risk_policy_path": "risk_policies/combined.json",
   "risk_policy_path": "risk_policy.json",
   "schema_version": 1,
   "seed": 20260801,
-  "selection_rule": "base-only-if-every-noncompensatory-development-gate-and-declared-neighborhood-gate-passes",
+  "selection_rule": "no-control-core-first; negative core is terminal; then fixed single-and-combined controls; combined must pass every full gate; only then declared neighbors",
   "strategy_entrypoint": "strategy.py:build_strategy"
 }

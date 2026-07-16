@@ -1,15 +1,16 @@
 {
   "activation": {
-    "condition": "base candidate passes every development hard gate except the not-yet-measurable neighbor fraction and neighbor median Sharpe gates",
+    "condition": "no-control core passes, fixed control batch is terminal, and the combined-policy candidate passes every full development hard gate except the not-yet-measurable neighbor gates",
     "registration_rule": "register all four neighbor trials before reading any neighbor result",
-    "status": "dormant-until-base-core-pass"
+    "status": "dormant-until-combined-full-gate-pass"
   },
-  "base_candidate_id": "t06-balanced-trend-reversal-v1-base",
+  "base_candidate_id": "t06-balanced-trend-reversal-v1-combined",
   "base_parameters": {
     "selection_fraction": 0.25,
     "slow_lookback_bars": 90
   },
   "family_id": "t06-balanced-trend-reversal-v1",
+  "risk_policy_path": "risk_policies/combined.json",
   "neighbors": [
     {
       "base_value": 90,

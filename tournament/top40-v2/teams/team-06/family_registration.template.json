@@ -9,14 +9,23 @@
     "stress": "Low requested gross, low-volatility preference, volatility targeting, and drawdown brakes should contain loss and keep Sharpe above the frozen worst-regime floor."
   },
   "family_id": "t06-balanced-trend-reversal-v1",
-  "falsifier": "Reject on any hard aggregate, fold, regime, role, sleeve, doubled-cost, concentration, or trial-adjusted gate; reject if fewer than three of four declared neighbors are profitable or their median Sharpe is below 0.50; reject if fixed combined risk controls fail their preregistered attribution test.",
+  "falsifier": "Reject immediately if the no-control core misses any preregistered positive broad-alpha minimum; controls cannot rescue it. After core pass, reject if the fixed combined policy misses any full gate or attribution requirement, or if fewer than three of four final neighbors are profitable or their median Sharpe is below 0.50.",
   "mechanism": "Deterministic daily cross-sectional blend of 30-day and 7-day lagged risk-adjusted trend with 2-day reversal, continuous past-only market-direction mixing, low-volatility penalty, balanced tail selection, and a bounded directional net tilt.",
   "parameter_ranges": {
+    "annualization_bars": [
+      1095
+    ],
+    "bar_interval_hours": [
+      8
+    ],
     "base_gross_exposure": [
       0.48
     ],
     "chop_trend_mix": [
       0.35
+    ],
+    "direction_full_scale_return": [
+      0.15
     ],
     "directional_trend_mix": [
       0.8
@@ -24,14 +33,29 @@
     "fast_lookback_bars": [
       21
     ],
+    "fast_trend_weight": [
+      0.35
+    ],
     "maximum_abs_net_exposure": [
       0.04
+    ],
+    "maximum_staleness_hours": [
+      16
     ],
     "maximum_symbol_exposure": [
       0.07
     ],
+    "minimum_positions_per_side": [
+      4
+    ],
+    "minimum_valid_symbols": [
+      12
+    ],
     "momentum_lag_bars": [
       3
+    ],
+    "rebalance_hour_utc": [
+      0
     ],
     "reversal_lookback_bars": [
       6
@@ -46,14 +70,104 @@
       90,
       96
     ],
+    "slow_trend_weight": [
+      0.65
+    ],
+    "volatility_floor": [
+      0.2
+    ],
     "volatility_lookback_bars": [
       60
+    ],
+    "volatility_score_penalty": [
+      0.1
     ]
   },
   "parent_family_id": null,
+  "registration_blocker": "Do not register until the organizer completes the A5 candidate-manifest and candidate-contract freeze and replaces all A5 sentinels from authoritative bytes.",
+  "registration_status": "blocked-pending-a5-freeze",
   "registered_at_utc": "<organizer-assigned-registration-timestamp-Z>",
-  "risk_policy_plan": "Freeze combined 18% volatility target, 10/18/25% drawdown brakes, 0.18 one-way turnover cap, disabled position/time stops, and no same-boundary reentry; after base and neighbor pass, run no-control and each-control-alone attribution at base and doubled costs without policy selection.",
+  "risk_policy_parameter_ranges": {
+    "drawdown_brakes": [
+      [],
+      [
+        {
+          "drawdown": 0.1,
+          "gross_scale": 0.75
+        },
+        {
+          "drawdown": 0.18,
+          "gross_scale": 0.45
+        },
+        {
+          "drawdown": 0.25,
+          "gross_scale": 0.25
+        }
+      ]
+    ],
+    "position_stop_cooldown_bars": [
+      3
+    ],
+    "position_stop_enabled": [
+      false
+    ],
+    "position_stop_loss_fraction": [
+      0.1
+    ],
+    "same_boundary_reentry": [
+      false
+    ],
+    "side_scaling_long": [
+      1.0
+    ],
+    "side_scaling_short": [
+      1.0
+    ],
+    "time_stop_cooldown_bars": [
+      3
+    ],
+    "time_stop_enabled": [
+      false
+    ],
+    "time_stop_maximum_holding_bars": [
+      21
+    ],
+    "turnover_limit_enabled": [
+      false,
+      true
+    ],
+    "turnover_limit_maximum_one_way_turnover": [
+      0.18
+    ],
+    "volatility_target_annualized_target": [
+      0.18
+    ],
+    "volatility_target_enabled": [
+      false,
+      true
+    ],
+    "volatility_target_lookback_days": [
+      30
+    ],
+    "volatility_target_maximum_scale": [
+      1.0
+    ],
+    "volatility_target_minimum_scale": [
+      0.3
+    ]
+  },
+  "risk_policy_plan": "Run the top-level no-control policy first and require every positive broad-alpha minimum. Only after it passes, run the three single controls and the separately frozen combined policy as one preregistered batch. Controls cannot rescue negative core alpha. Apply full qualification gates to combined, then activate combined-policy neighbors.",
   "schema_version": 1,
-  "selection_metric": "Eligibility first: the preregistered base must pass every noncompensatory development gate and the declared neighborhood gates; neighbors cannot replace it. No least-bad selection.",
+  "score_boundary_contract": {
+    "adapter_id": "top40-v2-preconstruction-score-boundary-v1",
+    "call_count_per_construction": 1,
+    "capture_boundary": "post-transform-pre-selection-weight-cap-risk",
+    "input": "finite built-in dict[str, float]",
+    "returned_values_drive_construction": true
+  },
+  "seed_range": [
+    20260801
+  ],
+  "selection_metric": "Eligibility first: no-control core positivity, then fixed controls, combined full gates, then combined-policy neighborhood stability. No control or neighbor can rescue or replace a failed core.",
   "team_id": "team-06"
 }

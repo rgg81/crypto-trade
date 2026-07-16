@@ -1,21 +1,79 @@
 {
   "candidate_id": "t06-balanced-trend-reversal-v1-base",
+  "candidate_contract_sha256": "<organizer-fill-after-a5-freeze-64-hex-sha256>",
+  "candidate_manifest_sha256": "<organizer-fill-after-a5-freeze-64-hex-sha256>",
   "config_sha256": "<organizer-fill-frozen-config-64-hex-sha256>",
-  "falsifier": "Any failed hard development gate rejects the base and leaves all neighbors dormant; no compensating metric or neighbor may replace it.",
+  "cost_views": {
+    "multipliers": [
+      1.0,
+      2.0
+    ],
+    "one_material_run": true
+  },
+  "falsifier": "Any failed preregistered no-control broad-alpha minimum rejects this family before controls; a single-control, combined-control, doubled-cost view, or neighbor cannot compensate.",
   "family_id": "t06-balanced-trend-reversal-v1",
   "parameters": {
+    "annualization_bars": 1095,
+    "bar_interval_hours": 8,
     "base_gross_exposure": 0.48,
-    "candidate_role": "base-only",
+    "chop_trend_mix": 0.35,
+    "direction_full_scale_return": 0.15,
+    "directional_trend_mix": 0.8,
+    "fast_lookback_bars": 21,
+    "fast_trend_weight": 0.35,
     "maximum_abs_net_exposure": 0.04,
-    "risk_policy": "combined-fixed",
+    "maximum_staleness_hours": 16,
+    "maximum_symbol_exposure": 0.07,
+    "minimum_positions_per_side": 4,
+    "minimum_valid_symbols": 12,
+    "momentum_lag_bars": 3,
+    "rebalance_hour_utc": 0,
+    "reversal_lookback_bars": 6,
     "selection_fraction": 0.25,
-    "slow_lookback_bars": 90
+    "slow_lookback_bars": 90,
+    "slow_trend_weight": 0.65,
+    "volatility_floor": 0.2,
+    "volatility_lookback_bars": 60,
+    "volatility_score_penalty": 0.1
   },
+  "registration_blocker": "A5 candidate-manifest and candidate-contract freeze incomplete; this template must not be registered while any A5 sentinel remains.",
+  "registration_status": "blocked-pending-a5-freeze",
   "risk_config_sha256": "<organizer-fill-risk-policy-64-hex-sha256>",
+  "risk_parameters": {
+    "drawdown_brakes": [],
+    "policy_path": "risk_policy.json",
+    "position_stop": {
+      "cooldown_bars": 3,
+      "enabled": false,
+      "loss_fraction": 0.1
+    },
+    "same_boundary_reentry": false,
+    "side_scaling": {
+      "long_scale": 1.0,
+      "short_scale": 1.0
+    },
+    "time_stop": {
+      "cooldown_bars": 3,
+      "enabled": false,
+      "maximum_holding_bars": 21
+    },
+    "turnover_limit": {
+      "enabled": false,
+      "maximum_one_way_turnover": 0.18
+    },
+    "variant": "no-control",
+    "volatility_target": {
+      "annualized_target": 0.18,
+      "enabled": false,
+      "lookback_days": 30,
+      "maximum_scale": 1.0,
+      "minimum_scale": 0.3
+    }
+  },
   "seed": 20260801,
   "source_bundle_sha256": "<organizer-fill-source-bundle-64-hex-sha256>",
   "strategy_sha256": "<organizer-fill-strategy-64-hex-sha256>",
   "team_id": "team-06",
-  "thesis": "The fixed balanced trend/reversal rule should clear every aggregate, fold, regime, sleeve, role, doubled-cost, and concentration gate with conservative exposure.",
+  "thesis": "Before any control is allowed, the fixed balanced trend/reversal rule should exhibit positive broad alpha at base and doubled cost across aggregate, chronological-slice, regime, role, sleeve, and concentration readouts with conservative exposure.",
   "timestamp_utc": "<organizer-assigned-registration-timestamp-Z>"
 }

@@ -1,27 +1,29 @@
 """Team 06 deterministic balanced trend/reversal strategy.
 
 The central evaluator owns membership, fills, costs, funding, positions, risk actions, and PnL.
-This module consumes only past-closed bars from ``DecisionContext`` and returns signed unlevered
-targets.  No model artifact, file access, randomness, or evaluator state is used.
+This module consumes canonical RangeIndex bar frames containing ``open_time`` and ``close`` and
+returns signed unlevered targets.  A row is available only after its complete 8-hour interval:
+``open_time + 8h <= decision_time``.
 
-``preconstruction_snapshot`` and ``preconstruction_scores`` are an intentional public boundary:
-every eligible candidate is scored before selection or sizing.  A future organizer may inject an
-identity-only observer at that boundary through ``build_strategy(score_identity_hook=...)``.  The
-hook must return the exact score mapping it receives; it cannot alter portfolio construction.
+Every finite transformed candidate score crosses the public prospective score boundary exactly
+once, before selection, weight caps, or risk.  The object returned by that boundary is the score
+dictionary used by portfolio construction.
 """
 
 from __future__ import annotations
 
 import dataclasses
 import math
-from collections.abc import Callable, Mapping, Sequence
-from types import MappingProxyType
-from typing import Any, Protocol, TypeAlias
+from collections.abc import Mapping, Sequence
+from typing import Any, Protocol
 
 import pandas as pd
 
+from crypto_trade.tournament.score_adapter_protocol_v5 import score_boundary
+
 
 FROZEN_SEED = 20260801
+BAR_INTERVAL_HOURS = 8
 REBALANCE_HOUR_UTC = 0
 SLOW_LOOKBACK_BARS = 90
 FAST_LOOKBACK_BARS = 21
@@ -53,11 +55,6 @@ class ContextLike(Protocol):
     funding: pd.DataFrame
     auxiliary: Mapping[str, pd.DataFrame]
     eligible_symbols: Sequence[str]
-
-
-ScoreIdentityHook: TypeAlias = Callable[
-    [pd.Timestamp, Mapping[str, float]], Mapping[str, float]
-]
 
 
 @dataclasses.dataclass(frozen=True)
@@ -110,43 +107,35 @@ def _datetime_values(values: Any) -> pd.DatetimeIndex:
 def _closed_close_values(
     frame: pd.DataFrame, decision_time: pd.Timestamp
 ) -> tuple[list[float], pd.Timestamp] | None:
-    """Return sorted, de-duplicated close values available at the decision boundary."""
+    """Return canonical closes whose full 8-hour bars have ended by the boundary."""
 
-    if not isinstance(frame, pd.DataFrame) or frame.empty:
+    if (
+        not isinstance(frame, pd.DataFrame)
+        or frame.empty
+        or not isinstance(frame.index, pd.RangeIndex)
+        or "open_time" not in frame.columns
+        or "close" not in frame.columns
+    ):
         return None
-    close_column = next(
-        (column for column in frame.columns if str(column).lower() == "close"), None
+
+    open_times = _datetime_values(frame["open_time"])
+    close_times = open_times + pd.Timedelta(hours=BAR_INTERVAL_HOURS)
+    closes = pd.to_numeric(frame["close"], errors="coerce").reset_index(drop=True)
+    table = pd.DataFrame(
+        {"open_time": open_times, "close_time": close_times, "close": closes}
     )
-    if close_column is None:
-        return None
-
-    close_time_column = None
-    for preferred_name in ("close_time", "closetime", "timestamp"):
-        close_time_column = next(
-            (
-                column
-                for column in frame.columns
-                if str(column).lower() == preferred_name
-            ),
-            None,
-        )
-        if close_time_column is not None:
-            break
-    if close_time_column is not None:
-        times = _datetime_values(frame[close_time_column])
-    elif isinstance(frame.index, pd.DatetimeIndex):
-        times = _datetime_values(frame.index)
-    else:
-        return None
-
-    closes = pd.to_numeric(frame[close_column], errors="coerce").reset_index(drop=True)
-    table = pd.DataFrame({"time": times, "close": closes})
-    table = table.loc[table["time"].notna() & (table["time"] <= decision_time)]
-    table = table.sort_values("time", kind="mergesort").drop_duplicates("time", keep="last")
+    table = table.loc[
+        table["open_time"].notna()
+        & table["close_time"].notna()
+        & (table["close_time"] <= decision_time)
+    ]
+    table = table.sort_values("open_time", kind="mergesort").drop_duplicates(
+        "open_time", keep="last"
+    )
     if table.empty:
         return None
 
-    last_time = _utc_timestamp(table["time"].iloc[-1])
+    last_time = _utc_timestamp(table["close_time"].iloc[-1])
     age_hours = (decision_time - last_time).total_seconds() / 3600.0
     if age_hours < 0.0 or age_hours > MAXIMUM_STALENESS_HOURS:
         return None
@@ -246,7 +235,6 @@ class BalancedTrendReversalStrategy:
         *,
         slow_lookback_bars: int = SLOW_LOOKBACK_BARS,
         selection_fraction: float = SELECTION_FRACTION,
-        score_identity_hook: ScoreIdentityHook | None = None,
     ) -> None:
         if (
             isinstance(slow_lookback_bars, bool)
@@ -262,7 +250,6 @@ class BalancedTrendReversalStrategy:
             raise ValueError("selection_fraction must be finite and in (0, 0.5)")
         self._slow_lookback_bars = slow_lookback_bars
         self._selection_fraction = float(selection_fraction)
-        self._score_identity_hook = score_identity_hook
 
     @staticmethod
     def _validate_seed(seed: int) -> None:
@@ -335,27 +322,38 @@ class BalancedTrendReversalStrategy:
             market_slow_return=float(market_slow_return),
         )
 
-    def _apply_score_identity_boundary(
-        self, snapshot: PreconstructionSnapshot
+    @staticmethod
+    def _apply_public_score_boundary(
+        snapshot: PreconstructionSnapshot,
     ) -> dict[str, float]:
-        scores = snapshot.score_map()
-        if self._score_identity_hook is None:
-            return scores
-        observed = self._score_identity_hook(
-            snapshot.decision_time, MappingProxyType(dict(scores))
-        )
-        echoed = dict(observed)
-        if set(echoed) != set(scores) or any(echoed[key] != scores[key] for key in scores):
-            raise ValueError("score_identity_hook must return the exact preconstruction scores")
-        return scores
+        """Call the direct public binding once and validate its construction input."""
+
+        scores = {symbol: float(value) for symbol, value in snapshot.scores}
+        if type(scores) is not dict or any(
+            type(symbol) is not str or type(value) is not float or not math.isfinite(value)
+            for symbol, value in scores.items()
+        ):
+            raise ValueError("score_boundary input must be a finite built-in dict[str, float]")
+
+        bounded_scores = score_boundary(scores)
+        if type(bounded_scores) is not dict or set(bounded_scores) != set(scores):
+            raise ValueError("score_boundary must return a built-in dict with unchanged keys")
+        if any(
+            isinstance(value, bool)
+            or not isinstance(value, (int, float))
+            or not math.isfinite(float(value))
+            for value in bounded_scores.values()
+        ):
+            raise ValueError("score_boundary returned a non-finite or non-numeric score")
+        return bounded_scores
 
     def preconstruction_scores(
         self, context: ContextLike, *, seed: int
     ) -> Mapping[str, float]:
-        """Organizer-facing identity-hook boundary; no selection has happened yet."""
+        """Organizer-facing public boundary; no selection has happened yet."""
 
         snapshot = self.preconstruction_snapshot(context, seed=seed)
-        return self._apply_score_identity_boundary(snapshot)
+        return self._apply_public_score_boundary(snapshot)
 
     def target_weights(
         self, context: ContextLike, *, seed: int
@@ -370,7 +368,7 @@ class BalancedTrendReversalStrategy:
             return None
 
         snapshot = self.preconstruction_snapshot(context, seed=seed)
-        scores = self._apply_score_identity_boundary(snapshot)
+        scores = self._apply_public_score_boundary(snapshot)
         if len(scores) < MINIMUM_VALID_SYMBOLS:
             return {}
 
@@ -404,24 +402,20 @@ class BalancedTrendReversalStrategy:
         return {symbol: targets[symbol] for symbol in sorted(targets)}
 
 
-def build_strategy(
-    *, score_identity_hook: ScoreIdentityHook | None = None
-) -> BalancedTrendReversalStrategy:
+def build_strategy() -> BalancedTrendReversalStrategy:
     """Canonical factory; the organizer normally calls it without arguments."""
 
-    return BalancedTrendReversalStrategy(score_identity_hook=score_identity_hook)
+    return BalancedTrendReversalStrategy()
 
 
 def build_parameterized_strategy(
     *,
     slow_lookback_bars: int = SLOW_LOOKBACK_BARS,
     selection_fraction: float = SELECTION_FRACTION,
-    score_identity_hook: ScoreIdentityHook | None = None,
 ) -> BalancedTrendReversalStrategy:
     """Explicit constructor used only by preregistered byte-distinct neighbor wrappers."""
 
     return BalancedTrendReversalStrategy(
         slow_lookback_bars=slow_lookback_bars,
         selection_fraction=selection_fraction,
-        score_identity_hook=score_identity_hook,
     )
