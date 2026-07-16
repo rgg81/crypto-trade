@@ -1,0 +1,35 @@
+{
+  "activation_status": "pending-integration",
+  "amendment_id": "top40-v2-amendment-0006-pure-crypto-universe",
+  "canonical_report": {
+    "bytes": 73777,
+    "contract_metadata_symbols": 667,
+    "membership_symbols": 321,
+    "policy_sha256": "2c7fb0ff593d06c323517e60df4b28ab9387a2df580b83f82f65ef71c91fc350",
+    "sha256": "b9c55b40fef331861af068272159f45860870182a58c93652eff2a819b3d5d1b",
+    "violations": 0
+  },
+  "entrypoint_candidate": {
+    "path": "scripts/top40_v2_tournament_pure_crypto_v6.py",
+    "sha256": "a9197dc2f83d4415f1aa4c098546e21e010cb99e754580de96c3e339cc927641"
+  },
+  "files": {
+    "scripts/top40_v2_tournament_pure_crypto_v6.py": "a9197dc2f83d4415f1aa4c098546e21e010cb99e754580de96c3e339cc927641",
+    "src/crypto_trade/tournament/amendment_0006_v2.py": "5f5187ef431ca89077f21ada09139fe3b3ada62afeb1fa0f3ce957c6ba5933b1",
+    "src/crypto_trade/tournament/pure_crypto_universe_v6.py": "fc93c0f26dcbf6304abe028736693ab2bee7430a56c14a8547defff472008192",
+    "tests/tournament/test_top40_v2_amendment_0006.py": "5eae809e3c5e7e5e2147bbd49f47c61d376038cb909bc4f2d1080a22eb723237",
+    "tournament/top40-v2/amendments/0006/AMENDMENT.md": "ccb69cf09580942930fdb15faa04f5ec9e4105c85b8c39ea45ba80e259628299",
+    "tournament/top40-v2/amendments/0006/REVIEW.json": "c9c2056ed6f5f739c315a54bda00a0267251b64f27155b41ed18db81bdba61e2"
+  },
+  "final_implementation_commit": "49dd8978c161fb75b9a78efaead5f847f589e7f1",
+  "freeze_timestamp_utc": "2026-07-16T14:09:55Z",
+  "parent_authority": {
+    "amendment_0004_active_runner_sha256": "03006ea1ce391ef3c8da6244acb89aab19f7e63d1e0a617e2743894a575fd6cd",
+    "amendment_0004_freeze_sha256": "bfb9e82c0b9a0950ead9b94ae61fe9f6c091462b106e46bd51113894b6eb9465",
+    "data_manifest_sha256": "077eb036d262befec80f7013084fe6906859f7c3bbe2f8c193c9d9ec68e367c3"
+  },
+  "review_commit": "ef4463518128ae3768eac9298315bf66abb1661e",
+  "review_sha256": "c9c2056ed6f5f739c315a54bda00a0267251b64f27155b41ed18db81bdba61e2",
+  "schema_version": 1,
+  "status": "frozen"
+}
