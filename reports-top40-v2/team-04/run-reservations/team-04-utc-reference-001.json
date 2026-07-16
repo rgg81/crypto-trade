@@ -1,0 +1,15 @@
+{
+  "candidate_id": "team-04-utc-reference-001",
+  "config_sha256": "bd0e4f70bcf335b2ac4e44ec049b89b8e8eaf4c6ac6502574d0accf12d9d9947",
+  "organizer_journal_head_sha256": "8205fbea6d140a729c2fe079e227512281b1760a73fa2b5a252787afd5a4c057",
+  "private_attempt_number": null,
+  "registration_sha256": "2d4b890e50527ed8a5372bf9b2e3a258db0567063afcb031666ce59fe2d072fa",
+  "reserved_at_utc": "2026-07-16T11:28:16.395970+00:00",
+  "risk_policy_sha256": "850e792495dd1861fbf61377d3131e4b43ecf3794b2f9545f6b9897c184b0fd2",
+  "schema_version": 1,
+  "source_bundle_sha256": "8c3ba47894bbc45664ee1d7e56190f64e2c1dee1e8a9c749d4f0ec3344443520",
+  "stage": "development",
+  "strategy_sha256": "0e63f868f99684bef394bc1996a6034032c0657b76eceefc1b1b052fdd0e02cc",
+  "team_id": "team-04",
+  "tournament": "quant-portfolio-blind-top40-v2"
+}
