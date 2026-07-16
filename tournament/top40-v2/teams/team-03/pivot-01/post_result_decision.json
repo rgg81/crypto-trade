@@ -1,0 +1,33 @@
+{
+  "candidate_id": "t03-crsa-base-i3-c1-b30-v21",
+  "decision": "dnf",
+  "failed_gates": [
+    "minimum_net_sharpe",
+    "positive_annualized_return",
+    "minimum_calmar",
+    "minimum_double_cost_sharpe",
+    "minimum_positive_quarter_fraction",
+    "minimum_positive_sharpe_regimes",
+    "minimum_worst_regime_sharpe"
+  ],
+  "family_id": "t03-confirmed-residual-shock-absorption-v1",
+  "metrics": {
+    "annualized_return": -0.06333241442682858,
+    "calmar": -0.2819101492754758,
+    "double_cost_sharpe": -1.5379779345470403,
+    "maximum_drawdown": 0.224654609241974,
+    "net_sharpe": -1.0216656274702798,
+    "positive_quarter_fraction": 0.21428571428571427,
+    "regime_sharpe": {
+      "bear": -1.046295205385974,
+      "bull": -1.5811092827245277,
+      "chop": -1.0745185971601638,
+      "stress": -0.49759582076750325
+    }
+  },
+  "next_actions_authorized": [],
+  "reason": "The exact no-control base failed multiple noncompensatory aggregate, cost, calendar, and regime gates; its preregistration forbids neighbors, controls, or a second pivot after any base failure.",
+  "runner_record_sha256": "895396195155506c037f6a3ac772688e069c3c904562d1c1074ae6873e6b15e9",
+  "schema_version": 1,
+  "team_id": "team-03"
+}
