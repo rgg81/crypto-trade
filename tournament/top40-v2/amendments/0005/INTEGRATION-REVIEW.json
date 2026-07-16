@@ -1,0 +1,44 @@
+{
+  "active_entrypoint": {
+    "path": "scripts/top40_v2_tournament_score_diagnostics_v5.py",
+    "sha256": "0dc9228f3b9c6fe41b2655055f766fc92f323a289a050e6bdf4e48a30b0105f4"
+  },
+  "amendment_freeze": {
+    "commit": "8315bf3ae82772c883fe09fe4c90b60cb02665bf",
+    "path": "tournament/top40-v2/amendments/0005/freeze.json",
+    "sha256": "0f112dc0e6452e29d691f46d42b8c19ea46482bda0b813143664acf056954c5f"
+  },
+  "amendment_id": "top40-v2-amendment-0005-prospective-development-score-adapters",
+  "decision": "approved",
+  "delegated_amendment_0006_integration": {
+    "commit": "ed3af1398543dfee4a50150915dc2e37b3631fc9",
+    "path": "tournament/top40-v2/amendments/0006/integration-freeze.json",
+    "sha256": "3e93bdfe031e2589888c3bbcaae583437bbd074fa9d86c6dc0a54187bc0f1e34"
+  },
+  "dispatch_scope": {
+    "all_other_argv_delegated_to_amendment_0006_unchanged": true,
+    "amendment_0005_commands": [
+      "amendment-0005-status",
+      "amendment-0005-reserve-development-score-diagnostic",
+      "amendment-0005-run-development-score-diagnostic"
+    ],
+    "draft_sidecar_mutations_authorized": false
+  },
+  "historical_entrypoint": {
+    "path": "scripts/top40_v2_tournament_pure_crypto_v6.py",
+    "sha256": "a9197dc2f83d4415f1aa4c098546e21e010cb99e754580de96c3e339cc927641",
+    "status": "superseded-unchanged"
+  },
+  "integration_draft": {
+    "commit": "329b32a258978660f9d8b6a78e3ba89a6dd30e40",
+    "path": "tournament/top40-v2/amendments/0005/integration-draft.json",
+    "sha256": "385bbe06345960cb01c666d8e91d64643267f17642ea8ce5002fc5e22b2cb550"
+  },
+  "integration_module": {
+    "path": "src/crypto_trade/tournament/amendment_0005_integration_v2.py",
+    "sha256": "c9e0b0be288edebf86f8c7d441b4093843ae3d64f0cbac42dbadf21625f786f8"
+  },
+  "reviewed_at_utc": "2026-07-16T15:42:44Z",
+  "reviewer": "a5_a6_entrypoint_audit",
+  "schema_version": 1
+}
