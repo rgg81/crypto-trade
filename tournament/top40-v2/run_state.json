@@ -52,7 +52,7 @@
   "critic_lock": null,
   "final_oos_lock": null,
   "finalist_cohort_lock": null,
-  "legacy_projection_sha256": "f35c6c92152fbdbfc26e6220603a4320b28db7f5b0e972f5797fbb64df065e3f",
+  "legacy_projection_sha256": "48e0f1de9bab0710c8672b4f4f724776057a5dea83046e2cfd8ceeef9263fc60",
   "legacy_state_sha256": "8c858495fde6ddde203124a055e40ebad5d8d5a684cd20f0e55f6c88f7360b07",
   "objective_lock": null,
   "organizer_audit": {
@@ -167,13 +167,13 @@
       "trial_count": 1
     },
     "team-06": {
-      "active_family_id": "t06-balanced-trend-reversal-v1",
+      "active_family_id": "t06-relative-rank-acceleration-v1",
       "canonical_result": null,
       "development_assessment": null,
       "dnf": null,
-      "family_count": 1,
+      "family_count": 2,
       "finalist_freeze": null,
-      "pivot_count": 0,
+      "pivot_count": 1,
       "private_attempts": 0,
       "private_result": null,
       "qualifier_candidate": null,
