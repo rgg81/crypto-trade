@@ -1,68 +1,18 @@
 {
-  "base_candidate_id": "vdr-core-candidate-001",
-  "activation_rule": "Neighbors remain dormant until the no-control core passes every non-neighborhood official central-development gate plus all stricter regime, role, sleeve, concentration, A5 coverage, and score-IC minima. They then adjudicate the frozen stability gate; they cannot rescue any earlier failure.",
+  "base_candidate_id": "t08-compressed-shock-recoil-v1-base",
+  "activation_rule": "Neighbors remain dormant until the no-control core passes every non-neighborhood official threshold and every stricter bull, bear, chop, role, sleeve, concentration, A5 coverage, pooled-IC, and fold-IC gate. They can adjudicate stability but cannot rescue any earlier failure.",
   "base_parameters_file": "frozen_config.json",
   "declaration_status": "prospective-unregistered-unevaluated",
-  "materialization_rule": "Merge each override into strategy_parameters without changing any other byte-level input; then preregister and run each neighbor independently before reading its result.",
+  "materialization_rule": "Change only the declared executable constant, preregister its exact source/config/risk identities, and run serially before reading the result; restore and verify the base source exactly afterward.",
   "neighbors": [
-    {
-      "hypothesis": "A two-day compression estimator reacts sooner without changing the slow baseline.",
-      "neighbor_id": "vdr-neighbor-fast-006",
-      "overrides": {
-        "fast_vol_bars": 6
-      }
-    },
-    {
-      "hypothesis": "A four-day compression estimator rejects brief false compressions.",
-      "neighbor_id": "vdr-neighbor-fast-012",
-      "overrides": {
-        "fast_vol_bars": 12
-      }
-    },
-    {
-      "hypothesis": "A stricter compression prerequisite trades only deeper squeezes.",
-      "neighbor_id": "vdr-neighbor-compression-080",
-      "overrides": {
-        "compression_ratio_ceiling": 0.8
-      }
-    },
-    {
-      "hypothesis": "A looser compression prerequisite tests whether the edge is broad rather than threshold-local.",
-      "neighbor_id": "vdr-neighbor-compression-092",
-      "overrides": {
-        "compression_ratio_ceiling": 0.92
-      }
-    },
-    {
-      "hypothesis": "A lower release threshold admits moderate impulses.",
-      "neighbor_id": "vdr-neighbor-release-100",
-      "overrides": {
-        "expansion_z_floor": 1.0
-      }
-    },
-    {
-      "hypothesis": "A higher release threshold trades only clear volatility releases.",
-      "neighbor_id": "vdr-neighbor-release-130",
-      "overrides": {
-        "expansion_z_floor": 1.3
-      }
-    },
-    {
-      "hypothesis": "An earlier continuation transition tests a wider definition of broad price discovery.",
-      "neighbor_id": "vdr-neighbor-dispersion-early",
-      "overrides": {
-        "dispersion_continuation_floor": 1.16,
-        "dispersion_fade_ceiling": 0.88
-      }
-    },
-    {
-      "hypothesis": "A later continuation transition requires stronger cross-sectional confirmation.",
-      "neighbor_id": "vdr-neighbor-dispersion-late",
-      "overrides": {
-        "dispersion_continuation_floor": 1.28,
-        "dispersion_fade_ceiling": 0.97
-      }
-    }
+    {"neighbor_id": "csr-neighbor-baseline-072", "overrides": {"baseline_volatility_bars": 72}, "hypothesis": "A shorter baseline adapts compression to newer volatility."},
+    {"neighbor_id": "csr-neighbor-baseline-096", "overrides": {"baseline_volatility_bars": 96}, "hypothesis": "A longer baseline tests whether compression survives slower volatility context."},
+    {"neighbor_id": "csr-neighbor-compression-018", "overrides": {"compression_volatility_bars": 18}, "hypothesis": "Six days of pre-shock compression tests faster setup recognition."},
+    {"neighbor_id": "csr-neighbor-compression-024", "overrides": {"compression_volatility_bars": 24}, "hypothesis": "Eight days of compression tests setup persistence."},
+    {"neighbor_id": "csr-neighbor-ceiling-090", "overrides": {"compression_ratio_ceiling": 0.9}, "hypothesis": "A stricter ceiling admits only clear volatility contraction."},
+    {"neighbor_id": "csr-neighbor-ceiling-110", "overrides": {"compression_ratio_ceiling": 1.1}, "hypothesis": "A looser ceiling tests whether the edge is threshold-local."},
+    {"neighbor_id": "csr-neighbor-shockscale-200", "overrides": {"shock_saturation_z": 2.0}, "hypothesis": "Earlier saturation reduces domination by extreme shocks."},
+    {"neighbor_id": "csr-neighbor-shockscale-300", "overrides": {"shock_saturation_z": 3.0}, "hypothesis": "Later saturation preserves more shock-magnitude differentiation."}
   ],
   "required_evidence": {
     "distinct_daily_return_series": true,
@@ -72,6 +22,6 @@
     "parameter_and_return_sha256_required": true
   },
   "schema_version": 1,
-  "selection_prohibition": "Do not add, remove, or recenter neighbors after any neighborhood result is observed.",
+  "selection_prohibition": "Do not add, remove, recenter, or choose among neighbors after any neighborhood result is observed.",
   "team_id": "team-08"
 }

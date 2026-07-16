@@ -1,0 +1,42 @@
+{
+  "active_authority": {
+    "entrypoint_path": "scripts/top40_v2_tournament_runtime_preload_v7.py",
+    "entrypoint_sha256": "8a4ada10176d2606df3f358fc188e21b45153ad9a7270f36908736f03322a3a9",
+    "integration_freeze_sha256": "6f77a146e7b414eabd20c5cc9321a95493bb98116dde07ef79d9eb009b6a6f51"
+  },
+  "authorization": {
+    "controls_authorized_before_core_pass": false,
+    "journals_or_reports_edited_by_draft": false,
+    "material_trial_number_if_registered": 2,
+    "private_data_authorized": false,
+    "registration_authorized_by_template": false
+  },
+  "new_candidate_id": "t08-compressed-shock-recoil-v1-base",
+  "new_family_id": "t08-compressed-shock-recoil-v1",
+  "parent_evidence": {
+    "approximate_inverse_same_cost_sharpe": -0.5756,
+    "bear_bull_chop_sharpes": "all_negative",
+    "candidate_id": "vdr-core-candidate-001",
+    "family_id": "volatility-dispersion-release-v1",
+    "net_sharpe": -2.2537,
+    "no_cost_same_direction_sharpe": -0.8355,
+    "terminal_decision": "failed_no_control_core",
+    "turnover_sum": 1012
+  },
+  "pivot_classification": {
+    "changes": [
+      "remove the dispersion continuation/convergence state switch and all continuation logic",
+      "replace one-bar release direction with a three-bar idiosyncratic shock and explicit recoil",
+      "require pre-shock volatility compression plus multi-bar sign and median-component durability",
+      "force exact dollar neutrality with broad equal-dollar sleeves",
+      "replace daily 0.80-gross construction with weekly 0.36-gross construction"
+    ],
+    "is_blind_score_negation": false,
+    "is_parameter_neighbor": false,
+    "is_risk_control_change": false,
+    "mechanism_pivot": true
+  },
+  "schema_version": 1,
+  "status": "draft_pending_serial_validation_review_registration_hash_binding_and_a7_rebind",
+  "team_id": "team-08"
+}

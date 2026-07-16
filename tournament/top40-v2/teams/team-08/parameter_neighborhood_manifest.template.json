@@ -1,62 +1,14 @@
 {
-  "candidate_id": "vdr-core-candidate-001",
+  "candidate_id": "t08-compressed-shock-recoil-v1-base",
   "neighbors": [
-    {
-      "daily_returns_path": "replace/vdr-neighbor-fast-006.daily-returns.json",
-      "daily_returns_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-      "neighbor_id": "vdr-neighbor-fast-006",
-      "parameter_artifact_path": "replace/vdr-neighbor-fast-006.parameters.json",
-      "parameter_artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
-    },
-    {
-      "daily_returns_path": "replace/vdr-neighbor-fast-012.daily-returns.json",
-      "daily_returns_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-      "neighbor_id": "vdr-neighbor-fast-012",
-      "parameter_artifact_path": "replace/vdr-neighbor-fast-012.parameters.json",
-      "parameter_artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
-    },
-    {
-      "daily_returns_path": "replace/vdr-neighbor-compression-080.daily-returns.json",
-      "daily_returns_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-      "neighbor_id": "vdr-neighbor-compression-080",
-      "parameter_artifact_path": "replace/vdr-neighbor-compression-080.parameters.json",
-      "parameter_artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
-    },
-    {
-      "daily_returns_path": "replace/vdr-neighbor-compression-092.daily-returns.json",
-      "daily_returns_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-      "neighbor_id": "vdr-neighbor-compression-092",
-      "parameter_artifact_path": "replace/vdr-neighbor-compression-092.parameters.json",
-      "parameter_artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
-    },
-    {
-      "daily_returns_path": "replace/vdr-neighbor-release-100.daily-returns.json",
-      "daily_returns_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-      "neighbor_id": "vdr-neighbor-release-100",
-      "parameter_artifact_path": "replace/vdr-neighbor-release-100.parameters.json",
-      "parameter_artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
-    },
-    {
-      "daily_returns_path": "replace/vdr-neighbor-release-130.daily-returns.json",
-      "daily_returns_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-      "neighbor_id": "vdr-neighbor-release-130",
-      "parameter_artifact_path": "replace/vdr-neighbor-release-130.parameters.json",
-      "parameter_artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
-    },
-    {
-      "daily_returns_path": "replace/vdr-neighbor-dispersion-early.daily-returns.json",
-      "daily_returns_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-      "neighbor_id": "vdr-neighbor-dispersion-early",
-      "parameter_artifact_path": "replace/vdr-neighbor-dispersion-early.parameters.json",
-      "parameter_artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
-    },
-    {
-      "daily_returns_path": "replace/vdr-neighbor-dispersion-late.daily-returns.json",
-      "daily_returns_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-      "neighbor_id": "vdr-neighbor-dispersion-late",
-      "parameter_artifact_path": "replace/vdr-neighbor-dispersion-late.parameters.json",
-      "parameter_artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
-    }
+    {"neighbor_id": "csr-neighbor-baseline-072", "parameter_artifact_path": "replace/csr-neighbor-baseline-072.parameters.json", "parameter_artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000", "daily_returns_path": "replace/csr-neighbor-baseline-072.daily-returns.csv", "daily_returns_sha256": "0000000000000000000000000000000000000000000000000000000000000000"},
+    {"neighbor_id": "csr-neighbor-baseline-096", "parameter_artifact_path": "replace/csr-neighbor-baseline-096.parameters.json", "parameter_artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000", "daily_returns_path": "replace/csr-neighbor-baseline-096.daily-returns.csv", "daily_returns_sha256": "0000000000000000000000000000000000000000000000000000000000000000"},
+    {"neighbor_id": "csr-neighbor-compression-018", "parameter_artifact_path": "replace/csr-neighbor-compression-018.parameters.json", "parameter_artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000", "daily_returns_path": "replace/csr-neighbor-compression-018.daily-returns.csv", "daily_returns_sha256": "0000000000000000000000000000000000000000000000000000000000000000"},
+    {"neighbor_id": "csr-neighbor-compression-024", "parameter_artifact_path": "replace/csr-neighbor-compression-024.parameters.json", "parameter_artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000", "daily_returns_path": "replace/csr-neighbor-compression-024.daily-returns.csv", "daily_returns_sha256": "0000000000000000000000000000000000000000000000000000000000000000"},
+    {"neighbor_id": "csr-neighbor-ceiling-090", "parameter_artifact_path": "replace/csr-neighbor-ceiling-090.parameters.json", "parameter_artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000", "daily_returns_path": "replace/csr-neighbor-ceiling-090.daily-returns.csv", "daily_returns_sha256": "0000000000000000000000000000000000000000000000000000000000000000"},
+    {"neighbor_id": "csr-neighbor-ceiling-110", "parameter_artifact_path": "replace/csr-neighbor-ceiling-110.parameters.json", "parameter_artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000", "daily_returns_path": "replace/csr-neighbor-ceiling-110.daily-returns.csv", "daily_returns_sha256": "0000000000000000000000000000000000000000000000000000000000000000"},
+    {"neighbor_id": "csr-neighbor-shockscale-200", "parameter_artifact_path": "replace/csr-neighbor-shockscale-200.parameters.json", "parameter_artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000", "daily_returns_path": "replace/csr-neighbor-shockscale-200.daily-returns.csv", "daily_returns_sha256": "0000000000000000000000000000000000000000000000000000000000000000"},
+    {"neighbor_id": "csr-neighbor-shockscale-300", "parameter_artifact_path": "replace/csr-neighbor-shockscale-300.parameters.json", "parameter_artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000", "daily_returns_path": "replace/csr-neighbor-shockscale-300.daily-returns.csv", "daily_returns_sha256": "0000000000000000000000000000000000000000000000000000000000000000"}
   ],
   "schema_version": 1,
   "team_id": "team-08"

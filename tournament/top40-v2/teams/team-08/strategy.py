@@ -1,13 +1,16 @@
-"""Team 08 volatility-release and cross-sectional-dispersion strategy.
+"""Team 08 causal compressed-shock recoil pivot.
 
-The implementation is deliberately self-contained because the tournament worker copies the team
-source bundle into a clean process.  It consumes only closed 8-hour bars supplied through the
-public ``DecisionContext`` contract.  It never prices fills, reads files, or uses private state.
+The organizer supplies point-in-time pure-crypto membership and completed 8-hour bars.  At each
+weekly construction the strategy subtracts the same-bar cross-sectional median return, measures
+whether each coin's idiosyncratic volatility compressed before the latest three-bar shock, and
+scores a durable recoil opposite that shock.  Compression, multi-bar direction agreement, the
+median aligned shock component, and path roughness all enter before the final deterministic
+cross-sectional rank.  This is not the negative of the retired dispersion-release score: it has
+new feature lineage, no dispersion-state switch, no continuation sleeve, and no common direction.
 
-On each scheduled construction, one finite built-in score dictionary crosses the organizer's
-public A5 identity boundary after the complete VDR transform and before selection, sizing, caps,
-or organizer risk.  The exact returned dictionary is the sole signal object used to construct the
-portfolio.
+One finite built-in score dictionary crosses the public A5 boundary after every signal transform
+and before selection, sizing, caps, or organizer risk.  The exact returned object alone builds a
+weekly broad, equal-dollar, exactly neutral no-control portfolio.
 """
 
 from __future__ import annotations
@@ -15,407 +18,424 @@ from __future__ import annotations
 import dataclasses
 import math
 import numbers
-import re
 from collections.abc import Mapping, Sequence
-from typing import Any
+from typing import Any, Literal, Protocol
 
 import candidate_variant
-import numpy as np
 import pandas as pd
 
 from crypto_trade.tournament.score_adapter_protocol_v5 import score_boundary
 
-_SYMBOL_PATTERN = re.compile(r"[A-Z0-9]+USDT")
-_BAR_INTERVAL = pd.Timedelta(hours=8)
-_REQUIRED_COLUMNS = frozenset({"open_time", "symbol", "close", "quote_volume"})
+FROZEN_SEED = 20260801
+BAR_INTERVAL_HOURS = 8
+REBALANCE_INTERVAL_BARS = 21
+HISTORY_RETURN_BARS = 126
+BASELINE_VOLATILITY_BARS = 84
+COMPRESSION_VOLATILITY_BARS = 21
+SHOCK_BARS = 3
+COMPRESSION_RATIO_FLOOR = 0.45
+COMPRESSION_RATIO_CEILING = 1.00
+SHOCK_SATURATION_Z = 2.50
+MINIMUM_DIRECTION_AGREEMENT_NUMERATOR = 2
+MINIMUM_DIRECTION_AGREEMENT_DENOMINATOR = 3
+MINIMUM_VALID_SYMBOLS = 24
+MINIMUM_POSITIONS_PER_SIDE = 8
+SELECTION_NUMERATOR = 1
+SELECTION_DENOMINATOR = 5
+GROSS_TARGET = 0.36
+MAXIMUM_SYMBOL_EXPOSURE = 0.025
+TOLERANCE = 1e-10
 
-ACTIVE_FAMILY_ID = "volatility-dispersion-release-v1"
-ACTIVE_CANDIDATE_ID = "vdr-core-candidate-001"
+ACTIVE_FAMILY_ID = "t08-compressed-shock-recoil-v1"
+ACTIVE_CANDIDATE_ID = "t08-compressed-shock-recoil-v1-base"
 MATERIALIZED_CANDIDATE_OVERRIDES: dict[str, dict[str, object]] = {
     ACTIVE_CANDIDATE_ID: {},
 }
 
+_BAR_INTERVAL = pd.Timedelta(hours=BAR_INTERVAL_HOURS)
+
+
+class ContextLike(Protocol):
+    """Runtime subset of the neutral decision context consumed by Team 08."""
+
+    decision_time: pd.Timestamp
+    bars: Mapping[str, pd.DataFrame]
+    funding: pd.DataFrame
+    auxiliary: Mapping[str, pd.DataFrame]
+    eligible_symbols: Sequence[str]
+
 
 @dataclasses.dataclass(frozen=True)
-class StrategyConfig:
-    """Frozen prospective parameters for the first Team 08 candidate."""
-
-    fast_vol_bars: int = 9
-    slow_vol_bars: int = 63
-    dispersion_lookback_bars: int = 42
-    direction_bars: int = 3
-    compression_ratio_floor: float = 0.35
-    compression_ratio_ceiling: float = 0.86
-    expansion_z_floor: float = 1.15
-    expansion_z_cap: float = 2.75
-    dispersion_fade_ceiling: float = 0.92
-    dispersion_continuation_floor: float = 1.22
-    minimum_cross_section: int = 12
-    minimum_side_positions: int = 5
-    side_fraction: float = 0.22
-    gross_target: float = 0.80
-    maximum_symbol_weight: float = 0.09
-    minimum_signal_strength: float = 0.025
-    rebalance_hour_utc: int = 0
-
-    def __post_init__(self) -> None:
-        integer_fields = (
-            self.fast_vol_bars,
-            self.slow_vol_bars,
-            self.dispersion_lookback_bars,
-            self.direction_bars,
-            self.minimum_cross_section,
-            self.minimum_side_positions,
-            self.rebalance_hour_utc,
-        )
-        if any(
-            isinstance(value, bool) or not isinstance(value, numbers.Integral)
-            for value in integer_fields
-        ):
-            raise ValueError("bar counts, position counts, and rebalance hour must be integers")
-        if not 2 <= self.fast_vol_bars < self.slow_vol_bars:
-            raise ValueError("fast_vol_bars must be at least 2 and below slow_vol_bars")
-        if self.dispersion_lookback_bars < 3 or self.direction_bars < 1:
-            raise ValueError("dispersion and direction lookbacks must be positive")
-        if not 0 < self.compression_ratio_floor < self.compression_ratio_ceiling:
-            raise ValueError("compression thresholds must be strictly increasing")
-        if not 0 < self.expansion_z_floor < self.expansion_z_cap:
-            raise ValueError("expansion thresholds must be strictly increasing")
-        if not 0 < self.dispersion_fade_ceiling < self.dispersion_continuation_floor:
-            raise ValueError("dispersion thresholds must be strictly increasing")
-        if self.minimum_cross_section < 2 * self.minimum_side_positions:
-            raise ValueError("cross section cannot support the requested two sleeves")
-        if not 0 < self.side_fraction < 0.5:
-            raise ValueError("side_fraction must be in (0, 0.5)")
-        if not 0 < self.gross_target <= 1:
-            raise ValueError("gross_target must be in (0, 1]")
-        if not 0 < self.maximum_symbol_weight <= 0.10:
-            raise ValueError("maximum_symbol_weight must be in (0, 0.10]")
-        if self.gross_target / 2 > self.minimum_side_positions * self.maximum_symbol_weight:
-            raise ValueError("minimum side count cannot carry its exposure below the symbol cap")
-        if not 0 <= self.minimum_signal_strength < 1:
-            raise ValueError("minimum_signal_strength must be in [0, 1)")
-        if not 0 <= self.rebalance_hour_utc <= 23:
-            raise ValueError("rebalance_hour_utc must be an integer UTC hour")
+class _RecoilFeature:
+    compression_ratio: float
+    signed_shock_z: float
+    direction_agreement: float
+    durable_shock_z: float
+    path_roughness: float
+    raw_recoil_score: float
 
 
-DEFAULT_CONFIG = StrategyConfig()
+@dataclasses.dataclass(frozen=True)
+class PreconstructionSnapshot:
+    """Immutable final scores before selection, sizing, caps, or organizer risk."""
+
+    decision_time: pd.Timestamp
+    scores: tuple[tuple[str, float], ...]
+
+    def score_map(self) -> dict[str, float]:
+        return {symbol: float(value) for symbol, value in self.scores}
 
 
-def _utc_timestamp(value: Any, label: str) -> pd.Timestamp:
+def _finite_number(value: Any) -> float | None:
+    if isinstance(value, bool):
+        return None
     try:
-        timestamp = pd.Timestamp(value)
-    except (TypeError, ValueError) as exc:
-        raise ValueError(f"{label} must be a timestamp") from exc
-    if timestamp.tzinfo is None:
-        raise ValueError(f"{label} must be timezone-aware")
-    return timestamp.tz_convert("UTC")
+        result = float(value)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    return result if math.isfinite(result) else None
 
 
-def _utc_index(values: Any, label: str) -> pd.DatetimeIndex:
+def _utc_timestamp(value: Any) -> pd.Timestamp | None:
+    """Parse an aware timestamp, including common integer epoch encodings."""
+
     try:
-        index = pd.DatetimeIndex(values)
-    except (TypeError, ValueError) as exc:
-        raise ValueError(f"{label} must contain timestamps") from exc
-    if index.tz is None:
-        raise ValueError(f"{label} must be timezone-aware")
-    index = index.tz_convert("UTC")
-    if index.hasnans:
-        raise ValueError(f"{label} cannot contain missing timestamps")
-    return index
+        if isinstance(value, bool):
+            return None
+        if isinstance(value, numbers.Real):
+            magnitude = abs(float(value))
+            if magnitude >= 1.0e17:
+                unit = "ns"
+            elif magnitude >= 1.0e14:
+                unit = "us"
+            elif magnitude >= 1.0e11:
+                unit = "ms"
+            else:
+                unit = "s"
+            timestamp = pd.Timestamp(value, unit=unit, tz="UTC")
+        else:
+            timestamp = pd.Timestamp(value)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    if pd.isna(timestamp) or timestamp.tzinfo is None:
+        return None
+    try:
+        return timestamp.tz_convert("UTC")
+    except (TypeError, ValueError, OverflowError):
+        return None
 
 
-def _validate_context(
-    context: Any,
-) -> tuple[pd.Timestamp, tuple[str, ...], dict[str, pd.DataFrame]]:
-    """Validate the complete supplied boundary before any signal decision.
-
-    Rejecting, rather than trimming, a future or malformed row ensures that direct calls cannot
-    turn an unauthorized context into an apparently valid prediction.
-    """
-
-    decision_time = _utc_timestamp(context.decision_time, "decision_time")
-    raw_eligible = context.eligible_symbols
-    if isinstance(raw_eligible, (str, bytes)) or not isinstance(raw_eligible, Sequence):
-        raise TypeError("eligible_symbols must be a sequence")
-    eligible = tuple(str(symbol) for symbol in raw_eligible)
-    if len(eligible) != len(set(eligible)):
-        raise ValueError("eligible_symbols cannot contain duplicates")
-    for symbol in eligible:
-        if _SYMBOL_PATTERN.fullmatch(symbol) is None:
-            raise ValueError(f"invalid eligible symbol syntax: {symbol!r}")
-
-    if not isinstance(context.bars, Mapping):
-        raise TypeError("bars must be a symbol mapping")
-    if set(context.bars) != set(eligible):
-        raise ValueError("bars keys must exactly match the point-in-time eligible set")
-    if not isinstance(context.auxiliary, Mapping) or context.auxiliary:
-        raise ValueError("Team 08 does not accept auxiliary data")
-
-    validated: dict[str, pd.DataFrame] = {}
-    for symbol in sorted(eligible):
-        frame = context.bars[symbol]
-        if not isinstance(frame, pd.DataFrame):
-            raise TypeError(f"bars[{symbol}] must be a DataFrame")
-        missing = _REQUIRED_COLUMNS - set(frame.columns)
-        if missing:
-            raise ValueError(f"bars[{symbol}] is missing columns: {sorted(missing)}")
-        if frame.empty:
-            raise ValueError(f"bars[{symbol}] cannot be empty")
-
-        times = _utc_index(frame["open_time"], f"bars[{symbol}].open_time")
-        if not times.is_monotonic_increasing or times.has_duplicates:
-            raise ValueError(f"bars[{symbol}] timestamps must be strictly increasing")
-        if bool(np.any(times + _BAR_INTERVAL > decision_time)):
-            raise ValueError(f"bars[{symbol}] contains an unclosed or future bar")
-        if not frame["symbol"].astype(str).eq(symbol).all():
-            raise ValueError(f"bars[{symbol}] contains a different symbol")
-
-        close = pd.to_numeric(frame["close"], errors="coerce").to_numpy(dtype=float)
-        quote_volume = pd.to_numeric(frame["quote_volume"], errors="coerce").to_numpy(dtype=float)
-        if not bool(np.isfinite(close).all()) or bool(np.any(close <= 0)):
-            raise ValueError(f"bars[{symbol}].close must be finite and positive")
-        if not bool(np.isfinite(quote_volume).all()) or bool(np.any(quote_volume < 0)):
-            raise ValueError(f"bars[{symbol}].quote_volume must be finite and nonnegative")
-
-        clean = pd.DataFrame(
-            {
-                "open_time": times,
-                "close": close,
-                "quote_volume": quote_volume,
-            }
-        )
-        validated[symbol] = clean
-
-    funding = context.funding
-    if not isinstance(funding, pd.DataFrame):
-        raise TypeError("funding must be a DataFrame")
-    if not funding.empty:
-        if not {"funding_time", "symbol"}.issubset(funding.columns):
-            raise ValueError("nonempty funding data requires funding_time and symbol")
-        funding_times = _utc_index(funding["funding_time"], "funding.funding_time")
-        if bool(np.any(funding_times >= decision_time)):
-            raise ValueError("funding contains a row that was not strictly past")
-        if not funding["symbol"].astype(str).isin(eligible).all():
-            raise ValueError("funding contains a symbol outside the eligible set")
-
-    return decision_time, eligible, validated
+_DecisionState = Literal["flat", "hold", "scheduled"]
 
 
-def _contiguous_tail(frame: pd.DataFrame) -> pd.DataFrame:
-    """Return the latest strictly 8-hour contiguous suffix."""
+def _decision_state(value: Any) -> tuple[_DecisionState, pd.Timestamp | None]:
+    timestamp = _utc_timestamp(value)
+    if timestamp is None:
+        return "flat", None
+    interval_ns = int(_BAR_INTERVAL.value)
+    timestamp_ns = int(timestamp.value)
+    if timestamp_ns < 0 or timestamp_ns % interval_ns:
+        return "flat", timestamp
+    if (timestamp_ns // interval_ns) % REBALANCE_INTERVAL_BARS:
+        return "hold", timestamp
+    return "scheduled", timestamp
 
-    times = pd.DatetimeIndex(frame["open_time"])
-    start = len(frame) - 1
-    while start > 0 and times[start] - times[start - 1] == _BAR_INTERVAL:
-        start -= 1
-    return frame.iloc[start:].reset_index(drop=True)
 
-
-def _return_matrix(
-    histories: Mapping[str, pd.DataFrame],
-    *,
-    decision_time: pd.Timestamp,
-    config: StrategyConfig,
-) -> pd.DataFrame:
-    required_returns = max(
-        config.slow_vol_bars + 1,
-        config.dispersion_lookback_bars + 1,
-        config.direction_bars + 1,
+def _expected_open_times(decision_time: pd.Timestamp) -> tuple[pd.Timestamp, ...]:
+    return tuple(
+        decision_time - offset * _BAR_INTERVAL
+        for offset in range(HISTORY_RETURN_BARS + 1, 0, -1)
     )
-    by_symbol: dict[str, pd.Series] = {}
-    for symbol in sorted(histories):
-        tail = _contiguous_tail(histories[symbol])
-        if len(tail) < required_returns + 1:
-            continue
-        if pd.Timestamp(tail["open_time"].iloc[-1]) + _BAR_INTERVAL != decision_time:
-            continue
-        if float(tail["quote_volume"].iloc[-config.slow_vol_bars :].median()) <= 0:
-            continue
-        close = tail["close"].to_numpy(dtype=float)
-        returns = np.diff(np.log(close))
-        close_times = pd.DatetimeIndex(tail["open_time"].iloc[1:]) + _BAR_INTERVAL
-        by_symbol[symbol] = pd.Series(returns, index=close_times, name=symbol)
-
-    if len(by_symbol) < config.minimum_cross_section:
-        return pd.DataFrame()
-    matrix = pd.concat(by_symbol.values(), axis=1, join="inner").sort_index()
-    matrix = matrix.iloc[-required_returns:]
-    if len(matrix) < required_returns or matrix.index[-1] != decision_time:
-        return pd.DataFrame()
-    if not bool(np.isfinite(matrix.to_numpy(dtype=float)).all()):
-        raise ValueError("return matrix is not finite")
-    return matrix
 
 
-def _continuation_mix(residuals: pd.DataFrame, config: StrategyConfig) -> float:
-    dispersion = residuals.abs().median(axis=1)
-    baseline = float(dispersion.iloc[-config.dispersion_lookback_bars - 1 : -1].median())
-    current = float(dispersion.iloc[-1])
-    if not math.isfinite(baseline) or not math.isfinite(current):
-        raise ValueError("cross-sectional dispersion is not finite")
-    scale = max(baseline, 1e-12)
-    ratio = current / scale
-    return float(
-        np.clip(
-            (ratio - config.dispersion_fade_ceiling)
-            / (config.dispersion_continuation_floor - config.dispersion_fade_ceiling),
+def _closed_history(frame: Any, *, decision_time: pd.Timestamp) -> tuple[float, ...] | None:
+    """Extract one finite positive close at every exact completed-bar open."""
+
+    if not isinstance(frame, pd.DataFrame) or not {"open_time", "close"}.issubset(frame.columns):
+        return None
+    expected = _expected_open_times(decision_time)
+    values: dict[pd.Timestamp, list[Any]] = {timestamp: [] for timestamp in expected}
+    for raw_open, raw_close in frame.loc[:, ["open_time", "close"]].itertuples(
+        index=False, name=None
+    ):
+        open_time = _utc_timestamp(raw_open)
+        if open_time is None or open_time not in values:
+            continue
+        values[open_time].append(raw_close)
+    closes: list[float] = []
+    for timestamp in expected:
+        if len(values[timestamp]) != 1:
+            return None
+        close = _finite_number(values[timestamp][0])
+        if timestamp + _BAR_INTERVAL > decision_time or close is None or close <= 0.0:
+            return None
+        closes.append(close)
+    return tuple(closes)
+
+
+def _log_returns(closes: Sequence[float]) -> tuple[float, ...] | None:
+    if len(closes) != HISTORY_RETURN_BARS + 1:
+        return None
+    result: list[float] = []
+    for previous, current in zip(closes[:-1], closes[1:], strict=True):
+        ratio = current / previous
+        if not math.isfinite(ratio) or ratio <= 0.0:
+            return None
+        value = math.log(ratio)
+        if not math.isfinite(value):
+            return None
+        result.append(value)
+    return tuple(result)
+
+
+def _median(values: Sequence[float]) -> float | None:
+    ordered = sorted(values)
+    if not ordered or any(not math.isfinite(value) for value in ordered):
+        return None
+    middle = len(ordered) // 2
+    if len(ordered) % 2:
+        return float(ordered[middle])
+    return float(0.5 * (ordered[middle - 1] + ordered[middle]))
+
+
+def _sample_standard_deviation(values: Sequence[float]) -> float | None:
+    if len(values) < 2 or any(not math.isfinite(value) for value in values):
+        return None
+    mean = math.fsum(values) / len(values)
+    variance = math.fsum((value - mean) ** 2 for value in values) / (len(values) - 1)
+    if not math.isfinite(variance) or variance < 0.0:
+        return None
+    result = math.sqrt(variance)
+    return float(result) if math.isfinite(result) else None
+
+
+def _eligible_symbols(context: ContextLike) -> tuple[str, ...] | None:
+    raw = context.eligible_symbols
+    if isinstance(raw, (str, bytes)):
+        return None
+    try:
+        supplied = tuple(raw)
+    except TypeError:
+        return None
+    if any(not isinstance(symbol, str) or not symbol for symbol in supplied):
+        return None
+    if len(supplied) != len(set(supplied)):
+        return None
+    eligible = tuple(sorted(supplied))
+    return eligible if len(eligible) >= MINIMUM_VALID_SYMBOLS else None
+
+
+def _residual_paths(
+    return_paths: Mapping[str, Sequence[float]],
+) -> dict[str, tuple[float, ...]] | None:
+    """Subtract the contemporaneous cross-sectional median at every completed bar."""
+
+    if len(return_paths) < MINIMUM_VALID_SYMBOLS:
+        return None
+    if any(len(path) != HISTORY_RETURN_BARS for path in return_paths.values()):
+        return None
+    result: dict[str, list[float]] = {symbol: [] for symbol in sorted(return_paths)}
+    for index in range(HISTORY_RETURN_BARS):
+        cross_section = [float(return_paths[symbol][index]) for symbol in sorted(return_paths)]
+        market_return = _median(cross_section)
+        if market_return is None:
+            return None
+        for symbol in sorted(result):
+            residual = float(return_paths[symbol][index]) - market_return
+            if not math.isfinite(residual):
+                return None
+            result[symbol].append(residual)
+    return {symbol: tuple(result[symbol]) for symbol in sorted(result)}
+
+
+def _recoil_feature(residual_path: Sequence[float]) -> _RecoilFeature | None:
+    """Score a durable recent shock for recoil only when it follows lower volatility."""
+
+    required = BASELINE_VOLATILITY_BARS + COMPRESSION_VOLATILITY_BARS + SHOCK_BARS
+    if len(residual_path) != HISTORY_RETURN_BARS or required > HISTORY_RETURN_BARS:
+        return None
+    baseline_stop = len(residual_path) - COMPRESSION_VOLATILITY_BARS - SHOCK_BARS
+    baseline_start = baseline_stop - BASELINE_VOLATILITY_BARS
+    compression_stop = len(residual_path) - SHOCK_BARS
+    baseline = residual_path[baseline_start:baseline_stop]
+    compression = residual_path[baseline_stop:compression_stop]
+    shock = residual_path[compression_stop:]
+    baseline_scale = _sample_standard_deviation(baseline)
+    compression_scale = _sample_standard_deviation(compression)
+    if (
+        baseline_scale is None
+        or compression_scale is None
+        or baseline_scale <= 1e-12
+    ):
+        return None
+
+    compression_ratio = compression_scale / baseline_scale
+    compression_strength = float(
+        max(
             0.0,
-            1.0,
-        )
-    )
-
-
-def _raw_scores(matrix: pd.DataFrame, config: StrategyConfig) -> pd.Series:
-    market_component = matrix.median(axis=1)
-    residuals = matrix.sub(market_component, axis=0)
-    continuation_mix = _continuation_mix(residuals, config)
-    scores: dict[str, float] = {}
-
-    for symbol in sorted(residuals.columns):
-        series = residuals[symbol]
-        prior = series.iloc[:-1]
-        fast_vol = float(prior.iloc[-config.fast_vol_bars :].std(ddof=1))
-        slow_vol = float(prior.iloc[-config.slow_vol_bars :].std(ddof=1))
-        if not math.isfinite(fast_vol) or not math.isfinite(slow_vol) or slow_vol <= 1e-12:
-            continue
-        fast_scale = max(fast_vol, 1e-12)
-        compression_ratio = fast_vol / slow_vol
-        # Compression is an eligibility condition, not merely a zero-valued feature.  Keeping an
-        # inactive name at score zero would let cross-sectional median centering move it away from
-        # zero and potentially select it.  Exclude it before any centering or ranking instead.
-        if compression_ratio >= config.compression_ratio_ceiling:
-            continue
-        compression_strength = float(
-            np.clip(
-                (config.compression_ratio_ceiling - compression_ratio)
-                / (config.compression_ratio_ceiling - config.compression_ratio_floor),
-                0.0,
+            min(
                 1.0,
-            )
+                (COMPRESSION_RATIO_CEILING - compression_ratio)
+                / (COMPRESSION_RATIO_CEILING - COMPRESSION_RATIO_FLOOR),
+            ),
         )
-        latest = float(series.iloc[-1])
-        shock_z = abs(latest) / fast_scale
-        expansion_strength = float(
-            np.clip(
-                (shock_z - config.expansion_z_floor)
-                / (config.expansion_z_cap - config.expansion_z_floor),
-                0.0,
-                1.0,
-            )
+    )
+    shock_sum = math.fsum(shock)
+    if not math.isfinite(shock_sum) or abs(shock_sum) <= 1e-15:
+        return _RecoilFeature(
+            compression_ratio=float(compression_ratio),
+            signed_shock_z=0.0,
+            direction_agreement=0.0,
+            durable_shock_z=0.0,
+            path_roughness=1.0,
+            raw_recoil_score=0.0,
         )
-        direction_z = float(
-            series.iloc[-config.direction_bars :].sum()
-            / (fast_scale * math.sqrt(config.direction_bars))
+
+    direction = math.copysign(1.0, shock_sum)
+    aligned = tuple(direction * value / baseline_scale for value in shock)
+    agreement_count = sum(value > 0.0 for value in aligned)
+    agreement = agreement_count / SHOCK_BARS
+    minimum_agreement = (
+        MINIMUM_DIRECTION_AGREEMENT_NUMERATOR / MINIMUM_DIRECTION_AGREEMENT_DENOMINATOR
+    )
+    signed_shock_z = shock_sum / (baseline_scale * math.sqrt(SHOCK_BARS))
+    aligned_median = _median(aligned)
+    absolute_path = math.fsum(abs(value) for value in shock)
+    path_roughness = absolute_path / abs(shock_sum)
+    if (
+        aligned_median is None
+        or aligned_median <= 0.0
+        or agreement + TOLERANCE < minimum_agreement
+        or not math.isfinite(signed_shock_z)
+        or not math.isfinite(path_roughness)
+        or path_roughness < 1.0 - TOLERANCE
+    ):
+        raw_score = 0.0
+        durable_shock_z = 0.0
+    else:
+        durable_shock_z = min(
+            abs(signed_shock_z),
+            float(aligned_median) * math.sqrt(SHOCK_BARS),
         )
-        continuation = math.tanh(direction_z) * compression_strength * expansion_strength
-        failed_release = float(np.clip(shock_z / config.expansion_z_floor, 0.0, 1.0)) * (
-            1.0 - expansion_strength
+        shock_strength = math.tanh(durable_shock_z / SHOCK_SATURATION_Z)
+        raw_score = (
+            -direction
+            * compression_strength
+            * shock_strength
+            * agreement**2
+            / path_roughness
         )
-        convergence = -math.tanh(latest / fast_scale) * compression_strength * failed_release
-        scores[symbol] = continuation_mix * continuation + (1.0 - continuation_mix) * convergence
-
-    if len(scores) < config.minimum_cross_section:
-        return pd.Series(dtype=float)
-    raw = pd.Series(scores, dtype=float).sort_index()
-    centered = raw - float(raw.median())
-    maximum = float(centered.abs().max())
-    if not math.isfinite(maximum) or maximum <= 1e-12:
-        return pd.Series(dtype=float)
-    return centered / maximum
-
-
-def _capped_allocation(
-    conviction: Mapping[str, float], *, budget: float, cap: float
-) -> dict[str, float]:
-    """Allocate a side budget proportionally, with deterministic water-filling."""
-
-    active = {symbol: abs(float(value)) for symbol, value in conviction.items()}
-    if not active or len(active) * cap + 1e-12 < budget:
-        return {}
-    allocation: dict[str, float] = {}
-    remaining_budget = budget
-    while active:
-        total = sum(active.values())
-        if total <= 0:
-            return {}
-        proposed = {symbol: remaining_budget * value / total for symbol, value in active.items()}
-        capped = sorted(symbol for symbol, weight in proposed.items() if weight > cap)
-        if not capped:
-            allocation.update(proposed)
-            break
-        for symbol in capped:
-            allocation[symbol] = cap
-            remaining_budget -= cap
-            del active[symbol]
-        if remaining_budget < -1e-12:
-            return {}
-    if abs(sum(allocation.values()) - budget) > 1e-10:
-        return {}
-    return allocation
-
-
-def _portfolio(scores: pd.Series, config: StrategyConfig) -> dict[str, float]:
-    positive = scores[scores >= config.minimum_signal_strength].sort_values(
-        ascending=False, kind="mergesort"
+    if not all(
+        math.isfinite(value)
+        for value in (
+            compression_ratio,
+            signed_shock_z,
+            agreement,
+            durable_shock_z,
+            raw_score,
+        )
+    ):
+        return None
+    return _RecoilFeature(
+        compression_ratio=float(compression_ratio),
+        signed_shock_z=float(signed_shock_z),
+        direction_agreement=float(agreement),
+        durable_shock_z=float(durable_shock_z),
+        path_roughness=float(path_roughness),
+        raw_recoil_score=float(raw_score),
     )
-    negative = scores[scores <= -config.minimum_signal_strength].sort_values(
-        ascending=True, kind="mergesort"
-    )
-    side_count = max(
-        config.minimum_side_positions,
-        int(math.floor(len(scores) * config.side_fraction)),
-    )
-    side_count = min(side_count, len(scores) // 2)
-    if len(positive) < side_count or len(negative) < side_count:
-        return {}
-
-    long_scores = positive.iloc[:side_count].to_dict()
-    short_scores = negative.iloc[:side_count].to_dict()
-    side_budget = config.gross_target / 2.0
-    long_allocation = _capped_allocation(
-        long_scores, budget=side_budget, cap=config.maximum_symbol_weight
-    )
-    short_allocation = _capped_allocation(
-        short_scores, budget=side_budget, cap=config.maximum_symbol_weight
-    )
-    if not long_allocation or not short_allocation:
-        return {}
-    weights = {symbol: weight for symbol, weight in long_allocation.items()}
-    weights.update({symbol: -weight for symbol, weight in short_allocation.items()})
-    return {symbol: float(weights[symbol]) for symbol in sorted(weights)}
 
 
-class VolatilityDispersionReleaseStrategy:
-    """Daily two-mode volatility-release portfolio."""
+def _signed_magnitude_ranks(values: Mapping[str, float]) -> dict[str, float] | None:
+    """Rank recoil magnitudes within sign while preserving inactive scores at exactly zero."""
 
-    def __init__(self, config: StrategyConfig = DEFAULT_CONFIG) -> None:
-        self.config = config
+    if len(values) < MINIMUM_VALID_SYMBOLS or any(
+        not math.isfinite(value) for value in values.values()
+    ):
+        return None
+    positive = sorted(
+        ((symbol, value) for symbol, value in values.items() if value > 0.0),
+        key=lambda item: (item[1], item[0]),
+    )
+    negative = sorted(
+        ((symbol, value) for symbol, value in values.items() if value < 0.0),
+        key=lambda item: (-item[1], item[0]),
+    )
+    result = {symbol: 0.0 for symbol in sorted(values)}
+    for rank, (symbol, _) in enumerate(positive, start=1):
+        result[symbol] = float(rank / len(positive))
+    for rank, (symbol, _) in enumerate(negative, start=1):
+        result[symbol] = -float(rank / len(negative))
+    return result
+
+
+class CompressedShockRecoilStrategy:
+    """Fade durable idiosyncratic shocks that emerge from lower-volatility setups."""
 
     @staticmethod
     def _validate_seed(seed: int) -> None:
-        if isinstance(seed, bool) or not isinstance(seed, numbers.Integral) or int(seed) < 0:
-            raise ValueError("seed must be a nonnegative integer")
+        if isinstance(seed, bool) or not isinstance(seed, int) or seed != FROZEN_SEED:
+            raise ValueError(f"Team 08 requires frozen seed {FROZEN_SEED}")
+
+    def preconstruction_snapshot(
+        self,
+        context: ContextLike,
+        *,
+        seed: int,
+        decision_time: pd.Timestamp | None = None,
+    ) -> PreconstructionSnapshot | None:
+        """Build final recoil ranks from exact completed pure-crypto histories."""
+
+        self._validate_seed(seed)
+        if decision_time is None:
+            state, parsed = _decision_state(context.decision_time)
+            if state != "scheduled" or parsed is None:
+                return None
+            decision_time = parsed
+
+        eligible = _eligible_symbols(context)
+        if eligible is None or not isinstance(context.bars, Mapping):
+            return None
+        return_paths: dict[str, tuple[float, ...]] = {}
+        for symbol in eligible:
+            history = _closed_history(context.bars.get(symbol), decision_time=decision_time)
+            if history is None:
+                continue
+            returns = _log_returns(history)
+            if returns is not None:
+                return_paths[symbol] = returns
+        residuals = _residual_paths(return_paths)
+        if residuals is None:
+            return None
+
+        raw_scores: dict[str, float] = {}
+        for symbol in sorted(residuals):
+            feature = _recoil_feature(residuals[symbol])
+            if feature is not None:
+                raw_scores[symbol] = feature.raw_recoil_score
+        final_scores = _signed_magnitude_ranks(raw_scores)
+        if final_scores is None:
+            return None
+        return PreconstructionSnapshot(
+            decision_time=decision_time,
+            scores=tuple((symbol, float(final_scores[symbol])) for symbol in sorted(final_scores)),
+        )
 
     @staticmethod
     def _apply_public_score_boundary(scores: dict[str, float]) -> dict[str, float]:
-        """Capture one exact operative ranking dictionary through the public A5 hook."""
-
-        if type(scores) is not dict or list(scores) != sorted(scores):
-            raise ValueError("score boundary input must be a sorted built-in dictionary")
-        if any(
+        if type(scores) is not dict or any(
             type(symbol) is not str or type(value) is not float or not math.isfinite(value)
             for symbol, value in scores.items()
         ):
-            raise ValueError("score boundary input must contain finite built-in str/float pairs")
+            raise ValueError("score boundary input must be a finite built-in dict[str, float]")
         input_scores = scores
-        expected_items = tuple(scores.items())
+        expected_symbols = set(scores)
         scores = score_boundary(scores)
         if scores is not input_scores:
             raise ValueError("score_boundary must return its exact input dictionary")
         if (
             type(scores) is not dict
-            or tuple(scores.items()) != expected_items
+            or set(scores) != expected_symbols
             or any(
                 type(symbol) is not str or type(value) is not float or not math.isfinite(value)
                 for symbol, value in scores.items()
@@ -424,51 +444,82 @@ class VolatilityDispersionReleaseStrategy:
             raise ValueError("score_boundary returned invalid or mutated scores")
         return scores
 
-    def preconstruction_scores(
-        self, context: Any, *, seed: int
-    ) -> dict[str, float] | None:
-        """Return final scheduled VDR ranks before selection, sizing, caps, or risk."""
+    def preconstruction_scores(self, context: ContextLike, *, seed: int) -> Mapping[str, float]:
+        """Return one captured scheduled score dictionary for organizer diagnostics."""
 
         self._validate_seed(seed)
-        decision_time, _, histories = _validate_context(context)
-        if (
-            decision_time.hour != self.config.rebalance_hour_utc
-            or decision_time.minute
-            or decision_time.second
-            or decision_time.microsecond
-        ):
-            return None
-        matrix = _return_matrix(
-            histories,
-            decision_time=decision_time,
-            config=self.config,
-        )
-        scores = pd.Series(dtype=float) if matrix.empty else _raw_scores(matrix, self.config)
-        final_scores = {
-            str(symbol): float(value) for symbol, value in scores.sort_index().items()
-        }
-        return self._apply_public_score_boundary(final_scores)
-
-    def target_weights(self, context: Any, *, seed: int) -> Mapping[str, float] | None:
-        scores = self.preconstruction_scores(context, seed=seed)
-        if scores is None:
-            return None
-        if not scores:
+        state, decision_time = _decision_state(context.decision_time)
+        if state != "scheduled" or decision_time is None:
             return {}
-        weights = _portfolio(pd.Series(scores, dtype=float), self.config)
-        if any(not math.isfinite(weight) for weight in weights.values()):
-            raise ValueError("constructed portfolio contains a non-finite weight")
-        return weights
+        snapshot = self.preconstruction_snapshot(
+            context,
+            seed=seed,
+            decision_time=decision_time,
+        )
+        return self._apply_public_score_boundary({} if snapshot is None else snapshot.score_map())
+
+    def target_weights(self, context: ContextLike, *, seed: int) -> Mapping[str, float] | None:
+        self._validate_seed(seed)
+        state, decision_time = _decision_state(context.decision_time)
+        if state == "hold":
+            return None
+        if state == "flat" or decision_time is None:
+            return {}
+
+        snapshot = self.preconstruction_snapshot(
+            context,
+            seed=seed,
+            decision_time=decision_time,
+        )
+        scores = self._apply_public_score_boundary({} if snapshot is None else snapshot.score_map())
+        if len(scores) < MINIMUM_VALID_SYMBOLS:
+            return {}
+
+        side_budget = 0.5 * GROSS_TARGET
+        cap_count = int(math.ceil((side_budget - TOLERANCE) / MAXIMUM_SYMBOL_EXPOSURE))
+        count = max(
+            MINIMUM_POSITIONS_PER_SIDE,
+            (SELECTION_NUMERATOR * len(scores)) // SELECTION_DENOMINATOR,
+            cap_count,
+        )
+        positive = sorted(
+            (symbol for symbol, value in scores.items() if value > 0.0),
+            key=lambda symbol: (scores[symbol], symbol),
+        )
+        negative = sorted(
+            (symbol for symbol, value in scores.items() if value < 0.0),
+            key=lambda symbol: (scores[symbol], symbol),
+        )
+        if count <= 0 or len(positive) < count or len(negative) < count:
+            return {}
+        long_symbols = tuple(positive[-count:])
+        short_symbols = tuple(negative[:count])
+        side_weight = side_budget / count
+        if (
+            not math.isfinite(side_weight)
+            or side_weight <= 0.0
+            or side_weight > MAXIMUM_SYMBOL_EXPOSURE + TOLERANCE
+        ):
+            return {}
+
+        targets = {symbol: -float(side_weight) for symbol in short_symbols}
+        targets.update({symbol: float(side_weight) for symbol in long_symbols})
+        targets = {symbol: targets[symbol] for symbol in sorted(targets)}
+        gross = math.fsum(abs(value) for value in targets.values())
+        net = math.fsum(targets.values())
+        if abs(gross - GROSS_TARGET) > TOLERANCE or abs(net) > TOLERANCE:
+            return {}
+        return targets
 
 
-def build_strategy() -> VolatilityDispersionReleaseStrategy:
-    """Canonical clean-worker factory for the exact materialized candidate."""
+def build_strategy() -> CompressedShockRecoilStrategy:
+    """Canonical zero-argument factory for the exact first-pivot candidate."""
 
     candidate_id = candidate_variant.ACTIVE_CANDIDATE_ID
     overrides = candidate_variant.ACTIVE_OVERRIDES
     expected = MATERIALIZED_CANDIDATE_OVERRIDES.get(candidate_id)
-    if candidate_id != ACTIVE_CANDIDATE_ID or expected is None:
+    if expected is None:
         raise ValueError(f"unknown materialized candidate identifier: {candidate_id}")
     if type(overrides) is not dict or overrides != expected:
         raise ValueError(f"active overrides do not match the declaration for {candidate_id}")
-    return VolatilityDispersionReleaseStrategy(dataclasses.replace(DEFAULT_CONFIG, **overrides))
+    return CompressedShockRecoilStrategy()

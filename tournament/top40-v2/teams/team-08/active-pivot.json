@@ -1,0 +1,30 @@
+{
+  "active_candidate_id": "t08-compressed-shock-recoil-v1-base",
+  "active_family_id": "t08-compressed-shock-recoil-v1",
+  "executable_promotion": {
+    "candidate_selector": "candidate_variant.py",
+    "frozen_config": "frozen_config.json",
+    "risk_policy": "risk_policy.json",
+    "strategy": "strategy.py",
+    "test": "test_strategy.py"
+  },
+  "material_trial_accounting": {
+    "material_trials_consumed_before_pivot": 1,
+    "pivot_reference_would_consume_trial_number": 2
+  },
+  "parent_candidate_id": "vdr-core-candidate-001",
+  "parent_family_id": "volatility-dispersion-release-v1",
+  "parent_status": "terminal_failed_no_control_core",
+  "pivot_directory": "pivot-01",
+  "prospective_registration_templates": {
+    "canonical_control_activation_template": "pivot-01/control-activation.template.json",
+    "canonical_family_input_template": "pivot-01/family-registration.template.json",
+    "canonical_pivot_record_template": "pivot-01/pivot-registration.template.json",
+    "canonical_trial_input_template": "pivot-01/trial-registration.template.json",
+    "root_family_and_trial_templates": "noncanonical_compatibility_drafts"
+  },
+  "registration_status": "draft_only_not_registered",
+  "schema_version": 1,
+  "team_id": "team-08",
+  "validation_status": "authored_pending_organizer_serial_validation_and_independent_static_review"
+}

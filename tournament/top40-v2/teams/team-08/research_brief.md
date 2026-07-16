@@ -1,8 +1,14 @@
-# Team 08 research brief — volatility-dispersion release
+# Team 08 research archive — retired volatility-dispersion release
 
-Status: **prospective draft; not registered, not run, and not performance evidence**
+Status: **retired after terminal negative no-control IS; historical context only**
 
-## Family and mechanism
+The active prospective research brief is
+[`pivot-01/README.md`](pivot-01/README.md), bound by `active-pivot.json` and `frozen_config.json` to
+`t08-compressed-shock-recoil-v1-base`. Its schedule and A5 open-to-open horizon are both 168 hours.
+Every description below concerns the retired `vdr-core-candidate-001` 24-hour mechanism and has no
+current registration, execution, control, or submission authority.
+
+## Retired family and mechanism
 
 Family ID: `volatility-dispersion-release-v1`
 

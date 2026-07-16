@@ -33,7 +33,8 @@ def test_risk_plan_requires_complete_no_control_gate_before_controls() -> None:
     assert plan["core_alpha_activation_gate"] == {
         "annualized_return_strictly_positive": True,
         "applies_to": (
-            "vdr-core-candidate-001 with root risk_policy.json in its exact no-control state"
+            "t08-compressed-shock-recoil-v1-base with root risk_policy.json in its exact "
+            "no-control state"
         ),
         "complete_a5_score_coverage": True,
         "combined_chop_attribution_strictly_positive": True,
@@ -118,7 +119,7 @@ def test_material_configuration_accounting_counts_no_control_core_once() -> None
         + accounting["additional_policy_configurations"]
         + 1
     )
-    assert expected == accounting["total_initial_family_configurations"] == 21
+    assert expected == accounting["total_initial_family_configurations"] == 22
 
 
 @pytest.mark.parametrize(

@@ -1,13 +1,13 @@
+"""Synthetic causal and construction tests for Team 08's first mechanism pivot."""
+
 from __future__ import annotations
 
-import dataclasses
-import importlib.util
 import json
+import math
 import sys
 from pathlib import Path
 from types import SimpleNamespace
 
-import numpy as np
 import pandas as pd
 import pytest
 
@@ -18,342 +18,330 @@ from crypto_trade.tournament.score_adapter_protocol_v5 import (
 TEAM_DIR = Path(__file__).resolve().parent
 if str(TEAM_DIR) not in sys.path:
     sys.path.insert(0, str(TEAM_DIR))
-SPEC = importlib.util.spec_from_file_location(
-    "team08_strategy_under_test", TEAM_DIR / "strategy.py"
+
+import candidate_variant  # noqa: E402
+import strategy  # noqa: E402
+
+DEFAULT_DECISION = pd.Timestamp(0, unit="ns", tz="UTC") + pd.Timedelta(
+    hours=strategy.BAR_INTERVAL_HOURS * strategy.REBALANCE_INTERVAL_BARS * 3000
 )
-assert SPEC is not None and SPEC.loader is not None
-strategy_module = importlib.util.module_from_spec(SPEC)
-sys.modules[SPEC.name] = strategy_module
-SPEC.loader.exec_module(strategy_module)
-
-DEFAULT_DECISION = pd.Timestamp(year=2022, month=6, day=1, tz="UTC")
 
 
-def _symbols(count: int = 20) -> tuple[str, ...]:
-    return tuple(f"C{index:02d}USDT" for index in range(count))
-
-
-def _bar_frame(
-    symbol: str,
+def _synthetic_context(
     *,
-    decision_time: pd.Timestamp,
-    symbol_index: int,
-    bars: int = 80,
-    mode: str = "expansion",
-) -> pd.DataFrame:
-    open_time = pd.date_range(
-        end=decision_time - pd.Timedelta(hours=8),
-        periods=bars,
+    decision_time: pd.Timestamp = DEFAULT_DECISION,
+    symbol_count: int = 28,
+    common_drift: float = 0.0,
+):
+    decision = pd.Timestamp(decision_time)
+    periods = strategy.HISTORY_RETURN_BARS + 1
+    open_times = pd.date_range(
+        end=decision - pd.Timedelta(hours=strategy.BAR_INTERVAL_HOURS),
+        periods=periods,
         freq="8h",
         tz="UTC",
     )
-    return_count = bars - 1
-    axis = np.arange(return_count, dtype=float)
-    phase = symbol_index * 0.37
-    returns = 0.006 * np.sin(axis * 0.71 + phase) + 0.0025 * np.cos(axis * 0.23 - phase)
-    returns[-10:-1] = 0.00025 * np.sin(axis[-10:-1] * 1.31 + phase)
-    sign = 1.0 if symbol_index % 2 == 0 else -1.0
-    if mode == "expansion":
-        returns[-1] = sign * (0.016 + 0.0004 * symbol_index)
-    elif mode == "failed-release":
-        returns[-1] = sign * (0.00038 + 0.000008 * symbol_index)
-    else:
-        raise ValueError(mode)
-    close = 100.0 * np.exp(np.r_[0.0, np.cumsum(returns)])
-    return pd.DataFrame(
-        {
-            "open_time": open_time,
-            "symbol": symbol,
-            "open": close,
-            "close": close,
-            "quote_volume": np.full(bars, 2_000_000.0 + symbol_index),
-        }
+    bars: dict[str, pd.DataFrame] = {}
+    compression_start = (
+        strategy.HISTORY_RETURN_BARS
+        - strategy.COMPRESSION_VOLATILITY_BARS
+        - strategy.SHOCK_BARS
     )
-
-
-def _context(
-    *,
-    mode: str = "expansion",
-    decision_time: pd.Timestamp | None = None,
-    symbols: tuple[str, ...] | None = None,
-    bars: int = 80,
-) -> SimpleNamespace:
-    if decision_time is None:
-        decision_time = DEFAULT_DECISION
-    if symbols is None:
-        symbols = _symbols()
-    frames = {
-        symbol: _bar_frame(
-            symbol,
-            decision_time=decision_time,
-            symbol_index=int(symbol[1:3]),
-            bars=bars,
-            mode=mode,
+    shock_start = strategy.HISTORY_RETURN_BARS - strategy.SHOCK_BARS
+    for symbol_index in range(symbol_count):
+        symbol = f"C{symbol_index:02d}USDT"
+        pair = symbol_index // 2
+        direction = 1.0 if symbol_index % 2 == 0 else -1.0
+        returns: list[float] = []
+        for return_index in range(strategy.HISTORY_RETURN_BARS):
+            if return_index >= shock_start:
+                idiosyncratic = direction * (0.010 + pair * 0.00012)
+            elif return_index >= compression_start:
+                idiosyncratic = direction * 0.00030 * math.sin(
+                    return_index * 1.17 + pair * 0.13
+                )
+            else:
+                idiosyncratic = direction * 0.0040 * math.sin(
+                    return_index * 0.71 + pair * 0.19
+                )
+            common = common_drift + 0.0015 * math.sin(return_index * 0.37)
+            returns.append(common + idiosyncratic)
+        closes = [100.0 + symbol_index]
+        for value in returns:
+            closes.append(closes[-1] * math.exp(value))
+        bars[symbol] = pd.DataFrame(
+            {
+                "open_time": open_times,
+                "close": closes,
+                "quote_volume": [10_000_000.0 - symbol_index * 10_000.0] * periods,
+            }
         )
-        for symbol in symbols
-    }
     return SimpleNamespace(
-        decision_time=decision_time,
-        bars=frames,
-        funding=pd.DataFrame(),
+        decision_time=decision,
+        bars=bars,
+        funding=pd.DataFrame(columns=["funding_time", "symbol", "funding_rate"]),
         auxiliary={},
-        eligible_symbols=symbols,
+        eligible_symbols=tuple(sorted(bars)),
     )
 
 
-def _compression_mask_matrix() -> tuple[pd.DataFrame, set[str], set[str]]:
-    """Create paired residual returns with exactly zero cross-sectional medians."""
+def _targets(context):
+    result = strategy.build_strategy().target_weights(context, seed=strategy.FROZEN_SEED)
+    assert result is not None
+    return dict(result)
 
-    prior_axis = np.arange(63, dtype=float)
-    compressed: dict[str, np.ndarray] = {}
-    uncompressed: dict[str, np.ndarray] = {}
-    for pair in range(6):
-        prior = 0.006 * np.where((prior_axis.astype(int) + pair) % 2 == 0, 1.0, -1.0)
-        prior[-9:] = 0.0002 * np.where((prior_axis[-9:].astype(int) + pair) % 2 == 0, 1.0, -1.0)
-        release = 0.020 + 0.0002 * pair
-        vector = np.r_[prior, release]
-        compressed[f"A{pair * 2:02d}USDT"] = vector
-        compressed[f"A{pair * 2 + 1:02d}USDT"] = -vector
-    for pair in range(4):
-        prior = 0.006 * np.where((prior_axis.astype(int) + pair) % 2 == 0, 1.0, -1.0)
-        release = 0.050 + 0.0005 * pair
-        vector = np.r_[prior, release]
-        uncompressed[f"U{pair * 2:02d}USDT"] = vector
-        uncompressed[f"U{pair * 2 + 1:02d}USDT"] = -vector
-    all_series = {**compressed, **uncompressed}
-    return (
-        pd.DataFrame(all_series, index=pd.RangeIndex(64)),
-        set(compressed),
-        set(uncompressed),
+
+def _feature_path(shock: tuple[float, float, float], *, compressed: bool = True):
+    unused = [0.003 * math.sin(index * 0.41) for index in range(18)]
+    baseline = [0.004 * math.sin(index * 0.83) for index in range(84)]
+    amplitude = 0.00035 if compressed else 0.006
+    compression = [amplitude * math.sin(index * 1.11) for index in range(21)]
+    return tuple(unused + baseline + compression + list(shock))
+
+
+def test_deterministic_finite_broad_exactly_neutral_targets() -> None:
+    context = _synthetic_context()
+    first = _targets(context)
+    second = _targets(context)
+
+    assert first == second
+    assert first
+    assert list(first) == sorted(first)
+    assert sum(value > 0.0 for value in first.values()) >= 8
+    assert sum(value < 0.0 for value in first.values()) >= 8
+    assert all(math.isfinite(value) for value in first.values())
+    assert abs(sum(abs(value) for value in first.values()) - strategy.GROSS_TARGET) <= 1e-10
+    assert abs(sum(first.values())) <= 1e-10
+    assert max(abs(value) for value in first.values()) <= strategy.MAXIMUM_SYMBOL_EXPOSURE
+
+
+def test_positive_and_negative_shocks_are_traded_for_recoil() -> None:
+    targets = _targets(_synthetic_context())
+    positive_shock = {f"C{index:02d}USDT" for index in range(0, 28, 2)}
+    negative_shock = {f"C{index:02d}USDT" for index in range(1, 28, 2)}
+
+    assert {symbol for symbol, value in targets.items() if value < 0.0}.issubset(positive_shock)
+    assert {symbol for symbol, value in targets.items() if value > 0.0}.issubset(negative_shock)
+
+
+def test_common_bull_and_bear_drifts_do_not_change_the_relative_book() -> None:
+    neutral = _targets(_synthetic_context())
+    bull = _targets(_synthetic_context(common_drift=0.0010))
+    bear = _targets(_synthetic_context(common_drift=-0.0010))
+
+    assert bull == neutral
+    assert bear == neutral
+    assert abs(sum(bull.values())) <= 1e-10
+    assert abs(sum(bear.values())) <= 1e-10
+
+
+def test_compression_and_recoil_direction_are_part_of_the_new_mechanism() -> None:
+    compressed = strategy._recoil_feature(_feature_path((0.009, 0.011, 0.010)))
+    uncompressed = strategy._recoil_feature(
+        _feature_path((0.009, 0.011, 0.010), compressed=False)
     )
+    negative_shock = strategy._recoil_feature(_feature_path((-0.009, -0.011, -0.010)))
+
+    assert compressed is not None and uncompressed is not None and negative_shock is not None
+    assert compressed.compression_ratio < uncompressed.compression_ratio
+    assert compressed.raw_recoil_score < 0.0
+    assert uncompressed.raw_recoil_score == 0.0
+    assert negative_shock.raw_recoil_score > 0.0
 
 
-def test_default_config_matches_authored_frozen_config() -> None:
-    authored = json.loads((TEAM_DIR / "frozen_config.json").read_text(encoding="utf-8"))
-    assert dataclasses.asdict(strategy_module.DEFAULT_CONFIG) == authored["strategy_parameters"]
+def test_multibar_durability_penalizes_a_rough_shock_path() -> None:
+    persistent = strategy._recoil_feature(_feature_path((0.007, 0.007, 0.007)))
+    rough = strategy._recoil_feature(_feature_path((0.020, -0.018, 0.019)))
+
+    assert persistent is not None and rough is not None
+    assert persistent.direction_agreement > rough.direction_agreement
+    assert persistent.path_roughness < rough.path_roughness
+    assert abs(persistent.raw_recoil_score) > abs(rough.raw_recoil_score)
 
 
-def test_candidate_variant_and_public_score_hook_are_exactly_bound() -> None:
-    assert strategy_module.candidate_variant.ACTIVE_CANDIDATE_ID == "vdr-core-candidate-001"
-    assert strategy_module.candidate_variant.ACTIVE_OVERRIDES == {}
-    assert strategy_module.score_boundary is public_score_boundary
+def test_boundary_is_called_once_after_final_transform_and_before_construction(monkeypatch) -> None:
+    context = _synthetic_context()
+    assert strategy.score_boundary is public_score_boundary
+    snapshot = strategy.build_strategy().preconstruction_snapshot(
+        context,
+        seed=strategy.FROZEN_SEED,
+    )
+    assert snapshot is not None
+    expected = snapshot.score_map()
+    observed: list[dict[str, float]] = []
 
-
-def test_public_boundary_captures_the_operative_final_scores_once(monkeypatch) -> None:
-    captured: list[dict[str, float]] = []
-
-    def capture(scores: dict[str, float]) -> dict[str, float]:
-        assert type(scores) is dict
-        assert list(scores) == sorted(scores)
-        assert all(type(symbol) is str and type(value) is float for symbol, value in scores.items())
-        captured.append(dict(scores))
+    def capture(scores):
+        observed.append(dict(scores))
         return scores
 
-    monkeypatch.setattr(strategy_module, "score_boundary", capture)
-    strategy = strategy_module.build_strategy()
-    weights = strategy.target_weights(_context(mode="expansion"), seed=20260801)
+    monkeypatch.setattr(strategy, "score_boundary", capture)
+    targets = strategy.build_strategy().target_weights(context, seed=strategy.FROZEN_SEED)
 
-    assert len(captured) == 1
-    assert captured[0]
-    assert weights == strategy_module._portfolio(
-        pd.Series(captured[0], dtype=float), strategy_module.DEFAULT_CONFIG
-    )
+    assert targets
+    assert observed == [expected]
+
+
+def test_boundary_returned_values_drive_both_sleeves(monkeypatch) -> None:
+    context = _synthetic_context()
+    baseline = _targets(context)
+    baseline_longs = {symbol for symbol, value in baseline.items() if value > 0.0}
+    baseline_shorts = {symbol for symbol, value in baseline.items() if value < 0.0}
+
+    def invert(scores):
+        for symbol in scores:
+            scores[symbol] = -scores[symbol]
+        return scores
+
+    monkeypatch.setattr(strategy, "score_boundary", invert)
+    inverted = strategy.build_strategy().target_weights(context, seed=strategy.FROZEN_SEED)
+
+    assert inverted
+    assert {symbol for symbol, value in inverted.items() if value > 0.0} == baseline_shorts
+    assert {symbol for symbol, value in inverted.items() if value < 0.0} == baseline_longs
 
 
 def test_public_boundary_rejects_a_replacement_dictionary(monkeypatch) -> None:
-    monkeypatch.setattr(strategy_module, "score_boundary", lambda scores: dict(scores))
+    monkeypatch.setattr(strategy, "score_boundary", lambda scores: dict(scores))
     with pytest.raises(ValueError, match="exact input dictionary"):
-        strategy_module.build_strategy().target_weights(_context(), seed=20260801)
+        strategy.build_strategy().target_weights(_synthetic_context(), seed=strategy.FROZEN_SEED)
 
 
-def test_parameter_neighbors_are_valid_distinct_and_inside_declared_domains() -> None:
-    frozen = json.loads((TEAM_DIR / "frozen_config.json").read_text(encoding="utf-8"))
-    family = json.loads((TEAM_DIR / "family_registration.draft.json").read_text(encoding="utf-8"))
-    neighborhood = json.loads(
-        (TEAM_DIR / "parameter_neighborhood.json").read_text(encoding="utf-8")
-    )
-    center = frozen["strategy_parameters"]
-    domains = family["parameter_ranges"]
-    config_fields = {field.name for field in dataclasses.fields(strategy_module.StrategyConfig)}
-    assert len(config_fields) == 17
-    assert set(center) == config_fields
-    assert set(domains) == config_fields
-    assert all(center[name] in domains[name] for name in config_fields)
+def test_scheduled_failure_captures_one_empty_dictionary(monkeypatch) -> None:
+    context = _synthetic_context(symbol_count=strategy.MINIMUM_VALID_SYMBOLS - 1)
+    observed = []
 
-    materialized: list[dict[str, object]] = []
-    for neighbor in neighborhood["neighbors"]:
-        parameters = dict(center)
-        parameters.update(neighbor["overrides"])
-        validated = strategy_module.StrategyConfig(**parameters)
-        canonical = dataclasses.asdict(validated)
-        assert canonical == parameters
-        assert all(canonical[name] in domains[name] for name in config_fields)
-        materialized.append(canonical)
+    def capture(scores):
+        observed.append(scores)
+        return scores
 
-    assert len(materialized) == 8
-    encodings = [json.dumps(parameters, sort_keys=True) for parameters in materialized]
-    assert len(set(encodings)) == len(encodings)
-    assert json.dumps(center, sort_keys=True) not in set(encodings)
+    monkeypatch.setattr(strategy, "score_boundary", capture)
+    assert _targets(context) == {}
+    assert observed == [{}]
 
 
-def test_uncompressed_names_are_removed_before_centering_and_selection() -> None:
-    matrix, compressed, uncompressed = _compression_mask_matrix()
-    scores = strategy_module._raw_scores(matrix, strategy_module.DEFAULT_CONFIG)
-    assert set(scores.index) == compressed
-    assert set(scores.index).isdisjoint(uncompressed)
-    weights = strategy_module._portfolio(scores, strategy_module.DEFAULT_CONFIG)
-    assert weights
-    assert set(weights).issubset(compressed)
-    assert set(weights).isdisjoint(uncompressed)
+def test_hold_and_off_grid_decisions_do_not_call_boundary(monkeypatch) -> None:
+    base = _synthetic_context()
+    calls = 0
+
+    def capture(scores):
+        nonlocal calls
+        calls += 1
+        return scores
+
+    monkeypatch.setattr(strategy, "score_boundary", capture)
+    hold = SimpleNamespace(**vars(base))
+    hold.decision_time = base.decision_time + pd.Timedelta(hours=8)
+    assert strategy.build_strategy().target_weights(hold, seed=strategy.FROZEN_SEED) is None
+
+    off_grid = SimpleNamespace(**vars(base))
+    off_grid.decision_time = base.decision_time + pd.Timedelta(hours=1)
+    assert strategy.build_strategy().target_weights(off_grid, seed=strategy.FROZEN_SEED) == {}
+    assert calls == 0
 
 
-def test_expansion_builds_balanced_material_sleeves() -> None:
-    context = _context(mode="expansion")
-    weights = strategy_module.build_strategy().target_weights(context, seed=20260801)
-    assert weights
-    longs = {symbol: weight for symbol, weight in weights.items() if weight > 0}
-    shorts = {symbol: weight for symbol, weight in weights.items() if weight < 0}
-    assert len(longs) >= 5
-    assert len(shorts) >= 5
-    assert sum(abs(weight) for weight in weights.values()) == pytest.approx(0.8)
-    assert sum(weights.values()) == pytest.approx(0.0, abs=1e-12)
-    assert max(abs(weight) for weight in weights.values()) <= 0.09 + 1e-12
-    assert set(weights).issubset(context.eligible_symbols)
-
-
-def test_failed_release_convergence_reverses_isolated_direction() -> None:
-    context = _context(mode="failed-release")
-    weights = strategy_module.build_strategy().target_weights(context, seed=20260801)
-    assert weights
-    positive_release = {
-        symbol for index, symbol in enumerate(context.eligible_symbols) if index % 2 == 0
-    }
-    negative_release = set(context.eligible_symbols) - positive_release
-    assert {symbol for symbol, weight in weights.items() if weight > 0}.issubset(negative_release)
-    assert {symbol for symbol, weight in weights.items() if weight < 0}.issubset(positive_release)
-
-
-def test_symbol_order_and_seed_do_not_change_targets() -> None:
-    first = _context()
-    reversed_symbols = tuple(reversed(first.eligible_symbols))
-    second = SimpleNamespace(
-        decision_time=first.decision_time,
-        bars={symbol: first.bars[symbol] for symbol in reversed_symbols},
-        funding=first.funding.copy(),
-        auxiliary={},
-        eligible_symbols=reversed_symbols,
-    )
-    first_weights = strategy_module.build_strategy().target_weights(first, seed=1)
-    second_weights = strategy_module.build_strategy().target_weights(second, seed=999999)
-    assert first_weights == second_weights
-
-
-def test_older_past_prefix_does_not_change_current_target() -> None:
-    longer = _context(bars=96)
-    shorter = SimpleNamespace(
-        decision_time=longer.decision_time,
-        bars={
-            symbol: frame.iloc[16:].reset_index(drop=True) for symbol, frame in longer.bars.items()
-        },
-        funding=pd.DataFrame(),
-        auxiliary={},
-        eligible_symbols=longer.eligible_symbols,
-    )
-    assert strategy_module.build_strategy().target_weights(
-        longer, seed=20260801
-    ) == strategy_module.build_strategy().target_weights(shorter, seed=20260801)
-
-
-def test_point_in_time_membership_removal_cannot_leave_old_targets() -> None:
-    full = _context()
-    reduced_symbols = full.eligible_symbols[:-2]
-    reduced = SimpleNamespace(
-        decision_time=full.decision_time,
-        bars={symbol: full.bars[symbol] for symbol in reduced_symbols},
-        funding=pd.DataFrame(),
-        auxiliary={},
-        eligible_symbols=reduced_symbols,
-    )
-    weights = strategy_module.build_strategy().target_weights(reduced, seed=20260801)
-    assert weights is not None
-    assert set(weights).issubset(reduced_symbols)
-
-
-def test_non_rebalance_boundary_returns_none_after_validation() -> None:
-    context = _context(decision_time=DEFAULT_DECISION + pd.Timedelta(hours=8))
-    assert strategy_module.build_strategy().target_weights(context, seed=20260801) is None
-    first_symbol = context.eligible_symbols[0]
-    bad = context.bars[first_symbol].copy()
-    bad.loc[bad.index[-1], "close"] = np.nan
-    context.bars[first_symbol] = bad
-    with pytest.raises(ValueError, match="finite and positive"):
-        strategy_module.build_strategy().target_weights(context, seed=20260801)
-
-
-def test_insufficient_or_recently_gapped_history_requests_flat() -> None:
-    short = _context(bars=40)
-    assert strategy_module.build_strategy().target_weights(short, seed=20260801) == {}
-
-    gapped = _context()
-    for symbol, frame in tuple(gapped.bars.items()):
-        gapped.bars[symbol] = frame.drop(frame.index[-20]).reset_index(drop=True)
-    assert strategy_module.build_strategy().target_weights(gapped, seed=20260801) == {}
-
-
-def test_future_or_incomplete_bar_fails_closed() -> None:
-    context = _context()
-    symbol = context.eligible_symbols[0]
-    future = context.bars[symbol].iloc[[-1]].copy()
-    future["open_time"] = context.decision_time
-    future["close"] = 1e12
-    context.bars[symbol] = pd.concat([context.bars[symbol], future], ignore_index=True)
-    with pytest.raises(ValueError, match="unclosed or future"):
-        strategy_module.build_strategy().target_weights(context, seed=20260801)
-
-
-@pytest.mark.parametrize("fault", ["duplicate", "unordered", "symbol", "naive-time"])
-def test_malformed_bar_history_fails_closed(fault: str) -> None:
-    context = _context()
-    symbol = context.eligible_symbols[0]
-    frame = context.bars[symbol].copy()
-    if fault == "duplicate":
-        frame.loc[frame.index[-1], "open_time"] = frame.loc[frame.index[-2], "open_time"]
-    elif fault == "unordered":
-        frame.loc[frame.index[-2], "open_time"], frame.loc[frame.index[-1], "open_time"] = (
-            frame.loc[frame.index[-1], "open_time"],
-            frame.loc[frame.index[-2], "open_time"],
+def test_future_rows_and_unused_fields_do_not_change_targets() -> None:
+    base = _synthetic_context()
+    expected = _targets(base)
+    changed = SimpleNamespace(**vars(base))
+    changed.bars = {}
+    for symbol, frame in base.bars.items():
+        mutated = frame.copy()
+        mutated["open"] = [1.0e12 if index % 2 else 1.0e-12 for index in range(len(mutated))]
+        future = pd.DataFrame(
+            {
+                "open_time": [base.decision_time, base.decision_time + pd.Timedelta(hours=8)],
+                "close": [1.0e12, 1.0e-12],
+                "open": [1.0e-12, 1.0e12],
+            }
         )
-    elif fault == "symbol":
-        frame.loc[frame.index[-1], "symbol"] = "WRONGUSDT"
-    elif fault == "naive-time":
-        frame["open_time"] = pd.DatetimeIndex(frame["open_time"]).tz_localize(None)
-    context.bars[symbol] = frame
-    with pytest.raises(ValueError):
-        strategy_module.build_strategy().target_weights(context, seed=20260801)
+        changed.bars[symbol] = pd.concat([mutated, future], ignore_index=True)
+    changed.funding = pd.DataFrame({"funding_rate": [float("inf")]})
+    changed.auxiliary = {"unused": pd.DataFrame({"value": [1.0e12]})}
+
+    assert _targets(changed) == expected
 
 
-def test_nonpast_funding_and_unexpected_auxiliary_fail_closed() -> None:
-    context = _context()
-    context.funding = pd.DataFrame(
-        {
-            "funding_time": [context.decision_time],
-            "symbol": [context.eligible_symbols[0]],
-        }
-    )
-    with pytest.raises(ValueError, match="strictly past"):
-        strategy_module.build_strategy().target_weights(context, seed=20260801)
+def test_missing_or_physically_duplicated_required_history_flattens() -> None:
+    missing = _synthetic_context()
+    missing.bars = {symbol: frame.iloc[:-1].copy() for symbol, frame in missing.bars.items()}
+    assert _targets(missing) == {}
 
-    context = _context()
-    context.auxiliary = {"unapproved": pd.DataFrame()}
-    with pytest.raises(ValueError, match="auxiliary"):
-        strategy_module.build_strategy().target_weights(context, seed=20260801)
+    duplicate = _synthetic_context()
+    duplicate.bars = {
+        symbol: pd.concat([frame, frame.iloc[[-1]]], ignore_index=True)
+        for symbol, frame in duplicate.bars.items()
+    }
+    assert _targets(duplicate) == {}
+
+    mixed = _synthetic_context()
+    mixed.bars = {
+        symbol: pd.concat(
+            [
+                frame,
+                pd.DataFrame(
+                    {"open_time": [frame.iloc[-1]["open_time"]], "close": [float("nan")]}
+                ),
+            ],
+            ignore_index=True,
+        )
+        for symbol, frame in mixed.bars.items()
+    }
+    assert _targets(mixed) == {}
 
 
-def test_invalid_seed_and_membership_contract_fail_closed() -> None:
-    context = _context()
-    with pytest.raises(ValueError, match="seed"):
-        strategy_module.build_strategy().target_weights(context, seed=-1)
+def test_point_in_time_membership_is_the_only_candidate_set() -> None:
+    context = _synthetic_context(symbol_count=32)
+    excluded = set(sorted(context.bars)[-4:])
+    context.eligible_symbols = tuple(sorted(set(context.bars) - excluded))
+    targets = _targets(context)
 
-    context.eligible_symbols = context.eligible_symbols + (context.eligible_symbols[0],)
-    with pytest.raises(ValueError, match="duplicates"):
-        strategy_module.build_strategy().target_weights(context, seed=20260801)
+    assert targets
+    assert set(targets).issubset(set(context.eligible_symbols))
+    assert not excluded & set(targets)
+
+
+def test_wrong_seed_and_candidate_identity_are_rejected(monkeypatch) -> None:
+    context = _synthetic_context()
+    with pytest.raises(ValueError, match="frozen seed"):
+        strategy.build_strategy().target_weights(context, seed=strategy.FROZEN_SEED + 1)
+
+    monkeypatch.setattr(candidate_variant, "ACTIVE_CANDIDATE_ID", "unknown-pivot")
+    with pytest.raises(ValueError, match="unknown materialized"):
+        strategy.build_strategy()
+
+
+def test_active_candidate_has_no_hidden_parameter_override(monkeypatch) -> None:
+    monkeypatch.setattr(candidate_variant, "ACTIVE_OVERRIDES", {"gross_target": 0.40})
+    with pytest.raises(ValueError, match="do not match"):
+        strategy.build_strategy()
+
+
+def test_frozen_config_matches_executable_constants_and_no_control() -> None:
+    config = json.loads((TEAM_DIR / "frozen_config.json").read_text(encoding="utf-8"))
+    assert config["family_id"] == strategy.ACTIVE_FAMILY_ID
+    assert config["candidate_id"] == strategy.ACTIVE_CANDIDATE_ID
+    assert config["seed"] == strategy.FROZEN_SEED
+    assert config["parameters"] == {
+        "bar_interval_hours": strategy.BAR_INTERVAL_HOURS,
+        "baseline_volatility_bars": strategy.BASELINE_VOLATILITY_BARS,
+        "compression_ratio_ceiling": strategy.COMPRESSION_RATIO_CEILING,
+        "compression_ratio_floor": strategy.COMPRESSION_RATIO_FLOOR,
+        "compression_volatility_bars": strategy.COMPRESSION_VOLATILITY_BARS,
+        "gross_target": strategy.GROSS_TARGET,
+        "history_return_bars": strategy.HISTORY_RETURN_BARS,
+        "maximum_symbol_exposure": strategy.MAXIMUM_SYMBOL_EXPOSURE,
+        "minimum_direction_agreement": "2/3",
+        "minimum_positions_per_side": strategy.MINIMUM_POSITIONS_PER_SIDE,
+        "minimum_valid_symbols": strategy.MINIMUM_VALID_SYMBOLS,
+        "rebalance_interval_bars": strategy.REBALANCE_INTERVAL_BARS,
+        "selected_fraction_per_side": "1/5",
+        "shock_bars": strategy.SHOCK_BARS,
+        "shock_saturation_z": strategy.SHOCK_SATURATION_Z,
+    }
+
+    risk = json.loads((TEAM_DIR / "risk_policy.json").read_text(encoding="utf-8"))
+    assert risk["drawdown_brakes"] == []
+    assert risk["position_stop"]["enabled"] is False
+    assert risk["time_stop"]["enabled"] is False
+    assert risk["turnover_limit"]["enabled"] is False
+    assert risk["volatility_target"]["enabled"] is False

@@ -1,8 +1,8 @@
 {
-  "candidate_id": "vdr-core-candidate-001",
+  "candidate_id": "t08-compressed-shock-recoil-v1-base",
   "core_alpha_activation_gate": {
     "annualized_return_strictly_positive": true,
-    "applies_to": "vdr-core-candidate-001 with root risk_policy.json in its exact no-control state",
+    "applies_to": "t08-compressed-shock-recoil-v1-base with root risk_policy.json in its exact no-control state",
     "complete_a5_score_coverage": true,
     "combined_chop_attribution_strictly_positive": true,
     "doubled_cost_net_return_strictly_positive": true,
@@ -41,7 +41,7 @@
     "center_candidate_uses_no_control_policy": true,
     "matrix_policy_count": 7,
     "reason_no_control_is_not_counted_twice": "The risk-none policy is byte-identical to root risk_policy.json used by the one center candidate; the five individual controls and combined policy are six additional material configurations.",
-    "total_initial_family_configurations": 21
+    "total_initial_family_configurations": 22
   },
   "policy_materialization_rule": "The lifecycle reads only root risk_policy.json. The no-control core runs first. After it passes every core-alpha activation minimum, copy any selected immutable risk_policies template byte-for-byte to root risk_policy.json before commit, registration, and run, then recompute every risk and source binding. Controls cannot rescue a failed core.",
   "policies": [
@@ -240,7 +240,7 @@
     },
     {
       "ablation_id": "risk-turnover-only",
-      "declared_failure_mode": "Bound next-open churn and participation demand from daily cross-sectional rank changes.",
+      "declared_failure_mode": "Bound next-open churn and participation demand from weekly cross-sectional recoil-rank changes.",
       "template_path": "risk_policies/turnover-only.json",
       "policy": {
         "drawdown_brakes": [],

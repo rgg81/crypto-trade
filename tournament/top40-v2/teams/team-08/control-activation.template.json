@@ -1,7 +1,7 @@
 {
-  "candidate_id": "vdr-core-candidate-001",
+  "candidate_id": "t08-compressed-shock-recoil-v1-base",
   "controls_authorized": false,
-  "family_id": "volatility-dispersion-release-v1",
+  "family_id": "t08-compressed-shock-recoil-v1",
   "gate_values": {
     "annualized_return_positive": null,
     "bull_bear_chop_returns_positive": null,
