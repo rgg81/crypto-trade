@@ -1,0 +1,15 @@
+{
+  "candidate_id": "t08-volatility-scaled-rank-persistence-v1-base",
+  "config_sha256": "bd0e4f70bcf335b2ac4e44ec049b89b8e8eaf4c6ac6502574d0accf12d9d9947",
+  "organizer_journal_head_sha256": "261dc3e7f029a4435cf896be846248e7003a0a5e378750fef015c36cb550d741",
+  "private_attempt_number": null,
+  "registration_sha256": "b3e0c3653a7f83033cd8d16118104a7bc59ecc69c5cef2a9b9102af5feecf60e",
+  "reserved_at_utc": "2026-07-16T23:01:13.502039+00:00",
+  "risk_policy_sha256": "8db76eb8d59fbef6473d2a2cd98bbba68c8e53d8d78284284ec06db54b8fa5d6",
+  "schema_version": 1,
+  "source_bundle_sha256": "d96efd9f860b7f1abf314deb74103b3afd290c541738c5d60426260f75c3551c",
+  "stage": "development",
+  "strategy_sha256": "3c7a36d1f9c868d330fb5f445ea7ca5dce213099a66190b88d43ea8e16db9800",
+  "team_id": "team-08",
+  "tournament": "quant-portfolio-blind-top40-v2"
+}
