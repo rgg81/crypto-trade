@@ -1,0 +1,23 @@
+{
+  "candidate_id": "t08-compressed-shock-recoil-v1-base",
+  "decision": "approve",
+  "declared_capture_boundary": "candidate-declared-post-transform-pre-selection-weight-cap-risk",
+  "executable_source_manifest_path": "tournament/top40-v2/teams/team-08/score-adapters/t08-compressed-shock-recoil-v1-base.executable-source-manifest.json",
+  "executable_source_manifest_sha256": "8e1cae0dc84d99f235b7cf2b72f71e09b1c33e289f36733d9e38cda6753c8e5c",
+  "family_id": "t08-compressed-shock-recoil-v1",
+  "findings": {
+    "direct_hook_call_found": true,
+    "hook_after_declared_score_transform": true,
+    "hook_before_selection_weight_caps_and_risk": true,
+    "no_decoy_or_transient_score_path_found": true,
+    "score_object_is_declared_model_ranking_signal": true
+  },
+  "hook": "strategy.score_boundary",
+  "review_kind": "top40-v2-score-semantic-coupling-static-review-v1",
+  "reviewed_at_utc": "2026-07-16T22:21:11Z",
+  "reviewer_id": "team08-pivot1-static-reviewer",
+  "runtime_proof_limit": "static-review-attestation-not-runtime-semantic-proof",
+  "schema_version": 1,
+  "strategy_sha256": "883ff191364d76febb1d070135236e9a245a4c4af9eb7139cbc2d06a55019d30",
+  "team_id": "team-08"
+}
