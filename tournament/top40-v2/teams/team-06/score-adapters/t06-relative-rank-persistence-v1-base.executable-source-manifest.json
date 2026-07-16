@@ -1,0 +1,34 @@
+{
+  "candidate_id": "t06-relative-rank-persistence-v1-base",
+  "family_id": "t06-relative-rank-persistence-v1",
+  "files": [
+    {
+      "path": "candidate_variant.py",
+      "sha256": "69f503d0514d4e7c9072241fe98780c6360d11b1f541cecaaf28919a3ace9498",
+      "size": 187
+    },
+    {
+      "path": "frozen_config.json",
+      "sha256": "90527b88b087f37fef95e071ba0812d885a6c7e17aff6f3c2baf0e15f00b1696",
+      "size": 4542
+    },
+    {
+      "path": "risk_policy.json",
+      "sha256": "7671efed25b8f9130e8f06fb9dbe44b5735e1cd2f23fd8c20e9dcc1a6b61c30b",
+      "size": 637
+    },
+    {
+      "path": "strategy.py",
+      "sha256": "39d5a773fef63349fd36282d8b1ae11966fc624f7f4a02f02aa3b9e37bbc482f",
+      "size": 16691
+    },
+    {
+      "path": "test_strategy.py",
+      "sha256": "d3fa014b7a5c19c438016be703c54c49d000697456804b8cd799ba003a10c020",
+      "size": 12699
+    }
+  ],
+  "manifest_kind": "top40-v2-executable-source-manifest-v1",
+  "schema_version": 1,
+  "team_id": "team-06"
+}
