@@ -1,0 +1,14 @@
+{
+  "amendment_id": "top40-v2-amendment-0001-organizer-private-score-diagnostics",
+  "hold_reason": "Pause result-bearing tournament work after discovering that the frozen worker did not expose the preregistered pre-construction score required for Team01 score-IC evidence.",
+  "hold_started_at_utc": "2026-07-15T23:34:48Z",
+  "legacy_state_sha256": "8c858495fde6ddde203124a055e40ebad5d8d5a684cd20f0e55f6c88f7360b07",
+  "notice_status": "administrative_hold",
+  "phase0_freeze_path": "tournament/top40-v2/phase0_freeze.json",
+  "phase0_freeze_sha256": "cc7484d0be2fe6b64b34b6f4c7ce76647af750b02c3df065c4b81e10f1396259",
+  "research_journal_head_sha256": "a0221ead2878492aa868521950a69ea554a9a59a3293ae4954bfeb85d3ef1ff6",
+  "research_journal_latest_timestamp_utc": "2026-07-15T23:27:47.445756Z",
+  "research_journal_path": "tournament/top40-v2/organizer_research_journal.jsonl",
+  "research_journal_record_count": 13,
+  "schema_version": 1
+}
