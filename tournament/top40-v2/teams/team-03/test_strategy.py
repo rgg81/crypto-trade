@@ -1,4 +1,4 @@
-"""Focused synthetic tests for Team 03's preregistration candidate."""
+"""Focused synthetic tests for Team 03's confirmed-shock pivot candidate."""
 
 from __future__ import annotations
 
@@ -41,6 +41,7 @@ def _frame(
     decision_time: pd.Timestamp,
     *,
     shock: float,
+    confirmation: float = 0.0,
     btc: bool = False,
     periods: int = 240,
 ) -> pd.DataFrame:
@@ -55,11 +56,12 @@ def _frame(
     residual = np.zeros(periods) if btc else 0.0015 * np.cos(index / 7.0)
     log_returns = common + residual
     if not btc:
-        log_returns[-3:] += shock / 3.0
+        log_returns[-4:-1] += shock / 3.0
+        log_returns[-1] += confirmation
     closes = 100.0 * np.exp(np.cumsum(log_returns))
     quote_volume = np.full(periods, 1_000_000.0)
     if not btc:
-        quote_volume[-3:] = 5_000_000.0
+        quote_volume[-4:-1] = 5_000_000.0
     return pd.DataFrame(
         {
             "open_time": open_times,
@@ -69,10 +71,23 @@ def _frame(
     )
 
 
-def _context(decision_time: pd.Timestamp) -> DecisionContext:
+def _context(
+    decision_time: pd.Timestamp,
+    *,
+    confirmed: bool = True,
+) -> DecisionContext:
     bars = {BTC_SYMBOL: _frame(decision_time, shock=0.0, btc=True)}
     bars.update(
-        {symbol: _frame(decision_time, shock=shock) for symbol, shock in SYNTHETIC_SHOCKS.items()}
+        {
+            symbol: _frame(
+                decision_time,
+                shock=shock,
+                confirmation=(
+                    -0.02 * float(np.sign(shock)) if confirmed else 0.02 * float(np.sign(shock))
+                ),
+            )
+            for symbol, shock in SYNTHETIC_SHOCKS.items()
+        }
     )
     return DecisionContext(
         decision_time=decision_time,
@@ -88,7 +103,7 @@ def test_daily_schedule_holds_between_rebalances() -> None:
     assert build_strategy().target_weights(context, seed=EXPECTED_SEED) is None
 
 
-def test_residual_exhaustion_builds_both_capped_sleeves_deterministically() -> None:
+def test_confirmed_residual_exhaustion_builds_exact_sleeves_deterministically() -> None:
     context = _context(_decision())
     first = build_strategy().target_weights(context, seed=EXPECTED_SEED)
     second = build_strategy().target_weights(context, seed=EXPECTED_SEED)
@@ -116,6 +131,11 @@ def test_residual_exhaustion_builds_both_capped_sleeves_deterministically() -> N
     assert actual_shorts == expected_shorts
 
 
+def test_impulses_without_a_reversal_confirmation_request_flat_book() -> None:
+    context = _context(_decision(), confirmed=False)
+    assert build_strategy().target_weights(context, seed=EXPECTED_SEED) == {}
+
+
 def test_rows_not_closed_by_the_boundary_cannot_change_targets() -> None:
     decision_time = _decision()
     context = _context(decision_time)
@@ -138,6 +158,32 @@ def test_rows_not_closed_by_the_boundary_cannot_change_targets() -> None:
         eligible_symbols=context.eligible_symbols,
     )
     assert build_strategy().target_weights(future_context, seed=EXPECTED_SEED) == baseline
+
+
+def test_funding_at_or_after_the_boundary_is_excluded() -> None:
+    decision_time = _decision()
+    context = _context(decision_time)
+    rows = []
+    for offset in range(15):
+        for symbol_number, symbol in enumerate(SYNTHETIC_SYMBOLS):
+            rows.append(
+                {
+                    "funding_time": decision_time + pd.Timedelta(hours=8 * offset),
+                    "symbol": symbol,
+                    "funding_rate": (symbol_number + 1) * (offset + 1) / 100.0,
+                }
+            )
+    future_funding = pd.DataFrame(rows)
+    future_context = DecisionContext(
+        decision_time=decision_time,
+        bars=context.bars,
+        funding=future_funding,
+        auxiliary={},
+        eligible_symbols=context.eligible_symbols,
+    )
+    expected = build_strategy().target_weights(context, seed=EXPECTED_SEED)
+    actual = build_strategy().target_weights(future_context, seed=EXPECTED_SEED)
+    assert actual == expected
 
 
 def test_insufficient_cross_section_requests_flat_book() -> None:

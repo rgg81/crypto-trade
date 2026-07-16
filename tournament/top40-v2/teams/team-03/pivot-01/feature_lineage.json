@@ -1,0 +1,124 @@
+{
+  "authorized_inputs": [
+    "bars.open_time",
+    "bars.close",
+    "bars.quote_volume",
+    "funding.funding_time",
+    "funding.symbol",
+    "funding.funding_rate",
+    "eligible_symbols"
+  ],
+  "candidate_id": "t03-crsa-base-i3-c1-b30-v21",
+  "decision_boundary": {
+    "bar_rule": "An 8-hour bar is usable only when open_time plus 8 hours is no later than the decision boundary.",
+    "fill_rule": "The executable open at the decision boundary is not an input to the strategy.",
+    "funding_rule": "The strategy filters funding_time strictly before the decision boundary."
+  },
+  "family_id": "t03-confirmed-residual-shock-absorption-v1",
+  "features": [
+    {
+      "availability_rule": "Both adjacent closes are from fully closed 8-hour bars.",
+      "feature_id": "close_log_return",
+      "lag": "one fully closed 8-hour candle",
+      "lookback": "one adjacent close pair",
+      "missing_rule": "Omit the symbol if closes are insufficient, non-finite, or nonpositive.",
+      "raw_inputs": [
+        "bars.open_time",
+        "bars.close"
+      ],
+      "transformation": "natural_log(close_current) minus natural_log(close_previous)"
+    },
+    {
+      "availability_rule": "The 90 aligned returns end before the three-bar impulse and one-bar confirmation.",
+      "feature_id": "rolling_btc_beta",
+      "lag": "four fully closed 8-hour returns relative to the decision boundary",
+      "lookback": "30 days (90 aligned 8-hour returns)",
+      "missing_rule": "Omit the symbol if aligned history is insufficient or BTC variance is at or below 1e-8.",
+      "raw_inputs": [
+        "close_log_return.symbol",
+        "close_log_return.BTCUSDT"
+      ],
+      "transformation": "covariance(symbol_return, btc_return) divided by variance(btc_return), clipped to [-1, 3]"
+    },
+    {
+      "availability_rule": "The 63 residuals end before the three-bar impulse and one-bar confirmation.",
+      "feature_id": "residual_volatility",
+      "lag": "four fully closed 8-hour returns relative to the decision boundary",
+      "lookback": "21 days (63 beta residuals)",
+      "missing_rule": "Omit the symbol if sample volatility is non-finite or at or below 1e-8.",
+      "raw_inputs": [
+        "close_log_return.symbol",
+        "close_log_return.BTCUSDT",
+        "rolling_btc_beta"
+      ],
+      "transformation": "sample standard deviation of pre-impulse beta residuals"
+    },
+    {
+      "availability_rule": "Uses the three fully closed residuals immediately before the confirmation bar.",
+      "feature_id": "residual_impulse",
+      "lag": "one fully closed confirmation bar relative to the decision boundary",
+      "lookback": "3 bars (24 hours)",
+      "missing_rule": "Omit the symbol when beta, scale, or aligned returns are unavailable.",
+      "raw_inputs": [
+        "close_log_return.symbol",
+        "close_log_return.BTCUSDT",
+        "rolling_btc_beta",
+        "residual_volatility"
+      ],
+      "transformation": "sum the three beta residuals and divide by pre-impulse residual volatility times square_root(3)"
+    },
+    {
+      "availability_rule": "Uses only the latest fully closed aligned return after the impulse.",
+      "feature_id": "residual_reversal_confirmation",
+      "lag": "available only when the confirmation bar closes at the decision boundary",
+      "lookback": "1 bar (8 hours), fixed and not tunable",
+      "missing_rule": "Zero, non-finite, or same-sign confirmation makes the symbol ineligible for both sleeves.",
+      "raw_inputs": [
+        "close_log_return.symbol",
+        "close_log_return.BTCUSDT",
+        "rolling_btc_beta"
+      ],
+      "transformation": "long eligibility requires residual_impulse below zero and confirmation residual above zero; short eligibility requires the opposite signs"
+    },
+    {
+      "availability_rule": "The numerator is the completed impulse-window volume and the baseline ends before the impulse.",
+      "feature_id": "impulse_quote_volume_surprise",
+      "lag": "one fully closed confirmation bar relative to the decision boundary",
+      "lookback": "three-bar impulse sum against 90 pre-impulse completed three-bar sums",
+      "missing_rule": "Omit the symbol for invalid volume, fewer than 30 rolling sums, or a nonpositive baseline median.",
+      "raw_inputs": [
+        "bars.open_time",
+        "bars.quote_volume"
+      ],
+      "transformation": "log(impulse_volume / pre_impulse_median), clipped to [0, 2], then multiplied by 0.35 and added to one"
+    },
+    {
+      "availability_rule": "The strategy explicitly keeps only funding_time strictly before the decision boundary.",
+      "feature_id": "funding_crowding",
+      "lag": "strictly before the decision boundary",
+      "lookback": "3-day mean scaled by sample volatility from up to 30 days",
+      "missing_rule": "Use zero until at least 12 valid events exist or when historical scale is degenerate.",
+      "raw_inputs": [
+        "funding.funding_time",
+        "funding.symbol",
+        "funding.funding_rate"
+      ],
+      "transformation": "recent mean divided by historical sample standard deviation, clipped to [-3, 3], with weight -0.25 in long desirability"
+    },
+    {
+      "availability_rule": "Uses BTC returns from fully closed bars only.",
+      "feature_id": "btc_trend_tilt",
+      "lag": "one fully closed 8-hour candle",
+      "lookback": "60 days (180 BTC returns)",
+      "missing_rule": "Use symmetric sleeve gross when history is insufficient or aggregate return is non-finite.",
+      "raw_inputs": [
+        "close_log_return.BTCUSDT"
+      ],
+      "transformation": "compound 180 log returns; move 0.05 gross toward long above +0.10 or toward short below -0.10"
+    }
+  ],
+  "parent_family_id": "t03-residual-liquidity-shock-absorption-v1",
+  "ranking_rule": "Count every feature-valid non-BTC symbol in universe breadth. Rank only sign-confirmed longs by descending raw finite score and sign-confirmed shorts by ascending raw finite score, with ascending symbol order only for exact numerical ties. Require both complete tails or request flat.",
+  "schema_version": 1,
+  "team_id": "team-03"
+}

@@ -1,0 +1,66 @@
+{
+  "candidate_id": "t03-crsa-base-i3-c1-b30-v21",
+  "commands_run": [
+    {
+      "command": "uv run ruff check tournament/top40-v2/teams/team-03/strategy.py tournament/top40-v2/teams/team-03/test_strategy.py tournament/top40-v2/teams/team-03/pivot-01/prepare_preregistration.py",
+      "exit_code": 0,
+      "result": "All checks passed"
+    },
+    {
+      "command": "uv run ruff format --check tournament/top40-v2/teams/team-03/strategy.py tournament/top40-v2/teams/team-03/test_strategy.py tournament/top40-v2/teams/team-03/pivot-01/prepare_preregistration.py",
+      "exit_code": 1,
+      "result": "test_strategy.py required mechanical formatting"
+    },
+    {
+      "command": "uv run ruff format tournament/top40-v2/teams/team-03/test_strategy.py",
+      "exit_code": 0,
+      "result": "one file reformatted"
+    },
+    {
+      "command": "uv run ruff format --check tournament/top40-v2/teams/team-03/strategy.py tournament/top40-v2/teams/team-03/test_strategy.py tournament/top40-v2/teams/team-03/pivot-01/prepare_preregistration.py",
+      "exit_code": 0,
+      "result": "three files already formatted"
+    },
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 uv run pytest -q tournament/top40-v2/teams/team-03/test_strategy.py",
+      "exit_code": 0,
+      "result": "7 passed in 1.04s"
+    },
+    {
+      "command": "uv run python scripts/top40_v2_tournament_active.py validate-risk-policy tournament/top40-v2/teams/team-03/risk_policy.json",
+      "exit_code": 0,
+      "result": "valid schema_version=1 policy_id=team-03-base enabled=false"
+    }
+  ],
+  "current_revision": {
+    "registration_blocked_until_pass": false,
+    "status": "validation_passed_registration_pending",
+    "validated_at_utc": "2026-07-16T12:09:51Z"
+  },
+  "file_sha256": {
+    "frozen_config.json": "f7405ef64aea39f5f2b9044a9ade02dbde58182afd601ff091322a0ac424d8b3",
+    "pivot-01/prepare_preregistration.py": "4cb7966ce376efbafe0eb59d3fa7107b481140057bb45a109916fe2e08265375",
+    "risk_policy.json": "5d862a75a08b6ffbb4683789efbb1b7338b30f024ddf381d1a95736148702bbc",
+    "strategy.py": "4b13293888f321b5734afc96e08c5665692aa62ab9c5d543b018a2a18f0199a6",
+    "test_strategy.py": "9fb71d159c307264345f5b44607fd4a0caedb1a444c72686392d29d5160c3f6b"
+  },
+  "historical_rlsa_result": {
+    "candidate_id": "t03-rlsa-base-h3-b30-v21-f25",
+    "failure_reason": "ValueError: portfolio insolvent at 2022-05-13 00:00:00+00:00",
+    "promoted_artifact_count": 0,
+    "scientific_state": "stopped_falsified_insolvency",
+    "status": "failed"
+  },
+  "required_current_checks": [
+    {"check": "daily schedule holds between rebalances", "status": "passed"},
+    {"check": "confirmed three-bar impulses form exact deterministic long and short sleeves", "status": "passed"},
+    {"check": "same-sign confirmation rejects all impulses and requests flat", "status": "passed"},
+    {"check": "future or not-yet-closed bars cannot change targets", "status": "passed"},
+    {"check": "funding at or after the decision boundary is excluded", "status": "passed"},
+    {"check": "insufficient cross-section requests flat", "status": "passed"},
+    {"check": "unexpected seed fails closed", "status": "passed"},
+    {"check": "risk-policy schema validation", "status": "passed"}
+  ],
+  "schema_version": 1,
+  "team_id": "team-03"
+}

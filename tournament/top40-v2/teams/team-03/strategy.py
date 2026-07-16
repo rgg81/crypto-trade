@@ -1,9 +1,9 @@
-"""Deterministic Team 03 residual-liquidity-shock absorption strategy.
+"""Deterministic Team 03 confirmed residual-shock absorption strategy.
 
 The strategy uses only bars closed by the decision boundary and funding rows strictly before it.
-It rebalances once per day at 00:00 UTC.  Positive scores identify unusually negative
-idiosyncratic shocks with liquidation/crowding evidence (long candidates); negative scores identify
-the symmetric crowded upside exhaustion (short candidates).
+It rebalances once per day at 00:00 UTC. A three-bar impulse is eligible only after the next fully
+closed residual reverses sign: negative impulse then positive confirmation for longs, and positive
+impulse then negative confirmation for shorts.
 """
 
 from __future__ import annotations
@@ -26,6 +26,7 @@ INTERVAL_HOURS = 8
 class Parameters:
     rebalance_hour_utc: int = 0
     shock_horizon_bars: int = 3
+    confirmation_horizon_bars: int = 1
     beta_lookback_days: int = 30
     residual_volatility_lookback_days: int = 21
     volume_lookback_days: int = 30
@@ -35,7 +36,7 @@ class Parameters:
     funding_weight: float = 0.25
     rank_tail_fraction: float = 0.25
     minimum_valid_symbols: int = 20
-    minimum_names_per_side: int = 5
+    minimum_names_per_side: int = 6
     trend_lookback_days: int = 60
     trend_threshold: float = 0.10
     directional_gross_tilt: float = 0.05
@@ -49,6 +50,8 @@ class Parameters:
             raise ValueError("rebalance_hour_utc is invalid")
         if self.shock_horizon_bars < 1:
             raise ValueError("shock_horizon_bars must be positive")
+        if self.confirmation_horizon_bars != 1:
+            raise ValueError("confirmation_horizon_bars is frozen at one")
         if (
             min(
                 self.beta_lookback_days,
@@ -83,9 +86,10 @@ DEFAULT_PARAMETERS = Parameters()
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class _Signal:
+class _Observation:
     symbol: str
     score: float
+    side: int
 
 
 def _past_bars(frame: pd.DataFrame, decision_time: pd.Timestamp) -> pd.DataFrame:
@@ -111,6 +115,18 @@ def _past_bars(frame: pd.DataFrame, decision_time: pd.Timestamp) -> pd.DataFrame
 
 def _log_returns(frame: pd.DataFrame) -> pd.Series:
     return np.log(frame["close"].astype(float)).diff().dropna()
+
+
+def _past_funding(frame: pd.DataFrame, decision_time: pd.Timestamp) -> pd.DataFrame:
+    required = {"funding_time", "symbol", "funding_rate"}
+    if frame.empty or not required.issubset(frame.columns):
+        return pd.DataFrame(columns=sorted(required))
+    result = frame.loc[:, ["funding_time", "symbol", "funding_rate"]].copy()
+    result["funding_time"] = pd.to_datetime(result["funding_time"], utc=True, errors="raise")
+    result["funding_rate"] = pd.to_numeric(result["funding_rate"], errors="coerce")
+    result = result.loc[result["funding_time"] < decision_time]
+    result = result.loc[np.isfinite(result["funding_rate"].to_numpy())]
+    return result.sort_values(["funding_time", "symbol"]).reset_index(drop=True)
 
 
 def _aligned_returns(
@@ -155,15 +171,16 @@ def _signal_for_symbol(
     btc_returns: pd.Series,
     funding: pd.DataFrame,
     parameters: Parameters,
-) -> _Signal | None:
+) -> _Observation | None:
     symbol_returns, aligned_btc = _aligned_returns(frame, btc_returns)
     beta_bars = parameters.beta_lookback_days * 3
     volatility_bars = parameters.residual_volatility_lookback_days * 3
-    required = max(beta_bars, volatility_bars) + parameters.shock_horizon_bars
+    signal_bars = parameters.shock_horizon_bars + parameters.confirmation_horizon_bars
+    required = max(beta_bars, volatility_bars) + signal_bars
     if len(symbol_returns) < required:
         return None
-    history_stop = -parameters.shock_horizon_bars
-    beta_history_start = -(beta_bars + parameters.shock_horizon_bars)
+    history_stop = -signal_bars
+    beta_history_start = -(beta_bars + signal_bars)
     beta_sample = pd.concat(
         [
             symbol_returns.iloc[beta_history_start:history_stop],
@@ -179,24 +196,29 @@ def _signal_for_symbol(
         return None
     beta = float(np.clip(beta, -1.0, 3.0))
     residuals = symbol_returns - beta * aligned_btc
-    residual_history = residuals.iloc[
-        -(volatility_bars + parameters.shock_horizon_bars) : history_stop
-    ]
+    residual_history = residuals.iloc[-(volatility_bars + signal_bars) : history_stop]
     residual_scale = float(residual_history.std(ddof=1))
     if not math.isfinite(residual_scale) or residual_scale <= parameters.residual_variance_floor:
         return None
-    shock = float(residuals.iloc[-parameters.shock_horizon_bars :].sum())
+    impulse_stop = -parameters.confirmation_horizon_bars
+    impulse_start = -(parameters.shock_horizon_bars + parameters.confirmation_horizon_bars)
+    shock = float(residuals.iloc[impulse_start:impulse_stop].sum())
+    confirmation = float(residuals.iloc[-1])
     shock_z = shock / (residual_scale * math.sqrt(parameters.shock_horizon_bars))
 
     volume = frame["quote_volume"].astype(float)
     rolling_volume = volume.rolling(parameters.shock_horizon_bars).sum().dropna()
-    volume_history = rolling_volume.iloc[-parameters.volume_lookback_days * 3 :]
-    if len(volume_history) < parameters.volume_lookback_days:
+    impulse_volume_position = -(parameters.confirmation_horizon_bars + 1)
+    volume_history_stop = -signal_bars
+    volume_history_start = -(parameters.volume_lookback_days * 3 + signal_bars)
+    volume_history = rolling_volume.iloc[volume_history_start:volume_history_stop]
+    if len(volume_history) < parameters.volume_lookback_days * 3:
         return None
     baseline_volume = float(volume_history.median())
     if not math.isfinite(baseline_volume) or baseline_volume <= 0.0:
         return None
-    volume_surprise = math.log(max(float(rolling_volume.iloc[-1]), 1.0) / baseline_volume)
+    impulse_volume = float(rolling_volume.iloc[impulse_volume_position])
+    volume_surprise = math.log(max(impulse_volume, 1.0) / baseline_volume)
     volume_multiplier = 1.0 + parameters.volume_amplifier * float(
         np.clip(volume_surprise, 0.0, 2.0)
     )
@@ -204,7 +226,13 @@ def _signal_for_symbol(
     score = -shock_z * volume_multiplier - parameters.funding_weight * funding_z
     if not math.isfinite(score):
         return None
-    return _Signal(symbol=symbol, score=float(score))
+    if shock < 0.0 and confirmation > 0.0:
+        side = 1
+    elif shock > 0.0 and confirmation < 0.0:
+        side = -1
+    else:
+        side = 0
+    return _Observation(symbol=symbol, score=float(score), side=side)
 
 
 def _btc_trend(btc_returns: pd.Series, parameters: Parameters) -> float:
@@ -239,7 +267,7 @@ def _equal_sleeve(
     return {symbol: sign * per_name for symbol in symbols}
 
 
-class ResidualLiquidityShockAbsorptionStrategy:
+class ConfirmedResidualShockAbsorptionStrategy:
     def __init__(self, parameters: Parameters = DEFAULT_PARAMETERS):
         parameters.validate()
         self.parameters = parameters
@@ -271,11 +299,13 @@ class ResidualLiquidityShockAbsorptionStrategy:
             )
             * 3
             + self.parameters.shock_horizon_bars
+            + self.parameters.confirmation_horizon_bars
         )
         if len(btc_returns) < required_btc_bars:
             return {}
 
-        signals: list[_Signal] = []
+        past_funding = _past_funding(context.funding, decision_time)
+        observations: list[_Observation] = []
         for symbol in sorted(str(value) for value in context.eligible_symbols):
             if symbol == BTC_SYMBOL:
                 continue
@@ -287,23 +317,32 @@ class ResidualLiquidityShockAbsorptionStrategy:
                 symbol,
                 frame,
                 btc_returns,
-                context.funding,
+                past_funding,
                 self.parameters,
             )
             if signal is not None:
-                signals.append(signal)
-        if len(signals) < self.parameters.minimum_valid_symbols:
+                observations.append(signal)
+        if len(observations) < self.parameters.minimum_valid_symbols:
             return {}
 
         tail_count = max(
             self.parameters.minimum_names_per_side,
-            int(math.floor(len(signals) * self.parameters.rank_tail_fraction)),
+            int(math.floor(len(observations) * self.parameters.rank_tail_fraction)),
         )
-        if 2 * tail_count > len(signals):
+        if 2 * tail_count > len(observations):
             return {}
-        ranked = sorted(signals, key=lambda item: (item.score, item.symbol))
-        shorts = [item.symbol for item in ranked[:tail_count]]
-        longs = [item.symbol for item in reversed(ranked[-tail_count:])]
+        long_candidates = sorted(
+            (item for item in observations if item.side > 0),
+            key=lambda item: (-item.score, item.symbol),
+        )
+        short_candidates = sorted(
+            (item for item in observations if item.side < 0),
+            key=lambda item: (item.score, item.symbol),
+        )
+        if min(len(long_candidates), len(short_candidates)) < tail_count:
+            return {}
+        longs = [item.symbol for item in long_candidates[:tail_count]]
+        shorts = [item.symbol for item in short_candidates[:tail_count]]
         if set(longs) & set(shorts):
             raise AssertionError("long and short selections overlap")
 
@@ -334,5 +373,5 @@ class ResidualLiquidityShockAbsorptionStrategy:
         return weights
 
 
-def build_strategy() -> ResidualLiquidityShockAbsorptionStrategy:
-    return ResidualLiquidityShockAbsorptionStrategy()
+def build_strategy() -> ConfirmedResidualShockAbsorptionStrategy:
+    return ConfirmedResidualShockAbsorptionStrategy()

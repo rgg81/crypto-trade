@@ -1,0 +1,16 @@
+{
+  "candidate_id": "t03-crsa-base-i3-c1-b30-v21",
+  "controls_authorized": false,
+  "decision": "The pivot is evaluated only with the unchanged no-control policy. A failed base or neighborhood ends Team 03 as DNF and cannot activate a risk-control rescue.",
+  "material_configuration_limit": 1,
+  "schema_version": 1,
+  "status": "planned_not_run",
+  "team_id": "team-03",
+  "variants": [
+    {
+      "changes_from_base": {},
+      "policy_id": "team-03-base",
+      "role": "sole no-control policy"
+    }
+  ]
+}

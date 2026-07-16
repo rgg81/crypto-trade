@@ -1,0 +1,16 @@
+{
+  "candidate_id": "t03-crsa-base-i3-c1-b30-v21",
+  "controls_authorized": false,
+  "decision": "No volatility target, drawdown brake, position stop, time stop, cooldown, turnover limit, side scaling, or combined overlay may rescue this pivot. Failure of the base or its fixed neighborhood ends Team 03 as DNF.",
+  "material_configuration_limit": 1,
+  "schema_version": 1,
+  "status": "planned_not_run",
+  "team_id": "team-03",
+  "variants": [
+    {
+      "changes_from_base": {},
+      "policy_id": "team-03-base",
+      "role": "sole no-control policy"
+    }
+  ]
+}
