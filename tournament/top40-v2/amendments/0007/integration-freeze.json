@@ -1,0 +1,65 @@
+{
+  "activation_journal": {
+    "head_sha256": "15e4d3453ee1fdaae0a4f1439f8a5bf57c4cf16c99fa73ff9992c29fa64aa09f",
+    "path": "tournament/top40-v2/organizer_research_journal.jsonl",
+    "record_count": 27
+  },
+  "activation_timestamp_utc": "2026-07-16T18:09:36Z",
+  "active_entrypoint": {
+    "path": "scripts/top40_v2_tournament_runtime_preload_v7.py",
+    "sha256": "8a4ada10176d2606df3f358fc188e21b45153ad9a7270f36908736f03322a3a9"
+  },
+  "amendment_freeze": {
+    "commit": "0ff45e655ee626c60b7e9c88ba44883d3c779941",
+    "path": "tournament/top40-v2/amendments/0007/freeze.json",
+    "sha256": "90bc6f73b2fec72cdee2b3897cd66900ccabd4231122cd2f51dad0b71b932a37"
+  },
+  "amendment_id": "top40-v2-amendment-0007-frozen-worker-a5-protocol-preload",
+  "delegated_amendment_0005_integration": {
+    "commit": "d2b95f610722aab65b4e67466b34efeaa3554101",
+    "path": "tournament/top40-v2/amendments/0005/integration-freeze.json",
+    "sha256": "b3b2b96245a479ccfff95b5cd5b5cd0aef3b2d0aac0fc9faf5367d3e6772958c"
+  },
+  "dispatch_scope": {
+    "all_other_argv_delegated_to_amendment_0005_unchanged": true,
+    "eligible_development_teams": [
+      "team-04",
+      "team-05",
+      "team-06",
+      "team-07",
+      "team-08",
+      "team-09",
+      "team-10"
+    ],
+    "ordinary_score_capture_enabled": false,
+    "patch_binding": "crypto_trade.tournament.runner_v2._strategy_worker_command",
+    "replacement_module": "crypto_trade.tournament._strategy_worker_preload_v7",
+    "source_module": "crypto_trade.tournament._strategy_worker_v2"
+  },
+  "historical_entrypoint": {
+    "path": "scripts/top40_v2_tournament_score_diagnostics_v5.py",
+    "sha256": "0dc9228f3b9c6fe41b2655055f766fc92f323a289a050e6bdf4e48a30b0105f4",
+    "status": "superseded-unchanged"
+  },
+  "implementation_module": {
+    "path": "src/crypto_trade/tournament/amendment_0007_v2.py",
+    "sha256": "609a240314ac242d4a895145b476bb98a05f27147e2e0aa8ecda85c8dd802da5"
+  },
+  "integration_draft": {
+    "commit": "4bd58b7bd8cdcdfaf2c0d117b41578dd1923257b",
+    "path": "tournament/top40-v2/amendments/0007/integration-draft.json",
+    "sha256": "9a1cc282714411116892bc51bc5f452f54d8731c57d560c2466bd04d8599bae2"
+  },
+  "integration_review": {
+    "commit": "c8c56d8bb69ccf7b3550a13b7e0e9151ee2a3a89",
+    "path": "tournament/top40-v2/amendments/0007/INTEGRATION-REVIEW.json",
+    "sha256": "385fda905891104ce56ceea0b97d634142b6dbeef00c6da378b89db2b72267e3"
+  },
+  "schema_version": 1,
+  "status": "active",
+  "worker_wrapper": {
+    "path": "src/crypto_trade/tournament/_strategy_worker_preload_v7.py",
+    "sha256": "a90ff198d5c03e4f3b85bfda8e95f218627b631884154858f6d084537fdd70ac",
+    "size": 7351
+  }
+}
