@@ -1,0 +1,55 @@
+{
+  "candidate_id": "team-02-fir-reference-001",
+  "causal_diagnostics": {
+    "funding_cashflow": "aggregate realized funding PnL must be positive; fold funding PnL should be positive in at least four of six folds",
+    "relaxation_uplift": "reference is compared only after passing against a preregistered level-only nondeployable diagnostic",
+    "strategy_input_labels": false
+  },
+  "family_id": "team-02-funding-inventory-relaxation-v1",
+  "information_contract": {
+    "bar_feature_cutoff": "decision_time minus 8h",
+    "bar_interval_hours": 8,
+    "fields_used": ["open_time", "close_time", "close", "funding_time", "funding_rate"],
+    "funding_cutoff": "strictly before decision_time",
+    "off_grid_action": "flat",
+    "unscheduled_action": "hold"
+  },
+  "mechanism_guardrail": {
+    "funding_level_required": true,
+    "funding_relaxation_required": true,
+    "price_return_signal_forbidden": true,
+    "volatility_is_filter_only": true
+  },
+  "parameters": {
+    "funding_window_days": 21,
+    "gross_target": 0.4,
+    "level_weight": 0.75,
+    "maximum_absolute_funding_rate": 0.05,
+    "maximum_funding_staleness_hours": 16,
+    "minimum_cross_section": 24,
+    "minimum_names_per_sleeve": 6,
+    "minimum_prefilter_cross_section": 30,
+    "minimum_prior_events": 18,
+    "minimum_recent_events": 3,
+    "rebalance_bars": 9,
+    "recent_funding_days": 3,
+    "relaxation_weight": 0.25,
+    "selected_fraction_per_side": "1/4",
+    "side_budget": 0.2,
+    "symbol_cap": 0.03,
+    "volatility_keep_fraction": "4/5",
+    "volatility_lookback_days": 30
+  },
+  "portfolio": {
+    "capacity_rule": "effective side budget is min(0.20,K*0.03); excess remains cash",
+    "name_count_rule": "K=max(6,floor(N/4)) after retaining the lowest-volatility floor(4N/5) symbols",
+    "name_weighting": "equal per sleeve with ASCII residual reconciliation",
+    "required_carry_spread": "mean selected-short funding level must exceed mean selected-long funding level by more than 1e-12 per day"
+  },
+  "risk_policy_id": "team-02-fir-reference-no-control",
+  "runtime_seed": 20260801,
+  "schema_version": 1,
+  "status": "implemented-not-registered-not-run",
+  "team_id": "team-02",
+  "trial_search_tie_namespace": 2026080102
+}

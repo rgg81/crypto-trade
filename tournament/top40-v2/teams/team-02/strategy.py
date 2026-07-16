@@ -1,4 +1,4 @@
-"""Directional Auction Absorption (DAA) exact no-control reference candidate."""
+"""Funding Inventory Relaxation (FIR) exact no-control reference candidate."""
 
 from __future__ import annotations
 
@@ -15,36 +15,54 @@ _EPOCH = pd.Timestamp("1970-01-01T00:00:00Z")
 
 @dataclasses.dataclass(frozen=True)
 class _Config:
-    candidate_id: str = "team-02-daa-reference-001"
+    candidate_id: str = "team-02-fir-reference-001"
     canonical_seed: int = 20260801
-    trend_efficiency_days: int = 12
-    absorption_window_bars: int = 3
-    absorption_half_life_bars: float = 2.0
-    trend_weight: float = 0.60
-    absorption_weight: float = 0.40
+    funding_window_days: int = 21
+    recent_funding_days: int = 3
+    minimum_prior_events: int = 18
+    minimum_recent_events: int = 3
+    maximum_funding_staleness_hours: int = 16
+    maximum_absolute_funding_rate: float = 0.05
+    level_weight: float = 0.75
+    relaxation_weight: float = 0.25
+    volatility_lookback_days: int = 30
+    volatility_keep_numerator: int = 4
+    volatility_keep_denominator: int = 5
+    minimum_prefilter_cross_section: int = 30
     minimum_cross_section: int = 24
     selection_numerator: int = 1
     selection_denominator: int = 4
     minimum_sleeve_names: int = 6
-    gross_target: float = 0.80
-    side_budget: float = 0.40
-    symbol_cap: float = 0.06
-    rebalance_bars: int = 3
+    gross_target: float = 0.40
+    side_budget: float = 0.20
+    symbol_cap: float = 0.03
+    rebalance_bars: int = 9
     epsilon: float = 1e-12
     tolerance: float = 1e-12
 
     @property
-    def trend_return_bars(self) -> int:
-        return 3 * self.trend_efficiency_days
+    def volatility_return_bars(self) -> int:
+        return 3 * self.volatility_lookback_days
+
+    @property
+    def prior_funding_days(self) -> int:
+        return self.funding_window_days - self.recent_funding_days
 
 
 _REFERENCE = _Config()
 
 
 @dataclasses.dataclass(frozen=True)
-class _Features:
-    path_efficiency: float
-    absorption: float
+class _FundingFeature:
+    level_per_day: float
+    relaxation_per_day: float
+
+
+@dataclasses.dataclass(frozen=True)
+class _Feature:
+    funding_level_per_day: float
+    funding_relaxation_per_day: float
+    realized_volatility: float
 
 
 def _finite_number(value: Any) -> float | None:
@@ -75,35 +93,67 @@ def _decision_index(value: Any) -> int | None:
     if timestamp is None:
         return None
     delta = timestamp.value - _EPOCH.value
-    interval = _EIGHT_HOURS.value
-    if delta % interval:
+    if delta % _EIGHT_HOURS.value:
         return None
-    return delta // interval
+    return delta // _EIGHT_HOURS.value
 
 
 def _average_ranks(values: Mapping[str, float]) -> dict[str, float] | None:
     """Return exact-equality average ranks mapped to [-1, 1]."""
+
     if len(values) < 2 or any(not math.isfinite(value) for value in values.values()):
         return None
     ordered = sorted(values.items(), key=lambda item: (item[1], item[0]))
     denominator = len(ordered) - 1
-    ranked: dict[str, float] = {}
+    ranks: dict[str, float] = {}
     start = 0
     while start < len(ordered):
         stop = start + 1
         while stop < len(ordered) and ordered[stop][1] == ordered[start][1]:
             stop += 1
-        average_one_based_rank = ((start + 1) + stop) / 2.0
-        mapped = 2.0 * (average_one_based_rank - 1.0) / denominator - 1.0
+        average_one_based = ((start + 1) + stop) / 2.0
+        mapped = 2.0 * (average_one_based - 1.0) / denominator - 1.0
         for index in range(start, stop):
-            ranked[ordered[index][0]] = mapped
+            ranks[ordered[index][0]] = mapped
         start = stop
-    return ranked
+    return ranks
 
 
-def _path_efficiency(closes: Sequence[float], epsilon: float = _REFERENCE.epsilon) -> float | None:
-    if len(closes) < 2 or any(not math.isfinite(value) or value <= 0.0 for value in closes):
+def _expected_price_times(cutoff: pd.Timestamp, return_bars: int) -> tuple[pd.Timestamp, ...]:
+    return tuple(cutoff - multiple * _EIGHT_HOURS for multiple in range(return_bars + 1, 0, -1))
+
+
+def _realized_volatility(
+    frame: Any,
+    *,
+    cutoff: pd.Timestamp,
+    return_bars: int = _REFERENCE.volatility_return_bars,
+) -> float | None:
+    if not isinstance(frame, pd.DataFrame):
         return None
+    required = ("open_time", "close_time", "close")
+    if not set(required).issubset(frame.columns):
+        return None
+    expected = _expected_price_times(cutoff, return_bars)
+    rows: dict[pd.Timestamp, list[tuple[Any, Any, Any]]] = {timestamp: [] for timestamp in expected}
+    for raw_open, raw_close_time, raw_close in frame.loc[:, list(required)].itertuples(
+        index=False, name=None
+    ):
+        open_time = _utc_timestamp(raw_open)
+        if open_time is None or open_time not in rows:
+            continue
+        close_time = _utc_timestamp(raw_close_time)
+        if close_time is None or close_time > cutoff:
+            continue
+        rows[open_time].append((raw_open, raw_close_time, raw_close))
+    if any(len(rows[timestamp]) != 1 for timestamp in expected):
+        return None
+    closes: list[float] = []
+    for timestamp in expected:
+        close = _finite_number(rows[timestamp][0][2])
+        if close is None or close <= 0.0:
+            return None
+        closes.append(close)
     returns: list[float] = []
     for previous, current in zip(closes[:-1], closes[1:], strict=True):
         ratio = current / previous
@@ -113,175 +163,105 @@ def _path_efficiency(closes: Sequence[float], epsilon: float = _REFERENCE.epsilo
         if not math.isfinite(value):
             return None
         returns.append(value)
-    denominator = math.fsum(abs(value) for value in returns) + epsilon
-    result = math.fsum(returns) / denominator
+    if len(returns) != return_bars:
+        return None
+    mean = math.fsum(returns) / len(returns)
+    variance = math.fsum((value - mean) ** 2 for value in returns) / len(returns)
+    if not math.isfinite(variance) or variance < 0.0:
+        return None
+    result = math.sqrt(variance)
     return result if math.isfinite(result) else None
 
 
-def _absorption_gap(
-    *,
-    open_price: Any,
-    high: Any,
-    low: Any,
-    close: Any,
-    quote_volume: Any,
-    taker_buy_quote_volume: Any,
-    epsilon: float = _REFERENCE.epsilon,
-) -> float | None:
-    open_value = _finite_number(open_price)
-    high_value = _finite_number(high)
-    low_value = _finite_number(low)
-    close_value = _finite_number(close)
-    quote_value = _finite_number(quote_volume)
-    taker_value = _finite_number(taker_buy_quote_volume)
-    if any(
-        value is None or value <= 0.0 for value in (open_value, high_value, low_value, close_value)
-    ):
-        return None
-    assert open_value is not None
-    assert high_value is not None
-    assert low_value is not None
-    assert close_value is not None
-    if not low_value <= open_value <= high_value or not low_value <= close_value <= high_value:
-        return None
-    price_range = high_value - low_value
-    minimum_range = epsilon * max(1.0, abs(high_value), abs(low_value))
-    if not math.isfinite(price_range) or price_range <= minimum_range:
-        return None
-    if (
-        quote_value is None
-        or taker_value is None
-        or quote_value <= epsilon
-        or taker_value < 0.0
-        or taker_value > quote_value
-    ):
-        return None
-    flow = 2.0 * taker_value / quote_value - 1.0
-    closing_location = (2.0 * close_value - high_value - low_value) / price_range
-    if not math.isfinite(flow) or not math.isfinite(closing_location):
-        return None
-    closing_location = min(1.0, max(-1.0, closing_location))
-    gap = (closing_location - flow) / 2.0
-    return gap if math.isfinite(gap) else None
-
-
-def _smooth_absorption(
-    gaps_oldest_to_newest: Sequence[float],
-    half_life_bars: float = _REFERENCE.absorption_half_life_bars,
-) -> float | None:
-    if (
-        not gaps_oldest_to_newest
-        or not math.isfinite(half_life_bars)
-        or half_life_bars <= 0.0
-        or any(not math.isfinite(value) for value in gaps_oldest_to_newest)
-    ):
-        return None
-    count = len(gaps_oldest_to_newest)
-    raw_weights = [math.pow(2.0, -(count - 1 - index) / half_life_bars) for index in range(count)]
-    weight_sum = math.fsum(raw_weights)
-    if not math.isfinite(weight_sum) or weight_sum <= 0.0:
-        return None
-    result = math.fsum(
-        (raw_weight / weight_sum) * gap
-        for raw_weight, gap in zip(raw_weights, gaps_oldest_to_newest, strict=True)
-    )
-    return result if math.isfinite(result) else None
-
-
-def _expected_price_times(cutoff: pd.Timestamp, return_bars: int) -> tuple[pd.Timestamp, ...]:
-    return tuple(cutoff - multiple * _EIGHT_HOURS for multiple in range(return_bars + 1, 0, -1))
-
-
-def _available_rows(
+def _funding_features(
     frame: Any,
     *,
-    cutoff: pd.Timestamp,
-    expected_times: Sequence[pd.Timestamp],
-) -> dict[pd.Timestamp, list[tuple[Any, ...]]]:
-    rows = {timestamp: [] for timestamp in expected_times}
+    eligible_symbols: Sequence[str],
+    decision_time: pd.Timestamp,
+    config: _Config = _REFERENCE,
+) -> dict[str, _FundingFeature]:
     if not isinstance(frame, pd.DataFrame):
-        return rows
-    columns = (
-        "open_time",
-        "close_time",
-        "open",
-        "high",
-        "low",
-        "close",
-        "quote_volume",
-        "taker_buy_quote_volume",
+        return {}
+    required = ("funding_time", "symbol", "funding_rate")
+    if not set(required).issubset(frame.columns):
+        return {}
+    eligible = frozenset(eligible_symbols)
+    window_start = decision_time - pd.Timedelta(days=config.funding_window_days)
+    recent_start = decision_time - pd.Timedelta(days=config.recent_funding_days)
+    observed: dict[str, list[tuple[pd.Timestamp, float]]] = {symbol: [] for symbol in eligible}
+    invalid: set[str] = set()
+    for raw_time, raw_symbol, raw_rate in frame.loc[:, list(required)].itertuples(
+        index=False, name=None
+    ):
+        if not isinstance(raw_symbol, str) or raw_symbol not in eligible:
+            continue
+        timestamp = _utc_timestamp(raw_time)
+        if timestamp is None:
+            invalid.add(raw_symbol)
+            continue
+        if timestamp < window_start or timestamp >= decision_time:
+            continue
+        rate = _finite_number(raw_rate)
+        if rate is None or abs(rate) > config.maximum_absolute_funding_rate:
+            invalid.add(raw_symbol)
+            continue
+        observed[raw_symbol].append((timestamp, rate))
+
+    result: dict[str, _FundingFeature] = {}
+    for symbol in sorted(eligible):
+        if symbol in invalid:
+            continue
+        events = sorted(observed[symbol], key=lambda item: item[0])
+        timestamps = [timestamp for timestamp, _rate in events]
+        if len(timestamps) != len(set(timestamps)) or not events:
+            continue
+        prior = [rate for timestamp, rate in events if timestamp < recent_start]
+        recent = [rate for timestamp, rate in events if timestamp >= recent_start]
+        if (
+            len(prior) < config.minimum_prior_events
+            or len(recent) < config.minimum_recent_events
+            or decision_time - events[-1][0]
+            > pd.Timedelta(hours=config.maximum_funding_staleness_hours)
+        ):
+            continue
+        prior_daily = math.fsum(prior) / config.prior_funding_days
+        recent_daily = math.fsum(recent) / config.recent_funding_days
+        level_daily = math.fsum(rate for _timestamp, rate in events) / config.funding_window_days
+        relaxation = recent_daily - prior_daily
+        if all(math.isfinite(value) for value in (level_daily, relaxation)):
+            result[symbol] = _FundingFeature(level_daily, relaxation)
+    return result
+
+
+def _lowest_volatility_symbols(
+    volatility: Mapping[str, float], config: _Config = _REFERENCE
+) -> tuple[str, ...] | None:
+    if len(volatility) < config.minimum_prefilter_cross_section:
+        return None
+    if any(not math.isfinite(value) or value < 0.0 for value in volatility.values()):
+        return None
+    keep = (config.volatility_keep_numerator * len(volatility)) // (
+        config.volatility_keep_denominator
     )
-    if not set(columns).issubset(frame.columns):
-        return rows
-    for raw_row in frame.loc[:, list(columns)].itertuples(index=False, name=None):
-        open_time = _utc_timestamp(raw_row[0])
-        if open_time is None or open_time not in rows:
-            continue
-        close_time = _utc_timestamp(raw_row[1])
-        if close_time is not None and close_time > cutoff:
-            continue
-        rows[open_time].append(raw_row)
-    return rows
-
-
-def _symbol_features(
-    frame: Any, cutoff: pd.Timestamp, config: _Config = _REFERENCE
-) -> _Features | None:
-    price_times = _expected_price_times(cutoff, config.trend_return_bars)
-    rows = _available_rows(frame, cutoff=cutoff, expected_times=price_times)
-    if any(len(rows[timestamp]) != 1 for timestamp in price_times):
+    if keep < config.minimum_cross_section:
         return None
-
-    closes: list[float] = []
-    for timestamp in price_times:
-        row = rows[timestamp][0]
-        close_time = _utc_timestamp(row[1])
-        close = _finite_number(row[5])
-        if close_time is None or close_time > cutoff or close is None or close <= 0.0:
-            return None
-        closes.append(close)
-    efficiency = _path_efficiency(closes, config.epsilon)
-    if efficiency is None:
-        return None
-
-    absorption_times = price_times[-config.absorption_window_bars :]
-    gaps: list[float] = []
-    for timestamp in absorption_times:
-        row = rows[timestamp][0]
-        gap = _absorption_gap(
-            open_price=row[2],
-            high=row[3],
-            low=row[4],
-            close=row[5],
-            quote_volume=row[6],
-            taker_buy_quote_volume=row[7],
-            epsilon=config.epsilon,
-        )
-        if gap is None:
-            return None
-        gaps.append(gap)
-    absorption = _smooth_absorption(gaps, config.absorption_half_life_bars)
-    if absorption is None:
-        return None
-    return _Features(path_efficiency=efficiency, absorption=absorption)
+    ordered = sorted(volatility, key=lambda symbol: (volatility[symbol], symbol))
+    return tuple(ordered[:keep])
 
 
 def _select_sleeves(
     scores: Mapping[str, float], config: _Config = _REFERENCE
 ) -> tuple[tuple[str, ...], tuple[str, ...]] | None:
-    count = len(scores)
-    if count < config.minimum_cross_section:
+    if len(scores) < config.minimum_cross_section:
         return None
-    sleeve_count = max(
+    count = max(
         config.minimum_sleeve_names,
-        (config.selection_numerator * count) // config.selection_denominator,
+        (config.selection_numerator * len(scores)) // config.selection_denominator,
     )
-    if 2 * sleeve_count > count:
+    if 2 * count > len(scores):
         return None
     ordered = sorted(scores, key=lambda symbol: (scores[symbol], symbol))
-    shorts = tuple(ordered[:sleeve_count])
-    longs = tuple(ordered[-sleeve_count:])
-    return longs, shorts
+    return tuple(ordered[-count:]), tuple(ordered[:count])
 
 
 def _equal_side_allocation(
@@ -295,29 +275,29 @@ def _equal_side_allocation(
     if not math.isfinite(initial) or initial < 0.0 or initial > config.symbol_cap:
         return None
     weights = {symbol: initial for symbol in ordered}
-    delta = effective_budget - math.fsum(weights[symbol] for symbol in ordered)
-    if delta > 0.0:
+    residual = effective_budget - math.fsum(weights.values())
+    if residual > 0.0:
         for symbol in ordered:
-            addition = min(delta, config.symbol_cap - weights[symbol])
+            addition = min(residual, config.symbol_cap - weights[symbol])
             weights[symbol] += addition
-            delta -= addition
-            if delta == 0.0:
+            residual -= addition
+            if residual == 0.0:
                 break
-    elif delta < 0.0:
+    elif residual < 0.0:
         for symbol in ordered:
-            subtraction = min(-delta, weights[symbol])
+            subtraction = min(-residual, weights[symbol])
             weights[symbol] -= subtraction
-            delta += subtraction
-            if delta == 0.0:
+            residual += subtraction
+            if residual == 0.0:
                 break
-    if abs(delta) > config.tolerance:
+    if abs(residual) > config.tolerance:
         return None
     if any(
         not math.isfinite(value) or value < 0.0 or value > config.symbol_cap
         for value in weights.values()
     ):
         return None
-    if abs(math.fsum(weights[symbol] for symbol in ordered) - effective_budget) > config.tolerance:
+    if abs(math.fsum(weights.values()) - effective_budget) > config.tolerance:
         return None
     return weights
 
@@ -332,65 +312,97 @@ def _scheduled_targets(
         eligible_input = tuple(raw_eligible)
     except TypeError:
         return {}
-    if any(not isinstance(symbol, str) or not symbol for symbol in eligible_input) or len(
-        eligible_input
-    ) != len(set(eligible_input)):
+    if any(not isinstance(symbol, str) or not symbol for symbol in eligible_input):
+        return {}
+    if len(eligible_input) != len(set(eligible_input)):
         return {}
     eligible = tuple(sorted(eligible_input))
-    if len(eligible) < config.minimum_cross_section:
+    if len(eligible) < config.minimum_prefilter_cross_section:
         return {}
     bars = getattr(context, "bars", None)
     if not isinstance(bars, Mapping):
         return {}
-
+    funding = _funding_features(
+        getattr(context, "funding", None),
+        eligible_symbols=eligible,
+        decision_time=decision_time,
+        config=config,
+    )
     cutoff = decision_time - _EIGHT_HOURS
-    features: dict[str, _Features] = {}
+    features: dict[str, _Feature] = {}
     for symbol in eligible:
-        feature = _symbol_features(bars.get(symbol), cutoff, config)
-        if feature is not None:
-            features[symbol] = feature
-    if len(features) < config.minimum_cross_section:
+        funding_feature = funding.get(symbol)
+        if funding_feature is None:
+            continue
+        volatility = _realized_volatility(
+            bars.get(symbol),
+            cutoff=cutoff,
+            return_bars=config.volatility_return_bars,
+        )
+        if volatility is None:
+            continue
+        features[symbol] = _Feature(
+            funding_level_per_day=funding_feature.level_per_day,
+            funding_relaxation_per_day=funding_feature.relaxation_per_day,
+            realized_volatility=volatility,
+        )
+    retained = _lowest_volatility_symbols(
+        {symbol: feature.realized_volatility for symbol, feature in features.items()},
+        config,
+    )
+    if retained is None:
         return {}
-
-    trend_ranks = _average_ranks(
-        {symbol: feature.path_efficiency for symbol, feature in features.items()}
+    level_ranks = _average_ranks(
+        {symbol: features[symbol].funding_level_per_day for symbol in retained}
     )
-    absorption_ranks = _average_ranks(
-        {symbol: feature.absorption for symbol, feature in features.items()}
+    relaxation_ranks = _average_ranks(
+        {symbol: features[symbol].funding_relaxation_per_day for symbol in retained}
     )
-    if trend_ranks is None or absorption_ranks is None:
+    if level_ranks is None or relaxation_ranks is None:
         return {}
     scores = {
-        symbol: config.trend_weight * trend_ranks[symbol]
-        + config.absorption_weight * absorption_ranks[symbol]
-        for symbol in features
+        symbol: -config.level_weight * level_ranks[symbol]
+        + config.relaxation_weight * relaxation_ranks[symbol]
+        for symbol in retained
     }
-    if any(not math.isfinite(value) for value in scores.values()):
-        return {}
     sleeves = _select_sleeves(scores, config)
     if sleeves is None:
         return {}
     long_symbols, short_symbols = sleeves
+    long_level = math.fsum(features[symbol].funding_level_per_day for symbol in long_symbols) / len(
+        long_symbols
+    )
+    short_level = math.fsum(
+        features[symbol].funding_level_per_day for symbol in short_symbols
+    ) / len(short_symbols)
+    if not math.isfinite(long_level) or not math.isfinite(short_level):
+        return {}
+    if short_level - long_level <= config.epsilon:
+        return {}
     long_weights = _equal_side_allocation(long_symbols, config)
     short_weights = _equal_side_allocation(short_symbols, config)
     if long_weights is None or short_weights is None:
         return {}
-
-    targets: dict[str, float] = {}
-    for symbol in sorted(long_weights):
-        targets[symbol] = long_weights[symbol]
-    for symbol in sorted(short_weights):
-        targets[symbol] = -short_weights[symbol] if short_weights[symbol] else 0.0
-    if any(
-        symbol not in eligible or not math.isfinite(weight) or abs(weight) > config.symbol_cap
-        for symbol, weight in targets.items()
+    targets = {
+        **{symbol: long_weights[symbol] for symbol in sorted(long_weights)},
+        **{symbol: -short_weights[symbol] for symbol in sorted(short_weights)},
+    }
+    gross = math.fsum(abs(weight) for weight in targets.values())
+    net = math.fsum(targets.values())
+    if (
+        gross > config.gross_target + config.tolerance
+        or abs(net) > config.tolerance
+        or any(
+            symbol not in eligible or not math.isfinite(weight) or abs(weight) > config.symbol_cap
+            for symbol, weight in targets.items()
+        )
     ):
         return {}
     return targets
 
 
-class DirectionalAuctionAbsorption:
-    """Fresh deterministic instance of the exact DAA reference."""
+class FundingInventoryRelaxation:
+    """Fresh deterministic instance of the exact FIR no-control reference."""
 
     def __init__(self, config: _Config = _REFERENCE) -> None:
         self._config = config
@@ -401,7 +413,7 @@ class DirectionalAuctionAbsorption:
             or not isinstance(seed, int)
             or seed != self._config.canonical_seed
         ):
-            raise ValueError("team-02 DAA requires canonical runtime seed 20260801")
+            raise ValueError("team-02 FIR requires canonical runtime seed 20260801")
         decision_time = _utc_timestamp(getattr(context, "decision_time", None))
         decision_index = _decision_index(getattr(context, "decision_time", None))
         if decision_time is None or decision_index is None:
@@ -414,6 +426,7 @@ class DirectionalAuctionAbsorption:
             return {}
 
 
-def build_strategy() -> DirectionalAuctionAbsorption:
-    """Return a fresh DAA reference strategy for the official worker."""
-    return DirectionalAuctionAbsorption()
+def build_strategy() -> FundingInventoryRelaxation:
+    """Return a fresh FIR reference strategy for the official worker."""
+
+    return FundingInventoryRelaxation()

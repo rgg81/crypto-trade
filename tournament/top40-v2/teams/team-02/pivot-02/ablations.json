@@ -1,0 +1,30 @@
+{
+  "budget": {
+    "configurations_consumed_before_pivot": 3,
+    "cumulative_team_limit": 80,
+    "fir_maximum_additional": 29,
+    "remaining_before_pivot": 77
+  },
+  "causal_diagnostics": [
+    {"change": "level_weight=1, relaxation_weight=0", "deployable": false, "id": "fir-level-only", "question": "Does relaxation improve direct funding carry selection?"},
+    {"change": "level_weight=0, relaxation_weight=1", "deployable": false, "id": "fir-relaxation-only", "question": "Does funding level remain necessary for a positive carry spread?"},
+    {"change": "retain all valid volatility values", "deployable": false, "id": "fir-no-volatility-filter", "question": "Does the top-volatility exclusion reduce squeeze and tail loss?"},
+    {"change": "multiply relaxation rank by -1", "deployable": false, "id": "fir-relaxation-sign-flip", "question": "Does normalization beat funding moving farther from zero?"}
+  ],
+  "family_id": "team-02-funding-inventory-relaxation-v1",
+  "global_stop": "Stop before every diagnostic, parameter, neighbor, or risk observation if the exact reference violates its registered solvency, aggregate, cost, drawdown, fold, regime, sleeve, or funding-PnL falsifier.",
+  "reference": {
+    "candidate_id": "team-02-fir-reference-001",
+    "no_control_first": true,
+    "status": "implemented-not-registered-not-run"
+  },
+  "risk_factorial": {
+    "allowed_only_after_positive_no_control_core": true,
+    "arms": ["none", "volatility-target-only", "drawdown-brake-only", "combined"],
+    "cost_multipliers": [1.0, 2.0],
+    "disabled": ["position-stop", "time-stop", "turnover-limit", "side-scaling", "same-boundary-reentry"]
+  },
+  "schema_version": 1,
+  "selection_order": ["all non-compensatory gates", "positive folds", "worst regime Sharpe", "worst fold Sharpe", "doubled-cost Sharpe", "median fold Sharpe", "aggregate Sharpe", "Calmar", "lower drawdown", "lower turnover", "candidate_id"],
+  "team_id": "team-02"
+}

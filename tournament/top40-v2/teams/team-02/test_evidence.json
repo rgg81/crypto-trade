@@ -1,67 +1,46 @@
 {
-  "canonical_runtime_seed": 20260801,
-  "candidate_id": "team-02-daa-reference-001",
-  "clean_process_replays": [
-    {
-      "gross": 0.8,
-      "long_count": 7,
-      "net": 0.0,
-      "replay": 1,
-      "short_count": 7,
-      "source_sha256": "d1d031e717031455ef93decbc990f1f55e0703abee26dd885763a2ec4191ffd4",
-      "target_sha256": "8f3f92958586e57d96019abee2c65a36e88d5996bb428feb82fe0a689ea9ac89"
-    },
-    {
-      "gross": 0.8,
-      "long_count": 7,
-      "net": 0.0,
-      "replay": 2,
-      "short_count": 7,
-      "source_sha256": "d1d031e717031455ef93decbc990f1f55e0703abee26dd885763a2ec4191ffd4",
-      "target_sha256": "8f3f92958586e57d96019abee2c65a36e88d5996bb428feb82fe0a689ea9ac89"
-    }
+  "candidate_id": "team-02-fir-reference-001",
+  "commands_run": [
+    "uv run ruff check tournament/top40-v2/teams/team-02/strategy.py tournament/top40-v2/teams/team-02/test_strategy.py",
+    "uv run ruff format tournament/top40-v2/teams/team-02/strategy.py tournament/top40-v2/teams/team-02/test_strategy.py",
+    "PYTHONDONTWRITEBYTECODE=1 uv run pytest -q tournament/top40-v2/teams/team-02/test_strategy.py"
   ],
-  "coverage": [
-    "exact signed log-return path-efficiency formula",
-    "OHLC closing-location and taker-flow absorption-gap formula",
-    "three-bar half-life-two normalized smoothing",
-    "positive finite OHLC, range, quote-volume, and taker-share validation",
-    "future append, finite corruption, and truncation invariance",
-    "strict t-8h cutoff, exact anchor, and no non-grid substitution",
-    "point-in-time eligible membership and funding independence",
-    "exact average ranks and ASCII selection ties",
-    "quarter selection, minimum six names, equal allocation, capacity cash, and cap",
-    "both sleeves, gross, net, finite target, and minimum-universe behavior",
-    "duplicate, missing, non-finite, invalid OHLC, and invalid flow failure behavior",
-    "input-order, fresh-instance, and clean-process determinism",
-    "off-grid flat, non-rebalance hold, and canonical-seed enforcement",
-    "read-only DecisionContext behavior",
-    "frozen reference config and exact no-control risk-policy validation"
+  "coverage_written": [
+    "exact 21-day funding level and 3-versus-18-day relaxation",
+    "strict funding cutoff, freshness, event counts, duplicate and finite-rate validation",
+    "exact 30-day closed-price realized-volatility window",
+    "lowest-volatility four-fifths filter and minimum cross sections",
+    "exact average ranks and fixed 75/25 score",
+    "positive selected carry spread, two sleeves, equal budgets, cash capacity, cap, gross, and net",
+    "future append, corruption, and truncation invariance",
+    "point-in-time membership and input-order determinism",
+    "off-grid flat, non-rebalance hold, canonical seed, and context immutability",
+    "frozen reference config and disabled organizer risk policy"
   ],
-  "family_id": "team-02-directional-auction-absorption-v1",
-  "files": {
-    "frozen_config.json": "f5b2a316b74c43323a6d38cf674c05422f6161e150bb3d624095267baa224e5b",
-    "risk_policy.json": "0c90e21388df81f4a4a045c8d8a86ac61d178f14779987cc53883f5531556a52",
-    "strategy.py": "d1d031e717031455ef93decbc990f1f55e0703abee26dd885763a2ec4191ffd4",
-    "test_strategy.py": "549db52e818be4489e8600ada593621f003e108ed5f7765d4de67556ef470a5c"
+  "family_id": "team-02-funding-inventory-relaxation-v1",
+  "files_sha256": {
+    "frozen_config.json": "09ee6821b2f481dc32940abb56ed44d44d7b5ec8c246901a736b906f430c0241",
+    "risk_policy.json": "ff2a9a4100f038a4d511a3ccffd85b879ecbbb29eee76fb920aa14b770069503",
+    "strategy.py": "2d4b72ac53897bd0fae89491a2164591301ea362723ab0e21592819b0da07abd",
+    "test_strategy.py": "a4efaff80da45c79ec6c58e00b1713dc72d1d2563da24996d081e56d880a5c47"
   },
   "market_data_accessed": false,
   "material_trial_run": false,
-  "official_worker_smoke": {
-    "decision_count": 1,
-    "input": "synthetic-bars-only",
-    "long_count": 7,
-    "short_count": 7,
-    "status": "passed",
-    "target_sha256": "8f3f92958586e57d96019abee2c65a36e88d5996bb428feb82fe0a689ea9ac89"
-  },
-  "pytest": {
-    "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src .venv/bin/python -m pytest tournament/top40-v2/teams/team-02/test_strategy.py -q",
-    "passed": 19,
-    "status": "passed"
+  "risk_policy_validation": {
+    "enabled": false,
+    "policy_id": "team-02-fir-reference-no-control",
+    "valid": true
   },
   "schema_version": 1,
-  "source_spec_commit": "e563a80a",
-  "spec_ambiguities": [],
+  "status": "synthetic-tests-passed",
+  "test_results": {
+    "failed_per_run": 0,
+    "passed_per_run": 11,
+    "serial_durations_seconds": [
+      2.02,
+      1.97
+    ],
+    "suite_runs": 2
+  },
   "team_id": "team-02"
 }

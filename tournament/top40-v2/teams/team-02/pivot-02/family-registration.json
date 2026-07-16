@@ -1,0 +1,37 @@
+{
+  "economic_thesis": "Perpetual funding is a realized transfer between long and short inventory, not merely a price predictor. Cross-sectional dispersion in past funding therefore defines a direct causal carry spread: hold the lowest-funding contracts long and the highest-funding contracts short. A funding-rate relaxation term favors crowded inventory that has begun to normalize, while excluding the highest realized-volatility fifth and using modest equal side budgets limits squeeze exposure without changing the carry signal.",
+  "expected_regime_roles": {
+    "bear": "High positive-funding inventory should populate the short sleeve and receive carry while falling or de-risking; the short sleeve must contribute positively, while low-volatility low-funding longs limit loss.",
+    "bull": "Low or negative-funding contracts populate the long sleeve and participate in broad appreciation while receiving or minimizing carry paid; the long sleeve must contribute positively, while the volatility exclusion limits crowded short squeezes.",
+    "chop": "With equal side budgets and little common direction, the realized funding spread is the primary expected return and combined portfolio return must be positive.",
+    "long_sleeve": "Long the highest fixed blend of low funding level and upward funding relaxation among the lower-volatility four fifths; the sleeve remains materially active and must be positive in bull.",
+    "short_sleeve": "Short the lowest fixed blend, corresponding to high funding level and downward funding relaxation among the lower-volatility four fifths; the sleeve remains materially active and must be positive in bear.",
+    "stress": "Requested gross is 0.40, each symbol is capped at 0.03, and the highest-volatility fifth is excluded before ranking. These are frozen construction choices, not a claim of crisis alpha; solvency, tail, drawdown, and stress evidence remain hard empirical gates."
+  },
+  "falsifier": "Stop FIR if its exact no-control reference is insolvent or incomplete; has nonpositive annualized return, net Sharpe, or doubled-cost Sharpe; exceeds 0.30 drawdown; has fewer than four profitable folds; has nonpositive bull, bear, or chop return; fails long-bull or short-bear attribution; or has nonpositive aggregate realized funding PnL. Risk controls cannot rescue a failed reference. Any later champion must pass every frozen development, multiplicity, concentration, and neighborhood gate.",
+  "family_id": "team-02-funding-inventory-relaxation-v1",
+  "mechanism": "At each scheduled three-day rebalance use only funding rows strictly before the decision and exact closed 8h prices through t-8h. For every current constituent compute 21-day realized funding per day and the difference between recent three-day and prior eighteen-day funding per day. Exclude the highest-volatility fifth using a 30-day close-return window. Cross-sectionally rank funding level and relaxation; score equals -0.75 times level rank plus 0.25 times relaxation rank. Long the top quarter and short the bottom quarter at equal broad weights, 0.20 budget per side, 0.03 cap, and at most 0.40 gross.",
+  "parameter_ranges": {
+    "funding_window_days": [14, 21, 28],
+    "gross_target": [0.4],
+    "level_weight": [0.65, 0.75, 0.85],
+    "maximum_funding_staleness_hours": [16],
+    "minimum_cross_section": [24],
+    "minimum_prefilter_cross_section": [30],
+    "rebalance_bars": [6, 9, 12],
+    "recent_funding_days": [2, 3, 5],
+    "relaxation_weight": [0.15, 0.25, 0.35],
+    "selected_fraction_per_side": [0.2, 0.25, 0.3],
+    "side_budget": [0.2],
+    "symbol_cap": [0.03],
+    "volatility_keep_fraction": [0.7, 0.8, 0.9],
+    "volatility_lookback_days": [20, 30, 45],
+    "weight_constraint": ["level_weight + relaxation_weight = 1"]
+  },
+  "parent_family_id": "team-02-directional-auction-absorption-v1",
+  "registered_at_utc": "2026-07-16T10:01:37Z",
+  "risk_policy_plan": "Begin with the exact disabled no-control reference. Only if it clears the reference falsifier may a 30-day 25 percent volatility target and preregistered 10/20/27.5 percent drawdown brake be evaluated as none, each individual, and combined at base and doubled costs. Position/time stops, turnover limits, side scaling, and same-boundary reentry remain disabled. Controls cannot create eligibility for a failed carry core.",
+  "schema_version": 1,
+  "selection_metric": "Require all non-compensatory gates and positive aggregate funding PnL first; then lexicographically maximize positive-fold count, worst-regime Sharpe, worst-fold Sharpe, doubled-cost Sharpe, median-fold Sharpe, aggregate Sharpe, and Calmar; then minimize drawdown and turnover, with bytewise candidate_id last. Require at least seven of nine profitable declared neighbors and neighbor median Sharpe at least 0.50.",
+  "team_id": "team-02"
+}

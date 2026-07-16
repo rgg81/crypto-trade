@@ -1,0 +1,63 @@
+{
+  "causality_tests": [
+    {"failure_condition": "Any target at or before the prefix boundary changes.", "name": "future_truncation", "procedure": "Remove all later bar and funding rows and compare exact prefix targets."},
+    {"failure_condition": "Any prefix target changes.", "name": "future_corruption", "procedure": "Append extreme non-finite funding and price rows at or after the decision; causal outputs must remain exact."},
+    {"failure_condition": "Input order changes ranks, sleeves, or bytes.", "name": "deterministic_rerun", "procedure": "Reverse symbol, bar, and funding row order and compare exact targets using seed 20260801."},
+    {"failure_condition": "An ineligible symbol, stale funding event, duplicate event/bar, or non-grid substitute enters a feature.", "name": "availability_membership", "procedure": "Inject each violation and require exclusion or a fail-closed flat request."}
+  ],
+  "decision_contract": {
+    "bar_cutoff": "decision_time minus 8h",
+    "funding_cutoff": "strictly before decision_time",
+    "insufficient_or_off_grid": "empty mapping requests flat",
+    "non_rebalance": "None holds",
+    "rebalance_rule": "integer 8h epoch index modulo 9 equals zero",
+    "runtime_seed": 20260801
+  },
+  "derived_features": [
+    {
+      "availability": "unique funding events in [t-21d,t), with >=18 prior, >=3 recent, and newest age <=16h",
+      "formula": "L=fsum(all rates)/21; P=fsum(prior rates)/18; R=fsum(recent rates)/3; D=R-P",
+      "id": "funding_level_and_relaxation",
+      "inputs": ["realized_funding"],
+      "missing_rule": "no fill; invalid, duplicate, stale, insufficient, or abs(rate)>0.05 excludes the symbol"
+    },
+    {
+      "availability": "90 exact 8h returns from 91 closed bars through t-8h",
+      "formula": "sqrt(fsum((log_return-mean)^2)/90)",
+      "id": "realized_volatility_filter",
+      "inputs": ["transaction_closes"],
+      "missing_rule": "every expected positive close is required; no imputation or older anchor"
+    },
+    {
+      "availability": "current symbols with both valid features; >=30 before and >=24 after filter",
+      "formula": "retain lowest floor(4N/5) vol; S=-0.75*average_rank_map(L)+0.25*average_rank_map(D)",
+      "id": "funding_inventory_relaxation_score",
+      "inputs": ["funding_level_and_relaxation", "realized_volatility_filter", "point_in_time_eligibility"],
+      "missing_rule": "flat if cross-section, rank, or carry-spread requirements fail"
+    },
+    {
+      "availability": "finite retained scores at scheduled decision",
+      "formula": "K=max(6,floor(N/4)); top K long, bottom K short; equal B_eff=min(0.20,K*0.03)",
+      "id": "target_weights",
+      "inputs": ["funding_inventory_relaxation_score"],
+      "missing_rule": "flat if either sleeve, positive carry spread, cap, gross, or net invariant fails"
+    }
+  ],
+  "family_id": "team-02-funding-inventory-relaxation-v1",
+  "forbidden_inputs": [
+    "price return, trend, reversal, path efficiency, residual, or beta as a score",
+    "OHLC shape, quote volume, taker flow, or auction absorption",
+    "common market, organizer regime label, or direction tilt",
+    "future or unsettled funding",
+    "execution open, mark price as a feature, fills, position, equity, costs, drawdown, or PnL",
+    "private/final observations, other teams, V1 results, ballots, or leaderboards"
+  ],
+  "raw_inputs": [
+    {"availability_timestamp": "funding_time strictly before decision", "coverage": "organizer-streamed realized funding for current eligible symbols", "event_timestamp": "funding_time", "fields": ["funding_time", "symbol", "funding_rate"], "id": "realized_funding", "lag": "strictly past", "missing_rule": "no fill or synthetic schedule"},
+    {"availability_timestamp": "close_time<=decision_time-8h", "coverage": "organizer-streamed 8h transaction bars", "event_timestamp": "close_time", "fields": ["open_time", "close_time", "close"], "id": "transaction_closes", "lag": "one complete 8h bar", "missing_rule": "exact contiguous window only"},
+    {"availability_timestamp": "decision time after causal weekly reconstitution", "coverage": "current point-in-time Top-40 intersected with executable symbols", "event_timestamp": "reconstitution_time", "fields": ["eligible_symbols"], "id": "point_in_time_eligibility", "lag": "available at decision", "missing_rule": "never synthesize membership"}
+  ],
+  "reference_candidate_id": "team-02-fir-reference-001",
+  "schema_version": 1,
+  "team_id": "team-02"
+}

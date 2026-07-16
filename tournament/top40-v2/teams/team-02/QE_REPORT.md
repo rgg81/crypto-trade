@@ -1,58 +1,39 @@
-# team-02 Directional Auction Absorption engineering report
+# Team 02 FIR engineering report
 
-## Outcome
+## Implemented reference
 
-Exact reference candidate `team-02-daa-reference-001` is implemented for active family
-`team-02-directional-auction-absorption-v1`. Commit `e563a80a` and the frozen files under
-`pivot-01/` were treated as authoritative and were not edited. No specification ambiguity remains.
+`team-02-fir-reference-001` implements the exact no-control reference for proposed final-pivot
+family `team-02-funding-inventory-relaxation-v1`. It has not been registered, run, or measured.
 
-The strategy applies the mandatory `t-8h` feature cutoff and exact 8-hour grid. It computes the
-complete 36-return signed path-efficiency statistic and the complete three-bar, half-life-two
-auction-absorption statistic from validated OHLC, quote volume, and taker-buy quote volume. It
-independently average-ranks both features, blends them at fixed `0.60/0.40`, and resolves final set
-ties by ASCII symbol.
+The strategy uses only realized funding strictly before each decision, exact closed 8-hour prices
+through `t-8h` for a risk filter, and current organizer eligibility. It computes 21-day funding per
+day and recent-three-day versus prior-eighteen-day relaxation, excludes the highest-volatility
+fifth, and applies the fixed score `-0.75*rank(level)+0.25*rank(relaxation)`. Price returns never
+enter the score.
 
-The portfolio requires 24 scoreable names, selects `K=max(6,floor(N/4))` on both sides, requests
-equal `0.40/0.40` budgets, leaves cap-constrained capacity in cash, and uses equal name magnitudes
-under the 6% cap. There is no common-market factor, beta, residual, funding feature, market state,
-directional side tilt, inverse-volatility weighting, fill logic, or risk-state logic.
+At every fixed three-day rebalance it requires 30 features before and 24 after filtering, selects
+the top/bottom quarter with at least six names per side, and requests equal 0.20 side budgets under
+a 0.03 name cap. Gross is at most 0.40; capacity that cannot be allocated remains cash. It refuses
+a portfolio whose selected short funding level does not exceed selected long funding level.
 
-`build_strategy()` returns a fresh object and accepts only canonical runtime seed `20260801`.
-Off-grid or insufficient scheduled inputs request flat `{}`; valid non-rebalance boundaries return
-`None` to hold. `risk_policy.json` is the exact disabled no-control policy identified as
-`team-02-daa-reference-no-control`.
+`risk_policy.json` is fully disabled and identified as `team-02-fir-reference-no-control`. The
+lower gross, cap, breadth, volatility exclusion, and schedule are preregistered construction—not an
+organizer risk overlay or a post-result rescue.
 
-## Verification
+## Verification status
 
-The synthetic suite passes `19/19` cases under the official `.venv`. Coverage includes causal
-append/corrupt/truncate invariance, exact timing, closed-bar availability, feature formulas,
-field validation, smoothing, ranks, numeric and membership ties, selection, capacity cash, equal
-allocation, cap/gross/net invariants, invalid and duplicate rows, membership, seed enforcement,
-context immutability, and clean-process determinism.
+The organizer ran the synthetic suite twice, serially, after formatting: **11 passed in 2.02
+seconds**, then **11 passed in 1.97 seconds**. Ruff check also passes. The suite covers exact funding
+windows and calendar-day normalization, relaxation sign, price-risk window, rank ties, volatility
+filtering, sleeve carry ordering, future append/corrupt/truncate invariance,
+stale/duplicate/invalid funding, missing/duplicate/corrupt prices, membership, input order,
+allocation, clock, seed, context immutability, frozen config, and no-control policy.
 
-An isolated official V2 worker smoke also passed using only synthetic transaction bars, empty
-funding, synthetic point-in-time membership, and one scheduled decision. Its target bytes exactly
-matched the direct clean-process target.
-
-- strategy SHA-256:
-  `d1d031e717031455ef93decbc990f1f55e0703abee26dd885763a2ec4191ffd4`
-- frozen config SHA-256:
-  `f5b2a316b74c43323a6d38cf674c05422f6161e150bb3d624095267baa224e5b`
-- no-control risk policy SHA-256:
-  `0c90e21388df81f4a4a045c8d8a86ac61d178f14779987cc53883f5531556a52`
-- synthetic target SHA-256:
-  `8f3f92958586e57d96019abee2c65a36e88d5996bb428feb82fe0a689ea9ac89`
-- synthetic target: seven longs, seven shorts, gross `0.8`, net `0.0`
-
-Ruff lint/format, JSON parsing, neutral risk-policy parsing, source-tree validation, and diff checks
-pass. Detailed test coverage and file hashes are recorded in `test_evidence.json`.
+Exact commands, timings, and final team-file hashes are recorded in `test_evidence.json`. No
+performance claim is made by implementation or synthetic tests.
 
 ## Scope
 
-Changed executable/test artifacts are `strategy.py`, `frozen_config.json`, `risk_policy.json`,
-`test_strategy.py`, `test_evidence.json`, and this report. Reviews, ledgers, experiment history,
-family records, top-level research artifacts, and every `pivot-01/` file were preserved.
-
-No market snapshot, development result, private/final data, evaluator, trial registration,
-lifecycle mutation, another team, or external research artifact was accessed. No performance claim
-is made and the candidate has not been run or registered by QE.
+Only Team 02-local source, documentation, JSON, and tests were changed. Existing organizer-owned
+family/experiment ledgers, reports, shared state, public infrastructure, and every prohibited data
+domain were left untouched. No tournament evaluator or backtest has run for this candidate.
