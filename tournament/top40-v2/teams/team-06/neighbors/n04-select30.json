@@ -1,0 +1,15 @@
+{
+  "activation": "only-after-base-core-pass",
+  "base_candidate_id": "t06-balanced-trend-reversal-v1-base",
+  "candidate_id": "t06-balanced-trend-reversal-v1-n04-select30",
+  "changed_parameter": "selection_fraction",
+  "entrypoint": "neighbors/n04_select30_strategy.py:build_strategy",
+  "family_id": "t06-balanced-trend-reversal-v1",
+  "neighbor_id": "n04-select30",
+  "parameters": {
+    "selection_fraction": 0.3,
+    "slow_lookback_bars": 90
+  },
+  "schema_version": 1,
+  "team_id": "team-06"
+}

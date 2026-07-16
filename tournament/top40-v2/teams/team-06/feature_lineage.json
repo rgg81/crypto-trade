@@ -1,0 +1,129 @@
+{
+  "candidate_id": "t06-balanced-trend-reversal-v1-base",
+  "features": [
+    {
+      "availability": "decision boundary supplied by organizer",
+      "event_timestamp": "DecisionContext.decision_time",
+      "feature_id": "decision_clock",
+      "lag": "none",
+      "missing_rule": "invalid timestamp is a hard strategy error",
+      "raw_fields": [
+        "DecisionContext.decision_time"
+      ],
+      "source": "neutral tournament protocol",
+      "use": "rebalance only at 00:00 UTC; non-rebalance boundaries return None"
+    },
+    {
+      "availability": "organizer point-in-time membership intersected with executable next-open availability",
+      "event_timestamp": "current decision boundary",
+      "feature_id": "eligible_universe",
+      "lag": "membership state supplied at boundary",
+      "missing_rule": "symbols absent from eligible_symbols are never scored or targeted",
+      "raw_fields": [
+        "DecisionContext.eligible_symbols"
+      ],
+      "source": "neutral tournament protocol",
+      "use": "preconstruction candidate set only"
+    },
+    {
+      "availability": "only rows with close timestamp <= decision_time; most recent close must be no more than 16 hours old",
+      "event_timestamp": "bar close_time or normalized datetime index",
+      "feature_id": "lagged_slow_return",
+      "lag": "3 bars between decision-side latest close and momentum endpoint",
+      "missing_rule": "exclude symbol if fewer than 94 valid positive closes, any nonfinite/nonpositive retained close, or stale close",
+      "raw_fields": [
+        "bars.close",
+        "bars.close_time"
+      ],
+      "source": "organizer-supplied past-closed 8h bars",
+      "transform": "log(close[t-3]/close[t-93]) / max(20% annualized volatility, trailing 60-bar annualized volatility)"
+    },
+    {
+      "availability": "same past-closed rule as lagged_slow_return",
+      "event_timestamp": "bar close_time or normalized datetime index",
+      "feature_id": "lagged_fast_return",
+      "lag": "3 bars between decision-side latest close and momentum endpoint",
+      "missing_rule": "same exclusion rule as lagged_slow_return",
+      "raw_fields": [
+        "bars.close",
+        "bars.close_time"
+      ],
+      "source": "organizer-supplied past-closed 8h bars",
+      "transform": "log(close[t-3]/close[t-24]) / max(20% annualized volatility, trailing 60-bar annualized volatility)"
+    },
+    {
+      "availability": "same past-closed rule as lagged_slow_return",
+      "event_timestamp": "bar close_time or normalized datetime index",
+      "feature_id": "short_reversal",
+      "lag": "current decision-side close is closed and available; no forward value",
+      "missing_rule": "same exclusion rule as lagged_slow_return",
+      "raw_fields": [
+        "bars.close",
+        "bars.close_time"
+      ],
+      "source": "organizer-supplied past-closed 8h bars",
+      "transform": "-log(close[t]/close[t-6]) / max(20% annualized volatility, trailing 60-bar annualized volatility)"
+    },
+    {
+      "availability": "same past-closed rule as lagged_slow_return",
+      "event_timestamp": "bar close_time or normalized datetime index",
+      "feature_id": "realized_volatility",
+      "lag": "60 past 8h close-to-close returns ending at decision-side close",
+      "missing_rule": "exclude symbol when fewer than 61 closes or result is nonfinite",
+      "raw_fields": [
+        "bars.close",
+        "bars.close_time"
+      ],
+      "source": "organizer-supplied past-closed 8h bars",
+      "transform": "sample standard deviation of 60 log returns * sqrt(1095)"
+    },
+    {
+      "availability": "computed from valid eligible symbols at the decision boundary",
+      "event_timestamp": "decision boundary",
+      "feature_id": "cross_sectional_centered_ranks",
+      "lag": "inherits each input feature lag",
+      "missing_rule": "average exact ties; return flat when fewer than 12 valid symbols",
+      "raw_fields": [
+        "lagged_slow_return",
+        "lagged_fast_return",
+        "short_reversal",
+        "realized_volatility"
+      ],
+      "source": "fixed deterministic transform",
+      "transform": "stable symbol-keyed average-tie ranks mapped to [-1,1]; no learned scaler or winsorizer"
+    },
+    {
+      "availability": "computed before selection from all valid eligible symbols",
+      "event_timestamp": "decision boundary",
+      "feature_id": "preconstruction_score",
+      "lag": "inherits ranked inputs",
+      "missing_rule": "nonfinite score is a hard strategy error",
+      "raw_fields": [
+        "cross_sectional_centered_ranks"
+      ],
+      "source": "fixed deterministic transform",
+      "transform": "continuous market-direction mix of 65/35 slow/fast trend and reversal, less 0.10 volatility rank"
+    }
+  ],
+  "forbidden_inputs": [
+    "future bars",
+    "next-open price",
+    "fills",
+    "funding values",
+    "positions",
+    "equity or drawdown",
+    "fees or slippage",
+    "private qualifier data",
+    "final OOS data",
+    "full-window learned transforms",
+    "timestamp-to-target tables"
+  ],
+  "labels": {
+    "embargo_bars": 0,
+    "forward_label_used": false,
+    "purge_bars": 0,
+    "reason": "family is a fixed rule with no supervised target, fitting, feature selection, or learned preprocessing"
+  },
+  "schema_version": 1,
+  "team_id": "team-06"
+}

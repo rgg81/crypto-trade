@@ -1,0 +1,47 @@
+{
+  "budget_ceiling": {
+    "maximum_material_configurations": 9,
+    "mechanism_pivots_consumed": 0,
+    "private_tickets_consumed": 0
+  },
+  "family_id": "t06-balanced-trend-reversal-v1",
+  "read_discipline": "within each activated batch, register every trial before running any; read results only after the full batch is terminal",
+  "schema_version": 1,
+  "stages": [
+    {
+      "activation": "initial",
+      "candidate_ids": [
+        "t06-balanced-trend-reversal-v1-base"
+      ],
+      "material_configurations": 1,
+      "required_outcome": "all base-core hard gates pass",
+      "stage_id": "base"
+    },
+    {
+      "activation": "only after base-core pass",
+      "candidate_ids": [
+        "t06-balanced-trend-reversal-v1-n01-slow84",
+        "t06-balanced-trend-reversal-v1-n02-slow96",
+        "t06-balanced-trend-reversal-v1-n03-select20",
+        "t06-balanced-trend-reversal-v1-n04-select30"
+      ],
+      "material_configurations": 4,
+      "required_outcome": "at least 3/4 profitable and median Sharpe >= 0.50; base remains candidate",
+      "stage_id": "neighborhood"
+    },
+    {
+      "activation": "only after neighborhood pass",
+      "candidate_ids": [
+        "t06-balanced-trend-reversal-v1-ablation-no-control",
+        "t06-balanced-trend-reversal-v1-ablation-volatility-only",
+        "t06-balanced-trend-reversal-v1-ablation-drawdown-only",
+        "t06-balanced-trend-reversal-v1-ablation-turnover-only"
+      ],
+      "material_configurations": 4,
+      "required_outcome": "risk falsifier in ablations.json does not trigger; no policy switching",
+      "stage_id": "risk-ablations"
+    }
+  ],
+  "team_id": "team-06",
+  "terminal_rule": "any failed noncompensatory gate rejects the base; record negative result, then documented pivot-or-DNF decision"
+}

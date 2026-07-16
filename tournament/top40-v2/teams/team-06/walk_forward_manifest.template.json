@@ -1,0 +1,57 @@
+{
+  "candidate_id": "t06-balanced-trend-reversal-v1-base",
+  "evidence_class": "declared-retrained-out-of-fold",
+  "folds": [
+    {
+      "fold_id": "fold-1",
+      "model_artifact_path": "folds/fold-1-model.json",
+      "model_artifact_sha256": "<organizer-fill-64-hex-sha256>",
+      "test_end_inclusive": "2020-08-31",
+      "test_start": "2020-02-03",
+      "training_end_inclusive": "2020-02-02"
+    },
+    {
+      "fold_id": "fold-2",
+      "model_artifact_path": "folds/fold-2-model.json",
+      "model_artifact_sha256": "<organizer-fill-64-hex-sha256>",
+      "test_end_inclusive": "2021-03-31",
+      "test_start": "2020-09-01",
+      "training_end_inclusive": "2020-08-31"
+    },
+    {
+      "fold_id": "fold-3",
+      "model_artifact_path": "folds/fold-3-model.json",
+      "model_artifact_sha256": "<organizer-fill-64-hex-sha256>",
+      "test_end_inclusive": "2021-10-31",
+      "test_start": "2021-04-01",
+      "training_end_inclusive": "2021-03-31"
+    },
+    {
+      "fold_id": "fold-4",
+      "model_artifact_path": "folds/fold-4-model.json",
+      "model_artifact_sha256": "<organizer-fill-64-hex-sha256>",
+      "test_end_inclusive": "2022-05-31",
+      "test_start": "2021-11-01",
+      "training_end_inclusive": "2021-10-31"
+    },
+    {
+      "fold_id": "fold-5",
+      "model_artifact_path": "folds/fold-5-model.json",
+      "model_artifact_sha256": "<organizer-fill-64-hex-sha256>",
+      "test_end_inclusive": "2022-12-31",
+      "test_start": "2022-06-01",
+      "training_end_inclusive": "2022-05-31"
+    },
+    {
+      "fold_id": "fold-6",
+      "model_artifact_path": "folds/fold-6-model.json",
+      "model_artifact_sha256": "<organizer-fill-64-hex-sha256>",
+      "test_end_inclusive": "2023-06-30",
+      "test_start": "2023-01-01",
+      "training_end_inclusive": "2022-12-31"
+    }
+  ],
+  "schema_version": 1,
+  "stitched_daily_returns_sha256": "<organizer-fill-after-development-run-64-hex-sha256>",
+  "team_id": "team-06"
+}

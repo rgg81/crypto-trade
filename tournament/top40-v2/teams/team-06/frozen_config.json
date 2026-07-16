@@ -1,0 +1,55 @@
+{
+  "candidate_id": "t06-balanced-trend-reversal-v1-base",
+  "data_contract": {
+    "bar_interval": "8h",
+    "close_availability": "close_time_lte_decision_time",
+    "funding_used_by_strategy": false,
+    "membership": "context.eligible_symbols_at_decision",
+    "maximum_staleness_hours": 16,
+    "minimum_valid_symbols": 12,
+    "runtime_artifacts": "none"
+  },
+  "family_id": "t06-balanced-trend-reversal-v1",
+  "parameters": {
+    "annualization_bars": 1095,
+    "base_gross_exposure": 0.48,
+    "chop_trend_mix": 0.35,
+    "direction_full_scale_return": 0.15,
+    "directional_trend_mix": 0.8,
+    "fast_lookback_bars": 21,
+    "fast_trend_weight": 0.35,
+    "maximum_abs_net_exposure": 0.04,
+    "maximum_symbol_exposure": 0.07,
+    "minimum_positions_per_side": 4,
+    "momentum_lag_bars": 3,
+    "rebalance_hour_utc": 0,
+    "reversal_lookback_bars": 6,
+    "selection_fraction": 0.25,
+    "slow_lookback_bars": 90,
+    "slow_trend_weight": 0.65,
+    "volatility_floor": 0.2,
+    "volatility_lookback_bars": 60,
+    "volatility_score_penalty": 0.1
+  },
+  "portfolio_construction": {
+    "long_selection": "highest_preconstruction_scores",
+    "net_tilt": "clip(cross_sectional_median_slow_return/0.15,-1,1)*0.04",
+    "short_selection": "lowest_preconstruction_scores",
+    "side_count": "min(floor(n/2),max(4,floor(0.25*n)))",
+    "sizing": "equal_weight_per_side_subject_to_0.07_symbol_cap"
+  },
+  "preconstruction_boundary": {
+    "hook_behavior": "optional_observer_must_return_byte-for-value-identical_score_mapping",
+    "public_methods": [
+      "preconstruction_snapshot",
+      "preconstruction_scores"
+    ],
+    "selection_or_sizing_before_boundary": false,
+    "shared_hook_import": null
+  },
+  "risk_policy_path": "risk_policy.json",
+  "schema_version": 1,
+  "seed": 20260801,
+  "selection_rule": "base-only-if-every-noncompensatory-development-gate-and-declared-neighborhood-gate-passes",
+  "strategy_entrypoint": "strategy.py:build_strategy"
+}

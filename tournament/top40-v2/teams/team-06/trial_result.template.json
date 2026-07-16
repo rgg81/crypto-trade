@@ -1,0 +1,17 @@
+{
+  "artifact_hashes": {
+    "development_evidence": "<organizer-fill-64-hex-sha256>",
+    "stitched_daily_returns": "<organizer-fill-64-hex-sha256>",
+    "walk_forward_manifest": "<organizer-fill-64-hex-sha256>"
+  },
+  "candidate_id": "t06-balanced-trend-reversal-v1-base",
+  "cpu_hours": "<organizer-fill-nonnegative-hours>",
+  "failure_reason": "<organizer-fill-null-or-reason>",
+  "family_id": "t06-balanced-trend-reversal-v1",
+  "metrics_summary": {},
+  "registration_sha256": "<organizer-fill-registration-record-64-hex-sha256>",
+  "status": "<organizer-fill-completed-failed-or-interrupted>",
+  "team_id": "team-06",
+  "timestamp_utc": "<organizer-assigned-result-timestamp-Z>",
+  "wall_clock_hours": "<organizer-fill-nonnegative-hours>"
+}

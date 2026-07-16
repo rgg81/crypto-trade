@@ -1,0 +1,15 @@
+{
+  "activation": "only-after-base-core-pass",
+  "base_candidate_id": "t06-balanced-trend-reversal-v1-base",
+  "candidate_id": "t06-balanced-trend-reversal-v1-n01-slow84",
+  "changed_parameter": "slow_lookback_bars",
+  "entrypoint": "neighbors/n01_slow84_strategy.py:build_strategy",
+  "family_id": "t06-balanced-trend-reversal-v1",
+  "neighbor_id": "n01-slow84",
+  "parameters": {
+    "selection_fraction": 0.25,
+    "slow_lookback_bars": 84
+  },
+  "schema_version": 1,
+  "team_id": "team-06"
+}

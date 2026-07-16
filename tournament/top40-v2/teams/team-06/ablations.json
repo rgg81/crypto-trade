@@ -1,0 +1,90 @@
+{
+  "activation": {
+    "condition": "base-core and parameter-neighborhood stability gates both pass",
+    "purpose": "mechanism and risk attribution only; never select a different final policy",
+    "status": "dormant"
+  },
+  "candidate_id": "t06-balanced-trend-reversal-v1-base",
+  "cost_views_per_policy": [
+    {
+      "cost_multiplier": 1.0,
+      "view_id": "base-cost"
+    },
+    {
+      "cost_multiplier": 2.0,
+      "view_id": "doubled-cost"
+    }
+  ],
+  "family_id": "t06-balanced-trend-reversal-v1",
+  "policy_variants": [
+    {
+      "controls_enabled": [],
+      "material_configuration": true,
+      "policy_path": "risk_policies/no-control.json",
+      "role": "uncontrolled signal baseline",
+      "variant_id": "no-control"
+    },
+    {
+      "controls_enabled": [
+        "volatility_target"
+      ],
+      "material_configuration": true,
+      "policy_path": "risk_policies/volatility-only.json",
+      "role": "attribute volatility and tail scaling",
+      "variant_id": "volatility-only"
+    },
+    {
+      "controls_enabled": [
+        "drawdown_brakes"
+      ],
+      "material_configuration": true,
+      "policy_path": "risk_policies/drawdown-only.json",
+      "role": "attribute peak-to-trough containment",
+      "variant_id": "drawdown-only"
+    },
+    {
+      "controls_enabled": [
+        "turnover_limit"
+      ],
+      "material_configuration": true,
+      "policy_path": "risk_policies/turnover-only.json",
+      "role": "attribute churn and cost containment",
+      "variant_id": "turnover-only"
+    },
+    {
+      "controls_enabled": [
+        "volatility_target",
+        "drawdown_brakes",
+        "turnover_limit"
+      ],
+      "material_configuration": false,
+      "note": "already consumed by the base candidate trial",
+      "policy_path": "risk_policy.json",
+      "role": "frozen combined policy and only qualification candidate",
+      "variant_id": "combined"
+    }
+  ],
+  "predeclared_readout": [
+    "net_return",
+    "net_sharpe",
+    "max_drawdown",
+    "tail_loss",
+    "turnover",
+    "bull_return_and_sharpe",
+    "bear_return_and_sharpe",
+    "chop_return_and_sharpe",
+    "stress_return_and_sharpe",
+    "long_bull_return",
+    "short_bear_return",
+    "combined_chop_return",
+    "volatility_scale_time",
+    "drawdown_brake_count",
+    "requested_risk_notional",
+    "filled_risk_notional",
+    "capacity_limited_risk_notional",
+    "same_boundary_reentry_prevented_count"
+  ],
+  "risk_falsifier": "combined policy must preserve all hard qualification gates and improve at least one stated volatility, drawdown, tail-loss, or turnover failure mode without worsening maximum drawdown versus no-control",
+  "schema_version": 1,
+  "team_id": "team-06"
+}

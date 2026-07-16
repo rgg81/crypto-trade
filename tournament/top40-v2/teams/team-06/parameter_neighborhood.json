@@ -1,0 +1,61 @@
+{
+  "activation": {
+    "condition": "base candidate passes every development hard gate except the not-yet-measurable neighbor fraction and neighbor median Sharpe gates",
+    "registration_rule": "register all four neighbor trials before reading any neighbor result",
+    "status": "dormant-until-base-core-pass"
+  },
+  "base_candidate_id": "t06-balanced-trend-reversal-v1-base",
+  "base_parameters": {
+    "selection_fraction": 0.25,
+    "slow_lookback_bars": 90
+  },
+  "family_id": "t06-balanced-trend-reversal-v1",
+  "neighbors": [
+    {
+      "base_value": 90,
+      "candidate_id": "t06-balanced-trend-reversal-v1-n01-slow84",
+      "changed_parameter": "slow_lookback_bars",
+      "neighbor_id": "n01-slow84",
+      "neighbor_value": 84,
+      "other_parameters": "identical-to-base",
+      "status": "dormant"
+    },
+    {
+      "base_value": 90,
+      "candidate_id": "t06-balanced-trend-reversal-v1-n02-slow96",
+      "changed_parameter": "slow_lookback_bars",
+      "neighbor_id": "n02-slow96",
+      "neighbor_value": 96,
+      "other_parameters": "identical-to-base",
+      "status": "dormant"
+    },
+    {
+      "base_value": 0.25,
+      "candidate_id": "t06-balanced-trend-reversal-v1-n03-select20",
+      "changed_parameter": "selection_fraction",
+      "neighbor_id": "n03-select20",
+      "neighbor_value": 0.2,
+      "other_parameters": "identical-to-base",
+      "status": "dormant"
+    },
+    {
+      "base_value": 0.25,
+      "candidate_id": "t06-balanced-trend-reversal-v1-n04-select30",
+      "changed_parameter": "selection_fraction",
+      "neighbor_id": "n04-select30",
+      "neighbor_value": 0.3,
+      "other_parameters": "identical-to-base",
+      "status": "dormant"
+    }
+  ],
+  "no_hindsight_rule": "neighbors validate the base plateau and can never replace the base candidate",
+  "schema_version": 1,
+  "stability_gate": {
+    "maximum_positive_pnl_concentration": 0.4,
+    "minimum_neighbor_median_sharpe": 0.5,
+    "minimum_profitable_neighbor_count": 3,
+    "minimum_profitable_neighbor_fraction": 0.7,
+    "planned_neighbor_count": 4
+  },
+  "team_id": "team-06"
+}

@@ -1,0 +1,21 @@
+{
+  "candidate_id": "t06-balanced-trend-reversal-v1-base",
+  "config_sha256": "<organizer-fill-frozen-config-64-hex-sha256>",
+  "falsifier": "Any failed hard development gate rejects the base and leaves all neighbors dormant; no compensating metric or neighbor may replace it.",
+  "family_id": "t06-balanced-trend-reversal-v1",
+  "parameters": {
+    "base_gross_exposure": 0.48,
+    "candidate_role": "base-only",
+    "maximum_abs_net_exposure": 0.04,
+    "risk_policy": "combined-fixed",
+    "selection_fraction": 0.25,
+    "slow_lookback_bars": 90
+  },
+  "risk_config_sha256": "<organizer-fill-risk-policy-64-hex-sha256>",
+  "seed": 20260801,
+  "source_bundle_sha256": "<organizer-fill-source-bundle-64-hex-sha256>",
+  "strategy_sha256": "<organizer-fill-strategy-64-hex-sha256>",
+  "team_id": "team-06",
+  "thesis": "The fixed balanced trend/reversal rule should clear every aggregate, fold, regime, sleeve, role, doubled-cost, and concentration gate with conservative exposure.",
+  "timestamp_utc": "<organizer-assigned-registration-timestamp-Z>"
+}

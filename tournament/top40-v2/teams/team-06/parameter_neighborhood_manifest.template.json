@@ -1,0 +1,35 @@
+{
+  "candidate_id": "t06-balanced-trend-reversal-v1-base",
+  "neighbors": [
+    {
+      "daily_returns_path": "organizer-artifacts/n01-slow84/daily_returns.json",
+      "daily_returns_sha256": "<organizer-fill-64-hex-sha256>",
+      "neighbor_id": "n01-slow84",
+      "parameter_artifact_path": "neighbors/n01-slow84.json",
+      "parameter_artifact_sha256": "<organizer-fill-64-hex-sha256>"
+    },
+    {
+      "daily_returns_path": "organizer-artifacts/n02-slow96/daily_returns.json",
+      "daily_returns_sha256": "<organizer-fill-64-hex-sha256>",
+      "neighbor_id": "n02-slow96",
+      "parameter_artifact_path": "neighbors/n02-slow96.json",
+      "parameter_artifact_sha256": "<organizer-fill-64-hex-sha256>"
+    },
+    {
+      "daily_returns_path": "organizer-artifacts/n03-select20/daily_returns.json",
+      "daily_returns_sha256": "<organizer-fill-64-hex-sha256>",
+      "neighbor_id": "n03-select20",
+      "parameter_artifact_path": "neighbors/n03-select20.json",
+      "parameter_artifact_sha256": "<organizer-fill-64-hex-sha256>"
+    },
+    {
+      "daily_returns_path": "organizer-artifacts/n04-select30/daily_returns.json",
+      "daily_returns_sha256": "<organizer-fill-64-hex-sha256>",
+      "neighbor_id": "n04-select30",
+      "parameter_artifact_path": "neighbors/n04-select30.json",
+      "parameter_artifact_sha256": "<organizer-fill-64-hex-sha256>"
+    }
+  ],
+  "schema_version": 1,
+  "team_id": "team-06"
+}
