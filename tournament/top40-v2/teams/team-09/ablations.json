@@ -1,4 +1,5 @@
 {
+  "activation_rule": "The no-control center is the first material run. Mechanism ablations may be registered only after that result is read; every risk overlay remains blocked unless all broad positive no-control core-alpha activation minima pass.",
   "mechanism_ablations": [
     {
       "ablation_id": "team09-ablation-funding-only",
@@ -37,7 +38,7 @@
       "material_configuration": true
     }
   ],
-  "registration_rule": "Register every ablation before any result is read. Source-level ablations require their own complete executable-source bundle and hash. Six mechanism ablations consume six material configurations.",
+  "registration_rule": "Register every ablation before any result is read. The zero-argument builder exposes only center defaults; each source-level ablation requires its own complete hash-bound executable strategy/config bundle that exposes the declared change. This JSON alone does not alter runtime behavior. Six mechanism ablations consume six material configurations.",
   "schema_version": 1,
   "status": "prospective-no-results",
   "team_id": "team-09"

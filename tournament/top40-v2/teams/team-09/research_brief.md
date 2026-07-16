@@ -64,21 +64,31 @@ A failed center leads to a documented ablation decision or a genuine mechanism p
 common cumulative budget. A negative or otherwise unqualified IS result is never frozen as a
 submission. If no family passes every gate by the budget/deadline, Team09 records DNF.
 
+The first material trial is the unchanged center with top-level no-control `risk_policy.json`.
+Before any volatility, drawdown, position-stop, turnover, or combined policy may be registered, the
+core must have strictly positive return and Sharpe at ordinary and doubled costs, at least four
+positive folds, positive bull/bear/chop returns, positive long-bull, short-bear, and combined-chop
+attribution, and active long and short sleeves. Controls cannot rescue a negative or otherwise
+failed core. Failure permits only a separately preregistered mechanism revision/pivot or DNF, whose
+own no-control core must restart the sequence.
+
 ## Prospective trial allocation
 
 The planned material allocation is 31 configurations, leaving 49 of the common 80 for documented
 follow-up or at most two mechanism pivots:
 
-- 1 center mechanism;
+- 1 no-control center mechanism;
 - 6 mechanism/control ablations in `ablations.json`;
 - 10 two-sided parameter neighbors in `parameter_neighborhood.json`;
-- 6 declarative risk policies, each producing paired base/doubled-cost panels in one run; and
-- 8 confirmatory reruns or preregistered simplifications selected only after a written review.
+- 5 additional declarative risk policies (four single controls plus combined), each producing paired
+  base/doubled-cost panels in one run; and
+- 9 confirmatory reruns or preregistered simplifications selected only after a written review.
 
 The 31 count does not grant permission to batch or inspect results before registration. Every
 material configuration must be registered through the active Amendment 0005 superset entrypoint,
-which preserves the A6 preflight, before its result is read. The six risk policies count as six,
-not twelve: base and doubled costs are paired outputs of the same organizer run.
+which preserves the A6 preflight, before its result is read. The no-control center plus five later
+policies count as six policy states, not twelve: base and doubled costs are paired outputs of the
+same organizer run.
 
 ## Selection rule
 

@@ -15,6 +15,13 @@ The eventual market authority is the shared immutable Binance USD-M snapshot bou
 The strategy uses only the neutral worker's past-closed `bars`, strictly past `funding`, and
 point-in-time `eligible_symbols` views. It does not read snapshot files directly.
 
+The first executable risk state is top-level no-control `risk_policy.json`, byte-identical to
+`risk_policies/00-none.json`. The remaining files are immutable declarations, not runtime
+selectors. They stay dormant unless the no-control core passes every broad positive activation
+minimum; controls cannot rescue failure. Before any later policy candidate is committed,
+registered, or run, its template must be copied byte-for-byte to root `risk_policy.json` and every
+affected hash recomputed.
+
 ## Pure-crypto authority
 
 All future lifecycle and result-bearing commands must use

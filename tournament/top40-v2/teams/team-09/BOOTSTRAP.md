@@ -12,3 +12,7 @@ confirmation. Any future organizer command must use
 `scripts/top40_v2_tournament_score_diagnostics_v5.py`, whose active integration preserves the
 exact Amendment 0006 pure-crypto preflight. Negative development evidence is research evidence,
 never a submission: Team09 must pass every non-compensatory IS gate or finish DNF.
+
+The first material candidate must use the no-control bytes at root `risk_policy.json`. Controls are
+dormant until that core is broadly positive at ordinary and doubled costs across the declared
+fold/regime/role/activity gates, and cannot rescue a failed core.

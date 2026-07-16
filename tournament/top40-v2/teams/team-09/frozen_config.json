@@ -32,6 +32,13 @@
     "canonical_report_sha256": "b9c55b40fef331861af068272159f45860870182a58c93652eff2a819b3d5d1b",
     "integration_freeze_sha256": "3e93bdfe031e2589888c3bbcaae583437bbd074fa9d86c6dc0a54187bc0f1e34"
   },
+  "risk_policy_contract": {
+    "combined_template": "risk_policies/05-combined.json",
+    "first_material_trial": "no-control core; controls remain dormant until every broad positive core-alpha activation minimum passes",
+    "no_control_template": "risk_policies/00-none.json",
+    "root_path": "risk_policy.json",
+    "root_materialization_rule": "The lifecycle reads only root risk_policy.json. Copy any later immutable risk_policies template byte-for-byte to root before commit, registration, and run; controls cannot rescue a failed core."
+  },
   "schema_version": 1,
   "seed": 20260801,
   "status": "prospective-unregistered",

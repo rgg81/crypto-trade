@@ -1,15 +1,35 @@
 {
+  "canonical_runtime_policy_path": "tournament/top40-v2/teams/team-09/risk_policy.json",
+  "combined_template_path": "risk_policies/05-combined.json",
+  "core_alpha_activation_gate": {
+    "applies_to": "team09-fcpc-center-v1 with root risk_policy.json in its no-control state",
+    "base_cost_net_return_strictly_positive": true,
+    "base_cost_net_sharpe_strictly_positive": true,
+    "both_sleeves_meet_activity_floors": true,
+    "combined_chop_attribution_strictly_positive": true,
+    "doubled_cost_net_return_strictly_positive": true,
+    "doubled_cost_net_sharpe_strictly_positive": true,
+    "long_bull_attribution_strictly_positive": true,
+    "minimum_positive_folds": 4,
+    "required_positive_return_regimes": ["bull", "bear", "chop"],
+    "short_bear_attribution_strictly_positive": true
+  },
   "cost_output_contract": {
     "base_cost_multiplier": 1.0,
     "double_cost_multiplier": 2.0,
     "material_count_rule": "Each policy is one material configuration whose organizer run emits base and doubled-cost outputs together. The two cost panels are not separately selected and do not count as two policy trials.",
     "required_for_every_policy": true
   },
-  "final_policy_path": "tournament/top40-v2/teams/team-09/risk_policy.json",
+  "material_policy_accounting": {
+    "additional_policy_configurations_after_core": 5,
+    "center_no_control_included": true,
+    "total_policy_states": 6
+  },
+  "policy_materialization_rule": "The frozen lifecycle reads only root risk_policy.json. The no-control core runs first. After it passes every activation minimum, copy any selected immutable risk_policies template byte-for-byte to root risk_policy.json before commit, registration, and run, then recompute every risk/source binding. Controls cannot rescue a failed core.",
   "policies": [
     {
       "hypothesis": "Execution/control baseline with no enabled optional risk control.",
-      "path": "risk_policies/00-none.json",
+      "path": "risk_policy.json",
       "policy_id": "team09-risk-none"
     },
     {
@@ -39,7 +59,7 @@
     }
   ],
   "policy_count": 6,
-  "registration_rule": "All six policies are prospective and must be separately preregistered before results. Compare return, Sharpe, drawdown, tail loss, turnover, regimes, action counts, cooldown, requested/filled risk notional, and reentry prevention. Controls cannot qualify a strategy that fails any development gate.",
+  "registration_rule": "The root no-control core is the first material preregistration. It must pass positive ordinary/doubled return and Sharpe, fold, bull/bear/chop, long-bull/short-bear/combined-chop, and sleeve-activity minima before any later policy may be registered. The five later policy paths are immutable templates copied byte-for-byte to root before their own commit, registration, and run. Controls cannot rescue failure.",
   "schema_version": 1,
   "status": "prospective-no-results",
   "team_id": "team-09"

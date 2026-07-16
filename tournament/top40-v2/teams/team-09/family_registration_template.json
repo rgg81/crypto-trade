@@ -32,8 +32,8 @@
     "volatility_bars": [63]
   },
   "parent_family_id": null,
-  "registered_at_utc": "1970-01-01T00:00:00Z",
-  "risk_policy_plan": "Six material policy configurations are preregistered prospectively: no control, volatility target only, drawdown brakes only, position stop only, turnover limit only, and combined. Each one organizer run must emit base-cost and doubled-cost outputs together; the paired cost panels are one material policy configuration, not two trials. No policy can rescue a failed development gate.",
+  "registered_at_utc": "REPLACE_WITH_ACTUAL_REGISTRATION_TIMESTAMP_Z",
+  "risk_policy_plan": "Run the center first with root no-control risk_policy.json. Volatility-target-only, drawdown-only, position-stop-only, turnover-only, and combined policies remain dormant unless that core has positive base- and doubled-cost return/Sharpe, at least four positive folds, positive bull/bear/chop returns, positive long-bull/short-bear/combined-chop attribution, and active sleeves. Controls cannot rescue failure. Before any later policy commit, registration, and run, copy its immutable risk_policies template byte-for-byte to root risk_policy.json because the frozen lifecycle reads only that path.",
   "schema_version": 1,
   "selection_metric": "Binary eligibility first: every frozen development, regime, sleeve, stability, concentration, and doubled-cost gate must pass on stitched chronological evidence. Among passers only, maximize the lower of net Sharpe and doubled-cost Sharpe, then the worst fold/regime Sharpe. A non-passer cannot be selected.",
   "team_id": "team-09"

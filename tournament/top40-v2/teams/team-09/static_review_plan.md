@@ -33,6 +33,12 @@ not substitute performance judgment for contract review.
     next-open execution, ordinary costs, capacity sharing, and same-boundary reentry are organizer
     responsibilities. Confirm each policy run produces paired base/doubled-cost panels and counts
     as one material configuration.
+    Before the first registration, require root `risk_policy.json` to be byte-identical to
+    `risk_policies/00-none.json`. Run that core first and require positive ordinary/doubled return
+    and Sharpe, at least four positive folds, positive bull/bear/chop returns, positive
+    long-bull/short-bear/combined-chop attribution, and active sleeves before any control. Controls
+    cannot rescue failure. For a later policy, copy its immutable template byte-for-byte to root
+    before commit, registration, and run, then recompute all bindings.
 11. Review tests for future-data fail-closed behavior, exact gap handling, stale/under-history
     symbols, funding economics, input-order invariance, deterministic reruns, exposure limits,
     config/template completeness, and risk-policy validity.
@@ -40,6 +46,8 @@ not substitute performance judgment for contract review.
     qualification evidence until exact model/parameter/return hashes and central evidence exist.
 13. Confirm the hard disposition: no qualifier freeze or submission unless every development gate
     passes; otherwise continue, pivot within budget, or DNF.
+14. Replace family/trial timestamp placeholders only with actual lifecycle event times and replace
+    every zero-hash sentinel before schema validation and registration.
 
 Any material source correction after review requires a new exact-byte review. A static GO would
 authorize only organizer registration through the then-active lifecycle, not an evaluator run,

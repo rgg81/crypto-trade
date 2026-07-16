@@ -1,7 +1,9 @@
 {
+  "activation_rule": "Neighbors remain dormant until the no-control core passes every broad positive activation minimum and the selected controlled/base candidate passes all non-neighborhood development gates.",
   "candidate_id": "team09-fcpc-center-v1",
   "center_parameters_path": "tournament/top40-v2/teams/team-09/frozen_config.json",
   "declaration_status": "prospective-no-return-artifacts",
+  "executable_materialization_rule": "The zero-argument builder exposes only the center defaults. Before a neighbor registration, materialize its override into hash-bound executable strategy/config bytes and prove the canonical builder exposes that exact candidate; this JSON declaration alone does not alter runtime behavior.",
   "neighbors": [
     {"changes": {"funding_lookback_hours": 120}, "neighbor_id": "team09-n01-lookback-120h"},
     {"changes": {"funding_lookback_hours": 216}, "neighbor_id": "team09-n02-lookback-216h"},

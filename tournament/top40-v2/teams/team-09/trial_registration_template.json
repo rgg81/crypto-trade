@@ -1,7 +1,7 @@
 {
   "candidate_id": "team09-fcpc-center-v1",
   "config_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-  "falsifier": "Do not qualify or submit unless all centrally derived development gates pass, including positive bull, bear, and chop net returns, both sleeve roles, parameter stability, concentration, and doubled costs. Otherwise continue within budget, pivot, or record DNF.",
+  "falsifier": "This first material trial is the no-control core. Reject it and prohibit every risk-overlay activation if base- or doubled-cost return/Sharpe is nonpositive, fewer than four folds are positive, bull/bear/chop return or long-bull/short-bear/combined-chop attribution is nonpositive, either sleeve is inactive, or any other centrally derived development gate fails. Otherwise make a separately preregistered mechanism pivot or record DNF; controls cannot rescue it.",
   "family_id": "team09-funding-crowding-confirmation-v1",
   "parameters": {
     "confirmation_bars": 9,
@@ -28,6 +28,6 @@
   "source_bundle_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
   "strategy_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
   "team_id": "team-09",
-  "thesis": "A funding extreme is actionable only when relative price confirms that the crowded side is unwinding; balanced sleeves should monetize relative carry and dislocation across directional and choppy markets.",
-  "timestamp_utc": "1970-01-01T00:00:00Z"
+  "thesis": "Without risk-overlay assistance, a funding extreme is actionable only when relative price confirms that the crowded side is unwinding; active balanced sleeves should monetize relative carry and dislocation across bull, bear, and chop after ordinary and doubled costs.",
+  "timestamp_utc": "REPLACE_WITH_ACTUAL_REGISTRATION_TIMESTAMP_Z"
 }

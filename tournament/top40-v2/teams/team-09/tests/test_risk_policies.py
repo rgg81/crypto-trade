@@ -39,16 +39,21 @@ def test_each_single_control_and_combined_policy_are_exact() -> None:
     assert combined.side_scaling.long_scale == combined.side_scaling.short_scale == 1.0
 
 
-def test_canonical_risk_policy_matches_combined_ablation_bytes_semantically() -> None:
-    assert _load(TEAM_DIR / "risk_policy.json") == _load(
-        TEAM_DIR / "risk_policies/05-combined.json"
-    )
+def test_canonical_root_policy_is_byte_exact_no_control() -> None:
+    assert (TEAM_DIR / "risk_policy.json").read_bytes() == (
+        TEAM_DIR / "risk_policies/00-none.json"
+    ).read_bytes()
 
 
 def test_risk_plan_counts_cost_panels_as_paired_outputs() -> None:
     plan = _load(TEAM_DIR / "risk_ablations.json")
     assert plan["policy_count"] == 6
     assert len(plan["policies"]) == 6
+    assert plan["material_policy_accounting"] == {
+        "additional_policy_configurations_after_core": 5,
+        "center_no_control_included": True,
+        "total_policy_states": 6,
+    }
     assert plan["cost_output_contract"] == {
         "base_cost_multiplier": 1.0,
         "double_cost_multiplier": 2.0,
@@ -59,6 +64,24 @@ def test_risk_plan_counts_cost_panels_as_paired_outputs() -> None:
         ),
         "required_for_every_policy": True,
     }
-    assert {item["path"] for item in plan["policies"]} == {
-        str(path.relative_to(TEAM_DIR)) for path in (TEAM_DIR / "risk_policies").glob("*.json")
+    assert [item["path"] for item in plan["policies"]] == [
+        "risk_policy.json",
+        "risk_policies/01-volatility-target.json",
+        "risk_policies/02-drawdown-brakes.json",
+        "risk_policies/03-position-stop.json",
+        "risk_policies/04-turnover-limit.json",
+        "risk_policies/05-combined.json",
+    ]
+    assert plan["core_alpha_activation_gate"] == {
+        "applies_to": "team09-fcpc-center-v1 with root risk_policy.json in its no-control state",
+        "base_cost_net_return_strictly_positive": True,
+        "base_cost_net_sharpe_strictly_positive": True,
+        "both_sleeves_meet_activity_floors": True,
+        "combined_chop_attribution_strictly_positive": True,
+        "doubled_cost_net_return_strictly_positive": True,
+        "doubled_cost_net_sharpe_strictly_positive": True,
+        "long_bull_attribution_strictly_positive": True,
+        "minimum_positive_folds": 4,
+        "required_positive_return_regimes": ["bull", "bear", "chop"],
+        "short_bear_attribution_strictly_positive": True,
     }
