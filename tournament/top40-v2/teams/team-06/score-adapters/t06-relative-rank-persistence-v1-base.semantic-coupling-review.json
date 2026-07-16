@@ -1,0 +1,23 @@
+{
+  "candidate_id": "t06-relative-rank-persistence-v1-base",
+  "decision": "approve",
+  "declared_capture_boundary": "candidate-declared-post-transform-pre-selection-weight-cap-risk",
+  "executable_source_manifest_path": "tournament/top40-v2/teams/team-06/score-adapters/t06-relative-rank-persistence-v1-base.executable-source-manifest.json",
+  "executable_source_manifest_sha256": "8d4d4593899c696d99c275552f9177e7c5b449b1fb117048ab2ebad97b61277d",
+  "family_id": "t06-relative-rank-persistence-v1",
+  "findings": {
+    "direct_hook_call_found": true,
+    "hook_after_declared_score_transform": true,
+    "hook_before_selection_weight_caps_and_risk": true,
+    "no_decoy_or_transient_score_path_found": true,
+    "score_object_is_declared_model_ranking_signal": true
+  },
+  "hook": "strategy.score_boundary",
+  "review_kind": "top40-v2-score-semantic-coupling-static-review-v1",
+  "reviewed_at_utc": "2026-07-16T20:16:58Z",
+  "reviewer_id": "team06-pivot2-static-reviewer",
+  "runtime_proof_limit": "static-review-attestation-not-runtime-semantic-proof",
+  "schema_version": 1,
+  "strategy_sha256": "39d5a773fef63349fd36282d8b1ae11966fc624f7f4a02f02aa3b9e37bbc482f",
+  "team_id": "team-06"
+}
