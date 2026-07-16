@@ -5,7 +5,8 @@
 - Family: `team-04-broad-exhaustion-reversal-v1` (`BER`).
 - Exact reference: `team-04-ber-reference-001`.
 - Parent: stopped `team-04-uncrowded-trend-carry-v1`.
-- Status: implemented, not registered, not tested, not evaluated, and blocked until A5 is frozen.
+- Status: implemented, promoted, and synthetic-validation passed; not registered or evaluated.
+  A5/A6 are active, while immutable review/hash binding remains pending.
 - Runtime seed: `20260801`; Team 04 namespace: `2026080104`.
 
 ## Why this is a mechanism pivot
@@ -45,20 +46,31 @@ The mathematical efficiency ratio cannot exceed one. The explicit `min(1, ...)` 
 binary64 rounding clamp for a possible upward overshoot and is part of the reference, not a tunable
 signal transform.
 
-Immediately after ranking and before sleeve selection, `strategy.py` calls the organizer-owned A5
-identity hook exactly as
+On every manifest-scheduled decision, `strategy.py` calls the organizer-owned A5 identity hook
+exactly once. A valid ranked cross section is passed immediately after ranking and before sleeve
+selection; a scheduled fail-closed decision passes the exact built-in empty dictionary `{}`. The
+call is exactly
 `from crypto_trade.tournament.score_adapter_protocol_v5 import score_boundary` followed by
 `scores = score_boundary(scores)`. A5 must return the exact input dictionary object and persist its
-finite ranked contents without labels. Registration is blocked until that module and its authority
-are frozen and a valid opt-in manifest replaces the prospective template.
+finite nonempty ranked contents as replay score rows without labels. Aligned nonscheduled,
+off-grid, and pre-anchor calls never invoke the hook. A5 is active through
+`scripts/top40_v2_tournament_score_diagnostics_v5.py`; registration is blocked until the canonical
+executable-source manifest, independent semantic review, score manifest, and exact opt-in are
+first-added in A5's required order.
 
 `organizer_score_adapter.py` is retained only as a noncanonical audit aid for the pre-A5 design. It
 is not promoted, is not an A5 adapter, is not an official score source, and must never be executed
 by the organizer diagnostic. The A5 boundary is the sole canonical score source.
 
+All future tournament commands use the active A5 dispatcher (SHA-256
+`0dc9228f3b9c6fe41b2655055f766fc92f323a289a050e6bdf4e48a30b0105f4`). Its delegated A6 audit
+restricts every development replay to the certified pure-crypto-only universe; Binance-listed
+stablecoins, direct TradFi, equities, indexes, metals, and commodities are ineligible.
+
 ## Portfolio and breadth
 
-Rebalance every six 8-hour bars (two days); otherwise hold. Sort by `(score, ASCII symbol)`. Set
+The literal UTC timestamp `1970-01-01T00:00:00Z` is the immutable schedule anchor, not a placeholder.
+Rebalance every six 8-hour bars from that anchor (two days); otherwise hold. Sort by `(score, ASCII symbol)`. Set
 `K=max(8,floor(3N/10))`; long the top `K` and short the bottom `K`. Each side receives `0.24`, each
 symbol is capped at `0.03`, excess capacity stays cash, gross is at most `0.48`, and net is zero
 within `1e-12`.
@@ -67,6 +79,11 @@ Every selected-fraction parameter is serialized as a reduced positive rational s
 `numerator/denominator`: the center is exactly `"3/10"`, with neighbors `"1/4"` and `"7/20"`.
 Implementation uses integer numerator and denominator fields, so no binary floating comparison
 defines sleeve membership.
+
+The family registration also declares both fixed reference parameters that appear in the trial
+(`minimum_baseline_volatility=[1e-6]` and `minimum_names_per_sleeve=[8]`) and the two material
+causal-ablation values (`shock_days=1` and `coherence_base_weight=1.0`). No planned material scalar
+lies outside the registered range.
 
 BER uses no signal-polarity gate: whenever at least 24 complete current symbols exist, both broad
 sleeves are requested. Its 24-day lookback, lack of funding dependency, two-day schedule, and broad
@@ -90,9 +107,11 @@ is insolvent or incomplete; has nonpositive annualized return, net Sharpe, or do
 has fewer than four profitable folds; has positive-quarter fraction below `0.55`; has nonpositive
 bull, bear, or chop return; fails long-bull or short-bear attribution; has globally pooled Pearson
 IC at or below zero; has positive fold IC in fewer than four of six folds; violates the pair-count,
-endpoint, purge, or malformed-label rules below; produces any scheduled empty A5 record; or lacks
-complete scheduled A5 score evidence. Unavailable IC or boundary evidence is a failure, not a
-deferred diagnostic. Controls cannot rescue any failed core gate.
+endpoint, purge, or malformed-label rules below; or lacks complete scheduled A5 score-row
+coverage. A5 itself accepts an empty scheduled capture; Team 04's separately audited schedule
+coverage gate treats any scheduled timestamp with no replay score rows as failure. Unavailable IC
+or boundary evidence is a failure, not a deferred diagnostic. Controls cannot rescue any failed
+core gate.
 
 A qualifying champion must additionally pass every public Calmar, drawdown, multiplicity,
 trial-adjusted probability, regime-Sharpe, sleeve-activity, PnL-concentration, and neighborhood
@@ -101,11 +120,15 @@ and their median Sharpe must be at least `0.50`.
 
 ## Walk-forward diagnostic
 
-Use the six public chronological development folds. At each aligned scheduled decision `t`, A5
-persists the exact ranked dictionary passed to `score_boundary`. An empty scheduled record is an
-immediate completeness failure. Aligned nonscheduled decisions return `None` and create no record.
-An off-grid call fails the strategy flat and, if observed by A5, is represented by an empty record;
-it is excluded from scheduled IC pairs and does not excuse a missing scheduled record.
+Use the six public chronological development folds. At each decision selected by the manifest's
+literal `1970-01-01T00:00:00Z` anchor and 48-hour interval, A5 captures the exact dictionary passed
+to `score_boundary`. A nonempty dictionary becomes replay score rows. A scheduled `{}` capture is
+valid under frozen A5 and proves the required call occurred, but it creates no replay score rows;
+Team 04 therefore compares replay timestamps with the canonical schedule and fails the reference
+if any scheduled timestamp has no score row. This is a preregistered Team 04 research gate, not an
+automatic A5 qualification gate. Aligned nonscheduled decisions return `None`; off-grid and
+pre-anchor calls return `{}`. All three nonscheduled cases make no hook call and create no A5 score
+artifact row.
 
 For every finite persisted score for symbol `i` at `t`, define the label only when the organizer has
 one unambiguous finite positive executable open for `i` at `t` and one at `t+48h`:
@@ -115,10 +138,13 @@ y[t,i] = executable_open[t+48h,i] / executable_open[t,i] - 1
 ```
 
 The symbol must be emitted in the score dictionary at `t`. Exit-fold eligibility is not required,
-but the executable endpoint is; a missing or delisted exit, absent entry, duplicate executable
-endpoint, nonfinite/nonpositive endpoint, wrong timestamp, nonfinite score, or nonfinite return
-omits that pair with a recorded reason. There is no imputation, terminal-loss substitution, label
-clipping, cost adjustment, or use of close prices.
+but both executable endpoints are. Frozen A5 rejects any duplicate `(open_time,symbol)` in the
+executable-open panel by aborting the entire diagnostic before label pairing. A missing or delisted
+exit, absent entry, wrong-timestamp endpoint, or nonfinite/nonpositive endpoint omits that pair and
+increments the aggregate `unavailable_symbol_label_count`; A5 does not persist a per-pair reason.
+Nonfinite scores are rejected before score-artifact creation, and nonfinite Pearson inputs abort
+the diagnostic. There is no imputation, terminal-loss substitution, label clipping, cost
+adjustment, or use of close prices.
 
 A pair belongs to fold `k` only when both `t` and `t+48h` lie inside that fold's development
 evaluation interval. Boundary-crossing pairs are purged, no pair belongs to more than one fold, and

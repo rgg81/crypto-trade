@@ -23,12 +23,14 @@
   ],
   "decision_contract": {
     "bar_cutoff": "decision_time minus 8h",
-    "insufficient_or_off_grid": "empty mapping requests flat",
+    "insufficient_scheduled": "empty mapping requests flat after exactly one score_boundary({}) call",
     "non_rebalance": "None holds",
-    "off_grid_score_boundary": "empty record if observed, excluded from scheduled IC pairs",
-    "rebalance_rule": "integer 8h epoch index modulo 6 equals zero",
+    "off_grid": "empty mapping requests flat with no score_boundary call and no A5 score artifact row",
+    "off_grid_score_boundary": "forbidden because the timestamp is outside the manifest schedule",
+    "rebalance_rule": "nonnegative integer 8h index from the literal 1970-01-01T00:00:00Z anchor modulo 6 equals zero",
     "runtime_seed": 20260801,
-    "scheduled_empty_score_boundary": "immediate completeness failure"
+    "schedule_anchor_status": "actual immutable 48h schedule authority, not an event-timestamp placeholder",
+    "scheduled_empty_score_boundary": "A5 accepts and captures the empty dict but emits no replay score rows for that timestamp; Team 04's separate schedule-coverage gate fails the reference"
   },
   "derived_features": [
     {
@@ -65,21 +67,21 @@
   "forward_diagnostic": {
     "aggregate": "one ordinary Pearson correlation across the union of the six disjoint retained fold pools",
     "boundary": "crypto_trade.tournament.score_adapter_protocol_v5:score_boundary",
-    "boundary_output": "organizer-persisted exact finite ranked score dictionary after ranking and before sleeve selection",
+    "boundary_output": "organizer-captured exact finite ranked score dictionary after ranking and before sleeve selection; a scheduled flat captures an empty dict and contributes no replay score rows",
     "embargo": "30 calendar days for any later outcome-selected candidate",
     "endpoint_rule": "Require exactly one finite positive organizer executable open for the emitted symbol at t and t+48h; exit-fold eligibility is not required, but executable endpoint availability is.",
     "fold_assignment": "Assign a pair to fold k only when t and t+48h both lie inside that fold's development evaluation interval; purge boundary-crossing pairs and never reuse a pair across folds.",
     "fold_statistic": "ordinary Pearson correlation across every retained decision-symbol pair in the fold; no label ranking, timestamp demeaning, timestamp-level averaging, weighting, or Fisher transform",
     "label": "simple return executable_open[t+48h,symbol]/executable_open[t,symbol]-1",
-    "malformed_or_missing": "Omit with a recorded reason any missing/delisted endpoint, absent entry, duplicate endpoint, wrong timestamp, nonfinite/nonpositive endpoint, nonfinite score, or nonfinite return; never impute, clip, substitute a terminal loss, or use closes.",
+    "malformed_or_missing": "A duplicate (open_time,symbol) anywhere in the executable-open panel aborts the entire A5 diagnostic before pairing. A missing/delisted, wrong-timestamp, nonfinite, or nonpositive expected endpoint omits that pair and increments the aggregate unavailable-symbol-label count. A5 rejects nonfinite scores before artifact creation, and downstream nonfinite Pearson inputs abort. Never impute, clip, substitute a terminal loss, or use closes.",
     "minimums": {
       "aggregate_pairs": 1440,
       "pairs_per_fold": 240,
       "scheduled_decisions_per_fold": 10
     },
     "pair_universe": "symbols with a finite score persisted by A5 at scheduled t and valid endpoints",
-    "required": "aggregate IC>0, fold IC>0 in at least four of six folds, every minimum met, no scheduled empty record, and no missing scheduled A5 record",
-    "scheduled_empty_record": "immediate completeness failure",
+    "required": "aggregate IC>0, fold IC>0 in at least four of six folds, every minimum met, runtime confirmation of one capture per scheduled decision, and Team 04 schedule-coverage confirmation that every scheduled timestamp contributes at least one replay score row",
+    "scheduled_empty_record": "Frozen A5 captures {} and emits no replay score rows; this is valid adapter behavior but fails Team 04's separately audited research gate, not an automatic A5 qualification gate.",
     "unavailable": "Any failed minimum, zero variance, nonfinite correlation, malformed pair membership, or missing A5 evidence fails the reference."
   },
   "parent_family_id": "team-04-uncrowded-trend-carry-v1",

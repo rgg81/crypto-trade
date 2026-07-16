@@ -1,32 +1,37 @@
 {
   "candidate_id": "team-04-ber-reference-001",
-  "command_blocker": "Do not import or test the strategy until A5 exists and is frozen; score_adapter_protocol_v5 is intentionally not supplied by this team package.",
-  "commands_run": [],
-  "commands_to_run": [
-    "uv run ruff check tournament/top40-v2/teams/team-04/pivot-01/strategy.py tournament/top40-v2/teams/team-04/pivot-01/organizer_score_adapter.py tournament/top40-v2/teams/team-04/pivot-01/test_strategy.py",
-    "uv run ruff format --check tournament/top40-v2/teams/team-04/pivot-01/strategy.py tournament/top40-v2/teams/team-04/pivot-01/organizer_score_adapter.py tournament/top40-v2/teams/team-04/pivot-01/test_strategy.py",
-    "PYTHONDONTWRITEBYTECODE=1 uv run pytest -q tournament/top40-v2/teams/team-04/pivot-01/test_strategy.py",
-    "uv run python scripts/top40_v2_tournament_active.py validate-risk-policy tournament/top40-v2/teams/team-04/pivot-01/risk_policy.json"
+  "command_blocker": "Synthetic validation is complete. Registration remains blocked on canonical A5 first-adds, independent semantic review, BER pivot-family registration, and final post-family hashes.",
+  "commands_run": [
+    "ruff check and format for pivot-local BER Python files",
+    "14 synthetic tests from pivot-01/test_strategy.py",
+    "active-dispatcher validation of pivot-01/risk_policy.json",
+    "ruff check for promoted root strategy.py and test_strategy.py",
+    "14 synthetic tests from promoted root test_strategy.py",
+    "active-dispatcher validation of root risk_policy.json",
+    "canonical source_bundle_fingerprint preflight"
   ],
-  "coverage_written_not_run": [
+  "commands_to_run": [],
+  "coverage_executed": [
     "exact 21-day baseline volatility and subsequent three-day shock windows",
     "exact path efficiency, standardized reversal formula, average-rank score, and tie handling",
-    "A5 identity boundary receives the exact ranked score consumed before sleeve construction",
+    "real GenericScoreBoundaryAdapter execution captures the exact ranked score once on a valid scheduled decision, captures {} once on a scheduled sparse decision, and captures nothing for hold/off-grid decisions",
     "deprecated audit serializer equality, noncanonical role, and exact poisoned-versus-clean bytes",
     "future append, corruption, and truncation invariance for scores, targets, and audit bytes",
     "missing, two-valid duplicate, valid-plus-malformed duplicate, nonfinite, wrong-close-time, and insufficient-cross-section behavior",
     "point-in-time membership, input-order determinism, and context immutability",
     "broad two-sided sleeves, equal budgets, cap, gross, and net",
-    "scheduled-invalid and off-grid empty audit records, non-rebalance hold, canonical seed, stateless rerun, frozen config, and disabled risk policy",
-    "exact rational parameter encoding, four-file canonical promotion, audit-adapter exclusion, source-bundle roles, and prospective non-authorized A5 status"
+    "scheduled-invalid A5 empty capture versus noncanonical off-grid audit serialization, non-rebalance hold, canonical seed, stateless rerun, frozen config, and disabled risk policy",
+    "exact rational parameter encoding, complete family scalar ranges, layout-aware byte-identical four-file canonical promotion, audit-adapter exclusion, literal epoch schedule authority, active A5/A6 bindings, and exact-shape non-evidence A5 templates"
   ],
   "family_id": "team-04-broad-exhaustion-reversal-v1",
   "files_sha256": {
+    "executable-source-manifest.template.json": "ROOT_MUST_COMPUTE_64_HEX",
     "frozen_config.json": "ROOT_MUST_COMPUTE_64_HEX",
     "organizer_score_adapter.py": "ROOT_MUST_COMPUTE_64_HEX",
     "prospective-a5-score-opt-in.template.json": "ROOT_MUST_COMPUTE_64_HEX",
     "risk_policy.json": "ROOT_MUST_COMPUTE_64_HEX",
-    "source-bundle-manifest.template.json": "ROOT_MUST_COMPUTE_64_HEX",
+    "score-adapter-manifest.template.json": "ROOT_MUST_COMPUTE_64_HEX",
+    "semantic-coupling-review.template.json": "ROOT_MUST_COMPUTE_64_HEX",
     "strategy.py": "ROOT_MUST_COMPUTE_64_HEX",
     "test_strategy.py": "ROOT_MUST_COMPUTE_64_HEX"
   },
@@ -35,14 +40,15 @@
   "risk_policy_validation": {
     "enabled": false,
     "policy_id": "team-04-ber-reference-no-control",
-    "valid": "NOT_RUN"
+    "valid": true
   },
   "schema_version": 1,
-  "status": "tests-written-not-run-blocked-awaiting-a5-freeze",
+  "status": "promoted-serialized-validation-passed-a5-a6-active-not-registered",
   "test_result": {
-    "duration_seconds": null,
-    "failed": null,
-    "passed": null
+    "canonical_duration_seconds": 3.27,
+    "failed": 0,
+    "passed_per_layout": 14,
+    "pivot_duration_seconds": 3.20
   },
   "team_id": "team-04"
 }

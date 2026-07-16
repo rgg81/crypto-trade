@@ -1,16 +1,48 @@
 {
   "active_candidate_id": "team-04-ber-reference-001",
   "active_family_id": "team-04-broad-exhaustion-reversal-v1",
+  "active_tournament_authority": {
+    "active_entrypoint": {
+      "path": "scripts/top40_v2_tournament_score_diagnostics_v5.py",
+      "sha256": "0dc9228f3b9c6fe41b2655055f766fc92f323a289a050e6bdf4e48a30b0105f4"
+    },
+    "amendment_0005_integration_freeze": {
+      "commit": "d2b95f610722aab65b4e67466b34efeaa3554101",
+      "path": "tournament/top40-v2/amendments/0005/integration-freeze.json",
+      "sha256": "b3b2b96245a479ccfff95b5cd5b5cd0aef3b2d0aac0fc9faf5367d3e6772958c",
+      "status": "active"
+    },
+    "delegated_amendment_0006_pure_crypto_universe": {
+      "canonical_report_sha256": "b9c55b40fef331861af068272159f45860870182a58c93652eff2a819b3d5d1b",
+      "integration_freeze_commit": "ed3af1398543dfee4a50150915dc2e37b3631fc9",
+      "integration_freeze_path": "tournament/top40-v2/amendments/0006/integration-freeze.json",
+      "integration_freeze_sha256": "3e93bdfe031e2589888c3bbcaae583437bbd074fa9d86c6dc0a54187bc0f1e34",
+      "policy_sha256": "2c7fb0ff593d06c323517e60df4b28ab9387a2df580b83f82f65ef71c91fc350",
+      "violations": 0
+    }
+  },
   "audit_only_organizer_score_adapter_source": "pivot-01/organizer_score_adapter.py",
+  "executable_source_manifest_template": "pivot-01/executable-source-manifest.template.json",
+  "family_registration_template": "pivot-01/family-registration-input.json",
+  "family_registration_before_final_source_hash": true,
   "frozen_config_source": "pivot-01/frozen_config.json",
-  "historical_top_level_utc_files_preserved": true,
+  "historical_top_level_utc_files_preserved": false,
+  "historical_top_level_utc_files_preserved_in_git_history": true,
+  "material_trial_accounting": {
+    "ber_reference_registration_would_consume_trial_number": 2,
+    "material_trials_consumed_before_ber": 1,
+    "organizer_ledgers_edited_in_this_rebind": false
+  },
   "pivot_directory": "pivot-01",
   "promotion": {
-    "authorized_in_this_step": false,
+    "authorized_in_this_step": true,
+    "canonical_test_support_directory_after_promotion": "pivot-01",
+    "canonical_validation_path_after_promotion": "test_strategy.py",
     "excluded_from_promotion": [
       "organizer_score_adapter.py"
     ],
-    "required_before_hash_or_registration": true,
+    "required_before_hash_or_registration": false,
+    "root_lifecycle_entrypoint_required": true,
     "target_frozen_config": "frozen_config.json",
     "target_risk_policy": "risk_policy.json",
     "target_strategy": "strategy.py",
@@ -18,15 +50,24 @@
   },
   "prospective_a5_opt_in_source": "pivot-01/prospective-a5-score-opt-in.template.json",
   "registration_blockers": [
-    "A5 score-boundary amendment does not yet exist as frozen authority",
-    "prospective A5 opt-in template has not been replaced by an authority-valid manifest",
-    "canonical promotion, hashes, and serialized validations are not complete"
+    "complete executable-source hashing is not complete",
+    "independent semantic-coupling review has not been first-added after the executable-source manifest",
+    "canonical score-adapter manifest and exact trial opt-in hashes have not been materialized",
+    "BER must be explicitly registered with pivot-team before the final source-tree fingerprint is computed",
+    "organizer family/trial registration has not run"
   ],
   "risk_policy_source": "pivot-01/risk_policy.json",
   "schema_version": 1,
-  "source_bundle_manifest_source": "pivot-01/source-bundle-manifest.template.json",
-  "status": "prepared-unregistered-unrun-blocked-awaiting-a5-freeze-and-root-promotion",
+  "score_adapter_manifest_template": "pivot-01/score-adapter-manifest.template.json",
+  "score_schedule_anchor_authority": {
+    "anchor_timestamp_utc": "1970-01-01T00:00:00Z",
+    "interval_hours": 48,
+    "placeholder": false
+  },
+  "semantic_coupling_review_template": "pivot-01/semantic-coupling-review.template.json",
+  "status": "promoted-synthetic-validation-passed-unregistered-awaiting-review-and-hashes",
   "strategy_source": "pivot-01/strategy.py",
   "team_id": "team-04",
-  "test_source": "pivot-01/test_strategy.py"
+  "test_source": "pivot-01/test_strategy.py",
+  "trial_registration_template": "pivot-01/trial-registration-input.template.json"
 }

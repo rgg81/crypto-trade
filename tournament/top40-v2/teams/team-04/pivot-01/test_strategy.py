@@ -1,4 +1,4 @@
-"""Synthetic, market-data-free tests for Team 04 BER pivot 01; intentionally unrun."""
+"""Synthetic, market-data-free tests for Team 04 BER pivot 01; organizer-validated."""
 
 from __future__ import annotations
 
@@ -11,27 +11,32 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
+from crypto_trade.tournament import score_adapter_protocol_v5
+from crypto_trade.tournament.generic_score_adapter_v5 import build_adapter
 from crypto_trade.tournament.protocol import DecisionContext
 from crypto_trade.tournament.risk_policy import risk_policy_from_dict
 
 DECISION_TIME = pd.Timestamp("2023-01-05T00:00:00Z")
 CUTOFF = DECISION_TIME - pd.Timedelta(hours=8)
 INTERVAL = pd.Timedelta(hours=8)
-PIVOT_DIR = Path(__file__).resolve().parent
+TEST_DIR = Path(__file__).resolve().parent
+TEAM_DIR = TEST_DIR.parent if TEST_DIR.name == "pivot-01" else TEST_DIR
+RUNTIME_DIR = TEST_DIR
+TEMPLATE_DIR = TEAM_DIR / "pivot-01"
 
 
-def _load(name: str, filename: str):
-    spec = importlib.util.spec_from_file_location(name, PIVOT_DIR / filename)
+def _load(name: str, path: Path):
+    spec = importlib.util.spec_from_file_location(name, path)
     if spec is None or spec.loader is None:
-        raise RuntimeError(f"cannot load {filename}")
+        raise RuntimeError(f"cannot load {path}")
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
     return module
 
 
-ber = _load("_team04_ber_test_strategy", "strategy.py")
-score_adapter = _load("_team04_ber_test_score_adapter", "organizer_score_adapter.py")
+ber = _load("_team04_ber_test_strategy", RUNTIME_DIR / "strategy.py")
+score_adapter = _load("_team04_ber_test_score_adapter", TEMPLATE_DIR / "organizer_score_adapter.py")
 
 
 def synthetic_symbols(count: int = 40) -> tuple[str, ...]:
@@ -103,9 +108,7 @@ def synthetic_context(
 
 
 def _reference_scores() -> dict[str, float]:
-    result = ber.build_strategy().preconstruction_scores(
-        synthetic_context(), seed=20260801
-    )
+    result = ber.build_strategy().preconstruction_scores(synthetic_context(), seed=20260801)
     assert isinstance(result, dict) and result
     return result
 
@@ -169,6 +172,72 @@ def test_a5_boundary_is_exact_ranked_score_used_by_construction(monkeypatch) -> 
     monkeypatch.setattr(ber, "score_boundary", lambda scores: dict(scores))
     with pytest.raises(RuntimeError, match="return its input dictionary by identity"):
         ber.build_strategy().preconstruction_scores(context, seed=20260801)
+
+
+def test_real_a5_adapter_schedule_and_empty_capture_contract() -> None:
+    anchor = pd.Timestamp("1970-01-01T00:00:00Z")
+    assert (DECISION_TIME - anchor).value % pd.Timedelta(hours=48).value == 0
+    context = synthetic_context()
+    strategy = ber.build_strategy()
+    adapter = build_adapter(score_adapter_protocol_v5.ADAPTER_ID, strategy)
+    result = adapter.evaluate(
+        lambda: strategy.target_weights(context, seed=20260801),
+        scheduled=True,
+        eligible_symbols=context.eligible_symbols,
+    )
+    assert isinstance(result.weights, dict) and result.weights
+    assert isinstance(result.scores, dict) and result.scores
+    assert min(
+        result.scores[symbol] for symbol, weight in result.weights.items() if weight > 0.0
+    ) > max(result.scores[symbol] for symbol, weight in result.weights.items() if weight < 0.0)
+
+    insufficient = synthetic_context(symbols=synthetic_symbols(23))
+    insufficient_strategy = ber.build_strategy()
+    insufficient_result = build_adapter(
+        score_adapter_protocol_v5.ADAPTER_ID, insufficient_strategy
+    ).evaluate(
+        lambda: insufficient_strategy.target_weights(insufficient, seed=20260801),
+        scheduled=True,
+        eligible_symbols=insufficient.eligible_symbols,
+    )
+    assert insufficient_result.weights == {}
+    assert insufficient_result.scores == {}
+
+    unscheduled = synthetic_context(decision_time=DECISION_TIME + INTERVAL)
+    unscheduled_strategy = ber.build_strategy()
+    unscheduled_result = build_adapter(
+        score_adapter_protocol_v5.ADAPTER_ID, unscheduled_strategy
+    ).evaluate(
+        lambda: unscheduled_strategy.target_weights(unscheduled, seed=20260801),
+        scheduled=False,
+        eligible_symbols=unscheduled.eligible_symbols,
+    )
+    assert unscheduled_result.weights is None
+    assert unscheduled_result.scores is None
+
+    off_grid = synthetic_context(decision_time=DECISION_TIME + pd.Timedelta(hours=1))
+    off_grid_strategy = ber.build_strategy()
+    off_grid_result = build_adapter(
+        score_adapter_protocol_v5.ADAPTER_ID, off_grid_strategy
+    ).evaluate(
+        lambda: off_grid_strategy.target_weights(off_grid, seed=20260801),
+        scheduled=False,
+        eligible_symbols=off_grid.eligible_symbols,
+    )
+    assert off_grid_result.weights == {}
+    assert off_grid_result.scores is None
+
+    pre_anchor = synthetic_context(decision_time=anchor - INTERVAL)
+    pre_anchor_strategy = ber.build_strategy()
+    pre_anchor_result = build_adapter(
+        score_adapter_protocol_v5.ADAPTER_ID, pre_anchor_strategy
+    ).evaluate(
+        lambda: pre_anchor_strategy.target_weights(pre_anchor, seed=20260801),
+        scheduled=False,
+        eligible_symbols=pre_anchor.eligible_symbols,
+    )
+    assert pre_anchor_result.weights == {}
+    assert pre_anchor_result.scores is None
 
 
 def test_a5_boundary_input_bytes_are_future_and_auxiliary_invariant(monkeypatch) -> None:
@@ -236,9 +305,7 @@ def test_reversal_direction_broad_sleeves_budget_cap_and_net() -> None:
     positives = {symbol: weight for symbol, weight in weights.items() if weight > 0.0}
     negatives = {symbol: weight for symbol, weight in weights.items() if weight < 0.0}
     assert len(positives) == len(negatives) == 12
-    assert min(scores[symbol] for symbol in positives) > max(
-        scores[symbol] for symbol in negatives
-    )
+    assert min(scores[symbol] for symbol in positives) > max(scores[symbol] for symbol in negatives)
     assert all(int(symbol[1:3]) < 20 for symbol in positives)
     assert all(int(symbol[1:3]) >= 20 for symbol in negatives)
     assert math.fsum(positives.values()) == pytest.approx(0.24, abs=1e-12)
@@ -323,8 +390,7 @@ def test_missing_duplicate_nonfinite_and_wrong_close_time_fail_closed() -> None:
     for symbol in affected:
         nonfinite[symbol].loc[nonfinite[symbol].index[-1], "close"] = float("nan")
     assert (
-        ber.build_strategy().target_weights(synthetic_context(bars=nonfinite), seed=20260801)
-        == {}
+        ber.build_strategy().target_weights(synthetic_context(bars=nonfinite), seed=20260801) == {}
     )
     wrong_close = synthetic_bars(symbols)
     for symbol in affected:
@@ -343,9 +409,7 @@ def test_membership_input_order_determinism_and_context_immutability() -> None:
     extra_bars = dict(context.bars)
     extra_bars["ZZZUSDT"] = _bar_frame("ZZZUSDT", 99)
     assert (
-        ber.build_strategy().target_weights(
-            synthetic_context(bars=extra_bars), seed=20260801
-        )
+        ber.build_strategy().target_weights(synthetic_context(bars=extra_bars), seed=20260801)
         == baseline_weights
     )
     reordered = DecisionContext(
@@ -360,17 +424,16 @@ def test_membership_input_order_determinism_and_context_immutability() -> None:
     )
     assert ber.build_strategy().preconstruction_scores(reordered, seed=20260801) == baseline_scores
     assert ber.build_strategy().target_weights(reordered, seed=20260801) == baseline_weights
-    assert (
-        score_adapter.build_score_adapter().serialize_score_record(reordered, seed=20260801)
-        == score_adapter.build_score_adapter().serialize_score_record(context, seed=20260801)
-    )
+    assert score_adapter.build_score_adapter().serialize_score_record(
+        reordered, seed=20260801
+    ) == score_adapter.build_score_adapter().serialize_score_record(context, seed=20260801)
     before = {symbol: frame.copy(deep=True) for symbol, frame in context.bars.items()}
     assert ber.build_strategy().target_weights(context, seed=20260801) == baseline_weights
     for symbol in context.eligible_symbols:
         pd.testing.assert_frame_equal(context.bars[symbol], before[symbol])
 
 
-def test_clock_cross_section_seed_stateless_and_empty_audit_contract(monkeypatch) -> None:
+def test_clock_cross_section_seed_stateless_a5_and_legacy_audit_contract(monkeypatch) -> None:
     boundary_calls: list[dict[str, float]] = []
 
     def identity_boundary(scores: dict[str, float]) -> dict[str, float]:
@@ -381,6 +444,7 @@ def test_clock_cross_section_seed_stateless_and_empty_audit_contract(monkeypatch
     monkeypatch.setattr(score_adapter.ber, "score_boundary", lambda scores: scores)
     insufficient = synthetic_context(symbols=synthetic_symbols(23))
     assert ber.build_strategy().target_weights(insufficient, seed=20260801) == {}
+    assert boundary_calls == [{}]
     insufficient_record = score_adapter.build_score_adapter().score_record(
         insufficient, seed=20260801
     )
@@ -388,12 +452,12 @@ def test_clock_cross_section_seed_stateless_and_empty_audit_contract(monkeypatch
     assert insufficient_record["scores"] == {}
     off_grid = synthetic_context(decision_time=DECISION_TIME + pd.Timedelta(hours=1))
     assert ber.build_strategy().target_weights(off_grid, seed=20260801) == {}
-    off_grid_record = score_adapter.build_score_adapter().score_record(
-        off_grid, seed=20260801
-    )
+    # This empty record belongs only to the deprecated audit serializer. The
+    # canonical A5 path above makes no off-schedule call and emits no score row.
+    off_grid_record = score_adapter.build_score_adapter().score_record(off_grid, seed=20260801)
     assert off_grid_record is not None
     assert off_grid_record["scores"] == {}
-    assert boundary_calls == []
+    assert boundary_calls == [{}]
     unscheduled = synthetic_context(decision_time=DECISION_TIME + INTERVAL)
     assert ber.build_strategy().target_weights(unscheduled, seed=20260801) is None
     assert ber.build_strategy().preconstruction_scores(unscheduled, seed=20260801) is None
@@ -403,11 +467,12 @@ def test_clock_cross_section_seed_stateless_and_empty_audit_contract(monkeypatch
     first = ber.build_strategy().target_weights(synthetic_context(), seed=20260801)
     second = ber.build_strategy().target_weights(synthetic_context(), seed=20260801)
     assert first == second
-    assert len(boundary_calls) == 2
+    assert len(boundary_calls) == 3
+    assert boundary_calls[0] == {}
 
 
 def test_frozen_pivot_config_score_contract_and_no_control_policy() -> None:
-    frozen = json.loads((PIVOT_DIR / "frozen_config.json").read_text(encoding="utf-8"))
+    frozen = json.loads((RUNTIME_DIR / "frozen_config.json").read_text(encoding="utf-8"))
     assert frozen["candidate_id"] == "team-04-ber-reference-001"
     assert frozen["family_id"] == "team-04-broad-exhaustion-reversal-v1"
     assert frozen["canonical_runtime_seed"] == 20260801
@@ -429,39 +494,73 @@ def test_frozen_pivot_config_score_contract_and_no_control_policy() -> None:
         "from crypto_trade.tournament.score_adapter_protocol_v5 import score_boundary"
     )
     assert frozen["score_contract"]["boundary_call"] == "scores=score_boundary(scores)"
+    assert frozen["score_contract"]["a5_authority_status"] == (
+        "active-prospective-opt-in-not-yet-materialized"
+    )
     assert frozen["score_contract"]["identity_requirement"] == (
         "return-exact-input-dictionary-object"
     )
     assert frozen["score_contract"]["legacy_team_adapter_role"] == (
         "noncanonical-audit-only-not-promoted-not-executed-by-a5"
     )
+    assert frozen["score_contract"]["schedule_utc"] == {
+        "anchor_timestamp_utc": "1970-01-01T00:00:00Z",
+        "interval_hours": 48,
+    }
+    assert frozen["score_contract"]["off_grid_output"] == (
+        "flat-target-with-no-boundary-call-no-score-capture-and-no-score-artifact-row"
+    )
     assert frozen["ic_contract"]["label"] == (
         "simple-executable-open-t-to-executable-open-t-plus-48h-return"
     )
     assert frozen["ic_contract"]["fold_minimum_pairs"] == 240
     assert frozen["ic_contract"]["aggregate_minimum_pairs"] == 1440
-    policy_raw = json.loads((PIVOT_DIR / "risk_policy.json").read_text(encoding="utf-8"))
+    policy_raw = json.loads((RUNTIME_DIR / "risk_policy.json").read_text(encoding="utf-8"))
     policy = risk_policy_from_dict(policy_raw)
     assert policy.policy_id == frozen["risk_policy_id"] == "team-04-ber-reference-no-control"
     assert not policy.enabled
     assert not policy.same_boundary_reentry
 
 
-def test_registration_templates_use_exact_fractions_and_bind_canonical_a5_sources() -> None:
+def test_canonical_promotion_is_byte_identical_when_run_from_team_root() -> None:
+    if TEST_DIR.name == "pivot-01":
+        assert RUNTIME_DIR == TEMPLATE_DIR
+        return
+    for filename in (
+        "strategy.py",
+        "frozen_config.json",
+        "risk_policy.json",
+        "test_strategy.py",
+    ):
+        assert (RUNTIME_DIR / filename).read_bytes() == (TEMPLATE_DIR / filename).read_bytes()
+
+
+def test_registration_templates_use_exact_fractions_and_active_a5_a6_shapes() -> None:
     family = json.loads(
-        (PIVOT_DIR / "family-registration-input.json").read_text(encoding="utf-8")
+        (TEMPLATE_DIR / "family-registration-input.json").read_text(encoding="utf-8")
     )
     trial = json.loads(
-        (PIVOT_DIR / "trial-registration-input.template.json").read_text(encoding="utf-8")
+        (TEMPLATE_DIR / "trial-registration-input.template.json").read_text(encoding="utf-8")
     )
     neighborhood = json.loads(
-        (PIVOT_DIR / "parameter_neighborhood.json").read_text(encoding="utf-8")
+        (TEMPLATE_DIR / "parameter_neighborhood.json").read_text(encoding="utf-8")
     )
     assert family["parameter_ranges"]["selected_fraction_per_side"] == [
         "1/4",
         "3/10",
         "7/20",
     ]
+    assert family["parameter_ranges"]["minimum_baseline_volatility"] == [1e-6]
+    assert family["parameter_ranges"]["minimum_names_per_sleeve"] == [8]
+    assert family["parameter_ranges"]["shock_days"] == [1, 2, 3, 4]
+    assert family["parameter_ranges"]["coherence_base_weight"] == [
+        0.25,
+        0.5,
+        0.75,
+        1.0,
+    ]
+    assert family["registered_at_utc"] == "1970-01-01T00:00:00Z"
+    assert trial["timestamp_utc"] == "1970-01-01T00:00:00Z"
     assert trial["parameters"]["selected_fraction_per_side"] == "3/10"
     assert [
         item["value"]
@@ -469,28 +568,80 @@ def test_registration_templates_use_exact_fractions_and_bind_canonical_a5_source
         if item["axis"] == "selected_fraction_per_side"
     ] == ["1/4", "7/20"]
 
-    active = json.loads((PIVOT_DIR.parent / "active-pivot.json").read_text(encoding="utf-8"))
+    active = json.loads((TEAM_DIR / "active-pivot.json").read_text(encoding="utf-8"))
     assert active["promotion"]["target_strategy"] == "strategy.py"
     assert active["promotion"]["target_frozen_config"] == "frozen_config.json"
     assert active["promotion"]["target_test"] == "test_strategy.py"
     assert active["promotion"]["target_risk_policy"] == "risk_policy.json"
-    assert active["promotion"]["excluded_from_promotion"] == [
-        "organizer_score_adapter.py"
-    ]
-
-    bundle = json.loads(
-        (PIVOT_DIR / "source-bundle-manifest.template.json").read_text(encoding="utf-8")
-    )
-    canonical_roles = {
-        item["role"] for item in bundle["canonical_fingerprint_entries"]
+    assert active["promotion"]["root_lifecycle_entrypoint_required"] is True
+    assert active["promotion"]["canonical_validation_path_after_promotion"] == ("test_strategy.py")
+    assert active["promotion"]["excluded_from_promotion"] == ["organizer_score_adapter.py"]
+    assert active["active_tournament_authority"]["active_entrypoint"] == {
+        "path": "scripts/top40_v2_tournament_score_diagnostics_v5.py",
+        "sha256": "0dc9228f3b9c6fe41b2655055f766fc92f323a289a050e6bdf4e48a30b0105f4",
     }
-    assert "canonical-strategy-containing-a5-boundary-hook" in canonical_roles
-    assert "active-disabled-risk-policy" in canonical_roles
-    assert bundle["deprecated_audit_entries"][0]["promoted"] is False
-    prospective = json.loads(
-        (PIVOT_DIR / "prospective-a5-score-opt-in.template.json").read_text(
-            encoding="utf-8"
-        )
+    pure_crypto = active["active_tournament_authority"][
+        "delegated_amendment_0006_pure_crypto_universe"
+    ]
+    assert pure_crypto["canonical_report_sha256"] == (
+        "b9c55b40fef331861af068272159f45860870182a58c93652eff2a819b3d5d1b"
     )
-    assert prospective["a5_authority"]["status"] == "NOT_YET_FROZEN"
-    assert prospective["opt_in"]["authorized"] is False
+    assert pure_crypto["violations"] == 0
+    assert active["material_trial_accounting"]["material_trials_consumed_before_ber"] == 1
+    assert (
+        active["material_trial_accounting"]["ber_reference_registration_would_consume_trial_number"]
+        == 2
+    )
+    assert active["family_registration_before_final_source_hash"] is True
+    assert active["score_schedule_anchor_authority"] == {
+        "anchor_timestamp_utc": "1970-01-01T00:00:00Z",
+        "interval_hours": 48,
+        "placeholder": False,
+    }
+
+    executable = json.loads(
+        (TEMPLATE_DIR / "executable-source-manifest.template.json").read_text(encoding="utf-8")
+    )
+    assert executable["manifest_kind"] == "top40-v2-executable-source-manifest-v1"
+    executable_paths = [item["path"] for item in executable["files"]]
+    assert executable_paths == [
+        "frozen_config.json",
+        "pivot-01/frozen_config.json",
+        "pivot-01/organizer_score_adapter.py",
+        "pivot-01/strategy.py",
+        "pivot-01/test_strategy.py",
+        "risk_policy.json",
+        "strategy.py",
+        "test_strategy.py",
+    ]
+    assert set(item["sha256"] for item in executable["files"]) == {"0" * 64}
+
+    semantic = json.loads(
+        (TEMPLATE_DIR / "semantic-coupling-review.template.json").read_text(encoding="utf-8")
+    )
+    assert semantic["review_kind"] == ("top40-v2-score-semantic-coupling-static-review-v1")
+    assert semantic["reviewed_at_utc"] == "1970-01-01T00:00:00Z"
+    assert semantic["reviewer_id"].startswith("TEMPLATE-ONLY")
+    score_manifest = json.loads(
+        (TEMPLATE_DIR / "score-adapter-manifest.template.json").read_text(encoding="utf-8")
+    )
+    assert score_manifest["adapter_id"] == "top40-v2-declared-score-boundary-v1"
+    assert score_manifest["hook"] == "strategy.score_boundary"
+    assert score_manifest["schedule_utc"] == {
+        "anchor_timestamp_utc": "1970-01-01T00:00:00Z",
+        "interval_hours": 48,
+    }
+    assert score_manifest["label"]["holding_horizon_hours"] == 48
+    assert score_manifest["label"]["minimum_pairs"] == 240
+
+    prospective = json.loads(
+        (TEMPLATE_DIR / "prospective-a5-score-opt-in.template.json").read_text(encoding="utf-8")
+    )
+    assert prospective == {
+        "_top40_v2_score_adapter": {
+            "adapter_id": "top40-v2-declared-score-boundary-v1",
+            "manifest_sha256": "0" * 64,
+            "schema_version": 1,
+        }
+    }
+    assert trial["parameters"]["_top40_v2_score_adapter"] == prospective["_top40_v2_score_adapter"]

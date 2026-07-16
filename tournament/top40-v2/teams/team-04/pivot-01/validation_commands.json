@@ -3,25 +3,43 @@
     {
       "command": "uv run ruff check tournament/top40-v2/teams/team-04/pivot-01/strategy.py tournament/top40-v2/teams/team-04/pivot-01/organizer_score_adapter.py tournament/top40-v2/teams/team-04/pivot-01/test_strategy.py",
       "purpose": "static lint",
-      "status": "NOT_RUN"
+      "status": "PASSED_2026-07-16"
     },
     {
       "command": "uv run ruff format --check tournament/top40-v2/teams/team-04/pivot-01/strategy.py tournament/top40-v2/teams/team-04/pivot-01/organizer_score_adapter.py tournament/top40-v2/teams/team-04/pivot-01/test_strategy.py",
       "purpose": "format verification without mutation",
-      "status": "NOT_RUN"
+      "status": "PASSED_AFTER_FORMAT_2026-07-16"
     },
     {
       "command": "PYTHONDONTWRITEBYTECODE=1 uv run pytest -q tournament/top40-v2/teams/team-04/pivot-01/test_strategy.py",
       "purpose": "synthetic market-data-free behavior tests",
-      "status": "BLOCKED_AWAITING_A5_FREEZE"
+      "status": "PASSED_14_2026-07-16"
     },
     {
-      "command": "uv run python scripts/top40_v2_tournament_active.py validate-risk-policy tournament/top40-v2/teams/team-04/pivot-01/risk_policy.json",
+      "command": "uv run python scripts/top40_v2_tournament_score_diagnostics_v5.py validate-risk-policy tournament/top40-v2/teams/team-04/pivot-01/risk_policy.json",
       "purpose": "organizer risk-policy validation",
-      "status": "NOT_RUN"
+      "status": "PASSED_2026-07-16"
+    },
+    {
+      "command": "uv run ruff check tournament/top40-v2/teams/team-04/strategy.py tournament/top40-v2/teams/team-04/test_strategy.py",
+      "precondition": "Run only after byte-identical canonical promotion.",
+      "purpose": "canonical root lifecycle source and layout-aware test lint",
+      "status": "PASSED_2026-07-16"
+    },
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 uv run pytest -q tournament/top40-v2/teams/team-04/test_strategy.py",
+      "precondition": "Run only after byte-identical canonical promotion.",
+      "purpose": "canonical root layout behavior and real GenericScoreBoundaryAdapter tests",
+      "status": "PASSED_14_2026-07-16"
+    },
+    {
+      "command": "uv run python scripts/top40_v2_tournament_score_diagnostics_v5.py validate-risk-policy tournament/top40-v2/teams/team-04/risk_policy.json",
+      "precondition": "Run only after byte-identical canonical promotion.",
+      "purpose": "canonical root risk-policy validation",
+      "status": "PASSED_2026-07-16"
     }
   ],
-  "execution_precondition": "A5 must exist and be frozen before any command that imports strategy.py; registration remains blocked until every command completes successfully.",
+  "execution_precondition": "The active dispatcher SHA-256 was verified as 0dc9228f3b9c6fe41b2655055f766fc92f323a289a050e6bdf4e48a30b0105f4. Promotion and the seven serialized validations are complete. Material trial registration remains blocked until the A5 control-file commit order is satisfied, BER is explicitly registered with pivot-team, and the final source hash is computed after that family append.",
   "schema_version": 1,
   "team_id": "team-04"
 }

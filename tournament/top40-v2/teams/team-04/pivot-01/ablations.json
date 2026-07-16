@@ -41,7 +41,7 @@
     }
   ],
   "family_id": "team-04-broad-exhaustion-reversal-v1",
-  "global_stop": "Stop before every later observation if the exact reference fails completeness, solvency, annual return, net or doubled-cost Sharpe, four profitable folds, 0.55 positive-quarter fraction, required regime/role returns, sleeve activity, globally pooled positive Pearson score IC, four positive fold ICs, frozen pair-count and purge rules, or complete scheduled A5 boundary evidence. Any scheduled empty record fails completeness.",
+  "global_stop": "Stop before every later observation if the exact reference fails completeness, solvency, annual return, net or doubled-cost Sharpe, four profitable folds, 0.55 positive-quarter fraction, required regime/role returns, sleeve activity, globally pooled positive Pearson score IC, four positive fold ICs, frozen pair-count and purge rules, or complete scheduled A5 boundary evidence. Frozen A5 accepts a scheduled empty-dictionary capture and emits no replay score rows; Team 04's separate schedule-coverage audit fails the reference if any scheduled timestamp lacks a replay score row.",
   "parent_family_id": "team-04-uncrowded-trend-carry-v1",
   "reference": {
     "candidate_id": "team-04-ber-reference-001",

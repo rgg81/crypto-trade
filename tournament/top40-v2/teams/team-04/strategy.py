@@ -1,13 +1,15 @@
-"""Uncrowded Trend Carry (UTC) exact no-control reference candidate."""
+"""Broad Exhaustion Reversal (BER) exact no-control pivot reference."""
 
 from __future__ import annotations
 
 import dataclasses
 import math
 from collections.abc import Mapping, Sequence
-from typing import Any
+from typing import Any, Literal
 
 import pandas as pd
+
+from crypto_trade.tournament.score_adapter_protocol_v5 import score_boundary
 
 _INTERVAL = pd.Timedelta(hours=8)
 _EPOCH = pd.Timestamp("1970-01-01T00:00:00Z")
@@ -15,59 +17,53 @@ _EPOCH = pd.Timestamp("1970-01-01T00:00:00Z")
 
 @dataclasses.dataclass(frozen=True)
 class _Config:
-    candidate_id: str = "team-04-utc-reference-001"
+    candidate_id: str = "team-04-ber-reference-001"
+    family_id: str = "team-04-broad-exhaustion-reversal-v1"
     canonical_seed: int = 20260801
-    slow_trend_days: int = 42
-    slow_skip_days: int = 2
-    fast_trend_days: int = 14
-    fast_skip_days: int = 1
-    funding_lookback_days: int = 7
-    minimum_funding_events: int = 7
-    maximum_funding_staleness_hours: int = 16
-    maximum_absolute_funding_rate: float = 0.05
-    volatility_lookback_days: int = 30
-    volatility_keep_numerator: int = 4
-    volatility_keep_denominator: int = 5
-    slow_weight: float = 0.50
-    fast_weight: float = 0.30
-    funding_weight: float = 0.20
-    minimum_prefilter_cross_section: int = 30
+    baseline_volatility_days: int = 21
+    shock_days: int = 3
+    minimum_baseline_volatility: float = 1e-6
+    coherence_base_weight: float = 0.50
     minimum_cross_section: int = 24
-    selection_numerator: int = 1
-    selection_denominator: int = 4
-    minimum_sleeve_names: int = 6
-    gross_target: float = 0.60
-    side_budget: float = 0.30
-    symbol_cap: float = 0.04
-    rebalance_bars: int = 9
+    selection_numerator: int = 3
+    selection_denominator: int = 10
+    minimum_sleeve_names: int = 8
+    side_budget: float = 0.24
+    symbol_cap: float = 0.03
+    gross_target: float = 0.48
+    rebalance_bars: int = 6
     epsilon: float = 1e-12
     tolerance: float = 1e-12
 
     @property
+    def baseline_bars(self) -> int:
+        return 3 * self.baseline_volatility_days
+
+    @property
+    def shock_bars(self) -> int:
+        return 3 * self.shock_days
+
+    @property
     def history_return_bars(self) -> int:
-        return max(
-            3 * (self.slow_trend_days + self.slow_skip_days),
-            3 * (self.fast_trend_days + self.fast_skip_days),
-            3 * self.volatility_lookback_days,
-        )
+        return self.baseline_bars + self.shock_bars
 
 
 _REFERENCE = _Config()
 
 
 @dataclasses.dataclass(frozen=True)
-class _PriceFeature:
-    slow_trend: float
-    fast_trend: float
-    volatility: float
+class _ShockFeature:
+    shock_log_return: float
+    baseline_volatility: float
+    path_efficiency: float
+    raw_reversal_score: float
 
 
 @dataclasses.dataclass(frozen=True)
-class _Feature:
-    slow_trend: float
-    fast_trend: float
-    funding_per_day: float
-    volatility: float
+class _ScoreSnapshot:
+    decision_time: pd.Timestamp
+    raw_scores: dict[str, float]
+    scores: dict[str, float]
 
 
 def _finite_number(value: Any) -> float | None:
@@ -98,7 +94,7 @@ def _decision_index(value: Any) -> int | None:
     if timestamp is None:
         return None
     delta = timestamp.value - _EPOCH.value
-    if delta % _INTERVAL.value:
+    if delta < 0 or delta % _INTERVAL.value:
         return None
     return delta // _INTERVAL.value
 
@@ -126,22 +122,12 @@ def _expected_open_times(cutoff: pd.Timestamp, return_bars: int) -> tuple[pd.Tim
     return tuple(cutoff - multiple * _INTERVAL for multiple in range(return_bars + 1, 0, -1))
 
 
-def _window_sum(returns: Sequence[float], *, days: int, skip_days: int) -> float | None:
-    width = 3 * days
-    stop = len(returns) - 3 * skip_days
-    start = stop - width
-    if start < 0 or stop <= start:
-        return None
-    result = math.fsum(returns[start:stop])
-    return result if math.isfinite(result) else None
-
-
-def _price_feature(
+def _shock_feature(
     frame: Any,
     *,
     cutoff: pd.Timestamp,
     config: _Config = _REFERENCE,
-) -> _PriceFeature | None:
+) -> _ShockFeature | None:
     if not isinstance(frame, pd.DataFrame):
         return None
     required = ("open_time", "close_time", "close")
@@ -157,7 +143,16 @@ def _price_feature(
             continue
         close_time = _utc_timestamp(raw_close_time)
         close = _finite_number(raw_close)
-        if close_time is None or close_time > cutoff or close is None or close <= 0.0:
+        if (
+            close_time is None
+            or close_time != open_time + _INTERVAL
+            or close_time > cutoff
+            or close is None
+            or close <= 0.0
+        ):
+            # Malformed extras never become observations.  Conversely, every row
+            # satisfying this exact predicate is retained, so two valid rows for
+            # one expected open fail the len==1 check below.
             continue
         rows[open_time].append(close)
     if any(len(rows[timestamp]) != 1 for timestamp in expected):
@@ -174,95 +169,104 @@ def _price_feature(
         returns.append(value)
     if len(returns) != config.history_return_bars:
         return None
-    slow = _window_sum(
-        returns,
-        days=config.slow_trend_days,
-        skip_days=config.slow_skip_days,
-    )
-    fast = _window_sum(
-        returns,
-        days=config.fast_trend_days,
-        skip_days=config.fast_skip_days,
-    )
-    volatility_returns = returns[-3 * config.volatility_lookback_days :]
-    mean = math.fsum(volatility_returns) / len(volatility_returns)
-    variance = math.fsum((value - mean) ** 2 for value in volatility_returns) / len(
-        volatility_returns
-    )
-    if slow is None or fast is None or not math.isfinite(variance) or variance < 0.0:
+    baseline = returns[: config.baseline_bars]
+    shock_path = returns[config.baseline_bars :]
+    if len(baseline) != config.baseline_bars or len(shock_path) != config.shock_bars:
         return None
-    volatility = math.sqrt(variance)
-    if not math.isfinite(volatility):
+    baseline_mean = math.fsum(baseline) / len(baseline)
+    variance = math.fsum((value - baseline_mean) ** 2 for value in baseline) / len(baseline)
+    if not math.isfinite(variance) or variance < 0.0:
         return None
-    return _PriceFeature(slow_trend=slow, fast_trend=fast, volatility=volatility)
+    baseline_volatility = math.sqrt(variance)
+    if (
+        not math.isfinite(baseline_volatility)
+        or baseline_volatility < config.minimum_baseline_volatility
+    ):
+        return None
+    shock_log_return = math.fsum(shock_path)
+    absolute_path = math.fsum(abs(value) for value in shock_path)
+    if absolute_path <= config.epsilon:
+        path_efficiency = 0.0
+    else:
+        # The mathematical ratio is at most one.  Clamp only a possible binary64
+        # upward-rounding overshoot; this convention is part of the frozen spec.
+        path_efficiency = min(1.0, abs(shock_log_return) / absolute_path)
+    standardized_shock = shock_log_return / (baseline_volatility * math.sqrt(config.shock_bars))
+    coherence_multiplier = (
+        config.coherence_base_weight + (1.0 - config.coherence_base_weight) * path_efficiency
+    )
+    raw_reversal_score = -standardized_shock * coherence_multiplier
+    values = (
+        shock_log_return,
+        baseline_volatility,
+        path_efficiency,
+        raw_reversal_score,
+    )
+    if any(not math.isfinite(value) for value in values):
+        return None
+    return _ShockFeature(
+        shock_log_return=shock_log_return,
+        baseline_volatility=baseline_volatility,
+        path_efficiency=path_efficiency,
+        raw_reversal_score=raw_reversal_score,
+    )
 
 
-def _funding_per_day(
-    frame: Any,
-    *,
-    eligible_symbols: Sequence[str],
+def _eligible_symbols(context: Any, config: _Config = _REFERENCE) -> tuple[str, ...] | None:
+    raw_eligible = getattr(context, "eligible_symbols", ())
+    if isinstance(raw_eligible, (str, bytes)):
+        return None
+    try:
+        eligible_input = tuple(raw_eligible)
+    except TypeError:
+        return None
+    if any(not isinstance(symbol, str) or not symbol for symbol in eligible_input):
+        return None
+    if len(eligible_input) != len(set(eligible_input)):
+        return None
+    eligible = tuple(sorted(eligible_input))
+    return eligible if len(eligible) >= config.minimum_cross_section else None
+
+
+def _scheduled_score_snapshot(
+    context: Any,
     decision_time: pd.Timestamp,
     config: _Config = _REFERENCE,
-) -> dict[str, float]:
-    if not isinstance(frame, pd.DataFrame):
-        return {}
-    required = ("funding_time", "symbol", "funding_rate")
-    if not set(required).issubset(frame.columns):
-        return {}
-    eligible = frozenset(eligible_symbols)
-    start = decision_time - pd.Timedelta(days=config.funding_lookback_days)
-    observed: dict[str, list[tuple[pd.Timestamp, float]]] = {symbol: [] for symbol in eligible}
-    invalid: set[str] = set()
-    for raw_time, raw_symbol, raw_rate in frame.loc[:, list(required)].itertuples(
-        index=False, name=None
-    ):
-        if not isinstance(raw_symbol, str) or raw_symbol not in eligible:
-            continue
-        timestamp = _utc_timestamp(raw_time)
-        if timestamp is None:
-            invalid.add(raw_symbol)
-            continue
-        if timestamp < start or timestamp >= decision_time:
-            continue
-        rate = _finite_number(raw_rate)
-        if rate is None or abs(rate) > config.maximum_absolute_funding_rate:
-            invalid.add(raw_symbol)
-            continue
-        observed[raw_symbol].append((timestamp, rate))
-    result: dict[str, float] = {}
-    for symbol in sorted(eligible):
-        if symbol in invalid:
-            continue
-        events = sorted(observed[symbol], key=lambda item: item[0])
-        timestamps = [timestamp for timestamp, _rate in events]
-        if (
-            len(events) < config.minimum_funding_events
-            or len(timestamps) != len(set(timestamps))
-            or decision_time - events[-1][0]
-            > pd.Timedelta(hours=config.maximum_funding_staleness_hours)
-        ):
-            continue
-        value = math.fsum(rate for _timestamp, rate in events) / config.funding_lookback_days
-        if math.isfinite(value):
-            result[symbol] = value
-    return result
+) -> _ScoreSnapshot | None:
+    eligible = _eligible_symbols(context, config)
+    if eligible is None:
+        return None
+    bars = getattr(context, "bars", None)
+    if not isinstance(bars, Mapping):
+        return None
+    cutoff = decision_time - _INTERVAL
+    features: dict[str, _ShockFeature] = {}
+    for symbol in eligible:
+        feature = _shock_feature(bars.get(symbol), cutoff=cutoff, config=config)
+        if feature is not None:
+            features[symbol] = feature
+    if len(features) < config.minimum_cross_section:
+        return None
+    raw_scores = {symbol: features[symbol].raw_reversal_score for symbol in sorted(features)}
+    ranked = _average_ranks(raw_scores)
+    if ranked is None:
+        return None
+    scores = {symbol: ranked[symbol] for symbol in sorted(ranked)}
+    return _ScoreSnapshot(
+        decision_time=decision_time,
+        raw_scores=raw_scores,
+        scores=scores,
+    )
 
 
-def _retain_low_volatility(
-    features: Mapping[str, _Feature], config: _Config = _REFERENCE
-) -> tuple[str, ...] | None:
-    if len(features) < config.minimum_prefilter_cross_section:
-        return None
-    keep = (config.volatility_keep_numerator * len(features)) // (
-        config.volatility_keep_denominator
-    )
-    if keep < config.minimum_cross_section:
-        return None
-    ordered = sorted(
-        features,
-        key=lambda symbol: (features[symbol].volatility, symbol),
-    )
-    return tuple(ordered[:keep])
+def _capture_scheduled_scores(scores: dict[str, float]) -> dict[str, float]:
+    """Call the A5 identity hook once for one manifest-scheduled decision."""
+
+    input_scores = scores
+    scores = score_boundary(scores)
+    if scores is not input_scores:
+        raise RuntimeError("A5 score_boundary must return its input dictionary by identity")
+    return scores
 
 
 def _select_sleeves(
@@ -318,82 +322,13 @@ def _equal_allocation(
     return weights
 
 
-def _scheduled_targets(
-    context: Any, decision_time: pd.Timestamp, config: _Config
+def _targets_from_snapshot(
+    snapshot: _ScoreSnapshot, config: _Config = _REFERENCE
 ) -> dict[str, float]:
-    raw_eligible = getattr(context, "eligible_symbols", ())
-    if isinstance(raw_eligible, (str, bytes)):
-        return {}
-    try:
-        eligible_input = tuple(raw_eligible)
-    except TypeError:
-        return {}
-    if any(not isinstance(symbol, str) or not symbol for symbol in eligible_input):
-        return {}
-    if len(eligible_input) != len(set(eligible_input)):
-        return {}
-    eligible = tuple(sorted(eligible_input))
-    if len(eligible) < config.minimum_prefilter_cross_section:
-        return {}
-    bars = getattr(context, "bars", None)
-    if not isinstance(bars, Mapping):
-        return {}
-    funding = _funding_per_day(
-        getattr(context, "funding", None),
-        eligible_symbols=eligible,
-        decision_time=decision_time,
-        config=config,
-    )
-    cutoff = decision_time - _INTERVAL
-    features: dict[str, _Feature] = {}
-    for symbol in eligible:
-        price = _price_feature(bars.get(symbol), cutoff=cutoff, config=config)
-        funding_value = funding.get(symbol)
-        if price is None or funding_value is None:
-            continue
-        features[symbol] = _Feature(
-            slow_trend=price.slow_trend,
-            fast_trend=price.fast_trend,
-            funding_per_day=funding_value,
-            volatility=price.volatility,
-        )
-    retained = _retain_low_volatility(features, config)
-    if retained is None:
-        return {}
-    slow_ranks = _average_ranks({symbol: features[symbol].slow_trend for symbol in retained})
-    fast_ranks = _average_ranks({symbol: features[symbol].fast_trend for symbol in retained})
-    funding_ranks = _average_ranks(
-        {symbol: features[symbol].funding_per_day for symbol in retained}
-    )
-    if slow_ranks is None or fast_ranks is None or funding_ranks is None:
-        return {}
-    scores = {
-        symbol: config.slow_weight * slow_ranks[symbol]
-        + config.fast_weight * fast_ranks[symbol]
-        - config.funding_weight * funding_ranks[symbol]
-        for symbol in retained
-    }
-    sleeves = _select_sleeves(scores, config)
+    sleeves = _select_sleeves(snapshot.scores, config)
     if sleeves is None:
         return {}
     long_symbols, short_symbols = sleeves
-    mean_long_slow = math.fsum(features[symbol].slow_trend for symbol in long_symbols) / len(
-        long_symbols
-    )
-    mean_short_slow = math.fsum(features[symbol].slow_trend for symbol in short_symbols) / len(
-        short_symbols
-    )
-    mean_long_funding = math.fsum(
-        features[symbol].funding_per_day for symbol in long_symbols
-    ) / len(long_symbols)
-    mean_short_funding = math.fsum(
-        features[symbol].funding_per_day for symbol in short_symbols
-    ) / len(short_symbols)
-    if (
-        mean_long_slow - mean_short_slow <= config.epsilon
-        or mean_short_funding - mean_long_funding <= config.epsilon
-    ):
-        return {}
     long_weights = _equal_allocation(long_symbols, config)
     short_weights = _equal_allocation(short_symbols, config)
     if long_weights is None or short_weights is None:
@@ -408,40 +343,77 @@ def _scheduled_targets(
         gross > config.gross_target + config.tolerance
         or abs(net) > config.tolerance
         or any(
-            symbol not in eligible or not math.isfinite(weight) or abs(weight) > config.symbol_cap
-            for symbol, weight in targets.items()
+            not math.isfinite(weight) or abs(weight) > config.symbol_cap
+            for weight in targets.values()
         )
     ):
         return {}
     return targets
 
 
-class UncrowdedTrendCarry:
-    """Fresh deterministic instance of the exact UTC reference."""
+_DecisionState = Literal["flat", "hold", "scheduled"]
+
+
+def _evaluate_score_state(
+    context: Any, config: _Config = _REFERENCE
+) -> tuple[_DecisionState, _ScoreSnapshot | None]:
+    raw_decision_time = getattr(context, "decision_time", None)
+    decision_time = _utc_timestamp(raw_decision_time)
+    decision_index = _decision_index(raw_decision_time)
+    if decision_time is None or decision_index is None:
+        return "flat", None
+    if decision_index % config.rebalance_bars:
+        return "hold", None
+    try:
+        snapshot = _scheduled_score_snapshot(context, decision_time, config)
+    except (ArithmeticError, KeyError, TypeError, ValueError, OverflowError):
+        snapshot = None
+    if snapshot is None:
+        # A5's frozen contract requires one call even when a scheduled decision
+        # fails closed.  The empty dictionary is the operative score object for
+        # that flat decision; nonscheduled and off-grid calls never reach here.
+        _capture_scheduled_scores({})
+        return "flat", None
+    captured_scores = _capture_scheduled_scores(snapshot.scores)
+    return "scheduled", dataclasses.replace(snapshot, scores=captured_scores)
+
+
+def _validate_seed(seed: Any, config: _Config = _REFERENCE) -> None:
+    if isinstance(seed, bool) or not isinstance(seed, int) or seed != config.canonical_seed:
+        raise ValueError("team-04 BER requires canonical runtime seed 20260801")
+
+
+class BroadExhaustionReversal:
+    """Fresh deterministic instance of the exact BER pivot reference."""
 
     def __init__(self, config: _Config = _REFERENCE) -> None:
         self._config = config
 
-    def target_weights(self, context: Any, *, seed: int) -> dict[str, float] | None:
-        if (
-            isinstance(seed, bool)
-            or not isinstance(seed, int)
-            or seed != self._config.canonical_seed
-        ):
-            raise ValueError("team-04 UTC requires canonical runtime seed 20260801")
-        decision_time = _utc_timestamp(getattr(context, "decision_time", None))
-        decision_index = _decision_index(getattr(context, "decision_time", None))
-        if decision_time is None or decision_index is None:
-            return {}
-        if decision_index % self._config.rebalance_bars:
+    def preconstruction_scores(self, context: Any, *, seed: int) -> dict[str, float] | None:
+        """Return exact ranked scores before sleeve construction; never consumes labels."""
+
+        _validate_seed(seed, self._config)
+        state, snapshot = _evaluate_score_state(context, self._config)
+        if state == "hold":
             return None
+        if state == "flat" or snapshot is None:
+            return {}
+        return dict(snapshot.scores)
+
+    def target_weights(self, context: Any, *, seed: int) -> dict[str, float] | None:
+        _validate_seed(seed, self._config)
+        state, snapshot = _evaluate_score_state(context, self._config)
+        if state == "hold":
+            return None
+        if state == "flat" or snapshot is None:
+            return {}
         try:
-            return _scheduled_targets(context, decision_time, self._config)
+            return _targets_from_snapshot(snapshot, self._config)
         except (ArithmeticError, KeyError, TypeError, ValueError, OverflowError):
             return {}
 
 
-def build_strategy() -> UncrowdedTrendCarry:
-    """Return a fresh UTC reference strategy for the official worker."""
+def build_strategy() -> BroadExhaustionReversal:
+    """Return a fresh BER pivot strategy for the official worker."""
 
-    return UncrowdedTrendCarry()
+    return BroadExhaustionReversal()

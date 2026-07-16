@@ -62,8 +62,8 @@ class _ShockFeature:
 @dataclasses.dataclass(frozen=True)
 class _ScoreSnapshot:
     decision_time: pd.Timestamp
-    raw_scores: Mapping[str, float]
-    scores: Mapping[str, float]
+    raw_scores: dict[str, float]
+    scores: dict[str, float]
 
 
 def _finite_number(value: Any) -> float | None:
@@ -94,7 +94,7 @@ def _decision_index(value: Any) -> int | None:
     if timestamp is None:
         return None
     delta = timestamp.value - _EPOCH.value
-    if delta % _INTERVAL.value:
+    if delta < 0 or delta % _INTERVAL.value:
         return None
     return delta // _INTERVAL.value
 
@@ -191,12 +191,10 @@ def _shock_feature(
         # The mathematical ratio is at most one.  Clamp only a possible binary64
         # upward-rounding overshoot; this convention is part of the frozen spec.
         path_efficiency = min(1.0, abs(shock_log_return) / absolute_path)
-    standardized_shock = shock_log_return / (
-        baseline_volatility * math.sqrt(config.shock_bars)
+    standardized_shock = shock_log_return / (baseline_volatility * math.sqrt(config.shock_bars))
+    coherence_multiplier = (
+        config.coherence_base_weight + (1.0 - config.coherence_base_weight) * path_efficiency
     )
-    coherence_multiplier = config.coherence_base_weight + (
-        1.0 - config.coherence_base_weight
-    ) * path_efficiency
     raw_reversal_score = -standardized_shock * coherence_multiplier
     values = (
         shock_log_return,
@@ -249,21 +247,26 @@ def _scheduled_score_snapshot(
             features[symbol] = feature
     if len(features) < config.minimum_cross_section:
         return None
-    raw_scores = {
-        symbol: features[symbol].raw_reversal_score for symbol in sorted(features)
-    }
+    raw_scores = {symbol: features[symbol].raw_reversal_score for symbol in sorted(features)}
     ranked = _average_ranks(raw_scores)
     if ranked is None:
         return None
     scores = {symbol: ranked[symbol] for symbol in sorted(ranked)}
-    boundary_scores = score_boundary(scores)
-    if boundary_scores is not scores:
-        raise RuntimeError("A5 score_boundary must return its input dictionary by identity")
     return _ScoreSnapshot(
         decision_time=decision_time,
         raw_scores=raw_scores,
-        scores=boundary_scores,
+        scores=scores,
     )
+
+
+def _capture_scheduled_scores(scores: dict[str, float]) -> dict[str, float]:
+    """Call the A5 identity hook once for one manifest-scheduled decision."""
+
+    input_scores = scores
+    scores = score_boundary(scores)
+    if scores is not input_scores:
+        raise RuntimeError("A5 score_boundary must return its input dictionary by identity")
+    return scores
 
 
 def _select_sleeves(
@@ -354,16 +357,25 @@ _DecisionState = Literal["flat", "hold", "scheduled"]
 def _evaluate_score_state(
     context: Any, config: _Config = _REFERENCE
 ) -> tuple[_DecisionState, _ScoreSnapshot | None]:
-    decision_time = _utc_timestamp(getattr(context, "decision_time", None))
-    decision_index = _decision_index(getattr(context, "decision_time", None))
+    raw_decision_time = getattr(context, "decision_time", None)
+    decision_time = _utc_timestamp(raw_decision_time)
+    decision_index = _decision_index(raw_decision_time)
     if decision_time is None or decision_index is None:
         return "flat", None
     if decision_index % config.rebalance_bars:
         return "hold", None
-    snapshot = _scheduled_score_snapshot(context, decision_time, config)
+    try:
+        snapshot = _scheduled_score_snapshot(context, decision_time, config)
+    except (ArithmeticError, KeyError, TypeError, ValueError, OverflowError):
+        snapshot = None
     if snapshot is None:
+        # A5's frozen contract requires one call even when a scheduled decision
+        # fails closed.  The empty dictionary is the operative score object for
+        # that flat decision; nonscheduled and off-grid calls never reach here.
+        _capture_scheduled_scores({})
         return "flat", None
-    return "scheduled", snapshot
+    captured_scores = _capture_scheduled_scores(snapshot.scores)
+    return "scheduled", dataclasses.replace(snapshot, scores=captured_scores)
 
 
 def _validate_seed(seed: Any, config: _Config = _REFERENCE) -> None:
@@ -377,16 +389,11 @@ class BroadExhaustionReversal:
     def __init__(self, config: _Config = _REFERENCE) -> None:
         self._config = config
 
-    def preconstruction_scores(
-        self, context: Any, *, seed: int
-    ) -> dict[str, float] | None:
+    def preconstruction_scores(self, context: Any, *, seed: int) -> dict[str, float] | None:
         """Return exact ranked scores before sleeve construction; never consumes labels."""
 
         _validate_seed(seed, self._config)
-        try:
-            state, snapshot = _evaluate_score_state(context, self._config)
-        except (ArithmeticError, KeyError, TypeError, ValueError, OverflowError):
-            return {}
+        state, snapshot = _evaluate_score_state(context, self._config)
         if state == "hold":
             return None
         if state == "flat" or snapshot is None:
@@ -395,12 +402,12 @@ class BroadExhaustionReversal:
 
     def target_weights(self, context: Any, *, seed: int) -> dict[str, float] | None:
         _validate_seed(seed, self._config)
+        state, snapshot = _evaluate_score_state(context, self._config)
+        if state == "hold":
+            return None
+        if state == "flat" or snapshot is None:
+            return {}
         try:
-            state, snapshot = _evaluate_score_state(context, self._config)
-            if state == "hold":
-                return None
-            if state == "flat" or snapshot is None:
-                return {}
             return _targets_from_snapshot(snapshot, self._config)
         except (ArithmeticError, KeyError, TypeError, ValueError, OverflowError):
             return {}

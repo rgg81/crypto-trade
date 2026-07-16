@@ -1,6 +1,6 @@
 {
   "drawdown_brakes": [],
-  "policy_id": "team-04-utc-reference-no-control",
+  "policy_id": "team-04-ber-reference-no-control",
   "position_stop": {
     "cooldown_bars": 3,
     "enabled": false,

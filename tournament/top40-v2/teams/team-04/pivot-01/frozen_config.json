@@ -6,6 +6,15 @@
     "pandas": "3.0.0",
     "python": "3.13.12"
   },
+  "development_authority": {
+    "active_entrypoint": "scripts/top40_v2_tournament_score_diagnostics_v5.py",
+    "active_entrypoint_sha256": "0dc9228f3b9c6fe41b2655055f766fc92f323a289a050e6bdf4e48a30b0105f4",
+    "amendment_0005_integration_freeze_commit": "d2b95f610722aab65b4e67466b34efeaa3554101",
+    "amendment_0005_integration_freeze_sha256": "b3b2b96245a479ccfff95b5cd5b5cd0aef3b2d0aac0fc9faf5367d3e6772958c",
+    "amendment_0006_integration_freeze_commit": "ed3af1398543dfee4a50150915dc2e37b3631fc9",
+    "amendment_0006_integration_freeze_sha256": "3e93bdfe031e2589888c3bbcaae583437bbd074fa9d86c6dc0a54187bc0f1e34",
+    "amendment_0006_pure_crypto_report_sha256": "b9c55b40fef331861af068272159f45860870182a58c93652eff2a819b3d5d1b"
+  },
   "entrypoint": "strategy.py",
   "factory": "build_strategy",
   "family_id": "team-04-broad-exhaustion-reversal-v1",
@@ -22,10 +31,12 @@
     "unscheduled_action": "hold"
   },
   "ic_contract": {
+    "a5_automatic_qualification_gate": false,
     "aggregate_minimum_pairs": 1440,
     "aggregate_statistic": "ordinary-pearson-over-union-of-six-disjoint-fold-pools",
     "boundary_crossing_pair_action": "purge",
-    "empty_scheduled_record_action": "completeness-failure",
+    "duplicate_executable_open_action": "abort-entire-a5-diagnostic-before-label-pairing",
+    "empty_scheduled_record_action": "a5-captures-empty-dict-and-emits-no-replay-score-rows;team-schedule-coverage-gate-fails-reference",
     "endpoint_eligibility": "exit-fold-membership-not-required-but-executable-open-required",
     "endpoint_offset_hours": 48,
     "fold_assignment": "both-entry-and-exit-inside-same-development-evaluation-fold",
@@ -33,9 +44,9 @@
     "fold_minimum_scheduled_decisions": 10,
     "fold_statistic": "ordinary-pearson-over-all-retained-decision-symbol-pairs",
     "label": "simple-executable-open-t-to-executable-open-t-plus-48h-return",
-    "malformed_pair_action": "omit-with-recorded-reason-no-imputation-clipping-or-terminal-loss-substitution",
+    "malformed_pair_action": "missing-nonfinite-or-nonpositive-expected-endpoint-omits-pair-and-increments-aggregate-unavailable-count;duplicate-open-aborts-diagnostic;no-imputation-clipping-or-terminal-loss-substitution",
     "minimum_positive_fold_ics": 4,
-    "pair_symbol_rule": "finite-score-emitted-at-t-and-two-unambiguous-finite-positive-executable-opens",
+    "pair_symbol_rule": "finite-captured-score-row-at-t-and-finite-positive-executable-opens-at-exact-t-and-t-plus-48h",
     "pooling_forbidden": [
       "label-ranking",
       "timestamp-demeaning",
@@ -44,6 +55,7 @@
       "fisher-transform"
     ],
     "required_aggregate_ic": "strictly-positive",
+    "team_schedule_coverage_gate": "compare-canonical-manifest-scheduled-timestamps-to-replay-score-row-timestamps;any-missing-timestamp-fails-reference",
     "unavailable_conditions": [
       "failed-pair-or-decision-minimum",
       "zero-score-or-label-variance",
@@ -96,22 +108,26 @@
   "runtime_seed_policy": "require-exact-canonical",
   "schema_version": 1,
   "score_contract": {
-    "a5_authority_status": "blocked-awaiting-frozen-amendment",
+    "a5_authority_status": "active-prospective-opt-in-not-yet-materialized",
     "boundary_call": "scores=score_boundary(scores)",
     "boundary_import": "from crypto_trade.tournament.score_adapter_protocol_v5 import score_boundary",
-    "boundary_stage": "after-feature-eligibility-and-ranking-before-sleeves",
+    "boundary_stage": "nonempty-after-feature-eligibility-and-ranking-before-sleeves;scheduled-empty-after-failed-feature-or-rank-attempt-before-sleeves",
     "higher_score_role": "long",
     "identity_requirement": "return-exact-input-dictionary-object",
-    "invalid_scheduled_output": "persisted-empty-score-record-completeness-failure",
+    "invalid_scheduled_output": "one-empty-dict-boundary-capture-no-replay-score-rows;separate-team-schedule-coverage-gate-fails-reference",
     "legacy_team_adapter": "organizer_score_adapter.py",
     "legacy_team_adapter_role": "noncanonical-audit-only-not-promoted-not-executed-by-a5",
-    "off_grid_output": "persisted-empty-score-record-excluded-from-scheduled-ic-pairs",
+    "off_grid_output": "flat-target-with-no-boundary-call-no-score-capture-and-no-score-artifact-row",
+    "schedule_utc": {
+      "anchor_timestamp_utc": "1970-01-01T00:00:00Z",
+      "interval_hours": 48
+    },
     "score_name": "ber_ranked_exhaustion_reversal",
-    "serialization_authority": "organizer-owned-a5-after-freeze",
+    "serialization_authority": "active-organizer-owned-a5",
     "unscheduled_output": null,
     "uses_labels": false
   },
-  "status": "implemented-not-registered-not-run-blocked-awaiting-a5-freeze",
+  "status": "promoted-synthetic-validation-passed-not-registered-not-evaluated-awaiting-review-and-hashes",
   "team_id": "team-04",
   "trial_search_tie_namespace": 2026080104
 }

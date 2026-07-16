@@ -1,9 +1,14 @@
 {
   "candidate_id": "team-04-ber-reference-001",
-  "config_sha256": "ROOT_MUST_COMPUTE_64_HEX",
-  "falsifier": "Stop BER before every later family observation if this exact no-control reference is incomplete or insolvent; has nonpositive annualized return, net Sharpe, or doubled-cost Sharpe; has fewer than four profitable folds; has positive-quarter fraction below 0.55; has nonpositive bull, bear, or chop return; fails long-bull or short-bear attribution; has globally pooled Pearson IC at or below zero between persisted ranked scores and simple executable-open(t)-to-executable-open(t+48h) returns; has positive fold IC in fewer than four of six folds; fails the frozen pair-count, endpoint, purge, or malformed-label rules; has any scheduled empty score record; or lacks complete scheduled A5 score evidence. Unavailable score evidence is failure. Controls cannot rescue a failed core.",
+  "config_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "falsifier": "Stop BER before every later family observation if this exact no-control reference is incomplete or insolvent; has nonpositive annualized return, net Sharpe, or doubled-cost Sharpe; has fewer than four profitable folds; has positive-quarter fraction below 0.55; has nonpositive bull, bear, or chop return; fails long-bull or short-bear attribution; has globally pooled Pearson IC at or below zero between persisted ranked scores and simple executable-open(t)-to-executable-open(t+48h) returns; has positive fold IC in fewer than four of six folds; fails the frozen pair-count, endpoint, purge, or malformed-label rules; has any manifest-scheduled timestamp with no replay score row under Team 04's separate schedule-coverage audit; or lacks complete scheduled A5 score evidence. Frozen A5 accepts one empty-dictionary capture and emits no row for it; that valid adapter behavior still fails this preregistered team gate. Unavailable score evidence is failure. Controls cannot rescue a failed core.",
   "family_id": "team-04-broad-exhaustion-reversal-v1",
   "parameters": {
+    "_top40_v2_score_adapter": {
+      "adapter_id": "top40-v2-declared-score-boundary-v1",
+      "manifest_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "schema_version": 1
+    },
     "baseline_volatility_days": 21,
     "coherence_base_weight": 0.5,
     "gross_target": 0.48,
@@ -17,11 +22,11 @@
     "side_budget": 0.24,
     "symbol_cap": 0.03
   },
-  "risk_config_sha256": "ROOT_MUST_COMPUTE_64_HEX",
+  "risk_config_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
   "seed": 20260801,
-  "source_bundle_sha256": "ROOT_MUST_COMPUTE_64_HEX",
-  "strategy_sha256": "ROOT_MUST_COMPUTE_64_HEX",
+  "source_bundle_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "strategy_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
   "team_id": "team-04",
   "thesis": "Broad volatility-normalized three-day exhaustion reversal should capture liquidation and inventory retracement over the next two-day interval across more calendar quarters, with its exact ranked score persisted by the frozen organizer-owned A5 identity hook before portfolio construction.",
-  "timestamp_utc": "ROOT_MUST_SUPPLY_CURRENT_UTC_Z"
+  "timestamp_utc": "1970-01-01T00:00:00Z"
 }
