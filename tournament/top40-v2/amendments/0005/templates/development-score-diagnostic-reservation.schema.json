@@ -24,6 +24,8 @@
     "executable_source_manifest_path": {"type": "string"},
     "executable_source_manifest_sha256": {"$ref": "#/$defs/sha256"},
     "family_id": {"$ref": "#/$defs/identifier"},
+    "integration_freeze_commit": {"$ref": "#/$defs/commit"},
+    "integration_freeze_sha256": {"$ref": "#/$defs/sha256"},
     "non_material": {"const": true},
     "registration_commit": {"$ref": "#/$defs/commit"},
     "registration_event_record_sha256": {"$ref": "#/$defs/sha256"},
@@ -66,6 +68,7 @@
     "semantic_coupling_review_commit", "snapshot_manifest_path", "snapshot_manifest_sha256",
     "development_target_path", "development_target_sha256", "runner_record_path",
     "runner_record_sha256", "amendment_freeze_sha256", "amendment_freeze_commit",
+    "integration_freeze_sha256", "integration_freeze_commit",
     "research_state_sha256", "research_journal_record_count", "research_journal_head_sha256",
     "reserved_at_utc", "non_material", "charges_team_trial_budget", "reservation_sha256"
   ],

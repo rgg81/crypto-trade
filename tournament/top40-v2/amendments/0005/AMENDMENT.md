@@ -43,18 +43,36 @@ outcome; the staging capability crosses through a trusted closure and is removed
 final-state rejection. A retry validates and returns an exact complete transaction; partial or extra
 canonical files fail closed. Failed runs publish only a terminal result in the same transaction.
 
-Freeze authority requires a strict implementation → independent-review → freeze commit order,
-unique immutable review/freeze first-adds, exact reviewed implementation and review bytes in the
-freeze tree, and the exact activation journal count/head in that tree. The draft SHA-pins parent
+Amendment freeze authority requires a strict implementation → independent-review → freeze commit
+order, unique immutable review/freeze first-adds, and exact reviewed implementation and review
+bytes in the freeze tree. That freeze alone is deliberately **frozen-pending-integration** and
+cannot authorize reservation or execution. A separate integration authority requires a strict
+amendment-freeze → integration-draft → independent-integration-review → integration-freeze commit
+order with unique first-adds and exact authority bytes in every applicable tree. Only the
+integration freeze records the activation journal count/head, validated with canonical zero-based
+sequences; it is the sole prospective registration boundary. The draft SHA-pins parent
 modules/entrypoint and checks callable identities before and after execution. It also pins the
 active Amendment 0006 implementation, pure-crypto audit module, entrypoint, freeze,
 integration-freeze, strict ancestry, and activation journal, and requires the exact canonical A6
 pure-crypto audit before and after every A5 lifecycle operation.
+
+The integration candidate is a prospective superset dispatcher at
+`scripts/top40_v2_tournament_score_diagnostics_v5.py`. Its three non-conflicting commands are
+`amendment-0005-status`, `amendment-0005-reserve-development-score-diagnostic`, and
+`amendment-0005-run-development-score-diagnostic`; every other argument vector is delegated
+unchanged to the exact frozen Amendment 0006 runner. Integration draft, review, and freeze must pin
+the new entrypoint/module bytes and the Amendment 0006 integration freeze, while recording the
+Amendment 0006 entrypoint as `superseded-unchanged`. A private identity capability held by that
+dispatcher is mandatory for reservation and execution, and exact active integration plus A6 audit
+authority is checked before and after each result-bearing call.
 
 Publication assumes the tournament process controls its own Unix UID. A hostile process running as
 the same UID can mutate files outside the lifecycle lock; such writers are out of scope. Even then,
 `RENAME_NOREPLACE` prevents this lifecycle from silently replacing a raced destination, and every
 existing transaction is fully revalidated before it can be returned.
 
-The draft entrypoint is `scripts/top40_v2_amendment_0005_draft.py`. It is not wired into the active
-runner. Execution remains disabled until a new independent approval and immutable freeze exist.
+The draft sidecar remains `scripts/top40_v2_amendment_0005_draft.py`. Its `status` command is
+read-only; its mutating commands intentionally lack the private integration capability and fail
+closed. Execution remains disabled until both independent amendment review/freeze and independent
+integration draft/review/freeze authorities exist. No integration authority JSON is supplied by
+this implementation draft.

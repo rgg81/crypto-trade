@@ -3,16 +3,6 @@
   "$id": "https://crypto-trade.invalid/schemas/top40-v2/amendments/0005/amendment-freeze.schema.json",
   "additionalProperties": false,
   "properties": {
-    "activation_journal": {
-      "additionalProperties": false,
-      "properties": {
-        "head_sha256": {"pattern": "^[0-9a-f]{64}$", "type": "string"},
-        "path": {"const": "tournament/top40-v2/organizer_research_journal.jsonl"},
-        "record_count": {"minimum": 1, "type": "integer"}
-      },
-      "required": ["path", "head_sha256", "record_count"],
-      "type": "object"
-    },
     "amendment_id": {"const": "top40-v2-amendment-0005-prospective-development-score-adapters"},
     "draft_sha256": {"pattern": "^[0-9a-f]{64}$", "type": "string"},
     "frozen_at_utc": {"pattern": "Z$", "type": "string"},
@@ -27,7 +17,7 @@
   "required": [
     "schema_version", "amendment_id", "status", "frozen_at_utc",
     "implementation_commit", "implementation_files", "review_path", "review_sha256",
-    "draft_sha256", "parent_authorities", "activation_journal"
+    "draft_sha256", "parent_authorities"
   ],
   "title": "Top40 V2 Amendment 0005 freeze",
   "type": "object"

@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://crypto-trade.invalid/schemas/top40-v2/amendments/0005/integration-draft.schema.json",
+  "$defs": {
+    "authorityBinding": {
+      "additionalProperties": false,
+      "properties": {
+        "commit": {"pattern": "^[0-9a-f]{40}$", "type": "string"},
+        "path": {"type": "string"},
+        "sha256": {"pattern": "^[0-9a-f]{64}$", "type": "string"}
+      },
+      "required": ["path", "sha256", "commit"],
+      "type": "object"
+    },
+    "activeEntrypoint": {
+      "additionalProperties": false,
+      "properties": {
+        "path": {"const": "scripts/top40_v2_tournament_score_diagnostics_v5.py"},
+        "sha256": {"pattern": "^[0-9a-f]{64}$", "type": "string"}
+      },
+      "required": ["path", "sha256"],
+      "type": "object"
+    },
+    "amendmentFreezeBinding": {
+      "allOf": [
+        {"$ref": "#/$defs/authorityBinding"},
+        {"properties": {"path": {"const": "tournament/top40-v2/amendments/0005/freeze.json"}}}
+      ]
+    },
+    "delegatedA6Integration": {
+      "additionalProperties": false,
+      "properties": {
+        "commit": {"const": "ed3af1398543dfee4a50150915dc2e37b3631fc9"},
+        "path": {"const": "tournament/top40-v2/amendments/0006/integration-freeze.json"},
+        "sha256": {"const": "3e93bdfe031e2589888c3bbcaae583437bbd074fa9d86c6dc0a54187bc0f1e34"}
+      },
+      "required": ["path", "sha256", "commit"],
+      "type": "object"
+    },
+    "dispatchScope": {
+      "additionalProperties": false,
+      "properties": {
+        "all_other_argv_delegated_to_amendment_0006_unchanged": {"const": true},
+        "amendment_0005_commands": {
+          "const": [
+            "amendment-0005-status",
+            "amendment-0005-reserve-development-score-diagnostic",
+            "amendment-0005-run-development-score-diagnostic"
+          ]
+        },
+        "draft_sidecar_mutations_authorized": {"const": false}
+      },
+      "required": [
+        "amendment_0005_commands",
+        "all_other_argv_delegated_to_amendment_0006_unchanged",
+        "draft_sidecar_mutations_authorized"
+      ],
+      "type": "object"
+    },
+    "historicalEntrypoint": {
+      "additionalProperties": false,
+      "properties": {
+        "path": {"const": "scripts/top40_v2_tournament_pure_crypto_v6.py"},
+        "sha256": {"const": "a9197dc2f83d4415f1aa4c098546e21e010cb99e754580de96c3e339cc927641"},
+        "status": {"const": "superseded-unchanged"}
+      },
+      "required": ["path", "sha256", "status"],
+      "type": "object"
+    },
+    "integrationModule": {
+      "additionalProperties": false,
+      "properties": {
+        "path": {"const": "src/crypto_trade/tournament/amendment_0005_integration_v2.py"},
+        "sha256": {"pattern": "^[0-9a-f]{64}$", "type": "string"}
+      },
+      "required": ["path", "sha256"],
+      "type": "object"
+    },
+    "integrationDraftBinding": {
+      "allOf": [
+        {"$ref": "#/$defs/authorityBinding"},
+        {"properties": {"path": {"const": "tournament/top40-v2/amendments/0005/integration-draft.json"}}}
+      ]
+    },
+    "integrationReviewBinding": {
+      "allOf": [
+        {"$ref": "#/$defs/authorityBinding"},
+        {"properties": {"path": {"const": "tournament/top40-v2/amendments/0005/INTEGRATION-REVIEW.json"}}}
+      ]
+    },
+    "timestamp": {"pattern": "Z$", "type": "string"}
+  },
+  "additionalProperties": false,
+  "properties": {
+    "active_entrypoint": {"$ref": "#/$defs/activeEntrypoint"},
+    "amendment_freeze": {"$ref": "#/$defs/amendmentFreezeBinding"},
+    "amendment_id": {"const": "top40-v2-amendment-0005-prospective-development-score-adapters"},
+    "delegated_amendment_0006_integration": {"$ref": "#/$defs/delegatedA6Integration"},
+    "dispatch_scope": {"$ref": "#/$defs/dispatchScope"},
+    "historical_entrypoint": {"$ref": "#/$defs/historicalEntrypoint"},
+    "integration_module": {"$ref": "#/$defs/integrationModule"},
+    "proposed_at_utc": {"$ref": "#/$defs/timestamp"},
+    "schema_version": {"const": 1},
+    "status": {"const": "draft"}
+  },
+  "required": [
+    "schema_version", "amendment_id", "status", "proposed_at_utc",
+    "amendment_freeze", "active_entrypoint", "integration_module",
+    "delegated_amendment_0006_integration", "historical_entrypoint", "dispatch_scope"
+  ],
+  "title": "Top40 V2 Amendment 0005 integration draft",
+  "type": "object"
+}

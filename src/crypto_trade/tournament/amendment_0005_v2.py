@@ -12,6 +12,7 @@ import re
 import shutil
 import stat
 import subprocess
+import sys
 from collections.abc import Callable, Iterator, Mapping
 from datetime import UTC, datetime
 from pathlib import Path
@@ -48,6 +49,17 @@ AMENDMENT_ROOT = "tournament/top40-v2/amendments/0005"
 DRAFT_PATH = f"{AMENDMENT_ROOT}/draft.json"
 REVIEW_PATH = f"{AMENDMENT_ROOT}/REVIEW.json"
 FREEZE_PATH = f"{AMENDMENT_ROOT}/freeze.json"
+INTEGRATION_DRAFT_PATH = f"{AMENDMENT_ROOT}/integration-draft.json"
+INTEGRATION_REVIEW_PATH = f"{AMENDMENT_ROOT}/INTEGRATION-REVIEW.json"
+INTEGRATION_FREEZE_PATH = f"{AMENDMENT_ROOT}/integration-freeze.json"
+
+ACTIVE_INTEGRATION_ENTRYPOINT_PATH = "scripts/top40_v2_tournament_score_diagnostics_v5.py"
+ACTIVE_INTEGRATION_MODULE_PATH = "src/crypto_trade/tournament/amendment_0005_integration_v2.py"
+A5_INTEGRATION_COMMANDS = (
+    "amendment-0005-status",
+    "amendment-0005-reserve-development-score-diagnostic",
+    "amendment-0005-run-development-score-diagnostic",
+)
 
 ELIGIBLE_TEAMS = tuple(f"team-{number:02d}" for number in range(4, 11))
 EXCLUDED_TEAMS = ("team-03",)
@@ -87,6 +99,8 @@ _AUTHORITY_KEYS = {
     "runner_record_sha256",
     "amendment_freeze_sha256",
     "amendment_freeze_commit",
+    "integration_freeze_sha256",
+    "integration_freeze_commit",
     "research_state_sha256",
     "research_journal_record_count",
     "research_journal_head_sha256",
@@ -137,14 +151,33 @@ A6_ACTIVATION_JOURNAL_HEAD_SHA256 = (
 A6_CANONICAL_AUDIT_SHA256 = "b9c55b40fef331861af068272159f45860870182a58c93652eff2a819b3d5d1b"
 A6_CANONICAL_AUDIT_SIZE = 73_777
 
+_A6_DELEGATED_INTEGRATION = {
+    "path": A6_INTEGRATION_FREEZE_PATH,
+    "sha256": PARENT_AUTHORITIES["amendment_0006_integration_freeze_sha256"],
+    "commit": PARENT_AUTHORITIES["amendment_0006_integration_freeze_commit"],
+}
+_A6_SUPERSEDED_ENTRYPOINT = {
+    "path": A6_ACTIVE_ENTRYPOINT_PATH,
+    "sha256": PARENT_AUTHORITIES["amendment_0006_active_entrypoint_sha256"],
+    "status": "superseded-unchanged",
+}
+_INTEGRATION_DISPATCH_SCOPE = {
+    "amendment_0005_commands": list(A5_INTEGRATION_COMMANDS),
+    "all_other_argv_delegated_to_amendment_0006_unchanged": True,
+    "draft_sidecar_mutations_authorized": False,
+}
+
 IMPLEMENTATION_FILE_PATHS = (
     "scripts/top40_v2_amendment_0005_draft.py",
+    ACTIVE_INTEGRATION_ENTRYPOINT_PATH,
     "src/crypto_trade/tournament/_score_worker_v5.py",
     "src/crypto_trade/tournament/amendment_0005_v2.py",
+    ACTIVE_INTEGRATION_MODULE_PATH,
     "src/crypto_trade/tournament/development_score_diagnostics_v5.py",
     "src/crypto_trade/tournament/generic_score_adapter_v5.py",
     "src/crypto_trade/tournament/score_adapter_protocol_v5.py",
     "tests/tournament/test_top40_v2_amendment_0005.py",
+    "tests/tournament/test_top40_v2_amendment_0005_integration.py",
     "tests/tournament/test_top40_v2_development_score_diagnostics_v5.py",
     "tests/tournament/test_top40_v2_score_adapter_v5.py",
     f"{AMENDMENT_ROOT}/AMENDMENT.md",
@@ -153,6 +186,9 @@ IMPLEMENTATION_FILE_PATHS = (
     DRAFT_PATH,
     f"{AMENDMENT_ROOT}/templates/amendment-freeze.schema.json",
     f"{AMENDMENT_ROOT}/templates/amendment-review.schema.json",
+    f"{AMENDMENT_ROOT}/templates/integration-draft.schema.json",
+    f"{AMENDMENT_ROOT}/templates/integration-freeze.schema.json",
+    f"{AMENDMENT_ROOT}/templates/integration-review.schema.json",
     f"{AMENDMENT_ROOT}/templates/development-score-diagnostic-reservation.schema.json",
     f"{AMENDMENT_ROOT}/templates/development-score-diagnostic-result.schema.json",
     f"{AMENDMENT_ROOT}/templates/executable-source-manifest.schema.json",
@@ -184,6 +220,13 @@ _IDENTIFIER = re.compile(r"[a-z0-9][a-z0-9._-]{0,127}")
 
 class Amendment0005Error(ValueError):
     """The prospective score-diagnostic authority failed closed."""
+
+
+class _ActiveIntegrationAuthorization:
+    """Private identity capability held only by the reviewed superset dispatcher."""
+
+
+_ACTIVE_INTEGRATION_AUTHORIZATION = _ActiveIntegrationAuthorization()
 
 
 def _regular_bytes(path: Path, label: str, *, maximum_bytes: int = 32 * 1024 * 1024) -> bytes:
@@ -367,15 +410,12 @@ def verify_parent_authorities(root: str | Path) -> None:
         f"{integration_commit}:{TOP40_V2_LAYOUT.organizer_journal_path}",
         label="Amendment 0006 activation journal",
     )
-    journal_lines = journal_bytes.splitlines()
-    if len(journal_lines) != A6_ACTIVATION_JOURNAL_RECORD_COUNT:
-        raise Amendment0005Error("Amendment 0006 activation journal count differs")
-    journal_head = strict_json_object(journal_lines[-1], "Amendment 0006 journal head")
-    if (
-        journal_head.get("sequence") != A6_ACTIVATION_JOURNAL_RECORD_COUNT - 1
-        or journal_head.get("record_sha256") != A6_ACTIVATION_JOURNAL_HEAD_SHA256
-    ):
-        raise Amendment0005Error("Amendment 0006 activation journal head differs")
+    _validate_zero_based_journal_prefix(
+        journal_bytes,
+        A6_ACTIVATION_JOURNAL_RECORD_COUNT,
+        A6_ACTIVATION_JOURNAL_HEAD_SHA256,
+        "Amendment 0006 activation journal",
+    )
 
 
 def _verified_pure_crypto_audit(root: Path) -> bytes:
@@ -415,6 +455,49 @@ def _read_pretty_json(root: Path, relative: str, label: str) -> tuple[Mapping[st
     if pretty_json_bytes(raw) != payload:
         raise Amendment0005Error(f"{label} must be canonical pretty JSON")
     return raw, payload
+
+
+def _validate_zero_based_journal_prefix(
+    payload: bytes,
+    expected_record_count: int,
+    expected_head_sha256: str,
+    label: str,
+) -> tuple[Mapping[str, Any], ...]:
+    """Validate the zero-based sequence and exact head of a frozen journal prefix."""
+
+    if type(expected_record_count) is not int or expected_record_count < 1:
+        raise Amendment0005Error(f"{label} record count is invalid")
+    if type(expected_head_sha256) is not str or _SHA.fullmatch(expected_head_sha256) is None:
+        raise Amendment0005Error(f"{label} head SHA-256 is invalid")
+    lines = payload.splitlines()
+    if len(lines) != expected_record_count:
+        raise Amendment0005Error(f"{label} count differs")
+    records = tuple(strict_json_object(line, f"{label} record") for line in lines)
+    if any(
+        record.get("sequence") != sequence
+        or type(record.get("record_sha256")) is not str
+        or _SHA.fullmatch(record["record_sha256"]) is None
+        for sequence, record in enumerate(records)
+    ):
+        raise Amendment0005Error(f"{label} sequence or record SHA-256 differs")
+    head = records[-1]
+    if (
+        head.get("sequence") != expected_record_count - 1
+        or head.get("record_sha256") != expected_head_sha256
+    ):
+        raise Amendment0005Error(f"{label} head differs")
+    return records
+
+
+def _is_post_journal_prefix(sequence: object, record_count: int) -> bool:
+    """Return whether a zero-based record sequence is strictly after a prefix."""
+
+    return (
+        type(sequence) is int
+        and type(record_count) is int
+        and record_count >= 1
+        and sequence >= record_count
+    )
 
 
 def _load_draft(root: Path) -> tuple[Mapping[str, Any], bytes]:
@@ -479,7 +562,6 @@ def _load_freeze(root: Path) -> tuple[Mapping[str, Any], bytes, str]:
         "review_sha256",
         "draft_sha256",
         "parent_authorities",
-        "activation_journal",
     }:
         raise Amendment0005Error("Amendment 0005 freeze has invalid keys")
     implementation_commit = freeze["implementation_commit"]
@@ -536,17 +618,6 @@ def _load_freeze(root: Path) -> tuple[Mapping[str, Any], bytes, str]:
     ):
         raise Amendment0005Error("Amendment 0005 review/freeze binding differs")
     review_commit = unique_first_add_commit(root, REVIEW_PATH, review_bytes)
-    activation = freeze["activation_journal"]
-    if (
-        not isinstance(activation, Mapping)
-        or set(activation) != {"path", "head_sha256", "record_count"}
-        or activation["path"] != TOP40_V2_LAYOUT.organizer_journal_path
-        or type(activation["head_sha256"]) is not str
-        or _SHA.fullmatch(activation["head_sha256"]) is None
-        or type(activation["record_count"]) is not int
-        or activation["record_count"] < 1
-    ):
-        raise Amendment0005Error("Amendment 0005 activation journal is invalid")
     freeze_commit = unique_first_add_commit(root, FREEZE_PATH, payload)
     _require_strict_ancestor(
         root,
@@ -574,34 +645,375 @@ def _load_freeze(root: Path) -> tuple[Mapping[str, Any], bytes, str]:
             raise Amendment0005Error(
                 "Amendment 0005 freeze tree lacks reviewed implementation bytes"
             )
+    return freeze, payload, freeze_commit
+
+
+def _canonical_utc_timestamp(value: object, label: str) -> datetime:
+    if type(value) is not str or not value.endswith("Z"):
+        raise Amendment0005Error(f"{label} must be canonical UTC text")
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise Amendment0005Error(f"{label} is invalid") from exc
+    if parsed.tzinfo is None or parsed.utcoffset() != UTC.utcoffset(parsed):
+        raise Amendment0005Error(f"{label} must be UTC")
+    if parsed.isoformat().replace("+00:00", "Z") != value:
+        raise Amendment0005Error(f"{label} is not canonical")
+    return parsed
+
+
+def _integration_file_binding(path: str, payload: bytes) -> dict[str, str]:
+    return {"path": path, "sha256": sha256_bytes(payload)}
+
+
+def _authority_file_binding(path: str, payload: bytes, commit: str) -> dict[str, str]:
+    return {"path": path, "sha256": sha256_bytes(payload), "commit": commit}
+
+
+def _integration_authority_present(root: Path) -> bool:
+    observations = [
+        (root / relative).exists() or (root / relative).is_symlink()
+        for relative in (
+            INTEGRATION_DRAFT_PATH,
+            INTEGRATION_REVIEW_PATH,
+            INTEGRATION_FREEZE_PATH,
+        )
+    ]
+    if any(observations) and not all(observations):
+        raise Amendment0005Error("Amendment 0005 integration authority is incomplete")
+    return all(observations)
+
+
+def _require_integration_ancestry(
+    root: Path,
+    freeze_commit: str,
+    draft_commit: str,
+    review_commit: str,
+    integration_commit: str,
+) -> None:
+    _require_strict_ancestor(root, freeze_commit, draft_commit, "A5 freeze/integration draft")
+    _require_strict_ancestor(root, draft_commit, review_commit, "integration draft/review")
+    _require_strict_ancestor(
+        root, review_commit, integration_commit, "integration review/integration freeze"
+    )
+
+
+def _load_active_integration(
+    root: Path,
+    *,
+    amendment_freeze: tuple[Mapping[str, Any], bytes, str] | None = None,
+) -> tuple[Mapping[str, Any], bytes, str]:
+    """Validate the unique reviewed integration chain and its zero-based boundary."""
+
+    verify_parent_authorities(root)
+    if amendment_freeze is None:
+        amendment_freeze = _load_freeze(root)
+    freeze, freeze_bytes, freeze_commit = amendment_freeze
+    if not _integration_authority_present(root):
+        raise Amendment0005Error("Amendment 0005 integration is not active")
+
+    _entry_relative, _entry_path, entrypoint_bytes, _entry_stat = read_repo_file(
+        root,
+        ACTIVE_INTEGRATION_ENTRYPOINT_PATH,
+        "Amendment 0005 active integration entrypoint",
+        maximum_bytes=1024 * 1024,
+        require_single_link=True,
+    )
+    _module_relative, _module_path, module_bytes, _module_stat = read_repo_file(
+        root,
+        ACTIVE_INTEGRATION_MODULE_PATH,
+        "Amendment 0005 active integration module",
+        maximum_bytes=4 * 1024 * 1024,
+        require_single_link=True,
+    )
+    active_entrypoint = _integration_file_binding(
+        ACTIVE_INTEGRATION_ENTRYPOINT_PATH, entrypoint_bytes
+    )
+    integration_module = _integration_file_binding(ACTIVE_INTEGRATION_MODULE_PATH, module_bytes)
+    amendment_binding = _authority_file_binding(FREEZE_PATH, freeze_bytes, freeze_commit)
+
+    draft, draft_bytes = _read_pretty_json(
+        root, INTEGRATION_DRAFT_PATH, "Amendment 0005 integration draft"
+    )
+    if set(draft) != {
+        "schema_version",
+        "amendment_id",
+        "status",
+        "proposed_at_utc",
+        "amendment_freeze",
+        "active_entrypoint",
+        "integration_module",
+        "delegated_amendment_0006_integration",
+        "historical_entrypoint",
+        "dispatch_scope",
+    }:
+        raise Amendment0005Error("Amendment 0005 integration draft has invalid keys")
+    proposed_at = _canonical_utc_timestamp(
+        draft.get("proposed_at_utc"), "Amendment 0005 integration proposal timestamp"
+    )
+    if (
+        draft.get("schema_version") != 1
+        or draft.get("amendment_id") != AMENDMENT_ID
+        or draft.get("status") != "draft"
+        or draft.get("amendment_freeze") != amendment_binding
+        or draft.get("active_entrypoint") != active_entrypoint
+        or draft.get("integration_module") != integration_module
+        or draft.get("delegated_amendment_0006_integration") != _A6_DELEGATED_INTEGRATION
+        or draft.get("historical_entrypoint") != _A6_SUPERSEDED_ENTRYPOINT
+        or draft.get("dispatch_scope") != _INTEGRATION_DISPATCH_SCOPE
+        or proposed_at
+        < _canonical_utc_timestamp(freeze.get("frozen_at_utc"), "Amendment 0005 freeze timestamp")
+    ):
+        raise Amendment0005Error("Amendment 0005 integration draft differs")
+    draft_commit = unique_first_add_commit(root, INTEGRATION_DRAFT_PATH, draft_bytes)
+    draft_binding = _authority_file_binding(INTEGRATION_DRAFT_PATH, draft_bytes, draft_commit)
+
+    review, review_bytes = _read_pretty_json(
+        root, INTEGRATION_REVIEW_PATH, "Amendment 0005 integration review"
+    )
+    if set(review) != {
+        "schema_version",
+        "amendment_id",
+        "decision",
+        "reviewed_at_utc",
+        "reviewer",
+        "amendment_freeze",
+        "integration_draft",
+        "active_entrypoint",
+        "integration_module",
+        "delegated_amendment_0006_integration",
+        "historical_entrypoint",
+        "dispatch_scope",
+    }:
+        raise Amendment0005Error("Amendment 0005 integration review has invalid keys")
+    reviewed_at = _canonical_utc_timestamp(
+        review.get("reviewed_at_utc"), "Amendment 0005 integration review timestamp"
+    )
+    reviewer = review.get("reviewer")
+    if (
+        review.get("schema_version") != 1
+        or review.get("amendment_id") != AMENDMENT_ID
+        or review.get("decision") != "approved"
+        or type(reviewer) is not str
+        or _IDENTIFIER.fullmatch(reviewer) is None
+        or review.get("amendment_freeze") != amendment_binding
+        or review.get("integration_draft") != draft_binding
+        or review.get("active_entrypoint") != active_entrypoint
+        or review.get("integration_module") != integration_module
+        or review.get("delegated_amendment_0006_integration") != _A6_DELEGATED_INTEGRATION
+        or review.get("historical_entrypoint") != _A6_SUPERSEDED_ENTRYPOINT
+        or review.get("dispatch_scope") != _INTEGRATION_DISPATCH_SCOPE
+        or reviewed_at < proposed_at
+    ):
+        raise Amendment0005Error("Amendment 0005 integration review differs")
+    review_commit = unique_first_add_commit(root, INTEGRATION_REVIEW_PATH, review_bytes)
+    review_binding = _authority_file_binding(INTEGRATION_REVIEW_PATH, review_bytes, review_commit)
+
+    integration, integration_bytes = _read_pretty_json(
+        root, INTEGRATION_FREEZE_PATH, "Amendment 0005 integration freeze"
+    )
+    if set(integration) != {
+        "schema_version",
+        "amendment_id",
+        "status",
+        "activation_timestamp_utc",
+        "amendment_freeze",
+        "integration_draft",
+        "integration_review",
+        "active_entrypoint",
+        "integration_module",
+        "delegated_amendment_0006_integration",
+        "historical_entrypoint",
+        "dispatch_scope",
+        "activation_journal",
+    }:
+        raise Amendment0005Error("Amendment 0005 integration freeze has invalid keys")
+    activated_at = _canonical_utc_timestamp(
+        integration.get("activation_timestamp_utc"),
+        "Amendment 0005 integration activation timestamp",
+    )
+    activation = integration.get("activation_journal")
+    if (
+        integration.get("schema_version") != 1
+        or integration.get("amendment_id") != AMENDMENT_ID
+        or integration.get("status") != "active"
+        or integration.get("amendment_freeze") != amendment_binding
+        or integration.get("integration_draft") != draft_binding
+        or integration.get("integration_review") != review_binding
+        or integration.get("active_entrypoint") != active_entrypoint
+        or integration.get("integration_module") != integration_module
+        or integration.get("delegated_amendment_0006_integration") != _A6_DELEGATED_INTEGRATION
+        or integration.get("historical_entrypoint") != _A6_SUPERSEDED_ENTRYPOINT
+        or integration.get("dispatch_scope") != _INTEGRATION_DISPATCH_SCOPE
+        or activated_at < reviewed_at
+        or not isinstance(activation, Mapping)
+        or set(activation) != {"path", "head_sha256", "record_count"}
+        or activation.get("path") != TOP40_V2_LAYOUT.organizer_journal_path
+        or type(activation.get("head_sha256")) is not str
+        or _SHA.fullmatch(activation["head_sha256"]) is None
+        or type(activation.get("record_count")) is not int
+        or activation["record_count"] < A6_ACTIVATION_JOURNAL_RECORD_COUNT
+    ):
+        raise Amendment0005Error("Amendment 0005 integration freeze differs")
+    integration_commit = unique_first_add_commit(root, INTEGRATION_FREEZE_PATH, integration_bytes)
+    _require_integration_ancestry(
+        root,
+        freeze_commit,
+        draft_commit,
+        review_commit,
+        integration_commit,
+    )
+
+    authority_files = {
+        FREEZE_PATH: freeze_bytes,
+        INTEGRATION_DRAFT_PATH: draft_bytes,
+        INTEGRATION_REVIEW_PATH: review_bytes,
+        INTEGRATION_FREEZE_PATH: integration_bytes,
+        ACTIVE_INTEGRATION_ENTRYPOINT_PATH: entrypoint_bytes,
+        ACTIVE_INTEGRATION_MODULE_PATH: module_bytes,
+        A6_INTEGRATION_FREEZE_PATH: _regular_bytes(
+            root / A6_INTEGRATION_FREEZE_PATH,
+            "Amendment 0006 integration freeze",
+            maximum_bytes=2_044,
+        ),
+        A6_ACTIVE_ENTRYPOINT_PATH: _regular_bytes(
+            root / A6_ACTIVE_ENTRYPOINT_PATH,
+            "Amendment 0006 superseded entrypoint",
+            maximum_bytes=244,
+        ),
+    }
+    if (
+        len(authority_files[A6_INTEGRATION_FREEZE_PATH]) != 2_044
+        or sha256_bytes(authority_files[A6_INTEGRATION_FREEZE_PATH])
+        != PARENT_AUTHORITIES["amendment_0006_integration_freeze_sha256"]
+        or len(authority_files[A6_ACTIVE_ENTRYPOINT_PATH]) != 244
+        or sha256_bytes(authority_files[A6_ACTIVE_ENTRYPOINT_PATH])
+        != PARENT_AUTHORITIES["amendment_0006_active_entrypoint_sha256"]
+    ):
+        raise Amendment0005Error("Amendment 0006 delegated integration bytes changed")
+    for commit, required_paths, label in (
+        (
+            draft_commit,
+            (
+                FREEZE_PATH,
+                INTEGRATION_DRAFT_PATH,
+                ACTIVE_INTEGRATION_ENTRYPOINT_PATH,
+                ACTIVE_INTEGRATION_MODULE_PATH,
+                A6_INTEGRATION_FREEZE_PATH,
+                A6_ACTIVE_ENTRYPOINT_PATH,
+            ),
+            "draft",
+        ),
+        (
+            review_commit,
+            (
+                FREEZE_PATH,
+                INTEGRATION_DRAFT_PATH,
+                INTEGRATION_REVIEW_PATH,
+                ACTIVE_INTEGRATION_ENTRYPOINT_PATH,
+                ACTIVE_INTEGRATION_MODULE_PATH,
+                A6_INTEGRATION_FREEZE_PATH,
+                A6_ACTIVE_ENTRYPOINT_PATH,
+            ),
+            "review",
+        ),
+        (integration_commit, tuple(authority_files), "integration freeze"),
+    ):
+        for relative in required_paths:
+            if (
+                git_bytes(
+                    root,
+                    "show",
+                    f"{commit}:{relative}",
+                    label=f"Amendment 0005 {label} tree file {relative}",
+                )
+                != authority_files[relative]
+            ):
+                raise Amendment0005Error(f"Amendment 0005 {label} tree lacks exact authority bytes")
     journal_bytes = git_bytes(
         root,
         "show",
-        f"{freeze_commit}:{TOP40_V2_LAYOUT.organizer_journal_path}",
-        label="Amendment 0005 activation journal at freeze",
+        f"{integration_commit}:{TOP40_V2_LAYOUT.organizer_journal_path}",
+        label="Amendment 0005 activation journal at integration freeze",
     )
-    journal_lines = journal_bytes.splitlines()
-    if len(journal_lines) != activation["record_count"]:
-        raise Amendment0005Error("activation journal count differs at freeze commit")
-    try:
-        records = [
-            strict_json_object(line, "Amendment 0005 activation journal record")
-            for line in journal_lines
-        ]
-        last_record = records[-1]
-    except IndexError as exc:
-        raise Amendment0005Error("activation journal is empty at freeze commit") from exc
-    if any(
-        record.get("sequence") != sequence
-        or type(record.get("record_sha256")) is not str
-        or _SHA.fullmatch(record["record_sha256"]) is None
-        for sequence, record in enumerate(records, start=1)
-    ) or (
-        last_record.get("record_sha256") != activation["head_sha256"]
-        or last_record.get("sequence") != activation["record_count"]
+    records = _validate_zero_based_journal_prefix(
+        journal_bytes,
+        activation["record_count"],
+        activation["head_sha256"],
+        "Amendment 0005 activation journal at integration freeze",
+    )
+    if (
+        len(records) < A6_ACTIVATION_JOURNAL_RECORD_COUNT
+        or records[A6_ACTIVATION_JOURNAL_RECORD_COUNT - 1]["record_sha256"]
+        != A6_ACTIVATION_JOURNAL_HEAD_SHA256
     ):
-        raise Amendment0005Error("activation journal head differs at freeze commit")
-    return freeze, payload, freeze_commit
+        raise Amendment0005Error("Amendment 0005 activation journal does not extend Amendment 0006")
+    return integration, integration_bytes, integration_commit
+
+
+def _integration_activation_boundary(integration: Mapping[str, Any]) -> tuple[int, str]:
+    """Return the sole prospective boundary from an already verified integration freeze."""
+
+    activation = integration.get("activation_journal")
+    if not isinstance(activation, Mapping):
+        raise Amendment0005Error("active integration lacks an activation journal")
+    record_count = activation.get("record_count")
+    head_sha256 = activation.get("head_sha256")
+    if (
+        type(record_count) is not int
+        or record_count < A6_ACTIVATION_JOURNAL_RECORD_COUNT
+        or type(head_sha256) is not str
+        or _SHA.fullmatch(head_sha256) is None
+    ):
+        raise Amendment0005Error("active integration activation boundary is invalid")
+    return record_count, head_sha256
+
+
+def _verify_loaded_integration_dispatch(root: Path) -> None:
+    module = sys.modules.get("crypto_trade.tournament.amendment_0005_integration_v2")
+    expected_path = (root / ACTIVE_INTEGRATION_MODULE_PATH).resolve()
+    loaded_path = None if module is None else getattr(module, "__file__", None)
+    if (
+        module is None
+        or type(loaded_path) is not str
+        or Path(loaded_path).resolve() != expected_path
+    ):
+        raise PermissionError("Amendment 0005 mutation requires the active integration dispatcher")
+    identities = {
+        "_A5_MODULE": sys.modules[__name__],
+        "_A5_STATUS": amendment_status,
+        "_A5_RESERVE": reserve_development_score_diagnostic,
+        "_A5_RUN": run_development_score_diagnostic,
+        "_A5_ACTIVE_GUARD": _active_integration_guard,
+        "_A5_AUTHORIZATION": _ACTIVE_INTEGRATION_AUTHORIZATION,
+        "_A6_RUN": _A6_RUN,
+    }
+    if any(getattr(module, name, None) is not value for name, value in identities.items()):
+        raise PermissionError("Amendment 0005 active integration identity changed")
+    if (
+        getattr(module, "STATUS_COMMAND", None) != A5_INTEGRATION_COMMANDS[0]
+        or getattr(module, "RESERVE_COMMAND", None) != A5_INTEGRATION_COMMANDS[1]
+        or getattr(module, "RUN_COMMAND", None) != A5_INTEGRATION_COMMANDS[2]
+        or getattr(module, "AMENDMENT_0005_COMMANDS", None) != A5_INTEGRATION_COMMANDS
+    ):
+        raise PermissionError("Amendment 0005 active integration commands changed")
+
+
+@contextlib.contextmanager
+def _active_integration_guard(
+    root: Path, *, _authorization: object | None = None
+) -> Iterator[Mapping[str, Any]]:
+    if _authorization is not _ACTIVE_INTEGRATION_AUTHORIZATION:
+        raise PermissionError("Amendment 0005 mutation requires active-entrypoint authority")
+    _verify_loaded_integration_dispatch(root)
+    before, before_bytes, before_commit = _load_active_integration(root)
+    try:
+        yield before
+    finally:
+        after, after_bytes, after_commit = _load_active_integration(root)
+        _verify_loaded_integration_dispatch(root)
+        if after != before or after_bytes != before_bytes or after_commit != before_commit:
+            raise Amendment0005Error("Amendment 0005 integration changed during dispatch")
 
 
 def amendment_status(root: str | Path) -> Mapping[str, Any]:
@@ -619,13 +1031,29 @@ def amendment_status(root: str | Path) -> Mapping[str, Any]:
                 "stage": "development",
             }
         freeze, freeze_bytes, freeze_commit = _load_freeze(root_path)
+        if not _integration_authority_present(root_path):
+            return {
+                "amendment_id": AMENDMENT_ID,
+                "status": "frozen-pending-integration",
+                "execution_enabled": False,
+                "freeze_sha256": sha256_bytes(freeze_bytes),
+                "freeze_commit": freeze_commit,
+                "eligible_teams": list(ELIGIBLE_TEAMS),
+                "stage": "development",
+            }
+        integration, integration_bytes, integration_commit = _load_active_integration(
+            root_path,
+            amendment_freeze=(freeze, freeze_bytes, freeze_commit),
+        )
         return {
             "amendment_id": AMENDMENT_ID,
-            "status": "frozen",
+            "status": "active",
             "execution_enabled": True,
             "freeze_sha256": sha256_bytes(freeze_bytes),
             "freeze_commit": freeze_commit,
-            "activation_journal": freeze["activation_journal"],
+            "integration_freeze_sha256": sha256_bytes(integration_bytes),
+            "integration_freeze_commit": integration_commit,
+            "activation_journal": integration["activation_journal"],
             "eligible_teams": list(ELIGIBLE_TEAMS),
             "stage": "development",
         }
@@ -736,6 +1164,10 @@ def _candidate_authority(
 ) -> tuple[dict[str, Any], Mapping[str, str]]:
     verify_parent_authorities(root)
     freeze, freeze_bytes, freeze_commit = _load_freeze(root)
+    integration, integration_bytes, integration_commit = _load_active_integration(
+        root,
+        amendment_freeze=(freeze, freeze_bytes, freeze_commit),
+    )
     paths = _candidate_paths(team_id, candidate_id)
     if state_lock_held:
         state, state_bytes, journal = _current_state_and_journal_locked(root, config)
@@ -743,8 +1175,7 @@ def _candidate_authority(
         state, state_bytes, journal = _current_state_and_journal(root, config)
     if state["teams"][team_id]["status"] != "researching":
         raise Amendment0005Error("candidate team is not in active research")
-    activation = freeze["activation_journal"]
-    activation_count = int(activation["record_count"])
+    activation_count, activation_head = _integration_activation_boundary(integration)
     if (
         len(journal.records) < A6_ACTIVATION_JOURNAL_RECORD_COUNT
         or journal.records[A6_ACTIVATION_JOURNAL_RECORD_COUNT - 1]["record_sha256"]
@@ -753,7 +1184,7 @@ def _candidate_authority(
         raise Amendment0005Error("current journal does not extend Amendment 0006 activation")
     if (
         len(journal.records) < activation_count
-        or journal.records[activation_count - 1]["record_sha256"] != activation["head_sha256"]
+        or journal.records[activation_count - 1]["record_sha256"] != activation_head
     ):
         raise Amendment0005Error("current journal does not extend the activation journal")
     accounting = journal.teams[team_id]
@@ -774,7 +1205,9 @@ def _candidate_authority(
         and record["payload"]["team_id"] == team_id
         and record["payload"]["candidate_id"] == candidate_id
     ]
-    if len(matching_records) != 1 or matching_records[0]["sequence"] <= activation_count:
+    if len(matching_records) != 1 or not _is_post_journal_prefix(
+        matching_records[0]["sequence"], activation_count
+    ):
         raise Amendment0005Error("preactivation registrations are outside Amendment 0005")
     parameters = registration.get("parameters")
     opt_in = parameters.get(OPT_IN_PARAMETER) if isinstance(parameters, Mapping) else None
@@ -803,7 +1236,12 @@ def _candidate_authority(
     if sha256_bytes(build_trial_registration(**dict(registration_raw))) != registration_sha:
         raise Amendment0005Error("registration input differs from organizer journal")
     registration_commit = unique_first_add_commit(root, paths["registration_input_path"], reg_bytes)
-    _require_strict_ancestor(root, freeze_commit, registration_commit, "prospective registration")
+    _require_strict_ancestor(
+        root,
+        integration_commit,
+        registration_commit,
+        "integration freeze/prospective registration",
+    )
 
     _manifest_relative, _manifest_path, manifest_bytes, _manifest_stat = read_repo_file(
         root,
@@ -979,10 +1417,9 @@ def _candidate_authority(
     ]
     if len(result_records) != 1:
         raise Amendment0005Error("candidate has no unique trial-result record")
-    if (
-        result_records[0]["sequence"] <= matching_records[0]["sequence"]
-        or result_records[0]["sequence"] <= activation_count
-    ):
+    if result_records[0]["sequence"] <= matching_records[0][
+        "sequence"
+    ] or not _is_post_journal_prefix(result_records[0]["sequence"], activation_count):
         raise Amendment0005Error(
             "trial result is not strictly postactivation registration evidence"
         )
@@ -1019,6 +1456,8 @@ def _candidate_authority(
         "runner_record_sha256": hashes["runner_record_sha256"],
         "amendment_freeze_sha256": sha256_bytes(freeze_bytes),
         "amendment_freeze_commit": freeze_commit,
+        "integration_freeze_sha256": sha256_bytes(integration_bytes),
+        "integration_freeze_commit": integration_commit,
         "research_state_sha256": sha256_bytes(state_bytes),
         "research_journal_record_count": len(journal.records),
         "research_journal_head_sha256": journal.records[-1]["record_sha256"],
@@ -1230,10 +1669,15 @@ def reserve_development_score_diagnostic(
     candidate_id: str,
     *,
     clock: Callable[[], datetime] = lambda: datetime.now(UTC),
+    _authorization: object | None = None,
 ) -> Mapping[str, Any]:
     root_path = Path(root).resolve()
-    config = load_config(root_path / TOP40_V2_LAYOUT.config_path)
-    with _execution_lock(root_path), _pure_crypto_audit_guard(root_path):
+    with (
+        _active_integration_guard(root_path, _authorization=_authorization),
+        _execution_lock(root_path),
+        _pure_crypto_audit_guard(root_path),
+    ):
+        config = load_config(root_path / TOP40_V2_LAYOUT.config_path)
         authority, paths = _candidate_authority(root_path, config, team_id, candidate_id)
         for key in ("reservation_path", "result_path", "evidence_dir"):
             path = root_path / paths[key]
@@ -1304,6 +1748,7 @@ def _load_reservation(root: Path, relative: str) -> tuple[Mapping[str, Any], byt
         "executable_source_manifest_commit",
         "semantic_coupling_review_commit",
         "amendment_freeze_commit",
+        "integration_freeze_commit",
     ):
         if type(reservation[key]) is not str or _COMMIT.fullmatch(reservation[key]) is None:
             raise Amendment0005Error("development score reservation has invalid commit binding")
@@ -1402,10 +1847,16 @@ def run_development_score_diagnostic(
     root: str | Path,
     team_id: str,
     candidate_id: str,
+    *,
+    _authorization: object | None = None,
 ) -> Mapping[str, Any]:
     root_path = Path(root).resolve()
-    config = load_config(root_path / TOP40_V2_LAYOUT.config_path)
-    with _execution_lock(root_path), _pure_crypto_audit_guard(root_path):
+    with (
+        _active_integration_guard(root_path, _authorization=_authorization),
+        _execution_lock(root_path),
+        _pure_crypto_audit_guard(root_path),
+    ):
+        config = load_config(root_path / TOP40_V2_LAYOUT.config_path)
         paths = _candidate_paths(team_id, candidate_id)
         reservation, reservation_bytes = _load_reservation(root_path, paths["reservation_path"])
         if (

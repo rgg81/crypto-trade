@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://crypto-trade.invalid/schemas/top40-v2/amendments/0005/integration-review.schema.json",
+  "additionalProperties": false,
+  "properties": {
+    "active_entrypoint": {"$ref": "https://crypto-trade.invalid/schemas/top40-v2/amendments/0005/integration-draft.schema.json#/$defs/activeEntrypoint"},
+    "amendment_freeze": {"$ref": "https://crypto-trade.invalid/schemas/top40-v2/amendments/0005/integration-draft.schema.json#/$defs/amendmentFreezeBinding"},
+    "amendment_id": {"const": "top40-v2-amendment-0005-prospective-development-score-adapters"},
+    "decision": {"const": "approved"},
+    "delegated_amendment_0006_integration": {"$ref": "https://crypto-trade.invalid/schemas/top40-v2/amendments/0005/integration-draft.schema.json#/$defs/delegatedA6Integration"},
+    "dispatch_scope": {"$ref": "https://crypto-trade.invalid/schemas/top40-v2/amendments/0005/integration-draft.schema.json#/$defs/dispatchScope"},
+    "historical_entrypoint": {"$ref": "https://crypto-trade.invalid/schemas/top40-v2/amendments/0005/integration-draft.schema.json#/$defs/historicalEntrypoint"},
+    "integration_draft": {"$ref": "https://crypto-trade.invalid/schemas/top40-v2/amendments/0005/integration-draft.schema.json#/$defs/integrationDraftBinding"},
+    "integration_module": {"$ref": "https://crypto-trade.invalid/schemas/top40-v2/amendments/0005/integration-draft.schema.json#/$defs/integrationModule"},
+    "reviewed_at_utc": {"$ref": "https://crypto-trade.invalid/schemas/top40-v2/amendments/0005/integration-draft.schema.json#/$defs/timestamp"},
+    "reviewer": {"pattern": "^[a-z0-9][a-z0-9._-]{0,127}$", "type": "string"},
+    "schema_version": {"const": 1}
+  },
+  "required": [
+    "schema_version", "amendment_id", "decision", "reviewed_at_utc", "reviewer",
+    "amendment_freeze", "integration_draft", "active_entrypoint", "integration_module",
+    "delegated_amendment_0006_integration", "historical_entrypoint", "dispatch_scope"
+  ],
+  "title": "Top40 V2 Amendment 0005 integration review",
+  "type": "object"
+}

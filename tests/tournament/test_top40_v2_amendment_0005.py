@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import contextlib
 import inspect
 import json
 import os
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 from urllib.parse import urldefrag, urljoin
@@ -19,6 +21,12 @@ from crypto_trade.tournament.amendment_integrity_v2 import pretty_json_bytes, sh
 from crypto_trade.tournament.top40_v2 import LoadedV2Config
 
 ROOT = Path(__file__).resolve().parents[2]
+_A2_RESULT_FIELDS = {
+    "status",
+    "failure_reason",
+    "organizer_cpu_hours",
+    "organizer_wall_clock_hours",
+}
 
 
 def _request() -> diagnostics.DevelopmentScoreDiagnosticRequest:
@@ -107,6 +115,7 @@ def _reservation() -> tuple[dict[str, Any], dict[str, str]]:
             "executable_source_manifest_commit": commit,
             "semantic_coupling_review_commit": commit,
             "amendment_freeze_commit": commit,
+            "integration_freeze_commit": commit,
             "candidate_seed": 1,
             "registration_event_sequence": 26,
             "trial_result_event_sequence": 27,
@@ -115,6 +124,125 @@ def _reservation() -> tuple[dict[str, Any], dict[str, str]]:
     )
     core = amendment._reservation_core(authority, "2026-07-16T00:00:00Z")
     return {**core, "reservation_sha256": sha256_bytes(pretty_json_bytes(core))}, paths
+
+
+def _journal_prefix_bytes(*, first_sequence: int, record_count: int) -> tuple[bytes, str]:
+    records = [
+        {
+            "record_sha256": f"{sequence + 1:064x}",
+            "sequence": sequence,
+        }
+        for sequence in range(first_sequence, first_sequence + record_count)
+    ]
+    payload = b"".join(
+        json.dumps(record, separators=(",", ":"), sort_keys=True).encode("utf-8") + b"\n"
+        for record in records
+    )
+    return payload, str(records[-1]["record_sha256"])
+
+
+def _install_public_lifecycle(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    *,
+    status: str,
+    reject_final_authority: bool = False,
+) -> tuple[dict[str, Any], dict[str, str], dict[str, Any]]:
+    config, state = _install_exact_a2(monkeypatch, tmp_path)
+    reservation, paths = _reservation()
+    authority = {key: reservation[key] for key in amendment._AUTHORITY_KEYS}
+    statistics = {"development_pearson": 0.25, "qualification_gate": False}
+    observed: dict[str, Any] = {
+        "a2_outcomes": [],
+        "authority_calls": 0,
+        "runner_calls": 0,
+    }
+
+    monkeypatch.setattr(amendment, "load_config", lambda _path: config)
+    monkeypatch.setattr(amendment, "_execution_lock", lambda _root: contextlib.nullcontext())
+    monkeypatch.setattr(
+        amendment,
+        "_active_integration_guard",
+        lambda _root, *, _authorization: contextlib.nullcontext(),
+    )
+    monkeypatch.setattr(
+        amendment, "_pure_crypto_audit_guard", lambda _root: contextlib.nullcontext()
+    )
+    monkeypatch.setattr(
+        amendment.amendment_v2, "_state_lock", lambda _root: contextlib.nullcontext()
+    )
+    monkeypatch.setattr(amendment, "verify_parent_authorities", lambda _root: None)
+    monkeypatch.setattr(amendment, "require_no_git_history", lambda *_args: None)
+    monkeypatch.setattr(amendment, "unique_first_add_commit", lambda *_args: "b" * 40)
+    monkeypatch.setattr(
+        amendment,
+        "_load_reservation",
+        lambda _root, _relative: (reservation, pretty_json_bytes(reservation)),
+    )
+
+    def candidate_authority(
+        _root: Path,
+        _config: LoadedV2Config,
+        team_id: str,
+        candidate_id: str,
+        *,
+        state_lock_held: bool = False,
+    ) -> tuple[dict[str, Any], dict[str, str]]:
+        assert (team_id, candidate_id) == ("team-04", "candidate-04")
+        observed["authority_calls"] += 1
+        result = dict(authority)
+        if reject_final_authority and state_lock_held:
+            result["research_journal_head_sha256"] = "f" * 64
+        return result, dict(paths)
+
+    monkeypatch.setattr(amendment, "_candidate_authority", candidate_authority)
+
+    def frozen_runner(
+        *,
+        root: Path,
+        request: diagnostics.DevelopmentScoreDiagnosticRequest,
+        staged_artifact_sink,
+    ) -> dict[str, object]:
+        observed["runner_calls"] += 1
+        runner_v2.tournament_contract.validate_run_state(state, config)
+        artifacts: dict[str, bytes] = {}
+        if status == "completed":
+            artifacts = {name: b"artifact" for name in diagnostics.REQUIRED_ARTIFACT_NAMES}
+            artifacts["diagnostic-summary.json"] = pretty_json_bytes(
+                {
+                    "reservation_sha256": request.reservation_sha256,
+                    "executable_source_manifest_sha256": (
+                        request.executable_source_manifest_sha256
+                    ),
+                    "semantic_coupling_review_sha256": (request.semantic_coupling_review_sha256),
+                    "statistics": statistics,
+                }
+            )
+        staged_artifact_sink(diagnostics.stage_diagnostic_artifacts(root, request, artifacts))
+        return {
+            "status": status,
+            "failure_reason": None if status == "completed" else "expected failure",
+            "organizer_cpu_hours": 0.0,
+            "organizer_wall_clock_hours": 0.0,
+        }
+
+    monkeypatch.setattr(diagnostics, "run_reserved_development_score_diagnostic", frozen_runner)
+    exact_a2 = amendment._A2_RUN
+
+    def observed_a2(*, root: Path, runner_call) -> Mapping[str, Any]:
+        outcome = exact_a2(root=root, runner_call=runner_call)
+        assert set(outcome) == _A2_RESULT_FIELDS
+        observed["a2_outcomes"].append(dict(outcome))
+        return outcome
+
+    monkeypatch.setattr(amendment, "_A2_RUN", observed_a2)
+
+    def publish(stage: Path, destination: Path) -> bool:
+        stage.rename(destination)
+        return True
+
+    monkeypatch.setattr(amendment, "_rename_directory_noreplace", publish)
+    return reservation, paths, observed
 
 
 def test_team03_and_earlier_teams_are_structurally_excluded() -> None:
@@ -210,6 +338,119 @@ def test_real_active_a6_parent_and_pure_crypto_audit_are_bound() -> None:
     report = amendment._verified_pure_crypto_audit(ROOT)
     assert len(report) == amendment.A6_CANONICAL_AUDIT_SIZE
     assert sha256_bytes(report) == amendment.A6_CANONICAL_AUDIT_SHA256
+
+
+def test_zero_based_journal_prefix_binds_count_sequences_and_head() -> None:
+    payload, head = _journal_prefix_bytes(first_sequence=0, record_count=3)
+    amendment._validate_zero_based_journal_prefix(
+        payload,
+        expected_record_count=3,
+        expected_head_sha256=head,
+        label="test activation journal",
+    )
+
+    with pytest.raises(amendment.Amendment0005Error, match="count"):
+        amendment._validate_zero_based_journal_prefix(
+            payload,
+            expected_record_count=2,
+            expected_head_sha256=head,
+            label="test activation journal",
+        )
+    one_based, one_based_head = _journal_prefix_bytes(first_sequence=1, record_count=3)
+    with pytest.raises(amendment.Amendment0005Error, match="sequence"):
+        amendment._validate_zero_based_journal_prefix(
+            one_based,
+            expected_record_count=3,
+            expected_head_sha256=one_based_head,
+            label="test activation journal",
+        )
+    with pytest.raises(amendment.Amendment0005Error, match="head"):
+        amendment._validate_zero_based_journal_prefix(
+            payload,
+            expected_record_count=3,
+            expected_head_sha256="f" * 64,
+            label="test activation journal",
+        )
+
+
+def test_first_sequence_after_zero_based_journal_prefix_is_record_count() -> None:
+    assert amendment._is_post_journal_prefix(24, 25) is False
+    assert amendment._is_post_journal_prefix(25, 25) is True
+    assert amendment._is_post_journal_prefix(26, 25) is True
+
+
+@pytest.mark.parametrize("status", ["completed", "failed"])
+def test_public_lifecycle_publishes_and_retries_idempotently_through_exact_a2(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    status: str,
+) -> None:
+    _reservation_payload, paths, observed = _install_public_lifecycle(
+        monkeypatch,
+        tmp_path,
+        status=status,
+    )
+
+    first = amendment.run_development_score_diagnostic(
+        tmp_path,
+        "team-04",
+        "candidate-04",
+        _authorization=amendment._ACTIVE_INTEGRATION_AUTHORIZATION,
+    )
+    second = amendment.run_development_score_diagnostic(
+        tmp_path,
+        "team-04",
+        "candidate-04",
+        _authorization=amendment._ACTIVE_INTEGRATION_AUTHORIZATION,
+    )
+
+    assert first == second
+    assert first["status"] == status
+    assert observed["runner_calls"] == 1
+    assert observed["authority_calls"] == 2
+    assert len(observed["a2_outcomes"]) == 1
+    assert set(observed["a2_outcomes"][0]) == _A2_RESULT_FIELDS
+    evidence = tmp_path / paths["evidence_dir"]
+    expected = {amendment.TERMINAL_RESULT_NAME}
+    if status == "completed":
+        expected.update(diagnostics.REQUIRED_ARTIFACT_NAMES)
+    assert {entry.name for entry in evidence.iterdir()} == expected
+    assert not [
+        entry
+        for entry in evidence.parent.iterdir()
+        if entry.name.startswith(".candidate-04.") and entry.name.endswith(".staged")
+    ]
+
+
+def test_public_lifecycle_final_state_rejection_discards_private_staging(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    _reservation_payload, paths, observed = _install_public_lifecycle(
+        monkeypatch,
+        tmp_path,
+        status="completed",
+        reject_final_authority=True,
+    )
+
+    with pytest.raises(amendment.Amendment0005Error, match="phase/state changed"):
+        amendment.run_development_score_diagnostic(
+            tmp_path,
+            "team-04",
+            "candidate-04",
+            _authorization=amendment._ACTIVE_INTEGRATION_AUTHORIZATION,
+        )
+
+    evidence = tmp_path / paths["evidence_dir"]
+    assert not evidence.exists()
+    assert observed["runner_calls"] == 1
+    assert observed["authority_calls"] == 2
+    assert len(observed["a2_outcomes"]) == 1
+    assert not [
+        entry
+        for entry in evidence.parent.iterdir()
+        if entry.name.startswith(".candidate-04.") and entry.name.endswith(".staged")
+    ]
 
 
 @pytest.mark.parametrize("status", ["completed", "failed"])

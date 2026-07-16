@@ -2,10 +2,16 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pandas as pd
 import pytest
 
-from crypto_trade.tournament.amendment_integrity_v2 import pretty_json_bytes
+from crypto_trade.tournament import development_score_diagnostics_v5 as diagnostics
+from crypto_trade.tournament.amendment_integrity_v2 import (
+    pretty_json_bytes,
+    sha256_bytes,
+)
 from crypto_trade.tournament.development_score_diagnostics_v5 import (
     label_score_panel,
     parse_executable_source_manifest,
@@ -42,6 +48,82 @@ def test_executable_source_manifest_is_acyclic_and_complete() -> None:
         "risk_policy.json",
         "strategy.py",
     ]
+
+
+@pytest.mark.parametrize(
+    ("commit", "label"),
+    [
+        ("1" * 40, "semantic-review tree"),
+        ("2" * 40, "score-manifest tree"),
+        ("3" * 40, "registration tree"),
+    ],
+)
+def test_each_candidate_history_boundary_rejects_an_incomplete_executable_manifest(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    commit: str,
+    label: str,
+) -> None:
+    source = {
+        "helper.py": b"VALUE = 1\n",
+        "risk_policy.json": b"{}\n",
+        "strategy.py": b"from helper import VALUE\n",
+    }
+    manifest = {
+        "files": [
+            {
+                "path": relative,
+                "sha256": sha256_bytes(source[relative]),
+                "size": len(source[relative]),
+            }
+            for relative in ("risk_policy.json", "strategy.py")
+        ]
+    }
+    boundary_label = label
+    materialized: list[tuple[str, str]] = []
+
+    def fake_git_bytes(
+        root: Path,
+        *arguments: str,
+        label: str,
+    ) -> bytes:
+        assert root == tmp_path
+        assert arguments[0] == "show"
+        bound_commit, relative = arguments[1].split(":", 1)
+        assert bound_commit == commit
+        prefix = "tournament/top40-v2/teams/team-04/"
+        assert relative.startswith(prefix)
+        assert label.startswith(f"{boundary_label} executable dependency ")
+        return source[relative.removeprefix(prefix)]
+
+    def fake_materialize_team_tree(
+        root: Path,
+        bound_commit: str,
+        team_id: str,
+        destination: Path,
+    ) -> None:
+        assert root == tmp_path
+        assert (bound_commit, team_id) == (commit, "team-04")
+        materialized.append((bound_commit, team_id))
+        destination.mkdir(mode=0o700, parents=True, exist_ok=False)
+        for relative, payload in source.items():
+            (destination / relative).write_bytes(payload)
+
+    monkeypatch.setattr(diagnostics, "git_bytes", fake_git_bytes)
+    monkeypatch.setattr(diagnostics, "_A1_MATERIALIZE_TREE", fake_materialize_team_tree)
+
+    with pytest.raises(
+        ValueError,
+        match=f"{label} executable dependency set is incomplete",
+    ):
+        diagnostics.verify_executable_sources_at_commit(
+            tmp_path,
+            commit,
+            "team-04",
+            manifest,
+            label=label,
+        )
+    assert materialized == [(commit, "team-04")]
 
 
 def _manifest(*, horizon: int = 48) -> bytes:
