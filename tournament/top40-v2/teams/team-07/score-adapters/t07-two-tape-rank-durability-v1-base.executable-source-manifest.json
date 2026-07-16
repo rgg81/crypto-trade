@@ -1,0 +1,39 @@
+{
+  "candidate_id": "t07-two-tape-rank-durability-v1-base",
+  "family_id": "t07-two-tape-rank-durability-v1",
+  "files": [
+    {
+      "path": "candidate_variant.py",
+      "sha256": "7aaed418826d38667e44ff26bdd73a4658bb329b02e0f379ab46218cdc8f80c8",
+      "size": 186
+    },
+    {
+      "path": "frozen_config.json",
+      "sha256": "10859e9a405ecccccab3712eb0db362f060a8cc0e8fbc473817c029ac3b40bb5",
+      "size": 4616
+    },
+    {
+      "path": "risk_policy.json",
+      "sha256": "d3b918f600f2b548b6a2c8dc44a3077b7b34d8c911ecc6e9c776eada8ad77b6c",
+      "size": 580
+    },
+    {
+      "path": "strategy.py",
+      "sha256": "bb5b45c3c0de5846463bc8b3164a5921a319ee5a17663ad93b3b6cc7e2224506",
+      "size": 17874
+    },
+    {
+      "path": "test_risk_policy_contract.py",
+      "sha256": "53968dadf0de262a0329ab90232d9a0407ad277123c0789095d7b08ec56d9baf",
+      "size": 4736
+    },
+    {
+      "path": "test_strategy.py",
+      "sha256": "9e98ecf3cdd175d30b76efc0b253cfc0c7f02c6dd896405ebaf1c807aaf2cac5",
+      "size": 12169
+    }
+  ],
+  "manifest_kind": "top40-v2-executable-source-manifest-v1",
+  "schema_version": 1,
+  "team_id": "team-07"
+}
