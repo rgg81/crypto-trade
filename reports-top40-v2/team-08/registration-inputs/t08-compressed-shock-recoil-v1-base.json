@@ -1,0 +1,35 @@
+{
+  "candidate_id": "t08-compressed-shock-recoil-v1-base",
+  "config_sha256": "bd0e4f70bcf335b2ac4e44ec049b89b8e8eaf4c6ac6502574d0accf12d9d9947",
+  "falsifier": "Reject if this exact no-control core fails any official central-development threshold: net Sharpe at least 0.75, positive annualized return, Calmar at least 0.40, maximum drawdown at most 0.30, doubled-cost Sharpe at least 0.35, positive doubled-cost return, trial-adjusted probability positive at least 0.90, at least four of six profitable folds, positive-quarter fraction at least 0.55, worst-regime Sharpe at least -0.25, and at least three positive regime Sharpes. Also require strictly positive return and Sharpe in bull, bear, and chop; positive long-bull, short-bear, and combined-chop attribution; both sleeves use the 0.01 active-exposure threshold and have active-bar fraction at least 0.10, mean gross exposure at least 0.01, and executed notional at least 1000 USDT; at least 70% of declared neighbors profitable with median neighbor Sharpe at least 0.50; positive-PnL concentration at most 0.40; complete scheduled A5 score coverage; positive pooled score IC; and at least four positive fold ICs. Controls, neighbors, ablations, private data, and sign inversion cannot rescue any failure.",
+  "family_id": "t08-compressed-shock-recoil-v1",
+  "parameters": {
+    "_top40_v2_score_adapter": {
+      "adapter_id": "top40-v2-declared-score-boundary-v1",
+      "manifest_sha256": "1db49ecb3cfe944efaa74b2408c50493a8daf8cfcca8b63ef550f9dcf46d7395",
+      "schema_version": 1
+    },
+    "bar_interval_hours": 8,
+    "baseline_volatility_bars": 84,
+    "compression_ratio_ceiling": 1.0,
+    "compression_ratio_floor": 0.45,
+    "compression_volatility_bars": 21,
+    "gross_target": 0.36,
+    "history_return_bars": 126,
+    "maximum_symbol_exposure": 0.025,
+    "minimum_direction_agreement": "2/3",
+    "minimum_positions_per_side": 8,
+    "minimum_valid_symbols": 24,
+    "rebalance_interval_bars": 21,
+    "selected_fraction_per_side": "1/5",
+    "shock_bars": 3,
+    "shock_saturation_z": 2.5
+  },
+  "risk_config_sha256": "8db76eb8d59fbef6473d2a2cd98bbba68c8e53d8d78284284ec06db54b8fa5d6",
+  "seed": 20260801,
+  "source_bundle_sha256": "58e4eef4f9b70227ae698c999d352138fc6f9f39b6ff06d01680a59eb74da2f3",
+  "strategy_sha256": "883ff191364d76febb1d070135236e9a245a4c4af9eb7139cbc2d06a55019d30",
+  "team_id": "team-08",
+  "thesis": "The exact no-control compressed-shock recoil core should earn positive aggregate and doubled-cost alpha across bull, bear, and chop by fading durable coin-specific shocks that emerge from prior volatility compression, while trading weekly and remaining exactly dollar neutral.",
+  "timestamp_utc": "2026-07-16T22:24:10Z"
+}
