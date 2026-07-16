@@ -1,0 +1,64 @@
+{
+  "activation_authorized": false,
+  "amendment_id": "top40-v2-amendment-0006-pure-crypto-universe",
+  "canonical_report": {
+    "accepted_symbol_set_sha256": {
+      "all_contract_metadata": "0935f4e3995cd5f44a3485ce14b2ab8f4659d4f29204572e2ac0081f460d9221",
+      "all_membership": "a211b5aa9857455ceb4d11b10f7d00fccdf852ece2e713953fc5a6b683430e90",
+      "archive_only_contract_metadata": "3107c7b1c52cdce16a0fa18da86fba49557ddb12e440a9cdac16ef581f59e475",
+      "archive_only_membership": "4f9f9416f89e1f4cfd2dfba8583e52ee1958341e978c15b73efd235a81ea1bb9",
+      "current_contract_metadata": "2ee211354df33551320e8b9e64bfd79d243703f4bc342cc070131c674767e47d",
+      "current_membership": "dc5c4fa468eca9b26de26d5ba9048967f10d1aa2a6ee70d58696641a62e71ff0",
+      "eligible_current_exchange": "416cf9a4bb3bfcb9bc909f15a9a4e761fb3e5b2cb896ee80d3141dbab56b307e"
+    },
+    "archive_only_metadata_symbols": 26,
+    "bytes": 73777,
+    "contract_metadata_symbols": 667,
+    "membership_symbols": 321,
+    "policy_sha256": "2c7fb0ff593d06c323517e60df4b28ab9387a2df580b83f82f65ef71c91fc350",
+    "sha256": "b9c55b40fef331861af068272159f45860870182a58c93652eff2a819b3d5d1b",
+    "violations": 0
+  },
+  "decision": "approved",
+  "final_implementation_commit": "49dd8978c161fb75b9a78efaead5f847f589e7f1",
+  "implementation_files": {
+    "scripts/top40_v2_tournament_pure_crypto_v6.py": "a9197dc2f83d4415f1aa4c098546e21e010cb99e754580de96c3e339cc927641",
+    "src/crypto_trade/tournament/amendment_0006_v2.py": "5f5187ef431ca89077f21ada09139fe3b3ada62afeb1fa0f3ce957c6ba5933b1",
+    "src/crypto_trade/tournament/pure_crypto_universe_v6.py": "fc93c0f26dcbf6304abe028736693ab2bee7430a56c14a8547defff472008192",
+    "tests/tournament/test_top40_v2_amendment_0006.py": "5eae809e3c5e7e5e2147bbd49f47c61d376038cb909bc4f2d1080a22eb723237",
+    "tournament/top40-v2/amendments/0006/AMENDMENT.md": "ccb69cf09580942930fdb15faa04f5ec9e4105c85b8c39ea45ba80e259628299"
+  },
+  "implementation_lineage": [
+    "8b94a5d6d99820bc62a82a3464f08587f882137e",
+    "38c3b000aed1063677d7634d0da5c309eb39c8e3",
+    "49dd8978c161fb75b9a78efaead5f847f589e7f1"
+  ],
+  "parent_authority": {
+    "amendment_0004_active_runner_sha256": "03006ea1ce391ef3c8da6244acb89aab19f7e63d1e0a617e2743894a575fd6cd",
+    "amendment_0004_freeze_sha256": "bfb9e82c0b9a0950ead9b94ae61fe9f6c091462b106e46bd51113894b6eb9465",
+    "contract_metadata_sha256": "0995d50011e73de880358b994031fdf8bb58e75ab8901de2c5601e7abed05243",
+    "data_manifest_sha256": "077eb036d262befec80f7013084fe6906859f7c3bbe2f8c193c9d9ec68e367c3",
+    "exchange_info_sha256": "aab4219452e61cfa5e135518ed182c98fd7e527d13bc240e891bb6b550deeb64",
+    "membership_sha256": "f51c9eb207c1da51cc4b9ff6045bb5e914828015b5c9c214f0e2673cd868eb14"
+  },
+  "review_scope": {
+    "all_contract_metadata_candidates_audited": true,
+    "all_membership_symbols_audited": true,
+    "archive_inference_requires_exact_reviewed_allowlist": true,
+    "builder_or_snapshot_changed": false,
+    "current_contract_eligibility_is_conjunctive": true,
+    "deterministic_report_independently_reproduced": true,
+    "native_rwa_sector_tokens_are_not_direct_tradfi": true,
+    "stablecoin_leveraged_metal_and_tradfi_exclusions_reviewed": true,
+    "wrapper_pre_and_post_checks_reviewed": true
+  },
+  "reviewed_at_utc": "2026-07-16T14:09:02Z",
+  "reviewer": "a6_exact_review",
+  "tests": {
+    "combined_a6_a4_a3": "46 passed",
+    "focused_a6": "24 passed",
+    "read_only_real_wrapper_research_status": "passed",
+    "ruff": "passed",
+    "ruff_format": "passed"
+  }
+}
