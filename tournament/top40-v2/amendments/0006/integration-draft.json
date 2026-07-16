@@ -18,7 +18,7 @@
   "downstream_requirements": {
     "amendment_0005_must_pin_this_integration_before_review": true,
     "future_result_bearing_commands_must_use_active_entrypoint": true,
-    "team_05_through_team_10_work_must_use_active_entrypoint": true
+    "team_04_through_team_10_pending_work_must_use_active_entrypoint": true
   },
   "historical_entrypoint": {
     "path": "scripts/top40_v2_tournament_active.py",
