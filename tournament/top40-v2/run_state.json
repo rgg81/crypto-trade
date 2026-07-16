@@ -52,7 +52,7 @@
   "critic_lock": null,
   "final_oos_lock": null,
   "finalist_cohort_lock": null,
-  "legacy_projection_sha256": "280576b83dc284e8ca2fef222fe41c0010eba843795acd03daef65ed0ed616da",
+  "legacy_projection_sha256": "638650ec7024e7768dad67f639d17b046e05b7e90a60aacaad242636471b74ca",
   "legacy_state_sha256": "8c858495fde6ddde203124a055e40ebad5d8d5a684cd20f0e55f6c88f7360b07",
   "objective_lock": null,
   "organizer_audit": {
@@ -73,9 +73,9 @@
   "qualification_lock": null,
   "research_journal": {
     "genesis_sha256": "a11eee0475d514a1f022deda4e62014536f12bfb074556546645c5f8255a48ed",
-    "head_sha256": "c577dd48b62a8faaa6a2c1841b28710821c9d2b648ade009c15951bf43b527cd",
+    "head_sha256": "261dc3e7f029a4435cf896be846248e7003a0a5e378750fef015c36cb550d741",
     "path": "tournament/top40-v2/organizer_research_journal.jsonl",
-    "record_count": 45
+    "record_count": 46
   },
   "schema_version": 3,
   "selection_lock": null,
@@ -206,7 +206,7 @@
       "private_result": null,
       "qualifier_candidate": null,
       "status": "researching",
-      "trial_count": 2
+      "trial_count": 3
     },
     "team-09": {
       "active_family_id": null,
