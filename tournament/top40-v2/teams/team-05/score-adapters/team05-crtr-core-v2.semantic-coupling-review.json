@@ -1,0 +1,23 @@
+{
+  "candidate_id": "team05-crtr-core-v2",
+  "decision": "approve",
+  "declared_capture_boundary": "candidate-declared-post-transform-pre-selection-weight-cap-risk",
+  "executable_source_manifest_path": "tournament/top40-v2/teams/team-05/score-adapters/team05-crtr-core-v2.executable-source-manifest.json",
+  "executable_source_manifest_sha256": "8b5c7805bdbccb26757d1446a039ed4e10f15932e463c6e86c2c5f2146a5491c",
+  "family_id": "team05-causal-residual-trend-reversal-v1",
+  "findings": {
+    "direct_hook_call_found": true,
+    "hook_after_declared_score_transform": true,
+    "hook_before_selection_weight_caps_and_risk": true,
+    "no_decoy_or_transient_score_path_found": true,
+    "score_object_is_declared_model_ranking_signal": true
+  },
+  "hook": "strategy.score_boundary",
+  "review_kind": "top40-v2-score-semantic-coupling-static-review-v1",
+  "reviewed_at_utc": "2026-07-16T16:52:31Z",
+  "reviewer_id": "independent-agent-team06-rebind-review",
+  "runtime_proof_limit": "static-review-attestation-not-runtime-semantic-proof",
+  "schema_version": 1,
+  "strategy_sha256": "b898bf8496047c8dadd8ead55840be637abdfbe1a8195e1bc88840b686e0944c",
+  "team_id": "team-05"
+}
