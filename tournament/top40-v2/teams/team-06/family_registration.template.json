@@ -81,83 +81,22 @@
     ],
     "volatility_score_penalty": [
       0.1
+    ],
+    "risk_policy_variants": [
+      "no-control",
+      "volatility-only",
+      "drawdown-only",
+      "turnover-only",
+      "combined"
+    ],
+    "seed": [
+      20260801
     ]
   },
   "parent_family_id": null,
-  "registered_at_utc": "<organizer-assigned-registration-timestamp-Z>",
-  "risk_policy_parameter_ranges": {
-    "drawdown_brakes": [
-      [],
-      [
-        {
-          "drawdown": 0.1,
-          "gross_scale": 0.75
-        },
-        {
-          "drawdown": 0.18,
-          "gross_scale": 0.45
-        },
-        {
-          "drawdown": 0.25,
-          "gross_scale": 0.25
-        }
-      ]
-    ],
-    "position_stop_cooldown_bars": [
-      3
-    ],
-    "position_stop_enabled": [
-      false
-    ],
-    "position_stop_loss_fraction": [
-      0.1
-    ],
-    "same_boundary_reentry": [
-      false
-    ],
-    "side_scaling_long": [
-      1.0
-    ],
-    "side_scaling_short": [
-      1.0
-    ],
-    "time_stop_cooldown_bars": [
-      3
-    ],
-    "time_stop_enabled": [
-      false
-    ],
-    "time_stop_maximum_holding_bars": [
-      21
-    ],
-    "turnover_limit_enabled": [
-      false,
-      true
-    ],
-    "turnover_limit_maximum_one_way_turnover": [
-      0.18
-    ],
-    "volatility_target_annualized_target": [
-      0.18
-    ],
-    "volatility_target_enabled": [
-      false,
-      true
-    ],
-    "volatility_target_lookback_days": [
-      30
-    ],
-    "volatility_target_maximum_scale": [
-      1.0
-    ],
-    "volatility_target_minimum_scale": [
-      0.3
-    ]
-  },
+  "registered_at_utc": "2026-07-16T16:37:45Z",
+  "risk_policy_plan": "Run the exact root no-control core first. Only after every preregistered broad positive-alpha minimum passes may the three fixed single-control diagnostics and combined policy be materialized at root risk_policy.json, committed, registered, and run. Each material run emits paired base and doubled-cost evidence. Controls cannot rescue a failed core; the combined candidate must pass every full non-neighborhood gate before the four fixed neighbors activate.",
   "schema_version": 1,
-  "seed_range": [
-    20260801
-  ],
   "selection_metric": "Eligibility first: no-control core positivity, then fixed controls, combined full gates, then combined-policy neighborhood stability. No control or neighbor can rescue or replace a failed core.",
   "team_id": "team-06"
 }
