@@ -52,7 +52,7 @@
   "critic_lock": null,
   "final_oos_lock": null,
   "finalist_cohort_lock": null,
-  "legacy_projection_sha256": "362bc3ba37bd223d3953e9202a1f367bdff72d3271614f5b5e7035250bbdbc78",
+  "legacy_projection_sha256": "5d2fa13666ae4cdf6dbb3f293369f3b76df07e576ce82f0a8701db21a7246494",
   "legacy_state_sha256": "8c858495fde6ddde203124a055e40ebad5d8d5a684cd20f0e55f6c88f7360b07",
   "objective_lock": null,
   "organizer_audit": {
@@ -198,14 +198,19 @@
       "active_family_id": "t08-volatility-scaled-rank-persistence-v1",
       "canonical_result": null,
       "development_assessment": null,
-      "dnf": null,
+      "dnf": {
+        "previous_status": "researching",
+        "reason": "All three no-control mechanism families failed the complete visible-development gate; both permitted mechanism pivots are consumed and controls cannot rescue a subthreshold core.",
+        "reason_code": "withdrawn",
+        "recorded_at_utc": "2026-07-16T23:12:40.190909+00:00"
+      },
       "family_count": 3,
       "finalist_freeze": null,
       "pivot_count": 2,
       "private_attempts": 0,
       "private_result": null,
       "qualifier_candidate": null,
-      "status": "researching",
+      "status": "dnf",
       "trial_count": 3
     },
     "team-09": {
