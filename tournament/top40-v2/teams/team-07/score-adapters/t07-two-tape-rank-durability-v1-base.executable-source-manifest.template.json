@@ -1,0 +1,39 @@
+{
+  "candidate_id": "t07-two-tape-rank-durability-v1-base",
+  "family_id": "t07-two-tape-rank-durability-v1",
+  "files": [
+    {
+      "path": "candidate_variant.py",
+      "sha256": "<organizer-fill-final-64-hex-sha256>",
+      "size": "<organizer-fill-exact-byte-size>"
+    },
+    {
+      "path": "frozen_config.json",
+      "sha256": "<organizer-fill-final-64-hex-sha256>",
+      "size": "<organizer-fill-exact-byte-size>"
+    },
+    {
+      "path": "risk_policy.json",
+      "sha256": "<organizer-fill-final-64-hex-sha256>",
+      "size": "<organizer-fill-exact-byte-size>"
+    },
+    {
+      "path": "strategy.py",
+      "sha256": "<organizer-fill-final-64-hex-sha256>",
+      "size": "<organizer-fill-exact-byte-size>"
+    },
+    {
+      "path": "test_risk_policy_contract.py",
+      "sha256": "<organizer-fill-final-64-hex-sha256>",
+      "size": "<organizer-fill-exact-byte-size>"
+    },
+    {
+      "path": "test_strategy.py",
+      "sha256": "<organizer-fill-final-64-hex-sha256>",
+      "size": "<organizer-fill-exact-byte-size>"
+    }
+  ],
+  "manifest_kind": "top40-v2-executable-source-manifest-v1",
+  "schema_version": 1,
+  "team_id": "team-07"
+}

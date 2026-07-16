@@ -1,27 +1,79 @@
 {
-  "activation_rule": "Dormant until the exact no-control pivot reference passes every broad positive activation minimum and the complete candidate passes all non-neighborhood development gates.",
-  "candidate_id": "t07-market-state-relative-ensemble-v1-base",
+  "activation_rule": "Dormant until the exact no-control second-pivot reference passes every broad positive activation minimum and the complete candidate passes all non-neighborhood development gates.",
+  "candidate_id": "t07-two-tape-rank-durability-v1-base",
   "center": {
-    "funding_carry_weight": 0.15,
-    "market_fast_bars": 21,
-    "market_slow_bars": 126,
-    "maximum_directional_net": 0.2,
-    "rebalance_interval_bars": 6,
-    "relative_trend_base_weight": 0.35,
-    "relative_trend_state_weight": 0.45,
-    "short_reversal_bars": 3
+    "block_core_weight": 0.3,
+    "cross_tape_disagreement_shrink": 0.15,
+    "gross_target": 0.36,
+    "history_return_bars": 126,
+    "minimum_tape_bars": 18,
+    "rebalance_interval_bars": 21,
+    "tape_core_weight": 0.7,
+    "time_block_bars": 42
   },
   "neighbors": [
-    {"changes": {"market_fast_bars": 18}, "neighbor_id": "market-fast-18"},
-    {"changes": {"market_fast_bars": 24}, "neighbor_id": "market-fast-24"},
-    {"changes": {"market_slow_bars": 105}, "neighbor_id": "market-slow-105"},
-    {"changes": {"market_slow_bars": 147}, "neighbor_id": "market-slow-147"},
-    {"changes": {"maximum_directional_net": 0.16}, "neighbor_id": "net-16"},
-    {"changes": {"maximum_directional_net": 0.24}, "neighbor_id": "net-24"},
-    {"changes": {"relative_trend_base_weight": 0.3, "relative_trend_state_weight": 0.4}, "neighbor_id": "more-reversal"},
-    {"changes": {"relative_trend_base_weight": 0.4, "relative_trend_state_weight": 0.4}, "neighbor_id": "more-trend"},
-    {"changes": {"funding_carry_weight": 0.1}, "neighbor_id": "carry-10"},
-    {"changes": {"funding_carry_weight": 0.2}, "neighbor_id": "carry-20"}
+    {
+      "changes": {
+        "block_core_weight": 0.25,
+        "tape_core_weight": 0.75
+      },
+      "neighbor_id": "tape-75"
+    },
+    {
+      "changes": {
+        "block_core_weight": 0.35,
+        "tape_core_weight": 0.65
+      },
+      "neighbor_id": "tape-65"
+    },
+    {
+      "changes": {
+        "cross_tape_disagreement_shrink": 0.1
+      },
+      "neighbor_id": "disagreement-10"
+    },
+    {
+      "changes": {
+        "cross_tape_disagreement_shrink": 0.2
+      },
+      "neighbor_id": "disagreement-20"
+    },
+    {
+      "changes": {
+        "gross_target": 0.32
+      },
+      "neighbor_id": "gross-32"
+    },
+    {
+      "changes": {
+        "gross_target": 0.4
+      },
+      "neighbor_id": "gross-40"
+    },
+    {
+      "changes": {
+        "minimum_tape_bars": 15
+      },
+      "neighbor_id": "minimum-tape-15"
+    },
+    {
+      "changes": {
+        "minimum_tape_bars": 21
+      },
+      "neighbor_id": "minimum-tape-21"
+    },
+    {
+      "changes": {
+        "rebalance_interval_bars": 18
+      },
+      "neighbor_id": "rebalance-18"
+    },
+    {
+      "changes": {
+        "rebalance_interval_bars": 24
+      },
+      "neighbor_id": "rebalance-24"
+    }
   ],
   "schema_version": 2,
   "selection_rule": "Freeze only if at least 70% of all declared neighbors are profitable, neighbor median Sharpe is at least 0.50, and no isolated point drives selection.",

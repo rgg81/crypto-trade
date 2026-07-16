@@ -6,9 +6,9 @@
     "integration_freeze_sha256": "6f77a146e7b414eabd20c5cc9321a95493bb98116dde07ef79d9eb009b6a6f51",
     "pure_crypto_integration_freeze_sha256": "3e93bdfe031e2589888c3bbcaae583437bbd074fa9d86c6dc0a54187bc0f1e34"
   },
-  "candidate_id": "t07-market-state-relative-ensemble-v1-base",
+  "candidate_id": "t07-two-tape-rank-durability-v1-base",
   "candidate_materialization": {
-    "active_candidate_id": "t07-market-state-relative-ensemble-v1-base",
+    "active_candidate_id": "t07-two-tape-rank-durability-v1-base",
     "active_overrides": {},
     "entrypoint": "strategy.py:build_strategy",
     "variant_path": "candidate_variant.py"
@@ -20,78 +20,62 @@
       "close"
     ],
     "completed_close_rule": "open_time_plus_8h_lte_decision_time",
-    "exact_history_rule": "one_valid_row_at_each_of_190_required_past_open_times",
-    "funding_required_columns_when_nonempty": [
-      "funding_time",
-      "symbol",
-      "funding_rate"
-    ],
-    "funding_time_rule": "strictly_before_decision_time",
+    "exact_history_rule": "exactly_one_physical_row_then_one_finite_positive_close_at_each_of_127_required_past_open_times",
+    "funding": "unused",
     "membership": "amendment_0006_certified_pure_crypto_context.eligible_symbols_at_decision",
     "minimum_valid_symbols": 24,
     "runtime_artifacts": "none"
   },
-  "family_id": "t07-market-state-relative-ensemble-v1",
+  "family_id": "t07-two-tape-rank-durability-v1",
   "mechanism": {
-    "common_path": "cross_sectional_median_of_each_exact_completed_8h_log_return",
-    "common_state": "0.45_fast21_plus_0.45_slow126_bounded_trend_plus_0.10_fast21_sign_breadth",
-    "relative_features": "market_median_residual_short3_reversal_medium21_trend_slow63_trend",
-    "state_blend": "relative_trend_weight_0.35_plus_0.45_times_fast_slow_common_trend_agreement",
-    "carry": "0.15_times_cross_sectional_rank_of_negative_mean_last21_strictly_past_funding_events",
-    "final_score": "centered_rank_of_relative_blend_plus_1.25_times_common_market_state"
+    "bar_signal": "deterministic_centered_cross_sectional_rank_of_each_completed_8h_log_return",
+    "block_robustness": "median_of_three_nonoverlapping_42_bar_mean_rank_blocks",
+    "common_tape": "same_bar_cross_sectional_median_log_return_classifies_up_or_down",
+    "cross_tape_core": "same_sign_up_down_means_use_signed_smaller_magnitude_else_shrink_average_by_0.15",
+    "durability": "0.70_cross_tape_core_plus_0.30_block_median_times_sign_agreement_squared_divided_by_tape_and_block_dispersion",
+    "final_score": "deterministic_centered_cross_sectional_rank_of_durability"
   },
   "parameters": {
     "bar_interval_hours": 8,
-    "funding_carry_weight": 0.15,
-    "funding_lookback_events": 21,
-    "gross_target": 0.48,
-    "history_return_bars": 189,
-    "market_breadth_weight": 0.1,
-    "market_fast_bars": 21,
-    "market_fast_weight": 0.45,
-    "market_score_offset": 1.25,
-    "market_slow_bars": 126,
-    "market_slow_weight": 0.45,
-    "market_trend_z_scale": 2.0,
-    "maximum_directional_net": 0.2,
-    "maximum_symbol_exposure": 0.04,
-    "medium_relative_trend_weight": 0.6,
-    "medium_trend_bars": 21,
+    "block_core_weight": 0.3,
+    "cross_tape_disagreement_shrink": 0.15,
+    "gross_target": 0.36,
+    "history_return_bars": 126,
+    "maximum_symbol_exposure": 0.025,
     "minimum_positions_per_side": 8,
-    "minimum_return_volatility": 0.002,
+    "minimum_tape_bars": 18,
     "minimum_valid_symbols": 24,
-    "rebalance_interval_bars": 6,
-    "relative_trend_base_weight": 0.35,
-    "relative_trend_state_weight": 0.45,
-    "selected_fraction_per_side": "1/4",
-    "short_reversal_bars": 3,
-    "slow_relative_trend_weight": 0.4,
-    "slow_trend_bars": 63,
-    "volatility_bars": 63
+    "rebalance_interval_bars": 21,
+    "selected_fraction_per_side": "1/5",
+    "tape_core_weight": 0.7,
+    "time_block_bars": 42,
+    "time_block_count": 3
   },
   "parent_negative_evidence": {
-    "annualized_return": -0.2711687284651866,
-    "candidate_id": "team07-shock-diffusion-center-v1",
-    "double_cost_sharpe": -2.0219597091428883,
-    "family_id": "shock-diffusion-v1",
-    "maximum_drawdown": 0.7048869094289969,
-    "net_sharpe": -0.9885686799550621,
+    "annualized_return": -0.00965012297436596,
+    "candidate_id": "t07-market-state-relative-ensemble-v1-base",
+    "double_cost_sharpe": -0.4927746942253113,
+    "family_id": "t07-market-state-relative-ensemble-v1",
+    "maximum_drawdown": 0.25427225222193583,
+    "net_sharpe": 0.01525570599742728,
+    "positive_quarter_fraction": 0.5,
     "regime_sharpe": {
-      "bear": -2.93395979348559,
-      "bull": -1.0800540819934916,
-      "chop": -1.7135328382084627,
-      "stress": 1.0084186282793683
+      "bear": -0.7393886043286119,
+      "bull": 0.21927822495562113,
+      "chop": -0.6013148112831725,
+      "stress": 0.8278504750439715
     },
-    "terminal_reason": "failed_no_control_core; shock_diffusion_controls_neighbors_and_ablations_not_activated"
+    "terminal_reason": "failed_no_control_core_and_doubled_cost; controls_neighbors_and_ablations_not_activated",
+    "trade_count": 15763
   },
   "portfolio_construction": {
-    "gross_target": 0.48,
+    "gross_target": 0.36,
     "long_selection": "highest_returned_final_scores",
-    "net_target": "0.20_times_clipped_mean_returned_score_divided_by_1.25",
-    "schedule": "every_six_exact_8h_bars_from_unix_epoch;hold_between",
+    "net_target": 0.0,
+    "schedule": "every_twenty_one_exact_8h_bars_from_unix_epoch;hold_between",
     "short_selection": "lowest_returned_final_scores",
-    "side_count": "max_8_floor_n_over_4_or_count_required_by_0.04_cap",
-    "sizing": "equal_dollar_within_each_side_subject_to_0.04_symbol_cap"
+    "side_count": "max_8_floor_n_over_5_or_count_required_by_0.025_cap",
+    "sizing": "equal_dollar_within_each_side_subject_to_0.025_symbol_cap"
   },
   "preconstruction_boundary": {
     "adapter_id": "top40-v2-declared-score-boundary-v1",
@@ -104,11 +88,11 @@
     "selection_weight_cap_or_risk_before_boundary": false,
     "shared_hook_import": "crypto_trade.tournament.score_adapter_protocol_v5.score_boundary"
   },
-  "registration_blocker": "family pivot registration, canonical A5 control files, and exact post-family source hashes remain organizer work",
+  "registration_blocker": "second family pivot registration, canonical A5 control files, and exact post-family source hashes remain organizer work",
   "risk_policy_path": "risk_policy.json",
   "risk_policy_status": "exact_disabled_no-control_policy_retained; no control is part of the pivot",
   "schema_version": 2,
   "seed": 20260801,
-  "status": "implemented_serially_validated_unregistered_unevaluated_mechanism_pivot",
+  "status": "implemented_serially_validated_unregistered_unevaluated_second_mechanism_pivot",
   "strategy_entrypoint": "strategy.py:build_strategy"
 }

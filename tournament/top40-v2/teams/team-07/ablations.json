@@ -1,40 +1,45 @@
 {
-  "activation_rule": "The new no-control reference must run first and pass every broad alpha, cost, regime, role, fold, quarter, sleeve, A5 score, and concentration gate. A failed reference terminates the family; none of these drafts may search for a rescue.",
-  "family_id": "t07-market-state-relative-ensemble-v1",
+  "activation_rule": "The exact no-control second-pivot reference must run first and pass every broad alpha, cost, regime, role, fold, quarter, sleeve, A5 score, and concentration gate. A failed reference terminates the family; none of these drafts may search for a rescue.",
+  "family_id": "t07-two-tape-rank-durability-v1",
   "material_trials": [
     {
-      "candidate_id": "t07-market-state-relative-ensemble-v1-base",
+      "candidate_id": "t07-two-tape-rank-durability-v1-base",
       "change_from_center": {},
-      "purpose": "exact no-control pivot reference"
+      "purpose": "exact no-control second-pivot reference"
     },
     {
-      "candidate_id": "t07-market-state-relative-ensemble-v1-no-net-tilt",
-      "change_from_center": {"maximum_directional_net": 0.0},
-      "purpose": "measure the common market-state contribution to bull and bear construction"
+      "candidate_id": "t07-two-tape-rank-durability-v1-tape-only",
+      "change_from_center": {
+        "block_core_weight": 0.0,
+        "tape_core_weight": 1.0
+      },
+      "purpose": "measure whether temporal block durability adds value beyond cross-tape robustness"
     },
     {
-      "candidate_id": "t07-market-state-relative-ensemble-v1-fixed-blend",
-      "change_from_center": {"relative_trend_state_weight": 0.0},
-      "purpose": "measure whether causal market-state adaptation improves regime breadth"
+      "candidate_id": "t07-two-tape-rank-durability-v1-block-only",
+      "change_from_center": {
+        "block_core_weight": 1.0,
+        "tape_core_weight": 0.0
+      },
+      "purpose": "measure whether explicit up/down tape robustness adds value beyond temporal persistence"
     },
     {
-      "candidate_id": "t07-market-state-relative-ensemble-v1-no-carry",
-      "change_from_center": {"funding_carry_weight": 0.0},
-      "purpose": "measure incremental past-funding carry value"
+      "candidate_id": "t07-two-tape-rank-durability-v1-no-tape-shrink",
+      "change_from_center": {
+        "cross_tape_disagreement_shrink": 1.0
+      },
+      "purpose": "measure whether penalizing tape-dependent leadership improves bear and chop behavior"
     },
     {
-      "candidate_id": "t07-market-state-relative-ensemble-v1-fast-common-only",
-      "change_from_center": {"market_fast_weight": 0.9, "market_slow_weight": 0.0},
-      "purpose": "test whether slow common trend prevents fast whipsaw"
-    },
-    {
-      "candidate_id": "t07-market-state-relative-ensemble-v1-slow-common-only",
-      "change_from_center": {"market_fast_weight": 0.0, "market_slow_weight": 0.9},
-      "purpose": "test whether fast common trend improves reversal timing"
+      "candidate_id": "t07-two-tape-rank-durability-v1-three-day",
+      "change_from_center": {
+        "rebalance_interval_bars": 9
+      },
+      "purpose": "measure whether the weekly horizon is essential to doubled-cost robustness"
     }
   ],
-  "parent_family_terminal": "shock-diffusion-v1",
-  "registration_rule": "Every activated row requires a separately materialized source identity and preregistration before execution.",
+  "parent_family_terminal": "t07-market-state-relative-ensemble-v1",
+  "registration_rule": "Every activated row requires a separately implemented and materialized source identity plus preregistration before execution.",
   "schema_version": 2,
   "team_id": "team-07"
 }

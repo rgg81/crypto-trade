@@ -1,0 +1,23 @@
+{
+  "candidate_id": "t07-two-tape-rank-durability-v1-base",
+  "decision": "<independent-reviewer-fill-approve-only-after-review>",
+  "declared_capture_boundary": "candidate-declared-post-transform-pre-selection-weight-cap-risk",
+  "executable_source_manifest_path": "tournament/top40-v2/teams/team-07/score-adapters/t07-two-tape-rank-durability-v1-base.executable-source-manifest.json",
+  "executable_source_manifest_sha256": "<organizer-fill-canonical-executable-source-manifest-64-hex-sha256>",
+  "family_id": "t07-two-tape-rank-durability-v1",
+  "findings": {
+    "direct_hook_call_found": "<independent-reviewer-fill-true-only-if-found>",
+    "hook_after_declared_score_transform": "<independent-reviewer-fill-true-only-if-found>",
+    "hook_before_selection_weight_caps_and_risk": "<independent-reviewer-fill-true-only-if-found>",
+    "no_decoy_or_transient_score_path_found": "<independent-reviewer-fill-true-only-if-found>",
+    "score_object_is_declared_model_ranking_signal": "<independent-reviewer-fill-true-only-if-found>"
+  },
+  "hook": "strategy.score_boundary",
+  "review_kind": "top40-v2-score-semantic-coupling-static-review-v1",
+  "reviewed_at_utc": "<independent-reviewer-fill-whole-second-utc-Z>",
+  "reviewer_id": "<independent-reviewer-fill-identifier>",
+  "runtime_proof_limit": "static-review-attestation-not-runtime-semantic-proof",
+  "schema_version": 1,
+  "strategy_sha256": "<organizer-fill-final-strategy-64-hex-sha256>",
+  "team_id": "team-07"
+}

@@ -1,5 +1,5 @@
 {
-  "candidate_id": "t07-market-state-relative-ensemble-v1-base",
+  "candidate_id": "t07-two-tape-rank-durability-v1-base",
   "evidence_class": "declared-deterministic-no-fit-out-of-fold",
   "folds": [
     {
@@ -33,9 +33,9 @@
       "start_inclusive_utc": "2023-01-01T00:00:00Z"
     }
   ],
-  "label_horizon": "next 48h executable open-to-open return aligned to the six-bar decision schedule",
+  "label_horizon": "next 168h executable open-to-open return aligned to the twenty-one-bar decision schedule",
   "model_update_rule": "No fitted parameter or training estimate; every decision recomputes frozen rolling transforms from then-completed inputs.",
-  "purge_and_embargo": "Use exact A5 start-inclusive/end-exclusive F1-F6 intervals and purge score/label pairs whose 48-hour label endpoint reaches or crosses a fold end.",
+  "purge_and_embargo": "Use exact A5 start-inclusive/end-exclusive F1-F6 intervals and purge score/label pairs whose 168-hour label endpoint reaches or crosses a fold end.",
   "qualification_evidence_requirements": [
     "deterministic no-fit declaration and hashes",
     "per-fold target score and return artifact paths and SHA-256 values",

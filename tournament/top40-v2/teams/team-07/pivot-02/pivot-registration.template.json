@@ -1,0 +1,49 @@
+{
+  "active_authority": {
+    "entrypoint_path": "scripts/top40_v2_tournament_runtime_preload_v7.py",
+    "entrypoint_sha256": "8a4ada10176d2606df3f358fc188e21b45153ad9a7270f36908736f03322a3a9",
+    "integration_freeze_sha256": "6f77a146e7b414eabd20c5cc9321a95493bb98116dde07ef79d9eb009b6a6f51"
+  },
+  "authorization": {
+    "controls_authorized_before_core_pass": false,
+    "journals_or_reports_edited_by_draft": false,
+    "material_trial_number_if_registered": 3,
+    "private_data_authorized": false,
+    "registration_authorized_by_template": false
+  },
+  "new_candidate_id": "t07-two-tape-rank-durability-v1-base",
+  "new_family_id": "t07-two-tape-rank-durability-v1",
+  "parent_evidence": {
+    "annualized_return": -0.00965012297436596,
+    "candidate_id": "t07-market-state-relative-ensemble-v1-base",
+    "double_cost_sharpe": -0.4927746942253113,
+    "family_id": "t07-market-state-relative-ensemble-v1",
+    "maximum_drawdown": 0.25427225222193583,
+    "net_sharpe": 0.01525570599742728,
+    "positive_quarter_fraction": 0.5,
+    "regime_sharpe": {
+      "bear": -0.7393886043286119,
+      "bull": 0.21927822495562113,
+      "chop": -0.6013148112831725,
+      "stress": 0.8278504750439715
+    },
+    "result_status": "completed",
+    "terminal_decision": "failed_no_control_core",
+    "trade_count": 15763
+  },
+  "pivot_classification": {
+    "changes": [
+      "remove the common directional market-state offset and force exact dollar neutrality",
+      "replace median-residual trend/reversal and funding inputs with same-bar cross-sectional return ranks",
+      "require relative leadership or laggardship to survive both common-market up and down tapes",
+      "require temporal durability across three non-overlapping 42-bar blocks",
+      "replace 48-hour 0.48-gross construction with weekly 0.36-gross construction to target doubled-cost robustness"
+    ],
+    "is_parameter_neighbor": false,
+    "is_risk_control_change": false,
+    "mechanism_pivot": true
+  },
+  "schema_version": 1,
+  "status": "draft_pending_serial_validation_review_registration_hash_binding_and_a7_rebind",
+  "team_id": "team-07"
+}

@@ -1,15 +1,15 @@
-"""Team 07 causal market-state and relative-opportunity ensemble pivot.
+"""Team 07 causal two-tape relative-rank durability pivot.
 
-The organizer supplies point-in-time pure-crypto membership and completed 8-hour bars.  The
-strategy first estimates a robust common crypto trend from the cross-sectional median return.
-It then blends medium/slow residual momentum with short residual reversal; the blend moves toward
-momentum only when the fast and slow common trends agree.  Past funding is a small cross-sectional
-carry input.  No position, fill, PnL, evaluator state, external file, or network input is used.
+The organizer supplies point-in-time pure-crypto membership and completed 8-hour bars.  On every
+scheduled construction, the strategy ranks each coin's return against the other eligible coins at
+each of 126 completed bars.  A coin earns a durable relative-strength score only to the extent that
+its ranks agree across common-market up and down bars and across three non-overlapping time blocks.
+This is a cross-sectional persistence mechanism: it has no common directional forecast, residual
+trend/reversal blend, funding input, position state, PnL state, external file, or network input.
 
-Every scheduled construction sends one finite built-in score dictionary through the organizer's
-public A5 boundary.  A common score offset encodes the directional forecast and the centered score
-dispersion encodes relative opportunity.  The returned dictionary is therefore the only signal
-object used for both side sizing and cross-sectional selection.
+One finite built-in score dictionary crosses the organizer's public A5 boundary after the complete
+durability transform and before selection, sizing, caps, or organizer risk.  The exact returned
+dictionary is the sole signal object used to build a weekly, broad, dollar-neutral portfolio.
 """
 
 from __future__ import annotations
@@ -27,37 +27,24 @@ from crypto_trade.tournament.score_adapter_protocol_v5 import score_boundary
 
 FROZEN_SEED = 20260801
 BAR_INTERVAL_HOURS = 8
-REBALANCE_INTERVAL_BARS = 6
-HISTORY_RETURN_BARS = 189
-SHORT_REVERSAL_BARS = 3
-MEDIUM_TREND_BARS = 21
-SLOW_TREND_BARS = 63
-MARKET_FAST_BARS = 21
-MARKET_SLOW_BARS = 126
-VOLATILITY_BARS = 63
-FUNDING_LOOKBACK_EVENTS = 21
+REBALANCE_INTERVAL_BARS = 21
+HISTORY_RETURN_BARS = 126
+TIME_BLOCK_COUNT = 3
+TIME_BLOCK_BARS = 42
+MINIMUM_TAPE_BARS = 18
 MINIMUM_VALID_SYMBOLS = 24
 MINIMUM_POSITIONS_PER_SIDE = 8
 SELECTION_NUMERATOR = 1
-SELECTION_DENOMINATOR = 4
-GROSS_TARGET = 0.48
-MAXIMUM_DIRECTIONAL_NET = 0.20
-MAXIMUM_SYMBOL_EXPOSURE = 0.04
-MINIMUM_RETURN_VOLATILITY = 0.002
-MARKET_TREND_Z_SCALE = 2.0
-MARKET_FAST_WEIGHT = 0.45
-MARKET_SLOW_WEIGHT = 0.45
-MARKET_BREADTH_WEIGHT = 0.10
-RELATIVE_TREND_BASE_WEIGHT = 0.35
-RELATIVE_TREND_STATE_WEIGHT = 0.45
-MEDIUM_RELATIVE_TREND_WEIGHT = 0.60
-SLOW_RELATIVE_TREND_WEIGHT = 0.40
-FUNDING_CARRY_WEIGHT = 0.15
-MARKET_SCORE_OFFSET = 1.25
+SELECTION_DENOMINATOR = 5
+GROSS_TARGET = 0.36
+MAXIMUM_SYMBOL_EXPOSURE = 0.025
+TAPE_CORE_WEIGHT = 0.70
+BLOCK_CORE_WEIGHT = 0.30
+CROSS_TAPE_DISAGREEMENT_SHRINK = 0.15
 TOLERANCE = 1e-10
 
-ACTIVE_FAMILY_ID = "t07-market-state-relative-ensemble-v1"
-ACTIVE_CANDIDATE_ID = "t07-market-state-relative-ensemble-v1-base"
+ACTIVE_FAMILY_ID = "t07-two-tape-rank-durability-v1"
+ACTIVE_CANDIDATE_ID = "t07-two-tape-rank-durability-v1-base"
 MATERIALIZED_CANDIDATE_OVERRIDES: dict[str, dict[str, object]] = {
     ACTIVE_CANDIDATE_ID: {},
 }
@@ -76,15 +63,16 @@ class ContextLike(Protocol):
 
 
 @dataclasses.dataclass(frozen=True)
-class _RelativeFeature:
-    short_reversal: float
-    medium_trend: float
-    slow_trend: float
+class _DurabilityFeature:
+    up_tape_mean: float
+    down_tape_mean: float
+    block_means: tuple[float, float, float]
+    raw_score: float
 
 
 @dataclasses.dataclass(frozen=True)
 class PreconstructionSnapshot:
-    """Immutable final forecasts before selection, sizing, caps, or organizer risk."""
+    """Immutable final scores before selection, sizing, caps, or organizer risk."""
 
     decision_time: pd.Timestamp
     scores: tuple[tuple[str, float], ...]
@@ -162,20 +150,23 @@ def _closed_history(frame: Any, *, decision_time: pd.Timestamp) -> tuple[float, 
     if not isinstance(frame, pd.DataFrame) or not {"open_time", "close"}.issubset(frame.columns):
         return None
     expected = _expected_open_times(decision_time)
-    values: dict[pd.Timestamp, list[float]] = {timestamp: [] for timestamp in expected}
+    values: dict[pd.Timestamp, list[Any]] = {timestamp: [] for timestamp in expected}
     for raw_open, raw_close in frame.loc[:, ["open_time", "close"]].itertuples(
         index=False, name=None
     ):
         open_time = _utc_timestamp(raw_open)
         if open_time is None or open_time not in values:
             continue
-        close = _finite_number(raw_close)
-        if open_time + _BAR_INTERVAL > decision_time or close is None or close <= 0.0:
-            continue
-        values[open_time].append(close)
-    if any(len(values[timestamp]) != 1 for timestamp in expected):
-        return None
-    return tuple(values[timestamp][0] for timestamp in expected)
+        values[open_time].append(raw_close)
+    closes: list[float] = []
+    for timestamp in expected:
+        if len(values[timestamp]) != 1:
+            return None
+        close = _finite_number(values[timestamp][0])
+        if timestamp + _BAR_INTERVAL > decision_time or close is None or close <= 0.0:
+            return None
+        closes.append(close)
+    return tuple(closes)
 
 
 def _log_returns(closes: Sequence[float]) -> tuple[float, ...] | None:
@@ -224,121 +215,6 @@ def _centered_ranks(values: Mapping[str, float]) -> dict[str, float] | None:
     return result
 
 
-def _sample_volatility(values: Sequence[float]) -> float | None:
-    if len(values) < 2:
-        return None
-    mean = math.fsum(values) / len(values)
-    variance = math.fsum((value - mean) ** 2 for value in values) / (len(values) - 1)
-    if not math.isfinite(variance) or variance < 0.0:
-        return None
-    result = math.sqrt(variance)
-    return result if math.isfinite(result) else None
-
-
-def _bounded_trend(path: Sequence[float], bars: int, volatility: float) -> float:
-    denominator = max(MINIMUM_RETURN_VOLATILITY, volatility) * math.sqrt(bars)
-    raw = math.fsum(path[-bars:]) / denominator
-    return float(max(-6.0, min(6.0, raw)))
-
-
-def _market_path(return_paths: Mapping[str, Sequence[float]]) -> tuple[float, ...] | None:
-    if len(return_paths) < MINIMUM_VALID_SYMBOLS:
-        return None
-    result: list[float] = []
-    for index in range(HISTORY_RETURN_BARS):
-        value = _median([path[index] for path in return_paths.values()])
-        if value is None:
-            return None
-        result.append(value)
-    return tuple(result)
-
-
-def _market_state(
-    return_paths: Mapping[str, Sequence[float]], market_path: Sequence[float]
-) -> tuple[float, float] | None:
-    volatility = _sample_volatility(market_path[-MARKET_SLOW_BARS:])
-    if volatility is None:
-        return None
-    fast_z = _bounded_trend(market_path, MARKET_FAST_BARS, volatility)
-    slow_z = _bounded_trend(market_path, MARKET_SLOW_BARS, volatility)
-    fast_state = math.tanh(fast_z / MARKET_TREND_Z_SCALE)
-    slow_state = math.tanh(slow_z / MARKET_TREND_Z_SCALE)
-    positive = sum(math.fsum(path[-MARKET_FAST_BARS:]) > 0.0 for path in return_paths.values())
-    negative = sum(math.fsum(path[-MARKET_FAST_BARS:]) < 0.0 for path in return_paths.values())
-    breadth = (positive - negative) / len(return_paths)
-    state = (
-        MARKET_FAST_WEIGHT * fast_state
-        + MARKET_SLOW_WEIGHT * slow_state
-        + MARKET_BREADTH_WEIGHT * breadth
-    )
-    state = float(max(-1.0, min(1.0, state)))
-    agreement = abs(0.5 * (fast_state + slow_state))
-    confidence = float(max(0.0, min(1.0, agreement)))
-    return state, confidence
-
-
-def _relative_feature(
-    asset_path: Sequence[float], market_path: Sequence[float]
-) -> _RelativeFeature | None:
-    if len(asset_path) != HISTORY_RETURN_BARS or len(market_path) != HISTORY_RETURN_BARS:
-        return None
-    residual = tuple(asset - market for asset, market in zip(asset_path, market_path, strict=True))
-    volatility = _sample_volatility(residual[-VOLATILITY_BARS:])
-    if volatility is None:
-        return None
-    short_reversal = -_bounded_trend(residual, SHORT_REVERSAL_BARS, volatility)
-    medium_trend = _bounded_trend(residual, MEDIUM_TREND_BARS, volatility)
-    slow_trend = _bounded_trend(residual, SLOW_TREND_BARS, volatility)
-    values = (short_reversal, medium_trend, slow_trend)
-    if any(not math.isfinite(value) for value in values):
-        return None
-    return _RelativeFeature(
-        short_reversal=float(short_reversal),
-        medium_trend=float(medium_trend),
-        slow_trend=float(slow_trend),
-    )
-
-
-def _past_funding_carry(
-    raw_funding: Any,
-    *,
-    decision_time: pd.Timestamp,
-    eligible: set[str],
-) -> dict[str, float] | None:
-    """Return negative trailing funding means using only strictly past events."""
-
-    if not isinstance(raw_funding, pd.DataFrame):
-        return None
-    if raw_funding.empty:
-        return {symbol: 0.0 for symbol in eligible}
-    required = {"funding_time", "symbol", "funding_rate"}
-    if not required.issubset(raw_funding.columns):
-        return None
-    observations: dict[str, list[tuple[pd.Timestamp, float]]] = {symbol: [] for symbol in eligible}
-    seen: set[tuple[str, pd.Timestamp]] = set()
-    for raw_time, raw_symbol, raw_rate in raw_funding.loc[
-        :, ["funding_time", "symbol", "funding_rate"]
-    ].itertuples(index=False, name=None):
-        timestamp = _utc_timestamp(raw_time)
-        rate = _finite_number(raw_rate)
-        if timestamp is None or timestamp >= decision_time or rate is None:
-            return None
-        if not isinstance(raw_symbol, str) or raw_symbol not in eligible:
-            return None
-        key = (raw_symbol, timestamp)
-        if key in seen:
-            return None
-        seen.add(key)
-        observations[raw_symbol].append((timestamp, rate))
-    carry: dict[str, float] = {}
-    for symbol in sorted(eligible):
-        recent = sorted(observations[symbol], key=lambda item: item[0])[-FUNDING_LOOKBACK_EVENTS:]
-        carry[symbol] = (
-            0.0 if not recent else -float(math.fsum(rate for _, rate in recent) / len(recent))
-        )
-    return carry
-
-
 def _eligible_symbols(context: ContextLike) -> tuple[str, ...] | None:
     raw = context.eligible_symbols
     if isinstance(raw, (str, bytes)):
@@ -355,8 +231,93 @@ def _eligible_symbols(context: ContextLike) -> tuple[str, ...] | None:
     return eligible if len(eligible) >= MINIMUM_VALID_SYMBOLS else None
 
 
-class MarketStateRelativeEnsembleStrategy:
-    """Blend causal common trend, residual trend/reversal, and past funding carry."""
+def _rank_histories(
+    return_paths: Mapping[str, Sequence[float]],
+) -> tuple[dict[str, tuple[float, ...]], tuple[float, ...]] | None:
+    """Build causal same-bar return ranks and the median common tape."""
+
+    if len(return_paths) < MINIMUM_VALID_SYMBOLS:
+        return None
+    if any(len(path) != HISTORY_RETURN_BARS for path in return_paths.values()):
+        return None
+    rank_paths: dict[str, list[float]] = {symbol: [] for symbol in sorted(return_paths)}
+    market_path: list[float] = []
+    for index in range(HISTORY_RETURN_BARS):
+        cross_section = {
+            symbol: float(return_paths[symbol][index]) for symbol in sorted(return_paths)
+        }
+        market_return = _median(list(cross_section.values()))
+        ranks = _centered_ranks(cross_section)
+        if market_return is None or ranks is None:
+            return None
+        market_path.append(market_return)
+        for symbol in sorted(rank_paths):
+            rank_paths[symbol].append(ranks[symbol])
+    return (
+        {symbol: tuple(rank_paths[symbol]) for symbol in sorted(rank_paths)},
+        tuple(market_path),
+    )
+
+
+def _mean(values: Sequence[float]) -> float | None:
+    if not values or any(not math.isfinite(value) for value in values):
+        return None
+    result = math.fsum(values) / len(values)
+    return float(result) if math.isfinite(result) else None
+
+
+def _durability_feature(
+    rank_path: Sequence[float], market_path: Sequence[float]
+) -> _DurabilityFeature | None:
+    """Shrink relative strength that does not survive both market tapes and time blocks."""
+
+    if len(rank_path) != HISTORY_RETURN_BARS or len(market_path) != HISTORY_RETURN_BARS:
+        return None
+    up_values = [rank for rank, market in zip(rank_path, market_path, strict=True) if market > 0.0]
+    down_values = [
+        rank for rank, market in zip(rank_path, market_path, strict=True) if market < 0.0
+    ]
+    if len(up_values) < MINIMUM_TAPE_BARS or len(down_values) < MINIMUM_TAPE_BARS:
+        return None
+    up_mean = _mean(up_values)
+    down_mean = _mean(down_values)
+    block_means = tuple(
+        _mean(rank_path[index * TIME_BLOCK_BARS : (index + 1) * TIME_BLOCK_BARS])
+        for index in range(TIME_BLOCK_COUNT)
+    )
+    if up_mean is None or down_mean is None or any(value is None for value in block_means):
+        return None
+    finite_blocks = tuple(float(value) for value in block_means if value is not None)
+    if len(finite_blocks) != TIME_BLOCK_COUNT:
+        return None
+
+    if up_mean * down_mean > 0.0:
+        tape_core = math.copysign(min(abs(up_mean), abs(down_mean)), up_mean)
+    else:
+        tape_core = CROSS_TAPE_DISAGREEMENT_SHRINK * 0.5 * (up_mean + down_mean)
+    block_core = _median(finite_blocks)
+    if block_core is None:
+        return None
+    combined = TAPE_CORE_WEIGHT * tape_core + BLOCK_CORE_WEIGHT * block_core
+    components = (up_mean, down_mean, *finite_blocks)
+    if combined == 0.0:
+        agreement = 0.0
+    else:
+        agreement = sum(component * combined > 0.0 for component in components) / len(components)
+    dispersion = abs(up_mean - down_mean) + max(finite_blocks) - min(finite_blocks)
+    raw_score = combined * agreement**2 / (1.0 + dispersion)
+    if not math.isfinite(raw_score):
+        return None
+    return _DurabilityFeature(
+        up_tape_mean=float(up_mean),
+        down_tape_mean=float(down_mean),
+        block_means=(finite_blocks[0], finite_blocks[1], finite_blocks[2]),
+        raw_score=float(raw_score),
+    )
+
+
+class TwoTapeRankDurabilityStrategy:
+    """Trade persistent cross-sectional leaders and laggards across both market tapes."""
 
     @staticmethod
     def _validate_seed(seed: int) -> None:
@@ -370,7 +331,7 @@ class MarketStateRelativeEnsembleStrategy:
         seed: int,
         decision_time: pd.Timestamp | None = None,
     ) -> PreconstructionSnapshot | None:
-        """Build final common-plus-relative scores from exact completed histories."""
+        """Build final durability ranks from exact completed histories."""
 
         self._validate_seed(seed)
         if decision_time is None:
@@ -391,77 +352,23 @@ class MarketStateRelativeEnsembleStrategy:
             returns = _log_returns(history)
             if returns is not None:
                 return_paths[symbol] = returns
-        if len(return_paths) < MINIMUM_VALID_SYMBOLS:
+        ranked = _rank_histories(return_paths)
+        if ranked is None:
             return None
+        rank_paths, market_path = ranked
 
-        market_path = _market_path(return_paths)
-        if market_path is None:
-            return None
-        state_result = _market_state(return_paths, market_path)
-        if state_result is None:
-            return None
-        market_state, state_confidence = state_result
-
-        features: dict[str, _RelativeFeature] = {}
-        for symbol in sorted(return_paths):
-            feature = _relative_feature(return_paths[symbol], market_path)
-            if feature is not None:
-                features[symbol] = feature
-        if len(features) < MINIMUM_VALID_SYMBOLS:
-            return None
-
-        carry = _past_funding_carry(
-            context.funding,
-            decision_time=decision_time,
-            eligible=set(eligible),
-        )
-        if carry is None:
-            return None
-        short_ranks = _centered_ranks(
-            {symbol: features[symbol].short_reversal for symbol in sorted(features)}
-        )
-        medium_ranks = _centered_ranks(
-            {symbol: features[symbol].medium_trend for symbol in sorted(features)}
-        )
-        slow_ranks = _centered_ranks(
-            {symbol: features[symbol].slow_trend for symbol in sorted(features)}
-        )
-        carry_ranks = _centered_ranks(
-            {symbol: carry.get(symbol, 0.0) for symbol in sorted(features)}
-        )
-        if short_ranks is None or medium_ranks is None or slow_ranks is None or carry_ranks is None:
-            return None
-
-        trend_weight = RELATIVE_TREND_BASE_WEIGHT + (RELATIVE_TREND_STATE_WEIGHT * state_confidence)
-        reversal_weight = 1.0 - trend_weight
-        raw_relative: dict[str, float] = {}
-        for symbol in sorted(features):
-            trend = (
-                MEDIUM_RELATIVE_TREND_WEIGHT * medium_ranks[symbol]
-                + SLOW_RELATIVE_TREND_WEIGHT * slow_ranks[symbol]
-            )
-            value = (
-                trend_weight * trend
-                + reversal_weight * short_ranks[symbol]
-                + FUNDING_CARRY_WEIGHT * carry_ranks[symbol]
-            )
-            if not math.isfinite(value):
+        raw_scores: dict[str, float] = {}
+        for symbol in sorted(rank_paths):
+            feature = _durability_feature(rank_paths[symbol], market_path)
+            if feature is None:
                 return None
-            raw_relative[symbol] = float(value)
-        relative_ranks = _centered_ranks(raw_relative)
-        if relative_ranks is None:
-            return None
-
-        common_offset = MARKET_SCORE_OFFSET * market_state
-        scores = {
-            symbol: float(relative_ranks[symbol] + common_offset)
-            for symbol in sorted(relative_ranks)
-        }
-        if any(not math.isfinite(value) for value in scores.values()):
+            raw_scores[symbol] = feature.raw_score
+        final_scores = _centered_ranks(raw_scores)
+        if final_scores is None:
             return None
         return PreconstructionSnapshot(
             decision_time=decision_time,
-            scores=tuple((symbol, scores[symbol]) for symbol in sorted(scores)),
+            scores=tuple((symbol, float(final_scores[symbol])) for symbol in sorted(final_scores)),
         )
 
     @staticmethod
@@ -518,14 +425,8 @@ class MarketStateRelativeEnsembleStrategy:
         if len(scores) < MINIMUM_VALID_SYMBOLS:
             return {}
 
-        captured_mean = math.fsum(scores.values()) / len(scores)
-        captured_market_state = max(-1.0, min(1.0, captured_mean / MARKET_SCORE_OFFSET))
-        directional_net = MAXIMUM_DIRECTIONAL_NET * captured_market_state
-        long_budget = 0.5 * (GROSS_TARGET + directional_net)
-        short_budget = 0.5 * (GROSS_TARGET - directional_net)
-        cap_count = int(
-            math.ceil((max(long_budget, short_budget) - TOLERANCE) / MAXIMUM_SYMBOL_EXPOSURE)
-        )
+        side_budget = 0.5 * GROSS_TARGET
+        cap_count = int(math.ceil((side_budget - TOLERANCE) / MAXIMUM_SYMBOL_EXPOSURE))
         count = max(
             MINIMUM_POSITIONS_PER_SIDE,
             (SELECTION_NUMERATOR * len(scores)) // SELECTION_DENOMINATOR,
@@ -537,25 +438,20 @@ class MarketStateRelativeEnsembleStrategy:
         ordered = sorted(scores, key=lambda symbol: (scores[symbol], symbol))
         short_symbols = tuple(ordered[:count])
         long_symbols = tuple(ordered[-count:])
-        long_weight = long_budget / count
-        short_weight = short_budget / count
+        side_weight = side_budget / count
         if (
-            not math.isfinite(long_weight)
-            or not math.isfinite(short_weight)
-            or long_weight <= 0.0
-            or short_weight <= 0.0
-            or max(long_weight, short_weight) > MAXIMUM_SYMBOL_EXPOSURE + TOLERANCE
+            not math.isfinite(side_weight)
+            or side_weight <= 0.0
+            or side_weight > MAXIMUM_SYMBOL_EXPOSURE + TOLERANCE
         ):
             return {}
 
-        targets = {symbol: -float(short_weight) for symbol in short_symbols}
-        targets.update({symbol: float(long_weight) for symbol in long_symbols})
+        targets = {symbol: -float(side_weight) for symbol in short_symbols}
+        targets.update({symbol: float(side_weight) for symbol in long_symbols})
         targets = {symbol: targets[symbol] for symbol in sorted(targets)}
         gross = math.fsum(abs(value) for value in targets.values())
         net = math.fsum(targets.values())
-        if abs(gross - GROSS_TARGET) > TOLERANCE:
-            return {}
-        if abs(net) > MAXIMUM_DIRECTIONAL_NET + TOLERANCE:
+        if abs(gross - GROSS_TARGET) > TOLERANCE or abs(net) > TOLERANCE:
             return {}
         if not any(value > 0.0 for value in targets.values()):
             return {}
@@ -564,7 +460,7 @@ class MarketStateRelativeEnsembleStrategy:
         return targets
 
 
-def build_strategy() -> MarketStateRelativeEnsembleStrategy:
+def build_strategy() -> TwoTapeRankDurabilityStrategy:
     """Canonical zero-argument factory for the exact promoted pivot candidate."""
 
     candidate_id = candidate_variant.ACTIVE_CANDIDATE_ID
@@ -574,4 +470,4 @@ def build_strategy() -> MarketStateRelativeEnsembleStrategy:
         raise ValueError(f"unknown materialized candidate identifier: {candidate_id}")
     if type(overrides) is not dict or overrides != expected:
         raise ValueError(f"active overrides do not match the declaration for {candidate_id}")
-    return MarketStateRelativeEnsembleStrategy()
+    return TwoTapeRankDurabilityStrategy()

@@ -1,27 +1,34 @@
-# Team 07 pivot provenance
+# Team 07 second-pivot provenance
 
-The mechanism pivot was created after reading Team 07's own visible-development no-control result.
-That result is retained unchanged in `experiments.jsonl` and its reports. No private qualifier or
-final OOS datum was used. The new family uses only generic time-series trend, cross-sectional
-ranking, short-horizon reversal, and funding-carry ideas under the tournament's public strategy,
-risk, A5 score, A6 pure-crypto, and A7 runtime contracts.
+This second mechanism pivot was authored after reading Team 07's own visible-development
+no-control results. Both results remain unchanged in `experiments.jsonl` and their reports. No
+private qualifier or final OOS datum was used. The new family uses only generic cross-sectional
+return-ranking and persistence ideas under the tournament's public strategy, risk, A5 score, A6
+pure-crypto, and A7 runtime contracts.
 
-The parent `shock-diffusion-v1` thesis is explicitly abandoned rather than tuned. The pivot removes
-liquidity leaders, lag-beta estimation, one-shock diffusion, 0.80 gross, and daily turnover. It
-introduces a median common market state, multi-horizon residual trend/reversal blend, a score-level
-directional offset, broader 48-hour construction, and new family/candidate identities.
+The terminal `t07-market-state-relative-ensemble-v1` thesis is abandoned rather than tuned. The
+new source removes the common directional offset, residual trend/reversal blend, funding carry,
+48-hour schedule, 0.48 gross, and 0.20 directional net. It introduces per-bar cross-sectional
+return ranks, explicit up/down tape durability, three-block temporal durability, a weekly schedule,
+0.36 gross, exact dollar neutrality, and new family/candidate identities.
 
 Authorship state at handoff:
 
-- no organizer journal, state, report, or Amendment 0007 file was edited;
-- no evaluator, lifecycle, test, Python, or git command was run by the pivot authoring agent;
+- no organizer journal, report, historical result, risk-policy file, or Amendment 0007 binding was
+  edited;
+- no evaluator, lifecycle, test, Python, script, or git command was run by the pivot authoring
+  agent;
 - no performance claim is made for the new family;
-- registration timestamps, hashes, reviews, and score controls remain explicit organizer
-  sentinels/templates;
+- registration timestamps, hashes, independent reviews, canonical A5 controls, and the A7 rebind
+  remain explicit organizer work;
 - root `risk_policy.json` was not changed and retains every control disabled; and
 - `strategy.py` contains no network, subprocess, filesystem read/write, fitted historical
   constant, timestamp-target table, position/PnL input, or evaluator-state dependency.
 
-All future result-bearing commands require the exact active Amendment 0007 entrypoint. The
-organizer completed the A7 rebind from the terminal parent identities to the reviewed pivot
-identities after author handoff.
+After author handoff, organizer formatting, lint, JSON, 21 focused tests, risk/source preflight,
+fail-closed duplicate hardening, independent A5 review, governance-gate correction, and the A7
+identity rebind passed. Family registration, canonical A5 first-adds, final hashes, trial
+registration, and evaluation remain pending.
+
+All future validation and result-bearing commands require the exact active Amendment 0007
+entrypoint and serial execution.

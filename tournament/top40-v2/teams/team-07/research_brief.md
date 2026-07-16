@@ -1,65 +1,67 @@
-# Team 07 pivot 01: market-state and relative-opportunity ensemble
+# Team 07 pivot 02: two-tape relative-rank durability
 
-Status: implemented and serially validated as a prospective no-control mechanism pivot;
+Status: statically authored and organizer-validated as a prospective no-control mechanism pivot;
 unregistered and unevaluated.
 
-## Why the original family is terminal
+## Why the first pivot family is terminal
 
-The exact no-control `team07-shock-diffusion-center-v1` result falsified shock diffusion as a
-tradable core. Net Sharpe was -0.9886, annualized return was -27.12%, doubled-cost Sharpe was
--2.0220, and maximum drawdown was 70.49%. Bull, bear, and chop Sharpe were all negative (-1.0801,
--2.9340, and -1.7135); stress Sharpe was +1.0084. Because the broad core-alpha gate failed,
-controls, parameter neighbors, and lead-lag ablations are not activated and cannot repair it.
+The exact no-control `t07-market-state-relative-ensemble-v1-base` result was approximately flat
+before costs and negative after them. Net Sharpe was +0.0153, annualized return was -0.97%,
+doubled-cost Sharpe was -0.4928, maximum drawdown was 25.43%, and only half of quarters were
+positive. Bull Sharpe was +0.2193, but bear and chop Sharpe were -0.7394 and -0.6013. It generated
+15,763 trades. The core therefore failed ordinary-return, doubled-cost, bear, chop, quarter, and
+robustness requirements. Its controls, neighbors, and ablations cannot repair that evidence.
 
 ## New mechanism
 
-The pivot does not estimate delayed reaction to liquid leaders. Every 48 hours it builds a robust
-common crypto return from the cross-sectional median of each completed 8-hour return. Fast
-21-bar and slow 126-bar normalized trends plus 21-bar sign breadth form a bounded common market
-state. That common forecast is intended to supply positive long net exposure in persistent bull
-conditions and negative net exposure in persistent bear conditions while both sleeves remain
-active.
+This pivot removes the failed common directional state, residual momentum/reversal blend, funding
+carry, and 48-hour construction. For each of 126 completed 8-hour returns, it rank-transforms every
+eligible coin against the same point-in-time pure-crypto cross-section. These same-bar ranks measure
+relative leadership without relying on return scale, beta estimates, or a fitted market model.
 
-For relative selection, every coin is residualized against the same-bar median return. The
-strategy combines 21- and 63-bar residual trend with three-bar residual reversal. The trend share
-rises only when fast and slow common trends agree; when they do not, the blend shifts toward
-short-horizon reversal. A small negative trailing-funding rank favors receiving rather than paying
-crowded carry. The relative blend is rank-transformed for robustness.
+The median cross-sectional return classifies each completed bar as common-market up or down. For
+each coin, the strategy separately averages its ranks on up-tape and down-tape bars. Same-sign tape
+means receive the signed smaller magnitude, so a long forecast must have held up during both market
+directions and a short forecast must have lagged during both. Opposite-sign tape means are shrunk to
+15% of their average. The strategy also computes mean rank in three non-overlapping 42-bar blocks;
+their median is a temporal durability estimate. A fixed 70/30 tape/block combination is multiplied
+by squared sign agreement and divided by tape-plus-block dispersion. The final scores are
+cross-sectionally rank-transformed once more.
 
-The final captured score is the centered relative rank plus a common market-state offset. Its
-cross-sectional order selects the long and short sleeves, and its mean determines their net tilt.
-Consequently the exact dictionary returned from the A5 score boundary is the sole signal object
-used in construction. Gross is fixed at 0.48, net is bounded at 0.20, each side has at least eight
-names, and each name is capped at 0.04. These are construction limits, not retrospective risk
-controls.
+The returned A5 dictionary alone selects the highest and lowest one-fifth, with at least eight
+coins per side. The book is exactly dollar neutral, has 0.36 gross, caps each coin at 0.025, and
+rebalances every 21 bars (seven days). The slower horizon is part of the alpha construction and
+directly targets the failed parent's doubled-cost weakness; no turnover control or other risk
+overlay is enabled.
 
 ## Expected regime roles
 
-- Bull: aligned fast/slow common trend and broad positive participation raise long gross; relative
-  medium/slow strength ranks select leaders while the short sleeve remains active.
-- Bear: aligned negative common trend raises short gross; relative weakness ranks select laggards
-  for the short sleeve while the long sleeve remains active.
-- Chop: fast/slow disagreement suppresses directional net and shifts relative scoring toward
-  three-bar reversal and funding carry.
-- Stress: the median market path, bounded trend transforms, broad sleeves, and coin caps reduce
-  outlier dependence, but stress profitability and drawdown remain empirical gates.
+- Bull: longs are coins that consistently outranked peers on both market-up and market-down bars;
+  shorts are persistent relative laggards. There is no positive market beta requirement.
+- Bear: the same dollar-neutral relative ranking seeks coins resilient on down bars and shorts
+  coins that lag even when the common tape is already weak.
+- Chop: agreement across three 42-bar blocks suppresses one-window winners and one-bar reversal
+  noise; broad neutral sleeves avoid depending on market direction.
+- Stress: per-bar ranks, the smaller-magnitude cross-tape core, broad sleeves, low gross, and coin
+  caps reduce outlier and beta concentration, while profitability remains an empirical gate.
 
 ## Causal and universe boundary
 
-The strategy accepts exactly 190 completed close observations at exact 8-hour opens to form 189
-returns. All transforms use those rows only. Funding events must be strictly earlier than the
-decision timestamp. Future bars, bar high/low/open, auxiliary data, positions, fills, equity, PnL,
-drawdown, evaluator actions, and private data are unused. Amendment 0006 supplies the only eligible
-pure-crypto universe; Team 07 performs no symbol classification.
+The strategy accepts exactly 127 completed close observations at exact 8-hour opens to form 126
+returns. It uses only `bars.open_time`, `bars.close`, the decision time, and the organizer-supplied
+point-in-time eligible-symbol list. Funding, current executable open, bar high/low, volume,
+auxiliary data, positions, fills, equity, PnL, drawdown, evaluator actions, private data, and future
+rows are unused. Amendment 0006 remains the only pure-crypto universe authority; Team 07 performs
+no symbol classification.
 
 ## Falsifier and tournament discipline
 
-The new no-control reference is rejected if aggregate return or Sharpe is nonpositive at ordinary
-or doubled costs; bull, bear, or chop return/Sharpe is nonpositive; long-bull, short-bear, or
-combined-chop attribution is nonpositive; fewer than four folds or 55% of quarters are profitable;
-either sleeve is inactive; A5 score coverage or IC gates fail; or positive PnL concentration
-exceeds 40%. No negative candidate is eligible for controls or submission.
-
-Only after the exact reference passes every broad gate may separately preregistered mechanism
-ablations, neighbors, or risk-control trials be considered. A failed pivot reference triggers the
-remaining documented mechanism pivot or DNF, never a stop-loss or drawdown overlay rescue.
+Reject this family unless net Sharpe is at least `0.75`, annualized return is positive, Calmar is
+at least `0.40`, maximum drawdown is at most `0.30`, doubled-cost Sharpe is at least `0.35`,
+doubled-cost return is positive, and trial-adjusted probability positive is at least `0.90`. Also
+require at least four profitable folds, positive-quarter fraction at least `0.55`, worst-regime
+Sharpe at least `-0.25`, at least three positive regime Sharpes, positive bull/bear/chop returns and
+Sharpes, positive long-bull, short-bear, and combined-chop attribution, active sleeves, complete A5
+coverage and IC gates, and positive-PnL concentration at most `0.40`. No subthreshold core is
+eligible for controls, neighbors, diagnostics, or submission. Failure of this second/final pivot
+means Team 07 is DNF.

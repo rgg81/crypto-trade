@@ -1,17 +1,20 @@
 # team-07 · Top-40 V2
 
-Status: `PIVOT_01_VALIDATED_UNREGISTERED`
+Status: `PIVOT_02_VALIDATED_REGISTRATION_PENDING`
 
-The original `shock-diffusion-v1` no-control core is immutable negative development evidence and
-terminal. Its controls, neighbors, and ablations were never activated. The canonical root source
-now contains the prospective `t07-market-state-relative-ensemble-v1` mechanism pivot with a new
-candidate identity.
+Both completed no-control families are immutable terminal development evidence. The original
+`shock-diffusion-v1` was deeply negative. The first pivot
+`t07-market-state-relative-ensemble-v1` was approximately flat before costs, negative after costs,
+and negative in bear and chop. No control, neighbor, or ablation under either family is authorized.
 
-Amendment 0006 remains the only pure-crypto universe authority. Result-bearing work must use the
-active Amendment 0007 entrypoint. Organizer formatting, lint, JSON, 21 focused tests, independent
-A5 semantic review, and the A7 identity rebind passed serially. Family registration, canonical A5
-control first-adds, final source hashes, and trial registration remain pending.
+The canonical root source now contains the prospective
+`t07-two-tape-rank-durability-v1` mechanism with a new candidate identity. It replaces directional
+state, residual trend/reversal, and funding with same-bar cross-sectional return ranks that must
+remain durable across up/down market tapes and three time blocks. It trades weekly, exactly dollar
+neutral, at 0.36 gross with a disabled root risk policy.
 
-The first pivot trial must retain the exact no-control root `risk_policy.json`. Controls remain
-dormant unless the pivot core is broadly positive at ordinary and doubled costs across every
-declared fold, regime, role, sleeve, score, and concentration gate.
+Amendment 0006 remains the only pure-crypto universe authority. All result-bearing work must use
+the active Amendment 0007 entrypoint. Organizer formatting, lint, JSON, 21 focused tests,
+risk/source preflight, independent A5 review, governance hardening, and the A7 identity rebind
+passed serially. Family registration, canonical A5 first-adds, final source hashes, trial
+registration, and evaluation remain pending.
