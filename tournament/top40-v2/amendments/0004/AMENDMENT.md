@@ -15,8 +15,18 @@ schema-3 validator while preserving the exact frozen config loader and Phase-0 f
 remaining branch, Git binding, manifest hash, canonical-file hash, snapshot load, strategy worker,
 evaluator, cost, risk, artifact, and journal rule remains frozen.
 
+Both reused Amendment 0002 and Amendment 0003 modules are SHA-256 pinned, and every live helper,
+lock, facade, loader, validator, and command identity used from them is captured and checked before
+and after execution. Amendment 0004 shares Amendment 0002's process lock, restores the runner
+contract through a deletion-safe `finally`, rejects repeated or noncanonical validation, and
+validates the canonical schema-3 state both before and after the full legacy command. Legitimate
+state transitions published by that legacy command remain allowed; they are validated, not
+compared to the pre-run bytes.
+
 Compatibility is restricted to `run-window development`. Private and finalist runner paths fail
 closed until separately reviewed. `research-status` delegates to frozen Amendment 0003; all
 non-runner commands delegate unchanged to Amendment 0001. A one-time administrative replacement
 candidate may repeat Team 01's exact H14 bytes under a new candidate ID because the first attempt
-revealed no model result. The failed event is not deleted or rewritten.
+revealed no model result. The failed event is not deleted or rewritten. Frozen accounting will
+still count the replacement registration as an additional material trial and retain the tiny
+failed-run resource charge; no favorable budget refund or multiplicity adjustment is introduced.

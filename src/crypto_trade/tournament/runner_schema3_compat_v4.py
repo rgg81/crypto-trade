@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import hashlib
+import os
+import stat
 import sys
 from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
@@ -22,7 +24,24 @@ from crypto_trade.tournament.top40_v2 import LoadedV2Config
 _AMENDMENT_0003_MODULE_SHA256 = (
     "b7c9be94aca5b4ef7a66a5f59f0a47d0cd52235474eafb576cf0dc37281c066d"
 )
+_AMENDMENT_0002_MODULE_SHA256 = (
+    "fc70dbdb752c58857c5ed60a96e497324e93b9d5dc7e6afa0692bd3e02ad21aa"
+)
 _SUPPORTED_RUNNER_COMMAND = "run-window"
+_MISSING = object()
+
+_A2_MODULE = score_diagnostic_compat_v2
+_A2_PATCH_LOCK = _A2_MODULE._PATCH_LOCK
+_A2_FACADE_TYPE = _A2_MODULE._TournamentContractFacade
+_A2_READ_STATE = _A2_MODULE._read_exact_schema3_state
+_A2_CANONICAL_CONTRACT = _A2_MODULE._CANONICAL_CONTRACT
+_A2_LOAD_CONFIG = _A2_MODULE._CANONICAL_LOAD_CONFIG
+_A2_LEGACY_VALIDATOR = _A2_MODULE._CANONICAL_LEGACY_VALIDATOR
+_A2_PHASE0_FILES = _A2_MODULE._CANONICAL_PHASE0_FROZEN_FILES
+
+_A3_MODULE = amended_orchestrator_compat_v3
+_A3_RUN = _A3_MODULE.run
+_A3_LOAD_ADAPTER = _A3_MODULE._load_frozen_adapter
 
 
 class RunnerSchema3CompatibilityError(ValueError):
@@ -31,6 +50,66 @@ class RunnerSchema3CompatibilityError(ValueError):
 
 def _canonical_config(root: Path) -> LoadedV2Config:
     return top40_v2.load_config(root / TOP40_V2_LAYOUT.config_path)
+
+
+def _regular_bytes(path: Path, label: str) -> bytes:
+    try:
+        descriptor = os.open(
+            path,
+            os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0),
+        )
+    except OSError as exc:
+        raise RunnerSchema3CompatibilityError(f"{label} is missing or unsafe: {exc}") from exc
+    try:
+        info = os.fstat(descriptor)
+        if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+            raise RunnerSchema3CompatibilityError(
+                f"{label} must be a regular single-link file"
+            )
+        chunks: list[bytes] = []
+        remaining = info.st_size
+        while remaining:
+            chunk = os.read(descriptor, min(remaining, 1024 * 1024))
+            if not chunk:
+                raise RunnerSchema3CompatibilityError(f"{label} changed while read")
+            chunks.append(chunk)
+            remaining -= len(chunk)
+        if os.read(descriptor, 1):
+            raise RunnerSchema3CompatibilityError(f"{label} grew while read")
+        return b"".join(chunks)
+    finally:
+        os.close(descriptor)
+
+
+def _verify_amendment_authorities() -> None:
+    bindings = (
+        (
+            _A2_MODULE,
+            _AMENDMENT_0002_MODULE_SHA256,
+            {
+                "_PATCH_LOCK": _A2_PATCH_LOCK,
+                "_TournamentContractFacade": _A2_FACADE_TYPE,
+                "_read_exact_schema3_state": _A2_READ_STATE,
+                "_CANONICAL_CONTRACT": _A2_CANONICAL_CONTRACT,
+                "_CANONICAL_LOAD_CONFIG": _A2_LOAD_CONFIG,
+                "_CANONICAL_LEGACY_VALIDATOR": _A2_LEGACY_VALIDATOR,
+                "_CANONICAL_PHASE0_FROZEN_FILES": _A2_PHASE0_FILES,
+            },
+            "Amendment 0002 compatibility module",
+        ),
+        (
+            _A3_MODULE,
+            _AMENDMENT_0003_MODULE_SHA256,
+            {"run": _A3_RUN, "_load_frozen_adapter": _A3_LOAD_ADAPTER},
+            "Amendment 0003 status module",
+        ),
+    )
+    for module, expected_sha256, identities, label in bindings:
+        payload = _regular_bytes(Path(module.__file__).resolve(), label)
+        if hashlib.sha256(payload).hexdigest() != expected_sha256:
+            raise RunnerSchema3CompatibilityError(f"{label} bytes changed")
+        if any(getattr(module, name, _MISSING) is not value for name, value in identities.items()):
+            raise RunnerSchema3CompatibilityError(f"{label} authority changed")
 
 
 def run_with_schema3_runner_compatibility[T](
@@ -50,29 +129,28 @@ def run_with_schema3_runner_compatibility[T](
     ):
         raise ValueError("expected_state_validations must be a positive integer")
     root_path = Path(root).resolve()
-    compatibility = score_diagnostic_compat_v2
-    with compatibility._PATCH_LOCK:
-        original_contract = runner_v2.tournament_contract
+    _verify_amendment_authorities()
+    with _A2_PATCH_LOCK:
+        original_contract = getattr(runner_v2, "tournament_contract", _MISSING)
         legacy_validator = top40_v2.validate_run_state
         amended_validator = amendment_v2.validate_amended_run_state
-        if original_contract is not compatibility._CANONICAL_CONTRACT:
+        if original_contract is not _A2_CANONICAL_CONTRACT:
             raise RunnerSchema3CompatibilityError(
                 "runner tournament-contract binding was already replaced"
             )
         if (
-            legacy_validator is not compatibility._CANONICAL_LEGACY_VALIDATOR
+            legacy_validator is not _A2_LEGACY_VALIDATOR
             or getattr(original_contract, "validate_run_state", None)
-            is not compatibility._CANONICAL_LEGACY_VALIDATOR
-            or top40_v2.load_config is not compatibility._CANONICAL_LOAD_CONFIG
-            or top40_v2.PHASE0_FROZEN_FILES
-            is not compatibility._CANONICAL_PHASE0_FROZEN_FILES
+            is not _A2_LEGACY_VALIDATOR
+            or top40_v2.load_config is not _A2_LOAD_CONFIG
+            or top40_v2.PHASE0_FROZEN_FILES is not _A2_PHASE0_FILES
             or amendment_v2.validate_run_state is not legacy_validator
         ):
             raise RunnerSchema3CompatibilityError(
                 "runner tournament-contract authority is invalid"
             )
         config = _canonical_config(root_path)
-        compatibility._read_exact_schema3_state(
+        _A2_READ_STATE(
             root_path,
             config,
             amended_validator=amended_validator,
@@ -95,7 +173,7 @@ def run_with_schema3_runner_compatibility[T](
                 raise RunnerSchema3CompatibilityError(
                     "runner validator received a noncanonical V2 config"
                 )
-            current = compatibility._read_exact_schema3_state(
+            current = _A2_READ_STATE(
                 root_path,
                 config,
                 amended_validator=amended_validator,
@@ -107,10 +185,10 @@ def run_with_schema3_runner_compatibility[T](
                 )
             successful_validations += 1
 
-        facade = compatibility._TournamentContractFacade(
-            load_config=compatibility._CANONICAL_LOAD_CONFIG,
+        facade = _A2_FACADE_TYPE(
+            load_config=_A2_LOAD_CONFIG,
             validate_run_state=compatible_validate_run_state,
-            PHASE0_FROZEN_FILES=compatibility._CANONICAL_PHASE0_FROZEN_FILES,
+            PHASE0_FROZEN_FILES=_A2_PHASE0_FILES,
         )
         result: T | None = None
         failure: BaseException | None = None
@@ -121,10 +199,17 @@ def run_with_schema3_runner_compatibility[T](
             except BaseException as exc:
                 failure = exc
         finally:
-            observed_contract = runner_v2.tournament_contract
-            runner_v2.tournament_contract = original_contract
-            restored = runner_v2.tournament_contract is original_contract
-            after = compatibility._read_exact_schema3_state(
+            observed_contract = _MISSING
+            restored = False
+            try:
+                observed_contract = getattr(runner_v2, "tournament_contract", _MISSING)
+            finally:
+                runner_v2.tournament_contract = original_contract
+                restored = (
+                    getattr(runner_v2, "tournament_contract", _MISSING)
+                    is original_contract
+                )
+            after = _A2_READ_STATE(
                 root_path,
                 config,
                 amended_validator=amended_validator,
@@ -141,6 +226,7 @@ def run_with_schema3_runner_compatibility[T](
                 raise RunnerSchema3CompatibilityError(
                     "state validator identity changed during runner execution"
                 ) from failure
+            _verify_amendment_authorities()
         if failure is not None:
             raise failure.with_traceback(failure.__traceback__)
         if successful_validations != expected_state_validations:
@@ -154,16 +240,6 @@ def _command(values: Sequence[str]) -> str | None:
     return values[0] if values else None
 
 
-def _verify_amendment_0003_authority() -> None:
-    path = Path(amended_orchestrator_compat_v3.__file__).resolve()
-    payload = amended_orchestrator_compat_v3._regular_bytes(
-        path,
-        "Amendment 0003 status module",
-    )
-    if hashlib.sha256(payload).hexdigest() != _AMENDMENT_0003_MODULE_SHA256:
-        raise RunnerSchema3CompatibilityError("Amendment 0003 status bytes changed")
-
-
 def run(argv: Sequence[str] | None = None, *, root: str | Path | None = None) -> int:
     """Use Amendment 0003 status and add compatibility only for development run-window."""
 
@@ -173,10 +249,10 @@ def run(argv: Sequence[str] | None = None, *, root: str | Path | None = None) ->
         raise ValueError("active orchestration root must be the current working directory")
     values = list(sys.argv[1:] if argv is None else argv)
     command = _command(values)
-    _verify_amendment_0003_authority()
+    _verify_amendment_authorities()
     if command == "research-status":
-        return amended_orchestrator_compat_v3.run(values, root=root_path)
-    adapter = amended_orchestrator_compat_v3._load_frozen_adapter()
+        return _A3_RUN(values, root=root_path)
+    adapter = _A3_LOAD_ADAPTER()
 
     def call() -> int:
         return int(adapter.run(None if argv is None else values, root=root_path))
