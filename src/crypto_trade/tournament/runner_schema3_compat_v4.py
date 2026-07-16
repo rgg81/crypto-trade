@@ -48,6 +48,13 @@ class RunnerSchema3CompatibilityError(ValueError):
     """The narrow frozen-runner validator boundary failed closed."""
 
 
+class _DevelopmentRunAuthorization:
+    """Private identity capability for the reviewed active-entrypoint path."""
+
+
+_DEVELOPMENT_RUN_AUTHORIZATION = _DevelopmentRunAuthorization()
+
+
 def _canonical_config(root: Path) -> LoadedV2Config:
     return top40_v2.load_config(root / TOP40_V2_LAYOUT.config_path)
 
@@ -112,24 +119,31 @@ def _verify_amendment_authorities() -> None:
             raise RunnerSchema3CompatibilityError(f"{label} authority changed")
 
 
-def run_with_schema3_runner_compatibility[T](
+def run_development_window_with_schema3_compatibility(
     *,
     root: str | Path,
-    runner_call: Callable[[], T],
-    expected_state_validations: int = 1,
-) -> T:
-    """Run one frozen development window with schema-3 state validation dispatch."""
+    argv: Sequence[str],
+    _authorization: object | None = None,
+) -> int:
+    """Run exactly one frozen ``run-window development`` command."""
 
-    if not callable(runner_call):
-        raise TypeError("runner_call must be callable")
-    if (
-        isinstance(expected_state_validations, bool)
-        or not isinstance(expected_state_validations, int)
-        or expected_state_validations < 1
-    ):
-        raise ValueError("expected_state_validations must be a positive integer")
+    if _authorization is not _DEVELOPMENT_RUN_AUTHORIZATION:
+        raise PermissionError(
+            "development runner compatibility requires active-entrypoint authority"
+        )
+    values = list(argv)
+    if len(values) < 4 or values[0] != "run-window" or values[1] != "development":
+        raise ValueError(
+            "Amendment 0004 compatibility requires exact run-window development argv"
+        )
     root_path = Path(root).resolve()
     _verify_amendment_authorities()
+    adapter = _A3_LOAD_ADAPTER()
+
+    def runner_call() -> int:
+        return int(adapter.run(values, root=root_path))
+
+    expected_state_validations = 1
     with _A2_PATCH_LOCK:
         original_contract = getattr(runner_v2, "tournament_contract", _MISSING)
         legacy_validator = top40_v2.validate_run_state
@@ -190,7 +204,7 @@ def run_with_schema3_runner_compatibility[T](
             validate_run_state=compatible_validate_run_state,
             PHASE0_FROZEN_FILES=_A2_PHASE0_FILES,
         )
-        result: T | None = None
+        result: int | None = None
         failure: BaseException | None = None
         try:
             runner_v2.tournament_contract = facade
@@ -233,11 +247,32 @@ def run_with_schema3_runner_compatibility[T](
             raise RunnerSchema3CompatibilityError(
                 "completed runner call did not traverse the expected state validation"
             )
-        return result  # type: ignore[return-value]
+        if result is None:
+            raise RunnerSchema3CompatibilityError(
+                "completed development command returned no result"
+            )
+        return result
 
 
 def _command(values: Sequence[str]) -> str | None:
     return values[0] if values else None
+
+
+def _verified_amendment_delegate[T](call: Callable[[], T]) -> T:
+    _verify_amendment_authorities()
+    result: T | None = None
+    failure: BaseException | None = None
+    try:
+        result = call()
+    except BaseException as exc:
+        failure = exc
+    try:
+        _verify_amendment_authorities()
+    except BaseException as integrity_failure:
+        raise integrity_failure from failure
+    if failure is not None:
+        raise failure.with_traceback(failure.__traceback__)
+    return result  # type: ignore[return-value]
 
 
 def run(argv: Sequence[str] | None = None, *, root: str | Path | None = None) -> int:
@@ -251,20 +286,25 @@ def run(argv: Sequence[str] | None = None, *, root: str | Path | None = None) ->
     command = _command(values)
     _verify_amendment_authorities()
     if command == "research-status":
-        return _A3_RUN(values, root=root_path)
-    adapter = _A3_LOAD_ADAPTER()
-
-    def call() -> int:
-        return int(adapter.run(None if argv is None else values, root=root_path))
+        return _verified_amendment_delegate(lambda: _A3_RUN(values, root=root_path))
     if command == _SUPPORTED_RUNNER_COMMAND:
         if len(values) < 2 or values[1] != "development":
             raise ValueError(
                 "Amendment 0004 permits schema-3 runner compatibility only for development"
             )
-        return run_with_schema3_runner_compatibility(root=root_path, runner_call=call)
+        return run_development_window_with_schema3_compatibility(
+            root=root_path,
+            argv=values,
+            _authorization=_DEVELOPMENT_RUN_AUTHORIZATION,
+        )
     if command == "run-finalist":
         raise ValueError("finalist runner compatibility is not frozen in Amendment 0004")
-    return call()
+
+    def ordinary_call() -> int:
+        adapter = _A3_LOAD_ADAPTER()
+        return int(adapter.run(None if argv is None else values, root=root_path))
+
+    return _verified_amendment_delegate(ordinary_call)
 
 
 def main(argv: Sequence[str] | None = None) -> int:

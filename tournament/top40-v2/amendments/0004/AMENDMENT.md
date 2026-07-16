@@ -24,8 +24,11 @@ state transitions published by that legacy command remain allowed; they are vali
 compared to the pre-run bytes.
 
 Compatibility is restricted to `run-window development`. Private and finalist runner paths fail
-closed until separately reviewed. `research-status` delegates to frozen Amendment 0003; all
-non-runner commands delegate unchanged to Amendment 0001. A one-time administrative replacement
+closed inside both the active entrypoint and the facade helper itself; the helper accepts no
+arbitrary callback and requires a private active-entrypoint identity capability before it loads
+the frozen adapter. `research-status` delegates to frozen Amendment 0003; all non-runner commands
+delegate unchanged to Amendment 0001. Those delegated paths recheck Amendment 0002/0003 authority
+after success, exception, or interruption. A one-time administrative replacement
 candidate may repeat Team 01's exact H14 bytes under a new candidate ID because the first attempt
 revealed no model result. The failed event is not deleted or rewritten. Frozen accounting will
 still count the replacement registration as an additional material trial and retain the tiny
