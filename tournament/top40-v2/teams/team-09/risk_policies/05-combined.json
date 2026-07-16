@@ -5,26 +5,12 @@
     {"drawdown": 0.28, "gross_scale": 0.0}
   ],
   "policy_id": "team09-risk-combined",
-  "position_stop": {
-    "cooldown_bars": 3,
-    "enabled": true,
-    "loss_fraction": 0.12
-  },
+  "position_stop": {"cooldown_bars": 3, "enabled": true, "loss_fraction": 0.12},
   "same_boundary_reentry": false,
   "schema_version": 1,
-  "side_scaling": {
-    "long_scale": 1.0,
-    "short_scale": 1.0
-  },
-  "time_stop": {
-    "cooldown_bars": 3,
-    "enabled": false,
-    "maximum_holding_bars": 21
-  },
-  "turnover_limit": {
-    "enabled": true,
-    "maximum_one_way_turnover": 0.4
-  },
+  "side_scaling": {"long_scale": 1.0, "short_scale": 1.0},
+  "time_stop": {"cooldown_bars": 3, "enabled": false, "maximum_holding_bars": 21},
+  "turnover_limit": {"enabled": true, "maximum_one_way_turnover": 0.4},
   "volatility_target": {
     "annualized_target": 0.35,
     "enabled": true,

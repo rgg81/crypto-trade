@@ -1,0 +1,25 @@
+{
+  "candidate_id": "team09-fcpc-center-v1",
+  "center_parameters_path": "tournament/top40-v2/teams/team-09/frozen_config.json",
+  "declaration_status": "prospective-no-return-artifacts",
+  "neighbors": [
+    {"changes": {"funding_lookback_hours": 120}, "neighbor_id": "team09-n01-lookback-120h"},
+    {"changes": {"funding_lookback_hours": 216}, "neighbor_id": "team09-n02-lookback-216h"},
+    {"changes": {"funding_half_life_hours": 48.0}, "neighbor_id": "team09-n03-half-life-48h"},
+    {"changes": {"funding_half_life_hours": 96.0}, "neighbor_id": "team09-n04-half-life-96h"},
+    {"changes": {"confirmation_bars": 6}, "neighbor_id": "team09-n05-confirmation-6"},
+    {"changes": {"confirmation_bars": 12}, "neighbor_id": "team09-n06-confirmation-12"},
+    {"changes": {"crowding_threshold": 0.2}, "neighbor_id": "team09-n07-crowding-020"},
+    {"changes": {"crowding_threshold": 0.4}, "neighbor_id": "team09-n08-crowding-040"},
+    {"changes": {"confirmation_threshold": 0.0}, "neighbor_id": "team09-n09-confirmation-threshold-000"},
+    {"changes": {"confirmation_threshold": 0.2}, "neighbor_id": "team09-n10-confirmation-threshold-020"}
+  ],
+  "registration_rule": "Each neighbor is a separate material preregistration with a full parameter artifact and distinct daily-return artifact. No placeholder hash in this draft is qualification evidence.",
+  "schema_version": 1,
+  "stability_gate": {
+    "maximum_positive_pnl_concentration": 0.4,
+    "minimum_neighbor_median_sharpe": 0.5,
+    "minimum_profitable_neighbor_fraction": 0.7
+  },
+  "team_id": "team-09"
+}

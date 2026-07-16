@@ -1,0 +1,33 @@
+{
+  "candidate_id": "team09-fcpc-center-v1",
+  "config_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "falsifier": "Do not qualify or submit unless all centrally derived development gates pass, including positive bull, bear, and chop net returns, both sleeve roles, parameter stability, concentration, and doubled costs. Otherwise continue within budget, pivot, or record DNF.",
+  "family_id": "team09-funding-crowding-confirmation-v1",
+  "parameters": {
+    "confirmation_bars": 9,
+    "confirmation_threshold": 0.1,
+    "crowding_threshold": 0.3,
+    "expected_seed": 20260801,
+    "funding_half_life_hours": 72.0,
+    "funding_lookback_hours": 168,
+    "funding_persistence_weight": 0.5,
+    "funding_rate_floor": 1e-07,
+    "interval_hours": 8,
+    "maximum_funding_age_hours": 16,
+    "maximum_symbol_weight": 0.09,
+    "maximum_symbols_per_side": 6,
+    "minimum_cross_section": 12,
+    "minimum_funding_events": 12,
+    "minimum_symbols_per_side": 4,
+    "rebalance_hour_utc": 0,
+    "target_side_gross": 0.45,
+    "volatility_bars": 63
+  },
+  "risk_config_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "seed": 20260801,
+  "source_bundle_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "strategy_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "team_id": "team-09",
+  "thesis": "A funding extreme is actionable only when relative price confirms that the crowded side is unwinding; balanced sleeves should monetize relative carry and dislocation across directional and choppy markets.",
+  "timestamp_utc": "1970-01-01T00:00:00Z"
+}

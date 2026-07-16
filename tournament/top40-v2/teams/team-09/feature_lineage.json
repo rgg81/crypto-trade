@@ -1,0 +1,66 @@
+{
+  "derived_features": [
+    {
+      "availability": "Computed only from funding_time strictly before decision_time.",
+      "definition": "Within the trailing funding_lookback_hours, sum funding_rate with an exponential half-life and divide by the deterministic eight-hour slot normalizer.",
+      "feature": "decayed_relative_funding_pressure",
+      "missing_rule": "Exclude the symbol when event count is below minimum_funding_events or the latest event exceeds maximum_funding_age_hours; never impute cross-sectionally or forward-fill.",
+      "parents": ["funding_rate", "funding_time"],
+      "purpose": "Measure relative directional crowding and expected relative carry per eight-hour interval."
+    },
+    {
+      "availability": "Computed from the same strictly past funding window.",
+      "definition": "Absolute exponentially weighted signed funding mass divided by exponentially weighted absolute funding mass plus a frozen floor.",
+      "feature": "funding_sign_persistence",
+      "missing_rule": "Inherited from decayed_relative_funding_pressure.",
+      "parents": ["funding_rate", "funding_time"],
+      "purpose": "Increase conviction when crowding has a persistent sign without changing its direction."
+    },
+    {
+      "availability": "The newest input candle opens exactly eight hours before decision_time and is closed at decision_time.",
+      "definition": "Log close-to-close move over confirmation_bars divided by trailing RMS eight-hour log returns and square-root horizon scaling.",
+      "feature": "volatility_scaled_price_confirmation",
+      "missing_rule": "Exclude the symbol unless volatility_bars plus one contiguous eight-hour closes end exactly at decision_time minus eight hours; do not compress gaps.",
+      "parents": ["bar_open_time", "bar_close"],
+      "purpose": "Confirm that price has begun moving against the crowded funding side."
+    },
+    {
+      "availability": "Computed at the decision boundary after symbol-level eligibility checks.",
+      "definition": "Average-tie cross-sectional ranks map funding pressure and price confirmation independently to [-1, 1]. A candidate must exceed the crowding threshold and have price rank aligned with the opposite-of-crowding direction.",
+      "feature": "confirmed_crowding_unwind",
+      "missing_rule": "Request an explicit flat book if the valid cross-section or either sleeve lacks frozen minimum breadth.",
+      "parents": ["decayed_relative_funding_pressure", "funding_sign_persistence", "volatility_scaled_price_confirmation"],
+      "purpose": "Produce the causal long/short selection signal."
+    }
+  ],
+  "forbidden_inputs": [
+    "future bars or funding rows",
+    "private-qualifier observations or metrics",
+    "final-OOS observations or metrics",
+    "other-team artifacts",
+    "fills, positions, PnL, marks, regimes, or evaluator-owned state",
+    "stablecoins, TradFi, metals, commodities, equities, ETFs, indexes, FX, leveraged tokens, or other Amendment-0006-ineligible contracts"
+  ],
+  "raw_fields": [
+    {
+      "availability_time": "open_time + 8h, supplied only after the candle closes",
+      "event_time": "bar open_time",
+      "field": "close",
+      "source": "SHA-bound Binance USD-M 8h transaction bars in the frozen shared snapshot"
+    },
+    {
+      "availability_time": "funding_time; organizer context requires funding_time < decision_time",
+      "event_time": "actual published funding_time",
+      "field": "funding_rate",
+      "source": "SHA-bound Binance USD-M funding rows in the frozen shared snapshot"
+    },
+    {
+      "availability_time": "the organizer's point-in-time decision boundary",
+      "event_time": "weekly reconstitution_time plus current executable-open intersection",
+      "field": "eligible_symbols",
+      "source": "central evaluator under active Amendment 0006 pure-crypto certification"
+    }
+  ],
+  "schema_version": 1,
+  "team_id": "team-09"
+}

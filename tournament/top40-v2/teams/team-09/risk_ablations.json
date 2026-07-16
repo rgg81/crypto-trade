@@ -1,0 +1,46 @@
+{
+  "cost_output_contract": {
+    "base_cost_multiplier": 1.0,
+    "double_cost_multiplier": 2.0,
+    "material_count_rule": "Each policy is one material configuration whose organizer run emits base and doubled-cost outputs together. The two cost panels are not separately selected and do not count as two policy trials.",
+    "required_for_every_policy": true
+  },
+  "final_policy_path": "tournament/top40-v2/teams/team-09/risk_policy.json",
+  "policies": [
+    {
+      "hypothesis": "Execution/control baseline with no enabled optional risk control.",
+      "path": "risk_policies/00-none.json",
+      "policy_id": "team09-risk-none"
+    },
+    {
+      "hypothesis": "Scale gross exposure from trailing realized portfolio volatility without exceeding the strategy request.",
+      "path": "risk_policies/01-volatility-target.json",
+      "policy_id": "team09-risk-vol"
+    },
+    {
+      "hypothesis": "Progressively reduce gross after authoritative portfolio drawdowns of 12%, 20%, and 28%.",
+      "path": "risk_policies/02-drawdown-brakes.json",
+      "policy_id": "team09-risk-drawdown"
+    },
+    {
+      "hypothesis": "Close a symbol only after a 12% position loss is confirmed and block same-boundary reentry with a three-bar cooldown.",
+      "path": "risk_policies/03-position-stop.json",
+      "policy_id": "team09-risk-stop"
+    },
+    {
+      "hypothesis": "Cap one-way turnover at 40% per boundary to test whether signal churn is a failure mode after ordinary capacity and costs.",
+      "path": "risk_policies/04-turnover-limit.json",
+      "policy_id": "team09-risk-turnover"
+    },
+    {
+      "hypothesis": "Combine volatility targeting, drawdown brakes, position stop, and turnover limit without side scaling or time stop.",
+      "path": "risk_policies/05-combined.json",
+      "policy_id": "team09-risk-combined"
+    }
+  ],
+  "policy_count": 6,
+  "registration_rule": "All six policies are prospective and must be separately preregistered before results. Compare return, Sharpe, drawdown, tail loss, turnover, regimes, action counts, cooldown, requested/filled risk notional, and reentry prevention. Controls cannot qualify a strategy that fails any development gate.",
+  "schema_version": 1,
+  "status": "prospective-no-results",
+  "team_id": "team-09"
+}

@@ -1,0 +1,40 @@
+{
+  "economic_thesis": "Perpetual funding is an observable transfer price for directional inventory. A persistent cross-sectional funding extreme marks a crowded side, but crowding alone can persist. Requiring relative price to move against that crowded side identifies an unwind while preserving relative carry: short high-funding relative laggards and long low-funding relative leaders.",
+  "expected_regime_roles": {
+    "bear": "The short sleeve targets relatively high-funding assets whose prices have become relative laggards; the balanced long sleeve limits market beta.",
+    "bull": "The long sleeve targets relatively low-funding assets whose prices have become relative leaders; crowded weak names remain available to the short sleeve.",
+    "chop": "Balanced sleeves seek cross-sectional funding transfer and crowd unwind rather than market direction; failure to produce positive chop return falsifies the mechanism.",
+    "long_sleeve": "Long low-relative-funding contracts only after positive relative-price confirmation.",
+    "short_sleeve": "Short high-relative-funding contracts only after negative relative-price confirmation.",
+    "stress": "Breadth requirements can force flat exposure, while organizer-owned brakes and volatility targeting are evaluated prospectively as separate policies; stress must still satisfy every frozen gate."
+  },
+  "falsifier": "Reject or pivot if causal stitched OOF evidence fails any development gate, if either sleeve is immaterial, if bull/bear/chop net return is nonpositive, if funding-only or price-only ablations match the joint rule, or if the result is an isolated parameter peak. DNF rather than submit a negative or unqualified IS model.",
+  "family_id": "team09-funding-crowding-confirmation-v1",
+  "mechanism": "At 00:00 UTC, estimate seven-day exponentially decayed funding pressure from strictly past events, cross-sectionally rank it, and take the opposite side only where contiguous past-close relative performance confirms an unwind. Select both sleeves independently, require breadth on both, and equalize gross exposure without an estimated hedge ratio.",
+  "parameter_ranges": {
+    "confirmation_bars": [6, 9, 12],
+    "confirmation_threshold": [0.0, 0.1, 0.2],
+    "crowding_threshold": [0.2, 0.3, 0.4],
+    "expected_seed": [20260801],
+    "funding_half_life_hours": [48.0, 72.0, 96.0],
+    "funding_lookback_hours": [120, 168, 216],
+    "funding_persistence_weight": [0.5],
+    "funding_rate_floor": [1e-07],
+    "interval_hours": [8],
+    "maximum_funding_age_hours": [16],
+    "maximum_symbol_weight": [0.09],
+    "maximum_symbols_per_side": [6],
+    "minimum_cross_section": [12],
+    "minimum_funding_events": [12],
+    "minimum_symbols_per_side": [4],
+    "rebalance_hour_utc": [0],
+    "target_side_gross": [0.45],
+    "volatility_bars": [63]
+  },
+  "parent_family_id": null,
+  "registered_at_utc": "1970-01-01T00:00:00Z",
+  "risk_policy_plan": "Six material policy configurations are preregistered prospectively: no control, volatility target only, drawdown brakes only, position stop only, turnover limit only, and combined. Each one organizer run must emit base-cost and doubled-cost outputs together; the paired cost panels are one material policy configuration, not two trials. No policy can rescue a failed development gate.",
+  "schema_version": 1,
+  "selection_metric": "Binary eligibility first: every frozen development, regime, sleeve, stability, concentration, and doubled-cost gate must pass on stitched chronological evidence. Among passers only, maximize the lower of net Sharpe and doubled-cost Sharpe, then the worst fold/regime Sharpe. A non-passer cannot be selected.",
+  "team_id": "team-09"
+}
