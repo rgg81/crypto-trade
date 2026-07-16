@@ -1,17 +1,35 @@
 {
   "candidate_id": "vdr-core-candidate-001",
   "core_alpha_activation_gate": {
-    "applies_to": "vdr-core-candidate-001 with root risk_policy.json in its no-control state",
-    "base_cost_net_return_strictly_positive": true,
-    "base_cost_net_sharpe_strictly_positive": true,
-    "both_sleeves_meet_activity_floors": true,
+    "annualized_return_strictly_positive": true,
+    "applies_to": "vdr-core-candidate-001 with root risk_policy.json in its exact no-control state",
+    "complete_a5_score_coverage": true,
     "combined_chop_attribution_strictly_positive": true,
     "doubled_cost_net_return_strictly_positive": true,
-    "doubled_cost_net_sharpe_strictly_positive": true,
     "long_bull_attribution_strictly_positive": true,
+    "maximum_drawdown": 0.3,
+    "maximum_positive_pnl_concentration": 0.4,
+    "minimum_calmar": 0.4,
+    "minimum_double_cost_net_sharpe": 0.35,
+    "minimum_fold_score_ic_positive": 4,
+    "minimum_neighbor_median_sharpe": 0.5,
+    "minimum_net_sharpe": 0.75,
     "minimum_positive_folds": 4,
+    "minimum_positive_quarter_fraction": 0.55,
+    "minimum_positive_regime_sharpes": 3,
+    "minimum_profitable_neighbor_fraction": 0.7,
+    "minimum_trial_adjusted_probability_positive": 0.9,
+    "minimum_worst_regime_sharpe": -0.25,
+    "pooled_score_ic_strictly_positive": true,
+    "required_positive_sharpe_regimes": ["bull", "bear", "chop"],
     "required_positive_return_regimes": ["bull", "bear", "chop"],
-    "short_bear_attribution_strictly_positive": true
+    "short_bear_attribution_strictly_positive": true,
+    "sleeve_minima": {
+      "minimum_mean_side_exposure": 0.01,
+      "minimum_side_active_bar_fraction": 0.1,
+      "minimum_side_executed_notional_usdt": 1000.0,
+      "minimum_side_exposure": 0.01
+    }
   },
   "cost_multipliers_for_every_policy": [
     1.0,
@@ -25,7 +43,7 @@
     "reason_no_control_is_not_counted_twice": "The risk-none policy is byte-identical to root risk_policy.json used by the one center candidate; the five individual controls and combined policy are six additional material configurations.",
     "total_initial_family_configurations": 21
   },
-  "policy_materialization_rule": "The frozen lifecycle reads only root risk_policy.json. The no-control core runs first. After it passes every core-alpha activation minimum, copy any selected immutable risk_policies template byte-for-byte to root risk_policy.json before commit, registration, and run, then recompute every risk and source binding. Controls cannot rescue a failed core.",
+  "policy_materialization_rule": "The lifecycle reads only root risk_policy.json. The no-control core runs first. After it passes every core-alpha activation minimum, copy any selected immutable risk_policies template byte-for-byte to root risk_policy.json before commit, registration, and run, then recompute every risk and source binding. Controls cannot rescue a failed core.",
   "policies": [
     {
       "ablation_id": "risk-none",
@@ -332,6 +350,6 @@
     "same_boundary_reentry_prevented_count"
   ],
   "schema_version": 1,
-  "selection_rule": "No control may be registered until the no-control core passes every broad positive activation minimum. A later control may enter the frozen candidate only if it improves its declared failure mode, does not create any new frozen-gate failure, and remains acceptable at doubled costs. Controls cannot rescue a negative or otherwise failed core.",
+  "selection_rule": "No control may be registered until the no-control core passes the complete official central-development gate and every stricter regime, role, sleeve, stability, concentration, A5 coverage, and score-IC minimum. A later control may enter the frozen candidate only if it improves its declared failure mode, creates no new gate failure, and remains acceptable at doubled costs. Controls cannot rescue a negative or subthreshold core.",
   "team_id": "team-08"
 }

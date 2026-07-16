@@ -33,9 +33,9 @@ Python process, private window, or final-OOS process was run while authoring thi
 The first executable risk state is the no-control top-level `risk_policy.json`, byte-identical to
 `risk_policies/no-control.json`. Single-control and combined files are immutable source
 declarations, not runtime selectors. They remain dormant unless the no-control core passes every
-broad positive activation minimum; controls cannot rescue failure. Before a later policy candidate
-is committed, registered, or run, the selected template must be copied byte-for-byte to root
-`risk_policy.json` and every affected hash recomputed.
+gate in `control-activation.template.json`; controls cannot rescue failure. Before a later policy
+candidate is committed, registered, or run, the selected template must be copied byte-for-byte to
+root `risk_policy.json` and every affected hash recomputed.
 
 ## Software and runtime lineage
 
@@ -55,10 +55,10 @@ fees, slippage, funding, participation, delistings, risk actions, equity, and me
 This package is downstream of active Amendment 0006,
 `top40-v2-amendment-0006-pure-crypto-universe`. The frozen canonical audit reports 667 contract
 metadata symbols, 321 distinct membership symbols, and zero violations. All future registration
-and result-bearing commands must use the active Amendment 0005 superset entrypoint, which delegates
-ordinary commands through the exact A6 preflight. Team code does not maintain a competing stablecoin
-or TradFi classifier because ticker-only inference cannot establish asset class and could diverge
-from the frozen metadata authority.
+and result-bearing commands must use the active Amendment 0007 runtime-preload entrypoint, which
+preserves A5 and delegates ordinary commands through the exact A6 preflight. Team code does not
+maintain a competing stablecoin or TradFi classifier because ticker-only inference cannot establish
+asset class and could diverge from the frozen metadata authority.
 
 ## Artifact lifecycle
 

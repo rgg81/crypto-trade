@@ -26,22 +26,42 @@ def test_root_policy_is_byte_exact_no_control() -> None:
     assert policy.policy_id == "team-08-risk-none"
 
 
-def test_risk_plan_requires_broad_positive_core_before_controls() -> None:
+def test_risk_plan_requires_complete_no_control_gate_before_controls() -> None:
     plan = json.loads((TEAM_DIR / "risk_ablations.json").read_text(encoding="utf-8"))
     assert plan["policies"][0]["template_path"] == "risk_policies/no-control.json"
     assert plan["policies"][-1]["template_path"] == "risk_policies/combined.json"
     assert plan["core_alpha_activation_gate"] == {
-        "applies_to": "vdr-core-candidate-001 with root risk_policy.json in its no-control state",
-        "base_cost_net_return_strictly_positive": True,
-        "base_cost_net_sharpe_strictly_positive": True,
-        "both_sleeves_meet_activity_floors": True,
+        "annualized_return_strictly_positive": True,
+        "applies_to": (
+            "vdr-core-candidate-001 with root risk_policy.json in its exact no-control state"
+        ),
+        "complete_a5_score_coverage": True,
         "combined_chop_attribution_strictly_positive": True,
         "doubled_cost_net_return_strictly_positive": True,
-        "doubled_cost_net_sharpe_strictly_positive": True,
         "long_bull_attribution_strictly_positive": True,
+        "maximum_drawdown": 0.3,
+        "maximum_positive_pnl_concentration": 0.4,
+        "minimum_calmar": 0.4,
+        "minimum_double_cost_net_sharpe": 0.35,
+        "minimum_fold_score_ic_positive": 4,
+        "minimum_neighbor_median_sharpe": 0.5,
+        "minimum_net_sharpe": 0.75,
         "minimum_positive_folds": 4,
+        "minimum_positive_quarter_fraction": 0.55,
+        "minimum_positive_regime_sharpes": 3,
+        "minimum_profitable_neighbor_fraction": 0.7,
+        "minimum_trial_adjusted_probability_positive": 0.9,
+        "minimum_worst_regime_sharpe": -0.25,
+        "pooled_score_ic_strictly_positive": True,
+        "required_positive_sharpe_regimes": ["bull", "bear", "chop"],
         "required_positive_return_regimes": ["bull", "bear", "chop"],
         "short_bear_attribution_strictly_positive": True,
+        "sleeve_minima": {
+            "minimum_mean_side_exposure": 0.01,
+            "minimum_side_active_bar_fraction": 0.1,
+            "minimum_side_executed_notional_usdt": 1000.0,
+            "minimum_side_exposure": 0.01,
+        },
     }
 
 

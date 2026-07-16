@@ -1,6 +1,6 @@
 {
   "candidate_id": "vdr-core-candidate-001",
-  "activation_rule": "The no-control core is the first material run. Mechanism ablations may be registered only after that result is read; every risk overlay remains blocked unless all broad positive no-control core-alpha activation minima pass.",
+  "activation_rule": "The no-control core is the first material run. Mechanism ablations may be registered only after that result is read and only as falsification evidence; every risk overlay remains blocked unless the immutable no-control candidate passes the complete official gate plus all stricter Team 08 gates.",
   "cost_protocol": {
     "base": "common 5 bp fee plus 2.5 bp slippage per side",
     "doubled": "organizer-owned independent rerun with all ordinary costs multiplied by 2",

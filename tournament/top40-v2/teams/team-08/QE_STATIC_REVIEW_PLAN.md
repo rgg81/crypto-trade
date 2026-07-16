@@ -12,8 +12,8 @@ Status: **planned; none of these checks has been executed by this draft**
    Reject sentinel hashes at materialization even though they are syntactically schema-compatible.
 4. Validate every full policy in `risk_ablations.json` and `risk_policy.json` through the public
    strict risk-policy parser.
-5. Bind the active Amendment 0005 superset and require its delegated Amendment 0006 pure-crypto
-   preflight for every later command.
+5. Bind the active Amendment 0007 runtime-preload authority and require its preserved A5 protocol
+   plus delegated Amendment 0006 pure-crypto preflight for every later command.
 6. Require root `risk_policy.json` to be byte-identical to `risk_policies/no-control.json` for the
    first material candidate. The lifecycle never selects `risk_policies/` directly.
 
@@ -74,7 +74,7 @@ These checks belong to the organizer because team code cannot price or execute t
 
 ## 5. Research lifecycle checks
 
-1. Replace the family draft timestamp and submit it through the active Amendment 0005 superset
+1. Replace the family draft timestamp and submit it through the active Amendment 0007 runtime-preload
    entrypoint before any material run; do not append `families.jsonl` manually.
 2. Materialize actual source/config/risk hashes into a trial registration, validate exact schema,
    and register it before reading a result.

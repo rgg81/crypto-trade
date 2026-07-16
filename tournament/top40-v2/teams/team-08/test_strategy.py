@@ -11,7 +11,13 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from crypto_trade.tournament.score_adapter_protocol_v5 import (
+    score_boundary as public_score_boundary,
+)
+
 TEAM_DIR = Path(__file__).resolve().parent
+if str(TEAM_DIR) not in sys.path:
+    sys.path.insert(0, str(TEAM_DIR))
 SPEC = importlib.util.spec_from_file_location(
     "team08_strategy_under_test", TEAM_DIR / "strategy.py"
 )
@@ -125,6 +131,39 @@ def _compression_mask_matrix() -> tuple[pd.DataFrame, set[str], set[str]]:
 def test_default_config_matches_authored_frozen_config() -> None:
     authored = json.loads((TEAM_DIR / "frozen_config.json").read_text(encoding="utf-8"))
     assert dataclasses.asdict(strategy_module.DEFAULT_CONFIG) == authored["strategy_parameters"]
+
+
+def test_candidate_variant_and_public_score_hook_are_exactly_bound() -> None:
+    assert strategy_module.candidate_variant.ACTIVE_CANDIDATE_ID == "vdr-core-candidate-001"
+    assert strategy_module.candidate_variant.ACTIVE_OVERRIDES == {}
+    assert strategy_module.score_boundary is public_score_boundary
+
+
+def test_public_boundary_captures_the_operative_final_scores_once(monkeypatch) -> None:
+    captured: list[dict[str, float]] = []
+
+    def capture(scores: dict[str, float]) -> dict[str, float]:
+        assert type(scores) is dict
+        assert list(scores) == sorted(scores)
+        assert all(type(symbol) is str and type(value) is float for symbol, value in scores.items())
+        captured.append(dict(scores))
+        return scores
+
+    monkeypatch.setattr(strategy_module, "score_boundary", capture)
+    strategy = strategy_module.build_strategy()
+    weights = strategy.target_weights(_context(mode="expansion"), seed=20260801)
+
+    assert len(captured) == 1
+    assert captured[0]
+    assert weights == strategy_module._portfolio(
+        pd.Series(captured[0], dtype=float), strategy_module.DEFAULT_CONFIG
+    )
+
+
+def test_public_boundary_rejects_a_replacement_dictionary(monkeypatch) -> None:
+    monkeypatch.setattr(strategy_module, "score_boundary", lambda scores: dict(scores))
+    with pytest.raises(ValueError, match="exact input dictionary"):
+        strategy_module.build_strategy().target_weights(_context(), seed=20260801)
 
 
 def test_parameter_neighbors_are_valid_distinct_and_inside_declared_domains() -> None:

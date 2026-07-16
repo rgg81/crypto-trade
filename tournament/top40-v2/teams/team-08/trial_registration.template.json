@@ -1,9 +1,14 @@
 {
   "candidate_id": "vdr-core-candidate-001",
   "config_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-  "falsifier": "This first material trial is the no-control core. Reject it and prohibit every risk-overlay activation if base- or doubled-cost return/Sharpe is nonpositive, fewer than four folds are positive, bull/bear/chop return or long-bull/short-bear/combined-chop attribution is nonpositive, either sleeve is inactive, any other frozen development gate fails, its declared neighborhood is an isolated peak, or compression and dispersion-switch ablations do not support the proposed interaction.",
+  "falsifier": "Reject this exact no-control core unless net Sharpe is at least 0.75, annualized return is positive, Calmar is at least 0.40, maximum drawdown is at most 0.30, doubled-cost Sharpe is at least 0.35, doubled-cost return is positive, trial-adjusted probability positive is at least 0.90, at least four of six folds are profitable, and positive-quarter fraction is at least 0.55. Also require positive bull, bear, and chop return and Sharpe, at least three positive regime Sharpes, worst-regime Sharpe at least -0.25, positive long-bull, short-bear, and combined-chop attribution, both sleeves above every official exposure/activity/notional floor, at least 70% profitable declared neighbors with median neighbor Sharpe at least 0.50, positive-PnL concentration at most 0.40, complete scheduled A5 score coverage, positive pooled score IC, and at least four positive fold ICs. Any failure rejects the core; controls, diagnostics, ablations, or private data cannot rescue it.",
   "family_id": "volatility-dispersion-release-v1",
   "parameters": {
+    "_top40_v2_score_adapter": {
+      "adapter_id": "top40-v2-declared-score-boundary-v1",
+      "manifest_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "schema_version": 1
+    },
     "compression_ratio_ceiling": 0.86,
     "compression_ratio_floor": 0.35,
     "direction_bars": 3,

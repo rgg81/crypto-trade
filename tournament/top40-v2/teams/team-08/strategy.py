@@ -3,6 +3,11 @@
 The implementation is deliberately self-contained because the tournament worker copies the team
 source bundle into a clean process.  It consumes only closed 8-hour bars supplied through the
 public ``DecisionContext`` contract.  It never prices fills, reads files, or uses private state.
+
+On each scheduled construction, one finite built-in score dictionary crosses the organizer's
+public A5 identity boundary after the complete VDR transform and before selection, sizing, caps,
+or organizer risk.  The exact returned dictionary is the sole signal object used to construct the
+portfolio.
 """
 
 from __future__ import annotations
@@ -14,12 +19,21 @@ import re
 from collections.abc import Mapping, Sequence
 from typing import Any
 
+import candidate_variant
 import numpy as np
 import pandas as pd
+
+from crypto_trade.tournament.score_adapter_protocol_v5 import score_boundary
 
 _SYMBOL_PATTERN = re.compile(r"[A-Z0-9]+USDT")
 _BAR_INTERVAL = pd.Timedelta(hours=8)
 _REQUIRED_COLUMNS = frozenset({"open_time", "symbol", "close", "quote_volume"})
+
+ACTIVE_FAMILY_ID = "volatility-dispersion-release-v1"
+ACTIVE_CANDIDATE_ID = "vdr-core-candidate-001"
+MATERIALIZED_CANDIDATE_OVERRIDES: dict[str, dict[str, object]] = {
+    ACTIVE_CANDIDATE_ID: {},
+}
 
 
 @dataclasses.dataclass(frozen=True)
@@ -378,9 +392,44 @@ class VolatilityDispersionReleaseStrategy:
     def __init__(self, config: StrategyConfig = DEFAULT_CONFIG) -> None:
         self.config = config
 
-    def target_weights(self, context: Any, *, seed: int) -> Mapping[str, float] | None:
+    @staticmethod
+    def _validate_seed(seed: int) -> None:
         if isinstance(seed, bool) or not isinstance(seed, numbers.Integral) or int(seed) < 0:
             raise ValueError("seed must be a nonnegative integer")
+
+    @staticmethod
+    def _apply_public_score_boundary(scores: dict[str, float]) -> dict[str, float]:
+        """Capture one exact operative ranking dictionary through the public A5 hook."""
+
+        if type(scores) is not dict or list(scores) != sorted(scores):
+            raise ValueError("score boundary input must be a sorted built-in dictionary")
+        if any(
+            type(symbol) is not str or type(value) is not float or not math.isfinite(value)
+            for symbol, value in scores.items()
+        ):
+            raise ValueError("score boundary input must contain finite built-in str/float pairs")
+        input_scores = scores
+        expected_items = tuple(scores.items())
+        scores = score_boundary(scores)
+        if scores is not input_scores:
+            raise ValueError("score_boundary must return its exact input dictionary")
+        if (
+            type(scores) is not dict
+            or tuple(scores.items()) != expected_items
+            or any(
+                type(symbol) is not str or type(value) is not float or not math.isfinite(value)
+                for symbol, value in scores.items()
+            )
+        ):
+            raise ValueError("score_boundary returned invalid or mutated scores")
+        return scores
+
+    def preconstruction_scores(
+        self, context: Any, *, seed: int
+    ) -> dict[str, float] | None:
+        """Return final scheduled VDR ranks before selection, sizing, caps, or risk."""
+
+        self._validate_seed(seed)
         decision_time, _, histories = _validate_context(context)
         if (
             decision_time.hour != self.config.rebalance_hour_utc
@@ -394,18 +443,32 @@ class VolatilityDispersionReleaseStrategy:
             decision_time=decision_time,
             config=self.config,
         )
-        if matrix.empty:
+        scores = pd.Series(dtype=float) if matrix.empty else _raw_scores(matrix, self.config)
+        final_scores = {
+            str(symbol): float(value) for symbol, value in scores.sort_index().items()
+        }
+        return self._apply_public_score_boundary(final_scores)
+
+    def target_weights(self, context: Any, *, seed: int) -> Mapping[str, float] | None:
+        scores = self.preconstruction_scores(context, seed=seed)
+        if scores is None:
+            return None
+        if not scores:
             return {}
-        scores = _raw_scores(matrix, self.config)
-        if scores.empty:
-            return {}
-        weights = _portfolio(scores, self.config)
+        weights = _portfolio(pd.Series(scores, dtype=float), self.config)
         if any(not math.isfinite(weight) for weight in weights.values()):
             raise ValueError("constructed portfolio contains a non-finite weight")
         return weights
 
 
 def build_strategy() -> VolatilityDispersionReleaseStrategy:
-    """Canonical clean-worker factory."""
+    """Canonical clean-worker factory for the exact materialized candidate."""
 
-    return VolatilityDispersionReleaseStrategy()
+    candidate_id = candidate_variant.ACTIVE_CANDIDATE_ID
+    overrides = candidate_variant.ACTIVE_OVERRIDES
+    expected = MATERIALIZED_CANDIDATE_OVERRIDES.get(candidate_id)
+    if candidate_id != ACTIVE_CANDIDATE_ID or expected is None:
+        raise ValueError(f"unknown materialized candidate identifier: {candidate_id}")
+    if type(overrides) is not dict or overrides != expected:
+        raise ValueError(f"active overrides do not match the declaration for {candidate_id}")
+    return VolatilityDispersionReleaseStrategy(dataclasses.replace(DEFAULT_CONFIG, **overrides))

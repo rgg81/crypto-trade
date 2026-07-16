@@ -74,9 +74,9 @@ omitted. If fewer than twelve symbols remain, or if either sleeve lacks five qua
 strategy requests a flat book.
 
 The Amendment 0006 pure-crypto preflight is the universe authority. Team code intentionally does
-not guess asset class from ticker substrings; the active Amendment 0005 superset delegates through
-that wrapper before the context can be supplied. The strategy still validates exact uppercase
-`*USDT` syntax and the point-in-time membership/key equality.
+not guess asset class from ticker substrings; the active Amendment 0007 runtime-preload authority
+delegates through that wrapper before the context can be supplied. The strategy still validates
+exact uppercase `*USDT` syntax and the point-in-time membership/key equality.
 
 No parameter is learned from a whole evaluation window. The initial candidate is a deterministic
 fixed rule. Chronological fold artifacts will bind the same rule plus each fold cutoff, and all
@@ -130,9 +130,9 @@ untouched by this draft. A failed or interrupted run still consumes its trial an
 
 ## Risk hypothesis
 
-The core initially has no risk overlay. Only after its broad positive activation gate passes may
-the combined risk policy be materialized at root. It targets 35% annualized portfolio volatility
-without leverage, applies
+The core initially has no risk overlay. Only after every gate in
+`control-activation.template.json` passes may the combined risk policy be materialized at root. It
+targets 35% annualized portfolio volatility without leverage and applies
 graduated brakes at 10%, 18%, and 26% drawdown, closes a position after a 7.5% boundary-confirmed
 loss, times out holdings after 18 bars, and caps one-way turnover at 0.45. Stops and timeouts carry
 cooldowns and cannot reopen on the same boundary. These controls are hypotheses, not assumed

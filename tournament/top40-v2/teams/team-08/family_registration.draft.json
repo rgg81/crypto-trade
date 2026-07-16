@@ -8,7 +8,7 @@
     "short_sleeve": "Own negative releases during dispersion expansion and overbought failed releases during convergence.",
     "stress": "Follow genuine idiosyncratic breaks but rely on no-leverage volatility targeting, stops, and drawdown brakes to reduce tail exposure."
   },
-  "falsifier": "Reject the family if compression conditioning does not outperform the no-compression ablation, if the dispersion switch fails to separate continuation from convergence across chronological folds, or if no declared candidate passes every frozen development gate including positive bull, bear, and chop returns.",
+  "falsifier": "Reject this exact no-control core unless net Sharpe is at least 0.75, annualized return is positive, Calmar is at least 0.40, maximum drawdown is at most 0.30, doubled-cost Sharpe is at least 0.35, doubled-cost return is positive, trial-adjusted probability positive is at least 0.90, at least four of six folds are profitable, and positive-quarter fraction is at least 0.55. Also require positive bull, bear, and chop return and Sharpe, at least three positive regime Sharpes, worst-regime Sharpe at least -0.25, positive long-bull, short-bear, and combined-chop attribution, both sleeves above every official exposure/activity/notional floor, at least 70% profitable declared neighbors with median neighbor Sharpe at least 0.50, positive-PnL concentration at most 0.40, complete scheduled A5 score coverage, positive pooled score IC, and at least four positive fold ICs. Compression and dispersion ablations remain mechanism evidence, never rescue evidence.",
   "family_id": "volatility-dispersion-release-v1",
   "mechanism": "Cross-sectionally residualize closed 8h returns; require prior idiosyncratic volatility compression; score the new release as continuation when cross-sectional dispersion expands and as convergence when dispersion stays subdued; form capped, balanced long and short sleeves once daily.",
   "parameter_ranges": {
@@ -76,7 +76,7 @@
   },
   "parent_family_id": null,
   "registered_at_utc": "REPLACE_WITH_ACTUAL_REGISTRATION_TIMESTAMP_Z",
-  "risk_policy_plan": "Run the center first with root no-control risk_policy.json. Volatility-target-only, drawdown-only, position-stop-only, time-stop-only, turnover-only, and combined policies remain dormant unless that core has positive base- and doubled-cost return/Sharpe, at least four positive folds, positive bull/bear/chop returns, positive long-bull/short-bear/combined-chop attribution, and active sleeves. Controls cannot rescue failure. Before any later policy commit, registration, and run, copy its immutable risk_policies template byte-for-byte to root risk_policy.json because the frozen lifecycle reads only that path.",
+  "risk_policy_plan": "Run the center first with root no-control risk_policy.json. Volatility-target-only, drawdown-only, position-stop-only, time-stop-only, turnover-only, and combined policies remain dormant unless that core passes every official central-development, regime, role, sleeve, stability, concentration, A5 coverage, and score-IC gate. Controls cannot rescue failure. Before any later policy commit, registration, and run, copy its immutable risk_policies template byte-for-byte to root risk_policy.json because the lifecycle reads only that path.",
   "schema_version": 1,
   "selection_metric": "First require every non-compensatory development gate. Among passers, maximize the minimum bull/bear/chop net Sharpe, then doubled-cost Sharpe, then minimize drawdown and one-way turnover.",
   "team_id": "team-08"
