@@ -1,0 +1,15 @@
+{
+  "candidate_id": "t03-crsa-base-i3-c1-b30-v21",
+  "config_sha256": "bd0e4f70bcf335b2ac4e44ec049b89b8e8eaf4c6ac6502574d0accf12d9d9947",
+  "organizer_journal_head_sha256": "56c99113f42a31ce0a210686ef0534fea554ce9e2581cb134cbdcbc2a79fd571",
+  "private_attempt_number": null,
+  "registration_sha256": "50e31382472271b560b37c649dc9b144664b9939074080a1430b8c9b2fa5e74b",
+  "reserved_at_utc": "2026-07-16T12:13:42.968054+00:00",
+  "risk_policy_sha256": "5d862a75a08b6ffbb4683789efbb1b7338b30f024ddf381d1a95736148702bbc",
+  "schema_version": 1,
+  "source_bundle_sha256": "aa0dc19e601c2d554eef721b9e2bf5fcd9277cd331acddeeb8d525b2dfc85cbd",
+  "stage": "development",
+  "strategy_sha256": "4b13293888f321b5734afc96e08c5665692aa62ab9c5d543b018a2a18f0199a6",
+  "team_id": "team-03",
+  "tournament": "quant-portfolio-blind-top40-v2"
+}
