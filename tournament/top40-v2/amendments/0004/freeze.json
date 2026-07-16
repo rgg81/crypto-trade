@@ -1,0 +1,35 @@
+{
+  "amendment_id": "top40-v2-amendment-0004-development-runner-schema3-compatibility",
+  "command_policy": {
+    "compatible_stage": "development",
+    "compatible_subcommand": "run-window",
+    "finalist_runner_allowed": false,
+    "private_runner_allowed": false,
+    "required_state_validations": 1
+  },
+  "entrypoint": "scripts/top40_v2_tournament_active.py",
+  "files": {
+    "scripts/top40_v2_tournament_active.py": "6031937952a29a1a226a778cd1bcfc2c9869559ab30465bdbebe6292c6a88377",
+    "src/crypto_trade/tournament/runner_schema3_compat_v4.py": "03006ea1ce391ef3c8da6244acb89aab19f7e63d1e0a617e2743894a575fd6cd",
+    "tests/tournament/test_top40_v2_runner_schema3_compat.py": "f310c425a8770399a79d92f6c8cfe85c70a6f35a452b47accf3f9ec6c3ada7f2",
+    "tournament/top40-v2/amendments/0004/AMENDMENT.md": "49a044ed30cbd9c73237a8b31f8343e24a19758f8027c1ccdba271dafd7dbad3",
+    "tournament/top40-v2/amendments/0004/REVIEW.json": "0b9c3cb82fdf7e5f490670489b03109212b67cab71c48edfedbdc01464800798"
+  },
+  "final_implementation_commit": "7c83ed993a9580a0d177912db0608e2a865ca660",
+  "freeze_timestamp_utc": "2026-07-16T10:39:58Z",
+  "parent_authority": {
+    "amendment_0002_compatibility_module_sha256": "fc70dbdb752c58857c5ed60a96e497324e93b9d5dc7e6afa0692bd3e02ad21aa",
+    "amendment_0003_freeze_sha256": "2e40c9e3e1df628d39df0b9fefd26bb45cee866f70ffbf90da780652ed9d208f"
+  },
+  "replacement_policy": {
+    "failed_candidate_id": "rdf-core-h14-k3-g05",
+    "favorable_accounting_refund": false,
+    "maximum_exact_replacements": 1,
+    "replacement_must_match_strategy_risk_source_and_parameters": true,
+    "scientific_information_revealed_by_failure": false
+  },
+  "review_commit": "f898be9ce4c9e9ecfcc2ececcb6c9c9b4ff18154",
+  "review_sha256": "0b9c3cb82fdf7e5f490670489b03109212b67cab71c48edfedbdc01464800798",
+  "schema_version": 1,
+  "status": "frozen"
+}
