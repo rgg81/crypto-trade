@@ -7,3 +7,7 @@ reviewed Amendment 0005 superset entrypoint, which delegates ordinary tournament
 that exact A6 authority. Negative research is evidence, not a submission. Work only inside this V2
 namespace and the visible-development data boundary. This package has not been registered,
 evaluated, or shown private/OOS data.
+
+The first material candidate must use the no-control bytes at root `risk_policy.json`. Controls are
+dormant until that core is broadly positive at ordinary and doubled costs across the declared
+fold/regime/role/activity gates, and cannot rescue a failed core.

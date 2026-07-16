@@ -23,7 +23,7 @@
   },
   "parent_family_id": null,
   "registered_at_utc": "1970-01-01T00:00:00Z",
-  "risk_policy_plan": "Preregister no-control, volatility-only, drawdown-only, position-stop-only, turnover-only, and combined policies once each; the runner emits base and doubled costs together, and controls use organizer state with next-open execution only.",
+  "risk_policy_plan": "Run the center once with top-level no-control risk_policy.json before every other material configuration. Volatility-only, drawdown-only, position-stop-only, turnover-only, and combined policies remain dormant unless the no-control core has positive base- and doubled-cost return/Sharpe, at least four positive folds, positive bull/bear/chop returns, positive long-bull/short-bear/combined-chop attribution, and active sleeves. Controls cannot rescue failure. Before any later policy commit, registration, and run, copy its immutable risk_policies template byte-for-byte to root risk_policy.json because the frozen lifecycle reads only that path.",
   "schema_version": 1,
   "selection_metric": "All non-compensatory development gates, then highest stitched OOF net Sharpe among stable candidates; no failed candidate advances.",
   "team_id": "team-07"

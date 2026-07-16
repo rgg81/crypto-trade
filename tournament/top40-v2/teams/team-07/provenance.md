@@ -22,6 +22,13 @@ Authorship state as delivered:
 - strategy.py contains no network, subprocess, filesystem read/write, fitted historical constant,
   timestamp-target table, or evaluator-state dependency.
 
+The first executable risk state is the no-control top-level `risk_policy.json`, byte-identical to
+`risk_policies/no-control.json`. The combined and single-control files are immutable declarations,
+not runtime selectors. They remain dormant unless the no-control core passes every broad positive
+activation minimum; controls cannot rescue failure. Before any later policy candidate is committed,
+registered, or run, its selected template must be copied byte-for-byte to root `risk_policy.json`
+and every affected hash recomputed.
+
 Amendment 0006 remains the exact pure-crypto universe authority. Its entrypoint is now
 superseded-unchanged by the reviewed Amendment 0005 superset. All future Team07 commands must use
 `scripts/top40_v2_tournament_score_diagnostics_v5.py` (SHA-256

@@ -20,8 +20,10 @@ MODULE = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = MODULE
 SPEC.loader.exec_module(MODULE)
 
+DEFAULT_DECISION = pd.Timestamp(year=2021, month=4, day=1, tz="UTC")
 
-def _context(*, periods: int = 220, decision: str = "2021-04-01T00:00:00Z"):
+
+def _context(*, periods: int = 220, decision: pd.Timestamp = DEFAULT_DECISION):
     decision_time = pd.Timestamp(decision)
     times = pd.date_range(end=decision_time - pd.Timedelta(hours=8), periods=periods, freq="8h")
     index = np.arange(periods, dtype=float)
@@ -126,7 +128,7 @@ def test_insufficient_history_requests_flat() -> None:
 
 
 def test_non_rebalance_boundary_holds() -> None:
-    context = _context(decision="2021-04-01T08:00:00Z")
+    context = _context(decision=DEFAULT_DECISION + pd.Timedelta(hours=8))
     assert MODULE.build_strategy().target_weights(context, seed=20260801) is None
 
 

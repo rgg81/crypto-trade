@@ -18,6 +18,14 @@ No GO decision has been made. Before family or trial registration, an independen
 10. require canonical OOF, doubled-cost, regime, role, concentration, and neighbor evidence before
     QR acceptance.
 
+Before the first registration, require top-level `risk_policy.json` to be byte-identical to
+`risk_policies/no-control.json`; the frozen lifecycle never selects a side path. Run and read this
+no-control center first. Require strictly positive base- and doubled-cost return/Sharpe, at least
+four positive folds, positive bull/bear/chop returns, positive long-bull, short-bear, and
+combined-chop attribution, and active sleeves before any control. A failed core cannot be rescued
+by a control. For each later policy, copy its immutable template byte-for-byte to root
+`risk_policy.json` before commit, registration, and execution, then recompute all bindings.
+
 Static review must separately verify organizer semantics: funding on carried positions, risk
 decision at a known boundary, next-open reductions, ordinary costs and shared participation,
 strategy gate after risk, and no same-boundary reopening. Team code does not implement those

@@ -1,7 +1,7 @@
 {
   "candidate_id": "team07-shock-diffusion-center-v1",
   "config_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-  "falsifier": "Fail if any frozen development gate fails, the lead-lag ablation is not worse, or the declared parameter neighborhood is unstable.",
+  "falsifier": "This first material trial is the no-control core. Fail and prohibit every risk-overlay activation if base- or doubled-cost return/Sharpe is nonpositive, fewer than four folds are positive, bull/bear/chop return or long-bull/short-bear/combined-chop attribution is nonpositive, either sleeve is inactive, any other frozen development gate fails, the lead-lag ablation is not worse, or the declared parameter neighborhood is unstable.",
   "family_id": "shock-diffusion-v1",
   "parameters": {
     "diffusion_multiplier": 1.0,
@@ -29,6 +29,6 @@
   "source_bundle_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
   "strategy_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
   "team_id": "team-07",
-  "thesis": "Causal price discovery diffuses from the most liquid native-crypto contracts to slower Top-40 followers and supports a two-sided daily spread after ordinary costs.",
+  "thesis": "Without risk-overlay assistance, causal price discovery diffuses from the most liquid native-crypto contracts to slower Top-40 followers and supports an active two-sided daily spread across bull, bear, and chop after ordinary and doubled costs.",
   "timestamp_utc": "1970-01-01T00:00:00Z"
 }

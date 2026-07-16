@@ -1,5 +1,6 @@
 {
   "candidate_id": "team07-shock-diffusion-center-v1",
+  "activation_rule": "Neighbors are dormant until the no-control core has passed every broad positive activation minimum and the selected controlled/base candidate passes all non-neighborhood development gates.",
   "center": {
     "funding_carry_multiplier": 6.0,
     "idiosyncratic_reversion": 0.12,

@@ -33,6 +33,9 @@
     "canonical_report_sha256": "b9c55b40fef331861af068272159f45860870182a58c93652eff2a819b3d5d1b",
     "integration_freeze_sha256": "3e93bdfe031e2589888c3bbcaae583437bbd074fa9d86c6dc0a54187bc0f1e34"
   },
+  "combined_risk_policy_template": "risk_policies/combined.json",
+  "first_material_trial": "no-control core; controls remain dormant until every broad positive core-alpha activation minimum passes",
+  "risk_policy_materialization_rule": "The lifecycle reads only root risk_policy.json. Copy any later immutable risk_policies template byte-for-byte to that root path before commit, registration, and run; controls cannot rescue a failed core.",
   "risk_policy_path": "tournament/top40-v2/teams/team-07/risk_policy.json",
   "schema_version": 1,
   "seed": 20260801,

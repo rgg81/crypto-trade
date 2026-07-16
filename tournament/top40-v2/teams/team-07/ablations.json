@@ -1,5 +1,6 @@
 {
   "family_id": "shock-diffusion-v1",
+  "activation_rule": "The no-control center trial is the first material run. Mechanism ablations may be registered only after that result is read; risk overlays remain separately blocked unless every broad positive no-control core-alpha minimum passes.",
   "material_trials": [
     {
       "candidate_id": "team07-shock-diffusion-center-v1",
@@ -41,4 +42,3 @@
   "schema_version": 1,
   "team_id": "team-07"
 }
-

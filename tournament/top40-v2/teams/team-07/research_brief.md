@@ -65,11 +65,20 @@ development evidence:
 No least-bad negative candidate is a submission. A failure triggers a documented simplification,
 one of at most two pivots, or DNF within the shared 80-trial budget.
 
+The first material trial is the unchanged center signal with the top-level no-control
+`risk_policy.json`. Before any volatility, drawdown, position-stop, turnover, or combined policy
+may be registered, that core must have strictly positive return and Sharpe at both ordinary and
+doubled costs, at least four positive folds, positive bull/bear/chop returns, positive long-bull,
+short-bear, and combined-chop attribution, and active long and short sleeves. Controls cannot rescue
+a negative or otherwise failed core. Such a failure permits only a separately preregistered
+mechanism revision/pivot or DNF, whose own no-control core must start the sequence again.
+
 ## Planned trial allocation
 
-Reserve 1 center trial, 6 mechanism/feature ablations, 10 parameter-neighborhood trials, 5
-additional risk-policy trials (the combined policy is the center, and each policy automatically
-produces base- and doubled-cost outputs), and up to 8 confirmatory/fold-diagnostic trials: 30
+Reserve 1 no-control center trial, 6 mechanism/feature ablations, 10 parameter-neighborhood trials,
+5 additional risk-policy trials (four single controls plus combined, activated only after the
+no-control core gate; each policy automatically produces base- and doubled-cost outputs), and up to
+8 confirmatory/fold-diagnostic trials: 30
 planned material configurations. The remaining 50 are contingency capacity and are not
 authorization to search
 until something looks good. Every material run is preregistered first.
