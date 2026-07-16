@@ -19,7 +19,7 @@
   "required_candidate_instances": [
     {
       "candidate_role": "no-control-core",
-      "candidate_id": "team05-crtr-core-v1",
+      "candidate_id": "team05-crtr-core-v2",
       "risk_policy_path": "risk_policy.json",
       "evidence_purpose": "preregistered core-alpha control-activation gate",
       "positive_fold_requirement": "at least four of six before any controlled candidate may activate",

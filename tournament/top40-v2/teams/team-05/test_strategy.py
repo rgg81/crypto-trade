@@ -31,13 +31,14 @@ from strategy import (
 
 from crypto_trade.tournament.protocol import DecisionContext
 
-DECISION = pd.Timestamp("2020-07-17T00:00:00Z")
+UTC_START = pd.Timestamp(year=2020, month=1, day=1, tz="UTC")
+DECISION = pd.Timestamp(year=2020, month=7, day=17, tz="UTC")
 TEAM_ROOT = Path(__file__).resolve().parent
 
 
 def _bars(symbol_number: int, *, future_days: int = 0) -> pd.DataFrame:
     end = DECISION + pd.Timedelta(days=future_days)
-    open_times = pd.date_range("2020-01-01T00:00:00Z", end=end, freq="8h")
+    open_times = pd.date_range(UTC_START, end=end, freq="8h")
     centered = symbol_number - 9.5
     drift = centered * 0.000018
     close = [
@@ -406,7 +407,7 @@ def test_insufficient_or_degenerate_history_fails_closed_to_flat() -> None:
     assert _targets(_context(too_small)) == {}
 
     constant = OrderedDict()
-    open_times = pd.date_range("2020-01-01T00:00:00Z", end=DECISION, freq="8h")
+    open_times = pd.date_range(UTC_START, end=DECISION, freq="8h")
     for number in range(20):
         constant[f"C{number:02d}USDT"] = pd.DataFrame(
             {
@@ -515,7 +516,7 @@ def test_canonical_builder_rejects_unregistered_or_mismatched_materialization(
     with pytest.raises(ValueError, match="not preregistered"):
         build_strategy()
 
-    monkeypatch.setattr(candidate_variant_module, "ACTIVE_CANDIDATE_ID", "team05-crtr-core-v1")
+    monkeypatch.setattr(candidate_variant_module, "ACTIVE_CANDIDATE_ID", "team05-crtr-core-v2")
     monkeypatch.setattr(candidate_variant_module, "ACTIVE_OVERRIDES", {"target_gross": 0.5})
     with pytest.raises(ValueError, match="do not match"):
         build_strategy()
@@ -533,7 +534,7 @@ def test_canonical_builder_rejects_unregistered_or_mismatched_materialization(
 @pytest.mark.parametrize(
     "candidate_id",
     [
-        "team05-crtr-core-v1",
+        "team05-crtr-core-v2",
         "team05-crtr-ab-vol",
         "team05-crtr-ab-dd",
         "team05-crtr-ab-stop",

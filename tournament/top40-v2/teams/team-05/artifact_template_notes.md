@@ -4,15 +4,16 @@ Files ending in `.template.json` are inputs for the organizer to materialize; th
 evidence. Uppercase `REPLACE_WITH...` values intentionally fail the official SHA/timestamp/number
 schemas so an incomplete draft cannot be mistaken for a valid artifact.
 
-- Set the family timestamp at actual organizer registration and journal the family before the
-  final source-bundle fingerprint, any trial registration, or any run. `families.jsonl` changes the
-  canonical team-tree fingerprint even though it is not an executable-source-manifest entry.
+- Preserve and verify the family registration accepted at `2026-07-16T16:32:53Z` before the final
+  source-bundle fingerprint, any trial registration, or any run. `families.jsonl` changes the
+  canonical team-tree fingerprint even though it is not an executable-source-manifest entry; do
+  not register or append the family again.
 - Each activated risk policy and neighbor gets one trial registration and candidate ID; every
   evaluator run emits both base- and doubled-cost evidence.
 - `walk_forward_manifest.template.json`, `fold_declaration.template.json`, and
   `model_artifact.template.json` are candidate-generic source templates, never base-candidate
   evidence. Materialize one complete candidate-specific set for the no-control
-  `team05-crtr-core-v1`/`risk_policy.json` run and a separate complete set for the eventual
+  `team05-crtr-core-v2`/`risk_policy.json` run and a separate complete set for the eventual
   combined `team05-crtr-base-v1` run after `risk_ablations/combined.json` is materialized at root
   `risk_policy.json`.
 - A fold declaration is materialized only after the organizer derives its exact equal
@@ -24,17 +25,17 @@ schemas so an incomplete draft cannot be mistaken for a valid artifact.
   canonical artifacts or evidence. Freeze the final Team05 executable tree and rederive the
   complete source set before replacing any placeholder.
 - Materialize `executable_source_manifest.template.json` first at
-  `score-adapters/team05-crtr-core-v1.executable-source-manifest.json`. Its sorted list must equal
+  `score-adapters/team05-crtr-core-v2.executable-source-manifest.json`. Its sorted list must equal
   every registered Team05 `.py`, staged strategy configuration, and `risk_policy.json` in the
   historical tree; currently that prospective set is `candidate_variant.py`,
   `frozen_config.json`, `risk_policy.json`, `strategy.py`, `test_risk_policy_contract.py`, and
   `test_strategy.py`.
 - An independent reviewer then materializes `semantic_coupling_review.template.json` at
-  `score-adapters/team05-crtr-core-v1.semantic-coupling-review.json`, binding the exact complete
+  `score-adapters/team05-crtr-core-v2.semantic-coupling-review.json`, binding the exact complete
   source-manifest and strategy hashes. The template's fixed `approve` shape is not a present
   approval; reviewer identity, timestamp, and all five findings must be established independently.
 - Only after the review first-add may the organizer materialize
-  `candidate_score_manifest.template.json` at `score-adapters/team05-crtr-core-v1.json`, binding the
+  `candidate_score_manifest.template.json` at `score-adapters/team05-crtr-core-v2.json`, binding the
   review SHA. Only after that score-manifest first-add may the core registration bind its SHA under
   `parameters._top40_v2_score_adapter`. Any executable-byte change restarts the sequence.
 - `trial_registration.template.json` is now intentionally candidate-specific to the first

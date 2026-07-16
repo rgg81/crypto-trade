@@ -2,7 +2,7 @@
   "timestamp_utc": "REPLACE_WITH_REGISTRATION_TIMESTAMP_Z",
   "team_id": "team-05",
   "family_id": "team05-causal-residual-trend-reversal-v1",
-  "candidate_id": "team05-crtr-core-v1",
+  "candidate_id": "team05-crtr-core-v2",
   "strategy_sha256": "REPLACE_WITH_64_LOWERCASE_HEX",
   "source_bundle_sha256": "REPLACE_WITH_64_LOWERCASE_HEX",
   "risk_config_sha256": "REPLACE_WITH_64_LOWERCASE_HEX",

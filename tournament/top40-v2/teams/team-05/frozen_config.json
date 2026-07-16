@@ -73,7 +73,7 @@
     "executable_source_manifest": "executable_source_manifest.template.json",
     "semantic_coupling_review": "semantic_coupling_review.template.json",
     "amendment_0005_authority_active": true,
-    "registration_preconditions_pending": "final Team05 hashes and dependency set, organizer tests, immutable executable-source first-add, independent semantic review first-add, score-manifest first-add, and accepted family/core registration"
+    "registration_preconditions_pending": "accepted family registration is preserved; final Team05 hashes and dependency set, organizer tests, fresh v2 immutable executable-source first-add, independent semantic review first-add, score-manifest first-add, and accepted v2 core trial registration remain pending"
   },
   "universe_authority": {
     "amendment_0006_integration_freeze_commit": "ed3af1398543dfee4a50150915dc2e37b3631fc9",
@@ -115,5 +115,5 @@
   "control_activation_gate": "all preregistered broad positive no-control core-alpha minima in ablations.json",
   "neighbor_activation_gate": "combined policy passes every official and Team-05 non-neighborhood gate",
   "selection_rule": "Binary: freeze team05-crtr-base-v1 only if every official and Team-05 gate, including the complete neighborhood, passes. Neighbors are nonselectable stability probes.",
-  "status": "DRAFT_UNREGISTERED_ACTIVE_A5_A6_BOUND_DO_NOT_EVALUATE"
+  "status": "FAMILY_REGISTERED_CORE_V2_TRIAL_UNREGISTERED_ACTIVE_A5_A6_BOUND_DO_NOT_EVALUATE"
 }

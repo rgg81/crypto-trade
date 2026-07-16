@@ -1,7 +1,8 @@
 # Team 05 handoff
 
-Outcome: one independent, performance-blind family is rebound to the active A5/A6 authority for
-QR/QE review, not registration or execution. The former Amendment 0005 freeze blocker is resolved.
+Outcome: one independent, performance-blind family is rebound to the active A5/A6 authority and
+registered at `2026-07-16T16:32:53Z`; the replacement v2 core is not trial-registered or executed.
+The former Amendment 0005 freeze blocker is resolved.
 The active entrypoint is `scripts/top40_v2_tournament_score_diagnostics_v5.py` at
 `0dc9228f3b9c6fe41b2655055f766fc92f323a289a050e6bdf4e48a30b0105f4`; the controlling A5
 integration freeze is commit `d2b95f610722aab65b4e67466b34efeaa3554101` with SHA-256
@@ -33,10 +34,9 @@ Required organizer actions, in order:
    A6's pure-crypto enforcement.
 3. Verify JSON/schema validity, source/config parity, synthetic tests, and the central integration
    checklist in `qe_test_plan.md`. This authority-rebind edit executed none of them.
-4. Set the actual family registration time and register
-   `family_registration.template.json` through the organizer lifecycle. Do not hand-edit
-   `families.jsonl`. This must happen before the final source-bundle fingerprint because the
-   canonical family projection participates in that fingerprint.
+4. Verify the already accepted family registration and its one-row canonical `families.jsonl`
+   projection from commit `742aa655`; never append or register it again. Preserve that projection
+   before the final source-bundle fingerprint because it participates in the fingerprint.
 5. Freeze the final core candidate tree, then materialize its A5 files in this strict ancestry
    order: complete executable-source manifest; independent semantic-coupling review; score-adapter
    manifest. Each file must be a canonical immutable first-add, and the executable dependency

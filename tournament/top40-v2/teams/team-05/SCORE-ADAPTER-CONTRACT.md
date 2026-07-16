@@ -60,9 +60,9 @@ acyclic dependency declaration is in `executable_source_manifest.template.json`,
 independent attestation shape is in `semantic_coupling_review.template.json`. Those root templates
 are not the canonical A5 artifacts. The organizer must materialize them respectively as:
 
-1. `score-adapters/team05-crtr-core-v1.executable-source-manifest.json`;
-2. `score-adapters/team05-crtr-core-v1.semantic-coupling-review.json`; and
-3. `score-adapters/team05-crtr-core-v1.json`.
+1. `score-adapters/team05-crtr-core-v2.executable-source-manifest.json`;
+2. `score-adapters/team05-crtr-core-v2.semantic-coupling-review.json`; and
+3. `score-adapters/team05-crtr-core-v2.json`.
 
 They must be canonical pretty JSON and immutable unique first-adds in that order, with the score
 manifest preceding the core registration. All material hashes, byte sizes, reviewer identity, and

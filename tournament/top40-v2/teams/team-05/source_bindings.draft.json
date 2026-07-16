@@ -28,9 +28,9 @@
     "sha256": "RECOMPUTE_FROM_FINAL_TEAM05_BYTES"
   },
   "core_score_adapter_artifacts": {
-    "canonical_executable_source_manifest_path": "tournament/top40-v2/teams/team-05/score-adapters/team05-crtr-core-v1.executable-source-manifest.json",
-    "canonical_score_manifest_path": "tournament/top40-v2/teams/team-05/score-adapters/team05-crtr-core-v1.json",
-    "canonical_semantic_review_path": "tournament/top40-v2/teams/team-05/score-adapters/team05-crtr-core-v1.semantic-coupling-review.json",
+    "canonical_executable_source_manifest_path": "tournament/top40-v2/teams/team-05/score-adapters/team05-crtr-core-v2.executable-source-manifest.json",
+    "canonical_score_manifest_path": "tournament/top40-v2/teams/team-05/score-adapters/team05-crtr-core-v2.json",
+    "canonical_semantic_review_path": "tournament/top40-v2/teams/team-05/score-adapters/team05-crtr-core-v2.semantic-coupling-review.json",
     "materialization_order": [
       "executable-source-manifest",
       "independent-semantic-coupling-review",

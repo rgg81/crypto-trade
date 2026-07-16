@@ -1,6 +1,6 @@
 # team-05 · Top-40 V2
 
-Status: `A5_A6_ACTIVE_REBOUND_DRAFT_NOT_REGISTERED`
+Status: `FAMILY_REGISTERED_CORE_V2_A5_RESTART_NOT_TRIAL_REGISTERED`
 
 Family: `team05-causal-residual-trend-reversal-v1`  
 Base: `team05-crtr-base-v1`
@@ -14,9 +14,10 @@ the active Amendment 0006 pure-crypto audit: only certified native crypto coins/
 stablecoins, equities/TradFi, indexes, metals, commodities, and other non-crypto contracts remain
 ineligible even if Binance lists a perpetual contract for them.
 
-No market data, performance result, evaluator, lifecycle command, test, Python process, or Git
-command was used during this authority rebind. `families.jsonl` and `experiments.jsonl` remain
-organizer-owned and empty. Start with `HANDOFF.md`; do not register or evaluate until every
+No market data, performance result, or evaluator was used during the authority rebind. The family
+was subsequently registered through the organizer lifecycle at `2026-07-16T16:32:53Z`;
+`families.jsonl` has that one accepted row and `experiments.jsonl` remains empty. Start with
+`HANDOFF.md`; do not register the v2 core trial or evaluate until every
 prospective Team05 placeholder is materialized, the complete executable-source manifest and
 independent semantic review are first-added in the required order, organizer verification passes,
-and family/trial registration is accepted into the organizer journal.
+and the v2 core trial registration is accepted into the organizer journal.

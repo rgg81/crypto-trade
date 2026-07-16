@@ -16,7 +16,7 @@
     "activation": "first policy run after active A5/A6 authority verification, complete A5 artifact first-add sequence, and accepted family/core registration",
     "cell": {
       "order": 1,
-      "candidate_id": "team05-crtr-core-v1",
+      "candidate_id": "team05-crtr-core-v2",
       "active_overrides": {},
       "definition": "ablations.json:risk-none",
       "risk_policy_path": "risk_policy.json"

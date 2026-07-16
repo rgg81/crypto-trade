@@ -2,7 +2,7 @@
   "schema_version": 1,
   "team_id": "team-05",
   "family_id": "team05-causal-residual-trend-reversal-v1",
-  "first_candidate_id": "team05-crtr-core-v1",
+  "first_candidate_id": "team05-crtr-core-v2",
   "signal_definition_id": "team05-crtr-base-v1",
   "applies_to": "the unchanged CRTR score producer across all declared risk policies and one-axis neighbors",
   "status": "PROSPECTIVE_UNREGISTERED_ACTIVE_A5_A6_AUTHORITY_BOUND",

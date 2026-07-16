@@ -97,7 +97,7 @@ class StrategyParameters:
 BASE_PARAMETERS = StrategyParameters()
 
 PREREGISTERED_CANDIDATE_OVERRIDES: dict[str, dict[str, object]] = {
-    "team05-crtr-core-v1": {},
+    "team05-crtr-core-v2": {},
     "team05-crtr-ab-vol": {},
     "team05-crtr-ab-dd": {},
     "team05-crtr-ab-stop": {},
@@ -114,7 +114,7 @@ PREREGISTERED_CANDIDATE_OVERRIDES: dict[str, dict[str, object]] = {
 }
 
 PREREGISTERED_RISK_POLICY_TEMPLATES: dict[str, str] = {
-    "team05-crtr-core-v1": "risk_ablations/none.json",
+    "team05-crtr-core-v2": "risk_ablations/none.json",
     "team05-crtr-ab-vol": "risk_ablations/volatility_only.json",
     "team05-crtr-ab-dd": "risk_ablations/drawdown_only.json",
     "team05-crtr-ab-stop": "risk_ablations/position_stop_only.json",

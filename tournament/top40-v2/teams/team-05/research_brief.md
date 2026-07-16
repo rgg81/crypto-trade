@@ -1,8 +1,8 @@
 # Team 05 research brief — CRTR v1
 
-Status: **draft, unregistered, and not authorized for evaluation**. No performance observation was
-used to create this family. The organizer must register the family and each material trial before
-running it.
+Status: **family registered; replacement core unregistered and not authorized for evaluation**.
+No performance observation was used to create this family. The organizer must register every
+material trial before running it.
 
 ## Family and falsifiable thesis
 
@@ -140,7 +140,8 @@ registered trials.
 
 1. After verifying the active A5/A6 authority, completing organizer QR/QE, first-adding the complete
    executable-source manifest, independent semantic review, and score manifest in strict order,
-   and accepting family/core registration, run only the no-control core.
+   verifying the accepted family registration, and accepting the v2 core trial registration, run
+   only the no-control core.
 2. Activate no risk control unless the core has strictly positive base- and doubled-cost net return
    and Sharpe, at least four positive equal chronological folds, positive bull/bear/chop returns,
    positive long-bull/short-bear/combined-chop roles, and both sleeves meet official activity
