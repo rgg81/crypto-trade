@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "adapter_id": {"const": "top40-v2-preconstruction-score-boundary-v1"},
+    "candidate_id": {"pattern": "^[a-z0-9][a-z0-9._-]{0,127}$", "type": "string"},
+    "capture_boundary": {"const": "post-transform-pre-selection-weight-cap-risk"},
+    "family_id": {"pattern": "^[a-z0-9][a-z0-9._-]{0,127}$", "type": "string"},
+    "hook": {"const": "strategy.score_boundary"},
+    "label": {
+      "additionalProperties": false,
+      "properties": {
+        "executable_price_column": {"const": "open"},
+        "holding_horizon_hours": {"maximum": 168, "minimum": 8, "multipleOf": 8, "type": "integer"},
+        "label_id": {"const": "manifest-horizon-simple-executable-open-to-open-return-v1"},
+        "minimum_pairs": {"maximum": 1000000, "minimum": 2, "type": "integer"},
+        "purge_cross_fold_endpoints": {"const": true},
+        "return_definition": {"const": "simple-executable-open-to-open"},
+        "score_direction": {"const": "higher-score-higher-return"},
+        "statistic_id": {"const": "globally-pooled-pearson-v1"}
+      },
+      "required": [
+        "label_id", "holding_horizon_hours", "return_definition",
+        "executable_price_column", "score_direction", "statistic_id",
+        "purge_cross_fold_endpoints", "minimum_pairs"
+      ],
+      "type": "object"
+    },
+    "schedule_utc": {
+      "additionalProperties": false,
+      "properties": {
+        "anchor_timestamp_utc": {"pattern": "Z$", "type": "string"},
+        "interval_hours": {"maximum": 168, "minimum": 8, "multipleOf": 8, "type": "integer"}
+      },
+      "required": ["anchor_timestamp_utc", "interval_hours"],
+      "type": "object"
+    },
+    "schema_version": {"const": 1},
+    "score_description": {"maxLength": 4000, "minLength": 1, "type": "string"},
+    "stage": {"const": "development"},
+    "team_id": {"enum": ["team-04", "team-05", "team-06", "team-07", "team-08", "team-09", "team-10"]}
+  },
+  "required": [
+    "schema_version", "adapter_id", "team_id", "family_id", "candidate_id",
+    "stage", "hook", "capture_boundary", "schedule_utc", "label", "score_description"
+  ],
+  "title": "Top40 V2 prospective score-adapter manifest",
+  "type": "object"
+}

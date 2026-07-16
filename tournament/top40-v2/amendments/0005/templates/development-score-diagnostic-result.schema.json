@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "artifact_hashes": {"additionalProperties": {"pattern": "^[0-9a-f]{64}$", "type": "string"}, "type": "object"},
+    "automatic_qualification_gate": {"const": false},
+    "candidate_id": {"pattern": "^[a-z0-9][a-z0-9._-]{0,127}$", "type": "string"},
+    "charges_team_trial_budget": {"const": false},
+    "diagnostic_id": {"type": "string"},
+    "diagnostic_kind": {"const": "top40-v2-development-score-diagnostic-v1"},
+    "event_type": {"const": "development_score_diagnostic_recorded"},
+    "failure_reason": {"type": ["string", "null"]},
+    "non_material": {"const": true},
+    "organizer_cpu_hours": {"minimum": 0, "type": "number"},
+    "organizer_wall_clock_hours": {"minimum": 0, "type": "number"},
+    "reservation_sha256": {"pattern": "^[0-9a-f]{64}$", "type": "string"},
+    "result_sha256": {"pattern": "^[0-9a-f]{64}$", "type": "string"},
+    "schema_version": {"const": 1},
+    "stage": {"const": "development"},
+    "statistics": {"type": ["object", "null"]},
+    "status": {"enum": ["completed", "failed", "interrupted"]},
+    "team_id": {"enum": ["team-04", "team-05", "team-06", "team-07", "team-08", "team-09", "team-10"]}
+  },
+  "required": [
+    "schema_version", "event_type", "diagnostic_kind", "diagnostic_id", "stage",
+    "team_id", "candidate_id", "reservation_sha256", "status", "failure_reason",
+    "organizer_cpu_hours", "organizer_wall_clock_hours", "artifact_hashes", "statistics",
+    "non_material", "charges_team_trial_budget", "automatic_qualification_gate", "result_sha256"
+  ],
+  "title": "Top40 V2 development score-diagnostic result",
+  "type": "object"
+}

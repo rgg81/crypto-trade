@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": true,
+  "properties": {
+    "candidate_id": {"pattern": "^[a-z0-9][a-z0-9._-]{0,127}$", "type": "string"},
+    "charges_team_trial_budget": {"const": false},
+    "diagnostic_kind": {"const": "top40-v2-development-score-diagnostic-v1"},
+    "event_type": {"const": "development_score_diagnostic_reserved"},
+    "non_material": {"const": true},
+    "reservation_sha256": {"pattern": "^[0-9a-f]{64}$", "type": "string"},
+    "schema_version": {"const": 1},
+    "stage": {"const": "development"},
+    "team_id": {"enum": ["team-04", "team-05", "team-06", "team-07", "team-08", "team-09", "team-10"]}
+  },
+  "required": [
+    "schema_version", "event_type", "diagnostic_kind", "diagnostic_id", "stage",
+    "team_id", "family_id", "candidate_id", "candidate_registration_sha256",
+    "registration_input_path", "registration_commit", "registration_event_record_sha256",
+    "registration_event_sequence", "trial_result_record_sha256", "strategy_sha256",
+    "risk_policy_sha256", "source_bundle_sha256", "candidate_seed", "config_sha256",
+    "score_manifest_path", "score_manifest_sha256", "score_manifest_commit",
+    "snapshot_manifest_path", "snapshot_manifest_sha256", "development_target_path",
+    "development_target_sha256", "runner_record_path", "runner_record_sha256",
+    "amendment_freeze_sha256", "amendment_freeze_commit", "reserved_at_utc",
+    "non_material", "charges_team_trial_budget", "reservation_sha256"
+  ],
+  "title": "Top40 V2 development score-diagnostic reservation",
+  "type": "object"
+}

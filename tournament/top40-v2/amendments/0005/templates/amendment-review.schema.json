@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": true,
+  "properties": {
+    "amendment_id": {"const": "top40-v2-amendment-0005-prospective-development-score-adapters"},
+    "decision": {"const": "approve"},
+    "implementation_commit": {"pattern": "^[0-9a-f]{40}$", "type": "string"},
+    "implementation_files": {"additionalProperties": {"pattern": "^[0-9a-f]{64}$", "type": "string"}, "type": "object"},
+    "parent_authorities": {"type": "object"},
+    "schema_version": {"const": 1}
+  },
+  "required": [
+    "schema_version", "amendment_id", "decision", "implementation_commit",
+    "implementation_files", "parent_authorities"
+  ],
+  "title": "Top40 V2 Amendment 0005 independent review",
+  "type": "object"
+}

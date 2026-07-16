@@ -1,0 +1,28 @@
+{
+  "amendment_id": "top40-v2-amendment-0005-prospective-development-score-adapters",
+  "automatic_qualification_gate": false,
+  "eligible_teams": [
+    "team-04",
+    "team-05",
+    "team-06",
+    "team-07",
+    "team-08",
+    "team-09",
+    "team-10"
+  ],
+  "excluded_teams": [
+    "team-03"
+  ],
+  "non_material": true,
+  "opt_in": true,
+  "parent_authorities": {
+    "amendment_0001_scientific_engine_sha256": "a0b99bd2928a64a37b6b9f6d900bbd8ddfc2f2e49b87e6f6633176228bfd2d4d",
+    "amendment_0002_schema3_facade_sha256": "fc70dbdb752c58857c5ed60a96e497324e93b9d5dc7e6afa0692bd3e02ad21aa",
+    "amendment_0004_active_entrypoint_sha256": "6031937952a29a1a226a778cd1bcfc2c9869559ab30465bdbebe6292c6a88377",
+    "amendment_0004_active_runner_sha256": "03006ea1ce391ef3c8da6244acb89aab19f7e63d1e0a617e2743894a575fd6cd"
+  },
+  "prospective": true,
+  "schema_version": 1,
+  "stage": "development",
+  "status": "draft"
+}
