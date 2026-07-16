@@ -1,0 +1,70 @@
+{
+  "economic_thesis": "Information and attention can diffuse gradually across native crypto assets. Coherent changes in relative-return rank and persistent relative leadership should continue over a four-day horizon after the common crypto direction is removed.",
+  "expected_regime_roles": {
+    "bear": "Long relatively resilient or improving coins and short persistently weak or deteriorating coins after removing the common negative move.",
+    "bull": "Long persistent relative leaders and short persistent laggards after removing the common positive move.",
+    "chop": "The level-plus-shift blend and coherence weight should favor sustained cross-sectional leadership over one-bar flips.",
+    "long_sleeve": "Long the highest persistence ranks: improving or established relative leaders.",
+    "short_sleeve": "Short the lowest persistence ranks: deteriorating or established relative laggards.",
+    "stress": "Broad exact-zero-net sleeves, a 0.025 coin cap, and 0.40 maximum gross limit concentration; profitability remains empirical."
+  },
+  "falsifier": "Reject if the exact no-control reference has net Sharpe below 0.75, nonpositive annualized return, Calmar below 0.40, maximum drawdown above 0.30, doubled-cost Sharpe below 0.35, nonpositive doubled-cost return, or trial-adjusted probability positive below 0.90; or fails any bull, bear, chop, role, four-of-six-fold, 0.55 positive-quarter, three-positive-regime-Sharpe, -0.25 worst-regime-Sharpe, sleeve, concentration, scheduled-score-coverage, pooled-IC, or fold-IC gate. Controls, neighbors, diagnostics, and private data cannot rescue it.",
+  "family_id": "t06-relative-rank-persistence-v1",
+  "mechanism": "Every 96 hours, convert 96 exact completed 8-hour pure-crypto return cross sections to centered ranks. Positively blend 0.65 times each coin's prior-12 to recent-12 mean-rank shift with 0.35 times its recent-12 mean-rank level, normalize by the preceding 72-rank volatility floor, weight by fixed displacement coherence, then rank and capture the final score before broad equal-dollar zero-net sleeve construction.",
+  "parameter_ranges": {
+    "acceleration_weight": [
+      0.65
+    ],
+    "bar_interval_hours": [
+      8
+    ],
+    "baseline_rank_bars": [
+      72
+    ],
+    "coherence_base_weight": [
+      0.5
+    ],
+    "level_weight": [
+      0.35
+    ],
+    "maximum_symbol_exposure": [
+      0.025
+    ],
+    "minimum_positions_per_side": [
+      8
+    ],
+    "minimum_rank_volatility": [
+      0.2
+    ],
+    "minimum_valid_symbols": [
+      24
+    ],
+    "prior_rank_bars": [
+      12
+    ],
+    "rebalance_interval_bars": [
+      12
+    ],
+    "recent_rank_bars": [
+      12
+    ],
+    "risk_policy_variants": [
+      "no-control"
+    ],
+    "seed": [
+      20260801
+    ],
+    "selected_fraction_per_side": [
+      "1/5"
+    ],
+    "side_budget": [
+      0.2
+    ]
+  },
+  "parent_family_id": "t06-relative-rank-acceleration-v1",
+  "registered_at_utc": "2026-07-16T20:18:59Z",
+  "risk_policy_plan": "Run only the exact disabled no-control reference. No risk control, stop, neighbor, diagnostic, or private ticket activates before the complete official central-development gate and every stricter broad PnL gate passes; no later result can repair a failed core.",
+  "schema_version": 1,
+  "selection_metric": "Every official central-development threshold, every stricter noncompensatory no-control gate, and, only after a passing material core, every score-evidence gate must pass; no later result substitutes for the exact reference.",
+  "team_id": "team-06"
+}
