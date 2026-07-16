@@ -52,7 +52,7 @@
   "critic_lock": null,
   "final_oos_lock": null,
   "finalist_cohort_lock": null,
-  "legacy_projection_sha256": "d3de7dcc102335153bcde8a007f196986a46efc22358fe3ef9088a5b5211896c",
+  "legacy_projection_sha256": "cb954a33c0e3fa328f30cfa0d5b1507c879c16bc23433aeaded72959a316153f",
   "legacy_state_sha256": "8c858495fde6ddde203124a055e40ebad5d8d5a684cd20f0e55f6c88f7360b07",
   "objective_lock": null,
   "organizer_audit": {
@@ -181,13 +181,13 @@
       "trial_count": 3
     },
     "team-07": {
-      "active_family_id": "t07-market-state-relative-ensemble-v1",
+      "active_family_id": "t07-two-tape-rank-durability-v1",
       "canonical_result": null,
       "development_assessment": null,
       "dnf": null,
-      "family_count": 2,
+      "family_count": 3,
       "finalist_freeze": null,
-      "pivot_count": 1,
+      "pivot_count": 2,
       "private_attempts": 0,
       "private_result": null,
       "qualifier_candidate": null,
