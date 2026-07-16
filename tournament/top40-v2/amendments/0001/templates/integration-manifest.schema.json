@@ -1,0 +1,178 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.crypto-trade.invalid/top40-v2/amendment-0001-integration-manifest.schema.json",
+  "title": "Top-40 V2 amendment 0001 integration freeze",
+  "description": "Exact reviewed diagnostic-engine, ordinary-orchestrator, and required-backfill authority.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "amendment_id", "status", "phase0_freeze_sha256",
+    "draft_sha256", "implementation_commit", "amendment_files",
+    "required_backfills", "diagnostic_engine", "amended_orchestrator",
+    "score_calculation_implemented"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "amendment_id": {"const": "top40-v2-amendment-0001-organizer-private-score-diagnostics"},
+    "status": {"const": "ready_for_review"},
+    "phase0_freeze_sha256": {"$ref": "#/$defs/sha256"},
+    "draft_sha256": {"$ref": "#/$defs/sha256"},
+    "implementation_commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "amendment_files": {"$ref": "#/$defs/amendment_files"},
+    "required_backfills": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "prefixItems": [
+        {"$ref": "#/$defs/backfill_core"},
+        {"$ref": "#/$defs/backfill_reference"}
+      ],
+      "items": false
+    },
+    "diagnostic_engine": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "files", "diagnostic_kind", "runner_api", "development_target_filename",
+        "required_private_artifact_names", "score_calculation_implemented"
+      ],
+      "properties": {
+        "files": {
+          "type": "object",
+          "minProperties": 6,
+          "maxProperties": 6,
+          "propertyNames": {"enum": [
+            "src/crypto_trade/tournament/score_diagnostics_v2.py",
+            "src/crypto_trade/tournament/_score_worker_v2.py",
+            "src/crypto_trade/tournament/score_adapters/team01_rdf_v1.py",
+            "tournament/top40-v2/amendments/0001/SCORE-DIAGNOSTIC-SPEC.md",
+            "tests/tournament/test_top40_v2_score_diagnostics.py",
+            "tests/tournament/test_top40_v2_score_worker.py"
+          ]},
+          "additionalProperties": {"$ref": "#/$defs/sha256"}
+        },
+        "diagnostic_kind": {"const": "organizer-private-score-diagnostics-backfill-v1"},
+        "runner_api": {"const": "run_reserved_score_diagnostic"},
+        "development_target_filename": {"const": "targets.parquet"},
+        "required_private_artifact_names": {
+          "type": "array",
+          "prefixItems": [
+            {"const": "diagnostic-summary.json"},
+            {"const": "labeled-score-panel.parquet"},
+            {"const": "replay-1-scores.parquet"},
+            {"const": "replay-1-targets.parquet"},
+            {"const": "replay-2-scores.parquet"},
+            {"const": "replay-2-targets.parquet"}
+          ],
+          "minItems": 6,
+          "maxItems": 6
+        },
+        "score_calculation_implemented": {"const": true}
+      }
+    },
+    "amended_orchestrator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["files", "state_schema", "effective_deadline_field", "edit_adapter_api", "read_adapter_api"],
+      "properties": {
+        "files": {
+          "type": "object",
+          "minProperties": 4,
+          "maxProperties": 4,
+          "propertyNames": {"enum": [
+            "scripts/crypto_trade/__init__.py",
+            "src/crypto_trade/tournament/amended_orchestrator_v2.py",
+            "scripts/top40_v2_amended_tournament.py",
+            "tests/tournament/test_top40_v2_amended_orchestrator.py"
+          ]},
+          "additionalProperties": {"$ref": "#/$defs/sha256"}
+        },
+        "state_schema": {"const": "top40-v2-amendment-aware-state-v1"},
+        "effective_deadline_field": {"const": "administrative_hold.effective_research_deadline_utc"},
+        "edit_adapter_api": {"const": "amendment_aware_legacy_state_edit"},
+        "read_adapter_api": {"const": "read_amendment_aware_legacy_state"}
+      }
+    },
+    "score_calculation_implemented": {"const": true}
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "amendment_files": {
+      "type": "object",
+      "minProperties": 20,
+      "maxProperties": 20,
+      "propertyNames": {"enum": [
+        "src/crypto_trade/tournament/amendment_integrity_v2.py",
+        "src/crypto_trade/tournament/amendment_v2.py",
+        "scripts/top40_v2_amendment_0001.py",
+        "tournament/top40-v2/amendments/0001/AMENDMENT-DRAFT.md",
+        "tournament/top40-v2/amendments/0001/templates/amendment-review.schema.json",
+        "tournament/top40-v2/amendments/0001/templates/hold-notice.schema.json",
+        "tournament/top40-v2/amendments/0001/templates/integration-manifest.schema.json",
+        "tournament/top40-v2/amendments/0001/templates/diagnostic-backfill-reservation.schema.json",
+        "tournament/top40-v2/amendments/0001/templates/diagnostic-backfill-result.schema.json",
+        "tests/tournament/test_top40_v2_amendment_0001.py",
+        "src/crypto_trade/tournament/score_diagnostics_v2.py",
+        "src/crypto_trade/tournament/_score_worker_v2.py",
+        "src/crypto_trade/tournament/score_adapters/team01_rdf_v1.py",
+        "tournament/top40-v2/amendments/0001/SCORE-DIAGNOSTIC-SPEC.md",
+        "tests/tournament/test_top40_v2_score_diagnostics.py",
+        "tests/tournament/test_top40_v2_score_worker.py",
+        "scripts/crypto_trade/__init__.py",
+        "src/crypto_trade/tournament/amended_orchestrator_v2.py",
+        "scripts/top40_v2_amended_tournament.py",
+        "tests/tournament/test_top40_v2_amended_orchestrator.py"
+      ]},
+      "additionalProperties": {"$ref": "#/$defs/sha256"}
+    },
+    "backfill": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "diagnostic_id", "team_id", "candidate_id", "candidate_registration_sha256",
+        "trial_result_record_sha256", "strategy_sha256", "source_bundle_sha256",
+        "risk_policy_sha256", "config_sha256", "candidate_seed",
+        "development_target_path", "development_target_sha256",
+        "runner_record_path", "runner_record_sha256"
+      ],
+      "properties": {
+        "diagnostic_id": {"type": "string", "pattern": "^score-ic-team-01-rdf-(core-h21-k3-g10|ref-001)$"},
+        "team_id": {"const": "team-01"},
+        "candidate_id": {"enum": ["rdf-core-h21-k3-g10", "rdf-ref-001"]},
+        "candidate_registration_sha256": {"$ref": "#/$defs/sha256"},
+        "trial_result_record_sha256": {"$ref": "#/$defs/sha256"},
+        "strategy_sha256": {"$ref": "#/$defs/sha256"},
+        "source_bundle_sha256": {"$ref": "#/$defs/sha256"},
+        "risk_policy_sha256": {"$ref": "#/$defs/sha256"},
+        "config_sha256": {"$ref": "#/$defs/sha256"},
+        "candidate_seed": {"type": "integer", "minimum": 0},
+        "development_target_path": {"type": "string", "pattern": "^reports-top40-v2/team-01/development-runs/.+/targets\\.parquet$"},
+        "development_target_sha256": {"$ref": "#/$defs/sha256"},
+        "runner_record_path": {"type": "string", "pattern": "^reports-top40-v2/team-01/qualification-attempts/.+\\.runner-record\\.json$"},
+        "runner_record_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "backfill_core": {
+      "allOf": [
+        {"$ref": "#/$defs/backfill"},
+        {"properties": {
+          "diagnostic_id": {"const": "score-ic-team-01-rdf-core-h21-k3-g10"},
+          "candidate_id": {"const": "rdf-core-h21-k3-g10"},
+          "development_target_path": {"const": "reports-top40-v2/team-01/development-runs/rdf-core-h21-k3-g10/targets.parquet"},
+          "runner_record_path": {"const": "reports-top40-v2/team-01/qualification-attempts/rdf-core-h21-k3-g10.runner-record.json"}
+        }}
+      ]
+    },
+    "backfill_reference": {
+      "allOf": [
+        {"$ref": "#/$defs/backfill"},
+        {"properties": {
+          "diagnostic_id": {"const": "score-ic-team-01-rdf-ref-001"},
+          "candidate_id": {"const": "rdf-ref-001"},
+          "development_target_path": {"const": "reports-top40-v2/team-01/development-runs/rdf-ref-001/targets.parquet"},
+          "runner_record_path": {"const": "reports-top40-v2/team-01/qualification-attempts/rdf-ref-001.runner-record.json"}
+        }}
+      ]
+    }
+  }
+}

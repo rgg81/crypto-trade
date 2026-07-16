@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.crypto-trade.invalid/top40-v2/diagnostic-backfill-reservation.schema.json",
+  "title": "Top-40 V2 organizer-private diagnostic reservation request",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "diagnostic_id", "team_id", "candidate_id"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "diagnostic_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{0,127}$"
+    },
+    "team_id": {
+      "enum": [
+        "team-01", "team-02", "team-03", "team-04", "team-05",
+        "team-06", "team-07", "team-08", "team-09", "team-10"
+      ]
+    },
+    "candidate_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^\\S(?:[\\s\\S]*\\S)?$"
+    }
+  }
+}

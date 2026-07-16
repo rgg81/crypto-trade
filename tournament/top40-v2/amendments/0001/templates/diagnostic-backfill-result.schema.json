@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.crypto-trade.invalid/top40-v2/diagnostic-backfill-result.schema.json",
+  "title": "Trusted Top-40 V2 diagnostic audit-result payload",
+  "description": "Recorder output only; this is not a caller-supplied result interface.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "diagnostic_id", "reservation_sha256", "status", "failure_reason",
+    "artifact_hashes", "diagnostic_outcomes", "organizer_cpu_hours",
+    "organizer_wall_clock_hours", "non_material", "team_material_trial_delta",
+    "team_cpu_hours_delta", "team_wall_clock_hours_delta"
+  ],
+  "properties": {
+    "diagnostic_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,127}$"},
+    "reservation_sha256": {"$ref": "#/$defs/sha256"},
+    "status": {"enum": ["completed", "failed", "interrupted"]},
+    "failure_reason": {"type": ["string", "null"], "maxLength": 8000},
+    "artifact_hashes": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "diagnostic-summary.json": {"$ref": "#/$defs/sha256"},
+        "labeled-score-panel.parquet": {"$ref": "#/$defs/sha256"},
+        "replay-1-scores.parquet": {"$ref": "#/$defs/sha256"},
+        "replay-1-targets.parquet": {"$ref": "#/$defs/sha256"},
+        "replay-2-scores.parquet": {"$ref": "#/$defs/sha256"},
+        "replay-2-targets.parquet": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "diagnostic_outcomes": {
+      "type": ["object", "null"]
+    },
+    "organizer_cpu_hours": {"type": "number", "minimum": 0},
+    "organizer_wall_clock_hours": {"type": "number", "minimum": 0},
+    "non_material": {"const": true},
+    "team_material_trial_delta": {"const": 0},
+    "team_cpu_hours_delta": {"const": 0.0},
+    "team_wall_clock_hours_delta": {"const": 0.0}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"status": {"const": "completed"}}, "required": ["status"]},
+      "then": {
+        "properties": {
+          "failure_reason": {"type": "null"},
+          "artifact_hashes": {
+            "required": [
+              "diagnostic-summary.json", "labeled-score-panel.parquet",
+              "replay-1-scores.parquet", "replay-1-targets.parquet",
+              "replay-2-scores.parquet", "replay-2-targets.parquet"
+            ]
+          },
+          "diagnostic_outcomes": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "canonical_targets_exact", "deterministic_replays_passed",
+              "four_of_six_fold_ics_positive", "pooled_ic_positive",
+              "score_ic_gate_passed"
+            ],
+            "properties": {
+              "canonical_targets_exact": {"type": "boolean"},
+              "deterministic_replays_passed": {"type": "boolean"},
+              "four_of_six_fold_ics_positive": {"type": "boolean"},
+              "pooled_ic_positive": {"type": "boolean"},
+              "score_ic_gate_passed": {"type": "boolean"}
+            }
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "failure_reason": {"type": "string", "minLength": 1, "pattern": "^\\S(?:[\\s\\S]*\\S)?$"},
+          "artifact_hashes": {"maxProperties": 0},
+          "diagnostic_outcomes": {"type": "null"}
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}

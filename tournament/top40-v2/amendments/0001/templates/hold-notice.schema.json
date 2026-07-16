@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.crypto-trade.invalid/top40-v2/amendment-0001-hold-notice.schema.json",
+  "title": "Top-40 V2 amendment 0001 administrative hold notice",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "amendment_id",
+    "notice_status",
+    "phase0_freeze_path",
+    "phase0_freeze_sha256",
+    "legacy_state_sha256",
+    "research_journal_path",
+    "research_journal_head_sha256",
+    "research_journal_record_count",
+    "research_journal_latest_timestamp_utc",
+    "hold_started_at_utc",
+    "hold_reason"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "amendment_id": {"const": "top40-v2-amendment-0001-organizer-private-score-diagnostics"},
+    "notice_status": {"const": "administrative_hold"},
+    "phase0_freeze_path": {"const": "tournament/top40-v2/phase0_freeze.json"},
+    "phase0_freeze_sha256": {"$ref": "#/$defs/sha256"},
+    "legacy_state_sha256": {"$ref": "#/$defs/sha256"},
+    "research_journal_path": {"const": "tournament/top40-v2/organizer_research_journal.jsonl"},
+    "research_journal_head_sha256": {"$ref": "#/$defs/sha256"},
+    "research_journal_record_count": {"type": "integer", "minimum": 1},
+    "research_journal_latest_timestamp_utc": {"type": "string", "format": "date-time", "pattern": "(?:Z|\\+00:00)$"},
+    "hold_started_at_utc": {"type": "string", "format": "date-time", "pattern": "Z$"},
+    "hold_reason": {"type": "string", "minLength": 1, "maxLength": 2000, "pattern": "^\\S(?:[\\s\\S]*\\S)?$"}
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}
