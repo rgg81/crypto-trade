@@ -1,0 +1,15 @@
+{
+  "candidate_id": "t06-relative-rank-persistence-v1-base",
+  "config_sha256": "bd0e4f70bcf335b2ac4e44ec049b89b8e8eaf4c6ac6502574d0accf12d9d9947",
+  "organizer_journal_head_sha256": "fe0577233b66d56165bf6cc495699593229d854ad85404fc1c5d2b0c5ff815f5",
+  "private_attempt_number": null,
+  "registration_sha256": "b6a3889af90c422adb298bd6a8a8cc6512c2313096e37f932d5c5ad0ed54c9d5",
+  "reserved_at_utc": "2026-07-16T20:24:58.946661+00:00",
+  "risk_policy_sha256": "7671efed25b8f9130e8f06fb9dbe44b5735e1cd2f23fd8c20e9dcc1a6b61c30b",
+  "schema_version": 1,
+  "source_bundle_sha256": "37671ec91a20ce5d52b79d83a5d3a3da6cc57b54674f88fb16d0f41d15ff8cab",
+  "stage": "development",
+  "strategy_sha256": "39d5a773fef63349fd36282d8b1ae11966fc624f7f4a02f02aa3b9e37bbc482f",
+  "team_id": "team-06",
+  "tournament": "quant-portfolio-blind-top40-v2"
+}
