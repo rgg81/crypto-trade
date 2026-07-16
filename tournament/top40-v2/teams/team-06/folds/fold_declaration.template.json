@@ -1,5 +1,5 @@
 {
-  "candidate_id": "t06-balanced-trend-reversal-v1-base",
+  "candidate_id": "t06-relative-rank-acceleration-v1-base",
   "derivation": {
     "authority": "crypto_trade.tournament.development_score_diagnostics_v5.FOLDS",
     "fold_count": 6,

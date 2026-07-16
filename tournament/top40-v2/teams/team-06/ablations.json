@@ -1,112 +1,28 @@
 {
   "activation": {
-    "condition": "every preregistered no-control core alpha minimum passes",
-    "purpose": "fixed control attribution followed by qualification of the predeclared combined policy; never policy selection and never rescue of negative core alpha",
-    "status": "dormant"
+    "condition": "exact no-control pivot reference passes every PnL and A5 score-evidence gate",
+    "status": "dormant-not-materialized-not-authorized"
   },
-  "candidate_id": "t06-balanced-trend-reversal-v1-base",
-  "canonical_runtime_materialization": {
-    "entrypoint": "strategy.py:build_strategy",
-    "risk_policy_path": "risk_policy.json",
-    "rule": "For each activated material candidate, commit its exact ID and overrides in root candidate_variant.py and copy the selected policy template byte-for-byte to root risk_policy.json before hashing, registration, and execution.",
-    "variant_path": "candidate_variant.py"
-  },
-  "cost_view_contract": {
-    "multipliers": [
-      1.0,
-      2.0
-    ],
-    "rule": "Both cost multipliers are evaluator views emitted from each single material run; doubled cost is not a separate trial."
-  },
-  "family_id": "t06-balanced-trend-reversal-v1",
-  "policy_variants": [
+  "candidate_id": "t06-relative-rank-acceleration-v1-base",
+  "family_id": "t06-relative-rank-acceleration-v1",
+  "planned_causal_questions": [
     {
-      "active_overrides": {},
-      "candidate_id": "t06-balanced-trend-reversal-v1-base",
-      "controls_enabled": [],
-      "material_configuration": true,
-      "policy_path": "risk_policy.json",
-      "policy_template_path": "risk_policies/no-control.json",
-      "role": "initial uncontrolled signal core; must pass before any controlled trial is activated",
-      "run_stage": "no-control-core",
-      "variant_id": "no-control"
+      "ablation_id": "remove-relative-rank-common-factor-transform",
+      "question": "Does return cross-sectional ranking, rather than raw-return acceleration, create regime invariance?",
+      "status": "design-only"
     },
     {
-      "active_overrides": {},
-      "candidate_id": "t06-balanced-trend-reversal-v1-ablation-volatility-only",
-      "controls_enabled": [
-        "volatility_target"
-      ],
-      "material_configuration": true,
-      "policy_path": "risk_policy.json",
-      "policy_template_path": "risk_policies/volatility-only.json",
-      "role": "attribute volatility and tail scaling",
-      "run_stage": "fixed-control-batch",
-      "variant_id": "volatility-only"
+      "ablation_id": "remove-acceleration-use-recent-rank-level",
+      "question": "Does changing relative leadership, rather than its persistent level, carry the reversal effect?",
+      "status": "design-only"
     },
     {
-      "active_overrides": {},
-      "candidate_id": "t06-balanced-trend-reversal-v1-ablation-drawdown-only",
-      "controls_enabled": [
-        "drawdown_brakes"
-      ],
-      "material_configuration": true,
-      "policy_path": "risk_policy.json",
-      "policy_template_path": "risk_policies/drawdown-only.json",
-      "role": "attribute peak-to-trough containment",
-      "run_stage": "fixed-control-batch",
-      "variant_id": "drawdown-only"
-    },
-    {
-      "active_overrides": {},
-      "candidate_id": "t06-balanced-trend-reversal-v1-ablation-turnover-only",
-      "controls_enabled": [
-        "turnover_limit"
-      ],
-      "material_configuration": true,
-      "policy_path": "risk_policy.json",
-      "policy_template_path": "risk_policies/turnover-only.json",
-      "role": "attribute churn and cost containment",
-      "run_stage": "fixed-control-batch",
-      "variant_id": "turnover-only"
-    },
-    {
-      "active_overrides": {},
-      "candidate_id": "t06-balanced-trend-reversal-v1-combined",
-      "controls_enabled": [
-        "volatility_target",
-        "drawdown_brakes",
-        "turnover_limit"
-      ],
-      "material_configuration": true,
-      "policy_path": "risk_policy.json",
-      "policy_template_path": "risk_policies/combined.json",
-      "role": "predeclared combined policy and only candidate assessed against full qualification gates",
-      "run_stage": "fixed-control-batch",
-      "variant_id": "combined"
+      "ablation_id": "remove-path-coherence",
+      "question": "Does coherent relative-rank displacement distinguish inventory pressure from noise?",
+      "status": "design-only"
     }
   ],
-  "predeclared_readout": [
-    "net_return",
-    "net_sharpe",
-    "max_drawdown",
-    "tail_loss",
-    "turnover",
-    "bull_return_and_sharpe",
-    "bear_return_and_sharpe",
-    "chop_return_and_sharpe",
-    "stress_return_and_sharpe",
-    "long_bull_return",
-    "short_bear_return",
-    "combined_chop_return",
-    "volatility_scale_time",
-    "drawdown_brake_count",
-    "requested_risk_notional",
-    "filled_risk_notional",
-    "capacity_limited_risk_notional",
-    "same_boundary_reentry_prevented_count"
-  ],
-  "risk_falsifier": "After the no-control core is independently positive, the combined policy must pass every full qualification gate and improve at least one stated volatility, drawdown, tail-loss, or turnover failure mode without worsening maximum drawdown versus no-control.",
-  "schema_version": 2,
+  "risk_control_ablation_authorized": false,
+  "schema_version": 3,
   "team_id": "team-06"
 }

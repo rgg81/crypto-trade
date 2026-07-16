@@ -1,12 +1,12 @@
 {
   "artifact_hashes": {
-    "reports-top40-v2/team-06/development-runs/t06-balanced-trend-reversal-v1-base/targets.parquet": "<organizer-fill-completed-development-target-64-hex-sha256>",
-    "reports-top40-v2/team-06/qualification-attempts/t06-balanced-trend-reversal-v1-base.runner-record.json": "<organizer-fill-completed-runner-record-64-hex-sha256>"
+    "reports-top40-v2/team-06/development-runs/t06-relative-rank-acceleration-v1-base/targets.parquet": "<organizer-fill-completed-development-target-64-hex-sha256>",
+    "reports-top40-v2/team-06/qualification-attempts/t06-relative-rank-acceleration-v1-base.runner-record.json": "<organizer-fill-completed-runner-record-64-hex-sha256>"
   },
-  "candidate_id": "t06-balanced-trend-reversal-v1-base",
+  "candidate_id": "t06-relative-rank-acceleration-v1-base",
   "cpu_hours": "<organizer-fill-nonnegative-hours>",
   "failure_reason": "<organizer-fill-null-or-reason>",
-  "family_id": "t06-balanced-trend-reversal-v1",
+  "family_id": "t06-relative-rank-acceleration-v1",
   "metrics_summary": {},
   "registration_sha256": "<organizer-fill-registration-record-64-hex-sha256>",
   "status": "<organizer-fill-completed-failed-or-interrupted>",

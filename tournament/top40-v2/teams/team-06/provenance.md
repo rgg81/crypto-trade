@@ -1,85 +1,49 @@
-# Team 06 provenance
+# Team 06 pivot provenance
 
-## Design boundary
+## Evidence boundary
 
-This package was authored on 2026-07-16 in the Team 06 V2 namespace. The original design review used only
-the permitted Top-40 V2 public README, Phase-0 policy, team playbook, methodology distillation,
-frozen `config.toml`, relevant public templates, the neutral strategy protocol and declarative
-risk-policy contract, and pre-existing Team 06 bootstrap files. It did not inspect performance
-data, snapshot observations, evaluator outputs, reports, journals, run state, amendments, private
-or final artifacts, ballots, leaderboards, another team, or any V1 team/result.
+This pivot was designed after the parent family's completed visible-development no-control result
+was public to Team 06. The exact aggregate, doubled-cost, drawdown, and regime statistics recorded
+in `experiments.jsonl` and the canonical runner record were used only to falsify the parent and
+define the new mechanism's objectives. No private qualifier data or final OOS data was inspected.
 
-No Python, test, tournament lifecycle, evaluator, or Git command was run. No network source,
-external research, historical coefficient, performance estimate, or opaque fitted state informed
-the mechanism or parameters. Accordingly, every expected behavior in `research_brief.md` is a
-preregistered hypothesis rather than evidence.
+The author inspected the existing Team 06 source/package, active public tournament authority, and
+another team's public pivot layout solely as a packaging precedent. No other team's performance
+evidence or strategy parameters informed the mechanism. No external research, network source,
+opaque fitted state, or historical target table was used.
 
-## Active-authority rebind
+No Python, test, evaluator, tournament lifecycle, or Git command was run by the pivot author. No
+journal, report, result, run state, or A7 authority file was edited. The registration, review, and
+hash files added here are explicit templates and cannot serve as evidence.
 
-On 2026-07-16 the prospective package metadata was rebound, without evaluation, to the public A5
-active entrypoint SHA-256
-`0dc9228f3b9c6fe41b2655055f766fc92f323a289a050e6bdf4e48a30b0105f4` and integration-freeze
-commit/SHA-256 `d2b95f610722aab65b4e67466b34efeaa3554101` /
-`b3b2b96245a479ccfff95b5cd5b5cd0aef3b2d0aac0fc9faf5367d3e6772958c`. The A5 dispatcher
-delegates unchanged to the A6 integration-freeze commit/SHA-256
-`ed3af1398543dfee4a50150915dc2e37b3631fc9` /
-`3e93bdfe031e2589888c3bbcaae583437bbd074fa9d86c6dc0a54187bc0f1e34` and its zero-violation
-pure-crypto audit. This rebind inspected only public A5/A6 authority/code/schemas and Team06.
+## Mechanism boundary
 
-No scripts, tests, evaluators, lifecycle operations, or Git commands were run during the rebind.
-No candidate hash, independent-review approval, registration, result, or performance evidence was
-created. Public authority hashes above are bindings, not Team06 result evidence.
+- Runtime dependencies: Python standard library and pandas already present in the neutral worker.
+- Canonical entrypoint: root `strategy.py:build_strategy`, seed `20260801`.
+- Candidate identity: exact root `candidate_variant.py`; unknown identities and all overrides fail.
+- Inputs: decision time, organizer-certified pure-crypto `eligible_symbols`, and canonical
+  RangeIndex `open_time` / `close` bars only.
+- History: one finite positive completed close at every exact required open; missing or duplicate
+  required rows fail that coin closed.
+- Transform: per-bar cross-sectional centered ranks, past-only relative-rank acceleration and
+  baseline rank volatility, fixed path coherence, and a final centered cross-sectional rank.
+- State and randomness: none. No filesystem, network, subprocess, environment, report, result,
+  snapshot, label, position, equity, drawdown, fill, cost, funding, or auxiliary read occurs.
+- Score capture: one direct organizer-owned identity call after the final score transform and
+  before selection, sizing, caps, or risk at each scheduled decision; scheduled failure captures
+  one empty built-in dictionary.
+- Portfolio: broad equal-dollar long/short sleeves, exact zero net, at most 0.48 gross and 0.03 per
+  coin, every 48 hours with holds between.
+- Risk: root `risk_policy.json` is unchanged and completely disabled. The pivot is not a control.
 
-## Executable provenance
+Amendment 0006 remains the universe authority. Only native crypto coins/tokens may reach the
+strategy; stablecoins, TradFi/equities, commodities/metals, and indexes are excluded by the
+organizer even when listed as Binance perpetuals.
 
-- Runtime dependency: Python standard library plus pandas already named by the neutral protocol.
-- Canonical entrypoint: `strategy.py:build_strategy` with seed `20260801`.
-- Candidate selection: the zero-argument root factory validates and consumes the exact candidate
-  ID/override dictionary committed in root `candidate_variant.py`. Unknown IDs and mismatched
-  overrides are hard errors; there is no nested entrypoint selection.
-- Runtime reads/writes: none. The strategy has no filesystem, network, subprocess, environment,
-  credential, report, snapshot, or evaluator access.
-- State: immutable source constants, the hash-bound root candidate variant, and a new strategy
-  instance; no learned or persisted state.
-- Randomness: none. The seed is nevertheless checked exactly to prevent accidental drift.
-- Input fields used: decision time, A6-certified pure-crypto eligible-symbol identity, and canonical
-  RangeIndex bar `open_time` / `close`.
-  Funding, auxiliary fields, prices other than close, positions, fills, costs, and risk state are
-  ignored. Team06 performs no symbol-text asset classification; the active organizer authority must
-  exclude stablecoins, TradFi/equities, commodities/metals, and indexes before context creation.
-- Timestamp rule: admit a close only when `open_time + 8h <= decision_time`, sort stably by
-  `open_time`, resolve duplicates deterministically, and reject noncanonical/stale/invalid data.
-- Construction rule: every valid finite built-in score crosses the directly imported public
-  `score_boundary` exactly once after transforms and before selection/weight caps/risk. Its
-  returned values drive construction.
-- Risk: the evaluator reads only top-level `risk_policy.json`. Files under `risk_policies/` are
-  inert templates until the organizer copies the selected bytes to that root path before the
-  candidate commit, registration, and run. Only the evaluator may act on state.
+## Evidence still required
 
-Every `.py` file in the registered Team06 tree—including `candidate_variant.py`—plus
-`frozen_config.json` and top-level `risk_policy.json` must appear in the complete A5
-executable-source manifest. The obsolete nested neighbor wrappers were removed;
-neighbor JSON files now prescribe exact root materialization. Controls and neighbors remain
-dormant until their noncompensatory activation conditions pass.
-
-## Hash and registration status
-
-No hash in a `*.template.json` file is evidence. Angle-bracket values are deliberate invalid
-sentinels so an unproduced artifact cannot masquerade as a valid SHA-256 or timestamp. The
-organizer must first commit the exact root `candidate_variant.py` and byte-materialized root
-`risk_policy.json`, then finalize executable bytes; materialize the complete acyclic
-executable-source manifest; obtain the independent semantic-coupling review; and materialize the
-score manifest and exact nested registration opt-in. Only after replacing sentinels from
-authoritative bytes may the organizer validate and register through the active lifecycle. Do not
-edit templates to simulate a journal record or review approval.
-
-`families.jsonl` and `experiments.jsonl` were left untouched because they are derived organizer
-projections. Resource usage remains zero only as an unevaluated design statement; the organizer
-journal becomes authoritative as soon as registration/execution begins.
-
-## Reproduction contract
-
-Two clean official workers must instantiate the exact frozen bundle and seed and emit identical
-targets and artifact hashes. Synthetic tests are authored in `test_strategy.py` but not executed.
-Evaluator-owned integration checks are listed separately in `synthetic_test_plan.md`. A replay
-mismatch, source/config mismatch, or hidden runtime dependency is a provenance failure.
+Organizer lint, JSON, 13 focused tests, source preflight, independent semantic review, and the A7
+family/candidate metadata rebind passed after the author handoff. Family registration, canonical
+A5 control first-adds, exact post-family source hashing, trial registration, visible-development
+evaluation, and score diagnostics remain pending. Two clean official workers must ultimately
+reproduce exact targets and artifact hashes before any private ticket can be considered.

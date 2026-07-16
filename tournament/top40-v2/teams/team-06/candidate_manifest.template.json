@@ -1,14 +1,14 @@
 {
   "active_authority": {
-    "entrypoint_path": "scripts/top40_v2_tournament_score_diagnostics_v5.py",
-    "entrypoint_sha256": "0dc9228f3b9c6fe41b2655055f766fc92f323a289a050e6bdf4e48a30b0105f4",
-    "integration_freeze_commit": "d2b95f610722aab65b4e67466b34efeaa3554101",
-    "integration_freeze_sha256": "b3b2b96245a479ccfff95b5cd5b5cd0aef3b2d0aac0fc9faf5367d3e6772958c",
+    "entrypoint_path": "scripts/top40_v2_tournament_runtime_preload_v7.py",
+    "entrypoint_sha256": "8a4ada10176d2606df3f358fc188e21b45153ad9a7270f36908736f03322a3a9",
+    "integration_freeze_commit": "c8b917ca49306d5200a4e08848e73ff6f5a18bf3",
+    "integration_freeze_sha256": "6f77a146e7b414eabd20c5cc9321a95493bb98116dde07ef79d9eb009b6a6f51",
     "pure_crypto_integration_freeze_sha256": "3e93bdfe031e2589888c3bbcaae583437bbd074fa9d86c6dc0a54187bc0f1e34"
   },
-  "candidate_id": "t06-balanced-trend-reversal-v1-base",
+  "candidate_id": "t06-relative-rank-acceleration-v1-base",
   "candidate_materialization": {
-    "active_candidate_id": "t06-balanced-trend-reversal-v1-base",
+    "active_candidate_id": "t06-relative-rank-acceleration-v1-base",
     "active_overrides": {},
     "entrypoint": "strategy.py:build_strategy",
     "risk_policy_source_path": "risk_policies/no-control.json",
@@ -16,8 +16,7 @@
     "variant_path": "candidate_variant.py"
   },
   "candidate_registration": {
-    "input_path": "reports-top40-v2/team-06/registration-inputs/t06-balanced-trend-reversal-v1-base.json",
-    "score_adapter_opt_in_template": "score_adapter_opt_in.template.json",
+    "input_template": "pivot-01/trial-registration.template.json",
     "status": "prospective-unmaterialized"
   },
   "entrypoint": "strategy.py:build_strategy",
@@ -48,19 +47,19 @@
       "size": "<organizer-fill-exact-byte-size>"
     }
   ],
-  "family_id": "t06-balanced-trend-reversal-v1",
+  "family_id": "t06-relative-rank-acceleration-v1",
   "initial_risk_policy": "risk_policy.json",
-  "manifest_kind": "top40-v2-team-candidate-materialization-plan-v2",
+  "manifest_kind": "top40-v2-team-candidate-materialization-plan-v3",
   "registration_allowed": false,
-  "risk_policy_materialization_rule": "Copy risk_policies/no-control.json byte-for-byte to root risk_policy.json before the candidate commit; registration and execution bind only that root file.",
-  "schema_version": 2,
+  "risk_policy_materialization_rule": "Keep risk_policies/no-control.json byte-identical at root risk_policy.json before the candidate commit; every control remains disabled.",
+  "schema_version": 3,
   "score_adapter_controls": {
-    "executable_source_manifest_canonical_path": "tournament/top40-v2/teams/team-06/score-adapters/t06-balanced-trend-reversal-v1-base.executable-source-manifest.json",
-    "score_manifest_canonical_path": "tournament/top40-v2/teams/team-06/score-adapters/t06-balanced-trend-reversal-v1-base.json",
-    "semantic_coupling_review_canonical_path": "tournament/top40-v2/teams/team-06/score-adapters/t06-balanced-trend-reversal-v1-base.semantic-coupling-review.json"
+    "executable_source_manifest_canonical_path": "tournament/top40-v2/teams/team-06/score-adapters/t06-relative-rank-acceleration-v1-base.executable-source-manifest.json",
+    "score_manifest_canonical_path": "tournament/top40-v2/teams/team-06/score-adapters/t06-relative-rank-acceleration-v1-base.json",
+    "semantic_coupling_review_canonical_path": "tournament/top40-v2/teams/team-06/score-adapters/t06-relative-rank-acceleration-v1-base.semantic-coupling-review.json"
   },
   "seed": 20260801,
-  "source_bundle_sha256": "<organizer-fill-only-after-final-control-files-64-hex-sha256>",
+  "source_bundle_sha256": "<organizer-fill-only-after-family-registration-a7-rebind-and-final-control-files-64-hex-sha256>",
   "team_id": "team-06",
   "template_only": true
 }

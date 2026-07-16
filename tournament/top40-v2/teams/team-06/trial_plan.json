@@ -1,180 +1,75 @@
 {
   "budget_ceiling": {
-    "maximum_material_configurations": 9,
+    "maximum_team_material_configurations": 9,
+    "material_configurations_consumed": 1,
     "mechanism_pivots_consumed": 0,
-    "private_tickets_consumed": 0
+    "mechanism_pivots_drafted_pending_registration": 1,
+    "private_tickets_consumed": 0,
+    "pivot_reference_material_configurations_planned": 1
   },
-  "canonical_runtime_materialization": {
-    "entrypoint": "strategy.py:build_strategy",
-    "risk_policy_path": "risk_policy.json",
-    "rule": "Before every material registration, write the declared active candidate ID and exact overrides to candidate_variant.py and copy the declared policy template byte-for-byte to root risk_policy.json. Commit those bytes and rederive all source, strategy, risk, and A5 hashes before registration; execute the historical registration commit.",
-    "variant_path": "candidate_variant.py"
+  "candidate_id": "t06-relative-rank-acceleration-v1-base",
+  "cost_view_rule": "One material run emits both 1x and 2x central-cost views from the same target and fill path; doubled cost is never a second trial.",
+  "family_id": "t06-relative-rank-acceleration-v1",
+  "parent_terminal_evidence": {
+    "candidate_id": "t06-balanced-trend-reversal-v1-base",
+    "family_id": "t06-balanced-trend-reversal-v1",
+    "material_trial_number": 1,
+    "reason": "failed_no_control_core",
+    "result_status": "completed"
   },
-  "cost_view_rule": "Every material run emits both 1x and 2x central-cost views from the same frozen target/fill path; the 2x view is never a trial or material configuration.",
-  "family_id": "t06-balanced-trend-reversal-v1",
-  "read_discipline": "Within each activated batch, register every material trial before running any and read results only after the full batch is terminal.",
+  "read_discipline": "Do not read, reinterpret, or use any later controlled or neighboring result to compensate for a failed no-control pivot reference.",
   "registration_prerequisite": {
-    "condition": "Organizer materializes the complete A5 executable-source manifest, obtains the independent semantic-coupling review, materializes the score manifest, and installs its exact SHA-256 in the nested registration opt-in while the active A5/A6 authority remains exact.",
-    "status": "active-authority-bound-materialization-pending"
+    "condition": "Serialized synthetic and organizer validation passes; independent review approves the exact executable set; the new family, A5 executable-source manifest, semantic review, score manifest, source hashes, trial opt-in, and A7 package rebind are materialized in their required order.",
+    "status": "pending"
   },
-  "schema_version": 2,
+  "schema_version": 3,
   "stages": [
     {
-      "activation": "initial, but only after A5 control-file materialization and independent semantic review",
-      "candidate_ids": [
-        "t06-balanced-trend-reversal-v1-base"
-      ],
+      "activation": "initial after every registration prerequisite",
+      "candidate_ids": ["t06-relative-rank-acceleration-v1-base"],
       "candidate_materializations": [
         {
-          "active_candidate_id": "t06-balanced-trend-reversal-v1-base",
+          "active_candidate_id": "t06-relative-rank-acceleration-v1-base",
           "active_overrides": {},
           "risk_policy_destination_path": "risk_policy.json",
           "risk_policy_source_path": "risk_policies/no-control.json"
         }
       ],
-      "cost_views": [
-        1.0,
-        2.0
-      ],
+      "cost_views": [1.0, 2.0],
       "hard_alpha_minima": {
         "combined_chop_net_return": "> 0",
         "doubled_cost_net_return": "> 0",
         "doubled_cost_net_sharpe": "> 0",
         "long_bull_net_return": "> 0",
         "maximum_positive_pnl_concentration": "<= 0.40",
-        "minimum_mean_side_exposure": ">= 0.01",
-        "minimum_positive_fold_count": ">= 4 of 6 frozen A5 chronological folds",
+        "minimum_positive_fold_count": ">= 4 of 6 frozen chronological folds",
         "minimum_positive_quarter_fraction": ">= 0.55",
-        "minimum_side_active_bar_fraction": ">= 0.10",
-        "minimum_side_executed_notional_usdt": ">= 1000",
-        "minimum_side_exposure_when_active": ">= 0.01",
         "net_return": "> 0",
         "net_sharpe": "> 0",
-        "required_positive_regime_returns": [
-          "bull",
-          "bear",
-          "chop"
-        ],
-        "short_bear_net_return": "> 0"
+        "required_positive_regime_returns": ["bull", "bear", "chop"],
+        "required_positive_regime_sharpes": ["bull", "bear", "chop"],
+        "short_bear_net_return": "> 0",
+        "sleeve_activity_and_exposure": "both sleeves pass every frozen minimum"
       },
       "material_configurations": 1,
-      "policy_path": "risk_policy.json",
-      "policy_template_path": "risk_policies/no-control.json",
       "policy_variant": "no-control",
-      "required_outcome": "Every broad no-control alpha minimum passes; any failure is terminal for this family because controls may not create or rescue negative core alpha.",
-      "stage_id": "no-control-core"
+      "required_outcome": "Every no-control broad-alpha minimum and every separately declared A5 score-evidence gate passes; any failure is terminal for this family.",
+      "stage_id": "pivot-no-control-core"
     },
     {
-      "activation": "only after every no-control core alpha minimum passes",
-      "candidate_ids": [
-        "t06-balanced-trend-reversal-v1-ablation-volatility-only",
-        "t06-balanced-trend-reversal-v1-ablation-drawdown-only",
-        "t06-balanced-trend-reversal-v1-ablation-turnover-only",
-        "t06-balanced-trend-reversal-v1-combined"
-      ],
-      "candidate_materializations": [
-        {
-          "active_candidate_id": "t06-balanced-trend-reversal-v1-ablation-volatility-only",
-          "active_overrides": {},
-          "risk_policy_destination_path": "risk_policy.json",
-          "risk_policy_source_path": "risk_policies/volatility-only.json"
-        },
-        {
-          "active_candidate_id": "t06-balanced-trend-reversal-v1-ablation-drawdown-only",
-          "active_overrides": {},
-          "risk_policy_destination_path": "risk_policy.json",
-          "risk_policy_source_path": "risk_policies/drawdown-only.json"
-        },
-        {
-          "active_candidate_id": "t06-balanced-trend-reversal-v1-ablation-turnover-only",
-          "active_overrides": {},
-          "risk_policy_destination_path": "risk_policy.json",
-          "risk_policy_source_path": "risk_policies/turnover-only.json"
-        },
-        {
-          "active_candidate_id": "t06-balanced-trend-reversal-v1-combined",
-          "active_overrides": {},
-          "risk_policy_destination_path": "risk_policy.json",
-          "risk_policy_source_path": "risk_policies/combined.json"
-        }
-      ],
-      "cost_views_per_run": [
-        1.0,
-        2.0
-      ],
-      "material_configurations": 4,
-      "policy_template_paths": [
-        "risk_policies/volatility-only.json",
-        "risk_policies/drawdown-only.json",
-        "risk_policies/turnover-only.json",
-        "risk_policies/combined.json"
-      ],
-      "runtime_policy_path": "risk_policy.json",
-      "required_outcome": "Read all four together for fixed attribution only; do not select a policy and do not use any controlled result to cure a failed no-control core gate.",
-      "stage_id": "fixed-control-batch"
-    },
-    {
-      "activation": "after the fixed-control batch is terminal",
-      "candidate_ids": [
-        "t06-balanced-trend-reversal-v1-combined"
-      ],
+      "activation": "only after the no-control material result and non-material A5 diagnostic are both terminal",
+      "candidate_ids": ["t06-relative-rank-acceleration-v1-base"],
       "material_configurations": 0,
-      "required_outcome": "The already-run combined policy passes every aggregate, doubled-cost, fold, quarter, trial-adjusted, regime, role, sleeve, drawdown, Calmar, and concentration qualification gate, plus the frozen risk-attribution falsifier.",
-      "stage_id": "combined-full-gates"
-    },
-    {
-      "activation": "only after combined full-gate pass",
-      "candidate_ids": [
-        "t06-balanced-trend-reversal-v1-n01-slow84",
-        "t06-balanced-trend-reversal-v1-n02-slow96",
-        "t06-balanced-trend-reversal-v1-n03-select20",
-        "t06-balanced-trend-reversal-v1-n04-select30"
-      ],
-      "candidate_materializations": [
-        {
-          "active_candidate_id": "t06-balanced-trend-reversal-v1-n01-slow84",
-          "active_overrides": {
-            "slow_lookback_bars": 84
-          },
-          "risk_policy_destination_path": "risk_policy.json",
-          "risk_policy_source_path": "risk_policies/combined.json"
-        },
-        {
-          "active_candidate_id": "t06-balanced-trend-reversal-v1-n02-slow96",
-          "active_overrides": {
-            "slow_lookback_bars": 96
-          },
-          "risk_policy_destination_path": "risk_policy.json",
-          "risk_policy_source_path": "risk_policies/combined.json"
-        },
-        {
-          "active_candidate_id": "t06-balanced-trend-reversal-v1-n03-select20",
-          "active_overrides": {
-            "selection_fraction": 0.2
-          },
-          "risk_policy_destination_path": "risk_policy.json",
-          "risk_policy_source_path": "risk_policies/combined.json"
-        },
-        {
-          "active_candidate_id": "t06-balanced-trend-reversal-v1-n04-select30",
-          "active_overrides": {
-            "selection_fraction": 0.3
-          },
-          "risk_policy_destination_path": "risk_policy.json",
-          "risk_policy_source_path": "risk_policies/combined.json"
-        }
-      ],
-      "cost_views_per_run": [
-        1.0,
-        2.0
-      ],
-      "material_configurations": 4,
-      "policy_path": "risk_policy.json",
-      "policy_template_path": "risk_policies/combined.json",
-      "required_outcome": "At least 3/4 neighbors are profitable and median Sharpe is >= 0.50; the combined base remains the only qualification candidate.",
-      "stage_id": "combined-policy-neighborhood"
+      "required_score_evidence": {
+        "complete_scheduled_score_coverage": true,
+        "minimum_positive_fold_ic_count": 4,
+        "pooled_pearson_ic": "> 0",
+        "unavailable_evidence_action": "fail"
+      },
+      "required_outcome": "Apply all no-control PnL and score-evidence gates together. Passing permits a separately documented future stability plan; failure stops Team 06 with no control rescue.",
+      "stage_id": "pivot-core-adjudication"
     }
   ],
   "team_id": "team-06",
-  "terminal_rule": "A failed no-control alpha minimum or combined full gate rejects the family; record the negative result and make a documented pivot-or-DNF decision. Controls and neighbors cannot compensate."
+  "terminal_rule": "A failed no-control PnL, regime, role, sleeve, fold, quarter, concentration, coverage, or IC gate rejects the family. No stop, volatility target, drawdown brake, turnover cap, neighbor, or private ticket can compensate."
 }

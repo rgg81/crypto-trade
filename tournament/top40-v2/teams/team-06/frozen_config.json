@@ -1,84 +1,94 @@
 {
   "active_authority": {
-    "entrypoint_path": "scripts/top40_v2_tournament_score_diagnostics_v5.py",
-    "entrypoint_sha256": "0dc9228f3b9c6fe41b2655055f766fc92f323a289a050e6bdf4e48a30b0105f4",
-    "integration_freeze_commit": "d2b95f610722aab65b4e67466b34efeaa3554101",
-    "integration_freeze_sha256": "b3b2b96245a479ccfff95b5cd5b5cd0aef3b2d0aac0fc9faf5367d3e6772958c",
+    "entrypoint_path": "scripts/top40_v2_tournament_runtime_preload_v7.py",
+    "entrypoint_sha256": "8a4ada10176d2606df3f358fc188e21b45153ad9a7270f36908736f03322a3a9",
+    "integration_freeze_commit": "c8b917ca49306d5200a4e08848e73ff6f5a18bf3",
+    "integration_freeze_sha256": "6f77a146e7b414eabd20c5cc9321a95493bb98116dde07ef79d9eb009b6a6f51",
     "pure_crypto_integration_freeze_sha256": "3e93bdfe031e2589888c3bbcaae583437bbd074fa9d86c6dc0a54187bc0f1e34"
   },
+  "candidate_id": "t06-relative-rank-acceleration-v1-base",
   "candidate_materialization": {
-    "initial_active_candidate_id": "t06-balanced-trend-reversal-v1-base",
-    "initial_active_overrides": {},
-    "rule": "Root candidate_variant.py is the sole candidate-specific selector; it is updated, committed, and hash-bound before each registration, and zero-argument strategy.py:build_strategy validates and consumes it.",
+    "active_candidate_id": "t06-relative-rank-acceleration-v1-base",
+    "active_overrides": {},
+    "entrypoint": "strategy.py:build_strategy",
     "variant_path": "candidate_variant.py"
   },
-  "candidate_id": "t06-balanced-trend-reversal-v1-base",
   "data_contract": {
-    "bar_interval": "8h",
     "bar_frame_index": "RangeIndex",
+    "bar_interval": "8h",
     "bar_required_columns": [
       "open_time",
       "close"
     ],
-    "close_availability": "open_time_plus_8h_lte_decision_time",
+    "completed_close_rule": "open_time_plus_8h_lte_decision_time",
+    "exact_history_rule": "one_valid_row_at_each_of_76_required_past_open_times",
     "funding_used_by_strategy": false,
     "membership": "amendment_0006_certified_pure_crypto_context.eligible_symbols_at_decision",
-    "maximum_staleness_hours": 16,
-    "minimum_valid_symbols": 12,
+    "minimum_valid_symbols": 24,
     "runtime_artifacts": "none"
   },
-  "family_id": "t06-balanced-trend-reversal-v1",
+  "family_id": "t06-relative-rank-acceleration-v1",
+  "mechanism": {
+    "common_factor_removal": "average-tie-center-rank-each-completed-8h-return-cross-section-to-minus1-plus1",
+    "feature": "negative_change_from_prior_six_bar_mean_rank_to_recent_six_bar_mean_rank",
+    "normalization": "divide_by_max_0.15_sample_volatility_of_prior_63_rank_observations",
+    "path_weight": "0.50_plus_0.50_times_recent_change_coherence",
+    "score_transform": "average-tie-center-rank-raw_reversal_score_cross_section_to_minus1_plus1"
+  },
   "parameters": {
-    "annualization_bars": 1095,
     "bar_interval_hours": 8,
-    "base_gross_exposure": 0.48,
-    "chop_trend_mix": 0.35,
-    "direction_full_scale_return": 0.15,
-    "directional_trend_mix": 0.8,
-    "fast_lookback_bars": 21,
-    "fast_trend_weight": 0.35,
-    "maximum_abs_net_exposure": 0.04,
-    "maximum_staleness_hours": 16,
-    "maximum_symbol_exposure": 0.07,
-    "minimum_positions_per_side": 4,
-    "minimum_valid_symbols": 12,
-    "momentum_lag_bars": 3,
-    "rebalance_hour_utc": 0,
-    "reversal_lookback_bars": 6,
-    "selection_fraction": 0.25,
-    "slow_lookback_bars": 90,
-    "slow_trend_weight": 0.65,
-    "volatility_floor": 0.2,
-    "volatility_lookback_bars": 60,
-    "volatility_score_penalty": 0.1
+    "baseline_rank_bars": 63,
+    "coherence_base_weight": 0.5,
+    "maximum_symbol_exposure": 0.03,
+    "minimum_positions_per_side": 8,
+    "minimum_rank_volatility": 0.15,
+    "minimum_valid_symbols": 24,
+    "prior_rank_bars": 6,
+    "rebalance_interval_bars": 6,
+    "recent_rank_bars": 6,
+    "selection_fraction": "1/4",
+    "side_budget": 0.24
+  },
+  "parent_negative_evidence": {
+    "annualized_return": -0.24452542046360337,
+    "candidate_id": "t06-balanced-trend-reversal-v1-base",
+    "double_cost_sharpe": -0.799922357968985,
+    "family_id": "t06-balanced-trend-reversal-v1",
+    "maximum_drawdown": 0.7380842004083039,
+    "net_sharpe": -0.524809872995251,
+    "regime_sharpe": {
+      "bear": -1.4458380733522744,
+      "bull": 0.0640641950162595,
+      "chop": 0.9867176235750049
+    },
+    "terminal_reason": "failed_no_control_core; controls_and_neighbors_not_activated"
   },
   "portfolio_construction": {
-    "long_selection": "highest_preconstruction_scores",
-    "net_tilt": "clip(cross_sectional_median_slow_return/0.15,-1,1)*0.04",
-    "short_selection": "lowest_preconstruction_scores",
-    "side_count": "min(floor(n/2),max(4,floor(0.25*n)))",
-    "sizing": "equal_weight_per_side_subject_to_0.07_symbol_cap"
+    "gross_limit": 0.48,
+    "long_selection": "highest_final_scores",
+    "net_target": 0.0,
+    "schedule": "every_six_exact_8h_bars_from_unix_epoch;hold_between",
+    "short_selection": "lowest_final_scores",
+    "side_budget": 0.24,
+    "side_count": "max_8_or_floor_n_over_4",
+    "sizing": "equal_dollar_per_side_subject_to_0.03_symbol_cap"
   },
   "preconstruction_boundary": {
     "adapter_id": "top40-v2-declared-score-boundary-v1",
     "call_count_per_scheduled_construction": 1,
     "capture_boundary": "candidate-declared-post-transform-pre-selection-weight-cap-risk",
+    "empty_scheduled_failure": "one_identity_capture_of_empty_builtin_dictionary",
     "input_contract": "finite_builtin_dict_str_float",
     "local_binding": "strategy.score_boundary",
-    "public_methods": [
-      "preconstruction_snapshot",
-      "preconstruction_scores"
-    ],
     "returned_values_drive_construction": true,
     "selection_weight_cap_or_risk_before_boundary": false,
     "shared_hook_import": "crypto_trade.tournament.score_adapter_protocol_v5.score_boundary"
   },
-  "registration_blocker": "A5 executable-source manifest, independent semantic review, score manifest, and exact registration opt-in are not materialized",
-  "combined_risk_policy_template_path": "risk_policies/combined.json",
-  "risk_materialization_rule": "Copy the selected risk_policies template byte-for-byte to top-level risk_policy.json before commit, registration, and run; the lifecycle reads only the root path.",
+  "registration_blocker": "new family registration, exact executable-source manifest, independent semantic review, score manifest, and source hashes remain organizer work",
   "risk_policy_path": "risk_policy.json",
-  "schema_version": 1,
+  "risk_policy_status": "exact_disabled_no-control_policy_retained; no control is part of the pivot",
+  "schema_version": 2,
   "seed": 20260801,
-  "selection_rule": "no-control-core-first; negative core is terminal; then fixed single-and-combined controls; combined must pass every full gate; only then declared neighbors",
+  "status": "implemented_serially_validated_unregistered_unevaluated_mechanism_pivot",
   "strategy_entrypoint": "strategy.py:build_strategy"
 }

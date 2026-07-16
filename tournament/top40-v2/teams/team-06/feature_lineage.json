@@ -1,115 +1,74 @@
 {
-  "candidate_id": "t06-balanced-trend-reversal-v1-base",
+  "candidate_id": "t06-relative-rank-acceleration-v1-base",
+  "family_id": "t06-relative-rank-acceleration-v1",
   "features": [
     {
       "availability": "decision boundary supplied by organizer",
       "event_timestamp": "DecisionContext.decision_time",
       "feature_id": "decision_clock",
       "lag": "none",
-      "missing_rule": "invalid timestamp is a hard strategy error",
-      "raw_fields": [
-        "DecisionContext.decision_time"
-      ],
+      "missing_rule": "naive, pre-epoch, or off-grid timestamp fails flat",
+      "raw_fields": ["DecisionContext.decision_time"],
       "source": "neutral tournament protocol",
-      "use": "rebalance only at 00:00 UTC; non-rebalance boundaries return None"
+      "use": "construct every six exact 8h bars from the Unix epoch and hold between"
     },
     {
-      "availability": "Amendment 0006-certified pure-crypto point-in-time membership intersected with executable next-open availability",
+      "availability": "Amendment 0006-certified pure-crypto point-in-time membership",
       "event_timestamp": "current decision boundary",
       "feature_id": "eligible_universe",
-      "lag": "membership state supplied at boundary",
+      "lag": "membership supplied at boundary",
       "missing_rule": "symbols absent from eligible_symbols are never scored or targeted",
-      "raw_fields": [
-        "DecisionContext.eligible_symbols"
-      ],
-      "source": "active A5 dispatcher delegated to Amendment 0006 pure-crypto universe authority",
-      "use": "preconstruction candidate set only"
+      "raw_fields": ["DecisionContext.eligible_symbols"],
+      "source": "active A7 dispatcher delegated to Amendment 0006 pure-crypto universe authority",
+      "use": "sole candidate universe; no symbol-text asset classification or expansion"
     },
     {
-      "availability": "canonical RangeIndex rows only; open_time + 8h <= decision_time; most recent completed close must be no more than 16 hours old",
-      "event_timestamp": "bars.open_time + 8h",
-      "feature_id": "lagged_slow_return",
-      "lag": "3 bars between decision-side latest close and momentum endpoint",
-      "missing_rule": "exclude symbol if fewer than 94 valid positive closes, any nonfinite/nonpositive retained close, or stale close",
-      "raw_fields": [
-        "bars.close",
-        "bars.open_time"
-      ],
+      "availability": "canonical RangeIndex rows with open_time plus 8h no later than decision_time",
+      "event_timestamp": "bars.open_time plus 8h",
+      "feature_id": "exact_completed_log_return_panel",
+      "lag": "75 returns from 76 completed closes ending at the decision boundary",
+      "missing_rule": "exclude a coin unless exactly one finite positive close exists at every required open time",
+      "raw_fields": ["bars.open_time", "bars.close"],
       "source": "organizer-supplied past-closed 8h bars",
-      "transform": "log(close[t-3]/close[t-93]) / max(20% annualized volatility, trailing 60-bar annualized volatility)"
+      "transform": "natural log of consecutive exact close ratios"
     },
     {
-      "availability": "same past-closed rule as lagged_slow_return",
-      "event_timestamp": "bars.open_time + 8h",
-      "feature_id": "lagged_fast_return",
-      "lag": "3 bars between decision-side latest close and momentum endpoint",
-      "missing_rule": "same exclusion rule as lagged_slow_return",
-      "raw_fields": [
-        "bars.close",
-        "bars.open_time"
-      ],
-      "source": "organizer-supplied past-closed 8h bars",
-      "transform": "log(close[t-3]/close[t-24]) / max(20% annualized volatility, trailing 60-bar annualized volatility)"
-    },
-    {
-      "availability": "same past-closed rule as lagged_slow_return",
-      "event_timestamp": "bars.open_time + 8h",
-      "feature_id": "short_reversal",
-      "lag": "current decision-side close is closed and available; no forward value",
-      "missing_rule": "same exclusion rule as lagged_slow_return",
-      "raw_fields": [
-        "bars.close",
-        "bars.open_time"
-      ],
-      "source": "organizer-supplied past-closed 8h bars",
-      "transform": "-log(close[t]/close[t-6]) / max(20% annualized volatility, trailing 60-bar annualized volatility)"
-    },
-    {
-      "availability": "same past-closed rule as lagged_slow_return",
-      "event_timestamp": "bars.open_time + 8h",
-      "feature_id": "realized_volatility",
-      "lag": "60 past 8h close-to-close returns ending at decision-side close",
-      "missing_rule": "exclude symbol when fewer than 61 closes or result is nonfinite",
-      "raw_fields": [
-        "bars.close",
-        "bars.open_time"
-      ],
-      "source": "organizer-supplied past-closed 8h bars",
-      "transform": "sample standard deviation of 60 log returns * sqrt(1095)"
-    },
-    {
-      "availability": "computed from valid eligible symbols at the decision boundary",
-      "event_timestamp": "decision boundary",
-      "feature_id": "cross_sectional_centered_ranks",
-      "lag": "inherits each input feature lag",
-      "missing_rule": "average exact ties; return flat when fewer than 12 valid symbols",
-      "raw_fields": [
-        "lagged_slow_return",
-        "lagged_fast_return",
-        "short_reversal",
-        "realized_volatility"
-      ],
+      "availability": "computed separately at each of 75 completed return timestamps",
+      "event_timestamp": "inherited completed bar close time",
+      "feature_id": "cross_sectional_return_rank",
+      "lag": "inherits completed return panel",
+      "missing_rule": "average exact ties; require at least 24 complete currently eligible coins",
+      "raw_fields": ["exact_completed_log_return_panel"],
       "source": "fixed deterministic transform",
-      "transform": "stable symbol-keyed average-tie ranks mapped to [-1,1]; no learned scaler or winsorizer"
+      "transform": "ASCII-stable average-tie rank mapped to [-1,1], removing any common additive crypto return"
     },
     {
-      "availability": "computed before selection from all valid eligible symbols",
+      "availability": "computed at a scheduled decision from each coin's 75 past rank observations",
+      "event_timestamp": "decision boundary",
+      "feature_id": "relative_rank_acceleration_reversal",
+      "lag": "63-rank baseline followed by disjoint prior-six and recent-six rank windows",
+      "missing_rule": "nonfinite feature excludes the coin; fewer than 24 features fails the decision closed",
+      "raw_fields": ["cross_sectional_return_rank"],
+      "source": "fixed deterministic transform",
+      "transform": "negative recent-minus-prior mean-rank change divided by max(0.15, baseline sample rank volatility), multiplied by 0.50 plus 0.50 times recent path coherence"
+    },
+    {
+      "availability": "computed before selection from every valid currently eligible coin",
       "event_timestamp": "decision boundary",
       "feature_id": "preconstruction_score",
-      "lag": "inherits ranked inputs",
-      "missing_rule": "nonfinite score is a hard strategy error",
-      "raw_fields": [
-        "cross_sectional_centered_ranks"
-      ],
+      "lag": "inherits relative-rank acceleration reversal",
+      "missing_rule": "scheduled failure captures one empty dictionary; nonfinite score is rejected",
+      "raw_fields": ["relative_rank_acceleration_reversal"],
       "source": "fixed deterministic transform",
-      "transform": "continuous market-direction mix of 65/35 slow/fast trend and reversal, less 0.10 volatility rank; all finite built-in scores then pass once through strategy.score_boundary and its returned values are used for construction"
+      "transform": "ASCII-stable average-tie rank mapped to [-1,1], then one direct strategy.score_boundary identity call before sleeves, sizing, caps, or risk"
     }
   ],
   "forbidden_inputs": [
-    "future bars",
+    "future or incomplete bars",
     "next-open price",
     "fills",
     "funding values",
+    "volume",
     "positions",
     "equity or drawdown",
     "fees or slippage",
@@ -126,8 +85,8 @@
     "embargo_bars": 0,
     "forward_label_used": false,
     "purge_bars": 0,
-    "reason": "family is a fixed rule with no supervised target, fitting, feature selection, or learned preprocessing"
+    "reason": "fixed causal rule with no supervised fitting, target, feature selection, or learned preprocessing"
   },
-  "schema_version": 1,
+  "schema_version": 2,
   "team_id": "team-06"
 }

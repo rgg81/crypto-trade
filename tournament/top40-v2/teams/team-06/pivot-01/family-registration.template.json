@@ -1,0 +1,36 @@
+{
+  "economic_thesis": "Abrupt changes in cross-sectional return rank can reflect temporary relative inventory and liquidation pressure. Reversing rank acceleration, while removing the common crypto direction at each bar, should isolate a two-sided relative effect that does not depend on whether the market is rising, falling, or chopping.",
+  "expected_regime_roles": {
+    "bear": "Cross-sectional ranking removes the common negative move; sharp relative squeezes enter the short sleeve and sharp relative liquidations enter the long sleeve, with exact zero dollar net.",
+    "bull": "Cross-sectional ranking removes the common positive move; the portfolio trades changes in relative leadership rather than market direction.",
+    "chop": "Repeated changes in relative leadership should mean-revert over the fixed 48-hour holding interval.",
+    "long_sleeve": "Long the highest reversal ranks, representing the sharpest recent deterioration in relative leadership.",
+    "short_sleeve": "Short the lowest reversal ranks, representing the sharpest recent acceleration in relative leadership.",
+    "stress": "Broad sleeves, exact dollar neutrality, a 0.03 coin cap, and 0.48 maximum gross limit concentration; profitability remains an empirical gate."
+  },
+  "family_id": "t06-relative-rank-acceleration-v1",
+  "falsifier": "Reject the family if the exact no-control reference has nonpositive aggregate or doubled-cost return or Sharpe; nonpositive bull, bear, or chop return or Sharpe; failed long-bull, short-bear, or combined-chop attribution; fewer than four profitable folds; positive-quarter fraction below 0.55; incomplete A5 score coverage; nonpositive pooled score IC or fewer than four positive fold ICs; failed sleeve minima; or positive-PnL concentration above 0.40. Controls, neighbors, and private data cannot rescue it.",
+  "mechanism": "Every 48 hours, convert each of 75 exact completed 8-hour pure-crypto return cross sections to centered ranks. For each coin, reverse the change from its prior six-rank mean to recent six-rank mean, normalized by the preceding 63-rank sample volatility and multiplied by fixed path coherence. Cross-sectionally rank that raw value, capture it at the organizer A5 boundary, and form broad equal-dollar zero-net sleeves.",
+  "parameter_ranges": {
+    "bar_interval_hours": [8],
+    "baseline_rank_bars": [63],
+    "coherence_base_weight": [0.5],
+    "maximum_symbol_exposure": [0.03],
+    "minimum_positions_per_side": [8],
+    "minimum_rank_volatility": [0.15],
+    "minimum_valid_symbols": [24],
+    "prior_rank_bars": [6],
+    "rebalance_interval_bars": [6],
+    "recent_rank_bars": [6],
+    "risk_policy_variants": ["no-control"],
+    "seed": [20260801],
+    "selected_fraction_per_side": ["1/4"],
+    "side_budget": [0.24]
+  },
+  "parent_family_id": "t06-balanced-trend-reversal-v1",
+  "registered_at_utc": "<organizer-assigned-registration-timestamp-Z>",
+  "risk_policy_plan": "Run only the exact disabled no-control reference. No risk control, stop, neighbor, or private ticket is authorized unless the reference passes every broad alpha, regime, role, fold, quarter, sleeve, concentration, score-IC, and coverage gate. Controls cannot repair a failed mechanism.",
+  "schema_version": 1,
+  "selection_metric": "Noncompensatory eligibility first: every no-control and score-evidence gate must pass. No controlled or neighboring result can substitute for the exact reference.",
+  "team_id": "team-06"
+}

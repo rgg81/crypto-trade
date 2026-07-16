@@ -1,46 +1,39 @@
-# Team 06 synthetic and organizer integration test plan
+# Team 06 pivot synthetic and organizer integration plan
 
-`test_strategy.py` contains invented-data unit tests for canonical RangeIndex `open_time` bars,
-`open_time + 8h` future truncation, deterministic construction, membership, two-sided exposure,
-the direct public score boundary and candidate-byte invariance, and separation from open, funding,
-cost, and auxiliary fields. It also validates that zero-argument root `build_strategy` consumes
-every exact preregistered candidate ID/override pair and rejects a mismatched materialization. It is
-authored but has not been executed in this handoff.
+`test_strategy.py` uses invented prices only. It covers exact past-close availability, future and
+forbidden-field invariance, pure point-in-time membership, common-return-path invariance,
+relative-rank acceleration polarity, deterministic broad zero-net construction, the 48-hour
+schedule, fail-closed behavior, frozen identity, and direct A5 boundary placement. The pivot author
+did not execute it.
 
-The following cases require the neutral organizer evaluator and must be run by the organizer, not
-implemented inside Team 06:
+The organizer must additionally run these cases serially:
 
-1. **Next-open execution:** a 00:00 decision changes the target; prove no fill occurs at the
-   decision close and every strategy/risk fill is priced from the next executable open.
-2. **Point-in-time membership:** remove an owned symbol and add a new member at a weekly boundary;
-   prove the common exit occurs and the strategy never receives an ineligible next-open price.
-3. **Funding order/sign/timestamp:** carry equal long/short positions across positive and negative
-   funding timestamps; prove funding is charged to carried quantities before mark/risk/rebalance
-   using the authoritative sign convention.
-4. **Base versus doubled costs:** emit 1x and 2x fee/slippage views from each one material run;
-   prove targets/fills before price adjustment are identical and no duplicate trial exists.
-5. **Long/short attribution:** reconcile combined PnL exactly to central long sleeve, short sleeve,
-   funding, fees, and slippage ledgers in bull/bear/chop/stress cells.
-6. **Risk action order and capacity:** simultaneously trigger funding, mark, volatility scale,
-   drawdown brake, strategy rebalance, and participation pressure; prove the frozen seven-step
-   ordering and shared capacity.
-7. **Same-boundary reentry:** trigger a central stop/cooldown fixture even though stops are disabled
-   in the final Team 06 policy; with `same_boundary_reentry=false`, prove a strategy request cannot
-   reopen the symbol at that boundary.
-8. **A5 declared-score capture and clean-process reproducibility:** prove
-   `strategy.score_boundary` is called once at each scheduled decision with the exact declared
-   post-transform/pre-selection-weight-cap-risk dictionary, returned values drive construction,
-   executable bytes match the complete acyclic manifest, and two clean replays emit byte-identical
-   scores and archived targets.
-9. **Frozen A5 folds and labels:** use only F1–F6 from active A5, assign each scheduled observation
-   exactly once, label with executable opens at `t` and `t + 24h`, purge endpoints touching or
-   crossing a fold end, and reproduce pooled/per-fold Pearson and pair counts. Confirm the
-   diagnostic's qualification-gate fields remain false.
-10. **Root candidate/risk materialization and neighbor identity:** after combined full-gate pass
-    only, prove each neighbor artifact's exact ID/override is committed in root
-    `candidate_variant.py`, the combined template is byte-identical to root `risk_policy.json`,
-    zero-argument root `strategy.py:build_strategy` changes exactly one declared axis, and each
-    historical candidate/source/risk bundle has its own hashes. Prove no nested entrypoint or
-    nested risk-policy path is selected by the lifecycle.
+1. **Next-open execution:** a scheduled target change must fill only at the next executable open,
+   never at the decision close or any price read by the strategy.
+2. **Pure-crypto point-in-time membership:** membership changes must use the Amendment 0006
+   certified native-crypto universe; stablecoins, TradFi/equities, metals/commodities, and indexes
+   must never enter the context.
+3. **48-hour schedule:** epoch-aligned decisions divisible by six 8-hour bars construct; the five
+   intervening aligned decisions hold; malformed or off-grid decisions fail flat.
+4. **Exact history:** a missing or duplicate required close removes only that coin; fewer than 24
+   complete coins produces a scheduled empty capture and flat target.
+5. **Common-factor invariance:** multiply every coin by the same arbitrary positive price path and
+   require byte-identical captured ranks and targets.
+6. **Base versus doubled costs:** emit 1x and 2x fee/slippage views from the same material run and
+   require identical pre-price-adjustment targets and fills; no duplicate trial exists.
+7. **Long/short attribution:** reconcile combined PnL to central long sleeve, short sleeve,
+   funding, fees, and slippage in bull, bear, chop, and stress cells.
+8. **Disabled risk policy:** verify no volatility scaling, drawdown brake, turnover cap, position
+   stop, time stop, or side scale changes the no-control reference.
+9. **A5 boundary and clean replay:** at every manifest-scheduled decision, capture exactly one
+   final finite built-in score dictionary—or one empty dictionary on valid scheduled failure—after
+   transforms and before selection, sizing, caps, or risk. Returned values must drive construction,
+   and two clean workers must reproduce byte-identical score and target artifacts.
+10. **Frozen folds and label:** use only A5 F1–F6, the epoch-anchored 48-hour schedule, executable
+    opens at `t` and `t+48h`, and frozen endpoint purge. Reproduce pooled and per-fold Pearson,
+    pair counts, unavailable-label counts, and scheduled coverage without fitting or imputation.
+11. **Registration identity:** the new family must precede final source fingerprinting; all three
+    new A5 controls must be immutable ancestors of the exact trial opt-in; the historical parent
+    A5 files and ledgers must remain unchanged.
 
-Any discrepancy is a failed contract test, not a tuning opportunity.
+Any discrepancy is a contract failure, not a tuning or control opportunity.

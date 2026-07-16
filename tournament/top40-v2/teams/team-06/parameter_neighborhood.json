@@ -1,70 +1,19 @@
 {
   "activation": {
-    "condition": "no-control core passes, fixed control batch is terminal, and the combined-policy candidate passes every full development hard gate except the not-yet-measurable neighbor gates",
-    "registration_rule": "register all four neighbor trials before reading any neighbor result",
-    "status": "dormant-until-combined-full-gate-pass"
+    "condition": "exact no-control pivot reference passes every PnL and A5 score-evidence gate and a new prospective neighborhood is documented before any neighbor registration",
+    "status": "not_declared_not_authorized"
   },
-  "base_candidate_id": "t06-balanced-trend-reversal-v1-combined",
+  "base_candidate_id": "t06-relative-rank-acceleration-v1-base",
   "base_parameters": {
-    "selection_fraction": 0.25,
-    "slow_lookback_bars": 90
+    "baseline_rank_bars": 63,
+    "coherence_base_weight": 0.5,
+    "prior_rank_bars": 6,
+    "recent_rank_bars": 6,
+    "selected_fraction_per_side": "1/4"
   },
-  "canonical_runtime_materialization": {
-    "entrypoint": "strategy.py:build_strategy",
-    "risk_policy_destination_path": "risk_policy.json",
-    "risk_policy_source_path": "risk_policies/combined.json",
-    "variant_path": "candidate_variant.py"
-  },
-  "family_id": "t06-balanced-trend-reversal-v1",
-  "materialization_rule": "Before each neighbor registration, write that neighbor artifact's exact active_candidate_id and active_overrides to root candidate_variant.py and copy risk_policies/combined.json byte-for-byte to root risk_policy.json. Commit those root bytes, rederive all candidate/A5/source/risk hashes, then register and run the historical commit through zero-argument strategy.py:build_strategy. The frozen lifecycle never selects a nested entrypoint or nested risk path.",
-  "risk_policy_path": "risk_policy.json",
-  "risk_policy_template_path": "risk_policies/combined.json",
-  "neighbors": [
-    {
-      "base_value": 90,
-      "candidate_id": "t06-balanced-trend-reversal-v1-n01-slow84",
-      "changed_parameter": "slow_lookback_bars",
-      "neighbor_id": "n01-slow84",
-      "neighbor_value": 84,
-      "other_parameters": "identical-to-base",
-      "status": "dormant"
-    },
-    {
-      "base_value": 90,
-      "candidate_id": "t06-balanced-trend-reversal-v1-n02-slow96",
-      "changed_parameter": "slow_lookback_bars",
-      "neighbor_id": "n02-slow96",
-      "neighbor_value": 96,
-      "other_parameters": "identical-to-base",
-      "status": "dormant"
-    },
-    {
-      "base_value": 0.25,
-      "candidate_id": "t06-balanced-trend-reversal-v1-n03-select20",
-      "changed_parameter": "selection_fraction",
-      "neighbor_id": "n03-select20",
-      "neighbor_value": 0.2,
-      "other_parameters": "identical-to-base",
-      "status": "dormant"
-    },
-    {
-      "base_value": 0.25,
-      "candidate_id": "t06-balanced-trend-reversal-v1-n04-select30",
-      "changed_parameter": "selection_fraction",
-      "neighbor_id": "n04-select30",
-      "neighbor_value": 0.3,
-      "other_parameters": "identical-to-base",
-      "status": "dormant"
-    }
-  ],
-  "no_hindsight_rule": "neighbors validate the base plateau and can never replace the base candidate",
-  "schema_version": 1,
-  "stability_gate": {
-    "maximum_positive_pnl_concentration": 0.4,
-    "minimum_neighbor_median_sharpe": 0.5,
-    "minimum_profitable_neighbor_count": 3,
-    "minimum_profitable_neighbor_fraction": 0.7,
-    "planned_neighbor_count": 4
-  },
+  "family_id": "t06-relative-rank-acceleration-v1",
+  "neighbors": [],
+  "no_hindsight_rule": "No neighbor is currently declared. A later prospective stability grid may validate but never replace or rescue the exact base.",
+  "schema_version": 2,
   "team_id": "team-06"
 }

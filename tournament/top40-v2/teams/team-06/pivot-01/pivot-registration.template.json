@@ -1,0 +1,46 @@
+{
+  "active_authority": {
+    "entrypoint_path": "scripts/top40_v2_tournament_runtime_preload_v7.py",
+    "entrypoint_sha256": "8a4ada10176d2606df3f358fc188e21b45153ad9a7270f36908736f03322a3a9",
+    "integration_freeze_sha256": "6f77a146e7b414eabd20c5cc9321a95493bb98116dde07ef79d9eb009b6a6f51"
+  },
+  "authorization": {
+    "controls_authorized_before_core_pass": false,
+    "journals_or_reports_edited_by_draft": false,
+    "material_trial_number_if_registered": 2,
+    "private_data_authorized": false,
+    "registration_authorized_by_template": false
+  },
+  "new_candidate_id": "t06-relative-rank-acceleration-v1-base",
+  "new_family_id": "t06-relative-rank-acceleration-v1",
+  "parent_evidence": {
+    "annualized_return": -0.24452542046360337,
+    "candidate_id": "t06-balanced-trend-reversal-v1-base",
+    "double_cost_sharpe": -0.799922357968985,
+    "family_id": "t06-balanced-trend-reversal-v1",
+    "maximum_drawdown": 0.7380842004083039,
+    "net_sharpe": -0.524809872995251,
+    "regime_sharpe": {
+      "bear": -1.4458380733522744,
+      "bull": 0.0640641950162595,
+      "chop": 0.9867176235750049
+    },
+    "result_status": "completed",
+    "terminal_decision": "failed_no_control_core"
+  },
+  "pivot_classification": {
+    "changes": [
+      "replace raw price trend and reversal blend with cross-sectional return-rank acceleration",
+      "remove market-direction-dependent signal mixing",
+      "remove directional net tilt",
+      "replace daily construction with a 48-hour signal and holding schedule",
+      "increase breadth and reduce the per-coin cap"
+    ],
+    "is_parameter_neighbor": false,
+    "is_risk_control_change": false,
+    "mechanism_pivot": true
+  },
+  "schema_version": 1,
+  "status": "draft_pending_serial_validation_review_registration_and_hash_binding",
+  "team_id": "team-06"
+}

@@ -1,102 +1,36 @@
 {
-  "economic_thesis": "Lagged cross-sectional trend captures persistent relative information while short reversal monetizes temporary liquidity pressure; a bounded past-only market-direction mix and small net tilt allocate their roles across bull, bear, and chop without suppressing either sleeve.",
+  "economic_thesis": "Abrupt changes in cross-sectional return rank can reflect temporary relative inventory and liquidation pressure. Reversing rank acceleration after removing the common crypto direction should isolate a two-sided effect across rising, falling, and chopping markets.",
   "expected_regime_roles": {
-    "bear": "Weak relative trends and at most four percent net short tilt should produce positive combined return, led by the short sleeve.",
-    "bull": "Strong relative trends and at most four percent net long tilt should produce positive combined return, led by the long sleeve.",
-    "chop": "Near-neutral long/short construction and short reversal should produce positive combined return after costs.",
-    "long_sleeve": "Materially active in every common regime and the required positive contributor in bull.",
-    "short_sleeve": "Materially active in every common regime and the required positive contributor in bear.",
-    "stress": "Low requested gross, low-volatility preference, volatility targeting, and drawdown brakes should contain loss and keep Sharpe above the frozen worst-regime floor."
+    "bear": "Remove the common negative move and trade only relative accelerations with exact zero dollar net.",
+    "bull": "Remove the common positive move and trade only changes in relative leadership.",
+    "chop": "Repeated two-sided changes in relative leadership should mean-revert over 48 hours.",
+    "long_sleeve": "Long the sharpest recent deteriorations in relative leadership.",
+    "short_sleeve": "Short the sharpest recent accelerations in relative leadership.",
+    "stress": "Broad sleeves, exact dollar neutrality, 0.03 coin caps, and 0.48 maximum gross limit concentration; profitability remains empirical."
   },
-  "family_id": "t06-balanced-trend-reversal-v1",
-  "falsifier": "Reject immediately if the no-control core misses any preregistered positive broad-alpha minimum; controls cannot rescue it. After core pass, reject if the fixed combined policy misses any full gate or attribution requirement, or if fewer than three of four final neighbors are profitable or their median Sharpe is below 0.50.",
-  "mechanism": "Deterministic daily cross-sectional blend of 30-day and 7-day lagged risk-adjusted trend with 2-day reversal, continuous past-only market-direction mixing, low-volatility penalty, balanced tail selection, and a bounded directional net tilt.",
+  "family_id": "t06-relative-rank-acceleration-v1",
+  "falsifier": "Reject if the exact no-control reference fails any aggregate, doubled-cost, bull, bear, chop, role, fold, quarter, sleeve, concentration, scheduled-score-coverage, pooled-IC, or fold-IC gate. Controls, neighbors, and private data cannot rescue it.",
+  "mechanism": "Every 48 hours, convert 75 exact completed 8-hour pure-crypto return cross sections to centered ranks. Reverse each coin's change from prior-six to recent-six mean rank, normalized by the preceding 63-rank volatility and weighted by fixed path coherence. Rank and capture the final score before broad equal-dollar zero-net sleeve construction.",
   "parameter_ranges": {
-    "annualization_bars": [
-      1095
-    ],
-    "bar_interval_hours": [
-      8
-    ],
-    "base_gross_exposure": [
-      0.48
-    ],
-    "chop_trend_mix": [
-      0.35
-    ],
-    "direction_full_scale_return": [
-      0.15
-    ],
-    "directional_trend_mix": [
-      0.8
-    ],
-    "fast_lookback_bars": [
-      21
-    ],
-    "fast_trend_weight": [
-      0.35
-    ],
-    "maximum_abs_net_exposure": [
-      0.04
-    ],
-    "maximum_staleness_hours": [
-      16
-    ],
-    "maximum_symbol_exposure": [
-      0.07
-    ],
-    "minimum_positions_per_side": [
-      4
-    ],
-    "minimum_valid_symbols": [
-      12
-    ],
-    "momentum_lag_bars": [
-      3
-    ],
-    "rebalance_hour_utc": [
-      0
-    ],
-    "reversal_lookback_bars": [
-      6
-    ],
-    "selection_fraction": [
-      0.2,
-      0.25,
-      0.3
-    ],
-    "slow_lookback_bars": [
-      84,
-      90,
-      96
-    ],
-    "slow_trend_weight": [
-      0.65
-    ],
-    "volatility_floor": [
-      0.2
-    ],
-    "volatility_lookback_bars": [
-      60
-    ],
-    "volatility_score_penalty": [
-      0.1
-    ],
-    "risk_policy_variants": [
-      "no-control",
-      "volatility-only",
-      "drawdown-only",
-      "turnover-only",
-      "combined"
-    ],
-    "seed": [
-      20260801
-    ]
+    "bar_interval_hours": [8],
+    "baseline_rank_bars": [63],
+    "coherence_base_weight": [0.5],
+    "maximum_symbol_exposure": [0.03],
+    "minimum_positions_per_side": [8],
+    "minimum_rank_volatility": [0.15],
+    "minimum_valid_symbols": [24],
+    "prior_rank_bars": [6],
+    "rebalance_interval_bars": [6],
+    "recent_rank_bars": [6],
+    "risk_policy_variants": ["no-control"],
+    "seed": [20260801],
+    "selected_fraction_per_side": ["1/4"],
+    "side_budget": [0.24]
   },
-  "parent_family_id": null,
-  "registered_at_utc": "2026-07-16T16:37:45Z",
-  "risk_policy_plan": "Run the exact root no-control core first. Only after every preregistered broad positive-alpha minimum passes may the three fixed single-control diagnostics and combined policy be materialized at root risk_policy.json, committed, registered, and run. Each material run emits paired base and doubled-cost evidence. Controls cannot rescue a failed core; the combined candidate must pass every full non-neighborhood gate before the four fixed neighbors activate.",
+  "parent_family_id": "t06-balanced-trend-reversal-v1",
+  "registered_at_utc": "<organizer-assigned-registration-timestamp-Z>",
+  "risk_policy_plan": "Run only the exact disabled no-control reference; no risk control, stop, neighbor, or private ticket activates before every broad PnL and score-evidence gate passes.",
   "schema_version": 1,
-  "selection_metric": "Eligibility first: no-control core positivity, then fixed controls, combined full gates, then combined-policy neighborhood stability. No control or neighbor can rescue or replace a failed core.",
+  "selection_metric": "Every noncompensatory no-control and score-evidence gate must pass; no later result substitutes for the exact reference.",
   "team_id": "team-06"
 }

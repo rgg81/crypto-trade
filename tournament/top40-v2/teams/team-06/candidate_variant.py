@@ -1,4 +1,4 @@
-"""Explicit hash-bound Team06 candidate selected before registration."""
+"""Exact Team 06 mechanism-pivot candidate selected before registration."""
 
-ACTIVE_CANDIDATE_ID = "t06-balanced-trend-reversal-v1-base"
+ACTIVE_CANDIDATE_ID = "t06-relative-rank-acceleration-v1-base"
 ACTIVE_OVERRIDES: dict[str, object] = {}
