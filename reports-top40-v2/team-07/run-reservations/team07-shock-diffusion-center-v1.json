@@ -1,0 +1,15 @@
+{
+  "candidate_id": "team07-shock-diffusion-center-v1",
+  "config_sha256": "bd0e4f70bcf335b2ac4e44ec049b89b8e8eaf4c6ac6502574d0accf12d9d9947",
+  "organizer_journal_head_sha256": "cd474c87c77f08120dc5f096d07aa2a30ce0784541c06ea74e56357948066b4d",
+  "private_attempt_number": null,
+  "registration_sha256": "edd16f7d35cb38c85a759a4734bbcebde21d01107e5c7940a7439e7613cbd927",
+  "reserved_at_utc": "2026-07-16T18:35:12.219767+00:00",
+  "risk_policy_sha256": "d3b918f600f2b548b6a2c8dc44a3077b7b34d8c911ecc6e9c776eada8ad77b6c",
+  "schema_version": 1,
+  "source_bundle_sha256": "8d911bce625c0aebab7d41a2d92191ab2163b040323aefb624ae2d384df910c8",
+  "stage": "development",
+  "strategy_sha256": "355dece1b92ddce40fa2e2fd3da94ac4f34ab3ca40b71299070ab84ace007fc3",
+  "team_id": "team-07",
+  "tournament": "quant-portfolio-blind-top40-v2"
+}
