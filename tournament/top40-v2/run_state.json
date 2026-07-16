@@ -57,13 +57,13 @@
   "objective_lock": null,
   "organizer_audit": {
     "genesis_sha256": "9885be7b8feef9325b786329afc29ed3dd125c32317908b31d7e7fbcc591f463",
-    "head_sha256": "f5ddc1cb8649774b1806eefbb49502b079673d0635800cdc906c631a5082902d",
-    "organizer_cpu_hours": 6.0142823e-05,
-    "organizer_wall_clock_hours": 8.6233647e-05,
+    "head_sha256": "974dc47619dcb4eb6173841dc94948669f01de09e36eba10f58268355f8162f7",
+    "organizer_cpu_hours": 0.30525386536,
+    "organizer_wall_clock_hours": 0.304914904723,
     "path": "tournament/top40-v2/amendments/0001/organizer_audit.jsonl",
-    "record_count": 4,
+    "record_count": 5,
     "reservation_count": 2,
-    "result_count": 1
+    "result_count": 2
   },
   "phase": "research",
   "phase0": {
