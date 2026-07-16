@@ -2,9 +2,9 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "properties": {
-    "adapter_id": {"const": "top40-v2-preconstruction-score-boundary-v1"},
+    "adapter_id": {"const": "top40-v2-declared-score-boundary-v1"},
     "candidate_id": {"pattern": "^[a-z0-9][a-z0-9._-]{0,127}$", "type": "string"},
-    "capture_boundary": {"const": "post-transform-pre-selection-weight-cap-risk"},
+    "capture_boundary": {"const": "candidate-declared-post-transform-pre-selection-weight-cap-risk"},
     "family_id": {"pattern": "^[a-z0-9][a-z0-9._-]{0,127}$", "type": "string"},
     "hook": {"const": "strategy.score_boundary"},
     "label": {
@@ -29,20 +29,22 @@
     "schedule_utc": {
       "additionalProperties": false,
       "properties": {
-        "anchor_timestamp_utc": {"pattern": "Z$", "type": "string"},
+        "anchor_timestamp_utc": {"format": "date-time", "pattern": "Z$", "type": "string"},
         "interval_hours": {"maximum": 168, "minimum": 8, "multipleOf": 8, "type": "integer"}
       },
       "required": ["anchor_timestamp_utc", "interval_hours"],
       "type": "object"
     },
     "schema_version": {"const": 1},
-    "score_description": {"maxLength": 4000, "minLength": 1, "type": "string"},
+    "semantic_coupling_review_sha256": {"pattern": "^[0-9a-f]{64}$", "type": "string"},
+    "score_description": {"maxLength": 4000, "minLength": 1, "pattern": "^\\S(?:[\\s\\S]*\\S)?$", "type": "string"},
     "stage": {"const": "development"},
     "team_id": {"enum": ["team-04", "team-05", "team-06", "team-07", "team-08", "team-09", "team-10"]}
   },
   "required": [
     "schema_version", "adapter_id", "team_id", "family_id", "candidate_id",
-    "stage", "hook", "capture_boundary", "schedule_utc", "label", "score_description"
+    "stage", "hook", "capture_boundary", "schedule_utc", "label", "score_description",
+    "semantic_coupling_review_sha256"
   ],
   "title": "Top40 V2 prospective score-adapter manifest",
   "type": "object"

@@ -1,8 +1,9 @@
-"""Sandboxed generic score-boundary worker for draft Amendment 0005.
+"""Sandboxed generic declared-score worker for draft Amendment 0005.
 
 The frozen V2 worker still owns source loading, incremental history, resources, namespace,
-filesystem, network, and seccomp policy.  This worker adds only the reviewed identity-hook capture
-and a manifest-bound UTC schedule supplied by the organizer process.
+filesystem, network, and seccomp policy. This worker adds only identity-hook byte capture and a
+manifest-bound UTC schedule supplied by the organizer process. It does not prove semantic coupling
+between the captured dictionary and portfolio construction.
 """
 
 from __future__ import annotations

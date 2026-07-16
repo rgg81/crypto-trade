@@ -1,10 +1,12 @@
-"""Prospective development-only score diagnostics for draft Amendment 0005.
+"""Prospective development-only declared-score diagnostics for draft Amendment 0005.
 
 The engine reconstructs the exact preregistration tree, runs two clean sandbox replays, requires
 bit-exact replay scores and targets, and requires both target replays to equal the archived
-completed development targets.  It never selects a private or final window.  Candidate-declared
-numeric Pearson evidence is public development evidence and is not a universal qualification
-gate.
+completed development targets. It never selects a private or final window. Runtime proves only
+the exact captured bytes, schedule, replay, and target equivalence. It does not prove that the
+captured values are the operative model-ranking signal or semantically pre-construction; that
+claim requires a separately hash-bound static source review. The resulting Pearson statistic is
+candidate-declared, nonautomatic public development evidence.
 """
 
 from __future__ import annotations
@@ -17,7 +19,9 @@ import json
 import math
 import os
 import resource
+import re
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -56,7 +60,7 @@ from crypto_trade.tournament.score_adapter_protocol_v5 import (
 from crypto_trade.tournament.top40_v2 import LoadedV2Config
 from crypto_trade.tournament.top40_v2 import load_config as load_v2_config
 
-DIAGNOSTIC_KIND = "top40-v2-development-score-diagnostic-v1"
+DIAGNOSTIC_KIND = "top40-v2-development-declared-score-diagnostic-v1"
 LABEL_ID = "manifest-horizon-simple-executable-open-to-open-return-v1"
 STATISTIC_ID = "globally-pooled-pearson-v1"
 STAGE = "development"
@@ -94,6 +98,30 @@ _A1_PARQUET_BYTES = frozen_science._parquet_bytes
 _A1_INDEXED_TARGETS = frozen_science._indexed_targets
 
 _MAX_ARTIFACT_BYTES = 128 * 1024 * 1024
+_IDENTIFIER = re.compile(r"[a-z0-9][a-z0-9._-]{0,127}")
+_ELIGIBLE_TEAMS = {f"team-{number:02d}" for number in range(4, 11)}
+
+
+def frozen_science_helper_bindings() -> Mapping[str, object]:
+    """Return every Amendment 0001 helper captured by this draft module."""
+
+    return {
+        "_materialize_team_tree": _A1_MATERIALIZE_TREE,
+        "_target_frame_from_bytes": _A1_TARGET_FROM_BYTES,
+        "_targets_exact": _A1_TARGETS_EXACT,
+        "_scores_exact": _A1_SCORES_EXACT,
+        "_target_digest": _A1_TARGET_DIGEST,
+        "_score_digest": _A1_SCORE_DIGEST,
+        "_snapshot_hashes": _A1_SNAPSHOT_HASHES,
+        "_parquet_bytes": _A1_PARQUET_BYTES,
+        "_indexed_targets": _A1_INDEXED_TARGETS,
+    }
+
+
+def verify_frozen_science_helper_identities() -> None:
+    for name, captured in frozen_science_helper_bindings().items():
+        if getattr(frozen_science, name, None) is not captured:
+            raise ValueError(f"Amendment 0001 helper identity changed: {name}")
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -106,6 +134,7 @@ class ScoreAdapterManifest:
     holding_horizon_hours: int
     minimum_pairs: int
     score_description: str
+    semantic_coupling_review_sha256: str
 
     @property
     def worker_schedule(self) -> Mapping[str, object]:
@@ -140,6 +169,9 @@ class DevelopmentScoreDiagnosticRequest:
     score_manifest_path: str
     score_manifest_sha256: str
     score_manifest_commit: str
+    semantic_coupling_review_path: str
+    semantic_coupling_review_sha256: str
+    semantic_coupling_review_commit: str
     snapshot_manifest_path: str
     snapshot_manifest_sha256: str
     development_target_path: str
@@ -185,6 +217,37 @@ def _pretty_json_bytes(value: object) -> bytes:
     return json.dumps(value, allow_nan=False, indent=2, sort_keys=True).encode("utf-8") + b"\n"
 
 
+def _exact_regular_bytes(path: Path, *, maximum_bytes: int, label: str) -> bytes:
+    descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+    try:
+        before = os.fstat(descriptor)
+        if (
+            not stat.S_ISREG(before.st_mode)
+            or before.st_nlink != 1
+            or before.st_size > maximum_bytes
+        ):
+            raise ValueError(f"{label} is not a bounded single-link regular file")
+        chunks: list[bytes] = []
+        remaining = before.st_size
+        while remaining:
+            chunk = os.read(descriptor, min(1024 * 1024, remaining))
+            if not chunk:
+                raise ValueError(f"{label} truncated while read")
+            chunks.append(chunk)
+            remaining -= len(chunk)
+        after = os.fstat(descriptor)
+        if os.read(descriptor, 1) or (
+            after.st_dev,
+            after.st_ino,
+            after.st_size,
+            after.st_nlink,
+        ) != (before.st_dev, before.st_ino, before.st_size, 1):
+            raise ValueError(f"{label} grew or changed while read")
+        return b"".join(chunks)
+    finally:
+        os.close(descriptor)
+
+
 def parse_score_adapter_manifest(
     payload: bytes,
     *,
@@ -207,6 +270,7 @@ def parse_score_adapter_manifest(
         "schedule_utc",
         "label",
         "score_description",
+        "semantic_coupling_review_sha256",
     }:
         raise ValueError("score-adapter manifest has invalid keys")
     if (
@@ -223,7 +287,12 @@ def parse_score_adapter_manifest(
         ("candidate_id", expected_candidate_id),
     ):
         value = raw[field]
-        if type(value) is not str or not value or (expected is not None and value != expected):
+        if (
+            type(value) is not str
+            or _IDENTIFIER.fullmatch(value) is None
+            or (field == "team_id" and value not in _ELIGIBLE_TEAMS)
+            or (expected is not None and value != expected)
+        ):
             raise ValueError(f"score-adapter manifest {field} is invalid")
     schedule = raw["schedule_utc"]
     if not isinstance(schedule, Mapping) or set(schedule) != {
@@ -278,6 +347,13 @@ def parse_score_adapter_manifest(
         or len(description) > 4000
     ):
         raise ValueError("score_description must be bounded trimmed text")
+    semantic_review_sha = raw["semantic_coupling_review_sha256"]
+    if (
+        type(semantic_review_sha) is not str
+        or len(semantic_review_sha) != 64
+        or any(character not in "0123456789abcdef" for character in semantic_review_sha)
+    ):
+        raise ValueError("semantic_coupling_review_sha256 must be lowercase SHA-256")
     return ScoreAdapterManifest(
         team_id=str(raw["team_id"]),
         family_id=str(raw["family_id"]),
@@ -287,7 +363,69 @@ def parse_score_adapter_manifest(
         holding_horizon_hours=int(horizon),
         minimum_pairs=int(minimum_pairs),
         score_description=str(description),
+        semantic_coupling_review_sha256=semantic_review_sha,
     )
+
+
+def parse_semantic_coupling_review(
+    payload: bytes,
+    *,
+    expected_team_id: str,
+    expected_family_id: str,
+    expected_candidate_id: str,
+    expected_strategy_sha256: str,
+) -> Mapping[str, Any]:
+    """Validate the preregistered human/static-review attestation.
+
+    This validates immutable review bytes and fixed attestations; it intentionally does not turn
+    those attestations into a runtime proof of score semantics.
+    """
+
+    raw = strict_json_object(payload, "semantic-coupling static review")
+    if _pretty_json_bytes(raw) != payload or set(raw) != {
+        "schema_version",
+        "review_kind",
+        "team_id",
+        "family_id",
+        "candidate_id",
+        "strategy_sha256",
+        "hook",
+        "declared_capture_boundary",
+        "decision",
+        "reviewer_id",
+        "reviewed_at_utc",
+        "findings",
+        "runtime_proof_limit",
+    }:
+        raise ValueError("semantic-coupling static review has invalid keys or encoding")
+    expected_findings = {
+        "direct_hook_call_found": True,
+        "score_object_is_declared_model_ranking_signal": True,
+        "hook_after_declared_score_transform": True,
+        "hook_before_selection_weight_caps_and_risk": True,
+        "no_decoy_or_transient_score_path_found": True,
+    }
+    if (
+        raw["schema_version"] != 1
+        or raw["review_kind"] != "top40-v2-score-semantic-coupling-static-review-v1"
+        or raw["team_id"] != expected_team_id
+        or raw["family_id"] != expected_family_id
+        or raw["candidate_id"] != expected_candidate_id
+        or raw["strategy_sha256"] != expected_strategy_sha256
+        or raw["hook"] != HOOK_QUALNAME
+        or raw["declared_capture_boundary"] != CAPTURE_BOUNDARY
+        or raw["decision"] != "approve"
+        or raw["findings"] != expected_findings
+        or raw["runtime_proof_limit"]
+        != "static-review-attestation-not-runtime-semantic-proof"
+        or type(raw["reviewer_id"]) is not str
+        or not raw["reviewer_id"].strip()
+        or raw["reviewer_id"] != raw["reviewer_id"].strip()
+        or type(raw["reviewed_at_utc"]) is not str
+        or not raw["reviewed_at_utc"].endswith("Z")
+    ):
+        raise ValueError("semantic-coupling static review binding is invalid")
+    return raw
 
 
 def _request_paths(request: DevelopmentScoreDiagnosticRequest) -> None:
@@ -300,6 +438,10 @@ def _request_paths(request: DevelopmentScoreDiagnosticRequest) -> None:
         f"{TOP40_V2_LAYOUT.team_root(request.team_id)}/score-adapters/"
         f"{request.candidate_id}.json"
     )
+    expected_semantic_review = (
+        f"{TOP40_V2_LAYOUT.team_root(request.team_id)}/score-adapters/"
+        f"{request.candidate_id}.semantic-coupling-review.json"
+    )
     expected_target = (
         f"{TOP40_V2_LAYOUT.report_root(request.team_id)}/development-runs/"
         f"{request.candidate_id}/targets.parquet"
@@ -311,6 +453,7 @@ def _request_paths(request: DevelopmentScoreDiagnosticRequest) -> None:
     if (
         request.registration_input_path != expected_registration
         or request.score_manifest_path != expected_manifest
+        or request.semantic_coupling_review_path != expected_semantic_review
         or request.development_target_path != expected_target
         or request.runner_record_path != expected_runner
     ):
@@ -391,6 +534,36 @@ def materialized_historical_source(
         expected_family_id=request.family_id,
         expected_candidate_id=request.candidate_id,
     )
+    _review_relative, _review_path, review_bytes, _review_stat = read_repo_file(
+        root_path,
+        request.semantic_coupling_review_path,
+        "semantic-coupling static review",
+        maximum_bytes=1024 * 1024,
+        require_single_link=True,
+    )
+    if sha256_bytes(review_bytes) != request.semantic_coupling_review_sha256:
+        raise ValueError("semantic-coupling static review differs from reservation")
+    if manifest.semantic_coupling_review_sha256 != request.semantic_coupling_review_sha256:
+        raise ValueError("manifest does not bind the reserved semantic review")
+    review_commit = unique_first_add_commit(
+        root_path, request.semantic_coupling_review_path, review_bytes
+    )
+    if review_commit != request.semantic_coupling_review_commit:
+        raise ValueError("semantic review first-add commit differs from reservation")
+    if git_bytes(
+        root_path,
+        "show",
+        f"{registration_commit}:{request.semantic_coupling_review_path}",
+        label="semantic review at registration",
+    ) != review_bytes:
+        raise ValueError("registration tree lacks the exact semantic review")
+    parse_semantic_coupling_review(
+        review_bytes,
+        expected_team_id=request.team_id,
+        expected_family_id=request.family_id,
+        expected_candidate_id=request.candidate_id,
+        expected_strategy_sha256=request.strategy_sha256,
+    )
 
     with tempfile.TemporaryDirectory(
         prefix=f"top40-v2-development-score-source-{request.team_id}-"
@@ -401,10 +574,18 @@ def materialized_historical_source(
         entrypoint = team_root / "strategy.py"
         risk_path = team_root / "risk_policy.json"
         historical_manifest = team_root / "score-adapters" / f"{request.candidate_id}.json"
-        if any(path.is_symlink() or not path.is_file() for path in (entrypoint, risk_path, historical_manifest)):
+        historical_review = (
+            team_root
+            / "score-adapters"
+            / f"{request.candidate_id}.semantic-coupling-review.json"
+        )
+        if any(
+            path.is_symlink() or not path.is_file()
+            for path in (entrypoint, risk_path, historical_manifest, historical_review)
+        ):
             raise ValueError("historical source tree lacks required regular files")
-        if historical_manifest.read_bytes() != manifest_bytes:
-            raise ValueError("historical source tree contains a different score manifest")
+        if historical_manifest.read_bytes() != manifest_bytes or historical_review.read_bytes() != review_bytes:
+            raise ValueError("historical source tree contains different diagnostic bindings")
         files = runner_v2._team_tree_files(team_root)
         entries = [
             {"path": item.relative, "sha256": item.sha256, "size": item.size}
@@ -617,7 +798,7 @@ def _score_frame(
         raise ValueError("manifest schedule selects no development decisions")
     frame = pd.DataFrame(rows, columns=("decision_time", "symbol", "score"))
     if frame.empty:
-        raise ValueError("score replay produced no pre-construction scores")
+        raise ValueError("score replay produced no declared-score captures")
     frame["decision_time"] = pd.to_datetime(frame["decision_time"], utc=True)
     frame["symbol"] = frame["symbol"].astype(str)
     frame["score"] = pd.to_numeric(frame["score"], errors="raise").astype(float)
@@ -772,7 +953,7 @@ def label_score_panel(
         ),
     )
     if panel.empty:
-        raise ValueError("no causal score-label pairs remain after fold purging")
+        raise ValueError("no declared-score label pairs remain after fold purging")
     panel = panel.sort_values(["decision_time", "symbol"]).reset_index(drop=True)
     fold_values: dict[str, float | None] = {}
     fold_counts: dict[str, int] = {}
@@ -829,67 +1010,133 @@ def _verify_runner_record(
         raise ValueError("completed runner record does not bind development targets")
 
 
-def _safe_output_parent(root: Path, output_dir: Path) -> None:
-    try:
-        relative = output_dir.relative_to(root)
-    except ValueError as exc:
-        raise ValueError("development evidence path escapes worktree") from exc
-    safe_relative(relative.as_posix(), "development evidence path")
+def _evidence_relative(request: DevelopmentScoreDiagnosticRequest) -> str:
+    return (
+        f"{TOP40_V2_LAYOUT.report_root(request.team_id)}/"
+        f"development-score-diagnostics/{request.candidate_id}"
+    )
+
+
+def _safe_directory_chain(root: Path, directory: Path) -> None:
+    relative = directory.relative_to(root)
+    safe_relative(relative.as_posix(), "declared-score staging parent")
+    root_info = os.lstat(root)
+    if (
+        not stat.S_ISDIR(root_info.st_mode)
+        or stat.S_ISLNK(root_info.st_mode)
+        or root_info.st_uid != os.geteuid()
+    ):
+        raise ValueError("declared-score worktree root is unsafe")
     current = root
-    for part in relative.parts[:-1]:
+    for part in relative.parts:
         current /= part
-        if current.exists() or current.is_symlink():
+        try:
             info = os.lstat(current)
-            if not os.path.isdir(current) or os.path.islink(current):
-                raise ValueError("development evidence parent is unsafe")
-        else:
+        except FileNotFoundError:
             os.mkdir(current, 0o755)
             fsync_directory(current.parent)
+            info = os.lstat(current)
+        if not os.path.isdir(current) or os.path.islink(current) or info.st_uid != os.geteuid():
+            raise ValueError("declared-score staging ancestor is unsafe")
 
 
-def _publish_artifacts(
+def stage_diagnostic_artifacts(
     root: Path,
-    output_dir: Path,
+    request: DevelopmentScoreDiagnosticRequest,
     artifacts: Mapping[str, bytes],
 ) -> Mapping[str, str]:
-    if set(artifacts) != set(REQUIRED_ARTIFACT_NAMES):
-        raise ValueError("development score artifact set is incomplete")
+    """Stage an exact artifact set behind an unguessable internally generated capability."""
+
+    if artifacts and set(artifacts) != set(REQUIRED_ARTIFACT_NAMES):
+        raise ValueError("development declared-score artifact set is incomplete")
     if any(len(payload) > _MAX_ARTIFACT_BYTES for payload in artifacts.values()):
-        raise ValueError("development score artifact exceeds size ceiling")
-    _safe_output_parent(root, output_dir)
-    if output_dir.exists() or output_dir.is_symlink():
-        raise ValueError("development score evidence is one-shot and already exists")
-    temporary = Path(tempfile.mkdtemp(prefix=f".{output_dir.name}.", dir=output_dir.parent))
+        raise ValueError("development declared-score artifact exceeds size ceiling")
+    parent = root / Path(_evidence_relative(request)).parent
+    _safe_directory_chain(root, parent)
+    token = os.urandom(32).hex()
+    stage = parent / f".{request.candidate_id}.{token}.staged"
+    os.mkdir(stage, 0o700)
     try:
         for name, payload in artifacts.items():
-            atomic_write_bytes(temporary / name, payload, mode=0o644)
-        os.rename(temporary, output_dir)
-        fsync_directory(output_dir.parent)
-    finally:
-        if temporary.exists():
-            shutil.rmtree(temporary)
+            atomic_write_bytes(stage / name, payload, mode=0o600)
+        fsync_directory(stage)
+    except BaseException:
+        shutil.rmtree(stage)
+        raise
+    return {
+        "capability": token,
+        "staging_path": stage.relative_to(root).as_posix(),
+    }
+
+
+def validate_staged_artifacts(
+    root: Path,
+    request: DevelopmentScoreDiagnosticRequest,
+    capability: Mapping[str, str],
+    *,
+    completed: bool,
+) -> tuple[Path, Mapping[str, str]]:
+    if set(capability) != {"capability", "staging_path"}:
+        raise ValueError("declared-score staging capability has invalid keys")
+    token = capability["capability"]
+    if (
+        type(token) is not str
+        or len(token) != 64
+        or any(character not in "0123456789abcdef" for character in token)
+    ):
+        raise ValueError("declared-score staging capability is invalid")
+    expected = (
+        Path(_evidence_relative(request)).parent
+        / f".{request.candidate_id}.{token}.staged"
+    ).as_posix()
+    if capability["staging_path"] != expected:
+        raise ValueError("declared-score staging path is not internally derived")
+    stage = root / expected
+    _safe_directory_chain(root, stage.parent)
+    info = os.lstat(stage)
+    if (
+        not os.path.isdir(stage)
+        or os.path.islink(stage)
+        or info.st_uid != os.geteuid()
+        or info.st_mode & 0o077
+    ):
+        raise ValueError("declared-score staging directory is unsafe")
+    expected_names = set(REQUIRED_ARTIFACT_NAMES) if completed else set()
+    if {entry.name for entry in os.scandir(stage)} != expected_names:
+        raise ValueError("declared-score staged artifact set differs")
     hashes: dict[str, str] = {}
-    for name in REQUIRED_ARTIFACT_NAMES:
-        relative = (output_dir / name).relative_to(root).as_posix()
-        _normalized, _path, payload, _stat = read_repo_file(
-            root,
-            relative,
-            f"published development score artifact {name}",
-            maximum_bytes=_MAX_ARTIFACT_BYTES,
-            require_single_link=True,
-        )
-        hashes[relative] = sha256_bytes(payload)
-    return hashes
+    for name in sorted(expected_names):
+        path = stage / name
+        descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+        try:
+            before = os.fstat(descriptor)
+            if (
+                not stat.S_ISREG(before.st_mode)
+                or before.st_nlink != 1
+                or before.st_size > _MAX_ARTIFACT_BYTES
+            ):
+                raise ValueError("declared-score staged artifact is unsafe")
+            payload = b""
+            while len(payload) < before.st_size:
+                chunk = os.read(descriptor, min(1024 * 1024, before.st_size - len(payload)))
+                if not chunk:
+                    raise ValueError("declared-score staged artifact truncated while read")
+                payload += chunk
+            if os.read(descriptor, 1) or os.fstat(descriptor).st_size != before.st_size:
+                raise ValueError("declared-score staged artifact grew while read")
+        finally:
+            os.close(descriptor)
+        hashes[f"{_evidence_relative(request)}/{name}"] = sha256_bytes(payload)
+    return stage, hashes
 
 
 def run_development_score_diagnostic(
     root: str | Path,
     config: LoadedV2Config,
     request: DevelopmentScoreDiagnosticRequest,
-    *,
-    output_dir: Path,
-) -> Mapping[str, str]:
+) -> Mapping[str, bytes]:
     root_path = Path(root).resolve()
+    verify_frozen_science_helper_identities()
     _request_paths(request)
     if config.sha256 != request.config_sha256:
         raise ValueError("diagnostic request config binding differs")
@@ -903,6 +1150,12 @@ def run_development_score_diagnostic(
         maximum_bytes=32 * 1024 * 1024,
         require_single_link=True,
     )
+    if _exact_regular_bytes(
+        manifest_path,
+        maximum_bytes=32 * 1024 * 1024,
+        label="development snapshot manifest",
+    ) != manifest_bytes:
+        raise ValueError("development snapshot manifest changed during initial read")
     if sha256_bytes(manifest_bytes) != request.snapshot_manifest_sha256:
         raise ValueError("development snapshot manifest hash differs")
     _target_relative, _target_path, target_bytes, _target_stat = read_repo_file(
@@ -972,6 +1225,22 @@ def run_development_score_diagnostic(
         after_hashes = _A1_SNAPSHOT_HASHES(snapshot, root_path)
         if after_hashes != before_hashes:
             raise ValueError("development snapshot changed during diagnostics")
+        _after_relative, _after_path, after_manifest_bytes, _after_stat = read_repo_file(
+            root_path,
+            manifest_relative,
+            "development snapshot manifest after replay",
+            maximum_bytes=32 * 1024 * 1024,
+            require_single_link=True,
+        )
+        if after_manifest_bytes != manifest_bytes:
+            raise ValueError("development snapshot manifest changed during diagnostics")
+        if _exact_regular_bytes(
+            manifest_path,
+            maximum_bytes=32 * 1024 * 1024,
+            label="development snapshot manifest after replay",
+        ) != manifest_bytes:
+            raise ValueError("development snapshot manifest grew during diagnostics")
+        verify_frozen_science_helper_identities()
         summary = {
             "schema_version": 1,
             "diagnostic_kind": DIAGNOSTIC_KIND,
@@ -983,6 +1252,8 @@ def run_development_score_diagnostic(
             "reservation_sha256": request.reservation_sha256,
             "score_manifest_sha256": request.score_manifest_sha256,
             "score_manifest_commit": request.score_manifest_commit,
+            "semantic_coupling_review_sha256": request.semantic_coupling_review_sha256,
+            "semantic_coupling_review_commit": request.semantic_coupling_review_commit,
             "registration_sha256": request.registration_sha256,
             "registration_commit": historical.binding.registration_commit,
             "source_tree_manifest_sha256": historical.binding.source_tree_manifest_sha256,
@@ -995,7 +1266,9 @@ def run_development_score_diagnostic(
                 "score_digest": _A1_SCORE_DIGEST(first.scores),
             },
             "statistics": statistics,
-            "candidate_declared_diagnostic_only": True,
+            "declared_score_diagnostic_only": True,
+            "runtime_semantic_coupling_proved": False,
+            "semantic_coupling_evidence_kind": "hash-bound-static-source-review",
             "automatic_qualification_gate": False,
         }
         artifacts = {
@@ -1006,7 +1279,7 @@ def run_development_score_diagnostic(
             "replay-2-scores.parquet": _A1_PARQUET_BYTES(second.scores),
             "replay-2-targets.parquet": _A1_PARQUET_BYTES(_A1_INDEXED_TARGETS(second.targets)),
         }
-        return _publish_artifacts(root_path, output_dir, artifacts)
+        return artifacts
 
 
 def _resource_snapshot() -> tuple[float, float]:
@@ -1026,32 +1299,34 @@ def run_reserved_development_score_diagnostic(
     *,
     root: Path,
     request: DevelopmentScoreDiagnosticRequest,
-    output_dir: Path,
 ) -> Mapping[str, Any]:
-    """A2-compatible lifecycle boundary with no caller-selected stage or data path."""
+    """A2-compatible boundary with no caller-selected stage, data, or output path."""
 
     usage = _resource_snapshot()
+    root_path = Path(root).resolve()
+    artifacts: Mapping[str, bytes] = {}
     try:
-        root_path = Path(root).resolve()
         config = load_v2_config(root_path / TOP40_V2_LAYOUT.config_path)
-        run_development_score_diagnostic(
+        artifacts = run_development_score_diagnostic(
             root_path,
             config,
             request,
-            output_dir=output_dir,
         )
     except BaseException as exc:
         cpu_hours, wall_hours = _resource_delta(usage)
-        return {
+        outcome: dict[str, Any] = {
             "status": "interrupted" if isinstance(exc, KeyboardInterrupt) else "failed",
             "failure_reason": f"{type(exc).__name__}: {exc}"[:8000],
             "organizer_cpu_hours": cpu_hours,
             "organizer_wall_clock_hours": wall_hours,
         }
-    cpu_hours, wall_hours = _resource_delta(usage)
-    return {
-        "status": "completed",
-        "failure_reason": None,
-        "organizer_cpu_hours": cpu_hours,
-        "organizer_wall_clock_hours": wall_hours,
-    }
+    else:
+        cpu_hours, wall_hours = _resource_delta(usage)
+        outcome = {
+            "status": "completed",
+            "failure_reason": None,
+            "organizer_cpu_hours": cpu_hours,
+            "organizer_wall_clock_hours": wall_hours,
+        }
+    capability = stage_diagnostic_artifacts(root_path, request, artifacts)
+    return {**outcome, "staged_artifacts": capability}

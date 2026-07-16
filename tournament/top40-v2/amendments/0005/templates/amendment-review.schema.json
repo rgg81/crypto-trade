@@ -1,18 +1,54 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "additionalProperties": true,
+  "additionalProperties": false,
+  "$defs": {
+    "implementationFiles": {
+      "additionalProperties": {"pattern": "^[0-9a-f]{64}$", "type": "string"},
+      "maxProperties": 18,
+      "minProperties": 18,
+      "propertyNames": {"enum": [
+        "scripts/top40_v2_amendment_0005_draft.py",
+        "src/crypto_trade/tournament/_score_worker_v5.py",
+        "src/crypto_trade/tournament/amendment_0005_v2.py",
+        "src/crypto_trade/tournament/development_score_diagnostics_v5.py",
+        "src/crypto_trade/tournament/generic_score_adapter_v5.py",
+        "src/crypto_trade/tournament/score_adapter_protocol_v5.py",
+        "tests/tournament/test_top40_v2_amendment_0005.py",
+        "tests/tournament/test_top40_v2_development_score_diagnostics_v5.py",
+        "tests/tournament/test_top40_v2_score_adapter_v5.py",
+        "tournament/top40-v2/amendments/0005/AMENDMENT.md",
+        "tournament/top40-v2/amendments/0005/DRAFT-SCOPE-INCIDENT.md",
+        "tournament/top40-v2/amendments/0005/SCORE-ADAPTER-CONTRACT.md",
+        "tournament/top40-v2/amendments/0005/draft.json",
+        "tournament/top40-v2/amendments/0005/templates/amendment-freeze.schema.json",
+        "tournament/top40-v2/amendments/0005/templates/amendment-review.schema.json",
+        "tournament/top40-v2/amendments/0005/templates/development-score-diagnostic-reservation.schema.json",
+        "tournament/top40-v2/amendments/0005/templates/development-score-diagnostic-result.schema.json",
+        "tournament/top40-v2/amendments/0005/templates/score-adapter-manifest.schema.json"
+      ]},
+      "type": "object"
+    },
+    "parentAuthorities": {
+      "additionalProperties": false,
+      "properties": {
+        "amendment_0001_scientific_engine_sha256": {"const": "a0b99bd2928a64a37b6b9f6d900bbd8ddfc2f2e49b87e6f6633176228bfd2d4d"},
+        "amendment_0002_schema3_facade_sha256": {"const": "fc70dbdb752c58857c5ed60a96e497324e93b9d5dc7e6afa0692bd3e02ad21aa"},
+        "amendment_0004_active_entrypoint_sha256": {"const": "6031937952a29a1a226a778cd1bcfc2c9869559ab30465bdbebe6292c6a88377"},
+        "amendment_0004_active_runner_sha256": {"const": "03006ea1ce391ef3c8da6244acb89aab19f7e63d1e0a617e2743894a575fd6cd"}
+      },
+      "required": ["amendment_0001_scientific_engine_sha256", "amendment_0002_schema3_facade_sha256", "amendment_0004_active_entrypoint_sha256", "amendment_0004_active_runner_sha256"],
+      "type": "object"
+    }
+  },
   "properties": {
     "amendment_id": {"const": "top40-v2-amendment-0005-prospective-development-score-adapters"},
     "decision": {"const": "approve"},
     "implementation_commit": {"pattern": "^[0-9a-f]{40}$", "type": "string"},
-    "implementation_files": {"additionalProperties": {"pattern": "^[0-9a-f]{64}$", "type": "string"}, "type": "object"},
-    "parent_authorities": {"type": "object"},
+    "implementation_files": {"$ref": "#/$defs/implementationFiles"},
+    "parent_authorities": {"$ref": "#/$defs/parentAuthorities"},
     "schema_version": {"const": 1}
   },
-  "required": [
-    "schema_version", "amendment_id", "decision", "implementation_commit",
-    "implementation_files", "parent_authorities"
-  ],
+  "required": ["schema_version", "amendment_id", "decision", "implementation_commit", "implementation_files", "parent_authorities"],
   "title": "Top40 V2 Amendment 0005 independent review",
   "type": "object"
 }

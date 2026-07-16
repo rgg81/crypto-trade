@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Draft-only entrypoint for prospective Top-40 V2 score diagnostics."""
+"""Draft-only entrypoint for prospective Top-40 V2 declared-score diagnostics."""
 
 from __future__ import annotations
 
@@ -21,11 +21,11 @@ def _parser() -> argparse.ArgumentParser:
     for name, help_text in (
         (
             "reserve-development-score-diagnostic",
-            "reserve one prospective completed development candidate",
+            "reserve one prospective completed candidate's declared-score diagnostic",
         ),
         (
             "run-development-score-diagnostic",
-            "run one committed reservation against development data",
+            "run one committed declared-score reservation against development data",
         ),
     ):
         command = commands.add_parser(name, help=help_text)

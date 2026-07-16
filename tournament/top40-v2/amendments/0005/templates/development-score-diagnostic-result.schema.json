@@ -1,21 +1,47 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {"properties": {"status": {"const": "completed"}}},
+      "then": {
+        "properties": {
+          "artifact_hashes": {"maxProperties": 6, "minProperties": 6},
+          "failure_reason": {"type": "null"},
+          "statistics": {"type": "object"}
+        }
+      },
+      "else": {
+        "properties": {
+          "artifact_hashes": {"maxProperties": 0},
+          "failure_reason": {"type": "string"},
+          "statistics": {"type": "null"}
+        }
+      }
+    }
+  ],
   "properties": {
-    "artifact_hashes": {"additionalProperties": {"pattern": "^[0-9a-f]{64}$", "type": "string"}, "type": "object"},
+    "artifact_hashes": {
+      "additionalProperties": {"pattern": "^[0-9a-f]{64}$", "type": "string"},
+      "propertyNames": {"pattern": "^reports-top40-v2/team-(04|05|06|07|08|09|10)/development-score-diagnostics/[a-z0-9][a-z0-9._-]{0,127}/(diagnostic-summary\\.json|labeled-score-panel\\.parquet|replay-[12]-(scores|targets)\\.parquet)$"},
+      "type": "object"
+    },
+    "authority_sha256": {"pattern": "^[0-9a-f]{64}$", "type": "string"},
     "automatic_qualification_gate": {"const": false},
     "candidate_id": {"pattern": "^[a-z0-9][a-z0-9._-]{0,127}$", "type": "string"},
     "charges_team_trial_budget": {"const": false},
+    "declared_score_diagnostic_only": {"const": true},
     "diagnostic_id": {"type": "string"},
-    "diagnostic_kind": {"const": "top40-v2-development-score-diagnostic-v1"},
+    "diagnostic_kind": {"const": "top40-v2-development-declared-score-diagnostic-v1"},
     "event_type": {"const": "development_score_diagnostic_recorded"},
-    "failure_reason": {"type": ["string", "null"]},
+    "failure_reason": {"maxLength": 8000, "type": ["string", "null"]},
     "non_material": {"const": true},
     "organizer_cpu_hours": {"minimum": 0, "type": "number"},
     "organizer_wall_clock_hours": {"minimum": 0, "type": "number"},
     "reservation_sha256": {"pattern": "^[0-9a-f]{64}$", "type": "string"},
     "result_sha256": {"pattern": "^[0-9a-f]{64}$", "type": "string"},
     "schema_version": {"const": 1},
+    "semantic_coupling_review_sha256": {"pattern": "^[0-9a-f]{64}$", "type": "string"},
     "stage": {"const": "development"},
     "statistics": {"type": ["object", "null"]},
     "status": {"enum": ["completed", "failed", "interrupted"]},
@@ -23,10 +49,12 @@
   },
   "required": [
     "schema_version", "event_type", "diagnostic_kind", "diagnostic_id", "stage",
-    "team_id", "candidate_id", "reservation_sha256", "status", "failure_reason",
-    "organizer_cpu_hours", "organizer_wall_clock_hours", "artifact_hashes", "statistics",
-    "non_material", "charges_team_trial_budget", "automatic_qualification_gate", "result_sha256"
+    "team_id", "candidate_id", "reservation_sha256", "authority_sha256",
+    "semantic_coupling_review_sha256", "status", "failure_reason", "organizer_cpu_hours",
+    "organizer_wall_clock_hours", "artifact_hashes", "statistics",
+    "declared_score_diagnostic_only", "non_material", "charges_team_trial_budget",
+    "automatic_qualification_gate", "result_sha256"
   ],
-  "title": "Top40 V2 development score-diagnostic result",
+  "title": "Top40 V2 development declared-score terminal result",
   "type": "object"
 }

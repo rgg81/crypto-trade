@@ -1,4 +1,10 @@
-"""Generic, organizer-owned capture for the Amendment 0005 score boundary."""
+"""Generic organizer capture for an Amendment 0005 declared-score boundary.
+
+The adapter proves the identity, shape, timing, and replay behavior of the captured bytes. It
+cannot prove that candidate code supplied its economically operative ranking signal rather than a
+decoy or transient dictionary. That semantic claim is handled only by the hash-bound static source
+review required by Amendment 0005.
+"""
 
 from __future__ import annotations
 

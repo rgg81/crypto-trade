@@ -1,6 +1,7 @@
 {
   "amendment_id": "top40-v2-amendment-0005-prospective-development-score-adapters",
   "automatic_qualification_gate": false,
+  "evidence_kind": "declared-score-diagnostic",
   "eligible_teams": [
     "team-04",
     "team-05",

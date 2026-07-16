@@ -9,6 +9,7 @@ from crypto_trade.tournament.amendment_integrity_v2 import pretty_json_bytes
 from crypto_trade.tournament.development_score_diagnostics_v5 import (
     label_score_panel,
     parse_score_adapter_manifest,
+    parse_semantic_coupling_review,
 )
 
 
@@ -16,13 +17,13 @@ def _manifest(*, horizon: int = 48) -> bytes:
     return pretty_json_bytes(
         {
             "schema_version": 1,
-            "adapter_id": "top40-v2-preconstruction-score-boundary-v1",
+            "adapter_id": "top40-v2-declared-score-boundary-v1",
             "team_id": "team-04",
             "family_id": "family-04",
             "candidate_id": "candidate-04",
             "stage": "development",
             "hook": "strategy.score_boundary",
-            "capture_boundary": "post-transform-pre-selection-weight-cap-risk",
+            "capture_boundary": "candidate-declared-post-transform-pre-selection-weight-cap-risk",
             "schedule_utc": {
                 "anchor_timestamp_utc": "2020-02-03T00:00:00Z",
                 "interval_hours": 24,
@@ -38,6 +39,7 @@ def _manifest(*, horizon: int = 48) -> bytes:
                 "minimum_pairs": 2,
             },
             "score_description": "Higher transformed values imply higher expected returns.",
+            "semantic_coupling_review_sha256": "a" * 64,
         }
     )
 
@@ -87,3 +89,45 @@ def test_labels_are_exact_simple_open_returns_and_globally_pooled_pearson() -> N
 def test_manifest_rejects_non_grid_horizon() -> None:
     with pytest.raises(ValueError, match="holding horizon"):
         parse_score_adapter_manifest(_manifest(horizon=10))
+
+
+def test_static_review_is_hash_bindable_but_explicitly_not_runtime_proof() -> None:
+    payload = pretty_json_bytes(
+        {
+            "schema_version": 1,
+            "review_kind": "top40-v2-score-semantic-coupling-static-review-v1",
+            "team_id": "team-04",
+            "family_id": "family-04",
+            "candidate_id": "candidate-04",
+            "strategy_sha256": "a" * 64,
+            "hook": "strategy.score_boundary",
+            "declared_capture_boundary": "candidate-declared-post-transform-pre-selection-weight-cap-risk",
+            "decision": "approve",
+            "reviewer_id": "independent-reviewer",
+            "reviewed_at_utc": "2026-07-16T00:00:00Z",
+            "findings": {
+                "direct_hook_call_found": True,
+                "score_object_is_declared_model_ranking_signal": True,
+                "hook_after_declared_score_transform": True,
+                "hook_before_selection_weight_caps_and_risk": True,
+                "no_decoy_or_transient_score_path_found": True,
+            },
+            "runtime_proof_limit": "static-review-attestation-not-runtime-semantic-proof",
+        }
+    )
+    parsed = parse_semantic_coupling_review(
+        payload,
+        expected_team_id="team-04",
+        expected_family_id="family-04",
+        expected_candidate_id="candidate-04",
+        expected_strategy_sha256="a" * 64,
+    )
+    assert parsed["runtime_proof_limit"].endswith("not-runtime-semantic-proof")
+    with pytest.raises(ValueError, match="binding"):
+        parse_semantic_coupling_review(
+            payload,
+            expected_team_id="team-04",
+            expected_family_id="family-04",
+            expected_candidate_id="candidate-04",
+            expected_strategy_sha256="b" * 64,
+        )
