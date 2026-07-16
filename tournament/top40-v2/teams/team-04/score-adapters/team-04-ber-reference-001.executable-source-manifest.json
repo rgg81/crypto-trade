@@ -1,0 +1,49 @@
+{
+  "candidate_id": "team-04-ber-reference-001",
+  "family_id": "team-04-broad-exhaustion-reversal-v1",
+  "files": [
+    {
+      "path": "frozen_config.json",
+      "sha256": "3e8b9a05d5e285d18f1fff499a34797dda2794ff81f00813a2e8aeb5ee0d13d6",
+      "size": 6179
+    },
+    {
+      "path": "pivot-01/frozen_config.json",
+      "sha256": "3e8b9a05d5e285d18f1fff499a34797dda2794ff81f00813a2e8aeb5ee0d13d6",
+      "size": 6179
+    },
+    {
+      "path": "pivot-01/organizer_score_adapter.py",
+      "sha256": "609d9c17322734b651c4db1ab90c3271f505d3dd85789440c5ceee5e5b8d1da2",
+      "size": 3261
+    },
+    {
+      "path": "pivot-01/strategy.py",
+      "sha256": "a5877c613ec579e41f26d370a9d6c5ca97a7df3a738e5e628430b31956e96cdb",
+      "size": 14836
+    },
+    {
+      "path": "pivot-01/test_strategy.py",
+      "sha256": "8ba4f82c374bda7eea8248fdb7ab3b1d797b0f65fc5e5e911caacbc3c8f4af86",
+      "size": 28396
+    },
+    {
+      "path": "risk_policy.json",
+      "sha256": "727cc5fe0e70351ba8ae36e43e7558962c093ca8c3909fdea3f041bf4264eb1d",
+      "size": 649
+    },
+    {
+      "path": "strategy.py",
+      "sha256": "a5877c613ec579e41f26d370a9d6c5ca97a7df3a738e5e628430b31956e96cdb",
+      "size": 14836
+    },
+    {
+      "path": "test_strategy.py",
+      "sha256": "8ba4f82c374bda7eea8248fdb7ab3b1d797b0f65fc5e5e911caacbc3c8f4af86",
+      "size": 28396
+    }
+  ],
+  "manifest_kind": "top40-v2-executable-source-manifest-v1",
+  "schema_version": 1,
+  "team_id": "team-04"
+}
