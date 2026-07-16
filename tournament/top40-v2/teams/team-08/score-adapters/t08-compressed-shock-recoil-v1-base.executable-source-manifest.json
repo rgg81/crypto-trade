@@ -1,0 +1,39 @@
+{
+  "candidate_id": "t08-compressed-shock-recoil-v1-base",
+  "family_id": "t08-compressed-shock-recoil-v1",
+  "files": [
+    {
+      "path": "candidate_variant.py",
+      "sha256": "7b25a97deed3e317c93f4b0d26db21bcc2f4378f1038af9e7b5e0594f3a82cdb",
+      "size": 185
+    },
+    {
+      "path": "frozen_config.json",
+      "sha256": "fe1c5ed38e175184517edd7a049ae2df9d9e35b18878b672844b26a87504a4d9",
+      "size": 5396
+    },
+    {
+      "path": "risk_policy.json",
+      "sha256": "8db76eb8d59fbef6473d2a2cd98bbba68c8e53d8d78284284ec06db54b8fa5d6",
+      "size": 580
+    },
+    {
+      "path": "strategy.py",
+      "sha256": "883ff191364d76febb1d070135236e9a245a4c4af9eb7139cbc2d06a55019d30",
+      "size": 19654
+    },
+    {
+      "path": "test_risk_policy_contract.py",
+      "sha256": "fc349ab076a1e5502cbf9a7838f04dc298f2abd3cbf174ee21c8c6b4fbef7c3f",
+      "size": 7164
+    },
+    {
+      "path": "test_strategy.py",
+      "sha256": "c16ffb368a37b3fa780a9dcdfcf22e2df7fb1e4a0b6311d1ffc0575c35056ba3",
+      "size": 13548
+    }
+  ],
+  "manifest_kind": "top40-v2-executable-source-manifest-v1",
+  "schema_version": 1,
+  "team_id": "team-08"
+}
