@@ -52,7 +52,7 @@
   "critic_lock": null,
   "final_oos_lock": null,
   "finalist_cohort_lock": null,
-  "legacy_projection_sha256": "949cd8db27e0d87b5c3cd9c360b226833ed7d982e0a3b91a28e16c47e425849d",
+  "legacy_projection_sha256": "bc2ede2e7fd63c9ed93a53a60bbf38f656060fabc029422d69ad5fcea41d55d3",
   "legacy_state_sha256": "8c858495fde6ddde203124a055e40ebad5d8d5a684cd20f0e55f6c88f7360b07",
   "objective_lock": null,
   "organizer_audit": {
@@ -73,9 +73,9 @@
   "qualification_lock": null,
   "research_journal": {
     "genesis_sha256": "a11eee0475d514a1f022deda4e62014536f12bfb074556546645c5f8255a48ed",
-    "head_sha256": "2ebf302de21ced25bb299803be5aad2fb717c378b556853835b0c2a8ec4f328a",
+    "head_sha256": "5d4b00663128fe0aec307ef0a6a532c052b7a84a5d53fae2c685b7f974444701",
     "path": "tournament/top40-v2/organizer_research_journal.jsonl",
-    "record_count": 25
+    "record_count": 26
   },
   "schema_version": 3,
   "selection_lock": null,
@@ -164,7 +164,7 @@
       "private_result": null,
       "qualifier_candidate": null,
       "status": "researching",
-      "trial_count": 0
+      "trial_count": 1
     },
     "team-06": {
       "active_family_id": "t06-balanced-trend-reversal-v1",
