@@ -1,0 +1,15 @@
+{
+  "candidate_id": "t07-two-tape-rank-durability-v1-base",
+  "config_sha256": "bd0e4f70bcf335b2ac4e44ec049b89b8e8eaf4c6ac6502574d0accf12d9d9947",
+  "organizer_journal_head_sha256": "b9a6351fd9a530d2e56cad769821b48bd361aa5ad612a97bcbb7729d5f188097",
+  "private_attempt_number": null,
+  "registration_sha256": "c9eee7ea71413657aa00d6f649f95b78d570d2fa6e101c1e7002e37045168e2e",
+  "reserved_at_utc": "2026-07-16T20:55:10.438485+00:00",
+  "risk_policy_sha256": "d3b918f600f2b548b6a2c8dc44a3077b7b34d8c911ecc6e9c776eada8ad77b6c",
+  "schema_version": 1,
+  "source_bundle_sha256": "119981c805c575a42b7fb2bf36885e4c2310311e848871cb5676a3eea887439b",
+  "stage": "development",
+  "strategy_sha256": "bb5b45c3c0de5846463bc8b3164a5921a319ee5a17663ad93b3b6cc7e2224506",
+  "team_id": "team-07",
+  "tournament": "quant-portfolio-blind-top40-v2"
+}
