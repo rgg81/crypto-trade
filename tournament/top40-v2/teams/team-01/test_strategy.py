@@ -334,7 +334,7 @@ def test_equal_scores_use_ascending_symbol_tie_break() -> None:
     assert [symbol for symbol, _, _ in long_tail] == ["G", "H"]
 
 
-def test_gamma_one_applies_the_exact_registered_path_efficiency_exponent() -> None:
+def test_h14_candidate_uses_the_exact_registered_shorter_residual_window() -> None:
     context = _synthetic_context()
     symbol = "A14USDT"
     btc_history = strategy_module._closed_history(
@@ -355,27 +355,27 @@ def test_gamma_one_applies_the_exact_registered_path_efficiency_exponent() -> No
     )
     assert funding is not None and symbol in funding
 
-    gamma_one = strategy_module.build_strategy()
+    h14_candidate = strategy_module.build_strategy()
     baseline_parameters = dataclasses.replace(
         strategy_module.REFERENCE_PARAMETERS,
-        path_efficiency_exponent=0.5,
+        residual_lookback_days=21,
     )
-    gamma_half = strategy_module.ResidualDriftFundingStrategy(baseline_parameters)
-    signal_one = gamma_one._symbol_signal(
+    h21_baseline = strategy_module.ResidualDriftFundingStrategy(baseline_parameters)
+    signal_h14 = h14_candidate._symbol_signal(
         symbol,
         symbol_returns=symbol_returns,
         btc_returns=btc_returns,
         funding_pressure=funding[symbol],
         decision_time=context.decision_time,
     )
-    signal_half = gamma_half._symbol_signal(
+    signal_h21 = h21_baseline._symbol_signal(
         symbol,
         symbol_returns=symbol_returns,
         btc_returns=btc_returns,
         funding_pressure=funding[symbol],
         decision_time=context.decision_time,
     )
-    assert signal_one is not None and signal_half is not None
+    assert signal_h14 is not None and signal_h21 is not None
 
     parameters = strategy_module.REFERENCE_PARAMETERS
     beta_times = pd.date_range(
@@ -390,25 +390,32 @@ def test_gamma_one_applies_the_exact_registered_path_efficiency_exponent() -> No
     centered_y = y_beta[paired] - float(np.mean(y_beta[paired]))
     beta = float(np.mean(centered_x * centered_y) / np.mean(centered_x * centered_x))
     beta = float(np.clip(beta, -1.0, 3.0))
-    drift_times = pd.date_range(
-        end=context.decision_time - pd.Timedelta(days=3),
-        periods=63,
-        freq="8h",
-    )
-    residuals = (
-        symbol_returns.reindex(drift_times).to_numpy(dtype=float)
-        - beta * btc_returns.reindex(drift_times).to_numpy(dtype=float)
-    )
-    residual_sum = float(np.sum(residuals))
-    residual_volatility = float(np.std(residuals, ddof=1))
-    trend = residual_sum / max(residual_volatility * math.sqrt(63.0), 1e-8)
-    efficiency = abs(residual_sum) / max(float(np.sum(np.abs(residuals))), 1e-8)
-    assert 0.0 < efficiency < 1.0
-    assert signal_one.drift == pytest.approx(trend * efficiency, rel=1e-13, abs=1e-13)
-    assert signal_half.drift == pytest.approx(
-        trend * math.sqrt(efficiency), rel=1e-13, abs=1e-13
-    )
-    assert abs(signal_one.drift) < abs(signal_half.drift)
+
+    def expected_drift(lookback_days: int) -> float:
+        periods = 3 * lookback_days
+        drift_times = pd.date_range(
+            end=context.decision_time - pd.Timedelta(days=3),
+            periods=periods,
+            freq="8h",
+        )
+        residuals = (
+            symbol_returns.reindex(drift_times).to_numpy(dtype=float)
+            - beta * btc_returns.reindex(drift_times).to_numpy(dtype=float)
+        )
+        residual_sum = float(np.sum(residuals))
+        residual_volatility = float(np.std(residuals, ddof=1))
+        trend = residual_sum / max(
+            residual_volatility * math.sqrt(float(periods)), 1e-8
+        )
+        efficiency = abs(residual_sum) / max(float(np.sum(np.abs(residuals))), 1e-8)
+        assert 0.0 < efficiency < 1.0
+        return trend * math.sqrt(efficiency)
+
+    expected_h14 = expected_drift(14)
+    expected_h21 = expected_drift(21)
+    assert signal_h14.drift == pytest.approx(expected_h14, rel=1e-13, abs=1e-13)
+    assert signal_h21.drift == pytest.approx(expected_h21, rel=1e-13, abs=1e-13)
+    assert signal_h14.drift != pytest.approx(signal_h21.drift, rel=1e-9, abs=1e-12)
 
 
 @pytest.mark.parametrize("defect", ["duplicate", "nonfinite_close", "nonfinite_funding"])
@@ -471,7 +478,7 @@ def test_canonical_target_hash_is_clean_process_stable() -> None:
     first = _target_hash(_targets(_synthetic_context()))
     second = _target_hash(_targets(_synthetic_context()))
     assert first == second
-    assert first == "7a08069e083289a37204b6be93f2916b2219c35272c1ba4e0a2617137a3c2f03"
+    assert first == "ebf2cce8ba380674f001cd852dcdb7cc6decbaaeed40ab07bd8ebb677e12977f"
 
 
 def test_official_namespaced_worker_matches_direct_synthetic_targets_twice() -> None:
@@ -488,27 +495,27 @@ def test_frozen_current_candidate_and_no_control_policy_match_qr_decision() -> N
     frozen = json.loads((_TEAM_DIR / "frozen_config.json").read_text(encoding="utf-8"))
     risk_policy_bytes = (_TEAM_DIR / "risk_policy.json").read_bytes()
     policy = json.loads(risk_policy_bytes)
-    assert frozen["candidate_id"] == "rdf-core-h21-k3-g10"
+    assert frozen["candidate_id"] == "rdf-core-h14-k3-g05"
     assert (
         frozen["candidate_status"]
         == "deterministic_core_candidate_not_yet_registered_or_evaluated"
     )
     expected_candidate = dict(_BASELINE_FROZEN_PARAMETERS)
-    expected_candidate["path_efficiency_exponent"] = 1.0
+    expected_candidate["residual_lookback_days"] = 14
     assert frozen["parameters"] == expected_candidate
     assert {
         key: value
         for key, value in frozen["parameters"].items()
-        if key != "path_efficiency_exponent"
+        if key != "residual_lookback_days"
     } == {
         key: value
         for key, value in _BASELINE_FROZEN_PARAMETERS.items()
-        if key != "path_efficiency_exponent"
+        if key != "residual_lookback_days"
     }
     assert dataclasses.asdict(strategy_module.REFERENCE_PARAMETERS) == {
-        "residual_lookback_days": 21,
+        "residual_lookback_days": 14,
         "skip_days": 3,
-        "path_efficiency_exponent": 1.0,
+        "path_efficiency_exponent": 0.5,
         "rank_tail_fraction": 0.25,
         "direction_tilt_delta": 0.075,
         "beta_lookback_days": 30,

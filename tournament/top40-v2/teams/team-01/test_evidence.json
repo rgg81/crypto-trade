@@ -3,31 +3,31 @@
   "baseline_comparison": {
     "baseline_candidate_id": "rdf-ref-001",
     "only_material_core_coordinate_delta": {
-      "path_efficiency_exponent": {
-        "from": 0.5,
-        "to": 1.0
+      "residual_lookback_days": {
+        "from": 21,
+        "to": 14
       }
     }
   },
-  "candidate_id": "rdf-core-h21-k3-g10",
+  "candidate_id": "rdf-core-h14-k3-g05",
   "central_evaluator_invoked": false,
   "clean_process_replays": {
-    "canonical_synthetic_target_sha256": "7a08069e083289a37204b6be93f2916b2219c35272c1ba4e0a2617137a3c2f03",
+    "canonical_synthetic_target_sha256": "ebf2cce8ba380674f001cd852dcdb7cc6decbaaeed40ab07bd8ebb677e12977f",
     "identical": true,
-    "process_count": 2,
+    "suite_replay_count": 2,
     "runtime_seed": 20260801
   },
-  "created_at_utc": "2026-07-15T23:10:32Z",
+  "created_at_utc": "2026-07-16T09:40:12Z",
   "dependencies_tested": {
     "numpy": "2.2.6",
     "pandas": "3.0.0",
     "python": "3.13.12"
   },
   "files_sha256": {
-    "frozen_config.json": "22097466ca921816f61f337c69b5f6e6439655a3e29ad91ed8ecd292d4713247",
+    "frozen_config.json": "46240258793fa9cb54626a42fc467e897fa46dc354e47e72ca458f899b77d877",
     "risk_policy.json": "9efd1401ffec46a7767fe625d70538b1aa5a9281a46fdb1bc06e90c264dc7e5b",
-    "strategy.py": "127449e75cdd3ec17f63bf7c36e3639568829501e16fe5e362203e53e1b6b773",
-    "test_strategy.py": "ed6115a059176a5d8199d558a5655b19d04cdd3fd568803662a4426baf3a07f8"
+    "strategy.py": "0f138479ee60dd03241abc7a3664ea80fc7f897763b81a8aad0ad1eb0800c6a4",
+    "test_strategy.py": "7cd0004b16a7632822b80a14f2d6ed4a5a7489e41b317672f14b5df5f7493847"
   },
   "family_id": "t01-residual-drift-funding-v1",
   "official_worker_smoke": {
@@ -39,6 +39,10 @@
     "total_process_count": 4
   },
   "result": {
+    "duration_seconds": [
+      2.68,
+      2.66
+    ],
     "failed": 0,
     "passed": 14
   },
@@ -52,12 +56,12 @@
     "point-in-time eligible membership removal",
     "positive funding lowers the score and negative funding raises it",
     "ascending-symbol score tie break",
-    "exact E^1.0 path-efficiency effect versus the otherwise identical E^0.5 baseline",
-    "all non-gamma frozen coordinates equal the solvent baseline binding",
+    "exact H14 residual window effect versus the otherwise identical H21 solvent baseline",
+    "all non-horizon frozen coordinates equal the solvent baseline binding",
     "two independent official namespaced-worker synthetic runs equal direct targets",
     "duplicate, NaN, Inf, sparse-history, missing-BTC, and one-sided-flat behavior",
     "eligible-only finite outputs with gross, net, per-symbol, and two-sleeve bounds",
-    "frozen rdf-core-h21-k3-g10 parameters and byte-identical no-control risk policy"
+    "frozen rdf-core-h14-k3-g05 parameters and byte-identical no-control risk policy"
   ],
   "team_id": "team-01"
 }

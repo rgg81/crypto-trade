@@ -1,16 +1,15 @@
 # team-01 QE implementation report
 
-Status: **rdf-core-h21-k3-g10 implemented and synthetically verified; not registered or evaluated**
+Status: **rdf-core-h14-k3-g05 implemented and synthetically verified once; not registered or evaluated**
 
-The implementation is a faithful, stateless translation of the preregistered
-`t01-residual-drift-funding-v1` mechanism. `build_strategy()` returns a fresh strategy fixed to
-the QR's frozen next core cell: `H=21d`, `K=3d`, `gamma=1.0`, `q=0.25`, `delta=0.075`, runtime
-seed `20260801`, base costs, and no enabled organizer risk controls. Relative to solvent baseline
-`rdf-ref-001`, the sole material core-coordinate change is the registered path-efficiency exponent
-from `0.5` to `1.0`. The previously installed failed K1 executable was restored from `K=1` to the
-baseline's `K=3`; it is not a second delta in the baseline attribution. Every other frozen signal,
-construction, execution, risk, and seed coordinate matches the baseline. Any other material cell
-still requires its own research decision and registration before execution.
+The implementation remains a faithful, stateless translation of the preregistered
+`t01-residual-drift-funding-v1` mechanism. `build_strategy()` now returns the exact next core cell
+authorized after the third material result: `H=14d`, `K=3d`, `gamma=0.5`, `q=0.25`,
+`delta=0.075`, runtime seed `20260801`, base costs, and no enabled organizer risk controls.
+Relative to solvent baseline `rdf-ref-001`, the sole material coordinate change is the already
+registered horizon value `H: 21d -> 14d`. Every other signal, construction, execution, risk, and
+seed coordinate matches that baseline. Any other material cell still requires a fresh research
+decision and preregistration.
 
 ## Implementation boundary
 
@@ -26,29 +25,21 @@ still requires its own research decision and registration before execution.
 - Funding is pre-sliced and grouped once per boundary before per-symbol transforms. This is a
   computational optimization only; it does not alter the registered formula or availability rule.
 
-## Evidence
+## Synthetic verification
 
-The evaluator-free synthetic suite passed twice in separate Python processes: **14 passed, 0
-failed**. Both processes reproduced canonical synthetic target SHA-256
-`7a08069e083289a37204b6be93f2916b2219c35272c1ba4e0a2617137a3c2f03`.
+The organizer ran the evaluator-free suite twice, serially: **14 passed in 2.68 seconds**, then
+**14 passed in 2.66 seconds** after pinning the exact target hash. Each suite launched the official
+namespaced V2 strategy worker twice on synthetic data; all four worker outputs matched direct
+targets. The exact canonical synthetic target SHA-256 was
+`ebf2cce8ba380674f001cd852dcdb7cc6decbaaeed40ab07bd8ebb677e12977f`.
 
-Each suite invocation launched the official namespaced V2 strategy worker twice on synthetic data;
-the suite itself was replayed twice, for four successful worker processes in total. Every worker
-run matched direct targets exactly. A separate causal unit test reconstructs beta,
-residual trend, and path efficiency and proves that the current signal applies `E^1.0`, while the
-otherwise identical solvent baseline applies `E^0.5`. The canonical synthetic portfolio hash is
-unchanged from that baseline because the selected names and inverse-volatility weights happen to
-be unchanged in this fixture; the underlying path score is demonstrably different.
+Coverage retains the causal and worker-contract checks of the preceding implementation and now
+reconstructs both the exact 14-day residual window and the otherwise identical 21-day solvent
+baseline. Those signal values match their respective formulas and differ in the synthetic fixture.
+The suite also binds `frozen_config.json` to the one-coordinate H14 change and the byte-identical
+no-control risk policy.
 
-Coverage includes future truncation/append/corruption invariance, ignored future opens, strict
-funding cutoff, membership removal, funding sign, deterministic score ties, daily hold behavior,
-runtime seed enforcement, missing/duplicate/NaN/Inf rejection, two-sided flat fallback,
-gross/net/symbol bounds, and exact non-gamma baseline equivalence. `risk_policy.json` parses through
-the neutral V2 risk-policy interface, remains byte-identical, and has every optional control
-disabled. Static V2 team-source text validation also passed.
-
-Exact commands, dependency versions, source hashes, and the complete check list are recorded in
-`test_evidence.json`.
+Candidate-specific evidence and final team-file hashes are recorded in `test_evidence.json`.
 
 ## Deliberately pending organizer evidence
 
@@ -60,5 +51,7 @@ central-engine properties and material tournament evidence; they remain pending 
 and organizer execution. The no-control core cell does not exercise stop, brake, cooldown, or
 same-boundary reentry events. Planned risk controls remain separate registered ablations.
 
-No implementation ambiguity remains after the QR's frozen post-result decision for
-`rdf-core-h21-k3-g10`.
+The organizer-private Amendment 0001 score diagnostic remains required after a completed run:
+Team 01's own falsifier treats missing pooled or per-fold score IC as failure. No implementation
+ambiguity remains after the frozen post-result decision authorizing
+`rdf-core-h14-k3-g05` as the sole next cell.
