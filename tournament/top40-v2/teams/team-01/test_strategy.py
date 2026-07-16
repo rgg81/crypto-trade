@@ -21,11 +21,14 @@ from crypto_trade.tournament.protocol import REBALANCE_INSTRUCTION_COLUMN, Decis
 _TEAM_DIR = Path(__file__).resolve().parent
 _DECISION_TIME = pd.Timestamp(year=2023, month=6, day=30, tz="UTC")
 _RUNTIME_SEED = 20260801
-_BASELINE_FROZEN_PARAMETERS = {
+_PIVOT_FROZEN_PARAMETERS = {
     "beta_clip": [-1.0, 3.0],
     "beta_lookback_days": 30,
+    "bear_threshold_log_return": -0.1,
     "btc_symbol": "BTCUSDT",
     "btc_variance_floor": 1e-12,
+    "bull_threshold_log_return": 0.1,
+    "direction_lag_days": 1,
     "direction_lookback_days": 60,
     "direction_return_scale": 0.2,
     "direction_tilt_delta": 0.075,
@@ -38,8 +41,8 @@ _BASELINE_FROZEN_PARAMETERS = {
     "path_efficiency_exponent": 0.5,
     "per_symbol_target_cap": 0.09,
     "rank_tail_fraction": 0.25,
-    "residual_denominator_floor": 1e-8,
-    "residual_lookback_days": 21,
+    "signal_denominator_floor": 1e-8,
+    "signal_lookback_days": 14,
     "skip_days": 3,
     "total_gross": 0.8,
 }
@@ -205,7 +208,7 @@ def test_candidate_factory_is_fresh_deterministic_and_bounded() -> None:
     first_strategy = strategy_module.build_strategy()
     second_strategy = strategy_module.build_strategy()
     assert first_strategy is not second_strategy
-    assert first_strategy._parameters == strategy_module.REFERENCE_PARAMETERS
+    assert first_strategy._parameters == strategy_module.PIVOT_REFERENCE_PARAMETERS
 
     context = _synthetic_context()
     first = first_strategy.target_weights(context, seed=_RUNTIME_SEED)
@@ -334,7 +337,7 @@ def test_equal_scores_use_ascending_symbol_tie_break() -> None:
     assert [symbol for symbol, _, _ in long_tail] == ["G", "H"]
 
 
-def test_h14_candidate_uses_the_exact_registered_shorter_residual_window() -> None:
+def test_pivot_uses_exact_h14_residual_in_chop_and_raw_trend_in_bear() -> None:
     context = _synthetic_context()
     symbol = "A14USDT"
     btc_history = strategy_module._closed_history(
@@ -355,29 +358,34 @@ def test_h14_candidate_uses_the_exact_registered_shorter_residual_window() -> No
     )
     assert funding is not None and symbol in funding
 
-    h14_candidate = strategy_module.build_strategy()
-    baseline_parameters = dataclasses.replace(
-        strategy_module.REFERENCE_PARAMETERS,
-        residual_lookback_days=21,
-    )
-    h21_baseline = strategy_module.ResidualDriftFundingStrategy(baseline_parameters)
-    signal_h14 = h14_candidate._symbol_signal(
+    candidate = strategy_module.build_strategy()
+    signal_chop = candidate._symbol_signal(
         symbol,
         symbol_returns=symbol_returns,
         btc_returns=btc_returns,
         funding_pressure=funding[symbol],
         decision_time=context.decision_time,
+        regime="chop",
     )
-    signal_h21 = h21_baseline._symbol_signal(
+    signal_bull = candidate._symbol_signal(
         symbol,
         symbol_returns=symbol_returns,
         btc_returns=btc_returns,
         funding_pressure=funding[symbol],
         decision_time=context.decision_time,
+        regime="bull",
     )
-    assert signal_h14 is not None and signal_h21 is not None
+    signal_bear = candidate._symbol_signal(
+        symbol,
+        symbol_returns=symbol_returns,
+        btc_returns=btc_returns,
+        funding_pressure=funding[symbol],
+        decision_time=context.decision_time,
+        regime="bear",
+    )
+    assert signal_chop is not None and signal_bull is not None and signal_bear is not None
 
-    parameters = strategy_module.REFERENCE_PARAMETERS
+    parameters = strategy_module.PIVOT_REFERENCE_PARAMETERS
     beta_times = pd.date_range(
         end=context.decision_time,
         periods=3 * parameters.beta_lookback_days,
@@ -391,31 +399,85 @@ def test_h14_candidate_uses_the_exact_registered_shorter_residual_window() -> No
     beta = float(np.mean(centered_x * centered_y) / np.mean(centered_x * centered_x))
     beta = float(np.clip(beta, -1.0, 3.0))
 
-    def expected_drift(lookback_days: int) -> float:
-        periods = 3 * lookback_days
-        drift_times = pd.date_range(
-            end=context.decision_time - pd.Timedelta(days=3),
-            periods=periods,
-            freq="8h",
-        )
-        residuals = (
-            symbol_returns.reindex(drift_times).to_numpy(dtype=float)
-            - beta * btc_returns.reindex(drift_times).to_numpy(dtype=float)
-        )
-        residual_sum = float(np.sum(residuals))
-        residual_volatility = float(np.std(residuals, ddof=1))
-        trend = residual_sum / max(
-            residual_volatility * math.sqrt(float(periods)), 1e-8
-        )
-        efficiency = abs(residual_sum) / max(float(np.sum(np.abs(residuals))), 1e-8)
-        assert 0.0 < efficiency < 1.0
-        return trend * math.sqrt(efficiency)
+    periods = 3 * parameters.signal_lookback_days
+    drift_times = pd.date_range(
+        end=context.decision_time - pd.Timedelta(days=parameters.skip_days),
+        periods=periods,
+        freq="8h",
+    )
+    raw_returns = symbol_returns.reindex(drift_times).to_numpy(dtype=float)
+    residual_returns = (
+        raw_returns - beta * btc_returns.reindex(drift_times).to_numpy(dtype=float)
+    )
 
-    expected_h14 = expected_drift(14)
-    expected_h21 = expected_drift(21)
-    assert signal_h14.drift == pytest.approx(expected_h14, rel=1e-13, abs=1e-13)
-    assert signal_h21.drift == pytest.approx(expected_h21, rel=1e-13, abs=1e-13)
-    assert signal_h14.drift != pytest.approx(signal_h21.drift, rel=1e-9, abs=1e-12)
+    def expected_drift(returns: np.ndarray) -> tuple[float, float]:
+        signal_sum = float(np.sum(returns))
+        signal_volatility = float(np.std(returns, ddof=1))
+        trend = signal_sum / max(
+            signal_volatility * math.sqrt(float(periods)), 1e-8
+        )
+        efficiency = abs(signal_sum) / max(float(np.sum(np.abs(returns))), 1e-8)
+        assert 0.0 < efficiency < 1.0
+        return trend * math.sqrt(efficiency), signal_volatility
+
+    expected_residual, expected_residual_volatility = expected_drift(residual_returns)
+    expected_raw, expected_raw_volatility = expected_drift(raw_returns)
+    assert signal_chop.drift == pytest.approx(expected_residual, rel=1e-13, abs=1e-13)
+    assert signal_bull.drift == pytest.approx(expected_residual, rel=1e-13, abs=1e-13)
+    assert signal_bear.drift == pytest.approx(expected_raw, rel=1e-13, abs=1e-13)
+    assert signal_chop.signal_volatility == pytest.approx(
+        expected_residual_volatility, rel=1e-13, abs=1e-13
+    )
+    assert signal_bear.signal_volatility == pytest.approx(
+        expected_raw_volatility, rel=1e-13, abs=1e-13
+    )
+    assert signal_bear.drift != pytest.approx(signal_chop.drift, rel=1e-9, abs=1e-12)
+
+
+def test_btc_regime_uses_lagged_60_day_return_and_inclusive_boundaries() -> None:
+    index = pd.date_range(
+        start=_DECISION_TIME - pd.Timedelta(days=61),
+        end=_DECISION_TIME,
+        freq="1D",
+    )
+    closes = pd.Series(100.0, index=index, dtype=float)
+    anchor = _DECISION_TIME - pd.Timedelta(days=1)
+
+    def classify(anchor_log_return: float):
+        candidate = closes.copy(deep=True)
+        candidate.loc[anchor] = 100.0 * math.exp(anchor_log_return)
+        candidate.loc[_DECISION_TIME] = 1.0e9
+        return strategy_module._btc_regime_direction(
+            candidate,
+            decision_time=_DECISION_TIME,
+            lookback_days=60,
+            lag_days=1,
+            scale=0.20,
+            bull_threshold=0.10,
+            bear_threshold=-0.10,
+        )
+
+    bull = classify(0.10)
+    bear = classify(-0.10)
+    chop = classify(0.099)
+    assert bull is not None and bull.state == "bull"
+    assert bull.log_return == pytest.approx(0.10, abs=1e-14)
+    assert bull.scaled_direction == pytest.approx(0.50, abs=1e-14)
+    assert bear is not None and bear.state == "bear"
+    assert bear.log_return == pytest.approx(-0.10, abs=1e-14)
+    assert bear.scaled_direction == pytest.approx(-0.50, abs=1e-14)
+    assert chop is not None and chop.state == "chop"
+
+    missing_anchor = closes.drop(index=anchor)
+    assert strategy_module._btc_regime_direction(
+        missing_anchor,
+        decision_time=_DECISION_TIME,
+        lookback_days=60,
+        lag_days=1,
+        scale=0.20,
+        bull_threshold=0.10,
+        bear_threshold=-0.10,
+    ) is None
 
 
 @pytest.mark.parametrize("defect", ["duplicate", "nonfinite_close", "nonfinite_funding"])
@@ -474,11 +536,14 @@ def test_inadequate_coverage_missing_btc_and_one_sided_infeasibility_are_flat() 
     assert _targets(one_sided) == {}
 
 
-def test_canonical_target_hash_is_clean_process_stable() -> None:
+def test_canonical_target_hash_is_repeatable_pending_organizer_freeze() -> None:
     first = _target_hash(_targets(_synthetic_context()))
     second = _target_hash(_targets(_synthetic_context()))
     assert first == second
-    assert first == "ebf2cce8ba380674f001cd852dcdb7cc6decbaaeed40ab07bd8ebb677e12977f"
+    # The exact pivot hash is intentionally not asserted until the organizer runs this
+    # unexecuted suite and records the clean-process evidence.
+    assert len(first) == 64
+    assert set(first).issubset(set("0123456789abcdef"))
 
 
 def test_official_namespaced_worker_matches_direct_synthetic_targets_twice() -> None:
@@ -491,29 +556,27 @@ def test_official_namespaced_worker_matches_direct_synthetic_targets_twice() -> 
     assert _target_hash(first_worker) == _target_hash(second_worker)
 
 
-def test_frozen_current_candidate_and_no_control_policy_match_qr_decision() -> None:
+def test_frozen_pivot_reference_and_no_control_policy_match_review_decision() -> None:
     frozen = json.loads((_TEAM_DIR / "frozen_config.json").read_text(encoding="utf-8"))
     risk_policy_bytes = (_TEAM_DIR / "risk_policy.json").read_bytes()
     policy = json.loads(risk_policy_bytes)
-    assert frozen["candidate_id"] == "rdf-core-h14-k3-g05"
+    assert frozen["candidate_id"] == "rctc-pivot-ref-001"
     assert (
         frozen["candidate_status"]
-        == "deterministic_core_candidate_not_yet_registered_or_evaluated"
+        == "deterministic_pivot_reference_not_yet_registered_or_evaluated"
     )
-    expected_candidate = dict(_BASELINE_FROZEN_PARAMETERS)
-    expected_candidate["residual_lookback_days"] = 14
-    assert frozen["parameters"] == expected_candidate
-    assert {
-        key: value
-        for key, value in frozen["parameters"].items()
-        if key != "residual_lookback_days"
-    } == {
-        key: value
-        for key, value in _BASELINE_FROZEN_PARAMETERS.items()
-        if key != "residual_lookback_days"
+    assert frozen["family_id"] == "t01-regime-conditional-trend-carry-v2"
+    assert frozen["parameters"] == _PIVOT_FROZEN_PARAMETERS
+    assert frozen["regime_signal_map"] == {
+        "bear": "path-efficient standardized raw asset log-return trend",
+        "bull": "path-efficient standardized BTC-residual continuation",
+        "chop": "path-efficient standardized BTC-residual continuation",
+        "state_observation": (
+            "BTC trailing 60-day log return ending one calendar day before decision_time"
+        ),
     }
-    assert dataclasses.asdict(strategy_module.REFERENCE_PARAMETERS) == {
-        "residual_lookback_days": 14,
+    assert dataclasses.asdict(strategy_module.PIVOT_REFERENCE_PARAMETERS) == {
+        "signal_lookback_days": 14,
         "skip_days": 3,
         "path_efficiency_exponent": 0.5,
         "rank_tail_fraction": 0.25,
@@ -524,7 +587,10 @@ def test_frozen_current_candidate_and_no_control_policy_match_qr_decision() -> N
         "minimum_funding_events": 14,
         "funding_penalty": 0.35,
         "direction_lookback_days": 60,
+        "direction_lag_days": 1,
         "direction_return_scale": 0.2,
+        "bull_threshold_log_return": 0.1,
+        "bear_threshold_log_return": -0.1,
         "total_gross": 0.8,
         "per_symbol_cap": 0.09,
         "minimum_valid_symbols": 24,

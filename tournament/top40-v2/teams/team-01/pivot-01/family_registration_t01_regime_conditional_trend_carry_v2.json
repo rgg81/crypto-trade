@@ -1,0 +1,152 @@
+{
+  "economic_thesis": "The stopped all-residual family retained aggregate, bull, chop, and doubled-cost strength but repeatedly failed in bear and late folds. Unconditional BTC residualization may remove the common downside information needed by the short sleeve. A causal, one-day-lagged BTC regime switch should preserve cross-sectional residual continuation in bull and chop while using raw path-efficient downside trend in bear; the unchanged realized-funding penalty should continue to de-crowd both tails.",
+  "expected_regime_roles": {
+    "bear": "The raw-trend branch should rank the strongest absolute downside trends into the short tail while the long tail holds relative survivors; bear net return and short-bear attribution must both be positive.",
+    "bull": "The residual-continuation branch should own path-efficient positive BTC-residual leaders and short residual laggards; long-bull attribution must be positive.",
+    "chop": "The residual-continuation branch should retain a balanced cross-sectional dispersion book; combined chop return must be positive.",
+    "long_sleeve": "Hold the positive signed tail after the state-specific trend score and unchanged funding penalty; remain active in every state and contribute positively in bull.",
+    "short_sleeve": "Short the negative signed tail after the state-specific trend score and unchanged funding penalty; remain active in every state and contribute positively in bear.",
+    "stress": "Stress is an evaluator label, not a strategy state. The reference promises no positive stress return; its bounded gross, symbol caps, two-sided construction, and funding de-crowding remain the only reference protections."
+  },
+  "family_id": "t01-regime-conditional-trend-carry-v2",
+  "falsifier": "Reject reference rctc-pivot-ref-001 with no risk rescue if its canonical record is incomplete or insolvent, no-control aggregate net Sharpe is nonpositive, fewer than four of six chronological folds have positive net return, any of bull/bear/chop net return is nonpositive, long-bull attribution, short-bear attribution, or combined-chop attribution is nonpositive, fewer than three evaluator regimes have positive Sharpe, or worst-regime Sharpe is below -0.25. Bear return and short-bear attribution must be positive against the completed all-residual H14 comparator. Any failure authorizes no parameter search and requires DNF or a separately registered second and final pivot.",
+  "mechanism": "At each 00:00 UTC boundary, use only closed 8h bars and actual funding rows strictly before the decision. Classify state from BTCUSDT's trailing 60-day log return ending exactly one calendar day before the decision: bull at or above +0.10, bear at or below -0.10, otherwise chop. Require exact anchor and lookback closes. Estimate every candidate contract's 30-day past-only beta to BTC for a consistent eligible cross-section. In bull and chop, rank path-efficient standardized 14-day BTC-residual continuation ending three days before the decision. In bear, rank the identical transform of raw asset log returns over the same H14/K3 slice. Robust-z the current state-specific drift and subtract 0.35 times robust-z of seven-day actual funding. Select signed q=0.25 tails with at least 24 valid contracts and six per side; use state-signal inverse volatility, winsorized 20/80, and deterministic capped-simplex sleeves. Keep total gross 0.80, symbol cap 0.09, and tilt sleeve gross by delta 0.075 using the same lagged BTC return clipped after division by 0.20. Hold between daily boundaries and request flat on missing state, coverage, scale, signed-tail, or allocation feasibility.",
+  "parameter_ranges": {
+    "beta": {
+      "clip": [
+        -1.0,
+        3.0
+      ],
+      "lookback_days": [
+        30
+      ],
+      "minimum_paired_8h_returns": [
+        72
+      ]
+    },
+    "construction": {
+      "base_gross": [
+        0.8
+      ],
+      "direction_scale_log_return": [
+        0.2
+      ],
+      "direction_tilt_delta": [
+        0.075
+      ],
+      "minimum_names_per_side": [
+        6
+      ],
+      "minimum_valid_symbols": [
+        24
+      ],
+      "per_symbol_target_cap": [
+        0.09
+      ],
+      "rank_tail_fraction": {
+        "reference": 0.25,
+        "post_reference_neighborhood_only": [
+          0.2,
+          0.25,
+          0.3
+        ]
+      },
+      "rebalance_utc": [
+        "00:00"
+      ],
+      "side_weighting": [
+        "inverse_state_signal_vol_winsorized_20_80_then_capped_simplex"
+      ]
+    },
+    "funding": {
+      "lookback_days": [
+        7
+      ],
+      "minimum_events": [
+        14
+      ],
+      "penalty_lambda": [
+        0.35
+      ]
+    },
+    "regime": {
+      "bear_threshold_log_return": [
+        -0.1
+      ],
+      "bull_threshold_log_return": [
+        0.1
+      ],
+      "btc_lookback_days": [
+        60
+      ],
+      "observation_lag_days": [
+        1
+      ]
+    },
+    "risk_controls": {
+      "reference": "none",
+      "post_reference_drawdown_brakes": [
+        [
+          0.1,
+          0.75
+        ],
+        [
+          0.18,
+          0.4
+        ],
+        [
+          0.25,
+          0.0
+        ]
+      ],
+      "post_reference_volatility_target": {
+        "annualized_target": 0.2,
+        "lookback_days": 30,
+        "scale_bounds": [
+          0.25,
+          1.0
+        ]
+      }
+    },
+    "signal": {
+      "bear_input": [
+        "raw_asset_log_returns"
+      ],
+      "bull_chop_input": [
+        "btc_residual_log_returns"
+      ],
+      "lookback_days": {
+        "post_reference_neighborhood_only": [
+          7,
+          14,
+          21
+        ],
+        "reference": 14
+      },
+      "path_efficiency_exponent": [
+        0.5
+      ],
+      "skip_days": [
+        3
+      ]
+    },
+    "strategy_seed": {
+      "canonical_runtime": 20260801,
+      "team_trial_search_placebo_namespace": 2026080101
+    },
+    "trial_allocation": {
+      "component_or_placebo_cells": 4,
+      "contingency_or_final_pivot_reserve": 3,
+      "family_hard_cap": 24,
+      "local_neighbors_additional": 8,
+      "reference": 1,
+      "risk_cost_matrix": 8
+    }
+  },
+  "parent_family_id": "t01-residual-drift-funding-v1",
+  "registered_at_utc": "PENDING_ORGANIZER_REGISTRATION_TIMESTAMP_Z",
+  "risk_policy_plan": "The exact reference uses no controls. Only if it clears every no-control pivot causal, fold, regime, and role gate may a fresh review register none, a 30-day 20% annualized volatility target alone (scale 0.25 to 1.00), the existing 10%/18%/25% drawdown brakes alone, and the combined policy, each at base and doubled costs. Position/time stops, turnover limits, and side scaling stay disabled; same-boundary reentry is false. No overlay may rescue a failed reference.",
+  "schema_version": 1,
+  "selection_metric": "Across six separate chronological cutoff-safe fold replays, first require every frozen development, regime, sleeve, concentration, multiplicity, doubled-cost, and declared parameter-neighborhood gate. Among passers maximize J = 25th percentile of the six net fold Sharpes + 0.25 times doubled-cost OOF Sharpe. Tie-break by lower maximum drawdown, then lower annualized one-way turnover, then lexicographically smallest canonical parameter JSON. No passer means no champion.",
+  "team_id": "team-01"
+}

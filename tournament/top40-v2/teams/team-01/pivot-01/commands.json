@@ -1,0 +1,49 @@
+{
+  "artifact": "serialized_unexecuted_commands",
+  "commands": [
+    {
+      "command": "python -m pytest -q tournament/top40-v2/teams/team-01/test_strategy.py",
+      "id": "validate-local-suite-first",
+      "status": "not_run"
+    },
+    {
+      "command": "python -m pytest -q tournament/top40-v2/teams/team-01/test_strategy.py",
+      "id": "validate-local-suite-second-clean-repeat",
+      "status": "not_run"
+    },
+    {
+      "command": "sha256sum tournament/top40-v2/config.toml tournament/top40-v2/teams/team-01/strategy.py tournament/top40-v2/teams/team-01/risk_policy.json tournament/top40-v2/teams/team-01/frozen_config.json tournament/top40-v2/teams/team-01/test_strategy.py",
+      "id": "compute-file-hashes",
+      "status": "not_run"
+    },
+    {
+      "command": "python -c 'from pathlib import Path; from crypto_trade.tournament.runner_v2 import source_bundle_fingerprint; print(source_bundle_fingerprint(Path.cwd(), \"team-01\", \"tournament/top40-v2/teams/team-01/strategy.py\")[0])'",
+      "id": "compute-source-bundle-hash",
+      "status": "not_run"
+    },
+    {
+      "command": "python scripts/top40_v2_tournament.py pivot-team team-01 tournament/top40-v2/teams/team-01/pivot-01/family_registration_t01_regime_conditional_trend_carry_v2.json --config tournament/top40-v2/config.toml --json-out tournament/top40-v2/teams/team-01/pivot-01/pivot_registration_receipt.json",
+      "id": "register-pivot-family-after-replacing-pending-timestamp",
+      "status": "not_run"
+    },
+    {
+      "command": "python scripts/top40_v2_tournament.py register-trial team-01 tournament/top40-v2/teams/team-01/pivot-01/trial_registration_rctc_pivot_ref_001.template.json --config tournament/top40-v2/config.toml --json-out tournament/top40-v2/teams/team-01/pivot-01/trial_registration_receipt.json",
+      "id": "register-reference-after-replacing-all-pending-fields",
+      "status": "not_run"
+    },
+    {
+      "command": "python scripts/top40_v2_tournament.py run-window development team-01 rctc-pivot-ref-001 --config tournament/top40-v2/config.toml --json-out tournament/top40-v2/teams/team-01/pivot-01/development_run_receipt.json",
+      "id": "evaluate-one-no-control-reference",
+      "status": "not_run"
+    }
+  ],
+  "preconditions": [
+    "Run from repository root in the authorized organizer environment.",
+    "Replace PENDING_ORGANIZER_REGISTRATION_TIMESTAMP_Z with a valid authorized UTC timestamp before pivot-team.",
+    "Replace every PENDING_ field in the trial template with current verified hashes or timestamp before register-trial.",
+    "Update test_evidence.json with exact outputs only after both tests complete.",
+    "Do not run component, neighborhood, risk, private, or final commands before the reference review authorizes them."
+  ],
+  "schema_version": 1,
+  "team_id": "team-01"
+}

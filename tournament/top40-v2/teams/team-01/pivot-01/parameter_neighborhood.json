@@ -1,0 +1,100 @@
+{
+  "artifact": "planned_parameter_neighborhood",
+  "authorization": "No neighbor is registered or executable unless rctc-pivot-ref-001 first clears every no-control pivot falsifier gate and a fresh review authorizes the neighborhood.",
+  "cells": [
+    {
+      "candidate_id": "rctc-nbr-h07-q20",
+      "rank_tail_fraction": 0.2,
+      "role": "neighbor",
+      "signal_lookback_days": 7,
+      "status": "planned_not_registered_not_run"
+    },
+    {
+      "candidate_id": "rctc-nbr-h07-q25",
+      "rank_tail_fraction": 0.25,
+      "role": "neighbor",
+      "signal_lookback_days": 7,
+      "status": "planned_not_registered_not_run"
+    },
+    {
+      "candidate_id": "rctc-nbr-h07-q30",
+      "rank_tail_fraction": 0.3,
+      "role": "neighbor",
+      "signal_lookback_days": 7,
+      "status": "planned_not_registered_not_run"
+    },
+    {
+      "candidate_id": "rctc-nbr-h14-q20",
+      "rank_tail_fraction": 0.2,
+      "role": "neighbor",
+      "signal_lookback_days": 14,
+      "status": "planned_not_registered_not_run"
+    },
+    {
+      "candidate_id": "rctc-pivot-ref-001",
+      "rank_tail_fraction": 0.25,
+      "role": "reference_center_reused",
+      "signal_lookback_days": 14,
+      "status": "implemented_not_registered_not_run"
+    },
+    {
+      "candidate_id": "rctc-nbr-h14-q30",
+      "rank_tail_fraction": 0.3,
+      "role": "neighbor",
+      "signal_lookback_days": 14,
+      "status": "planned_not_registered_not_run"
+    },
+    {
+      "candidate_id": "rctc-nbr-h21-q20",
+      "rank_tail_fraction": 0.2,
+      "role": "neighbor",
+      "signal_lookback_days": 21,
+      "status": "planned_not_registered_not_run"
+    },
+    {
+      "candidate_id": "rctc-nbr-h21-q25",
+      "rank_tail_fraction": 0.25,
+      "role": "neighbor",
+      "signal_lookback_days": 21,
+      "status": "planned_not_registered_not_run"
+    },
+    {
+      "candidate_id": "rctc-nbr-h21-q30",
+      "rank_tail_fraction": 0.3,
+      "role": "neighbor",
+      "signal_lookback_days": 21,
+      "status": "planned_not_registered_not_run"
+    }
+  ],
+  "family_id": "t01-regime-conditional-trend-carry-v2",
+  "fixed_parameters": {
+    "beta_lookback_days": 30,
+    "bear_threshold_log_return": -0.1,
+    "bull_threshold_log_return": 0.1,
+    "direction_lag_days": 1,
+    "direction_lookback_days": 60,
+    "direction_return_scale": 0.2,
+    "direction_tilt_delta": 0.075,
+    "funding_lookback_days": 7,
+    "funding_penalty": 0.35,
+    "minimum_funding_events": 14,
+    "minimum_names_per_side": 6,
+    "minimum_paired_returns": 72,
+    "minimum_valid_symbols": 24,
+    "path_efficiency_exponent": 0.5,
+    "per_symbol_target_cap": 0.09,
+    "risk_controls": [],
+    "skip_days": 3,
+    "total_gross": 0.8
+  },
+  "neighborhood_gate": {
+    "center_reuse": "Reuse the exact reference canonical record; do not rerun it as a tenth cell.",
+    "mandatory_common_gates": "Every candidate considered for selection must pass all frozen development, regime, role, doubled-cost, concentration, multiplicity, and fold-manifest requirements.",
+    "median_net_sharpe_minimum": 0.5,
+    "minimum_profitable_fraction": 0.7,
+    "selection_metric": "Among complete common-gate passers maximize preregistered J; apply frozen tie-breaks.",
+    "zero_survivor_rule": "No champion and DNF or formal second-pivot decision."
+  },
+  "schema_version": 1,
+  "team_id": "team-01"
+}

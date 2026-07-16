@@ -1,0 +1,208 @@
+{
+  "artifact": "feature_lineage",
+  "created_at_utc": null,
+  "decision_contract": {
+    "decision_timezone": "UTC",
+    "execution": "A target formed at boundary t uses only closed rows available at t and is filled by the central evaluator at the next executable open with ordinary costs and capacity limits.",
+    "hold_boundaries_utc": [
+      "08:00",
+      "16:00"
+    ],
+    "rebalance_boundary_utc": "00:00",
+    "strategy_outputs": {
+      "flat": "{} at a scheduled boundary when state, history, funding, cross-sectional scale, signed tails, or allocation is invalid",
+      "hold": "None outside the daily scheduled boundary",
+      "targets": "finite signed unlevered weights for current eligible symbols only"
+    }
+  },
+  "family_id": "t01-regime-conditional-trend-carry-v2",
+  "forward_diagnostics": [
+    {
+      "availability": "Outcome only; never an input to a target at t.",
+      "embargo": "One 24-hour holding interval for any training-prefix diagnostic.",
+      "label_id": "next_daily_open_to_open_return",
+      "label_window": "Executable open following decision t through the following daily executable open.",
+      "overlap_rule": "Daily labels are non-overlapping; purge a label whose endpoint reaches a fold boundary.",
+      "purpose": "Optional state-score diagnostics only; the pivot falsifier makes no unmeasured IC claim."
+    },
+    {
+      "availability": "Outcome only; calculated centrally from canonical fills and costs.",
+      "embargo": "Not applicable to accounting; chronological folds are separate cutoff-safe replays.",
+      "label_id": "portfolio_net_return_and_role_attribution",
+      "label_window": "Central evaluator return interval after the next-open target fill.",
+      "overlap_rule": "Assigned by evaluator timestamp to canonical fold and regime.",
+      "purpose": "Reference falsifier, role gates, qualification, and any later selection metric."
+    }
+  ],
+  "invariance_tests": [
+    {
+      "expected": "All targets at or before cutoff are byte-identical.",
+      "test": "truncate every raw stream strictly after cutoff"
+    },
+    {
+      "expected": "All targets at or before cutoff are byte-identical.",
+      "test": "append valid future bars, funding rows, and memberships"
+    },
+    {
+      "expected": "All targets at or before cutoff are byte-identical and no exception exposes future values.",
+      "test": "replace future closes, opens, volumes, funding values, and symbols with corrupt sentinels"
+    },
+    {
+      "expected": "Changing the BTC close at t cannot alter the state, direction tilt, or target because both end at t-1d.",
+      "test": "mutate only BTC close at decision_time after preserving the exact t-1d anchor"
+    },
+    {
+      "expected": "The state changes only at inclusive +0.10/-0.10 boundaries and is chop strictly between them.",
+      "test": "synthetic exact-boundary BTC paths"
+    },
+    {
+      "expected": "Target mapping and canonical serialization are identical across clean processes.",
+      "test": "repeat with canonical runtime seed 20260801"
+    },
+    {
+      "expected": "No target includes the removed symbol; earlier targets are unchanged.",
+      "test": "point-in-time membership removal"
+    }
+  ],
+  "mechanism_identity_guardrail": {
+    "allowed_state_switch": "raw asset trend only in the causally lagged bear state; BTC-residual continuation in bull and chop",
+    "forbidden_without_second_formal_pivot": [
+      "different regime thresholds, lag, market factor, or state labels",
+      "reversal rather than continuation in any state",
+      "risk controls on a reference that failed its causal or role gates",
+      "simultaneous signal, funding, construction, and risk redesign"
+    ],
+    "identity": "one-day-lagged BTC regime-conditional path-efficient trend with unchanged funding de-crowding",
+    "parent_comparator": "rdf-core-h14-k3-g05-r1 from stopped t01-residual-drift-funding-v1"
+  },
+  "missing_data_policy": {
+    "bars": "No forward fill or full-sample imputation. Exclude a symbol failing finite-positive close, consecutive-return, state-slice, or paired-BTC coverage.",
+    "cross_section": "Require at least 24 valid symbols and six signed names per side. Otherwise request flat; never transfer unused gross to one sleeve.",
+    "funding": "Require at least 14 finite actual events in [t-7d,t). No row at or after t and no imputation.",
+    "market_factor": "Require BTCUSDT, exact closes at t-1d and t-61d, valid 30-day paired coverage, and variance above 1e-12. Request flat rather than substitute a factor or neutral state.",
+    "robust_scale": "Request flat when either current-cross-section MAD is non-finite or <=1e-12; no fallback scale."
+  },
+  "raw_inputs": [
+    {
+      "availability_timestamp": "A bar is delivered only when open_time + 8h <= decision_time.",
+      "coverage": "Closed 8h rows for current eligible symbols; the regime needs exact BTC closes at t-1d and t-61d, beta needs 72 paired returns, and signal needs the complete H14/K3 slice.",
+      "event_timestamp": "open_time + 8h",
+      "field": "bars.close",
+      "lag": "Signal slice ends t-3d; BTC state and tilt end t-1d; execution remains next-open.",
+      "missing_rule": "Exclude non-finite, non-positive, duplicate, non-monotone, gapped, or insufficient history; do not forward fill.",
+      "source": "Frozen public Binance USD-M 8h transaction-bar snapshot through the authorized stage cutoff."
+    },
+    {
+      "availability_timestamp": "Strictly after the completed event; worker admits only funding_time < decision_time.",
+      "coverage": "Actual event rows for current eligible symbols; at least 14 finite events in seven calendar days.",
+      "event_timestamp": "funding_time",
+      "field": "funding.funding_rate",
+      "lag": "Strictly excludes funding_time >=t.",
+      "missing_rule": "Exclude the symbol; do not impute zero or a scheduled rate.",
+      "source": "Frozen public Binance USD-M actual funding rows through the authorized stage cutoff."
+    },
+    {
+      "availability_timestamp": "Effective at the current decision boundary and delivered by the organizer.",
+      "coverage": "Point-in-time Top-40 intersected with contracts having an executable next open.",
+      "event_timestamp": "universe effective boundary",
+      "field": "context.eligible_symbols",
+      "lag": "The strategy consumes only the authorized current membership.",
+      "missing_rule": "Never synthesize membership or return targets outside the delivered set.",
+      "source": "Organizer-owned point-in-time universe from the frozen public snapshot."
+    }
+  ],
+  "schema_version": 1,
+  "seed_contract": {
+    "canonical_runtime_strategy_seed": 20260801,
+    "team_trial_search_placebo_namespace": 2026080101
+  },
+  "team_id": "team-01",
+  "transforms": [
+    {
+      "availability": "At t after both adjacent closes have closed and been delivered.",
+      "fit_scope": "None; deterministic point transform.",
+      "formula": "r_i,u = log(C_i,u / C_i,u-1)",
+      "inputs": [
+        "bars.close",
+        "bars.open_time"
+      ],
+      "lag": "No return is formed across a missing 8h interval.",
+      "missing_rule": "Invalid across gaps or non-positive closes.",
+      "transform_id": "log_return_8h"
+    },
+    {
+      "availability": "At decision t from exact BTC closes ending one calendar day earlier.",
+      "fit_scope": "Fixed 60-day rule; no learned state.",
+      "formula": "g_t=log(C_BTC,t-1d/C_BTC,t-61d); bull if g_t>=0.10, bear if g_t<=-0.10, else chop; m_t=clip(g_t/0.20,-1,1)",
+      "inputs": [
+        "bars.close for BTCUSDT"
+      ],
+      "lag": "Both state and direction tilt end at t-1d.",
+      "missing_rule": "Request flat if either exact close is missing or invalid; do not substitute chop or zero.",
+      "transform_id": "lagged_btc_regime_and_direction"
+    },
+    {
+      "availability": "Recomputed at every t from paired closed returns.",
+      "fit_scope": "Past-only rolling 30 days; no fold-spanning object.",
+      "formula": "beta_i(t)=clip(cov(r_i,r_BTC)/var(r_BTC),-1,3)",
+      "inputs": [
+        "log_return_8h for symbol",
+        "log_return_8h for BTCUSDT"
+      ],
+      "lag": "Window ends no later than t; minimum 72 paired returns.",
+      "missing_rule": "Invalid on insufficient coverage or BTC variance <=1e-12.",
+      "transform_id": "rolling_btc_beta"
+    },
+    {
+      "availability": "At t after the lagged state and H14/K3 return slice are valid.",
+      "fit_scope": "Fixed H=14 days, K=3 days, gamma=0.5 for the reference.",
+      "formula": "x_i,u=r_i,u-beta_i(t)r_BTC,u in bull/chop and x_i,u=r_i,u in bear; U_i=[sum(x)/(sd(x)*sqrt(42))]*[abs(sum(x))/sum(abs(x))]^0.5",
+      "inputs": [
+        "log_return_8h",
+        "rolling_btc_beta",
+        "lagged_btc_regime_and_direction"
+      ],
+      "lag": "Exactly 42 8h returns ending t-3d.",
+      "missing_rule": "Invalid on incomplete slice, non-finite value, sample sd <=1e-12, or path denominator <=1e-8.",
+      "transform_id": "regime_conditional_path_efficient_trend"
+    },
+    {
+      "availability": "At t using actual events strictly before t.",
+      "fit_scope": "Fixed trailing seven calendar days.",
+      "formula": "F_i=sum(funding_rate where t-7d <= funding_time < t)",
+      "inputs": [
+        "funding.funding_rate"
+      ],
+      "lag": "Strictly excludes funding_time >=t.",
+      "missing_rule": "Invalid with fewer than 14 finite events.",
+      "transform_id": "funding_pressure_7d"
+    },
+    {
+      "availability": "At t over the valid current eligible cross-section.",
+      "fit_scope": "Contemporaneous median and MAD only.",
+      "formula": "S_i=clip((U_i-med(U))/(1.4826*MAD(U)),-3,3)-0.35*clip((F_i-med(F))/(1.4826*MAD(F)),-3,3)",
+      "inputs": [
+        "regime_conditional_path_efficient_trend",
+        "funding_pressure_7d",
+        "context.eligible_symbols"
+      ],
+      "lag": "Inherits H14/K3 price and strict funding lags.",
+      "missing_rule": "Request flat when either MAD fails or valid cross-section <24.",
+      "transform_id": "regime_trend_funding_score"
+    },
+    {
+      "availability": "At scheduled t after score, state, and coverage checks.",
+      "fit_scope": "Reference-fixed q=0.25 and delta=0.075; deterministic current-slice weighting.",
+      "formula": "rank signed tails; long gross=0.40+0.075*m_t, short magnitude=0.40-0.075*m_t, total gross=0.80, symbol cap=0.09",
+      "inputs": [
+        "regime_trend_funding_score",
+        "lagged_btc_regime_and_direction",
+        "sample volatility of the state-specific signal return",
+        "context.eligible_symbols"
+      ],
+      "lag": "Formed at t and filled only at the next executable open.",
+      "missing_rule": "Request flat if either side has fewer than six signed names or capped-simplex projection is infeasible.",
+      "transform_id": "two_sleeve_target_weights"
+    }
+  ]
+}

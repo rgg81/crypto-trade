@@ -1,0 +1,54 @@
+{
+  "artifact": "pivot_reference_candidate",
+  "candidate_id": "rctc-pivot-ref-001",
+  "candidate_status": "specified_implemented_not_registered_not_evaluated",
+  "entrypoint": "../strategy.py",
+  "evidence": {
+    "canonical_evaluation_id": null,
+    "canonical_return_sha256": null,
+    "official_result": null,
+    "registration_record": null,
+    "synthetic_target_sha256": null,
+    "test_result": null
+  },
+  "family_id": "t01-regime-conditional-trend-carry-v2",
+  "material_change_from_parent": "Only the bear-state ranking and signal-volatility input switch from BTC-residual returns to raw asset returns. State is causal and lagged one day. Funding, selection, two-sleeve construction, gross, caps, direction tilt, runtime seed, execution contract, and no-control policy remain fixed.",
+  "parameters": {
+    "beta_clip": [
+      -1.0,
+      3.0
+    ],
+    "beta_lookback_days": 30,
+    "bear_threshold_log_return": -0.1,
+    "bull_threshold_log_return": 0.1,
+    "direction_lag_days": 1,
+    "direction_lookback_days": 60,
+    "direction_return_scale": 0.2,
+    "direction_tilt_delta": 0.075,
+    "funding_lookback_days": 7,
+    "funding_penalty": 0.35,
+    "minimum_funding_events": 14,
+    "minimum_names_per_side": 6,
+    "minimum_paired_returns": 72,
+    "minimum_valid_symbols": 24,
+    "path_efficiency_exponent": 0.5,
+    "per_symbol_target_cap": 0.09,
+    "rank_tail_fraction": 0.25,
+    "signal_lookback_days": 14,
+    "skip_days": 3,
+    "total_gross": 0.8
+  },
+  "reference_policy": {
+    "cost_multiplier": 1.0,
+    "enabled_controls": [],
+    "policy_id": "team-01-base"
+  },
+  "schema_version": 1,
+  "seeds": {
+    "canonical_runtime": 20260801,
+    "team_trial_search_placebo_namespace_not_used_for_targets": 2026080101
+  },
+  "source_bundle_sha256": null,
+  "team_id": "team-01",
+  "trial_registered_at_utc": null
+}

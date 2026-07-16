@@ -52,7 +52,7 @@
   "critic_lock": null,
   "final_oos_lock": null,
   "finalist_cohort_lock": null,
-  "legacy_projection_sha256": "a7b2c36d312515ce873b3144bc2b6a57ed48a25cd1326d8c96ff0e2926ee34e0",
+  "legacy_projection_sha256": "216200e58d3b6cdb0125fd0879083ad89717e4d67fcfb9fb463aa99e34acff2e",
   "legacy_state_sha256": "8c858495fde6ddde203124a055e40ebad5d8d5a684cd20f0e55f6c88f7360b07",
   "objective_lock": null,
   "organizer_audit": {
@@ -85,14 +85,19 @@
       "active_family_id": "t01-residual-drift-funding-v1",
       "canonical_result": null,
       "development_assessment": null,
-      "dnf": null,
+      "dnf": {
+        "previous_status": "researching",
+        "reason": "Integrity DNF: an over-broad Team 01 search exposed other V2 team files and matched research content, violating the Team Playbook clean-room boundary; the unregistered pivot is quarantined and receives no test or evaluation.",
+        "reason_code": "withdrawn",
+        "recorded_at_utc": "2026-07-16T12:03:13.680967+00:00"
+      },
       "family_count": 1,
       "finalist_freeze": null,
       "pivot_count": 0,
       "private_attempts": 0,
       "private_result": null,
       "qualifier_candidate": null,
-      "status": "researching",
+      "status": "dnf",
       "trial_count": 5
     },
     "team-02": {

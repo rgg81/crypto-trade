@@ -1,0 +1,217 @@
+{
+  "artifact": "planned_ablations",
+  "component_ablations": [
+    {
+      "ablation_id": "P01-no-funding-term",
+      "change": "Set funding penalty to zero; keep the lagged state, state-specific trend, construction, no-control policy, and base costs identical.",
+      "causal_claim_tested": "Actual funding de-crowding reduces funding drag and squeeze exposure in the pivot rather than merely perturbing ranks.",
+      "decision": "Retain the funding term only if it reduces net funding drag without breaking the reference causal, regime, role, or doubled-cost gates.",
+      "prerequisite": "rctc-pivot-ref-001 passes every no-control pivot falsifier gate",
+      "status": "planned_not_registered_not_run"
+    },
+    {
+      "ablation_id": "P02-no-direction-tilt",
+      "change": "Set direction tilt delta to zero so each sleeve remains at gross 0.40; keep regime routing and rankings identical.",
+      "causal_claim_tested": "The same lagged BTC direction value improves long-bull and short-bear roles without sacrificing chop.",
+      "decision": "Retain the tilt only if all common gates pass and declared J is higher than this zero-tilt cell.",
+      "prerequisite": "rctc-pivot-ref-001 passes every no-control pivot falsifier gate",
+      "status": "planned_not_registered_not_run"
+    },
+    {
+      "ablation_id": "P03-all-raw-states",
+      "change": "Use path-efficient raw asset trend in bull, bear, and chop; keep lagged state labels for attribution and keep every other term identical.",
+      "causal_claim_tested": "Residualization remains useful specifically in bull and chop, while raw common downside information is needed specifically in bear.",
+      "decision": "If all-raw dominates the reference on J and all required roles, the conditional residualization thesis is unsupported and requires formal review rather than silent adoption.",
+      "prerequisite": "rctc-pivot-ref-001 passes every no-control pivot falsifier gate",
+      "status": "planned_not_registered_not_run"
+    },
+    {
+      "ablation_id": "P04-inverted-state-routing-placebo",
+      "change": "Invert only the sign used for branch routing: route the observed bull state to raw trend and observed bear to residual trend; leave observed regime attribution, direction tilt, funding, and construction unchanged.",
+      "causal_claim_tested": "The economic mapping of raw trend to bear, rather than a generic state switch, carries the improvement.",
+      "decision": "The placebo should have lower bear return, short-bear attribution, and J. Contrary evidence rejects the claimed state mapping.",
+      "prerequisite": "rctc-pivot-ref-001 passes every no-control pivot falsifier gate",
+      "status": "planned_not_registered_not_run"
+    }
+  ],
+  "created_at_utc": null,
+  "family_id": "t01-regime-conditional-trend-carry-v2",
+  "historical_comparator": {
+    "candidate_id": "rdf-core-h14-k3-g05-r1",
+    "family_id": "t01-residual-drift-funding-v1",
+    "reuse_rule": "Use only its already completed canonical evidence as the all-residual comparator; do not rerun, modify, or charge it as a pivot cell.",
+    "status": "completed_parent_evidence_family_stopped"
+  },
+  "metrics_required_for_every_new_cell": [
+    "net annualized return",
+    "net Sharpe",
+    "maximum drawdown",
+    "Calmar",
+    "1% daily expected shortfall",
+    "worst daily return",
+    "annualized one-way turnover",
+    "funding cashflow",
+    "bull/bear/chop/stress return and Sharpe",
+    "long-bull, short-bear, and combined-chop attribution",
+    "long and short sleeve exposure, activity, and notional",
+    "six chronological fold returns and Sharpes",
+    "positive quarter fraction",
+    "positive-PnL concentration",
+    "requested and filled risk notional",
+    "risk action counts and time under every scale for risk cells"
+  ],
+  "risk_control_definitions": {
+    "brakes_only": {
+      "drawdown_brakes": [
+        {
+          "drawdown": 0.1,
+          "gross_scale": 0.75
+        },
+        {
+          "drawdown": 0.18,
+          "gross_scale": 0.4
+        },
+        {
+          "drawdown": 0.25,
+          "gross_scale": 0.0
+        }
+      ],
+      "position_stop_enabled": false,
+      "same_boundary_reentry": false,
+      "side_scaling": {
+        "long_scale": 1.0,
+        "short_scale": 1.0
+      },
+      "time_stop_enabled": false,
+      "turnover_limit_enabled": false,
+      "volatility_target_enabled": false
+    },
+    "combined": {
+      "drawdown_brakes": [
+        {
+          "drawdown": 0.1,
+          "gross_scale": 0.75
+        },
+        {
+          "drawdown": 0.18,
+          "gross_scale": 0.4
+        },
+        {
+          "drawdown": 0.25,
+          "gross_scale": 0.0
+        }
+      ],
+      "position_stop_enabled": false,
+      "same_boundary_reentry": false,
+      "side_scaling": {
+        "long_scale": 1.0,
+        "short_scale": 1.0
+      },
+      "time_stop_enabled": false,
+      "turnover_limit_enabled": false,
+      "volatility_target": {
+        "annualized_target": 0.2,
+        "enabled": true,
+        "lookback_days": 30,
+        "maximum_scale": 1.0,
+        "minimum_scale": 0.25
+      }
+    },
+    "none": {
+      "drawdown_brakes": [],
+      "position_stop_enabled": false,
+      "same_boundary_reentry": false,
+      "side_scaling": {
+        "long_scale": 1.0,
+        "short_scale": 1.0
+      },
+      "time_stop_enabled": false,
+      "turnover_limit_enabled": false,
+      "volatility_target_enabled": false
+    },
+    "volatility_only": {
+      "drawdown_brakes": [],
+      "position_stop_enabled": false,
+      "same_boundary_reentry": false,
+      "side_scaling": {
+        "long_scale": 1.0,
+        "short_scale": 1.0
+      },
+      "time_stop_enabled": false,
+      "turnover_limit_enabled": false,
+      "volatility_target": {
+        "annualized_target": 0.2,
+        "enabled": true,
+        "lookback_days": 30,
+        "maximum_scale": 1.0,
+        "minimum_scale": 0.25
+      }
+    }
+  },
+  "risk_decision_rule": {
+    "admissibility": "Register risk cells only after the no-control reference clears every pivot causal, fold, regime, and role gate.",
+    "combined_policy_minimum_effect": "Versus no control at the same costs, maximum drawdown and 1% daily expected shortfall must both improve; expected shortfall must improve at least 10%; annualized return retention must be at least 70%; neither base- nor doubled-cost Sharpe may fall more than 0.05; every mandatory regime and role gate must remain satisfied.",
+    "fallback": "If combined fails, choose the least complex admissible individual control, otherwise no control. Tie-break by lower maximum drawdown, lower turnover, then canonical policy ID.",
+    "non_rescue": "No risk cell may be registered or used to rescue a reference that fails its pivot falsifier."
+  },
+  "risk_matrix": [
+    {
+      "ablation_id": "PR01-none-base",
+      "control_definition": "none",
+      "cost_multiplier": 1.0,
+      "status": "planned_not_registered_not_run"
+    },
+    {
+      "ablation_id": "PR02-volatility-base",
+      "control_definition": "volatility_only",
+      "cost_multiplier": 1.0,
+      "status": "planned_not_registered_not_run"
+    },
+    {
+      "ablation_id": "PR03-brakes-base",
+      "control_definition": "brakes_only",
+      "cost_multiplier": 1.0,
+      "status": "planned_not_registered_not_run"
+    },
+    {
+      "ablation_id": "PR04-combined-base",
+      "control_definition": "combined",
+      "cost_multiplier": 1.0,
+      "status": "planned_not_registered_not_run"
+    },
+    {
+      "ablation_id": "PR05-none-double",
+      "control_definition": "none",
+      "cost_multiplier": 2.0,
+      "status": "planned_not_registered_not_run"
+    },
+    {
+      "ablation_id": "PR06-volatility-double",
+      "control_definition": "volatility_only",
+      "cost_multiplier": 2.0,
+      "status": "planned_not_registered_not_run"
+    },
+    {
+      "ablation_id": "PR07-brakes-double",
+      "control_definition": "brakes_only",
+      "cost_multiplier": 2.0,
+      "status": "planned_not_registered_not_run"
+    },
+    {
+      "ablation_id": "PR08-combined-double",
+      "control_definition": "combined",
+      "cost_multiplier": 2.0,
+      "status": "planned_not_registered_not_run"
+    }
+  ],
+  "schema_version": 1,
+  "team_id": "team-01",
+  "trial_accounting": {
+    "component_or_placebo_cells": 4,
+    "family_hard_cap": 24,
+    "local_neighbor_cells_additional": 8,
+    "reference_cells": 1,
+    "risk_cost_cells": 8,
+    "rule": "Every new material cell is registered before execution; no planned cell is authorized merely by appearing here."
+  }
+}
