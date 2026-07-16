@@ -1,0 +1,78 @@
+{
+  "bundle_sha256": "ROOT_MUST_COMPUTE_AFTER_A5_FREEZE_64_HEX",
+  "candidate_id": "team-04-ber-reference-001",
+  "canonical_fingerprint_entries": [
+    {
+      "canonical_path": "tournament/top40-v2/teams/team-04/frozen_config.json",
+      "role": "frozen-candidate-contract",
+      "sha256": "ROOT_MUST_COMPUTE_64_HEX",
+      "source_path": "tournament/top40-v2/teams/team-04/pivot-01/frozen_config.json"
+    },
+    {
+      "canonical_path": "tournament/top40-v2/teams/team-04/risk_policy.json",
+      "role": "active-disabled-risk-policy",
+      "sha256": "ROOT_MUST_COMPUTE_64_HEX",
+      "source_path": "tournament/top40-v2/teams/team-04/pivot-01/risk_policy.json"
+    },
+    {
+      "canonical_path": "tournament/top40-v2/teams/team-04/strategy.py",
+      "role": "canonical-strategy-containing-a5-boundary-hook",
+      "sha256": "ROOT_MUST_COMPUTE_64_HEX",
+      "source_path": "tournament/top40-v2/teams/team-04/pivot-01/strategy.py"
+    },
+    {
+      "canonical_path": "tournament/top40-v2/teams/team-04/test_strategy.py",
+      "role": "canonical-synthetic-test-source",
+      "sha256": "ROOT_MUST_COMPUTE_64_HEX",
+      "source_path": "tournament/top40-v2/teams/team-04/pivot-01/test_strategy.py"
+    },
+    {
+      "canonical_path": "tournament/top40-v2/teams/team-04/a5-score-opt-in.json",
+      "role": "future-authority-valid-a5-opt-in",
+      "sha256": "ROOT_MUST_FILL_ONLY_AFTER_A5_FREEZE_64_HEX",
+      "source_path": "ROOT_MUST_REPLACE_PROSPECTIVE_TEMPLATE_AFTER_A5_FREEZE"
+    }
+  ],
+  "deprecated_audit_entries": [
+    {
+      "canonical_path": null,
+      "included_in_bundle_fingerprint": true,
+      "official_score_source": false,
+      "promoted": false,
+      "role": "deprecated-noncanonical-audit-only",
+      "sha256": "ROOT_MUST_COMPUTE_64_HEX",
+      "source_path": "tournament/top40-v2/teams/team-04/pivot-01/organizer_score_adapter.py"
+    }
+  ],
+  "digest_contract": {
+    "algorithm": "sha256",
+    "entry_order": "canonical-path-ascending-then-audit-source-path-ascending",
+    "manifest_self_inclusion": false,
+    "payload": "length-prefixed-utf8-path-null-byte-raw-file-bytes-for-every-listed-entry",
+    "required_hashes": [
+      "frozen_config.json",
+      "risk_policy.json",
+      "strategy.py",
+      "test_strategy.py",
+      "organizer_score_adapter.py",
+      "a5-score-opt-in.json-after-a5-freeze"
+    ]
+  },
+  "family_id": "team-04-broad-exhaustion-reversal-v1",
+  "official_score_binding_proof": {
+    "a5_authority_sha256": "ROOT_MUST_FILL_ONLY_AFTER_A5_FREEZE_64_HEX",
+    "a5_manifest_fingerprint_entry": "tournament/top40-v2/teams/team-04/a5-score-opt-in.json",
+    "a5_manifest_sha256": "ROOT_MUST_FILL_ONLY_AFTER_A5_FREEZE_64_HEX",
+    "canonical_promoted_strategy_fingerprint_entry": "tournament/top40-v2/teams/team-04/strategy.py",
+    "canonical_promoted_strategy_sha256": "ROOT_MUST_COMPUTE_64_HEX",
+    "hook_import": "from crypto_trade.tournament.score_adapter_protocol_v5 import score_boundary",
+    "hook_stage": "post-rank-pre-selection",
+    "legacy_team_adapter_is_a5_adapter": false,
+    "legacy_team_adapter_promotion_prohibited": true,
+    "verification": "ROOT_MUST_PROVE_PROMOTED_STRATEGY_BYTES_MATCH_ENTRY_AND_VALID_A5_MANIFEST_BINDS_ITS_HOOK"
+  },
+  "registration_gate": "BLOCKED_UNTIL_A5_IS_FROZEN_AND_EVERY_PLACEHOLDER_IS_REPLACED_AND_VERIFIED",
+  "schema_version": 1,
+  "status": "prospective-template-not-a-valid-bundle-manifest",
+  "team_id": "team-04"
+}

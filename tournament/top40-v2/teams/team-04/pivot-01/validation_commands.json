@@ -1,0 +1,27 @@
+{
+  "commands": [
+    {
+      "command": "uv run ruff check tournament/top40-v2/teams/team-04/pivot-01/strategy.py tournament/top40-v2/teams/team-04/pivot-01/organizer_score_adapter.py tournament/top40-v2/teams/team-04/pivot-01/test_strategy.py",
+      "purpose": "static lint",
+      "status": "NOT_RUN"
+    },
+    {
+      "command": "uv run ruff format --check tournament/top40-v2/teams/team-04/pivot-01/strategy.py tournament/top40-v2/teams/team-04/pivot-01/organizer_score_adapter.py tournament/top40-v2/teams/team-04/pivot-01/test_strategy.py",
+      "purpose": "format verification without mutation",
+      "status": "NOT_RUN"
+    },
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 uv run pytest -q tournament/top40-v2/teams/team-04/pivot-01/test_strategy.py",
+      "purpose": "synthetic market-data-free behavior tests",
+      "status": "BLOCKED_AWAITING_A5_FREEZE"
+    },
+    {
+      "command": "uv run python scripts/top40_v2_tournament_active.py validate-risk-policy tournament/top40-v2/teams/team-04/pivot-01/risk_policy.json",
+      "purpose": "organizer risk-policy validation",
+      "status": "NOT_RUN"
+    }
+  ],
+  "execution_precondition": "A5 must exist and be frozen before any command that imports strategy.py; registration remains blocked until every command completes successfully.",
+  "schema_version": 1,
+  "team_id": "team-04"
+}

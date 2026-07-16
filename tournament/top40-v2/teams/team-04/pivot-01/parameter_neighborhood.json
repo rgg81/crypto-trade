@@ -1,0 +1,19 @@
+{
+  "candidate_center": "team-04-ber-reference-001",
+  "family_id": "team-04-broad-exhaustion-reversal-v1",
+  "minimum_median_sharpe": 0.5,
+  "minimum_profitable_count": 7,
+  "neighbors": [
+    {"axis": "baseline_volatility_days", "value": 14},
+    {"axis": "baseline_volatility_days", "value": 28},
+    {"axis": "shock_days", "value": 2},
+    {"axis": "shock_days", "value": 4},
+    {"axis": "coherence_base_weight", "value": 0.25},
+    {"axis": "coherence_base_weight", "value": 0.75},
+    {"axis": "selected_fraction_per_side", "value": "1/4"},
+    {"axis": "selected_fraction_per_side", "value": "7/20"}
+  ],
+  "size_including_center": 9,
+  "status": "preregistered-not-run",
+  "team_id": "team-04"
+}

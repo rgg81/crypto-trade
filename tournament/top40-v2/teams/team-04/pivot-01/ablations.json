@@ -1,0 +1,60 @@
+{
+  "budget": {
+    "causal_diagnostics": 5,
+    "coarse_additional": 6,
+    "initial_family_maximum": 28,
+    "neighbors_additional": 8,
+    "portfolio_schedule": 4,
+    "reference": 1,
+    "risk_cost_observations": 4
+  },
+  "causal_diagnostics": [
+    {
+      "change": "coherence_base_weight=1.0",
+      "deployable": false,
+      "id": "ber-no-coherence",
+      "question": "Does coherent path structure improve normalized shock reversal?"
+    },
+    {
+      "change": "replace raw with -R",
+      "deployable": false,
+      "id": "ber-no-volatility-normalization",
+      "question": "Does own-history scale prevent high-volatility names from dominating?"
+    },
+    {
+      "change": "replace raw with +Z*(0.50+0.50*E)",
+      "deployable": false,
+      "id": "ber-momentum-sign-flip",
+      "question": "Is reversal direction essential rather than continuation?"
+    },
+    {
+      "change": "shock_days=1",
+      "deployable": false,
+      "id": "ber-one-day-shock",
+      "question": "Is three-day inventory accumulation stronger than a one-day move?"
+    },
+    {
+      "change": "select all complete symbols into continuous demeaned score weights",
+      "deployable": false,
+      "id": "ber-continuous-book",
+      "question": "Do discrete broad tails outperform diffuse cross-sectional exposure?"
+    }
+  ],
+  "family_id": "team-04-broad-exhaustion-reversal-v1",
+  "global_stop": "Stop before every later observation if the exact reference fails completeness, solvency, annual return, net or doubled-cost Sharpe, four profitable folds, 0.55 positive-quarter fraction, required regime/role returns, sleeve activity, globally pooled positive Pearson score IC, four positive fold ICs, frozen pair-count and purge rules, or complete scheduled A5 boundary evidence. Any scheduled empty record fails completeness.",
+  "parent_family_id": "team-04-uncrowded-trend-carry-v1",
+  "reference": {
+    "candidate_id": "team-04-ber-reference-001",
+    "no_control_first": true,
+    "status": "implemented-not-registered-not-run"
+  },
+  "risk_factorial": {
+    "allowed_only_after_every_core_gate_passes": true,
+    "arms": ["none", "volatility-target-only"],
+    "cost_multipliers": [1.0, 2.0],
+    "disabled": ["drawdown-brake", "position-stop", "time-stop", "turnover-limit", "side-scaling", "same-boundary-reentry"]
+  },
+  "schema_version": 1,
+  "selection_order": ["all non-compensatory gates", "positive quarters", "positive folds", "worst regime Sharpe", "worst fold return", "doubled-cost Sharpe", "median fold Sharpe", "aggregate Sharpe", "Calmar", "lower drawdown", "lower concentration", "lower turnover", "candidate_id"],
+  "team_id": "team-04"
+}

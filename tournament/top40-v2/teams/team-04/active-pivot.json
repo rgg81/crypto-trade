@@ -1,0 +1,32 @@
+{
+  "active_candidate_id": "team-04-ber-reference-001",
+  "active_family_id": "team-04-broad-exhaustion-reversal-v1",
+  "audit_only_organizer_score_adapter_source": "pivot-01/organizer_score_adapter.py",
+  "frozen_config_source": "pivot-01/frozen_config.json",
+  "historical_top_level_utc_files_preserved": true,
+  "pivot_directory": "pivot-01",
+  "promotion": {
+    "authorized_in_this_step": false,
+    "excluded_from_promotion": [
+      "organizer_score_adapter.py"
+    ],
+    "required_before_hash_or_registration": true,
+    "target_frozen_config": "frozen_config.json",
+    "target_risk_policy": "risk_policy.json",
+    "target_strategy": "strategy.py",
+    "target_test": "test_strategy.py"
+  },
+  "prospective_a5_opt_in_source": "pivot-01/prospective-a5-score-opt-in.template.json",
+  "registration_blockers": [
+    "A5 score-boundary amendment does not yet exist as frozen authority",
+    "prospective A5 opt-in template has not been replaced by an authority-valid manifest",
+    "canonical promotion, hashes, and serialized validations are not complete"
+  ],
+  "risk_policy_source": "pivot-01/risk_policy.json",
+  "schema_version": 1,
+  "source_bundle_manifest_source": "pivot-01/source-bundle-manifest.template.json",
+  "status": "prepared-unregistered-unrun-blocked-awaiting-a5-freeze-and-root-promotion",
+  "strategy_source": "pivot-01/strategy.py",
+  "team_id": "team-04",
+  "test_source": "pivot-01/test_strategy.py"
+}

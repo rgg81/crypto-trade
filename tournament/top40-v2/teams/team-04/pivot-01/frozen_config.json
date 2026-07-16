@@ -1,0 +1,117 @@
+{
+  "canonical_runtime_seed": 20260801,
+  "candidate_id": "team-04-ber-reference-001",
+  "configuration_id": "team-04-ber-reference-001",
+  "dependencies": {
+    "pandas": "3.0.0",
+    "python": "3.13.12"
+  },
+  "entrypoint": "strategy.py",
+  "factory": "build_strategy",
+  "family_id": "team-04-broad-exhaustion-reversal-v1",
+  "information_contract": {
+    "bar_feature_cutoff": "decision-time-minus-8h",
+    "bar_interval_hours": 8,
+    "fields_used": [
+      "open_time",
+      "close_time",
+      "close"
+    ],
+    "funding_used": false,
+    "off_grid_action": "flat",
+    "unscheduled_action": "hold"
+  },
+  "ic_contract": {
+    "aggregate_minimum_pairs": 1440,
+    "aggregate_statistic": "ordinary-pearson-over-union-of-six-disjoint-fold-pools",
+    "boundary_crossing_pair_action": "purge",
+    "empty_scheduled_record_action": "completeness-failure",
+    "endpoint_eligibility": "exit-fold-membership-not-required-but-executable-open-required",
+    "endpoint_offset_hours": 48,
+    "fold_assignment": "both-entry-and-exit-inside-same-development-evaluation-fold",
+    "fold_minimum_pairs": 240,
+    "fold_minimum_scheduled_decisions": 10,
+    "fold_statistic": "ordinary-pearson-over-all-retained-decision-symbol-pairs",
+    "label": "simple-executable-open-t-to-executable-open-t-plus-48h-return",
+    "malformed_pair_action": "omit-with-recorded-reason-no-imputation-clipping-or-terminal-loss-substitution",
+    "minimum_positive_fold_ics": 4,
+    "pair_symbol_rule": "finite-score-emitted-at-t-and-two-unambiguous-finite-positive-executable-opens",
+    "pooling_forbidden": [
+      "label-ranking",
+      "timestamp-demeaning",
+      "timestamp-level-ic-averaging",
+      "pair-weighting",
+      "fisher-transform"
+    ],
+    "required_aggregate_ic": "strictly-positive",
+    "unavailable_conditions": [
+      "failed-pair-or-decision-minimum",
+      "zero-score-or-label-variance",
+      "nonfinite-correlation",
+      "malformed-pair-membership",
+      "missing-scheduled-a5-evidence"
+    ]
+  },
+  "mechanism_guardrail": {
+    "common_factor_forbidden": true,
+    "deployable": true,
+    "drawdown_or_equity_input_forbidden": true,
+    "funding_input_forbidden": true,
+    "label_input_forbidden": true,
+    "no_outcome_conditioned_switch": true,
+    "risk_control_rescue_forbidden": true,
+    "volatility_is_historical_scale_only": true
+  },
+  "numerical_conventions": {
+    "allocation_tolerance": 1e-12,
+    "arithmetic": "finite-ieee-754-binary64",
+    "epsilon": 1e-12,
+    "path_efficiency_rounding": "min(1,abs(fsum(shock))/fsum(abs(shock))) with zero when denominator<=epsilon",
+    "logarithm": "natural",
+    "rank_ties": "exact-average",
+    "reduction": "math-fsum-time-ascending-symbol-ascii",
+    "selected_fraction_encoding": "reduced-positive-rational-string-numerator-slash-denominator",
+    "selection_tie_order": "score-ascending-then-symbol-ascii"
+  },
+  "parameters": {
+    "baseline_volatility_days": 21,
+    "coherence_base_weight": 0.5,
+    "gross_target": 0.48,
+    "minimum_baseline_volatility": 1e-6,
+    "minimum_cross_section": 24,
+    "minimum_names_per_sleeve": 8,
+    "rebalance_bars": 6,
+    "selected_fraction_per_side": "3/10",
+    "shock_days": 3,
+    "side_budget": 0.24,
+    "symbol_cap": 0.03
+  },
+  "portfolio": {
+    "long_budget": 0.24,
+    "name_count_rule": "max-8-or-floor-3n-over-10",
+    "name_weighting": "equal-with-ascii-residual-reconciliation",
+    "short_budget": 0.24
+  },
+  "risk_policy_id": "team-04-ber-reference-no-control",
+  "runtime_seed_policy": "require-exact-canonical",
+  "schema_version": 1,
+  "score_contract": {
+    "a5_authority_status": "blocked-awaiting-frozen-amendment",
+    "boundary_call": "scores=score_boundary(scores)",
+    "boundary_import": "from crypto_trade.tournament.score_adapter_protocol_v5 import score_boundary",
+    "boundary_stage": "after-feature-eligibility-and-ranking-before-sleeves",
+    "higher_score_role": "long",
+    "identity_requirement": "return-exact-input-dictionary-object",
+    "invalid_scheduled_output": "persisted-empty-score-record-completeness-failure",
+    "legacy_team_adapter": "organizer_score_adapter.py",
+    "legacy_team_adapter_role": "noncanonical-audit-only-not-promoted-not-executed-by-a5",
+    "off_grid_output": "persisted-empty-score-record-excluded-from-scheduled-ic-pairs",
+    "score_name": "ber_ranked_exhaustion_reversal",
+    "serialization_authority": "organizer-owned-a5-after-freeze",
+    "unscheduled_output": null,
+    "uses_labels": false
+  },
+  "status": "implemented-not-registered-not-run-blocked-awaiting-a5-freeze",
+  "team_id": "team-04",
+  "trial_search_tie_namespace": 2026080104
+}

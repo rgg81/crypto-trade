@@ -1,0 +1,46 @@
+{
+  "a5_authority": {
+    "amendment_id": "ROOT_MUST_FILL_ONLY_AFTER_A5_FREEZE",
+    "authority_sha256": "ROOT_MUST_FILL_ONLY_AFTER_A5_FREEZE_64_HEX",
+    "frozen_at_utc": "ROOT_MUST_FILL_ONLY_AFTER_A5_FREEZE_UTC_Z",
+    "module": "crypto_trade.tournament.score_adapter_protocol_v5",
+    "status": "NOT_YET_FROZEN",
+    "symbol": "score_boundary"
+  },
+  "boundary_contract": {
+    "call": "scores=score_boundary(scores)",
+    "input": "finite-symbol-to-ranked-score-dictionary",
+    "labels_available_to_hook": false,
+    "output": "exact-input-dictionary-object-by-identity",
+    "stage": "post-transform-and-rank-pre-selection-weights-costs-and-labels"
+  },
+  "candidate_binding": {
+    "candidate_id": "team-04-ber-reference-001",
+    "config_sha256": "ROOT_MUST_COMPUTE_AFTER_CANONICAL_PROMOTION_64_HEX",
+    "family_id": "team-04-broad-exhaustion-reversal-v1",
+    "risk_config_sha256": "ROOT_MUST_COMPUTE_AFTER_CANONICAL_PROMOTION_64_HEX",
+    "source_bundle_sha256": "ROOT_MUST_COMPUTE_AFTER_A5_FREEZE_64_HEX",
+    "strategy_sha256": "ROOT_MUST_COMPUTE_AFTER_CANONICAL_PROMOTION_64_HEX",
+    "team_id": "team-04"
+  },
+  "ic_contract_binding": {
+    "aggregate_statistic": "globally-pooled-ordinary-pearson",
+    "frozen_config_ic_contract_sha256": "ROOT_MUST_COMPUTE_AFTER_CANONICAL_PROMOTION_64_HEX",
+    "label": "simple-executable-open-t-to-executable-open-t-plus-48h-return",
+    "score": "persisted-ranked-score-at-a5-boundary"
+  },
+  "opt_in": {
+    "authorized": false,
+    "signed_or_confirmed_by": "ROOT_MUST_FILL_ONLY_AFTER_A5_FREEZE",
+    "timestamp_utc": "ROOT_MUST_FILL_ONLY_AFTER_A5_FREEZE_UTC_Z"
+  },
+  "record_contract": {
+    "aligned_nonscheduled": "no-score-record",
+    "off_grid_if_observed": "empty-score-record-excluded-from-scheduled-ic-pairs",
+    "scheduled_boundary_without_finite_ranked_scores": "empty-score-record-and-immediate-completeness-failure",
+    "scheduled_valid": "persist-exact-ranked-score-dictionary"
+  },
+  "registration_gate": "THIS_TEMPLATE_IS_NOT_AN_OPT_IN_AND_REGISTRATION_MUST_REMAIN_BLOCKED",
+  "schema_version": 1,
+  "status": "prospective-template-awaiting-frozen-a5-schema-and-authority"
+}

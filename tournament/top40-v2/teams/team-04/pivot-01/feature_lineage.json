@@ -1,0 +1,109 @@
+{
+  "causality_tests": [
+    {
+      "failure_condition": "Any prefix score or target changes.",
+      "name": "future_append_corruption_truncation",
+      "procedure": "Append, corrupt, and remove rows strictly after the lagged cutoff, then compare exact persisted A5 boundary bytes and target mappings."
+    },
+    {
+      "failure_condition": "Input order changes score bytes, membership, or targets.",
+      "name": "deterministic_order",
+      "procedure": "Reverse symbol order and every price-row order under seed 20260801."
+    },
+    {
+      "failure_condition": "The A5 boundary input reads, accepts, or serializes an outcome label.",
+      "name": "label_free_a5_score_boundary",
+      "procedure": "Place opaque poison objects under auxiliary outcome-like keys and require identical exact persisted A5 boundary bytes."
+    },
+    {
+      "failure_condition": "Missing, duplicate, nonfinite, off-grid, or wrong-close-time data enters a score.",
+      "name": "availability_membership",
+      "procedure": "Inject each malformed state and require symbol exclusion or fail-closed flat when fewer than 24 complete symbols remain."
+    }
+  ],
+  "decision_contract": {
+    "bar_cutoff": "decision_time minus 8h",
+    "insufficient_or_off_grid": "empty mapping requests flat",
+    "non_rebalance": "None holds",
+    "off_grid_score_boundary": "empty record if observed, excluded from scheduled IC pairs",
+    "rebalance_rule": "integer 8h epoch index modulo 6 equals zero",
+    "runtime_seed": 20260801,
+    "scheduled_empty_score_boundary": "immediate completeness failure"
+  },
+  "derived_features": [
+    {
+      "availability": "63 exact baseline returns followed by 9 exact shock returns through the lagged cutoff",
+      "formula": "sigma=population_std(baseline); R=fsum(shock); E=min(1,abs(R)/fsum(abs(shock))); raw=-(R/(sigma*sqrt(9)))*(0.50+0.50*E)",
+      "id": "coherent_normalized_exhaustion",
+      "inputs": ["transaction_closes"],
+      "missing_rule": "Require all 73 exact positive closes, exact 8h close times, and sigma>=1e-6; no fill or substitution. Extra malformed rows are ignored, while two or more valid rows for one expected open invalidate the symbol."
+    },
+    {
+      "availability": "at least 24 complete current symbols",
+      "formula": "exact average rank of raw mapped to [-1,1]",
+      "id": "ber_ranked_exhaustion_reversal",
+      "inputs": ["coherent_normalized_exhaustion", "point_in_time_eligibility"],
+      "missing_rule": "Flat when fewer than 24 complete symbols or rank construction is invalid."
+    },
+    {
+      "availability": "finite ranked scores at a scheduled boundary",
+      "formula": "K=max(8,floor(3N/10)); top K long, bottom K short; equal 0.24 side budgets and 0.03 cap",
+      "id": "target_weights",
+      "inputs": ["ber_ranked_exhaustion_reversal"],
+      "missing_rule": "Flat if sleeve, cap, gross, or net invariant fails."
+    }
+  ],
+  "family_id": "team-04-broad-exhaustion-reversal-v1",
+  "forbidden_inputs": [
+    "future or unclosed price rows",
+    "funding, mark price, OHLC shape, volume, order flow, or order book",
+    "common-market factor, beta, residual, or regime label",
+    "position, fill, fee, slippage, equity, drawdown, or PnL",
+    "forward label or outcome passed through context auxiliary",
+    "private/final observations, V1 results, other teams, ballots, or leaderboards"
+  ],
+  "forward_diagnostic": {
+    "aggregate": "one ordinary Pearson correlation across the union of the six disjoint retained fold pools",
+    "boundary": "crypto_trade.tournament.score_adapter_protocol_v5:score_boundary",
+    "boundary_output": "organizer-persisted exact finite ranked score dictionary after ranking and before sleeve selection",
+    "embargo": "30 calendar days for any later outcome-selected candidate",
+    "endpoint_rule": "Require exactly one finite positive organizer executable open for the emitted symbol at t and t+48h; exit-fold eligibility is not required, but executable endpoint availability is.",
+    "fold_assignment": "Assign a pair to fold k only when t and t+48h both lie inside that fold's development evaluation interval; purge boundary-crossing pairs and never reuse a pair across folds.",
+    "fold_statistic": "ordinary Pearson correlation across every retained decision-symbol pair in the fold; no label ranking, timestamp demeaning, timestamp-level averaging, weighting, or Fisher transform",
+    "label": "simple return executable_open[t+48h,symbol]/executable_open[t,symbol]-1",
+    "malformed_or_missing": "Omit with a recorded reason any missing/delisted endpoint, absent entry, duplicate endpoint, wrong timestamp, nonfinite/nonpositive endpoint, nonfinite score, or nonfinite return; never impute, clip, substitute a terminal loss, or use closes.",
+    "minimums": {
+      "aggregate_pairs": 1440,
+      "pairs_per_fold": 240,
+      "scheduled_decisions_per_fold": 10
+    },
+    "pair_universe": "symbols with a finite score persisted by A5 at scheduled t and valid endpoints",
+    "required": "aggregate IC>0, fold IC>0 in at least four of six folds, every minimum met, no scheduled empty record, and no missing scheduled A5 record",
+    "scheduled_empty_record": "immediate completeness failure",
+    "unavailable": "Any failed minimum, zero variance, nonfinite correlation, malformed pair membership, or missing A5 evidence fails the reference."
+  },
+  "parent_family_id": "team-04-uncrowded-trend-carry-v1",
+  "raw_inputs": [
+    {
+      "availability_timestamp": "close_time<=decision_time-8h",
+      "coverage": "organizer-streamed 8h transaction bars for current eligible symbols",
+      "event_timestamp": "close_time",
+      "fields": ["open_time", "close_time", "close"],
+      "id": "transaction_closes",
+      "lag": "one complete 8h bar",
+      "missing_rule": "Exact contiguous history only. Ignore rows that fail the expected-open/finite-positive/exact-close-time predicate; invalidate the symbol when more than one row passes that predicate for an expected open."
+    },
+    {
+      "availability_timestamp": "current decision after weekly causal reconstitution",
+      "coverage": "point-in-time Top-40 intersected with executable symbols",
+      "event_timestamp": "reconstitution_time",
+      "fields": ["eligible_symbols"],
+      "id": "point_in_time_eligibility",
+      "lag": "available at decision",
+      "missing_rule": "never synthesize membership"
+    }
+  ],
+  "reference_candidate_id": "team-04-ber-reference-001",
+  "schema_version": 1,
+  "team_id": "team-04"
+}
