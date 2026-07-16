@@ -1,0 +1,454 @@
+{
+  "schema_version": 1,
+  "document_type": "team-local-post-result-diagnostics",
+  "team_id": "team-02",
+  "family_id": "team-02-funding-inventory-relaxation-v1",
+  "candidate_id": "team-02-fir-reference-001",
+  "stage": "development",
+  "evidence_class": "read-only-team-artifact-review-not-organizer-qualification-evidence",
+  "review_scope": {
+    "runner_record": "reports-top40-v2/team-02/qualification-attempts/team-02-fir-reference-001.runner-record.json",
+    "candidate_daily_returns": "reports-top40-v2/team-02/development-runs/team-02-fir-reference-001/daily_returns.csv",
+    "candidate_bar_returns": "reports-top40-v2/team-02/development-runs/team-02-fir-reference-001/bar_returns.csv",
+    "candidate_trades": "reports-top40-v2/team-02/development-runs/team-02-fir-reference-001/trades.csv",
+    "daily_returns_sha256": "1821e15ae6217b93a05503ecb7e895f9809f042df2af6c78a9065b5808d69bf7",
+    "bar_returns_sha256": "3ae7e3e57095ee04bcd9c31e7493a5d746d50d9c5ea4551f6b954a1fc34c2a56",
+    "trades_sha256": "5f41cdec994f3e18e2ee90d12b76d4a80203ebc93b65ed41d646d837663b0c02",
+    "runner_record_sha256_from_experiment_ledger": "d906624c310b29e862a86dab4820c69fd01d6bc1fb86c79930fb5614bddb056a",
+    "read_only": true,
+    "organizer_cli_or_evaluator_run": false,
+    "strategy_or_source_changed": false,
+    "private_or_final_oos_inspected": false
+  },
+  "identity": {
+    "strategy_sha256": "2d4b72ac53897bd0fae89491a2164591301ea362723ab0e21592819b0da07abd",
+    "source_bundle_sha256": "5c907e37f85a3434ffa14cd74ef53650f4eeb4e2367c4a7b192296b2fefb18da",
+    "risk_policy_sha256": "ff2a9a4100f038a4d511a3ccffd85b879ecbbb29eee76fb920aa14b770069503",
+    "config_sha256": "bd0e4f70bcf335b2ac4e44ec049b89b8e8eaf4c6ac6502574d0accf12d9d9947",
+    "registration_sha256": "6241104c69780b0e6461ac8db7e11cc7273aa2bec07d5933e7c6e1c5fff44d9f",
+    "seed": 20260801,
+    "risk_policy_id": "team-02-fir-reference-no-control"
+  },
+  "runner_result": {
+    "status": "completed",
+    "scored_start": "2020-02-03",
+    "scored_end_inclusive": "2023-06-30",
+    "decision_count": 3732,
+    "event_count": 98829,
+    "trade_count": 6486,
+    "net_sharpe": 1.2742743402942744,
+    "annualized_return": 0.1131956023912728,
+    "calmar": 1.3765628606630103,
+    "max_drawdown": 0.08223060902337076,
+    "double_cost_sharpe": 1.0698731207752976,
+    "positive_quarter_fraction": 0.5714285714285714,
+    "net_sortino": 2.0597906832684254,
+    "net_sharpe_95": [
+      0.11449754601163036,
+      2.4341102967333046
+    ],
+    "double_cost_sharpe_95": [
+      -0.10030111749929538,
+      2.227980350349412
+    ],
+    "initial_equity_usdt": 100000.0,
+    "ending_equity_usdt_derived_from_bar_artifact": 144120.51924317062,
+    "total_net_pnl_usdt_derived_from_bar_artifact": 44120.519243170464
+  },
+  "chronological_folds": {
+    "derivation": "Compound the candidate daily net-return rows inside the six preregistered contiguous, end-exclusive fold boundaries; PnL is the sequential equity change from 100000 USDT.",
+    "official_walk_forward_manifest_present": false,
+    "folds": [
+      {
+        "fold_id": "fold-1",
+        "start": "2020-02-03",
+        "end_exclusive": "2020-09-01",
+        "scored_days": 211,
+        "net_return": 0.015537221653829869,
+        "net_pnl_usdt": 1553.7221653829911,
+        "profitable": true
+      },
+      {
+        "fold_id": "fold-2",
+        "start": "2020-09-01",
+        "end_exclusive": "2021-04-01",
+        "scored_days": 212,
+        "net_return": 0.16237363162959029,
+        "net_pnl_usdt": 16489.646673495648,
+        "profitable": true
+      },
+      {
+        "fold_id": "fold-3",
+        "start": "2021-04-01",
+        "end_exclusive": "2021-11-01",
+        "scored_days": 214,
+        "net_return": 0.18262924628142208,
+        "net_pnl_usdt": 21558.171479564306,
+        "profitable": true
+      },
+      {
+        "fold_id": "fold-4",
+        "start": "2021-11-01",
+        "end_exclusive": "2022-06-01",
+        "scored_days": 212,
+        "net_return": 0.025887986262197016,
+        "net_pnl_usdt": 3614.002757945389,
+        "profitable": true
+      },
+      {
+        "fold_id": "fold-5",
+        "start": "2022-06-01",
+        "end_exclusive": "2023-01-01",
+        "scored_days": 214,
+        "net_return": -0.0041559243401081414,
+        "net_pnl_usdt": -595.1929613529646,
+        "profitable": false
+      },
+      {
+        "fold_id": "fold-6",
+        "start": "2023-01-01",
+        "end_exclusive": "2023-07-01",
+        "scored_days": 181,
+        "net_return": 0.01051861902543938,
+        "net_pnl_usdt": 1500.1691281348467,
+        "profitable": true
+      }
+    ],
+    "positive_fold_count": 5,
+    "minimum_positive_folds": 4,
+    "return_gate_status": "pass-local-derivation",
+    "qualification_evidence_status": "unestablished-no-six-fold-hash-bound-walk-forward-manifest"
+  },
+  "quarter_evidence": {
+    "positive_quarters": 8,
+    "quarters_scored": 14,
+    "positive_quarter_fraction": 0.5714285714285714,
+    "minimum_positive_quarter_fraction": 0.55,
+    "status": "pass"
+  },
+  "regime_evidence": {
+    "runner_regime_sharpe": {
+      "bull": 1.9272882271946317,
+      "bear": -1.0155758613712025,
+      "chop": 0.8611137173031981,
+      "stress": 2.2542068737080267
+    },
+    "positive_sharpe_regime_count": 3,
+    "minimum_positive_sharpe_regimes": 3,
+    "positive_sharpe_count_status": "pass",
+    "worst_regime": "bear",
+    "worst_regime_sharpe": -1.0155758613712025,
+    "minimum_worst_regime_sharpe": -0.25,
+    "worst_regime_status": "fail",
+    "required_positive_return_regimes": [
+      "bull",
+      "bear",
+      "chop"
+    ],
+    "exact_regime_net_returns_published": false,
+    "bear_return_sign": "negative",
+    "bear_sign_basis": "A completed solvent zero-risk-free net-return series with negative bear Sharpe has negative mean bear return; the exact compounded bear return was not serialized in the runner record.",
+    "required_return_status": "fail-bear"
+  },
+  "sleeve_evidence": {
+    "derivation": "Inspect long_exposure and short_exposure in all 3732 candidate bar rows; an active bar meets the frozen 0.01 side-exposure threshold. First-rebalance signed executions start from flat and provide a conservative side-notional proof.",
+    "long": {
+      "active_bars_at_or_above_0_01": 3150,
+      "active_bar_fraction": 0.8440514469453376,
+      "mean_gross_exposure": 0.16815086264219517,
+      "maximum_gross_exposure": 0.287475050962935,
+      "first_rebalance_opening_notional_usdt": 18000.19615851095,
+      "first_rebalance_names": 6
+    },
+    "short": {
+      "active_bars_at_or_above_0_01": 3150,
+      "active_bar_fraction": 0.8440514469453376,
+      "mean_gross_exposure": 0.1667696275517433,
+      "maximum_gross_exposure": 0.2685547649560076,
+      "first_rebalance_opening_notional_usdt": 17999.202746876792,
+      "first_rebalance_names": 6
+    },
+    "minimum_active_bar_fraction": 0.1,
+    "minimum_mean_side_exposure": 0.01,
+    "minimum_side_executed_notional_usdt": 1000.0,
+    "materiality_status": "pass-local-derivation",
+    "long_bull_net_return": null,
+    "short_bear_net_return": null,
+    "combined_chop_net_return": null,
+    "role_status": "unestablished-runner-does-not-publish-regime-by-sleeve-attribution"
+  },
+  "funding_and_pnl_evidence": {
+    "derivation": "Multiply each bar funding return component by prior-bar equity, beginning at 100000 USDT; the component reconciliation equals the observed equity change.",
+    "price_pnl_usdt": 33981.86741224241,
+    "long_price_pnl_usdt": 31569.239519716913,
+    "short_price_pnl_usdt": 2412.627892525678,
+    "funding_pnl_usdt": 18272.07559470852,
+    "long_funding_pnl_usdt": 1273.023830920515,
+    "short_funding_pnl_usdt": 16999.051763787997,
+    "fees_usdt": 5422.282509187051,
+    "slippage_usdt": 2711.1412545935254,
+    "net_pnl_usdt": 44120.519243170464,
+    "funding_fold_pnl_usdt": {
+      "fold-1": 204.10424037263232,
+      "fold-2": 4684.10112097439,
+      "fold-3": 2276.720193798502,
+      "fold-4": 5086.067479125398,
+      "fold-5": 3518.7922929115184,
+      "fold-6": 2502.2902675261075
+    },
+    "positive_funding_fold_count": 6,
+    "minimum_expected_positive_funding_folds": 4,
+    "aggregate_funding_falsifier_status": "pass"
+  },
+  "stability_and_multiplicity": {
+    "registered_neighbor_set_size_including_center": 9,
+    "registered_additional_neighbors": 8,
+    "neighbors_run": 0,
+    "minimum_profitable_neighbor_fraction": 0.7,
+    "minimum_neighbor_median_sharpe": 0.5,
+    "profitable_neighbor_fraction": null,
+    "neighbor_median_sharpe": null,
+    "neighbor_status": "not-run-and-stopped-by-reference-falsifier",
+    "material_trials_consumed": 4,
+    "trial_adjusted_probability_positive": null,
+    "minimum_trial_adjusted_probability_positive": 0.9,
+    "multiplicity_status": "unestablished-runner-does-not-publish-trial-adjusted-probability"
+  },
+  "pnl_concentration_diagnostic": {
+    "derivation": "For each preregistered fold and calendar quarter, divide the largest positive sequential USDT PnL by the sum of positive sequential USDT PnL; report the larger fraction. This is a team-local interpretation because no central development-evidence record publishes the official scalar.",
+    "positive_fold_pnl_sum_usdt": 44715.71220452318,
+    "largest_positive_fold": "fold-3",
+    "largest_positive_fold_pnl_usdt": 21558.171479564306,
+    "fold_positive_pnl_concentration": 0.4821162498980304,
+    "positive_quarter_pnl_sum_usdt": 57323.049764311,
+    "largest_positive_quarter": "2021-Q2",
+    "largest_positive_quarter_pnl_usdt": 15864.953021231544,
+    "quarter_positive_pnl_concentration": 0.27676393852842374,
+    "maximum_local_positive_pnl_concentration": 0.4821162498980304,
+    "maximum_allowed_positive_pnl_concentration": 0.4,
+    "local_diagnostic_status": "fail",
+    "official_gate_status": "unestablished-central-definition-and-evidence-not-published"
+  },
+  "visible_gate_matrix": [
+    {
+      "gate": "net_sharpe",
+      "threshold": ">= 0.75",
+      "observed": 1.2742743402942744,
+      "status": "pass"
+    },
+    {
+      "gate": "annualized_return",
+      "threshold": "> 0",
+      "observed": 0.1131956023912728,
+      "status": "pass"
+    },
+    {
+      "gate": "calmar",
+      "threshold": ">= 0.40",
+      "observed": 1.3765628606630103,
+      "status": "pass"
+    },
+    {
+      "gate": "max_drawdown",
+      "threshold": "<= 0.30",
+      "observed": 0.08223060902337076,
+      "status": "pass"
+    },
+    {
+      "gate": "double_cost_sharpe",
+      "threshold": ">= 0.35",
+      "observed": 1.0698731207752976,
+      "status": "pass"
+    },
+    {
+      "gate": "positive_chronological_folds",
+      "threshold": ">= 4 of 6",
+      "observed": "5 of 6",
+      "status": "pass-local-derivation-official-oof-manifest-absent"
+    },
+    {
+      "gate": "positive_quarter_fraction",
+      "threshold": ">= 0.55",
+      "observed": 0.5714285714285714,
+      "status": "pass"
+    },
+    {
+      "gate": "trial_adjusted_probability_positive",
+      "threshold": ">= 0.90",
+      "observed": null,
+      "status": "unestablished"
+    },
+    {
+      "gate": "bull_bear_chop_positive_return",
+      "threshold": "all three > 0",
+      "observed": "bear return sign negative; exact regime returns not serialized",
+      "status": "fail"
+    },
+    {
+      "gate": "positive_sharpe_regimes",
+      "threshold": ">= 3",
+      "observed": 3,
+      "status": "pass"
+    },
+    {
+      "gate": "worst_regime_sharpe",
+      "threshold": ">= -0.25",
+      "observed": -1.0155758613712025,
+      "status": "fail"
+    },
+    {
+      "gate": "long_bull_positive",
+      "threshold": "> 0",
+      "observed": null,
+      "status": "unestablished"
+    },
+    {
+      "gate": "short_bear_positive",
+      "threshold": "> 0",
+      "observed": null,
+      "status": "unestablished"
+    },
+    {
+      "gate": "combined_chop_positive",
+      "threshold": "> 0",
+      "observed": null,
+      "status": "unestablished"
+    },
+    {
+      "gate": "long_active_bar_fraction",
+      "threshold": ">= 0.10 at side exposure >= 0.01",
+      "observed": 0.8440514469453376,
+      "status": "pass-local-derivation"
+    },
+    {
+      "gate": "short_active_bar_fraction",
+      "threshold": ">= 0.10 at side exposure >= 0.01",
+      "observed": 0.8440514469453376,
+      "status": "pass-local-derivation"
+    },
+    {
+      "gate": "long_mean_side_exposure",
+      "threshold": ">= 0.01",
+      "observed": 0.16815086264219517,
+      "status": "pass-local-derivation"
+    },
+    {
+      "gate": "short_mean_side_exposure",
+      "threshold": ">= 0.01",
+      "observed": 0.1667696275517433,
+      "status": "pass-local-derivation"
+    },
+    {
+      "gate": "long_executed_notional_usdt",
+      "threshold": ">= 1000",
+      "observed": 18000.19615851095,
+      "status": "pass-conservative-first-opening-proof"
+    },
+    {
+      "gate": "short_executed_notional_usdt",
+      "threshold": ">= 1000",
+      "observed": 17999.202746876792,
+      "status": "pass-conservative-first-opening-proof"
+    },
+    {
+      "gate": "profitable_neighbor_fraction",
+      "threshold": ">= 0.70",
+      "observed": null,
+      "status": "unestablished-and-further-neighbor-runs-forbidden"
+    },
+    {
+      "gate": "neighbor_median_sharpe",
+      "threshold": ">= 0.50",
+      "observed": null,
+      "status": "unestablished-and-further-neighbor-runs-forbidden"
+    },
+    {
+      "gate": "maximum_positive_pnl_concentration",
+      "threshold": "<= 0.40",
+      "observed": 0.4821162498980304,
+      "status": "fail-under-local-fold-quarter-interpretation-official-scalar-unpublished"
+    },
+    {
+      "gate": "six_hash_bound_walk_forward_declarations",
+      "threshold": "required",
+      "observed": "absent",
+      "status": "unestablished"
+    }
+  ],
+  "preregistered_falsifier_review": [
+    {
+      "condition": "reference complete and solvent",
+      "observed": "completed; ending equity 144120.51924317062 USDT",
+      "status": "pass"
+    },
+    {
+      "condition": "annualized return > 0",
+      "observed": 0.1131956023912728,
+      "status": "pass"
+    },
+    {
+      "condition": "net Sharpe > 0",
+      "observed": 1.2742743402942744,
+      "status": "pass"
+    },
+    {
+      "condition": "doubled-cost Sharpe > 0",
+      "observed": 1.0698731207752976,
+      "status": "pass"
+    },
+    {
+      "condition": "aggregate realized funding PnL > 0",
+      "observed": 18272.07559470852,
+      "status": "pass-local-derivation"
+    },
+    {
+      "condition": "maximum drawdown <= 0.30",
+      "observed": 0.08223060902337076,
+      "status": "pass"
+    },
+    {
+      "condition": "at least four profitable folds",
+      "observed": "5 of 6",
+      "status": "pass-local-derivation"
+    },
+    {
+      "condition": "bull, bear, and chop return each > 0",
+      "observed": "bear return sign negative; bear Sharpe -1.0155758613712025",
+      "status": "fail"
+    },
+    {
+      "condition": "long-bull and short-bear attribution each > 0",
+      "observed": null,
+      "status": "unestablished"
+    }
+  ],
+  "budget_at_decision": {
+    "material_configurations_consumed": 4,
+    "cumulative_material_configuration_limit": 80,
+    "global_unused_material_configurations": 76,
+    "fir_staged_maximum_additional_configurations": 29,
+    "fir_configurations_consumed": 1,
+    "fir_unused_staged_configurations": 28,
+    "mechanism_pivots_consumed": 2,
+    "mechanism_pivot_limit": 2,
+    "remaining_mechanism_pivots": 0,
+    "cpu_hours_consumed": 0.9014440241291666,
+    "cpu_hour_limit": 12.0,
+    "wall_clock_hours_consumed": 0.9006860905658283,
+    "wall_clock_hour_limit": 18.0,
+    "private_attempts_consumed": 0,
+    "unused_budget_authorizes_continuation": false,
+    "reason": "The final-pivot global stop forbids every diagnostic, parameter, neighbor, and risk observation once the exact reference violates a registered regime falsifier."
+  },
+  "decision": {
+    "family_disposition": "stop",
+    "team_disposition": "dnf",
+    "pivot_allowed": false,
+    "risk_rescue_allowed": false,
+    "private_qualifier_allowed": false,
+    "decisive_failed_conditions": [
+      "preregistered positive-bear-return core condition",
+      "visible worst-regime Sharpe floor"
+    ]
+  }
+}

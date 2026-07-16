@@ -1,0 +1,72 @@
+{
+  "schema_version": 1,
+  "document_type": "team-local-post-result-decision",
+  "team_id": "team-02",
+  "family_id": "team-02-funding-inventory-relaxation-v1",
+  "candidate_id": "team-02-fir-reference-001",
+  "decision": "dnf",
+  "family_action": "stop",
+  "pivot_action": "not-available",
+  "private_qualifier_action": "do-not-consume",
+  "organizer_lifecycle_mutated": false,
+  "decisive_evidence": [
+    {
+      "condition": "preregistered bull, bear, and chop return must each be positive",
+      "observed": "bear return sign negative from published bear Sharpe -1.0155758613712025",
+      "result": "fail"
+    },
+    {
+      "condition": "worst-regime Sharpe must be at least -0.25",
+      "observed": -1.0155758613712025,
+      "shortfall": 0.7655758613712025,
+      "result": "fail"
+    }
+  ],
+  "non_rescuing_positive_evidence": {
+    "net_sharpe": 1.2742743402942744,
+    "annualized_return": 0.1131956023912728,
+    "calmar": 1.3765628606630103,
+    "max_drawdown": 0.08223060902337076,
+    "double_cost_sharpe": 1.0698731207752976,
+    "positive_quarter_fraction": 0.5714285714285714,
+    "positive_fold_count_local_derivation": 5,
+    "aggregate_funding_pnl_usdt_local_derivation": 18272.07559470852,
+    "positive_funding_fold_count_local_derivation": 6
+  },
+  "additional_unmet_or_unestablished_qualification_evidence": [
+    "trial-adjusted probability of positive Sharpe",
+    "profitable-neighbor fraction",
+    "neighbor median Sharpe",
+    "long-bull attribution",
+    "short-bear attribution",
+    "combined-chop return",
+    "six hash-bound walk-forward fold declarations",
+    "official maximum positive PnL concentration"
+  ],
+  "budget_basis": {
+    "material_configurations_consumed": 4,
+    "mechanism_pivots_consumed": 2,
+    "mechanism_pivot_limit": 2,
+    "remaining_mechanism_pivots": 0,
+    "fir_unused_staged_configurations": 28,
+    "unused_capacity_may_override_falsifier": false
+  },
+  "risk_control_ruling": {
+    "reference_policy": "team-02-fir-reference-no-control",
+    "volatility_target_enabled": false,
+    "drawdown_brakes_enabled": false,
+    "controls_may_rescue_failed_core": false,
+    "risk_factorial_authorized": false
+  },
+  "prohibited_followups": [
+    "FIR causal diagnostic runs",
+    "FIR coarse parameter runs",
+    "FIR parameter-neighbor runs",
+    "FIR risk-control or doubled-cost factorial runs",
+    "lower-gross or altered-sleeve rescue",
+    "third mechanism pivot",
+    "private-qualifier attempt"
+  ],
+  "next_administrative_step": "Record Team 02 DNF through an independently authorized organizer lifecycle action; this read-only review does not perform it.",
+  "rationale": "The exact final-pivot no-control reference violates a preregistered regime falsifier and the frozen worst-regime gate. All qualification gates are non-compensatory, risk controls cannot rescue a failed core, the family global stop forbids further observations, and the two-pivot limit is exhausted."
+}
