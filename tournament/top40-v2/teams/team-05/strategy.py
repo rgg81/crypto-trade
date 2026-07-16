@@ -17,7 +17,6 @@ import pandas as pd
 from crypto_trade.tournament.protocol import DecisionContext, TargetStrategy
 from crypto_trade.tournament.score_adapter_protocol_v5 import score_boundary
 
-
 CANONICAL_SEED = 20260801
 BAR_DURATION = pd.Timedelta(hours=8)
 
@@ -363,10 +362,8 @@ def preconstruction_scores(
         row.medium_log_return for row in raw.values()
     ) + 0.60 * statistics.median(row.slow_log_return for row in raw.values())
     directionality = min(1.0, abs(market_direction) / parameters.directional_full_scale)
-    reversal_weight = (
-        parameters.chop_reversal_weight
-        + directionality
-        * (parameters.directional_reversal_weight - parameters.chop_reversal_weight)
+    reversal_weight = parameters.chop_reversal_weight + directionality * (
+        parameters.directional_reversal_weight - parameters.chop_reversal_weight
     )
     slow_weight = 1.0 - parameters.medium_score_weight - reversal_weight
 
@@ -381,14 +378,11 @@ def preconstruction_scores(
         aligned = (
             row.medium_log_return == 0
             or row.slow_log_return == 0
-            or math.copysign(1.0, row.medium_log_return)
-            == math.copysign(1.0, row.slow_log_return)
+            or math.copysign(1.0, row.medium_log_return) == math.copysign(1.0, row.slow_log_return)
         )
         alignment_scale = 1.0 if aligned else parameters.alignment_discount
         unit_volatility_rank = (volatility_ranks[symbol] + 1.0) / 2.0
-        reliability_scale = 1.0 - (
-            parameters.volatility_reliability_penalty * unit_volatility_rank
-        )
+        reliability_scale = 1.0 - (parameters.volatility_reliability_penalty * unit_volatility_rank)
         score = max(-1.0, min(1.0, composite * alignment_scale * reliability_scale))
         scores[symbol] = PreconstructionScore(
             symbol=symbol,
@@ -439,9 +433,7 @@ def candidate_score_values(
         if not -1.0 <= row.score <= 1.0 or row.realized_bar_volatility <= 0:
             return {}
 
-    boundary_input = {
-        symbol: float(scores[symbol].score) for symbol in ordered_symbols
-    }
+    boundary_input = {symbol: float(scores[symbol].score) for symbol in ordered_symbols}
     boundary_output = score_boundary(boundary_input)
     if not isinstance(boundary_output, Mapping) or set(boundary_output) != set(boundary_input):
         return {}
@@ -470,9 +462,7 @@ def candidate_score_payload_bytes(
         return b""
     payload = {
         "schema_version": 1,
-        "scores": [
-            {"score": values[symbol], "symbol": symbol} for symbol in sorted(values)
-        ],
+        "scores": [{"score": values[symbol], "symbol": symbol} for symbol in sorted(values)],
     }
     return (
         json.dumps(
@@ -501,9 +491,7 @@ def _bounded_side_weights(
     if magnitude_sum <= 0:
         magnitude_share = {symbol: 1.0 / len(symbols) for symbol in symbols}
     else:
-        magnitude_share = {
-            symbol: magnitudes[symbol] / magnitude_sum for symbol in symbols
-        }
+        magnitude_share = {symbol: magnitudes[symbol] / magnitude_sum for symbol in symbols}
     preference = {
         symbol: equal_weight_fraction / len(symbols)
         + (1.0 - equal_weight_fraction) * magnitude_share[symbol]
@@ -518,13 +506,9 @@ def _bounded_side_weights(
         if preference_sum <= 0:
             shares = {symbol: remaining / len(active) for symbol in active}
         else:
-            shares = {
-                symbol: remaining * preference[symbol] / preference_sum for symbol in active
-            }
+            shares = {symbol: remaining * preference[symbol] / preference_sum for symbol in active}
         capped = [
-            symbol
-            for symbol in active
-            if result[symbol] + shares[symbol] > maximum_symbol_weight
+            symbol for symbol in active if result[symbol] + shares[symbol] > maximum_symbol_weight
         ]
         if not capped:
             for symbol in active:
@@ -556,8 +540,7 @@ def scores_to_target_weights(
     }
     ordered_symbols = sorted(construction_scores)
     market_values = [
-        construction_scores[symbol].market_direction_log_return
-        for symbol in ordered_symbols
+        construction_scores[symbol].market_direction_log_return for symbol in ordered_symbols
     ]
     if max(market_values) - min(market_values) > 1e-15:
         return {}
@@ -583,12 +566,11 @@ def scores_to_target_weights(
     long_preferred = [
         symbol
         for symbol in long_order
-        if construction_scores[symbol].medium_log_return
-        >= -parameters.trend_gate_log_return
+        if construction_scores[symbol].medium_log_return >= -parameters.trend_gate_log_return
     ]
-    long_symbols = (long_preferred + [
-        symbol for symbol in long_order if symbol not in set(long_preferred)
-    ])[:side_count]
+    long_symbols = (
+        long_preferred + [symbol for symbol in long_order if symbol not in set(long_preferred)]
+    )[:side_count]
 
     long_set = set(long_symbols)
     short_order = sorted(
@@ -598,12 +580,11 @@ def scores_to_target_weights(
     short_preferred = [
         symbol
         for symbol in short_order
-        if construction_scores[symbol].medium_log_return
-        <= parameters.trend_gate_log_return
+        if construction_scores[symbol].medium_log_return <= parameters.trend_gate_log_return
     ]
-    short_symbols = (short_preferred + [
-        symbol for symbol in short_order if symbol not in set(short_preferred)
-    ])[:side_count]
+    short_symbols = (
+        short_preferred + [symbol for symbol in short_order if symbol not in set(short_preferred)]
+    )[:side_count]
     if not long_symbols or not short_symbols:
         return {}
 

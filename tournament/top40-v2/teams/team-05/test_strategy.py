@@ -14,9 +14,7 @@ from pathlib import Path
 
 import pandas as pd
 import pytest
-
 import strategy as strategy_module
-from crypto_trade.tournament.protocol import DecisionContext
 from strategy import (
     BASE_PARAMETERS,
     CANONICAL_SEED,
@@ -28,6 +26,7 @@ from strategy import (
     scores_to_target_weights,
 )
 
+from crypto_trade.tournament.protocol import DecisionContext
 
 DECISION = pd.Timestamp("2020-07-17T00:00:00Z")
 TEAM_ROOT = Path(__file__).resolve().parent
@@ -61,8 +60,7 @@ def _bars(symbol_number: int, *, future_days: int = 0) -> pd.DataFrame:
 
 def _frames(*, future_days: int = 0) -> OrderedDict[str, pd.DataFrame]:
     return OrderedDict(
-        (f"S{number:02d}USDT", _bars(number, future_days=future_days))
-        for number in range(20)
+        (f"S{number:02d}USDT", _bars(number, future_days=future_days)) for number in range(20)
     )
 
 
@@ -99,8 +97,7 @@ def test_future_append_truncation_and_corruption_invariance() -> None:
         (
             symbol,
             frame.loc[
-                pd.to_datetime(frame["open_time"], utc=True) + pd.Timedelta(hours=8)
-                <= DECISION
+                pd.to_datetime(frame["open_time"], utc=True) + pd.Timedelta(hours=8) <= DECISION
             ]
             .copy()
             .reset_index(drop=True),
@@ -110,8 +107,7 @@ def test_future_append_truncation_and_corruption_invariance() -> None:
     corrupted = OrderedDict((symbol, frame.copy()) for symbol, frame in with_future.items())
     for frame in corrupted.values():
         unavailable = (
-            pd.to_datetime(frame["open_time"], utc=True) + pd.Timedelta(hours=8)
-            > DECISION
+            pd.to_datetime(frame["open_time"], utc=True) + pd.Timedelta(hours=8) > DECISION
         )
         frame.loc[unavailable, "close"] = [
             float("nan") if i % 2 else 1e100 for i in range(unavailable.sum())
@@ -139,15 +135,9 @@ def test_open_time_plus_eight_hours_is_the_exact_availability_boundary() -> None
         frame.loc[row, "close"] = 1e100
     assert _score_bytes(_context(not_closed)) == baseline_bytes
 
-    last_closed_changed = OrderedDict(
-        (symbol, frame.copy()) for symbol, frame in frames.items()
-    )
+    last_closed_changed = OrderedDict((symbol, frame.copy()) for symbol, frame in frames.items())
     changed_frame = last_closed_changed["S19USDT"]
-    row = (
-        pd.to_datetime(changed_frame["open_time"], utc=True)
-        + pd.Timedelta(hours=8)
-        == DECISION
-    )
+    row = pd.to_datetime(changed_frame["open_time"], utc=True) + pd.Timedelta(hours=8) == DECISION
     assert row.sum() == 1
     changed_frame.loc[row, "close"] *= 1.50
     assert _score_bytes(_context(last_closed_changed)) != baseline_bytes
@@ -155,9 +145,7 @@ def test_open_time_plus_eight_hours_is_the_exact_availability_boundary() -> None
 
 def test_numeric_millisecond_open_time_has_identical_score_and_target_bytes() -> None:
     frames = _frames()
-    numeric_milliseconds = OrderedDict(
-        (symbol, frame.copy()) for symbol, frame in frames.items()
-    )
+    numeric_milliseconds = OrderedDict((symbol, frame.copy()) for symbol, frame in frames.items())
     for frame in numeric_milliseconds.values():
         frame["open_time"] = pd.Series(
             [
@@ -185,10 +173,7 @@ def test_stale_and_sparse_histories_each_fail_closed() -> None:
 
     sparse = _frames()
     for symbol, frame in tuple(sparse.items()):
-        closed = (
-            pd.to_datetime(frame["open_time"], utc=True) + pd.Timedelta(hours=8)
-            <= DECISION
-        )
+        closed = pd.to_datetime(frame["open_time"], utc=True) + pd.Timedelta(hours=8) <= DECISION
         keep = ~closed | (frame.index % 2 == 0)
         sparse[symbol] = frame.loc[keep].copy().reset_index(drop=True)
     assert preconstruction_scores(_context(sparse)) == {}
@@ -258,9 +243,7 @@ def test_non_close_fields_funding_and_auxiliary_cannot_change_targets() -> None:
         {"symbol": ["S00USDT"], "funding_rate": [999.0]},
         index=[DECISION - pd.Timedelta(hours=1)],
     )
-    hostile_auxiliary = {
-        "oracle": pd.DataFrame({"future_target": [1e100]}, index=[DECISION])
-    }
+    hostile_auxiliary = {"oracle": pd.DataFrame({"future_target": [1e100]}, index=[DECISION])}
     assert _targets(_context(frames)) == _targets(
         _context(
             altered,
@@ -297,9 +280,7 @@ def test_mapping_order_and_fresh_instance_reproducibility() -> None:
     frames = _frames()
     reversed_frames = OrderedDict(reversed(list(frames.items())))
     first = build_strategy().target_weights(_context(frames), seed=CANONICAL_SEED)
-    second = build_strategy().target_weights(
-        _context(reversed_frames), seed=CANONICAL_SEED
-    )
+    second = build_strategy().target_weights(_context(reversed_frames), seed=CANONICAL_SEED)
     third = build_strategy().target_weights(_context(frames), seed=CANONICAL_SEED)
     assert first == second == third
 
@@ -331,9 +312,7 @@ def test_a5_boundary_gets_builtin_finite_floats_and_return_is_consumed(
         assert type(values) is dict
         assert list(values) == sorted(values)
         assert all(type(symbol) is str for symbol in values)
-        assert all(
-            type(value) is float and math.isfinite(value) for value in values.values()
-        )
+        assert all(type(value) is float and math.isfinite(value) for value in values.values())
         observed.update(values)
         return {symbol: 0.0 for symbol in values}
 
@@ -351,9 +330,7 @@ def test_a5_identity_and_score_payload_bytes_are_order_invariant() -> None:
 
     reversed_frames = OrderedDict(reversed(list(frames.items())))
     reversed_scores = preconstruction_scores(_context(reversed_frames))
-    assert candidate_score_payload_bytes(scores) == candidate_score_payload_bytes(
-        reversed_scores
-    )
+    assert candidate_score_payload_bytes(scores) == candidate_score_payload_bytes(reversed_scores)
 
 
 def test_adapter_emits_finite_two_sided_conservative_targets() -> None:
@@ -377,9 +354,7 @@ def test_adapter_rejects_an_invalid_score_record_instead_of_imputing() -> None:
     scores = preconstruction_scores(_context(_frames()))
     first_symbol = sorted(scores)[0]
     corrupted = dict(scores)
-    corrupted[first_symbol] = dataclasses.replace(
-        corrupted[first_symbol], score=float("inf")
-    )
+    corrupted[first_symbol] = dataclasses.replace(corrupted[first_symbol], score=float("inf"))
     assert candidate_score_values(corrupted) == {}
     assert candidate_score_payload_bytes(corrupted) == b""
     assert scores_to_target_weights(corrupted) == {}
@@ -443,8 +418,7 @@ def test_insufficient_or_degenerate_history_fails_closed_to_flat() -> None:
 def test_non_rebalance_boundary_returns_none_not_flat() -> None:
     off_schedule = DECISION + pd.Timedelta(days=1)
     frames = OrderedDict(
-        (symbol, _bars(number, future_days=1))
-        for number, symbol in enumerate(_frames())
+        (symbol, _bars(number, future_days=1)) for number, symbol in enumerate(_frames())
     )
     result = build_strategy().target_weights(
         _context(frames, decision=off_schedule),
@@ -479,9 +453,7 @@ def test_every_declared_neighbor_changes_exactly_its_one_registered_axis(
     axis: str,
     neighbor_value: int | float,
 ) -> None:
-    artifact = json.loads(
-        (TEAM_ROOT / "neighbors" / artifact_name).read_text(encoding="utf-8")
-    )
+    artifact = json.loads((TEAM_ROOT / "neighbors" / artifact_name).read_text(encoding="utf-8"))
     expected_override = {axis: neighbor_value}
     assert artifact["one_axis"] == axis
     assert artifact["overrides"] == expected_override

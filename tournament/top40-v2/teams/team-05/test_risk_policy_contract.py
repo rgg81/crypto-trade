@@ -7,7 +7,6 @@ from pathlib import Path
 
 from crypto_trade.tournament.risk_policy import boundary_risk_decision, load_risk_policy
 
-
 POLICY_PATH = Path(__file__).with_name("risk_policy.json")
 ABLATION_ROOT = Path(__file__).with_name("risk_ablations")
 COMBINED_PATH = ABLATION_ROOT / "combined.json"
