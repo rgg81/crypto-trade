@@ -1,0 +1,40 @@
+{
+  "amendment_id": "top40-v2-amendment-0004-development-runner-schema3-compatibility",
+  "decision": "approved",
+  "failed_run_evidence": {
+    "artifact_count": 0,
+    "candidate_id": "rdf-core-h14-k3-g05",
+    "failure_reason": "ValueError: run state has an invalid schema",
+    "journal_result_record_sha256": "f09da8f72bb62470a269c01b5b920e62d9e93c1ff7b019d9bef39f141147cb47",
+    "metrics_count": 0,
+    "reservation_file_sha256": "41da1a05e15d5f3aa85c9d9d66d1087b4cee45441617177277cc7c210ecfef17",
+    "scientific_information_revealed": false
+  },
+  "final_implementation_commit": "7c83ed993a9580a0d177912db0608e2a865ca660",
+  "implementation_files": {
+    "scripts/top40_v2_tournament_active.py": "6031937952a29a1a226a778cd1bcfc2c9869559ab30465bdbebe6292c6a88377",
+    "src/crypto_trade/tournament/runner_schema3_compat_v4.py": "03006ea1ce391ef3c8da6244acb89aab19f7e63d1e0a617e2743894a575fd6cd",
+    "tests/tournament/test_top40_v2_runner_schema3_compat.py": "f310c425a8770399a79d92f6c8cfe85c70a6f35a452b47accf3f9ec6c3ada7f2",
+    "tournament/top40-v2/amendments/0004/AMENDMENT.md": "49a044ed30cbd9c73237a8b31f8343e24a19758f8027c1ccdba271dafd7dbad3"
+  },
+  "parent_authority": {
+    "amendment_0001_freeze_sha256": "a897850a205e720002ef9d7c17862a60d60b809da27f998244b64943deaeb439",
+    "amendment_0002_compatibility_module_sha256": "fc70dbdb752c58857c5ed60a96e497324e93b9d5dc7e6afa0692bd3e02ad21aa",
+    "amendment_0003_freeze_sha256": "2e40c9e3e1df628d39df0b9fefd26bb45cee866f70ffbf90da780652ed9d208f",
+    "reviewed_run_state_sha256": "baee6ae55ecb5e0a07a2d91fd368d54086e9659242a81ea24f58fa201d32fb67"
+  },
+  "reviewed_at_utc": "2026-07-16T10:38:43Z",
+  "reviewer": "v2_design_review",
+  "scope": {
+    "development_only": true,
+    "favorable_accounting_adjustment": false,
+    "private_runner_allowed": false,
+    "finalist_runner_allowed": false,
+    "scientific_logic_changed": false
+  },
+  "tests": {
+    "focused": "15 passed",
+    "production_phase0_schema3_traversal": true,
+    "ruff": "passed"
+  }
+}
