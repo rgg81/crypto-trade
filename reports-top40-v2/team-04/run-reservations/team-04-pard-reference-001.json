@@ -1,0 +1,15 @@
+{
+  "candidate_id": "team-04-pard-reference-001",
+  "config_sha256": "bd0e4f70bcf335b2ac4e44ec049b89b8e8eaf4c6ac6502574d0accf12d9d9947",
+  "organizer_journal_head_sha256": "ff2028c375c24199a750daba49e4f94f3b8a31360b0cd08631552c8ee0b58db4",
+  "private_attempt_number": null,
+  "registration_sha256": "846ee679ca9a068694f4da6ed47042eefe0c2b00a573076943db9a9b48822588",
+  "reserved_at_utc": "2026-07-16T23:42:18.190015+00:00",
+  "risk_policy_sha256": "ab36a9bf0810efd856491f7bebe148a889bca887390dac817348afe249cee76b",
+  "schema_version": 1,
+  "source_bundle_sha256": "3473d40ec2af5a54482f9bac3e9ec68c79415a56438ce9ccf594790b86e48bcd",
+  "stage": "development",
+  "strategy_sha256": "97517891669b6298542b6bc4c7fc64b1c8e68717933505b6d39251db3d7fb08b",
+  "team_id": "team-04",
+  "tournament": "quant-portfolio-blind-top40-v2"
+}
