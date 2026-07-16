@@ -1,0 +1,36 @@
+{
+  "activation_scope": {
+    "all_organizer_commands_require_pure_crypto_preflight": true,
+    "canonical_state_or_journal_mutation": false,
+    "historical_entrypoint_modified": false,
+    "scientific_snapshot_or_liquidity_rank_changed": false
+  },
+  "active_entrypoint": {
+    "path": "scripts/top40_v2_tournament_pure_crypto_v6.py",
+    "sha256": "a9197dc2f83d4415f1aa4c098546e21e010cb99e754580de96c3e339cc927641"
+  },
+  "amendment_freeze": {
+    "commit": "8e7577d510bbdd4839650800037e0d0e744d038b",
+    "path": "tournament/top40-v2/amendments/0006/freeze.json",
+    "sha256": "e8cc34251ba0eb558015a02b96f15e884eee05006f41ea0b32ce6510376a76db"
+  },
+  "amendment_id": "top40-v2-amendment-0006-pure-crypto-universe",
+  "downstream_requirements": {
+    "amendment_0005_must_pin_this_integration_before_review": true,
+    "future_result_bearing_commands_must_use_active_entrypoint": true,
+    "team_05_through_team_10_work_must_use_active_entrypoint": true
+  },
+  "historical_entrypoint": {
+    "path": "scripts/top40_v2_tournament_active.py",
+    "sha256": "6031937952a29a1a226a778cd1bcfc2c9869559ab30465bdbebe6292c6a88377",
+    "status": "superseded-unchanged"
+  },
+  "implementation": {
+    "final_commit": "49dd8978c161fb75b9a78efaead5f847f589e7f1",
+    "pure_crypto_module_sha256": "fc93c0f26dcbf6304abe028736693ab2bee7430a56c14a8547defff472008192",
+    "wrapper_module_sha256": "5f5187ef431ca89077f21ada09139fe3b3ada62afeb1fa0f3ce957c6ba5933b1"
+  },
+  "proposed_at_utc": "2026-07-16T14:10:50Z",
+  "schema_version": 1,
+  "status": "draft"
+}
