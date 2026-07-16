@@ -1,0 +1,94 @@
+{
+  "activation_authorized": false,
+  "amendment_id": "top40-v2-amendment-0007-frozen-worker-a5-protocol-preload",
+  "decision": "approved",
+  "implementation_commit": "fd7c7a452e43451e2f4dd849d37a4cb16e677896",
+  "implementation_files": {
+    "scripts/top40_v2_tournament_runtime_preload_v7.py": "8a4ada10176d2606df3f358fc188e21b45153ad9a7270f36908736f03322a3a9",
+    "src/crypto_trade/tournament/_strategy_worker_preload_v7.py": "a90ff198d5c03e4f3b85bfda8e95f218627b631884154858f6d084537fdd70ac",
+    "src/crypto_trade/tournament/amendment_0007_v2.py": "609a240314ac242d4a895145b476bb98a05f27147e2e0aa8ecda85c8dd802da5",
+    "tests/tournament/test_top40_v2_amendment_0007.py": "b3c690c573068a9d368836c2d2ca9ebf68ec5fa450677e1f0548924f3bfa5061",
+    "tournament/top40-v2/amendments/0007/AMENDMENT.md": "1e3fee4f8b8b292f36c4094dfe7010f3918d4e29c3ab481a8c67a21c05e8d529",
+    "tournament/top40-v2/amendments/0007/draft.json": "816dcd2f094b2b435c61c7db6a75b0f7be8e77f1e065d6b35ba977f4b76d1a6a"
+  },
+  "parent_authorities": {
+    "scripts/top40_v2_tournament_score_diagnostics_v5.py": {
+      "sha256": "0dc9228f3b9c6fe41b2655055f766fc92f323a289a050e6bdf4e48a30b0105f4",
+      "size": 263
+    },
+    "src/crypto_trade/tournament/_strategy_worker_v2.py": {
+      "sha256": "fff67076592e337adb721b72c4c77326c3e40e396ba57217c387a8b5f58f2b5d",
+      "size": 46620
+    },
+    "src/crypto_trade/tournament/amendment_0005_integration_v2.py": {
+      "sha256": "c9e0b0be288edebf86f8c7d441b4093843ae3d64f0cbac42dbadf21625f786f8",
+      "size": 3080
+    },
+    "src/crypto_trade/tournament/amendment_0005_v2.py": {
+      "sha256": "a61795b2e979bbcbbb44d4dd9e321b3db7190992c386b3129b832e1256a002bf",
+      "size": 84717
+    },
+    "src/crypto_trade/tournament/amendment_integrity_v2.py": {
+      "sha256": "e3a4f60aa955ebcf461026527da5b6b28b87e9e7ec057dd2e10a1e884612a8ab",
+      "size": 34451
+    },
+    "src/crypto_trade/tournament/runner_schema3_compat_v4.py": {
+      "sha256": "03006ea1ce391ef3c8da6244acb89aab19f7e63d1e0a617e2743894a575fd6cd",
+      "size": 12114
+    },
+    "src/crypto_trade/tournament/runner_v2.py": {
+      "sha256": "d4fc1c381f9e69c0dbdd5b7c6e5d273e43b39c5df16a082a99af1b4ef7310ec2",
+      "size": 86317
+    },
+    "src/crypto_trade/tournament/score_adapter_protocol_v5.py": {
+      "sha256": "8f8f5db3be3069cce7c7c0605fb15b31c4f28af7c2e0f2e24d79d861a65ae4ff",
+      "size": 1037
+    },
+    "src/crypto_trade/tournament/score_diagnostic_compat_v2.py": {
+      "sha256": "fc70dbdb752c58857c5ed60a96e497324e93b9d5dc7e6afa0692bd3e02ad21aa",
+      "size": 10828
+    },
+    "tournament/top40-v2/amendments/0004/freeze.json": {
+      "sha256": "bfb9e82c0b9a0950ead9b94ae61fe9f6c091462b106e46bd51113894b6eb9465",
+      "size": 1865
+    },
+    "tournament/top40-v2/amendments/0005/freeze.json": {
+      "sha256": "0f112dc0e6452e29d691f46d42b8c19ea46482bda0b813143664acf056954c5f",
+      "size": 5477
+    },
+    "tournament/top40-v2/amendments/0005/integration-freeze.json": {
+      "sha256": "b3b2b96245a479ccfff95b5cd5b5cd0aef3b2d0aac0fc9faf5367d3e6772958c",
+      "size": 2286
+    },
+    "tournament/top40-v2/amendments/0006/integration-freeze.json": {
+      "sha256": "3e93bdfe031e2589888c3bbcaae583437bbd074fa9d86c6dc0a54187bc0f1e34",
+      "size": 2044
+    },
+    "tournament/top40-v2/phase0_freeze.json": {
+      "sha256": "cc7484d0be2fe6b64b34b6f4c7ce76647af750b02c3df065c4b81e10f1396259",
+      "size": 5301
+    }
+  },
+  "review_scope": {
+    "a5_a6_a4_delegation_chain_unchanged": true,
+    "candidate_or_scientific_bytes_changed": false,
+    "exact_one_token_command_replacement": true,
+    "parent_authorities_exactly_pinned": true,
+    "patch_scope_team_04_through_team_10_development_only": true,
+    "private_and_final_execution_enabled": false,
+    "real_repository_mask_smoke_passed": true,
+    "restoration_after_every_baseexception": true,
+    "score_capture_or_disclosure_added": false,
+    "worker_sandbox_policy_changed": false
+  },
+  "reviewed_at_utc": "2026-07-16T18:00:29Z",
+  "reviewer_id": "a7-independent-implementation-review",
+  "schema_version": 1,
+  "validation": {
+    "a5_a6_a4_regression": "passed",
+    "focused_a7": "passed",
+    "frozen_worker_regression": "passed",
+    "real_namespace_mask_smoke": "passed",
+    "ruff": "passed"
+  }
+}
