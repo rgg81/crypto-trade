@@ -1,0 +1,32 @@
+{
+  "amendment_0002_freeze_sha256": "d95cebdb17ef76ec815f2561e502aa076f9370d29eaa8f2d1ed01c75cf2a76c9",
+  "amendment_id": "top40-v2-amendment-0002-schema3-score-diagnostic-compatibility",
+  "artifact_hashes": {
+    "diagnostic-summary.json": "e8a089c64fbb13224cf1a6e1dfd6604d97f5a63546954c2591d92a83fe65e1f3",
+    "labeled-score-panel.parquet": "828320f72d66391d037561da1e97e7da977403c38b4766390fb67985c2b3c8c6",
+    "replay-1-scores.parquet": "a2b56b03a71322e5f23544087aba044379af06d2d6b6963347faa59e800add16",
+    "replay-1-targets.parquet": "a28991479efcabe341df538ce557c999bb1979fa5f0e0b30c6339a46e42b3f7d",
+    "replay-2-scores.parquet": "a2b56b03a71322e5f23544087aba044379af06d2d6b6963347faa59e800add16",
+    "replay-2-targets.parquet": "a28991479efcabe341df538ce557c999bb1979fa5f0e0b30c6339a46e42b3f7d"
+  },
+  "corrects_failure_result_sha256": "e5bc180a85acf3429d727a16c77789344dcd99f8ce5dd6153f02cf9a8c1d66f6",
+  "diagnostic_id": "score-ic-team-01-rdf-core-h21-k3-g10-retry-0002",
+  "diagnostic_outcomes": {
+    "canonical_targets_exact": true,
+    "deterministic_replays_passed": true,
+    "four_of_six_fold_ics_positive": false,
+    "pooled_ic_positive": false,
+    "score_ic_gate_passed": false
+  },
+  "failure_reason": null,
+  "non_material": true,
+  "organizer_cpu_hours": 0.30549300951888886,
+  "organizer_wall_clock_hours": 0.3053938258997207,
+  "recorded_at_utc": "2026-07-16T03:53:02.563659Z",
+  "retry_reservation_sha256": "1da9becf3989028c06c99770e13f6eb8207fb52330e65eddd221019a53aeecac",
+  "schema_version": 1,
+  "status": "completed",
+  "team_cpu_hours_delta": 0.0,
+  "team_material_trial_delta": 0,
+  "team_wall_clock_hours_delta": 0.0
+}
