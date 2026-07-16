@@ -1,0 +1,39 @@
+{
+  "candidate_id": "team05-crtr-core-v2",
+  "family_id": "team05-causal-residual-trend-reversal-v1",
+  "files": [
+    {
+      "path": "candidate_variant.py",
+      "sha256": "425f8da35d3e0c0b6b6a4bf9bf1d854051e26d1088c1ef0eb1574c18ae39bb3f",
+      "size": 232
+    },
+    {
+      "path": "frozen_config.json",
+      "sha256": "eca6455e365a8c57e32da9b3edb1b963455666affb405808f1e8f1c7e69b2cf4",
+      "size": 6713
+    },
+    {
+      "path": "risk_policy.json",
+      "sha256": "6d26816cb61be1267084acbf689161baa39d4bbbcb3bb62fe686ec0c8ee5d9b4",
+      "size": 638
+    },
+    {
+      "path": "strategy.py",
+      "sha256": "b898bf8496047c8dadd8ead55840be637abdfbe1a8195e1bc88840b686e0944c",
+      "size": 28556
+    },
+    {
+      "path": "test_risk_policy_contract.py",
+      "sha256": "90ba85356fd523a1305f66f6d2e1609d89653481f76a5e6de93bc89c55deac4b",
+      "size": 5462
+    },
+    {
+      "path": "test_strategy.py",
+      "sha256": "c134bd3f5abec8f80de376fa788bad70b241269daedc80a4d2f5bf2fc071e5b5",
+      "size": 22333
+    }
+  ],
+  "manifest_kind": "top40-v2-executable-source-manifest-v1",
+  "schema_version": 1,
+  "team_id": "team-05"
+}
