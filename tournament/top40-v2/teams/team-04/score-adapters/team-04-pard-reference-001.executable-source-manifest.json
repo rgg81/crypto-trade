@@ -1,0 +1,64 @@
+{
+  "candidate_id": "team-04-pard-reference-001",
+  "family_id": "team-04-path-adaptive-relative-dynamics-v1",
+  "files": [
+    {
+      "path": "frozen_config.json",
+      "sha256": "7ac9e7f66ab2358a693a750699b95f45b4f476090fa4031c508b1f37f7aacad9",
+      "size": 6565
+    },
+    {
+      "path": "pivot-01/frozen_config.json",
+      "sha256": "3e8b9a05d5e285d18f1fff499a34797dda2794ff81f00813a2e8aeb5ee0d13d6",
+      "size": 6179
+    },
+    {
+      "path": "pivot-01/organizer_score_adapter.py",
+      "sha256": "609d9c17322734b651c4db1ab90c3271f505d3dd85789440c5ceee5e5b8d1da2",
+      "size": 3261
+    },
+    {
+      "path": "pivot-01/strategy.py",
+      "sha256": "a5877c613ec579e41f26d370a9d6c5ca97a7df3a738e5e628430b31956e96cdb",
+      "size": 14836
+    },
+    {
+      "path": "pivot-01/test_strategy.py",
+      "sha256": "8ba4f82c374bda7eea8248fdb7ab3b1d797b0f65fc5e5e911caacbc3c8f4af86",
+      "size": 28396
+    },
+    {
+      "path": "pivot-02/frozen_config.json",
+      "sha256": "7ac9e7f66ab2358a693a750699b95f45b4f476090fa4031c508b1f37f7aacad9",
+      "size": 6565
+    },
+    {
+      "path": "pivot-02/strategy.py",
+      "sha256": "97517891669b6298542b6bc4c7fc64b1c8e68717933505b6d39251db3d7fb08b",
+      "size": 16340
+    },
+    {
+      "path": "pivot-02/test_strategy.py",
+      "sha256": "8418dee2e2c4a6441599961f69258bcb1aa5f0fcce40e72131558a29432b3e0f",
+      "size": 19586
+    },
+    {
+      "path": "risk_policy.json",
+      "sha256": "ab36a9bf0810efd856491f7bebe148a889bca887390dac817348afe249cee76b",
+      "size": 650
+    },
+    {
+      "path": "strategy.py",
+      "sha256": "97517891669b6298542b6bc4c7fc64b1c8e68717933505b6d39251db3d7fb08b",
+      "size": 16340
+    },
+    {
+      "path": "test_strategy.py",
+      "sha256": "8418dee2e2c4a6441599961f69258bcb1aa5f0fcce40e72131558a29432b3e0f",
+      "size": 19586
+    }
+  ],
+  "manifest_kind": "top40-v2-executable-source-manifest-v1",
+  "schema_version": 1,
+  "team_id": "team-04"
+}
