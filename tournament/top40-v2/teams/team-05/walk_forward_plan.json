@@ -1,7 +1,8 @@
 {
   "schema_version": 1,
   "team_id": "team-05",
-  "candidate_id": "team05-crtr-base-v1",
+  "family_id": "team05-causal-residual-trend-reversal-v1",
+  "candidate_scope": "candidate-generic derivation plan; never itself a candidate evidence manifest",
   "evidence_class": "prospective-organizer-derived-equal-chronological-folds",
   "fold_count": 6,
   "boundary_owner": "central evaluator",
@@ -13,10 +14,29 @@
     "slice sizes equal under the organizer rule",
     "expanding past-only replay state with no test observation entering prior state"
   ],
-  "construction": "After the evaluator materializes exact boundaries, create one independently hash-bound model declaration per fold. The model is a frozen deterministic rule with no learned coefficients, but every replay remains past-only and distinct.",
+  "construction": "After the evaluator materializes exact boundaries, instantiate this plan separately for each required candidate role. Each candidate gets its own walk-forward manifest, six candidate-specific fold declarations, six candidate-specific model artifacts, target hashes, and stitched-return hash. The model is a frozen deterministic rule with no learned coefficients, but every replay remains past-only and distinct.",
+  "candidate_identity_rule": "The organizer-derived boundary derivation may be shared, but no candidate manifest, fold declaration, model artifact, target artifact, return artifact, path, or artifact hash may stand in for another candidate. Candidate ID, accepted registration hash, exact risk-policy path/hash, fold ID, and candidate-specific upstream declarations must be bound before evidence is admissible.",
+  "required_candidate_instances": [
+    {
+      "candidate_role": "no-control-core",
+      "candidate_id": "team05-crtr-core-v1",
+      "risk_policy_path": "risk_policy.json",
+      "evidence_purpose": "preregistered core-alpha control-activation gate",
+      "positive_fold_requirement": "at least four of six before any controlled candidate may activate",
+      "artifact_requirement": "one distinct candidate-specific walk-forward manifest plus six fold declarations and six model artifacts"
+    },
+    {
+      "candidate_role": "eventual-combined-base",
+      "candidate_id": "team05-crtr-base-v1",
+      "risk_policy_path": "risk_ablations/combined.json",
+      "evidence_purpose": "full combined-policy non-neighborhood qualification",
+      "positive_fold_requirement": "official minimum four of six and Team-05 minimum five of six",
+      "artifact_requirement": "a second distinct candidate-specific walk-forward manifest plus six fold declarations and six model artifacts; core artifacts are inadmissible substitutes"
+    }
+  ],
   "label_policy": "The strategy has no training label. The prospective A5 diagnostic label is evaluation-only and cannot enter fold state, selection, or targets.",
   "stitching_rule": "Stitch organizer-derived test returns once in fold order; include no training return and permit no gap, overlap, local boundary substitution, or hand-dated fallback.",
-  "fold_declarations": [
+  "candidate_generic_fold_templates": [
     {"fold_id": "fold-1", "ordinal": 1, "boundary_source": "REPLACE_WITH_ORGANIZER_DERIVED_FOLD_DECLARATION"},
     {"fold_id": "fold-2", "ordinal": 2, "boundary_source": "REPLACE_WITH_ORGANIZER_DERIVED_FOLD_DECLARATION"},
     {"fold_id": "fold-3", "ordinal": 3, "boundary_source": "REPLACE_WITH_ORGANIZER_DERIVED_FOLD_DECLARATION"},
@@ -31,6 +51,6 @@
     "failure_is_noncompensatory": true
   },
   "qualification_evidence_admissible": false,
-  "admissibility_condition": "Exact evaluator-derived boundaries, per-fold model/target hashes, and the stitched-return hash are materialized and organizer-bound before metrics are recorded.",
-  "status": "DECLARATION_ONLY_BOUNDARIES_AND_HASHES_PENDING"
+  "admissibility_condition": "For the candidate being evaluated, its accepted registration, exact risk policy, evaluator-derived boundaries, six candidate-specific fold/model/target hashes, and candidate-specific stitched-return hash are materialized and organizer-bound before metrics are recorded.",
+  "status": "CANDIDATE_GENERIC_DECLARATION_ONLY_TWO_CANDIDATE_INSTANTIATIONS_BOUNDARIES_AND_HASHES_PENDING"
 }

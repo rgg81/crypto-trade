@@ -412,28 +412,32 @@ def candidate_score_values(
     the values used by portfolio construction.  The hook is prospective until Amendment 0005 and
     ``score_adapter_protocol_v5`` are frozen by the organizer.
     """
-    if any(not isinstance(symbol, str) or not symbol for symbol in scores):
+    if any(type(symbol) is not str or not symbol for symbol in scores):
         return {}
     ordered_symbols = sorted(scores)
-    if any(
-        not isinstance(row, PreconstructionScore)
-        or symbol != row.symbol
-        or not -1.0 <= row.score <= 1.0
-        or row.realized_bar_volatility <= 0
-        or not all(
-            math.isfinite(value)
-            for value in (
-                row.score,
-                row.short_log_return,
-                row.medium_log_return,
-                row.slow_log_return,
-                row.realized_bar_volatility,
-                row.market_direction_log_return,
-            )
+    for symbol in ordered_symbols:
+        row = scores[symbol]
+        if not isinstance(row, PreconstructionScore):
+            return {}
+        if type(row.symbol) is not str or row.symbol != symbol:
+            return {}
+        values = (
+            row.score,
+            row.short_log_return,
+            row.medium_log_return,
+            row.slow_log_return,
+            row.realized_bar_volatility,
+            row.market_direction_log_return,
         )
-        for symbol, row in scores.items()
-    ):
-        return {}
+        # The dataclass annotations are not runtime validators.  Reject malformed typed fields
+        # before comparisons or ``math.isfinite`` so hostile strings, booleans, ``None``, and
+        # other non-floats can never escape the fail-closed boundary as a TypeError.
+        if any(type(value) is not float for value in values):
+            return {}
+        if not all(math.isfinite(value) for value in values):
+            return {}
+        if not -1.0 <= row.score <= 1.0 or row.realized_bar_volatility <= 0:
+            return {}
 
     boundary_input = {
         symbol: float(scores[symbol].score) for symbol in ordered_symbols
@@ -460,8 +464,10 @@ def candidate_score_values(
 def candidate_score_payload_bytes(
     scores: Mapping[str, PreconstructionScore],
 ) -> bytes:
-    """Canonical bytes for the score-map portion of the prospective A5 artifact."""
+    """Canonical prospective A5 bytes, or empty bytes for a malformed nonempty map."""
     values = candidate_score_values(scores)
+    if scores and len(values) != len(scores):
+        return b""
     payload = {
         "schema_version": 1,
         "scores": [

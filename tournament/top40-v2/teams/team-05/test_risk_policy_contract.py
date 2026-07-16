@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 from pathlib import Path
 
 from crypto_trade.tournament.risk_policy import boundary_risk_decision, load_risk_policy
@@ -12,31 +13,98 @@ ABLATION_ROOT = Path(__file__).with_name("risk_ablations")
 COMBINED_PATH = ABLATION_ROOT / "combined.json"
 
 
-def test_initial_top_level_policy_parses_and_has_no_controls() -> None:
-    policy = load_risk_policy(POLICY_PATH)
-    assert policy.policy_id == "team-05-crtr-none-v1"
-    assert not policy.enabled
-    assert not policy.same_boundary_reentry
+POLICY_CASES = (
+    (POLICY_PATH, "team-05-crtr-none-v1", frozenset()),
+    (ABLATION_ROOT / "none.json", "team-05-crtr-none-v1", frozenset()),
+    (
+        ABLATION_ROOT / "volatility_only.json",
+        "team-05-crtr-volatility-only-v1",
+        frozenset({"volatility_target"}),
+    ),
+    (
+        ABLATION_ROOT / "drawdown_only.json",
+        "team-05-crtr-drawdown-only-v1",
+        frozenset({"drawdown_brakes"}),
+    ),
+    (
+        ABLATION_ROOT / "position_stop_only.json",
+        "team-05-crtr-position-stop-only-v1",
+        frozenset({"position_stop"}),
+    ),
+    (
+        ABLATION_ROOT / "turnover_only.json",
+        "team-05-crtr-turnover-only-v1",
+        frozenset({"turnover_limit"}),
+    ),
+    (
+        COMBINED_PATH,
+        "team-05-crtr-conservative-v1",
+        frozenset(
+            {
+                "volatility_target",
+                "drawdown_brakes",
+                "position_stop",
+                "turnover_limit",
+            }
+        ),
+    ),
+)
 
 
-def test_every_exact_ablation_policy_parses_with_only_declared_controls() -> None:
-    none = load_risk_policy(ABLATION_ROOT / "none.json")
-    volatility = load_risk_policy(ABLATION_ROOT / "volatility_only.json")
-    drawdown = load_risk_policy(ABLATION_ROOT / "drawdown_only.json")
-    position = load_risk_policy(ABLATION_ROOT / "position_stop_only.json")
-    turnover = load_risk_policy(ABLATION_ROOT / "turnover_only.json")
-    combined = load_risk_policy(COMBINED_PATH)
+def _exact_expected_policy(
+    policy_id: str,
+    enabled_controls: frozenset[str],
+) -> dict[str, object]:
+    return {
+        "schema_version": 1,
+        "policy_id": policy_id,
+        "same_boundary_reentry": False,
+        "volatility_target": {
+            "enabled": "volatility_target" in enabled_controls,
+            "lookback_days": 30,
+            "annualized_target": 0.18,
+            "minimum_scale": 0.35,
+            "maximum_scale": 1.0,
+        },
+        "drawdown_brakes": (
+            (
+                {"drawdown": 0.10, "gross_scale": 0.75},
+                {"drawdown": 0.16, "gross_scale": 0.50},
+                {"drawdown": 0.22, "gross_scale": 0.25},
+                {"drawdown": 0.28, "gross_scale": 0.0},
+            )
+            if "drawdown_brakes" in enabled_controls
+            else ()
+        ),
+        "position_stop": {
+            "enabled": "position_stop" in enabled_controls,
+            "loss_fraction": 0.12,
+            "cooldown_bars": 6,
+        },
+        "time_stop": {
+            "enabled": False,
+            "maximum_holding_bars": 90,
+            "cooldown_bars": 3,
+        },
+        "turnover_limit": {
+            "enabled": "turnover_limit" in enabled_controls,
+            "maximum_one_way_turnover": 0.18,
+        },
+        "side_scaling": {
+            "long_scale": 1.0,
+            "short_scale": 1.0,
+        },
+    }
 
-    assert not none.enabled
-    assert volatility.volatility_target.enabled and not volatility.drawdown_brakes
-    assert drawdown.drawdown_brakes and not drawdown.volatility_target.enabled
-    assert position.position_stop.enabled and not position.turnover_limit.enabled
-    assert turnover.turnover_limit.enabled and not turnover.position_stop.enabled
-    assert combined.enabled
-    assert combined.volatility_target.enabled
-    assert combined.drawdown_brakes
-    assert combined.position_stop.enabled
-    assert combined.turnover_limit.enabled
+
+def test_every_policy_has_exhaustive_exact_control_and_setting_declaration() -> None:
+    for path, policy_id, enabled_controls in POLICY_CASES:
+        policy = load_risk_policy(path)
+        assert dataclasses.asdict(policy) == _exact_expected_policy(
+            policy_id,
+            enabled_controls,
+        )
+        assert policy.enabled is bool(enabled_controls)
 
 
 def test_drawdown_and_volatility_take_the_more_conservative_scale() -> None:

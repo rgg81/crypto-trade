@@ -7,8 +7,10 @@ not executed during clean-room design.
 from __future__ import annotations
 
 import dataclasses
+import json
 import math
 from collections import OrderedDict
+from pathlib import Path
 
 import pandas as pd
 import pytest
@@ -28,6 +30,7 @@ from strategy import (
 
 
 DECISION = pd.Timestamp("2020-07-17T00:00:00Z")
+TEAM_ROOT = Path(__file__).resolve().parent
 
 
 def _bars(symbol_number: int, *, future_days: int = 0) -> pd.DataFrame:
@@ -150,6 +153,85 @@ def test_open_time_plus_eight_hours_is_the_exact_availability_boundary() -> None
     assert _score_bytes(_context(last_closed_changed)) != baseline_bytes
 
 
+def test_numeric_millisecond_open_time_has_identical_score_and_target_bytes() -> None:
+    frames = _frames()
+    numeric_milliseconds = OrderedDict(
+        (symbol, frame.copy()) for symbol, frame in frames.items()
+    )
+    for frame in numeric_milliseconds.values():
+        frame["open_time"] = pd.Series(
+            [
+                int(timestamp.value // 1_000_000)
+                for timestamp in pd.to_datetime(frame["open_time"], utc=True)
+            ],
+            dtype="int64",
+        )
+
+    assert _score_bytes(_context(numeric_milliseconds)) == _score_bytes(_context(frames))
+    assert _targets(_context(numeric_milliseconds)) == _targets(_context(frames))
+
+
+def test_stale_and_sparse_histories_each_fail_closed() -> None:
+    stale = _frames()
+    for symbol, frame in tuple(stale.items()):
+        close_times = pd.to_datetime(frame["open_time"], utc=True) + pd.Timedelta(hours=8)
+        stale[symbol] = (
+            frame.loc[close_times <= DECISION - pd.Timedelta(hours=16)]
+            .copy()
+            .reset_index(drop=True)
+        )
+    assert preconstruction_scores(_context(stale)) == {}
+    assert _targets(_context(stale)) == {}
+
+    sparse = _frames()
+    for symbol, frame in tuple(sparse.items()):
+        closed = (
+            pd.to_datetime(frame["open_time"], utc=True) + pd.Timedelta(hours=8)
+            <= DECISION
+        )
+        keep = ~closed | (frame.index % 2 == 0)
+        sparse[symbol] = frame.loc[keep].copy().reset_index(drop=True)
+    assert preconstruction_scores(_context(sparse)) == {}
+    assert _targets(_context(sparse)) == {}
+
+
+def test_malformed_timestamp_and_close_each_fail_closed_without_raising() -> None:
+    malformed_timestamp = _frames()
+    for frame in malformed_timestamp.values():
+        frame["open_time"] = ["not-a-timestamp"] * len(frame)
+    assert preconstruction_scores(_context(malformed_timestamp)) == {}
+    assert _targets(_context(malformed_timestamp)) == {}
+
+    malformed_close = _frames()
+    for frame in malformed_close.values():
+        frame["close"] = ["not-a-close"] * len(frame)
+    assert preconstruction_scores(_context(malformed_close)) == {}
+    assert _targets(_context(malformed_close)) == {}
+
+
+def test_duplicate_open_time_uses_the_last_input_row_before_stable_time_sort() -> None:
+    frames = _frames()
+    duplicated = OrderedDict((symbol, frame.copy()) for symbol, frame in frames.items())
+    reference = OrderedDict((symbol, frame.copy()) for symbol, frame in frames.items())
+    symbol = "S19USDT"
+    duplicate_open_time = DECISION - pd.Timedelta(hours=8)
+    duplicate_mask = (
+        pd.to_datetime(duplicated[symbol]["open_time"], utc=True) == duplicate_open_time
+    )
+    assert duplicate_mask.sum() == 1
+    duplicate_row = duplicated[symbol].loc[duplicate_mask].copy()
+    duplicate_row.loc[:, "close"] *= 1.10
+    duplicated[symbol] = pd.concat(
+        [duplicated[symbol], duplicate_row],
+        ignore_index=True,
+    )
+    reference[symbol].loc[duplicate_mask, "close"] *= 1.10
+
+    assert _score_bytes(_context(duplicated)) == _score_bytes(_context(reference))
+    assert _targets(_context(duplicated)) == _targets(_context(reference))
+    assert _score_bytes(_context(duplicated)) != _score_bytes(_context(frames))
+
+
 def test_missing_open_time_or_canonical_range_index_fails_closed() -> None:
     missing_open_time = _frames()
     for frame in missing_open_time.values():
@@ -199,6 +281,18 @@ def test_point_in_time_membership_excludes_ineligible_symbol() -> None:
     assert set(targets) <= set(eligible)
 
 
+def test_reserved_rebalance_key_is_excluded_from_scores_and_targets() -> None:
+    frames = _frames()
+    with_reserved_key = OrderedDict((symbol, frame.copy()) for symbol, frame in frames.items())
+    with_reserved_key["__crypto_trade_rebalance__"] = _bars(99)
+
+    assert preconstruction_scores(_context(with_reserved_key)) == preconstruction_scores(
+        _context(frames)
+    )
+    assert _score_bytes(_context(with_reserved_key)) == _score_bytes(_context(frames))
+    assert _targets(_context(with_reserved_key)) == _targets(_context(frames))
+
+
 def test_mapping_order_and_fresh_instance_reproducibility() -> None:
     frames = _frames()
     reversed_frames = OrderedDict(reversed(list(frames.items())))
@@ -208,6 +302,23 @@ def test_mapping_order_and_fresh_instance_reproducibility() -> None:
     )
     third = build_strategy().target_weights(_context(frames), seed=CANONICAL_SEED)
     assert first == second == third
+
+
+def test_fresh_instances_emit_exactly_equal_candidate_score_payload_bytes() -> None:
+    context = _context(_frames())
+    first = build_strategy_from_parameters()
+    second = build_strategy_from_parameters({})
+    first_bytes = candidate_score_payload_bytes(
+        preconstruction_scores(context, parameters=first.parameters)
+    )
+    second_bytes = candidate_score_payload_bytes(
+        preconstruction_scores(context, parameters=second.parameters)
+    )
+    assert first is not second
+    assert first.parameters is not second.parameters
+    assert first.parameters == second.parameters
+    assert first_bytes
+    assert first_bytes == second_bytes
 
 
 def test_a5_boundary_gets_builtin_finite_floats_and_return_is_consumed(
@@ -269,6 +380,40 @@ def test_adapter_rejects_an_invalid_score_record_instead_of_imputing() -> None:
     corrupted[first_symbol] = dataclasses.replace(
         corrupted[first_symbol], score=float("inf")
     )
+    assert candidate_score_values(corrupted) == {}
+    assert candidate_score_payload_bytes(corrupted) == b""
+    assert scores_to_target_weights(corrupted) == {}
+
+
+@pytest.mark.parametrize(
+    ("field_name", "malformed_value"),
+    [
+        ("symbol", 7),
+        ("score", "0.25"),
+        ("short_log_return", None),
+        ("medium_log_return", True),
+        ("slow_log_return", 0),
+        ("realized_bar_volatility", "0.01"),
+        ("market_direction_log_return", 0j),
+        ("score", float("nan")),
+        ("score", 1.01),
+        ("realized_bar_volatility", 0.0),
+    ],
+)
+def test_every_malformed_score_field_fails_closed_to_empty_values_and_bytes(
+    field_name: str,
+    malformed_value: object,
+) -> None:
+    scores = preconstruction_scores(_context(_frames()))
+    first_symbol = sorted(scores)[0]
+    corrupted = dict(scores)
+    corrupted[first_symbol] = dataclasses.replace(
+        corrupted[first_symbol],
+        **{field_name: malformed_value},
+    )
+
+    assert candidate_score_values(corrupted) == {}
+    assert candidate_score_payload_bytes(corrupted) == b""
     assert scores_to_target_weights(corrupted) == {}
 
 
@@ -314,6 +459,40 @@ def test_neighbor_override_is_explicit_and_unknown_axis_is_rejected() -> None:
     assert neighbor.parameters.selection_fraction == BASE_PARAMETERS.selection_fraction
     with pytest.raises(ValueError, match="unknown strategy parameters"):
         build_strategy_from_parameters({"secret_parameter": 1})
+
+
+@pytest.mark.parametrize(
+    ("artifact_name", "axis", "neighbor_value"),
+    [
+        ("team05-crtr-n01-slow-50d.json", "slow_horizon_days", 50),
+        ("team05-crtr-n02-slow-70d.json", "slow_horizon_days", 70),
+        ("team05-crtr-n03-selection-020.json", "selection_fraction", 0.20),
+        ("team05-crtr-n04-selection-030.json", "selection_fraction", 0.30),
+        ("team05-crtr-n05-gross-050.json", "target_gross", 0.50),
+        ("team05-crtr-n06-gross-070.json", "target_gross", 0.70),
+        ("team05-crtr-n07-chop-reversal-015.json", "chop_reversal_weight", 0.15),
+        ("team05-crtr-n08-chop-reversal-025.json", "chop_reversal_weight", 0.25),
+    ],
+)
+def test_every_declared_neighbor_changes_exactly_its_one_registered_axis(
+    artifact_name: str,
+    axis: str,
+    neighbor_value: int | float,
+) -> None:
+    artifact = json.loads(
+        (TEAM_ROOT / "neighbors" / artifact_name).read_text(encoding="utf-8")
+    )
+    expected_override = {axis: neighbor_value}
+    assert artifact["one_axis"] == axis
+    assert artifact["overrides"] == expected_override
+
+    neighbor = build_strategy_from_parameters(artifact["overrides"])
+    changed = {
+        field.name: getattr(neighbor.parameters, field.name)
+        for field in dataclasses.fields(BASE_PARAMETERS)
+        if getattr(neighbor.parameters, field.name) != getattr(BASE_PARAMETERS, field.name)
+    }
+    assert changed == expected_override
 
 
 def test_every_noncanonical_seed_is_rejected() -> None:

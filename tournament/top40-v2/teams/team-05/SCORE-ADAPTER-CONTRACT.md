@@ -30,7 +30,11 @@ Immediately after the final score transform and before score-span checks or sele
 scores and directly calls
 `crypto_trade.tournament.score_adapter_protocol_v5.score_boundary`. Portfolio construction
 validates and consumes the values returned by that hook. `candidate_score_payload_bytes()` defines
-the canonical byte representation used by the prospective first-candidate score artifact.
+the canonical byte representation used by the prospective first-candidate score artifact. The
+runtime dataclass annotations are not trusted as validators: every record field must have its
+declared exact runtime type and satisfy the finite/range rules before the hook. Any malformed
+nonempty score map returns `{}` from `candidate_score_values()`, `b""` from
+`candidate_score_payload_bytes()`, and `{}` from construction without coercion or an exception.
 
 The diagnostic label is the simple three-day return from the organizer-authoritative executable
 entry open for the target produced at the score decision to the first executable open at or after
@@ -70,4 +74,6 @@ execution, funding, costs, participation, delistings, positions, and the frozen 
   `maximum_abs_net_tilt`; every absolute symbol request is no more than
   `maximum_symbol_weight`.
 - Both sleeves are present whenever the adapter emits a nonempty target.
-- Any invalid score record fails closed to `{}` rather than being silently imputed.
+- Any invalid score record, including a wrong-typed dataclass field, fails closed to `{}` and
+  empty artifact bytes rather than raising, coercing, serializing a valid-looking empty payload,
+  or being silently imputed.

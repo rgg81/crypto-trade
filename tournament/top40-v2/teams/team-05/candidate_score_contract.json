@@ -40,6 +40,7 @@
     "encoding": "UTF-8 JSON plus one LF",
     "json_options": "allow_nan=false, ensure_ascii=true, separators=(',', ':'), sort_keys=true",
     "shape": "{schema_version:1,scores:[{score:<float>,symbol:<string>}]} with rows sorted by symbol",
+    "invalid_record_rule": "Any malformed nonempty PreconstructionScore map returns empty bytes; it must never be coerced or serialized as a valid-looking empty score artifact.",
     "byte_invariance": "same causal input must be identical under future append/corruption/truncation, bar-map insertion order, and fresh construction"
   },
   "registration_rule": "Do not register or execute any Team-05 candidate until Amendment 0005 and score_adapter_protocol_v5 are frozen and this contract and its manifest are organizer hash-bound."
