@@ -1,9 +1,24 @@
 {
   "cost_accounting": {
+    "additional_policy_configurations_after_core": 5,
+    "center_no_control_included": true,
     "cost_multipliers_per_policy": [1.0, 2.0],
     "material_configuration_count": 6,
     "paired_outputs_in_one_organizer_evaluation": true,
     "prohibited_interpretation": "Do not count base and doubled costs as two policy configurations."
+  },
+  "core_alpha_activation_gate": {
+    "applies_to": "t10-rtre-core-v1 with root risk_policy.json in its no-control state",
+    "base_cost_net_return_strictly_positive": true,
+    "base_cost_net_sharpe_strictly_positive": true,
+    "both_sleeves_meet_activity_floors": true,
+    "combined_chop_attribution_strictly_positive": true,
+    "doubled_cost_net_return_strictly_positive": true,
+    "doubled_cost_net_sharpe_strictly_positive": true,
+    "long_bull_attribution_strictly_positive": true,
+    "minimum_positive_folds": 4,
+    "required_positive_return_regimes": ["bull", "bear", "chop"],
+    "short_bear_attribution_strictly_positive": true
   },
   "execution_contract": {
     "intrabar_fills": false,
@@ -14,13 +29,14 @@
     "stop_execution": "next executable open"
   },
   "policies": [
-    {"path": "risk_policies/no-control.json", "policy_id": "team-10-no-control"},
+    {"path": "risk_policy.json", "policy_id": "team-10-no-control"},
     {"path": "risk_policies/volatility-only.json", "policy_id": "team-10-volatility-only"},
     {"path": "risk_policies/drawdown-only.json", "policy_id": "team-10-drawdown-only"},
     {"path": "risk_policies/position-stop-only.json", "policy_id": "team-10-position-stop-only"},
     {"path": "risk_policies/turnover-only.json", "policy_id": "team-10-turnover-only"},
-    {"path": "risk_policy.json", "policy_id": "team-10-combined"}
+    {"path": "risk_policies/combined.json", "policy_id": "team-10-combined"}
   ],
+  "policy_materialization_rule": "The frozen lifecycle reads only root risk_policy.json. Run the root no-control core first. After it passes every activation minimum, copy any selected immutable risk_policies template byte-for-byte to root before commit, registration, and run, then recompute every risk/source binding. Controls cannot rescue a failed core.",
   "required_comparisons": [
     "net return and Sharpe",
     "maximum drawdown and tail loss",

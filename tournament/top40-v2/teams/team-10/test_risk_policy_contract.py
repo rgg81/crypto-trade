@@ -37,6 +37,8 @@ def test_risk_plan_counts_paired_costs_as_six_material_policies() -> None:
     plan = _load("risk_ablations.json")
     accounting = plan["cost_accounting"]
     assert accounting == {
+        "additional_policy_configurations_after_core": 5,
+        "center_no_control_included": True,
         "cost_multipliers_per_policy": [1.0, 2.0],
         "material_configuration_count": 6,
         "paired_outputs_in_one_organizer_evaluation": True,
@@ -47,6 +49,33 @@ def test_risk_plan_counts_paired_costs_as_six_material_policies() -> None:
     policies = plan["policies"]
     assert isinstance(policies, list) and len(policies) == 6
     assert len({entry["policy_id"] for entry in policies}) == 6
+    assert [entry["path"] for entry in policies] == [
+        "risk_policy.json",
+        "risk_policies/volatility-only.json",
+        "risk_policies/drawdown-only.json",
+        "risk_policies/position-stop-only.json",
+        "risk_policies/turnover-only.json",
+        "risk_policies/combined.json",
+    ]
+    assert plan["core_alpha_activation_gate"] == {
+        "applies_to": "t10-rtre-core-v1 with root risk_policy.json in its no-control state",
+        "base_cost_net_return_strictly_positive": True,
+        "base_cost_net_sharpe_strictly_positive": True,
+        "both_sleeves_meet_activity_floors": True,
+        "combined_chop_attribution_strictly_positive": True,
+        "doubled_cost_net_return_strictly_positive": True,
+        "doubled_cost_net_sharpe_strictly_positive": True,
+        "long_bull_attribution_strictly_positive": True,
+        "minimum_positive_folds": 4,
+        "required_positive_return_regimes": ["bull", "bear", "chop"],
+        "short_bear_attribution_strictly_positive": True,
+    }
+
+
+def test_root_policy_is_byte_exact_no_control() -> None:
+    assert (TEAM_DIR / "risk_policy.json").read_bytes() == (
+        TEAM_DIR / "risk_policies/no-control.json"
+    ).read_bytes()
 
 
 def test_each_policy_is_declarative_bounded_and_disables_same_boundary_reentry() -> None:

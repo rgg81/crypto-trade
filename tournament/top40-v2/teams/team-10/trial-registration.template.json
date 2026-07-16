@@ -1,7 +1,7 @@
 {
   "candidate_id": "t10-rtre-core-v1",
   "config_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-  "falsifier": "Fail the candidate if any non-compensatory development, regime, sleeve, walk-forward, doubled-cost, concentration, or neighborhood gate fails. A failing result cannot be submitted.",
+  "falsifier": "This first material trial is the no-control core. Reject it and prohibit every risk-overlay activation if base- or doubled-cost return/Sharpe is nonpositive, fewer than four folds are positive, bull/bear/chop return or long-bull/short-bear/combined-chop attribution is nonpositive, either sleeve is inactive, or any other non-compensatory development gate fails. A failing result requires a separately preregistered mechanism pivot or DNF and cannot be rescued by controls.",
   "family_id": "t10-residual-trend-reversion-ensemble-v1",
   "parameters": {
     "efficiency_lower": 0.12,
@@ -27,6 +27,6 @@
   "source_bundle_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
   "strategy_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
   "team_id": "team-10",
-  "thesis": "A balanced adaptive mixture of causal crypto residual continuation and reversal can produce positive, stable visible-development evidence across bull, bear, and chop after realistic and doubled costs.",
-  "timestamp_utc": "1970-01-01T00:00:00Z"
+  "thesis": "Without risk-overlay assistance, a balanced adaptive mixture of causal crypto residual continuation and reversal can produce active, positive visible-development evidence across bull, bear, and chop after realistic and doubled costs.",
+  "timestamp_utc": "REPLACE_WITH_ACTUAL_REGISTRATION_TIMESTAMP_Z"
 }

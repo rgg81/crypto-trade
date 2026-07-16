@@ -27,3 +27,7 @@ the exact Amendment 0006 pure-crypto authority and is bound by:
 The strategy accepts the eligible-symbol set supplied by A6 through that command surface. It must not maintain a
 second ticker-based asset classifier. Negative development evidence is research evidence, never a
 submission: Team 10 continues within budget, makes a documented pivot, or records DNF.
+
+The first material candidate must use the no-control bytes at root `risk_policy.json`. Controls are
+dormant until that core is broadly positive at ordinary and doubled costs across the declared
+fold/regime/role/activity gates, and cannot rescue a failed core.

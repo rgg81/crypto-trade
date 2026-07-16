@@ -20,6 +20,12 @@ This is a prospective checklist, not evidence that review has passed.
    ordinary costs, shared participation, and same-boundary reentry prevention remain organizer-owned.
 9. Confirm the risk plan counts six policies, with base and doubled costs emitted together for each;
    reject any accounting that calls those twelve material choices.
+   Require root `risk_policy.json` to be byte-identical to `risk_policies/no-control.json` for the
+   first material candidate. Run that core first and require positive ordinary/doubled return and
+   Sharpe, at least four positive folds, positive bull/bear/chop returns, positive
+   long-bull/short-bear/combined-chop attribution, and active sleeves before any control. Controls
+   cannot rescue failure. For a later policy, copy its immutable template byte-for-byte to root
+   before commit, registration, and run, then recompute all bindings.
 10. Confirm `families.jsonl` and `experiments.jsonl` are still empty and that every generated evidence
     hash, result path, and performance field remains absent before registration/evaluation.
 

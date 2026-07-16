@@ -20,9 +20,12 @@ STRATEGY = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = STRATEGY
 SPEC.loader.exec_module(STRATEGY)
 
+MARKET_START = pd.Timestamp(year=2022, month=1, day=1, tz="UTC")
+EFFICIENCY_DECISION = pd.Timestamp(year=2022, month=6, day=1, tz="UTC")
+
 
 def _market_context(*, periods: int = 100, symbol_count: int = 20) -> SimpleNamespace:
-    open_times = pd.date_range("2022-01-01", periods=periods, freq="8h", tz="UTC")
+    open_times = pd.date_range(MARKET_START, periods=periods, freq="8h")
     decision_time = open_times[-1] + pd.Timedelta(hours=8)
     step = np.arange(periods, dtype=float)
     symbols = [f"COIN{index:02d}USDT" for index in range(symbol_count)]
@@ -178,7 +181,7 @@ def test_insufficient_breadth_and_constant_market_request_flat() -> None:
 
 def test_adaptive_efficiency_interpolates_between_reversion_and_trend() -> None:
     strategy = STRATEGY.build_strategy()
-    decision_time = pd.Timestamp("2022-06-01T00:00:00Z")
+    decision_time = EFFICIENCY_DECISION
     index = pd.date_range(
         end=decision_time,
         periods=strategy.config.regime_horizon_bars,

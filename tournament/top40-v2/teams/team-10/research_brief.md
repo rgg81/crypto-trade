@@ -69,11 +69,20 @@ Reject or pivot this family if any of the following occurs in visible chronologi
 The team will not submit a negative or merely least-bad in-sample model. It will simplify, use at
 most two documented mechanism pivots inside the cumulative budget, or record DNF.
 
+The first material trial is the unchanged reference with top-level no-control `risk_policy.json`.
+Before any volatility, drawdown, position-stop, turnover, or combined policy may be registered, the
+core must have strictly positive return and Sharpe at ordinary and doubled costs, at least four
+positive folds, positive bull/bear/chop returns, positive long-bull, short-bear, and combined-chop
+attribution, and active long and short sleeves. Controls cannot rescue a negative or otherwise
+failed core. Failure permits only a separately preregistered mechanism revision/pivot or DNF, whose
+own no-control core must restart the sequence.
+
 ## Prospective accounting
 
-The planned first family uses 31 material configurations at most: one reference configuration,
-seven signal/mechanism ablations, twelve two-sided parameter neighbors, six risk-policy choices,
-and five confirmatory reservations. A base-cost and doubled-cost result are paired outputs of one
-risk-policy evaluation and do **not** count as two configurations. No item is evidence until it is
+The planned first family uses 31 material configurations at most: one no-control reference,
+seven signal/mechanism ablations, twelve two-sided parameter neighbors, five additional risk-policy
+choices (four single controls plus combined), and six confirmatory reservations. A base-cost and
+doubled-cost result are paired outputs of one policy state and do **not** count as two
+configurations. No item is evidence until it is
 registered through the active A5 superset lifecycle, with its delegated A6 preflight, and evaluated
 by the organizer.

@@ -1,10 +1,12 @@
 {
+  "activation_rule": "The no-control reference is the first material run. Signal ablations may be registered only after that result is read; every risk overlay remains blocked unless all broad positive no-control core-alpha activation minima pass.",
   "accounting": {
     "reference_configurations": 1,
     "signal_ablation_configurations": 7,
     "status": "prospective_unregistered",
     "total_material_configurations": 8
   },
+  "executable_materialization_rule": "The zero-argument builder exposes only the reference defaults. Every non-core ablation requires separately hash-bound executable strategy/config bytes that expose its declared override before registration; this JSON alone is not an executable variant.",
   "ablations": [
     {
       "ablation_id": "trend-only",

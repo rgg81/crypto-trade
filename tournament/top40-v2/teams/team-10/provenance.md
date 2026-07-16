@@ -23,9 +23,15 @@ eligible universe as native crypto only.
 
 All model choices are explicit in `frozen_config.json`; there are no serialized fitted coefficients,
 hidden state, external files, network calls, subprocesses, credentials, or writable outputs. The
-strategy is deterministic for every valid seed. Exact source/config/risk/source-bundle hashes are
-intentionally left as zero-hash sentinels only in clearly named templates until organizer review and
-preregistration replace them.
+strategy is deterministic for every valid seed. Exact source/config/risk/source-bundle hashes remain
+zero-hash sentinels and registration times remain explicit invalid placeholders in clearly named
+templates until organizer review and preregistration replace them.
+
+The first executable risk state is top-level no-control `risk_policy.json`, byte-identical to
+`risk_policies/no-control.json`. The remaining files are immutable declarations, not runtime
+selectors. They remain dormant unless the no-control core passes every broad positive activation
+minimum; controls cannot rescue failure. Before a later policy candidate is committed, registered,
+or run, its template must be copied byte-for-byte to root and every affected hash recomputed.
 
 ## Holds
 
