@@ -1,0 +1,307 @@
+{
+  "candidate_id": "vdr-core-candidate-001",
+  "cost_multipliers_for_every_policy": [
+    1.0,
+    2.0
+  ],
+  "declaration_status": "prospective-unregistered-unevaluated",
+  "material_configuration_accounting": {
+    "additional_policy_configurations": 6,
+    "center_candidate_uses_combined_policy": true,
+    "matrix_policy_count": 7,
+    "reason_combined_is_not_counted_twice": "The risk-combined policy is field-for-field identical to risk_policy.json used by the one center candidate; the other six matrix rows are additional material configurations.",
+    "total_initial_family_configurations": 21
+  },
+  "policies": [
+    {
+      "ablation_id": "risk-none",
+      "declared_failure_mode": "Signal-only control used to establish whether any overlay adds value after costs.",
+      "policy": {
+        "drawdown_brakes": [],
+        "policy_id": "team-08-risk-none",
+        "position_stop": {
+          "cooldown_bars": 6,
+          "enabled": false,
+          "loss_fraction": 0.075
+        },
+        "same_boundary_reentry": false,
+        "schema_version": 1,
+        "side_scaling": {
+          "long_scale": 1.0,
+          "short_scale": 1.0
+        },
+        "time_stop": {
+          "cooldown_bars": 3,
+          "enabled": false,
+          "maximum_holding_bars": 18
+        },
+        "turnover_limit": {
+          "enabled": false,
+          "maximum_one_way_turnover": 0.45
+        },
+        "volatility_target": {
+          "annualized_target": 0.35,
+          "enabled": false,
+          "lookback_days": 30,
+          "maximum_scale": 1.0,
+          "minimum_scale": 0.25
+        }
+      }
+    },
+    {
+      "ablation_id": "risk-volatility-only",
+      "declared_failure_mode": "Reduce exposure during sustained high realized portfolio volatility without levering quiet periods.",
+      "policy": {
+        "drawdown_brakes": [],
+        "policy_id": "team-08-risk-volatility",
+        "position_stop": {
+          "cooldown_bars": 6,
+          "enabled": false,
+          "loss_fraction": 0.075
+        },
+        "same_boundary_reentry": false,
+        "schema_version": 1,
+        "side_scaling": {
+          "long_scale": 1.0,
+          "short_scale": 1.0
+        },
+        "time_stop": {
+          "cooldown_bars": 3,
+          "enabled": false,
+          "maximum_holding_bars": 18
+        },
+        "turnover_limit": {
+          "enabled": false,
+          "maximum_one_way_turnover": 0.45
+        },
+        "volatility_target": {
+          "annualized_target": 0.35,
+          "enabled": true,
+          "lookback_days": 30,
+          "maximum_scale": 1.0,
+          "minimum_scale": 0.25
+        }
+      }
+    },
+    {
+      "ablation_id": "risk-drawdown-only",
+      "declared_failure_mode": "Limit portfolio-level path dependence after cumulative losses.",
+      "policy": {
+        "drawdown_brakes": [
+          {
+            "drawdown": 0.1,
+            "gross_scale": 0.75
+          },
+          {
+            "drawdown": 0.18,
+            "gross_scale": 0.45
+          },
+          {
+            "drawdown": 0.26,
+            "gross_scale": 0.0
+          }
+        ],
+        "policy_id": "team-08-risk-drawdown",
+        "position_stop": {
+          "cooldown_bars": 6,
+          "enabled": false,
+          "loss_fraction": 0.075
+        },
+        "same_boundary_reentry": false,
+        "schema_version": 1,
+        "side_scaling": {
+          "long_scale": 1.0,
+          "short_scale": 1.0
+        },
+        "time_stop": {
+          "cooldown_bars": 3,
+          "enabled": false,
+          "maximum_holding_bars": 18
+        },
+        "turnover_limit": {
+          "enabled": false,
+          "maximum_one_way_turnover": 0.45
+        },
+        "volatility_target": {
+          "annualized_target": 0.35,
+          "enabled": false,
+          "lookback_days": 30,
+          "maximum_scale": 1.0,
+          "minimum_scale": 0.25
+        }
+      }
+    },
+    {
+      "ablation_id": "risk-position-stop-only",
+      "declared_failure_mode": "Exit failed releases whose carried position has lost 7.5% at a known close boundary.",
+      "policy": {
+        "drawdown_brakes": [],
+        "policy_id": "team-08-risk-position-stop",
+        "position_stop": {
+          "cooldown_bars": 6,
+          "enabled": true,
+          "loss_fraction": 0.075
+        },
+        "same_boundary_reentry": false,
+        "schema_version": 1,
+        "side_scaling": {
+          "long_scale": 1.0,
+          "short_scale": 1.0
+        },
+        "time_stop": {
+          "cooldown_bars": 3,
+          "enabled": false,
+          "maximum_holding_bars": 18
+        },
+        "turnover_limit": {
+          "enabled": false,
+          "maximum_one_way_turnover": 0.45
+        },
+        "volatility_target": {
+          "annualized_target": 0.35,
+          "enabled": false,
+          "lookback_days": 30,
+          "maximum_scale": 1.0,
+          "minimum_scale": 0.25
+        }
+      }
+    },
+    {
+      "ablation_id": "risk-time-stop-only",
+      "declared_failure_mode": "Remove stale holdings after six days when the expected release has not resolved through ordinary rebalancing.",
+      "policy": {
+        "drawdown_brakes": [],
+        "policy_id": "team-08-risk-time-stop",
+        "position_stop": {
+          "cooldown_bars": 6,
+          "enabled": false,
+          "loss_fraction": 0.075
+        },
+        "same_boundary_reentry": false,
+        "schema_version": 1,
+        "side_scaling": {
+          "long_scale": 1.0,
+          "short_scale": 1.0
+        },
+        "time_stop": {
+          "cooldown_bars": 3,
+          "enabled": true,
+          "maximum_holding_bars": 18
+        },
+        "turnover_limit": {
+          "enabled": false,
+          "maximum_one_way_turnover": 0.45
+        },
+        "volatility_target": {
+          "annualized_target": 0.35,
+          "enabled": false,
+          "lookback_days": 30,
+          "maximum_scale": 1.0,
+          "minimum_scale": 0.25
+        }
+      }
+    },
+    {
+      "ablation_id": "risk-turnover-only",
+      "declared_failure_mode": "Bound next-open churn and participation demand from daily cross-sectional rank changes.",
+      "policy": {
+        "drawdown_brakes": [],
+        "policy_id": "team-08-risk-turnover",
+        "position_stop": {
+          "cooldown_bars": 6,
+          "enabled": false,
+          "loss_fraction": 0.075
+        },
+        "same_boundary_reentry": false,
+        "schema_version": 1,
+        "side_scaling": {
+          "long_scale": 1.0,
+          "short_scale": 1.0
+        },
+        "time_stop": {
+          "cooldown_bars": 3,
+          "enabled": false,
+          "maximum_holding_bars": 18
+        },
+        "turnover_limit": {
+          "enabled": true,
+          "maximum_one_way_turnover": 0.45
+        },
+        "volatility_target": {
+          "annualized_target": 0.35,
+          "enabled": false,
+          "lookback_days": 30,
+          "maximum_scale": 1.0,
+          "minimum_scale": 0.25
+        }
+      }
+    },
+    {
+      "ablation_id": "risk-combined",
+      "declared_failure_mode": "Jointly address volatility, cumulative loss, failed/stale releases, and excessive turnover; reject if interaction costs outweigh those controls.",
+      "policy": {
+        "drawdown_brakes": [
+          {
+            "drawdown": 0.1,
+            "gross_scale": 0.75
+          },
+          {
+            "drawdown": 0.18,
+            "gross_scale": 0.45
+          },
+          {
+            "drawdown": 0.26,
+            "gross_scale": 0.0
+          }
+        ],
+        "policy_id": "team-08-vdr-combined",
+        "position_stop": {
+          "cooldown_bars": 6,
+          "enabled": true,
+          "loss_fraction": 0.075
+        },
+        "same_boundary_reentry": false,
+        "schema_version": 1,
+        "side_scaling": {
+          "long_scale": 1.0,
+          "short_scale": 1.0
+        },
+        "time_stop": {
+          "cooldown_bars": 3,
+          "enabled": true,
+          "maximum_holding_bars": 18
+        },
+        "turnover_limit": {
+          "enabled": true,
+          "maximum_one_way_turnover": 0.45
+        },
+        "volatility_target": {
+          "annualized_target": 0.35,
+          "enabled": true,
+          "lookback_days": 30,
+          "maximum_scale": 1.0,
+          "minimum_scale": 0.25
+        }
+      }
+    }
+  ],
+  "required_outputs": [
+    "annualized_return",
+    "net_sharpe",
+    "max_drawdown",
+    "tail_loss",
+    "turnover",
+    "regime_returns",
+    "long_short_attribution",
+    "stop_count",
+    "time_stop_count",
+    "drawdown_brake_count",
+    "cooldown_bars",
+    "requested_risk_notional",
+    "filled_risk_notional",
+    "same_boundary_reentry_prevented_count"
+  ],
+  "schema_version": 1,
+  "selection_rule": "A control may enter the frozen candidate only if it improves its declared failure mode, does not create any new frozen-gate failure, and remains acceptable at doubled costs.",
+  "team_id": "team-08"
+}

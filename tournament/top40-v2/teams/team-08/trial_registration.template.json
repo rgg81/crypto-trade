@@ -1,0 +1,32 @@
+{
+  "candidate_id": "vdr-core-candidate-001",
+  "config_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "falsifier": "The candidate is rejected if any frozen development gate fails, if its declared neighborhood is an isolated peak, or if compression and dispersion-switch ablations do not support the proposed interaction.",
+  "family_id": "volatility-dispersion-release-v1",
+  "parameters": {
+    "compression_ratio_ceiling": 0.86,
+    "compression_ratio_floor": 0.35,
+    "direction_bars": 3,
+    "dispersion_continuation_floor": 1.22,
+    "dispersion_fade_ceiling": 0.92,
+    "dispersion_lookback_bars": 42,
+    "expansion_z_cap": 2.75,
+    "expansion_z_floor": 1.15,
+    "fast_vol_bars": 9,
+    "gross_target": 0.8,
+    "maximum_symbol_weight": 0.09,
+    "minimum_cross_section": 12,
+    "minimum_side_positions": 5,
+    "minimum_signal_strength": 0.025,
+    "rebalance_hour_utc": 0,
+    "side_fraction": 0.22,
+    "slow_vol_bars": 63
+  },
+  "risk_config_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "seed": 20260801,
+  "source_bundle_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "strategy_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "team_id": "team-08",
+  "thesis": "Compression-conditioned residual releases should continue when crypto cross-sectional dispersion expands and converge when dispersion stays subdued, producing distinct long, short, and chop roles after costs.",
+  "timestamp_utc": "2026-07-16T00:00:00Z"
+}

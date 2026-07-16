@@ -1,0 +1,57 @@
+{
+  "candidate_id": "vdr-core-candidate-001",
+  "cost_protocol": {
+    "base": "common 5 bp fee plus 2.5 bp slippage per side",
+    "doubled": "organizer-owned independent rerun with all ordinary costs multiplied by 2",
+    "require_both_for_every_material_variant": true
+  },
+  "declaration_status": "prospective-unregistered-unevaluated",
+  "mechanism_ablations": [
+    {
+      "ablation_id": "vdr-ablation-no-compression",
+      "change": "Set compression strength to one for every symbol while retaining release and dispersion logic.",
+      "falsification_role": "Tests whether the volatility-compression setup contributes rather than merely reducing trade count."
+    },
+    {
+      "ablation_id": "vdr-ablation-continuation-only",
+      "change": "Set the dispersion mix to continuation for every boundary.",
+      "falsification_role": "Tests whether the low-dispersion convergence mode is needed for chop."
+    },
+    {
+      "ablation_id": "vdr-ablation-convergence-only",
+      "change": "Set the dispersion mix to convergence for every boundary.",
+      "falsification_role": "Tests whether expansion continuation supplies bull/bear roles rather than a generic reversal effect."
+    },
+    {
+      "ablation_id": "vdr-ablation-no-dispersion-switch",
+      "change": "Fix continuation/convergence mixing at 0.5.",
+      "falsification_role": "Directly tests the value of the cross-sectional dispersion state."
+    },
+    {
+      "ablation_id": "vdr-ablation-no-market-residual",
+      "change": "Use raw symbol log returns instead of subtracting the same-boundary cross-sectional median.",
+      "falsification_role": "Tests whether the candidate is a common-beta momentum proxy."
+    }
+  ],
+  "required_report_fields": [
+    "net_return",
+    "net_sharpe",
+    "max_drawdown",
+    "tail_loss",
+    "turnover",
+    "positive_fold_count",
+    "positive_quarter_fraction",
+    "bull_net_return",
+    "bear_net_return",
+    "chop_net_return",
+    "stress_net_return",
+    "long_bull_net_return",
+    "short_bear_net_return",
+    "combined_chop_net_return",
+    "long_mean_gross_exposure",
+    "short_mean_gross_exposure"
+  ],
+  "risk_ablation_plan": "risk_ablations.json",
+  "schema_version": 1,
+  "team_id": "team-08"
+}

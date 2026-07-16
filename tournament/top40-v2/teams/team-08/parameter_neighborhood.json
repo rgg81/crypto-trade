@@ -1,0 +1,76 @@
+{
+  "base_candidate_id": "vdr-core-candidate-001",
+  "base_parameters_file": "frozen_config.json",
+  "declaration_status": "prospective-unregistered-unevaluated",
+  "materialization_rule": "Merge each override into strategy_parameters without changing any other byte-level input; then preregister and run each neighbor independently before reading its result.",
+  "neighbors": [
+    {
+      "hypothesis": "A two-day compression estimator reacts sooner without changing the slow baseline.",
+      "neighbor_id": "vdr-neighbor-fast-006",
+      "overrides": {
+        "fast_vol_bars": 6
+      }
+    },
+    {
+      "hypothesis": "A four-day compression estimator rejects brief false compressions.",
+      "neighbor_id": "vdr-neighbor-fast-012",
+      "overrides": {
+        "fast_vol_bars": 12
+      }
+    },
+    {
+      "hypothesis": "A stricter compression prerequisite trades only deeper squeezes.",
+      "neighbor_id": "vdr-neighbor-compression-080",
+      "overrides": {
+        "compression_ratio_ceiling": 0.8
+      }
+    },
+    {
+      "hypothesis": "A looser compression prerequisite tests whether the edge is broad rather than threshold-local.",
+      "neighbor_id": "vdr-neighbor-compression-092",
+      "overrides": {
+        "compression_ratio_ceiling": 0.92
+      }
+    },
+    {
+      "hypothesis": "A lower release threshold admits moderate impulses.",
+      "neighbor_id": "vdr-neighbor-release-100",
+      "overrides": {
+        "expansion_z_floor": 1.0
+      }
+    },
+    {
+      "hypothesis": "A higher release threshold trades only clear volatility releases.",
+      "neighbor_id": "vdr-neighbor-release-130",
+      "overrides": {
+        "expansion_z_floor": 1.3
+      }
+    },
+    {
+      "hypothesis": "An earlier continuation transition tests a wider definition of broad price discovery.",
+      "neighbor_id": "vdr-neighbor-dispersion-early",
+      "overrides": {
+        "dispersion_continuation_floor": 1.16,
+        "dispersion_fade_ceiling": 0.88
+      }
+    },
+    {
+      "hypothesis": "A later continuation transition requires stronger cross-sectional confirmation.",
+      "neighbor_id": "vdr-neighbor-dispersion-late",
+      "overrides": {
+        "dispersion_continuation_floor": 1.28,
+        "dispersion_fade_ceiling": 0.97
+      }
+    }
+  ],
+  "required_evidence": {
+    "distinct_daily_return_series": true,
+    "maximum_positive_pnl_concentration": 0.4,
+    "minimum_neighbor_median_sharpe": 0.5,
+    "minimum_profitable_neighbor_fraction": 0.7,
+    "parameter_and_return_sha256_required": true
+  },
+  "schema_version": 1,
+  "selection_prohibition": "Do not add, remove, or recenter neighbors after any neighborhood result is observed.",
+  "team_id": "team-08"
+}

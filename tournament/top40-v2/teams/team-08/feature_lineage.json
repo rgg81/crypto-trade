@@ -1,0 +1,95 @@
+{
+  "candidate_id": "vdr-core-candidate-001",
+  "features": [
+    {
+      "availability": "All constituent closes are available by decision_time; the current release bar closes exactly at decision_time.",
+      "formula": "log(close_t / close_(t-1)) minus the same-boundary cross-sectional median log return",
+      "id": "cross_sectional_residual_return_8h",
+      "lag": "zero additional bars after the source bar closes",
+      "missing_rule": "Omit a symbol unless its latest contiguous 8h suffix is long enough; flatten if fewer than 12 symbols remain.",
+      "uses_current_release_bar": true
+    },
+    {
+      "availability": "Only residual returns strictly before the current release return are included.",
+      "formula": "sample_std(last 9 prior residual returns) / sample_std(last 63 prior residual returns)",
+      "id": "idiosyncratic_compression_ratio",
+      "lag": "current release return excluded from numerator and denominator",
+      "missing_rule": "Omit non-finite or effectively zero slow-volatility symbols. A ratio at or above 0.86 is hard-inactive and is removed before cross-sectional score centering or selection.",
+      "uses_current_release_bar": false
+    },
+    {
+      "availability": "The numerator is the newly closed residual return; its scale is the prior 9-bar residual volatility.",
+      "formula": "abs(current residual return) / max(prior fast residual volatility, 1e-12)",
+      "id": "release_shock_z",
+      "lag": "prior volatility scale; current closed return",
+      "missing_rule": "Omit if the prior scale is unavailable.",
+      "uses_current_release_bar": true
+    },
+    {
+      "availability": "All direction bars are closed by decision_time.",
+      "formula": "sum(last 3 residual returns) / (prior fast volatility * sqrt(3))",
+      "id": "release_direction_z",
+      "lag": "current and two prior closed residual returns",
+      "missing_rule": "Omit if the contiguous return suffix is insufficient.",
+      "uses_current_release_bar": true
+    },
+    {
+      "availability": "Current dispersion uses the newly closed cross section; baseline values end one bar earlier.",
+      "formula": "current median absolute residual return / median(previous 42 cross-sectional median absolute residual returns)",
+      "id": "cross_sectional_dispersion_ratio",
+      "lag": "baseline excludes current boundary",
+      "missing_rule": "Flatten if the aligned cross section or baseline is insufficient.",
+      "uses_current_release_bar": true
+    },
+    {
+      "availability": "All inputs satisfy their individual rules above.",
+      "formula": "linear dispersion-ratio mix of compression-conditioned directional continuation and failed-release convergence",
+      "id": "volatility_dispersion_release_score",
+      "lag": "same closed decision boundary",
+      "missing_rule": "Require five scores above +0.025 and five below -0.025 after median centering; otherwise flatten.",
+      "uses_current_release_bar": true
+    }
+  ],
+  "learned_preprocessing": false,
+  "raw_fields": [
+    {
+      "availability_timestamp": "open_time + 8 hours",
+      "coverage": "Only symbols in the point-in-time eligible set supplied by the organizer.",
+      "event_timestamp": "open_time + 8 hours",
+      "field": "close",
+      "lag": "bar must be fully closed at decision_time",
+      "missing_rule": "Reject non-finite/nonpositive values; never forward fill.",
+      "source": "organizer past-only DecisionContext.bars"
+    },
+    {
+      "availability_timestamp": "open_time + 8 hours",
+      "coverage": "Same bars as close.",
+      "event_timestamp": "open_time + 8 hours",
+      "field": "quote_volume",
+      "lag": "bar must be fully closed at decision_time",
+      "missing_rule": "Reject negative/non-finite values; require positive trailing median for inclusion.",
+      "source": "organizer past-only DecisionContext.bars"
+    },
+    {
+      "availability_timestamp": "decision_time",
+      "coverage": "Weekly point-in-time membership intersected with next-open executability.",
+      "event_timestamp": "decision_time",
+      "field": "eligible_symbols",
+      "lag": "current organizer decision boundary",
+      "missing_rule": "Bars keys must exactly equal the eligible set; duplicates or malformed symbols reject the call.",
+      "source": "organizer DecisionContext under active Amendment 0006"
+    },
+    {
+      "availability_timestamp": "strictly before decision_time",
+      "coverage": "Organizer-provided eligible-symbol funding rows.",
+      "event_timestamp": "funding_time",
+      "field": "funding",
+      "lag": "strictly past",
+      "missing_rule": "Not used as a feature; any non-past row rejects the context.",
+      "source": "organizer past-only DecisionContext.funding"
+    }
+  ],
+  "schema_version": 1,
+  "team_id": "team-08",
+  "whole_window_fit": false
+}
