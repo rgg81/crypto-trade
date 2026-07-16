@@ -9,6 +9,7 @@
       "short_sleeve": "Short positive beta-residual, high-volume exhaustion, strengthened by positive funding crowding.",
       "stress": "Diversification and unlevered gross limit exposure, but falling-knife risk is explicit and must be tested with separate controls."
     },
+    "family_id": "t03-residual-liquidity-shock-absorption-v1",
     "falsifier": "Reject for causal or deterministic failure. Reject this iteration without risk rescue if the base has nonpositive OOF Sharpe, fewer than four positive folds, nonpositive bull/bear/chop return, failed long-bull or short-bear roles, nonpositive doubled-cost Sharpe, or drawdown above 40%.",
     "mechanism": "Daily cross-sectional reversal of high-volume idiosyncratic shocks after removing rolling BTC beta, with funding crowding confirmation and a slow BTC trend gross tilt.",
     "parameter_ranges": {
