@@ -1,0 +1,15 @@
+{
+  "candidate_id": "t06-balanced-trend-reversal-v1-base",
+  "config_sha256": "bd0e4f70bcf335b2ac4e44ec049b89b8e8eaf4c6ac6502574d0accf12d9d9947",
+  "organizer_journal_head_sha256": "d0fc6c8e38c0216f76727001e04addb8fa3edd33088670d7f87545808297dd7d",
+  "private_attempt_number": null,
+  "registration_sha256": "8f5ad34bc1b40abc8682ce94229541bacca20d989c3c38542e8a37bea6a01552",
+  "reserved_at_utc": "2026-07-16T18:16:49.594573+00:00",
+  "risk_policy_sha256": "7671efed25b8f9130e8f06fb9dbe44b5735e1cd2f23fd8c20e9dcc1a6b61c30b",
+  "schema_version": 1,
+  "source_bundle_sha256": "a597f8f40fc6f76e477c8ec94aaca33d14aacbbb0b90ec8455b6902eb2ea49d5",
+  "stage": "development",
+  "strategy_sha256": "ead419349cef8983549ad3d1f98af89354d4fba818357637170f3ca48dbe1022",
+  "team_id": "team-06",
+  "tournament": "quant-portfolio-blind-top40-v2"
+}
