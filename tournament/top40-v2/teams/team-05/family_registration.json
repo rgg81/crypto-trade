@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "team_id": "team-05",
+  "family_id": "team05-causal-residual-trend-reversal-v1",
+  "parent_family_id": null,
+  "registered_at_utc": "2026-07-16T16:32:53Z",
+  "mechanism": "Deterministic cross-sectional 20d/60d volatility-normalized residual trend with a smaller 3d reversal component that fades continuously as broad direction strengthens; diversified two-sided construction with a small directional sleeve tilt.",
+  "economic_thesis": "Slow-moving flows and heterogeneous reaction speeds create intermediate relative continuation, while transient liquidity pressure creates short reversal chiefly in non-directional markets. Long relative winners should carry bull, short relative losers bear, and balanced trend/reversal sleeves chop.",
+  "expected_regime_roles": {
+    "bull": "Long persistent relative winners contribute positively; smooth net tilt modestly favors the long sleeve while shorts remain active.",
+    "bear": "Short persistent relative losers contribute positively; smooth net tilt modestly favors the short sleeve while longs remain active in resilient names.",
+    "chop": "The reversal component rises toward 20% and balanced sleeves express cross-sectional mean reversion; combined return must be positive.",
+    "stress": "Signal dispersion may persist; controls can be considered only after broad positive no-control alpha, and the fixed combined policy must contain exposure while clearing the official worst-regime floor.",
+    "long_sleeve": "Top quartile causal scores, diversified and capped; required to be positive in bull.",
+    "short_sleeve": "Bottom quartile causal scores, diversified and capped; required to be positive in bear."
+  },
+  "falsifier": "Falsify if the preregistered base fails any official or Team-05 hard development gate, any causal/reproducibility test, any required sleeve/regime role, doubled-cost viability, five-of-six fold profitability, or six-of-eight one-axis neighbor profitability with median neighbor Sharpe at least 0.55.",
+  "parameter_ranges": {
+    "short_horizon_days": [3],
+    "medium_horizon_days": [20],
+    "slow_horizon_days": [50, 60, 70],
+    "selection_fraction": [0.20, 0.25, 0.30],
+    "target_gross": [0.50, 0.60, 0.70],
+    "maximum_abs_net_tilt": [0.08],
+    "maximum_symbol_weight": [0.04],
+    "chop_reversal_weight": [0.15, 0.20, 0.25],
+    "rebalance_every_days": [3],
+    "neighborhood_design": "Base plus exactly eight preregistered one-axis moves listed in parameter_neighborhood.json; no Cartesian grid and no replacement neighbors."
+  },
+  "selection_metric": "Binary noncompensatory rule: freeze team05-crtr-base-v1 only if every official and Team-05 hard gate, including the full predeclared neighborhood, passes. Neighbors are stability probes and cannot replace the base.",
+  "risk_policy_plan": "Run the top-level no-control policy first. Only after every preregistered broad positive core-alpha minimum passes may four single controls and the fixed combined policy activate. Before each controlled registration, copy the declared risk_ablations policy byte-for-byte to top-level risk_policy.json because the frozen lifecycle reads only that path. Each of six policy runs emits base and doubled costs. The combined declaration must pass all full non-neighborhood gates before any neighbor."
+}

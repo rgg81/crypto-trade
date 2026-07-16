@@ -52,7 +52,7 @@
   "critic_lock": null,
   "final_oos_lock": null,
   "finalist_cohort_lock": null,
-  "legacy_projection_sha256": "ebf26fc7b7778e15972186a3d08a77471f301a4e946cb15a4d11997f16b78589",
+  "legacy_projection_sha256": "ce3345627f3cde64a3b433c0e8279e58505326d2cd8429853bf56cc857c37adc",
   "legacy_state_sha256": "8c858495fde6ddde203124a055e40ebad5d8d5a684cd20f0e55f6c88f7360b07",
   "objective_lock": null,
   "organizer_audit": {
@@ -153,11 +153,11 @@
       "trial_count": 1
     },
     "team-05": {
-      "active_family_id": null,
+      "active_family_id": "team05-causal-residual-trend-reversal-v1",
       "canonical_result": null,
       "development_assessment": null,
       "dnf": null,
-      "family_count": 0,
+      "family_count": 1,
       "finalist_freeze": null,
       "pivot_count": 0,
       "private_attempts": 0,
