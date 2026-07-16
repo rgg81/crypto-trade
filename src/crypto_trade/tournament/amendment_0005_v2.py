@@ -4,19 +4,16 @@ from __future__ import annotations
 
 import contextlib
 import fcntl
-import hashlib
-import json
 import math
 import os
 import re
 import shutil
 import stat
 import subprocess
-import tempfile
-from collections.abc import Iterator, Mapping
+from collections.abc import Callable, Iterator, Mapping
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from crypto_trade.tournament import (
     amendment_v2,
@@ -30,7 +27,6 @@ from crypto_trade.tournament.amendment_integrity_v2 import (
     ensure_owner_directory,
     git_bytes,
     git_path,
-    git_text,
     pretty_json_bytes,
     read_repo_file,
     require_no_git_history,
@@ -55,23 +51,53 @@ OPT_IN_PARAMETER = "_top40_v2_score_adapter"
 SEMANTIC_REVIEW_KIND = "top40-v2-score-semantic-coupling-static-review-v1"
 TERMINAL_RESULT_NAME = "terminal-result.json"
 _AUTHORITY_KEYS = {
-    "team_id", "family_id", "candidate_id", "candidate_registration_sha256",
-    "registration_input_path", "registration_commit", "registration_event_record_sha256",
-    "registration_event_sequence", "trial_result_record_sha256", "trial_result_event_sequence",
-    "strategy_sha256", "risk_policy_sha256", "source_bundle_sha256", "candidate_seed",
-    "config_sha256", "score_manifest_path", "score_manifest_sha256", "score_manifest_commit",
-    "semantic_coupling_review_path", "semantic_coupling_review_sha256",
-    "semantic_coupling_review_commit", "snapshot_manifest_path", "snapshot_manifest_sha256",
-    "development_target_path", "development_target_sha256", "runner_record_path",
-    "runner_record_sha256", "amendment_freeze_sha256", "amendment_freeze_commit",
-    "research_state_sha256", "research_journal_record_count", "research_journal_head_sha256",
+    "team_id",
+    "family_id",
+    "candidate_id",
+    "candidate_registration_sha256",
+    "registration_input_path",
+    "registration_commit",
+    "registration_event_record_sha256",
+    "registration_event_sequence",
+    "trial_result_record_sha256",
+    "trial_result_event_sequence",
+    "strategy_sha256",
+    "risk_policy_sha256",
+    "source_bundle_sha256",
+    "candidate_seed",
+    "config_sha256",
+    "score_manifest_path",
+    "score_manifest_sha256",
+    "score_manifest_commit",
+    "semantic_coupling_review_path",
+    "semantic_coupling_review_sha256",
+    "semantic_coupling_review_commit",
+    "snapshot_manifest_path",
+    "snapshot_manifest_sha256",
+    "development_target_path",
+    "development_target_sha256",
+    "runner_record_path",
+    "runner_record_sha256",
+    "amendment_freeze_sha256",
+    "amendment_freeze_commit",
+    "research_state_sha256",
+    "research_journal_record_count",
+    "research_journal_head_sha256",
 }
 
 PARENT_AUTHORITIES = {
-    "amendment_0001_scientific_engine_sha256": "a0b99bd2928a64a37b6b9f6d900bbd8ddfc2f2e49b87e6f6633176228bfd2d4d",
-    "amendment_0002_schema3_facade_sha256": "fc70dbdb752c58857c5ed60a96e497324e93b9d5dc7e6afa0692bd3e02ad21aa",
-    "amendment_0004_active_runner_sha256": "03006ea1ce391ef3c8da6244acb89aab19f7e63d1e0a617e2743894a575fd6cd",
-    "amendment_0004_active_entrypoint_sha256": "6031937952a29a1a226a778cd1bcfc2c9869559ab30465bdbebe6292c6a88377",
+    "amendment_0001_scientific_engine_sha256": (
+        "a0b99bd2928a64a37b6b9f6d900bbd8ddfc2f2e49b87e6f6633176228bfd2d4d"
+    ),
+    "amendment_0002_schema3_facade_sha256": (
+        "fc70dbdb752c58857c5ed60a96e497324e93b9d5dc7e6afa0692bd3e02ad21aa"
+    ),
+    "amendment_0004_active_runner_sha256": (
+        "03006ea1ce391ef3c8da6244acb89aab19f7e63d1e0a617e2743894a575fd6cd"
+    ),
+    "amendment_0004_active_entrypoint_sha256": (
+        "6031937952a29a1a226a778cd1bcfc2c9869559ab30465bdbebe6292c6a88377"
+    ),
 }
 
 IMPLEMENTATION_FILE_PATHS = (
@@ -113,9 +139,7 @@ class Amendment0005Error(ValueError):
     """The prospective score-diagnostic authority failed closed."""
 
 
-def _regular_bytes(
-    path: Path, label: str, *, maximum_bytes: int = 32 * 1024 * 1024
-) -> bytes:
+def _regular_bytes(path: Path, label: str, *, maximum_bytes: int = 32 * 1024 * 1024) -> bytes:
     try:
         descriptor = os.open(
             path,
@@ -190,9 +214,7 @@ def verify_parent_authorities(root: str | Path) -> None:
         maximum_bytes=1024 * 1024,
         require_single_link=True,
     )
-    if sha256_bytes(active_bytes) != PARENT_AUTHORITIES[
-        "amendment_0004_active_entrypoint_sha256"
-    ]:
+    if sha256_bytes(active_bytes) != PARENT_AUTHORITIES["amendment_0004_active_entrypoint_sha256"]:
         raise Amendment0005Error("Amendment 0004 active entrypoint bytes changed")
     development_score_diagnostics_v5.verify_frozen_science_helper_identities()
     _A4_VERIFY()
@@ -287,9 +309,7 @@ def _load_freeze(root: Path) -> tuple[Mapping[str, Any], bytes, str]:
     if type(freeze["frozen_at_utc"]) is not str or not freeze["frozen_at_utc"].endswith("Z"):
         raise Amendment0005Error("Amendment 0005 freeze timestamp must be canonical UTC text")
     try:
-        frozen_at = datetime.fromisoformat(
-            str(freeze["frozen_at_utc"]).replace("Z", "+00:00")
-        )
+        frozen_at = datetime.fromisoformat(str(freeze["frozen_at_utc"]).replace("Z", "+00:00"))
     except ValueError as exc:
         raise Amendment0005Error("Amendment 0005 freeze timestamp is invalid") from exc
     if frozen_at.tzinfo is None or frozen_at.utcoffset() != UTC.utcoffset(frozen_at):
@@ -341,20 +361,23 @@ def _load_freeze(root: Path) -> tuple[Mapping[str, Any], bytes, str]:
     ):
         raise Amendment0005Error("Amendment 0005 activation journal is invalid")
     freeze_commit = unique_first_add_commit(root, FREEZE_PATH, payload)
-    _require_strict_ancestor(
-        root, implementation_commit, review_commit, "implementation/review"
-    )
+    _require_strict_ancestor(root, implementation_commit, review_commit, "implementation/review")
     _require_strict_ancestor(root, review_commit, freeze_commit, "review/freeze")
     for relative in (*IMPLEMENTATION_FILE_PATHS, REVIEW_PATH):
-        expected = review_bytes if relative == REVIEW_PATH else _regular_bytes(
-            root / relative, f"Amendment 0005 freeze-tree file {relative}"
+        expected = (
+            review_bytes
+            if relative == REVIEW_PATH
+            else _regular_bytes(root / relative, f"Amendment 0005 freeze-tree file {relative}")
         )
-        if git_bytes(
-            root,
-            "show",
-            f"{freeze_commit}:{relative}",
-            label=f"Amendment 0005 freeze-tree file {relative}",
-        ) != expected:
+        if (
+            git_bytes(
+                root,
+                "show",
+                f"{freeze_commit}:{relative}",
+                label=f"Amendment 0005 freeze-tree file {relative}",
+            )
+            != expected
+        ):
             raise Amendment0005Error(
                 "Amendment 0005 freeze tree lacks reviewed implementation bytes"
             )
@@ -445,9 +468,7 @@ def _require_ancestor(root: Path, ancestor: str, descendant: str, label: str) ->
         raise Amendment0005Error(f"{label} ancestry is invalid")
 
 
-def _require_strict_ancestor(
-    root: Path, ancestor: str, descendant: str, label: str
-) -> None:
+def _require_strict_ancestor(root: Path, ancestor: str, descendant: str, label: str) -> None:
     if ancestor == descendant:
         raise Amendment0005Error(f"{label} must be strictly ordered")
     _require_ancestor(root, ancestor, descendant, label)
@@ -456,9 +477,7 @@ def _require_strict_ancestor(
 def _current_state_and_journal_locked(
     root: Path, config: LoadedV2Config
 ) -> tuple[Mapping[str, Any], bytes, Any]:
-    state, state_bytes, _chain, _audit = amendment_v2._read_amended_state_locked(
-        root, config
-    )
+    state, state_bytes, _chain, _audit = amendment_v2._read_amended_state_locked(root, config)
     journal = amendment_v2._load_bound_research_journal(root, config, state)
     if (
         state["phase"] != "research"
@@ -529,9 +548,10 @@ def _candidate_authority(
         raise Amendment0005Error("candidate team is not in active research")
     activation = freeze["activation_journal"]
     activation_count = int(activation["record_count"])
-    if len(journal.records) < activation_count or journal.records[
-        activation_count - 1
-    ]["record_sha256"] != activation["head_sha256"]:
+    if (
+        len(journal.records) < activation_count
+        or journal.records[activation_count - 1]["record_sha256"] != activation["head_sha256"]
+    ):
         raise Amendment0005Error("current journal does not extend the activation journal")
     accounting = journal.teams[team_id]
     registration = accounting.registrations.get(candidate_id)
@@ -580,9 +600,7 @@ def _candidate_authority(
     if sha256_bytes(build_trial_registration(**dict(registration_raw))) != registration_sha:
         raise Amendment0005Error("registration input differs from organizer journal")
     registration_commit = unique_first_add_commit(root, paths["registration_input_path"], reg_bytes)
-    _require_strict_ancestor(
-        root, freeze_commit, registration_commit, "prospective registration"
-    )
+    _require_strict_ancestor(root, freeze_commit, registration_commit, "prospective registration")
 
     _manifest_relative, _manifest_path, manifest_bytes, _manifest_stat = read_repo_file(
         root,
@@ -602,12 +620,15 @@ def _candidate_authority(
     )
     manifest_commit = unique_first_add_commit(root, paths["score_manifest_path"], manifest_bytes)
     _require_ancestor(root, manifest_commit, registration_commit, "manifest/registration")
-    if git_bytes(
-        root,
-        "show",
-        f"{registration_commit}:{paths['score_manifest_path']}",
-        label="score manifest in registration tree",
-    ) != manifest_bytes:
+    if (
+        git_bytes(
+            root,
+            "show",
+            f"{registration_commit}:{paths['score_manifest_path']}",
+            label="score manifest in registration tree",
+        )
+        != manifest_bytes
+    ):
         raise Amendment0005Error("registration tree lacks exact preregistered manifest")
 
     semantic_relative = paths["semantic_coupling_review_path"]
@@ -620,9 +641,7 @@ def _candidate_authority(
     )
     semantic_review_sha = sha256_bytes(semantic_review_bytes)
     if semantic_review_sha != manifest.semantic_coupling_review_sha256:
-        raise Amendment0005Error(
-            "semantic-coupling review differs from the preregistered manifest"
-        )
+        raise Amendment0005Error("semantic-coupling review differs from the preregistered manifest")
     development_score_diagnostics_v5.parse_semantic_coupling_review(
         semantic_review_bytes,
         expected_team_id=team_id,
@@ -630,25 +649,22 @@ def _candidate_authority(
         expected_candidate_id=candidate_id,
         expected_strategy_sha256=str(registration["strategy_sha256"]),
     )
-    semantic_review_commit = unique_first_add_commit(
-        root, semantic_relative, semantic_review_bytes
-    )
-    _require_ancestor(
-        root, semantic_review_commit, manifest_commit, "semantic review/manifest"
-    )
+    semantic_review_commit = unique_first_add_commit(root, semantic_relative, semantic_review_bytes)
+    _require_ancestor(root, semantic_review_commit, manifest_commit, "semantic review/manifest")
     for commit, label in (
         (manifest_commit, "manifest tree"),
         (registration_commit, "registration tree"),
     ):
-        if git_bytes(
-            root,
-            "show",
-            f"{commit}:{semantic_relative}",
-            label=f"semantic-coupling review in {label}",
-        ) != semantic_review_bytes:
-            raise Amendment0005Error(
-                f"{label} lacks the exact semantic-coupling static review"
+        if (
+            git_bytes(
+                root,
+                "show",
+                f"{commit}:{semantic_relative}",
+                label=f"semantic-coupling review in {label}",
             )
+            != semantic_review_bytes
+        ):
+            raise Amendment0005Error(f"{label} lacks the exact semantic-coupling static review")
 
     artifacts = result.get("artifact_hashes")
     if not isinstance(artifacts, Mapping):
@@ -698,7 +714,9 @@ def _candidate_authority(
         result_records[0]["sequence"] <= matching_records[0]["sequence"]
         or result_records[0]["sequence"] <= activation_count
     ):
-        raise Amendment0005Error("trial result is not strictly postactivation registration evidence")
+        raise Amendment0005Error(
+            "trial result is not strictly postactivation registration evidence"
+        )
     authority = {
         "team_id": team_id,
         "family_id": registration["family_id"],
@@ -771,12 +789,27 @@ def _load_existing_transaction(
         root, paths["result_path"], "declared-score terminal result"
     )
     expected_keys = {
-        "schema_version", "event_type", "diagnostic_kind", "diagnostic_id", "stage",
-        "team_id", "candidate_id", "reservation_sha256", "authority_sha256",
-        "semantic_coupling_review_sha256", "status", "failure_reason",
-        "organizer_cpu_hours", "organizer_wall_clock_hours", "artifact_hashes",
-        "statistics", "declared_score_diagnostic_only", "non_material",
-        "charges_team_trial_budget", "automatic_qualification_gate", "result_sha256",
+        "schema_version",
+        "event_type",
+        "diagnostic_kind",
+        "diagnostic_id",
+        "stage",
+        "team_id",
+        "candidate_id",
+        "reservation_sha256",
+        "authority_sha256",
+        "semantic_coupling_review_sha256",
+        "status",
+        "failure_reason",
+        "organizer_cpu_hours",
+        "organizer_wall_clock_hours",
+        "artifact_hashes",
+        "statistics",
+        "declared_score_diagnostic_only",
+        "non_material",
+        "charges_team_trial_budget",
+        "automatic_qualification_gate",
+        "result_sha256",
     }
     if set(result) != expected_keys:
         raise Amendment0005Error("declared-score terminal result has invalid keys")
@@ -792,9 +825,7 @@ def _load_existing_transaction(
         or result["candidate_id"] != reservation["candidate_id"]
         or result["reservation_sha256"] != reservation["reservation_sha256"]
         or result["authority_sha256"]
-        != sha256_bytes(
-            pretty_json_bytes({key: reservation[key] for key in _AUTHORITY_KEYS})
-        )
+        != sha256_bytes(pretty_json_bytes({key: reservation[key] for key in _AUTHORITY_KEYS}))
         or result["semantic_coupling_review_sha256"]
         != reservation["semantic_coupling_review_sha256"]
         or result["declared_score_diagnostic_only"] is not True
@@ -811,7 +842,12 @@ def _load_existing_transaction(
         raise Amendment0005Error("declared-score terminal status is invalid")
     for field in ("organizer_cpu_hours", "organizer_wall_clock_hours"):
         value = result[field]
-        if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value < 0:
+        if (
+            isinstance(value, bool)
+            or not isinstance(value, (int, float))
+            or not math.isfinite(value)
+            or value < 0
+        ):
             raise Amendment0005Error("declared-score resource accounting is invalid")
     expected_artifacts = (
         set(development_score_diagnostics_v5.REQUIRED_ARTIFACT_NAMES)
@@ -888,9 +924,7 @@ def reserve_development_score_diagnostic(
                 state_lock_held=True,
             )
             if final_authority != authority:
-                raise Amendment0005Error(
-                    "research authority changed while staging reservation"
-                )
+                raise Amendment0005Error("research authority changed while staging reservation")
             if path.exists() or path.is_symlink():
                 raise Amendment0005Error("development score diagnostic is one-shot")
             _ensure_safe_directory_chain(root_path, path.parent)
@@ -901,8 +935,15 @@ def reserve_development_score_diagnostic(
 def _load_reservation(root: Path, relative: str) -> tuple[Mapping[str, Any], bytes]:
     reservation, payload = _read_pretty_json(root, relative, "development score reservation")
     if set(reservation) != _AUTHORITY_KEYS | {
-        "schema_version", "event_type", "diagnostic_kind", "diagnostic_id", "stage",
-        "reserved_at_utc", "non_material", "charges_team_trial_budget", "reservation_sha256",
+        "schema_version",
+        "event_type",
+        "diagnostic_kind",
+        "diagnostic_id",
+        "stage",
+        "reserved_at_utc",
+        "non_material",
+        "charges_team_trial_budget",
+        "reservation_sha256",
     }:
         raise Amendment0005Error("development score reservation has invalid keys")
     if (
@@ -921,18 +962,20 @@ def _load_reservation(root: Path, relative: str) -> tuple[Mapping[str, Any], byt
         ):
             raise Amendment0005Error("development score reservation has invalid SHA-256")
     for key in (
-        "registration_commit", "score_manifest_commit", "semantic_coupling_review_commit",
+        "registration_commit",
+        "score_manifest_commit",
+        "semantic_coupling_review_commit",
         "amendment_freeze_commit",
     ):
         if type(reservation[key]) is not str or _COMMIT.fullmatch(reservation[key]) is None:
             raise Amendment0005Error("development score reservation has invalid commit binding")
     for key in (
-        "candidate_seed", "registration_event_sequence", "trial_result_event_sequence",
+        "candidate_seed",
+        "registration_event_sequence",
+        "trial_result_event_sequence",
         "research_journal_record_count",
     ):
-        if type(reservation[key]) is not int or (
-            key != "candidate_seed" and reservation[key] < 1
-        ):
+        if type(reservation[key]) is not int or (key != "candidate_seed" and reservation[key] < 1):
             raise Amendment0005Error("development score reservation has invalid integer binding")
     supplied = reservation.get("reservation_sha256")
     core = {key: value for key, value in reservation.items() if key != "reservation_sha256"}
@@ -941,7 +984,9 @@ def _load_reservation(root: Path, relative: str) -> tuple[Mapping[str, Any], byt
     return reservation, payload
 
 
-def _request(reservation: Mapping[str, Any]) -> development_score_diagnostics_v5.DevelopmentScoreDiagnosticRequest:
+def _request(
+    reservation: Mapping[str, Any],
+) -> development_score_diagnostics_v5.DevelopmentScoreDiagnosticRequest:
     return development_score_diagnostics_v5.DevelopmentScoreDiagnosticRequest(
         diagnostic_id=str(reservation["diagnostic_id"]),
         team_id=str(reservation["team_id"]),
@@ -958,15 +1003,9 @@ def _request(reservation: Mapping[str, Any]) -> development_score_diagnostics_v5
         score_manifest_path=str(reservation["score_manifest_path"]),
         score_manifest_sha256=str(reservation["score_manifest_sha256"]),
         score_manifest_commit=str(reservation["score_manifest_commit"]),
-        semantic_coupling_review_path=str(
-            reservation["semantic_coupling_review_path"]
-        ),
-        semantic_coupling_review_sha256=str(
-            reservation["semantic_coupling_review_sha256"]
-        ),
-        semantic_coupling_review_commit=str(
-            reservation["semantic_coupling_review_commit"]
-        ),
+        semantic_coupling_review_path=str(reservation["semantic_coupling_review_path"]),
+        semantic_coupling_review_sha256=str(reservation["semantic_coupling_review_sha256"]),
+        semantic_coupling_review_commit=str(reservation["semantic_coupling_review_commit"]),
         snapshot_manifest_path=str(reservation["snapshot_manifest_path"]),
         snapshot_manifest_sha256=str(reservation["snapshot_manifest_sha256"]),
         development_target_path=str(reservation["development_target_path"]),
@@ -990,8 +1029,7 @@ def run_development_score_diagnostic(
         if (
             reservation["team_id"] != team_id
             or reservation["candidate_id"] != candidate_id
-            or reservation["diagnostic_id"]
-            != f"development-score-{team_id}-{candidate_id}"
+            or reservation["diagnostic_id"] != f"development-score-{team_id}-{candidate_id}"
         ):
             raise Amendment0005Error("reservation identity differs from derived candidate path")
         unique_first_add_commit(root_path, paths["reservation_path"], reservation_bytes)
@@ -1008,15 +1046,20 @@ def run_development_score_diagnostic(
         request = _request(reservation)
         outcome = _A2_RUN(
             root=root_path,
-            runner_call=lambda: development_score_diagnostics_v5.run_reserved_development_score_diagnostic(
-                root=root_path,
-                request=request,
+            runner_call=lambda: (
+                development_score_diagnostics_v5.run_reserved_development_score_diagnostic(
+                    root=root_path,
+                    request=request,
+                )
             ),
         )
         verify_parent_authorities(root_path)
         if set(outcome) != {
-            "status", "failure_reason", "organizer_cpu_hours",
-            "organizer_wall_clock_hours", "staged_artifacts",
+            "status",
+            "failure_reason",
+            "organizer_cpu_hours",
+            "organizer_wall_clock_hours",
+            "staged_artifacts",
         }:
             raise Amendment0005Error("declared-score runner returned invalid keys")
         for field in ("organizer_cpu_hours", "organizer_wall_clock_hours"):
@@ -1058,9 +1101,7 @@ def run_development_score_diagnostic(
                 "candidate_id": candidate_id,
                 "reservation_sha256": reservation["reservation_sha256"],
                 "authority_sha256": authority_sha,
-                "semantic_coupling_review_sha256": reservation[
-                    "semantic_coupling_review_sha256"
-                ],
+                "semantic_coupling_review_sha256": reservation["semantic_coupling_review_sha256"],
                 "status": outcome["status"],
                 "failure_reason": outcome["failure_reason"],
                 "organizer_cpu_hours": outcome["organizer_cpu_hours"],

@@ -101,7 +101,9 @@ def test_static_review_is_hash_bindable_but_explicitly_not_runtime_proof() -> No
             "candidate_id": "candidate-04",
             "strategy_sha256": "a" * 64,
             "hook": "strategy.score_boundary",
-            "declared_capture_boundary": "candidate-declared-post-transform-pre-selection-weight-cap-risk",
+            "declared_capture_boundary": (
+                "candidate-declared-post-transform-pre-selection-weight-cap-risk"
+            ),
             "decision": "approve",
             "reviewer_id": "independent-reviewer",
             "reviewed_at_utc": "2026-07-16T00:00:00Z",

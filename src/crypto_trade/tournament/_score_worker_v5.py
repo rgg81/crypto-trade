@@ -88,9 +88,7 @@ def _decision(
     state: _ScoreWorkerState,
     message: Mapping[str, Any],
 ) -> tuple[dict[str, float] | None, dict[str, float] | None]:
-    eligible = frozen_worker._string_tuple(
-        message.get("eligible_symbols"), "eligible_symbols"
-    )
+    eligible = frozen_worker._string_tuple(message.get("eligible_symbols"), "eligible_symbols")
     adapted = state.adapter.evaluate(
         lambda: frozen_worker._decision(state.historical, message),
         scheduled=state.schedule.contains(message.get("decision_time")),

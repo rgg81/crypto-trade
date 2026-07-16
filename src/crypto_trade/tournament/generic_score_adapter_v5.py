@@ -53,7 +53,9 @@ def _number_token(value: object) -> tuple[type[object], bytes]:
     return type(value), struct.pack("!d", converted)
 
 
-def _snapshot_scores(value: object) -> tuple[dict[str, float], tuple[tuple[str, type[object], bytes], ...]]:
+def _snapshot_scores(
+    value: object,
+) -> tuple[dict[str, float], tuple[tuple[str, type[object], bytes], ...]]:
     if type(value) is not dict:
         raise ScoreBoundaryError("score_boundary requires an exact built-in dict")
     normalized: dict[str, float] = {}
@@ -144,17 +146,13 @@ class GenericScoreBoundaryAdapter:
         if failure is not None:
             raise failure.with_traceback(failure.__traceback__)
         if scheduled and calls != 1:
-            raise ScoreBoundaryError(
-                "scheduled decision did not call score_boundary exactly once"
-            )
+            raise ScoreBoundaryError("scheduled decision did not call score_boundary exactly once")
         if not scheduled and calls != 0:
             raise ScoreBoundaryError("score_boundary was called outside the manifest schedule")
         if captured_object is not None and captured_tokens is not None:
             _assert_unmodified(captured_object, captured_tokens)
         if scheduled and weights and not captured:
-            raise ScoreBoundaryError(
-                "nonempty scheduled targets require a nonempty score capture"
-            )
+            raise ScoreBoundaryError("nonempty scheduled targets require a nonempty score capture")
         return BoundaryResult(weights=weights, scores=captured if scheduled else None)
 
 

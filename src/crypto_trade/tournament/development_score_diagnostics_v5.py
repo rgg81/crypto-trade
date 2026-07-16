@@ -13,13 +13,11 @@ from __future__ import annotations
 
 import contextlib
 import dataclasses
-import hashlib
-import io
 import json
 import math
 import os
-import resource
 import re
+import resource
 import shutil
 import stat
 import subprocess
@@ -144,12 +142,17 @@ class ScoreAdapterManifest:
         }
 
     def scheduled(self, timestamp: pd.Timestamp) -> bool:
-        value = timestamp.tz_localize("UTC") if timestamp.tzinfo is None else timestamp.tz_convert("UTC")
+        value = (
+            timestamp.tz_localize("UTC")
+            if timestamp.tzinfo is None
+            else timestamp.tz_convert("UTC")
+        )
         anchor = pd.Timestamp(self.anchor_timestamp_utc)
         delta = value - anchor
-        return delta >= pd.Timedelta(0) and delta.value % pd.Timedelta(
-            hours=self.interval_hours
-        ).value == 0
+        return (
+            delta >= pd.Timedelta(0)
+            and delta.value % pd.Timedelta(hours=self.interval_hours).value == 0
+        )
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -416,8 +419,7 @@ def parse_semantic_coupling_review(
         or raw["declared_capture_boundary"] != CAPTURE_BOUNDARY
         or raw["decision"] != "approve"
         or raw["findings"] != expected_findings
-        or raw["runtime_proof_limit"]
-        != "static-review-attestation-not-runtime-semantic-proof"
+        or raw["runtime_proof_limit"] != "static-review-attestation-not-runtime-semantic-proof"
         or type(raw["reviewer_id"]) is not str
         or not raw["reviewer_id"].strip()
         or raw["reviewer_id"] != raw["reviewer_id"].strip()
@@ -435,8 +437,7 @@ def _request_paths(request: DevelopmentScoreDiagnosticRequest) -> None:
         f"{request.candidate_id}.json"
     )
     expected_manifest = (
-        f"{TOP40_V2_LAYOUT.team_root(request.team_id)}/score-adapters/"
-        f"{request.candidate_id}.json"
+        f"{TOP40_V2_LAYOUT.team_root(request.team_id)}/score-adapters/{request.candidate_id}.json"
     )
     expected_semantic_review = (
         f"{TOP40_V2_LAYOUT.team_root(request.team_id)}/score-adapters/"
@@ -521,12 +522,15 @@ def materialized_historical_source(
     )
     if manifest_commit != request.score_manifest_commit:
         raise ValueError("manifest first-add commit differs from reservation")
-    if git_bytes(
-        root_path,
-        "show",
-        f"{registration_commit}:{request.score_manifest_path}",
-        label="score manifest at registration",
-    ) != manifest_bytes:
+    if (
+        git_bytes(
+            root_path,
+            "show",
+            f"{registration_commit}:{request.score_manifest_path}",
+            label="score manifest at registration",
+        )
+        != manifest_bytes
+    ):
         raise ValueError("registration tree does not contain the exact score manifest")
     manifest = parse_score_adapter_manifest(
         manifest_bytes,
@@ -550,12 +554,15 @@ def materialized_historical_source(
     )
     if review_commit != request.semantic_coupling_review_commit:
         raise ValueError("semantic review first-add commit differs from reservation")
-    if git_bytes(
-        root_path,
-        "show",
-        f"{registration_commit}:{request.semantic_coupling_review_path}",
-        label="semantic review at registration",
-    ) != review_bytes:
+    if (
+        git_bytes(
+            root_path,
+            "show",
+            f"{registration_commit}:{request.semantic_coupling_review_path}",
+            label="semantic review at registration",
+        )
+        != review_bytes
+    ):
         raise ValueError("registration tree lacks the exact semantic review")
     parse_semantic_coupling_review(
         review_bytes,
@@ -575,27 +582,25 @@ def materialized_historical_source(
         risk_path = team_root / "risk_policy.json"
         historical_manifest = team_root / "score-adapters" / f"{request.candidate_id}.json"
         historical_review = (
-            team_root
-            / "score-adapters"
-            / f"{request.candidate_id}.semantic-coupling-review.json"
+            team_root / "score-adapters" / f"{request.candidate_id}.semantic-coupling-review.json"
         )
         if any(
             path.is_symlink() or not path.is_file()
             for path in (entrypoint, risk_path, historical_manifest, historical_review)
         ):
             raise ValueError("historical source tree lacks required regular files")
-        if historical_manifest.read_bytes() != manifest_bytes or historical_review.read_bytes() != review_bytes:
+        if (
+            historical_manifest.read_bytes() != manifest_bytes
+            or historical_review.read_bytes() != review_bytes
+        ):
             raise ValueError("historical source tree contains different diagnostic bindings")
         files = runner_v2._team_tree_files(team_root)
         entries = [
-            {"path": item.relative, "sha256": item.sha256, "size": item.size}
-            for item in files
+            {"path": item.relative, "sha256": item.sha256, "size": item.size} for item in files
         ]
         if (
-            sha256_bytes(runner_v2._stable_file_bytes(entrypoint))
-            != request.strategy_sha256
-            or sha256_bytes(runner_v2._stable_file_bytes(risk_path))
-            != request.risk_policy_sha256
+            sha256_bytes(runner_v2._stable_file_bytes(entrypoint)) != request.strategy_sha256
+            or sha256_bytes(runner_v2._stable_file_bytes(risk_path)) != request.risk_policy_sha256
             or runner_v2._team_tree_fingerprint(files) != request.source_bundle_sha256
         ):
             raise ValueError("registration commit does not reconstruct registered source hashes")
@@ -631,7 +636,11 @@ class _CapturingClient:
         if response.get("type") != "score_result" or "weights" not in response:
             raise runner_v2.StrategySandboxError("score worker returned an invalid response")
         timestamp = pd.Timestamp(payload["decision_time"])
-        timestamp = timestamp.tz_localize("UTC") if timestamp.tzinfo is None else timestamp.tz_convert("UTC")
+        timestamp = (
+            timestamp.tz_localize("UTC")
+            if timestamp.tzinfo is None
+            else timestamp.tz_convert("UTC")
+        )
         if timestamp in self.captured:
             raise runner_v2.StrategySandboxError("score worker replayed a decision")
         eligible = payload.get("eligible_symbols")
@@ -653,7 +662,9 @@ class _CapturingClient:
                 try:
                     score = float(raw_score)
                 except (TypeError, ValueError) as exc:
-                    raise runner_v2.StrategySandboxError("score worker returned a nonnumeric score") from exc
+                    raise runner_v2.StrategySandboxError(
+                        "score worker returned a nonnumeric score"
+                    ) from exc
                 if not math.isfinite(score):
                     raise runner_v2.StrategySandboxError("score worker returned a nonfinite score")
                 scores[symbol] = score
@@ -789,9 +800,7 @@ def _score_frame(
             if scores is None:
                 raise ValueError("scheduled decision lacks score-boundary capture")
             for symbol in sorted(scores):
-                rows.append(
-                    {"decision_time": value, "symbol": symbol, "score": scores[symbol]}
-                )
+                rows.append({"decision_time": value, "symbol": symbol, "score": scores[symbol]})
         elif scores is not None:
             raise ValueError("unscheduled decision contains score-boundary capture")
     if scheduled_count == 0:
@@ -852,7 +861,9 @@ def _run_replay(
 
 
 def _fold(timestamp: pd.Timestamp) -> tuple[str, pd.Timestamp, pd.Timestamp] | None:
-    value = timestamp.tz_localize("UTC") if timestamp.tzinfo is None else timestamp.tz_convert("UTC")
+    value = (
+        timestamp.tz_localize("UTC") if timestamp.tzinfo is None else timestamp.tz_convert("UTC")
+    )
     for fold_id, raw_start, raw_end in FOLDS:
         start = pd.Timestamp(raw_start)
         end = pd.Timestamp(raw_end)
@@ -1006,7 +1017,10 @@ def _verify_runner_record(
     if record.get("seeds") != [request.candidate_seed]:
         raise ValueError("completed runner seed differs from preregistration")
     artifacts = record.get("artifact_sha256")
-    if not isinstance(artifacts, Mapping) or artifacts.get("targets") != request.development_target_sha256:
+    if (
+        not isinstance(artifacts, Mapping)
+        or artifacts.get("targets") != request.development_target_sha256
+    ):
         raise ValueError("completed runner record does not bind development targets")
 
 
@@ -1086,8 +1100,7 @@ def validate_staged_artifacts(
     ):
         raise ValueError("declared-score staging capability is invalid")
     expected = (
-        Path(_evidence_relative(request)).parent
-        / f".{request.candidate_id}.{token}.staged"
+        Path(_evidence_relative(request)).parent / f".{request.candidate_id}.{token}.staged"
     ).as_posix()
     if capability["staging_path"] != expected:
         raise ValueError("declared-score staging path is not internally derived")
@@ -1150,11 +1163,14 @@ def run_development_score_diagnostic(
         maximum_bytes=32 * 1024 * 1024,
         require_single_link=True,
     )
-    if _exact_regular_bytes(
-        manifest_path,
-        maximum_bytes=32 * 1024 * 1024,
-        label="development snapshot manifest",
-    ) != manifest_bytes:
+    if (
+        _exact_regular_bytes(
+            manifest_path,
+            maximum_bytes=32 * 1024 * 1024,
+            label="development snapshot manifest",
+        )
+        != manifest_bytes
+    ):
         raise ValueError("development snapshot manifest changed during initial read")
     if sha256_bytes(manifest_bytes) != request.snapshot_manifest_sha256:
         raise ValueError("development snapshot manifest hash differs")
@@ -1180,9 +1196,7 @@ def run_development_score_diagnostic(
             raise ValueError("score schedule anchor must equal the first development decision")
         runner_v2._validate_snapshot_bounds(snapshot, config.raw, decision_times)
         end = pd.Timestamp(authorized.end_exclusive, tz="UTC")
-        bars = snapshot.bars.loc[
-            pd.to_datetime(snapshot.bars["open_time"], utc=True) < end
-        ].copy()
+        bars = snapshot.bars.loc[pd.to_datetime(snapshot.bars["open_time"], utc=True) < end].copy()
         funding = snapshot.funding.loc[
             pd.to_datetime(snapshot.funding["funding_time"], utc=True) < end
         ].copy()
@@ -1234,11 +1248,14 @@ def run_development_score_diagnostic(
         )
         if after_manifest_bytes != manifest_bytes:
             raise ValueError("development snapshot manifest changed during diagnostics")
-        if _exact_regular_bytes(
-            manifest_path,
-            maximum_bytes=32 * 1024 * 1024,
-            label="development snapshot manifest after replay",
-        ) != manifest_bytes:
+        if (
+            _exact_regular_bytes(
+                manifest_path,
+                maximum_bytes=32 * 1024 * 1024,
+                label="development snapshot manifest after replay",
+            )
+            != manifest_bytes
+        ):
             raise ValueError("development snapshot manifest grew during diagnostics")
         verify_frozen_science_helper_identities()
         summary = {
@@ -1290,9 +1307,7 @@ def _resource_snapshot() -> tuple[float, float]:
 def _resource_delta(before: tuple[float, float]) -> tuple[float, float]:
     children = resource.getrusage(resource.RUSAGE_CHILDREN)
     cpu = time.process_time() + children.ru_utime + children.ru_stime
-    return max(0.0, (cpu - before[0]) / 3600.0), max(
-        0.0, (time.monotonic() - before[1]) / 3600.0
-    )
+    return max(0.0, (cpu - before[0]) / 3600.0), max(0.0, (time.monotonic() - before[1]) / 3600.0)
 
 
 def run_reserved_development_score_diagnostic(

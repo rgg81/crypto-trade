@@ -42,13 +42,9 @@ def main() -> int:
         if args.command == "status":
             result = amendment_status(root)
         elif args.command == "reserve-development-score-diagnostic":
-            result = reserve_development_score_diagnostic(
-                root, args.team_id, args.candidate_id
-            )
+            result = reserve_development_score_diagnostic(root, args.team_id, args.candidate_id)
         else:
-            result = run_development_score_diagnostic(
-                root, args.team_id, args.candidate_id
-            )
+            result = run_development_score_diagnostic(root, args.team_id, args.candidate_id)
         print(json.dumps(result, allow_nan=False, indent=2, sort_keys=True))
         return 0
     except (OSError, RuntimeError, ValueError) as exc:

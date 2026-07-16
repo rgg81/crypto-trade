@@ -62,9 +62,7 @@ def test_paths_are_derived_and_development_only() -> None:
     assert paths["development_target_path"].endswith(
         "/development-runs/candidate-04/targets.parquet"
     )
-    assert paths["evidence_dir"].endswith(
-        "/development-score-diagnostics/candidate-04"
-    )
+    assert paths["evidence_dir"].endswith("/development-score-diagnostics/candidate-04")
     assert paths["result_path"] == f"{paths['evidence_dir']}/terminal-result.json"
     assert all("private" not in value and "final" not in value for value in paths.values())
 
@@ -80,12 +78,14 @@ def test_reservation_is_nonmaterial_and_has_no_caller_stage_or_path() -> None:
 
 
 def test_internal_engine_has_no_caller_selected_output() -> None:
-    assert "output_dir" not in inspect.signature(
-        diagnostics.run_development_score_diagnostic
-    ).parameters
-    assert "output_dir" not in inspect.signature(
-        diagnostics.run_reserved_development_score_diagnostic
-    ).parameters
+    assert (
+        "output_dir"
+        not in inspect.signature(diagnostics.run_development_score_diagnostic).parameters
+    )
+    assert (
+        "output_dir"
+        not in inspect.signature(diagnostics.run_reserved_development_score_diagnostic).parameters
+    )
 
 
 def test_private_staging_capability_is_derived_and_rejects_traversal(tmp_path) -> None:
@@ -97,9 +97,7 @@ def test_private_staging_capability_is_derived_and_rejects_traversal(tmp_path) -
     assert os.stat(tmp_path / capability["staging_path"]).st_mode & 0o077 == 0
     forged = dict(capability, staging_path="../escape")
     with pytest.raises(ValueError, match="internally derived"):
-        diagnostics.validate_staged_artifacts(
-            tmp_path, request, forged, completed=False
-        )
+        diagnostics.validate_staged_artifacts(tmp_path, request, forged, completed=False)
 
 
 def test_staging_rejects_symlink_ancestor(tmp_path) -> None:
@@ -111,9 +109,15 @@ def test_staging_rejects_symlink_ancestor(tmp_path) -> None:
 
 def test_all_captured_a1_helpers_are_identity_bound() -> None:
     assert set(diagnostics.frozen_science_helper_bindings()) == {
-        "_materialize_team_tree", "_target_frame_from_bytes", "_targets_exact",
-        "_scores_exact", "_target_digest", "_score_digest", "_snapshot_hashes",
-        "_parquet_bytes", "_indexed_targets",
+        "_materialize_team_tree",
+        "_target_frame_from_bytes",
+        "_targets_exact",
+        "_scores_exact",
+        "_target_digest",
+        "_score_digest",
+        "_snapshot_hashes",
+        "_parquet_bytes",
+        "_indexed_targets",
     }
     diagnostics.verify_frozen_science_helper_identities()
 
