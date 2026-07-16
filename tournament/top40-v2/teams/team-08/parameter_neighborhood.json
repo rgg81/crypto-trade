@@ -1,26 +1,20 @@
 {
-  "base_candidate_id": "t08-compressed-shock-recoil-v1-base",
-  "activation_rule": "Neighbors remain dormant until the no-control core passes every non-neighborhood official threshold and every stricter bull, bear, chop, role, sleeve, concentration, A5 coverage, pooled-IC, and fold-IC gate. They can adjudicate stability but cannot rescue any earlier failure.",
+  "base_candidate_id": "t08-volatility-scaled-rank-persistence-v1-base",
+  "activation_rule": "Neighbors remain dormant until the no-control core passes every non-neighborhood official and stricter regime, role, sleeve, concentration, A5 coverage, pooled-IC, and fold-IC gate. They adjudicate stability only and cannot rescue failure.",
   "base_parameters_file": "frozen_config.json",
   "declaration_status": "prospective-unregistered-unevaluated",
-  "materialization_rule": "Change only the declared executable constant, preregister its exact source/config/risk identities, and run serially before reading the result; restore and verify the base source exactly afterward.",
+  "materialization_rule": "Change only the declared executable constant, preregister exact source/config/risk identities, run serially before reading the result, and restore and verify base source afterward.",
   "neighbors": [
-    {"neighbor_id": "csr-neighbor-baseline-072", "overrides": {"baseline_volatility_bars": 72}, "hypothesis": "A shorter baseline adapts compression to newer volatility."},
-    {"neighbor_id": "csr-neighbor-baseline-096", "overrides": {"baseline_volatility_bars": 96}, "hypothesis": "A longer baseline tests whether compression survives slower volatility context."},
-    {"neighbor_id": "csr-neighbor-compression-018", "overrides": {"compression_volatility_bars": 18}, "hypothesis": "Six days of pre-shock compression tests faster setup recognition."},
-    {"neighbor_id": "csr-neighbor-compression-024", "overrides": {"compression_volatility_bars": 24}, "hypothesis": "Eight days of compression tests setup persistence."},
-    {"neighbor_id": "csr-neighbor-ceiling-090", "overrides": {"compression_ratio_ceiling": 0.9}, "hypothesis": "A stricter ceiling admits only clear volatility contraction."},
-    {"neighbor_id": "csr-neighbor-ceiling-110", "overrides": {"compression_ratio_ceiling": 1.1}, "hypothesis": "A looser ceiling tests whether the edge is threshold-local."},
-    {"neighbor_id": "csr-neighbor-shockscale-200", "overrides": {"shock_saturation_z": 2.0}, "hypothesis": "Earlier saturation reduces domination by extreme shocks."},
-    {"neighbor_id": "csr-neighbor-shockscale-300", "overrides": {"shock_saturation_z": 3.0}, "hypothesis": "Later saturation preserves more shock-magnitude differentiation."}
+    {"neighbor_id": "vsrp-neighbor-short-018", "overrides": {"short_horizon_bars": 18}, "hypothesis": "A six-day short horizon tests faster persistence."},
+    {"neighbor_id": "vsrp-neighbor-short-024", "overrides": {"short_horizon_bars": 24}, "hypothesis": "An eight-day short horizon tests slower entry."},
+    {"neighbor_id": "vsrp-neighbor-medium-056", "overrides": {"medium_horizon_bars": 56}, "hypothesis": "A shorter medium horizon tests local timing stability."},
+    {"neighbor_id": "vsrp-neighbor-medium-070", "overrides": {"medium_horizon_bars": 70}, "hypothesis": "A longer medium horizon tests persistence breadth."},
+    {"neighbor_id": "vsrp-neighbor-saturation-250", "overrides": {"horizon_saturation_z": 2.5}, "hypothesis": "Earlier saturation limits extreme trend dominance."},
+    {"neighbor_id": "vsrp-neighbor-saturation-350", "overrides": {"horizon_saturation_z": 3.5}, "hypothesis": "Later saturation retains magnitude differentiation."},
+    {"neighbor_id": "vsrp-neighbor-disagreement-150", "overrides": {"disagreement_power": 1.5}, "hypothesis": "Softer disagreement shrink tests gate locality."},
+    {"neighbor_id": "vsrp-neighbor-disagreement-250", "overrides": {"disagreement_power": 2.5}, "hypothesis": "Stronger disagreement shrink tests consensus robustness."}
   ],
-  "required_evidence": {
-    "distinct_daily_return_series": true,
-    "maximum_positive_pnl_concentration": 0.4,
-    "minimum_neighbor_median_sharpe": 0.5,
-    "minimum_profitable_neighbor_fraction": 0.7,
-    "parameter_and_return_sha256_required": true
-  },
+  "required_evidence": {"distinct_daily_return_series": true, "maximum_positive_pnl_concentration": 0.4, "minimum_neighbor_median_sharpe": 0.5, "minimum_profitable_neighbor_fraction": 0.7, "parameter_and_return_sha256_required": true},
   "schema_version": 1,
   "selection_prohibition": "Do not add, remove, recenter, or choose among neighbors after any neighborhood result is observed.",
   "team_id": "team-08"

@@ -1,4 +1,4 @@
-"""Synthetic causal and construction tests for Team 08's first mechanism pivot."""
+"""Synthetic causal and construction tests for Team 08's second/final mechanism pivot."""
 
 from __future__ import annotations
 
@@ -42,33 +42,18 @@ def _synthetic_context(
         tz="UTC",
     )
     bars: dict[str, pd.DataFrame] = {}
-    compression_start = (
-        strategy.HISTORY_RETURN_BARS
-        - strategy.COMPRESSION_VOLATILITY_BARS
-        - strategy.SHOCK_BARS
-    )
-    shock_start = strategy.HISTORY_RETURN_BARS - strategy.SHOCK_BARS
+    center = (symbol_count - 1) / 2.0
     for symbol_index in range(symbol_count):
         symbol = f"C{symbol_index:02d}USDT"
-        pair = symbol_index // 2
-        direction = 1.0 if symbol_index % 2 == 0 else -1.0
-        returns: list[float] = []
-        for return_index in range(strategy.HISTORY_RETURN_BARS):
-            if return_index >= shock_start:
-                idiosyncratic = direction * (0.010 + pair * 0.00012)
-            elif return_index >= compression_start:
-                idiosyncratic = direction * 0.00030 * math.sin(
-                    return_index * 1.17 + pair * 0.13
-                )
-            else:
-                idiosyncratic = direction * 0.0040 * math.sin(
-                    return_index * 0.71 + pair * 0.19
-                )
-            common = common_drift + 0.0015 * math.sin(return_index * 0.37)
-            returns.append(common + idiosyncratic)
+        loading = (symbol_index - center) / max(center, 1.0)
         closes = [100.0 + symbol_index]
-        for value in returns:
-            closes.append(closes[-1] * math.exp(value))
+        for return_index in range(strategy.HISTORY_RETURN_BARS):
+            common = common_drift + 0.0018 * math.sin(return_index * 0.37)
+            persistent = 0.00055 * loading
+            idiosyncratic = 0.00022 * math.sin(
+                return_index * 0.71 + symbol_index * 0.13
+            )
+            closes.append(closes[-1] * math.exp(common + persistent + idiosyncratic))
         bars[symbol] = pd.DataFrame(
             {
                 "open_time": open_times,
@@ -91,12 +76,12 @@ def _targets(context):
     return dict(result)
 
 
-def _feature_path(shock: tuple[float, float, float], *, compressed: bool = True):
-    unused = [0.003 * math.sin(index * 0.41) for index in range(18)]
-    baseline = [0.004 * math.sin(index * 0.83) for index in range(84)]
-    amplitude = 0.00035 if compressed else 0.006
-    compression = [amplitude * math.sin(index * 1.11) for index in range(21)]
-    return tuple(unused + baseline + compression + list(shock))
+def _persistent_path(*, direction: float = 1.0, recent_amplitude: float = 0.0003):
+    result = []
+    for index in range(strategy.HISTORY_RETURN_BARS):
+        amplitude = recent_amplitude if index >= strategy.BASELINE_VOLATILITY_BARS else 0.0003
+        result.append(direction * 0.00045 + amplitude * math.sin(index * 0.83))
+    return tuple(result)
 
 
 def test_deterministic_finite_broad_exactly_neutral_targets() -> None:
@@ -115,13 +100,92 @@ def test_deterministic_finite_broad_exactly_neutral_targets() -> None:
     assert max(abs(value) for value in first.values()) <= strategy.MAXIMUM_SYMBOL_EXPOSURE
 
 
-def test_positive_and_negative_shocks_are_traded_for_recoil() -> None:
-    targets = _targets(_synthetic_context())
-    positive_shock = {f"C{index:02d}USDT" for index in range(0, 28, 2)}
-    negative_shock = {f"C{index:02d}USDT" for index in range(1, 28, 2)}
+def test_persistent_relative_leaders_and_laggards_occupy_opposite_sleeves() -> None:
+    context = _synthetic_context()
+    model = strategy.build_strategy()
+    snapshot = model.preconstruction_snapshot(context, seed=strategy.FROZEN_SEED)
+    assert snapshot is not None
+    scores = snapshot.score_map()
+    targets = _targets(context)
+    side_count = sum(value > 0.0 for value in targets.values())
+    expected_shorts = set(sorted(scores, key=lambda symbol: (scores[symbol], symbol))[:side_count])
+    expected_longs = set(sorted(scores, key=lambda symbol: (scores[symbol], symbol))[-side_count:])
 
-    assert {symbol for symbol, value in targets.items() if value < 0.0}.issubset(positive_shock)
-    assert {symbol for symbol, value in targets.items() if value > 0.0}.issubset(negative_shock)
+    assert {symbol for symbol, value in targets.items() if value < 0.0} == expected_shorts
+    assert {symbol for symbol, value in targets.items() if value > 0.0} == expected_longs
+
+
+def test_inactive_zero_scores_remain_zero_and_cannot_enter_either_sleeve(monkeypatch) -> None:
+    context = _synthetic_context()
+    symbols = tuple(sorted(context.eligible_symbols))
+    zero_snapshot = strategy.PreconstructionSnapshot(
+        decision_time=context.decision_time,
+        scores=tuple((symbol, 0.0) for symbol in symbols),
+    )
+    model = strategy.build_strategy()
+    monkeypatch.setattr(model, "preconstruction_snapshot", lambda *args, **kwargs: zero_snapshot)
+
+    assert strategy._signed_magnitude_ranks({symbol: 0.0 for symbol in symbols}) == {
+        symbol: 0.0 for symbol in symbols
+    }
+    assert model.target_weights(context, seed=strategy.FROZEN_SEED) == {}
+
+
+def test_asymmetric_zero_scores_remain_inactive_when_both_active_sides_are_broad(
+    monkeypatch,
+) -> None:
+    context = _synthetic_context()
+    symbols = tuple(sorted(context.eligible_symbols))
+    raw = {
+        symbol: (
+            -float(index + 1)
+            if index < 9
+            else float(index - 18)
+            if index >= 19
+            else 0.0
+        )
+        for index, symbol in enumerate(symbols)
+    }
+    ranked = strategy._signed_magnitude_ranks(raw)
+    assert ranked is not None
+    inactive = {symbol for symbol, value in raw.items() if value == 0.0}
+    assert inactive
+    assert all(ranked[symbol] == 0.0 for symbol in inactive)
+    snapshot = strategy.PreconstructionSnapshot(
+        decision_time=context.decision_time,
+        scores=tuple((symbol, ranked[symbol]) for symbol in symbols),
+    )
+    model = strategy.build_strategy()
+    monkeypatch.setattr(model, "preconstruction_snapshot", lambda *args, **kwargs: snapshot)
+    targets = model.target_weights(context, seed=strategy.FROZEN_SEED)
+
+    assert targets
+    assert inactive.isdisjoint(targets)
+
+
+def test_sparse_active_side_flattens_instead_of_recruiting_zero_scores(monkeypatch) -> None:
+    context = _synthetic_context()
+    symbols = tuple(sorted(context.eligible_symbols))
+    raw = {
+        symbol: (
+            -float(index + 1)
+            if index < 7
+            else float(index - 17)
+            if index >= 18
+            else 0.0
+        )
+        for index, symbol in enumerate(symbols)
+    }
+    ranked = strategy._signed_magnitude_ranks(raw)
+    assert ranked is not None
+    snapshot = strategy.PreconstructionSnapshot(
+        decision_time=context.decision_time,
+        scores=tuple((symbol, ranked[symbol]) for symbol in symbols),
+    )
+    model = strategy.build_strategy()
+    monkeypatch.setattr(model, "preconstruction_snapshot", lambda *args, **kwargs: snapshot)
+
+    assert model.target_weights(context, seed=strategy.FROZEN_SEED) == {}
 
 
 def test_common_bull_and_bear_drifts_do_not_change_the_relative_book() -> None:
@@ -135,28 +199,47 @@ def test_common_bull_and_bear_drifts_do_not_change_the_relative_book() -> None:
     assert abs(sum(bear.values())) <= 1e-10
 
 
-def test_compression_and_recoil_direction_are_part_of_the_new_mechanism() -> None:
-    compressed = strategy._recoil_feature(_feature_path((0.009, 0.011, 0.010)))
-    uncompressed = strategy._recoil_feature(
-        _feature_path((0.009, 0.011, 0.010), compressed=False)
+def test_three_horizon_continuation_is_not_recoil_sign_inversion() -> None:
+    positive = strategy._persistence_feature(_persistent_path(direction=1.0))
+    negative = strategy._persistence_feature(_persistent_path(direction=-1.0))
+
+    assert positive is not None and negative is not None
+    assert positive.raw_persistence_score > 0.0
+    assert negative.raw_persistence_score < 0.0
+    assert positive.horizon_agreement == 1.0
+    assert negative.horizon_agreement == 1.0
+    assert all(value > 0.0 for value in positive.horizon_components)
+    assert all(value < 0.0 for value in negative.horizon_components)
+
+
+def test_horizon_disagreement_is_required_and_shrunk() -> None:
+    persistent = strategy._persistence_feature(_persistent_path())
+    mixed_path = tuple(
+        0.0010 + 0.0002 * math.sin(index * 0.67)
+        if index < 63
+        else (
+            -0.0015 + 0.0002 * math.sin(index * 0.67)
+            if index < 105
+            else 0.0015 + 0.0002 * math.sin(index * 0.67)
+        )
+        for index in range(strategy.HISTORY_RETURN_BARS)
     )
-    negative_shock = strategy._recoil_feature(_feature_path((-0.009, -0.011, -0.010)))
+    mixed = strategy._persistence_feature(mixed_path)
 
-    assert compressed is not None and uncompressed is not None and negative_shock is not None
-    assert compressed.compression_ratio < uncompressed.compression_ratio
-    assert compressed.raw_recoil_score < 0.0
-    assert uncompressed.raw_recoil_score == 0.0
-    assert negative_shock.raw_recoil_score > 0.0
+    assert persistent is not None and mixed is not None
+    assert persistent.horizon_agreement == 1.0
+    assert mixed.horizon_agreement == pytest.approx(2.0 / 3.0)
+    assert abs(mixed.raw_persistence_score) < abs(persistent.raw_persistence_score)
 
 
-def test_multibar_durability_penalizes_a_rough_shock_path() -> None:
-    persistent = strategy._recoil_feature(_feature_path((0.007, 0.007, 0.007)))
-    rough = strategy._recoil_feature(_feature_path((0.020, -0.018, 0.019)))
+def test_excess_recent_volatility_only_shrinks_signal() -> None:
+    ordinary = strategy._persistence_feature(_persistent_path(recent_amplitude=0.0003))
+    volatile = strategy._persistence_feature(_persistent_path(recent_amplitude=0.0040))
 
-    assert persistent is not None and rough is not None
-    assert persistent.direction_agreement > rough.direction_agreement
-    assert persistent.path_roughness < rough.path_roughness
-    assert abs(persistent.raw_recoil_score) > abs(rough.raw_recoil_score)
+    assert ordinary is not None and volatile is not None
+    assert ordinary.volatility_shrink == 1.0
+    assert volatile.recent_to_baseline_volatility > 1.0
+    assert 0.0 < volatile.volatility_shrink < 1.0
 
 
 def test_boundary_is_called_once_after_final_transform_and_before_construction(monkeypatch) -> None:
@@ -324,19 +407,23 @@ def test_frozen_config_matches_executable_constants_and_no_control() -> None:
     assert config["parameters"] == {
         "bar_interval_hours": strategy.BAR_INTERVAL_HOURS,
         "baseline_volatility_bars": strategy.BASELINE_VOLATILITY_BARS,
-        "compression_ratio_ceiling": strategy.COMPRESSION_RATIO_CEILING,
-        "compression_ratio_floor": strategy.COMPRESSION_RATIO_FLOOR,
-        "compression_volatility_bars": strategy.COMPRESSION_VOLATILITY_BARS,
+        "disagreement_power": strategy.DISAGREEMENT_POWER,
         "gross_target": strategy.GROSS_TARGET,
         "history_return_bars": strategy.HISTORY_RETURN_BARS,
+        "horizon_saturation_z": strategy.HORIZON_SATURATION_Z,
         "maximum_symbol_exposure": strategy.MAXIMUM_SYMBOL_EXPOSURE,
-        "minimum_direction_agreement": "2/3",
+        "medium_horizon_bars": strategy.MEDIUM_HORIZON_BARS,
+        "medium_horizon_weight": strategy.MEDIUM_HORIZON_WEIGHT,
+        "minimum_agreeing_horizons": strategy.MINIMUM_AGREEING_HORIZONS,
         "minimum_positions_per_side": strategy.MINIMUM_POSITIONS_PER_SIDE,
         "minimum_valid_symbols": strategy.MINIMUM_VALID_SYMBOLS,
         "rebalance_interval_bars": strategy.REBALANCE_INTERVAL_BARS,
+        "recent_volatility_bars": strategy.RECENT_VOLATILITY_BARS,
         "selected_fraction_per_side": "1/5",
-        "shock_bars": strategy.SHOCK_BARS,
-        "shock_saturation_z": strategy.SHOCK_SATURATION_Z,
+        "short_horizon_bars": strategy.SHORT_HORIZON_BARS,
+        "short_horizon_weight": strategy.SHORT_HORIZON_WEIGHT,
+        "slow_horizon_bars": strategy.SLOW_HORIZON_BARS,
+        "slow_horizon_weight": strategy.SLOW_HORIZON_WEIGHT,
     }
 
     risk = json.loads((TEAM_DIR / "risk_policy.json").read_text(encoding="utf-8"))

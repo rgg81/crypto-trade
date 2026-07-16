@@ -1,24 +1,19 @@
-# Team08 first-pivot handoff
+# Team08 second/final-pivot handoff
 
-The initial `vdr-core-candidate-001` result is terminal negative evidence. Its IS Sharpe was
-−2.2537, its no-cost signal remained negative, a same-cost inverse remained negative, turnover was
-1012, and bear, bull, and chop all failed. That candidate and its 24-hour A5 declaration are
-historical only; no control, neighbor, ablation, or blind sign inversion may rescue it.
+Both prior no-control cores are historical and terminal. `vdr-core-candidate-001` had IS Sharpe
+−2.2537. `t08-compressed-shock-recoil-v1-base` had Sharpe −1.16083, doubled-cost Sharpe −1.34838,
+all-negative regimes, and 2,952 trades. Neither may be rescued by controls, neighbors, ablations,
+or sign inversion. A read-only approximate continuation diagnostic reached Sharpe 0.78615 but
+failed trial-adjustment (0.7289) and concentration (0.4357); a literal flip is prohibited.
 
-The current prospective candidate is `t08-compressed-shock-recoil-v1-base` in family
-`t08-compressed-shock-recoil-v1`. It uses the canonical zero-argument
-`strategy.py:build_strategy`, seed `20260801`, a 168-hour epoch-anchored construction and A5 label
-horizon, and the exact disabled no-control bytes at root `risk_policy.json`. Point-in-time asset
-eligibility remains exclusively Amendment 0006 pure crypto.
+The prospective final candidate is `t08-volatility-scaled-rank-persistence-v1-base` in family
+`t08-volatility-scaled-rank-persistence-v1`. It is a genuine 21/63/126-bar residual-persistence
+mechanism with volatility scaling, horizon-agreement shrinkage, excessive-recent-volatility
+shrinkage, weekly 168-hour construction/A5 horizon, exact neutrality, 0.36 gross, and the unchanged
+disabled root no-control policy. Amendment 0006 remains the pure-crypto universe authority.
 
-Before registration, materialize and independently review the new candidate-specific executable,
-semantic-review, and score manifests. Register the pivot family through active A7, then recompute
-the complete source bundle after the family log changes and preregister the exact trial. Run only
-the no-control core. It must pass every non-neighborhood official and stricter gate before the
-already declared neighbors may run solely to adjudicate stability. Only after those neighbors make
-the complete gate pass may controls, private data, or submission activate.
-
-The lifecycle imports only root `strategy.py` and root `risk_policy.json`. Any later policy would
-have to be copied byte-for-byte from its immutable template to root before commit, registration,
-and execution, with every affected hash recomputed. Use only the active A7 runtime-preload
-entrypoint, which preserves A5 and delegates through the exact A6 pure-crypto authority.
+Organizer next steps are serial validation and static review, canonical candidate-specific A5
+materialization, pivot/family registration through A7, final source/hash binding, and one
+no-control core run. If any non-neighborhood gate fails, stop. Only after those gates pass may the
+declared neighbors run for the 0.70 profitable-fraction and 0.50 median-Sharpe stability gates.
+Controls, private data, and submission remain dormant until the complete gate passes.

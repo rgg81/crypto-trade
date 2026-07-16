@@ -1,0 +1,32 @@
+{
+  "candidate_id": "t08-volatility-scaled-rank-persistence-v1-base",
+  "controls_authorized": false,
+  "family_id": "t08-volatility-scaled-rank-persistence-v1",
+  "required_core_gate": {
+    "annualized_return_strictly_positive": true,
+    "complete_a5_score_coverage": true,
+    "combined_chop_attribution_strictly_positive": true,
+    "doubled_cost_net_return_strictly_positive": true,
+    "long_bull_attribution_strictly_positive": true,
+    "maximum_drawdown": 0.3,
+    "maximum_positive_pnl_concentration": 0.4,
+    "minimum_calmar": 0.4,
+    "minimum_double_cost_net_sharpe": 0.35,
+    "minimum_fold_score_ic_positive": 4,
+    "minimum_neighbor_median_sharpe": 0.5,
+    "minimum_net_sharpe": 0.75,
+    "minimum_positive_folds": 4,
+    "minimum_positive_quarter_fraction": 0.55,
+    "minimum_positive_regime_sharpes": 3,
+    "minimum_profitable_neighbor_fraction": 0.7,
+    "minimum_trial_adjusted_probability_positive": 0.9,
+    "minimum_worst_regime_sharpe": -0.25,
+    "pooled_score_ic_strictly_positive": true,
+    "required_positive_sharpe_regimes": ["bull", "bear", "chop"],
+    "required_positive_return_regimes": ["bull", "bear", "chop"],
+    "short_bear_attribution_strictly_positive": true,
+    "sleeve_minima": {"minimum_mean_side_exposure": 0.01, "minimum_side_active_bar_fraction": 0.1, "minimum_side_executed_notional_usdt": 1000.0, "minimum_side_exposure": 0.01}
+  },
+  "schema_version": 1,
+  "team_id": "team-08"
+}

@@ -1,0 +1,46 @@
+{
+  "active_authority": {
+    "entrypoint_path": "scripts/top40_v2_tournament_runtime_preload_v7.py",
+    "entrypoint_sha256": "8a4ada10176d2606df3f358fc188e21b45153ad9a7270f36908736f03322a3a9",
+    "integration_freeze_sha256": "6f77a146e7b414eabd20c5cc9321a95493bb98116dde07ef79d9eb009b6a6f51"
+  },
+  "authorization": {
+    "controls_authorized_before_core_pass": false,
+    "journals_or_reports_edited_by_draft": false,
+    "material_trial_number_if_registered": 3,
+    "private_data_authorized": false,
+    "registration_authorized_by_template": false
+  },
+  "new_candidate_id": "t08-volatility-scaled-rank-persistence-v1-base",
+  "new_family_id": "t08-volatility-scaled-rank-persistence-v1",
+  "parent_evidence": {
+    "candidate_id": "t08-compressed-shock-recoil-v1-base",
+    "double_cost_sharpe": -1.34838,
+    "family_id": "t08-compressed-shock-recoil-v1",
+    "net_sharpe": -1.16083,
+    "regime_sharpes": "all_negative",
+    "terminal_decision": "failed_no_control_core",
+    "trade_count": 2952
+  },
+  "pivot_classification": {
+    "changes": [
+      "remove compression-shock and opposite-direction recoil scoring",
+      "replace it with residual continuation over distinct 21-, 63-, and 126-bar horizons",
+      "volatility-scale every horizon and shrink horizon disagreement and excessive recent volatility",
+      "retain only weekly broad 0.36-gross exact-neutral no-control construction"
+    ],
+    "is_blind_score_negation": false,
+    "is_parameter_neighbor": false,
+    "is_risk_control_change": false,
+    "mechanism_pivot": true
+  },
+  "prohibited_diagnostic": {
+    "approximate_continuation_sharpe": 0.78615,
+    "positive_fold_pnl_concentration": 0.4357,
+    "trial_adjusted_probability_positive": 0.7289,
+    "literal_sign_flip_authorized": false
+  },
+  "schema_version": 1,
+  "status": "draft_pending_serial_validation_review_registration_hash_binding_and_a7_rebind",
+  "team_id": "team-08"
+}

@@ -1,12 +1,11 @@
-"""Team 08 causal compressed-shock recoil pivot.
+"""Team 08 causal volatility-scaled rank-persistence pivot.
 
 The organizer supplies point-in-time pure-crypto membership and completed 8-hour bars.  At each
-weekly construction the strategy subtracts the same-bar cross-sectional median return, measures
-whether each coin's idiosyncratic volatility compressed before the latest three-bar shock, and
-scores a durable recoil opposite that shock.  Compression, multi-bar direction agreement, the
-median aligned shock component, and path roughness all enter before the final deterministic
-cross-sectional rank.  This is not the negative of the retired dispersion-release score: it has
-new feature lineage, no dispersion-state switch, no continuation sleeve, and no common direction.
+weekly construction this strategy removes the same-bar cross-sectional median return and measures
+coin-specific continuation over distinct 21-, 63-, and 126-bar horizons.  Every horizon is scaled
+by a past residual-volatility baseline.  At least two horizons must agree, disagreement is shrunk,
+and excessive recent volatility can reduce but never increase the score.  This is an explicit
+multi-horizon persistence model, not a sign flip or parameter variant of the terminal recoil model.
 
 One finite built-in score dictionary crosses the public A5 boundary after every signal transform
 and before selection, sizing, caps, or organizer risk.  The exact returned object alone builds a
@@ -30,14 +29,17 @@ FROZEN_SEED = 20260801
 BAR_INTERVAL_HOURS = 8
 REBALANCE_INTERVAL_BARS = 21
 HISTORY_RETURN_BARS = 126
-BASELINE_VOLATILITY_BARS = 84
-COMPRESSION_VOLATILITY_BARS = 21
-SHOCK_BARS = 3
-COMPRESSION_RATIO_FLOOR = 0.45
-COMPRESSION_RATIO_CEILING = 1.00
-SHOCK_SATURATION_Z = 2.50
-MINIMUM_DIRECTION_AGREEMENT_NUMERATOR = 2
-MINIMUM_DIRECTION_AGREEMENT_DENOMINATOR = 3
+SHORT_HORIZON_BARS = 21
+MEDIUM_HORIZON_BARS = 63
+SLOW_HORIZON_BARS = 126
+RECENT_VOLATILITY_BARS = 21
+BASELINE_VOLATILITY_BARS = 105
+SHORT_HORIZON_WEIGHT = 0.50
+MEDIUM_HORIZON_WEIGHT = 0.30
+SLOW_HORIZON_WEIGHT = 0.20
+HORIZON_SATURATION_Z = 3.0
+MINIMUM_AGREEING_HORIZONS = 2
+DISAGREEMENT_POWER = 2.0
 MINIMUM_VALID_SYMBOLS = 24
 MINIMUM_POSITIONS_PER_SIDE = 8
 SELECTION_NUMERATOR = 1
@@ -46,13 +48,19 @@ GROSS_TARGET = 0.36
 MAXIMUM_SYMBOL_EXPOSURE = 0.025
 TOLERANCE = 1e-10
 
-ACTIVE_FAMILY_ID = "t08-compressed-shock-recoil-v1"
-ACTIVE_CANDIDATE_ID = "t08-compressed-shock-recoil-v1-base"
+ACTIVE_FAMILY_ID = "t08-volatility-scaled-rank-persistence-v1"
+ACTIVE_CANDIDATE_ID = "t08-volatility-scaled-rank-persistence-v1-base"
 MATERIALIZED_CANDIDATE_OVERRIDES: dict[str, dict[str, object]] = {
     ACTIVE_CANDIDATE_ID: {},
 }
 
 _BAR_INTERVAL = pd.Timedelta(hours=BAR_INTERVAL_HOURS)
+_HORIZONS = (SHORT_HORIZON_BARS, MEDIUM_HORIZON_BARS, SLOW_HORIZON_BARS)
+_HORIZON_WEIGHTS = (
+    SHORT_HORIZON_WEIGHT,
+    MEDIUM_HORIZON_WEIGHT,
+    SLOW_HORIZON_WEIGHT,
+)
 
 
 class ContextLike(Protocol):
@@ -66,13 +74,13 @@ class ContextLike(Protocol):
 
 
 @dataclasses.dataclass(frozen=True)
-class _RecoilFeature:
-    compression_ratio: float
-    signed_shock_z: float
-    direction_agreement: float
-    durable_shock_z: float
-    path_roughness: float
-    raw_recoil_score: float
+class _PersistenceFeature:
+    horizon_z_scores: tuple[float, float, float]
+    horizon_components: tuple[float, float, float]
+    recent_to_baseline_volatility: float
+    horizon_agreement: float
+    volatility_shrink: float
+    raw_persistence_score: float
 
 
 @dataclasses.dataclass(frozen=True)
@@ -209,145 +217,8 @@ def _sample_standard_deviation(values: Sequence[float]) -> float | None:
     return float(result) if math.isfinite(result) else None
 
 
-def _eligible_symbols(context: ContextLike) -> tuple[str, ...] | None:
-    raw = context.eligible_symbols
-    if isinstance(raw, (str, bytes)):
-        return None
-    try:
-        supplied = tuple(raw)
-    except TypeError:
-        return None
-    if any(not isinstance(symbol, str) or not symbol for symbol in supplied):
-        return None
-    if len(supplied) != len(set(supplied)):
-        return None
-    eligible = tuple(sorted(supplied))
-    return eligible if len(eligible) >= MINIMUM_VALID_SYMBOLS else None
-
-
-def _residual_paths(
-    return_paths: Mapping[str, Sequence[float]],
-) -> dict[str, tuple[float, ...]] | None:
-    """Subtract the contemporaneous cross-sectional median at every completed bar."""
-
-    if len(return_paths) < MINIMUM_VALID_SYMBOLS:
-        return None
-    if any(len(path) != HISTORY_RETURN_BARS for path in return_paths.values()):
-        return None
-    result: dict[str, list[float]] = {symbol: [] for symbol in sorted(return_paths)}
-    for index in range(HISTORY_RETURN_BARS):
-        cross_section = [float(return_paths[symbol][index]) for symbol in sorted(return_paths)]
-        market_return = _median(cross_section)
-        if market_return is None:
-            return None
-        for symbol in sorted(result):
-            residual = float(return_paths[symbol][index]) - market_return
-            if not math.isfinite(residual):
-                return None
-            result[symbol].append(residual)
-    return {symbol: tuple(result[symbol]) for symbol in sorted(result)}
-
-
-def _recoil_feature(residual_path: Sequence[float]) -> _RecoilFeature | None:
-    """Score a durable recent shock for recoil only when it follows lower volatility."""
-
-    required = BASELINE_VOLATILITY_BARS + COMPRESSION_VOLATILITY_BARS + SHOCK_BARS
-    if len(residual_path) != HISTORY_RETURN_BARS or required > HISTORY_RETURN_BARS:
-        return None
-    baseline_stop = len(residual_path) - COMPRESSION_VOLATILITY_BARS - SHOCK_BARS
-    baseline_start = baseline_stop - BASELINE_VOLATILITY_BARS
-    compression_stop = len(residual_path) - SHOCK_BARS
-    baseline = residual_path[baseline_start:baseline_stop]
-    compression = residual_path[baseline_stop:compression_stop]
-    shock = residual_path[compression_stop:]
-    baseline_scale = _sample_standard_deviation(baseline)
-    compression_scale = _sample_standard_deviation(compression)
-    if (
-        baseline_scale is None
-        or compression_scale is None
-        or baseline_scale <= 1e-12
-    ):
-        return None
-
-    compression_ratio = compression_scale / baseline_scale
-    compression_strength = float(
-        max(
-            0.0,
-            min(
-                1.0,
-                (COMPRESSION_RATIO_CEILING - compression_ratio)
-                / (COMPRESSION_RATIO_CEILING - COMPRESSION_RATIO_FLOOR),
-            ),
-        )
-    )
-    shock_sum = math.fsum(shock)
-    if not math.isfinite(shock_sum) or abs(shock_sum) <= 1e-15:
-        return _RecoilFeature(
-            compression_ratio=float(compression_ratio),
-            signed_shock_z=0.0,
-            direction_agreement=0.0,
-            durable_shock_z=0.0,
-            path_roughness=1.0,
-            raw_recoil_score=0.0,
-        )
-
-    direction = math.copysign(1.0, shock_sum)
-    aligned = tuple(direction * value / baseline_scale for value in shock)
-    agreement_count = sum(value > 0.0 for value in aligned)
-    agreement = agreement_count / SHOCK_BARS
-    minimum_agreement = (
-        MINIMUM_DIRECTION_AGREEMENT_NUMERATOR / MINIMUM_DIRECTION_AGREEMENT_DENOMINATOR
-    )
-    signed_shock_z = shock_sum / (baseline_scale * math.sqrt(SHOCK_BARS))
-    aligned_median = _median(aligned)
-    absolute_path = math.fsum(abs(value) for value in shock)
-    path_roughness = absolute_path / abs(shock_sum)
-    if (
-        aligned_median is None
-        or aligned_median <= 0.0
-        or agreement + TOLERANCE < minimum_agreement
-        or not math.isfinite(signed_shock_z)
-        or not math.isfinite(path_roughness)
-        or path_roughness < 1.0 - TOLERANCE
-    ):
-        raw_score = 0.0
-        durable_shock_z = 0.0
-    else:
-        durable_shock_z = min(
-            abs(signed_shock_z),
-            float(aligned_median) * math.sqrt(SHOCK_BARS),
-        )
-        shock_strength = math.tanh(durable_shock_z / SHOCK_SATURATION_Z)
-        raw_score = (
-            -direction
-            * compression_strength
-            * shock_strength
-            * agreement**2
-            / path_roughness
-        )
-    if not all(
-        math.isfinite(value)
-        for value in (
-            compression_ratio,
-            signed_shock_z,
-            agreement,
-            durable_shock_z,
-            raw_score,
-        )
-    ):
-        return None
-    return _RecoilFeature(
-        compression_ratio=float(compression_ratio),
-        signed_shock_z=float(signed_shock_z),
-        direction_agreement=float(agreement),
-        durable_shock_z=float(durable_shock_z),
-        path_roughness=float(path_roughness),
-        raw_recoil_score=float(raw_score),
-    )
-
-
 def _signed_magnitude_ranks(values: Mapping[str, float]) -> dict[str, float] | None:
-    """Rank recoil magnitudes within sign while preserving inactive scores at exactly zero."""
+    """Rank persistence magnitude within sign while preserving inactive zero scores."""
 
     if len(values) < MINIMUM_VALID_SYMBOLS or any(
         not math.isfinite(value) for value in values.values()
@@ -369,8 +240,128 @@ def _signed_magnitude_ranks(values: Mapping[str, float]) -> dict[str, float] | N
     return result
 
 
-class CompressedShockRecoilStrategy:
-    """Fade durable idiosyncratic shocks that emerge from lower-volatility setups."""
+def _eligible_symbols(context: ContextLike) -> tuple[str, ...] | None:
+    raw = context.eligible_symbols
+    if isinstance(raw, (str, bytes)):
+        return None
+    try:
+        supplied = tuple(raw)
+    except TypeError:
+        return None
+    if any(not isinstance(symbol, str) or not symbol for symbol in supplied):
+        return None
+    if len(supplied) != len(set(supplied)):
+        return None
+    eligible = tuple(sorted(supplied))
+    return eligible if len(eligible) >= MINIMUM_VALID_SYMBOLS else None
+
+
+def _residual_paths(
+    return_paths: Mapping[str, Sequence[float]],
+) -> dict[str, tuple[float, ...]] | None:
+    """Subtract the contemporaneous pure-crypto median at every completed bar."""
+
+    if len(return_paths) < MINIMUM_VALID_SYMBOLS:
+        return None
+    if any(len(path) != HISTORY_RETURN_BARS for path in return_paths.values()):
+        return None
+    result: dict[str, list[float]] = {symbol: [] for symbol in sorted(return_paths)}
+    for index in range(HISTORY_RETURN_BARS):
+        cross_section = [float(return_paths[symbol][index]) for symbol in sorted(return_paths)]
+        market_return = _median(cross_section)
+        if market_return is None:
+            return None
+        for symbol in sorted(result):
+            residual = float(return_paths[symbol][index]) - market_return
+            if not math.isfinite(residual):
+                return None
+            result[symbol].append(residual)
+    return {symbol: tuple(result[symbol]) for symbol in sorted(result)}
+
+
+def _persistence_feature(residual_path: Sequence[float]) -> _PersistenceFeature | None:
+    """Build a volatility-scaled continuation score with explicit horizon agreement."""
+
+    if (
+        len(residual_path) != HISTORY_RETURN_BARS
+        or BASELINE_VOLATILITY_BARS + RECENT_VOLATILITY_BARS != HISTORY_RETURN_BARS
+        or SLOW_HORIZON_BARS != HISTORY_RETURN_BARS
+    ):
+        return None
+    baseline = residual_path[:BASELINE_VOLATILITY_BARS]
+    recent = residual_path[-RECENT_VOLATILITY_BARS:]
+    baseline_scale = _sample_standard_deviation(baseline)
+    recent_scale = _sample_standard_deviation(recent)
+    if baseline_scale is None or recent_scale is None or baseline_scale <= 1e-12:
+        return None
+
+    horizon_z_scores: list[float] = []
+    horizon_components: list[float] = []
+    for horizon in _HORIZONS:
+        horizon_sum = math.fsum(residual_path[-horizon:])
+        z_score = horizon_sum / (baseline_scale * math.sqrt(horizon))
+        component = math.tanh(z_score / HORIZON_SATURATION_Z)
+        if not math.isfinite(z_score) or not math.isfinite(component):
+            return None
+        horizon_z_scores.append(float(z_score))
+        horizon_components.append(float(component))
+
+    consensus = _median(horizon_components)
+    if consensus is None:
+        return None
+    recent_ratio = recent_scale / baseline_scale
+    volatility_shrink = min(1.0, 1.0 / max(recent_ratio, 1e-12))
+    if abs(consensus) <= 1e-15:
+        agreement = 0.0
+        raw_score = 0.0
+    else:
+        direction = math.copysign(1.0, consensus)
+        agreeing = tuple(component * direction > 0.0 for component in horizon_components)
+        agreement_count = sum(agreeing)
+        agreement = agreement_count / len(_HORIZONS)
+        weighted_core = math.fsum(
+            weight * component
+            for weight, component in zip(_HORIZON_WEIGHTS, horizon_components, strict=True)
+        )
+        agreeing_weight = math.fsum(
+            weight
+            for weight, is_agreeing in zip(_HORIZON_WEIGHTS, agreeing, strict=True)
+            if is_agreeing
+        )
+        if agreement_count < MINIMUM_AGREEING_HORIZONS or weighted_core * direction <= 0.0:
+            raw_score = 0.0
+        else:
+            raw_score = (
+                weighted_core
+                * agreeing_weight**DISAGREEMENT_POWER
+                * volatility_shrink
+            )
+    values = (
+        *horizon_z_scores,
+        *horizon_components,
+        recent_ratio,
+        agreement,
+        volatility_shrink,
+        raw_score,
+    )
+    if any(not math.isfinite(value) for value in values):
+        return None
+    return _PersistenceFeature(
+        horizon_z_scores=(horizon_z_scores[0], horizon_z_scores[1], horizon_z_scores[2]),
+        horizon_components=(
+            horizon_components[0],
+            horizon_components[1],
+            horizon_components[2],
+        ),
+        recent_to_baseline_volatility=float(recent_ratio),
+        horizon_agreement=float(agreement),
+        volatility_shrink=float(volatility_shrink),
+        raw_persistence_score=float(raw_score),
+    )
+
+
+class VolatilityScaledRankPersistenceStrategy:
+    """Trade persistent residual leaders and laggards across three horizons."""
 
     @staticmethod
     def _validate_seed(seed: int) -> None:
@@ -384,7 +375,7 @@ class CompressedShockRecoilStrategy:
         seed: int,
         decision_time: pd.Timestamp | None = None,
     ) -> PreconstructionSnapshot | None:
-        """Build final recoil ranks from exact completed pure-crypto histories."""
+        """Build final persistence ranks from exact completed pure-crypto histories."""
 
         self._validate_seed(seed)
         if decision_time is None:
@@ -410,9 +401,10 @@ class CompressedShockRecoilStrategy:
 
         raw_scores: dict[str, float] = {}
         for symbol in sorted(residuals):
-            feature = _recoil_feature(residuals[symbol])
-            if feature is not None:
-                raw_scores[symbol] = feature.raw_recoil_score
+            feature = _persistence_feature(residuals[symbol])
+            if feature is None:
+                return None
+            raw_scores[symbol] = feature.raw_persistence_score
         final_scores = _signed_magnitude_ranks(raw_scores)
         if final_scores is None:
             return None
@@ -492,8 +484,10 @@ class CompressedShockRecoilStrategy:
         )
         if count <= 0 or len(positive) < count or len(negative) < count:
             return {}
-        long_symbols = tuple(positive[-count:])
         short_symbols = tuple(negative[:count])
+        long_symbols = tuple(positive[-count:])
+        if set(short_symbols) & set(long_symbols):
+            return {}
         side_weight = side_budget / count
         if (
             not math.isfinite(side_weight)
@@ -512,8 +506,8 @@ class CompressedShockRecoilStrategy:
         return targets
 
 
-def build_strategy() -> CompressedShockRecoilStrategy:
-    """Canonical zero-argument factory for the exact first-pivot candidate."""
+def build_strategy() -> VolatilityScaledRankPersistenceStrategy:
+    """Canonical zero-argument factory for the exact second-pivot candidate."""
 
     candidate_id = candidate_variant.ACTIVE_CANDIDATE_ID
     overrides = candidate_variant.ACTIVE_OVERRIDES
@@ -522,4 +516,4 @@ def build_strategy() -> CompressedShockRecoilStrategy:
         raise ValueError(f"unknown materialized candidate identifier: {candidate_id}")
     if type(overrides) is not dict or overrides != expected:
         raise ValueError(f"active overrides do not match the declaration for {candidate_id}")
-    return CompressedShockRecoilStrategy()
+    return VolatilityScaledRankPersistenceStrategy()

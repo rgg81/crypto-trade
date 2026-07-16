@@ -1,4 +1,4 @@
-"""Exact Team 08 first-pivot no-control candidate selected before registration."""
+"""Exact Team 08 second/final-pivot no-control candidate selected before registration."""
 
-ACTIVE_CANDIDATE_ID = "t08-compressed-shock-recoil-v1-base"
+ACTIVE_CANDIDATE_ID = "t08-volatility-scaled-rank-persistence-v1-base"
 ACTIVE_OVERRIDES: dict[str, object] = {}

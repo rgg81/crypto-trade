@@ -33,8 +33,8 @@ def test_risk_plan_requires_complete_no_control_gate_before_controls() -> None:
     assert plan["core_alpha_activation_gate"] == {
         "annualized_return_strictly_positive": True,
         "applies_to": (
-            "t08-compressed-shock-recoil-v1-base with root risk_policy.json in its exact "
-            "no-control state"
+            "t08-volatility-scaled-rank-persistence-v1-base with root risk_policy.json "
+            "in its exact no-control state"
         ),
         "complete_a5_score_coverage": True,
         "combined_chop_attribution_strictly_positive": True,

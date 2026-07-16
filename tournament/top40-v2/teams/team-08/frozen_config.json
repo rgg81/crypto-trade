@@ -6,19 +6,16 @@
     "integration_freeze_sha256": "6f77a146e7b414eabd20c5cc9321a95493bb98116dde07ef79d9eb009b6a6f51",
     "pure_crypto_integration_freeze_sha256": "3e93bdfe031e2589888c3bbcaae583437bbd074fa9d86c6dc0a54187bc0f1e34"
   },
-  "candidate_id": "t08-compressed-shock-recoil-v1-base",
+  "candidate_id": "t08-volatility-scaled-rank-persistence-v1-base",
   "candidate_materialization": {
-    "active_candidate_id": "t08-compressed-shock-recoil-v1-base",
+    "active_candidate_id": "t08-volatility-scaled-rank-persistence-v1-base",
     "active_overrides": {},
     "entrypoint": "strategy.py:build_strategy",
     "variant_path": "candidate_variant.py"
   },
   "data_contract": {
     "bar_interval": "8h",
-    "bar_required_columns": [
-      "open_time",
-      "close"
-    ],
+    "bar_required_columns": ["open_time", "close"],
     "completed_close_rule": "open_time_plus_8h_lte_decision_time",
     "exact_history_rule": "exactly_one_physical_row_then_one_finite_positive_close_at_each_of_127_required_past_open_times",
     "funding": "unused",
@@ -26,48 +23,62 @@
     "minimum_valid_symbols": 24,
     "runtime_artifacts": "none"
   },
-  "family_id": "t08-compressed-shock-recoil-v1",
+  "family_id": "t08-volatility-scaled-rank-persistence-v1",
   "mechanism": {
-    "compression": "sample_standard_deviation_of_21_pre_shock_residual_returns_divided_by_sample_standard_deviation_of_prior_84_residual_returns_clipped_between_0.45_and_1.00",
-    "durability": "require_at_least_two_of_three_shock_bars_to_agree_with_cumulative_direction_then_bound_strength_by_the_median_aligned_component_and_penalize_path_roughness",
-    "final_score": "signed_within_recoil_direction_magnitude_rank_with_inactive_valid_names_fixed_at_zero",
+    "horizon_continuation": "residual_return_sums_over_21_63_126_bars_scaled_by_prior_105_bar_residual_volatility_and_sqrt_horizon_then_tanh_saturated",
+    "horizon_consensus": "median_component_sets_direction_at_least_two_of_three_horizons_must_agree_and_agreeing_weight_squared_shrinks_disagreement",
     "market_residual": "each_completed_8h_log_return_minus_same_bar_cross_sectional_median",
-    "recoil": "opposite_sign_of_latest_three_bar_idiosyncratic_shock",
-    "shock_scale": "three_bar_residual_sum_divided_by_prior_84_bar_residual_volatility_times_sqrt_three"
+    "recent_volatility_shrink": "minimum_one_or_prior_105_bar_volatility_divided_by_recent_21_bar_volatility_no_low_volatility_boost",
+    "final_score": "deterministic_within_sign_magnitude_rank_with_inactive_raw_zero_names_fixed_at_exact_zero"
   },
   "parameters": {
     "bar_interval_hours": 8,
-    "baseline_volatility_bars": 84,
-    "compression_ratio_ceiling": 1.0,
-    "compression_ratio_floor": 0.45,
-    "compression_volatility_bars": 21,
+    "baseline_volatility_bars": 105,
+    "disagreement_power": 2.0,
     "gross_target": 0.36,
     "history_return_bars": 126,
+    "horizon_saturation_z": 3.0,
     "maximum_symbol_exposure": 0.025,
-    "minimum_direction_agreement": "2/3",
+    "medium_horizon_bars": 63,
+    "medium_horizon_weight": 0.3,
+    "minimum_agreeing_horizons": 2,
     "minimum_positions_per_side": 8,
     "minimum_valid_symbols": 24,
     "rebalance_interval_bars": 21,
+    "recent_volatility_bars": 21,
     "selected_fraction_per_side": "1/5",
-    "shock_bars": 3,
-    "shock_saturation_z": 2.5
+    "short_horizon_bars": 21,
+    "short_horizon_weight": 0.5,
+    "slow_horizon_bars": 126,
+    "slow_horizon_weight": 0.2
   },
   "parent_negative_evidence": {
-    "candidate_id": "vdr-core-candidate-001",
-    "family_id": "volatility-dispersion-release-v1",
-    "net_sharpe": -2.2537,
-    "no_cost_same_direction_sharpe": -0.8355,
-    "approximate_inverse_same_cost_sharpe": -0.5756,
-    "bear_bull_chop_sharpes": "all_negative",
-    "terminal_reason": "failed_no_control_core; controls_neighbors_ablations_and_blind_sign_inversion_cannot_rescue",
-    "turnover_sum": 1012
+    "candidate_id": "t08-compressed-shock-recoil-v1-base",
+    "double_cost_sharpe": -1.34838,
+    "family_id": "t08-compressed-shock-recoil-v1",
+    "net_sharpe": -1.16083,
+    "regime_sharpes": "all_negative",
+    "terminal_reason": "failed_no_control_core; controls_neighbors_and_ablations_not_activated",
+    "trade_count": 2952
+  },
+  "prohibited_diagnostic": {
+    "approximate_continuation_annualized_return": 0.05915,
+    "approximate_continuation_calmar": 0.927,
+    "approximate_continuation_maximum_drawdown": 0.0638,
+    "approximate_continuation_net_sharpe": 0.78615,
+    "positive_fold_count": 4,
+    "positive_fold_pnl_concentration": 0.4357,
+    "positive_quarter_fraction": 0.5714,
+    "regime_returns": "all_positive",
+    "trial_adjusted_probability_positive": 0.7289,
+    "use_prohibited": "literal sign flip is not a candidate and cannot satisfy concentration or trial-adjustment gates"
   },
   "portfolio_construction": {
     "gross_target": 0.36,
-    "long_selection": "highest_strictly_positive_returned_final_recoil_scores",
+    "long_selection": "highest_returned_final_persistence_scores",
     "net_target": 0.0,
     "schedule": "every_twenty_one_exact_8h_bars_from_unix_epoch;hold_between",
-    "short_selection": "lowest_strictly_negative_returned_final_recoil_scores",
+    "short_selection": "lowest_returned_final_persistence_scores",
     "side_count": "max_8_floor_n_over_5_or_count_required_by_0.025_cap",
     "sizing": "equal_dollar_within_each_side_subject_to_0.025_symbol_cap"
   },
@@ -86,20 +97,17 @@
     "shared_hook_import": "crypto_trade.tournament.score_adapter_protocol_v5.score_boundary"
   },
   "pure_crypto_authority": {
-    "audited_entrypoint": "scripts/top40_v2_tournament_pure_crypto_v6.py",
-    "audited_entrypoint_sha256": "a9197dc2f83d4415f1aa4c098546e21e010cb99e754580de96c3e339cc927641",
     "amendment_id": "top40-v2-amendment-0006-pure-crypto-universe",
     "canonical_report_sha256": "b9c55b40fef331861af068272159f45860870182a58c93652eff2a819b3d5d1b",
-    "integration_freeze": "tournament/top40-v2/amendments/0006/integration-freeze.json",
     "integration_freeze_sha256": "3e93bdfe031e2589888c3bbcaae583437bbd074fa9d86c6dc0a54187bc0f1e34",
     "status": "active-upstream-authority-enforced-by-a7"
   },
-  "registration_blocker": "first-pivot family registration, canonical A5 controls, independent semantic review, and exact source hashes remain organizer work",
+  "registration_blocker": "second/final-pivot family registration, canonical A5 controls, independent semantic review, and exact source hashes remain organizer work",
   "risk_policy_path": "risk_policy.json",
   "risk_policy_status": "exact disabled no-control policy retained; controls cannot rescue this pivot",
   "schema_version": 2,
   "seed": 20260801,
-  "status": "implemented_unregistered_unevaluated_first_mechanism_pivot",
+  "status": "implemented_unregistered_unevaluated_second_final_mechanism_pivot",
   "strategy_entrypoint": "strategy.py:build_strategy",
   "team_id": "team-08"
 }

@@ -1,75 +1,53 @@
 {
-  "candidate_id": "t08-compressed-shock-recoil-v1-base",
+  "candidate_id": "t08-volatility-scaled-rank-persistence-v1-base",
   "features": [
     {
-      "availability": "Every constituent close is from an exact completed 8-hour bar at or before decision_time.",
-      "formula": "log(close_t / close_(t-1)) minus the same-bar cross-sectional median log return",
+      "availability": "Every constituent close comes from an exact completed 8-hour bar at or before decision_time.",
+      "formula": "log(close_t / close_(t-1)) minus same-bar cross-sectional median log return",
       "id": "per_bar_pure_crypto_residual_return",
       "lag": "zero additional lag after each source bar closes",
-      "missing_rule": "Omit a symbol with any missing exact close; flatten if fewer than 24 valid symbols remain.",
-      "uses_current_shock_bar": true
+      "missing_rule": "Omit an invalid symbol; flatten if fewer than 24 valid symbols remain."
     },
     {
-      "availability": "Both windows end strictly before the three shock bars.",
-      "formula": "sample_std(21 residual returns immediately before shock) / sample_std(prior 84 residual returns)",
-      "id": "pre_shock_compression_ratio",
-      "lag": "latest three residual returns excluded from both volatility windows",
-      "missing_rule": "Zero signal strength at or above ratio 1.00; full strength at or below 0.45; omit an invalid baseline scale.",
-      "uses_current_shock_bar": false
+      "availability": "Uses the oldest 105 of 126 completed residual returns.",
+      "formula": "sample standard deviation of the first 105 residual returns",
+      "id": "past_residual_volatility_baseline",
+      "lag": "excludes the latest 21 completed returns",
+      "missing_rule": "Flatten on a non-finite or effectively zero baseline."
     },
     {
-      "availability": "All three shock returns are closed by decision_time; their scale ends before the shock.",
-      "formula": "sum(last 3 residual returns) / (prior 84-bar residual volatility * sqrt(3))",
-      "id": "signed_three_bar_idiosyncratic_shock_z",
-      "lag": "prior scale plus latest three completed bars",
-      "missing_rule": "Zero recoil signal for a zero cumulative shock.",
-      "uses_current_shock_bar": true
+      "availability": "All horizon endpoints are closed by decision_time.",
+      "formula": "sum of latest h residual returns divided by baseline volatility times sqrt(h), then tanh(z/3), for h in 21,63,126",
+      "id": "volatility_scaled_multi_horizon_continuation",
+      "lag": "latest completed 21, 63, and 126 bars",
+      "missing_rule": "Flatten on any non-finite component."
     },
     {
-      "availability": "Uses only the same three completed shock returns.",
-      "formula": "require at least 2/3 bars to share cumulative sign; bound magnitude by median aligned component; divide by sum(abs(shock))/abs(sum(shock))",
-      "id": "multi_bar_shock_durability",
+      "availability": "Built after all three horizon components are frozen.",
+      "formula": "median sets direction; require two agreeing horizons; weighted 0.50/0.30/0.20 core times agreeing-weight squared",
+      "id": "horizon_consensus_and_disagreement_shrink",
       "lag": "same completed decision boundary",
-      "missing_rule": "Set recoil signal to zero when sign agreement, aligned median, or roughness validity fails.",
-      "uses_current_shock_bar": true
+      "missing_rule": "Set raw signal to zero if fewer than two horizons agree or weighted core conflicts with consensus."
     },
     {
-      "availability": "All upstream compression and shock inputs satisfy their causal rules.",
-      "formula": "negative shock direction * compression strength * tanh(durable shock z / 2.5) * agreement^2 / path roughness",
-      "id": "compressed_shock_recoil_raw_score",
-      "lag": "same completed decision boundary",
-      "missing_rule": "Inactive but otherwise valid symbols remain exactly zero.",
-      "uses_current_shock_bar": true
+      "availability": "Recent and baseline volatility windows are both complete.",
+      "formula": "multiply by min(1, baseline 105-bar volatility / recent 21-bar volatility)",
+      "id": "excess_recent_volatility_shrink",
+      "lag": "latest 21 bars versus preceding 105 bars",
+      "missing_rule": "Never boost a low-volatility signal; flatten on invalid scale."
     },
     {
-      "availability": "Built only after raw recoil scores are frozen.",
-      "formula": "deterministic within-sign magnitude ranks; inactive names remain zero",
-      "id": "final_a5_recoil_score",
+      "availability": "Built only after residualization, all horizon transforms, agreement, and volatility shrinkage.",
+      "formula": "deterministic magnitude rank within persistence sign with inactive raw-zero names fixed at exact zero",
+      "id": "final_a5_persistence_score",
       "lag": "same completed decision boundary",
-      "missing_rule": "Capture one empty built-in dictionary on a scheduled construction failure.",
-      "uses_current_shock_bar": true
+      "missing_rule": "Capture one empty built-in dictionary on a scheduled construction failure."
     }
   ],
   "learned_preprocessing": false,
   "raw_fields": [
-    {
-      "availability_timestamp": "open_time + 8 hours",
-      "coverage": "Only Amendment 0006 certified point-in-time pure-crypto eligible symbols.",
-      "event_timestamp": "open_time + 8 hours",
-      "field": "close",
-      "lag": "bar must be fully closed at decision_time",
-      "missing_rule": "Require exactly one finite positive close at each of 127 exact opens; never forward fill.",
-      "source": "organizer past-only DecisionContext.bars"
-    },
-    {
-      "availability_timestamp": "decision_time",
-      "coverage": "Pure-crypto point-in-time membership intersected with organizer executability.",
-      "event_timestamp": "decision_time",
-      "field": "eligible_symbols",
-      "lag": "current organizer decision boundary",
-      "missing_rule": "Reject duplicates; require at least 24 valid symbols.",
-      "source": "organizer DecisionContext under active Amendment 0006"
-    }
+    {"availability_timestamp": "open_time + 8 hours", "coverage": "Amendment 0006 pure-crypto eligible symbols", "event_timestamp": "open_time + 8 hours", "field": "close", "lag": "bar fully closed at decision_time", "missing_rule": "Exactly one finite positive close at each of 127 exact opens; no fill.", "source": "organizer past-only DecisionContext.bars"},
+    {"availability_timestamp": "decision_time", "coverage": "Pure-crypto point-in-time membership intersected with executability", "event_timestamp": "decision_time", "field": "eligible_symbols", "lag": "current organizer boundary", "missing_rule": "Reject duplicates and require at least 24 valid symbols.", "source": "organizer DecisionContext under Amendment 0006"}
   ],
   "schema_version": 1,
   "team_id": "team-08",

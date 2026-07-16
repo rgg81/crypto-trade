@@ -1,8 +1,8 @@
 {
-  "candidate_id": "t08-compressed-shock-recoil-v1-base",
+  "candidate_id": "t08-volatility-scaled-rank-persistence-v1-base",
   "core_alpha_activation_gate": {
     "annualized_return_strictly_positive": true,
-    "applies_to": "t08-compressed-shock-recoil-v1-base with root risk_policy.json in its exact no-control state",
+    "applies_to": "t08-volatility-scaled-rank-persistence-v1-base with root risk_policy.json in its exact no-control state",
     "complete_a5_score_coverage": true,
     "combined_chop_attribution_strictly_positive": true,
     "doubled_cost_net_return_strictly_positive": true,
@@ -168,7 +168,7 @@
     },
     {
       "ablation_id": "risk-position-stop-only",
-      "declared_failure_mode": "Exit failed releases whose carried position has lost 7.5% at a known close boundary.",
+      "declared_failure_mode": "Exit failed persistence positions whose carried loss reaches 7.5% at a known close boundary.",
       "template_path": "risk_policies/position-stop-only.json",
       "policy": {
         "drawdown_brakes": [],
@@ -204,7 +204,7 @@
     },
     {
       "ablation_id": "risk-time-stop-only",
-      "declared_failure_mode": "Remove stale holdings after six days when the expected release has not resolved through ordinary rebalancing.",
+      "declared_failure_mode": "Remove stale holdings after six days when expected persistence has not resolved through ordinary rebalancing.",
       "template_path": "risk_policies/time-stop-only.json",
       "policy": {
         "drawdown_brakes": [],
@@ -240,7 +240,7 @@
     },
     {
       "ablation_id": "risk-turnover-only",
-      "declared_failure_mode": "Bound next-open churn and participation demand from weekly cross-sectional recoil-rank changes.",
+      "declared_failure_mode": "Bound next-open churn and participation demand from weekly persistence-rank changes.",
       "template_path": "risk_policies/turnover-only.json",
       "policy": {
         "drawdown_brakes": [],
@@ -276,7 +276,7 @@
     },
     {
       "ablation_id": "risk-combined",
-      "declared_failure_mode": "Jointly address volatility, cumulative loss, failed/stale releases, and excessive turnover; reject if interaction costs outweigh those controls.",
+      "declared_failure_mode": "Jointly address volatility, cumulative loss, failed or stale persistence, and turnover; reject if interaction costs outweigh controls.",
       "template_path": "risk_policies/combined.json",
       "policy": {
         "drawdown_brakes": [

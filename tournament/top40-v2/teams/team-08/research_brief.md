@@ -2,11 +2,10 @@
 
 Status: **retired after terminal negative no-control IS; historical context only**
 
-The active prospective research brief is
-[`pivot-01/README.md`](pivot-01/README.md), bound by `active-pivot.json` and `frozen_config.json` to
-`t08-compressed-shock-recoil-v1-base`. Its schedule and A5 open-to-open horizon are both 168 hours.
-Every description below concerns the retired `vdr-core-candidate-001` 24-hour mechanism and has no
-current registration, execution, control, or submission authority.
+The active prospective brief is `HANDOFF.md`, bound by `active-pivot.json` and
+`frozen_config.json` to `t08-volatility-scaled-rank-persistence-v1-base`. `pivot-01/` and every
+description below are historical. They have no current registration, execution, control, or
+submission authority.
 
 ## Retired family and mechanism
 

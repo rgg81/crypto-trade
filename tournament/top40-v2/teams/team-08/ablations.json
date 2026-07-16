@@ -1,19 +1,15 @@
 {
-  "candidate_id": "t08-compressed-shock-recoil-v1-base",
-  "activation_rule": "The no-control pivot core runs first. Ablations are falsification evidence only after a complete core pass; controls, neighbors, and ablations cannot rescue any failed core gate.",
-  "cost_protocol": {
-    "base": "common 5 bp fee plus 2.5 bp slippage per side",
-    "doubled": "organizer-owned independent rerun with all ordinary costs multiplied by 2",
-    "require_both_for_every_material_variant": true
-  },
+  "candidate_id": "t08-volatility-scaled-rank-persistence-v1-base",
+  "activation_rule": "The no-control core runs first. Ablations are falsifiers only after a complete core pass; controls, neighbors, and ablations cannot rescue a failed core gate.",
+  "cost_protocol": {"base": "common 5 bp fee plus 2.5 bp slippage per side", "doubled": "organizer-owned rerun with ordinary costs multiplied by 2", "require_both_for_every_material_variant": true},
   "declaration_status": "prospective-unregistered-unevaluated",
   "mechanism_ablations": [
-    {"ablation_id": "csr-no-compression", "change": "Set compression strength to one.", "falsification_role": "Tests whether the pre-shock low-volatility setup adds information beyond generic reversal."},
-    {"ablation_id": "csr-single-bar-shock", "change": "Use only the newest residual shock bar.", "falsification_role": "Tests whether a causal multi-bar displacement is materially different from the retired one-bar release."},
-    {"ablation_id": "csr-no-direction-agreement", "change": "Remove the two-of-three sign requirement and agreement-squared shrinkage.", "falsification_role": "Tests whether shock persistence filters transient noise."},
-    {"ablation_id": "csr-no-roughness", "change": "Set path roughness to one and remove the median-component bound.", "falsification_role": "Tests whether durable path shape contributes beyond cumulative magnitude."},
-    {"ablation_id": "csr-no-market-residual", "change": "Use raw coin returns instead of subtracting each same-bar pure-crypto median.", "falsification_role": "Tests whether the candidate is merely common-market reversal."},
-    {"ablation_id": "csr-continuation-sign", "change": "Trade with rather than opposite the three-bar shock while retaining every new feature.", "falsification_role": "Directly distinguishes the recoil thesis without blindly negating the retired family's score."}
+    {"ablation_id": "vsrp-no-market-residual", "change": "Use raw returns rather than same-bar median residuals.", "falsification_role": "Tests whether the spread is merely common crypto direction."},
+    {"ablation_id": "vsrp-short-only", "change": "Use only the 21-bar continuation component.", "falsification_role": "Tests whether multi-horizon persistence adds beyond a short trend."},
+    {"ablation_id": "vsrp-medium-only", "change": "Use only the 63-bar continuation component.", "falsification_role": "Tests whether the declared horizon consensus is necessary."},
+    {"ablation_id": "vsrp-no-disagreement-shrink", "change": "Retain two-of-three sign requirement but remove agreeing-weight shrinkage.", "falsification_role": "Tests whether disagreement magnitude carries information."},
+    {"ablation_id": "vsrp-no-recent-volatility-shrink", "change": "Set recent-volatility shrink to one.", "falsification_role": "Tests whether excessive recent volatility degrades persistence."},
+    {"ablation_id": "vsrp-equal-horizon-weights", "change": "Set all three horizon weights to one third.", "falsification_role": "Tests whether recency emphasis is material rather than generic averaging."}
   ],
   "required_report_fields": ["net_return", "net_sharpe", "max_drawdown", "turnover", "positive_fold_count", "positive_quarter_fraction", "bull_net_return", "bear_net_return", "chop_net_return", "long_bull_net_return", "short_bear_net_return", "combined_chop_net_return", "long_mean_gross_exposure", "short_mean_gross_exposure", "pooled_score_ic", "positive_fold_score_ic_count"],
   "risk_ablation_plan": "risk_ablations.json",

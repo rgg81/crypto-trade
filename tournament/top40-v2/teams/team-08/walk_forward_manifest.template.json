@@ -1,5 +1,5 @@
 {
-  "candidate_id": "t08-compressed-shock-recoil-v1-base",
+  "candidate_id": "t08-volatility-scaled-rank-persistence-v1-base",
   "evidence_class": "declared-retrained-out-of-fold",
   "folds": [
     {
