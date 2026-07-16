@@ -52,7 +52,7 @@
   "critic_lock": null,
   "final_oos_lock": null,
   "finalist_cohort_lock": null,
-  "legacy_projection_sha256": "154944493a5d36efbddd5615a48d55622b43335a9b8ccaa32a71a0db97fb041e",
+  "legacy_projection_sha256": "57a454e4ed85b135062e45077b72298c197e88ab2ed0cc0820277ce90b4f64c3",
   "legacy_state_sha256": "8c858495fde6ddde203124a055e40ebad5d8d5a684cd20f0e55f6c88f7360b07",
   "objective_lock": null,
   "organizer_audit": {
@@ -195,11 +195,11 @@
       "trial_count": 3
     },
     "team-08": {
-      "active_family_id": null,
+      "active_family_id": "volatility-dispersion-release-v1",
       "canonical_result": null,
       "development_assessment": null,
       "dnf": null,
-      "family_count": 0,
+      "family_count": 1,
       "finalist_freeze": null,
       "pivot_count": 0,
       "private_attempts": 0,
