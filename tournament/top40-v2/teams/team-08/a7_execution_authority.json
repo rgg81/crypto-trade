@@ -1,0 +1,32 @@
+{
+  "activation_journal": {
+    "head_sha256": "15e4d3453ee1fdaae0a4f1439f8a5bf57c4cf16c99fa73ff9992c29fa64aa09f",
+    "path": "tournament/top40-v2/organizer_research_journal.jsonl",
+    "record_count": 27
+  },
+  "active_entrypoint": {
+    "path": "scripts/top40_v2_tournament_runtime_preload_v7.py",
+    "sha256": "8a4ada10176d2606df3f358fc188e21b45153ad9a7270f36908736f03322a3a9"
+  },
+  "amendment_id": "top40-v2-amendment-0007-frozen-worker-a5-protocol-preload",
+  "binding_kind": "top40-v2-a7-execution-authority-v1",
+  "candidate_id": "vdr-core-candidate-001",
+  "delegated_amendment_0005_integration": {
+    "commit": "d2b95f610722aab65b4e67466b34efeaa3554101",
+    "path": "tournament/top40-v2/amendments/0005/integration-freeze.json",
+    "sha256": "b3b2b96245a479ccfff95b5cd5b5cd0aef3b2d0aac0fc9faf5367d3e6772958c"
+  },
+  "family_id": "volatility-dispersion-release-v1",
+  "integration_freeze": {
+    "commit": "c8b917ca49306d5200a4e08848e73ff6f5a18bf3",
+    "path": "tournament/top40-v2/amendments/0007/integration-freeze.json",
+    "sha256": "6f77a146e7b414eabd20c5cc9321a95493bb98116dde07ef79d9eb009b6a6f51"
+  },
+  "pure_crypto_report": {
+    "policy_sha256": "2c7fb0ff593d06c323517e60df4b28ab9387a2df580b83f82f65ef71c91fc350",
+    "report_sha256": "b9c55b40fef331861af068272159f45860870182a58c93652eff2a819b3d5d1b",
+    "violations": 0
+  },
+  "schema_version": 1,
+  "team_id": "team-08"
+}
