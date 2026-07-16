@@ -52,7 +52,7 @@
   "critic_lock": null,
   "final_oos_lock": null,
   "finalist_cohort_lock": null,
-  "legacy_projection_sha256": "603c982bdb86764881a7e9fff26577eaeef4c43442af2098b5294b6bbd415673",
+  "legacy_projection_sha256": "aa59a1caf19029ba635da08f3adcf8eb6343aaec65b07b66a8b953b577281ff0",
   "legacy_state_sha256": "8c858495fde6ddde203124a055e40ebad5d8d5a684cd20f0e55f6c88f7360b07",
   "objective_lock": null,
   "organizer_audit": {
@@ -195,13 +195,13 @@
       "trial_count": 3
     },
     "team-08": {
-      "active_family_id": "volatility-dispersion-release-v1",
+      "active_family_id": "t08-compressed-shock-recoil-v1",
       "canonical_result": null,
       "development_assessment": null,
       "dnf": null,
-      "family_count": 1,
+      "family_count": 2,
       "finalist_freeze": null,
-      "pivot_count": 0,
+      "pivot_count": 1,
       "private_attempts": 0,
       "private_result": null,
       "qualifier_candidate": null,
