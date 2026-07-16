@@ -52,7 +52,7 @@
   "critic_lock": null,
   "final_oos_lock": null,
   "finalist_cohort_lock": null,
-  "legacy_projection_sha256": "2c136a437a13956c515818ffc5f81752c0b1bf07b06c38860965c356879ea5cd",
+  "legacy_projection_sha256": "4440d5d8aa6eca140d23ce0431dd75c2eec6c7324948d492c831072a5fc4b8c8",
   "legacy_state_sha256": "8c858495fde6ddde203124a055e40ebad5d8d5a684cd20f0e55f6c88f7360b07",
   "objective_lock": null,
   "organizer_audit": {
@@ -110,11 +110,11 @@
       "trial_count": 4
     },
     "team-03": {
-      "active_family_id": null,
+      "active_family_id": "t03-residual-liquidity-shock-absorption-v1",
       "canonical_result": null,
       "development_assessment": null,
       "dnf": null,
-      "family_count": 0,
+      "family_count": 1,
       "finalist_freeze": null,
       "pivot_count": 0,
       "private_attempts": 0,
