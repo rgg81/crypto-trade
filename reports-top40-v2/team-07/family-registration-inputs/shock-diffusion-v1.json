@@ -1,0 +1,65 @@
+{
+  "economic_thesis": "Liquid native-crypto perpetuals incorporate common shocks first; heterogeneous delayed response in the remaining point-in-time Top-40 creates a cost-aware next-interval long/short diffusion spread, while idiosyncratic overshoot and funding crowding support chop.",
+  "expected_regime_roles": {
+    "bear": "Negative slow trend increases short gross and negative leader shocks identify delayed downside followers.",
+    "bull": "Positive slow trend increases long gross and positive leader shocks identify delayed upside followers.",
+    "chop": "Balanced sleeves use residual overshoot reversion and funding crowding after two-way shocks.",
+    "long_sleeve": "Owns the strongest positive diffusion gaps and under-reactions; expected to contribute in bull.",
+    "short_sleeve": "Owns the weakest diffusion gaps and over-reactions; expected to contribute in bear.",
+    "stress": "Winsorized shocks and organizer risk controls reduce tail gross; stress must remain within drawdown and worst-regime gates."
+  },
+  "falsifier": "Reject if stitched OOF development misses any frozen gate, propagation ablation is not worse, required regime/role signs fail, or the declared neighborhood is unstable.",
+  "family_id": "shock-diffusion-v1",
+  "mechanism": "Dynamic liquid-leader basket; rolling contemporaneous-beta residualization; nonnegative one-bar lag response to the latest closed leader shock; small idiosyncratic reversal and past-funding carry; two-sided cross-sectional ranks with bounded slow-trend side tilt.",
+  "parameter_ranges": {
+    "diffusion_multiplier": [
+      0.0,
+      0.75,
+      1.0,
+      1.25
+    ],
+    "funding_carry_multiplier": [
+      0.0,
+      3.0,
+      6.0,
+      9.0
+    ],
+    "idiosyncratic_reversion": [
+      0.0,
+      0.08,
+      0.12,
+      0.16
+    ],
+    "leader_fraction": [
+      0.15,
+      0.2,
+      0.25,
+      0.5
+    ],
+    "lookback_bars": [
+      162,
+      189,
+      216
+    ],
+    "maximum_directional_net": [
+      0.0,
+      0.12,
+      0.16,
+      0.2
+    ],
+    "minimum_observations": [
+      108,
+      126
+    ],
+    "rebalance_every_bars": [
+      1,
+      3
+    ]
+  },
+  "parent_family_id": null,
+  "registered_at_utc": "2026-07-16T18:30:59Z",
+  "risk_policy_plan": "Run the center once with top-level no-control risk_policy.json before every other material configuration. Volatility-only, drawdown-only, position-stop-only, turnover-only, and combined policies remain dormant unless the no-control core has positive base- and doubled-cost return/Sharpe, at least four positive folds, positive bull/bear/chop returns, positive long-bull/short-bear/combined-chop attribution, and active sleeves. Controls cannot rescue failure. Before any later policy commit, registration, and run, copy its immutable risk_policies template byte-for-byte to root risk_policy.json because the frozen lifecycle reads only that path.",
+  "schema_version": 1,
+  "selection_metric": "All non-compensatory development gates, then highest stitched OOF net Sharpe among stable candidates; no failed candidate advances.",
+  "team_id": "team-07"
+}
