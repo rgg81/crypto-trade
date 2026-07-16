@@ -1,7 +1,7 @@
 {
   "artifact": "frozen_reference_config",
-  "candidate_id": "rctc-pivot-ref-001",
-  "candidate_status": "deterministic_pivot_reference_not_yet_registered_or_evaluated",
+  "candidate_id": "rdf-core-h14-k3-g05",
+  "candidate_status": "deterministic_core_candidate_not_yet_registered_or_evaluated",
   "dependencies": {
     "numpy": "2.2.6",
     "pandas": "3.0.0",
@@ -15,7 +15,7 @@
     "rebalance_boundary_utc": "00:00",
     "target_execution": "organizer_owned_next_executable_open"
   },
-  "family_id": "t01-regime-conditional-trend-carry-v2",
+  "family_id": "t01-residual-drift-funding-v1",
   "implementation": {
     "build_factory": "build_strategy",
     "entrypoint": "strategy.py",
@@ -30,7 +30,7 @@
       3.0
     ],
     "inverse_volatility_quantile_method": "linear",
-    "signal_standard_deviation": "sample_ddof_1 on BTC residual returns in bull/chop and raw asset returns in bear"
+    "residual_standard_deviation": "sample_ddof_1"
   },
   "parameters": {
     "beta_clip": [
@@ -38,11 +38,8 @@
       3.0
     ],
     "beta_lookback_days": 30,
-    "bear_threshold_log_return": -0.1,
     "btc_symbol": "BTCUSDT",
     "btc_variance_floor": 1e-12,
-    "bull_threshold_log_return": 0.1,
-    "direction_lag_days": 1,
     "direction_lookback_days": 60,
     "direction_return_scale": 0.2,
     "direction_tilt_delta": 0.075,
@@ -55,16 +52,10 @@
     "path_efficiency_exponent": 0.5,
     "per_symbol_target_cap": 0.09,
     "rank_tail_fraction": 0.25,
-    "signal_denominator_floor": 1e-08,
-    "signal_lookback_days": 14,
+    "residual_denominator_floor": 1e-08,
+    "residual_lookback_days": 14,
     "skip_days": 3,
     "total_gross": 0.8
-  },
-  "regime_signal_map": {
-    "bear": "path-efficient standardized raw asset log-return trend",
-    "bull": "path-efficient standardized BTC-residual continuation",
-    "chop": "path-efficient standardized BTC-residual continuation",
-    "state_observation": "BTC trailing 60-day log return ending one calendar day before decision_time"
   },
   "risk_policy": {
     "cost_multiplier": 1.0,

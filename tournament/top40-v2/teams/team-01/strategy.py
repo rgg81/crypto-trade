@@ -1,4 +1,4 @@
-"""Causal implementation of team-01's regime-conditional trend/carry pivot.
+"""Causal implementation of team-01's residual-drift/funding family.
 
 The strategy is intentionally stateless.  Every transform is rebuilt from the past-only
 ``DecisionContext`` supplied at a boundary.  Execution, positions, costs, funding cashflows,
@@ -21,11 +21,18 @@ _CANONICAL_RUNTIME_SEED = 20260801
 _EPSILON = 1.0e-12
 
 
+def _is_grid_value(value: float, lower: float, upper: float, step: float) -> bool:
+    if not math.isfinite(float(value)) or value < lower - _EPSILON or value > upper + _EPSILON:
+        return False
+    units = (value - lower) / step
+    return abs(units - round(units)) <= 1.0e-9
+
+
 @dataclasses.dataclass(frozen=True)
 class StrategyParameters:
-    """One preregistered material cell from the team-01 pivot family."""
+    """One preregistered material cell from the team-01 family."""
 
-    signal_lookback_days: int
+    residual_lookback_days: int
     skip_days: int
     path_efficiency_exponent: float
     rank_tail_fraction: float
@@ -36,34 +43,31 @@ class StrategyParameters:
     minimum_funding_events: int = 14
     funding_penalty: float = 0.35
     direction_lookback_days: int = 60
-    direction_lag_days: int = 1
     direction_return_scale: float = 0.20
-    bull_threshold_log_return: float = 0.10
-    bear_threshold_log_return: float = -0.10
     total_gross: float = 0.80
     per_symbol_cap: float = 0.09
     minimum_valid_symbols: int = 24
     minimum_names_per_side: int = 6
 
     def __post_init__(self) -> None:
-        if self.signal_lookback_days not in {7, 14, 21}:
-            raise ValueError("signal lookback is outside the registered pivot neighborhood")
-        if self.rank_tail_fraction not in {0.20, 0.25, 0.30}:
+        if self.residual_lookback_days not in {7, 14, 21, 28, 35}:
+            raise ValueError("residual lookback is outside the registered domain")
+        if self.skip_days not in {1, 3}:
+            raise ValueError("skip is outside the registered domain")
+        if self.path_efficiency_exponent not in {0.5, 1.0}:
+            raise ValueError("path exponent is outside the registered domain")
+        if not _is_grid_value(self.rank_tail_fraction, 0.15, 0.35, 0.05):
             raise ValueError("tail fraction is outside the registered domain")
+        if self.direction_tilt_delta not in {0.05, 0.075, 0.10}:
+            raise ValueError("direction tilt is outside the registered domain")
         fixed_values = {
-            "skip_days": (self.skip_days, 3),
-            "path_efficiency_exponent": (self.path_efficiency_exponent, 0.5),
-            "direction_tilt_delta": (self.direction_tilt_delta, 0.075),
             "beta_lookback_days": (self.beta_lookback_days, 30),
             "minimum_paired_returns": (self.minimum_paired_returns, 72),
             "funding_lookback_days": (self.funding_lookback_days, 7),
             "minimum_funding_events": (self.minimum_funding_events, 14),
             "funding_penalty": (self.funding_penalty, 0.35),
             "direction_lookback_days": (self.direction_lookback_days, 60),
-            "direction_lag_days": (self.direction_lag_days, 1),
             "direction_return_scale": (self.direction_return_scale, 0.20),
-            "bull_threshold_log_return": (self.bull_threshold_log_return, 0.10),
-            "bear_threshold_log_return": (self.bear_threshold_log_return, -0.10),
             "total_gross": (self.total_gross, 0.80),
             "per_symbol_cap": (self.per_symbol_cap, 0.09),
             "minimum_valid_symbols": (self.minimum_valid_symbols, 24),
@@ -74,17 +78,13 @@ class StrategyParameters:
                 raise ValueError(f"{name} differs from the preregistered fixed value")
 
 
-PIVOT_REFERENCE_PARAMETERS = StrategyParameters(
-    signal_lookback_days=14,
+REFERENCE_PARAMETERS = StrategyParameters(
+    residual_lookback_days=14,
     skip_days=3,
     path_efficiency_exponent=0.5,
     rank_tail_fraction=0.25,
     direction_tilt_delta=0.075,
 )
-
-# Kept as a narrow compatibility alias for local contract consumers.  It points to the
-# pivot reference, never to the stopped residual-drift/funding candidate.
-REFERENCE_PARAMETERS = PIVOT_REFERENCE_PARAMETERS
 
 
 @dataclasses.dataclass(frozen=True)
@@ -92,18 +92,11 @@ class _SymbolSignal:
     symbol: str
     drift: float
     funding: float
-    signal_volatility: float
+    residual_volatility: float
 
 
-@dataclasses.dataclass(frozen=True)
-class _RegimeDirection:
-    state: str
-    scaled_direction: float
-    log_return: float
-
-
-class RegimeConditionalTrendCarryStrategy:
-    """Residual continuation in bull/chop and raw downside trend in bear."""
+class ResidualDriftFundingStrategy:
+    """BTC-residual, path-efficient, medium-horizon continuation strategy."""
 
     def __init__(self, parameters: StrategyParameters) -> None:
         self._parameters = parameters
@@ -140,18 +133,6 @@ class RegimeConditionalTrendCarryStrategy:
         btc_closes, btc_returns = btc_history
 
         parameters = self._parameters
-        regime = _btc_regime_direction(
-            btc_closes,
-            decision_time=decision_time,
-            lookback_days=parameters.direction_lookback_days,
-            lag_days=parameters.direction_lag_days,
-            scale=parameters.direction_return_scale,
-            bull_threshold=parameters.bull_threshold_log_return,
-            bear_threshold=parameters.bear_threshold_log_return,
-        )
-        if regime is None:
-            return {}
-
         funding_pressures = _funding_pressures(
             funding,
             eligible=eligible,
@@ -179,7 +160,6 @@ class RegimeConditionalTrendCarryStrategy:
                 btc_returns=btc_returns,
                 funding_pressure=funding_pressure,
                 decision_time=decision_time,
-                regime=regime.state,
             )
             if signal is not None:
                 signals.append(signal)
@@ -201,7 +181,7 @@ class RegimeConditionalTrendCarryStrategy:
             return {}
         scored: list[tuple[str, float, float]] = []
         for signal, score in zip(signals, combined_scores, strict=True):
-            scored.append((signal.symbol, float(score), signal.signal_volatility))
+            scored.append((signal.symbol, float(score), signal.residual_volatility))
 
         selected_tails = _select_signed_tails(
             scored,
@@ -212,14 +192,14 @@ class RegimeConditionalTrendCarryStrategy:
             return {}
         short_tail, long_tail = selected_tails
 
-        long_gross = (
-            parameters.total_gross / 2.0
-            + parameters.direction_tilt_delta * regime.scaled_direction
+        direction = _btc_direction(
+            btc_closes,
+            decision_time=decision_time,
+            lookback_days=parameters.direction_lookback_days,
+            scale=parameters.direction_return_scale,
         )
-        short_gross = (
-            parameters.total_gross / 2.0
-            - parameters.direction_tilt_delta * regime.scaled_direction
-        )
+        long_gross = parameters.total_gross / 2.0 + parameters.direction_tilt_delta * direction
+        short_gross = parameters.total_gross / 2.0 - parameters.direction_tilt_delta * direction
 
         long_weights = _inverse_volatility_sleeve(
             long_tail,
@@ -254,11 +234,8 @@ class RegimeConditionalTrendCarryStrategy:
         btc_returns: pd.Series,
         funding_pressure: float,
         decision_time: pd.Timestamp,
-        regime: str,
     ) -> _SymbolSignal | None:
         parameters = self._parameters
-        if regime not in {"bull", "bear", "chop"}:
-            return None
         beta_times = pd.date_range(
             end=decision_time,
             periods=3 * parameters.beta_lookback_days,
@@ -283,7 +260,7 @@ class RegimeConditionalTrendCarryStrategy:
         drift_end = decision_time - pd.Timedelta(days=parameters.skip_days)
         drift_times = pd.date_range(
             end=drift_end,
-            periods=3 * parameters.signal_lookback_days,
+            periods=3 * parameters.residual_lookback_days,
             freq=_BAR_INTERVAL,
         )
         symbol_drift = symbol_returns.reindex(drift_times).to_numpy(dtype=float)
@@ -293,18 +270,17 @@ class RegimeConditionalTrendCarryStrategy:
         residuals = symbol_drift - beta * btc_drift
         if not np.isfinite(residuals).all() or residuals.size < 2:
             return None
-        signal_returns = symbol_drift if regime == "bear" else residuals
-        signal_sum = float(np.sum(signal_returns))
-        signal_volatility = float(np.std(signal_returns, ddof=1))
-        if not math.isfinite(signal_volatility) or signal_volatility <= _EPSILON:
+        residual_sum = float(np.sum(residuals))
+        residual_volatility = float(np.std(residuals, ddof=1))
+        if not math.isfinite(residual_volatility) or residual_volatility <= _EPSILON:
             return None
-        path_length = float(np.sum(np.abs(signal_returns)))
+        path_length = float(np.sum(np.abs(residuals)))
         if not math.isfinite(path_length) or path_length <= 1.0e-8:
             return None
-        standardized = signal_sum / max(
-            signal_volatility * math.sqrt(float(signal_returns.size)), 1.0e-8
+        standardized = residual_sum / max(
+            residual_volatility * math.sqrt(float(residuals.size)), 1.0e-8
         )
-        efficiency = abs(signal_sum) / max(path_length, 1.0e-8)
+        efficiency = abs(residual_sum) / max(path_length, 1.0e-8)
         drift = standardized * efficiency**parameters.path_efficiency_exponent
         if not math.isfinite(drift):
             return None
@@ -313,7 +289,7 @@ class RegimeConditionalTrendCarryStrategy:
             symbol=symbol,
             drift=float(drift),
             funding=funding_pressure,
-            signal_volatility=signal_volatility,
+            residual_volatility=residual_volatility,
         )
 
 
@@ -470,38 +446,21 @@ def _select_signed_tails(
     return short_tail, long_tail
 
 
-def _btc_regime_direction(
+def _btc_direction(
     closes: pd.Series,
     *,
     decision_time: pd.Timestamp,
     lookback_days: int,
-    lag_days: int,
     scale: float,
-    bull_threshold: float,
-    bear_threshold: float,
-) -> _RegimeDirection | None:
-    anchor_time = decision_time - pd.Timedelta(days=lag_days)
-    past_time = anchor_time - pd.Timedelta(days=lookback_days)
-    if anchor_time not in closes.index or past_time not in closes.index:
-        return None
-    latest = float(closes.loc[anchor_time])
+) -> float:
+    past_time = decision_time - pd.Timedelta(days=lookback_days)
+    if decision_time not in closes.index or past_time not in closes.index:
+        return 0.0
+    latest = float(closes.loc[decision_time])
     past = float(closes.loc[past_time])
     if not math.isfinite(latest) or not math.isfinite(past) or latest <= 0.0 or past <= 0.0:
-        return None
-    log_return = math.log(latest / past)
-    if not math.isfinite(log_return):
-        return None
-    if log_return >= bull_threshold:
-        state = "bull"
-    elif log_return <= bear_threshold:
-        state = "bear"
-    else:
-        state = "chop"
-    return _RegimeDirection(
-        state=state,
-        scaled_direction=float(np.clip(log_return / scale, -1.0, 1.0)),
-        log_return=float(log_return),
-    )
+        return 0.0
+    return float(np.clip(math.log(latest / past) / scale, -1.0, 1.0))
 
 
 def _inverse_volatility_sleeve(
@@ -595,7 +554,7 @@ def _valid_targets(
     )
 
 
-def build_strategy() -> RegimeConditionalTrendCarryStrategy:
-    """Return a fresh rctc-pivot-ref-001 instance for the canonical worker."""
+def build_strategy() -> ResidualDriftFundingStrategy:
+    """Return a fresh rdf-core-h14-k3-g05 strategy instance for the canonical worker."""
 
-    return RegimeConditionalTrendCarryStrategy(PIVOT_REFERENCE_PARAMETERS)
+    return ResidualDriftFundingStrategy(REFERENCE_PARAMETERS)

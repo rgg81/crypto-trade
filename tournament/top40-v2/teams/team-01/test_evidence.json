@@ -1,55 +1,67 @@
 {
-  "artifact": "qe_test_evidence_placeholder",
+  "artifact": "qe_test_evidence",
   "baseline_comparison": {
-    "baseline_candidate_id": "rdf-core-h14-k3-g05-r1",
-    "baseline_family_status": "stopped",
-    "material_pivot_delta": "Causally classify BTC state from its 60-day log return ending t-1d; keep H14 residual continuation in bull/chop and switch only bear ranking and sizing returns to raw asset trend."
+    "baseline_candidate_id": "rdf-ref-001",
+    "only_material_core_coordinate_delta": {
+      "residual_lookback_days": {
+        "from": 21,
+        "to": 14
+      }
+    }
   },
-  "candidate_id": "rctc-pivot-ref-001",
+  "candidate_id": "rdf-core-h14-k3-g05",
   "central_evaluator_invoked": false,
   "clean_process_replays": {
-    "canonical_synthetic_target_sha256": null,
-    "identical": null,
-    "runtime_seed": 20260801,
-    "suite_replay_count": 0
+    "canonical_synthetic_target_sha256": "ebf2cce8ba380674f001cd852dcdb7cc6decbaaeed40ab07bd8ebb677e12977f",
+    "identical": true,
+    "suite_replay_count": 2,
+    "runtime_seed": 20260801
   },
-  "created_at_utc": null,
-  "dependencies_tested": null,
+  "created_at_utc": "2026-07-16T09:40:12Z",
+  "dependencies_tested": {
+    "numpy": "2.2.6",
+    "pandas": "3.0.0",
+    "python": "3.13.12"
+  },
   "files_sha256": {
-    "frozen_config.json": null,
-    "risk_policy.json": null,
-    "strategy.py": null,
-    "test_strategy.py": null
+    "frozen_config.json": "46240258793fa9cb54626a42fc467e897fa46dc354e47e72ca458f899b77d877",
+    "risk_policy.json": "9efd1401ffec46a7767fe625d70538b1aa5a9281a46fdb1bc06e90c264dc7e5b",
+    "strategy.py": "0f138479ee60dd03241abc7a3664ea80fc7f897763b81a8aad0ad1eb0800c6a4",
+    "test_strategy.py": "7cd0004b16a7632822b80a14f2d6ed4a5a7489e41b317672f14b5df5f7493847"
   },
-  "family_id": "t01-regime-conditional-trend-carry-v2",
-  "historical_unchanged_risk_policy_sha256_recompute_required": "9efd1401ffec46a7767fe625d70538b1aa5a9281a46fdb1bc06e90c264dc7e5b",
+  "family_id": "t01-residual-drift-funding-v1",
   "official_worker_smoke": {
-    "direct_targets_matched": null,
+    "direct_targets_matched": true,
     "namespaced_worker": true,
-    "synthetic_only": true
+    "process_count_per_suite": 2,
+    "suite_replay_count": 2,
+    "synthetic_only": true,
+    "total_process_count": 4
   },
   "result": {
-    "duration_seconds": null,
-    "failed": null,
-    "passed": null,
-    "status": "pending_not_run"
+    "duration_seconds": [
+      2.68,
+      2.66
+    ],
+    "failed": 0,
+    "passed": 14
   },
   "schema_version": 1,
-  "suite_command": "python -m pytest -q tournament/top40-v2/teams/team-01/test_strategy.py",
-  "synthetic_checks_declared": [
-    "fresh pivot factory instances and repeatable bounded targets",
+  "suite_command": "PYTHONDONTWRITEBYTECODE=1 uv run pytest tournament/top40-v2/teams/team-01/test_strategy.py -q",
+  "synthetic_checks": [
+    "fresh factory instances and repeated deterministic targets",
     "canonical runtime seed and daily hold/rebalance semantics",
     "future append, future corruption, and unexposed-open invariance",
     "strict exclusion of funding_time equal to or after the decision",
     "point-in-time eligible membership removal",
-    "positive funding lowers score and negative funding raises it",
+    "positive funding lowers the score and negative funding raises it",
     "ascending-symbol score tie break",
-    "exact H14 residual formula in chop and bull",
-    "exact H14 raw-trend formula and raw sample volatility in bear",
-    "one-day-lagged BTC 60-day state, inclusive thresholds, and missing-anchor flat behavior",
-    "duplicate, non-finite, sparse-history, missing-BTC, and one-sided-flat behavior",
-    "official namespaced-worker synthetic targets equal direct targets twice",
-    "frozen rctc-pivot-ref-001 parameters and unchanged no-control policy"
+    "exact H14 residual window effect versus the otherwise identical H21 solvent baseline",
+    "all non-horizon frozen coordinates equal the solvent baseline binding",
+    "two independent official namespaced-worker synthetic runs equal direct targets",
+    "duplicate, NaN, Inf, sparse-history, missing-BTC, and one-sided-flat behavior",
+    "eligible-only finite outputs with gross, net, per-symbol, and two-sleeve bounds",
+    "frozen rdf-core-h14-k3-g05 parameters and byte-identical no-control risk policy"
   ],
   "team_id": "team-01"
 }
