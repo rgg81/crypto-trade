@@ -27,10 +27,12 @@ if str(TEAM_DIR) not in sys.path:
 import candidate_variant  # noqa: E402
 import strategy  # noqa: E402
 
+DEFAULT_DECISION = pd.Timestamp(year=2023, month=6, day=30, tz="UTC")
+
 
 def _synthetic_context(
     *,
-    decision_time: str | pd.Timestamp = "2023-06-30T00:00:00Z",
+    decision_time: pd.Timestamp = DEFAULT_DECISION,
     symbol_count: int = 24,
 ):
     decision = pd.Timestamp(decision_time)
@@ -239,7 +241,7 @@ def test_score_capture_does_not_change_frozen_candidate_bytes(monkeypatch) -> No
 
 
 def test_non_rebalance_holds_and_insufficient_universe_requests_flat() -> None:
-    off_schedule = _synthetic_context(decision_time="2023-06-30T08:00:00Z")
+    off_schedule = _synthetic_context(decision_time=DEFAULT_DECISION + pd.Timedelta(hours=8))
     assert strategy.build_strategy().target_weights(off_schedule, seed=strategy.FROZEN_SEED) is None
 
     too_small = _synthetic_context(symbol_count=11)
